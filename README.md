@@ -1,6 +1,6 @@
-# Blendersito (nombre provisional)
+# Whisk 3D (Ex Blendersito)
 
-ENGLISH: Blendersito is a Blender clone, developed from scratch for Symbian s60v3.
+ENGLISH: Whisk3D is a Blender clone, developed from scratch for Symbian s60v3.
 
 YouTube: [Youtube Video](https://youtu.be/dMe-Vit5OT0)
 
@@ -9,10 +9,10 @@ Clarifications:
 2) Basic functionality: The program is basic, and some media have exaggerated its current capabilities.
 3) Future updates: The ability to model, render, animate, and more is in development. Updates will be shared on social media.
 4) Planned obsolescence: The project's goal is to highlight the planned obsolescence of phones, both those from 18 years ago and current models. I aim to generate consumer demand for more sustainable and durable phones, reducing the vast amount of electronic waste. This would also help more people access technology through the recycling of these old devices.
-5) Knowledge in computing: We want to highlight the general lack of knowledge in computing. It shouldn't be surprising that Blendersito works on a Nokia N95, a phone that was top-of-the-line in its time, comparable to today's iPhone 15 Pro Max. I want to make it clear that with 300 MHz and 128 MB of RAM, tasks that today require phones with 8 GB of RAM and multicore processors can be performed.
-6) Use of the Blender logo: The Blender logo belongs to the Blender Foundation. I would like to discuss with the foundation the possibility of splitting the project into two: one entirely free as a 3D game engine with its own identity, and another that can be part of the Blender Foundation, using its logo and assets to avoid multiple clones of the project (as happens with Linux distributions). It would also be interesting if Blendersito could become compatible with the traditional Blender. The idea is to create something that adds value. "The Freedom to Create". Blender does a great job in this regard, and Blendersito is just a way to allow more people to enter this wonderful world.
-7) Rendering and ray tracing: Blendersito can already perform renderings. Rendering, in computing terms, is the process of generating an image from a 2D or 3D model. While I haven't implemented ray tracing yet, the Nokia N95 is capable of it through its CPU and FPU (Floating Point Unit). In movies like Terminator 2 and Jurassic Park, SGI Onyx computers from 1993 were used. The Nokia N95, released in 2007, has 14 years of difference and is comparable in terms of power. It is concerning that so many people are surprised that an old phone can perform rendering.
-8) Graphics performance: Blendersito runs smoothly thanks to the N95's hardware graphics acceleration (PowerVR MBX Lite) and its FPU, which allows it to handle complex 3D models like Arthur Morgan from Red Dead Redemption 2.
+5) Knowledge in computing: We want to highlight the general lack of knowledge in computing. It shouldn't be surprising that Whisk 3D works on a Nokia N95, a phone that was top-of-the-line in its time, comparable to today's iPhone 15 Pro Max. I want to make it clear that with 300 MHz and 128 MB of RAM, tasks that today require phones with 8 GB of RAM and multicore processors can be performed.
+6) Use of the Blender logo: The Blender logo belongs to the Blender Foundation. I would like to discuss with the foundation the possibility of splitting the project into two: one entirely free as a 3D game engine with its own identity, and another that can be part of the Blender Foundation, using its logo and assets to avoid multiple clones of the project (as happens with Linux distributions). It would also be interesting if Whisk 3D could become compatible with the traditional Blender. The idea is to create something that adds value. "The Freedom to Create". Blender does a great job in this regard, and Whisk3D is just a way to allow more people to enter this wonderful world.
+7) Rendering and ray tracing: Whisk 3D can already perform renderings. Rendering, in computing terms, is the process of generating an image from a 2D or 3D model. While I haven't implemented ray tracing yet, the Nokia N95 is capable of it through its CPU and FPU (Floating Point Unit). In movies like Terminator 2 and Jurassic Park, SGI Onyx computers from 1993 were used. The Nokia N95, released in 2007, has 14 years of difference and is comparable in terms of power. It is concerning that so many people are surprised that an old phone can perform rendering.
+8) Graphics performance: Whisk 3D runs smoothly thanks to the N95's hardware graphics acceleration (PowerVR MBX Lite) and its FPU, which allows it to handle complex 3D models like Arthur Morgan from Red Dead Redemption 2.
    
  ![](https://pbs.twimg.com/media/GPawZAKWsAA7Rw9?format=png) ![](https://pbs.twimg.com/media/GPawalTWUAAe-J1?format=png)
 
@@ -26,16 +26,16 @@ I highly recommend using Linux, installing an SSD in your PCs, and optimizing yo
 # Thank You!
 Thank you to everyone who shared the project. I hope this effort helps raise awareness and urge companies to manufacture more durable and sustainable phones.
 
-ESPAÑOL: Blendersito es un clon de Blender, desarrollado desde cero para Symbian s60v3.
+ESPAÑOL: Whisk 3D es un clon de Blender, desarrollado desde cero para Symbian s60v3.
 aclaraciones:
 1) No es un port: Este programa no comparte código con el original.
 2) Funcionalidad básica: El programa es básico, y algunos medios han exagerado sus capacidades actuales.
 3) Futuras actualizaciones: Está en desarrollo la capacidad para modelar, renderizar, animar, entre otras funciones. Las novedades se compartirán en redes sociales.
 4) Obsolescencia programada: El objetivo del proyecto es evidenciar la obsolescencia programada de los teléfonos, tanto de hace 18 años como de los actuales. Busco generar una demanda por parte de los consumidores de teléfonos más sostenibles y duraderos, reduciendo la enorme cantidad de residuos electrónicos. tambien ayudaria a que mas gente accesda a la tecnologia gracias al reciclaje de estos antiguos dispositivos.
-5) Conocimiento en informática: Queremos resaltar la falta de conocimiento general en informática. No debería sorprender que Blendersito funcione en un Nokia N95, un teléfono que en su tiempo era de gama alta, comparable con un iPhone 15 Pro Max de hoy. Quiero dejar claro que con 300 MHz y 128 MB de RAM se pueden realizar tareas que hoy en día requieren teléfonos con 8 GB de RAM y procesadores multicore.
-6) Uso del logo de Blender: El logo de Blender pertenece a la Fundación Blender. Me gustaría dialogar con la fundación para dividir el proyecto en dos: uno completamente libre como motor de juegos 3D con su propia identidad, y otro que pueda ser parte de la Fundación Blender, usando su logo y assets para evitar múltiples clones del proyecto (como ocurre con distribuciones de linux). tambien seria interesante ahora si que Blendersito empiece a ser compatible con el blender de toda la vida. La idea es que sea algo que sume. "The Freedom to Create". blender hace un gran trabajo en ese camino, blendersito es solo darle la posibilidad a mas gente de entrar a este hermoso mundo.
-7) Renderización y trazado de rayos: Blendersito ya puede hacer renderizaciones. La renderización, en términos informáticos, es el proceso de generar una imagen a partir de un modelo 2D o 3D. Si bien aún no he implementado el trazado de rayos, el Nokia N95 es capaz de hacerlo mediante su CPU y FPU (Unidad de Punto Flotante). En películas como Terminator 2 y Jurassic Park, se utilizaron computadoras SGI Onyx de 1993. El Nokia N95, lanzado en 2007, tiene 14 años de diferencia y es comparable en cuanto a potencia. Es preocupante que tanta gente se sorprenda de que un teléfono antiguo pueda realizar un render.
-8) Desempeño gráfico: Blendersito se ve fluido gracias a la aceleración gráfica por hardware del N95 (PowerVR MBX Lite) y su FPU, lo que permite mover modelos 3D complejos como Arthur Morgan de Red Dead Redemption 2.
+5) Conocimiento en informática: Queremos resaltar la falta de conocimiento general en informática. No debería sorprender que Whisk 3D funcione en un Nokia N95, un teléfono que en su tiempo era de gama alta, comparable con un iPhone 15 Pro Max de hoy. Quiero dejar claro que con 300 MHz y 128 MB de RAM se pueden realizar tareas que hoy en día requieren teléfonos con 8 GB de RAM y procesadores multicore.
+6) Uso del logo de Blender: El logo de Blender pertenece a la Fundación Blender. Me gustaría dialogar con la fundación para dividir el proyecto en dos: uno completamente libre como motor de juegos 3D con su propia identidad, y otro que pueda ser parte de la Fundación Blender, usando su logo y assets para evitar múltiples clones del proyecto (como ocurre con distribuciones de linux). tambien seria interesante ahora si que Whisk 3D empiece a ser compatible con el blender de toda la vida. La idea es que sea algo que sume. "The Freedom to Create". blender hace un gran trabajo en ese camino, Whisk 3D es solo darle la posibilidad a mas gente de entrar a este hermoso mundo.
+7) Renderización y trazado de rayos: Whisk 3D ya puede hacer renderizaciones. La renderización, en términos informáticos, es el proceso de generar una imagen a partir de un modelo 2D o 3D. Si bien aún no he implementado el trazado de rayos, el Nokia N95 es capaz de hacerlo mediante su CPU y FPU (Unidad de Punto Flotante). En películas como Terminator 2 y Jurassic Park, se utilizaron computadoras SGI Onyx de 1993. El Nokia N95, lanzado en 2007, tiene 14 años de diferencia y es comparable en cuanto a potencia. Es preocupante que tanta gente se sorprenda de que un teléfono antiguo pueda realizar un render.
+8) Desempeño gráfico: Whisk 3D se ve fluido gracias a la aceleración gráfica por hardware del N95 (PowerVR MBX Lite) y su FPU, lo que permite mover modelos 3D complejos como Arthur Morgan de Red Dead Redemption 2.
 
 ![](https://pbs.twimg.com/media/GPawZAKWsAA7Rw9?format=png) ![](https://pbs.twimg.com/media/GPawalTWUAAe-J1?format=png)
 
@@ -71,7 +71,7 @@ Novedades 20/06/2023:
 
 Novedades 8/5/2023:
 1) Ya se puede importar archivos obj!
-![photo Example](https://github.com/Dante-Leoncini/Blendersito/blob/main/capturas/importObj.png?raw=true)
+![photo Example](https://github.com/Dante-Leoncini/Whisk3D/blob/main/capturas/importObj.png?raw=true)
 
 2) tambien se agrego el soporte de luces, camaras y emptys.
 3) Ahora se puede duplicar mallas 3d linkeadas.
@@ -80,44 +80,44 @@ Novedades 8/5/2023:
 6) se agrego el cursor 3d. actualmente se puede hacer un snap al objeto seleccionado y al crear un objeto se crea donde esta el cursor 3d (planeo agregar mas funcionalidades a futuro)
 7) soporte de vertex color (hace falta desactivar la iluminacion y activarlo en el material)
    
-![photo Example](https://github.com/Dante-Leoncini/Blendersito/blob/main/capturas/vertexcolor.png?raw=true)
+![photo Example](https://github.com/Dante-Leoncini/Whisk3D/blob/main/capturas/vertexcolor.png?raw=true)
 
 lo malo... se rompio el modo edicion, el agrupado de vertices y bordes en esta version. cuando este completo el importador, voy a retomar el editor de mallas 3d
 
-![photo Example](https://github.com/Dante-Leoncini/Blendersito/blob/main/capturas/nuevaUI.png?raw=true)
+![photo Example](https://github.com/Dante-Leoncini/Whisk3D/blob/main/capturas/nuevaUI.png?raw=true)
 
 Actualmente permite:
 1) Crear y Eliminar multiples objetos: Suzanne, Cube y Vertice
 
-![photo Example](https://github.com/Dante-Leoncini/Blendersito/blob/main/capturas/Screenshot0007.jpg?raw=true)
-![photo Example](https://github.com/Dante-Leoncini/Blendersito/blob/main/capturas/Screenshot0034.jpg?raw=true)
+![photo Example](https://github.com/Dante-Leoncini/Whisk3D/blob/main/capturas/Screenshot0007.jpg?raw=true)
+![photo Example](https://github.com/Dante-Leoncini/Whisk3D/blob/main/capturas/Screenshot0034.jpg?raw=true)
 
 2) Edicion basica de mallas 3d: Mover vertices, Extruir Vertices, Eliminar Vertices, Seleccionar vertices, Bordes y Caras (se esta trabajando en mas opciones)
 
-![photo Example](https://github.com/Dante-Leoncini/Blendersito/blob/main/capturas/Screenshot0027.jpg?raw=true)
+![photo Example](https://github.com/Dante-Leoncini/Whisk3D/blob/main/capturas/Screenshot0027.jpg?raw=true)
 
 3) Editar la posicion, rotacion y escala de los objetos
 
-![photo Example](https://github.com/Dante-Leoncini/Blendersito/blob/main/capturas/Screenshot0026.jpg?raw=true)
+![photo Example](https://github.com/Dante-Leoncini/Whisk3D/blob/main/capturas/Screenshot0026.jpg?raw=true)
 
 4) poder editar el material, Su color (diffuse), Emission, Specular, Shader Smooth, Cambiar Textura, Cambiar la interpolacion de textura entre Closest y Lineal, Activar/desactivar transparents
 
-![photo Example](https://github.com/Dante-Leoncini/Blendersito/blob/main/capturas/Screenshot0014.jpg)
-![photo Example](https://github.com/Dante-Leoncini/Blendersito/blob/main/capturas/Screenshot0016.jpg?raw=true)
-![photo Example](https://github.com/Dante-Leoncini/Blendersito/blob/main/capturas/Screenshot0024.jpg)
-![photo Example](https://github.com/Dante-Leoncini/Blendersito/blob/main/capturas/Screenshot0023.jpg)
-![photo Example](https://github.com/Dante-Leoncini/Blendersito/blob/main/capturas/Screenshot0025.jpg)
+![photo Example](https://github.com/Dante-Leoncini/Whisk3D/blob/main/capturas/Screenshot0014.jpg)
+![photo Example](https://github.com/Dante-Leoncini/Whisk3D/blob/main/capturas/Screenshot0016.jpg?raw=true)
+![photo Example](https://github.com/Dante-Leoncini/Whisk3D/blob/main/capturas/Screenshot0024.jpg)
+![photo Example](https://github.com/Dante-Leoncini/Whisk3D/blob/main/capturas/Screenshot0023.jpg)
+![photo Example](https://github.com/Dante-Leoncini/Whisk3D/blob/main/capturas/Screenshot0025.jpg)
 
 5) Poder entrar en Modo Object y Modo Edicion
 6) proyeccion en perspectiva/orthographic, poder mover la camara a una vista superior, de perfil o frente (trabajando en mas funciones)
 
-![photo Example](https://github.com/Dante-Leoncini/Blendersito/blob/main/capturas/mejores%20(1).jpg?raw=true)
+![photo Example](https://github.com/Dante-Leoncini/Whisk3D/blob/main/capturas/mejores%20(1).jpg?raw=true)
 
 7) Poder cambiar la vista 3d entre Material preview, Solid y Wireframe
 
-![photo Example](https://github.com/Dante-Leoncini/Blendersito/blob/main/capturas/Screenshot0034.jpg)
-![photo Example](https://github.com/Dante-Leoncini/Blendersito/blob/main/capturas/Screenshot0036.jpg)
-![photo Example](https://github.com/Dante-Leoncini/Blendersito/blob/main/capturas/Screenshot0038.jpg)
+![photo Example](https://github.com/Dante-Leoncini/Whisk3D/blob/main/capturas/Screenshot0034.jpg)
+![photo Example](https://github.com/Dante-Leoncini/Whisk3D/blob/main/capturas/Screenshot0036.jpg)
+![photo Example](https://github.com/Dante-Leoncini/Whisk3D/blob/main/capturas/Screenshot0038.jpg)
 
 8) trabajando en una opcion para importar/exportar modelos .OBJ
 
