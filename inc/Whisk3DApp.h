@@ -1,38 +1,38 @@
 /*
  * ==============================================================================
- *  Name        : BlendersitoApp.h
- *  Part of     : OpenGLEx / Blendersito
+ *  Name        : Whisk3DApp.h
+ *  Part of     : OpenGLEx / Whisk3D
  * ==============================================================================
  */
 
-#ifndef BLENDERSITOAPP_H
-#define BLENDERSITOAPP_H
+#ifndef WHISK3DAPP_H
+#define WHISK3DAPP_H
 
 // INCLUDES
 #include <aknapp.h>
 
 // CONSTANTS
 /** UID of the application. */
-const TUid KUidBlendersito = { 0xA00D021D };
+const TUid KUidWhisk3D = { 0xA00D021D };
 
 // CLASS DECLARATION
 
 /**
  * Application class. Provides factory method to create a concrete document object.
  */
-class CBlendersitoApp : public CAknApplication
+class CWhisk3DApp : public CAknApplication
     {
     private: // Functions from base classes
 
         /**
-         * From CApaApplication, creates and returns CBlendersitoDocument document object.
+         * From CApaApplication, creates and returns CWhisk3DDocument document object.
          * @return Pointer to the created document object.
          */
         CApaDocument* CreateDocumentL();
 
         /**
-         * From CApaApplication, returns application's UID (KUidBlendersito).
-         * @return Value of KUidBlendersito.
+         * From CApaApplication, returns application's UID (KUidWhisk3D).
+         * @return Value of KUidWhisk3D.
          */
         TUid AppDllUid() const;
     };

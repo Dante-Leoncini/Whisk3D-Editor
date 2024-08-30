@@ -1,12 +1,12 @@
 /*
  * ==============================================================================
- *  Name        : Blendersito.h
- *  Part of     : OpenGLEx / Blendersito
+ *  Name        : Whisk3D.h
+ *  Part of     : OpenGLEx / Whisk3D
  * ==============================================================================
  */
 
-#ifndef BLENDERSITO_H
-#define BLENDERSITO_H
+#ifndef WHISK3D_H
+#define WHISK3D_H
 
 // INCLUDES
 #include <e32base.h> // for CBase definition
@@ -14,13 +14,13 @@
 #include <GLES/gl.h> // OpenGL ES header file
 #include "Utils3d.h" // Utilities (texmanager, textures etc.)
 #include "Glutils.h" // Misc GLU and GLUT functions
-#include "Blendersitoinput.h"
+#include "Whisk3Dinput.h"
 
 //para el cuadro de wait
 #include <AknWaitDialog.h>
 
 // Forward declaration de Object
-//class CBlendersitoContainer;
+//class CWhisk3DContainer;
 class Object;
 
 // MACROS
@@ -40,7 +40,7 @@ class Mesh;
 /**
  * Class that does the actual OpenGL ES rendering.
  */
-class CBlendersito : public CFiniteStateMachine, public MTextureLoadingListener
+class CWhisk3D : public CFiniteStateMachine, public MTextureLoadingListener
     {
     public:  // Constructors and destructor
 
@@ -48,12 +48,12 @@ class CBlendersito : public CFiniteStateMachine, public MTextureLoadingListener
          * Factory method for creating a new CSimpleCube object.
          * @param iInputHandler Input handler that maps keycodes to inputs and stores the current state for each key.
          */
-        static CBlendersito* NewL( TUint aWidth, TUint aHeight, CBlendersitoInput* aInputHandler);
+        static CWhisk3D* NewL( TUint aWidth, TUint aHeight, CWhisk3DInput* aInputHandler);
 
         /**
          * Destructor. Does nothing.
          */
-        virtual ~CBlendersito();
+        virtual ~CWhisk3D();
             
     public:  // New functions
         
@@ -277,7 +277,7 @@ class CBlendersito : public CFiniteStateMachine, public MTextureLoadingListener
          * @param aWidth Width of the screen.
          * @param aHeight Height of the screen.
          */
-        CBlendersito( TUint aWidth, TUint aHeight, CBlendersitoInput* aInputHandler );
+        CWhisk3D( TUint aWidth, TUint aHeight, CWhisk3DInput* aInputHandler );
 
         /**
          * Second phase contructor. Does nothing.
@@ -333,7 +333,7 @@ class CBlendersito : public CFiniteStateMachine, public MTextureLoadingListener
     private:  // Data
         CAknWaitDialog* iWaitDialog;
 
-        //CBlendersitoContainer*    iContainer;
+        //CWhisk3DContainer*    iContainer;
 
 		/** Texture manager that is used to load the used textures. */
 		CTextureManager * iTextureManager;
@@ -362,7 +362,7 @@ class CBlendersito : public CFiniteStateMachine, public MTextureLoadingListener
 		 * Input handler that maps keycodes to inputs and stores the current state
 		 * for each key. Owned by the C#Name#Container.
 		 */
-		CBlendersitoInput* iInputHandler;
+		CWhisk3DInput* iInputHandler;
     };
 
-#endif // BLENDERSITO_H
+#endif // WHISK3D_H

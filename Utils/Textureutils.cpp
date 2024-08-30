@@ -13,7 +13,7 @@
 
 #include "Textureutils.h"
 
-#include <blendersito.rsg>
+#include <whisk3D.rsg>
 #include <aknmessagequerydialog.h>		// DialogAlertL
 TBool CTextureManager::DialogAlert(HBufC* noteBuf) {
     TBool retVal(EFalse);

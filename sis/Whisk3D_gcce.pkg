@@ -2,7 +2,7 @@
 &EN
 
 ;Header
-#{"Blendersito"}, (0xA00D021D), 1, 0, 0,TYPE=SA
+#{"Whisk3D"}, (0xA00D021D), 1, 0, 0,TYPE=SA
 
 ;Localised Vendor name
 %{"Vendor-EN"}
@@ -14,10 +14,10 @@
 [0x101F7961], 0, 0, 0, {"Series60ProductID"}
 
 ;Files to install
-"..\..\..\..\epoc32\release\gcce\urel\Blendersito.exe"                       -"!:\sys\bin\Blendersito.exe"
-"..\..\..\..\epoc32\data\z\resource\apps\Blendersito.RSC"                    -"!:\resource\apps\Blendersito.RSC"
-"..\..\..\..\epoc32\data\Z\private\10003a3f\import\apps\blendersito_reg.RSC" -"!:\private\10003a3f\import\apps\blendersito_reg.RSC"
-"..\..\..\..\epoc32\data\z\resource\apps\blendersito_icon.mif"  			        -"!:\resource\apps\blendersito_icon.mif"
+"..\..\..\..\epoc32\release\gcce\urel\Whisk3D.exe"                       -"!:\sys\bin\Whisk3D.exe"
+"..\..\..\..\epoc32\data\z\resource\apps\Whisk3D.RSC"                    -"!:\resource\apps\Whisk3D.RSC"
+"..\..\..\..\epoc32\data\Z\private\10003a3f\import\apps\whisk3D_reg.RSC" -"!:\private\10003a3f\import\apps\whisk3D_reg.RSC"
+"..\..\..\..\epoc32\data\z\resource\apps\whisk3D_icon.mif"  			        -"!:\resource\apps\whisk3D_icon.mif"
 
 "..\inc\texturas\origen.png"   -"!:\private\A00D021D\origen.png"
 "..\inc\texturas\lamp.png"   -"!:\private\A00D021D\lamp.png"

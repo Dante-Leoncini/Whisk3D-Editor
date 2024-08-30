@@ -1,15 +1,15 @@
 /*
  * ==============================================================================
- *  Name        : BlendersitoAppUi.cpp
- *  Part of     : OpenGLEx / Blendersito
+ *  Name        : Whisk3DAppUi.cpp
+ *  Part of     : OpenGLEx / Whisk3D
  * ==============================================================================
  */
 
 // INCLUDE FILES
-#include "BlendersitoAppUi.h"
-#include "BlendersitoContainer.h"
-#include <Blendersito.rsg>
-#include "blendersito.hrh"
+#include "Whisk3DAppUi.h"
+#include "Whisk3DContainer.h"
+#include <Whisk3D.rsg>
+#include "whisk3D.hrh"
 
 #include <eikmenup.h>
 #include <avkon.hrh>
@@ -20,20 +20,20 @@
 // ================= MEMBER FUNCTIONS =======================
 //
 // ----------------------------------------------------------
-// CBlendersitoAppUi::ConstructL
+// CWhisk3DAppUi::ConstructL
 // Symbian 2nd phase constructor can leave.
 // ----------------------------------------------------------
 //
-void CBlendersitoAppUi::ConstructL(){
+void CWhisk3DAppUi::ConstructL(){
     BaseConstructL();
-    iAppContainer = new (ELeave) CBlendersitoContainer;
+    iAppContainer = new (ELeave) CWhisk3DContainer;
     iAppContainer->SetMopParent(this);
     iAppContainer->ConstructL( ClientRect() );
     AddToStackL( iAppContainer );
 }
 
 // Destructor
-CBlendersitoAppUi::~CBlendersitoAppUi(){
+CWhisk3DAppUi::~CWhisk3DAppUi(){
 	if ( iAppContainer ){
 		RemoveFromStack( iAppContainer );
 		delete iAppContainer;
@@ -41,7 +41,7 @@ CBlendersitoAppUi::~CBlendersitoAppUi(){
 }
 
 // ------------------------------------------------------------------------------
-//  CBlendersitoAppUi::DynInitMenuPaneL
+//  CWhisk3DAppUi::DynInitMenuPaneL
 //  This function is called by the EIKON framework just before it displays
 //  a menu pane. Its default implementation is empty, and by overriding it,
 //  the application can set the state of menu items dynamically according
@@ -55,9 +55,9 @@ enum{
 
 enum {Solid, MaterialPreview, Wireframe, Rendered};
 
-void CBlendersitoAppUi::DynInitMenuPaneL(TInt aResourceId, CEikMenuPane* aMenuPane ){
+void CWhisk3DAppUi::DynInitMenuPaneL(TInt aResourceId, CEikMenuPane* aMenuPane ){
     //para trabajar mas facil
-    CBlendersito& BL = *(iAppContainer->iBlendersito); 
+    CWhisk3D& BL = *(iAppContainer->iWhisk3D); 
     //BL.InteractionMode = ...;
 
     //prepara el menu de materiales    
@@ -75,7 +75,7 @@ void CBlendersitoAppUi::DynInitMenuPaneL(TInt aResourceId, CEikMenuPane* aMenuPa
         //TPtrC16 itemText(unicodeText);
         TPtrC8 itemText = L"Nombre del elemento de men�";
 
-		TBlendersitoMenuCommands menuCommand = EBlendersitoOrigenSetOrigen;  // Suponiendo que EBlendersitoCommand es una constante o enumeraci�n v�lida
+		TWhisk3DMenuCommands menuCommand = EWhisk3DOrigenSetOrigen;  // Suponiendo que EWhisk3DCommand es una constante o enumeraci�n v�lida
 		
 		CEikMenuPaneItem::SData menuItemData;
 		menuItemData.iCommandId = menuCommand;  // Asigna el ID de comando de tu men�
@@ -84,14 +84,14 @@ void CBlendersitoAppUi::DynInitMenuPaneL(TInt aResourceId, CEikMenuPane* aMenuPa
 		aMenuPane->InsertMenuItemL(menuItemData, 2);
         
         // Agrega los nombres de materiales como elementos de men�
-		//for (TInt i = 0; i < iAppContainer->iBlendersito->Materials.Count(); ++i){
+		//for (TInt i = 0; i < iAppContainer->iWhisk3D->Materials.Count(); ++i){
 			//TInt commandId = EAknCmdEmpty + i; // Asigna un ID de comando �nico para cada elemento de men�
 		    //_LIT(KTitle, "Selecciona la Textura");
-			//aMenuPane->AddMenuItemL(TPtrC(KTitle), EBlendersitoOrigenSetOrigen);
+			//aMenuPane->AddMenuItemL(TPtrC(KTitle), EWhisk3DOrigenSetOrigen);
 		//}
     }*/
 	//oculta el SetOrigen si no esta en modo edicion
-    if (aResourceId == R_BLENDERSITO_MENU ) {
+    if (aResourceId == R_WHISK3D_MENU ) {
         if (BL.InteractionMode == EditMode) {
 	        if (BL.Objects.Count() > 0){
                 aMenuPane->SetItemDimmed(EViewportObject, EFalse);
@@ -102,12 +102,12 @@ void CBlendersitoAppUi::DynInitMenuPaneL(TInt aResourceId, CEikMenuPane* aMenuPa
                 aMenuPane->SetItemDimmed(EUvMappingMenu, ETrue);
             }
             aMenuPane->SetItemDimmed(ESetOrigenMenu, ETrue);
-            aMenuPane->SetItemDimmed(EBlendersitoSeleccionar, EFalse);
+            aMenuPane->SetItemDimmed(EWhisk3DSeleccionar, EFalse);
             aMenuPane->SetItemDimmed(EViewportAdd, ETrue);            
         } 
         else {
             aMenuPane->SetItemDimmed(ESetOrigenMenu, EFalse);
-            aMenuPane->SetItemDimmed(EBlendersitoSeleccionar, ETrue);
+            aMenuPane->SetItemDimmed(EWhisk3DSeleccionar, ETrue);
             aMenuPane->SetItemDimmed(EViewportAdd, EFalse);
 
             //si hay objetos            
@@ -122,7 +122,7 @@ void CBlendersitoAppUi::DynInitMenuPaneL(TInt aResourceId, CEikMenuPane* aMenuPa
                     if (obj.type == mesh){
                         aMenuPane->SetItemDimmed(ECameraMenu, ETrue); 
                         aMenuPane->SetItemDimmed(EMaterial, EFalse);
-                        aMenuPane->SetItemDimmed(EBlendersitoModificadores, EFalse);
+                        aMenuPane->SetItemDimmed(EWhisk3DModificadores, EFalse);
                         aMenuPane->SetItemDimmed(EUvMappingMenu, EFalse);
                         aMenuPane->SetItemDimmed(ESetOrigenMenu, EFalse);    
                     }
@@ -130,7 +130,7 @@ void CBlendersitoAppUi::DynInitMenuPaneL(TInt aResourceId, CEikMenuPane* aMenuPa
                     else if (obj.type == camera){
                         aMenuPane->SetItemDimmed(ECameraMenu, EFalse); 
                         aMenuPane->SetItemDimmed(EMaterial, ETrue);
-                        aMenuPane->SetItemDimmed(EBlendersitoModificadores, ETrue); 
+                        aMenuPane->SetItemDimmed(EWhisk3DModificadores, ETrue); 
                         aMenuPane->SetItemDimmed(EUvMappingMenu, ETrue);
                         aMenuPane->SetItemDimmed(ESetOrigenMenu, ETrue);
                     }
@@ -138,7 +138,7 @@ void CBlendersitoAppUi::DynInitMenuPaneL(TInt aResourceId, CEikMenuPane* aMenuPa
                     else {
                         aMenuPane->SetItemDimmed(ECameraMenu, ETrue); 
                         aMenuPane->SetItemDimmed(EMaterial, ETrue);
-                        aMenuPane->SetItemDimmed(EBlendersitoModificadores, ETrue); 
+                        aMenuPane->SetItemDimmed(EWhisk3DModificadores, ETrue); 
                         aMenuPane->SetItemDimmed(EUvMappingMenu, ETrue);
                         aMenuPane->SetItemDimmed(ESetOrigenMenu, ETrue);     
                     }                    
@@ -147,7 +147,7 @@ void CBlendersitoAppUi::DynInitMenuPaneL(TInt aResourceId, CEikMenuPane* aMenuPa
                 else {
                     aMenuPane->SetItemDimmed(ECameraMenu, ETrue); 
                     aMenuPane->SetItemDimmed(EMaterial, ETrue);
-                    aMenuPane->SetItemDimmed(EBlendersitoModificadores, ETrue);  
+                    aMenuPane->SetItemDimmed(EWhisk3DModificadores, ETrue);  
                     aMenuPane->SetItemDimmed(EUvMappingMenu, ETrue);  
                     aMenuPane->SetItemDimmed(ESetOrigenMenu, ETrue);  
                     aMenuPane->SetItemDimmed(ETransformMenu, ETrue);  
@@ -157,7 +157,7 @@ void CBlendersitoAppUi::DynInitMenuPaneL(TInt aResourceId, CEikMenuPane* aMenuPa
             }
             else {
                 aMenuPane->SetItemDimmed(ECameraMenu, ETrue); 
-                aMenuPane->SetItemDimmed(EBlendersitoModificadores, ETrue);  
+                aMenuPane->SetItemDimmed(EWhisk3DModificadores, ETrue);  
                 aMenuPane->SetItemDimmed(EMaterial, ETrue);
                 aMenuPane->SetItemDimmed(EViewportObject, ETrue);
                 aMenuPane->SetItemDimmed(EUvMappingMenu, ETrue);
@@ -196,50 +196,50 @@ void CBlendersitoAppUi::DynInitMenuPaneL(TInt aResourceId, CEikMenuPane* aMenuPa
     }
     else if (aResourceId == R_VIEWPORT_OVERLEY_MENU ) {
         // Texto para setear la pantalla ancha
-        if ( iAppContainer->iBlendersito->iWidescreenEnabled ){
-            aMenuPane->SetItemTextL( EBlendersitoWidescreen, R_WIDESCREEN_OFF );
+        if ( iAppContainer->iWhisk3D->iWidescreenEnabled ){
+            aMenuPane->SetItemTextL( EWhisk3DWidescreen, R_WIDESCREEN_OFF );
             }
         else {
-            aMenuPane->SetItemTextL( EBlendersitoWidescreen, R_WIDESCREEN_ON  );
+            aMenuPane->SetItemTextL( EWhisk3DWidescreen, R_WIDESCREEN_ON  );
         }
-        if ( iAppContainer->iBlendersito->showOverlays ){
+        if ( iAppContainer->iWhisk3D->showOverlays ){
             aMenuPane->SetItemTextL( EViewportSetOverlay, R_HIDEOVERLAY );
         }
         else {
             aMenuPane->SetItemTextL( EViewportSetOverlay, R_SHOWOVERLAY  );
         } 
-        if ( iAppContainer->iBlendersito->show3DCursor ){
+        if ( iAppContainer->iWhisk3D->show3DCursor ){
             aMenuPane->SetItemTextL( EViewportSet3DCursor, R_HIDE3DCURSOR );
         }
         else {
             aMenuPane->SetItemTextL( EViewportSet3DCursor, R_SHOW3DCURSOR  );
         } 
 
-        if ( iAppContainer->iBlendersito->showFloor ){
+        if ( iAppContainer->iWhisk3D->showFloor ){
             aMenuPane->SetItemTextL( EViewportSetShowFloor, R_HIDEFLOOR );
         }
         else {
             aMenuPane->SetItemTextL( EViewportSetShowFloor, R_SHOWFLOOR  );
         } 
-        if ( iAppContainer->iBlendersito->showYaxis ){
+        if ( iAppContainer->iWhisk3D->showYaxis ){
             aMenuPane->SetItemTextL( EViewportSetShowYaxis, R_HIDEYAXIS );
         }
         else {
             aMenuPane->SetItemTextL( EViewportSetShowYaxis, R_SHOWYAXIS  );
         } 
-        if ( iAppContainer->iBlendersito->showXaxis ){
+        if ( iAppContainer->iWhisk3D->showXaxis ){
             aMenuPane->SetItemTextL( EViewportSetShowXaxis, R_HIDEXAXIS );
         }
         else {
             aMenuPane->SetItemTextL( EViewportSetShowXaxis, R_SHOWXAXIS  );
         } 
-        if ( iAppContainer->iBlendersito->showOutlineSelect ){
+        if ( iAppContainer->iWhisk3D->showOutlineSelect ){
             aMenuPane->SetItemTextL( EViewportSetOutlineSelect, R_HIDEOUTLINESELECT );
         }
         else {
             aMenuPane->SetItemTextL( EViewportSetOutlineSelect, R_SHOWOUTLINESELECT  );
         } 
-        if ( iAppContainer->iBlendersito->showOrigins ){
+        if ( iAppContainer->iWhisk3D->showOrigins ){
             aMenuPane->SetItemTextL( EViewportSetOrigins, R_HIDEORIGIN );
         }
         else {
@@ -247,13 +247,13 @@ void CBlendersitoAppUi::DynInitMenuPaneL(TInt aResourceId, CEikMenuPane* aMenuPa
         }    
     }  
     else if (aResourceId == R_TIMELINE_MENU ) {
-        if ( iAppContainer->iBlendersito->PlayAnimation ){
+        if ( iAppContainer->iWhisk3D->PlayAnimation ){
             aMenuPane->SetItemTextL( ETimelinePlayStop, R_STOP );
         }
         else {
             aMenuPane->SetItemTextL( ETimelinePlayStop, R_PLAY );
         }
-        if ( iAppContainer->iBlendersito->ShowTimeline ){
+        if ( iAppContainer->iWhisk3D->ShowTimeline ){
             aMenuPane->SetItemTextL( ETimelineShowTimeline, R_HIDE_TIMELINE );
         }
         else {
@@ -263,12 +263,12 @@ void CBlendersitoAppUi::DynInitMenuPaneL(TInt aResourceId, CEikMenuPane* aMenuPa
 }
 
 // ----------------------------------------------------
-// CBlendersitoAppUi::HandleKeyEventL
+// CWhisk3DAppUi::HandleKeyEventL
 // Key event handler
 // ----------------------------------------------------
 //
-TKeyResponse CBlendersitoAppUi::HandleKeyEventL(const TKeyEvent& aKeyEvent, TEventCode aType ){
-    if ( iAppContainer->iBlendersito->GetState() == CBlendersito::ERunning ){   
+TKeyResponse CWhisk3DAppUi::HandleKeyEventL(const TKeyEvent& aKeyEvent, TEventCode aType ){
+    if ( iAppContainer->iWhisk3D->GetState() == CWhisk3D::ERunning ){   
         TUint scan = aKeyEvent.iScanCode;
             
         // Imprimir el código de escaneo para depuración
@@ -276,144 +276,144 @@ TKeyResponse CBlendersitoAppUi::HandleKeyEventL(const TKeyEvent& aKeyEvent, TEve
             HBufC* noteBuf = HBufC::NewLC(100);
             _LIT(KFormatString, "Scan Code: %d\naType: %d");
             noteBuf->Des().Format(KFormatString, scan, aType);			
-            iAppContainer->iBlendersito->DialogAlert(noteBuf);
+            iAppContainer->iWhisk3D->DialogAlert(noteBuf);
         }*/
 
         if (aType == EEventKeyDown) {
 			switch(scan){    
                 /*case EKeyIncVolume: // Volumen arriba
-                    iAppContainer->iBlendersito->SetPosicion();
+                    iAppContainer->iWhisk3D->SetPosicion();
                     return EKeyWasConsumed;
                 case EKeyDecVolume: // Volumen abajo
-                    iAppContainer->iBlendersito->SetPosicion();
+                    iAppContainer->iWhisk3D->SetPosicion();
                     return EKeyWasConsumed;
                 case(162): //volumen arriba
-                    iAppContainer->iBlendersito->SetPosicion();
+                    iAppContainer->iWhisk3D->SetPosicion();
                     return EKeyWasNotConsumed;
                 case(163): //volumen abajo
-                    iAppContainer->iBlendersito->SetPosicion();
+                    iAppContainer->iWhisk3D->SetPosicion();
                     return EKeyWasNotConsumed;*/
                 case EStdKeyEscape: // Código estándar para la tecla ESC
-                    iAppContainer->iBlendersito->Cancelar(); // Llama a tu función Cancelar
+                    iAppContainer->iWhisk3D->Cancelar(); // Llama a tu función Cancelar
                     return EKeyWasConsumed;                
                 /*case(14): //izquierda
-                    //iAppContainer->iBlendersito->Rotar(1);
-                    iAppContainer->iBlendersito->Tab();
+                    //iAppContainer->iWhisk3D->Rotar(1);
+                    iAppContainer->iWhisk3D->Tab();
                     return EKeyWasConsumed;
                 case(15): //derecha
-                    //iAppContainer->iBlendersito->Rotar(2);
-                    iAppContainer->iBlendersito->Tab();
+                    //iAppContainer->iWhisk3D->Rotar(2);
+                    iAppContainer->iWhisk3D->Tab();
                     return EKeyWasConsumed;
                 case(16): //arriba
-                    //iAppContainer->iBlendersito->NextPos(0,1);
-                    iAppContainer->iBlendersito->Tab();
+                    //iAppContainer->iWhisk3D->NextPos(0,1);
+                    iAppContainer->iWhisk3D->Tab();
                     return EKeyWasConsumed;
                 case(17): //abajo
-                    //iAppContainer->iBlendersito->NextPos(8,1);
-                    iAppContainer->iBlendersito->Tab();
+                    //iAppContainer->iWhisk3D->NextPos(8,1);
+                    iAppContainer->iWhisk3D->Tab();
                     return EKeyWasConsumed;*/     
                 case(5): //Space
-                    iAppContainer->iBlendersito->ToggleValue(iAppContainer->iBlendersito->PlayAnimation);
+                    iAppContainer->iWhisk3D->ToggleValue(iAppContainer->iWhisk3D->PlayAnimation);
                     return EKeyWasConsumed;
                 case(18): //left Shift
                 case(19): //rigth Shift
-                    iAppContainer->iBlendersito->iShiftPressed = ETrue;
+                    iAppContainer->iWhisk3D->iShiftPressed = ETrue;
                     return EKeyWasConsumed;
                 case(22): //left Ctrl
-                    iAppContainer->iBlendersito->iCtrlPressed = ETrue;
+                    iAppContainer->iWhisk3D->iCtrlPressed = ETrue;
                     return EKeyWasConsumed;
                 case(20): //left  Alt
-                    iAppContainer->iBlendersito->iAltPressed = ETrue;
+                    iAppContainer->iWhisk3D->iAltPressed = ETrue;
                     return EKeyWasConsumed;
                 case(1): //Delete
-                    iAppContainer->iBlendersito->Borrar();
+                    iAppContainer->iWhisk3D->Borrar();
                     return EKeyWasConsumed;
                 case(49): //1
-                    iAppContainer->iBlendersito->TecladoNumerico(1);
+                    iAppContainer->iWhisk3D->TecladoNumerico(1);
                     return EKeyWasConsumed;
                 case(50): //2
-                    iAppContainer->iBlendersito->TecladoNumerico(2);
+                    iAppContainer->iWhisk3D->TecladoNumerico(2);
                     return EKeyWasConsumed;
                 case(51): //3
-                    iAppContainer->iBlendersito->TecladoNumerico(3);
+                    iAppContainer->iWhisk3D->TecladoNumerico(3);
                     return EKeyWasConsumed;
                 case(52): //4
-                    iAppContainer->iBlendersito->TecladoNumerico(4);
+                    iAppContainer->iWhisk3D->TecladoNumerico(4);
                     return EKeyWasConsumed;
                 case(53): //5
-                    iAppContainer->iBlendersito->TecladoNumerico(5);
+                    iAppContainer->iWhisk3D->TecladoNumerico(5);
                     return EKeyWasConsumed;
                 case(54): //6
-                    iAppContainer->iBlendersito->TecladoNumerico(6);
+                    iAppContainer->iWhisk3D->TecladoNumerico(6);
                     return EKeyWasConsumed;
                 case(55): //7
-                    iAppContainer->iBlendersito->TecladoNumerico(7);
+                    iAppContainer->iWhisk3D->TecladoNumerico(7);
                     return EKeyWasConsumed;
                 case(56): //8
-                    iAppContainer->iBlendersito->TecladoNumerico(8);
+                    iAppContainer->iWhisk3D->TecladoNumerico(8);
                     return EKeyWasConsumed;
                 case(57): //9
-                    iAppContainer->iBlendersito->TecladoNumerico(9);
+                    iAppContainer->iWhisk3D->TecladoNumerico(9);
                     return EKeyWasConsumed;
                 case(48): //0
-                    iAppContainer->iBlendersito->TecladoNumerico(0);
+                    iAppContainer->iWhisk3D->TecladoNumerico(0);
                     return EKeyWasConsumed;
                 case(42): //*
-                    iAppContainer->iBlendersito->TecladoNumerico(10);
+                    iAppContainer->iWhisk3D->TecladoNumerico(10);
                     return EKeyWasConsumed;
                 case(127): //#
-                    iAppContainer->iBlendersito->TecladoNumerico(11);
+                    iAppContainer->iWhisk3D->TecladoNumerico(11);
                     return EKeyWasConsumed;
                 case(226): //camara
-                    iAppContainer->iBlendersito->Extrude();
+                    iAppContainer->iWhisk3D->Extrude();
                     return EKeyWasConsumed;
                 case(196): //llamada
-                    iAppContainer->iBlendersito->ChangeEje();
+                    iAppContainer->iWhisk3D->ChangeEje();
                     return EKeyWasConsumed;
                 case(65): //A
-                    iAppContainer->iBlendersito->SeleccionarTodo();
+                    iAppContainer->iWhisk3D->SeleccionarTodo();
                     return EKeyWasConsumed;
                 case(71): //G
-                    iAppContainer->iBlendersito->SetPosicion();
+                    iAppContainer->iWhisk3D->SetPosicion();
                     return EKeyWasConsumed;
                 case(82): //R
-                    iAppContainer->iBlendersito->SetRotacion();
+                    iAppContainer->iWhisk3D->SetRotacion();
                     return EKeyWasConsumed;
                 case(81): //Q
-                    iAppContainer->iBlendersito->Cancelar();
+                    iAppContainer->iWhisk3D->Cancelar();
                     return EKeyWasConsumed;
                 case(88): //X
-                    iAppContainer->iBlendersito->EventKeyDown(scan);
+                    iAppContainer->iWhisk3D->EventKeyDown(scan);
                     return EKeyWasConsumed;
                 case(3): //Enter
-                    iAppContainer->iBlendersito->Aceptar();
+                    iAppContainer->iWhisk3D->Aceptar();
                     return EKeyWasConsumed;
                 case(167): //OK
-                    iAppContainer->iBlendersito->Aceptar();
+                    iAppContainer->iWhisk3D->Aceptar();
                     return EKeyWasConsumed;
                 case(89): //Y
-                    iAppContainer->iBlendersito->SetEje(1);
+                    iAppContainer->iWhisk3D->SetEje(1);
                     return EKeyWasConsumed;
                 case(90): //Z
-                    iAppContainer->iBlendersito->SetEje(2);
+                    iAppContainer->iWhisk3D->SetEje(2);
                     return EKeyWasConsumed;
                 case(2): //Tab
-                    iAppContainer->iBlendersito->PressTab();
+                    iAppContainer->iWhisk3D->PressTab();
                     return EKeyWasNotConsumed;
                 /*case(14): //izquierda
-                    iAppContainer->iBlendersito->Tab();
+                    iAppContainer->iWhisk3D->Tab();
                     return EKeyWasNotConsumed;
                 case(15): //derecha
-                    iAppContainer->iBlendersito->Tab();
+                    iAppContainer->iWhisk3D->Tab();
                     return EKeyWasNotConsumed;
                 case(16): //arriba
-                    iAppContainer->iBlendersito->Tab();
+                    iAppContainer->iWhisk3D->Tab();
                     return EKeyWasNotConsumed;
                 case(17): //abajo
-                    iAppContainer->iBlendersito->Tab();
+                    iAppContainer->iWhisk3D->Tab();
                     return EKeyWasNotConsumed;*/
                 default:
-                    iAppContainer->iBlendersito->EventKeyDown(scan);
+                    iAppContainer->iWhisk3D->EventKeyDown(scan);
                     return EKeyWasNotConsumed;
 			}
 		}
@@ -421,27 +421,27 @@ TKeyResponse CBlendersitoAppUi::HandleKeyEventL(const TKeyEvent& aKeyEvent, TEve
             TUint scan = aKeyEvent.iScanCode;
             switch (scan) {                
                 /*case(14): //izquierda
-                    //if (iAppContainer->iBlendersito->iShiftPressed) {
-                    iAppContainer->iBlendersito->Tab();
+                    //if (iAppContainer->iWhisk3D->iShiftPressed) {
+                    iAppContainer->iWhisk3D->Tab();
                     return EKeyWasNotConsumed;
                 case(15): //derecha
-                    iAppContainer->iBlendersito->Tab();
+                    iAppContainer->iWhisk3D->Tab();
                     return EKeyWasNotConsumed;
                 case(16): //arriba
-                    iAppContainer->iBlendersito->Tab();
+                    iAppContainer->iWhisk3D->Tab();
                     return EKeyWasNotConsumed;
                 case(17): //abajo
-                    iAppContainer->iBlendersito->Tab();
+                    iAppContainer->iWhisk3D->Tab();
                     return EKeyWasNotConsumed;*/
                 case 18: // Left Shift
                 case 19: // Right Shift
-                    iAppContainer->iBlendersito->iShiftPressed = EFalse;
+                    iAppContainer->iWhisk3D->iShiftPressed = EFalse;
                     return EKeyWasConsumed;                    
                 case(22): //left Ctrl
-                    iAppContainer->iBlendersito->iCtrlPressed = EFalse;
+                    iAppContainer->iWhisk3D->iCtrlPressed = EFalse;
                     return EKeyWasConsumed;
                 case(20): //left  Alt
-                    iAppContainer->iBlendersito->iAltPressed = EFalse;
+                    iAppContainer->iWhisk3D->iAltPressed = EFalse;
                     return EKeyWasConsumed;
                 default:
                     return EKeyWasNotConsumed;
@@ -476,15 +476,15 @@ enum{
 typedef enum { AnimPosition, AnimRotation, AnimScale };
 
 // ----------------------------------------------------
-// CBlendersitoAppUi::HandleCommandL
+// CWhisk3DAppUi::HandleCommandL
 // Command handler
 // ----------------------------------------------------
 //
-void CBlendersitoAppUi::HandleCommandL(TInt aCommand){
+void CWhisk3DAppUi::HandleCommandL(TInt aCommand){
     switch ( aCommand )
         {
         case EAknSoftkeyBack:
-            iAppContainer->iBlendersito->SetMouse();
+            iAppContainer->iWhisk3D->SetMouse();
             break;
         case EEikCmdExit:
             {
@@ -496,283 +496,283 @@ void CBlendersitoAppUi::HandleCommandL(TInt aCommand){
         //    OpenMaterialMenuL();
         //    break;
         case EViewportSetShowFloor:
-            iAppContainer->iBlendersito->ToggleValue(iAppContainer->iBlendersito->showFloor);
+            iAppContainer->iWhisk3D->ToggleValue(iAppContainer->iWhisk3D->showFloor);
             break;       
         case EViewportSetShowYaxis:
-            iAppContainer->iBlendersito->ToggleValue(iAppContainer->iBlendersito->showYaxis);
+            iAppContainer->iWhisk3D->ToggleValue(iAppContainer->iWhisk3D->showYaxis);
             break;       
         case EViewportSetShowXaxis:
-            iAppContainer->iBlendersito->ToggleValue(iAppContainer->iBlendersito->showXaxis);
+            iAppContainer->iWhisk3D->ToggleValue(iAppContainer->iWhisk3D->showXaxis);
             break;       
         case EViewportSetOutlineSelect:
-            iAppContainer->iBlendersito->ToggleValue(iAppContainer->iBlendersito->showOutlineSelect);
+            iAppContainer->iWhisk3D->ToggleValue(iAppContainer->iWhisk3D->showOutlineSelect);
             break;       
         case EViewportSetOrigins:
-            iAppContainer->iBlendersito->ToggleValue(iAppContainer->iBlendersito->showOrigins);
+            iAppContainer->iWhisk3D->ToggleValue(iAppContainer->iWhisk3D->showOrigins);
             break;          
         case EViewportSetOverlay:
-            iAppContainer->iBlendersito->ToggleValue(iAppContainer->iBlendersito->showOverlays);
+            iAppContainer->iWhisk3D->ToggleValue(iAppContainer->iWhisk3D->showOverlays);
             break;       
         case EViewportSet3DCursor:
-            iAppContainer->iBlendersito->ToggleValue(iAppContainer->iBlendersito->show3DCursor);
+            iAppContainer->iWhisk3D->ToggleValue(iAppContainer->iWhisk3D->show3DCursor);
             break;    
         case ETimelinePlayStop:
-            iAppContainer->iBlendersito->ToggleValue(iAppContainer->iBlendersito->PlayAnimation);
+            iAppContainer->iWhisk3D->ToggleValue(iAppContainer->iWhisk3D->PlayAnimation);
             break;  
         case ETimelineShowTimeline:
-            iAppContainer->iBlendersito->ToggleValue(iAppContainer->iBlendersito->ShowTimeline);
+            iAppContainer->iWhisk3D->ToggleValue(iAppContainer->iWhisk3D->ShowTimeline);
             break;
         case ETimelineSetCurrentFrame:
-            iAppContainer->iBlendersito->SetCurrentFrame();
+            iAppContainer->iWhisk3D->SetCurrentFrame();
             break;
         case ETimelineSetEndFrame:
-            iAppContainer->iBlendersito->SetEndFrame();
+            iAppContainer->iWhisk3D->SetEndFrame();
             break;
         case ETimelineSetStartFrame:
-            iAppContainer->iBlendersito->SetStartFrame();
+            iAppContainer->iWhisk3D->SetStartFrame();
             break;
         case EImportOBJ:
-            iAppContainer->iBlendersito->ImportOBJ();
+            iAppContainer->iWhisk3D->ImportOBJ();
             break; 
         case EShrinkFatten:
-            iAppContainer->iBlendersito->CalcShrinkFattenVectors();
+            iAppContainer->iWhisk3D->CalcShrinkFattenVectors();
             break; 
         case EExtrude:
-            iAppContainer->iBlendersito->Extrude();
+            iAppContainer->iWhisk3D->Extrude();
             break; 
         case EDuplicate:
-            iAppContainer->iBlendersito->Duplicate();
+            iAppContainer->iWhisk3D->Duplicate();
             break; 
         case EOldImportOBJ:
-            iAppContainer->iBlendersito->OldImportOBJ();
+            iAppContainer->iWhisk3D->OldImportOBJ();
             break; 
-        case EBlendersitoWidescreen:
+        case EWhisk3DWidescreen:
             iAppContainer->SetWidescreen();
             break;    
         case EViewportBackgroudColor:
-            iAppContainer->iBlendersito->SetViewportBackgroudColor();
+            iAppContainer->iWhisk3D->SetViewportBackgroudColor();
             break;    
         case ECursorToSelect:
-            iAppContainer->iBlendersito->CursorToSelect();
+            iAppContainer->iWhisk3D->CursorToSelect();
             break;
         case ESelectToCursor:
-            iAppContainer->iBlendersito->SelectToCursor();
+            iAppContainer->iWhisk3D->SelectToCursor();
             break;     
         case ECursorToWorldOrigin:    
-            iAppContainer->iBlendersito->CursorToWorldOrigin();
+            iAppContainer->iWhisk3D->CursorToWorldOrigin();
             break;        
         case ECamera:            
-            iAppContainer->iBlendersito->AddObject(camera);
+            iAppContainer->iWhisk3D->AddObject(camera);
             break;   
         case ELight:            
-            iAppContainer->iBlendersito->AddObject(light);
+            iAppContainer->iWhisk3D->AddObject(light);
             break;       
         case EEmpty:            
-            iAppContainer->iBlendersito->AddObject(empty);
+            iAppContainer->iWhisk3D->AddObject(empty);
             break;
         case ECube:            
-            iAppContainer->iBlendersito->AddMesh(cubo);
+            iAppContainer->iWhisk3D->AddMesh(cubo);
             break;  
         case ECircle:            
-            iAppContainer->iBlendersito->AddMesh(circle);
+            iAppContainer->iWhisk3D->AddMesh(circle);
             break;  
         case EPlane:            
-            iAppContainer->iBlendersito->AddMesh(plane);
+            iAppContainer->iWhisk3D->AddMesh(plane);
             break;          
         case EMonkey:
-            iAppContainer->iBlendersito->AddMesh(monkey);
+            iAppContainer->iWhisk3D->AddMesh(monkey);
             break;  
         case EVertex:
-            iAppContainer->iBlendersito->AddMesh(vertice);
+            iAppContainer->iWhisk3D->AddMesh(vertice);
             break; 
         case ESetMaterial:
-            iAppContainer->iBlendersito->SetMaterial();
+            iAppContainer->iWhisk3D->SetMaterial();
             break;  
         case ESetSpecular:
-            iAppContainer->iBlendersito->SetSpecular();
+            iAppContainer->iWhisk3D->SetSpecular();
             break;   
-        case EBlendersitoEditarMesh:
-            iAppContainer->iBlendersito->SetEditMode();
+        case EWhisk3DEditarMesh:
+            iAppContainer->iWhisk3D->SetEditMode();
             break; 
         case ECylinderProjection:            
-            iAppContainer->iBlendersito->UVmapping(0);
+            iAppContainer->iWhisk3D->UVmapping(0);
             break;   
-        case EBlendersitoSetEscala:
-            iAppContainer->iBlendersito->SetEscala();
+        case EWhisk3DSetEscala:
+            iAppContainer->iWhisk3D->SetEscala();
             break;   
-        case EBlendersitoSetPosicion:
-            iAppContainer->iBlendersito->SetPosicion();
+        case EWhisk3DSetPosicion:
+            iAppContainer->iWhisk3D->SetPosicion();
             break;   
-        case EBlendersitoSetRotacion:
-            iAppContainer->iBlendersito->SetRotacion();
+        case EWhisk3DSetRotacion:
+            iAppContainer->iWhisk3D->SetRotacion();
             break;     
         case EDuplicatedObject:
-            iAppContainer->iBlendersito->DuplicatedObject();
+            iAppContainer->iWhisk3D->DuplicatedObject();
             break;       
         case EDuplicatedLinked:
-            iAppContainer->iBlendersito->DuplicatedLinked();
+            iAppContainer->iWhisk3D->DuplicatedLinked();
             break;     
         case ESetParent:
-            iAppContainer->iBlendersito->SetParent();
+            iAppContainer->iWhisk3D->SetParent();
             break;     
         case EClearParent:
-            iAppContainer->iBlendersito->ClearParent();
+            iAppContainer->iWhisk3D->ClearParent();
             break;  
         case EFlipNormals:
-            iAppContainer->iBlendersito->FlipNormals();
+            iAppContainer->iWhisk3D->FlipNormals();
             break;
         case ESetActiveObjectAsCamera:
-            iAppContainer->iBlendersito->SetActiveObjectAsCamera();
+            iAppContainer->iWhisk3D->SetActiveObjectAsCamera();
             break;  
         case ERenderUI:
-            iAppContainer->iBlendersito->SaveCanvasToImage(false, true);
+            iAppContainer->iWhisk3D->SaveCanvasToImage(false, true);
             break;  
         case ERenderUIanimation:
-            iAppContainer->iBlendersito->SaveCanvasToImage(false, true);
+            iAppContainer->iWhisk3D->SaveCanvasToImage(false, true);
             break;  
         case ERenderImage:
-            iAppContainer->iBlendersito->SaveCanvasToImage(false, false);
+            iAppContainer->iWhisk3D->SaveCanvasToImage(false, false);
             break; 
         case ERenderAnimation:
-            iAppContainer->iBlendersito->SaveCanvasToImage(true, false);
+            iAppContainer->iWhisk3D->SaveCanvasToImage(true, false);
             break; 
         case ESetAmbientLight:
-            iAppContainer->iBlendersito->SetAmbientLight();
+            iAppContainer->iWhisk3D->SetAmbientLight();
             break;   
         case ESetDiffuse:
-            iAppContainer->iBlendersito->SetDiffuse();
+            iAppContainer->iWhisk3D->SetDiffuse();
             break;   
         case ESetEmission:
-            iAppContainer->iBlendersito->SetEmission();
+            iAppContainer->iWhisk3D->SetEmission();
             break;  
         case ESetTexture:
-            iAppContainer->iBlendersito->SetTexture();
+            iAppContainer->iWhisk3D->SetTexture();
             break;  
         case ESetActiveTexture:
-            iAppContainer->iBlendersito->ActivarTextura();
+            iAppContainer->iWhisk3D->ActivarTextura();
             break; 
         case ESetInterpolation:
-            iAppContainer->iBlendersito->SetInterpolation();
+            iAppContainer->iWhisk3D->SetInterpolation();
             break; 
         case ESetTransparent:
-            iAppContainer->iBlendersito->SetTransparencia();
+            iAppContainer->iWhisk3D->SetTransparencia();
             break; 
         case ESetTextureRepeat:
-            iAppContainer->iBlendersito->SetTextureRepeat();
+            iAppContainer->iWhisk3D->SetTextureRepeat();
             break;             
         case ESetSmooth:
-            iAppContainer->iBlendersito->SetSmooth();
+            iAppContainer->iWhisk3D->SetSmooth();
             break;  
         case ESetCulling:
-            iAppContainer->iBlendersito->SetCulling();
+            iAppContainer->iWhisk3D->SetCulling();
             break;  
         case ESetLighting:
-            iAppContainer->iBlendersito->SetLighting();
+            iAppContainer->iWhisk3D->SetLighting();
             break;  
         case ESetVertexColor:
-            iAppContainer->iBlendersito->SetVertexColor();
+            iAppContainer->iWhisk3D->SetVertexColor();
             break;    
-        case EBlendersitoInfoObject:
-            iAppContainer->iBlendersito->InfoObject(1);
+        case EWhisk3DInfoObject:
+            iAppContainer->iWhisk3D->InfoObject(1);
             break; 
-        case EBlendersitoBorrar:
-            iAppContainer->iBlendersito->Borrar();
+        case EWhisk3DBorrar:
+            iAppContainer->iWhisk3D->Borrar();
             break;  
-        case EBlendersitoPerspectiva:
-            iAppContainer->iBlendersito->SetPerspectiva();
+        case EWhisk3DPerspectiva:
+            iAppContainer->iWhisk3D->SetPerspectiva();
             break;
         case ECameraView:
-            iAppContainer->iBlendersito->SetViewpoint(cameraView);
+            iAppContainer->iWhisk3D->SetViewpoint(cameraView);
             break;
         case ESetCameraToView:
-            iAppContainer->iBlendersito->SetCameraToView();
+            iAppContainer->iWhisk3D->SetCameraToView();
             break;
         case ETopView:
-            iAppContainer->iBlendersito->SetViewpoint(top);
+            iAppContainer->iWhisk3D->SetViewpoint(top);
             break;
-        case EBlendersitoFrontView:
-            iAppContainer->iBlendersito->SetViewpoint(front);
+        case EWhisk3DFrontView:
+            iAppContainer->iWhisk3D->SetViewpoint(front);
             break;
-        case EBlendersitoRightView:
-            iAppContainer->iBlendersito->SetViewpoint(right);
+        case EWhisk3DRightView:
+            iAppContainer->iWhisk3D->SetViewpoint(right);
             break;
-        case EBlendersitoObjFocus:
-            iAppContainer->iBlendersito->EnfocarObject();
+        case EWhisk3DObjFocus:
+            iAppContainer->iWhisk3D->EnfocarObject();
             break; 
-        case EBlendersitoViewMaterial:
-            iAppContainer->iBlendersito->SetShading(MaterialPreview);
+        case EWhisk3DViewMaterial:
+            iAppContainer->iWhisk3D->SetShading(MaterialPreview);
             break; 
-        case EBlendersitoViewSolid:
-            iAppContainer->iBlendersito->SetShading(Solid);
+        case EWhisk3DViewSolid:
+            iAppContainer->iWhisk3D->SetShading(Solid);
             break; 
-        case EBlendersitoViewWireframe:
-            iAppContainer->iBlendersito->SetShading(Wireframe);
+        case EWhisk3DViewWireframe:
+            iAppContainer->iWhisk3D->SetShading(Wireframe);
             break; 
         case EViewRendered:
-            iAppContainer->iBlendersito->SetShading(Rendered);
+            iAppContainer->iWhisk3D->SetShading(Rendered);
             break;
-        case EBlendersitoSetTipoVertex:
-            iAppContainer->iBlendersito->SetTipoSelect(vertexSelect);
+        case EWhisk3DSetTipoVertex:
+            iAppContainer->iWhisk3D->SetTipoSelect(vertexSelect);
             break; 
-        case EBlendersitoSetTipoEdge:
-            iAppContainer->iBlendersito->SetTipoSelect(edgeSelect);
+        case EWhisk3DSetTipoEdge:
+            iAppContainer->iWhisk3D->SetTipoSelect(edgeSelect);
             break; 
-        case EBlendersitoSetTipoFace:
-            iAppContainer->iBlendersito->SetTipoSelect(faceSelect);
+        case EWhisk3DSetTipoFace:
+            iAppContainer->iWhisk3D->SetTipoSelect(faceSelect);
             break; 
         case ESetOrigenToGeometry:
-            iAppContainer->iBlendersito->SetOrigen(0);
+            iAppContainer->iWhisk3D->SetOrigen(0);
             break; 
         case ESetOriginTo3DCursor:
-            iAppContainer->iBlendersito->SetOriginTo3DCursor();
+            iAppContainer->iWhisk3D->SetOriginTo3DCursor();
             break; 
-        case EBlendersitoCambiarObject:
-            iAppContainer->iBlendersito->changeSelect();
+        case EWhisk3DCambiarObject:
+            iAppContainer->iWhisk3D->changeSelect();
             break; 
         case ESelectInvert:
-            iAppContainer->iBlendersito->InvertirSeleccion();
+            iAppContainer->iWhisk3D->InvertirSeleccion();
             break; 
-        case EBlendersitoModificadorArray:
-            iAppContainer->iBlendersito->AddModificador(array);
+        case EWhisk3DModificadorArray:
+            iAppContainer->iWhisk3D->AddModificador(array);
             break; 
-        case EBlendersitoModificadorMirror:
-            iAppContainer->iBlendersito->AddModificador(mirror);
+        case EWhisk3DModificadorMirror:
+            iAppContainer->iWhisk3D->AddModificador(mirror);
             break; 
-        case EBlendersitoModificadorScrew:
-            iAppContainer->iBlendersito->AddModificador(screw);
+        case EWhisk3DModificadorScrew:
+            iAppContainer->iWhisk3D->AddModificador(screw);
             break;             
         case ENewMaterial:
-            iAppContainer->iBlendersito->NewMaterial(true);
+            iAppContainer->iWhisk3D->NewMaterial(true);
             break;
         case ENewTexture:
-            iAppContainer->iBlendersito->NewTexture();
+            iAppContainer->iWhisk3D->NewTexture();
             break; 
         case ERemoveMaterial:
-            iAppContainer->iBlendersito->RemoveMaterial();
+            iAppContainer->iWhisk3D->RemoveMaterial();
             break;  
         case ERemoveTexture:
-            iAppContainer->iBlendersito->RemoveTexture();
+            iAppContainer->iWhisk3D->RemoveTexture();
             break; 
         case EInsertKeyframe:
-            iAppContainer->iBlendersito->InsertKeyframe(AnimPosition);
+            iAppContainer->iWhisk3D->InsertKeyframe(AnimPosition);
             break; 
         case EInsertKeyframeLocation:
-            iAppContainer->iBlendersito->InsertKeyframe(AnimPosition);
+            iAppContainer->iWhisk3D->InsertKeyframe(AnimPosition);
             break; 
         case EInsertKeyframeRotation:
-            iAppContainer->iBlendersito->InsertKeyframe(AnimRotation);
+            iAppContainer->iWhisk3D->InsertKeyframe(AnimRotation);
             break; 
         case EInsertKeyframeScale:
-            iAppContainer->iBlendersito->InsertKeyframe(AnimScale);
+            iAppContainer->iWhisk3D->InsertKeyframe(AnimScale);
             break; 
         case ERemoveKeyframes:
-            iAppContainer->iBlendersito->RemoveKeyframes();
+            iAppContainer->iWhisk3D->RemoveKeyframes();
             break; 
         case EClearKeyframes:
-            iAppContainer->iBlendersito->ClearKeyframes();
+            iAppContainer->iWhisk3D->ClearKeyframes();
             break; 
-        case EBlendersitoNavegacion:
-            iAppContainer->iBlendersito->SetNavigation();
+        case EWhisk3DNavegacion:
+            iAppContainer->iWhisk3D->SetNavigation();
             break;            
         default:
             break;

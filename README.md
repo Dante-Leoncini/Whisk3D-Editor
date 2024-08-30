@@ -1,4 +1,4 @@
-# Whisk 3D (Ex Blendersito)
+# Whisk 3D (Ex Whisk3D)
 
 ENGLISH: Whisk3D is a Blender clone, developed from scratch for Symbian s60v3.
 

@@ -1,12 +1,12 @@
 /*
  * ==============================================================================
- *  Name        : BlendersitoAppUi.h
- *  Part of     : OpenGLEx / Blendersito
+ *  Name        : Whisk3DAppUi.h
+ *  Part of     : OpenGLEx / Whisk3D
  * ==============================================================================
  */
 
-#ifndef BLENDERSITOAPPUI_H
-#define BLENDERSITOAPPUI_H
+#ifndef WHISK3DAPPUI_H
+#define WHISK3DAPPUI_H
 
 // INCLUDES
 #include <eikapp.h>
@@ -16,30 +16,30 @@
 #include <aknappui.h>
 
 // FORWARD DECLARATIONS
-class CBlendersitoContainer;
+class CWhisk3DContainer;
 
 
 // CLASS DECLARATION
 
 /**
- * Application UI class that is contains the CBlendersitoContainer
+ * Application UI class that is contains the CWhisk3DContainer
  * (as required by the Symbian UI application architecture).
  */
-class CBlendersitoAppUi : public CAknAppUi
+class CWhisk3DAppUi : public CAknAppUi
     {
     public: // Constructors and destructor
 
         /**
-         * Second phase constructor. Creates the CBlendersitoContainer
+         * Second phase constructor. Creates the CWhisk3DContainer
          * and adds it to the control stack.
          */
         void ConstructL();
 
         /**
-         * Destructor. Removes CBlendersitoContainer from the control
+         * Destructor. Removes CWhisk3DContainer from the control
          * stack and destroys it.
          */
-        virtual ~CBlendersitoAppUi();
+        virtual ~CWhisk3DAppUi();
 
     private: // Functions from base classes
         /**
@@ -69,7 +69,7 @@ class CBlendersitoAppUi : public CAknAppUi
 
     private: //Data
         /** GUI container that resides in this application UI. */
-        CBlendersitoContainer* iAppContainer;
+        CWhisk3DContainer* iAppContainer;
     };
 
 #endif

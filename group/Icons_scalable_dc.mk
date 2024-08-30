@@ -1,7 +1,7 @@
 #
 # ==============================================================================
 #  Name        : Icons_scalable_dc.mk
-#  Part of     : OpenGLEx / Blendersito
+#  Part of     : OpenGLEx / Whisk3D
 # ==============================================================================
 #
 
@@ -13,7 +13,7 @@ ZDIR=$(EPOCROOT)epoc32\data\z
 endif
 
 TARGETDIR=$(ZDIR)\resource\apps
-ICONTARGETFILENAME=$(TARGETDIR)\blendersito_icon.mif
+ICONTARGETFILENAME=$(TARGETDIR)\whisk3D_icon.mif
 
 ICONDIR=..\gfx
 
@@ -35,7 +35,7 @@ CLEANLIB : do_nothing
 	
 RESOURCE : #capaz rompi el icono
 	mifconv $(ICONTARGETFILENAME) \
-		/c32 $(ICONDIR)\qgn_menu_blendersito.svg
+		/c32 $(ICONDIR)\qgn_menu_whisk3D.svg
 
 FREEZE : do_nothing
 

@@ -1,27 +1,27 @@
 /*
  * ==============================================================================
- *  Name        : blendersito.hrh
- *  Part of     : OpenGLEx / Blendersito
+ *  Name        : whisk3D.hrh
+ *  Part of     : OpenGLEx / Whisk3D
  * ==============================================================================
  */
 
-#ifndef BLENDERSITO_HRH
-#define BLENDERSITO_HRH
+#ifndef WHISK3D_HRH
+#define WHISK3D_HRH
 	
 // DATA TYPES
-enum TBlendersitoMenuCommands
+enum TWhisk3DMenuCommands
 {    	    	
     ETestNada,
 
     ECameraView,
     ETopView,
-    EBlendersitoFrontView,
-    EBlendersitoRightView,
-    EBlendersitoPerspectiva,
-    EBlendersitoObjFocus,
-    EBlendersitoCambiarObject,
-    EBlendersitoNavegacion,
-    EBlendersitoBorrar,
+    EWhisk3DFrontView,
+    EWhisk3DRightView,
+    EWhisk3DPerspectiva,
+    EWhisk3DObjFocus,
+    EWhisk3DCambiarObject,
+    EWhisk3DNavegacion,
+    EWhisk3DBorrar,
 
     ESelectInvert,
     
@@ -44,12 +44,12 @@ enum TBlendersitoMenuCommands
     ESetVertexColor,
     ESetAmbientLight,
     
-    EBlendersitoEditarMesh,
+    EWhisk3DEditarMesh,
     EViewportObject,
-    EBlendersitoInfoObject,
-    EBlendersitoSetEscala,
-    EBlendersitoSetPosicion,
-    EBlendersitoSetRotacion,
+    EWhisk3DInfoObject,
+    EWhisk3DSetEscala,
+    EWhisk3DSetPosicion,
+    EWhisk3DSetRotacion,
     
     ESetParent,
 	EClearParent,
@@ -68,30 +68,30 @@ enum TBlendersitoMenuCommands
     EExtrude,
     EDuplicate,
     
-    EBlendersitoSeleccionar,
-    EBlendersitoSetTipoVertex,
-    EBlendersitoSetTipoEdge,
-    EBlendersitoSetTipoFace,
+    EWhisk3DSeleccionar,
+    EWhisk3DSetTipoVertex,
+    EWhisk3DSetTipoEdge,
+    EWhisk3DSetTipoFace,
     
-    EBlendersitoVista3D,
-    EBlendersitoViewSolid,
-    EBlendersitoViewMaterial,
-    EBlendersitoViewWireframe,
+    EWhisk3DVista3D,
+    EWhisk3DViewSolid,
+    EWhisk3DViewMaterial,
+    EWhisk3DViewWireframe,
     EViewRendered,
     
-    EBlendersitoModificadores,
-    EBlendersitoModificadorArray,
-    EBlendersitoModificadorMirror,
-    EBlendersitoModificadorScrew,
+    EWhisk3DModificadores,
+    EWhisk3DModificadorArray,
+    EWhisk3DModificadorMirror,
+    EWhisk3DModificadorScrew,
 
     EViewportBackgroudColor,
-    EBlendersitoWidescreen,
+    EWhisk3DWidescreen,
     EImportOBJ,
     EOldImportOBJ,
     ENewTexture,
 
-    EBlendersitoProgressNote,
-    EBlendersitoWaitNote,
+    EWhisk3DProgressNote,
+    EWhisk3DWaitNote,
 
     EViewportSetOverlay,
     EViewportSet3DCursor,
@@ -156,9 +156,9 @@ enum TAknExNoteNoteControlIds {
     EAknExNoteCtrlIdDynamicText    
 };
 
-//enum TBlendersitoNoteControlIds {
-//    EBlendersitoProgressNote,
-//    EBlendersitoWaitNote
+//enum TWhisk3DNoteControlIds {
+//    EWhisk3DProgressNote,
+//    EWhisk3DWaitNote
 //};
 
-#endif      // BLENDERSITO_HRH
+#endif      // WHISK3D_HRH

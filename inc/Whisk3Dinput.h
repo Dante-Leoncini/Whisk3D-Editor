@@ -1,12 +1,12 @@
 /*
  * ==============================================================================
- *  Name        : Blendersitoinput.h
- *  Part of     : OpenGLEx / Blendersito
+ *  Name        : Whisk3Dinput.h
+ *  Part of     : OpenGLEx / Whisk3D
  * ==============================================================================
  */
 
-#ifndef __BLENDERSITOINPUTH__
-#define __BLENDERSITOINPUTH__
+#ifndef __WHISK3DINPUTH__
+#define __WHISK3DINPUTH__
 
 //  INCLUDES
 
@@ -63,37 +63,37 @@ static const TUint KKeyCodeMap[] = {
 /**
  * Class that handles the mapping of scancodes to input signals that can then
  * be queried from the application. When the program is initialized
- * this class reference is given by the CBlendersitoContainer to CBlendersito. CBlendersitoContainer
+ * this class reference is given by the CWhisk3DContainer to CWhisk3D. CWhisk3DContainer
  * class then notifies this class of key presses and releases. If an input signal
  * mapping exists for a scancode the state of that input signal's state is modified.
- * The CBlendersito class can then query the state of the various input signal's from this class.
+ * The CWhisk3D class can then query the state of the various input signal's from this class.
  *
  * Note that this class supports mapping of multiple scancodes to a single input signal.
  * But only one input signal can be mapped to one scancode (that means single keypress can't
  * change multiple input signals to pressed state).
  *
  */
- class CBlendersitoInput
+ class CWhisk3DInput
     {
     public: // Constructors and destructor
 
         /**
-         * Factory method for creating a new CBlendersito object.
+         * Factory method for creating a new CWhisk3D object.
          * Calls the hidden constructors.
          */
-        static CBlendersitoInput* NewL();
+        static CWhisk3DInput* NewL();
 
         /**
          * Destructor. Does nothing.
          */
-        virtual ~CBlendersitoInput();
+        virtual ~CWhisk3DInput();
 
     protected: // Hidden constructors
 
         /**
          * Standard constructor that must never Leave.
          */
-        CBlendersitoInput();
+        CWhisk3DInput();
 
         /**
          * Second phase constructor that can call methods that may leave. Does nothing.

@@ -1,7 +1,7 @@
 /*
  * ==============================================================================
- *  Name        : BlendersitoContainer.cpp
- *  Part of     : OpenGLEx / Blendersito
+ *  Name        : Whisk3DContainer.cpp
+ *  Part of     : OpenGLEx / Whisk3D
  * ==============================================================================
  */
 
@@ -17,25 +17,25 @@
 #include <eikprogi.h>
 #include <aknnotecontrol.h>
 
-#include "BlendersitoContainer.h"
-#include "BlendersitoAppUi.h"
-#include "blendersito.hrh"
+#include "Whisk3DContainer.h"
+#include "Whisk3DAppUi.h"
+#include "whisk3D.hrh"
 
 // CONSTANTS
-#include "BlendersitoConstants.h"
+#include "Whisk3DConstants.h"
 
 
 // ================= MEMBER FUNCTIONS =======================
 // ---------------------------------------------------------
-// CBlendersitoContainer::ConstructL
+// CWhisk3DContainer::ConstructL
 // Symbian 2nd phase constructor
 // ---------------------------------------------------------
 //
-void CBlendersitoContainer::ConstructL(const TRect& /*aRect*/){
+void CWhisk3DContainer::ConstructL(const TRect& /*aRect*/){
     CreateWindowL();
     iOpenGlInitialized = EFalse;
     // Create the input handler
-    iInputHandler = CBlendersitoInput::NewL();
+    iInputHandler = CWhisk3DInput::NewL();
 
     SetExtentToWholeScreen();                // Take the whole screen into use
     ActivateL();
@@ -196,15 +196,15 @@ void CBlendersitoContainer::ConstructL(const TRect& /*aRect*/){
     TSize size;
     size = this->Size();
 
-    iBlendersito = CBlendersito::NewL( size.iWidth, size.iHeight, iInputHandler ); // Create an instance of Blendersito
-    iBlendersito->AppInit();                                       // Initialize OpenGL ES
+    iWhisk3D = CWhisk3D::NewL( size.iWidth, size.iHeight, iInputHandler ); // Create an instance of Whisk3D
+    iWhisk3D->AppInit();                                       // Initialize OpenGL ES
 
     iOpenGlInitialized = ETrue;
 
     iPeriodic = CPeriodic::NewL( CActive::EPriorityIdle );         // Create an active object for
                                                                   // animating the scene
     iPeriodic->Start( 100, 100,
-                      TCallBack( CBlendersitoContainer::DrawCallBack, this ) );
+                      TCallBack( CWhisk3DContainer::DrawCallBack, this ) );
     }
 
 // ------------------------------------------------------------------------------
@@ -212,7 +212,7 @@ void CBlendersitoContainer::ConstructL(const TRect& /*aRect*/){
 // Handles joystick movements.
 // ------------------------------------------------------------------------------
 //
-TKeyResponse CBlendersitoContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEventCode aType ){
+TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEventCode aType ){
 	switch( aType )
 		{
 		case EEventKeyDown:
@@ -228,15 +228,15 @@ TKeyResponse CBlendersitoContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,T
 }
 
 // Destructor
-CBlendersitoContainer::~CBlendersitoContainer()
+CWhisk3DContainer::~CWhisk3DContainer()
     {
     delete iIdle;
     delete iPeriodic;
 
-    if ( iBlendersito )
+    if ( iWhisk3D )
         {
-        iBlendersito->AppExit();
-        delete iBlendersito;
+        iWhisk3D->AppExit();
+        delete iWhisk3D;
         }
     delete iInputHandler;
     
@@ -248,46 +248,46 @@ CBlendersitoContainer::~CBlendersitoContainer()
     }
 
 // ---------------------------------------------------------
-// CBlendersitoContainer::SizeChanged()
+// CWhisk3DContainer::SizeChanged()
 // Called by framework when the view size is changed
 // ---------------------------------------------------------
 //
-void CBlendersitoContainer::SizeChanged(){
-    if( iOpenGlInitialized && iBlendersito )
+void CWhisk3DContainer::SizeChanged(){
+    if( iOpenGlInitialized && iWhisk3D )
         {
         TSize size;
         size = this->Size();
 
-        iBlendersito->SetScreenSize( size.iWidth, size.iHeight );
+        iWhisk3D->SetScreenSize( size.iWidth, size.iHeight );
         }
     }
 
 //cambia entre WideScreen a pantalla normal
 TBool widescreen = false;
-void CBlendersitoContainer::SetWidescreen(){
-    if( iOpenGlInitialized && iBlendersito ){
+void CWhisk3DContainer::SetWidescreen(){
+    if( iOpenGlInitialized && iWhisk3D ){
         TSize size;
         size = this->Size();
         if (widescreen){
             widescreen = false;
-            iBlendersito->iWidescreenEnabled = false;
+            iWhisk3D->iWidescreenEnabled = false;
         }
         else {
             widescreen = true;
-            iBlendersito->iWidescreenEnabled = true;
+            iWhisk3D->iWidescreenEnabled = true;
         }
-        iBlendersito->SetScreenSize( size.iWidth, size.iHeight, widescreen );
+        iWhisk3D->SetScreenSize( size.iWidth, size.iHeight, widescreen );
     }
 }
 
 // ---------------------------------------------------------
-// CBlendersitoContainer::HandleResourceChange(
+// CWhisk3DContainer::HandleResourceChange(
 //     TInt aType)
 // Dynamic screen resize changes by calling the
 // SetExtentToWholeScreen() method again.
 // ---------------------------------------------------------
 //
- void CBlendersitoContainer::HandleResourceChange(TInt aType)
+ void CWhisk3DContainer::HandleResourceChange(TInt aType)
     {
 	switch( aType )
     	{
@@ -298,40 +298,40 @@ void CBlendersitoContainer::SetWidescreen(){
     }
 
 // ---------------------------------------------------------
-// CBlendersitoContainer::CountComponentControls() const
+// CWhisk3DContainer::CountComponentControls() const
 // ---------------------------------------------------------
 //
-TInt CBlendersitoContainer::CountComponentControls() const
+TInt CWhisk3DContainer::CountComponentControls() const
     {
     return 0; // return nbr of controls inside this container
     }
 
 // ---------------------------------------------------------
-// CBlendersitoContainer::ComponentControl(TInt aIndex) const
+// CWhisk3DContainer::ComponentControl(TInt aIndex) const
 // ---------------------------------------------------------
 //
-CCoeControl* CBlendersitoContainer::ComponentControl(TInt /*aIndex*/ ) const
+CCoeControl* CWhisk3DContainer::ComponentControl(TInt /*aIndex*/ ) const
     {
     return NULL;
     }
 
 // ---------------------------------------------------------
-// CBlendersitoContainer::Draw(const TRect& aRect) const
+// CWhisk3DContainer::Draw(const TRect& aRect) const
 // ---------------------------------------------------------
 //
-void CBlendersitoContainer::Draw(const TRect& /*aRect*/ ) const
+void CWhisk3DContainer::Draw(const TRect& /*aRect*/ ) const
     {
     // No need to implement anything here!
     }
 
 // ---------------------------------------------------------
-// CBlendersitoContainer::DrawCallBack( TAny* aInstance )
+// CWhisk3DContainer::DrawCallBack( TAny* aInstance )
 // Called by the CPeriodic in order to draw the graphics
 // ---------------------------------------------------------
 //
-int CBlendersitoContainer::DrawCallBack( TAny* aInstance )
+int CWhisk3DContainer::DrawCallBack( TAny* aInstance )
     {
-    CBlendersitoContainer* instance = (CBlendersitoContainer*) aInstance;
+    CWhisk3DContainer* instance = (CWhisk3DContainer*) aInstance;
     instance->iFrame++;
 
     // Compute the elapsed time in seconds since the startup of the example
@@ -356,7 +356,7 @@ int CBlendersitoContainer::DrawCallBack( TAny* aInstance )
     instance->iLastFrameTimeSecs = timeSecs;
 
     // Call the main OpenGL ES Symbian rendering 'loop'
-    instance->iBlendersito->AppCycle( instance->iFrame, timeSecs, deltaTimeSecs );
+    instance->iWhisk3D->AppCycle( instance->iFrame, timeSecs, deltaTimeSecs );
 
     // Call eglSwapBuffers, which blit the graphics to the window
     eglSwapBuffers( instance->iEglDisplay, instance->iEglSurface );
@@ -385,7 +385,7 @@ int CBlendersitoContainer::DrawCallBack( TAny* aInstance )
 // iIdle must be canceled when cancel button is pressed.
 // -----------------------------------------------------------------------------
 //
-void CBlendersitoContainer::DialogDismissedL( TInt aButtonId )
+void CWhisk3DContainer::DialogDismissedL( TInt aButtonId )
     {
     // Check when pressing cancel button.
     if ( aButtonId == -1 )
@@ -396,11 +396,11 @@ void CBlendersitoContainer::DialogDismissedL( TInt aButtonId )
     }
 
 // ---------------------------------------------------------
-// CBlendersitoContainer::HandleControlEventL(
+// CWhisk3DContainer::HandleControlEventL(
 //     CCoeControl* aControl,TCoeEvent aEventType)
 // ---------------------------------------------------------
 //
-void CBlendersitoContainer::HandleControlEventL(
+void CWhisk3DContainer::HandleControlEventL(
     CCoeControl* /*aControl*/,TCoeEvent /*aEventType*/)
     {
     }
@@ -410,7 +410,7 @@ void CBlendersitoContainer::HandleControlEventL(
 // Show General Note
 // -----------------------------------------------------------------------------
 //
-void CBlendersitoContainer::ShowGeneralNoteL( TInt aResourceId, 
+void CWhisk3DContainer::ShowGeneralNoteL( TInt aResourceId, 
                                             const CAknNoteDialog::
                                             TTimeout aTimeout, 
                                             const CAknNoteDialog::TTone aTone )
@@ -427,7 +427,7 @@ void CBlendersitoContainer::ShowGeneralNoteL( TInt aResourceId,
 // Show General Note
 // -----------------------------------------------------------------------------
 //
-void CBlendersitoContainer::ShowGeneralNoteL( TInt aResourceId, 
+void CWhisk3DContainer::ShowGeneralNoteL( TInt aResourceId, 
     TInt /* aControlId */, const CAknNoteDialog::TTimeout aTimeout,
     const CAknNoteDialog::TTone aTone,TBool aPlural )
     {
@@ -447,11 +447,11 @@ void CBlendersitoContainer::ShowGeneralNoteL( TInt aResourceId,
 // Show Note.
 // -----------------------------------------------------------------------------
 //
-void CBlendersitoContainer::ShowShowNoteL( TAknGlobalNoteType aType, 
+void CWhisk3DContainer::ShowShowNoteL( TAknGlobalNoteType aType, 
                                          TInt aResourceId )
     {
     //Allocate TBuf with constant length.
-    TBuf<KBlendersitoTextBufLength> text( NULL );
+    TBuf<KWhisk3DTextBufLength> text( NULL );
 
     // Reads a resource into a descriptor.
     CEikonEnv::Static()->ReadResource( text, aResourceId );
@@ -475,7 +475,7 @@ void CBlendersitoContainer::ShowShowNoteL( TAknGlobalNoteType aType,
 // Indicates wait note.
 // -----------------------------------------------------------------------------
 //
-void CBlendersitoContainer::ShowWaitNoteL( TInt aResourceId, TInt /* aControlId */){        
+void CWhisk3DContainer::ShowWaitNoteL( TInt aResourceId, TInt /* aControlId */){        
     // Create CAknWaitDialog instance
     CAknWaitDialog* waitDialog =  new ( ELeave ) CAknWaitDialog( NULL, ETrue );
     
@@ -488,7 +488,7 @@ void CBlendersitoContainer::ShowWaitNoteL( TInt aResourceId, TInt /* aControlId 
 // Show ProgressNote Under Single Process.
 // -----------------------------------------------------------------------------
 //
-void CBlendersitoContainer::ShowProgressNoteUnderSingleProcessL( 
+void CWhisk3DContainer::ShowProgressNoteUnderSingleProcessL( 
         TInt aResourceId, 
         TInt /* aControlId */)
 { 
@@ -503,7 +503,7 @@ iProgressDialog = new ( ELeave ) CAknProgressDialog( reinterpret_cast
 iProgressDialog->SetCallback( this );
 iProgressDialog->PrepareLC( aResourceId );
 iProgressInfo = iProgressDialog->GetProgressInfoL();
-iProgressInfo->SetFinalValue( KBlendersitoProgressbarFinalValue );
+iProgressInfo->SetFinalValue( KWhisk3DProgressbarFinalValue );
 iProgressDialog->RunLD();
 
 delete iIdle;
@@ -519,9 +519,9 @@ iIdle->Start( callback );
 // If retrun 0(EFalse), CIdle does not call this.
 // -----------------------------------------------------------------------------
 //
-TInt CBlendersitoContainer::CallbackIncrementProgressNoteL( TAny* aThis )
+TInt CWhisk3DContainer::CallbackIncrementProgressNoteL( TAny* aThis )
     {
-    //return static_cast<CBlendersitoContainer*>( aThis )->UpdateProgressNote();
+    //return static_cast<CWhisk3DContainer*>( aThis )->UpdateProgressNote();
     }
 
 // -----------------------------------------------------------------------------
@@ -529,7 +529,7 @@ TInt CBlendersitoContainer::CallbackIncrementProgressNoteL( TAny* aThis )
 // Updates ProgressNote
 // -----------------------------------------------------------------------------
 //
-TInt CBlendersitoContainer::UpdateProgressNote()
+TInt CWhisk3DContainer::UpdateProgressNote()
     {
     /*TTime intervalTime;
     intervalTime.HomeTime();
@@ -543,7 +543,7 @@ TInt CBlendersitoContainer::UpdateProgressNote()
         }
 
     iProgressInfo->IncrementAndDraw( 1 );
-    if ( KBlendersitoProgressbarFinalValue <= iProgressInfo->CurrentValue() )
+    if ( KWhisk3DProgressbarFinalValue <= iProgressInfo->CurrentValue() )
         {
         iProgressDialog->ProcessFinishedL();
         delete iProgressDialog;

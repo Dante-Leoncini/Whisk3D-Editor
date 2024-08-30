@@ -1,12 +1,12 @@
 /*
  * ==============================================================================
- *  Name        : BlendersitoDocument.h
- *  Part of     : OpenGLEx / Blendersito
+ *  Name        : Whisk3DDocument.h
+ *  Part of     : OpenGLEx / Whisk3D
  * ==============================================================================
  */
 
-#ifndef BLENDERSITODOCUMENT_H
-#define BLENDERSITODOCUMENT_H
+#ifndef WHISK3DDOCUMENT_H
+#define WHISK3DDOCUMENT_H
 
 // INCLUDES
 #include <akndoc.h>
@@ -20,26 +20,26 @@ class  CEikAppUi;
  * Document class that is just used as the container for the application
  * (as required by the Symbian UI application architecture).
  */
-class CBlendersitoDocument : public CAknDocument
+class CWhisk3DDocument : public CAknDocument
     {
     public: // Constructors and destructor
 
         /**
-         * Factory method for creating a new CBlendersitoDocument object.
+         * Factory method for creating a new CWhisk3DDocument object.
          */
-        static CBlendersitoDocument* NewL(CEikApplication& aApp);
+        static CWhisk3DDocument* NewL(CEikApplication& aApp);
 
         /**
          * Destructor. Does nothing.
          */
-        virtual ~CBlendersitoDocument();
+        virtual ~CWhisk3DDocument();
 
     private:  // Functions from base classes
 
         /**
          * C++ constructor. Just passes the given application reference to the baseclass.
          */
-        CBlendersitoDocument(CEikApplication& aApp);
+        CWhisk3DDocument(CEikApplication& aApp);
 
         /**
          * Second phase constructor. Does nothing.
@@ -49,7 +49,7 @@ class CBlendersitoDocument : public CAknDocument
     private: // New functions
 
         /**
-         * From CEikDocument, creates and returns CBlendersitoAppUi application UI object.
+         * From CEikDocument, creates and returns CWhisk3DAppUi application UI object.
          */
         CEikAppUi* CreateAppUiL();
     };

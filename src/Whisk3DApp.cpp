@@ -1,34 +1,34 @@
 /*
  * ==============================================================================
- *  Name        : BlendersitoApp.cpp
- *  Part of     : OpenGLEx / Blendersito
+ *  Name        : Whisk3DApp.cpp
+ *  Part of     : OpenGLEx / Whisk3D
  * ==============================================================================
  */
 
 // INCLUDE FILES
 #include    <eikstart.h>
-#include    "BlendersitoApp.h"
-#include    "BlendersitoDocument.h"
+#include    "Whisk3DApp.h"
+#include    "Whisk3DDocument.h"
 
 // ================= MEMBER FUNCTIONS =======================
 
 // ---------------------------------------------------------
-// CBlendersitoApp::AppDllUid()
+// CWhisk3DApp::AppDllUid()
 // Returns application UID
 // ---------------------------------------------------------
 //
-TUid CBlendersitoApp::AppDllUid() const {
-    return KUidBlendersito;
+TUid CWhisk3DApp::AppDllUid() const {
+    return KUidWhisk3D;
 }
 
 
 // ---------------------------------------------------------
-// CBlendersitoApp::CreateDocumentL()
-// Creates CBlendersitoDocument object
+// CWhisk3DApp::CreateDocumentL()
+// Creates CWhisk3DDocument object
 // ---------------------------------------------------------
 //
-CApaDocument* CBlendersitoApp::CreateDocumentL(){
-    return CBlendersitoDocument::NewL( *this );
+CApaDocument* CWhisk3DApp::CreateDocumentL(){
+    return CWhisk3DDocument::NewL( *this );
 }
 
 
@@ -36,7 +36,7 @@ CApaDocument* CBlendersitoApp::CreateDocumentL(){
 
 
 CApaApplication* NewApplication(){
-    return new CBlendersitoApp;
+    return new CWhisk3DApp;
 }
 
 TInt E32Main(){

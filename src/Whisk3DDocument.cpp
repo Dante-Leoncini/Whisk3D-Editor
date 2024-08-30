@@ -1,23 +1,23 @@
 /*
  * ==============================================================================
- *  Name        : BlendersitoDocument.cpp
- *  Part of     : OpenGLEx / Blendersito
+ *  Name        : Whisk3DDocument.cpp
+ *  Part of     : OpenGLEx / Whisk3D
  * ==============================================================================
  */
 
 // INCLUDE FILES
-#include "BlendersitoDocument.h"
-#include "BlendersitoAppUi.h"
+#include "Whisk3DDocument.h"
+#include "Whisk3DAppUi.h"
 
 // ================= MEMBER FUNCTIONS =======================
 
 // -----------------------------------------------------------------------------
-// CBlendersitoDocument::CBlendersitoDocument
+// CWhisk3DDocument::CWhisk3DDocument
 // C++ default constructor can NOT contain any code, that
 // might leave.
 // -----------------------------------------------------------------------------
 //
-CBlendersitoDocument::CBlendersitoDocument(CEikApplication& aApp)
+CWhisk3DDocument::CWhisk3DDocument(CEikApplication& aApp)
 : CAknDocument(aApp)
     {
     }
@@ -27,19 +27,19 @@ CBlendersitoDocument::CBlendersitoDocument(CEikApplication& aApp)
 // Symbian 2nd phase constructor can leave.
 // -----------------------------------------------------------------------------
 //
-void CBlendersitoDocument::ConstructL()
+void CWhisk3DDocument::ConstructL()
     {
     }
 
 // -----------------------------------------------------------------------------
-// CBlendersitoDocument::NewL
+// CWhisk3DDocument::NewL
 // Two-phased constructor.
 // -----------------------------------------------------------------------------
 //
-CBlendersitoDocument* CBlendersitoDocument::NewL(
-        CEikApplication& aApp)     // CBlendersitoApp reference
+CWhisk3DDocument* CWhisk3DDocument::NewL(
+        CEikApplication& aApp)     // CWhisk3DApp reference
     {
-    CBlendersitoDocument* self = new (ELeave) CBlendersitoDocument( aApp );
+    CWhisk3DDocument* self = new (ELeave) CWhisk3DDocument( aApp );
     CleanupStack::PushL( self );
     self->ConstructL();
     CleanupStack::Pop();
@@ -48,18 +48,18 @@ CBlendersitoDocument* CBlendersitoDocument::NewL(
     }
 
 // destructor
-CBlendersitoDocument::~CBlendersitoDocument()
+CWhisk3DDocument::~CWhisk3DDocument()
     {
     }
 
 // ----------------------------------------------------
-// CBlendersitoDocument::CreateAppUiL()
-// constructs CBlendersitoAppUi
+// CWhisk3DDocument::CreateAppUiL()
+// constructs CWhisk3DAppUi
 // ----------------------------------------------------
 //
-CEikAppUi* CBlendersitoDocument::CreateAppUiL()
+CEikAppUi* CWhisk3DDocument::CreateAppUiL()
     {
-    return new (ELeave) CBlendersitoAppUi;
+    return new (ELeave) CWhisk3DAppUi;
     }
 
 // End of File

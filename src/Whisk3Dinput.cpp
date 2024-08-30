@@ -1,13 +1,13 @@
 /*
  * ==============================================================================
- *  Name        : Blendersitoinput.cpp
- *  Part of     : OpenGLEx / Blendersito
+ *  Name        : Whisk3Dinput.cpp
+ *  Part of     : OpenGLEx / Whisk3D
  * ==============================================================================
  */
 
 // INCLUDE FILES
 #include <aknnotewrappers.h>
-#include "blendersitoinput.h"
+#include "whisk3Dinput.h"
 
 // MACROS
 /*#define FRUSTUM_LEFT   -1.f     //left vertical clipping plane
@@ -24,14 +24,14 @@
 // ============================= MEMBER FUNCTIONS ===============================
 
 // -----------------------------------------------------------------------------
-// CBlendersitoInput::NewL
+// CWhisk3DInput::NewL
 // Symbian 2-phase constructor. Can leave.
 // -----------------------------------------------------------------------------
 //
-CBlendersitoInput* CBlendersitoInput::NewL(){
+CWhisk3DInput* CWhisk3DInput::NewL(){
     // Symbian 2-phase constructor. Calls both the default
     // C++ constructor and Symbian ConstructL methods
-    CBlendersitoInput* self = new (ELeave) CBlendersitoInput();
+    CWhisk3DInput* self = new (ELeave) CWhisk3DInput();
     CleanupStack::PushL( self );
     self->ConstructL();
     CleanupStack::Pop();
@@ -40,20 +40,20 @@ CBlendersitoInput* CBlendersitoInput::NewL(){
 }
 
 // ----------------------------------------------------------------------------
-// CBlendersitoInput::CBlendersitoInput
+// CWhisk3DInput::CWhisk3DInput
 // C++ default constructor can NOT contain any code, that
 // might leave.
 // ----------------------------------------------------------------------------
 //
-CBlendersitoInput::CBlendersitoInput(){
+CWhisk3DInput::CWhisk3DInput(){
 }
 
 // ----------------------------------------------------------------------------
-// CBlendersitoInput::ConstructL
+// CWhisk3DInput::ConstructL
 // Symbian 2nd phase constructor can leave.
 // ----------------------------------------------------------------------------
 //
-void CBlendersitoInput::ConstructL( void ){
+void CWhisk3DInput::ConstructL( void ){
     iInputPressed = new (ELeave) TBool[ MAX_NUM_INPUTS ];
     for( int i = 0; i < MAX_NUM_INPUTS; i++ ){
         iInputPressed[i] = EFalse;
@@ -61,20 +61,20 @@ void CBlendersitoInput::ConstructL( void ){
 }
 
 // ----------------------------------------------------------------------------
-// CBlendersitoInput::~CBlendersitoInput()
+// CWhisk3DInput::~CWhisk3DInput()
 // Destructor.
 // ----------------------------------------------------------------------------
 //
-CBlendersitoInput::~CBlendersitoInput(){
+CWhisk3DInput::~CWhisk3DInput(){
     delete iInputPressed;
 }
 
 // ----------------------------------------------------------------------------
-// CBlendersitoInput::KeyDown( const int aKeyCode )
+// CWhisk3DInput::KeyDown( const int aKeyCode )
 // Sets the given keycode to pressed state.
 // ----------------------------------------------------------------------------
 //
-TKeyResponse CBlendersitoInput::KeyDown( const int aKeyCode ){
+TKeyResponse CWhisk3DInput::KeyDown( const int aKeyCode ){
     TInt inputIdx = -1;
     for( int i = 0; i < KKeyCodeMapSize; i +=2 ){
         if( KKeyCodeMap[i] == aKeyCode ){
@@ -92,11 +92,11 @@ TKeyResponse CBlendersitoInput::KeyDown( const int aKeyCode ){
 }
 
 // ----------------------------------------------------------------------------
-// CBlendersitoInput::KeyUp( const int aKeyCode )
+// CWhisk3DInput::KeyUp( const int aKeyCode )
 // Sets the given keycode to non-pressed state.
 // ----------------------------------------------------------------------------
 //
-TKeyResponse CBlendersitoInput::KeyUp( const int aKeyCode ){
+TKeyResponse CWhisk3DInput::KeyUp( const int aKeyCode ){
     TInt inputIdx = -1;
     for( int i = 0; i < KKeyCodeMapSize; i +=2 ){
         if( KKeyCodeMap[i] == aKeyCode ){
@@ -114,11 +114,11 @@ TKeyResponse CBlendersitoInput::KeyUp( const int aKeyCode ){
 }
 
 // ----------------------------------------------------------------------------
-// CBlendersitoInput::IsInputPressed( Input aInput )
+// CWhisk3DInput::IsInputPressed( Input aInput )
 // Returns whether or not a given input is pressed at the moment or not.
 // ----------------------------------------------------------------------------
 //
-TBool CBlendersitoInput::IsInputPressed( TUint aInput ){
+TBool CWhisk3DInput::IsInputPressed( TUint aInput ){
     return iInputPressed[ aInput ];
 }
 

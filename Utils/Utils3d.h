@@ -325,13 +325,13 @@ class T3DModel
 		 * @param aCamera Target camera.
 		 * @param aPosition Model's position.
 		 */
-		static void MakeBlendersitoWorldViewMatrix(TCamera &aCamera, TVector aPosition);
+		static void MakeWhisk3DWorldViewMatrix(TCamera &aCamera, TVector aPosition);
 
 		/**
- 		* Sets up a blendersito matrix, which is a matrix that rotates objects in such a way that they always
+ 		* Sets up a whisk3D matrix, which is a matrix that rotates objects in such a way that they always
 		* face the camera.
-		* Refer to the blendersito example to see how this method is used.
-		* Uses member data to position the blendersito.
+		* Refer to the whisk3D example to see how this method is used.
+		* Uses member data to position the whisk3D.
 		* @param aCamera Targer camera.
 		*/
 
@@ -341,7 +341,7 @@ class T3DModel
 		 * the camera. Note that this method doesn't modify the current yeaw, pitch and roll of this object.
 		 * @param aCamera Target camera.
 		 */
-		void MakeBlendersitoWorldViewMatrix(TCamera &aCamera);
+		void MakeWhisk3DWorldViewMatrix(TCamera &aCamera);
 
 	protected: // Data
 		/** Position of the model's pivot point. */
@@ -460,7 +460,7 @@ class T3DModelx
 		 * @param aCamera Target camera.
 		 * @param aPosition Model's position.
 		 */
-		static void MakeBlendersitoWorldViewMatrix(TCamerax &aCamera, TVectorx aPosition);
+		static void MakeWhisk3DWorldViewMatrix(TCamerax &aCamera, TVectorx aPosition);
 
 		/**
 		 * Sets up the current Open GL's matrix (normally this should be set to be the worldview matrix
@@ -468,7 +468,7 @@ class T3DModelx
 		 * the camera. Note that this method doesn't modify the current yeaw, pitch and roll of this object.
 		 * @param aCamera Target camera.
 		 */
-		void MakeBlendersitoWorldViewMatrix(TCamerax &aCamera);
+		void MakeWhisk3DWorldViewMatrix(TCamerax &aCamera);
 
 	protected: // Data
 

@@ -391,27 +391,27 @@ void T3DModel::MakeWorldViewMatrix(TCamera & aCamera, TVector aPosition,
 	}
 
 // -----------------------------------------------------------------------------
-// T3DModel::MakeBlendersitoWorldViewMatrix
-// Sets up a blendersito matrix, which is a matrix that rotates objects in such a
+// T3DModel::MakeWhisk3DWorldViewMatrix
+// Sets up a whisk3D matrix, which is a matrix that rotates objects in such a
 // way that they always face the camera.
-// Refer to the blendersito example to see how this method is used.
+// Refer to the whisk3D example to see how this method is used.
 // -----------------------------------------------------------------------------
 //
-void T3DModel::MakeBlendersitoWorldViewMatrix(TCamera & aCamera)
+void T3DModel::MakeWhisk3DWorldViewMatrix(TCamera & aCamera)
 	{
-	MakeBlendersitoWorldViewMatrix( aCamera, GetPosition() );
+	MakeWhisk3DWorldViewMatrix( aCamera, GetPosition() );
 	}
 
 // -----------------------------------------------------------------------------
-// T3DModel::MakeBlendersitoWorldViewMatrix
-// Sets up a blendersito matrix, which is a matrix that rotates objects in such a
+// T3DModel::MakeWhisk3DWorldViewMatrix
+// Sets up a whisk3D matrix, which is a matrix that rotates objects in such a
 // way that they always face the camera.
-// Refer to the blendersito example to see how this method is used.
+// Refer to the whisk3D example to see how this method is used.
 // -----------------------------------------------------------------------------
 //
-void T3DModel::MakeBlendersitoWorldViewMatrix(TCamera & aCamera, TVector aPosition)
+void T3DModel::MakeWhisk3DWorldViewMatrix(TCamera & aCamera, TVector aPosition)
 	{
-	// Set up a rotation matrix to orient the blendersito towards the camera.
+	// Set up a rotation matrix to orient the whisk3D towards the camera.
 	TVector dir   = aCamera.iLookAt - aCamera.iPosition;
 	GLfloat angle = atan( dir.iZ, dir.iX );
 	// The Yaw angle is computed in such a way that the object always faces the
@@ -564,28 +564,28 @@ void T3DModelx::MakeWorldViewMatrix(TCamerax & aCamera, TVectorx aPosition,
 	}
 
 // -----------------------------------------------------------------------------
-// T3DModelx::MakeBlendersitoWorldViewMatrix
-// Sets up a blendersito matrix, which is a matrix that rotates objects in such a
+// T3DModelx::MakeWhisk3DWorldViewMatrix
+// Sets up a whisk3D matrix, which is a matrix that rotates objects in such a
 // way that they always face the camera.
-// Refer to the blendersito example to see how this method is used.
+// Refer to the whisk3D example to see how this method is used.
 // -----------------------------------------------------------------------------
 //
-void T3DModelx::MakeBlendersitoWorldViewMatrix(TCamerax & aCamera)
+void T3DModelx::MakeWhisk3DWorldViewMatrix(TCamerax & aCamera)
 	{
-	MakeBlendersitoWorldViewMatrix( aCamera, GetPosition() );
+	MakeWhisk3DWorldViewMatrix( aCamera, GetPosition() );
 	}
 
 // -----------------------------------------------------------------------------
-// T3DModelx::MakeBlendersitoWorldViewMatrix
-// Sets up a blendersito matrix, which is a matrix that rotates objects in such a
+// T3DModelx::MakeWhisk3DWorldViewMatrix
+// Sets up a whisk3D matrix, which is a matrix that rotates objects in such a
 // way that they always face the camera.
-// Refer to the blendersito example to see how this method is used.
+// Refer to the whisk3D example to see how this method is used.
 // -----------------------------------------------------------------------------
 //
-void T3DModelx::MakeBlendersitoWorldViewMatrix(TCamerax & aCamera,
+void T3DModelx::MakeWhisk3DWorldViewMatrix(TCamerax & aCamera,
 	TVectorx aPosition)
 	{
-	// Set up a rotation matrix to orient the blendersito towards the camera.
+	// Set up a rotation matrix to orient the whisk3D towards the camera.
 	TVectorx Dir = aCamera.iLookAt - aCamera.iPosition;
 
 	GLfloat Angle = atan( FIXED_2_FLOAT(Dir.iZ), FIXED_2_FLOAT(Dir.iX) );

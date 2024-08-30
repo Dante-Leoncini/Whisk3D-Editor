@@ -1,12 +1,12 @@
 /*
  * ==============================================================================
- *  Name        : BlendersitoContainer.h
- *  Part of     : OpenGLEx / Blendersito
+ *  Name        : Whisk3DContainer.h
+ *  Part of     : OpenGLEx / Whisk3D
  * ==============================================================================
  */
 
-#ifndef BLENDERSITOCONTAINER_H
-#define BLENDERSITOCONTAINER_H
+#ifndef WHISK3DCONTAINER_H
+#define WHISK3DCONTAINER_H
 
 // INCLUDES
 #include <coecntrl.h>
@@ -17,8 +17,8 @@
 #include <GLES/egl.h>
 #include <akndef.h>
 
-#include "Blendersito.h"
-#include "Blendersitoinput.h"
+#include "Whisk3D.h"
+#include "Whisk3Dinput.h"
 
 // CLASS DECLARATION
 
@@ -28,10 +28,10 @@ class CAknExNoteView;
 
 /**
  * Container control class that handles the OpenGL ES initialization and deinitializations.
- * Also uses the CBlendersito class to do the actual OpenGL ES rendering.
+ * Also uses the CWhisk3D class to do the actual OpenGL ES rendering.
  */
 
-class CBlendersitoContainer : public CCoeControl, MCoeControlObserver, public MProgressDialogCallback
+class CWhisk3DContainer : public CCoeControl, MCoeControlObserver, public MProgressDialogCallback
     {       
 	private: // Enumerations
 	
@@ -48,9 +48,9 @@ class CBlendersitoContainer : public CCoeControl, MCoeControlObserver, public MP
         void ConstructL(const TRect& aRect);
 
         /**
-         * Destructor. Destroys the CPeriodic, CBlendersito and uninitializes OpenGL ES.
+         * Destructor. Destroys the CPeriodic, CWhisk3D and uninitializes OpenGL ES.
          */
-        virtual ~CBlendersitoContainer();
+        virtual ~CWhisk3DContainer();
 
     public: // New functions
 
@@ -129,8 +129,8 @@ class CBlendersitoContainer : public CCoeControl, MCoeControlObserver, public MP
 
         /**
          * Callback function for the CPeriodic. Calculates the current frame, keeps the background
-         * light from turning off and orders the CBlendersito to do the rendering for each frame.
-         *@param aInstance Pointer to this instance of CBlendersitoContainer.
+         * light from turning off and orders the CWhisk3D to do the rendering for each frame.
+         *@param aInstance Pointer to this instance of CWhisk3DContainer.
          */
         static int DrawCallBack( TAny* aInstance );
 
@@ -264,7 +264,7 @@ class CBlendersitoContainer : public CCoeControl, MCoeControlObserver, public MP
         GLfloat iLastFrameTimeSecs;
         
         /** Input handler that maps keycodes to inputs and stores the current state for each key. */
-        CBlendersitoInput* iInputHandler;
+        CWhisk3DInput* iInputHandler;
 
     public:  //data
 
@@ -272,7 +272,7 @@ class CBlendersitoContainer : public CCoeControl, MCoeControlObserver, public MP
         TInt iFrame;
 
         /** Used in DrawCallBack() method to do the actual OpenGL ES rendering.  */
-        CBlendersito* iBlendersito;
+        CWhisk3D* iWhisk3D;
     };
 
 #endif

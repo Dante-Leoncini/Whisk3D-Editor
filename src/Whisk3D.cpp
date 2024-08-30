@@ -1,7 +1,7 @@
 /*
  * ==============================================================================
- *  Name        : Blendersito.cpp
- *  Part of     : OpenGLEx / Blendersito
+ *  Name        : Whisk3D.cpp
+ *  Part of     : OpenGLEx / Whisk3D
  * ==============================================================================
  */
 
@@ -16,8 +16,8 @@
 //debug
 //#include <e32cons.h>
 //LOCAL_D CConsoleBase* console;
-#include "Blendersito.h"
-#include "BlendersitoContainer.h"
+#include "Whisk3D.h"
+#include "Whisk3DContainer.h"
 
 #include "Animation.h"
 #include "Mesh.h"
@@ -28,8 +28,8 @@
 
 #include <utf.h>       // Para CnvUtfConverter
 
-#include "blendersito.rsg"
-#include "blendersito.hrh"
+#include "whisk3D.rsg"
+#include "whisk3D.hrh"
 //#include <aknmessagequerydialog.h>		// DialogAlertL
 #include <aknnotewrappers.h> 
 #include <akncommondialogs.h>
@@ -283,7 +283,7 @@ GLshort TransformPivotPoint[3] = {0,0,0};
 GLfloat TransformPivotPointFloat[3] = {0.0f,0.0f,0.0f};
 FlechaEstado* flechasEstados;
 
-void CBlendersito::changeSelect(){
+void CWhisk3D::changeSelect(){
 	if (InteractionMode == ObjectMode){
 		//si no hay objetos
 		//o si esta moviendo, rotando o haciendo algo... no deja que continue
@@ -359,14 +359,14 @@ void CBlendersito::changeSelect(){
     redibujar = true;	
 }
 
-void CBlendersito::SetTipoSelect(TInt tipo){
+void CWhisk3D::SetTipoSelect(TInt tipo){
 	if (InteractionMode != EditMode){return;}
 	tipoSelect = tipo;
 	//SelectEdicionActivo = 0;	
     redibujar = true;
 }
 
-void CBlendersito::SetNavigation(){
+void CWhisk3D::SetNavigation(){
 	if (navegacionMode == Orbit){
 		navegacionMode = Fly;
 	}
@@ -387,7 +387,7 @@ void CBlendersito::SetNavigation(){
 // Help function to make the duck 'quak'.
 // -----------------------------------------------------------------------------
 //
-GLfloat CBlendersito::sin(GLfloat aRad){
+GLfloat CWhisk3D::sin(GLfloat aRad){
     TReal trg, src = (TReal)aRad;
     if ( Math::Sin(trg, src) == KErrNone )
         {
@@ -400,7 +400,7 @@ GLfloat CBlendersito::sin(GLfloat aRad){
 #define M_PI 3.14159265358979323846
 #endif
 
-GLfloat CBlendersito::aSin(GLfloat value) {
+GLfloat CWhisk3D::aSin(GLfloat value) {
     TReal result, input = static_cast<TReal>(value);
     if (Math::ASin(result, input) == KErrNone) {
         return static_cast<GLfloat>(result);
@@ -408,7 +408,7 @@ GLfloat CBlendersito::aSin(GLfloat value) {
     return 0;
 }
 
-GLfloat CBlendersito::atan2(GLfloat y, GLfloat x) {
+GLfloat CWhisk3D::atan2(GLfloat y, GLfloat x) {
     TReal result;
     if (x > 0) {
         if (Math::ATan(result, y / x) == KErrNone) {
@@ -435,12 +435,12 @@ GLfloat CBlendersito::atan2(GLfloat y, GLfloat x) {
 // ============================ MEMBER FUNCTIONS ===============================
 
 // -----------------------------------------------------------------------------
-// CBlendersito::CBlendersito
+// CWhisk3D::CWhisk3D
 // C++ default constructor can NOT contain any code, that
 // might leave.
 // -----------------------------------------------------------------------------
 //
-CBlendersito::CBlendersito( TUint aWidth, TUint aHeight, CBlendersitoInput* aInputHandler )
+CWhisk3D::CWhisk3D( TUint aWidth, TUint aHeight, CWhisk3DInput* aInputHandler )
 : CFiniteStateMachine() // iContainer( NULL ),CFiniteStateMachine()
 	{
     iScreenWidth  = aWidth;
@@ -450,7 +450,7 @@ CBlendersito::CBlendersito( TUint aWidth, TUint aHeight, CBlendersitoInput* aInp
 	}
 
 // -----------------------------------------------------------------------------
-// CBlendersito::ConstructL
+// CWhisk3D::ConstructL
 // Symbian 2nd phase constructor can leave.
 // -----------------------------------------------------------------------------
 //
@@ -461,7 +461,7 @@ enum{
 	FlechaIzquierda
 };
 
-void CBlendersito::ConstructL( void ){
+void CWhisk3D::ConstructL( void ){
 	InteractionMode = ObjectMode;
 	estado = editNavegacion;
 	navegacionMode = Orbit;
@@ -539,7 +539,7 @@ void CBlendersito::ConstructL( void ){
 	prop.keyframes.Append(key);*/
 }
 
-void CBlendersito::RemoveMaterial(){
+void CWhisk3D::RemoveMaterial(){
 	//si no hay objetos
 	/*if (Objects.Count() < 1){return;}	
 	Object& obj = Objects[SelectActivo];
@@ -551,19 +551,19 @@ void CBlendersito::RemoveMaterial(){
 	Materials.Remove(SelectActivo);*/
 };
 
-void CBlendersito::RemoveTexture(){
+void CWhisk3D::RemoveTexture(){
 
 };
 
 // -----------------------------------------------------------------------------
-// CBlendersito::NewL
+// CWhisk3D::NewL
 // Two-phased constructor.
 // -----------------------------------------------------------------------------
 //
-CBlendersito* CBlendersito::NewL( TUint aWidth, TUint aHeight, CBlendersitoInput* aInputHandler ){
+CWhisk3D* CWhisk3D::NewL( TUint aWidth, TUint aHeight, CWhisk3DInput* aInputHandler ){
     /* Symbian 2-phase constructor. Calls both the default
        C++ constructor and Symbian ConstructL methods */
-    CBlendersito* self = new (ELeave) CBlendersito( aWidth, aHeight, aInputHandler );
+    CWhisk3D* self = new (ELeave) CWhisk3D( aWidth, aHeight, aInputHandler );
     CleanupStack::PushL( self );
     self->ConstructL();
     CleanupStack::Pop();
@@ -573,19 +573,19 @@ CBlendersito* CBlendersito::NewL( TUint aWidth, TUint aHeight, CBlendersitoInput
 
 
 // Destructor.
-CBlendersito::~CBlendersito(){
+CWhisk3D::~CWhisk3D(){
     //delete iContainer;
 }
 
 // -----------------------------------------------------------------------------
-// CBlendersito::AppInit
+// CWhisk3D::AppInit
 // Initialize OpenGL ES, set the vertex and color arrays and pointers,
 // and select the shading mode.
 // -----------------------------------------------------------------------------
 //
 RArray<TTexture> Textures;
-TInt NumTexturasBlendersito = 0;
-void CBlendersito::AppInit( void ){
+TInt NumTexturasWhisk3D = 0;
+void CWhisk3D::AppInit( void ){
     // Construct a texture manager that uses the application's private
     // directory as the location for all textures.
 	iTextureManager = CTextureManager::NewL ( iScreenWidth, iScreenHeight,
@@ -677,9 +677,9 @@ void CBlendersito::AppInit( void ){
 	_LIT( KkeyframeTextura, "keyframe.png" );	
 	_LIT( KRelationshipLineTextura, "relationshipLine.png" );	
 	
-	NumTexturasBlendersito = 6;
-	Textures.ReserveL(NumTexturasBlendersito); // Reservar espacio para las texturas
-	for (TInt i = 0; i < NumTexturasBlendersito; ++i) {
+	NumTexturasWhisk3D = 6;
+	Textures.ReserveL(NumTexturasWhisk3D); // Reservar espacio para las texturas
+	for (TInt i = 0; i < NumTexturasWhisk3D; ++i) {
 	    TTexture texture;
 	    Textures.Append(texture);
 	}
@@ -700,23 +700,23 @@ void CBlendersito::AppInit( void ){
 
 
 // -----------------------------------------------------------------------------
-// CBlendersito::AppExit
+// CWhisk3D::AppExit
 // Release any allocations made in AppInit.
 // -----------------------------------------------------------------------------
 //
-void CBlendersito::AppExit( void ){
+void CWhisk3D::AppExit( void ){
 	delete iTextureManager;
 }
 
 
 // -----------------------------------------------------------------------------
-// CBlendersito::AppCycle
+// CWhisk3D::AppCycle
 // Draws and animates the objects
 // -----------------------------------------------------------------------------
 //
 
 // Funcion para calcular las coordenadas de textura esféricas
-void CBlendersito::calculateReflectionUVs(Mesh& pMesh) {
+void CWhisk3D::calculateReflectionUVs(Mesh& pMesh) {
     for (int i = 0; i < pMesh.vertexSize; ++i) {
         // Obtener la normal del vértice
         GLfloat nx = static_cast<GLfloat>(pMesh.normals[i * 3 + 0]) / 127.0f;
@@ -732,7 +732,7 @@ void CBlendersito::calculateReflectionUVs(Mesh& pMesh) {
     }
 }
 
-void CBlendersito::RenderMesh( Object& obj, TInt indice ){
+void CWhisk3D::RenderMesh( Object& obj, TInt indice ){
 	Mesh& pMesh = Meshes[obj.Id];	
     glPushMatrix();
     glScalex(obj.scaleX, obj.scaleZ, obj.scaleY);	
@@ -1011,7 +1011,7 @@ void CBlendersito::RenderMesh( Object& obj, TInt indice ){
 }
 
 // Funcion recursiva para renderizar un objeto y sus hijos
-void CBlendersito::RenderMeshAndChildren(Object& obj, TInt indice){
+void CWhisk3D::RenderMeshAndChildren(Object& obj, TInt indice){
     // Guardar la matriz actual
     glPushMatrix();
     
@@ -1037,7 +1037,7 @@ void CBlendersito::RenderMeshAndChildren(Object& obj, TInt indice){
 }
 
 // Funcion recursiva para renderizar un objeto y sus hijos
-void CBlendersito::RenderObjectAndChildrens(TInt objId){
+void CWhisk3D::RenderObjectAndChildrens(TInt objId){
 	Object& obj = Objects[objId];
     // Guardar la matriz actual
     glPushMatrix();
@@ -1063,7 +1063,7 @@ void CBlendersito::RenderObjectAndChildrens(TInt objId){
 }
 
 //Relantionshipslines
-void CBlendersito::RenderLinkLines(TInt objId){
+void CWhisk3D::RenderLinkLines(TInt objId){
 	Object& obj = Objects[objId];
     // Guardar la matriz actual
     glPushMatrix();
@@ -1102,7 +1102,7 @@ void CBlendersito::RenderLinkLines(TInt objId){
     glPopMatrix();
 }
 
-void CBlendersito::RenderObject( TInt objId ){
+void CWhisk3D::RenderObject( TInt objId ){
 	Object& obj = Objects[objId];
 	glPushMatrix();
 	glScalex(obj.scaleX, obj.scaleZ, obj.scaleY);	
@@ -1165,7 +1165,7 @@ void CBlendersito::RenderObject( TInt objId ){
 }
 
 
-void CBlendersito::InsertKeyframe(TInt propertySelect){
+void CWhisk3D::InsertKeyframe(TInt propertySelect){
 	//ShowOptionsDialogL();
     // Crear una lista de opciones
     //CDesCArrayFlat* options = new (ELeave) CDesCArrayFlat(3);
@@ -1272,7 +1272,7 @@ void CBlendersito::InsertKeyframe(TInt propertySelect){
     redibujar = true;	
 }
 
-void CBlendersito::RemoveKeyframes(){
+void CWhisk3D::RemoveKeyframes(){
     for(TInt a = 0; a < Animations.Count(); a++) {
 		if (Animations[a].Id == SelectActivo){
         	if (Animations[a].Propertys.Count() > 0) {
@@ -1297,7 +1297,7 @@ void CBlendersito::RemoveKeyframes(){
     redibujar = true;
 }
 
-void CBlendersito::ClearKeyframes(){
+void CWhisk3D::ClearKeyframes(){
     for(TInt a = 0; a < Animations.Count(); a++) {
 		if (Animations[a].Id == SelectActivo){
 			/*for(TInt p = 0; p < Animations[a].Propertys.Count(); p++){
@@ -1311,7 +1311,7 @@ void CBlendersito::ClearKeyframes(){
     redibujar = true;
 }
 
-void CBlendersito::ReloadAnimation(){
+void CWhisk3D::ReloadAnimation(){
     for(TInt a = 0; a < Animations.Count(); a++) {
 		for(TInt p = 0; p < Animations[a].Propertys.Count(); p++){
 			AnimProperty& anim = Animations[a].Propertys[p];
@@ -1401,13 +1401,13 @@ void CBlendersito::ReloadAnimation(){
     }
 }
 
-void CBlendersito::SetCurrentFrame(){
+void CWhisk3D::SetCurrentFrame(){
 	Cancelar();
 	estado = timelineMove;
     redibujar = true;
 }
 
-void CBlendersito::SetEndFrame(){
+void CWhisk3D::SetEndFrame(){
 	Cancelar();
 	HBufC* noteBuf = HBufC::NewLC(100);
 	noteBuf->Des().Copy(_L("Set Final Frame"));
@@ -1416,7 +1416,7 @@ void CBlendersito::SetEndFrame(){
     redibujar = true;
 }
 
-void CBlendersito::SetStartFrame(){
+void CWhisk3D::SetStartFrame(){
 	Cancelar();
 	HBufC* noteBuf = HBufC::NewLC(100);
 	noteBuf->Des().Copy(_L("Set Start Frame"));
@@ -1427,7 +1427,7 @@ void CBlendersito::SetStartFrame(){
 
 TBool postProcesado = true;
 TBool dialogoSymbian = false;
-void CBlendersito::AppCycle( TInt iFrame, GLfloat aTimeSecs, GLfloat aDeltaTimeSecs ){
+void CWhisk3D::AppCycle( TInt iFrame, GLfloat aTimeSecs, GLfloat aDeltaTimeSecs ){
     // If texture loading is still going on, return from this method without doing anything.
 	if ( GetState() == ELoadingTextures ){
         return;
@@ -1696,7 +1696,7 @@ void CBlendersito::AppCycle( TInt iFrame, GLfloat aTimeSecs, GLfloat aDeltaTimeS
     redibujar = false;
 }
 
-void CBlendersito::SearchSelectObj(Object& obj, TInt objIndex, TBool& found) {
+void CWhisk3D::SearchSelectObj(Object& obj, TInt objIndex, TBool& found) {
     glPushMatrix();    
     glTranslatef(obj.posX, obj.posZ, obj.posY);
     
@@ -1725,7 +1725,7 @@ void CBlendersito::SearchSelectObj(Object& obj, TInt objIndex, TBool& found) {
     glPopMatrix();
 }
 
-void CBlendersito::DrawTransformAxis(Object& obj) {
+void CWhisk3D::DrawTransformAxis(Object& obj) {
 	glPushMatrix();    
 	glVertexPointer( 3, GL_SHORT, 0, objVertexdataFloor );
 	glLineWidth(2);
@@ -1766,7 +1766,7 @@ void CBlendersito::DrawTransformAxis(Object& obj) {
 	glPopMatrix();
 }
 
-void CBlendersito::DibujarOrigen(Object& obj, TInt objIndex){
+void CWhisk3D::DibujarOrigen(Object& obj, TInt objIndex){
     glPushMatrix();    
     glTranslatef(obj.posX, obj.posZ, obj.posY);
     
@@ -1798,7 +1798,7 @@ void CBlendersito::DibujarOrigen(Object& obj, TInt objIndex){
 }
 
 //Se encarga de la nueva UI 3d
-void CBlendersito::dibujarUI(){
+void CWhisk3D::dibujarUI(){
 	glMatrixMode( GL_PROJECTION );
 	glLoadIdentity();     
 	glOrthof(0.0f, (GLfloat)iScreenWidth, (GLfloat)iScreenHeight, 0.0f, -5.0f, 1000.0f);
@@ -1918,7 +1918,7 @@ void CBlendersito::dibujarUI(){
 	SetPerspectiva(false);
 }
 
-void CBlendersito::DrawnTimeline(){
+void CWhisk3D::DrawnTimeline(){
 	glDisable( GL_TEXTURE_2D );	
 	glDisable( GL_BLEND );
 
@@ -1957,35 +1957,35 @@ void CBlendersito::DrawnTimeline(){
 	DrawnLines(2, 1, LineaTimeline, LineaEdge);
 }
 
-void CBlendersito::DrawnLines(TInt LineWidth, TInt cantidad, GLshort* vertexlines, GLushort* lineasIndices){
+void CWhisk3D::DrawnLines(TInt LineWidth, TInt cantidad, GLshort* vertexlines, GLushort* lineasIndices){
 	glVertexPointer( 3, GL_SHORT, 0, vertexlines );
 	glLineWidth(LineWidth);	
 	glDrawElements( GL_LINES, cantidad*2, GL_UNSIGNED_SHORT, lineasIndices );
 }
 
-void CBlendersito::DrawnLines(TInt LineWidth, TInt cantidad, const GLshort* vertexlines, const GLushort* lineasIndices) {
+void CWhisk3D::DrawnLines(TInt LineWidth, TInt cantidad, const GLshort* vertexlines, const GLushort* lineasIndices) {
     glVertexPointer(3, GL_SHORT, 0, vertexlines);
     glLineWidth(LineWidth);
     glDrawElements(GL_LINES, cantidad * 2, GL_UNSIGNED_SHORT, lineasIndices);
 }
 
-void CBlendersito::SetUvSprite(GLshort x, GLshort y, GLshort ancho, GLshort alto){
+void CWhisk3D::SetUvSprite(GLshort x, GLshort y, GLshort ancho, GLshort alto){
 	SpriteUV[0] = SpriteUV[6] = (GLbyte)(-128+x);
 	SpriteUV[2] = SpriteUV[4] = (GLbyte)(-128+x+ancho);
 	SpriteUV[1] = SpriteUV[3] = (GLbyte)(-128+y);
 	SpriteUV[5] = SpriteUV[7] = (GLbyte)(-128+y+alto);
 }
 
-void CBlendersito::SetSpriteSize(GLshort ancho, GLshort alto){
+void CWhisk3D::SetSpriteSize(GLshort ancho, GLshort alto){
 	SpriteVertices[3] = SpriteVertices[6] = ancho+1;
 	SpriteVertices[7] = SpriteVertices[10] = alto+1;
 }
 
-void CBlendersito::DrawnRectangle(){
+void CWhisk3D::DrawnRectangle(){
 	glDrawElements( GL_TRIANGLES, 2*3, GL_UNSIGNED_SHORT, SpriteFaces );
 }
 
-void CBlendersito::IconSelect(TBool activo){
+void CWhisk3D::IconSelect(TBool activo){
 	if (activo){
 		glDisable( GL_TEXTURE_2D );
 		glColor4f(ListaColores[azulUI][0],ListaColores[azulUI][1],ListaColores[azulUI][2],ListaColores[azulUI][3]);	
@@ -2000,11 +2000,11 @@ void CBlendersito::IconSelect(TBool activo){
 	}
 }
 
-void CBlendersito::UiMoveTo(GLshort x, GLshort y){
+void CWhisk3D::UiMoveTo(GLshort x, GLshort y){
 	glTranslatef( x, y, 0);
 }
 
-void CBlendersito::SetUvBordes(GLshort origenX, GLshort origenY, GLshort ancho, GLshort alto, GLshort top, GLshort right, GLshort bottom, GLshort left){
+void CWhisk3D::SetUvBordes(GLshort origenX, GLshort origenY, GLshort ancho, GLshort alto, GLshort top, GLshort right, GLshort bottom, GLshort left){
 	//Filas en X
 	SpriteUV[0]  = SpriteUV[6]  = SpriteUV[16] = SpriteUV[24] = (GLbyte)(-128+origenX);
 	SpriteUV[2]  = SpriteUV[4]  = SpriteUV[18] = SpriteUV[26] = (GLbyte)(-128+origenX+left);
@@ -2017,7 +2017,7 @@ void CBlendersito::SetUvBordes(GLshort origenX, GLshort origenY, GLshort ancho, 
 	SpriteUV[25] = SpriteUV[27] = SpriteUV[29] = SpriteUV[31] =(GLbyte)(-128+origenY+alto);
 }
 
-void CBlendersito::DibujarRectanguloBordes(GLshort ancho, GLshort alto, GLshort top, GLshort right, GLshort bottom, GLshort left ){
+void CWhisk3D::DibujarRectanguloBordes(GLshort ancho, GLshort alto, GLshort top, GLshort right, GLshort bottom, GLshort left ){
 	//cambia el tamaño
 	//Posicion en X
 	SpriteVertices[3]  = SpriteVertices[6]  = SpriteVertices[27] = SpriteVertices[39] = left+1;
@@ -2031,7 +2031,7 @@ void CBlendersito::DibujarRectanguloBordes(GLshort ancho, GLshort alto, GLshort 
 	glDrawElements( GL_TRIANGLES, 18*3, GL_UNSIGNED_SHORT, SpriteFaces );
 }
 
-void CBlendersito::SetMouse(){
+void CWhisk3D::SetMouse(){
 	mouseVisible = !mouseVisible;
 	mouseX = iScreenWidth/2;
 	mouseY = (GLshort)iScreenHeightSplit;
@@ -2039,32 +2039,32 @@ void CBlendersito::SetMouse(){
 }
 
 //invierte cualquier valor que se le manda, de verdadero a falso y viceversa
-void CBlendersito::ToggleValue(TBool& valueToUpdate){
+void CWhisk3D::ToggleValue(TBool& valueToUpdate){
     valueToUpdate = !valueToUpdate;
     redibujar = true;
 }
 
 // -------------------------------------------------------------------------------------------------------
-// CBlendersito::OnStartLoadingTextures()
+// CWhisk3D::OnStartLoadingTextures()
 // Called for a MTextureLoadingListener by the texture manager when texture loading operation starts
 // -------------------------------------------------------------------------------------------------------
 
-void CBlendersito::OnStartLoadingTexturesL(){
+void CWhisk3D::OnStartLoadingTexturesL(){
     SetStateL( ELoadingTextures );
 }
 
 // ------------------------------------------------------------------------------------------------------------
-// CBlendersito::OnEndLoadingTextures()
+// CWhisk3D::OnEndLoadingTextures()
 // Called for a MTextureLoadingListener by the texture manager when texture loading operation is completed
 // ------------------------------------------------------------------------------------------------------------
-void CBlendersito::OnEndLoadingTexturesL(){
+void CWhisk3D::OnEndLoadingTexturesL(){
 	if ( GetState() == ELoadingTextures ){
 		SetStateL( ERunning );
 	}
 }
 
 
-void CBlendersito::SeleccionarAnterior(){
+void CWhisk3D::SeleccionarAnterior(){
 	if (InteractionMode == ObjectMode){
 		if (Objects.Count() < 1){return;}
 		/*if (Objects[SelectActivo].seleccionado){
@@ -2098,7 +2098,7 @@ void CBlendersito::SeleccionarAnterior(){
 	redibujar = true;
 }
 
-void CBlendersito::SeleccionarProximo(){
+void CWhisk3D::SeleccionarProximo(){
 	if (InteractionMode == ObjectMode){
 		if (Objects.Count() < 1){return;}
 		/*if (Objects[SelectActivo].seleccionado){
@@ -2132,7 +2132,7 @@ void CBlendersito::SeleccionarProximo(){
 	redibujar = true;
 }
 
-void CBlendersito::InvertirSeleccion(){
+void CWhisk3D::InvertirSeleccion(){
 	if (InteractionMode == ObjectMode){
 		for(int o=0; o < Objects.Count(); o++){
 			Objects[o].seleccionado = !Objects[o].seleccionado;
@@ -2152,7 +2152,7 @@ void CBlendersito::InvertirSeleccion(){
 	redibujar = true;
 }
 
-void CBlendersito::SeleccionarTodo(){
+void CWhisk3D::SeleccionarTodo(){
 	TBool TodoSeleccionado = true;
 	if (InteractionMode == ObjectMode){
 		for(int o=0; o < Objects.Count(); o++){
@@ -2197,7 +2197,7 @@ void CBlendersito::SeleccionarTodo(){
 	redibujar = true;
 }
 
-void CBlendersito::SetTranslacionObjetos(TInt valor){
+void CWhisk3D::SetTranslacionObjetos(TInt valor){
 	for (int o = 0; o < estadoObjetos.Count(); o++) {
 		switch (axisSelect) {
 			case X:
@@ -2214,12 +2214,12 @@ void CBlendersito::SetTranslacionObjetos(TInt valor){
 }
 
 // Convierte grados a radianes
-GLfloat CBlendersito::GradosARadianes(TInt grados) {
+GLfloat CWhisk3D::GradosARadianes(TInt grados) {
     return grados * (PI / 180.0);
 }
 
 TInt valorRotacion = 0;
-void CBlendersito::SetRotacion(TInt valor){
+void CWhisk3D::SetRotacion(TInt valor){
 	if (InteractionMode == ObjectMode){
 		for (int o = 0; o < estadoObjetos.Count(); o++) {
 			switch (axisSelect) {
@@ -2280,7 +2280,7 @@ void CBlendersito::SetRotacion(TInt valor){
 	}
 }
 
-void CBlendersito::SetTranslacionVertices(TInt valor){
+void CWhisk3D::SetTranslacionVertices(TInt valor){
 	Mesh& pMesh = Meshes[Objects[SelectActivo].Id];	
 	for(int g=0; g < estadoVertices.Count(); g++){
 		for(int vg=0; vg < pMesh.vertexGroups[estadoVertices[g].indice].indices.Count(); vg++){
@@ -2299,7 +2299,7 @@ void CBlendersito::SetTranslacionVertices(TInt valor){
 	}
 }
 
-void CBlendersito::CalcShrinkFattenVectors(){
+void CWhisk3D::CalcShrinkFattenVectors(){
 	if (Objects.Count() < 1){return;}
 	Object& obj = Objects[SelectActivo];
 	if (!obj.seleccionado || obj.type != mesh){return;}
@@ -2344,7 +2344,7 @@ void CBlendersito::CalcShrinkFattenVectors(){
 	redibujar = true;
 }
 
-void CBlendersito::SetShrinkFatten(TInt fuerza){
+void CWhisk3D::SetShrinkFatten(TInt fuerza){
 	Mesh& pMesh = Meshes[Objects[SelectActivo].Id];
 	for(int i=0; i < VectoresTInt.Count(); i++){		
 		//aplica el vector
@@ -2364,7 +2364,7 @@ void CBlendersito::SetShrinkFatten(TInt fuerza){
 	redibujar = true;
 }
 
-void CBlendersito::CalcScaleVectors(){
+void CWhisk3D::CalcScaleVectors(){
 	Object& obj = Objects[SelectActivo];
 	Mesh& pMesh = Meshes[obj.Id];
 
@@ -2409,7 +2409,7 @@ void CBlendersito::CalcScaleVectors(){
 	redibujar = true;
 }
 
-void CBlendersito::SetScale(TInt valor){
+void CWhisk3D::SetScale(TInt valor){
 	if (InteractionMode == EditMode){
 		Mesh& pMesh = Meshes[Objects[SelectActivo].Id];
 		for(int i=0; i < VectoresTInt.Count(); i++){		
@@ -2453,7 +2453,7 @@ void CBlendersito::SetScale(TInt valor){
 }
 
 TInt ShiftCount = 0;
-void CBlendersito::InputUsuario(GLfixed aDeltaTimeSecs){
+void CWhisk3D::InputUsuario(GLfixed aDeltaTimeSecs){
 	if (iInputHandler->IsInputPressed( EEscape )){
 		Cancelar();
 		return;
@@ -2760,7 +2760,7 @@ void CBlendersito::InputUsuario(GLfixed aDeltaTimeSecs){
 	}
 }
 
-void CBlendersito::SetRotacion(){
+void CWhisk3D::SetRotacion(){
 	//si no hay objetos
 	if (Objects.Count() < 1){return;}
 	else if (Objects[SelectActivo].seleccionado && estado == editNavegacion){
@@ -2778,7 +2778,7 @@ void CBlendersito::SetRotacion(){
     redibujar = true;	
 };
 
-void CBlendersito::SetEscala(){
+void CWhisk3D::SetEscala(){
 	//XYZ tiene escala
 	//si no hay objetos
 	if (Objects.Count() < 1){return;}
@@ -2796,7 +2796,7 @@ void CBlendersito::SetEscala(){
     redibujar = true;	
 };
 
-void CBlendersito::ChangeEje(){
+void CWhisk3D::ChangeEje(){
 	if (Objects.Count() < 1){return;}
 	if (estado != editNavegacion){
 		axisSelect++;
@@ -2812,7 +2812,7 @@ void CBlendersito::ChangeEje(){
 	redibujar = true;
 }
 
-void CBlendersito::SetPosicion(){
+void CWhisk3D::SetPosicion(){
 	//si no hay objetos
 	if (Objects.Count() < 1){return;}
 
@@ -2854,7 +2854,7 @@ void CBlendersito::SetPosicion(){
     redibujar = true;	
 };
 
-void CBlendersito::EventKeyDown(TInt scan){
+void CWhisk3D::EventKeyDown(TInt scan){
 	switch(scan){               
 		/*case(4): //ESC no anda...
 			Cancelar(); */   
@@ -2904,7 +2904,7 @@ void CBlendersito::EventKeyDown(TInt scan){
 };
 
 // Funcion para abrir el popup con las opciones
-void CBlendersito::VerOpciones(){
+void CWhisk3D::VerOpciones(){
     // Declarar el indice seleccionado
     /*TInt iSelectedIndex = 0;
 
@@ -2932,20 +2932,20 @@ void CBlendersito::VerOpciones(){
     CleanupStack::Pop(items); // Limpia el array de la pila*/
 }
 
-void CBlendersito::SetEje(TInt eje){
+void CWhisk3D::SetEje(TInt eje){
 	if (estado != editNavegacion){
 		axisSelect = eje;
 	}	
     redibujar = true;	
 };
 
-void CBlendersito::Cancelar(){
+void CWhisk3D::Cancelar(){
 	if (estado != editNavegacion){
 		ReestablecerEstado();
 	}
 };
 
-void CBlendersito::Aceptar(){	
+void CWhisk3D::Aceptar(){	
 	//si no hay objetos
 	if (Objects.Count() < 1){return;}
 
@@ -2978,7 +2978,7 @@ void CBlendersito::Aceptar(){
     redibujar = true;
 };
 
-void CBlendersito::PressTab(){
+void CWhisk3D::PressTab(){
 	if (estado == editNavegacion){
 		if (InteractionMode == EditMode){
 			InteractionMode = ObjectMode;
@@ -2994,7 +2994,7 @@ void CBlendersito::PressTab(){
     redibujar = true;
 }
 
-void CBlendersito::Tab(){
+void CWhisk3D::Tab(){
 	if (estado != editNavegacion){ //} estado == translacion || estado == rotacion || estado == EditScale || estado == VertexMove){
 		InsertarValor();
 	}
@@ -3010,7 +3010,7 @@ void CBlendersito::Tab(){
 	};
 };
 
-void CBlendersito::ReestablecerEstado(){
+void CWhisk3D::ReestablecerEstado(){
 	Object& obj = Objects[SelectActivo];
 
 	if (InteractionMode == EditMode){
@@ -3060,7 +3060,7 @@ void CBlendersito::ReestablecerEstado(){
 };
 
 
-void CBlendersito::SetTransformPivotPoint(){
+void CWhisk3D::SetTransformPivotPoint(){
 	if (Objects.Count() < 1){return;}	
 	if (InteractionMode == EditMode){
 		Object& obj = Objects[SelectActivo];
@@ -3115,7 +3115,7 @@ void CBlendersito::SetTransformPivotPoint(){
 	}
 }
 
-void CBlendersito::guardarEstado(){	
+void CWhisk3D::guardarEstado(){	
 	if (InteractionMode == EditMode){
 		Object& obj = Objects[SelectActivo];
 		Mesh& pMesh = Meshes[obj.Id];
@@ -3173,7 +3173,7 @@ void CBlendersito::guardarEstado(){
 };
 
 //cambie el shader
-void CBlendersito::SetShading(TInt valor){	
+void CWhisk3D::SetShading(TInt valor){	
 	for (int i = 0; i < Lights.Count(); i++) {
 		//glDisable( Lights[i].lightId );			
 		//glDisable( GL_LIGHT3 );			
@@ -3209,15 +3209,15 @@ void CBlendersito::SetShading(TInt valor){
 }
 
 // ---------------------------------------------------------
-// CBlendersito::OnEnterState( TInt aState )
+// CWhisk3D::OnEnterState( TInt aState )
 // Called by TFiniteStateMachine when the f.s.m enters a new state
 // ---------------------------------------------------------
 
-void CBlendersito::OnEnterStateL( TInt /*aState*/ ){
+void CWhisk3D::OnEnterStateL( TInt /*aState*/ ){
 	// Nothing to do here...
 }
 
-void CBlendersito::InsertarValor(){
+void CWhisk3D::InsertarValor(){
 	dialogoSymbian = true;
 	HBufC* buf = HBufC::NewLC( 100 );
 	if (estado == rotacion ){
@@ -3336,7 +3336,7 @@ void CBlendersito::InsertarValor(){
 	redibujar = true;	
 }
 
-void CBlendersito::TecladoNumerico(TInt numero){
+void CWhisk3D::TecladoNumerico(TInt numero){
 	if (InteractionMode == ObjectMode){
 		switch (numero) {
 			case 1:
@@ -3398,7 +3398,7 @@ void CBlendersito::TecladoNumerico(TInt numero){
 };
 
 
-void CBlendersito::SetParent(){
+void CWhisk3D::SetParent(){
 	if (Objects.Count() < 1){return;}
 	
 	TInt ParentID = 1;
@@ -3467,7 +3467,7 @@ void CBlendersito::SetParent(){
 	redibujar = true;
 }
 
-void CBlendersito::ClearParent(){
+void CWhisk3D::ClearParent(){
 	if (Objects.Count() < 1){return;}
 	for(int c=0; c < Collection.Count(); c++){
 		if (Collection[c] == SelectActivo){
@@ -3492,7 +3492,7 @@ void CBlendersito::ClearParent(){
 	redibujar = true;
 };
 
-void CBlendersito::FlipNormals(){
+void CWhisk3D::FlipNormals(){
 	//si no hay objetos
 	if (Objects.Count() < 1){return;}	
 	Object& obj = Objects[SelectActivo];
@@ -3514,7 +3514,7 @@ void CBlendersito::FlipNormals(){
 	redibujar = true;
 }
 
-void CBlendersito::Borrar(){
+void CWhisk3D::Borrar(){
 	if (estado != editNavegacion ){
 		Cancelar();
 	}
@@ -3591,7 +3591,7 @@ void CBlendersito::Borrar(){
     redibujar = true;	
 }
 
-void CBlendersito::BorrarMesh(TInt indice){
+void CWhisk3D::BorrarMesh(TInt indice){
 	TInt links = 0;
 	
 	for(int o=0; o < Objects.Count(); o++){
@@ -3629,7 +3629,7 @@ void CBlendersito::BorrarMesh(TInt indice){
 	}
 }
 
-void CBlendersito::BorrarAnimaciones(TInt indice){
+void CWhisk3D::BorrarAnimaciones(TInt indice){
 	for(TInt a = 0; a < Animations.Count(); a++) {
 		if (Animations[a].Id == indice) {	
 			for(TInt p = 0; p < Animations[a].Propertys.Count(); p++) {
@@ -3645,7 +3645,7 @@ void CBlendersito::BorrarAnimaciones(TInt indice){
 	}
 }
 
-void CBlendersito::BorrarObjeto(TInt indice){
+void CWhisk3D::BorrarObjeto(TInt indice){
 	Object& obj = Objects[indice];
 	// Liberar memoria de los punteros del objeto seleccionado
 	if (obj.type == mesh){
@@ -3710,7 +3710,7 @@ void CBlendersito::BorrarObjeto(TInt indice){
 	}
 }
 
-void CBlendersito::CursorToSelect(){		
+void CWhisk3D::CursorToSelect(){		
 	SetTransformPivotPoint();
 	if (InteractionMode == ObjectMode){
 		Cursor3DposX = TransformPivotPointFloat[0];
@@ -3728,7 +3728,7 @@ void CBlendersito::CursorToSelect(){
 	redibujar = true;
 }
 
-void CBlendersito::SelectToCursor(){
+void CWhisk3D::SelectToCursor(){
 	if (Objects.Count() < 1){return;}	
 	if (InteractionMode == ObjectMode){	
 		for(TInt i=0; i < Objects.Count(); i++){	
@@ -3762,7 +3762,7 @@ void CBlendersito::SelectToCursor(){
 	redibujar = true;
 }
 
-void CBlendersito::SetOriginTo3DCursor(){
+void CWhisk3D::SetOriginTo3DCursor(){
 	if (Objects.Count() < 1){return;}	
 	Object& obj = Objects[SelectActivo];
 	if (obj.type != mesh){return;};
@@ -3784,14 +3784,14 @@ void CBlendersito::SetOriginTo3DCursor(){
 	redibujar = true;
 }
 
-void CBlendersito::CursorToWorldOrigin(){
+void CWhisk3D::CursorToWorldOrigin(){
 	Cursor3DposX = 0;
 	Cursor3DposZ = 0;
 	Cursor3DposY = 0;
 	redibujar = true;
 }
 
-void CBlendersito::AddObject( TInt tipo ){
+void CWhisk3D::AddObject( TInt tipo ){
 	//Cancelar();
 	Object obj;
 	obj.type = tipo;
@@ -3852,7 +3852,7 @@ void CBlendersito::AddObject( TInt tipo ){
 }
 
 
-void CBlendersito::DeseleccionarTodo(){
+void CWhisk3D::DeseleccionarTodo(){
 	if (InteractionMode == ObjectMode){
 		for(int o=0; o < Objects.Count(); o++){
 			Objects[o].seleccionado = false;				
@@ -3875,7 +3875,7 @@ void CBlendersito::DeseleccionarTodo(){
 	}
 }
 
-void CBlendersito::UVmapping(TInt valor){
+void CWhisk3D::UVmapping(TInt valor){
     Object& obj = Objects[SelectActivo];
     if (obj.type != mesh) { return; }
     Mesh& pMesh = Meshes[obj.Id];
@@ -3911,7 +3911,7 @@ void CBlendersito::UVmapping(TInt valor){
 	redibujar = true;
 }
 
-void CBlendersito::AddMesh( int modelo ){
+void CWhisk3D::AddMesh( int modelo ){
 	//Cancelar();
 	//creamos la mesh primero
 	Object obj;	
@@ -4135,7 +4135,7 @@ void CBlendersito::AddMesh( int modelo ){
     redibujar = true;
 }
 
-void CBlendersito::Extrude(){
+void CWhisk3D::Extrude(){
 	if (InteractionMode != EditMode && estado != editNavegacion){return;};
 	Object& obj = Objects[SelectActivo];
 	Mesh& pMesh = Meshes[obj.Id];
@@ -4147,7 +4147,7 @@ void CBlendersito::Extrude(){
 	redibujar = true;
 }
 
-void CBlendersito::Duplicate(){
+void CWhisk3D::Duplicate(){
 	if (InteractionMode != EditMode && estado != editNavegacion){return;};
 	Object& obj = Objects[SelectActivo];
 	Mesh& pMesh = Meshes[obj.Id];
@@ -4159,7 +4159,7 @@ void CBlendersito::Duplicate(){
 	redibujar = true;
 }
 
-void CBlendersito::ActivarTextura(){
+void CWhisk3D::ActivarTextura(){
 	//si no hay objetos
 	if (Objects.Count() < 1){return;}	
 	Object& obj = Objects[SelectActivo];
@@ -4191,7 +4191,7 @@ void CBlendersito::ActivarTextura(){
     redibujar = true;
 }
 
-void CBlendersito::SetTransparencia(){
+void CWhisk3D::SetTransparencia(){
 	//si no hay objetos
 	if (Objects.Count() < 1){return;}	
 	Object& obj = Objects[SelectActivo];
@@ -4223,7 +4223,7 @@ void CBlendersito::SetTransparencia(){
     redibujar = true;
 }
 
-void CBlendersito::SetTextureRepeat(){
+void CWhisk3D::SetTextureRepeat(){
 	//si no hay objetos
 	if (Objects.Count() < 1){return;}	
 	Object& obj = Objects[SelectActivo];
@@ -4254,7 +4254,7 @@ void CBlendersito::SetTextureRepeat(){
     redibujar = true;
 }
 
-void CBlendersito::SetSmooth(){
+void CWhisk3D::SetSmooth(){
 	//si no hay objetos
 	if (Objects.Count() < 1){return;}	
 	Object& obj = Objects[SelectActivo];
@@ -4276,7 +4276,7 @@ void CBlendersito::SetSmooth(){
 	CleanupStack::PopAndDestroy(noteBuf);	
 }
 
-void CBlendersito::SetCulling(){
+void CWhisk3D::SetCulling(){
 	//si no hay objetos
 	if (Objects.Count() < 1){return;}	
 	Object& obj = Objects[SelectActivo];
@@ -4306,7 +4306,7 @@ void CBlendersito::SetCulling(){
     redibujar = true;
 }
 
-void CBlendersito::SetLighting(){
+void CWhisk3D::SetLighting(){
 	//si no hay objetos
 	if (Objects.Count() < 1){return;}	
 	Object& obj = Objects[SelectActivo];
@@ -4336,7 +4336,7 @@ void CBlendersito::SetLighting(){
     redibujar = true;
 }
 
-void CBlendersito::SetVertexColor(){
+void CWhisk3D::SetVertexColor(){
 	//si no hay objetos
 	if (Objects.Count() < 1){return;}	
 	Object& obj = Objects[SelectActivo];
@@ -4366,7 +4366,7 @@ void CBlendersito::SetVertexColor(){
     redibujar = true;
 }
 
-void CBlendersito::SetInterpolation(){
+void CWhisk3D::SetInterpolation(){
 	//si no hay objetos
 	if (Objects.Count() < 1){return;}	
 	Object& obj = Objects[SelectActivo];
@@ -4396,9 +4396,9 @@ void CBlendersito::SetInterpolation(){
     redibujar = true;
 }
 
-void CBlendersito::SetTexture(){
+void CWhisk3D::SetTexture(){
 	//si solo estan las texturas de blender
-	if (Textures.Count() < NumTexturasBlendersito+1){		
+	if (Textures.Count() < NumTexturasWhisk3D+1){		
 		HBufC* noteBuf = HBufC::NewLC(100);	
 		noteBuf->Des().Copy(_L("No hay texturas cargadas"));	
 		MensajeError(noteBuf);
@@ -4424,17 +4424,17 @@ void CBlendersito::SetTexture(){
 	Material& mat = Materials[pMesh.facesGroup[MaterialID-1].material];
 
 	_LIT(KFormatString2, "Select Texture 1 to %d");
-	noteBuf->Des().Format(KFormatString2, Textures.Count()-NumTexturasBlendersito);
-	TInt textureID = DialogNumber(1, 1, Textures.Count()-NumTexturasBlendersito, noteBuf);
+	noteBuf->Des().Format(KFormatString2, Textures.Count()-NumTexturasWhisk3D);
+	TInt textureID = DialogNumber(1, 1, Textures.Count()-NumTexturasWhisk3D, noteBuf);
 	CleanupStack::PopAndDestroy(noteBuf);
 	
 	mat.textura = true;
-	mat.textureID = textureID+NumTexturasBlendersito;
+	mat.textureID = textureID+NumTexturasWhisk3D;
 	//mat.textureID = Textures[textureID-5].iID;
     redibujar = true;
 }
 
-void CBlendersito::NewMaterial(TBool reemplazar){
+void CWhisk3D::NewMaterial(TBool reemplazar){
 	/*HBufC* inicialBuf = HBufC::NewLC(100);
 	_LIT(Kinicial, "Material.%03d");
 	inicialBuf->Des().Format(Kinicial, Materials.Count()+1);
@@ -4496,7 +4496,7 @@ void CBlendersito::NewMaterial(TBool reemplazar){
 	redibujar = true;
 }
 
-void CBlendersito::SetMaterial(){
+void CWhisk3D::SetMaterial(){
 	//si no hay objetos
 	if (Objects.Count() < 1){return;}	
 	Object& obj = Objects[SelectActivo];
@@ -4534,7 +4534,7 @@ void CBlendersito::SetMaterial(){
     redibujar = true;
 }
 
-void CBlendersito::SetEditMode(){
+void CWhisk3D::SetEditMode(){
 	//si no hay objetos
 	if (Objects.Count() < 1){return;}	
 	Object& obj = Objects[SelectActivo];
@@ -4552,7 +4552,7 @@ void CBlendersito::SetEditMode(){
     redibujar = true;
 }
 
-void CBlendersito::EnfocarObject(){
+void CWhisk3D::EnfocarObject(){
 	//si no hay objetos
 	if (Objects.Count() < 1){return;}
 	SetTransformPivotPoint();	
@@ -4577,7 +4577,7 @@ void CBlendersito::EnfocarObject(){
 }
 
 
-void CBlendersito::DuplicatedObject(){	
+void CWhisk3D::DuplicatedObject(){	
 	if (estado != editNavegacion || InteractionMode != ObjectMode){return;};	
 	TInt cantObjetosOriginal = Objects.Count();
 	for(TInt a=0; a < cantObjetosOriginal; a++){
@@ -4663,7 +4663,7 @@ void CBlendersito::DuplicatedObject(){
     redibujar = true;
 }
 
-void CBlendersito::DuplicatedLinked(){
+void CWhisk3D::DuplicatedLinked(){
 	if (estado != editNavegacion || InteractionMode != ObjectMode){return;};
 	TInt cantObjetosOriginal = Objects.Count();
 	for(TInt a=0; a < cantObjetosOriginal; a++){
@@ -4681,7 +4681,7 @@ void CBlendersito::DuplicatedLinked(){
     redibujar = true;
 }
 
-void CBlendersito::SetSpecular(){	
+void CWhisk3D::SetSpecular(){	
 	//si no hay objetos
 	if (Objects.Count() < 1){return;}	
 	Object& obj = Objects[SelectActivo];
@@ -4711,7 +4711,7 @@ void CBlendersito::SetSpecular(){
     redibujar = true;
 }
 
-void CBlendersito::SetEmission(){
+void CWhisk3D::SetEmission(){
 	//si no hay objetos
 	if (Objects.Count() < 1){return;}	
 	Object& obj = Objects[SelectActivo];
@@ -4746,7 +4746,7 @@ void CBlendersito::SetEmission(){
 	redibujar = true;
 }
 
-void CBlendersito::SetAmbientLight(){
+void CWhisk3D::SetAmbientLight(){
 	HBufC* buf = HBufC::NewLC( 25 );
 	buf->Des().Copy(_L("Rojo (0 - 100)"));
 	TInt valorR = DialogNumber((TInt)(AmbientRender[0]*100.f), 0, 100, buf);
@@ -4766,7 +4766,7 @@ void CBlendersito::SetAmbientLight(){
     redibujar = true;
 }
 
-void CBlendersito::SetViewportBackgroudColor(){
+void CWhisk3D::SetViewportBackgroudColor(){
 	HBufC* noteBuf = HBufC::NewLC(100);
 	noteBuf->Des().Copy(_L("Red (0 - 100)"));
 	TInt valor = DialogNumber((TInt)(ClearColor[0]*100.f), 0, 100, noteBuf);
@@ -4783,7 +4783,7 @@ void CBlendersito::SetViewportBackgroudColor(){
     redibujar = true;		
 }
 
-void CBlendersito::SetDiffuse(){
+void CWhisk3D::SetDiffuse(){
 	//si no hay objetos
 	if (Objects.Count() < 1){return;}	
 	Object& obj = Objects[SelectActivo];
@@ -4824,7 +4824,7 @@ void CBlendersito::SetDiffuse(){
     redibujar = true;
 }
 
-void CBlendersito::SetPerspectiva(TBool redibuja ){
+void CWhisk3D::SetPerspectiva(TBool redibuja ){
 	// Reinitialize viewport and projection.
 	//glViewport( 0, 0, iScreenWidth, iScreenHeight );
 	// Recalculate the view frustrum
@@ -4842,7 +4842,7 @@ void CBlendersito::SetPerspectiva(TBool redibuja ){
     redibujar = redibuja;
 }
 
-/*void CBlendersito::DialogAlert(){
+/*void CWhisk3D::DialogAlert(){
 	_LIT( KAlerta, "origen.png" );
 	_LIT( KAlerta2, "origen.png2" );
 	CAknMessageQueryDialog* dialog = CAknMessageQueryDialog::NewL( KAlerta );
@@ -4881,7 +4881,7 @@ enum{
 	screw
 };
 
-void CBlendersito::AddModificador(TInt opcion){
+void CWhisk3D::AddModificador(TInt opcion){
 	/*Mesh& obj = Objects[SelectActivo];
 	if (opcion == mirror){
 		//primero crea los array temporales y les suma el espacio del nuevo vertice
@@ -4985,7 +4985,7 @@ void CBlendersito::AddModificador(TInt opcion){
 //mira si no hay camara activa
 //si no hay una camara activa. busca una camara para asignarla
 //si no hay camaras... quedara en -1
-void CBlendersito::CheckCameraState(){
+void CWhisk3D::CheckCameraState(){
 	if (CameraActive < 0){
 		for(TInt i=0; i < Objects.Count(); i++){
 			if (Objects[i].type == camera){
@@ -4996,7 +4996,7 @@ void CBlendersito::CheckCameraState(){
 	}	
 }
 
-void CBlendersito::SetActiveObjectAsCamera(){
+void CWhisk3D::SetActiveObjectAsCamera(){
 	if (Objects.Count() < 1){return;}	
 	Object& obj = Objects[SelectActivo];
 	if (!obj.seleccionado){return;}	
@@ -5007,7 +5007,7 @@ void CBlendersito::SetActiveObjectAsCamera(){
 	redibujar = true;
 }
 
-void CBlendersito::SetViewpoint(TInt opcion){
+void CWhisk3D::SetViewpoint(TInt opcion){
 	switch (opcion) {
 		case top:
 			rotX = -180.0;
@@ -5051,7 +5051,7 @@ void CBlendersito::SetViewpoint(TInt opcion){
 }
 
 
-void CBlendersito::RestaurarViewport(){
+void CWhisk3D::RestaurarViewport(){
 	ViewFromCameraActive = false;
 	rotX = LastRotX;
 	rotY = LastRotY;	
@@ -5060,11 +5060,11 @@ void CBlendersito::RestaurarViewport(){
 	PivotZ = LastPivotZ;
 }
 
-void CBlendersito::SetCameraToView(){	
+void CWhisk3D::SetCameraToView(){	
 	CameraToView = !CameraToView;
 }
 
-void CBlendersito::RecalcViewPos(){		
+void CWhisk3D::RecalcViewPos(){		
 	Object& obj = Objects[CameraActive];
 	rotX = -obj.rotZ+90;
 	rotY = -obj.rotY;	
@@ -5085,7 +5085,7 @@ void CBlendersito::RecalcViewPos(){
 	}*/
 }
 
-void CBlendersito::InfoObject(TInt opciones){
+void CWhisk3D::InfoObject(TInt opciones){
 	HBufC* noteBuf = HBufC::NewLC(100);	
 	_LIT(KFormatString, "Posicion: x: %d, y: %d, z: %d");
 	noteBuf->Des().Format(KFormatString, Objects[SelectActivo].posX, Objects[SelectActivo].posY, Objects[SelectActivo].posZ);
@@ -5128,19 +5128,19 @@ void CBlendersito::InfoObject(TInt opciones){
 }; 
 
 
-void CBlendersito::Mensaje(HBufC* noteBuf){	        	
+void CWhisk3D::Mensaje(HBufC* noteBuf){	        	
 	CAknInformationNote* note = new (ELeave) CAknInformationNote();
 	note->ExecuteLD(*noteBuf);
 	//CleanupStack::PopAndDestroy(noteBuf);
 };
 
-void CBlendersito::MensajeError(HBufC* noteBuf){
+void CWhisk3D::MensajeError(HBufC* noteBuf){
     CAknErrorNote* note = new (ELeave) CAknErrorNote();
     note->ExecuteLD(*noteBuf);
     //CleanupStack::PopAndDestroy(noteBuf);
 }
 
-/*TBool CBlendersito::DialogAlert(HBufC* noteBuf){	  
+/*TBool CWhisk3D::DialogAlert(HBufC* noteBuf){	  
     TBool retVal( EFalse );
     CAknQueryDialog* query = CAknQueryDialog::NewL();
     if( query->ExecuteLD( R_ACCEPT_INVITATION_DLG, *noteBuf )) {
@@ -5151,7 +5151,7 @@ void CBlendersito::MensajeError(HBufC* noteBuf){
     return retVal;
 }*/
 
-TBool CBlendersito::DialogAlert(HBufC* noteBuf) {
+TBool CWhisk3D::DialogAlert(HBufC* noteBuf) {
     TBool retVal(EFalse);
 	CAknQueryDialog* query = CAknQueryDialog::NewL();
 	if (query->ExecuteLD(R_ACCEPT_INVITATION_DLG, *noteBuf)) {
@@ -5161,7 +5161,7 @@ TBool CBlendersito::DialogAlert(HBufC* noteBuf) {
 }
 
 
-TBool CBlendersito::DialogAlert(const TDesC& noteBuf) {
+TBool CWhisk3D::DialogAlert(const TDesC& noteBuf) {
     TBool retVal(EFalse);
 	CAknQueryDialog* query = CAknQueryDialog::NewL();
 	if (query->ExecuteLD(R_ACCEPT_INVITATION_DLG, noteBuf)) {
@@ -5171,7 +5171,7 @@ TBool CBlendersito::DialogAlert(const TDesC& noteBuf) {
     return retVal;
 }
 
-TInt CBlendersito::DialogNumber(TInt valor, TInt min, TInt max, HBufC* noteBuf ){ //TPtrC etiqueta
+TInt CWhisk3D::DialogNumber(TInt valor, TInt min, TInt max, HBufC* noteBuf ){ //TPtrC etiqueta
 	TInt number = valor;
 	CAknNumberQueryDialog* dlg = CAknNumberQueryDialog::NewL( number );
 	dlg->PrepareLC( R_AVKON_DIALOG_QUERY_VALUE_NUMBER );
@@ -5183,7 +5183,7 @@ TInt CBlendersito::DialogNumber(TInt valor, TInt min, TInt max, HBufC* noteBuf )
     return number;
 }
 
-TPtr CBlendersito::DialogText(HBufC* textBuf, HBufC* noteBuf) {
+TPtr CWhisk3D::DialogText(HBufC* textBuf, HBufC* noteBuf) {
     TPtr textPtr = textBuf->Des();
     
     CAknTextQueryDialog* dlg = CAknTextQueryDialog::NewL(textPtr);
@@ -5193,20 +5193,20 @@ TPtr CBlendersito::DialogText(HBufC* textBuf, HBufC* noteBuf) {
 	return textPtr;
 }
 
-void CBlendersito::ShowWaitDialogL(){
+void CWhisk3D::ShowWaitDialogL(){
 	iWaitDialog = new (ELeave) CAknWaitDialog((REINTERPRET_CAST(CEikDialog**, &iWaitDialog)), ETrue);
 	//iWaitDialog->SetCallback(this); // Opcional: establece un callback para eventos del dialogo
-	iWaitDialog->ExecuteLD(R_BLENDERSITO_WAIT_NOTE_SOFTKEY_CANCEL);
+	iWaitDialog->ExecuteLD(R_WHISK3D_WAIT_NOTE_SOFTKEY_CANCEL);
 };
 
-void CBlendersito::CloseWaitDialog(){
+void CWhisk3D::CloseWaitDialog(){
     if (iWaitDialog){
         iWaitDialog->ProcessFinishedL(); // Esto cierra el cuadro de espera.
         iWaitDialog = NULL; // Asegúrate de que el puntero sea nulo después de cerrar el cuadro de espera.
     }
 };
 
-void CBlendersito::DialogWait(HBufC* noteBuf){
+void CWhisk3D::DialogWait(HBufC* noteBuf){
     ShowWaitDialogL(); // Mostrar el cuadro de espera
 
     // Aqui puedes agregar el codigo que necesita tiempo para ejecutarse.
@@ -5215,16 +5215,16 @@ void CBlendersito::DialogWait(HBufC* noteBuf){
     CloseWaitDialog(); // Cerrar el cuadro de espera*/
 }
 
-TInt CBlendersito::ShowOptionsDialogL() {	
+TInt CWhisk3D::ShowOptionsDialogL() {	
 	/*HBufC* noteBuf = HBufC::NewLC(100);	
 	noteBuf->Des().Copy(_L("Ver wait?"));
 	DialogWait(noteBuf);*/
 	ShowWaitDialogL();
 	//CleanupStack::PopAndDestroy(noteBuf);	
 	
-	///iContainer->ShowProgressNoteUnderSingleProcessL(R_BLENDERSITO_PROGRESS_NOTE, EAknExNoteCtrlIdProgressNote);
-    //iContainer->ShowWaitNoteL(R_BLENDERSITO_PROGRESS_NOTE, EAknExNoteCtrlIdWaitNote);
-    //R_BLENDERSITO_WAIT_NOTE_SOFTKEY_CANCEL r_blendersito_wait_note_softkey_cancel
+	///iContainer->ShowProgressNoteUnderSingleProcessL(R_WHISK3D_PROGRESS_NOTE, EAknExNoteCtrlIdProgressNote);
+    //iContainer->ShowWaitNoteL(R_WHISK3D_PROGRESS_NOTE, EAknExNoteCtrlIdWaitNote);
+    //R_WHISK3D_WAIT_NOTE_SOFTKEY_CANCEL r_whisk3D_wait_note_softkey_cancel
 	
 	TInt blee = 1;
 	return blee;
@@ -5252,7 +5252,7 @@ TInt CBlendersito::ShowOptionsDialogL() {
 }
 
 //recalcula la geometria de la camaras
-void CBlendersito::SetCameraGeometria( TUint aWidth, TUint aHeight ){
+void CWhisk3D::SetCameraGeometria( TUint aWidth, TUint aHeight ){
 	//ancho
 	CameraVertices[5]  = CameraVertices[8]  =  aWidth*5;
 	CameraVertices[11] = CameraVertices[14] = -aWidth*5;
@@ -5278,11 +5278,11 @@ void CBlendersito::SetCameraGeometria( TUint aWidth, TUint aHeight ){
 };*/
 
 // -----------------------------------------------------------------------------
-// CBlendersito::SetScreenSize
+// CWhisk3D::SetScreenSize
 // Reacts to the dynamic screen size change during execution of this program.
 // -----------------------------------------------------------------------------
 //
-void CBlendersito::SetScreenSize( TUint aWidth, TUint aHeight, TBool widescreen = false ){
+void CWhisk3D::SetScreenSize( TUint aWidth, TUint aHeight, TBool widescreen = false ){
     iScreenWidth  = aWidth;
     iScreenHeight = aHeight;
 	SetCameraGeometria(aWidth, aHeight);
@@ -5313,7 +5313,7 @@ void CBlendersito::SetScreenSize( TUint aWidth, TUint aHeight, TBool widescreen 
 	redibujar = true;
 }
 
-void CBlendersito::SetScreenSize( TUint aWidth, TUint aHeight ){
+void CWhisk3D::SetScreenSize( TUint aWidth, TUint aHeight ){
     iScreenWidth  = aWidth;
     iScreenHeight = aHeight;
 	SetCameraGeometria(aWidth, aHeight);
@@ -5342,7 +5342,7 @@ void CBlendersito::SetScreenSize( TUint aWidth, TUint aHeight ){
 }
 
 // Funcion para obtener el directorio raiz de un filePath
-TFileName CBlendersito::GetRootDirectory(const TDesC& aFilePath)
+TFileName CWhisk3D::GetRootDirectory(const TDesC& aFilePath)
 {
     TParse parse;
     parse.Set(aFilePath, NULL, NULL);
@@ -5350,7 +5350,7 @@ TFileName CBlendersito::GetRootDirectory(const TDesC& aFilePath)
 }
 
 //import
-void CBlendersito::NewTexture(){
+void CWhisk3D::NewTexture(){
 	//si no hay objetos
 	if (Objects.Count() < 1){return;}	
 	Object& obj = Objects[SelectActivo];
@@ -5371,7 +5371,7 @@ void CBlendersito::NewTexture(){
 
     _LIT(KTitle, "Selecciona la Textura");
     TFileName filePath;
-    if (AknCommonDialogs::RunSelectDlgLD(filePath, R_BLENDERSITO_SELECT_DIALOG, KTitle)) {
+    if (AknCommonDialogs::RunSelectDlgLD(filePath, R_WHISK3D_SELECT_DIALOG, KTitle)) {
 		
 		iTextureManager = CTextureManager::NewL ( iScreenWidth, iScreenHeight,
 												FRUSTUM_TOP, FRUSTUM_BOTTOM, FRUSTUM_RIGHT, FRUSTUM_LEFT, FRUSTUM_NEAR,
@@ -5405,10 +5405,10 @@ void CBlendersito::NewTexture(){
     }
 }
 
-void CBlendersito::ImportOBJ(){    
+void CWhisk3D::ImportOBJ(){    
     _LIT(KTitle, "Import Wavefront (.obj)");
     TFileName file(KNullDesC);
-    if (AknCommonDialogs::RunSelectDlgLD(file, R_BLENDERSITO_SELECT_DIALOG, KTitle)){		
+    if (AknCommonDialogs::RunSelectDlgLD(file, R_WHISK3D_SELECT_DIALOG, KTitle)){		
     	RFs fsSession;	
     	User::LeaveIfError(fsSession.Connect());
     	CleanupClosePushL(fsSession);
@@ -5907,7 +5907,7 @@ void CBlendersito::ImportOBJ(){
     }
 };
 
-void CBlendersito::LeerMTL(const TFileName& aFile) {
+void CWhisk3D::LeerMTL(const TFileName& aFile) {
 	RFs fsSession2;	
 	User::LeaveIfError(fsSession2.Connect());
 
@@ -6122,10 +6122,10 @@ void CBlendersito::LeerMTL(const TFileName& aFile) {
     //CleanupStack::PopAndDestroy(&fsSession);
 }
 
-void CBlendersito::OldImportOBJ(){    
+void CWhisk3D::OldImportOBJ(){    
     _LIT(KTitle, "Old Import Wavefront (.obj)");
     TFileName file(KNullDesC);
-    if (AknCommonDialogs::RunSelectDlgLD(file, R_BLENDERSITO_SELECT_DIALOG, KTitle)){		
+    if (AknCommonDialogs::RunSelectDlgLD(file, R_WHISK3D_SELECT_DIALOG, KTitle)){		
     	RFs fsSession;	
     	User::LeaveIfError(fsSession.Connect());
     	CleanupClosePushL(fsSession);
@@ -6224,7 +6224,7 @@ void CBlendersito::OldImportOBJ(){
 }
 
 
-TBool CBlendersito::LeerOBJ(RFs* fsSession, RFile* rFile, TFileName* file, TInt64* startPos,
+TBool CWhisk3D::LeerOBJ(RFs* fsSession, RFile* rFile, TFileName* file, TInt64* startPos,
 	TInt* acumuladoVertices,
 	TInt* acumuladoNormales,
 	TInt* acumuladoUVs
@@ -6721,7 +6721,7 @@ TBool CBlendersito::LeerOBJ(RFs* fsSession, RFile* rFile, TFileName* file, TInt6
 };
 
 
-void CBlendersito::SetOrigen( TInt opcion ){
+void CWhisk3D::SetOrigen( TInt opcion ){
 	if (InteractionMode != EditMode){
 		return;
 	}
@@ -6793,7 +6793,7 @@ struct TBMPInfoHeader {
     TUint32 biClrImportant;
 };
 
-void CBlendersito::SaveAsBMP(int width, int height, const GLubyte* pixels, const TDesC& fileName) {
+void CWhisk3D::SaveAsBMP(int width, int height, const GLubyte* pixels, const TDesC& fileName) {
     RFs fsSession;
     RFile file;
     TInt err = fsSession.Connect();
@@ -6802,7 +6802,7 @@ void CBlendersito::SaveAsBMP(int width, int height, const GLubyte* pixels, const
     }
 
     // Crear la carpeta si no existe
-    _LIT(KDirName, "E:\\blendersito\\");
+    _LIT(KDirName, "E:\\whisk3D\\");
     err = fsSession.MkDirAll(KDirName);
     if (err != KErrNone && err != KErrAlreadyExists) {
 		fsSession.Close();
@@ -6872,7 +6872,7 @@ void CBlendersito::SaveAsBMP(int width, int height, const GLubyte* pixels, const
     fsSession.Close();
 }
 
-void CBlendersito::SaveCanvasToImage(TBool secuencia, TBool showUi)  {
+void CWhisk3D::SaveCanvasToImage(TBool secuencia, TBool showUi)  {
     // Redibuja el canvas sin los overlays
     TBool originalShowOverlays = showOverlays;
     TBool originalShowUi = ShowUi;
@@ -6892,8 +6892,8 @@ void CBlendersito::SaveCanvasToImage(TBool secuencia, TBool showUi)  {
     // Captura los pixeles de la pantalla
     GLubyte* pixels = new GLubyte[iScreenWidth * iScreenHeight * 4]; // 4 para RGBA
 
-    _LIT(KFileName, "E:\\blendersito\\render_%04d.bmp");
-    _LIT(KFileNameZbuffer, "E:\\blendersito\\renderZbuffer_%04d.bmp");
+    _LIT(KFileName, "E:\\whisk3D\\render_%04d.bmp");
+    _LIT(KFileNameZbuffer, "E:\\whisk3D\\renderZbuffer_%04d.bmp");
     TFileName fileName;	
 	TBuf<256> buffer;
 
@@ -6944,7 +6944,7 @@ void CBlendersito::SaveCanvasToImage(TBool secuencia, TBool showUi)  {
     redibujar = true;
 }
 
-void CBlendersito::applyBlur(GLubyte* pixels, int width, int height, int radius) {
+void CWhisk3D::applyBlur(GLubyte* pixels, int width, int height, int radius) {
     // Calcula el tamaño del area del kernel
     int kernelSize = 2 * radius + 1;
     
@@ -6976,7 +6976,7 @@ void CBlendersito::applyBlur(GLubyte* pixels, int width, int height, int radius)
     }
 }
 
-int CBlendersito::clamp(int value, int min, int max) {
+int CWhisk3D::clamp(int value, int min, int max) {
     if (value < min) {
         return min;
     } else if (value > max) {
@@ -6986,7 +6986,7 @@ int CBlendersito::clamp(int value, int min, int max) {
     }
 }
 
-void CBlendersito::SetWidescreen(){
+void CWhisk3D::SetWidescreen(){
 	iWidescreenEnabled = !iWidescreenEnabled;
 	SetScreenSize( iScreenWidth, iScreenHeight, iWidescreenEnabled );
 }
