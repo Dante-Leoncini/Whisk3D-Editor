@@ -26,6 +26,8 @@ I highly recommend using Linux, installing an SSD in your PCs, and optimizing yo
 # Thank You!
 Thank you to everyone who shared the project. I hope this effort helps raise awareness and urge companies to manufacture more durable and sustainable phones.
 
+#Thanks Marcig for the new Name!
+
 ESPAÑOL: Whisk 3D es un clon de Blender, desarrollado desde cero para Symbian s60v3.
 aclaraciones:
 1) No es un port: Este programa no comparte código con el original.
