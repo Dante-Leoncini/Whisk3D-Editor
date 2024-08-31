@@ -74,35 +74,32 @@ static const GLfloat colorBorde[4]  = { MATERIALCOLOR(0.68, 0.45, 0.13, 1.0) };
 //color borde Select
 //GLfloat colorBordeSelect[4] = { MATERIALCOLOR(0.94, 0.59, 0.17, 1.0) };
 //array de colores
-static const GLfloat ListaColores[10][4] = {
-		{ MATERIALCOLOR(1.0, 1.0, 1.0, 1.0)     },   //blanco
-		{ MATERIALCOLOR(0.94, 0.59, 0.17, 1.0)  },   //naranja 	
-		{ MATERIALCOLOR(0.0, 0.0, 0.0, 1.0)     },   //negro
-		{ MATERIALCOLOR(0.12, 0.12, 0.12, 1.0)  },   //gris
-		{ MATERIALCOLOR(0.94, 0.59, 0.17, 0.25f)},   //naranja transparente
-		{ MATERIALCOLOR(0.22, 0.22, 0.22, 1.0)  },    //cabezera de la barra de herramientas
-		{ MATERIALCOLOR(0.0, 0.0, 0.0, 0.25f)     },   //negroTransparente
-		{ MATERIALCOLOR(0.278, 0.447, 0.702, 1.0)     },   //azul de los iconos seleccionados
-		{ MATERIALCOLOR(0.757, 0.757, 0.757, 1.0)     },   //azul de los iconos seleccionados
-		{ MATERIALCOLOR(0.92, 0.34, 0.0, 1.0)  },   //naranja oscuro
+GLfloat ListaColores[11][4] = {
+	{ MATERIALCOLOR(0.22, 0.28, 0.25, 1.0)  },   //fondo
+	{ MATERIALCOLOR(1.0, 1.0, 1.0, 1.0)     },   //blanco
+	{ MATERIALCOLOR(0.91, 0.50, 0.98, 1.0)  },   //acento (violeta) 
+	{ MATERIALCOLOR(0.48, 0.30, 1.0, 1.0)  },   //acento oscuro	
+	{ MATERIALCOLOR(0.0, 0.0, 0.0, 1.0)     },   //negro
+	{ MATERIALCOLOR(0.12, 0.12, 0.12, 1.0)  },   //gris
+	{ MATERIALCOLOR(0.94, 0.59, 0.17, 0.25f)},   //naranja transparente
+	{ MATERIALCOLOR(0.22, 0.22, 0.22, 1.0)  },    //cabezera de la barra de herramientas
+	{ MATERIALCOLOR(0.0, 0.0, 0.0, 0.25f)     },   //negroTransparente
+	{ MATERIALCOLOR(0.757, 0.757, 0.757, 1.0)     },   //azul de los iconos seleccionados
 };
 
 enum{
+	background,
 	blanco,
-	naranja,
+	accent,
+	accentDark,
 	negro,
 	gris,
 	naranjaFace,
 	headerColor,
 	negroTransparente,
-	azulUI,
-	grisUI,
-	naranjaOscuro
+	grisUI
 };
 
-//Piso
-
-GLfloat ClearColor[3] = {0.23f, 0.23f, 0.23f};
 static const GLfloat LineaPiso[4]  =      { MATERIALCOLOR(0.29, 0.29, 0.29, 1.0) };
 static const GLfloat LineaPisoRoja[4]  =  { MATERIALCOLOR(0.56, 0.23, 0.28, 1.0) };
 static const GLfloat LineaPisoVerde[4]  = { MATERIALCOLOR(0.38, 0.53, 0.15, 1.0) };
@@ -596,7 +593,7 @@ void CWhisk3D::AppInit( void ){
 	SetScreenSize( iScreenWidth, iScreenHeight );
 
     // Set the screen background color.
-	glClearColor( ClearColor[0], ClearColor[1], ClearColor[2], 1.f );
+	glClearColor( ListaColores[background][0], ListaColores[background][1], ListaColores[background][2], 1.f );
 
     // Enable depth testing, texturing, back face culling, and lighting.
     glEnable( GL_DEPTH_TEST );
@@ -889,10 +886,10 @@ void CWhisk3D::RenderMesh( Object& obj, TInt indice ){
 			glColor4f(ListaColores[negro][0],ListaColores[negro][1],ListaColores[negro][2],ListaColores[negro][3]);
 		}
 		else if (SelectActivo == indice && obj.seleccionado){
-			glColor4f(ListaColores[naranja][0],ListaColores[naranja][1],ListaColores[naranja][2],ListaColores[naranja][3]);
+			glColor4f(ListaColores[accent][0],ListaColores[accent][1],ListaColores[accent][2],ListaColores[accent][3]);
 		}
 		else if (obj.seleccionado) {
-			glColor4f(ListaColores[naranjaOscuro][0],ListaColores[naranjaOscuro][1],ListaColores[naranjaOscuro][2],ListaColores[naranjaOscuro][3]);
+			glColor4f(ListaColores[accentDark][0],ListaColores[accentDark][1],ListaColores[accentDark][2],ListaColores[accentDark][3]);
 		}
 		else {
 			glColor4f(ListaColores[negro][0],ListaColores[negro][1],ListaColores[negro][2],ListaColores[negro][3]);
@@ -925,10 +922,10 @@ void CWhisk3D::RenderMesh( Object& obj, TInt indice ){
 		glLineWidth(1);	 
 
 		if (SelectActivo == indice && obj.seleccionado){
-			glColor4f(ListaColores[naranja][0],ListaColores[naranja][1],ListaColores[naranja][2],ListaColores[naranja][3]);
+			glColor4f(ListaColores[accent][0],ListaColores[accent][1],ListaColores[accent][2],ListaColores[accent][3]);
 		}
 		else if (obj.seleccionado) {
-			glColor4f(ListaColores[naranjaOscuro][0],ListaColores[naranjaOscuro][1],ListaColores[naranjaOscuro][2],ListaColores[naranjaOscuro][3]);
+			glColor4f(ListaColores[accentDark][0],ListaColores[accentDark][1],ListaColores[accentDark][2],ListaColores[accentDark][3]);
 		}
 		else {
 			glColor4f(ListaColores[negro][0],ListaColores[negro][1],ListaColores[negro][2],ListaColores[negro][3]);
@@ -1111,10 +1108,10 @@ void CWhisk3D::RenderObject( TInt objId ){
 
 	//color si esta seleccionado
 	if (SelectActivo == objId && obj.seleccionado){
-		glColor4f(ListaColores[naranja][0],ListaColores[naranja][1],ListaColores[naranja][2],ListaColores[naranja][3]);
+		glColor4f(ListaColores[accent][0],ListaColores[accent][1],ListaColores[accent][2],ListaColores[accent][3]);
 	}
 	else if (obj.seleccionado){
-		glColor4f(ListaColores[naranjaOscuro][0],ListaColores[naranjaOscuro][1],ListaColores[naranjaOscuro][2],ListaColores[naranjaOscuro][3]);
+		glColor4f(ListaColores[accentDark][0],ListaColores[accentDark][1],ListaColores[accentDark][2],ListaColores[accentDark][3]);
 	}
 	else {		
 		glColor4f(ListaColores[negro][0],ListaColores[negro][1],ListaColores[negro][2],ListaColores[negro][3]);		
@@ -1480,7 +1477,7 @@ void CWhisk3D::AppCycle( TInt iFrame, GLfloat aTimeSecs, GLfloat aDeltaTimeSecs 
 	}
 	else {
 		glDisable(GL_FOG);
-		glClearColor( ClearColor[0], ClearColor[1], ClearColor[2], 1.f );
+		glClearColor(ListaColores[background][0],ListaColores[background][1],ListaColores[background][2],ListaColores[background][3]);
 	}
 	
     glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
@@ -1565,7 +1562,7 @@ void CWhisk3D::AppCycle( TInt iFrame, GLfloat aTimeSecs, GLfloat aDeltaTimeSecs 
 			glFogf(GL_FOG_END, FRUSTUM_FAR);     // Distancia final de la niebla
 			//GLfloat fogColor[] = {0.23f, 0.23f, 0.23f, 1.f};
 			//glClearColor( ClearColor[0], ClearColor[1], ClearColor[2], 1.f );
-			glFogfv(GL_FOG_COLOR, ClearColor); // Color de la niebla
+			glFogfv(GL_FOG_COLOR, ListaColores[background]); // Color de la niebla
 			glLineWidth(1);	 
 
 			glVertexPointer( 3, GL_SHORT, 0, objVertexdataFloor );
@@ -1772,10 +1769,10 @@ void CWhisk3D::DibujarOrigen(Object& obj, TInt objIndex){
     
     if (obj.visible && (obj.seleccionado || objIndex == SelectActivo)){	
 		if (objIndex == SelectActivo){
-			glColor4f(ListaColores[naranja][0],ListaColores[naranja][1],ListaColores[naranja][2],ListaColores[naranja][3]);
+			glColor4f(ListaColores[accent][0],ListaColores[accent][1],ListaColores[accent][2],ListaColores[accent][3]);
 		}
 		else {
-			glColor4f(ListaColores[naranjaOscuro][0],ListaColores[naranjaOscuro][1],ListaColores[naranjaOscuro][2],ListaColores[naranjaOscuro][3]);
+			glColor4f(ListaColores[accentDark][0],ListaColores[accentDark][1],ListaColores[accentDark][2],ListaColores[accentDark][3]);
 		}
 		glVertexPointer( 3, GL_SHORT, 0, pointVertex );
 		glBindTexture( GL_TEXTURE_2D, Textures[0].iID ); //selecciona la textura
@@ -1988,7 +1985,7 @@ void CWhisk3D::DrawnRectangle(){
 void CWhisk3D::IconSelect(TBool activo){
 	if (activo){
 		glDisable( GL_TEXTURE_2D );
-		glColor4f(ListaColores[azulUI][0],ListaColores[azulUI][1],ListaColores[azulUI][2],ListaColores[azulUI][3]);	
+		glColor4f(ListaColores[accent][0],ListaColores[accent][1],ListaColores[accent][2],ListaColores[accent][3]);	
 		SetSpriteSize(18,18);
 		DrawnRectangle();
 		SetSpriteSize(14,14);
@@ -3777,9 +3774,9 @@ void CWhisk3D::SetOriginTo3DCursor(){
 		pMesh.vertex[i*3+1] -= NewPosZ;	
 		pMesh.vertex[i*3+2] -= NewPosY;
 	}
-	obj.posX = obj.posX + Cursor3DposX;
-	obj.posY = obj.posY + Cursor3DposY;
-	obj.posZ = obj.posZ + Cursor3DposZ;
+	obj.posX = obj.posX - Cursor3DposX;
+	obj.posY = obj.posY - Cursor3DposY;
+	obj.posZ = obj.posZ - Cursor3DposZ;
 	pMesh.UpdateVertexUI();
 	redibujar = true;
 }
@@ -4769,16 +4766,16 @@ void CWhisk3D::SetAmbientLight(){
 void CWhisk3D::SetViewportBackgroudColor(){
 	HBufC* noteBuf = HBufC::NewLC(100);
 	noteBuf->Des().Copy(_L("Red (0 - 100)"));
-	TInt valor = DialogNumber((TInt)(ClearColor[0]*100.f), 0, 100, noteBuf);
-	ClearColor[0] = (GLfloat)valor/100.0f;
+	TInt valor = DialogNumber((TInt)(ListaColores[background][0]*100.f), 0, 100, noteBuf);
+	ListaColores[background][0] = (GLfloat)valor/100.0f;
     redibujar = true;	
 	noteBuf->Des().Copy(_L("Green (0 - 100)"));
-	valor = DialogNumber((TInt)(ClearColor[1]*100.f), 0, 100, noteBuf);
-	ClearColor[1] = (GLfloat)valor/100.0f;
+	valor = DialogNumber((TInt)(ListaColores[background][1]*100.f), 0, 100, noteBuf);
+	ListaColores[background][1] = (GLfloat)valor/100.0f;
     redibujar = true;	
 	noteBuf->Des().Copy(_L("Blue (0 - 100)"));
-	valor = DialogNumber((TInt)(ClearColor[2]*100.f), 0, 100, noteBuf);
-	ClearColor[2] = (GLfloat)valor/100.0f;
+	valor = DialogNumber((TInt)(ListaColores[background][2]*100.f), 0, 100, noteBuf);
+	ListaColores[background][2] = (GLfloat)valor/100.0f;
 	CleanupStack::PopAndDestroy(noteBuf);
     redibujar = true;		
 }
