@@ -167,7 +167,7 @@ TInt nextLightId = GL_LIGHT1;
 
 //animacion
 TInt StartFrame = 1;
-TInt EndFrame = 10;
+TInt EndFrame = 250;
 TInt CurrentFrame = 1;
 TBool redibujar = true; //solo redibuja si este valor esta en true
 TBool ViewFromCameraActive = false;
@@ -1196,7 +1196,11 @@ void CWhisk3D::InsertKeyframe(TInt propertySelect){
 
 	keyFrame key;
 	key.frame = CurrentFrame;
-	key.Interpolation = Linear;
+
+	HBufC* noteBuf = HBufC::NewLC(100);
+	noteBuf->Des().Copy(_L("Interpolation:\n0 Constant, 1 Linear, 2 EaseInOut, 3 EaseIn, 4 EaseOut"));
+	key.Interpolation = DialogNumber(Constant, Constant, EaseOut, noteBuf);
+	CleanupStack::PopAndDestroy(noteBuf);
 
 	if (encontrado){
 		for(TInt p = 0; p < AnimationObjects[index].Propertys.Count(); p++) {
@@ -1358,6 +1362,9 @@ void CWhisk3D::ReloadAnimation(){
 					GLfloat valueY2 = anim.keyframes[lastFrameIndex].valueY;
 					GLfloat valueZ2 = anim.keyframes[lastFrameIndex].valueZ;
 
+					GLfloat t;
+					GLfloat t2;
+
 					switch (anim.keyframes[firstFrameIndex].Interpolation) {
 						case Constant:
 							valueX = valueX1;
@@ -1369,11 +1376,44 @@ void CWhisk3D::ReloadAnimation(){
 							valueY = valueY1 + ((valueY2 - valueY1) * (CurrentFrame - frame1)) / (frame2 - frame1);
 							valueZ = valueZ1 + ((valueZ2 - valueZ1) * (CurrentFrame - frame1)) / (frame2 - frame1);
 							break;
+						case EaseIn:
+							t = (CurrentFrame - frame1) / (GLfloat)(frame2 - frame1); // Normalizar el tiempo entre 0 y 1
+							t2 = t * t; // EaseIn (usando una interpolacion cuadratica)
+							
+							valueX = valueX1 + (valueX2 - valueX1) * t2;
+							valueY = valueY1 + (valueY2 - valueY1) * t2;
+							valueZ = valueZ1 + (valueZ2 - valueZ1) * t2;
+							break;
+						case EaseOut:
+							t = (CurrentFrame - frame1) / (GLfloat)(frame2 - frame1); // Normalizar el tiempo entre 0 y 1
+							
+							t2 = 1 - (1 - t) * (1 - t); // EaseOut (inversa de EaseIn)
+
+							valueX = valueX1 + (valueX2 - valueX1) * t2;
+							valueY = valueY1 + (valueY2 - valueY1) * t2;
+							valueZ = valueZ1 + (valueZ2 - valueZ1) * t2;
+							break;						
+						case EaseInOut:
+							t = (CurrentFrame - frame1) / (GLfloat)(frame2 - frame1); // Normalizar el tiempo entre 0 y 1
+
+							// EaseIn (aceleracion)
+							if (t < 0.5) {
+								t2 = 2 * t * t;  // t^2
+							} 
+							// EaseOut (desaceleracion)
+							else {
+								t2 = 1 - 2 * (1 - t) * (1 - t);  // 1 - (1 - t)^2
+							}
+
+							valueX = valueX1 + (valueX2 - valueX1) * t2;
+							valueY = valueY1 + (valueY2 - valueY1) * t2;
+							valueZ = valueZ1 + (valueZ2 - valueZ1) * t2;
+							break;
 						default:
 							valueX = valueX1;
 							valueY = valueY1;
 							valueZ = valueZ1;
-							break;
+							break;							
 					}
 				}
 

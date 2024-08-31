@@ -1,4 +1,4 @@
-typedef enum { Constant, Linear, Bezier };
+typedef enum { Constant, Linear, EaseInOut, EaseIn, EaseOut };
 class keyFrame { 
 	public:
 		TInt frame;
@@ -49,9 +49,11 @@ typedef enum { AnimPosition, AnimRotation, AnimScale };
 class AnimProperty { 
 	public:
 		TInt Property;
+        TInt firstFrameIndex;
+        TInt lastFrameIndex;
 		RArray<keyFrame> keyframes;
 
-        void SortKeyFrames() {
+        void AnimProperty::SortKeyFrames() {
             QuickSort(keyframes, 0, keyframes.Count() - 1);
         }
 };
@@ -59,5 +61,22 @@ class AnimProperty {
 class AnimationObject { 
 	public:
 		TInt Id; //id del objeto al que afecta
+		TInt FirstKeyFrame; //id del objeto al que afecta
+		TInt LastKeyFrame; //id del objeto al que afecta
 		RArray<AnimProperty> Propertys;
+        
+		void AnimationObject::UpdateFirstLastFrame(){
+            FirstKeyFrame = 100000000;
+            LastKeyFrame = 0;
+			for(TInt pr = 0; pr < Propertys.Count(); pr++) {	
+			    for(TInt kf = 0; kf < Propertys[pr].keyframes.Count(); kf++) {	
+                    if (Propertys[pr].keyframes[kf].frame > LastKeyFrame){
+                        LastKeyFrame = Propertys[pr].keyframes[kf].frame;	
+                    }
+                    if (Propertys[pr].keyframes[kf].frame < FirstKeyFrame){
+                        FirstKeyFrame = Propertys[pr].keyframes[kf].frame;	
+                    }
+                }	
+			}
+        }
 };
