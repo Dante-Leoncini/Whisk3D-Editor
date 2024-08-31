@@ -3774,9 +3774,9 @@ void CWhisk3D::SetOriginTo3DCursor(){
 		pMesh.vertex[i*3+1] -= NewPosZ;	
 		pMesh.vertex[i*3+2] -= NewPosY;
 	}
-	obj.posX = obj.posX - Cursor3DposX;
-	obj.posY = obj.posY - Cursor3DposY;
-	obj.posZ = obj.posZ - Cursor3DposZ;
+	obj.posX = Cursor3DposX;
+	obj.posY = Cursor3DposY;
+	obj.posZ = Cursor3DposZ;
 	pMesh.UpdateVertexUI();
 	redibujar = true;
 }
