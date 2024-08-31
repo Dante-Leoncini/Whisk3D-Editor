@@ -56,8 +56,8 @@ class AnimProperty {
         }
 };
 
-class Animation { 
+class AnimationObject { 
 	public:
-		TInt Id;
+		TInt Id; //id del objeto al que afecta
 		RArray<AnimProperty> Propertys;
 };

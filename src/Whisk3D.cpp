@@ -272,7 +272,7 @@ RArray<Object> Objects;
 RArray<Material> Materials;
 RArray<Light> Lights;
 RArray<Mesh> Meshes;
-RArray<Animation> Animations;
+RArray<AnimationObject> AnimationObjects;
 TInt tipoSelect = vertexSelect;
 TInt SelectActivo = 0;
 TInt SelectCount = 0;
@@ -516,8 +516,8 @@ void CWhisk3D::ConstructL( void ){
 	//ImportOBJ();
 
 	/*Animation animNew;	
-	Animations.Append(animNew);
-	Animation& anim = Animations[0];	
+	AnimationObjects.Append(animNew);
+	Animation& anim = AnimationObjects[0];	
 	anim.Id = 2;
 
 	AnimProperty propNew;
@@ -1178,14 +1178,20 @@ void CWhisk3D::InsertKeyframe(TInt propertySelect){
 	//si no se selecciono nada
     if (selectedIndex == -1) {return;}*/
 
+	//busca si ya existe esa animacion de objeto con esa propiedad
 	TBool encontrado = false;
 	TInt index = 0;
-    for(TInt a = 0; a < Animations.Count(); a++) {
-		if (Animations[a].Id == SelectActivo){
-			encontrado = true;
-			index = a;
-			break;
+    for(TInt a = 0; a < AnimationObjects.Count(); a++) {
+		if (AnimationObjects[a].Id == SelectActivo){
+    		for(TInt pr = 0; pr < AnimationObjects[a].Propertys.Count(); pr++) {		
+				if (AnimationObjects[a].Propertys[pr].Property == propertySelect){		
+					encontrado = true;
+					index = a;
+					break;
+				}
+			}
 		}
+		if (encontrado){break;}
 	}	
 
 	keyFrame key;
@@ -1193,8 +1199,8 @@ void CWhisk3D::InsertKeyframe(TInt propertySelect){
 	key.Interpolation = Linear;
 
 	if (encontrado){
-		for(TInt p = 0; p < Animations[index].Propertys.Count(); p++) {
-			AnimProperty& animProp = Animations[index].Propertys[p];
+		for(TInt p = 0; p < AnimationObjects[index].Propertys.Count(); p++) {
+			AnimProperty& animProp = AnimationObjects[index].Propertys[p];
 			if(animProp.Property != propertySelect){continue;}
 			switch (animProp.Property) {
 				case AnimPosition:
@@ -1235,9 +1241,9 @@ void CWhisk3D::InsertKeyframe(TInt propertySelect){
 		}
 	}
 	else {		
-		Animation NewAnim;	
-		Animations.Append(NewAnim);
-		Animation& anim = Animations[Animations.Count()-1];	
+		AnimationObject NewAnim;	
+		AnimationObjects.Append(NewAnim);
+		AnimationObject& anim = AnimationObjects[AnimationObjects.Count()-1];	
 		anim.Id = SelectActivo;
 		
 		AnimProperty propNew;
@@ -1270,11 +1276,11 @@ void CWhisk3D::InsertKeyframe(TInt propertySelect){
 }
 
 void CWhisk3D::RemoveKeyframes(){
-    for(TInt a = 0; a < Animations.Count(); a++) {
-		if (Animations[a].Id == SelectActivo){
-        	if (Animations[a].Propertys.Count() > 0) {
-				for(TInt p = 0; p < Animations[a].Propertys.Count(); p++) {
-					AnimProperty& anim = Animations[a].Propertys[p];
+    for(TInt a = 0; a < AnimationObjects.Count(); a++) {
+		if (AnimationObjects[a].Id == SelectActivo){
+        	if (AnimationObjects[a].Propertys.Count() > 0) {
+				for(TInt p = 0; p < AnimationObjects[a].Propertys.Count(); p++) {
+					AnimProperty& anim = AnimationObjects[a].Propertys[p];
 					if (anim.keyframes.Count() > 0) {
 						TInt firstFrame = 0;
 						TInt firstFrameIndex = 0;
@@ -1295,13 +1301,13 @@ void CWhisk3D::RemoveKeyframes(){
 }
 
 void CWhisk3D::ClearKeyframes(){
-    for(TInt a = 0; a < Animations.Count(); a++) {
-		if (Animations[a].Id == SelectActivo){
-			/*for(TInt p = 0; p < Animations[a].Propertys.Count(); p++){
-				Animations[a].Propertys[p].keyframes.Close();
+    for(TInt a = 0; a < AnimationObjects.Count(); a++) {
+		if (AnimationObjects[a].Id == SelectActivo){
+			/*for(TInt p = 0; p < AnimationObjects[a].Propertys.Count(); p++){
+				AnimationObjects[a].Propertys[p].keyframes.Close();
 			}*/
-			Animations[a].Propertys.Close();
-			Animations.Remove(a);
+			AnimationObjects[a].Propertys.Close();
+			AnimationObjects.Remove(a);
 			break;
 		}
 	}	
@@ -1309,9 +1315,9 @@ void CWhisk3D::ClearKeyframes(){
 }
 
 void CWhisk3D::ReloadAnimation(){
-    for(TInt a = 0; a < Animations.Count(); a++) {
-		for(TInt p = 0; p < Animations[a].Propertys.Count(); p++){
-			AnimProperty& anim = Animations[a].Propertys[p];
+    for(TInt a = 0; a < AnimationObjects.Count(); a++) {
+		for(TInt p = 0; p < AnimationObjects[a].Propertys.Count(); p++){
+			AnimProperty& anim = AnimationObjects[a].Propertys[p];
 			if (anim.keyframes.Count() > 0){
 				GLfloat valueX = 0;
 				GLfloat valueY = 0;
@@ -1374,19 +1380,19 @@ void CWhisk3D::ReloadAnimation(){
 				// Asignar el valor calculado a la propiedad correspondiente del objeto
 				switch (anim.Property) {
 					case AnimPosition:
-						Objects[Animations[a].Id].posX = valueX;
-						Objects[Animations[a].Id].posY = valueY;
-						Objects[Animations[a].Id].posZ = valueZ;
+						Objects[AnimationObjects[a].Id].posX = valueX;
+						Objects[AnimationObjects[a].Id].posY = valueY;
+						Objects[AnimationObjects[a].Id].posZ = valueZ;
 						break;
 					case AnimRotation:
-						Objects[Animations[a].Id].rotX = valueX;
-						Objects[Animations[a].Id].rotY = valueY;
-						Objects[Animations[a].Id].rotZ = valueZ;
+						Objects[AnimationObjects[a].Id].rotX = valueX;
+						Objects[AnimationObjects[a].Id].rotY = valueY;
+						Objects[AnimationObjects[a].Id].rotZ = valueZ;
 						break;
 					case AnimScale:
-						Objects[Animations[a].Id].scaleX = valueX;
-						Objects[Animations[a].Id].scaleY = valueY;
-						Objects[Animations[a].Id].scaleZ = valueZ;
+						Objects[AnimationObjects[a].Id].scaleX = valueX;
+						Objects[AnimationObjects[a].Id].scaleY = valueY;
+						Objects[AnimationObjects[a].Id].scaleZ = valueZ;
 						break;
 					// Otros casos según las propiedades
 					default:
@@ -3627,17 +3633,17 @@ void CWhisk3D::BorrarMesh(TInt indice){
 }
 
 void CWhisk3D::BorrarAnimaciones(TInt indice){
-	for(TInt a = 0; a < Animations.Count(); a++) {
-		if (Animations[a].Id == indice) {	
-			for(TInt p = 0; p < Animations[a].Propertys.Count(); p++) {
-				Animations[a].Propertys[p].keyframes.Close();
+	for(TInt a = 0; a < AnimationObjects.Count(); a++) {
+		if (AnimationObjects[a].Id == indice) {	
+			for(TInt p = 0; p < AnimationObjects[a].Propertys.Count(); p++) {
+				AnimationObjects[a].Propertys[p].keyframes.Close();
 			}				
-			Animations[a].Propertys.Close();
-			Animations.Remove(a);
+			AnimationObjects[a].Propertys.Close();
+			AnimationObjects.Remove(a);
 		}
 		// Hace falta cambiar los indices
-		else if (Animations[a].Id > indice) {
-			Animations[a].Id--;
+		else if (AnimationObjects[a].Id > indice) {
+			AnimationObjects[a].Id--;
 		}			
 	}
 }
