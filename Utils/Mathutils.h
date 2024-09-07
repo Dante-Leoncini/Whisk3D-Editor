@@ -55,7 +55,7 @@
  * @param aIn Value whose square root is to be returned.
  * @return Square root for the given value or 0 if an error occured.
  */
-extern GLfloat sqrt(GLfloat aIn);
+extern GLfloat sqrtu(GLfloat aIn);
 
 /**
  * Helper function for calculating the sine for a given value.

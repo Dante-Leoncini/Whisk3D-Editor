@@ -19,6 +19,17 @@
 //para el cuadro de wait
 #include <AknWaitDialog.h>
 
+//PYTHON
+#include <Python.h>
+
+//acelerometro
+/*#include <SensrvChannel.h>
+#include <SensrvChannelFinder.h>
+#include <SensrvChannelInfo.h>
+#include <SensrvListener.h>
+#include <SensrvChannel.h>
+#include <SensrvAccelerometerAxisData.h>*/
+
 // Forward declaration de Object
 //class CWhisk3DContainer;
 class Object;
@@ -126,6 +137,8 @@ class CWhisk3D : public CFiniteStateMachine, public MTextureLoadingListener
         void SeleccionarProximo();
         void SetViewportBackgroudColor();
         void CheckCameraState();
+        void EjecutarScriptPython();
+        void CalculateMillisecondsPerFrame(TInt aFPS);
         
         void dibujarUI();
         void guardarEstado();
@@ -144,6 +157,7 @@ class CWhisk3D : public CFiniteStateMachine, public MTextureLoadingListener
         void SetInterpolation();
         void SetTransparencia();
         void SetAmbientLight();
+        void SetFrameRate();
 
         //nueva forma de editar vertices
         void CalcShrinkFattenVectors();
@@ -209,6 +223,7 @@ class CWhisk3D : public CFiniteStateMachine, public MTextureLoadingListener
         void SetCameraToView();
         void DeseleccionarTodo();
         void OldImportOBJ();
+        void ImportAnimation();
         TBool LeerOBJ(RFs* fsSession, RFile* rFile, TFileName* file, TInt64* startPos, 
                         TInt* acumuladoVertices,
                         TInt* acumuladoNormales,
@@ -249,6 +264,9 @@ class CWhisk3D : public CFiniteStateMachine, public MTextureLoadingListener
         void MensajeError(HBufC* noteBuf);
         TBool DialogAlert(HBufC* noteBuf);
         TBool DialogAlert(const TDesC& noteBuf);
+        TInt BuscarAnimacion(TInt propertySelect);
+        TInt BuscarAnimProperty(TInt indice, TInt propertySelect);
+        TInt BuscarAnimacionObj();
         TInt DialogNumber( TInt valor, TInt min, TInt max, HBufC* noteBuf); //,TPtrC etiqueta
         TPtr DialogText(HBufC* textBuf, HBufC* noteBuf);
         //void ShowProgressNoteUnderSingleProcessL( TInt aResourceId, TInt aControlId );
@@ -332,6 +350,7 @@ class CWhisk3D : public CFiniteStateMachine, public MTextureLoadingListener
 
     private:  // Data
         CAknWaitDialog* iWaitDialog;
+        //CSensrvChannel* iAccelerometerChannel;  // Canal del acelerómetro
 
         //CWhisk3DContainer*    iContainer;
 

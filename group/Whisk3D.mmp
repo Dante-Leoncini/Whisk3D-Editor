@@ -42,6 +42,10 @@ USERINCLUDE     ..\inc
 USERINCLUDE     ..\Utils
 
 SYSTEMINCLUDE   .
+//necesario para python
+SYSTEMINCLUDE   \epoc32\include\python25
+SYSTEMINCLUDE   \epoc32\include\stdapis
+
 SYSTEMINCLUDE   \epoc32\include
 
 LIBRARY         avkon.lib euser.lib apparc.lib cone.lib eikcore.lib
@@ -52,6 +56,13 @@ LIBRARY         libgles_cm.lib
 LIBRARY         ws32.lib commondialogs.lib
 LIBRARY         estor.lib eikctl.lib aknnotify.lib apgrfx.lib eikdlg.lib charconv.lib 
 
+LIBRARY         libc.lib
+LIBRARY         python25.lib
+
+//acelerometro
+//LIBRARY         NokiaAccSensor.lib
+
+
 START RESOURCE ..\data\whisk3D_reg.rss
 #ifdef WINSCW
 TARGETPATH 	  \private\10003a3f\apps
@@ -60,3 +71,4 @@ TARGETPATH 	  \private\10003a3f\import\apps
 #endif
 END
 CAPABILITY ReadUserData WriteUserData ReadDeviceData
+CAPABILITY Location

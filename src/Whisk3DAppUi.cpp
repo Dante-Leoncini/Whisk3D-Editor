@@ -747,6 +747,9 @@ void CWhisk3DAppUi::HandleCommandL(TInt aCommand){
         case ENewTexture:
             iAppContainer->iWhisk3D->NewTexture();
             break; 
+        case ESetFrameRate:
+            iAppContainer->iWhisk3D->SetFrameRate();
+            break; 
         case ERemoveMaterial:
             iAppContainer->iWhisk3D->RemoveMaterial();
             break;  
@@ -758,6 +761,9 @@ void CWhisk3DAppUi::HandleCommandL(TInt aCommand){
             break; 
         case EInsertKeyframeLocation:
             iAppContainer->iWhisk3D->InsertKeyframe(AnimPosition);
+            break; 
+        case EImportAnimation:
+            iAppContainer->iWhisk3D->ImportAnimation();
             break; 
         case EInsertKeyframeRotation:
             iAppContainer->iWhisk3D->InsertKeyframe(AnimRotation);

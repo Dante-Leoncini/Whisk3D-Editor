@@ -137,8 +137,10 @@ enum TWhisk3DMenuCommands
     ETimelineSetCurrentFrame,    
     ETimelineSetEndFrame,
     ETimelineSetStartFrame,
+    ESetFrameRate,
 
     EAnimationMenu,
+    EImportAnimation,
 
     EInsertKeyframeLocation,
     EInsertKeyframeRotation,

@@ -479,6 +479,8 @@ void CWhisk3D::ConstructL( void ){
 	SelectActivo = 0;
 	SelectActivo = -1;
 
+	CalculateMillisecondsPerFrame(60);
+
 	flechasEstados = new FlechaEstado[4];
 	for (TInt i = 0; i < 4; i++) {
 	    flechasEstados[i].estado = TeclaSuelta;
@@ -1082,7 +1084,7 @@ void CWhisk3D::RenderLinkLines(TInt objId){
 		GLfloat diffX = objChild.posX - obj.posX;
         GLfloat diffY = objChild.posY - obj.posY;
         GLfloat diffZ = objChild.posZ - obj.posZ;
-        GLfloat distancia = sqrt(diffX * diffX + diffY * diffY + diffZ * diffZ);
+        GLfloat distancia = sqrtu(diffX * diffX + diffY * diffY + diffZ * diffZ);
         
         // Usar la distancia escalada para modificar las coordenadas UV
         lineUV[3] = distancia/8;
@@ -1161,6 +1163,43 @@ void CWhisk3D::RenderObject( TInt objId ){
 	glPopMatrix();
 }
 
+TInt CWhisk3D::BuscarAnimacionObj(){
+	TInt index = -1;
+    for(TInt a = 0; a < AnimationObjects.Count(); a++) {
+		if (AnimationObjects[a].Id == SelectActivo){
+			index = a;
+			break;
+		}
+	}
+	return index;
+}
+
+TInt CWhisk3D::BuscarAnimProperty(TInt indice, TInt propertySelect){
+	TInt index = -1;
+	for(TInt pr = 0; pr < AnimationObjects[indice].Propertys.Count(); pr++) {		
+		if (AnimationObjects[indice].Propertys[pr].Property == propertySelect){	
+			index = pr;
+			break;
+		}
+	}
+	return index;
+}
+
+TInt CWhisk3D::BuscarAnimacion(TInt propertySelect){
+	TInt index = -1;
+    for(TInt a = 0; a < AnimationObjects.Count(); a++) {
+		if (AnimationObjects[a].Id == SelectActivo){
+    		for(TInt pr = 0; pr < AnimationObjects[a].Propertys.Count(); pr++) {		
+				if (AnimationObjects[a].Propertys[pr].Property == propertySelect){	
+					index = a;
+					break;
+				}
+			}
+		}
+		if (index > -1){break;}
+	}
+	return index;
+}
 
 void CWhisk3D::InsertKeyframe(TInt propertySelect){
 	//ShowOptionsDialogL();
@@ -1179,21 +1218,8 @@ void CWhisk3D::InsertKeyframe(TInt propertySelect){
     if (selectedIndex == -1) {return;}*/
 
 	//busca si ya existe esa animacion de objeto con esa propiedad
-	TBool encontrado = false;
-	TInt index = 0;
-    for(TInt a = 0; a < AnimationObjects.Count(); a++) {
-		if (AnimationObjects[a].Id == SelectActivo){
-    		for(TInt pr = 0; pr < AnimationObjects[a].Propertys.Count(); pr++) {		
-				if (AnimationObjects[a].Propertys[pr].Property == propertySelect){		
-					encontrado = true;
-					index = a;
-					break;
-				}
-			}
-		}
-		if (encontrado){break;}
-	}	
-
+	
+	TInt index = BuscarAnimacion(propertySelect);
 	keyFrame key;
 	key.frame = CurrentFrame;
 
@@ -1202,7 +1228,7 @@ void CWhisk3D::InsertKeyframe(TInt propertySelect){
 	key.Interpolation = DialogNumber(Constant, Constant, EaseOut, noteBuf);
 	CleanupStack::PopAndDestroy(noteBuf);
 
-	if (encontrado){
+	if (index > -1){
 		for(TInt p = 0; p < AnimationObjects[index].Propertys.Count(); p++) {
 			AnimProperty& animProp = AnimationObjects[index].Propertys[p];
 			if(animProp.Property != propertySelect){continue;}
@@ -1470,6 +1496,30 @@ void CWhisk3D::SetStartFrame(){
 
 TBool postProcesado = true;
 TBool dialogoSymbian = false;
+
+TUint32 millisecondsPerFrame = 67;
+TInt FrameRate = 60;
+
+// Obtenemos la frecuencia del FastCounter (ticks por segundo)
+TUint32 lastFrameTime = User::NTickCount(); //TickCount
+
+void CWhisk3D::CalculateMillisecondsPerFrame(TInt aFPS){
+	FrameRate = aFPS;
+	millisecondsPerFrame = 1000/aFPS;
+}
+
+void CWhisk3D::SetFrameRate(){
+	Cancelar();
+	HBufC* noteBuf = HBufC::NewLC(100);
+	_LIT(KFormatString, "Set Frame Rate (Now: %d)");
+	noteBuf->Des().Format(KFormatString, FrameRate);
+	TInt NewFrameRate = DialogNumber(FrameRate, 1, 120, noteBuf);
+	CleanupStack::PopAndDestroy(noteBuf);
+	CalculateMillisecondsPerFrame(NewFrameRate);
+    redibujar = true;
+}
+
+
 void CWhisk3D::AppCycle( TInt iFrame, GLfloat aTimeSecs, GLfloat aDeltaTimeSecs ){
     // If texture loading is still going on, return from this method without doing anything.
 	if ( GetState() == ELoadingTextures ){
@@ -1482,7 +1532,7 @@ void CWhisk3D::AppCycle( TInt iFrame, GLfloat aTimeSecs, GLfloat aDeltaTimeSecs 
 	}
 	
 	if ( !redibujar && !PlayAnimation ){	
-		if (postProcesado){
+		/*if (postProcesado){
 			GLubyte* pixels = new GLubyte[iScreenWidth * iScreenHeight * 4]; // 4 para RGBA
 			
 			for (TInt i = 0; i < iScreenWidth * iScreenHeight * 4; ++i){
@@ -1499,17 +1549,27 @@ void CWhisk3D::AppCycle( TInt iFrame, GLfloat aTimeSecs, GLfloat aDeltaTimeSecs 
 			glFlush();	
 			delete pixels;
 			postProcesado = false;
-		}
+		}*/
 		return;
 	}
-	postProcesado = true;
+	//postProcesado = true;
 
-	if (PlayAnimation){
-		CurrentFrame++;
-		if (CurrentFrame > EndFrame){
-			CurrentFrame = StartFrame;
-		}
-		ReloadAnimation();
+	else if (PlayAnimation){
+        TUint32 currentTime = User::NTickCount(); // Obtén el tiempo actual en milisegundos
+
+        // Calcula el tiempo transcurrido en milisegundos
+        TUint32 elapsedTimeMillisecs = currentTime - lastFrameTime;
+        
+        if (elapsedTimeMillisecs >= millisecondsPerFrame) {
+			lastFrameTime = currentTime;
+	
+			if (fixedDeltaTimeSecs)
+			CurrentFrame++;
+			if (CurrentFrame > EndFrame){
+				CurrentFrame = StartFrame;
+			}
+			ReloadAnimation();
+        }
 	}
 
 	if (SimularZBuffer){
@@ -2435,7 +2495,7 @@ void CWhisk3D::CalcScaleVectors(){
             TInt vectorZ = TransformPivotPoint[2] - pMesh.vertex[primerVertice+2];
 
             // Normaliza el vector
-            TInt magnitude = sqrt(vectorX * vectorX + vectorY * vectorY + vectorZ * vectorZ);
+            TInt magnitude = sqrtu(vectorX * vectorX + vectorY * vectorY + vectorZ * vectorZ);
             if (magnitude > 0) {
                 vectorX = (vectorX * 127) / magnitude;
                 vectorY = (vectorY * 127) / magnitude;
@@ -4616,7 +4676,85 @@ void CWhisk3D::EnfocarObject(){
 		PivotY = PivotY-TransformPivotPointFloat[1];
 		PivotZ = PivotZ-TransformPivotPointFloat[2];
 	}
+	//EjecutarScriptPython();
     redibujar = true;
+}
+
+// Función para obtener el valor de la variable global
+/*PyObject* CWhisk3D::GetShowOverlays(PyObject* self, PyObject* args){
+    return PyBool_FromLong(showOverlays ? 1 : 0);
+}*/
+
+void CWhisk3D::EjecutarScriptPython(){
+    // Inicializa el intérprete de Python
+    Py_Initialize();
+    
+	// Script Python a ejecutar
+	const char* script = "print('Python esta funcionando')\n"
+                         "from time import time,ctime\n"
+                         "print('Today is', ctime(time()))\n";
+
+	const char* script2 =  "try:\n"
+	        "    import appuifw\n"
+	        "    appuifw.note(u'Importaci�n exitosa', 'info')\n"
+	        "except ImportError:\n"
+	        "    print('appuifw no est� disponible')\n";
+    
+	const char* script3 = "import appuifw\n"
+		"print('Python está funcionando')\n"
+		"L = [u'Fer', u'Dante', u'Leandro']\n"
+		"test = appuifw.popup_menu(L, u'Quien es el mas lindo?')\n"
+		"if test == 0:\n"
+		"    appuifw.note(u'lo siento, segui participando :p', 'error')\n"
+		"elif test == 1:\n"
+		"    appuifw.note(u'obio! xD', 'conf')\n"
+		"elif test == 2:\n"
+		"    appuifw.note(u'no en mi juego xD', 'error')\n";
+
+	// Ejecuta el script Python usando PyRun_SimpleString
+	int result = PyRun_SimpleString(script);
+	if (result != 0) {
+		// Si hay un error en la ejecuci�n del script, imprime el error
+		PyErr_Print();
+		_LIT(KFormatString, "Error al ejecutar el script");
+		HBufC* noteBuf = HBufC::NewLC(50);
+		noteBuf->Des().Format(KFormatString);
+		DialogAlert(noteBuf);  
+		CleanupStack::PopAndDestroy(noteBuf);
+	}
+	result = PyRun_SimpleString(script2);
+	if (result != 0) {
+		// Si hay un error en la ejecuci�n del script, imprime el error
+		PyErr_Print();
+		_LIT(KFormatString, "Error al ejecutar el script");
+		HBufC* noteBuf = HBufC::NewLC(50);
+		noteBuf->Des().Format(KFormatString);
+		DialogAlert(noteBuf);  
+		CleanupStack::PopAndDestroy(noteBuf);
+	}
+	
+	// Ruta del archivo de script
+    _LIT8(KScriptPath, "E:/hola.py");
+
+    // Convertir TDesC8 a const char*
+    TPtrC8 ptrC8 = KScriptPath();
+    const char* scriptPath = reinterpret_cast<const char*>(ptrC8.Ptr());
+
+    // Abre el archivo de script
+    FILE* fp = fopen(scriptPath, "r");
+    if (fp != NULL){
+        // Ejecuta el archivo de script
+    	PyRun_SimpleFile(fp, scriptPath);
+        fclose(fp);
+    }
+    else{
+        // Si no se puede abrir el archivo, muestra un mensaje de error
+        CAknInformationNote* note = new (ELeave) CAknInformationNote();
+        note->ExecuteLD(_L("No se pudo abrir el script hola.py"));
+    }
+
+    // Finaliza el intérprete de Python
+    //Py_Finalize();
 }
 
 
@@ -6163,6 +6301,365 @@ void CWhisk3D::LeerMTL(const TFileName& aFile) {
     rFile.Close();	
     fsSession2.Close();	
     //CleanupStack::PopAndDestroy(&fsSession);
+}
+
+void CWhisk3D::ImportAnimation(){
+	//si no hay objetos
+	if (Objects.Count() < 1){return;}	
+	Object& obj = Objects[SelectActivo];
+	if (!obj.seleccionado){return;}
+
+    _LIT(KTitle, "Import Animation (.txt)");
+    TFileName file(KNullDesC);
+    if (AknCommonDialogs::RunSelectDlgLD(file, R_WHISK3D_SELECT_DIALOG, KTitle)){		
+    	RFs fsSession;	
+    	User::LeaveIfError(fsSession.Connect());
+    	CleanupClosePushL(fsSession);
+
+		// Revisar la extension del archivo
+		TPtrC extension = file.Right(4);  // Obtiene las ultimas 4 letras del nombre del archivo
+		if (extension.CompareF(_L(".txt")) != 0) {
+			_LIT(KExtensionError, "Error: El archivo seleccionado no tiene la extension .txt");
+			HBufC* noteBuf = HBufC::NewLC(180);
+			noteBuf->Des().Format(KExtensionError);
+			MensajeError(noteBuf);
+			CleanupStack::PopAndDestroy(noteBuf);
+			fsSession.Close();
+			return;
+		}
+
+    	RFile rFile;
+    	TInt err;	
+
+    	TRAP(err,rFile.Open(fsSession, file, EFileRead));
+		if (err != KErrNone){
+			_LIT(KFormatString, "Error al abrir: %S");
+			HBufC* noteBuf = HBufC::NewLC(file.Length()+16);
+			noteBuf->Des().Format(KFormatString, &file);
+			MensajeError(noteBuf);
+			CleanupStack::PopAndDestroy(noteBuf);
+			rFile.Close();
+			fsSession.Close();
+			return;
+		}	
+
+		Cancelar();
+
+		TInt64 startPos = 0;
+		TBool continuarLeyendo = true; // Variable para controlar la lectura del archivo
+		TBuf8<2048> buffer;
+		TInt pos = 0;
+		TInt fileSize;
+		rFile.Size(fileSize);
+
+		/*if (AnimationObjects.Count() < 1){				
+			AnimationObject NewAnim;	
+			AnimationObjects.Append(NewAnim);
+			AnimationObject& anim = AnimationObjects[AnimationObjects.Count()-1];	
+			anim.Id = SelectActivo;
+			
+			AnimProperty propNew;
+			anim.Propertys.Append(propNew);
+			AnimProperty& prop = anim.Propertys[anim.Propertys.Count()-1];
+			prop.Property = AnimPosition;			
+		}*/
+		TInt animIndex = 0;
+		TInt propIndex = 0;
+		
+		keyFrame key;
+		key.Interpolation = 0;					
+		key.valueX = 0;
+		key.valueY =  0;
+		key.valueZ =  0;				
+		key.frame = 0;
+
+		while (continuarLeyendo && startPos < fileSize ) {
+			// Leer una linea del archivo desde la posicion actual
+			err = rFile.Read(startPos, buffer, buffer.MaxLength());
+			if (err != KErrNone) {
+				//tarde o temprano va a fallar la lectura y va a parar
+				// Manejar error al leer
+				_LIT(KFormatString, "Error al leer linea");
+				HBufC* noteBuf = HBufC::NewLC(100);
+				noteBuf->Des().Format(KFormatString);
+				MensajeError(noteBuf);
+				continuarLeyendo = false; // Salir del bucle
+				break;
+			}	
+
+			// Procesar la linea hasta que no haya mas caracteres en buffer
+			while (continuarLeyendo && (pos = buffer.Locate('\n')) != KErrNotFound || (pos = buffer.Locate('\r')) != KErrNotFound) {
+				TPtrC8 line = buffer.Left(pos);
+			
+				// Contador para almacenar la cantidad de "strings" separados por espacios
+				TInt contador = 0;
+				if (line.Length() > 0) {					
+					if (line.Left(9) == _L8("rotacion ")) {						
+						animIndex = BuscarAnimacionObj();
+						//si no existe la animacion. la crea
+						if (animIndex < 0){							
+							AnimationObject NewAnim;	
+							AnimationObjects.Append(NewAnim);
+							animIndex = AnimationObjects.Count()-1;	
+						}
+						AnimationObject& anim = AnimationObjects[animIndex];
+						anim.Id = SelectActivo;
+							
+						propIndex = BuscarAnimProperty(animIndex, AnimRotation);
+						//si no existe el animProp lo crea
+						if (propIndex < 0){		
+							AnimProperty propNew;
+							anim.Propertys.Append(propNew);
+							propIndex = anim.Propertys.Count()-1;
+						}
+						AnimProperty& prop = anim.Propertys[propIndex];
+						prop.Property = AnimRotation;
+						
+						TLex8 lex(line.Mid(9));  // Inicializa TLex con la subcadena a partir del tercer caracter
+						// Iterar mientras no se llegue al final del descriptor y se haya alcanzado el limite de 8 strings
+						contador = 0;
+						while (!lex.Eos() && contador < 2) {							
+							TPtrC8 currentString = lex.NextToken(); // Mostrar el mensaje con el valor actual del "string" y el contador
+							TLex8 testLex(currentString); // Crear un nuevo objeto TLex para la prueba
+							
+							TInt number = 0;
+							TInt err = testLex.Val(number);
+							if (err == KErrNone && number > 0) {	
+								prop.keyframes.ReserveL(number); // Reservar espacio para los keyframes
+									
+								/*HBufC* noteBuf3 = HBufC::NewLC(180);
+								_LIT(KFormatString33, "reservado %d");
+								noteBuf3->Des().Format(KFormatString33, number);
+								DialogAlert(noteBuf3);
+								CleanupStack::PopAndDestroy(noteBuf3);*/
+							}
+							contador++;
+							lex.SkipSpace();
+						}
+					}
+					else if (line.Left(2) == _L8("r ")){	
+						AnimationObject& anim = AnimationObjects[animIndex];
+						AnimProperty& prop = anim.Propertys[propIndex];					
+						TInt indiceKey = prop.keyframes.Count();
+						prop.keyframes.Append(key);
+
+						TLex8 lex(line.Mid(2));
+						// Iterar mientras no se llegue al final del descriptor y se haya alcanzado el limite de 8 strings
+						contador = 0;
+						while (!lex.Eos() && contador < 4) {							
+							TPtrC8 currentString = lex.NextToken(); // Mostrar el mensaje con el valor actual del "string" y el contador
+							TLex8 testLex(currentString); // Crear un nuevo objeto TLex para la prueba
+							
+							TInt number = 0;
+							TInt err = testLex.Val(number);
+							if (err == KErrNone){
+								switch (contador) {
+									case 0:
+										prop.keyframes[indiceKey].frame = number;
+										break;
+									case 1:
+										prop.keyframes[indiceKey].valueX = (GLfloat)number;
+										break;
+									case 2:
+										prop.keyframes[indiceKey].valueZ = (GLfloat)number;	
+										break;
+									case 3:	
+										prop.keyframes[indiceKey].valueY = (GLfloat)number;	
+										break;
+								}
+							}
+							
+							contador++;
+							lex.SkipSpace();				
+									
+							/*HBufC* noteBuf3 = HBufC::NewLC(180);
+							_LIT(KFormatString33, "frame %d\nRotacion\nX: %f, Y: %f, Z: %f");
+							noteBuf3->Des().Format(KFormatString33, prop.keyframes[indiceKey].frame, 
+												prop.keyframes[indiceKey].valueX, prop.keyframes[indiceKey].valueY, prop.keyframes[indiceKey].valueZ);
+							DialogAlert(noteBuf3);
+							CleanupStack::PopAndDestroy(noteBuf3);*/
+						}
+					}
+					else if (line.Left(9) == _L8("locacion ")) {
+						animIndex = BuscarAnimacionObj();
+						//si no existe la animacion. la crea
+						if (animIndex < 0){							
+							AnimationObject NewAnim;	
+							AnimationObjects.Append(NewAnim);
+							animIndex = AnimationObjects.Count()-1;	
+						}
+						AnimationObject& anim = AnimationObjects[animIndex];
+						anim.Id = SelectActivo;
+							
+						propIndex = BuscarAnimProperty(animIndex, AnimPosition);
+						//si no existe el animProp lo crea
+						if (propIndex < 0){		
+							AnimProperty propNew;
+							anim.Propertys.Append(propNew);
+							propIndex = anim.Propertys.Count()-1;
+							
+							/*HBufC* noteBuf3 = HBufC::NewLC(180);
+							_LIT(KFormatString33, "se creo position\ncontador: %d");
+							noteBuf3->Des().Format(KFormatString33, anim.Propertys.Count());
+							DialogAlert(noteBuf3);
+							CleanupStack::PopAndDestroy(noteBuf3);*/
+						}
+						AnimProperty& prop = anim.Propertys[propIndex];
+						prop.Property = AnimPosition;	
+						
+						TLex8 lex(line.Mid(9));  // Inicializa TLex con la subcadena a partir del tercer caracter
+						// Iterar mientras no se llegue al final del descriptor y se haya alcanzado el limite de 8 strings
+						contador = 0;
+						while (!lex.Eos() && contador < 2) {							
+							TPtrC8 currentString = lex.NextToken(); // Mostrar el mensaje con el valor actual del "string" y el contador
+							TLex8 testLex(currentString); // Crear un nuevo objeto TLex para la prueba
+							
+							TInt number = 0;
+							TInt err = testLex.Val(number);
+							if (err == KErrNone && number > 0) {	
+								prop.keyframes.ReserveL(number); // Reservar espacio para los keyframes
+							}
+							contador++;
+							lex.SkipSpace();
+						}
+					}
+					else if (line.Left(2) == _L8("l ")){	
+						AnimationObject& anim = AnimationObjects[animIndex];
+						AnimProperty& prop = anim.Propertys[propIndex];					
+						TInt indiceKey = prop.keyframes.Count();
+						prop.keyframes.Append(key);
+
+						TLex8 lex(line.Mid(2));
+						// Iterar mientras no se llegue al final del descriptor y se haya alcanzado el limite de 8 strings
+						contador = 0;
+						while (!lex.Eos() && contador < 4) {							
+							TPtrC8 currentString = lex.NextToken(); // Mostrar el mensaje con el valor actual del "string" y el contador
+							TLex8 testLex(currentString); // Crear un nuevo objeto TLex para la prueba
+							
+							TInt number = 0;
+							TInt err = testLex.Val(number);
+							if (err == KErrNone){
+								switch (contador) {
+									case 0:
+										prop.keyframes[indiceKey].frame = number;
+										break;
+									case 1:
+										prop.keyframes[indiceKey].valueX = (GLfloat)number;
+										break;
+									case 2:
+										prop.keyframes[indiceKey].valueY = (GLfloat)number;	
+										break;
+									case 3:
+										prop.keyframes[indiceKey].valueZ = (GLfloat)number;		
+										break;
+								}
+							}
+							
+							contador++;
+							lex.SkipSpace();
+						}
+					}
+					else if (line.Left(7) == _L8("escala ")) {
+						animIndex = BuscarAnimacionObj();
+						//si no existe la animacion. la crea
+						if (animIndex < 0){							
+							AnimationObject NewAnim;	
+							AnimationObjects.Append(NewAnim);
+							animIndex = AnimationObjects.Count()-1;	
+						}
+						AnimationObject& anim = AnimationObjects[animIndex];
+						anim.Id = SelectActivo;
+							
+						propIndex = BuscarAnimProperty(animIndex, AnimScale);
+						//si no existe el animProp lo crea
+						if (propIndex < 0){		
+							AnimProperty propNew;
+							anim.Propertys.Append(propNew);
+							propIndex = anim.Propertys.Count()-1;
+						}
+						AnimProperty& prop = anim.Propertys[propIndex];
+						prop.Property = AnimScale;	
+						
+						TLex8 lex(line.Mid(7));  // Inicializa TLex con la subcadena a partir del tercer caracter
+						// Iterar mientras no se llegue al final del descriptor y se haya alcanzado el limite de 8 strings
+						contador = 0;
+						while (!lex.Eos() && contador < 2) {							
+							TPtrC8 currentString = lex.NextToken(); // Mostrar el mensaje con el valor actual del "string" y el contador
+							TLex8 testLex(currentString); // Crear un nuevo objeto TLex para la prueba
+							
+							TInt number = 0;
+							TInt err = testLex.Val(number);
+							if (err == KErrNone && number > 0) {	
+								prop.keyframes.ReserveL(number); // Reservar espacio para los keyframes
+							}
+							contador++;
+							lex.SkipSpace();
+						}
+					}
+					else if (line.Left(2) == _L8("s ")){	
+						AnimationObject& anim = AnimationObjects[animIndex];
+						AnimProperty& prop = anim.Propertys[propIndex];					
+						TInt indiceKey = prop.keyframes.Count();
+						prop.keyframes.Append(key);
+
+						TLex8 lex(line.Mid(2));
+						// Iterar mientras no se llegue al final del descriptor y se haya alcanzado el limite de 8 strings
+						contador = 0;
+						while (!lex.Eos() && contador < 4) {							
+							TPtrC8 currentString = lex.NextToken(); // Mostrar el mensaje con el valor actual del "string" y el contador
+							TLex8 testLex(currentString); // Crear un nuevo objeto TLex para la prueba
+							
+							TInt number = 0;
+							TInt err = testLex.Val(number);
+							if (err == KErrNone){
+								switch (contador) {
+									case 0:
+										prop.keyframes[indiceKey].frame = number;
+										break;
+									case 1:
+										prop.keyframes[indiceKey].valueX = (GLfloat)number;
+										break;
+									case 2:
+										prop.keyframes[indiceKey].valueY = (GLfloat)number;	
+										break;
+									case 3:
+										prop.keyframes[indiceKey].valueZ = (GLfloat)number;		
+										break;
+								}
+							}
+							
+							contador++;
+							lex.SkipSpace();
+						}
+					}
+				}
+				if (continuarLeyendo){
+					// Actualizar la posicion de inicio para la proxima lectura
+					startPos += pos + 1;
+
+					// Eliminar la parte de la linea ya procesada y el caracter de salto de linea
+					buffer.Delete(0, pos + 1);
+					buffer.TrimLeft(); // Eliminar espacios en blanco iniciales
+				}
+			}
+		}
+
+		// Cerrar el archivo
+		rFile.Close();
+		fsSession.Close();
+		/*AnimationObject& anim = AnimationObjects[animIndex];
+		AnimProperty& prop = anim.Propertys[propIndex];
+		prop.SortKeyFrames();*/
+
+		redibujar = true;
+	}
+    else {
+    	_LIT(KFormatString, "Error al leer el Archivo");
+		HBufC* noteBuf = HBufC::NewLC(24);
+		noteBuf->Des().Format(KFormatString);
+		MensajeError(noteBuf);  
+		CleanupStack::PopAndDestroy(noteBuf);
+    }
 }
 
 void CWhisk3D::OldImportOBJ(){    

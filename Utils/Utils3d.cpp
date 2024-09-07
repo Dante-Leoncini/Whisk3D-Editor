@@ -113,7 +113,7 @@ TVector TVector::operator * (GLfloat aScalar) const
 // -----------------------------------------------------------------------------
 GLfloat TVector::Magnitude()
 	{
-	return sqrt( (*this) * (*this) );
+	return sqrtu( (*this) * (*this) );
 	}
 
 // -----------------------------------------------------------------------------
@@ -277,7 +277,7 @@ TVectorx TVectorx::operator * (GLfixed aScalar) const
 //
 GLfixed TVectorx::Magnitude() const
 	{
-	return FLOAT_2_FIXED( sqrt( FIXED_2_FLOAT( (*this) * (*this) ) ) );
+	return FLOAT_2_FIXED( sqrtu( FIXED_2_FLOAT( (*this) * (*this) ) ) );
 	}
 
 // -----------------------------------------------------------------------------

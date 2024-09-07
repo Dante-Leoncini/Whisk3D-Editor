@@ -154,9 +154,11 @@ rls_string STRING_r_SetStartFrame    "Set Start Frame"
 rls_string STRING_r_SetEndFrame      "Set End Frame"
 rls_string STRING_r_Show_Timeline    "Show Timeline"
 rls_string STRING_r_Hide_Timeline    "Hide Timeline"
+rls_string STRING_r_SetFrameRate     "Set Frame Rate"
 
 rls_string STRING_r_Animation        "Animation"
 rls_string STRING_r_InsertKeyframe   "Insert keyframe"
+rls_string STRING_r_ImportAnimation  "Import Animation"
 
 rls_string STRING_r_InsertKeyframeLocation  "Insert keyframe Location"
 rls_string STRING_r_InsertKeyframeRotation  "Insert keyframe Rotation"

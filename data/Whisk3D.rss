@@ -303,7 +303,12 @@ RESOURCE MENU_PANE r_animation_menu {
         MENU_ITEM {
             command = EClearKeyframes;
             txt = STRING_r_ClearKeyframes;
-        }	
+        },
+        MENU_ITEM {
+            command = EImportAnimation;
+            txt = STRING_r_ImportAnimation;
+        }		
+        
     };
 }
 
@@ -331,11 +336,15 @@ RESOURCE MENU_PANE r_timeline_menu {
         MENU_ITEM {
             command = ETimelineSetStartFrame;
             txt = STRING_r_SetStartFrame;
-        }	,
+        },
         MENU_ITEM {
             command = ETimelineSetEndFrame;
             txt = STRING_r_SetEndFrame;
-        }		
+        },
+        MENU_ITEM {
+            command = ESetFrameRate;
+            txt = STRING_r_SetFrameRate;
+        }	
     };
 }
 

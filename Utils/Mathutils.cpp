@@ -23,7 +23,7 @@
 // Returns: Square root for the given value or 0 if an error occured.
 // -----------------------------------------------------------------------------
 //
-GLfloat sqrt( GLfloat aIn )
+GLfloat sqrtu( GLfloat aIn )
 {
     TReal trg;
     if (Math::Sqrt( trg, (TReal) aIn ) == KErrNone)

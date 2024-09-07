@@ -77,7 +77,7 @@ void gluLookAt( GLfloat aCameraX, GLfloat aCameraY, GLfloat aCameraZ,
 	z[2] = aCameraZ - aLookAtZ;
 
 	// Normalize the Z basis vector
-	magnitude = sqrt(z[0] * z[0] + z[1] * z[1] + z[2] * z[2]);
+	magnitude = sqrtu(z[0] * z[0] + z[1] * z[1] + z[2] * z[2]);
 	if ( magnitude != 0.f )
 		{
 		z[0] /= magnitude;
@@ -108,14 +108,14 @@ void gluLookAt( GLfloat aCameraX, GLfloat aCameraY, GLfloat aCameraZ,
     y[2] =  z[0] * x[1] - z[1] * x[0];
 
 	// Normalize both X and Y basis vectors
-	magnitude = sqrt( x[0] * x[0] + x[1] * x[1] + x[2] * x[2] );
+	magnitude = sqrtu( x[0] * x[0] + x[1] * x[1] + x[2] * x[2] );
 	if( magnitude != 0.f )
 		{
 		x[0] /= magnitude;
 		x[1] /= magnitude;
 		x[2] /= magnitude;
 		}
-	magnitude = sqrt( y[0] * y[0] + y[1] * y[1] + y[2] * y[2] );
+	magnitude = sqrtu( y[0] * y[0] + y[1] * y[1] + y[2] * y[2] );
 	if( magnitude != 0.f )
 		{
 		y[0] /= magnitude;
