@@ -49,11 +49,21 @@ class Material {
 		HBufC* name;
 };
 
+class VertexIndice {
+	public:
+		TInt Vertex;
+		TInt Normal;
+		TInt UV;
+		TInt Color;
+};
+
 class VertexGroup { 
 	public:
-        RArray<GLushort> indices;
+        RArray<TInt> indices;
         RArray<TInt> edgeLinks;
-		TBool seleccionado;
+		TBool seleccionado;		
+		GLfloat posX; GLfloat posY; GLfloat posZ;
+		RArray<TInt> face;
 };
 
 class NewVertexGroup { 
@@ -70,13 +80,48 @@ class EdgesGroup {
 		TBool seleccionado;
 };
 
-class FacesGroup { 
+class MaterialGroup { 
 	public:
         TInt start; //donde esta el primer triangulo real
         TInt count; //cuantos triangulos son reales
 
         TInt startDrawn; //indice del primer triangulo para dibujar
 		TInt indicesDrawnCount; //cuantos vertices son
+		TInt material; //de que material
+};
+
+class VertexNormal {
+	public:
+		GLbyte x;
+		GLbyte y;
+		GLbyte z;
+};
+
+class VertexUV {
+	public:
+		GLfloat u;
+		GLfloat v;
+};
+
+class VertexColor {
+	public:
+		GLubyte r;
+		GLubyte g;
+		GLubyte b;	
+};
+
+class FaceCorner {
+	public:
+		TInt Vertex;
+		TInt Normal;
+		TInt UV;
+		TInt Color;
+};
+
+class FaceGroup {
+	public:
+		RArray<FaceCorner> FaceCorners;
+		RArray<TInt> edges;
 		TInt material; //de que material
 };
 
@@ -99,16 +144,149 @@ class Mesh {
 		//grupo de caras
 		TInt facesCount;
 		TInt facesCountIndices;
-        RArray<FacesGroup> facesGroup;
+        RArray<MaterialGroup> materialsGroup;
+
+		//estos son los datos crudos con los que reconstruir el resto de geometria
+        RArray<VertexGroup> vertexGroups;
+        RArray<VertexNormal> normalGroups;
+        RArray<VertexUV> uvGroups;
+        RArray<VertexColor> colorGroups;
+        RArray<EdgesGroup> edgesGroups;
+        RArray<FaceGroup> faceGroups;
 
 		//nuevo vertex group
 		GLshort* vertexGroupUI;
 		GLubyte* vertexGroupUIcolor;
-        RArray<VertexGroup> vertexGroups;
 
 		//nuevo bordes group
 		TInt edgesDrawnSize;
-        RArray<EdgesGroup> edgesGroups;
+
+		void Mesh::ResetMesh(){
+			if (edges != NULL){delete[] edges;}
+			if (vertex != NULL){delete[] vertex;}
+			if (vertexColor != NULL){delete[] vertexColor;}
+			if (normals != NULL){delete[] normals;}
+			if (uv != NULL){delete[] uv;}
+			if (vertexGroupUI != NULL){delete[] vertexGroupUI;}
+			if (vertexGroupUIcolor != NULL){delete[] vertexGroupUIcolor;}
+
+			edges = NULL;	
+			vertex = NULL;
+			vertexColor = NULL;
+			normals = NULL;
+			uv = NULL;
+			vertexGroupUI = NULL;
+			vertexGroupUIcolor = NULL;
+			
+			edgesDrawnSize = 0;
+			smooth = true;
+			
+			//vertices Solitarios
+			/*TInt VerticesSolitarios = 0;
+			for (int i = 0; i < vertexGroups.Count(); i++) {
+				if (vertexGroups[i]){
+					
+				}
+			}*/
+			
+			
+			/*TInt ultimoIndice = 0;
+			vertexSize = vertexGroups.Count();
+			vertex = new GLshort[vertexSize*3];
+			vertexColor = new GLubyte[vertexSize*4];
+			normals = new GLbyte[vertexSize*3];
+			uv = new GLfloat[vertexSize*2];
+			smooth = true;
+			vertexGroupUI = NULL;	
+			edges = NULL;	
+			facesCount = facesCount;
+			facesCountIndices = facesCountIndices;
+
+			//valores defecto
+			for (int i = 0; i < vertexSize*3; i++) {
+				vertex[i] = ListVertices[i];
+				normals[i] = 0;
+			}
+			for (int i = 0; i < vertexSize*4; i++) {
+				vertexColor[i] = 255;
+			}
+			for (int i = 0; i < vertexSize*2; i++) {
+				uv[i] = 0;
+			}*/
+			//copia directamente las caras. es mas simple que antes
+			/*faces = new GLushort[facesCountIndices];
+			for (int i = 0; i < facesCountIndices; i++) {
+				faces[i] = 0;
+			}*/
+
+			/*HBufC* noteBuf3 = HBufC::NewLC(180);
+			_LIT(KFormatString3, "vertices: %d\nfaces: %d\nnormals: %d\nUVs: %d\nColors: %d");
+			noteBuf3->Des().Format(KFormatString3, ListVertices.Count()/3, TempMaterialGroup.Count(), ListNormals.Count()/3, ListUVs.Count()/2, ListColors.Count()/3);
+			DialogAlert(noteBuf3);*/
+			
+			/*HBufC* noteBuf3 = HBufC::NewLC(180);
+			_LIT(KFormatString33, "Num Vertices: %d\nNormales: %d\nUVs: %d"); //\nvalores: %d/%f/%d"
+			noteBuf3->Des().Format(KFormatString33, ListVertices.Count()/3, ListNormals.Count()/3, ListUVs.Count()/2);
+			DialogAlert(noteBuf3);*/
+			
+			/*for(TInt m=0; m < TempMaterialGroup.Count(); m++){			
+				HBufC* noteBuf3 = HBufC::NewLC(180);
+				_LIT(KFormatString33, "FaceGroup: %d\nStart: %d\nCount: %d (%d)\nMaterial: %d"); //\nvalores: %d/%f/%d"
+				noteBuf3->Des().Format(KFormatString33, m+1, TempMaterialGroup[m].start, TempMaterialGroup[m].count, TempMaterialGroup[m].indicesDrawnCount, TempMaterialGroup[m].material);
+				DialogAlert(noteBuf3);
+				
+				//valores reales
+				TInt limite = ultimoIndice + TempMaterialGroup[m].count;			
+				TInt ultimoIndiceinicio = ultimoIndice;
+
+				for(TInt a=ultimoIndice; a < limite; a++){			
+					for(TInt f=0; f < 3; f++){
+						TInt indiceCara = a*9+f*3;
+
+						TInt indiceVertice = (ListCaras[indiceCara]-*acumuladoVertices)*3;
+						TInt indiceNormales = (ListCaras[indiceCara]-*acumuladoNormales)*3;
+						TInt indiceUV = (ListCaras[indiceCara]-*acumuladoUVs)*2;
+						TInt indiceColor = (ListCaras[indiceCara]-*acumuladoVertices)*4;
+
+						/*HBufC* noteBuf3 = HBufC::NewLC(180);
+						_LIT(KFormatString3, "indiceCara: %d\nNuevoIndiceCara: %d\nindiceVertice: %d\nindiceUV: %d\nindiceColor: %d");
+						noteBuf3->Des().Format(KFormatString3, ListCaras[indiceCara]+1, ListCaras[indiceCara]-*acumuladoVertices+1,indiceVertice, indiceUV, indiceColor);
+						DialogAlert(noteBuf3);*/				
+
+						/*HBufC* noteBuf3 = HBufC::NewLC(180);
+						_LIT(KFormatString3, "cara: %d vertice: %d\nindices viejo: %d\nindice nuevo: %d");
+						noteBuf3->Des().Format(KFormatString3, a+1, f+1, ListCaras[indiceCara]-*acumuladoVertices, ListCaras[indiceCara]-*acumuladoVertices);*/
+						/*_LIT(KFormatString3, "cara: %d vertice: %d\nindices: %d/%d/%d\nvertice: %f\n%f\n%f");//\nuv: %f/%f\nnormal: %d/%d/%d"); //\nvalores: %d/%f/%d"
+						noteBuf3->Des().Format(KFormatString3, a+1, f+1, 
+							ListCaras[indiceCara]-*acumuladoVertices+1, ListCaras[indiceCara+1]-*acumuladoUVs+1, ListCaras[indiceCara+2]-*acumuladoNormales+1, 
+							(GLfloat)ListVertices[(ListCaras[indiceCara]-*acumuladoVertices)*3]/2000,
+							(GLfloat)ListVertices[(ListCaras[indiceCara]-*acumuladoVertices)*3+1]/2000,
+							(GLfloat)ListVertices[(ListCaras[indiceCara]-*acumuladoVertices)*3+2]/2000
+							ListUVs[(ListCaras[indiceCara+1]-*acumuladoUVs)*3],
+							ListUVs[(ListCaras[indiceCara+1]-*acumuladoUVs)*3+1],
+							ListNormals[(ListCaras[indiceCara+2]-*acumuladoNormales)*3],
+							ListNormals[(ListCaras[indiceCara+2]-*acumuladoNormales)*3+1],
+							ListNormals[(ListCaras[indiceCara+2]-*acumuladoNormales)*3+2]
+						);
+						DialogAlert(noteBuf3);*/
+
+						/*tempMesh.faces[(a-ultimoIndiceinicio)*3+f] = ListCaras[indiceCara]-*acumuladoVertices;	
+						//tempMesh.faces[m][(a-ultimoIndiceinicio)*3+f] = ListCaras[indiceCara]-*acumuladoVertices;				
+						for(TInt v=0; v < 3; v++){*/
+							//a*9 es que ListCaras tiene 9 valores por cara, 3 vertices, 3 normales y 3 UV
+							//f*3 es para ir por las distintas "/" 1/1/1
+							/*vertex[indiceVertice+v]  = ListVertices[(ListCaras[indiceCara]-*acumuladoVertices)*3+v];	
+							normals[indiceNormales+v] = ListNormals[(ListCaras[indiceCara+2]-*acumuladoNormales)*3+v];
+							vertexColor[indiceColor+v] = ListColors[(ListCaras[indiceCara]-*acumuladoVertices)*3+v];
+						}
+						for(TInt uv=0; uv < 2; uv++){
+							uv[indiceUV+uv] = ListUVs[(ListCaras[indiceCara+1]-*acumuladoUVs)*2+uv];
+						}
+					}	
+					ultimoIndice++;		
+				}
+			}*/
+		}
 
 		void Mesh::VertexSelect(TInt index, TBool select){
 			vertexGroups[index].seleccionado = select;
@@ -407,9 +585,9 @@ class Mesh {
 					TempFaces[facesCountIndices+2] = vertexGroups[newIndexB].indices[0];
 					facesCountIndices += 3;
 
-					TInt indiceFG = facesGroup.Count()-1;
-					facesGroup[indiceFG].count += 2; 
-					facesGroup[indiceFG].indicesDrawnCount +=6;
+					TInt indiceFG = materialsGroup.Count()-1;
+					materialsGroup[indiceFG].count += 2; 
+					materialsGroup[indiceFG].indicesDrawnCount +=6;
 				}
 			}
 
@@ -510,20 +688,20 @@ class Mesh {
 
 			//agrupar bordes
 			/*EdgesGroup nuevoEdgesGroup;	
-			for(TInt fg=0; fg < facesGroup.Count(); fg++){
+			for(TInt fg=0; fg < materialsGroup.Count(); fg++){
 				//las caras tienen 3 bordes. revisa cada borde
-				//for(TInt f=facesGroup[fg].start; f < facesGroup[fg].start + facesGroup[fg].count; f++){
+				//for(TInt f=materialsGroup[fg].start; f < materialsGroup[fg].start + materialsGroup[fg].count; f++){
 				edgesGroups.Append(nuevoEdgesGroup);
-				edgesGroups[edgesGroups.Count()-1].indicesA.Append(facesGroup[fg].start*3);
-				edgesGroups[edgesGroups.Count()-1].indicesB.Append(facesGroup[fg].start*3+1);
+				edgesGroups[edgesGroups.Count()-1].indicesA.Append(materialsGroup[fg].start*3);
+				edgesGroups[edgesGroups.Count()-1].indicesB.Append(materialsGroup[fg].start*3+1);
 				
 				edgesGroups.Append(nuevoEdgesGroup);
-				edgesGroups[edgesGroups.Count()-1].indicesA.Append(facesGroup[fg].start*3+1);
-				edgesGroups[edgesGroups.Count()-1].indicesB.Append(facesGroup[fg].start*3+2);
+				edgesGroups[edgesGroups.Count()-1].indicesA.Append(materialsGroup[fg].start*3+1);
+				edgesGroups[edgesGroups.Count()-1].indicesB.Append(materialsGroup[fg].start*3+2);
 
 				edgesGroups.Append(nuevoEdgesGroup);
-				edgesGroups[edgesGroups.Count()-1].indicesA.Append(facesGroup[fg].start*3+2);
-				edgesGroups[edgesGroups.Count()-1].indicesB.Append(facesGroup[fg].start*3);
+				edgesGroups[edgesGroups.Count()-1].indicesA.Append(materialsGroup[fg].start*3+2);
+				edgesGroups[edgesGroups.Count()-1].indicesB.Append(materialsGroup[fg].start*3);
 				//}
 			}	*/
 
@@ -578,7 +756,7 @@ class Mesh {
 			};*/
 			
 			/*for(TInt m=0; m < materialsSize; m++){
-				for(TInt f=0; f < facesGroupsSize[m]; f++){
+				for(TInt f=0; f < materialsGroupsSize[m]; f++){
 					(faces[m][f*3], faces[m][f*3+1])
 					(faces[m][f*3+1], faces[m][f*3+2])
 					(faces[m][f*3], faces[m][f*3+2])

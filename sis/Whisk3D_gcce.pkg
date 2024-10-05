@@ -11,7 +11,8 @@
 :"Vendor"
 
 ;Supports Series 60 v 3.0
-[0x101F7961], 0, 0, 0, {"Series60ProductID"}
+;[0x101F7961], 0, 0, 0, {"Series60ProductID"}
+[0x101F7961], 0, 0, 0, {"S60v5-compatible App"}
 
 ;Files to install
 "..\..\..\..\epoc32\release\gcce\urel\Whisk3D.exe"                       -"!:\sys\bin\Whisk3D.exe"

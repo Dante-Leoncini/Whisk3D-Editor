@@ -4,8 +4,8 @@
 <cproject storage_type_id="org.eclipse.cdt.core.XmlProjectDescriptionStorage">
 <storageModule buildFromInf="true" buildingTestComps="true" cleanLevel="0" concurrentBuildJobs="4" defaultMMPChangedAction="0" extraSBSv2Args="" infBuildComponents="" infFileLocation="group\bld.inf" macrosFile="" makeEngineToUse="make" manageDependencies="true" moduleId="com.nokia.carbide.cdt.builder.carbideCPPBuilder" overrideMakeEngine="false" overrideWorkspaceSettings="false" promptForMMPChangedAction="true" useConcurrentBuilding="true" useDebugMode="false" useIncrementalBuilder="false" useKeepGoing="false" useMMPMacros="true"/>
 <storageModule moduleId="org.eclipse.cdt.core.settings">
-<cconfiguration id="Emulator Debug (WINSCW) [S60_3rd_FP2_SDK_v1.1]">
-<storageModule buildSystemId="com.nokia.carbide.cdt.builder.CarbideConfigurationDataProvider" id="Emulator Debug (WINSCW) [S60_3rd_FP2_SDK_v1.1]" moduleId="org.eclipse.cdt.core.settings" name="Emulator Debug (WINSCW) [S60_3rd_FP2_SDK_v1.1]">
+<cconfiguration id="Emulator Debug (WINSCW) [S60_5th_Edition_SDK_v1.0]">
+<storageModule buildSystemId="com.nokia.carbide.cdt.builder.CarbideConfigurationDataProvider" id="Emulator Debug (WINSCW) [S60_5th_Edition_SDK_v1.0]" moduleId="org.eclipse.cdt.core.settings" name="Emulator Debug (WINSCW) [S60_5th_Edition_SDK_v1.0]">
 <externalSettings/>
 <extensions>
 <extension id="org.eclipse.cdt.core.ELF" point="org.eclipse.cdt.core.BinaryParser"/>
@@ -24,14 +24,13 @@
 <storageModule moduleId="CarbideConfigurationDataProvider">
 <ENV_VAR_DATA_ID/>
 <ARGUMENTS_DATA_ID ABLDFREEZEARGSSTORAGE="-r"/>
-<ROM_BUILDER_DATA_ID ROMBUILDWORKINGDIRECTORYSTORAGE="C:\S60\devices\S60_3rd_FP2_SDK_v1.1\epoc32\rom\"/>
+<ROM_BUILDER_DATA_ID ROMBUILDWORKINGDIRECTORYSTORAGE="C:\"/>
 </storageModule>
-<storageModule filesCache="C:\S60\devices\S60_3rd_FP2_SDK_v1.1\S60CppExamples\Dante\Whisk3D\group\bld.inf;C:\S60\devices\S60_3rd_FP2_SDK_v1.1\S60CppExamples\Dante\Whisk3D\group\Whisk3D.mmp;" includesCache="C:/S60/devices/S60_3rd_FP2_SDK_v1.1/S60CppExamples/Dante/Whisk3D/group[LOCAL];C:/S60/devices/S60_3rd_FP2_SDK_v1.1/S60CppExamples/Dante/Whisk3D/inc[LOCAL];C:/S60/devices/S60_3rd_FP2_SDK_v1.1/S60CppExamples/Dante/Whisk3D/Utils[LOCAL];C:/S60/devices/S60_3rd_FP2_SDK_v1.1/S60CppExamples/Dante/Whisk3D/group;C:/S60/devices/S60_3rd_FP2_SDK_v1.1/epoc32/include/python25;C:/S60/devices/S60_3rd_FP2_SDK_v1.1/epoc32/include/stdapis;C:/S60/devices/S60_3rd_FP2_SDK_v1.1/epoc32/include;" macrosCache="_UNICODE;__SYMBIAN32__;__SUPPORT_CPP_EXCEPTIONS__;__EXE__;__S60_3X__;__SERIES60_3X__;__S60_32__;__CW32__;__WINS__;__WINSCW__;_DEBUG;" moduleId="configDataCache" sourcesCache="/Whisk3D/Utils;/Whisk3D/data;/Whisk3D/group;/Whisk3D/inc;/Whisk3D/src;" timestampCache="1725326219569" useMmpMacrosCache="true"/>
+<storageModule filesCache="C:\S60\devices\S60_3rd_FP2_SDK_v1.1\S60CppExamples\Dante\Whisk3D\group\bld.inf;C:\S60\devices\S60_3rd_FP2_SDK_v1.1\S60CppExamples\Dante\Whisk3D\group\Whisk3D.mmp;" includesCache="C:/S60/devices/S60_3rd_FP2_SDK_v1.1/S60CppExamples/Dante/Whisk3D/group[LOCAL];C:/S60/devices/S60_3rd_FP2_SDK_v1.1/S60CppExamples/Dante/Whisk3D/inc[LOCAL];C:/S60/devices/S60_3rd_FP2_SDK_v1.1/S60CppExamples/Dante/Whisk3D/Utils[LOCAL];C:/S60/devices/S60_3rd_FP2_SDK_v1.1/S60CppExamples/Dante/Whisk3D/group;C:/S60/devices/S60_5th_Edition_SDK_v1.0/epoc32/include/python25;C:/S60/devices/S60_5th_Edition_SDK_v1.0/epoc32/include/stdapis;C:/S60/devices/S60_5th_Edition_SDK_v1.0/epoc32/include;" macrosCache="_UNICODE;__SYMBIAN32__;__SUPPORT_CPP_EXCEPTIONS__;__EXE__;__S60_3X__;__SERIES60_3X__;__S60_5X__;__CW32__;__WINS__;__WINSCW__;__S60_50__;_DEBUG;" moduleId="configDataCache" sourcesCache="/Whisk3D/Utils;/Whisk3D/data;/Whisk3D/group;/Whisk3D/inc;/Whisk3D/src;" timestampCache="1726451583338" useMmpMacrosCache="true"/>
 <storageModule moduleId="org.eclipse.cdt.core.externalSettings"/>
-<storageModule moduleId="org.eclipse.cdt.core.language.mapping"/>
 </cconfiguration>
-<cconfiguration id="Phone Debug (ARMV5) [S60_3rd_FP2_SDK_v1.1]">
-<storageModule buildSystemId="com.nokia.carbide.cdt.builder.CarbideConfigurationDataProvider" id="Phone Debug (ARMV5) [S60_3rd_FP2_SDK_v1.1]" moduleId="org.eclipse.cdt.core.settings" name="Phone Debug (ARMV5) [S60_3rd_FP2_SDK_v1.1]">
+<cconfiguration id="Phone Debug (ARMV5) [S60_5th_Edition_SDK_v1.0]">
+<storageModule buildSystemId="com.nokia.carbide.cdt.builder.CarbideConfigurationDataProvider" id="Phone Debug (ARMV5) [S60_5th_Edition_SDK_v1.0]" moduleId="org.eclipse.cdt.core.settings" name="Phone Debug (ARMV5) [S60_5th_Edition_SDK_v1.0]">
 <externalSettings/>
 <extensions>
 <extension id="org.eclipse.cdt.core.ELF" point="org.eclipse.cdt.core.BinaryParser"/>
@@ -51,14 +50,13 @@
 <storageModule moduleId="CarbideConfigurationDataProvider">
 <ENV_VAR_DATA_ID/>
 <ARGUMENTS_DATA_ID ABLDFREEZEARGSSTORAGE="-r"/>
-<ROM_BUILDER_DATA_ID ROMBUILDWORKINGDIRECTORYSTORAGE="C:\S60\devices\S60_3rd_FP2_SDK_v1.1\epoc32\rom\"/>
+<ROM_BUILDER_DATA_ID ROMBUILDWORKINGDIRECTORYSTORAGE="C:\"/>
 </storageModule>
-<storageModule filesCache="C:\S60\devices\S60_3rd_FP2_SDK_v1.1\S60CppExamples\Dante\Whisk3D\group\bld.inf;C:\S60\devices\S60_3rd_FP2_SDK_v1.1\S60CppExamples\Dante\Whisk3D\group\Whisk3D.mmp;" includesCache="C:/S60/devices/S60_3rd_FP2_SDK_v1.1/S60CppExamples/Dante/Whisk3D/group[LOCAL];C:/S60/devices/S60_3rd_FP2_SDK_v1.1/S60CppExamples/Dante/Whisk3D/inc[LOCAL];C:/S60/devices/S60_3rd_FP2_SDK_v1.1/S60CppExamples/Dante/Whisk3D/Utils[LOCAL];C:/S60/devices/S60_3rd_FP2_SDK_v1.1/S60CppExamples/Dante/Whisk3D/group;C:/S60/devices/S60_3rd_FP2_SDK_v1.1/epoc32/include/python25;C:/S60/devices/S60_3rd_FP2_SDK_v1.1/epoc32/include/stdapis;C:/S60/devices/S60_3rd_FP2_SDK_v1.1/epoc32/include;" macrosCache="_UNICODE;__SUPPORT_CPP_EXCEPTIONS__;__S60_32__;__MARM_ARMV5__;__ARMCC__;__ARMCC_2_2__;__SYMBIAN32__;__MARM__;__EXE__;__S60_3X__;__SERIES60_3X__;__EPOC32__;__GENERIC_MARM__;__EABI__;_DEBUG;" moduleId="configDataCache" sourcesCache="/Whisk3D/Utils;/Whisk3D/data;/Whisk3D/group;/Whisk3D/inc;/Whisk3D/src;" timestampCache="1725326219575" useMmpMacrosCache="true"/>
-<storageModule moduleId="org.eclipse.cdt.core.language.mapping"/>
+<storageModule filesCache="C:\S60\devices\S60_3rd_FP2_SDK_v1.1\S60CppExamples\Dante\Whisk3D\group\bld.inf;C:\S60\devices\S60_3rd_FP2_SDK_v1.1\S60CppExamples\Dante\Whisk3D\group\Whisk3D.mmp;" includesCache="C:/S60/devices/S60_3rd_FP2_SDK_v1.1/S60CppExamples/Dante/Whisk3D/group[LOCAL];C:/S60/devices/S60_3rd_FP2_SDK_v1.1/S60CppExamples/Dante/Whisk3D/inc[LOCAL];C:/S60/devices/S60_3rd_FP2_SDK_v1.1/S60CppExamples/Dante/Whisk3D/Utils[LOCAL];C:/S60/devices/S60_3rd_FP2_SDK_v1.1/S60CppExamples/Dante/Whisk3D/group;C:/S60/devices/S60_5th_Edition_SDK_v1.0/epoc32/include/python25;C:/S60/devices/S60_5th_Edition_SDK_v1.0/epoc32/include/stdapis;C:/S60/devices/S60_5th_Edition_SDK_v1.0/epoc32/include;" macrosCache="_UNICODE;__SUPPORT_CPP_EXCEPTIONS__;__MARM_ARMV5__;__ARMCC__;__ARMCC_2_2__;__SYMBIAN32__;__MARM__;__EXE__;__S60_3X__;__SERIES60_3X__;__ARMCC_2__;__S60_5X__;__EPOC32__;__GENERIC_MARM__;__EABI__;__S60_50__;_DEBUG;" moduleId="configDataCache" sourcesCache="/Whisk3D/Utils;/Whisk3D/data;/Whisk3D/group;/Whisk3D/inc;/Whisk3D/src;" timestampCache="1726451583340" useMmpMacrosCache="true"/>
 <storageModule moduleId="org.eclipse.cdt.core.externalSettings"/>
 </cconfiguration>
-<cconfiguration id="Phone Release (ARMV5) [S60_3rd_FP2_SDK_v1.1]">
-<storageModule buildSystemId="com.nokia.carbide.cdt.builder.CarbideConfigurationDataProvider" id="Phone Release (ARMV5) [S60_3rd_FP2_SDK_v1.1]" moduleId="org.eclipse.cdt.core.settings" name="Phone Release (ARMV5) [S60_3rd_FP2_SDK_v1.1]">
+<cconfiguration id="Phone Release (ARMV5) [S60_5th_Edition_SDK_v1.0]">
+<storageModule buildSystemId="com.nokia.carbide.cdt.builder.CarbideConfigurationDataProvider" id="Phone Release (ARMV5) [S60_5th_Edition_SDK_v1.0]" moduleId="org.eclipse.cdt.core.settings" name="Phone Release (ARMV5) [S60_5th_Edition_SDK_v1.0]">
 <externalSettings/>
 <extensions>
 <extension id="org.eclipse.cdt.core.ELF" point="org.eclipse.cdt.core.BinaryParser"/>
@@ -78,14 +76,13 @@
 <storageModule moduleId="CarbideConfigurationDataProvider">
 <ENV_VAR_DATA_ID/>
 <ARGUMENTS_DATA_ID ABLDFREEZEARGSSTORAGE="-r"/>
-<ROM_BUILDER_DATA_ID ROMBUILDWORKINGDIRECTORYSTORAGE="C:\S60\devices\S60_3rd_FP2_SDK_v1.1\epoc32\rom\"/>
+<ROM_BUILDER_DATA_ID ROMBUILDWORKINGDIRECTORYSTORAGE="C:\"/>
 </storageModule>
-<storageModule filesCache="C:\S60\devices\S60_3rd_FP2_SDK_v1.1\S60CppExamples\Dante\Whisk3D\group\bld.inf;C:\S60\devices\S60_3rd_FP2_SDK_v1.1\S60CppExamples\Dante\Whisk3D\group\Whisk3D.mmp;" includesCache="C:/S60/devices/S60_3rd_FP2_SDK_v1.1/S60CppExamples/Dante/Whisk3D/group[LOCAL];C:/S60/devices/S60_3rd_FP2_SDK_v1.1/S60CppExamples/Dante/Whisk3D/inc[LOCAL];C:/S60/devices/S60_3rd_FP2_SDK_v1.1/S60CppExamples/Dante/Whisk3D/Utils[LOCAL];C:/S60/devices/S60_3rd_FP2_SDK_v1.1/S60CppExamples/Dante/Whisk3D/group;C:/S60/devices/S60_3rd_FP2_SDK_v1.1/epoc32/include/python25;C:/S60/devices/S60_3rd_FP2_SDK_v1.1/epoc32/include/stdapis;C:/S60/devices/S60_3rd_FP2_SDK_v1.1/epoc32/include;" macrosCache="_UNICODE;__SUPPORT_CPP_EXCEPTIONS__;__S60_32__;__MARM_ARMV5__;NDEBUG;__ARMCC__;__ARMCC_2_2__;__SYMBIAN32__;__MARM__;__EXE__;__S60_3X__;__SERIES60_3X__;__EPOC32__;__GENERIC_MARM__;__EABI__;" moduleId="configDataCache" sourcesCache="/Whisk3D/Utils;/Whisk3D/data;/Whisk3D/group;/Whisk3D/inc;/Whisk3D/src;" timestampCache="1725326219579" useMmpMacrosCache="true"/>
-<storageModule moduleId="org.eclipse.cdt.core.language.mapping"/>
+<storageModule filesCache="C:\S60\devices\S60_3rd_FP2_SDK_v1.1\S60CppExamples\Dante\Whisk3D\group\bld.inf;C:\S60\devices\S60_3rd_FP2_SDK_v1.1\S60CppExamples\Dante\Whisk3D\group\Whisk3D.mmp;" includesCache="C:/S60/devices/S60_3rd_FP2_SDK_v1.1/S60CppExamples/Dante/Whisk3D/group[LOCAL];C:/S60/devices/S60_3rd_FP2_SDK_v1.1/S60CppExamples/Dante/Whisk3D/inc[LOCAL];C:/S60/devices/S60_3rd_FP2_SDK_v1.1/S60CppExamples/Dante/Whisk3D/Utils[LOCAL];C:/S60/devices/S60_3rd_FP2_SDK_v1.1/S60CppExamples/Dante/Whisk3D/group;C:/S60/devices/S60_5th_Edition_SDK_v1.0/epoc32/include/python25;C:/S60/devices/S60_5th_Edition_SDK_v1.0/epoc32/include/stdapis;C:/S60/devices/S60_5th_Edition_SDK_v1.0/epoc32/include;" macrosCache="_UNICODE;__SUPPORT_CPP_EXCEPTIONS__;__MARM_ARMV5__;NDEBUG;__ARMCC__;__ARMCC_2_2__;__SYMBIAN32__;__MARM__;__EXE__;__S60_3X__;__SERIES60_3X__;__ARMCC_2__;__S60_5X__;__EPOC32__;__GENERIC_MARM__;__EABI__;__S60_50__;" moduleId="configDataCache" sourcesCache="/Whisk3D/Utils;/Whisk3D/data;/Whisk3D/group;/Whisk3D/inc;/Whisk3D/src;" timestampCache="1726451583342" useMmpMacrosCache="true"/>
 <storageModule moduleId="org.eclipse.cdt.core.externalSettings"/>
 </cconfiguration>
-<cconfiguration id="Phone Debug (GCCE) [S60_3rd_FP2_SDK_v1.1]">
-<storageModule buildSystemId="com.nokia.carbide.cdt.builder.CarbideConfigurationDataProvider" id="Phone Debug (GCCE) [S60_3rd_FP2_SDK_v1.1]" moduleId="org.eclipse.cdt.core.settings" name="Phone Debug (GCCE) [S60_3rd_FP2_SDK_v1.1]">
+<cconfiguration id="Phone Debug (GCCE) [S60_5th_Edition_SDK_v1.0]">
+<storageModule buildSystemId="com.nokia.carbide.cdt.builder.CarbideConfigurationDataProvider" id="Phone Debug (GCCE) [S60_5th_Edition_SDK_v1.0]" moduleId="org.eclipse.cdt.core.settings" name="Phone Debug (GCCE) [S60_5th_Edition_SDK_v1.0]">
 <externalSettings/>
 <extensions>
 <extension id="org.eclipse.cdt.core.ELF" point="org.eclipse.cdt.core.BinaryParser"/>
@@ -105,14 +102,13 @@
 <storageModule moduleId="CarbideConfigurationDataProvider">
 <ENV_VAR_DATA_ID/>
 <ARGUMENTS_DATA_ID ABLDFREEZEARGSSTORAGE="-r"/>
-<ROM_BUILDER_DATA_ID ROMBUILDWORKINGDIRECTORYSTORAGE="C:\S60\devices\S60_3rd_FP2_SDK_v1.1\epoc32\rom\"/>
+<ROM_BUILDER_DATA_ID ROMBUILDWORKINGDIRECTORYSTORAGE="C:\"/>
 </storageModule>
-<storageModule filesCache="C:\S60\devices\S60_3rd_FP2_SDK_v1.1\S60CppExamples\Dante\Whisk3D\group\bld.inf;C:\S60\devices\S60_3rd_FP2_SDK_v1.1\S60CppExamples\Dante\Whisk3D\group\Whisk3D.mmp;" includesCache="C:/S60/devices/S60_3rd_FP2_SDK_v1.1/S60CppExamples/Dante/Whisk3D/group[LOCAL];C:/S60/devices/S60_3rd_FP2_SDK_v1.1/S60CppExamples/Dante/Whisk3D/inc[LOCAL];C:/S60/devices/S60_3rd_FP2_SDK_v1.1/S60CppExamples/Dante/Whisk3D/Utils[LOCAL];C:/S60/devices/S60_3rd_FP2_SDK_v1.1/S60CppExamples/Dante/Whisk3D/group;C:/S60/devices/S60_3rd_FP2_SDK_v1.1/epoc32/include/python25;C:/S60/devices/S60_3rd_FP2_SDK_v1.1/epoc32/include/stdapis;C:/S60/devices/S60_3rd_FP2_SDK_v1.1/epoc32/include;" macrosCache="_UNICODE;__SUPPORT_CPP_EXCEPTIONS__;__S60_32__;__MARM_ARMV5__;__SYMBIAN32__;__GCCE__;__MARM__;__EXE__;__SERIES60_3X__;__S60_3X__;__GENERIC_MARM__;__EPOC32__;__EABI__;_DEBUG;" moduleId="configDataCache" sourcesCache="/Whisk3D/Utils;/Whisk3D/data;/Whisk3D/group;/Whisk3D/inc;/Whisk3D/src;" timestampCache="1725326219583" useMmpMacrosCache="true"/>
-<storageModule moduleId="org.eclipse.cdt.core.language.mapping"/>
+<storageModule filesCache="C:\S60\devices\S60_3rd_FP2_SDK_v1.1\S60CppExamples\Dante\Whisk3D\group\bld.inf;C:\S60\devices\S60_3rd_FP2_SDK_v1.1\S60CppExamples\Dante\Whisk3D\group\Whisk3D.mmp;" includesCache="C:/S60/devices/S60_3rd_FP2_SDK_v1.1/S60CppExamples/Dante/Whisk3D/group[LOCAL];C:/S60/devices/S60_3rd_FP2_SDK_v1.1/S60CppExamples/Dante/Whisk3D/inc[LOCAL];C:/S60/devices/S60_3rd_FP2_SDK_v1.1/S60CppExamples/Dante/Whisk3D/Utils[LOCAL];C:/S60/devices/S60_3rd_FP2_SDK_v1.1/S60CppExamples/Dante/Whisk3D/group;C:/S60/devices/S60_5th_Edition_SDK_v1.0/epoc32/include/python25;C:/S60/devices/S60_5th_Edition_SDK_v1.0/epoc32/include/stdapis;C:/S60/devices/S60_5th_Edition_SDK_v1.0/epoc32/include;" macrosCache="_UNICODE;__SUPPORT_CPP_EXCEPTIONS__;__MARM_ARMV5__;__SYMBIAN32__;__GCCE__;__MARM__;__EXE__;__SERIES60_3X__;__S60_3X__;__S60_5X__;__EPOC32__;__GENERIC_MARM__;__EABI__;_DEBUG;__S60_50__;" moduleId="configDataCache" sourcesCache="/Whisk3D/Utils;/Whisk3D/data;/Whisk3D/group;/Whisk3D/inc;/Whisk3D/src;" timestampCache="1726451583345" useMmpMacrosCache="true"/>
 <storageModule moduleId="org.eclipse.cdt.core.externalSettings"/>
 </cconfiguration>
-<cconfiguration id="Phone Release (GCCE) [S60_3rd_FP2_SDK_v1.1]">
-<storageModule buildSystemId="com.nokia.carbide.cdt.builder.CarbideConfigurationDataProvider" id="Phone Release (GCCE) [S60_3rd_FP2_SDK_v1.1]" moduleId="org.eclipse.cdt.core.settings" name="Phone Release (GCCE) [S60_3rd_FP2_SDK_v1.1]">
+<cconfiguration id="Phone Release (GCCE) [S60_5th_Edition_SDK_v1.0]">
+<storageModule buildSystemId="com.nokia.carbide.cdt.builder.CarbideConfigurationDataProvider" id="Phone Release (GCCE) [S60_5th_Edition_SDK_v1.0]" moduleId="org.eclipse.cdt.core.settings" name="Phone Release (GCCE) [S60_5th_Edition_SDK_v1.0]">
 <externalSettings/>
 <extensions>
 <extension id="org.eclipse.cdt.core.ELF" point="org.eclipse.cdt.core.BinaryParser"/>
@@ -133,10 +129,9 @@
 <SIS_BUILDER_DATA_ID CREATESTUBSTORAGE="false" ENABLEDSTORAGE="true" PARTIALUPGRADESTORAGE="false" PKGFILESTORAGE="sis\Whisk3D_gcce.pkg" SIGNINGTYPESTORAGE="1"/>
 <ENV_VAR_DATA_ID/>
 <ARGUMENTS_DATA_ID ABLDFREEZEARGSSTORAGE="-r"/>
-<ROM_BUILDER_DATA_ID ROMBUILDWORKINGDIRECTORYSTORAGE="C:\S60\devices\S60_3rd_FP2_SDK_v1.1\epoc32\rom\"/>
+<ROM_BUILDER_DATA_ID ROMBUILDWORKINGDIRECTORYSTORAGE="C:\"/>
 </storageModule>
-<storageModule filesCache="C:\S60\devices\S60_3rd_FP2_SDK_v1.1\S60CppExamples\Dante\Whisk3D\group\bld.inf;C:\S60\devices\S60_3rd_FP2_SDK_v1.1\S60CppExamples\Dante\Whisk3D\group\Whisk3D.mmp;" includesCache="C:/S60/devices/S60_3rd_FP2_SDK_v1.1/S60CppExamples/Dante/Whisk3D/group[LOCAL];C:/S60/devices/S60_3rd_FP2_SDK_v1.1/S60CppExamples/Dante/Whisk3D/inc[LOCAL];C:/S60/devices/S60_3rd_FP2_SDK_v1.1/S60CppExamples/Dante/Whisk3D/Utils[LOCAL];C:/S60/devices/S60_3rd_FP2_SDK_v1.1/S60CppExamples/Dante/Whisk3D/group;C:/S60/devices/S60_3rd_FP2_SDK_v1.1/epoc32/include/python25;C:/S60/devices/S60_3rd_FP2_SDK_v1.1/epoc32/include/stdapis;C:/S60/devices/S60_3rd_FP2_SDK_v1.1/epoc32/include;" macrosCache="_UNICODE;__SUPPORT_CPP_EXCEPTIONS__;__S60_32__;__MARM_ARMV5__;NDEBUG;__SYMBIAN32__;__GCCE__;__MARM__;__EXE__;__SERIES60_3X__;__S60_3X__;__GENERIC_MARM__;__EPOC32__;__EABI__;" moduleId="configDataCache" sourcesCache="/Whisk3D/Utils;/Whisk3D/data;/Whisk3D/group;/Whisk3D/inc;/Whisk3D/src;" timestampCache="1725326219587" useMmpMacrosCache="true"/>
-<storageModule moduleId="org.eclipse.cdt.core.language.mapping"/>
+<storageModule filesCache="C:\S60\devices\S60_3rd_FP2_SDK_v1.1\S60CppExamples\Dante\Whisk3D\group\bld.inf;C:\S60\devices\S60_3rd_FP2_SDK_v1.1\S60CppExamples\Dante\Whisk3D\group\Whisk3D.mmp;" includesCache="C:/S60/devices/S60_3rd_FP2_SDK_v1.1/S60CppExamples/Dante/Whisk3D/group[LOCAL];C:/S60/devices/S60_3rd_FP2_SDK_v1.1/S60CppExamples/Dante/Whisk3D/inc[LOCAL];C:/S60/devices/S60_3rd_FP2_SDK_v1.1/S60CppExamples/Dante/Whisk3D/Utils[LOCAL];C:/S60/devices/S60_3rd_FP2_SDK_v1.1/S60CppExamples/Dante/Whisk3D/group;C:/S60/devices/S60_5th_Edition_SDK_v1.0/epoc32/include/python25;C:/S60/devices/S60_5th_Edition_SDK_v1.0/epoc32/include/stdapis;C:/S60/devices/S60_5th_Edition_SDK_v1.0/epoc32/include;" macrosCache="_UNICODE;__SUPPORT_CPP_EXCEPTIONS__;__MARM_ARMV5__;NDEBUG;__SYMBIAN32__;__GCCE__;__MARM__;__EXE__;__SERIES60_3X__;__S60_3X__;__S60_5X__;__EPOC32__;__GENERIC_MARM__;__EABI__;__S60_50__;" moduleId="configDataCache" sourcesCache="/Whisk3D/Utils;/Whisk3D/data;/Whisk3D/group;/Whisk3D/inc;/Whisk3D/src;" timestampCache="1726451583347" useMmpMacrosCache="true"/>
 <storageModule moduleId="org.eclipse.cdt.core.externalSettings"/>
 </cconfiguration>
 </storageModule>
