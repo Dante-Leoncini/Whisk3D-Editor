@@ -49,123 +49,65 @@ CWhisk3DAppUi::~CWhisk3DAppUi(){
 // ------------------------------------------------------------------------------
 //
 enum{
-	ObjectMode,
-	EditMode
+	ObjectMode
 };
 
-enum {Solid, MaterialPreview, Wireframe, Rendered};
+enum {Solid, MaterialPreview, Rendered};
 
 void CWhisk3DAppUi::DynInitMenuPaneL(TInt aResourceId, CEikMenuPane* aMenuPane ){
     //para trabajar mas facil
     CWhisk3D& BL = *(iAppContainer->iWhisk3D); 
-    //BL.InteractionMode = ...;
 
-    //prepara el menu de materiales    
-	/*if (aResourceId == R_MATERIAL_MENU){
-	//if (aResourceId == R_LISTMATERIALS_MENU){
-        // Eliminar todos los elementos de men� existentes uno por uno
-        for (TInt i = aMenuPane->NumberOfItemsInPane() - 1; i >= 0; --i)
-        {
-            aMenuPane->DeleteMenuItem(aMenuPane->MenuItemCommandId(i));
-        }      
-        // Definir una cadena de caracteres Unicode de 16 bits
-        const TUint16 unicodeText[] = { 'N', 'o', 'm', 'b', 'r', 'e', ' ', 'd', 'e', 'l', ' ', 'e', 'l', 'e', 'm', 'e', 'n', 't', 'o', ' ', 'd', 'e', ' ', 'm', 'e', 'n', '�', '\0' };
-
-        // Inicializar TPtrC16 con la cadena de caracteres Unicode de 16 bits
-        //TPtrC16 itemText(unicodeText);
-        TPtrC8 itemText = L"Nombre del elemento de men�";
-
-		TWhisk3DMenuCommands menuCommand = EWhisk3DOrigenSetOrigen;  // Suponiendo que EWhisk3DCommand es una constante o enumeraci�n v�lida
-		
-		CEikMenuPaneItem::SData menuItemData;
-		menuItemData.iCommandId = menuCommand;  // Asigna el ID de comando de tu men�
-		menuItemData.iText = itemText;
-				
-		aMenuPane->InsertMenuItemL(menuItemData, 2);
-        
-        // Agrega los nombres de materiales como elementos de men�
-		//for (TInt i = 0; i < iAppContainer->iWhisk3D->Materials.Count(); ++i){
-			//TInt commandId = EAknCmdEmpty + i; // Asigna un ID de comando �nico para cada elemento de men�
-		    //_LIT(KTitle, "Selecciona la Textura");
-			//aMenuPane->AddMenuItemL(TPtrC(KTitle), EWhisk3DOrigenSetOrigen);
-		//}
-    }*/
 	//oculta el SetOrigen si no esta en modo edicion
-    if (aResourceId == R_WHISK3D_MENU ) {
-        if (BL.InteractionMode == EditMode) {
-	        if (BL.Objects.Count() > 0){
-                aMenuPane->SetItemDimmed(EViewportObject, EFalse);
-                aMenuPane->SetItemDimmed(EUvMappingMenu, EFalse);                
-            }
-            else {
-                aMenuPane->SetItemDimmed(EViewportObject, ETrue);
-                aMenuPane->SetItemDimmed(EUvMappingMenu, ETrue);
-            }
-            aMenuPane->SetItemDimmed(ESetOrigenMenu, ETrue);
-            aMenuPane->SetItemDimmed(EWhisk3DSeleccionar, EFalse);
-            aMenuPane->SetItemDimmed(EViewportAdd, ETrue);            
-        } 
-        else {
-            aMenuPane->SetItemDimmed(ESetOrigenMenu, EFalse);
-            aMenuPane->SetItemDimmed(EWhisk3DSeleccionar, ETrue);
-            aMenuPane->SetItemDimmed(EViewportAdd, EFalse);
+    /* if (aResourceId == R_WHISK3D_MENU ) {
+        aMenuPane->SetItemDimmed(EWhisk3DSeleccionar, ETrue);
+        aMenuPane->SetItemDimmed(EViewportAdd, EFalse);
 
-            //si hay objetos            
-	        if (BL.Objects.Count() > 0){   
-                aMenuPane->SetItemDimmed(EViewportObject, EFalse);   
-                Object& obj = BL.Objects[BL.SelectActivo];
-                //si esta seleccionada
-                if (obj.seleccionado){ 
-                    aMenuPane->SetItemDimmed(ETransformMenu, EFalse);
-                    aMenuPane->SetItemDimmed(ESnapMenu, EFalse);  
-                    //si es una malla 3d
-                    if (obj.type == mesh){
-                        aMenuPane->SetItemDimmed(ECameraMenu, ETrue); 
-                        aMenuPane->SetItemDimmed(EMaterial, EFalse);
-                        aMenuPane->SetItemDimmed(EWhisk3DModificadores, EFalse);
-                        aMenuPane->SetItemDimmed(EUvMappingMenu, EFalse);
-                        aMenuPane->SetItemDimmed(ESetOrigenMenu, EFalse);    
-                    }
-                    //si es una camara
-                    else if (obj.type == camera){
-                        aMenuPane->SetItemDimmed(ECameraMenu, EFalse); 
-                        aMenuPane->SetItemDimmed(EMaterial, ETrue);
-                        aMenuPane->SetItemDimmed(EWhisk3DModificadores, ETrue); 
-                        aMenuPane->SetItemDimmed(EUvMappingMenu, ETrue);
-                        aMenuPane->SetItemDimmed(ESetOrigenMenu, ETrue);
-                    }
-                    //si es otra cosa
-                    else {
-                        aMenuPane->SetItemDimmed(ECameraMenu, ETrue); 
-                        aMenuPane->SetItemDimmed(EMaterial, ETrue);
-                        aMenuPane->SetItemDimmed(EWhisk3DModificadores, ETrue); 
-                        aMenuPane->SetItemDimmed(EUvMappingMenu, ETrue);
-                        aMenuPane->SetItemDimmed(ESetOrigenMenu, ETrue);     
-                    }                    
+        //si hay objetos            
+        if (BL.Objects.Count() > 0){   
+            aMenuPane->SetItemDimmed(EViewportObject, EFalse);   
+            Object& obj = BL.Objects[BL.SelectActivo];
+            //si esta seleccionada
+            if (obj.seleccionado){ 
+                aMenuPane->SetItemDimmed(ETransformMenu, EFalse);
+                aMenuPane->SetItemDimmed(ESnapMenu, EFalse);  
+                //si es una malla 3d
+                if (obj.type == mesh){
+                    aMenuPane->SetItemDimmed(ECameraMenu, ETrue); 
+                    aMenuPane->SetItemDimmed(EMaterial, EFalse);
+                    aMenuPane->SetItemDimmed(EWhisk3DModificadores, EFalse);
                 }
-                //si nada esta seleccionado
+                //si es una camara
+                else if (obj.type == camera){
+                    aMenuPane->SetItemDimmed(ECameraMenu, EFalse); 
+                    aMenuPane->SetItemDimmed(EMaterial, ETrue);
+                    aMenuPane->SetItemDimmed(EWhisk3DModificadores, ETrue); 
+                }
+                //si es otra cosa
                 else {
                     aMenuPane->SetItemDimmed(ECameraMenu, ETrue); 
                     aMenuPane->SetItemDimmed(EMaterial, ETrue);
-                    aMenuPane->SetItemDimmed(EWhisk3DModificadores, ETrue);  
-                    aMenuPane->SetItemDimmed(EUvMappingMenu, ETrue);  
-                    aMenuPane->SetItemDimmed(ESetOrigenMenu, ETrue);  
-                    aMenuPane->SetItemDimmed(ETransformMenu, ETrue);  
-                    aMenuPane->SetItemDimmed(ESnapMenu, ETrue);  
-                    aMenuPane->SetItemDimmed(EViewportObject, ETrue);                                         
-                }
+                    aMenuPane->SetItemDimmed(EWhisk3DModificadores, ETrue); 
+                }                    
             }
+            //si nada esta seleccionado
             else {
                 aMenuPane->SetItemDimmed(ECameraMenu, ETrue); 
-                aMenuPane->SetItemDimmed(EWhisk3DModificadores, ETrue);  
                 aMenuPane->SetItemDimmed(EMaterial, ETrue);
-                aMenuPane->SetItemDimmed(EViewportObject, ETrue);
-                aMenuPane->SetItemDimmed(EUvMappingMenu, ETrue);
-                aMenuPane->SetItemDimmed(ESetOrigenMenu, ETrue);  
+                aMenuPane->SetItemDimmed(EWhisk3DModificadores, ETrue);  
                 aMenuPane->SetItemDimmed(ETransformMenu, ETrue);  
-                aMenuPane->SetItemDimmed(ESnapMenu, ETrue);   
-                aMenuPane->SetItemDimmed(EViewportObject, ETrue);                   
+                aMenuPane->SetItemDimmed(ESnapMenu, ETrue);  
+                aMenuPane->SetItemDimmed(EViewportObject, ETrue);                                         
             }
+        }
+        else {
+            aMenuPane->SetItemDimmed(ECameraMenu, ETrue); 
+            aMenuPane->SetItemDimmed(EWhisk3DModificadores, ETrue);  
+            aMenuPane->SetItemDimmed(EMaterial, ETrue);
+            aMenuPane->SetItemDimmed(EViewportObject, ETrue);
+            aMenuPane->SetItemDimmed(ETransformMenu, ETrue);  
+            aMenuPane->SetItemDimmed(ESnapMenu, ETrue);   
+            aMenuPane->SetItemDimmed(EViewportObject, ETrue);                   
         }
     }
     else if ( aResourceId == R_CAMERA_MENU ){
@@ -176,24 +118,6 @@ void CWhisk3DAppUi::DynInitMenuPaneL(TInt aResourceId, CEikMenuPane* aMenuPane )
             aMenuPane->SetItemTextL( ESetCameraToView, R_CAMERATOVIEW_ON  );
         } 
     }    
-    else if ( aResourceId == R_TRANSFORM_MENU ){
-        //si hay objetos            
-        if (BL.Objects.Count() > 0){        
-            Object& obj = BL.Objects[BL.SelectActivo];
-            //si es una malla 3d
-            if (obj.type == mesh && obj.seleccionado){
-                aMenuPane->SetItemDimmed(EShrinkFatten, EFalse);
-                aMenuPane->SetItemDimmed(EExtrude, EFalse);
-            }
-            else {
-                aMenuPane->SetItemDimmed(EShrinkFatten, ETrue);    
-                aMenuPane->SetItemDimmed(EExtrude, ETrue);                  
-            }
-        }
-        else {
-            aMenuPane->SetItemDimmed(EShrinkFatten, ETrue);
-        }
-    }
     else if (aResourceId == R_VIEWPORT_OVERLEY_MENU ) {
         // Texto para setear la pantalla ancha
         if ( iAppContainer->iWhisk3D->iWidescreenEnabled ){
@@ -259,7 +183,7 @@ void CWhisk3DAppUi::DynInitMenuPaneL(TInt aResourceId, CEikMenuPane* aMenuPane )
         else {
             aMenuPane->SetItemTextL( ETimelineShowTimeline, R_SHOW_TIMELINE  );
         }
-    }
+    }*/
 }
 
 // ----------------------------------------------------
@@ -365,7 +289,7 @@ TKeyResponse CWhisk3DAppUi::HandleKeyEventL(const TKeyEvent& aKeyEvent, TEventCo
                     iAppContainer->iWhisk3D->TecladoNumerico(11);
                     return EKeyWasConsumed;
                 case(226): //camara
-                    iAppContainer->iWhisk3D->Extrude();
+                    //iAppContainer->iWhisk3D->Extrude();
                     return EKeyWasConsumed;
                 case(196): //llamada
                     iAppContainer->iWhisk3D->ChangeEje();
@@ -453,7 +377,7 @@ TKeyResponse CWhisk3DAppUi::HandleKeyEventL(const TKeyEvent& aKeyEvent, TEventCo
 
 enum{
 	cubo, esfera, cilindro, plane, vacio, camara,
-    cad, luz, monkey,vertice, circle
+    cad, luz, vertice, circle
 };
 
 enum{
@@ -534,18 +458,6 @@ void CWhisk3DAppUi::HandleCommandL(TInt aCommand){
         case EImportOBJ:
             iAppContainer->iWhisk3D->ImportOBJ();
             break; 
-        case EShrinkFatten:
-            iAppContainer->iWhisk3D->CalcShrinkFattenVectors();
-            break; 
-        case EExtrude:
-            iAppContainer->iWhisk3D->Extrude();
-            break; 
-        case EDuplicate:
-            iAppContainer->iWhisk3D->Duplicate();
-            break; 
-        case EOldImportOBJ:
-            iAppContainer->iWhisk3D->OldImportOBJ();
-            break; 
         case EWhisk3DWidescreen:
             iAppContainer->SetWidescreen();
             break;    
@@ -578,10 +490,7 @@ void CWhisk3DAppUi::HandleCommandL(TInt aCommand){
             break;  
         case EPlane:            
             iAppContainer->iWhisk3D->AddMesh(plane);
-            break;          
-        case EMonkey:
-            iAppContainer->iWhisk3D->AddMesh(monkey);
-            break;  
+            break;    
         case EVertex:
             iAppContainer->iWhisk3D->AddMesh(vertice);
             break; 
@@ -590,13 +499,7 @@ void CWhisk3DAppUi::HandleCommandL(TInt aCommand){
             break;  
         case ESetSpecular:
             iAppContainer->iWhisk3D->SetSpecular();
-            break;   
-        case EWhisk3DEditarMesh:
-            iAppContainer->iWhisk3D->SetEditMode();
-            break; 
-        case ECylinderProjection:            
-            iAppContainer->iWhisk3D->UVmapping(0);
-            break;   
+            break;     
         case EWhisk3DSetEscala:
             iAppContainer->iWhisk3D->SetEscala();
             break;   
@@ -618,9 +521,6 @@ void CWhisk3DAppUi::HandleCommandL(TInt aCommand){
         case EClearParent:
             iAppContainer->iWhisk3D->ClearParent();
             break;  
-        case EFlipNormals:
-            iAppContainer->iWhisk3D->FlipNormals();
-            break;
         case ESetActiveObjectAsCamera:
             iAppContainer->iWhisk3D->SetActiveObjectAsCamera();
             break;  
@@ -659,10 +559,7 @@ void CWhisk3DAppUi::HandleCommandL(TInt aCommand){
             break; 
         case ESetTextureRepeat:
             iAppContainer->iWhisk3D->SetTextureRepeat();
-            break;             
-        case ESetSmooth:
-            iAppContainer->iWhisk3D->SetSmooth();
-            break;  
+            break;     
         case ESetCulling:
             iAppContainer->iWhisk3D->SetCulling();
             break;  
@@ -705,27 +602,9 @@ void CWhisk3DAppUi::HandleCommandL(TInt aCommand){
         case EWhisk3DViewSolid:
             iAppContainer->iWhisk3D->SetShading(Solid);
             break; 
-        case EWhisk3DViewWireframe:
-            iAppContainer->iWhisk3D->SetShading(Wireframe);
-            break; 
         case EViewRendered:
             iAppContainer->iWhisk3D->SetShading(Rendered);
             break;
-        case EWhisk3DSetTipoVertex:
-            iAppContainer->iWhisk3D->SetTipoSelect(vertexSelect);
-            break; 
-        case EWhisk3DSetTipoEdge:
-            iAppContainer->iWhisk3D->SetTipoSelect(edgeSelect);
-            break; 
-        case EWhisk3DSetTipoFace:
-            iAppContainer->iWhisk3D->SetTipoSelect(faceSelect);
-            break; 
-        case ESetOrigenToGeometry:
-            iAppContainer->iWhisk3D->SetOrigen(0);
-            break; 
-        case ESetOriginTo3DCursor:
-            iAppContainer->iWhisk3D->SetOriginTo3DCursor();
-            break; 
         case EWhisk3DCambiarObject:
             iAppContainer->iWhisk3D->changeSelect();
             break; 

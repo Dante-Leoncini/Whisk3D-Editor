@@ -124,7 +124,6 @@ class CWhisk3D : public CFiniteStateMachine, public MTextureLoadingListener
         void Cancelar( void );
         void Aceptar( void );
         void SetTransformPivotPoint(void);
-        void UVmapping(TInt valor);
         void PressTab( void );
 
         void SetTranslacionVertices(TInt valor);
@@ -160,14 +159,9 @@ class CWhisk3D : public CFiniteStateMachine, public MTextureLoadingListener
         void SetFrameRate();
 
         //nueva forma de editar vertices
-        void CalcShrinkFattenVectors();
-        void SetShrinkFatten(TInt fuerza);
         void CalcScaleVectors();
         void SetScale(TInt fuerza);
-        void Duplicate();
 
-        void FlipNormals();
-        void SetSmooth();
         void SetCulling();
         void SetLighting();
         void SetVertexColor();
@@ -177,8 +171,6 @@ class CWhisk3D : public CFiniteStateMachine, public MTextureLoadingListener
         void RemoveKeyframes();
         void ClearKeyframes();
         void SetEmission();
-        void SetEditMode();
-        void Extrude();
         void SetPerspectiva( TBool redibuja = true );
         void EnfocarObject();
         void CursorToSelect();
@@ -218,11 +210,10 @@ class CWhisk3D : public CFiniteStateMachine, public MTextureLoadingListener
         void RenderLinkLines(TInt objId);
         void TecladoNumerico(TInt numero);
         void InsertarValor();
-        void ImportOBJ();
         void RecalcViewPos();
         void SetCameraToView();
         void DeseleccionarTodo();
-        void OldImportOBJ();
+        void ImportOBJ();
         void ImportAnimation();
         TBool LeerOBJ(RFs* fsSession, RFile* rFile, TFileName* file, TInt64* startPos, 
                         TInt* acumuladoVertices,
@@ -251,19 +242,17 @@ class CWhisk3D : public CFiniteStateMachine, public MTextureLoadingListener
         void SetStartFrame();
         void SetEndFrame();
         void SetParent();
-        void SetOriginTo3DCursor();
         void ClearParent();
         void ObtenerUbicacionInstalacionL(TDes& aUbicacion);
         void SetTipoSelect(TInt tipo);
-        void SetOrigen( TInt opcion );
         void LoadTextureFromFile(const TDesC& aFileName);
         void LoadFile(const TFileName& aFileName,
                                        const TSize &aSize,
                                        TInt aSelectedFrame = 0);
         void Mensaje(HBufC* noteBuf);
         void MensajeError(HBufC* noteBuf);
-        TBool DialogAlert(HBufC* noteBuf);
-        TBool DialogAlert(const TDesC& noteBuf);
+        /*TBool DialogAlert(HBufC* noteBuf);
+        TBool DialogAlert(const TDesC& noteBuf);*/
         TInt BuscarAnimacion(TInt propertySelect);
         TInt BuscarAnimProperty(TInt indice, TInt propertySelect);
         TInt BuscarAnimacionObj();
@@ -375,7 +364,6 @@ class CWhisk3D : public CFiniteStateMachine, public MTextureLoadingListener
         TTexture iShaderMaterialPreview;
         TTexture iShaderRendered;
         TTexture iShaderSolid;
-        TTexture iShaderWireframe;
 
 		/**
 		 * Input handler that maps keycodes to inputs and stores the current state

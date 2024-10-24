@@ -87,25 +87,13 @@ RESOURCE MENU_PANE r_whisk3D_menu
 				command = ETransformMenu;
 				cascade = r_transform_menu;
 				txt = STRING_r_Transform;
-			},	            
-			MENU_ITEM
-			{
-				command = EWhisk3DSeleccionar;
-				cascade = r_whisk3D_seleccionar_menu;
-				txt = STRING_r_whisk3D_Seleccionar;
-			},	
+			},	   
             MENU_ITEM
             {
                 command = ESnapMenu;
                 cascade = r_viewport_snap_menu;
                 txt = STRING_r_Snap;
             },  
-			MENU_ITEM
-			{
-				command = EUvMappingMenu;
-				cascade = r_uv_mapping_menu;
-				txt = STRING_r_UVMapping;
-			},	
 			MENU_ITEM
 			{
 				command = EViewportObject;
@@ -119,12 +107,6 @@ RESOURCE MENU_PANE r_whisk3D_menu
 	            txt = STRING_r_Material;
 	            //flags = EEikMenuItemSeparatorAfter; //no da error pero no veo cambios
 	        },		
-			MENU_ITEM
-			{
-				command = ESetOrigenMenu; 
-				cascade = r_whisk3D_editarOrigen_menu; 
-				txt = STRING_r_whisk3D_SetOrigen;
-			},	
 			MENU_ITEM
 			{
 				command = EWhisk3DVista3D;
@@ -192,22 +174,6 @@ RESOURCE MENU_PANE r_camera_menu {
 
 //----------------------------------------------------
 //
-//    r_uv_mapping_menu
-//
-//----------------------------------------------------
-//
-
-RESOURCE MENU_PANE r_uv_mapping_menu {
-    items = { 		        
-		MENU_ITEM {
-			command = ECylinderProjection;
-			txt = STRING_r_CylinderProjection;
-		}
-    };
-}
-
-//----------------------------------------------------
-//
 //    r_transform_menu
 //
 //----------------------------------------------------
@@ -226,18 +192,6 @@ RESOURCE MENU_PANE r_transform_menu {
         MENU_ITEM {
             command = EWhisk3DSetEscala;
             txt = STRING_r_whisk3D_CambiarEscala;
-        },
-        MENU_ITEM {
-            command = EShrinkFatten;
-            txt = STRING_r_ShrinkFatten;
-        },
-        MENU_ITEM {
-            command = EExtrude;
-            txt = STRING_r_Extrude;
-        },
-        MENU_ITEM {
-            command = EDuplicate;
-            txt = STRING_r_Duplicate;
         },
         MENU_ITEM {
             command = ESelectInvert;
@@ -412,22 +366,11 @@ RESOURCE MENU_PANE r_viewport_add_menu{
         MENU_ITEM {
             command = ELight;
             txt = STRING_r_Light;
-        },
+        },      
         MENU_ITEM {
-            command = EMonkey;
-            txt = STRING_r_Monkey;
-        },        
-        //MENU_ITEM
-        //{
-        //    command = EImportOBJ;
-        //    txt = STRING_r_ImportOBJ;
-        //},        
-        MENU_ITEM
-        {
-            command = EOldImportOBJ;
+            command = EImportOBJ;
             txt = STRING_r_ImportOBJ;
-            //txt = STRING_r_OldImportOBJ;
-        }        
+        }      
     };
 }
 
@@ -451,10 +394,6 @@ RESOURCE MENU_PANE r_whisk3D_vista3D_menu{
 			command = EWhisk3DViewSolid;
 			txt = STRING_r_whisk3D_ViewSolid;
 		},
-        MENU_ITEM {
-            command = EWhisk3DViewWireframe;
-            txt = STRING_r_whisk3D_ViewWireframe;
-        },
         MENU_ITEM {
             command = ECameraView;
             txt = STRING_r_Camera;
@@ -521,10 +460,6 @@ RESOURCE MENU_PANE r_Material_menu{
             command = ENewTexture;
             txt = STRING_r_newTexture;
         }, 
-		MENU_ITEM {
-			command = ESetSmooth;
-			txt = STRING_r_setSmooth;
-		},
 		MENU_ITEM {
 			command = ESetDiffuse;
 			txt = STRING_r_setDiffuse;
@@ -639,11 +574,6 @@ RESOURCE MENU_PANE r_viewport_object_menu{
 	items = {
 		MENU_ITEM
 		{
-			command = EWhisk3DEditarMesh;
-			txt = STRING_r_whisk3D_EditarMesh;
-		},
-		MENU_ITEM
-		{
 			command = EWhisk3DBorrar;
 			txt = STRING_r_whisk3D_Borrar;
 		},	
@@ -676,12 +606,7 @@ RESOURCE MENU_PANE r_viewport_object_menu{
 		{
 			command = EClearParent;
 			txt = STRING_r_ClearParent;
-        } , 
-		MENU_ITEM
-		{
-			command = EFlipNormals;
-			txt = STRING_r_FlipNormals;
-        } 
+        }
     };
 }
 
@@ -707,49 +632,6 @@ RESOURCE MENU_PANE r_viewport_snap_menu{
         {
             command = ECursorToWorldOrigin;
             txt = STRING_r_CursorToWorldOrigin;
-        }
-    };
-}
-
-//----------------------------------------------------
-//
-//    r_whisk3D_seleccionar_menu
-//
-//----------------------------------------------------
-//
-RESOURCE MENU_PANE r_whisk3D_seleccionar_menu{
-	items = {
-		MENU_ITEM {
-			command = EWhisk3DSetTipoVertex;
-			txt = STRING_r_whisk3D_SeleccionVertice;
-		},
-		MENU_ITEM {
-			command = EWhisk3DSetTipoEdge;
-			txt = STRING_r_whisk3D_SeleccionBordes;
-		},
-        MENU_ITEM {
-            command = EWhisk3DSetTipoFace;
-            txt = STRING_r_whisk3D_SeleccionCaras;
-        }	
-    };
-}
-
-//----------------------------------------------------
-//
-//    r_whisk3D_editarOrigen_menu
-//
-//----------------------------------------------------
-//
-RESOURCE MENU_PANE r_whisk3D_editarOrigen_menu{
-	items = {
-		//MENU_ITEM {
-		//	command = ESetOrigenToGeometry;
-		//	txt = STRING_r_whisk3D_OrigenToGeometry;
-		//},  
-        MENU_ITEM
-        {
-            command = ESetOriginTo3DCursor;
-            txt = STRING_r_SetOriginTo3DCursor;
         }
     };
 }
