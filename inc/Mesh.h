@@ -121,13 +121,13 @@ class Wavefront {
 		void Wavefront::ConvertToES1(Mesh& TempMesh){
 			TempMesh.vertexSize = vertex.Count();
 			TempMesh.vertex = new GLshort[vertex.Count()];
-			TempMesh.vertexColor = new GLubyte[vertex.Count()];
+			TempMesh.vertexColor = new GLubyte[(vertex.Count()/3)*4];
 			TempMesh.normals = new GLbyte[vertex.Count()];
 			TempMesh.uv = new GLfloat[(vertex.Count()/3)*2];
 			//valores por defecto
 			for (TInt i = 0; i < vertex.Count()/3; i++) {
 				TempMesh.vertex[i*3] = TempMesh.vertex[i*3+1] = TempMesh.vertex[i*3+2] = 0;
-				TempMesh.vertexColor[i*3] = TempMesh.vertexColor[i*3+1] = TempMesh.vertexColor[i*3+2] = 255;
+				TempMesh.vertexColor[i*4] = TempMesh.vertexColor[i*4+1] = TempMesh.vertexColor[i*4+2] = TempMesh.vertexColor[i*4+3] = 255;
 				TempMesh.normals[i*3] = TempMesh.normals[i*3+1] = TempMesh.normals[i*3+2] = 0;
 				TempMesh.uv[i*2] = TempMesh.uv[i*2+1] = 0;
 			}
@@ -145,7 +145,11 @@ class Wavefront {
 					for(TInt v=0; v < 3; v++){
 						TempMesh.vertex[vertexIndice*3+v] = vertex[vertexIndice*3+v];
 						TempMesh.normals[vertexIndice*3+v] = normals[normalIndice*3+v];
-					}
+						TempMesh.vertexColor[vertexIndice*4+v] = vertexColor[vertexIndice*3+v];
+					}						
+					/*_LIT(KFormatString3, "face corn: %d\ncolor: %d, %d, %d, %d");
+					noteBuf3->Des().Format(KFormatString3, f+1, TempMesh.vertexColor[vertexIndice*4], TempMesh.vertexColor[vertexIndice*4+1], TempMesh.vertexColor[vertexIndice*4+2], TempMesh.vertexColor[vertexIndice*4+3]);
+					CDialogs::Alert(noteBuf3);*/
 					for(TInt v=0; v < 2; v++){
 						TempMesh.uv[vertexIndice*2+v] = uv[uvIndice*2+v];
 					}
@@ -182,7 +186,10 @@ class Wavefront {
 			//si tiene materiales
 			if (materialsGroup.Count() > 0){			
 				for (TInt i = 0; i < materialsGroup.Count(); i++) {
-					TempMesh.materialsGroup.Append(materialsGroup[i]);				
+					/*_LIT(KFormatString3, "mat: %d\nfaces: %d\nstart: %d\nstartDrawn: %d\nindicesDrawnCount: %d");
+					noteBuf3->Des().Format(KFormatString3, i+1, materialsGroup[i].count, materialsGroup[i].start, materialsGroup[i].startDrawn, materialsGroup[i].indicesDrawnCount);
+					CDialogs::Alert(noteBuf3);*/
+					TempMesh.materialsGroup.Append(materialsGroup[i]);			
 				}
 			}
 			else {

@@ -1736,7 +1736,7 @@ void CWhisk3D::dibujarUI(){
 	glEnable( GL_TEXTURE_2D ); // Permite usar texturas
 	glColor4f(ListaColores[blanco][0],ListaColores[blanco][1],ListaColores[blanco][2],ListaColores[blanco][3]);	
 	glBindTexture( GL_TEXTURE_2D, Textures[1].iID ); 
-
+    
 	//que editor esta abierto
 	glPushMatrix();
 	UiMoveTo(5,5);
@@ -5210,6 +5210,7 @@ TBool CWhisk3D::LeerOBJ(RFs* fsSession, RFile* rFile, TFileName* file, TInt64* s
 	Wobj.Reset();
 	Face NewFace;
 	FaceCorners NewFaceCorners;
+	TBool TieneVertexColor = false;
 
 	TBool continuarLeyendo = true; // Variable para controlar la lectura del archivo
 	TBuf8<2048> buffer;
@@ -5271,26 +5272,34 @@ TBool CWhisk3D::LeerOBJ(RFs* fsSession, RFile* rFile, TFileName* file, TInt64* s
 
 						TLex8 lex(line.Mid(2));  // Inicializa TLex con la subcadena a partir del tercer caracter
 						// Iterar mientras no se llegue al final del descriptor y se haya alcanzado el limite de 8 strings
-						while (!lex.Eos() && contador < 3) {		
+						while (!lex.Eos() && contador < 6) {		
 							TPtrC8 currentString = lex.NextToken(); // Mostrar el mensaje con el valor actual del "string" y el contador					
 							TLex8 testLex(currentString);// Crear un nuevo objeto TLex para la prueba
 							
 							// Convertir el string en un número TInt
 							TReal number = 0.0;
 							TInt err = testLex.Val(number, '.');
-							if (err == KErrNone && contador < 3) {
-								number = number*2000;								
-								GLshort glNumber = static_cast<GLshort>(number);
-								Wobj.vertex.Append(glNumber);							
+							if (err == KErrNone){
+								if (contador < 3) {
+									number = number*2000;								
+									GLshort glNumber = static_cast<GLshort>(number);
+									Wobj.vertex.Append(glNumber);							
+								}
+								//que el vertice tenga el color es una mierda. se hara un nuevo formato y se guardara en el face corner...							
+								else if (contador < 6){
+									number = number*255.0;	
+									if (number > 255.0){number = 255.0;}	
+									GLshort glNumber = static_cast<GLubyte>(number); // Conversion a GLbyte
+									Wobj.vertexColor.Append(glNumber);	
+									TieneVertexColor = true;
+									
+									/*HBufC* noteBuf3 = HBufC::NewLC(180);
+									_LIT(KFormatString3, "se agrego color: %f, %d");
+									noteBuf3->Des().Format(KFormatString3, number, glNumber);
+									CDialogs::Alert(noteBuf3);
+									CleanupStack::PopAndDestroy(noteBuf3);*/
+								}
 							}
-							//que el vertice tenga el color es una mierda. se hara un nuevo formato y se guardara en el face corner...							
-							/*else if (contador < 6){
-								number = number*255.0;	
-								if (number > 255.0){number = 255.0;}	
-								GLshort glNumber = static_cast<GLubyte>(number); // Conversion a GLbyte
-								ListColors.Append(glNumber);
-								tieneVertexColor = true;
-							}*/
 
 							// Avanzar al siguiente "string" que no sea espacio en blanco
 							lex.SkipSpace();
@@ -5298,12 +5307,13 @@ TBool CWhisk3D::LeerOBJ(RFs* fsSession, RFile* rFile, TFileName* file, TInt64* s
 							// Incrementar el contador para llevar la cuenta de los strings procesados
 							contador++;
 						}
-						/*while (contador < 6) {		
-							if (contador < 6){
-								ListColors.Append(255);
+						//en caso de no tener color
+						while (contador < 6) {		
+							if (contador > 2){
+								Wobj.vertexColor.Append(255);	
 							}
 							contador++;
-						}*/
+						}
 					}
 					else if (line.Left(3) == _L8("vn ")) {
 						contador = 0;
@@ -5372,7 +5382,7 @@ TBool CWhisk3D::LeerOBJ(RFs* fsSession, RFile* rFile, TFileName* file, TInt64* s
 
 						Wobj.faces.Append(NewFace);
 						Face& TempFace = Wobj.faces[Wobj.faces.Count()-1];
-
+						MaterialGroup& UltimoMG = Wobj.materialsGroup[Wobj.materialsGroup.Count()-1];
 						
 						//HBufC* noteBuf4 = HBufC::NewLC(180);								
 						while (!lex.Eos()) {		
@@ -5430,7 +5440,9 @@ TBool CWhisk3D::LeerOBJ(RFs* fsSession, RFile* rFile, TFileName* file, TInt64* s
 									//cada face corner extra es un triangulo
 									if (contador > 1 && conTBarras == 2){
 										Wobj.facesCount++;
-										Wobj.facesSize += 3;
+										Wobj.facesSize += 3;	
+										UltimoMG.count++;
+										UltimoMG.indicesDrawnCount += 3;
 									}
 									/*_LIT(KFormatString6, "facesCount: %d\nfacesSize: %d");
 									noteBuf4->Des().Format(KFormatString6, Wobj.facesCount, Wobj.facesSize);
@@ -5500,15 +5512,20 @@ TBool CWhisk3D::LeerOBJ(RFs* fsSession, RFile* rFile, TFileName* file, TInt64* s
 					}
 					else if (line.Left(7) == _L8("usemtl ")) {	
 						MaterialGroup tempFaceGroup;
-						tempFaceGroup.count = tempFaceGroup.indicesDrawnCount = tempFaceGroup.material = 0;
-						tempFaceGroup.start = Wobj.facesSize;
+						tempFaceGroup.count = 0;
+						tempFaceGroup.indicesDrawnCount = 0;
+						tempFaceGroup.start = Wobj.facesSize/3;
+						tempFaceGroup.startDrawn = Wobj.facesSize;
+						tempFaceGroup.material = 0;
+
 						Wobj.materialsGroup.Append(tempFaceGroup);
+						tempFaceGroup.count = 0;
 						Material mat;	
 						mat.specular[0] = mat.specular[1] = mat.specular[2] = mat.specular[3] = 0.3;
 						mat.diffuse[0] = mat.diffuse[1] = mat.diffuse[2] = mat.diffuse[3] = 1.0;
 						mat.emission[0] = mat.emission[1] = mat.emission[2] = mat.emission[3] = 0.0;
 						mat.textura = false;
-						mat.vertexColor = false;
+						mat.vertexColor = TieneVertexColor;
 						mat.repeat = true;
 						mat.lighting = true;
 						mat.culling = true;
@@ -5584,6 +5601,10 @@ TBool CWhisk3D::LeerOBJ(RFs* fsSession, RFile* rFile, TFileName* file, TInt64* s
 	Objects.Append(obj);
 	SelectActivo = Objects.Count()-1;
 	Collection.Append(SelectActivo);
+	
+	DeseleccionarTodo();
+	Objects[SelectActivo].seleccionado = true;
+	SelectCount = 1;
 
 	/*HBufC* noteBuf3 = HBufC::NewLC(180);
 	_LIT(KFormatString4, "vertices: %d\nCaras: %d\nMateriales: %d");
