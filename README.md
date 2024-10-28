@@ -6,6 +6,8 @@ ENGLISH: Whisk3D is a Blender clone, developed from scratch for Symbian s60v3.
 
 YouTube: [Youtube Video](https://youtu.be/dMe-Vit5OT0)
 
+Note: you need to have python installed on your phone for it to work! (pys60 2.0.0)
+
 Clarifications:
 1) Not a port: This program does not share any code with the original Blender.
 2) Basic functionality: The program is basic, and some media have exaggerated its current capabilities.
@@ -29,6 +31,8 @@ I highly recommend using Linux, installing an SSD in your PCs, and optimizing yo
 Thank you to everyone who shared the project. I hope this effort helps raise awareness and urge companies to manufacture more durable and sustainable phones.
 
 #Thanks Marcig for the new Name!
+
+nota: es necesario tener instalado en el telefono python para que funcione!. (pys60 2.0.0)
 
 ESPAÑOL: Whisk 3D es un clon de Blender, desarrollado desde cero para Symbian s60v3.
 aclaraciones:
