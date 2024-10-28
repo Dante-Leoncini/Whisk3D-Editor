@@ -4544,6 +4544,12 @@ void CWhisk3D::LeerMTL(const TFileName& aFile) {
 	HBufC* noteBuf3 = HBufC::NewLC(180);
 	TBool encontrado = false;
 
+	// Cargar la textura desde la ruta absoluta
+	TBool HaytexturasQueCargar = false;
+	iTextureManager = CTextureManager::NewL(iScreenWidth, iScreenHeight,
+											FRUSTUM_TOP, FRUSTUM_BOTTOM, FRUSTUM_RIGHT, FRUSTUM_LEFT, FRUSTUM_NEAR,
+											this); 
+
 	while (startPos < fileSize) {
 		// Leer una linea del archivo desde la posicion actual
 		err = rFile.Read(startPos, buffer, buffer.MaxLength());
@@ -4556,7 +4562,7 @@ void CWhisk3D::LeerMTL(const TFileName& aFile) {
     		fsSession2.Close();	
             //CleanupStack::PopAndDestroy(&fsSession);
 			break;
-		}        
+		}      
 
         while ((pos = buffer.Locate('\n')) != KErrNotFound || (pos = buffer.Locate('\r')) != KErrNotFound) {
 			//TInt indice = 0;
@@ -4675,6 +4681,7 @@ void CWhisk3D::LeerMTL(const TFileName& aFile) {
 						mat->transparent = true;
 					}
 					else if (line.Left(7) == _L8("map_Kd ")) {
+						HaytexturasQueCargar = true;
 						TLex8 lex(line.Mid(7));
 						TPtrC8 texturePath = lex.NextToken();
 
@@ -4693,10 +4700,6 @@ void CWhisk3D::LeerMTL(const TFileName& aFile) {
 						TEntry entry;
 						TInt err = fs.Entry(absolutePath, entry);
 						if (err == KErrNone) {						
-							// Cargar la textura desde la ruta absoluta
-							iTextureManager = CTextureManager::NewL(iScreenWidth, iScreenHeight,
-																	FRUSTUM_TOP, FRUSTUM_BOTTOM, FRUSTUM_RIGHT, FRUSTUM_LEFT, FRUSTUM_NEAR,
-																	this);
 							TTexture newTexture;
 							newTexture.iTextureName = *texturePath16;
 							Textures.Append(newTexture);
@@ -4704,7 +4707,6 @@ void CWhisk3D::LeerMTL(const TFileName& aFile) {
 							mat->textureID = Textures.Count();
 
 							iTextureManager->RequestToLoad(newTexture.iTextureName, fileParser.DriveAndPath(), &Textures[Textures.Count() - 1], false);
-							iTextureManager->DoLoadL();
 						} else {
 							// El archivo no existe, manejar el error
 							_LIT(KFileNotFound, "No existe la textura '%S'");
@@ -4726,6 +4728,11 @@ void CWhisk3D::LeerMTL(const TFileName& aFile) {
 	CleanupStack::PopAndDestroy(noteBuf3);
     rFile.Close();	
     fsSession2.Close();	
+
+	//si hay texturas. las lee
+	if (HaytexturasQueCargar){		
+		iTextureManager->DoLoadL();
+	}
     //CleanupStack::PopAndDestroy(&fsSession);
 }
 
