@@ -180,7 +180,7 @@ class CWhisk3D : public CFiniteStateMachine, public MTextureLoadingListener
         void DialogWait(HBufC* noteBuf);
         void Borrar();
         void changeSelect();
-        void LeerMTL(const TFileName& aFile);
+        void LeerMTL(const TFileName& aFile, TInt objetosCargados);
         void ReloadAnimation();
         void SetMouse();
         void ToggleValue(TBool& valueToUpdate);

@@ -118,7 +118,7 @@ class Wavefront {
 			facesCount = 0;
 		};	
 
-		void Wavefront::ConvertToES1(Mesh& TempMesh){
+		void Wavefront::ConvertToES1(Mesh& TempMesh, TInt* acumuladoVertices, TInt* acumuladoNormales, TInt* acumuladoUVs){
 			TempMesh.vertexSize = vertex.Count();
 			TempMesh.vertex = new GLshort[vertex.Count()];
 			TempMesh.vertexColor = new GLubyte[(vertex.Count()/3)*4];
@@ -135,12 +135,22 @@ class Wavefront {
 			//agrega las caras
 			TempMesh.faces = new GLushort[facesSize];
 			TempMesh.facesSize = facesSize;
-			//HBufC* noteBuf3 = HBufC::NewLC(180);
+
+			/*HBufC* noteBuf3 = HBufC::NewLC(180);
+			_LIT(KFormatString3, "convirtiendo caras: %d\nvertices: %d");
+			noteBuf3->Des().Format(KFormatString3, faces.Count(),vertex.Count()/3);
+			CDialogs::Alert(noteBuf3);*/
+
 			for (TInt i = 0; i < faces.Count(); i++) {
 				for (TInt f = 0; f < faces[i].corner.Count(); f++) {
-					TInt vertexIndice = faces[i].corner[f].vertex;
-					TInt normalIndice = faces[i].corner[f].normal;
-					TInt uvIndice = faces[i].corner[f].uv;
+					TInt vertexIndice = faces[i].corner[f].vertex - *acumuladoVertices;
+					TInt normalIndice = faces[i].corner[f].normal - *acumuladoNormales;
+					TInt uvIndice = faces[i].corner[f].uv - *acumuladoUVs;
+					
+					/*_LIT(KFormatString3, "face %d\ncorner: %d\n%d/%d/%d");
+					noteBuf3->Des().Format(KFormatString3, i+1, f+1, vertexIndice+1, uvIndice+1, normalIndice+1);
+					CDialogs::Alert(noteBuf3);*/
+
 					TempMesh.faces[i*3+f] = vertexIndice;	
 					for(TInt v=0; v < 3; v++){
 						TempMesh.vertex[vertexIndice*3+v] = vertex[vertexIndice*3+v];
@@ -150,6 +160,7 @@ class Wavefront {
 					/*_LIT(KFormatString3, "face corn: %d\ncolor: %d, %d, %d, %d");
 					noteBuf3->Des().Format(KFormatString3, f+1, TempMesh.vertexColor[vertexIndice*4], TempMesh.vertexColor[vertexIndice*4+1], TempMesh.vertexColor[vertexIndice*4+2], TempMesh.vertexColor[vertexIndice*4+3]);
 					CDialogs::Alert(noteBuf3);*/
+
 					for(TInt v=0; v < 2; v++){
 						TempMesh.uv[vertexIndice*2+v] = uv[uvIndice*2+v];
 					}

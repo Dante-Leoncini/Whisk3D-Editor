@@ -4514,7 +4514,7 @@ void CWhisk3D::NewTexture(){
     }
 }
 
-void CWhisk3D::LeerMTL(const TFileName& aFile) {
+void CWhisk3D::LeerMTL(const TFileName& aFile, TInt objetosCargados) {
 	RFs fsSession2;	
 	User::LeaveIfError(fsSession2.Connect());
 
@@ -4538,6 +4538,10 @@ void CWhisk3D::LeerMTL(const TFileName& aFile) {
 
 	//necesario para modificar el material correcto	
 	Object& obj = Objects[SelectActivo];
+	/*RArray<Object&> objs;	
+	objs.Append(Objects[SelectActivo-3])
+	Object& obj = Objects[SelectActivo];*/
+
 	Mesh& pMesh = Meshes[obj.Id];
 	Material* mat = NULL; 
 	HBufC* materialName16 = HBufC::NewLC(180);
@@ -5166,7 +5170,7 @@ void CWhisk3D::ImportOBJ(){
 
 		//si el archivo existe. no tendria que marcar error
 		if (err == KErrNone) {
-			TRAP(err, LeerMTL(mtlFile));
+			TRAP(err, LeerMTL(mtlFile, objetosCargados));
 			//si ocurrio algun error al leerlo
 			if (err != KErrNone) {
 				_LIT(KFormatString, "Error al leer el archivo .mtl");
@@ -5218,6 +5222,9 @@ TBool CWhisk3D::LeerOBJ(RFs* fsSession, RFile* rFile, TFileName* file, TInt64* s
 	Face NewFace;
 	FaceCorners NewFaceCorners;
 	TBool TieneVertexColor = false;
+	TInt acumuladoVerticesProximo = 0;
+	TInt acumuladoNormalesProximo = 0;
+	TInt acumuladoUVsProximo = 0;
 
 	TBool continuarLeyendo = true; // Variable para controlar la lectura del archivo
 	TBuf8<2048> buffer;
@@ -5276,6 +5283,7 @@ TBool CWhisk3D::LeerOBJ(RFs* fsSession, RFile* rFile, TFileName* file, TInt64* s
 						contador = 0;
 						Wobj.vertex.ReserveL(Wobj.vertex.Count()+3);
 						Wobj.vertexColor.ReserveL(Wobj.vertexColor.Count()+3);
+						acumuladoVerticesProximo++;
 
 						TLex8 lex(line.Mid(2));  // Inicializa TLex con la subcadena a partir del tercer caracter
 						// Iterar mientras no se llegue al final del descriptor y se haya alcanzado el limite de 8 strings
@@ -5323,6 +5331,7 @@ TBool CWhisk3D::LeerOBJ(RFs* fsSession, RFile* rFile, TFileName* file, TInt64* s
 						}
 					}
 					else if (line.Left(3) == _L8("vn ")) {
+						acumuladoNormalesProximo++;
 						contador = 0;
 						Wobj.normals.ReserveL(Wobj.normals.Count()+3);
 						TLex8 lex(line.Mid(3));  // Inicializa TLex con la subcadena a partir del tercer caracter
@@ -5344,7 +5353,8 @@ TBool CWhisk3D::LeerOBJ(RFs* fsSession, RFile* rFile, TFileName* file, TInt64* s
 							contador++;
 						}			
 					}
-					else if (line.Left(3) == _L8("vt ")) {					
+					else if (line.Left(3) == _L8("vt ")) {	
+						acumuladoUVsProximo++;				
 						contador = 0;
 						Wobj.uv.ReserveL(Wobj.uv.Count()+2);
 
@@ -5604,7 +5614,10 @@ TBool CWhisk3D::LeerOBJ(RFs* fsSession, RFile* rFile, TFileName* file, TInt64* s
 	Meshes.Append(NewMesh);
 	obj.Id = Meshes.Count()-1;
 	Mesh& TempMesh = Meshes[obj.Id];
-	Wobj.ConvertToES1(TempMesh);
+	Wobj.ConvertToES1(TempMesh, acumuladoVertices, acumuladoNormales, acumuladoUVs);
+	*acumuladoVertices += acumuladoVerticesProximo;
+	*acumuladoNormales += acumuladoNormalesProximo;
+	*acumuladoUVs += acumuladoUVsProximo;
 	Objects.Append(obj);
 	SelectActivo = Objects.Count()-1;
 	Collection.Append(SelectActivo);
