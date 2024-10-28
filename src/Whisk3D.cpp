@@ -19,9 +19,9 @@
 #include "Whisk3D.h"
 #include "Whisk3DContainer.h"
 
+#include "Dialogs.h"
 #include "Animation.h"
 #include "Mesh.h"
-#include "mono.h" //modelo 3d
 #include "Floor.h" //modelo 3d
 #include "Primitivas.h" //sprite 2D
 #include "GeometriaUI.h" //elementos de la UI
@@ -174,19 +174,16 @@ TBool ViewFromCameraActive = false;
 
 //interpolacion
 enum {lineal, closest};
-enum {Solid, MaterialPreview, Wireframe, Rendered};
+enum {Solid, MaterialPreview, Rendered};
 
 enum{
-	ObjectMode,
-	EditMode
+	ObjectMode
 };
 
 enum {
 	editNavegacion,
-	VertexMove, //translacionVertex
     EdgeMove,
 	FaceMove,
-	EditShrinkFatten,
 	timelineMove,
 	rotacion,
 	EditScale,
@@ -205,7 +202,7 @@ enum{
 
 enum{
 	cubo, esfera, cilindro, plane, vacio, camara,
-    cad, luz, monkey,vertice, circle
+    cad, luz, vertice, circle
 };
 
 //CPrimitiva Primitivas;
@@ -305,62 +302,7 @@ void CWhisk3D::changeSelect(){
 			SelectCount++;
 		}
 	}
-	else if (InteractionMode == EditMode){
-		Mesh& pMesh = Meshes[Objects[SelectActivo].Id];	
-		//si no hay grupos de vertices. no hace nada
-		if (pMesh.vertexGroups.Count() < 1){return;}
-
-		//si hay mas de un vertice seleccionado. los deselecciona
-		/*if (SelectEditCount > 1){
-			DeseleccionarTodo();
-		}
-		else {*/
-		//deselecciona solo el que estaba seleccionado
-		if (pMesh.SelectActivo > -1){
-			pMesh.VertexSelect(pMesh.SelectActivo, false);
-			pMesh.UpdateVertexColorUI(pMesh.SelectActivo);			
-		}
-		//}
-
-		pMesh.SelectActivo++;
-		if (tipoSelect == vertexSelect && pMesh.SelectActivo >= pMesh.vertexGroups.Count()){
-			pMesh.SelectActivo = 0;			
-		}	
-
-		//selecciona el nuevo vertice solo si hay vertices
-		if (pMesh.vertexGroups[pMesh.SelectActivo].seleccionado){
-			pMesh.SelectCount--;			
-		}
-		else {
-			pMesh.VertexSelect(pMesh.SelectActivo, true);
-		}
-		pMesh.UpdateVertexColorUI(pMesh.SelectActivo);
-		/*if (SelectEditCount != 1 && pMesh.vertexGroups.Count() > 0){
-			SelectEditCount = 1;
-		}
-		else {
-			SelectEditCount = 0;
-		}*/
-		/*if (tipoSelect == edgeSelect && SelectActivo >= pMesh.facesSize/2){
-			SelectActivo = 0;			
-		}	
-		else if (tipoSelect == faceSelect && SelectActivo >= pMesh.facesSize/3){
-			SelectActivo = 0;			
-		}	*/
-
-		//si no hay nada seleccionado
-		if (pMesh.SelectCount < 1 && pMesh.vertexGroups.Count() > 0){
-			pMesh.SelectCount = 1;
-		}
-	};
     redibujar = true;	
-}
-
-void CWhisk3D::SetTipoSelect(TInt tipo){
-	if (InteractionMode != EditMode){return;}
-	tipoSelect = tipo;
-	//SelectEdicionActivo = 0;	
-    redibujar = true;
 }
 
 void CWhisk3D::SetNavigation(){
@@ -513,8 +455,8 @@ void CWhisk3D::ConstructL( void ){
 	//glLightfv(  nextLightId-1, GL_POSITION, positionPuntualLight );
 	//glLightfv(  nextLightId, GL_POSITION, lightPositionSpot );
 	
-	//AddMesh(monkey);
-	AddMesh(plane);	
+	AddMesh(cubo);
+	//AddMesh(plane);	
 	//ImportOBJ();
 
 	/*Animation animNew;	
@@ -746,17 +688,15 @@ void CWhisk3D::RenderMesh( Object& obj, TInt indice ){
 	glVertexPointer( 3, GL_SHORT, 0, pMesh.vertex );
 	glColorPointer( 4, GL_UNSIGNED_BYTE, 0, pMesh.vertexColor );	
 	glNormalPointer( GL_BYTE, 0, pMesh.normals );
-
-	//glShadeModel( GL_SMOOTH );
-	if (pMesh.smooth){glShadeModel( GL_SMOOTH );}
-	else {glShadeModel( GL_FLAT );}
+	
+	glShadeModel( GL_SMOOTH );
 	
 	//modelo con textura
 	if (SimularZBuffer){
 		glDisable( GL_LIGHTING );
 		glDisable(GL_BLEND);
 		glDisable( GL_TEXTURE_2D );
-		glDrawElements(GL_TRIANGLES, pMesh.facesCountIndices, GL_UNSIGNED_SHORT, pMesh.faces);
+		glDrawElements(GL_TRIANGLES, pMesh.facesSize, GL_UNSIGNED_SHORT, pMesh.faces);
 	}
 	//material
 	else if (view == MaterialPreview || view == Rendered){
@@ -836,7 +776,7 @@ void CWhisk3D::RenderMesh( Object& obj, TInt indice ){
 
 		//no hace falta usar el bucle ya que es todo del mismo material.
 		//esto es mucho mas rapido
-		glDrawElements( GL_TRIANGLES, pMesh.facesCountIndices, GL_UNSIGNED_SHORT, pMesh.faces );			
+		glDrawElements( GL_TRIANGLES, pMesh.facesSize, GL_UNSIGNED_SHORT, pMesh.faces );			
 
 		//glDrawElements( GL_TRIANGLES, pMesh.facesSize*3, GL_UNSIGNED_SHORT, pMesh.faces );	
 		//for(int f=0; f < pMesh.materialsGroup.Count(); f++){	
@@ -848,93 +788,8 @@ void CWhisk3D::RenderMesh( Object& obj, TInt indice ){
 			//glDrawElements( GL_TRIANGLES, pMesh.materialsGroupsSize[f]*3, GL_UNSIGNED_SHORT, pMesh.faces[f] );	
 			//glDrawElements( GL_TRIANGLES, pMesh.materialsGroup[f].start, GL_UNSIGNED_SHORT, &pMesh.faces[pMesh.materialsGroup[f].start] );	
 		//}
-	}
-	//wireframe view
-	//else if(SelectActivo != objId){    
-	/*else if(view == Wireframe){    
-		glDisable( GL_CULL_FACE );
-		glDisable(GL_BLEND);
-		glDisable( GL_TEXTURE_2D );
-		glDisable( GL_LIGHTING );
+	} 
 
-		glEnableClientState( GL_COLOR_ARRAY );
-		glEnable(GL_COLOR_MATERIAL);
-		
-		glColorPointer( 4, GL_UNSIGNED_BYTE, 0, pMesh.vertexGroupUIcolor );
-		glDrawElements( GL_LINES, pMesh.edgesGroups.Count(), GL_UNSIGNED_SHORT, pMesh.edges );	
-	}  */
-
-	//si esta en modo wireframe o el objeto esta selñeccionado. tiene que dibujar los bordes
-	//if (obj.seleccionado || view == Wireframe){
-	glDisable( GL_CULL_FACE );
-	glDisable(GL_BLEND);
-	glDisable( GL_TEXTURE_2D );
-	glDisable( GL_LIGHTING );
-	glEnable(GL_POLYGON_OFFSET_FILL);
-	glDepthFunc(GL_LEQUAL);
-	glVertexPointer( 3, GL_SHORT, 0, pMesh.vertexGroupUI );			
-	
-	//se usa el GL_POLYGON_OFFSET_FILL para el modo solido, render o material si no esta en modo edicion
-	//esto dibuja el contorno con una linea mas gruesa
-	if (view != Wireframe && InteractionMode != EditMode && showOutlineSelect && showOverlays){
-		glPolygonOffset(1.0, 40.0);
-		glLineWidth(4);	 
-		glDisable(GL_COLOR_MATERIAL);
-		glDisableClientState( GL_COLOR_ARRAY );
-
-		if (!obj.seleccionado){
-			glDepthFunc(GL_LESS);
-			glLineWidth(1);	 
-			glColor4f(ListaColores[negro][0],ListaColores[negro][1],ListaColores[negro][2],ListaColores[negro][3]);
-		}
-		else if (SelectActivo == indice && obj.seleccionado){
-			glColor4f(ListaColores[accent][0],ListaColores[accent][1],ListaColores[accent][2],ListaColores[accent][3]);
-		}
-		else if (obj.seleccionado) {
-			glColor4f(ListaColores[accentDark][0],ListaColores[accentDark][1],ListaColores[accentDark][2],ListaColores[accentDark][3]);
-		}
-		else {
-			glColor4f(ListaColores[negro][0],ListaColores[negro][1],ListaColores[negro][2],ListaColores[negro][3]);
-		}
-
-		glDrawElements( GL_LINES, pMesh.edgesDrawnSize, GL_UNSIGNED_SHORT, pMesh.edges );
-	}
-	else if (obj.seleccionado && InteractionMode == EditMode && tipoSelect == vertexSelect && SelectActivo == indice && showOutlineSelect && showOverlays){		
-		glPolygonOffset(1.0, -1.0);
-		glEnableClientState( GL_COLOR_ARRAY );
-		glEnable(GL_COLOR_MATERIAL);
-		glColorPointer( 4, GL_UNSIGNED_BYTE, 0, pMesh.vertexGroupUIcolor );
-		glLineWidth(1);	 
-		glDrawElements( GL_LINES, pMesh.edgesDrawnSize, GL_UNSIGNED_SHORT, pMesh.edges );
-		glPointSize(4);
-		glDrawArrays( GL_POINTS, 0, pMesh.vertexGroups.Count() );
-
-		//vertice seleccionado	
-		if (pMesh.SelectCount > 0){	
-			glDisableClientState( GL_COLOR_ARRAY );
-			glDisable(GL_COLOR_MATERIAL);
-			glColor4f(ListaColores[blanco][0],ListaColores[blanco][1],ListaColores[blanco][2],ListaColores[blanco][3]);
-			glDrawArrays( GL_POINTS, pMesh.SelectActivo, 1 );	
-		}	
-	}
-	else if (view == Wireframe || showOutlineSelect && showOverlays) {	
-		glPolygonOffset(1.0, -1.0);
-		glDisable(GL_COLOR_MATERIAL);
-		glDisableClientState( GL_COLOR_ARRAY );
-		glLineWidth(1);	 
-
-		if (SelectActivo == indice && obj.seleccionado){
-			glColor4f(ListaColores[accent][0],ListaColores[accent][1],ListaColores[accent][2],ListaColores[accent][3]);
-		}
-		else if (obj.seleccionado) {
-			glColor4f(ListaColores[accentDark][0],ListaColores[accentDark][1],ListaColores[accentDark][2],ListaColores[accentDark][3]);
-		}
-		else {
-			glColor4f(ListaColores[negro][0],ListaColores[negro][1],ListaColores[negro][2],ListaColores[negro][3]);
-		}
-		glDrawElements( GL_LINES, pMesh.edgesDrawnSize, GL_UNSIGNED_SHORT, pMesh.edges );
-
-	}
 	glDisable(GL_POLYGON_OFFSET_FILL);
 	glDepthFunc(GL_LESS);
 	
@@ -947,52 +802,6 @@ void CWhisk3D::RenderMesh( Object& obj, TInt indice ){
 		glEnable(GL_POLYGON_OFFSET_FILL);
 		
 		//si se esta editando
-		if (InteractionMode == EditMode){ // || estado == VertexMove
-			//bordes
-			glPolygonOffset(1.0, -1.0);
-			glColor4f(ListaColores[gris][0],
-					ListaColores[gris][1],
-					ListaColores[gris][2],
-					ListaColores[gris][3]);
-			//glDrawElements( GL_LINES, obj.edgesSize, GL_UNSIGNED_SHORT, obj.edges );
-			//vertices
-			if (tipoSelect == vertexSelect){
-				glVertexPointer( 3, GL_SHORT, 0, pMesh.vertexGroupUI );
-				glPolygonOffset(1.0, -4.0);
-				glColor4f(ListaColores[negro][0], ListaColores[negro][1], ListaColores[negro][2], ListaColores[negro][3]);
-				glPointSize(4);
-				//glDrawElements( GL_POINTS, pMesh.vertexGroupSize, GL_UNSIGNED_SHORT, pMesh.vertexGroup);
-				glDrawElements( GL_POINTS, pMesh.vertexGroups.Count(), GL_UNSIGNED_SHORT, pMesh.vertexGroupUI);
-				glDrawArrays( GL_POINTS, 0, pMesh.vertexGroups.Count() );
-				//vertice seleccionado
-				glPolygonOffset(1.0, -10.0);
-				glColor4f(ListaColores[blanco][0],ListaColores[blanco][1],ListaColores[blanco][2],ListaColores[blanco][3]);
-				//glDrawArrays( GL_POINTS, pMesh.vertexGroup[SelectActivo], 1 );
-				glDrawArrays( GL_POINTS, SelectEdicionActivo, 1 );			
-			}
-			//borde seleccionado
-			else if (tipoSelect == edgeSelect){		
-				//vertice seleccionado*/
-				/*if (obj.edgesSize > 0){		
-					glPolygonOffset(1.0, -10.0);
-					glColor4f(ListaColores[blanco][0],ListaColores[blanco][1],ListaColores[blanco][2],ListaColores[blanco][3]);
-					glDrawElements( GL_LINES, 2, GL_UNSIGNED_SHORT, &obj.edges[SelectActivo*2]);
-				}			
-			}*/
-			//cara seleccionado
-			/*else if (tipoSelect == faceSelect){	
-				//vertice seleccionado
-				if (pMesh.facesSize > 0){	
-					glEnable(GL_BLEND);
-					glDisable(GL_LIGHTING);
-					glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-					glPolygonOffset(1.0, -10.0);
-					glColor4f(ListaColores[naranjaFace][0],ListaColores[naranjaFace][1],ListaColores[naranjaFace][2],ListaColores[naranjaFace][3]);
-					glDrawElements( GL_TRIANGLES, 3, GL_UNSIGNED_SHORT, &pMesh.faces[SelectActivo*3]);
-					glDisable(GL_BLEND);
-				}				
-			}*/
-		/*}
 		else if (view != 2){
 			glPolygonOffset(1.0, 200.0);
 			glLineWidth(3);	 
@@ -1000,11 +809,6 @@ void CWhisk3D::RenderMesh( Object& obj, TInt indice ){
 			//glDrawElements( GL_LINES, obj.edgesSize, GL_UNSIGNED_SHORT, obj.edges );	
 			glLineWidth(1); //lo deja en su valor por defecto	 
 		}	
-		else { //bordes seleccionados en wireframe
-			glDisable(GL_POLYGON_OFFSET_FILL);
-			glColor4f(ListaColores[colorBordeSelect][0],ListaColores[colorBordeSelect][1],ListaColores[colorBordeSelect][2],ListaColores[colorBordeSelect][3]);
-			//glDrawElements( GL_LINES, obj.edgesSize, GL_UNSIGNED_SHORT, obj.edges );	
-		}
 	};*/
     glPopMatrix();
 }
@@ -1735,7 +1539,7 @@ void CWhisk3D::AppCycle( TInt iFrame, GLfloat aTimeSecs, GLfloat aDeltaTimeSecs 
 			glDisable( GL_BLEND );
 			glDisable( GL_TEXTURE_2D );
 			//dibuja los ejes de transformacion
-			if (estado == translacion || estado == VertexMove || estado == rotacion || estado == EditScale) {
+			if (estado == translacion || estado == rotacion || estado == EditScale) {
 				for (TInt o = 0; o < Collection.Count(); o++) {
 					TBool found = false;
 					Object& obj = Objects[Collection[o]];
@@ -1810,7 +1614,7 @@ void CWhisk3D::SearchSelectObj(Object& obj, TInt objIndex, TBool& found) {
 			glRotatef(obj.rotY, 0, 0, 1); //angulo, X Y Z
 		}		
 		//dibuja los ejes de transformacion
-		if (estado == translacion || estado == VertexMove || estado == rotacion || estado == EditScale){		
+		if (estado == translacion || estado == rotacion || estado == EditScale){		
         	DrawTransformAxis(obj);
 		}		
         found = true;
@@ -1833,13 +1637,7 @@ void CWhisk3D::DrawTransformAxis(Object& obj) {
 	glVertexPointer( 3, GL_SHORT, 0, objVertexdataFloor );
 	glLineWidth(2);
 		
-	if (InteractionMode == EditMode){
-		glTranslatef(TransformPivotPoint[0]*obj.scaleX/65000, 
-					 TransformPivotPoint[1]*obj.scaleY/65000, 
-					 TransformPivotPoint[2]*obj.scaleZ/65000
-		);
-	}
-	else {	
+	if (InteractionMode == ObjectMode){
 		glTranslatef(TransformPivotPointFloat[0]/65000, 
 					 TransformPivotPointFloat[1]/65000, 
 					 TransformPivotPointFloat[2]/65000
@@ -1938,7 +1736,7 @@ void CWhisk3D::dibujarUI(){
 	glEnable( GL_TEXTURE_2D ); // Permite usar texturas
 	glColor4f(ListaColores[blanco][0],ListaColores[blanco][1],ListaColores[blanco][2],ListaColores[blanco][3]);	
 	glBindTexture( GL_TEXTURE_2D, Textures[1].iID ); 
-
+    
 	//que editor esta abierto
 	glPushMatrix();
 	UiMoveTo(5,5);
@@ -1948,11 +1746,7 @@ void CWhisk3D::dibujarUI(){
 
 	//icono de modo objeto
 	UiMoveTo(25,0);
-	if (InteractionMode != EditMode){
-		SetUvSprite(1*2,113*2,28,28);
-	}
-	//icono de edicion de mesh
-	else {
+	if (InteractionMode == ObjectMode){
 		SetUvSprite(1*2,97*2,28,28);
 	}
 	DrawnRectangle();
@@ -1972,14 +1766,6 @@ void CWhisk3D::dibujarUI(){
 	UiMoveTo(23,-3);
 	SetUvBordes(1*2,56*2, 8*2,9*2, 4*2,4*2,5*2,4*2 );	
 	DibujarRectanguloBordes(79,21, 4,4,5,4 );
-
-	//wireframe
-	UiMoveTo(1,1);
-	IconSelect(view == Wireframe);
-	UiMoveTo(2,2);
-	SetUvSprite(65*2,113*2,28,28);
-	SetSpriteSize(14,14);
-	DrawnRectangle();
 
 	//solid
 	UiMoveTo(18,-2);
@@ -2183,21 +1969,6 @@ void CWhisk3D::SeleccionarAnterior(){
 			SelectCount++;
 		}
 	}
-	else if (InteractionMode == EditMode){
-		Object& obj = Objects[SelectActivo];
-		if (obj.type != mesh){return;}
-		Mesh& pMesh = Meshes[obj.Id];	
-
-		pMesh.SelectActivo--;
-		if (0 > pMesh.SelectActivo){
-			pMesh.SelectActivo = pMesh.vertexGroups.Count()-1;
-		}
-		if (!pMesh.vertexGroups[pMesh.SelectActivo].seleccionado){
-			pMesh.VertexSelect(pMesh.SelectActivo, true);
-			pMesh.UpdateVertexColorUI(pMesh.SelectActivo);
-			pMesh.SelectCount++;
-		}		
-	}
 	redibujar = true;
 }
 
@@ -2217,21 +1988,6 @@ void CWhisk3D::SeleccionarProximo(){
 			SelectCount++;
 		}
 	}
-	else if (InteractionMode == EditMode){
-		Object& obj = Objects[SelectActivo];
-		if (obj.type != mesh){return;}
-		Mesh& pMesh = Meshes[obj.Id];	
-
-		pMesh.SelectActivo++;
-		if (pMesh.vertexGroups.Count() <= pMesh.SelectActivo){
-			pMesh.SelectActivo = 0;
-		}
-		if (!pMesh.vertexGroups[pMesh.SelectActivo].seleccionado){
-			pMesh.VertexSelect(pMesh.SelectActivo, true);
-			pMesh.UpdateVertexColorUI(pMesh.SelectActivo);
-			pMesh.SelectCount++;
-		}
-	}
 	redibujar = true;
 }
 
@@ -2240,17 +1996,6 @@ void CWhisk3D::InvertirSeleccion(){
 		for(int o=0; o < Objects.Count(); o++){
 			Objects[o].seleccionado = !Objects[o].seleccionado;
 		}
-	}
-	else if (InteractionMode == EditMode){
-		Object& obj = Objects[SelectActivo];
-		if (obj.type != mesh){return;}
-		Mesh& pMesh = Meshes[obj.Id];	
-
-		for(int vg=0; vg < pMesh.vertexGroups.Count(); vg++){
-			pMesh.VertexSelect(vg, !pMesh.vertexGroups[vg].seleccionado);
-		}	
-		pMesh.SelectActivo = -1;
-		pMesh.UpdateVertexColorsUI();	
 	}
 	redibujar = true;
 }
@@ -2273,29 +2018,6 @@ void CWhisk3D::SeleccionarTodo(){
 		for(int o=0; o < Objects.Count(); o++){
 			Objects[o].seleccionado = !TodoSeleccionado;
 		}
-	}
-	else if (InteractionMode == EditMode){
-		Object& obj = Objects[SelectActivo];
-		if (obj.type != mesh){return;}
-		Mesh& pMesh = Meshes[obj.Id];	
-
-		//revisa si estan todos los vertices seleccionados
-		for(int vg=0; vg < pMesh.vertexGroups.Count(); vg++){
-			if (!pMesh.vertexGroups[vg].seleccionado){
-				TodoSeleccionado = false;
-			}	
-		}
-		//solo si esta todo seleccionado hace lo contrario
-		if (TodoSeleccionado){
-			pMesh.SelectCount = 0;
-		}
-		else {
-			pMesh.SelectCount = pMesh.vertexGroups.Count();
-		}
-		for(int vg=0; vg < pMesh.vertexGroups.Count(); vg++){
-			pMesh.VertexSelect(vg, !TodoSeleccionado);
-		}		
-		pMesh.UpdateVertexColorsUI();
 	}
 	redibujar = true;
 }
@@ -2323,235 +2045,41 @@ GLfloat CWhisk3D::GradosARadianes(TInt grados) {
 
 TInt valorRotacion = 0;
 void CWhisk3D::SetRotacion(TInt valor){
-	if (InteractionMode == ObjectMode){
-		for (int o = 0; o < estadoObjetos.Count(); o++) {
-			switch (axisSelect) {
-				case X:
-					Objects[estadoObjetos[o].indice].rotX -= valor;
-					break;
-				case Y:
-					Objects[estadoObjetos[o].indice].rotY -= valor;
-					break;
-				case Z:
-					Objects[estadoObjetos[o].indice].rotZ -= valor;
-					break;
-			}
+	for (int o = 0; o < estadoObjetos.Count(); o++) {
+		switch (axisSelect) {
+			case X:
+				Objects[estadoObjetos[o].indice].rotX -= valor;
+				break;
+			case Y:
+				Objects[estadoObjetos[o].indice].rotY -= valor;
+				break;
+			case Z:
+				Objects[estadoObjetos[o].indice].rotZ -= valor;
+				break;
 		}
 	}
-	else if (InteractionMode == EditMode){
-		valorRotacion +=valor;
-		GLfloat theta = GradosARadianes(valorRotacion); // Convertir a radianes
-		Mesh& pMesh = Meshes[Objects[SelectActivo].Id];	
-		GLfloat cosTheta = cos(theta);
-		GLfloat sinTheta = sin(theta);
-
-		for(int g=0; g < estadoVertices.Count(); g++){
-			GLfloat x = estadoVertices[g].x - TransformPivotPoint[0];
-			GLfloat y = estadoVertices[g].y - TransformPivotPoint[1];
-			GLfloat z = estadoVertices[g].z - TransformPivotPoint[2];
-
-			GLshort xNuevo = 0;
-			GLshort yNuevo = 0;
-			GLshort zNuevo = 0;
-			switch (axisSelect) {
-				case X:
-					yNuevo = (GLshort)(y * cosTheta - z * sinTheta)+ TransformPivotPoint[1];
-					zNuevo = (GLshort)(y * sinTheta + z * cosTheta)+ TransformPivotPoint[2];
-					xNuevo = (GLshort)x + TransformPivotPoint[0];
-					break;
-				case Y:
-					xNuevo = (GLshort)(x * cosTheta - y * sinTheta) + TransformPivotPoint[0];
-					yNuevo = (GLshort)(x * sinTheta + y * cosTheta) + TransformPivotPoint[1];
-					zNuevo = (GLshort)z + TransformPivotPoint[2];
-					break;
-				case Z:
-					xNuevo = (GLshort)(x * cosTheta + z * sinTheta)+ TransformPivotPoint[0];
-					zNuevo = (GLshort)(-x * sinTheta + z * cosTheta)+ TransformPivotPoint[2];
-					yNuevo = (GLshort)y + TransformPivotPoint[1];
-					break;
-			}
-
-			for(int vg=0; vg < pMesh.vertexGroups[estadoVertices[g].indice].indices.Count(); vg++){
-				TInt indiceVertice = pMesh.vertexGroups[estadoVertices[g].indice].indices[vg]*3;
-				pMesh.vertex[indiceVertice] = xNuevo;
-				pMesh.vertex[indiceVertice + 1] = yNuevo;
-				pMesh.vertex[indiceVertice + 2] = zNuevo;
-			}
-			pMesh.UpdateVertexUI(estadoVertices[g].indice);
-		}
-
-	}
-}
-
-void CWhisk3D::SetTranslacionVertices(TInt valor){
-	Mesh& pMesh = Meshes[Objects[SelectActivo].Id];	
-	for(int g=0; g < estadoVertices.Count(); g++){
-		for(int vg=0; vg < pMesh.vertexGroups[estadoVertices[g].indice].indices.Count(); vg++){
-			TInt indiceVertice = pMesh.vertexGroups[estadoVertices[g].indice].indices[vg]*3;
-			if (axisSelect == X){
-				pMesh.vertex[indiceVertice] += valor;					
-			}
-			else if (axisSelect == Y){
-				pMesh.vertex[indiceVertice+2] -= valor;				
-			}
-			else if (axisSelect == Z){
-				pMesh.vertex[indiceVertice+1] -= valor;	
-			}
-			pMesh.UpdateVertexUI(estadoVertices[g].indice);
-		}
-	}
-}
-
-void CWhisk3D::CalcShrinkFattenVectors(){
-	if (Objects.Count() < 1){return;}
-	Object& obj = Objects[SelectActivo];
-	if (!obj.seleccionado || obj.type != mesh){return;}
-	Mesh& pMesh = Meshes[obj.Id];
-	if (estado != editNavegacion && InteractionMode != EditMode){return;};
-
-	estado = EditShrinkFatten;
-	VectoresTInt.Close();
-	VectoresTInt.ReserveL(pMesh.SelectCount);
-
-	for(int i=0; i < pMesh.vertexGroups.Count(); i++){
-		if (pMesh.vertexGroups[i].seleccionado){
-			//calcula el vector
-			VectorTInt newVectorTInt;
-			VectoresTInt.Append(newVectorTInt);
-			VectorTInt& tempVectorTInt = VectoresTInt[VectoresTInt.Count()-1];
-
-			tempVectorTInt.indice = i;
-			TInt cantidad = pMesh.vertexGroups[i].indices.Count();
-
-			//guarda la posicion original. parecido a estadoVertices
-			TInt primerVertice = pMesh.vertexGroups[i].indices[0]*3;
-			tempVectorTInt.posX = pMesh.vertex[primerVertice];
-			tempVectorTInt.posY = pMesh.vertex[primerVertice+1];	
-			tempVectorTInt.posZ = pMesh.vertex[primerVertice+2];
-			tempVectorTInt.x = 0;		
-			tempVectorTInt.y = 0;	
-			tempVectorTInt.z = 0;
-
-			for(int vg=0; vg < cantidad; vg++){
-				TInt indiceVertice = pMesh.vertexGroups[i].indices[vg]*3;
-				tempVectorTInt.x += pMesh.normals[indiceVertice];		
-				tempVectorTInt.y += pMesh.normals[indiceVertice+1];	
-				tempVectorTInt.z += pMesh.normals[indiceVertice+2];
-			}
-			tempVectorTInt.x = tempVectorTInt.x/cantidad;		
-			tempVectorTInt.y = tempVectorTInt.y/cantidad;	
-			tempVectorTInt.z = tempVectorTInt.z/cantidad;
-		}		
-	}
-
-	redibujar = true;
-}
-
-void CWhisk3D::SetShrinkFatten(TInt fuerza){
-	Mesh& pMesh = Meshes[Objects[SelectActivo].Id];
-	for(int i=0; i < VectoresTInt.Count(); i++){		
-		//aplica el vector
-		TInt indiceVector = VectoresTInt[i].indice;
-
-		TInt resultadoX = VectoresTInt[i].x*fuerza;
-		TInt resultadoY = VectoresTInt[i].y*fuerza;
-		TInt resultadoZ = VectoresTInt[i].z*fuerza;
-		for(int vg=0; vg < pMesh.vertexGroups[indiceVector].indices.Count(); vg++){
-			TInt indiceVertice = pMesh.vertexGroups[indiceVector].indices[vg]*3;
-			pMesh.vertex[indiceVertice] += resultadoX;		
-			pMesh.vertex[indiceVertice+1] += resultadoY;	
-			pMesh.vertex[indiceVertice+2] += resultadoZ;
-		}
-		pMesh.UpdateVertexUI(indiceVector);
-	}
-	redibujar = true;
-}
-
-void CWhisk3D::CalcScaleVectors(){
-	Object& obj = Objects[SelectActivo];
-	Mesh& pMesh = Meshes[obj.Id];
-
-	VectoresTInt.Close();
-	VectoresTInt.ReserveL(pMesh.SelectCount);
-
-	for(int i=0; i < pMesh.vertexGroups.Count(); i++){
-		if (pMesh.vertexGroups[i].seleccionado){
-			//calcula el vector
-			VectorTInt newVectorTInt;
-			VectoresTInt.Append(newVectorTInt);
-			VectorTInt& tempVectorTInt = VectoresTInt[VectoresTInt.Count()-1];
-
-			tempVectorTInt.indice = i;
-
-			//guarda la posicion original. parecido a estadoVertices
-			TInt primerVertice = pMesh.vertexGroups[i].indices[0]*3;
-			tempVectorTInt.posX = pMesh.vertex[primerVertice];
-			tempVectorTInt.posY = pMesh.vertex[primerVertice+1];	
-			tempVectorTInt.posZ = pMesh.vertex[primerVertice+2];
-
-			// Calcula el vector de desplazamiento y normaliza
-            TInt vectorX = TransformPivotPoint[0] - pMesh.vertex[primerVertice];        
-            TInt vectorY = TransformPivotPoint[1] - pMesh.vertex[primerVertice+1];    
-            TInt vectorZ = TransformPivotPoint[2] - pMesh.vertex[primerVertice+2];
-
-            // Normaliza el vector
-            TInt magnitude = sqrtu(vectorX * vectorX + vectorY * vectorY + vectorZ * vectorZ);
-            if (magnitude > 0) {
-                vectorX = (vectorX * 127) / magnitude;
-                vectorY = (vectorY * 127) / magnitude;
-                vectorZ = (vectorZ * 127) / magnitude;
-            }
-
-            // Guarda los valores normalizados
-            tempVectorTInt.x = vectorX;
-            tempVectorTInt.y = vectorY;
-            tempVectorTInt.z = vectorZ;
-		}		
-	}
-
-	redibujar = true;
 }
 
 void CWhisk3D::SetScale(TInt valor){
-	if (InteractionMode == EditMode){
-		Mesh& pMesh = Meshes[Objects[SelectActivo].Id];
-		for(int i=0; i < VectoresTInt.Count(); i++){		
-			//aplica el vector
-			TInt indiceVector = VectoresTInt[i].indice;
-
-			TInt resultadoX = VectoresTInt[i].x*valor/4;
-			TInt resultadoY = VectoresTInt[i].y*valor/4;
-			TInt resultadoZ = VectoresTInt[i].z*valor/4;
-			for(int vg=0; vg < pMesh.vertexGroups[indiceVector].indices.Count(); vg++){
-				TInt indiceVertice = pMesh.vertexGroups[indiceVector].indices[vg]*3;
-				pMesh.vertex[indiceVertice] += resultadoX;		
-				pMesh.vertex[indiceVertice+1] += resultadoY;	
-				pMesh.vertex[indiceVertice+2] += resultadoZ;
-			}
-			pMesh.UpdateVertexUI(indiceVector);
+	valor = valor*1000;
+	for (int o = 0; o < estadoObjetos.Count(); o++) {
+		switch (axisSelect) {
+			case X:
+				Objects[estadoObjetos[o].indice].scaleX += valor;
+				break;
+			case Y:
+				Objects[estadoObjetos[o].indice].scaleY += valor;
+				break;
+			case Z:
+				Objects[estadoObjetos[o].indice].scaleZ += valor;
+				break;
+			case XYZ:
+				Objects[estadoObjetos[o].indice].scaleX += valor;
+				Objects[estadoObjetos[o].indice].scaleY += valor;
+				Objects[estadoObjetos[o].indice].scaleZ += valor;
+				break;
 		}
-	}
-	else if (InteractionMode == ObjectMode){
-		valor = valor*1000;
-		for (int o = 0; o < estadoObjetos.Count(); o++) {
-			switch (axisSelect) {
-				case X:
-					Objects[estadoObjetos[o].indice].scaleX += valor;
-					break;
-				case Y:
-					Objects[estadoObjetos[o].indice].scaleY += valor;
-					break;
-				case Z:
-					Objects[estadoObjetos[o].indice].scaleZ += valor;
-					break;
-				case XYZ:
-					Objects[estadoObjetos[o].indice].scaleX += valor;
-					Objects[estadoObjetos[o].indice].scaleY += valor;
-					Objects[estadoObjetos[o].indice].scaleZ += valor;
-					break;
-			}
-		}	
-	}
+	}	
 	redibujar = true;
 }
 
@@ -2646,7 +2174,7 @@ void CWhisk3D::InputUsuario(GLfixed aDeltaTimeSecs){
 		}
 
 		//rotX += fixedMul( 0.1, aDeltaTimeSecs );
-		if (estado == editNavegacion){ //InteractionMode == navegacion || InteractionMode == EditMode){
+		if (estado == editNavegacion){ 
 			if (navegacionMode == Orbit){
 				if (ViewFromCameraActive && CameraToView){
 					Object& obj = Objects[CameraActive];
@@ -2676,12 +2204,6 @@ void CWhisk3D::InputUsuario(GLfixed aDeltaTimeSecs){
 				PivotY += 30 * leftY;
 			}	
 		}
-		else if (estado == EditShrinkFatten){
-			SetShrinkFatten(-1);
-		}
-		else if (estado == VertexMove){	
-			SetTranslacionVertices(30);
-		}
 		else if (estado == translacion){	
 			SetTranslacionObjetos(30);		
 		}
@@ -2710,7 +2232,7 @@ void CWhisk3D::InputUsuario(GLfixed aDeltaTimeSecs){
 		}
 
 		//rotX -= fixedMul( 1, aDeltaTimeSecs );
-		if (estado == editNavegacion){ //InteractionMode == ObjectMode || InteractionMode == EditMode){					
+		if (estado == editNavegacion){				
 			if (navegacionMode == Orbit){
 				if (ViewFromCameraActive && CameraToView){
 					Object& obj = Objects[CameraActive];
@@ -2740,12 +2262,6 @@ void CWhisk3D::InputUsuario(GLfixed aDeltaTimeSecs){
 				PivotY -= 30 * leftY;
 			}
 		}
-		else if (estado == EditShrinkFatten){
-			SetShrinkFatten(1);
-		}
-		else if (estado == VertexMove){	
-			SetTranslacionVertices(-30);	
-		}
 		else if (estado == translacion){
 			SetTranslacionObjetos(-30);		
 		}
@@ -2770,7 +2286,7 @@ void CWhisk3D::InputUsuario(GLfixed aDeltaTimeSecs){
 			if (mouseY < 0){mouseY = 0;};
 		}
 
-		if (estado == editNavegacion){ //InteractionMode == ObjectMode || InteractionMode == EditMode){			
+		if (estado == editNavegacion){	
 			if (navegacionMode == Orbit){
 				if (ViewFromCameraActive && CameraToView){
 					Object& obj = Objects[CameraActive];
@@ -2798,14 +2314,8 @@ void CWhisk3D::InputUsuario(GLfixed aDeltaTimeSecs){
 				PivotX-= 30 * sin(radRotX);
 			}		
 		}
-		else if (estado == EditShrinkFatten){
-			SetShrinkFatten(1);
-		}
 		else if (estado == EditScale){
 			SetScale(1);	
-		}
-		else if (estado == VertexMove){	
-			SetTranslacionVertices(-30);
 		}
 		else if (estado == translacion){
 			SetTranslacionObjetos(-30);
@@ -2819,7 +2329,7 @@ void CWhisk3D::InputUsuario(GLfixed aDeltaTimeSecs){
 			if (mouseY > iScreenHeight-17){mouseY = iScreenHeight-17;};
 		}
 
-		if (estado == editNavegacion){ //InteractionMode == ObjectMode || InteractionMode == EditMode){					
+		if (estado == editNavegacion){ 			
 			if (navegacionMode == Orbit){
 				if (ViewFromCameraActive && CameraToView){
 					Object& obj = Objects[CameraActive];
@@ -2847,14 +2357,8 @@ void CWhisk3D::InputUsuario(GLfixed aDeltaTimeSecs){
 				PivotX+= 30 * sin(radRotX);
 			}
 		}
-		else if (estado == EditShrinkFatten){
-			SetShrinkFatten(-1);
-		}
 		else if (estado == EditScale){
 			SetScale(-1);	
-		}
-		else if (estado == VertexMove){	
-			SetTranslacionVertices(30);
 		}
 		else if (estado == translacion){
 			SetTranslacionObjetos(30);		
@@ -2924,30 +2428,6 @@ void CWhisk3D::SetPosicion(){
 		estado = translacion;
 		if (axisSelect > 2){axisSelect = X;}
 	}
-	else if (InteractionMode == EditMode && estado == editNavegacion){
-		Object& obj = Objects[SelectActivo];
-		Mesh& pMesh = Meshes[obj.Id];
-		switch (tipoSelect) {
-			case vertexSelect:
-				estado = VertexMove;
-				break;
-			case edgeSelect:
-				estado = EdgeMove;
-				break;
-			case faceSelect:
-				estado = FaceMove;
-				break;
-			default:
-				// Manejar cualquier otro caso aqui si es necesario
-				break;
-		}
-		if (estado == VertexMove && pMesh.SelectCount < 1){
-			estado = editNavegacion;
-			return;
-		}
-		guardarEstado();
-		if (axisSelect > 2){axisSelect = X;}
-	}	
 	else {
 		axisSelect = X;
 	}
@@ -2971,26 +2451,15 @@ void CWhisk3D::EventKeyDown(TInt scan){
 			}
 			break;
 		case(69): //E
-			Extrude();
+			//Extrude();
 			break;
 		case(73): //I
 			if (iCtrlPressed){
 				InvertirSeleccion();	
 			}
-			break;
-		case(78): //N
-			if (iShiftPressed){
-				ShiftCount = 40;
-				FlipNormals();			
-			}
 			break;			
 		case(83): //S
-			if (iAltPressed && InteractionMode == EditMode){
-				CalcShrinkFattenVectors();
-			}
-			else {
-				SetEscala();
-			}
+			SetEscala();
 			break;
 		case(88): //X
 			if (estado != editNavegacion){
@@ -3053,46 +2522,20 @@ void CWhisk3D::Aceptar(){
 	if (Objects.Count() < 1){return;}
 
 	if ( InteractionMode == ObjectMode ){
-		Object& obj = Objects[SelectActivo];	
-		if (estado == editNavegacion && obj.seleccionado && obj.type == mesh ){
-			InteractionMode = EditMode;
-		}
-		else if (estado != editNavegacion){
+		if (estado != editNavegacion){
 			estado = editNavegacion;
 		}
 	}
-	else if (InteractionMode == EditMode){
-		if (estado == editNavegacion ){
-			InteractionMode = ObjectMode;
-		}
-		else if (estado != editNavegacion){
-			if (estado == EditShrinkFatten){
-				VectoresTInt.Close();
-			}
-			estado = editNavegacion;
-		}
-	}
-	/*else if (estado == VertexMove){
-		estado = editNavegacion;
-	}
-	else {
-		guardarEstado();
-	};*/
     redibujar = true;
 };
 
 void CWhisk3D::PressTab(){
 	if (estado == editNavegacion){
-		if (InteractionMode == EditMode){
-			InteractionMode = ObjectMode;
-		}
-		else if (InteractionMode == ObjectMode){
+		if (InteractionMode == ObjectMode){
 			if (Objects.Count() < 1){return;}
 			Object& obj = Objects[SelectActivo];
 			if (obj.type != mesh || !obj.seleccionado){return;}
-			InteractionMode = EditMode;
 		}
-
 	}
     redibujar = true;
 }
@@ -3101,7 +2544,7 @@ void CWhisk3D::Tab(){
 	if (estado != editNavegacion){ //} estado == translacion || estado == rotacion || estado == EditScale || estado == VertexMove){
 		InsertarValor();
 	}
-	else if (InteractionMode == ObjectMode || InteractionMode == EditMode){
+	else if (InteractionMode == ObjectMode){
 		changeSelect();
 	}
 	else if (InteractionMode == timelineMove){	
@@ -3114,35 +2557,7 @@ void CWhisk3D::Tab(){
 };
 
 void CWhisk3D::ReestablecerEstado(){
-	Object& obj = Objects[SelectActivo];
-
-	if (InteractionMode == EditMode){
-		Mesh& pMesh = Meshes[obj.Id];	
-		if (estado == EditShrinkFatten || estado == EditScale){
-			for(int i=0; i < VectoresTInt.Count(); i++){	
-				TInt indiceVector = VectoresTInt[i].indice;
-				for(int vg=0; vg < pMesh.vertexGroups[indiceVector].indices.Count(); vg++){
-					TInt indiceVertice = pMesh.vertexGroups[indiceVector].indices[vg]*3;
-					pMesh.vertex[indiceVertice] = VectoresTInt[i].posX;		
-					pMesh.vertex[indiceVertice+1] = VectoresTInt[i].posY;	
-					pMesh.vertex[indiceVertice+2] = VectoresTInt[i].posZ;
-				}
-				pMesh.UpdateVertexUI(indiceVector);
-			}	
-		}
-		else {
-			for(int vg=0; vg < estadoVertices.Count(); vg++){
-				for(int g=0; g < pMesh.vertexGroups[estadoVertices[vg].indice].indices.Count(); g++){
-					TInt numeroVertice = pMesh.vertexGroups[estadoVertices[vg].indice].indices[g]*3;
-					pMesh.vertex[numeroVertice] = estadoVertices[vg].x;
-					pMesh.vertex[numeroVertice+1] = estadoVertices[vg].y;	
-					pMesh.vertex[numeroVertice+2] = estadoVertices[vg].z;	
-				}			
-			}			
-			pMesh.UpdateVertexUI();
-		}
-	}
-	else if (InteractionMode == ObjectMode){
+	if (InteractionMode == ObjectMode){
 		for(int o=0; o < estadoObjetos.Count(); o++){
 			SaveState& estadoObj = estadoObjetos[o];
 			Object& obj = Objects[estadoObj.indice];
@@ -3165,32 +2580,7 @@ void CWhisk3D::ReestablecerEstado(){
 
 void CWhisk3D::SetTransformPivotPoint(){
 	if (Objects.Count() < 1){return;}	
-	if (InteractionMode == EditMode){
-		Object& obj = Objects[SelectActivo];
-		TransformPivotPointFloat[0] = obj.posX;
-		TransformPivotPointFloat[1] = obj.posY;
-		TransformPivotPointFloat[2] = obj.posZ;
-
-		Mesh& pMesh = Meshes[obj.Id];
-		TInt Encontrados = 0;
-		GLshort TempTransformPivotPointX = 0;
-		GLshort TempTransformPivotPointY = 0;
-		GLshort TempTransformPivotPointZ = 0;
-		for(TInt i=0; i < pMesh.vertexGroups.Count(); i++){
-			if (pMesh.vertexGroups[i].seleccionado){
-				Encontrados++;
-				TInt primerVertice = pMesh.vertexGroups[i].indices[0]*3;
-				TempTransformPivotPointX += pMesh.vertex[primerVertice];
-				TempTransformPivotPointY += pMesh.vertex[primerVertice+1];	
-				TempTransformPivotPointZ += pMesh.vertex[primerVertice+2];
-			}
-		}
-		if (Encontrados < 1){return;}
-		TransformPivotPoint[0] = TempTransformPivotPointX/Encontrados;
-		TransformPivotPoint[1] = TempTransformPivotPointY/Encontrados;	
-		TransformPivotPoint[2] = TempTransformPivotPointZ/Encontrados;
-	}
-	else if (InteractionMode == ObjectMode){	
+	if (InteractionMode == ObjectMode){	
 		TransformPivotPointFloat[0] = 0;
 		TransformPivotPointFloat[1] = 0;
 		TransformPivotPointFloat[2] = 0;
@@ -3218,61 +2608,27 @@ void CWhisk3D::SetTransformPivotPoint(){
 	}
 }
 
-void CWhisk3D::guardarEstado(){	
-	if (InteractionMode == EditMode){
-		Object& obj = Objects[SelectActivo];
-		Mesh& pMesh = Meshes[obj.Id];
-		if (pMesh.SelectCount < 1){return;}
-
-		if (estado != EditScale){
-			estadoVertices.Close();
-			estadoVertices.ReserveL(pMesh.SelectCount);
-			
-			for(int vg=0; vg < pMesh.vertexGroups.Count(); vg++){
-				if ( pMesh.vertexGroups[vg].seleccionado){
-					SaveStateVertex NuevoEstadoVertice;
-					TInt primerVertice = pMesh.vertexGroups[vg].indices[0]*3;
-					NuevoEstadoVertice.indice = vg;
-					NuevoEstadoVertice.x = pMesh.vertex[primerVertice];
-					NuevoEstadoVertice.y = pMesh.vertex[primerVertice+1];	
-					NuevoEstadoVertice.z = pMesh.vertex[primerVertice+2];
-					estadoVertices.Append(NuevoEstadoVertice);		
-				}		
-			}	
-			SetTransformPivotPoint();
+void CWhisk3D::guardarEstado(){
+	estadoObjetos.Close();
+	estadoObjetos.ReserveL(SelectCount);
+	for(int o=0; o < Objects.Count(); o++){
+		Object& obj = Objects[o];
+		if (obj.seleccionado){
+			SaveState NuevoEstado;
+			NuevoEstado.indice = o;
+			NuevoEstado.posX = obj.posX;
+			NuevoEstado.posY = obj.posY;
+			NuevoEstado.posZ = obj.posZ;
+			NuevoEstado.rotX = obj.rotX;
+			NuevoEstado.rotY = obj.rotY;
+			NuevoEstado.rotZ = obj.rotZ;
+			NuevoEstado.scaleX = obj.scaleX;
+			NuevoEstado.scaleY = obj.scaleY;
+			NuevoEstado.scaleZ = obj.scaleZ;
+			estadoObjetos.Append(NuevoEstado);
 		}
-		else if (estado = EditScale){
-			SetTransformPivotPoint();
-			CalcScaleVectors();
-		}
-		/*HBufC* noteBuf = HBufC::NewLC(180);
-		_LIT(KFormatString, "vertices count: %d\nSelectCount: %d");
-		noteBuf->Des().Format(KFormatString, estadoVertices.Count(), SelectEditCount);
-		DialogAlert(noteBuf);
-		CleanupStack::PopAndDestroy(noteBuf);	*/	
-	}
-	else {
-		estadoObjetos.Close();
-		estadoObjetos.ReserveL(SelectCount);
-		for(int o=0; o < Objects.Count(); o++){
-			Object& obj = Objects[o];
-			if (obj.seleccionado){
-				SaveState NuevoEstado;
-				NuevoEstado.indice = o;
-				NuevoEstado.posX = obj.posX;
-				NuevoEstado.posY = obj.posY;
-				NuevoEstado.posZ = obj.posZ;
-				NuevoEstado.rotX = obj.rotX;
-				NuevoEstado.rotY = obj.rotY;
-				NuevoEstado.rotZ = obj.rotZ;
-				NuevoEstado.scaleX = obj.scaleX;
-				NuevoEstado.scaleY = obj.scaleY;
-				NuevoEstado.scaleZ = obj.scaleZ;
-				estadoObjetos.Append(NuevoEstado);
-			}
-		}	
-		SetTransformPivotPoint();
-	}
+	}	
+	SetTransformPivotPoint();
 };
 
 //cambie el shader
@@ -3282,10 +2638,6 @@ void CWhisk3D::SetShading(TInt valor){
 		//glDisable( GL_LIGHT3 );			
 	}
 	switch (valor) {
-		case Wireframe:
-			glDisable( GL_LIGHT0 );
-    		glLightModelfv( GL_LIGHT_MODEL_AMBIENT, globalAmbient );
-			break;
 		case Rendered:
 			glDisable( GL_LIGHT0 );			
 			for (int i = 0; i < Lights.Count(); i++) {
@@ -3387,53 +2739,6 @@ void CWhisk3D::InsertarValor(){
 			}		
 		}
 	}
-	else if (InteractionMode == EditMode){
-		/*if (axisSelect == X){
-			buf->Des().Copy(_L("Posicion en X"));
-			TInt valorX = DialogNumber((TInt)Objects[SelectActivo].vertex[Objects[SelectActivo].vertexGroupIndice[SelectActivo][0]*3], -1000000, 1000000,buf);
-			for(int g=0; g < Objects[SelectActivo].vertexGroupIndiceSize[SelectActivo]; g++){
-				Objects[SelectActivo].vertex[Objects[SelectActivo].vertexGroupIndice[SelectActivo][g]*3] = valorX;
-			}
-		}
-		else if (axisSelect == Y){
-			buf->Des().Copy(_L("Posicion en Y"));
-			TInt valorY = DialogNumber((TInt)Objects[SelectActivo].vertex[Objects[SelectActivo].vertexGroupIndice[SelectActivo][0]*3+2], -1000000, 1000000,buf);
-			for(int g=0; g < Objects[SelectActivo].vertexGroupIndiceSize[SelectActivo]; g++){
-				Objects[SelectActivo].vertex[Objects[SelectActivo].vertexGroupIndice[SelectActivo][g]*3+2] = valorY;
-			}
-		}
-		else if (axisSelect == Z){
-			buf->Des().Copy(_L("Posicion en Z"));
-			TInt valorZ = DialogNumber((TInt)Objects[SelectActivo].vertex[Objects[SelectActivo].vertexGroupIndice[SelectActivo][0]*3+1], -1000000, 1000000,buf);
-			for(int g=0; g < Objects[SelectActivo].vertexGroupIndiceSize[SelectActivo]; g++){
-				Objects[SelectActivo].vertex[Objects[SelectActivo].vertexGroupIndice[SelectActivo][g]*3+1] = valorZ;
-			}
-		}*/	
-	}
-	else if (estado == VertexMove){
-		/*if (axisSelect == X){
-			buf->Des().Copy(_L("Posicion en X")); //(Objects[SelectActivo].vertex[Objects[SelectActivo].vertexGroupIndice[SelectActivo][0]*3]-
-			TInt valorX = DialogNumber((TInt)(Objects[SelectActivo].vertex[Objects[SelectActivo].vertexGroupIndice[SelectActivo][0]*3]-estadoVertex[0]), -1000000, 1000000,buf);
-			for(int g=0; g < Objects[SelectActivo].vertexGroupIndiceSize[SelectActivo]; g++){
-				Objects[SelectActivo].vertex[Objects[SelectActivo].vertexGroupIndice[SelectActivo][g]*3] = valorX+estadoVertex[0]; //)*1;
-			}
-		}
-		else if (axisSelect == Y){
-			buf->Des().Copy(_L("Posicion en Y"));
-			TInt valorY = DialogNumber((TInt)(Objects[SelectActivo].vertex[Objects[SelectActivo].vertexGroupIndice[SelectActivo][0]*3+2]-estadoVertex[1]), -1000000, 1000000,buf);
-			for(int g=0; g < Objects[SelectActivo].vertexGroupIndiceSize[SelectActivo]; g++){
-				Objects[SelectActivo].vertex[Objects[SelectActivo].vertexGroupIndice[SelectActivo][g]*3+2] = valorY+estadoVertex[1];
-			}
-		}
-		else if (axisSelect == Z){
-			buf->Des().Copy(_L("Posicion en Z"));
-			TInt valorZ = DialogNumber((TInt)(Objects[SelectActivo].vertex[Objects[SelectActivo].vertexGroupIndice[SelectActivo][0]*3+1]-estadoVertex[2]), -1000000, 1000000,buf);
-			for(int g=0; g < Objects[SelectActivo].vertexGroupIndiceSize[SelectActivo]; g++){
-				Objects[SelectActivo].vertex[Objects[SelectActivo].vertexGroupIndice[SelectActivo][g]*3+1] = valorZ+estadoVertex[2];
-			}
-		}	
-		Aceptar();*/
-	}	
 	CleanupStack::PopAndDestroy(buf);
 	dialogoSymbian = false;
 	redibujar = true;	
@@ -3466,38 +2771,6 @@ void CWhisk3D::TecladoNumerico(TInt numero){
 				break;
 		}	
 	}
-	else if (InteractionMode == EditMode){
-		switch (numero) {
-			case 1:
-				SetPosicion();
-				break;
-			case 2:
-				SetRotacion();
-				break;
-			case 3:
-				SetEscala();
-				break;
-			case 4:
-				SetShading(0);	
-				break;
-			case 5:
-				SetShading(1);	
-				break;
-			case 6:
-				SetShading(2);	
-				break;
-			case 7:
-				Extrude();
-				break;
-			case 8:
-				Duplicate();
-				break;
-			case 0:
-				EnfocarObject();
-			default:
-				break;
-		}	
-	}
 };
 
 
@@ -3517,7 +2790,7 @@ void CWhisk3D::SetParent(){
 	while (ParentIDtest > -1) {
 		//_LIT(KFormatString2, "activo: %d\nParentID: %d");
 		//noteBuf->Des().Format(KFormatString2, SelectActivo, ParentIDtest);
-		//DialogAlert(noteBuf);
+		//CDialogs::Alert(noteBuf);
 		if (ParentIDtest == SelectActivo){
 			ParentIDtest = -1;
 			error = true;
@@ -3595,28 +2868,6 @@ void CWhisk3D::ClearParent(){
 	redibujar = true;
 };
 
-void CWhisk3D::FlipNormals(){
-	//si no hay objetos
-	if (Objects.Count() < 1){return;}	
-	Object& obj = Objects[SelectActivo];
-	//si no es un mesh
-	if (obj.type != mesh || !obj.seleccionado){return;}
-	Mesh& pMesh = Meshes[obj.Id];	
-
-	for(TInt a = 0; a < pMesh.vertexSize*3; a++) {
-		pMesh.normals[a] = (GLbyte)-pMesh.normals[a];
-	}
-
-	TInt temIndiceFace = 0;
-	for(TInt f = 0; f < pMesh.facesCount; f++) {
-		temIndiceFace = pMesh.faces[f*3];
-		pMesh.faces[f*3] = pMesh.faces[f*3+2];
-		pMesh.faces[f*3+2] = temIndiceFace;
-	}
-	
-	redibujar = true;
-}
-
 void CWhisk3D::Borrar(){
 	if (estado != editNavegacion ){
 		Cancelar();
@@ -3637,7 +2888,7 @@ void CWhisk3D::Borrar(){
 		HBufC* noteBuf = HBufC::NewLC(100);
 		_LIT(KStaticErrorMessage, "Delete?");
 		noteBuf->Des().Format(KStaticErrorMessage);
-		if (!DialogAlert(noteBuf)){
+		if (!CDialogs::Alert(noteBuf)){
 			CleanupStack::PopAndDestroy(noteBuf);	
 			return;
 		}
@@ -3651,45 +2902,6 @@ void CWhisk3D::Borrar(){
 				BorrarObjeto(o);
 			}			
 		}
-	}
-	else if (InteractionMode == EditMode){
-		/*if (Objects[SelectActivo].vertexGroupSize < 1){return;}
-		//pregunta de confirmacion
-		_LIT(KStaticErrorMessage, "¿Eliminar Vertice?");
-		if (!DialogAlert(KStaticErrorMessage)){return;}
-		Mesh& obj = Objects[SelectActivo];
-		//busca las caras que contengan algun vertices del grupo de vertices
-		RArray<GLushort> faces;
-		for(int f=0; f < obj.facesSize/3; f++){
-			for(int v=0; v < obj.vertexGroupIndiceSize[SelectActivo]; v++){
-				if (obj.vertexGroupIndice[SelectActivo][v] == obj.faces[f*3] ||
-					obj.vertexGroupIndice[SelectActivo][v] == obj.faces[f*3+1] ||
-					obj.vertexGroupIndice[SelectActivo][v] == obj.faces[f*3+2]){
-					faces.Append(f);
-					break;
-				}				
-			}
-		};		
-		//busca los bordes
-		RArray<GLushort> edges;
-		for(int e=0; e < obj.edgesSize/2; e++){
-			for(int g=0; g < obj.vertexGroupIndiceSize[SelectActivo]; g++){
-				if (obj.vertexGroupIndice[SelectActivo][g] == obj.edges[e*2] ||
-					obj.vertexGroupIndice[SelectActivo][g] == obj.edges[e*2+1]){
-					edges.Append(e);
-					break;
-				}				
-			}
-		};		
-		
-		obj.RemoveFaces(faces, SelectActivo);
-		obj.RemoveEdges(edges, SelectActivo);
-		obj.RemoveVertex(SelectActivo);
-		faces.Close();
-		edges.Close();
-		if (obj.vertexGroupSize < SelectActivo+1){
-			SelectActivo = obj.vertexGroupSize-1;			
-		}*/
 	}
     redibujar = true;	
 }
@@ -3711,18 +2923,12 @@ void CWhisk3D::BorrarMesh(TInt indice){
 		//primero se borran los objetos a los que apunta el mesh
 		delete[] pMesh.vertex;
 		delete[] pMesh.vertexColor;
-		delete[] pMesh.vertexGroupUIcolor;
 		delete[] pMesh.normals;
 		delete[] pMesh.uv;
 		for(TInt i=0; i < pMesh.vertexGroups.Count(); i++){
 			pMesh.vertexGroups[i].indices.Close();
 		}
 		pMesh.vertexGroups.Close();
-		//borra los bordes
-		for(TInt i=0; i < pMesh.edgesGroups.Count(); i++){
-			pMesh.edgesGroups[i].faces.Close();
-		}
-		pMesh.edgesGroups.Close();
 
 		delete[] pMesh.faces;
 		pMesh.materialsGroup.Close();
@@ -3819,14 +3025,6 @@ void CWhisk3D::CursorToSelect(){
 		Cursor3DposX = TransformPivotPointFloat[0];
 		Cursor3DposY = TransformPivotPointFloat[1];
 		Cursor3DposZ = TransformPivotPointFloat[2];
-	}	
-	else if (InteractionMode == EditMode){
-		Cursor3DposX = TransformPivotPointFloat[0];
-		Cursor3DposY = TransformPivotPointFloat[1];
-		Cursor3DposZ = TransformPivotPointFloat[2];
-		Cursor3DposX += TransformPivotPoint[0]*Objects[SelectActivo].scaleX/65000; 
-		Cursor3DposY += TransformPivotPoint[2]*Objects[SelectActivo].scaleY/65000;
-		Cursor3DposZ += TransformPivotPoint[1]*Objects[SelectActivo].scaleZ/65000;
 	}
 	redibujar = true;
 }
@@ -3843,47 +3041,6 @@ void CWhisk3D::SelectToCursor(){
 			};
 		}
 	}
-	else if (InteractionMode == EditMode){
-		Object& obj = Objects[SelectActivo];
-		Mesh& pMesh = Meshes[obj.Id];	
-		GLshort NewPosX = (GLshort)((Cursor3DposX -obj.posX) * 65000 / obj.scaleX);
-		GLshort NewPosY = (GLshort)((Cursor3DposY -obj.posY) * 65000 / obj.scaleY);
-		GLshort NewPosZ = (GLshort)((Cursor3DposZ -obj.posZ) * 65000 / obj.scaleZ);
-
-		for(TInt vg=0; vg < pMesh.vertexGroups.Count(); vg++){
-			if (pMesh.vertexGroups[vg].seleccionado){
-				for(TInt i=0; i < pMesh.vertexGroups[vg].indices.Count(); i++){
-					TInt primerVertice = pMesh.vertexGroups[vg].indices[i]*3;
-					pMesh.vertex[primerVertice] = NewPosX;
-					pMesh.vertex[primerVertice+1] = NewPosZ;	
-					pMesh.vertex[primerVertice+2] = NewPosY;
-				}
-			}
-			pMesh.UpdateVertexUI(vg);
-		}
-	}
-	redibujar = true;
-}
-
-void CWhisk3D::SetOriginTo3DCursor(){
-	if (Objects.Count() < 1){return;}	
-	Object& obj = Objects[SelectActivo];
-	if (obj.type != mesh){return;};
-	
-	Mesh& pMesh = Meshes[obj.Id];	
-	GLshort NewPosX = (GLshort)((Cursor3DposX -obj.posX) * 65000 / obj.scaleX);
-	GLshort NewPosY = (GLshort)((Cursor3DposY -obj.posY) * 65000 / obj.scaleY);
-	GLshort NewPosZ = (GLshort)((Cursor3DposZ -obj.posZ) * 65000 / obj.scaleZ);
-
-	for(TInt i=0; i < pMesh.vertexSize; i++){
-		pMesh.vertex[i*3] -= NewPosX;
-		pMesh.vertex[i*3+1] -= NewPosZ;	
-		pMesh.vertex[i*3+2] -= NewPosY;
-	}
-	obj.posX = Cursor3DposX;
-	obj.posY = Cursor3DposY;
-	obj.posZ = Cursor3DposZ;
-	pMesh.UpdateVertexUI();
 	redibujar = true;
 }
 
@@ -3962,56 +3119,6 @@ void CWhisk3D::DeseleccionarTodo(){
 		}
 		SelectCount = 0;
 	}
-	else if (InteractionMode == EditMode){
-		Object& obj = Objects[SelectActivo];
-		if (obj.type != mesh){return;}
-		Mesh& pMesh = Meshes[obj.Id];	
-		//si no hay grupos de vertices. no hace nada
-		if (pMesh.vertexGroups.Count() < 1){return;}
-
-		for(int vg=0; vg < pMesh.vertexGroups.Count(); vg++){
-			pMesh.VertexSelect(vg, false);			
-		}
-		pMesh.UpdateVertexColorsUI();
-		
-		pMesh.SelectCount = 0;
-	}
-}
-
-void CWhisk3D::UVmapping(TInt valor){
-    Object& obj = Objects[SelectActivo];
-    if (obj.type != mesh) { return; }
-    Mesh& pMesh = Meshes[obj.Id];
-
-    // Variables para almacenar las posiciones minimas y maximas en el eje Y (altura)
-    GLshort minY = pMesh.vertex[1], maxY = pMesh.vertex[1];
-    
-    // Encontrar los valores minimos y maximos de Y
-    for (int i = 0; i < pMesh.vertexSize; i++) {
-        GLshort y = pMesh.vertex[i * 3 + 1];
-        if (y < minY) { minY = y; }
-        if (y > maxY) { maxY = y; }
-    }
-
-    // Recorrer todos los vértices
-    for (int i = 0; i < pMesh.vertexSize; i++) {
-        GLshort x = pMesh.vertex[i * 3];
-        GLshort y = pMesh.vertex[i * 3 + 1];
-        GLshort z = pMesh.vertex[i * 3 + 2];
-
-        // Calcular el angulo en torno al eje Y (cilindro alrededor del eje Y)
-        float angle = atan2(z, x);  // angulo en radianes
-        float U = (angle / (2.0f * M_PI)) * 255 - 128;  // Ajustar U al rango [-128, 127]
-
-        // Calcular V basado en la altura relativa del vértice en el eje Y
-        float V = ((y - minY) / float(maxY - minY)) * 255 - 128;  // Ajustar V al rango [-128, 127]
-
-        // Invertir las coordenadas UV
-        pMesh.uv[i * 2] = -U;
-        pMesh.uv[i * 2 + 1] = -V;
-    }
-
-	redibujar = true;
 }
 
 void CWhisk3D::AddMesh( int modelo ){
@@ -4039,12 +3146,6 @@ void CWhisk3D::AddMesh( int modelo ){
 	Mesh tempMesh;
 	Meshes.Append(tempMesh);
 	Mesh& pMesh = Meshes[obj.Id];	
-	pMesh.SelectEdgesCount = 0;
-	
-	EdgesGroup TempEdgesGroups;
-	//pMesh.
-	TempEdgesGroups.faces.ReserveL(0);
-	TempEdgesGroups.seleccionado = false;
 	
 	MaterialGroup tempFaceGroup;
 	tempFaceGroup.startDrawn = 0;
@@ -4052,29 +3153,7 @@ void CWhisk3D::AddMesh( int modelo ){
 	
 	VertexGroup TempVertexGroups;	
 	
-	if (modelo == plane){ 
-		pMesh.vertexGroups.ReserveL(4);
-		TInt InputSize = 2;	
-		for (TInt i = 0; i < pMesh.vertexGroups.Count(); i++) {
-			pMesh.vertexGroups.Append(TempVertexGroups);
-			VertexGroup& NewVertexGroup = pMesh.vertexGroups[pMesh.vertexGroups.Count()-1];
-			if (i == 0){
-				NewVertexGroup.seleccionado = true;
-			}
-			else {				
-				NewVertexGroup.seleccionado = false;
-			}
-			NewVertexGroup.posX = PlaneVertices[i*3]*InputSize;
-			NewVertexGroup.posY = PlaneVertices[i*3+1]*InputSize;
-			NewVertexGroup.posZ = PlaneVertices[i*3+2]*InputSize;
-
-			NewVertexGroup.indices.Append(i);
-			NewVertexGroup.face.Append(0);
-		}		
-		pMesh.ResetMesh();
-		//pMesh.face.Append(0);
-
-    	/*pMesh.vertexSize = 4;
+	if (modelo == plane){ pMesh.vertexSize = 4;
 		pMesh.vertex = new GLshort[pMesh.vertexSize*3];
 		pMesh.vertexColor = new GLubyte[pMesh.vertexSize*4];
 		pMesh.normals = new GLbyte[pMesh.vertexSize*3];
@@ -4100,21 +3179,13 @@ void CWhisk3D::AddMesh( int modelo ){
 			pMesh.uv[i] = (GLfloat)PlaneUV[i];
 		}
 
-		pMesh.facesCount = tempFaceGroup.count = 2;
-		pMesh.facesCountIndices = tempFaceGroup.indicesDrawnCount = 6;
+		//pMesh.facesCount = tempFaceGroup.count = 2;
+		pMesh.facesSize = tempFaceGroup.indicesDrawnCount = 6;
 
 		pMesh.faces = new GLushort[tempFaceGroup.indicesDrawnCount];
 		for (int i = 0; i < tempFaceGroup.indicesDrawnCount; i++) {
 			pMesh.faces[i] = PlaneTriangles[i];
 		}
-
-		//bordes
-		pMesh.edgesGroups.ReserveL(PlaneEdgesSize/2);
-		for(int a=0; a < PlaneEdgesSize/2; a++){
-			TempEdgesGroups.indicesA = PlaneBordes[a*2];
-			TempEdgesGroups.indicesB = PlaneBordes[a*2+1];
-			pMesh.edgesGroups.Append(TempEdgesGroups);	
-		}*/
 	}	
 	else if (modelo == circle){ 
 		HBufC* noteBuf = HBufC::NewLC(100);
@@ -4152,8 +3223,7 @@ void CWhisk3D::AddMesh( int modelo ){
 			pMesh.vertexColor[i] = 255;
 		}
 
-		pMesh.facesCount = tempFaceGroup.count = pMesh.vertexSize - 2;
-		pMesh.facesCountIndices = tempFaceGroup.indicesDrawnCount = (pMesh.vertexSize - 2) * 3;
+		pMesh.facesSize = tempFaceGroup.indicesDrawnCount = (pMesh.vertexSize - 2) * 3;
 
 		pMesh.faces = new GLushort[tempFaceGroup.indicesDrawnCount];
 		for (TInt i = 0; i < originalVertexSize - 1; i++) {
@@ -4161,17 +3231,9 @@ void CWhisk3D::AddMesh( int modelo ){
 			pMesh.faces[i * 3 + 1] = i + 2;  // Segundo vértice
 			pMesh.faces[i * 3 + 2] = i + 1;  // Tercer vértice
 		}
-
-		// Bordes
-		pMesh.edgesGroups.ReserveL(pMesh.vertexSize);
-		for (TInt a = 0; a < originalVertexSize; a++) {
-			TempEdgesGroups.indicesA = a;
-			TempEdgesGroups.indicesB = (a + 1) % originalVertexSize;
-			pMesh.edgesGroups.Append(TempEdgesGroups);    
-		}
 	}
 	else if (modelo == cubo){ 
-    	/*pMesh.vertexSize = 24;
+    	pMesh.vertexSize = 24;
 		pMesh.vertex = new GLshort[pMesh.vertexSize*3];
 		pMesh.vertexColor = new GLubyte[pMesh.vertexSize*4];
 		pMesh.normals = new GLbyte[pMesh.vertexSize*3];
@@ -4189,95 +3251,17 @@ void CWhisk3D::AddMesh( int modelo ){
 			pMesh.uv[i] = (GLfloat)CuboUV[i];
 		}
 
-		pMesh.facesCount = tempFaceGroup.count = 12;
-		pMesh.facesCountIndices = tempFaceGroup.indicesDrawnCount = 36;
+		pMesh.facesSize = tempFaceGroup.indicesDrawnCount = 36;
 
 		pMesh.faces = new GLushort[tempFaceGroup.indicesDrawnCount];
 		for (int i = 0; i < tempFaceGroup.indicesDrawnCount; i++) {
 			pMesh.faces[i] = CuboTriangles[i];
 		}
-		//bordes
-		pMesh.edgesGroups.ReserveL(CuboEdgesSize/2);
-		for(int a=0; a < CuboEdgesSize/2; a++){
-			TempEdgesGroups.indicesA = CuboBordes[a*2];
-			TempEdgesGroups.indicesB = CuboBordes[a*2+1];	
-			pMesh.edgesGroups.Append(TempEdgesGroups);		
-		}*/
 	}	
-	else if (modelo == monkey){  
-		obj.rotZ = 180;
-    	pMesh.vertexSize = MonkeyVertexSize;
-
-		pMesh.vertex = new GLshort[MonkeyVertexSize*3];
-		pMesh.normals = new GLbyte[MonkeyVertexSize*3];		
-		for(int a=0; a < MonkeyVertexSize*3; a++){
-			pMesh.vertex[a] = MonkeyVertex[a];	
-			pMesh.normals[a] = MonkeyNormal[a];	
-		}
-
-		pMesh.vertexColor = new GLubyte[MonkeyVertexSize*4];
-		for(int a=0; a < MonkeyVertexSize*4; a++){
-			pMesh.vertexColor[a] = 255;
-		}	
-
-		pMesh.facesCount = tempFaceGroup.count = MonkeyFaceSize;
-		pMesh.facesCountIndices = tempFaceGroup.indicesDrawnCount = MonkeyFaceSize*3;
-		pMesh.faces = new GLushort[tempFaceGroup.indicesDrawnCount];
-		for(int a=0; a < tempFaceGroup.indicesDrawnCount; a++){
-			pMesh.faces[a] = MonkeyFace[a];	
-		}
-		//pMesh.edges = new GLushort[pMesh.edgesSize];
-		pMesh.uv = new GLfloat[pMesh.vertexSize*2];
-		for(int a=0; a < pMesh.vertexSize*2; a++){
-			//pMesh.uv[a] = (GLfloat)(MonkeyUV+128)[a]/255;	
-			pMesh.uv[a] = (GLfloat)MonkeyUV[a];			
-		}
-	}
-	else if (modelo == vertice){
-    	pMesh.vertexSize = 1;
-		pMesh.vertex = new GLshort[3];
-		pMesh.normals = new GLbyte[3];	
-		pMesh.vertexColor = new GLubyte[4];
-		pMesh.faces = new GLushort[0];
-		pMesh.uv = new GLfloat[2];
-		pMesh.vertex[0] = pMesh.vertex[1] = pMesh.vertex[2] = 0;
-		pMesh.normals[0] = pMesh.normals[1] = 0;	
-		pMesh.normals[2] = 127;	
-		pMesh.uv[0] = pMesh.uv[1] = 0.0f;		
-		pMesh.vertexColor[0] = pMesh.vertexColor[1] = pMesh.vertexColor[2] = 255;
-		pMesh.facesCount = tempFaceGroup.count = 0;
-		pMesh.facesCountIndices = tempFaceGroup.indicesDrawnCount = 0;
-	}
 
 	//creamos el objeto y le asignamos la mesh	
-	//Meshes[obj.Id].materialsGroup.Append(tempFaceGroup);
-	//Meshes[obj.Id].AgruparVertices();
-	//Meshes[obj.Id].RecalcularBordes();
+	Meshes[obj.Id].materialsGroup.Append(tempFaceGroup);
     redibujar = true;
-}
-
-void CWhisk3D::Extrude(){
-	if (InteractionMode != EditMode && estado != editNavegacion){return;};
-	Object& obj = Objects[SelectActivo];
-	Mesh& pMesh = Meshes[obj.Id];
-	if (pMesh.vertexGroups.Count() < 1){return;}
-	if (!pMesh.vertexGroups[pMesh.SelectActivo].seleccionado){return;}	
-
-	pMesh.ExtrudeVertices();
-	SetPosicion();
-	redibujar = true;
-}
-
-void CWhisk3D::Duplicate(){
-	if (InteractionMode != EditMode && estado != editNavegacion){return;};
-	Object& obj = Objects[SelectActivo];
-	Mesh& pMesh = Meshes[obj.Id];
-	if (pMesh.vertexGroups.Count() < 1){return;}
-	if (!pMesh.vertexGroups[pMesh.SelectActivo].seleccionado){return;}	
-
-	pMesh.DuplicateVertices();
-	SetPosicion();
-	redibujar = true;
 }
 
 void CWhisk3D::ActivarTextura(){
@@ -4301,7 +3285,7 @@ void CWhisk3D::ActivarTextura(){
 	Cancelar();
 	//activa o desactiva las texturas
 	noteBuf->Des().Copy(_L("Activar Textura?"));
-	if (DialogAlert(noteBuf)){	
+	if (CDialogs::Alert(noteBuf)){	
 		mat.textura = true;
 		
 	}
@@ -4334,7 +3318,7 @@ void CWhisk3D::SetTransparencia(){
 	Cancelar();
 	//activa o desactiva las Transparencias
 	noteBuf->Des().Copy(_L("Activar Transparencia?"));
-	if (DialogAlert(noteBuf)){	
+	if (CDialogs::Alert(noteBuf)){	
 		mat.transparent = true;
 	}
 	else {
@@ -4365,7 +3349,7 @@ void CWhisk3D::SetTextureRepeat(){
 
 	//activa o desactiva las Transparencias
 	noteBuf->Des().Copy(_L("Activar Repeticion de Textura?"));
-	if (DialogAlert(noteBuf)){	
+	if (CDialogs::Alert(noteBuf)){	
 		mat.repeat = true;
 	}
 	else {
@@ -4373,28 +3357,6 @@ void CWhisk3D::SetTextureRepeat(){
 	}
 	CleanupStack::PopAndDestroy(noteBuf);	
     redibujar = true;
-}
-
-void CWhisk3D::SetSmooth(){
-	//si no hay objetos
-	if (Objects.Count() < 1){return;}	
-	Object& obj = Objects[SelectActivo];
-	//si no es un mesh
-	if (obj.type != mesh){return;}	
-	Mesh& pMesh = Meshes[obj.Id];
-
-	Cancelar();
-	//activa o desactiva las Transparencias
-	HBufC* noteBuf = HBufC::NewLC( 22 );
-	noteBuf->Des().Copy(_L("Activar Smooth?"));
-	if (DialogAlert(noteBuf)){	
-		pMesh.smooth = true;
-	}
-	else {
-		pMesh.smooth = false;	
-	}
-    redibujar = true;
-	CleanupStack::PopAndDestroy(noteBuf);	
 }
 
 void CWhisk3D::SetCulling(){
@@ -4417,7 +3379,7 @@ void CWhisk3D::SetCulling(){
 
 	//activa o desactiva culling de caras
 	noteBuf->Des().Copy(_L("Activar Culling?"));
-	if (DialogAlert(noteBuf)){	
+	if (CDialogs::Alert(noteBuf)){	
 		mat.culling = true;
 	}
 	else {
@@ -4447,7 +3409,7 @@ void CWhisk3D::SetLighting(){
 	Cancelar();
 	//activa o desactiva las Transparencias
 	noteBuf->Des().Copy(_L("Activar Iluminacion?"));
-	if (DialogAlert(noteBuf)){	
+	if (CDialogs::Alert(noteBuf)){	
 		mat.lighting = true;
 	}
 	else {
@@ -4477,7 +3439,7 @@ void CWhisk3D::SetVertexColor(){
 	Cancelar();
 	//activa o desactiva las Transparencias
 	noteBuf->Des().Copy(_L("Activar Vertex Color?"));
-	if (DialogAlert(noteBuf)){	
+	if (CDialogs::Alert(noteBuf)){	
 		mat.vertexColor = true;
 	}
 	else {
@@ -4507,7 +3469,7 @@ void CWhisk3D::SetInterpolation(){
 	Cancelar();
 	//activa o desactiva las Transparencias
 	noteBuf->Des().Copy(_L("Interpolacion Lineal?"));
-	if (DialogAlert(noteBuf)){	
+	if (CDialogs::Alert(noteBuf)){	
 		mat.interpolacion = lineal;
 	}
 	else {
@@ -4567,7 +3529,7 @@ void CWhisk3D::NewMaterial(TBool reemplazar){
 	
 	HBufC* noteBuf = HBufC::NewLC(100);//textoingresado.AllocLC();
 	noteBuf->Des().Copy(textoingresado);
-	DialogAlert(noteBuf);
+	CDialogs::Alert(noteBuf);
 	CleanupStack::PopAndDestroy(noteBuf);	
 	CleanupStack::PopAndDestroy(tituloBuf);	
 	CleanupStack::PopAndDestroy(inicialBuf);	*/
@@ -4655,24 +3617,6 @@ void CWhisk3D::SetMaterial(){
     redibujar = true;
 }
 
-void CWhisk3D::SetEditMode(){
-	//si no hay objetos
-	if (Objects.Count() < 1){return;}	
-	Object& obj = Objects[SelectActivo];
-	//si no es un mesh
-	if (obj.type != mesh){return;}	
-	
-	Cancelar();
-	if ( InteractionMode != EditMode ){
-		SelectActivo = 0;
-		InteractionMode = EditMode;
-	}	
-    else {
-    	InteractionMode = ObjectMode;
-	}
-    redibujar = true;
-}
-
 void CWhisk3D::EnfocarObject(){
 	//si no hay objetos
 	if (Objects.Count() < 1){return;}
@@ -4680,20 +3624,9 @@ void CWhisk3D::EnfocarObject(){
 	PivotX = 0.0f; 
 	PivotY = 0.0f;
 	PivotZ = 0.0f;
-	if (InteractionMode == EditMode){
-		Object& obj = Objects[SelectActivo];
-		PivotX = -TransformPivotPoint[0]*obj.scaleX/65000; 
-		PivotY = -TransformPivotPoint[2]*obj.scaleY/65000;
-		PivotZ = -TransformPivotPoint[1]*obj.scaleZ/65000;
-		PivotX -= obj.posX;
-		PivotY -= obj.posY;
-		PivotZ -= obj.posZ;
-	}
-	else if (InteractionMode == ObjectMode){
-		PivotX = PivotX-TransformPivotPointFloat[0]; 
-		PivotY = PivotY-TransformPivotPointFloat[1];
-		PivotZ = PivotZ-TransformPivotPointFloat[2];
-	}
+	PivotX = PivotX-TransformPivotPointFloat[0]; 
+	PivotY = PivotY-TransformPivotPointFloat[1];
+	PivotZ = PivotZ-TransformPivotPointFloat[2];
 	//EjecutarScriptPython();
     redibujar = true;
 }
@@ -4737,7 +3670,7 @@ void CWhisk3D::EjecutarScriptPython(){
 		_LIT(KFormatString, "Error al ejecutar el script");
 		HBufC* noteBuf = HBufC::NewLC(50);
 		noteBuf->Des().Format(KFormatString);
-		DialogAlert(noteBuf);  
+		CDialogs::Alert(noteBuf);  
 		CleanupStack::PopAndDestroy(noteBuf);
 	}
 	result = PyRun_SimpleString(script2);
@@ -4747,7 +3680,7 @@ void CWhisk3D::EjecutarScriptPython(){
 		_LIT(KFormatString, "Error al ejecutar el script");
 		HBufC* noteBuf = HBufC::NewLC(50);
 		noteBuf->Des().Format(KFormatString);
-		DialogAlert(noteBuf);  
+		CDialogs::Alert(noteBuf);  
 		CleanupStack::PopAndDestroy(noteBuf);
 	}
 	
@@ -4792,18 +3725,7 @@ void CWhisk3D::DuplicatedObject(){
 		//si es un mesh
 		if (obj.type == mesh){			
 			Mesh tempMesh;	
-			EdgesGroup TempEdgesGroups;
-			TempEdgesGroups.faces.ReserveL(0);
-			TempEdgesGroups.seleccionado = false;
-
-			tempMesh.edgesDrawnSize = 0;
-			tempMesh.edges = NULL;	
-			tempMesh.smooth = true;
-			tempMesh.vertexGroupUI = NULL;
-			tempMesh.vertexGroupUIcolor = NULL;
-			tempMesh.SelectActivo = 0;
-			tempMesh.SelectCount = 0;
-			tempMesh.SelectEdgesCount = 0;
+			
 			Meshes.Append(tempMesh);
 			Mesh& originaMesh = Meshes[obj.Id];
 			obj.Id = Meshes.Count()-1;
@@ -4826,21 +3748,12 @@ void CWhisk3D::DuplicatedObject(){
 				pMesh.uv[i] = originaMesh.uv[i];
 			}
 
-			pMesh.facesCount = originaMesh.facesCount;
-			pMesh.facesCountIndices = originaMesh.facesCountIndices;
+			pMesh.facesSize = originaMesh.facesSize;
 
-			pMesh.faces = new GLushort[pMesh.facesCountIndices];
-			for (int i = 0; i < pMesh.facesCountIndices; i++) {
+			pMesh.faces = new GLushort[pMesh.facesSize];
+			for (int i = 0; i < pMesh.facesSize; i++) {
 				pMesh.faces[i] = originaMesh.faces[i];
-			}
-			//bordes
-			pMesh.edgesGroups.Close();
-			pMesh.edgesGroups.ReserveL(originaMesh.edgesGroups.Count());
-			for(TInt i=0; i < originaMesh.edgesGroups.Count(); i++){
-				TempEdgesGroups.indicesA = originaMesh.edgesGroups[i].indicesA;
-				TempEdgesGroups.indicesB = originaMesh.edgesGroups[i].indicesB;	
-				pMesh.edgesGroups.Append(TempEdgesGroups);		
-			}			
+			}		
 
 			//creamos el objeto y le asignamos la mesh	
 			MaterialGroup tempFaceGroup;
@@ -4853,9 +3766,6 @@ void CWhisk3D::DuplicatedObject(){
 				tempFaceGroup.indicesDrawnCount = originaMesh.materialsGroup[i].indicesDrawnCount;
 				pMesh.materialsGroup.Append(tempFaceGroup);
 			}
-
-			pMesh.AgruparVertices();
-			pMesh.RecalcularBordes();
 		}
 	}
 	SetPosicion();
@@ -5041,7 +3951,7 @@ void CWhisk3D::SetPerspectiva(TBool redibuja ){
     redibujar = redibuja;
 }
 
-/*void CWhisk3D::DialogAlert(){
+/*void CWhisk3D::CDialogs::Alert(){
 	_LIT( KAlerta, "origen.png" );
 	_LIT( KAlerta2, "origen.png2" );
 	CAknMessageQueryDialog* dialog = CAknMessageQueryDialog::NewL( KAlerta );
@@ -5288,15 +4198,15 @@ void CWhisk3D::InfoObject(TInt opciones){
 	HBufC* noteBuf = HBufC::NewLC(100);	
 	_LIT(KFormatString, "Posicion: x: %d, y: %d, z: %d");
 	noteBuf->Des().Format(KFormatString, Objects[SelectActivo].posX, Objects[SelectActivo].posY, Objects[SelectActivo].posZ);
-	DialogAlert(noteBuf);	
+	CDialogs::Alert(noteBuf);	
 	
 	_LIT(KFormatString2, "Rotacion: x: %d, y: %d, z: %d");
 	noteBuf->Des().Format(KFormatString2, Objects[SelectActivo].rotX, Objects[SelectActivo].rotY, Objects[SelectActivo].rotZ);
-	DialogAlert(noteBuf);	
+	CDialogs::Alert(noteBuf);	
 
 	_LIT(KFormatString3, "Scale: x: %d, y: %d, z: %d");
 	noteBuf->Des().Format(KFormatString3, Objects[SelectActivo].scaleX, Objects[SelectActivo].scaleY, Objects[SelectActivo].scaleZ);
-	DialogAlert(noteBuf);
+	CDialogs::Alert(noteBuf);
 
 	CleanupStack::PopAndDestroy(noteBuf);	
 	/*if (opciones == 1){
@@ -5339,7 +4249,7 @@ void CWhisk3D::MensajeError(HBufC* noteBuf){
     //CleanupStack::PopAndDestroy(noteBuf);
 }
 
-/*TBool CWhisk3D::DialogAlert(HBufC* noteBuf){	  
+/*TBool CWhisk3D::CDialogs::Alert(HBufC* noteBuf){	  
     TBool retVal( EFalse );
     CAknQueryDialog* query = CAknQueryDialog::NewL();
     if( query->ExecuteLD( R_ACCEPT_INVITATION_DLG, *noteBuf )) {
@@ -5350,7 +4260,7 @@ void CWhisk3D::MensajeError(HBufC* noteBuf){
     return retVal;
 }*/
 
-TBool CWhisk3D::DialogAlert(HBufC* noteBuf) {
+/*TBool CWhisk3D::CDialogs::Alert(HBufC* noteBuf) {
     TBool retVal(EFalse);
 	CAknQueryDialog* query = CAknQueryDialog::NewL();
 	if (query->ExecuteLD(R_ACCEPT_INVITATION_DLG, *noteBuf)) {
@@ -5360,7 +4270,7 @@ TBool CWhisk3D::DialogAlert(HBufC* noteBuf) {
 }
 
 
-TBool CWhisk3D::DialogAlert(const TDesC& noteBuf) {
+TBool CWhisk3D::CDialogs::Alert(const TDesC& noteBuf) {
     TBool retVal(EFalse);
 	CAknQueryDialog* query = CAknQueryDialog::NewL();
 	if (query->ExecuteLD(R_ACCEPT_INVITATION_DLG, noteBuf)) {
@@ -5368,7 +4278,7 @@ TBool CWhisk3D::DialogAlert(const TDesC& noteBuf) {
 	}
 
     return retVal;
-}
+}*/
 
 TInt CWhisk3D::DialogNumber(TInt valor, TInt min, TInt max, HBufC* noteBuf ){ //TPtrC etiqueta
 	TInt number = valor;
@@ -5604,508 +4514,6 @@ void CWhisk3D::NewTexture(){
     }
 }
 
-void CWhisk3D::ImportOBJ(){    
-    _LIT(KTitle, "Import Wavefront (.obj)");
-    TFileName file(KNullDesC);
-    if (AknCommonDialogs::RunSelectDlgLD(file, R_WHISK3D_SELECT_DIALOG, KTitle)){		
-    	RFs fsSession;	
-    	User::LeaveIfError(fsSession.Connect());
-    	CleanupClosePushL(fsSession);
-
-    	RFile rFile;
-    	TInt err;
-    	TRAP(err,rFile.Open(fsSession, file, EFileRead));
-		if (err != KErrNone){
-			_LIT(KFormatString, "Error al abrir: %S");
-			HBufC* noteBuf = HBufC::NewLC(file.Length()+16);
-			noteBuf->Des().Format(KFormatString, &file);
-			MensajeError(noteBuf); 
-			return;
-		}	
-		/*if (file){
-			_LIT(KFormatString, "Formato no valido");
-			HBufC* noteBuf = HBufC::NewLC(100);
-			noteBuf->Des().Format(KFormatString, &file);
-			MensajeError(noteBuf); 
-			return;
-		}			*/
-		//crea el objeto
-		Cancelar();
-		Object obj;
-		obj.visible = true;
-		obj.posX = Cursor3DposX;
-		obj.posY = Cursor3DposY;
-		obj.posZ = Cursor3DposZ;
-		obj.rotX = obj.rotY = obj.rotZ = 0;
-		obj.rotX = obj.rotY = obj.rotZ = 0;	
-		obj.scaleX = 65000;
-		obj.scaleY = 65000;
-		obj.scaleZ = 65000;
-		obj.Id = 0;		
-		obj.type = mesh;
-		
-		//los obj tienen una lista de normales. a veces las normales se pueden repetir y esa es la logica
-		//tambien se puede repetir coordenadas de texturas asi que en vez de tener los uv y normals vertice por vertices.. tienen un listado
-
-		RArray<GLshort> ListVertices;
-		RArray<GLubyte> ListColors;
-		RArray<GLbyte> ListNormals;
-		RArray<GLfloat> ListUVs;
-		RArray<TInt> ListCaras;
-		TInt facesCountIndices = 0;
-		TInt facesCount = 0;
-        RArray<MaterialGroup> MaterialGroup;
-
-		TBool continuarLeyendo = ETrue; // Variable para controlar la lectura del archivo
-		TBuf8<2048> buffer;
-		TInt pos = 0;
-		TInt64 startPos = 0; // Variable para mantener la posicion de lectura en el archivo
-		TInt fileSize;
-		rFile.Size(fileSize);
- 
-		while (startPos < fileSize) {
-			// Leer una linea del archivo desde la posicion actual
-			err = rFile.Read(startPos, buffer, buffer.MaxLength());
-			if (err != KErrNone) {
-				//tarde o temprano va a fallar la lectura y va a parar
-				// Manejar error al leer
-				_LIT(KFormatString, "Error al leer linea");
-				HBufC* noteBuf = HBufC::NewLC(100);
-				noteBuf->Des().Format(KFormatString);
-				MensajeError(noteBuf);
-				continuarLeyendo = EFalse; // Salir del bucle
-				break;
-			}
-			// Procesar la linea hasta que no haya mas caracteres en buffer
-			while ((pos = buffer.Locate('\n')) != KErrNotFound || (pos = buffer.Locate('\r')) != KErrNotFound) {
-				TPtrC8 line = buffer.Left(pos);
-			
-				// Contador para almacenar la cantidad de "strings" separados por espacios
-				TInt contador = 0;
-				if (line.Length() > 0) {
-					if (line.Left(2) == _L8("v ")) {
-						contador = 0;		
-						ListVertices.ReserveL(ListVertices.Count() +3); // Reservar espacio para los elementos
-						ListColors.ReserveL(ListColors.Count() +3); // Reservar espacio para los elementos
-
-						TLex8 lex(line.Mid(2));  // Inicializa TLex con la subcadena a partir del tercer caracter
-						// Iterar mientras no se llegue al final del descriptor y se haya alcanzado el limite de 8 strings
-						while (!lex.Eos() && contador < 6) {		
-							TPtrC8 currentString = lex.NextToken(); // Mostrar el mensaje con el valor actual del "string" y el contador					
-							TLex8 testLex(currentString);// Crear un nuevo objeto TLex para la prueba
-							
-							// Convertir el string en un número TInt
-							TReal number = 0.0;
-							TInt err = testLex.Val(number, '.');
-							if (err == KErrNone && contador < 3) {
-								number = number*2000;								
-								GLshort glNumber = static_cast<GLshort>(number); // Conversion a GLbyte
-								ListVertices.Append(glNumber);
-							}
-							else if (contador < 3){
-								ListVertices.Append(0);
-							}							
-							else if (contador < 6){
-								number = number*255.0;	
-								if (number > 255.0){number = 255.0;}	
-								GLshort glNumber = static_cast<GLubyte>(number); // Conversion a GLbyte
-								ListColors.Append(glNumber);
-							}
-
-							// Avanzar al siguiente "string" que no sea espacio en blanco
-							lex.SkipSpace();
-
-							// Incrementar el contador para llevar la cuenta de los strings procesados
-							contador++;
-						}
-						while (contador < 6) {		
-							if (contador < 3){
-								ListVertices.Append(0);
-							}							
-							else if (contador < 6){
-								ListColors.Append(255);
-							}
-							contador++;
-						}
-					}
-					else if (line.Left(3) == _L8("vn ")) {
-						contador = 0;
-						ListNormals.ReserveL(ListNormals.Count() +3); // Reservar espacio para los elementos
-
-						TLex8 lex(line.Mid(3));  // Inicializa TLex con la subcadena a partir del tercer caracter
-						// Iterar mientras no se llegue al final del descriptor y se haya alcanzado el limite de 8 strings
-						while (!lex.Eos() && contador < 3) {							
-							TPtrC8 currentString = lex.NextToken(); // Mostrar el mensaje con el valor actual del "string" y el contador
-							TLex8 testLex(currentString); // Crear un nuevo objeto TLex para la prueba
-							
-							TReal number = 0.0;
-							TInt err = testLex.Val(number, '.');
-							if (err == KErrNone) {
-								number = ((number +1)/2)* 255.0 - 128.0;
-								if (number > 127.0){number = 127.0;}
-								else if (number < -128.0){number = -128.0;}
-								GLbyte glNumber = static_cast<GLbyte>(number); // Conversion a GLbyte
-								ListNormals.Append(glNumber);
-							}
-							else if (contador < 3){
-								ListNormals.Append(0);
-							}
-							lex.SkipSpace();
-							contador++;
-						}				
-					}
-					else if (line.Left(3) == _L8("vt ")) {					
-						contador = 0;
-						ListUVs.ReserveL(ListUVs.Count() +2); // Reservar espacio para los elementos
-
-						TLex8 lex(line.Mid(3));  // Inicializa TLex con la subcadena a partir del tercer caracter
-						// Iterar mientras no se llegue al final del descriptor y se haya alcanzado el limite de 8 strings
-						while (!lex.Eos() && contador < 2) {							
-							TPtrC8 currentString = lex.NextToken(); // Mostrar el mensaje con el valor actual del "string" y el contador
-							TLex8 testLex(currentString); // Crear un nuevo objeto TLex para la prueba
-							
-							TReal number = 0.0;
-							TInt err = testLex.Val(number, '.');
-							if (err == KErrNone) {		
-								if (contador == 1) {
-									number = -number+1;
-								}		
-								number = number * 255.0 - 128.0;
-								/*if (number > 127.0){number = 127.0;}
-								else if (number < -128.0){number = -128.0;}*/
-								//GLbyte glNumber = static_cast<GLbyte>(number); // Conversion a GLbyte
-								GLfloat glNumber = static_cast<GLfloat>(number); // Conversion a GLbyte
-								ListUVs.Append(glNumber);	
-							}
-							else if (contador < 2){
-								ListUVs.Append(0);
-							}
-							contador++;
-							lex.SkipSpace();
-						}			
-					}
-					else if (line.Left(2) == _L8("f ")) {
-						contador = 0;
-						ListCaras.ReserveL(ListCaras.Count() +9); // Reservar espacio para los elementos
-						TInt conTBarras = 0;
-
-						TLex8 lex(line.Mid(2));  // Inicializa TLex con la subcadena a partir del tercer caracter
-
-						// Iterar mientras no se llegue al final del descriptor y se haya alcanzado el limite de 8 strings
-						while (!lex.Eos() && contador < 3) {				
-							TPtrC8 currentString = lex.NextToken(); // Mostrar el mensaje con el valor actual del "string" y el contador
-
-							TInt startPos = 0; // Posicion inicial
-							TInt tokenLength = 0; // Longitud del token
-							conTBarras = 0;
-
-							// Recorre la cadena hasta encontrar el final
-							while (startPos < currentString.Length()) {
-								// Busca la posicion de la siguiente barra diagonal
-								TInt nextSlashPos = currentString.Mid(startPos).Locate('/');
-
-								// Si no se encuentra una barra diagonal, asume que es el último token
-								if (nextSlashPos == KErrNotFound) {
-									tokenLength = currentString.Length() - startPos;
-								} else {
-									tokenLength = nextSlashPos; // Longitud del token hasta la barra diagonal
-								}
-
-								// Extrae el token utilizando la posicion y longitud calculadas
-								TPtrC8 token = currentString.Mid(startPos, tokenLength);
-								TLex8 testLex(token); // Crear un nuevo objeto TLex para la prueba
-
-								// Convertir el string en un número TInt
-								TInt number = 0;
-								TInt err = testLex.Val(number);
-								if (err == KErrNone && conTBarras < 3) {
-									ListCaras.Append(number-1);
-								}
-
-								// Actualiza la posicion inicial para el proximo token
-								startPos += tokenLength + 1; // Suma 1 para omitir la barra diagonal
-								conTBarras++;
-							}	
-							lex.SkipSpace();
-							contador++;
-						}
-						MaterialGroup[MaterialGroup.Count()-1].count++;
-						MaterialGroup[MaterialGroup.Count()-1].indicesDrawnCount += 3;
-						facesCountIndices += 3;
-						facesCount++;
-					}
-					else if (line.Left(7) == _L8("usemtl ")) {	
-						MaterialGroup[MaterialGroup.Count()-1].material = Materials.Count();
-						
-						Material mat;	
-						mat.specular[0] = mat.specular[1] = mat.specular[2] = mat.specular[3] = 0.3;
-						mat.diffuse[0] = mat.diffuse[1] = mat.diffuse[2] = mat.diffuse[3] = 1.0;
-						mat.emission[0] = mat.emission[1] = mat.emission[2] = mat.emission[3] = 0.0;
-						mat.textura = false;
-						mat.vertexColor = false;
-						mat.repeat = true;
-						mat.lighting = true;
-						mat.culling = true;
-						mat.transparent = false;
-						mat.interpolacion = lineal;
-						mat.textureID = 0;
-
-						TLex8 lex(line.Mid(7));
-						if (!lex.Eos()){
-							TPtrC8 currentString = lex.NextToken();	
-							mat.name = HBufC::NewL(currentString.Length());
-							mat.name->Des().Copy(currentString);
-						}
-						else {	
-							mat.name = HBufC::NewL(100);						
-							_LIT(KMatName, "Material.%03d");
-							mat.name->Des().Format(KMatName, Materials.Count()+1);
-						}
-
-						/*HBufC* noteBuf3 = HBufC::NewLC(180);
-						_LIT(KFormatString3, "Material: %d\nNombre: %S");
-						noteBuf3->Des().Format(KFormatString3, Materials.Count(), mat.name);
-						DialogAlert(noteBuf3);
-						CleanupStack::PopAndDestroy(noteBuf3);*/
-
-						Materials.Append(mat);
-					}
-				}
-
-				// Actualizar la posicion de inicio para la proxima lectura
-				startPos += pos + 1;
-
-				// Eliminar la parte de la linea ya procesada y el caracter de salto de linea
-				buffer.Delete(0, pos + 1);
-				buffer.TrimLeft(); // Eliminar espacios en blanco iniciales
-			}
-			//continuarLeyendo = (buffer.Length() > 0);
-		}
-		
-		// cuantos vertices tiene
-		/*HBufC* noteBuf3 = HBufC::NewLC(180);
-		_LIT(KFormatString3, "Vertexs: %d Faces: %d Norm: %d UVs: %d");
-		noteBuf3->Des().Format(KFormatString3, tempMesh.vertexSize, tempMesh.facesSize, ListNormals.Count()/3, ListUVs.Count()/2);
-		DialogAlert(noteBuf3);*/
-
-		
-		HBufC* noteBuf25 = HBufC::NewLC(180);
-		_LIT(KFormatString25, "termino de leer");
-		noteBuf25->Des().Format(KFormatString25);
-		DialogAlert(noteBuf25);
-		CleanupStack::PopAndDestroy(noteBuf25);	
-		
-		// Cerrar el archivo
-		rFile.Close();
-		fsSession.Close();
-
-		//liberar memoria			
-		//parece que no ahce falta ya que hago "close". pero no estoy seguro con la pila de limpieza
-		//CleanupStack::PopAndDestroy(&rFile);
-		//CleanupStack::PopAndDestroy(&fsSession);
-
-		//obj.edges = new GLushort[obj.edgesSize];
-		/*for(TInt v=0; v < ListColors.Count()/3; v++){
-			HBufC* noteBuf = HBufC::NewLC(180);
-			_LIT(KFormatString, "indice: %d, color: %d, %d, %d");
-			noteBuf->Des().Format(KFormatString, v+1, ListColors[v*3],ListColors[v*3+1],ListColors[v*3+2]);
-			DialogAlert(noteBuf);
-		}*/
-		
-		// Arregla los errores que puede haber
-		TInt errores = 0;
-		TInt ultimoIndice = 0;
-
-		RArray<GLshort> NewListVertices;
-		RArray<GLubyte> NewListColors;
-		RArray<GLbyte> NewListNormals;
-		RArray<GLfloat> NewListUVs;
-		RArray<TInt> NewListCaras;		
-
-		NewListCaras.ReserveL(ListCaras.Count()/3);
-		
-		for (TInt m = 0; m < MaterialGroup.Count(); m++) {
-			TInt limite = ultimoIndice + MaterialGroup[m].count;
-			//TInt ultimoIndiceinicio = ultimoIndice;
-			for (TInt a = ultimoIndice; a < limite; a++) {
-				for (TInt f = 0; f < 3; f++) {
-					TInt indiceCara = a * 9 + f * 3;
-					TInt positionIndex = ListCaras[indiceCara];
-					TInt normalIndex = ListCaras[indiceCara + 2];
-					TInt uvIndex = ListCaras[indiceCara + 1];
-
-					// Detecta que el vértice del triangulo tiene errores
-					if (positionIndex != normalIndex || positionIndex != uvIndex) {
-						// Comprobar si ya existe un vértice con estas propiedades
-						TInt foundIndex = -1;
-						for (TInt i = 0; i < NewListVertices.Count()/3; i++) {
-							if (NewListVertices[i * 3] == ListVertices[positionIndex * 3] &&
-								NewListVertices[i * 3 + 1] == ListVertices[positionIndex * 3 + 1] &&
-								NewListVertices[i * 3 + 2] == ListVertices[positionIndex * 3 + 2] &&
-								NewListNormals[i * 3] == ListNormals[normalIndex * 3] &&
-								NewListNormals[i * 3 + 1] == ListNormals[normalIndex * 3 + 1] &&
-								NewListNormals[i * 3 + 2] == ListNormals[normalIndex * 3 + 2] &&
-								NewListUVs[i * 2] == ListUVs[uvIndex * 2] &&
-								NewListUVs[i * 2 + 1] == ListUVs[uvIndex * 2 + 1]) {
-								foundIndex = i;
-								break;
-							}
-						}
-						if (foundIndex == -1) {
-							NewListVertices.ReserveL(NewListVertices.Count() +3);
-							NewListNormals.ReserveL(NewListNormals.Count() +3);
-							NewListColors.ReserveL(NewListColors.Count() +3);
-							NewListUVs.ReserveL(NewListUVs.Count() +2);
-							// Añadir nueva posicion, normal y color
-							for (TInt v = 0; v < 3; v++) {
-								NewListVertices.Append(ListVertices[positionIndex*3+v]);
-								NewListNormals.Append(ListNormals[normalIndex*3+v]);
-								NewListColors.Append(ListColors[positionIndex*3+v]);
-							}
-							// Añadir nuevas UVs
-							for (TInt uv = 0; uv < 2; uv++) {
-								NewListUVs.Append(ListUVs[uvIndex*2+uv]);
-							}
-							foundIndex = (NewListVertices.Count()/3)-1;
-						}
-
-						NewListCaras.Append(foundIndex);
-						errores++;
-					}
-				}
-				ultimoIndice++;
-			}
-		}
-		
-		HBufC* noteBuf22 = HBufC::NewLC(180);
-		_LIT(KFormatString22, "Num. Vert. Original %d\nNum. Vert. GLES1.1: %d");
-		noteBuf22->Des().Format(KFormatString22, ListVertices.Count(), NewListColors.Count());
-		DialogAlert(noteBuf22);
-		CleanupStack::PopAndDestroy(noteBuf22);	
-		
-		//ya no hacen falta
-		ListVertices.Close();
-		ListColors.Close();
-		ListNormals.Close();
-		ListUVs.Close();	
-		ListCaras.Close();		
-		//fin del arreglo de vertices
-		
-		ultimoIndice = 0;
-		Mesh tempMesh;
-		tempMesh.facesCount = facesCount;
-		tempMesh.facesCountIndices = facesCountIndices;
-		tempMesh.vertexSize = NewListVertices.Count()/3;
-		tempMesh.vertex = new GLshort[tempMesh.vertexSize*3];
-		tempMesh.vertexColor = new GLubyte[tempMesh.vertexSize*4];
-		tempMesh.normals = new GLbyte[tempMesh.vertexSize*3];
-		tempMesh.uv = new GLfloat[tempMesh.vertexSize*2];
-		tempMesh.smooth = true;
-		tempMesh.vertexGroupUI = NULL;	
-		tempMesh.vertexGroupUIcolor = NULL;
-		tempMesh.edges = NULL;	
-		tempMesh.SelectActivo = 0;
-		tempMesh.SelectCount = 0;
-
-		//valores defecto
-		for (int i = 0; i < tempMesh.vertexSize*3; i++) {
-			tempMesh.vertex[i] = NewListVertices[i];
-			tempMesh.normals[i] = NewListNormals[i];
-		}
-		for (int i = 0; i < tempMesh.vertexSize; i++) {
-			tempMesh.vertexColor[i*4] = NewListColors[i*3];
-			tempMesh.vertexColor[i*4+1] = NewListColors[i*3+1];
-			tempMesh.vertexColor[i*4+2] = NewListColors[i*3+2];
-			tempMesh.vertexColor[i*4+3] = 255;
-		}
-		for (int i = 0; i < tempMesh.vertexSize*2; i++) {
-			tempMesh.uv[i] = NewListUVs[i];
-		}
-		
-		//mucho mas simple. es solo copiar los valores de las caras
-		tempMesh.faces = new GLushort[facesCountIndices];
-		for(TInt f=0; f < facesCountIndices; f++){
-			tempMesh.faces[f] = NewListCaras[f*3];
-		}
-		
-		/*for(TInt m=0; m < MaterialGroup.Count(); m++){			
-			//valores reales
-			TInt limite = ultimoIndice + MaterialGroup[m].count;			
-			TInt ultimoIndiceinicio = ultimoIndice;
-			for(TInt a=ultimoIndice; a < limite; a++){			
-				for(TInt f=0; f < 3; f++){
-					TInt indiceCara = a*3+f;
-					TInt indiceTodos = NewListCaras[indiceCara];
-					tempMesh.faces[m+(a-ultimoIndiceinicio)*3+f] = indiceTodos;
-				}	
-				ultimoIndice++;		
-			}
-		}*/
-
-		Meshes.Append(tempMesh);
-		
-		obj.Id = Meshes.Count()-1;
-		Objects.Append(obj);
-		Collection.Append(Objects.Count()-1);
-		SelectActivo = Objects.Count()-1;
-		Meshes[obj.Id].materialsGroup.ReserveL(MaterialGroup.Count());
-		for(TInt f=0; f < MaterialGroup.Count(); f++){
-			Meshes[obj.Id].materialsGroup.Append(MaterialGroup[f]);
-		}
-		//Meshes[obj.Id].AgruparVertices();
-
-		//libero memoria	
-		NewListVertices.Close();
-		NewListColors.Close();
-		NewListNormals.Close();
-		NewListUVs.Close();	
-		NewListCaras.Close();	
-		MaterialGroup.Close();
-		//Objects[SelectActivo].RecalcularBordes();
-
-		// Intenta leer el archivo .mtl
-		TFileName mtlFile = file;
-		mtlFile.Replace(file.Length() - 4, 4, _L(".mtl"));
-
-		RFs fs;
-	    User::LeaveIfError(fs.Connect()); // Asegurarse de que fs se conecta correctamente
-	    CleanupClosePushL(fs);
-	    
-		TEntry entry;
-		err = fs.Entry(mtlFile, entry);
-
-		//si el archivo existe. no tendria que marcar error
-		if (err == KErrNone) {
-			TRAP(err, LeerMTL(mtlFile));
-			//si ocurrio algun error al leerlo
-			if (err != KErrNone) {
-				_LIT(KFormatString, "Error al leer el archivo .mtl");
-				HBufC* noteBuf = HBufC::NewLC(100);
-				noteBuf->Des().Format(KFormatString);
-				MensajeError(noteBuf);
-				CleanupStack::PopAndDestroy(noteBuf);
-			}
-		} else {
-            // El archivo no existe, manejar el error
-            _LIT(KFileNotFound, "El archivo .mtl no existe");
-            HBufC* noteBuf = HBufC::NewLC(100);
-            noteBuf->Des().Format(KFileNotFound);
-            MensajeError(noteBuf);
-            CleanupStack::PopAndDestroy(noteBuf);
-        }
-		fs.Close();
-
-		redibujar = true;
-    }	
-    else {		
-    	_LIT(KFormatString, "Error al leer el Archivo");
-		HBufC* noteBuf = HBufC::NewLC(24);
-		noteBuf->Des().Format(KFormatString);
-		MensajeError(noteBuf);
-        CleanupStack::PopAndDestroy(noteBuf);
-    }
-};
-
 void CWhisk3D::LeerMTL(const TFileName& aFile) {
 	RFs fsSession2;	
 	User::LeaveIfError(fsSession2.Connect());
@@ -6136,6 +4544,12 @@ void CWhisk3D::LeerMTL(const TFileName& aFile) {
 	HBufC* noteBuf3 = HBufC::NewLC(180);
 	TBool encontrado = false;
 
+	// Cargar la textura desde la ruta absoluta
+	TBool HaytexturasQueCargar = false;
+	iTextureManager = CTextureManager::NewL(iScreenWidth, iScreenHeight,
+											FRUSTUM_TOP, FRUSTUM_BOTTOM, FRUSTUM_RIGHT, FRUSTUM_LEFT, FRUSTUM_NEAR,
+											this); 
+
 	while (startPos < fileSize) {
 		// Leer una linea del archivo desde la posicion actual
 		err = rFile.Read(startPos, buffer, buffer.MaxLength());
@@ -6148,7 +4562,7 @@ void CWhisk3D::LeerMTL(const TFileName& aFile) {
     		fsSession2.Close();	
             //CleanupStack::PopAndDestroy(&fsSession);
 			break;
-		}        
+		}      
 
         while ((pos = buffer.Locate('\n')) != KErrNotFound || (pos = buffer.Locate('\r')) != KErrNotFound) {
 			//TInt indice = 0;
@@ -6165,7 +4579,7 @@ void CWhisk3D::LeerMTL(const TFileName& aFile) {
 
 					/*_LIT(KFormatString3, "newmtl %S");
 					noteBuf3->Des().Format(KFormatString3, materialName16);
-					DialogAlert(noteBuf3);*/
+					CDialogs::Alert(noteBuf3);*/
 
 					//buscar el material con el mismo nombre
 					encontrado = false;
@@ -6175,7 +4589,7 @@ void CWhisk3D::LeerMTL(const TFileName& aFile) {
 							mat = &Materials[pMesh.materialsGroup[f].material];
 							/*_LIT(KFormatString3, "newmtl %S encontrado\nMaterial: %d");
 							noteBuf3->Des().Format(KFormatString3, materialName16, pMesh.materials[f]+1);
-							DialogAlert(noteBuf3);*/
+							CDialogs::Alert(noteBuf3);*/
 							encontrado = true;
 							break;
 						}
@@ -6195,7 +4609,7 @@ void CWhisk3D::LeerMTL(const TFileName& aFile) {
 						
 						/*_LIT(KFormatString3, "newmtl %S encontrado\nSpecular: %f");
 						noteBuf3->Des().Format(KFormatString3, materialName16, resultado);
-						DialogAlert(noteBuf3);*/
+						CDialogs::Alert(noteBuf3);*/
 					} 
 					//difusso, Aqui manejas el color ambiental Ka (kaR, kaG, kaB)			
 					else if (line.Left(3) == _L8("Kd ")) {
@@ -6267,6 +4681,7 @@ void CWhisk3D::LeerMTL(const TFileName& aFile) {
 						mat->transparent = true;
 					}
 					else if (line.Left(7) == _L8("map_Kd ")) {
+						HaytexturasQueCargar = true;
 						TLex8 lex(line.Mid(7));
 						TPtrC8 texturePath = lex.NextToken();
 
@@ -6285,10 +4700,6 @@ void CWhisk3D::LeerMTL(const TFileName& aFile) {
 						TEntry entry;
 						TInt err = fs.Entry(absolutePath, entry);
 						if (err == KErrNone) {						
-							// Cargar la textura desde la ruta absoluta
-							iTextureManager = CTextureManager::NewL(iScreenWidth, iScreenHeight,
-																	FRUSTUM_TOP, FRUSTUM_BOTTOM, FRUSTUM_RIGHT, FRUSTUM_LEFT, FRUSTUM_NEAR,
-																	this);
 							TTexture newTexture;
 							newTexture.iTextureName = *texturePath16;
 							Textures.Append(newTexture);
@@ -6296,7 +4707,6 @@ void CWhisk3D::LeerMTL(const TFileName& aFile) {
 							mat->textureID = Textures.Count();
 
 							iTextureManager->RequestToLoad(newTexture.iTextureName, fileParser.DriveAndPath(), &Textures[Textures.Count() - 1], false);
-							iTextureManager->DoLoadL();
 						} else {
 							// El archivo no existe, manejar el error
 							_LIT(KFileNotFound, "No existe la textura '%S'");
@@ -6318,6 +4728,11 @@ void CWhisk3D::LeerMTL(const TFileName& aFile) {
 	CleanupStack::PopAndDestroy(noteBuf3);
     rFile.Close();	
     fsSession2.Close();	
+
+	//si hay texturas. las lee
+	if (HaytexturasQueCargar){		
+		iTextureManager->DoLoadL();
+	}
     //CleanupStack::PopAndDestroy(&fsSession);
 }
 
@@ -6448,7 +4863,7 @@ void CWhisk3D::ImportAnimation(){
 								/*HBufC* noteBuf3 = HBufC::NewLC(180);
 								_LIT(KFormatString33, "reservado %d");
 								noteBuf3->Des().Format(KFormatString33, number);
-								DialogAlert(noteBuf3);
+								CDialogs::Alert(noteBuf3);
 								CleanupStack::PopAndDestroy(noteBuf3);*/
 							}
 							contador++;
@@ -6494,7 +4909,7 @@ void CWhisk3D::ImportAnimation(){
 							_LIT(KFormatString33, "frame %d\nRotacion\nX: %f, Y: %f, Z: %f");
 							noteBuf3->Des().Format(KFormatString33, prop.keyframes[indiceKey].frame, 
 												prop.keyframes[indiceKey].valueX, prop.keyframes[indiceKey].valueY, prop.keyframes[indiceKey].valueZ);
-							DialogAlert(noteBuf3);
+							CDialogs::Alert(noteBuf3);
 							CleanupStack::PopAndDestroy(noteBuf3);*/
 						}
 					}
@@ -6519,7 +4934,7 @@ void CWhisk3D::ImportAnimation(){
 							/*HBufC* noteBuf3 = HBufC::NewLC(180);
 							_LIT(KFormatString33, "se creo position\ncontador: %d");
 							noteBuf3->Des().Format(KFormatString33, anim.Propertys.Count());
-							DialogAlert(noteBuf3);
+							CDialogs::Alert(noteBuf3);
 							CleanupStack::PopAndDestroy(noteBuf3);*/
 						}
 						AnimProperty& prop = anim.Propertys[propIndex];
@@ -6680,8 +5095,8 @@ void CWhisk3D::ImportAnimation(){
     }
 }
 
-void CWhisk3D::OldImportOBJ(){    
-    _LIT(KTitle, "Old Import Wavefront (.obj)");
+void CWhisk3D::ImportOBJ(){    
+    _LIT(KTitle, "Import Wavefront (.obj)");
     TFileName file(KNullDesC);
     if (AknCommonDialogs::RunSelectDlgLD(file, R_WHISK3D_SELECT_DIALOG, KTitle)){		
     	RFs fsSession;	
@@ -6794,43 +5209,15 @@ TBool CWhisk3D::LeerOBJ(RFs* fsSession, RFile* rFile, TFileName* file, TInt64* s
 	obj.visible = true;
 	obj.posX = obj.posY = obj.posZ = 0;
 	obj.rotX = obj.rotY = obj.rotZ = 0;
-	obj.rotX = obj.rotY = obj.rotZ = 0;	
 	obj.scaleX = obj.scaleY = obj.scaleZ = 65000;
 	obj.Id = 0;		
 	obj.type = mesh;
 
-	//malla 3d	
-	Mesh tempMesh;
-	Meshes.Append(tempMesh);
-	Mesh& NewMesh = Meshes[Meshes.Count()-1];
-	NewMesh.facesCountIndices = 0;
-	NewMesh.facesCount = 0;
-
-	//vertexGroupDefecto	
-	VertexGroup VGnew;
-	VGnew.seleccionado = false;	
-	VGnew.posX = VGnew.posY = VGnew.posZ = 0;
-	//uv defecto	
-	VertexUV newVertexUV;
-	newVertexUV.u = newVertexUV.v = 0;
-
-	//normal defecto	
-	VertexNormal newNormal;
-	newNormal.x = newNormal.y = newNormal.z = 0;
-
-	//face group defecto
-	FaceGroup TempFaceGroup;
-	TempFaceGroup.material = 0;
-	FaceCorner TempFaceCorner;
-	TempFaceCorner.Vertex = 0;
-	TempFaceCorner.Normal = 0;
-	TempFaceCorner.UV = 0;
-	TempFaceCorner.Color = 0;
-	
-	//los obj tienen una lista de normales. a veces las normales se pueden repetir y esa es la logica
-	//tambien se puede repetir coordenadas de texturas asi que en vez de tener los uv y normals vertice por vertices.. tienen un listado
-
-	RArray<MaterialGroup> TempMaterialGroup;
+	Wavefront Wobj;
+	Wobj.Reset();
+	Face NewFace;
+	FaceCorners NewFaceCorners;
+	TBool TieneVertexColor = false;
 
 	TBool continuarLeyendo = true; // Variable para controlar la lectura del archivo
 	TBuf8<2048> buffer;
@@ -6874,7 +5261,7 @@ TBool CWhisk3D::LeerOBJ(RFs* fsSession, RFile* rFile, TFileName* file, TInt64* s
 					/*HBufC* noteBuf3 = HBufC::NewLC(180);
 					_LIT(KFormatString3, "Nombre de objeto: %S");
 					noteBuf3->Des().Format(KFormatString3, obj.name);
-					DialogAlert(noteBuf3);
+					CDialogs::Alert(noteBuf3);
 					CleanupStack::PopAndDestroy(noteBuf3);*/
 
 					NombreEncontrado = true;
@@ -6887,41 +5274,39 @@ TBool CWhisk3D::LeerOBJ(RFs* fsSession, RFile* rFile, TFileName* file, TInt64* s
 				else {
 					if (line.Left(2) == _L8("v ")) {
 						contador = 0;
+						Wobj.vertex.ReserveL(Wobj.vertex.Count()+3);
+						Wobj.vertexColor.ReserveL(Wobj.vertexColor.Count()+3);
 
 						TLex8 lex(line.Mid(2));  // Inicializa TLex con la subcadena a partir del tercer caracter
 						// Iterar mientras no se llegue al final del descriptor y se haya alcanzado el limite de 8 strings
-						while (!lex.Eos() && contador < 3) {		
+						while (!lex.Eos() && contador < 6) {		
 							TPtrC8 currentString = lex.NextToken(); // Mostrar el mensaje con el valor actual del "string" y el contador					
 							TLex8 testLex(currentString);// Crear un nuevo objeto TLex para la prueba
 							
 							// Convertir el string en un número TInt
 							TReal number = 0.0;
 							TInt err = testLex.Val(number, '.');
-							if (err == KErrNone && contador < 3) {
-								number = number*2000;								
-								GLshort glNumber = static_cast<GLshort>(number); // Conversion a GLbyte
-								switch (contador) {
-									case 0:
-										VGnew.posX = glNumber;
-										break;
-									case 1:
-										VGnew.posY = glNumber;
-										break;
-									case 2:
-										VGnew.posZ = glNumber;
-										break;
-									default:
-										break;
-								}								
+							if (err == KErrNone){
+								if (contador < 3) {
+									number = number*2000;								
+									GLshort glNumber = static_cast<GLshort>(number);
+									Wobj.vertex.Append(glNumber);							
+								}
+								//que el vertice tenga el color es una mierda. se hara un nuevo formato y se guardara en el face corner...							
+								else if (contador < 6){
+									number = number*255.0;	
+									if (number > 255.0){number = 255.0;}	
+									GLshort glNumber = static_cast<GLubyte>(number); // Conversion a GLbyte
+									Wobj.vertexColor.Append(glNumber);	
+									TieneVertexColor = true;
+									
+									/*HBufC* noteBuf3 = HBufC::NewLC(180);
+									_LIT(KFormatString3, "se agrego color: %f, %d");
+									noteBuf3->Des().Format(KFormatString3, number, glNumber);
+									CDialogs::Alert(noteBuf3);
+									CleanupStack::PopAndDestroy(noteBuf3);*/
+								}
 							}
-							//que el vertice tenga el color es una mierda. se hara un nuevo formato y se guardara en el face corner...							
-							/*else if (contador < 6){
-								number = number*255.0;	
-								if (number > 255.0){number = 255.0;}	
-								GLshort glNumber = static_cast<GLubyte>(number); // Conversion a GLbyte
-								ListColors.Append(glNumber);
-								tieneVertexColor = true;
-							}*/
 
 							// Avanzar al siguiente "string" que no sea espacio en blanco
 							lex.SkipSpace();
@@ -6929,16 +5314,17 @@ TBool CWhisk3D::LeerOBJ(RFs* fsSession, RFile* rFile, TFileName* file, TInt64* s
 							// Incrementar el contador para llevar la cuenta de los strings procesados
 							contador++;
 						}
-						/*while (contador < 6) {		
-							if (contador < 6){
-								ListColors.Append(255);
+						//en caso de no tener color
+						while (contador < 6) {		
+							if (contador > 2){
+								Wobj.vertexColor.Append(255);	
 							}
 							contador++;
-						}*/
-						NewMesh.vertexGroups.Append(VGnew);	
+						}
 					}
 					else if (line.Left(3) == _L8("vn ")) {
 						contador = 0;
+						Wobj.normals.ReserveL(Wobj.normals.Count()+3);
 						TLex8 lex(line.Mid(3));  // Inicializa TLex con la subcadena a partir del tercer caracter
 						// Iterar mientras no se llegue al final del descriptor y se haya alcanzado el limite de 8 strings
 						while (!lex.Eos() && contador < 3) {							
@@ -6947,33 +5333,20 @@ TBool CWhisk3D::LeerOBJ(RFs* fsSession, RFile* rFile, TFileName* file, TInt64* s
 							
 							TReal number = 0.0;
 							TInt err = testLex.Val(number, '.');
-							if (err == KErrNone) {
+							if (err == KErrNone && contador < 3) {
 								number = ((number +1)/2)* 255.0 - 128.0;
 								if (number > 127.0){number = 127.0;}
 								else if (number < -128.0){number = -128.0;}
 								GLbyte glNumber = static_cast<GLbyte>(number); // Conversion a GLbyte
-
-								switch (contador) {
-									case 0:
-										newNormal.x = glNumber;
-										break;
-									case 1:
-										newNormal.y = glNumber;
-										break;
-									case 2:
-										newNormal.z = glNumber;
-										break;
-									default:
-										break;
-								}
+								Wobj.normals.Append(glNumber);
 							}
 							lex.SkipSpace();
 							contador++;
-						}		
-						NewMesh.normalGroups.Append(newNormal);		
+						}			
 					}
 					else if (line.Left(3) == _L8("vt ")) {					
 						contador = 0;
+						Wobj.uv.ReserveL(Wobj.uv.Count()+2);
 
 						TLex8 lex(line.Mid(3));  // Inicializa TLex con la subcadena a partir del tercer caracter
 						// Iterar mientras no se llegue al final del descriptor y se haya alcanzado el limite de 8 strings
@@ -6989,13 +5362,16 @@ TBool CWhisk3D::LeerOBJ(RFs* fsSession, RFile* rFile, TFileName* file, TInt64* s
 									case 0:
 										number = number * 255.0 - 128.0;
 										glNumber = static_cast<GLfloat>(number); // Conversion a GLbyte
-										newVertexUV.u = glNumber;
+										//newVertexUV.u = glNumber;
+										Wobj.uv.Append(glNumber);
 										break;
 									case 1:
 										number = -number+1;
-										glNumber = static_cast<GLfloat>(number); // Conversion a GLbyte
 										number = number * 255.0 - 128.0;
-										newVertexUV.v = glNumber;
+										glNumber = static_cast<GLfloat>(number); // Conversion a GLbyte
+										//number = number * 255.0 - 128.0;
+										//newVertexUV.v = glNumber;
+										Wobj.uv.Append(glNumber);
 										break;
 									default:
 										break;
@@ -7004,7 +5380,6 @@ TBool CWhisk3D::LeerOBJ(RFs* fsSession, RFile* rFile, TFileName* file, TInt64* s
 							contador++;
 							lex.SkipSpace();
 						}	
-						NewMesh.uvGroups.Append(newVertexUV);		
 					}
 					else if (line.Left(2) == _L8("f ")) {
 						contador = 0;
@@ -7012,13 +5387,11 @@ TBool CWhisk3D::LeerOBJ(RFs* fsSession, RFile* rFile, TFileName* file, TInt64* s
 
 						TLex8 lex(line.Mid(2));  // Inicializa TLex con la subcadena a partir del tercer caracter
 
-						NewMesh.faceGroups.Append(TempFaceGroup);
-						FaceGroup& NewFaceGroup = NewMesh.faceGroups[NewMesh.faceGroups.Count()-1];
-						NewFaceGroup.FaceCorners.ReserveL(3);
-						NewFaceGroup.edges.ReserveL(3);
-						NewFaceGroup.FaceCorners.Append(TempFaceCorner);
-						FaceCorner& NewFaceCorner = NewFaceGroup.FaceCorners[NewFaceGroup.FaceCorners.Count()-1];
-								
+						Wobj.faces.Append(NewFace);
+						Face& TempFace = Wobj.faces[Wobj.faces.Count()-1];
+						MaterialGroup& UltimoMG = Wobj.materialsGroup[Wobj.materialsGroup.Count()-1];
+						
+						//HBufC* noteBuf4 = HBufC::NewLC(180);								
 						while (!lex.Eos()) {		
 							TPtrC8 currentString = lex.NextToken();
 
@@ -7047,25 +5420,40 @@ TBool CWhisk3D::LeerOBJ(RFs* fsSession, RFile* rFile, TFileName* file, TInt64* s
 								TInt err = testLex.Val(number);
 								//v1/vt1/vn1
 								if (err == KErrNone) {
+									/*_LIT(KFormatString5, "contador: %d\nconTBarras: %d\nnumber: %d");
+									noteBuf4->Des().Format(KFormatString5, contador, conTBarras, number);
+									CDialogs::Alert(noteBuf4);*/
 									//resetea el contador de barras si se pasa
 									if (conTBarras > 2){
-										NewFaceGroup.FaceCorners.Append(TempFaceCorner);
-										NewFaceCorner = NewFaceGroup.FaceCorners[NewFaceGroup.FaceCorners.Count()-1];
+										//NewFaceGroup.FaceCorners.Append(TempFaceCorner);
+										//NewFaceCorner = NewFaceGroup.FaceCorners[NewFaceGroup.FaceCorners.Count()-1];
 										conTBarras = 0;
 									};
-									switch (contador) {
+									switch (conTBarras) {
 										case 0:
-											NewFaceCorner.Vertex = number-1;
+											NewFaceCorners.vertex = number-1;
 											break;
 										case 1:
-											NewFaceCorner.UV = number-1;
+											NewFaceCorners.uv = number-1;
 											break;
 										case 2:
-											NewFaceCorner.Normal = number-1;
+											//se da por hecho que aca se termino un triangulo
+											NewFaceCorners.normal = number-1;
+											TempFace.corner.Append(NewFaceCorners);
 											break;
 										default:
 											break;
 									}	
+									//cada face corner extra es un triangulo
+									if (contador > 1 && conTBarras == 2){
+										Wobj.facesCount++;
+										Wobj.facesSize += 3;	
+										UltimoMG.count++;
+										UltimoMG.indicesDrawnCount += 3;
+									}
+									/*_LIT(KFormatString6, "facesCount: %d\nfacesSize: %d");
+									noteBuf4->Des().Format(KFormatString6, Wobj.facesCount, Wobj.facesSize);
+									CDialogs::Alert(noteBuf4);*/
 								}
 
 								// Actualiza la posicion inicial para el proximo token
@@ -7082,7 +5470,7 @@ TBool CWhisk3D::LeerOBJ(RFs* fsSession, RFile* rFile, TFileName* file, TInt64* s
 
 						/*_LIT(KFormatString4, "Num. indices: %d\nCaras: %d");
 						noteBuf3->Des().Format(KFormatString4, numIndices, contador);
-						DialogAlert(noteBuf3);*/
+						CDialogs::Alert(noteBuf3);*/
 
 						//si se resta 2 al contador. el contador es el numero de caras
 						//contador -= 2;
@@ -7107,7 +5495,7 @@ TBool CWhisk3D::LeerOBJ(RFs* fsSession, RFile* rFile, TFileName* file, TInt64* s
 						/*HBufC* noteBuf3 = HBufC::NewLC(180);
 						_LIT(KFormatString5, "tempIndices\ncontador: %d\nCaras: %d\nListCaras: %d");
 						noteBuf3->Des().Format(KFormatString5, contador, tempIndices.Count()/3,ListCaras.Count());
-						DialogAlert(noteBuf3);
+						CDialogs::Alert(noteBuf3);
 						CleanupStack::PopAndDestroy(noteBuf3);*/
 
 						// Limpiar la lista temporal de indices
@@ -7118,12 +5506,12 @@ TBool CWhisk3D::LeerOBJ(RFs* fsSession, RFile* rFile, TFileName* file, TInt64* s
 						/*if (TempMaterialGroup.Count() < 1){
 							MaterialGroup tempFaceGroup;
 							tempFaceGroup.count = tempFaceGroup.indicesDrawnCount = tempFaceGroup.material = 0;
-							tempFaceGroup.start = facesCountIndices;
+							tempFaceGroup.start = facesSize;
 							TempMaterialGroup.Append(tempFaceGroup);
 						}*/
 						//TempMaterialGroup[TempMaterialGroup.Count()-1].count += contador;
 						/*NewMesh.facesCount++;
-						NewMesh.facesCountIndices += 3;
+						NewMesh.facesSize += 3;
 						TempMaterialGroup[TempMaterialGroup.Count()-1].count ++;
 						TempMaterialGroup[TempMaterialGroup.Count()-1].indicesDrawnCount += 3;*/
 
@@ -7131,15 +5519,20 @@ TBool CWhisk3D::LeerOBJ(RFs* fsSession, RFile* rFile, TFileName* file, TInt64* s
 					}
 					else if (line.Left(7) == _L8("usemtl ")) {	
 						MaterialGroup tempFaceGroup;
-						tempFaceGroup.count = tempFaceGroup.indicesDrawnCount = tempFaceGroup.material = 0;
-						tempFaceGroup.start = NewMesh.facesCountIndices;
-						TempMaterialGroup.Append(tempFaceGroup);
+						tempFaceGroup.count = 0;
+						tempFaceGroup.indicesDrawnCount = 0;
+						tempFaceGroup.start = Wobj.facesSize/3;
+						tempFaceGroup.startDrawn = Wobj.facesSize;
+						tempFaceGroup.material = 0;
+
+						Wobj.materialsGroup.Append(tempFaceGroup);
+						tempFaceGroup.count = 0;
 						Material mat;	
 						mat.specular[0] = mat.specular[1] = mat.specular[2] = mat.specular[3] = 0.3;
 						mat.diffuse[0] = mat.diffuse[1] = mat.diffuse[2] = mat.diffuse[3] = 1.0;
 						mat.emission[0] = mat.emission[1] = mat.emission[2] = mat.emission[3] = 0.0;
 						mat.textura = false;
-						mat.vertexColor = false;
+						mat.vertexColor = TieneVertexColor;
 						mat.repeat = true;
 						mat.lighting = true;
 						mat.culling = true;
@@ -7173,7 +5566,7 @@ TBool CWhisk3D::LeerOBJ(RFs* fsSession, RFile* rFile, TFileName* file, TInt64* s
 						/*HBufC* noteBuf3 = HBufC::NewLC(180);
 						_LIT(KFormatString3, "Material: %d\nNombre: %S");
 						noteBuf3->Des().Format(KFormatString3, Materials.Count(), mat.name);
-						DialogAlert(noteBuf3);
+						CDialogs::Alert(noteBuf3);
 						CleanupStack::PopAndDestroy(noteBuf3);*/
 
 						//si se encontro no crea el nuevo material
@@ -7181,16 +5574,16 @@ TBool CWhisk3D::LeerOBJ(RFs* fsSession, RFile* rFile, TFileName* file, TInt64* s
 							/*HBufC* noteBuf3 = HBufC::NewLC(180);
 							_LIT(KFormatString3, "newmtl %S\nencontrado %d\nmateriales num: %d");
 							noteBuf3->Des().Format(KFormatString3, materialName16, encontrado, Materials.Count());
-							DialogAlert(noteBuf3);*/
-							TempMaterialGroup[TempMaterialGroup.Count()-1].material = encontrado;
+							CDialogs::Alert(noteBuf3);*/
+							Wobj.materialsGroup[Wobj.materialsGroup.Count()-1].material = encontrado;
 						}
 						else {
 							/*HBufC* noteBuf3 = HBufC::NewLC(180);
 							_LIT(KFormatString3, "no encontrado %S");
 							noteBuf3->Des().Format(KFormatString3, materialName16);
-							DialogAlert(noteBuf3);*/
+							CDialogs::Alert(noteBuf3);*/
 							Materials.Append(mat);
-							TempMaterialGroup[TempMaterialGroup.Count()-1].material = Materials.Count()-1;
+							Wobj.materialsGroup[Wobj.materialsGroup.Count()-1].material = Materials.Count()-1;
 						}
 						CleanupStack::PopAndDestroy(materialName16);
 					}
@@ -7207,72 +5600,32 @@ TBool CWhisk3D::LeerOBJ(RFs* fsSession, RFile* rFile, TFileName* file, TInt64* s
 		}
 	}
 	
-	NewMesh.ResetMesh();
-	
+    Mesh NewMesh;
+	Meshes.Append(NewMesh);
 	obj.Id = Meshes.Count()-1;
+	Mesh& TempMesh = Meshes[obj.Id];
+	Wobj.ConvertToES1(TempMesh);
 	Objects.Append(obj);
-	Collection.Append(Objects.Count()-1);
 	SelectActivo = Objects.Count()-1;
+	Collection.Append(SelectActivo);
+	
+	DeseleccionarTodo();
+	Objects[SelectActivo].seleccionado = true;
+	SelectCount = 1;
+
+	/*HBufC* noteBuf3 = HBufC::NewLC(180);
+	_LIT(KFormatString4, "vertices: %d\nCaras: %d\nMateriales: %d");
+	noteBuf3->Des().Format(KFormatString4, Meshes[obj.Id].vertexSize/3, Meshes[obj.Id].facesSize/3, Meshes[obj.Id].materialsGroup.Count());
+	CDialogs::Alert(noteBuf3);*/
 
 	HBufC* noteBuf = HBufC::NewLC(180);
 	_LIT(KFormatString, "se creo la malla 3D");
 	noteBuf->Des().Format(KFormatString);
-	DialogAlert(noteBuf);
+	CDialogs::Alert(noteBuf);
 	CleanupStack::PopAndDestroy(noteBuf);
 
 	return hayMasObjetos;
 };
-
-
-void CWhisk3D::SetOrigen( TInt opcion ){
-	if (InteractionMode != EditMode){
-		return;
-	}
-	//a la geometria
-	else if (opcion == 0){
-		/*if (tipoSelect == vertexSelect){
-			//guarda el centro de la geometria
-			GLshort NuevoOrigen[3] = {0,0,0};
-			for(TInt i = 0; i < Objects[SelectActivo].vertexGroupSize; i++) {
-			    NuevoOrigen[0] += Objects[SelectActivo].vertex[Objects[SelectActivo].vertexGroup[i]*3];
-			    NuevoOrigen[1] += Objects[SelectActivo].vertex[Objects[SelectActivo].vertexGroup[i]*3+1];
-			    NuevoOrigen[2] += Objects[SelectActivo].vertex[Objects[SelectActivo].vertexGroup[i]*3+2];
-			}
-			NuevoOrigen[0] /= Objects[SelectActivo].vertexGroupSize;
-			NuevoOrigen[1] /= Objects[SelectActivo].vertexGroupSize;
-			NuevoOrigen[2] /= Objects[SelectActivo].vertexGroupSize;
-
-			for(TInt i = 0; i < Objects[SelectActivo].vertexSize/3; i++) {
-				Objects[SelectActivo].vertex[i*3] -= NuevoOrigen[0];
-				Objects[SelectActivo].vertex[i*3+1] -= NuevoOrigen[1];
-				Objects[SelectActivo].vertex[i*3+2] -= NuevoOrigen[2];
-			}			
-			Objects[SelectActivo].posX += NuevoOrigen[0]*Objects[SelectActivo].scaleX/65000;
-			Objects[SelectActivo].posY += NuevoOrigen[2]*Objects[SelectActivo].scaleY/65000;
-			Objects[SelectActivo].posZ += NuevoOrigen[1]*Objects[SelectActivo].scaleZ/65000;
-		}	*/
-	}	
-	//al vertice seleccionado
-	else if (opcion == 1){
-		/*if (tipoSelect == vertexSelect){
-			//guarda el valor del vertice seleccionado
-			GLshort NuevoOrigen[3] = {
-				Objects[SelectActivo].vertex[Objects[SelectActivo].vertexGroup[SelectActivo]*3],
-				Objects[SelectActivo].vertex[Objects[SelectActivo].vertexGroup[SelectActivo]*3+1],
-				Objects[SelectActivo].vertex[Objects[SelectActivo].vertexGroup[SelectActivo]*3+2]
-			};
-			for(TInt i = 0; i < Objects[SelectActivo].vertexSize/3; i++) {
-				Objects[SelectActivo].vertex[i*3] -= NuevoOrigen[0];
-				Objects[SelectActivo].vertex[i*3+1] -= NuevoOrigen[1];
-				Objects[SelectActivo].vertex[i*3+2] -= NuevoOrigen[2];
-			}
-			Objects[SelectActivo].posX += NuevoOrigen[0]*Objects[SelectActivo].scaleX/65000;
-			Objects[SelectActivo].posY += NuevoOrigen[2]*Objects[SelectActivo].scaleY/65000;
-			Objects[SelectActivo].posZ += NuevoOrigen[1]*Objects[SelectActivo].scaleZ/65000;
-		}//, edgeSelect, faceSelect  SelectActivo		*/
-	}	
-    redibujar = true;
-}
 
 struct __attribute__((packed)) TBMPFileHeader {
     TUint16 bfType;
@@ -7335,7 +5688,7 @@ void CWhisk3D::SaveAsBMP(int width, int height, const GLubyte* pixels, const TDe
 
 	_LIT(KFormatString2, "rowSize: %d\nimage size:%d\nbfSize: %d\nbfReserved1: %d\nbfReserved2: %d");
 	noteBuf->Des().Format(KFormatString2, rowSize, imageSize, fileHeader.bfSize, fileHeader.bfReserved1, fileHeader.bfReserved2);
-	DialogAlert(noteBuf);	
+	CDialogs::Alert(noteBuf);	
 	CleanupStack::PopAndDestroy(noteBuf);*/
 
     infoHeader.biSize = sizeof(TBMPInfoHeader);

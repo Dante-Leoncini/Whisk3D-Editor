@@ -38,13 +38,11 @@ enum TWhisk3DMenuCommands
     ESetInterpolation,
     ESetTransparent, 
     ESetTextureRepeat,
-    ESetSmooth,
     ESetCulling,
     ESetLighting,
     ESetVertexColor,
     ESetAmbientLight,
     
-    EWhisk3DEditarMesh,
     EViewportObject,
     EWhisk3DInfoObject,
     EWhisk3DSetEscala,
@@ -54,8 +52,6 @@ enum TWhisk3DMenuCommands
     ESetParent,
 	EClearParent,
 
-    EFlipNormals,
-
     ERenderImage,
     ERenderAnimation,
     ERenderMenu,
@@ -63,10 +59,6 @@ enum TWhisk3DMenuCommands
     ERenderUIanimation,
 
     ETransformMenu,
-    EShrinkFatten,
-    
-    EExtrude,
-    EDuplicate,
     
     EWhisk3DSeleccionar,
     EWhisk3DSetTipoVertex,
@@ -76,7 +68,6 @@ enum TWhisk3DMenuCommands
     EWhisk3DVista3D,
     EWhisk3DViewSolid,
     EWhisk3DViewMaterial,
-    EWhisk3DViewWireframe,
     EViewRendered,
     
     EWhisk3DModificadores,
@@ -108,12 +99,8 @@ enum TWhisk3DMenuCommands
     ECircle,
     ECamera,
     ELight,
-    EMonkey,
     EVertex,
     EEmpty,
-
-    EUvMappingMenu,
-    ECylinderProjection,
 
     EDuplicatedObject,
     EDuplicatedLinked,  
@@ -126,10 +113,6 @@ enum TWhisk3DMenuCommands
     ECursorToWorldOrigin,
     ECursorToSelect,
     ESelectToCursor,
-
-    ESetOrigenMenu,
-    ESetOrigenToGeometry,
-    ESetOriginTo3DCursor,
 
     ETimelineMenu,
     ETimelinePlayStop,
