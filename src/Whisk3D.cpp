@@ -4537,15 +4537,27 @@ void CWhisk3D::LeerMTL(const TFileName& aFile, TInt objetosCargados) {
 	rFile.Size(fileSize);
 
 	//necesario para modificar el material correcto	
-	Object& obj = Objects[SelectActivo];
-	/*RArray<Object&> objs;	
-	objs.Append(Objects[SelectActivo-3])
-	Object& obj = Objects[SelectActivo];*/
+	//Object& obj = Objects[SelectActivo];
+	//Mesh& pMesh = Meshes[obj.Id];
 
-	Mesh& pMesh = Meshes[obj.Id];
-	Material* mat = NULL; 
 	HBufC* materialName16 = HBufC::NewLC(180);
 	HBufC* noteBuf3 = HBufC::NewLC(180);
+	
+	RPointerArray<Object> objs; // Array de punteros a Object
+	RPointerArray<Mesh> pMeshs; // Array de punteros a Meshes
+	// Llena el array con punteros a los objetos
+	for (TInt c = 0; c <= SelectActivo; ++c){
+		Object* obj = &Objects[SelectActivo - c];
+		Mesh* pMesh = &Meshes[obj->Id];
+		objs.Append(obj);
+		pMeshs.Append(pMesh);
+		
+		/*_LIT(KFormatString3, "Pmesh %d\nID obj:: %d");
+		noteBuf3->Des().Format(KFormatString3, pMeshs.Count(), obj->Id);
+		CDialogs::Alert(noteBuf3);*/
+	};
+
+	Material* mat = NULL; 
 	TBool encontrado = false;
 
 	// Cargar la textura desde la ruta absoluta
@@ -4587,16 +4599,20 @@ void CWhisk3D::LeerMTL(const TFileName& aFile, TInt objetosCargados) {
 
 					//buscar el material con el mismo nombre
 					encontrado = false;
-					for(int f=0; f < pMesh.materialsGroup.Count(); f++){
-						//no se puede usar el material 0. ese el que es por defecto y no se toca por mas que se llame igual
-						if (Materials[pMesh.materialsGroup[f].material].name->Compare(*materialName16) == 0 && pMesh.materialsGroup[f].material != 0){
-							mat = &Materials[pMesh.materialsGroup[f].material];
-							/*_LIT(KFormatString3, "newmtl %S encontrado\nMaterial: %d");
-							noteBuf3->Des().Format(KFormatString3, materialName16, pMesh.materials[f]+1);
-							CDialogs::Alert(noteBuf3);*/
-							encontrado = true;
-							break;
-						}
+
+					for(TInt pm=0; pm < pMeshs.Count(); pm++){
+					    Mesh* pMesh = pMeshs[pm]; // Obtener el puntero al Mesh actual
+						for(TInt f=0; f < pMesh->materialsGroup.Count(); f++){
+							//no se puede usar el material 0. ese el que es por defecto y no se toca por mas que se llame igual
+							if (Materials[pMesh->materialsGroup[f].material].name->Compare(*materialName16) == 0 && pMesh->materialsGroup[f].material != 0){
+								mat = &Materials[pMesh->materialsGroup[f].material];								
+								/*_LIT(KFormatString3, "newmtl %S encontrado\nMaterial: %d");
+								noteBuf3->Des().Format(KFormatString3, materialName16, pMesh->materialsGroup[f].material+1);
+								CDialogs::Alert(noteBuf3);*/								
+								encontrado = true;
+								break;
+							}
+						}	
 					}	
                 } 
 				else if (encontrado){
@@ -5631,11 +5647,11 @@ TBool CWhisk3D::LeerOBJ(RFs* fsSession, RFile* rFile, TFileName* file, TInt64* s
 	noteBuf3->Des().Format(KFormatString4, Meshes[obj.Id].vertexSize/3, Meshes[obj.Id].facesSize/3, Meshes[obj.Id].materialsGroup.Count());
 	CDialogs::Alert(noteBuf3);*/
 
-	HBufC* noteBuf = HBufC::NewLC(180);
+	/*HBufC* noteBuf = HBufC::NewLC(180);
 	_LIT(KFormatString, "se creo la malla 3D");
 	noteBuf->Des().Format(KFormatString);
 	CDialogs::Alert(noteBuf);
-	CleanupStack::PopAndDestroy(noteBuf);
+	CleanupStack::PopAndDestroy(noteBuf);*/
 
 	return hayMasObjetos;
 };
