@@ -270,6 +270,7 @@ RArray<Material> Materials;
 RArray<Light> Lights;
 RArray<Mesh> Meshes;
 RArray<AnimationObject> AnimationObjects;
+RArray<ShapeKeyAnimation> ShapeKeyAnimations;
 TInt tipoSelect = vertexSelect;
 TInt SelectActivo = 0;
 TInt SelectCount = 0;
@@ -1148,7 +1149,20 @@ void CWhisk3D::ClearKeyframes(){
     redibujar = true;
 }
 
-void CWhisk3D::ReloadAnimation(){
+void CWhisk3D::ReloadAnimation(){		
+	//ShapeKeyAnimation
+    for(TInt ska = 0; ska < ShapeKeyAnimations.Count(); ska++){
+		Mesh& pMesh = Meshes[ShapeKeyAnimations[ska].Id];
+		TInt AF = ShapeKeyAnimations[ska].FrameActual;
+    	for(TInt v = 0; v < ShapeKeyAnimations[ska].Frames[AF].Vertex.Count(); v++) {
+			pMesh.vertex[v*3] = ShapeKeyAnimations[ska].Frames[AF].Vertex[v].vertexX;
+			pMesh.vertex[v*3+1] = ShapeKeyAnimations[ska].Frames[AF].Vertex[v].vertexY;
+			pMesh.vertex[v*3+2] = ShapeKeyAnimations[ska].Frames[AF].Vertex[v].vertexZ;
+			pMesh.normals[v*3] = ShapeKeyAnimations[ska].Frames[AF].Vertex[v].normalX;
+			pMesh.normals[v*3+1] = ShapeKeyAnimations[ska].Frames[AF].Vertex[v].normalY;
+			pMesh.normals[v*3+2] = ShapeKeyAnimations[ska].Frames[AF].Vertex[v].normalZ;
+		}
+	}
     for(TInt a = 0; a < AnimationObjects.Count(); a++) {
 		for(TInt p = 0; p < AnimationObjects[a].Propertys.Count(); p++){
 			AnimProperty& anim = AnimationObjects[a].Propertys[p];
@@ -1369,8 +1383,17 @@ void CWhisk3D::AppCycle( TInt iFrame, GLfloat aTimeSecs, GLfloat aDeltaTimeSecs 
 	
 			if (fixedDeltaTimeSecs)
 			CurrentFrame++;
+			for(TInt ska = 0; ska < ShapeKeyAnimations.Count(); ska++){
+				ShapeKeyAnimations[ska].FrameActual++;
+				if (ShapeKeyAnimations[ska].FrameActual > ShapeKeyAnimations[ska].Frames.Count()-1){
+					ShapeKeyAnimations[ska].FrameActual = ShapeKeyAnimations[ska].Frames.Count()-1;
+				}
+			}
 			if (CurrentFrame > EndFrame){
 				CurrentFrame = StartFrame;
+				for(TInt ska = 0; ska < ShapeKeyAnimations.Count(); ska++){
+					ShapeKeyAnimations[ska].FrameActual = 0;
+				}
 			}
 			ReloadAnimation();
         }
@@ -4761,6 +4784,15 @@ void CWhisk3D::ImportAnimation(){
 	if (Objects.Count() < 1){return;}	
 	Object& obj = Objects[SelectActivo];
 	if (!obj.seleccionado){return;}
+	//si no es un mesh
+	TBool esMesh = false;
+	
+	Mesh meshInstance;    // Crea un objeto v�lido
+	Mesh& pMesh = meshInstance; // Asigna la referencia a ese objeto
+	if (obj.type == mesh){
+		pMesh = Meshes[obj.Id];
+		esMesh = true;
+	}	
 
     _LIT(KTitle, "Import Animation (.txt)");
     TFileName file(KNullDesC);
@@ -4816,6 +4848,10 @@ void CWhisk3D::ImportAnimation(){
 			AnimProperty& prop = anim.Propertys[anim.Propertys.Count()-1];
 			prop.Property = AnimPosition;			
 		}*/
+		TBool animacion_keyframe = false;
+		TInt SAIndex = 0;
+		TInt FrameIndex = 0;
+
 		TInt animIndex = 0;
 		TInt propIndex = 0;
 		
@@ -4846,8 +4882,87 @@ void CWhisk3D::ImportAnimation(){
 			
 				// Contador para almacenar la cantidad de "strings" separados por espacios
 				TInt contador = 0;
-				if (line.Length() > 0) {					
-					if (line.Left(9) == _L8("rotacion ")) {						
+				if (line.Length() > 0) {												
+					if (line.Left(22) == _L8("new_animation_ShapeKey")) {			
+						if (esMesh){
+							animacion_keyframe = true;
+							ShapeKeyAnimation NewShapeKeyAnimations;
+							ShapeKeyAnimations.Append(NewShapeKeyAnimations);
+							SAIndex = ShapeKeyAnimations.Count()-1;
+							ShapeKeyAnimations[SAIndex].Id = obj.Id;
+							ShapeKeyAnimations[SAIndex].FrameActual = 0;
+						}					
+						TLex8 lex(line.Mid(22));  // Inicializa TLex con la subcadena a partir del tercer caracter
+						while (!lex.Eos()) {						
+							lex.SkipSpace();
+						}
+					}												
+					else if (line.Left(8) == _L8("ShapeKey")){	
+						if (esMesh){
+							ShapeKey NewShapeKey;
+							ShapeKeyAnimations[SAIndex].Frames.Append(NewShapeKey);
+							FrameIndex = ShapeKeyAnimations[SAIndex].Frames.Count()-1;
+							ShapeKeyAnimations[SAIndex].Frames[FrameIndex].Vertex.ReserveL(pMesh.vertexSize);								
+						}					
+						TLex8 lex(line.Mid(8));  // Inicializa TLex con la subcadena a partir del tercer caracter
+						while (!lex.Eos()) {						
+							lex.SkipSpace();
+						}
+					}							
+					else if (line.Left(4) == _L8("akf ")){	
+						TLex8 lex(line.Mid(4));
+						// Iterar mientras no se llegue al final del descriptor y se haya alcanzado el limite de 8 strings
+						contador = 0;
+						ShapeKeyVertex NewShapeKeyVertex;
+						while (!lex.Eos() && contador < 6) {							
+							TPtrC8 currentString = lex.NextToken(); // Mostrar el mensaje con el valor actual del "string" y el contador
+							TLex8 testLex(currentString); // Crear un nuevo objeto TLex para la prueba
+
+							TReal number = 0.0;
+							TInt err = testLex.Val(number, '.');
+							if (err == KErrNone){
+								switch (contador) {
+									case 0:
+										number = number*2000;
+										NewShapeKeyVertex.vertexX = static_cast<GLshort>(number);
+										break;
+									case 1:
+										number = number*2000;
+										NewShapeKeyVertex.vertexY = static_cast<GLshort>(number);
+										break;
+									case 2:
+										number = number*2000;
+										NewShapeKeyVertex.vertexZ = static_cast<GLshort>(number);
+										break;
+									case 3:	
+										number = ((number +1)/2)* 255.0 - 128.0;
+										if (number > 127.0){number = 127.0;}
+										else if (number < -128.0){number = -128.0;}
+										NewShapeKeyVertex.normalX = static_cast<GLbyte>(number); // Conversion a GLbyte
+										break;
+									case 4:	
+										number = ((number +1)/2)* 255.0 - 128.0;
+										if (number > 127.0){number = 127.0;}
+										else if (number < -128.0){number = -128.0;}
+										NewShapeKeyVertex.normalY = static_cast<GLbyte>(number);	
+										break;
+									case 5:	
+										number = ((number +1)/2)* 255.0 - 128.0;
+										if (number > 127.0){number = 127.0;}
+										else if (number < -128.0){number = -128.0;}
+										NewShapeKeyVertex.normalZ = static_cast<GLbyte>(number);	
+										break;
+								}
+							}
+							
+							contador++;
+							lex.SkipSpace();				
+						}
+						if (esMesh){
+							ShapeKeyAnimations[SAIndex].Frames[FrameIndex].Vertex.Append(NewShapeKeyVertex);
+						}
+					}
+					else if (line.Left(9) == _L8("rotacion ")) {						
 						animIndex = BuscarAnimacionObj();
 						//si no existe la animacion. la crea
 						if (animIndex < 0){							

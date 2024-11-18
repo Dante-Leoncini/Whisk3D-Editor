@@ -67,6 +67,29 @@ class MaterialGroup {
 		TInt material; //de que material
 };
 
+class ShapeKeyVertex { 
+	public:
+		TInt index;
+		GLshort vertexX;
+		GLshort vertexY;
+		GLshort vertexZ;
+		GLbyte normalX;
+		GLbyte normalY;
+		GLbyte normalZ;
+};
+
+class ShapeKey { 
+	public:
+        RArray<ShapeKeyVertex> Vertex;
+};
+
+class ShapeKeyAnimation { 
+	public:
+		TInt Id; //id del objeto al que afecta
+        RArray<ShapeKey> Frames;
+		TInt FrameActual;
+};
+
 class Mesh { 
 	public:
 		TInt vertexSize;
@@ -141,6 +164,24 @@ class Wavefront {
 			noteBuf3->Des().Format(KFormatString3, faces.Count(),vertex.Count()/3);
 			CDialogs::Alert(noteBuf3);*/
 
+			//convertir cuads y ngones a triangulos
+			/*contador -= 2;
+			for (TInt c = 0; c < contador; ++c) {
+				for (TInt i = 0; i < 3; ++i) {
+					//el primer vertice de los triangulos es el primero
+					if (i == 0){
+						ListCaras.Append(tempIndices[0]);
+						ListCaras.Append(tempIndices[1]);
+						ListCaras.Append(tempIndices[2]);
+					}
+					else {									
+						ListCaras.Append(tempIndices[3*c+ i*3  ]);
+						ListCaras.Append(tempIndices[3*c+ i*3+1]);
+						ListCaras.Append(tempIndices[3*c+ i*3+2]);
+					}
+				}
+			}*/
+
 			for (TInt i = 0; i < faces.Count(); i++) {
 				for (TInt f = 0; f < faces[i].corner.Count(); f++) {
 					TInt vertexIndice = faces[i].corner[f].vertex - *acumuladoVertices;
@@ -150,8 +191,8 @@ class Wavefront {
 					/*_LIT(KFormatString3, "face %d\ncorner: %d\n%d/%d/%d");
 					noteBuf3->Des().Format(KFormatString3, i+1, f+1, vertexIndice+1, uvIndice+1, normalIndice+1);
 					CDialogs::Alert(noteBuf3);*/
-
-					TempMesh.faces[i*3+f] = vertexIndice;	
+						
+					TempMesh.faces[i*3+f] = vertexIndice;
 					for(TInt v=0; v < 3; v++){
 						TempMesh.vertex[vertexIndice*3+v] = vertex[vertexIndice*3+v];
 						TempMesh.normals[vertexIndice*3+v] = normals[normalIndice*3+v];
