@@ -1170,7 +1170,7 @@ void CWhisk3D::ReloadAnimation(){
 		// Calcular el porcentaje de mezcla
 		GLfloat mixFactor = static_cast<GLfloat>(anim.Mix) / anim.Frames[anim.LastAnimation].MixSpeed;
 
-		if (anim.Interpolacion){
+		if (!anim.Interpolacion){
 			for(TInt v = 0; v < LastFrame.Vertex.Count(); v++) {
 				pMesh.vertex[v*3] = LastFrame.Vertex[v].vertexX;
 				pMesh.vertex[v*3+1] = LastFrame.Vertex[v].vertexY;
