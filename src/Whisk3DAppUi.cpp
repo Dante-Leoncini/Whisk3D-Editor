@@ -644,6 +644,18 @@ void CWhisk3DAppUi::HandleCommandL(TInt aCommand){
         case EImportAnimation:
             iAppContainer->iWhisk3D->ImportAnimation();
             break; 
+        case ESetMixNormals:
+            iAppContainer->iWhisk3D->SetMixNormals();
+            break; 
+        case ESetMixFaces:
+            iAppContainer->iWhisk3D->SetMixFaces();
+            break; 
+        case ESetSpeedMix:
+            iAppContainer->iWhisk3D->SetSpeedMix();
+            break; 
+        case ESetShapekeysInterpolation:
+            iAppContainer->iWhisk3D->SetShapekeysInterpolation();
+            break;
         case EInsertKeyframeRotation:
             iAppContainer->iWhisk3D->InsertKeyframe(AnimRotation);
             break; 

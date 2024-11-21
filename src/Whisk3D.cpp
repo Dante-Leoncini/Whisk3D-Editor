@@ -659,19 +659,19 @@ void CWhisk3D::AppExit( void ){
 
 // Funcion para calcular las coordenadas de textura esféricas
 void CWhisk3D::calculateReflectionUVs(Mesh& pMesh) {
-    for (int i = 0; i < pMesh.vertexSize; ++i) {
-        // Obtener la normal del vértice
-        GLfloat nx = static_cast<GLfloat>(pMesh.normals[i * 3 + 0]) / 127.0f;
-        GLfloat ny = static_cast<GLfloat>(pMesh.normals[i * 3 + 1]) / 127.0f;
-        GLfloat nz = static_cast<GLfloat>(pMesh.normals[i * 3 + 2]) / 127.0f;
+    // Recalcular las coordenadas UV por cada normal
+    /*for (TInt i = 0; i < pMesh.vertexSize/3; ++i) {
+        // Convertir las normales de GLbyte (-128 a 127) a flotante (-1 a 1)
+        GLfloat normalizedNormal[3] = {
+            pMesh.normals[i * 3] / 127.0f,
+            pMesh.normals[i * 3 + 1] / 127.0f,
+            pMesh.normals[i * 3 + 2] / 127.0f,
+        };
 
-        // Calcular coordenadas UV esféricas
-        GLfloat u = 0.5f + (atan2(nx, nz) / (2.0f * M_PI));
-        GLfloat v = 0.5f - (asin(ny) / M_PI);
-
-        pMesh.uv[i * 2 + 0] = u;
-        pMesh.uv[i * 2 + 1] = v;
-    }
+        // Mapear la normal al espacio UV
+        pMesh.uv[i * 2] = 0.5f + 0.5f * normalizedNormal[0]; // U
+        pMesh.uv[i * 2 + 1] = 0.5f - 0.5f * normalizedNormal[1]; // V
+    }*/
 }
 
 void CWhisk3D::RenderMesh( Object& obj, TInt indice ){
@@ -1153,14 +1153,67 @@ void CWhisk3D::ReloadAnimation(){
 	//ShapeKeyAnimation
     for(TInt ska = 0; ska < ShapeKeyAnimations.Count(); ska++){
 		Mesh& pMesh = Meshes[ShapeKeyAnimations[ska].Id];
-		TInt AF = ShapeKeyAnimations[ska].FrameActual;
-    	for(TInt v = 0; v < ShapeKeyAnimations[ska].Frames[AF].Vertex.Count(); v++) {
-			pMesh.vertex[v*3] = ShapeKeyAnimations[ska].Frames[AF].Vertex[v].vertexX;
-			pMesh.vertex[v*3+1] = ShapeKeyAnimations[ska].Frames[AF].Vertex[v].vertexY;
-			pMesh.vertex[v*3+2] = ShapeKeyAnimations[ska].Frames[AF].Vertex[v].vertexZ;
-			pMesh.normals[v*3] = ShapeKeyAnimations[ska].Frames[AF].Vertex[v].normalX;
-			pMesh.normals[v*3+1] = ShapeKeyAnimations[ska].Frames[AF].Vertex[v].normalY;
-			pMesh.normals[v*3+2] = ShapeKeyAnimations[ska].Frames[AF].Vertex[v].normalZ;
+		ShapeKeyAnimation& anim = ShapeKeyAnimations[ska];
+		anim.Mix++;
+		if (anim.Mix >= anim.Frames[anim.LastAnimation].MixSpeed){
+			anim.Mix = 0;
+			anim.LastAnimation = anim.NextAnimation;
+			anim.LastFrame = anim.NextFrame;
+			anim.NextFrame++;
+			if (anim.NextFrame >= anim.Frames.Count()){
+				anim.NextFrame = 0;
+			}
+		}
+		ShapeKey& LastFrame = anim.Frames[anim.LastFrame];
+		ShapeKey& NextFrame = anim.Frames[anim.NextFrame];
+
+		// Calcular el porcentaje de mezcla
+		GLfloat mixFactor = static_cast<GLfloat>(anim.Mix) / anim.Frames[anim.LastAnimation].MixSpeed;
+
+		if (anim.Interpolacion){
+			for(TInt v = 0; v < LastFrame.Vertex.Count(); v++) {
+				pMesh.vertex[v*3] = LastFrame.Vertex[v].vertexX;
+				pMesh.vertex[v*3+1] = LastFrame.Vertex[v].vertexY;
+				pMesh.vertex[v*3+2] = LastFrame.Vertex[v].vertexZ;
+				if (anim.Normals){
+					pMesh.normals[v*3] = LastFrame.Vertex[v].normalX;
+					pMesh.normals[v*3+1] = LastFrame.Vertex[v].normalY;
+					pMesh.normals[v*3+2] = LastFrame.Vertex[v].normalZ;
+				}
+			}
+		}
+		else {
+			for (TInt v = 0; v < NextFrame.Vertex.Count(); v++) {
+				// Interpolación lineal de los vértices
+				pMesh.vertex[v * 3] = static_cast<GLshort>(
+					LastFrame.Vertex[v].vertexX +
+					mixFactor * (NextFrame.Vertex[v].vertexX - LastFrame.Vertex[v].vertexX)
+				);
+				pMesh.vertex[v * 3 + 1] = static_cast<GLshort>(
+					LastFrame.Vertex[v].vertexY +
+					mixFactor * (NextFrame.Vertex[v].vertexY - LastFrame.Vertex[v].vertexY)
+				);
+				pMesh.vertex[v * 3 + 2] = static_cast<GLshort>(
+					LastFrame.Vertex[v].vertexZ +
+					mixFactor * (NextFrame.Vertex[v].vertexZ - LastFrame.Vertex[v].vertexZ)
+				);
+
+				// Interpolación lineal de las normales (si aplica)
+				if (anim.Normals) {
+					pMesh.normals[v * 3] = static_cast<GLshort>(
+						LastFrame.Vertex[v].normalX +
+						mixFactor * (NextFrame.Vertex[v].normalX - LastFrame.Vertex[v].normalX)
+					);
+					pMesh.normals[v * 3 + 1] = static_cast<GLshort>(
+						LastFrame.Vertex[v].normalY +
+						mixFactor * (NextFrame.Vertex[v].normalY - LastFrame.Vertex[v].normalY)
+					);
+					pMesh.normals[v * 3 + 2] = static_cast<GLshort>(
+						LastFrame.Vertex[v].normalZ +
+						mixFactor * (NextFrame.Vertex[v].normalZ - LastFrame.Vertex[v].normalZ)
+					);
+				}
+			}
 		}
 	}
     for(TInt a = 0; a < AnimationObjects.Count(); a++) {
@@ -1383,17 +1436,8 @@ void CWhisk3D::AppCycle( TInt iFrame, GLfloat aTimeSecs, GLfloat aDeltaTimeSecs 
 	
 			if (fixedDeltaTimeSecs)
 			CurrentFrame++;
-			for(TInt ska = 0; ska < ShapeKeyAnimations.Count(); ska++){
-				ShapeKeyAnimations[ska].FrameActual++;
-				if (ShapeKeyAnimations[ska].FrameActual > ShapeKeyAnimations[ska].Frames.Count()-1){
-					ShapeKeyAnimations[ska].FrameActual = ShapeKeyAnimations[ska].Frames.Count()-1;
-				}
-			}
 			if (CurrentFrame > EndFrame){
 				CurrentFrame = StartFrame;
-				for(TInt ska = 0; ska < ShapeKeyAnimations.Count(); ska++){
-					ShapeKeyAnimations[ska].FrameActual = 0;
-				}
 			}
 			ReloadAnimation();
         }
@@ -4779,6 +4823,75 @@ void CWhisk3D::LeerMTL(const TFileName& aFile, TInt objetosCargados) {
     //CleanupStack::PopAndDestroy(&fsSession);
 }
 
+TInt CWhisk3D::BuscarShapeKeyAnimation(TInt ID){
+	for (TInt ska = 0; ska < ShapeKeyAnimations.Count(); ska++){
+		if (ShapeKeyAnimations[ska].Id == ID){
+			return ska;
+			break;
+		}
+	}
+	_LIT(KExtensionError, "El objeto no tiene animacion");
+	HBufC* noteBuf = HBufC::NewLC(180);
+	noteBuf->Des().Format(KExtensionError);
+	MensajeError(noteBuf);
+	CleanupStack::PopAndDestroy(noteBuf);
+	return -1;
+};
+
+void CWhisk3D::SetMixNormals(){
+};
+
+void CWhisk3D::SetMixFaces(){};
+
+void CWhisk3D::SetSpeedMix(){
+	//si no hay objetos
+	if (Objects.Count() < 1){return;}	
+	Object& obj = Objects[SelectActivo];
+
+	//si no tiene animacion
+	TInt SAIndex = BuscarShapeKeyAnimation(obj.Id);
+
+	if (SAIndex < 0){return;}
+	
+	TBool OriginalPlayAnimation = PlayAnimation;
+	PlayAnimation = false;
+	TInt ValorAnterior = ShapeKeyAnimations[SAIndex].Frames[ShapeKeyAnimations[SAIndex].LastAnimation].MixSpeed;
+
+	HBufC* noteBuf = HBufC::NewLC(100);	
+	noteBuf->Des().Copy(_L("Velocidad de Animacion (minimo 0)"));	
+	TInt valor = DialogNumber(ValorAnterior, 0, 10000, noteBuf);
+	CleanupStack::PopAndDestroy(noteBuf);
+
+	ShapeKeyAnimations[SAIndex].Frames[ShapeKeyAnimations[SAIndex].LastAnimation].MixSpeed = valor;
+	PlayAnimation = OriginalPlayAnimation;
+};
+
+void CWhisk3D::SetShapekeysInterpolation(){
+	//si no hay objetos
+	if (Objects.Count() < 1){return;}	
+	Object& obj = Objects[SelectActivo];
+
+	//si no tiene animacion
+	TInt SAIndex = BuscarShapeKeyAnimation(obj.Id);
+
+	if (SAIndex < 0){return;}
+	
+	TBool OriginalPlayAnimation = PlayAnimation;
+	PlayAnimation = false;
+
+	HBufC* noteBuf = HBufC::NewLC(100);
+	noteBuf->Des().Copy(_L("¿Usar Interpolacion en los ShapeKeys?"));
+	if (CDialogs::Alert(noteBuf)){	
+		ShapeKeyAnimations[SAIndex].Interpolacion = true;
+	}
+	else {
+		ShapeKeyAnimations[SAIndex].Interpolacion = false;	
+	}
+	CleanupStack::PopAndDestroy(noteBuf);	
+
+	PlayAnimation = OriginalPlayAnimation;
+};
+
 void CWhisk3D::ImportAnimation(){
 	//si no hay objetos
 	if (Objects.Count() < 1){return;}	
@@ -4890,23 +5003,87 @@ void CWhisk3D::ImportAnimation(){
 							ShapeKeyAnimations.Append(NewShapeKeyAnimations);
 							SAIndex = ShapeKeyAnimations.Count()-1;
 							ShapeKeyAnimations[SAIndex].Id = obj.Id;
-							ShapeKeyAnimations[SAIndex].FrameActual = 0;
-						}					
-						TLex8 lex(line.Mid(22));  // Inicializa TLex con la subcadena a partir del tercer caracter
-						while (!lex.Eos()) {						
-							lex.SkipSpace();
-						}
+							ShapeKeyAnimations[SAIndex].LastFrame = 0;
+							ShapeKeyAnimations[SAIndex].NextFrame = 0;
+							ShapeKeyAnimations[SAIndex].LastAnimation = 0;
+							ShapeKeyAnimations[SAIndex].NextAnimation = 0;
+							ShapeKeyAnimations[SAIndex].Mix = 0;
+							ShapeKeyAnimations[SAIndex].Normals = true;
+							ShapeKeyAnimations[SAIndex].Faces = false;
+							ShapeKeyAnimations[SAIndex].Interpolacion = false;
+
+							TLex8 lex(line.Mid(22));  // Inicializa TLex con la subcadena a partir del tercer caracter
+							while (!lex.Eos()) {	
+								TPtrC8 currentString = lex.NextToken(); // Mostrar el mensaje con el valor actual del "string" y el contador
+								TLex8 testLex(currentString); // Crear un nuevo objeto TLex para la prueba
+
+								TInt number = 0;
+								TInt err = testLex.Val(number);
+								if (err == KErrNone){
+									switch (contador) {
+										case 0:
+											if (number == 1){
+												ShapeKeyAnimations[SAIndex].Interpolacion = true;
+											}
+											break;
+										case 1:
+											if (number == 0){
+												ShapeKeyAnimations[SAIndex].Normals = false;
+											}
+											break;
+										case 2:
+											if (number == 1){
+												ShapeKeyAnimations[SAIndex].Faces = true;
+											}
+											break;
+									}									
+								}			
+								contador++;					
+								lex.SkipSpace();
+							}
+						}		
+						else {		
+							TLex8 lex(line.Mid(22));  // Inicializa TLex con la subcadena a partir del tercer caracter
+							while (!lex.Eos()) {						
+								lex.SkipSpace();
+							}
+						}	
 					}												
 					else if (line.Left(8) == _L8("ShapeKey")){	
 						if (esMesh){
 							ShapeKey NewShapeKey;
+							contador = 0;
 							ShapeKeyAnimations[SAIndex].Frames.Append(NewShapeKey);
 							FrameIndex = ShapeKeyAnimations[SAIndex].Frames.Count()-1;
-							ShapeKeyAnimations[SAIndex].Frames[FrameIndex].Vertex.ReserveL(pMesh.vertexSize);								
-						}					
-						TLex8 lex(line.Mid(8));  // Inicializa TLex con la subcadena a partir del tercer caracter
-						while (!lex.Eos()) {						
-							lex.SkipSpace();
+							ShapeKeyAnimations[SAIndex].Frames[FrameIndex].Vertex.ReserveL(pMesh.vertexSize);	
+							ShapeKeyAnimations[SAIndex].Frames[FrameIndex].MixSpeed = 1;	
+							if (ShapeKeyAnimations[SAIndex].Frames.Count() > 1 && ShapeKeyAnimations[SAIndex].NextFrame == 0){
+								ShapeKeyAnimations[SAIndex].NextFrame = 1;
+							}		
+
+							TLex8 lex(line.Mid(8));  // Inicializa TLex con la subcadena a partir del tercer caracter
+							while (!lex.Eos()) {	
+								TPtrC8 currentString = lex.NextToken(); // Mostrar el mensaje con el valor actual del "string" y el contador
+								TLex8 testLex(currentString); // Crear un nuevo objeto TLex para la prueba
+
+								TInt number = 0;
+								TInt err = testLex.Val(number);
+								if (err == KErrNone){
+									switch (contador) {
+										case 0:
+											ShapeKeyAnimations[SAIndex].Frames[FrameIndex].MixSpeed = number;	
+											break;
+									}									
+								}			
+								contador++;					
+								lex.SkipSpace();
+							}					
+						}		
+						else {		
+							TLex8 lex(line.Mid(8));
+							while (!lex.Eos()) {								
+								lex.SkipSpace();
+							}						
 						}
 					}							
 					else if (line.Left(4) == _L8("akf ")){	

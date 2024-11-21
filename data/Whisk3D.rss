@@ -259,10 +259,25 @@ RESOURCE MENU_PANE r_animation_menu {
             txt = STRING_r_ClearKeyframes;
         },
         MENU_ITEM {
+            command = ESetMixNormals;
+            txt = STRING_r_SetMixNormals;
+        },
+        MENU_ITEM {
+            command = ESetMixFaces;
+            txt = STRING_r_SetMixFaces;
+        },
+        MENU_ITEM {
+            command = ESetSpeedMix;
+            txt = STRING_r_SetSpeedMix;
+        },
+        MENU_ITEM {
+            command = ESetShapekeysInterpolation;
+            txt = STRING_r_SetShapekeysInterpolation;
+        },        
+        MENU_ITEM {
             command = EImportAnimation;
             txt = STRING_r_ImportAnimation;
-        }		
-        
+        }
     };
 }
 

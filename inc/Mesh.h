@@ -81,13 +81,21 @@ class ShapeKeyVertex {
 class ShapeKey { 
 	public:
         RArray<ShapeKeyVertex> Vertex;
+		TInt MixSpeed;
 };
 
 class ShapeKeyAnimation { 
 	public:
 		TInt Id; //id del objeto al que afecta
         RArray<ShapeKey> Frames;
-		TInt FrameActual;
+		TInt LastAnimation;
+		TInt NextAnimation;
+		TInt LastFrame;
+		TInt NextFrame;
+		TInt Mix;
+		TBool Normals;
+		TBool Faces;
+		TBool Interpolacion;
 };
 
 class Mesh { 

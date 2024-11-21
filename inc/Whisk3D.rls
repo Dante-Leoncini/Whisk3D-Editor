@@ -151,6 +151,11 @@ rls_string STRING_r_Animation        "Animation"
 rls_string STRING_r_InsertKeyframe   "Insert keyframe"
 rls_string STRING_r_ImportAnimation  "Import Animation"
 
+rls_string STRING_r_SetMixNormals    "Usar ShapeKey Normals"
+rls_string STRING_r_SetMixFaces      "Usar ShapeKey Faces"
+rls_string STRING_r_SetSpeedMix      "Animation Speed"
+rls_string STRING_r_SetShapekeysInterpolation       "Set Interpolation"
+
 rls_string STRING_r_InsertKeyframeLocation  "Insert keyframe Location"
 rls_string STRING_r_InsertKeyframeRotation  "Insert keyframe Rotation"
 rls_string STRING_r_InsertKeyframeScale     "Insert keyframe Scale"

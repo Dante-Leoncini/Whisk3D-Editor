@@ -124,6 +124,10 @@ enum TWhisk3DMenuCommands
 
     EAnimationMenu,
     EImportAnimation,
+    ESetMixNormals,
+    ESetMixFaces,
+    ESetSpeedMix,
+    ESetShapekeysInterpolation,
 
     EInsertKeyframeLocation,
     EInsertKeyframeRotation,
