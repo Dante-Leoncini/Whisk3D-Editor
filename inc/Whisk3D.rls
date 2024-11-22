@@ -155,6 +155,13 @@ rls_string STRING_r_SetMixNormals    "Usar ShapeKey Normals"
 rls_string STRING_r_SetMixFaces      "Usar ShapeKey Faces"
 rls_string STRING_r_SetSpeedMix      "Animation Speed"
 rls_string STRING_r_SetShapekeysInterpolation       "Set Interpolation"
+rls_string STRING_r_SetAnimation       "Seleccionar Animacion"
+
+rls_string STRING_r_Constraints        "Constraints"
+rls_string STRING_r_TrackTo            "Track To"
+rls_string STRING_r_CopyRotation       "Copy Rotation"
+rls_string STRING_r_CopyLocation       "Copy Location"
+rls_string STRING_r_FollowPath         "Follow Path"
 
 rls_string STRING_r_InsertKeyframeLocation  "Insert keyframe Location"
 rls_string STRING_r_InsertKeyframeRotation  "Insert keyframe Rotation"

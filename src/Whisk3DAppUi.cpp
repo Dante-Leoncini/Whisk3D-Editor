@@ -656,6 +656,21 @@ void CWhisk3DAppUi::HandleCommandL(TInt aCommand){
         case ESetShapekeysInterpolation:
             iAppContainer->iWhisk3D->SetShapekeysInterpolation();
             break;
+        case ESetAnimation:
+            iAppContainer->iWhisk3D->SetAnimation(-1);
+            break;  
+        case ETrackTo:
+            iAppContainer->iWhisk3D->SetTrackTo();
+            break;   
+        case ECopyRotation:
+            iAppContainer->iWhisk3D->SetCopyRotation();
+            break;   
+        case ECopyLocation:
+            iAppContainer->iWhisk3D->SetCopyLocation();
+            break;               
+        case EFollowPath:
+            iAppContainer->iWhisk3D->SetFollowPath();
+            break;   
         case EInsertKeyframeRotation:
             iAppContainer->iWhisk3D->InsertKeyframe(AnimRotation);
             break; 

@@ -271,6 +271,7 @@ RArray<Light> Lights;
 RArray<Mesh> Meshes;
 RArray<AnimationObject> AnimationObjects;
 RArray<ShapeKeyAnimation> ShapeKeyAnimations;
+RArray<Constraint> Constraints;
 TInt tipoSelect = vertexSelect;
 TInt SelectActivo = 0;
 TInt SelectCount = 0;
@@ -1153,29 +1154,38 @@ void CWhisk3D::ReloadAnimation(){
 	//ShapeKeyAnimation
     for(TInt ska = 0; ska < ShapeKeyAnimations.Count(); ska++){
 		Mesh& pMesh = Meshes[ShapeKeyAnimations[ska].Id];
-		ShapeKeyAnimation& anim = ShapeKeyAnimations[ska];
-		anim.Mix++;
-		if (anim.Mix >= anim.Frames[anim.LastAnimation].MixSpeed){
-			anim.Mix = 0;
-			anim.LastAnimation = anim.NextAnimation;
-			anim.LastFrame = anim.NextFrame;
-			anim.NextFrame++;
-			if (anim.NextFrame >= anim.Frames.Count()){
-				anim.NextFrame = 0;
+		ShapeKeyAnimation& animState = ShapeKeyAnimations[ska];
+		animState.Mix++;
+		if (animState.Mix >= animState.Animations[animState.LastAnimation].MixSpeed){
+			animState.Mix = 0;
+			animState.LastAnimation = animState.NextAnimation;
+			animState.LastFrame = animState.NextFrame;
+			if (animState.ChangeAnimation < 0){
+				animState.NextFrame++;
+				if (animState.NextFrame >= animState.Animations[animState.NextAnimation].Frames.Count()){
+					animState.NextFrame = 0;
+				}
+			}
+			else {
+				animState.NextAnimation = animState.ChangeAnimation;
+				animState.ChangeAnimation = -1;
+				animState.NextFrame = 0;
 			}
 		}
-		ShapeKey& LastFrame = anim.Frames[anim.LastFrame];
-		ShapeKey& NextFrame = anim.Frames[anim.NextFrame];
+		Animation& LasAnim = animState.Animations[animState.LastAnimation];
+		Animation& NexAnim = animState.Animations[animState.NextAnimation];
+		ShapeKey& LastFrame = LasAnim.Frames[animState.LastFrame];
+		ShapeKey& NextFrame = NexAnim.Frames[animState.NextFrame];
 
 		// Calcular el porcentaje de mezcla
-		GLfloat mixFactor = static_cast<GLfloat>(anim.Mix) / anim.Frames[anim.LastAnimation].MixSpeed;
+		GLfloat mixFactor = static_cast<GLfloat>(animState.Mix) / LasAnim.MixSpeed;
 
-		if (!anim.Interpolacion){
+		if (!animState.Interpolacion){
 			for(TInt v = 0; v < LastFrame.Vertex.Count(); v++) {
 				pMesh.vertex[v*3] = LastFrame.Vertex[v].vertexX;
 				pMesh.vertex[v*3+1] = LastFrame.Vertex[v].vertexY;
 				pMesh.vertex[v*3+2] = LastFrame.Vertex[v].vertexZ;
-				if (anim.Normals){
+				if (animState.Normals){
 					pMesh.normals[v*3] = LastFrame.Vertex[v].normalX;
 					pMesh.normals[v*3+1] = LastFrame.Vertex[v].normalY;
 					pMesh.normals[v*3+2] = LastFrame.Vertex[v].normalZ;
@@ -1199,7 +1209,7 @@ void CWhisk3D::ReloadAnimation(){
 				);
 
 				// Interpolación lineal de las normales (si aplica)
-				if (anim.Normals) {
+				if (animState.Normals) {
 					pMesh.normals[v * 3] = static_cast<GLshort>(
 						LastFrame.Vertex[v].normalX +
 						mixFactor * (NextFrame.Vertex[v].normalX - LastFrame.Vertex[v].normalX)
@@ -1339,6 +1349,52 @@ void CWhisk3D::ReloadAnimation(){
 			}
 		}
     }
+	ReloadViewport(false);
+}
+
+void CWhisk3D::ReloadViewport(TBool hacerRedibujo){
+	//Recalcula los constrains
+    for(TInt c = 0; c < Constraints.Count(); c++) {
+		TInt id = Constraints[c].Id;
+		TInt Target = Constraints[c].Target;
+		switch (Constraints[c].type) {
+			case trackto:
+				// Calcular vector dirección
+				GLfloat dirX = Objects[Target].posX - Objects[id].posX;
+				GLfloat dirY = Objects[Target].posY - Objects[id].posY;
+				GLfloat dirZ = Objects[Target].posZ - Objects[id].posZ;						
+				
+				Objects[id].rotZ = atan2(dirX, dirY) * (180.0 / M_PI);  // Azimut
+
+				// Calcular longitud del vector (magnitud)
+				GLfloat length = sqrt(dirX * dirX + dirY * dirY + dirZ * dirZ);
+
+				// Cálculo de la elevación (rotY)
+				if (Constraints[c].opcion){	
+					Objects[id].rotZ += 180; // Para invertir el eje si necesario.
+					Objects[id].rotX = asin(dirZ/length) * (180.0 / M_PI);					
+				}
+				else {
+					Objects[id].rotZ -= 90; // Para invertir el eje si necesario.
+					Objects[id].rotY = asin(dirZ/length) * (180.0 / M_PI);	
+				}
+
+				break;
+			case copyrotation:
+				Objects[id].rotX = Objects[Target].rotX;
+				Objects[id].rotY = Objects[Target].rotY;
+				Objects[id].rotZ = Objects[Target].rotZ;
+				break;
+			case copylocation:
+				Objects[id].posX = Objects[Target].posX;
+				Objects[id].posY = Objects[Target].posY;
+				Objects[id].posZ = Objects[Target].posZ;
+				break;
+		}
+	}
+	if (hacerRedibujo){
+    	redibujar = true;
+	}
 }
 
 void CWhisk3D::SetCurrentFrame(){
@@ -2203,7 +2259,7 @@ void CWhisk3D::InputUsuario(GLfixed aDeltaTimeSecs){
 			if (!PlayAnimation){
 				ReloadAnimation();
 			}
-	    	redibujar = true;
+	    	ReloadViewport();
 			ShiftCount = 40;
 		}
 		else if( iInputHandler->IsInputPressed( EVolumenDown ) ){
@@ -2214,7 +2270,7 @@ void CWhisk3D::InputUsuario(GLfixed aDeltaTimeSecs){
 			if (!PlayAnimation){
 				ReloadAnimation();
 			}
-	    	redibujar = true;
+	    	ReloadViewport();
 			ShiftCount = 40;
 		}*/
 		return;
@@ -2289,7 +2345,7 @@ void CWhisk3D::InputUsuario(GLfixed aDeltaTimeSecs){
 				ReloadAnimation();
 			}
 		}
-	    redibujar = true;
+		ReloadViewport(true);
 	}
 	if( iInputHandler->IsInputPressed( EJoystickRight ) ){
 		//mueve el mouse
@@ -2344,7 +2400,7 @@ void CWhisk3D::InputUsuario(GLfixed aDeltaTimeSecs){
 				ReloadAnimation();
 			}
 		}
-	    redibujar = true;
+	    ReloadViewport(true);
 	}
 	if( iInputHandler->IsInputPressed( EJoystickUp ) ){
 		//mueve el mouse
@@ -2387,7 +2443,7 @@ void CWhisk3D::InputUsuario(GLfixed aDeltaTimeSecs){
 		else if (estado == translacion){
 			SetTranslacionObjetos(-30);
 		}
-	    redibujar = true;
+	    ReloadViewport(true);
 	}
 	if( iInputHandler->IsInputPressed( EJoystickDown ) ){
 		//mueve el mouse
@@ -2430,7 +2486,7 @@ void CWhisk3D::InputUsuario(GLfixed aDeltaTimeSecs){
 		else if (estado == translacion){
 			SetTranslacionObjetos(30);		
 		}
-	    redibujar = true;
+	    ReloadViewport(true);
 	}
 }
 
@@ -2449,7 +2505,7 @@ void CWhisk3D::SetRotacion(){
 	if (estado == rotacion){
 		SetRotacion(0);
 	}
-    redibujar = true;	
+    ReloadViewport(true);	
 };
 
 void CWhisk3D::SetEscala(){
@@ -2467,7 +2523,7 @@ void CWhisk3D::SetEscala(){
 	if (estado == rotacion){
 		SetRotacion(0);
 	}
-    redibujar = true;	
+    ReloadViewport(true);
 };
 
 void CWhisk3D::ChangeEje(){
@@ -2501,7 +2557,7 @@ void CWhisk3D::SetPosicion(){
 	if (estado == rotacion){
 		SetRotacion(0);
 	}
-    redibujar = true;	
+    ReloadViewport(true);	
 };
 
 void CWhisk3D::EventKeyDown(TInt scan){
@@ -2593,7 +2649,7 @@ void CWhisk3D::Aceptar(){
 			estado = editNavegacion;
 		}
 	}
-    redibujar = true;
+    ReloadViewport(true);
 };
 
 void CWhisk3D::PressTab(){
@@ -2641,7 +2697,7 @@ void CWhisk3D::ReestablecerEstado(){
 		estadoObjetos.Close();
 	}
 	estado = editNavegacion;
-	redibujar = true;
+	ReloadViewport(true);
 };
 
 
@@ -2808,7 +2864,7 @@ void CWhisk3D::InsertarValor(){
 	}
 	CleanupStack::PopAndDestroy(buf);
 	dialogoSymbian = false;
-	redibujar = true;	
+	ReloadViewport(true);	
 }
 
 void CWhisk3D::TecladoNumerico(TInt numero){
@@ -2907,7 +2963,7 @@ void CWhisk3D::SetParent(){
 		}
 	}
 	CleanupStack::PopAndDestroy(noteBuf);
-	redibujar = true;
+	ReloadViewport(true);
 }
 
 void CWhisk3D::ClearParent(){
@@ -2932,7 +2988,7 @@ void CWhisk3D::ClearParent(){
 		}
 		if (salirBucle){break;}
 	}
-	redibujar = true;
+	ReloadViewport(true);
 };
 
 void CWhisk3D::Borrar(){
@@ -2970,7 +3026,7 @@ void CWhisk3D::Borrar(){
 			}			
 		}
 	}
-    redibujar = true;	
+    ReloadViewport(true);	
 }
 
 void CWhisk3D::BorrarMesh(TInt indice){
@@ -3108,7 +3164,7 @@ void CWhisk3D::SelectToCursor(){
 			};
 		}
 	}
-	redibujar = true;
+	ReloadViewport(true);
 }
 
 void CWhisk3D::CursorToWorldOrigin(){
@@ -4823,20 +4879,186 @@ void CWhisk3D::LeerMTL(const TFileName& aFile, TInt objetosCargados) {
     //CleanupStack::PopAndDestroy(&fsSession);
 }
 
-TInt CWhisk3D::BuscarShapeKeyAnimation(TInt ID){
+
+void CWhisk3D::SetCopyLocation(){
+	//si no hay objetos
+	if (Objects.Count() < 1){return;}	
+	Object& obj = Objects[SelectActivo];
+
+	if (Objects.Count() < 2){
+		_LIT(KExtensionError, "No hay suficientes objetos");
+		HBufC* noteBuf = HBufC::NewLC(180);
+		noteBuf->Des().Format(KExtensionError);
+		MensajeError(noteBuf);
+		CleanupStack::PopAndDestroy(noteBuf);
+		return;
+	}	
+
+	Constraint NewConstraint;
+	TInt valor = 0;
+	HBufC* noteBuf = HBufC::NewLC(100);
+	_LIT(KFormatString, "Seleccione Objeto al que copiar su locacion entre 1 y %d excepto %d");
+	while (true) {
+		noteBuf->Des().Format(KFormatString, Objects.Count(), SelectActivo + 1);
+		valor = DialogNumber(1, 1, Objects.Count(), noteBuf);
+		valor -= 1; // Ajustar a índice base 0.
+
+		// Verificar que no se apunte al mismo objeto.
+		if (valor != SelectActivo) {
+			break; // Salir del bucle si la selección es válida.
+		}
+
+		_LIT(KErrorMsg, "El target no puede ser igual que el objeto seleccionado");
+		noteBuf->Des().Format(KErrorMsg);
+		CDialogs::Alert(noteBuf);
+	}
+	CleanupStack::PopAndDestroy(noteBuf);
+	NewConstraint.type = copylocation;
+	NewConstraint.Id = SelectActivo;
+	NewConstraint.Target = valor;
+	Constraints.Append(NewConstraint);	
+	ReloadViewport(true);
+}
+
+void CWhisk3D::SetCopyRotation(){
+	//si no hay objetos
+	if (Objects.Count() < 1){return;}	
+	Object& obj = Objects[SelectActivo];
+
+	if (Objects.Count() < 2){
+		_LIT(KExtensionError, "No hay suficientes objetos");
+		HBufC* noteBuf = HBufC::NewLC(180);
+		noteBuf->Des().Format(KExtensionError);
+		MensajeError(noteBuf);
+		CleanupStack::PopAndDestroy(noteBuf);
+		return;
+	}	
+
+	Constraint NewConstraint;
+	TInt valor = 0;
+	HBufC* noteBuf = HBufC::NewLC(100);
+	_LIT(KFormatString, "Seleccione Objeto al que copiar su rotacion entre 1 y %d excepto %d");
+	while (true) {
+		noteBuf->Des().Format(KFormatString, Objects.Count(), SelectActivo + 1);
+		valor = DialogNumber(1, 1, Objects.Count(), noteBuf);
+		valor -= 1; // Ajustar a índice base 0.
+
+		// Verificar que no se apunte al mismo objeto.
+		if (valor != SelectActivo) {
+			break; // Salir del bucle si la selección es válida.
+		}
+
+		_LIT(KErrorMsg, "El target no puede ser igual que el objeto seleccionado");
+		noteBuf->Des().Format(KErrorMsg);
+		CDialogs::Alert(noteBuf);
+	}
+	CleanupStack::PopAndDestroy(noteBuf);
+	NewConstraint.type = copyrotation;
+	NewConstraint.Id = SelectActivo;
+	NewConstraint.Target = valor;
+	Constraints.Append(NewConstraint);	
+	ReloadViewport(true);
+}
+
+void CWhisk3D::SetFollowPath(){}
+
+void CWhisk3D::SetTrackTo(){
+	//si no hay objetos
+	if (Objects.Count() < 1){return;}	
+	Object& obj = Objects[SelectActivo];
+
+	if (Objects.Count() < 2){
+		_LIT(KExtensionError, "No hay suficientes objetos");
+		HBufC* noteBuf = HBufC::NewLC(180);
+		noteBuf->Des().Format(KExtensionError);
+		MensajeError(noteBuf);
+		CleanupStack::PopAndDestroy(noteBuf);
+		return;
+	}	
+
+	Constraint NewConstraint;
+	TInt valor = 0;
+	HBufC* noteBuf = HBufC::NewLC(100);
+	_LIT(KFormatString, "Seleccione Objeto al que apuntar entre 1 y %d excepto %d");
+	while (true) {
+		noteBuf->Des().Format(KFormatString, Objects.Count(), SelectActivo + 1);
+		valor = DialogNumber(1, 1, Objects.Count(), noteBuf);
+		valor -= 1; // Ajustar a índice base 0.
+
+		// Verificar que no se apunte al mismo objeto.
+		if (valor != SelectActivo) {
+			break; // Salir del bucle si la selección es válida.
+		}
+
+		_LIT(KErrorMsg, "No se puede hacer un track to a uno mismo");
+		noteBuf->Des().Format(KErrorMsg);
+		CDialogs::Alert(noteBuf);
+	}
+	_LIT(KrotarMsg, "¿Rotar 90 grados el Track To?");
+	noteBuf->Des().Format(KrotarMsg);
+
+	NewConstraint.type = trackto;
+	NewConstraint.Id = SelectActivo;
+	NewConstraint.opcion = false;
+	if (CDialogs::Alert(noteBuf)){
+		NewConstraint.opcion = true;
+	}
+	NewConstraint.Target = valor;
+	Constraints.Append(NewConstraint);	
+	CleanupStack::PopAndDestroy(noteBuf);
+	ReloadViewport(true);
+}
+
+TInt CWhisk3D::BuscarShapeKeyAnimation(TInt ID, TBool mostrarError){
 	for (TInt ska = 0; ska < ShapeKeyAnimations.Count(); ska++){
 		if (ShapeKeyAnimations[ska].Id == ID){
 			return ska;
 			break;
 		}
 	}
-	_LIT(KExtensionError, "El objeto no tiene animacion");
-	HBufC* noteBuf = HBufC::NewLC(180);
-	noteBuf->Des().Format(KExtensionError);
-	MensajeError(noteBuf);
-	CleanupStack::PopAndDestroy(noteBuf);
+	if (mostrarError){
+		_LIT(KExtensionError, "El objeto no tiene animacion");
+		HBufC* noteBuf = HBufC::NewLC(180);
+		noteBuf->Des().Format(KExtensionError);
+		MensajeError(noteBuf);
+		CleanupStack::PopAndDestroy(noteBuf);
+	}
 	return -1;
 };
+
+void CWhisk3D::SetAnimation(TInt index){
+	//si no hay objetos
+	if (Objects.Count() < 1){return;}	
+	Object& obj = Objects[SelectActivo];
+
+	//si no tiene animacion
+	TInt SAIndex = BuscarShapeKeyAnimation(obj.Id, true);
+
+	if (SAIndex < 0){return;}
+
+	TBool OriginalPlayAnimation = PlayAnimation;
+	PlayAnimation = false;
+
+	TInt valor = index;
+	if (valor < 0){
+		if (ShapeKeyAnimations[SAIndex].Animations.Count() > 1){
+			_LIT(KFormatString, "Seleccione Animacion entre 1 y %d");
+			HBufC* noteBuf = HBufC::NewLC(100);
+			noteBuf->Des().Format(KFormatString, ShapeKeyAnimations[SAIndex].Animations.Count());
+			valor = DialogNumber(ShapeKeyAnimations[SAIndex].NextAnimation+1, 1, ShapeKeyAnimations[SAIndex].Animations.Count(), noteBuf);
+			valor = valor -1;
+			CleanupStack::PopAndDestroy(noteBuf);			
+		}
+		else {
+			valor = 0;
+		}
+	}
+
+	ShapeKeyAnimations[SAIndex].ChangeAnimation = valor;
+	//ShapeKeyAnimations[SAIndex].NextAnimation = valor;
+	//ShapeKeyAnimations[SAIndex].NextFrame = 0;
+	PlayAnimation = OriginalPlayAnimation;
+}
 
 void CWhisk3D::SetMixNormals(){
 };
@@ -4849,20 +5071,20 @@ void CWhisk3D::SetSpeedMix(){
 	Object& obj = Objects[SelectActivo];
 
 	//si no tiene animacion
-	TInt SAIndex = BuscarShapeKeyAnimation(obj.Id);
+	TInt SAIndex = BuscarShapeKeyAnimation(obj.Id, true);
 
 	if (SAIndex < 0){return;}
 	
 	TBool OriginalPlayAnimation = PlayAnimation;
 	PlayAnimation = false;
-	TInt ValorAnterior = ShapeKeyAnimations[SAIndex].Frames[ShapeKeyAnimations[SAIndex].LastAnimation].MixSpeed;
+	TInt ValorAnterior = ShapeKeyAnimations[SAIndex].Animations[ShapeKeyAnimations[SAIndex].LastAnimation].MixSpeed;
 
 	HBufC* noteBuf = HBufC::NewLC(100);	
 	noteBuf->Des().Copy(_L("Velocidad de Animacion (minimo 0)"));	
 	TInt valor = DialogNumber(ValorAnterior, 0, 10000, noteBuf);
 	CleanupStack::PopAndDestroy(noteBuf);
 
-	ShapeKeyAnimations[SAIndex].Frames[ShapeKeyAnimations[SAIndex].LastAnimation].MixSpeed = valor;
+	ShapeKeyAnimations[SAIndex].Animations[ShapeKeyAnimations[SAIndex].LastAnimation].MixSpeed = valor;
 	PlayAnimation = OriginalPlayAnimation;
 };
 
@@ -4872,7 +5094,7 @@ void CWhisk3D::SetShapekeysInterpolation(){
 	Object& obj = Objects[SelectActivo];
 
 	//si no tiene animacion
-	TInt SAIndex = BuscarShapeKeyAnimation(obj.Id);
+	TInt SAIndex = BuscarShapeKeyAnimation(obj.Id, true);
 
 	if (SAIndex < 0){return;}
 	
@@ -4963,6 +5185,7 @@ void CWhisk3D::ImportAnimation(){
 		}*/
 		TBool animacion_keyframe = false;
 		TInt SAIndex = 0;
+		TInt AnimID = 0;
 		TInt FrameIndex = 0;
 
 		TInt animIndex = 0;
@@ -4999,18 +5222,27 @@ void CWhisk3D::ImportAnimation(){
 					if (line.Left(22) == _L8("new_animation_ShapeKey")) {			
 						if (esMesh){
 							animacion_keyframe = true;
-							ShapeKeyAnimation NewShapeKeyAnimations;
-							ShapeKeyAnimations.Append(NewShapeKeyAnimations);
-							SAIndex = ShapeKeyAnimations.Count()-1;
-							ShapeKeyAnimations[SAIndex].Id = obj.Id;
-							ShapeKeyAnimations[SAIndex].LastFrame = 0;
-							ShapeKeyAnimations[SAIndex].NextFrame = 0;
-							ShapeKeyAnimations[SAIndex].LastAnimation = 0;
-							ShapeKeyAnimations[SAIndex].NextAnimation = 0;
-							ShapeKeyAnimations[SAIndex].Mix = 0;
-							ShapeKeyAnimations[SAIndex].Normals = true;
-							ShapeKeyAnimations[SAIndex].Faces = false;
-							ShapeKeyAnimations[SAIndex].Interpolacion = false;
+							SAIndex = BuscarShapeKeyAnimation(obj.Id, false);
+							if (SAIndex < 0){					
+								SAIndex = ShapeKeyAnimations.Count();			
+								ShapeKeyAnimation NewShapeKeyAnimations;
+								ShapeKeyAnimations.Append(NewShapeKeyAnimations);
+								ShapeKeyAnimations[SAIndex].Id = obj.Id;
+								ShapeKeyAnimations[SAIndex].ChangeAnimation = -1;
+								ShapeKeyAnimations[SAIndex].LastFrame = 0;
+								ShapeKeyAnimations[SAIndex].NextFrame = 0;
+								ShapeKeyAnimations[SAIndex].LastAnimation = 0;
+								ShapeKeyAnimations[SAIndex].NextAnimation = 0;
+								ShapeKeyAnimations[SAIndex].Mix = 0;
+								ShapeKeyAnimations[SAIndex].Normals = true;
+								ShapeKeyAnimations[SAIndex].Faces = false;
+								ShapeKeyAnimations[SAIndex].Interpolacion = false;
+							}
+							AnimID = ShapeKeyAnimations[SAIndex].Animations.Count();	
+							Animation NewAnimation;
+							NewAnimation.MixSpeed = 1;
+							ShapeKeyAnimations[SAIndex].Animations.Append(NewAnimation);
+
 
 							TLex8 lex(line.Mid(22));  // Inicializa TLex con la subcadena a partir del tercer caracter
 							while (!lex.Eos()) {	
@@ -5022,16 +5254,19 @@ void CWhisk3D::ImportAnimation(){
 								if (err == KErrNone){
 									switch (contador) {
 										case 0:
+											ShapeKeyAnimations[SAIndex].Animations[AnimID].MixSpeed = number;	
+											break;
+										case 1:
 											if (number == 1){
 												ShapeKeyAnimations[SAIndex].Interpolacion = true;
 											}
 											break;
-										case 1:
+										case 2:
 											if (number == 0){
 												ShapeKeyAnimations[SAIndex].Normals = false;
 											}
 											break;
-										case 2:
+										case 3:
 											if (number == 1){
 												ShapeKeyAnimations[SAIndex].Faces = true;
 											}
@@ -5052,38 +5287,16 @@ void CWhisk3D::ImportAnimation(){
 					else if (line.Left(8) == _L8("ShapeKey")){	
 						if (esMesh){
 							ShapeKey NewShapeKey;
-							contador = 0;
-							ShapeKeyAnimations[SAIndex].Frames.Append(NewShapeKey);
-							FrameIndex = ShapeKeyAnimations[SAIndex].Frames.Count()-1;
-							ShapeKeyAnimations[SAIndex].Frames[FrameIndex].Vertex.ReserveL(pMesh.vertexSize);	
-							ShapeKeyAnimations[SAIndex].Frames[FrameIndex].MixSpeed = 1;	
-							if (ShapeKeyAnimations[SAIndex].Frames.Count() > 1 && ShapeKeyAnimations[SAIndex].NextFrame == 0){
+							ShapeKeyAnimations[SAIndex].Animations[AnimID].Frames.Append(NewShapeKey);
+							FrameIndex = ShapeKeyAnimations[SAIndex].Animations[AnimID].Frames.Count()-1;
+							ShapeKeyAnimations[SAIndex].Animations[AnimID].Frames[FrameIndex].Vertex.ReserveL(pMesh.vertexSize);	
+							if (ShapeKeyAnimations[SAIndex].Animations[AnimID].Frames.Count() > 1 && ShapeKeyAnimations[SAIndex].NextFrame == 0){
 								ShapeKeyAnimations[SAIndex].NextFrame = 1;
-							}		
-
-							TLex8 lex(line.Mid(8));  // Inicializa TLex con la subcadena a partir del tercer caracter
-							while (!lex.Eos()) {	
-								TPtrC8 currentString = lex.NextToken(); // Mostrar el mensaje con el valor actual del "string" y el contador
-								TLex8 testLex(currentString); // Crear un nuevo objeto TLex para la prueba
-
-								TInt number = 0;
-								TInt err = testLex.Val(number);
-								if (err == KErrNone){
-									switch (contador) {
-										case 0:
-											ShapeKeyAnimations[SAIndex].Frames[FrameIndex].MixSpeed = number;	
-											break;
-									}									
-								}			
-								contador++;					
-								lex.SkipSpace();
 							}					
-						}		
-						else {		
-							TLex8 lex(line.Mid(8));
-							while (!lex.Eos()) {								
-								lex.SkipSpace();
-							}						
+						}			
+						TLex8 lex(line.Mid(8));
+						while (!lex.Eos()) {								
+							lex.SkipSpace();
 						}
 					}							
 					else if (line.Left(4) == _L8("akf ")){	
@@ -5101,7 +5314,7 @@ void CWhisk3D::ImportAnimation(){
 								switch (contador) {
 									case 0:
 										number = number*2000;
-										NewShapeKeyVertex.vertexX = static_cast<GLshort>(number);
+										NewShapeKeyVertex.vertexZ = static_cast<GLshort>(-number);
 										break;
 									case 1:
 										number = number*2000;
@@ -5109,13 +5322,13 @@ void CWhisk3D::ImportAnimation(){
 										break;
 									case 2:
 										number = number*2000;
-										NewShapeKeyVertex.vertexZ = static_cast<GLshort>(number);
+										NewShapeKeyVertex.vertexX = static_cast<GLshort>(number);
 										break;
 									case 3:	
-										number = ((number +1)/2)* 255.0 - 128.0;
+										number = -(((number +1)/2)* 255.0 - 128.0);
 										if (number > 127.0){number = 127.0;}
 										else if (number < -128.0){number = -128.0;}
-										NewShapeKeyVertex.normalX = static_cast<GLbyte>(number); // Conversion a GLbyte
+										NewShapeKeyVertex.normalZ = static_cast<GLbyte>(number); // Conversion a GLbyte
 										break;
 									case 4:	
 										number = ((number +1)/2)* 255.0 - 128.0;
@@ -5127,7 +5340,7 @@ void CWhisk3D::ImportAnimation(){
 										number = ((number +1)/2)* 255.0 - 128.0;
 										if (number > 127.0){number = 127.0;}
 										else if (number < -128.0){number = -128.0;}
-										NewShapeKeyVertex.normalZ = static_cast<GLbyte>(number);	
+										NewShapeKeyVertex.normalX = static_cast<GLbyte>(number);	
 										break;
 								}
 							}
@@ -5136,7 +5349,7 @@ void CWhisk3D::ImportAnimation(){
 							lex.SkipSpace();				
 						}
 						if (esMesh){
-							ShapeKeyAnimations[SAIndex].Frames[FrameIndex].Vertex.Append(NewShapeKeyVertex);
+							ShapeKeyAnimations[SAIndex].Animations[AnimID].Frames[FrameIndex].Vertex.Append(NewShapeKeyVertex);
 						}
 					}
 					else if (line.Left(9) == _L8("rotacion ")) {						

@@ -215,12 +215,19 @@ class CWhisk3D : public CFiniteStateMachine, public MTextureLoadingListener
         void DeseleccionarTodo();
         void ImportOBJ();
 
+        void SetTrackTo();
+        void SetCopyRotation();
+        void SetCopyLocation();
+        void SetFollowPath();
+        void ReloadViewport(TBool hacerRedibujo);
+
         void ImportAnimation();
         void SetMixNormals();
         void SetMixFaces();
         void SetSpeedMix();
         void SetShapekeysInterpolation();
-        TInt CWhisk3D::BuscarShapeKeyAnimation(TInt ID);
+        void SetAnimation(TInt index);
+        TInt CWhisk3D::BuscarShapeKeyAnimation(TInt ID, TBool mostrarError);
 
         TBool LeerOBJ(RFs* fsSession, RFile* rFile, TFileName* file, TInt64* startPos, 
                         TInt* acumuladoVertices,

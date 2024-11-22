@@ -130,7 +130,13 @@ RESOURCE MENU_PANE r_whisk3D_menu
                 command = EWhisk3DModificadores;
                 cascade = r_viewport_overley_menu;
                 txt = STRING_r_Overlay;
-            },			
+            },		  	
+        	MENU_ITEM
+            {
+                command = EConstraints;
+                cascade = r_constraints_menu;
+                txt = STRING_r_Constraints;
+            },		
         	MENU_ITEM
             {
                 command = ETimelineMenu;
@@ -150,6 +156,34 @@ RESOURCE MENU_PANE r_whisk3D_menu
                 txt = STRING_r_Render;
             }
         };
+}
+
+//----------------------------------------------------
+//
+//    r_constraints_menu
+//
+//----------------------------------------------------
+//
+
+RESOURCE MENU_PANE r_constraints_menu {
+    items = { 		
+        MENU_ITEM {
+            command = ETrackTo;
+            txt = STRING_r_TrackTo;
+        },		
+        MENU_ITEM {
+            command = ECopyRotation;
+            txt = STRING_r_CopyRotation;
+        },			
+        MENU_ITEM {
+            command = ECopyLocation;
+            txt = STRING_r_CopyLocation;
+        },		
+        MENU_ITEM {
+            command = EFollowPath;
+            txt = STRING_r_FollowPath;
+        }	
+    };
 }
 
 //----------------------------------------------------
@@ -273,7 +307,11 @@ RESOURCE MENU_PANE r_animation_menu {
         MENU_ITEM {
             command = ESetShapekeysInterpolation;
             txt = STRING_r_SetShapekeysInterpolation;
-        },        
+        },     
+        MENU_ITEM {
+            command = ESetAnimation;
+            txt = STRING_r_SetAnimation;
+        },   
         MENU_ITEM {
             command = EImportAnimation;
             txt = STRING_r_ImportAnimation;
