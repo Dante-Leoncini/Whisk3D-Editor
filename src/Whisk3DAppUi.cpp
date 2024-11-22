@@ -670,6 +670,9 @@ void CWhisk3DAppUi::HandleCommandL(TInt aCommand){
             break;               
         case EFollowPath:
             iAppContainer->iWhisk3D->SetFollowPath();
+            break;         
+        case EClearConstraints:
+            iAppContainer->iWhisk3D->ClearConstraints();
             break;   
         case EInsertKeyframeRotation:
             iAppContainer->iWhisk3D->InsertKeyframe(AnimRotation);

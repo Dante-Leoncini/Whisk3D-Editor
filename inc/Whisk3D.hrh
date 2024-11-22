@@ -135,6 +135,7 @@ enum TWhisk3DMenuCommands
     ECopyRotation,
     ECopyLocation,
     EFollowPath,
+    EClearConstraints,
 
     EInsertKeyframeLocation,
     EInsertKeyframeRotation,

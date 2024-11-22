@@ -4962,6 +4962,20 @@ void CWhisk3D::SetCopyRotation(){
 
 void CWhisk3D::SetFollowPath(){}
 
+void CWhisk3D::ClearConstraints(){
+	//si no hay objetos
+	if (Objects.Count() < 1){return;}	
+	
+    // Iterar de adelante hacia atrás
+    for (TInt c = Constraints.Count() - 1; c >= 0; --c) {
+        if (Constraints[c].Id == SelectActivo) {
+            // Elimina el constraint actual
+            Constraints.Remove(c);
+        }
+    }
+	ReloadViewport(true);
+}
+
 void CWhisk3D::SetTrackTo(){
 	//si no hay objetos
 	if (Objects.Count() < 1){return;}	

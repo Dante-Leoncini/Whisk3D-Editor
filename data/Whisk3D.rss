@@ -182,7 +182,11 @@ RESOURCE MENU_PANE r_constraints_menu {
         MENU_ITEM {
             command = EFollowPath;
             txt = STRING_r_FollowPath;
-        }	
+        },		
+        MENU_ITEM {
+            command = EClearConstraints;
+            txt = STRING_r_ClearConstraints;
+        }		
     };
 }
 

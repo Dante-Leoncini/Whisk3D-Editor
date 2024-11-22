@@ -219,6 +219,7 @@ class CWhisk3D : public CFiniteStateMachine, public MTextureLoadingListener
         void SetCopyRotation();
         void SetCopyLocation();
         void SetFollowPath();
+        void ClearConstraints();
         void ReloadViewport(TBool hacerRedibujo);
 
         void ImportAnimation();

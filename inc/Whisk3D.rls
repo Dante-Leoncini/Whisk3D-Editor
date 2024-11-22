@@ -162,6 +162,7 @@ rls_string STRING_r_TrackTo            "Track To"
 rls_string STRING_r_CopyRotation       "Copy Rotation"
 rls_string STRING_r_CopyLocation       "Copy Location"
 rls_string STRING_r_FollowPath         "Follow Path"
+rls_string STRING_r_ClearConstraints   "Clear Constraints"
 
 rls_string STRING_r_InsertKeyframeLocation  "Insert keyframe Location"
 rls_string STRING_r_InsertKeyframeRotation  "Insert keyframe Rotation"
