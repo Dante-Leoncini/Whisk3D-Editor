@@ -6,7 +6,10 @@ ENGLISH: Whisk3D is a Blender clone, developed from scratch for Symbian s60v3.
 
 YouTube: [Youtube Video](https://youtu.be/dMe-Vit5OT0)
 
-Note: you need to have python installed on your phone for it to work! (pys60 2.0.0)
+Install: you need to have PyS60 installed, or it won’t run. If you don’t have it, I’ve included the installer in the "Dependencies" folder on GitHub. The latest version is always in the "sis" folder as "Whisk3D_gcce.sisx", though the latest version might not always work properly. The more polished versions are always in the "releases" folder, with their date and a name referencing the demos I show on Instagram.
+The program isn’t production-ready and has several known bugs. It’s constantly evolving, and I’m always adding or removing features. For example, the 3D modeling feature was removed in the latest versions, but if you use versions like Whisk3D_gcce_beta_24-08-15_FERNET.sisx, it was still available.
+
+Finally, if the installer fails, it’s likely you’ll need to hack your phone to bypass Symbian’s restrictions on certificates. Here’s a video showing how to do it: [tutorial hack](https://www.youtube.com/watch?v=UJJICzbk3TA)
 
 Clarifications:
 1) Not a port: This program does not share any code with the original Blender.
