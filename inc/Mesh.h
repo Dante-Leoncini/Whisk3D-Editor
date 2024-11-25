@@ -113,6 +113,15 @@ class Constraint {
 		TBool opcion;
 };
 
+enum{array, mirror,	screw, boolean};
+class Modifier { 
+	public:
+		TInt type;
+		TInt Id;
+		TInt Target;
+        RArray<TBool> OpcionesTBool;
+};
+
 class Mesh { 
 	public:
 		TInt vertexSize;
@@ -127,6 +136,23 @@ class Mesh {
    		TInt facesSize;
    		GLushort* faces;
         RArray<MaterialGroup> materialsGroup;
+		RArray<TInt> Modifiers;
+
+		//libera la memoria
+		void Mesh::LiberarMemoria(){
+			delete[] vertex;
+			delete[] vertexColor;
+			delete[] normals;
+			delete[] uv;
+			for(TInt i=0; i < vertexGroups.Count(); i++){
+				vertexGroups[i].indices.Close();
+			}
+			vertexGroups.Close();
+
+			delete[] faces;
+			materialsGroup.Close();
+			Modifiers.Close();
+		}
 };
 
 class FaceCorners {

@@ -388,12 +388,6 @@ enum{
 };
 
 enum{
-	array,
-	mirror,
-	screw
-};
-
-enum{
 	vertexSelect, edgeSelect, faceSelect
 };
 

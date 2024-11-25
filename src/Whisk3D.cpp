@@ -272,6 +272,8 @@ RArray<Mesh> Meshes;
 RArray<AnimationObject> AnimationObjects;
 RArray<ShapeKeyAnimation> ShapeKeyAnimations;
 RArray<Constraint> Constraints;
+RArray<Modifier> Modifiers;
+
 TInt tipoSelect = vertexSelect;
 TInt SelectActivo = 0;
 TInt SelectCount = 0;
@@ -677,9 +679,9 @@ void CWhisk3D::calculateReflectionUVs(Mesh& pMesh) {
 
 void CWhisk3D::RenderMesh( Object& obj, TInt indice ){
 	Mesh& pMesh = Meshes[obj.Id];	
-    glPushMatrix();
-    glScalex(obj.scaleX, obj.scaleZ, obj.scaleY);	
-		
+	glPushMatrix();
+	glScalex(obj.scaleX, obj.scaleZ, obj.scaleY);
+			
 	glColor4f(ListaColores[blanco][0],ListaColores[blanco][1],ListaColores[blanco][2],ListaColores[blanco][3]);
 	glDisable(GL_COLOR_MATERIAL);
 	glMaterialfv(   GL_FRONT_AND_BACK, GL_AMBIENT,  objAmbient  );
@@ -765,6 +767,33 @@ void CWhisk3D::RenderMesh( Object& obj, TInt indice ){
 			glMaterialfv(   GL_FRONT_AND_BACK, GL_EMISSION, mat.emission );
 
 			glDrawElements( GL_TRIANGLES, pMesh.materialsGroup[f].indicesDrawnCount, GL_UNSIGNED_SHORT, &pMesh.faces[pMesh.materialsGroup[f].startDrawn] );
+
+			for (TInt mdf = 0; mdf < pMesh.Modifiers.Count(); ++mdf) {	
+				Modifier& modificador = Modifiers[pMesh.Modifiers[mdf]];
+				switch (modificador.type) {
+					case mirror:
+						if (modificador.OpcionesTBool[0]){	
+							glPopMatrix();						
+							glPushMatrix();
+							glScalex(-obj.scaleX, obj.scaleZ, obj.scaleY);
+							glScalex(-1, 0, 0);
+							glDrawElements( GL_TRIANGLES, pMesh.materialsGroup[f].indicesDrawnCount, GL_UNSIGNED_SHORT, &pMesh.faces[pMesh.materialsGroup[f].startDrawn] );
+						}
+						if (modificador.OpcionesTBool[1]){	
+							glPopMatrix();				
+							glPushMatrix();
+							glScalex(obj.scaleX, obj.scaleZ, -obj.scaleY);
+							glDrawElements( GL_TRIANGLES, pMesh.materialsGroup[f].indicesDrawnCount, GL_UNSIGNED_SHORT, &pMesh.faces[pMesh.materialsGroup[f].startDrawn] );
+						}
+						if (modificador.OpcionesTBool[2]){	
+							glPopMatrix();
+							glPushMatrix();
+							glScalex(obj.scaleX, -obj.scaleZ, obj.scaleY);
+							glDrawElements( GL_TRIANGLES, pMesh.materialsGroup[f].indicesDrawnCount, GL_UNSIGNED_SHORT, &pMesh.faces[pMesh.materialsGroup[f].startDrawn] );
+						}
+						break;
+				}
+			}
 		}
 	}	
 	//modelo sin textura
@@ -812,7 +841,7 @@ void CWhisk3D::RenderMesh( Object& obj, TInt indice ){
 			glLineWidth(1); //lo deja en su valor por defecto	 
 		}	
 	};*/
-    glPopMatrix();
+	glPopMatrix();
 }
 
 // Funcion recursiva para renderizar un objeto y sus hijos
@@ -3042,21 +3071,7 @@ void CWhisk3D::BorrarMesh(TInt indice){
 				Objects[o].Id--;
 			};				
 		}
-		Mesh& pMesh = Meshes[indice];
-		//primero se borran los objetos a los que apunta el mesh
-		delete[] pMesh.vertex;
-		delete[] pMesh.vertexColor;
-		delete[] pMesh.normals;
-		delete[] pMesh.uv;
-		for(TInt i=0; i < pMesh.vertexGroups.Count(); i++){
-			pMesh.vertexGroups[i].indices.Close();
-		}
-		pMesh.vertexGroups.Close();
-
-		delete[] pMesh.faces;
-		pMesh.materialsGroup.Close();
-
-		//ahora se borra el mesh
+		Meshes[indice].LiberarMemoria();
 		Meshes.Remove(indice);
 	}
 }
@@ -4107,13 +4122,46 @@ enum{
     cameraView
 };
 
-enum{
-	array,
-	mirror,
-	screw
-};
+void CWhisk3D::AddModificador(TInt opcion){	
+	//si no hay objetos
+	if (Objects.Count() < 1){return;}	
+	Object& obj = Objects[SelectActivo];
+	//si no es un mesh
+	if (obj.type != mesh){return;}	
+	Mesh& pMesh = Meshes[obj.Id];
 
-void CWhisk3D::AddModificador(TInt opcion){
+	HBufC* noteBuf = HBufC::NewLC(100);
+	Modifier NewModifier;
+	NewModifier.Id = SelectActivo;
+	switch (opcion) {
+		case mirror:
+			NewModifier.type = mirror;
+			
+			_LIT(KFormatString, "Seleccione Objeto entre 1 y %d seleccionado: %d");
+			noteBuf->Des().Format(KFormatString, Objects.Count(), SelectActivo + 1);
+			NewModifier.Target = DialogNumber(1, 1, Objects.Count(), noteBuf);
+			NewModifier.Target -= 1; // Ajustar a índice base 0.			
+
+			_LIT(KEpejarX, "�Espejar en el eje X?");
+			noteBuf->Des().Format(KEpejarX);
+			TBool BooleanValor = CDialogs::Alert(noteBuf);
+			NewModifier.OpcionesTBool.Append(BooleanValor);
+
+			_LIT(KEpejarY, "�Espejar en el eje Y?");
+			noteBuf->Des().Format(KEpejarY);
+			BooleanValor = CDialogs::Alert(noteBuf);
+			NewModifier.OpcionesTBool.Append(BooleanValor);
+
+			_LIT(KEpejarZ, "�Espejar en el eje Z?");
+			noteBuf->Des().Format(KEpejarZ);
+			BooleanValor = CDialogs::Alert(noteBuf);
+			NewModifier.OpcionesTBool.Append(BooleanValor);			
+			break;
+	}
+	pMesh.Modifiers.Append(Modifiers.Count());
+	Modifiers.Append(NewModifier);
+	CleanupStack::PopAndDestroy(noteBuf);
+
 	/*Mesh& obj = Objects[SelectActivo];
 	if (opcion == mirror){
 		//primero crea los array temporales y les suma el espacio del nuevo vertice
@@ -4211,7 +4259,7 @@ void CWhisk3D::AddModificador(TInt opcion){
 		delete[] TempVertexGroupIndices;*/
 		//CleanupStack::PopAndDestroy(noteBuf);
 	//}
-	/*redibujar = true;*/
+	redibujar = true;
 }
 
 //mira si no hay camara activa
