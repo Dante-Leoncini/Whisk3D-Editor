@@ -92,7 +92,8 @@ class CWhisk3D : public CFiniteStateMachine, public MTextureLoadingListener
          * Renders one frame.
          * @param aFrame Number of the frame to be rendered.
          */
-        void AppCycle( TInt aFrame, GLfloat aTimeSecs, GLfloat aDeltaTimeSecs );
+        TBool AppCycle( GLfloat aDeltaTimeSecs );
+        void AppRender();
 
     	/**
     	 * Called when the finite state machine enters a new state.

@@ -10,13 +10,13 @@ NAME    AWIZ // 4 letter ID
 
 //  INCLUDES
 #include <eikon.rh>
+#include <avkon.rh>
+#include <CommonDialogs.rh>
 #include "whisk3D.hrh"
 #include "whisk3D.rls"
 #include <avkon.rsg>
-#include <avkon.rh>
 #include <avkon.mbg>
 #include <appinfo.rh>
-#include <CommonDialogs.rh>
 
 //  RESOURCE DEFINITIONS
 RESOURCE RSS_SIGNATURE { }

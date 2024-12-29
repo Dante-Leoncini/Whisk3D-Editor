@@ -113,6 +113,7 @@ void CWhisk3DContainer::ConstructL(const TRect& /*aRect*/){
 				EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
         EGL_BUFFER_SIZE,  BufferSize,
         EGL_DEPTH_SIZE,   16,
+        //EGL_RENDER_BUFFER, EGL_BACK_BUFFER, // Habilita doble buffer
 				EGL_SAMPLE_BUFFERS, 1,
 				EGL_SAMPLES,        4,//antialiasing
         EGL_NONE
@@ -122,6 +123,7 @@ void CWhisk3DContainer::ConstructL(const TRect& /*aRect*/){
         EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
         EGL_BUFFER_SIZE, BufferSize,
         EGL_DEPTH_SIZE, 16,
+        //EGL_RENDER_BUFFER, EGL_BACK_BUFFER, // Habilita doble buffer
         EGL_SAMPLE_BUFFERS, 0,  // Desactiva el antialiasing
         EGL_SAMPLES, 0,         // Desactiva el antialiasing
         EGL_NONE
@@ -205,7 +207,7 @@ void CWhisk3DContainer::ConstructL(const TRect& /*aRect*/){
                                                                   // animating the scene
     iPeriodic->Start( 100, 100,
                       TCallBack( CWhisk3DContainer::DrawCallBack, this ) );
-    }
+}
 
 // ------------------------------------------------------------------------------
 // CBillboardContainer::OfferKeyEventL()
@@ -356,28 +358,30 @@ int CWhisk3DContainer::DrawCallBack( TAny* aInstance )
     instance->iLastFrameTimeSecs = timeSecs;
 
     // Call the main OpenGL ES Symbian rendering 'loop'
-    instance->iWhisk3D->AppCycle( instance->iFrame, timeSecs, deltaTimeSecs );
+    TBool renderizar = instance->iWhisk3D->AppCycle( deltaTimeSecs );
+    
+    if (true){
+        instance->iWhisk3D->AppRender();
 
-    // Call eglSwapBuffers, which blit the graphics to the window
-    eglSwapBuffers( instance->iEglDisplay, instance->iEglSurface );
+        // Call eglSwapBuffers, which blit the graphics to the window
+        eglSwapBuffers( instance->iEglDisplay, instance->iEglSurface );
+    }
 
     // To keep the background light on
-    if ( !(instance->iFrame%100) )
-        {
+    if ( !(instance->iFrame%100) ){
         User::ResetInactivityTime();
-        }
+    }
 
     /* Suspend the current thread for a short while. Give some time
        to other threads and AOs, avoids the ViewSrv error in ARMI and
        THUMB release builds. One may try to decrease the callback
        function instead of this. */
-    if ( !(instance->iFrame%50) )
-         {
-         User::After(0);
-         }
+    if ( !(instance->iFrame%50) ){
+        User::After(0);
+    }
 
     return 0;
-    }
+}
 
 // -----------------------------------------------------------------------------
 // CAknExNoteContainer::DialogDismissedL()

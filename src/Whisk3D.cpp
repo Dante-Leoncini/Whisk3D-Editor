@@ -1476,10 +1476,10 @@ void CWhisk3D::SetFrameRate(){
 }
 
 
-void CWhisk3D::AppCycle( TInt iFrame, GLfloat aTimeSecs, GLfloat aDeltaTimeSecs ){
+TBool CWhisk3D::AppCycle( GLfloat aDeltaTimeSecs ){
     // If texture loading is still going on, return from this method without doing anything.
 	if ( GetState() == ELoadingTextures ){
-        return;
+        return false;
     }
 	GLfixed fixedDeltaTimeSecs = FLOAT_2_FIXED( aDeltaTimeSecs );
 	// Controles
@@ -1506,7 +1506,7 @@ void CWhisk3D::AppCycle( TInt iFrame, GLfloat aTimeSecs, GLfloat aDeltaTimeSecs 
 			delete pixels;
 			postProcesado = false;
 		}*/
-		return;
+		return false;
 	}
 	//postProcesado = true;
 
@@ -1527,7 +1527,10 @@ void CWhisk3D::AppCycle( TInt iFrame, GLfloat aTimeSecs, GLfloat aDeltaTimeSecs 
 			ReloadAnimation();
         }
 	}
+	return true;
+}
 
+void CWhisk3D::AppRender(){
 	if (SimularZBuffer){
 		glClearColor(0.0f, 0.0f, 0.0f, 1.0f); // Color negro
 		glEnable(GL_FOG);
@@ -4714,19 +4717,19 @@ void CWhisk3D::LeerMTL(const TFileName& aFile, TInt objetosCargados) {
 	HBufC* materialName16 = HBufC::NewLC(180);
 	HBufC* noteBuf3 = HBufC::NewLC(180);
 	
-	RPointerArray<Object> objs; // Array de punteros a Object
+	/*RPointerArray<Object> objs; // Array de punteros a Object
 	RPointerArray<Mesh> pMeshs; // Array de punteros a Meshes
 	// Llena el array con punteros a los objetos
 	for (TInt c = 0; c <= SelectActivo; ++c){
 		Object* obj = &Objects[SelectActivo - c];
 		Mesh* pMesh = &Meshes[obj->Id];
 		objs.Append(obj);
-		pMeshs.Append(pMesh);
+		pMeshs.Append(pMesh);*/
 		
 		/*_LIT(KFormatString3, "Pmesh %d\nID obj:: %d");
 		noteBuf3->Des().Format(KFormatString3, pMeshs.Count(), obj->Id);
 		CDialogs::Alert(noteBuf3);*/
-	};
+	//};
 
 	Material* mat = NULL; 
 	TBool encontrado = false;
@@ -4771,20 +4774,29 @@ void CWhisk3D::LeerMTL(const TFileName& aFile, TInt objetosCargados) {
 					//buscar el material con el mismo nombre
 					encontrado = false;
 
-					for(TInt pm=0; pm < pMeshs.Count(); pm++){
+					/*for(TInt pm=0; pm < pMeshs.Count(); pm++){
 					    Mesh* pMesh = pMeshs[pm]; // Obtener el puntero al Mesh actual
 						for(TInt f=0; f < pMesh->materialsGroup.Count(); f++){
 							//no se puede usar el material 0. ese el que es por defecto y no se toca por mas que se llame igual
 							if (Materials[pMesh->materialsGroup[f].material].name->Compare(*materialName16) == 0 && pMesh->materialsGroup[f].material != 0){
 								mat = &Materials[pMesh->materialsGroup[f].material];								
-								/*_LIT(KFormatString3, "newmtl %S encontrado\nMaterial: %d");
+								_LIT(KFormatString3, "newmtl %S encontrado\nMaterial: %d");
 								noteBuf3->Des().Format(KFormatString3, materialName16, pMesh->materialsGroup[f].material+1);
-								CDialogs::Alert(noteBuf3);*/								
+								CDialogs::Alert(noteBuf3);								
 								encontrado = true;
 								break;
 							}
 						}	
-					}	
+					}	*/
+					
+					for (TInt m = 1; m < Materials.Count(); m++) {
+					    // Compara el nombre del material con el proporcionado
+					    if (Materials[m].name->Compare(*materialName16) == 0) {
+					        mat = &Materials[m];
+					        encontrado = true;
+					        break;
+					    }
+					}
                 } 
 				else if (encontrado){
 					//specular
@@ -6354,7 +6366,8 @@ void CWhisk3D::SaveCanvasToImage(TBool secuencia, TBool showUi)  {
 		ReloadAnimation();
 		for (int r = 0; r < EndFrame; ++r) {	
 			redibujar = true;
-			AppCycle(0, 0, 0);		
+			AppCycle(0);	
+			AppRender();	
     		glReadPixels(0, 0, iScreenWidth, iScreenHeight, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
 			buffer.Format(KFileName, CurrentFrame);
 			fileName.Copy(buffer);
@@ -6365,7 +6378,8 @@ void CWhisk3D::SaveCanvasToImage(TBool secuencia, TBool showUi)  {
 	}
 	else {   
 		redibujar = true;
-		AppCycle(0, 0, 0);
+		AppCycle(0);
+		AppRender();
 		glReadPixels(0, 0, iScreenWidth, iScreenHeight, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
 
 		//postprocesado
@@ -6377,7 +6391,8 @@ void CWhisk3D::SaveCanvasToImage(TBool secuencia, TBool showUi)  {
 
 		SimularZBuffer = true;
 		redibujar = true;
-		AppCycle(0, 0, 0);	
+		AppCycle(0);	
+		AppRender();
 		glReadPixels(0, 0, iScreenWidth, iScreenHeight, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
 
 		buffer.Format(KFileNameZbuffer, CurrentFrame);
