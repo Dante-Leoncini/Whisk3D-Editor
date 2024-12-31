@@ -298,9 +298,6 @@ TKeyResponse CWhisk3DAppUi::HandleKeyEventL(const TKeyEvent& aKeyEvent, TEventCo
                 case(196): //llamada
                     iAppContainer->iWhisk3D->ChangeEje();
                     return EKeyWasConsumed;
-                case(65): //A
-                    iAppContainer->iWhisk3D->SeleccionarTodo();
-                    return EKeyWasConsumed;
                 case(71): //G
                     iAppContainer->iWhisk3D->SetPosicion();
                     return EKeyWasConsumed;

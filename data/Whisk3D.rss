@@ -955,6 +955,77 @@ RESOURCE ARRAY r_aknexquery_list_single_pane_item {
 	};
 }
 
+RESOURCE DIALOG r_animation_list_single_pane {
+    flags = EGeneralQueryFlags;
+    buttons = R_AVKON_SOFTKEYS_OK_CANCEL;
+    items = {
+        DLG_LINE
+            {
+            type = EAknCtListQueryControl;
+            id = EListQueryControl;
+            control = AVKON_LIST_QUERY_CONTROL
+                {
+                listtype = EAknCtSinglePopupMenuListBox;
+                listbox = LISTBOX
+                    {
+                    flags = EAknListBoxMenuList;
+                    array_id = r_animation_list_single_pane_item;
+                    };
+                heading = STRING_r_Animation;
+                };
+            }
+	};
+}
+
+RESOURCE ARRAY r_animation_list_single_pane_item {
+    items = {
+        //LBUF { txt = STRING_r_InsertKeyframeLocation; },	   
+        //LBUF { txt = STRING_r_InsertKeyframeRotation; },  		
+        //LBUF { txt = STRING_r_InsertKeyframeScale; },			
+        //LBUF { txt = STRING_r_RemoveKeyframes; },		
+        //LBUF { txt = STRING_r_ClearKeyframes; },	  			  	
+        //LBUF { txt = STRING_r_SetMixNormals; },					
+        //LBUF { txt = STRING_r_SetMixFaces; },					
+        LBUF { txt = STRING_r_SetSpeedMix; },				
+        LBUF { txt = STRING_r_SetShapekeysInterpolation; },				
+        LBUF { txt = STRING_r_SetAnimation; },				
+        LBUF { txt = STRING_r_ImportAnimation; }
+	};
+}
+
+RESOURCE DIALOG r_timeline_list_single_pane {
+    flags = EGeneralQueryFlags;
+    buttons = R_AVKON_SOFTKEYS_OK_CANCEL;
+    items = {
+        DLG_LINE
+            {
+            type = EAknCtListQueryControl;
+            id = EListQueryControl;
+            control = AVKON_LIST_QUERY_CONTROL
+                {
+                listtype = EAknCtSinglePopupMenuListBox;
+                listbox = LISTBOX
+                    {
+                    flags = EAknListBoxMenuList;
+                    array_id = r_timeline_list_single_pane_item;
+                    };
+                heading = STRING_r_Timeline;
+                };
+            }
+	};
+}
+
+RESOURCE ARRAY r_timeline_list_single_pane_item {
+    items = {
+        LBUF { txt = STRING_r_Play; },	   
+        LBUF { txt = STRING_r_SetCurrentFrame; },  		
+        LBUF { txt = STRING_r_ShowTimeline; },			
+        LBUF { txt = STRING_r_SetStartFrame; },		
+        LBUF { txt = STRING_r_SetEndFrame; },		
+        LBUF { txt = STRING_r_SetFrameRate; }
+	};
+}
+
 RESOURCE DIALOG r_transform_list_single_pane {
     flags = EGeneralQueryFlags;
     buttons = R_AVKON_SOFTKEYS_OK_CANCEL;
@@ -969,8 +1040,6 @@ RESOURCE DIALOG r_transform_list_single_pane {
                 listbox = LISTBOX
                     {
                     flags = EAknListBoxMenuList;
-                    //height = WHISK3D_LISTBOX_HEIGHT;
-                    //width = WHISK3D_LISTBOX_WIDTH;
                     array_id = r_transforms_list_items;
                     };
                 heading = STRING_r_Transform;

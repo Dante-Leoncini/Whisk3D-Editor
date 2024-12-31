@@ -2700,7 +2700,16 @@ void CWhisk3D::SetPosicion(){
 void CWhisk3D::EventKeyDown(TInt scan){
 	switch(scan){               
 		/*case(4): //ESC no anda...
-			Cancelar(); */   
+			Cancelar(); */  
+		case(65): //A
+			if (iShiftPressed){
+				ShiftCount = 40;
+				ShowAddMenu();				
+			}
+			else {
+				SeleccionarTodo();
+			}
+			break;
 		case(68): //D
 			if (iShiftPressed){
 				ShiftCount = 40;
@@ -4667,15 +4676,10 @@ void CWhisk3D::ShowMenu(){
 				dialogoSymbian = false;
     			ShowAddMenu();
     			break;
-    		case 1:
-    			AddMesh(plane);
-    			break;
-    		case 2:
-    			ImportOBJ();
-    			break;
-    		case 7:
-    			Borrar();
-    			break;
+    		case 3:
+				dialogoSymbian = false;
+    			ShowTimelineMenu();
+    			break;				
     		default:
     			break;
     	}    	
@@ -4704,12 +4708,12 @@ void CWhisk3D::ShowAddMenu(){
     		case 2:
     			AddMesh(circle);
     			break;
-    		case 3:
+    		/*case 3:
     			AddMesh(vertice);
-    			break;
-    		/*case 4:
-    			AddObject(empty);
     			break;*/
+    		case 3:
+    			AddObject(empty);
+    			break;
     		case 4:
     			AddObject(camera);
     			break;
@@ -4718,6 +4722,74 @@ void CWhisk3D::ShowAddMenu(){
     			break;
     		case 6:
     			ImportOBJ();
+    			break;
+    		default:
+    			break;
+    	}    	
+    }
+	dialogoSymbian = false;
+}
+
+void CWhisk3D::ShowAnimationMenu(){
+	if (dialogoSymbian){return;};
+	dialogoSymbian = true;
+	TInt aResourceId = R_ANIMATION_LIST_SINGLE_PANE;
+    CAknListQueryDialog* dlg;
+    TInt index( 0 );
+    
+	dlg = new ( ELeave ) CAknListQueryDialog( &index );
+
+    if (dlg->ExecuteLD( aResourceId ) ){
+		dialogoSymbian = false;
+    	switch (index) {
+    		case 0:
+    			SetSpeedMix();
+    			break;
+    		case 1:
+    			SetShapekeysInterpolation();
+    			break;
+    		case 2:
+    			SetAnimation(-1);
+    			break;
+    		case 3:
+    			ImportAnimation();
+    			break;
+    		default:
+    			break;
+    	}    	
+    }
+	dialogoSymbian = false;
+}
+
+void CWhisk3D::ShowTimelineMenu(){
+	if (dialogoSymbian){return;};
+	dialogoSymbian = true;
+	TInt aResourceId = R_TIMELINE_LIST_SINGLE_PANE;
+    CAknListQueryDialog* dlg;
+    TInt index( 0 );
+    
+	dlg = new ( ELeave ) CAknListQueryDialog( &index );
+
+    if (dlg->ExecuteLD( aResourceId ) ){
+		dialogoSymbian = false;
+    	switch (index) {
+    		case 0:
+    			ToggleValue(PlayAnimation);
+    			break;
+    		case 1:
+    			SetCurrentFrame();
+    			break;
+    		case 2:
+    			ToggleValue(ShowTimeline);
+    			break;
+    		case 3:
+    			SetStartFrame();
+    			break;
+    		case 4:
+    			SetEndFrame();
+    			break;
+    		case 5:
+    			SetFrameRate();
     			break;
     		default:
     			break;
@@ -4741,11 +4813,9 @@ void CWhisk3D::ShowObjectMenu(){
     		case 0:
     			ShowTransformMenu();
     			break;
-    		case 1:
-    			AddMesh(plane);
-    			break;
-    		case 2:
-    			ImportOBJ();
+    		case 6:
+				dialogoSymbian = false;
+				ShowAnimationMenu();
     			break;
     		case 7:
     			Borrar();

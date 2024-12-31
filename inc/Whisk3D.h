@@ -289,6 +289,8 @@ class CWhisk3D : public CFiniteStateMachine, public MTextureLoadingListener
         void ShowAddMenu();  
         void ShowObjectMenu();
         void ShowTransformMenu();
+        void ShowAnimationMenu();
+        void ShowTimelineMenu();
         
         //cambiar el shader en el viewport
         void SetShading( TInt valor );        
