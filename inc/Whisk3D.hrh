@@ -146,13 +146,6 @@ enum TWhisk3DMenuCommands
     EClearKeyframes
 };
 
-enum TAknExNoteNoteControlIds {
-    EAknExNoteCtrlIdErrorNote = 0x100,
-    EAknExNoteCtrlIdProgressNote,
-    EAknExNoteCtrlIdWaitNote,
-    EAknExNoteCtrlIdDynamicText    
-};
-
 //enum TWhisk3DNoteControlIds {
 //    EWhisk3DProgressNote,
 //    EWhisk3DWaitNote

@@ -380,48 +380,25 @@ TKeyResponse CWhisk3DAppUi::HandleKeyEventL(const TKeyEvent& aKeyEvent, TEventCo
 }
 
 void CWhisk3DAppUi::TestTouch(){
-    /*// Crear un array con las opciones
-    CDesCArrayFlat* optionsArray = new (ELeave) CDesCArrayFlat(3);
-    CleanupStack::PushL(optionsArray);
+	/*TInt selectedIndex = 0; // Variable para almacenar el índice seleccionado
+    CAknListQueryDialog* dialog = new (ELeave) CAknListQueryDialog(&selectedIndex);
+    
+    // Configurar los elementos para el diálogo
+    CDesCArrayFlat* items = new (ELeave) CDesCArrayFlat(5);
+    CleanupStack::PushL(items);
+    items->AppendL(_L("Item 1"));
+    items->AppendL(_L("Item 2"));
+    items->AppendL(_L("Item 3"));
+    dialog->SetItemTextArray(items);
+    dialog->SetOwnershipType(ELbmOwnsItemArray);
 
-    optionsArray->AppendL(_L("Opcion 1"));
-    optionsArray->AppendL(_L("Opcion 2"));
-    optionsArray->AppendL(_L("Opcion 3"));
-
-    // Crear un cuadro emergente con las opciones
-    TInt selectedOption = -1; // Para capturar la selección del usuario
-    CAknListQueryDialog* popupDialog = CAknListQueryDialog::NewL(&selectedOption);
-
-    popupDialog->PrepareLC(R_AVKON_LIST_QUERY_DIALOG);
-    popupDialog->SetItemTextArray(optionsArray);
-    popupDialog->SetOwnershipType(ELbmOwnsItemArray);
-
-    // Mostrar el cuadro de di�logo
-    TInt selectedOption = popupDialog->RunLD();
-
-    // Manejar la selecci�n del usuario
-    if (selectedOption >= 0)
-    {
-        // El usuario seleccion� una opci�n
-        switch (selectedOption)
-        {
-        case 0:
-            // Acci�n para "Opci�n 1"
-            break;
-        case 1:
-            // Acci�n para "Opci�n 2"
-            break;
-        case 2:
-            // Acci�n para "Opci�n 3"
-            break;
-        }
-    }
-    else
-    {
-        // El usuario cancel� el di�logo
+    // Mostrar el diálogo
+    if (dialog->ExecuteLD(R_CE_DEFAULT_SORTING_PARAM_QUERY)){
+        // Procesar el índice seleccionado
+        CEikonEnv::Static()->InfoMsg(_L("Seleccionaste un ítem"));
     }
 
-    CleanupStack::PopAndDestroy(optionsArray); // Limpiar memoria*/
+    CleanupStack::PopAndDestroy(items); // items*/
 }
 
 

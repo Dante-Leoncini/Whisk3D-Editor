@@ -9,20 +9,29 @@
 #include <aknnotecontrol.h>
 
 // INCLUDE FILES
-#include <eiklabel.h>
-#include <e32math.h>
-#include <aknglobalnote.h>
-#include <aknwaitdialog.h>
+#include <eiklabel.h> // For label control
+//#include <eikclb.h>   // For listbox
+//#include <eiktxlbm.h> // For listbox model
+//#include <eikclbd.h>  // For listbox data
+//#include <aknlists.h> // For list pane
+
+//#include <e32math.h>
+//#include <aknglobalnote.h>
+//#include <aknwaitdialog.h>
 //#include <aknexnote.rsg>
-#include <eikprogi.h>
-#include <aknnotecontrol.h>
+//#include <eikprogi.h>
+//#include <aknnotecontrol.h>
+
+#include <AknMessageQueryDialog.h> // for global message query
 
 #include "Whisk3DContainer.h"
 #include "Whisk3DAppUi.h"
 #include "whisk3D.hrh"
+#include <Whisk3D.rsg>
 
 // CONSTANTS
 #include "Whisk3DConstants.h"
+
 
 
 // ================= MEMBER FUNCTIONS =======================
@@ -225,10 +234,10 @@ void CWhisk3DContainer::HandlePointerEventL(const TPointerEvent& aPointerEvent) 
         iWhisk3D->TerminaTactil(touchPosition);  // Terminar la acciÃ³n
         
         // Obtener el AppUi asociado
-		CWhisk3DAppUi* appUi = static_cast<CWhisk3DAppUi*>(iCoeEnv->AppUi());
+		/*CWhisk3DAppUi* appUi = static_cast<CWhisk3DAppUi*>(iCoeEnv->AppUi());
 		if (appUi){
 			TRAP_IGNORE(appUi->TestTouch()); // Llamar a la función de AppUi
-		}
+		}		*/
     }
     else if (aPointerEvent.iType == TPointerEvent::EDrag) {
         // Si el dedo se mueve mientras se mantiene presionado
@@ -237,6 +246,11 @@ void CWhisk3DContainer::HandlePointerEventL(const TPointerEvent& aPointerEvent) 
     }
     CCoeControl::HandlePointerEventL(aPointerEvent);
 }
+
+enum{
+	cubo, esfera, cilindro, plane, vacio, camara,
+    cad, luz, vertice, circle
+};
 
 // ------------------------------------------------------------------------------
 // CBillboardContainer::OfferKeyEventL()

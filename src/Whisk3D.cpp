@@ -4621,6 +4621,28 @@ void CWhisk3D::TerminaTactil(TPoint touchPosition){
 	DragTouchX = touchPosition.iX;
 	DragTouchY = touchPosition.iY;
 	redibujar = true;
+	ShowListQueryL();
+}
+
+void CWhisk3D::ShowListQueryL(){
+	TInt aResourceId = R_WHISK3D_LIST_SINGLE_PANE;
+    CAknListQueryDialog* dlg;
+    TInt index( 0 );
+    
+	dlg = new ( ELeave ) CAknListQueryDialog( &index );
+
+    if (dlg->ExecuteLD( aResourceId ) ){
+    	switch (index) {
+    		case 0:
+    			AddMesh(plane);
+    			break;
+    		case 1:
+    			ImportOBJ();
+    			break;
+    		default:
+    			break;
+    	}    	
+    }
 }
 
 // -----------------------------------------------------------------------------

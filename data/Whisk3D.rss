@@ -10,13 +10,18 @@ NAME    AWIZ // 4 letter ID
 
 //  INCLUDES
 #include <eikon.rh>
+#include <avkon.rsg>
 #include <avkon.rh>
+#include <appinfo.rh>
+#include <aknexquery.mbg>
+
 #include <CommonDialogs.rh>
 #include "whisk3D.hrh"
 #include "whisk3D.rls"
-#include <avkon.rsg>
 #include <avkon.mbg>
-#include <appinfo.rh>
+
+#define WHISK3D_LISTBOX_HEIGHT 3
+#define WHISK3D_LISTBOX_WIDTH 3
 
 //  RESOURCE DEFINITIONS
 RESOURCE RSS_SIGNATURE { }
@@ -431,6 +436,26 @@ RESOURCE MENU_PANE r_viewport_add_menu{
     };
 }
 
+
+
+//-----------------------------------------------------------------------------
+//
+//    r_aknexquery_list_single_pane_item
+//    Items array for List Query
+//
+//-----------------------------------------------------------------------------
+//
+RESOURCE ARRAY r_aknexquery_list_single_pane_item {
+    items = {
+		LBUF {
+            txt = STRING_r_Plane;
+        },   
+        LBUF {
+            txt = STRING_r_ImportOBJ;
+        }  
+	};
+}
+
 //----------------------------------------------------
 //
 //    r_whisk3D_vista3D_menu
@@ -834,87 +859,36 @@ RESOURCE LOCALISABLE_APP_INFO r_whisk3D_localisable_app_info{
         };
 }
 
-//Dialogos
-//-----------------------------------------------------------------------------
-//
-//    r_aknexnote_error_note
-//    For error note.
-//
-//-----------------------------------------------------------------------------
-//
-RESOURCE DIALOG r_aknexnote_error_note
-    {
-    flags = EAknErrorNoteFlags;
-    items =
-        {
-        DLG_LINE
-            {
-            type = EAknCtNote;
-            id = EAknExNoteCtrlIdErrorNote;
-            control = AVKON_NOTE
-                {
-                layout = EGeneralLayout;
-                singular_label = STRING_r_exnt_error_singular;
-                plural_label = STRING_r_exnt_error_plural;
-                imagefile = AVKON_BMPFILE_NAME;
-                imageid = EMbmAvkonQgn_note_error;
-                imagemask = EMbmAvkonQgn_note_error_mask;
-                };
-            }
-        };
-    }
-
 // End of File
 
+//listas dinamicas
 //-----------------------------------------------------------------------------
 //
-//    r_whisk3D_wait_note_softkey_cancel
-//    Wait note with softkey Cancel.
+//    r_aknexquery_list_single_pane
+//    Resource of List Query.
 //
 //-----------------------------------------------------------------------------
 //
-RESOURCE DIALOG r_whisk3D_wait_note_softkey_cancel{
-    flags = EAknWaitNoteFlags;
-    buttons = r_whisk3D_softkeys_cancel;
+RESOURCE DIALOG r_whisk3D_list_single_pane {
+    flags = EGeneralQueryFlags;
+    buttons = R_AVKON_SOFTKEYS_OK_CANCEL;
     items = {
-        DLG_LINE {
-            type = EAknCtNote;
-            id = EAknExNoteCtrlIdWaitNote;
-            control= AVKON_NOTE { 
-                layout = EWaitLayout;
-                singular_label = STRING_r_exnt_wait_prompt;
-                imagefile = AVKON_BMPFILE_NAME;
-                imageid = EMbmAvkonQgn_note_voice;
-                imagemask = EMbmAvkonQgn_note_voice_mask;
-                animation = R_QGN_GRAF_WAIT_BAR_ANIM;
-            };
-        }
-    };
-}
-
-//-----------------------------------------------------------------------------
-//
-//    r_whisk3D_progress_note
-//    For progress note.
-//
-//-----------------------------------------------------------------------------
-//
-RESOURCE DIALOG r_whisk3D_progress_note {
-    flags = EAknProgressNoteFlags;
-    buttons = r_whisk3D_softkeys_cancel;
-    items = {
-        DLG_LINE {
-            type = EAknCtNote;
-            //id = EAknExNoteCtrlIdProgressNote;
-            id = EWhisk3DProgressNote;            
-            control = AVKON_NOTE {
-                layout = EProgressLayout;
-                singular_label = STRING_r_exnt_progress_singular;
-                plural_label = STRING_r_exnt_progress_plural;
-                imagefile = AVKON_BMPFILE_NAME;
-                imageid = EMbmAvkonQgn_note_progress;
-                imagemask = EMbmAvkonQgn_note_progress_mask;
-            };
-        }
-    };
+        DLG_LINE
+            {
+            type = EAknCtListQueryControl;
+            id = EListQueryControl;
+            control = AVKON_LIST_QUERY_CONTROL
+                {
+                listtype = EAknCtSinglePopupMenuListBox;
+                listbox = LISTBOX
+                    {
+                    flags = EAknListBoxMenuList;
+                    height = WHISK3D_LISTBOX_HEIGHT;
+                    width = WHISK3D_LISTBOX_WIDTH;
+                    array_id = r_aknexquery_list_single_pane_item;
+                    };
+                heading = STRING_r_aknexquery_list_title;
+                };
+            }
+	};
 }

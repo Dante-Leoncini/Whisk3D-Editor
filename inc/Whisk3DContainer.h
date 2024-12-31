@@ -9,22 +9,10 @@
 #define WHISK3DCONTAINER_H
 
 // INCLUDES
-#include <coecntrl.h>
-#include <aknnotedialog.h>
-#include <AknNotifyStd.h>
-#include <apadef.h>
-#include <aknprogressdialog.h>
 #include <GLES/egl.h>
-#include <akndef.h>
 
 #include "Whisk3D.h"
 #include "Whisk3Dinput.h"
-
-// CLASS DECLARATION
-
-// FORWARD DECLARATIONS
-class CEikLabel;
-class CAknExNoteView;
 
 /**
  * Container control class that handles the OpenGL ES initialization and deinitializations.
@@ -116,7 +104,7 @@ class CWhisk3DContainer : public CCoeControl, MCoeControlObserver
          */
         void HandleControlEventL(CCoeControl* aControl,TCoeEvent aEventType);
 
-    private: //data 
+    private: //data         
         /** Display where the OpenGL ES window surface resides. */
         EGLDisplay  iEglDisplay;
 

@@ -171,5 +171,16 @@ rls_string STRING_r_InsertKeyframeScale     "Insert keyframe Scale"
 rls_string STRING_r_RemoveKeyframes  "Remove keyframes"
 rls_string STRING_r_ClearKeyframes   "Clear keyframes"
 
+//
+// For list query tittle message
+//
+rls_string STRING_r_aknexquery_list_title        "Welcome note :"
+
+//
+// For list single pane
+//
+rls_string STRING_r_aknexquery_list_item1        "Edit"
+rls_string STRING_r_aknexquery_list_item2        "On"
+rls_string STRING_r_aknexquery_list_item3        "Off"
 
 // End of File
