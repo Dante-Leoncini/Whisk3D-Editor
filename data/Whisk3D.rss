@@ -799,26 +799,6 @@ RESOURCE MEMORYSELECTIONDIALOG r_whisk3D_select_dialog {
     };
 }
 
-//wait
-RESOURCE DIALOG r_whisk3D_wait_note {
-    flags = (((0x200  | 0x040  | 0x2000  )  | 0x002 ) ) ;
-    buttons = 0x8cc0010 ;
-    items =
-	{
-        DLG_LINE
-		{
-            type = EAknCtNote;
-            id = EGeneralNote;
-            control = AVKON_NOTE
-			{
-                layout = EWaitLayout;
-                singular_label = STRING_r_ce_wait_note;
-                animation = 0x8cc0140 ;
-			};
-		}
-	};
-}
-
 //test
 RESOURCE DIALOG r_accept_invitation_dlg {
     flags = EGeneralQueryFlags;

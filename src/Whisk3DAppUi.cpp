@@ -17,6 +17,10 @@
 
 #include <aknconsts.h>
 
+//para mostrar menus con listas
+#include <aknlistquerydialog.h> // Para el popup
+
+
 // ================= MEMBER FUNCTIONS =======================
 //
 // ----------------------------------------------------------
@@ -374,6 +378,52 @@ TKeyResponse CWhisk3DAppUi::HandleKeyEventL(const TKeyEvent& aKeyEvent, TEventCo
 	}
     return EKeyWasNotConsumed;
 }
+
+void CWhisk3DAppUi::TestTouch(){
+    /*// Crear un array con las opciones
+    CDesCArrayFlat* optionsArray = new (ELeave) CDesCArrayFlat(3);
+    CleanupStack::PushL(optionsArray);
+
+    optionsArray->AppendL(_L("Opcion 1"));
+    optionsArray->AppendL(_L("Opcion 2"));
+    optionsArray->AppendL(_L("Opcion 3"));
+
+    // Crear un cuadro emergente con las opciones
+    TInt selectedOption = -1; // Para capturar la selección del usuario
+    CAknListQueryDialog* popupDialog = CAknListQueryDialog::NewL(&selectedOption);
+
+    popupDialog->PrepareLC(R_AVKON_LIST_QUERY_DIALOG);
+    popupDialog->SetItemTextArray(optionsArray);
+    popupDialog->SetOwnershipType(ELbmOwnsItemArray);
+
+    // Mostrar el cuadro de di�logo
+    TInt selectedOption = popupDialog->RunLD();
+
+    // Manejar la selecci�n del usuario
+    if (selectedOption >= 0)
+    {
+        // El usuario seleccion� una opci�n
+        switch (selectedOption)
+        {
+        case 0:
+            // Acci�n para "Opci�n 1"
+            break;
+        case 1:
+            // Acci�n para "Opci�n 2"
+            break;
+        case 2:
+            // Acci�n para "Opci�n 3"
+            break;
+        }
+    }
+    else
+    {
+        // El usuario cancel� el di�logo
+    }
+
+    CleanupStack::PopAndDestroy(optionsArray); // Limpiar memoria*/
+}
+
 
 enum{
 	cubo, esfera, cilindro, plane, vacio, camara,

@@ -116,6 +116,11 @@ class CWhisk3D : public CFiniteStateMachine, public MTextureLoadingListener
         
         //mover al siguiente casillero
         void InputUsuario( GLfixed aDeltaTimeSecs );
+
+        //pantalla tactil
+        void StartTactil(TPoint touchPosition);
+        void ActualizarTactil(TPoint touchPosition);
+        void TerminaTactil(TPoint touchPosition);
         
         GLfloat GradosARadianes(TInt grados);
         void SetRotacion( void );

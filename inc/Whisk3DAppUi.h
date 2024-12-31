@@ -35,6 +35,8 @@ class CWhisk3DAppUi : public CAknAppUi
          */
         void ConstructL();
 
+        void TestTouch();
+
         /**
          * Destructor. Removes CWhisk3DContainer from the control
          * stack and destroys it.

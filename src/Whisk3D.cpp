@@ -100,6 +100,13 @@ enum{
 	grisUI
 };
 
+enum{
+	top,
+	front,
+	right,
+    cameraView
+};
+
 static const GLfloat LineaPiso[4]  =      { MATERIALCOLOR(0.29, 0.29, 0.29, 1.0) };
 static const GLfloat LineaPisoRoja[4]  =  { MATERIALCOLOR(0.56, 0.23, 0.28, 1.0) };
 static const GLfloat LineaPisoVerde[4]  = { MATERIALCOLOR(0.38, 0.53, 0.15, 1.0) };
@@ -128,14 +135,30 @@ static const GLfloat sunLightPosition[4]  = {-100, 1000, 1000, 0 }; // y, z, x, 
 //para las luces puntuales
 static const GLfloat positionPuntualLight[4] = {0, 0, 0, 1};
 
+//touch
+TBool TocandoPantalla = false;
+TBool SoltoPantalla = false;
+TInt StartTouchX = 0;
+TInt StartTouchY = 0;
+TInt DragTouchX = 0;
+TInt DragTouchY = 0;
+
+GLfloat OriginalLeftX = 0;
+GLfloat OriginalLeftY = 0;
+
 //camara
 TBool ortografica = false;
 GLfloat aspectRatio;
 GLfloat rotX = 113.5;
-GLfloat rotY = 20.0; //66.2
+GLfloat rotY = 20.0;
+GLfloat OriginalRotX = 113.5;
+GLfloat OriginalRotY = 20.0;
 GLfloat posX = 0;
 GLfloat posY = 0;
-GLfloat posZ = 0;
+GLfloat posZ = 0;		
+GLfloat OriginalPivotX = 0;
+GLfloat OriginalPivotY = 0;
+GLfloat OriginalPivotZ = 0;
 GLfloat PivotX = 0;
 GLfloat PivotY = 0;
 GLfloat PivotZ = 0;
@@ -2265,6 +2288,62 @@ void CWhisk3D::InputUsuario(GLfixed aDeltaTimeSecs){
 		}
 	}
 
+	//revisa si se apreto una flecha y actualiza los valores dependiendo el estado de la aplicacion
+	//ya sea animando, editando una malla 3d o en modo objeto
+	if (TocandoPantalla){
+		if (iShiftPressed || navegacionMode == Fly){	
+			GLfloat radRotX = rotX * PI / 180.0; // Rotación en radianes (X)
+			GLfloat radRotY = rotY * PI / 180.0; // Rotación en radianes (Y)
+
+			/*// Direcciones en el espacio global basadas en la rotación
+			GLfloat forwardX = cos(radRotY) * cos(radRotX); // Dirección hacia adelante/atrás en X
+			GLfloat forwardY = sin(radRotX);               // Dirección hacia adelante/atrás en Y
+			GLfloat forwardZ = sin(radRotY) * cos(radRotX); // Dirección hacia adelante/atrás en Z
+
+			// Cálculo del vector "izquierda" basado en la rotación
+			GLfloat rightX = cos(radRotY + PI / 2.0);      // Dirección hacia la derecha en X
+			GLfloat rightZ = sin(radRotY + PI / 2.0);      // Dirección hacia la derecha en Z
+
+			GLfloat upX = -cos(radRotY) * sin(radRotX);    // Dirección hacia arriba/abajo en X
+			GLfloat upY = cos(radRotX);                    // Dirección hacia arriba/abajo en Y
+			GLfloat upZ = -sin(radRotY) * sin(radRotX);    // Dirección hacia arriba/abajo en Z*/
+
+			// Ajuste de sensibilidad
+			GLfloat scaleFactor = cameraDistance * 0.3f;
+
+			// Desplazamiento del toque
+			GLfloat deltaX = (StartTouchX - DragTouchX) * scaleFactor; // Movimiento horizontal del táctil
+			GLfloat deltaY = (StartTouchY - DragTouchY) * scaleFactor; // Movimiento vertical del táctil
+
+			// Movimiento restringido a un solo eje (por ejemplo, eje Y del mundo)
+			//GLfloat moveX = deltaX * cos(radRotX);
+			//GLfloat moveY = deltaY;
+			GLfloat moveZ = deltaY * sin(radRotY + PI / 2.0);
+
+			// Aplica el movimiento al pivote de la cámara
+			//PivotX = OriginalPivotX + moveX;
+			//PivotY = OriginalPivotY + moveY;
+			PivotZ = OriginalPivotZ + moveZ;
+
+			/*GLfloat radRotX = rotX * PI / 180.0;
+			OriginalLeftX = cos(radRotX);
+			OriginalLeftY = sin(radRotX);
+
+			PivotX = OriginalPivotX - ((StartTouchX - DragTouchX) * OriginalLeftX)*10;
+			PivotY = OriginalPivotY - ((StartTouchY - DragTouchY) * OriginalLeftY)*10;
+			PivotZ = ?????????;*/
+		}
+		else if (navegacionMode == Orbit){
+			rotX = OriginalRotX - ((StartTouchX - DragTouchX)/2);
+			rotY = OriginalRotY - ((StartTouchY - DragTouchY)/2);
+		}
+		if (SoltoPantalla){
+			TocandoPantalla = false;
+			SoltoPantalla = false;
+		}
+		return;
+	}	
+
 	if ( iShiftPressed && estado == editNavegacion){
 		ShiftCount++;
 		if( flechasEstados[FlechaIzquierda].estado == TeclaPresionada ){
@@ -2307,7 +2386,7 @@ void CWhisk3D::InputUsuario(GLfixed aDeltaTimeSecs){
 		}*/
 		return;
 	}
-	if ( iShiftPressed && estado != editNavegacion){
+	else if ( iShiftPressed && estado != editNavegacion){
 		ShiftCount++;
 		return;
 	}
@@ -2319,8 +2398,6 @@ void CWhisk3D::InputUsuario(GLfixed aDeltaTimeSecs){
 		return;
 	}
 
-	//revisa si se apreto una flecha y actualiza los valores dependiendo el estado de la aplicacion
-	//ya sea animando, editando una malla 3d o en modo objeto
 	if( flechasEstados[FlechaIzquierda].activo ){
 		//mueve el mouse
 		if (mouseVisible){
@@ -2626,6 +2703,16 @@ void CWhisk3D::EventKeyDown(TInt scan){
 			break;
 		case(77)://M
 			VerOpciones();
+			break;
+
+		case(74)://J
+			SetViewpoint(top);
+			break;
+		case(75)://K
+			SetViewpoint(front);
+			break;
+		case(76)://L
+			SetViewpoint(right);
 			break;
 	}
 };
@@ -4118,13 +4205,6 @@ void CWhisk3D::SetPerspectiva(TBool redibuja ){
     delete buf;
 }*/
 
-enum{
-	top,
-	front,
-	right,
-    cameraView
-};
-
 void CWhisk3D::AddModificador(TInt opcion){	
 	//si no hay objetos
 	if (Objects.Count() < 1){return;}	
@@ -4476,64 +4556,6 @@ TPtr CWhisk3D::DialogText(HBufC* textBuf, HBufC* noteBuf) {
 	return textPtr;
 }
 
-void CWhisk3D::ShowWaitDialogL(){
-	iWaitDialog = new (ELeave) CAknWaitDialog((REINTERPRET_CAST(CEikDialog**, &iWaitDialog)), ETrue);
-	//iWaitDialog->SetCallback(this); // Opcional: establece un callback para eventos del dialogo
-	iWaitDialog->ExecuteLD(R_WHISK3D_WAIT_NOTE_SOFTKEY_CANCEL);
-};
-
-void CWhisk3D::CloseWaitDialog(){
-    if (iWaitDialog){
-        iWaitDialog->ProcessFinishedL(); // Esto cierra el cuadro de espera.
-        iWaitDialog = NULL; // Asegúrate de que el puntero sea nulo después de cerrar el cuadro de espera.
-    }
-};
-
-void CWhisk3D::DialogWait(HBufC* noteBuf){
-    ShowWaitDialogL(); // Mostrar el cuadro de espera
-
-    // Aqui puedes agregar el codigo que necesita tiempo para ejecutarse.
-    /*User::After(2000000); // Simular una espera de 2 segundos.
-
-    CloseWaitDialog(); // Cerrar el cuadro de espera*/
-}
-
-TInt CWhisk3D::ShowOptionsDialogL() {	
-	/*HBufC* noteBuf = HBufC::NewLC(100);	
-	noteBuf->Des().Copy(_L("Ver wait?"));
-	DialogWait(noteBuf);*/
-	ShowWaitDialogL();
-	//CleanupStack::PopAndDestroy(noteBuf);	
-	
-	///iContainer->ShowProgressNoteUnderSingleProcessL(R_WHISK3D_PROGRESS_NOTE, EAknExNoteCtrlIdProgressNote);
-    //iContainer->ShowWaitNoteL(R_WHISK3D_PROGRESS_NOTE, EAknExNoteCtrlIdWaitNote);
-    //R_WHISK3D_WAIT_NOTE_SOFTKEY_CANCEL r_whisk3D_wait_note_softkey_cancel
-	
-	TInt blee = 1;
-	return blee;
-    /*TInt index = 0; // Variable para almacenar el �ndice seleccionado
-    CAknListQueryDialog* dialog = new (ELeave) CAknListQueryDialog(&index); // Crear una instancia de CAknListQueryDialog
-
-    const TInt KNumberOfItems = 3;
-    CDesC16ArrayFlat* itemTextArray = new (ELeave) CDesC16ArrayFlat(KNumberOfItems);
-    CleanupStack::PushL(itemTextArray);
-
-    // Agregar los textos de las opciones al array de texto
-    itemTextArray->AppendL(_L("Option 1"));
-    itemTextArray->AppendL(_L("Option 2"));
-    itemTextArray->AppendL(_L("Option 3"));
-
-    dialog->PrepareLC(R_AVKON_DIALOG_POPUP_LIST); // Preparar el di�logo
-    dialog->SetItemTextArray(itemTextArray); // Establecer el array de texto como opciones
-    dialog->SetOwnershipType(ELbmOwnsItemArray);
-
-    dialog->RunLD(); // Ejecutar el di�logo
-
-    CleanupStack::PopAndDestroy(itemTextArray); // Limpiar el array de texto
-
-    return index;*/
-}
-
 //recalcula la geometria de la camaras
 void CWhisk3D::SetCameraGeometria( TUint aWidth, TUint aHeight ){
 	//ancho
@@ -4559,6 +4581,47 @@ void CWhisk3D::SetCameraGeometria( TUint aWidth, TUint aHeight ){
     18,    1700, -1280,
     21,    3100, 0,
 };*/
+
+
+void CWhisk3D::StartTactil(TPoint touchPosition){	
+	if (navegacionMode == Orbit){
+		OriginalRotX = rotX;
+		OriginalRotY = rotY;
+	}
+	if (iShiftPressed){
+		// Convertir el angulo de rotX a radianes
+		GLfloat radRotX = rotX * PI / 180.0;
+
+		// Calcular el vector de direccion hacia la izquierda (90 grados a la izquierda del angulo actual)
+		OriginalLeftX = cos(radRotX);
+		OriginalLeftY = sin(radRotX);
+		
+		OriginalPivotX = PivotX;
+		OriginalPivotY = PivotY;
+		OriginalPivotZ = PivotZ;
+		ShiftCount = 40;
+	}
+	TocandoPantalla = true;
+	SoltoPantalla = false;
+	StartTouchX = touchPosition.iX;
+	StartTouchY = touchPosition.iY;
+	DragTouchX = touchPosition.iX;
+	DragTouchY = touchPosition.iY;
+	redibujar = true;
+}
+
+void CWhisk3D::ActualizarTactil(TPoint touchPosition){
+	DragTouchX = touchPosition.iX;
+	DragTouchY = touchPosition.iY;
+	redibujar = true;
+}
+
+void CWhisk3D::TerminaTactil(TPoint touchPosition){	
+	SoltoPantalla = true;
+	DragTouchX = touchPosition.iX;
+	DragTouchY = touchPosition.iY;
+	redibujar = true;
+}
 
 // -----------------------------------------------------------------------------
 // CWhisk3D::SetScreenSize

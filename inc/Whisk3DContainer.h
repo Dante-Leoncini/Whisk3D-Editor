@@ -31,15 +31,8 @@ class CAknExNoteView;
  * Also uses the CWhisk3D class to do the actual OpenGL ES rendering.
  */
 
-class CWhisk3DContainer : public CCoeControl, MCoeControlObserver, public MProgressDialogCallback
+class CWhisk3DContainer : public CCoeControl, MCoeControlObserver
     {       
-	private: // Enumerations
-	
-		enum TAknExNoteComponentControls
-			{
-			EAknExNoteComponentLabel,
-			EAknExNoteComponentListbox
-			}; 
     public: // Constructors and destructor
         /**
          * EPOC default constructor. Initializes the OpenGL ES and creates the rendering context.
@@ -53,100 +46,17 @@ class CWhisk3DContainer : public CCoeControl, MCoeControlObserver, public MProgr
         virtual ~CWhisk3DContainer();
 
     public: // New functions
-
-        /**
-        * ShowGeneralNoteL
-        * Indicates general note
-        * @param aResourceId
-        * @param aTimeout
-        * @param aTone
-        */
-        void ShowGeneralNoteL( TInt aResourceId, 
-                               const CAknNoteDialog::TTimeout aTimeout,
-                               const CAknNoteDialog::TTone aTone );
-
-        /**
-        * ShowGeneralNoteL
-        * Indicates general note.
-        * @param aResourceId
-        * @param aControlId
-        * @param aTimeout
-        * @param aTone
-        * @param aPlural
-        */
-        void ShowGeneralNoteL( TInt aResourceId,
-                               TInt aControlId,
-                               const CAknNoteDialog::TTimeout aTimeout,
-                               const CAknNoteDialog::TTone aTone,
-                               TBool aPlural );
-
-        /**
-        * ShowDynamicNumberNoteL
-        * Indicates note
-        */
-        void ShowDynamicNumberNoteL();
-
-        /**
-        * ShowWaitNoteL
-        * Indicates wait note.
-        * @param aResourceId
-        * @param aControlId
-        */
-        void ShowWaitNoteL( TInt aResourceId, TInt aControlId );
-
-        /**
-        * ShowProgressNoteUnderSingleProcessL
-        * Indicates ProgressNote.
-        * @param aResourceId
-        * @param aControlId
-        */
-        void ShowProgressNoteUnderSingleProcessL( TInt aResourceId,   
-                                                  TInt aControlId );
-
-        /**
-        * ShowShowNoteL
-        * Show Note
-        * @param aType 
-        * @param aResourceId
-        */
-        void ShowShowNoteL( TAknGlobalNoteType aType, 
-                            TInt aResourceId );
-
-        /**
-        * CallbackIncrementProgressNoteL
-        * Callback function to increment progress note
-        * @param aThis
-        * @return TInt Return 0 when work is done, otherwise return 1.
-        */
-        static TInt CallbackIncrementProgressNoteL( TAny* aThis );
-        
-        /**
-        * UpdateProgressNote
-        * The entity of ProgressCallBackL() function
-        * @return TInt 0 when work is done, otherwise return 1.
-        */
-        TInt UpdateProgressNote();
-
         /**
          * Callback function for the CPeriodic. Calculates the current frame, keeps the background
          * light from turning off and orders the CWhisk3D to do the rendering for each frame.
          *@param aInstance Pointer to this instance of CWhisk3DContainer.
          */
         static int DrawCallBack( TAny* aInstance );
-
-    public: // From MProgressDialogCallback
         
         /**
          * Para cambiar al modo Widescreen
          */
-        void SetWidescreen();
-        
-        /**
-        * DialogDismissedL
-        * Called when/if the dialog has been dismissed.
-        * @param aButtonId
-        */
-        void DialogDismissedL( TInt aButtonId );    
+        void SetWidescreen();  
 
     private: // Functions from base classes
 
@@ -182,6 +92,8 @@ class CWhisk3DContainer : public CCoeControl, MCoeControlObserver, public MProgr
          */
         void HandleResourceChange(TInt aType);
 
+        void HandlePointerEventL(const TPointerEvent& aPointerEvent);
+
         /**
          * Method from CCoeControl. Does nothing in this implementation.
          * All rendering is done in the DrawCallBack() method.
@@ -205,41 +117,6 @@ class CWhisk3DContainer : public CCoeControl, MCoeControlObserver, public MProgr
         void HandleControlEventL(CCoeControl* aControl,TCoeEvent aEventType);
 
     private: //data 
-        /**
-        * iLabel
-        * owned by CAknExNoteContainer object.
-        */
-        CEikLabel*                      iLabel;
-
-        /**
-        * iIdle
-        * owned by CAknExNoteContainer object.
-        */
-        CIdle*                          iIdle;
-
-        /**
-        * iProgressDialog
-        * Not owned by CAknExNoteContainer object.
-        */
-        CAknProgressDialog*             iProgressDialog;
-
-        /**
-        * iProgressInfo
-        * Not owned by CAknExNoteContainer object.
-        */
-        CEikProgressInfo*               iProgressInfo;
-
-        /**
-        * iView
-        * Not owned by CAknExNoteContainer object.
-        */
-        CAknExNoteView*                 iView;
-
-        /** Private Integers for Notes behaviours **/
-        TInt                            iGlobalNoteId;
-        TInt                            iPermanentNoteId;
-        TRequestStatus                  iStatus;
-
         /** Display where the OpenGL ES window surface resides. */
         EGLDisplay  iEglDisplay;
 

@@ -37,6 +37,9 @@ void CWhisk3DContainer::ConstructL(const TRect& /*aRect*/){
     // Create the input handler
     iInputHandler = CWhisk3DInput::NewL();
 
+    // Habilitar eventos táctiles
+    EnableDragEvents();
+
     SetExtentToWholeScreen();                // Take the whole screen into use
     ActivateL();
 
@@ -209,6 +212,32 @@ void CWhisk3DContainer::ConstructL(const TRect& /*aRect*/){
                       TCallBack( CWhisk3DContainer::DrawCallBack, this ) );
 }
 
+void CWhisk3DContainer::HandlePointerEventL(const TPointerEvent& aPointerEvent) {
+    // Filtra los eventos táctiles que necesitas
+    if (aPointerEvent.iType == TPointerEvent::EButton1Down) {
+        // Cuando empieza el toque
+        TPoint touchPosition = aPointerEvent.iPosition;
+        iWhisk3D->StartTactil(touchPosition);  // Iniciar la acción
+    }
+    else if (aPointerEvent.iType == TPointerEvent::EButton1Up) {
+        // Cuando termina el toque
+        TPoint touchPosition = aPointerEvent.iPosition;
+        iWhisk3D->TerminaTactil(touchPosition);  // Terminar la acción
+        
+        // Obtener el AppUi asociado
+		CWhisk3DAppUi* appUi = static_cast<CWhisk3DAppUi*>(iCoeEnv->AppUi());
+		if (appUi){
+			TRAP_IGNORE(appUi->TestTouch()); // Llamar a la funci�n de AppUi
+		}
+    }
+    else if (aPointerEvent.iType == TPointerEvent::EDrag) {
+        // Si el dedo se mueve mientras se mantiene presionado
+        TPoint touchPosition = aPointerEvent.iPosition;
+        iWhisk3D->ActualizarTactil(touchPosition);  // Actualizar mientras se arrastra
+    }
+    CCoeControl::HandlePointerEventL(aPointerEvent);
+}
+
 // ------------------------------------------------------------------------------
 // CBillboardContainer::OfferKeyEventL()
 // Handles joystick movements.
@@ -232,7 +261,6 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 // Destructor
 CWhisk3DContainer::~CWhisk3DContainer()
     {
-    delete iIdle;
     delete iPeriodic;
 
     if ( iWhisk3D )
@@ -360,7 +388,7 @@ int CWhisk3DContainer::DrawCallBack( TAny* aInstance )
     // Call the main OpenGL ES Symbian rendering 'loop'
     TBool renderizar = instance->iWhisk3D->AppCycle( deltaTimeSecs );
     
-    if (true){
+    if (renderizar){
         instance->iWhisk3D->AppRender();
 
         // Call eglSwapBuffers, which blit the graphics to the window
@@ -383,22 +411,6 @@ int CWhisk3DContainer::DrawCallBack( TAny* aInstance )
     return 0;
 }
 
-// -----------------------------------------------------------------------------
-// CAknExNoteContainer::DialogDismissedL()
-// Called when/if the dialog has been dismissed.
-// iIdle must be canceled when cancel button is pressed.
-// -----------------------------------------------------------------------------
-//
-void CWhisk3DContainer::DialogDismissedL( TInt aButtonId )
-    {
-    // Check when pressing cancel button.
-    if ( aButtonId == -1 )
-        { 
-        delete iIdle;
-        iIdle = NULL;
-        }
-    }
-
 // ---------------------------------------------------------
 // CWhisk3DContainer::HandleControlEventL(
 //     CCoeControl* aControl,TCoeEvent aEventType)
@@ -408,153 +420,4 @@ void CWhisk3DContainer::HandleControlEventL(
     CCoeControl* /*aControl*/,TCoeEvent /*aEventType*/)
     {
     }
-
-// -----------------------------------------------------------------------------
-// CAknExNoteContainer::ShowGeneralNoteL()
-// Show General Note
-// -----------------------------------------------------------------------------
-//
-void CWhisk3DContainer::ShowGeneralNoteL( TInt aResourceId, 
-                                            const CAknNoteDialog::
-                                            TTimeout aTimeout, 
-                                            const CAknNoteDialog::TTone aTone )
-    {
-    // Create CAknNoteDialog instance
-    CAknNoteDialog* dlg = new ( ELeave ) CAknNoteDialog( aTone, aTimeout );
-    
-    // Show the Dialog
-    dlg->ExecuteLD( aResourceId );
-}
-
-// -----------------------------------------------------------------------------
-// CAknExNoteContainer::ShowGeneralNoteL()
-// Show General Note
-// -----------------------------------------------------------------------------
-//
-void CWhisk3DContainer::ShowGeneralNoteL( TInt aResourceId, 
-    TInt /* aControlId */, const CAknNoteDialog::TTimeout aTimeout,
-    const CAknNoteDialog::TTone aTone,TBool aPlural )
-    {
-
-    // Create CAknNoteDialog instance
-    CAknNoteDialog* dlg = new ( ELeave ) CAknNoteDialog( aTone, aTimeout );
-
-    dlg->PrepareLC( aResourceId );
-    dlg->SetTextPluralityL( aPlural );
-    
-    // Show the Dialog
-    dlg->RunLD();
-}
-
-// -----------------------------------------------------------------------------
-// CAknExNoteContainer::ShowShowNoteL()
-// Show Note.
-// -----------------------------------------------------------------------------
-//
-void CWhisk3DContainer::ShowShowNoteL( TAknGlobalNoteType aType, 
-                                         TInt aResourceId )
-    {
-    //Allocate TBuf with constant length.
-    TBuf<KWhisk3DTextBufLength> text( NULL );
-
-    // Reads a resource into a descriptor.
-    CEikonEnv::Static()->ReadResource( text, aResourceId );
-
-    TPtrC noteText( text );
-
-    // Create new CAknGlobalNote instance.
-    CAknGlobalNote* globalNote = CAknGlobalNote::NewL();
-
-    // Push CAknGlobalNote's pointer to CleanupStack
-    CleanupStack::PushL( globalNote );
-
-    iPermanentNoteId = globalNote->ShowNoteL( aType, noteText );
-
-    // Pop and Destroy CAknGlobalNote's pointer from CleanupStack
-    CleanupStack::PopAndDestroy();
-}
-
-// -----------------------------------------------------------------------------
-// CAknExNoteContainer::ShowWaitNoteL()
-// Indicates wait note.
-// -----------------------------------------------------------------------------
-//
-void CWhisk3DContainer::ShowWaitNoteL( TInt aResourceId, TInt /* aControlId */){        
-    // Create CAknWaitDialog instance
-    CAknWaitDialog* waitDialog =  new ( ELeave ) CAknWaitDialog( NULL, ETrue );
-    
-    // Show the Dialog
-    waitDialog->ExecuteLD( aResourceId ); 
-}
-
-// -----------------------------------------------------------------------------
-// CAknExNoteContainer::ShowProgressNoteUnderSingleProcessL()
-// Show ProgressNote Under Single Process.
-// -----------------------------------------------------------------------------
-//
-void CWhisk3DContainer::ShowProgressNoteUnderSingleProcessL( 
-        TInt aResourceId, 
-        TInt /* aControlId */)
-{ 
-// Delete possible previous CAknProgressDialog.
-delete iProgressDialog;
-
-// Create new CAknProgressDialog.
-iProgressDialog = new ( ELeave ) CAknProgressDialog( reinterpret_cast
-       <CEikDialog**> 
-       ( &iProgressDialog ) );
-
-iProgressDialog->SetCallback( this );
-iProgressDialog->PrepareLC( aResourceId );
-iProgressInfo = iProgressDialog->GetProgressInfoL();
-iProgressInfo->SetFinalValue( KWhisk3DProgressbarFinalValue );
-iProgressDialog->RunLD();
-
-delete iIdle;
-iIdle = CIdle::NewL( CActive::EPriorityStandard );
-TCallBack callback( CallbackIncrementProgressNoteL, this );
-iIdle->Start( callback );
-}
-
-// -----------------------------------------------------------------------------
-// CAknExNoteContainer::CallbackIncrementProgressNoteL()
-// Just call UpdateProgressNote() function.
-// If return 1(ETrue), CIdle calls this again.
-// If retrun 0(EFalse), CIdle does not call this.
-// -----------------------------------------------------------------------------
-//
-TInt CWhisk3DContainer::CallbackIncrementProgressNoteL( TAny* aThis )
-    {
-    //return static_cast<CWhisk3DContainer*>( aThis )->UpdateProgressNote();
-    }
-
-// -----------------------------------------------------------------------------
-// CAknExNoteContainer::UpdateProgressNote()
-// Updates ProgressNote
-// -----------------------------------------------------------------------------
-//
-TInt CWhisk3DContainer::UpdateProgressNote()
-    {
-    /*TTime intervalTime;
-    intervalTime.HomeTime();
-    intervalTime += TTimeIntervalMicroSeconds( 50000 );
-    TTime currentTime;
-    currentTime.HomeTime();
-
-    while ( intervalTime > currentTime )
-        {
-        currentTime.HomeTime();
-        }
-
-    iProgressInfo->IncrementAndDraw( 1 );
-    if ( KWhisk3DProgressbarFinalValue <= iProgressInfo->CurrentValue() )
-        {
-        iProgressDialog->ProcessFinishedL();
-        delete iProgressDialog;
-        iProgressDialog = NULL;
-        return 0;
-        }
-    return 1;*/
-    }
-
 // End of File
