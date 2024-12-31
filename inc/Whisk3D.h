@@ -283,8 +283,12 @@ class CWhisk3D : public CFiniteStateMachine, public MTextureLoadingListener
         //TInt DialogSelectOption(const TDesC& aPrompt, CDesCArray& aOptions);
         TInt ShowOptionsDialogL();
         void Tab();
-        
-        void ShowListQueryL();
+
+        //interfaz tactil!    
+        void ShowMenu();  
+        void ShowAddMenu();  
+        void ShowObjectMenu();
+        void ShowTransformMenu();
         
         //cambiar el shader en el viewport
         void SetShading( TInt valor );        

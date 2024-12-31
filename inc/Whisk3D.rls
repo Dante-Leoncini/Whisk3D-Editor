@@ -11,6 +11,7 @@ rls_string STRING_r_app_caption_string       "Whisk3D"
 rls_string STRING_r_app_short_caption_string "Whisk3D"
 
 rls_string STRING_r_whisk3D_exit         "Quit"
+rls_string STRING_r_whisk3D_menu         "Whisk3D Menu"
 
 rls_string STRING_r_whisk3D_lighting     "Luces"
 rls_string STRING_r_whisk3D_lights_on    "Turn lights on"

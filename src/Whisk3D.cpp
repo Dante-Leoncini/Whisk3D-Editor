@@ -138,6 +138,7 @@ static const GLfloat positionPuntualLight[4] = {0, 0, 0, 1};
 //touch
 TBool TocandoPantalla = false;
 TBool SoltoPantalla = false;
+TInt TimeTouch = 0;
 TInt StartTouchX = 0;
 TInt StartTouchY = 0;
 TInt DragTouchX = 0;
@@ -2291,7 +2292,33 @@ void CWhisk3D::InputUsuario(GLfixed aDeltaTimeSecs){
 	//revisa si se apreto una flecha y actualiza los valores dependiendo el estado de la aplicacion
 	//ya sea animando, editando una malla 3d o en modo objeto
 	if (TocandoPantalla){
-		if (iShiftPressed || navegacionMode == Fly){	
+		TimeTouch++;
+		if (TimeTouch < 10){			
+			if (SoltoPantalla){
+				TimeTouch = 0;
+				TocandoPantalla = false;
+				SoltoPantalla = false;
+				if (DragTouchX < 120 && DragTouchY < 120){
+					ShowMenu();
+				}
+				else {
+				ShowObjectMenu();
+				}
+				return;
+			}
+		}
+		else if (TimeTouch > 40 && SoltoPantalla){
+			TimeTouch = 0;
+			TocandoPantalla = false;
+			SoltoPantalla = false;
+			TInt MovimientoX = StartTouchX - DragTouchX + 10;
+			TInt MovimientoY = StartTouchY - DragTouchY + 10;
+			if (MovimientoX > -1 && MovimientoX < 21 && MovimientoY > -1 && MovimientoY < 21){
+				ShowObjectMenu();
+				return;
+			}
+		}
+		else if (iShiftPressed || navegacionMode == Fly){	
 			GLfloat radRotX = rotX * PI / 180.0; // Rotación en radianes (X)
 			GLfloat radRotY = rotY * PI / 180.0; // Rotación en radianes (Y)
 
@@ -2338,6 +2365,7 @@ void CWhisk3D::InputUsuario(GLfixed aDeltaTimeSecs){
 			rotY = OriginalRotY - ((StartTouchY - DragTouchY)/2);
 		}
 		if (SoltoPantalla){
+			TimeTouch = 0;
 			TocandoPantalla = false;
 			SoltoPantalla = false;
 		}
@@ -4621,11 +4649,118 @@ void CWhisk3D::TerminaTactil(TPoint touchPosition){
 	DragTouchX = touchPosition.iX;
 	DragTouchY = touchPosition.iY;
 	redibujar = true;
-	ShowListQueryL();
 }
 
-void CWhisk3D::ShowListQueryL(){
-	TInt aResourceId = R_WHISK3D_LIST_SINGLE_PANE;
+void CWhisk3D::ShowMenu(){
+	if (dialogoSymbian){return;};
+	dialogoSymbian = true;
+	TInt aResourceId = R_MENU_LIST_SINGLE_PANE;
+    CAknListQueryDialog* dlg;
+    TInt index( 0 );
+    
+	dlg = new ( ELeave ) CAknListQueryDialog( &index );
+
+    if (dlg->ExecuteLD( aResourceId ) ){
+		dialogoSymbian = false;
+    	switch (index) {
+    		case 0:
+				dialogoSymbian = false;
+    			ShowAddMenu();
+    			break;
+    		case 1:
+    			AddMesh(plane);
+    			break;
+    		case 2:
+    			ImportOBJ();
+    			break;
+    		case 7:
+    			Borrar();
+    			break;
+    		default:
+    			break;
+    	}    	
+    }
+	dialogoSymbian = false;
+}
+
+void CWhisk3D::ShowAddMenu(){
+	if (dialogoSymbian){return;};
+	dialogoSymbian = true;
+	TInt aResourceId = R_ADD_MENU_LIST_SINGLE_PANE;
+    CAknListQueryDialog* dlg;
+    TInt index( 0 );
+    
+	dlg = new ( ELeave ) CAknListQueryDialog( &index );
+
+    if (dlg->ExecuteLD( aResourceId ) ){
+		dialogoSymbian = false;
+    	switch (index) {
+    		case 0:
+    			AddMesh(plane);
+    			break;
+    		case 1:
+    			AddMesh(cubo);
+    			break;
+    		case 2:
+    			AddMesh(circle);
+    			break;
+    		case 3:
+    			AddMesh(vertice);
+    			break;
+    		/*case 4:
+    			AddObject(empty);
+    			break;*/
+    		case 4:
+    			AddObject(camera);
+    			break;
+    		case 5:
+    			AddObject(light);
+    			break;
+    		case 6:
+    			ImportOBJ();
+    			break;
+    		default:
+    			break;
+    	}    	
+    }
+	dialogoSymbian = false;
+}
+
+void CWhisk3D::ShowObjectMenu(){
+	if (dialogoSymbian){return;};
+	dialogoSymbian = true;
+	TInt aResourceId = R_OBJECT_LIST_SINGLE_PANE;
+    CAknListQueryDialog* dlg;
+    TInt index( 0 );
+    
+	dlg = new ( ELeave ) CAknListQueryDialog( &index );
+
+    if (dlg->ExecuteLD( aResourceId ) ){
+		dialogoSymbian = false;
+    	switch (index) {
+    		case 0:
+    			ShowTransformMenu();
+    			break;
+    		case 1:
+    			AddMesh(plane);
+    			break;
+    		case 2:
+    			ImportOBJ();
+    			break;
+    		case 7:
+    			Borrar();
+    			break;
+    		default:
+    			break;
+    	}    	
+    }
+	dialogoSymbian = false;
+}
+
+void CWhisk3D::ShowTransformMenu(){
+	if (dialogoSymbian){return;};
+	dialogoSymbian = true;
+	TInt aResourceId = R_TRANSFORM_LIST_SINGLE_PANE;
     CAknListQueryDialog* dlg;
     TInt index( 0 );
     
@@ -4634,15 +4769,19 @@ void CWhisk3D::ShowListQueryL(){
     if (dlg->ExecuteLD( aResourceId ) ){
     	switch (index) {
     		case 0:
-    			AddMesh(plane);
+    			SetPosicion();
     			break;
     		case 1:
-    			ImportOBJ();
+    			SetRotacion();
+    			break;
+    		case 2:
+    			SetEscala();
     			break;
     		default:
     			break;
     	}    	
     }
+	dialogoSymbian = false;
 }
 
 // -----------------------------------------------------------------------------

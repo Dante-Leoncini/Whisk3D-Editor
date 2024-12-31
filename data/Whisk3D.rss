@@ -20,9 +20,6 @@ NAME    AWIZ // 4 letter ID
 #include "whisk3D.rls"
 #include <avkon.mbg>
 
-#define WHISK3D_LISTBOX_HEIGHT 3
-#define WHISK3D_LISTBOX_WIDTH 3
-
 //  RESOURCE DEFINITIONS
 RESOURCE RSS_SIGNATURE { }
 RESOURCE TBUF { buf="Whisk3D"; }
@@ -434,26 +431,6 @@ RESOURCE MENU_PANE r_viewport_add_menu{
             txt = STRING_r_ImportOBJ;
         }      
     };
-}
-
-
-
-//-----------------------------------------------------------------------------
-//
-//    r_aknexquery_list_single_pane_item
-//    Items array for List Query
-//
-//-----------------------------------------------------------------------------
-//
-RESOURCE ARRAY r_aknexquery_list_single_pane_item {
-    items = {
-		LBUF {
-            txt = STRING_r_Plane;
-        },   
-        LBUF {
-            txt = STRING_r_ImportOBJ;
-        }  
-	};
 }
 
 //----------------------------------------------------
@@ -869,7 +846,7 @@ RESOURCE LOCALISABLE_APP_INFO r_whisk3D_localisable_app_info{
 //
 //-----------------------------------------------------------------------------
 //
-RESOURCE DIALOG r_whisk3D_list_single_pane {
+RESOURCE DIALOG r_menu_list_single_pane {
     flags = EGeneralQueryFlags;
     buttons = R_AVKON_SOFTKEYS_OK_CANCEL;
     items = {
@@ -883,12 +860,129 @@ RESOURCE DIALOG r_whisk3D_list_single_pane {
                 listbox = LISTBOX
                     {
                     flags = EAknListBoxMenuList;
-                    height = WHISK3D_LISTBOX_HEIGHT;
-                    width = WHISK3D_LISTBOX_WIDTH;
-                    array_id = r_aknexquery_list_single_pane_item;
+                    //height = WHISK3D_LISTBOX_HEIGHT;
+                    //width = WHISK3D_LISTBOX_WIDTH;
+                    array_id = r_menu_list_single_pane_item;
                     };
-                heading = STRING_r_aknexquery_list_title;
+                heading = STRING_r_whisk3D_menu;
                 };
             }
+	};
+}
+
+RESOURCE ARRAY r_menu_list_single_pane_item {
+    items = {	   
+        LBUF { txt = STRING_r_Add; },  		
+        LBUF { txt = STRING_r_whisk3D_Vista3D; },
+        LBUF { txt = STRING_r_Overlay; },			
+        LBUF { txt = STRING_r_Timeline; },		
+        LBUF { txt = STRING_r_Render; },	  			  	
+        LBUF { txt = STRING_r_whisk3D_exit; }		
+	};
+}
+
+RESOURCE DIALOG r_add_menu_list_single_pane {
+    flags = EGeneralQueryFlags;
+    buttons = R_AVKON_SOFTKEYS_OK_CANCEL;
+    items = {
+        DLG_LINE
+            {
+            type = EAknCtListQueryControl;
+            id = EListQueryControl;
+            control = AVKON_LIST_QUERY_CONTROL
+                {
+                listtype = EAknCtSinglePopupMenuListBox;
+                listbox = LISTBOX
+                    {
+                    flags = EAknListBoxMenuList;
+                    //height = WHISK3D_LISTBOX_HEIGHT;
+                    //width = WHISK3D_LISTBOX_WIDTH;
+                    array_id = r_add_menu_list_single_pane_item;
+                    };
+                heading = STRING_r_Add;
+                };
+            }
+	};
+}
+
+RESOURCE ARRAY r_add_menu_list_single_pane_item {
+    items = {	   
+        LBUF { txt = STRING_r_Plane; },  		
+        LBUF { txt = STRING_r_Cube; },
+        LBUF { txt = STRING_r_Circle; },			
+        //LBUF { txt = STRING_r_Vertex; },		
+        LBUF { txt = STRING_r_Empty; },	  	
+        LBUF { txt = STRING_r_Camera; },	  	
+        LBUF { txt = STRING_r_Light; },	  			  	
+        LBUF { txt = STRING_r_ImportOBJ; }	
+	};
+}
+
+RESOURCE DIALOG r_object_list_single_pane {
+    flags = EGeneralQueryFlags;
+    buttons = R_AVKON_SOFTKEYS_OK_CANCEL;
+    items = {
+        DLG_LINE
+            {
+            type = EAknCtListQueryControl;
+            id = EListQueryControl;
+            control = AVKON_LIST_QUERY_CONTROL
+                {
+                listtype = EAknCtSinglePopupMenuListBox;
+                listbox = LISTBOX
+                    {
+                    flags = EAknListBoxMenuList;
+                    //height = WHISK3D_LISTBOX_HEIGHT;
+                    //width = WHISK3D_LISTBOX_WIDTH;
+                    array_id = r_aknexquery_list_single_pane_item;
+                    };
+                heading = STRING_r_Object;
+                };
+            }
+	};
+}
+
+RESOURCE ARRAY r_aknexquery_list_single_pane_item {
+    items = {
+        LBUF { txt = STRING_r_Transform; },	   
+        LBUF { txt = STRING_r_Snap; },  		
+        LBUF { txt = STRING_r_Material; },			
+        LBUF { txt = STRING_r_Add; },		
+        LBUF { txt = STRING_r_whisk3D_Modificadores; },	  			  	
+        LBUF { txt = STRING_r_Constraints; },					
+        LBUF { txt = STRING_r_Animation; },					
+        LBUF { txt = STRING_r_whisk3D_Borrar; }
+	};
+}
+
+RESOURCE DIALOG r_transform_list_single_pane {
+    flags = EGeneralQueryFlags;
+    buttons = R_AVKON_SOFTKEYS_OK_CANCEL;
+    items = {
+        DLG_LINE
+            {
+            type = EAknCtListQueryControl;
+            id = EListQueryControl;
+            control = AVKON_LIST_QUERY_CONTROL
+                {
+                listtype = EAknCtSinglePopupMenuListBox;
+                listbox = LISTBOX
+                    {
+                    flags = EAknListBoxMenuList;
+                    //height = WHISK3D_LISTBOX_HEIGHT;
+                    //width = WHISK3D_LISTBOX_WIDTH;
+                    array_id = r_transforms_list_items;
+                    };
+                heading = STRING_r_Transform;
+                };
+            }
+	};
+}
+
+RESOURCE ARRAY r_transforms_list_items {
+    items = {      
+        LBUF { txt = STRING_r_whisk3D_CambiarPosicion; },	   
+        LBUF { txt = STRING_r_whisk3D_CambiarRotacion; },  		
+        LBUF { txt = STRING_r_whisk3D_CambiarEscala; }
 	};
 }
