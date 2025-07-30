@@ -1,6 +1,6 @@
 # Whisk 3D (Ex Blendersito)
 
-[![en](https://img.shields.io/badge/lang-en-red.svg)](/README.md)
+[![en](https://img.shields.io/badge/lang-en-red.svg)](/)
 
 Este repositorio contiene iconos, tipografías y otros elementos gráficos diseñados por **Dante Demian Leoncini**. Estos diseños están disponibles para su uso bajo los términos de la Licencia Creative Commons Atribución 4.0 Internacional (CC BY 4.0).
 
