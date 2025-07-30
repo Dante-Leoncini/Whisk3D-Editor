@@ -10,7 +10,8 @@ The designs are available for its use under the terms of the Licence **Licencia 
 YouTube: [Youtube Video](https://youtu.be/dMe-Vit5OT0)
 
 ## Instalation: 
-you need to have PyS60 installed, or it won’t run. If you don’t have it, I’ve included the installer in the "Dependencies" folder on GitHub. The latest version is always in the "sis" folder as "Whisk3D_gcce.sisx", though the latest version might not always work properly. The more polished versions are always in the "releases" folder, with their date and a name referencing the demos I show on Instagram.
+You need to have PyS60 installed, or it won’t run. If you don’t have it, I’ve included the installer in the "Dependencies" folder on GitHub. The latest version is always in the "sis" folder as "Whisk3D_gcce.sisx", though the latest version might not always work properly. The more polished versions are always in the "releases" folder, with their date and a name referencing the demos I show on [Instagram](https://www.instagram.com/).
+
 The program isn’t production-ready and has several known bugs. It’s constantly evolving, and I’m always adding or removing features. For example, the 3D modeling feature was removed in the latest versions, but if you use versions like Whisk3D_gcce_beta_24-08-15_FERNET.sisx, it was still available.
 
 Finally, if the installer fails, it’s likely you’ll need to hack your phone to bypass Symbian’s restrictions on certificates. Here’s a video showing how to do it: [tutorial hack](https://www.youtube.com/watch?v=UJJICzbk3TA)
@@ -40,4 +41,11 @@ Thank you to everyone who shared the project. I hope this effort helps raise awa
 #Thanks Marcig for the new Name!
 (Currently is not support for s60v5 aka Symbian belle. But in theory is not hard to achieve)
 
+[Primera Demo en Video](https://youtu.be/dMe-Vit5OT0)
+
+This program is optimized to run on a Nokia N95-3 with 128mb of ram.
+It can work in other Nokia's s60v3 with 64mb or less, but with the mayority has not graphic acceleration, it may not run as well as seen on the demos.
+
 Notes: it's necessary to have python installed in order to run! (pys60 2.0.0)
+# Contribute
+Please do contribute! Issues and pull requests are welcome.
