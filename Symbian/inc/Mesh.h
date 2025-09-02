@@ -1,71 +1,6 @@
 #include "Dialogs.h"
 
-//tipos de objetos
-typedef enum { mesh, camera, light, empty, armature, curve };
 typedef GLshort Edge[2];
-
-typedef enum { pointLight, sunLight };
-
-class Children {
-	public:
-		TInt Id;
-		GLfixed OriginalScaleX;
-		GLfixed OriginalScaleY; 
-		GLfixed OriginalScaleZ;		
-};
-
-class Object {
-	public:
-		TInt type;
-		TBool visible;
-		TBool seleccionado;
-		GLfloat posX; GLfloat posY; GLfloat posZ;
-		GLfloat rotX; GLfloat rotY; GLfloat rotZ;
-		GLfixed scaleX; GLfixed scaleY; GLfixed scaleZ;
-		TInt Id;
-		TInt Parent;
-		RArray<Children> Childrens;
-		HBufC* name;
-};
-
-class Light { 
-	public:
-		TInt type;
-		TInt lightId;
-		GLfloat color[4];
-};
-
-class Material { 
-	public:
-		TBool textura;
-		TBool transparent;
-		TBool vertexColor;
-		TBool lighting;
-		TBool repeat;
-		TBool uv8bit;
-		TBool culling;
-		TInt interpolacion;
-		GLuint textureID;
-		GLfloat diffuse[4];		
-		GLfloat specular[4];	
-		GLfloat emission[4];
-		HBufC* name;
-};
-
-class VertexGroup { 
-	public:
-        RArray<TInt> indices;
-};
-
-class MaterialGroup { 
-	public:
-        TInt start; //donde esta el primer triangulo real
-        TInt count; //cuantos triangulos son reales
-
-        TInt startDrawn; //indice del primer triangulo para dibujar
-		TInt indicesDrawnCount; //cuantos vertices son
-		TInt material; //de que material
-};
 
 class ShapeKeyVertex { 
 	public:
@@ -102,57 +37,6 @@ class ShapeKeyAnimation {
 		TBool Normals;
 		TBool Faces;
 		TBool Interpolacion;
-};
-
-typedef enum { trackto, copyrotation, copylocation };
-class Constraint { 
-	public:
-		TInt type;
-		TInt Id;
-		TInt Target;
-		TBool opcion;
-};
-
-enum{array, mirror,	screw, boolean};
-class Modifier { 
-	public:
-		TInt type;
-		TInt Id;
-		TInt Target;
-        RArray<TBool> OpcionesTBool;
-};
-
-class Mesh { 
-	public:
-		TInt vertexSize;
-		GLshort* vertex;
-        RArray<VertexGroup> vertexGroups;
-		GLubyte* vertexColor;
-		GLbyte* normals;
-		GLfloat* uv;
-		//GLbyte* uv8;
-
-		//caras
-   		TInt facesSize;
-   		GLushort* faces;
-        RArray<MaterialGroup> materialsGroup;
-		RArray<TInt> Modifiers;
-
-		//libera la memoria
-		void Mesh::LiberarMemoria(){
-			delete[] vertex;
-			delete[] vertexColor;
-			delete[] normals;
-			delete[] uv;
-			for(TInt i=0; i < vertexGroups.Count(); i++){
-				vertexGroups[i].indices.Close();
-			}
-			vertexGroups.Close();
-
-			delete[] faces;
-			materialsGroup.Close();
-			Modifiers.Close();
-		}
 };
 
 class FaceCorners {

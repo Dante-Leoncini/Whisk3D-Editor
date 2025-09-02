@@ -42,8 +42,6 @@ class Object;
 #define FRUSTUM_RIGHT   1.f     //right vertical clipping plane
 #define FRUSTUM_BOTTOM -1.f     //bottom horizontal clipping plane
 #define FRUSTUM_TOP     1.f     //top horizontal clipping plane
-#define FRUSTUM_NEAR    3.f     //near depth clipping plane
-#define FRUSTUM_FAR  1000.f     //far depth clipping plane
 
 // CLASS DECLARATION
 class Mesh;
@@ -342,7 +340,6 @@ class CWhisk3D : public CFiniteStateMachine, public MTextureLoadingListener
         TBool showOutlineSelect;
         TBool showOrigins;
         TBool ShowTimeline;
-        TBool ShowRelantionshipsLines;
         TBool PlayAnimation;    
         TBool iShiftPressed; 
         TBool iAltPressed;
@@ -350,7 +347,6 @@ class CWhisk3D : public CFiniteStateMachine, public MTextureLoadingListener
         TBool CameraToView;
         RArray<Object> Objects;
         TInt SelectActivo;
-        TInt CameraActive;
 
 		/**
 		 * Application states:
@@ -361,10 +357,6 @@ class CWhisk3D : public CFiniteStateMachine, public MTextureLoadingListener
 			ELoadingTextures,
 			ERunning
 		};
-        
-        TInt estado;
-        TInt InteractionMode;
-        TInt navegacionMode;
 
     private:  // Data
         CAknWaitDialog* iWaitDialog;

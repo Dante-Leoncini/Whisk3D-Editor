@@ -47,8 +47,6 @@
 #define MATERIAL_MAX 1
 #define LIGHT_MAX    1
 
-#define cameraDistance 270
-
 #define MATERIALCOLOR(r, g, b, a)     \
        (GLfloat)(r * MATERIAL_MAX),   \
        (GLfloat)(g * MATERIAL_MAX),   \
@@ -65,40 +63,12 @@
 
 /* Materials for the Models object. */
 static const GLfloat objDiffuse[4] = { MATERIALCOLOR(0.8, 0.8, 0.8, 1.0) };
-static const GLfloat objAmbient[4] = { MATERIALCOLOR(0.4, 0.4, 0.4, 1.0) };
-
 //color vertices
 static const GLfloat colorVertice[4]  = { MATERIALCOLOR(0.87, 0.44, 0.06, 1.0) };
 //color borde
 static const GLfloat colorBorde[4]  = { MATERIALCOLOR(0.68, 0.45, 0.13, 1.0) };
 //color borde Select
 //GLfloat colorBordeSelect[4] = { MATERIALCOLOR(0.94, 0.59, 0.17, 1.0) };
-//array de colores
-GLfloat ListaColores[11][4] = {
-	{ MATERIALCOLOR(0.22, 0.28, 0.25, 1.0)  },   //fondo
-	{ MATERIALCOLOR(1.0, 1.0, 1.0, 1.0)     },   //blanco
-	{ MATERIALCOLOR(0.91, 0.50, 0.98, 1.0)  },   //acento (violeta) 
-	{ MATERIALCOLOR(0.48, 0.30, 1.0, 1.0)  },   //acento oscuro	
-	{ MATERIALCOLOR(0.0, 0.0, 0.0, 1.0)     },   //negro
-	{ MATERIALCOLOR(0.12, 0.12, 0.12, 1.0)  },   //gris
-	{ MATERIALCOLOR(0.94, 0.59, 0.17, 0.25f)},   //naranja transparente
-	{ MATERIALCOLOR(0.22, 0.22, 0.22, 1.0)  },    //cabezera de la barra de herramientas
-	{ MATERIALCOLOR(0.0, 0.0, 0.0, 0.25f)     },   //negroTransparente
-	{ MATERIALCOLOR(0.757, 0.757, 0.757, 1.0)     },   //azul de los iconos seleccionados
-};
-
-enum{
-	background,
-	blanco,
-	accent,
-	accentDark,
-	negro,
-	gris,
-	naranjaFace,
-	headerColor,
-	negroTransparente,
-	grisUI
-};
 
 enum{
 	top,
@@ -107,15 +77,6 @@ enum{
     cameraView
 };
 
-static const GLfloat LineaPiso[4]  =      { MATERIALCOLOR(0.29, 0.29, 0.29, 1.0) };
-static const GLfloat LineaPisoRoja[4]  =  { MATERIALCOLOR(0.56, 0.23, 0.28, 1.0) };
-static const GLfloat LineaPisoVerde[4]  = { MATERIALCOLOR(0.38, 0.53, 0.15, 1.0) };
-
-//ejes transformacion
-static const GLfloat ColorTransformX[4]  = { MATERIALCOLOR(0.88, 0.48, 0.54, 1.0) };
-static const GLfloat ColorTransformY[4]  = { MATERIALCOLOR(0.65, 0.81, 0.38, 1.0) };
-static const GLfloat ColorTransformZ[4]  = { MATERIALCOLOR(0.46, 0.67, 0.89, 1.0) };
-
 /* Global ambient light. */
 static const GLfloat globalAmbient[4]   = { LIGHTCOLOR(0.5, 0.5, 0.5, 1.0) };
 
@@ -123,7 +84,6 @@ GLfloat AmbientRender[4] = { LIGHTCOLOR(0.0, 0.0, 0.0, 1.0) };
 
 /* Lamp parameters. */
 static const GLfloat lightDiffuseLamp[4]   = { LIGHTCOLOR(0.8, 0.8, 0.8, 1.0) };
-static const GLfloat lightAmbient[4]   = { LIGHTCOLOR(0.0, 0.0, 0.0, 1.0) };
 static const GLfloat sunLightPosition[4]  = {-100, 1000, 1000, 0 }; // y, z, x, si es direccional o puntual
 	
 /* Spotlight parameters. */
@@ -131,9 +91,6 @@ static const GLfloat sunLightPosition[4]  = {-100, 1000, 1000, 0 }; // y, z, x, 
 //static const GLfloat lightSpecularSpot[4]  = { LIGHTCOLOR(1.0, 1.0, 1.0, 1.0) };
 //static const GLfloat lightPositionSpot[4]  = {  0, -10, -1, 0 };
 //static const GLfloat lightDirectionSpot[4] = {  0,  -10,  -1, 1 };
-
-//para las luces puntuales
-static const GLfloat positionPuntualLight[4] = {0, 0, 0, 1};
 
 //touch
 TBool TocandoPantalla = false;
@@ -150,19 +107,11 @@ GLfloat OriginalLeftY = 0;
 //camara
 TBool ortografica = false;
 GLfloat aspectRatio;
-GLfloat rotX = 113.5;
-GLfloat rotY = 20.0;
 GLfloat OriginalRotX = 113.5;
-GLfloat OriginalRotY = 20.0;
-GLfloat posX = 0;
-GLfloat posY = 0;
-GLfloat posZ = 0;		
+GLfloat OriginalRotY = 20.0;	
 GLfloat OriginalPivotX = 0;
 GLfloat OriginalPivotY = 0;
 GLfloat OriginalPivotZ = 0;
-GLfloat PivotX = 0;
-GLfloat PivotY = 0;
-GLfloat PivotZ = 0;
 
 GLfloat LastRotX = 0;
 GLfloat LastRotY = 0;	
@@ -174,82 +123,8 @@ GLfloat LastPivotZ = 0;
 GLshort mouseX = 0;
 GLshort mouseY = 0;
 TBool mouseVisible = false;
-TBool showOverlays = true;
-TBool ShowUi = true;
-TBool show3DCursor = true;
-TBool showFloor = true;
-TBool showYaxis = true;
-TBool showXaxis = true;
 TBool showOutlineSelect = true;
 TBool iWidescreenEnabled = false;
-TBool showOrigins = true;
-TBool SimularZBuffer = false;
-GLfloat Cursor3DposX = 0.0f;
-GLfloat Cursor3DposZ = 0.0f;
-GLfloat Cursor3DposY = 0.0f;
-TInt nextLightId = GL_LIGHT1;
-
-//animacion
-TInt StartFrame = 1;
-TInt EndFrame = 250;
-TInt CurrentFrame = 1;
-TBool redibujar = true; //solo redibuja si este valor esta en true
-TBool ViewFromCameraActive = false;
-
-//interpolacion
-enum {lineal, closest};
-enum {Solid, MaterialPreview, Rendered};
-
-enum{
-	ObjectMode
-};
-
-enum {
-	editNavegacion,
-    EdgeMove,
-	FaceMove,
-	timelineMove,
-	rotacion,
-	EditScale,
-	translacion
-};
-
-enum{
-	Orbit,
-	Fly,
-	Apuntar
-};
-
-enum{
-	vertexSelect, edgeSelect, faceSelect
-};
-
-enum{
-	cubo, esfera, cilindro, plane, vacio, camara,
-    cad, luz, vertice, circle
-};
-
-//CPrimitiva Primitivas;
-
-typedef enum { X, Y, Z, XYZ } Axis;
-
-TInt view = MaterialPreview;
-TInt axisSelect = X;
-
-class SaveState {
-	public:
-		TInt indice;
-		GLfloat posX;
-		GLfloat posY;
-		GLfloat posZ;
-		GLfloat rotX;
-		GLfloat rotY;
-		GLfloat rotZ;
-		GLfixed scaleX;
-		GLfixed scaleY;
-		GLfixed scaleZ;
-};
-RArray<SaveState> estadoObjetos;
 
 //GLshort estadoVertex[3]={0, 0, 0};
 class SaveStateVertex {
@@ -288,21 +163,10 @@ class FlechaEstado {
 };
 
 //Crea un array de objetos
-RArray<TInt> Collection;
-RArray<Object> Objects;
-RArray<Material> Materials;
-RArray<Light> Lights;
-RArray<Mesh> Meshes;
 RArray<AnimationObject> AnimationObjects;
 RArray<ShapeKeyAnimation> ShapeKeyAnimations;
-RArray<Constraint> Constraints;
-RArray<Modifier> Modifiers;
 
 TInt tipoSelect = vertexSelect;
-TInt SelectActivo = 0;
-TInt SelectCount = 0;
-GLshort TransformPivotPoint[3] = {0,0,0};
-GLfloat TransformPivotPointFloat[3] = {0.0f,0.0f,0.0f};
 FlechaEstado* flechasEstados;
 
 void CWhisk3D::changeSelect(){
@@ -441,7 +305,6 @@ void CWhisk3D::ConstructL( void ){
 	showOrigins = true;
 	PlayAnimation = false;
 	ShowTimeline = true;
-	ShowRelantionshipsLines = true;
 	iShiftPressed = false;
 	iAltPressed = false;
 	iCtrlPressed = false;
@@ -461,29 +324,6 @@ void CWhisk3D::ConstructL( void ){
 	flechasEstados[FlechaAbajo].cual = EJoystickDown;
 	flechasEstados[FlechaIzquierda].cual = EJoystickLeft;
 
-	//tiene que haber un material por defecto siempre
-	NewMaterial(false);
-
-	//debuger
-	//console = Console::NewL(_L("Consola"),TSize(KConsFullScreen, KConsFullScreen));
-	AddObject(camera);
-	Objects[0].posX = -800*6.8;
-	Objects[0].posY = -800*7.29;
-	Objects[0].posZ = 800*4.91;
-	Objects[0].rotZ = -45.0;
-	Objects[0].rotY = -26.15;
-	Objects[0].scaleX = Objects[0].scaleY = Objects[0].scaleZ = 40000;
-
-	AddObject(light);
-	Objects[1].posX = -3000;
-	Objects[1].posY = 1500;
-	Objects[1].posZ = 4500;
-	//GLfloat positionLight[4] = {0, -10, 0, 0};
-    //GLfloat lightPositionSpot[4]  = {  0, -10, -1, 0 };
-	//glLightfv(  nextLightId-1, GL_POSITION, positionPuntualLight );
-	//glLightfv(  nextLightId, GL_POSITION, lightPositionSpot );
-	
-	AddMesh(cubo);
 	//AddMesh(plane);	
 	//ImportOBJ();
 
@@ -552,8 +392,6 @@ CWhisk3D::~CWhisk3D(){
 // and select the shading mode.
 // -----------------------------------------------------------------------------
 //
-RArray<TTexture> Textures;
-TInt NumTexturasWhisk3D = 0;
 void CWhisk3D::AppInit( void ){
     // Construct a texture manager that uses the application's private
     // directory as the location for all textures.
@@ -701,173 +539,6 @@ void CWhisk3D::calculateReflectionUVs(Mesh& pMesh) {
     }*/
 }
 
-void CWhisk3D::RenderMesh( Object& obj, TInt indice ){
-	Mesh& pMesh = Meshes[obj.Id];	
-	glPushMatrix();
-	glScalex(obj.scaleX, obj.scaleZ, obj.scaleY);
-			
-	glColor4f(ListaColores[blanco][0],ListaColores[blanco][1],ListaColores[blanco][2],ListaColores[blanco][3]);
-	glDisable(GL_COLOR_MATERIAL);
-	glMaterialfv(   GL_FRONT_AND_BACK, GL_AMBIENT,  objAmbient  );
-	glMaterialx( GL_FRONT_AND_BACK, GL_SHININESS,   12 << 16     );
-	glMaterialfv(   GL_FRONT_AND_BACK, GL_EMISSION, ListaColores[negro] );
-
-	// Set array pointers from mesh.
-	glVertexPointer( 3, GL_SHORT, 0, pMesh.vertex );
-	glColorPointer( 4, GL_UNSIGNED_BYTE, 0, pMesh.vertexColor );	
-	glNormalPointer( GL_BYTE, 0, pMesh.normals );
-	
-	glShadeModel( GL_SMOOTH );
-	
-	//modelo con textura
-	if (SimularZBuffer){
-		glDisable( GL_LIGHTING );
-		glDisable(GL_BLEND);
-		glDisable( GL_TEXTURE_2D );
-		glDrawElements(GL_TRIANGLES, pMesh.facesSize, GL_UNSIGNED_SHORT, pMesh.faces);
-	}
-	//material
-	else if (view == MaterialPreview || view == Rendered){
-		// Calcular coordenadas UV reflejadas
-		//calculateReflectionUVs(pMesh);
-
-		glTexCoordPointer( 2, GL_FLOAT, 0, pMesh.uv );
-		
-		for(int f=0; f < pMesh.materialsGroup.Count(); f++){
-			Material& mat = Materials[pMesh.materialsGroup[f].material];	
-			glMaterialfv(   GL_FRONT_AND_BACK, GL_DIFFUSE, mat.diffuse ); 
-			glMaterialfv(   GL_FRONT_AND_BACK, GL_SPECULAR, mat.specular );
-
-			//vertex color
-			if (mat.vertexColor){
-				glColor4f(ListaColores[negro][0],ListaColores[negro][1],ListaColores[negro][2],ListaColores[negro][3]);
-				glEnableClientState( GL_COLOR_ARRAY );
-				glEnable(GL_COLOR_MATERIAL);
-			}
-			else {
-				glColor4f(mat.diffuse[0], mat.diffuse[1], mat.diffuse[2], mat.diffuse[3]);
-				glDisable(GL_COLOR_MATERIAL);
-				glDisableClientState( GL_COLOR_ARRAY );
-			}		
-
-			//si usa culling
-			if (mat.culling){glEnable( GL_CULL_FACE );}
-			else {glDisable( GL_CULL_FACE );}		 
-
-			//si tiene iluminacion	
-			if (mat.lighting){glEnable( GL_LIGHTING );}
-			else {glDisable( GL_LIGHTING );}
-			
-			//transparent
-			if (mat.transparent){glEnable(GL_BLEND);}
-			else {glDisable(GL_BLEND);}
-			
-			//si tiene texturas
-			if (mat.textura){
-				glEnable( GL_TEXTURE_2D );
-				glBindTexture(  GL_TEXTURE_2D, mat.textureID ); //selecciona la textura							
-			
-				//textura pixelada o suave
-				if (mat.interpolacion == lineal){
-					glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-					glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-				}
-				else if (mat.interpolacion == closest){
-					glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-					glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-				}	
-				//si la textura se repite
-				if (mat.repeat){
-					glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-					glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-				}
-				else {
-					glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-					glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-				}	
-			}
-			else {glDisable( GL_TEXTURE_2D );}
-
-			glMaterialfv(   GL_FRONT_AND_BACK, GL_EMISSION, mat.emission );
-
-			glDrawElements( GL_TRIANGLES, pMesh.materialsGroup[f].indicesDrawnCount, GL_UNSIGNED_SHORT, &pMesh.faces[pMesh.materialsGroup[f].startDrawn] );
-
-			for (TInt mdf = 0; mdf < pMesh.Modifiers.Count(); ++mdf) {	
-				Modifier& modificador = Modifiers[pMesh.Modifiers[mdf]];
-				switch (modificador.type) {
-					case mirror:
-						if (modificador.OpcionesTBool[0]){	
-							glPopMatrix();						
-							glPushMatrix();
-							glScalex(-obj.scaleX, obj.scaleZ, obj.scaleY);
-							glScalex(-1, 0, 0);
-							glDrawElements( GL_TRIANGLES, pMesh.materialsGroup[f].indicesDrawnCount, GL_UNSIGNED_SHORT, &pMesh.faces[pMesh.materialsGroup[f].startDrawn] );
-						}
-						if (modificador.OpcionesTBool[1]){	
-							glPopMatrix();				
-							glPushMatrix();
-							glScalex(obj.scaleX, obj.scaleZ, -obj.scaleY);
-							glDrawElements( GL_TRIANGLES, pMesh.materialsGroup[f].indicesDrawnCount, GL_UNSIGNED_SHORT, &pMesh.faces[pMesh.materialsGroup[f].startDrawn] );
-						}
-						if (modificador.OpcionesTBool[2]){	
-							glPopMatrix();
-							glPushMatrix();
-							glScalex(obj.scaleX, -obj.scaleZ, obj.scaleY);
-							glDrawElements( GL_TRIANGLES, pMesh.materialsGroup[f].indicesDrawnCount, GL_UNSIGNED_SHORT, &pMesh.faces[pMesh.materialsGroup[f].startDrawn] );
-						}
-						break;
-				}
-			}
-		}
-	}	
-	//modelo sin textura
-	else if (view == Solid){
-		glEnable( GL_LIGHTING );
-		glEnable( GL_CULL_FACE );
-		glDisableClientState( GL_COLOR_ARRAY );	  	
-		glDisable( GL_TEXTURE_2D );
-		glDisable(GL_BLEND);
-		glMaterialfv(   GL_FRONT_AND_BACK, GL_DIFFUSE,  Materials[0].diffuse   ); 
-
-		//no hace falta usar el bucle ya que es todo del mismo material.
-		//esto es mucho mas rapido
-		glDrawElements( GL_TRIANGLES, pMesh.facesSize, GL_UNSIGNED_SHORT, pMesh.faces );			
-
-		//glDrawElements( GL_TRIANGLES, pMesh.facesSize*3, GL_UNSIGNED_SHORT, pMesh.faces );	
-		//for(int f=0; f < pMesh.materialsGroup.Count(); f++){	
-			/*Material& mat = Materials[pMesh.materialsGroup[f].material];
-			//si usa culling
-			if (mat.culling){glEnable( GL_CULL_FACE );}
-			else {glDisable( GL_CULL_FACE );}	*/
-
-			//glDrawElements( GL_TRIANGLES, pMesh.materialsGroupsSize[f]*3, GL_UNSIGNED_SHORT, pMesh.faces[f] );	
-			//glDrawElements( GL_TRIANGLES, pMesh.materialsGroup[f].start, GL_UNSIGNED_SHORT, &pMesh.faces[pMesh.materialsGroup[f].start] );	
-		//}
-	} 
-
-	glDisable(GL_POLYGON_OFFSET_FILL);
-	glDepthFunc(GL_LESS);
-	
-	//dibuja el borde seleccionado
-	/*if(SelectActivo == objId && showOverlays && showOutlineSelect){
-		glDisableClientState( GL_COLOR_ARRAY );	  
-		glDisable( GL_LIGHTING );
-		glEnable(GL_COLOR_MATERIAL);
-		glDisable( GL_TEXTURE_2D );  
-		glEnable(GL_POLYGON_OFFSET_FILL);
-		
-		//si se esta editando
-		else if (view != 2){
-			glPolygonOffset(1.0, 200.0);
-			glLineWidth(3);	 
-			glColor4f(ListaColores[colorBordeSelect][0],ListaColores[colorBordeSelect][1],ListaColores[colorBordeSelect][2],ListaColores[colorBordeSelect][3]);
-			//glDrawElements( GL_LINES, obj.edgesSize, GL_UNSIGNED_SHORT, obj.edges );	
-			glLineWidth(1); //lo deja en su valor por defecto	 
-		}	
-	};*/
-	glPopMatrix();
-}
-
 // Funcion recursiva para renderizar un objeto y sus hijos
 void CWhisk3D::RenderMeshAndChildren(Object& obj, TInt indice){
     // Guardar la matriz actual
@@ -892,134 +563,6 @@ void CWhisk3D::RenderMeshAndChildren(Object& obj, TInt indice){
 
     // Restaurar la matriz previa
     glPopMatrix();
-}
-
-// Funcion recursiva para renderizar un objeto y sus hijos
-void CWhisk3D::RenderObjectAndChildrens(TInt objId){
-	Object& obj = Objects[objId];
-    // Guardar la matriz actual
-    glPushMatrix();
-    
-    // Aplicar las transformaciones del objeto
-    glTranslatef(obj.posX, obj.posZ, obj.posY);
-    glRotatef(obj.rotX, 1, 0, 0); // angulo, X Y Z
-    glRotatef(obj.rotZ, 0, 1, 0); // angulo, X Y Z
-    glRotatef(obj.rotY, 0, 0, 1); // angulo, X Y Z
-
-    // Si es visible y no es un mesh, lo dibuja
-    if (obj.visible && obj.type != mesh) {
-        RenderObject(objId); // Ajusta el segundo parametro si es necesario
-    }
-    
-    // Procesar cada hijo
-    for (int c = 0; c < obj.Childrens.Count(); c++) {
-        RenderObjectAndChildrens(obj.Childrens[c].Id);
-    }
-
-    // Restaurar la matriz previa
-    glPopMatrix();
-}
-
-//Relantionshipslines
-void CWhisk3D::RenderLinkLines(TInt objId){
-	Object& obj = Objects[objId];
-    // Guardar la matriz actual
-    glPushMatrix();
-    
-    // Aplicar las transformaciones del objeto
-    glTranslatef(obj.posX, obj.posZ, obj.posY);
-    glRotatef(obj.rotX, 1, 0, 0); // angulo, X Y Z
-    glRotatef(obj.rotZ, 0, 1, 0); // angulo, X Y Z
-    glRotatef(obj.rotY, 0, 0, 1); // angulo, X Y Z
-    
-    // Procesar cada hijo
-    for (TInt c = 0; c < obj.Childrens.Count(); c++) {
-		Object& objChild = Objects[obj.Childrens[c].Id];
-		LineaLinkChild[3] = (GLshort)objChild.posX;
-		LineaLinkChild[4] = (GLshort)objChild.posZ;
-		LineaLinkChild[5] = (GLshort)objChild.posY;
-
-		// Calcular la distancia en 3D entre obj y objChild
-		GLfloat diffX = objChild.posX - obj.posX;
-        GLfloat diffY = objChild.posY - obj.posY;
-        GLfloat diffZ = objChild.posZ - obj.posZ;
-        GLfloat distancia = sqrtu(diffX * diffX + diffY * diffY + diffZ * diffZ);
-        
-        // Usar la distancia escalada para modificar las coordenadas UV
-        lineUV[3] = distancia/8;
-		glVertexPointer( 3, GL_SHORT, 0, LineaLinkChild );
-		glDrawElements( GL_LINES, LineaEdgeSize, GL_UNSIGNED_SHORT, LineaEdge );
-				
-		DrawnLines(1, 1, LineaTimeline, LineaEdge);
-		if (obj.Childrens.Count() > 0){
-			RenderLinkLines(obj.Childrens[c].Id);
-		}
-    }
-
-    // Restaurar la matriz previa
-    glPopMatrix();
-}
-
-void CWhisk3D::RenderObject( TInt objId ){
-	Object& obj = Objects[objId];
-	glPushMatrix();
-	glScalex(obj.scaleX, obj.scaleZ, obj.scaleY);	
-
-	glDisable( GL_TEXTURE_2D );
-
-	//color si esta seleccionado
-	if (SelectActivo == objId && obj.seleccionado){
-		glColor4f(ListaColores[accent][0],ListaColores[accent][1],ListaColores[accent][2],ListaColores[accent][3]);
-	}
-	else if (obj.seleccionado){
-		glColor4f(ListaColores[accentDark][0],ListaColores[accentDark][1],ListaColores[accentDark][2],ListaColores[accentDark][3]);
-	}
-	else {		
-		glColor4f(ListaColores[negro][0],ListaColores[negro][1],ListaColores[negro][2],ListaColores[negro][3]);		
-	}
-	//si es un empty
-	if (obj.type == empty){		
-		glDisable( GL_TEXTURE_2D );	 
-		glDisable( GL_BLEND );	
-		glVertexPointer( 3, GL_SHORT, 0, EmptyVertices );
-		glDrawElements( GL_LINES, EmptyEdgesSize, GL_UNSIGNED_SHORT, EmptyEdges );
-	}
-	else if (obj.type == camera){			
-		glDisable( GL_TEXTURE_2D ); 
-		glDisable( GL_BLEND );
-		glVertexPointer( 3, GL_SHORT, 0, CameraVertices );
-		glDrawElements( GL_LINES, CameraEdgesSize, GL_UNSIGNED_SHORT, CameraEdges );
-		if (CameraActive == objId){		
-    		//glDisable( GL_CULL_FACE  );	
-			glDrawElements( GL_TRIANGLES, 3, GL_UNSIGNED_SHORT, CameraFaceActive );	
-		}
-	}
-	else if (obj.type == light){				
-		glEnable( GL_TEXTURE_2D ); 
-		glEnable( GL_BLEND );
-		glDepthMask(GL_FALSE); // Desactiva la escritura en el Z-buffer
-
-		glEnable( GL_POINT_SPRITE_OES ); //activa el uso de sprites en los vertices
-		glPointSize( 32 ); //tamaño del punto
-		glVertexPointer( 3, GL_SHORT, 0, pointVertex );
-		glBindTexture( GL_TEXTURE_2D, Textures[2].iID ); //selecciona la textura
-
-		glTexEnvi( GL_POINT_SPRITE_OES, GL_COORD_REPLACE_OES, GL_TRUE );
-		glDrawArrays( GL_POINTS, 0, 1 );
-		glTexEnvi( GL_POINT_SPRITE_OES, GL_COORD_REPLACE_OES, GL_FALSE);
-
-		glDisable( GL_POINT_SPRITE_OES );			
-		glDisable( GL_TEXTURE_2D ); 
-
-		//glScalex( 0, 10, 0 ); //4500
-		LineaLightVertex[4] = (GLshort)-obj.posZ;
-		glVertexPointer( 3, GL_SHORT, 0, LineaLightVertex );
-		glDrawElements( GL_LINES, LineaEdgeSize, GL_UNSIGNED_SHORT, LineaEdge );
-
-		glDisable( GL_BLEND );
-		glDepthMask(GL_TRUE); // Reactiva la escritura en el Z-buffer
-	}
-	glPopMatrix();
 }
 
 TInt CWhisk3D::BuscarAnimacionObj(){
@@ -1405,51 +948,6 @@ void CWhisk3D::ReloadAnimation(){
 	ReloadViewport(false);
 }
 
-void CWhisk3D::ReloadViewport(TBool hacerRedibujo){
-	//Recalcula los constrains
-    for(TInt c = 0; c < Constraints.Count(); c++) {
-		TInt id = Constraints[c].Id;
-		TInt Target = Constraints[c].Target;
-		switch (Constraints[c].type) {
-			case trackto:
-				// Calcular vector dirección
-				GLfloat dirX = Objects[Target].posX - Objects[id].posX;
-				GLfloat dirY = Objects[Target].posY - Objects[id].posY;
-				GLfloat dirZ = Objects[Target].posZ - Objects[id].posZ;						
-				
-				Objects[id].rotZ = atan2(dirX, dirY) * (180.0 / M_PI);  // Azimut
-
-				// Calcular longitud del vector (magnitud)
-				GLfloat length = sqrt(dirX * dirX + dirY * dirY + dirZ * dirZ);
-
-				// Cálculo de la elevación (rotY)
-				if (Constraints[c].opcion){	
-					Objects[id].rotZ += 180; // Para invertir el eje si necesario.
-					Objects[id].rotX = asin(dirZ/length) * (180.0 / M_PI);					
-				}
-				else {
-					Objects[id].rotZ -= 90; // Para invertir el eje si necesario.
-					Objects[id].rotY = asin(dirZ/length) * (180.0 / M_PI);	
-				}
-
-				break;
-			case copyrotation:
-				Objects[id].rotX = Objects[Target].rotX;
-				Objects[id].rotY = Objects[Target].rotY;
-				Objects[id].rotZ = Objects[Target].rotZ;
-				break;
-			case copylocation:
-				Objects[id].posX = Objects[Target].posX;
-				Objects[id].posY = Objects[Target].posY;
-				Objects[id].posZ = Objects[Target].posZ;
-				break;
-		}
-	}
-	if (hacerRedibujo){
-    	redibujar = true;
-	}
-}
-
 void CWhisk3D::SetCurrentFrame(){
 	Cancelar();
 	estado = timelineMove;
@@ -1554,327 +1052,8 @@ TBool CWhisk3D::AppCycle( GLfloat aDeltaTimeSecs ){
 	return true;
 }
 
-void CWhisk3D::AppRender(){
-	if (SimularZBuffer){
-		glClearColor(0.0f, 0.0f, 0.0f, 1.0f); // Color negro
-		glEnable(GL_FOG);
-		glFogf(GL_FOG_MODE, GL_LINEAR); // Tipo de niebla lineal
-		glFogf(GL_FOG_START, FRUSTUM_NEAR);  // Distancia inicial de la niebla
-		glFogf(GL_FOG_END, FRUSTUM_FAR);     // Distancia final de la niebla
-		GLfloat fogColor[] = {0.0f, 0.0f, 0.0f, 1.0f};
-		glFogfv(GL_FOG_COLOR, fogColor); // Color de la niebla
-	}
-	else {
-		glDisable(GL_FOG);
-		glClearColor(ListaColores[background][0],ListaColores[background][1],ListaColores[background][2],ListaColores[background][3]);
-	}
-	
-    glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
-    glLoadIdentity();
-    glEnable( GL_DEPTH_TEST );	
-
-	if (ViewFromCameraActive){
-		RecalcViewPos();
-		//glTranslatef( posX, posZ, posY);
-		glTranslatef( posX, posZ, -cameraDistance+posY);
-	}
-	else {
-		glTranslatef( posX, posZ, -cameraDistance+posY);
-	}
-	glRotatef(rotY, 1, 0, 0); //angulo, X Y Z
-	glRotatef(rotX, 0, 1, 0); //angulo, X Y Z
-	// Use some magic numbers to scale the head model to fit the screen.
-	glScalex( 1 << 10, 1 << 10, 1 << 10 );
-	glTranslatef( PivotX, PivotZ, PivotY);
-
-    // Habilitar la normalizaci�n de las normales
-    glEnable(GL_NORMALIZE);	
-
-	//primero hay que colocar las luces en caso de estar en modo render!
-	if (!SimularZBuffer && view == MaterialPreview || view == Rendered){
-		for(TInt o=0; o < Objects.Count(); o++){
-			Object& obj = Objects[o];
-			if(!obj.visible || obj.type != light ) {continue;}
-			Light& light = Lights[obj.Id];
-
-			glPushMatrix(); //guarda la matrix
-			glTranslatef( obj.posX, obj.posZ, obj.posY);
-			GLfloat lightPos[] = {0.0f, 0.0f, 0.0f, 1.0f}; // Luz puntual en la posici�n transformada
-			glLightfv(light.lightId, GL_POSITION, lightPos);
-			//glLightfv(  light.lightId, GL_POSITION, positionPuntualLight );
-			glPopMatrix(); //reinicia la matrix a donde se guardo  
-		}		
-	}
-
-	//por defecto la linea es de 1	
-	glLineWidth(1);		
-	
-	//bucle que dibuja cada objeto en orden
-	if(Meshes.Count() > 0){
-		// Funcion principal para iterar sobre la coleccion
-		for (int o = 0; o < Collection.Count(); o++) {
-			Object& obj = Objects[Collection[o]];
-			RenderMeshAndChildren(obj, Collection[o]);
-		}
-	}
-	//el valor que tiene que tener para dibujar el resto correctamente
-	//glDisable(GL_COLOR_MATERIAL);
-	glDisableClientState( GL_COLOR_ARRAY );
-
-	//fin del dibujado de objetos
-	//si estaba simulando el zbuffer. el resto no hace falta
-	if (SimularZBuffer){		
-		redibujar = false;
-		return;
-	};
-
-	//el resto de objetos no usan materiales ni luces
-	glMaterialfv(   GL_FRONT_AND_BACK, GL_DIFFUSE,  ListaColores[negro] );
-	glMaterialfv(   GL_FRONT_AND_BACK, GL_AMBIENT,  ListaColores[negro] );
-	glMaterialfv(   GL_FRONT_AND_BACK, GL_SPECULAR, ListaColores[negro] );
-	glDisable( GL_CULL_FACE ); // Enable back face culling.
-	glDisable( GL_LIGHTING );
-	glEnable(GL_COLOR_MATERIAL);
-	glDisable( GL_TEXTURE_2D );
-	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glEnable( GL_BLEND );
-	glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
-	
-	//se encarga de dibujar el layout 
-	if (showOverlays){
-		//dibujar las lineas del piso y el piso
-		if (showFloor || showXaxis || showYaxis){
-			glEnable(GL_FOG);
-			glFogf(GL_FOG_MODE, GL_LINEAR); // Tipo de niebla lineal
-			glFogf(GL_FOG_START, FRUSTUM_NEAR);  // Distancia inicial de la niebla
-			glFogf(GL_FOG_END, FRUSTUM_FAR);     // Distancia final de la niebla
-			//GLfloat fogColor[] = {0.23f, 0.23f, 0.23f, 1.f};
-			//glClearColor( ClearColor[0], ClearColor[1], ClearColor[2], 1.f );
-			glFogfv(GL_FOG_COLOR, ListaColores[background]); // Color de la niebla
-			glLineWidth(1);	 
-
-			glVertexPointer( 3, GL_SHORT, 0, objVertexdataFloor );
-			//glNormalPointer( GL_BYTE, 0, objNormaldataFloor );
-
-			//dibuja el piso	
-			if (showFloor){
-				glColor4f(LineaPiso[0],LineaPiso[1],LineaPiso[2],LineaPiso[3]);
-				glDrawElements( GL_LINES, objFacesFloor, GL_UNSIGNED_SHORT, objFacedataFloor );			
-			}		
-			//linea Verde
-			if (showXaxis){
-				glLineWidth(2);
-				glColor4f(LineaPisoRoja[0],LineaPisoRoja[1],LineaPisoRoja[2],LineaPisoRoja[3]);
-				glDrawElements( GL_LINES, 2, GL_UNSIGNED_SHORT, EjeRojo );
-				glLineWidth(1);	//la deja como es por defecto
-			}
-			else if (showFloor){
-				glColor4f(LineaPiso[0],LineaPiso[1],LineaPiso[2],LineaPiso[3]);
-				glDrawElements( GL_LINES, 2, GL_UNSIGNED_SHORT, EjeRojo );
-			}
-			//linea Roja	
-			if (showYaxis){
-				glLineWidth(2);
-				glColor4f(LineaPisoVerde[0],LineaPisoVerde[1],LineaPisoVerde[2],LineaPisoVerde[3]);
-				glDrawElements( GL_LINES, 2, GL_UNSIGNED_SHORT, EjeVerde );
-				glLineWidth(1);	//la deja como es por defecto
-			}
-			else if (showFloor){
-				glColor4f(LineaPiso[0],LineaPiso[1],LineaPiso[2],LineaPiso[3]);
-				glDrawElements( GL_LINES, 2, GL_UNSIGNED_SHORT, EjeVerde );
-			}	
-			glDisable(GL_FOG);
-		}
-		//esto solo se hace si hay objetos
-		if (Objects.Count() > 0){
-			//dibujo de objetos nuevo!
-			glLineWidth(1);	 
-			for (int o = 0; o < Collection.Count(); o++) {
-				RenderObjectAndChildrens(Collection[o]);
-			}	 
-			//dibujar lineas parent		
-			if (ShowRelantionshipsLines){
-				glEnable( GL_TEXTURE_2D );
-				glEnable( GL_BLEND );
-				glDepthMask(GL_FALSE); // Desactiva la escritura en el Z-buffer				
-				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-				glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-				glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-				glTexCoordPointer( 2, GL_FLOAT, 0, lineUV ); //SpriteUvSize
-				glColor4f(ListaColores[negro][0],ListaColores[negro][1],ListaColores[negro][2],ListaColores[negro][3]);	
-				glBindTexture( GL_TEXTURE_2D, Textures[5].iID ); //selecciona la de linea punteada	
-				for (int o = 0; o < Collection.Count(); o++) {
-					Object& obj = Objects[Collection[o]];
-					if (obj.Childrens.Count() > 0){
-						RenderLinkLines(Collection[o]);
-					}
-				}
-				glDepthMask(GL_TRUE); // Reactiva la escritura en el Z-buffer		
-			}
-
-			glDisable( GL_DEPTH_TEST );	
-			glDisable( GL_BLEND );
-			glDisable( GL_TEXTURE_2D );
-			//dibuja los ejes de transformacion
-			if (estado == translacion || estado == rotacion || estado == EditScale) {
-				for (TInt o = 0; o < Collection.Count(); o++) {
-					TBool found = false;
-					Object& obj = Objects[Collection[o]];
-					SearchSelectObj(obj, Collection[o], found);
-					if (found) break;  // Si ya encontro el objeto, salir del bucle
-				}
-			}
-
-			//Dibuja el origen de los objetos seleccionados		
-			if (showOrigins){	
-				glEnable( GL_TEXTURE_2D );
-				glEnable( GL_BLEND );
-				// Enable point sprites.
-				glEnable( GL_POINT_SPRITE_OES );
-				// Make the points bigger.
-				glPointSize( 8 );
-				for (TInt o = 0; o < Collection.Count(); o++) {
-					Object& obj = Objects[o];
-					DibujarOrigen(obj, o);
-				}
-				glTexEnvi( GL_POINT_SPRITE_OES, GL_COORD_REPLACE_OES, GL_FALSE);
-				glDisable( GL_POINT_SPRITE_OES );
-			}			
-		}
-		//dibuja el cursor 3D	
-		if (show3DCursor){
-			glDisable( GL_DEPTH_TEST );
-			glPushMatrix(); //guarda la matrix
-			glTranslatef( Cursor3DposX, Cursor3DposZ, Cursor3DposY);
-			
-			glEnable( GL_TEXTURE_2D );
-			glEnable( GL_BLEND );
-			glEnable( GL_POINT_SPRITE_OES ); // Enable point sprites.	
-			glPointSize( 32 ); // Make the points bigger.
-			glColor4f(ListaColores[blanco][0],ListaColores[blanco][1],ListaColores[blanco][2],ListaColores[blanco][3]);
-			glVertexPointer( 3, GL_SHORT, 0, pointVertex );
-			glBindTexture( GL_TEXTURE_2D, Textures[3].iID);//iCursor3dTextura.iID ); //selecciona la textura
-
-			glTexEnvi( GL_POINT_SPRITE_OES, GL_COORD_REPLACE_OES, GL_TRUE );
-			glDrawArrays( GL_POINTS, 0, 1 );
-			glTexEnvi( GL_POINT_SPRITE_OES, GL_COORD_REPLACE_OES, GL_FALSE);
-
-			//dibuja lineas		
-			glDisable( GL_TEXTURE_2D );
-			glDisable( GL_POINT_SPRITE_OES );
-			glDisable( GL_BLEND );
-		
-			glColor4f(ListaColores[negro][0],ListaColores[negro][1],ListaColores[negro][2],ListaColores[negro][3]);
-			glVertexPointer( 3, GL_SHORT, 0, Cursor3DVertices );
-			glDrawElements( GL_LINES, Cursor3DEdgesSize, GL_UNSIGNED_SHORT, Cursor3DEdges );	
-
-			glPopMatrix(); //reinicia la matrix a donde se guardo	
-		}
-	}
-
-	if (ShowUi){
-		dibujarUI();
-	}
-
-    //termino de dibujar
-    redibujar = false;
-}
-
-void CWhisk3D::SearchSelectObj(Object& obj, TInt objIndex, TBool& found) {
-    glPushMatrix();    
-    glTranslatef(obj.posX, obj.posZ, obj.posY);
-    
-    if (objIndex == SelectActivo) {
-		if (estado == rotacion || estado == EditScale){
-			glRotatef(obj.rotX, 1, 0, 0); //angulo, X Y Z
-			glRotatef(obj.rotZ, 0, 1, 0); //angulo, X Y Z
-			glRotatef(obj.rotY, 0, 0, 1); //angulo, X Y Z
-		}		
-		//dibuja los ejes de transformacion
-		if (estado == translacion || estado == rotacion || estado == EditScale){		
-        	DrawTransformAxis(obj);
-		}		
-        found = true;
-    } 
-	else if (obj.Childrens.Count() > 0){	
-		glRotatef(obj.rotX, 1, 0, 0); //angulo, X Y Z
-		glRotatef(obj.rotZ, 0, 1, 0); //angulo, X Y Z
-		glRotatef(obj.rotY, 0, 0, 1); //angulo, X Y Z
-        for (int c = 0; c < obj.Childrens.Count(); c++) {
-            if (found) break;  // Si ya lo encontro, salir del bucle
-            Object& objChild = Objects[obj.Childrens[c].Id];
-            SearchSelectObj(objChild, obj.Childrens[c].Id, found);
-        }
-    }
-    glPopMatrix();
-}
-
-void CWhisk3D::DrawTransformAxis(Object& obj) {
-	glPushMatrix();    
-	glVertexPointer( 3, GL_SHORT, 0, objVertexdataFloor );
-	glLineWidth(2);
-		
-	if (InteractionMode == ObjectMode){
-		glTranslatef(TransformPivotPointFloat[0]/65000, 
-					 TransformPivotPointFloat[1]/65000, 
-					 TransformPivotPointFloat[2]/65000
-		);	
-	}
-	if (axisSelect == X){
-		glColor4f(ColorTransformX[0],ColorTransformX[1],ColorTransformX[2],ColorTransformX[3]);
-		glDrawElements( GL_LINES, 2, GL_UNSIGNED_SHORT, EjeRojo );				
-	}
-	else if (axisSelect == Y){
-		glColor4f(ColorTransformY[0],ColorTransformY[1],ColorTransformY[2],ColorTransformY[3]);
-		glDrawElements( GL_LINES, 2, GL_UNSIGNED_SHORT, EjeVerde ); 				
-	}
-	else if (axisSelect == Z){
-		glColor4f(ColorTransformZ[0],ColorTransformZ[1],ColorTransformZ[2],ColorTransformZ[3]);
-		glDrawElements( GL_LINES, 2, GL_UNSIGNED_SHORT, EjeAzul ); 				
-	}	
-	else if (axisSelect == XYZ){
-		glColor4f(ColorTransformX[0],ColorTransformX[1],ColorTransformX[2],ColorTransformX[3]);
-		glDrawElements( GL_LINES, 2, GL_UNSIGNED_SHORT, EjeRojo );	
-		glColor4f(ColorTransformY[0],ColorTransformY[1],ColorTransformY[2],ColorTransformY[3]);
-		glDrawElements( GL_LINES, 2, GL_UNSIGNED_SHORT, EjeVerde ); 
-		glColor4f(ColorTransformZ[0],ColorTransformZ[1],ColorTransformZ[2],ColorTransformZ[3]);
-		glDrawElements( GL_LINES, 2, GL_UNSIGNED_SHORT, EjeAzul ); 				
-	}
-	glLineWidth(1);	//la deja como es por defecto	
-	glPopMatrix();
-}
-
-void CWhisk3D::DibujarOrigen(Object& obj, TInt objIndex){
-    glPushMatrix();    
-    glTranslatef(obj.posX, obj.posZ, obj.posY);
-    
-    if (obj.visible && (obj.seleccionado || objIndex == SelectActivo)){	
-		if (objIndex == SelectActivo){
-			glColor4f(ListaColores[accent][0],ListaColores[accent][1],ListaColores[accent][2],ListaColores[accent][3]);
-		}
-		else {
-			glColor4f(ListaColores[accentDark][0],ListaColores[accentDark][1],ListaColores[accentDark][2],ListaColores[accentDark][3]);
-		}
-		glVertexPointer( 3, GL_SHORT, 0, pointVertex );
-		glBindTexture( GL_TEXTURE_2D, Textures[0].iID ); //selecciona la textura
-		glTexEnvi( GL_POINT_SPRITE_OES, GL_COORD_REPLACE_OES, GL_TRUE );    	
-		glPushMatrix();    		
-		glScalex(obj.scaleX, obj.scaleZ, obj.scaleY);	
-		glDrawArrays( GL_POINTS, 0, 1 );	
-    	glPopMatrix();
-    } 
-	else if (obj.Childrens.Count() > 0){	
-		glRotatef(obj.rotX, 1, 0, 0); //angulo, X Y Z
-		glRotatef(obj.rotZ, 0, 1, 0); //angulo, X Y Z
-		glRotatef(obj.rotY, 0, 0, 1); //angulo, X Y Z
-        for (int c = 0; c < obj.Childrens.Count(); c++) {
-            Object& objChild = Objects[obj.Childrens[c].Id];
-            DibujarOrigen(objChild, obj.Childrens[c].Id);
-        }
-    }
-    glPopMatrix();
+void CWhisk3D::AppRender(){	
+	//ahora es "Render()"
 }
 
 //Se encarga de la nueva UI 3d
@@ -2023,18 +1202,6 @@ void CWhisk3D::DrawnTimeline(){
     GLshort posicionTiempo = CurrentFrame;
 	UiMoveTo(posicionTiempo,0);
 	DrawnLines(2, 1, LineaTimeline, LineaEdge);
-}
-
-void CWhisk3D::DrawnLines(TInt LineWidth, TInt cantidad, GLshort* vertexlines, GLushort* lineasIndices){
-	glVertexPointer( 3, GL_SHORT, 0, vertexlines );
-	glLineWidth(LineWidth);	
-	glDrawElements( GL_LINES, cantidad*2, GL_UNSIGNED_SHORT, lineasIndices );
-}
-
-void CWhisk3D::DrawnLines(TInt LineWidth, TInt cantidad, const GLshort* vertexlines, const GLushort* lineasIndices) {
-    glVertexPointer(3, GL_SHORT, 0, vertexlines);
-    glLineWidth(LineWidth);
-    glDrawElements(GL_LINES, cantidad * 2, GL_UNSIGNED_SHORT, lineasIndices);
 }
 
 void CWhisk3D::SetUvSprite(GLshort x, GLshort y, GLshort ancho, GLshort alto){
@@ -2258,374 +1425,11 @@ void CWhisk3D::SetScale(TInt valor){
 				Objects[estadoObjetos[o].indice].scaleZ += valor;
 				break;
 		}
-	}	
+	}
 	redibujar = true;
 }
 
 TInt ShiftCount = 0;
-void CWhisk3D::InputUsuario(GLfixed aDeltaTimeSecs){
-	if (iInputHandler->IsInputPressed( EEscape )){
-		Cancelar();
-		return;
-	}
-	//revisa las 4 direcciones
-	for(TInt f=0; f < 4; f++){
-		if (iInputHandler->IsInputPressed( flechasEstados[f].cual )){
-			flechasEstados[f].activo = true;
-			if ( flechasEstados[f].estado == TeclaSuelta || flechasEstados[f].estado == TeclaSoltada){
-				flechasEstados[f].estado = TeclaPresionada;
-			}
-			else {
-				flechasEstados[f].estado = TeclaMantenida;
-			}
-		}
-		else if ( flechasEstados[f].estado == TeclaMantenida || flechasEstados[f].estado == TeclaPresionada){
-			flechasEstados[f].activo = false;
-			flechasEstados[f].estado = TeclaSoltada;
-		}
-		else  {
-			flechasEstados[f].activo = false;
-			flechasEstados[f].estado = TeclaSuelta;
-		}
-	}
-
-	//revisa si se apreto una flecha y actualiza los valores dependiendo el estado de la aplicacion
-	//ya sea animando, editando una malla 3d o en modo objeto
-	if (TocandoPantalla){
-		TimeTouch++;
-		if (TimeTouch < 10){			
-			if (SoltoPantalla){
-				TimeTouch = 0;
-				TocandoPantalla = false;
-				SoltoPantalla = false;
-				if (DragTouchX < 120 && DragTouchY < 120){
-					ShowMenu();
-				}
-				else {
-				ShowObjectMenu();
-				}
-				return;
-			}
-		}
-		else if (TimeTouch > 40 && SoltoPantalla){
-			TimeTouch = 0;
-			TocandoPantalla = false;
-			SoltoPantalla = false;
-			TInt MovimientoX = StartTouchX - DragTouchX + 10;
-			TInt MovimientoY = StartTouchY - DragTouchY + 10;
-			if (MovimientoX > -1 && MovimientoX < 21 && MovimientoY > -1 && MovimientoY < 21){
-				ShowObjectMenu();
-				return;
-			}
-		}
-		else if (iShiftPressed || navegacionMode == Fly){	
-			GLfloat radRotX = rotX * PI / 180.0; // Rotación en radianes (X)
-			GLfloat radRotY = rotY * PI / 180.0; // Rotación en radianes (Y)
-
-			/*// Direcciones en el espacio global basadas en la rotación
-			GLfloat forwardX = cos(radRotY) * cos(radRotX); // Dirección hacia adelante/atrás en X
-			GLfloat forwardY = sin(radRotX);               // Dirección hacia adelante/atrás en Y
-			GLfloat forwardZ = sin(radRotY) * cos(radRotX); // Dirección hacia adelante/atrás en Z
-
-			// Cálculo del vector "izquierda" basado en la rotación
-			GLfloat rightX = cos(radRotY + PI / 2.0);      // Dirección hacia la derecha en X
-			GLfloat rightZ = sin(radRotY + PI / 2.0);      // Dirección hacia la derecha en Z
-
-			GLfloat upX = -cos(radRotY) * sin(radRotX);    // Dirección hacia arriba/abajo en X
-			GLfloat upY = cos(radRotX);                    // Dirección hacia arriba/abajo en Y
-			GLfloat upZ = -sin(radRotY) * sin(radRotX);    // Dirección hacia arriba/abajo en Z*/
-
-			// Ajuste de sensibilidad
-			GLfloat scaleFactor = cameraDistance * 0.3f;
-
-			// Desplazamiento del toque
-			GLfloat deltaX = (StartTouchX - DragTouchX) * scaleFactor; // Movimiento horizontal del táctil
-			GLfloat deltaY = (StartTouchY - DragTouchY) * scaleFactor; // Movimiento vertical del táctil
-
-			// Movimiento restringido a un solo eje (por ejemplo, eje Y del mundo)
-			//GLfloat moveX = deltaX * cos(radRotX);
-			//GLfloat moveY = deltaY;
-			GLfloat moveZ = deltaY * sin(radRotY + PI / 2.0);
-
-			// Aplica el movimiento al pivote de la cámara
-			//PivotX = OriginalPivotX + moveX;
-			//PivotY = OriginalPivotY + moveY;
-			PivotZ = OriginalPivotZ + moveZ;
-
-			/*GLfloat radRotX = rotX * PI / 180.0;
-			OriginalLeftX = cos(radRotX);
-			OriginalLeftY = sin(radRotX);
-
-			PivotX = OriginalPivotX - ((StartTouchX - DragTouchX) * OriginalLeftX)*10;
-			PivotY = OriginalPivotY - ((StartTouchY - DragTouchY) * OriginalLeftY)*10;
-			PivotZ = ?????????;*/
-		}
-		else if (navegacionMode == Orbit){
-			rotX = OriginalRotX - ((StartTouchX - DragTouchX)/2);
-			rotY = OriginalRotY - ((StartTouchY - DragTouchY)/2);
-		}
-		if (SoltoPantalla){
-			TimeTouch = 0;
-			TocandoPantalla = false;
-			SoltoPantalla = false;
-		}
-		return;
-	}	
-
-	if ( iShiftPressed && estado == editNavegacion){
-		ShiftCount++;
-		if( flechasEstados[FlechaIzquierda].estado == TeclaPresionada ){
-			SeleccionarAnterior();
-			ShiftCount = 40;
-		}		
-		else if( flechasEstados[FlechaDerecha].estado == TeclaPresionada ){
-			SeleccionarProximo();
-			ShiftCount = 40;
-		}
-		else if( flechasEstados[FlechaArriba].estado == TeclaPresionada ){
-			SeleccionarTodo();
-			ShiftCount = 40;
-		}
-		else if( flechasEstados[FlechaAbajo].estado == TeclaPresionada ){
-			SeleccionarTodo();
-			ShiftCount = 40;
-		}
-		/*else if (iInputHandler->IsInputPressed( EVolumenUp ) ){
-			CurrentFrame++;
-			if (CurrentFrame > EndFrame){
-				CurrentFrame = StartFrame;
-			}
-			if (!PlayAnimation){
-				ReloadAnimation();
-			}
-	    	ReloadViewport();
-			ShiftCount = 40;
-		}
-		else if( iInputHandler->IsInputPressed( EVolumenDown ) ){
-			CurrentFrame--;
-			if (CurrentFrame < StartFrame){
-				StartFrame = EndFrame;
-			}
-			if (!PlayAnimation){
-				ReloadAnimation();
-			}
-	    	ReloadViewport();
-			ShiftCount = 40;
-		}*/
-		return;
-	}
-	else if ( iShiftPressed && estado != editNavegacion){
-		ShiftCount++;
-		return;
-	}
-	else if (ShiftCount > 0){
-		if (ShiftCount < 30){
-			Tab();
-		}
-		ShiftCount = 0;
-		return;
-	}
-
-	if( flechasEstados[FlechaIzquierda].activo ){
-		//mueve el mouse
-		if (mouseVisible){
-			mouseX--;
-			if (mouseX < 0){mouseX = 0;};
-		}
-
-		//rotX += fixedMul( 0.1, aDeltaTimeSecs );
-		if (estado == editNavegacion){ 
-			if (navegacionMode == Orbit){
-				if (ViewFromCameraActive && CameraToView){
-					Object& obj = Objects[CameraActive];
-					// Convertir el angulo de rotX a radianes
-					GLfloat radRotX = obj.rotX * PI / 180.0;
-
-					obj.posX+= 30 * cos(radRotX);
-					obj.posY-= 30 * sin(radRotX);
-				}
-				else {
-					if (ViewFromCameraActive){
-						RestaurarViewport();
-					}
-					rotX-= 0.5;
-				}
-			}
-			else if (navegacionMode == Fly){
-				// Convertir el angulo de rotX a radianes
-				GLfloat radRotX = rotX * PI / 180.0;
-
-				// Calcular el vector de direccion hacia la izquierda (90 grados a la izquierda del angulo actual)
-				GLfloat leftX = cos(radRotX);
-				GLfloat leftY = sin(radRotX);
-
-				// Mover hacia la izquierda
-				PivotX += 30 * leftX;
-				PivotY += 30 * leftY;
-			}	
-		}
-		else if (estado == translacion){	
-			SetTranslacionObjetos(30);		
-		}
-		else if (estado == rotacion){
-			SetRotacion(1);
-		}
-		else if (estado == EditScale){
-			SetScale(-1);
-		}
-		else if (estado == timelineMove){
-			CurrentFrame--;
-			if (CurrentFrame < StartFrame){
-				StartFrame = EndFrame;
-			}
-			if (!PlayAnimation){
-				ReloadAnimation();
-			}
-		}
-		ReloadViewport(true);
-	}
-	if( iInputHandler->IsInputPressed( EJoystickRight ) ){
-		//mueve el mouse
-		if (mouseVisible){
-			mouseX++;
-			if (mouseX > iScreenWidth-11){mouseX = iScreenWidth-11;};
-		}
-
-		//rotX -= fixedMul( 1, aDeltaTimeSecs );
-		if (estado == editNavegacion){				
-			if (navegacionMode == Orbit){
-				if (ViewFromCameraActive && CameraToView){
-					Object& obj = Objects[CameraActive];
-					// Convertir el angulo de rotX a radianes
-					GLfloat radRotX = obj.rotX * PI / 180.0;
-
-					obj.posX-= 30 * cos(radRotX);
-					obj.posY+= 30 * sin(radRotX);
-				}
-				else {
-					if (ViewFromCameraActive){
-						RestaurarViewport();
-					}
-					rotX+= 0.5;	
-				}		
-			}
-			else if (navegacionMode == Fly){
-				// Convertir el angulo de rotX a radianes
-				GLfloat radRotX = rotX * PI / 180.0;
-
-				// Calcular el vector de direccion hacia la izquierda (90 grados a la izquierda del angulo actual)
-				GLfloat leftX = cos(radRotX);
-				GLfloat leftY = sin(radRotX);
-
-				// Mover hacia la izquierda
-				PivotX -= 30 * leftX;
-				PivotY -= 30 * leftY;
-			}
-		}
-		else if (estado == translacion){
-			SetTranslacionObjetos(-30);		
-		}
-		else if (estado == rotacion){
-			SetRotacion(-1);
-		}
-		else if (estado == EditScale){
-			SetScale(1);	
-		}
-		else if (estado == timelineMove){
-			CurrentFrame++;
-			if (!PlayAnimation){
-				ReloadAnimation();
-			}
-		}
-	    ReloadViewport(true);
-	}
-	if( iInputHandler->IsInputPressed( EJoystickUp ) ){
-		//mueve el mouse
-		if (mouseVisible){
-			mouseY--;
-			if (mouseY < 0){mouseY = 0;};
-		}
-
-		if (estado == editNavegacion){	
-			if (navegacionMode == Orbit){
-				if (ViewFromCameraActive && CameraToView){
-					Object& obj = Objects[CameraActive];
-					// Convertir el angulo de rotX a radianes
-					GLfloat radRotX = obj.rotX * PI / 180.0;
-					GLfloat radRotY = obj.rotY * PI / 180.0;
-					//GLfloat radRotZ = obj.rotZ * PI / 180.0;
-
-					obj.posX+= 30 * sin(radRotX);
-					//obj.posY-= 30 * cos(radRotX);
-					obj.posZ+= 30 * cos(radRotY);
-				}
-				else {
-					if (ViewFromCameraActive){
-						RestaurarViewport();
-					}
-					rotY-= 0.5;	
-				}			
-			}
-			else if (navegacionMode == Fly){
-				// Convertir el angulo de rotX a radianes
-				GLfloat radRotX = rotX * PI / 180.0;
-
-				PivotY+= 30 * cos(radRotX);
-				PivotX-= 30 * sin(radRotX);
-			}		
-		}
-		else if (estado == EditScale){
-			SetScale(1);	
-		}
-		else if (estado == translacion){
-			SetTranslacionObjetos(-30);
-		}
-	    ReloadViewport(true);
-	}
-	if( iInputHandler->IsInputPressed( EJoystickDown ) ){
-		//mueve el mouse
-		if (mouseVisible){
-			mouseY++;
-			if (mouseY > iScreenHeight-17){mouseY = iScreenHeight-17;};
-		}
-
-		if (estado == editNavegacion){ 			
-			if (navegacionMode == Orbit){
-				if (ViewFromCameraActive && CameraToView){
-					Object& obj = Objects[CameraActive];
-					// Convertir el angulo de rotX a radianes
-					GLfloat radRotX = obj.rotX * PI / 180.0;
-					GLfloat radRotY = obj.rotY * PI / 180.0;
-					//GLfloat radRotZ = obj.rotZ * PI / 180.0;
-
-					obj.posX-= 30 * sin(radRotX);
-					//obj.posY-= 30 * cos(radRotX);
-					obj.posZ-= 30 * cos(radRotY);
-				}
-				else {
-					if (ViewFromCameraActive){
-						RestaurarViewport();
-					}
-					rotY+= 0.5;	
-				}		
-			}
-			else if (navegacionMode == Fly){
-				// Convertir el angulo de rotX a radianes
-				GLfloat radRotX = rotX * PI / 180.0;
-
-				PivotY-= 30 * cos(radRotX);
-				PivotX+= 30 * sin(radRotX);
-			}
-		}
-		else if (estado == EditScale){
-			SetScale(-1);	
-		}
-		else if (estado == translacion){
-			SetTranslacionObjetos(30);		
-		}
-	    ReloadViewport(true);
-	}
-}
 
 void CWhisk3D::SetRotacion(){
 	//si no hay objetos
@@ -2790,12 +1594,6 @@ void CWhisk3D::SetEje(TInt eje){
     redibujar = true;	
 };
 
-void CWhisk3D::Cancelar(){
-	if (estado != editNavegacion){
-		ReestablecerEstado();
-	}
-};
-
 void CWhisk3D::Aceptar(){	
 	//si no hay objetos
 	if (Objects.Count() < 1){return;}
@@ -2834,28 +1632,6 @@ void CWhisk3D::Tab(){
 		Aceptar();
 	};
 };
-
-void CWhisk3D::ReestablecerEstado(){
-	if (InteractionMode == ObjectMode){
-		for(int o=0; o < estadoObjetos.Count(); o++){
-			SaveState& estadoObj = estadoObjetos[o];
-			Object& obj = Objects[estadoObj.indice];
-			obj.posX = estadoObj.posX;
-			obj.posY = estadoObj.posY;
-			obj.posZ = estadoObj.posZ;
-			obj.rotX = estadoObj.rotX;
-			obj.rotY = estadoObj.rotY;
-			obj.rotZ = estadoObj.rotZ;
-			obj.scaleX = estadoObj.scaleX;
-			obj.scaleY = estadoObj.scaleY;
-			obj.scaleZ = estadoObj.scaleZ;	
-		}	
-		estadoObjetos.Close();
-	}
-	estado = editNavegacion;
-	ReloadViewport(true);
-};
-
 
 void CWhisk3D::SetTransformPivotPoint(){
 	if (Objects.Count() < 1){return;}	
@@ -3316,219 +2092,6 @@ void CWhisk3D::CursorToWorldOrigin(){
 	redibujar = true;
 }
 
-void CWhisk3D::AddObject( TInt tipo ){
-	//Cancelar();
-	Object obj;
-	obj.type = tipo;
-	obj.visible = true;
-	obj.seleccionado = false;
-	obj.posX = Cursor3DposX;
-	obj.posY = Cursor3DposY;
-	obj.posZ = Cursor3DposZ;
-	obj.rotX = obj.rotY = obj.rotZ = 0;
-	obj.scaleX = obj.scaleY = obj.scaleZ = 45000;
-	obj.Parent = -1;	
-	obj.Id = -0;
-	Objects.Append(obj);
-	Collection.Append(Objects.Count()-1);
-	SelectActivo = Objects.Count()-1;
-	if (tipo == light){
-		Light tempLight;
-		tempLight.type = pointLight;
-		tempLight.lightId = nextLightId;
-		tempLight.color[0] = 1.0;
-		tempLight.color[1] = 1.0;
-		tempLight.color[2] = 1.0;
-		tempLight.color[3] = 1.0;
-		//tempLight.color  = { MATERIALCOLOR(1.0, 1.0, 1.0, 1.0) };
-
-		glEnable( nextLightId );		
-		GLfloat lightDiffuseSpot[4]   = { LIGHTCOLOR(1.0, 1.0, 1.0, 1.0) };
-		GLfloat lightSpecularSpot[4]  = { LIGHTCOLOR(1.0, 1.0, 1.0, 1.0) };
-		glLightfv(  nextLightId, GL_DIFFUSE,  lightDiffuseSpot  );
-		glLightfv(  nextLightId, GL_AMBIENT,  lightAmbient  );
-		glLightfv(  nextLightId, GL_SPECULAR, lightSpecularSpot );
-		//glLightfv(  nextLightId, GL_POSITION, lightPositionSpot );
-		glLightfv(  nextLightId, GL_POSITION, positionPuntualLight );
-		
-
-		glLightf(   nextLightId, GL_CONSTANT_ATTENUATION,  1.5  );
-		glLightf(   nextLightId, GL_LINEAR_ATTENUATION,    0.5  );
-		glLightf(   nextLightId, GL_QUADRATIC_ATTENUATION, 0.5  );
-
-		/*glLightf(   nextLightId, GL_SPOT_CUTOFF,   170.0                );
-		glLightf(   nextLightId, GL_SPOT_EXPONENT,  20.0                );
-		glLightfv(  nextLightId, GL_SPOT_DIRECTION, lightDirectionSpot );*/
-		nextLightId++;
-
-		Lights.Append(tempLight);
-		obj.Id = Lights.Count()-1;
-	}
-	//tipo camara
-	else if (tipo == camera){
-		if (CameraActive < 0){
-			CameraActive = SelectActivo;		
-		}		
-	}
-	DeseleccionarTodo();
-	Objects[SelectActivo].seleccionado = true;
-	SelectCount = 1;
-    redibujar = true;
-}
-
-
-void CWhisk3D::DeseleccionarTodo(){
-	if (InteractionMode == ObjectMode){
-		for(int o=0; o < Objects.Count(); o++){
-			Objects[o].seleccionado = false;				
-		}
-		SelectCount = 0;
-	}
-}
-
-void CWhisk3D::AddMesh( int modelo ){
-	Cancelar();
-	DeseleccionarTodo();
-	Collection.Append(Objects.Count());
-	SelectActivo = Objects.Count();
-	SelectCount = 1;
-	
-	Object TempObj;	
-	Objects.Append(TempObj);
-	Object& obj = Objects[Objects.Count()-1];
-	Objects[SelectActivo].seleccionado = true;
-	
-	obj.Id = Meshes.Count();
-	obj.type = mesh;
-	obj.visible = true;
-	obj.posX = Cursor3DposX;
-	obj.posY = Cursor3DposY;
-	obj.posZ = Cursor3DposZ;
-	obj.rotX = obj.rotY = obj.rotZ = 0;
-	obj.scaleX = obj.scaleY = obj.scaleZ = 45000;
-	obj.Parent = -1;
-	
-	Mesh tempMesh;
-	Meshes.Append(tempMesh);
-	Mesh& pMesh = Meshes[obj.Id];	
-	
-	MaterialGroup tempFaceGroup;
-	tempFaceGroup.startDrawn = 0;
-	tempFaceGroup.material = 0;
-	
-	VertexGroup TempVertexGroups;	
-	
-	if (modelo == plane){ pMesh.vertexSize = 4;
-		pMesh.vertex = new GLshort[pMesh.vertexSize*3];
-		pMesh.vertexColor = new GLubyte[pMesh.vertexSize*4];
-		pMesh.normals = new GLbyte[pMesh.vertexSize*3];
-		pMesh.uv = new GLfloat[pMesh.vertexSize*2];
-		HBufC* noteBuf = HBufC::NewLC(100);
-		noteBuf->Des().Copy(_L("Add Plane Size"));
-		TInt InputSize = DialogNumber(2, 0, 20, noteBuf);		
-		CleanupStack::PopAndDestroy(noteBuf);
-		InputSize = InputSize*1000;	
-
-		for (int i = 0; i < pMesh.vertexSize*3; i++) {
-			pMesh.vertex[i] = PlaneVertices[i]*InputSize;
-		}
-		for (int i = 0; i < pMesh.vertexSize; i++) {
-			pMesh.normals[i*3] = 0;
-			pMesh.normals[i*3+1] = 127;
-			pMesh.normals[i*3+2] = 0;
-		}
-		for (int i = 0; i < pMesh.vertexSize*4; i++) {
-			pMesh.vertexColor[i] = 255;
-		}
-		for (int i = 0; i < pMesh.vertexSize*2; i++) {
-			pMesh.uv[i] = (GLfloat)PlaneUV[i];
-		}
-
-		//pMesh.facesCount = tempFaceGroup.count = 2;
-		pMesh.facesSize = tempFaceGroup.indicesDrawnCount = 6;
-
-		pMesh.faces = new GLushort[tempFaceGroup.indicesDrawnCount];
-		for (int i = 0; i < tempFaceGroup.indicesDrawnCount; i++) {
-			pMesh.faces[i] = PlaneTriangles[i];
-		}
-	}	
-	else if (modelo == circle){ 
-		HBufC* noteBuf = HBufC::NewLC(100);
-		noteBuf->Des().Copy(_L("Add Circle vertices"));
-		TInt originalVertexSize  = DialogNumber(8, 3, 512, noteBuf);	
-		pMesh.vertexSize = originalVertexSize + 1;  // Agregar un vértice adicional
-		noteBuf->Des().Copy(_L("Add Circle radius cm"));
-		TInt Radius = DialogNumber(100, 1, 10000, noteBuf);	
-		CleanupStack::PopAndDestroy(noteBuf);
-		Radius = Radius*20;	
-
-		pMesh.vertex = new GLshort[pMesh.vertexSize*3];
-		pMesh.vertexColor = new GLubyte[pMesh.vertexSize*4];
-		pMesh.normals = new GLbyte[pMesh.vertexSize*3];
-		pMesh.uv = new GLfloat[pMesh.vertexSize*2];
-
-		for (int i = 0; i < pMesh.vertexSize*3; i++) {
-			pMesh.vertex[i] = Radius;
-		}
-
-		for (int i = 0; i < pMesh.vertexSize; i++) {
-			GLfloat angle = 2.0f * M_PI * (i % originalVertexSize) / originalVertexSize;  // angulo para los vértices
-
-			pMesh.vertex[i*3] = -Radius * cos(angle);
-			pMesh.vertex[i*3+1] = 0;
-			pMesh.vertex[i*3+2] = -Radius * sin(angle);
-			pMesh.normals[i*3] = 0;
-			pMesh.normals[i*3+1] = 127;
-			pMesh.normals[i*3+2] = 0;
-			pMesh.uv[i * 2] = static_cast<GLfloat>(cos(angle) * 127);
-			pMesh.uv[i * 2 + 1] = static_cast<GLfloat>(sin(angle) * 127);
-		}
-
-		for (int i = 0; i < pMesh.vertexSize*4; i++) {
-			pMesh.vertexColor[i] = 255;
-		}
-
-		pMesh.facesSize = tempFaceGroup.indicesDrawnCount = (pMesh.vertexSize - 2) * 3;
-
-		pMesh.faces = new GLushort[tempFaceGroup.indicesDrawnCount];
-		for (TInt i = 0; i < originalVertexSize - 1; i++) {
-			pMesh.faces[i * 3] = 0;          // Primer vértice
-			pMesh.faces[i * 3 + 1] = i + 2;  // Segundo vértice
-			pMesh.faces[i * 3 + 2] = i + 1;  // Tercer vértice
-		}
-	}
-	else if (modelo == cubo){ 
-    	pMesh.vertexSize = 24;
-		pMesh.vertex = new GLshort[pMesh.vertexSize*3];
-		pMesh.vertexColor = new GLubyte[pMesh.vertexSize*4];
-		pMesh.normals = new GLbyte[pMesh.vertexSize*3];
-		pMesh.uv = new GLfloat[pMesh.vertexSize*2];
-
-		for (int i = 0; i < pMesh.vertexSize*3; i++) {
-			pMesh.vertex[i] = CuboVertices[i];
-			pMesh.normals[i] = CuboNormals[i];
-		}
-		for (int i = 0; i < pMesh.vertexSize*4; i++) {
-			pMesh.vertexColor[i] = 255;
-		}
-		for (int i = 0; i < pMesh.vertexSize*2; i++) {
-			//pMesh.uv[i] = (GLfloat)((CuboUV[i]+128)/255)*1280;
-			pMesh.uv[i] = (GLfloat)CuboUV[i];
-		}
-
-		pMesh.facesSize = tempFaceGroup.indicesDrawnCount = 36;
-
-		pMesh.faces = new GLushort[tempFaceGroup.indicesDrawnCount];
-		for (int i = 0; i < tempFaceGroup.indicesDrawnCount; i++) {
-			pMesh.faces[i] = CuboTriangles[i];
-		}
-	}	
-
-	//creamos el objeto y le asignamos la mesh	
-	Meshes[obj.Id].materialsGroup.Append(tempFaceGroup);
-    redibujar = true;
-}
-
 void CWhisk3D::ActivarTextura(){
 	//si no hay objetos
 	if (Objects.Count() < 1){return;}	
@@ -3780,68 +2343,6 @@ void CWhisk3D::SetTexture(){
 	mat.textureID = textureID+NumTexturasWhisk3D;
 	//mat.textureID = Textures[textureID-5].iID;
     redibujar = true;
-}
-
-void CWhisk3D::NewMaterial(TBool reemplazar){
-	/*HBufC* inicialBuf = HBufC::NewLC(100);
-	_LIT(Kinicial, "Material.%03d");
-	inicialBuf->Des().Format(Kinicial, Materials.Count()+1);
-	
-	HBufC* tituloBuf = HBufC::NewLC(100);
-	_LIT(Ktitulo, "Ingrese el nombre del Material");
-	tituloBuf->Des().Copy(Ktitulo);
-	TPtr nombre = DialogText(inicialBuf, tituloBuf);
-	
-	HBufC* noteBuf = HBufC::NewLC(100);//textoingresado.AllocLC();
-	noteBuf->Des().Copy(textoingresado);
-	CDialogs::Alert(noteBuf);
-	CleanupStack::PopAndDestroy(noteBuf);	
-	CleanupStack::PopAndDestroy(tituloBuf);	
-	CleanupStack::PopAndDestroy(inicialBuf);	*/
-	
-	Material mat;	
-	mat.specular[0] = mat.specular[1] = mat.specular[2] = mat.specular[3] = 0.3;
-	mat.diffuse[0] = mat.diffuse[1] = mat.diffuse[2] = mat.diffuse[3] = 1.0;
-	mat.emission[0] = mat.emission[1] = mat.emission[2] = mat.emission[3] = 0.0;
-	mat.textura = false;
-	mat.vertexColor = false;
-	mat.repeat = true;
-	mat.lighting = true;
-	mat.culling = true;
-	mat.transparent = false;
-	mat.interpolacion = lineal;
-	mat.textureID = 0;
-	if (Materials.Count() < 1){
-		mat.name = HBufC::NewL(15);
-		_LIT(KMatNameDefault, "DefaultMaterial");
-		mat.name->Des().Format(KMatNameDefault, Materials.Count()+1);
-	}
-	else {
-		mat.name = HBufC::NewL(12);
-		_LIT(KMatName, "Material.%03d");
-		mat.name->Des().Format(KMatName, Materials.Count()+1);
-	}
-	Materials.Append(mat);
-
-	
-	//si no hay objetos
-	if (Objects.Count() < 1){return;}	
-	Object& obj = Objects[SelectActivo];
-	//si no es un mesh
-	if (obj.type != mesh || !obj.seleccionado){return;}		
-	Mesh& pMesh = Meshes[obj.Id];
-
-	if (reemplazar){
-		HBufC* noteBuf = HBufC::NewLC(100);
-		_LIT(KFormatString, "Old Material 1 to %d");
-		noteBuf->Des().Format(KFormatString, pMesh.materialsGroup.Count());
-		TInt OldMaterialID = 1;
-		if (pMesh.materialsGroup.Count() > 1){
-			OldMaterialID = DialogNumber(1, 1, pMesh.materialsGroup.Count(), noteBuf);
-		}
-		pMesh.materialsGroup[OldMaterialID-1].material = Materials.Count()-1;
-	}
-	redibujar = true;
 }
 
 void CWhisk3D::SetMaterial(){
