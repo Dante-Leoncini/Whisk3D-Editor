@@ -114,93 +114,9 @@ int main(int argc, char* argv[]) {
 
     while (running) {
         while (SDL_PollEvent(&e)) {
-            if (e.type == SDL_QUIT) running = false;
-
-			//eventos del teclado
-			else if (e.type == SDL_KEYDOWN) {
-
-				if (e.key.repeat == 0) { 
-					// Primera vez que se presiona la tecla
-					switch (e.key.keysym.sym) {
-						case SDLK_RETURN:  // Enter
-							Confirmar();
-							break;
-						case SDLK_RIGHT:   // Flecha derecha
-							ClickDerecha();
-							break;
-						case SDLK_LEFT:    // Flecha izquierda
-							ClickIzquierda();
-							break;
-						case SDLK_UP:   // Flecha derecha
-							ClickArriba();
-							break;
-						case SDLK_DOWN:    // Flecha izquierda
-							ClickAbajo();
-							break;
-						case SDLK_w:   // Flecha derecha
-							ClickW();
-							break;
-						case SDLK_s:    // Flecha izquierda
-							ClickS();
-							break;
-						case SDLK_a:   // Flecha derecha
-							ClickA();
-							break;
-						case SDLK_d:    // Flecha izquierda
-							ClickD();
-							break;
-						// si querés, agregá más teclas aquí
-						case SDLK_ESCAPE:  // Esc para salir rápido
-							running = false;
-							break;
-					}
-				} else {
-					// Evento repetido por mantener apretada
-					//std::cout << "apretando tecla" << std::endl;
-					switch (e.key.keysym.sym) {
-						case SDLK_RETURN:  // Enter
-							Confirmar();
-							break;
-						case SDLK_RIGHT:   // Flecha derecha
-							ClickDerecha();
-							break;
-						case SDLK_LEFT:    // Flecha izquierda
-							ClickIzquierda();
-							break;
-						case SDLK_UP:   // Flecha derecha
-							ClickArriba();
-							break;
-						case SDLK_DOWN:    // Flecha izquierda
-							ClickAbajo();
-							break;
-						case SDLK_w:   // Flecha derecha
-							ClickW();
-							break;
-						case SDLK_s:    // Flecha izquierda
-							ClickS();
-							break;
-						case SDLK_a:   // Flecha derecha
-							ClickA();
-							break;
-						case SDLK_d:    // Flecha izquierda
-							ClickD();
-							break;
-						case SDLK_e:   // Flecha derecha
-							ClickE();
-							break;
-						case SDLK_q:    // Flecha izquierda
-							ClickQ();
-							break;
-						// si querés, agregá más teclas aquí
-						case SDLK_ESCAPE:  // Esc para salir rápido
-							running = false;
-							break;
-					}
-				}
-			}
+            if (e.type == SDL_QUIT){running = false;}
+			else {InputUsuarioSDL(e);}			
         }
-
-		//InputUsuario();
 
 		// Renderizar si hay cambios
         if (redibujar){

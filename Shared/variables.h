@@ -82,6 +82,10 @@ int estado;
 int InteractionMode;
 int navegacionMode;
 
+// Variables para el Mouse
+bool middleMouseDown = false;
+int lastMouseX, lastMouseY;
+
 //camara
 int cameraDistance = 270; //3000.0f; //270;
 GLfloat posX = 0;
@@ -152,7 +156,7 @@ GLfloat ListaColores[11][4] = {
 	{ 0.757, 0.757, 0.757, 1.0     },   //azul de los iconos seleccionados
 };
 
-GLfloat LineaPiso[4]  =      { 0.29, 0.29, 0.29, 1.0 };
+GLfloat LineaPiso[4]  =      { 0.22, 0.22, 0.22, 1.0 };
 GLfloat LineaPisoRoja[4]  =  { 0.56, 0.23, 0.28, 1.0 };
 GLfloat LineaPisoVerde[4]  = { 0.38, 0.53, 0.15, 1.0 };
 

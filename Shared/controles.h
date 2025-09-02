@@ -51,3 +51,558 @@ void ClickQ(){
     posZ+= 1.0;  
 	redibujar = true;  
 }
+
+void InputUsuarioSDL(SDL_Event &e){
+    // Botones del mouse
+    if (e.type == SDL_MOUSEBUTTONDOWN) {
+        if (e.button.button == SDL_BUTTON_MIDDLE) {  // rueda clic
+            middleMouseDown = true;
+            lastMouseX = e.button.x;
+            lastMouseY = e.button.y;
+        }
+    }
+    else if (e.type == SDL_MOUSEBUTTONUP) {
+        if (e.button.button == SDL_BUTTON_MIDDLE) {
+            middleMouseDown = false;
+        }
+    }
+    else if (e.type == SDL_MOUSEMOTION && middleMouseDown) {
+        int dx = e.motion.x - lastMouseX;
+        int dy = e.motion.y - lastMouseY;
+
+        // Chequear si Shift está presionado
+        bool shiftHeld = (SDL_GetModState() & KMOD_SHIFT);
+
+        if (shiftHeld) {
+            float radX = rotX * M_PI / 180.0f; // Pitch
+            float radY = rotY * M_PI / 180.0f; // Yaw
+
+            // Vector forward (dirección a donde mira la cámara)
+            float fx = cos(radX) * sin(radY);
+            float fy = sin(radX);
+            float fz = cos(radX) * cos(radY);
+
+            // Normalizar forward
+            float fLen = sqrt(fx*fx + fy*fy + fz*fz);
+            fx /= fLen; fy /= fLen; fz /= fLen;
+
+            // Vector "up" mundial (constante, Y global)
+            float upXw = 0.0f, upYw = 1.0f, upZw = 0.0f;
+
+            // Vector "right" = forward × worldUp
+            float rx = fy * upZw - fz * upYw;
+            float ry = fz * upXw - fx * upZw;
+            float rz = fx * upYw - fy * upXw;
+
+            // Normalizar right
+            float rLen = sqrt(rx*rx + ry*ry + rz*rz);
+            rx /= rLen; ry /= rLen; rz /= rLen;
+
+            // Vector "up" de la cámara = right × forward
+            float ux = ry * fz - rz * fy;
+            float uy = rz * fx - rx * fz;
+            float uz = rx * fy - ry * fx;
+
+            // Normalizar up
+            float uLen = sqrt(ux*ux + uy*uy + uz*uz);
+            ux /= uLen; uy /= uLen; uz /= uLen;
+
+            // Sensibilidad
+            float factor = 4.0f;
+
+            // Aplicar desplazamiento (paneo relativo a la vista)
+            if (rotX <= -90.0f || rotX < 90.0f){
+                //PivotX += dx * factor * rx + dy * factor * ux;
+                //PivotY += dx * factor * ry + dy * factor * uy;
+                PivotZ += dx * factor * rz + dy * factor * uz;
+            }
+            else {
+                //PivotX += dx * factor * rx + dy * factor * ux;
+                //PivotY += dx * factor * ry + dy * factor * uy;
+                PivotZ -= dx * factor * rz + dy * factor * uz;
+            }
+        } 
+        else {
+            // 🚀 ROTAR cámara
+            rotX += dx * 0.2f;  
+            rotY += dy * 0.2f;  
+
+            // Limitar rotY para evitar giros extremos
+            if(rotY > 180.0f) rotY -= 360.0f;
+            if(rotY < -180.0f) rotY += 360.0f;
+            if(rotX > 180.0f) rotX -= 360.0f;
+            if(rotX < -180.0f) rotX += 360.0f;
+
+            std::string viewDesc;
+
+            // Definir rangos aproximados para la vista
+            if(rotY > 80.0f && rotY < 100.0f)
+                viewDesc = "Mirando desde arriba";
+            else if(rotY < -80.0f && rotY > -100.0f)
+                viewDesc = "Mirando desde abajo";
+            else if(rotX > 45.0f && rotX < 135.0f)
+                viewDesc = "Mirando desde el costado izquierdo";
+            else if(rotX < -45.0f && rotX > -135.0f)
+                viewDesc = "Mirando desde el costado derecho";
+            else if(rotX > 170.0f || rotX < -170.0f)
+                viewDesc = "Mirando desde atrás";
+            else
+                viewDesc = "Mirando desde el frente";
+
+            // Mostrar consola
+            std::cout << "rotX: " << rotX << " | rotY: " << rotY
+                    << " -> " << viewDesc << std::endl;
+        }
+
+        redibujar = true;
+
+        lastMouseX = e.motion.x;
+        lastMouseY = e.motion.y;
+    }
+    //eventos del teclado
+    else if (e.type == SDL_KEYDOWN) {
+
+        if (e.key.repeat == 0) { 
+            // Primera vez que se presiona la tecla
+            switch (e.key.keysym.sym) {
+                case SDLK_RETURN:  // Enter
+                    Confirmar();
+                    break;
+                case SDLK_RIGHT:   // Flecha derecha
+                    ClickDerecha();
+                    break;
+                case SDLK_LEFT:    // Flecha izquierda
+                    ClickIzquierda();
+                    break;
+                case SDLK_UP:   // Flecha derecha
+                    ClickArriba();
+                    break;
+                case SDLK_DOWN:    // Flecha izquierda
+                    ClickAbajo();
+                    break;
+                case SDLK_w:   // Flecha derecha
+                    ClickW();
+                    break;
+                case SDLK_s:    // Flecha izquierda
+                    ClickS();
+                    break;
+                case SDLK_a:   // Flecha derecha
+                    ClickA();
+                    break;
+                case SDLK_d:    // Flecha izquierda
+                    ClickD();
+                    break;
+                // si querés, agregá más teclas aquí
+                case SDLK_ESCAPE:  // Esc para salir rápido
+                    running = false;
+                    break;
+            }
+        } else {
+            // Evento repetido por mantener apretada
+            //std::cout << "apretando tecla" << std::endl;
+            switch (e.key.keysym.sym) {
+                case SDLK_RETURN:  // Enter
+                    Confirmar();
+                    break;
+                case SDLK_RIGHT:   // Flecha derecha
+                    ClickDerecha();
+                    break;
+                case SDLK_LEFT:    // Flecha izquierda
+                    ClickIzquierda();
+                    break;
+                case SDLK_UP:   // Flecha derecha
+                    ClickArriba();
+                    break;
+                case SDLK_DOWN:    // Flecha izquierda
+                    ClickAbajo();
+                    break;
+                case SDLK_w:   // Flecha derecha
+                    ClickW();
+                    break;
+                case SDLK_s:    // Flecha izquierda
+                    ClickS();
+                    break;
+                case SDLK_a:   // Flecha derecha
+                    ClickA();
+                    break;
+                case SDLK_d:    // Flecha izquierda
+                    ClickD();
+                    break;
+                case SDLK_e:   // Flecha derecha
+                    ClickE();
+                    break;
+                case SDLK_q:    // Flecha izquierda
+                    ClickQ();
+                    break;
+                // si querés, agregá más teclas aquí
+                case SDLK_ESCAPE:  // Esc para salir rápido
+                    running = false;
+                    break;
+            }
+        }
+    }
+}
+
+void InputUsuarioSymbian(GLfixed aDeltaTimeSecs){
+	/*if (iInputHandler->IsInputPressed( EEscape )){
+		Cancelar();
+		return;
+	}
+	//revisa las 4 direcciones
+	for(TInt f=0; f < 4; f++){
+		if (iInputHandler->IsInputPressed( flechasEstados[f].cual )){
+			flechasEstados[f].activo = true;
+			if ( flechasEstados[f].estado == TeclaSuelta || flechasEstados[f].estado == TeclaSoltada){
+				flechasEstados[f].estado = TeclaPresionada;
+			}
+			else {
+				flechasEstados[f].estado = TeclaMantenida;
+			}
+		}
+		else if ( flechasEstados[f].estado == TeclaMantenida || flechasEstados[f].estado == TeclaPresionada){
+			flechasEstados[f].activo = false;
+			flechasEstados[f].estado = TeclaSoltada;
+		}
+		else  {
+			flechasEstados[f].activo = false;
+			flechasEstados[f].estado = TeclaSuelta;
+		}
+	}
+
+	//revisa si se apreto una flecha y actualiza los valores dependiendo el estado de la aplicacion
+	//ya sea animando, editando una malla 3d o en modo objeto
+	if (TocandoPantalla){
+		TimeTouch++;
+		if (TimeTouch < 10){			
+			if (SoltoPantalla){
+				TimeTouch = 0;
+				TocandoPantalla = false;
+				SoltoPantalla = false;
+				if (DragTouchX < 120 && DragTouchY < 120){
+					ShowMenu();
+				}
+				else {
+				ShowObjectMenu();
+				}
+				return;
+			}
+		}
+		else if (TimeTouch > 40 && SoltoPantalla){
+			TimeTouch = 0;
+			TocandoPantalla = false;
+			SoltoPantalla = false;
+			TInt MovimientoX = StartTouchX - DragTouchX + 10;
+			TInt MovimientoY = StartTouchY - DragTouchY + 10;
+			if (MovimientoX > -1 && MovimientoX < 21 && MovimientoY > -1 && MovimientoY < 21){
+				ShowObjectMenu();
+				return;
+			}
+		}
+		else if (iShiftPressed || navegacionMode == Fly){	
+			GLfloat radRotX = rotX * PI / 180.0; // Rotación en radianes (X)
+			GLfloat radRotY = rotY * PI / 180.0; // Rotación en radianes (Y)*/
+
+			/*// Direcciones en el espacio global basadas en la rotación
+			/*GLfloat forwardX = cos(radRotY) * cos(radRotX); // Dirección hacia adelante/atrás en X
+			GLfloat forwardY = sin(radRotX);               // Dirección hacia adelante/atrás en Y
+			GLfloat forwardZ = sin(radRotY) * cos(radRotX); // Dirección hacia adelante/atrás en Z
+
+			// Cálculo del vector "izquierda" basado en la rotación
+			GLfloat rightX = cos(radRotY + PI / 2.0);      // Dirección hacia la derecha en X
+			GLfloat rightZ = sin(radRotY + PI / 2.0);      // Dirección hacia la derecha en Z
+
+			GLfloat upX = -cos(radRotY) * sin(radRotX);    // Dirección hacia arriba/abajo en X
+			GLfloat upY = cos(radRotX);                    // Dirección hacia arriba/abajo en Y
+			GLfloat upZ = -sin(radRotY) * sin(radRotX);    // Dirección hacia arriba/abajo en Z*/
+
+			// Ajuste de sensibilidad
+			/*GLfloat scaleFactor = cameraDistance * 0.3f;
+
+			// Desplazamiento del toque
+			GLfloat deltaX = (StartTouchX - DragTouchX) * scaleFactor; // Movimiento horizontal del táctil
+			GLfloat deltaY = (StartTouchY - DragTouchY) * scaleFactor; // Movimiento vertical del táctil
+
+			// Movimiento restringido a un solo eje (por ejemplo, eje Y del mundo)
+			//GLfloat moveX = deltaX * cos(radRotX);
+			//GLfloat moveY = deltaY;
+			GLfloat moveZ = deltaY * sin(radRotY + PI / 2.0);
+
+			// Aplica el movimiento al pivote de la cámara
+			//PivotX = OriginalPivotX + moveX;
+			//PivotY = OriginalPivotY + moveY;
+			PivotZ = OriginalPivotZ + moveZ;
+
+			/*GLfloat radRotX = rotX * PI / 180.0;
+			OriginalLeftX = cos(radRotX);
+			OriginalLeftY = sin(radRotX);
+
+			PivotX = OriginalPivotX - ((StartTouchX - DragTouchX) * OriginalLeftX)*10;
+			PivotY = OriginalPivotY - ((StartTouchY - DragTouchY) * OriginalLeftY)*10;
+			PivotZ = ?????????;*/
+		/*}
+		else if (navegacionMode == Orbit){
+			rotX = OriginalRotX - ((StartTouchX - DragTouchX)/2);
+			rotY = OriginalRotY - ((StartTouchY - DragTouchY)/2);
+		}
+		if (SoltoPantalla){
+			TimeTouch = 0;
+			TocandoPantalla = false;
+			SoltoPantalla = false;
+		}
+		return;
+	}	
+
+	if ( iShiftPressed && estado == editNavegacion){
+		ShiftCount++;
+		if( flechasEstados[FlechaIzquierda].estado == TeclaPresionada ){
+			SeleccionarAnterior();
+			ShiftCount = 40;
+		}		
+		else if( flechasEstados[FlechaDerecha].estado == TeclaPresionada ){
+			SeleccionarProximo();
+			ShiftCount = 40;
+		}
+		else if( flechasEstados[FlechaArriba].estado == TeclaPresionada ){
+			SeleccionarTodo();
+			ShiftCount = 40;
+		}
+		else if( flechasEstados[FlechaAbajo].estado == TeclaPresionada ){
+			SeleccionarTodo();
+			ShiftCount = 40;
+		}
+		/*else if (iInputHandler->IsInputPressed( EVolumenUp ) ){
+			CurrentFrame++;
+			if (CurrentFrame > EndFrame){
+				CurrentFrame = StartFrame;
+			}
+			if (!PlayAnimation){
+				ReloadAnimation();
+			}
+	    	ReloadViewport();
+			ShiftCount = 40;
+		}
+		else if( iInputHandler->IsInputPressed( EVolumenDown ) ){
+			CurrentFrame--;
+			if (CurrentFrame < StartFrame){
+				StartFrame = EndFrame;
+			}
+			if (!PlayAnimation){
+				ReloadAnimation();
+			}
+	    	ReloadViewport();
+			ShiftCount = 40;
+		}*/
+		/*return;
+	}
+	else if ( iShiftPressed && estado != editNavegacion){
+		ShiftCount++;
+		return;
+	}
+	else if (ShiftCount > 0){
+		if (ShiftCount < 30){
+			Tab();
+		}
+		ShiftCount = 0;
+		return;
+	}
+
+	if( flechasEstados[FlechaIzquierda].activo ){
+		//mueve el mouse
+		if (mouseVisible){
+			mouseX--;
+			if (mouseX < 0){mouseX = 0;};
+		}
+
+		//rotX += fixedMul( 0.1, aDeltaTimeSecs );
+		if (estado == editNavegacion){ 
+			if (navegacionMode == Orbit){
+				if (ViewFromCameraActive && CameraToView){
+					Object& obj = Objects[CameraActive];
+					// Convertir el angulo de rotX a radianes
+					GLfloat radRotX = obj.rotX * PI / 180.0;
+
+					obj.posX+= 30 * cos(radRotX);
+					obj.posY-= 30 * sin(radRotX);
+				}
+				else {
+					if (ViewFromCameraActive){
+						RestaurarViewport();
+					}
+					rotX-= 0.5;
+				}
+			}
+			else if (navegacionMode == Fly){
+				// Convertir el angulo de rotX a radianes
+				GLfloat radRotX = rotX * PI / 180.0;
+
+				// Calcular el vector de direccion hacia la izquierda (90 grados a la izquierda del angulo actual)
+				GLfloat leftX = cos(radRotX);
+				GLfloat leftY = sin(radRotX);
+
+				// Mover hacia la izquierda
+				PivotX += 30 * leftX;
+				PivotY += 30 * leftY;
+			}	
+		}
+		else if (estado == translacion){	
+			SetTranslacionObjetos(30);		
+		}
+		else if (estado == rotacion){
+			SetRotacion(1);
+		}
+		else if (estado == EditScale){
+			SetScale(-1);
+		}
+		else if (estado == timelineMove){
+			CurrentFrame--;
+			if (CurrentFrame < StartFrame){
+				StartFrame = EndFrame;
+			}
+			if (!PlayAnimation){
+				ReloadAnimation();
+			}
+		}
+		ReloadViewport(true);
+	}
+	if( iInputHandler->IsInputPressed( EJoystickRight ) ){
+		//mueve el mouse
+		if (mouseVisible){
+			mouseX++;
+			if (mouseX > iScreenWidth-11){mouseX = iScreenWidth-11;};
+		}
+
+		//rotX -= fixedMul( 1, aDeltaTimeSecs );
+		if (estado == editNavegacion){				
+			if (navegacionMode == Orbit){
+				if (ViewFromCameraActive && CameraToView){
+					Object& obj = Objects[CameraActive];
+					// Convertir el angulo de rotX a radianes
+					GLfloat radRotX = obj.rotX * PI / 180.0;
+
+					obj.posX-= 30 * cos(radRotX);
+					obj.posY+= 30 * sin(radRotX);
+				}
+				else {
+					if (ViewFromCameraActive){
+						RestaurarViewport();
+					}
+					rotX+= 0.5;	
+				}		
+			}
+			else if (navegacionMode == Fly){
+				// Convertir el angulo de rotX a radianes
+				GLfloat radRotX = rotX * PI / 180.0;
+
+				// Calcular el vector de direccion hacia la izquierda (90 grados a la izquierda del angulo actual)
+				GLfloat leftX = cos(radRotX);
+				GLfloat leftY = sin(radRotX);
+
+				// Mover hacia la izquierda
+				PivotX -= 30 * leftX;
+				PivotY -= 30 * leftY;
+			}
+		}
+		else if (estado == translacion){
+			SetTranslacionObjetos(-30);		
+		}
+		else if (estado == rotacion){
+			SetRotacion(-1);
+		}
+		else if (estado == EditScale){
+			SetScale(1);	
+		}
+		else if (estado == timelineMove){
+			CurrentFrame++;
+			if (!PlayAnimation){
+				ReloadAnimation();
+			}
+		}
+	    ReloadViewport(true);
+	}
+	if( iInputHandler->IsInputPressed( EJoystickUp ) ){
+		//mueve el mouse
+		if (mouseVisible){
+			mouseY--;
+			if (mouseY < 0){mouseY = 0;};
+		}
+
+		if (estado == editNavegacion){	
+			if (navegacionMode == Orbit){
+				if (ViewFromCameraActive && CameraToView){
+					Object& obj = Objects[CameraActive];
+					// Convertir el angulo de rotX a radianes
+					GLfloat radRotX = obj.rotX * PI / 180.0;
+					GLfloat radRotY = obj.rotY * PI / 180.0;
+					//GLfloat radRotZ = obj.rotZ * PI / 180.0;
+
+					obj.posX+= 30 * sin(radRotX);
+					//obj.posY-= 30 * cos(radRotX);
+					obj.posZ+= 30 * cos(radRotY);
+				}
+				else {
+					if (ViewFromCameraActive){
+						RestaurarViewport();
+					}
+					rotY-= 0.5;	
+				}			
+			}
+			else if (navegacionMode == Fly){
+				// Convertir el angulo de rotX a radianes
+				GLfloat radRotX = rotX * PI / 180.0;
+
+				PivotY+= 30 * cos(radRotX);
+				PivotX-= 30 * sin(radRotX);
+			}		
+		}
+		else if (estado == EditScale){
+			SetScale(1);	
+		}
+		else if (estado == translacion){
+			SetTranslacionObjetos(-30);
+		}
+	    ReloadViewport(true);
+	}
+	if( iInputHandler->IsInputPressed( EJoystickDown ) ){
+		//mueve el mouse
+		if (mouseVisible){
+			mouseY++;
+			if (mouseY > iScreenHeight-17){mouseY = iScreenHeight-17;};
+		}
+
+		if (estado == editNavegacion){ 			
+			if (navegacionMode == Orbit){
+				if (ViewFromCameraActive && CameraToView){
+					Object& obj = Objects[CameraActive];
+					// Convertir el angulo de rotX a radianes
+					GLfloat radRotX = obj.rotX * PI / 180.0;
+					GLfloat radRotY = obj.rotY * PI / 180.0;
+					//GLfloat radRotZ = obj.rotZ * PI / 180.0;
+
+					obj.posX-= 30 * sin(radRotX);
+					//obj.posY-= 30 * cos(radRotX);
+					obj.posZ-= 30 * cos(radRotY);
+				}
+				else {
+					if (ViewFromCameraActive){
+						RestaurarViewport();
+					}
+					rotY+= 0.5;	
+				}		
+			}
+			else if (navegacionMode == Fly){
+				// Convertir el angulo de rotX a radianes
+				GLfloat radRotX = rotX * PI / 180.0;
+
+				PivotY-= 30 * cos(radRotX);
+				PivotX+= 30 * sin(radRotX);
+			}
+		}
+		else if (estado == EditScale){
+			SetScale(-1);	
+		}
+		else if (estado == translacion){
+			SetTranslacionObjetos(30);		
+		}
+	    ReloadViewport(true);
+	}*/
+}
