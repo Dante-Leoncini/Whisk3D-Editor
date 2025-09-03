@@ -22,10 +22,16 @@ void ConstructUniversal(){
 
 	//iluminacion
     glEnable(GL_LIGHTING);
-    glEnable(GL_LIGHT0);
-    glLightfv(GL_LIGHT0, GL_POSITION, light_pos);
-    glLightfv(GL_LIGHT0, GL_DIFFUSE, light_diffuse);
-    glLightfv(GL_LIGHT0, GL_SPECULAR, light_specular);
+    glEnable( GL_LIGHT0 );
+
+    //glLightfv(GL_LIGHT0, GL_POSITION, light_pos);
+    //glLightfv(GL_LIGHT0, GL_DIFFUSE, light_diffuse);
+    //glLightfv(GL_LIGHT0, GL_SPECULAR, light_specular);
+
+    glLightfv(  GL_LIGHT0, GL_DIFFUSE,  lightDiffuseLamp  );
+    glLightfv(  GL_LIGHT0, GL_AMBIENT,  lightAmbient  );
+    glLightfv(  GL_LIGHT0, GL_SPECULAR, lightDiffuseLamp  );
+    glLightfv(  GL_LIGHT0, GL_POSITION, sunLightPosition );
 
     // Habilitar la normalizaci�n de las normales
     glEnable(GL_NORMALIZE);	

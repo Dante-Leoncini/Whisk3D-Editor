@@ -77,50 +77,29 @@ void InputUsuarioSDL(SDL_Event &e){
             float radX = rotX * M_PI / 180.0f; // Pitch
             float radY = rotY * M_PI / 180.0f; // Yaw
 
-            // Vector forward (dirección a donde mira la cámara)
+            // Vector "forward" (dirección a donde mira la cámara)
             float fx = cos(radX) * sin(radY);
             float fy = sin(radX);
             float fz = cos(radX) * cos(radY);
 
-            // Normalizar forward
-            float fLen = sqrt(fx*fx + fy*fy + fz*fz);
-            fx /= fLen; fy /= fLen; fz /= fLen;
+            // Vector "right" (horizontal relativo a yaw)
+            float rx = cos(radY);
+            float ry = 0.0f;
+            float rz = -sin(radY);
 
-            // Vector "up" mundial (constante, Y global)
-            float upXw = 0.0f, upYw = 1.0f, upZw = 0.0f;
-
-            // Vector "right" = forward × worldUp
-            float rx = fy * upZw - fz * upYw;
-            float ry = fz * upXw - fx * upZw;
-            float rz = fx * upYw - fy * upXw;
-
-            // Normalizar right
-            float rLen = sqrt(rx*rx + ry*ry + rz*rz);
-            rx /= rLen; ry /= rLen; rz /= rLen;
-
-            // Vector "up" de la cámara = right × forward
+            // Vector "up" relativo a cámara = cross(right, forward)
             float ux = ry * fz - rz * fy;
             float uy = rz * fx - rx * fz;
             float uz = rx * fy - ry * fx;
 
-            // Normalizar up
+            // Normalizar "up"
             float uLen = sqrt(ux*ux + uy*uy + uz*uz);
             ux /= uLen; uy /= uLen; uz /= uLen;
 
-            // Sensibilidad
             float factor = 4.0f;
 
-            // Aplicar desplazamiento (paneo relativo a la vista)
-            if (rotX <= -90.0f || rotX < 90.0f){
-                //PivotX += dx * factor * rx + dy * factor * ux;
-                //PivotY += dx * factor * ry + dy * factor * uy;
-                PivotZ += dx * factor * rz + dy * factor * uz;
-            }
-            else {
-                //PivotX += dx * factor * rx + dy * factor * ux;
-                //PivotY += dx * factor * ry + dy * factor * uy;
-                PivotZ -= dx * factor * rz + dy * factor * uz;
-            }
+            // 🚨 Sólo mover PivotZ con el movimiento vertical del mouse
+            PivotZ += dy * factor * uz;
         } 
         else {
             // 🚀 ROTAR cámara
@@ -192,6 +171,18 @@ void InputUsuarioSDL(SDL_Event &e){
                 case SDLK_d:    // Flecha izquierda
                     ClickD();
                     break;
+                // Numpad
+                case SDLK_KP_1: SetViewpoint(front); break;
+                //case SDLK_KP_2: numpad('2'); break;
+                case SDLK_KP_3: SetViewpoint(right); break;
+                /*case SDLK_KP_4: numpad('4'); break;
+                case SDLK_KP_5: numpad('5'); break;
+                case SDLK_KP_6: numpad('6'); break;*/
+                case SDLK_KP_7: SetViewpoint(top); break;
+                /*case SDLK_KP_8: numpad('8'); break;
+                case SDLK_KP_9: numpad('9'); break;
+                case SDLK_KP_0: numpad('0'); break;
+                case SDLK_KP_PERIOD: numpad('.'); break;*/
                 // si querés, agregá más teclas aquí
                 case SDLK_ESCAPE:  // Esc para salir rápido
                     running = false;
@@ -234,6 +225,18 @@ void InputUsuarioSDL(SDL_Event &e){
                 case SDLK_q:    // Flecha izquierda
                     ClickQ();
                     break;
+                // Numpad
+                case SDLK_KP_1: SetViewpoint(front); break;
+                //case SDLK_KP_2: numpad('2'); break;
+                case SDLK_KP_3: SetViewpoint(right); break;
+                /*case SDLK_KP_4: numpad('4'); break;
+                case SDLK_KP_5: numpad('5'); break;
+                case SDLK_KP_6: numpad('6'); break;*/
+                case SDLK_KP_7: SetViewpoint(top); break;
+                /*case SDLK_KP_8: numpad('8'); break;
+                case SDLK_KP_9: numpad('9'); break;
+                case SDLK_KP_0: numpad('0'); break;
+                case SDLK_KP_PERIOD: numpad('.'); break;*/
                 // si querés, agregá más teclas aquí
                 case SDLK_ESCAPE:  // Esc para salir rápido
                     running = false;

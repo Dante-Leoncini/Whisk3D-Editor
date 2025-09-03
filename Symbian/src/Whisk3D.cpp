@@ -70,21 +70,10 @@ static const GLfloat colorBorde[4]  = { MATERIALCOLOR(0.68, 0.45, 0.13, 1.0) };
 //color borde Select
 //GLfloat colorBordeSelect[4] = { MATERIALCOLOR(0.94, 0.59, 0.17, 1.0) };
 
-enum{
-	top,
-	front,
-	right,
-    cameraView
-};
-
 /* Global ambient light. */
 static const GLfloat globalAmbient[4]   = { LIGHTCOLOR(0.5, 0.5, 0.5, 1.0) };
 
 GLfloat AmbientRender[4] = { LIGHTCOLOR(0.0, 0.0, 0.0, 1.0) };
-
-/* Lamp parameters. */
-static const GLfloat lightDiffuseLamp[4]   = { LIGHTCOLOR(0.8, 0.8, 0.8, 1.0) };
-static const GLfloat sunLightPosition[4]  = {-100, 1000, 1000, 0 }; // y, z, x, si es direccional o puntual
 	
 /* Spotlight parameters. */
 //static const GLfloat lightDiffuseSpot[4]   = { LIGHTCOLOR(1.0, 1.0, 1.0, 1.0) };
@@ -112,12 +101,6 @@ GLfloat OriginalRotY = 20.0;
 GLfloat OriginalPivotX = 0;
 GLfloat OriginalPivotY = 0;
 GLfloat OriginalPivotZ = 0;
-
-GLfloat LastRotX = 0;
-GLfloat LastRotY = 0;	
-GLfloat LastPivotX = 0;
-GLfloat LastPivotY = 0;
-GLfloat LastPivotZ = 0;
 
 //vista 3d
 GLshort mouseX = 0;
@@ -308,7 +291,6 @@ void CWhisk3D::ConstructL( void ){
 	iShiftPressed = false;
 	iAltPressed = false;
 	iCtrlPressed = false;
-	CameraToView = false;
 	SelectActivo = 0;
 	SelectActivo = -1;
 
@@ -436,13 +418,6 @@ void CWhisk3D::AppInit( void ){
 
     // Set up global ambient light.
     glLightModelfv( GL_LIGHT_MODEL_AMBIENT, globalAmbient );
-
-    // Set up lamp.
-    glEnable( GL_LIGHT0 );
-    glLightfv(  GL_LIGHT0, GL_DIFFUSE,  lightDiffuseLamp  );
-    glLightfv(  GL_LIGHT0, GL_AMBIENT,  lightAmbient  );
-    glLightfv(  GL_LIGHT0, GL_SPECULAR, lightDiffuseLamp  );
-    glLightfv(  GL_LIGHT0, GL_POSITION, sunLightPosition );
 
     // Set up spot.  Initially spot is disabled.
     //glEnable( GL_LIGHT1 );
@@ -2883,20 +2858,6 @@ void CWhisk3D::AddModificador(TInt opcion){
 	redibujar = true;
 }
 
-//mira si no hay camara activa
-//si no hay una camara activa. busca una camara para asignarla
-//si no hay camaras... quedara en -1
-void CWhisk3D::CheckCameraState(){
-	if (CameraActive < 0){
-		for(TInt i=0; i < Objects.Count(); i++){
-			if (Objects[i].type == camera){
-				CameraActive = i;
-				return;
-			}		
-		}
-	}	
-}
-
 void CWhisk3D::SetActiveObjectAsCamera(){
 	if (Objects.Count() < 1){return;}	
 	Object& obj = Objects[SelectActivo];
@@ -2907,50 +2868,6 @@ void CWhisk3D::SetActiveObjectAsCamera(){
 	}	
 	redibujar = true;
 }
-
-void CWhisk3D::SetViewpoint(TInt opcion){
-	switch (opcion) {
-		case top:
-			rotX = -180.0;
-			rotY = 90.0;
-			ViewFromCameraActive = false;	
-			CameraToView = false;
-			break;
-		case front:
-			rotX = -180.0;
-			rotY = 0.0;	
-			ViewFromCameraActive = false;	
-			CameraToView = false;
-			break;
-		case right:
-			rotX = 90.0;
-			rotY = 0.0;		
-			ViewFromCameraActive = false;	
-			CameraToView = false;
-			break;
-		case cameraView:
-			CheckCameraState();
-			if (CameraActive < 0){
-				_LIT(KFormatString, "There are no cameras!");
-				HBufC* noteBuf = HBufC::NewLC(50);
-				noteBuf->Des().Format(KFormatString);
-				MensajeError(noteBuf);  
-				CleanupStack::PopAndDestroy(noteBuf);
-			}
-			else if (Objects.Count() > CameraActive && !ViewFromCameraActive){	
-				LastRotX = rotX;
-				LastRotY = rotY;	
-				LastPivotX = PivotX;
-				LastPivotY = PivotY;
-				LastPivotZ = PivotZ;
-				RecalcViewPos();
-				ViewFromCameraActive = true;
-			}
-			break;
-	}
-	redibujar = true;
-}
-
 
 void CWhisk3D::RestaurarViewport(){
 	ViewFromCameraActive = false;

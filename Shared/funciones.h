@@ -389,3 +389,62 @@ void NewMaterial(bool reemplazar){
 	}
 	redibujar = true;
 }
+
+//mira si no hay camara activa
+//si no hay una camara activa. busca una camara para asignarla
+//si no hay camaras... quedara en -1
+void CheckCameraState(){
+	if (CameraActive < 0){
+		//for(TInt i=0; i < Objects.Count(); i++){
+		for(size_t i=0; i < Objects.size(); i++){
+			if (Objects[i].type == camera){
+				CameraActive = i;
+				return;
+			}		
+		}
+	}	
+}
+
+void SetViewpoint(int opcion){
+	switch (opcion) {
+		case top:
+			rotX = -180.0;
+			rotY = 90.0;
+			ViewFromCameraActive = false;	
+			CameraToView = false;
+			break;
+		case front:
+			rotX = -180.0;
+			rotY = 0.0;	
+			ViewFromCameraActive = false;	
+			CameraToView = false;
+			break;
+		case right:
+			rotX = 90.0;
+			rotY = 0.0;		
+			ViewFromCameraActive = false;	
+			CameraToView = false;
+			break;
+		case cameraView:
+			CheckCameraState();
+			if (CameraActive < 0){
+				//_LIT(KFormatString, "There are no cameras!");
+				//HBufC* noteBuf = HBufC::NewLC(50);
+				//noteBuf->Des().Format(KFormatString);
+				//MensajeError(noteBuf);  
+				//CleanupStack::PopAndDestroy(noteBuf);
+			}
+			//else if (Objects.Count() > CameraActive && !ViewFromCameraActive){	
+			else if (Objects.size() > CameraActive && !ViewFromCameraActive){	
+				LastRotX = rotX;
+				LastRotY = rotY;	
+				LastPivotX = PivotX;
+				LastPivotY = PivotY;
+				LastPivotZ = PivotZ;
+				RecalcViewPos();
+				ViewFromCameraActive = true;
+			}
+			break;
+	}
+	redibujar = true;
+}

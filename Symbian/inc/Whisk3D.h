@@ -344,7 +344,6 @@ class CWhisk3D : public CFiniteStateMachine, public MTextureLoadingListener
         TBool iShiftPressed; 
         TBool iAltPressed;
         TBool iCtrlPressed;
-        TBool CameraToView;
         RArray<Object> Objects;
         TInt SelectActivo;
 

@@ -15,6 +15,13 @@ enum {
 };
 
 enum{
+	top,
+	front,
+	right,
+    cameraView
+};
+
+enum{
 	ObjectMode
 };
 
@@ -57,11 +64,13 @@ typedef enum { X, Y, Z, XYZ } Axis;
 int axisSelect = X;
 
 //luz
-GLfloat light_pos[] = { -5000.0f, 5000.0f, 5000.0f, 1.0f };
-GLfloat light_diffuse[] = { 1.0f, 1.0f, 1.0f, 1.0f };
-GLfloat light_specular[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+//GLfloat light_pos[] = { -5000.0f, 5000.0f, 5000.0f, 1.0f };
+//GLfloat light_diffuse[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+//GLfloat light_specular[] = { 1.0f, 1.0f, 1.0f, 1.0f };
 GLfloat objAmbient[4] = { 0.4, 0.4, 0.4, 1.0 };
 
+GLfloat lightDiffuseLamp[4]   = { 0.8, 0.8, 0.8, 1.0 };
+GLfloat sunLightPosition[4]  = {-100, 1000, 1000, 0 }; // y, z, x, si es direccional o puntual
 
 //para las luces puntuales
 GLfloat positionPuntualLight[4] = {0, 0, 0, 1};
@@ -98,6 +107,13 @@ GLfloat PivotY = 0;
 GLfloat PivotZ = 0;
 int CameraActive;
 int view = MaterialPreview;
+bool CameraToView = false;
+
+GLfloat LastRotX = 0;
+GLfloat LastRotY = 0;	
+GLfloat LastPivotX = 0;
+GLfloat LastPivotY = 0;
+GLfloat LastPivotZ = 0;
 
 int SelectActivo = 0;
 int SelectCount = 0;
