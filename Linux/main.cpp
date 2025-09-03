@@ -15,11 +15,13 @@
 #include "../Shared/Primitivas.h"
 
 #include "../Shared/clases.h"
+#include "../Shared/lectura-escritura.h"
 #include "../Shared/variables.h"
 #include "../Shared/funciones.h"
 #include "../Shared/constructor.h"
 #include "../Shared/controles.h"
 #include "../Shared/render.h"
+
 
 // --- Cargar textura ---
 bool LoadTexture(const char* filename, GLuint &textureID) {

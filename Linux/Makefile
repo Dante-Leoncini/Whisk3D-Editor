@@ -2,7 +2,7 @@
 TARGET_LINUX = Whisk3D_Pre-alpha
 TARGET_WIN   = Whisk3D_Pre-alpha.exe
 
-SRC = main.cpp
+SRC = main.cpp ../Shared/tinyfiledialogs.c
 INCLUDES = -I../Shared
 #SRC_SHARED = ../Shared/ficha.h ../Shared/tablero.h
 

@@ -74,32 +74,19 @@ void InputUsuarioSDL(SDL_Event &e){
         bool shiftHeld = (SDL_GetModState() & KMOD_SHIFT);
 
         if (shiftHeld) {
-            float radX = rotX * M_PI / 180.0f; // Pitch
             float radY = rotY * M_PI / 180.0f; // Yaw
+            float radX = rotX * M_PI / 180.0f; // Pitch
 
-            // Vector "forward" (dirección a donde mira la cámara)
-            float fx = cos(radX) * sin(radY);
-            float fy = sin(radX);
-            float fz = cos(radX) * cos(radY);
+            float factor = 8.0f;
 
-            // Vector "right" (horizontal relativo a yaw)
-            float rx = cos(radY);
-            float ry = 0.0f;
-            float rz = -sin(radY);
+            float cosX = cos(radX);
+            float sinX = sin(radX);
+            float cosY = cos(radY);
+            float sinY = sin(radY);
 
-            // Vector "up" relativo a cámara = cross(right, forward)
-            float ux = ry * fz - rz * fy;
-            float uy = rz * fx - rx * fz;
-            float uz = rx * fy - ry * fx;
-
-            // Normalizar "up"
-            float uLen = sqrt(ux*ux + uy*uy + uz*uz);
-            ux /= uLen; uy /= uLen; uz /= uLen;
-
-            float factor = 4.0f;
-
-            // 🚨 Sólo mover PivotZ con el movimiento vertical del mouse
-            PivotZ += dy * factor * uz;
+            PivotZ -= dy * factor * cosY;
+            PivotX += dx * factor * cosX - dy * factor * sinY * sinX;
+            PivotY += dx * factor * sinX + dy * factor * sinY * cosX;
         } 
         else {
             // 🚀 ROTAR cámara
@@ -111,26 +98,6 @@ void InputUsuarioSDL(SDL_Event &e){
             if(rotY < -180.0f) rotY += 360.0f;
             if(rotX > 180.0f) rotX -= 360.0f;
             if(rotX < -180.0f) rotX += 360.0f;
-
-            std::string viewDesc;
-
-            // Definir rangos aproximados para la vista
-            if(rotY > 80.0f && rotY < 100.0f)
-                viewDesc = "Mirando desde arriba";
-            else if(rotY < -80.0f && rotY > -100.0f)
-                viewDesc = "Mirando desde abajo";
-            else if(rotX > 45.0f && rotX < 135.0f)
-                viewDesc = "Mirando desde el costado izquierdo";
-            else if(rotX < -45.0f && rotX > -135.0f)
-                viewDesc = "Mirando desde el costado derecho";
-            else if(rotX > 170.0f || rotX < -170.0f)
-                viewDesc = "Mirando desde atrás";
-            else
-                viewDesc = "Mirando desde el frente";
-
-            // Mostrar consola
-            std::cout << "rotX: " << rotX << " | rotY: " << rotY
-                    << " -> " << viewDesc << std::endl;
         }
 
         redibujar = true;
@@ -179,9 +146,9 @@ void InputUsuarioSDL(SDL_Event &e){
                 case SDLK_KP_5: numpad('5'); break;
                 case SDLK_KP_6: numpad('6'); break;*/
                 case SDLK_KP_7: SetViewpoint(top); break;
-                /*case SDLK_KP_8: numpad('8'); break;
-                case SDLK_KP_9: numpad('9'); break;
-                case SDLK_KP_0: numpad('0'); break;
+                //case SDLK_KP_8: numpad('8'); break;
+                case SDLK_KP_9: abrir(); break;
+                /*case SDLK_KP_0: numpad('0'); break;
                 case SDLK_KP_PERIOD: numpad('.'); break;*/
                 // si querés, agregá más teclas aquí
                 case SDLK_ESCAPE:  // Esc para salir rápido
@@ -233,9 +200,9 @@ void InputUsuarioSDL(SDL_Event &e){
                 case SDLK_KP_5: numpad('5'); break;
                 case SDLK_KP_6: numpad('6'); break;*/
                 case SDLK_KP_7: SetViewpoint(top); break;
-                /*case SDLK_KP_8: numpad('8'); break;
-                case SDLK_KP_9: numpad('9'); break;
-                case SDLK_KP_0: numpad('0'); break;
+                //case SDLK_KP_8: numpad('8'); break;
+                case SDLK_KP_9: abrir(); break;
+                /*case SDLK_KP_0: numpad('0'); break;
                 case SDLK_KP_PERIOD: numpad('.'); break;*/
                 // si querés, agregá más teclas aquí
                 case SDLK_ESCAPE:  // Esc para salir rápido

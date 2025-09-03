@@ -447,4 +447,5 @@ void SetViewpoint(int opcion){
 			break;
 	}
 	redibujar = true;
+	std::cout << "rotX: " << rotX << " | rotY: " << rotY << std::endl;
 }
