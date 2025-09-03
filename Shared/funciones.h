@@ -449,3 +449,269 @@ void SetViewpoint(int opcion){
 	redibujar = true;
 	std::cout << "rotX: " << rotX << " | rotY: " << rotY << std::endl;
 }
+
+void SetTransformPivotPoint(){
+	//if (Objects.Count() < 1){return;}	
+	if (Objects.size() < 1){return;}	
+	if (InteractionMode == ObjectMode){	
+		TransformPivotPointFloat[0] = 0;
+		TransformPivotPointFloat[1] = 0;
+		TransformPivotPointFloat[2] = 0;
+		//for(TInt i=0; i < Objects.Count(); i++){	
+		for(size_t i=0; i < Objects.size(); i++){	
+			Object& obj = Objects[i];	
+			if (obj.seleccionado){
+				TransformPivotPointFloat[0] += obj.posX;
+				TransformPivotPointFloat[1] += obj.posY;
+				TransformPivotPointFloat[2] += obj.posZ;	
+			};
+
+			//esto va a dar errores si el padre y el hijo estan seleccionados
+			/*TInt ParentID = obj.Parent;
+			while (ParentID  > -1) {		
+				Object& parentObj = Objects[ParentID];
+				TransformPivotPointFloat[0] += parentObj.posX;
+				TransformPivotPointFloat[1] += parentObj.posY;
+				TransformPivotPointFloat[2] += parentObj.posZ;	
+				ParentID = parentObj.Parent;		
+			}*/
+		}
+		TransformPivotPointFloat[0] = TransformPivotPointFloat[0]/SelectCount;
+		TransformPivotPointFloat[1] = TransformPivotPointFloat[1]/SelectCount;
+		TransformPivotPointFloat[2] = TransformPivotPointFloat[2]/SelectCount;
+	}
+}
+
+void EnfocarObject(){
+	//si no hay objetos
+	//if (Objects.Count() < 1){return;}
+	if (Objects.size() < 1){return;}
+	SetTransformPivotPoint();	
+	PivotX = 0.0f; 
+	PivotY = 0.0f;
+	PivotZ = 0.0f;
+	PivotX = PivotX-TransformPivotPointFloat[0]; 
+	PivotY = PivotY-TransformPivotPointFloat[1];
+	PivotZ = PivotZ-TransformPivotPointFloat[2];
+    redibujar = true;
+}
+
+void changeSelect(){
+	if (InteractionMode == ObjectMode){
+		//si no hay objetos
+		//o si esta moviendo, rotando o haciendo algo... no deja que continue
+		//if (1 > Objects.Count() || estado != editNavegacion){
+		if (1 > Objects.size() || estado != editNavegacion){
+			return;
+		}
+		//DeseleccionarTodo();
+		//deselecciona el objeto actual si es que estaba seleccionado
+		if (Objects[SelectActivo].seleccionado){
+			Objects[SelectActivo].seleccionado = false;
+			SelectCount--;
+		}
+
+		//pasa al siguiente
+		SelectActivo++;
+		if (SelectActivo >= Objects.size()){
+			SelectActivo = 0;
+		}
+		//selecciona el proximo objeto
+		if (!Objects[SelectActivo].seleccionado){
+			Objects[SelectActivo].seleccionado = true;
+			SelectCount++;
+		}
+	}
+    redibujar = true;	
+}
+
+void guardarEstado(){
+	//estadoObjetos.Close();
+	estadoObjetos.clear();
+	//estadoObjetos.ReserveL(SelectCount);
+	estadoObjetos.reserve(SelectCount);
+	//for(int o=0; o < Objects.Count(); o++){
+	for(size_t o=0; o < Objects.size(); o++){
+		Object& obj = Objects[o];
+		if (obj.seleccionado){
+			SaveState NuevoEstado;
+			NuevoEstado.indice = o;
+			NuevoEstado.posX = obj.posX;
+			NuevoEstado.posY = obj.posY;
+			NuevoEstado.posZ = obj.posZ;
+			NuevoEstado.rotX = obj.rotX;
+			NuevoEstado.rotY = obj.rotY;
+			NuevoEstado.rotZ = obj.rotZ;
+			NuevoEstado.scaleX = obj.scaleX;
+			NuevoEstado.scaleY = obj.scaleY;
+			NuevoEstado.scaleZ = obj.scaleZ;
+			//estadoObjetos.Append(NuevoEstado);
+			estadoObjetos.push_back(NuevoEstado);
+		}
+	}	
+	SetTransformPivotPoint();
+};
+
+void SetRotacion(int valor){
+	for (size_t o = 0; o < estadoObjetos.size(); o++) {
+		switch (axisSelect) {
+			case X:
+				Objects[estadoObjetos[o].indice].rotX -= valor;
+				break;
+			case Y:
+				Objects[estadoObjetos[o].indice].rotY -= valor;
+				break;
+			case Z:
+				Objects[estadoObjetos[o].indice].rotZ -= valor;
+				break;
+		}
+	}
+}
+
+void SetRotacion(){
+	//si no hay objetos
+	if (Objects.size() < 1){return;}
+	else if (Objects[SelectActivo].seleccionado && estado == editNavegacion){
+		guardarEstado();
+		estado = rotacion;	
+		valorRotacion = 0;
+		if (axisSelect > 2){axisSelect = X;}
+	}	
+	//esto es para symbian. la tecla 2 es para rotar. pero tambien para seleccionar el eje Y
+	else {
+		axisSelect = Y;
+	}
+	if (estado == rotacion){
+		SetRotacion(0);
+	}
+    ReloadViewport(true);	
+};
+
+void SetScale(int valor){
+	valor = valor*1000;
+	for (size_t o = 0; o < estadoObjetos.size(); o++) {
+		switch (axisSelect) {
+			case X:
+				Objects[estadoObjetos[o].indice].scaleX += valor;
+				break;
+			case Y:
+				Objects[estadoObjetos[o].indice].scaleY += valor;
+				break;
+			case Z:
+				Objects[estadoObjetos[o].indice].scaleZ += valor;
+				break;
+			case XYZ:
+				Objects[estadoObjetos[o].indice].scaleX += valor;
+				Objects[estadoObjetos[o].indice].scaleY += valor;
+				Objects[estadoObjetos[o].indice].scaleZ += valor;
+				break;
+		}
+	}
+	redibujar = true;
+}
+
+void SetEscala(){
+	//XYZ tiene escala
+	//si no hay objetos
+	if (Objects.size() < 1){return;}
+	else if (Objects[SelectActivo].seleccionado && estado == editNavegacion){
+		estado = EditScale;
+		guardarEstado();
+		axisSelect = XYZ;	
+	}	
+	else {
+		axisSelect = Z;
+	}
+	if (estado == rotacion){
+		SetRotacion(0);
+	}
+    ReloadViewport(true);
+};
+
+void RestaurarViewport(){
+	ViewFromCameraActive = false;
+	rotX = LastRotX;
+	rotY = LastRotY;	
+	PivotX = LastPivotX;
+	PivotY = LastPivotY;
+	PivotZ = LastPivotZ;
+}
+
+void ReloadAnimation(){
+	
+}
+
+void SetTranslacionObjetos(int valor){
+	for (size_t o = 0; o < estadoObjetos.size(); o++) {
+		switch (axisSelect) {
+			case X:
+				Objects[estadoObjetos[o].indice].posX += valor;
+				break;
+			case Y:
+				Objects[estadoObjetos[o].indice].posY -= valor;
+				break;
+			case Z:
+				Objects[estadoObjetos[o].indice].posZ -= valor;
+				break;
+		}
+	}
+}
+
+void TeclaIzquierda(){
+	//mueve el mouse
+	if (mouseVisible){
+		mouseX--;
+		if (mouseX < 0){mouseX = 0;};
+	}
+
+	//rotX += fixedMul( 0.1, aDeltaTimeSecs );
+	if (estado == editNavegacion){ 
+		if (navegacionMode == Orbit){
+			if (ViewFromCameraActive && CameraToView){
+				Object& obj = Objects[CameraActive];
+				// Convertir el angulo de rotX a radianes
+				GLfloat radRotX = obj.rotX * M_PI / 180.0;
+
+				obj.posX+= 30 * cos(radRotX);
+				obj.posY-= 30 * sin(radRotX);
+			}
+			else {
+				if (ViewFromCameraActive){
+					RestaurarViewport();
+				}
+				rotX-= 0.5;
+			}
+		}
+		else if (navegacionMode == Fly){
+			// Convertir el angulo de rotX a radianes
+			GLfloat radRotX = rotX * M_PI / 180.0;
+
+			// Calcular el vector de direccion hacia la izquierda (90 grados a la izquierda del angulo actual)
+			GLfloat leftX = cos(radRotX);
+			GLfloat leftY = sin(radRotX);
+
+			// Mover hacia la izquierda
+			PivotX += 30 * leftX;
+			PivotY += 30 * leftY;
+		}	
+	}
+	else if (estado == translacion){	
+		SetTranslacionObjetos(30);		
+	}
+	else if (estado == rotacion){
+		SetRotacion(1);
+	}
+	else if (estado == EditScale){
+		SetScale(-1);
+	}
+	else if (estado == timelineMove){
+		CurrentFrame--;
+		if (CurrentFrame < StartFrame){
+			StartFrame = EndFrame;
+		}
+		if (!PlayAnimation){
+			ReloadAnimation();
+		}
+	}
+	ReloadViewport(true);
+}

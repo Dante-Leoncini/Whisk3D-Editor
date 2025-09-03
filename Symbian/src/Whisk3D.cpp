@@ -103,9 +103,6 @@ GLfloat OriginalPivotY = 0;
 GLfloat OriginalPivotZ = 0;
 
 //vista 3d
-GLshort mouseX = 0;
-GLshort mouseY = 0;
-TBool mouseVisible = false;
 TBool showOutlineSelect = true;
 TBool iWidescreenEnabled = false;
 
@@ -151,34 +148,6 @@ RArray<ShapeKeyAnimation> ShapeKeyAnimations;
 
 TInt tipoSelect = vertexSelect;
 FlechaEstado* flechasEstados;
-
-void CWhisk3D::changeSelect(){
-	if (InteractionMode == ObjectMode){
-		//si no hay objetos
-		//o si esta moviendo, rotando o haciendo algo... no deja que continue
-		if (1 > Objects.Count() || estado != editNavegacion){
-			return;
-		}
-		//DeseleccionarTodo();
-		//deselecciona el objeto actual si es que estaba seleccionado
-		if (Objects[SelectActivo].seleccionado){
-			Objects[SelectActivo].seleccionado = false;
-			SelectCount--;
-		}
-
-		//pasa al siguiente
-		SelectActivo++;
-		if (SelectActivo > Objects.Count()-1){
-			SelectActivo = 0;
-		}
-		//selecciona el proximo objeto
-		if (!Objects[SelectActivo].seleccionado){
-			Objects[SelectActivo].seleccionado = true;
-			SelectCount++;
-		}
-	}
-    redibujar = true;	
-}
 
 void CWhisk3D::SetNavigation(){
 	if (navegacionMode == Orbit){
@@ -286,7 +255,6 @@ void CWhisk3D::ConstructL( void ){
 	showXaxis = true;
 	showOutlineSelect = true;
 	showOrigins = true;
-	PlayAnimation = false;
 	ShowTimeline = true;
 	iShiftPressed = false;
 	iAltPressed = false;
@@ -1343,104 +1311,10 @@ void CWhisk3D::SeleccionarTodo(){
 	redibujar = true;
 }
 
-void CWhisk3D::SetTranslacionObjetos(TInt valor){
-	for (int o = 0; o < estadoObjetos.Count(); o++) {
-		switch (axisSelect) {
-			case X:
-				Objects[estadoObjetos[o].indice].posX += valor;
-				break;
-			case Y:
-				Objects[estadoObjetos[o].indice].posY -= valor;
-				break;
-			case Z:
-				Objects[estadoObjetos[o].indice].posZ -= valor;
-				break;
-		}
-	}
-}
-
 // Convierte grados a radianes
 GLfloat CWhisk3D::GradosARadianes(TInt grados) {
     return grados * (PI / 180.0);
 }
-
-TInt valorRotacion = 0;
-void CWhisk3D::SetRotacion(TInt valor){
-	for (int o = 0; o < estadoObjetos.Count(); o++) {
-		switch (axisSelect) {
-			case X:
-				Objects[estadoObjetos[o].indice].rotX -= valor;
-				break;
-			case Y:
-				Objects[estadoObjetos[o].indice].rotY -= valor;
-				break;
-			case Z:
-				Objects[estadoObjetos[o].indice].rotZ -= valor;
-				break;
-		}
-	}
-}
-
-void CWhisk3D::SetScale(TInt valor){
-	valor = valor*1000;
-	for (int o = 0; o < estadoObjetos.Count(); o++) {
-		switch (axisSelect) {
-			case X:
-				Objects[estadoObjetos[o].indice].scaleX += valor;
-				break;
-			case Y:
-				Objects[estadoObjetos[o].indice].scaleY += valor;
-				break;
-			case Z:
-				Objects[estadoObjetos[o].indice].scaleZ += valor;
-				break;
-			case XYZ:
-				Objects[estadoObjetos[o].indice].scaleX += valor;
-				Objects[estadoObjetos[o].indice].scaleY += valor;
-				Objects[estadoObjetos[o].indice].scaleZ += valor;
-				break;
-		}
-	}
-	redibujar = true;
-}
-
-TInt ShiftCount = 0;
-
-void CWhisk3D::SetRotacion(){
-	//si no hay objetos
-	if (Objects.Count() < 1){return;}
-	else if (Objects[SelectActivo].seleccionado && estado == editNavegacion){
-		guardarEstado();
-		estado = rotacion;	
-		valorRotacion = 0;
-		if (axisSelect > 2){axisSelect = X;}
-	}	
-	else {
-		axisSelect = Y;
-	}
-	if (estado == rotacion){
-		SetRotacion(0);
-	}
-    ReloadViewport(true);	
-};
-
-void CWhisk3D::SetEscala(){
-	//XYZ tiene escala
-	//si no hay objetos
-	if (Objects.Count() < 1){return;}
-	else if (Objects[SelectActivo].seleccionado && estado == editNavegacion){
-		estado = EditScale;
-		guardarEstado();
-		axisSelect = XYZ;	
-	}	
-	else {
-		axisSelect = Z;
-	}
-	if (estado == rotacion){
-		SetRotacion(0);
-	}
-    ReloadViewport(true);
-};
 
 void CWhisk3D::ChangeEje(){
 	if (Objects.Count() < 1){return;}
@@ -1569,18 +1443,6 @@ void CWhisk3D::SetEje(TInt eje){
     redibujar = true;	
 };
 
-void CWhisk3D::Aceptar(){	
-	//si no hay objetos
-	if (Objects.Count() < 1){return;}
-
-	if ( InteractionMode == ObjectMode ){
-		if (estado != editNavegacion){
-			estado = editNavegacion;
-		}
-	}
-    ReloadViewport(true);
-};
-
 void CWhisk3D::PressTab(){
 	if (estado == editNavegacion){
 		if (InteractionMode == ObjectMode){
@@ -1606,59 +1468,6 @@ void CWhisk3D::Tab(){
 		CleanupStack::PopAndDestroy(noteBuf);
 		Aceptar();
 	};
-};
-
-void CWhisk3D::SetTransformPivotPoint(){
-	if (Objects.Count() < 1){return;}	
-	if (InteractionMode == ObjectMode){	
-		TransformPivotPointFloat[0] = 0;
-		TransformPivotPointFloat[1] = 0;
-		TransformPivotPointFloat[2] = 0;
-		for(TInt i=0; i < Objects.Count(); i++){	
-			Object& obj = Objects[i];	
-			if (obj.seleccionado){
-				TransformPivotPointFloat[0] += obj.posX;
-				TransformPivotPointFloat[1] += obj.posY;
-				TransformPivotPointFloat[2] += obj.posZ;	
-			};
-
-			//esto va a dar errores si el padre y el hijo estan seleccionados
-			/*TInt ParentID = obj.Parent;
-			while (ParentID  > -1) {		
-				Object& parentObj = Objects[ParentID];
-				TransformPivotPointFloat[0] += parentObj.posX;
-				TransformPivotPointFloat[1] += parentObj.posY;
-				TransformPivotPointFloat[2] += parentObj.posZ;	
-				ParentID = parentObj.Parent;		
-			}*/
-		}
-		TransformPivotPointFloat[0] = TransformPivotPointFloat[0]/SelectCount;
-		TransformPivotPointFloat[1] = TransformPivotPointFloat[1]/SelectCount;
-		TransformPivotPointFloat[2] = TransformPivotPointFloat[2]/SelectCount;
-	}
-}
-
-void CWhisk3D::guardarEstado(){
-	estadoObjetos.Close();
-	estadoObjetos.ReserveL(SelectCount);
-	for(int o=0; o < Objects.Count(); o++){
-		Object& obj = Objects[o];
-		if (obj.seleccionado){
-			SaveState NuevoEstado;
-			NuevoEstado.indice = o;
-			NuevoEstado.posX = obj.posX;
-			NuevoEstado.posY = obj.posY;
-			NuevoEstado.posZ = obj.posZ;
-			NuevoEstado.rotX = obj.rotX;
-			NuevoEstado.rotY = obj.rotY;
-			NuevoEstado.rotZ = obj.rotZ;
-			NuevoEstado.scaleX = obj.scaleX;
-			NuevoEstado.scaleY = obj.scaleY;
-			NuevoEstado.scaleZ = obj.scaleZ;
-			estadoObjetos.Append(NuevoEstado);
-		}
-	}	
-	SetTransformPivotPoint();
 };
 
 //cambie el shader
@@ -2358,20 +2167,6 @@ void CWhisk3D::SetMaterial(){
     redibujar = true;
 }
 
-void CWhisk3D::EnfocarObject(){
-	//si no hay objetos
-	if (Objects.Count() < 1){return;}
-	SetTransformPivotPoint();	
-	PivotX = 0.0f; 
-	PivotY = 0.0f;
-	PivotZ = 0.0f;
-	PivotX = PivotX-TransformPivotPointFloat[0]; 
-	PivotY = PivotY-TransformPivotPointFloat[1];
-	PivotZ = PivotZ-TransformPivotPointFloat[2];
-	//EjecutarScriptPython();
-    redibujar = true;
-}
-
 // Función para obtener el valor de la variable global
 /*PyObject* CWhisk3D::GetShowOverlays(PyObject* self, PyObject* args){
     return PyBool_FromLong(showOverlays ? 1 : 0);
@@ -2867,15 +2662,6 @@ void CWhisk3D::SetActiveObjectAsCamera(){
 		CameraActive = SelectActivo;		
 	}	
 	redibujar = true;
-}
-
-void CWhisk3D::RestaurarViewport(){
-	ViewFromCameraActive = false;
-	rotX = LastRotX;
-	rotY = LastRotY;	
-	PivotX = LastPivotX;
-	PivotY = LastPivotY;
-	PivotZ = LastPivotZ;
 }
 
 void CWhisk3D::SetCameraToView(){	

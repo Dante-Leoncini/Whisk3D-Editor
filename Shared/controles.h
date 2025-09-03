@@ -1,14 +1,17 @@
-void Confirmar(){
+void Aceptar(){	
+	//si no hay objetos
+	if (Objects.size() < 1){return;}
 
-}
+	if ( InteractionMode == ObjectMode ){
+		if (estado != editNavegacion){
+			estado = editNavegacion;
+		}
+	}
+    ReloadViewport(true);
+};
 
 void ClickDerecha(){
     rotX+= 0.5;
-	redibujar = true;  
-}
-
-void ClickIzquierda(){
-    rotX-= 0.5;  
 	redibujar = true;  
 }
 
@@ -87,6 +90,7 @@ void InputUsuarioSDL(SDL_Event &e){
             PivotZ -= dy * factor * cosY;
             PivotX += dx * factor * cosX - dy * factor * sinY * sinX;
             PivotY += dx * factor * sinX + dy * factor * sinY * cosX;
+			PodesCambiarElMalditoObjetoSeleccionado = false;
         } 
         else {
             // 🚀 ROTAR cámara
@@ -107,36 +111,41 @@ void InputUsuarioSDL(SDL_Event &e){
     }
     //eventos del teclado
     else if (e.type == SDL_KEYDOWN) {
-
         if (e.key.repeat == 0) { 
             // Primera vez que se presiona la tecla
             switch (e.key.keysym.sym) {
+				case SDLK_LSHIFT:
+					PodesCambiarElMalditoObjetoSeleccionado = true;
+					break;
                 case SDLK_RETURN:  // Enter
-                    Confirmar();
+                    Aceptar();
                     break;
                 case SDLK_RIGHT:   // Flecha derecha
                     ClickDerecha();
                     break;
                 case SDLK_LEFT:    // Flecha izquierda
-                    ClickIzquierda();
+                    TeclaIzquierda();
                     break;
-                case SDLK_UP:   // Flecha derecha
+                case SDLK_UP:  
                     ClickArriba();
                     break;
-                case SDLK_DOWN:    // Flecha izquierda
+                case SDLK_DOWN:  
                     ClickAbajo();
                     break;
-                case SDLK_w:   // Flecha derecha
+                case SDLK_w:  
                     ClickW();
                     break;
-                case SDLK_s:    // Flecha izquierda
+                case SDLK_s:  
                     ClickS();
                     break;
-                case SDLK_a:   // Flecha derecha
+                case SDLK_a:  
                     ClickA();
                     break;
-                case SDLK_d:    // Flecha izquierda
+                case SDLK_d:   
                     ClickD();
+                    break;
+                case SDLK_r:    
+                    SetRotacion();
                     break;
                 // Numpad
                 case SDLK_KP_1: SetViewpoint(front); break;
@@ -148,25 +157,28 @@ void InputUsuarioSDL(SDL_Event &e){
                 case SDLK_KP_7: SetViewpoint(top); break;
                 //case SDLK_KP_8: numpad('8'); break;
                 case SDLK_KP_9: abrir(); break;
-                /*case SDLK_KP_0: numpad('0'); break;
-                case SDLK_KP_PERIOD: numpad('.'); break;*/
+                //case SDLK_KP_0: numpad('0'); break;
+                case SDLK_KP_PERIOD: EnfocarObject(); break;
                 // si querés, agregá más teclas aquí
-                case SDLK_ESCAPE:  // Esc para salir rápido
-                    running = false;
+                case SDLK_ESCAPE:  // Esc                    
+                    Cancelar();
                     break;
             }
-        } else {
+        }else {
             // Evento repetido por mantener apretada
             //std::cout << "apretando tecla" << std::endl;
-            switch (e.key.keysym.sym) {
+    		SDL_Keycode key = e.key.keysym.sym;
+            switch (key) {
                 case SDLK_RETURN:  // Enter
-                    Confirmar();
+					ShiftCount++;
+					std::cout << "ShiftCount: " << ShiftCount << std::endl;
+                    Aceptar();
                     break;
                 case SDLK_RIGHT:   // Flecha derecha
                     ClickDerecha();
                     break;
                 case SDLK_LEFT:    // Flecha izquierda
-                    ClickIzquierda();
+                    TeclaIzquierda();
                     break;
                 case SDLK_UP:   // Flecha derecha
                     ClickArriba();
@@ -202,15 +214,24 @@ void InputUsuarioSDL(SDL_Event &e){
                 case SDLK_KP_7: SetViewpoint(top); break;
                 //case SDLK_KP_8: numpad('8'); break;
                 case SDLK_KP_9: abrir(); break;
-                /*case SDLK_KP_0: numpad('0'); break;
-                case SDLK_KP_PERIOD: numpad('.'); break;*/
+                //case SDLK_KP_0: numpad('0'); break;
+                case SDLK_KP_PERIOD: EnfocarObject(); break;
                 // si querés, agregá más teclas aquí
-                case SDLK_ESCAPE:  // Esc para salir rápido
-                    running = false;
+                case SDLK_ESCAPE:  // Esc
+                    Cancelar();
                     break;
             }
         }
-    }
+    } 	
+	else if (e.type == SDL_KEYUP) {
+		switch (e.key.keysym.sym) {
+			case SDLK_LSHIFT:
+				if (PodesCambiarElMalditoObjetoSeleccionado){
+					changeSelect();
+				}
+				break;
+		}
+	}
 }
 
 void InputUsuarioSymbian(GLfixed aDeltaTimeSecs){

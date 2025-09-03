@@ -340,7 +340,6 @@ class CWhisk3D : public CFiniteStateMachine, public MTextureLoadingListener
         TBool showOutlineSelect;
         TBool showOrigins;
         TBool ShowTimeline;
-        TBool PlayAnimation;    
         TBool iShiftPressed; 
         TBool iAltPressed;
         TBool iCtrlPressed;

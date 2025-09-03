@@ -84,6 +84,7 @@ int nextLightId = GL_LIGHT1;
 float angle = 55.0f;
 bool SimularZBuffer = false;
 bool ViewFromCameraActive = false;
+bool PodesCambiarElMalditoObjetoSeleccionado = false;
 float FRUSTUM_NEAR  = 1.f;     //near depth clipping plane
 float FRUSTUM_FAR = 1000.f;     //far depth clipping plane
         
@@ -126,6 +127,7 @@ bool showXaxis = true;
 bool ShowRelantionshipsLines = true;
 
 //animacion
+bool PlayAnimation = false;
 int StartFrame = 1;
 int EndFrame = 250;
 int CurrentFrame = 1;
@@ -135,6 +137,14 @@ bool show3DCursor = true;
 GLfloat Cursor3DposX = 0.0f;
 GLfloat Cursor3DposZ = 0.0f;
 GLfloat Cursor3DposY = 0.0f;
+
+//mouse
+GLshort mouseX = 0;
+GLshort mouseY = 0;
+bool mouseVisible = false;
+
+int ShiftCount = 0;
+int valorRotacion = 0;
 
 //listados
 //RArray<Object> Objects;
