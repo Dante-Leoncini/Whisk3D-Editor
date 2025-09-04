@@ -67,6 +67,8 @@ typedef enum { X, Y, Z, XYZ, ViewAxis } Axis;
 
 int axisSelect = X;
 
+SDL_Window* window = nullptr;  // definición real
+
 //luz
 //GLfloat light_pos[] = { -5000.0f, 5000.0f, 5000.0f, 1.0f };
 //GLfloat light_diffuse[] = { 1.0f, 1.0f, 1.0f, 1.0f };
@@ -82,6 +84,9 @@ GLfloat lightAmbient[4]   = { 0.0, 0.0, 0.0, 1.0 };
 
 GLshort TransformPivotPoint[3] = {0,0,0};
 GLfloat TransformPivotPointFloat[3] = {0.0f,0.0f,0.0f};
+
+int winW = 800; 
+int winH = 600;
 
 int nextLightId = GL_LIGHT1;
 

@@ -233,6 +233,51 @@ void TeclaIzquierda(){
 	ReloadViewport(true);
 }
 
+int dx = 0;
+int dy = 0;
+void CheckWarpMouseInWindow(int mx, int my){
+    bool warped = false;
+	dx = mx - lastMouseX;
+	dy = my - lastMouseY;
+
+    if (mx <= 0) {
+        mx = winW - 2;
+        SDL_WarpMouseInWindow(window, mx, my);
+        warped = true;
+    }
+    else if (mx >= winW - 1) {
+        mx = 1;
+        SDL_WarpMouseInWindow(window, mx, my);
+        warped = true;
+    }
+
+    // --- wrap vertical ---
+    if (my <= 0) {
+        my = winH - 2;
+        SDL_WarpMouseInWindow(window, mx, my);
+        warped = true;
+    }
+    else if (my >= winH - 1) {
+        my = 1;
+        SDL_WarpMouseInWindow(window, mx, my);
+        warped = true;
+    } 
+
+    // Calcular delta solo si no hubo warp
+    if (!warped) {
+        dx = mx - lastMouseX;
+        dy = my - lastMouseY;
+    } else {
+        dx = 0;
+        dy = 0; // ignorar delta falso
+    }
+	
+	// Guardar última posición
+    lastMouseX = mx;
+    lastMouseY = my;
+	//GuardarMousePos();
+}
+
 void InputUsuarioSDL(SDL_Event &e){
 	//rueda del mouse	
     if (e.type == SDL_MOUSEWHEEL) {
@@ -241,11 +286,20 @@ void InputUsuarioSDL(SDL_Event &e){
     }
     // Botones del mouse
     else if (e.type == SDL_MOUSEBUTTONDOWN) {
-        if (e.button.button == SDL_BUTTON_MIDDLE) {  // rueda clic
+		if (e.button.button == SDL_BUTTON_LEFT) {  
+			if (estado == translacion){
+				Aceptar();
+			}
+		}
+        else if (e.button.button == SDL_BUTTON_MIDDLE) {  // rueda clic
             middleMouseDown = true;
-            lastMouseX = e.button.x;
-            lastMouseY = e.button.y;
+            GuardarMousePos();
         }
+		else if (e.button.button == SDL_BUTTON_RIGHT) {  
+			if (estado == translacion){
+				Cancelar();
+			}
+		}
     }
     else if (e.type == SDL_MOUSEBUTTONUP) {
         if (e.button.button == SDL_BUTTON_MIDDLE) {
@@ -253,9 +307,10 @@ void InputUsuarioSDL(SDL_Event &e){
         }
     }
     else if (e.type == SDL_MOUSEMOTION){
-		int dx = e.motion.x - lastMouseX;
-		int dy = e.motion.y - lastMouseY;
+		int mx = e.motion.x;
+		int my = e.motion.y;
 		if (middleMouseDown) {
+			CheckWarpMouseInWindow(mx, my);
 			// Chequear si Shift está presionado
 			bool shiftHeld = (SDL_GetModState() & KMOD_SHIFT);
 
@@ -288,14 +343,11 @@ void InputUsuarioSDL(SDL_Event &e){
 			}
 
 			redibujar = true;
-
-			lastMouseX = e.motion.x;
-			lastMouseY = e.motion.y;
 		}
 		else if (estado == translacion){
 			// mover objetos con el mouse
+			CheckWarpMouseInWindow(mx, my);
 			SetTranslacionObjetos(dx, dy, 16.0f);
-			GuardarMousePos();
 		}
     }
     //eventos del teclado

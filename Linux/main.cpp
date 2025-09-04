@@ -67,9 +67,9 @@ int main(int argc, char* argv[]) {
 	SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 4); // 4x MSAA (puedes probar 8, 16 si tu GPU soporta)
 
 	// Crear ventana con OpenGL
-	SDL_Window* window = SDL_CreateWindow("SDL2 OpenGL Cube",
+	window = SDL_CreateWindow("SDL2 OpenGL Cube",
 		SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-		800, 600,
+		winW, winH,
 		SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN);
 
 	if (!window) {

@@ -1,2 +1,1 @@
-make linux
-./Whisk3D_Pre-alpha
+make linux && ./Whisk3D_Pre-alpha
