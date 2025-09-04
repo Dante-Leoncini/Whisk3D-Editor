@@ -122,11 +122,11 @@ int main(int argc, char* argv[]) {
         }
 
 		// Renderizar si hay cambios
-        if (redibujar){
+        //if (redibujar){
 			//std::cout << "redibujar: " << std::boolalpha << redibujar << std::endl;
 			Render();
 			SDL_GL_SwapWindow(window);
-		}
+		//}
 
         // Animación
         SDL_Delay(16); // ~60 fps
