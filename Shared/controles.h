@@ -69,7 +69,7 @@ void TeclaArriba(){
 		SetScale(1);	
 	}
 	else if (estado == translacion){
-		SetTranslacionObjetos(-30);
+		SetTranslacionObjetos(0, -30);
 	}
 	ReloadViewport(true);
 }
@@ -113,7 +113,7 @@ void TeclaAbajo(){
 		SetScale(-1);	
 	}
 	else if (estado == translacion){
-		SetTranslacionObjetos(30);		
+		SetTranslacionObjetos(0, 30);		
 	}
 	ReloadViewport(true);
 }
@@ -157,7 +157,7 @@ void TeclaDerecha(){
 		}
 	}
 	else if (estado == translacion){
-		SetTranslacionObjetos(-30);		
+		SetTranslacionObjetos(30, 0);		
 	}
 	else if (estado == rotacion){
 		SetRotacion(-1);
@@ -213,7 +213,7 @@ void TeclaIzquierda(){
 		}	
 	}
 	else if (estado == translacion){	
-		SetTranslacionObjetos(30);		
+		SetTranslacionObjetos(-30, 0);		
 	}
 	else if (estado == rotacion){
 		SetRotacion(1);
@@ -236,11 +236,6 @@ void TeclaIzquierda(){
 void InputUsuarioSDL(SDL_Event &e){
 	//rueda del mouse	
     if (e.type == SDL_MOUSEWHEEL) {
-        /*if (e.wheel.y > 0) {
-            rueda++;
-        } else if (e.wheel.y < 0) {
-            rueda--;
-        }*/
 		posY+= e.wheel.y*20;
 		redibujar = true;  
     }
@@ -257,45 +252,51 @@ void InputUsuarioSDL(SDL_Event &e){
             middleMouseDown = false;
         }
     }
-    else if (e.type == SDL_MOUSEMOTION && middleMouseDown) {
-        int dx = e.motion.x - lastMouseX;
-        int dy = e.motion.y - lastMouseY;
+    else if (e.type == SDL_MOUSEMOTION){
+		int dx = e.motion.x - lastMouseX;
+		int dy = e.motion.y - lastMouseY;
+		if (middleMouseDown) {
+			// Chequear si Shift está presionado
+			bool shiftHeld = (SDL_GetModState() & KMOD_SHIFT);
 
-        // Chequear si Shift está presionado
-        bool shiftHeld = (SDL_GetModState() & KMOD_SHIFT);
+			if (shiftHeld) {
+				float radY = rotY * M_PI / 180.0f; // Yaw
+				float radX = rotX * M_PI / 180.0f; // Pitch
 
-        if (shiftHeld) {
-            float radY = rotY * M_PI / 180.0f; // Yaw
-            float radX = rotX * M_PI / 180.0f; // Pitch
+				float factor = 8.0f;
 
-            float factor = 8.0f;
+				float cosX = cos(radX);
+				float sinX = sin(radX);
+				float cosY = cos(radY);
+				float sinY = sin(radY);
 
-            float cosX = cos(radX);
-            float sinX = sin(radX);
-            float cosY = cos(radY);
-            float sinY = sin(radY);
+				PivotZ -= dy * factor * cosY;
+				PivotX += dx * factor * cosX - dy * factor * sinY * sinX;
+				PivotY += dx * factor * sinX + dy * factor * sinY * cosX;
+				PodesCambiarElMalditoObjetoSeleccionado = false;
+			} 
+			else {
+				// 🚀 ROTAR cámara
+				rotX += dx * 0.2f;  
+				rotY += dy * 0.2f;  
 
-            PivotZ -= dy * factor * cosY;
-            PivotX += dx * factor * cosX - dy * factor * sinY * sinX;
-            PivotY += dx * factor * sinX + dy * factor * sinY * cosX;
-			PodesCambiarElMalditoObjetoSeleccionado = false;
-        } 
-        else {
-            // 🚀 ROTAR cámara
-            rotX += dx * 0.2f;  
-            rotY += dy * 0.2f;  
+				// Limitar rotY para evitar giros extremos
+				if(rotY > 180.0f) rotY -= 360.0f;
+				if(rotY < -180.0f) rotY += 360.0f;
+				if(rotX > 180.0f) rotX -= 360.0f;
+				if(rotX < -180.0f) rotX += 360.0f;
+			}
 
-            // Limitar rotY para evitar giros extremos
-            if(rotY > 180.0f) rotY -= 360.0f;
-            if(rotY < -180.0f) rotY += 360.0f;
-            if(rotX > 180.0f) rotX -= 360.0f;
-            if(rotX < -180.0f) rotX += 360.0f;
-        }
+			redibujar = true;
 
-        redibujar = true;
-
-        lastMouseX = e.motion.x;
-        lastMouseY = e.motion.y;
+			lastMouseX = e.motion.x;
+			lastMouseY = e.motion.y;
+		}
+		else if (estado == translacion){
+			// mover objetos con el mouse
+			SetTranslacionObjetos(dx, dy, 16.0f);
+			GuardarMousePos();
+		}
     }
     //eventos del teclado
     else if (e.type == SDL_KEYDOWN) {
@@ -328,29 +329,44 @@ void InputUsuarioSDL(SDL_Event &e){
                     break;
                 case SDLK_x:   
 					if (estado != editNavegacion){
-						SetEje(X);
-					}
+						if (axisSelect != X){
+							SetEje(X);
+						}
+						else {
+							SetEje(ViewAxis);
+						}
+					} 
 					else {
 						Borrar();
 					}
                     break;
                 case SDLK_y:   
 					if (estado != editNavegacion){
-						SetEje(Y);
+						if (axisSelect != Y){
+							SetEje(Y);
+						}
+						else {
+							SetEje(ViewAxis);
+						}
 					}
                     break;
                 case SDLK_z:   
 					if (estado != editNavegacion){
-						SetEje(Z);
+						if (axisSelect != Z){
+							SetEje(Z);
+						}
+						else {
+							SetEje(ViewAxis);
+						}
 					}
                     break;
                 case SDLK_r:    
                     SetRotacion();
                     break;
-                case SDLK_g:    
+                case SDLK_g:  
                     SetPosicion();
                     break;			
-                case SDLK_s:    
+                case SDLK_s:   
                     SetEscala();
                     break;
                 // Numpad
@@ -636,7 +652,7 @@ void InputUsuarioSymbian(GLfixed aDeltaTimeSecs){
 			}	
 		}
 		else if (estado == translacion){	
-			SetTranslacionObjetos(30);		
+			SetTranslacionObjetos(30, 0);		
 		}
 		else if (estado == rotacion){
 			SetRotacion(1);
@@ -694,7 +710,7 @@ void InputUsuarioSymbian(GLfixed aDeltaTimeSecs){
 			}
 		}
 		else if (estado == translacion){
-			SetTranslacionObjetos(-30);		
+			SetTranslacionObjetos(-30, 0);		
 		}
 		else if (estado == rotacion){
 			SetRotacion(-1);
@@ -749,7 +765,7 @@ void InputUsuarioSymbian(GLfixed aDeltaTimeSecs){
 			SetScale(1);	
 		}
 		else if (estado == translacion){
-			SetTranslacionObjetos(-30);
+			SetTranslacionObjetos(-30, 0);
 		}
 	    ReloadViewport(true);
 	}
@@ -792,7 +808,7 @@ void InputUsuarioSymbian(GLfixed aDeltaTimeSecs){
 			SetScale(-1);	
 		}
 		else if (estado == translacion){
-			SetTranslacionObjetos(30);		
+			SetTranslacionObjetos(30, 0);		
 		}
 	    ReloadViewport(true);
 	}*/

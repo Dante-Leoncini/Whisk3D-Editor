@@ -525,7 +525,15 @@ void changeSelect(){
     redibujar = true;	
 }
 
+// Función para guardar la posición actual del mouse
+void GuardarMousePos() {
+    SDL_GetMouseState(&lastMouseX, &lastMouseY);
+	/*std::cout << "Mouse guardado en: X=" << lastMouseX 
+              << " Y=" << lastMouseY << std::endl;*/
+}
+
 void guardarEstado(){
+	GuardarMousePos();
 	//estadoObjetos.Close();
 	estadoObjetos.clear();
 	//estadoObjetos.ReserveL(SelectCount);
@@ -781,10 +789,11 @@ void SetEscala(){
 		estado = EditScale;
 		guardarEstado();
 		axisSelect = XYZ;	
-	}	
-	else {
-		axisSelect = Z;
 	}
+	//esto era para symbian- porque "escala" y "eje Z" es el numero 3
+	/*else {
+		axisSelect = Z;
+	}*/
 	if (estado == rotacion){
 		SetRotacion(0);
 	}
@@ -804,17 +813,37 @@ void ReloadAnimation(){
 
 }
 
-void SetTranslacionObjetos(int valor){
+void SetTranslacionObjetos(int dx, int dy, float factor = 1.0f){
 	for (size_t o = 0; o < estadoObjetos.size(); o++) {
 		switch (axisSelect) {
+			case ViewAxis: {
+                float radY = rotY * M_PI / 180.0f;
+                float radX = rotX * M_PI / 180.0f;
+
+                //float factor = 1.0f;
+
+                float cosX = cos(radX);
+                float sinX = sin(radX);
+                float cosY = cos(radY);
+                float sinY = sin(radY);
+
+                auto& obj = Objects[estadoObjetos[o].indice];
+                obj.posZ -= dy * factor * cosY;
+                obj.posX += dx * factor * cosX - dy * factor * sinY * sinX;
+                obj.posY += dx * factor * sinX + dy * factor * sinY * cosX;
+                break;
+            }
 			case X:
-				Objects[estadoObjetos[o].indice].posX += valor;
+				Objects[estadoObjetos[o].indice].posX += dx;
+				Objects[estadoObjetos[o].indice].posX += dy;
 				break;
 			case Y:
-				Objects[estadoObjetos[o].indice].posY -= valor;
+				Objects[estadoObjetos[o].indice].posY -= dx;
+				Objects[estadoObjetos[o].indice].posY -= dy;
 				break;
 			case Z:
-				Objects[estadoObjetos[o].indice].posZ -= valor;
+				Objects[estadoObjetos[o].indice].posZ -= dx;
+				Objects[estadoObjetos[o].indice].posZ -= dy;
 				break;
 		}
 	}
@@ -827,11 +856,12 @@ void SetPosicion(){
 	if (InteractionMode == ObjectMode && Objects[SelectActivo].seleccionado && estado == editNavegacion){
 		guardarEstado();
 		estado = translacion;
-		if (axisSelect > 2){axisSelect = X;}
+		//if (axisSelect > 2){axisSelect = X;}
+		axisSelect = ViewAxis;
 	}
-	else {
+	/*else {
 		axisSelect = X;
-	}
+	}*/
 	if (estado == rotacion){
 		SetRotacion(0);
 	}

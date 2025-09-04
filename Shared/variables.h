@@ -63,7 +63,7 @@ enum{
     cad, luz, vertice, circle
 };
 
-typedef enum { X, Y, Z, XYZ } Axis;
+typedef enum { X, Y, Z, XYZ, ViewAxis } Axis;
 
 int axisSelect = X;
 
