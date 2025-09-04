@@ -435,7 +435,7 @@ void SetViewpoint(int opcion){
 				//CleanupStack::PopAndDestroy(noteBuf);
 			}
 			//else if (Objects.Count() > CameraActive && !ViewFromCameraActive){	
-			else if (Objects.size() > CameraActive && !ViewFromCameraActive){	
+			else if (Objects.size() > static_cast<size_t>(CameraActive) && !ViewFromCameraActive){	
 				LastRotX = rotX;
 				LastRotY = rotY;	
 				LastPivotX = PivotX;
@@ -513,7 +513,7 @@ void changeSelect(){
 
 		//pasa al siguiente
 		SelectActivo++;
-		if (SelectActivo >= Objects.size()){
+		if (static_cast<size_t>(SelectActivo) >= Objects.size()){
 			SelectActivo = 0;
 		}
 		//selecciona el proximo objeto
@@ -552,6 +552,169 @@ void guardarEstado(){
 	SetTransformPivotPoint();
 };
 
+void BorrarMesh(int indice){
+	int links = 0;
+	
+	for(size_t o=0; o < Objects.size(); o++){
+		if (Objects[o].type == mesh && Objects[o].Id == indice){links++;};				
+	}
+
+	if (links < 2){	
+		for(size_t o=0; o < Objects.size(); o++){
+			if (Objects[o].type == mesh && Objects[o].Id > indice){
+				Objects[o].Id--;
+			};				
+		}
+		Meshes[indice].LiberarMemoria();
+		//Meshes.Remove(indice);
+
+		// borrar el elemento en posición `indice`
+		if (indice >= 0 && static_cast<size_t>(indice) < Meshes.size()) {
+			Meshes.erase(Meshes.begin() + indice);
+		}
+	}
+}
+
+void BorrarAnimaciones(int indice){
+	for(size_t a = 0; a < AnimationObjects.size(); a++) {
+		if (AnimationObjects[a].Id == indice) {	
+			for(size_t p = 0; p < AnimationObjects[a].Propertys.size(); p++) {
+				AnimationObjects[a].Propertys[p].keyframes.clear();
+			}				
+			AnimationObjects[a].Propertys.clear();
+			//AnimationObjects.Remove(a);
+			if (a >= 0 && a < AnimationObjects.size()) {
+				AnimationObjects.erase(AnimationObjects.begin() + a);
+			}
+		}
+		// Hace falta cambiar los indices
+		else if (AnimationObjects[a].Id > indice) {
+			AnimationObjects[a].Id--;
+		}			
+	}
+}
+
+void BorrarObjeto(int indice){
+	Object& obj = Objects[indice];
+	// Liberar memoria de los punteros del objeto seleccionado
+	if (obj.type == mesh){
+		BorrarMesh(obj.Id);
+	}
+
+	//si existe animaciones para ese objeto. las borra		
+	BorrarAnimaciones(indice);
+
+	// Borrar de la coleccion
+	for (size_t c = Collection.size() - 1; c >= 0; c--) {
+		if (Collection[c] == indice) {
+			//Collection.Remove(c);
+			// borrar el elemento en posición `indice`
+			if (c >= 0 && c < Collection.size()) {
+				Collection.erase(Collection.begin() + c);
+			}
+		}
+		// Hace falta cambiar los indices
+		else if (Collection[c] > indice) {
+			Collection[c]--;
+		}
+	}
+
+	//si es la camara activa. borra el indice
+	if (CameraActive == indice){
+		CameraActive = -1;	
+		ViewFromCameraActive = false;	
+	}
+	//si era mas grande. resta uno para que el indice apunte a la camara correcta
+	else if (CameraActive > indice){
+		CameraActive--;
+	}
+
+	//Objects.Remove(indice);
+	if (indice >= 0 && static_cast<size_t>(indice) < Objects.size()) {
+		Objects.erase(Objects.begin() + indice);
+	}
+	SelectCount--;
+	SelectActivo = 0;
+	/*if (Objects.Count() > 0){
+		SelectCount = 1;
+		SelectActivo = Objects.Count()-1;
+		Objects[SelectActivo].seleccionado = true;
+	}
+	else {
+		SelectCount = 0;
+		SelectActivo = 0;
+	}*/
+	
+	// Actualizar indices en los objetos
+	for (size_t o = 0; o < Objects.size(); o++) {
+		for (size_t c = Objects[o].Childrens.size() - 1; c >= 0; c--) {
+			if (Objects[o].Childrens[c].Id == indice) {
+				//Objects[o].Childrens.Remove(c);
+				if (c >= 0 && c < Objects.size()) {
+					Objects.erase(Objects.begin() + c);
+				}
+			} 
+			else if (Objects[o].Childrens[c].Id > indice) {
+				Objects[o].Childrens[c].Id--;
+			}
+		}
+		//borra y actualiza los padres
+		if (Objects[o].Parent == indice){				
+			Objects[o].Parent = -1;
+			//Collection.Append(o);
+			Collection.push_back(o);
+		} 
+		else if (Objects[o].Parent > indice) {
+			Objects[o].Parent--;
+		}
+	}
+}
+
+void Borrar(){
+	if (estado != editNavegacion ){
+		Cancelar();
+	}
+	else if (InteractionMode == ObjectMode){
+		if (Objects.size() < 1){return;}
+
+		//si no hay nada seleccionado. no borra
+		bool algoSeleccionado = false;
+		for (size_t o = Objects.size() - 1; o >= 0; o--) {
+			if (Objects[o].seleccionado){
+				algoSeleccionado = true;
+				break;	
+			}		
+		}
+		if (!algoSeleccionado){return;}
+		//pregunta de confirmacion
+		//HBufC* noteBuf = HBufC::NewLC(100);
+		//_LIT(KStaticErrorMessage, "Delete?");
+		//noteBuf->Des().Format(KStaticErrorMessage);
+		/*if (!CDialogs::Alert(noteBuf)){
+			CleanupStack::PopAndDestroy(noteBuf);	
+			return;
+		}*/
+		//CleanupStack::PopAndDestroy(noteBuf);	
+		Cancelar();
+
+		//libera la memoria de los punteros primero	
+		// Obtener el objeto seleccionado			
+		for (size_t o = Objects.size() - 1; o >= 0; o--) {
+			if (Objects[o].seleccionado){
+				BorrarObjeto(o);
+			}			
+		}
+	}
+    ReloadViewport(true);	
+}
+
+void SetEje(int eje){
+	if (estado != editNavegacion){
+		axisSelect = eje;
+	}	
+    redibujar = true;	
+};
+
 void SetRotacion(int valor){
 	for (size_t o = 0; o < estadoObjetos.size(); o++) {
 		switch (axisSelect) {
@@ -578,9 +741,9 @@ void SetRotacion(){
 		if (axisSelect > 2){axisSelect = X;}
 	}	
 	//esto es para symbian. la tecla 2 es para rotar. pero tambien para seleccionar el eje Y
-	else {
+	/*else {
 		axisSelect = Y;
-	}
+	}*/
 	if (estado == rotacion){
 		SetRotacion(0);
 	}
@@ -638,7 +801,7 @@ void RestaurarViewport(){
 }
 
 void ReloadAnimation(){
-	
+
 }
 
 void SetTranslacionObjetos(int valor){
@@ -655,63 +818,4 @@ void SetTranslacionObjetos(int valor){
 				break;
 		}
 	}
-}
-
-void TeclaIzquierda(){
-	//mueve el mouse
-	if (mouseVisible){
-		mouseX--;
-		if (mouseX < 0){mouseX = 0;};
-	}
-
-	//rotX += fixedMul( 0.1, aDeltaTimeSecs );
-	if (estado == editNavegacion){ 
-		if (navegacionMode == Orbit){
-			if (ViewFromCameraActive && CameraToView){
-				Object& obj = Objects[CameraActive];
-				// Convertir el angulo de rotX a radianes
-				GLfloat radRotX = obj.rotX * M_PI / 180.0;
-
-				obj.posX+= 30 * cos(radRotX);
-				obj.posY-= 30 * sin(radRotX);
-			}
-			else {
-				if (ViewFromCameraActive){
-					RestaurarViewport();
-				}
-				rotX-= 0.5;
-			}
-		}
-		else if (navegacionMode == Fly){
-			// Convertir el angulo de rotX a radianes
-			GLfloat radRotX = rotX * M_PI / 180.0;
-
-			// Calcular el vector de direccion hacia la izquierda (90 grados a la izquierda del angulo actual)
-			GLfloat leftX = cos(radRotX);
-			GLfloat leftY = sin(radRotX);
-
-			// Mover hacia la izquierda
-			PivotX += 30 * leftX;
-			PivotY += 30 * leftY;
-		}	
-	}
-	else if (estado == translacion){	
-		SetTranslacionObjetos(30);		
-	}
-	else if (estado == rotacion){
-		SetRotacion(1);
-	}
-	else if (estado == EditScale){
-		SetScale(-1);
-	}
-	else if (estado == timelineMove){
-		CurrentFrame--;
-		if (CurrentFrame < StartFrame){
-			StartFrame = EndFrame;
-		}
-		if (!PlayAnimation){
-			ReloadAnimation();
-		}
-	}
-	ReloadViewport(true);
 }

@@ -2,43 +2,6 @@
 
 typedef GLshort Edge[2];
 
-class ShapeKeyVertex { 
-	public:
-		TInt index;
-		GLshort vertexX;
-		GLshort vertexY;
-		GLshort vertexZ;
-		GLbyte normalX;
-		GLbyte normalY;
-		GLbyte normalZ;
-};
-
-class ShapeKey { 
-	public:
-        RArray<ShapeKeyVertex> Vertex;
-};
-
-class Animation { 
-	public:
-        RArray<ShapeKey> Frames;
-		TInt MixSpeed;
-};
-
-class ShapeKeyAnimation { 
-	public:
-		TInt Id; //id del objeto al que afecta
-        RArray<Animation> Animations;
-		TInt ChangeAnimation;
-		TInt LastAnimation;
-		TInt NextAnimation;
-		TInt LastFrame;
-		TInt NextFrame;
-		TInt Mix;
-		TBool Normals;
-		TBool Faces;
-		TBool Interpolacion;
-};
-
 class FaceCorners {
 	public:
 		TInt vertex;

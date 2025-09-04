@@ -1,3 +1,43 @@
+class ShapeKeyVertex { 
+	public:
+		int index;
+		GLshort vertexX;
+		GLshort vertexY;
+		GLshort vertexZ;
+		GLbyte normalX;
+		GLbyte normalY;
+		GLbyte normalZ;
+};
+
+class ShapeKey { 
+	public:
+        //RArray<ShapeKeyVertex> Vertex;
+		std::vector<ShapeKeyVertex> Vertex;
+};
+
+class Animation { 
+	public:
+        //RArray<ShapeKey> Frames;
+		std::vector<ShapeKey> Frames;
+		int MixSpeed;
+};
+
+class ShapeKeyAnimation { 
+	public:
+		int Id; //id del objeto al que afecta
+        //RArray<Animation> Animations;
+		std::vector<Animation> Animations;
+		int ChangeAnimation;
+		int LastAnimation;
+		int NextAnimation;
+		int LastFrame;
+		int NextFrame;
+		int Mix;
+		bool Normals;
+		bool Faces;
+		bool Interpolacion;
+};
+
 class Children {
 	public:
     	int Id = -1;
@@ -117,18 +157,18 @@ class Mesh {
 		std::vector<int> Modifiers;
 
 		//libera la memoria
-		/*void Mesh::LiberarMemoria(){
+		void LiberarMemoria(){
 			delete[] vertex;
 			delete[] vertexColor;
 			delete[] normals;
 			delete[] uv;
-			for(TInt i=0; i < vertexGroups.Count(); i++){
-				vertexGroups[i].indices.Close();
+			for(size_t i=0; i < vertexGroups.size(); i++){
+				vertexGroups[i].indices.clear();
 			}
-			vertexGroups.Close();
+			vertexGroups.clear();
 
 			delete[] faces;
-			materialsGroup.Close();
-			Modifiers.Close();
-		}*/
+			materialsGroup.clear();
+			Modifiers.clear();
+		}
 };

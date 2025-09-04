@@ -1,13 +1,12 @@
-typedef enum { Constant, Linear, EaseInOut, EaseIn, EaseOut };
 class keyFrame { 
 	public:
-		TInt frame;
+		int frame;
 		//TInt value;
 		GLfloat valueX;
 		GLfloat valueY;
 		GLfloat valueZ;
 		//TBool boolean;
-		TInt Interpolation;
+		int Interpolation;
 };
 
 // Función de intercambio
@@ -18,11 +17,12 @@ void Swap(keyFrame& a, keyFrame& b) {
 }
 
 // Partición para quicksort
-TInt Partition(RArray<keyFrame>& arr, TInt low, TInt high) {
-    TInt pivot = arr[high].frame;
-    TInt i = low - 1;
+//int Partition(RArray<keyFrame>& arr, int low, int high) {
+int Partition(std::vector<keyFrame>& arr, int low, int high) {
+    int pivot = arr[high].frame;
+    int i = low - 1;
 
-    for (TInt j = low; j < high; j++) {
+    for (int j = low; j < high; j++) {
         if (arr[j].frame < pivot) {
             i++;
             Swap(arr[i], arr[j]);
@@ -33,43 +33,45 @@ TInt Partition(RArray<keyFrame>& arr, TInt low, TInt high) {
 }
 
 // Implementación de quicksort
-void QuickSort(RArray<keyFrame>& arr, TInt low, TInt high) {
+//void QuickSort(RArray<keyFrame>& arr, int low, int high) {
+void QuickSort(std::vector<keyFrame>& arr, int low, int high) {
     if (low < high) {
-        TInt pi = Partition(arr, low, high);
+        int pi = Partition(arr, low, high);
         QuickSort(arr, low, pi - 1);
         QuickSort(arr, pi + 1, high);
     }
 }
 
-TBool compareKeyFrames(const keyFrame& a, const keyFrame& b) {
+bool compareKeyFrames(const keyFrame& a, const keyFrame& b) {
     return a.frame < b.frame;
 }
 
-typedef enum { AnimPosition, AnimRotation, AnimScale };
 class AnimProperty { 
 	public:
-		TInt Property;
-        TInt firstFrameIndex;
-        TInt lastFrameIndex;
-		RArray<keyFrame> keyframes;
+		int Property;
+        int firstFrameIndex;
+        int lastFrameIndex;
+		//RArray<keyFrame> keyframes;
+        std::vector<keyFrame> keyframes;
 
-        void AnimProperty::SortKeyFrames() {
-            QuickSort(keyframes, 0, keyframes.Count() - 1);
+        void SortKeyFrames() {
+            QuickSort(keyframes, 0, keyframes.size() - 1);
         }
 };
 
 class AnimationObject { 
 	public:
-		TInt Id; //id del objeto al que afecta
-		TInt FirstKeyFrame; //id del objeto al que afecta
-		TInt LastKeyFrame; //id del objeto al que afecta
-		RArray<AnimProperty> Propertys;
+		int Id; //id del objeto al que afecta
+		int FirstKeyFrame; //id del objeto al que afecta
+		int LastKeyFrame; //id del objeto al que afecta
+		//RArray<AnimProperty> Propertys;
+        std::vector<AnimProperty> Propertys;
         
-		void AnimationObject::UpdateFirstLastFrame(){
+		void UpdateFirstLastFrame(){
             FirstKeyFrame = 100000000;
             LastKeyFrame = 0;
-			for(TInt pr = 0; pr < Propertys.Count(); pr++) {	
-			    for(TInt kf = 0; kf < Propertys[pr].keyframes.Count(); kf++) {	
+			for(size_t pr = 0; pr < Propertys.size(); pr++) {	
+			    for(size_t kf = 0; kf < Propertys[pr].keyframes.size(); kf++) {	
                     if (Propertys[pr].keyframes[kf].frame > LastKeyFrame){
                         LastKeyFrame = Propertys[pr].keyframes[kf].frame;	
                     }

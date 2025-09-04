@@ -14,6 +14,10 @@ enum {
 	grisUI
 };
 
+enum { Constant, Linear, EaseInOut, EaseIn, EaseOut };
+
+enum { AnimPosition, AnimRotation, AnimScale };
+
 enum{
 	top,
 	front,
@@ -163,6 +167,10 @@ std::vector<Modifier> Modifiers;
 std::vector<SaveState> estadoObjetos;
 //RArray<Constraint> Constraints;
 std::vector<Constraint> Constraints;
+//RArray<AnimationObject> AnimationObjects;
+std::vector<AnimationObject> AnimationObjects;
+//RArray<ShapeKeyAnimation> ShapeKeyAnimations;
+std::vector<ShapeKeyAnimation> ShapeKeyAnimations;
 
 //RArray<TTexture> Textures;
 std::vector<Texture> Textures;

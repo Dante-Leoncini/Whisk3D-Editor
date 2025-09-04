@@ -142,10 +142,6 @@ class FlechaEstado {
 		TBool activo;
 };
 
-//Crea un array de objetos
-RArray<AnimationObject> AnimationObjects;
-RArray<ShapeKeyAnimation> ShapeKeyAnimations;
-
 TInt tipoSelect = vertexSelect;
 FlechaEstado* flechasEstados;
 
@@ -1436,13 +1432,6 @@ void CWhisk3D::VerOpciones(){
     CleanupStack::Pop(items); // Limpia el array de la pila*/
 }
 
-void CWhisk3D::SetEje(TInt eje){
-	if (estado != editNavegacion){
-		axisSelect = eje;
-	}	
-    redibujar = true;	
-};
-
 void CWhisk3D::PressTab(){
 	if (estado == editNavegacion){
 		if (InteractionMode == ObjectMode){
@@ -1706,143 +1695,6 @@ void CWhisk3D::ClearParent(){
 	}
 	ReloadViewport(true);
 };
-
-void CWhisk3D::Borrar(){
-	if (estado != editNavegacion ){
-		Cancelar();
-	}
-	else if (InteractionMode == ObjectMode){
-		if (Objects.Count() < 1){return;}
-
-		//si no hay nada seleccionado. no borra
-		TBool algoSeleccionado = false;
-		for (TInt o = Objects.Count() - 1; o >= 0; o--) {
-			if (Objects[o].seleccionado){
-				algoSeleccionado = true;
-				break;	
-			}		
-		}
-		if (!algoSeleccionado){return;}
-		//pregunta de confirmacion
-		HBufC* noteBuf = HBufC::NewLC(100);
-		_LIT(KStaticErrorMessage, "Delete?");
-		noteBuf->Des().Format(KStaticErrorMessage);
-		if (!CDialogs::Alert(noteBuf)){
-			CleanupStack::PopAndDestroy(noteBuf);	
-			return;
-		}
-		CleanupStack::PopAndDestroy(noteBuf);	
-		Cancelar();
-
-		//libera la memoria de los punteros primero	
-		// Obtener el objeto seleccionado			
-		for (TInt o = Objects.Count() - 1; o >= 0; o--) {
-			if (Objects[o].seleccionado){
-				BorrarObjeto(o);
-			}			
-		}
-	}
-    ReloadViewport(true);	
-}
-
-void CWhisk3D::BorrarMesh(TInt indice){
-	TInt links = 0;
-	
-	for(int o=0; o < Objects.Count(); o++){
-		if (Objects[o].type == mesh && Objects[o].Id == indice){links++;};				
-	}
-
-	if (links < 2){	
-		for(int o=0; o < Objects.Count(); o++){
-			if (Objects[o].type == mesh && Objects[o].Id > indice){
-				Objects[o].Id--;
-			};				
-		}
-		Meshes[indice].LiberarMemoria();
-		Meshes.Remove(indice);
-	}
-}
-
-void CWhisk3D::BorrarAnimaciones(TInt indice){
-	for(TInt a = 0; a < AnimationObjects.Count(); a++) {
-		if (AnimationObjects[a].Id == indice) {	
-			for(TInt p = 0; p < AnimationObjects[a].Propertys.Count(); p++) {
-				AnimationObjects[a].Propertys[p].keyframes.Close();
-			}				
-			AnimationObjects[a].Propertys.Close();
-			AnimationObjects.Remove(a);
-		}
-		// Hace falta cambiar los indices
-		else if (AnimationObjects[a].Id > indice) {
-			AnimationObjects[a].Id--;
-		}			
-	}
-}
-
-void CWhisk3D::BorrarObjeto(TInt indice){
-	Object& obj = Objects[indice];
-	// Liberar memoria de los punteros del objeto seleccionado
-	if (obj.type == mesh){
-		BorrarMesh(obj.Id);
-	}
-
-	//si existe animaciones para ese objeto. las borra		
-	BorrarAnimaciones(indice);
-
-	// Borrar de la coleccion
-	for (int c = Collection.Count() - 1; c >= 0; c--) {
-		if (Collection[c] == indice) {
-			Collection.Remove(c);
-		}
-		// Hace falta cambiar los indices
-		else if (Collection[c] > indice) {
-			Collection[c]--;
-		}
-	}
-
-	//si es la camara activa. borra el indice
-	if (CameraActive == indice){
-		CameraActive = -1;	
-		ViewFromCameraActive = false;	
-	}
-	//si era mas grande. resta uno para que el indice apunte a la camara correcta
-	else if (CameraActive > indice){
-		CameraActive--;
-	}
-
-	Objects.Remove(indice);
-	SelectCount--;
-	SelectActivo = 0;
-	/*if (Objects.Count() > 0){
-		SelectCount = 1;
-		SelectActivo = Objects.Count()-1;
-		Objects[SelectActivo].seleccionado = true;
-	}
-	else {
-		SelectCount = 0;
-		SelectActivo = 0;
-	}*/
-	
-	// Actualizar indices en los objetos
-	for (TInt o = 0; o < Objects.Count(); o++) {
-		for (TInt c = Objects[o].Childrens.Count() - 1; c >= 0; c--) {
-			if (Objects[o].Childrens[c].Id == indice) {
-				Objects[o].Childrens.Remove(c);
-			} 
-			else if (Objects[o].Childrens[c].Id > indice) {
-				Objects[o].Childrens[c].Id--;
-			}
-		}
-		//borra y actualiza los padres
-		if (Objects[o].Parent == indice){				
-			Objects[o].Parent = -1;
-			Collection.Append(o);
-		} 
-		else if (Objects[o].Parent > indice) {
-			Objects[o].Parent--;
-		}
-	}
-}
 
 void CWhisk3D::CursorToSelect(){		
 	SetTransformPivotPoint();

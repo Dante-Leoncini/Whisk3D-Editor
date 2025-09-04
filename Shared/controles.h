@@ -10,21 +10,6 @@ void Aceptar(){
     ReloadViewport(true);
 };
 
-void ClickDerecha(){
-    rotX+= 0.5;
-	redibujar = true;  
-}
-
-void ClickArriba(){
-    rotY+= 0.5;
-	redibujar = true;  
-}
-
-void ClickAbajo(){
-    rotY-= 0.5;  
-	redibujar = true;  
-}
-
 void ClickW(){
     posY+= 1.0;
 	redibujar = true;  
@@ -53,6 +38,209 @@ void ClickE(){
 void ClickQ(){
     posZ+= 1.0;  
 	redibujar = true;  
+}
+
+void TeclaArriba(){
+	//mueve el mouse
+	if (mouseVisible){
+		mouseY--;
+		if (mouseY < 0){mouseY = 0;};
+	}
+
+	if (estado == editNavegacion){	
+		if (navegacionMode == Orbit){
+			if (ViewFromCameraActive && CameraToView){
+				Object& obj = Objects[CameraActive];
+				// Convertir el angulo de rotX a radianes
+				GLfloat radRotX = obj.rotX * M_PI / 180.0;
+				GLfloat radRotY = obj.rotY * M_PI / 180.0;
+				//GLfloat radRotZ = obj.rotZ * M_PI / 180.0;
+
+				obj.posX+= 30 * sin(radRotX);
+				//obj.posY-= 30 * cos(radRotX);
+				obj.posZ+= 30 * cos(radRotY);
+			}
+			else {
+				if (ViewFromCameraActive){
+					RestaurarViewport();
+				}
+				rotY-= 0.5;	
+			}			
+		}
+		else if (navegacionMode == Fly){
+			// Convertir el angulo de rotX a radianes
+			GLfloat radRotX = rotX * M_PI / 180.0;
+
+			PivotY+= 30 * cos(radRotX);
+			PivotX-= 30 * sin(radRotX);
+		}		
+	}
+	else if (estado == EditScale){
+		SetScale(1);	
+	}
+	else if (estado == translacion){
+		SetTranslacionObjetos(-30);
+	}
+	ReloadViewport(true);
+}
+
+void TeclaAbajo(){
+	//mueve el mouse
+	/*if (mouseVisible){
+		mouseY++;
+		if (mouseY > iScreenHeight-17){mouseY = iScreenHeight-17;};
+	}*/
+
+	if (estado == editNavegacion){ 			
+		if (navegacionMode == Orbit){
+			if (ViewFromCameraActive && CameraToView){
+				Object& obj = Objects[CameraActive];
+				// Convertir el angulo de rotX a radianes
+				GLfloat radRotX = obj.rotX * M_PI / 180.0;
+				GLfloat radRotY = obj.rotY * M_PI / 180.0;
+				//GLfloat radRotZ = obj.rotZ * M_PI / 180.0;
+
+				obj.posX-= 30 * sin(radRotX);
+				//obj.posY-= 30 * cos(radRotX);
+				obj.posZ-= 30 * cos(radRotY);
+			}
+			else {
+				if (ViewFromCameraActive){
+					RestaurarViewport();
+				}
+				rotY+= 0.5;	
+			}		
+		}
+		else if (navegacionMode == Fly){
+			// Convertir el angulo de rotX a radianes
+			GLfloat radRotX = rotX * M_PI / 180.0;
+
+			PivotY-= 30 * cos(radRotX);
+			PivotX+= 30 * sin(radRotX);
+		}
+	}
+	else if (estado == EditScale){
+		SetScale(-1);	
+	}
+	else if (estado == translacion){
+		SetTranslacionObjetos(30);		
+	}
+	ReloadViewport(true);
+}
+
+void TeclaDerecha(){
+	//mueve el mouse
+	/*if (mouseVisible){
+		mouseX++;
+		if (mouseX > iScreenWidth-11){mouseX = iScreenWidth-11;};
+	}*/
+
+	//rotX -= fixedMul( 1, aDeltaTimeSecs );
+	if (estado == editNavegacion){				
+		if (navegacionMode == Orbit){
+			if (ViewFromCameraActive && CameraToView){
+				Object& obj = Objects[CameraActive];
+				// Convertir el angulo de rotX a radianes
+				GLfloat radRotX = obj.rotX * M_PI / 180.0;
+
+				obj.posX-= 30 * cos(radRotX);
+				obj.posY+= 30 * sin(radRotX);
+			}
+			else {
+				if (ViewFromCameraActive){
+					RestaurarViewport();
+				}
+				rotX+= 0.5;	
+			}		
+		}
+		else if (navegacionMode == Fly){
+			// Convertir el angulo de rotX a radianes
+			GLfloat radRotX = rotX * M_PI / 180.0;
+
+			// Calcular el vector de direccion hacia la izquierda (90 grados a la izquierda del angulo actual)
+			GLfloat leftX = cos(radRotX);
+			GLfloat leftY = sin(radRotX);
+
+			// Mover hacia la izquierda
+			PivotX -= 30 * leftX;
+			PivotY -= 30 * leftY;
+		}
+	}
+	else if (estado == translacion){
+		SetTranslacionObjetos(-30);		
+	}
+	else if (estado == rotacion){
+		SetRotacion(-1);
+	}
+	else if (estado == EditScale){
+		SetScale(1);	
+	}
+	else if (estado == timelineMove){
+		CurrentFrame++;
+		if (!PlayAnimation){
+			ReloadAnimation();
+		}
+	}
+	ReloadViewport(true);
+}
+
+void TeclaIzquierda(){
+	//mueve el mouse
+	if (mouseVisible){
+		mouseX--;
+		if (mouseX < 0){mouseX = 0;};
+	}
+
+	//rotX += fixedMul( 0.1, aDeltaTimeSecs );
+	if (estado == editNavegacion){ 
+		if (navegacionMode == Orbit){
+			if (ViewFromCameraActive && CameraToView){
+				Object& obj = Objects[CameraActive];
+				// Convertir el angulo de rotX a radianes
+				GLfloat radRotX = obj.rotX * M_PI / 180.0;
+
+				obj.posX+= 30 * cos(radRotX);
+				obj.posY-= 30 * sin(radRotX);
+			}
+			else {
+				if (ViewFromCameraActive){
+					RestaurarViewport();
+				}
+				rotX-= 0.5;
+			}
+		}
+		else if (navegacionMode == Fly){
+			// Convertir el angulo de rotX a radianes
+			GLfloat radRotX = rotX * M_PI / 180.0;
+
+			// Calcular el vector de direccion hacia la izquierda (90 grados a la izquierda del angulo actual)
+			GLfloat leftX = cos(radRotX);
+			GLfloat leftY = sin(radRotX);
+
+			// Mover hacia la izquierda
+			PivotX += 30 * leftX;
+			PivotY += 30 * leftY;
+		}	
+	}
+	else if (estado == translacion){	
+		SetTranslacionObjetos(30);		
+	}
+	else if (estado == rotacion){
+		SetRotacion(1);
+	}
+	else if (estado == EditScale){
+		SetScale(-1);
+	}
+	else if (estado == timelineMove){
+		CurrentFrame--;
+		if (CurrentFrame < StartFrame){
+			StartFrame = EndFrame;
+		}
+		if (!PlayAnimation){
+			ReloadAnimation();
+		}
+	}
+	ReloadViewport(true);
 }
 
 void InputUsuarioSDL(SDL_Event &e){
@@ -121,16 +309,16 @@ void InputUsuarioSDL(SDL_Event &e){
                     Aceptar();
                     break;
                 case SDLK_RIGHT:   // Flecha derecha
-                    ClickDerecha();
+                    TeclaDerecha();
                     break;
                 case SDLK_LEFT:    // Flecha izquierda
                     TeclaIzquierda();
                     break;
                 case SDLK_UP:  
-                    ClickArriba();
+                    TeclaArriba();
                     break;
                 case SDLK_DOWN:  
-                    ClickAbajo();
+                    TeclaAbajo();
                     break;
                 case SDLK_w:  
                     ClickW();
@@ -143,6 +331,24 @@ void InputUsuarioSDL(SDL_Event &e){
                     break;
                 case SDLK_d:   
                     ClickD();
+                    break;
+                case SDLK_x:   
+					if (estado != editNavegacion){
+						SetEje(X);
+					}
+					else {
+						Borrar();
+					}
+                    break;
+                case SDLK_y:   
+					if (estado != editNavegacion){
+						SetEje(Y);
+					}
+                    break;
+                case SDLK_z:   
+					if (estado != editNavegacion){
+						SetEje(Z);
+					}
                     break;
                 case SDLK_r:    
                     SetRotacion();
@@ -175,16 +381,16 @@ void InputUsuarioSDL(SDL_Event &e){
                     Aceptar();
                     break;
                 case SDLK_RIGHT:   // Flecha derecha
-                    ClickDerecha();
+                    TeclaDerecha();
                     break;
                 case SDLK_LEFT:    // Flecha izquierda
                     TeclaIzquierda();
                     break;
                 case SDLK_UP:   // Flecha derecha
-                    ClickArriba();
+                    TeclaArriba();
                     break;
                 case SDLK_DOWN:    // Flecha izquierda
-                    ClickAbajo();
+                    TeclaAbajo();
                     break;
                 case SDLK_w:   // Flecha derecha
                     ClickW();
@@ -291,9 +497,9 @@ void InputUsuarioSymbian(GLfixed aDeltaTimeSecs){
 		}
 		else if (iShiftPressed || navegacionMode == Fly){	
 			GLfloat radRotX = rotX * PI / 180.0; // Rotación en radianes (X)
-			GLfloat radRotY = rotY * PI / 180.0; // Rotación en radianes (Y)*/
+			GLfloat radRotY = rotY * PI / 180.0; // Rotación en radianes (Y)
 
-			/*// Direcciones en el espacio global basadas en la rotación
+			// Direcciones en el espacio global basadas en la rotación*/
 			/*GLfloat forwardX = cos(radRotY) * cos(radRotX); // Dirección hacia adelante/atrás en X
 			GLfloat forwardY = sin(radRotX);               // Dirección hacia adelante/atrás en Y
 			GLfloat forwardZ = sin(radRotY) * cos(radRotX); // Dirección hacia adelante/atrás en Z
@@ -306,7 +512,7 @@ void InputUsuarioSymbian(GLfixed aDeltaTimeSecs){
 			GLfloat upY = cos(radRotX);                    // Dirección hacia arriba/abajo en Y
 			GLfloat upZ = -sin(radRotY) * sin(radRotX);    // Dirección hacia arriba/abajo en Z*/
 
-			// Ajuste de sensibilidad
+			// Ajuste de sensibilidad*/
 			/*GLfloat scaleFactor = cameraDistance * 0.3f;
 
 			// Desplazamiento del toque
@@ -321,7 +527,7 @@ void InputUsuarioSymbian(GLfixed aDeltaTimeSecs){
 			// Aplica el movimiento al pivote de la cámara
 			//PivotX = OriginalPivotX + moveX;
 			//PivotY = OriginalPivotY + moveY;
-			PivotZ = OriginalPivotZ + moveZ;
+			PivotZ = OriginalPivotZ + moveZ;*/
 
 			/*GLfloat radRotX = rotX * PI / 180.0;
 			OriginalLeftX = cos(radRotX);
@@ -360,7 +566,7 @@ void InputUsuarioSymbian(GLfixed aDeltaTimeSecs){
 		else if( flechasEstados[FlechaAbajo].estado == TeclaPresionada ){
 			SeleccionarTodo();
 			ShiftCount = 40;
-		}
+		}*/
 		/*else if (iInputHandler->IsInputPressed( EVolumenUp ) ){
 			CurrentFrame++;
 			if (CurrentFrame > EndFrame){
