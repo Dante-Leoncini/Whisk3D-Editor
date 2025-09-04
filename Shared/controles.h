@@ -10,16 +10,6 @@ void Aceptar(){
     ReloadViewport(true);
 };
 
-void ClickW(){
-    posY+= 1.0;
-	redibujar = true;  
-}
-
-void ClickS(){
-    posY-= 1.0;  
-	redibujar = true;  
-}
-
 void ClickA(){
     posX+= 1.0;
 	redibujar = true;  
@@ -244,8 +234,18 @@ void TeclaIzquierda(){
 }
 
 void InputUsuarioSDL(SDL_Event &e){
+	//rueda del mouse	
+    if (e.type == SDL_MOUSEWHEEL) {
+        /*if (e.wheel.y > 0) {
+            rueda++;
+        } else if (e.wheel.y < 0) {
+            rueda--;
+        }*/
+		posY+= e.wheel.y*20;
+		redibujar = true;  
+    }
     // Botones del mouse
-    if (e.type == SDL_MOUSEBUTTONDOWN) {
+    else if (e.type == SDL_MOUSEBUTTONDOWN) {
         if (e.button.button == SDL_BUTTON_MIDDLE) {  // rueda clic
             middleMouseDown = true;
             lastMouseX = e.button.x;
@@ -391,12 +391,6 @@ void InputUsuarioSDL(SDL_Event &e){
                     break;
                 case SDLK_DOWN:    // Flecha izquierda
                     TeclaAbajo();
-                    break;
-                case SDLK_w:   // Flecha derecha
-                    ClickW();
-                    break;
-                case SDLK_s:    // Flecha izquierda
-                    ClickS();
                     break;
                 case SDLK_a:   // Flecha derecha
                     ClickA();
