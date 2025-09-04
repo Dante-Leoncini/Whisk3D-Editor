@@ -14,6 +14,7 @@
 #include "../Shared/GeometriaUI.h"
 #include "../Shared/Primitivas.h"
 
+#include "../Shared/Animation.h"
 #include "../Shared/clases.h"
 #include "../Shared/lectura-escritura.h"
 #include "../Shared/variables.h"
