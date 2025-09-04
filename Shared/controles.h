@@ -319,13 +319,7 @@ void InputUsuarioSDL(SDL_Event &e){
                     break;
                 case SDLK_DOWN:  
                     TeclaAbajo();
-                    break;
-                case SDLK_w:  
-                    ClickW();
-                    break;
-                case SDLK_s:  
-                    ClickS();
-                    break;
+                    break;	
                 case SDLK_a:  
                     ClickA();
                     break;
@@ -352,6 +346,12 @@ void InputUsuarioSDL(SDL_Event &e){
                     break;
                 case SDLK_r:    
                     SetRotacion();
+                    break;
+                case SDLK_g:    
+                    SetPosicion();
+                    break;			
+                case SDLK_s:    
+                    SetEscala();
                     break;
                 // Numpad
                 case SDLK_KP_1: SetViewpoint(front); break;

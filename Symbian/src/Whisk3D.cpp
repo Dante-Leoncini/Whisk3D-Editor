@@ -1328,24 +1328,6 @@ void CWhisk3D::ChangeEje(){
 	redibujar = true;
 }
 
-void CWhisk3D::SetPosicion(){
-	//si no hay objetos
-	if (Objects.Count() < 1){return;}
-
-	if (InteractionMode == ObjectMode && Objects[SelectActivo].seleccionado && estado == editNavegacion){
-		guardarEstado();
-		estado = translacion;
-		if (axisSelect > 2){axisSelect = X;}
-	}
-	else {
-		axisSelect = X;
-	}
-	if (estado == rotacion){
-		SetRotacion(0);
-	}
-    ReloadViewport(true);	
-};
-
 void CWhisk3D::EventKeyDown(TInt scan){
 	switch(scan){               
 		/*case(4): //ESC no anda...

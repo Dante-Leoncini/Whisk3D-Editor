@@ -819,3 +819,21 @@ void SetTranslacionObjetos(int valor){
 		}
 	}
 }
+
+void SetPosicion(){
+	//si no hay objetos
+	if (Objects.size() < 1){return;}
+
+	if (InteractionMode == ObjectMode && Objects[SelectActivo].seleccionado && estado == editNavegacion){
+		guardarEstado();
+		estado = translacion;
+		if (axisSelect > 2){axisSelect = X;}
+	}
+	else {
+		axisSelect = X;
+	}
+	if (estado == rotacion){
+		SetRotacion(0);
+	}
+    ReloadViewport(true);	
+};
