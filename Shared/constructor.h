@@ -13,7 +13,7 @@ void ConstructUniversal(){
 
     // Cámara y transformaciones
     glMatrixMode(GL_PROJECTION);
-    gluPerspective(45.0, 800.0/600.0, 10.0, 20000.0);
+    gluPerspective(fovDeg, aspect, nearClip, 20000.0);
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
     gluLookAt(0, 0, 8000,   // ojo

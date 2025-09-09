@@ -16,6 +16,12 @@ Este programa no esta listo para producción y tiene una serie de errores conoci
 
 Sí el instalador falla, probablemente debas de "hackear" tu teléfono para ignorar las restricciones y certificados de Symbian. Puedes ver el siguiente video mostrando como hacerlo: [Tutorial Hack](https://www.youtube.com/watch?v=UJJICzbk3TA)
 
+## Notas de Linux
+Se puede compilar desde la carpeta "Linux" y desde la terminal usando "make"
+
+## Nota para Android
+Se puede compilar usando Android Studio, NDK, SDL2 y openjdk-17-jdk
+
 ## Aclaraciones:
 
 1. No es un port: Este programa no comparte código con el original.

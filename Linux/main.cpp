@@ -7,6 +7,7 @@
 //esto es solo para linux
 #include <vector>
 #include <cmath>
+#include <cfloat>
 
 //mallas 3d
 #include "../Shared/tablero.h"

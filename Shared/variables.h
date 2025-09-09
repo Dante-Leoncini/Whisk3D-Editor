@@ -87,6 +87,10 @@ GLfloat TransformPivotPointFloat[3] = {0.0f,0.0f,0.0f};
 
 int winW = 800; 
 int winH = 600;
+float fovDeg = 45.0f;
+float aspect = (float)winW / (float)winH;
+float nearClip = 10.0f;
+float FRUSTUM_FAR = 1000.f;     //far depth clipping plane
 
 int nextLightId = GL_LIGHT1;
 
@@ -94,8 +98,6 @@ float angle = 55.0f;
 bool SimularZBuffer = false;
 bool ViewFromCameraActive = false;
 bool PodesCambiarElMalditoObjetoSeleccionado = false;
-float FRUSTUM_NEAR  = 1.f;     //near depth clipping plane
-float FRUSTUM_FAR = 1000.f;     //far depth clipping plane
         
 int estado;
 int InteractionMode;

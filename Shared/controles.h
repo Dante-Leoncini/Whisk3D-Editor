@@ -160,7 +160,7 @@ void TeclaDerecha(){
 		SetTranslacionObjetos(30, 0);		
 	}
 	else if (estado == rotacion){
-		SetRotacion(-1);
+		SetRotacion(-1, 0);
 	}
 	else if (estado == EditScale){
 		SetScale(1);	
@@ -216,7 +216,7 @@ void TeclaIzquierda(){
 		SetTranslacionObjetos(-30, 0);		
 	}
 	else if (estado == rotacion){
-		SetRotacion(1);
+		SetRotacion(1, 0);
 	}
 	else if (estado == EditScale){
 		SetScale(-1);
@@ -289,6 +289,10 @@ void InputUsuarioSDL(SDL_Event &e){
 		if (e.button.button == SDL_BUTTON_LEFT) {  
 			if (estado == translacion){
 				Aceptar();
+			}
+			else {
+            	GuardarMousePos();
+				SetCursor3D();
 			}
 		}
         else if (e.button.button == SDL_BUTTON_MIDDLE) {  // rueda clic

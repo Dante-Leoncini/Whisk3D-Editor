@@ -525,6 +525,70 @@ void changeSelect(){
     redibujar = true;	
 }
 
+//coloca el cursor 3d desde la vista 3d
+void SetCursor3D(){// 1) Calcular base de la cámara (forward/right/up)
+    float pitch = rotX * DEG2RAD;
+    float yaw = rotY * DEG2RAD;
+
+    Vec3 forward(cosf(pitch) * sinf(yaw), sinf(pitch), cosf(pitch) * cosf(yaw));
+    forward = Normalize(forward);
+
+    Vec3 worldUp(0, 1, 0);
+    Vec3 right = Cross(forward, worldUp);
+    float rlen = Len(right);
+    if (rlen < 1e-8f) {
+        right = Vec3(1, 0, 0); // Evitar degeneración en pitch ±90°
+    } else {
+        right = right * (1.0f / rlen);
+    }
+
+    Vec3 up = Cross(right, forward); // Unitario por construcción
+
+    // 2) Posición de la cámara
+    Vec3 pivotPos(PivotX + posX, PivotY + posY, PivotZ + posZ);
+    Vec3 camPos = pivotPos - forward * cameraDistance;
+
+    // 3) Mouse a NDC
+    float ndcX = (2.0f * (float)lastMouseX / (float)winW) - 1.0f;
+    float ndcY = 1.0f - (2.0f * (float)lastMouseY / (float)winH);
+
+    // 4) Calcular dirección del rayo en el espacio de la cámara
+    float halfFovRad = fovDeg * DEG2RAD * 0.5f;
+    float halfH = tanf(halfFovRad);
+    float halfW = aspect * halfH;
+
+    // Rayo en el espacio de la cámara (sin normalizar)
+    Vec3 rayDir = forward + right * (ndcX * halfW) + up * (ndcY * halfH);
+
+    // 5) Intersección con un plano perpendicular al forward, pasando por el pivot
+    // Plano: punto = pivotPos, normal = forward
+    // Rayo: origen = camPos, dirección = rayDir
+    // Ecuación: dot((camPos + t * rayDir - pivotPos), forward) = 0
+    float denom = Dot(rayDir, forward);
+    if (fabs(denom) < 1e-8f) {
+        // Rayo paralelo al plano, usar posición por defecto
+        Cursor3DposX = pivotPos.x;
+        Cursor3DposY = pivotPos.y;
+        Cursor3DposZ = pivotPos.z;
+        return;
+    }
+
+    float t = Dot(pivotPos - camPos, forward) / denom;
+    if (t < 0) {
+        // Intersección detrás de la cámara, usar posición por defecto
+        Cursor3DposX = pivotPos.x;
+        Cursor3DposY = pivotPos.y;
+        Cursor3DposZ = pivotPos.z;
+        return;
+    }
+
+    Vec3 cursorPos = camPos + rayDir * t;
+
+    Cursor3DposX = cursorPos.x;
+    Cursor3DposY = cursorPos.y;
+    Cursor3DposZ = cursorPos.z;
+}
+
 // Función para guardar la posición actual del mouse
 void GuardarMousePos() {
     SDL_GetMouseState(&lastMouseX, &lastMouseY);
@@ -607,17 +671,19 @@ void BorrarObjeto(int indice){
 	// Liberar memoria de los punteros del objeto seleccionado
 	if (obj.type == mesh){
 		BorrarMesh(obj.Id);
+		std::cout << "era un mesh" << std::endl;
 	}
 
 	//si existe animaciones para ese objeto. las borra		
 	BorrarAnimaciones(indice);
+	std::cout << "borrar animaciones" << std::endl;
 
 	// Borrar de la coleccion
-	for (size_t c = Collection.size() - 1; c >= 0; c--) {
+	for (int c = static_cast<int>(Collection.size()) - 1; c >= 0; c--) {
 		if (Collection[c] == indice) {
 			//Collection.Remove(c);
 			// borrar el elemento en posición `indice`
-			if (c >= 0 && c < Collection.size()) {
+			if (c >= 0 && static_cast<size_t>(c) < Collection.size()) {
 				Collection.erase(Collection.begin() + c);
 			}
 		}
@@ -641,6 +707,7 @@ void BorrarObjeto(int indice){
 	if (indice >= 0 && static_cast<size_t>(indice) < Objects.size()) {
 		Objects.erase(Objects.begin() + indice);
 	}
+
 	SelectCount--;
 	SelectActivo = 0;
 	/*if (Objects.Count() > 0){
@@ -654,11 +721,12 @@ void BorrarObjeto(int indice){
 	}*/
 	
 	// Actualizar indices en los objetos
-	for (size_t o = 0; o < Objects.size(); o++) {
-		for (size_t c = Objects[o].Childrens.size() - 1; c >= 0; c--) {
+	std::cout << "ya casi" << std::endl;
+	for (int o = 0; o < static_cast<int>(Objects.size()); o++) {
+		for (int c = static_cast<int>(Objects[o].Childrens.size()) - 1; c >= 0; c--) {
 			if (Objects[o].Childrens[c].Id == indice) {
 				//Objects[o].Childrens.Remove(c);
-				if (c >= 0 && c < Objects.size()) {
+				if (c >= 0 && static_cast<size_t>(c) < Objects.size()) {
 					Objects.erase(Objects.begin() + c);
 				}
 			} 
@@ -723,17 +791,29 @@ void SetEje(int eje){
     redibujar = true;	
 };
 
-void SetRotacion(int valor){
+void SetRotacion(int dx, int dy){
 	for (size_t o = 0; o < estadoObjetos.size(); o++) {
 		switch (axisSelect) {
+			case ViewAxis:
+				/*Objects[estadoObjetos[o].indice].rotX -= valor;
+
+				Vec3 objPos = Objects[estadoObjetos[o].indice].pos;
+				Vec3 screenPos = ProjectToScreen(objPos); // convierte mundo -> pantalla
+
+				int dxScreen = mouseX - screenPos.x;
+				int dyScreen = mouseY - screenPos.y;*/
+				break;
 			case X:
-				Objects[estadoObjetos[o].indice].rotX -= valor;
+				Objects[estadoObjetos[o].indice].rotX -= dx;
+				Objects[estadoObjetos[o].indice].rotX -= dy;
 				break;
 			case Y:
-				Objects[estadoObjetos[o].indice].rotY -= valor;
+				Objects[estadoObjetos[o].indice].rotY -= dx;
+				Objects[estadoObjetos[o].indice].rotY -= dy;
 				break;
 			case Z:
-				Objects[estadoObjetos[o].indice].rotZ -= valor;
+				Objects[estadoObjetos[o].indice].rotZ -= dx;
+				Objects[estadoObjetos[o].indice].rotZ -= dy;
 				break;
 		}
 	}
@@ -746,15 +826,16 @@ void SetRotacion(){
 		guardarEstado();
 		estado = rotacion;	
 		valorRotacion = 0;
+		//axisSelect = ViewAxis;
 		if (axisSelect > 2){axisSelect = X;}
 	}	
 	//esto es para symbian. la tecla 2 es para rotar. pero tambien para seleccionar el eje Y
 	/*else {
 		axisSelect = Y;
 	}*/
-	if (estado == rotacion){
-		SetRotacion(0);
-	}
+	/*if (estado == rotacion){
+		SetRotacion(0, 0);
+	}*/
     ReloadViewport(true);	
 };
 
@@ -794,9 +875,9 @@ void SetEscala(){
 	/*else {
 		axisSelect = Z;
 	}*/
-	if (estado == rotacion){
-		SetRotacion(0);
-	}
+	/*if (estado == rotacion){
+		SetRotacion(0, 0);
+	}*/
     ReloadViewport(true);
 };
 
@@ -831,6 +912,17 @@ void SetTranslacionObjetos(int dx, int dy, float factor = 1.0f){
                 obj.posZ -= dy * factor * cosY;
                 obj.posX += dx * factor * cosX - dy * factor * sinY * sinX;
                 obj.posY += dx * factor * sinX + dy * factor * sinY * cosX;
+
+				/*std::cout << "cameraDistance " << cameraDistance 
+				        << " | PivotY " << PivotY						
+						<< " | posY: " << posY << std::endl;
+
+				// factor relativo a distancia
+				float factorDist = (cameraDistance - posY ) * 0.0055f;
+
+				obj.posZ -= dy * factor * cosY * factorDist;
+				obj.posX += dx * factor * cosX * factorDist - dy * factor * sinY * sinX * factorDist;
+				obj.posY += dx * factor * sinX * factorDist + dy * factor * sinY * cosX * factorDist;*/
                 break;
             }
 			case X:
@@ -862,8 +954,8 @@ void SetPosicion(){
 	/*else {
 		axisSelect = X;
 	}*/
-	if (estado == rotacion){
+	/*if (estado == rotacion){
 		SetRotacion(0);
-	}
+	}*/
     ReloadViewport(true);	
 };
