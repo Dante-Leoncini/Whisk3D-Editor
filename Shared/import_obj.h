@@ -33,6 +33,12 @@ namespace std {
     };
 }
 
+int BuscarMaterialPorNombre(const std::string& name) {
+    for (size_t i = 0; i < Materials.size(); ++i)
+        if (Materials[i].name == name) return (int)i;
+    return 0; // fallback
+}
+
 class Wavefront {
 	public:
 		std::vector<GLshort> vertex;
@@ -211,15 +217,27 @@ class Wavefront {
             TempMesh.faces = new GLushort[newFaces.size()];
             std::copy(newFaces.begin(), newFaces.end(), TempMesh.faces);
 
-            // MaterialGroup
-            MaterialGroup mg;
-            mg.start = 0;
-            mg.count = faces.size();
-            mg.startDrawn = 0;
-            mg.indicesDrawnCount = TempMesh.facesSize;
-            mg.material = (materialsGroup.size() > 0 ? materialsGroup[0].material : 0);
-            TempMesh.materialsGroup.push_back(mg);
-
+			// MaterialGroup
+			if (!materialsGroup.empty()) {
+				for (const MaterialGroup& mgOrig : materialsGroup) {
+					MaterialGroup mg;
+					mg.start = mgOrig.start;                 // índice del primer triángulo
+					mg.count = mgOrig.count;                 // cantidad de triángulos
+					mg.startDrawn = mgOrig.startDrawn;       // índice de vértices en array final
+					mg.indicesDrawnCount = mgOrig.indicesDrawnCount;
+					mg.material = mgOrig.material;           // índice correcto del material
+					TempMesh.materialsGroup.push_back(mg);
+				}
+			} else {
+				// Si no tiene materiales, crear uno por defecto
+				MaterialGroup mg;
+				mg.start = 0;
+				mg.count = faces.size();
+				mg.startDrawn = 0;
+				mg.indicesDrawnCount = TempMesh.facesSize;
+				mg.material = 0;
+				TempMesh.materialsGroup.push_back(mg);
+			}
             Reset();
         }
 };
@@ -784,6 +802,7 @@ bool LeerOBJ(std::ifstream& file,
 
     bool NombreEncontrado = false;
     bool hayMasObjetos = false;
+	bool TieneVertexColor = false;
 
     int acumuladoVerticesProximo = 0;
     int acumuladoNormalesProximo = 0;
@@ -808,20 +827,48 @@ bool LeerOBJ(std::ifstream& file,
         }
         else if (line.rfind("v ", 0) == 0) {
             std::istringstream ss(line.substr(2));
-            double x, y, z, r=1.0, g=1.0, b=1.0;
-            ss >> x >> y >> z;
-            if (!(ss >> r >> g >> b)) {
-                r = g = b = 1.0; // default color
-            }
-            Wobj.vertex.push_back((short)(x * 2000));
-            Wobj.vertex.push_back((short)(y * 2000));
-            Wobj.vertex.push_back((short)(z * 2000));
+			double x, y, z, r, g, b, a;
+			bool hasColor = false;
 
-            Wobj.vertexColor.push_back((unsigned char)(r*255));
-            Wobj.vertexColor.push_back((unsigned char)(g*255));
-            Wobj.vertexColor.push_back((unsigned char)(b*255));
+			ss >> x >> y >> z; // siempre están
 
-            acumuladoVerticesProximo++;
+			// leer hasta 4 valores extra
+			if (ss >> r >> g >> b) {
+				hasColor = true;
+				if (ss >> a) {
+					// tiene alpha también
+				} else {
+					a = 1.0; // default alpha
+				}
+			} else {
+				r = g = b = 1.0; // default color
+				a = 1.0;
+			}
+
+			// vértice
+			Wobj.vertex.push_back((short)(x * 2000));
+			Wobj.vertex.push_back((short)(y * 2000));
+			Wobj.vertex.push_back((short)(z * 2000));
+
+			// color con saturación
+			auto saturar = [](double v) { 
+				double n = v * 255.0; 
+				if (n < 0) n = 0; 
+				if (n > 255.0) n = 255.0; 
+				return (unsigned char)n; 
+			};
+
+			Wobj.vertexColor.push_back(saturar(r));
+			Wobj.vertexColor.push_back(saturar(g));
+			Wobj.vertexColor.push_back(saturar(b));
+			// si usabas alpha en Symbian, podés agregarlo aquí
+			// Wobj.vertexColor.push_back(saturar(a));
+
+			acumuladoVerticesProximo++;
+
+			if (hasColor) {
+				TieneVertexColor = true;
+			}
         }
         else if (line.rfind("vn ", 0) == 0) {
             std::istringstream ss(line.substr(3));
@@ -839,14 +886,15 @@ bool LeerOBJ(std::ifstream& file,
             acumuladoNormalesProximo++;
         }
         else if (line.rfind("vt ", 0) == 0) {
-            std::istringstream ss(line.substr(3));
-            double u, v;
-            ss >> u >> v;
-            u = u * 255.0 - 128.0;
-            v = (-v + 1.0) * 255.0 - 128.0;
-            Wobj.uv.push_back((float)u);
-            Wobj.uv.push_back((float)v);
-            acumuladoUVsProximo++;
+			std::istringstream ss(line.substr(3));
+			double u, v;
+			ss >> u >> v;
+
+			// Dejar normalizado (sin escalar)
+			Wobj.uv.push_back((float)u);
+			Wobj.uv.push_back(1.0f - (float)v);
+
+			acumuladoUVsProximo++;
         }
         else if (line.rfind("f ", 0) == 0) {
             std::istringstream ss(line.substr(2));
@@ -894,24 +942,57 @@ bool LeerOBJ(std::ifstream& file,
             }
         } 
         else if (line.rfind("usemtl ", 0) == 0) {
-            MaterialGroup mg;
-            mg.start = Wobj.faces.size();           // índice de la primera cara con este material
-            mg.startDrawn = Wobj.faces.size() * 3;  // índice de los vértices en el array final
-            mg.count = 0;
-            mg.indicesDrawnCount = 0;
-            mg.material = 0; // o buscar por nombre
+			std::string matName = line.substr(7); // toma el nombre del material
+			int materialIndex = -1;
 
-            Wobj.materialsGroup.push_back(mg);
+			// busca si el material ya existe
+			for (size_t i = 0; i < Materials.size(); ++i) {
+				if (Materials[i].name == matName) {
+					materialIndex = static_cast<int>(i);
+					break;
+				}
+			}
+
+			// si no existe, crea uno nuevo
+			if (materialIndex == -1) {
+				Material mat;
+				mat.name = matName;
+				mat.specular[0] = mat.specular[1] = mat.specular[2] = mat.specular[3] = 0.3f;
+				mat.diffuse[0] = mat.diffuse[1] = mat.diffuse[2] = mat.diffuse[3] = 1.0f;
+				mat.emission[0] = mat.emission[1] = mat.emission[2] = mat.emission[3] = 0.0f;
+				mat.textura = false;
+				mat.vertexColor = TieneVertexColor;
+				mat.repeat = true;
+				mat.lighting = true;
+				mat.culling = true;
+				mat.transparent = false;
+				mat.interpolacion = lineal;
+				mat.textureID = 0;
+
+				Materials.push_back(mat);
+				materialIndex = static_cast<int>(Materials.size() - 1);
+			}
+
+			// crea el MaterialGroup usando el índice correcto
+			MaterialGroup mg;
+			mg.start = Wobj.faces.size();
+			mg.startDrawn = Wobj.faces.size() * 3;
+			mg.count = 0;
+			mg.indicesDrawnCount = 0;
+			mg.material = materialIndex;
+
+			Wobj.materialsGroup.push_back(mg);
         }
     }
 
     // Convertir a Mesh final
     Mesh TempMesh;
     std::cout << "DEBUG Wobj:\n";
-    std::cout << "  vertices = " << Wobj.vertex.size() << "\n";
-    std::cout << "  normals  = " << Wobj.normals.size() << "\n";
-    std::cout << "  uv       = " << Wobj.uv.size() << "\n";
-    std::cout << "  faces    = " << Wobj.faces.size() << "\n";
+    std::cout << "  vertices = " << Wobj.vertex.size() / 3 << "\n";
+    std::cout << "  normals  = " << Wobj.normals.size() / 3 << "\n";
+    std::cout << "  uv       = " << Wobj.uv.size() / 2 << "\n";
+    std::cout << "  faces    = " << Wobj.faces.size() / 3 << "\n\n";
+
     Wobj.ConvertToES1(TempMesh, acumuladoVertices, acumuladoNormales, acumuladoUVs);
 
     *acumuladoVertices += acumuladoVerticesProximo;
@@ -1255,6 +1336,10 @@ bool LeerMTL(const std::string& filepath, int objetosCargados) {
                 if (LoadTexture(texPath.c_str(), texid)) {
                     newTex.iID = texid;
                     Textures.push_back(newTex);
+
+					// Enlazar al material actual
+					mat->textura = true;
+					mat->textureID = texid;
                 } 
                 else {
                     std::cerr << "Error cargando textura: " << texPath << "\n";
@@ -1318,6 +1403,26 @@ bool ImportOBJ(const std::string& filepath) {
 
     // Señalar que hay que redibujar
     redibujar = true;
+
+	//DEBUG. para ver que ocurrio con las texturas despues de cargar
+	/*for (size_t i = 0; i < Textures.size(); ++i) {
+        const Texture& tex = Textures[i];
+        std::cout << "[" << i << "] "
+                  << "ID: " << tex.iID << " | "
+                  << "Path: " << tex.path << std::endl;
+    }*/
+
+	//para ver los materiales
+    /*std::cout << "=== DEBUG Materials ===\n";
+    for (size_t i = 0; i < Materials.size(); i++) {
+        const auto &m = Materials[i];
+        std::cout << "[" << i << "] " << m.name 
+                  << " | textura=" << (m.textura ? "true" : "false")
+                  << " | textureID=" << m.textureID
+                  << " | diffuse=(" << m.diffuse[0] << ", " << m.diffuse[1] << ", " << m.diffuse[2] << ", " << m.diffuse[3] << ")"
+                  << " | specular=(" << m.specular[0] << ", " << m.specular[1] << ", " << m.specular[2] << ", " << m.specular[3] << ")"
+                  << "\n";
+    }*/
 
     return true;
 }

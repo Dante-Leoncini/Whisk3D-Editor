@@ -214,7 +214,6 @@ class CWhisk3D : public CFiniteStateMachine, public MTextureLoadingListener
         void RenderLinkLines(TInt objId);
         void TecladoNumerico(TInt numero);
         void InsertarValor();
-        void RecalcViewPos();
         void SetCameraToView();
         void DeseleccionarTodo();
         void ImportOBJ();

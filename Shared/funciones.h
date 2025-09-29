@@ -291,7 +291,7 @@ void AddObject( int tipo ){
 		GLfloat lightDiffuseSpot[4]   = { 1.0, 1.0, 1.0, 1.0 };
 		GLfloat lightSpecularSpot[4]  = { 1.0, 1.0, 1.0, 1.0 };
 		glLightfv(  nextLightId, GL_DIFFUSE,  lightDiffuseSpot  );
-		glLightfv(  nextLightId, GL_AMBIENT,  lightAmbient  );
+		glLightfv(  nextLightId, GL_AMBIENT,  objAmbient  );
 		glLightfv(  nextLightId, GL_SPECULAR, lightSpecularSpot );
 		//glLightfv(  nextLightId, GL_POSITION, lightPositionSpot );
 		glLightfv(  nextLightId, GL_POSITION, positionPuntualLight );

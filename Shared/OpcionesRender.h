@@ -13,7 +13,7 @@ bool SimularZBuffer = false;
 int view = MaterialPreview;
 bool redibujar = true; //solo redibuja si este valor esta en true
 
-GLfloat objAmbient[4]  = { 3.0, 3.0, 3.0, 1.0 };
+GLfloat objAmbient[4]  = { 0.3, 0.3, 0.3, 1.0 };
 
 std::vector<Light> Lights;
 std::vector<int> Collection;
@@ -28,18 +28,18 @@ void RenderMesh( Object& obj, int indice ){
 	//averiguar diferencia entre glScalex y glScalef
 	//glScalex(obj.scaleX, obj.scaleZ, obj.scaleY);
 	//glScalef(obj.scaleX, obj.scaleZ, obj.scaleY);
-	/*glScalef(
+	glScalef(
 		FIXED_TO_FLOAT(obj.scaleX),
 		FIXED_TO_FLOAT(obj.scaleZ),
 		FIXED_TO_FLOAT(obj.scaleY)
-	);*/
+	);
 			
 	glColor4f(ListaColores[blanco][0],ListaColores[blanco][1],ListaColores[blanco][2],ListaColores[blanco][3]);
 	glDisable(GL_COLOR_MATERIAL);
 	glMaterialfv(   GL_FRONT_AND_BACK, GL_AMBIENT,  objAmbient  );
 	//averiguar diferencia entre glMaterialx y glMateriali
 	//glMaterialx( GL_FRONT_AND_BACK, GL_SHININESS,   12 << 16     );
-	glMateriali( GL_FRONT_AND_BACK, GL_SHININESS,   12 << 16     );
+	glMateriali( GL_FRONT_AND_BACK, GL_SHININESS,   1     );
 	glMaterialfv(   GL_FRONT_AND_BACK, GL_EMISSION, ListaColores[negro] );
 
 	// Set array pointers from mesh.
@@ -50,12 +50,12 @@ void RenderMesh( Object& obj, int indice ){
 	glShadeModel( GL_SMOOTH );
 	
 	//modelo con textura
-	/*if (SimularZBuffer){
+	if (SimularZBuffer){
 		glDisable( GL_LIGHTING );
 		glDisable(GL_BLEND);
 		glDisable( GL_TEXTURE_2D );
 		glDrawElements(GL_TRIANGLES, pMesh.facesSize, GL_UNSIGNED_SHORT, pMesh.faces);
-	}*/
+	}
 	
 	//material
 	if (view == MaterialPreview || view == Rendered){
@@ -97,6 +97,7 @@ void RenderMesh( Object& obj, int indice ){
 			//si tiene texturas
 			if (mat.textura){
 				glEnable( GL_TEXTURE_2D );
+				glEnableClientState(GL_TEXTURE_COORD_ARRAY);
 				glBindTexture(  GL_TEXTURE_2D, mat.textureID ); //selecciona la textura							
 			
 				//textura pixelada o suave
@@ -118,7 +119,10 @@ void RenderMesh( Object& obj, int indice ){
 					glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 				}	
 			}
-			else {glDisable( GL_TEXTURE_2D );}
+			else {
+				glDisable( GL_TEXTURE_2D );
+				glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+			}
 
 			glMaterialfv(   GL_FRONT_AND_BACK, GL_EMISSION, mat.emission );
 

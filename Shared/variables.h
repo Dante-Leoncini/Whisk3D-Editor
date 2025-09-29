@@ -52,14 +52,14 @@ SDL_Window* window = nullptr;  // definición real
 //GLfloat light_pos[] = { -5000.0f, 5000.0f, 5000.0f, 1.0f };
 //GLfloat light_diffuse[] = { 1.0f, 1.0f, 1.0f, 1.0f };
 //GLfloat light_specular[] = { 1.0f, 1.0f, 1.0f, 1.0f };
-GLfloat objAmbient[4] = { 0.4, 0.4, 0.4, 1.0 };
 
-GLfloat lightDiffuseLamp[4]   = { 0.8, 0.8, 0.8, 1.0 };
-GLfloat sunLightPosition[4]  = {-100, 1000, 1000, 0 }; // y, z, x, si es direccional o puntual
+GLfloat lightDiffuseLamp[4]   = { 0.9, 0.9, 0.9, 1.0 };
+GLfloat lightSpecularLamp[4]   = { 1.0, 1.0, 1.0, 1.0 };
+
+GLfloat sunLightPosition[4]  = {-50, 500, 500, 0 }; // y, z, x, si es direccional o puntual
 
 //para las luces puntuales
 GLfloat positionPuntualLight[4] = {0, 0, 0, 1};
-GLfloat lightAmbient[4]   = { 0.0, 0.0, 0.0, 1.0 };
 
 GLshort TransformPivotPoint[3] = {0,0,0};
 GLfloat TransformPivotPointFloat[3] = {0.0f,0.0f,0.0f};

@@ -73,21 +73,25 @@ int main(int argc, char* argv[]) {
         std::cerr << "Error cargando tablero.jpg" << std::endl;
         return -1;
     }*/
+    
 	Textures.push_back(Texture());
     if (!LoadTexture("../Shared/origen.png", Textures[1].iID)) {
         std::cerr << "Error cargando origen.png" << std::endl;
         return -1;
     }
+
 	Textures.push_back(Texture());
     if (!LoadTexture("../Shared/cursor3d.png", Textures[2].iID)) {
         std::cerr << "Error cargando cursor3d.png" << std::endl;
         return -1;
     }
+
 	Textures.push_back(Texture());
     if (!LoadTexture("../Shared/relationshipLine.png", Textures[3].iID)) {
         std::cerr << "Error cargando relationshipLine.png" << std::endl;
         return -1;
     }
+
 	Textures.push_back(Texture());
     if (!LoadTexture("../Shared/lamp.png", Textures[4].iID)) {
         std::cerr << "Error cargando lamp.png" << std::endl;

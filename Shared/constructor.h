@@ -29,8 +29,8 @@ void ConstructUniversal(){
     //glLightfv(GL_LIGHT0, GL_SPECULAR, light_specular);
 
     glLightfv(  GL_LIGHT0, GL_DIFFUSE,  lightDiffuseLamp  );
-    glLightfv(  GL_LIGHT0, GL_AMBIENT,  lightAmbient  );
-    glLightfv(  GL_LIGHT0, GL_SPECULAR, lightDiffuseLamp  );
+    glLightfv(  GL_LIGHT0, GL_AMBIENT,  objAmbient  );
+    glLightfv(  GL_LIGHT0, GL_SPECULAR, lightSpecularLamp  );
     glLightfv(  GL_LIGHT0, GL_POSITION, sunLightPosition );
 
     // Habilitar la normalizaci�n de las normales

@@ -3,6 +3,16 @@ class VertexGroup {
 		std::vector<int> indices;
 };
 
+class MaterialGroup { 
+	public:
+        int start = 0; //donde esta el primer triangulo real
+        int count = 0; //cuantos triangulos son reales
+
+        int startDrawn = 0; //indice del primer triangulo para dibujar
+		int indicesDrawnCount = 0; //cuantos vertices son
+		int material = -1; //de que material
+};
+
 class Mesh { 
 	public:
 		int vertexSize = 0;

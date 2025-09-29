@@ -2502,27 +2502,6 @@ void CWhisk3D::SetCameraToView(){
 	CameraToView = !CameraToView;
 }
 
-void CWhisk3D::RecalcViewPos(){		
-	Object& obj = Objects[CameraActive];
-	rotX = -obj.rotZ+90;
-	rotY = -obj.rotY;	
-	PivotX = -obj.posX;
-	PivotY = -obj.posY;
-	PivotZ = -obj.posZ;
-
-	//en caso de que este emparentado
-	/*TInt ParentID = obj.Parent;
-	while (ParentID  > -1) {		
-		Object& parentObj = Objects[ParentID];		
-		rotX = -parentObj.rotZ;
-		rotY = -parentObj.rotY;	
-		//PivotX = -parentObj.posX;
-		//PivotY = -parentObj.posY;
-		//PivotZ = -parentObj.posZ;	
-		ParentID = parentObj.Parent;		
-	}*/
-}
-
 void CWhisk3D::InfoObject(TInt opciones){
 	HBufC* noteBuf = HBufC::NewLC(100);	
 	_LIT(KFormatString, "Posicion: x: %d, y: %d, z: %d");
