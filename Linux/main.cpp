@@ -2,12 +2,20 @@
 #include <SDL2/SDL_image.h>
 #include <GL/gl.h>
 #include <GL/glu.h>
-#include <iostream>
 
 //esto es solo para linux
-#include <vector>
 #include <cmath>
 #include <cfloat>
+#include <map>
+#include <algorithm>
+
+#include <filesystem>
+#include <vector>
+#include <fstream>
+#include <string>
+#include <sstream>
+#include <iostream>
+#include <iomanip>
 
 //mallas 3d
 #include "../Shared/tablero.h"
@@ -17,43 +25,17 @@
 
 #include "../Shared/Animation.h"
 #include "../Shared/clases.h"
-#include "../Shared/lectura-escritura.h"
 #include "../Shared/variables.h"
+#include "../Shared/colores.h"
+#include "../Shared/OpcionesRender.h"
+
+#include "../Shared/import_obj.h"
+#include "../Shared/lectura-escritura.h"
+
 #include "../Shared/funciones.h"
 #include "../Shared/constructor.h"
 #include "../Shared/controles.h"
 #include "../Shared/render.h"
-
-
-// --- Cargar textura ---
-bool LoadTexture(const char* filename, GLuint &textureID) {
-    SDL_Surface* surface = IMG_Load(filename);
-    if (!surface) {
-        std::cerr << "Error cargando textura: " << IMG_GetError() << std::endl;
-        return false;
-    }
-
-    glGenTextures(1, &textureID);
-    glBindTexture(GL_TEXTURE_2D, textureID);
-
-    // Configurar filtros
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-    // Determinar formato
-    GLenum format = (surface->format->BytesPerPixel == 4) ? GL_RGBA : GL_RGB;
-
-    glTexImage2D(GL_TEXTURE_2D, 0, format, surface->w, surface->h, 0,
-                 format, GL_UNSIGNED_BYTE, surface->pixels);
-
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    gluBuild2DMipmaps(GL_TEXTURE_2D, format, surface->w, surface->h,
-                    format, GL_UNSIGNED_BYTE, surface->pixels);
-
-    SDL_FreeSurface(surface);
-    return true;
-}
 
 int main(int argc, char* argv[]) {
 	// Inicializar SDL
