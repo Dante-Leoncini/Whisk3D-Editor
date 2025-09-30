@@ -1,8 +1,8 @@
 //para los sprites
 static const GLshort pointVertex[3]={0, 0, 0};
 
-static const TInt LineaLightVertexSize = 2 * 3;
-static const TInt LineaEdgeSize = 1 * 2;
+static const int LineaLightVertexSize = 2 * 3;
+static const int LineaEdgeSize = 1 * 2;
 
 static GLshort LineaLightVertex[LineaLightVertexSize] = {    
     0, 0, 0,
@@ -29,8 +29,8 @@ static const GLushort LineaEdge[2] = {
     0, 1
 };
 
-static const TInt CameraVertexSize = 8 * 3;
-static const TInt CameraEdgesSize = 11 * 2;
+static const int CameraVertexSize = 8 * 3;
+static const int CameraEdgesSize = 11 * 2;
 
 static GLshort CameraVertices[CameraVertexSize] = {    
     0, 0, 0, //origen
@@ -65,8 +65,8 @@ static const GLushort CameraEdges[CameraEdgesSize]={
 	7, 5,
 };
 
-static const TInt EmptyVertexSize = 6 * 3;
-static const TInt EmptyEdgesSize = 3 * 2;
+static const int EmptyVertexSize = 6 * 3;
+static const int EmptyEdgesSize = 3 * 2;
 
 static const GLshort EmptyVertices[EmptyVertexSize] = {
     //eje1
@@ -86,8 +86,8 @@ static const GLushort EmptyEdges[EmptyEdgesSize]={
 	4, 5
 };
 
-static const TInt Cursor3DVertexSize = 12 * 3;
-static const TInt Cursor3DEdgesSize = 6 * 2;
+static const int Cursor3DVertexSize = 12 * 3;
+static const int Cursor3DEdgesSize = 6 * 2;
 
 static const GLshort Cursor3DVertices[Cursor3DVertexSize] = {
     //eje1
@@ -116,13 +116,13 @@ static const GLushort Cursor3DEdges[Cursor3DEdgesSize]={
 	10,11
 };
 
-static const TInt SpriteVertexSize = 16 * 3;
-static const TInt SpriteFacesSize = 18 * 3;
-static const TInt SpriteUvSize = 16 * 2;
+static const int SpriteVertexSize = 16 * 3;
+static const int SpriteFacesSize = 18 * 3;
+static const int SpriteUvSize = 16 * 2;
 
 /* Define vertice coordinates for the ground plane */
 //en el sentido del reloj empezando de la esquina superior izquierda
-static GLshort SpriteVertices[SpriteVertexSize] = {
+/*static GLshort SpriteVertices[SpriteVertexSize] = {
 	0,    0, 0,
 	256,    0, 0,
     256, 256, 0,
@@ -137,7 +137,7 @@ static GLshort SpriteVertices[SpriteVertexSize] = {
     0, 0, 0,
     0, 0, 0,
     0, 0, 0,
-};
+};*/
 
 /** los dos triangulos */
 static const GLushort SpriteFaces[SpriteFacesSize]={
@@ -172,7 +172,7 @@ static const GLushort SpriteFaces[SpriteFacesSize]={
 
 /* textura UV */
 //en el sentido del reloj empezando de la esquina superior izquierda
-static GLbyte SpriteUV[SpriteUvSize] ={
+/*static GLbyte SpriteUV[SpriteUvSize] ={
     -128,  -128,
     127,   -128,
     127,    127,
@@ -189,5 +189,5 @@ static GLbyte SpriteUV[SpriteUvSize] ={
     0, 0, 
     0, 0, 
     0, 0 
-};
+};*/
 //f v1/vt1/vn1 v2/vt2/vn2 v3/vt3/vn3 ...
