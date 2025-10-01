@@ -188,7 +188,9 @@ class Wavefront {
                             for (int v = 0; v < 3; v++) {
                                 newVertices.push_back(vertex[corners[c].vertex*3+v]);
                                 newNormals.push_back(normals[corners[c].normal*3+v]);
-                                newColors.push_back(vertexColor[corners[c].vertex*3+v]);
+                            }
+                            for (int v = 0; v < 4; v++) {
+                                newColors.push_back(vertexColor[corners[c].vertex*4+v]);
                             }
                             for (int u = 0; u < 2; u++) {
                                 newUVs.push_back(uv[corners[c].uv*2+u]);
@@ -861,8 +863,7 @@ bool LeerOBJ(std::ifstream& file,
 			Wobj.vertexColor.push_back(saturar(r));
 			Wobj.vertexColor.push_back(saturar(g));
 			Wobj.vertexColor.push_back(saturar(b));
-			// si usabas alpha en Symbian, podés agregarlo aquí
-			// Wobj.vertexColor.push_back(saturar(a));
+			Wobj.vertexColor.push_back(saturar(a));
 
 			acumuladoVerticesProximo++;
 

@@ -8,6 +8,7 @@
 #include <cfloat>
 #include <map>
 #include <algorithm>
+#include <cstring>
 
 #include <filesystem>
 #include <vector>
@@ -16,6 +17,7 @@
 #include <sstream>
 #include <iostream>
 #include <iomanip>
+
 
 //mallas 3d
 #include "../Shared/tablero.h"

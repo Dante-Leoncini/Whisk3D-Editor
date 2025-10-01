@@ -16,3 +16,12 @@ class Material {
 };
 
 std::vector<Material> Materials;
+
+int DuplicateMaterial(int srcId) {
+    if (srcId < 0 || srcId >= (int)Materials.size()) return -1;
+
+    Material copy = Materials[srcId]; // copia completa
+    Materials.push_back(copy);
+
+    return (int)Materials.size() - 1; // devuelve el índice del duplicado
+}

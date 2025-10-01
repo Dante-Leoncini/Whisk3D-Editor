@@ -447,7 +447,6 @@ void SetViewpoint(int opcion){
 			break;
 	}
 	redibujar = true;
-	std::cout << "rotX: " << rotX << " | rotY: " << rotY << std::endl;
 }
 
 void SetTransformPivotPoint(){
@@ -624,6 +623,25 @@ void guardarEstado(){
 	SetTransformPivotPoint();
 };
 
+void BorrarAnimaciones(int indice){
+	for(size_t a = 0; a < AnimationObjects.size(); a++) {
+		if (AnimationObjects[a].Id == indice) {	
+			for(size_t p = 0; p < AnimationObjects[a].Propertys.size(); p++) {
+				AnimationObjects[a].Propertys[p].keyframes.clear();
+			}				
+			AnimationObjects[a].Propertys.clear();
+			//AnimationObjects.Remove(a);
+			if (a >= 0 && a < AnimationObjects.size()) {
+				AnimationObjects.erase(AnimationObjects.begin() + a);
+			}
+		}
+		// Hace falta cambiar los indices
+		else if (AnimationObjects[a].Id > indice) {
+			AnimationObjects[a].Id--;
+		}			
+	}
+}
+
 void BorrarMesh(int indice){
 	int links = 0;
 	
@@ -647,41 +665,50 @@ void BorrarMesh(int indice){
 	}
 }
 
-void BorrarAnimaciones(int indice){
-	for(size_t a = 0; a < AnimationObjects.size(); a++) {
-		if (AnimationObjects[a].Id == indice) {	
-			for(size_t p = 0; p < AnimationObjects[a].Propertys.size(); p++) {
-				AnimationObjects[a].Propertys[p].keyframes.clear();
-			}				
-			AnimationObjects[a].Propertys.clear();
-			//AnimationObjects.Remove(a);
-			if (a >= 0 && a < AnimationObjects.size()) {
-				AnimationObjects.erase(AnimationObjects.begin() + a);
-			}
-		}
-		// Hace falta cambiar los indices
-		else if (AnimationObjects[a].Id > indice) {
-			AnimationObjects[a].Id--;
-		}			
-	}
-}
-
 void BorrarObjeto(int indice){
 	Object& obj = Objects[indice];
-	// Liberar memoria de los punteros del objeto seleccionado
+
 	if (obj.type == mesh){
-		BorrarMesh(obj.Id);
-		std::cout << "era un mesh" << std::endl;
+		//primero miramos si alguien mas esta usando esta malla 3d.
+		//es posible compartir una malla 3d entre distintos objetos
+		bool MeshEnUso = false;
+		
+		for(size_t o=0; o < Objects.size(); o++){
+			//si el objeto esta seleccionado. significa que se va a borrar, por lo tanto no se cuenta
+			if (Objects[o].type == mesh && Objects[o].Id == indice && Objects[o].seleccionado){
+				MeshEnUso = true;
+				break;
+			};				
+		}
+
+		//si la malla 3d esta en uso por otro objeto que no va a ser borrado. no se puede borrar
+		if (!MeshEnUso){
+			std::cout << "El Objeto tenia una malla 3D que solo el usaba. asi que se va a borrar" << std::endl;	
+			Meshes[obj.Id].LiberarMemoria();
+
+			// borrar el elemento en posición `indice`
+			if (indice >= 0 && static_cast<size_t>(obj.Id) < Meshes.size()) {
+				Meshes.erase(Meshes.begin() + obj.Id);
+			}
+
+			//al eliminarse la malla 3d. hay que restarle 1 al ID de todos los objetos para que apunten bien a la memoria de su malla 3d
+			for(size_t o=0; o < Objects.size(); o++){
+				if (Objects[o].type == mesh && Objects[o].Id > obj.Id){
+					Objects[o].Id--;
+				};				
+			}
+		}
+		else {
+			std::cout << "La Malla 3d esta siendo usada en otros objetos. por lo que no se va a borrar" << std::endl;
+		}
 	}
 
 	//si existe animaciones para ese objeto. las borra		
 	BorrarAnimaciones(indice);
-	std::cout << "borrar animaciones" << std::endl;
 
 	// Borrar de la coleccion
-	for (int c = static_cast<int>(Collection.size()) - 1; c >= 0; c--) {
+	for (int c = (int)(Collection.size()) - 1; c >= 0; c--) {
 		if (Collection[c] == indice) {
-			//Collection.Remove(c);
 			// borrar el elemento en posición `indice`
 			if (c >= 0 && static_cast<size_t>(c) < Collection.size()) {
 				Collection.erase(Collection.begin() + c);
@@ -704,28 +731,17 @@ void BorrarObjeto(int indice){
 	}
 
 	//Objects.Remove(indice);
-	if (indice >= 0 && static_cast<size_t>(indice) < Objects.size()) {
+	if (indice >= 0 && indice < (int)(Objects.size())) {
 		Objects.erase(Objects.begin() + indice);
 	}
 
 	SelectCount--;
-	SelectActivo = 0;
-	/*if (Objects.Count() > 0){
-		SelectCount = 1;
-		SelectActivo = Objects.Count()-1;
-		Objects[SelectActivo].seleccionado = true;
-	}
-	else {
-		SelectCount = 0;
-		SelectActivo = 0;
-	}*/
+	SelectActivo = -1;
 	
 	// Actualizar indices en los objetos
-	std::cout << "ya casi" << std::endl;
-	for (int o = 0; o < static_cast<int>(Objects.size()); o++) {
-		for (int c = static_cast<int>(Objects[o].Childrens.size()) - 1; c >= 0; c--) {
+	for (int o = 0; o < (int)(Objects.size()); o++) {
+		for (int c = (int)(Objects[o].Childrens.size()) - 1; c >= 0; c--) {
 			if (Objects[o].Childrens[c].Id == indice) {
-				//Objects[o].Childrens.Remove(c);
 				if (c >= 0 && static_cast<size_t>(c) < Objects.size()) {
 					Objects.erase(Objects.begin() + c);
 				}
@@ -737,7 +753,6 @@ void BorrarObjeto(int indice){
 		//borra y actualiza los padres
 		if (Objects[o].Parent == indice){				
 			Objects[o].Parent = -1;
-			//Collection.Append(o);
 			Collection.push_back(o);
 		} 
 		else if (Objects[o].Parent > indice) {
@@ -761,7 +776,11 @@ void Borrar(){
 				break;	
 			}		
 		}
-		if (!algoSeleccionado){return;}
+		if (!algoSeleccionado){
+			std::cout << "nada seleccionado para borrar" << std::endl;
+			return;
+		}
+		
 		//pregunta de confirmacion
 		//HBufC* noteBuf = HBufC::NewLC(100);
 		//_LIT(KStaticErrorMessage, "Delete?");
@@ -775,8 +794,9 @@ void Borrar(){
 
 		//libera la memoria de los punteros primero	
 		// Obtener el objeto seleccionado			
-		for (size_t o = Objects.size() - 1; o >= 0; o--) {
+		for (int o = (int)Objects.size() - 1; o >= 0; o--) {
 			if (Objects[o].seleccionado){
+				std::cout << "El objeto " << (o + 1) << " esta seleccionado y se va a borrar" << std::endl;
 				BorrarObjeto(o);
 			}			
 		}

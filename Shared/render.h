@@ -327,7 +327,8 @@ void Render(){
 		//for (int o = 0; o < Collection.Count(); o++) {
 		for (size_t o = 0; o < Collection.size(); o++) {
 			Object& obj = Objects[Collection[o]];
-			RenderMeshAndChildren(obj, Collection[o]);
+			//RenderMeshAndChildren(obj, Collection[o]);
+			RenderMeshAndChildren(obj);
 		}
 	}
 
