@@ -13,7 +13,8 @@ bool SimularZBuffer = false;
 int view = MaterialPreview;
 bool redibujar = true; //solo redibuja si este valor esta en true
 
-GLfloat objAmbient[4]  = { 0.3, 0.3, 0.3, 1.0 };
+GLfloat objAmbient[4]  = { 0.6, 0.6, 0.6, 1.0 };
+//GLfloat objAmbient[4]  = { 0.0, 0.0, 0.0, 1.0 };
 
 std::vector<Light> Lights;
 std::vector<int> Collection;
@@ -22,7 +23,8 @@ inline float FIXED_TO_FLOAT(GLfixed x) {
     return static_cast<float>(x) / 65536.0f; // porque Q16.16
 }
 
-void RenderMesh( Object& obj, int indice ){
+void RenderMesh( Object& obj ){
+//void RenderMesh( Object& obj, int indice ){
 	Mesh& pMesh = Meshes[obj.Id];	
 	glPushMatrix();
 	//averiguar diferencia entre glScalex y glScalef
@@ -39,7 +41,7 @@ void RenderMesh( Object& obj, int indice ){
 	glMaterialfv(   GL_FRONT_AND_BACK, GL_AMBIENT,  objAmbient  );
 	//averiguar diferencia entre glMaterialx y glMateriali
 	//glMaterialx( GL_FRONT_AND_BACK, GL_SHININESS,   12 << 16     );
-	glMateriali( GL_FRONT_AND_BACK, GL_SHININESS,   1     );
+	glMateriali( GL_FRONT_AND_BACK, GL_SHININESS,   12     );
 	glMaterialfv(   GL_FRONT_AND_BACK, GL_EMISSION, ListaColores[negro] );
 
 	// Set array pointers from mesh.
@@ -221,7 +223,8 @@ void RenderMesh( Object& obj, int indice ){
 }
 
 // Funcion recursiva para renderizar un objeto y sus hijos
-void RenderMeshAndChildren(Object& obj, int indice){
+void RenderMeshAndChildren(Object& obj){
+//void RenderMeshAndChildren(Object& obj, int indice){
     // Guardar la matriz actual
     glPushMatrix();
     
@@ -233,14 +236,16 @@ void RenderMeshAndChildren(Object& obj, int indice){
 
     // Si es visible y es un mesh, lo dibuja
     if (obj.visible && obj.type == mesh) {
-        RenderMesh(obj, indice); // Ajusta el segundo parametro si es necesario
+        RenderMesh(obj);
+        //RenderMesh(obj, indice); // Ajusta el segundo parametro si es necesario
     }
     
     // Procesar cada hijo
     //for (int c = 0; c < obj.Childrens.Count(); c++) {
     for (size_t c = 0; c < obj.Childrens.size(); c++) {
         Object& objChild = Objects[obj.Childrens[c].Id];
-        RenderMeshAndChildren(objChild, indice);
+        //RenderMeshAndChildren(objChild, indice);
+        RenderMeshAndChildren(objChild);
     }
 
     // Restaurar la matriz previa

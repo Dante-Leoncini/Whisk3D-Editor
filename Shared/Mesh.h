@@ -46,3 +46,52 @@ class Mesh {
 };
 
 std::vector<Mesh> Meshes;
+
+int DuplicateMesh(int meshIndex) {
+    if (meshIndex < 0 || meshIndex >= (int)Meshes.size()) {
+        std::cerr << "DuplicateMesh: índice inválido\n";
+        return -1;
+    }
+
+    Mesh& src = Meshes[meshIndex];
+    Mesh copy;
+
+    // Copiar tamaños
+    copy.vertexSize = src.vertexSize;
+    copy.facesSize = src.facesSize;
+
+    // Copiar arrays dinámicos
+    if (src.vertex && src.vertexSize > 0) {
+        copy.vertex = new GLshort[src.vertexSize * 3];
+        std::memcpy(copy.vertex, src.vertex, sizeof(GLshort) * src.vertexSize * 3);
+    }
+
+    if (src.vertexColor && src.vertexSize > 0) {
+        copy.vertexColor = new GLubyte[src.vertexSize * 3];
+        std::memcpy(copy.vertexColor, src.vertexColor, sizeof(GLubyte) * src.vertexSize * 3);
+    }
+
+    if (src.normals && src.vertexSize > 0) {
+        copy.normals = new GLbyte[src.vertexSize * 3];
+        std::memcpy(copy.normals, src.normals, sizeof(GLbyte) * src.vertexSize * 3);
+    }
+
+    if (src.uv && src.vertexSize > 0) {
+        copy.uv = new GLfloat[src.vertexSize * 2];
+        std::memcpy(copy.uv, src.uv, sizeof(GLfloat) * src.vertexSize * 2);
+    }
+
+    if (src.faces && src.facesSize > 0) {
+        copy.faces = new GLushort[src.facesSize * 3];
+        std::memcpy(copy.faces, src.faces, sizeof(GLushort) * src.facesSize * 3);
+    }
+
+    // Copiar std::vectors
+    copy.vertexGroups = src.vertexGroups;
+    copy.materialsGroup = src.materialsGroup;
+    copy.Modifiers = src.Modifiers;
+
+    // Insertar en Meshes y devolver índice
+    Meshes.push_back(std::move(copy));
+    return (int)Meshes.size() - 1;
+}
