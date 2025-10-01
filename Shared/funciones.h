@@ -485,6 +485,7 @@ void EnfocarObject(){
 	//si no hay objetos
 	//if (Objects.Count() < 1){return;}
 	if (Objects.size() < 1){return;}
+
 	SetTransformPivotPoint();	
 	PivotX = 0.0f; 
 	PivotY = 0.0f;
@@ -505,6 +506,10 @@ void changeSelect(){
 		}
 		//DeseleccionarTodo();
 		//deselecciona el objeto actual si es que estaba seleccionado
+		if (SelectActivo < 1 && (int)(Objects.size() > 0)){
+			SelectCount = 1;
+			SelectActivo = 0;
+		}
 		if (Objects[SelectActivo].seleccionado){
 			Objects[SelectActivo].seleccionado = false;
 			SelectCount--;
@@ -512,7 +517,7 @@ void changeSelect(){
 
 		//pasa al siguiente
 		SelectActivo++;
-		if (static_cast<size_t>(SelectActivo) >= Objects.size()){
+		if (SelectActivo >= (int)(Objects.size()) ){
 			SelectActivo = 0;
 		}
 		//selecciona el proximo objeto
