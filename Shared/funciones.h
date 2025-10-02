@@ -566,15 +566,15 @@ void BorrarObjeto(int indice){
 		
 		for(size_t o=0; o < Objects.size(); o++){
 			//si el objeto esta seleccionado. significa que se va a borrar, por lo tanto no se cuenta
-			if (Objects[o].type == mesh && Objects[o].Id == indice && Objects[o].seleccionado){
+			if (Objects[o].type == mesh && Objects[o].Id == indice && !Objects[o].seleccionado){
 				MeshEnUso = true;
 				break;
 			};				
 		}
 
 		//si la malla 3d esta en uso por otro objeto que no va a ser borrado. no se puede borrar
-		if (!MeshEnUso){
-			std::cout << "El Objeto tenia una malla 3D que solo el usaba. asi que se va a borrar" << std::endl;	
+		if (MeshEnUso){
+			std::cout << "Malla 3D unica. SI se borra" << std::endl;	
 			Meshes[obj.Id].LiberarMemoria();
 
 			// borrar el elemento en posición `indice`
@@ -590,7 +590,7 @@ void BorrarObjeto(int indice){
 			}
 		}
 		else {
-			std::cout << "La Malla 3d esta siendo usada en otros objetos. por lo que no se va a borrar" << std::endl;
+			std::cout << "Malla 3d en uso. NO se borra" << std::endl;
 		}
 	}
 
