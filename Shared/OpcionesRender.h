@@ -1,3 +1,6 @@
+bool redibujar = true; //solo redibuja si este valor esta en true
+std::vector<int> Collection;
+
 #include "./Textures.h"
 #include "./Materials.h"
 #include "./Mesh.h"
@@ -11,13 +14,11 @@ enum { Solid, MaterialPreview, Rendered };
 
 bool SimularZBuffer = false;
 int view = MaterialPreview;
-bool redibujar = true; //solo redibuja si este valor esta en true
 
-GLfloat objAmbient[4]  = { 0.6, 0.6, 0.6, 1.0 };
+GLfloat objAmbient[4]  = { 0.3, 0.3, 0.3, 1.0 };
 //GLfloat objAmbient[4]  = { 0.0, 0.0, 0.0, 1.0 };
 
 std::vector<Light> Lights;
-std::vector<int> Collection;
 
 inline float FIXED_TO_FLOAT(GLfixed x) {
     return static_cast<float>(x) / 65536.0f; // porque Q16.16

@@ -19,7 +19,7 @@
 #include <iomanip>
 
 
-//mallas 3d
+//Whisk3D imports
 #include "../Shared/tablero.h"
 #include "../Shared/Floor.h"
 #include "../Shared/GeometriaUI.h"
@@ -105,9 +105,12 @@ int main(int argc, char* argv[]) {
 	running = true;
 
     while (running) {
+        Contadores();
         while (SDL_PollEvent(&e)) {
             if (e.type == SDL_QUIT){running = false;}
-			else {InputUsuarioSDL(e);}			
+			else {
+                InputUsuarioSDL(e);
+            }			
         }
 
 		// Renderizar si hay cambios

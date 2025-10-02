@@ -1,3 +1,6 @@
+bool LAltPressed = false;
+bool LShiftPressed = false;
+
 void Aceptar(){	
 	//si no hay objetos
 	if (Objects.size() < 1){return;}
@@ -16,8 +19,12 @@ void ClickA(){
 }
 
 void ClickD(){
-    posX-= 1.0;  
-	redibujar = true;  
+	if (LAltPressed){
+		DuplicatedLinked();
+	}
+	else if (LShiftPressed){
+		DuplicatedObject();
+	}
 }
 
 void ClickE(){
@@ -278,6 +285,12 @@ void CheckWarpMouseInWindow(int mx, int my){
 	//GuardarMousePos();
 }
 
+void Contadores(){
+	if (LShiftPressed){
+		ShiftCount++;
+	}
+}
+
 void InputUsuarioSDL(SDL_Event &e){
 	//rueda del mouse	
     if (e.type == SDL_MOUSEWHEEL) {
@@ -332,7 +345,7 @@ void InputUsuarioSDL(SDL_Event &e){
 				PivotZ -= dy * factor * cosY;
 				PivotX += dx * factor * cosX - dy * factor * sinY * sinX;
 				PivotY += dx * factor * sinX + dy * factor * sinY * cosX;
-				PodesCambiarElMalditoObjetoSeleccionado = false;
+				LShiftPressed = false;
 			} 
 			else {
 				// 🚀 ROTAR cámara
@@ -360,7 +373,10 @@ void InputUsuarioSDL(SDL_Event &e){
             // Primera vez que se presiona la tecla
             switch (e.key.keysym.sym) {
 				case SDLK_LSHIFT:
-					PodesCambiarElMalditoObjetoSeleccionado = true;
+					LShiftPressed = true;
+					break;
+				case SDLK_LALT:
+					LAltPressed = true;
 					break;
                 case SDLK_RETURN:  // Enter
                     Aceptar();
@@ -380,7 +396,7 @@ void InputUsuarioSDL(SDL_Event &e){
                 case SDLK_a:  
                     ClickA();
                     break;
-                case SDLK_d:   
+                case SDLK_d:
                     ClickD();
                     break;
                 case SDLK_x:   
@@ -448,8 +464,6 @@ void InputUsuarioSDL(SDL_Event &e){
     		SDL_Keycode key = e.key.keysym.sym;
             switch (key) {
                 case SDLK_RETURN:  // Enter
-					ShiftCount++;
-					std::cout << "ShiftCount: " << ShiftCount << std::endl;
                     Aceptar();
                     break;
                 case SDLK_RIGHT:   // Flecha derecha
@@ -466,9 +480,6 @@ void InputUsuarioSDL(SDL_Event &e){
                     break;
                 case SDLK_a:   // Flecha derecha
                     ClickA();
-                    break;
-                case SDLK_d:    // Flecha izquierda
-                    ClickD();
                     break;
                 case SDLK_e:   // Flecha derecha
                     ClickE();
@@ -498,9 +509,14 @@ void InputUsuarioSDL(SDL_Event &e){
 	else if (e.type == SDL_KEYUP) {
 		switch (e.key.keysym.sym) {
 			case SDLK_LSHIFT:
-				if (PodesCambiarElMalditoObjetoSeleccionado){
+				if (ShiftCount < 20){
 					changeSelect();
 				}
+				ShiftCount = 0;
+				LShiftPressed = false;
+				break;
+			case SDLK_LALT:
+				LAltPressed = false;
 				break;
 		}
 	}

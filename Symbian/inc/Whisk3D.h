@@ -144,7 +144,6 @@ class CWhisk3D : public CFiniteStateMachine, public MTextureLoadingListener
         void CalculateMillisecondsPerFrame(TInt aFPS);
         
         void dibujarUI();
-        void guardarEstado();
         void ReestablecerEstado();
         void SeleccionarTodo();
         void SetEje( TInt eje );     
@@ -154,8 +153,6 @@ class CWhisk3D : public CFiniteStateMachine, public MTextureLoadingListener
         void AddObject( TInt tipo );
         void SetTexture(); //int textureID 
         void SetMaterial();
-        void DuplicatedObject();
-        void DuplicatedLinked();
         void ActivarTextura();
         void SetInterpolation();
         void SetTransparencia();

@@ -29,53 +29,6 @@ void DeseleccionarTodo(){
 	}
 }
 
-void ReloadViewport(bool hacerRedibujo){
-	//Recalcula los constrains
-    //for(TInt c = 0; c < Constraints.Count(); c++) {
-    for(size_t c = 0; c < Constraints.size(); c++) {
-		int id = Constraints[c].Id;
-		int Target = Constraints[c].Target;
-		switch (Constraints[c].type) {
-			case trackto: {
-				// Calcular vector dirección
-				GLfloat dirX = Objects[Target].posX - Objects[id].posX;
-				GLfloat dirY = Objects[Target].posY - Objects[id].posY;
-				GLfloat dirZ = Objects[Target].posZ - Objects[id].posZ;						
-				
-				Objects[id].rotZ = atan2(dirX, dirY) * (180.0 / M_PI);  // Azimut
-
-				// Calcular longitud del vector (magnitud)
-				GLfloat length = sqrt(dirX * dirX + dirY * dirY + dirZ * dirZ);
-
-				// Cálculo de la elevación (rotY)
-				if (Constraints[c].opcion){	
-					Objects[id].rotZ += 180; // Para invertir el eje si necesario.
-					Objects[id].rotX = asin(dirZ/length) * (180.0 / M_PI);					
-				}
-				else {
-					Objects[id].rotZ -= 90; // Para invertir el eje si necesario.
-					Objects[id].rotY = asin(dirZ/length) * (180.0 / M_PI);	
-				}
-
-				break;
-			}
-			case copyrotation:
-				Objects[id].rotX = Objects[Target].rotX;
-				Objects[id].rotY = Objects[Target].rotY;
-				Objects[id].rotZ = Objects[Target].rotZ;
-				break;
-			case copylocation:
-				Objects[id].posX = Objects[Target].posX;
-				Objects[id].posY = Objects[Target].posY;
-				Objects[id].posZ = Objects[Target].posZ;
-				break;
-		}
-	}
-	if (hacerRedibujo){
-    	redibujar = true;
-	}
-}
-
 void ReestablecerEstado(){
 	if (InteractionMode == ObjectMode){
 		//for(int o=0; o < estadoObjetos.Count(); o++){
@@ -449,38 +402,6 @@ void SetViewpoint(int opcion){
 	redibujar = true;
 }
 
-void SetTransformPivotPoint(){
-	//if (Objects.Count() < 1){return;}	
-	if (Objects.size() < 1){return;}	
-	if (InteractionMode == ObjectMode){	
-		TransformPivotPointFloat[0] = 0;
-		TransformPivotPointFloat[1] = 0;
-		TransformPivotPointFloat[2] = 0;
-		//for(TInt i=0; i < Objects.Count(); i++){	
-		for(size_t i=0; i < Objects.size(); i++){	
-			Object& obj = Objects[i];	
-			if (obj.seleccionado){
-				TransformPivotPointFloat[0] += obj.posX;
-				TransformPivotPointFloat[1] += obj.posY;
-				TransformPivotPointFloat[2] += obj.posZ;	
-			};
-
-			//esto va a dar errores si el padre y el hijo estan seleccionados
-			/*TInt ParentID = obj.Parent;
-			while (ParentID  > -1) {		
-				Object& parentObj = Objects[ParentID];
-				TransformPivotPointFloat[0] += parentObj.posX;
-				TransformPivotPointFloat[1] += parentObj.posY;
-				TransformPivotPointFloat[2] += parentObj.posZ;	
-				ParentID = parentObj.Parent;		
-			}*/
-		}
-		TransformPivotPointFloat[0] = TransformPivotPointFloat[0]/SelectCount;
-		TransformPivotPointFloat[1] = TransformPivotPointFloat[1]/SelectCount;
-		TransformPivotPointFloat[2] = TransformPivotPointFloat[2]/SelectCount;
-	}
-}
-
 void EnfocarObject(){
 	//si no hay objetos
 	//if (Objects.Count() < 1){return;}
@@ -592,41 +513,6 @@ void SetCursor3D(){// 1) Calcular base de la cámara (forward/right/up)
     Cursor3DposY = cursorPos.y;
     Cursor3DposZ = cursorPos.z;
 }
-
-// Función para guardar la posición actual del mouse
-void GuardarMousePos() {
-    SDL_GetMouseState(&lastMouseX, &lastMouseY);
-	/*std::cout << "Mouse guardado en: X=" << lastMouseX 
-              << " Y=" << lastMouseY << std::endl;*/
-}
-
-void guardarEstado(){
-	GuardarMousePos();
-	//estadoObjetos.Close();
-	estadoObjetos.clear();
-	//estadoObjetos.ReserveL(SelectCount);
-	estadoObjetos.reserve(SelectCount);
-	//for(int o=0; o < Objects.Count(); o++){
-	for(size_t o=0; o < Objects.size(); o++){
-		Object& obj = Objects[o];
-		if (obj.seleccionado){
-			SaveState NuevoEstado;
-			NuevoEstado.indice = o;
-			NuevoEstado.posX = obj.posX;
-			NuevoEstado.posY = obj.posY;
-			NuevoEstado.posZ = obj.posZ;
-			NuevoEstado.rotX = obj.rotX;
-			NuevoEstado.rotY = obj.rotY;
-			NuevoEstado.rotZ = obj.rotZ;
-			NuevoEstado.scaleX = obj.scaleX;
-			NuevoEstado.scaleY = obj.scaleY;
-			NuevoEstado.scaleZ = obj.scaleZ;
-			//estadoObjetos.Append(NuevoEstado);
-			estadoObjetos.push_back(NuevoEstado);
-		}
-	}	
-	SetTransformPivotPoint();
-};
 
 void BorrarAnimaciones(int indice){
 	for(size_t a = 0; a < AnimationObjects.size(); a++) {
@@ -965,22 +851,3 @@ void SetTranslacionObjetos(int dx, int dy, float factor = 1.0f){
 		}
 	}
 }
-
-void SetPosicion(){
-	//si no hay objetos
-	if (Objects.size() < 1){return;}
-
-	if (InteractionMode == ObjectMode && Objects[SelectActivo].seleccionado && estado == editNavegacion){
-		guardarEstado();
-		estado = translacion;
-		//if (axisSelect > 2){axisSelect = X;}
-		axisSelect = ViewAxis;
-	}
-	/*else {
-		axisSelect = X;
-	}*/
-	/*if (estado == rotacion){
-		SetRotacion(0);
-	}*/
-    ReloadViewport(true);	
-};

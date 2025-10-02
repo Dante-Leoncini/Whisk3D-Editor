@@ -75,7 +75,6 @@ int nextLightId = GL_LIGHT1;
 
 float angle = 55.0f;
 bool ViewFromCameraActive = false;
-bool PodesCambiarElMalditoObjetoSeleccionado = false;
         
 int estado;
 int InteractionMode;
