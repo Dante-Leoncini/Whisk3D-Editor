@@ -62,14 +62,6 @@ class Children {
 		GLfixed OriginalScaleZ = 0;	
 };
 
-class Constraint { 
-	public:
-		int type = 0;
-		int Id = -1;
-		int Target = -1;
-		bool opcion = false;
-};
-
 class SaveState {
 	public:
 		int indice = -1;

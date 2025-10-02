@@ -13,8 +13,6 @@ enum{
 	ObjectMode
 };
 
-enum { trackto, copyrotation, copylocation };
-
 enum { pointLight, sunLight };
 
 enum {
@@ -135,8 +133,6 @@ int valorRotacion = 0;
 //listados
 //RArray<SaveState> estadoObjetos;
 std::vector<SaveState> estadoObjetos;
-//RArray<Constraint> Constraints;
-std::vector<Constraint> Constraints;
 //RArray<AnimationObject> AnimationObjects;
 std::vector<AnimationObject> AnimationObjects;
 //RArray<ShapeKeyAnimation> ShapeKeyAnimations;

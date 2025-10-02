@@ -4,6 +4,7 @@ std::vector<int> Collection;
 #include "./Textures.h"
 #include "./Materials.h"
 #include "./Mesh.h"
+#include "./Constrains.h"
 #include "./Objects.h"
 #include "./Modifiers.h"
 

@@ -31,6 +31,12 @@
 #include "../Shared/colores.h"
 #include "../Shared/OpcionesRender.h"
 
+//estas son importaciones especificas para Whisk 3D
+//Incluyen los modos objeto, edicion, animacion, escultura, etc.
+//no van a ser cosas que otros proyectos necesiten (o si)
+#include "../Shared/ObjectMode.h"
+
+//Hice un importador OBJ. pero se podrian crear importadores de otros formatos
 #include "../Shared/import_obj.h"
 #include "../Shared/lectura-escritura.h"
 
