@@ -1,60 +1,68 @@
 bool running = false;
 
-//un constructor universal para todas las plataformas
-void ConstructUniversal(){
-	//la parte de openGL es igual en OpenGL ES 1.1 y el OpenGl de PC
-    // Configuración básica de OpenGL
-    glEnable(GL_DEPTH_TEST); // Habilitar z-buffer
-	glEnable(GL_NORMALIZE);
-	glShadeModel(GL_SMOOTH);
-	glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_FASTEST);
-    glEnableClientState(GL_VERTEX_ARRAY);
-    glEnableClientState(GL_NORMAL_ARRAY);
+// Configuración dependiente del tamaño de ventana
+void OnResize(int w, int h) {
+    if (h == 0) h = 1; // evitar división por cero
 
-    // Cámara y transformaciones
+    winW = w;
+    winH = h;
+
+    aspect = (float)w / (float)h;
+
+    // Viewport
+    glViewport(0, 0, w, h);
+
+    // Proyección
     glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
     gluPerspective(fovDeg, aspect, nearClip, 20000.0);
+
+    // Volvemos al modelo
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
     gluLookAt(0, 0, 8000,   // ojo
-        0, 0, 0,      // centro
-        0, 1, 0);     // up
+              0, 0, 0,      // centro
+              0, 1, 0);     // up
+}
 
-	//iluminacion
+//un constructor universal para todas las plataformas
+void ConstructUniversal(){
+    // Configuración básica de OpenGL
+    glEnable(GL_DEPTH_TEST); // Habilitar z-buffer
+    glEnable(GL_NORMALIZE);
+    glShadeModel(GL_SMOOTH);
+    glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_FASTEST);
+    glEnableClientState(GL_VERTEX_ARRAY);
+    glEnableClientState(GL_NORMAL_ARRAY);
+
+    // Inicializar la proyección al tamaño inicial de la ventana
+    OnResize(winW, winH);
+
+    // iluminación
     glEnable(GL_LIGHTING);
-    glEnable( GL_LIGHT0 );
+    glEnable(GL_LIGHT0);
 
-    //glLightfv(GL_LIGHT0, GL_POSITION, light_pos);
-    //glLightfv(GL_LIGHT0, GL_DIFFUSE, light_diffuse);
-    //glLightfv(GL_LIGHT0, GL_SPECULAR, light_specular);
+    glLightfv(GL_LIGHT0, GL_DIFFUSE,  lightDiffuseLamp);
+    glLightfv(GL_LIGHT0, GL_AMBIENT,  objAmbient);
+    glLightfv(GL_LIGHT0, GL_SPECULAR, lightSpecularLamp);
+    glLightfv(GL_LIGHT0, GL_POSITION, sunLightPosition);
 
-    glLightfv(  GL_LIGHT0, GL_DIFFUSE,  lightDiffuseLamp  );
-    glLightfv(  GL_LIGHT0, GL_AMBIENT,  objAmbient  );
-    glLightfv(  GL_LIGHT0, GL_SPECULAR, lightSpecularLamp  );
-    glLightfv(  GL_LIGHT0, GL_POSITION, sunLightPosition );
+    // Siempre un material por defecto
+    NewMaterial(false);
 
-    // Habilitar la normalizaci�n de las normales
-    glEnable(GL_NORMALIZE);	
+    // Cámara y objetos iniciales
+    AddObject(camera);
+    Objects[0].posX = -800 * 6.8;
+    Objects[0].posY = -800 * 7.29;
+    Objects[0].posZ = 800 * 4.91;
+    Objects[0].rotZ = -45.0;
+    Objects[0].rotY = -26.15;
+    Objects[0].scaleX = Objects[0].scaleY = Objects[0].scaleZ = 40000;
 
-	//tiene que haber un material por defecto siempre
-	NewMaterial(false);
-	
-	AddObject(camera);
-	Objects[0].posX = -800*6.8;
-	Objects[0].posY = -800*7.29;
-	Objects[0].posZ = 800*4.91;
-	Objects[0].rotZ = -45.0;
-	Objects[0].rotY = -26.15;
-	Objects[0].scaleX = Objects[0].scaleY = Objects[0].scaleZ = 40000;
+    AddObject(light);
+    Objects[1].posX = -3000;
+    Objects[1].posY = 1500;
+    Objects[1].posZ = 4500;
 
-	AddObject(light);
-	Objects[1].posX = -3000;
-	Objects[1].posY = 1500;
-	Objects[1].posZ = 4500;
-	//GLfloat positionLight[4] = {0, -10, 0, 0};
-    //GLfloat lightPositionSpot[4]  = {  0, -10, -1, 0 };
-	//glLightfv(  nextLightId-1, GL_POSITION, positionPuntualLight );
-	//glLightfv(  nextLightId, GL_POSITION, lightPositionSpot );
-	
-	AddMesh(cubo);
+    AddMesh(cubo);
 }

@@ -421,7 +421,6 @@ void changeSelect(){
 	if (InteractionMode == ObjectMode){
 		//si no hay objetos
 		//o si esta moviendo, rotando o haciendo algo... no deja que continue
-		//if (1 > Objects.Count() || estado != editNavegacion){
 		if (1 > Objects.size() || estado != editNavegacion){
 			return;
 		}

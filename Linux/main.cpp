@@ -39,6 +39,26 @@
 #include "../Shared/controles.h"
 #include "../Shared/render.h"
 
+void Minimize(SDL_Window* window) {
+    SDL_MinimizeWindow(window);
+}
+
+void Maximize(SDL_Window* window) {
+    SDL_MaximizeWindow(window);
+}
+
+void Restore(SDL_Window* window) {
+    SDL_RestoreWindow(window);
+}
+
+SDL_HitTestResult HitTestCallback(SDL_Window *win, const SDL_Point *area, void *data) {
+    // Si el mouse está en el "header" de 30px de alto
+    if (area->y < 30) {
+        return SDL_HITTEST_DRAGGABLE;
+    }
+    return SDL_HITTEST_NORMAL;
+}
+
 int main(int argc, char* argv[]) {
 	// Inicializar SDL
 	if (SDL_Init(SDL_INIT_VIDEO) < 0) {
@@ -52,15 +72,23 @@ int main(int argc, char* argv[]) {
 	SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 4); // 4x MSAA (puedes probar 8, 16 si tu GPU soporta)
 
 	// Crear ventana con OpenGL
-	window = SDL_CreateWindow("SDL2 OpenGL Cube",
+	window = SDL_CreateWindow("Whisk 3D",
 		SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
 		winW, winH,
-		SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN);
+		SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE //| SDL_WINDOW_BORDERLESS
+    );
 
 	if (!window) {
 		std::cerr << "Error SDL_CreateWindow: " << SDL_GetError() << std::endl;
 		return -1;
 	}
+
+    // Forzar a maximizar al arrancar
+    SDL_MaximizeWindow(window);
+    
+    /*if (SDL_SetWindowHitTest(window, HitTestCallback, nullptr) < 0) {
+        std::cerr << "Error SetWindowHitTest: " << SDL_GetError() << std::endl;
+    }*/
 
 	SDL_GLContext context = SDL_GL_CreateContext(window);
 
@@ -108,6 +136,13 @@ int main(int argc, char* argv[]) {
         Contadores();
         while (SDL_PollEvent(&e)) {
             if (e.type == SDL_QUIT){running = false;}
+            else if (e.type == SDL_WINDOWEVENT) {
+                if (e.window.event == SDL_WINDOWEVENT_RESIZED ||
+                    e.window.event == SDL_WINDOWEVENT_SIZE_CHANGED) 
+                {
+                    OnResize(e.window.data1, e.window.data2);
+                }
+            }
 			else {
                 InputUsuarioSDL(e);
             }			
