@@ -110,6 +110,11 @@ int main(int argc, char* argv[]) {
 	SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
 	SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 4); // 4x MSAA (puedes probar 8, 16 si tu GPU soporta)
 
+
+    // mover working dir al path donde está el ejecutable
+    std::filesystem::path exePath = std::filesystem::absolute(argv[0]).parent_path();
+    std::filesystem::current_path(exePath);
+
 	Config cfg = loadConfig("./config.ini");
 
 	// Crear ventana con OpenGL

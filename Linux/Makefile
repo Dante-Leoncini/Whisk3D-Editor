@@ -4,7 +4,6 @@ TARGET_WIN   = Whisk3D_Pre-alpha.exe
 
 SRC = main.cpp ../Shared/UI/tinyfiledialogs.c
 INCLUDES = -I../Shared
-#SRC_SHARED = ../Shared/ficha.h ../Shared/tablero.h
 
 # Compilador Linux
 CXX_LINUX = g++
@@ -20,10 +19,10 @@ LIBS_WIN = -lmingw32 -lSDL2main -lSDL2 -lSDL2_image -lopengl32 -lglu32
 
 all: linux
 
-linux: $(SRC) $(SRC_SHARED)
+linux: $(SRC)
 	$(CXX_LINUX) $(CXXFLAGS_LINUX) $(SRC) -o $(TARGET_LINUX) $(LIBS_LINUX)
 
-windows: $(SRC) $(SRC_SHARED)
+windows: $(SRC)
 	$(CXX_WIN) $(CXXFLAGS_WIN) $(SRC) -o $(TARGET_WIN) $(LIBS_WIN)
 
 clean:
