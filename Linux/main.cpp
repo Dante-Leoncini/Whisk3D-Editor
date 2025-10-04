@@ -45,6 +45,39 @@
 #include "../Shared/controles.h"
 #include "../Shared/render.h"
 
+struct Config {
+    bool fullscreen = false;
+    int width = 800;
+    int height = 600;
+	int displayIndex = 0; // monitor 1
+	std::string SkinName = "Whisk3D"; // monitor 1
+};
+Config cfg;
+
+// Función simple para leer el ini
+Config loadConfig(const std::string& filename) {
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "No se pudo abrir " << filename << ", usando valores por defecto.\n";
+        return cfg;
+    }
+
+    std::string line;
+    while (std::getline(file, line)) {
+        std::istringstream iss(line);
+        std::string key, eq, value;
+        if (iss >> key >> eq >> value && eq == "=") {
+            if (key == "fullscreen") cfg.fullscreen = (value == "true");
+            else if (key == "width") cfg.width = std::stoi(value);
+            else if (key == "height") cfg.height = std::stoi(value);
+            else if (key == "displayIndex") cfg.displayIndex = std::stoi(value);
+            else if (key == "SkinName") cfg.SkinName = value;
+        }
+    }
+
+    return cfg;
+}
+
 void Minimize(SDL_Window* window) {
     SDL_MinimizeWindow(window);
 }
@@ -77,6 +110,8 @@ int main(int argc, char* argv[]) {
 	SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
 	SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 4); // 4x MSAA (puedes probar 8, 16 si tu GPU soporta)
 
+	Config cfg = loadConfig("./config.ini");
+
 	// Crear ventana con OpenGL
 	window = SDL_CreateWindow("Whisk 3D",
 		SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
@@ -101,35 +136,33 @@ int main(int argc, char* argv[]) {
     //constructor symbian, linux y windows
     ConstructUniversal();
 
-	//ConvertirTexData(objTexdataDado, objTexdataDadoF, 248 * 2);
-
 	// Cargar texturas
 	Textures.push_back(Texture());
-    /*if (!LoadTexture("../Shared/tablero.jpg", Textures[0].iID)) {
-        std::cerr << "Error cargando tablero.jpg" << std::endl;
+    if (!LoadTexture(("../Shared/UI/Skins/" + cfg.SkinName + "/font.png").c_str(), Textures[0].iID)) {
+        std::cerr << "Error cargando font.png" << std::endl;
         return -1;
-    }*/
+    }	
     
 	Textures.push_back(Texture());
-    if (!LoadTexture("../Shared/origen.png", Textures[1].iID)) {
+    if (!LoadTexture(("../Shared/UI/Skins/"+cfg.SkinName+"/origen.png").c_str(), Textures[1].iID)) {
         std::cerr << "Error cargando origen.png" << std::endl;
         return -1;
     }
 
 	Textures.push_back(Texture());
-    if (!LoadTexture("../Shared/cursor3d.png", Textures[2].iID)) {
+    if (!LoadTexture(("../Shared/UI/Skins/"+cfg.SkinName+"/cursor3d.png").c_str(), Textures[2].iID)) {
         std::cerr << "Error cargando cursor3d.png" << std::endl;
         return -1;
     }
 
 	Textures.push_back(Texture());
-    if (!LoadTexture("../Shared/relationshipLine.png", Textures[3].iID)) {
+    if (!LoadTexture(("../Shared/UI/Skins/"+cfg.SkinName+"/relationshipLine.png").c_str(), Textures[3].iID)) {
         std::cerr << "Error cargando relationshipLine.png" << std::endl;
         return -1;
     }
 
 	Textures.push_back(Texture());
-    if (!LoadTexture("../Shared/lamp.png", Textures[4].iID)) {
+    if (!LoadTexture(("../Shared/UI/Skins/"+cfg.SkinName+"/lamp.png").c_str(), Textures[4].iID)) {
         std::cerr << "Error cargando lamp.png" << std::endl;
         return -1;
     }

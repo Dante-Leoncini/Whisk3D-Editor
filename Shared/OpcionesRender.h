@@ -7,6 +7,7 @@ std::vector<int> Collection;
 #include "./Constrains.h"
 #include "./Objects.h"
 #include "./Modifiers.h"
+#include "./UI/UI.h"
 
 //interpolacion
 enum {lineal, closest};
@@ -20,6 +21,21 @@ GLfloat objAmbient[4]  = { 0.3, 0.3, 0.3, 1.0 };
 //GLfloat objAmbient[4]  = { 0.0, 0.0, 0.0, 1.0 };
 
 std::vector<Light> Lights;
+
+void InitOpenGL(){
+    // Configuración básica de OpenGL
+    glEnable(GL_DEPTH_TEST); // Habilitar z-buffer
+    //glDisable(GL_CULL_FACE); // desactivar culling
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    gluPerspective(45.0, aspect, 10.0, 20000.0);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    // Cámara y transformaciones
+    glMatrixMode(GL_MODELVIEW);
+}
 
 inline float FIXED_TO_FLOAT(GLfixed x) {
     return static_cast<float>(x) / 65536.0f; // porque Q16.16

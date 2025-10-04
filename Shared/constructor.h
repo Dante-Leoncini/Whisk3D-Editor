@@ -28,12 +28,13 @@ void OnResize(int w, int h) {
 //un constructor universal para todas las plataformas
 void ConstructUniversal(){
     // Configuración básica de OpenGL
-    glEnable(GL_DEPTH_TEST); // Habilitar z-buffer
     glEnable(GL_NORMALIZE);
     glShadeModel(GL_SMOOTH);
     glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_FASTEST);
     glEnableClientState(GL_VERTEX_ARRAY);
     glEnableClientState(GL_NORMAL_ARRAY);
+
+	InitOpenGL();
 
     // Inicializar la proyección al tamaño inicial de la ventana
     OnResize(winW, winH);

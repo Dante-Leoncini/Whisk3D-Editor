@@ -507,7 +507,8 @@ void Render(){
 	}
 
 	if (ShowUi){
-		//dibujarUI();
+		DibujarUI();
+		InitOpenGL();
 	}
 
     //termino de dibujar
