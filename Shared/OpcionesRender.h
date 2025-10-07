@@ -1,6 +1,9 @@
 bool redibujar = true; //solo redibuja si este valor esta en true
 std::vector<int> Collection;
 
+//interpolacion
+enum {lineal, closest};
+
 #include "./Textures.h"
 #include "./Materials.h"
 #include "./Mesh.h"
@@ -8,9 +11,6 @@ std::vector<int> Collection;
 #include "./Objects.h"
 #include "./Modifiers.h"
 #include "./UI/UI.h"
-
-//interpolacion
-enum {lineal, closest};
 
 enum { Solid, MaterialPreview, Rendered };
 
@@ -50,9 +50,6 @@ void InitOpenGL(){
     //glDisable(GL_CULL_FACE); // desactivar culling
 
     SetPerspectiva(orthographic, redibujar);
-
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 }
 
 inline float FIXED_TO_FLOAT(GLfixed x) {

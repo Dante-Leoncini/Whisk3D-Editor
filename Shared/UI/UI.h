@@ -20,10 +20,6 @@ void DibujarUI() {
 	glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &texH);
 	std::cout << "Tex size in GPU: " << texW << "x" << texH << std::endl;*/
 
-	//esto se hace despues del bind de la textura. sino no le afecta
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
 

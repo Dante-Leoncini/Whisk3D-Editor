@@ -3,6 +3,7 @@
 class Text {
 	public:
 		int parent = -1;
+		int interpolacion = closest;
 		//colores RGB
 		GLfloat r = 1.0f;
 		GLfloat g = 1.0f;
@@ -109,6 +110,17 @@ class Text {
 
 		void Render() const {
 			glBindTexture(GL_TEXTURE_2D, Textures[0].iID);
+
+			//esto se hace despues del bind de la textura. sino no le afecta
+			if (interpolacion == closest){
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+			}
+			else {
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			}
+
 			for (const auto& ls : letters) {
 				ls.Render();
 			}
