@@ -94,7 +94,6 @@ GLfloat OriginalLeftX = 0;
 GLfloat OriginalLeftY = 0;
 
 //camara
-TBool ortografica = false;
 GLfloat aspectRatio;
 GLfloat OriginalRotX = 113.5;
 GLfloat OriginalRotY = 20.0;	
@@ -2219,24 +2218,6 @@ void CWhisk3D::SetDiffuse(){
 	
 	CleanupStack::PopAndDestroy(noteBuf);
     redibujar = true;
-}
-
-void CWhisk3D::SetPerspectiva(TBool redibuja ){
-	// Reinitialize viewport and projection.
-	//glViewport( 0, 0, iScreenWidth, iScreenHeight );
-	// Recalculate the view frustrum
-	glMatrixMode( GL_PROJECTION );
-	glLoadIdentity();
-    if ( ortografica ){
-    	glOrthof(-90.0f * aspectRatio, 90.0f * aspectRatio, -90.0f, 90.0f, -0.0f, 1000.0f);
-    }
-    else {
-		glFrustumf( FRUSTUM_LEFT * aspectRatio, FRUSTUM_RIGHT * aspectRatio,
-					FRUSTUM_BOTTOM, FRUSTUM_TOP,
-					FRUSTUM_NEAR, FRUSTUM_FAR );    	
-    }
-    glMatrixMode( GL_MODELVIEW );
-    redibujar = redibuja;
 }
 
 /*void CWhisk3D::CDialogs::Alert(){

@@ -67,7 +67,7 @@ int winH = 600;
 float fovDeg = 45.0f;
 float aspect = (float)winW / (float)winH;
 float nearClip = 10.0f;
-float FRUSTUM_FAR = 1000.f;     //far depth clipping plane
+float farClip = 2000.0f;
 
 int nextLightId = GL_LIGHT1;
 

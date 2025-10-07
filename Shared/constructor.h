@@ -13,16 +13,14 @@ void OnResize(int w, int h) {
     glViewport(0, 0, w, h);
 
     // Proyección
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    gluPerspective(fovDeg, aspect, nearClip, 20000.0);
+    SetPerspectiva(orthographic, true);
 
     // Volvemos al modelo
-    glMatrixMode(GL_MODELVIEW);
+    /*glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
     gluLookAt(0, 0, 8000,   // ojo
               0, 0, 0,      // centro
-              0, 1, 0);     // up
+              0, 1, 0);     // up*/
 }
 
 //un constructor universal para todas las plataformas

@@ -16,25 +16,43 @@ enum { Solid, MaterialPreview, Rendered };
 
 bool SimularZBuffer = false;
 int view = MaterialPreview;
+bool orthographic = false;
 
 GLfloat objAmbient[4]  = { 0.3, 0.3, 0.3, 1.0 };
 //GLfloat objAmbient[4]  = { 0.0, 0.0, 0.0, 1.0 };
 
 std::vector<Light> Lights;
 
+void SetPerspectiva(bool orthographicValue, bool redibuja ){
+	orthographic = orthographicValue;
+	glMatrixMode( GL_PROJECTION );
+	glLoadIdentity();
+    if ( orthographicValue ){
+        // Proyección ortográfica
+        float size = 90.0f;
+        glOrtho(-size * aspect, size * aspect,
+                -size, size,
+                -1.0f, 1000.0f);
+    }
+    else {
+        gluPerspective(fovDeg, aspect, nearClip, farClip);
+		/*glFrustumf( FRUSTUM_LEFT * aspect, FRUSTUM_RIGHT * aspect,
+					FRUSTUM_BOTTOM, FRUSTUM_TOP,
+					FRUSTUM_NEAR, farClip );  */  	
+    }
+    glMatrixMode( GL_MODELVIEW );
+    redibujar = redibuja;
+}
+
 void InitOpenGL(){
     // Configuración básica de OpenGL
     glEnable(GL_DEPTH_TEST); // Habilitar z-buffer
     //glDisable(GL_CULL_FACE); // desactivar culling
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    gluPerspective(45.0, aspect, 10.0, 20000.0);
+
+    SetPerspectiva(orthographic, redibujar);
 
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-    // Cámara y transformaciones
-    glMatrixMode(GL_MODELVIEW);
 }
 
 inline float FIXED_TO_FLOAT(GLfixed x) {

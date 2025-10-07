@@ -448,6 +448,10 @@ void InputUsuarioSDL(SDL_Event &e){
                 /*case SDLK_KP_4: numpad('4'); break;
                 case SDLK_KP_5: numpad('5'); break;
                 case SDLK_KP_6: numpad('6'); break;*/
+                case SDLK_KP_5: {
+					SetPerspectiva(!orthographic, true); 
+					break;
+				};
                 case SDLK_KP_7: SetViewpoint(top); break;
                 //case SDLK_KP_8: numpad('8'); break;
                 case SDLK_KP_9: abrir(); break;
@@ -491,8 +495,7 @@ void InputUsuarioSDL(SDL_Event &e){
                 case SDLK_KP_1: SetViewpoint(front); break;
                 //case SDLK_KP_2: numpad('2'); break;
                 case SDLK_KP_3: SetViewpoint(right); break;
-                /*case SDLK_KP_4: numpad('4'); break;
-                case SDLK_KP_5: numpad('5'); break;
+                /*case SDLK_KP_4: numpad('4'); break;    
                 case SDLK_KP_6: numpad('6'); break;*/
                 case SDLK_KP_7: SetViewpoint(top); break;
                 //case SDLK_KP_8: numpad('8'); break;

@@ -271,7 +271,7 @@ void Render(){
 		glEnable(GL_FOG);
 		glFogf(GL_FOG_MODE, GL_LINEAR); // Tipo de niebla lineal
 		glFogf(GL_FOG_START, nearClip);  // Distancia inicial de la niebla
-		glFogf(GL_FOG_END, FRUSTUM_FAR);     // Distancia final de la niebla
+		glFogf(GL_FOG_END, farClip);     // Distancia final de la niebla
 		GLfloat fogColor[] = {0.0f, 0.0f, 0.0f, 1.0f};
 		glFogfv(GL_FOG_COLOR, fogColor); // Color de la niebla
 	}
@@ -363,7 +363,7 @@ void Render(){
 			glEnable(GL_FOG);
 			glFogf(GL_FOG_MODE, GL_LINEAR); // Tipo de niebla lineal
 			glFogf(GL_FOG_START, nearClip);  // Distancia inicial de la niebla
-			glFogf(GL_FOG_END, FRUSTUM_FAR);     // Distancia final de la niebla
+			glFogf(GL_FOG_END, farClip);     // Distancia final de la niebla
 			//GLfloat fogColor[] = {0.23f, 0.23f, 0.23f, 1.f};
 			//glClearColor( ClearColor[0], ClearColor[1], ClearColor[2], 1.f );
 			glFogfv(GL_FOG_COLOR, ListaColores[background]); // Color de la niebla
