@@ -66,4 +66,14 @@ void ConstructUniversal(){
     Objects[1].posZ = 4500;
 
     AddMesh(cubo);
+
+    Object2D& tempObject2D = Objects2D[AddObject2D(UI::text)];
+    Text& tempText = Texts[tempObject2D.Id];
+    tempText.SetValue("Whisk3D pre-alpha 25-10-07");
+    tempText.SetScaleX(3);
+    tempText.SetScaleY(3);
+    tempObject2D.opacity = 0.5f;
+    tempText.SetX(20);
+    tempText.SetY(10);
+    tempText.SetColor(1.0f, 1.0f, 1.0f);
 }

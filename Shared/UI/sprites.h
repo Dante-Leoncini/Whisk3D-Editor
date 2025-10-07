@@ -24,6 +24,39 @@ class Sprite {
 			// bottom-right
 			uvs[6] = u2; uvs[7] = v2;
 		}
+
+		// Calcular los vértices una sola vez
+		void SetVertices(int x, int y, int w, int h) {
+			vertices[0] = (GLfloat)x;
+			vertices[1] = (GLfloat)y;
+
+			vertices[2] = (GLfloat)(x + w);
+			vertices[3] = (GLfloat)y;
+
+			vertices[4] = (GLfloat)x;
+			vertices[5] = (GLfloat)(y + h);
+
+			vertices[6] = (GLfloat)(x + w);
+			vertices[7] = (GLfloat)(y + h);
+		}
+
+		// Calcular los vértices una sola vez
+		void SetX(int x, int w) {
+			vertices[0] = vertices[4] = (GLfloat)x;
+			vertices[2] = vertices[6] = (GLfloat)(x + w);
+		}
+
+		void SetY(int y, int h) {
+			vertices[1] = vertices[3] = (GLfloat)y;       // parte superior
+			vertices[5] = vertices[7] = (GLfloat)(y + h); // parte inferior
+		}
+
+		void Render() const {
+			// Dibujar con TRIANGLE_STRIP (dos triángulos)
+			glTexCoordPointer(2, GL_FLOAT, 0, uvs);
+    		glVertexPointer(2, GL_FLOAT, 0, vertices);
+			glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+		}
 };
 
-Sprite sprite;
+//Sprite sprite;
