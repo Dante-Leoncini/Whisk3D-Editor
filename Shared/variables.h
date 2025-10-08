@@ -46,6 +46,14 @@ int axisSelect = X;
 
 SDL_Window* window = nullptr;  // definición real
 
+//NUEVO! es para poder usar OpenGl o Vulkan
+SDL_GLContext glContext = nullptr;
+
+// Para Vulkan
+VkInstance vkInstance = VK_NULL_HANDLE;
+VkSurfaceKHR vkSurface = VK_NULL_HANDLE;
+bool usingVulkan = false;
+
 //luz
 //GLfloat light_pos[] = { -5000.0f, 5000.0f, 5000.0f, 1.0f };
 //GLfloat light_diffuse[] = { 1.0f, 1.0f, 1.0f, 1.0f };

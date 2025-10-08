@@ -291,6 +291,8 @@ void Contadores(){
 	}
 }
 
+//Como era en SDL2
+/*
 void InputUsuarioSDL(SDL_Event &e){
 	//rueda del mouse	
     if (e.type == SDL_MOUSEWHEEL) {
@@ -445,9 +447,6 @@ void InputUsuarioSDL(SDL_Event &e){
                 case SDLK_KP_1: SetViewpoint(front); break;
                 //case SDLK_KP_2: numpad('2'); break;
                 case SDLK_KP_3: SetViewpoint(right); break;
-                /*case SDLK_KP_4: numpad('4'); break;
-                case SDLK_KP_5: numpad('5'); break;
-                case SDLK_KP_6: numpad('6'); break;*/
                 case SDLK_KP_5: {
 					SetPerspectiva(!orthographic, true); 
 					break;
@@ -495,8 +494,6 @@ void InputUsuarioSDL(SDL_Event &e){
                 case SDLK_KP_1: SetViewpoint(front); break;
                 //case SDLK_KP_2: numpad('2'); break;
                 case SDLK_KP_3: SetViewpoint(right); break;
-                /*case SDLK_KP_4: numpad('4'); break;    
-                case SDLK_KP_6: numpad('6'); break;*/
                 case SDLK_KP_7: SetViewpoint(top); break;
                 //case SDLK_KP_8: numpad('8'); break;
                 case SDLK_KP_9: abrir(); break;
@@ -511,6 +508,237 @@ void InputUsuarioSDL(SDL_Event &e){
     } 	
 	else if (e.type == SDL_KEYUP) {
 		switch (e.key.keysym.sym) {
+			case SDLK_LSHIFT:
+				if (ShiftCount < 20){
+					changeSelect();
+				}
+				ShiftCount = 0;
+				LShiftPressed = false;
+				break;
+			case SDLK_LALT:
+				LAltPressed = false;
+				break;
+		}
+	}
+}*/
+
+void InputUsuarioSDL3(SDL_Event &e){
+	//rueda del mouse	
+    if (e.type == SDL_EVENT_MOUSE_WHEEL) {
+		posY+= e.wheel.y*20;
+		redibujar = true;  
+    }
+    // Botones del mouse
+    else if (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
+		if (e.button.button == SDL_BUTTON_LEFT) {  
+			if (estado == translacion){
+				Aceptar();
+			}
+			else {
+            	GuardarMousePos();
+				SetCursor3D();
+			}
+		}
+        else if (e.button.button == SDL_BUTTON_MIDDLE) {  // rueda clic
+            middleMouseDown = true;
+            GuardarMousePos();
+        }
+		else if (e.button.button == SDL_BUTTON_RIGHT) {  
+			if (estado == translacion){
+				Cancelar();
+			}
+		}
+    }
+    else if (e.type == SDL_EVENT_MOUSE_BUTTON_UP) {
+        if (e.button.button == SDL_BUTTON_MIDDLE) {
+            middleMouseDown = false;
+        }
+    }
+    else if (e.type == SDL_EVENT_MOUSE_MOTION){
+		int mx = e.motion.x;
+		int my = e.motion.y;
+		if (middleMouseDown) {
+			CheckWarpMouseInWindow(mx, my);
+			// Chequear si Shift está presionado
+			const bool* state = SDL_GetKeyboardState(NULL);
+			bool shiftHeld = state[SDL_SCANCODE_LSHIFT] || state[SDL_SCANCODE_RSHIFT];
+
+			if (shiftHeld) {
+				float radY = rotY * M_PI / 180.0f; // Yaw
+				float radX = rotX * M_PI / 180.0f; // Pitch
+
+				float factor = 8.0f;
+
+				float cosX = cos(radX);
+				float sinX = sin(radX);
+				float cosY = cos(radY);
+				float sinY = sin(radY);
+
+				PivotZ -= dy * factor * cosY;
+				PivotX += dx * factor * cosX - dy * factor * sinY * sinX;
+				PivotY += dx * factor * sinX + dy * factor * sinY * cosX;
+				LShiftPressed = false;
+			} 
+			else {
+				// 🚀 ROTAR cámara
+				rotX += dx * 0.2f;  
+				rotY += dy * 0.2f;  
+
+				// Limitar rotY para evitar giros extremos
+				if(rotY > 180.0f) rotY -= 360.0f;
+				if(rotY < -180.0f) rotY += 360.0f;
+				if(rotX > 180.0f) rotX -= 360.0f;
+				if(rotX < -180.0f) rotX += 360.0f;
+			}
+
+			redibujar = true;
+		}
+		else if (estado == translacion){
+			// mover objetos con el mouse
+			CheckWarpMouseInWindow(mx, my);
+			SetTranslacionObjetos(dx, dy, 16.0f);
+		}
+    }
+    //eventos del teclado
+    else if (e.type == SDL_EVENT_KEY_DOWN) {
+        if (e.key.repeat == 0) { 
+			SDL_Keycode key = e.key.key; // SDL3
+			switch (key) {
+				case SDLK_LSHIFT:
+					LShiftPressed = true;
+					break;
+				case SDLK_LALT:
+					LAltPressed = true;
+					break;
+                case SDLK_RETURN:  // Enter
+                    Aceptar();
+                    break;
+                case SDLK_RIGHT:   // Flecha derecha
+                    TeclaDerecha();
+                    break;
+                case SDLK_LEFT:    // Flecha izquierda
+                    TeclaIzquierda();
+                    break;
+                case SDLK_UP:  
+                    TeclaArriba();
+                    break;
+                case SDLK_DOWN:  
+                    TeclaAbajo();
+                    break;	
+                case SDLK_A:  
+                    ClickA();
+                    break;
+                case SDLK_D:
+                    ClickD();
+                    break;
+                case SDLK_X:   
+					if (estado != editNavegacion){
+						if (axisSelect != X){
+							SetEje(X);
+						}
+						else {
+							SetEje(ViewAxis);
+						}
+					} 
+					else {
+						Borrar();
+					}
+                    break;
+                case SDLK_Y:   
+					if (estado != editNavegacion){
+						if (axisSelect != Y){
+							SetEje(Y);
+						}
+						else {
+							SetEje(ViewAxis);
+						}
+					}
+                    break;
+                case SDLK_Z:   
+					if (estado != editNavegacion){
+						if (axisSelect != Z){
+							SetEje(Z);
+						}
+						else {
+							SetEje(ViewAxis);
+						}
+					}
+                    break;
+                case SDLK_R:    
+                    SetRotacion();
+                    break;
+                case SDLK_G:  
+                    SetPosicion();
+                    break;			
+                case SDLK_S:   
+                    SetEscala();
+                    break;
+                // Numpad
+                case SDLK_KP_1: SetViewpoint(front); break;
+                //case SDLK_KP_2: numpad('2'); break;
+                case SDLK_KP_3: SetViewpoint(right); break;
+                case SDLK_KP_5: {
+					SetPerspectiva(!orthographic, true); 
+					break;
+				};
+                case SDLK_KP_7: SetViewpoint(top); break;
+                //case SDLK_KP_8: numpad('8'); break;
+                case SDLK_KP_9: abrir(); break;
+                //case SDLK_KP_0: numpad('0'); break;
+                case SDLK_KP_PERIOD: EnfocarObject(); break;
+                // si querés, agregá más teclas aquí
+                case SDLK_ESCAPE:  // Esc                    
+                    Cancelar();
+                    break;
+            }
+        }else {
+            // Evento repetido por mantener apretada
+            //std::cout << "apretando tecla" << std::endl;
+			SDL_Keycode key = e.key.key; // SDL3
+            switch (key) {
+                case SDLK_RETURN:  // Enter
+                    Aceptar();
+                    break;
+                case SDLK_RIGHT:   // Flecha derecha
+                    TeclaDerecha();
+                    break;
+                case SDLK_LEFT:    // Flecha izquierda
+                    TeclaIzquierda();
+                    break;
+                case SDLK_UP:   // Flecha derecha
+                    TeclaArriba();
+                    break;
+                case SDLK_DOWN:    // Flecha izquierda
+                    TeclaAbajo();
+                    break;
+                case SDLK_A:   // Flecha derecha
+                    ClickA();
+                    break;
+                case SDLK_E:   // Flecha derecha
+                    ClickE();
+                    break;
+                case SDLK_Q:    // Flecha izquierda
+                    ClickQ();
+                    break;
+                // Numpad
+                case SDLK_KP_1: SetViewpoint(front); break;
+                //case SDLK_KP_2: numpad('2'); break;
+                case SDLK_KP_3: SetViewpoint(right); break;
+                case SDLK_KP_7: SetViewpoint(top); break;
+                //case SDLK_KP_8: numpad('8'); break;
+                case SDLK_KP_9: abrir(); break;
+                //case SDLK_KP_0: numpad('0'); break;
+                case SDLK_KP_PERIOD: EnfocarObject(); break;
+                // si querés, agregá más teclas aquí
+                case SDLK_ESCAPE:  // Esc
+                    Cancelar();
+                    break;
+            }
+        }
+    } 	
+	else if (e.type == SDL_EVENT_KEY_UP) {
+		SDL_Keycode key = e.key.key; // SDL3
+		switch (key) {
 			case SDLK_LSHIFT:
 				if (ShiftCount < 20){
 					changeSelect();

@@ -17,15 +17,37 @@ Este programa no esta listo para producción y tiene una serie de errores conoci
 Sí el instalador falla, probablemente debas de "hackear" tu teléfono para ignorar las restricciones y certificados de Symbian. Puedes ver el siguiente video mostrando como hacerlo: [Tutorial Hack](https://www.youtube.com/watch?v=UJJICzbk3TA)
 
 ## Notas de Linux
-Se puede compilar desde la carpeta "Linux" y desde la terminal usando "make".
-Para compilar en Ubuntu es necesario tener instalado: 
+Para linux estoy usando SDL3, Vulkan (para poder usar RTX) y openGl (para poder seguir trabajando con Symbian y dispositivos antiguos)
 
-build-essential → incluye g++, make, etc. (herramientas básicas de compilación).
-libsdl2-dev → cabeceras y librerías de desarrollo de SDL2.
-libsdl2-image-dev → lo mismo pero para SDL2_image.
-libglu1-mesa-dev, freeglut3-dev, mesa-common-dev → cabeceras y librerías de OpenGL/GLU.
+para usar SDL3 hace falta que bajes el repositorio:
+    git clone https://github.com/libsdl-org/SDL.git
+entra a la carpeta:
+    cd SDL
+Crear build y compilar:
+    mkdir build && cd build
+    cmake .. -DCMAKE_BUILD_TYPE=Release
+    make -j$(nproc)
+    sudo make install
 
-se puede instalar haciendo: "sudo apt install build-essential libsdl2-dev libsdl2-image-dev libglu1-mesa-dev freeglut3-dev mesa-common-dev"
+algunas dependencias para Ubuntu 22.04 en adelante:
+    sudo apt install build-essential cmake git pkg-config libpng-dev libjpeg-dev libtiff-dev libwebp-dev
+
+y vas a necesitar compilar tambien SDL_image. clona el repo:
+    git clone https://github.com/libsdl-org/SDL_image.git
+    cd SDL_image
+Crear y configurar el directorio de compilación:
+    mkdir build
+    cd build
+    cmake ..
+Compilar e instalar:
+    make
+    sudo make install
+
+si tenes el error "./Whisk3D_Pre-alpha: error while loading shared libraries: libSDL3.so.0: cannot open shared object file: No such file or directory"
+instalar la biblioteca en un lugar reconocido:
+    sudo ldconfig /usr/local/lib
+
+Se puede compilar Whisk3D desde la carpeta "Linux" usando el comando "make". o "./CompilarYrun.sh"
 
 ## Nota para Android
 Se puede compilar usando Android Studio, NDK, SDL2 y openjdk-17-jdk

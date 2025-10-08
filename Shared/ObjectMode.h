@@ -79,7 +79,11 @@ void SetTransformPivotPoint(){
 
 // Función para guardar la posición actual del mouse
 void GuardarMousePos() {
-    SDL_GetMouseState(&lastMouseX, &lastMouseY);
+    //SDL_GetMouseState(&lastMouseX, &lastMouseY);
+    float mx, my;                       // variables temporales
+    SDL_GetMouseState(&mx, &my);      // SDL devuelve int
+    lastMouseX = mx;           // convertimos a float
+    lastMouseY = my;
 }
 
 void guardarEstado(){

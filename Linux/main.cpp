@@ -1,7 +1,16 @@
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_image.h>
+//#include <SDL2/SDL.h>
+//#include <SDL2/SDL_image.h>
+
+#include <SDL3/SDL.h>
+//#include <SDL3/SDL_image.h>
+
+//para las texturas
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
 #include <GL/gl.h>
 #include <GL/glu.h>
+#include <vulkan/vulkan.h>
 
 //esto es solo para linux
 #include <cmath>
@@ -51,6 +60,7 @@ struct Config {
     int height = 600;
 	int displayIndex = 0; // monitor 1
 	std::string SkinName = "Whisk3D"; // monitor 1
+    std::string graphicsAPI = "opengl";
 };
 Config cfg;
 
@@ -72,6 +82,7 @@ Config loadConfig(const std::string& filename) {
             else if (key == "height") cfg.height = std::stoi(value);
             else if (key == "displayIndex") cfg.displayIndex = std::stoi(value);
             else if (key == "SkinName") cfg.SkinName = value;
+            else if (key == "graphicsAPI") cfg.graphicsAPI = value;            
         }
     }
 
@@ -100,10 +111,10 @@ SDL_HitTestResult HitTestCallback(SDL_Window *win, const SDL_Point *area, void *
 
 int main(int argc, char* argv[]) {
 	// Inicializar SDL
-	if (SDL_Init(SDL_INIT_VIDEO) < 0) {
-		std::cerr << "Error SDL_Init: " << SDL_GetError() << std::endl;
-		return -1;
-	}
+	if (!SDL_Init(SDL_INIT_VIDEO)) {
+        std::cerr << "Error SDL_Init: " << SDL_GetError() << std::endl;
+        return -1;
+    }
 
 	// ---- CONFIGURAR ANTIALIASING ----
 	// Pedir un framebuffer con multisampling
@@ -117,12 +128,24 @@ int main(int argc, char* argv[]) {
 
 	Config cfg = loadConfig("./config.ini");
 
-	// Crear ventana con OpenGL
-	window = SDL_CreateWindow("Whisk 3D",
-		SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-		winW, winH,
-		SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE //| SDL_WINDOW_BORDERLESS
-    );
+	SDL_WindowFlags windowFlags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY;
+
+    if (cfg.graphicsAPI == "opengl") {
+        std::cerr << "Renderer: OpenGl\n";
+        windowFlags |= SDL_WINDOW_OPENGL;
+        usingVulkan = false;
+    } else if (cfg.graphicsAPI == "vulkan") {
+        std::cerr << "Renderer: Vulkan\n";
+        windowFlags |= SDL_WINDOW_VULKAN;
+        usingVulkan = true;
+    } else {
+        std::cerr << "Renderer desconocido, usando OpenGL por defecto\n";
+        windowFlags |= SDL_WINDOW_OPENGL;
+        usingVulkan = false;
+    }
+
+    // Crear la ventana
+    window = SDL_CreateWindow("Whisk 3D", winW, winH, windowFlags);
 
 	if (!window) {
 		std::cerr << "Error SDL_CreateWindow: " << SDL_GetError() << std::endl;
@@ -136,7 +159,45 @@ int main(int argc, char* argv[]) {
         std::cerr << "Error SetWindowHitTest: " << SDL_GetError() << std::endl;
     }*/
 
-	SDL_GLContext context = SDL_GL_CreateContext(window);
+    if (!usingVulkan) {
+        // OpenGL
+        glContext = SDL_GL_CreateContext(window);
+        if (!glContext) {
+            std::cerr << "Error SDL_GL_CreateContext: " << SDL_GetError() << std::endl;
+            return -1;
+        }
+        SDL_GL_SetSwapInterval(1); // VSync
+    } 
+    #ifdef SDL_VIDEO_VULKAN
+    else {
+        // --- Vulkan ---
+        VkResult res;
+
+        VkApplicationInfo appInfo = {};
+        appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+        appInfo.pApplicationName = "Whisk3D";
+        appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
+        appInfo.pEngineName = "Whisk3D Engine";
+        appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
+        appInfo.apiVersion = VK_API_VERSION_1_3;
+
+        VkInstanceCreateInfo createInfo = {};
+        createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+        createInfo.pApplicationInfo = &appInfo;
+
+        res = vkCreateInstance(&createInfo, nullptr, &vkInstance);
+        if (res != VK_SUCCESS) {
+            std::cerr << "Fallo al crear Vulkan Instance\n";
+            return -1;
+        }
+
+        if (!SDL_Vulkan_CreateSurface(window, vkInstance, &vkSurface)) {
+            std::cerr << "Fallo al crear Vulkan Surface: " << SDL_GetError() << std::endl;
+            return -1;
+        }
+    }
+    #endif
+
 
     //constructor symbian, linux y windows
     ConstructUniversal();
@@ -179,17 +240,14 @@ int main(int argc, char* argv[]) {
     while (running) {
         Contadores();
         while (SDL_PollEvent(&e)) {
-            if (e.type == SDL_QUIT){running = false;}
-            else if (e.type == SDL_WINDOWEVENT) {
-                if (e.window.event == SDL_WINDOWEVENT_RESIZED ||
-                    e.window.event == SDL_WINDOWEVENT_SIZE_CHANGED) 
-                {
-                    OnResize(e.window.data1, e.window.data2);
-                }
+            if (e.type == SDL_EVENT_QUIT) { running = false; }
+            else if (e.type == SDL_EVENT_WINDOW_RESIZED ||
+                    e.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED) {
+                OnResize(e.window.data1, e.window.data2);
             }
-			else {
-                InputUsuarioSDL(e);
-            }			
+            else {
+                InputUsuarioSDL3(e);
+            }
         }
 
 		// Renderizar si hay cambios
@@ -203,7 +261,7 @@ int main(int argc, char* argv[]) {
         SDL_Delay(16); // ~60 fps
     }
 
-    SDL_GL_DeleteContext(context);
+    SDL_GL_DestroyContext(glContext);
     SDL_DestroyWindow(window);
     SDL_Quit();
     return 0;
