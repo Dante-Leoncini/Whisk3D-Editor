@@ -44,6 +44,7 @@
 
 //Hice un importador OBJ. pero se podrian crear importadores de otros formatos
 #include "../Shared/import_obj.h"
+#include "../Shared/import_vertex_animation.h"
 #include "../Shared/lectura-escritura.h"
 
 #include "../Shared/funciones.h"
