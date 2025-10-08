@@ -682,7 +682,7 @@ void InputUsuarioSDL3(SDL_Event &e){
 					break;
 				};
                 case SDLK_KP_7: SetViewpoint(top); break;
-                //case SDLK_KP_8: numpad('8'); break;
+                case SDLK_KP_8: BuscarVertexAnimation(); break;
                 case SDLK_KP_9: abrir(); break;
                 //case SDLK_KP_0: numpad('0'); break;
                 case SDLK_KP_PERIOD: EnfocarObject(); break;
@@ -725,7 +725,7 @@ void InputUsuarioSDL3(SDL_Event &e){
                 //case SDLK_KP_2: numpad('2'); break;
                 case SDLK_KP_3: SetViewpoint(right); break;
                 case SDLK_KP_7: SetViewpoint(top); break;
-                //case SDLK_KP_8: numpad('8'); break;
+                case SDLK_KP_8: BuscarVertexAnimation(); break;
                 case SDLK_KP_9: abrir(); break;
                 //case SDLK_KP_0: numpad('0'); break;
                 case SDLK_KP_PERIOD: EnfocarObject(); break;

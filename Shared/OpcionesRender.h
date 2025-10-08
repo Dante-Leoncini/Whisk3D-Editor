@@ -49,6 +49,7 @@ void InitOpenGL(){
     glEnable(GL_DEPTH_TEST); // Habilitar z-buffer
     //glDisable(GL_CULL_FACE); // desactivar culling
 
+	//glViewport(0, 0, winW / 2, winH); // x, y, ancho, alto
     SetPerspectiva(orthographic, redibujar);
 }
 

@@ -222,7 +222,6 @@ class CWhisk3D : public CFiniteStateMachine, public MTextureLoadingListener
         void ClearConstraints();
         void ReloadViewport(TBool hacerRedibujo);
 
-        void ImportAnimation();
         void SetMixNormals();
         void SetMixFaces();
         void SetSpeedMix();

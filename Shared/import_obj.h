@@ -796,6 +796,7 @@ bool LeerOBJ(std::ifstream& file,
     obj.posX = obj.posY = obj.posZ = 0;
     obj.rotX = obj.rotY = obj.rotZ = 0;
     obj.scaleX = obj.scaleY = obj.scaleZ = 65000;
+    //obj.scaleX = obj.scaleY = obj.scaleZ = 520000;
     obj.Id = 0;
     obj.type = 0; // mesh
 
@@ -851,6 +852,9 @@ bool LeerOBJ(std::ifstream& file,
 			Wobj.vertex.push_back((short)(x * 2000));
 			Wobj.vertex.push_back((short)(y * 2000));
 			Wobj.vertex.push_back((short)(z * 2000));
+			/*Wobj.vertex.push_back((short)(x*250));
+			Wobj.vertex.push_back((short)(y*250));
+			Wobj.vertex.push_back((short)(z*250));*/
 
 			// color con saturación
 			auto saturar = [](double v) { 
@@ -1351,6 +1355,9 @@ bool LeerMTL(const std::string& filepath, int objetosCargados) {
             }
             else if (prefix == "NoLight") {
                 mat->lighting = false;
+            }
+            else if (prefix == "CLAMP_TO_EDGE") {
+				mat->repeat = false;
             }
             else if (prefix == "map_d") {
                 mat->transparent = true;
