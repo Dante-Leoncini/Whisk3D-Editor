@@ -172,23 +172,23 @@ void DrawTransformAxis(Object& obj) {
 		);	
 	}
 	if (axisSelect == X){
-		glColor4f(ColorTransformX[0],ColorTransformX[1],ColorTransformX[2],ColorTransformX[3]);
+		glColor4f(ListaColores[ColorTransformX][0],ListaColores[ColorTransformX][1],ListaColores[ColorTransformX][2],ListaColores[ColorTransformX][3]);
 		glDrawElements( GL_LINES, 2, GL_UNSIGNED_SHORT, EjeRojo );				
 	}
 	else if (axisSelect == Y){
-		glColor4f(ColorTransformY[0],ColorTransformY[1],ColorTransformY[2],ColorTransformY[3]);
+		glColor4f(ListaColores[ColorTransformY][0],ListaColores[ColorTransformY][1],ListaColores[ColorTransformY][2],ListaColores[ColorTransformY][3]);
 		glDrawElements( GL_LINES, 2, GL_UNSIGNED_SHORT, EjeVerde ); 				
 	}
 	else if (axisSelect == Z){
-		glColor4f(ColorTransformZ[0],ColorTransformZ[1],ColorTransformZ[2],ColorTransformZ[3]);
+		glColor4f(ListaColores[ColorTransformZ][0],ListaColores[ColorTransformZ][1],ListaColores[ColorTransformZ][2],ListaColores[ColorTransformZ][3]);
 		glDrawElements( GL_LINES, 2, GL_UNSIGNED_SHORT, EjeAzul ); 				
 	}	
 	else if (axisSelect == XYZ){
-		glColor4f(ColorTransformX[0],ColorTransformX[1],ColorTransformX[2],ColorTransformX[3]);
+		glColor4f(ListaColores[ColorTransformX][0],ListaColores[ColorTransformX][1],ListaColores[ColorTransformX][2],ListaColores[ColorTransformX][3]);
 		glDrawElements( GL_LINES, 2, GL_UNSIGNED_SHORT, EjeRojo );	
-		glColor4f(ColorTransformY[0],ColorTransformY[1],ColorTransformY[2],ColorTransformY[3]);
+		glColor4f(ListaColores[ColorTransformY][0],ListaColores[ColorTransformY][1],ListaColores[ColorTransformY][2],ListaColores[ColorTransformY][3]);
 		glDrawElements( GL_LINES, 2, GL_UNSIGNED_SHORT, EjeVerde ); 
-		glColor4f(ColorTransformZ[0],ColorTransformZ[1],ColorTransformZ[2],ColorTransformZ[3]);
+		glColor4f(ListaColores[ColorTransformZ][0],ListaColores[ColorTransformZ][1],ListaColores[ColorTransformZ][2],ListaColores[ColorTransformZ][3]);
 		glDrawElements( GL_LINES, 2, GL_UNSIGNED_SHORT, EjeAzul ); 				
 	}
 	glLineWidth(1);	//la deja como es por defecto	
@@ -263,6 +263,10 @@ void DibujarOrigen(Object& obj, int objIndex){
         }
     }
     glPopMatrix();
+}
+
+void RenderVK(){
+
 }
 
 void Render(){
@@ -363,10 +367,10 @@ void Render(){
 			glEnable(GL_FOG);
 			glFogf(GL_FOG_MODE, GL_LINEAR); // Tipo de niebla lineal
 			glFogf(GL_FOG_START, nearClip);  // Distancia inicial de la niebla
-			glFogf(GL_FOG_END, farClip);     // Distancia final de la niebla
+			glFogf(GL_FOG_END, 800.0f);     // Distancia final de la niebla
 			//GLfloat fogColor[] = {0.23f, 0.23f, 0.23f, 1.f};
 			//glClearColor( ClearColor[0], ClearColor[1], ClearColor[2], 1.f );
-			glFogfv(GL_FOG_COLOR, ListaColores[background]); // Color de la niebla
+			glFogfv(GL_FOG_COLOR, ListaColores[background]); // Color de la niebla DEL piso. que es mas pequeña que otros fog
 			glLineWidth(1);	 
 
 			glVertexPointer( 3, GL_SHORT, 0, objVertexdataFloor );
@@ -374,29 +378,54 @@ void Render(){
 
 			//dibuja el piso	
 			if (showFloor){
-				glColor4f(LineaPiso[0],LineaPiso[1],LineaPiso[2],LineaPiso[3]);
+				glColor4f(
+					ListaColores[LineaPiso][0],
+					ListaColores[LineaPiso][1],
+					ListaColores[LineaPiso][2],
+					ListaColores[LineaPiso][3]
+				);
 				glDrawElements( GL_LINES, objFacesFloor, GL_UNSIGNED_SHORT, objFacedataFloor );			
 			}		
-			//linea Verde
+			//linea Roja
 			if (showXaxis){				
 				glLineWidth(2);
-				glColor4f(LineaPisoRoja[0],LineaPisoRoja[1],LineaPisoRoja[2],LineaPisoRoja[3]);
+				glColor4f(
+					ListaColores[LineaPisoRoja][0],
+					ListaColores[LineaPisoRoja][1],
+					ListaColores[LineaPisoRoja][2],
+					ListaColores[LineaPisoRoja][3]
+				);
 				glDrawElements( GL_LINES, 2, GL_UNSIGNED_SHORT, EjeRojo );
 				glLineWidth(1);	//la deja como es por defecto
 			}
 			else if (showFloor){
-				glColor4f(LineaPiso[0],LineaPiso[1],LineaPiso[2],LineaPiso[3]);
+				glColor4f(
+					ListaColores[LineaPiso][0],
+					ListaColores[LineaPiso][1],
+					ListaColores[LineaPiso][2],
+					ListaColores[LineaPiso][3]
+				);
 				glDrawElements( GL_LINES, 2, GL_UNSIGNED_SHORT, EjeRojo );
 			}
-			//linea Roja	
+			//linea Verde	
 			if (showYaxis){
 				glLineWidth(2);
-				glColor4f(LineaPisoVerde[0],LineaPisoVerde[1],LineaPisoVerde[2],LineaPisoVerde[3]);
+				glColor4f(
+					ListaColores[LineaPisoVerde][0],
+					ListaColores[LineaPisoVerde][1],
+					ListaColores[LineaPisoVerde][2],
+					ListaColores[LineaPisoVerde][3]
+				);
 				glDrawElements( GL_LINES, 2, GL_UNSIGNED_SHORT, EjeVerde );
 				glLineWidth(1);	//la deja como es por defecto
 			}
 			else if (showFloor){
-				glColor4f(LineaPiso[0],LineaPiso[1],LineaPiso[2],LineaPiso[3]);
+				glColor4f(
+					ListaColores[LineaPiso][0],
+					ListaColores[LineaPiso][1],
+					ListaColores[LineaPiso][2],
+					ListaColores[LineaPiso][3]
+				);
 				glDrawElements( GL_LINES, 2, GL_UNSIGNED_SHORT, EjeVerde );
 			}	
 			glDisable(GL_FOG);
@@ -458,7 +487,7 @@ void Render(){
 				//glEnable( GL_POINT_SPRITE_OES );
 				glEnable( GL_POINT_SPRITE );
 				// Make the points bigger.
-				glPointSize( 8 );
+				glPointSize( 16 );
 				//for (TInt o = 0; o < Collection.Count(); o++) {
 				for (size_t o = 0; o < Collection.size(); o++) {
 					Object& obj = Objects[o];

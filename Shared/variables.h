@@ -147,12 +147,3 @@ std::vector<AnimationObject> AnimationObjects;
 std::vector<ShapeKeyAnimation> ShapeKeyAnimations;
 
 int NumTexturasWhisk3D = 0;
-
-GLfloat LineaPiso[4]  =      { 0.22, 0.22, 0.22, 1.0 };
-GLfloat LineaPisoRoja[4]  =  { 0.56, 0.23, 0.28, 1.0 };
-GLfloat LineaPisoVerde[4]  = { 0.38, 0.53, 0.15, 1.0 };
-
-//ejes transformacion
-GLfloat ColorTransformX[4]  = { 0.88, 0.48, 0.54, 1.0 };
-GLfloat ColorTransformY[4]  = { 0.65, 0.81, 0.38, 1.0 };
-GLfloat ColorTransformZ[4]  = { 0.46, 0.67, 0.89, 1.0 };

@@ -23,14 +23,16 @@ para usar SDL3 hace falta que bajes el repositorio:
     git clone https://github.com/libsdl-org/SDL.git
 entra a la carpeta:
     cd SDL
-Crear build y compilar:
+Crear build y compilar (hay que activar el soporte de vulkan):
     mkdir build && cd build
-    cmake .. -DCMAKE_BUILD_TYPE=Release
+    cmake .. -DSDL_VULKAN=ON -DSDL_VIDEO_VULKAN=ON -DSDL_RENDER_VULKAN=ON
     make -j$(nproc)
     sudo make install
+    sudo ldconfig
 
 algunas dependencias para Ubuntu 22.04 en adelante:
-    sudo apt install build-essential cmake git pkg-config libpng-dev libjpeg-dev libtiff-dev libwebp-dev
+    sudo apt install build-essential cmake git pkg-config libpng-dev libjpeg-dev libtiff-dev libwebp-dev libvulkan-dev vulkan-tools
+
 
 y vas a necesitar compilar tambien SDL_image. clona el repo:
     git clone https://github.com/libsdl-org/SDL_image.git

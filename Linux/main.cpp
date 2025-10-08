@@ -1,6 +1,3 @@
-//#include <SDL2/SDL.h>
-//#include <SDL2/SDL_image.h>
-
 #include <SDL3/SDL.h>
 //#include <SDL3/SDL_image.h>
 
@@ -89,6 +86,59 @@ Config loadConfig(const std::string& filename) {
     return cfg;
 }
 
+// Función para cargar colores desde archivo
+bool loadColors(const std::string& filename) {
+    // Map de strings a enums
+    static std::unordered_map<std::string, ColorID> colorMap = {
+        {"background", background},
+        {"blanco", blanco},
+        {"accent", accent},
+        {"accentDark", accentDark},
+        {"negro", negro},
+        {"gris", gris},
+        {"naranjaFace", naranjaFace},
+        {"headerColor", headerColor},
+        {"negroTransparente", negroTransparente},
+        {"grisUI", grisUI},
+        {"LineaPiso", LineaPiso},
+        {"LineaPisoRoja", LineaPisoRoja},
+        {"LineaPisoVerde", LineaPisoVerde},
+        {"ColorTransformX", ColorTransformX},
+        {"ColorTransformY", ColorTransformY},
+        {"ColorTransformZ", ColorTransformZ}
+    };
+
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "No se pudo abrir " << filename << ", usando colores por defecto.\n";
+        return false;
+    }
+
+    std::string line;
+    while (std::getline(file, line)) {
+        std::istringstream iss(line);
+        std::string name;
+        float r, g, b, a;
+        if (!(iss >> name >> r >> g >> b >> a)) {
+            std::cerr << "Formato incorrecto en colors.skin: " << line << "\n";
+            continue;
+        }
+
+        auto it = colorMap.find(name);
+        if (it != colorMap.end()) {
+            int idx = it->second;
+            ListaColores[idx][0] = r;
+            ListaColores[idx][1] = g;
+            ListaColores[idx][2] = b;
+            ListaColores[idx][3] = a;
+        } else {
+            std::cerr << "Color desconocido en colors.skin: " << name << "\n";
+        }
+    }
+
+    return true;
+}
+
 void Minimize(SDL_Window* window) {
     SDL_MinimizeWindow(window);
 }
@@ -108,6 +158,20 @@ SDL_HitTestResult HitTestCallback(SDL_Window *win, const SDL_Point *area, void *
     }
     return SDL_HITTEST_NORMAL;
 }
+
+//Necesiario para Vulkan
+VkInstance instance;
+VkSurfaceKHR surface;
+VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
+VkDevice device;
+VkQueue graphicsQueue;
+VkQueue presentQueue;
+VkSwapchainKHR swapchain;
+std::vector<VkImage> swapchainImages;
+VkFormat swapchainImageFormat;
+VkExtent2D swapchainExtent;
+VkApplicationInfo appInfo = {};
+VkPresentInfoKHR presentInfo = {};
 
 int main(int argc, char* argv[]) {
 	// Inicializar SDL
@@ -154,10 +218,6 @@ int main(int argc, char* argv[]) {
 
     // Forzar a maximizar al arrancar
     SDL_MaximizeWindow(window);
-    
-    /*if (SDL_SetWindowHitTest(window, HitTestCallback, nullptr) < 0) {
-        std::cerr << "Error SetWindowHitTest: " << SDL_GetError() << std::endl;
-    }*/
 
     if (!usingVulkan) {
         // OpenGL
@@ -168,39 +228,99 @@ int main(int argc, char* argv[]) {
         }
         SDL_GL_SetSwapInterval(1); // VSync
     } 
-    #ifdef SDL_VIDEO_VULKAN
     else {
         // --- Vulkan ---
-        VkResult res;
-
-        VkApplicationInfo appInfo = {};
         appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
         appInfo.pApplicationName = "Whisk3D";
-        appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
+        appInfo.applicationVersion = VK_MAKE_VERSION(1,0,0);
         appInfo.pEngineName = "Whisk3D Engine";
-        appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
+        appInfo.engineVersion = VK_MAKE_VERSION(1,0,0);
         appInfo.apiVersion = VK_API_VERSION_1_3;
 
         VkInstanceCreateInfo createInfo = {};
         createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
         createInfo.pApplicationInfo = &appInfo;
 
-        res = vkCreateInstance(&createInfo, nullptr, &vkInstance);
-        if (res != VK_SUCCESS) {
-            std::cerr << "Fallo al crear Vulkan Instance\n";
+        if (vkCreateInstance(&createInfo, nullptr, &instance) != VK_SUCCESS) {
+            std::cerr << "Error creando instancia Vulkan\n";
             return -1;
         }
 
-        if (!SDL_Vulkan_CreateSurface(window, vkInstance, &vkSurface)) {
-            std::cerr << "Fallo al crear Vulkan Surface: " << SDL_GetError() << std::endl;
+        VkSurfaceKHR surface;
+        #ifdef SDL_VIDEO_VULKAN
+        if (!SDL_Vulkan_CreateSurface(window, instance, &surface)) {
+            std::cerr << "Error creando surface Vulkan\n";
             return -1;
         }
+        #else
+        std::cerr << "SDL3 compilado sin soporte Vulkan\n";
+        return -1;
+        #endif
+
+        // Enumerar GPUs
+        uint32_t deviceCount = 0;
+        vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
+        std::vector<VkPhysicalDevice> devices(deviceCount);
+        vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
+        physicalDevice = devices[0]; // por simplicidad, elegir la primera
+
+        // Crear device y obtener queues
+        float queuePriority = 1.0f;
+        VkDeviceQueueCreateInfo queueCreateInfo = {};
+        queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+        queueCreateInfo.queueFamilyIndex = 0; // Debe ser la queue correcta que soporte graphics + present
+        queueCreateInfo.queueCount = 1;
+        queueCreateInfo.pQueuePriorities = &queuePriority;
+
+        VkDeviceCreateInfo deviceCreateInfo = {};
+        deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+        deviceCreateInfo.queueCreateInfoCount = 1;
+        deviceCreateInfo.pQueueCreateInfos = &queueCreateInfo;
+
+        vkCreateDevice(physicalDevice, &deviceCreateInfo, nullptr, &device);
+        vkGetDeviceQueue(device, 0, 0, &graphicsQueue);
+        vkGetDeviceQueue(device, 0, 0, &presentQueue);
+        
+        VkSwapchainCreateInfoKHR swapchainInfo = {};
+        swapchainInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+        swapchainInfo.surface = surface;
+        swapchainInfo.minImageCount = 2;
+        swapchainInfo.imageFormat = VK_FORMAT_B8G8R8A8_SRGB;
+        swapchainInfo.imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+        swapchainInfo.imageExtent = { static_cast<uint32_t>(cfg.width), static_cast<uint32_t>(cfg.height) };
+        swapchainInfo.imageArrayLayers = 1;
+        swapchainInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+        swapchainInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        swapchainInfo.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+        swapchainInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+        swapchainInfo.presentMode = VK_PRESENT_MODE_FIFO_KHR;
+        swapchainInfo.clipped = VK_TRUE;
+        swapchainInfo.oldSwapchain = VK_NULL_HANDLE;
+
+        vkCreateSwapchainKHR(device, &swapchainInfo, nullptr, &swapchain);
+
+        // Obtener imágenes del swapchain
+        uint32_t imageCount;
+        vkGetSwapchainImagesKHR(device, swapchain, &imageCount, nullptr);
+        swapchainImages.resize(imageCount);
+        vkGetSwapchainImagesKHR(device, swapchain, &imageCount, swapchainImages.data());
+
+        presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+        presentInfo.waitSemaphoreCount = 0;
+        presentInfo.pWaitSemaphores = nullptr;
+        presentInfo.swapchainCount = 1;
+        presentInfo.pSwapchains = &swapchain;
+        uint32_t imageIndex = 0; // índice de la imagen que querés presentar
+        presentInfo.pImageIndices = &imageIndex;
+        vkQueuePresentKHR(presentQueue, &presentInfo);
     }
-    #endif
-
 
     //constructor symbian, linux y windows
     ConstructUniversal();
+
+    //carga el Skin
+    std::string skinPath = "../Shared/UI/Skins/" + cfg.SkinName + "/skin.ini";
+    loadColors(skinPath);
 
 	// Cargar texturas
 	Textures.push_back(Texture());
@@ -253,15 +373,27 @@ int main(int argc, char* argv[]) {
 		// Renderizar si hay cambios
         //if (redibujar){
 			//std::cout << "redibujar: " << std::boolalpha << redibujar << std::endl;
-			Render();
-			SDL_GL_SwapWindow(window);
+            if (usingVulkan){
+			    RenderVK();
+                vkQueuePresentKHR(presentQueue, &presentInfo);
+            }
+            else {
+			    Render();
+			    SDL_GL_SwapWindow(window);
+            }
 		//}
 
         // Animación
         SDL_Delay(16); // ~60 fps
     }
 
-    SDL_GL_DestroyContext(glContext);
+    if (usingVulkan){
+        vkDestroySurfaceKHR(instance, surface, nullptr);
+        vkDestroyInstance(instance, nullptr);
+    }
+    else {
+        SDL_GL_DestroyContext(glContext);
+    }
     SDL_DestroyWindow(window);
     SDL_Quit();
     return 0;
