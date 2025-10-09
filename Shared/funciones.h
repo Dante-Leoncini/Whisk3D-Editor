@@ -800,10 +800,6 @@ void RestaurarViewport(){
 	PivotZ = LastPivotZ;
 }
 
-void ReloadAnimation(){
-
-}
-
 void SetTranslacionObjetos(int dx, int dy, float factor = 1.0f){
 	for (size_t o = 0; o < estadoObjetos.size(); o++) {
 		switch (axisSelect) {

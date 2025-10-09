@@ -1,28 +1,5 @@
 bool running = false;
 
-// Configuración dependiente del tamaño de ventana
-void OnResize(int w, int h) {
-    if (h == 0) h = 1; // evitar división por cero
-
-    winW = w;
-    winH = h;
-
-    aspect = (float)w / (float)h;
-
-    // Viewport
-    glViewport(0, 0, w, h);
-
-    // Proyección
-    SetPerspectiva(orthographic, true);
-
-    // Volvemos al modelo
-    /*glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
-    gluLookAt(0, 0, 8000,   // ojo
-              0, 0, 0,      // centro
-              0, 1, 0);     // up*/
-}
-
 //un constructor universal para todas las plataformas
 void ConstructUniversal(){
     // Configuración básica de OpenGL
@@ -31,11 +8,6 @@ void ConstructUniversal(){
     glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_FASTEST);
     glEnableClientState(GL_VERTEX_ARRAY);
     glEnableClientState(GL_NORMAL_ARRAY);
-
-	InitOpenGL();
-
-    // Inicializar la proyección al tamaño inicial de la ventana
-    OnResize(winW, winH);
 
     // iluminación
     glEnable(GL_LIGHTING);
@@ -48,6 +20,8 @@ void ConstructUniversal(){
 
     // Siempre un material por defecto
     NewMaterial(false);
+    
+	CalculateMillisecondsPerFrame(60);
 
     // Cámara y objetos iniciales
     AddObject(camera);
@@ -74,4 +48,9 @@ void ConstructUniversal(){
     tempText.SetX(20);
     tempText.SetY(10);
     tempText.SetColor(1.0f, 1.0f, 1.0f);
+
+
+    AddViewport(View::ViewPort3D, -1, winW, winH, 0, 0);
+
+    OnResizeViewports(winW, winH);
 }

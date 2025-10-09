@@ -14,16 +14,13 @@ enum {lineal, closest};
 
 enum { Solid, MaterialPreview, Rendered };
 
-bool SimularZBuffer = false;
 int view = MaterialPreview;
-bool orthographic = false;
 
 GLfloat objAmbient[4]  = { 0.3, 0.3, 0.3, 1.0 };
-//GLfloat objAmbient[4]  = { 0.0, 0.0, 0.0, 1.0 };
 
 std::vector<Light> Lights;
 
-void SetPerspectiva(bool orthographicValue, bool redibuja ){
+/*void SetPerspectiva(bool orthographicValue, bool redibuja ){
 	orthographic = orthographicValue;
 	glMatrixMode( GL_PROJECTION );
 	glLoadIdentity();
@@ -36,9 +33,6 @@ void SetPerspectiva(bool orthographicValue, bool redibuja ){
     }
     else {
         gluPerspective(fovDeg, aspect, nearClip, farClip);
-		/*glFrustumf( FRUSTUM_LEFT * aspect, FRUSTUM_RIGHT * aspect,
-					FRUSTUM_BOTTOM, FRUSTUM_TOP,
-					FRUSTUM_NEAR, farClip );  */  	
     }
     glMatrixMode( GL_MODELVIEW );
     redibujar = redibuja;
@@ -51,7 +45,7 @@ void InitOpenGL(){
 
 	//glViewport(0, 0, winW / 2, winH); // x, y, ancho, alto
     SetPerspectiva(orthographic, redibujar);
-}
+}*/
 
 inline float FIXED_TO_FLOAT(GLfixed x) {
     return static_cast<float>(x) / 65536.0f; // porque Q16.16
@@ -86,12 +80,12 @@ void RenderMesh( Object& obj ){
 	glShadeModel( GL_SMOOTH );
 	
 	//modelo con textura
-	if (SimularZBuffer){
+	/*if (SimularZBuffer){
 		glDisable( GL_LIGHTING );
 		glDisable(GL_BLEND);
 		glDisable( GL_TEXTURE_2D );
 		glDrawElements(GL_TRIANGLES, pMesh.facesSize, GL_UNSIGNED_SHORT, pMesh.faces);
-	}
+	}*/
 	
 	//material
 	if (view == MaterialPreview || view == Rendered){
@@ -275,7 +269,6 @@ void RenderMeshAndChildren(Object& obj){
     }
     
     // Procesar cada hijo
-    //for (int c = 0; c < obj.Childrens.Count(); c++) {
     for (size_t c = 0; c < obj.Childrens.size(); c++) {
         Object& objChild = Objects[obj.Childrens[c].Id];
         //RenderMeshAndChildren(objChild, indice);

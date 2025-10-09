@@ -1,7 +1,5 @@
 enum { Constant, Linear, EaseInOut, EaseIn, EaseOut };
 
-enum { AnimPosition, AnimRotation, AnimScale };
-
 enum{
 	top,
 	front,
@@ -119,11 +117,6 @@ bool showYaxis = true;
 bool showXaxis = true;
 bool ShowRelantionshipsLines = true;
 
-//animacion
-bool PlayAnimation = false;
-int StartFrame = 1;
-int EndFrame = 250;
-int CurrentFrame = 1;
 bool showOrigins = true;
 bool show3DCursor = true;
 GLfloat Cursor3DposX = 0.0f;
@@ -141,8 +134,6 @@ int valorRotacion = 0;
 //listados
 //RArray<SaveState> estadoObjetos;
 std::vector<SaveState> estadoObjetos;
-//RArray<AnimationObject> AnimationObjects;
-std::vector<AnimationObject> AnimationObjects;
 //RArray<ShapeKeyAnimation> ShapeKeyAnimations;
 std::vector<ShapeKeyAnimation> ShapeKeyAnimations;
 

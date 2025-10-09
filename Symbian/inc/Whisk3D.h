@@ -172,7 +172,6 @@ class CWhisk3D : public CFiniteStateMachine, public MTextureLoadingListener
         void RemoveKeyframes();
         void ClearKeyframes();
         void SetEmission();
-        void SetPerspectiva( TBool redibuja = true );
         void EnfocarObject();
         void CursorToSelect();
         void SelectToCursor();

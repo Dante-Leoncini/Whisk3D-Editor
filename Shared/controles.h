@@ -678,7 +678,7 @@ void InputUsuarioSDL3(SDL_Event &e){
                 //case SDLK_KP_2: numpad('2'); break;
                 case SDLK_KP_3: SetViewpoint(right); break;
                 case SDLK_KP_5: {
-					SetPerspectiva(!orthographic, true); 
+					SetPerspectiva(0); 
 					break;
 				};
                 case SDLK_KP_7: SetViewpoint(top); break;
