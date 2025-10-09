@@ -31,16 +31,12 @@
 #include "../Shared/GeometriaUI.h"
 #include "../Shared/Primitivas.h"
 
-#include "../Shared/Animation.h"
 #include "../Shared/clases.h"
 #include "../Shared/variables.h"
 #include "../Shared/colores.h"
 #include "../Shared/OpcionesRender.h"
-
-//estas son importaciones especificas para Whisk 3D
-//Incluyen los modos objeto, edicion, animacion, escultura, etc.
-//no van a ser cosas que otros proyectos necesiten (o si)
 #include "../Shared/ObjectMode.h"
+#include "../Shared/Animation.h"
 
 //Hice un importador OBJ. pero se podrian crear importadores de otros formatos
 #include "../Shared/import_obj.h"
@@ -48,9 +44,10 @@
 #include "../Shared/lectura-escritura.h"
 
 #include "../Shared/funciones.h"
-#include "../Shared/constructor.h"
-#include "../Shared/controles.h"
 #include "../Shared/render.h"
+#include "../Shared/ViewPorts/ViewPorts.h"
+#include "../Shared/controles.h"
+#include "../Shared/constructor.h"
 
 struct Config {
     bool fullscreen = false;
@@ -364,28 +361,40 @@ int main(int argc, char* argv[]) {
             if (e.type == SDL_EVENT_QUIT) { running = false; }
             else if (e.type == SDL_EVENT_WINDOW_RESIZED ||
                     e.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED) {
-                OnResize(e.window.data1, e.window.data2);
+                OnResizeViewports(e.window.data1, e.window.data2);
             }
             else {
                 InputUsuarioSDL3(e);
             }
         }
 
-		// Renderizar si hay cambios
-        //if (redibujar){
-			//std::cout << "redibujar: " << std::boolalpha << redibujar << std::endl;
-            if (usingVulkan){
-			    RenderVK();
-                vkQueuePresentKHR(presentQueue, &presentInfo);
-            }
-            else {
-			    Render();
-			    SDL_GL_SwapWindow(window);
-            }
-		//}
+        // --- Animación ---
+        Uint32 now = SDL_GetTicks();
+        if (now - lastAnimTime >= millisecondsPerFrame) {
+            lastAnimTime = now;
 
-        // Animación
-        SDL_Delay(16); // ~60 fps
+            CurrentFrame++;
+            if (CurrentFrame > EndFrame) {
+                CurrentFrame = StartFrame;
+            }
+            ReloadAnimation();
+        }
+
+        // --- Render siempre a 60 fps ---
+        if (now - lastRenderTime >= 16) {  // ~60hz
+            lastRenderTime = now;
+
+            if (usingVulkan) {
+                RenderVK();
+                vkQueuePresentKHR(presentQueue, &presentInfo);
+            } else {
+                RenderViewports();
+                SDL_GL_SwapWindow(window);
+            }
+        }
+
+        // Si querés liberar CPU:
+        SDL_Delay(8); // duerme lo mínimo
     }
 
     if (usingVulkan){
