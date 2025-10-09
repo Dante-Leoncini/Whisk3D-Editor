@@ -71,9 +71,6 @@ GLfloat TransformPivotPointFloat[3] = {0.0f,0.0f,0.0f};
 int winW = 800; 
 int winH = 600;
 float fovDeg = 45.0f;
-float aspect = (float)winW / (float)winH;
-float nearClip = 10.0f;
-float farClip = 2000.0f;
 
 int nextLightId = GL_LIGHT1;
 

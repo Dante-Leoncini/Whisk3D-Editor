@@ -451,7 +451,7 @@ void changeSelect(){
 
 //coloca el cursor 3d desde la vista 3d
 void SetCursor3D(){// 1) Calcular base de la cámara (forward/right/up)
-    float pitch = rotX * DEG2RAD;
+    /*float pitch = rotX * DEG2RAD;
     float yaw = rotY * DEG2RAD;
 
     Vec3 forward(cosf(pitch) * sinf(yaw), sinf(pitch), cosf(pitch) * cosf(yaw));
@@ -510,7 +510,7 @@ void SetCursor3D(){// 1) Calcular base de la cámara (forward/right/up)
 
     Cursor3DposX = cursorPos.x;
     Cursor3DposY = cursorPos.y;
-    Cursor3DposZ = cursorPos.z;
+    Cursor3DposZ = cursorPos.z;*/
 }
 
 void BorrarAnimaciones(int indice){

@@ -3,6 +3,8 @@ class Viewport3D {
 		int Parent = -1;
         bool orthographic = false;
         bool SimularZBuffer = false;
+        float nearClip = 10.0f;
+        float farClip = 2000.0f;
 
         void Render(){
             //Configuracion inicial!
@@ -40,7 +42,11 @@ class Viewport3D {
             }
 
             // Limpiar pantalla
-            glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
+            glEnable(GL_SCISSOR_TEST);
+            glScissor(parentView.x, parentView.y, parentView.width, parentView.height); // igual a tu viewport
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            glDisable(GL_SCISSOR_TEST);
+
             glLoadIdentity();
             glEnable( GL_DEPTH_TEST );	
 

@@ -49,8 +49,12 @@ void ConstructUniversal(){
     tempText.SetY(10);
     tempText.SetColor(1.0f, 1.0f, 1.0f);
 
+    //creamos el Vieport Base
+    int BaseView = AddViewport(View::ViewPort3D, -1, winW, winH, 0, 0, 1.0f, 1.0f);
+    //lo dividimos
+    SplitView(BaseView, View::Row);
 
-    AddViewport(View::ViewPort3D, -1, winW, winH, 0, 0);
+    SplitView(1, View::Column);
 
     OnResizeViewports(winW, winH);
 }
