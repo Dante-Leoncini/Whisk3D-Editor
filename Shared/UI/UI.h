@@ -1,11 +1,11 @@
 #include "./sprites.h"
 #include "./object2D.h"
 
-void DibujarUI() {
+void DibujarUI(int width, int height) {
     // Guardar matrices
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    glOrtho(0, winW, winH, 0, -1, 1);
+    glOrtho(0, width, height, 0, -1, 1);
 
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_LIGHTING);

@@ -14,7 +14,8 @@ void Aceptar(){
 };
 
 void ClickA(){
-    posX+= 1.0;
+	int viewPortActive = 1;
+    Viewports3D[viewPortActive].posX+= 1.0;
 	redibujar = true;  
 }
 
@@ -28,16 +29,19 @@ void ClickD(){
 }
 
 void ClickE(){
-    posZ-= 1.0;
+	int viewPortActive = 1;
+    Viewports3D[viewPortActive].posZ-= 1.0;
 	redibujar = true;  
 }
 
 void ClickQ(){
-    posZ+= 1.0;  
+	int viewPortActive = 1;
+    Viewports3D[viewPortActive].posZ+= 1.0;  
 	redibujar = true;  
 }
 
 void TeclaArriba(){
+	int viewPortActive = 1;
 	//mueve el mouse
 	if (mouseVisible){
 		mouseY--;
@@ -46,7 +50,7 @@ void TeclaArriba(){
 
 	if (estado == editNavegacion){	
 		if (navegacionMode == Orbit){
-			if (ViewFromCameraActive && CameraToView){
+			if (Viewports3D[viewPortActive].ViewFromCameraActive && CameraToView){
 				Object& obj = Objects[CameraActive];
 				// Convertir el angulo de rotX a radianes
 				GLfloat radRotX = obj.rotX * M_PI / 180.0;
@@ -58,18 +62,18 @@ void TeclaArriba(){
 				obj.posZ+= 30 * cos(radRotY);
 			}
 			else {
-				if (ViewFromCameraActive){
-					RestaurarViewport();
+				if (Viewports3D[viewPortActive].ViewFromCameraActive){
+					Viewports3D[viewPortActive].RestaurarViewport();
 				}
-				rotY-= 0.5;	
+				Viewports3D[viewPortActive].rotY-= 0.5;	
 			}			
 		}
 		else if (navegacionMode == Fly){
 			// Convertir el angulo de rotX a radianes
-			GLfloat radRotX = rotX * M_PI / 180.0;
+			GLfloat radRotX = Viewports3D[viewPortActive].rotX * M_PI / 180.0;
 
-			PivotY+= 30 * cos(radRotX);
-			PivotX-= 30 * sin(radRotX);
+			Viewports3D[viewPortActive].PivotY+= 30 * cos(radRotX);
+			Viewports3D[viewPortActive].PivotX-= 30 * sin(radRotX);
 		}		
 	}
 	else if (estado == EditScale){
@@ -82,6 +86,7 @@ void TeclaArriba(){
 }
 
 void TeclaAbajo(){
+	int viewPortActive = 1;
 	//mueve el mouse
 	/*if (mouseVisible){
 		mouseY++;
@@ -90,7 +95,7 @@ void TeclaAbajo(){
 
 	if (estado == editNavegacion){ 			
 		if (navegacionMode == Orbit){
-			if (ViewFromCameraActive && CameraToView){
+			if (Viewports3D[viewPortActive].ViewFromCameraActive && CameraToView){
 				Object& obj = Objects[CameraActive];
 				// Convertir el angulo de rotX a radianes
 				GLfloat radRotX = obj.rotX * M_PI / 180.0;
@@ -102,18 +107,18 @@ void TeclaAbajo(){
 				obj.posZ-= 30 * cos(radRotY);
 			}
 			else {
-				if (ViewFromCameraActive){
-					RestaurarViewport();
+				if (Viewports3D[viewPortActive].ViewFromCameraActive){
+					Viewports3D[viewPortActive].RestaurarViewport();
 				}
-				rotY+= 0.5;	
+				Viewports3D[viewPortActive].rotY+= 0.5;	
 			}		
 		}
 		else if (navegacionMode == Fly){
 			// Convertir el angulo de rotX a radianes
-			GLfloat radRotX = rotX * M_PI / 180.0;
+			GLfloat radRotX = Viewports3D[viewPortActive].rotX * M_PI / 180.0;
 
-			PivotY-= 30 * cos(radRotX);
-			PivotX+= 30 * sin(radRotX);
+			Viewports3D[viewPortActive].PivotY-= 30 * cos(radRotX);
+			Viewports3D[viewPortActive].PivotX+= 30 * sin(radRotX);
 		}
 	}
 	else if (estado == EditScale){
@@ -126,6 +131,7 @@ void TeclaAbajo(){
 }
 
 void TeclaDerecha(){
+	int viewPortActive = 1;
 	//mueve el mouse
 	/*if (mouseVisible){
 		mouseX++;
@@ -135,7 +141,7 @@ void TeclaDerecha(){
 	//rotX -= fixedMul( 1, aDeltaTimeSecs );
 	if (estado == editNavegacion){				
 		if (navegacionMode == Orbit){
-			if (ViewFromCameraActive && CameraToView){
+			if (Viewports3D[viewPortActive].ViewFromCameraActive && CameraToView){
 				Object& obj = Objects[CameraActive];
 				// Convertir el angulo de rotX a radianes
 				GLfloat radRotX = obj.rotX * M_PI / 180.0;
@@ -144,23 +150,23 @@ void TeclaDerecha(){
 				obj.posY+= 30 * sin(radRotX);
 			}
 			else {
-				if (ViewFromCameraActive){
-					RestaurarViewport();
+				if (Viewports3D[viewPortActive].ViewFromCameraActive){
+					Viewports3D[viewPortActive].RestaurarViewport();
 				}
-				rotX+= 0.5;	
+				Viewports3D[viewPortActive].rotX+= 0.5;	
 			}		
 		}
 		else if (navegacionMode == Fly){
 			// Convertir el angulo de rotX a radianes
-			GLfloat radRotX = rotX * M_PI / 180.0;
+			GLfloat radRotX = Viewports3D[viewPortActive].rotX * M_PI / 180.0;
 
 			// Calcular el vector de direccion hacia la izquierda (90 grados a la izquierda del angulo actual)
 			GLfloat leftX = cos(radRotX);
 			GLfloat leftY = sin(radRotX);
 
 			// Mover hacia la izquierda
-			PivotX -= 30 * leftX;
-			PivotY -= 30 * leftY;
+			Viewports3D[viewPortActive].PivotX -= 30 * leftX;
+			Viewports3D[viewPortActive].PivotY -= 30 * leftY;
 		}
 	}
 	else if (estado == translacion){
@@ -182,6 +188,7 @@ void TeclaDerecha(){
 }
 
 void TeclaIzquierda(){
+	int viewPortActive = 1;
 	//mueve el mouse
 	if (mouseVisible){
 		mouseX--;
@@ -191,7 +198,7 @@ void TeclaIzquierda(){
 	//rotX += fixedMul( 0.1, aDeltaTimeSecs );
 	if (estado == editNavegacion){ 
 		if (navegacionMode == Orbit){
-			if (ViewFromCameraActive && CameraToView){
+			if (Viewports3D[viewPortActive].ViewFromCameraActive && CameraToView){
 				Object& obj = Objects[CameraActive];
 				// Convertir el angulo de rotX a radianes
 				GLfloat radRotX = obj.rotX * M_PI / 180.0;
@@ -200,23 +207,23 @@ void TeclaIzquierda(){
 				obj.posY-= 30 * sin(radRotX);
 			}
 			else {
-				if (ViewFromCameraActive){
-					RestaurarViewport();
+				if (Viewports3D[viewPortActive].ViewFromCameraActive){
+					Viewports3D[viewPortActive].RestaurarViewport();
 				}
-				rotX-= 0.5;
+				Viewports3D[viewPortActive].rotX-= 0.5;
 			}
 		}
 		else if (navegacionMode == Fly){
 			// Convertir el angulo de rotX a radianes
-			GLfloat radRotX = rotX * M_PI / 180.0;
+			GLfloat radRotX = Viewports3D[viewPortActive].rotX * M_PI / 180.0;
 
 			// Calcular el vector de direccion hacia la izquierda (90 grados a la izquierda del angulo actual)
 			GLfloat leftX = cos(radRotX);
 			GLfloat leftY = sin(radRotX);
 
 			// Mover hacia la izquierda
-			PivotX += 30 * leftX;
-			PivotY += 30 * leftY;
+			Viewports3D[viewPortActive].PivotX += 30 * leftX;
+			Viewports3D[viewPortActive].PivotY += 30 * leftY;
 		}	
 	}
 	else if (estado == translacion){	
@@ -523,13 +530,68 @@ void InputUsuarioSDL(SDL_Event &e){
 }*/
 
 void InputUsuarioSDL3(SDL_Event &e){
-	//rueda del mouse	
-    if (e.type == SDL_EVENT_MOUSE_WHEEL) {
-		posY+= e.wheel.y*20;
-		redibujar = true;  
+    if (e.type == SDL_EVENT_MOUSE_MOTION){
+		int mx = e.motion.x;
+		int my = e.motion.y;
+
+		//para saber en que vieport estamos
+    	viewPortActive = FindViewportUnderMouse(mx, my);
+		//std::cout << "viewport actual: " << viewPortActive << std::endl;
+
+		if (middleMouseDown && viewPortActive > -1) {
+			ViewPortClickDown = true;
+			CheckWarpMouseInWindow(mx, my);
+			// Chequear si Shift está presionado
+			const bool* state = SDL_GetKeyboardState(NULL);
+			bool shiftHeld = state[SDL_SCANCODE_LSHIFT] || state[SDL_SCANCODE_RSHIFT];
+
+			if (shiftHeld) {
+				float radY = Viewports3D[viewPortActive].rotY * M_PI / 180.0f; // Yaw
+				float radX = Viewports3D[viewPortActive].rotX * M_PI / 180.0f; // Pitch
+
+				float factor = 8.0f;
+
+				float cosX = cos(radX);
+				float sinX = sin(radX);
+				float cosY = cos(radY);
+				float sinY = sin(radY);
+
+				Viewports3D[viewPortActive].PivotZ -= dy * factor * cosY;
+				Viewports3D[viewPortActive].PivotX += dx * factor * cosX - dy * factor * sinY * sinX;
+				Viewports3D[viewPortActive].PivotY += dx * factor * sinX + dy * factor * sinY * cosX;
+				LShiftPressed = false;
+			} 
+			else {
+				// 🚀 ROTAR cámara
+				Viewports3D[viewPortActive].rotX += dx * 0.2f;  
+				Viewports3D[viewPortActive].rotY += dy * 0.2f;  
+
+				// Limitar rotY para evitar giros extremos
+				if(Viewports3D[viewPortActive].rotY > 180.0f) Viewports3D[viewPortActive].rotY -= 360.0f;
+				if(Viewports3D[viewPortActive].rotY < -180.0f) Viewports3D[viewPortActive].rotY += 360.0f;
+				if(Viewports3D[viewPortActive].rotX > 180.0f) Viewports3D[viewPortActive].rotX -= 360.0f;
+				if(Viewports3D[viewPortActive].rotX < -180.0f) Viewports3D[viewPortActive].rotX += 360.0f;
+			}
+
+			redibujar = true;
+		}
+		else if (estado == translacion){
+			// mover objetos con el mouse
+			CheckWarpMouseInWindow(mx, my);
+			if (viewPortActive > -1){
+				SetTranslacionObjetos(dx, dy, 16.0f);				
+			}
+		}
     }
+
+	//rueda del mouse	
+    if (e.type == SDL_EVENT_MOUSE_WHEEL && viewPortActive > -1) {
+		Viewports3D[viewPortActive].posY+= e.wheel.y*20;
+    }
+
     // Botones del mouse
-    else if (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
+    if (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
+		ViewPortClickDown = true;
 		if (e.button.button == SDL_BUTTON_LEFT) {  
 			if (estado == translacion){
 				Aceptar();
@@ -550,57 +612,14 @@ void InputUsuarioSDL3(SDL_Event &e){
 		}
     }
     else if (e.type == SDL_EVENT_MOUSE_BUTTON_UP) {
+		ViewPortClickDown = false;
         if (e.button.button == SDL_BUTTON_MIDDLE) {
             middleMouseDown = false;
         }
     }
-    else if (e.type == SDL_EVENT_MOUSE_MOTION){
-		int mx = e.motion.x;
-		int my = e.motion.y;
-		if (middleMouseDown) {
-			CheckWarpMouseInWindow(mx, my);
-			// Chequear si Shift está presionado
-			const bool* state = SDL_GetKeyboardState(NULL);
-			bool shiftHeld = state[SDL_SCANCODE_LSHIFT] || state[SDL_SCANCODE_RSHIFT];
 
-			if (shiftHeld) {
-				float radY = rotY * M_PI / 180.0f; // Yaw
-				float radX = rotX * M_PI / 180.0f; // Pitch
-
-				float factor = 8.0f;
-
-				float cosX = cos(radX);
-				float sinX = sin(radX);
-				float cosY = cos(radY);
-				float sinY = sin(radY);
-
-				PivotZ -= dy * factor * cosY;
-				PivotX += dx * factor * cosX - dy * factor * sinY * sinX;
-				PivotY += dx * factor * sinX + dy * factor * sinY * cosX;
-				LShiftPressed = false;
-			} 
-			else {
-				// 🚀 ROTAR cámara
-				rotX += dx * 0.2f;  
-				rotY += dy * 0.2f;  
-
-				// Limitar rotY para evitar giros extremos
-				if(rotY > 180.0f) rotY -= 360.0f;
-				if(rotY < -180.0f) rotY += 360.0f;
-				if(rotX > 180.0f) rotX -= 360.0f;
-				if(rotX < -180.0f) rotX += 360.0f;
-			}
-
-			redibujar = true;
-		}
-		else if (estado == translacion){
-			// mover objetos con el mouse
-			CheckWarpMouseInWindow(mx, my);
-			SetTranslacionObjetos(dx, dy, 16.0f);
-		}
-    }
     //eventos del teclado
-    else if (e.type == SDL_EVENT_KEY_DOWN) {
+    if (e.type == SDL_EVENT_KEY_DOWN) {
         if (e.key.repeat == 0) { 
 			SDL_Keycode key = e.key.key; // SDL3
 			switch (key) {
@@ -668,24 +687,30 @@ void InputUsuarioSDL3(SDL_Event &e){
                     SetRotacion();
                     break;
                 case SDLK_G:  
+					UpdatePrecalculos();
                     SetPosicion();
                     break;			
                 case SDLK_S:   
                     SetEscala();
                     break;
                 // Numpad
-                case SDLK_KP_1: SetViewpoint(front); break;
+                case SDLK_KP_1: Viewports3D[viewPortActive].SetViewpoint(front); break;
                 //case SDLK_KP_2: numpad('2'); break;
-                case SDLK_KP_3: SetViewpoint(right); break;
+                case SDLK_KP_3: Viewports3D[viewPortActive].SetViewpoint(right); break;
                 case SDLK_KP_5: {
-					SetPerspectiva(0); 
+					Viewports3D[viewPortActive].ChangePerspective(); 
 					break;
 				};
-                case SDLK_KP_7: SetViewpoint(top); break;
+                case SDLK_KP_7: Viewports3D[viewPortActive].SetViewpoint(top); break;
                 case SDLK_KP_8: BuscarVertexAnimation(); break;
                 case SDLK_KP_9: abrir(); break;
                 //case SDLK_KP_0: numpad('0'); break;
-                case SDLK_KP_PERIOD: EnfocarObject(); break;
+                case SDLK_KP_PERIOD: {
+					if (Objects.size() > 0){
+						Viewports3D[viewPortActive].EnfocarObject(); 
+					}
+					break;
+				}
                 // si querés, agregá más teclas aquí
                 case SDLK_ESCAPE:  // Esc                    
                     Cancelar();
@@ -721,14 +746,34 @@ void InputUsuarioSDL3(SDL_Event &e){
                     ClickQ();
                     break;
                 // Numpad
-                case SDLK_KP_1: SetViewpoint(front); break;
+                case SDLK_KP_1: {
+					if (viewPortActive > -1){
+						Viewports3D[viewPortActive].SetViewpoint(front);
+					}
+					break;
+				}
                 //case SDLK_KP_2: numpad('2'); break;
-                case SDLK_KP_3: SetViewpoint(right); break;
-                case SDLK_KP_7: SetViewpoint(top); break;
+                case SDLK_KP_3: {
+					if (viewPortActive > -1){
+						Viewports3D[viewPortActive].SetViewpoint(right);
+					} 
+					break;
+				}
+                case SDLK_KP_7: {
+					if (viewPortActive > -1){
+						Viewports3D[viewPortActive].SetViewpoint(top);
+					}
+					break;
+				}
                 case SDLK_KP_8: BuscarVertexAnimation(); break;
-                case SDLK_KP_9: abrir(); break;
+                case SDLK_KP_9: abrir();break;
                 //case SDLK_KP_0: numpad('0'); break;
-                case SDLK_KP_PERIOD: EnfocarObject(); break;
+                case SDLK_KP_PERIOD: {
+					if (viewPortActive > -1 && Objects.size() > 0){
+						Viewports3D[viewPortActive].EnfocarObject();
+					}
+					break;
+				}
                 // si querés, agregá más teclas aquí
                 case SDLK_ESCAPE:  // Esc
                     Cancelar();

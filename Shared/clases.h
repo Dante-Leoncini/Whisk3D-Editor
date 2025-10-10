@@ -1,5 +1,13 @@
 const float DEG2RAD = 3.14159265358979323846f / 180.0f;
 
+// --- PRECALCULADOS ---
+struct Cache {
+    float radX = 0;
+    float radY = 0;
+    float cosX = 1, sinX = 0;
+    float cosY = 1, sinY = 0;
+} precalculado;
+
 struct Vec3 {
     float x,y,z;
     Vec3() : x(0),y(0),z(0) {}

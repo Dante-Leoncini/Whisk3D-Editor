@@ -18,10 +18,44 @@ class Viewport {
         bool redibujar = true;
 };
 std::vector<Viewport> Viewports;
+int viewPortActive = -1;
+bool ViewPortClickDown = false;
+
+int FindViewportUnderMouse(int mx, int my) {
+    if (ViewPortClickDown) return viewPortActive;
+    // invertir coordenada Y de SDL a OpenGL
+    int oglY = winH - my;  
+
+    for (size_t i = 0; i < Viewports.size(); i++) {
+        const Viewport& v = Viewports[i];
+        if (v.type != View::ViewPort3D){
+            continue;
+        }
+        if (mx >= v.x && mx < v.x + v.width &&
+            oglY >= v.y && oglY < v.y + v.height
+        ) {
+            return v.ChildA;
+        }
+    }
+    return -1; // no encontró nada
+}
 
 #include "./ViewPort3D.h"
 
-int AddViewport(View type, int parent, int width, int height, int x, int y, float weightX, float weightY) {
+// Método para actualizar cache
+void UpdatePrecalculos() {
+    if (viewPortActive > -1){
+        precalculado.radY = Viewports3D[viewPortActive].rotY * M_PI / 180.0f;
+        precalculado.radX = Viewports3D[viewPortActive].rotX * M_PI / 180.0f;
+
+        precalculado.cosX = cos(precalculado.radX);
+        precalculado.sinX = sin(precalculado.radX);
+        precalculado.cosY = cos(precalculado.radY);
+        precalculado.sinY = sin(precalculado.radY);
+    }
+}
+
+int AddViewport(View type, int parent, int width, int height, int x, int y, float weightX, float weightY, bool NewViewPort = true) {
     Viewport view;
     view.type = type;
     view.x = x;
@@ -35,7 +69,7 @@ int AddViewport(View type, int parent, int width, int height, int x, int y, floa
     view.ChildB = -1;
     view.aspect = (float)width / (float)height;
 
-    if (type == View::ViewPort3D){
+    if (NewViewPort && type == View::ViewPort3D){
         view.ChildA = AddViewport3D(Viewports.size());
     }
 
@@ -45,8 +79,8 @@ int AddViewport(View type, int parent, int width, int height, int x, int y, floa
 }
 
 void SplitView(int id, View split){
-    float weightX = Viewports[id].weightX;
-    float weightY = Viewports[id].weightY;
+    float weightX = 1.0f;
+    float weightY = 1.0f;
     switch (split){
         case View::Row: {
             weightX = weightX/2;
@@ -68,8 +102,13 @@ void SplitView(int id, View split){
         Viewports[id].width/2 + Viewports[id].x,
         Viewports[id].y,
         weightX,
-        weightY
+        weightY,
+        false
     );
+    //ChildA hereda el ChildA de ViewPort dividido
+    Viewports[newIdLeft].ChildA = Viewports[id].ChildA;
+    Viewports3D[Viewports[id].ChildA].Parent = newIdLeft;
+
     int newIdRight = AddViewport(
         Viewports[id].type, 
         id, 
@@ -78,13 +117,43 @@ void SplitView(int id, View split){
         Viewports[id].width/2 + Viewports[id].x,
         Viewports[id].y,
         weightX,
-        weightY
+        weightY,
+        true
     );
 
     //Los llamo A y 
     Viewports[id].type = split;
     Viewports[id].ChildA = newIdLeft;
     Viewports[id].ChildB = newIdRight;
+    //std::cout << "creado viewport ChildA: " << Viewports[id].ChildA << std::endl;
+    //std::cout << "creado viewport ChildB: " << Viewports[id].ChildB << std::endl;
+    //std::cout << "Count de Vieports3D: " << Viewports3D.size() << std::endl;
+}
+
+void SetWidthViewport(int id, int width){
+    if (Viewports[id].Parent != -1){
+        Viewport& viewParent = Viewports[Viewports[id].Parent];    
+        Viewport& viewA = Viewports[viewParent.ChildA];  
+        viewA.width = width;
+        viewA.weightX = (float)viewA.width / (float)viewParent.width;
+
+        Viewport& viewB = Viewports[viewParent.ChildB];  
+        viewB.width = viewParent.width - viewA.width;
+        viewB.weightX = (float)viewB.width / (float)viewParent.width;
+    }
+}
+
+void SetHeightViewport(int id, int height){
+    if (Viewports[id].Parent != -1){
+        Viewport& viewParent = Viewports[Viewports[id].Parent];    
+        Viewport& viewA = Viewports[viewParent.ChildA];  
+        viewA.height = height;
+        viewA.weightY = (float)viewA.height / (float)viewParent.height;
+
+        Viewport& viewB = Viewports[viewParent.ChildB];  
+        viewB.height = viewParent.height - viewA.height;
+        viewB.weightY = (float)viewB.height / (float)viewParent.height;
+    }
 }
 
 void OnResizeViewport(int id){

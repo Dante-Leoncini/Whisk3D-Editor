@@ -1,10 +1,26 @@
+GLfloat LastRotX = 0;
+GLfloat LastRotY = 0;	
+GLfloat LastPivotX = 0;
+GLfloat LastPivotY = 0;
+GLfloat LastPivotZ = 0;
+
 class Viewport3D {
 	public:
 		int Parent = -1;
         bool orthographic = false;
         bool SimularZBuffer = false;
+        bool ViewFromCameraActive = false;
         float nearClip = 10.0f;
         float farClip = 2000.0f;
+        int cameraDistance = 270;
+        GLfloat posX = 0;
+        GLfloat posY = 0;
+        GLfloat posZ = 0.0f;
+        GLfloat rotX = 113.5;
+        GLfloat rotY = 20.0;
+        GLfloat PivotX = 0;
+        GLfloat PivotY = 0;
+        GLfloat PivotZ = 0;
 
         void Render(){
             //Configuracion inicial!
@@ -290,19 +306,122 @@ class Viewport3D {
             }
 
             if (ShowUi){
-                DibujarUI();
+                DibujarUI(parentView.width, parentView.height);
             }
 
             //termino de dibujar
             parentView.redibujar = false;
         }
+
+        void EnfocarObject(){
+            SetTransformPivotPoint();	
+            PivotX = 0.0f; 
+            PivotY = 0.0f;
+            PivotZ = 0.0f;
+            PivotX = PivotX-TransformPivotPointFloat[0]; 
+            PivotY = PivotY-TransformPivotPointFloat[1];
+            PivotZ = PivotZ-TransformPivotPointFloat[2];
+        }
+
+        void RecalcViewPos(){
+            Object& obj = Objects[CameraActive];
+            rotX = -obj.rotZ+90;
+            rotY = -obj.rotY;	
+            PivotX = -obj.posX;
+            PivotY = -obj.posY;
+            PivotZ = -obj.posZ;
+
+            //en caso de que este emparentado
+            /*TInt ParentID = obj.Parent;
+            while (ParentID  > -1) {		
+                Object& parentObj = Objects[ParentID];		
+                rotX = -parentObj.rotZ;
+                rotY = -parentObj.rotY;	
+                //PivotX = -parentObj.posX;
+                //PivotY = -parentObj.posY;
+                //PivotZ = -parentObj.posZ;	
+                ParentID = parentObj.Parent;		
+            }*/
+        }
+
+        //mira si no hay camara activa
+        //si no hay una camara activa. busca una camara para asignarla
+        //si no hay camaras... quedara en -1
+        void CheckCameraState(){
+            if (CameraActive < 0){
+                //for(TInt i=0; i < Objects.Count(); i++){
+                for(size_t i=0; i < Objects.size(); i++){
+                    if (Objects[i].type == camera){
+                        CameraActive = i;
+                        return;
+                    }		
+                }
+            }	
+        }
+
+        void SetViewpoint(int opcion){
+            switch (opcion) {
+                case top:
+                    rotX = -180.0;
+                    rotY = 90.0;
+                    ViewFromCameraActive = false;	
+                    CameraToView = false;
+                    break;
+                case front:
+                    rotX = -180.0;
+                    rotY = 0.0;	
+                    ViewFromCameraActive = false;	
+                    CameraToView = false;
+                    break;
+                case right:
+                    rotX = 90.0;
+                    rotY = 0.0;		
+                    ViewFromCameraActive = false;	
+                    CameraToView = false;
+                    break;
+                case cameraView:
+                    CheckCameraState();
+                    if (CameraActive < 0){
+                        //_LIT(KFormatString, "There are no cameras!");
+                        //HBufC* noteBuf = HBufC::NewLC(50);
+                        //noteBuf->Des().Format(KFormatString);
+                        //MensajeError(noteBuf);  
+                        //CleanupStack::PopAndDestroy(noteBuf);
+                    }
+                    //else if (Objects.Count() > CameraActive && !ViewFromCameraActive){	
+                    else if (Objects.size() > static_cast<size_t>(CameraActive) && !ViewFromCameraActive){	
+                        LastRotX = rotX;
+                        LastRotY = rotY;	
+                        LastPivotX = PivotX;
+                        LastPivotY = PivotY;
+                        LastPivotZ = PivotZ;
+                        RecalcViewPos();
+                        ViewFromCameraActive = true;
+                    }
+                    break;
+            }
+        }
+
+        void RestaurarViewport(){
+            ViewFromCameraActive = false;
+            rotX = LastRotX;
+            rotY = LastRotY;	
+            PivotX = LastPivotX;
+            PivotY = LastPivotY;
+            PivotZ = LastPivotZ;
+        }
+
+        void ChangePerspective(){
+            orthographic = !orthographic;
+        }
 };
 
 std::vector<Viewport3D> Viewports3D;
 
-void SetPerspectiva(int parentView){
-    Viewports3D[parentView].orthographic = !Viewports3D[parentView].orthographic;
-    Viewports[Viewports3D[parentView].Parent].redibujar = true;
+void DesactivarCamaraActiva(){
+    for (size_t o = 0; o < Viewports3D.size(); o++) {
+		Viewports3D[o].ViewFromCameraActive = false;	
+    }
 }
 
 int AddViewport3D(int parent) {

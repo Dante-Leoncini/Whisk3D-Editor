@@ -25,6 +25,20 @@
 #include <iostream>
 #include <iomanip>
 
+//variables de SDL/Linux
+SDL_Window* window = nullptr;  // definición real
+
+//NUEVO! es para poder usar OpenGl o Vulkan
+SDL_GLContext glContext = nullptr;
+
+// Para Vulkan
+VkInstance vkInstance = VK_NULL_HANDLE;
+VkSurfaceKHR vkSurface = VK_NULL_HANDLE;
+bool usingVulkan = false;
+
+int winW = 800; 
+int winH = 600;
+
 //Whisk3D imports
 #include "../Shared/tablero.h"
 #include "../Shared/Floor.h"
@@ -35,22 +49,21 @@
 #include "../Shared/variables.h"
 #include "../Shared/colores.h"
 #include "../Shared/OpcionesRender.h"
+
 #include "../Shared/ObjectMode.h"
 #include "../Shared/Animation.h"
-
-//Hice un importador OBJ. pero se podrian crear importadores de otros formatos
+#include "../Shared/render.h"
+#include "../Shared/ViewPorts/ViewPorts.h"
+#include "../Shared/funciones.h"
 #include "../Shared/import_obj.h"
 #include "../Shared/import_vertex_animation.h"
 #include "../Shared/lectura-escritura.h"
-
-#include "../Shared/funciones.h"
-#include "../Shared/render.h"
-#include "../Shared/ViewPorts/ViewPorts.h"
 #include "../Shared/controles.h"
 #include "../Shared/constructor.h"
 
 struct Config {
     bool fullscreen = false;
+    bool enableAntialiasing = false;
     int width = 800;
     int height = 600;
 	int displayIndex = 0; // monitor 1
@@ -73,6 +86,7 @@ Config loadConfig(const std::string& filename) {
         std::string key, eq, value;
         if (iss >> key >> eq >> value && eq == "=") {
             if (key == "fullscreen") cfg.fullscreen = (value == "true");
+            else if (key == "enableAntialiasing") cfg.enableAntialiasing = (value == "true");
             else if (key == "width") cfg.width = std::stoi(value);
             else if (key == "height") cfg.height = std::stoi(value);
             else if (key == "displayIndex") cfg.displayIndex = std::stoi(value);
@@ -178,17 +192,21 @@ int main(int argc, char* argv[]) {
         return -1;
     }
 
-	// ---- CONFIGURAR ANTIALIASING ----
-	// Pedir un framebuffer con multisampling
-	SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
-	SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 4); // 4x MSAA (puedes probar 8, 16 si tu GPU soporta)
-
-
     // mover working dir al path donde está el ejecutable
     std::filesystem::path exePath = std::filesystem::absolute(argv[0]).parent_path();
     std::filesystem::current_path(exePath);
 
 	Config cfg = loadConfig("./config.ini");
+
+	// ---- CONFIGURAR ANTIALIASING ----
+	// Pedir un framebuffer con multisampling
+    if (cfg.enableAntialiasing) {
+        SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
+        SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 4); // 4x MSAA
+    } else {
+        SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 0);
+        SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 0);
+    }
 
 	SDL_WindowFlags windowFlags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY;
 

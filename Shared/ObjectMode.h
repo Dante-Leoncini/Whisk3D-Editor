@@ -46,7 +46,6 @@ void ReloadViewport(bool hacerRedibujo){
 }
 
 void SetTransformPivotPoint(){
-	//if (Objects.Count() < 1){return;}	
 	if (Objects.size() < 1){return;}	
 	if (InteractionMode == ObjectMode){	
 		TransformPivotPointFloat[0] = 0;
@@ -209,4 +208,139 @@ void DuplicatedLinked(){
 	}
 	SetPosicion();
 	redibujar = true;
+}
+
+void SetRotacion(int dx, int dy){
+	for (size_t o = 0; o < estadoObjetos.size(); o++) {
+		switch (axisSelect) {
+			case ViewAxis:
+				/*Objects[estadoObjetos[o].indice].rotX -= valor;
+
+				Vec3 objPos = Objects[estadoObjetos[o].indice].pos;
+				Vec3 screenPos = ProjectToScreen(objPos); // convierte mundo -> pantalla
+
+				int dxScreen = mouseX - screenPos.x;
+				int dyScreen = mouseY - screenPos.y;*/
+				break;
+			case X:
+				Objects[estadoObjetos[o].indice].rotX -= dx;
+				Objects[estadoObjetos[o].indice].rotX -= dy;
+				break;
+			case Y:
+				Objects[estadoObjetos[o].indice].rotY -= dx;
+				Objects[estadoObjetos[o].indice].rotY -= dy;
+				break;
+			case Z:
+				Objects[estadoObjetos[o].indice].rotZ -= dx;
+				Objects[estadoObjetos[o].indice].rotZ -= dy;
+				break;
+		}
+	}
+}
+
+void SetRotacion(){
+	//si no hay objetos
+	if (Objects.size() < 1){return;}
+	else if (Objects[SelectActivo].seleccionado && estado == editNavegacion){
+		guardarEstado();
+		estado = rotacion;	
+		valorRotacion = 0;
+		//axisSelect = ViewAxis;
+		if (axisSelect > 2){axisSelect = X;}
+	}	
+	//esto es para symbian. la tecla 2 es para rotar. pero tambien para seleccionar el eje Y
+	/*else {
+		axisSelect = Y;
+	}*/
+	/*if (estado == rotacion){
+		SetRotacion(0, 0);
+	}*/
+    ReloadViewport(true);	
+};
+
+void SetScale(int valor){
+	valor = valor*1000;
+	for (size_t o = 0; o < estadoObjetos.size(); o++) {
+		switch (axisSelect) {
+			case X:
+				Objects[estadoObjetos[o].indice].scaleX += valor;
+				break;
+			case Y:
+				Objects[estadoObjetos[o].indice].scaleY += valor;
+				break;
+			case Z:
+				Objects[estadoObjetos[o].indice].scaleZ += valor;
+				break;
+			case XYZ:
+				Objects[estadoObjetos[o].indice].scaleX += valor;
+				Objects[estadoObjetos[o].indice].scaleY += valor;
+				Objects[estadoObjetos[o].indice].scaleZ += valor;
+				break;
+		}
+	}
+	redibujar = true;
+}
+
+void SetEscala(){
+	//XYZ tiene escala
+	//si no hay objetos
+	if (Objects.size() < 1){return;}
+	else if (Objects[SelectActivo].seleccionado && estado == editNavegacion){
+		estado = EditScale;
+		guardarEstado();
+		axisSelect = XYZ;	
+	}
+	//esto era para symbian- porque "escala" y "eje Z" es el numero 3
+	/*else {
+		axisSelect = Z;
+	}*/
+	/*if (estado == rotacion){
+		SetRotacion(0, 0);
+	}*/
+    ReloadViewport(true);
+};
+
+void SetTranslacionObjetos(int dx, int dy, float factor = 1.0f){
+	for (size_t o = 0; o < estadoObjetos.size(); o++) {
+		switch (axisSelect) {
+			case ViewAxis: {
+                //float radY = Viewports3D[ViewportId].rotY * M_PI / 180.0f;
+                //float radX = Viewports3D[ViewportId].rotX * M_PI / 180.0f;
+
+                //float cosX = cos(radX);
+                //float sinX = sin(radX);
+                //float cosY = cos(radY);
+                //float sinY = sin(radY);
+
+                auto& obj = Objects[estadoObjetos[o].indice];
+                obj.posZ -= dy * factor * precalculado.cosY;
+                obj.posX += dx * factor * precalculado.cosX - dy * factor * precalculado.sinY * precalculado.sinX;
+                obj.posY += dx * factor * precalculado.sinX + dy * factor * precalculado.sinY * precalculado.cosX;
+
+				/*std::cout << "cameraDistance " << cameraDistance 
+				        << " | PivotY " << PivotY						
+						<< " | posY: " << posY << std::endl;
+
+				// factor relativo a distancia
+				float factorDist = (cameraDistance - posY ) * 0.0055f;
+
+				obj.posZ -= dy * factor * cosY * factorDist;
+				obj.posX += dx * factor * cosX * factorDist - dy * factor * sinY * sinX * factorDist;
+				obj.posY += dx * factor * sinX * factorDist + dy * factor * sinY * cosX * factorDist;*/
+                break;
+            }
+			case X:
+				Objects[estadoObjetos[o].indice].posX += dx;
+				Objects[estadoObjetos[o].indice].posX += dy;
+				break;
+			case Y:
+				Objects[estadoObjetos[o].indice].posY -= dx;
+				Objects[estadoObjetos[o].indice].posY -= dy;
+				break;
+			case Z:
+				Objects[estadoObjetos[o].indice].posZ -= dx;
+				Objects[estadoObjetos[o].indice].posZ -= dy;
+				break;
+		}
+	}
 }

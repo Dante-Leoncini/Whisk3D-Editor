@@ -41,7 +41,7 @@ void ConstructUniversal(){
 
     Object2D& tempObject2D = Objects2D[AddObject2D(UI::text)];
     Text& tempText = Texts[tempObject2D.Id];
-    tempText.SetValue("Whisk3D pre-alpha 25-10-07");
+    tempText.SetValue("Whisk3D pre-alpha 25-10-10");
     tempText.SetScaleX(3);
     tempText.SetScaleY(3);
     tempObject2D.opacity = 0.5f;
@@ -55,6 +55,11 @@ void ConstructUniversal(){
     SplitView(BaseView, View::Row);
 
     SplitView(1, View::Column);
+    SplitView(2, View::Column);
+
+    SetWidthViewport(1,winW*0.8);
+    SetHeightViewport(3,winH*0.1);
+    SetHeightViewport(5,winH*0.7);
 
     OnResizeViewports(winW, winH);
 }
