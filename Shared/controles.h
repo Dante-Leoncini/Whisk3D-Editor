@@ -2,6 +2,8 @@ bool LAltPressed = false;
 bool LShiftPressed = false;
 
 void Aceptar(){	
+	// Mostrar el cursor
+	SDL_ShowCursor();
 	//si no hay objetos
 	if (Objects.size() < 1){return;}
 
@@ -77,7 +79,7 @@ void TeclaArriba(){
 		}		
 	}
 	else if (estado == EditScale){
-		SetScale(1);	
+		SetScale(2,0);	
 	}
 	else if (estado == translacion){
 		SetTranslacionObjetos(0, -30);
@@ -122,7 +124,7 @@ void TeclaAbajo(){
 		}
 	}
 	else if (estado == EditScale){
-		SetScale(-1);	
+		SetScale(-2,0);	
 	}
 	else if (estado == translacion){
 		SetTranslacionObjetos(0, 30);		
@@ -176,7 +178,7 @@ void TeclaDerecha(){
 		SetRotacion(-1, 0);
 	}
 	else if (estado == EditScale){
-		SetScale(1);	
+		SetScale(2,0);	
 	}
 	else if (estado == timelineMove){
 		CurrentFrame++;
@@ -233,7 +235,7 @@ void TeclaIzquierda(){
 		SetRotacion(1, 0);
 	}
 	else if (estado == EditScale){
-		SetScale(-1);
+		SetScale(-2,0);
 	}
 	else if (estado == timelineMove){
 		CurrentFrame--;
@@ -575,11 +577,27 @@ void InputUsuarioSDL3(SDL_Event &e){
 
 			redibujar = true;
 		}
-		else if (estado == translacion){
+		else if (estado == translacion || estado == rotacion || estado == EditScale){
 			// mover objetos con el mouse
 			CheckWarpMouseInWindow(mx, my);
+			// Ocultar el cursor
+			SDL_HideCursor();
 			if (viewPortActive > -1){
-				SetTranslacionObjetos(dx, dy, 16.0f);				
+				switch (estado) {
+					case translacion:
+						SetTranslacionObjetos(dx, dy, 16.0f);
+						break;
+
+					case rotacion:
+						SetRotacion(dx, dy);
+						break;
+					case EditScale:
+						SetScale(dx, dy);
+						break;
+					default:
+						// por si no coincide con nada
+						break;
+				}	
 			}
 		}
     }
@@ -593,7 +611,7 @@ void InputUsuarioSDL3(SDL_Event &e){
     if (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
 		ViewPortClickDown = true;
 		if (e.button.button == SDL_BUTTON_LEFT) {  
-			if (estado == translacion){
+			if (estado == translacion || estado == EditScale || estado == rotacion){
 				Aceptar();
 			}
 			else {
@@ -606,7 +624,7 @@ void InputUsuarioSDL3(SDL_Event &e){
             GuardarMousePos();
         }
 		else if (e.button.button == SDL_BUTTON_RIGHT) {  
-			if (estado == translacion){
+			if (estado == translacion || estado == EditScale || estado == rotacion){
 				Cancelar();
 			}
 		}

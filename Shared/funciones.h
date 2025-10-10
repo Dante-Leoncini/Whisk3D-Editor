@@ -32,6 +32,8 @@ void ReestablecerEstado(){
 };
 
 void Cancelar(){
+	// Mostrar el cursor
+	SDL_ShowCursor();
 	if (estado != editNavegacion){
 		ReestablecerEstado();
 	}

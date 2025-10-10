@@ -258,23 +258,30 @@ void SetRotacion(){
     ReloadViewport(true);	
 };
 
-void SetScale(int valor){
-	valor = valor*1000;
+void SetScale(int dx, int dy){
+	dx = dx*500;
+	dy = dy*500;
 	for (size_t o = 0; o < estadoObjetos.size(); o++) {
 		switch (axisSelect) {
 			case X:
-				Objects[estadoObjetos[o].indice].scaleX += valor;
+				Objects[estadoObjetos[o].indice].scaleX += dx;
+				Objects[estadoObjetos[o].indice].scaleX += dy;
 				break;
 			case Y:
-				Objects[estadoObjetos[o].indice].scaleY += valor;
+				Objects[estadoObjetos[o].indice].scaleY += dx;
+				Objects[estadoObjetos[o].indice].scaleY += dy;
 				break;
 			case Z:
-				Objects[estadoObjetos[o].indice].scaleZ += valor;
+				Objects[estadoObjetos[o].indice].scaleZ += dx;
+				Objects[estadoObjetos[o].indice].scaleZ += dy;
 				break;
 			case XYZ:
-				Objects[estadoObjetos[o].indice].scaleX += valor;
-				Objects[estadoObjetos[o].indice].scaleY += valor;
-				Objects[estadoObjetos[o].indice].scaleZ += valor;
+				Objects[estadoObjetos[o].indice].scaleX += dx;
+				Objects[estadoObjetos[o].indice].scaleY += dx;
+				Objects[estadoObjetos[o].indice].scaleZ += dx;
+				Objects[estadoObjetos[o].indice].scaleX += dy;
+				Objects[estadoObjetos[o].indice].scaleY += dy;
+				Objects[estadoObjetos[o].indice].scaleZ += dy;
 				break;
 		}
 	}
