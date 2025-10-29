@@ -2,8 +2,6 @@
 
 class Text {
 	public:
-		//Object2D* parent = nullptr;
-		//Object2D& ObjParent = *parent;
     	Object2D& parent;
 		int interpolacion = closest;
 		//colores RGB

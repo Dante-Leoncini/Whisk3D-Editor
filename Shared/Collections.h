@@ -18,6 +18,8 @@ void AddToCollection(size_t objID, const std::string& name) {
     // Crear la colección en memoria dinámica
     Collection* newCollection = new Collection(objID, *newText);
 
+    reinterpret_cast<Object2D*>(newText)->scaleX = 2;
+    reinterpret_cast<Object2D*>(newText)->scaleY = 2;
     reinterpret_cast<Text*>(newText->data)->SetValue(name);
 
     // Guardar el puntero, sin copiar nada
