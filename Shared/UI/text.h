@@ -12,7 +12,9 @@ class Text {
     	std::vector<Sprite> letters;
 
 		Text(Object2D& p)
-			: parent(p), value("Text") {}
+			: parent(p), value("Text") {
+			UpdateCache();
+		}
 
 		void SetColor(GLubyte red, GLubyte green, GLubyte blue){
 			color[0] = red;

@@ -69,12 +69,12 @@ class Outliner {
             glEnable( GL_BLEND );
             glColor4f(ListaColores[blanco][0],ListaColores[blanco][1],ListaColores[blanco][2],ListaColores[blanco][3]);
 
-            /*for (size_t i = 0; i < Objects2Doutliner.size(); i++) {
+            for (size_t i = 0; i < Collections.size(); i++) {
                 glPushMatrix();                      
                 glTranslatef(0, i * RenglonHeight, 0);       
-                RenderObject2D(Objects2Doutliner[i]);   
+                RenderObject2D(Collections[i]->Text);   
                 glPopMatrix();  
-            }*/
+            }
         }
 
         // Inicializar el Outliner

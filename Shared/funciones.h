@@ -32,8 +32,6 @@ void Cancelar(){
 void AddMesh( int modelo ){
 	Cancelar();
 	DeseleccionarTodo();
-	AddToCollection(Objects.size());
-	//SelectActivo = Objects.Count();
 	SelectActivo = Objects.size();
 	SelectCount = 1;
 	
@@ -179,6 +177,7 @@ void AddMesh( int modelo ){
 	//creamos el objeto y le asignamos la mesh	
 	//Meshes[obj.Id].materialsGroup.Append(tempFaceGroup);
 	Meshes[obj.Id].materialsGroup.push_back(tempFaceGroup);
+	AddToCollection(SelectActivo, obj.name);
     redibujar = true;
 }
 
@@ -452,7 +451,7 @@ void BorrarObjeto(size_t indice){
 		//borra y actualiza los padres
 		if (Objects[o].Parent == (int)(indice)){				
 			Objects[o].Parent = -1;
-			AddToCollection(o);
+			AddToCollection(o, Objects[o].name);
 		} 
 		else if (Objects[o].Parent > (int)(indice)) {
 			Objects[o].Parent--;

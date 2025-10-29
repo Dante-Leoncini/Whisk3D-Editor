@@ -116,7 +116,7 @@ void AddObject( int tipo ){
 	obj.Id = -0;
 	Objects.push_back(obj);
 	SelectActivo = Objects.size()-1;
-	AddToCollection(SelectActivo);
+	AddToCollection(SelectActivo, obj.name);
 	if (tipo == light){
 		Light tempLight;
 		tempLight.type = pointLight;
