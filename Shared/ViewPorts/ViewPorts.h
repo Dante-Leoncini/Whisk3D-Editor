@@ -268,3 +268,18 @@ void SetViewPort(int id, View type){
             break;
     }
 }
+
+void SetGlobalScale(int scale){
+    GlobalScale = scale;
+    margin = 10 * scale;
+    padding = 5 * scale;
+    gap = 5 * scale;
+    RenglonHeight = 12 * scale;
+    SetIconScale(scale);
+
+    for (size_t i = 0; i < Collections.size(); i++) {                  
+        Collections[i]->Text.scaleX = scale;                
+        Collections[i]->Text.scaleY = scale;    
+        reinterpret_cast<Text*>(Collections[i]->Text.data)->UpdateCache();    
+    }
+}

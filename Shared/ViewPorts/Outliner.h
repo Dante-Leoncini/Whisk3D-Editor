@@ -1,5 +1,3 @@
-int RenglonHeight = 24;
-
 class Outliner {
     public:
         int Parent = -1;
@@ -69,10 +67,26 @@ class Outliner {
             glEnable( GL_BLEND );
             glColor4f(ListaColores[blanco][0],ListaColores[blanco][1],ListaColores[blanco][2],ListaColores[blanco][3]);
 
+            glPushMatrix();          
+            glTranslatef(margin, 0, 0);
             for (size_t i = 0; i < Collections.size(); i++) {
                 glPushMatrix();                      
                 glTranslatef(0, i * RenglonHeight, 0);       
                 RenderObject2D(Collections[i]->Text);   
+                glPopMatrix();  
+            }
+            glPopMatrix();  
+
+			glBindTexture(GL_TEXTURE_2D, Textures[0].iID);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    		glVertexPointer(2, GL_SHORT, 0, IconMesh); //todos los iconos comparten los vertices y tamaño
+            glTranslatef(parentView.width-IconSize-margin, GlobalScale, 0);
+            for (size_t i = 0; i < Collections.size(); i++) {
+                glPushMatrix();                      
+                glTranslatef(0, i * RenglonHeight, 0);
+                glTexCoordPointer(2, GL_FLOAT, 0, IconsUV[static_cast<size_t>(IconType::visible)]->uvs);
+                glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
                 glPopMatrix();  
             }
         }

@@ -53,6 +53,10 @@ void ConstructUniversal(){
 
     //creamos el Vieport Base
 
+    //es el tamaño en X e Y de la textura
+    CrearIconos(128, 128);
+    SetGlobalScale(2);
+
     int BaseView = AddViewport(View::ViewPort3D, -1, winW, winH, 0, 0, 1.0f, 1.0f);
     //lo dividimos
     SplitView(BaseView, View::Row);
