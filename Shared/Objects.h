@@ -76,7 +76,7 @@ void changeSelect(){
 }
 
 std::string SetName(const std::string& baseName) {
-    // Ver si el nombre base ya existe
+    // Comprueba si un nombre ya existe
     auto nameExists = [&](const std::string& name) {
         for (size_t o = 0; o < Objects.size(); ++o) {
             if (Objects[o]->name == name)
@@ -85,15 +85,44 @@ std::string SetName(const std::string& baseName) {
         return false;
     };
 
+    // Si el nombre base no existe, devolverlo tal cual
     if (!nameExists(baseName))
         return baseName;
 
-    // Si existe, buscar el siguiente número disponible
-    int counter = 1;
+    // Detectar si baseName termina en ".<digits>"
+    std::string root = baseName;
+    int startCounter = 1;
+
+    size_t pos = baseName.find_last_of('.');
+    if (pos != std::string::npos && pos + 1 < baseName.size()) {
+        bool allDigits = true;
+        for (size_t i = pos + 1; i < baseName.size(); ++i) {
+            if (!std::isdigit(static_cast<unsigned char>(baseName[i]))) { allDigits = false; break; }
+        }
+        if (allDigits) {
+            // separar raíz y sufijo numérico
+            root = baseName.substr(0, pos);
+            try {
+                startCounter = std::stoi(baseName.substr(pos + 1)) + 1;
+                if (startCounter < 1) startCounter = 1;
+            } catch (...) {
+                startCounter = 1;
+            }
+        } else {
+            root = baseName; // no es sufijo numérico
+            startCounter = 1;
+        }
+    } else {
+        root = baseName;
+        startCounter = 1;
+    }
+
+    // Buscar el siguiente número disponible
+    int counter = startCounter;
     std::string newName;
     do {
         std::ostringstream ss;
-        ss << baseName << "." << std::setw(3) << std::setfill('0') << counter;
+        ss << root << "." << std::setw(3) << std::setfill('0') << counter;
         newName = ss.str();
         counter++;
     } while (nameExists(newName));

@@ -91,16 +91,16 @@ class FontUV {
             addGlyph("#", texW, texH, 67, 51, 5, 11);
             addGlyph("%", texW, texH, 73, 51, 5, 11);
 
-            addGlyph("!", texW, texH, 1, 61, 5, 11);
-            addGlyph("?", texW, texH, 7, 61, 5, 11);
-            addGlyph(".", texW, texH, 13, 61, 5, 11);
-            addGlyph(",", texW, texH, 19, 61, 5, 11);
-            addGlyph("'", texW, texH, 25, 61, 5, 11);
-            addGlyph("\"", texW, texH, 31, 61, 5, 11);
-            addGlyph("@", texW, texH, 37, 61, 5, 11);
-            addGlyph("&", texW, texH, 43, 61, 5, 11);
-            addGlyph("$", texW, texH, 49, 61, 5, 11);
-            addGlyph("¡", texW, texH, 55, 61, 5, 11);
+            addGlyph("!", texW, texH, 1, 63, 5, 11);
+            addGlyph("?", texW, texH, 7, 63, 5, 11);
+            addGlyph(".", texW, texH, 13, 63, 5, 11);
+            addGlyph(",", texW, texH, 19, 63, 5, 11);
+            addGlyph("'", texW, texH, 25, 63, 5, 11);
+            addGlyph("\"", texW, texH, 31, 63, 5, 11);
+            addGlyph("@", texW, texH, 37, 63, 5, 11);
+            addGlyph("&", texW, texH, 43, 63, 5, 11);
+            addGlyph("$", texW, texH, 49, 63, 5, 11);
+            addGlyph("¡", texW, texH, 55, 63, 5, 11);
         }
 
         const GLfloat* getUV(const std::string& c) {
