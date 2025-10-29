@@ -16,6 +16,9 @@
 #include <algorithm>
 #include <cstring>
 
+//utilidades de Whisk3D de uso general. mas que nada para manejo de punteros y memoria
+#include "../Shared/Whisk3Dutils.h"
+
 #include <filesystem>
 #include <vector>
 #include <fstream>
@@ -143,6 +146,11 @@ bool loadColors(const std::string& filename) {
             ListaColores[idx][1] = g;
             ListaColores[idx][2] = b;
             ListaColores[idx][3] = a;
+            
+            ListaColoresUbyte[idx][0] = (GLubyte)(r*255);
+            ListaColoresUbyte[idx][1] = (GLubyte)(g*255);
+            ListaColoresUbyte[idx][2] = (GLubyte)(b*255);
+            ListaColoresUbyte[idx][3] = (GLubyte)(a*255);
         } else {
             std::cerr << "Color desconocido en colors.skin: " << name << "\n";
         }
@@ -331,12 +339,12 @@ int main(int argc, char* argv[]) {
         vkQueuePresentKHR(presentQueue, &presentInfo);
     }
 
-    //constructor symbian, linux y windows
-    ConstructUniversal();
-
     //carga el Skin
     std::string skinPath = "../Shared/UI/Skins/" + cfg.SkinName + "/skin.ini";
     loadColors(skinPath);
+
+    //constructor symbian, linux y windows
+    ConstructUniversal();
 
 	// Cargar texturas
 	Textures.push_back(Texture());

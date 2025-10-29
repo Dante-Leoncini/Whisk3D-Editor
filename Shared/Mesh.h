@@ -17,6 +17,9 @@ class Mesh {
 	public:
 		int vertexSize = 0;
 		GLshort* vertex = nullptr;
+		GLfixed* vertexF = nullptr;	
+		bool UseVertexF = false;
+
 		std::vector<VertexGroup> vertexGroups;
 		GLubyte* vertexColor = nullptr;
 		GLbyte* normals = nullptr;
@@ -31,6 +34,7 @@ class Mesh {
 		//libera la memoria
 		void LiberarMemoria(){
 			delete[] vertex;
+            delete[] vertexF;
 			delete[] vertexColor;
 			delete[] normals;
 			delete[] uv;

@@ -1,6 +1,8 @@
 enum class UI {
     text,
-    empty
+    empty,
+    Image,
+    Rectangle
 };
 
 class Object2D {
@@ -10,58 +12,74 @@ class Object2D {
 		int x = 0, y = 0;
 		int scaleX = 1;
 		int scaleY = 1;
-		float opacity = 1.0f;
-		int Id = -1;
-		int Parent = -1;
-		std::vector<Children> Childrens;
-		std::string name;
+		GLubyte opacity = 255;
+
+        Object2D* Childrens;
+        size_t ChildrensCount = 0;        
+
+        //punteros
+        Object2D* Parent = nullptr;
+        void* data = nullptr; // Apunta al tipo real (Rectangle*, Text*, etc.)
 };
 
-std::vector<Object2D> Objects2D;
-
 #include "./text.h"
+#include "./image.h"
+#include "./rectangle.h"
 
-int AddObject2D(UI type = UI::empty) {
-    Object2D obj;
-    obj.type = type;
+Object2D* AddObject2D(UI type = UI::empty, Object2D** outPtr = nullptr) {
+    // Crear el objeto en memoria dinámica
+    Object2D* obj = new Object2D();
+    obj->type = type;
+    obj->visible = true;
+    obj->x = 0;
+    obj->y = 0;
+    obj->scaleX = 1;
+    obj->scaleY = 1;
+    obj->Parent = nullptr;
+    obj->data = nullptr;
 
-    // podés inicializar más campos si querés:
-    obj.visible = true;
-    obj.x = 0;
-    obj.y = 0;
-    obj.scaleX = 1;
-    obj.scaleY = 1;
-    obj.Id = static_cast<int>(Objects2D.size()); // id incremental
-    obj.Parent = -1;
-    obj.name = "Object";
+    // Asignar memoria al contenido según tipo
+    switch(type) {
+        case UI::Rectangle:
+            obj->data = AddRectangle(*obj);
+            break;
 
-	if (type == UI::text) {
-        // Guardar índice en el Object2D
-        obj.Id = AddText(Objects2D.size());
-        obj.name = "Text" + std::to_string(obj.Id+1);
-    } else {
-        // Objeto normal (no texto)
-        obj.Id = -1;
-        obj.name = "Empty " + std::to_string(Objects2D.size());
+        case UI::text:
+            obj->data = AddText(*obj);
+            break;
+
+        case UI::Image:
+            obj->data = AddImage(*obj);
+            break;
+
+        default:
+            break;
     }
 
-    Objects2D.push_back(obj);
-	return Objects2D.size() -1;
+    // Si se pasó un puntero externo, guardar ahí la dirección
+    if (outPtr)
+        *outPtr = obj;
+
+    // Devolver el puntero
+    return obj;
 }
 
-void RenderObject2D( int objId ){
-	Object2D& obj = Objects2D[objId];
+void RenderObject2D( Object2D& obj ){
 	if (!obj.visible){
 		return;
 	}
 
 	switch (obj.type) {
-        case UI::text: {
-			Text& txt = Texts[obj.Id];
-            glColor4f(txt.r, txt.g, txt.b, obj.opacity);
-			txt.Render();
+        case UI::Rectangle: {
+            Rectangle* rect = static_cast<Rectangle*>(obj.data);
+            if (rect) rect->Render();
             break;
-		}
+        }
+        case UI::text: {
+            Text* txt = static_cast<Text*>(obj.data);
+            if (txt) txt->Render();
+            break;
+        }
 		case UI::empty:
         default:
             break;

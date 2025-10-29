@@ -42,6 +42,8 @@ int BuscarMaterialPorNombre(const std::string& name) {
 class Wavefront {
 	public:
 		std::vector<GLshort> vertex;
+		std::vector<GLfixed> vertexF;		
+		bool UseVertexF = true;
 		std::vector<GLubyte> vertexColor;
 		std::vector<GLbyte> normals;
 		std::vector<GLfloat> uv;
@@ -52,6 +54,7 @@ class Wavefront {
 
         void Reset(){
          	vertex.clear();
+			vertexF.clear();
          	vertexColor.clear();
          	normals.clear();
          	uv.clear();
@@ -764,7 +767,7 @@ class Wavefront {
 	*acumuladoUVs += acumuladoUVsProximo;
 	Objects.Append(obj);
 	SelectActivo = Objects.Count()-1;
-	Collection.Append(SelectActivo);
+	Collections.Append(SelectActivo);
 	
 	DeseleccionarTodo();
 	Objects[SelectActivo].seleccionado = true;
@@ -1016,7 +1019,7 @@ bool LeerOBJ(std::ifstream& file,
     int objIndex = (int)Objects.size() - 1;
 
     // Agregar el índice del objeto a Collection para render
-    Collection.push_back(objIndex);
+	AddToCollection(objIndex);
 
     return hayMasObjetos;
 }

@@ -1,13 +1,3 @@
-void DeseleccionarTodo(){
-	if (InteractionMode == ObjectMode){
-		//for(int o=0; o < Objects.Count(); o++){
-		for(size_t o=0; o < Objects.size(); o++){
-			Objects[o].seleccionado = false;				
-		}
-		SelectCount = 0;
-	}
-}
-
 void ReestablecerEstado(){
 	if (InteractionMode == ObjectMode){
 		//for(int o=0; o < estadoObjetos.Count(); o++){
@@ -42,8 +32,7 @@ void Cancelar(){
 void AddMesh( int modelo ){
 	Cancelar();
 	DeseleccionarTodo();
-	//Collection.Append(Objects.Count());
-	Collection.push_back(Objects.size());
+	AddToCollection(Objects.size());
 	//SelectActivo = Objects.Count();
 	SelectActivo = Objects.size();
 	SelectCount = 1;
@@ -52,7 +41,7 @@ void AddMesh( int modelo ){
 	//Objects.Append(TempObj);
 	Objects.push_back(TempObj);
 	//Object& obj = Objects[Objects.Count()-1];
-	Object& obj = Objects[Objects.size()-1];
+	Object& obj = Objects[SelectActivo];
 	Objects[SelectActivo].seleccionado = true;
 	
 	//obj.Id = Meshes.Count();
@@ -184,76 +173,12 @@ void AddMesh( int modelo ){
 		for (int i = 0; i < tempFaceGroup.indicesDrawnCount; i++) {
 			pMesh.faces[i] = CuboTriangles[i];
 		}
+		Objects[SelectActivo].name = SetName("Cube");
 	}	
 
 	//creamos el objeto y le asignamos la mesh	
 	//Meshes[obj.Id].materialsGroup.Append(tempFaceGroup);
 	Meshes[obj.Id].materialsGroup.push_back(tempFaceGroup);
-    redibujar = true;
-}
-
-void AddObject( int tipo ){
-	//Cancelar();
-	Object obj;
-	obj.type = tipo;
-	obj.visible = true;
-	obj.seleccionado = false;
-	obj.posX = Cursor3DposX;
-	obj.posY = Cursor3DposY;
-	obj.posZ = Cursor3DposZ;
-	obj.rotX = obj.rotY = obj.rotZ = 0;
-	obj.scaleX = obj.scaleY = obj.scaleZ = 45000;
-	obj.Parent = -1;	
-	obj.Id = -0;
-	//Objects.Append(obj);
-	Objects.push_back(obj);
-	//Collection.Append(Objects.Count()-1);
-	Collection.push_back(Objects.size()-1);
-	//SelectActivo = Objects.Count()-1;
-	SelectActivo = Objects.size()-1;
-	if (tipo == light){
-		Light tempLight;
-		tempLight.type = pointLight;
-		tempLight.lightId = nextLightId;
-		tempLight.color[0] = 1.0;
-		tempLight.color[1] = 1.0;
-		tempLight.color[2] = 1.0;
-		tempLight.color[3] = 1.0;
-		//tempLight.color  = { MATERIALCOLOR(1.0, 1.0, 1.0, 1.0) };
-
-		glEnable( nextLightId );		
-		GLfloat lightDiffuseSpot[4]   = { 1.0, 1.0, 1.0, 1.0 };
-		GLfloat lightSpecularSpot[4]  = { 1.0, 1.0, 1.0, 1.0 };
-		glLightfv(  nextLightId, GL_DIFFUSE,  lightDiffuseSpot  );
-		glLightfv(  nextLightId, GL_AMBIENT,  objAmbient  );
-		glLightfv(  nextLightId, GL_SPECULAR, lightSpecularSpot );
-		//glLightfv(  nextLightId, GL_POSITION, lightPositionSpot );
-		glLightfv(  nextLightId, GL_POSITION, positionPuntualLight );
-		
-
-		glLightf(   nextLightId, GL_CONSTANT_ATTENUATION,  1.5  );
-		glLightf(   nextLightId, GL_LINEAR_ATTENUATION,    0.5  );
-		glLightf(   nextLightId, GL_QUADRATIC_ATTENUATION, 0.5  );
-
-		/*glLightf(   nextLightId, GL_SPOT_CUTOFF,   170.0                );
-		glLightf(   nextLightId, GL_SPOT_EXPONENT,  20.0                );
-		glLightfv(  nextLightId, GL_SPOT_DIRECTION, lightDirectionSpot );*/
-		nextLightId++;
-
-		//Lights.Append(tempLight);
-		Lights.push_back(tempLight);
-		//obj.Id = Lights.Count()-1;
-		obj.Id = Lights.size()-1;
-	}
-	//tipo camara
-	else if (tipo == camera){
-		if (CameraActive < 0){
-			CameraActive = SelectActivo;		
-		}		
-	}
-	DeseleccionarTodo();
-	Objects[SelectActivo].seleccionado = true;
-	SelectCount = 1;
     redibujar = true;
 }
 
@@ -322,38 +247,6 @@ void NewMaterial(bool reemplazar){
 		pMesh.materialsGroup[OldMaterialID-1].material = Materials.size()-1;
 	}
 	redibujar = true;
-}
-
-void changeSelect(){
-	if (InteractionMode == ObjectMode){
-		//si no hay objetos
-		//o si esta moviendo, rotando o haciendo algo... no deja que continue
-		if (1 > Objects.size() || estado != editNavegacion){
-			return;
-		}
-		//DeseleccionarTodo();
-		//deselecciona el objeto actual si es que estaba seleccionado
-		if (SelectActivo < 1 && (int)(Objects.size() > 0)){
-			SelectCount = 1;
-			SelectActivo = 0;
-		}
-		if (Objects[SelectActivo].seleccionado){
-			Objects[SelectActivo].seleccionado = false;
-			SelectCount--;
-		}
-
-		//pasa al siguiente
-		SelectActivo++;
-		if (SelectActivo >= (int)(Objects.size()) ){
-			SelectActivo = 0;
-		}
-		//selecciona el proximo objeto
-		if (!Objects[SelectActivo].seleccionado){
-			Objects[SelectActivo].seleccionado = true;
-			SelectCount++;
-		}
-	}
-    redibujar = true;	
 }
 
 //coloca el cursor 3d desde la vista 3d
@@ -462,7 +355,7 @@ void BorrarMesh(int indice){
 	}
 }
 
-void BorrarObjeto(int indice){
+void BorrarObjeto(size_t indice){
 	Object& obj = Objects[indice];
 
 	if (obj.type == mesh){
@@ -472,7 +365,7 @@ void BorrarObjeto(int indice){
 		
 		for(size_t o=0; o < Objects.size(); o++){
 			//si el objeto esta seleccionado. significa que se va a borrar, por lo tanto no se cuenta
-			if (Objects[o].type == mesh && Objects[o].Id == indice && !Objects[o].seleccionado){
+			if (Objects[o].type == mesh && Objects[o].Id == (int)(indice) && !Objects[o].seleccionado){
 				MeshEnUso = true;
 				break;
 			};				
@@ -504,31 +397,40 @@ void BorrarObjeto(int indice){
 	BorrarAnimaciones(indice);
 
 	// Borrar de la coleccion
-	for (int c = (int)(Collection.size()) - 1; c >= 0; c--) {
-		if (Collection[c] == indice) {
+	/*for (int c = (int)(Collections.size()) - 1; c >= 0; c--) {
+		if (Collections[c].ObjID == indice) {
 			// borrar el elemento en posición `indice`
-			if (c >= 0 && static_cast<size_t>(c) < Collection.size()) {
-				Collection.erase(Collection.begin() + c);
+			if (c >= 0 && static_cast<size_t>(c) < Collections.size()) {
+				Collections.erase(Collections.begin() + c);
 			}
 		}
 		// Hace falta cambiar los indices
-		else if (Collection[c] > indice) {
-			Collection[c]--;
+		else if (Collections[c].ObjID > indice) {
+			Collections[c].ObjID--;
+		}
+	}*/
+
+	for (size_t c = 0; c < Collections.size(); ) {
+		if (Collections[c]->ObjID == indice) {
+			delete Collections[c];               // liberar memoria
+			Collections.erase(Collections.begin() + c); // borrar del vector
+		} else {
+			++c;
 		}
 	}
 
 	//si es la camara activa. borra el indice
-	if (CameraActive == indice){
+	if (CameraActive == (int)(indice)){
 		CameraActive = -1;	
 		DesactivarCamaraActiva();
 	}
 	//si era mas grande. resta uno para que el indice apunte a la camara correcta
-	else if (CameraActive > indice){
+	else if (CameraActive > (int)(indice)){
 		CameraActive--;
 	}
 
 	//Objects.Remove(indice);
-	if (indice >= 0 && indice < (int)(Objects.size())) {
+	if (indice >= 0 && indice < Objects.size()) {
 		Objects.erase(Objects.begin() + indice);
 	}
 
@@ -538,21 +440,21 @@ void BorrarObjeto(int indice){
 	// Actualizar indices en los objetos
 	for (int o = 0; o < (int)(Objects.size()); o++) {
 		for (int c = (int)(Objects[o].Childrens.size()) - 1; c >= 0; c--) {
-			if (Objects[o].Childrens[c].Id == indice) {
+			if (Objects[o].Childrens[c].Id == (int)(indice)) {
 				if (c >= 0 && static_cast<size_t>(c) < Objects.size()) {
 					Objects.erase(Objects.begin() + c);
 				}
 			} 
-			else if (Objects[o].Childrens[c].Id > indice) {
+			else if (Objects[o].Childrens[c].Id > (int)(indice)) {
 				Objects[o].Childrens[c].Id--;
 			}
 		}
 		//borra y actualiza los padres
-		if (Objects[o].Parent == indice){				
+		if (Objects[o].Parent == (int)(indice)){				
 			Objects[o].Parent = -1;
-			Collection.push_back(o);
+			AddToCollection(o);
 		} 
-		else if (Objects[o].Parent > indice) {
+		else if (Objects[o].Parent > (int)(indice)) {
 			Objects[o].Parent--;
 		}
 	}

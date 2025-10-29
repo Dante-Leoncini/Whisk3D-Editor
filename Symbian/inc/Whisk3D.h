@@ -143,7 +143,6 @@ class CWhisk3D : public CFiniteStateMachine, public MTextureLoadingListener
         void EjecutarScriptPython();
         void CalculateMillisecondsPerFrame(TInt aFPS);
         
-        void dibujarUI();
         void ReestablecerEstado();
         void SeleccionarTodo();
         void SetEje( TInt eje );     

@@ -1,5 +1,4 @@
 bool redibujar = true; //solo redibuja si este valor esta en true
-std::vector<int> Collection;
 
 //interpolacion
 enum {lineal, closest};
@@ -8,17 +7,18 @@ enum {lineal, closest};
 #include "./Materials.h"
 #include "./Mesh.h"
 #include "./Constrains.h"
+
+std::vector<Light> Lights;
+GLfloat objAmbient[4]  = { 0.3, 0.3, 0.3, 1.0 };
+
+#include "./UI/UI.h"
+#include "./Collections.h"
 #include "./Objects.h"
 #include "./Modifiers.h"
-#include "./UI/UI.h"
 
 enum { Solid, MaterialPreview, Rendered };
 
 int view = MaterialPreview;
-
-GLfloat objAmbient[4]  = { 0.3, 0.3, 0.3, 1.0 };
-
-std::vector<Light> Lights;
 
 /*void SetPerspectiva(bool orthographicValue, bool redibuja ){
 	orthographic = orthographicValue;

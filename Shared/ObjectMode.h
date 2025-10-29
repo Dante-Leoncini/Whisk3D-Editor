@@ -141,7 +141,7 @@ void DuplicatedObject(){
 		if (SelectActivo == a){
 			SelectActivo = nuevoindice;
 		}
-		Collection.push_back(nuevoindice);
+		AddToCollection(nuevoindice);
 		//si es un mesh
 		if (obj.type == mesh){			
 			Mesh tempMesh;	
@@ -204,7 +204,7 @@ void DuplicatedLinked(){
 		if (SelectActivo == a){
 			SelectActivo = nuevoindice;
 		}
-		Collection.push_back(nuevoindice);
+		AddToCollection(nuevoindice);
 	}
 	SetPosicion();
 	redibujar = true;

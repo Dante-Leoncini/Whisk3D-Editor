@@ -23,9 +23,11 @@ void ClickA(){
 
 void ClickD(){
 	if (LAltPressed){
+		UpdatePrecalculos();
 		DuplicatedLinked();
 	}
 	else if (LShiftPressed){
+		UpdatePrecalculos();
 		DuplicatedObject();
 	}
 }
@@ -581,13 +583,12 @@ void InputUsuarioSDL3(SDL_Event &e){
 			// mover objetos con el mouse
 			CheckWarpMouseInWindow(mx, my);
 			// Ocultar el cursor
-			SDL_HideCursor();
+			//SDL_HideCursor();
 			if (viewPortActive > -1){
 				switch (estado) {
 					case translacion:
 						SetTranslacionObjetos(dx, dy, 16.0f);
 						break;
-
 					case rotacion:
 						SetRotacion(dx, dy);
 						break;
@@ -705,6 +706,7 @@ void InputUsuarioSDL3(SDL_Event &e){
                     SetRotacion();
                     break;
                 case SDLK_G:  
+					// Para activar el cursor de mover/arrastrar
 					UpdatePrecalculos();
                     SetPosicion();
                     break;			

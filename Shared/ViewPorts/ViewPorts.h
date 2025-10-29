@@ -1,5 +1,10 @@
 enum class View {
     ViewPort3D,
+    Outliner,
+    Properties,
+    UVeditor,
+    Timeline,
+    GraphEditor,
     Row,
     Column
 };
@@ -11,7 +16,6 @@ class Viewport {
 		int width = 0, height = 0;
         float weightX = 1;
         float weightY = 1;
-        float aspect = 1;
 		int Parent = -1;
 		int ChildA = -1; //antiguamente era el ID. pero se podria reutilizar como ChildA y para ahorrar memoria son lo mismo
 		int ChildB = -1; //si esta solo. puede quedar en -1
@@ -41,6 +45,7 @@ int FindViewportUnderMouse(int mx, int my) {
 }
 
 #include "./ViewPort3D.h"
+#include "./Outliner.h"
 
 // Método para actualizar cache
 void UpdatePrecalculos() {
@@ -67,10 +72,15 @@ int AddViewport(View type, int parent, int width, int height, int x, int y, floa
     view.Parent = parent;
     view.ChildA = -1;
     view.ChildB = -1;
-    view.aspect = (float)width / (float)height;
+    //view.aspect = (float)width / (float)height;
 
-    if (NewViewPort && type == View::ViewPort3D){
-        view.ChildA = AddViewport3D(Viewports.size());
+    if (NewViewPort){
+        if (type == View::ViewPort3D){
+            view.ChildA = AddViewport3D(Viewports.size());
+        }
+        else if (type == View::Outliner){
+            view.ChildA = AddOutliner(Viewports.size());
+        }
     }
 
     Viewports.push_back(view);
@@ -160,7 +170,11 @@ void OnResizeViewport(int id){
     Viewport& viewActual = Viewports[id];  
     switch (viewActual.type){
         case View::ViewPort3D: {
-            viewActual.aspect = (float)viewActual.width / (float)viewActual.height;
+            Viewports3D[viewActual.ChildA].OnResize();
+            break;
+        }
+        case View::Outliner: {
+            Outliners[viewActual.ChildA]->OnResize();
             break;
         }
         case View::Column: {
@@ -224,11 +238,30 @@ void RenderViewports(int VievId = 0){
             Viewports3D[view.ChildA].Render();
             break;
         }
+        case View::Outliner: {
+            //std::cout << "Es un Outliner " << (VievId+1) << std::endl;
+            Outliners[view.ChildA]->Render();
+            break;
+        }
         case View::Column:
         case View::Row: {
-            //std::cout << "Es un Row " << (VievId+1) << std::endl;
+            //std::cout << "Es un Row/column " << (VievId+1) << std::endl;
             RenderViewports(view.ChildA);
             RenderViewports(view.ChildB);
+            break;
+        }
+        default:
+            break;
+    }
+}
+
+void SetViewPort(int id, View type){
+    Viewports[id].type = type; 
+
+    switch (type) {
+        case View::Outliner: {
+            Viewports[id].ChildA = AddOutliner(id);
+            //Outliners[Viewports[id].ChildA].InitOutliner();
             break;
         }
         default:

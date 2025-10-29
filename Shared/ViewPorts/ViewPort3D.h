@@ -4,6 +4,8 @@ GLfloat LastPivotX = 0;
 GLfloat LastPivotY = 0;
 GLfloat LastPivotZ = 0;
 
+std::vector<int> Objs2Dviewport3D;
+
 class Viewport3D {
 	public:
 		int Parent = -1;
@@ -13,6 +15,7 @@ class Viewport3D {
         float nearClip = 10.0f;
         float farClip = 2000.0f;
         int cameraDistance = 270;
+        float aspect = 1;
         GLfloat posX = 0;
         GLfloat posY = 0;
         GLfloat posZ = 0.0f;
@@ -21,6 +24,11 @@ class Viewport3D {
         GLfloat PivotX = 0;
         GLfloat PivotY = 0;
         GLfloat PivotZ = 0;
+
+        void OnResize(){
+            Viewport& parentView = Viewports[Parent];
+            aspect = (float)parentView.width / (float)parentView.height;
+        }
 
         void Render(){
             //Configuracion inicial!
@@ -33,12 +41,12 @@ class Viewport3D {
             // Proyección ortográfica
             if ( orthographic ){
                 float size = 90.0f;
-                glOrtho(-size * parentView.aspect, size * parentView.aspect,
+                glOrtho(-size * aspect, size * aspect,
                         -size, size,
                         nearClip, farClip);
             }
             else {
-                gluPerspective(fovDeg, parentView.aspect, nearClip, farClip);
+                gluPerspective(fovDeg, aspect, nearClip, farClip);
             }
             glMatrixMode( GL_MODELVIEW );
 
@@ -100,8 +108,8 @@ class Viewport3D {
             //bucle que dibuja cada objeto en orden
             if(Meshes.size() > 0){
                 // Funcion principal para iterar sobre la coleccion
-                for (size_t o = 0; o < Collection.size(); o++) {
-                    Object& obj = Objects[Collection[o]];
+                for (size_t o = 0; o < Collections.size(); o++) {
+                    Object& obj = Objects[Collections[o]->ObjID];
                     RenderMeshAndChildren(obj);
                 }
             }
@@ -154,8 +162,8 @@ class Viewport3D {
                             ListaColores[LineaPiso][2],
                             ListaColores[LineaPiso][3]
                         );
-                        glDrawElements( GL_LINES, objFacesFloor, GL_UNSIGNED_SHORT, objFacedataFloor );			
-                    }		
+                        glDrawElements( GL_LINES, objFacesFloor, GL_UNSIGNED_SHORT, objFacedataFloor );		
+                    }	
                     //linea Roja
                     if (showXaxis){				
                         glLineWidth(2);
@@ -206,9 +214,8 @@ class Viewport3D {
                 if (Objects.size() > 0){
                     //dibujo de objetos nuevo!
                     glLineWidth(1);	 
-                    //for (int o = 0; o < Collection.Count(); o++) {
-                    for (size_t o = 0; o < Collection.size(); o++) {
-                        RenderObjectAndChildrens(Collection[o]);
+                    for (size_t o = 0; o < Collections.size(); o++) {
+                        RenderObjectAndChildrens(Collections[o]->ObjID);
                     }	 
 
                     //dibujar lineas parent		
@@ -223,12 +230,11 @@ class Viewport3D {
                         glTexCoordPointer( 2, GL_FLOAT, 0, lineUV ); //SpriteUvSize
                         glColor4f(ListaColores[negro][0],ListaColores[negro][1],ListaColores[negro][2],ListaColores[negro][3]);	
                         glBindTexture( GL_TEXTURE_2D, Textures[3].iID ); //selecciona la de linea punteada	
-                        //for (int o = 0; o < Collection.Count(); o++) {
-                        for (size_t o = 0; o < Collection.size(); o++) {
-                            Object& obj = Objects[Collection[o]];
+                        for (size_t o = 0; o < Collections.size(); o++) {
+                            Object& obj = Objects[Collections[o]->ObjID];
                             //if (obj.Childrens.Count() > 0){
                             if (obj.Childrens.size() > 0){
-                                RenderLinkLines(Collection[o]);
+                                RenderLinkLines(Collections[o]->ObjID);
                             }
                         }
                         glDepthMask(GL_TRUE); // Reactiva la escritura en el Z-buffer		
@@ -239,11 +245,10 @@ class Viewport3D {
                     glDisable( GL_TEXTURE_2D );
                     //dibuja los ejes de transformacion
                     if (estado == translacion || estado == rotacion || estado == EditScale) {
-                        //for (TInt o = 0; o < Collection.Count(); o++) {
-                        for (size_t o = 0; o < Collection.size(); o++) {
+                        for (size_t o = 0; o < Collections.size(); o++) {
                             bool found = false;
-                            Object& obj = Objects[Collection[o]];
-                            SearchSelectObj(obj, Collection[o], found);
+                            Object& obj = Objects[Collections[o]->ObjID];
+                            SearchSelectObj(obj, Collections[o]->ObjID, found);
                             if (found) break;  // Si ya encontro el objeto, salir del bucle
                         }
                     }
@@ -258,8 +263,7 @@ class Viewport3D {
                         glEnable( GL_POINT_SPRITE );
                         // Make the points bigger.
                         glPointSize( 16 );
-                        //for (TInt o = 0; o < Collection.Count(); o++) {
-                        for (size_t o = 0; o < Collection.size(); o++) {
+                        for (size_t o = 0; o < Collections.size(); o++) {
                             Object& obj = Objects[o];
                             DibujarOrigen(obj, o);
                         }
@@ -306,7 +310,33 @@ class Viewport3D {
             }
 
             if (ShowUi){
-                DibujarUI(parentView.width, parentView.height);
+                // Guardar matrices
+                glMatrixMode(GL_PROJECTION);
+                glLoadIdentity();
+                glOrtho(0, parentView.width, parentView.height, 0, -1, 1);
+
+                glDisable(GL_DEPTH_TEST);
+                glDisable(GL_LIGHTING);
+                glEnable(GL_TEXTURE_2D);
+                glEnable( GL_BLEND );
+
+                glColor4f(ListaColores[blanco][0],ListaColores[blanco][1],ListaColores[blanco][2],ListaColores[blanco][3]);
+
+                //int texW, texH;
+                glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+                /*glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &texW);
+                glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &texH);
+                std::cout << "Tex size in GPU: " << texW << "x" << texH << std::endl;*/
+
+                glMatrixMode(GL_MODELVIEW);
+                glLoadIdentity();
+
+                //std::string text = "ABCDEFGHIJKLMNÑOPQRSTUVWXYZ abcdefghijklmnñopqrstuvwyz 0123456789+-= ()[]{}<>/*:#%!?.,'\"@&$";
+
+                /*for (size_t i = 0; i < Objs2Dviewport3D.size(); i++) {
+                    int idx = Objs2Dviewport3D[i];        // índice
+                    RenderObject2D(*Objects2D[idx]);      // desreferenciamos el puntero
+                }*/
             }
 
             //termino de dibujar

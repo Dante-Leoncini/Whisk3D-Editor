@@ -6,7 +6,7 @@ class Sprite {
 			0.0f, 1.0f,
 			1.0f, 1.0f
 		};
-		GLfloat vertices[8] = { 0,0, 1,0, 0,1, 1,1 };
+		GLshort vertices[8] = { 0,0, 1,0, 0,1, 1,1 };
 
 		void SetUV(int texW, int texH, int x, int y, int w, int h) {
 			GLfloat u1 = (GLfloat)x / texW;
@@ -26,18 +26,18 @@ class Sprite {
 		}
 
 		// Calcular los vértices una sola vez
-		void SetVertices(int x, int y, int w, int h) {
-			vertices[0] = (GLfloat)x;
-			vertices[1] = (GLfloat)y;
+		void SetVertices(GLshort x, GLshort y, GLshort w, GLshort h) {
+			vertices[0] = (GLshort)x;
+			vertices[1] = (GLshort)y;
 
-			vertices[2] = (GLfloat)(x + w);
-			vertices[3] = (GLfloat)y;
+			vertices[2] = (GLshort)(x + w);
+			vertices[3] = (GLshort)y;
 
-			vertices[4] = (GLfloat)x;
-			vertices[5] = (GLfloat)(y + h);
+			vertices[4] = (GLshort)x;
+			vertices[5] = (GLshort)(y + h);
 
-			vertices[6] = (GLfloat)(x + w);
-			vertices[7] = (GLfloat)(y + h);
+			vertices[6] = (GLshort)(x + w);
+			vertices[7] = (GLshort)(y + h);
 		}
 
 		// Calcular los vértices una sola vez
@@ -54,7 +54,7 @@ class Sprite {
 		void Render() const {
 			// Dibujar con TRIANGLE_STRIP (dos triángulos)
 			glTexCoordPointer(2, GL_FLOAT, 0, uvs);
-    		glVertexPointer(2, GL_FLOAT, 0, vertices);
+    		glVertexPointer(2, GL_SHORT, 0, vertices);
 			glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 		}
 };
