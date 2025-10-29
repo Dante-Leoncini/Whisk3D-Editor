@@ -787,6 +787,17 @@ class Wavefront {
 	/*return hayMasObjetos;
 };*/
 
+// extraer nombre base del filename (sin path ni extensión)
+auto ExtractBaseName = [](const std::string& filepath) {
+    // quitar ruta
+    size_t pos = filepath.find_last_of("/\\");
+    std::string name = (pos == std::string::npos) ? filepath : filepath.substr(pos + 1);
+    // quitar extensión (la última '.')
+    size_t dot = name.find_last_of('.');
+    if (dot != std::string::npos) name = name.substr(0, dot);
+    return name;
+};
+
 bool LeerOBJ(std::ifstream& file,
              const std::string& filename,
              std::streampos& startPos,
@@ -802,6 +813,10 @@ bool LeerOBJ(std::ifstream& file,
     //obj.scaleX = obj.scaleY = obj.scaleZ = 520000;
     obj->Id = 0;
     obj->type = 0; // mesh
+
+	// usar filename para nombrar por defecto (y hacerlo único)
+	std::string fileBase = ExtractBaseName(filename);
+	obj->name = SetName(fileBase);   // SetName ya comprueba colisiones en Objects
 
     Wavefront Wobj;
     Wobj.Reset();
@@ -824,7 +839,8 @@ bool LeerOBJ(std::ifstream& file,
 
         if (line.rfind("o ", 0) == 0) {
             if (!NombreEncontrado) {
-                obj->name = line.substr(2);
+				//algo anda mal por aca
+                //obj->name = line.substr(2);
                 NombreEncontrado = true;
             } else {
                 hayMasObjetos = true;
