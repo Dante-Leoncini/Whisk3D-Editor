@@ -270,7 +270,7 @@ void RenderMeshAndChildren(Object& obj){
     
     // Procesar cada hijo
     for (size_t c = 0; c < obj.Childrens.size(); c++) {
-        Object& objChild = Objects[obj.Childrens[c].Id];
+        Object& objChild = *Objects[obj.Childrens[c].Id];
         //RenderMeshAndChildren(objChild, indice);
         RenderMeshAndChildren(objChild);
     }

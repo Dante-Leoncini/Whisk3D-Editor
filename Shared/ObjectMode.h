@@ -2,41 +2,41 @@ void ReloadViewport(bool hacerRedibujo){
 	//Recalcula los constrains
     //for(TInt c = 0; c < Constraints.Count(); c++) {
     for(size_t c = 0; c < Constraints.size(); c++) {
-		int id = Constraints[c].Id;
-		int Target = Constraints[c].Target;
+		Object& objTarget = *Objects[Constraints[c].Target];
+		Object& obj = *Objects[Constraints[c].Id];
 		switch (Constraints[c].type) {
 			case trackto: {
 				// Calcular vector dirección
-				GLfloat dirX = Objects[Target].posX - Objects[id].posX;
-				GLfloat dirY = Objects[Target].posY - Objects[id].posY;
-				GLfloat dirZ = Objects[Target].posZ - Objects[id].posZ;						
+				GLfloat dirX = objTarget.posX - obj.posX;
+				GLfloat dirY = objTarget.posY - obj.posY;
+				GLfloat dirZ = objTarget.posZ - obj.posZ;						
 				
-				Objects[id].rotZ = atan2(dirX, dirY) * (180.0 / M_PI);  // Azimut
+				obj.rotZ = atan2(dirX, dirY) * (180.0 / M_PI);  // Azimut
 
 				// Calcular longitud del vector (magnitud)
 				GLfloat length = sqrt(dirX * dirX + dirY * dirY + dirZ * dirZ);
 
 				// Cálculo de la elevación (rotY)
 				if (Constraints[c].opcion){	
-					Objects[id].rotZ += 180; // Para invertir el eje si necesario.
-					Objects[id].rotX = asin(dirZ/length) * (180.0 / M_PI);					
+					obj.rotZ += 180; // Para invertir el eje si necesario.
+					obj.rotX = asin(dirZ/length) * (180.0 / M_PI);					
 				}
 				else {
-					Objects[id].rotZ -= 90; // Para invertir el eje si necesario.
-					Objects[id].rotY = asin(dirZ/length) * (180.0 / M_PI);	
+					obj.rotZ -= 90; // Para invertir el eje si necesario.
+					obj.rotY = asin(dirZ/length) * (180.0 / M_PI);	
 				}
 
 				break;
 			}
 			case copyrotation:
-				Objects[id].rotX = Objects[Target].rotX;
-				Objects[id].rotY = Objects[Target].rotY;
-				Objects[id].rotZ = Objects[Target].rotZ;
+				obj.rotX = objTarget.rotX;
+				obj.rotY = objTarget.rotY;
+				obj.rotZ = objTarget.rotZ;
 				break;
 			case copylocation:
-				Objects[id].posX = Objects[Target].posX;
-				Objects[id].posY = Objects[Target].posY;
-				Objects[id].posZ = Objects[Target].posZ;
+				obj.posX = objTarget.posX;
+				obj.posY = objTarget.posY;
+				obj.posZ = objTarget.posZ;
 				break;
 		}
 	}
@@ -53,7 +53,7 @@ void SetTransformPivotPoint(){
 		TransformPivotPointFloat[2] = 0;
 		//for(TInt i=0; i < Objects.Count(); i++){	
 		for(size_t i=0; i < Objects.size(); i++){	
-			Object& obj = Objects[i];	
+			Object& obj = *Objects[i];	
 			if (obj.seleccionado){
 				TransformPivotPointFloat[0] += obj.posX;
 				TransformPivotPointFloat[1] += obj.posY;
@@ -91,7 +91,7 @@ void guardarEstado(){
 	//estadoObjetos.ReserveL(SelectCount);
 	estadoObjetos.reserve(SelectCount);
 	for(size_t o=0; o < Objects.size(); o++){
-		Object& obj = Objects[o];
+		Object& obj = *Objects[o];
 		if (obj.seleccionado){
 			SaveState NuevoEstado;
 			NuevoEstado.indice = o;
@@ -114,7 +114,7 @@ void SetPosicion(){
 	//si no hay objetos
 	if (Objects.size() < 1){return;}
 
-	if (InteractionMode == ObjectMode && Objects[SelectActivo].seleccionado && estado == editNavegacion){
+	if (InteractionMode == ObjectMode && Objects[SelectActivo]->seleccionado && estado == editNavegacion){
 		guardarEstado();
 		estado = translacion;
 		//if (axisSelect > 2){axisSelect = X;}
@@ -133,23 +133,29 @@ void DuplicatedObject(){
 	if (estado != editNavegacion || InteractionMode != ObjectMode){return;};	
 	int cantObjetosOriginal = Objects.size();
 	for(int a=0; a < cantObjetosOriginal; a++){
-		Object& obj = Objects[a];
+		Object& obj = *Objects[a];
 		if (!obj.seleccionado){continue;};
-		Objects.push_back(obj);	
+
+		// Crear copia dinámica
+		Object* NewObj = new Object(obj); // usa el constructor copia
+		Objects.push_back(NewObj);	
+
 		obj.seleccionado = false;	
 		int nuevoindice = Objects.size()-1;
 		if (SelectActivo == a){
 			SelectActivo = nuevoindice;
 		}
-		AddToCollection(nuevoindice, obj.name);
+		NewObj->name = SetName(obj.name);
+		AddToCollection(nuevoindice, NewObj->name);
+
 		//si es un mesh
 		if (obj.type == mesh){			
 			Mesh tempMesh;	
 			
 			Meshes.push_back(tempMesh);
 			Mesh& originaMesh = Meshes[obj.Id];
-			obj.Id = Meshes.size()-1;
-			Mesh& pMesh = Meshes[obj.Id];
+			NewObj->Id = Meshes.size()-1;
+			Mesh& pMesh = Meshes[NewObj->Id];
 			
 			pMesh.vertexSize = originaMesh.vertexSize;
 			pMesh.vertex = new GLshort[pMesh.vertexSize*3];
@@ -196,15 +202,22 @@ void DuplicatedLinked(){
 	if (estado != editNavegacion || InteractionMode != ObjectMode){return;};
 	int cantObjetosOriginal = Objects.size();
 	for(int a=0; a < cantObjetosOriginal; a++){
-		Object& obj = Objects[a];
+		Object& obj = *Objects[a];
 		if (!obj.seleccionado){continue;};
-		Objects.push_back(obj);	
+
+		// Crear copia dinámica
+		Object* NewObj = new Object(obj); // usa el constructor copia
+
+		Objects.push_back(NewObj);	
 		obj.seleccionado = false;	
+		NewObj->seleccionado = true;
+		NewObj->name = SetName(obj.name);
+
 		int nuevoindice = Objects.size()-1;
 		if (SelectActivo == a){
 			SelectActivo = nuevoindice;
 		}
-		AddToCollection(nuevoindice, obj.name);
+		AddToCollection(nuevoindice, NewObj->name);
 	}
 	SetPosicion();
 	redibujar = true;
@@ -212,6 +225,7 @@ void DuplicatedLinked(){
 
 void SetRotacion(int dx, int dy){
 	for (size_t o = 0; o < estadoObjetos.size(); o++) {
+		Object& obj = *Objects[estadoObjetos[o].indice];
 		switch (axisSelect) {
 			case ViewAxis:
 				/*Objects[estadoObjetos[o].indice].rotX -= valor;
@@ -223,16 +237,16 @@ void SetRotacion(int dx, int dy){
 				int dyScreen = mouseY - screenPos.y;*/
 				break;
 			case X:
-				Objects[estadoObjetos[o].indice].rotX -= dx;
-				Objects[estadoObjetos[o].indice].rotX -= dy;
+				obj.rotX -= dx;
+				obj.rotX -= dy;
 				break;
 			case Y:
-				Objects[estadoObjetos[o].indice].rotY -= dx;
-				Objects[estadoObjetos[o].indice].rotY -= dy;
+				obj.rotY -= dx;
+				obj.rotY -= dy;
 				break;
 			case Z:
-				Objects[estadoObjetos[o].indice].rotZ -= dx;
-				Objects[estadoObjetos[o].indice].rotZ -= dy;
+				obj.rotZ -= dx;
+				obj.rotZ -= dy;
 				break;
 		}
 	}
@@ -241,7 +255,7 @@ void SetRotacion(int dx, int dy){
 void SetRotacion(){
 	//si no hay objetos
 	if (Objects.size() < 1){return;}
-	else if (Objects[SelectActivo].seleccionado && estado == editNavegacion){
+	else if (Objects[SelectActivo]->seleccionado && estado == editNavegacion){
 		guardarEstado();
 		estado = rotacion;	
 		valorRotacion = 0;
@@ -262,26 +276,27 @@ void SetScale(int dx, int dy){
 	dx = dx*500;
 	dy = dy*500;
 	for (size_t o = 0; o < estadoObjetos.size(); o++) {
+		Object& obj = *Objects[estadoObjetos[o].indice];
 		switch (axisSelect) {
 			case X:
-				Objects[estadoObjetos[o].indice].scaleX += dx;
-				Objects[estadoObjetos[o].indice].scaleX += dy;
+				obj.scaleX += dx;
+				obj.scaleX += dy;
 				break;
 			case Y:
-				Objects[estadoObjetos[o].indice].scaleY += dx;
-				Objects[estadoObjetos[o].indice].scaleY += dy;
+				obj.scaleY += dx;
+				obj.scaleY += dy;
 				break;
 			case Z:
-				Objects[estadoObjetos[o].indice].scaleZ += dx;
-				Objects[estadoObjetos[o].indice].scaleZ += dy;
+				obj.scaleZ += dx;
+				obj.scaleZ += dy;
 				break;
 			case XYZ:
-				Objects[estadoObjetos[o].indice].scaleX += dx;
-				Objects[estadoObjetos[o].indice].scaleY += dx;
-				Objects[estadoObjetos[o].indice].scaleZ += dx;
-				Objects[estadoObjetos[o].indice].scaleX += dy;
-				Objects[estadoObjetos[o].indice].scaleY += dy;
-				Objects[estadoObjetos[o].indice].scaleZ += dy;
+				obj.scaleX += dx;
+				obj.scaleY += dx;
+				obj.scaleZ += dx;
+				obj.scaleX += dy;
+				obj.scaleY += dy;
+				obj.scaleZ += dy;
 				break;
 		}
 	}
@@ -292,7 +307,7 @@ void SetEscala(){
 	//XYZ tiene escala
 	//si no hay objetos
 	if (Objects.size() < 1){return;}
-	else if (Objects[SelectActivo].seleccionado && estado == editNavegacion){
+	else if (Objects[SelectActivo]->seleccionado && estado == editNavegacion){
 		estado = EditScale;
 		guardarEstado();
 		axisSelect = XYZ;	
@@ -309,6 +324,7 @@ void SetEscala(){
 
 void SetTranslacionObjetos(int dx, int dy, float factor = 1.0f){
 	for (size_t o = 0; o < estadoObjetos.size(); o++) {
+		Object& obj = *Objects[estadoObjetos[o].indice];
 		switch (axisSelect) {
 			case ViewAxis: {
                 //float radY = Viewports3D[ViewportId].rotY * M_PI / 180.0f;
@@ -319,7 +335,7 @@ void SetTranslacionObjetos(int dx, int dy, float factor = 1.0f){
                 //float cosY = cos(radY);
                 //float sinY = sin(radY);
 
-                auto& obj = Objects[estadoObjetos[o].indice];
+                Object& obj = *Objects[estadoObjetos[o].indice];
                 obj.posZ -= dy * factor * precalculado.cosY;
                 obj.posX += dx * factor * precalculado.cosX - dy * factor * precalculado.sinY * precalculado.sinX;
                 obj.posY += dx * factor * precalculado.sinX + dy * factor * precalculado.sinY * precalculado.cosX;
@@ -337,16 +353,16 @@ void SetTranslacionObjetos(int dx, int dy, float factor = 1.0f){
                 break;
             }
 			case X:
-				Objects[estadoObjetos[o].indice].posX += dx;
-				Objects[estadoObjetos[o].indice].posX += dy;
+				obj.posX += dx;
+				obj.posX += dy;
 				break;
 			case Y:
-				Objects[estadoObjetos[o].indice].posY -= dx;
-				Objects[estadoObjetos[o].indice].posY -= dy;
+				obj.posY -= dx;
+				obj.posY -= dy;
 				break;
 			case Z:
-				Objects[estadoObjetos[o].indice].posZ -= dx;
-				Objects[estadoObjetos[o].indice].posZ -= dy;
+				obj.posZ -= dx;
+				obj.posZ -= dy;
 				break;
 		}
 	}

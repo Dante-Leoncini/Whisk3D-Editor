@@ -89,7 +89,7 @@ class Viewport3D {
             //primero hay que colocar las luces en caso de estar en modo render!
             if ((!SimularZBuffer && view == MaterialPreview) || view == Rendered){
                 for (size_t o = 0; o < Objects.size(); o++) {
-                    Object& obj = Objects[o];
+                    Object& obj = *Objects[o];
                     if(!obj.visible || obj.type != light ) {continue;}
                     Light& light = Lights[obj.Id];
 
@@ -109,7 +109,7 @@ class Viewport3D {
             if(Meshes.size() > 0){
                 // Funcion principal para iterar sobre la coleccion
                 for (size_t o = 0; o < Collections.size(); o++) {
-                    Object& obj = Objects[Collections[o]->ObjID];
+                    Object& obj = *Objects[Collections[o]->ObjID];
                     RenderMeshAndChildren(obj);
                 }
             }
@@ -231,7 +231,7 @@ class Viewport3D {
                         glColor4f(ListaColores[negro][0],ListaColores[negro][1],ListaColores[negro][2],ListaColores[negro][3]);	
                         glBindTexture( GL_TEXTURE_2D, Textures[3].iID ); //selecciona la de linea punteada	
                         for (size_t o = 0; o < Collections.size(); o++) {
-                            Object& obj = Objects[Collections[o]->ObjID];
+                            Object& obj = *Objects[Collections[o]->ObjID];
                             //if (obj.Childrens.Count() > 0){
                             if (obj.Childrens.size() > 0){
                                 RenderLinkLines(Collections[o]->ObjID);
@@ -247,7 +247,7 @@ class Viewport3D {
                     if (estado == translacion || estado == rotacion || estado == EditScale) {
                         for (size_t o = 0; o < Collections.size(); o++) {
                             bool found = false;
-                            Object& obj = Objects[Collections[o]->ObjID];
+                            Object& obj = *Objects[Collections[o]->ObjID];
                             SearchSelectObj(obj, Collections[o]->ObjID, found);
                             if (found) break;  // Si ya encontro el objeto, salir del bucle
                         }
@@ -264,7 +264,7 @@ class Viewport3D {
                         // Make the points bigger.
                         glPointSize( 16 );
                         for (size_t o = 0; o < Collections.size(); o++) {
-                            Object& obj = Objects[o];
+                            Object& obj = *Objects[o];
                             DibujarOrigen(obj, o);
                         }
                         //glTexEnvi( GL_POINT_SPRITE_OES, GL_COORD_REPLACE_OES, GL_FALSE);
@@ -354,7 +354,7 @@ class Viewport3D {
         }
 
         void RecalcViewPos(){
-            Object& obj = Objects[CameraActive];
+            Object& obj = *Objects[CameraActive];
             rotX = -obj.rotZ+90;
             rotY = -obj.rotY;	
             PivotX = -obj.posX;
@@ -381,7 +381,7 @@ class Viewport3D {
             if (CameraActive < 0){
                 //for(TInt i=0; i < Objects.Count(); i++){
                 for(size_t i=0; i < Objects.size(); i++){
-                    if (Objects[i].type == camera){
+                    if (Objects[i]->type == camera){
                         CameraActive = i;
                         return;
                     }		

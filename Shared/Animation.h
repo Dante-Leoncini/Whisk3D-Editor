@@ -303,19 +303,19 @@ void ReloadAnimation() {
                 // Asignar valor a la propiedad
                 switch (anim.Property) {
                     case AnimPosition:
-                        Objects[AnimationObjects[a].Id].posX = valueX;
-                        Objects[AnimationObjects[a].Id].posY = valueY;
-                        Objects[AnimationObjects[a].Id].posZ = valueZ;
+                        Objects[AnimationObjects[a].Id]->posX = valueX;
+                        Objects[AnimationObjects[a].Id]->posY = valueY;
+                        Objects[AnimationObjects[a].Id]->posZ = valueZ;
                         break;
                     case AnimRotation:
-                        Objects[AnimationObjects[a].Id].rotX = valueX;
-                        Objects[AnimationObjects[a].Id].rotY = valueY;
-                        Objects[AnimationObjects[a].Id].rotZ = valueZ;
+                        Objects[AnimationObjects[a].Id]->rotX = valueX;
+                        Objects[AnimationObjects[a].Id]->rotY = valueY;
+                        Objects[AnimationObjects[a].Id]->rotZ = valueZ;
                         break;
                     case AnimScale:
-                        Objects[AnimationObjects[a].Id].scaleX = valueX;
-                        Objects[AnimationObjects[a].Id].scaleY = valueY;
-                        Objects[AnimationObjects[a].Id].scaleZ = valueZ;
+                        Objects[AnimationObjects[a].Id]->scaleX = valueX;
+                        Objects[AnimationObjects[a].Id]->scaleY = valueY;
+                        Objects[AnimationObjects[a].Id]->scaleZ = valueZ;
                         break;
                     default:
                         break;

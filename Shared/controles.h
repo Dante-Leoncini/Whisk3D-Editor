@@ -55,7 +55,7 @@ void TeclaArriba(){
 	if (estado == editNavegacion){	
 		if (navegacionMode == Orbit){
 			if (Viewports3D[viewPortActive].ViewFromCameraActive && CameraToView){
-				Object& obj = Objects[CameraActive];
+				Object& obj = *Objects[CameraActive];
 				// Convertir el angulo de rotX a radianes
 				GLfloat radRotX = obj.rotX * M_PI / 180.0;
 				GLfloat radRotY = obj.rotY * M_PI / 180.0;
@@ -100,7 +100,7 @@ void TeclaAbajo(){
 	if (estado == editNavegacion){ 			
 		if (navegacionMode == Orbit){
 			if (Viewports3D[viewPortActive].ViewFromCameraActive && CameraToView){
-				Object& obj = Objects[CameraActive];
+				Object& obj = *Objects[CameraActive];
 				// Convertir el angulo de rotX a radianes
 				GLfloat radRotX = obj.rotX * M_PI / 180.0;
 				GLfloat radRotY = obj.rotY * M_PI / 180.0;
@@ -146,7 +146,7 @@ void TeclaDerecha(){
 	if (estado == editNavegacion){				
 		if (navegacionMode == Orbit){
 			if (Viewports3D[viewPortActive].ViewFromCameraActive && CameraToView){
-				Object& obj = Objects[CameraActive];
+				Object& obj = *Objects[CameraActive];
 				// Convertir el angulo de rotX a radianes
 				GLfloat radRotX = obj.rotX * M_PI / 180.0;
 
@@ -203,7 +203,7 @@ void TeclaIzquierda(){
 	if (estado == editNavegacion){ 
 		if (navegacionMode == Orbit){
 			if (Viewports3D[viewPortActive].ViewFromCameraActive && CameraToView){
-				Object& obj = Objects[CameraActive];
+				Object& obj = *Objects[CameraActive];
 				// Convertir el angulo de rotX a radianes
 				GLfloat radRotX = obj.rotX * M_PI / 180.0;
 

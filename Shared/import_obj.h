@@ -794,14 +794,14 @@ bool LeerOBJ(std::ifstream& file,
              int* acumuladoNormales,
              int* acumuladoUVs) 
 {
-    Object obj;
-    obj.visible = true;
-    obj.posX = obj.posY = obj.posZ = 0;
-    obj.rotX = obj.rotY = obj.rotZ = 0;
-    obj.scaleX = obj.scaleY = obj.scaleZ = 65000;
+	Object* obj = new Object();
+    obj->visible = true;
+    obj->posX = obj->posY = obj->posZ = 0;
+    obj->rotX = obj->rotY = obj->rotZ = 0;
+    obj->scaleX = obj->scaleY = obj->scaleZ = 65000;
     //obj.scaleX = obj.scaleY = obj.scaleZ = 520000;
-    obj.Id = 0;
-    obj.type = 0; // mesh
+    obj->Id = 0;
+    obj->type = 0; // mesh
 
     Wavefront Wobj;
     Wobj.Reset();
@@ -824,7 +824,7 @@ bool LeerOBJ(std::ifstream& file,
 
         if (line.rfind("o ", 0) == 0) {
             if (!NombreEncontrado) {
-                obj.name = line.substr(2);
+                obj->name = line.substr(2);
                 NombreEncontrado = true;
             } else {
                 hayMasObjetos = true;
@@ -1012,14 +1012,14 @@ bool LeerOBJ(std::ifstream& file,
     int meshIndex = (int)Meshes.size() - 1;
 
     // Asignar el mesh al objeto
-    obj.Id = meshIndex;   // o obj.MeshIndex = meshIndex; según tu estructura
+    obj->Id = meshIndex;   // o obj.MeshIndex = meshIndex; según tu estructura
 
     // Agregar el objeto a Objects
     Objects.push_back(obj);
     int objIndex = (int)Objects.size() - 1;
 
     // Agregar el índice del objeto a Collection para render
-	AddToCollection(objIndex, obj.name);
+	AddToCollection(objIndex, obj->name);
 
     return hayMasObjetos;
 }

@@ -30,7 +30,7 @@ bool ImportVertexAnimation(const std::string& filepath){
 
     // si no hay objetos
     if (Objects.size() < 1) { file.close(); return false; }
-    Object& obj = Objects[SelectActivo];
+    Object& obj = *Objects[SelectActivo];
     if (!obj.seleccionado) { file.close(); return false; }
     // si no es un mesh
     bool esMesh = false;

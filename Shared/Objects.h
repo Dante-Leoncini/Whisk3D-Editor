@@ -14,13 +14,13 @@ class Object {
 		std::string name;
 };
 
-std::vector<Object> Objects;
+std::vector<Object*> Objects;
 
 void DeseleccionarTodo(){
 	if (InteractionMode == ObjectMode){
 		//for(int o=0; o < Objects.Count(); o++){
 		for(size_t o=0; o < Objects.size(); o++){
-			Objects[o].seleccionado = false;				
+			Objects[o]->seleccionado = false;				
 		}
 		SelectCount = 0;
 	}
@@ -29,7 +29,7 @@ void DeseleccionarTodo(){
 //outliner
 void UpdateOutlinerColor(){
 	for (size_t c = 0; c < Collections.size(); c++) {
-		Object& obj = Objects[c];
+		Object& obj = *Objects[c];
 		if (SelectActivo == obj.Id && obj.seleccionado){
 			SetColorOutlinerText(c, ListaColoresUbyte[accent][0], ListaColoresUbyte[accent][1], ListaColoresUbyte[accent][2]);
 		}
@@ -55,8 +55,8 @@ void changeSelect(){
 			SelectCount = 1;
 			SelectActivo = 0;
 		}
-		if (Objects[SelectActivo].seleccionado){
-			Objects[SelectActivo].seleccionado = false;
+		if (Objects[SelectActivo]->seleccionado){
+			Objects[SelectActivo]->seleccionado = false;
 			SelectCount--;
 		}
 
@@ -66,8 +66,8 @@ void changeSelect(){
 			SelectActivo = 0;
 		}
 		//selecciona el proximo objeto
-		if (!Objects[SelectActivo].seleccionado){
-			Objects[SelectActivo].seleccionado = true;
+		if (!Objects[SelectActivo]->seleccionado){
+			Objects[SelectActivo]->seleccionado = true;
 			SelectCount++;
 		}
 		UpdateOutlinerColor();
@@ -79,7 +79,7 @@ std::string SetName(const std::string& baseName) {
     // Ver si el nombre base ya existe
     auto nameExists = [&](const std::string& name) {
         for (size_t o = 0; o < Objects.size(); ++o) {
-            if (Objects[o].name == name)
+            if (Objects[o]->name == name)
                 return true;
         }
         return false;
@@ -103,17 +103,17 @@ std::string SetName(const std::string& baseName) {
 
 void AddObject( int tipo ){
 	//Cancelar();
-	Object obj;
-	obj.type = tipo;
-	obj.visible = true;
-	obj.seleccionado = false;
-	obj.posX = Cursor3DposX;
-	obj.posY = Cursor3DposY;
-	obj.posZ = Cursor3DposZ;
-	obj.rotX = obj.rotY = obj.rotZ = 0;
-	obj.scaleX = obj.scaleY = obj.scaleZ = 45000;
-	obj.Parent = -1;	
-	obj.Id = -0;
+	Object* obj = new Object();
+	obj->type = tipo;
+	obj->visible = true;
+	obj->seleccionado = false;
+	obj->posX = Cursor3DposX;
+	obj->posY = Cursor3DposY;
+	obj->posZ = Cursor3DposZ;
+	obj->rotX = obj->rotY = obj->rotZ = 0;
+	obj->scaleX = obj->scaleY = obj->scaleZ = 45000;
+	obj->Parent = -1;	
+	obj->Id = -0;
 	Objects.push_back(obj);
 	SelectActivo = Objects.size()-1;
 	if (tipo == light){
@@ -148,19 +148,19 @@ void AddObject( int tipo ){
 		//Lights.Append(tempLight);
 		Lights.push_back(tempLight);
 		//obj.Id = Lights.Count()-1;
-		obj.Id = Lights.size()-1;
-		Objects[SelectActivo].name = SetName("Light");
+		obj->Id = Lights.size()-1;
+		Objects[SelectActivo]->name = SetName("Light");
 	}
 	//tipo camara
 	else if (tipo == camera){
-		Objects[SelectActivo].name = SetName("Camera");
+		Objects[SelectActivo]->name = SetName("Camera");
 		if (CameraActive < 0){
 			CameraActive = SelectActivo;		
 		}		
 	}
-	AddToCollection(SelectActivo, Objects[SelectActivo].name);
+	AddToCollection(SelectActivo, Objects[SelectActivo]->name);
 	DeseleccionarTodo();
-	Objects[SelectActivo].seleccionado = true;
+	Objects[SelectActivo]->seleccionado = true;
 	SelectCount = 1;
     redibujar = true;
 }

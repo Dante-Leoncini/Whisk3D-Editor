@@ -25,17 +25,17 @@ void ConstructUniversal(){
 
     // Cámara y objetos iniciales
     AddObject(camera);
-    Objects[0].posX = -800 * 6.8;
-    Objects[0].posY = -800 * 7.29;
-    Objects[0].posZ = 800 * 4.91;
-    Objects[0].rotZ = -45.0;
-    Objects[0].rotY = -26.15;
-    Objects[0].scaleX = Objects[0].scaleY = Objects[0].scaleZ = 40000;
+    Objects[0]->posX = -800 * 6.8;
+    Objects[0]->posY = -800 * 7.29;
+    Objects[0]->posZ = 800 * 4.91;
+    Objects[0]->rotZ = -45.0;
+    Objects[0]->rotY = -26.15;
+    Objects[0]->scaleX = Objects[0]->scaleY = Objects[0]->scaleZ = 40000;
 
     AddObject(light);
-    Objects[1].posX = -3000;
-    Objects[1].posY = 1500;
-    Objects[1].posZ = 4500;
+    Objects[1]->posX = -3000;
+    Objects[1]->posY = 1500;
+    Objects[1]->posZ = 4500;
 
     AddMesh(cubo);
 

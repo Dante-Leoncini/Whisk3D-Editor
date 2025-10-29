@@ -1,5 +1,5 @@
 void RenderObject( int objId ){
-	Object& obj = Objects[objId];
+	Object& obj = *Objects[objId];
 	glPushMatrix();
 	//glScalex(obj.scaleX, obj.scaleZ, obj.scaleY);
 	glScalef(
@@ -80,7 +80,7 @@ void RenderObject( int objId ){
 
 // Funcion recursiva para renderizar un objeto y sus hijos
 void RenderObjectAndChildrens(int objId){
-	Object& obj = Objects[objId];
+	Object& obj = *Objects[objId];
     // Guardar la matriz actual
     glPushMatrix();
     
@@ -119,7 +119,7 @@ void DrawnLines(int LineWidth, int cantidad, const GLshort* vertexlines, const G
 
 //Relantionshipslines
 void RenderLinkLines(int objId){
-	Object& obj = Objects[objId];
+	Object& obj = *Objects[objId];
     // Guardar la matriz actual
     glPushMatrix();
     
@@ -132,7 +132,7 @@ void RenderLinkLines(int objId){
     // Procesar cada hijo
     //for (TInt c = 0; c < obj.Childrens.Count(); c++) {
     for (size_t c = 0; c < obj.Childrens.size(); c++) {
-		Object& objChild = Objects[obj.Childrens[c].Id];
+		Object& objChild = *Objects[obj.Childrens[c].Id];
 		LineaLinkChild[3] = (GLshort)objChild.posX;
 		LineaLinkChild[4] = (GLshort)objChild.posZ;
 		LineaLinkChild[5] = (GLshort)objChild.posY;
@@ -219,7 +219,7 @@ void SearchSelectObj(Object& obj, int objIndex, bool& found) {
         //for (int c = 0; c < obj.Childrens.Count(); c++) {
         for (size_t c = 0; c < obj.Childrens.size(); c++) {
             if (found) break;  // Si ya lo encontro, salir del bucle
-            Object& objChild = Objects[obj.Childrens[c].Id];
+            Object& objChild = *Objects[obj.Childrens[c].Id];
             SearchSelectObj(objChild, obj.Childrens[c].Id, found);
         }
     }
@@ -258,7 +258,7 @@ void DibujarOrigen(Object& obj, int objIndex){
 		glRotatef(obj.rotY, 0, 0, 1); //angulo, X Y Z
         //for (int c = 0; c < obj.Childrens.Count(); c++) {
         for (size_t c = 0; c < obj.Childrens.size(); c++) {
-            Object& objChild = Objects[obj.Childrens[c].Id];
+            Object& objChild = *Objects[obj.Childrens[c].Id];
             DibujarOrigen(objChild, obj.Childrens[c].Id);
         }
     }

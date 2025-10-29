@@ -3,7 +3,7 @@ void ReestablecerEstado(){
 		//for(int o=0; o < estadoObjetos.Count(); o++){
 		for(size_t o=0; o < estadoObjetos.size(); o++){
 			SaveState& estadoObj = estadoObjetos[o];
-			Object& obj = Objects[estadoObj.indice];
+			Object& obj = *Objects[estadoObj.indice];
 			obj.posX = estadoObj.posX;
 			obj.posY = estadoObj.posY;
 			obj.posZ = estadoObj.posZ;
@@ -35,28 +35,25 @@ void AddMesh( int modelo ){
 	SelectActivo = Objects.size();
 	SelectCount = 1;
 	
-	Object TempObj;	
-	//Objects.Append(TempObj);
-	Objects.push_back(TempObj);
-	//Object& obj = Objects[Objects.Count()-1];
-	Object& obj = Objects[SelectActivo];
-	Objects[SelectActivo].seleccionado = true;
+	Object* obj = new Object();
+	Objects.push_back(obj);
+	Objects[SelectActivo]->seleccionado = true;
 	
 	//obj.Id = Meshes.Count();
-	obj.Id = Meshes.size();
-	obj.type = mesh;
-	obj.visible = true;
-	obj.posX = Cursor3DposX;
-	obj.posY = Cursor3DposY;
-	obj.posZ = Cursor3DposZ;
-	obj.rotX = obj.rotY = obj.rotZ = 0;
-	obj.scaleX = obj.scaleY = obj.scaleZ = 45000;
-	obj.Parent = -1;
+	obj->Id = Meshes.size();
+	obj->type = mesh;
+	obj->visible = true;
+	obj->posX = Cursor3DposX;
+	obj->posY = Cursor3DposY;
+	obj->posZ = Cursor3DposZ;
+	obj->rotX = obj->rotY = obj->rotZ = 0;
+	obj->scaleX = obj->scaleY = obj->scaleZ = 45000;
+	obj->Parent = -1;
 	
 	Mesh tempMesh;
 	//Meshes.Append(tempMesh);
 	Meshes.push_back(tempMesh);
-	Mesh& pMesh = Meshes[obj.Id];	
+	Mesh& pMesh = Meshes[obj->Id];	
 	
 	MaterialGroup tempFaceGroup;
 	tempFaceGroup.startDrawn = 0;
@@ -171,13 +168,13 @@ void AddMesh( int modelo ){
 		for (int i = 0; i < tempFaceGroup.indicesDrawnCount; i++) {
 			pMesh.faces[i] = CuboTriangles[i];
 		}
-		Objects[SelectActivo].name = SetName("Cube");
+		Objects[SelectActivo]->name = SetName("Cube");
 	}	
 
 	//creamos el objeto y le asignamos la mesh	
 	//Meshes[obj.Id].materialsGroup.Append(tempFaceGroup);
-	Meshes[obj.Id].materialsGroup.push_back(tempFaceGroup);
-	AddToCollection(SelectActivo, obj.name);
+	Meshes[obj->Id].materialsGroup.push_back(tempFaceGroup);
+	AddToCollection(SelectActivo, obj->name);
     redibujar = true;
 }
 
@@ -227,7 +224,7 @@ void NewMaterial(bool reemplazar){
 	//si no hay objetos
 	//if (Objects.Count() < 1){return;}	
 	if (Objects.size() < 1){return;}	
-	Object& obj = Objects[SelectActivo];
+	Object& obj = *Objects[SelectActivo];
 	//si no es un mesh
 	if (obj.type != mesh || !obj.seleccionado){return;}		
 	Mesh& pMesh = Meshes[obj.Id];
@@ -335,13 +332,13 @@ void BorrarMesh(int indice){
 	int links = 0;
 	
 	for(size_t o=0; o < Objects.size(); o++){
-		if (Objects[o].type == mesh && Objects[o].Id == indice){links++;};				
+		if (Objects[o]->type == mesh && Objects[o]->Id == indice){links++;};				
 	}
 
 	if (links < 2){	
 		for(size_t o=0; o < Objects.size(); o++){
-			if (Objects[o].type == mesh && Objects[o].Id > indice){
-				Objects[o].Id--;
+			if (Objects[o]->type == mesh && Objects[o]->Id > indice){
+				Objects[o]->Id--;
 			};				
 		}
 		Meshes[indice].LiberarMemoria();
@@ -355,7 +352,7 @@ void BorrarMesh(int indice){
 }
 
 void BorrarObjeto(size_t indice){
-	Object& obj = Objects[indice];
+	Object& obj = *Objects[indice];
 
 	if (obj.type == mesh){
 		//primero miramos si alguien mas esta usando esta malla 3d.
@@ -364,7 +361,7 @@ void BorrarObjeto(size_t indice){
 		
 		for(size_t o=0; o < Objects.size(); o++){
 			//si el objeto esta seleccionado. significa que se va a borrar, por lo tanto no se cuenta
-			if (Objects[o].type == mesh && Objects[o].Id == (int)(indice) && !Objects[o].seleccionado){
+			if (Objects[o]->type == mesh && Objects[o]->Id == (int)(indice) && !Objects[o]->seleccionado){
 				MeshEnUso = true;
 				break;
 			};				
@@ -382,8 +379,8 @@ void BorrarObjeto(size_t indice){
 
 			//al eliminarse la malla 3d. hay que restarle 1 al ID de todos los objetos para que apunten bien a la memoria de su malla 3d
 			for(size_t o=0; o < Objects.size(); o++){
-				if (Objects[o].type == mesh && Objects[o].Id > obj.Id){
-					Objects[o].Id--;
+				if (Objects[o]->type == mesh && Objects[o]->Id > obj.Id){
+					Objects[o]->Id--;
 				};				
 			}
 		}
@@ -438,23 +435,23 @@ void BorrarObjeto(size_t indice){
 	
 	// Actualizar indices en los objetos
 	for (int o = 0; o < (int)(Objects.size()); o++) {
-		for (int c = (int)(Objects[o].Childrens.size()) - 1; c >= 0; c--) {
-			if (Objects[o].Childrens[c].Id == (int)(indice)) {
+		for (int c = (int)(Objects[o]->Childrens.size()) - 1; c >= 0; c--) {
+			if (Objects[o]->Childrens[c].Id == (int)(indice)) {
 				if (c >= 0 && static_cast<size_t>(c) < Objects.size()) {
 					Objects.erase(Objects.begin() + c);
 				}
 			} 
-			else if (Objects[o].Childrens[c].Id > (int)(indice)) {
-				Objects[o].Childrens[c].Id--;
+			else if (Objects[o]->Childrens[c].Id > (int)(indice)) {
+				Objects[o]->Childrens[c].Id--;
 			}
 		}
 		//borra y actualiza los padres
-		if (Objects[o].Parent == (int)(indice)){				
-			Objects[o].Parent = -1;
-			AddToCollection(o, Objects[o].name);
+		if (Objects[o]->Parent == (int)(indice)){				
+			Objects[o]->Parent = -1;
+			AddToCollection(o, Objects[o]->name);
 		} 
-		else if (Objects[o].Parent > (int)(indice)) {
-			Objects[o].Parent--;
+		else if (Objects[o]->Parent > (int)(indice)) {
+			Objects[o]->Parent--;
 		}
 	}
 }
@@ -469,7 +466,7 @@ void Borrar(){
 		//si no hay nada seleccionado. no borra
 		bool algoSeleccionado = false;
 		for (size_t o = Objects.size() - 1; o >= 0; o--) {
-			if (Objects[o].seleccionado){
+			if (Objects[o]->seleccionado){
 				algoSeleccionado = true;
 				break;	
 			}		
@@ -493,7 +490,7 @@ void Borrar(){
 		//libera la memoria de los punteros primero	
 		// Obtener el objeto seleccionado			
 		for (int o = (int)Objects.size() - 1; o >= 0; o--) {
-			if (Objects[o].seleccionado){
+			if (Objects[o]->seleccionado){
 				std::cout << "El objeto " << (o + 1) << " esta seleccionado y se va a borrar" << std::endl;
 				BorrarObjeto(o);
 			}			
