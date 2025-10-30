@@ -145,7 +145,7 @@ void BorrarObjeto(size_t indice){
 		//borra y actualiza los padres
 		if (Objects[o]->Parent == (int)(indice)){				
 			Objects[o]->Parent = -1;
-			AddToCollection(o, Objects[o]->name);
+			AddToCollection(o, Objects[o]->name, GetIconType(Objects[o]->type));
 		} 
 		else if (Objects[o]->Parent > (int)(indice)) {
 			Objects[o]->Parent--;
@@ -297,7 +297,7 @@ void DuplicatedObject(){
 			SelectActivo = nuevoindice;
 		}
 		NewObj->name = SetName(obj.name);
-		AddToCollection(nuevoindice, NewObj->name);
+		AddToCollection(nuevoindice, NewObj->name, GetIconType(obj.type));
 
 		//si es un mesh
 		if (obj.type == mesh){			
@@ -368,7 +368,8 @@ void DuplicatedLinked(){
 		if (SelectActivo == a){
 			SelectActivo = nuevoindice;
 		}
-		AddToCollection(nuevoindice, NewObj->name);
+
+		AddToCollection(nuevoindice, NewObj->name, GetIconType(obj.type));
 	}
 	SetPosicion();
 	redibujar = true;

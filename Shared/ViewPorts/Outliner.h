@@ -1,6 +1,10 @@
 class Outliner {
     public:
         int Parent = -1;
+        int PosX = 10;
+        int PosY = 10;
+        int MaxPosX = 100;
+        int MaxPosY = -100;
         Object2D& Renglon;
         size_t CantidadRenglones = 5;
 
@@ -43,6 +47,9 @@ class Outliner {
             glDisable(GL_TEXTURE_2D);
             glDisable( GL_BLEND );
 
+            glPushMatrix();     
+            //no usa PosX porque el renglon tiene el ancho exacto de la ventana     
+            glTranslatef(0, PosY, 0);
             for (size_t i = 0; i < CantidadRenglones; i++) {
                 glPushMatrix();                   
                 glTranslatef(0, i * RenglonHeight, 0);
@@ -61,6 +68,7 @@ class Outliner {
                 RenderObject2D(Renglon);
                 glPopMatrix();  
             }
+            glPopMatrix();  
 
             glEnableClientState(GL_TEXTURE_COORD_ARRAY);            
             glEnable(GL_TEXTURE_2D);
@@ -68,7 +76,7 @@ class Outliner {
             glColor4f(ListaColores[blanco][0],ListaColores[blanco][1],ListaColores[blanco][2],ListaColores[blanco][3]);
 
             glPushMatrix();          
-            glTranslatef(margin, 0, 0);
+            glTranslatef(margin + IconSize + gap + PosX, PosY, 0);
             for (size_t i = 0; i < Collections.size(); i++) {
                 glPushMatrix();                      
                 glTranslatef(0, i * RenglonHeight, 0);       
@@ -81,7 +89,23 @@ class Outliner {
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     		glVertexPointer(2, GL_SHORT, 0, IconMesh); //todos los iconos comparten los vertices y tamaño
-            glTranslatef(parentView.width-IconSize-margin, GlobalScale, 0);
+
+            glPushMatrix();   
+            //no usa PosX porque los ojos siempre estan en la misma posicion en X. al borde
+            glTranslatef(margin + PosX, GlobalScale+PosY, 0);
+            for (size_t i = 0; i < Collections.size(); i++) {
+                glPushMatrix();                      
+                glTranslatef(0, i * RenglonHeight, 0);
+                glTexCoordPointer(2, GL_FLOAT, 0, IconsUV[Collections[i]->IconType]->uvs);
+                //glTexCoordPointer(2, GL_FLOAT, 0, IconsUV[static_cast<size_t>(Collections[i].IconType)]->uvs);
+                glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+                glPopMatrix();  
+            }
+            glPopMatrix();  
+
+            glPushMatrix();   
+            //no usa PosX porque los ojos siempre estan en la misma posicion en X. al borde
+            glTranslatef(parentView.width - IconSize - margin, GlobalScale+PosY, 0);
             for (size_t i = 0; i < Collections.size(); i++) {
                 glPushMatrix();                      
                 glTranslatef(0, i * RenglonHeight, 0);
@@ -89,6 +113,7 @@ class Outliner {
                 glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
                 glPopMatrix();  
             }
+            glPopMatrix();  
         }
 
         void OnResize(){
@@ -107,7 +132,20 @@ class Outliner {
         }
 
         void event_mouse_motion(){
-        
+            //boton del medio del mouse
+            if (middleMouseDown) {
+                ViewPortClickDown = true;
+
+                PosX += dx;  
+                PosY += dy;  
+
+		        //std::cout << "nuevo PosX: " << PosX << " PosY: " << PosY << std::endl;
+                if (PosX < 0){PosX = 0;}
+                if (PosY > 0){PosY = 0;}
+                //if (MaxPosX < PosX){PosX = MaxPosX;}
+                //if (MaxPosY > PosY){PosY = MaxPosY;}
+		        //std::cout << "ahora PosX: " << PosX << " PosY: " << PosY << std::endl;
+            }        
         }
 
         void event_mouse_wheel(SDL_Event &e){

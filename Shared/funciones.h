@@ -143,7 +143,7 @@ void AddMesh( int modelo ){
 	//creamos el objeto y le asignamos la mesh	
 	//Meshes[obj.Id].materialsGroup.Append(tempFaceGroup);
 	Meshes[obj->Id].materialsGroup.push_back(tempFaceGroup);
-	AddToCollection(SelectActivo, obj->name);
+	AddToCollection(SelectActivo, obj->name, GetIconType(obj->type));
     redibujar = true;
 }
 

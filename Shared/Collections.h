@@ -4,19 +4,20 @@ class Collection {
         bool select = false;
         bool SelectActivo = false;
         Object2D& Text; // referencia directa
+        size_t IconType = 0;
 
-        Collection(size_t objID, Object2D& text)
-            : ObjID(objID), Text(text) {}
+        Collection(size_t objID, Object2D& text, size_t icon)
+            : ObjID(objID), Text(text), IconType(icon) {}
 };
 
 std::vector<Collection*> Collections;
 
-void AddToCollection(size_t objID, const std::string& name) {
+void AddToCollection(size_t objID, const std::string& name, size_t icon = 0) {
     // Crear el Object2D y guardar su dirección
     Object2D* newText = AddObject2D(UI::text);
 
     // Crear la colección en memoria dinámica
-    Collection* newCollection = new Collection(objID, *newText);
+    Collection* newCollection = new Collection(objID, *newText, icon);
 
     reinterpret_cast<Object2D*>(newText)->scaleX = GlobalScale;
     reinterpret_cast<Object2D*>(newText)->scaleY = GlobalScale;

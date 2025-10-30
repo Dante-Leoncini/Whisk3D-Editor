@@ -539,7 +539,7 @@ class Viewport3D {
 
         void event_mouse_motion(){
             //boton del medio del mouse
-            if (middleMouseDown && viewPortActive > -1) {
+            if (middleMouseDown) {
                 ViewPortClickDown = true;
                 // Chequear si Shift está presionado
                 const bool* state = SDL_GetKeyboardState(NULL);

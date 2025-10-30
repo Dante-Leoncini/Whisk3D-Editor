@@ -130,6 +130,15 @@ std::string SetName(const std::string& baseName) {
     return newName;
 }
 
+size_t GetIconType(int type){
+	switch (type) {			
+		case camera: {return static_cast<size_t>(IconType::camera); break;}
+		case light: {return static_cast<size_t>(IconType::light); break;}
+		case mesh: {return static_cast<size_t>(IconType::mesh); break;}
+		default: {return 0; break;}
+	}
+};
+
 void AddObject( int tipo ){
 	//Cancelar();
 	Object* obj = new Object();
@@ -187,7 +196,7 @@ void AddObject( int tipo ){
 			CameraActive = SelectActivo;		
 		}		
 	}
-	AddToCollection(SelectActivo, Objects[SelectActivo]->name);
+	AddToCollection(SelectActivo, Objects[SelectActivo]->name, GetIconType(Objects[SelectActivo]->type));
 	DeseleccionarTodo();
 	Objects[SelectActivo]->seleccionado = true;
 	SelectCount = 1;

@@ -1035,7 +1035,7 @@ bool LeerOBJ(std::ifstream& file,
     int objIndex = (int)Objects.size() - 1;
 
     // Agregar el índice del objeto a Collection para render
-	AddToCollection(objIndex, obj->name);
+	AddToCollection(objIndex, obj->name, static_cast<size_t>(IconType::mesh));
 
     return hayMasObjetos;
 }
