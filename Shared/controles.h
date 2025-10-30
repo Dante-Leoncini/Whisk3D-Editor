@@ -1,258 +1,80 @@
-bool LAltPressed = false;
-bool LShiftPressed = false;
-
-void Aceptar(){	
-	// Mostrar el cursor
-	SDL_ShowCursor();
-	//si no hay objetos
-	if (Objects.size() < 1){return;}
-
-	if ( InteractionMode == ObjectMode ){
-		if (estado != editNavegacion){
-			estado = editNavegacion;
-		}
-	}
-    ReloadViewport(true);
-};
-
-void ClickA(){
-	int viewPortActive = 1;
-    Viewports3D[viewPortActive].posX+= 1.0;
-	redibujar = true;  
+void button_left(){
+    if (viewPortActive > -1){
+        Viewport& view = Viewports[viewPortActive];
+        switch (Viewports[viewPortActive].type){
+            case View::ViewPort3D: {
+                Viewports3D[view.ChildA].button_left();
+                break;
+            }
+            case View::Outliner: {
+                Outliners[view.ChildA]->button_left();
+                break;
+            }
+            default: {
+                break;
+            }
+        }        
+    };
 }
 
-void ClickD(){
-	if (LAltPressed){
-		UpdatePrecalculos();
-		DuplicatedLinked();
-	}
-	else if (LShiftPressed){
-		UpdatePrecalculos();
-		DuplicatedObject();
-	}
+void event_mouse_motion(){
+    if (viewPortActive > -1){
+        Viewport& view = Viewports[viewPortActive];
+        switch (Viewports[viewPortActive].type){
+            case View::ViewPort3D: {
+                Viewports3D[view.ChildA].event_mouse_motion();
+                break;
+            }
+            case View::Outliner: {
+                Outliners[view.ChildA]->event_mouse_motion();
+                break;
+            }
+            default: {
+                break;
+            }
+        }        
+    };
 }
 
-void ClickE(){
-	int viewPortActive = 1;
-    Viewports3D[viewPortActive].posZ-= 1.0;
-	redibujar = true;  
+
+void event_mouse_wheel(SDL_Event &e){
+    if (viewPortActive > -1){
+        Viewport& view = Viewports[viewPortActive];
+        switch (Viewports[viewPortActive].type){
+            case View::ViewPort3D: {
+                Viewports3D[view.ChildA].event_mouse_wheel(e);
+                break;
+            }
+            case View::Outliner: {
+                Outliners[view.ChildA]->event_mouse_wheel(e);
+                break;
+            }
+            default: {
+                break;
+            }
+        }        
+    };
 }
 
-void ClickQ(){
-	int viewPortActive = 1;
-    Viewports3D[viewPortActive].posZ+= 1.0;  
-	redibujar = true;  
+void event_key_down(SDL_Event &e){
+    if (viewPortActive > -1){
+        Viewport& view = Viewports[viewPortActive];
+        switch (Viewports[viewPortActive].type){
+            case View::ViewPort3D: {
+                Viewports3D[view.ChildA].event_key_down(e);
+                break;
+            }
+            case View::Outliner: {
+                Outliners[view.ChildA]->event_key_down(e);
+                break;
+            }
+            default: {
+                break;
+            }
+        }        
+    };
 }
 
-void TeclaArriba(){
-	int viewPortActive = 1;
-	//mueve el mouse
-	if (mouseVisible){
-		mouseY--;
-		if (mouseY < 0){mouseY = 0;};
-	}
-
-	if (estado == editNavegacion){	
-		if (navegacionMode == Orbit){
-			if (Viewports3D[viewPortActive].ViewFromCameraActive && CameraToView){
-				Object& obj = *Objects[CameraActive];
-				// Convertir el angulo de rotX a radianes
-				GLfloat radRotX = obj.rotX * M_PI / 180.0;
-				GLfloat radRotY = obj.rotY * M_PI / 180.0;
-				//GLfloat radRotZ = obj.rotZ * M_PI / 180.0;
-
-				obj.posX+= 30 * sin(radRotX);
-				//obj.posY-= 30 * cos(radRotX);
-				obj.posZ+= 30 * cos(radRotY);
-			}
-			else {
-				if (Viewports3D[viewPortActive].ViewFromCameraActive){
-					Viewports3D[viewPortActive].RestaurarViewport();
-				}
-				Viewports3D[viewPortActive].rotY-= 0.5;	
-			}			
-		}
-		else if (navegacionMode == Fly){
-			// Convertir el angulo de rotX a radianes
-			GLfloat radRotX = Viewports3D[viewPortActive].rotX * M_PI / 180.0;
-
-			Viewports3D[viewPortActive].PivotY+= 30 * cos(radRotX);
-			Viewports3D[viewPortActive].PivotX-= 30 * sin(radRotX);
-		}		
-	}
-	else if (estado == EditScale){
-		SetScale(2,0);	
-	}
-	else if (estado == translacion){
-		SetTranslacionObjetos(0, -30);
-	}
-	ReloadViewport(true);
-}
-
-void TeclaAbajo(){
-	int viewPortActive = 1;
-	//mueve el mouse
-	/*if (mouseVisible){
-		mouseY++;
-		if (mouseY > iScreenHeight-17){mouseY = iScreenHeight-17;};
-	}*/
-
-	if (estado == editNavegacion){ 			
-		if (navegacionMode == Orbit){
-			if (Viewports3D[viewPortActive].ViewFromCameraActive && CameraToView){
-				Object& obj = *Objects[CameraActive];
-				// Convertir el angulo de rotX a radianes
-				GLfloat radRotX = obj.rotX * M_PI / 180.0;
-				GLfloat radRotY = obj.rotY * M_PI / 180.0;
-				//GLfloat radRotZ = obj.rotZ * M_PI / 180.0;
-
-				obj.posX-= 30 * sin(radRotX);
-				//obj.posY-= 30 * cos(radRotX);
-				obj.posZ-= 30 * cos(radRotY);
-			}
-			else {
-				if (Viewports3D[viewPortActive].ViewFromCameraActive){
-					Viewports3D[viewPortActive].RestaurarViewport();
-				}
-				Viewports3D[viewPortActive].rotY+= 0.5;	
-			}		
-		}
-		else if (navegacionMode == Fly){
-			// Convertir el angulo de rotX a radianes
-			GLfloat radRotX = Viewports3D[viewPortActive].rotX * M_PI / 180.0;
-
-			Viewports3D[viewPortActive].PivotY-= 30 * cos(radRotX);
-			Viewports3D[viewPortActive].PivotX+= 30 * sin(radRotX);
-		}
-	}
-	else if (estado == EditScale){
-		SetScale(-2,0);	
-	}
-	else if (estado == translacion){
-		SetTranslacionObjetos(0, 30);		
-	}
-	ReloadViewport(true);
-}
-
-void TeclaDerecha(){
-	int viewPortActive = 1;
-	//mueve el mouse
-	/*if (mouseVisible){
-		mouseX++;
-		if (mouseX > iScreenWidth-11){mouseX = iScreenWidth-11;};
-	}*/
-
-	//rotX -= fixedMul( 1, aDeltaTimeSecs );
-	if (estado == editNavegacion){				
-		if (navegacionMode == Orbit){
-			if (Viewports3D[viewPortActive].ViewFromCameraActive && CameraToView){
-				Object& obj = *Objects[CameraActive];
-				// Convertir el angulo de rotX a radianes
-				GLfloat radRotX = obj.rotX * M_PI / 180.0;
-
-				obj.posX-= 30 * cos(radRotX);
-				obj.posY+= 30 * sin(radRotX);
-			}
-			else {
-				if (Viewports3D[viewPortActive].ViewFromCameraActive){
-					Viewports3D[viewPortActive].RestaurarViewport();
-				}
-				Viewports3D[viewPortActive].rotX+= 0.5;	
-			}		
-		}
-		else if (navegacionMode == Fly){
-			// Convertir el angulo de rotX a radianes
-			GLfloat radRotX = Viewports3D[viewPortActive].rotX * M_PI / 180.0;
-
-			// Calcular el vector de direccion hacia la izquierda (90 grados a la izquierda del angulo actual)
-			GLfloat leftX = cos(radRotX);
-			GLfloat leftY = sin(radRotX);
-
-			// Mover hacia la izquierda
-			Viewports3D[viewPortActive].PivotX -= 30 * leftX;
-			Viewports3D[viewPortActive].PivotY -= 30 * leftY;
-		}
-	}
-	else if (estado == translacion){
-		SetTranslacionObjetos(30, 0);		
-	}
-	else if (estado == rotacion){
-		SetRotacion(-1, 0);
-	}
-	else if (estado == EditScale){
-		SetScale(2,0);	
-	}
-	else if (estado == timelineMove){
-		CurrentFrame++;
-		if (!PlayAnimation){
-			ReloadAnimation();
-		}
-	}
-	ReloadViewport(true);
-}
-
-void TeclaIzquierda(){
-	int viewPortActive = 1;
-	//mueve el mouse
-	if (mouseVisible){
-		mouseX--;
-		if (mouseX < 0){mouseX = 0;};
-	}
-
-	//rotX += fixedMul( 0.1, aDeltaTimeSecs );
-	if (estado == editNavegacion){ 
-		if (navegacionMode == Orbit){
-			if (Viewports3D[viewPortActive].ViewFromCameraActive && CameraToView){
-				Object& obj = *Objects[CameraActive];
-				// Convertir el angulo de rotX a radianes
-				GLfloat radRotX = obj.rotX * M_PI / 180.0;
-
-				obj.posX+= 30 * cos(radRotX);
-				obj.posY-= 30 * sin(radRotX);
-			}
-			else {
-				if (Viewports3D[viewPortActive].ViewFromCameraActive){
-					Viewports3D[viewPortActive].RestaurarViewport();
-				}
-				Viewports3D[viewPortActive].rotX-= 0.5;
-			}
-		}
-		else if (navegacionMode == Fly){
-			// Convertir el angulo de rotX a radianes
-			GLfloat radRotX = Viewports3D[viewPortActive].rotX * M_PI / 180.0;
-
-			// Calcular el vector de direccion hacia la izquierda (90 grados a la izquierda del angulo actual)
-			GLfloat leftX = cos(radRotX);
-			GLfloat leftY = sin(radRotX);
-
-			// Mover hacia la izquierda
-			Viewports3D[viewPortActive].PivotX += 30 * leftX;
-			Viewports3D[viewPortActive].PivotY += 30 * leftY;
-		}	
-	}
-	else if (estado == translacion){	
-		SetTranslacionObjetos(-30, 0);		
-	}
-	else if (estado == rotacion){
-		SetRotacion(1, 0);
-	}
-	else if (estado == EditScale){
-		SetScale(-2,0);
-	}
-	else if (estado == timelineMove){
-		CurrentFrame--;
-		if (CurrentFrame < StartFrame){
-			StartFrame = EndFrame;
-		}
-		if (!PlayAnimation){
-			ReloadAnimation();
-		}
-	}
-	ReloadViewport(true);
-}
-
-int dx = 0;
-int dy = 0;
 void CheckWarpMouseInWindow(int mx, int my){
     bool warped = false;
 	dx = mx - lastMouseX;
@@ -302,237 +124,6 @@ void Contadores(){
 	}
 }
 
-//Como era en SDL2
-/*
-void InputUsuarioSDL(SDL_Event &e){
-	//rueda del mouse	
-    if (e.type == SDL_MOUSEWHEEL) {
-		posY+= e.wheel.y*20;
-		redibujar = true;  
-    }
-    // Botones del mouse
-    else if (e.type == SDL_MOUSEBUTTONDOWN) {
-		if (e.button.button == SDL_BUTTON_LEFT) {  
-			if (estado == translacion){
-				Aceptar();
-			}
-			else {
-            	GuardarMousePos();
-				SetCursor3D();
-			}
-		}
-        else if (e.button.button == SDL_BUTTON_MIDDLE) {  // rueda clic
-            middleMouseDown = true;
-            GuardarMousePos();
-        }
-		else if (e.button.button == SDL_BUTTON_RIGHT) {  
-			if (estado == translacion){
-				Cancelar();
-			}
-		}
-    }
-    else if (e.type == SDL_MOUSEBUTTONUP) {
-        if (e.button.button == SDL_BUTTON_MIDDLE) {
-            middleMouseDown = false;
-        }
-    }
-    else if (e.type == SDL_MOUSEMOTION){
-		int mx = e.motion.x;
-		int my = e.motion.y;
-		if (middleMouseDown) {
-			CheckWarpMouseInWindow(mx, my);
-			// Chequear si Shift está presionado
-			bool shiftHeld = (SDL_GetModState() & KMOD_SHIFT);
-
-			if (shiftHeld) {
-				float radY = rotY * M_PI / 180.0f; // Yaw
-				float radX = rotX * M_PI / 180.0f; // Pitch
-
-				float factor = 8.0f;
-
-				float cosX = cos(radX);
-				float sinX = sin(radX);
-				float cosY = cos(radY);
-				float sinY = sin(radY);
-
-				PivotZ -= dy * factor * cosY;
-				PivotX += dx * factor * cosX - dy * factor * sinY * sinX;
-				PivotY += dx * factor * sinX + dy * factor * sinY * cosX;
-				LShiftPressed = false;
-			} 
-			else {
-				// 🚀 ROTAR cámara
-				rotX += dx * 0.2f;  
-				rotY += dy * 0.2f;  
-
-				// Limitar rotY para evitar giros extremos
-				if(rotY > 180.0f) rotY -= 360.0f;
-				if(rotY < -180.0f) rotY += 360.0f;
-				if(rotX > 180.0f) rotX -= 360.0f;
-				if(rotX < -180.0f) rotX += 360.0f;
-			}
-
-			redibujar = true;
-		}
-		else if (estado == translacion){
-			// mover objetos con el mouse
-			CheckWarpMouseInWindow(mx, my);
-			SetTranslacionObjetos(dx, dy, 16.0f);
-		}
-    }
-    //eventos del teclado
-    else if (e.type == SDL_KEYDOWN) {
-        if (e.key.repeat == 0) { 
-            // Primera vez que se presiona la tecla
-            switch (e.key.keysym.sym) {
-				case SDLK_LSHIFT:
-					LShiftPressed = true;
-					break;
-				case SDLK_LALT:
-					LAltPressed = true;
-					break;
-                case SDLK_RETURN:  // Enter
-                    Aceptar();
-                    break;
-                case SDLK_RIGHT:   // Flecha derecha
-                    TeclaDerecha();
-                    break;
-                case SDLK_LEFT:    // Flecha izquierda
-                    TeclaIzquierda();
-                    break;
-                case SDLK_UP:  
-                    TeclaArriba();
-                    break;
-                case SDLK_DOWN:  
-                    TeclaAbajo();
-                    break;	
-                case SDLK_a:  
-                    ClickA();
-                    break;
-                case SDLK_d:
-                    ClickD();
-                    break;
-                case SDLK_x:   
-					if (estado != editNavegacion){
-						if (axisSelect != X){
-							SetEje(X);
-						}
-						else {
-							SetEje(ViewAxis);
-						}
-					} 
-					else {
-						Borrar();
-					}
-                    break;
-                case SDLK_y:   
-					if (estado != editNavegacion){
-						if (axisSelect != Y){
-							SetEje(Y);
-						}
-						else {
-							SetEje(ViewAxis);
-						}
-					}
-                    break;
-                case SDLK_z:   
-					if (estado != editNavegacion){
-						if (axisSelect != Z){
-							SetEje(Z);
-						}
-						else {
-							SetEje(ViewAxis);
-						}
-					}
-                    break;
-                case SDLK_r:    
-                    SetRotacion();
-                    break;
-                case SDLK_g:  
-                    SetPosicion();
-                    break;			
-                case SDLK_s:   
-                    SetEscala();
-                    break;
-                // Numpad
-                case SDLK_KP_1: SetViewpoint(front); break;
-                //case SDLK_KP_2: numpad('2'); break;
-                case SDLK_KP_3: SetViewpoint(right); break;
-                case SDLK_KP_5: {
-					SetPerspectiva(!orthographic, true); 
-					break;
-				};
-                case SDLK_KP_7: SetViewpoint(top); break;
-                //case SDLK_KP_8: numpad('8'); break;
-                case SDLK_KP_9: abrir(); break;
-                //case SDLK_KP_0: numpad('0'); break;
-                case SDLK_KP_PERIOD: EnfocarObject(); break;
-                // si querés, agregá más teclas aquí
-                case SDLK_ESCAPE:  // Esc                    
-                    Cancelar();
-                    break;
-            }
-        }else {
-            // Evento repetido por mantener apretada
-            //std::cout << "apretando tecla" << std::endl;
-    		SDL_Keycode key = e.key.keysym.sym;
-            switch (key) {
-                case SDLK_RETURN:  // Enter
-                    Aceptar();
-                    break;
-                case SDLK_RIGHT:   // Flecha derecha
-                    TeclaDerecha();
-                    break;
-                case SDLK_LEFT:    // Flecha izquierda
-                    TeclaIzquierda();
-                    break;
-                case SDLK_UP:   // Flecha derecha
-                    TeclaArriba();
-                    break;
-                case SDLK_DOWN:    // Flecha izquierda
-                    TeclaAbajo();
-                    break;
-                case SDLK_a:   // Flecha derecha
-                    ClickA();
-                    break;
-                case SDLK_e:   // Flecha derecha
-                    ClickE();
-                    break;
-                case SDLK_q:    // Flecha izquierda
-                    ClickQ();
-                    break;
-                // Numpad
-                case SDLK_KP_1: SetViewpoint(front); break;
-                //case SDLK_KP_2: numpad('2'); break;
-                case SDLK_KP_3: SetViewpoint(right); break;
-                case SDLK_KP_7: SetViewpoint(top); break;
-                //case SDLK_KP_8: numpad('8'); break;
-                case SDLK_KP_9: abrir(); break;
-                //case SDLK_KP_0: numpad('0'); break;
-                case SDLK_KP_PERIOD: EnfocarObject(); break;
-                // si querés, agregá más teclas aquí
-                case SDLK_ESCAPE:  // Esc
-                    Cancelar();
-                    break;
-            }
-        }
-    } 	
-	else if (e.type == SDL_KEYUP) {
-		switch (e.key.keysym.sym) {
-			case SDLK_LSHIFT:
-				if (ShiftCount < 20){
-					changeSelect();
-				}
-				ShiftCount = 0;
-				LShiftPressed = false;
-				break;
-			case SDLK_LALT:
-				LAltPressed = false;
-				break;
-		}
-	}
-}*/
-
 void InputUsuarioSDL3(SDL_Event &e){
     if (e.type == SDL_EVENT_MOUSE_MOTION){
 		int mx = e.motion.x;
@@ -540,85 +131,27 @@ void InputUsuarioSDL3(SDL_Event &e){
 
 		//para saber en que vieport estamos
     	viewPortActive = FindViewportUnderMouse(mx, my);
-		//std::cout << "viewport actual: " << viewPortActive << std::endl;
+		event_mouse_motion();
 
 		if (middleMouseDown && viewPortActive > -1) {
-			ViewPortClickDown = true;
 			CheckWarpMouseInWindow(mx, my);
-			// Chequear si Shift está presionado
-			const bool* state = SDL_GetKeyboardState(NULL);
-			bool shiftHeld = state[SDL_SCANCODE_LSHIFT] || state[SDL_SCANCODE_RSHIFT];
-
-			if (shiftHeld) {
-				float radY = Viewports3D[viewPortActive].rotY * M_PI / 180.0f; // Yaw
-				float radX = Viewports3D[viewPortActive].rotX * M_PI / 180.0f; // Pitch
-
-				float factor = 8.0f;
-
-				float cosX = cos(radX);
-				float sinX = sin(radX);
-				float cosY = cos(radY);
-				float sinY = sin(radY);
-
-				Viewports3D[viewPortActive].PivotZ -= dy * factor * cosY;
-				Viewports3D[viewPortActive].PivotX += dx * factor * cosX - dy * factor * sinY * sinX;
-				Viewports3D[viewPortActive].PivotY += dx * factor * sinX + dy * factor * sinY * cosX;
-				LShiftPressed = false;
-			} 
-			else {
-				// 🚀 ROTAR cámara
-				Viewports3D[viewPortActive].rotX += dx * 0.2f;  
-				Viewports3D[viewPortActive].rotY += dy * 0.2f;  
-
-				// Limitar rotY para evitar giros extremos
-				if(Viewports3D[viewPortActive].rotY > 180.0f) Viewports3D[viewPortActive].rotY -= 360.0f;
-				if(Viewports3D[viewPortActive].rotY < -180.0f) Viewports3D[viewPortActive].rotY += 360.0f;
-				if(Viewports3D[viewPortActive].rotX > 180.0f) Viewports3D[viewPortActive].rotX -= 360.0f;
-				if(Viewports3D[viewPortActive].rotX < -180.0f) Viewports3D[viewPortActive].rotX += 360.0f;
-			}
-
-			redibujar = true;
 		}
 		else if (estado == translacion || estado == rotacion || estado == EditScale){
-			// mover objetos con el mouse
+			ViewPortClickDown = true;
 			CheckWarpMouseInWindow(mx, my);
-			// Ocultar el cursor
-			//SDL_HideCursor();
-			if (viewPortActive > -1){
-				switch (estado) {
-					case translacion:
-						SetTranslacionObjetos(dx, dy, 16.0f);
-						break;
-					case rotacion:
-						SetRotacion(dx, dy);
-						break;
-					case EditScale:
-						SetScale(dx, dy);
-						break;
-					default:
-						// por si no coincide con nada
-						break;
-				}	
-			}
 		}
     }
 
 	//rueda del mouse	
-    if (e.type == SDL_EVENT_MOUSE_WHEEL && viewPortActive > -1) {
-		Viewports3D[viewPortActive].posY+= e.wheel.y*20;
+    if (e.type == SDL_EVENT_MOUSE_WHEEL) {
+		event_mouse_wheel(e);
     }
 
     // Botones del mouse
     if (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
 		ViewPortClickDown = true;
 		if (e.button.button == SDL_BUTTON_LEFT) {  
-			if (estado == translacion || estado == EditScale || estado == rotacion){
-				Aceptar();
-			}
-			else {
-            	GuardarMousePos();
-				SetCursor3D();
-			}
+			button_left();
 		}
         else if (e.button.button == SDL_BUTTON_MIDDLE) {  // rueda clic
             middleMouseDown = true;
@@ -639,167 +172,7 @@ void InputUsuarioSDL3(SDL_Event &e){
 
     //eventos del teclado
     if (e.type == SDL_EVENT_KEY_DOWN) {
-        if (e.key.repeat == 0) { 
-			SDL_Keycode key = e.key.key; // SDL3
-			switch (key) {
-				case SDLK_LSHIFT:
-					LShiftPressed = true;
-					break;
-				case SDLK_LALT:
-					LAltPressed = true;
-					break;
-                case SDLK_RETURN:  // Enter
-                    Aceptar();
-                    break;
-                case SDLK_RIGHT:   // Flecha derecha
-                    TeclaDerecha();
-                    break;
-                case SDLK_LEFT:    // Flecha izquierda
-                    TeclaIzquierda();
-                    break;
-                case SDLK_UP:  
-                    TeclaArriba();
-                    break;
-                case SDLK_DOWN:  
-                    TeclaAbajo();
-                    break;	
-                case SDLK_A:  
-                    ClickA();
-                    break;
-                case SDLK_D:
-                    ClickD();
-                    break;
-                case SDLK_X:   
-					if (estado != editNavegacion){
-						if (axisSelect != X){
-							SetEje(X);
-						}
-						else {
-							SetEje(ViewAxis);
-						}
-					} 
-					else {
-						Borrar();
-					}
-                    break;
-                case SDLK_Y:   
-					if (estado != editNavegacion){
-						if (axisSelect != Y){
-							SetEje(Y);
-						}
-						else {
-							SetEje(ViewAxis);
-						}
-					}
-                    break;
-                case SDLK_Z:   
-					if (estado != editNavegacion){
-						if (axisSelect != Z){
-							SetEje(Z);
-						}
-						else {
-							SetEje(ViewAxis);
-						}
-					}
-                    break;
-                case SDLK_R:    
-                    SetRotacion();
-                    break;
-                case SDLK_G:  
-					// Para activar el cursor de mover/arrastrar
-					UpdatePrecalculos();
-                    SetPosicion();
-                    break;			
-                case SDLK_S:   
-                    SetEscala();
-                    break;
-                // Numpad
-                case SDLK_KP_1: Viewports3D[viewPortActive].SetViewpoint(front); break;
-                //case SDLK_KP_2: numpad('2'); break;
-                case SDLK_KP_3: Viewports3D[viewPortActive].SetViewpoint(right); break;
-                case SDLK_KP_5: {
-					Viewports3D[viewPortActive].ChangePerspective(); 
-					break;
-				};
-                case SDLK_KP_7: Viewports3D[viewPortActive].SetViewpoint(top); break;
-                case SDLK_KP_8: BuscarVertexAnimation(); break;
-                case SDLK_KP_9: abrir(); break;
-                //case SDLK_KP_0: numpad('0'); break;
-                case SDLK_KP_PERIOD: {
-					if (Objects.size() > 0){
-						Viewports3D[viewPortActive].EnfocarObject(); 
-					}
-					break;
-				}
-                // si querés, agregá más teclas aquí
-                case SDLK_ESCAPE:  // Esc                    
-                    Cancelar();
-                    break;
-            }
-        }else {
-            // Evento repetido por mantener apretada
-            //std::cout << "apretando tecla" << std::endl;
-			SDL_Keycode key = e.key.key; // SDL3
-            switch (key) {
-                case SDLK_RETURN:  // Enter
-                    Aceptar();
-                    break;
-                case SDLK_RIGHT:   // Flecha derecha
-                    TeclaDerecha();
-                    break;
-                case SDLK_LEFT:    // Flecha izquierda
-                    TeclaIzquierda();
-                    break;
-                case SDLK_UP:   // Flecha derecha
-                    TeclaArriba();
-                    break;
-                case SDLK_DOWN:    // Flecha izquierda
-                    TeclaAbajo();
-                    break;
-                case SDLK_A:   // Flecha derecha
-                    ClickA();
-                    break;
-                case SDLK_E:   // Flecha derecha
-                    ClickE();
-                    break;
-                case SDLK_Q:    // Flecha izquierda
-                    ClickQ();
-                    break;
-                // Numpad
-                case SDLK_KP_1: {
-					if (viewPortActive > -1){
-						Viewports3D[viewPortActive].SetViewpoint(front);
-					}
-					break;
-				}
-                //case SDLK_KP_2: numpad('2'); break;
-                case SDLK_KP_3: {
-					if (viewPortActive > -1){
-						Viewports3D[viewPortActive].SetViewpoint(right);
-					} 
-					break;
-				}
-                case SDLK_KP_7: {
-					if (viewPortActive > -1){
-						Viewports3D[viewPortActive].SetViewpoint(top);
-					}
-					break;
-				}
-                case SDLK_KP_8: BuscarVertexAnimation(); break;
-                case SDLK_KP_9: abrir();break;
-                //case SDLK_KP_0: numpad('0'); break;
-                case SDLK_KP_PERIOD: {
-					if (viewPortActive > -1 && Objects.size() > 0){
-						Viewports3D[viewPortActive].EnfocarObject();
-					}
-					break;
-				}
-                // si querés, agregá más teclas aquí
-                case SDLK_ESCAPE:  // Esc
-                    Cancelar();
-                    break;
-            }
-        }
+		event_key_down(e);
     } 	
 	else if (e.type == SDL_EVENT_KEY_UP) {
 		SDL_Keycode key = e.key.key; // SDL3
@@ -1181,3 +554,236 @@ void InputUsuarioSymbian(GLfixed aDeltaTimeSecs){
 	    ReloadViewport(true);
 	}*/
 }
+
+
+
+//Como era en SDL2
+/*
+void InputUsuarioSDL(SDL_Event &e){
+	//rueda del mouse	
+    if (e.type == SDL_MOUSEWHEEL) {
+		posY+= e.wheel.y*20;
+		redibujar = true;  
+    }
+    // Botones del mouse
+    else if (e.type == SDL_MOUSEBUTTONDOWN) {
+		if (e.button.button == SDL_BUTTON_LEFT) {  
+			if (estado == translacion){
+				Aceptar();
+			}
+			else {
+            	GuardarMousePos();
+				SetCursor3D();
+			}
+		}
+        else if (e.button.button == SDL_BUTTON_MIDDLE) {  // rueda clic
+            middleMouseDown = true;
+            GuardarMousePos();
+        }
+		else if (e.button.button == SDL_BUTTON_RIGHT) {  
+			if (estado == translacion){
+				Cancelar();
+			}
+		}
+    }
+    else if (e.type == SDL_MOUSEBUTTONUP) {
+        if (e.button.button == SDL_BUTTON_MIDDLE) {
+            middleMouseDown = false;
+        }
+    }
+    else if (e.type == SDL_MOUSEMOTION){
+		int mx = e.motion.x;
+		int my = e.motion.y;
+		if (middleMouseDown) {
+			CheckWarpMouseInWindow(mx, my);
+			// Chequear si Shift está presionado
+			bool shiftHeld = (SDL_GetModState() & KMOD_SHIFT);
+
+			if (shiftHeld) {
+				float radY = rotY * M_PI / 180.0f; // Yaw
+				float radX = rotX * M_PI / 180.0f; // Pitch
+
+				float factor = 8.0f;
+
+				float cosX = cos(radX);
+				float sinX = sin(radX);
+				float cosY = cos(radY);
+				float sinY = sin(radY);
+
+				PivotZ -= dy * factor * cosY;
+				PivotX += dx * factor * cosX - dy * factor * sinY * sinX;
+				PivotY += dx * factor * sinX + dy * factor * sinY * cosX;
+				LShiftPressed = false;
+			} 
+			else {
+				// 🚀 ROTAR cámara
+				rotX += dx * 0.2f;  
+				rotY += dy * 0.2f;  
+
+				// Limitar rotY para evitar giros extremos
+				if(rotY > 180.0f) rotY -= 360.0f;
+				if(rotY < -180.0f) rotY += 360.0f;
+				if(rotX > 180.0f) rotX -= 360.0f;
+				if(rotX < -180.0f) rotX += 360.0f;
+			}
+
+			redibujar = true;
+		}
+		else if (estado == translacion){
+			// mover objetos con el mouse
+			CheckWarpMouseInWindow(mx, my);
+			SetTranslacionObjetos(dx, dy, 16.0f);
+		}
+    }
+    //eventos del teclado
+    else if (e.type == SDL_KEYDOWN) {
+        if (e.key.repeat == 0) { 
+            // Primera vez que se presiona la tecla
+            switch (e.key.keysym.sym) {
+				case SDLK_LSHIFT:
+					LShiftPressed = true;
+					break;
+				case SDLK_LALT:
+					LAltPressed = true;
+					break;
+                case SDLK_RETURN:  // Enter
+                    Aceptar();
+                    break;
+                case SDLK_RIGHT:   // Flecha derecha
+                    TeclaDerecha();
+                    break;
+                case SDLK_LEFT:    // Flecha izquierda
+                    TeclaIzquierda();
+                    break;
+                case SDLK_UP:  
+                    TeclaArriba();
+                    break;
+                case SDLK_DOWN:  
+                    TeclaAbajo();
+                    break;	
+                case SDLK_a:  
+                    ClickA();
+                    break;
+                case SDLK_d:
+                    ClickD();
+                    break;
+                case SDLK_x:   
+					if (estado != editNavegacion){
+						if (axisSelect != X){
+							SetEje(X);
+						}
+						else {
+							SetEje(ViewAxis);
+						}
+					} 
+					else {
+						Borrar();
+					}
+                    break;
+                case SDLK_y:   
+					if (estado != editNavegacion){
+						if (axisSelect != Y){
+							SetEje(Y);
+						}
+						else {
+							SetEje(ViewAxis);
+						}
+					}
+                    break;
+                case SDLK_z:   
+					if (estado != editNavegacion){
+						if (axisSelect != Z){
+							SetEje(Z);
+						}
+						else {
+							SetEje(ViewAxis);
+						}
+					}
+                    break;
+                case SDLK_r:    
+                    SetRotacion();
+                    break;
+                case SDLK_g:  
+                    SetPosicion();
+                    break;			
+                case SDLK_s:   
+                    SetEscala();
+                    break;
+                // Numpad
+                case SDLK_KP_1: SetViewpoint(front); break;
+                //case SDLK_KP_2: numpad('2'); break;
+                case SDLK_KP_3: SetViewpoint(right); break;
+                case SDLK_KP_5: {
+					SetPerspectiva(!orthographic, true); 
+					break;
+				};
+                case SDLK_KP_7: SetViewpoint(top); break;
+                //case SDLK_KP_8: numpad('8'); break;
+                case SDLK_KP_9: abrir(); break;
+                //case SDLK_KP_0: numpad('0'); break;
+                case SDLK_KP_PERIOD: EnfocarObject(); break;
+                // si querés, agregá más teclas aquí
+                case SDLK_ESCAPE:  // Esc                    
+                    Cancelar();
+                    break;
+            }
+        }else {
+            // Evento repetido por mantener apretada
+            //std::cout << "apretando tecla" << std::endl;
+    		SDL_Keycode key = e.key.keysym.sym;
+            switch (key) {
+                case SDLK_RETURN:  // Enter
+                    Aceptar();
+                    break;
+                case SDLK_RIGHT:   // Flecha derecha
+                    TeclaDerecha();
+                    break;
+                case SDLK_LEFT:    // Flecha izquierda
+                    TeclaIzquierda();
+                    break;
+                case SDLK_UP:   // Flecha derecha
+                    TeclaArriba();
+                    break;
+                case SDLK_DOWN:    // Flecha izquierda
+                    TeclaAbajo();
+                    break;
+                case SDLK_a:   // Flecha derecha
+                    ClickA();
+                    break;
+                case SDLK_e:   // Flecha derecha
+                    ClickE();
+                    break;
+                case SDLK_q:    // Flecha izquierda
+                    ClickQ();
+                    break;
+                // Numpad
+                case SDLK_KP_1: SetViewpoint(front); break;
+                //case SDLK_KP_2: numpad('2'); break;
+                case SDLK_KP_3: SetViewpoint(right); break;
+                case SDLK_KP_7: SetViewpoint(top); break;
+                //case SDLK_KP_8: numpad('8'); break;
+                case SDLK_KP_9: abrir(); break;
+                //case SDLK_KP_0: numpad('0'); break;
+                case SDLK_KP_PERIOD: EnfocarObject(); break;
+                // si querés, agregá más teclas aquí
+                case SDLK_ESCAPE:  // Esc
+                    Cancelar();
+                    break;
+            }
+        }
+    } 	
+	else if (e.type == SDL_KEYUP) {
+		switch (e.key.keysym.sym) {
+			case SDLK_LSHIFT:
+				if (ShiftCount < 20){
+					changeSelect();
+				}
+				ShiftCount = 0;
+				LShiftPressed = false;
+				break;
+			case SDLK_LALT:
+				LAltPressed = false;
+				break;
+		}
+	}
+}*/

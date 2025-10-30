@@ -53,14 +53,14 @@ int winH = 600;
 #include "../Shared/colores.h"
 #include "../Shared/OpcionesRender.h"
 
-#include "../Shared/ObjectMode.h"
 #include "../Shared/Animation.h"
+#include "../Shared/ObjectMode.h"
 #include "../Shared/render.h"
-#include "../Shared/ViewPorts/ViewPorts.h"
-#include "../Shared/funciones.h"
 #include "../Shared/import_obj.h"
 #include "../Shared/import_vertex_animation.h"
 #include "../Shared/lectura-escritura.h"
+#include "../Shared/ViewPorts/ViewPorts.h"
+#include "../Shared/funciones.h"
 #include "../Shared/controles.h"
 #include "../Shared/constructor.h"
 

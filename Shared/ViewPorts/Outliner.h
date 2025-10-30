@@ -91,18 +91,6 @@ class Outliner {
             }
         }
 
-        // Inicializar el Outliner
-        /*static Outliner* InitOutliner(int parent) {
-            // Crear un Object2D tipo Rectangle
-            Object2D* newObj = AddObject2D(UI::Rectangle);
-
-            // Configurar tamaño y color
-            Rectangle* rect = static_cast<Rectangle*>(newObj->data);
-            rect->SetSize(0, 0, Viewports[parent].width, RenglonHeight);
-            rect->SetColor(255, 0, 0);
-            rect->opacity = 255;
-        }*/
-
         void OnResize(){
             Viewport& parentView = Viewports[Parent];
             Rectangle* rect = static_cast<Rectangle*>(Renglon.data);
@@ -112,6 +100,22 @@ class Outliner {
             CantidadRenglones = static_cast<int>(
                 std::ceil(static_cast<float>(parentView.height) / static_cast<float>(RenglonHeight))
             );
+        }
+
+        void button_left(){
+		    std::cout << "outline: " << lastMouseX << std::endl;
+        }
+
+        void event_mouse_motion(){
+        
+        }
+
+        void event_mouse_wheel(SDL_Event &e){
+
+        }
+
+        void event_key_down(SDL_Event &e){
+            
         }
 };
 

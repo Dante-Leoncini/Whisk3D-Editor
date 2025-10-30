@@ -26,39 +26,32 @@ int viewPortActive = -1;
 bool ViewPortClickDown = false;
 
 int FindViewportUnderMouse(int mx, int my) {
-    if (ViewPortClickDown) return viewPortActive;
-    // invertir coordenada Y de SDL a OpenGL
-    int oglY = winH - my;  
+    if (ViewPortClickDown)
+        return viewPortActive;
+
+    int oglY = winH - my;
 
     for (size_t i = 0; i < Viewports.size(); i++) {
         const Viewport& v = Viewports[i];
-        if (v.type != View::ViewPort3D){
+
+        // Ignorar contenedores
+        if (v.type == View::Row || v.type == View::Column)
             continue;
-        }
+
+        // Detectar si el mouse está dentro del área de este viewport
         if (mx >= v.x && mx < v.x + v.width &&
-            oglY >= v.y && oglY < v.y + v.height
-        ) {
-            return v.ChildA;
+            oglY >= v.y && oglY < v.y + v.height)
+        {
+            // 👇 devolver el índice del viewport real
+            return (int)i;
         }
     }
-    return -1; // no encontró nada
+
+    return -1;
 }
 
 #include "./ViewPort3D.h"
 #include "./Outliner.h"
-
-// Método para actualizar cache
-void UpdatePrecalculos() {
-    if (viewPortActive > -1){
-        precalculado.radY = Viewports3D[viewPortActive].rotY * M_PI / 180.0f;
-        precalculado.radX = Viewports3D[viewPortActive].rotX * M_PI / 180.0f;
-
-        precalculado.cosX = cos(precalculado.radX);
-        precalculado.sinX = sin(precalculado.radX);
-        precalculado.cosY = cos(precalculado.radY);
-        precalculado.sinY = sin(precalculado.radY);
-    }
-}
 
 int AddViewport(View type, int parent, int width, int height, int x, int y, float weightX, float weightY, bool NewViewPort = true) {
     Viewport view;

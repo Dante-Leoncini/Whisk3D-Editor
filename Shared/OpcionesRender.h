@@ -20,6 +20,53 @@ enum { Solid, MaterialPreview, Rendered };
 
 int view = MaterialPreview;
 
+void ReloadViewport(bool hacerRedibujo){
+	//Recalcula los constrains
+    //for(TInt c = 0; c < Constraints.Count(); c++) {
+    for(size_t c = 0; c < Constraints.size(); c++) {
+		Object& objTarget = *Objects[Constraints[c].Target];
+		Object& obj = *Objects[Constraints[c].Id];
+		switch (Constraints[c].type) {
+			case trackto: {
+				// Calcular vector dirección
+				GLfloat dirX = objTarget.posX - obj.posX;
+				GLfloat dirY = objTarget.posY - obj.posY;
+				GLfloat dirZ = objTarget.posZ - obj.posZ;						
+				
+				obj.rotZ = atan2(dirX, dirY) * (180.0 / M_PI);  // Azimut
+
+				// Calcular longitud del vector (magnitud)
+				GLfloat length = sqrt(dirX * dirX + dirY * dirY + dirZ * dirZ);
+
+				// Cálculo de la elevación (rotY)
+				if (Constraints[c].opcion){	
+					obj.rotZ += 180; // Para invertir el eje si necesario.
+					obj.rotX = asin(dirZ/length) * (180.0 / M_PI);					
+				}
+				else {
+					obj.rotZ -= 90; // Para invertir el eje si necesario.
+					obj.rotY = asin(dirZ/length) * (180.0 / M_PI);	
+				}
+
+				break;
+			}
+			case copyrotation:
+				obj.rotX = objTarget.rotX;
+				obj.rotY = objTarget.rotY;
+				obj.rotZ = objTarget.rotZ;
+				break;
+			case copylocation:
+				obj.posX = objTarget.posX;
+				obj.posY = objTarget.posY;
+				obj.posZ = objTarget.posZ;
+				break;
+		}
+	}
+	if (hacerRedibujo){
+    	redibujar = true;
+	}
+}
+
 /*void SetPerspectiva(bool orthographicValue, bool redibuja ){
 	orthographic = orthographicValue;
 	glMatrixMode( GL_PROJECTION );

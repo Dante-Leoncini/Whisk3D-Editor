@@ -1,48 +1,199 @@
-void ReloadViewport(bool hacerRedibujo){
-	//Recalcula los constrains
-    //for(TInt c = 0; c < Constraints.Count(); c++) {
-    for(size_t c = 0; c < Constraints.size(); c++) {
-		Object& objTarget = *Objects[Constraints[c].Target];
-		Object& obj = *Objects[Constraints[c].Id];
-		switch (Constraints[c].type) {
-			case trackto: {
-				// Calcular vector dirección
-				GLfloat dirX = objTarget.posX - obj.posX;
-				GLfloat dirY = objTarget.posY - obj.posY;
-				GLfloat dirZ = objTarget.posZ - obj.posZ;						
-				
-				obj.rotZ = atan2(dirX, dirY) * (180.0 / M_PI);  // Azimut
+void ReestablecerEstado(){
+	if (InteractionMode == ObjectMode){
+		//for(int o=0; o < estadoObjetos.Count(); o++){
+		for(size_t o=0; o < estadoObjetos.size(); o++){
+			SaveState& estadoObj = estadoObjetos[o];
+			Object& obj = *Objects[estadoObj.indice];
+			obj.posX = estadoObj.posX;
+			obj.posY = estadoObj.posY;
+			obj.posZ = estadoObj.posZ;
+			obj.rotX = estadoObj.rotX;
+			obj.rotY = estadoObj.rotY;
+			obj.rotZ = estadoObj.rotZ;
+			obj.scaleX = estadoObj.scaleX;
+			obj.scaleY = estadoObj.scaleY;
+			obj.scaleZ = estadoObj.scaleZ;	
+		}	
+		//estadoObjetos.Close();
+		estadoObjetos.clear();
+	}
+	estado = editNavegacion;
+	ReloadViewport(true);
+};
 
-				// Calcular longitud del vector (magnitud)
-				GLfloat length = sqrt(dirX * dirX + dirY * dirY + dirZ * dirZ);
+void Cancelar(){
+	// Mostrar el cursor
+	SDL_ShowCursor();
+	if (estado != editNavegacion){
+		ReestablecerEstado();
+	}
+};
 
-				// Cálculo de la elevación (rotY)
-				if (Constraints[c].opcion){	
-					obj.rotZ += 180; // Para invertir el eje si necesario.
-					obj.rotX = asin(dirZ/length) * (180.0 / M_PI);					
-				}
-				else {
-					obj.rotZ -= 90; // Para invertir el eje si necesario.
-					obj.rotY = asin(dirZ/length) * (180.0 / M_PI);	
-				}
-
-				break;
+void BorrarAnimaciones(int indice){
+	for(size_t a = 0; a < AnimationObjects.size(); a++) {
+		if (AnimationObjects[a].Id == indice) {	
+			for(size_t p = 0; p < AnimationObjects[a].Propertys.size(); p++) {
+				AnimationObjects[a].Propertys[p].keyframes.clear();
+			}				
+			AnimationObjects[a].Propertys.clear();
+			//AnimationObjects.Remove(a);
+			if (a >= 0 && a < AnimationObjects.size()) {
+				AnimationObjects.erase(AnimationObjects.begin() + a);
 			}
-			case copyrotation:
-				obj.rotX = objTarget.rotX;
-				obj.rotY = objTarget.rotY;
-				obj.rotZ = objTarget.rotZ;
+		}
+		// Hace falta cambiar los indices
+		else if (AnimationObjects[a].Id > indice) {
+			AnimationObjects[a].Id--;
+		}			
+	}
+}
+
+void BorrarObjeto(size_t indice){
+	Object& obj = *Objects[indice];
+
+	if (obj.type == mesh){
+		//primero miramos si alguien mas esta usando esta malla 3d.
+		//es posible compartir una malla 3d entre distintos objetos
+		bool MeshEnUso = false;
+		
+		for(size_t o=0; o < Objects.size(); o++){
+			//si el objeto esta seleccionado. significa que se va a borrar, por lo tanto no se cuenta
+			if (Objects[o]->type == mesh && Objects[o]->Id == (int)(indice) && !Objects[o]->seleccionado){
+				MeshEnUso = true;
 				break;
-			case copylocation:
-				obj.posX = objTarget.posX;
-				obj.posY = objTarget.posY;
-				obj.posZ = objTarget.posZ;
-				break;
+			};				
+		}
+
+		//si la malla 3d esta en uso por otro objeto que no va a ser borrado. no se puede borrar
+		if (MeshEnUso){
+			std::cout << "Malla 3D unica. SI se borra" << std::endl;	
+			Meshes[obj.Id].LiberarMemoria();
+
+			// borrar el elemento en posición `indice`
+			if (indice >= 0 && static_cast<size_t>(obj.Id) < Meshes.size()) {
+				Meshes.erase(Meshes.begin() + obj.Id);
+			}
+
+			//al eliminarse la malla 3d. hay que restarle 1 al ID de todos los objetos para que apunten bien a la memoria de su malla 3d
+			for(size_t o=0; o < Objects.size(); o++){
+				if (Objects[o]->type == mesh && Objects[o]->Id > obj.Id){
+					Objects[o]->Id--;
+				};				
+			}
+		}
+		else {
+			std::cout << "Malla 3d en uso. NO se borra" << std::endl;
 		}
 	}
-	if (hacerRedibujo){
-    	redibujar = true;
+
+	//si existe animaciones para ese objeto. las borra		
+	BorrarAnimaciones(indice);
+
+	// Borrar de la coleccion
+	/*for (int c = (int)(Collections.size()) - 1; c >= 0; c--) {
+		if (Collections[c].ObjID == indice) {
+			// borrar el elemento en posición `indice`
+			if (c >= 0 && static_cast<size_t>(c) < Collections.size()) {
+				Collections.erase(Collections.begin() + c);
+			}
+		}
+		// Hace falta cambiar los indices
+		else if (Collections[c].ObjID > indice) {
+			Collections[c].ObjID--;
+		}
+	}*/
+
+	for (size_t c = 0; c < Collections.size(); ) {
+		if (Collections[c]->ObjID == indice) {
+			delete Collections[c];               // liberar memoria
+			Collections.erase(Collections.begin() + c); // borrar del vector
+		} else {
+			++c;
+		}
 	}
+
+	//si es la camara activa. borra el indice
+	if (CameraActive == (int)(indice)){
+		CameraActive = -1;	
+		//DesactivarCamaraActiva();
+	}
+	//si era mas grande. resta uno para que el indice apunte a la camara correcta
+	else if (CameraActive > (int)(indice)){
+		CameraActive--;
+	}
+
+	//Objects.Remove(indice);
+	if (indice >= 0 && indice < Objects.size()) {
+		Objects.erase(Objects.begin() + indice);
+	}
+
+	SelectCount--;
+	SelectActivo = -1;
+	
+	// Actualizar indices en los objetos
+	for (int o = 0; o < (int)(Objects.size()); o++) {
+		for (int c = (int)(Objects[o]->Childrens.size()) - 1; c >= 0; c--) {
+			if (Objects[o]->Childrens[c].Id == (int)(indice)) {
+				if (c >= 0 && static_cast<size_t>(c) < Objects.size()) {
+					Objects.erase(Objects.begin() + c);
+				}
+			} 
+			else if (Objects[o]->Childrens[c].Id > (int)(indice)) {
+				Objects[o]->Childrens[c].Id--;
+			}
+		}
+		//borra y actualiza los padres
+		if (Objects[o]->Parent == (int)(indice)){				
+			Objects[o]->Parent = -1;
+			AddToCollection(o, Objects[o]->name);
+		} 
+		else if (Objects[o]->Parent > (int)(indice)) {
+			Objects[o]->Parent--;
+		}
+	}
+}
+
+void Borrar(){
+	if (estado != editNavegacion ){
+		Cancelar();
+	}
+	else if (InteractionMode == ObjectMode){
+		if (Objects.size() < 1){return;}
+
+		//si no hay nada seleccionado. no borra
+		bool algoSeleccionado = false;
+		for (size_t o = Objects.size() - 1; o >= 0; o--) {
+			if (Objects[o]->seleccionado){
+				algoSeleccionado = true;
+				break;	
+			}		
+		}
+		if (!algoSeleccionado){
+			std::cout << "nada seleccionado para borrar" << std::endl;
+			return;
+		}
+		
+		//pregunta de confirmacion
+		//HBufC* noteBuf = HBufC::NewLC(100);
+		//_LIT(KStaticErrorMessage, "Delete?");
+		//noteBuf->Des().Format(KStaticErrorMessage);
+		/*if (!CDialogs::Alert(noteBuf)){
+			CleanupStack::PopAndDestroy(noteBuf);	
+			return;
+		}*/
+		//CleanupStack::PopAndDestroy(noteBuf);	
+		Cancelar();
+
+		//libera la memoria de los punteros primero	
+		// Obtener el objeto seleccionado			
+		for (int o = (int)Objects.size() - 1; o >= 0; o--) {
+			if (Objects[o]->seleccionado){
+				std::cout << "El objeto " << (o + 1) << " esta seleccionado y se va a borrar" << std::endl;
+				BorrarObjeto(o);
+			}			
+		}
+	}
+    ReloadViewport(true);	
 }
 
 void SetTransformPivotPoint(){
