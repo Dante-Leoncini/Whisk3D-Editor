@@ -49,13 +49,13 @@ class Text {
 				ls.SetVertices(
 					parent.x + offsetX, 
 					parent.y, 
-					5 * parent.scaleX, 
-					11 * parent.scaleY
+					5 * parent.scaleX * GlobalScale, 
+					11 * parent.scaleY * GlobalScale
 				);
 
 				letters.push_back(ls);
 
-				offsetX += 6 * parent.scaleX; // ancho letra escalado
+				offsetX += 6 * parent.scaleX * GlobalScale; // ancho letra escalado
 			}
 		}
 

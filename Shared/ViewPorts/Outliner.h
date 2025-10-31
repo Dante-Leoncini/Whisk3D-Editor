@@ -109,7 +109,6 @@ class Outliner {
                 glPushMatrix();                      
                 glTranslatef(0, RenglonesY, 0);
                 RenglonesY += RenglonHeight;
-                //glTexCoordPointer(2, GL_FLOAT, 0, IconsUV[Collections[i]->IconType]->uvs);
                 glTexCoordPointer(2, GL_FLOAT, 0, IconsUV[static_cast<size_t>(IconType::archive)]->uvs);
                 glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
@@ -121,7 +120,6 @@ class Outliner {
                     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
                     glPopMatrix();   
                 }
-                //glTexCoordPointer(2, GL_FLOAT, 0, IconsUV[static_cast<size_t>(Collections[i].IconType)]->uvs);
                 glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
                 glPopMatrix();  
             }

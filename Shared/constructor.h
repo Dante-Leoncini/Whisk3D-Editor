@@ -23,6 +23,10 @@ void ConstructUniversal(){
     
 	CalculateMillisecondsPerFrame(60);
 
+    //es el tamaño en X e Y de la textura
+    CrearIconos(128, 128);
+    SetGlobalScale(2);
+
     Collection* colec = new Collection(nullptr, "Collection");
     Collections.push_back(colec);
 
@@ -59,10 +63,6 @@ void ConstructUniversal(){
     tempText.SetColor(255, 255, 255);*/
 
     //creamos el Vieport Base
-
-    //es el tamaño en X e Y de la textura
-    CrearIconos(128, 128);
-    SetGlobalScale(2);
 
     int BaseView = AddViewport(View::ViewPort3D, -1, winW, winH, 0, 0, 1.0f, 1.0f);
     //lo dividimos

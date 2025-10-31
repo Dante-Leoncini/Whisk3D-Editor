@@ -159,11 +159,11 @@ size_t GetIconType(int type){
 	}
 };
 
-Object* AddObject( size_t tipo ){
+Object* AddObject( size_t type ){
 	//Cancelar();
 	ObjectsCount++;
 	Object* obj = new Object();
-	obj->type = tipo;
+	obj->type = type;
 	obj->visible = true;
 	obj->seleccionado = false;
 	obj->posX = Cursor3DposX;
@@ -173,7 +173,8 @@ Object* AddObject( size_t tipo ){
 	obj->scaleX = obj->scaleY = obj->scaleZ = 45000;
 	obj->Parent = -1;	
 	obj->Id = -0;
-	if (tipo == light){
+	obj->IconType = GetIconType(type);
+	if (type == light){
 		Light tempLight;
 		tempLight.type = pointLight;
 		tempLight.lightId = nextLightId;
@@ -209,7 +210,7 @@ Object* AddObject( size_t tipo ){
 		reinterpret_cast<Text*>(obj->name->data)->SetValue(SetName("Light"));
 	}
 	//tipo camara
-	else if (tipo == camera){
+	else if (type == camera){
 		reinterpret_cast<Text*>(obj->name->data)->SetValue(SetName("Camera"));
 		if (!CameraActive){
 			CameraActive = SelectActivo;		

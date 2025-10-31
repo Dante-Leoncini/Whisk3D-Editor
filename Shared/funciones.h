@@ -17,6 +17,7 @@ void AddMesh( int modelo ){
 	obj->rotX = obj->rotY = obj->rotZ = 0;
 	obj->scaleX = obj->scaleY = obj->scaleZ = 45000;
 	obj->Parent = -1;
+	obj->IconType = GetIconType(mesh);
 	
 	Mesh tempMesh;
 	Meshes.push_back(tempMesh);
