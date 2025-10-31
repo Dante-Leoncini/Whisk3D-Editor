@@ -1,16 +1,15 @@
 void AddMesh( int modelo ){
 	Cancelar();
 	DeseleccionarTodo();
-	SelectActivo = Objects.size();
 	SelectCount = 1;
 	
+	ObjectsCount++;
 	Object* obj = new Object();
-	Objects.push_back(obj);
-	Objects[SelectActivo]->seleccionado = true;
+	SelectActivo = obj;
 	
-	//obj.Id = Meshes.Count();
 	obj->Id = Meshes.size();
 	obj->type = mesh;
+	obj->seleccionado = true;
 	obj->visible = true;
 	obj->posX = Cursor3DposX;
 	obj->posY = Cursor3DposY;
@@ -20,7 +19,6 @@ void AddMesh( int modelo ){
 	obj->Parent = -1;
 	
 	Mesh tempMesh;
-	//Meshes.Append(tempMesh);
 	Meshes.push_back(tempMesh);
 	Mesh& pMesh = Meshes[obj->Id];	
 	
@@ -137,14 +135,14 @@ void AddMesh( int modelo ){
 		for (int i = 0; i < tempFaceGroup.indicesDrawnCount; i++) {
 			pMesh.faces[i] = CuboTriangles[i];
 		}
-		Objects[SelectActivo]->name = SetName("Cube");
+		reinterpret_cast<Text*>(obj->name->data)->SetValue(SetName("Cube"));
+
 	}	
 
 	//creamos el objeto y le asignamos la mesh	
 	//Meshes[obj.Id].materialsGroup.Append(tempFaceGroup);
 	Meshes[obj->Id].materialsGroup.push_back(tempFaceGroup);
-	AddToCollection(SelectActivo, obj->name, GetIconType(obj->type));
-    redibujar = true;
+	AddToCollection(CollectionActive, obj);
 }
 
 void NewMaterial(bool reemplazar){
@@ -191,9 +189,8 @@ void NewMaterial(bool reemplazar){
 	Materials.push_back(mat);
 	
 	//si no hay objetos
-	//if (Objects.Count() < 1){return;}	
-	if (Objects.size() < 1){return;}	
-	Object& obj = *Objects[SelectActivo];
+	if (!SelectActivo){return;}	
+	Object& obj = *SelectActivo;
 	//si no es un mesh
 	if (obj.type != mesh || !obj.seleccionado){return;}		
 	Mesh& pMesh = Meshes[obj.Id];
@@ -215,7 +212,7 @@ void NewMaterial(bool reemplazar){
 }
 
 void BorrarMesh(int indice){
-	int links = 0;
+	/*int links = 0;
 	
 	for(size_t o=0; o < Objects.size(); o++){
 		if (Objects[o]->type == mesh && Objects[o]->Id == indice){links++;};				
@@ -234,5 +231,5 @@ void BorrarMesh(int indice){
 		if (indice >= 0 && static_cast<size_t>(indice) < Meshes.size()) {
 			Meshes.erase(Meshes.begin() + indice);
 		}
-	}
+	}*/
 }

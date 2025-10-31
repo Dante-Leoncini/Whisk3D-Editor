@@ -20,6 +20,7 @@ class Viewport {
 		int ChildA = -1; //antiguamente era el ID. pero se podria reutilizar como ChildA y para ahorrar memoria son lo mismo
 		int ChildB = -1; //si esta solo. puede quedar en -1
         bool redibujar = true;
+        GLshort borderMesh[8] = { 0,0, 30,0, 0,30, 30,30 };
 };
 std::vector<Viewport> Viewports;
 int viewPortActive = -1;
@@ -271,8 +272,8 @@ void SetGlobalScale(int scale){
     SetIconScale(scale);
 
     for (size_t i = 0; i < Collections.size(); i++) {                  
-        Collections[i]->Text.scaleX = scale;                
-        Collections[i]->Text.scaleY = scale;    
-        reinterpret_cast<Text*>(Collections[i]->Text.data)->UpdateCache();    
+        Collections[i]->name->scaleX = scale;                
+        Collections[i]->name->scaleY = scale;    
+        reinterpret_cast<Text*>(Collections[i]->name->data)->UpdateCache();    
     }
 }

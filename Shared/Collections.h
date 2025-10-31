@@ -1,30 +1,64 @@
 class Collection {
     public:
-        size_t ObjID = 0;
+        //size_t ObjID = 0;
+		Collection* Parent = nullptr;
+        std::vector<Object*> Objects;
+        std::vector<Collection*> Childrens;
         bool select = false;
         bool SelectActivo = false;
-        Object2D& Text; // referencia directa
-        size_t IconType = 0;
+        Object2D* name = nullptr;
 
-        Collection(size_t objID, Object2D& text, size_t icon)
-            : ObjID(objID), Text(text), IconType(icon) {}
+        Collection(Collection* parent, const std::string& nombre)
+            : Parent(parent){
+            name = AddObject2D(UI::text);
+            reinterpret_cast<Text*>(name->data)->SetValue(nombre);
+        }
+
+        void DeseleccionarTodo(){
+            select = false;
+            for(size_t c=0; c < Childrens.size(); c++){
+                Childrens[c]->DeseleccionarTodo();				
+            }    
+            for(size_t o=0; o < Objects.size(); o++){
+                Objects[o]->DeseleccionarTodo();		
+            }     
+        }
+
+		~Collection() {
+			delete name;
+		}
 };
 
 std::vector<Collection*> Collections;
+size_t CollectionActive = 0;
 
-void AddToCollection(size_t objID, const std::string& name, size_t icon = 0) {
-    // Crear el Object2D y guardar su dirección
-    Object2D* newText = AddObject2D(UI::text);
+void AddToCollection(size_t CollectionID, Object* obj) {
+    Collections[CollectionID]->Objects.push_back(obj);
+}
 
-    // Crear la colección en memoria dinámica
-    Collection* newCollection = new Collection(objID, *newText, icon);
+void DeseleccionarTodo(){
+	if (InteractionMode == ObjectMode){
+		for(size_t c=0; c < Collections.size(); c++){
+            Collections[c]->DeseleccionarTodo();		
+		}
+		SelectCount = 0;
+	}
+}
 
-    reinterpret_cast<Object2D*>(newText)->scaleX = GlobalScale;
-    reinterpret_cast<Object2D*>(newText)->scaleY = GlobalScale;
-    reinterpret_cast<Text*>(newText->data)->SetValue(name);
-
-    // Guardar el puntero, sin copiar nada
-    Collections.push_back(newCollection);
+//outliner
+void UpdateOutlinerColor(){
+	/*for (size_t c = 0; c < Collections.size(); c++) {
+		Object& obj = *Objects[c];
+		if (SelectActivo == obj.Id && obj.seleccionado){
+			SetColorOutlinerText(c, ListaColoresUbyte[accent][0], ListaColoresUbyte[accent][1], ListaColoresUbyte[accent][2]);
+		}
+		else if (obj.seleccionado){
+			SetColorOutlinerText(c, ListaColoresUbyte[accentDark][0], ListaColoresUbyte[accentDark][1], ListaColoresUbyte[accentDark][2]);
+		}
+		else {	
+			SetColorOutlinerText(c, ListaColoresUbyte[negro][0], ListaColoresUbyte[negro][1], ListaColoresUbyte[negro][2]);	
+		}
+	}*/
 }
 
 void SetColorOutlinerText(size_t Id, float r, float g, float b){

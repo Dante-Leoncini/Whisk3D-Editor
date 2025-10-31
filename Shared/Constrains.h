@@ -2,9 +2,9 @@ enum { trackto, copyrotation, copylocation };
 
 class Constraint { 
 	public:
-		int type = 0;
-		int Id = -1;
-		int Target = -1;
+		size_t type = 0;
+		Object* Id = nullptr;
+		Object* Target = nullptr;
 		bool opcion = false;
 };
 

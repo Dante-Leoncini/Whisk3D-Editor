@@ -1,5 +1,4 @@
-void RenderObject( int objId ){
-	Object& obj = *Objects[objId];
+void RenderObject( Object& obj ){
 	glPushMatrix();
 	//glScalex(obj.scaleX, obj.scaleZ, obj.scaleY);
 	glScalef(
@@ -11,7 +10,7 @@ void RenderObject( int objId ){
 	glDisable( GL_TEXTURE_2D );
 
 	//color si esta seleccionado
-	if (SelectActivo == objId && obj.seleccionado){
+	if (SelectActivo == &obj && obj.seleccionado){
 		glColor4f(ListaColores[accent][0],ListaColores[accent][1],ListaColores[accent][2],ListaColores[accent][3]);
 	}
 	else if (obj.seleccionado){
@@ -32,7 +31,7 @@ void RenderObject( int objId ){
 		glDisable( GL_BLEND );
 		glVertexPointer( 3, GL_SHORT, 0, CameraVertices );
 		glDrawElements( GL_LINES, CameraEdgesSize, GL_UNSIGNED_SHORT, CameraEdges );
-		if (CameraActive == objId){		
+		if (CameraActive == &obj){		
     		glDisable( GL_CULL_FACE  );	
 			glDrawElements( GL_TRIANGLES, 3, GL_UNSIGNED_SHORT, CameraFaceActive );	
 		}
@@ -79,8 +78,7 @@ void RenderObject( int objId ){
 }
 
 // Funcion recursiva para renderizar un objeto y sus hijos
-void RenderObjectAndChildrens(int objId){
-	Object& obj = *Objects[objId];
+void RenderObjectAndChildrens(Object& obj){
     // Guardar la matriz actual
     glPushMatrix();
     
@@ -92,13 +90,13 @@ void RenderObjectAndChildrens(int objId){
 
     // Si es visible y no es un mesh, lo dibuja
     if (obj.visible && obj.type != mesh) {
-        RenderObject(objId); // Ajusta el segundo parametro si es necesario
+        RenderObject(obj); // Ajusta el segundo parametro si es necesario
     }
     
     // Procesar cada hijo
     //for (int c = 0; c < obj.Childrens.Count(); c++) {
     for (size_t c = 0; c < obj.Childrens.size(); c++) {
-        RenderObjectAndChildrens(obj.Childrens[c].Id);
+        RenderObjectAndChildrens(*obj.Childrens[c]);
     }
 
     // Restaurar la matriz previa
@@ -118,8 +116,7 @@ void DrawnLines(int LineWidth, int cantidad, const GLshort* vertexlines, const G
 }
 
 //Relantionshipslines
-void RenderLinkLines(int objId){
-	Object& obj = *Objects[objId];
+void RenderLinkLines(Object& obj){
     // Guardar la matriz actual
     glPushMatrix();
     
@@ -132,7 +129,7 @@ void RenderLinkLines(int objId){
     // Procesar cada hijo
     //for (TInt c = 0; c < obj.Childrens.Count(); c++) {
     for (size_t c = 0; c < obj.Childrens.size(); c++) {
-		Object& objChild = *Objects[obj.Childrens[c].Id];
+		Object& objChild = *obj.Childrens[c];
 		LineaLinkChild[3] = (GLshort)objChild.posX;
 		LineaLinkChild[4] = (GLshort)objChild.posZ;
 		LineaLinkChild[5] = (GLshort)objChild.posY;
@@ -150,10 +147,10 @@ void RenderLinkLines(int objId){
 		glDrawElements( GL_LINES, LineaEdgeSize, GL_UNSIGNED_SHORT, LineaEdge );
 				
 		DrawnLines(1, 1, LineaTimeline, LineaEdge);
-		//if (obj.Childrens.Count() > 0){
-		if (obj.Childrens.size() > 0){
+		//esta parte recursiva no la entendi. capaz tengo que revisarla mas adelante. me suena a un error
+		/*if (obj.Childrens.size() > 0){
 			RenderLinkLines(obj.Childrens[c].Id);
-		}
+		}*/
     }
 
     // Restaurar la matriz previa
@@ -195,11 +192,11 @@ void DrawTransformAxis(Object& obj) {
 	glPopMatrix();
 }
 
-void SearchSelectObj(Object& obj, int objIndex, bool& found) {
+void SearchSelectObj(Object& obj, bool& found) {
     glPushMatrix();    
     glTranslatef(obj.posX, obj.posZ, obj.posY);
     
-    if (objIndex == SelectActivo) {
+    if (&obj == SelectActivo) {
 		if (estado == rotacion || estado == EditScale){
 			glRotatef(obj.rotX, 1, 0, 0); //angulo, X Y Z
 			glRotatef(obj.rotZ, 0, 1, 0); //angulo, X Y Z
@@ -211,7 +208,6 @@ void SearchSelectObj(Object& obj, int objIndex, bool& found) {
 		}		
         found = true;
     } 
-	//else if (obj.Childrens.Count() > 0){	
 	else if (obj.Childrens.size() > 0){	
 		glRotatef(obj.rotX, 1, 0, 0); //angulo, X Y Z
 		glRotatef(obj.rotZ, 0, 1, 0); //angulo, X Y Z
@@ -219,19 +215,19 @@ void SearchSelectObj(Object& obj, int objIndex, bool& found) {
         //for (int c = 0; c < obj.Childrens.Count(); c++) {
         for (size_t c = 0; c < obj.Childrens.size(); c++) {
             if (found) break;  // Si ya lo encontro, salir del bucle
-            Object& objChild = *Objects[obj.Childrens[c].Id];
-            SearchSelectObj(objChild, obj.Childrens[c].Id, found);
+            Object& objChild = *obj.Childrens[c];
+            SearchSelectObj(objChild, found);
         }
     }
     glPopMatrix();
 }
 
-void DibujarOrigen(Object& obj, int objIndex){
+void DibujarOrigen(Object& obj){
     glPushMatrix();    
     glTranslatef(obj.posX, obj.posZ, obj.posY);
     
-    if (obj.visible && (obj.seleccionado || objIndex == SelectActivo)){	
-		if (objIndex == SelectActivo){
+    if (obj.visible && (obj.seleccionado || &obj == SelectActivo)){	
+		if (&obj == SelectActivo){
 			glColor4f(ListaColores[accent][0],ListaColores[accent][1],ListaColores[accent][2],ListaColores[accent][3]);
 		}
 		else {
@@ -258,8 +254,8 @@ void DibujarOrigen(Object& obj, int objIndex){
 		glRotatef(obj.rotY, 0, 0, 1); //angulo, X Y Z
         //for (int c = 0; c < obj.Childrens.Count(); c++) {
         for (size_t c = 0; c < obj.Childrens.size(); c++) {
-            Object& objChild = *Objects[obj.Childrens[c].Id];
-            DibujarOrigen(objChild, obj.Childrens[c].Id);
+            Object& objChild = *obj.Childrens[c];
+            DibujarOrigen(objChild);
         }
     }
     glPopMatrix();

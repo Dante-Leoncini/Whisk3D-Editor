@@ -816,7 +816,7 @@ bool LeerOBJ(std::ifstream& file,
 
 	// usar filename para nombrar por defecto (y hacerlo único)
 	std::string fileBase = ExtractBaseName(filename);
-	obj->name = SetName(fileBase);   // SetName ya comprueba colisiones en Objects
+	reinterpret_cast<Text*>(obj->name->data)->SetValue(SetName(fileBase));
 
     Wavefront Wobj;
     Wobj.Reset();
@@ -1030,17 +1030,11 @@ bool LeerOBJ(std::ifstream& file,
     // Asignar el mesh al objeto
     obj->Id = meshIndex;   // o obj.MeshIndex = meshIndex; según tu estructura
 
-    // Agregar el objeto a Objects
-    Objects.push_back(obj);
-    int objIndex = (int)Objects.size() - 1;
-
-    // Agregar el índice del objeto a Collection para render
-	AddToCollection(objIndex, obj->name, static_cast<size_t>(IconType::mesh));
+    // Agregar el objeto a la colleccion activa
+	AddToCollection(CollectionActive, obj);
 
     return hayMasObjetos;
 }
-
-
 
 /*void CWhisk3D::LeerMTL(const TFileName& aFile, TInt objetosCargados) {
 	RFs fsSession2;	

@@ -20,11 +20,34 @@ class Object2D {
         //punteros
         Object2D* Parent = nullptr;
         void* data = nullptr; // Apunta al tipo real (Rectangle*, Text*, etc.)
+
+        ~Object2D(); // 👈 solo la declaración
 };
 
 #include "./text.h"
 #include "./image.h"
 #include "./rectangle.h"
+
+Object2D::~Object2D() {
+    // Liberar memoria de data según el tipo
+    switch (type) {
+        case UI::Rectangle:
+            delete reinterpret_cast<Rectangle*>(data);
+            break;
+        case UI::text:
+            delete reinterpret_cast<Text*>(data);
+            break;
+        case UI::Image:
+            delete reinterpret_cast<Image*>(data);
+            break;
+        default:
+            break;
+    }
+
+    // Si tiene hijos, liberarlos también
+    if (ChildrensCount > 0 && Childrens)
+        delete[] Childrens;
+}
 
 Object2D* AddObject2D(UI type = UI::empty, Object2D** outPtr = nullptr) {
     // Crear el objeto en memoria dinámica

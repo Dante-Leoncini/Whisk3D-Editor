@@ -70,20 +70,6 @@ class Children {
 		GLfixed OriginalScaleZ = 0;	
 };
 
-class SaveState {
-	public:
-		int indice = -1;
-		GLfloat posX = 0.0f;
-		GLfloat posY = 0.0f;
-		GLfloat posZ = 0.0f;
-		GLfloat rotX = 0.0f;
-		GLfloat rotY = 0.0f;
-		GLfloat rotZ = 0.0f;
-		GLfixed scaleX = 0;
-		GLfixed scaleY = 0;
-		GLfixed scaleZ = 0;
-};
-
 class Light { 
 	public:
 		int type = 0;

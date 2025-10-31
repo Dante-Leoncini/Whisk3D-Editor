@@ -29,8 +29,8 @@ bool ImportVertexAnimation(const std::string& filepath){
     }
 
     // si no hay objetos
-    if (Objects.size() < 1) { file.close(); return false; }
-    Object& obj = *Objects[SelectActivo];
+    if (!SelectActivo) { file.close(); return false; }
+    Object& obj = *SelectActivo;
     if (!obj.seleccionado) { file.close(); return false; }
     // si no es un mesh
     bool esMesh = false;
@@ -170,7 +170,7 @@ bool ImportVertexAnimation(const std::string& filepath){
                 animIndex = (int)AnimationObjects.size() - 1;
             }
             AnimationObject& anim = AnimationObjects[animIndex];
-            anim.Id = SelectActivo;
+            anim.obj = SelectActivo;
 
             propIndex = BuscarAnimProperty(animIndex, AnimRotation);
             if (propIndex < 0) {
@@ -224,7 +224,7 @@ bool ImportVertexAnimation(const std::string& filepath){
                 animIndex = (int)AnimationObjects.size() - 1;
             }
             AnimationObject& anim = AnimationObjects[animIndex];
-            anim.Id = SelectActivo;
+            anim.obj = SelectActivo;
 
             propIndex = BuscarAnimProperty(animIndex, AnimPosition);
             if (propIndex < 0) {
@@ -273,7 +273,7 @@ bool ImportVertexAnimation(const std::string& filepath){
                 animIndex = (int)AnimationObjects.size() - 1;
             }
             AnimationObject& anim = AnimationObjects[animIndex];
-            anim.Id = SelectActivo;
+            anim.obj = SelectActivo;
 
             propIndex = BuscarAnimProperty(animIndex, AnimScale);
             if (propIndex < 0) {

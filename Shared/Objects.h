@@ -10,53 +10,60 @@ class Object {
 		GLfixed scaleX = 0, scaleY = 0, scaleZ = 0;
 		int Id = -1;
 		int Parent = -1;
-		std::vector<Children> Childrens;
-		std::string name;
+		std::vector<Object*> Childrens;
+		Object2D* name = AddObject2D(UI::text);
+        size_t IconType = 0;
+
+		void DeseleccionarTodo(){
+            for(size_t c=0; c < Childrens.size(); c++){
+                Childrens[c]->DeseleccionarTodo();		
+                Childrens[c]->seleccionado = false;
+            }     
+        }
+
+    	Object() = default;
+
+		~Object() {
+			delete name;
+		}
 };
 
-std::vector<Object*> Objects;
+Object* SelectActivo = nullptr;
+Object* CameraActive = nullptr;
+int ObjectsCount = 0;
 
-void DeseleccionarTodo(){
-	if (InteractionMode == ObjectMode){
-		//for(int o=0; o < Objects.Count(); o++){
-		for(size_t o=0; o < Objects.size(); o++){
-			Objects[o]->seleccionado = false;				
-		}
-		SelectCount = 0;
-	}
-}
+#include "./Collections.h"
 
-//outliner
-void UpdateOutlinerColor(){
-	for (size_t c = 0; c < Collections.size(); c++) {
-		Object& obj = *Objects[c];
-		if (SelectActivo == obj.Id && obj.seleccionado){
-			SetColorOutlinerText(c, ListaColoresUbyte[accent][0], ListaColoresUbyte[accent][1], ListaColoresUbyte[accent][2]);
-		}
-		else if (obj.seleccionado){
-			SetColorOutlinerText(c, ListaColoresUbyte[accentDark][0], ListaColoresUbyte[accentDark][1], ListaColoresUbyte[accentDark][2]);
-		}
-		else {	
-			SetColorOutlinerText(c, ListaColoresUbyte[negro][0], ListaColoresUbyte[negro][1], ListaColoresUbyte[negro][2]);	
-		}
-	}
-}
+class SaveState {
+	public:
+		Object* obj;
+		GLfloat posX = 0.0f;
+		GLfloat posY = 0.0f;
+		GLfloat posZ = 0.0f;
+		GLfloat rotX = 0.0f;
+		GLfloat rotY = 0.0f;
+		GLfloat rotZ = 0.0f;
+		GLfixed scaleX = 0;
+		GLfixed scaleY = 0;
+		GLfixed scaleZ = 0;
+};
+std::vector<SaveState> estadoObjetos;
 
 void changeSelect(){
-	if (InteractionMode == ObjectMode){
+	/*if (InteractionMode == ObjectMode){
 		//si no hay objetos
 		//o si esta moviendo, rotando o haciendo algo... no deja que continue
-		if (1 > Objects.size() || estado != editNavegacion){
+		if (1 > ObjectsCount || estado != editNavegacion){
 			return;
 		}
 		//DeseleccionarTodo();
 		//deselecciona el objeto actual si es que estaba seleccionado
-		if (SelectActivo < 1 && (int)(Objects.size() > 0)){
+		if (!SelectActivo && (int)(Objects.size() > 0)){
 			SelectCount = 1;
 			SelectActivo = 0;
 		}
-		if (Objects[SelectActivo]->seleccionado){
-			Objects[SelectActivo]->seleccionado = false;
+		if (SelectActivo->seleccionado){
+			SelectActivo->seleccionado = false;
 			SelectCount--;
 		}
 
@@ -66,33 +73,55 @@ void changeSelect(){
 			SelectActivo = 0;
 		}
 		//selecciona el proximo objeto
-		if (!Objects[SelectActivo]->seleccionado){
-			Objects[SelectActivo]->seleccionado = true;
+		if (!SelectActivo->seleccionado){
+			SelectActivo->seleccionado = true;
 			SelectCount++;
 		}
 		UpdateOutlinerColor();
-	}
-    redibujar = true;	
+	}*/
 }
 
 std::string SetName(const std::string& baseName) {
-    // Comprueba si un nombre ya existe
-    auto nameExists = [&](const std::string& name) {
-        for (size_t o = 0; o < Objects.size(); ++o) {
-            if (Objects[o]->name == name)
-                return true;
+    // Función recursiva para comprobar si un nombre ya existe
+    std::function<bool(const Collection*, const std::string&)> nameExistsInCollection;
+    nameExistsInCollection = [&](const Collection* col, const std::string& name) -> bool {
+        // Recorremos los objetos de la colección
+        for (Object* obj : col->Objects) {
+            if (obj->name->data) {
+                Text* text = reinterpret_cast<Text*>(obj->name->data);
+                if (text->value == name) return true;
+            }
+
+            // Revisamos los hijos de cada objeto
+            for (Object* child : obj->Childrens) {
+                if (child->name->data) {
+                    Text* textChild = reinterpret_cast<Text*>(child->name->data);
+                    if (textChild->value == name) return true;
+                }
+            }
+        }
+
+        // Recorremos las subcolecciones recursivamente
+        for (Collection* childCol : col->Childrens) {
+            if (nameExistsInCollection(childCol, name)) return true;
+        }
+
+        return false;
+    };
+
+    auto nameExists = [&](const std::string& name) -> bool {
+        for (Collection* col : Collections) {
+            if (nameExistsInCollection(col, name)) return true;
         }
         return false;
     };
 
     // Si el nombre base no existe, devolverlo tal cual
-    if (!nameExists(baseName))
-        return baseName;
+    if (!nameExists(baseName)) return baseName;
 
-    // Detectar si baseName termina en ".<digits>"
+    // Separar raíz y contador si termina en ".NNN"
     std::string root = baseName;
     int startCounter = 1;
-
     size_t pos = baseName.find_last_of('.');
     if (pos != std::string::npos && pos + 1 < baseName.size()) {
         bool allDigits = true;
@@ -100,21 +129,12 @@ std::string SetName(const std::string& baseName) {
             if (!std::isdigit(static_cast<unsigned char>(baseName[i]))) { allDigits = false; break; }
         }
         if (allDigits) {
-            // separar raíz y sufijo numérico
             root = baseName.substr(0, pos);
             try {
                 startCounter = std::stoi(baseName.substr(pos + 1)) + 1;
                 if (startCounter < 1) startCounter = 1;
-            } catch (...) {
-                startCounter = 1;
-            }
-        } else {
-            root = baseName; // no es sufijo numérico
-            startCounter = 1;
+            } catch (...) { startCounter = 1; }
         }
-    } else {
-        root = baseName;
-        startCounter = 1;
     }
 
     // Buscar el siguiente número disponible
@@ -139,8 +159,9 @@ size_t GetIconType(int type){
 	}
 };
 
-void AddObject( int tipo ){
+Object* AddObject( size_t tipo ){
 	//Cancelar();
+	ObjectsCount++;
 	Object* obj = new Object();
 	obj->type = tipo;
 	obj->visible = true;
@@ -152,8 +173,6 @@ void AddObject( int tipo ){
 	obj->scaleX = obj->scaleY = obj->scaleZ = 45000;
 	obj->Parent = -1;	
 	obj->Id = -0;
-	Objects.push_back(obj);
-	SelectActivo = Objects.size()-1;
 	if (tipo == light){
 		Light tempLight;
 		tempLight.type = pointLight;
@@ -187,18 +206,19 @@ void AddObject( int tipo ){
 		Lights.push_back(tempLight);
 		//obj.Id = Lights.Count()-1;
 		obj->Id = Lights.size()-1;
-		Objects[SelectActivo]->name = SetName("Light");
+		reinterpret_cast<Text*>(obj->name->data)->SetValue(SetName("Light"));
 	}
 	//tipo camara
 	else if (tipo == camera){
-		Objects[SelectActivo]->name = SetName("Camera");
-		if (CameraActive < 0){
+		reinterpret_cast<Text*>(obj->name->data)->SetValue(SetName("Camera"));
+		if (!CameraActive){
 			CameraActive = SelectActivo;		
 		}		
 	}
-	AddToCollection(SelectActivo, Objects[SelectActivo]->name, GetIconType(Objects[SelectActivo]->type));
+	AddToCollection(CollectionActive, obj);
 	DeseleccionarTodo();
-	Objects[SelectActivo]->seleccionado = true;
+	obj->seleccionado = true;
+	SelectActivo = obj;
 	SelectCount = 1;
-    redibujar = true;
+	return obj;
 }

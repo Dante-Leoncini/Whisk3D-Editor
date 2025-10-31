@@ -78,7 +78,7 @@ class AnimProperty {
 
 class AnimationObject { 
 	public:
-		int Id; //id del objeto al que afecta
+		Object* obj; //a que objeto le afecta. ahora es un puntero y no un indice
 		int FirstKeyFrame; //id del objeto al que afecta
 		int LastKeyFrame; //id del objeto al que afecta
 		//RArray<AnimProperty> Propertys;
@@ -105,7 +105,7 @@ std::vector<AnimationObject> AnimationObjects;
 int BuscarAnimacionObj(){
 	int index = -1;
     for(size_t a = 0; a < AnimationObjects.size(); a++) {
-		if (AnimationObjects[a].Id == SelectActivo){
+		if (AnimationObjects[a].obj == SelectActivo){
 			index = a;
 			break;
 		}
@@ -303,19 +303,19 @@ void ReloadAnimation() {
                 // Asignar valor a la propiedad
                 switch (anim.Property) {
                     case AnimPosition:
-                        Objects[AnimationObjects[a].Id]->posX = valueX;
-                        Objects[AnimationObjects[a].Id]->posY = valueY;
-                        Objects[AnimationObjects[a].Id]->posZ = valueZ;
+                        AnimationObjects[a].obj->posX = valueX;
+                        AnimationObjects[a].obj->posY = valueY;
+                        AnimationObjects[a].obj->posZ = valueZ;
                         break;
                     case AnimRotation:
-                        Objects[AnimationObjects[a].Id]->rotX = valueX;
-                        Objects[AnimationObjects[a].Id]->rotY = valueY;
-                        Objects[AnimationObjects[a].Id]->rotZ = valueZ;
+                        AnimationObjects[a].obj->rotX = valueX;
+                        AnimationObjects[a].obj->rotY = valueY;
+                        AnimationObjects[a].obj->rotZ = valueZ;
                         break;
                     case AnimScale:
-                        Objects[AnimationObjects[a].Id]->scaleX = valueX;
-                        Objects[AnimationObjects[a].Id]->scaleY = valueY;
-                        Objects[AnimationObjects[a].Id]->scaleZ = valueZ;
+                        AnimationObjects[a].obj->scaleX = valueX;
+                        AnimationObjects[a].obj->scaleY = valueY;
+                        AnimationObjects[a].obj->scaleZ = valueZ;
                         break;
                     default:
                         break;

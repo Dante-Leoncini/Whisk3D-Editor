@@ -88,18 +88,20 @@ class Viewport3D {
 
             //primero hay que colocar las luces en caso de estar en modo render!
             if ((!SimularZBuffer && view == MaterialPreview) || view == Rendered){
-                for (size_t o = 0; o < Objects.size(); o++) {
-                    Object& obj = *Objects[o];
-                    if(!obj.visible || obj.type != light ) {continue;}
-                    Light& light = Lights[obj.Id];
+                for (size_t c = 0; c < Collections.size(); c++) {
+                    for (size_t o = 0; o < Collections[c]->Objects.size(); o++) {
+                        Object& obj = *Collections[c]->Objects[o];
+                        if(!obj.visible || obj.type != light ) {continue;}
+                        Light& light = Lights[obj.Id];
 
-                    glPushMatrix(); //guarda la matrix
-                    glTranslatef( obj.posX, obj.posZ, obj.posY);
-                    GLfloat lightPos[] = {0.0f, 0.0f, 0.0f, 1.0f}; // Luz puntual en la posici�n transformada
-                    glLightfv(light.lightId, GL_POSITION, lightPos);
-                    //glLightfv(  light.lightId, GL_POSITION, positionPuntualLight );
-                    glPopMatrix(); //reinicia la matrix a donde se guardo  
-                }	
+                        glPushMatrix(); //guarda la matrix
+                        glTranslatef( obj.posX, obj.posZ, obj.posY);
+                        GLfloat lightPos[] = {0.0f, 0.0f, 0.0f, 1.0f}; // Luz puntual en la posici�n transformada
+                        glLightfv(light.lightId, GL_POSITION, lightPos);
+                        //glLightfv(  light.lightId, GL_POSITION, positionPuntualLight );
+                        glPopMatrix(); //reinicia la matrix a donde se guardo  
+                    }	
+                }
             }
 
             //por defecto la linea es de 1	
@@ -108,9 +110,11 @@ class Viewport3D {
             //bucle que dibuja cada objeto en orden
             if(Meshes.size() > 0){
                 // Funcion principal para iterar sobre la coleccion
-                for (size_t o = 0; o < Collections.size(); o++) {
-                    Object& obj = *Objects[Collections[o]->ObjID];
-                    RenderMeshAndChildren(obj);
+                for (size_t c = 0; c < Collections.size(); c++) {
+                    for (size_t o = 0; o < Collections[c]->Objects.size(); o++) {
+                        Object& obj = *Collections[c]->Objects[o];
+                        RenderMeshAndChildren(obj);
+                    }
                 }
             }
 
@@ -210,12 +214,13 @@ class Viewport3D {
                 }
 
                 //esto solo se hace si hay objetos
-                //if (Objects.Count() > 0){
-                if (Objects.size() > 0){
+                if (ObjectsCount){
                     //dibujo de objetos nuevo!
                     glLineWidth(1);	 
-                    for (size_t o = 0; o < Collections.size(); o++) {
-                        RenderObjectAndChildrens(Collections[o]->ObjID);
+                    for (size_t c = 0; c < Collections.size(); c++) {
+                        for (size_t o = 0; o < Collections[c]->Objects.size(); o++) {
+                            RenderObjectAndChildrens(*Collections[c]->Objects[o]);
+                        }	 
                     }	 
 
                     //dibujar lineas parent		
@@ -230,11 +235,10 @@ class Viewport3D {
                         glTexCoordPointer( 2, GL_FLOAT, 0, lineUV ); //SpriteUvSize
                         glColor4f(ListaColores[negro][0],ListaColores[negro][1],ListaColores[negro][2],ListaColores[negro][3]);	
                         glBindTexture( GL_TEXTURE_2D, Textures[3].iID ); //selecciona la de linea punteada	
-                        for (size_t o = 0; o < Collections.size(); o++) {
-                            Object& obj = *Objects[Collections[o]->ObjID];
-                            //if (obj.Childrens.Count() > 0){
-                            if (obj.Childrens.size() > 0){
-                                RenderLinkLines(Collections[o]->ObjID);
+                        for (size_t c = 0; c < Collections.size(); c++) {
+                            for (size_t o = 0; o < Collections[c]->Objects.size(); o++) {
+                                Object& obj = *Collections[c]->Objects[o];
+                                RenderLinkLines(obj);
                             }
                         }
                         glDepthMask(GL_TRUE); // Reactiva la escritura en el Z-buffer		
@@ -245,11 +249,13 @@ class Viewport3D {
                     glDisable( GL_TEXTURE_2D );
                     //dibuja los ejes de transformacion
                     if (estado == translacion || estado == rotacion || estado == EditScale) {
-                        for (size_t o = 0; o < Collections.size(); o++) {
+                        for (size_t c = 0; c < Collections.size(); c++) {
                             bool found = false;
-                            Object& obj = *Objects[Collections[o]->ObjID];
-                            SearchSelectObj(obj, Collections[o]->ObjID, found);
-                            if (found) break;  // Si ya encontro el objeto, salir del bucle
+                            for (size_t o = 0; o < Collections[c]->Objects.size(); o++) {
+                                Object& obj = *Collections[c]->Objects[o];
+                                SearchSelectObj(obj, found);
+                                if (found) break;
+                            }
                         }
                     }
 
@@ -263,9 +269,11 @@ class Viewport3D {
                         glEnable( GL_POINT_SPRITE );
                         // Make the points bigger.
                         glPointSize( 16 );
-                        for (size_t o = 0; o < Collections.size(); o++) {
-                            Object& obj = *Objects[o];
-                            DibujarOrigen(obj, o);
+                        for (size_t c = 0; c < Collections.size(); c++) {
+                            for (size_t o = 0; o < Collections[c]->Objects.size(); o++) {
+                                Object& obj = *Collections[c]->Objects[o];
+                                DibujarOrigen(obj);
+                            }
                         }
                         //glTexEnvi( GL_POINT_SPRITE_OES, GL_COORD_REPLACE_OES, GL_FALSE);
                         //glDisable( GL_POINT_SPRITE_OES );
@@ -344,17 +352,19 @@ class Viewport3D {
         }
 
         void EnfocarObject(){
-            SetTransformPivotPoint();	
-            PivotX = 0.0f; 
-            PivotY = 0.0f;
-            PivotZ = 0.0f;
-            PivotX = PivotX-TransformPivotPointFloat[0]; 
-            PivotY = PivotY-TransformPivotPointFloat[1];
-            PivotZ = PivotZ-TransformPivotPointFloat[2];
+            if (SelectCount > 0){
+                SetTransformPivotPoint();	
+                PivotX = 0.0f; 
+                PivotY = 0.0f;
+                PivotZ = 0.0f;
+                PivotX = PivotX-TransformPivotPointFloat[0]; 
+                PivotY = PivotY-TransformPivotPointFloat[1];
+                PivotZ = PivotZ-TransformPivotPointFloat[2];
+            }
         }
 
         void RecalcViewPos(){
-            Object& obj = *Objects[CameraActive];
+            Object& obj = *CameraActive;
             rotX = -obj.rotZ+90;
             rotY = -obj.rotY;	
             PivotX = -obj.posX;
@@ -372,21 +382,6 @@ class Viewport3D {
                 //PivotZ = -parentObj.posZ;	
                 ParentID = parentObj.Parent;		
             }*/
-        }
-
-        //mira si no hay camara activa
-        //si no hay una camara activa. busca una camara para asignarla
-        //si no hay camaras... quedara en -1
-        void CheckCameraState(){
-            if (CameraActive < 0){
-                //for(TInt i=0; i < Objects.Count(); i++){
-                for(size_t i=0; i < Objects.size(); i++){
-                    if (Objects[i]->type == camera){
-                        CameraActive = i;
-                        return;
-                    }		
-                }
-            }	
         }
 
         void SetViewpoint(int opcion){
@@ -410,16 +405,15 @@ class Viewport3D {
                     CameraToView = false;
                     break;
                 case cameraView:
-                    CheckCameraState();
-                    if (CameraActive < 0){
+                    //if (CameraActive < 0){
                         //_LIT(KFormatString, "There are no cameras!");
                         //HBufC* noteBuf = HBufC::NewLC(50);
                         //noteBuf->Des().Format(KFormatString);
                         //MensajeError(noteBuf);  
                         //CleanupStack::PopAndDestroy(noteBuf);
-                    }
+                    //}
                     //else if (Objects.Count() > CameraActive && !ViewFromCameraActive){	
-                    else if (Objects.size() > static_cast<size_t>(CameraActive) && !ViewFromCameraActive){	
+                    if (CameraActive && !ViewFromCameraActive){	
                         LastRotX = rotX;
                         LastRotY = rotY;	
                         LastPivotX = PivotX;
@@ -513,7 +507,7 @@ class Viewport3D {
             // Mostrar el cursor
             SDL_ShowCursor();
             //si no hay objetos
-            if (Objects.size() < 1){return;}
+            if (ObjectsCount < 1){return;}
 
             if ( InteractionMode == ObjectMode ){
                 if (estado != editNavegacion){
@@ -605,8 +599,8 @@ class Viewport3D {
             //rotX -= fixedMul( 1, aDeltaTimeSecs );
             if (estado == editNavegacion){				
                 if (navegacionMode == Orbit){
-                    if (ViewFromCameraActive && CameraToView){
-                        Object& obj = *Objects[CameraActive];
+                    if (CameraActive && ViewFromCameraActive && CameraToView){
+                        Object& obj = *CameraActive;
                         // Convertir el angulo de rotX a radianes
                         GLfloat radRotX = obj.rotX * M_PI / 180.0;
 
@@ -661,8 +655,8 @@ class Viewport3D {
             //rotX += fixedMul( 0.1, aDeltaTimeSecs );
             if (estado == editNavegacion){ 
                 if (navegacionMode == Orbit){
-                    if (ViewFromCameraActive && CameraToView){
-                        Object& obj = *Objects[CameraActive];
+                    if (CameraActive && ViewFromCameraActive && CameraToView){
+                        Object& obj = *CameraActive;
                         // Convertir el angulo de rotX a radianes
                         GLfloat radRotX = obj.rotX * M_PI / 180.0;
 
@@ -719,8 +713,8 @@ class Viewport3D {
 
             if (estado == editNavegacion){	
                 if (navegacionMode == Orbit){
-                    if (ViewFromCameraActive && CameraToView){
-                        Object& obj = *Objects[CameraActive];
+                    if (CameraActive && ViewFromCameraActive && CameraToView){
+                        Object& obj = *CameraActive;
                         // Convertir el angulo de rotX a radianes
                         GLfloat radRotX = obj.rotX * M_PI / 180.0;
                         GLfloat radRotY = obj.rotY * M_PI / 180.0;
@@ -763,8 +757,8 @@ class Viewport3D {
 
             if (estado == editNavegacion){ 			
                 if (navegacionMode == Orbit){
-                    if (ViewFromCameraActive && CameraToView){
-                        Object& obj = *Objects[CameraActive];
+                    if (CameraActive && ViewFromCameraActive && CameraToView){
+                        Object& obj = *CameraActive;
                         // Convertir el angulo de rotX a radianes
                         GLfloat radRotX = obj.rotX * M_PI / 180.0;
                         GLfloat radRotY = obj.rotY * M_PI / 180.0;
@@ -928,9 +922,7 @@ class Viewport3D {
                     case SDLK_KP_9: abrir(); break;
                     //case SDLK_KP_0: numpad('0'); break;
                     case SDLK_KP_PERIOD: {
-                        if (Objects.size() > 0){
-                            EnfocarObject(); 
-                        }
+                        EnfocarObject(); 
                         break;
                     }
                     // si querés, agregá más teclas aquí
@@ -968,31 +960,23 @@ class Viewport3D {
                         break;
                     // Numpad
                     case SDLK_KP_1: {
-                        if (viewPortActive > -1){
-                            SetViewpoint(front);
-                        }
+                        SetViewpoint(front);
                         break;
                     }
                     //case SDLK_KP_2: numpad('2'); break;
                     case SDLK_KP_3: {
-                        if (viewPortActive > -1){
-                            SetViewpoint(right);
-                        } 
+                        SetViewpoint(right);
                         break;
                     }
                     case SDLK_KP_7: {
-                        if (viewPortActive > -1){
-                            SetViewpoint(top);
-                        }
+                        SetViewpoint(top);
                         break;
                     }
                     case SDLK_KP_8: BuscarVertexAnimation(); break;
                     case SDLK_KP_9: abrir();break;
                     //case SDLK_KP_0: numpad('0'); break;
                     case SDLK_KP_PERIOD: {
-                        if (viewPortActive > -1 && Objects.size() > 0){
-                            EnfocarObject();
-                        }
+                        EnfocarObject();
                         break;
                     }
                     // si querés, agregá más teclas aquí

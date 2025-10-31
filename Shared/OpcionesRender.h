@@ -6,14 +6,13 @@ enum {lineal, closest};
 #include "./Textures.h"
 #include "./Materials.h"
 #include "./Mesh.h"
-#include "./Constrains.h"
 
 std::vector<Light> Lights;
 GLfloat objAmbient[4]  = { 0.3, 0.3, 0.3, 1.0 };
 
 #include "./UI/UI.h"
-#include "./Collections.h"
 #include "./Objects.h"
+#include "./Constrains.h"
 #include "./Modifiers.h"
 
 enum { Solid, MaterialPreview, Rendered };
@@ -22,10 +21,9 @@ int view = MaterialPreview;
 
 void ReloadViewport(bool hacerRedibujo){
 	//Recalcula los constrains
-    //for(TInt c = 0; c < Constraints.Count(); c++) {
     for(size_t c = 0; c < Constraints.size(); c++) {
-		Object& objTarget = *Objects[Constraints[c].Target];
-		Object& obj = *Objects[Constraints[c].Id];
+		Object& objTarget = *Constraints[c].Target;
+		Object& obj = *Constraints[c].Id;
 		switch (Constraints[c].type) {
 			case trackto: {
 				// Calcular vector dirección
@@ -317,7 +315,7 @@ void RenderMeshAndChildren(Object& obj){
     
     // Procesar cada hijo
     for (size_t c = 0; c < obj.Childrens.size(); c++) {
-        Object& objChild = *Objects[obj.Childrens[c].Id];
+        Object& objChild = *obj.Childrens[c];
         //RenderMeshAndChildren(objChild, indice);
         RenderMeshAndChildren(objChild);
     }

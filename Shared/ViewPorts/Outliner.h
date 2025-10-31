@@ -1,8 +1,8 @@
 class Outliner {
     public:
         int Parent = -1;
-        int PosX = 10;
-        int PosY = 10;
+        int PosX = 0;
+        int PosY = 0;
         int MaxPosX = 100;
         int MaxPosY = -100;
         Object2D& Renglon;
@@ -70,17 +70,28 @@ class Outliner {
             }
             glPopMatrix();  
 
+            size_t RenglonesY = 0;
             glEnableClientState(GL_TEXTURE_COORD_ARRAY);            
             glEnable(GL_TEXTURE_2D);
             glEnable( GL_BLEND );
             glColor4f(ListaColores[blanco][0],ListaColores[blanco][1],ListaColores[blanco][2],ListaColores[blanco][3]);
 
             glPushMatrix();          
-            glTranslatef(margin + IconSize + gap + PosX, PosY, 0);
-            for (size_t i = 0; i < Collections.size(); i++) {
+            glTranslatef(margin + IconSize + gap + PosX, PosY, 0);            
+            for (size_t c = 0; c < Collections.size(); c++) {
                 glPushMatrix();                      
-                glTranslatef(0, i * RenglonHeight, 0);       
-                RenderObject2D(Collections[i]->Text);   
+                glTranslatef(0, RenglonesY, 0);       
+                RenderObject2D(*Collections[c]->name);
+                RenglonesY += RenglonHeight;
+
+                for (size_t o = 0; o < Collections[c]->Objects.size(); o++) {
+                    glPushMatrix();               
+                    glTranslatef(20, RenglonesY, 0);   
+                    RenglonesY += RenglonHeight;
+                    RenderObject2D(*Collections[c]->Objects[o]->name);  
+                    glPopMatrix();   
+                }
+
                 glPopMatrix();  
             }
             glPopMatrix();  
@@ -89,14 +100,27 @@ class Outliner {
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     		glVertexPointer(2, GL_SHORT, 0, IconMesh); //todos los iconos comparten los vertices y tamaño
+            RenglonesY = 0;
 
             glPushMatrix();   
             //no usa PosX porque los ojos siempre estan en la misma posicion en X. al borde
             glTranslatef(margin + PosX, GlobalScale+PosY, 0);
-            for (size_t i = 0; i < Collections.size(); i++) {
+            for (size_t c = 0; c < Collections.size(); c++) {
                 glPushMatrix();                      
-                glTranslatef(0, i * RenglonHeight, 0);
-                glTexCoordPointer(2, GL_FLOAT, 0, IconsUV[Collections[i]->IconType]->uvs);
+                glTranslatef(0, RenglonesY, 0);
+                RenglonesY += RenglonHeight;
+                //glTexCoordPointer(2, GL_FLOAT, 0, IconsUV[Collections[i]->IconType]->uvs);
+                glTexCoordPointer(2, GL_FLOAT, 0, IconsUV[static_cast<size_t>(IconType::archive)]->uvs);
+                glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+                for (size_t o = 0; o < Collections[c]->Objects.size(); o++) {
+                    glPushMatrix();               
+                    glTranslatef(20, RenglonesY, 0);   
+                    RenglonesY += RenglonHeight;
+                    glTexCoordPointer(2, GL_FLOAT, 0, IconsUV[Collections[c]->Objects[o]->IconType]->uvs);
+                    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+                    glPopMatrix();   
+                }
                 //glTexCoordPointer(2, GL_FLOAT, 0, IconsUV[static_cast<size_t>(Collections[i].IconType)]->uvs);
                 glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
                 glPopMatrix();  
@@ -106,11 +130,22 @@ class Outliner {
             glPushMatrix();   
             //no usa PosX porque los ojos siempre estan en la misma posicion en X. al borde
             glTranslatef(parentView.width - IconSize - margin, GlobalScale+PosY, 0);
-            for (size_t i = 0; i < Collections.size(); i++) {
+            RenglonesY = 0;
+            for (size_t c = 0; c < Collections.size(); c++) {
                 glPushMatrix();                      
-                glTranslatef(0, i * RenglonHeight, 0);
+                glTranslatef(0, RenglonesY, 0);
+                RenglonesY += RenglonHeight;
                 glTexCoordPointer(2, GL_FLOAT, 0, IconsUV[static_cast<size_t>(IconType::visible)]->uvs);
                 glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+                for (size_t o = 0; o < Collections[c]->Objects.size(); o++) {
+                    glPushMatrix();               
+                    glTranslatef(0, RenglonesY, 0);   
+                    RenglonesY += RenglonHeight;
+                    glTexCoordPointer(2, GL_FLOAT, 0, IconsUV[static_cast<size_t>(IconType::visible)]->uvs);
+                    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+                    glPopMatrix();   
+                }
                 glPopMatrix();  
             }
             glPopMatrix();  

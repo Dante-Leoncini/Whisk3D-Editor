@@ -73,10 +73,8 @@ bool middleMouseDown = false;
 int lastMouseX, lastMouseY;
 
 //camara
-int CameraActive;
 bool CameraToView = false;
 
-int SelectActivo = 0;
 int SelectCount = 0;
 
 bool showOverlays = true;
@@ -101,9 +99,6 @@ int ShiftCount = 0;
 int valorRotacion = 0;
 
 //listados
-//RArray<SaveState> estadoObjetos;
-std::vector<SaveState> estadoObjetos;
-//RArray<ShapeKeyAnimation> ShapeKeyAnimations;
 std::vector<ShapeKeyAnimation> ShapeKeyAnimations;
 
 int NumTexturasWhisk3D = 0;

@@ -23,21 +23,28 @@ void ConstructUniversal(){
     
 	CalculateMillisecondsPerFrame(60);
 
-    // Cámara y objetos iniciales
-    AddObject(camera);
-    Objects[0]->posX = -800 * 6.8;
-    Objects[0]->posY = -800 * 7.29;
-    Objects[0]->posZ = 800 * 4.91;
-    Objects[0]->rotZ = -45.0;
-    Objects[0]->rotY = -26.15;
-    Objects[0]->scaleX = Objects[0]->scaleY = Objects[0]->scaleZ = 40000;
+    Collection* colec = new Collection(nullptr, "Collection");
+    Collections.push_back(colec);
 
-    AddObject(light);
-    Objects[1]->posX = -3000;
-    Objects[1]->posY = 1500;
-    Objects[1]->posZ = 4500;
+    // Cámara y objetos iniciales
+    Object* cam = AddObject(camera);
+    cam->posX = -800 * 6.8;
+    cam->posY = -800 * 7.29;
+    cam->posZ = 800 * 4.91;
+    cam->rotZ = -45.0;
+    cam->rotY = -26.15;
+    cam->scaleX = cam->scaleY = cam->scaleZ = 40000;
+
+    Object* luz = AddObject(light);
+    luz->posX = -3000;
+    luz->posY = 1500;
+    luz->posZ = 4500;
 
     AddMesh(cubo);
+
+    Collection* colec2 = new Collection(nullptr, "Collection_Test");
+    Collections.push_back(colec2);
+    CollectionActive = 1;
 
     /*int New2dId = AddObject2D(Objects2D, UI::text);
     Objs2Dviewport3D.push_back(New2dId);
