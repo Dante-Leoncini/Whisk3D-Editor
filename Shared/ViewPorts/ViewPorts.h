@@ -22,7 +22,7 @@ class Viewport {
         bool redibujar = true;
 };
 std::vector<Viewport> Viewports;
-int viewPortActive = -1;
+Viewport* viewPortActive = nullptr;
 bool ViewPortClickDown = false;
 
 GLfloat bourderUV[32] = {
@@ -89,7 +89,7 @@ void DibujarBordes(const GLshort* borderMesh) {
     glDrawElements(GL_TRIANGLES, (3*2)*8, GL_UNSIGNED_BYTE, indices);
 }
 
-int FindViewportUnderMouse(int mx, int my) {
+Viewport* FindViewportUnderMouse(int mx, int my) {
     if (ViewPortClickDown)
         return viewPortActive;
 
@@ -106,12 +106,11 @@ int FindViewportUnderMouse(int mx, int my) {
         if (mx >= v.x && mx < v.x + v.width &&
             oglY >= v.y && oglY < v.y + v.height)
         {
-            // 👇 devolver el índice del viewport real
-            return (int)i;
+            return &Viewports[i]; // ✅ dirección del objeto
         }
     }
 
-    return -1;
+    return nullptr;
 }
 
 #include "./ViewPort3D.h"

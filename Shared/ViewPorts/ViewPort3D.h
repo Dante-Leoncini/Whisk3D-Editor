@@ -579,7 +579,7 @@ class Viewport3D {
             else if (estado == translacion || estado == rotacion || estado == EditScale){
                 // Ocultar el cursor
                 //SDL_HideCursor();
-                if (viewPortActive > -1){
+                if (viewPortActive){
                     switch (estado) {
                         case translacion:
                             SetTranslacionObjetos(dx, dy, 16.0f);
@@ -807,7 +807,7 @@ class Viewport3D {
 
         // Método para actualizar cache
         void UpdatePrecalculos() {
-            if (viewPortActive > -1){
+            if (viewPortActive){
                 precalculado.radY = rotY * M_PI / 180.0f;
                 precalculado.radX = rotX * M_PI / 180.0f;
 

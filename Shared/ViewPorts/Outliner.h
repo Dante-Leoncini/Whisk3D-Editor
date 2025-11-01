@@ -144,7 +144,7 @@ class Outliner {
                     //icono desplegar
                     glTranslatef(IconSizeGS + gapGS, 0, 0);   
                     glVertexPointer(2, GL_SHORT, 0, IconMesh); //todos los iconos comparten los vertices y tamaño
-                    glTexCoordPointer(2, GL_FLOAT, 0, IconsUV[static_cast<size_t>(IconType::arrow)]->uvs);
+                    glTexCoordPointer(2, GL_FLOAT, 0, IconsUV[static_cast<size_t>(IconType::arrowRight)]->uvs);
                     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
                     //icono del objeto

@@ -1,13 +1,12 @@
 void button_left(){
-    if (viewPortActive > -1){
-        Viewport& view = Viewports[viewPortActive];
-        switch (Viewports[viewPortActive].type){
+    if (viewPortActive){
+        switch (viewPortActive->type){
             case View::ViewPort3D: {
-                Viewports3D[view.ChildA].button_left();
+                Viewports3D[viewPortActive->ChildA].button_left();
                 break;
             }
             case View::Outliner: {
-                Outliners[view.ChildA]->button_left();
+                Outliners[viewPortActive->ChildA]->button_left();
                 break;
             }
             default: {
@@ -18,15 +17,14 @@ void button_left(){
 }
 
 void event_mouse_motion(){
-    if (viewPortActive > -1){
-        Viewport& view = Viewports[viewPortActive];
-        switch (Viewports[viewPortActive].type){
+    if (viewPortActive){
+        switch (viewPortActive->type){
             case View::ViewPort3D: {
-                Viewports3D[view.ChildA].event_mouse_motion();
+                Viewports3D[viewPortActive->ChildA].event_mouse_motion();
                 break;
             }
             case View::Outliner: {
-                Outliners[view.ChildA]->event_mouse_motion();
+                Outliners[viewPortActive->ChildA]->event_mouse_motion();
                 break;
             }
             default: {
@@ -38,15 +36,14 @@ void event_mouse_motion(){
 
 
 void event_mouse_wheel(SDL_Event &e){
-    if (viewPortActive > -1){
-        Viewport& view = Viewports[viewPortActive];
-        switch (Viewports[viewPortActive].type){
+    if (viewPortActive){
+        switch (viewPortActive->type){
             case View::ViewPort3D: {
-                Viewports3D[view.ChildA].event_mouse_wheel(e);
+                Viewports3D[viewPortActive->ChildA].event_mouse_wheel(e);
                 break;
             }
             case View::Outliner: {
-                Outliners[view.ChildA]->event_mouse_wheel(e);
+                Outliners[viewPortActive->ChildA]->event_mouse_wheel(e);
                 break;
             }
             default: {
@@ -57,15 +54,14 @@ void event_mouse_wheel(SDL_Event &e){
 }
 
 void event_key_down(SDL_Event &e){
-    if (viewPortActive > -1){
-        Viewport& view = Viewports[viewPortActive];
-        switch (Viewports[viewPortActive].type){
+    if (viewPortActive){
+        switch (viewPortActive->type){
             case View::ViewPort3D: {
-                Viewports3D[view.ChildA].event_key_down(e);
+                Viewports3D[viewPortActive->ChildA].event_key_down(e);
                 break;
             }
             case View::Outliner: {
-                Outliners[view.ChildA]->event_key_down(e);
+                Outliners[viewPortActive->ChildA]->event_key_down(e);
                 break;
             }
             default: {
@@ -133,7 +129,7 @@ void InputUsuarioSDL3(SDL_Event &e){
     	viewPortActive = FindViewportUnderMouse(mx, my);
 		event_mouse_motion();
 
-		if (middleMouseDown && viewPortActive > -1) {
+		if (middleMouseDown && viewPortActive) {
 			CheckWarpMouseInWindow(mx, my);
 		}
 		else if (estado == translacion || estado == rotacion || estado == EditScale){
