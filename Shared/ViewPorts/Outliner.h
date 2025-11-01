@@ -5,11 +5,37 @@ class Outliner {
         int PosY = 0;
         int MaxPosX = 100;
         int MaxPosY = -100;
-        Object2D& Renglon;
+        Object2D* Renglon = nullptr;
         size_t CantidadRenglones = 5;
+        GLshort borderMesh[32] = { 
+            // fila 1 (y = 0)
+            0,0,   6,0,   12,0,   18,0,
+            // fila 2 (y = 6)
+            0,6,   6,6,   12,6,   18,6,
+            // fila 3 (y = 12)
+            0,12,  6,12,  12,12,  18,12,
+            // fila 4 (y = 18)
+            0,18,  6,18,  12,18,  18,18
+        };
 
-        Outliner(int parent, Object2D& renglon)
-            : Parent(parent), Renglon(renglon) {}
+        void OnResize(){
+            Viewport& parentView = Viewports[Parent];
+            Rectangle* rect = static_cast<Rectangle*>(Renglon->data);
+            rect->SetSize(0, 0, parentView.width, RenglonHeightGS);
+
+            // Calcular cuántos renglones entran en la altura
+            CantidadRenglones = static_cast<int>(
+                std::ceil(static_cast<float>(parentView.height) / static_cast<float>(RenglonHeightGS))
+            );
+
+            //recalcular malla 3d del borde
+            ResizeBorder(borderMesh, parentView.width, parentView.height);
+        }
+
+        Outliner(int parent)
+            : Parent(parent) {
+            Renglon = AddObject2D(UI::Rectangle);
+        }
 
         void Render(){
             //Configuracion inicial!
@@ -47,14 +73,18 @@ class Outliner {
             glDisable(GL_TEXTURE_2D);
             glDisable( GL_BLEND );
 
-            glPushMatrix();     
+            glPushMatrix();   
+            
+            //Dibujado de los renglones!!!
             //no usa PosX porque el renglon tiene el ancho exacto de la ventana     
-            glTranslatef(0, PosY, 0);
+            glTranslatef(0, PosY + borderGS, 0);
+            size_t RenglonesY = 0;
             for (size_t i = 0; i < CantidadRenglones; i++) {
                 glPushMatrix();                   
-                glTranslatef(0, i * RenglonHeight, 0);
+                glTranslatef(0, RenglonesY, 0);
+                RenglonesY += RenglonHeightGS;
                 // Renglón Seleccionado
-                Rectangle* rect = static_cast<Rectangle*>(Renglon.data);
+                Rectangle* rect = static_cast<Rectangle*>(Renglon->data);
                 if (i % 2 == 0) {
                     rect->SetColor(ListaColoresUbyte[gris][0], ListaColoresUbyte[gris][1], ListaColoresUbyte[gris][2]);
                 }
@@ -65,30 +95,68 @@ class Outliner {
                     // Renglón impar
                     rect->SetColor(ListaColoresUbyte[background][0], ListaColoresUbyte[background][1], ListaColoresUbyte[background][2]);
                 }
-                RenderObject2D(Renglon);
+                RenderObject2D(*Renglon);
                 glPopMatrix();  
             }
             glPopMatrix();  
 
-            size_t RenglonesY = 0;
-            glEnableClientState(GL_TEXTURE_COORD_ARRAY);            
+            //dibuja los iconos y los textos
+			glBindTexture(GL_TEXTURE_2D, Textures[0].iID);
+            glEnableClientState(GL_TEXTURE_COORD_ARRAY);  
             glEnable(GL_TEXTURE_2D);
             glEnable( GL_BLEND );
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);      
             glColor4f(ListaColores[blanco][0],ListaColores[blanco][1],ListaColores[blanco][2],ListaColores[blanco][3]);
 
+            RenglonesY = 0;  
             glPushMatrix();          
-            glTranslatef(margin + IconSize + gap + PosX, PosY, 0);            
+            glTranslatef(marginGS + PosX, PosY + borderGS, 0);            
             for (size_t c = 0; c < Collections.size(); c++) {
                 glPushMatrix();                      
-                glTranslatef(0, RenglonesY, 0);       
+                glTranslatef(0, RenglonesY, 0); 
+                
+                //icono desplegar
+                glVertexPointer(2, GL_SHORT, 0, IconMesh); //todos los iconos comparten los vertices y tamaño
+                glTexCoordPointer(2, GL_FLOAT, 0, IconsUV[static_cast<size_t>(IconType::arrow)]->uvs);
+                glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+                //icono de la coleccion
+                glTranslatef(IconSizeGS + gapGS, 0, 0);   
+                glTexCoordPointer(2, GL_FLOAT, 0, IconsUV[static_cast<size_t>(IconType::archive)]->uvs);
+                glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+                //texto render                   
+                glTranslatef(IconSizeGS + gapGS, 0, 0);   
                 RenderObject2D(*Collections[c]->name);
-                RenglonesY += RenglonHeight;
+                RenglonesY += RenglonHeightGS;
 
                 for (size_t o = 0; o < Collections[c]->Objects.size(); o++) {
                     glPushMatrix();               
-                    glTranslatef(20, RenglonesY, 0);   
-                    RenglonesY += RenglonHeight;
+                    glTranslatef(-IconSizeGS - gapGS -IconSizeGS - gapGS, RenglonesY, 0);   
+                    RenglonesY += RenglonHeightGS;
+
+                    //linea
+                    glVertexPointer(2, GL_SHORT, 0, IconLineMesh); //todos los iconos comparten los vertices y tamaño
+                    glTexCoordPointer(2, GL_FLOAT, 0, IconsUV[static_cast<size_t>(IconType::line)]->uvs);
+                    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+                    //icono desplegar
+                    glTranslatef(IconSizeGS + gapGS, 0, 0);   
+                    glVertexPointer(2, GL_SHORT, 0, IconMesh); //todos los iconos comparten los vertices y tamaño
+                    glTexCoordPointer(2, GL_FLOAT, 0, IconsUV[static_cast<size_t>(IconType::arrow)]->uvs);
+                    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+                    //icono del objeto
+                    glTranslatef(IconSizeGS + gapGS, 0, 0);   
+                    glTexCoordPointer(2, GL_FLOAT, 0, IconsUV[Collections[c]->Objects[o]->IconType]->uvs);
+    		        glVertexPointer(2, GL_SHORT, 0, IconMesh); //todos los iconos comparten los vertices y tamaño
+                    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+                    //texto
+                    glTranslatef(IconSizeGS + gapGS, 0, 0);   
                     RenderObject2D(*Collections[c]->Objects[o]->name);  
+
                     glPopMatrix();   
                 }
 
@@ -96,50 +164,24 @@ class Outliner {
             }
             glPopMatrix();  
 
-			glBindTexture(GL_TEXTURE_2D, Textures[0].iID);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     		glVertexPointer(2, GL_SHORT, 0, IconMesh); //todos los iconos comparten los vertices y tamaño
             RenglonesY = 0;
 
             glPushMatrix();   
             //no usa PosX porque los ojos siempre estan en la misma posicion en X. al borde
-            glTranslatef(margin + PosX, GlobalScale+PosY, 0);
-            for (size_t c = 0; c < Collections.size(); c++) {
-                glPushMatrix();                      
-                glTranslatef(0, RenglonesY, 0);
-                RenglonesY += RenglonHeight;
-                glTexCoordPointer(2, GL_FLOAT, 0, IconsUV[static_cast<size_t>(IconType::archive)]->uvs);
-                glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-
-                for (size_t o = 0; o < Collections[c]->Objects.size(); o++) {
-                    glPushMatrix();               
-                    glTranslatef(20, RenglonesY, 0);   
-                    RenglonesY += RenglonHeight;
-                    glTexCoordPointer(2, GL_FLOAT, 0, IconsUV[Collections[c]->Objects[o]->IconType]->uvs);
-                    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-                    glPopMatrix();   
-                }
-                glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-                glPopMatrix();  
-            }
-            glPopMatrix();  
-
-            glPushMatrix();   
-            //no usa PosX porque los ojos siempre estan en la misma posicion en X. al borde
-            glTranslatef(parentView.width - IconSize - margin, GlobalScale+PosY, 0);
+            glTranslatef(parentView.width - IconSizeGS - margin - borderGS, GlobalScale + PosY + borderGS, 0);
             RenglonesY = 0;
             for (size_t c = 0; c < Collections.size(); c++) {
                 glPushMatrix();                      
                 glTranslatef(0, RenglonesY, 0);
-                RenglonesY += RenglonHeight;
+                RenglonesY += RenglonHeightGS;
                 glTexCoordPointer(2, GL_FLOAT, 0, IconsUV[static_cast<size_t>(IconType::visible)]->uvs);
                 glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
                 for (size_t o = 0; o < Collections[c]->Objects.size(); o++) {
                     glPushMatrix();               
                     glTranslatef(0, RenglonesY, 0);   
-                    RenglonesY += RenglonHeight;
+                    RenglonesY += RenglonHeightGS;
                     glTexCoordPointer(2, GL_FLOAT, 0, IconsUV[static_cast<size_t>(IconType::visible)]->uvs);
                     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
                     glPopMatrix();   
@@ -147,17 +189,8 @@ class Outliner {
                 glPopMatrix();  
             }
             glPopMatrix();  
-        }
 
-        void OnResize(){
-            Viewport& parentView = Viewports[Parent];
-            Rectangle* rect = static_cast<Rectangle*>(Renglon.data);
-            rect->SetSize(0, 0, parentView.width, RenglonHeight);
-
-            // Calcular cuántos renglones entran en la altura
-            CantidadRenglones = static_cast<int>(
-                std::ceil(static_cast<float>(parentView.height) / static_cast<float>(RenglonHeight))
-            );
+            DibujarBordes(borderMesh);
         }
 
         void button_left(){
@@ -193,8 +226,7 @@ class Outliner {
 std::vector<Outliner*> Outliners;
 
 int AddOutliner(int parent) {
-    Object2D* rectObj = AddObject2D(UI::Rectangle);
-    Outliner* view = new Outliner(parent, *rectObj);
+    Outliner* view = new Outliner(parent);
 
     Outliners.push_back(view);    
 

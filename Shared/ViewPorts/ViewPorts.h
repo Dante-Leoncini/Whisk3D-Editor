@@ -20,11 +20,74 @@ class Viewport {
 		int ChildA = -1; //antiguamente era el ID. pero se podria reutilizar como ChildA y para ahorrar memoria son lo mismo
 		int ChildB = -1; //si esta solo. puede quedar en -1
         bool redibujar = true;
-        GLshort borderMesh[8] = { 0,0, 30,0, 0,30, 30,30 };
 };
 std::vector<Viewport> Viewports;
 int viewPortActive = -1;
 bool ViewPortClickDown = false;
+
+GLfloat bourderUV[32] = {
+    0.0f,      0.0f,
+    0.0f,      0.0f,
+    0.0f,      0.0f,
+    0.0f,      0.0f,
+    0.0f,      0.0f,
+    0.0f,      0.0f,
+    0.0f,      0.0f,
+    0.0f,      0.0f,
+    0.0f,      0.0f,
+    0.0f,      0.0f,
+    0.0f,      0.0f,
+    0.0f,      0.0f,
+    0.0f,      0.0f,
+    0.0f,      0.0f,
+    0.0f,      0.0f,
+    0.0f,      0.0f
+};
+    
+// índices de los 8 quads que forman el borde (sin centro)
+GLubyte indices[] = {
+    0,1, 4, 1,4, 5,   1, 2, 5, 5, 2, 6,   2, 3, 6, 6, 3, 7,    
+    4,5, 8, 8,5, 9,                       6, 7,10,10, 7,11,
+    8,9,12,12,9,13,   9,10,13,13,10,14,  10,11,14,14,11,15
+};
+
+void CalcBorderUV(int texW, int texH) {
+    GLfloat* uv = bourderUV;
+
+    // Coordenadas UV en píxeles (borde de 13px, esquinas de 6px, centro de 1px)
+    float U[4] = { 115.0f / texW, 121.0f / texW, 122.0f / texW, 128.0f / texW };
+    float V[4] = { 115.0f / texH, 121.0f / texH, 122.0f / texH, 128.0f / texH };
+
+    // Generar los 16 pares UV (fila × columna)
+    int k = 0;
+    for (int y = 0; y < 4; y++) {
+        for (int x = 0; x < 4; x++) {
+            uv[k++] = U[x];
+            uv[k++] = V[y];
+        }
+    }
+}
+
+void ResizeBorder(GLshort* borderMesh, int viewW, int viewH) {
+    GLshort U[4] = { 0, (GLshort)(6*GlobalScale), (GLshort)(viewW - 6*GlobalScale), (GLshort)(viewW) };
+    GLshort V[4] = { 0, (GLshort)(6*GlobalScale), (GLshort)(viewH - 6*GlobalScale), (GLshort)(viewH) };
+
+    // Generar los 16 pares UV (fila × columna)
+    int k = 0;
+    for (int y = 0; y < 4; y++) {
+        for (int x = 0; x < 4; x++) {
+            borderMesh[k++] = U[x];
+            borderMesh[k++] = V[y];
+        }
+    }
+}
+
+void DibujarBordes(const GLshort* borderMesh) {
+    glTexCoordPointer(2, GL_FLOAT, 0, bourderUV);
+    glVertexPointer(2, GL_SHORT, 0, borderMesh);
+    //glDrawElements(GL_TRIANGLES, sizeof(indices), GL_UNSIGNED_BYTE, indices);
+    glDrawElements(GL_TRIANGLES, (3*2)*8, GL_UNSIGNED_BYTE, indices);
+}
 
 int FindViewportUnderMouse(int mx, int my) {
     if (ViewPortClickDown)
@@ -265,10 +328,11 @@ void SetViewPort(int id, View type){
 
 void SetGlobalScale(int scale){
     GlobalScale = scale;
-    margin = 10 * scale;
-    padding = 5 * scale;
-    gap = 5 * scale;
-    RenglonHeight = 12 * scale;
+    marginGS = margin * scale;
+    paddingGS = padding * scale;
+    gapGS = gap * scale;
+    RenglonHeightGS = RenglonHeight * scale;
+    borderGS = border * scale;
     SetIconScale(scale);
 
     for (size_t i = 0; i < Collections.size(); i++) {                  

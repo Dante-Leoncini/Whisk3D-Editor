@@ -25,6 +25,7 @@ void ConstructUniversal(){
 
     //es el tamaño en X e Y de la textura
     CrearIconos(128, 128);
+    CalcBorderUV(128, 128);
     SetGlobalScale(2);
 
     Collection* colec = new Collection(nullptr, "Collection");
@@ -49,6 +50,8 @@ void ConstructUniversal(){
     Collection* colec2 = new Collection(nullptr, "Collection_Test");
     Collections.push_back(colec2);
     CollectionActive = 1;
+    
+    AddMesh(cubo);
 
     /*int New2dId = AddObject2D(Objects2D, UI::text);
     Objs2Dviewport3D.push_back(New2dId);

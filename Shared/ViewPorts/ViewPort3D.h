@@ -25,9 +25,23 @@ class Viewport3D {
         GLfloat PivotY = 0;
         GLfloat PivotZ = 0;
 
+        GLshort borderMesh[32] = { 
+            // fila 1 (y = 0)
+            0,0,   6,0,   12,0,   18,0,
+            // fila 2 (y = 6)
+            0,6,   6,6,   12,6,   18,6,
+            // fila 3 (y = 12)
+            0,12,  6,12,  12,12,  18,12,
+            // fila 4 (y = 18)
+            0,18,  6,18,  12,18,  18,18
+        };
+
         void OnResize(){
             Viewport& parentView = Viewports[Parent];
             aspect = (float)parentView.width / (float)parentView.height;
+
+            //recalcular malla 3d del borde
+            ResizeBorder(borderMesh, parentView.width, parentView.height);
         }
 
         void Render(){
@@ -318,6 +332,11 @@ class Viewport3D {
             }
 
             if (ShowUi){
+                //Configuracion inicial!
+                Viewport& parentView = Viewports[Parent];
+
+                glViewport(parentView.x, parentView.y, parentView.width, parentView.height); // x, y, ancho, alto
+
                 // Guardar matrices
                 glMatrixMode(GL_PROJECTION);
                 glLoadIdentity();
@@ -325,29 +344,19 @@ class Viewport3D {
 
                 glDisable(GL_DEPTH_TEST);
                 glDisable(GL_LIGHTING);
-                glEnable(GL_TEXTURE_2D);
+                glDisable(GL_FOG);
                 glEnable( GL_BLEND );
 
-                glColor4f(ListaColores[blanco][0],ListaColores[blanco][1],ListaColores[blanco][2],ListaColores[blanco][3]);
+                glEnableClientState(GL_TEXTURE_COORD_ARRAY);    
+                glEnableClientState(GL_VERTEX_ARRAY);   
+                //esa es la textura de la UI
+			    glBindTexture(GL_TEXTURE_2D, Textures[0].iID);
 
-                //int texW, texH;
-                glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-                /*glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &texW);
-                glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &texH);
-                std::cout << "Tex size in GPU: " << texW << "x" << texH << std::endl;*/
-
-                glMatrixMode(GL_MODELVIEW);
-                glLoadIdentity();
-
-                //std::string text = "ABCDEFGHIJKLMNÑOPQRSTUVWXYZ abcdefghijklmnñopqrstuvwyz 0123456789+-= ()[]{}<>/*:#%!?.,'\"@&$";
-
-                /*for (size_t i = 0; i < Objs2Dviewport3D.size(); i++) {
-                    int idx = Objs2Dviewport3D[i];        // índice
-                    RenderObject2D(*Objects2D[idx]);      // desreferenciamos el puntero
-                }*/
+                DibujarBordes(borderMesh);
             }
 
             //termino de dibujar
+
             parentView.redibujar = false;
         }
 

@@ -1,14 +1,19 @@
 GLshort IconMesh[8] = { 0,0, 10,0, 0,10, 10,10 };
-int IconSize = 10;
+GLshort IconLineMesh[8] = { 0,0, (GLshort)(RenglonHeight),0, 0, (GLshort)(RenglonHeight), (GLshort)(RenglonHeight), (GLshort)(RenglonHeight) };
 
-size_t ICON_TOTAL = 6;
+int IconSize = 10;
+int IconSizeGS = IconSize;
+
+size_t ICON_TOTAL = 8;
 enum class IconType {
 	camera,
 	light,
 	mesh,
 	visible,
 	hidden,
-	archive
+	archive,
+	line,
+    arrow
 };
 
 struct IconRect {
@@ -26,8 +31,9 @@ class IconUV {
 std::vector<IconUV*> IconsUV;
 
 void SetIconScale(int scale){
-    IconSize = 10 * scale;
-    IconMesh[2] = IconMesh[5] = IconMesh[6] = IconMesh[7] = 10 * scale;
+    IconSizeGS = IconSize * scale;
+    IconMesh[2] = IconMesh[5] = IconMesh[6] = IconMesh[7] = IconSize * scale;
+    IconLineMesh[2] = IconLineMesh[5] = IconLineMesh[6] = IconLineMesh[7] = (GLshort)(RenglonHeight * scale);
 }
 
 void CrearIconos(int texW, int texH){
@@ -38,7 +44,9 @@ void CrearIconos(int texW, int texH){
         { 24, 117, 10, 10 }, // mesh
         { 36, 117, 10, 10 }, // visible
         { 48, 117, 10, 10 }, // hidden
-        { 60, 117, 10, 10 }  // archive
+        { 60, 117, 10, 10 }, // archive
+        { 72, 117, 10, 10 }, // line
+        { 84, 117, 10, 10 }  // arrow
     };
 
     // limpia por si se llama más de una vez
