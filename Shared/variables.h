@@ -77,6 +77,8 @@ bool CameraToView = false;
 
 int SelectCount = 0;
 
+bool ViewPortClickDown = false;
+
 bool showOverlays = true;
 bool ShowUi = true;
 bool showFloor = true;

@@ -128,8 +128,6 @@ void CalcBorderUV(int texW, int texH) {
     }
 }
 
-bool ViewPortClickDown = false;
-
 class ViewportRow : public ViewportBase {
     public:
         ViewportBase* childA = nullptr;

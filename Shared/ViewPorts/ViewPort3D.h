@@ -504,6 +504,7 @@ class Viewport3D : public ViewportBase, public WithBorder  {
                 }
             }
             ReloadViewport();
+	        ViewPortClickDown = false;
         };
 
         void button_left() override {

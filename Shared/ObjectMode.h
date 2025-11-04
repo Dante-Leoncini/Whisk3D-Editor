@@ -26,6 +26,7 @@ void Cancelar(){
 	if (estado != editNavegacion){
 		ReestablecerEstado();
 	}
+	ViewPortClickDown = false;
 };
 
 void BorrarAnimaciones(Object& obj){
