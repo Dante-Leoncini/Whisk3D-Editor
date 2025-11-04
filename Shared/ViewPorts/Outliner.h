@@ -87,6 +87,10 @@ class Outliner : public ViewportBase, public WithBorder  {
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);      
             glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
 
+            //esto es para recortar y que no se ponga el texto encima de los ojos de la derecha
+            glEnable(GL_SCISSOR_TEST);
+            glScissor(x, y, width - IconSizeGS - marginGS - borderGS -gapGS, height); // igual a tu viewport - los ojos
+
             RenglonesY = 0;  
             glPushMatrix();          
             glTranslatef(marginGS + PosX, PosY + borderGS, 0);            
@@ -139,13 +143,14 @@ class Outliner : public ViewportBase, public WithBorder  {
                 glTranslatef(-IconSizeGS - gapGS -IconSizeGS - gapGS -IconSizeGS - gapGS, RenglonHeightGS, 0);    
             }
             glPopMatrix();  
+            glDisable(GL_SCISSOR_TEST);
 
     		glVertexPointer(2, GL_SHORT, 0, IconMesh); //todos los iconos comparten los vertices y tamaño
             RenglonesY = 0;
 
             glPushMatrix();   
             //no usa PosX porque los ojos siempre estan en la misma posicion en X. al borde
-            glTranslatef(width - IconSizeGS - margin - borderGS, GlobalScale + PosY + borderGS, 0);
+            glTranslatef(width - IconSizeGS - marginGS - borderGS, GlobalScale + PosY + borderGS, 0);
             
             for (size_t c = 0; c < Collections.size(); c++) {       
                 glTexCoordPointer(2, GL_FLOAT, 0, IconsUV[static_cast<size_t>(IconType::visible)]->uvs);
