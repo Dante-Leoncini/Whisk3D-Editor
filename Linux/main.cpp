@@ -388,7 +388,10 @@ int main(int argc, char* argv[]) {
             else if (e.type == SDL_EVENT_WINDOW_RESIZED ||
                     e.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED) {
                 //OnResizeViewports(e.window.data1, e.window.data2);
-                rootViewport->Resize(e.window.data1, e.window.data2);
+
+                winW = e.window.data1;
+                winH = e.window.data2;
+                rootViewport->Resize(winW, winH);
             }
             else {
                 InputUsuarioSDL3(e);

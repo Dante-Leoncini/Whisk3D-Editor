@@ -305,12 +305,15 @@ void CheckWarpMouseInViewport(int mx, int my, const ViewportBase* vp) {
     int vy = vp->y;
     int vw = vp->width;
     int vh = vp->height;
-
-    // Límites efectivos con margen
+    
     int left   = vx + borderGS;
     int right  = vx + vw - borderGS;
-    int top    = vy + borderGS;            // superior en sistema de ventana
-    int bottom = vy + vh - borderGS;       // inferior en sistema de ventana
+    int top    = winH - vy - vh + borderGS;            // superior en sistema de ventana
+    int bottom = winH - vy - borderGS;       // inferior en sistema de ventana
+
+    //std::cout << "winW: " << winW << " winH: " << winH << std::endl;
+    //std::cout << "top: " << top << " bottom: " << bottom << std::endl;
+    //std::cout << "my: " << my << std::endl;
 
     bool warped = false;
 
@@ -327,7 +330,8 @@ void CheckWarpMouseInViewport(int mx, int my, const ViewportBase* vp) {
     if (my <= top) {
         my = bottom - 1;
         warped = true;
-    } else if (my >= bottom) {
+    } 
+    else if (my >= bottom) {
         my = top + 1;
         warped = true;
     }
