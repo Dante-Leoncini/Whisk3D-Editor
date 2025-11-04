@@ -52,34 +52,4 @@ void ConstructUniversal(){
     CollectionActive = 1;
     
     AddMesh(cubo);
-
-    /*int New2dId = AddObject2D(Objects2D, UI::text);
-    Objs2Dviewport3D.push_back(New2dId);
-    Object2D& tempObject2D = Objects2D[New2dId];
-    Text& tempText = Texts[tempObject2D.Id];
-    tempText.SetValue("Whisk3D pre-alpha 25-10-10");
-    tempText.SetScaleX(3);
-    tempText.SetScaleY(3);
-    tempObject2D.opacity = 255;
-    tempText.SetX(20);
-    tempText.SetY(10);
-    tempText.SetColor(255, 255, 255);*/
-
-    //creamos el Vieport Base
-
-    int BaseView = AddViewport(View::ViewPort3D, -1, winW, winH, 0, 0, 1.0f, 1.0f);
-    //lo dividimos
-    SplitView(BaseView, View::Row);
-
-    SplitView(1, View::Column);
-    SetViewPort(3, View::Timeline);
-
-    SplitView(2, View::Column);
-    SetViewPort(6, View::Outliner);
-
-    SetWidthViewport(1,winW*0.8);
-    SetHeightViewport(3,winH*0.1);
-    SetHeightViewport(5,winH*0.7);
-
-    OnResizeViewports(winW, winH);
 }

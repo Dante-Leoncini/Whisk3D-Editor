@@ -1,5 +1,3 @@
-bool redibujar = true; //solo redibuja si este valor esta en true
-
 //interpolacion
 enum {lineal, closest};
 
@@ -19,7 +17,7 @@ enum { Solid, MaterialPreview, Rendered };
 
 int view = MaterialPreview;
 
-void ReloadViewport(bool hacerRedibujo){
+void ReloadViewport(){
 	//Recalcula los constrains
     for(size_t c = 0; c < Constraints.size(); c++) {
 		Object& objTarget = *Constraints[c].Target;
@@ -60,12 +58,9 @@ void ReloadViewport(bool hacerRedibujo){
 				break;
 		}
 	}
-	if (hacerRedibujo){
-    	redibujar = true;
-	}
 }
 
-/*void SetPerspectiva(bool orthographicValue, bool redibuja ){
+/*void SetPerspectiva(bool orthographicValue ){
 	orthographic = orthographicValue;
 	glMatrixMode( GL_PROJECTION );
 	glLoadIdentity();
@@ -80,7 +75,6 @@ void ReloadViewport(bool hacerRedibujo){
         gluPerspective(fovDeg, aspect, nearClip, farClip);
     }
     glMatrixMode( GL_MODELVIEW );
-    redibujar = redibuja;
 }
 
 void InitOpenGL(){
@@ -89,7 +83,7 @@ void InitOpenGL(){
     //glDisable(GL_CULL_FACE); // desactivar culling
 
 	//glViewport(0, 0, winW / 2, winH); // x, y, ancho, alto
-    SetPerspectiva(orthographic, redibujar);
+    SetPerspectiva(orthographic);
 }*/
 
 inline float FIXED_TO_FLOAT(GLfixed x) {

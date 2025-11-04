@@ -218,7 +218,7 @@ class CWhisk3D : public CFiniteStateMachine, public MTextureLoadingListener
         void SetCopyLocation();
         void SetFollowPath();
         void ClearConstraints();
-        void ReloadViewport(TBool hacerRedibujo);
+        void ReloadViewport();
 
         void SetMixNormals();
         void SetMixFaces();

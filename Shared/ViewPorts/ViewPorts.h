@@ -8,22 +8,13 @@ enum class View {
     Row,
     Column
 };
-
-class Viewport {
-	public:
-		View type = View::ViewPort3D;
-		int x = 0, y = 0;
-		int width = 0, height = 0;
-        float weightX = 1;
-        float weightY = 1;
-		int Parent = -1;
-		int ChildA = -1; //antiguamente era el ID. pero se podria reutilizar como ChildA y para ahorrar memoria son lo mismo
-		int ChildB = -1; //si esta solo. puede quedar en -1
-        bool redibujar = true;
+    
+// índices de los 8 quads que forman el borde (sin centro)
+GLubyte indices[] = {
+    0,1, 4, 1,4, 5,   1, 2, 5, 5, 2, 6,   2, 3, 6, 6, 3, 7,    
+    4,5, 8, 8,5, 9,                       6, 7,10,10, 7,11,
+    8,9,12,12,9,13,   9,10,13,13,10,14,  10,11,14,14,11,15
 };
-std::vector<Viewport> Viewports;
-Viewport* viewPortActive = nullptr;
-bool ViewPortClickDown = false;
 
 GLfloat bourderUV[32] = {
     0.0f,      0.0f,
@@ -43,12 +34,81 @@ GLfloat bourderUV[32] = {
     0.0f,      0.0f,
     0.0f,      0.0f
 };
-    
-// índices de los 8 quads que forman el borde (sin centro)
-GLubyte indices[] = {
-    0,1, 4, 1,4, 5,   1, 2, 5, 5, 2, 6,   2, 3, 6, 6, 3, 7,    
-    4,5, 8, 8,5, 9,                       6, 7,10,10, 7,11,
-    8,9,12,12,9,13,   9,10,13,13,10,14,  10,11,14,14,11,15
+
+// Adelantamos la clase (por si se usa en otros headers)
+class ViewportBase;
+
+// Adelantamos la variable global (sin definirla todavía)
+ViewportBase* viewPortActive = nullptr;
+
+class ViewportBase {
+	public:
+		int x = 0, y = 0;
+		int width = 0, height = 0;
+
+        ViewportBase* parent = nullptr;
+
+        ViewportBase(){}
+        virtual bool Contains(int mx, int my) const {
+            return (mx >= x && mx < x + width && my >= y && my < y + height);
+        }
+        
+        virtual bool isLeaf() const { return true; } // por defecto, no tiene hijos
+
+        virtual ~ViewportBase() {}
+
+        // Métodos virtuales para que cada vista defina su comportamiento
+        virtual void Render() = 0;
+        virtual void Resize(int newW, int newH) {
+            width = newW;
+            height = newH;
+        }
+
+        //controles
+        virtual void event_mouse_motion() {}
+        virtual void button_left() {}
+        virtual void event_key_down(SDL_Event &e) {}
+        virtual void event_mouse_wheel(SDL_Event &e) {}
+
+};
+
+class WithBorder {
+    public:
+        GLshort borderMesh[32] = { 
+            0,0,   6,0,   12,0,   18,0,
+            0,6,   6,6,   12,6,   18,6,
+            0,12,  6,12,  12,12,  18,12,
+            0,18,  6,18,  12,18,  18,18
+        };
+
+        void DibujarBordes(ViewportBase* current) {
+            //si es la vista activa
+            if (current == viewPortActive)
+                glColor4f(ListaColores[accent][0], ListaColores[accent][1],
+                        ListaColores[accent][2], ListaColores[accent][3]);
+            else
+                glColor4f(ListaColores[negro][0], ListaColores[negro][1],
+                        ListaColores[negro][2], ListaColores[negro][3]);
+
+            glTexCoordPointer(2, GL_FLOAT, 0, bourderUV);
+            glVertexPointer(2, GL_SHORT, 0, borderMesh);
+            glDrawElements(GL_TRIANGLES, 48, GL_UNSIGNED_BYTE, indices);
+        }
+
+        void ResizeBorder(int width, int height){
+            //cambia el tamaño del borde del viewportResizeBorder
+            GLshort U[4] = { 0, (GLshort)(6*GlobalScale), (GLshort)(width - 6*GlobalScale), (GLshort)(width) };
+            GLshort V[4] = { 0, (GLshort)(6*GlobalScale), (GLshort)(height - 6*GlobalScale), (GLshort)(height) };
+
+            // Generar los 16 pares UV (fila × columna)
+            int k = 0;
+            for (int y = 0; y < 4; y++) {
+                for (int x = 0; x < 4; x++) {
+                    borderMesh[k++] = U[x];
+                    borderMesh[k++] = V[y];
+                }
+            }
+        }
 };
 
 void CalcBorderUV(int texW, int texH) {
@@ -68,261 +128,158 @@ void CalcBorderUV(int texW, int texH) {
     }
 }
 
-void ResizeBorder(GLshort* borderMesh, int viewW, int viewH) {
-    GLshort U[4] = { 0, (GLshort)(6*GlobalScale), (GLshort)(viewW - 6*GlobalScale), (GLshort)(viewW) };
-    GLshort V[4] = { 0, (GLshort)(6*GlobalScale), (GLshort)(viewH - 6*GlobalScale), (GLshort)(viewH) };
+bool ViewPortClickDown = false;
 
-    // Generar los 16 pares UV (fila × columna)
-    int k = 0;
-    for (int y = 0; y < 4; y++) {
-        for (int x = 0; x < 4; x++) {
-            borderMesh[k++] = U[x];
-            borderMesh[k++] = V[y];
+class ViewportRow : public ViewportBase {
+    public:
+        ViewportBase* childA = nullptr;
+        ViewportBase* childB = nullptr;
+        float splitFrac = 0.5f;       
+
+        bool isLeaf() const override {
+            return !childA && !childB;
         }
-    }
-}
 
-void DibujarBordes(const GLshort* borderMesh) {
-    glTexCoordPointer(2, GL_FLOAT, 0, bourderUV);
-    glVertexPointer(2, GL_SHORT, 0, borderMesh);
-    //glDrawElements(GL_TRIANGLES, sizeof(indices), GL_UNSIGNED_BYTE, indices);
-    glDrawElements(GL_TRIANGLES, (3*2)*8, GL_UNSIGNED_BYTE, indices);
-}
+        ViewportRow(ViewportBase* a = nullptr, ViewportBase* b = nullptr, float frac = 0.5f)
+            : childA(a), childB(b), splitFrac(frac) {}
 
-Viewport* FindViewportUnderMouse(int mx, int my) {
-    if (ViewPortClickDown)
-        return viewPortActive;
+        ~ViewportRow(){ delete childA; delete childB; }
 
-    int oglY = winH - my;
+        void Resize(int newW, int newH) override {
+            width = newW;
+            height = newH;
 
-    for (size_t i = 0; i < Viewports.size(); i++) {
-        const Viewport& v = Viewports[i];
+            if (!childA && !childB) return;
 
-        // Ignorar contenedores
-        if (v.type == View::Row || v.type == View::Column)
-            continue;
+            // clamp fraction
+            if (splitFrac < 0.0f) splitFrac = 0.0f;
+            if (splitFrac > 1.0f) splitFrac = 1.0f;
 
-        // Detectar si el mouse está dentro del área de este viewport
-        if (mx >= v.x && mx < v.x + v.width &&
-            oglY >= v.y && oglY < v.y + v.height)
-        {
-            return &Viewports[i]; // ✅ dirección del objeto
+            int wA = static_cast<int>(std::round(width * splitFrac));
+            int wB = width - wA;
+
+            if (childA) {
+                childA->x = x;
+                childA->y = y;
+                childA->width  = wA;
+                childA->height = height;
+                childA->Resize(wA, height);
+            }
+            if (childB) {
+                childB->x = x + wA;
+                childB->y = y;
+                childB->width  = wB;
+                childB->height = height;
+                childB->Resize(wB, height);
+            }
         }
-    }
 
-    return nullptr;
-}
+        void Render() override {
+            // If leaf, nothing to render here (or you could draw a background)
+            if (isLeaf()) return;
+
+            childA->Render();
+            childB->Render();
+        }
+};
+
+class ViewportColumn : public ViewportBase {
+    public:
+        ViewportBase* childA = nullptr;
+        ViewportBase* childB = nullptr;
+        float splitFrac = 0.5f;    
+
+        bool isLeaf() const override {
+            return !childA && !childB;
+        }
+
+        ViewportColumn(ViewportBase* a = nullptr, ViewportBase* b = nullptr, float frac = 0.5f)
+            : childA(a), childB(b), splitFrac(frac) {}
+
+        ~ViewportColumn(){ delete childA; delete childB; }
+
+        void Resize(int newW, int newH) override {
+            width = newW;
+            height = newH;
+            if (!childA && !childB) return;
+
+            if (splitFrac < 0.0f) splitFrac = 0.0f;
+            if (splitFrac > 1.0f) splitFrac = 1.0f;
+
+            int hA = static_cast<int>(std::round(height * splitFrac));
+            int hB = height - hA;
+
+            if (childA) {
+                childA->x = x;
+                childA->y = y;
+                childA->width  = width;
+                childA->height = hA;
+                childA->Resize(width, hA);
+            }
+            if (childB) {
+                childB->x = x;
+                childB->y = y + hA;
+                childB->width  = width;
+                childB->height = hB;
+                childB->Resize(width, hB);
+            }
+        }
+
+        void Render() override {
+            // If leaf, nothing to render here (or you could draw a background)
+            if (isLeaf()) return;
+
+            childA->Render();
+            childB->Render();
+        }
+};
 
 #include "./ViewPort3D.h"
 #include "./Outliner.h"
 
-int AddViewport(View type, int parent, int width, int height, int x, int y, float weightX, float weightY, bool NewViewPort = true) {
-    Viewport view;
-    view.type = type;
-    view.x = x;
-    view.y = y;
-    view.width = width;
-    view.height = height;
-    view.weightX = weightX;
-    view.weightY = weightY;
-    view.Parent = parent;
-    view.ChildA = -1;
-    view.ChildB = -1;
-    //view.aspect = (float)width / (float)height;
+ViewportBase* rootViewport = new ViewportRow(
+    new Viewport3D(), 
+    new ViewportColumn(
+        new Viewport3D(), new Outliner(), 0.3f
+    ),
+    0.7f
+);
 
-    if (NewViewPort){
-        if (type == View::ViewPort3D){
-            view.ChildA = AddViewport3D(Viewports.size());
-        }
-        else if (type == View::Outliner){
-            view.ChildA = AddOutliner(Viewports.size());
-        }
+ViewportBase* FindViewportUnderMouse(ViewportBase* vp, int mx, int my) {
+    if (!vp) return nullptr;
+
+    // Si es un ViewportRow, revisar sus hijos
+    if (auto row = dynamic_cast<ViewportRow*>(vp)) {
+        if (row->childA && 
+            mx >= row->childA->x && mx < row->childA->x + row->childA->width &&
+            my >= row->childA->y && my < row->childA->y + row->childA->height)
+            return FindViewportUnderMouse(row->childA, mx, my);
+
+        if (row->childB && 
+            mx >= row->childB->x && mx < row->childB->x + row->childB->width &&
+            my >= row->childB->y && my < row->childB->y + row->childB->height)
+            return FindViewportUnderMouse(row->childB, mx, my);
     }
 
-    Viewports.push_back(view);
-    //std::cout << "creado viewport: " << (Viewports.size()) << std::endl;
-	return Viewports.size() -1;
-}
+    // Si es un ViewportColumn, revisar sus hijos
+    else if (auto col = dynamic_cast<ViewportColumn*>(vp)) {
+        if (col->childA && 
+            mx >= col->childA->x && mx < col->childA->x + col->childA->width &&
+            my >= col->childA->y && my < col->childA->y + col->childA->height)
+            return FindViewportUnderMouse(col->childA, mx, my);
 
-void SplitView(int id, View split){
-    float weightX = 1.0f;
-    float weightY = 1.0f;
-    switch (split){
-        case View::Row: {
-            weightX = weightX/2;
-            break;
-        }
-        case View::Column: {
-            weightY = weightY/2;
-            break;
-        }
-        default:
-            break;
+        if (col->childB && 
+            mx >= col->childB->x && mx < col->childB->x + col->childB->width &&
+            my >= col->childB->y && my < col->childB->y + col->childB->height)
+            return FindViewportUnderMouse(col->childB, mx, my);
     }
 
-    int newIdLeft = AddViewport(
-        Viewports[id].type, 
-        id,
-        Viewports[id].width/2,
-        Viewports[id].height,
-        Viewports[id].width/2 + Viewports[id].x,
-        Viewports[id].y,
-        weightX,
-        weightY,
-        false
-    );
-    //ChildA hereda el ChildA de ViewPort dividido
-    Viewports[newIdLeft].ChildA = Viewports[id].ChildA;
-    Viewports3D[Viewports[id].ChildA].Parent = newIdLeft;
-
-    int newIdRight = AddViewport(
-        Viewports[id].type, 
-        id, 
-        Viewports[id].width/2,
-        Viewports[id].height,
-        Viewports[id].width/2 + Viewports[id].x,
-        Viewports[id].y,
-        weightX,
-        weightY,
-        true
-    );
-
-    //Los llamo A y 
-    Viewports[id].type = split;
-    Viewports[id].ChildA = newIdLeft;
-    Viewports[id].ChildB = newIdRight;
-    //std::cout << "creado viewport ChildA: " << Viewports[id].ChildA << std::endl;
-    //std::cout << "creado viewport ChildB: " << Viewports[id].ChildB << std::endl;
-    //std::cout << "Count de Vieports3D: " << Viewports3D.size() << std::endl;
-}
-
-void SetWidthViewport(int id, int width){
-    if (Viewports[id].Parent != -1){
-        Viewport& viewParent = Viewports[Viewports[id].Parent];    
-        Viewport& viewA = Viewports[viewParent.ChildA];  
-        viewA.width = width;
-        viewA.weightX = (float)viewA.width / (float)viewParent.width;
-
-        Viewport& viewB = Viewports[viewParent.ChildB];  
-        viewB.width = viewParent.width - viewA.width;
-        viewB.weightX = (float)viewB.width / (float)viewParent.width;
+    // Si no es row ni column, comprobar el viewport actual
+    else if (vp->Contains(mx, my)) {
+        return vp;
     }
-}
 
-void SetHeightViewport(int id, int height){
-    if (Viewports[id].Parent != -1){
-        Viewport& viewParent = Viewports[Viewports[id].Parent];    
-        Viewport& viewA = Viewports[viewParent.ChildA];  
-        viewA.height = height;
-        viewA.weightY = (float)viewA.height / (float)viewParent.height;
-
-        Viewport& viewB = Viewports[viewParent.ChildB];  
-        viewB.height = viewParent.height - viewA.height;
-        viewB.weightY = (float)viewB.height / (float)viewParent.height;
-    }
-}
-
-void OnResizeViewport(int id){
-    Viewport& viewActual = Viewports[id];  
-    switch (viewActual.type){
-        case View::ViewPort3D: {
-            Viewports3D[viewActual.ChildA].OnResize();
-            break;
-        }
-        case View::Outliner: {
-            Outliners[viewActual.ChildA]->OnResize();
-            break;
-        }
-        case View::Column: {
-            Viewport& viewA = Viewports[viewActual.ChildA];  
-            viewA.x = viewActual.x;
-            viewA.y = viewActual.y;
-            viewA.width = viewActual.width;
-            viewA.height = viewActual.height*viewA.weightY;
-
-            Viewport& viewB = Viewports[viewActual.ChildB];  
-            viewB.x = viewActual.x;
-            viewB.y = viewA.y + viewA.height;
-            viewB.width = viewActual.width;
-            viewB.height = viewActual.height - viewA.height;
-
-            OnResizeViewport(viewActual.ChildA);
-            OnResizeViewport(viewActual.ChildB);
-            break;
-        }
-        case View::Row: {
-            Viewport& viewA = Viewports[viewActual.ChildA];  
-            viewA.x = viewActual.x;
-            viewA.y = viewActual.y;
-            viewA.width = viewActual.width*viewA.weightX;
-            viewA.height = viewActual.height;
-
-            Viewport& viewB = Viewports[viewActual.ChildB];  
-            viewB.x = viewA.x + viewA.width;
-            viewB.y = viewActual.y;
-            viewB.width = viewActual.width - viewA.width;
-            viewB.height = viewActual.height;
-
-            OnResizeViewport(viewActual.ChildA);
-            OnResizeViewport(viewActual.ChildB);
-            break;
-        }
-        default:
-            break;
-    }
-}
-
-void OnResizeViewports(int w, int h){
-    winW = w;
-    winH = h;
-
-    //siempre arranca renderizando al padre. y recursivamente va renderizando a los hijos 
-    Viewport& BaseView = Viewports[0];      
-    BaseView.x = 0;
-    BaseView.y = 0;
-    BaseView.width = w;
-    BaseView.height = h;
-    OnResizeViewport(0);
-}
-
-void RenderViewports(int VievId = 0){
-    //siempre arranca renderizando al padre. y recursivamente va renderizando a los hijos 
-    Viewport& view = Viewports[VievId];    
-    switch (view.type) {
-        case View::ViewPort3D: {
-            //std::cout << "Es un ViewPort3D " << (VievId+1) << std::endl;
-            Viewports3D[view.ChildA].Render();
-            break;
-        }
-        case View::Outliner: {
-            //std::cout << "Es un Outliner " << (VievId+1) << std::endl;
-            Outliners[view.ChildA]->Render();
-            break;
-        }
-        case View::Column:
-        case View::Row: {
-            //std::cout << "Es un Row/column " << (VievId+1) << std::endl;
-            RenderViewports(view.ChildA);
-            RenderViewports(view.ChildB);
-            break;
-        }
-        default:
-            break;
-    }
-}
-
-void SetViewPort(int id, View type){
-    Viewports[id].type = type; 
-
-    switch (type) {
-        case View::Outliner: {
-            Viewports[id].ChildA = AddOutliner(id);
-            //Outliners[Viewports[id].ChildA].InitOutliner();
-            break;
-        }
-        default:
-            break;
-    }
+    return nullptr;
 }
 
 void SetGlobalScale(int scale){
@@ -339,4 +296,51 @@ void SetGlobalScale(int scale){
         Collections[i]->name->scaleY = scale;    
         reinterpret_cast<Text*>(Collections[i]->name->data)->UpdateCache();    
     }
+}
+
+void CheckWarpMouseInViewport(int mx, int my, const ViewportBase* vp) {
+    if (!vp) return;
+
+    int vx = vp->x;
+    int vy = vp->y;
+    int vw = vp->width;
+    int vh = vp->height;
+
+    // Límites efectivos con margen
+    int left   = vx + borderGS;
+    int right  = vx + vw - borderGS;
+    int top    = vy + borderGS;            // superior en sistema de ventana
+    int bottom = vy + vh - borderGS;       // inferior en sistema de ventana
+
+    bool warped = false;
+
+    // Wrap horizontal
+    if (mx <= left) {
+        mx = right - 1;
+        warped = true;
+    } else if (mx >= right) {
+        mx = left + 1;
+        warped = true;
+    }
+
+    // Wrap vertical
+    if (my <= top) {
+        my = bottom - 1;
+        warped = true;
+    } else if (my >= bottom) {
+        my = top + 1;
+        warped = true;
+    }
+
+    if (warped) {
+        SDL_WarpMouseInWindow(window, mx, my);
+        dx = 0;
+        dy = 0;
+    } else {
+        dx = mx - lastMouseX;
+        dy = my - lastMouseY;
+    }
+
+    lastMouseX = mx;
+    lastMouseY = my;
 }

@@ -155,7 +155,6 @@ void CWhisk3D::SetNavigation(){
 	else {
 		navegacionMode = Orbit;
 	}
-    redibujar = true;
 }
 
 // ============================= LOCAL FUNCTIONS ===============================
@@ -620,7 +619,6 @@ void CWhisk3D::InsertKeyframe(TInt propertySelect){
 		}
 		prop.keyframes.Append(key);
 	}
-    redibujar = true;	
 }
 
 void CWhisk3D::RemoveKeyframes(){
@@ -645,7 +643,6 @@ void CWhisk3D::RemoveKeyframes(){
 			break;
 		}
 	}	
-    redibujar = true;
 }
 
 void CWhisk3D::ClearKeyframes(){
@@ -659,13 +656,11 @@ void CWhisk3D::ClearKeyframes(){
 			break;
 		}
 	}	
-    redibujar = true;
 }
 
 void CWhisk3D::SetCurrentFrame(){
 	Cancelar();
 	estado = timelineMove;
-    redibujar = true;
 }
 
 void CWhisk3D::SetEndFrame(){
@@ -674,7 +669,6 @@ void CWhisk3D::SetEndFrame(){
 	noteBuf->Des().Copy(_L("Set Final Frame"));
 	EndFrame = DialogNumber(EndFrame, 0, 2147483647, noteBuf);	
 	CleanupStack::PopAndDestroy(noteBuf);
-    redibujar = true;
 }
 
 void CWhisk3D::SetStartFrame(){
@@ -683,7 +677,6 @@ void CWhisk3D::SetStartFrame(){
 	noteBuf->Des().Copy(_L("Set Start Frame"));
 	StartFrame = DialogNumber(StartFrame, 0, 2147483647, noteBuf);
 	CleanupStack::PopAndDestroy(noteBuf);
-    redibujar = true;
 }
 
 TBool postProcesado = true;
@@ -697,7 +690,6 @@ void CWhisk3D::SetFrameRate(){
 	TInt NewFrameRate = DialogNumber(FrameRate, 1, 120, noteBuf);
 	CleanupStack::PopAndDestroy(noteBuf);
 	CalculateMillisecondsPerFrame(NewFrameRate);
-    redibujar = true;
 }
 
 
@@ -973,13 +965,11 @@ void CWhisk3D::SetMouse(){
 	mouseVisible = !mouseVisible;
 	mouseX = iScreenWidth/2;
 	mouseY = (GLshort)iScreenHeightSplit;
-    redibujar = true;
 }
 
 //invierte cualquier valor que se le manda, de verdadero a falso y viceversa
 void CWhisk3D::ToggleValue(TBool& valueToUpdate){
     valueToUpdate = !valueToUpdate;
-    redibujar = true;
 }
 
 // -------------------------------------------------------------------------------------------------------
@@ -1018,7 +1008,6 @@ void CWhisk3D::SeleccionarAnterior(){
 			SelectCount++;
 		}
 	}
-	redibujar = true;
 }
 
 void CWhisk3D::SeleccionarProximo(){
@@ -1315,7 +1304,7 @@ void CWhisk3D::InsertarValor(){
 	}
 	CleanupStack::PopAndDestroy(buf);
 	dialogoSymbian = false;
-	ReloadViewport(true);	
+	ReloadViewport();	
 }
 
 void CWhisk3D::TecladoNumerico(TInt numero){
@@ -1414,7 +1403,7 @@ void CWhisk3D::SetParent(){
 		}
 	}
 	CleanupStack::PopAndDestroy(noteBuf);
-	ReloadViewport(true);
+	ReloadViewport();
 }
 
 void CWhisk3D::ClearParent(){
@@ -1439,7 +1428,7 @@ void CWhisk3D::ClearParent(){
 		}
 		if (salirBucle){break;}
 	}
-	ReloadViewport(true);
+	ReloadViewport();
 };
 
 void CWhisk3D::CursorToSelect(){		
@@ -1449,7 +1438,6 @@ void CWhisk3D::CursorToSelect(){
 		Cursor3DposY = TransformPivotPointFloat[1];
 		Cursor3DposZ = TransformPivotPointFloat[2];
 	}
-	redibujar = true;
 }
 
 void CWhisk3D::SelectToCursor(){
@@ -1464,14 +1452,13 @@ void CWhisk3D::SelectToCursor(){
 			};
 		}
 	}
-	ReloadViewport(true);
+	ReloadViewport();
 }
 
 void CWhisk3D::CursorToWorldOrigin(){
 	Cursor3DposX = 0;
 	Cursor3DposZ = 0;
 	Cursor3DposY = 0;
-	redibujar = true;
 }
 
 void CWhisk3D::ActivarTextura(){
@@ -2700,7 +2687,7 @@ void CWhisk3D::SetCopyLocation(){
 	NewConstraint.Id = SelectActivo;
 	NewConstraint.Target = valor;
 	Constraints.Append(NewConstraint);	
-	ReloadViewport(true);
+	ReloadViewport();
 }
 
 void CWhisk3D::SetCopyRotation(){
@@ -2740,7 +2727,7 @@ void CWhisk3D::SetCopyRotation(){
 	NewConstraint.Id = SelectActivo;
 	NewConstraint.Target = valor;
 	Constraints.Append(NewConstraint);	
-	ReloadViewport(true);
+	ReloadViewport();
 }
 
 void CWhisk3D::SetFollowPath(){}
@@ -2756,7 +2743,7 @@ void CWhisk3D::ClearConstraints(){
             Constraints.Remove(c);
         }
     }
-	ReloadViewport(true);
+	ReloadViewport();
 }
 
 void CWhisk3D::SetTrackTo(){
@@ -2803,7 +2790,7 @@ void CWhisk3D::SetTrackTo(){
 	NewConstraint.Target = valor;
 	Constraints.Append(NewConstraint);	
 	CleanupStack::PopAndDestroy(noteBuf);
-	ReloadViewport(true);
+	ReloadViewport();
 }
 
 void CWhisk3D::SetAnimation(TInt index){

@@ -102,7 +102,7 @@ std::string SetName(const std::string& baseName) {
         }
 
         // Recorremos las subcolecciones recursivamente
-        for (Collection* childCol : col->Childrens) {
+        for (Collection* childCol : col->Collections) {
             if (nameExistsInCollection(childCol, name)) return true;
         }
 

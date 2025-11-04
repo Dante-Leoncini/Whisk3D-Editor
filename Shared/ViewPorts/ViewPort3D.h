@@ -4,55 +4,39 @@ GLfloat LastPivotX = 0;
 GLfloat LastPivotY = 0;
 GLfloat LastPivotZ = 0;
 
-std::vector<int> Objs2Dviewport3D;
-
-class Viewport3D {
+class Viewport3D : public ViewportBase, public WithBorder  {
 	public:
-		int Parent = -1;
         bool orthographic = false;
         bool SimularZBuffer = false;
         bool ViewFromCameraActive = false;
         float nearClip = 10.0f;
         float farClip = 2000.0f;
         int cameraDistance = 270;
-        float aspect = 1;
-        GLfloat posX = 0;
-        GLfloat posY = 0;
+        float aspect = 1.0f;
+        GLfloat posX = 0.0f;
+        GLfloat posY = 0.0f;
         GLfloat posZ = 0.0f;
         GLfloat rotX = 113.5;
         GLfloat rotY = 20.0;
-        GLfloat PivotX = 0;
-        GLfloat PivotY = 0;
-        GLfloat PivotZ = 0;
+        GLfloat PivotX = 0.0f;
+        GLfloat PivotY = 0.0f;
+        GLfloat PivotZ = 0.0f;
 
-        GLshort borderMesh[32] = { 
-            // fila 1 (y = 0)
-            0,0,   6,0,   12,0,   18,0,
-            // fila 2 (y = 6)
-            0,6,   6,6,   12,6,   18,6,
-            // fila 3 (y = 12)
-            0,12,  6,12,  12,12,  18,12,
-            // fila 4 (y = 18)
-            0,18,  6,18,  12,18,  18,18
-        };
-
-        void OnResize(){
-            Viewport& parentView = Viewports[Parent];
-            aspect = (float)parentView.width / (float)parentView.height;
-
-            //recalcular malla 3d del borde
-            ResizeBorder(borderMesh, parentView.width, parentView.height);
+        Viewport3D(): ViewportBase() {}
+        
+        void Resize(int newW, int newH) override {
+            ViewportBase::Resize(newW, newH);
+            ResizeBorder(newW, newH);
+            aspect = (float)newW / (float)newH;
         }
 
-        void Render(){
-            //Configuracion inicial!
-            Viewport& parentView =  Viewports[Parent];
-
+        void Render() override {
             glEnable(GL_DEPTH_TEST); // Habilitar z-buffer
-	        glViewport(parentView.x, parentView.y, parentView.width, parentView.height); // x, y, ancho, alto
+	        glViewport(x, y, width, height); // x, y, ancho, alto
             glMatrixMode( GL_PROJECTION );
             glLoadIdentity();
             // Proyección ortográfica
+
             if ( orthographic ){
                 float size = 90.0f;
                 glOrtho(-size * aspect, size * aspect,
@@ -81,7 +65,7 @@ class Viewport3D {
 
             // Limpiar pantalla
             glEnable(GL_SCISSOR_TEST);
-            glScissor(parentView.x, parentView.y, parentView.width, parentView.height); // igual a tu viewport
+            glScissor(x, y, width, height); // igual a tu viewport
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             glDisable(GL_SCISSOR_TEST);
 
@@ -90,8 +74,8 @@ class Viewport3D {
 
             if (ViewFromCameraActive){
                 RecalcViewPos();
-                //glTranslatef( posX, posZ, posY);
             }
+
             glTranslatef( posX, posZ, -cameraDistance+posY );
 
             //original
@@ -120,12 +104,14 @@ class Viewport3D {
 
             //por defecto la linea es de 1	
             glLineWidth(1);	
+            glEnableClientState(GL_NORMAL_ARRAY);
             
             //bucle que dibuja cada objeto en orden
             if(Meshes.size() > 0){
                 // Funcion principal para iterar sobre la coleccion
                 for (size_t c = 0; c < Collections.size(); c++) {
                     for (size_t o = 0; o < Collections[c]->Objects.size(); o++) {
+                        //std::cout << "Coleccion " << (c+1) << " obj: " << (o+1) << std::endl;
                         Object& obj = *Collections[c]->Objects[o];
                         RenderMeshAndChildren(obj);
                     }
@@ -139,7 +125,6 @@ class Viewport3D {
             //fin del dibujado de objetos
             //si estaba simulando el zbuffer. el resto no hace falta
             if (SimularZBuffer){		
-                redibujar = false;
                 return;
             };
 
@@ -332,32 +317,27 @@ class Viewport3D {
             }
 
             if (ShowUi){
-                //Configuracion inicial!
-                Viewport& parentView = Viewports[Parent];
-
-                glViewport(parentView.x, parentView.y, parentView.width, parentView.height); // x, y, ancho, alto
-
-                // Guardar matrices
                 glMatrixMode(GL_PROJECTION);
                 glLoadIdentity();
-                glOrtho(0, parentView.width, parentView.height, 0, -1, 1);
 
+                glMatrixMode(GL_MODELVIEW);
+                glLoadIdentity();
+                
+                glViewport(x, y, width, height); // x, y, ancho, alto
+                glOrtho(0, width, height, 0, -1, 1);
+
+                glBindTexture(GL_TEXTURE_2D, Textures[0].iID);
+                glEnableClientState(GL_TEXTURE_COORD_ARRAY);  
                 glDisable(GL_DEPTH_TEST);
                 glDisable(GL_LIGHTING);
                 glDisable(GL_FOG);
+                glEnable(GL_TEXTURE_2D);
                 glEnable( GL_BLEND );
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);      
 
-                glEnableClientState(GL_TEXTURE_COORD_ARRAY);    
-                glEnableClientState(GL_VERTEX_ARRAY);   
-                //esa es la textura de la UI
-			    glBindTexture(GL_TEXTURE_2D, Textures[0].iID);
-
-                DibujarBordes(borderMesh);
+                DibujarBordes(this);
             }
-
-            //termino de dibujar
-
-            parentView.redibujar = false;
         }
 
         void EnfocarObject(){
@@ -512,7 +492,7 @@ class Viewport3D {
             Cursor3DposZ = cursorPos.z;*/
         }
 
-        void Aceptar(){	
+        void Aceptar() {	
             // Mostrar el cursor
             SDL_ShowCursor();
             //si no hay objetos
@@ -523,10 +503,10 @@ class Viewport3D {
                     estado = editNavegacion;
                 }
             }
-            ReloadViewport(true);
+            ReloadViewport();
         };
 
-        void button_left(){
+        void button_left() override {
             if (estado == translacion || estado == EditScale || estado == rotacion){
 				Aceptar();
 			}
@@ -536,11 +516,11 @@ class Viewport3D {
 			}
         }
 
-        void event_mouse_wheel(SDL_Event &e){
+        void event_mouse_wheel(SDL_Event &e) override {
             posY+= e.wheel.y*20;
         }
 
-        void event_mouse_motion(){
+        void event_mouse_motion() override {
             //boton del medio del mouse
             if (middleMouseDown) {
                 ViewPortClickDown = true;
@@ -579,21 +559,19 @@ class Viewport3D {
             else if (estado == translacion || estado == rotacion || estado == EditScale){
                 // Ocultar el cursor
                 //SDL_HideCursor();
-                if (viewPortActive){
-                    switch (estado) {
-                        case translacion:
-                            SetTranslacionObjetos(dx, dy, 16.0f);
-                            break;
-                        case rotacion:
-                            SetRotacion(dx, dy);
-                            break;
-                        case EditScale:
-                            SetScale(dx, dy);
-                            break;
-                        default:
-                            // por si no coincide con nada
-                            break;
-                    }	
+                switch (estado) {
+                    case translacion:
+                        SetTranslacionObjetos(dx, dy, 16.0f);
+                        break;
+                    case rotacion:
+                        SetRotacion(dx, dy);
+                        break;
+                    case EditScale:
+                        SetScale(dx, dy);
+                        break;
+                    default:
+                        // por si no coincide con nada
+                        break;
                 }
             }
         }
@@ -651,7 +629,7 @@ class Viewport3D {
                     ReloadAnimation();
                 }
             }
-            ReloadViewport(true);
+            ReloadViewport();
         }
 
         void TeclaIzquierda(){
@@ -710,7 +688,7 @@ class Viewport3D {
                     ReloadAnimation();
                 }
             }
-            ReloadViewport(true);
+            ReloadViewport();
         }
 
         void TeclaArriba(){
@@ -754,7 +732,7 @@ class Viewport3D {
             else if (estado == translacion){
                 SetTranslacionObjetos(0, -30);
             }
-            ReloadViewport(true);
+            ReloadViewport();
         }
 
         void TeclaAbajo(){
@@ -798,7 +776,7 @@ class Viewport3D {
             else if (estado == translacion){
                 SetTranslacionObjetos(0, 30);		
             }
-            ReloadViewport(true);
+            ReloadViewport();
         }
 
         void ClickA(){
@@ -807,15 +785,13 @@ class Viewport3D {
 
         // Método para actualizar cache
         void UpdatePrecalculos() {
-            if (viewPortActive){
-                precalculado.radY = rotY * M_PI / 180.0f;
-                precalculado.radX = rotX * M_PI / 180.0f;
+            precalculado.radY = rotY * M_PI / 180.0f;
+            precalculado.radX = rotX * M_PI / 180.0f;
 
-                precalculado.cosX = cos(precalculado.radX);
-                precalculado.sinX = sin(precalculado.radX);
-                precalculado.cosY = cos(precalculado.radY);
-                precalculado.sinY = sin(precalculado.radY);
-            }
+            precalculado.cosX = cos(precalculado.radX);
+            precalculado.sinX = sin(precalculado.radX);
+            precalculado.cosY = cos(precalculado.radY);
+            precalculado.sinY = sin(precalculado.radY);
         }
 
         void ClickD(){
@@ -843,7 +819,7 @@ class Viewport3D {
             }	
         };
 
-        void event_key_down(SDL_Event &e){
+        void event_key_down(SDL_Event &e) override {
             SDL_Keycode key = e.key.key; // SDL3
             if (e.key.repeat == 0) { 
                 switch (key) {
@@ -1000,18 +976,3 @@ class Viewport3D {
             Aceptar();
         }
 };
-
-std::vector<Viewport3D> Viewports3D;
-
-void DesactivarCamaraActiva(){
-    for (size_t o = 0; o < Viewports3D.size(); o++) {
-		Viewports3D[o].ViewFromCameraActive = false;	
-    }
-}
-
-int AddViewport3D(int parent) {
-    Viewport3D view;
-    view.Parent = parent;
-    Viewports3D.push_back(view);
-	return Viewports3D.size() -1;
-}

@@ -318,8 +318,6 @@ bool ImportVertexAnimation(const std::string& filepath){
     }
 
     file.close();
-    // marcar que hay que redibujar (igual que en Symbian)
-    redibujar = true;
     std::cout << "Animación importada correctamente desde " << filepath << std::endl;
     return true;
 }
@@ -786,8 +784,6 @@ void ImportAnimation(){
 		// Cerrar el archivo
 		rFile.Close();
 		fsSession.Close();
-
-		redibujar = true;
 	}
     else {
     	_LIT(KFormatString, "Error al leer el Archivo");

@@ -26,16 +26,6 @@ class Rectangle {
 
 			vertices[6] = (GLshort)(x + w);
 			vertices[7] = (GLshort)(y + h);
-
-			// Debug: imprimir todos los vertices
-			/*std::cout << "Vertices: ";
-			for (int i = 0; i < 8; i += 2) {
-				std::cout << "(" << vertices[i] << "," << vertices[i+1] << ") ";
-			}
-			std::cout << std::endl;*/
-
-		    /*std::cout << "Tamaño: " << width << "x" << height << std::endl;
-		    std::cout << "Pos x: " << x << " y: " << y << std::endl;*/
 		}
 
 		void SetColor(GLubyte red, GLubyte green, GLubyte blue){

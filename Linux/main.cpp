@@ -387,7 +387,8 @@ int main(int argc, char* argv[]) {
             if (e.type == SDL_EVENT_QUIT) { running = false; }
             else if (e.type == SDL_EVENT_WINDOW_RESIZED ||
                     e.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED) {
-                OnResizeViewports(e.window.data1, e.window.data2);
+                //OnResizeViewports(e.window.data1, e.window.data2);
+                rootViewport->Resize(e.window.data1, e.window.data2);
             }
             else {
                 InputUsuarioSDL3(e);
@@ -414,7 +415,8 @@ int main(int argc, char* argv[]) {
                 RenderVK();
                 vkQueuePresentKHR(presentQueue, &presentInfo);
             } else {
-                RenderViewports();
+                //RenderViewports();
+                rootViewport->Render();
                 SDL_GL_SwapWindow(window);
             }
         }

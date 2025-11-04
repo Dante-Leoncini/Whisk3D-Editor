@@ -324,7 +324,7 @@ void ReloadAnimation() {
         }
     }
 
-    ReloadViewport(false);
+    ReloadViewport();
 }
 
 /*void CWhisk3D::ReloadAnimation(){		
@@ -526,5 +526,5 @@ void ReloadAnimation() {
 			}
 		}
     }
-	ReloadViewport(false);
+	ReloadViewport();
 }*/

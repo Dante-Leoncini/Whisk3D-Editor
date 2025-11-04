@@ -3,7 +3,7 @@ class Collection {
         //size_t ObjID = 0;
 		Collection* Parent = nullptr;
         std::vector<Object*> Objects;
-        std::vector<Collection*> Childrens;
+        std::vector<Collection*> Collections;
         bool select = false;
         bool SelectActivo = false;
         Object2D* name = nullptr;
@@ -16,8 +16,9 @@ class Collection {
 
         void DeseleccionarTodo(){
             select = false;
-            for(size_t c=0; c < Childrens.size(); c++){
-                Childrens[c]->DeseleccionarTodo();				
+            //colecciones hijas
+            for(size_t c=0; c < Collections.size(); c++){
+                Collections[c]->DeseleccionarTodo();				
             }    
             for(size_t o=0; o < Objects.size(); o++){
                 Objects[o]->DeseleccionarTodo();		
@@ -41,7 +42,7 @@ void DeseleccionarTodo(){
 		for(size_t c=0; c < Collections.size(); c++){
             Collections[c]->DeseleccionarTodo();		
 		}
-		SelectCount = 0;
+        SelectCount = 0;
 	}
 }
 

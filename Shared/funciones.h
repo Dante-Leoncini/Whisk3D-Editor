@@ -209,7 +209,6 @@ void NewMaterial(bool reemplazar){
 		//pMesh.materialsGroup[OldMaterialID-1].material = Materials.Count()-1;
 		pMesh.materialsGroup[OldMaterialID-1].material = Materials.size()-1;
 	}
-	redibujar = true;
 }
 
 void BorrarMesh(int indice){

@@ -336,8 +336,6 @@ class Wavefront {
             CleanupStack::PopAndDestroy(noteBuf);
         }
 		fs.Close();
-
-		redibujar = true;
 	}	
     else {
     	_LIT(KFormatString, "Error al leer el Archivo");
@@ -1421,9 +1419,6 @@ bool ImportOBJ(const std::string& filepath) {
     } else {
         std::cerr << "El archivo .mtl no existe" << std::endl;
     }
-
-    // Señalar que hay que redibujar
-    redibujar = true;
 
 	//DEBUG. para ver que ocurrio con las texturas despues de cargar
 	/*for (size_t i = 0; i < Textures.size(); ++i) {

@@ -17,7 +17,7 @@ void ReestablecerEstado(){
 		estadoObjetos.clear();
 	}
 	estado = editNavegacion;
-	ReloadViewport(true);
+	ReloadViewport();
 };
 
 void Cancelar(){
@@ -132,7 +132,7 @@ void Borrar(){
 			}
 		}
 	}
-    ReloadViewport(true);	
+    ReloadViewport();	
 }
 
 void SetTransformPivotPoint(){
@@ -215,7 +215,7 @@ void SetPosicion(){
 	/*if (estado == rotacion){
 		SetRotacion(0);
 	}*/
-    ReloadViewport(true);	
+    ReloadViewport();	
 };
 
 void DuplicatedObject(){	
@@ -285,7 +285,6 @@ void DuplicatedObject(){
 		}
 	}
 	SetPosicion();
-	redibujar = true;
 }
 
 void DuplicatedLinked(){
@@ -312,7 +311,6 @@ void DuplicatedLinked(){
 		}
 	}
 	SetPosicion();
-	redibujar = true;
 }
 
 void SetRotacion(int dx, int dy){
@@ -360,7 +358,7 @@ void SetRotacion(){
 	/*if (estado == rotacion){
 		SetRotacion(0, 0);
 	}*/
-    ReloadViewport(true);	
+    ReloadViewport();	
 };
 
 void SetScale(int dx, int dy){
@@ -391,7 +389,6 @@ void SetScale(int dx, int dy){
 				break;
 		}
 	}
-	redibujar = true;
 }
 
 void SetEscala(){
@@ -409,7 +406,7 @@ void SetEscala(){
 	/*if (estado == rotacion){
 		SetRotacion(0, 0);
 	}*/
-    ReloadViewport(true);
+    ReloadViewport();
 };
 
 void SetTranslacionObjetos(int dx, int dy, float factor = 1.0f){

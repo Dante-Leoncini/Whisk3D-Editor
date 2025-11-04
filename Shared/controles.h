@@ -1,119 +1,3 @@
-void button_left(){
-    if (viewPortActive){
-        switch (viewPortActive->type){
-            case View::ViewPort3D: {
-                Viewports3D[viewPortActive->ChildA].button_left();
-                break;
-            }
-            case View::Outliner: {
-                Outliners[viewPortActive->ChildA]->button_left();
-                break;
-            }
-            default: {
-                break;
-            }
-        }        
-    };
-}
-
-void event_mouse_motion(){
-    if (viewPortActive){
-        switch (viewPortActive->type){
-            case View::ViewPort3D: {
-                Viewports3D[viewPortActive->ChildA].event_mouse_motion();
-                break;
-            }
-            case View::Outliner: {
-                Outliners[viewPortActive->ChildA]->event_mouse_motion();
-                break;
-            }
-            default: {
-                break;
-            }
-        }        
-    };
-}
-
-
-void event_mouse_wheel(SDL_Event &e){
-    if (viewPortActive){
-        switch (viewPortActive->type){
-            case View::ViewPort3D: {
-                Viewports3D[viewPortActive->ChildA].event_mouse_wheel(e);
-                break;
-            }
-            case View::Outliner: {
-                Outliners[viewPortActive->ChildA]->event_mouse_wheel(e);
-                break;
-            }
-            default: {
-                break;
-            }
-        }        
-    };
-}
-
-void event_key_down(SDL_Event &e){
-    if (viewPortActive){
-        switch (viewPortActive->type){
-            case View::ViewPort3D: {
-                Viewports3D[viewPortActive->ChildA].event_key_down(e);
-                break;
-            }
-            case View::Outliner: {
-                Outliners[viewPortActive->ChildA]->event_key_down(e);
-                break;
-            }
-            default: {
-                break;
-            }
-        }        
-    };
-}
-
-void CheckWarpMouseInWindow(int mx, int my){
-    bool warped = false;
-	dx = mx - lastMouseX;
-	dy = my - lastMouseY;
-
-    if (mx <= 0) {
-        mx = winW - 2;
-        SDL_WarpMouseInWindow(window, mx, my);
-        warped = true;
-    }
-    else if (mx >= winW - 1) {
-        mx = 1;
-        SDL_WarpMouseInWindow(window, mx, my);
-        warped = true;
-    }
-
-    // --- wrap vertical ---
-    if (my <= 0) {
-        my = winH - 2;
-        SDL_WarpMouseInWindow(window, mx, my);
-        warped = true;
-    }
-    else if (my >= winH - 1) {
-        my = 1;
-        SDL_WarpMouseInWindow(window, mx, my);
-        warped = true;
-    } 
-
-    // Calcular delta solo si no hubo warp
-    if (!warped) {
-        dx = mx - lastMouseX;
-        dy = my - lastMouseY;
-    } else {
-        dx = 0;
-        dy = 0; // ignorar delta falso
-    }
-	
-	// Guardar última posición
-    lastMouseX = mx;
-    lastMouseY = my;
-	//GuardarMousePos();
-}
-
 void Contadores(){
 	if (LShiftPressed){
 		ShiftCount++;
@@ -126,28 +10,35 @@ void InputUsuarioSDL3(SDL_Event &e){
 		int my = e.motion.y;
 
 		//para saber en que vieport estamos
-    	viewPortActive = FindViewportUnderMouse(mx, my);
-		event_mouse_motion();
+		int oglY = winH - my;
+		if (!ViewPortClickDown){
+			viewPortActive = FindViewportUnderMouse(rootViewport, mx, oglY);
+		}
+		
+		if (viewPortActive) viewPortActive->event_mouse_motion();   
 
 		if (middleMouseDown && viewPortActive) {
-			CheckWarpMouseInWindow(mx, my);
+			CheckWarpMouseInViewport(mx, my, viewPortActive);
 		}
 		else if (estado == translacion || estado == rotacion || estado == EditScale){
 			ViewPortClickDown = true;
-			CheckWarpMouseInWindow(mx, my);
+			CheckWarpMouseInViewport(mx, my, viewPortActive);
 		}
     }
 
+	//si el mouse no esta en ningun viewport activo. sale
+	if (!viewPortActive) return;
+
 	//rueda del mouse	
     if (e.type == SDL_EVENT_MOUSE_WHEEL) {
-		event_mouse_wheel(e);
+		viewPortActive->event_mouse_wheel(e);
     }
 
     // Botones del mouse
     if (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
 		ViewPortClickDown = true;
 		if (e.button.button == SDL_BUTTON_LEFT) {  
-			button_left();
+			viewPortActive->button_left();
 		}
         else if (e.button.button == SDL_BUTTON_MIDDLE) {  // rueda clic
             middleMouseDown = true;
@@ -168,7 +59,7 @@ void InputUsuarioSDL3(SDL_Event &e){
 
     //eventos del teclado
     if (e.type == SDL_EVENT_KEY_DOWN) {
-		event_key_down(e);
+		viewPortActive->event_key_down(e);
     } 	
 	else if (e.type == SDL_EVENT_KEY_UP) {
 		SDL_Keycode key = e.key.key; // SDL3
@@ -406,7 +297,7 @@ void InputUsuarioSymbian(GLfixed aDeltaTimeSecs){
 				ReloadAnimation();
 			}
 		}
-		ReloadViewport(true);
+		ReloadViewport();
 	}
 	if( iInputHandler->IsInputPressed( EJoystickRight ) ){
 		//mueve el mouse
@@ -461,7 +352,7 @@ void InputUsuarioSymbian(GLfixed aDeltaTimeSecs){
 				ReloadAnimation();
 			}
 		}
-	    ReloadViewport(true);
+	    ReloadViewport();
 	}
 	if( iInputHandler->IsInputPressed( EJoystickUp ) ){
 		//mueve el mouse
@@ -559,7 +450,6 @@ void InputUsuarioSDL(SDL_Event &e){
 	//rueda del mouse	
     if (e.type == SDL_MOUSEWHEEL) {
 		posY+= e.wheel.y*20;
-		redibujar = true;  
     }
     // Botones del mouse
     else if (e.type == SDL_MOUSEBUTTONDOWN) {
@@ -622,8 +512,6 @@ void InputUsuarioSDL(SDL_Event &e){
 				if(rotX > 180.0f) rotX -= 360.0f;
 				if(rotX < -180.0f) rotX += 360.0f;
 			}
-
-			redibujar = true;
 		}
 		else if (estado == translacion){
 			// mover objetos con el mouse
