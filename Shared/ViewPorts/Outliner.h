@@ -214,6 +214,7 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable  {
         }
 
         void event_mouse_wheel(SDL_Event &e) override {
+            ScrollY(e.wheel.y*6*GlobalScale);
         }
 
         void event_mouse_motion() override {
@@ -221,15 +222,8 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable  {
             if (middleMouseDown) {
                 ViewPortClickDown = true;
 
-                PosX += dx;  
-                PosY += dy;  
-
-		        //std::cout << "nuevo PosX: " << PosX << " PosY: " << PosY << std::endl;
-                if (PosX > 0){PosX = 0;}
-                if (PosY > 0){PosY = 0;}
-                //if (MaxPosX < PosX){PosX = MaxPosX;}
-                if (MaxPosY > PosY){PosY = MaxPosY;}
-		        //std::cout << "ahora PosX: " << PosX << " PosY: " << PosY << std::endl;
+                ScrollX(dx);
+                ScrollY(dy);
             }  
         }
 

@@ -160,6 +160,20 @@ class Scrollable {
             0,6,   6,6,   12,6,   18,6
         };
 
+        void ScrollY(int dy){
+            PosY += dy;  
+            if (PosY > 0){PosY = 0;}
+            if (MaxPosY > PosY){PosY = MaxPosY;}
+            //std::cout << "ahora PosX: " << PosX << " PosY: " << PosY << std::endl;
+        }
+
+        void ScrollX(int dx){
+            PosX += dx;  
+
+            if (PosX > 0){PosX = 0;}
+            //if (MaxPosX < PosX){PosX = MaxPosX;}
+        }
+
         void ResizeScrollbar(int width, int height, int MaxX, int MaxY){
             //MaxPosX = MaxX;
             MaxPosY = MaxY + height - borderGS - borderGS;
