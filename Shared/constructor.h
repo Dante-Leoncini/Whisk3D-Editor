@@ -26,7 +26,8 @@ void ConstructUniversal(){
     //es el tamaño en X e Y de la textura
     CrearIconos(128, 128);
     CalcBorderUV(128, 128);
-    SetGlobalScale(2);
+    CalcScrollUV(128, 128);
+    SetGlobalScale(3);
 
     Collection* colec = new Collection(nullptr, "Collection");
     Collections.push_back(colec);

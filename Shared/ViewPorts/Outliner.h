@@ -1,9 +1,5 @@
-class Outliner : public ViewportBase, public WithBorder  {
+class Outliner : public ViewportBase, public WithBorder, public Scrollable  {
 	public:
-        int PosX = 0;
-        int PosY = 0;
-        int MaxPosX = 100;
-        int MaxPosY = -100;
         size_t CantidadRenglones = 5;
         Object2D* Renglon = nullptr;
 
@@ -22,6 +18,49 @@ class Outliner : public ViewportBase, public WithBorder  {
             CantidadRenglones = static_cast<int>(
                 std::ceil(static_cast<float>(height) / static_cast<float>(RenglonHeightGS))
             );
+
+            int sizeX = 0;
+            int MaxPosYtemp = 0;
+
+            for (size_t c = 0; c < Collections.size(); c++) {    
+                MaxPosYtemp -= RenglonHeightGS;
+                //glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+                //icono de la coleccion
+                //glTranslatef(IconSizeGS + gapGS, 0, 0);   
+                //glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+                //texto render                   
+                //glTranslatef(IconSizeGS + gapGS, 0, 0);   
+                //RenderObject2D(*Collections[c]->name);
+
+                //glTranslatef(gapGS + IconSizeGS, 0, 0); 
+                for (size_t o = 0; o < Collections[c]->Objects.size(); o++) {
+                    //icono
+                    MaxPosYtemp -= RenglonHeightGS;
+                    //glTranslatef(0, RenglonHeightGS, 0); 
+                    //glPushMatrix();
+                    //glTranslatef(-IconSizeGS - gapGS -IconSizeGS - gapGS -IconSizeGS - gapGS, 0, 0);   
+
+                    //linea
+                    //glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+                    //icono desplegar
+                    //glTranslatef(IconSizeGS + gapGS, 0, 0);   
+                    //glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+                    //icono del objeto
+                    //glTranslatef(IconSizeGS + gapGS, 0, 0);   
+                    //glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+                    //texto
+                    //glTranslatef(IconSizeGS + gapGS, 0, 0);   
+                    //RenderObject2D(*Collections[c]->Objects[o]->name);  
+                } 
+            }
+            std::cout << "sizeX: " << sizeX << " MaxPosY: "<< MaxPosY << std::endl;
+            std::cout << "Ancho: " << newW << " Alto: "<< newH << std::endl;
+            ResizeScrollbar(newW, newH, MaxPosX, MaxPosYtemp);
         }
 
         void Render() override {
@@ -113,9 +152,11 @@ class Outliner : public ViewportBase, public WithBorder  {
 
                 glTranslatef(gapGS + IconSizeGS, 0, 0); 
                 for (size_t o = 0; o < Collections[c]->Objects.size(); o++) {
-                    glTranslatef(0, RenglonHeightGS, 0); 
-                    //glPushMatrix();
-                    glTranslatef(-IconSizeGS - gapGS -IconSizeGS - gapGS -IconSizeGS - gapGS, 0, 0);   
+                    glTranslatef(
+                        -IconSizeGS - gapGS -IconSizeGS - gapGS -IconSizeGS - gapGS, 
+                        RenglonHeightGS, 
+                        0
+                    );   
 
                     //linea
                     glVertexPointer(2, GL_SHORT, 0, IconLineMesh); //todos los iconos comparten los vertices y tamaño
@@ -166,6 +207,7 @@ class Outliner : public ViewportBase, public WithBorder  {
             glPopMatrix();     
 
             DibujarBordes(this);
+            DibujarScrollbar(this);
         }
 
         void button_left() override {
@@ -183,10 +225,10 @@ class Outliner : public ViewportBase, public WithBorder  {
                 PosY += dy;  
 
 		        //std::cout << "nuevo PosX: " << PosX << " PosY: " << PosY << std::endl;
-                if (PosX < 0){PosX = 0;}
+                if (PosX > 0){PosX = 0;}
                 if (PosY > 0){PosY = 0;}
                 //if (MaxPosX < PosX){PosX = MaxPosX;}
-                //if (MaxPosY > PosY){PosY = MaxPosY;}
+                if (MaxPosY > PosY){PosY = MaxPosY;}
 		        //std::cout << "ahora PosX: " << PosX << " PosY: " << PosY << std::endl;
             }  
         }

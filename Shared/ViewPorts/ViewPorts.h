@@ -9,12 +9,61 @@ enum class View {
     Column
 };
     
-// índices de los 8 quads que forman el borde (sin centro)
-GLubyte indices[] = {
+GLubyte indicesBorder[] = {
     0,1, 4, 1,4, 5,   1, 2, 5, 5, 2, 6,   2, 3, 6, 6, 3, 7,    
     4,5, 8, 8,5, 9,                       6, 7,10,10, 7,11,
     8,9,12,12,9,13,   9,10,13,13,10,14,  10,11,14,14,11,15
 };
+
+GLubyte indicesScrollbarVertical[] = {
+    0,1,2, 2,1,3,
+    2,3,4, 4,3,5,
+    4,5,6, 6,5,7
+};
+
+GLubyte indicesScrollbarHorizontal[] = {
+    0,1,4, 4,1,5, 
+    1,2,5, 5,2,6,
+    2,3,6, 6,3,7
+};
+
+GLfloat ScrollbarHorizontalUV[16] = {
+    0.0f, 0.0f,
+    0.0f, 0.0f,
+    0.0f, 0.0f,
+    0.0f, 0.0f,
+    0.0f, 0.0f,
+    0.0f, 0.0f,
+    0.0f, 0.0f,
+    0.0f, 0.0f
+};
+
+GLfloat ScrollbarVerticalUV[16] = {
+    0.0f, 0.0f,
+    0.0f, 0.0f,
+    0.0f, 0.0f,
+    0.0f, 0.0f,
+    0.0f, 0.0f,
+    0.0f, 0.0f,
+    0.0f, 0.0f,
+    0.0f, 0.0f
+};
+
+void CalcScrollUV(int texW, int texH) {
+    GLfloat* uv = ScrollbarVerticalUV;
+
+    float U[2] = { 116.0f / texW, 119.0f / texW };
+    float V[4] = { 109.0f / texH, 111.0f / texH, 112.0f / texH, 114.0f / texH };
+
+    // Generar los 16 pares UV (fila × columna)
+    int k = 0;
+    for (int y = 0; y < 4; y++) {
+        for (int x = 0; x < 2; x++) {
+            uv[k++] = U[x];
+            uv[k++] = V[y];
+        }
+    }
+}
 
 GLfloat bourderUV[32] = {
     0.0f,      0.0f,
@@ -34,6 +83,23 @@ GLfloat bourderUV[32] = {
     0.0f,      0.0f,
     0.0f,      0.0f
 };
+
+void CalcBorderUV(int texW, int texH) {
+    GLfloat* uv = bourderUV;
+
+    // Coordenadas UV en píxeles (borde de 13px, esquinas de 6px, centro de 1px)
+    float U[4] = { 115.0f / texW, 121.0f / texW, 122.0f / texW, 128.0f / texW };
+    float V[4] = { 115.0f / texH, 121.0f / texH, 122.0f / texH, 128.0f / texH };
+
+    // Generar los 16 pares UV (fila × columna)
+    int k = 0;
+    for (int y = 0; y < 4; y++) {
+        for (int x = 0; x < 4; x++) {
+            uv[k++] = U[x];
+            uv[k++] = V[y];
+        }
+    }
+}
 
 // Adelantamos la clase (por si se usa en otros headers)
 class ViewportBase;
@@ -72,6 +138,91 @@ class ViewportBase {
 
 };
 
+class Scrollable {
+    public:
+        int PosX = 0;
+        int PosY = 0;
+        int MaxPosX = 100;
+        int MaxPosY = 0;
+        bool scrollX = false;
+        bool scrollY = false;
+
+        float scrollHeight = 0;
+        float scrollPosFactor = 0;
+
+        GLshort scrollVerticalMesh[16] = { 
+            0,0,   6,0,   12,0,   18,0,
+            0,6,   6,6,   12,6,   18,6
+        };
+
+        GLshort scrollHorizontalMesh[16] = { 
+            0,0,   6,0,   12,0,   18,0,
+            0,6,   6,6,   12,6,   18,6
+        };
+
+        void ResizeScrollbar(int width, int height, int MaxX, int MaxY){
+            //MaxPosX = MaxX;
+            MaxPosY = MaxY + height - borderGS - borderGS;
+            scrollY = (MaxPosY < 0);
+            //evita que el contenido quede enganchado en la parte inferior y deje espacio arriba
+            if (MaxPosY > 0){MaxPosY = 0;};
+            //Si hay espacio disponible. acomoda el contenido automaticamente
+            if (MaxPosY > PosY){PosY = MaxPosY;};
+
+            // --- Cálculo proporcional del tamaño de la barra ---
+            if (MaxPosY < 0) {
+                float totalHeight = height - MaxPosY;   // altura total del contenido
+                float visibleHeight = height;           // lo que se ve
+                scrollHeight = visibleHeight * (visibleHeight / totalHeight);
+                // límite mínimo opcional
+                int limite = borderGS + GlobalScale*5 + borderGS;
+                if (scrollHeight < limite){
+                    scrollHeight = limite;
+                } 
+
+                // --- Calcular factor de desplazamiento ---
+                float rangeContenido = -MaxPosY; // cuánto se puede desplazar el contenido
+                float rangeScroll = height - scrollHeight;
+                scrollPosFactor = rangeScroll / rangeContenido;
+            } else {
+                scrollHeight = height; // por defecto (si no hay scroll)
+                scrollPosFactor = 0;
+            }
+
+            //cambia el tamaño del borde del viewportResizeBorder
+            GLshort U[2] = { (GLshort)(width - GlobalScale - borderGS), (GLshort)(width - 4*GlobalScale - borderGS) };
+            GLshort V[4] = { (GLshort)(borderGS+ 1*GlobalScale), (GLshort)(borderGS + 3*GlobalScale), (GLshort)(scrollHeight - 3*GlobalScale - borderGS), (GLshort)(scrollHeight - GlobalScale - borderGS) };
+
+            // Generar los 16 pares UV (fila × columna)
+            int k = 0;
+            for (int y = 0; y < 4; y++) {
+                for (int x = 0; x < 2; x++) {
+                    scrollVerticalMesh[k++] = U[x];
+                    scrollVerticalMesh[k++] = V[y];
+                }
+            }
+        }
+
+        void DibujarScrollbar(ViewportBase* current){
+            if (scrollY){
+                glPushMatrix();          
+                glTranslatef(0, (int)(-PosY * scrollPosFactor), 0);       
+                //si es la vista activa
+                if (current == viewPortActive)
+                    glColor4f(ListaColores[accent][0], ListaColores[accent][1],
+                            ListaColores[accent][2], ListaColores[accent][3]);
+                else
+                    glColor4f(ListaColores[negro][0], ListaColores[negro][1],
+                            ListaColores[negro][2], ListaColores[negro][3]);
+
+                glTexCoordPointer(2, GL_FLOAT, 0, ScrollbarVerticalUV);
+                glVertexPointer(2, GL_SHORT, 0, scrollVerticalMesh);
+                glDrawElements(GL_TRIANGLES, 3*2*3, GL_UNSIGNED_BYTE, indicesScrollbarVertical);
+                glPopMatrix();
+            }
+        }
+};
+
 class WithBorder {
     public:
         GLshort borderMesh[32] = { 
@@ -92,7 +243,7 @@ class WithBorder {
 
             glTexCoordPointer(2, GL_FLOAT, 0, bourderUV);
             glVertexPointer(2, GL_SHORT, 0, borderMesh);
-            glDrawElements(GL_TRIANGLES, 48, GL_UNSIGNED_BYTE, indices);
+            glDrawElements(GL_TRIANGLES, 48, GL_UNSIGNED_BYTE, indicesBorder);
         }
 
         void ResizeBorder(int width, int height){
@@ -110,23 +261,6 @@ class WithBorder {
             }
         }
 };
-
-void CalcBorderUV(int texW, int texH) {
-    GLfloat* uv = bourderUV;
-
-    // Coordenadas UV en píxeles (borde de 13px, esquinas de 6px, centro de 1px)
-    float U[4] = { 115.0f / texW, 121.0f / texW, 122.0f / texW, 128.0f / texW };
-    float V[4] = { 115.0f / texH, 121.0f / texH, 122.0f / texH, 128.0f / texH };
-
-    // Generar los 16 pares UV (fila × columna)
-    int k = 0;
-    for (int y = 0; y < 4; y++) {
-        for (int x = 0; x < 4; x++) {
-            uv[k++] = U[x];
-            uv[k++] = V[y];
-        }
-    }
-}
 
 class ViewportRow : public ViewportBase {
     public:
