@@ -217,14 +217,19 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable  {
             ScrollY(e.wheel.y*6*GlobalScale);
         }
 
-        void event_mouse_motion() override {
+        void event_mouse_motion(int mx, int my) override {
             //boton del medio del mouse
             if (middleMouseDown) {
                 ViewPortClickDown = true;
 
                 ScrollX(dx);
                 ScrollY(dy);
-            }  
+                return;
+            }
+
+            if (scrollY){
+                ScrollMouseOver(this, mx, my);
+            }
         }
 
         void event_key_down(SDL_Event &e) override {

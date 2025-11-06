@@ -53,4 +53,20 @@ void ConstructUniversal(){
     CollectionActive = 1;
     
     AddMesh(cubo);
+    AddMesh(cubo);
+    AddMesh(cubo);
+    AddMesh(cubo);
+    AddMesh(cubo);
+    AddMesh(cubo);
+    AddMesh(cubo);
+    AddMesh(cubo);
+    AddMesh(cubo);
+    AddMesh(cubo);
+    AddMesh(cubo);
+    AddMesh(cubo);
+    AddMesh(cubo);
+    AddMesh(cubo);
+    AddMesh(cubo);
+    AddMesh(cubo);
+    AddMesh(cubo);
 }

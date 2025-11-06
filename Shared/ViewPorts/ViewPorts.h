@@ -38,7 +38,29 @@ GLfloat ScrollbarHorizontalUV[16] = {
     0.0f, 0.0f
 };
 
+GLfloat ScrollbarHorizontalBigUV[16] = {
+    0.0f, 0.0f,
+    0.0f, 0.0f,
+    0.0f, 0.0f,
+    0.0f, 0.0f,
+    0.0f, 0.0f,
+    0.0f, 0.0f,
+    0.0f, 0.0f,
+    0.0f, 0.0f
+};
+
 GLfloat ScrollbarVerticalUV[16] = {
+    0.0f, 0.0f,
+    0.0f, 0.0f,
+    0.0f, 0.0f,
+    0.0f, 0.0f,
+    0.0f, 0.0f,
+    0.0f, 0.0f,
+    0.0f, 0.0f,
+    0.0f, 0.0f
+};
+
+GLfloat ScrollbarVerticalBigUV[16] = {
     0.0f, 0.0f,
     0.0f, 0.0f,
     0.0f, 0.0f,
@@ -51,16 +73,22 @@ GLfloat ScrollbarVerticalUV[16] = {
 
 void CalcScrollUV(int texW, int texH) {
     GLfloat* uv = ScrollbarVerticalUV;
+    GLfloat* uvBig = ScrollbarVerticalBigUV;
 
-    float U[2] = { 116.0f / texW, 119.0f / texW };
-    float V[4] = { 109.0f / texH, 111.0f / texH, 112.0f / texH, 114.0f / texH };
+    float VerticalU[2] = { 116.0f / texW, 119.0f / texW };
+    float VerticalV[4] = { 109.0f / texH, 111.0f / texH, 112.0f / texH, 114.0f / texH };
+    float VerticalUbig[2] = { 120.0f / texW, 127.0f / texW };
+    float VerticalVbig[4] = { 109.0f / texH, 111.0f / texH, 112.0f / texH, 114.0f / texH };
 
-    // Generar los 16 pares UV (fila × columna)
+    // Generar (fila × columna)
     int k = 0;
     for (int y = 0; y < 4; y++) {
         for (int x = 0; x < 2; x++) {
-            uv[k++] = U[x];
-            uv[k++] = V[y];
+            uv[k++] = VerticalU[x];
+            uv[k++] = VerticalV[y];
+            k-=2;
+            uvBig[k++] = VerticalUbig[x];
+            uvBig[k++] = VerticalVbig[y];
         }
     }
 }
@@ -131,7 +159,7 @@ class ViewportBase {
         }
 
         //controles
-        virtual void event_mouse_motion() {}
+        virtual void event_mouse_motion(int mx, int my) {}
         virtual void button_left() {}
         virtual void event_key_down(SDL_Event &e) {}
         virtual void event_mouse_wheel(SDL_Event &e) {}
@@ -146,6 +174,8 @@ class Scrollable {
         int MaxPosY = 0;
         bool scrollX = false;
         bool scrollY = false;
+        bool mouseOverScrollY = false;
+        bool mouseOverScrollX = false;
 
         float scrollHeight = 0;
         float scrollPosFactor = 0;
@@ -155,7 +185,17 @@ class Scrollable {
             0,6,   6,6,   12,6,   18,6
         };
 
+        GLshort scrollVerticalBigMesh[16] = { 
+            0,0,   6,0,   12,0,   18,0,
+            0,6,   6,6,   12,6,   18,6
+        };
+
         GLshort scrollHorizontalMesh[16] = { 
+            0,0,   6,0,   12,0,   18,0,
+            0,6,   6,6,   12,6,   18,6
+        };
+
+        GLshort scrollHorizontalBigMesh[16] = { 
             0,0,   6,0,   12,0,   18,0,
             0,6,   6,6,   12,6,   18,6
         };
@@ -172,6 +212,23 @@ class Scrollable {
 
             if (PosX > 0){PosX = 0;}
             //if (MaxPosX < PosX){PosX = MaxPosX;}
+        }
+
+
+        void ScrollMouseOver(ViewportBase* current, int mx, int my){
+            mx -= current->x;
+            //my -= y;
+
+            // Área de la barra de scroll vertical
+            int barXStart = current->width - borderGS - 7* GlobalScale;
+            int barXEnd = current->width - borderGS - GlobalScale;
+            int barYStart = borderGS + GlobalScale;
+            int barYEnd = current->height - borderGS - GlobalScale;
+            bool dentroX = (mx >= barXStart && mx <= barXEnd);
+            bool dentroY = (my >= barYStart && my <= barYEnd);
+
+            //std::cout << "mx: " << mx << "my: " << my << std::endl;
+            mouseOverScrollY = dentroX && dentroY;
         }
 
         void ResizeScrollbar(int width, int height, int MaxX, int MaxY){
@@ -204,15 +261,21 @@ class Scrollable {
             }
 
             //cambia el tamaño del borde del viewportResizeBorder
-            GLshort U[2] = { (GLshort)(width - GlobalScale - borderGS), (GLshort)(width - 4*GlobalScale - borderGS) };
-            GLshort V[4] = { (GLshort)(borderGS+ 1*GlobalScale), (GLshort)(borderGS + 3*GlobalScale), (GLshort)(scrollHeight - 3*GlobalScale - borderGS), (GLshort)(scrollHeight - GlobalScale - borderGS) };
+            GLshort verticalU[2] = { (GLshort)(width - GlobalScale - borderGS), (GLshort)(width - 4*GlobalScale - borderGS) };
+            GLshort verticalV[4] = { (GLshort)(borderGS+ 1*GlobalScale), (GLshort)(borderGS + 3*GlobalScale), (GLshort)(scrollHeight - 3*GlobalScale - borderGS), (GLshort)(scrollHeight - GlobalScale - borderGS) };
+
+            GLshort verticalUbig[2] = { (GLshort)(width - GlobalScale - borderGS), (GLshort)(width - 8*GlobalScale - borderGS)};
+            GLshort verticalVbig[4] = { (GLshort)(borderGS+ 1*GlobalScale), (GLshort)(borderGS + 3*GlobalScale), (GLshort)(scrollHeight - 3*GlobalScale - borderGS), (GLshort)(scrollHeight - GlobalScale - borderGS) };
 
             // Generar los 16 pares UV (fila × columna)
             int k = 0;
             for (int y = 0; y < 4; y++) {
                 for (int x = 0; x < 2; x++) {
-                    scrollVerticalMesh[k++] = U[x];
-                    scrollVerticalMesh[k++] = V[y];
+                    scrollVerticalMesh[k++] = verticalU[x];
+                    scrollVerticalMesh[k++] = verticalV[y];
+                    k-=2;
+                    scrollVerticalBigMesh[k++] = verticalUbig[x];
+                    scrollVerticalBigMesh[k++] = verticalVbig[y];
                 }
             }
         }
@@ -222,15 +285,19 @@ class Scrollable {
                 glPushMatrix();          
                 glTranslatef(0, (int)(-PosY * scrollPosFactor), 0);       
                 //si es la vista activa
-                if (current == viewPortActive)
+                if (mouseOverScrollY){
+                    glTexCoordPointer(2, GL_FLOAT, 0, ScrollbarVerticalBigUV);
+                    glVertexPointer(2, GL_SHORT, 0, scrollVerticalBigMesh);
                     glColor4f(ListaColores[accent][0], ListaColores[accent][1],
                             ListaColores[accent][2], ListaColores[accent][3]);
-                else
+                }
+                else {
+                    glTexCoordPointer(2, GL_FLOAT, 0, ScrollbarVerticalUV);
+                    glVertexPointer(2, GL_SHORT, 0, scrollVerticalMesh);
                     glColor4f(ListaColores[negro][0], ListaColores[negro][1],
                             ListaColores[negro][2], ListaColores[negro][3]);
+                }
 
-                glTexCoordPointer(2, GL_FLOAT, 0, ScrollbarVerticalUV);
-                glVertexPointer(2, GL_SHORT, 0, scrollVerticalMesh);
                 glDrawElements(GL_TRIANGLES, 3*2*3, GL_UNSIGNED_BYTE, indicesScrollbarVertical);
                 glPopMatrix();
             }

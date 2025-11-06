@@ -521,7 +521,7 @@ class Viewport3D : public ViewportBase, public WithBorder  {
             posY+= e.wheel.y*20;
         }
 
-        void event_mouse_motion() override {
+        void event_mouse_motion(int mx, int my) override {
             //boton del medio del mouse
             if (middleMouseDown) {
                 ViewPortClickDown = true;

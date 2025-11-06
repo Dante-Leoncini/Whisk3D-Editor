@@ -15,7 +15,9 @@ void InputUsuarioSDL3(SDL_Event &e){
 			viewPortActive = FindViewportUnderMouse(rootViewport, mx, oglY);
 		}
 		
-		if (viewPortActive) viewPortActive->event_mouse_motion();   
+		if (viewPortActive){
+			viewPortActive->event_mouse_motion(mx, my);
+		}
 
 		if (middleMouseDown && viewPortActive) {
 			CheckWarpMouseInViewport(mx, my, viewPortActive);
