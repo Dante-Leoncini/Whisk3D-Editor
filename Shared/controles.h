@@ -19,7 +19,7 @@ void InputUsuarioSDL3(SDL_Event &e){
 			viewPortActive->event_mouse_motion(mx, my);
 		}
 
-		if (middleMouseDown && viewPortActive) {
+		if ((leftMouseDown || middleMouseDown) && viewPortActive) {
 			CheckWarpMouseInViewport(mx, my, viewPortActive);
 		}
 		else if (estado == translacion || estado == rotacion || estado == EditScale){
@@ -40,6 +40,7 @@ void InputUsuarioSDL3(SDL_Event &e){
     if (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
 		ViewPortClickDown = true;
 		if (e.button.button == SDL_BUTTON_LEFT) {  
+            leftMouseDown = true;
 			viewPortActive->button_left();
 		}
         else if (e.button.button == SDL_BUTTON_MIDDLE) {  // rueda clic
@@ -54,9 +55,18 @@ void InputUsuarioSDL3(SDL_Event &e){
     }
     else if (e.type == SDL_EVENT_MOUSE_BUTTON_UP) {
 		ViewPortClickDown = false;
-        if (e.button.button == SDL_BUTTON_MIDDLE) {
+		if (e.button.button == SDL_BUTTON_LEFT) {  
+            leftMouseDown = false;
+		}
+        else if (e.button.button == SDL_BUTTON_MIDDLE) {
             middleMouseDown = false;
         }
+		GuardarMousePos();
+		viewPortActive->mouse_button_up(e);
+		//el orden importa. porque eso afecta al ultimo viewport activo. despues de hacer lo que tenga que hacer
+		//ahi si revisas en donde quedo el mouse. si se hace al revez podes quedar en un viewport distinto y enviar un comando que no corresponde
+		int oglY = winH - lastMouseY;
+		viewPortActive = FindViewportUnderMouse(rootViewport, lastMouseX, oglY);
     }
 
     //eventos del teclado

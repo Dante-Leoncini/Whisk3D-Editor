@@ -163,6 +163,7 @@ class ViewportBase {
         virtual void button_left() {}
         virtual void event_key_down(SDL_Event &e) {}
         virtual void event_mouse_wheel(SDL_Event &e) {}
+        virtual void mouse_button_up(SDL_Event &e) {}
 
 };
 
@@ -176,9 +177,12 @@ class Scrollable {
         bool scrollY = false;
         bool mouseOverScrollY = false;
         bool mouseOverScrollX = false;
+        bool mouseOverScrollYpress = false;
+        bool mouseOverScrollXpress = false;
 
-        float scrollHeight = 0;
-        float scrollPosFactor = 0;
+        float scrollHeight = 0.0f;;
+        float scrollPosFactor = 0.0f;;
+        float scrollDragFactor = 0.0f;
 
         GLshort scrollVerticalMesh[16] = { 
             0,0,   6,0,   12,0,   18,0,
@@ -201,16 +205,28 @@ class Scrollable {
         };
 
         void ScrollY(int dy){
-            PosY += dy;  
-            if (PosY > 0){PosY = 0;}
-            if (MaxPosY > PosY){PosY = MaxPosY;}
+            if (leftMouseDown && mouseOverScrollY) {
+                PosY -= dy * scrollDragFactor;  
+                if (PosY > 0){PosY = 0;}
+                if (MaxPosY > PosY){PosY = MaxPosY;}
+            }
+            else if (middleMouseDown) {
+                PosY += dy;  
+                if (PosY > 0){PosY = 0;}
+                if (MaxPosY > PosY){PosY = MaxPosY;}
+            }
             //std::cout << "ahora PosX: " << PosX << " PosY: " << PosY << std::endl;
         }
 
         void ScrollX(int dx){
-            PosX += dx;  
-
-            if (PosX > 0){PosX = 0;}
+            if (leftMouseDown && mouseOverScrollX) {
+                PosX += dy * scrollDragFactor;  
+                if (PosX > 0){PosX = 0;}
+            }
+            else if (middleMouseDown) {
+                PosX += dx;
+                if (PosX > 0){PosX = 0;}
+            }
             //if (MaxPosX < PosX){PosX = MaxPosX;}
         }
 
@@ -255,9 +271,11 @@ class Scrollable {
                 float rangeContenido = -MaxPosY; // cuánto se puede desplazar el contenido
                 float rangeScroll = height - scrollHeight;
                 scrollPosFactor = rangeScroll / rangeContenido;
+                scrollDragFactor = rangeContenido / rangeScroll;  // barra → contenido (inverso)
             } else {
                 scrollHeight = height; // por defecto (si no hay scroll)
                 scrollPosFactor = 0;
+                scrollDragFactor = 1;
             }
 
             //cambia el tamaño del borde del viewportResizeBorder
@@ -285,11 +303,16 @@ class Scrollable {
                 glPushMatrix();          
                 glTranslatef(0, (int)(-PosY * scrollPosFactor), 0);       
                 //si es la vista activa
-                if (mouseOverScrollY){
+                if (current == viewPortActive && mouseOverScrollY){
                     glTexCoordPointer(2, GL_FLOAT, 0, ScrollbarVerticalBigUV);
                     glVertexPointer(2, GL_SHORT, 0, scrollVerticalBigMesh);
-                    glColor4f(ListaColores[accent][0], ListaColores[accent][1],
-                            ListaColores[accent][2], ListaColores[accent][3]);
+                    if (ViewPortClickDown && mouseOverScrollYpress){
+                        glColor4f(ListaColores[accent][0], ListaColores[accent][1],
+                                ListaColores[accent][2], ListaColores[accent][3]);
+                    }
+                    else {
+                        glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+                    }
                 }
                 else {
                     glTexCoordPointer(2, GL_FLOAT, 0, ScrollbarVerticalUV);

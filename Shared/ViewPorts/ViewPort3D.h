@@ -517,6 +517,10 @@ class Viewport3D : public ViewportBase, public WithBorder  {
 			}
         }
 
+        void mouse_button_up(SDL_Event &e) override {
+
+        }
+
         void event_mouse_wheel(SDL_Event &e) override {
             posY+= e.wheel.y*20;
         }

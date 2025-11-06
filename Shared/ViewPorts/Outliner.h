@@ -19,7 +19,7 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable  {
                 std::ceil(static_cast<float>(height) / static_cast<float>(RenglonHeightGS))
             );
 
-            int sizeX = 0;
+            //int sizeX = 0;
             int MaxPosYtemp = 0;
 
             for (size_t c = 0; c < Collections.size(); c++) {    
@@ -58,8 +58,8 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable  {
                     //RenderObject2D(*Collections[c]->Objects[o]->name);  
                 } 
             }
-            std::cout << "sizeX: " << sizeX << " MaxPosY: "<< MaxPosY << std::endl;
-            std::cout << "Ancho: " << newW << " Alto: "<< newH << std::endl;
+            //std::cout << "sizeX: " << sizeX << " MaxPosY: "<< MaxPosY << std::endl;
+            //std::cout << "Ancho: " << newW << " Alto: "<< newH << std::endl;
             ResizeScrollbar(newW, newH, MaxPosX, MaxPosYtemp);
         }
 
@@ -211,24 +211,41 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable  {
         }
 
         void button_left() override {
+            if (mouseOverScrollY){
+                mouseOverScrollYpress = true;
+            }
+        }
+
+        void mouse_button_up(SDL_Event &e) override {
+            if (e.button.button == SDL_BUTTON_LEFT) {  
+                mouseOverScrollYpress = false;
+                mouseOverScrollXpress = false;
+            }
+            //else if (e.button.button == SDL_BUTTON_MIDDLE) {
+            //    middleMouseDown = false;
+            //}
+            FindMouseOver(lastMouseX,lastMouseY);
         }
 
         void event_mouse_wheel(SDL_Event &e) override {
             ScrollY(e.wheel.y*6*GlobalScale);
         }
 
+        void FindMouseOver(int mx, int my){
+            ScrollMouseOver(this, mx, my);
+        }
+
         void event_mouse_motion(int mx, int my) override {
-            //boton del medio del mouse
-            if (middleMouseDown) {
+            if (middleMouseDown || leftMouseDown) {
                 ViewPortClickDown = true;
 
                 ScrollX(dx);
                 ScrollY(dy);
                 return;
             }
-
-            if (scrollY){
-                ScrollMouseOver(this, mx, my);
+            //si no se esta haciendo click. entonces miras si el mouse esta encima de algo
+            else if (scrollY){
+                FindMouseOver(mx, my);
             }
         }
 

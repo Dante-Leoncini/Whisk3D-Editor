@@ -69,6 +69,7 @@ int InteractionMode;
 int navegacionMode;
 
 // Variables para el Mouse
+bool leftMouseDown = false;
 bool middleMouseDown = false;
 int lastMouseX, lastMouseY;
 
