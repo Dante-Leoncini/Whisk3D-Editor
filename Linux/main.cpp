@@ -39,8 +39,8 @@ VkInstance vkInstance = VK_NULL_HANDLE;
 VkSurfaceKHR vkSurface = VK_NULL_HANDLE;
 bool usingVulkan = false;
 
-int winW = 800; 
-int winH = 600;
+int winW = 640; 
+int winH = 480;
 
 //Whisk3D imports
 #include "../Shared/tablero.h"

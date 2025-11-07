@@ -210,7 +210,7 @@ class Scrollable {
                 if (PosY > 0){PosY = 0;}
                 if (MaxPosY > PosY){PosY = MaxPosY;}
             }
-            else if (middleMouseDown) {
+            else if (middleMouseDown || MouseWheel) {
                 PosY += dy;  
                 if (PosY > 0){PosY = 0;}
                 if (MaxPosY > PosY){PosY = MaxPosY;}
@@ -222,12 +222,14 @@ class Scrollable {
             if (leftMouseDown && mouseOverScrollX) {
                 PosX += dy * scrollDragFactor;  
                 if (PosX > 0){PosX = 0;}
+                if (MaxPosX > PosX){PosX = MaxPosX;}
             }
             else if (middleMouseDown) {
+                std::cout << "PosX: " << PosX << " MaxPosX: " << MaxPosX << std::endl;
                 PosX += dx;
                 if (PosX > 0){PosX = 0;}
+                if (MaxPosX > PosX){PosX = MaxPosX;}
             }
-            //if (MaxPosX < PosX){PosX = MaxPosX;}
         }
 
 
@@ -248,13 +250,17 @@ class Scrollable {
         }
 
         void ResizeScrollbar(int width, int height, int MaxX, int MaxY){
-            //MaxPosX = MaxX;
+            MaxPosX = -MaxX + width - borderGS - borderGS;// + width - borderGS - borderGS;
             MaxPosY = MaxY + height - borderGS - borderGS;
-            scrollY = (MaxPosY < 0);
             //evita que el contenido quede enganchado en la parte inferior y deje espacio arriba
             if (MaxPosY > 0){MaxPosY = 0;};
+            if (MaxPosX > 0){MaxPosX = 0;};
             //Si hay espacio disponible. acomoda el contenido automaticamente
             if (MaxPosY > PosY){PosY = MaxPosY;};
+            if (MaxPosX > PosX){PosX = MaxPosX;};
+
+            scrollY = (MaxPosY < 0);
+            scrollX = (MaxPosX < 0);
 
             // --- Cálculo proporcional del tamaño de la barra ---
             if (MaxPosY < 0) {
@@ -322,6 +328,31 @@ class Scrollable {
                 }
 
                 glDrawElements(GL_TRIANGLES, 3*2*3, GL_UNSIGNED_BYTE, indicesScrollbarVertical);
+                glPopMatrix();
+            }
+            if (scrollX){
+                glPushMatrix();          
+                glTranslatef((int)(-PosX * scrollPosFactor), 0, 0);       
+                //si es la vista activa
+                if (current == viewPortActive && mouseOverScrollX){
+                    glTexCoordPointer(2, GL_FLOAT, 0, ScrollbarHorizontalBigUV);
+                    glVertexPointer(2, GL_SHORT, 0, scrollHorizontalBigMesh);
+                    if (ViewPortClickDown && mouseOverScrollXpress){
+                        glColor4f(ListaColores[accent][0], ListaColores[accent][1],
+                                ListaColores[accent][2], ListaColores[accent][3]);
+                    }
+                    else {
+                        glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+                    }
+                }
+                else {
+                    glTexCoordPointer(2, GL_FLOAT, 0, ScrollbarHorizontalUV);
+                    glVertexPointer(2, GL_SHORT, 0, scrollHorizontalMesh);
+                    glColor4f(ListaColores[negro][0], ListaColores[negro][1],
+                            ListaColores[negro][2], ListaColores[negro][3]);
+                }
+
+                glDrawElements(GL_TRIANGLES, 3*2*3, GL_UNSIGNED_BYTE, indicesScrollbarHorizontal);
                 glPopMatrix();
             }
         }
@@ -525,6 +556,8 @@ void SetGlobalScale(int scale){
     gapGS = gap * scale;
     RenglonHeightGS = RenglonHeight * scale;
     borderGS = border * scale;
+    LetterWidthGS = LetterWidth * scale;
+    LetterHeightGS = LetterHeight * scale;
     SetIconScale(scale);
 
     for (size_t i = 0; i < Collections.size(); i++) {                  

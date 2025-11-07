@@ -71,6 +71,7 @@ int navegacionMode;
 // Variables para el Mouse
 bool leftMouseDown = false;
 bool middleMouseDown = false;
+bool MouseWheel = false;
 int lastMouseX, lastMouseY;
 
 //camara

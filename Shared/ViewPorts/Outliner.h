@@ -19,48 +19,37 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable  {
                 std::ceil(static_cast<float>(height) / static_cast<float>(RenglonHeightGS))
             );
 
-            //int sizeX = 0;
+            int MaxPosXtemp = 0;
             int MaxPosYtemp = 0;
 
-            for (size_t c = 0; c < Collections.size(); c++) {    
+            for (size_t c = 0; c < Collections.size(); c++) {   
+                int rowWidth = marginGS + IconSizeGS + gapGS + IconSizeGS + gapGS + IconSizeGS + marginGS; 
                 MaxPosYtemp -= RenglonHeightGS;
-                //glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+                int textWidth = reinterpret_cast<Text*>(Collections[c]->name->data)->letters.size() * LetterWidthGS;
+                rowWidth += textWidth + gapGS;
 
-                //icono de la coleccion
-                //glTranslatef(IconSizeGS + gapGS, 0, 0);   
-                //glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+                // guardar ancho máximo
+                if (rowWidth > MaxPosXtemp) MaxPosXtemp = rowWidth;
 
-                //texto render                   
-                //glTranslatef(IconSizeGS + gapGS, 0, 0);   
-                //RenderObject2D(*Collections[c]->name);
-
-                //glTranslatef(gapGS + IconSizeGS, 0, 0); 
+                //std::cout << "textWidth: " << textWidth << " rowWidth: " << rowWidth << std::endl;
                 for (size_t o = 0; o < Collections[c]->Objects.size(); o++) {
-                    //icono
+                    int rowWidthObj = marginGS + IconSizeGS + gapGS + IconSizeGS + gapGS + IconSizeGS + gapGS + IconSizeGS + marginGS;
                     MaxPosYtemp -= RenglonHeightGS;
-                    //glTranslatef(0, RenglonHeightGS, 0); 
-                    //glPushMatrix();
-                    //glTranslatef(-IconSizeGS - gapGS -IconSizeGS - gapGS -IconSizeGS - gapGS, 0, 0);   
 
-                    //linea
-                    //glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+                    // texto del objeto
+                    int textWidthObj = reinterpret_cast<Text*>(Collections[c]->Objects[o]->name->data)->letters.size() * LetterWidthGS;
+                    rowWidthObj += textWidthObj + gapGS;
 
-                    //icono desplegar
-                    //glTranslatef(IconSizeGS + gapGS, 0, 0);   
-                    //glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-
-                    //icono del objeto
-                    //glTranslatef(IconSizeGS + gapGS, 0, 0);   
-                    //glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-
-                    //texto
-                    //glTranslatef(IconSizeGS + gapGS, 0, 0);   
-                    //RenderObject2D(*Collections[c]->Objects[o]->name);  
+                    if (rowWidthObj > MaxPosXtemp) MaxPosXtemp = rowWidthObj;
+                    //std::cout << "caracteres obj: " << rowWidthObj << std::endl;
                 } 
             }
+            //este es el gap para la barra de desplazamiento de abajo
+            MaxPosYtemp -= marginGS;
+            //std::cout << "MaxPosXtemp: " << MaxPosXtemp << " width: " << width << std::endl;
             //std::cout << "sizeX: " << sizeX << " MaxPosY: "<< MaxPosY << std::endl;
             //std::cout << "Ancho: " << newW << " Alto: "<< newH << std::endl;
-            ResizeScrollbar(newW, newH, MaxPosX, MaxPosYtemp);
+            ResizeScrollbar(newW, newH, MaxPosXtemp, MaxPosYtemp);
         }
 
         void Render() override {
@@ -128,7 +117,13 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable  {
 
             //esto es para recortar y que no se ponga el texto encima de los ojos de la derecha
             glEnable(GL_SCISSOR_TEST);
-            glScissor(x, y, width - IconSizeGS - marginGS - borderGS -gapGS, height); // igual a tu viewport - los ojos
+            if (scrollX){
+                glScissor(x, y+ marginGS, width - IconSizeGS - marginGS - borderGS -gapGS, height - marginGS); // igual a tu viewport - los ojos
+
+            }
+            else {
+                glScissor(x, y, width - IconSizeGS - marginGS - borderGS -gapGS, height); // igual a tu viewport - los ojos
+            }
 
             RenglonesY = 0;  
             glPushMatrix();          
@@ -228,7 +223,9 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable  {
         }
 
         void event_mouse_wheel(SDL_Event &e) override {
+            MouseWheel = true;
             ScrollY(e.wheel.y*6*GlobalScale);
+            MouseWheel = false;
         }
 
         void FindMouseOver(int mx, int my){
