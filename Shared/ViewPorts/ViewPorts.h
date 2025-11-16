@@ -15,19 +15,13 @@ GLubyte indicesBorder[] = {
     8,9,12,12,9,13,   9,10,13,13,10,14,  10,11,14,14,11,15
 };
 
-GLubyte indicesScrollbarVertical[] = {
+GLubyte indicesScrollbar[] = {
     0,1,2, 2,1,3,
     2,3,4, 4,3,5,
     4,5,6, 6,5,7
 };
 
-GLubyte indicesScrollbarHorizontal[] = {
-    0,1,4, 4,1,5, 
-    1,2,5, 5,2,6,
-    2,3,6, 6,3,7
-};
-
-GLfloat ScrollbarHorizontalUV[16] = {
+GLfloat ScrollbarUV[16] = {
     0.0f, 0.0f,
     0.0f, 0.0f,
     0.0f, 0.0f,
@@ -38,29 +32,7 @@ GLfloat ScrollbarHorizontalUV[16] = {
     0.0f, 0.0f
 };
 
-GLfloat ScrollbarHorizontalBigUV[16] = {
-    0.0f, 0.0f,
-    0.0f, 0.0f,
-    0.0f, 0.0f,
-    0.0f, 0.0f,
-    0.0f, 0.0f,
-    0.0f, 0.0f,
-    0.0f, 0.0f,
-    0.0f, 0.0f
-};
-
-GLfloat ScrollbarVerticalUV[16] = {
-    0.0f, 0.0f,
-    0.0f, 0.0f,
-    0.0f, 0.0f,
-    0.0f, 0.0f,
-    0.0f, 0.0f,
-    0.0f, 0.0f,
-    0.0f, 0.0f,
-    0.0f, 0.0f
-};
-
-GLfloat ScrollbarVerticalBigUV[16] = {
+GLfloat ScrollbarBigUV[16] = {
     0.0f, 0.0f,
     0.0f, 0.0f,
     0.0f, 0.0f,
@@ -72,8 +44,8 @@ GLfloat ScrollbarVerticalBigUV[16] = {
 };
 
 void CalcScrollUV(int texW, int texH) {
-    GLfloat* uv = ScrollbarVerticalUV;
-    GLfloat* uvBig = ScrollbarVerticalBigUV;
+    GLfloat* uv = ScrollbarUV;
+    GLfloat* uvBig = ScrollbarBigUV;
 
     float VerticalU[2] = { 116.0f / texW, 119.0f / texW };
     float VerticalV[4] = { 109.0f / texH, 111.0f / texH, 112.0f / texH, 114.0f / texH };
@@ -180,9 +152,10 @@ class Scrollable {
         bool mouseOverScrollYpress = false;
         bool mouseOverScrollXpress = false;
 
-        float scrollHeight = 0.0f;;
-        float scrollPosFactor = 0.0f;;
+        float scrollPosFactor = 0.0f;
         float scrollDragFactor = 0.0f;
+        float scrollPosFactorX = 0.0f;
+        float scrollDragFactorX = 0.0f;
 
         GLshort scrollVerticalMesh[16] = { 
             0,0,   6,0,   12,0,   18,0,
@@ -232,7 +205,6 @@ class Scrollable {
             }
         }
 
-
         void ScrollMouseOver(ViewportBase* current, int mx, int my){
             mx -= current->x;
             //my -= y;
@@ -262,13 +234,17 @@ class Scrollable {
             scrollY = (MaxPosY < 0);
             scrollX = (MaxPosX < 0);
 
+
+            // mínimos y valores por defecto
+            int limite = borderGS + GlobalScale * 5 + borderGS;
+            
             // --- Cálculo proporcional del tamaño de la barra ---
+            float scrollHeight = 0.0f;
             if (MaxPosY < 0) {
                 float totalHeight = height - MaxPosY;   // altura total del contenido
                 float visibleHeight = height;           // lo que se ve
                 scrollHeight = visibleHeight * (visibleHeight / totalHeight);
                 // límite mínimo opcional
-                int limite = borderGS + GlobalScale*5 + borderGS;
                 if (scrollHeight < limite){
                     scrollHeight = limite;
                 } 
@@ -284,6 +260,37 @@ class Scrollable {
                 scrollDragFactor = 1;
             }
 
+            // --- Cálculo proporcional X (ancho de la barra horizontal) ---
+            float scrollWidthGlobal = 0.0f;
+            if (MaxPosX < 0) {
+                float totalWidth = width - MaxPosX;       // visible + overflow
+                float visibleWidth = (float)width;
+                float scrollWidth = visibleWidth * (visibleWidth / totalWidth);
+                if (scrollWidth < limite) scrollWidth = (float)limite;
+
+                float rangeContenidoX = -MaxPosX;             // cuánto se puede desplazar el contenido X
+                float rangeScrollX = (float)width - scrollWidth; // espacio horizontal para la barra
+                if (rangeContenidoX <= 0.0f || rangeScrollX <= 0.0f) {
+                    scrollPosFactorX = 0.0f;
+                    scrollDragFactorX = 1.0f;
+                } else {
+                    scrollPosFactorX = rangeScrollX / rangeContenidoX;
+                    scrollDragFactorX = rangeContenidoX / rangeScrollX;
+                }
+
+                // guardamos el scrollWidth en una variable global/externa si la necesitás luego
+                scrollWidthGlobal = (int)scrollWidth; // opcional, si usás una variable global
+            } else {
+                // no hay scroll horizontal
+                scrollWidthGlobal = width; // o scrollWidth = width si preferís float
+                scrollPosFactorX = 0.0f;
+                scrollDragFactorX = 1.0f;
+            }
+
+            //la abrra horizontal usa lo mismo que la vertical. pero los vertices estan en otra posicion
+            GLshort horizontalX[4] = { (GLshort)(borderGS+ 1*GlobalScale), (GLshort)(borderGS + 3*GlobalScale), (GLshort)(scrollWidthGlobal - 3*GlobalScale - borderGS), (GLshort)(scrollWidthGlobal - GlobalScale - borderGS) };
+            GLshort horizontalY[2] = { (GLshort)(height - GlobalScale - borderGS), (GLshort)(height - 4*GlobalScale - borderGS) };
+
             //cambia el tamaño del borde del viewportResizeBorder
             GLshort verticalU[2] = { (GLshort)(width - GlobalScale - borderGS), (GLshort)(width - 4*GlobalScale - borderGS) };
             GLshort verticalV[4] = { (GLshort)(borderGS+ 1*GlobalScale), (GLshort)(borderGS + 3*GlobalScale), (GLshort)(scrollHeight - 3*GlobalScale - borderGS), (GLshort)(scrollHeight - GlobalScale - borderGS) };
@@ -295,6 +302,9 @@ class Scrollable {
             int k = 0;
             for (int y = 0; y < 4; y++) {
                 for (int x = 0; x < 2; x++) {
+                    scrollHorizontalMesh[k++] = horizontalX[y];
+                    scrollHorizontalMesh[k++] = horizontalY[x];
+                    k-=2;
                     scrollVerticalMesh[k++] = verticalU[x];
                     scrollVerticalMesh[k++] = verticalV[y];
                     k-=2;
@@ -310,7 +320,7 @@ class Scrollable {
                 glTranslatef(0, (int)(-PosY * scrollPosFactor), 0);       
                 //si es la vista activa
                 if (current == viewPortActive && mouseOverScrollY){
-                    glTexCoordPointer(2, GL_FLOAT, 0, ScrollbarVerticalBigUV);
+                    glTexCoordPointer(2, GL_FLOAT, 0, ScrollbarBigUV);
                     glVertexPointer(2, GL_SHORT, 0, scrollVerticalBigMesh);
                     if (ViewPortClickDown && mouseOverScrollYpress){
                         glColor4f(ListaColores[accent][0], ListaColores[accent][1],
@@ -321,21 +331,21 @@ class Scrollable {
                     }
                 }
                 else {
-                    glTexCoordPointer(2, GL_FLOAT, 0, ScrollbarVerticalUV);
+                    glTexCoordPointer(2, GL_FLOAT, 0, ScrollbarUV);
                     glVertexPointer(2, GL_SHORT, 0, scrollVerticalMesh);
                     glColor4f(ListaColores[negro][0], ListaColores[negro][1],
                             ListaColores[negro][2], ListaColores[negro][3]);
                 }
 
-                glDrawElements(GL_TRIANGLES, 3*2*3, GL_UNSIGNED_BYTE, indicesScrollbarVertical);
+                glDrawElements(GL_TRIANGLES, 3*2*3, GL_UNSIGNED_BYTE, indicesScrollbar);
                 glPopMatrix();
             }
             if (scrollX){
                 glPushMatrix();          
-                glTranslatef((int)(-PosX * scrollPosFactor), 0, 0);       
+                glTranslatef((int)(-PosX * scrollPosFactorX), 0, 0);       
                 //si es la vista activa
                 if (current == viewPortActive && mouseOverScrollX){
-                    glTexCoordPointer(2, GL_FLOAT, 0, ScrollbarHorizontalBigUV);
+                    glTexCoordPointer(2, GL_FLOAT, 0, ScrollbarBigUV);
                     glVertexPointer(2, GL_SHORT, 0, scrollHorizontalBigMesh);
                     if (ViewPortClickDown && mouseOverScrollXpress){
                         glColor4f(ListaColores[accent][0], ListaColores[accent][1],
@@ -346,13 +356,13 @@ class Scrollable {
                     }
                 }
                 else {
-                    glTexCoordPointer(2, GL_FLOAT, 0, ScrollbarHorizontalUV);
+                    glTexCoordPointer(2, GL_FLOAT, 0, ScrollbarUV);
                     glVertexPointer(2, GL_SHORT, 0, scrollHorizontalMesh);
                     glColor4f(ListaColores[negro][0], ListaColores[negro][1],
                             ListaColores[negro][2], ListaColores[negro][3]);
                 }
 
-                glDrawElements(GL_TRIANGLES, 3*2*3, GL_UNSIGNED_BYTE, indicesScrollbarHorizontal);
+                glDrawElements(GL_TRIANGLES, 3*2*3, GL_UNSIGNED_BYTE, indicesScrollbar);
                 glPopMatrix();
             }
         }
@@ -412,6 +422,26 @@ class ViewportRow : public ViewportBase {
 
         ~ViewportRow(){ delete childA; delete childB; }
 
+        void SetSizeChildrens(int move){
+            int test_A = childA->width + move;
+            int test_B = childB->width - move;
+
+            //el viewport es menor a cierto tamaño y explotaria todo
+            if (test_A < MinViewportWidthGS || test_B < MinViewportWidthGS) return;
+
+            if (childA) {
+                //childA->x = x;
+                childA->width = childA->width + move;
+                childA->Resize(childA->width, childA->height);
+            }
+            if (childB) {
+                childB->x += move;
+                childB->width = childB->width - move;
+                childB->Resize(childB->width, childB->height);
+            }
+            splitFrac = (float)childA->width / (float)width;
+        }
+
         void Resize(int newW, int newH) override {
             width = newW;
             height = newH;
@@ -447,6 +477,19 @@ class ViewportRow : public ViewportBase {
 
             childA->Render();
             childB->Render();
+        }
+
+        void button_left() override {
+            leftMouseDown = true;
+            ViewPortClickDown = true;
+        }
+
+        void event_mouse_motion(int mx, int my) override {
+            if (leftMouseDown) {
+                ViewPortClickDown = true;
+                SetSizeChildrens(dx);
+                return;
+            }
         }
 };
 
@@ -492,12 +535,45 @@ class ViewportColumn : public ViewportBase {
             }
         }
 
+        void SetSizeChildrens(int move){
+            int test_A = childA->height - move;
+            int test_B = childB->height + move;
+
+            //el viewport es menor a cierto tamaño y explotaria todo
+            if (test_A < MinViewportHeightGS || test_B < MinViewportHeightGS) return;
+
+            if (childA) {
+                childA->height -= move;
+                childA->Resize(childA->width, childA->height);
+            }
+            if (childB) {
+                //se que es boludo. pero el b es el de arriba y no el de abajo
+                childB->y -= move;
+                childB->height += move;
+                childB->Resize(childB->width, childB->height);
+            }
+            splitFrac = (float)childA->height / (float)height;
+        }
+
         void Render() override {
             // If leaf, nothing to render here (or you could draw a background)
             if (isLeaf()) return;
 
             childA->Render();
             childB->Render();
+        }
+
+        void button_left() override {
+            leftMouseDown = true;
+            ViewPortClickDown = true;
+        }
+
+        void event_mouse_motion(int mx, int my) override {
+            if (leftMouseDown) {
+                ViewPortClickDown = true;
+                SetSizeChildrens(dy);
+                return;
+            }
         }
 };
 
@@ -512,7 +588,7 @@ ViewportBase* rootViewport = new ViewportRow(
     0.7f
 );
 
-ViewportBase* FindViewportUnderMouse(ViewportBase* vp, int mx, int my) {
+/*ViewportBase* FindViewportUnderMouse(ViewportBase* vp, int mx, int my) {
     if (!vp) return nullptr;
 
     // Si es un ViewportRow, revisar sus hijos
@@ -547,6 +623,90 @@ ViewportBase* FindViewportUnderMouse(ViewportBase* vp, int mx, int my) {
     }
 
     return nullptr;
+}*/
+
+ViewportBase* FindViewportUnderMouse(ViewportBase* vp, int mx, int my) {
+    if (!vp) return nullptr;
+
+    const int PADDING = paddingViewportGS;
+
+    auto isInside = [&](ViewportBase* v) {
+        return mx >= v->x && mx < v->x + v->width &&
+               my >= v->y && my < v->y + v->height;
+    };
+
+    auto isInPadding = [&](ViewportBase* a, ViewportBase* b, bool isRow) {
+        if (!a || !b) return false;
+
+        if (isRow) {
+            // Padding horizontal entre childA y childB
+            int splitX = a->x + a->width;
+            if (mx >= splitX - PADDING && mx < splitX + PADDING &&
+                my >= a->y && my < a->y + a->height) 
+            {
+                //std::cout << "[ROW] Mouse está entre A y B (zona de resize horizontal)\n";
+                return true;
+            }
+        } else {
+            // Padding vertical entre childA y childB
+            int splitY = a->y + a->height;
+            if (my >= splitY - PADDING && my < splitY + PADDING &&
+                mx >= a->x && mx < a->x + a->width) 
+            {
+                //std::cout << "[COLUMN] Mouse está entre A y B (zona de resize vertical)\n";
+                return true;
+            }
+        }
+        return false;
+    };
+
+    // -----------------------------
+    // ViewportRow (divide en columnas)
+    // -----------------------------
+    if (auto row = dynamic_cast<ViewportRow*>(vp)) {
+
+        // ¿Está el mouse sobre la línea entre A y B?
+        if (isInPadding(row->childA, row->childB, true))
+            return vp;
+
+        // Normal: buscar hijos
+        if (row->childA && isInside(row->childA))
+            return FindViewportUnderMouse(row->childA, mx, my);
+
+        if (row->childB && isInside(row->childB))
+            return FindViewportUnderMouse(row->childB, mx, my);
+    }
+
+    // -----------------------------
+    // ViewportColumn (divide en filas)
+    // -----------------------------
+    else if (auto col = dynamic_cast<ViewportColumn*>(vp)) {
+
+        // ¿Está el mouse sobre la línea entre A y B?
+        if (isInPadding(col->childA, col->childB, false))
+            return vp;
+
+        if (col->childA && isInside(col->childA))
+            return FindViewportUnderMouse(col->childA, mx, my);
+
+        if (col->childB && isInside(col->childB))
+            return FindViewportUnderMouse(col->childB, mx, my);
+    }
+
+    // Viewport final (sin hijos)
+    else if (vp->Contains(mx, my)) {
+        // Verificar borde del viewport base (padding externo)
+        if (mx <= vp->x + PADDING || mx >= vp->x + vp->width - PADDING ||
+            my <= vp->y + PADDING || my >= vp->y + vp->height - PADDING)
+        {
+            //std::cout << "[VIEWPORT] Mouse en el padding externo del viewport\n";
+            return nullptr;
+        }
+
+        return vp;
+    }
+
+    return nullptr;
 }
 
 void SetGlobalScale(int scale){
@@ -557,7 +717,11 @@ void SetGlobalScale(int scale){
     RenglonHeightGS = RenglonHeight * scale;
     borderGS = border * scale;
     LetterWidthGS = LetterWidth * scale;
-    LetterHeightGS = LetterHeight * scale;
+    LetterHeightGS = LetterHeight * scale;    
+    paddingViewportGS = paddingViewport * scale;
+    MinViewportHeightGS = MinViewportHeight * scale;
+    MinViewportWidthGS = MinViewportWidth * scale;
+
     SetIconScale(scale);
 
     for (size_t i = 0; i < Collections.size(); i++) {                  

@@ -6,6 +6,9 @@ int gap = 5;
 int RenglonHeight = 12;
 int LetterWidth = 6;
 int LetterHeight = 11;
+int paddingViewport = 3;
+int MinViewportHeight = 30;
+int MinViewportWidth = 30;
 
 //precalculos con el global scale para ahorrar multiplicaciones
 int marginGS = margin;
@@ -15,6 +18,9 @@ int borderGS = border;
 int RenglonHeightGS = RenglonHeight;
 int LetterWidthGS = LetterWidth;
 int LetterHeightGS = LetterHeight;
+int paddingViewportGS = paddingViewport;
+int MinViewportHeightGS = MinViewportHeight;
+int MinViewportWidthGS = MinViewportWidth;
 
 //mouse, se usa en controles... pero tambien necesario en la UI y viewport. por eso esta aca
 int dx = 0;

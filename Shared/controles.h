@@ -39,9 +39,10 @@ void InputUsuarioSDL3(SDL_Event &e){
     // Botones del mouse
     if (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
 		ViewPortClickDown = true;
-		if (e.button.button == SDL_BUTTON_LEFT) {  
+		if (e.button.button == SDL_BUTTON_LEFT) { 
             leftMouseDown = true;
 			viewPortActive->button_left();
+            GuardarMousePos();
 		}
         else if (e.button.button == SDL_BUTTON_MIDDLE) {  // rueda clic
             middleMouseDown = true;
