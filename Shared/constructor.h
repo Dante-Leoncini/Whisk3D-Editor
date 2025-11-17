@@ -28,6 +28,7 @@ void ConstructUniversal(){
     CalcBorderUV(128, 128);
     CalcScrollUV(128, 128);
     SetGlobalScale(3);
+    InitCursors();
 
     Collection* colec = new Collection(nullptr, "Collection");
     Collections.push_back(colec);
@@ -48,7 +49,7 @@ void ConstructUniversal(){
 
     AddMesh(cubo);
 
-    Collection* colec2 = new Collection(nullptr, "Collection_Test");
+    /*Collection* colec2 = new Collection(nullptr, "Collection_Test");
     Collections.push_back(colec2);
     CollectionActive = 1;
     
@@ -68,5 +69,5 @@ void ConstructUniversal(){
     AddMesh(cubo);
     AddMesh(cubo);
     AddMesh(cubo);
-    AddMesh(cubo);
+    AddMesh(cubo);*/
 }

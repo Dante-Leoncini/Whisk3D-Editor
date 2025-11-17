@@ -144,7 +144,6 @@ class CWhisk3D : public CFiniteStateMachine, public MTextureLoadingListener
         void CalculateMillisecondsPerFrame(TInt aFPS);
         
         void ReestablecerEstado();
-        void SeleccionarTodo();
         void SetEje( TInt eje );     
         void AddMesh( TInt modelo );
         void CursorToWorldOrigin();
@@ -210,7 +209,6 @@ class CWhisk3D : public CFiniteStateMachine, public MTextureLoadingListener
         void TecladoNumerico(TInt numero);
         void InsertarValor();
         void SetCameraToView();
-        void DeseleccionarTodo();
         void ImportOBJ();
 
         void SetTrackTo();

@@ -106,3 +106,18 @@ int valorRotacion = 0;
 std::vector<ShapeKeyAnimation> ShapeKeyAnimations;
 
 int NumTexturasWhisk3D = 0;
+
+//para los cursores de SDL3, puede que no sea bueno tenerlo aca...
+SDL_Cursor* cursorDefault;
+SDL_Cursor* cursorRotate;
+SDL_Cursor* cursorScaleVertical;
+SDL_Cursor* cursorScaleHorizontal;
+SDL_Cursor* cursorTranslate;
+
+void InitCursors() {
+    cursorDefault   = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_DEFAULT);
+    cursorTranslate = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_MOVE);
+    cursorRotate    = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_CROSSHAIR);
+    cursorScaleVertical   = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_NS_RESIZE);
+	cursorScaleHorizontal = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_EW_RESIZE);
+}

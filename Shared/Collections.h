@@ -25,6 +25,32 @@ class Collection {
             }     
         }
 
+        bool SeleccionarTodo(){
+            /*for(size_t o=0; o < Objects.size(); o++){
+                if (Objects[o]->select){
+                    return true;
+                }
+                Objects[o]->select = true;
+                Objects[o]->SelectActivo = false;	
+            }*/
+            for(size_t c=0; c < Collections.size(); c++){
+                if (Collections[c]->select){
+                    return true;
+                }
+                Collections[c]->select = true;
+                Collections[c]->SelectActivo = false;
+                for(size_t cc=0; cc < Collections.size(); cc++){
+                    if (Collections[cc]->select){
+                        return true;
+                    }
+                    if (Collections[cc]->SeleccionarTodo()){
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
 		~Collection() {
 			delete name;
 		}
@@ -44,6 +70,19 @@ void DeseleccionarTodo(){
 		}
         SelectCount = 0;
 	}
+}
+
+void SeleccionarTodo(){
+    //recorre las colecciones y selecciona todo. si llega a encontrar algo hace lo contrario. deselecciona todo
+	if (InteractionMode == ObjectMode){
+        for(size_t c=0; c < Collections.size(); c++){
+            //habia algo seleccionado... asi que hacemos lo contrario. deseleccionar todo
+            if (Collections[c]->SeleccionarTodo()){
+                DeseleccionarTodo();
+                return;
+            }
+        }
+    }
 }
 
 //outliner

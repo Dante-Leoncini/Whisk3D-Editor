@@ -784,10 +784,6 @@ class Viewport3D : public ViewportBase, public WithBorder  {
             ReloadViewport();
         }
 
-        void ClickA(){
-            posX+= 1.0;
-        }
-
         // Método para actualizar cache
         void UpdatePrecalculos() {
             precalculado.radY = rotY * M_PI / 180.0f;
@@ -850,7 +846,7 @@ class Viewport3D : public ViewportBase, public WithBorder  {
                         TeclaAbajo();
                         break;	
                     case SDLK_A:  
-                        ClickA();
+                        SeleccionarTodo();
                         break;
                     case SDLK_D:
                         ClickD();
@@ -940,7 +936,7 @@ class Viewport3D : public ViewportBase, public WithBorder  {
                         TeclaAbajo();
                         break;
                     case SDLK_A:   // Flecha derecha
-                        ClickA();
+                        SeleccionarTodo();
                         break;
                     case SDLK_E:   // Flecha derecha
                         ClickE();

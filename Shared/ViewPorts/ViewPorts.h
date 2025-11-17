@@ -645,6 +645,7 @@ ViewportBase* FindViewportUnderMouse(ViewportBase* vp, int mx, int my) {
                 my >= a->y && my < a->y + a->height) 
             {
                 //std::cout << "[ROW] Mouse está entre A y B (zona de resize horizontal)\n";
+                SDL_SetCursor(cursorScaleHorizontal);
                 return true;
             }
         } else {
@@ -654,9 +655,11 @@ ViewportBase* FindViewportUnderMouse(ViewportBase* vp, int mx, int my) {
                 mx >= a->x && mx < a->x + a->width) 
             {
                 //std::cout << "[COLUMN] Mouse está entre A y B (zona de resize vertical)\n";
+                SDL_SetCursor(cursorScaleVertical);
                 return true;
             }
         }
+        SDL_SetCursor(cursorDefault);
         return false;
     };
 

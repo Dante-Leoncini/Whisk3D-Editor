@@ -1038,28 +1038,6 @@ void CWhisk3D::InvertirSeleccion(){
 	redibujar = true;
 }
 
-void CWhisk3D::SeleccionarTodo(){
-	TBool TodoSeleccionado = true;
-	if (InteractionMode == ObjectMode){
-		for(int o=0; o < Objects.Count(); o++){
-			if (!Objects[o].seleccionado){
-				TodoSeleccionado = false;
-			}	
-		}
-		//solo si esta todo seleccionado hace lo contrario
-		if (TodoSeleccionado){
-			SelectCount = 0;
-		}
-		else {
-			SelectCount = Objects.Count();
-		}
-		for(int o=0; o < Objects.Count(); o++){
-			Objects[o].seleccionado = !TodoSeleccionado;
-		}
-	}
-	redibujar = true;
-}
-
 // Convierte grados a radianes
 GLfloat CWhisk3D::GradosARadianes(TInt grados) {
     return grados * (PI / 180.0);
