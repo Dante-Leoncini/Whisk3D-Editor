@@ -17,13 +17,14 @@ class Material {
 		GLfloat emission[4] = {0.0f, 0.0f, 0.0f, 1.0f};
         Object2D* name = nullptr;
 
-        Material(const std::string& nombre, bool MaterialDefecto = false, bool vertexColor = false) 
-		: vertexColor(vertexColor){
+        Material(const std::string& nombre, bool MaterialDefecto = false, bool TieneVertexColor = false) {
             name = AddObject2D(UI::text);
             reinterpret_cast<Text*>(name->data)->SetValue(nombre);
 			if (!MaterialDefecto){
+				//std::cout << "Nuevo Material: " << nombre << std::endl;
 				Materials.push_back(this);
 			}
+			vertexColor = TieneVertexColor;
         }
 
 		~Material() {
@@ -35,8 +36,10 @@ Material* MaterialDefecto;
 std::vector<Material*> Materials;
 
 Material* BuscarMaterialPorNombre(const std::string& name) {
-    for (size_t i = 0; i < Materials.size(); ++i)
+    for (size_t i = 0; i < Materials.size(); ++i){
         if (reinterpret_cast<Text*>(Materials[i]->name->data)->value == name) return Materials[i];
+		//std::cout << "name: " << name << " material: " << reinterpret_cast<Text*>(Materials[i]->name->data)->value << std::endl;
+	}
     return nullptr;
 }
 

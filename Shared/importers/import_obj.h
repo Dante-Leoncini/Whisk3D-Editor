@@ -832,13 +832,13 @@ bool LeerOBJ(std::ifstream& file,
         else if (line.rfind("v ", 0) == 0) {
             std::istringstream ss(line.substr(2));
 			double x, y, z, r, g, b, a;
-			bool hasColor = false;
 
 			ss >> x >> y >> z; // siempre están
 
 			// leer hasta 4 valores extra
 			if (ss >> r >> g >> b) {
-				hasColor = true;
+				//std::cout << "Tiene vertex color!" << std::endl;
+				TieneVertexColor = true;
 				if (ss >> a) {
 					// tiene alpha también
 				} else {
@@ -853,12 +853,6 @@ bool LeerOBJ(std::ifstream& file,
 			Wobj.vertex.push_back((GLfloat)(x));
 			Wobj.vertex.push_back((GLfloat)(y));
 			Wobj.vertex.push_back((GLfloat)(z));
-			/*Wobj.vertex.push_back((short)(x * 2000));
-			Wobj.vertex.push_back((short)(y * 2000));
-			Wobj.vertex.push_back((short)(z * 2000));*/
-			/*Wobj.vertex.push_back((short)(x*250));
-			Wobj.vertex.push_back((short)(y*250));
-			Wobj.vertex.push_back((short)(z*250));*/
 
 			// color con saturación
 			auto saturar = [](double v) { 
@@ -874,10 +868,6 @@ bool LeerOBJ(std::ifstream& file,
 			Wobj.vertexColor.push_back(saturar(a));
 
 			acumuladoVerticesProximo++;
-
-			if (hasColor) {
-				TieneVertexColor = true;
-			}
         }
         else if (line.rfind("vn ", 0) == 0) {
             std::istringstream ss(line.substr(3));
@@ -956,7 +946,7 @@ bool LeerOBJ(std::ifstream& file,
 
 			// si no existe, crea uno nuevo
 			if (!materialPuntero) {
-				materialPuntero = new Material(matName, TieneVertexColor);
+				materialPuntero = new Material(matName, false, TieneVertexColor);
 			}
 
 			// crea el MaterialGroup usando el índice correcto
@@ -1261,18 +1251,13 @@ bool LeerMTL(const std::string& filepath, int objetosCargados) {
 
     while (std::getline(file, line)) {
         if (line.rfind("newmtl ", 0) == 0) {
-            std::string matName = line.substr(7);
+			std::string matName = line.substr(7); // toma el nombre del material
             // Buscar material existente
-            mat = nullptr;
-            for (auto* m : Materials) {
-				Text* t = reinterpret_cast<Text*>(m->name->data);
-				if (t->value == matName) {
-					mat = m;
-					break;
-				}
-			}
-            if (!mat) {
-                // si no existe, crear uno nuevo
+            mat = BuscarMaterialPorNombre(matName);
+
+			// si no existe, crea uno nuevo
+			if (!mat) {
+				std::cout << "LeerMTL: Material no encontrado! " << matName << std::endl;
 				mat = new Material(matName);
                 Materials.push_back(mat);
             }
@@ -1319,6 +1304,7 @@ bool LeerMTL(const std::string& filepath, int objetosCargados) {
 					// Enlazar al material actual
 					mat->textura = true;
 					mat->textureID = texid;
+                    //std::cerr << "textura " << texPath << " ID: " << texid << "\n";
                 } 
                 else {
                     std::cerr << "Error cargando textura: " << texPath << "\n";
