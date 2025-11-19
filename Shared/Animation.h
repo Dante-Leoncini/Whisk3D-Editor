@@ -1,3 +1,25 @@
+class ShapeKeyVertex { 
+	public:
+		int index;
+		GLshort vertexX;
+		GLshort vertexY;
+		GLshort vertexZ;
+		GLbyte normalX;
+		GLbyte normalY;
+		GLbyte normalZ;
+};
+
+class ShapeKey { 
+	public:
+		std::vector<ShapeKeyVertex> Vertex;
+};
+
+class Animation { 
+	public:
+		std::vector<ShapeKey> Frames;
+		int MixSpeed;
+};
+
 // Variables globales
 bool PlayAnimation = true;
 int StartFrame = 1;
@@ -104,43 +126,43 @@ std::vector<AnimationObject> AnimationObjects;
 
 int BuscarAnimacionObj(){
 	int index = -1;
-    for(size_t a = 0; a < AnimationObjects.size(); a++) {
+    /*for(size_t a = 0; a < AnimationObjects.size(); a++) {
 		if (AnimationObjects[a].obj == SelectActivo){
 			index = a;
 			break;
 		}
-	}
+	}*/
 	return index;
 }
 
 int BuscarAnimProperty(int indice, int propertySelect){
 	int index = -1;
-	for(size_t pr = 0; pr < AnimationObjects[indice].Propertys.size(); pr++) {		
+	/*for(size_t pr = 0; pr < AnimationObjects[indice].Propertys.size(); pr++) {		
 		if (AnimationObjects[indice].Propertys[pr].Property == propertySelect){	
 			index = pr;
 			break;
 		}
-	}
+	}*/
 	return index;
 }
 
-int BuscarShapeKeyAnimation(int ID, bool mostrarError) {
-    for (size_t ska = 0; ska < ShapeKeyAnimations.size(); ++ska) {
-        if (ShapeKeyAnimations[ska].Id == ID) {
+int BuscarShapeKeyAnimation(Object* obj, bool mostrarError) {
+    /*for (size_t ska = 0; ska < ShapeKeyAnimations.size(); ++ska) {
+        if (ShapeKeyAnimations[ska].obj == obj) {
             return static_cast<int>(ska);
         }
     }
 
     if (mostrarError) {
         std::cerr << "Error: El objeto no tiene animacion" << std::endl;
-    }
+    }*/
 
     return -1;
 }
 
 void ReloadAnimation() {		
     // ShapeKeyAnimation
-    for (size_t ska = 0; ska < ShapeKeyAnimations.size(); ska++) {
+    /*for (size_t ska = 0; ska < ShapeKeyAnimations.size(); ska++) {
         Mesh& pMesh = Meshes[ShapeKeyAnimations[ska].Id];
         ShapeKeyAnimation& animState = ShapeKeyAnimations[ska];
 
@@ -324,7 +346,7 @@ void ReloadAnimation() {
         }
     }
 
-    ReloadViewport();
+    ReloadViewport();*/
 }
 
 /*void CWhisk3D::ReloadAnimation(){		

@@ -9,14 +9,14 @@ class Viewport3D : public ViewportBase, public WithBorder  {
         bool orthographic = false;
         bool SimularZBuffer = false;
         bool ViewFromCameraActive = false;
-        float nearClip = 10.0f;
-        float farClip = 2000.0f;
-        int cameraDistance = 270;
-        float aspect = 1.0f;
+        GLfloat nearClip = 0.01f;
+        GLfloat farClip = 1000.0f;
+        GLfloat cameraDistance = 10.0f;
+        GLfloat aspect = 1.0f;
         GLfloat posX = 0.0f;
         GLfloat posY = 0.0f;
         GLfloat posZ = 0.0f;
-        GLfloat rotX = 113.5;
+        GLfloat rotX = 23.5;
         GLfloat rotY = 20.0;
         GLfloat PivotX = 0.0f;
         GLfloat PivotY = 0.0f;
@@ -31,11 +31,8 @@ class Viewport3D : public ViewportBase, public WithBorder  {
         }
 
         void Render() override {
-            glEnable(GL_DEPTH_TEST); // Habilitar z-buffer
-	        glViewport(x, y, width, height); // x, y, ancho, alto
-            glMatrixMode( GL_PROJECTION );
-            glLoadIdentity();
-            // Proyección ortográfica
+            glMatrixMode(GL_PROJECTION);
+            glLoadIdentity();        
 
             if ( orthographic ){
                 float size = 90.0f;
@@ -46,8 +43,14 @@ class Viewport3D : public ViewportBase, public WithBorder  {
             else {
                 gluPerspective(fovDeg, aspect, nearClip, farClip);
             }
-            glMatrixMode( GL_MODELVIEW );
 
+            // 1. Matriz limpia
+            glMatrixMode(GL_MODELVIEW);
+            glLoadIdentity();
+
+            // Limpiar pantalla
+            glEnable(GL_SCISSOR_TEST);
+            glScissor(x, y, width, height); // igual a tu viewport
             //Empieza el render
             if (SimularZBuffer){
                 glClearColor(0.0f, 0.0f, 0.0f, 1.0f); // Color negro
@@ -62,18 +65,30 @@ class Viewport3D : public ViewportBase, public WithBorder  {
                 glDisable(GL_FOG);
                 glClearColor(ListaColores[background][0],ListaColores[background][1],ListaColores[background][2],ListaColores[background][3]);
             }
-
-            // Limpiar pantalla
-            glEnable(GL_SCISSOR_TEST);
-            glScissor(x, y, width, height); // igual a tu viewport
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);            
             glDisable(GL_SCISSOR_TEST);
 
-            glLoadIdentity();
-            glEnable( GL_DEPTH_TEST );	
+	        glViewport(x, y, width, height); // x, y, ancho, alto    
+
+            glEnable(GL_DEPTH_TEST);
+            glDisable( GL_CULL_FACE );
+            glDisable( GL_LIGHTING );
+            glDisable( GL_TEXTURE_2D );
+            glDisable( GL_BLEND );
+            glDisable(GL_COLOR_MATERIAL);
+
+            glEnableClientState(GL_VERTEX_ARRAY);
+            glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+            glDisableClientState(GL_NORMAL_ARRAY);
 
             if (ViewFromCameraActive){
                 RecalcViewPos();
+            } 
+
+            // estas son luces que se mueven con la camara
+            if (view == RenderType::Solid || view == RenderType::MaterialPreview){
+                glEnable(GL_LIGHT0);
+                glLightfv(GL_LIGHT0, GL_POSITION, sunLightPosition);
             }
 
             glTranslatef( posX, posZ, -cameraDistance+posY );
@@ -81,53 +96,168 @@ class Viewport3D : public ViewportBase, public WithBorder  {
             //original
             glRotatef(rotY, 1, 0, 0); //angulo, X Y Z
             glRotatef(rotX, 0, 1, 0); //angulo, X Y Z
-            glScalef(1024.0f / 65536.0f, 1024.0f / 65536.0f, 1024.0f / 65536.0f);
+            //glScalef(1024.0f / 65536.0f, 1024.0f / 65536.0f, 1024.0f / 65536.0f);
             glTranslatef( PivotX, PivotZ, PivotY);
 
-            //primero hay que colocar las luces en caso de estar en modo render!
-            if ((!SimularZBuffer && view == MaterialPreview) || view == Rendered){
-                for (size_t c = 0; c < Collections.size(); c++) {
-                    for (size_t o = 0; o < Collections[c]->Objects.size(); o++) {
-                        Object& obj = *Collections[c]->Objects[o];
-                        if(!obj.visible || obj.type != light ) {continue;}
-                        Light& light = Lights[obj.Id];
+            //las luces que se coloquen ACA se colocan en el mundo
+            if (view == RenderType::Rendered){
+                /*for (size_t c = 0; c < Objects.size(); c++) {
+                    for (size_t o = 0; o < Objects[c]->Childrens.size(); o++) {
+                        if(Objects[c]->Childrens[o]->getType() != ObjectType::light ) {continue;}
+                        Light* light = static_cast<Light*>(Objects[c]->Childrens[o]);
+
+                        if (light->lightId != -1) continue;
+
+                        if (Objects[c]->Childrens[o]->visible){
+
+                        if (light->lightId != -1) {
+                            glEnable(light->lightId);
+
+                            glPushMatrix();
+                            glTranslatef(light->posX, light->posZ, light->posY);
+
+                            GLfloat lightPos[] = {0, 0, 0, 1}; // puntual
+                            glLightfv(light->lightId, GL_POSITION, lightPos);
+
+                            glLightfv(light->lightId, GL_DIFFUSE, light->color);
+                            glLightfv(light->lightId, GL_SPECULAR, light->color);
+
+                            glPopMatrix();
+                        }
+
+                        }
 
                         glPushMatrix(); //guarda la matrix
-                        glTranslatef( obj.posX, obj.posZ, obj.posY);
+                        glTranslatef( light->posX, light->posZ, light->posY);
                         GLfloat lightPos[] = {0.0f, 0.0f, 0.0f, 1.0f}; // Luz puntual en la posici�n transformada
-                        glLightfv(light.lightId, GL_POSITION, lightPos);
+                        glLightfv(light->lightId, GL_POSITION, lightPos);
                         //glLightfv(  light.lightId, GL_POSITION, positionPuntualLight );
                         glPopMatrix(); //reinicia la matrix a donde se guardo  
                     }	
-                }
+                }*/
             }
-
-            //por defecto la linea es de 1	
-            glLineWidth(1);	
-            glEnableClientState(GL_NORMAL_ARRAY);
             
-            //bucle que dibuja cada objeto en orden
-            if(Meshes.size() > 0){
-                // Funcion principal para iterar sobre la coleccion
-                for (size_t c = 0; c < Collections.size(); c++) {
-                    for (size_t o = 0; o < Collections[c]->Objects.size(); o++) {
-                        //std::cout << "Coleccion " << (c+1) << " obj: " << (o+1) << std::endl;
-                        Object& obj = *Collections[c]->Objects[o];
-                        RenderMeshAndChildren(obj);
-                    }
-                }
+            //se encarga de dibujar el layout 
+            if (showOverlays){
+                glMaterialfv(   GL_FRONT_AND_BACK, GL_DIFFUSE,  ListaColores[negro] );
+                glMaterialfv(   GL_FRONT_AND_BACK, GL_AMBIENT,  ListaColores[negro] );
+                glMaterialfv(   GL_FRONT_AND_BACK, GL_SPECULAR, ListaColores[negro] );
+
+                glDisable( GL_CULL_FACE ); // Enable back face culling.
+                glDisable( GL_LIGHTING );
+                glEnable(GL_COLOR_MATERIAL);
+                glDisable( GL_BLEND );
+
+                glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+                glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+                glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
+
+                glEnable(GL_DEPTH_TEST);
+                glDisable( GL_TEXTURE_2D );
+
+                glDisableClientState(GL_COLOR_ARRAY);
+                glEnableClientState(GL_VERTEX_ARRAY);
+                glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+                glDisableClientState(GL_NORMAL_ARRAY);
+
+                if (showFloor || showXaxis || showYaxis) RenderFloor();
+                if (Objects.size() > 0 && 
+                   (estado == translacion || estado == rotacion || estado == EditScale)) RenderAxisTransform();
+            }
+          
+            // Funcion que renderiza cada objeto de forma recursiva
+            for (size_t o = 0; o < Objects.size(); o++) {
+                Objects[o]->Render();
+            }
+            
+            //se encarga de dibujar el layout 
+            if (showOverlays) RenderOverlay();
+
+            //dibuja la UI
+            if (ShowUi) RenderUI();
+        }
+
+        //dibuja el piso
+        void RenderFloor(){
+            glEnable(GL_FOG);
+            glFogf(GL_FOG_MODE, GL_LINEAR); // Tipo de niebla lineal
+            glFogf(GL_FOG_START, nearClip);  // Distancia inicial de la niebla
+            glFogf(GL_FOG_END, 800.0f);     // Distancia final de la niebla
+            glFogfv(GL_FOG_COLOR, ListaColores[background]); // Color de la niebla DEL piso. que es mas pequeña que otros fog
+            glLineWidth(1);	 
+
+            glVertexPointer( 3, GL_FLOAT, 0, objVertexdataFloor );
+            	
+            glColor4f(
+                ListaColores[LineaPiso][0],
+                ListaColores[LineaPiso][1],
+                ListaColores[LineaPiso][2],
+                ListaColores[LineaPiso][3]
+            );
+            glDrawElements( GL_LINES, objFacesFloor, GL_UNSIGNED_SHORT, objFacedataFloor );		
+
+            //linea Roja
+            if (showXaxis){				
+                glLineWidth(2);
+                glColor4f(
+                    ListaColores[LineaPisoRoja][0],
+                    ListaColores[LineaPisoRoja][1],
+                    ListaColores[LineaPisoRoja][2],
+                    ListaColores[LineaPisoRoja][3]
+                );
+                glDrawElements( GL_LINES, 2, GL_UNSIGNED_SHORT, EjeRojo );
+                glLineWidth(1);	//la deja como es por defecto
+            }
+            else if (showFloor){
+                glColor4f(
+                    ListaColores[LineaPiso][0],
+                    ListaColores[LineaPiso][1],
+                    ListaColores[LineaPiso][2],
+                    ListaColores[LineaPiso][3]
+                );
+                glDrawElements( GL_LINES, 2, GL_UNSIGNED_SHORT, EjeRojo );
             }
 
-            //el valor que tiene que tener para dibujar el resto correctamente
-            //glDisable(GL_COLOR_MATERIAL);
-            glDisableClientState( GL_COLOR_ARRAY );
+            //linea Verde	
+            if (showYaxis){
+                glLineWidth(2);
+                glColor4f(
+                    ListaColores[LineaPisoVerde][0],
+                    ListaColores[LineaPisoVerde][1],
+                    ListaColores[LineaPisoVerde][2],
+                    ListaColores[LineaPisoVerde][3]
+                );
+                glDrawElements( GL_LINES, 2, GL_UNSIGNED_SHORT, EjeVerde );
+                glLineWidth(1);	//la deja como es por defecto
+            }
+            else if (showFloor){
+                glColor4f(
+                    ListaColores[LineaPiso][0],
+                    ListaColores[LineaPiso][1],
+                    ListaColores[LineaPiso][2],
+                    ListaColores[LineaPiso][3]
+                );
+                glDrawElements( GL_LINES, 2, GL_UNSIGNED_SHORT, EjeVerde );
+            }	
+            glDisable(GL_FOG);
+        }
 
-            //fin del dibujado de objetos
-            //si estaba simulando el zbuffer. el resto no hace falta
-            if (SimularZBuffer){		
-                return;
-            };
+        //dibuja los ejes de transformacion
+        void RenderAxisTransform(){ 
+            glLineWidth(2);	 
 
+            for (size_t c = 0; c < Objects.size(); c++) {
+                bool found = false;
+                for (size_t o = 0; o < Objects[c]->Childrens.size(); o++) {
+                    Object& obj = *Objects[c]->Childrens[o];
+                    SearchSelectObj(obj, found);
+                    //voy a cambiarlo para que si se esta modificando individualmente. todos tengan su ejes de transformacion
+                    if (found) break;
+                }
+            }
+        }
+
+        void RenderOverlay(){
             //el resto de objetos no usan materiales ni luces
             glMaterialfv(   GL_FRONT_AND_BACK, GL_DIFFUSE,  ListaColores[negro] );
             glMaterialfv(   GL_FRONT_AND_BACK, GL_AMBIENT,  ListaColores[negro] );
@@ -135,209 +265,137 @@ class Viewport3D : public ViewportBase, public WithBorder  {
             glDisable( GL_CULL_FACE ); // Enable back face culling.
             glDisable( GL_LIGHTING );
             glEnable(GL_COLOR_MATERIAL);
-            glDisable( GL_TEXTURE_2D );
+            glDisableClientState( GL_COLOR_ARRAY );
             glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
             glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
             glEnable( GL_BLEND );
             glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
-            
-            //se encarga de dibujar el layout 
-            if (showOverlays){
-                //dibujar las lineas del piso y el piso
-                if (showFloor || showXaxis || showYaxis){
-                    glEnable(GL_FOG);
-                    glFogf(GL_FOG_MODE, GL_LINEAR); // Tipo de niebla lineal
-                    glFogf(GL_FOG_START, nearClip);  // Distancia inicial de la niebla
-                    glFogf(GL_FOG_END, 800.0f);     // Distancia final de la niebla
-                    //GLfloat fogColor[] = {0.23f, 0.23f, 0.23f, 1.f};
-                    //glClearColor( ClearColor[0], ClearColor[1], ClearColor[2], 1.f );
-                    glFogfv(GL_FOG_COLOR, ListaColores[background]); // Color de la niebla DEL piso. que es mas pequeña que otros fog
-                    glLineWidth(1);	 
 
-                    glVertexPointer( 3, GL_SHORT, 0, objVertexdataFloor );
-                    //glNormalPointer( GL_BYTE, 0, objNormaldataFloor );
+            glEnable(GL_DEPTH_TEST);
+            glDisable( GL_TEXTURE_2D );
 
-                    //dibuja el piso	
-                    if (showFloor){
-                        glColor4f(
-                            ListaColores[LineaPiso][0],
-                            ListaColores[LineaPiso][1],
-                            ListaColores[LineaPiso][2],
-                            ListaColores[LineaPiso][3]
-                        );
-                        glDrawElements( GL_LINES, objFacesFloor, GL_UNSIGNED_SHORT, objFacedataFloor );		
-                    }	
-                    //linea Roja
-                    if (showXaxis){				
-                        glLineWidth(2);
-                        glColor4f(
-                            ListaColores[LineaPisoRoja][0],
-                            ListaColores[LineaPisoRoja][1],
-                            ListaColores[LineaPisoRoja][2],
-                            ListaColores[LineaPisoRoja][3]
-                        );
-                        glDrawElements( GL_LINES, 2, GL_UNSIGNED_SHORT, EjeRojo );
-                        glLineWidth(1);	//la deja como es por defecto
-                    }
-                    else if (showFloor){
-                        glColor4f(
-                            ListaColores[LineaPiso][0],
-                            ListaColores[LineaPiso][1],
-                            ListaColores[LineaPiso][2],
-                            ListaColores[LineaPiso][3]
-                        );
-                        glDrawElements( GL_LINES, 2, GL_UNSIGNED_SHORT, EjeRojo );
-                    }
-                    //linea Verde	
-                    if (showYaxis){
-                        glLineWidth(2);
-                        glColor4f(
-                            ListaColores[LineaPisoVerde][0],
-                            ListaColores[LineaPisoVerde][1],
-                            ListaColores[LineaPisoVerde][2],
-                            ListaColores[LineaPisoVerde][3]
-                        );
-                        glDrawElements( GL_LINES, 2, GL_UNSIGNED_SHORT, EjeVerde );
-                        glLineWidth(1);	//la deja como es por defecto
-                    }
-                    else if (showFloor){
-                        glColor4f(
-                            ListaColores[LineaPiso][0],
-                            ListaColores[LineaPiso][1],
-                            ListaColores[LineaPiso][2],
-                            ListaColores[LineaPiso][3]
-                        );
-                        glDrawElements( GL_LINES, 2, GL_UNSIGNED_SHORT, EjeVerde );
-                    }	
-                    glDisable(GL_FOG);
-                }
+            glEnableClientState(GL_VERTEX_ARRAY);
+            glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+            glDisableClientState(GL_NORMAL_ARRAY);     
 
-                //esto solo se hace si hay objetos
-                if (ObjectsCount){
-                    //dibujo de objetos nuevo!
-                    glLineWidth(1);	 
-                    for (size_t c = 0; c < Collections.size(); c++) {
-                        for (size_t o = 0; o < Collections[c]->Objects.size(); o++) {
-                            RenderObjectAndChildrens(*Collections[c]->Objects[o]);
-                        }	 
-                    }	 
+            //esto solo se hace si hay objetos
+            if (Objects.size() > 0){
+                //dibujo de objetos nuevo!
+                glLineWidth(1);	 
+                // aca hay algo raro... yo ya renderize los objetos. supongo que era para la camara, empty. etc. que se renderizan despues... 
+                // pero aca no tiene sentido como quedo. se redibujarian 2 veces las cosas
+                //for (size_t c = 0; c < Objects.size(); c++) {
+                //    for (size_t o = 0; o < Objects[c]->Childrens.size(); o++) {
+                //        RenderObjectAndChildrens(*Objects[c]->Childrens[o]);
+                //    }	 
+                //}	 
 
-                    //dibujar lineas parent		
-                    if (ShowRelantionshipsLines){
-                        glEnable( GL_TEXTURE_2D );
-                        glEnable( GL_BLEND );
-                        glDepthMask(GL_FALSE); // Desactiva la escritura en el Z-buffer				
-                        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-                        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-                        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-                        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-                        glTexCoordPointer( 2, GL_FLOAT, 0, lineUV ); //SpriteUvSize
-                        glColor4f(ListaColores[negro][0],ListaColores[negro][1],ListaColores[negro][2],ListaColores[negro][3]);	
-                        glBindTexture( GL_TEXTURE_2D, Textures[3].iID ); //selecciona la de linea punteada	
-                        for (size_t c = 0; c < Collections.size(); c++) {
-                            for (size_t o = 0; o < Collections[c]->Objects.size(); o++) {
-                                Object& obj = *Collections[c]->Objects[o];
-                                RenderLinkLines(obj);
-                            }
-                        }
-                        glDepthMask(GL_TRUE); // Reactiva la escritura en el Z-buffer		
-                    }
-
-                    glDisable( GL_DEPTH_TEST );	
-                    glDisable( GL_BLEND );
-                    glDisable( GL_TEXTURE_2D );
-                    //dibuja los ejes de transformacion
-                    if (estado == translacion || estado == rotacion || estado == EditScale) {
-                        for (size_t c = 0; c < Collections.size(); c++) {
-                            bool found = false;
-                            for (size_t o = 0; o < Collections[c]->Objects.size(); o++) {
-                                Object& obj = *Collections[c]->Objects[o];
-                                SearchSelectObj(obj, found);
-                                if (found) break;
-                            }
-                        }
-                    }
-
-                    //Dibuja el origen de los objetos seleccionados		
-                    if (showOrigins){	
-                        //std::cout << "origen!" << std::endl;
-                        glEnable( GL_TEXTURE_2D );
-                        glEnable( GL_BLEND );
-                        // Enable point sprites.
-                        //glEnable( GL_POINT_SPRITE_OES );
-                        glEnable( GL_POINT_SPRITE );
-                        // Make the points bigger.
-                        glPointSize( 16 );
-                        for (size_t c = 0; c < Collections.size(); c++) {
-                            for (size_t o = 0; o < Collections[c]->Objects.size(); o++) {
-                                Object& obj = *Collections[c]->Objects[o];
-                                DibujarOrigen(obj);
-                            }
-                        }
-                        //glTexEnvi( GL_POINT_SPRITE_OES, GL_COORD_REPLACE_OES, GL_FALSE);
-                        //glDisable( GL_POINT_SPRITE_OES );
-                        glTexEnvi( GL_POINT_SPRITE, GL_COORD_REPLACE, GL_FALSE);
-                        glDisable( GL_POINT_SPRITE );
-                    }		
-                }
-
-                //dibuja el cursor 3D	
-                if (show3DCursor){
-                    glDisable( GL_DEPTH_TEST );
-                    glPushMatrix(); //guarda la matrix
-                    glTranslatef( Cursor3DposX, Cursor3DposZ, Cursor3DposY);
-                    
+                //dibujar lineas parent		
+                if (ShowRelantionshipsLines){
                     glEnable( GL_TEXTURE_2D );
                     glEnable( GL_BLEND );
-                    //glEnable( GL_POINT_SPRITE_OES ); // Enable point sprites.	
-                    glEnable( GL_POINT_SPRITE ); // Enable point sprites.	
-                    glPointSize( 32 ); // Make the points bigger.
-                    glColor4f(ListaColores[blanco][0],ListaColores[blanco][1],ListaColores[blanco][2],ListaColores[blanco][3]);
-                    glVertexPointer( 3, GL_SHORT, 0, pointVertex );
-                    glBindTexture( GL_TEXTURE_2D, Textures[2].iID);//iCursor3dTextura.iID ); //selecciona la textura
-
-                    //glTexEnvi( GL_POINT_SPRITE_OES, GL_COORD_REPLACE_OES, GL_TRUE );
-                    glTexEnvi( GL_POINT_SPRITE, GL_COORD_REPLACE, GL_TRUE );
-                    glDrawArrays( GL_POINTS, 0, 1 );
-                    //glTexEnvi( GL_POINT_SPRITE_OES, GL_COORD_REPLACE_OES, GL_FALSE);
-                    glTexEnvi( GL_POINT_SPRITE, GL_COORD_REPLACE, GL_FALSE);
-
-                    //dibuja lineas		
-                    glDisable( GL_TEXTURE_2D );
-                    //glDisable( GL_POINT_SPRITE_OES );
-                    glDisable( GL_POINT_SPRITE );
-                    glDisable( GL_BLEND );
-                
-                    glColor4f(ListaColores[negro][0],ListaColores[negro][1],ListaColores[negro][2],ListaColores[negro][3]);
-                    glVertexPointer( 3, GL_SHORT, 0, Cursor3DVertices );
-                    glDrawElements( GL_LINES, Cursor3DEdgesSize, GL_UNSIGNED_SHORT, Cursor3DEdges );	
-
-                    glPopMatrix(); //reinicia la matrix a donde se guardo	
+                    glDepthMask(GL_FALSE); // Desactiva la escritura en el Z-buffer				
+                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+                    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+                    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+                    glTexCoordPointer( 2, GL_FLOAT, 0, lineUV ); //SpriteUvSize
+                    glColor4f(ListaColores[negro][0],ListaColores[negro][1],ListaColores[negro][2],ListaColores[negro][3]);	
+                    glBindTexture( GL_TEXTURE_2D, Textures[3].iID ); //selecciona la de linea punteada	
+                    for (size_t c = 0; c < Objects.size(); c++) {
+                        for (size_t o = 0; o < Objects[c]->Childrens.size(); o++) {
+                            Object& obj = *Objects[c]->Childrens[o];
+                            RenderLinkLines(obj);
+                        }
+                    }
+                    glDepthMask(GL_TRUE); // Reactiva la escritura en el Z-buffer		
                 }
+
+                glDisable( GL_DEPTH_TEST );	
+                glDisable( GL_BLEND );
+                glDisable( GL_TEXTURE_2D );
+
+                //Dibuja el origen de los objetos seleccionados		
+                if (showOrigins){	
+                    //std::cout << "origen!" << std::endl;
+                    glEnable( GL_TEXTURE_2D );
+                    glEnable( GL_BLEND );
+                    // Enable point sprites.
+                    //glEnable( GL_POINT_SPRITE_OES );
+                    glEnable( GL_POINT_SPRITE );
+                    // Make the points bigger.
+                    glPointSize( 16 );
+                    for (size_t c = 0; c < Objects.size(); c++) {
+                        for (size_t o = 0; o < Objects[c]->Childrens.size(); o++) {
+                            Object& obj = *Objects[c]->Childrens[o];
+                            DibujarOrigen(obj);
+                        }
+                    }
+                    //glTexEnvi( GL_POINT_SPRITE_OES, GL_COORD_REPLACE_OES, GL_FALSE);
+                    //glDisable( GL_POINT_SPRITE_OES );
+                    glTexEnvi( GL_POINT_SPRITE, GL_COORD_REPLACE, GL_FALSE);
+                    glDisable( GL_POINT_SPRITE );
+                }		
             }
 
-            if (ShowUi){
-                glMatrixMode(GL_PROJECTION);
-                glLoadIdentity();
-
-                glMatrixMode(GL_MODELVIEW);
-                glLoadIdentity();
+            //dibuja el cursor 3D	
+            if (show3DCursor){
+                glDisable( GL_DEPTH_TEST );
+                glPushMatrix(); //guarda la matrix
+                glTranslatef( Cursor3DposX, Cursor3DposZ, Cursor3DposY);
                 
-                glViewport(x, y, width, height); // x, y, ancho, alto
-                glOrtho(0, width, height, 0, -1, 1);
-
-                glBindTexture(GL_TEXTURE_2D, Textures[0].iID);
-                glEnableClientState(GL_TEXTURE_COORD_ARRAY);  
-                glDisable(GL_DEPTH_TEST);
-                glDisable(GL_LIGHTING);
-                glDisable(GL_FOG);
-                glEnable(GL_TEXTURE_2D);
+                glEnable( GL_TEXTURE_2D );
                 glEnable( GL_BLEND );
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);      
+                //glEnable( GL_POINT_SPRITE_OES ); // Enable point sprites.	
+                glEnable( GL_POINT_SPRITE ); // Enable point sprites.	
+                glPointSize( 32 ); // Make the points bigger.
+                glColor4f(ListaColores[blanco][0],ListaColores[blanco][1],ListaColores[blanco][2],ListaColores[blanco][3]);
+                glVertexPointer( 3, GL_SHORT, 0, pointVertex );
+                glBindTexture( GL_TEXTURE_2D, Textures[2].iID);//iCursor3dTextura.iID ); //selecciona la textura
 
-                DibujarBordes(this);
+                //glTexEnvi( GL_POINT_SPRITE_OES, GL_COORD_REPLACE_OES, GL_TRUE );
+                glTexEnvi( GL_POINT_SPRITE, GL_COORD_REPLACE, GL_TRUE );
+                glDrawArrays( GL_POINTS, 0, 1 );
+                //glTexEnvi( GL_POINT_SPRITE_OES, GL_COORD_REPLACE_OES, GL_FALSE);
+                glTexEnvi( GL_POINT_SPRITE, GL_COORD_REPLACE, GL_FALSE);
+
+                //dibuja lineas		
+                glDisable( GL_TEXTURE_2D );
+                //glDisable( GL_POINT_SPRITE_OES );
+                glDisable( GL_POINT_SPRITE );
+                glDisable( GL_BLEND );
+            
+                glColor4f(ListaColores[negro][0],ListaColores[negro][1],ListaColores[negro][2],ListaColores[negro][3]);
+                glVertexPointer( 3, GL_FLOAT, 0, Cursor3DVertices );
+                glDrawElements( GL_LINES, Cursor3DEdgesSize, GL_UNSIGNED_SHORT, Cursor3DEdges );	
+
+                glPopMatrix(); //reinicia la matrix a donde se guardo	
             }
+        }
+
+        void RenderUI(){
+            glMatrixMode(GL_PROJECTION);
+            glLoadIdentity();
+
+            glMatrixMode(GL_MODELVIEW);
+            glLoadIdentity();
+
+            glViewport(x, y, width, height); // x, y, ancho, alto
+            glOrtho(0, width, height, 0, -1, 1);
+
+            glDisable(GL_FOG);
+            glDisable(GL_DEPTH_TEST);
+            glEnable( GL_TEXTURE_2D );
+            glEnable( GL_BLEND );
+            glBindTexture(GL_TEXTURE_2D, Textures[0].iID);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);     
+
+            glEnableClientState(GL_VERTEX_ARRAY);
+            glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+            glDisableClientState(GL_NORMAL_ARRAY);
+
+            DibujarBordes(this);
         }
 
         void EnfocarObject(){
@@ -496,7 +554,7 @@ class Viewport3D : public ViewportBase, public WithBorder  {
             // Mostrar el cursor
             SDL_ShowCursor();
             //si no hay objetos
-            if (ObjectsCount < 1){return;}
+            if (Objects.size() < 1){return;}
 
             if ( InteractionMode == ObjectMode ){
                 if (estado != editNavegacion){
@@ -522,7 +580,7 @@ class Viewport3D : public ViewportBase, public WithBorder  {
         }
 
         void event_mouse_wheel(SDL_Event &e) override {
-            posY+= e.wheel.y*20;
+            posY+= e.wheel.y;
         }
 
         void event_mouse_motion(int mx, int my) override {
@@ -537,7 +595,7 @@ class Viewport3D : public ViewportBase, public WithBorder  {
                     float radY = rotY * M_PI / 180.0f; // Yaw
                     float radX = rotX * M_PI / 180.0f; // Pitch
 
-                    float factor = 8.0f;
+                    float factor = 0.01f;
 
                     float cosX = cos(radX);
                     float sinX = sin(radX);
@@ -566,7 +624,7 @@ class Viewport3D : public ViewportBase, public WithBorder  {
                 //SDL_HideCursor();
                 switch (estado) {
                     case translacion:
-                        SetTranslacionObjetos(dx, dy, 16.0f);
+                        SetTranslacionObjetos(dx, dy, 0.01f);
                         break;
                     case rotacion:
                         SetRotacion(dx, dy);

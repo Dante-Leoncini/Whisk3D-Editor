@@ -1,108 +1,3 @@
-void RenderObject( Object& obj ){
-	glPushMatrix();
-	//glScalex(obj.scaleX, obj.scaleZ, obj.scaleY);
-	glScalef(
-		FIXED_TO_FLOAT(obj.scaleX),
-		FIXED_TO_FLOAT(obj.scaleZ),
-		FIXED_TO_FLOAT(obj.scaleY)
-	);
-
-	glDisable( GL_TEXTURE_2D );
-
-	//color si esta seleccionado
-	if (SelectActivo == &obj && obj.seleccionado){
-		glColor4f(ListaColores[accent][0],ListaColores[accent][1],ListaColores[accent][2],ListaColores[accent][3]);
-	}
-	else if (obj.seleccionado){
-		glColor4f(ListaColores[accentDark][0],ListaColores[accentDark][1],ListaColores[accentDark][2],ListaColores[accentDark][3]);
-	}
-	else {		
-		glColor4f(ListaColores[negro][0],ListaColores[negro][1],ListaColores[negro][2],ListaColores[negro][3]);		
-	}
-	//si es un empty
-	if (obj.type == empty){		
-		glDisable( GL_TEXTURE_2D );	 
-		glDisable( GL_BLEND );	
-		glVertexPointer( 3, GL_SHORT, 0, EmptyVertices );
-		glDrawElements( GL_LINES, EmptyEdgesSize, GL_UNSIGNED_SHORT, EmptyEdges );
-	}
-	else if (obj.type == camera){	
-		glDisable( GL_TEXTURE_2D ); 
-		glDisable( GL_BLEND );
-		glVertexPointer( 3, GL_SHORT, 0, CameraVertices );
-		glDrawElements( GL_LINES, CameraEdgesSize, GL_UNSIGNED_SHORT, CameraEdges );
-		if (CameraActive == &obj){		
-    		glDisable( GL_CULL_FACE  );	
-			glDrawElements( GL_TRIANGLES, 3, GL_UNSIGNED_SHORT, CameraFaceActive );	
-		}
-	}
-	else if (obj.type == light){
-		glEnable( GL_TEXTURE_2D ); 
-		glEnable( GL_BLEND );
-		glDepthMask(GL_FALSE); // Desactiva la escritura en el Z-buffer
-
-		//GL_POINT_SPRITE_OES es para symbian
-		//glEnable( GL_POINT_SPRITE_OES ); //activa el uso de sprites en los vertices
-		glEnable(GL_POINT_SPRITE);                        // habilitar point sprites
-		
-		glPointSize( 32 ); //tamaño del punto
-		glVertexPointer( 3, GL_SHORT, 0, pointVertex );
-		glBindTexture( GL_TEXTURE_2D, Textures[4].iID ); //selecciona la textura
-
-		//glTexEnvi( GL_POINT_SPRITE_OES, GL_COORD_REPLACE_OES, GL_TRUE );
-		glTexEnvi(GL_POINT_SPRITE, GL_COORD_REPLACE, GL_TRUE); 
-
-		glDrawArrays( GL_POINTS, 0, 1 );
-		//glTexEnvi( GL_POINT_SPRITE_OES, GL_COORD_REPLACE_OES, GL_FALSE);
-		glTexEnvi(GL_POINT_SPRITE, GL_COORD_REPLACE, GL_FALSE); 
-
-		//glDisable( GL_POINT_SPRITE_OES );	
-		glDisable( GL_POINT_SPRITE );			
-			
-		glDisable( GL_TEXTURE_2D ); 
-
-		//glScalex( 0, 10, 0 ); //4500
-		/*glScalef(
-			FIXED_TO_FLOAT(0),
-			FIXED_TO_FLOAT(10),
-			FIXED_TO_FLOAT(0)
-		);*/
-		LineaLightVertex[4] = (GLshort)-obj.posZ;
-		glVertexPointer( 3, GL_SHORT, 0, LineaLightVertex );
-		glDrawElements( GL_LINES, LineaEdgeSize, GL_UNSIGNED_SHORT, LineaEdge );
-
-		glDisable( GL_BLEND );
-		glDepthMask(GL_TRUE); // Reactiva la escritura en el Z-buffer		
-	}
-	glPopMatrix();
-}
-
-// Funcion recursiva para renderizar un objeto y sus hijos
-void RenderObjectAndChildrens(Object& obj){
-    // Guardar la matriz actual
-    glPushMatrix();
-    
-    // Aplicar las transformaciones del objeto
-    glTranslatef(obj.posX, obj.posZ, obj.posY);
-    glRotatef(obj.rotX, 1, 0, 0); // angulo, X Y Z
-    glRotatef(obj.rotZ, 0, 1, 0); // angulo, X Y Z
-    glRotatef(obj.rotY, 0, 0, 1); // angulo, X Y Z
-
-    // Si es visible y no es un mesh, lo dibuja
-    if (obj.visible && obj.type != mesh) {
-        RenderObject(obj); // Ajusta el segundo parametro si es necesario
-    }
-    
-    // Procesar cada hijo
-    //for (int c = 0; c < obj.Childrens.Count(); c++) {
-    for (size_t c = 0; c < obj.Childrens.size(); c++) {
-        RenderObjectAndChildrens(*obj.Childrens[c]);
-    }
-
-    // Restaurar la matriz previa
-    glPopMatrix();
-}
-
 void DrawnLines(int LineWidth, int cantidad, GLshort* vertexlines, GLushort* lineasIndices){
 	glVertexPointer( 3, GL_SHORT, 0, vertexlines );
 	glLineWidth(LineWidth);	
@@ -196,7 +91,7 @@ void SearchSelectObj(Object& obj, bool& found) {
     glPushMatrix();    
     glTranslatef(obj.posX, obj.posZ, obj.posY);
     
-    if (&obj == SelectActivo) {
+    if (&obj == ObjActivo) {
 		if (estado == rotacion || estado == EditScale){
 			glRotatef(obj.rotX, 1, 0, 0); //angulo, X Y Z
 			glRotatef(obj.rotZ, 0, 1, 0); //angulo, X Y Z
@@ -226,8 +121,8 @@ void DibujarOrigen(Object& obj){
     glPushMatrix();    
     glTranslatef(obj.posX, obj.posZ, obj.posY);
     
-    if (obj.visible && (obj.seleccionado || &obj == SelectActivo)){	
-		if (&obj == SelectActivo){
+    if (obj.visible && (obj.select || &obj == ObjActivo)){	
+		if (&obj == ObjActivo){
 			glColor4f(ListaColores[accent][0],ListaColores[accent][1],ListaColores[accent][2],ListaColores[accent][3]);
 		}
 		else {
@@ -239,11 +134,13 @@ void DibujarOrigen(Object& obj){
 		glTexEnvi( GL_POINT_SPRITE, GL_COORD_REPLACE, GL_TRUE );  
 		glPushMatrix();    		
 		//glScalex(obj.scaleX, obj.scaleZ, obj.scaleY);	
-		glScalef(
+		/*glScalef(
 			FIXED_TO_FLOAT(obj.scaleX),
 			FIXED_TO_FLOAT(obj.scaleZ),
 			FIXED_TO_FLOAT(obj.scaleY)
-		);
+		);*/
+		glScalef(obj.scaleX, obj.scaleZ, obj.scaleY);
+
 		glDrawArrays( GL_POINTS, 0, 1 );	
     	glPopMatrix();
     } 

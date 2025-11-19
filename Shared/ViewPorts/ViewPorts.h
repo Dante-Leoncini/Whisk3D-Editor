@@ -580,13 +580,7 @@ class ViewportColumn : public ViewportBase {
 #include "./ViewPort3D.h"
 #include "./Outliner.h"
 
-ViewportBase* rootViewport = new ViewportRow(
-    new Viewport3D(), 
-    new ViewportColumn(
-        new Viewport3D(), new Outliner(), 0.3f
-    ),
-    0.7f
-);
+ViewportBase* rootViewport = nullptr;
 
 /*ViewportBase* FindViewportUnderMouse(ViewportBase* vp, int mx, int my) {
     if (!vp) return nullptr;
@@ -727,10 +721,10 @@ void SetGlobalScale(int scale){
 
     SetIconScale(scale);
 
-    for (size_t i = 0; i < Collections.size(); i++) {                  
-        Collections[i]->name->scaleX = scale;                
-        Collections[i]->name->scaleY = scale;    
-        reinterpret_cast<Text*>(Collections[i]->name->data)->UpdateCache();    
+    for (size_t i = 0; i < Objects.size(); i++) {                  
+        Objects[i]->name->scaleX = scale;                
+        Objects[i]->name->scaleY = scale;    
+        reinterpret_cast<Text*>(Objects[i]->name->data)->UpdateCache();    
     }
 }
 

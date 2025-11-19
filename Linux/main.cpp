@@ -45,8 +45,7 @@ int winH = 480;
 //Whisk3D imports
 #include "../Shared/tablero.h"
 #include "../Shared/Floor.h"
-#include "../Shared/GeometriaUI.h"
-#include "../Shared/Primitivas.h"
+#include "../Shared/UI/GeometriaUI.h"
 
 #include "../Shared/clases.h"
 #include "../Shared/variables.h"
@@ -54,10 +53,10 @@ int winH = 480;
 #include "../Shared/OpcionesRender.h"
 
 #include "../Shared/Animation.h"
-#include "../Shared/ObjectMode.h"
+#include "../Shared/Objects/ObjectMode.h"
 #include "../Shared/render.h"
-#include "../Shared/import_obj.h"
-#include "../Shared/import_vertex_animation.h"
+#include "../Shared/importers/import_obj.h"
+//#include "../Shared/import_vertex_animation.h"
 #include "../Shared/lectura-escritura.h"
 #include "../Shared/ViewPorts/ViewPorts.h"
 #include "../Shared/funciones.h"
@@ -419,6 +418,7 @@ int main(int argc, char* argv[]) {
                 vkQueuePresentKHR(presentQueue, &presentInfo);
             } else {
                 //RenderViewports();
+                //std::cout << "Render Viewports" << std::endl;
                 rootViewport->Render();
                 SDL_GL_SwapWindow(window);
             }

@@ -22,22 +22,22 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable  {
             int MaxPosXtemp = 0;
             int MaxPosYtemp = 0;
 
-            for (size_t c = 0; c < Collections.size(); c++) {   
+            for (size_t c = 0; c < Objects.size(); c++) {   
                 int rowWidth = marginGS + IconSizeGS + gapGS + IconSizeGS + gapGS + IconSizeGS + marginGS; 
                 MaxPosYtemp -= RenglonHeightGS;
-                int textWidth = reinterpret_cast<Text*>(Collections[c]->name->data)->letters.size() * LetterWidthGS;
+                int textWidth = reinterpret_cast<Text*>(Objects[c]->name->data)->letters.size() * LetterWidthGS;
                 rowWidth += textWidth + gapGS;
 
                 // guardar ancho máximo
                 if (rowWidth > MaxPosXtemp) MaxPosXtemp = rowWidth;
 
                 //std::cout << "textWidth: " << textWidth << " rowWidth: " << rowWidth << std::endl;
-                for (size_t o = 0; o < Collections[c]->Objects.size(); o++) {
+                for (size_t o = 0; o < Objects[c]->Childrens.size(); o++) {
                     int rowWidthObj = marginGS + IconSizeGS + gapGS + IconSizeGS + gapGS + IconSizeGS + gapGS + IconSizeGS + marginGS;
                     MaxPosYtemp -= RenglonHeightGS;
 
                     // texto del objeto
-                    int textWidthObj = reinterpret_cast<Text*>(Collections[c]->Objects[o]->name->data)->letters.size() * LetterWidthGS;
+                    int textWidthObj = reinterpret_cast<Text*>(Objects[c]->Childrens[o]->name->data)->letters.size() * LetterWidthGS;
                     rowWidthObj += textWidthObj + gapGS;
 
                     if (rowWidthObj > MaxPosXtemp) MaxPosXtemp = rowWidthObj;
@@ -128,13 +128,16 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable  {
             RenglonesY = 0;  
             glPushMatrix();          
             glTranslatef(marginGS + PosX, PosY + borderGS, 0);            
-            for (size_t c = 0; c < Collections.size(); c++) {    
+            for (size_t c = 0; c < Objects.size(); c++) {    
                 //glTranslatef(0, RenglonesY, 0); 
                 
                 //icono desplegar
                 glVertexPointer(2, GL_SHORT, 0, IconMesh); //todos los iconos comparten los vertices y tamaño
-                glTexCoordPointer(2, GL_FLOAT, 0, IconsUV[static_cast<size_t>(IconType::arrow)]->uvs);
-                glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+                //si no tiene hijos. no hagas la flecha
+                if (Objects[c]->Childrens.size() > 0){
+                    glTexCoordPointer(2, GL_FLOAT, 0, IconsUV[static_cast<size_t>(IconType::arrow)]->uvs);
+                    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+                }
 
                 //icono de la coleccion
                 glTranslatef(IconSizeGS + gapGS, 0, 0);   
@@ -143,10 +146,10 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable  {
 
                 //texto render                   
                 glTranslatef(IconSizeGS + gapGS, 0, 0);   
-                RenderObject2D(*Collections[c]->name);
+                RenderObject2D(*Objects[c]->name);
 
                 glTranslatef(gapGS + IconSizeGS, 0, 0); 
-                for (size_t o = 0; o < Collections[c]->Objects.size(); o++) {
+                for (size_t o = 0; o < Objects[c]->Childrens.size(); o++) {
                     glTranslatef(
                         -IconSizeGS - gapGS -IconSizeGS - gapGS -IconSizeGS - gapGS, 
                         RenglonHeightGS, 
@@ -166,13 +169,13 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable  {
 
                     //icono del objeto
                     glTranslatef(IconSizeGS + gapGS, 0, 0);   
-                    glTexCoordPointer(2, GL_FLOAT, 0, IconsUV[Collections[c]->Objects[o]->IconType]->uvs);
+                    glTexCoordPointer(2, GL_FLOAT, 0, IconsUV[Objects[c]->Childrens[o]->IconType]->uvs);
     		        glVertexPointer(2, GL_SHORT, 0, IconMesh); //todos los iconos comparten los vertices y tamaño
                     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
                     //texto
                     glTranslatef(IconSizeGS + gapGS, 0, 0);   
-                    RenderObject2D(*Collections[c]->Objects[o]->name);  
+                    RenderObject2D(*Objects[c]->Childrens[o]->name);  
 
                     //glPopMatrix();   
                 }           
@@ -188,11 +191,11 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable  {
             //no usa PosX porque los ojos siempre estan en la misma posicion en X. al borde
             glTranslatef(width - IconSizeGS - marginGS - borderGS, GlobalScale + PosY + borderGS, 0);
             
-            for (size_t c = 0; c < Collections.size(); c++) {       
+            for (size_t c = 0; c < Objects.size(); c++) {       
                 glTexCoordPointer(2, GL_FLOAT, 0, IconsUV[static_cast<size_t>(IconType::visible)]->uvs);
                 glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
-                for (size_t o = 0; o < Collections[c]->Objects.size(); o++) {    
+                for (size_t o = 0; o < Objects[c]->Childrens.size(); o++) {    
                     glTranslatef(0, RenglonHeightGS, 0);    
                     glTexCoordPointer(2, GL_FLOAT, 0, IconsUV[static_cast<size_t>(IconType::visible)]->uvs);
                     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);

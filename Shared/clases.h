@@ -22,57 +22,10 @@ inline Vec3 Cross(const Vec3&a,const Vec3&b){ return Vec3(a.y*b.z-a.z*b.y, a.z*b
 inline float Len(const Vec3&a){ return sqrtf(Dot(a,a)); }
 inline Vec3 Normalize(const Vec3&a){ float L = Len(a); if(L<=1e-8f) return Vec3(0,0,1); return a*(1.0f/L); }
 
-class ShapeKeyVertex { 
-	public:
-		int index;
-		GLshort vertexX;
-		GLshort vertexY;
-		GLshort vertexZ;
-		GLbyte normalX;
-		GLbyte normalY;
-		GLbyte normalZ;
-};
-
-class ShapeKey { 
-	public:
-        //RArray<ShapeKeyVertex> Vertex;
-		std::vector<ShapeKeyVertex> Vertex;
-};
-
-class Animation { 
-	public:
-        //RArray<ShapeKey> Frames;
-		std::vector<ShapeKey> Frames;
-		int MixSpeed;
-};
-
-class ShapeKeyAnimation { 
-	public:
-		int Id; //id del objeto al que afecta
-        //RArray<Animation> Animations;
-		std::vector<Animation> Animations;
-		int ChangeAnimation;
-		int LastAnimation;
-		int NextAnimation;
-		int LastFrame;
-		int NextFrame;
-		int Mix;
-		bool Normals;
-		bool Faces;
-		bool Interpolacion;
-};
-
 class Children {
 	public:
     	int Id = -1;
 		GLfixed OriginalScaleX = 0;
 		GLfixed OriginalScaleY = 0; 
 		GLfixed OriginalScaleZ = 0;	
-};
-
-class Light { 
-	public:
-		int type = 0;
-		int lightId = -1;
-		GLfloat color[4] = {1.0f, 1.0f, 1.0f, 1.0f}; // blanco por defecto
 };

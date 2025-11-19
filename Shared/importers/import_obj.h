@@ -33,17 +33,9 @@ namespace std {
     };
 }
 
-int BuscarMaterialPorNombre(const std::string& name) {
-    for (size_t i = 0; i < Materials.size(); ++i)
-        if (Materials[i].name == name) return (int)i;
-    return 0; // fallback
-}
-
 class Wavefront {
 	public:
-		std::vector<GLshort> vertex;
-		std::vector<GLfixed> vertexF;		
-		bool UseVertexF = true;
+		std::vector<GLfloat> vertex;	
 		std::vector<GLubyte> vertexColor;
 		std::vector<GLbyte> normals;
 		std::vector<GLfloat> uv;
@@ -54,7 +46,6 @@ class Wavefront {
 
         void Reset(){
          	vertex.clear();
-			vertexF.clear();
          	vertexColor.clear();
          	normals.clear();
          	uv.clear();
@@ -162,8 +153,8 @@ class Wavefront {
 			Reset();
 		};	*/
 
-        void ConvertToES1(Mesh& TempMesh, int* acumuladoVertices, int* acumuladoNormales, int* acumuladoUVs){
-            std::vector<GLshort> newVertices;
+        void ConvertToES1(Mesh* TempMesh, int* acumuladoVertices, int* acumuladoNormales, int* acumuladoUVs){
+            std::vector<GLfloat> newVertices;
             std::vector<GLubyte> newColors;
             std::vector<GLbyte> newNormals;
             std::vector<GLfloat> newUVs;
@@ -205,22 +196,22 @@ class Wavefront {
             }
 
             // asignar a TempMesh
-            TempMesh.vertexSize = newVertices.size();
-            TempMesh.vertex = new GLshort[newVertices.size()];
-            std::copy(newVertices.begin(), newVertices.end(), TempMesh.vertex);
+            TempMesh->vertexSize = newVertices.size();
+            TempMesh->vertex = new GLfloat[newVertices.size()];
+            std::copy(newVertices.begin(), newVertices.end(), TempMesh->vertex);
 
-            TempMesh.normals = new GLbyte[newNormals.size()];
-            std::copy(newNormals.begin(), newNormals.end(), TempMesh.normals);
+            TempMesh->normals = new GLbyte[newNormals.size()];
+            std::copy(newNormals.begin(), newNormals.end(), TempMesh->normals);
 
-            TempMesh.vertexColor = new GLubyte[newColors.size()];
-            std::copy(newColors.begin(), newColors.end(), TempMesh.vertexColor);
+            TempMesh->vertexColor = new GLubyte[newColors.size()];
+            std::copy(newColors.begin(), newColors.end(), TempMesh->vertexColor);
 
-            TempMesh.uv = new GLfloat[newUVs.size()];
-            std::copy(newUVs.begin(), newUVs.end(), TempMesh.uv);
+            TempMesh->uv = new GLfloat[newUVs.size()];
+            std::copy(newUVs.begin(), newUVs.end(), TempMesh->uv);
 
-            TempMesh.facesSize = newFaces.size();
-            TempMesh.faces = new GLushort[newFaces.size()];
-            std::copy(newFaces.begin(), newFaces.end(), TempMesh.faces);
+            TempMesh->facesSize = newFaces.size();
+            TempMesh->faces = new GLushort[newFaces.size()];
+            std::copy(newFaces.begin(), newFaces.end(), TempMesh->faces);
 
 			// MaterialGroup
 			if (!materialsGroup.empty()) {
@@ -231,7 +222,7 @@ class Wavefront {
 					mg.startDrawn = mgOrig.startDrawn;       // índice de vértices en array final
 					mg.indicesDrawnCount = mgOrig.indicesDrawnCount;
 					mg.material = mgOrig.material;           // índice correcto del material
-					TempMesh.materialsGroup.push_back(mg);
+					TempMesh->materialsGroup.push_back(mg);
 				}
 			} else {
 				// Si no tiene materiales, crear uno por defecto
@@ -239,9 +230,9 @@ class Wavefront {
 				mg.start = 0;
 				mg.count = faces.size();
 				mg.startDrawn = 0;
-				mg.indicesDrawnCount = TempMesh.facesSize;
+				mg.indicesDrawnCount = TempMesh->facesSize;
 				mg.material = 0;
-				TempMesh.materialsGroup.push_back(mg);
+				TempMesh->materialsGroup.push_back(mg);
 			}
             Reset();
         }
@@ -803,18 +794,11 @@ bool LeerOBJ(std::ifstream& file,
              int* acumuladoNormales,
              int* acumuladoUVs) 
 {
-	Object* obj = new Object();
-    obj->visible = true;
-    obj->posX = obj->posY = obj->posZ = 0;
-    obj->rotX = obj->rotY = obj->rotZ = 0;
-    obj->scaleX = obj->scaleY = obj->scaleZ = 65000;
-    //obj.scaleX = obj.scaleY = obj.scaleZ = 520000;
-    obj->Id = 0;
-    obj->type = 0; // mesh
+	Mesh* mesh = new Mesh(CollectionActive, 0, 0, 0);
 
 	// usar filename para nombrar por defecto (y hacerlo único)
 	std::string fileBase = ExtractBaseName(filename);
-	reinterpret_cast<Text*>(obj->name->data)->SetValue(SetName(fileBase));
+	reinterpret_cast<Text*>(mesh->name->data)->SetValue(SetName(fileBase));
 
     Wavefront Wobj;
     Wobj.Reset();
@@ -838,7 +822,7 @@ bool LeerOBJ(std::ifstream& file,
         if (line.rfind("o ", 0) == 0) {
             if (!NombreEncontrado) {
 				//algo anda mal por aca
-                //obj->name = line.substr(2);
+                //mesh->name = line.substr(2);
                 NombreEncontrado = true;
             } else {
                 hayMasObjetos = true;
@@ -866,9 +850,12 @@ bool LeerOBJ(std::ifstream& file,
 			}
 
 			// vértice
-			Wobj.vertex.push_back((short)(x * 2000));
+			Wobj.vertex.push_back((GLfloat)(x));
+			Wobj.vertex.push_back((GLfloat)(y));
+			Wobj.vertex.push_back((GLfloat)(z));
+			/*Wobj.vertex.push_back((short)(x * 2000));
 			Wobj.vertex.push_back((short)(y * 2000));
-			Wobj.vertex.push_back((short)(z * 2000));
+			Wobj.vertex.push_back((short)(z * 2000));*/
 			/*Wobj.vertex.push_back((short)(x*250));
 			Wobj.vertex.push_back((short)(y*250));
 			Wobj.vertex.push_back((short)(z*250));*/
@@ -965,34 +952,11 @@ bool LeerOBJ(std::ifstream& file,
         } 
         else if (line.rfind("usemtl ", 0) == 0) {
 			std::string matName = line.substr(7); // toma el nombre del material
-			int materialIndex = -1;
-
-			// busca si el material ya existe
-			for (size_t i = 0; i < Materials.size(); ++i) {
-				if (Materials[i].name == matName) {
-					materialIndex = static_cast<int>(i);
-					break;
-				}
-			}
+			Material* materialPuntero = BuscarMaterialPorNombre(matName);
 
 			// si no existe, crea uno nuevo
-			if (materialIndex == -1) {
-				Material mat;
-				mat.name = matName;
-				mat.specular[0] = mat.specular[1] = mat.specular[2] = mat.specular[3] = 0.3f;
-				mat.diffuse[0] = mat.diffuse[1] = mat.diffuse[2] = mat.diffuse[3] = 1.0f;
-				mat.emission[0] = mat.emission[1] = mat.emission[2] = mat.emission[3] = 0.0f;
-				mat.textura = false;
-				mat.vertexColor = TieneVertexColor;
-				mat.repeat = true;
-				mat.lighting = true;
-				mat.culling = true;
-				mat.transparent = false;
-				mat.interpolacion = lineal;
-				mat.textureID = 0;
-
-				Materials.push_back(mat);
-				materialIndex = static_cast<int>(Materials.size() - 1);
+			if (!materialPuntero) {
+				materialPuntero = new Material(matName, TieneVertexColor);
 			}
 
 			// crea el MaterialGroup usando el índice correcto
@@ -1001,35 +965,34 @@ bool LeerOBJ(std::ifstream& file,
 			mg.startDrawn = Wobj.faces.size() * 3;
 			mg.count = 0;
 			mg.indicesDrawnCount = 0;
-			mg.material = materialIndex;
+			mg.material = materialPuntero;
 
 			Wobj.materialsGroup.push_back(mg);
         }
     }
 
     // Convertir a Mesh final
-    Mesh TempMesh;
     std::cout << "DEBUG Wobj:\n";
     std::cout << "  vertices = " << Wobj.vertex.size() / 3 << "\n";
     std::cout << "  normals  = " << Wobj.normals.size() / 3 << "\n";
     std::cout << "  uv       = " << Wobj.uv.size() / 2 << "\n";
     std::cout << "  faces    = " << Wobj.faces.size() / 3 << "\n\n";
 
-    Wobj.ConvertToES1(TempMesh, acumuladoVertices, acumuladoNormales, acumuladoUVs);
+    Wobj.ConvertToES1(mesh, acumuladoVertices, acumuladoNormales, acumuladoUVs);
 
     *acumuladoVertices += acumuladoVerticesProximo;
     *acumuladoNormales += acumuladoNormalesProximo;
     *acumuladoUVs += acumuladoUVsProximo;
 
     // Agregar a Meshes y obtener el índice
-    Meshes.push_back(TempMesh);
+    /*Meshes.push_back(TempMesh);
     int meshIndex = (int)Meshes.size() - 1;
 
     // Asignar el mesh al objeto
-    obj->Id = meshIndex;   // o obj.MeshIndex = meshIndex; según tu estructura
+    mesh->Id = meshIndex;   // o obj.MeshIndex = meshIndex; según tu estructura
 
     // Agregar el objeto a la colleccion activa
-	AddToCollection(CollectionActive, obj);
+	AddToCollection(CollectionActive, obj);*/
 
     return hayMasObjetos;
 }
@@ -1068,12 +1031,12 @@ bool LeerOBJ(std::ifstream& file,
 	// Llena el array con punteros a los objetos
 	for (TInt c = 0; c <= SelectActivo; ++c){
 		Object* obj = &Objects[SelectActivo - c];
-		Mesh* pMesh = &Meshes[obj->Id];
+		Mesh* pMesh = &Meshes[mesh->Id];
 		objs.Append(obj);
 		pMeshs.Append(pMesh);*/
 		
 		/*_LIT(KFormatString3, "Pmesh %d\nID obj:: %d");
-		noteBuf3->Des().Format(KFormatString3, pMeshs.Count(), obj->Id);
+		noteBuf3->Des().Format(KFormatString3, pMeshs.Count(), mesh->Id);
 		CDialogs::Alert(noteBuf3);*/
 	//};
 
@@ -1301,17 +1264,17 @@ bool LeerMTL(const std::string& filepath, int objetosCargados) {
             std::string matName = line.substr(7);
             // Buscar material existente
             mat = nullptr;
-            for (auto& m : Materials) {
-                if (m.name == matName) {
-                    mat = &m;
-                    break;
-                }
-            }
+            for (auto* m : Materials) {
+				Text* t = reinterpret_cast<Text*>(m->name->data);
+				if (t->value == matName) {
+					mat = m;
+					break;
+				}
+			}
             if (!mat) {
                 // si no existe, crear uno nuevo
-                Materials.push_back(Material());
-                mat = &Materials.back();
-                mat->name = matName;
+				mat = new Material(matName);
+                Materials.push_back(mat);
             }
         }
         else if (mat) {

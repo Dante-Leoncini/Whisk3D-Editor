@@ -4,9 +4,9 @@ static const GLshort pointVertex[3]={0, 0, 0};
 static const int LineaLightVertexSize = 2 * 3;
 static const int LineaEdgeSize = 1 * 2;
 
-static GLshort LineaLightVertex[LineaLightVertexSize] = {    
-    0, 0, 0,
-    0, -30000, 0,
+static GLfloat LineaLightVertex[LineaLightVertexSize] = {    
+    0.0f, 0.0f, 0.0f,
+    0.0f, -3.0f, 0.0f,
 };
 
 static GLshort LineaLinkChild[LineaLightVertexSize] = {    
@@ -27,42 +27,6 @@ static const GLshort LineaTimeline[6] = {
 // Define los índices de las líneas
 static const GLushort LineaEdge[2] = {
     0, 1
-};
-
-static const int CameraVertexSize = 8 * 3;
-static const int CameraEdgesSize = 11 * 2;
-
-static GLshort CameraVertices[CameraVertexSize] = {    
-    0, 0, 0, //origen
-    3500, 1440, 1920,
-    3500, -1440, 1920,
-    3500, -1440, -1920,
-    3500, 1440, -1920,
-    //tiangulo
-    3500, 1700, 1280,
-    3500, 1700, -1280,
-    3500, 3100, 0,
-};
-
-static const GLshort CameraFaceActive[3]={
-    5,6,7
-};
-
-static const GLushort CameraEdges[CameraEdgesSize]={
-    //cono
-	0, 1,
-	0, 2,
-	0, 3,
-	0, 4,
-    //tapa de enfrente    
-	1, 2,
-	2, 3,
-	3, 4,
-	4, 1,
-    //triangulo
-	5, 6,
-	6, 7,
-	7, 5,
 };
 
 static const int EmptyVertexSize = 6 * 3;
@@ -89,22 +53,22 @@ static const GLushort EmptyEdges[EmptyEdgesSize]={
 static const int Cursor3DVertexSize = 12 * 3;
 static const int Cursor3DEdgesSize = 6 * 2;
 
-static const GLshort Cursor3DVertices[Cursor3DVertexSize] = {
+static const GLfloat Cursor3DVertices[Cursor3DVertexSize] = {
     //eje1
-    0, 0, -750,
-    0, 0, -225,
-    0, 0, 750,
-    0, 0, 225,
+    0.0f,  0.0f, -0.75f,
+    0.0f,  0.0f, -0.225f,
+    0.0f,  0.0f,  0.75f,
+    0.0f,  0.0f,  0.225f,
     //eje2
-    0, -750, 0,
-    0, -225, 0,
-    0, 750, 0,
-    0, 225, 0,
+    0.0f, -0.75f,  0.0f,
+    0.0f, -0.225f, 0.0f,
+    0.0f,  0.75f,  0.0f,
+    0.0f,  0.225f, 0.0f,
     //eje3
-    -750, 0, 0,
-    -225, 0, 0,
-    750, 0, 0,
-    225, 0, 0,
+    -0.75f,  0.0f, 0.0f,
+    -0.225f, 0.0f, 0.0f,
+     0.75f,  0.0f, 0.0f,
+     0.225f, 0.0f, 0.0f,
 };
 
 static const GLushort Cursor3DEdges[Cursor3DEdgesSize]={

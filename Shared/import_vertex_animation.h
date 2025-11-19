@@ -15,6 +15,21 @@
 	return -1;
 };*/
 
+class ShapeKeyAnimation { 
+	public:
+		Object* obj = nullptr;
+		std::vector<Animation> Animations;
+		int ChangeAnimation;
+		int LastAnimation;
+		int NextAnimation;
+		int LastFrame;
+		int NextFrame;
+		int Mix;
+		bool Normals;
+		bool Faces;
+		bool Interpolacion;
+};
+
 bool ImportVertexAnimation(const std::string& filepath){
     // Revisar extensión
     if (filepath.size() < 4 || filepath.substr(filepath.size() - 4) != ".txt") {
@@ -67,11 +82,11 @@ bool ImportVertexAnimation(const std::string& filepath){
         // --- ShapeKey animation import ---
         if (rawline.rfind("new_animation_ShapeKey", 0) == 0) {
             if (esMesh) {
-                SAIndex = BuscarShapeKeyAnimation(obj.Id, false);
+                SAIndex = BuscarShapeKeyAnimation(&obj, false);
                 if (SAIndex < 0) {
                     SAIndex = (int)ShapeKeyAnimations.size();
                     ShapeKeyAnimation newAnim{};
-                    newAnim.Id = obj.Id;
+                    newAnim.obj = &obj;
                     newAnim.ChangeAnimation = -1;
                     newAnim.LastFrame = newAnim.NextFrame = 0;
                     newAnim.LastAnimation = newAnim.NextAnimation = 0;
@@ -157,7 +172,7 @@ bool ImportVertexAnimation(const std::string& filepath){
                 }
             }
             if (esMesh) {
-                ShapeKeyAnimations[SAIndex].Animations[AnimID].Frames[FrameIndex].Vertex.push_back(newVertex);
+            	ShapeKeyAnimations[SAIndex].Animations[AnimID].Frames[FrameIndex].Vertex.push_back(newVertex);
             }
         }
         // --- Animacion de objetos: rotacion / r / locacion / l / escala / s ---

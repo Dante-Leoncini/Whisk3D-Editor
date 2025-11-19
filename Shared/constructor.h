@@ -9,17 +9,15 @@ void ConstructUniversal(){
     glEnableClientState(GL_VERTEX_ARRAY);
     glEnableClientState(GL_NORMAL_ARRAY);
 
-    // iluminación
-    glEnable(GL_LIGHTING);
+    // iluminación. GL_LIGHT0 es el sol
     glEnable(GL_LIGHT0);
-
     glLightfv(GL_LIGHT0, GL_DIFFUSE,  lightDiffuseLamp);
     glLightfv(GL_LIGHT0, GL_AMBIENT,  objAmbient);
     glLightfv(GL_LIGHT0, GL_SPECULAR, lightSpecularLamp);
     glLightfv(GL_LIGHT0, GL_POSITION, sunLightPosition);
 
     // Siempre un material por defecto
-    NewMaterial(false);
+    MaterialDefecto = new Material("Default", true);
     
 	CalculateMillisecondsPerFrame(60);
 
@@ -30,24 +28,14 @@ void ConstructUniversal(){
     SetGlobalScale(3);
     InitCursors();
 
-    Collection* colec = new Collection(nullptr, "Collection");
-    Collections.push_back(colec);
+    CollectionActive = new Collection(nullptr);
 
     // Cámara y objetos iniciales
-    Object* cam = AddObject(camera);
-    cam->posX = -800 * 6.8;
-    cam->posY = -800 * 7.29;
-    cam->posZ = 800 * 4.91;
-    cam->rotZ = -45.0;
-    cam->rotY = -26.15;
-    cam->scaleX = cam->scaleY = cam->scaleZ = 40000;
+    new Camera(CollectionActive, -2.5f, -2.5f, 1.8f, 0, -35.0, -45.0);
 
-    Object* luz = AddObject(light);
-    luz->posX = -3000;
-    luz->posY = 1500;
-    luz->posZ = 4500;
+    Light::Create(CollectionActive, 1.5f, 0.75f, 2.25f);
 
-    AddMesh(cubo);
+    NewMesh(MeshType::cube, CollectionActive);
 
     /*Collection* colec2 = new Collection(nullptr, "Collection_Test");
     Collections.push_back(colec2);
@@ -70,4 +58,12 @@ void ConstructUniversal(){
     AddMesh(cubo);
     AddMesh(cubo);
     AddMesh(cubo);*/
+
+    rootViewport = new ViewportRow(
+        new Viewport3D(), 
+        new ViewportColumn(
+            new Viewport3D(), new Outliner(), 0.3f
+        ),
+        0.7f
+    );
 }

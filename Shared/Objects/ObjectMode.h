@@ -45,7 +45,7 @@ void BorrarAnimaciones(Object& obj){
 }
 
 void BorrarObjeto(Object& obj){
-	if (obj.type == mesh){
+	/*if (obj.type == mesh){
 		//primero miramos si alguien mas esta usando esta malla 3d.
 		//es posible compartir una malla 3d entre distintos objetos
 		bool MeshEnUso = false;
@@ -53,7 +53,7 @@ void BorrarObjeto(Object& obj){
 		for(size_t c=0; c < Collections.size(); c++){
 			for(size_t o=0; o < Collections[c]->Objects.size(); o++){
 				//si el objeto esta seleccionado. significa que se va a borrar, por lo tanto no se cuenta
-				if (Collections[c]->Objects[o]->type == mesh && Collections[c]->Objects[o] == &obj && !Collections[c]->Objects[o]->seleccionado){
+				if (Collections[c]->Objects[o]->type == mesh && Collections[c]->Objects[o] == &obj && !Collections[c]->Objects[o]->select){
 					MeshEnUso = true;
 					break;
 				};				
@@ -63,12 +63,12 @@ void BorrarObjeto(Object& obj){
 		//si la malla 3d esta en uso por otro objeto que no va a ser borrado. no se puede borrar
 		if (MeshEnUso){
 			std::cout << "Malla 3D unica. SI se borra" << std::endl;	
-			Meshes[obj.Id].LiberarMemoria();
+			Objects[obj.Id].LiberarMemoria();
 
 			// borrar el elemento en posición `indice`
 			//no se porque era indice >= 0 && 
-			if (static_cast<size_t>(obj.Id) < Meshes.size()) {
-				Meshes.erase(Meshes.begin() + obj.Id);
+			if (static_cast<size_t>(obj.Id) < Objects.size()) {
+				Objects.erase(Objects.begin() + obj.Id);
 			}
 		}
 		else {
@@ -87,19 +87,19 @@ void BorrarObjeto(Object& obj){
 	delete &obj;
 
 	SelectCount--;
-	SelectActivo = nullptr;
+	SelectActivo = nullptr;*/
 }
 
 void Borrar(){
-	if (estado != editNavegacion ){
+	/*if (estado != editNavegacion ){
 		Cancelar();
 	}
 	else if (InteractionMode == ObjectMode){
 		//si no hay nada seleccionado. no borra
 		bool algoSeleccionado = false;
-		for (int c = (int)Collections.size() - 1; c >= 0; c--) {
-			for (int o = (int)Collections[c]->Objects.size() - 1; o >= 0; o--) {
-				if (Collections[c]->Objects[o]->seleccionado){
+		for (int c = (int)Objects.size() - 1; c >= 0; c--) {
+			for (int o = (int)Objects[c]->Childrens.size() - 1; o >= 0; o--) {
+				if (Objects[c]->Childrens[o]->select){
 					algoSeleccionado = true;
 					break;	
 				}		
@@ -109,7 +109,7 @@ void Borrar(){
 		if (!algoSeleccionado){
 			std::cout << "nada seleccionado para borrar" << std::endl;
 			return;
-		}
+		}*/
 		
 		//pregunta de confirmacion
 		//HBufC* noteBuf = HBufC::NewLC(100);
@@ -120,20 +120,20 @@ void Borrar(){
 			return;
 		}*/
 		//CleanupStack::PopAndDestroy(noteBuf);	
-		Cancelar();
+		/*Cancelar();
 
 		//libera la memoria de los punteros primero	
 		// Obtener el objeto seleccionado			
-		for (int c = (int)Collections.size() - 1; c >= 0; c--) {
-			for (int o = (int)Collections[c]->Objects.size() - 1; o >= 0; o--) {
-				if (Collections[c]->Objects[o]->seleccionado){
+		for (int c = (int)Objects.size() - 1; c >= 0; c--) {
+			for (int o = (int)Objects[c]->Childrens.size() - 1; o >= 0; o--) {
+				if (Objects[c]->Childrens[o]->select){
 					std::cout << "El objeto " << (o + 1) << " esta seleccionado y se va a borrar" << std::endl;
-					BorrarObjeto(*Collections[c]->Objects[o]);
+					BorrarObjeto(*Objects[c]->Childrens[o]);
 				}			
 			}
 		}
 	}
-    ReloadViewport();	
+    ReloadViewport();	*/
 }
 
 void SetTransformPivotPoint(){
@@ -141,10 +141,10 @@ void SetTransformPivotPoint(){
 		TransformPivotPointFloat[0] = 0;
 		TransformPivotPointFloat[1] = 0;
 		TransformPivotPointFloat[2] = 0;
-		for(size_t c=0; c < Collections.size(); c++){
-			for(size_t o=0; o < Collections[c]->Objects.size(); o++){
-				Object& obj = *Collections[c]->Objects[o];	
-				if (obj.seleccionado){
+		for(size_t c=0; c < Objects.size(); c++){
+			for(size_t o=0; o < Objects[c]->Childrens.size(); o++){
+				Object& obj = *Objects[c]->Childrens[o];	
+				if (obj.select){
 					TransformPivotPointFloat[0] += obj.posX;
 					TransformPivotPointFloat[1] += obj.posY;
 					TransformPivotPointFloat[2] += obj.posZ;	
@@ -181,10 +181,10 @@ void guardarEstado(){
 	estadoObjetos.clear();
 	//estadoObjetos.ReserveL(SelectCount);
 	estadoObjetos.reserve(SelectCount);
-	for(size_t c=0; c < Collections.size(); c++){
-		for(size_t o=0; o < Collections[c]->Objects.size(); o++){
-			Object& obj = *Collections[c]->Objects[o];
-			if (obj.seleccionado){
+	for(size_t c=0; c < Objects.size(); c++){
+		for(size_t o=0; o < Objects[c]->Childrens.size(); o++){
+			Object& obj = *Objects[c]->Childrens[o];
+			if (obj.select){
 				SaveState NuevoEstado;
 				NuevoEstado.obj = &obj;
 				NuevoEstado.posX = obj.posX;
@@ -204,7 +204,7 @@ void guardarEstado(){
 };
 
 void SetPosicion(){
-	if (SelectActivo && InteractionMode == ObjectMode && SelectActivo->seleccionado && estado == editNavegacion){
+	if (ObjActivo && InteractionMode == ObjectMode && ObjActivo->select && estado == editNavegacion){
 		guardarEstado();
 		estado = translacion;
 		//if (axisSelect > 2){axisSelect = X;}
@@ -220,7 +220,7 @@ void SetPosicion(){
 };
 
 void DuplicatedObject(){	
-	if (estado != editNavegacion || InteractionMode != ObjectMode){return;};
+	/*if (estado != editNavegacion || InteractionMode != ObjectMode){return;};
 	for(size_t c=0; c < Collections.size(); c++){
 		for(size_t o=0; o < Collections[c]->Objects.size(); o++){
 			Object& obj = *Collections[c]->Objects[o];
@@ -285,21 +285,21 @@ void DuplicatedObject(){
 			}
 		}
 	}
-	SetPosicion();
+	SetPosicion();*/
 }
 
 void DuplicatedLinked(){
-	if (estado != editNavegacion || InteractionMode != ObjectMode){return;};
-	for(size_t c=0; c < Collections.size(); c++){
-		for(size_t o=0; o < Collections[c]->Objects.size(); o++){
-			Object& obj = *Collections[c]->Objects[o];
-			if (!obj.seleccionado){continue;};
+	/*if (estado != editNavegacion || InteractionMode != ObjectMode){return;};
+	for(size_t c=0; c < Objects.size(); c++){
+		for(size_t o=0; o < Objects[c]->Childrens.size(); o++){
+			Object& obj = *Objects[c]->Childrens[o];
+			if (!obj.select){continue;};
 
 			// Crear copia dinámica
 			Object* NewObj = new Object(obj); // usa el constructor copia
 
-			obj.seleccionado = false;	
-			NewObj->seleccionado = true;
+			obj.select = false;	
+			NewObj->select = true;
 			reinterpret_cast<Text*>(NewObj->name->data)->SetValue(
 				SetName(reinterpret_cast<Text*>(obj.name->data)->value)
 			);
@@ -311,7 +311,7 @@ void DuplicatedLinked(){
 			AddToCollection(CollectionActive, NewObj);
 		}
 	}
-	SetPosicion();
+	SetPosicion();*/
 }
 
 void SetRotacion(int dx, int dy){
@@ -345,7 +345,7 @@ void SetRotacion(int dx, int dy){
 
 void SetRotacion(){
 	//si no hay objetos
-	if (SelectActivo && SelectActivo->seleccionado && estado == editNavegacion){
+	if (ObjActivo && ObjActivo->select && estado == editNavegacion){
 		guardarEstado();
 		estado = rotacion;	
 		valorRotacion = 0;
@@ -362,31 +362,31 @@ void SetRotacion(){
     ReloadViewport();	
 };
 
-void SetScale(int dx, int dy){
-	dx = dx*500;
-	dy = dy*500;
+void SetScale(int dx, int dy, float factor = 0.01f){
+	float dxf = dx*factor;
+	float dyf = dy*factor;
 	for (size_t o = 0; o < estadoObjetos.size(); o++) {
 		Object& obj = *estadoObjetos[o].obj;
 		switch (axisSelect) {
 			case X:
-				obj.scaleX += dx;
-				obj.scaleX += dy;
+				obj.scaleX += dxf;
+				obj.scaleX += dyf;
 				break;
 			case Y:
-				obj.scaleY += dx;
-				obj.scaleY += dy;
+				obj.scaleY += dxf;
+				obj.scaleY += dyf;
 				break;
 			case Z:
-				obj.scaleZ += dx;
-				obj.scaleZ += dy;
+				obj.scaleZ += dxf;
+				obj.scaleZ += dyf;
 				break;
 			case XYZ:
-				obj.scaleX += dx;
-				obj.scaleY += dx;
-				obj.scaleZ += dx;
-				obj.scaleX += dy;
-				obj.scaleY += dy;
-				obj.scaleZ += dy;
+				obj.scaleX += dxf;
+				obj.scaleY += dxf;
+				obj.scaleZ += dxf;
+				obj.scaleX += dyf;
+				obj.scaleY += dyf;
+				obj.scaleZ += dyf;
 				break;
 		}
 	}
@@ -395,7 +395,7 @@ void SetScale(int dx, int dy){
 void SetEscala(){
 	//XYZ tiene escala
 	//si no hay objetos
-	if (SelectActivo && SelectActivo->seleccionado && estado == editNavegacion){
+	if (ObjActivo && ObjActivo->select && estado == editNavegacion){
 		estado = EditScale;
 		guardarEstado();
 		axisSelect = XYZ;	

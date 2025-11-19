@@ -33,27 +33,9 @@ enum{
 	vertexSelect, edgeSelect, faceSelect
 };
 
-enum{
-	cubo, esfera, cilindro, plane, vacio, camara,
-    cad, luz, vertice, circle
-};
-
 typedef enum { X, Y, Z, XYZ, ViewAxis } Axis;
 
 int axisSelect = X;
-
-//luz
-//GLfloat light_pos[] = { -5000.0f, 5000.0f, 5000.0f, 1.0f };
-//GLfloat light_diffuse[] = { 1.0f, 1.0f, 1.0f, 1.0f };
-//GLfloat light_specular[] = { 1.0f, 1.0f, 1.0f, 1.0f };
-
-GLfloat lightDiffuseLamp[4]   = { 0.9, 0.9, 0.9, 1.0 };
-GLfloat lightSpecularLamp[4]   = { 1.0, 1.0, 1.0, 1.0 };
-
-GLfloat sunLightPosition[4]  = {-50, 500, 500, 0 }; // y, z, x, si es direccional o puntual
-
-//para las luces puntuales
-GLfloat positionPuntualLight[4] = {0, 0, 0, 1};
 
 GLshort TransformPivotPoint[3] = {0,0,0};
 GLfloat TransformPivotPointFloat[3] = {0.0f,0.0f,0.0f};
@@ -102,9 +84,6 @@ bool mouseVisible = false;
 int ShiftCount = 0;
 int valorRotacion = 0;
 
-//listados
-std::vector<ShapeKeyAnimation> ShapeKeyAnimations;
-
 int NumTexturasWhisk3D = 0;
 
 //para los cursores de SDL3, puede que no sea bueno tenerlo aca...
@@ -121,3 +100,7 @@ void InitCursors() {
     cursorScaleVertical   = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_NS_RESIZE);
 	cursorScaleHorizontal = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_EW_RESIZE);
 }
+
+/*inline float FIXED_TO_FLOAT(GLfixed x) {
+    return static_cast<float>(x) / 65536.0f; // porque Q16.16
+}*/

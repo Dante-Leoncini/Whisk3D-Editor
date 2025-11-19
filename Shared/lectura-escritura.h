@@ -38,7 +38,7 @@ int BuscarVertexAnimation(){
 
     if (ruta) {
         std::cout << "Archivo seleccionado: " << ruta << std::endl;
-        ImportVertexAnimation(ruta);
+        //ImportVertexAnimation(ruta);
     } else {
         std::cout << "No se seleccionó nada." << std::endl;
     }
