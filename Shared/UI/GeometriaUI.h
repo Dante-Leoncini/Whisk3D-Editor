@@ -55,20 +55,20 @@ static const int Cursor3DEdgesSize = 6 * 2;
 
 static const GLfloat Cursor3DVertices[Cursor3DVertexSize] = {
     //eje1
-    0.0f,  0.0f, -0.75f,
-    0.0f,  0.0f, -0.225f,
-    0.0f,  0.0f,  0.75f,
-    0.0f,  0.0f,  0.225f,
+    0.0f,  0.0f, -0.75f/2,
+    0.0f,  0.0f, -0.225f/2,
+    0.0f,  0.0f,  0.75f/2,
+    0.0f,  0.0f,  0.225f/2,
     //eje2
-    0.0f, -0.75f,  0.0f,
-    0.0f, -0.225f, 0.0f,
-    0.0f,  0.75f,  0.0f,
-    0.0f,  0.225f, 0.0f,
+    0.0f, -0.75f/2,  0.0f,
+    0.0f, -0.225f/2, 0.0f,
+    0.0f,  0.75f/2,  0.0f,
+    0.0f,  0.225f/2, 0.0f,
     //eje3
-    -0.75f,  0.0f, 0.0f,
-    -0.225f, 0.0f, 0.0f,
-     0.75f,  0.0f, 0.0f,
-     0.225f, 0.0f, 0.0f,
+    -0.75f/2,  0.0f, 0.0f,
+    -0.225f/2, 0.0f, 0.0f,
+     0.75f/2,  0.0f, 0.0f,
+     0.225f/2, 0.0f, 0.0f,
 };
 
 static const GLushort Cursor3DEdges[Cursor3DEdgesSize]={

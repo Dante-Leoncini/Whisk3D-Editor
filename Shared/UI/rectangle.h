@@ -34,8 +34,8 @@ class Rectangle {
 			color[2] = blue;
 		}
 
-		void Render() const {
-			glColor4ub(color[0], color[1], color[2], opacity);
+		void Render(bool usarColorPropio = true) const {
+			if (usarColorPropio) glColor4ub(color[0], color[1], color[2], opacity);
     		glVertexPointer(2, GL_SHORT, 0, vertices);
 			glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 		}

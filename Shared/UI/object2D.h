@@ -87,7 +87,7 @@ Object2D* AddObject2D(UI type = UI::empty, Object2D** outPtr = nullptr) {
     return obj;
 }
 
-void RenderObject2D( Object2D& obj ){
+void RenderObject2D( Object2D& obj, bool usarColorPropio = true){
 	if (!obj.visible){
 		return;
 	}
@@ -95,12 +95,12 @@ void RenderObject2D( Object2D& obj ){
 	switch (obj.type) {
         case UI::Rectangle: {
             Rectangle* rect = static_cast<Rectangle*>(obj.data);
-            if (rect) rect->Render();
+            if (rect) rect->Render(usarColorPropio);
             break;
         }
         case UI::text: {
             Text* txt = static_cast<Text*>(obj.data);
-            if (txt) txt->Render();
+            if (txt) txt->Render(usarColorPropio);
             break;
         }
 		case UI::empty:

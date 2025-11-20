@@ -49,7 +49,7 @@ int winH = 480;
 
 #include "../Shared/clases.h"
 #include "../Shared/variables.h"
-#include "../Shared/colores.h"
+#include "../Shared/UI/colores.h"
 #include "../Shared/OpcionesRender.h"
 
 #include "../Shared/Animation.h"

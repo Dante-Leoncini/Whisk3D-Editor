@@ -99,8 +99,10 @@ class Text {
 			}
 		}
 
-		void Render() const {
-			glColor4ub(color[0], color[1], color[2], parent.opacity);
+		void Render(bool UsarColor = true) const {
+			if (UsarColor){ 
+				glColor4ub(color[0], color[1], color[2], parent.opacity);				
+			}
 			glBindTexture(GL_TEXTURE_2D, Textures[0].iID);
 
 			//esto se hace despues del bind de la textura. sino no le afecta

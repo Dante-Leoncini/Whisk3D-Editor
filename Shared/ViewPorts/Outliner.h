@@ -113,13 +113,13 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable  {
             glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);      
-            glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+            glColor4f(ListaColores[grisUI][0], ListaColores[grisUI][1],
+                    ListaColores[grisUI][2], ListaColores[grisUI][3]);
 
             //esto es para recortar y que no se ponga el texto encima de los ojos de la derecha
             glEnable(GL_SCISSOR_TEST);
             if (scrollX){
                 glScissor(x, y+ marginGS, width - IconSizeGS - marginGS - borderGS -gapGS, height - marginGS); // igual a tu viewport - los ojos
-
             }
             else {
                 glScissor(x, y, width - IconSizeGS - marginGS - borderGS -gapGS, height); // igual a tu viewport - los ojos
@@ -146,7 +146,7 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable  {
 
                 //texto render                   
                 glTranslatef(IconSizeGS + gapGS, 0, 0);   
-                RenderObject2D(*Objects[c]->name);
+                RenderObject2D(*Objects[c]->name, false);
 
                 glTranslatef(gapGS + IconSizeGS, 0, 0); 
                 for (size_t o = 0; o < Objects[c]->Childrens.size(); o++) {
@@ -175,14 +175,13 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable  {
 
                     //texto
                     glTranslatef(IconSizeGS + gapGS, 0, 0);   
-                    RenderObject2D(*Objects[c]->Childrens[o]->name);  
+                    RenderObject2D(*Objects[c]->Childrens[o]->name, false);  
 
                     //glPopMatrix();   
                 }           
                 glTranslatef(-IconSizeGS - gapGS -IconSizeGS - gapGS -IconSizeGS - gapGS, RenglonHeightGS, 0);    
             }
             glPopMatrix();  
-            glDisable(GL_SCISSOR_TEST);
 
     		glVertexPointer(2, GL_SHORT, 0, IconMesh); //todos los iconos comparten los vertices y tamaño
             RenglonesY = 0;
@@ -190,6 +189,13 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable  {
             glPushMatrix();   
             //no usa PosX porque los ojos siempre estan en la misma posicion en X. al borde
             glTranslatef(width - IconSizeGS - marginGS - borderGS, GlobalScale + PosY + borderGS, 0);
+            
+            if (scrollX){
+                glScissor(x, y+ marginGS, width - marginGS - borderGS, height - marginGS); // igual a tu viewport - los ojos
+            }
+            else {
+                glScissor(x, y, width - marginGS - borderGS, height); // igual a tu viewport - los ojos
+            }
             
             for (size_t c = 0; c < Objects.size(); c++) {       
                 glTexCoordPointer(2, GL_FLOAT, 0, IconsUV[static_cast<size_t>(IconType::visible)]->uvs);
@@ -203,6 +209,7 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable  {
                 glTranslatef(0, RenglonHeightGS, 0); 
             }
             glPopMatrix();     
+            glDisable(GL_SCISSOR_TEST);
 
             DibujarBordes(this);
             DibujarScrollbar(this);

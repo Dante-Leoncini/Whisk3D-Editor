@@ -327,14 +327,15 @@ class Scrollable {
                                 ListaColores[accent][2], ListaColores[accent][3]);
                     }
                     else {
-                        glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+                        glColor4f(ListaColores[blanco][0], ListaColores[blanco][1],
+                                ListaColores[blanco][2], ListaColores[blanco][3]);
                     }
                 }
                 else {
                     glTexCoordPointer(2, GL_FLOAT, 0, ScrollbarUV);
                     glVertexPointer(2, GL_SHORT, 0, scrollVerticalMesh);
-                    glColor4f(ListaColores[negro][0], ListaColores[negro][1],
-                            ListaColores[negro][2], ListaColores[negro][3]);
+                    glColor4f(ListaColores[grisUI][0], ListaColores[grisUI][1],
+                            ListaColores[grisUI][2], ListaColores[grisUI][3]);
                 }
 
                 glDrawElements(GL_TRIANGLES, 3*2*3, GL_UNSIGNED_BYTE, indicesScrollbar);
@@ -352,14 +353,15 @@ class Scrollable {
                                 ListaColores[accent][2], ListaColores[accent][3]);
                     }
                     else {
-                        glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+                        glColor4f(ListaColores[blanco][0], ListaColores[blanco][1],
+                                ListaColores[blanco][2], ListaColores[blanco][3]);
                     }
                 }
                 else {
                     glTexCoordPointer(2, GL_FLOAT, 0, ScrollbarUV);
                     glVertexPointer(2, GL_SHORT, 0, scrollHorizontalMesh);
-                    glColor4f(ListaColores[negro][0], ListaColores[negro][1],
-                            ListaColores[negro][2], ListaColores[negro][3]);
+                    glColor4f(ListaColores[grisUI][0], ListaColores[grisUI][1],
+                            ListaColores[grisUI][2], ListaColores[grisUI][3]);
                 }
 
                 glDrawElements(GL_TRIANGLES, 3*2*3, GL_UNSIGNED_BYTE, indicesScrollbar);
