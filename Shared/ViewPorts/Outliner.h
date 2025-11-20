@@ -131,8 +131,14 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable  {
             for (size_t c = 0; c < Objects.size(); c++){
                 if (Objects[c] == ObjActivo){
                     //std::cout << "Objeto activo en el outliner: " << reinterpret_cast<Text*>(Objects[c]->name->data)->value << "\n";
-                    glColor4f(ListaColores[accent][0], ListaColores[accent][1],
-                            ListaColores[accent][2], ListaColores[accent][3]);
+                    if (Objects[c]->select){
+                        glColor4f(ListaColores[accent][0], ListaColores[accent][1],
+                                ListaColores[accent][2], ListaColores[accent][3]);
+                    }
+                    else {
+                        glColor4f(ListaColores[blanco][0], ListaColores[blanco][1],
+                                ListaColores[blanco][2], ListaColores[blanco][3]);
+                    }
                 }
                 else if (Objects[c]->select){
                     glColor4f(ListaColores[accentDark][0], ListaColores[accentDark][1],
@@ -161,10 +167,27 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable  {
                 RenderObject2D(*Objects[c]->name, false);
 
                 glTranslatef(gapGS + IconSizeGS, 0, 0); 
-                for (size_t o = 0; o < Objects[c]->Childrens.size(); o++) {
-                    glColor4f(ListaColores[grisUI][0], ListaColores[grisUI][1],
-                            ListaColores[grisUI][2], ListaColores[grisUI][3]);
-                    
+                for (size_t o = 0; o < Objects[c]->Childrens.size(); o++) {    
+                    if (Objects[c] == ObjActivo){
+                        //std::cout << "Objeto activo en el outliner: " << reinterpret_cast<Text*>(Objects[c]->name->data)->value << "\n";
+                        if (Objects[c]->select){
+                            glColor4f(ListaColores[accent][0], ListaColores[accent][1],
+                                    ListaColores[accent][2], ListaColores[accent][3]);
+                        }
+                        else {
+                            glColor4f(ListaColores[blanco][0], ListaColores[blanco][1],
+                                    ListaColores[blanco][2], ListaColores[blanco][3]);
+                        }
+                    }
+                    else if (Objects[c]->select){
+                        glColor4f(ListaColores[accentDark][0], ListaColores[accentDark][1],
+                                ListaColores[accentDark][2], ListaColores[accentDark][3]);
+                    }
+                    else {
+                        glColor4f(ListaColores[grisUI][0], ListaColores[grisUI][1],
+                                ListaColores[grisUI][2], ListaColores[grisUI][3]);
+                    }     
+                               
                     glTranslatef(
                         -IconSizeGS - gapGS -IconSizeGS - gapGS -IconSizeGS - gapGS, 
                         RenglonHeightGS, 
@@ -178,10 +201,16 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable  {
 
                     if (Objects[c]->Childrens[o] == ObjActivo){
                         //std::cout << "Objeto activo en el outliner: " << reinterpret_cast<Text*>(Objects[c]->Childrens[o]->name->data)->value << "\n";
-                        glColor4f(ListaColores[accent][0], ListaColores[accent][1],
-                                ListaColores[accent][2], ListaColores[accent][3]);
+                        if (Objects[c]->Childrens[o]->select){
+                            glColor4f(ListaColores[accent][0], ListaColores[accent][1],
+                                    ListaColores[accent][2], ListaColores[accent][3]);
+                        }
+                        else {
+                            glColor4f(ListaColores[blanco][0], ListaColores[blanco][1],
+                                    ListaColores[blanco][2], ListaColores[blanco][3]);
+                        }
                     }
-                    else if (Objects[c]->select){
+                    else if (Objects[c]->Childrens[o]->select){
                         glColor4f(ListaColores[accentDark][0], ListaColores[accentDark][1],
                                 ListaColores[accentDark][2], ListaColores[accentDark][3]);
                     }

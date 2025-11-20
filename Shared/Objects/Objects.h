@@ -75,30 +75,20 @@ class Object {
         }
 
         bool SeleccionarCompleto(){
+            //si hay algo seleccionado retorna true para deseleccionar todo
+            if (select) return true;
+            
+            if (getType() != ObjectType::collection && getType() != ObjectType::baseObject){
+                select = true;
+                ObjSelects.push_back(this);
+                if (!ObjActivo) ObjActivo = this;
+            }
+
+            for(size_t o=0; o < Childrens.size(); o++){      
+                if (Childrens[o]->SeleccionarCompleto()) return true;
+            }
+            //nada seleccionado
             return false;
-            /*for(size_t o=0; o < Objects.size(); o++){
-                if (Objects[o]->select){
-                    return true;
-                }
-                Objects[o]->select = true;
-                Objects[o]->SelectActivo = false;	
-            }
-            for(size_t c=0; c < Collections.size(); c++){
-                if (Collections[c]->select){
-                    return true;
-                }
-                Collections[c]->select = true;
-                Collections[c]->SelectActivo = false;
-                for(size_t cc=0; cc < Collections.size(); cc++){
-                    if (Collections[cc]->select){
-                        return true;
-                    }
-                    if (Collections[cc]->SeleccionarTodo()){
-                        return true;
-                    }
-                }
-            }
-            return false;*/
         }
 
         virtual void RenderObject(){
@@ -336,11 +326,10 @@ void changeSelect(){
 
 void DeseleccionarTodo(){
 	if (InteractionMode == ObjectMode){
-        ObjActivo = nullptr;
+        ObjSelects.clear();
 		for(size_t o=0; o < Objects.size(); o++){
             Objects[o]->DeseleccionarCompleto();		
 		}
-        ObjSelects.clear();
 	}
 }
 
@@ -350,15 +339,16 @@ void SeleccionarTodo(){
     }*/
     //recorre las colecciones y selecciona todo. si llega a encontrar algo hace lo contrario. deselecciona todo
 	if (InteractionMode == ObjectMode){
+        ObjSelects.clear();
         for(size_t c=0; c < Objects.size(); c++){
             //habia algo seleccionado... asi que hacemos lo contrario. deseleccionar todo
             if (Objects[c]->SeleccionarCompleto()){
-                std::cout << "habia algo seleccionado! se deselecciona todo\n";
+                //std::cout << "habia algo seleccionado! se deselecciona todo\n";
                 DeseleccionarTodo();
                 return;
             }
         }
-        std::cout << "Todos los objetos seleccionados\n";
+        //std::cout << "Todos los objetos seleccionados\n";
     }
 }
 
