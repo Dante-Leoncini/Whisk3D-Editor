@@ -70,14 +70,14 @@ class Camera : public Object {
             glScalef(scaleX, scaleZ, scaleY);
 
             //color si esta seleccionado
-            if (SelectActivo){
+            if (ObjActivo == this){
                 glColor4f(ListaColores[accent][0],ListaColores[accent][1],ListaColores[accent][2],ListaColores[accent][3]);
             }
             else if (select){
                 glColor4f(ListaColores[accentDark][0],ListaColores[accentDark][1],ListaColores[accentDark][2],ListaColores[accentDark][3]);
             }
             else {		
-                glColor4f(ListaColores[negro][0],ListaColores[negro][1],ListaColores[negro][2],ListaColores[negro][3]);		
+                glColor4f(ListaColores[grisUI][0], ListaColores[grisUI][1], ListaColores[grisUI][2], ListaColores[grisUI][3]);		
             }
 
             glEnable(GL_DEPTH_TEST);

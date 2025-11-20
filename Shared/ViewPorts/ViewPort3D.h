@@ -399,7 +399,7 @@ class Viewport3D : public ViewportBase, public WithBorder  {
         }
 
         void EnfocarObject(){
-            if (SelectCount > 0){
+            if (ObjSelects.size() > 0){
                 SetTransformPivotPoint();	
                 PivotX = 0.0f; 
                 PivotY = 0.0f;

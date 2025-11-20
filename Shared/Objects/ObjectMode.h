@@ -161,6 +161,7 @@ void SetTransformPivotPoint(){
 				}*/
 			}
 		}
+		size_t SelectCount = ObjSelects.size();
 		TransformPivotPointFloat[0] = TransformPivotPointFloat[0]/SelectCount;
 		TransformPivotPointFloat[1] = TransformPivotPointFloat[1]/SelectCount;
 		TransformPivotPointFloat[2] = TransformPivotPointFloat[2]/SelectCount;
@@ -179,8 +180,7 @@ void GuardarMousePos() {
 void guardarEstado(){
 	GuardarMousePos();
 	estadoObjetos.clear();
-	//estadoObjetos.ReserveL(SelectCount);
-	estadoObjetos.reserve(SelectCount);
+	estadoObjetos.reserve(ObjSelects.size());
 	for(size_t c=0; c < Objects.size(); c++){
 		for(size_t o=0; o < Objects[c]->Childrens.size(); o++){
 			Object& obj = *Objects[c]->Childrens[o];

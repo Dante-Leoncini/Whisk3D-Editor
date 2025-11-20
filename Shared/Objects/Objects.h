@@ -12,7 +12,10 @@ enum class ObjectType {
 // Declaración adelantada
 class Object;                 // forward declaration de la clase
 extern std::vector<Object*> Objects;   // forward declaration del vector global
+extern std::vector<Object*> ObjSelects;   // forward declaration del vector global
 Object* ObjActivo = nullptr;
+
+void DeseleccionarTodo(); // ← forward declaration
 
 class Object {
     public:
@@ -20,7 +23,6 @@ class Object {
         std::vector<Object*> Childrens;
 		bool visible = true;
         bool select = true;
-        bool SelectActivo = true;
         Object2D* name = nullptr;
         size_t IconType = 0;
         
@@ -45,17 +47,34 @@ class Object {
             else {
                 Objects.push_back(this);
             }
+            DeseleccionarTodo();
+            Seleccionar();
+        }
+
+        void Seleccionar(){
+            select = true;
             ObjActivo = this;
+            ObjSelects.push_back(this);
         }
 
-        void DeseleccionarTodo(){
-            /*select = false;
-            for(size_t o=0; o < Objects.size(); o++){
-                Objects[o]->DeseleccionarTodo();		
-            }    */ 
+        void Deseleccionar(){
+            select = false;
+            for(size_t o=0; o < ObjSelects.size(); o++){
+                if (this == ObjSelects[o]){
+                    ObjSelects.erase(ObjSelects.begin() + o);
+                    break;
+                }                
+            } 
         }
 
-        bool SeleccionarTodo(){
+        void DeseleccionarCompleto(){
+            select = false;
+            for(size_t o=0; o < Childrens.size(); o++){
+                Childrens[o]->DeseleccionarCompleto();		
+            } 
+        }
+
+        bool SeleccionarCompleto(){
             return false;
             /*for(size_t o=0; o < Objects.size(); o++){
                 if (Objects[o]->select){
@@ -202,6 +221,7 @@ std::string SetName(const std::string& baseName) {
 
 //Objects es el punto raiz. o los objetos estan dentro de esta lista. o dentro de objetos de esta lista
 std::vector<Object*> Objects;
+std::vector<Object*> ObjSelects;
 Object* CollectionActive = nullptr;
 
 class SaveState {
@@ -250,16 +270,6 @@ void changeSelect(){
 		UpdateOutlinerColor();
 	}*/
 }
-
-size_t GetIconType(int type){
-    return 0;
-	/*switch (type) {			
-		case camera: {return static_cast<size_t>(IconType::camera); break;}
-		case light: {return static_cast<size_t>(IconType::light); break;}
-		case mesh: {return static_cast<size_t>(IconType::mesh); break;}
-		default: {return 0; break;}
-	}*/
-};
 
 /*Object* AddObject( size_t type ){
 	Object* obj = new Object();
@@ -326,34 +336,30 @@ size_t GetIconType(int type){
 
 void DeseleccionarTodo(){
 	if (InteractionMode == ObjectMode){
-		/*for(size_t o=0; c < Objects.size(); o++){
-            Objects[o]->DeseleccionarTodo();		
-		}*/
-        SelectCount = 0;
+        ObjActivo = nullptr;
+		for(size_t o=0; o < Objects.size(); o++){
+            Objects[o]->DeseleccionarCompleto();		
+		}
+        ObjSelects.clear();
 	}
 }
 
 void SeleccionarTodo(){
+    /*if (ObjActivo){
+        std::cout << "Objecto activo " << reinterpret_cast<Text*>(ObjActivo->name->data)->value << "\n";
+    }*/
     //recorre las colecciones y selecciona todo. si llega a encontrar algo hace lo contrario. deselecciona todo
-	/*if (InteractionMode == ObjectMode){
-        for(size_t c=0; c < Collections.size(); c++){
+	if (InteractionMode == ObjectMode){
+        for(size_t c=0; c < Objects.size(); c++){
             //habia algo seleccionado... asi que hacemos lo contrario. deseleccionar todo
-            if (Collections[c]->SeleccionarTodo()){
+            if (Objects[c]->SeleccionarCompleto()){
                 std::cout << "habia algo seleccionado! se deselecciona todo\n";
                 DeseleccionarTodo();
                 return;
             }
         }
         std::cout << "Todos los objetos seleccionados\n";
-    }*/
-}
-
-void SetActive(Object* obj){
-    DeseleccionarTodo();
-    ObjActivo = obj;
-    obj->select = true;
-    obj->SelectActivo = true;
-	SelectCount = 1;
+    }
 }
 
 //outliner

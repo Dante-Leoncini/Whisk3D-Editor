@@ -59,8 +59,6 @@ int lastMouseX, lastMouseY;
 //camara
 bool CameraToView = false;
 
-int SelectCount = 0;
-
 bool ViewPortClickDown = false;
 
 bool showOverlays = true;

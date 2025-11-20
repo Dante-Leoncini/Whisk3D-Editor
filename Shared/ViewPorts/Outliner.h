@@ -128,8 +128,20 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable  {
             RenglonesY = 0;  
             glPushMatrix();          
             glTranslatef(marginGS + PosX, PosY + borderGS, 0);            
-            for (size_t c = 0; c < Objects.size(); c++) {    
-                //glTranslatef(0, RenglonesY, 0); 
+            for (size_t c = 0; c < Objects.size(); c++){
+                if (Objects[c] == ObjActivo){
+                    //std::cout << "Objeto activo en el outliner: " << reinterpret_cast<Text*>(Objects[c]->name->data)->value << "\n";
+                    glColor4f(ListaColores[accent][0], ListaColores[accent][1],
+                            ListaColores[accent][2], ListaColores[accent][3]);
+                }
+                else if (Objects[c]->select){
+                    glColor4f(ListaColores[accentDark][0], ListaColores[accentDark][1],
+                            ListaColores[accentDark][2], ListaColores[accentDark][3]);
+                }
+                else {
+                    glColor4f(ListaColores[grisUI][0], ListaColores[grisUI][1],
+                            ListaColores[grisUI][2], ListaColores[grisUI][3]);
+                }
                 
                 //icono desplegar
                 glVertexPointer(2, GL_SHORT, 0, IconMesh); //todos los iconos comparten los vertices y tamaño
@@ -150,6 +162,9 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable  {
 
                 glTranslatef(gapGS + IconSizeGS, 0, 0); 
                 for (size_t o = 0; o < Objects[c]->Childrens.size(); o++) {
+                    glColor4f(ListaColores[grisUI][0], ListaColores[grisUI][1],
+                            ListaColores[grisUI][2], ListaColores[grisUI][3]);
+                    
                     glTranslatef(
                         -IconSizeGS - gapGS -IconSizeGS - gapGS -IconSizeGS - gapGS, 
                         RenglonHeightGS, 
@@ -160,6 +175,20 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable  {
                     glVertexPointer(2, GL_SHORT, 0, IconLineMesh); //todos los iconos comparten los vertices y tamaño
                     glTexCoordPointer(2, GL_FLOAT, 0, IconsUV[static_cast<size_t>(IconType::line)]->uvs);
                     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+                    if (Objects[c]->Childrens[o] == ObjActivo){
+                        //std::cout << "Objeto activo en el outliner: " << reinterpret_cast<Text*>(Objects[c]->Childrens[o]->name->data)->value << "\n";
+                        glColor4f(ListaColores[accent][0], ListaColores[accent][1],
+                                ListaColores[accent][2], ListaColores[accent][3]);
+                    }
+                    else if (Objects[c]->select){
+                        glColor4f(ListaColores[accentDark][0], ListaColores[accentDark][1],
+                                ListaColores[accentDark][2], ListaColores[accentDark][3]);
+                    }
+                    else {
+                        glColor4f(ListaColores[grisUI][0], ListaColores[grisUI][1],
+                                ListaColores[grisUI][2], ListaColores[grisUI][3]);
+                    }
 
                     //icono desplegar
                     glTranslatef(IconSizeGS + gapGS, 0, 0);   
@@ -184,6 +213,7 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable  {
             glPopMatrix();  
 
     		glVertexPointer(2, GL_SHORT, 0, IconMesh); //todos los iconos comparten los vertices y tamaño
+            glColor4f(ListaColores[grisUI][0], ListaColores[grisUI][1], ListaColores[grisUI][2], ListaColores[grisUI][3]);
             RenglonesY = 0;
 
             glPushMatrix();   
