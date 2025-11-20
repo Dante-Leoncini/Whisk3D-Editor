@@ -75,7 +75,7 @@ class Mesh : public Object {
 					
 			glColor4f(ListaColores[blanco][0],ListaColores[blanco][1],ListaColores[blanco][2],ListaColores[blanco][3]);
 			glDisable(GL_COLOR_MATERIAL);
-			glMaterialfv(   GL_FRONT_AND_BACK, GL_AMBIENT,  objAmbient  );
+			glMaterialfv(   GL_FRONT_AND_BACK, GL_AMBIENT,  MaterialPreviewAmbient  );
 			//averiguar diferencia entre glMaterialx y glMateriali
 			//glMaterialx( GL_FRONT_AND_BACK, GL_SHININESS,   12 << 16     );
 			glMateriali( GL_FRONT_AND_BACK, GL_SHININESS,   12     );

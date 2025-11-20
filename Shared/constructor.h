@@ -6,15 +6,9 @@ void ConstructUniversal(){
     glEnable(GL_NORMALIZE);
     glShadeModel(GL_SMOOTH);
     glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_FASTEST);
-    glEnableClientState(GL_VERTEX_ARRAY);
-    glEnableClientState(GL_NORMAL_ARRAY);
 
     // iluminación. GL_LIGHT0 es el sol
-    glEnable(GL_LIGHT0);
-    glLightfv(GL_LIGHT0, GL_DIFFUSE,  lightDiffuseLamp);
-    glLightfv(GL_LIGHT0, GL_AMBIENT,  objAmbient);
-    glLightfv(GL_LIGHT0, GL_SPECULAR, lightSpecularLamp);
-    glLightfv(GL_LIGHT0, GL_POSITION, sunLightPosition);
+    SetViewType(RenderType::MaterialPreview);
 
     // Siempre un material por defecto
     MaterialDefecto = new Material("Default", true);
@@ -31,11 +25,20 @@ void ConstructUniversal(){
     CollectionActive = new Collection(nullptr);
 
     // Cámara y objetos iniciales
-    new Camera(CollectionActive, -2.5f, -2.5f, 1.8f, 0, -35.0, -45.0);
+    new Camera(CollectionActive, -3.0f, 2.5f, 1.8f, 0, -35.0, 45.0);
 
-    Light::Create(CollectionActive, 1.5f, 0.75f, 2.25f);
+    //Light::Create(CollectionActive, 1.5f, 0.75f, 2.25f);
+
+    //Light* luz1 = Light::Create(CollectionActive, -3.5f, 1.75f, 2.25f);
+    Light* luz1 = Light::Create(CollectionActive, 1.0f, 2.25f, 2.25f);
+    luz1->SetDiffuse(1.0f, 0.0f, 0.0f);
 
     NewMesh(MeshType::cube, CollectionActive);
+    //abrir();
+
+    /*Light* luz2 = Light::Create(nullptr, 1.5f, 1.75f, 2.25f);
+    luz2->SetDiffuse(0.0f, 1.0f, 0.0f);
+    luz2->SetLightID(GL_LIGHT1);*/
 
     /*Collection* colec2 = new Collection(nullptr, "Collection_Test");
     Collections.push_back(colec2);
@@ -59,11 +62,19 @@ void ConstructUniversal(){
     AddMesh(cubo);
     AddMesh(cubo);*/
 
+    //vertical
+    rootViewport = new ViewportColumn(
+        new Outliner(),
+        new Viewport3D(), 
+        0.2f
+    );
+
+    /* horizontal
     rootViewport = new ViewportRow(
         new Viewport3D(), 
         new ViewportColumn(
             new Viewport3D(), new Outliner(), 0.3f
         ),
         0.7f
-    );
+    );*/
 }

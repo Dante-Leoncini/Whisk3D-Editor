@@ -441,16 +441,16 @@ void SetTranslacionObjetos(int dx, int dy, float factor = 1.0f){
                 break;
             }
 			case X:
-				obj.posX += dx;
-				obj.posX += dy;
+				obj.posX += dx * factor;
+				obj.posX += dy * factor;
 				break;
 			case Y:
-				obj.posY -= dx;
-				obj.posY -= dy;
+				obj.posY -= dx * factor;
+				obj.posY -= dy * factor;
 				break;
 			case Z:
-				obj.posZ -= dx;
-				obj.posZ -= dy;
+				obj.posZ -= dx * factor;
+				obj.posZ -= dy * factor;
 				break;
 		}
 	}

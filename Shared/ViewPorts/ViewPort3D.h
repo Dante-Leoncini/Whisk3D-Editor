@@ -4,10 +4,15 @@ GLfloat LastPivotX = 0;
 GLfloat LastPivotY = 0;
 GLfloat LastPivotZ = 0;
 
+bool limpiarPantalla = true;
+
+void SetLimpiarPantalla(){
+    limpiarPantalla = !limpiarPantalla;
+}
+
 class Viewport3D : public ViewportBase, public WithBorder  {
 	public:
         bool orthographic = false;
-        bool SimularZBuffer = false;
         bool ViewFromCameraActive = false;
         GLfloat nearClip = 0.01f;
         GLfloat farClip = 1000.0f;
@@ -52,8 +57,7 @@ class Viewport3D : public ViewportBase, public WithBorder  {
             glEnable(GL_SCISSOR_TEST);
             glScissor(x, y, width, height); // igual a tu viewport
             //Empieza el render
-            if (SimularZBuffer){
-                glClearColor(0.0f, 0.0f, 0.0f, 1.0f); // Color negro
+            if (view == RenderType::ZBuffer){
                 glEnable(GL_FOG);
                 glFogf(GL_FOG_MODE, GL_LINEAR); // Tipo de niebla lineal
                 glFogf(GL_FOG_START, nearClip);  // Distancia inicial de la niebla
@@ -65,14 +69,26 @@ class Viewport3D : public ViewportBase, public WithBorder  {
                 glDisable(GL_FOG);
                 glClearColor(ListaColores[background][0],ListaColores[background][1],ListaColores[background][2],ListaColores[background][3]);
             }
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);            
+
+            if (limpiarPantalla){
+                if (view == RenderType::ZBuffer){
+                    glClearColor(0.0f, 0.0f, 0.0f, 1.0f); // Color negro
+                }
+                else if (view == RenderType::Rendered){
+                    glClearColor(backgroundRender[0], backgroundRender[1], backgroundRender[2], backgroundRender[3]);
+                }
+                else {
+                    glClearColor(ListaColores[background][0],ListaColores[background][1],ListaColores[background][2],ListaColores[background][3]);
+                }
+                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            }    
+            else {
+                glClear(GL_DEPTH_BUFFER_BIT);
+            }    
             glDisable(GL_SCISSOR_TEST);
 
 	        glViewport(x, y, width, height); // x, y, ancho, alto    
-
-            glEnable(GL_DEPTH_TEST);
-            glDisable( GL_CULL_FACE );
-            glDisable( GL_LIGHTING );
+            
             glDisable( GL_TEXTURE_2D );
             glDisable( GL_BLEND );
             glDisable(GL_COLOR_MATERIAL);
@@ -87,8 +103,7 @@ class Viewport3D : public ViewportBase, public WithBorder  {
 
             // estas son luces que se mueven con la camara
             if (view == RenderType::Solid || view == RenderType::MaterialPreview){
-                glEnable(GL_LIGHT0);
-                glLightfv(GL_LIGHT0, GL_POSITION, sunLightPosition);
+                glLightfv(GL_LIGHT0, GL_POSITION, MaterialPreviewPosition);
             }
 
             glTranslatef( posX, posZ, -cameraDistance+posY );
@@ -98,44 +113,6 @@ class Viewport3D : public ViewportBase, public WithBorder  {
             glRotatef(rotX, 0, 1, 0); //angulo, X Y Z
             //glScalef(1024.0f / 65536.0f, 1024.0f / 65536.0f, 1024.0f / 65536.0f);
             glTranslatef( PivotX, PivotZ, PivotY);
-
-            //las luces que se coloquen ACA se colocan en el mundo
-            if (view == RenderType::Rendered){
-                /*for (size_t c = 0; c < Objects.size(); c++) {
-                    for (size_t o = 0; o < Objects[c]->Childrens.size(); o++) {
-                        if(Objects[c]->Childrens[o]->getType() != ObjectType::light ) {continue;}
-                        Light* light = static_cast<Light*>(Objects[c]->Childrens[o]);
-
-                        if (light->lightId != -1) continue;
-
-                        if (Objects[c]->Childrens[o]->visible){
-
-                        if (light->lightId != -1) {
-                            glEnable(light->lightId);
-
-                            glPushMatrix();
-                            glTranslatef(light->posX, light->posZ, light->posY);
-
-                            GLfloat lightPos[] = {0, 0, 0, 1}; // puntual
-                            glLightfv(light->lightId, GL_POSITION, lightPos);
-
-                            glLightfv(light->lightId, GL_DIFFUSE, light->color);
-                            glLightfv(light->lightId, GL_SPECULAR, light->color);
-
-                            glPopMatrix();
-                        }
-
-                        }
-
-                        glPushMatrix(); //guarda la matrix
-                        glTranslatef( light->posX, light->posZ, light->posY);
-                        GLfloat lightPos[] = {0.0f, 0.0f, 0.0f, 1.0f}; // Luz puntual en la posici�n transformada
-                        glLightfv(light->lightId, GL_POSITION, lightPos);
-                        //glLightfv(  light.lightId, GL_POSITION, positionPuntualLight );
-                        glPopMatrix(); //reinicia la matrix a donde se guardo  
-                    }	
-                }*/
-            }
             
             //se encarga de dibujar el layout 
             if (showOverlays){
@@ -365,7 +342,7 @@ class Viewport3D : public ViewportBase, public WithBorder  {
                 glDisable( GL_POINT_SPRITE );
                 glDisable( GL_BLEND );
             
-                glColor4f(ListaColores[negro][0],ListaColores[negro][1],ListaColores[negro][2],ListaColores[negro][3]);
+                glColor4f(ListaColores[grisUI][0],ListaColores[grisUI][1],ListaColores[grisUI][2],ListaColores[grisUI][3]);
                 glVertexPointer( 3, GL_FLOAT, 0, Cursor3DVertices );
                 glDrawElements( GL_LINES, Cursor3DEdgesSize, GL_UNSIGNED_SHORT, Cursor3DEdges );	
 
@@ -909,6 +886,12 @@ class Viewport3D : public ViewportBase, public WithBorder  {
                     case SDLK_D:
                         ClickD();
                         break;
+                    case SDLK_U:
+                        SetLimpiarPantalla();
+                        break;
+                    case SDLK_J:
+                        ChangeViewType();
+                        break;                        
                     case SDLK_X:   
                         if (estado != editNavegacion){
                             if (axisSelect != X){

@@ -1,8 +1,42 @@
 //interpolacion
 enum {lineal, closest};
 
-enum class RenderType { Solid, MaterialPreview, Rendered };
+enum class RenderType { Solid, MaterialPreview, Rendered, ZBuffer };
+
 RenderType view = RenderType::MaterialPreview;
+GLfloat backgroundRender[4]  = { 0.0f, 0.0f, 0.0f, 1.0f };
+
+//luz material preview
+GLfloat MaterialPreviewAmbient[4]  = { 0.3f, 0.3f, 0.3f, 1.0f };
+GLfloat MaterialPreviewDiffuse[4]   = { 1.0f, 1.0f, 1.0f, 1.0f };
+GLfloat MaterialPreviewSpecular[4]   = { 0.2f, 0.2f, 0.2f, 1.0f };
+GLfloat MaterialPreviewPosition[4]  = { -0.45f, 0.55f, 1.0f, 0.0f };
+
+void SetViewType(RenderType type = view){
+	view = type;
+    if (type == RenderType::MaterialPreview){
+		glEnable(GL_LIGHT0);
+		glLightfv(GL_LIGHT0, GL_DIFFUSE,  MaterialPreviewDiffuse);
+		glLightfv(GL_LIGHT0, GL_AMBIENT,  MaterialPreviewAmbient);
+		glLightfv(GL_LIGHT0, GL_SPECULAR, MaterialPreviewSpecular);
+
+		glLightf(GL_LIGHT0, GL_CONSTANT_ATTENUATION, 1.0f);
+		glLightf(GL_LIGHT0, GL_LINEAR_ATTENUATION,   0.0f);
+		glLightf(GL_LIGHT0, GL_QUADRATIC_ATTENUATION, 0.00f);
+    }
+    else if (type == RenderType::ZBuffer){
+		glDisable(GL_LIGHT0);
+    }
+};
+
+void ChangeViewType(){
+    if (view == RenderType::MaterialPreview){
+        SetViewType(RenderType::Rendered);
+    }
+    else {
+        SetViewType(RenderType::MaterialPreview);
+    }
+};
 
 #include "./Objects/Textures.h"
 #include "./UI/UI.h"

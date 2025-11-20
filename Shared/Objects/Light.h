@@ -1,23 +1,10 @@
-//luz
-//GLfloat light_pos[] = { -5000.0f, 5000.0f, 5000.0f, 1.0f };
-//GLfloat light_diffuse[] = { 1.0f, 1.0f, 1.0f, 1.0f };
-//GLfloat light_specular[] = { 1.0f, 1.0f, 1.0f, 1.0f };
-
-//GLfloat objAmbient[4]  = { 0.3, 0.3, 0.3, 1.0 };
-
-//GLfloat lightDiffuseLamp[4]   = { 0.9, 0.9, 0.9, 1.0 };
-//GLfloat lightSpecularLamp[4]   = { 1.0, 1.0, 1.0, 1.0 };
-
-//GLfloat sunLightPosition[4]  = {-50, 500, 500, 0 }; // y, z, x, si es direccional o puntual
-
-GLfloat objAmbient[4]  = { 0.2f, 0.2f, 0.2f, 1.0f };
-GLfloat lightDiffuseLamp[4]   = { 1.0f, 1.0f, 1.0f, 1.0f };
-GLfloat lightSpecularLamp[4]   = { 0.3f, 0.3f, 0.3f, 1.0f };
-GLfloat sunLightPosition[4]  = { -0.45f, 0.55f, 1.0f, 0.0f };
-
 class Light : public Object {
     public:
-		GLfloat color[4] = {1.0f, 1.0f, 1.0f, 1.0f}; // blanco por defecto
+        int LightID = GL_LIGHT0;
+        GLfloat position[4]  = { 0.0f, 0.0f, 0.0f, 1.0f };
+        GLfloat ambient[4]  = { 0.0f, 0.0f, 0.0f, 1.0f };
+        GLfloat diffuse[4]   = { 1.0f, 1.0f, 1.0f, 1.0f }; // blanco por defecto
+        GLfloat specular[4]   = { 0.0f, 0.0f, 0.0f, 1.0f };
 
         static Light* Create(Object* parent = nullptr, GLfloat x = 0, GLfloat y = 0, GLfloat z = 0);
 
@@ -25,7 +12,31 @@ class Light : public Object {
             return ObjectType::light;
         }
 
+        void SetDiffuse(GLfloat r = 1.0f, GLfloat g = 1.0f, GLfloat b = 1.0f){
+            diffuse[0] = r;
+            diffuse[0] = g;
+            diffuse[0] = b;
+        }
+
+        void SetLightID(int ID){
+            LightID = ID;
+        }
+
         void RenderObject() override {
+            //como afecta a la luz en OpenGl. solo tiene efecto si estamos en modo render
+            if (view == RenderType::Rendered){
+                glEnable(LightID);
+                glLightfv(GL_LIGHT0, GL_POSITION, position);
+                glLightfv(GL_LIGHT0, GL_DIFFUSE,  diffuse);
+                glLightfv(GL_LIGHT0, GL_AMBIENT,  ambient);
+                glLightfv(GL_LIGHT0, GL_SPECULAR, specular);
+
+                // ACTIVAR ATENUACIÓN:
+                /*glLightf(GL_LIGHT0, GL_CONSTANT_ATTENUATION, 0.5f);
+                glLightf(GL_LIGHT0, GL_LINEAR_ATTENUATION,   0.1f);
+                glLightf(GL_LIGHT0, GL_QUADRATIC_ATTENUATION, 0.02f);*/
+            }
+
             //color si esta seleccionado
             if (ObjActivo == this){
                 glColor4f(ListaColores[accent][0],ListaColores[accent][1],ListaColores[accent][2],ListaColores[accent][3]);
