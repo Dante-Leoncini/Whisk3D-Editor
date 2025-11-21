@@ -1,3 +1,6 @@
+class Viewport3D;     // forward declaration válida
+extern Viewport3D* Viewport3DActive;
+
 enum class ObjectType {
     mesh, 
     camera, 

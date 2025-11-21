@@ -37,7 +37,7 @@ void RenderLinkLines(Object& obj){
 		GLfloat distancia = std::sqrt(diffX * diffX + diffY * diffY + diffZ * diffZ);
         
         // Usar la distancia escalada para modificar las coordenadas UV
-        lineUV[3] = distancia/8;
+        lineUV[3] = distancia*8;
 		glVertexPointer( 3, GL_SHORT, 0, LineaLinkChild );
 		glDrawElements( GL_LINES, LineaEdgeSize, GL_UNSIGNED_SHORT, LineaEdge );
 				

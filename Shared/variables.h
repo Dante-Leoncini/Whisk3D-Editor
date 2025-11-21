@@ -57,19 +57,11 @@ bool MouseWheel = false;
 int lastMouseX, lastMouseY;
 
 //camara
-bool CameraToView = false;
-
 bool ViewPortClickDown = false;
 
-bool showOverlays = true;
-bool ShowUi = true;
-bool showFloor = true;
-bool showYaxis = true;
-bool showXaxis = true;
-bool ShowRelantionshipsLines = true;
+//viewport3D valores globales
+bool showOverlayGlobal = false;
 
-bool showOrigins = true;
-bool show3DCursor = true;
 GLfloat Cursor3DposX = 0.0f;
 GLfloat Cursor3DposZ = 0.0f;
 GLfloat Cursor3DposY = 0.0f;

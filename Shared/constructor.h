@@ -33,12 +33,13 @@ void ConstructUniversal(){
     Light* luz1 = Light::Create(CollectionActive, 1.0f, 2.25f, 2.25f);
     luz1->SetDiffuse(1.0f, 0.0f, 0.0f);
 
+    /*Light* luz2 = Light::Create(luz1, -3.0f, 1.0f, 0.0f);
+    luz2->SetDiffuse(0.0f, 0.0f, 1.0f);
+    luz2->SetLightID(GL_LIGHT1);*/
+
     NewMesh(MeshType::cube, CollectionActive);
     //abrir();
 
-    /*Light* luz2 = Light::Create(nullptr, 1.5f, 1.75f, 2.25f);
-    luz2->SetDiffuse(0.0f, 1.0f, 0.0f);
-    luz2->SetLightID(GL_LIGHT1);*/
 
     /*Collection* colec2 = new Collection(nullptr, "Collection_Test");
     Collections.push_back(colec2);

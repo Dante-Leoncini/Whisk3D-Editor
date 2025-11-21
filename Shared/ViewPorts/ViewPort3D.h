@@ -14,6 +14,16 @@ class Viewport3D : public ViewportBase, public WithBorder  {
 	public:
         bool orthographic = false;
         bool ViewFromCameraActive = false;
+        bool showOverlays = true;
+        bool ShowUi = true;
+        bool showFloor = true;
+        bool showYaxis = true;
+        bool showXaxis = true;
+        bool CameraToView = false;
+        bool showOrigins = true;
+        bool show3DCursor = true;
+        bool ShowRelantionshipsLines = true;
+
         GLfloat nearClip = 0.01f;
         GLfloat farClip = 1000.0f;
         GLfloat cameraDistance = 10.0f;
@@ -35,7 +45,14 @@ class Viewport3D : public ViewportBase, public WithBorder  {
             aspect = (float)newW / (float)newH;
         }
 
+        void SetShowOverlays(bool valor){
+            showOverlays = valor;
+        }
+
         void Render() override {
+            //coloca los valores de forma global para que otras partes del programa las lea
+            showOverlayGlobal = showOverlays;
+
             glMatrixMode(GL_PROJECTION);
             glLoadIdentity();        
 
@@ -269,16 +286,17 @@ class Viewport3D : public ViewportBase, public WithBorder  {
 
                 //dibujar lineas parent		
                 if (ShowRelantionshipsLines){
+                    glEnableClientState(GL_TEXTURE_COORD_ARRAY);
                     glEnable( GL_TEXTURE_2D );
                     glEnable( GL_BLEND );
-                    glDepthMask(GL_FALSE); // Desactiva la escritura en el Z-buffer				
+                    glDepthMask(GL_FALSE); // Desactiva la escritura en el Z-buffer		
+                    glTexCoordPointer( 2, GL_FLOAT, 0, lineUV ); //SpriteUvSize
+                    glColor4f(ListaColores[grisUI][0],ListaColores[grisUI][1],ListaColores[grisUI][2],ListaColores[grisUI][3]);	
+                    glBindTexture( GL_TEXTURE_2D, Textures[3].iID ); //selecciona la de linea punteada	
                     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
                     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
                     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
                     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-                    glTexCoordPointer( 2, GL_FLOAT, 0, lineUV ); //SpriteUvSize
-                    glColor4f(ListaColores[negro][0],ListaColores[negro][1],ListaColores[negro][2],ListaColores[negro][3]);	
-                    glBindTexture( GL_TEXTURE_2D, Textures[3].iID ); //selecciona la de linea punteada	
                     for (size_t c = 0; c < Objects.size(); c++) {
                         for (size_t o = 0; o < Objects[c]->Childrens.size(); o++) {
                             Object& obj = *Objects[c]->Childrens[o];
@@ -316,38 +334,44 @@ class Viewport3D : public ViewportBase, public WithBorder  {
             }
 
             //dibuja el cursor 3D	
-            if (show3DCursor){
-                glDisable( GL_DEPTH_TEST );
-                glPushMatrix(); //guarda la matrix
-                glTranslatef( Cursor3DposX, Cursor3DposZ, Cursor3DposY);
-                
-                glEnable( GL_TEXTURE_2D );
-                glEnable( GL_BLEND );
-                //glEnable( GL_POINT_SPRITE_OES ); // Enable point sprites.	
-                glEnable( GL_POINT_SPRITE ); // Enable point sprites.	
-                glPointSize( 32 ); // Make the points bigger.
-                glColor4f(ListaColores[blanco][0],ListaColores[blanco][1],ListaColores[blanco][2],ListaColores[blanco][3]);
-                glVertexPointer( 3, GL_SHORT, 0, pointVertex );
-                glBindTexture( GL_TEXTURE_2D, Textures[2].iID);//iCursor3dTextura.iID ); //selecciona la textura
+            if (show3DCursor) Render3Dcursor();
+        }
 
-                //glTexEnvi( GL_POINT_SPRITE_OES, GL_COORD_REPLACE_OES, GL_TRUE );
-                glTexEnvi( GL_POINT_SPRITE, GL_COORD_REPLACE, GL_TRUE );
-                glDrawArrays( GL_POINTS, 0, 1 );
-                //glTexEnvi( GL_POINT_SPRITE_OES, GL_COORD_REPLACE_OES, GL_FALSE);
-                glTexEnvi( GL_POINT_SPRITE, GL_COORD_REPLACE, GL_FALSE);
-
-                //dibuja lineas		
-                glDisable( GL_TEXTURE_2D );
-                //glDisable( GL_POINT_SPRITE_OES );
-                glDisable( GL_POINT_SPRITE );
-                glDisable( GL_BLEND );
+        void Render3Dcursor(){
+            glDisable( GL_DEPTH_TEST );
+            glPushMatrix(); //guarda la matrix
+            glTranslatef( Cursor3DposX, Cursor3DposZ, Cursor3DposY);
             
-                glColor4f(ListaColores[grisUI][0],ListaColores[grisUI][1],ListaColores[grisUI][2],ListaColores[grisUI][3]);
-                glVertexPointer( 3, GL_FLOAT, 0, Cursor3DVertices );
-                glDrawElements( GL_LINES, Cursor3DEdgesSize, GL_UNSIGNED_SHORT, Cursor3DEdges );	
+            glEnable( GL_TEXTURE_2D );
+            glEnable( GL_BLEND );
+            //glEnable( GL_POINT_SPRITE_OES ); // Enable point sprites.	
+            glEnable( GL_POINT_SPRITE ); // Enable point sprites.	
+            glPointSize( 32 ); // Make the points bigger.
+            glVertexPointer( 3, GL_SHORT, 0, pointVertex );
+            glBindTexture( GL_TEXTURE_2D, Textures[2].iID);//iCursor3dTextura.iID ); //selecciona la textura
 
-                glPopMatrix(); //reinicia la matrix a donde se guardo	
-            }
+            //glTexEnvi( GL_POINT_SPRITE_OES, GL_COORD_REPLACE_OES, GL_TRUE );
+            glTexEnvi( GL_POINT_SPRITE, GL_COORD_REPLACE, GL_TRUE );
+            glColor4f(ListaColores[blanco][0],ListaColores[blanco][1],ListaColores[blanco][2],ListaColores[blanco][3]);
+            glDrawArrays( GL_POINTS, 0, 1 );
+            //glTexEnvi( GL_POINT_SPRITE_OES, GL_COORD_REPLACE_OES, GL_FALSE);
+            glTexEnvi( GL_POINT_SPRITE, GL_COORD_REPLACE, GL_FALSE);
+
+            //dibuja lineas		
+            glDisable( GL_TEXTURE_2D );
+            //glDisable( GL_POINT_SPRITE_OES );
+            glDisable( GL_POINT_SPRITE );
+            glDisable( GL_BLEND );
+        
+            glVertexPointer( 3, GL_FLOAT, 0, Cursor3DVertices );
+            glLineWidth(6);	 
+            glColor4f(ListaColores[negro][0],ListaColores[negro][1],ListaColores[negro][2],ListaColores[negro][3]);
+            glDrawElements( GL_LINES, Cursor3DEdgesSize, GL_UNSIGNED_SHORT, Cursor3DEdges );	
+            glLineWidth(2);	 
+            glColor4f(ListaColores[accent][0],ListaColores[accent][1],ListaColores[accent][2],ListaColores[accent][3]);
+            glDrawElements( GL_LINES, Cursor3DEdgesSize, GL_UNSIGNED_SHORT, Cursor3DEdges );	
+
+            glPopMatrix(); //reinicia la matrix a donde se guardo	
         }
 
         void RenderUI(){
@@ -359,6 +383,12 @@ class Viewport3D : public ViewportBase, public WithBorder  {
 
             glViewport(x, y, width, height); // x, y, ancho, alto
             glOrtho(0, width, height, 0, -1, 1);
+
+            glDisable( GL_CULL_FACE ); // Enable back face culling.
+            glDisable( GL_LIGHTING );
+            glEnable(GL_COLOR_MATERIAL);
+            glDisableClientState( GL_COLOR_ARRAY );
+            glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
 
             glDisable(GL_FOG);
             glDisable(GL_DEPTH_TEST);
@@ -891,7 +921,10 @@ class Viewport3D : public ViewportBase, public WithBorder  {
                         break;
                     case SDLK_J:
                         ChangeViewType();
-                        break;                        
+                        break;    
+                    case SDLK_K:          
+                        SetShowOverlays(!showOverlays);
+                        break;          
                     case SDLK_X:   
                         if (estado != editNavegacion){
                             if (axisSelect != X){

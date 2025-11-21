@@ -14,8 +14,8 @@ class Light : public Object {
 
         void SetDiffuse(GLfloat r = 1.0f, GLfloat g = 1.0f, GLfloat b = 1.0f){
             diffuse[0] = r;
-            diffuse[0] = g;
-            diffuse[0] = b;
+            diffuse[1] = g;
+            diffuse[2] = b;
         }
 
         void SetLightID(int ID){
@@ -32,10 +32,13 @@ class Light : public Object {
                 glLightfv(GL_LIGHT0, GL_SPECULAR, specular);
 
                 // ACTIVAR ATENUACIÓN:
-                /*glLightf(GL_LIGHT0, GL_CONSTANT_ATTENUATION, 0.5f);
+                glLightf(GL_LIGHT0, GL_CONSTANT_ATTENUATION, 0.5f);
                 glLightf(GL_LIGHT0, GL_LINEAR_ATTENUATION,   0.1f);
-                glLightf(GL_LIGHT0, GL_QUADRATIC_ATTENUATION, 0.02f);*/
+                glLightf(GL_LIGHT0, GL_QUADRATIC_ATTENUATION, 0.02f);
             }
+
+            //si no esta el overlay. no dibuja la representacion de la luz en el espacio 3d
+            if (!showOverlayGlobal) return;
 
             //color si esta seleccionado
             if (ObjActivo == this){

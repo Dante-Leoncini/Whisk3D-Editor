@@ -61,6 +61,9 @@ class Camera : public Object {
         }
 
         void RenderObject() override {
+            //si no esta el overlay. no dibuja la representacion de la luz en el espacio 3d
+            if (!showOverlayGlobal) return;
+
             glPushMatrix();
             /*glScalef(
                 FIXED_TO_FLOAT(scaleX),
