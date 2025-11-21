@@ -155,8 +155,6 @@ class Viewport3D : public ViewportBase, public WithBorder  {
                 glDisableClientState(GL_NORMAL_ARRAY);
 
                 if (showFloor || showXaxis || showYaxis) RenderFloor();
-                if (Objects.size() > 0 && 
-                   (estado == translacion || estado == rotacion || estado == EditScale)) RenderAxisTransform();
             }
           
             // Funcion que renderiza cada objeto de forma recursiva
@@ -176,7 +174,7 @@ class Viewport3D : public ViewportBase, public WithBorder  {
             glEnable(GL_FOG);
             glFogf(GL_FOG_MODE, GL_LINEAR); // Tipo de niebla lineal
             glFogf(GL_FOG_START, nearClip);  // Distancia inicial de la niebla
-            glFogf(GL_FOG_END, 800.0f);     // Distancia final de la niebla
+            glFogf(GL_FOG_END, 25.0f);     // Distancia final de la niebla
             glFogfv(GL_FOG_COLOR, ListaColores[background]); // Color de la niebla DEL piso. que es mas pequeña que otros fog
             glLineWidth(1);	 
 
@@ -234,6 +232,9 @@ class Viewport3D : public ViewportBase, public WithBorder  {
                 glDrawElements( GL_LINES, 2, GL_UNSIGNED_SHORT, EjeVerde );
             }	
             glDisable(GL_FOG);
+            
+            //ejes de transformacion
+            if (Objects.size() > 0 && (estado == translacion || estado == rotacion || estado == EditScale)) RenderAxisTransform();
         }
 
         //dibuja los ejes de transformacion
@@ -274,67 +275,41 @@ class Viewport3D : public ViewportBase, public WithBorder  {
 
             //esto solo se hace si hay objetos
             if (Objects.size() > 0){
-                //dibujo de objetos nuevo!
                 glLineWidth(1);	 
-                // aca hay algo raro... yo ya renderize los objetos. supongo que era para la camara, empty. etc. que se renderizan despues... 
-                // pero aca no tiene sentido como quedo. se redibujarian 2 veces las cosas
-                //for (size_t c = 0; c < Objects.size(); c++) {
-                //    for (size_t o = 0; o < Objects[c]->Childrens.size(); o++) {
-                //        RenderObjectAndChildrens(*Objects[c]->Childrens[o]);
-                //    }	 
-                //}	 
 
-                //dibujar lineas parent		
-                if (ShowRelantionshipsLines){
-                    glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-                    glEnable( GL_TEXTURE_2D );
-                    glEnable( GL_BLEND );
-                    glDepthMask(GL_FALSE); // Desactiva la escritura en el Z-buffer		
-                    glTexCoordPointer( 2, GL_FLOAT, 0, lineUV ); //SpriteUvSize
-                    glColor4f(ListaColores[grisUI][0],ListaColores[grisUI][1],ListaColores[grisUI][2],ListaColores[grisUI][3]);	
-                    glBindTexture( GL_TEXTURE_2D, Textures[3].iID ); //selecciona la de linea punteada	
-                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-                    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-                    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-                    for (size_t c = 0; c < Objects.size(); c++) {
-                        for (size_t o = 0; o < Objects[c]->Childrens.size(); o++) {
-                            Object& obj = *Objects[c]->Childrens[o];
-                            RenderLinkLines(obj);
-                        }
-                    }
-                    glDepthMask(GL_TRUE); // Reactiva la escritura en el Z-buffer		
-                }
+                if (ShowRelantionshipsLines) RenderRelantionshipsLines();
 
                 glDisable( GL_DEPTH_TEST );	
                 glDisable( GL_BLEND );
                 glDisable( GL_TEXTURE_2D );
 
                 //Dibuja el origen de los objetos seleccionados		
-                if (showOrigins){	
-                    //std::cout << "origen!" << std::endl;
-                    glEnable( GL_TEXTURE_2D );
-                    glEnable( GL_BLEND );
-                    // Enable point sprites.
-                    //glEnable( GL_POINT_SPRITE_OES );
-                    glEnable( GL_POINT_SPRITE );
-                    // Make the points bigger.
-                    glPointSize( 16 );
-                    for (size_t c = 0; c < Objects.size(); c++) {
-                        for (size_t o = 0; o < Objects[c]->Childrens.size(); o++) {
-                            Object& obj = *Objects[c]->Childrens[o];
-                            DibujarOrigen(obj);
-                        }
-                    }
-                    //glTexEnvi( GL_POINT_SPRITE_OES, GL_COORD_REPLACE_OES, GL_FALSE);
-                    //glDisable( GL_POINT_SPRITE_OES );
-                    glTexEnvi( GL_POINT_SPRITE, GL_COORD_REPLACE, GL_FALSE);
-                    glDisable( GL_POINT_SPRITE );
-                }		
+                if (showOrigins) RenderOrigins();	
             }
 
             //dibuja el cursor 3D	
             if (show3DCursor) Render3Dcursor();
+        }
+
+        void RenderRelantionshipsLines(){
+            glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+            glEnable( GL_TEXTURE_2D );
+            glEnable( GL_BLEND );
+            glDepthMask(GL_FALSE); // Desactiva la escritura en el Z-buffer		
+            glTexCoordPointer( 2, GL_FLOAT, 0, lineUV ); //SpriteUvSize
+            glColor4f(ListaColores[grisUI][0],ListaColores[grisUI][1],ListaColores[grisUI][2],ListaColores[grisUI][3]);	
+            glBindTexture( GL_TEXTURE_2D, Textures[3].iID ); //selecciona la de linea punteada	
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+            glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+            for (size_t c = 0; c < Objects.size(); c++) {
+                for (size_t o = 0; o < Objects[c]->Childrens.size(); o++) {
+                    Object& obj = *Objects[c]->Childrens[o];
+                    RenderLinkLines(obj);
+                }
+            }
+            glDepthMask(GL_TRUE); // Reactiva la escritura en el Z-buffer	
         }
 
         void Render3Dcursor(){

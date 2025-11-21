@@ -117,12 +117,12 @@ void SearchSelectObj(Object& obj, bool& found) {
     glPopMatrix();
 }
 
-void DibujarOrigen(Object& obj){
+void DibujarOrigen(Object* obj){
     glPushMatrix();    
-    glTranslatef(obj.posX, obj.posZ, obj.posY);
+    glTranslatef(obj->posX, obj->posZ, obj->posY);
     
-    if (obj.visible && (obj.select || &obj == ObjActivo)){	
-		if (&obj == ObjActivo){
+    if (obj->visible && (obj->select || obj == ObjActivo)){
+		if (obj == ObjActivo){
 			glColor4f(ListaColores[accent][0],ListaColores[accent][1],ListaColores[accent][2],ListaColores[accent][3]);
 		}
 		else {
@@ -132,31 +132,40 @@ void DibujarOrigen(Object& obj){
 		glBindTexture( GL_TEXTURE_2D, Textures[1].iID ); //selecciona la textura
 		//glTexEnvi( GL_POINT_SPRITE_OES, GL_COORD_REPLACE_OES, GL_TRUE );    	
 		glTexEnvi( GL_POINT_SPRITE, GL_COORD_REPLACE, GL_TRUE );  
-		glPushMatrix();    		
-		//glScalex(obj.scaleX, obj.scaleZ, obj.scaleY);	
-		/*glScalef(
-			FIXED_TO_FLOAT(obj.scaleX),
-			FIXED_TO_FLOAT(obj.scaleZ),
-			FIXED_TO_FLOAT(obj.scaleY)
-		);*/
-		glScalef(obj.scaleX, obj.scaleZ, obj.scaleY);
+		glPushMatrix();    	
+		glScalef(obj->scaleX, obj->scaleZ, obj->scaleY);
 
 		glDrawArrays( GL_POINTS, 0, 1 );	
     	glPopMatrix();
     } 
-	//else if (obj.Childrens.Count() > 0){
-	else if (obj.Childrens.size() > 0){	
-		glRotatef(obj.rotX, 1, 0, 0); //angulo, X Y Z
-		glRotatef(obj.rotZ, 0, 1, 0); //angulo, X Y Z
-		glRotatef(obj.rotY, 0, 0, 1); //angulo, X Y Z
-        //for (int c = 0; c < obj.Childrens.Count(); c++) {
-        for (size_t c = 0; c < obj.Childrens.size(); c++) {
-            Object& objChild = *obj.Childrens[c];
-            DibujarOrigen(objChild);
+
+	if (obj->Childrens.size() > 0){	
+		glRotatef(obj->rotX, 1, 0, 0); //angulo, X Y Z
+		glRotatef(obj->rotZ, 0, 1, 0); //angulo, X Y Z
+		glRotatef(obj->rotY, 0, 0, 1); //angulo, X Y Z
+        for (size_t c = 0; c < obj->Childrens.size(); c++) {
+            DibujarOrigen(obj->Childrens[c]);
         }
     }
     glPopMatrix();
 }
+
+void RenderOrigins(){	
+	glEnable( GL_TEXTURE_2D );
+	glEnable( GL_BLEND );
+	// Enable point sprites.
+	//glEnable( GL_POINT_SPRITE_OES );
+	glEnable( GL_POINT_SPRITE );
+	// Make the points bigger.
+	glPointSize( 16 );
+	for (size_t c = 0; c < Objects.size(); c++) {
+		DibujarOrigen(Objects[c]);
+	}
+	//glTexEnvi( GL_POINT_SPRITE_OES, GL_COORD_REPLACE_OES, GL_FALSE);
+	//glDisable( GL_POINT_SPRITE_OES );
+	glTexEnvi( GL_POINT_SPRITE, GL_COORD_REPLACE, GL_FALSE);
+	glDisable( GL_POINT_SPRITE );
+}	
 
 void RenderVK(){
 
