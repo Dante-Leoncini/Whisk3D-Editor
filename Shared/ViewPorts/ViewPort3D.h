@@ -156,6 +156,8 @@ class Viewport3D : public ViewportBase, public WithBorder  {
 
                 if (showFloor || showXaxis || showYaxis) RenderFloor();
             }
+
+            glEnable(GL_DEPTH_TEST);
           
             // Funcion que renderiza cada objeto de forma recursiva
             for (size_t o = 0; o < Objects.size(); o++) {
