@@ -177,7 +177,13 @@ class Viewport3D : public ViewportBase, public WithBorder  {
             glFogf(GL_FOG_MODE, GL_LINEAR); // Tipo de niebla lineal
             glFogf(GL_FOG_START, nearClip);  // Distancia inicial de la niebla
             glFogf(GL_FOG_END, 25.0f);     // Distancia final de la niebla
-            glFogfv(GL_FOG_COLOR, ListaColores[background]); // Color de la niebla DEL piso. que es mas pequeña que otros fog
+            // Color de la niebla DEL piso. que es mas pequeña que otros fog
+            if (view == RenderType::Rendered){
+                glFogfv(GL_FOG_COLOR, backgroundRender); 
+            }
+            else {
+                glFogfv(GL_FOG_COLOR, ListaColores[background]);
+            }
             glLineWidth(1);	 
 
             glVertexPointer( 3, GL_FLOAT, 0, objVertexdataFloor );
@@ -241,7 +247,8 @@ class Viewport3D : public ViewportBase, public WithBorder  {
 
         //dibuja los ejes de transformacion
         void RenderAxisTransform(){ 
-            glLineWidth(2);	 
+            glDisable(GL_DEPTH_TEST);
+            glLineWidth(4);	 
 
             for (size_t c = 0; c < Objects.size(); c++) {
                 bool found = false;
@@ -329,7 +336,7 @@ class Viewport3D : public ViewportBase, public WithBorder  {
 
             //glTexEnvi( GL_POINT_SPRITE_OES, GL_COORD_REPLACE_OES, GL_TRUE );
             glTexEnvi( GL_POINT_SPRITE, GL_COORD_REPLACE, GL_TRUE );
-            glColor4f(ListaColores[blanco][0],ListaColores[blanco][1],ListaColores[blanco][2],ListaColores[blanco][3]);
+            glColor4f(ListaColores[accent][0],ListaColores[accent][1],ListaColores[accent][2],ListaColores[accent][3]);
             glDrawArrays( GL_POINTS, 0, 1 );
             //glTexEnvi( GL_POINT_SPRITE_OES, GL_COORD_REPLACE_OES, GL_FALSE);
             glTexEnvi( GL_POINT_SPRITE, GL_COORD_REPLACE, GL_FALSE);
@@ -341,11 +348,11 @@ class Viewport3D : public ViewportBase, public WithBorder  {
             glDisable( GL_BLEND );
         
             glVertexPointer( 3, GL_FLOAT, 0, Cursor3DVertices );
-            glLineWidth(6);	 
+            /*glLineWidth(6);	 
             glColor4f(ListaColores[negro][0],ListaColores[negro][1],ListaColores[negro][2],ListaColores[negro][3]);
-            glDrawElements( GL_LINES, Cursor3DEdgesSize, GL_UNSIGNED_SHORT, Cursor3DEdges );	
+            glDrawElements( GL_LINES, Cursor3DEdgesSize, GL_UNSIGNED_SHORT, Cursor3DEdges );*/	
             glLineWidth(2);	 
-            glColor4f(ListaColores[accent][0],ListaColores[accent][1],ListaColores[accent][2],ListaColores[accent][3]);
+            glColor4f(ListaColores[grisUI][0],ListaColores[grisUI][1],ListaColores[grisUI][2],ListaColores[grisUI][3]);	
             glDrawElements( GL_LINES, Cursor3DEdgesSize, GL_UNSIGNED_SHORT, Cursor3DEdges );	
 
             glPopMatrix(); //reinicia la matrix a donde se guardo	
