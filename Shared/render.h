@@ -52,10 +52,8 @@ void RenderLinkLines(Object& obj){
     glPopMatrix();
 }
 
-void DrawTransformAxis(Object& obj) {
+void DrawTransformAxis() {
 	glPushMatrix();    
-	glVertexPointer( 3, GL_SHORT, 0, objVertexdataFloor );
-	glLineWidth(2);
 		
 	if (InteractionMode == ObjectMode){
 		glTranslatef(TransformPivotPointFloat[0]/65000, 
@@ -63,58 +61,68 @@ void DrawTransformAxis(Object& obj) {
 					 TransformPivotPointFloat[2]/65000
 		);	
 	}
-	if (axisSelect == X){
-		glColor4f(ListaColores[ColorTransformX][0],ListaColores[ColorTransformX][1],ListaColores[ColorTransformX][2],ListaColores[ColorTransformX][3]);
-		glDrawElements( GL_LINES, 2, GL_UNSIGNED_SHORT, EjeRojo );				
+	switch (axisSelect) {
+		case X:
+			glColor4fv(ListaColores[ColorTransformX]);
+			glDrawElements(GL_LINES, 2, GL_UNSIGNED_SHORT, EjeRojo);
+			break;
+
+		case Y:
+			glColor4fv(ListaColores[ColorTransformY]);
+			glDrawElements(GL_LINES, 2, GL_UNSIGNED_SHORT, EjeVerde);
+			break;
+
+		case Z:
+			glColor4fv(ListaColores[ColorTransformZ]);
+			glDrawElements(GL_LINES, 2, GL_UNSIGNED_SHORT, EjeAzul);
+			break;
+
+		case XYZ:
+			glColor4fv(ListaColores[ColorTransformX]);
+			glDrawElements(GL_LINES, 2, GL_UNSIGNED_SHORT, EjeRojo);
+
+			glColor4fv(ListaColores[ColorTransformY]);
+			glDrawElements(GL_LINES, 2, GL_UNSIGNED_SHORT, EjeVerde);
+
+			glColor4fv(ListaColores[ColorTransformZ]);
+			glDrawElements(GL_LINES, 2, GL_UNSIGNED_SHORT, EjeAzul);
+			break;
 	}
-	else if (axisSelect == Y){
-		glColor4f(ListaColores[ColorTransformY][0],ListaColores[ColorTransformY][1],ListaColores[ColorTransformY][2],ListaColores[ColorTransformY][3]);
-		glDrawElements( GL_LINES, 2, GL_UNSIGNED_SHORT, EjeVerde ); 				
-	}
-	else if (axisSelect == Z){
-		glColor4f(ListaColores[ColorTransformZ][0],ListaColores[ColorTransformZ][1],ListaColores[ColorTransformZ][2],ListaColores[ColorTransformZ][3]);
-		glDrawElements( GL_LINES, 2, GL_UNSIGNED_SHORT, EjeAzul ); 				
-	}	
-	else if (axisSelect == XYZ){
-		glColor4f(ListaColores[ColorTransformX][0],ListaColores[ColorTransformX][1],ListaColores[ColorTransformX][2],ListaColores[ColorTransformX][3]);
-		glDrawElements( GL_LINES, 2, GL_UNSIGNED_SHORT, EjeRojo );	
-		glColor4f(ListaColores[ColorTransformY][0],ListaColores[ColorTransformY][1],ListaColores[ColorTransformY][2],ListaColores[ColorTransformY][3]);
-		glDrawElements( GL_LINES, 2, GL_UNSIGNED_SHORT, EjeVerde ); 
-		glColor4f(ListaColores[ColorTransformZ][0],ListaColores[ColorTransformZ][1],ListaColores[ColorTransformZ][2],ListaColores[ColorTransformZ][3]);
-		glDrawElements( GL_LINES, 2, GL_UNSIGNED_SHORT, EjeAzul ); 				
-	}
-	glLineWidth(1);	//la deja como es por defecto	
+
 	glPopMatrix();
 }
 
-void SearchSelectObj(Object& obj, bool& found) {
+bool RenderAxisTransform(Object* obj) {
+	bool found = false;
     glPushMatrix();    
-    glTranslatef(obj.posX, obj.posZ, obj.posY);
+    glTranslatef(obj->posX, obj->posZ, obj->posY);
     
-    if (&obj == ObjActivo) {
+    if (obj == ObjActivo) {
 		if (estado == rotacion || estado == EditScale){
-			glRotatef(obj.rotX, 1, 0, 0); //angulo, X Y Z
-			glRotatef(obj.rotZ, 0, 1, 0); //angulo, X Y Z
-			glRotatef(obj.rotY, 0, 0, 1); //angulo, X Y Z
+			glRotatef(obj->rotX, 1, 0, 0); //angulo, X Y Z
+			glRotatef(obj->rotZ, 0, 1, 0); //angulo, X Y Z
+			glRotatef(obj->rotY, 0, 0, 1); //angulo, X Y Z
 		}		
 		//dibuja los ejes de transformacion
 		if (estado == translacion || estado == rotacion || estado == EditScale){		
-        	DrawTransformAxis(obj);
+        	DrawTransformAxis();
 		}		
-        found = true;
+		return true;
     } 
-	else if (obj.Childrens.size() > 0){	
-		glRotatef(obj.rotX, 1, 0, 0); //angulo, X Y Z
-		glRotatef(obj.rotZ, 0, 1, 0); //angulo, X Y Z
-		glRotatef(obj.rotY, 0, 0, 1); //angulo, X Y Z
-        //for (int c = 0; c < obj.Childrens.Count(); c++) {
-        for (size_t c = 0; c < obj.Childrens.size(); c++) {
-            if (found) break;  // Si ya lo encontro, salir del bucle
-            Object& objChild = *obj.Childrens[c];
-            SearchSelectObj(objChild, found);
+	else if (obj->Childrens.size() > 0){	
+		glRotatef(obj->rotX, 1, 0, 0); //angulo, X Y Z
+		glRotatef(obj->rotZ, 0, 1, 0); //angulo, X Y Z
+		glRotatef(obj->rotY, 0, 0, 1); //angulo, X Y Z
+
+        for (size_t c = 0; c < obj->Childrens.size(); c++) {
+            if (RenderAxisTransform(obj->Childrens[c])){
+				found = true;
+				break;
+			}
         }
     }
     glPopMatrix();
+	return found;
 }
 
 void DibujarOrigen(Object* obj){

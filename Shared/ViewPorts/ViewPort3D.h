@@ -150,7 +150,6 @@ class Viewport3D : public ViewportBase, public WithBorder  {
                 glDisable( GL_TEXTURE_2D );
 
                 glDisableClientState(GL_COLOR_ARRAY);
-                glEnableClientState(GL_VERTEX_ARRAY);
                 glDisableClientState(GL_TEXTURE_COORD_ARRAY);
                 glDisableClientState(GL_NORMAL_ARRAY);
 
@@ -240,24 +239,18 @@ class Viewport3D : public ViewportBase, public WithBorder  {
                 glDrawElements( GL_LINES, 2, GL_UNSIGNED_SHORT, EjeVerde );
             }	
             glDisable(GL_FOG);
-            
-            //ejes de transformacion
-            if (Objects.size() > 0 && (estado == translacion || estado == rotacion || estado == EditScale)) RenderAxisTransform();
         }
 
         //dibuja los ejes de transformacion
-        void RenderAxisTransform(){ 
+        void RenderAllAxisTransform(){ 
+	        glVertexPointer( 3, GL_FLOAT, 0, objVertexdataFloor );
             glDisable(GL_DEPTH_TEST);
-            glLineWidth(4);	 
+            glDisable(GL_BLEND );
+            glDisable(GL_TEXTURE_2D );
+            glLineWidth(3);	 
 
-            for (size_t c = 0; c < Objects.size(); c++) {
-                bool found = false;
-                for (size_t o = 0; o < Objects[c]->Childrens.size(); o++) {
-                    Object& obj = *Objects[c]->Childrens[o];
-                    SearchSelectObj(obj, found);
-                    //voy a cambiarlo para que si se esta modificando individualmente. todos tengan su ejes de transformacion
-                    if (found) break;
-                }
+            for (size_t c = 0; c < Objects.size(); c++){
+                if (RenderAxisTransform(Objects[c])) break;                
             }
         }
 
@@ -295,6 +288,9 @@ class Viewport3D : public ViewportBase, public WithBorder  {
                 //Dibuja el origen de los objetos seleccionados		
                 if (showOrigins) RenderOrigins();	
             }
+            
+            //ejes de transformacion
+            if (Objects.size() > 0 && (estado == translacion || estado == rotacion || estado == EditScale)) RenderAllAxisTransform();
 
             //dibuja el cursor 3D	
             if (show3DCursor) Render3Dcursor();
