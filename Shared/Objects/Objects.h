@@ -25,6 +25,7 @@ class Object {
 		Object* Parent = nullptr;
         std::vector<Object*> Childrens;
 		bool visible = true;
+		bool desplegado = true;
         bool select = true;
         Object2D* name = nullptr;
         size_t IconType = 0;
@@ -35,6 +36,10 @@ class Object {
 
         virtual ObjectType getType(){
             return ObjectType::baseObject;
+        }
+
+        void SetName(const std::string& nombre){
+            reinterpret_cast<Text*>(name->data)->SetValue(nombre);
         }
 
         Object(Object* parent, const std::string& nombre)
@@ -75,6 +80,41 @@ class Object {
             for(size_t o=0; o < Childrens.size(); o++){
                 Childrens[o]->DeseleccionarCompleto();		
             } 
+        }
+
+		bool EliminarObjetosSeleccionados(){
+            // 1) Procesar hijos primero
+            /*for (int i = (int)Childrens.size() - 1; i >= 0; i--){
+                Object* child = Childrens[i];
+
+                // Recursión: si el hijo pide borrarse (select == true)
+                if (child->EliminarObjetosSeleccionados()){
+				    std::cout << "Se borro '" << reinterpret_cast<Text*>(child->name->data)->value << "'"<< std::endl;
+                    delete child;
+                    Childrens.erase(Childrens.begin() + i);
+                }
+                else if (select){
+                    //despues tengo que meterlo en algun child o en la lista de objetos.. o queda huerfano en memoria
+                    child->Parent = nullptr;
+                }
+            }*/
+
+            // 2) Si YO estoy seleccionado,
+            // indico al padre que debe desconectarme y borrar ME (NO AQUÍ)
+            return select;
+        }
+
+        bool EstaSeleccionado(bool IncluirCollecciones){
+            // Si este objeto está seleccionado y cumple la condición de colecciones → true
+            if ( select && ( IncluirCollecciones || getType() != ObjectType::collection ) ) {
+                return true;
+            }
+
+            //si no estaba seleccionado. mira recursivamente a los hijos
+            for(size_t o=0; o < Childrens.size(); o++){   
+                if (Childrens[o]->EstaSeleccionado(IncluirCollecciones)) return true;
+            }
+            return false;       
         }
 
         bool SeleccionarCompleto(){
@@ -132,8 +172,9 @@ class Object {
             glPopMatrix();
         }
 
-		~Object() {
-			delete name;
+		virtual ~Object() {
+            //Childrens.clear();
+            if (name) delete name;
 		}
 };
 
@@ -337,9 +378,6 @@ void DeseleccionarTodo(){
 }
 
 void SeleccionarTodo(){
-    /*if (ObjActivo){
-        std::cout << "Objecto activo " << reinterpret_cast<Text*>(ObjActivo->name->data)->value << "\n";
-    }*/
     //recorre las colecciones y selecciona todo. si llega a encontrar algo hace lo contrario. deselecciona todo
 	if (InteractionMode == ObjectMode){
         ObjSelects.clear();
@@ -353,6 +391,16 @@ void SeleccionarTodo(){
         }
         //std::cout << "Todos los objetos seleccionados\n";
     }
+}
+
+//si hay objetos seleccionasos, devuelve true
+bool HayObjetosSeleccionados(bool IncluirColecciones = false){
+    for(size_t c=0; c < Objects.size(); c++){
+        if (Objects[c]->EstaSeleccionado(IncluirColecciones)){
+            return true;
+        }
+    }
+    return false;
 }
 
 //outliner

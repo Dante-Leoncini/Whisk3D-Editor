@@ -12,7 +12,15 @@ GLfloat MaterialPreviewDiffuse[4]   = { 1.0f, 1.0f, 1.0f, 1.0f };
 GLfloat MaterialPreviewSpecular[4]   = { 0.2f, 0.2f, 0.2f, 1.0f };
 GLfloat MaterialPreviewPosition[4]  = { -0.45f, 0.55f, 1.0f, 0.0f };
 
+#include "./Objects/Textures.h"
+#include "./UI/UI.h"
+#include "./Objects/Materials.h"
+#include "./Objects/Objects.h"
+
 void SetViewType(RenderType type = view){
+    for(size_t l = 0; l < Lights.size(); l++) {
+		glDisable(Lights[l]->LightID);
+	}
 	view = type;
     if (type == RenderType::MaterialPreview){
 		glEnable(GL_LIGHT0);
@@ -38,10 +46,6 @@ void ChangeViewType(){
     }
 };
 
-#include "./Objects/Textures.h"
-#include "./UI/UI.h"
-#include "./Objects/Materials.h"
-#include "./Objects/Objects.h"
 #include "./Constrains.h"
 #include "./Modifiers.h"
 

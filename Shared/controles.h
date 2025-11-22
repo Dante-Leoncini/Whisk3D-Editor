@@ -574,7 +574,7 @@ void InputUsuarioSDL(SDL_Event &e){
 						}
 					} 
 					else {
-						Borrar();
+						Eliminar();
 					}
                     break;
                 case SDLK_y:   

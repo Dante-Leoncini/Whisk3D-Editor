@@ -8,4 +8,8 @@ class Collection : public Object {
         ObjectType getType() override{
             return ObjectType::collection;
         }
+
+		~Collection() {
+			delete name;
+		}
 };

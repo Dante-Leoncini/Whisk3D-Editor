@@ -915,7 +915,7 @@ class Viewport3D : public ViewportBase, public WithBorder  {
                             }
                         } 
                         else {
-                            Borrar();
+                            Eliminar();
                         }
                         break;
                     case SDLK_Y:   

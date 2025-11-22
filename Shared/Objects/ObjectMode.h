@@ -29,7 +29,7 @@ void Cancelar(){
 	ViewPortClickDown = false;
 };
 
-void BorrarAnimaciones(Object& obj){
+void EliminarAnimaciones(Object& obj){
 	for(size_t a = 0; a < AnimationObjects.size(); a++) {
 		if (AnimationObjects[a].obj == &obj) {	
 			for(size_t p = 0; p < AnimationObjects[a].Propertys.size(); p++) {
@@ -44,8 +44,8 @@ void BorrarAnimaciones(Object& obj){
 	}
 }
 
-void BorrarObjeto(Object& obj){
-	/*if (obj.type == mesh){
+/*void EliminarObjeto(Object& obj){
+	if (obj.type == mesh){
 		//primero miramos si alguien mas esta usando esta malla 3d.
 		//es posible compartir una malla 3d entre distintos objetos
 		bool MeshEnUso = false;
@@ -87,29 +87,16 @@ void BorrarObjeto(Object& obj){
 	delete &obj;
 
 	SelectCount--;
-	SelectActivo = nullptr;*/
-}
+	SelectActivo = nullptr;
+}*/
 
-void Borrar(){
-	/*if (estado != editNavegacion ){
-		Cancelar();
-	}
-	else if (InteractionMode == ObjectMode){
+void Eliminar(){
+	if (InteractionMode == ObjectMode){
 		//si no hay nada seleccionado. no borra
-		bool algoSeleccionado = false;
-		for (int c = (int)Objects.size() - 1; c >= 0; c--) {
-			for (int o = (int)Objects[c]->Childrens.size() - 1; o >= 0; o--) {
-				if (Objects[c]->Childrens[o]->select){
-					algoSeleccionado = true;
-					break;	
-				}		
-			}
-		}
-
-		if (!algoSeleccionado){
+		if (!HayObjetosSeleccionados()){
 			std::cout << "nada seleccionado para borrar" << std::endl;
 			return;
-		}*/
+		}
 		
 		//pregunta de confirmacion
 		//HBufC* noteBuf = HBufC::NewLC(100);
@@ -120,20 +107,30 @@ void Borrar(){
 			return;
 		}*/
 		//CleanupStack::PopAndDestroy(noteBuf);	
-		/*Cancelar();
+		Cancelar();
 
-		//libera la memoria de los punteros primero	
-		// Obtener el objeto seleccionado			
-		for (int c = (int)Objects.size() - 1; c >= 0; c--) {
-			for (int o = (int)Objects[c]->Childrens.size() - 1; o >= 0; o--) {
-				if (Objects[c]->Childrens[o]->select){
-					std::cout << "El objeto " << (o + 1) << " esta seleccionado y se va a borrar" << std::endl;
-					BorrarObjeto(*Objects[c]->Childrens[o]);
-				}			
+		//borra de adelante para atras		
+		/*for (int c = (int)Objects.size() - 1; c >= 0; c--) {
+			std::cout << "borrando " << (c+1) << std::endl;
+			Objects[c]->EliminarObjetosSeleccionados();
+		}*/
+
+		for (int i = Objects.size() - 1; i >= 0; i--){
+			Object* obj = Objects[i];
+			/*if (obj->EliminarObjetosSeleccionados()){
+				std::cout << "Se borro '" << reinterpret_cast<Text*>(obj->name->data)->value << "'"<< std::endl;
+				delete obj;
+				Objects.erase(Objects.begin() + i);
+			}*/
+			if (obj->EliminarObjetosSeleccionados()){
+				std::cout << "Se borro '" << reinterpret_cast<Text*>(obj->name->data)->value << "'"<< std::endl;
+				//delete obj;
+				//Objects.erase(Objects.begin() + i);
 			}
 		}
+
+		ObjSelects.clear();
 	}
-    ReloadViewport();	*/
 }
 
 void SetTransformPivotPoint(){

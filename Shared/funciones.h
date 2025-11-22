@@ -47,7 +47,7 @@
 	}
 }*/
 
-void BorrarMesh(int indice){
+void EliminarMesh(int indice){
 	/*int links = 0;
 	
 	for(size_t o=0; o < Objects.size(); o++){

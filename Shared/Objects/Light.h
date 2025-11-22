@@ -26,15 +26,15 @@ class Light : public Object {
             //como afecta a la luz en OpenGl. solo tiene efecto si estamos en modo render
             if (view == RenderType::Rendered){
                 glEnable(LightID);
-                glLightfv(GL_LIGHT0, GL_POSITION, position);
-                glLightfv(GL_LIGHT0, GL_DIFFUSE,  diffuse);
-                glLightfv(GL_LIGHT0, GL_AMBIENT,  ambient);
-                glLightfv(GL_LIGHT0, GL_SPECULAR, specular);
+                glLightfv(LightID, GL_POSITION, position);
+                glLightfv(LightID, GL_DIFFUSE,  diffuse);
+                glLightfv(LightID, GL_AMBIENT,  ambient);
+                glLightfv(LightID, GL_SPECULAR, specular);
 
                 // ACTIVAR ATENUACIÓN:
-                glLightf(GL_LIGHT0, GL_CONSTANT_ATTENUATION, 0.5f);
-                glLightf(GL_LIGHT0, GL_LINEAR_ATTENUATION,   0.1f);
-                glLightf(GL_LIGHT0, GL_QUADRATIC_ATTENUATION, 0.02f);
+                glLightf(LightID, GL_CONSTANT_ATTENUATION, 0.5f);
+                glLightf(LightID, GL_LINEAR_ATTENUATION,   0.1f);
+                glLightf(LightID, GL_QUADRATIC_ATTENUATION, 0.02f);
             }
 
             //si no esta el overlay. no dibuja la representacion de la luz en el espacio 3d
@@ -86,6 +86,10 @@ class Light : public Object {
             glVertexPointer( 3, GL_FLOAT, 0, LineaLightVertex );
             glDrawElements( GL_LINES, LineaEdgeSize, GL_UNSIGNED_SHORT, LineaEdge );         
         }
+
+		~Light() {
+			delete name;
+		}
 
     private:
         Light(Object* parent, GLfloat x, GLfloat y, GLfloat z)

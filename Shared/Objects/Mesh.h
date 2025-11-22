@@ -303,7 +303,8 @@ class Mesh : public Object {
 		}*/
 
 		~Mesh() {
-            LiberarMemoria();
+            //LiberarMemoria();
+			delete name;
 		}
 };
 

@@ -6,6 +6,34 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable  {
         Outliner(): ViewportBase() {
             Renglon = AddObject2D(UI::Rectangle);
         }
+
+        //para hacer el calculo si o si hay que hacerlo de forma recursiva
+        void CalcularRenglon(Object* obj, int* MaxPosXtemp, int* MaxPosYtemp){
+            int rowWidth = marginGS + IconSizeGS + gapGS + IconSizeGS + gapGS + IconSizeGS + marginGS; 
+            *MaxPosYtemp -= RenglonHeightGS;
+            int textWidth = reinterpret_cast<Text*>(obj->name->data)->letters.size() * LetterWidthGS;
+            rowWidth += textWidth + gapGS;
+
+            // guardar ancho máximo
+            if (rowWidth > *MaxPosXtemp) *MaxPosXtemp = rowWidth;
+            
+            //si no tiene hijos. o no esta desplegado se ahorra todos los bucles siguentes
+            if (obj->Childrens.size() < 1 || !obj->desplegado) return;
+
+            //std::cout << "textWidth: " << textWidth << " rowWidth: " << rowWidth << std::endl;
+            for (size_t o = 0; o < obj->Childrens.size(); o++) {
+                CalcularRenglon(obj->Childrens[o], MaxPosXtemp, MaxPosYtemp);
+                /*int rowWidthObj = marginGS + IconSizeGS + gapGS + IconSizeGS + gapGS + IconSizeGS + gapGS + IconSizeGS + marginGS;
+                *MaxPosYtemp -= RenglonHeightGS;
+
+                // texto del objeto
+                int textWidthObj = reinterpret_cast<Text*>(obj->Childrens[o]->name->data)->letters.size() * LetterWidthGS;
+                rowWidthObj += textWidthObj + gapGS;
+
+                if (rowWidthObj > *MaxPosXtemp) *MaxPosXtemp = rowWidthObj;
+                //std::cout << "caracteres obj: " << rowWidthObj << std::endl;*/
+            }
+        }
         
         void Resize(int newW, int newH) override {
             ViewportBase::Resize(newW, newH);
@@ -23,31 +51,12 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable  {
             int MaxPosYtemp = 0;
 
             for (size_t c = 0; c < Objects.size(); c++) {   
-                int rowWidth = marginGS + IconSizeGS + gapGS + IconSizeGS + gapGS + IconSizeGS + marginGS; 
-                MaxPosYtemp -= RenglonHeightGS;
-                int textWidth = reinterpret_cast<Text*>(Objects[c]->name->data)->letters.size() * LetterWidthGS;
-                rowWidth += textWidth + gapGS;
-
-                // guardar ancho máximo
-                if (rowWidth > MaxPosXtemp) MaxPosXtemp = rowWidth;
-
-                //std::cout << "textWidth: " << textWidth << " rowWidth: " << rowWidth << std::endl;
-                for (size_t o = 0; o < Objects[c]->Childrens.size(); o++) {
-                    int rowWidthObj = marginGS + IconSizeGS + gapGS + IconSizeGS + gapGS + IconSizeGS + gapGS + IconSizeGS + marginGS;
-                    MaxPosYtemp -= RenglonHeightGS;
-
-                    // texto del objeto
-                    int textWidthObj = reinterpret_cast<Text*>(Objects[c]->Childrens[o]->name->data)->letters.size() * LetterWidthGS;
-                    rowWidthObj += textWidthObj + gapGS;
-
-                    if (rowWidthObj > MaxPosXtemp) MaxPosXtemp = rowWidthObj;
-                    //std::cout << "caracteres obj: " << rowWidthObj << std::endl;
-                } 
+                CalcularRenglon(Objects[c], &MaxPosXtemp, &MaxPosYtemp);
             }
             //este es el gap para la barra de desplazamiento de abajo
             MaxPosYtemp -= marginGS;
             //std::cout << "MaxPosXtemp: " << MaxPosXtemp << " width: " << width << std::endl;
-            //std::cout << "sizeX: " << sizeX << " MaxPosY: "<< MaxPosY << std::endl;
+            std::cout << "MaxPosYtemp: "<< MaxPosYtemp << std::endl;
             //std::cout << "Ancho: " << newW << " Alto: "<< newH << std::endl;
             ResizeScrollbar(newW, newH, MaxPosXtemp, MaxPosYtemp);
         }
@@ -128,116 +137,9 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable  {
             RenglonesY = 0;  
             glPushMatrix();          
             glTranslatef(marginGS + PosX, PosY + borderGS, 0);            
-            for (size_t c = 0; c < Objects.size(); c++){
-                if (Objects[c] == ObjActivo){
-                    //std::cout << "Objeto activo en el outliner: " << reinterpret_cast<Text*>(Objects[c]->name->data)->value << "\n";
-                    if (Objects[c]->select){
-                        glColor4f(ListaColores[accent][0], ListaColores[accent][1],
-                                ListaColores[accent][2], ListaColores[accent][3]);
-                    }
-                    else {
-                        glColor4f(ListaColores[blanco][0], ListaColores[blanco][1],
-                                ListaColores[blanco][2], ListaColores[blanco][3]);
-                    }
-                }
-                else if (Objects[c]->select){
-                    glColor4f(ListaColores[accentDark][0], ListaColores[accentDark][1],
-                            ListaColores[accentDark][2], ListaColores[accentDark][3]);
-                }
-                else {
-                    glColor4f(ListaColores[grisUI][0], ListaColores[grisUI][1],
-                            ListaColores[grisUI][2], ListaColores[grisUI][3]);
-                }
-                
-                //icono desplegar
-                glVertexPointer(2, GL_SHORT, 0, IconMesh); //todos los iconos comparten los vertices y tamaño
-                //si no tiene hijos. no hagas la flecha
-                if (Objects[c]->Childrens.size() > 0){
-                    glTexCoordPointer(2, GL_FLOAT, 0, IconsUV[static_cast<size_t>(IconType::arrow)]->uvs);
-                    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-                }
-
-                //icono de la coleccion
-                glTranslatef(IconSizeGS + gapGS, 0, 0);   
-                glTexCoordPointer(2, GL_FLOAT, 0, IconsUV[static_cast<size_t>(IconType::archive)]->uvs);
-                glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-
-                //texto render                   
-                glTranslatef(IconSizeGS + gapGS, 0, 0);   
-                RenderObject2D(*Objects[c]->name, false);
-
-                glTranslatef(gapGS + IconSizeGS, 0, 0); 
-                for (size_t o = 0; o < Objects[c]->Childrens.size(); o++) {    
-                    if (Objects[c] == ObjActivo){
-                        //std::cout << "Objeto activo en el outliner: " << reinterpret_cast<Text*>(Objects[c]->name->data)->value << "\n";
-                        if (Objects[c]->select){
-                            glColor4f(ListaColores[accent][0], ListaColores[accent][1],
-                                    ListaColores[accent][2], ListaColores[accent][3]);
-                        }
-                        else {
-                            glColor4f(ListaColores[blanco][0], ListaColores[blanco][1],
-                                    ListaColores[blanco][2], ListaColores[blanco][3]);
-                        }
-                    }
-                    else if (Objects[c]->select){
-                        glColor4f(ListaColores[accentDark][0], ListaColores[accentDark][1],
-                                ListaColores[accentDark][2], ListaColores[accentDark][3]);
-                    }
-                    else {
-                        glColor4f(ListaColores[grisUI][0], ListaColores[grisUI][1],
-                                ListaColores[grisUI][2], ListaColores[grisUI][3]);
-                    }     
-                               
-                    glTranslatef(
-                        -IconSizeGS - gapGS -IconSizeGS - gapGS -IconSizeGS - gapGS, 
-                        RenglonHeightGS, 
-                        0
-                    );   
-
-                    //linea
-                    glVertexPointer(2, GL_SHORT, 0, IconLineMesh); //todos los iconos comparten los vertices y tamaño
-                    glTexCoordPointer(2, GL_FLOAT, 0, IconsUV[static_cast<size_t>(IconType::line)]->uvs);
-                    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-
-                    if (Objects[c]->Childrens[o] == ObjActivo){
-                        //std::cout << "Objeto activo en el outliner: " << reinterpret_cast<Text*>(Objects[c]->Childrens[o]->name->data)->value << "\n";
-                        if (Objects[c]->Childrens[o]->select){
-                            glColor4f(ListaColores[accent][0], ListaColores[accent][1],
-                                    ListaColores[accent][2], ListaColores[accent][3]);
-                        }
-                        else {
-                            glColor4f(ListaColores[blanco][0], ListaColores[blanco][1],
-                                    ListaColores[blanco][2], ListaColores[blanco][3]);
-                        }
-                    }
-                    else if (Objects[c]->Childrens[o]->select){
-                        glColor4f(ListaColores[accentDark][0], ListaColores[accentDark][1],
-                                ListaColores[accentDark][2], ListaColores[accentDark][3]);
-                    }
-                    else {
-                        glColor4f(ListaColores[grisUI][0], ListaColores[grisUI][1],
-                                ListaColores[grisUI][2], ListaColores[grisUI][3]);
-                    }
-
-                    //icono desplegar
-                    glTranslatef(IconSizeGS + gapGS, 0, 0);   
-                    glVertexPointer(2, GL_SHORT, 0, IconMesh); //todos los iconos comparten los vertices y tamaño
-                    glTexCoordPointer(2, GL_FLOAT, 0, IconsUV[static_cast<size_t>(IconType::arrowRight)]->uvs);
-                    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-
-                    //icono del objeto
-                    glTranslatef(IconSizeGS + gapGS, 0, 0);   
-                    glTexCoordPointer(2, GL_FLOAT, 0, IconsUV[Objects[c]->Childrens[o]->IconType]->uvs);
-    		        glVertexPointer(2, GL_SHORT, 0, IconMesh); //todos los iconos comparten los vertices y tamaño
-                    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-
-                    //texto
-                    glTranslatef(IconSizeGS + gapGS, 0, 0);   
-                    RenderObject2D(*Objects[c]->Childrens[o]->name, false);  
-
-                    //glPopMatrix();   
-                }           
-                glTranslatef(-IconSizeGS - gapGS -IconSizeGS - gapGS -IconSizeGS - gapGS, RenglonHeightGS, 0);    
+            for (size_t c = 0; c < Objects.size(); c++){    
+                DibujarRenglon(Objects[c], !Objects[c]->visible); 
+                glTranslatef(0, RenglonHeightGS, 0);     
             }
             glPopMatrix();  
 
@@ -256,22 +158,121 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable  {
                 glScissor(x, y, width - marginGS - borderGS, height); // igual a tu viewport - los ojos
             }
             
-            for (size_t c = 0; c < Objects.size(); c++) {       
-                glTexCoordPointer(2, GL_FLOAT, 0, IconsUV[static_cast<size_t>(IconType::visible)]->uvs);
-                glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-
-                for (size_t o = 0; o < Objects[c]->Childrens.size(); o++) {    
-                    glTranslatef(0, RenglonHeightGS, 0);    
-                    glTexCoordPointer(2, GL_FLOAT, 0, IconsUV[static_cast<size_t>(IconType::visible)]->uvs);
-                    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-                }
-                glTranslatef(0, RenglonHeightGS, 0); 
+            for (size_t c = 0; c < Objects.size(); c++) {  
+                DibujarOjos(Objects[c], !Objects[c]->visible);     
             }
             glPopMatrix();     
             glDisable(GL_SCISSOR_TEST);
 
             DibujarBordes(this);
             DibujarScrollbar(this);
+        }
+
+        void DibujarRenglon(Object* obj, bool hidden){
+            glPushMatrix();     
+            GLfloat opacityRow = hidden ? 0.5f : 1.0f;
+
+            if (obj == ObjActivo){
+                //std::cout << "Objeto activo en el outliner: " << reinterpret_cast<Text*>(Objects[c]->name->data)->value << "\n";
+                if (obj->select){
+                    glColor4f(ListaColores[accent][0], ListaColores[accent][1],
+                            ListaColores[accent][2], opacityRow);
+                }
+                else {
+                    glColor4f(ListaColores[blanco][0], ListaColores[blanco][1],
+                            ListaColores[blanco][2], opacityRow);
+                }
+            }
+            else if (obj->select){
+                glColor4f(ListaColores[accentDark][0], ListaColores[accentDark][1],
+                        ListaColores[accentDark][2], opacityRow);
+            }
+            else {
+                glColor4f(ListaColores[grisUI][0], ListaColores[grisUI][1],
+                        ListaColores[grisUI][2], opacityRow);
+            }
+            
+            //icono desplegar
+            glVertexPointer(2, GL_SHORT, 0, IconMesh); //todos los iconos comparten los vertices y tamaño
+
+            //si no tiene hijos. no hagas la flecha
+            if (obj->Childrens.size() < 1 || !obj->desplegado){
+                glTexCoordPointer(2, GL_FLOAT, 0, IconsUV[static_cast<size_t>(IconType::arrowRight)]->uvs);
+            }
+            else {
+                glTexCoordPointer(2, GL_FLOAT, 0, IconsUV[static_cast<size_t>(IconType::arrow)]->uvs);
+            }
+            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+            //icono de la coleccion
+            glTranslatef(IconSizeGS + gapGS, 0, 0);   
+            glTexCoordPointer(2, GL_FLOAT, 0, IconsUV[obj->IconType]->uvs);
+            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+            //texto render                   
+            glTranslatef(IconSizeGS + gapGS, 0, 0);   
+            RenderObject2D(*obj->name, false);
+            
+            glPopMatrix(); 
+
+            //si no tiene hijos. o no esta desplegado se ahorra todos los bucles siguentes
+            if (obj->Childrens.size() < 1 || !obj->desplegado) return;
+
+            //linea
+            glVertexPointer(2, GL_SHORT, 0, IconLineMesh); //todos los iconos comparten los vertices y tamaño
+            glTexCoordPointer(2, GL_FLOAT, 0, IconsUV[static_cast<size_t>(IconType::line)]->uvs);
+            glPushMatrix();  
+            for (size_t o = 0; o < obj->Childrens.size(); o++){
+                glTranslatef(0, RenglonHeightGS, 0);                
+                glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+            }
+            glPopMatrix(); 
+
+            //flechas
+            glTexCoordPointer(2, GL_FLOAT, 0, IconsUV[static_cast<size_t>(IconType::line)]->uvs);
+            glPushMatrix();  
+            DibujarLineaDesplegada(obj);
+            glPopMatrix(); 
+
+            //renglon normal
+            glTranslatef(IconSizeGS + gapGS, 0, 0);    
+            for (size_t o = 0; o < obj->Childrens.size(); o++){     
+                glTranslatef(0, RenglonHeightGS, 0);                    
+                DibujarRenglon(obj->Childrens[o],
+                    hidden ? true : !obj->Childrens[o]->visible);
+            }
+            glTranslatef(-IconSizeGS - gapGS, 0, 0);  
+        }
+
+        void DibujarLineaDesplegada(Object* obj){
+            for (size_t o = 0; o < obj->Childrens.size(); o++){
+                glTranslatef(0, RenglonHeightGS, 0);                
+                glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+                DibujarLineaDesplegada(obj->Childrens[o]);
+            }
+        }
+
+        void DibujarOjos(Object* obj, bool hidden){
+            GLfloat opacityRow = hidden ? 0.5f : 1.0f;
+            //std::cout << "dibujo ojo '" << reinterpret_cast<Text*>(obj->name->data)->value << "'"<< std::endl;
+            if (obj->visible){
+                glColor4f(ListaColores[grisUI][0], ListaColores[grisUI][1], ListaColores[grisUI][2], opacityRow);
+                glTexCoordPointer(2, GL_FLOAT, 0, IconsUV[static_cast<size_t>(IconType::visible)]->uvs);
+            }
+            else {
+                glColor4f(ListaColores[grisUI][0], ListaColores[grisUI][1], ListaColores[grisUI][2], opacityRow);
+                glTexCoordPointer(2, GL_FLOAT, 0, IconsUV[static_cast<size_t>(IconType::hidden)]->uvs);
+            }
+            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);                
+            glTranslatef(0, RenglonHeightGS, 0); 
+            
+            //si no tiene hijos. o no esta desplegado se ahorra todos los bucles siguentes
+            if (obj->Childrens.size() < 1 || !obj->desplegado) return;
+
+            for (size_t o = 0; o < obj->Childrens.size(); o++){ 
+                DibujarOjos(obj->Childrens[o],
+                            hidden ? true : !obj->Childrens[o]->visible);
+            }
         }
 
         void button_left() override {

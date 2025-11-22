@@ -100,4 +100,8 @@ class Camera : public Object {
             // Restaurar la matriz previa
             glPopMatrix();
         }
+
+		~Camera() {
+			delete name;
+		}
 };
