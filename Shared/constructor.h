@@ -23,14 +23,10 @@ void ConstructUniversal(){
     InitCursors();
 
     CollectionActive = new Collection(SceneCollection);
-    //CollectionActive->desplegado = false;
 
     // Cámara y objetos iniciales
     new Camera(CollectionActive, -3.0f, 2.5f, 1.8f, 0, -35.0, 45.0);
 
-    //Light::Create(CollectionActive, 1.5f, 0.75f, 2.25f);
-
-    //Light* luz1 = Light::Create(CollectionActive, -3.5f, 1.75f, 2.25f);
     Light* luz1 = Light::Create(CollectionActive, 1.0f, 2.25f, 2.25f);
     luz1->SetDiffuse(1.0f, 0.0f, 0.0f);
 
@@ -42,63 +38,11 @@ void ConstructUniversal(){
 
     /*Object* cubo = NewMesh(MeshType::cube, CollectionActive);
     Object* cubo2 = NewMesh(MeshType::cube, cubo);
-    NewMesh(MeshType::cube, cubo2);
-    NewMesh(MeshType::cube, cubo2);
-    NewMesh(MeshType::cube, cubo2);
-
-    CollectionActive = new Collection(SceneCollection);
-    Object* cubo4 = NewMesh(MeshType::cube, CollectionActive);
-    Object* cubo5 = NewMesh(MeshType::cube, cubo4);
-    Object* cubo6 = NewMesh(MeshType::cube, cubo5);
-    cubo6->Deseleccionar();
+    Object* cubo3 = NewMesh(MeshType::cube, cubo2);
+    cubo3->Deseleccionar();
     cubo->Seleccionar();*/
 
     //abrir();
-    //ObjActivo->Deseleccionar();
-    //luz1->Seleccionar();
-
-    /*Object* obj1 = NewMesh(MeshType::cube, nullptr);
-    obj1->SetName("Pepito1");
-
-    Object* obj2 = NewMesh(MeshType::cube, obj1);
-    obj2->SetName("Pepito2");
-
-    Object* obj3 = NewMesh(MeshType::cube, obj2);
-    obj3->SetName("Pepito3");
-    obj3->visible = false;
-
-    Object* obj4 = NewMesh(MeshType::cube, obj3);
-    obj4->SetName("Pepito4");
-
-    Object* obj5 = NewMesh(MeshType::cube, obj4);
-    obj5->SetName("Pepito5");
-
-    Object* obj6 = NewMesh(MeshType::cube, obj5);
-    obj6->SetName("Pepito6");
-    obj6->visible = false;*/
-
-
-    /*Collection* colec2 = new Collection(nullptr, "Collection_Test");
-    Collections.push_back(colec2);
-    CollectionActive = 1;
-    
-    AddMesh(cubo);
-    AddMesh(cubo);
-    AddMesh(cubo);
-    AddMesh(cubo);
-    AddMesh(cubo);
-    AddMesh(cubo);
-    AddMesh(cubo);
-    AddMesh(cubo);
-    AddMesh(cubo);
-    AddMesh(cubo);
-    AddMesh(cubo);
-    AddMesh(cubo);
-    AddMesh(cubo);
-    AddMesh(cubo);
-    AddMesh(cubo);
-    AddMesh(cubo);
-    AddMesh(cubo);*/
 
     //vertical
     rootViewport = new ViewportColumn(

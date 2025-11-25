@@ -483,6 +483,12 @@ void ApagarLucesHijas(Object* obj){
     }
 }
 
+void SetDesplegado(bool desplegado){
+    if (SceneCollection && ObjActivo){
+        ObjActivo->desplegado = desplegado;
+    }
+}
+
 void ChangeVisibilityObj(){
     if (InteractionMode == ObjectMode && estado == editNavegacion && SceneCollection && ObjActivo){
         ObjActivo->visible = !ObjActivo->visible;

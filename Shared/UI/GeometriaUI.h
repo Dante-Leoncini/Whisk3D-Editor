@@ -9,9 +9,9 @@ static GLfloat LineaLightVertex[LineaLightVertexSize] = {
     0.0f, -3.0f, 0.0f,
 };
 
-static GLshort LineaLinkChild[LineaLightVertexSize] = {    
-    0, 0, 0,
-    0, 30000, 0,
+static GLfloat LineaLinkChild[LineaLightVertexSize] = {    
+    0.0f, 0.0f, 0.0f,
+    0.0f, 1000.0f, 0.0f,
 };
 
 static GLfloat lineUV[4] = {

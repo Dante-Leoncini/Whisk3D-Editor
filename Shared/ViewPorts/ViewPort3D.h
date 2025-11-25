@@ -295,6 +295,7 @@ class Viewport3D : public ViewportBase, public WithBorder  {
         }
 
         void RenderRelantionshipsLines(){
+            if (!SceneCollection) return;
             glEnableClientState(GL_TEXTURE_COORD_ARRAY);
             glEnable( GL_TEXTURE_2D );
             glEnable( GL_BLEND );
@@ -306,12 +307,9 @@ class Viewport3D : public ViewportBase, public WithBorder  {
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
             glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
             glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-            for (size_t c = 0; c < SceneCollection->Childrens.size(); c++) {
-                for (size_t o = 0; o < SceneCollection->Childrens[c]->Childrens.size(); o++) {
-                    Object& obj = *SceneCollection->Childrens[c]->Childrens[o];
-                    RenderLinkLines(obj);
-                }
-            }
+
+            RenderLinkLines(SceneCollection);
+
             glDepthMask(GL_TRUE); // Reactiva la escritura en el Z-buffer	
         }
 

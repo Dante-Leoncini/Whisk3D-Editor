@@ -323,6 +323,15 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable  {
                     case SDLK_H:
                         ChangeVisibilityObj();
                         break;  
+                    case SDLK_LEFT:
+                        SetDesplegado(false);
+                        break;
+                    case SDLK_RIGHT:
+                        SetDesplegado(true);
+                        break;
+                    case SDLK_DOWN:
+                        changeSelect(SelectMode::NextSingle, true);
+                        break;
                 };
             }            
         }

@@ -11,41 +11,39 @@ void DrawnLines(int LineWidth, int cantidad, const GLshort* vertexlines, const G
 }
 
 //Relantionshipslines
-void RenderLinkLines(Object& obj){
+void RenderLinkLines(Object* obj){
     // Guardar la matriz actual
     glPushMatrix();
     
     // Aplicar las transformaciones del objeto
-    glTranslatef(obj.posX, obj.posZ, obj.posY);
-    glRotatef(obj.rotX, 1, 0, 0); // angulo, X Y Z
-    glRotatef(obj.rotZ, 0, 1, 0); // angulo, X Y Z
-    glRotatef(obj.rotY, 0, 0, 1); // angulo, X Y Z
+    glTranslatef(obj->posX, obj->posZ, obj->posY);
+    glRotatef(obj->rotX, 1, 0, 0); // angulo, X Y Z
+    glRotatef(obj->rotZ, 0, 1, 0); // angulo, X Y Z
+    glRotatef(obj->rotY, 0, 0, 1); // angulo, X Y Z
     
     // Procesar cada hijo
-    //for (TInt c = 0; c < obj.Childrens.Count(); c++) {
-    for (size_t c = 0; c < obj.Childrens.size(); c++) {
-		Object& objChild = *obj.Childrens[c];
-		LineaLinkChild[3] = (GLshort)objChild.posX;
-		LineaLinkChild[4] = (GLshort)objChild.posZ;
-		LineaLinkChild[5] = (GLshort)objChild.posY;
+    for (size_t c = 0; c < obj->Childrens.size(); c++) {
+		Object* objChild = obj->Childrens[c];
+		if (!objChild->visible) continue;
+		if (obj->getType()!= ObjectType::collection && obj->getType() != ObjectType::baseObject){
+			LineaLinkChild[3] = objChild->posX;
+			LineaLinkChild[4] = objChild->posZ;
+			LineaLinkChild[5] = objChild->posY;
 
-		// Calcular la distancia en 3D entre obj y objChild
-		GLfloat diffX = objChild.posX - obj.posX;
-        GLfloat diffY = objChild.posY - obj.posY;
-        GLfloat diffZ = objChild.posZ - obj.posZ;
-        //GLfloat distancia = sqrtu(diffX * diffX + diffY * diffY + diffZ * diffZ);
-		GLfloat distancia = std::sqrt(diffX * diffX + diffY * diffY + diffZ * diffZ);
-        
-        // Usar la distancia escalada para modificar las coordenadas UV
-        lineUV[3] = distancia*8;
-		glVertexPointer( 3, GL_SHORT, 0, LineaLinkChild );
-		glDrawElements( GL_LINES, LineaEdgeSize, GL_UNSIGNED_SHORT, LineaEdge );
-				
-		DrawnLines(1, 1, LineaTimeline, LineaEdge);
-		//esta parte recursiva no la entendi. capaz tengo que revisarla mas adelante. me suena a un error
-		/*if (obj.Childrens.size() > 0){
-			RenderLinkLines(obj.Childrens[c].Id);
-		}*/
+			// Calcular la distancia en 3D entre obj y objChild
+			GLfloat diffX = objChild->posX - obj->posX;
+			GLfloat diffY = objChild->posY - obj->posY;
+			GLfloat diffZ = objChild->posZ - obj->posZ;
+			//GLfloat distancia = sqrtu(diffX * diffX + diffY * diffY + diffZ * diffZ);
+			GLfloat distancia = std::sqrt(diffX * diffX + diffY * diffY + diffZ * diffZ);
+			
+			// Usar la distancia escalada para modificar las coordenadas UV
+			lineUV[3] = distancia*8;
+			glVertexPointer( 3, GL_FLOAT, 0, LineaLinkChild );
+			glDrawElements( GL_LINES, LineaEdgeSize, GL_UNSIGNED_SHORT, LineaEdge );
+		}
+
+		RenderLinkLines(objChild);
     }
 
     // Restaurar la matriz previa
