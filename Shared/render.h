@@ -166,8 +166,8 @@ void RenderOrigins(){
 	glEnable( GL_POINT_SPRITE );
 	// Make the points bigger.
 	glPointSize( 16 );
-	for (size_t c = 0; c < Objects.size(); c++) {
-		DibujarOrigen(Objects[c]);
+	for (size_t c = 0; c < SceneCollection->Childrens.size(); c++) {
+		DibujarOrigen(SceneCollection->Childrens[c]);
 	}
 	//glTexEnvi( GL_POINT_SPRITE_OES, GL_COORD_REPLACE_OES, GL_FALSE);
 	//glDisable( GL_POINT_SPRITE_OES );

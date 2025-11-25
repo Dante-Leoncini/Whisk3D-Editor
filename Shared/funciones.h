@@ -51,13 +51,13 @@ void EliminarMesh(int indice){
 	/*int links = 0;
 	
 	for(size_t o=0; o < Objects.size(); o++){
-		if (Objects[o]->type == mesh && Objects[o]->Id == indice){links++;};				
+		if (SceneCollection->Childrens[o]->type == mesh && SceneCollection->Childrens[o]->Id == indice){links++;};				
 	}
 
 	if (links < 2){	
-		for(size_t o=0; o < Objects.size(); o++){
-			if (Objects[o]->type == mesh && Objects[o]->Id > indice){
-				Objects[o]->Id--;
+		for(size_t o=0; o < SceneCollection->Childrens.size(); o++){
+			if (SceneCollection->Childrens[o]->type == mesh && SceneCollection->Childrens[o]->Id > indice){
+				SceneCollection->Childrens[o]->Id--;
 			};				
 		}
 		Meshes[indice].LiberarMemoria();

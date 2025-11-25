@@ -159,9 +159,7 @@ class Viewport3D : public ViewportBase, public WithBorder  {
             glEnable(GL_DEPTH_TEST);
           
             // Funcion que renderiza cada objeto de forma recursiva
-            for (size_t o = 0; o < Objects.size(); o++) {
-                Objects[o]->Render();
-            }
+            SceneCollection->Render();
             
             //se encarga de dibujar el layout 
             if (showOverlays) RenderOverlay();
@@ -249,8 +247,8 @@ class Viewport3D : public ViewportBase, public WithBorder  {
             glDisable(GL_TEXTURE_2D );
             glLineWidth(3);	 
 
-            for (size_t c = 0; c < Objects.size(); c++){
-                if (RenderAxisTransform(Objects[c])) break;                
+            for (size_t c = 0; c < SceneCollection->Childrens.size(); c++){
+                if (RenderAxisTransform(SceneCollection->Childrens[c])) break;                
             }
         }
 
@@ -276,7 +274,7 @@ class Viewport3D : public ViewportBase, public WithBorder  {
             glDisableClientState(GL_NORMAL_ARRAY);     
 
             //esto solo se hace si hay objetos
-            if (Objects.size() > 0){
+            if (!SceneCollection->Childrens.empty()){
                 glLineWidth(1);	 
 
                 if (ShowRelantionshipsLines) RenderRelantionshipsLines();
@@ -290,7 +288,7 @@ class Viewport3D : public ViewportBase, public WithBorder  {
             }
             
             //ejes de transformacion
-            if (Objects.size() > 0 && (estado == translacion || estado == rotacion || estado == EditScale)) RenderAllAxisTransform();
+            if (!SceneCollection->Childrens.empty() && (estado == translacion || estado == rotacion || estado == EditScale)) RenderAllAxisTransform();
 
             //dibuja el cursor 3D	
             if (show3DCursor) Render3Dcursor();
@@ -308,9 +306,9 @@ class Viewport3D : public ViewportBase, public WithBorder  {
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
             glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
             glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-            for (size_t c = 0; c < Objects.size(); c++) {
-                for (size_t o = 0; o < Objects[c]->Childrens.size(); o++) {
-                    Object& obj = *Objects[c]->Childrens[o];
+            for (size_t c = 0; c < SceneCollection->Childrens.size(); c++) {
+                for (size_t o = 0; o < SceneCollection->Childrens[c]->Childrens.size(); o++) {
+                    Object& obj = *SceneCollection->Childrens[c]->Childrens[o];
                     RenderLinkLines(obj);
                 }
             }
@@ -408,7 +406,7 @@ class Viewport3D : public ViewportBase, public WithBorder  {
             //en caso de que este emparentado
             /*TInt ParentID = obj.Parent;
             while (ParentID  > -1) {		
-                Object& parentObj = Objects[ParentID];		
+                Object& parentObj = SceneCollection->Childrens[ParentID];		
                 rotX = -parentObj.rotZ;
                 rotY = -parentObj.rotY;	
                 //PivotX = -parentObj.posX;
@@ -541,7 +539,7 @@ class Viewport3D : public ViewportBase, public WithBorder  {
             // Mostrar el cursor
             SDL_ShowCursor();
             //si no hay objetos
-            if (Objects.size() < 1){return;}
+            if (SceneCollection->Childrens.empty()){return;}
 
             if ( InteractionMode == ObjectMode ){
                 if (estado != editNavegacion){
@@ -861,6 +859,7 @@ class Viewport3D : public ViewportBase, public WithBorder  {
 
         void SetEje(int eje){
             if (estado != editNavegacion){
+                ReestablecerEstado(false);
                 axisSelect = eje;
             }	
         };
@@ -901,6 +900,9 @@ class Viewport3D : public ViewportBase, public WithBorder  {
                         break;
                     case SDLK_J:
                         ChangeViewType();
+                        break;    
+                    case SDLK_H:
+                        ChangeVisibilityObj();
                         break;    
                     case SDLK_K:          
                         SetShowOverlays(!showOverlays);
@@ -1024,6 +1026,22 @@ class Viewport3D : public ViewportBase, public WithBorder  {
                         Cancelar();
                         break;
                 }
+            }
+        }
+
+        void event_key_up(SDL_Event &e) override {
+		    SDL_Keycode key = e.key.key; // SDL3
+            switch (key) {
+                case SDLK_LSHIFT:
+                    if (ShiftCount < 20){
+                        changeSelect(SelectMode::NextSingle);
+                    }
+                    ShiftCount = 0;
+                    LShiftPressed = false;
+                    break;
+                case SDLK_LALT:
+                    LAltPressed = false;
+                    break;
             }
         }
 

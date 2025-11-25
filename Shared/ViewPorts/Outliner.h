@@ -50,8 +50,8 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable  {
             int MaxPosXtemp = 0;
             int MaxPosYtemp = 0;
 
-            for (size_t c = 0; c < Objects.size(); c++) {   
-                CalcularRenglon(Objects[c], &MaxPosXtemp, &MaxPosYtemp);
+            for (size_t c = 0; c < SceneCollection->Childrens.size(); c++) {   
+                CalcularRenglon(SceneCollection->Childrens[c], &MaxPosXtemp, &MaxPosYtemp);
             }
             //este es el gap para la barra de desplazamiento de abajo
             MaxPosYtemp -= marginGS;
@@ -137,8 +137,8 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable  {
             RenglonesY = 0;  
             glPushMatrix();          
             glTranslatef(marginGS + PosX, PosY + borderGS, 0);            
-            for (size_t c = 0; c < Objects.size(); c++){    
-                DibujarRenglon(Objects[c], !Objects[c]->visible); 
+            for (size_t c = 0; c < SceneCollection->Childrens.size(); c++){    
+                DibujarRenglon(SceneCollection->Childrens[c], !SceneCollection->Childrens[c]->visible); 
                 glTranslatef(0, RenglonHeightGS, 0);     
             }
             glPopMatrix();  
@@ -158,8 +158,8 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable  {
                 glScissor(x, y, width - marginGS - borderGS, height); // igual a tu viewport - los ojos
             }
             
-            for (size_t c = 0; c < Objects.size(); c++) {  
-                DibujarOjos(Objects[c], !Objects[c]->visible);     
+            for (size_t c = 0; c < SceneCollection->Childrens.size(); c++) {  
+                DibujarOjos(SceneCollection->Childrens[c], !SceneCollection->Childrens[c]->visible);     
             }
             glPopMatrix();     
             glDisable(GL_SCISSOR_TEST);
@@ -173,7 +173,7 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable  {
             GLfloat opacityRow = hidden ? 0.5f : 1.0f;
 
             if (obj == ObjActivo){
-                //std::cout << "Objeto activo en el outliner: " << reinterpret_cast<Text*>(Objects[c]->name->data)->value << "\n";
+                //std::cout << "Objeto activo en el outliner: " << reinterpret_cast<Text*>(SceneCollection->Childrens[c]->name->data)->value << "\n";
                 if (obj->select){
                     glColor4f(ListaColores[accent][0], ListaColores[accent][1],
                             ListaColores[accent][2], opacityRow);
@@ -317,6 +317,30 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable  {
         }
 
         void event_key_down(SDL_Event &e) override {
+            SDL_Keycode key = e.key.key; // SDL3
+            if (e.key.repeat == 0) { 
+                switch (key) {
+                    case SDLK_H:
+                        ChangeVisibilityObj();
+                        break;  
+                };
+            }            
+        }
+
+        void event_key_up(SDL_Event &e) override {
+		    SDL_Keycode key = e.key.key; // SDL3
+            switch (key) {
+                case SDLK_LSHIFT:
+                    if (ShiftCount < 20){
+                        changeSelect(SelectMode::NextSingle, true);
+                    }
+                    ShiftCount = 0;
+                    LShiftPressed = false;
+                    break;
+                case SDLK_LALT:
+                    LAltPressed = false;
+                    break;
+            }
         }
 
         void key_down_return(){

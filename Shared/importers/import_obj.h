@@ -759,7 +759,7 @@ class Wavefront {
 	Collections.Append(SelectActivo);
 	
 	DeseleccionarTodo();
-	Objects[SelectActivo].seleccionado = true;
+	SceneCollection->Childrens[SelectActivo].seleccionado = true;
 	SelectCount = 1;*/
 
 	/*HBufC* noteBuf3 = HBufC::NewLC(180);
@@ -798,7 +798,8 @@ bool LeerOBJ(std::ifstream& file,
 
 	// usar filename para nombrar por defecto (y hacerlo único)
 	std::string fileBase = ExtractBaseName(filename);
-	reinterpret_cast<Text*>(mesh->name->data)->SetValue(SetName(fileBase));
+	//reinterpret_cast<Text*>(mesh->name->data)->SetValue(SetName(fileBase));
+	mesh->SetName(fileBase);
 
     Wavefront Wobj;
     Wobj.Reset();
@@ -1010,7 +1011,7 @@ bool LeerOBJ(std::ifstream& file,
 	rFile.Size(fileSize);
 
 	//necesario para modificar el material correcto	
-	//Object& obj = Objects[SelectActivo];
+	//Object& obj = SceneCollection->Childrens[SelectActivo];
 	//Mesh& pMesh = Meshes[obj.Id];
 
 	HBufC* materialName16 = HBufC::NewLC(180);
@@ -1020,7 +1021,7 @@ bool LeerOBJ(std::ifstream& file,
 	RPointerArray<Mesh> pMeshs; // Array de punteros a Meshes
 	// Llena el array con punteros a los objetos
 	for (TInt c = 0; c <= SelectActivo; ++c){
-		Object* obj = &Objects[SelectActivo - c];
+		Object* obj = &SceneCollection->Childrens[SelectActivo - c];
 		Mesh* pMesh = &Meshes[mesh->Id];
 		objs.Append(obj);
 		pMeshs.Append(pMesh);*/

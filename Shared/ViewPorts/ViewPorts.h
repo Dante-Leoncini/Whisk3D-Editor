@@ -134,6 +134,7 @@ class ViewportBase {
         virtual void event_mouse_motion(int mx, int my) {}
         virtual void button_left() {}
         virtual void event_key_down(SDL_Event &e) {}
+        virtual void event_key_up(SDL_Event &e) {}
         virtual void event_mouse_wheel(SDL_Event &e) {}
         virtual void mouse_button_up(SDL_Event &e) {}
 
@@ -723,10 +724,10 @@ void SetGlobalScale(int scale){
 
     SetIconScale(scale);
 
-    for (size_t i = 0; i < Objects.size(); i++) {                  
-        Objects[i]->name->scaleX = scale;                
-        Objects[i]->name->scaleY = scale;    
-        reinterpret_cast<Text*>(Objects[i]->name->data)->UpdateCache();    
+    for (size_t i = 0; i < SceneCollection->Childrens.size(); i++) {                  
+        SceneCollection->Childrens[i]->name->scaleX = scale;                
+        SceneCollection->Childrens[i]->name->scaleY = scale;    
+        reinterpret_cast<Text*>(SceneCollection->Childrens[i]->name->data)->UpdateCache();    
     }
 }
 

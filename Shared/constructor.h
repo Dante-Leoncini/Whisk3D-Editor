@@ -22,7 +22,7 @@ void ConstructUniversal(){
     SetGlobalScale(3);
     InitCursors();
 
-    CollectionActive = new Collection(nullptr);
+    CollectionActive = new Collection(SceneCollection);
     //CollectionActive->desplegado = false;
 
     // Cámara y objetos iniciales
@@ -39,6 +39,20 @@ void ConstructUniversal(){
     luz2->SetLightID(GL_LIGHT2);*/
 
     NewMesh(MeshType::cube, CollectionActive);
+
+    /*Object* cubo = NewMesh(MeshType::cube, CollectionActive);
+    Object* cubo2 = NewMesh(MeshType::cube, cubo);
+    NewMesh(MeshType::cube, cubo2);
+    NewMesh(MeshType::cube, cubo2);
+    NewMesh(MeshType::cube, cubo2);
+
+    CollectionActive = new Collection(SceneCollection);
+    Object* cubo4 = NewMesh(MeshType::cube, CollectionActive);
+    Object* cubo5 = NewMesh(MeshType::cube, cubo4);
+    Object* cubo6 = NewMesh(MeshType::cube, cubo5);
+    cubo6->Deseleccionar();
+    cubo->Seleccionar();*/
+
     //abrir();
     //ObjActivo->Deseleccionar();
     //luz1->Seleccionar();

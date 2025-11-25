@@ -2,6 +2,7 @@ class Viewport3D;     // forward declaration válida
 extern Viewport3D* Viewport3DActive;
 
 enum class ObjectType {
+    scene,
     mesh, 
     camera, 
     light, 
@@ -14,7 +15,7 @@ enum class ObjectType {
 
 // Declaración adelantada
 class Object;                 // forward declaration de la clase
-extern std::vector<Object*> Objects;   // forward declaration del vector global
+extern Object* SceneCollection;
 extern std::vector<Object*> ObjSelects;   // forward declaration del vector global
 Object* ObjActivo = nullptr;
 
@@ -23,6 +24,7 @@ void DeseleccionarTodo(); // ← forward declaration
 class Object {
     public:
 		Object* Parent = nullptr;
+        //size_t ChildrenIndex; //solo se usa si Parent no es nullptr;
         std::vector<Object*> Childrens;
 		bool visible = true;
 		bool desplegado = true;
@@ -38,31 +40,110 @@ class Object {
             return ObjectType::baseObject;
         }
 
-        void SetName(const std::string& nombre){
-            reinterpret_cast<Text*>(name->data)->SetValue(nombre);
+        void SetName(const std::string& baseName) {
+            if (!SceneCollection) reinterpret_cast<Text*>(name->data)->SetValue(baseName);
+            // ----------------------------
+            // 1) Función recursiva para revisar un objeto y todos sus hijos
+            // ----------------------------
+            std::function<bool(const Object*, const std::string&)> nameExistsInTree;
+
+            nameExistsInTree = [&](const Object* obj, const std::string& name) -> bool {
+                if (!obj) return false;
+
+                if (obj->name && obj->name->data) {
+                    Text* txt = reinterpret_cast<Text*>(obj->name->data);
+                    if (txt->value == name) return true;
+                }
+
+                for (Object* child : obj->Childrens) {
+                    if (nameExistsInTree(child, name)) return true;
+                }
+
+                return false;
+            };
+
+            // ----------------------------
+            // 2) Buscar en toda la jerarquía de la escena
+            // ----------------------------
+            auto nameExists = [&](const std::string& name) -> bool {
+                if (!SceneCollection) return false;
+                return nameExistsInTree(SceneCollection, name);
+            };
+
+            // ----------------------------
+            // 3) Si el nombre base NO existe → usarlo directamente
+            // ----------------------------
+            if (!nameExists(baseName)) {
+                reinterpret_cast<Text*>(name->data)->SetValue(baseName);
+                return;
+            }
+
+            // ----------------------------
+            // 4) Particionar si termina en ".NNN"
+            // ----------------------------
+            std::string root = baseName;
+            int startCounter = 1;
+
+            size_t pos = baseName.find_last_of('.');
+            if (pos != std::string::npos && pos + 1 < baseName.size()) {
+
+                bool digits = true;
+                for (size_t i = pos + 1; i < baseName.size(); ++i) {
+                    if (!isdigit((unsigned char)baseName[i])) { digits = false; break; }
+                }
+
+                if (digits) {
+                    root = baseName.substr(0, pos);
+                    try {
+                        startCounter = std::stoi(baseName.substr(pos + 1)) + 1;
+                        if (startCounter < 1) startCounter = 1;
+                    } catch (...) {}
+                }
+            }
+
+            // ----------------------------
+            // 5) Buscar el primer ".NNN" libre
+            // ----------------------------
+            int counter = startCounter;
+            std::string newName;
+
+            do {
+                std::ostringstream ss;
+                ss << root << "." << std::setw(3) << std::setfill('0') << counter;
+                newName = ss.str();
+                counter++;
+            } while (nameExists(newName));
+
+            reinterpret_cast<Text*>(name->data)->SetValue(newName);
         }
 
         Object(Object* parent, const std::string& nombre)
             : Parent(parent){
             name = AddObject2D(UI::text);
-            reinterpret_cast<Text*>(name->data)->SetValue(nombre);
+            SetName(nombre);
 
             // Si tiene padre → agregar a su vector Children
             if (Parent) {
                 Parent->Childrens.push_back(this);
+                //ChildrenIndex = Parent->Childrens.size() -1;
+                //std::cout << "ChildrenIndex: " << ChildrenIndex << std::endl;
             }
             // Si no tiene padre → agregar a la raíz global
-            else {
-                Objects.push_back(this);
+            else if (SceneCollection && this != SceneCollection){
+                SceneCollection->Childrens.push_back(this);
+                //ChildrenIndex = 0;
             }
+
             DeseleccionarTodo();
             Seleccionar();
         }
 
         void Seleccionar(){
-            select = true;
             ObjActivo = this;
-            ObjSelects.push_back(this);
+            if (!select){
+                select = true;
+                ObjSelects.push_back(this);
+            }
         }
 
         void Deseleccionar(){
@@ -134,21 +215,11 @@ class Object {
             return false;
         }
 
-        virtual void RenderObject(){
-            /*void RenderObject( Object& obj ){
-                //si es un empty
-                if (obj.type == empty){		
-                    glDisable( GL_TEXTURE_2D );	 
-                    glDisable( GL_BLEND );	
-                    glVertexPointer( 3, GL_SHORT, 0, EmptyVertices );
-                    glDrawElements( GL_LINES, EmptyEdgesSize, GL_UNSIGNED_SHORT, EmptyEdges );
-                }
-                glPopMatrix();
-            }*/
-        }
+        virtual void RenderObject(){}
 
         // Funcion recursiva para renderizar un objeto y sus hijos
-        void Render(){    
+        void Render(){   
+            if (!visible) return; 
             // Guardar la matriz actual
             glPushMatrix();       
                 
@@ -159,10 +230,8 @@ class Object {
             glRotatef(rotY, 0, 0, 1); // angulo, X Y Z
 
             // Si es visible y no es un mesh, lo dibuja
-            if (visible) {
-                RenderObject();
-            }
-                
+            RenderObject();
+
             // Procesar cada hijo
             for (size_t c = 0; c < Childrens.size(); c++) {
                 Childrens[c]->Render();
@@ -178,85 +247,212 @@ class Object {
 		}
 };
 
-std::string SetName(const std::string& baseName) {
-    return baseName;
-    // Función recursiva para comprobar si un nombre ya existe
-    /*std::function<bool(const Object*, const std::string&)> nameExistsInCollection;
-    nameExistsInCollection = [&](const Collection* col, const std::string& name) -> bool {
-        // Recorremos los objetos de la colección
-        for (Object* obj : col->Objects) {
-            if (obj->name->data) {
-                Text* text = reinterpret_cast<Text*>(obj->name->data);
-                if (text->value == name) return true;
-            }
-
-            // Revisamos los hijos de cada objeto
-            for (Object* child : obj->Childrens) {
-                if (child->name->data) {
-                    Text* textChild = reinterpret_cast<Text*>(child->name->data);
-                    if (textChild->value == name) return true;
-                }
-            }
-        }
-
-        // Recorremos las subcolecciones recursivamente
-        for (Collection* childCol : col->Collections) {
-            if (nameExistsInCollection(childCol, name)) return true;
-        }
-
-        return false;
-    };
-
-    auto nameExists = [&](const std::string& name) -> bool {
-        for (Collection* col : Collections) {
-            if (nameExistsInCollection(col, name)) return true;
-        }
-        return false;
-    };
-
-    // Si el nombre base no existe, devolverlo tal cual
-    if (!nameExists(baseName)) return baseName;
-
-    // Separar raíz y contador si termina en ".NNN"
-    std::string root = baseName;
-    int startCounter = 1;
-    size_t pos = baseName.find_last_of('.');
-    if (pos != std::string::npos && pos + 1 < baseName.size()) {
-        bool allDigits = true;
-        for (size_t i = pos + 1; i < baseName.size(); ++i) {
-            if (!std::isdigit(static_cast<unsigned char>(baseName[i]))) { allDigits = false; break; }
-        }
-        if (allDigits) {
-            root = baseName.substr(0, pos);
-            try {
-                startCounter = std::stoi(baseName.substr(pos + 1)) + 1;
-                if (startCounter < 1) startCounter = 1;
-            } catch (...) { startCounter = 1; }
-        }
-    }
-
-    // Buscar el siguiente número disponible
-    int counter = startCounter;
-    std::string newName;
-    do {
-        std::ostringstream ss;
-        ss << root << "." << std::setw(3) << std::setfill('0') << counter;
-        newName = ss.str();
-        counter++;
-    } while (nameExists(newName));
-
-    return newName;*/
-}
-
+#include "./Objects/Scene.h"
 #include "./Objects/Collection.h"
 #include "./Objects/Light.h"
 #include "./Objects/Camera.h"
 #include "./Objects/Mesh.h"
 
 //Objects es el punto raiz. o los objetos estan dentro de esta lista. o dentro de objetos de esta lista
-std::vector<Object*> Objects;
+//std::vector<Object*> Objects;
+Object* SceneCollection = new Scene();
 std::vector<Object*> ObjSelects;
 Object* CollectionActive = nullptr;
+
+size_t GetIndexInParent(Object* obj) {
+    /*if (!obj->Parent) {
+        auto it = std::find(Objects.begin(), Objects.end(), obj);
+        if (it == Objects.end()) return (size_t)-1;
+        return it - Objects.begin();
+    }*/
+    auto& siblings = obj->Parent->Childrens;
+    auto it = std::find(siblings.begin(), siblings.end(), obj);
+    if (it == siblings.end()) return (size_t)-1;
+    return it - siblings.begin();
+}
+
+Object* GetPrevDFS(Object* current){
+   /* if (!current) return nullptr;
+
+    // 1) Si tiene hermano anterior → ir al hermano anterior y bajar al último hijo profundo
+    Object* parent = current->Parent;
+    size_t idx = GetIndexInParent(current);
+
+    if (parent && idx > 0){
+        Object* node = parent->Childrens[idx - 1];
+
+        // bajar al hijo más profundo
+        while(!node->Childrens.empty()){
+            node = node->Childrens.back();
+        }
+        return node;
+    }
+
+    // 2) Si no tiene hermano anterior → el anterior es su padre
+    if (parent) return parent;
+
+    // 3) Es raíz → buscar raíz anterior
+    size_t ridx = GetIndexInParent(current);
+    if (ridx > 0){
+        Object* node = SceneCollection->Childrens[ridx - 1];
+        while(!node->Childrens.empty()){
+            node = node->Childrens.back();
+        }
+        return node;
+    }*/
+
+    return nullptr;
+}
+
+Object* GetNextDFS(Object* current) {
+    if (!current) {
+        //std::cout << "GetNextDFS: current fue nulo!\n";
+        return nullptr;
+    }
+
+    // 1) Si tiene hijos -> primero hijo
+    if (!current->Childrens.empty()) {
+        //std::cout << "Tenia hijos, se selecciono su hijo\n";
+        return current->Childrens[0];
+    }
+
+    // 2) Si no tiene hijos -> subimos buscando el siguiente hermano de algún ancestro
+    Object* node = current;
+
+    while (node) {
+        Object* parent = node->Parent;
+
+        // --------------------------------------------------------
+        // Caso especial: node es la raíz (SceneCollection)
+        // Antes buscábamos el "siguiente root" en Objects[], ahora no existe.
+        // Por lo tanto, no hay siguiente.
+        // --------------------------------------------------------
+        if (!parent) {
+            if (node == SceneCollection) {
+                return nullptr;  // fin total del DFS
+            } else {
+                std::cout << "[ERROR] Root inesperado diferente a SceneCollection " << parent << "\n";
+                std::cout << "Objeto: " << reinterpret_cast<Text*>(node->name->data)->value << "\n";
+                return nullptr;
+            }
+        }
+
+        // Buscar node entre los hijos del padre
+        auto& siblings = parent->Childrens;
+        auto it = std::find(siblings.begin(), siblings.end(), node);
+
+        if (it == siblings.end()) {
+            std::cout << "GetNextDFS: inconsistencia, parent no contiene al hijo\n";
+            return nullptr;
+        }
+
+        // Intentar el siguiente hermano
+        ++it;
+        if (it != siblings.end()) {
+            return *it;  // siguiente hermano → siguiente en DFS
+        }
+
+        // No hay más hermanos → seguir subiendo
+        node = parent;
+    }
+
+    return nullptr;
+}
+
+bool IsSelectable(Object* obj, bool IncluirColecciones = false) {
+    if (!obj) return false;
+
+    const ObjectType t = obj->getType();
+
+    // Si NO queremos incluir colecciones → bloquearlas
+    if (!IncluirColecciones) {
+        if (t == ObjectType::collection)
+            return false;
+    }
+
+    // Siempre bloquear baseObject
+    if (t == ObjectType::baseObject)
+        return false;
+
+    return true;
+}
+
+enum class SelectMode {
+    NextSingle,      // Deselecciona actual → selecciona siguiente
+    NextAdd,         // Mantiene actual → agrega el siguiente
+    PrevAdd          // Mantiene actual → agrega anterior
+};
+
+Object* GetFirstDFS(){
+    if (!SceneCollection) return nullptr;
+    if (SceneCollection->Childrens.empty()) return nullptr;
+    return SceneCollection->Childrens[0];
+}
+
+void changeSelect(SelectMode mode, bool IncluirColecciones = false){
+    if (InteractionMode != ObjectMode) return;
+    if (estado != editNavegacion) return;
+    if (SceneCollection->Childrens.empty()) return;
+
+    //std::cout << "changeSelect " << ObjActivo << std::endl;
+    //std::cout << "Seleccionados: " << ObjSelects.size() << std::endl;
+    //std::cout << "IncluirColecciones: " << IncluirColecciones << std::endl;
+
+    // Si no hay activo → elegir el primero DFS
+    if (!ObjActivo){
+        Object* it = SceneCollection->Childrens[0];
+
+        while(it && !IsSelectable(it, IncluirColecciones))
+            it = GetNextDFS(it);
+
+        if (it){
+            ObjActivo->Deseleccionar();
+            it->Seleccionar();
+        }
+        return;
+    }
+
+    Object* next = nullptr;
+
+    // elegir next o previous según modo
+    if (mode == SelectMode::NextSingle || mode == SelectMode::NextAdd){
+        next = GetNextDFS(ObjActivo);
+    }
+    else if (mode == SelectMode::PrevAdd){
+        next = GetPrevDFS(ObjActivo);
+    }
+
+    if (!next) {
+        // Llegamos al final del DFS → wrap
+        next = GetFirstDFS();
+        if (!next) return;
+    }
+
+    // Buscar un selectable
+    Object* it = next;
+    while(it && !IsSelectable(it, IncluirColecciones)){
+        it = (mode == SelectMode::PrevAdd)
+               ? GetPrevDFS(it)
+               : GetNextDFS(it);
+    }
+
+    if (!it) return;
+
+    // ------------------------
+    // Aplicar modo de selección
+    // ------------------------
+
+    if (mode == SelectMode::NextSingle){
+        ObjActivo->Deseleccionar();
+        it->Seleccionar();
+        return;
+    }
+
+    if (mode == SelectMode::NextAdd || mode == SelectMode::PrevAdd){
+        it->Seleccionar();
+        return;
+    }
+}
 
 class SaveState {
 	public:
@@ -273,121 +469,44 @@ class SaveState {
 };
 std::vector<SaveState> estadoObjetos;
 
-void changeSelect(){
-	/*if (InteractionMode == ObjectMode){
-		//si no hay objetos
-		//o si esta moviendo, rotando o haciendo algo... no deja que continue
-		if (1 > ObjectsCount || estado != editNavegacion){
-			return;
-		}
-		//DeseleccionarTodo();
-		//deselecciona el objeto actual si es que estaba seleccionado
-		if (!SelectActivo && (int)(Objects.size() > 0)){
-			SelectCount = 1;
-			SelectActivo = 0;
-		}
-		if (SelectActivo->seleccionado){
-			SelectActivo->seleccionado = false;
-			SelectCount--;
-		}
-
-		//pasa al siguiente
-		SelectActivo++;
-		if (SelectActivo >= (int)(Objects.size()) ){
-			SelectActivo = 0;
-		}
-		//selecciona el proximo objeto
-		if (!SelectActivo->seleccionado){
-			SelectActivo->seleccionado = true;
-			SelectCount++;
-		}
-		UpdateOutlinerColor();
-	}*/
+void ApagarLucesHijas(Object* obj){
+    //si es una luz. la apaga
+    if (obj->getType() == ObjectType::light) {
+        Light* luz = dynamic_cast<Light*>(obj);
+        if (luz) {
+            glDisable(luz->LightID);
+        }
+    }
+    //lo mismo con los hijos
+    for(size_t o=0; o < obj->Childrens.size(); o++){   
+        ApagarLucesHijas(obj->Childrens[o]);
+    }
 }
 
-/*Object* AddObject( size_t type ){
-	Object* obj = new Object();
-	obj->type = type;
-	obj->visible = true;
-	obj->seleccionado = false;
-	obj->posX = Cursor3DposX;
-	obj->posY = Cursor3DposY;
-	obj->posZ = Cursor3DposZ;
-	obj->rotX = obj->rotY = obj->rotZ = 0;
-	obj->scaleX = obj->scaleY = obj->scaleZ = 45000;
-	obj->Parent = -1;	
-	obj->Id = -0;
-	obj->IconType = GetIconType(type);
-	if (type == light){
-		Light tempLight;
-		tempLight.type = pointLight;
-		tempLight.lightId = nextLightId;
-		tempLight.color[0] = 1.0;
-		tempLight.color[1] = 1.0;
-		tempLight.color[2] = 1.0;
-		tempLight.color[3] = 1.0;
-		//tempLight.color  = { MATERIALCOLOR(1.0, 1.0, 1.0, 1.0) };
-
-		glEnable( nextLightId );		
-		GLfloat lightDiffuseSpot[4]   = { 1.0, 1.0, 1.0, 1.0 };
-		GLfloat lightSpecularSpot[4]  = { 1.0, 1.0, 1.0, 1.0 };
-		glLightfv(  nextLightId, GL_DIFFUSE,  lightDiffuseSpot  );
-		glLightfv(  nextLightId, GL_AMBIENT,  objAmbient  );
-		glLightfv(  nextLightId, GL_SPECULAR, lightSpecularSpot );
-		//glLightfv(  nextLightId, GL_POSITION, lightPositionSpot );
-		glLightfv(  nextLightId, GL_POSITION, positionPuntualLight );
-		
-
-		glLightf(   nextLightId, GL_CONSTANT_ATTENUATION,  1.5  );
-		glLightf(   nextLightId, GL_LINEAR_ATTENUATION,    0.5  );
-		glLightf(   nextLightId, GL_QUADRATIC_ATTENUATION, 0.5  );*/
-
-		/*glLightf(   nextLightId, GL_SPOT_CUTOFF,   170.0                );
-		glLightf(   nextLightId, GL_SPOT_EXPONENT,  20.0                );
-		glLightfv(  nextLightId, GL_SPOT_DIRECTION, lightDirectionSpot );*/
-		/*nextLightId++;
-
-		//Lights.Append(tempLight);
-		Lights.push_back(tempLight);
-		//obj.Id = Lights.Count()-1;
-		obj->Id = Lights.size()-1;
-		reinterpret_cast<Text*>(obj->name->data)->SetValue(SetName("Light"));
-	}
-	//tipo camara
-	else if (type == camera){
-		reinterpret_cast<Text*>(obj->name->data)->SetValue(SetName("Camera"));
-		if (!CameraActive){
-			CameraActive = SelectActivo;		
-		}		
-	}
-	AddToCollection(CollectionActive, obj);
-	DeseleccionarTodo();
-	obj->select = true;
-	SelectActivo = obj;
-	SelectCount = 1;
-	return obj;
-}*/
+void ChangeVisibilityObj(){
+    if (InteractionMode == ObjectMode && estado == editNavegacion && SceneCollection && ObjActivo){
+        ObjActivo->visible = !ObjActivo->visible;
+        //apagar luces en caso de que era una luz o sus hijas eran luces
+        if (!ObjActivo->visible && view == RenderType::Rendered) ApagarLucesHijas(ObjActivo);
+    }
+}
 
 void DeseleccionarTodo(){
-	if (InteractionMode == ObjectMode){
+	if (InteractionMode == ObjectMode && SceneCollection){
         ObjSelects.clear();
-		for(size_t o=0; o < Objects.size(); o++){
-            Objects[o]->DeseleccionarCompleto();		
-		}
+        SceneCollection->DeseleccionarCompleto();	
 	}
 }
 
 void SeleccionarTodo(){
     //recorre las colecciones y selecciona todo. si llega a encontrar algo hace lo contrario. deselecciona todo
-	if (InteractionMode == ObjectMode){
+	if (InteractionMode == ObjectMode && SceneCollection){
         ObjSelects.clear();
-        for(size_t c=0; c < Objects.size(); c++){
-            //habia algo seleccionado... asi que hacemos lo contrario. deseleccionar todo
-            if (Objects[c]->SeleccionarCompleto()){
-                //std::cout << "habia algo seleccionado! se deselecciona todo\n";
-                DeseleccionarTodo();
-                return;
-            }
+        //habia algo seleccionado... asi que hacemos lo contrario. deseleccionar todo
+        if (SceneCollection->SeleccionarCompleto()){
+            //std::cout << "habia algo seleccionado! se deselecciona todo\n";
+            DeseleccionarTodo();
+            return;
         }
         //std::cout << "Todos los objetos seleccionados\n";
     }
@@ -395,50 +514,5 @@ void SeleccionarTodo(){
 
 //si hay objetos seleccionasos, devuelve true
 bool HayObjetosSeleccionados(bool IncluirColecciones = false){
-    for(size_t c=0; c < Objects.size(); c++){
-        if (Objects[c]->EstaSeleccionado(IncluirColecciones)){
-            return true;
-        }
-    }
-    return false;
+    return SceneCollection->EstaSeleccionado(IncluirColecciones);
 }
-
-//outliner
-void UpdateOutlinerColor(){
-	/*for (size_t c = 0; c < Collections.size(); c++) {
-		Object& obj = *Objects[c];
-		if (SelectActivo == obj.Id && obj.seleccionado){
-			SetColorOutlinerText(c, ListaColoresUbyte[accent][0], ListaColoresUbyte[accent][1], ListaColoresUbyte[accent][2]);
-		}
-		else if (obj.seleccionado){
-			SetColorOutlinerText(c, ListaColoresUbyte[accentDark][0], ListaColoresUbyte[accentDark][1], ListaColoresUbyte[accentDark][2]);
-		}
-		else {	
-			SetColorOutlinerText(c, ListaColoresUbyte[negro][0], ListaColoresUbyte[negro][1], ListaColoresUbyte[negro][2]);	
-		}
-	}*/
-}
-
-void SetColorOutlinerText(size_t Id, float r, float g, float b){
-    //Texts[Objects2Doutliner[Id]].SetColor(r, g, b);
-}
-
-/*void InitAllOutliners(){
-    for (size_t c = 0; c < Collections.size(); c++) {
-        Object& obj = Objects[c];
-
-        int Id2D = AddObject2D(UI::text);
-        Objects2Doutliner.push_back(Id2D);
-
-        Object2D& tempObject2D = Objects2D[Id2D];
-        Text& tempText = Texts[tempObject2D.Id];
-        tempText.SetValue(obj.name);
-        tempText.SetScaleX(2);
-        tempText.SetScaleY(2);
-        tempObject2D.opacity = 255;
-        tempText.SetX(0);
-        tempText.SetY(0);
-        tempText.SetColor(255, 255, 255);
-    }
-    UpdateOutlinerColor();
-}*/

@@ -1,4 +1,4 @@
-void ReestablecerEstado(){
+void ReestablecerEstado(bool ClearEstado = true){
 	if (InteractionMode == ObjectMode){
 		for(size_t o=0; o < estadoObjetos.size(); o++){
 			SaveState& estadoObj = estadoObjetos[o];
@@ -14,10 +14,12 @@ void ReestablecerEstado(){
 			obj.scaleZ = estadoObj.scaleZ;	
 		}	
 		//estadoObjetos.Close();
-		estadoObjetos.clear();
+		if (ClearEstado) estadoObjetos.clear();
 	}
-	estado = editNavegacion;
-	ReloadViewport();
+	if (ClearEstado) {
+		estado = editNavegacion;
+		ReloadViewport();
+	}
 };
 
 void Cancelar(){
@@ -51,9 +53,9 @@ void EliminarAnimaciones(Object& obj){
 		bool MeshEnUso = false;
 		
 		for(size_t c=0; c < Collections.size(); c++){
-			for(size_t o=0; o < Collections[c]->Objects.size(); o++){
+			for(size_t o=0; o < SceneCollection->Childrens.size(); o++){
 				//si el objeto esta seleccionado. significa que se va a borrar, por lo tanto no se cuenta
-				if (Collections[c]->Objects[o]->type == mesh && Collections[c]->Objects[o] == &obj && !Collections[c]->Objects[o]->select){
+				if (SceneCollection->Childrens[o]->type == mesh && SceneCollection->Childrens[o] == &obj && !SceneCollection->Childrens[o]->select){
 					MeshEnUso = true;
 					break;
 				};				
@@ -63,7 +65,7 @@ void EliminarAnimaciones(Object& obj){
 		//si la malla 3d esta en uso por otro objeto que no va a ser borrado. no se puede borrar
 		if (MeshEnUso){
 			std::cout << "Malla 3D unica. SI se borra" << std::endl;	
-			Objects[obj.Id].LiberarMemoria();
+			SceneCollection->Childrens[obj.Id].LiberarMemoria();
 
 			// borrar el elemento en posición `indice`
 			//no se porque era indice >= 0 && 
@@ -115,19 +117,19 @@ void Eliminar(){
 			Objects[c]->EliminarObjetosSeleccionados();
 		}*/
 
-		for (int i = Objects.size() - 1; i >= 0; i--){
-			Object* obj = Objects[i];
+		/*for (int i = Objects.size() - 1; i >= 0; i--){
+			Object* obj = Objects[i];*/
 			/*if (obj->EliminarObjetosSeleccionados()){
 				std::cout << "Se borro '" << reinterpret_cast<Text*>(obj->name->data)->value << "'"<< std::endl;
 				delete obj;
 				Objects.erase(Objects.begin() + i);
 			}*/
-			if (obj->EliminarObjetosSeleccionados()){
+			/*if (obj->EliminarObjetosSeleccionados()){
 				std::cout << "Se borro '" << reinterpret_cast<Text*>(obj->name->data)->value << "'"<< std::endl;
 				//delete obj;
 				//Objects.erase(Objects.begin() + i);
 			}
-		}
+		}*/
 
 		ObjSelects.clear();
 	}
@@ -138,25 +140,23 @@ void SetTransformPivotPoint(){
 		TransformPivotPointFloat[0] = 0;
 		TransformPivotPointFloat[1] = 0;
 		TransformPivotPointFloat[2] = 0;
-		for(size_t c=0; c < Objects.size(); c++){
-			for(size_t o=0; o < Objects[c]->Childrens.size(); o++){
-				Object& obj = *Objects[c]->Childrens[o];	
-				if (obj.select){
-					TransformPivotPointFloat[0] += obj.posX;
-					TransformPivotPointFloat[1] += obj.posY;
-					TransformPivotPointFloat[2] += obj.posZ;	
-				};
+		for(size_t c=0; c < SceneCollection->Childrens.size(); c++){
+			Object& obj = *SceneCollection->Childrens[c];	
+			if (obj.select){
+				TransformPivotPointFloat[0] += obj.posX;
+				TransformPivotPointFloat[1] += obj.posY;
+				TransformPivotPointFloat[2] += obj.posZ;	
+			};
 
-				//esto va a dar errores si el padre y el hijo estan seleccionados
-				/*TInt ParentID = obj.Parent;
-				while (ParentID  > -1) {		
-					Object& parentObj = Objects[ParentID];
-					TransformPivotPointFloat[0] += parentObj.posX;
-					TransformPivotPointFloat[1] += parentObj.posY;
-					TransformPivotPointFloat[2] += parentObj.posZ;	
-					ParentID = parentObj.Parent;		
-				}*/
-			}
+			//esto va a dar errores si el padre y el hijo estan seleccionados
+			/*TInt ParentID = obj.Parent;
+			while (ParentID  > -1) {		
+				Object& parentObj = Objects[ParentID];
+				TransformPivotPointFloat[0] += parentObj.posX;
+				TransformPivotPointFloat[1] += parentObj.posY;
+				TransformPivotPointFloat[2] += parentObj.posZ;	
+				ParentID = parentObj.Parent;		
+			}*/
 		}
 		size_t SelectCount = ObjSelects.size();
 		TransformPivotPointFloat[0] = TransformPivotPointFloat[0]/SelectCount;
@@ -174,35 +174,49 @@ void GuardarMousePos() {
     lastMouseY = my;
 }
 
-void guardarEstado(){
-	GuardarMousePos();
-	estadoObjetos.clear();
-	estadoObjetos.reserve(ObjSelects.size());
-	for(size_t c=0; c < Objects.size(); c++){
-		for(size_t o=0; o < Objects[c]->Childrens.size(); o++){
-			Object& obj = *Objects[c]->Childrens[o];
-			if (obj.select){
-				SaveState NuevoEstado;
-				NuevoEstado.obj = &obj;
-				NuevoEstado.posX = obj.posX;
-				NuevoEstado.posY = obj.posY;
-				NuevoEstado.posZ = obj.posZ;
-				NuevoEstado.rotX = obj.rotX;
-				NuevoEstado.rotY = obj.rotY;
-				NuevoEstado.rotZ = obj.rotZ;
-				NuevoEstado.scaleX = obj.scaleX;
-				NuevoEstado.scaleY = obj.scaleY;
-				NuevoEstado.scaleZ = obj.scaleZ;
-				estadoObjetos.push_back(NuevoEstado);
-			}
-		}	
+void guardarEstadoRec(Object* obj){
+    if (!obj) return;
+
+    // Si está seleccionado, guardar estado
+    if (obj->select && obj->visible) {
+        SaveState NuevoEstado;
+        NuevoEstado.obj = obj;
+        NuevoEstado.posX = obj->posX;
+        NuevoEstado.posY = obj->posY;
+        NuevoEstado.posZ = obj->posZ;
+        NuevoEstado.rotX = obj->rotX;
+        NuevoEstado.rotY = obj->rotY;
+        NuevoEstado.rotZ = obj->rotZ;
+        NuevoEstado.scaleX = obj->scaleX;
+        NuevoEstado.scaleY = obj->scaleY;
+        NuevoEstado.scaleZ = obj->scaleZ;
+        estadoObjetos.push_back(NuevoEstado);
+    }
+
+    // Recursión: recorrer hijos
+    for (size_t i = 0; i < obj->Childrens.size(); i++) {
+        guardarEstadoRec(obj->Childrens[i]);
+    }
 }
-	SetTransformPivotPoint();
-};
+
+bool guardarEstado(){
+    if (!SceneCollection) return false;
+
+    GuardarMousePos();
+    estadoObjetos.clear();
+
+    // Recorrer todo el árbol desde la raíz
+    guardarEstadoRec(SceneCollection);
+
+	if (estadoObjetos.empty()) return false;	
+
+    SetTransformPivotPoint();
+	return true;
+}
 
 void SetPosicion(){
 	if (ObjActivo && InteractionMode == ObjectMode && ObjActivo->select && estado == editNavegacion){
-		guardarEstado();
+		if (!guardarEstado()) return;
 		estado = translacion;
 		//if (axisSelect > 2){axisSelect = X;}
 		axisSelect = ViewAxis;
@@ -343,7 +357,7 @@ void SetRotacion(int dx, int dy){
 void SetRotacion(){
 	//si no hay objetos
 	if (ObjActivo && ObjActivo->select && estado == editNavegacion){
-		guardarEstado();
+		if (!guardarEstado()) return;
 		estado = rotacion;	
 		valorRotacion = 0;
 		//axisSelect = ViewAxis;
@@ -360,6 +374,7 @@ void SetRotacion(){
 };
 
 void SetScale(int dx, int dy, float factor = 0.01f){
+	//std::cout << "estadoObjetos size: " << estadoObjetos.size() << std::endl;
 	float dxf = dx*factor;
 	float dyf = dy*factor;
 	for (size_t o = 0; o < estadoObjetos.size(); o++) {
@@ -393,8 +408,8 @@ void SetEscala(){
 	//XYZ tiene escala
 	//si no hay objetos
 	if (ObjActivo && ObjActivo->select && estado == editNavegacion){
+		if (!guardarEstado()) return;
 		estado = EditScale;
-		guardarEstado();
 		axisSelect = XYZ;	
 	}
 	//esto era para symbian- porque "escala" y "eje Z" es el numero 3

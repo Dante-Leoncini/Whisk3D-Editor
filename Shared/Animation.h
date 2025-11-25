@@ -526,19 +526,19 @@ void ReloadAnimation() {
 				// Asignar el valor calculado a la propiedad correspondiente del objeto
 				switch (anim.Property) {
 					case AnimPosition:
-						Objects[AnimationObjects[a].Id].posX = valueX;
-						Objects[AnimationObjects[a].Id].posY = valueY;
-						Objects[AnimationObjects[a].Id].posZ = valueZ;
+						SceneCollection->Childrens[AnimationObjects[a].Id].posX = valueX;
+						SceneCollection->Childrens[AnimationObjects[a].Id].posY = valueY;
+						SceneCollection->Childrens[AnimationObjects[a].Id].posZ = valueZ;
 						break;
 					case AnimRotation:
-						Objects[AnimationObjects[a].Id].rotX = valueX;
-						Objects[AnimationObjects[a].Id].rotY = valueY;
-						Objects[AnimationObjects[a].Id].rotZ = valueZ;
+						SceneCollection->Childrens[AnimationObjects[a].Id].rotX = valueX;
+						SceneCollection->Childrens[AnimationObjects[a].Id].rotY = valueY;
+						SceneCollection->Childrens[AnimationObjects[a].Id].rotZ = valueZ;
 						break;
 					case AnimScale:
-						Objects[AnimationObjects[a].Id].scaleX = valueX;
-						Objects[AnimationObjects[a].Id].scaleY = valueY;
-						Objects[AnimationObjects[a].Id].scaleZ = valueZ;
+						SceneCollection->Childrens[AnimationObjects[a].Id].scaleX = valueX;
+						SceneCollection->Childrens[AnimationObjects[a].Id].scaleY = valueY;
+						SceneCollection->Childrens[AnimationObjects[a].Id].scaleZ = valueZ;
 						break;
 					// Otros casos según las propiedades
 					default:

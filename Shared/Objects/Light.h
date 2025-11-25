@@ -41,7 +41,7 @@ class Light : public Object {
             if (!showOverlayGlobal) return;
 
             //color si esta seleccionado
-            if (ObjActivo == this){
+            if (ObjActivo == this && select){
                 glColor4f(ListaColores[accent][0],ListaColores[accent][1],ListaColores[accent][2],ListaColores[accent][3]);
             }
             else if (select){

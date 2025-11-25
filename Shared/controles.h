@@ -75,19 +75,7 @@ void InputUsuarioSDL3(SDL_Event &e){
 		viewPortActive->event_key_down(e);
     } 	
 	else if (e.type == SDL_EVENT_KEY_UP) {
-		SDL_Keycode key = e.key.key; // SDL3
-		switch (key) {
-			case SDLK_LSHIFT:
-				if (ShiftCount < 20){
-					changeSelect();
-				}
-				ShiftCount = 0;
-				LShiftPressed = false;
-				break;
-			case SDLK_LALT:
-				LAltPressed = false;
-				break;
-		}
+		viewPortActive->event_key_up(e);
 	}
 }
 
@@ -265,7 +253,7 @@ void InputUsuarioSymbian(GLfixed aDeltaTimeSecs){
 		if (estado == editNavegacion){ 
 			if (navegacionMode == Orbit){
 				if (ViewFromCameraActive && CameraToView){
-					Object& obj = Objects[CameraActive];
+					Object& obj = SceneCollection->Childrens[CameraActive];
 					// Convertir el angulo de rotX a radianes
 					GLfloat radRotX = obj.rotX * PI / 180.0;
 
@@ -323,7 +311,7 @@ void InputUsuarioSymbian(GLfixed aDeltaTimeSecs){
 		if (estado == editNavegacion){				
 			if (navegacionMode == Orbit){
 				if (ViewFromCameraActive && CameraToView){
-					Object& obj = Objects[CameraActive];
+					Object& obj = SceneCollection->Childrens[CameraActive];
 					// Convertir el angulo de rotX a radianes
 					GLfloat radRotX = obj.rotX * PI / 180.0;
 
@@ -377,7 +365,7 @@ void InputUsuarioSymbian(GLfixed aDeltaTimeSecs){
 		if (estado == editNavegacion){	
 			if (navegacionMode == Orbit){
 				if (ViewFromCameraActive && CameraToView){
-					Object& obj = Objects[CameraActive];
+					Object& obj = SceneCollection->Childrens[CameraActive];
 					// Convertir el angulo de rotX a radianes
 					GLfloat radRotX = obj.rotX * PI / 180.0;
 					GLfloat radRotY = obj.rotY * PI / 180.0;
@@ -420,7 +408,7 @@ void InputUsuarioSymbian(GLfixed aDeltaTimeSecs){
 		if (estado == editNavegacion){ 			
 			if (navegacionMode == Orbit){
 				if (ViewFromCameraActive && CameraToView){
-					Object& obj = Objects[CameraActive];
+					Object& obj = SceneCollection->Childrens[CameraActive];
 					// Convertir el angulo de rotX a radianes
 					GLfloat radRotX = obj.rotX * PI / 180.0;
 					GLfloat radRotY = obj.rotY * PI / 180.0;
