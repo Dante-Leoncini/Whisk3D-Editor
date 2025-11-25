@@ -19,7 +19,7 @@ extern Object* SceneCollection;
 extern std::vector<Object*> ObjSelects;   // forward declaration del vector global
 Object* ObjActivo = nullptr;
 
-void DeseleccionarTodo(); // ← forward declaration
+void DeseleccionarTodo(bool IncluirColecciones = false); // ← forward declaration
 
 class Object {
     public:
@@ -38,6 +38,61 @@ class Object {
 
         virtual ObjectType getType(){
             return ObjectType::baseObject;
+        }
+
+        Object(Object* parent, const std::string& nombre)
+            : Parent(parent){
+            name = AddObject2D(UI::text);
+            SetName(nombre);
+
+            // Si tiene padre → agregar a su vector Children
+            if (Parent) {
+                Parent->Childrens.push_back(this);
+                //ChildrenIndex = Parent->Childrens.size() -1;
+                //std::cout << "ChildrenIndex: " << ChildrenIndex << std::endl;
+            }
+            // Si no tiene padre → agregar a la raíz global
+            else if (SceneCollection && this != SceneCollection){
+                SceneCollection->Childrens.push_back(this);
+                //ChildrenIndex = 0;
+            }
+
+            DeseleccionarTodo();
+            Seleccionar();
+        }
+        
+        virtual ~Object() {
+            // Borrar hijos primero
+            for (Object* c : Childrens){
+                c->Parent = Parent;
+            }
+
+            Childrens.clear();
+
+            // Borrar nombre/UI
+            if (name) {
+                //delete name;
+                name = nullptr;
+            }
+        }
+
+
+        //Esta funcion siempre borra a los hijos del objeto. nunca el objeto en si
+        //como la Escena es un objeto. la escena nunca se borra
+		void EliminarObjetosSeleccionados(bool IncluirCollecciones = false){
+		    //std::cout << "Eliminando objetos en " << reinterpret_cast<Text*>(name->data)->value << std::endl;
+            // 1) Procesar hijos primero
+            for (int i = (int)Childrens.size() - 1; i >= 0; i--){
+                Object* child = Childrens[i];
+
+                // Recursión: si el hijo pide borrarse (select == true)
+                child->EliminarObjetosSeleccionados(IncluirCollecciones);
+                if (child->select && (IncluirCollecciones || child->getType() != ObjectType::collection ) ){
+				    std::cout << "Se borro '" << reinterpret_cast<Text*>(child->name->data)->value << "'"<< std::endl;
+                    Childrens.erase(Childrens.begin() + i);
+                    delete child;
+                }
+            }
         }
 
         void SetName(const std::string& baseName) {
@@ -117,27 +172,6 @@ class Object {
             reinterpret_cast<Text*>(name->data)->SetValue(newName);
         }
 
-        Object(Object* parent, const std::string& nombre)
-            : Parent(parent){
-            name = AddObject2D(UI::text);
-            SetName(nombre);
-
-            // Si tiene padre → agregar a su vector Children
-            if (Parent) {
-                Parent->Childrens.push_back(this);
-                //ChildrenIndex = Parent->Childrens.size() -1;
-                //std::cout << "ChildrenIndex: " << ChildrenIndex << std::endl;
-            }
-            // Si no tiene padre → agregar a la raíz global
-            else if (SceneCollection && this != SceneCollection){
-                SceneCollection->Childrens.push_back(this);
-                //ChildrenIndex = 0;
-            }
-
-            DeseleccionarTodo();
-            Seleccionar();
-        }
-
         void Seleccionar(){
             ObjActivo = this;
             if (!select){
@@ -156,33 +190,11 @@ class Object {
             } 
         }
 
-        void DeseleccionarCompleto(){
+        void DeseleccionarCompleto(bool IncluirColecciones = false){
             select = false;
             for(size_t o=0; o < Childrens.size(); o++){
-                Childrens[o]->DeseleccionarCompleto();		
+                Childrens[o]->DeseleccionarCompleto(IncluirColecciones);		
             } 
-        }
-
-		bool EliminarObjetosSeleccionados(){
-            // 1) Procesar hijos primero
-            /*for (int i = (int)Childrens.size() - 1; i >= 0; i--){
-                Object* child = Childrens[i];
-
-                // Recursión: si el hijo pide borrarse (select == true)
-                if (child->EliminarObjetosSeleccionados()){
-				    std::cout << "Se borro '" << reinterpret_cast<Text*>(child->name->data)->value << "'"<< std::endl;
-                    delete child;
-                    Childrens.erase(Childrens.begin() + i);
-                }
-                else if (select){
-                    //despues tengo que meterlo en algun child o en la lista de objetos.. o queda huerfano en memoria
-                    child->Parent = nullptr;
-                }
-            }*/
-
-            // 2) Si YO estoy seleccionado,
-            // indico al padre que debe desconectarme y borrar ME (NO AQUÍ)
-            return select;
         }
 
         bool EstaSeleccionado(bool IncluirCollecciones){
@@ -198,18 +210,18 @@ class Object {
             return false;       
         }
 
-        bool SeleccionarCompleto(){
+        bool SeleccionarCompleto(bool IncluirColecciones = false){
             //si hay algo seleccionado retorna true para deseleccionar todo
             if (select) return true;
             
-            if (getType() != ObjectType::collection && getType() != ObjectType::baseObject){
+            if (IncluirColecciones || (getType() != ObjectType::collection && getType() != ObjectType::baseObject)){
                 select = true;
                 ObjSelects.push_back(this);
                 if (!ObjActivo) ObjActivo = this;
             }
 
             for(size_t o=0; o < Childrens.size(); o++){      
-                if (Childrens[o]->SeleccionarCompleto()) return true;
+                if (Childrens[o]->SeleccionarCompleto(IncluirColecciones)) return true;
             }
             //nada seleccionado
             return false;
@@ -240,11 +252,6 @@ class Object {
             // Restaurar la matriz previa
             glPopMatrix();
         }
-
-		virtual ~Object() {
-            //Childrens.clear();
-            if (name) delete name;
-		}
 };
 
 #include "./Objects/Scene.h"
@@ -400,14 +407,20 @@ void changeSelect(SelectMode mode, bool IncluirColecciones = false){
 
     // Si no hay activo → elegir el primero DFS
     if (!ObjActivo){
+        if (SceneCollection->Childrens.empty()){
+            std::cout << "no hay objetos para seleccionar" << std::endl;
+            return;
+        }
         Object* it = SceneCollection->Childrens[0];
 
         while(it && !IsSelectable(it, IncluirColecciones))
             it = GetNextDFS(it);
 
         if (it){
-            ObjActivo->Deseleccionar();
             it->Seleccionar();
+        }
+        else {
+            std::cout << "los objetos no eran seleccionables" << std::endl;
         }
         return;
     }
@@ -497,21 +510,21 @@ void ChangeVisibilityObj(){
     }
 }
 
-void DeseleccionarTodo(){
+void DeseleccionarTodo(bool IncluirColecciones){
 	if (InteractionMode == ObjectMode && SceneCollection){
         ObjSelects.clear();
-        SceneCollection->DeseleccionarCompleto();	
+        SceneCollection->DeseleccionarCompleto(IncluirColecciones);	
 	}
 }
 
-void SeleccionarTodo(){
+void SeleccionarTodo(bool IncluirColecciones = false){
     //recorre las colecciones y selecciona todo. si llega a encontrar algo hace lo contrario. deselecciona todo
 	if (InteractionMode == ObjectMode && SceneCollection){
         ObjSelects.clear();
         //habia algo seleccionado... asi que hacemos lo contrario. deseleccionar todo
-        if (SceneCollection->SeleccionarCompleto()){
+        if (SceneCollection->SeleccionarCompleto(IncluirColecciones)){
             //std::cout << "habia algo seleccionado! se deselecciona todo\n";
-            DeseleccionarTodo();
+            DeseleccionarTodo(IncluirColecciones);
             return;
         }
         //std::cout << "Todos los objetos seleccionados\n";

@@ -320,9 +320,17 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable  {
             SDL_Keycode key = e.key.key; // SDL3
             if (e.key.repeat == 0) { 
                 switch (key) {
+                    case SDLK_A:  
+                        SeleccionarTodo(true);
+                        break;
                     case SDLK_H:
                         ChangeVisibilityObj();
                         break;  
+                    case SDLK_X:   
+                        if (estado == editNavegacion){
+                            Eliminar(true);
+                        }
+                        break;
                     case SDLK_LEFT:
                         SetDesplegado(false);
                         break;

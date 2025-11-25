@@ -92,45 +92,19 @@ void EliminarAnimaciones(Object& obj){
 	SelectActivo = nullptr;
 }*/
 
-void Eliminar(){
+void Eliminar(bool IncluirCollecciones = false){
 	if (InteractionMode == ObjectMode){
 		//si no hay nada seleccionado. no borra
-		if (!HayObjetosSeleccionados()){
+		if (!HayObjetosSeleccionados(IncluirCollecciones)){
 			std::cout << "nada seleccionado para borrar" << std::endl;
 			return;
 		}
-		
-		//pregunta de confirmacion
-		//HBufC* noteBuf = HBufC::NewLC(100);
-		//_LIT(KStaticErrorMessage, "Delete?");
-		//noteBuf->Des().Format(KStaticErrorMessage);
-		/*if (!CDialogs::Alert(noteBuf)){
-			CleanupStack::PopAndDestroy(noteBuf);	
-			return;
-		}*/
-		//CleanupStack::PopAndDestroy(noteBuf);	
 		Cancelar();
 
-		//borra de adelante para atras		
-		/*for (int c = (int)Objects.size() - 1; c >= 0; c--) {
-			std::cout << "borrando " << (c+1) << std::endl;
-			Objects[c]->EliminarObjetosSeleccionados();
-		}*/
+		if (!SceneCollection) return;
 
-		/*for (int i = Objects.size() - 1; i >= 0; i--){
-			Object* obj = Objects[i];*/
-			/*if (obj->EliminarObjetosSeleccionados()){
-				std::cout << "Se borro '" << reinterpret_cast<Text*>(obj->name->data)->value << "'"<< std::endl;
-				delete obj;
-				Objects.erase(Objects.begin() + i);
-			}*/
-			/*if (obj->EliminarObjetosSeleccionados()){
-				std::cout << "Se borro '" << reinterpret_cast<Text*>(obj->name->data)->value << "'"<< std::endl;
-				//delete obj;
-				//Objects.erase(Objects.begin() + i);
-			}
-		}*/
-
+		SceneCollection->EliminarObjetosSeleccionados(IncluirCollecciones);
+		ObjActivo = nullptr;
 		ObjSelects.clear();
 	}
 }
