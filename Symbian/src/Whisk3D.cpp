@@ -2530,7 +2530,7 @@ void CWhisk3D::SetScreenSize( TUint aWidth, TUint aHeight, TBool widescreen = fa
 					FRUSTUM_NEAR, FRUSTUM_FAR );
     }
     else {
-    	glOrthof(-90.0f * aspectRatio, 90.0f * aspectRatio, -90.0f, 90.0f, -5.0f, 1000.0f);    	
+    	glOrthof(-45.0f * aspectRatio, 45.0f * aspectRatio, -45.0f, 45.0f, FRUSTUM_NEAR, FRUSTUM_FAR);    	
     }
     glMatrixMode( GL_MODELVIEW );
 	redibujar = true;
