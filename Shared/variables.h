@@ -76,7 +76,7 @@ int valorRotacion = 0;
 
 int NumTexturasWhisk3D = 0;
 
-//para los cursores de SDL3, puede que no sea bueno tenerlo aca...
+//para los cursores de SDL
 SDL_Cursor* cursorDefault;
 SDL_Cursor* cursorRotate;
 SDL_Cursor* cursorScaleVertical;
@@ -84,13 +84,19 @@ SDL_Cursor* cursorScaleHorizontal;
 SDL_Cursor* cursorTranslate;
 
 void InitCursors() {
-    cursorDefault   = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_DEFAULT);
-    cursorTranslate = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_MOVE);
-    cursorRotate    = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_CROSSHAIR);
-    cursorScaleVertical   = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_NS_RESIZE);
-	cursorScaleHorizontal = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_EW_RESIZE);
+	#if SDL_MAJOR_VERSION == 2
+		//para los cursores de SDL2
+		cursorDefault         = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_ARROW);
+		cursorTranslate       = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZEALL);
+		cursorRotate          = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_CROSSHAIR);
+		cursorScaleVertical   = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZENS);
+		cursorScaleHorizontal = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZEWE);
+	#elif SDL_MAJOR_VERSION == 3
+		//para los cursores de SDL3
+		cursorDefault   = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_DEFAULT);
+		cursorTranslate = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_MOVE);
+		cursorRotate    = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_CROSSHAIR);
+		cursorScaleVertical   = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_NS_RESIZE);
+		cursorScaleHorizontal = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_EW_RESIZE);
+	#endif
 }
-
-/*inline float FIXED_TO_FLOAT(GLfixed x) {
-    return static_cast<float>(x) / 65536.0f; // porque Q16.16
-}*/

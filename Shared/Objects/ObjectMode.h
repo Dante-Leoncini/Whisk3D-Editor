@@ -24,7 +24,12 @@ void ReestablecerEstado(bool ClearEstado = true){
 
 void Cancelar(){
 	// Mostrar el cursor
-	SDL_ShowCursor();
+	#if SDL_MAJOR_VERSION == 2
+		SDL_ShowCursor(SDL_ENABLE);
+	#elif SDL_MAJOR_VERSION == 3
+		SDL_ShowCursor();	
+	#endif
+
 	if (estado != editNavegacion){
 		ReestablecerEstado();
 	}
@@ -149,11 +154,17 @@ void SetTransformPivotPoint(){
 
 // Función para guardar la posición actual del mouse
 void GuardarMousePos() {
-    //SDL_GetMouseState(&lastMouseX, &lastMouseY);
-    float mx, my;                       // variables temporales
-    SDL_GetMouseState(&mx, &my);      // SDL devuelve int
-    lastMouseX = mx;           // convertimos a float
-    lastMouseY = my;
+	#if SDL_MAJOR_VERSION == 2
+		int mx, my;                  // SDL2 usa enteros
+		SDL_GetMouseState(&mx, &my); // OK
+		lastMouseX = (float)mx;      // convertimos después
+		lastMouseY = (float)my;
+	#elif SDL_MAJOR_VERSION == 3
+		float mx, my;                       // variables temporales
+		SDL_GetMouseState(&mx, &my);      // SDL devuelve int
+		lastMouseX = mx;           // convertimos a float
+		lastMouseY = my;
+	#endif
 }
 
 void guardarEstadoRec(Object* obj){

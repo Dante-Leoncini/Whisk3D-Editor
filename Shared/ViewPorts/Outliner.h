@@ -313,7 +313,11 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable  {
         }
 
         void event_key_down(SDL_Event &e) override {
-            SDL_Keycode key = e.key.key; // SDL3
+            #if SDL_MAJOR_VERSION == 2
+                SDL_Keycode key = e.key.keysym.sym; //SDL2            
+            #elif SDL_MAJOR_VERSION == 3
+                SDL_Keycode key = e.key.key; // SDL3
+            #endif
             if (e.key.repeat == 0) { 
                 switch (key) {
                     case SDLK_A:  
@@ -341,7 +345,11 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable  {
         }
 
         void event_key_up(SDL_Event &e) override {
-		    SDL_Keycode key = e.key.key; // SDL3
+            #if SDL_MAJOR_VERSION == 2
+                SDL_Keycode key = e.key.keysym.sym; //SDL2            
+            #elif SDL_MAJOR_VERSION == 3
+                SDL_Keycode key = e.key.key; // SDL3
+            #endif
             switch (key) {
                 case SDLK_LSHIFT:
                     if (ShiftCount < 20){

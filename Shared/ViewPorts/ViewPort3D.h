@@ -532,7 +532,11 @@ class Viewport3D : public ViewportBase, public WithBorder  {
 
         void Aceptar() {	
             // Mostrar el cursor
-            SDL_ShowCursor();
+            #if SDL_MAJOR_VERSION == 2
+                SDL_ShowCursor(SDL_ENABLE);
+            #elif SDL_MAJOR_VERSION == 3
+                SDL_ShowCursor();	
+            #endif
             //si no hay objetos
             if (SceneCollection->Childrens.empty()){return;}
 
@@ -568,7 +572,11 @@ class Viewport3D : public ViewportBase, public WithBorder  {
             if (middleMouseDown) {
                 ViewPortClickDown = true;
                 // Chequear si Shift está presionado
-                const bool* state = SDL_GetKeyboardState(NULL);
+	            #if SDL_MAJOR_VERSION == 2
+                    const Uint8* state = SDL_GetKeyboardState(NULL);
+	            #elif SDL_MAJOR_VERSION == 3
+                    const bool* state = SDL_GetKeyboardState(NULL);
+                #endif
                 bool shiftHeld = state[SDL_SCANCODE_LSHIFT] || state[SDL_SCANCODE_RSHIFT];
 
                 if (shiftHeld) {
@@ -860,7 +868,11 @@ class Viewport3D : public ViewportBase, public WithBorder  {
         };
 
         void event_key_down(SDL_Event &e) override {
-            SDL_Keycode key = e.key.key; // SDL3
+            #if SDL_MAJOR_VERSION == 2
+                SDL_Keycode key = e.key.keysym.sym; //SDL2            
+            #elif SDL_MAJOR_VERSION == 3
+                SDL_Keycode key = e.key.key; // SDL3
+            #endif
             if (e.key.repeat == 0) { 
                 switch (key) {
                     case SDLK_LSHIFT:
@@ -1025,7 +1037,11 @@ class Viewport3D : public ViewportBase, public WithBorder  {
         }
 
         void event_key_up(SDL_Event &e) override {
-		    SDL_Keycode key = e.key.key; // SDL3
+            #if SDL_MAJOR_VERSION == 2
+                SDL_Keycode key = e.key.keysym.sym; //SDL2            
+            #elif SDL_MAJOR_VERSION == 3
+                SDL_Keycode key = e.key.key; // SDL3
+            #endif
             switch (key) {
                 case SDLK_LSHIFT:
                     if (ShiftCount < 20){
