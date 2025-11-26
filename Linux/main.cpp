@@ -10,6 +10,7 @@
 #include <vulkan/vulkan.h>
 
 //esto es solo para linux
+#include <functional>
 #include <cmath>
 #include <cfloat>
 #include <map>
@@ -276,7 +277,7 @@ int main(int argc, char* argv[]) {
             return -1;
         }
         #else
-        std::cerr << "SDL3 compilado sin soporte Vulkan\n";
+        std::cerr << "SDL2 compilado sin soporte Vulkan\n";
         return -1;
         #endif
 

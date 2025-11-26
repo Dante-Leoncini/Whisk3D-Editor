@@ -443,11 +443,8 @@ void InputUsuarioSymbian(GLfixed aDeltaTimeSecs){
 	}*/
 }
 
-
-
-//Como era en SDL2
-/*
-void InputUsuarioSDL(SDL_Event &e){
+//Como es en SDL2
+/*void InputUsuarioSDL(SDL_Event &e){
 	//rueda del mouse	
     if (e.type == SDL_MOUSEWHEEL) {
 		posY+= e.wheel.y*20;
