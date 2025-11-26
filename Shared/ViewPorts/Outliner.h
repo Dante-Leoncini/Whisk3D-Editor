@@ -1,17 +1,17 @@
 class Outliner : public ViewportBase, public WithBorder, public Scrollable  {
 	public:
         size_t CantidadRenglones = 5;
-        Object2D* Renglon = nullptr;
+        Rectangle* Renglon = nullptr;
 
         Outliner(): ViewportBase() {
-            Renglon = AddObject2D(UI::Rectangle);
+            Renglon = new Rectangle();
         }
 
         //para hacer el calculo si o si hay que hacerlo de forma recursiva
         void CalcularRenglon(Object* obj, int* MaxPosXtemp, int* MaxPosYtemp){
             int rowWidth = marginGS + IconSizeGS + gapGS + IconSizeGS + gapGS + IconSizeGS + marginGS; 
             *MaxPosYtemp -= RenglonHeightGS;
-            int textWidth = reinterpret_cast<Text*>(obj->name->data)->letters.size() * LetterWidthGS;
+            int textWidth = obj->name->letters.size() * LetterWidthGS;
             rowWidth += textWidth + gapGS;
 
             // guardar ancho máximo
@@ -39,8 +39,7 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable  {
             ViewportBase::Resize(newW, newH);
             ResizeBorder(newW, newH);
 
-            Rectangle* rect = static_cast<Rectangle*>(Renglon->data);
-            rect->SetSize(0, 0, width, RenglonHeightGS);
+            Renglon->SetSize(0, 0, width, RenglonHeightGS);
 
             // Calcular cuántos renglones entran en la altura
             CantidadRenglones = static_cast<int>(
@@ -99,18 +98,15 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable  {
                 glTranslatef(0, RenglonesY, 0);
                 RenglonesY += RenglonHeightGS;
                 // Renglón Seleccionado
-                Rectangle* rect = static_cast<Rectangle*>(Renglon->data);
                 if (i % 2 == 0) {
-                    rect->SetColor(ListaColoresUbyte[gris][0], ListaColoresUbyte[gris][1], ListaColoresUbyte[gris][2]);
+                    glColor4ub(ListaColoresUbyte[gris][0], ListaColoresUbyte[gris][1], ListaColoresUbyte[gris][2], 255);
                 }
-                else if (i % 2 == 0) {
-                    // Renglón par
-                    rect->SetColor(ListaColoresUbyte[gris][0], ListaColoresUbyte[gris][1], ListaColoresUbyte[gris][2]);
-                } else {
+                else {
                     // Renglón impar
-                    rect->SetColor(ListaColoresUbyte[background][0], ListaColoresUbyte[background][1], ListaColoresUbyte[background][2]);
+                    glColor4ub(ListaColoresUbyte[background][0], ListaColoresUbyte[background][1], ListaColoresUbyte[background][2], 255);
                 }
-                RenderObject2D(*Renglon);
+                //RenderObject2D(*Renglon);
+                Renglon->Render(false);
                 glPopMatrix();
             }
             glPopMatrix();  
@@ -210,8 +206,8 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable  {
             glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
             //texto render                   
-            glTranslatef(IconSizeGS + gapGS, 0, 0);   
-            RenderObject2D(*obj->name, false);
+            glTranslatef(IconSizeGS + gapGS, 0, 0);  
+            obj->name->Render(false);
             
             glPopMatrix(); 
 

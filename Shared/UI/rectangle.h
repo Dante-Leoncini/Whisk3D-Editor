@@ -1,15 +1,12 @@
-class Rectangle {
+class Rectangle : public Object2D {
 	public:
-    	Object2D& parent;
 		GLshort width = 10;
 		GLshort height = 10;
-		GLubyte opacity = 255;
-		GLubyte color[3] = { 255, 255, 255 };
 
 		GLshort vertices[8] = { 0,0, 10,0, 0,10, 10,10 };
 
     	// Constructor completo
-		Rectangle(Object2D& p): parent(p){}
+        Rectangle(Object2D* parent = nullptr): Object2D(parent){}
 
 		// Calcular los vértices una sola vez
 		void SetSize(GLshort x, GLshort y, GLshort w, GLshort h) {
@@ -34,22 +31,9 @@ class Rectangle {
 			color[2] = blue;
 		}
 
-		void Render(bool usarColorPropio = true) const {
+		void RenderObject(bool usarColorPropio = true) override {
 			if (usarColorPropio) glColor4ub(color[0], color[1], color[2], opacity);
     		glVertexPointer(2, GL_SHORT, 0, vertices);
 			glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 		}
 };
-
-// Crear un Text vacío
-/*int AddRectangle(int parent){
-	Rectangle rec;
-	rec.parent = parent;
-
-	// Retorna el índice
-	return static_cast<int>(Rectangles.size()) - 1;	
-}*/
-
-Rectangle* AddRectangle(Object2D& parent) {
-    return new Rectangle(parent);
-}

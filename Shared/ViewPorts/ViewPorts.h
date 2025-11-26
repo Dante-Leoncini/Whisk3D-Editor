@@ -727,7 +727,7 @@ void SetGlobalScale(int scale){
     for (size_t i = 0; i < SceneCollection->Childrens.size(); i++) {                  
         SceneCollection->Childrens[i]->name->scaleX = scale;                
         SceneCollection->Childrens[i]->name->scaleY = scale;    
-        reinterpret_cast<Text*>(SceneCollection->Childrens[i]->name->data)->UpdateCache();    
+        SceneCollection->Childrens[i]->name->UpdateCache();    
     }
 }
 

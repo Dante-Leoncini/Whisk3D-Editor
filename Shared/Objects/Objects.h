@@ -29,7 +29,7 @@ class Object {
 		bool visible = true;
 		bool desplegado = true;
         bool select = true;
-        Object2D* name = nullptr;
+        Text* name = nullptr;
         size_t IconType = 0;
         
 		GLfloat posX = 0.0f, posY = 0.0f, posZ = 0.0f;
@@ -42,8 +42,7 @@ class Object {
 
         Object(Object* parent, const std::string& nombre)
             : Parent(parent){
-            name = AddObject2D(UI::text);
-            SetName(nombre);
+            name = new Text(SetName(nombre));
 
             // Si tiene padre → agregar a su vector Children
             if (Parent) {
@@ -62,7 +61,7 @@ class Object {
         }
         
         virtual ~Object() {
-            // Borrar hijos primero
+            // evita que los hijos queden huerfanos
             for (Object* c : Childrens){
                 c->Parent = Parent;
             }
@@ -88,15 +87,15 @@ class Object {
                 // Recursión: si el hijo pide borrarse (select == true)
                 child->EliminarObjetosSeleccionados(IncluirCollecciones);
                 if (child->select && (IncluirCollecciones || child->getType() != ObjectType::collection ) ){
-				    std::cout << "Se borro '" << reinterpret_cast<Text*>(child->name->data)->value << "'"<< std::endl;
+				    std::cout << "Se borro '" << child->name->value << "'"<< std::endl;
                     Childrens.erase(Childrens.begin() + i);
                     delete child;
                 }
             }
         }
 
-        void SetName(const std::string& baseName) {
-            if (!SceneCollection) reinterpret_cast<Text*>(name->data)->SetValue(baseName);
+        std::string SetName(const std::string& baseName) {
+            if (!SceneCollection) return baseName;
             // ----------------------------
             // 1) Función recursiva para revisar un objeto y todos sus hijos
             // ----------------------------
@@ -105,9 +104,8 @@ class Object {
             nameExistsInTree = [&](const Object* obj, const std::string& name) -> bool {
                 if (!obj) return false;
 
-                if (obj->name && obj->name->data) {
-                    Text* txt = reinterpret_cast<Text*>(obj->name->data);
-                    if (txt->value == name) return true;
+                if (obj->name) {
+                    if (obj->name->value == name) return true;
                 }
 
                 for (Object* child : obj->Childrens) {
@@ -129,8 +127,7 @@ class Object {
             // 3) Si el nombre base NO existe → usarlo directamente
             // ----------------------------
             if (!nameExists(baseName)) {
-                reinterpret_cast<Text*>(name->data)->SetValue(baseName);
-                return;
+                return baseName;
             }
 
             // ----------------------------
@@ -169,7 +166,7 @@ class Object {
                 counter++;
             } while (nameExists(newName));
 
-            reinterpret_cast<Text*>(name->data)->SetValue(newName);
+            return newName;
         }
 
         void Seleccionar(){
@@ -339,7 +336,7 @@ Object* GetNextDFS(Object* current) {
                 return nullptr;  // fin total del DFS
             } else {
                 std::cout << "[ERROR] Root inesperado diferente a SceneCollection " << parent << "\n";
-                std::cout << "Objeto: " << reinterpret_cast<Text*>(node->name->data)->value << "\n";
+                std::cout << "Objeto: " << node->name->value << "\n";
                 return nullptr;
             }
         }

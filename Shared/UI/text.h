@@ -1,18 +1,14 @@
 #include "./font.h"
 
-class Text {
+class Text : public Object2D {
 	public:
-    	Object2D& parent;
 		int interpolacion = closest;
-		//colores RGB
-		GLubyte color[3] = { 255, 255, 255 };
 		std::string value;
     	std::vector<Sprite> letters;
 
-		Text(Object2D& p)
-			: parent(p), value("Text") {
-			UpdateCache();
-		}
+        Text(const std::string& nombre = "Text", Object2D* parent = nullptr): Object2D(parent) {
+            SetValue(nombre);
+        }
 
 		void SetColor(GLubyte red, GLubyte green, GLubyte blue){
 			color[0] = red;
@@ -47,15 +43,15 @@ class Text {
 
 				// Posición + escala viene del padre
 				ls.SetVertices(
-					parent.x + offsetX, 
-					parent.y, 
-					5 * parent.scaleX * GlobalScale, 
-					11 * parent.scaleY * GlobalScale
+					x + offsetX, 
+					y, 
+					5 * scaleX * GlobalScale, 
+					11 * scaleY * GlobalScale
 				);
 
 				letters.push_back(ls);
 
-				offsetX += 6 * parent.scaleX * GlobalScale; // ancho letra escalado
+				offsetX += 6 * scaleX * GlobalScale; // ancho letra escalado
 			}
 		}
 
@@ -66,12 +62,12 @@ class Text {
 		}
 
 		void SetScaleX(int value){
-			parent.scaleX = value;
+			scaleX = value;
 			UpdateCache();
 		}
 
 		void SetScaleY(int value){
-			parent.scaleY = value;
+			scaleY = value;
 			UpdateCache();
 		}
 
@@ -80,11 +76,11 @@ class Text {
 
 			for (auto& ls : letters) {
 				ls.SetX(
-					parent.x + offsetX,
-					5 * parent.scaleX
+					x + offsetX,
+					5 * scaleX
 				);
 
-				offsetX += 6 * parent.scaleX; // ancho letra escalado
+				offsetX += 6 * scaleX; // ancho letra escalado
 			}
 		}
 
@@ -93,15 +89,15 @@ class Text {
 
 			for (auto& ls : letters) {
 				ls.SetY(
-					parent.y + offsetY,
-					11 * parent.scaleY // altura de letra escalada (ajustá este valor según tu fuente)
+					y + offsetY,
+					11 * scaleY // altura de letra escalada (ajustá este valor según tu fuente)
 				);
 			}
 		}
 
-		void Render(bool UsarColor = true) const {
+		void RenderObject(bool UsarColor = true) override {
 			if (UsarColor){ 
-				glColor4ub(color[0], color[1], color[2], parent.opacity);				
+				glColor4ub(color[0], color[1], color[2], opacity);				
 			}
 			glBindTexture(GL_TEXTURE_2D, Textures[0].iID);
 
@@ -120,7 +116,3 @@ class Text {
 			}
 		}
 };
-
-Text* AddText(Object2D& parent) {
-    return new Text(parent);
-}
