@@ -17,39 +17,9 @@ Este programa no esta listo para producción y tiene una serie de errores conoci
 Sí el instalador falla, probablemente debas de "hackear" tu teléfono para ignorar las restricciones y certificados de Symbian. Puedes ver el siguiente video mostrando como hacerlo: [Tutorial Hack](https://www.youtube.com/watch?v=UJJICzbk3TA)
 
 ## Notas de Linux
-Para linux estoy usando SDL3, Vulkan (para poder usar RTX) y openGl (para poder seguir trabajando con Symbian y dispositivos antiguos)
+Para linux estaba usando SDL3... pero para gente nueva no es lo mejor ya que tienen que clonar el repo. compilar SDl3... y un largo etc. asi que volvi al SDL2 el cual solo necesitan instalar un par de librerias que ya estan en los repositorios de linux y listo.
 
-para usar SDL3 hace falta que bajes el repositorio:
-    git clone https://github.com/libsdl-org/SDL.git
-entra a la carpeta:
-    cd SDL
-Crear build y compilar (hay que activar el soporte de vulkan):
-    mkdir build && cd build
-    cmake .. -DSDL_VULKAN=ON -DSDL_VIDEO_VULKAN=ON -DSDL_RENDER_VULKAN=ON
-    make -j$(nproc)
-    sudo make install
-    sudo ldconfig
-
-algunas dependencias para Ubuntu 22.04 en adelante:
-    sudo apt install build-essential cmake git pkg-config libpng-dev libjpeg-dev libtiff-dev libwebp-dev libvulkan-dev vulkan-tools
-
-
-y vas a necesitar compilar tambien SDL_image. clona el repo:
-    git clone https://github.com/libsdl-org/SDL_image.git
-    cd SDL_image
-Crear y configurar el directorio de compilación:
-    mkdir build
-    cd build
-    cmake ..
-Compilar e instalar:
-    make
-    sudo make install
-
-si tenes el error "./Whisk3D_Pre-alpha: error while loading shared libraries: libSDL3.so.0: cannot open shared object file: No such file or directory"
-instalar la biblioteca en un lugar reconocido:
-    sudo ldconfig /usr/local/lib
-
-Se puede compilar Whisk3D desde la carpeta "Linux" usando el comando "make". o "./CompilarYrun.sh"
+Se puede compilar Whisk3D desde la carpeta "Linux" usando el comando "make". o "./CompilarYrun.sh" (este ultimo compila y abre Whisk3D)
 
 ## Nota para Android
 Se puede compilar usando Android Studio, NDK, SDL2 y openjdk-17-jdk
