@@ -424,8 +424,7 @@ Object* NewMesh(MeshType type = MeshType::cube, Object* parent = nullptr, bool q
 		for (int i = 0; i < tempFaceGroup.indicesDrawnCount; i++) {
 			mesh->faces[i] = CuboTriangles[i];
 		}
-		//reinterpret_cast<Text*>(mesh->name->data)->SetValue(SetName("Cube"));
-		mesh->SetName("Cube");
+		mesh->name->SetValue(mesh->SetName("Cube"));
 	}	
 
 	//le asignamos la mesh	

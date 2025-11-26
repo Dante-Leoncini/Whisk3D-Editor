@@ -19,7 +19,6 @@ class Material {
 
         Material(const std::string& nombre, bool MaterialDefecto = false, bool TieneVertexColor = false) {
             name = new Text(nombre);
-            //reinterpret_cast<Text*>(name->data)->SetValue(nombre);
 			if (!MaterialDefecto){
 				//std::cout << "Nuevo Material: " << nombre << std::endl;
 				Materials.push_back(this);

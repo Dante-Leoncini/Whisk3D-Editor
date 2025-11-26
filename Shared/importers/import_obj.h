@@ -799,7 +799,7 @@ bool LeerOBJ(std::ifstream& file,
 	// usar filename para nombrar por defecto (y hacerlo único)
 	std::string fileBase = ExtractBaseName(filename);
 	//reinterpret_cast<Text*>(mesh->name->data)->SetValue(SetName(fileBase));
-	mesh->SetName(fileBase);
+	mesh->name->SetValue(mesh->SetName(fileBase));
 
     Wavefront Wobj;
     Wobj.Reset();

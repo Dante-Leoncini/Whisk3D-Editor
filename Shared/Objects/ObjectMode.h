@@ -109,28 +109,36 @@ void Eliminar(bool IncluirCollecciones = false){
 	}
 }
 
+void CalcObjectsTransformPivotPoint(Object* obj){
+	if (obj->select && obj->getType() != ObjectType::collection){
+		//std::cout << "Seleccionado " << obj->name->value << std::endl;
+		TransformPivotPointFloat[0] += obj->posX;
+		TransformPivotPointFloat[1] += obj->posY;
+		TransformPivotPointFloat[2] += obj->posZ;	
+	};
+
+	for(size_t c=0; c < obj->Childrens.size(); c++){
+		CalcObjectsTransformPivotPoint(obj->Childrens[c]);
+	}
+
+	//esto va a dar errores si el padre y el hijo estan seleccionados
+	/*TInt ParentID = obj.Parent;
+	while (ParentID  > -1) {		
+		Object& parentObj = Objects[ParentID];
+		TransformPivotPointFloat[0] += parentObj.posX;
+		TransformPivotPointFloat[1] += parentObj.posY;
+		TransformPivotPointFloat[2] += parentObj.posZ;	
+		ParentID = parentObj.Parent;		
+	}*/
+}
+
 void SetTransformPivotPoint(){
 	if (InteractionMode == ObjectMode){	
-		TransformPivotPointFloat[0] = 0;
-		TransformPivotPointFloat[1] = 0;
-		TransformPivotPointFloat[2] = 0;
+		TransformPivotPointFloat[0] = 0.0f;
+		TransformPivotPointFloat[1] = 0.0f;
+		TransformPivotPointFloat[2] = 0.0f;
 		for(size_t c=0; c < SceneCollection->Childrens.size(); c++){
-			Object& obj = *SceneCollection->Childrens[c];	
-			if (obj.select){
-				TransformPivotPointFloat[0] += obj.posX;
-				TransformPivotPointFloat[1] += obj.posY;
-				TransformPivotPointFloat[2] += obj.posZ;	
-			};
-
-			//esto va a dar errores si el padre y el hijo estan seleccionados
-			/*TInt ParentID = obj.Parent;
-			while (ParentID  > -1) {		
-				Object& parentObj = Objects[ParentID];
-				TransformPivotPointFloat[0] += parentObj.posX;
-				TransformPivotPointFloat[1] += parentObj.posY;
-				TransformPivotPointFloat[2] += parentObj.posZ;	
-				ParentID = parentObj.Parent;		
-			}*/
+			CalcObjectsTransformPivotPoint(SceneCollection->Childrens[c]);
 		}
 		size_t SelectCount = ObjSelects.size();
 		TransformPivotPointFloat[0] = TransformPivotPointFloat[0]/SelectCount;
