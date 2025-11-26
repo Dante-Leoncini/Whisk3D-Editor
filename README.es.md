@@ -15,7 +15,7 @@ Whisk3D NO instala servicios ocultos, no espía al usuario ni vende sus datos, n
 
 Queremos devolverte el control de tu software, democratizar la creación y permitirle a las nuevas generaciones experimentar con el 3D sin barreras técnicas ni económicas.
 
-![]([https://pbs.twimg.com/media/GPawZAKWsAA7Rw9?format=png](https://i.ibb.co/hp1w0DH/Captura-desde-2025-11-26-15-19-37.png))
+![]([https://pbs.twimg.com/media/GPawZAKWsAA7Rw9?format=png](https://i.ibb.co/hp1w0DH/Captura-desde-2025-11-26-15-19-37.png)
 
 YouTube: [Youtube Video](https://youtu.be/dMe-Vit5OT0)
 
