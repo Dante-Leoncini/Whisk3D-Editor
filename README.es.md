@@ -1,10 +1,19 @@
-# Whisk 3D (Ex Blendersito)
-
+# Whisk 3D (antiguamente Blendersito)
 [![en](https://img.shields.io/badge/lang-en-red.svg)](/)
 
-Este repositorio contiene iconos, tipografías y otros elementos gráficos diseñados por **Dante Demian Leoncini**. Estos diseños están disponibles para su uso bajo los términos de la Licencia Creative Commons Atribución 4.0 Internacional (CC BY 4.0).
+Whisk3D es una herramienta de creación 3D desarrollada desde cero, con el objetivo de llevar el modelado, render y animación y desarrollo de videojuegos a cualquier dispositivo, incluso aquellos “Obsoletos”.
 
-## Whisk 3D es un clon de Blender, desarrollado desde cero para Symbian s60v3.
+Nació como un clon liviano de Blender para Nokia, pero hoy es mucho más: un entorno creativo, centrado en la estética low-poly y la identidad visual de PlayStation, Dreamcast y la PC retro. Whisk3D prioriza la velocidad, la accesibilidad y la diversión por encima de la complejidad excesiva.
+
+La licencia MIT permite que cualquiera pueda usarlo libremente para crear juegos, proyectos comerciales, educativos o artísticos, e incluso hacer forks y expandir la herramienta sin restricciones.
+
+Aun esta en pre-alpha, una primera mirada a algo que todavía está creciendo, pero con una visión clara: que cualquier persona pueda modelar, animar, diseñar, renderizar y desarrollar juegos 3D sin necesitar una PC moderna ni enfrentar curvas de aprendizaje intimidantes.
+Whisk3D se construye con una filosofía sencilla: el hardware no debería morir por el software. Busco demostrar que la obsolescencia programada puede revertirse desde el código, que una máquina considerada “vieja” puede seguir creando, imaginando y generando contenido nuevo.
+
+El proyecto, y los videojuegos que se desarrollen con él, planean sostenerse mediante donaciones voluntarias, no con microtransacciones, publicidad molesta, loot boxes, ni mecanismos diseñados para generar adicción o manipular al jugador.
+Whisk3D NO instala servicios ocultos, no espía al usuario ni vende sus datos, no exige cuentas ni conexión permanente. Respetamos a los creadores y jugadores.
+
+Queremos devolverte el control de tu software, democratizar la creación y permitirle a las nuevas generaciones experimentar con el 3D sin barreras técnicas ni económicas.
 
 YouTube: [Youtube Video](https://youtu.be/dMe-Vit5OT0)
 
