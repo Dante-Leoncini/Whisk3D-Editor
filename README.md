@@ -2,10 +2,22 @@
 
 [![es](https://img.shields.io/badge/lang-es-yellow.svg)](/README.es.md)
 
-This repository contains icons, typographies and other graphic elements designed by **Dante Demian Leoncini**.
-The designs are available for its use under the terms of the Licence **Licencia Creative Commons Atribución 4.0 Internacional (CC BY 4.0).**.
+Whisk3D is a fully home-grown 3D creation tool developed from scratch, with the goal of bringing modeling, rendering, animation and game development to any device — even those considered “obsolete.”
 
-## Whisk3D is a Blender clone, developed from scratch for Symbian s60v3.
+It began as a lightweight Blender-like tool made for Nokia phones, but today it has evolved into something much more: a creative environment focused on low-poly aesthetics and the visual identity of PlayStation, Dreamcast and retro PC graphics. Whisk3D prioritizes speed, accessibility and fun over unnecessary complexity.
+
+The MIT license allows anyone to use it freely to create games, commercial, educational or artistic projects, and even fork or expand the tool without restrictions.
+
+It is still in pre-alpha — an early glimpse of something that is growing — yet it already carries a clear vision: anyone should be able to model, animate, design, render and develop 3D games without needing modern hardware or facing overwhelming learning curves.
+
+Whisk3D is built on a simple philosophy: hardware shouldn’t die because software did. I want to prove that planned obsolescence can be reversed through code, and that a machine labeled as “old” can continue creating, imagining and producing new content.
+
+The project — and the games made with it — aim to be sustained through voluntary donations, not microtransactions, intrusive ads, loot boxes, or systems designed to manipulate or create artificial engagement.
+Whisk3D does NOT install background services, track users, sell data, require an account or demand permanent connectivity. We respect creators and players.
+
+We want to return control of software back to its users, democratize creation, and allow new generations to experiment with 3D without technical or financial barriers.
+
+![](https://i.ibb.co/hp1w0DH/Captura-desde-2025-11-26-15-19-37.png)
 
 YouTube: [Youtube Video](https://youtu.be/dMe-Vit5OT0)
 
