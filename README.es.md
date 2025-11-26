@@ -55,7 +55,7 @@ Me indigna bastante la gran cantidad de comentarios negativos hacia Blender, cal
 
 Realmente recomiendo usar Linux, instalar un disco SSD en sus PCs, y optimizar sus proyectos de acuerdo a su hardware y necesidades. Verán que se puede trabajar sin problemas con hardware antiguo.
 
-## Gracias!
+## ¡Gracias!
 Gracias a todos los que compartieron el proyecto. Espero que este esfuerzo sirva para aumentar la conciencia y exigir a las empresas que fabriquen teléfonos más duraderos y sostenibles.
 #Gracias a Marcig por el nuevo nombre!
 
