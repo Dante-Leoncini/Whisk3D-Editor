@@ -59,6 +59,10 @@ class Object {
             DeseleccionarTodo();
             Seleccionar();
         }
+
+        void SetNameObj(const std::string& nombre){
+            name->SetValue(SetName(nombre));
+        }
         
         virtual ~Object() {
             // evita que los hijos queden huerfanos
@@ -96,19 +100,25 @@ class Object {
 
         std::string SetName(const std::string& baseName) {
             if (!SceneCollection) return baseName;
+
+            // conservar puntero a este objeto para ignorarlo en la búsqueda
+            const Object* me = this;
+
             // ----------------------------
             // 1) Función recursiva para revisar un objeto y todos sus hijos
+            //    IGNORANDO 'me'
             // ----------------------------
             std::function<bool(const Object*, const std::string&)> nameExistsInTree;
 
             nameExistsInTree = [&](const Object* obj, const std::string& name) -> bool {
                 if (!obj) return false;
 
-                if (obj->name) {
+                // Si este objeto NO es 'me' y tiene nombre igual -> existe
+                if (obj != me && obj->name) {
                     if (obj->name->value == name) return true;
                 }
 
-                for (Object* child : obj->Childrens) {
+                for (const Object* child : obj->Childrens) {
                     if (nameExistsInTree(child, name)) return true;
                 }
 
@@ -116,7 +126,7 @@ class Object {
             };
 
             // ----------------------------
-            // 2) Buscar en toda la jerarquía de la escena
+            // 2) Buscar en toda la jerarquía de la escena (ignorando 'me')
             // ----------------------------
             auto nameExists = [&](const std::string& name) -> bool {
                 if (!SceneCollection) return false;
@@ -138,7 +148,6 @@ class Object {
 
             size_t pos = baseName.find_last_of('.');
             if (pos != std::string::npos && pos + 1 < baseName.size()) {
-
                 bool digits = true;
                 for (size_t i = pos + 1; i < baseName.size(); ++i) {
                     if (!isdigit((unsigned char)baseName[i])) { digits = false; break; }
@@ -168,6 +177,7 @@ class Object {
 
             return newName;
         }
+
 
         void Seleccionar(){
             ObjActivo = this;

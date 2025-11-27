@@ -232,10 +232,6 @@ int main(int argc, char* argv[]) {
         );
     #endif
 
-    SDL_Surface* icon = IMG_Load("Whisk3D.png"); // o BMP si no usas SDL_image
-    SDL_SetWindowIcon(window, icon);
-    SDL_FreeSurface(icon);
-
 	if (!window) {
 		std::cerr << "Error SDL_CreateWindow: " << SDL_GetError() << std::endl;
 		return -1;

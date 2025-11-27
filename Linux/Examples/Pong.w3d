@@ -1,20 +1,19 @@
 Whisk3D {
-    // --- Escena ---
     Escena {
         Mesh {
-            name: "Cube"
+            name: "Cube1"
             x: 0.0
             y: 0.0
             z: 0.0
             scale: 1.0
             Mesh {
-                name: "Cube"
+                name: "Cube2"
                 x: 0.0
                 y: 0.0
                 z: 0.0
                 scale: 1.0
                 Mesh {
-                    name: "Cube"
+                    name: "Cube3"
                     x: 0.0
                     y: 0.0
                     z: 0.0
@@ -31,9 +30,9 @@ Whisk3D {
 
             Camera {
                 name: "Camera"
-                x: 0.0
-                y: 0.0
-                z: 0.0
+                x: -3.0
+                y: 2.5
+                z: 1.8
             }
 
             Mesh {
@@ -63,9 +62,9 @@ Whisk3D {
 
             Camera {
                 name: "Camera"
-                x: 0.0
-                y: 0.0
-                z: 0.0
+                x: -3.0
+                y: 2.5
+                z: 2.8
             }
 
             Mesh {
@@ -89,16 +88,15 @@ Whisk3D {
         }         
     }
 
-    // --- Interfaz (Layout UI) ---
     Layout {
         ViewportRow {
             Viewport3D
             ViewportColumn {
-                Outliner
                 Viewport3D
-                Split 0.35
+                Outliner
+                Split: 0.35
             }
-            Split 0.7
+            Split: 0.7
         }
     }
 }
