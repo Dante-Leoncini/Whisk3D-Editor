@@ -230,7 +230,7 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
         return NewMesh(MeshType::cube, parent);
 
     if(n->type=="Camera")
-        return new Camera(parent,0,0,0, 0,-35,45);
+        return new Camera(parent,0,0,0, 0, 0, 0);
 
     if(n->type=="Light"){
         Light* L=Light::Create(parent,X,Y,Z);
