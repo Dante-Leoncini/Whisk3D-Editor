@@ -337,6 +337,9 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable  {
                     case SDLK_RIGHT:
                         SetDesplegado(true);
                         break;
+                    case SDLK_UP:
+                        changeSelect(SelectMode::PrevSingle, true);
+                        break;
                     case SDLK_DOWN:
                         changeSelect(SelectMode::NextSingle, true);
                         break;

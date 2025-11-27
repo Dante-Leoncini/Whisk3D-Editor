@@ -75,7 +75,7 @@ Whisk3D {
                 ShowRelantionshipsLines: true
                 view: Rendered
             }
-            Viewport3D
+            Outliner
             Split: 0.7
         }
     }

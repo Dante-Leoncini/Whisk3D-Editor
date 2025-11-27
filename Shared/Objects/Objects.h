@@ -291,36 +291,54 @@ size_t GetIndexInParent(Object* obj) {
     return it - siblings.begin();
 }
 
+// Devuelve el último nodo DFS (más profundo) a partir de 'node'
+Object* GetDeepestDFS(Object* node){
+    if (!node) return nullptr;
+
+    while(!node->Childrens.empty()){
+        node = node->Childrens.back();
+    }
+    return node;
+}
+
 Object* GetPrevDFS(Object* current){
-   /* if (!current) return nullptr;
+    if (!current) return nullptr;
 
-    // 1) Si tiene hermano anterior → ir al hermano anterior y bajar al último hijo profundo
     Object* parent = current->Parent;
-    size_t idx = GetIndexInParent(current);
 
-    if (parent && idx > 0){
-        Object* node = parent->Childrens[idx - 1];
-
-        // bajar al hijo más profundo
-        while(!node->Childrens.empty()){
-            node = node->Childrens.back();
+    // --- Caso especial: current es el primer hijo del root ---
+    if (parent == SceneCollection){
+        auto& siblings = parent->Childrens;
+        if (!siblings.empty() && current == siblings.front()){
+            // Volver al último nodo DFS del árbol completo
+            return GetDeepestDFS(siblings.back());
         }
-        return node;
     }
 
-    // 2) Si no tiene hermano anterior → el anterior es su padre
-    if (parent) return parent;
+    // --- Si existe hermano anterior ---
+    if (parent){
+        auto& siblings = parent->Childrens;
+        auto it = std::find(siblings.begin(), siblings.end(), current);
 
-    // 3) Es raíz → buscar raíz anterior
-    size_t ridx = GetIndexInParent(current);
-    if (ridx > 0){
-        Object* node = SceneCollection->Childrens[ridx - 1];
-        while(!node->Childrens.empty()){
-            node = node->Childrens.back();
+        if (it == siblings.end()){
+            std::cout << "GetPrevDFS: inconsistencia, parent no contiene a current\n";
+            return nullptr;
         }
-        return node;
-    }*/
 
+        if (it != siblings.begin()){
+            --it; // hermano anterior
+            return GetDeepestDFS(*it);
+        }
+
+        // Si no hay hermano anterior, el anterior es el padre
+        return parent;
+    }
+
+    // Si es root real => no hay anterior
+    if (current == SceneCollection)
+        return nullptr;
+
+    std::cout << "[ERROR] Root inesperado\n";
     return nullptr;
 }
 
@@ -399,6 +417,7 @@ bool IsSelectable(Object* obj, bool IncluirColecciones = false) {
 
 enum class SelectMode {
     NextSingle,      // Deselecciona actual → selecciona siguiente
+    PrevSingle,      // Deselecciona actual → selecciona anterior
     NextAdd,         // Mantiene actual → agrega el siguiente
     PrevAdd          // Mantiene actual → agrega anterior
 };
@@ -444,7 +463,7 @@ void changeSelect(SelectMode mode, bool IncluirColecciones = false){
     if (mode == SelectMode::NextSingle || mode == SelectMode::NextAdd){
         next = GetNextDFS(ObjActivo);
     }
-    else if (mode == SelectMode::PrevAdd){
+    else if (mode == SelectMode::PrevSingle || mode == SelectMode::PrevAdd){
         next = GetPrevDFS(ObjActivo);
     }
 
@@ -467,17 +486,11 @@ void changeSelect(SelectMode mode, bool IncluirColecciones = false){
     // ------------------------
     // Aplicar modo de selección
     // ------------------------
-
-    if (mode == SelectMode::NextSingle){
+    if (mode == SelectMode::NextSingle || mode == SelectMode::PrevSingle){
         ObjActivo->Deseleccionar();
-        it->Seleccionar();
-        return;
     }
 
-    if (mode == SelectMode::NextAdd || mode == SelectMode::PrevAdd){
-        it->Seleccionar();
-        return;
-    }
+    it->Seleccionar();
 }
 
 class SaveState {
