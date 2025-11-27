@@ -4,12 +4,6 @@ GLfloat LastPivotX = 0;
 GLfloat LastPivotY = 0;
 GLfloat LastPivotZ = 0;
 
-bool limpiarPantalla = true;
-
-void SetLimpiarPantalla(){
-    limpiarPantalla = !limpiarPantalla;
-}
-
 class Viewport3D : public ViewportBase, public WithBorder  {
 	public:
         bool orthographic = false;
@@ -23,6 +17,7 @@ class Viewport3D : public ViewportBase, public WithBorder  {
         bool showOrigins = true;
         bool show3DCursor = true;
         bool ShowRelantionshipsLines = true;
+        RenderType view = RenderType::MaterialPreview;
 
         GLfloat nearClip = 0.01f;
         GLfloat farClip = 1000.0f;
@@ -38,6 +33,44 @@ class Viewport3D : public ViewportBase, public WithBorder  {
         GLfloat PivotZ = 0.0f;
 
         Viewport3D(): ViewportBase() {}
+
+        void ReloadLights(){
+            //coloca los valores de forma global para que otras partes del programa las lea
+            ::view = view;
+            ::showOverlayGlobal = showOverlays;
+                        
+            for(size_t l = 0; l < Lights.size(); l++) {
+                glDisable(Lights[l]->LightID);
+            }
+            switch(view){
+                case RenderType::MaterialPreview:
+                    glEnable(GL_LIGHT0);
+                    glLightfv(GL_LIGHT0, GL_DIFFUSE,  MaterialPreviewDiffuse);
+                    glLightfv(GL_LIGHT0, GL_AMBIENT,  MaterialPreviewAmbient);
+                    glLightfv(GL_LIGHT0, GL_SPECULAR, MaterialPreviewSpecular);
+
+                    glLightf(GL_LIGHT0, GL_CONSTANT_ATTENUATION, 1.0f);
+                    glLightf(GL_LIGHT0, GL_LINEAR_ATTENUATION,   0.0f);
+                    glLightf(GL_LIGHT0, GL_QUADRATIC_ATTENUATION, 0.0f);
+                    break;
+
+                case RenderType::ZBuffer:
+                    glDisable(GL_LIGHT0);
+                    break;
+
+                default:
+                    break;
+            }
+        };
+
+        void ChangeViewType(){
+            if (view == RenderType::MaterialPreview){
+                view = RenderType::Rendered;
+            }
+            else {
+                view = RenderType::MaterialPreview;
+            }
+        };
         
         void Resize(int newW, int newH) override {
             ViewportBase::Resize(newW, newH);
@@ -50,8 +83,7 @@ class Viewport3D : public ViewportBase, public WithBorder  {
         }
 
         void Render() override {
-            //coloca los valores de forma global para que otras partes del programa las lea
-            showOverlayGlobal = showOverlays;
+            ReloadLights();
 
             glMatrixMode(GL_PROJECTION);
             glLoadIdentity();        
@@ -87,12 +119,12 @@ class Viewport3D : public ViewportBase, public WithBorder  {
                 glClearColor(ListaColores[background][0],ListaColores[background][1],ListaColores[background][2],ListaColores[background][3]);
             }
 
-            if (limpiarPantalla){
+            if (scene->limpiarPantalla){
                 if (view == RenderType::ZBuffer){
                     glClearColor(0.0f, 0.0f, 0.0f, 1.0f); // Color negro
                 }
                 else if (view == RenderType::Rendered){
-                    glClearColor(backgroundRender[0], backgroundRender[1], backgroundRender[2], backgroundRender[3]);
+                    glClearColor(scene->backgroundColor[0], scene->backgroundColor[1], scene->backgroundColor[2], scene->backgroundColor[3]);
                 }
                 else {
                     glClearColor(ListaColores[background][0],ListaColores[background][1],ListaColores[background][2],ListaColores[background][3]);
@@ -176,7 +208,7 @@ class Viewport3D : public ViewportBase, public WithBorder  {
             glFogf(GL_FOG_END, 25.0f);     // Distancia final de la niebla
             // Color de la niebla DEL piso. que es mas pequeña que otros fog
             if (view == RenderType::Rendered){
-                glFogfv(GL_FOG_COLOR, backgroundRender); 
+                glFogfv(GL_FOG_COLOR, scene->backgroundColor); 
             }
             else {
                 glFogfv(GL_FOG_COLOR, ListaColores[background]);
@@ -903,7 +935,7 @@ class Viewport3D : public ViewportBase, public WithBorder  {
                         ClickD();
                         break;
                     case SDLK_U:
-                        SetLimpiarPantalla();
+                        scene->SetLimpiarPantalla();
                         break;
                     case SDLK_J:
                         ChangeViewType();

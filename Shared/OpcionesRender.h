@@ -4,7 +4,17 @@ enum {lineal, closest};
 enum class RenderType { Solid, MaterialPreview, Rendered, ZBuffer };
 
 RenderType view = RenderType::MaterialPreview;
-GLfloat backgroundRender[4]  = { 0.0f, 0.0f, 0.0f, 1.0f };
+
+RenderType StringToRenderType(const std::string& s){
+    if(s == "Solid")            return RenderType::Solid;
+    if(s == "MaterialPreview")  return RenderType::MaterialPreview;
+    if(s == "Rendered")         return RenderType::Rendered;
+    if(s == "ZBuffer")          return RenderType::ZBuffer;
+
+    std::cerr << "[StringToRenderType] WARNING: valor desconocido '" << s
+              << "' → usando RenderType::Solid" << std::endl;
+    return RenderType::Solid; // fallback seguro
+}
 
 //luz material preview
 GLfloat MaterialPreviewAmbient[4]  = { 0.3f, 0.3f, 0.3f, 1.0f };
@@ -16,38 +26,7 @@ GLfloat MaterialPreviewPosition[4]  = { -0.45f, 0.55f, 1.0f, 0.0f };
 #include "./UI/UI.h"
 #include "./Objects/Materials.h"
 #include "./Objects/Objects.h"
-
-void SetViewType(RenderType type = view){
-    for(size_t l = 0; l < Lights.size(); l++) {
-		glDisable(Lights[l]->LightID);
-	}
-	view = type;
-    if (type == RenderType::MaterialPreview){
-		glEnable(GL_LIGHT0);
-		glLightfv(GL_LIGHT0, GL_DIFFUSE,  MaterialPreviewDiffuse);
-		glLightfv(GL_LIGHT0, GL_AMBIENT,  MaterialPreviewAmbient);
-		glLightfv(GL_LIGHT0, GL_SPECULAR, MaterialPreviewSpecular);
-
-		glLightf(GL_LIGHT0, GL_CONSTANT_ATTENUATION, 1.0f);
-		glLightf(GL_LIGHT0, GL_LINEAR_ATTENUATION,   0.0f);
-		glLightf(GL_LIGHT0, GL_QUADRATIC_ATTENUATION, 0.00f);
-    }
-    else if (type == RenderType::ZBuffer){
-		glDisable(GL_LIGHT0);
-    }
-};
-
-void ChangeViewType(){
-    if (view == RenderType::MaterialPreview){
-        SetViewType(RenderType::Rendered);
-    }
-    else {
-        SetViewType(RenderType::MaterialPreview);
-    }
-};
-
 #include "./Constrains.h"
-#include "./Modifiers.h"
 
 void ReloadViewport(){
 	//Recalcula los constrains

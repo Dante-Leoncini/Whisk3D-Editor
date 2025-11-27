@@ -1,5 +1,5 @@
-class Viewport3D;     // forward declaration válida
-extern Viewport3D* Viewport3DActive;
+/*class Viewport3D;     // forward declaration válida
+extern Viewport3D* Viewport3DActive;*/
 
 enum class ObjectType {
     scene,
@@ -10,7 +10,10 @@ enum class ObjectType {
     armature, 
     curve,
     collection,
-    baseObject
+    baseObject,
+    mirror,
+    array,
+    gamepad
 };
 
 // Declaración adelantada
@@ -266,6 +269,9 @@ class Object {
 #include "./Objects/Light.h"
 #include "./Objects/Camera.h"
 #include "./Objects/Mesh.h"
+#include "./Objects/Mirror.h"
+#include "./Objects/Gamepad.h"
+#include "./Objects/Array.h"
 
 //Objects es el punto raiz. o los objetos estan dentro de esta lista. o dentro de objetos de esta lista
 //std::vector<Object*> Objects;

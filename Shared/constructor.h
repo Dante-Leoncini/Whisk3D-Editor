@@ -10,7 +10,7 @@ void ConstructUniversal(int argc, char* argv[]){
     glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_FASTEST);
 
     // iluminación. GL_LIGHT0 es el sol
-    SetViewType(RenderType::MaterialPreview);
+    //SetViewType(RenderType::MaterialPreview);
 
     // Siempre un material por defecto
     MaterialDefecto = new Material("Default", true);
@@ -29,9 +29,6 @@ void ConstructUniversal(int argc, char* argv[]){
     // ======================================================
     if(argc > 1){
         OpenW3D(argv[1]);
-        SDL_Surface* icon = IMG_Load("Whisk3D.png"); // o BMP si no usas SDL_image
-        SDL_SetWindowIcon(window, icon);
-        SDL_FreeSurface(icon);
         return;
     }
 

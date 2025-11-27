@@ -143,12 +143,39 @@ Node* ParseNode(std::vector<std::string>& tk, size_t& i){
     return n;
 }
 
+void ApplyViewport3DProps(Viewport3D* v, const std::map<std::string,std::string>& p){
+    if(!v) return;
+
+    auto B = [&](const std::string& k, bool def=false){
+        return p.count(k) ? (p.at(k)=="true" || p.at(k)=="1") : def;
+    };
+
+    if(p.count("orthographic"))       v->orthographic = B("orthographic");
+    if(p.count("ViewFromCameraActive")) v->ViewFromCameraActive = B("ViewFromCameraActive");
+    if(p.count("showOverlays"))       v->showOverlays = B("showOverlays");
+    if(p.count("ShowUi"))             v->ShowUi = B("ShowUi");
+    if(p.count("showFloor"))          v->showFloor = B("showFloor");
+    if(p.count("showYaxis"))          v->showYaxis = B("showYaxis");
+    if(p.count("showXaxis"))          v->showXaxis = B("showXaxis");
+    if(p.count("CameraToView"))       v->CameraToView = B("CameraToView");
+    if(p.count("showOrigins"))        v->showOrigins = B("showOrigins");
+    if(p.count("show3DCursor"))       v->show3DCursor = B("show3DCursor");
+    if(p.count("ShowRelantionshipsLines")) v->ShowRelantionshipsLines = B("ShowRelantionshipsLines");
+
+    if(p.count("view"))  // string → enum
+         v->view = StringToRenderType(p.at("view"));
+}
+
 // ----------------------------- Builders -----------------------------
 ViewportBase* BuildLayout(Node* n){
     if(!n) return nullptr;
     std::cout << "[BuildLayout] node=" << n->type << std::endl;
 
-    if(n->type == "Viewport3D") return new Viewport3D();
+    if(n->type == "Viewport3D"){
+        auto* v = new Viewport3D();
+        ApplyViewport3DProps(v, n->props);
+        return v;
+    }
     if(n->type == "Outliner")  return new Outliner();
 
     if(n->type == "ViewportRow" || n->type == "ViewportColumn"){
@@ -225,12 +252,33 @@ void ApplyCommonProps(Object* obj, const std::map<std::string,std::string>& p){
 Object* CreateObjectFromNode(Node* n, Object* parent){
     if(!n) return nullptr;
 
+    const auto& p = n->props;
+
     // ‼ Se crea el objeto por tipo (mínimo switch posible)
     if(n->type=="Mesh")
         return NewMesh(MeshType::cube, parent);
 
-    if(n->type=="Camera")
+    if(n->type=="Mirror"){
+        Mirror* mirror = new Mirror(parent);
+        if(p.count("name")) mirror->SetTarget(p.at("name"));
+        return mirror;
+    }
+
+    if(n->type=="Array"){
+        Array* array = new Array(parent);
+        if(p.count("name")) array->SetTarget(p.at("name"));
+        return array;
+    }
+
+    if(n->type=="Gamepad"){
+        Gamepad* gamepad = new Gamepad(parent);
+        if(p.count("name")) gamepad->SetTarget(p.at("name"));
+        return gamepad;
+    }
+
+    if(n->type=="Camera"){
         return new Camera(parent,0,0,0, 0, 0, 0);
+    }
 
     if(n->type=="Light"){
         Light* L=Light::Create(parent,X,Y,Z);
@@ -261,8 +309,57 @@ void BuildObjectRecursive(Node* n, Object* parent){
         BuildObjectRecursive(c, obj);
 }
 
-void BuildScene(Node* root){
+void BuildScene(Node* root, const std::string& w3dPath){
     if(!root || root->type!="Escena") return;
+
+    // --- Icono opcional desde W3D ---
+    if(root->props.count("iconApp")){
+        std::string iconFile = root->props.at("iconApp");
+
+        // Obtener directorio del W3D
+        std::string dir;
+        size_t pos = w3dPath.find_last_of("/\\");
+        if(pos != std::string::npos) dir = w3dPath.substr(0,pos+1);
+        else dir = "";
+
+        std::string iconPath = dir + iconFile;
+
+        std::cout << "[BuildScene] Icon path: " << iconPath << std::endl;
+
+        SDL_Surface* icon = IMG_Load(iconPath.c_str());
+        if(icon){
+            SDL_SetWindowIcon(window, icon);
+            SDL_FreeSurface(icon);
+        } else {
+            std::cerr << "Warning: no se pudo abrir icono: " << iconPath << std::endl;
+        }
+    }
+    //por defecto
+    else {
+        SDL_Surface* icon = IMG_Load("Whisk3D.png");
+        SDL_SetWindowIcon(window, icon);
+        SDL_FreeSurface(icon);
+    }
+
+    // --- Propiedades de escena ---
+    if(root->props.count("limpiarPantalla")){
+        std::string v = root->props.at("limpiarPantalla");
+        scene->limpiarPantalla = (v == "true" || v == "1");
+    }
+
+    if(root->props.count("background")){
+        std::cerr << "Set Background" << std::endl;
+        std::string bg = Unquote(root->props.at("background")); // <- quita comillas si las hay
+        std::replace(bg.begin(), bg.end(), ',', ' '); // reemplaza comas por espacios
+        std::stringstream ss(bg);
+        float r,g,b,a;
+        if(ss >> r >> g >> b >> a){
+            std::cerr << "lo hizo!!" << std::endl;
+            scene->SetBackground(r,g,b,a);
+        } else {
+            std::cerr << "Error al parsear background: '" << bg << "'\n";
+        }
+    }
 
     for(Node* n : root->children)
         BuildObjectRecursive(n, SceneCollection);  // 👈 el parent puede ser la escena global
@@ -294,7 +391,7 @@ void OpenW3D(std::string path){
 			if(!escena) std::cerr << "AVISO: No hay 'Escena' en archivo\n";
 			if(!layout) std::cerr << "AVISO: No hay 'Layout' en archivo\n";
 
-			if(escena) BuildScene(escena);
+			if(escena) BuildScene(escena, path);
 			// ensure we have a CollectionActive even if scene empty
 			if(!CollectionActive) CollectionActive = new Collection(SceneCollection);
 

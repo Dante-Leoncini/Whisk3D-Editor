@@ -4,7 +4,7 @@ GLshort IconLineMesh[8] = { 0,0, (GLshort)(RenglonHeight),0, 0, (GLshort)(Renglo
 int IconSize = 10;
 int IconSizeGS = IconSize;
 
-size_t ICON_TOTAL = 9;
+size_t ICON_TOTAL = 12;
 enum class IconType {
 	camera,
 	light,
@@ -15,6 +15,9 @@ enum class IconType {
 	line,
     arrow,
     arrowRight,
+	mirror,
+	array,
+	gamepad
 };
 
 struct IconRect {
@@ -48,7 +51,10 @@ void CrearIconos(int texW, int texH){
         { 60, 117, 10, 10 }, // archive
         { 72, 117, 10, 10 }, // line
         { 84, 117, 10, 10 }, // arrow
-        { 96, 117, 10, 10 }  // arrowRight
+        { 96, 117, 10, 10 }, // arrowRight
+        { 1,  93, 10, 10 }, // mirror
+        { 25, 93, 10, 10 }, // array
+        { 37, 93, 10, 10 }  // gamepad
     };
 
     // limpia por si se llama más de una vez
