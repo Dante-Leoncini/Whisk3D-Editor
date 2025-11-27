@@ -255,7 +255,7 @@ int main(int argc, char* argv[]) {
     loadColors(skinPath);
 
     //constructor symbian, linux y windows
-    ConstructUniversal();
+    ConstructUniversal(argc, argv);
 
 	// Cargar texturas
 	Textures.push_back(Texture());
@@ -343,7 +343,12 @@ int main(int argc, char* argv[]) {
             lastRenderTime = now;
 
             //std::cout << "Render Viewports" << std::endl;
-            rootViewport->Render();
+            if (rootViewport){
+                rootViewport->Render();
+            }
+            else {
+                std::cout << "ERROR: ¡no hay rootViewport!" << std::endl;
+            }
             SDL_GL_SwapWindow(window);
         }
 

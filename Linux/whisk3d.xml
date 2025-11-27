@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+    <mime-type type="application/x-whisk3d">
+        <comment>Whisk3D Project File</comment>
+        <glob pattern="*.w3d"/>
+    </mime-type>
+</mime-info>

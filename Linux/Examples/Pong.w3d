@@ -1,0 +1,104 @@
+Whisk3D {
+    // --- Escena ---
+    Escena {
+        Mesh {
+            name: "Cube"
+            x: 0.0
+            y: 0.0
+            z: 0.0
+            scale: 1.0
+            Mesh {
+                name: "Cube"
+                x: 0.0
+                y: 0.0
+                z: 0.0
+                scale: 1.0
+                Mesh {
+                    name: "Cube"
+                    x: 0.0
+                    y: 0.0
+                    z: 0.0
+                    scale: 1.0
+                }
+            }
+        }
+
+        Collection {
+            name: "Collection"
+            x: 0.0
+            y: 0.0
+            z: 0.0
+
+            Camera {
+                name: "Camera"
+                x: 0.0
+                y: 0.0
+                z: 0.0
+            }
+
+            Mesh {
+                name: "Cube"
+                x: 0.0
+                y: 0.0
+                z: 0.0
+                scale: 1.0
+                material: "Default"
+            }
+
+            Light {
+                name: "Light"
+                x: 1.0
+                y: 2.0
+                z: 3.0
+                r: 1.0
+                g: 0.0
+                b: 0.0
+            }
+        }   
+        Collection {
+            name: "Collection2"
+            x: 0.0
+            y: 0.0
+            z: 0.0
+
+            Camera {
+                name: "Camera"
+                x: 0.0
+                y: 0.0
+                z: 0.0
+            }
+
+            Mesh {
+                name: "Cube"
+                x: 0.0
+                y: 0.0
+                z: 0.0
+                scale: 1.0
+                material: "Default"
+            }
+
+            Light {
+                name: "Light"
+                x: 1.0
+                y: 2.0
+                z: 3.0
+                r: 1.0
+                g: 0.0
+                b: 0.0
+            }
+        }         
+    }
+
+    // --- Interfaz (Layout UI) ---
+    Layout {
+        ViewportRow {
+            Viewport3D
+            ViewportColumn {
+                Outliner
+                Viewport3D
+                Split 0.35
+            }
+            Split 0.7
+        }
+    }
+}
