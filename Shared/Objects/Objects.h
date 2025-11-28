@@ -276,7 +276,6 @@ class Object {
         }
 };
 
-
 Object* FindObjectByName(Object* node, const std::string& name){
     if (!node) return nullptr;
 

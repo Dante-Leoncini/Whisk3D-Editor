@@ -5,6 +5,51 @@ Whisk3D {
         limpiarPantalla: true
         background: "0.2, 0.2, 0.2, 1.0"
 
+        Camera {
+            name: "Camera"
+            x: -3.0
+            y: 2.5
+            z: 1.8
+            rx: 0
+            ry: -35
+            rz: 45
+        }
+
+        Light {
+            name: "Light"
+            x: 1.0
+            y: 2.25
+            z: 2
+            r: 1.0
+            g: 0.0
+            b: 0.0
+        }
+
+        Gamepad {
+            name: "Control"
+            target: "Cube"
+            player: 0
+            x: 0.0
+            y: 0.0
+            z: 0.0
+        }  
+
+        Mirror {
+            name: "Espejo"
+            target: "Cube"
+            x: 0.0
+            y: 0.0
+            z: 0.0
+        }  
+
+        Array {
+            name: "Array"
+            target: "Cube"
+            x: 0.0
+            y: 0.0
+            z: 0.0
+        }  
+
         Mesh {
             name: "Cube"
             x: 0.0

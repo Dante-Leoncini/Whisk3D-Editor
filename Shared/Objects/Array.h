@@ -9,7 +9,7 @@ class Array : public Object, public Modifier {
         }
 
         void Reload() override {
-            ReloadTarget();
+            ReloadTarget(this);
         }
 
         void RenderObject() override {        

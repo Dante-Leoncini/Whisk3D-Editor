@@ -260,19 +260,19 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
 
     if(n->type=="Mirror"){
         Mirror* mirror = new Mirror(parent);
-        if(p.count("name")) mirror->SetTarget(p.at("name"));
+        if(p.count("target")) mirror->SetTarget(p.at("target"));
         return mirror;
     }
 
     if(n->type=="Array"){
         Array* array = new Array(parent);
-        if(p.count("name")) array->SetTarget(p.at("name"));
+        if(p.count("target")) array->SetTarget(p.at("target"));
         return array;
     }
 
     if(n->type=="Gamepad"){
         Gamepad* gamepad = new Gamepad(parent);
-        if(p.count("name")) gamepad->SetTarget(p.at("name"));
+        if(p.count("target")) gamepad->SetTarget(p.at("target"));
         return gamepad;
     }
 
