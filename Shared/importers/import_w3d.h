@@ -5,6 +5,14 @@ float GetFloatOrDefault(const std::map<std::string,std::string>& props, const st
     try{ return std::stof(it->second); } catch(...){ return def; }
 }
 
+int GetIntOrDefault(const std::map<std::string,std::string>& props,
+                    const std::string& k, int def=0){
+    auto it = props.find(k);
+    if(it == props.end()) return def;
+    try{ return std::stoi(it->second); }
+    catch(...){ return def; }
+}
+
 std::string Unquote(const std::string& s){
     if(s.size()>=2 && ((s.front()=='"' && s.back()=='"') || (s.front()=='\'' && s.back()=='\'')))
         return s.substr(1,s.size()-2);
@@ -262,6 +270,13 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
         Mirror* mirror = new Mirror(parent);
         if(p.count("target")) mirror->SetTarget(p.at("target"));
         return mirror;
+    }
+
+    if(n->type=="Instance"){
+        Instance* instance = new Instance(parent);
+        if(p.count("target")) instance->SetTarget(p.at("target"));
+        if(p.count("count")) instance->count = GetIntOrDefault(p, "count", 1);
+        return instance;
     }
 
     if(n->type=="Array"){

@@ -291,30 +291,20 @@ void DuplicatedObject(){
 	SetPosicion();*/
 }
 
-void DuplicatedLinked(){
-	/*if (estado != editNavegacion || InteractionMode != ObjectMode){return;};
-	for(size_t c=0; c < Objects.size(); c++){
-		for(size_t o=0; o < Objects[c]->Childrens.size(); o++){
-			Object& obj = *Objects[c]->Childrens[o];
-			if (!obj.select){continue;};
+void NewInstance(){
+	if (estado != editNavegacion || InteractionMode != ObjectMode){return;};
+	
+	// ITERAMOS AL REVÉS PARA PODER ELIMINAR SIN ROMPER EL ÍNDICE
+    for (int i = (int)ObjSelects.size() - 1; i >= 0; i--) {        
+        Object* obj = ObjSelects[i];     // objeto original
+        if (!obj) continue;
 
-			// Crear copia dinámica
-			Object* NewObj = new Object(obj); // usa el constructor copia
-
-			obj.select = false;	
-			NewObj->select = true;
-			reinterpret_cast<Text*>(NewObj->name->data)->SetValue(
-				SetName(reinterpret_cast<Text*>(obj.name->data)->value)
-			);
-
-			if (SelectActivo == &obj){
-				SelectActivo = NewObj;
-			}
-
-			AddToCollection(CollectionActive, NewObj);
-		}
+		Instance* instance = new Instance(obj->Parent, obj);
+		obj->select = false;
+		instance->select = true;
+		if (ObjActivo == obj) ObjActivo = instance;
 	}
-	SetPosicion();*/
+	SetPosicion();
 }
 
 void SetRotacion(int dx, int dy){

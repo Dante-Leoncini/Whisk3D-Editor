@@ -13,7 +13,8 @@ enum class ObjectType {
     baseObject,
     mirror,
     array,
-    gamepad
+    gamepad,
+    instance
 };
 
 // Declaración adelantada
@@ -298,6 +299,7 @@ Object* FindObjectByName(Object* node, const std::string& name){
 #include "./Objects/Light.h"
 #include "./Objects/Camera.h"
 #include "./Objects/Mesh.h"
+#include "./Objects/Instance.h"
 #include "./Objects/Mirror.h"
 #include "./Objects/Gamepad.h"
 #include "./Objects/Array.h"

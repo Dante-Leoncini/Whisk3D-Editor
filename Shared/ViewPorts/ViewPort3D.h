@@ -870,7 +870,7 @@ class Viewport3D : public ViewportBase, public WithBorder  {
         void ClickD(){
             if (LAltPressed){
                 UpdatePrecalculos();
-                DuplicatedLinked();
+                NewInstance();
             }
             else if (LShiftPressed){
                 UpdatePrecalculos();
