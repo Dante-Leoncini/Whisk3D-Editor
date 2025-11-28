@@ -25,21 +25,12 @@ Whisk3D {
             b: 0.0
         }
 
-        Gamepad {
-            name: "Control"
-            target: "Cube"
-            player: 0
+        Mesh {
+            name: "Cube"
             x: 0.0
             y: 0.0
             z: 0.0
-        }  
-
-        Mirror {
-            name: "Espejo"
-            target: "Cube"
-            x: 0.0
-            y: 0.0
-            z: -2.0
+            scale: 1.0
         }  
 
         Instance {
@@ -49,22 +40,7 @@ Whisk3D {
             x: -3.0
             y: 0.0
             z: 0.0
-        }  
-
-        Array {
-            name: "Array"
-            target: "Cube"
-            x: 0.0
-            y: 0.0
-            z: 0.0
-        }  
-
-        Mesh {
-            name: "Cube"
-            x: 0.0
-            y: 0.0
-            z: 0.0
-            scale: 1.0
+            rz: 5.0
         }  
     }
 
@@ -83,6 +59,18 @@ Whisk3D {
                 show3DCursor: true
                 ShowRelantionshipsLines: true
                 view: Rendered
+                nearClip: 0.01
+                farClip: 1000.0
+                cameraDistance: 10.0
+                aspect: 1.0
+                posX: 0.0
+                posY: 0.0
+                posZ: 0.0
+                rotX: 270.0
+                rotY: 20.0
+                PivotX: 0.0
+                PivotY: 0.0
+                PivotZ: 0.0
             }
             Outliner
             Split: 0.7

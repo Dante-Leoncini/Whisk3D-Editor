@@ -31,18 +31,13 @@ class Instance : public Object, public Modifier {
 
             glPushMatrix();      
             for(size_t i = 0; i < count; i++){
-                glPushMatrix();      
-
                 glScalef(scaleX, scaleY, scaleZ);
-
                 target->RenderObject();   
 
                 if(RenderChildrens){
                     for(size_t c = 0; c < target->Childrens.size(); c++)
                         target->Childrens[c]->Render();
                 }
-
-                glPopMatrix();
                 
                 glTranslatef(posX, posZ, posY);
                 glRotatef(rotX, 1, 0, 0);

@@ -23,16 +23,7 @@ Whisk3D {
             r: 1.0
             g: 0.0
             b: 0.0
-        }
-
-        Gamepad {
-            name: "Control"
-            target: "Cube"
-            player: 0
-            x: 0.0
-            y: 0.0
-            z: 0.0
-        }  
+        } 
 
         Mirror {
             name: "Espejo"
@@ -40,23 +31,6 @@ Whisk3D {
             x: 0.0
             y: 0.0
             z: -2.0
-        }  
-
-        Instance {
-            name: "Instance"
-            target: "Cube"
-            count: 10
-            x: -3.0
-            y: 0.0
-            z: 0.0
-        }  
-
-        Array {
-            name: "Array"
-            target: "Cube"
-            x: 0.0
-            y: 0.0
-            z: 0.0
         }  
 
         Mesh {

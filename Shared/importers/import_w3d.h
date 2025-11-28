@@ -158,17 +158,39 @@ void ApplyViewport3DProps(Viewport3D* v, const std::map<std::string,std::string>
         return p.count(k) ? (p.at(k)=="true" || p.at(k)=="1") : def;
     };
 
-    if(p.count("orthographic"))       v->orthographic = B("orthographic");
-    if(p.count("ViewFromCameraActive")) v->ViewFromCameraActive = B("ViewFromCameraActive");
-    if(p.count("showOverlays"))       v->showOverlays = B("showOverlays");
-    if(p.count("ShowUi"))             v->ShowUi = B("ShowUi");
-    if(p.count("showFloor"))          v->showFloor = B("showFloor");
-    if(p.count("showYaxis"))          v->showYaxis = B("showYaxis");
-    if(p.count("showXaxis"))          v->showXaxis = B("showXaxis");
-    if(p.count("CameraToView"))       v->CameraToView = B("CameraToView");
-    if(p.count("showOrigins"))        v->showOrigins = B("showOrigins");
-    if(p.count("show3DCursor"))       v->show3DCursor = B("show3DCursor");
-    if(p.count("ShowRelantionshipsLines")) v->ShowRelantionshipsLines = B("ShowRelantionshipsLines");
+    auto F = [&](const std::string& k, float def=0.0f){
+        return p.count(k) ? std::stof(p.at(k)) : def;
+    };
+
+    /// --- bools ---
+    if(p.count("orthographic"))           v->orthographic = B("orthographic");
+    if(p.count("ViewFromCameraActive"))   v->ViewFromCameraActive = B("ViewFromCameraActive");
+    if(p.count("showOverlays"))           v->showOverlays = B("showOverlays");
+    if(p.count("ShowUi"))                 v->ShowUi = B("ShowUi");
+    if(p.count("showFloor"))              v->showFloor = B("showFloor");
+    if(p.count("showYaxis"))              v->showYaxis = B("showYaxis");
+    if(p.count("showXaxis"))              v->showXaxis = B("showXaxis");
+    if(p.count("CameraToView"))           v->CameraToView = B("CameraToView");
+    if(p.count("showOrigins"))            v->showOrigins = B("showOrigins");
+    if(p.count("show3DCursor"))           v->show3DCursor = B("show3DCursor");
+    if(p.count("ShowRelantionshipsLines"))v->ShowRelantionshipsLines = B("ShowRelantionshipsLines");
+
+    /// --- floats/doubles ---
+    if(p.count("nearClip"))       v->nearClip       = F("nearClip", 0.01f);
+    if(p.count("farClip"))        v->farClip        = F("farClip", 1000.0f);
+    if(p.count("cameraDistance")) v->cameraDistance = F("cameraDistance", 10.0f);
+    if(p.count("aspect"))         v->aspect         = F("aspect", 1.0f);
+
+    if(p.count("posX")) v->posX = F("posX");
+    if(p.count("posY")) v->posY = F("posY");
+    if(p.count("posZ")) v->posZ = F("posZ");
+
+    if(p.count("rotX")) v->rotX = F("rotX");
+    if(p.count("rotY")) v->rotY = F("rotY");
+
+    if(p.count("PivotX")) v->PivotX = F("PivotX");
+    if(p.count("PivotY")) v->PivotY = F("PivotY");
+    if(p.count("PivotZ")) v->PivotZ = F("PivotZ");
 
     if(p.count("view"))  // string → enum
          v->view = StringToRenderType(p.at("view"));
