@@ -12,7 +12,6 @@ enum class ObjectType {
     collection,
     baseObject,
     mirror,
-    array,
     gamepad,
     instance
 };
@@ -302,7 +301,6 @@ Object* FindObjectByName(Object* node, const std::string& name){
 #include "./Objects/Instance.h"
 #include "./Objects/Mirror.h"
 #include "./Objects/Gamepad.h"
-#include "./Objects/Array.h"
 
 //Objects es el punto raiz. o los objetos estan dentro de esta lista. o dentro de objetos de esta lista
 //std::vector<Object*> Objects;

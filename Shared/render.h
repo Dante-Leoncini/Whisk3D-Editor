@@ -123,55 +123,96 @@ bool RenderAxisTransform(Object* obj) {
 	return found;
 }
 
-void DibujarOrigen(Object* obj){
-    glPushMatrix();    
-    glTranslatef(obj->posX, obj->posZ, obj->posY);
-    
-    if (obj->visible && (obj->select || obj == ObjActivo)){
-		if (obj == ObjActivo){
-			glColor4f(ListaColores[accent][0],ListaColores[accent][1],ListaColores[accent][2],ListaColores[accent][3]);
-		}
-		else {
-			glColor4f(ListaColores[accentDark][0],ListaColores[accentDark][1],ListaColores[accentDark][2],ListaColores[accentDark][3]);
-		}
-		glVertexPointer( 3, GL_SHORT, 0, pointVertex );
-		glBindTexture( GL_TEXTURE_2D, Textures[1].iID ); //selecciona la textura
-		//glTexEnvi( GL_POINT_SPRITE_OES, GL_COORD_REPLACE_OES, GL_TRUE );    	
-		glTexEnvi( GL_POINT_SPRITE, GL_COORD_REPLACE, GL_TRUE );  
-		glPushMatrix();    	
-		glScalef(obj->scaleX, obj->scaleZ, obj->scaleY);
+void DibujarOrigen(Object* obj){    
+    if (obj->visible){
+		glPushMatrix();    
+		glTranslatef(obj->posX, obj->posZ, obj->posY);
+		if (obj->select || obj == ObjActivo){
+			if (obj == ObjActivo){
+				glColor4f(ListaColores[accent][0],ListaColores[accent][1],ListaColores[accent][2],ListaColores[accent][3]);
+			}
+			else {
+				glColor4f(ListaColores[accentDark][0],ListaColores[accentDark][1],ListaColores[accentDark][2],ListaColores[accentDark][3]);
+			}	
 
-		glDrawArrays( GL_POINTS, 0, 1 );	
+			glDrawArrays( GL_POINTS, 0, 1 );
+		}
+
+		if (!obj->Childrens.empty()){	
+			glRotatef(obj->rotX, 1, 0, 0); //angulo, X Y Z
+			glRotatef(obj->rotZ, 0, 1, 0); //angulo, X Y Z
+			glRotatef(obj->rotY, 0, 0, 1); //angulo, X Y Z
+			for (size_t c = 0; c < obj->Childrens.size(); c++) {
+				DibujarOrigen(obj->Childrens[c]);
+			}
+		}
     	glPopMatrix();
     } 
-
-	if (obj->Childrens.size() > 0){	
-		glRotatef(obj->rotX, 1, 0, 0); //angulo, X Y Z
-		glRotatef(obj->rotZ, 0, 1, 0); //angulo, X Y Z
-		glRotatef(obj->rotY, 0, 0, 1); //angulo, X Y Z
-        for (size_t c = 0; c < obj->Childrens.size(); c++) {
-            DibujarOrigen(obj->Childrens[c]);
-        }
-    }
-    glPopMatrix();
 }
 
 void RenderOrigins(){	
 	glEnable( GL_TEXTURE_2D );
+	glBindTexture( GL_TEXTURE_2D, Textures[1].iID ); //selecciona la textura
+	glVertexPointer( 3, GL_SHORT, 0, pointVertex );
+	glTexEnvi( GL_POINT_SPRITE, GL_COORD_REPLACE, GL_TRUE );  
 	glEnable( GL_BLEND );
 	// Enable point sprites.
-	//glEnable( GL_POINT_SPRITE_OES );
 	glEnable( GL_POINT_SPRITE );
 	// Make the points bigger.
 	glPointSize( 16 );
 	for (size_t c = 0; c < SceneCollection->Childrens.size(); c++) {
 		DibujarOrigen(SceneCollection->Childrens[c]);
 	}
-	//glTexEnvi( GL_POINT_SPRITE_OES, GL_COORD_REPLACE_OES, GL_FALSE);
-	//glDisable( GL_POINT_SPRITE_OES );
 	glTexEnvi( GL_POINT_SPRITE, GL_COORD_REPLACE, GL_FALSE);
 	glDisable( GL_POINT_SPRITE );
 }	
+
+void DibujarIcono3D(Object* obj){    
+    if (obj->visible){
+		glPushMatrix();    
+		glTranslatef(obj->posX, obj->posZ, obj->posY);
+
+		if (obj->getType() == ObjectType::light){
+			if (ObjActivo == obj && obj->select){
+                glColor4f(ListaColores[accent][0],ListaColores[accent][1],ListaColores[accent][2],ListaColores[accent][3]);
+            }
+            else if (obj->select){
+                glColor4f(ListaColores[accentDark][0],ListaColores[accentDark][1],ListaColores[accentDark][2],ListaColores[accentDark][3]);
+            }
+            else {		
+                glColor4f(ListaColores[grisUI][0], ListaColores[grisUI][1], ListaColores[grisUI][2], ListaColores[grisUI][3]);		
+            }
+			glDrawArrays( GL_POINTS, 0, 1 );
+		}
+
+		if (!obj->Childrens.empty()){	
+			glRotatef(obj->rotX, 1, 0, 0); //angulo, X Y Z
+			glRotatef(obj->rotZ, 0, 1, 0); //angulo, X Y Z
+			glRotatef(obj->rotY, 0, 0, 1); //angulo, X Y Z
+			for (size_t c = 0; c < obj->Childrens.size(); c++) {
+				DibujarIcono3D(obj->Childrens[c]);
+			}
+		}
+    	glPopMatrix();
+    } 
+}
+
+void RenderIcons3D(){
+	glDepthMask(GL_FALSE); // Reactiva la escritura en el Z-buffer   
+	glEnable( GL_TEXTURE_2D );
+	glBindTexture( GL_TEXTURE_2D, Textures[4].iID ); //selecciona la textura 	
+	glTexEnvi( GL_POINT_SPRITE, GL_COORD_REPLACE, GL_TRUE );  
+	glVertexPointer( 3, GL_SHORT, 0, pointVertex );
+	glEnable( GL_BLEND );
+	glEnable( GL_POINT_SPRITE );
+	glPointSize( 32 );
+
+	DibujarIcono3D(SceneCollection);
+
+	glTexEnvi( GL_POINT_SPRITE, GL_COORD_REPLACE, GL_FALSE);
+	glDisable( GL_POINT_SPRITE );
+	glDepthMask(GL_TRUE); // Reactiva la escritura en el Z-buffer     
+}
 
 void RenderVK(){
 

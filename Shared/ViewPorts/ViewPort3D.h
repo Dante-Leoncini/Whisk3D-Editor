@@ -311,12 +311,15 @@ class Viewport3D : public ViewportBase, public WithBorder  {
 
                 if (ShowRelantionshipsLines) RenderRelantionshipsLines();
 
+                RenderIcons3D();	
+
                 glDisable( GL_DEPTH_TEST );	
-                glDisable( GL_BLEND );
-                glDisable( GL_TEXTURE_2D );
 
                 //Dibuja el origen de los objetos seleccionados		
                 if (showOrigins) RenderOrigins();	
+                
+                glDisable( GL_BLEND );
+                glDisable( GL_TEXTURE_2D );
             
                 //ejes de transformacion
                 if (!SceneCollection->Childrens.empty() && (estado == translacion || estado == rotacion || estado == EditScale)) RenderAllAxisTransform();

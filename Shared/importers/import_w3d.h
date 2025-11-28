@@ -301,12 +301,6 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
         return instance;
     }
 
-    if(n->type=="Array"){
-        Array* array = new Array(parent);
-        if(p.count("target")) array->SetTarget(p.at("target"));
-        return array;
-    }
-
     if(n->type=="Gamepad"){
         Gamepad* gamepad = new Gamepad(parent);
         if(p.count("target")) gamepad->SetTarget(p.at("target"));

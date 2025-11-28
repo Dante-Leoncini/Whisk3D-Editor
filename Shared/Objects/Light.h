@@ -51,40 +51,36 @@ class Light : public Object {
                 glColor4f(ListaColores[grisUI][0], ListaColores[grisUI][1], ListaColores[grisUI][2], ListaColores[grisUI][3]);		
             }
 
-            glEnable(GL_DEPTH_TEST);
-            glEnable( GL_TEXTURE_2D ); 
-            glEnable( GL_BLEND );
             glDisable( GL_LIGHTING );
-            glDepthMask(GL_FALSE); // Desactiva la escritura en el Z-buffer
 
-            //GL_POINT_SPRITE_OES es para symbian
-            //glEnable( GL_POINT_SPRITE_OES ); //activa el uso de sprites en los vertices
-            glEnable(GL_POINT_SPRITE);                        // habilitar point sprites
-            glPointSize( 32 ); //tamaño del punto
-            glDisableClientState(GL_NORMAL_ARRAY); //no tiene normales. asi que crasharia
-            
-            glVertexPointer( 3, GL_SHORT, 0, pointVertex );
-            glBindTexture( GL_TEXTURE_2D, Textures[4].iID ); //selecciona la textura
-
-            //glTexEnvi( GL_POINT_SPRITE_OES, GL_COORD_REPLACE_OES, GL_TRUE );
-            glTexEnvi(GL_POINT_SPRITE, GL_COORD_REPLACE, GL_TRUE); 
-
-            glDrawArrays( GL_POINTS, 0, 1 );
-            //glTexEnvi( GL_POINT_SPRITE_OES, GL_COORD_REPLACE_OES, GL_FALSE);
-            glTexEnvi(GL_POINT_SPRITE, GL_COORD_REPLACE, GL_FALSE); 
-
-            //glDisable( GL_POINT_SPRITE_OES );	
-            glDisable( GL_POINT_SPRITE );	
-
-            //glScalex( 0, 10, 0 ); //4500
-            glDepthMask(GL_TRUE); // Reactiva la escritura en el Z-buffer     
             glDisable( GL_TEXTURE_2D ); 
             glDisable( GL_BLEND );
             glLineWidth(1);	
-            //glScalef(0, FIXED_TO_FLOAT(scaleZ), 0 );
-            LineaLightVertex[4] = (GLfloat)-posZ;
+
+            //esto calcula el largo de la linea
+            GLfloat totalZ = posZ;
+            GLfloat rX = rotX, rY = rotY, rZ = rotZ;
+
+            Object* p = Parent;       // empezamos desde el parent inmediato
+            while (p != nullptr) {
+                totalZ += p->posZ;   // posición global acumulada
+                rX += p->rotX;       // rotación global acumulada
+                rY += p->rotY;
+                rZ += p->rotZ;
+
+                p = p->Parent;       // << avanzar recién al final
+            }
+            LineaLightVertex[4] = -totalZ;   // aplicamos el negativo al final
+
+            // Invertir rotaciones para que la luz no se incline con el objeto
+		    glPushMatrix();    
+            glRotatef(-rX, 1, 0, 0);
+            glRotatef(-rZ, 0, 1, 0);
+            glRotatef(-rY, 0, 0, 1);
+
             glVertexPointer( 3, GL_FLOAT, 0, LineaLightVertex );
-            glDrawElements( GL_LINES, LineaEdgeSize, GL_UNSIGNED_SHORT, LineaEdge );         
+            glDrawElements( GL_LINES, LineaEdgeSize, GL_UNSIGNED_SHORT, LineaEdge );    
+    	    glPopMatrix();     
         }
 
 		~Light() {

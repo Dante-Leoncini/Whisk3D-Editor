@@ -15,30 +15,37 @@ Whisk3D {
             rz: 45
         }
 
-        Light {
-            name: "Light"
-            x: 1.0
-            y: 2.25
-            z: 2
-            r: 1.0
-            g: 0.0
-            b: 0.0
-        } 
-
-        Mirror {
-            name: "Espejo"
-            target: "Cube"
-            x: 0.0
-            y: 0.0
-            z: -2.0
-        }  
-
-        Mesh {
-            name: "Cube"
+        Collection {
+            name: "Collection"
             x: 0.0
             y: 0.0
             z: 0.0
-            scale: 1.0
+
+            Light {
+                name: "Light"
+                x: 1.0
+                y: 2.25
+                z: 2
+                r: 1.0
+                g: 0.0
+                b: 0.0
+            } 
+
+            Mesh {
+                name: "Cube"
+                x: 0.0
+                y: 0.0
+                z: 1.0
+                scale: 1.0
+            } 
+        }
+
+        Mirror {
+            name: "Espejo"
+            target: "Collection"
+            x: 0.0
+            y: 0.0
+            z: 0.0
         }  
     }
 
