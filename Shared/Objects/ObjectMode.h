@@ -18,7 +18,6 @@ void ReestablecerEstado(bool ClearEstado = true){
 	}
 	if (ClearEstado) {
 		estado = editNavegacion;
-		ReloadViewport();
 	}
 };
 
@@ -115,7 +114,7 @@ void Eliminar(bool IncluirCollecciones = false){
 }
 
 void CalcObjectsTransformPivotPoint(Object* obj){
-	if (obj->select && obj->getType() != ObjectType::collection){
+	if (obj->select){ //&& obj->getType() != ObjectType::collection
 		//std::cout << "Seleccionado " << obj->name->value << std::endl;
 		TransformPivotPointFloat[0] += obj->posX;
 		TransformPivotPointFloat[1] += obj->posY;
@@ -202,6 +201,7 @@ bool guardarEstado(){
     guardarEstadoRec(SceneCollection);
 
 	if (estadoObjetos.empty()) return false;	
+	std::cout << "moviendo "<< estadoObjetos.size() << " objetos" << std::endl;
 
     SetTransformPivotPoint();
 	return true;
@@ -220,7 +220,6 @@ void SetPosicion(){
 	/*if (estado == rotacion){
 		SetRotacion(0);
 	}*/
-    ReloadViewport();	
 };
 
 void DuplicatedObject(){	
@@ -363,7 +362,6 @@ void SetRotacion(){
 	/*if (estado == rotacion){
 		SetRotacion(0, 0);
 	}*/
-    ReloadViewport();	
 };
 
 void SetScale(int dx, int dy, float factor = 0.01f){
@@ -412,7 +410,6 @@ void SetEscala(){
 	/*if (estado == rotacion){
 		SetRotacion(0, 0);
 	}*/
-    ReloadViewport();
 };
 
 void SetTranslacionObjetos(int dx, int dy, float factor = 1.0f){

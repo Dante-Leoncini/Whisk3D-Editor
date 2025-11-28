@@ -237,6 +237,18 @@ class Object {
             return false;
         }
 
+        
+        virtual void Reload(){}
+        
+        void ReloadAll(){
+            Reload();
+
+            // Procesar cada hijo
+            for (size_t c = 0; c < Childrens.size(); c++) {
+                Childrens[c]->ReloadAll();
+            }      
+        }
+
         virtual void RenderObject(){}
 
         // Funcion recursiva para renderizar un objeto y sus hijos
@@ -264,6 +276,24 @@ class Object {
         }
 };
 
+
+Object* FindObjectByName(Object* node, const std::string& name){
+    if (!node) return nullptr;
+
+    // Coincide con este nodo → devolverlo
+    if (node->name && node->name->value == name)
+        return node;
+
+    // Buscar en hijos
+    for (Object* child : node->Childrens){
+        Object* r = FindObjectByName(child, name);
+        if (r) return r; // si lo encontró en un hijo, devolverlo
+    }
+
+    return nullptr; // no encontrado
+}
+
+#include "./Objects/Modifier.h"
 #include "./Objects/Scene.h"
 #include "./Objects/Collection.h"
 #include "./Objects/Light.h"
@@ -278,6 +308,46 @@ class Object {
 Object* SceneCollection = new Scene();
 std::vector<Object*> ObjSelects;
 Object* CollectionActive = nullptr;
+
+bool DetectLoop(Object* node,
+                std::unordered_set<Object*>& visited,
+                std::unordered_set<Object*>& stack,
+                int depth = 0){
+    if (!node) return false;
+
+    // Si el nodo ya está en recursion → BUCLE encontrado
+    if (stack.count(node)) {
+        std::cout << "⚠ LOOP DETECTADO en nodo: " << node->name->value << std::endl;
+        return true;
+    }
+
+    // Si ya lo visitamos pero no está en la pila actual → no hay loop aquí
+    if (visited.count(node)) return false;
+
+    visited.insert(node);
+    stack.insert(node);
+
+    // revisar hijos
+    for (auto* child : node->Childrens)
+        if (DetectLoop(child, visited, stack, depth + 1))
+            return true;
+
+    stack.erase(node);
+    return false;
+}
+
+void SearchLoop(){
+    std::unordered_set<Object*> visited;
+    std::unordered_set<Object*> stack;
+
+    std::cout << "Analizando árbol para loops..." << std::endl;
+
+    if (DetectLoop(SceneCollection, visited, stack)) {
+        std::cout << "\n🟥 RESULTADO: Hay bucles en la jerarquía!\n" << std::endl;
+    } else {
+        std::cout << "\n🟩 No se detectaron loops. Árbol sano.\n" << std::endl;
+    }
+}
 
 size_t GetIndexInParent(Object* obj) {
     /*if (!obj->Parent) {

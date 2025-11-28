@@ -1,7 +1,5 @@
-class Array : public Object {
-    public:
-		std::string targetName;
-        
+class Array : public Object, public Modifier {
+    public:        
         Array(Object* parent): Object(parent, "Array"){
             IconType = static_cast<size_t>(IconType::array);
         }
@@ -10,8 +8,8 @@ class Array : public Object {
             return ObjectType::array;
         }
 
-        void SetTarget(const std::string& NewValue){
-            targetName = NewValue;
+        void Reload() override {
+            ReloadTarget();
         }
 
         void RenderObject() override {        

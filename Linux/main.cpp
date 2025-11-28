@@ -22,6 +22,7 @@
 #include <map>
 #include <algorithm>
 #include <cstring>
+#include <unordered_set>
 
 //utilidades de Whisk3D de uso general. mas que nada para manejo de punteros y memoria
 #include "../Shared/Whisk3Dutils.h"

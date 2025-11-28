@@ -105,7 +105,7 @@ bool RenderAxisTransform(Object* obj) {
 		if (estado == translacion || estado == rotacion || estado == EditScale){		
         	DrawTransformAxis();
 		}		
-		return true;
+		found = true;
     } 
 	else if (obj->Childrens.size() > 0){	
 		glRotatef(obj->rotX, 1, 0, 0); //angulo, X Y Z

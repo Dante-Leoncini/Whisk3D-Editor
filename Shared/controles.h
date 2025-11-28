@@ -214,7 +214,6 @@ void InputUsuarioSymbian(GLfixed aDeltaTimeSecs){
 			if (!PlayAnimation){
 				ReloadAnimation();
 			}
-	    	ReloadViewport();
 			ShiftCount = 40;
 		}
 		else if( iInputHandler->IsInputPressed( EVolumenDown ) ){
@@ -225,7 +224,6 @@ void InputUsuarioSymbian(GLfixed aDeltaTimeSecs){
 			if (!PlayAnimation){
 				ReloadAnimation();
 			}
-	    	ReloadViewport();
 			ShiftCount = 40;
 		}*/
 		/*return;
@@ -298,7 +296,6 @@ void InputUsuarioSymbian(GLfixed aDeltaTimeSecs){
 				ReloadAnimation();
 			}
 		}
-		ReloadViewport();
 	}
 	if( iInputHandler->IsInputPressed( EJoystickRight ) ){
 		//mueve el mouse
@@ -353,7 +350,6 @@ void InputUsuarioSymbian(GLfixed aDeltaTimeSecs){
 				ReloadAnimation();
 			}
 		}
-	    ReloadViewport();
 	}
 	if( iInputHandler->IsInputPressed( EJoystickUp ) ){
 		//mueve el mouse
@@ -396,7 +392,6 @@ void InputUsuarioSymbian(GLfixed aDeltaTimeSecs){
 		else if (estado == translacion){
 			SetTranslacionObjetos(-30, 0);
 		}
-	    ReloadViewport(true);
 	}
 	if( iInputHandler->IsInputPressed( EJoystickDown ) ){
 		//mueve el mouse
@@ -439,7 +434,6 @@ void InputUsuarioSymbian(GLfixed aDeltaTimeSecs){
 		else if (estado == translacion){
 			SetTranslacionObjetos(30, 0);		
 		}
-	    ReloadViewport(true);
 	}*/
 }
 

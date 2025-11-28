@@ -317,17 +317,15 @@ class Viewport3D : public ViewportBase, public WithBorder  {
 
                 //Dibuja el origen de los objetos seleccionados		
                 if (showOrigins) RenderOrigins();	
-            }
             
-            //ejes de transformacion
-            if (!SceneCollection->Childrens.empty() && (estado == translacion || estado == rotacion || estado == EditScale)) RenderAllAxisTransform();
-
+                //ejes de transformacion
+                if (!SceneCollection->Childrens.empty() && (estado == translacion || estado == rotacion || estado == EditScale)) RenderAllAxisTransform();
+            }
             //dibuja el cursor 3D	
             if (show3DCursor) Render3Dcursor();
         }
 
         void RenderRelantionshipsLines(){
-            if (!SceneCollection) return;
             glEnableClientState(GL_TEXTURE_COORD_ARRAY);
             glEnable( GL_TEXTURE_2D );
             glEnable( GL_BLEND );
@@ -577,7 +575,6 @@ class Viewport3D : public ViewportBase, public WithBorder  {
                     estado = editNavegacion;
                 }
             }
-            ReloadViewport();
 	        ViewPortClickDown = false;
         };
 
@@ -637,6 +634,7 @@ class Viewport3D : public ViewportBase, public WithBorder  {
                     if(rotY < -180.0f) rotY += 360.0f;
                     if(rotX > 180.0f) rotX -= 360.0f;
                     if(rotX < -180.0f) rotX += 360.0f;
+                    UpdatePrecalculos();
                 }
             }
             else if (estado == translacion || estado == rotacion || estado == EditScale){
@@ -712,7 +710,6 @@ class Viewport3D : public ViewportBase, public WithBorder  {
                     ReloadAnimation();
                 }
             }
-            ReloadViewport();
         }
 
         void TeclaIzquierda(){
@@ -771,7 +768,6 @@ class Viewport3D : public ViewportBase, public WithBorder  {
                     ReloadAnimation();
                 }
             }
-            ReloadViewport();
         }
 
         void TeclaArriba(){
@@ -815,7 +811,6 @@ class Viewport3D : public ViewportBase, public WithBorder  {
             else if (estado == translacion){
                 SetTranslacionObjetos(0, -30);
             }
-            ReloadViewport();
         }
 
         void TeclaAbajo(){
@@ -859,7 +854,6 @@ class Viewport3D : public ViewportBase, public WithBorder  {
             else if (estado == translacion){
                 SetTranslacionObjetos(0, 30);		
             }
-            ReloadViewport();
         }
 
         // Método para actualizar cache

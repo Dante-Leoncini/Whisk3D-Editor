@@ -1,6 +1,7 @@
-class Mirror : public Object {
+class Mirror : public Object, public Modifier {
     public:
-		std::string targetName;
+		std::string targetName = "";
+		Object* target = nullptr;
 
         Mirror(Object* parent): Object(parent, "Mirror"){
             IconType = static_cast<size_t>(IconType::mirror);
@@ -14,7 +15,19 @@ class Mirror : public Object {
             return ObjectType::mirror;
         }
 
-        void RenderObject() override {        
+        void Reload() override {
+            ReloadTarget();
+        }
+
+        void RenderObject() override {
+            if (!target) return;
+            
+            glPushMatrix();
+            glScalef(scaleX, scaleZ, scaleY);
+            
+            target->RenderObject();
+
+            glPopMatrix();
         }
 
 		~Mirror() {

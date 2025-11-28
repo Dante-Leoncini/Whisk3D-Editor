@@ -348,13 +348,11 @@ void BuildScene(Node* root, const std::string& w3dPath){
     }
 
     if(root->props.count("background")){
-        std::cerr << "Set Background" << std::endl;
         std::string bg = Unquote(root->props.at("background")); // <- quita comillas si las hay
         std::replace(bg.begin(), bg.end(), ',', ' '); // reemplaza comas por espacios
         std::stringstream ss(bg);
         float r,g,b,a;
         if(ss >> r >> g >> b >> a){
-            std::cerr << "lo hizo!!" << std::endl;
             scene->SetBackground(r,g,b,a);
         } else {
             std::cerr << "Error al parsear background: '" << bg << "'\n";
@@ -392,8 +390,10 @@ void OpenW3D(std::string path){
 			if(!layout) std::cerr << "AVISO: No hay 'Layout' en archivo\n";
 
 			if(escena) BuildScene(escena, path);
+            
 			// ensure we have a CollectionActive even if scene empty
-			if(!CollectionActive) CollectionActive = new Collection(SceneCollection);
+			if(!CollectionActive) CollectionActive = SceneCollection;
+			//if(!CollectionActive) CollectionActive = new Collection(SceneCollection);
 
 			if(layout && layout->children.size()>0)
     			rootViewport = BuildLayout(layout->children[0]);
@@ -403,5 +403,9 @@ void OpenW3D(std::string path){
 			}
 		}
 	}
+
+    //esto es para recargar los targets de todos los objetos modificadores
+    SearchLoop();
+    SceneCollection->ReloadAll();
     //std::cout << "CollectionActive: " << CollectionActive << " rootViewport: " << rootViewport << std::endl;
 }

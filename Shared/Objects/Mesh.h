@@ -63,13 +63,6 @@ class Mesh : public Object {
 
 		void RenderObject() override {
 			glPushMatrix();
-			//glScalex(obj.scaleX, obj.scaleZ, obj.scaleY);
-			//glScalef(obj.scaleX, obj.scaleZ, obj.scaleY);
-			/*glScalef(
-				FIXED_TO_FLOAT(scaleX),
-				FIXED_TO_FLOAT(scaleZ),
-				FIXED_TO_FLOAT(scaleY)
-			);*/
 
 			glScalef(scaleX, scaleZ, scaleY);
 					

@@ -1,7 +1,5 @@
-class Gamepad : public Object {
-    public:
-		std::string targetName;
-        
+class Gamepad : public Object, public Modifier {
+    public:        
         Gamepad(Object* parent): Object(parent, "Gamepad"){
             IconType = static_cast<size_t>(IconType::gamepad);
         }
@@ -10,8 +8,8 @@ class Gamepad : public Object {
             return ObjectType::gamepad;
         }
 
-        void SetTarget(const std::string& NewValue){
-            targetName = NewValue;
+        void Reload() override {
+            ReloadTarget();
         }
 
         void RenderObject() override {        
