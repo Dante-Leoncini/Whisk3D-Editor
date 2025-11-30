@@ -28,6 +28,13 @@ Este programa no esta listo para producción y tiene una serie de errores conoci
 Sí el instalador falla, probablemente debas de "hackear" tu teléfono para ignorar las restricciones y certificados de Symbian. Puedes ver el siguiente video mostrando como hacerlo: [Tutorial Hack](https://www.youtube.com/watch?v=UJJICzbk3TA)
 
 ## Notas de Linux
+Para compilar en Linux 32bit y SDL 1.2 necesitas las siguientes dependencias:
+sudo apt install libsdl1.2-dev
+
+necesario para compilar en 32bit
+sudo apt install gcc-multilib g++-multilib
+sudo apt install libsdl1.2-dev:i386 libgl1-mesa-dev:i386 libglu1-mesa-dev:i386 libc6-dev:i386
+
 Para linux estaba usando SDL3... pero para gente nueva no es lo mejor ya que tienen que clonar el repo. compilar SDl3... y un largo etc. asi que volvi al SDL2 el cual solo necesitan instalar un par de librerias que ya estan en los repositorios de linux y listo.
 
 Se puede compilar Whisk3D desde la carpeta "Linux" usando el comando "make". o "./CompilarYrun.sh" (este ultimo compila y abre Whisk3D)

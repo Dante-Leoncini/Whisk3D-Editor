@@ -234,6 +234,12 @@ class Wavefront {
 				mg.material = 0;
 				TempMesh->materialsGroup.push_back(mg);
 			}
+
+			std::cout << "\n[ConvertToES1 RESULTADO]\n";
+			std::cout << "Vertices finales: " << newVertices.size()/3 << "\n";
+			std::cout << "Normales final:   " << newNormals.size()/3 << "\n";
+			std::cout << "UV final:         " << newUVs.size()/2 << "\n";
+			std::cout << "Caras triangulos: " << newFaces.size()/3 << "\n";
             Reset();
         }
 };
@@ -1393,7 +1399,4 @@ bool ImportOBJ(const std::string& filepath) {
     return true;
 }
 
-// Ejemplo simple de MensajeError
-void MensajeError(const std::string& msg) {
-    std::cerr << msg << std::endl;
-}
+#include "./import_wobj.h"

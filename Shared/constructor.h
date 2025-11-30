@@ -28,7 +28,8 @@ void ConstructUniversal(int argc, char* argv[]){
     // Si se abrió un archivo .w3d al hacer doble click
     // ======================================================
     if(argc > 1){
-        OpenW3D(argv[1]);
+        w3dPath = argv[1];
+        OpenW3D();
         return;
     }
 

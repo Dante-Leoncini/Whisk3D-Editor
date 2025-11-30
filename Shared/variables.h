@@ -50,6 +50,8 @@ int estado;
 int InteractionMode;
 int navegacionMode;
 
+std::string w3dPath = "";
+
 // Variables para el Mouse
 bool leftMouseDown = false;
 bool middleMouseDown = false;
