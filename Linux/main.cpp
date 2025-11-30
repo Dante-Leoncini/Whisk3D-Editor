@@ -38,6 +38,7 @@
 
 //variables de SDL/Linux
 SDL_Window* window = nullptr;  // definición real
+SDL_GameController* controller = nullptr;
 SDL_GLContext glContext = nullptr;
 
 int winW = 640; 
@@ -169,7 +170,7 @@ SDL_HitTestResult HitTestCallback(SDL_Window *win, const SDL_Point *area, void *
 
 int main(int argc, char* argv[]) {
 	// Inicializar SDL
-    if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER) != 0) {
         std::cerr << "Error SDL_Init: " << SDL_GetError() << std::endl;
         return -1;
     }
@@ -253,6 +254,17 @@ int main(int argc, char* argv[]) {
 
     //constructor symbian, linux y windows
     ConstructUniversal(argc, argv);
+
+    // Abrir el primer mando disponible
+    if (SDL_NumJoysticks() > 0) {
+        if (SDL_IsGameController(0)) {
+            controller = SDL_GameControllerOpen(0);
+            if (controller) {
+                std::cout << "Control detectado: " 
+                        << SDL_GameControllerName(controller) << std::endl;
+            }
+        }
+    }
 
 	// Cargar texturas
 	Textures.push_back(Texture());
@@ -352,6 +364,10 @@ int main(int argc, char* argv[]) {
         // Si querés liberar CPU:
         SDL_Delay(8); // duerme lo mínimo
     }
+
+	if (controller) {
+		SDL_GameControllerClose(controller);
+	}
 
     SDL_GL_DestroyContext(glContext);
     SDL_DestroyWindow(window);

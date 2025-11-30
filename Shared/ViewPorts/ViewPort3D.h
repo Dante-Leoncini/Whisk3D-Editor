@@ -38,6 +38,7 @@ class Viewport3D : public ViewportBase, public WithBorder  {
             //coloca los valores de forma global para que otras partes del programa las lea
             ::view = view;
             ::showOverlayGlobal = showOverlays;
+            Viewport3DActive = this;
                         
             for(size_t l = 0; l < Lights.size(); l++) {
                 glDisable(Lights[l]->LightID);
@@ -1089,3 +1090,65 @@ class Viewport3D : public ViewportBase, public WithBorder  {
             Aceptar();
         }
 };
+
+Viewport3D* Viewport3DActive = nullptr;
+
+//precalculos
+bool recalcularCamara = true;
+GLfloat radY = 0.0f;
+GLfloat radX = 0.0f;
+
+GLfloat factor = 0.01f;
+
+GLfloat cosX = 0.0f;
+GLfloat sinX = 0.0f;
+GLfloat cosY = 0.0f;
+GLfloat sinY = 0.0f;
+
+void Gamepad::Update(){
+    if (!target || !Viewport3DActive) return;
+
+    //Viewport3DActive->rotX   += axisState[SDL_CONTROLLER_AXIS_RIGHTX] * 1.0f;
+    //Viewport3DActive->rotY   += axisState[SDL_CONTROLLER_AXIS_RIGHTY] * 1.0f;
+
+    target->rotX += axisState[SDL_CONTROLLER_AXIS_RIGHTX] * 0.3f;
+    target->rotZ += axisState[SDL_CONTROLLER_AXIS_RIGHTY] * 0.3f;
+
+    // Limitar rotY para evitar giros extremos
+    if(Viewport3DActive->rotY > 180.0f) Viewport3DActive->rotY -= 360.0f;
+    if(Viewport3DActive->rotY < -180.0f) Viewport3DActive->rotY += 360.0f;
+    if(Viewport3DActive->rotX > 180.0f) Viewport3DActive->rotX -= 360.0f;
+    if(Viewport3DActive->rotX < -180.0f) Viewport3DActive->rotX += 360.0f;
+
+    if (recalcularCamara || axisState[SDL_CONTROLLER_AXIS_RIGHTX] != 0.0f || axisState[SDL_CONTROLLER_AXIS_RIGHTY] != 0.0f ){
+        //precalculos
+        radY = Viewport3DActive->rotY * M_PI / 180.0f; // Yaw
+        radX = Viewport3DActive->rotX * M_PI / 180.0f; // Pitch
+
+        cosX = cos(radX);
+        sinX = sin(radX);
+        cosY = cos(radY);
+        sinY = sin(radY);
+        recalcularCamara = false;
+    }
+
+    // Movimiento cámara según sticks y gatillos
+    /*Viewport3DActive->PivotZ += axisState[SDL_CONTROLLER_AXIS_LEFTY] * factor * cosY;
+    Viewport3DActive->PivotX -= axisState[SDL_CONTROLLER_AXIS_LEFTX] * factor * cosX - axisState[SDL_CONTROLLER_AXIS_LEFTY] * factor * sinY * sinX;
+    Viewport3DActive->PivotY += axisState[SDL_CONTROLLER_AXIS_LEFTX] * factor * sinX + axisState[SDL_CONTROLLER_AXIS_LEFTY] * factor * sinY * cosX;*/
+
+    target->posZ += axisState[SDL_CONTROLLER_AXIS_LEFTY] * factor * cosY;
+    target->posX -= axisState[SDL_CONTROLLER_AXIS_LEFTX] * factor * cosX - axisState[SDL_CONTROLLER_AXIS_LEFTY] * factor * sinY * sinX;
+    target->posY += axisState[SDL_CONTROLLER_AXIS_LEFTX] * factor * sinX + axisState[SDL_CONTROLLER_AXIS_LEFTY] * factor * sinY * cosX;
+
+    //std::cout << "PivotX: " << PivotX << " PivotY: " << PivotY << " PivotZ: " << PivotZ << std::endl;
+    //std::cout << "rotY: " << rotY << std::endl;
+
+    //Viewport3DActive->posY += (axisState[SDL_CONTROLLER_AXIS_TRIGGERRIGHT] - axisState[SDL_CONTROLLER_AXIS_TRIGGERLEFT]) * 0.1f;
+    target->scaleX += (axisState[SDL_CONTROLLER_AXIS_TRIGGERRIGHT] - axisState[SDL_CONTROLLER_AXIS_TRIGGERLEFT]) * 0.02f;
+    target->scaleY += (axisState[SDL_CONTROLLER_AXIS_TRIGGERRIGHT] - axisState[SDL_CONTROLLER_AXIS_TRIGGERLEFT]) * 0.02f;
+    target->scaleZ += (axisState[SDL_CONTROLLER_AXIS_TRIGGERRIGHT] - axisState[SDL_CONTROLLER_AXIS_TRIGGERLEFT]) * 0.02f;
+
+    //target->posY += axisState[SDL_CONTROLLER_AXIS_LEFTX] * velocidad;
+    //target->posX += axisState[SDL_CONTROLLER_AXIS_LEFTY] * velocidad; 
+}

@@ -13,6 +13,22 @@ int GetIntOrDefault(const std::map<std::string,std::string>& props,
     catch(...){ return def; }
 }
 
+GLenum GetLightIDOrDefault(std::string name, GLenum defaultLight = GL_LIGHT0){
+    static std::unordered_map<std::string, GLenum> lightMap = {
+        {"GL_LIGHT0", GL_LIGHT0},
+        {"GL_LIGHT1", GL_LIGHT1},
+        {"GL_LIGHT2", GL_LIGHT2},
+        {"GL_LIGHT3", GL_LIGHT3},
+        {"GL_LIGHT4", GL_LIGHT4},
+        {"GL_LIGHT5", GL_LIGHT5},
+        {"GL_LIGHT6", GL_LIGHT6},
+        {"GL_LIGHT7", GL_LIGHT7},
+    };
+
+    auto it = lightMap.find(name);
+    return (it != lightMap.end()) ? it->second : defaultLight;
+}
+
 std::string Unquote(const std::string& s){
     if(s.size()>=2 && ((s.front()=='"' && s.back()=='"') || (s.front()=='\'' && s.back()=='\'')))
         return s.substr(1,s.size()-2);
@@ -288,6 +304,47 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
     if(n->type=="Mesh")
         return NewMesh(MeshType::cube, parent);
 
+    // --- OBJ / Wavefront (.obj) ---
+    if(n->type == "Wavefront"){
+        std::string path;
+
+        // Si el archivo viene con comillas --> Unquote
+        if(n->props.count("filePath"))
+            path = Unquote(n->props.at("filePath"));
+        else {
+            std::cerr << "[Wavefront] Falta filePath\n";
+            return nullptr;
+        }
+
+        // --- convertir path a ruta absoluta basada en el .w3d ---
+        std::string baseDir;
+        size_t pos = w3dPath.find_last_of("/\\");
+        if(pos != std::string::npos) baseDir = w3dPath.substr(0,pos+1);
+        else baseDir = "";
+
+        // si path YA es absoluto → no tocarlo
+        if(!(path.size()>0 && (path[0]=='/' || path[1]==':'))){
+            path = baseDir + path;  // 🔥 ruta final correcta
+        }
+
+        std::cout << "[WAVEFRONT] Path resuelto: " << path << "\n";
+
+        // --- IMPORTACIÓN ---
+        Mesh* mesh = ImportWOBJ(path, parent);
+
+        std::cout << "materialsGroup: " << mesh->materialsGroup.size() << std::endl;
+        std::cout << "vertexSize: " << mesh->vertexSize << std::endl;
+        std::cout << "facesSize: " << mesh->facesSize << std::endl;
+        std::cout << "ScaleX: " << mesh->scaleX << std::endl;
+
+        if (!mesh){
+            std::cerr << "[Wobj] Se importo mal el wobj!\n";
+            return nullptr;
+        }
+
+        return mesh;
+    }
+
     if(n->type=="Mirror"){
         Mirror* mirror = new Mirror(parent);
         if(p.count("target")) mirror->SetTarget(p.at("target"));
@@ -318,6 +375,7 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
             GetFloatOrDefault(n->props,"g",1),
             GetFloatOrDefault(n->props,"b",1)
         );
+        L->LightID = GetLightIDOrDefault(p.at("LightID"));
         return L;
     }
 
@@ -340,7 +398,7 @@ void BuildObjectRecursive(Node* n, Object* parent){
         BuildObjectRecursive(c, obj);
 }
 
-void BuildScene(Node* root, const std::string& w3dPath){
+void BuildScene(Node* root){
     if(!root || root->type!="Escena") return;
 
     // --- Icono opcional desde W3D ---
@@ -397,10 +455,10 @@ void BuildScene(Node* root, const std::string& w3dPath){
         CollectionActive = SceneCollection;        // seguridad
 }
 
-void OpenW3D(std::string path){
-	std::ifstream f(path);
+void OpenW3D(){
+	std::ifstream f(w3dPath);
 	if(!f.is_open()){
-		std::cerr << "Warning: no pude abrir archivo: " << path << "  -> usando escena por defecto\n";
+		std::cerr << "Warning: no pude abrir archivo: " << w3dPath << "  -> usando escena por defecto\n";
 	} 
 	else {
 		std::string src((std::istreambuf_iterator<char>(f)), {});
@@ -420,11 +478,10 @@ void OpenW3D(std::string path){
 			if(!escena) std::cerr << "AVISO: No hay 'Escena' en archivo\n";
 			if(!layout) std::cerr << "AVISO: No hay 'Layout' en archivo\n";
 
-			if(escena) BuildScene(escena, path);
+			if(escena) BuildScene(escena);
             
 			// ensure we have a CollectionActive even if scene empty
 			if(!CollectionActive) CollectionActive = SceneCollection;
-			//if(!CollectionActive) CollectionActive = new Collection(SceneCollection);
 
 			if(layout && layout->children.size()>0)
     			rootViewport = BuildLayout(layout->children[0]);
@@ -438,5 +495,4 @@ void OpenW3D(std::string path){
     //esto es para recargar los targets de todos los objetos modificadores
     SearchLoop();
     SceneCollection->ReloadAll();
-    //std::cout << "CollectionActive: " << CollectionActive << " rootViewport: " << rootViewport << std::endl;
 }

@@ -5,6 +5,8 @@ void Contadores(){
 }
 
 void InputUsuarioSDL3(SDL_Event &e){
+	RefreshInputControllerSDL(e);
+
     if (e.type == SDL_EVENT_MOUSE_MOTION){
 		int mx = e.motion.x;
 		int my = e.motion.y;

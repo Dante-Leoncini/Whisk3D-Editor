@@ -1,6 +1,6 @@
 class Light : public Object {
     public:
-        int LightID = GL_LIGHT0;
+        GLenum LightID = GL_LIGHT0;
         GLfloat position[4]  = { 0.0f, 0.0f, 0.0f, 1.0f };
         GLfloat ambient[4]  = { 0.0f, 0.0f, 0.0f, 1.0f };
         GLfloat diffuse[4]   = { 1.0f, 1.0f, 1.0f, 1.0f }; // blanco por defecto
@@ -18,7 +18,7 @@ class Light : public Object {
             diffuse[2] = b;
         }
 
-        void SetLightID(int ID){
+        void SetLightID(GLenum ID){
             LightID = ID;
         }
 

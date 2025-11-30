@@ -30,13 +30,23 @@ class Instance : public Object, public Modifier {
             if (!target && target != this) return;
 
             glPushMatrix();      
+            glTranslatef(target->posX, target->posZ, target->posY);
+            glRotatef(target->rotX, 1, 0, 0); // angulo, X Y Z
+            glRotatef(target->rotZ, 0, 1, 0); // angulo, X Y Z
+            glRotatef(target->rotY, 0, 0, 1); // angulo, X Y Z
             for(size_t i = 0; i < count; i++){
                 glScalef(scaleX, scaleY, scaleZ);
                 target->RenderObject();   
 
                 if(RenderChildrens){
-                    for(size_t c = 0; c < target->Childrens.size(); c++)
+                    for(size_t c = 0; c < target->Childrens.size(); c++){
+                        //cancela la rotacion y translacion del target y solo usa la de la instancia
+                        glTranslatef(-target->posX, -target->posZ, -target->posY);
+                        glRotatef(target->rotX, -1, 0, 0); // angulo, X Y Z
+                        glRotatef(target->rotZ, 0, -1, 0); // angulo, X Y Z
+                        glRotatef(target->rotY, 0, 0, -1); // angulo, X Y Z
                         target->Childrens[c]->Render();
+                    }
                 }
                 
                 glTranslatef(posX, posZ, posY);
