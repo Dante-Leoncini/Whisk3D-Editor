@@ -40,7 +40,8 @@ Para linux estaba usando SDL3... pero para gente nueva no es lo mejor ya que tie
 Se puede compilar Whisk3D desde la carpeta "Linux" usando el comando "make". o "./CompilarYrun.sh" (este ultimo compila y abre Whisk3D)
 
 ## Nota para Android
-Se puede compilar usando Android Studio, NDK, SDL2 y openjdk-17-jdk
+Para compilar. desde el directorio raiz usa
+cd platform/android && ./gradlew assembleDebug
 
 ## Aclaraciones:
 

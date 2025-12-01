@@ -1,0 +1,2 @@
+rootProject.name = "Whisk3D-Android"
+include ':app'

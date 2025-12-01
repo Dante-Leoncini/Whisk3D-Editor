@@ -1,0 +1,15 @@
+<manifest package="org.whisk3d"
+    xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application android:label="Whisk3D" android:icon="@mipmap/ic_launcher">
+        <activity android:name="org.whisk3d.MainActivity"
+            android:exported="true"
+            android:configChanges="keyboardHidden|orientation|screenSize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>
