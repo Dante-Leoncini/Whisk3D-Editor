@@ -133,6 +133,13 @@ Node* ParseNode(std::vector<std::string>& tk, size_t& i){
             i++; break;
         }
 
+        // reconocer propiedad ANTES que hijo simple
+        if(i+2 < tk.size() && tk[i+1] == ":") {
+            n->props[tk[i]] = Unquote(tk[i+2]);
+            i += 3;
+            continue;
+        }
+
         // ---------------------------------------------
         // 1) Hijo con tipo simple (Viewport3D, Outliner…)
         // ---------------------------------------------
@@ -149,15 +156,6 @@ Node* ParseNode(std::vector<std::string>& tk, size_t& i){
         // ---------------------------------------------
         if(i+1 < tk.size() && tk[i+1] == "{"){
             n->children.push_back(ParseNode(tk,i));
-            continue;
-        }
-
-        // ---------------------------------------------
-        // 3) Propiedades estilo "Split: 0.5"
-        // ---------------------------------------------
-        if(i+2 < tk.size() && tk[i+1] == ":"){
-            n->props[tk[i]] = Unquote(tk[i+2]);
-            i += 3;
             continue;
         }
 
@@ -253,8 +251,11 @@ ViewportBase* BuildLayout(Node* n){
 			}
 		}
 
-        ViewportBase* A = BuildLayout(n->children[0]);
-        ViewportBase* B = BuildLayout(n->children[1]);
+        ViewportBase* A = nullptr;
+        ViewportBase* B = nullptr;
+
+        if(n->children.size() > 0) A = BuildLayout(n->children[0]);
+        if(n->children.size() > 1) B = BuildLayout(n->children[1]);
 
         if(!A) A = new Viewport3D();
         if(!B) B = new Viewport3D();
@@ -375,7 +376,8 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
             GetFloatOrDefault(n->props,"g",1),
             GetFloatOrDefault(n->props,"b",1)
         );
-        L->LightID = GetLightIDOrDefault(p.at("LightID"));
+        L->LightID = GetLightIDOrDefault(p.count("LightID") ? p.at("LightID") : "GL_LIGHT0");
+
         return L;
     }
 
