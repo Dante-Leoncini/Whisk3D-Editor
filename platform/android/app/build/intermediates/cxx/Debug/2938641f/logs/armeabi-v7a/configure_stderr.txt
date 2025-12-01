@@ -1,0 +1,5 @@
+CMake Error at CMakeLists.txt:13 (message):
+  ❌ NO SE ENCONTRÓ SDL2_image en:
+  /home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/cpp/../../../../../../external/SDL2_image
+
+

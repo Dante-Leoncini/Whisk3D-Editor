@@ -7,3 +7,4 @@
 [submodule "external/SDL2_image"]
 	path = external/SDL2_image
 	url = https://github.com/libsdl-org/SDL_image
+	branch = SDL2
