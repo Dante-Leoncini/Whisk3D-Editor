@@ -1,0 +1,38 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="org.whisk3d" >
+4
+5    <uses-sdk
+6        android:minSdkVersion="21"
+7        android:targetSdkVersion="34" />
+8
+9    <application
+9-->/home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml:4:5-13:19
+10        android:debuggable="true"
+11        android:extractNativeLibs="true"
+12        android:icon="@mipmap/ic_launcher"
+12-->/home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml:4:42-76
+13        android:label="Whisk3D" >
+13-->/home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml:4:18-41
+14        <activity
+14-->/home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml:5:9-12:20
+15            android:name="org.whisk3d.MainActivity"
+15-->/home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml:5:19-58
+16            android:configChanges="keyboardHidden|orientation|screenSize"
+16-->/home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml:7:13-74
+17            android:exported="true" >
+17-->/home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml:6:13-36
+18            <intent-filter>
+18-->/home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml:8:13-11:29
+19                <action android:name="android.intent.action.MAIN" />
+19-->/home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml:9:17-68
+19-->/home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml:9:25-66
+20
+21                <category android:name="android.intent.category.LAUNCHER" />
+21-->/home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml:10:17-76
+21-->/home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml:10:27-74
+22            </intent-filter>
+23        </activity>
+24    </application>
+25
+26</manifest>

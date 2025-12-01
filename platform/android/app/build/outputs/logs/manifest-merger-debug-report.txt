@@ -1,0 +1,44 @@
+-- Merging decision tree log ---
+manifest
+ADDED from /home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml:1:1-15:12
+INJECTED from /home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml:1:1-15:12
+	package
+		ADDED from /home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml:1:11-32
+		INJECTED from /home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml
+	xmlns:android
+		ADDED from /home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml:2:5-63
+application
+ADDED from /home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml:4:5-13:19
+INJECTED from /home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml:4:5-13:19
+	android:extractNativeLibs
+		INJECTED from /home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml
+	android:label
+		ADDED from /home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml:4:18-41
+	android:icon
+		ADDED from /home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml:4:42-76
+activity#org.whisk3d.MainActivity
+ADDED from /home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml:5:9-12:20
+	android:exported
+		ADDED from /home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml:6:13-36
+	android:configChanges
+		ADDED from /home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml:7:13-74
+	android:name
+		ADDED from /home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml:5:19-58
+intent-filter#action:name:android.intent.action.MAIN+category:name:android.intent.category.LAUNCHER
+ADDED from /home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml:8:13-11:29
+action#android.intent.action.MAIN
+ADDED from /home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml:9:17-68
+	android:name
+		ADDED from /home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml:9:25-66
+category#android.intent.category.LAUNCHER
+ADDED from /home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml:10:17-76
+	android:name
+		ADDED from /home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml:10:27-74
+uses-sdk
+INJECTED from /home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml reason: use-sdk injection requested
+INJECTED from /home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml
+INJECTED from /home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml
+	android:targetSdkVersion
+		INJECTED from /home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml
+	android:minSdkVersion
+		INJECTED from /home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml

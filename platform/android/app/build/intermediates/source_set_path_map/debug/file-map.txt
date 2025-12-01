@@ -1,0 +1,7 @@
+org.whisk3d.app-pngs-0 /home/dante/Documentos/personal/Whisk3D/platform/android/app/build/generated/res/pngs/debug
+org.whisk3d.app-resValues-1 /home/dante/Documentos/personal/Whisk3D/platform/android/app/build/generated/res/resValues/debug
+org.whisk3d.app-packageDebugResources-2 /home/dante/Documentos/personal/Whisk3D/platform/android/app/build/intermediates/incremental/debug/packageDebugResources/merged.dir
+org.whisk3d.app-packageDebugResources-3 /home/dante/Documentos/personal/Whisk3D/platform/android/app/build/intermediates/incremental/debug/packageDebugResources/stripped.dir
+org.whisk3d.app-merged_res-4 /home/dante/Documentos/personal/Whisk3D/platform/android/app/build/intermediates/merged_res/debug
+org.whisk3d.app-debug-5 /home/dante/Documentos/personal/Whisk3D/platform/android/app/src/debug/res
+org.whisk3d.app-main-6 /home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/res

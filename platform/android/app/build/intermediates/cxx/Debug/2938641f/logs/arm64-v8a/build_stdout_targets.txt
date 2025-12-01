@@ -1,0 +1,199 @@
+ninja: Entering directory `/home/dante/Documentos/personal/Whisk3D/platform/android/app/.cxx/Debug/2938641f/arm64-v8a'
+[1/265] Generating include/SDL2/SDL.h
+[2/265] Generating include/SDL2/SDL_hints.h
+[3/265] Generating include/SDL2/SDL_atomic.h
+[4/265] Generating include/SDL2/SDL_bits.h
+[5/265] Generating include/SDL2/SDL_blendmode.h
+[6/265] Generating include/SDL2/SDL_assert.h
+[7/265] Generating include/SDL2/SDL_audio.h
+[8/265] Generating include/SDL2/SDL_clipboard.h
+[9/265] Generating include/SDL2/SDL_cpuinfo.h
+[10/265] Generating include/SDL2/SDL_copying.h
+[11/265] Generating include/SDL2/SDL_egl.h
+[12/265] Generating include/SDL2/SDL_endian.h
+[13/265] Generating include/SDL2/SDL_error.h
+[14/265] Generating include/SDL2/SDL_gamecontroller.h
+[15/265] Generating include/SDL2/SDL_gesture.h
+[16/265] Generating include/SDL2/SDL_events.h
+[17/265] Generating include/SDL2/SDL_filesystem.h
+[18/265] Generating include/SDL2/SDL_guid.h
+[19/265] Generating include/SDL2/SDL_haptic.h
+[20/265] Generating include/SDL2/SDL_keyboard.h
+[21/265] Generating include/SDL2/SDL_keycode.h
+[22/265] Generating include/SDL2/SDL_hidapi.h
+[23/265] Generating include/SDL2/SDL_joystick.h
+[24/265] Generating include/SDL2/SDL_loadso.h
+[25/265] Generating include/SDL2/SDL_locale.h
+[26/265] Generating include/SDL2/SDL_log.h
+[27/265] Generating include/SDL2/SDL_main.h
+[28/265] Generating include/SDL2/SDL_messagebox.h
+[29/265] Generating include/SDL2/SDL_metal.h
+[30/265] Generating include/SDL2/SDL_misc.h
+[31/265] Generating include/SDL2/SDL_mouse.h
+[32/265] Generating include/SDL2/SDL_mutex.h
+[33/265] Generating include/SDL2/SDL_opengl.h
+[34/265] Generating include/SDL2/SDL_name.h
+[35/265] Generating include/SDL2/SDL_opengles.h
+[36/265] Generating include/SDL2/SDL_opengles2.h
+[37/265] Generating include/SDL2/SDL_opengles2_gl2.h
+[38/265] Generating include/SDL2/SDL_opengles2_gl2ext.h
+[39/265] Generating include/SDL2/SDL_opengl_glext.h
+[40/265] Generating include/SDL2/SDL_opengles2_gl2platform.h
+[41/265] Generating include/SDL2/SDL_opengles2_khrplatform.h
+[42/265] Generating include/SDL2/SDL_pixels.h
+[43/265] Generating include/SDL2/SDL_power.h
+[44/265] Generating include/SDL2/SDL_rect.h
+[45/265] Generating include/SDL2/SDL_platform.h
+[46/265] Generating include/SDL2/SDL_quit.h
+[47/265] Generating include/SDL2/SDL_render.h
+[48/265] Generating include/SDL2/SDL_sensor.h
+[49/265] Generating include/SDL2/SDL_shape.h
+[50/265] Generating include/SDL2/SDL_scancode.h
+[51/265] Generating include/SDL2/SDL_stdinc.h
+[52/265] Generating include/SDL2/SDL_surface.h
+[53/265] Generating include/SDL2/SDL_system.h
+[54/265] Generating include/SDL2/SDL_rwops.h
+[55/265] Generating include/SDL2/SDL_syswm.h
+[56/265] Generating include/SDL2/SDL_test_assert.h
+[57/265] Generating include/SDL2/SDL_test_common.h
+[58/265] Generating include/SDL2/SDL_test_compare.h
+[59/265] Generating include/SDL2/SDL_test_crc32.h
+[60/265] Generating include/SDL2/SDL_test_font.h
+[61/265] Generating include/SDL2/SDL_test_fuzzer.h
+[62/265] Generating include/SDL2/SDL_test.h
+[63/265] Generating include/SDL2/SDL_test_harness.h
+[64/265] Generating include/SDL2/SDL_test_log.h
+[65/265] Generating include/SDL2/SDL_test_images.h
+[66/265] Generating include/SDL2/SDL_test_memory.h
+[67/265] Generating include/SDL2/SDL_test_random.h
+[68/265] Generating include/SDL2/SDL_thread.h
+[69/265] Generating include/SDL2/SDL_test_md5.h
+[70/265] Generating include/SDL2/SDL_timer.h
+[71/265] Generating include/SDL2/SDL_touch.h
+[72/265] Generating include/SDL2/SDL_video.h
+[73/265] Generating include/SDL2/SDL_version.h
+[74/265] Generating include/SDL2/SDL_types.h
+[75/265] Generating include/SDL2/SDL_vulkan.h
+[76/265] Generating include/SDL2/begin_code.h
+[77/265] Generating include/SDL2/close_code.h
+[78/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/SDL_utils.c.o
+[79/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/atomic/SDL_atomic.c.o
+[80/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/SDL_error.c.o
+[81/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/atomic/SDL_spinlock.c.o
+[82/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/SDL_guid.c.o
+[83/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/SDL_hints.c.o
+[84/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/SDL_log.c.o
+[85/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/audio/SDL_audiodev.c.o
+[86/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/dynapi/SDL_dynapi.c.o
+[87/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/events/SDL_clipboardevents.c.o
+[88/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/SDL_list.c.o
+[89/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/SDL_dataqueue.c.o
+[90/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/audio/SDL_wave.c.o
+[91/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/audio/SDL_mixer.c.o
+[92/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/cpuinfo/SDL_cpuinfo.c.o
+[93/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/events/SDL_displayevents.c.o
+[94/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/SDL_assert.c.o
+[95/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/events/SDL_dropevents.c.o
+[96/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/events/SDL_keysym_to_scancode.c.o
+[97/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/audio/SDL_audio.c.o
+[98/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/events/SDL_scancode_tables.c.o
+[99/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/audio/SDL_audiotypecvt.c.o
+[100/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/SDL.c.o
+[101/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/events/imKStoUCS.c.o
+[102/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/events/SDL_gesture.c.o
+[103/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/haptic/SDL_haptic.c.o
+[104/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/audio/SDL_audiocvt.c.o
+[105/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/events/SDL_windowevents.c.o
+[106/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/events/SDL_quit.c.o
+[107/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/hidapi/SDL_hidapi.c.o
+[108/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/events/SDL_mouse.c.o
+[109/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/joystick/SDL_steam_virtual_gamepad.c.o
+[110/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/events/SDL_touch.c.o
+[111/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/libm/e_atan2.c.o
+[112/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/events/SDL_keyboard.c.o
+[113/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/file/SDL_rwops.c.o
+[114/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/joystick/controller_type.c.o
+[115/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/libm/e_log10.c.o
+[116/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/libm/e_fmod.c.o
+[117/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/libm/e_log.c.o
+[118/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/libm/e_exp.c.o
+[119/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/libm/e_rem_pio2.c.o
+[120/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/libm/e_pow.c.o
+[121/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/libm/e_sqrt.c.o
+[122/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/events/SDL_events.c.o
+[123/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/libm/k_tan.c.o
+[124/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/libm/k_cos.c.o
+[125/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/libm/k_rem_pio2.c.o
+[126/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/libm/k_sin.c.o
+[127/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/libm/s_atan.c.o
+[128/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/libm/s_copysign.c.o
+[129/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/libm/s_cos.c.o
+[130/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/libm/s_fabs.c.o
+[131/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/libm/s_floor.c.o
+[132/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/libm/s_scalbn.c.o
+[133/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/locale/SDL_locale.c.o
+[134/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/misc/SDL_url.c.o
+[135/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/libm/s_sin.c.o
+[136/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/power/SDL_power.c.o
+[137/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/libm/s_tan.c.o
+[138/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/render/SDL_d3dmath.c.o
+[139/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/render/direct3d/SDL_render_d3d.c.o
+[140/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/render/direct3d11/SDL_shaders_d3d11.c.o
+[141/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/render/direct3d/SDL_shaders_d3d.c.o
+[142/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/render/direct3d11/SDL_render_d3d11.c.o
+[143/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/render/direct3d12/SDL_shaders_d3d12.c.o
+[144/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/render/opengl/SDL_render_gl.c.o
+[145/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/render/direct3d12/SDL_render_d3d12.c.o
+[146/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/render/opengl/SDL_shaders_gl.c.o
+[147/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/joystick/SDL_gamecontroller.c.o
+[148/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/render/psp/SDL_render_psp.c.o
+[149/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/render/ps2/SDL_render_ps2.c.o
+[150/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/render/opengles2/SDL_shaders_gles2.c.o
+[151/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/render/SDL_yuv_sw.c.o
+[152/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/joystick/SDL_joystick.c.o
+[153/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/render/opengles/SDL_render_gles.c.o
+[154/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/render/vitagxm/SDL_render_vita_gxm.c.o
+[155/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/render/software/SDL_drawpoint.c.o
+[156/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/render/software/SDL_blendpoint.c.o
+[157/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/render/vitagxm/SDL_render_vita_gxm_memory.c.o
+[158/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/render/vitagxm/SDL_render_vita_gxm_tools.c.o
+[159/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/stdlib/SDL_crc16.c.o
+[160/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/stdlib/SDL_crc32.c.o
+[161/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/stdlib/SDL_mslibc.c.o
+[162/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/stdlib/SDL_iconv.c.o
+[163/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/render/software/SDL_drawline.c.o
+[164/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/render/software/SDL_triangle.c.o
+[165/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/render/software/SDL_blendfillrect.c.o
+[166/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/render/software/SDL_render_sw.c.o
+[167/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/stdlib/SDL_qsort.c.o
+[168/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/stdlib/SDL_malloc.c.o
+[169/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/stdlib/SDL_getenv.c.o
+[170/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/stdlib/SDL_strtokr.c.o
+[171/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/render/software/SDL_rotate.c.o
+[172/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/stdlib/SDL_stdlib.c.o
+[173/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/stdlib/SDL_string.c.o
+[174/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/render/opengles2/SDL_render_gles2.c.o
+[175/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/thread/SDL_thread.c.o
+[176/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/render/SDL_render.c.o
+[177/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/sensor/SDL_sensor.c.o
+[178/265] Building CXX object CMakeFiles/whisk3d.dir/main.cpp.o
+FAILED: CMakeFiles/whisk3d.dir/main.cpp.o 
+/home/dante/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++ --target=aarch64-none-linux-android21 --sysroot=/home/dante/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/linux-x86_64/sysroot -Dwhisk3d_EXPORTS -I/home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/cpp/../../../../../src -I/home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/cpp/../../../../../include -I/home/dante/Documentos/personal/Whisk3D/platform/android/app/.cxx/Debug/2938641f/arm64-v8a/SDL2build/include -I/home/dante/Documentos/personal/Whisk3D/platform/android/app/.cxx/Debug/2938641f/arm64-v8a/SDL2build/include/SDL2 -I/home/dante/Documentos/personal/Whisk3D/platform/android/app/.cxx/Debug/2938641f/arm64-v8a/SDL2build/include-config-debug/SDL2 -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security   -fno-limit-debug-info  -fPIC -MD -MT CMakeFiles/whisk3d.dir/main.cpp.o -MF CMakeFiles/whisk3d.dir/main.cpp.o.d -o CMakeFiles/whisk3d.dir/main.cpp.o -c /home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/cpp/main.cpp
+/home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/cpp/main.cpp:6:14: fatal error: 'SDL2/SDL_image.h' file not found
+    #include <SDL2/SDL_image.h>
+             ^~~~~~~~~~~~~~~~~~
+1 error generated.
+[179/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/timer/SDL_timer.c.o
+[180/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/render/software/SDL_blendline.c.o
+[181/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/video/SDL_clipboard.c.o
+[182/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/video/SDL_blit.c.o
+[183/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/video/SDL_blit_copy.c.o
+[184/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/video/SDL_blit_slow.c.o
+[185/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/video/SDL_blit_1.c.o
+[186/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/video/SDL_blit_0.c.o
+[187/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/video/SDL_RLEaccel.c.o
+[188/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/video/SDL_bmp.c.o
+[189/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/video/SDL_blit_A.c.o
+[190/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/video/SDL_blit_auto.c.o
+[191/265] Building C object SDL2build/CMakeFiles/SDL2.dir/src/video/SDL_blit_N.c.o
+ninja: build stopped: subcommand failed.

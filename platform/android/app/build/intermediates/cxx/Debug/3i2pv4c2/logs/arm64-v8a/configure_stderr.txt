@@ -1,0 +1,5 @@
+CMake Error at CMakeLists.txt:4 (add_subdirectory):
+  add_subdirectory given source "../../../../external/SDL3" which is not an
+  existing directory.
+
+
