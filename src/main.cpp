@@ -221,10 +221,24 @@ bool loadColors(const std::string& filename) {
             ListaColores[idx][2] = b;
             ListaColores[idx][3] = a;
 
+            // Convertimos a GLfixed
+            ListaColoresX[idx][0] = COLOR_CONVERT_FIXED(r);
+            ListaColoresX[idx][1] = COLOR_CONVERT_FIXED(g);
+            ListaColoresX[idx][2] = COLOR_CONVERT_FIXED(b);
+            ListaColoresX[idx][3] = COLOR_CONVERT_FIXED(a);
+
             ListaColoresUbyte[idx][0] = (GLubyte)(r*255);
             ListaColoresUbyte[idx][1] = (GLubyte)(g*255);
             ListaColoresUbyte[idx][2] = (GLubyte)(b*255);
             ListaColoresUbyte[idx][3] = (GLubyte)(a*255);
+
+            #ifdef __ANDROID__
+                __android_log_print(ANDROID_LOG_VERBOSE, "SDL_MAIN", 
+                    "Color %s cargado: R=%.3f G=%.3f B=%.3f A=%.3f",
+                    name.c_str(), r, g, b, a);
+            #else
+                std::cout << "Color " << name << " cargado: R=" << r << " G=" << g << " B=" << b << " A=" << a << "\n";
+            #endif
         } else {
             std::cerr << "Color desconocido en colors.skin: " << name << "\n";
         }

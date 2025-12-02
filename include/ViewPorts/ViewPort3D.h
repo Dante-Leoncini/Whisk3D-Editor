@@ -182,9 +182,9 @@ class Viewport3D : public ViewportBase, public WithBorder  {
             if (showOverlays){
                 #ifdef ANDROID
                     // OpenGL ES 1.1 usa versiones "x" (fixed-point)
-                    glMaterialxv(GL_FRONT_AND_BACK, GL_DIFFUSE,  ListaColores[negro]);
-                    glMaterialxv(GL_FRONT_AND_BACK, GL_AMBIENT,  ListaColores[negro]);
-                    glMaterialxv(GL_FRONT_AND_BACK, GL_SPECULAR, ListaColores[negro]);
+                    glMaterialxv(GL_FRONT_AND_BACK, GL_DIFFUSE,  ListaColoresX[negro]);
+                    glMaterialxv(GL_FRONT_AND_BACK, GL_AMBIENT,  ListaColoresX[negro]);
+                    glMaterialxv(GL_FRONT_AND_BACK, GL_SPECULAR, ListaColoresX[negro]);
                 #else
                     // OpenGL desktop usa versiones float
                     glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE,  ListaColores[negro]);
@@ -235,7 +235,7 @@ class Viewport3D : public ViewportBase, public WithBorder  {
             }
             else {
                 #ifdef ANDROID
-                    glFogxv(GL_FOG_COLOR, ListaColores[background]);
+                    glFogxv(GL_FOG_COLOR, ListaColoresX[background]);
                 #else
                     glFogfv(GL_FOG_COLOR, ListaColores[background]);
                 #endif
@@ -314,9 +314,9 @@ class Viewport3D : public ViewportBase, public WithBorder  {
         void RenderOverlay(){
             //el resto de objetos no usan materiales ni luces
             #ifdef ANDROID
-                glMaterialxv(GL_FRONT_AND_BACK, GL_DIFFUSE,  ListaColores[negro]);
-                glMaterialxv(GL_FRONT_AND_BACK, GL_AMBIENT,  ListaColores[negro]);
-                glMaterialxv(GL_FRONT_AND_BACK, GL_SPECULAR, ListaColores[negro]);
+                glMaterialxv(GL_FRONT_AND_BACK, GL_DIFFUSE,  ListaColoresX[negro]);
+                glMaterialxv(GL_FRONT_AND_BACK, GL_AMBIENT,  ListaColoresX[negro]);
+                glMaterialxv(GL_FRONT_AND_BACK, GL_SPECULAR, ListaColoresX[negro]);
             #else
                 // Desktop OpenGL puede pasar el puntero completo
                 glMaterialfv(   GL_FRONT_AND_BACK, GL_DIFFUSE,  ListaColores[negro] );
@@ -636,7 +636,11 @@ class Viewport3D : public ViewportBase, public WithBorder  {
 
         void event_mouse_motion(int mx, int my) override {
             //boton del medio del mouse
-            if (middleMouseDown) {
+            #ifdef __ANDROID__
+                if (middleMouseDown || leftMouseDown) {
+            #else
+                if (middleMouseDown) {
+            #endif
                 ViewPortClickDown = true;
                 // Chequear si Shift está presionado
 	            #if SDL_MAJOR_VERSION == 2

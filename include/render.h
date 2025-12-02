@@ -180,7 +180,8 @@ void DibujarIcono3D(Object* obj){
                 glColor4f(ListaColores[accentDark][0],ListaColores[accentDark][1],ListaColores[accentDark][2],ListaColores[accentDark][3]);
             }
             else {		
-                glColor4f(ListaColores[grisUI][0], ListaColores[grisUI][1], ListaColores[grisUI][2], ListaColores[grisUI][3]);		
+                glColor4f(ListaColores[grisUI][0], ListaColores[grisUI][1], ListaColores[grisUI][2], ListaColores[grisUI][3]);	
+                //glColor4f(0.75f,0.75f,0.75f,1.0f);		
             }
 			glDrawArrays( GL_POINTS, 0, 1 );
 		}

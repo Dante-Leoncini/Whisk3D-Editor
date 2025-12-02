@@ -72,7 +72,7 @@ class Mesh : public Object {
 			//averiguar diferencia entre glMaterialx y glMateriali
             #ifdef ANDROID
                 // OpenGL ES 1.1
-                glMaterialxv( GL_FRONT_AND_BACK, GL_EMISSION, ListaColores[negro] );
+                glMaterialxv( GL_FRONT_AND_BACK, GL_EMISSION, ListaColoresX[negro] );
                 glMaterialx(GL_FRONT_AND_BACK, GL_SHININESS, 12 << 16);
             #else
                 glMaterialfv( GL_FRONT_AND_BACK, GL_EMISSION, ListaColores[negro] );

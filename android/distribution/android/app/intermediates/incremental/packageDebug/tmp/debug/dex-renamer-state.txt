@@ -1,4 +1,4 @@
-#Tue Dec 02 02:39:48 ART 2025
+#Tue Dec 02 04:14:20 ART 2025
 base.0=/home/dante/Documentos/personal/Whisk3D/android/distribution/android/app/intermediates/dex/debug/mergeExtDexDebug/classes.dex
 base.1=/home/dante/Documentos/personal/Whisk3D/android/distribution/android/app/intermediates/dex/debug/mergeProjectDexDebug/0/classes.dex
 base.2=/home/dante/Documentos/personal/Whisk3D/android/distribution/android/app/intermediates/dex/debug/mergeProjectDexDebug/1/classes.dex
