@@ -25,7 +25,7 @@ inline Vec3 Normalize(const Vec3&a){ float L = Len(a); if(L<=1e-8f) return Vec3(
 class Children {
 	public:
     	int Id = -1;
-		GLfixed OriginalScaleX = 0;
-		GLfixed OriginalScaleY = 0; 
-		GLfixed OriginalScaleZ = 0;	
+		GLfloat OriginalScaleX = 0;
+		GLfloat OriginalScaleY = 0; 
+		GLfloat OriginalScaleZ = 0;	
 };

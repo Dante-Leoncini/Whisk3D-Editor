@@ -28,6 +28,3 @@ int dy = 0;
 //mismo problema para teclas
 bool LAltPressed = false;
 bool LShiftPressed = false;
-
-#include "./sprites.h"
-#include "./object2D.h"

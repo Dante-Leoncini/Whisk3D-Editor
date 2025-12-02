@@ -21,6 +21,7 @@
 #else
     #include <GL/gl.h>      // OpenGL Desktop
     #include <GL/glu.h>
+    #include <GL/glext.h> 
 #endif
 
 //esto es solo para linux/android
@@ -57,6 +58,22 @@ int winH = 480;
 
 
 #ifdef __ANDROID__
+#elif defined(_WIN32)
+    // ============================
+    // WINDOWS
+    // ============================
+    #include <windows.h>
+    std::string getExeDir() {
+        char buffer[MAX_PATH];
+        GetModuleFileNameA(NULL, buffer, MAX_PATH);
+
+        std::string path(buffer);
+        size_t pos = path.find_last_of("\\/");
+        if (pos != std::string::npos)
+            path = path.substr(0, pos);
+
+        return path;
+    }
 #else
     #include <unistd.h>
     #include <limits.h>
@@ -84,13 +101,29 @@ int winH = 480;
 #include "../include/UI/colores.h"
 #include "../include/OpcionesRender.h"
 
+#include "../include/Objects/Textures.h"
+
+#include "../include/UI/UI.h"
+#include "../include/UI/sprites.h"
+#include "../include/UI/object2D.h"
+#include "../include/UI/text.h"
+#include "../include/UI/image.h"
+#include "../include/UI/rectangle.h"
+
+#include "../include/Objects/Materials.h"
+#include "../include/Objects/Objects.h"
+
 #include "../include/Animation.h"
 #include "../include/Objects/ObjectMode.h"
 #include "../include/render.h"
 #include "../include/importers/import_obj.h"
 //#include "../include/import_vertex_animation.h"
 #include "../include/lectura-escritura.h"
+
 #include "../include/ViewPorts/ViewPorts.h"
+#include "../include/ViewPorts/ViewPort3D.h"
+#include "../include/ViewPorts/Outliner.h"
+
 #include "../include/funciones.h"
 #include "../include/controles.h"
 #include "../include/constructor.h"
@@ -221,11 +254,14 @@ bool loadColors(const std::string& filename) {
             ListaColores[idx][2] = b;
             ListaColores[idx][3] = a;
 
-            // Convertimos a GLfixed
-            ListaColoresX[idx][0] = COLOR_CONVERT_FIXED(r);
-            ListaColoresX[idx][1] = COLOR_CONVERT_FIXED(g);
-            ListaColoresX[idx][2] = COLOR_CONVERT_FIXED(b);
-            ListaColoresX[idx][3] = COLOR_CONVERT_FIXED(a);
+            //los colores fixed solo son para android
+            #ifdef __ANDROID__
+                // Convertimos a GLfixed
+                ListaColoresX[idx][0] = COLOR_CONVERT_FIXED(r);
+                ListaColoresX[idx][1] = COLOR_CONVERT_FIXED(g);
+                ListaColoresX[idx][2] = COLOR_CONVERT_FIXED(b);
+                ListaColoresX[idx][3] = COLOR_CONVERT_FIXED(a);
+            #endif
 
             ListaColoresUbyte[idx][0] = (GLubyte)(r*255);
             ListaColoresUbyte[idx][1] = (GLubyte)(g*255);

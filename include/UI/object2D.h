@@ -44,7 +44,3 @@ class Object2D {
             }
         }
 };
-
-#include "./text.h"
-#include "./image.h"
-#include "./rectangle.h"
