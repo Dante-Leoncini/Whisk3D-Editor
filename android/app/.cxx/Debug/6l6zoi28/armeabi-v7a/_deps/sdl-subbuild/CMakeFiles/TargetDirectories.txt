@@ -1,3 +1,0 @@
-/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/armeabi-v7a/_deps/sdl-subbuild/CMakeFiles/sdl-populate.dir
-/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/armeabi-v7a/_deps/sdl-subbuild/CMakeFiles/edit_cache.dir
-/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/armeabi-v7a/_deps/sdl-subbuild/CMakeFiles/rebuild_cache.dir
