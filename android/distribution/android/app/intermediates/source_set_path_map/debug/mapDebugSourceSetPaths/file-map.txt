@@ -1,0 +1,10 @@
+pvallet.com.github.hello_sdl2.app-appcompat-1.1.0-0 /home/dante/.gradle/caches/8.9/transforms/05d6de65a18d1a783e452d0c6ac64abb/transformed/appcompat-1.1.0/res
+pvallet.com.github.hello_sdl2.app-core-1.1.0-1 /home/dante/.gradle/caches/8.9/transforms/6f61606391ba590d6ca80cbdda7a3ded/transformed/core-1.1.0/res
+pvallet.com.github.hello_sdl2.app-appcompat-resources-1.1.0-2 /home/dante/.gradle/caches/8.9/transforms/d2011d3dca4edcf92de2910d976e86ff/transformed/appcompat-resources-1.1.0/res
+pvallet.com.github.hello_sdl2.app-debug-3 /home/dante/Documentos/personal/Whisk3D/android/app/src/debug/res
+pvallet.com.github.hello_sdl2.app-main-4 /home/dante/Documentos/personal/Whisk3D/android/app/src/main/res
+pvallet.com.github.hello_sdl2.app-pngs-5 /home/dante/Documentos/personal/Whisk3D/android/distribution/android/app/generated/res/pngs/debug
+pvallet.com.github.hello_sdl2.app-resValues-6 /home/dante/Documentos/personal/Whisk3D/android/distribution/android/app/generated/res/resValues/debug
+pvallet.com.github.hello_sdl2.app-mergeDebugResources-7 /home/dante/Documentos/personal/Whisk3D/android/distribution/android/app/intermediates/incremental/debug/mergeDebugResources/merged.dir
+pvallet.com.github.hello_sdl2.app-mergeDebugResources-8 /home/dante/Documentos/personal/Whisk3D/android/distribution/android/app/intermediates/incremental/debug/mergeDebugResources/stripped.dir
+pvallet.com.github.hello_sdl2.app-debug-9 /home/dante/Documentos/personal/Whisk3D/android/distribution/android/app/intermediates/merged_res/debug/mergeDebugResources

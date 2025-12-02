@@ -1,0 +1,3175 @@
+The target system is: Android - 1 - aarch64
+The host system is: Linux - 6.8.0-87-generic - x86_64
+Compiling the C compiler identification source file "CMakeCCompilerId.c" succeeded.
+Compiler: /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/bin/clang 
+Build flags: -g;-DANDROID;-fdata-sections;-ffunction-sections;-funwind-tables;-fstack-protector-strong;-no-canonical-prefixes;-D_FORTIFY_SOURCE=2;-Wformat;-Werror=format-security;
+Id flags: -c;--target=aarch64-none-linux-android21 
+
+The output was:
+0
+
+
+Compilation of the C compiler identification source "CMakeCCompilerId.c" produced "CMakeCCompilerId.o"
+
+The C compiler identification is Clang, found in "/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/3.22.1/CompilerIdC/CMakeCCompilerId.o"
+
+Compiling the CXX compiler identification source file "CMakeCXXCompilerId.cpp" succeeded.
+Compiler: /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++ 
+Build flags: -g;-DANDROID;-fdata-sections;-ffunction-sections;-funwind-tables;-fstack-protector-strong;-no-canonical-prefixes;-D_FORTIFY_SOURCE=2;-Wformat;-Werror=format-security;;-std=c++11;-frtti;-fexceptions
+Id flags: -c;--target=aarch64-none-linux-android21 
+
+The output was:
+0
+
+
+Compilation of the CXX compiler identification source "CMakeCXXCompilerId.cpp" produced "CMakeCXXCompilerId.o"
+
+The CXX compiler identification is Clang, found in "/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/3.22.1/CompilerIdCXX/CMakeCXXCompilerId.o"
+
+Detecting C compiler ABI info compiled with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_212ee && [1/2] Building C object CMakeFiles/cmTC_212ee.dir/CMakeCCompilerABI.c.o
+Android (12027248, +pgo, +bolt, +lto, +mlgo, based on r522817) clang version 18.0.1 (https://android.googlesource.com/toolchain/llvm-project d8003a456d14a3deb8054cdaa529ffbf02d9b262)
+Target: aarch64-none-linux-android21
+Thread model: posix
+InstalledDir: /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/bin
+ (in-process)
+ "/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/bin/clang" -cc1 -triple aarch64-none-linux-android21 -emit-obj -mrelax-all -disable-free -clear-ast-before-backend -disable-llvm-verifier -discard-value-names -main-file-name CMakeCCompilerABI.c -mrelocation-model pic -pic-level 2 -pic-is-pie -mframe-pointer=non-leaf -ffp-contract=on -fno-rounding-math -mconstructor-aliases -funwind-tables=2 -target-cpu generic -target-feature +neon -target-feature +v8a -target-feature +fix-cortex-a53-835769 -target-abi aapcs -debug-info-kind=constructor -dwarf-version=4 -debugger-tuning=gdb -fdebug-compilation-dir=/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp -v -ffunction-sections -fdata-sections -fcoverage-compilation-dir=/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp -resource-dir /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18 -dependency-file CMakeFiles/cmTC_212ee.dir/CMakeCCompilerABI.c.o.d -MT CMakeFiles/cmTC_212ee.dir/CMakeCCompilerABI.c.o -sys-header-deps -D ANDROID -D _FORTIFY_SOURCE=2 -isysroot /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot -internal-isystem /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/include -internal-isystem /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/local/include -internal-externc-isystem /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/aarch64-linux-android -internal-externc-isystem /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/include -internal-externc-isystem /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include -Wformat -ferror-limit 19 -femulated-tls -stack-protector 2 -fno-signed-char -fgnuc-version=4.2.1 -target-feature +outline-atomics -target-feature -fmv -D__GCC_HAVE_DWARF2_CFI_ASM=1 -o CMakeFiles/cmTC_212ee.dir/CMakeCCompilerABI.c.o -x c /usr/share/cmake-3.22/Modules/CMakeCCompilerABI.c
+clang -cc1 version 18.0.1 based upon LLVM 18.0.1 default target x86_64-unknown-linux-gnu
+ignoring nonexistent directory "/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/local/include"
+ignoring nonexistent directory "/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/include"
+#include "..." search starts here:
+#include <...> search starts here:
+ /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/include
+ /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/aarch64-linux-android
+ /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include
+End of search list.
+[2/2] Linking C executable cmTC_212ee
+Android (12027248, +pgo, +bolt, +lto, +mlgo, based on r522817) clang version 18.0.1 (https://android.googlesource.com/toolchain/llvm-project d8003a456d14a3deb8054cdaa529ffbf02d9b262)
+Target: aarch64-none-linux-android21
+Thread model: posix
+InstalledDir: /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/bin
+ "/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/bin/ld.lld" --sysroot=/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot -EL --fix-cortex-a53-843419 -z now -z relro -z max-page-size=4096 --hash-style=both --eh-frame-hdr -m aarch64linux -pie -dynamic-linker /system/bin/linker64 -o cmTC_212ee /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/21/crtbegin_dynamic.o -L/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/lib/linux/aarch64 -L/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/21 -L/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android -L/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib --build-id=sha1 --no-rosegment --no-undefined-version --fatal-warnings --no-undefined CMakeFiles/cmTC_212ee.dir/CMakeCCompilerABI.c.o /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/lib/linux/libclang_rt.builtins-aarch64-android.a -l:libunwind.a -ldl -lc /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/lib/linux/libclang_rt.builtins-aarch64-android.a -l:libunwind.a -ldl /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/21/crtend_android.o
+
+
+
+Parsed C implicit include dir info from above output: rv=done
+  found start of include info
+  found start of implicit include info
+    add: [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/include]
+    add: [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/aarch64-linux-android]
+    add: [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include]
+  end of search list found
+  collapse include dir [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/include] ==> [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/include]
+  collapse include dir [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/aarch64-linux-android] ==> [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/aarch64-linux-android]
+  collapse include dir [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include] ==> [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include]
+  implicit include dirs: [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/include;/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/aarch64-linux-android;/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include]
+
+
+Parsed C implicit link information from above output:
+  link line regex: [^( *|.*[/\])(ld\.lld|CMAKE_LINK_STARTFILE-NOTFOUND|([^/\]+-)?ld|collect2)[^/\]*( |$)]
+  ignore line: [Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp]
+  ignore line: []
+  ignore line: [Run Build Command(s):/usr/bin/ninja cmTC_212ee && [1/2] Building C object CMakeFiles/cmTC_212ee.dir/CMakeCCompilerABI.c.o]
+  ignore line: [Android (12027248  +pgo  +bolt  +lto  +mlgo  based on r522817) clang version 18.0.1 (https://android.googlesource.com/toolchain/llvm-project d8003a456d14a3deb8054cdaa529ffbf02d9b262)]
+  ignore line: [Target: aarch64-none-linux-android21]
+  ignore line: [Thread model: posix]
+  ignore line: [InstalledDir: /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/bin]
+  ignore line: [ (in-process)]
+  ignore line: [ "/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/bin/clang" -cc1 -triple aarch64-none-linux-android21 -emit-obj -mrelax-all -disable-free -clear-ast-before-backend -disable-llvm-verifier -discard-value-names -main-file-name CMakeCCompilerABI.c -mrelocation-model pic -pic-level 2 -pic-is-pie -mframe-pointer=non-leaf -ffp-contract=on -fno-rounding-math -mconstructor-aliases -funwind-tables=2 -target-cpu generic -target-feature +neon -target-feature +v8a -target-feature +fix-cortex-a53-835769 -target-abi aapcs -debug-info-kind=constructor -dwarf-version=4 -debugger-tuning=gdb -fdebug-compilation-dir=/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp -v -ffunction-sections -fdata-sections -fcoverage-compilation-dir=/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp -resource-dir /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18 -dependency-file CMakeFiles/cmTC_212ee.dir/CMakeCCompilerABI.c.o.d -MT CMakeFiles/cmTC_212ee.dir/CMakeCCompilerABI.c.o -sys-header-deps -D ANDROID -D _FORTIFY_SOURCE=2 -isysroot /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot -internal-isystem /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/include -internal-isystem /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/local/include -internal-externc-isystem /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/aarch64-linux-android -internal-externc-isystem /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/include -internal-externc-isystem /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include -Wformat -ferror-limit 19 -femulated-tls -stack-protector 2 -fno-signed-char -fgnuc-version=4.2.1 -target-feature +outline-atomics -target-feature -fmv -D__GCC_HAVE_DWARF2_CFI_ASM=1 -o CMakeFiles/cmTC_212ee.dir/CMakeCCompilerABI.c.o -x c /usr/share/cmake-3.22/Modules/CMakeCCompilerABI.c]
+  ignore line: [clang -cc1 version 18.0.1 based upon LLVM 18.0.1 default target x86_64-unknown-linux-gnu]
+  ignore line: [ignoring nonexistent directory "/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/local/include"]
+  ignore line: [ignoring nonexistent directory "/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/include"]
+  ignore line: [#include "..." search starts here:]
+  ignore line: [#include <...> search starts here:]
+  ignore line: [ /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/include]
+  ignore line: [ /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/aarch64-linux-android]
+  ignore line: [ /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include]
+  ignore line: [End of search list.]
+  ignore line: [[2/2] Linking C executable cmTC_212ee]
+  ignore line: [Android (12027248  +pgo  +bolt  +lto  +mlgo  based on r522817) clang version 18.0.1 (https://android.googlesource.com/toolchain/llvm-project d8003a456d14a3deb8054cdaa529ffbf02d9b262)]
+  ignore line: [Target: aarch64-none-linux-android21]
+  ignore line: [Thread model: posix]
+  ignore line: [InstalledDir: /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/bin]
+  link line: [ "/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/bin/ld.lld" --sysroot=/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot -EL --fix-cortex-a53-843419 -z now -z relro -z max-page-size=4096 --hash-style=both --eh-frame-hdr -m aarch64linux -pie -dynamic-linker /system/bin/linker64 -o cmTC_212ee /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/21/crtbegin_dynamic.o -L/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/lib/linux/aarch64 -L/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/21 -L/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android -L/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib --build-id=sha1 --no-rosegment --no-undefined-version --fatal-warnings --no-undefined CMakeFiles/cmTC_212ee.dir/CMakeCCompilerABI.c.o /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/lib/linux/libclang_rt.builtins-aarch64-android.a -l:libunwind.a -ldl -lc /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/lib/linux/libclang_rt.builtins-aarch64-android.a -l:libunwind.a -ldl /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/21/crtend_android.o]
+    arg [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/bin/ld.lld] ==> ignore
+    arg [--sysroot=/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot] ==> ignore
+    arg [-EL] ==> ignore
+    arg [--fix-cortex-a53-843419] ==> ignore
+    arg [-znow] ==> ignore
+    arg [-zrelro] ==> ignore
+    arg [-zmax-page-size=4096] ==> ignore
+    arg [--hash-style=both] ==> ignore
+    arg [--eh-frame-hdr] ==> ignore
+    arg [-m] ==> ignore
+    arg [aarch64linux] ==> ignore
+    arg [-pie] ==> ignore
+    arg [-dynamic-linker] ==> ignore
+    arg [/system/bin/linker64] ==> ignore
+    arg [-o] ==> ignore
+    arg [cmTC_212ee] ==> ignore
+    arg [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/21/crtbegin_dynamic.o] ==> obj [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/21/crtbegin_dynamic.o]
+    arg [-L/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/lib/linux/aarch64] ==> dir [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/lib/linux/aarch64]
+    arg [-L/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/21] ==> dir [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/21]
+    arg [-L/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android] ==> dir [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android]
+    arg [-L/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib] ==> dir [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib]
+    arg [--build-id=sha1] ==> ignore
+    arg [--no-rosegment] ==> ignore
+    arg [--no-undefined-version] ==> ignore
+    arg [--fatal-warnings] ==> ignore
+    arg [--no-undefined] ==> ignore
+    arg [CMakeFiles/cmTC_212ee.dir/CMakeCCompilerABI.c.o] ==> ignore
+    arg [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/lib/linux/libclang_rt.builtins-aarch64-android.a] ==> lib [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/lib/linux/libclang_rt.builtins-aarch64-android.a]
+    arg [-l:libunwind.a] ==> lib [-l:libunwind.a]
+    arg [-ldl] ==> lib [dl]
+    arg [-lc] ==> lib [c]
+    arg [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/lib/linux/libclang_rt.builtins-aarch64-android.a] ==> lib [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/lib/linux/libclang_rt.builtins-aarch64-android.a]
+    arg [-l:libunwind.a] ==> lib [-l:libunwind.a]
+    arg [-ldl] ==> lib [dl]
+    arg [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/21/crtend_android.o] ==> obj [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/21/crtend_android.o]
+  remove lib [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/lib/linux/libclang_rt.builtins-aarch64-android.a]
+  remove lib [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/lib/linux/libclang_rt.builtins-aarch64-android.a]
+  collapse library dir [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/lib/linux/aarch64] ==> [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/lib/linux/aarch64]
+  collapse library dir [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/21] ==> [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/21]
+  collapse library dir [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android] ==> [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android]
+  collapse library dir [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib] ==> [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib]
+  implicit libs: [-l:libunwind.a;dl;c;-l:libunwind.a;dl]
+  implicit objs: [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/21/crtbegin_dynamic.o;/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/21/crtend_android.o]
+  implicit dirs: [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/lib/linux/aarch64;/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/21;/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android;/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib]
+  implicit fwks: []
+
+
+Detecting CXX compiler ABI info compiled with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_0d735 && [1/2] Building CXX object CMakeFiles/cmTC_0d735.dir/CMakeCXXCompilerABI.cpp.o
+Android (12027248, +pgo, +bolt, +lto, +mlgo, based on r522817) clang version 18.0.1 (https://android.googlesource.com/toolchain/llvm-project d8003a456d14a3deb8054cdaa529ffbf02d9b262)
+Target: aarch64-none-linux-android21
+Thread model: posix
+InstalledDir: /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/bin
+ (in-process)
+ "/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++" -cc1 -triple aarch64-none-linux-android21 -emit-obj -mrelax-all -disable-free -clear-ast-before-backend -disable-llvm-verifier -discard-value-names -main-file-name CMakeCXXCompilerABI.cpp -mrelocation-model pic -pic-level 2 -pic-is-pie -mframe-pointer=non-leaf -ffp-contract=on -fno-rounding-math -mconstructor-aliases -funwind-tables=2 -target-cpu generic -target-feature +neon -target-feature +v8a -target-feature +fix-cortex-a53-835769 -target-abi aapcs -debug-info-kind=constructor -dwarf-version=4 -debugger-tuning=gdb -fdebug-compilation-dir=/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp -v -ffunction-sections -fdata-sections -fcoverage-compilation-dir=/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp -resource-dir /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18 -dependency-file CMakeFiles/cmTC_0d735.dir/CMakeCXXCompilerABI.cpp.o.d -MT CMakeFiles/cmTC_0d735.dir/CMakeCXXCompilerABI.cpp.o -sys-header-deps -D ANDROID -D _FORTIFY_SOURCE=2 -isysroot /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot -internal-isystem /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1 -internal-isystem /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/include -internal-isystem /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/local/include -internal-externc-isystem /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/aarch64-linux-android -internal-externc-isystem /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/include -internal-externc-isystem /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include -Wformat -std=c++11 -fdeprecated-macro -ferror-limit 19 -femulated-tls -stack-protector 2 -fno-signed-char -fgnuc-version=4.2.1 -fcxx-exceptions -fexceptions -target-feature +outline-atomics -target-feature -fmv -D__GCC_HAVE_DWARF2_CFI_ASM=1 -o CMakeFiles/cmTC_0d735.dir/CMakeCXXCompilerABI.cpp.o -x c++ /usr/share/cmake-3.22/Modules/CMakeCXXCompilerABI.cpp
+clang -cc1 version 18.0.1 based upon LLVM 18.0.1 default target x86_64-unknown-linux-gnu
+ignoring nonexistent directory "/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/local/include"
+ignoring nonexistent directory "/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/include"
+#include "..." search starts here:
+#include <...> search starts here:
+ /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1
+ /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/include
+ /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/aarch64-linux-android
+ /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include
+End of search list.
+[2/2] Linking CXX executable cmTC_0d735
+Android (12027248, +pgo, +bolt, +lto, +mlgo, based on r522817) clang version 18.0.1 (https://android.googlesource.com/toolchain/llvm-project d8003a456d14a3deb8054cdaa529ffbf02d9b262)
+Target: aarch64-none-linux-android21
+Thread model: posix
+InstalledDir: /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/bin
+ "/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/bin/ld.lld" --sysroot=/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot -EL --fix-cortex-a53-843419 -z now -z relro -z max-page-size=4096 --hash-style=both --eh-frame-hdr -m aarch64linux -pie -dynamic-linker /system/bin/linker64 -o cmTC_0d735 /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/21/crtbegin_dynamic.o -L/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/lib/linux/aarch64 -L/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/21 -L/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android -L/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib --build-id=sha1 --no-rosegment --no-undefined-version --fatal-warnings --no-undefined CMakeFiles/cmTC_0d735.dir/CMakeCXXCompilerABI.cpp.o -Bstatic -lc++ -Bdynamic -lm /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/lib/linux/libclang_rt.builtins-aarch64-android.a -l:libunwind.a -ldl -lc /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/lib/linux/libclang_rt.builtins-aarch64-android.a -l:libunwind.a -ldl /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/21/crtend_android.o
+
+
+
+Parsed CXX implicit include dir info from above output: rv=done
+  found start of include info
+  found start of implicit include info
+    add: [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1]
+    add: [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/include]
+    add: [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/aarch64-linux-android]
+    add: [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include]
+  end of search list found
+  collapse include dir [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1] ==> [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1]
+  collapse include dir [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/include] ==> [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/include]
+  collapse include dir [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/aarch64-linux-android] ==> [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/aarch64-linux-android]
+  collapse include dir [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include] ==> [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include]
+  implicit include dirs: [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1;/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/include;/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/aarch64-linux-android;/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include]
+
+
+Parsed CXX implicit link information from above output:
+  link line regex: [^( *|.*[/\])(ld\.lld|CMAKE_LINK_STARTFILE-NOTFOUND|([^/\]+-)?ld|collect2)[^/\]*( |$)]
+  ignore line: [Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp]
+  ignore line: []
+  ignore line: [Run Build Command(s):/usr/bin/ninja cmTC_0d735 && [1/2] Building CXX object CMakeFiles/cmTC_0d735.dir/CMakeCXXCompilerABI.cpp.o]
+  ignore line: [Android (12027248  +pgo  +bolt  +lto  +mlgo  based on r522817) clang version 18.0.1 (https://android.googlesource.com/toolchain/llvm-project d8003a456d14a3deb8054cdaa529ffbf02d9b262)]
+  ignore line: [Target: aarch64-none-linux-android21]
+  ignore line: [Thread model: posix]
+  ignore line: [InstalledDir: /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/bin]
+  ignore line: [ (in-process)]
+  ignore line: [ "/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++" -cc1 -triple aarch64-none-linux-android21 -emit-obj -mrelax-all -disable-free -clear-ast-before-backend -disable-llvm-verifier -discard-value-names -main-file-name CMakeCXXCompilerABI.cpp -mrelocation-model pic -pic-level 2 -pic-is-pie -mframe-pointer=non-leaf -ffp-contract=on -fno-rounding-math -mconstructor-aliases -funwind-tables=2 -target-cpu generic -target-feature +neon -target-feature +v8a -target-feature +fix-cortex-a53-835769 -target-abi aapcs -debug-info-kind=constructor -dwarf-version=4 -debugger-tuning=gdb -fdebug-compilation-dir=/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp -v -ffunction-sections -fdata-sections -fcoverage-compilation-dir=/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp -resource-dir /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18 -dependency-file CMakeFiles/cmTC_0d735.dir/CMakeCXXCompilerABI.cpp.o.d -MT CMakeFiles/cmTC_0d735.dir/CMakeCXXCompilerABI.cpp.o -sys-header-deps -D ANDROID -D _FORTIFY_SOURCE=2 -isysroot /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot -internal-isystem /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1 -internal-isystem /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/include -internal-isystem /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/local/include -internal-externc-isystem /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/aarch64-linux-android -internal-externc-isystem /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/include -internal-externc-isystem /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include -Wformat -std=c++11 -fdeprecated-macro -ferror-limit 19 -femulated-tls -stack-protector 2 -fno-signed-char -fgnuc-version=4.2.1 -fcxx-exceptions -fexceptions -target-feature +outline-atomics -target-feature -fmv -D__GCC_HAVE_DWARF2_CFI_ASM=1 -o CMakeFiles/cmTC_0d735.dir/CMakeCXXCompilerABI.cpp.o -x c++ /usr/share/cmake-3.22/Modules/CMakeCXXCompilerABI.cpp]
+  ignore line: [clang -cc1 version 18.0.1 based upon LLVM 18.0.1 default target x86_64-unknown-linux-gnu]
+  ignore line: [ignoring nonexistent directory "/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/local/include"]
+  ignore line: [ignoring nonexistent directory "/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/include"]
+  ignore line: [#include "..." search starts here:]
+  ignore line: [#include <...> search starts here:]
+  ignore line: [ /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1]
+  ignore line: [ /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/include]
+  ignore line: [ /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/aarch64-linux-android]
+  ignore line: [ /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include]
+  ignore line: [End of search list.]
+  ignore line: [[2/2] Linking CXX executable cmTC_0d735]
+  ignore line: [Android (12027248  +pgo  +bolt  +lto  +mlgo  based on r522817) clang version 18.0.1 (https://android.googlesource.com/toolchain/llvm-project d8003a456d14a3deb8054cdaa529ffbf02d9b262)]
+  ignore line: [Target: aarch64-none-linux-android21]
+  ignore line: [Thread model: posix]
+  ignore line: [InstalledDir: /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/bin]
+  link line: [ "/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/bin/ld.lld" --sysroot=/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot -EL --fix-cortex-a53-843419 -z now -z relro -z max-page-size=4096 --hash-style=both --eh-frame-hdr -m aarch64linux -pie -dynamic-linker /system/bin/linker64 -o cmTC_0d735 /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/21/crtbegin_dynamic.o -L/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/lib/linux/aarch64 -L/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/21 -L/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android -L/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib --build-id=sha1 --no-rosegment --no-undefined-version --fatal-warnings --no-undefined CMakeFiles/cmTC_0d735.dir/CMakeCXXCompilerABI.cpp.o -Bstatic -lc++ -Bdynamic -lm /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/lib/linux/libclang_rt.builtins-aarch64-android.a -l:libunwind.a -ldl -lc /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/lib/linux/libclang_rt.builtins-aarch64-android.a -l:libunwind.a -ldl /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/21/crtend_android.o]
+    arg [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/bin/ld.lld] ==> ignore
+    arg [--sysroot=/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot] ==> ignore
+    arg [-EL] ==> ignore
+    arg [--fix-cortex-a53-843419] ==> ignore
+    arg [-znow] ==> ignore
+    arg [-zrelro] ==> ignore
+    arg [-zmax-page-size=4096] ==> ignore
+    arg [--hash-style=both] ==> ignore
+    arg [--eh-frame-hdr] ==> ignore
+    arg [-m] ==> ignore
+    arg [aarch64linux] ==> ignore
+    arg [-pie] ==> ignore
+    arg [-dynamic-linker] ==> ignore
+    arg [/system/bin/linker64] ==> ignore
+    arg [-o] ==> ignore
+    arg [cmTC_0d735] ==> ignore
+    arg [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/21/crtbegin_dynamic.o] ==> obj [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/21/crtbegin_dynamic.o]
+    arg [-L/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/lib/linux/aarch64] ==> dir [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/lib/linux/aarch64]
+    arg [-L/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/21] ==> dir [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/21]
+    arg [-L/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android] ==> dir [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android]
+    arg [-L/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib] ==> dir [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib]
+    arg [--build-id=sha1] ==> ignore
+    arg [--no-rosegment] ==> ignore
+    arg [--no-undefined-version] ==> ignore
+    arg [--fatal-warnings] ==> ignore
+    arg [--no-undefined] ==> ignore
+    arg [CMakeFiles/cmTC_0d735.dir/CMakeCXXCompilerABI.cpp.o] ==> ignore
+    arg [-Bstatic] ==> search static
+    arg [-lc++] ==> lib [c++]
+    arg [-Bdynamic] ==> search dynamic
+    arg [-lm] ==> lib [m]
+    arg [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/lib/linux/libclang_rt.builtins-aarch64-android.a] ==> lib [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/lib/linux/libclang_rt.builtins-aarch64-android.a]
+    arg [-l:libunwind.a] ==> lib [-l:libunwind.a]
+    arg [-ldl] ==> lib [dl]
+    arg [-lc] ==> lib [c]
+    arg [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/lib/linux/libclang_rt.builtins-aarch64-android.a] ==> lib [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/lib/linux/libclang_rt.builtins-aarch64-android.a]
+    arg [-l:libunwind.a] ==> lib [-l:libunwind.a]
+    arg [-ldl] ==> lib [dl]
+    arg [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/21/crtend_android.o] ==> obj [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/21/crtend_android.o]
+  remove lib [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/lib/linux/libclang_rt.builtins-aarch64-android.a]
+  remove lib [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/lib/linux/libclang_rt.builtins-aarch64-android.a]
+  collapse library dir [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/lib/linux/aarch64] ==> [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/lib/linux/aarch64]
+  collapse library dir [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/21] ==> [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/21]
+  collapse library dir [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android] ==> [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android]
+  collapse library dir [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib] ==> [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib]
+  implicit libs: [c++;m;-l:libunwind.a;dl;c;-l:libunwind.a;dl]
+  implicit objs: [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/21/crtbegin_dynamic.o;/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/21/crtend_android.o]
+  implicit dirs: [/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/lib/linux/aarch64;/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/21;/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android;/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib]
+  implicit fwks: []
+
+
+Performing C SOURCE FILE Test CHECK_CPU_ARCHITECTURE_ARM64 succeeded with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_05a10 && [1/2] Building C object CMakeFiles/cmTC_05a10.dir/src.c.o
+[2/2] Linking C executable cmTC_05a10
+
+
+Source file was:
+
+int main(int argc, char *argv[]) {
+#if defined(__aarch64__) || defined(_M_ARM64)
+  return 0;
+#else
+  choke
+#endif
+}
+
+Performing C SOURCE FILE Test HAVE_GCC_WALL succeeded with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_7631b && [1/2] Building C object CMakeFiles/cmTC_7631b.dir/src.c.o
+[2/2] Linking C executable cmTC_7631b
+
+
+Source file was:
+int main(void) { return 0; }
+Performing C SOURCE FILE Test HAVE_GCC_WUNDEF succeeded with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_d0a64 && [1/2] Building C object CMakeFiles/cmTC_d0a64.dir/src.c.o
+[2/2] Linking C executable cmTC_d0a64
+
+
+Source file was:
+int main(void) { return 0; }
+Performing C SOURCE FILE Test HAVE_GCC_NO_STRICT_ALIASING succeeded with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_6edcc && [1/2] Building C object CMakeFiles/cmTC_6edcc.dir/src.c.o
+[2/2] Linking C executable cmTC_6edcc
+
+
+Source file was:
+int main(void) { return 0; }
+Performing C SOURCE FILE Test HAVE_GCC_WDOCUMENTATION succeeded with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_b1d93 && [1/2] Building C object CMakeFiles/cmTC_b1d93.dir/src.c.o
+[2/2] Linking C executable cmTC_b1d93
+
+
+Source file was:
+int main(void) { return 0; }
+Performing C SOURCE FILE Test HAVE_GCC_WDOCUMENTATION_UNKNOWN_COMMAND succeeded with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_c0f20 && [1/2] Building C object CMakeFiles/cmTC_c0f20.dir/src.c.o
+[2/2] Linking C executable cmTC_c0f20
+
+
+Source file was:
+int main(void) { return 0; }
+Performing C SOURCE FILE Test HAVE_GCC_COMMENT_BLOCK_COMMANDS succeeded with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_eaa73 && [1/2] Building C object CMakeFiles/cmTC_eaa73.dir/src.c.o
+[2/2] Linking C executable cmTC_eaa73
+
+
+Source file was:
+int main(void) { return 0; }
+Performing C SOURCE FILE Test HAVE_GCC_WDECLARATION_AFTER_STATEMENT succeeded with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_ad120 && [1/2] Building C object CMakeFiles/cmTC_ad120.dir/src.c.o
+[2/2] Linking C executable cmTC_ad120
+
+
+Source file was:
+int main(void) { return 0; }
+Performing C SOURCE FILE Test HAVE_GCC_ATOMICS succeeded with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_54fd6 && [1/2] Building C object CMakeFiles/cmTC_54fd6.dir/src.c.o
+[2/2] Linking C executable cmTC_54fd6
+
+
+Source file was:
+int main(int argc, char **argv) {
+        int a;
+        void *x, *y, *z;
+        __sync_lock_test_and_set(&a, 4);
+        __sync_lock_test_and_set(&x, y);
+        __sync_fetch_and_add(&a, 1);
+        __sync_bool_compare_and_swap(&a, 5, 10);
+        __sync_bool_compare_and_swap(&x, y, z);
+        return 0; }
+Performing C SOURCE FILE Test HAVE_GCC_FVISIBILITY succeeded with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_1edbb && [1/2] Building C object CMakeFiles/cmTC_1edbb.dir/src.c.o
+[2/2] Linking C executable cmTC_1edbb
+
+
+Source file was:
+
+      #if !defined(__GNUC__) || __GNUC__ < 4
+      #error SDL only uses visibility attributes in GCC 4 or newer
+      #endif
+      int main(int argc, char **argv) { return 0; }
+Performing C SOURCE FILE Test HAVE_GCC_WSHADOW succeeded with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_76740 && [1/2] Building C object CMakeFiles/cmTC_76740.dir/src.c.o
+[2/2] Linking C executable cmTC_76740
+
+
+Source file was:
+int main(void) { return 0; }
+Performing C SOURCE FILE Test HAVE_GCC_WUNUSED_LOCAL_TYPEDEFS succeeded with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_7902c && [1/2] Building C object CMakeFiles/cmTC_7902c.dir/src.c.o
+[2/2] Linking C executable cmTC_7902c
+
+
+Source file was:
+int main(void) { return 0; }
+Performing C SOURCE FILE Test HAVE_NO_UNDEFINED succeeded with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_8347b && [1/2] Building C object CMakeFiles/cmTC_8347b.dir/src.c.o
+clang: warning: -Wl,--no-undefined: 'linker' input unused [-Wunused-command-line-argument]
+[2/2] Linking C executable cmTC_8347b
+
+
+Source file was:
+int main(void) { return 0; }
+Determining if the include file ctype.h exists passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_f31ad && [1/2] Building C object CMakeFiles/cmTC_f31ad.dir/CheckIncludeFile.c.o
+[2/2] Linking C executable cmTC_f31ad
+
+
+
+Determining if the include file float.h exists passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_78e67 && [1/2] Building C object CMakeFiles/cmTC_78e67.dir/CheckIncludeFile.c.o
+[2/2] Linking C executable cmTC_78e67
+
+
+
+Determining if the include file iconv.h exists passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_b5de8 && [1/2] Building C object CMakeFiles/cmTC_b5de8.dir/CheckIncludeFile.c.o
+[2/2] Linking C executable cmTC_b5de8
+
+
+
+Determining if the include file inttypes.h exists passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_bbd82 && [1/2] Building C object CMakeFiles/cmTC_bbd82.dir/CheckIncludeFile.c.o
+[2/2] Linking C executable cmTC_bbd82
+
+
+
+Determining if the include file limits.h exists passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_92302 && [1/2] Building C object CMakeFiles/cmTC_92302.dir/CheckIncludeFile.c.o
+[2/2] Linking C executable cmTC_92302
+
+
+
+Determining if the include file malloc.h exists passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_b915e && [1/2] Building C object CMakeFiles/cmTC_b915e.dir/CheckIncludeFile.c.o
+[2/2] Linking C executable cmTC_b915e
+
+
+
+Determining if the include file math.h exists passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_09e3c && [1/2] Building C object CMakeFiles/cmTC_09e3c.dir/CheckIncludeFile.c.o
+[2/2] Linking C executable cmTC_09e3c
+
+
+
+Determining if the include file memory.h exists passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_d86a5 && [1/2] Building C object CMakeFiles/cmTC_d86a5.dir/CheckIncludeFile.c.o
+[2/2] Linking C executable cmTC_d86a5
+
+
+
+Determining if the include file signal.h exists passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_12d5c && [1/2] Building C object CMakeFiles/cmTC_12d5c.dir/CheckIncludeFile.c.o
+[2/2] Linking C executable cmTC_12d5c
+
+
+
+Determining if the include file stdarg.h exists passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_fb412 && [1/2] Building C object CMakeFiles/cmTC_fb412.dir/CheckIncludeFile.c.o
+[2/2] Linking C executable cmTC_fb412
+
+
+
+Determining if the include file stddef.h exists passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_efe0e && [1/2] Building C object CMakeFiles/cmTC_efe0e.dir/CheckIncludeFile.c.o
+[2/2] Linking C executable cmTC_efe0e
+
+
+
+Determining if the include file stdint.h exists passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_09393 && [1/2] Building C object CMakeFiles/cmTC_09393.dir/CheckIncludeFile.c.o
+[2/2] Linking C executable cmTC_09393
+
+
+
+Determining if the include file stdio.h exists passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_92da0 && [1/2] Building C object CMakeFiles/cmTC_92da0.dir/CheckIncludeFile.c.o
+[2/2] Linking C executable cmTC_92da0
+
+
+
+Determining if the include file stdlib.h exists passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_3d299 && [1/2] Building C object CMakeFiles/cmTC_3d299.dir/CheckIncludeFile.c.o
+[2/2] Linking C executable cmTC_3d299
+
+
+
+Determining if the include file string.h exists passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_9f22d && [1/2] Building C object CMakeFiles/cmTC_9f22d.dir/CheckIncludeFile.c.o
+[2/2] Linking C executable cmTC_9f22d
+
+
+
+Determining if the include file strings.h exists passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_e93ff && [1/2] Building C object CMakeFiles/cmTC_e93ff.dir/CheckIncludeFile.c.o
+[2/2] Linking C executable cmTC_e93ff
+
+
+
+Determining if the include file sys/types.h exists passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_10c2d && [1/2] Building C object CMakeFiles/cmTC_10c2d.dir/CheckIncludeFile.c.o
+[2/2] Linking C executable cmTC_10c2d
+
+
+
+Determining if the include file wchar.h exists passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_7faeb && [1/2] Building C object CMakeFiles/cmTC_7faeb.dir/CheckIncludeFile.c.o
+[2/2] Linking C executable cmTC_7faeb
+
+
+
+Determining if files stddef.h;stdarg.h;stdlib.h;string.h;stdio.h;wchar.h;float.h exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_2923e && [1/2] Building C object CMakeFiles/cmTC_2923e.dir/STDC_HEADERS.c.o
+[2/2] Linking C executable cmTC_2923e
+
+
+
+Determining if the M_PI exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_ea65f && [1/2] Building C object CMakeFiles/cmTC_ea65f.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_ea65f
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <math.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef M_PI
+  return ((int*)(&M_PI))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Performing C SOURCE FILE Test HAVE_MPROTECT succeeded with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_d59d0 && [1/2] Building C object CMakeFiles/cmTC_d59d0.dir/src.c.o
+[2/2] Linking C executable cmTC_d59d0
+
+
+Source file was:
+#include <sys/types.h>
+                             #include <sys/mman.h>
+                             int main(void) { return 0; }
+Determining if the strtod exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_06263 && [1/2] Building C object CMakeFiles/cmTC_06263.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_06263
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <wchar.h>
+#include <float.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef strtod
+  return ((int*)(&strtod))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the malloc exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_9b32d && [1/2] Building C object CMakeFiles/cmTC_9b32d.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_9b32d
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <wchar.h>
+#include <float.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef malloc
+  return ((int*)(&malloc))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the calloc exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_ad437 && [1/2] Building C object CMakeFiles/cmTC_ad437.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_ad437
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <wchar.h>
+#include <float.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef calloc
+  return ((int*)(&calloc))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the realloc exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_e8e79 && [1/2] Building C object CMakeFiles/cmTC_e8e79.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_e8e79
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <wchar.h>
+#include <float.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef realloc
+  return ((int*)(&realloc))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the free exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_c3d85 && [1/2] Building C object CMakeFiles/cmTC_c3d85.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_c3d85
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <wchar.h>
+#include <float.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef free
+  return ((int*)(&free))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the getenv exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_66d35 && [1/2] Building C object CMakeFiles/cmTC_66d35.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_66d35
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <wchar.h>
+#include <float.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef getenv
+  return ((int*)(&getenv))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the setenv exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_f6e68 && [1/2] Building C object CMakeFiles/cmTC_f6e68.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_f6e68
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <wchar.h>
+#include <float.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef setenv
+  return ((int*)(&setenv))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the putenv exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_d893e && [1/2] Building C object CMakeFiles/cmTC_d893e.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_d893e
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <wchar.h>
+#include <float.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef putenv
+  return ((int*)(&putenv))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the unsetenv exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_0696e && [1/2] Building C object CMakeFiles/cmTC_0696e.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_0696e
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <wchar.h>
+#include <float.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef unsetenv
+  return ((int*)(&unsetenv))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the bsearch exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_ae8d1 && [1/2] Building C object CMakeFiles/cmTC_ae8d1.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_ae8d1
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <wchar.h>
+#include <float.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef bsearch
+  return ((int*)(&bsearch))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the qsort exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_b1268 && [1/2] Building C object CMakeFiles/cmTC_b1268.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_b1268
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <wchar.h>
+#include <float.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef qsort
+  return ((int*)(&qsort))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the abs exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_611b7 && [1/2] Building C object CMakeFiles/cmTC_611b7.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_611b7
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <wchar.h>
+#include <float.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef abs
+  return ((int*)(&abs))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the bcopy exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_64b97 && [1/2] Building C object CMakeFiles/cmTC_64b97.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_64b97
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <wchar.h>
+#include <float.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef bcopy
+  return ((int*)(&bcopy))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the memset exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_dac2d && [1/2] Building C object CMakeFiles/cmTC_dac2d.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_dac2d
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <wchar.h>
+#include <float.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef memset
+  return ((int*)(&memset))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the memcpy exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_3c02c && [1/2] Building C object CMakeFiles/cmTC_3c02c.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_3c02c
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <wchar.h>
+#include <float.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef memcpy
+  return ((int*)(&memcpy))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the memmove exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_3dbb6 && [1/2] Building C object CMakeFiles/cmTC_3dbb6.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_3dbb6
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <wchar.h>
+#include <float.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef memmove
+  return ((int*)(&memmove))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the memcmp exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_7da46 && [1/2] Building C object CMakeFiles/cmTC_7da46.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_7da46
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <wchar.h>
+#include <float.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef memcmp
+  return ((int*)(&memcmp))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the strlen exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_e856c && [1/2] Building C object CMakeFiles/cmTC_e856c.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_e856c
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <wchar.h>
+#include <float.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef strlen
+  return ((int*)(&strlen))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the strlcpy exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_bee3b && [1/2] Building C object CMakeFiles/cmTC_bee3b.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_bee3b
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <wchar.h>
+#include <float.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef strlcpy
+  return ((int*)(&strlcpy))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the strlcat exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_74985 && [1/2] Building C object CMakeFiles/cmTC_74985.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_74985
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <wchar.h>
+#include <float.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef strlcat
+  return ((int*)(&strlcat))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the strchr exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_7a243 && [1/2] Building C object CMakeFiles/cmTC_7a243.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_7a243
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <wchar.h>
+#include <float.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef strchr
+  return ((int*)(&strchr))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the strrchr exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_54cf9 && [1/2] Building C object CMakeFiles/cmTC_54cf9.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_54cf9
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <wchar.h>
+#include <float.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef strrchr
+  return ((int*)(&strrchr))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the strstr exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_78ca7 && [1/2] Building C object CMakeFiles/cmTC_78ca7.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_78ca7
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <wchar.h>
+#include <float.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef strstr
+  return ((int*)(&strstr))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the strtok_r exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_8a1fa && [1/2] Building C object CMakeFiles/cmTC_8a1fa.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_8a1fa
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <wchar.h>
+#include <float.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef strtok_r
+  return ((int*)(&strtok_r))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the strtol exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_65e9c && [1/2] Building C object CMakeFiles/cmTC_65e9c.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_65e9c
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <wchar.h>
+#include <float.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef strtol
+  return ((int*)(&strtol))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the strtoul exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_bf41b && [1/2] Building C object CMakeFiles/cmTC_bf41b.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_bf41b
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <wchar.h>
+#include <float.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef strtoul
+  return ((int*)(&strtoul))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the strtoll exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_a880c && [1/2] Building C object CMakeFiles/cmTC_a880c.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_a880c
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <wchar.h>
+#include <float.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef strtoll
+  return ((int*)(&strtoll))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the strtoull exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_3d351 && [1/2] Building C object CMakeFiles/cmTC_3d351.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_3d351
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <wchar.h>
+#include <float.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef strtoull
+  return ((int*)(&strtoull))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the atoi exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_1ed87 && [1/2] Building C object CMakeFiles/cmTC_1ed87.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_1ed87
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <wchar.h>
+#include <float.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef atoi
+  return ((int*)(&atoi))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the atof exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_75835 && [1/2] Building C object CMakeFiles/cmTC_75835.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_75835
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <wchar.h>
+#include <float.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef atof
+  return ((int*)(&atof))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the strcmp exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_47743 && [1/2] Building C object CMakeFiles/cmTC_47743.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_47743
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <wchar.h>
+#include <float.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef strcmp
+  return ((int*)(&strcmp))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the strncmp exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_a428f && [1/2] Building C object CMakeFiles/cmTC_a428f.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_a428f
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <wchar.h>
+#include <float.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef strncmp
+  return ((int*)(&strncmp))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the strcasecmp exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_96762 && [1/2] Building C object CMakeFiles/cmTC_96762.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_96762
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <wchar.h>
+#include <float.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef strcasecmp
+  return ((int*)(&strcasecmp))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the strncasecmp exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_01821 && [1/2] Building C object CMakeFiles/cmTC_01821.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_01821
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <wchar.h>
+#include <float.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef strncasecmp
+  return ((int*)(&strncasecmp))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the strcasestr exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_ea240 && [1/2] Building C object CMakeFiles/cmTC_ea240.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_ea240
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <wchar.h>
+#include <float.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef strcasestr
+  return ((int*)(&strcasestr))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the wcscmp exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_11633 && [1/2] Building C object CMakeFiles/cmTC_11633.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_11633
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <wchar.h>
+#include <float.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef wcscmp
+  return ((int*)(&wcscmp))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the wcsdup exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_52467 && [1/2] Building C object CMakeFiles/cmTC_52467.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_52467
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <wchar.h>
+#include <float.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef wcsdup
+  return ((int*)(&wcsdup))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the wcslcat exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_6b268 && [1/2] Building C object CMakeFiles/cmTC_6b268.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_6b268
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <wchar.h>
+#include <float.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef wcslcat
+  return ((int*)(&wcslcat))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the wcslcpy exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_0bb9d && [1/2] Building C object CMakeFiles/cmTC_0bb9d.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_0bb9d
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <wchar.h>
+#include <float.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef wcslcpy
+  return ((int*)(&wcslcpy))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the wcslen exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_0c3d9 && [1/2] Building C object CMakeFiles/cmTC_0c3d9.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_0c3d9
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <wchar.h>
+#include <float.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef wcslen
+  return ((int*)(&wcslen))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the wcsncmp exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_35870 && [1/2] Building C object CMakeFiles/cmTC_35870.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_35870
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <wchar.h>
+#include <float.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef wcsncmp
+  return ((int*)(&wcsncmp))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the wcsstr exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_712e4 && [1/2] Building C object CMakeFiles/cmTC_712e4.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_712e4
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <wchar.h>
+#include <float.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef wcsstr
+  return ((int*)(&wcsstr))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the wcscasecmp exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_6472d && [1/2] Building C object CMakeFiles/cmTC_6472d.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_6472d
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <wchar.h>
+#include <float.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef wcscasecmp
+  return ((int*)(&wcscasecmp))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the wcsncasecmp exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_99f2f && [1/2] Building C object CMakeFiles/cmTC_99f2f.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_99f2f
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <wchar.h>
+#include <float.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef wcsncasecmp
+  return ((int*)(&wcsncasecmp))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the sscanf exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_ca210 && [1/2] Building C object CMakeFiles/cmTC_ca210.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_ca210
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <wchar.h>
+#include <float.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef sscanf
+  return ((int*)(&sscanf))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the vsscanf exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_4973c && [1/2] Building C object CMakeFiles/cmTC_4973c.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_4973c
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <wchar.h>
+#include <float.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef vsscanf
+  return ((int*)(&vsscanf))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the vsnprintf exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_a3367 && [1/2] Building C object CMakeFiles/cmTC_a3367.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_a3367
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <wchar.h>
+#include <float.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef vsnprintf
+  return ((int*)(&vsnprintf))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the fseeko exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_abf4e && [1/2] Building C object CMakeFiles/cmTC_abf4e.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_abf4e
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <wchar.h>
+#include <float.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef fseeko
+  return ((int*)(&fseeko))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the _Exit exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_540bf && [1/2] Building C object CMakeFiles/cmTC_540bf.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_540bf
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <wchar.h>
+#include <float.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef _Exit
+  return ((int*)(&_Exit))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the sigaction exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_c3965 && [1/2] Building C object CMakeFiles/cmTC_c3965.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_c3965
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <signal.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef sigaction
+  return ((int*)(&sigaction))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the setjmp exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_2b1fd && [1/2] Building C object CMakeFiles/cmTC_2b1fd.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_2b1fd
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <setjmp.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef setjmp
+  return ((int*)(&setjmp))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the nanosleep exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_ba699 && [1/2] Building C object CMakeFiles/cmTC_ba699.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_ba699
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <time.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef nanosleep
+  return ((int*)(&nanosleep))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the sysconf exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_41d1c && [1/2] Building C object CMakeFiles/cmTC_41d1c.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_41d1c
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <unistd.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef sysconf
+  return ((int*)(&sysconf))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the getauxval exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_5c7cf && [1/2] Building C object CMakeFiles/cmTC_5c7cf.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_5c7cf
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <sys/auxv.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef getauxval
+  return ((int*)(&getauxval))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the poll exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_c492a && [1/2] Building C object CMakeFiles/cmTC_c492a.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_c492a
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <poll.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef poll
+  return ((int*)(&poll))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the posix_fallocate exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_6a54a && [1/2] Building C object CMakeFiles/cmTC_6a54a.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_6a54a
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <fcntl.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef posix_fallocate
+  return ((int*)(&posix_fallocate))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the function pow exists in the m passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_8ea38 && [1/2] Building C object CMakeFiles/cmTC_8ea38.dir/CheckFunctionExists.c.o
+/usr/share/cmake-3.22/Modules/CheckFunctionExists.c:7:3: warning: incompatible redeclaration of library function 'pow' [-Wincompatible-library-redeclaration]
+    7 |   CHECK_FUNCTION_EXISTS(void);
+      |   ^
+<command line>:3:31: note: expanded from macro 'CHECK_FUNCTION_EXISTS'
+    3 | #define CHECK_FUNCTION_EXISTS pow
+      |                               ^
+/usr/share/cmake-3.22/Modules/CheckFunctionExists.c:7:3: note: 'pow' is a builtin with type 'double (double, double)'
+<command line>:3:31: note: expanded from macro 'CHECK_FUNCTION_EXISTS'
+    3 | #define CHECK_FUNCTION_EXISTS pow
+      |                               ^
+1 warning generated.
+[2/2] Linking C executable cmTC_8ea38
+
+
+
+Determining if the atan exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_84e19 && [1/2] Building C object CMakeFiles/cmTC_84e19.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_84e19
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <math.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef atan
+  return ((int*)(&atan))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the atan2 exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_e0b9e && [1/2] Building C object CMakeFiles/cmTC_e0b9e.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_e0b9e
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <math.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef atan2
+  return ((int*)(&atan2))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the atanf exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_bcc02 && [1/2] Building C object CMakeFiles/cmTC_bcc02.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_bcc02
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <math.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef atanf
+  return ((int*)(&atanf))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the atan2f exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_3a08d && [1/2] Building C object CMakeFiles/cmTC_3a08d.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_3a08d
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <math.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef atan2f
+  return ((int*)(&atan2f))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the ceil exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_005fe && [1/2] Building C object CMakeFiles/cmTC_005fe.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_005fe
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <math.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef ceil
+  return ((int*)(&ceil))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the ceilf exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_48da2 && [1/2] Building C object CMakeFiles/cmTC_48da2.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_48da2
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <math.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef ceilf
+  return ((int*)(&ceilf))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the copysign exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_e5fc9 && [1/2] Building C object CMakeFiles/cmTC_e5fc9.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_e5fc9
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <math.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef copysign
+  return ((int*)(&copysign))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the copysignf exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_d1584 && [1/2] Building C object CMakeFiles/cmTC_d1584.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_d1584
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <math.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef copysignf
+  return ((int*)(&copysignf))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the cos exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_33532 && [1/2] Building C object CMakeFiles/cmTC_33532.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_33532
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <math.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef cos
+  return ((int*)(&cos))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the cosf exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_1164c && [1/2] Building C object CMakeFiles/cmTC_1164c.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_1164c
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <math.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef cosf
+  return ((int*)(&cosf))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the exp exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_29768 && [1/2] Building C object CMakeFiles/cmTC_29768.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_29768
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <math.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef exp
+  return ((int*)(&exp))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the expf exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_360d3 && [1/2] Building C object CMakeFiles/cmTC_360d3.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_360d3
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <math.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef expf
+  return ((int*)(&expf))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the fabs exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_596fe && [1/2] Building C object CMakeFiles/cmTC_596fe.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_596fe
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <math.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef fabs
+  return ((int*)(&fabs))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the fabsf exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_7cc51 && [1/2] Building C object CMakeFiles/cmTC_7cc51.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_7cc51
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <math.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef fabsf
+  return ((int*)(&fabsf))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the floor exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_d6580 && [1/2] Building C object CMakeFiles/cmTC_d6580.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_d6580
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <math.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef floor
+  return ((int*)(&floor))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the floorf exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_679c3 && [1/2] Building C object CMakeFiles/cmTC_679c3.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_679c3
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <math.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef floorf
+  return ((int*)(&floorf))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the fmod exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_360c2 && [1/2] Building C object CMakeFiles/cmTC_360c2.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_360c2
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <math.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef fmod
+  return ((int*)(&fmod))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the fmodf exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_ceadc && [1/2] Building C object CMakeFiles/cmTC_ceadc.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_ceadc
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <math.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef fmodf
+  return ((int*)(&fmodf))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the log exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_cd725 && [1/2] Building C object CMakeFiles/cmTC_cd725.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_cd725
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <math.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef log
+  return ((int*)(&log))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the logf exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_1d1e7 && [1/2] Building C object CMakeFiles/cmTC_1d1e7.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_1d1e7
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <math.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef logf
+  return ((int*)(&logf))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the log10 exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_32ef0 && [1/2] Building C object CMakeFiles/cmTC_32ef0.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_32ef0
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <math.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef log10
+  return ((int*)(&log10))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the log10f exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_935b4 && [1/2] Building C object CMakeFiles/cmTC_935b4.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_935b4
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <math.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef log10f
+  return ((int*)(&log10f))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the lround exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_4d831 && [1/2] Building C object CMakeFiles/cmTC_4d831.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_4d831
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <math.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef lround
+  return ((int*)(&lround))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the lroundf exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_b1c30 && [1/2] Building C object CMakeFiles/cmTC_b1c30.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_b1c30
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <math.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef lroundf
+  return ((int*)(&lroundf))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the pow exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_14bc3 && [1/2] Building C object CMakeFiles/cmTC_14bc3.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_14bc3
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <math.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef pow
+  return ((int*)(&pow))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the powf exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_b11e6 && [1/2] Building C object CMakeFiles/cmTC_b11e6.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_b11e6
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <math.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef powf
+  return ((int*)(&powf))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the round exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_a15fc && [1/2] Building C object CMakeFiles/cmTC_a15fc.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_a15fc
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <math.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef round
+  return ((int*)(&round))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the roundf exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_42f04 && [1/2] Building C object CMakeFiles/cmTC_42f04.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_42f04
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <math.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef roundf
+  return ((int*)(&roundf))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the scalbn exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_7b3dd && [1/2] Building C object CMakeFiles/cmTC_7b3dd.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_7b3dd
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <math.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef scalbn
+  return ((int*)(&scalbn))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the scalbnf exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_e1630 && [1/2] Building C object CMakeFiles/cmTC_e1630.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_e1630
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <math.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef scalbnf
+  return ((int*)(&scalbnf))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the sin exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_2ea64 && [1/2] Building C object CMakeFiles/cmTC_2ea64.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_2ea64
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <math.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef sin
+  return ((int*)(&sin))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the sinf exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_5bd24 && [1/2] Building C object CMakeFiles/cmTC_5bd24.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_5bd24
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <math.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef sinf
+  return ((int*)(&sinf))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the sqrt exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_0625c && [1/2] Building C object CMakeFiles/cmTC_0625c.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_0625c
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <math.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef sqrt
+  return ((int*)(&sqrt))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the sqrtf exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_47613 && [1/2] Building C object CMakeFiles/cmTC_47613.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_47613
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <math.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef sqrtf
+  return ((int*)(&sqrtf))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the tan exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_5f0a8 && [1/2] Building C object CMakeFiles/cmTC_5f0a8.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_5f0a8
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <math.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef tan
+  return ((int*)(&tan))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the tanf exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_1b8f8 && [1/2] Building C object CMakeFiles/cmTC_1b8f8.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_1b8f8
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <math.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef tanf
+  return ((int*)(&tanf))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the acos exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_c74dc && [1/2] Building C object CMakeFiles/cmTC_c74dc.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_c74dc
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <math.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef acos
+  return ((int*)(&acos))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the acosf exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_6035c && [1/2] Building C object CMakeFiles/cmTC_6035c.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_6035c
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <math.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef acosf
+  return ((int*)(&acosf))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the asin exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_af5e6 && [1/2] Building C object CMakeFiles/cmTC_af5e6.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_af5e6
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <math.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef asin
+  return ((int*)(&asin))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the asinf exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_20cfa && [1/2] Building C object CMakeFiles/cmTC_20cfa.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_20cfa
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <math.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef asinf
+  return ((int*)(&asinf))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the trunc exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_d38e0 && [1/2] Building C object CMakeFiles/cmTC_d38e0.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_d38e0
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <math.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef trunc
+  return ((int*)(&trunc))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the truncf exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_7bea0 && [1/2] Building C object CMakeFiles/cmTC_7bea0.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_7bea0
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <math.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef truncf
+  return ((int*)(&truncf))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the include file alloca.h exists passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_f2fcc && [1/2] Building C object CMakeFiles/cmTC_f2fcc.dir/CheckIncludeFile.c.o
+[2/2] Linking C executable cmTC_f2fcc
+
+
+
+Determining if the alloca exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_0e842 && [1/2] Building C object CMakeFiles/cmTC_0e842.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_0e842
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <alloca.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef alloca
+  return ((int*)(&alloca))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the alloca exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_1b4a1 && [1/2] Building C object CMakeFiles/cmTC_1b4a1.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_1b4a1
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stdlib.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef alloca
+  return ((int*)(&alloca))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Performing C SOURCE FILE Test HAVE_SA_SIGACTION succeeded with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_50e0b && [1/2] Building C object CMakeFiles/cmTC_50e0b.dir/src.c.o
+[2/2] Linking C executable cmTC_50e0b
+
+
+Source file was:
+
+#include <signal.h>
+
+int main()
+{
+  (void)sizeof(((struct sigaction *)0)->sa_sigaction);
+  return 0;
+}
+
+Determining if the dlopen exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_6cb28 && [1/2] Building C object CMakeFiles/cmTC_6cb28.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_6cb28
+
+
+File /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <dlfcn.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef dlopen
+  return ((int*)(&dlopen))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Performing C SOURCE FILE Test HAVE_O_CLOEXEC succeeded with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_195ac && [1/2] Building C object CMakeFiles/cmTC_195ac.dir/src.c.o
+[2/2] Linking C executable cmTC_195ac
+
+
+Source file was:
+
+    #include <fcntl.h>
+    int flag = O_CLOEXEC;
+    int main(int argc, char **argv) { return 0; }
+Performing C SOURCE FILE Test VULKAN_PASSED_ANDROID_CHECKS succeeded with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_9f7fa && [1/2] Building C object CMakeFiles/cmTC_9f7fa.dir/src.c.o
+[2/2] Linking C executable cmTC_9f7fa
+
+
+Source file was:
+
+      #if defined(__ARM_ARCH) && __ARM_ARCH < 7
+      #error Vulkan doesn't work on this configuration
+      #endif
+      int main(int argc, char **argv) { return 0; }
+      
+Performing C SOURCE FILE Test HAVE_PTHREADS succeeded with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_91c14 && [1/2] Building C object CMakeFiles/cmTC_91c14.dir/src.c.o
+[2/2] Linking C executable cmTC_91c14
+
+
+Source file was:
+
+      #include <pthread.h>
+      int main(int argc, char** argv) {
+        pthread_attr_t type;
+        pthread_attr_init(&type);
+        return 0;
+      }
+Performing C SOURCE FILE Test HAVE_RECURSIVE_MUTEXES succeeded with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_42a9a && [1/2] Building C object CMakeFiles/cmTC_42a9a.dir/src.c.o
+[2/2] Linking C executable cmTC_42a9a
+
+
+Source file was:
+
+        #include <pthread.h>
+        int main(int argc, char **argv) {
+          pthread_mutexattr_t attr;
+          pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
+          return 0;
+        }
+Performing C SOURCE FILE Test HAVE_PTHREADS_SEM succeeded with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_2da20 && [1/2] Building C object CMakeFiles/cmTC_2da20.dir/src.c.o
+[2/2] Linking C executable cmTC_2da20
+
+
+Source file was:
+#include <pthread.h>
+                                 #include <semaphore.h>
+                                 int main(int argc, char **argv) { return 0; }
+Performing C SOURCE FILE Test HAVE_SEM_TIMEDWAIT succeeded with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_6c540 && [1/2] Building C object CMakeFiles/cmTC_6c540.dir/src.c.o
+/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/src.c:5:33: warning: null passed to a callee that requires a non-null argument [-Wnonnull]
+    5 |                   sem_timedwait(NULL, NULL);
+      |                                 ^~~~
+/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/include/__stddef_null.h:26:14: note: expanded from macro 'NULL'
+   26 | #define NULL ((void*)0)
+      |              ^~~~~~~~~~
+/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp/src.c:5:39: warning: null passed to a callee that requires a non-null argument [-Wnonnull]
+    5 |                   sem_timedwait(NULL, NULL);
+      |                                       ^~~~
+/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/include/__stddef_null.h:26:14: note: expanded from macro 'NULL'
+   26 | #define NULL ((void*)0)
+      |              ^~~~~~~~~~
+2 warnings generated.
+[2/2] Linking C executable cmTC_6c540
+
+
+Source file was:
+
+              #include <pthread.h>
+              #include <semaphore.h>
+              int main(int argc, char **argv) {
+                  sem_timedwait(NULL, NULL);
+                  return 0;
+              }
+Determining if files pthread.h exist passed with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_4344a && [1/2] Building C object CMakeFiles/cmTC_4344a.dir/HAVE_PTHREAD_H.c.o
+[2/2] Linking C executable cmTC_4344a
+
+
+
+Performing C SOURCE FILE Test HAVE_PTHREAD_SETNAME_NP succeeded with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_96e05 && [1/2] Building C object CMakeFiles/cmTC_96e05.dir/src.c.o
+[2/2] Linking C executable cmTC_96e05
+
+
+Source file was:
+
+            #include <pthread.h>
+            int main(int argc, char **argv) {
+              #ifdef __APPLE__
+              pthread_setname_np("");
+              #else
+              pthread_setname_np(pthread_self(),"");
+              #endif
+              return 0;
+            }
+Performing C SOURCE FILE Test HAVE_WL_NO_UNDEFINED succeeded with the following output:
+Change Dir: /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/ninja cmTC_e5c86 && [1/2] Building C object CMakeFiles/cmTC_e5c86.dir/src.c.o
+[2/2] Linking C executable cmTC_e5c86
+
+
+Source file was:
+int main() { return 0; }

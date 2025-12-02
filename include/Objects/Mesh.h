@@ -70,9 +70,14 @@ class Mesh : public Object {
 			glDisable(GL_COLOR_MATERIAL);
 			glMaterialfv(   GL_FRONT_AND_BACK, GL_AMBIENT,  MaterialPreviewAmbient  );
 			//averiguar diferencia entre glMaterialx y glMateriali
-			//glMaterialx( GL_FRONT_AND_BACK, GL_SHININESS,   12 << 16     );
-			glMateriali( GL_FRONT_AND_BACK, GL_SHININESS,   12     );
-			glMaterialfv(   GL_FRONT_AND_BACK, GL_EMISSION, ListaColores[negro] );
+            #ifdef ANDROID
+                // OpenGL ES 1.1
+                glMaterialxv( GL_FRONT_AND_BACK, GL_EMISSION, ListaColores[negro] );
+                glMaterialx(GL_FRONT_AND_BACK, GL_SHININESS, 12 << 16);
+            #else
+                glMaterialfv( GL_FRONT_AND_BACK, GL_EMISSION, ListaColores[negro] );
+                glMateriali( GL_FRONT_AND_BACK, GL_SHININESS,   12     );
+            #endif
 
 			// Set array pointers from mesh.
 			glVertexPointer( 3, GL_FLOAT, 0, vertex );

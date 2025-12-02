@@ -1,0 +1,2 @@
+ninja: Entering directory `/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/x86_64'
+ninja: no work to do.

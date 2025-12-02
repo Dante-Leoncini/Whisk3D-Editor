@@ -1,0 +1,6 @@
+/usr/bin/ninja \
+  -C \
+  /home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/x86_64 \
+  SDL2 \
+  SDL2_image \
+  hello_sdl2

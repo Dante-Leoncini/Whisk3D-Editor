@@ -1,0 +1,66 @@
+{
+  "buildFiles": [
+    "/home/dante/Documentos/personal/Whisk3D/CMakeLists.txt",
+    "/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/x86_64/external/SDL2/CMakeLists.txt",
+    "/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/x86_64/external/SDL2_image/CMakeLists.txt"
+  ],
+  "cleanCommandsComponents": [
+    [
+      "/usr/bin/ninja",
+      "-C",
+      "/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/x86_64",
+      "clean"
+    ]
+  ],
+  "buildTargetsCommandComponents": [
+    "/usr/bin/ninja",
+    "-C",
+    "/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/x86_64",
+    "{LIST_OF_TARGETS_TO_BUILD}"
+  ],
+  "libraries": {
+    "SDL2::@fc7b397d5a055aba6d5e": {
+      "toolchain": "toolchain",
+      "abi": "x86_64",
+      "artifactName": "SDL2",
+      "output": "/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/x86_64/lib/libSDL2.so",
+      "runtimeFiles": []
+    },
+    "SDL2_image::@6b7ccc8d74ccd70fd666": {
+      "toolchain": "toolchain",
+      "abi": "x86_64",
+      "artifactName": "SDL2_image",
+      "output": "/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/x86_64/lib/libSDL2_image.so",
+      "runtimeFiles": [
+        "/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/x86_64/lib/libSDL2.so"
+      ]
+    },
+    "hello_sdl2::@6890427a1f51a3e7e1df": {
+      "toolchain": "toolchain",
+      "abi": "x86_64",
+      "artifactName": "hello_sdl2",
+      "output": "/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/x86_64/lib/libhello_sdl2.so",
+      "runtimeFiles": [
+        "/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/x86_64/lib/libSDL2_image.so",
+        "/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/x86_64/lib/libSDL2.so"
+      ]
+    },
+    "sdl_headers_copy::@fc7b397d5a055aba6d5e": {
+      "toolchain": "toolchain",
+      "abi": "x86_64",
+      "artifactName": "sdl_headers_copy"
+    }
+  },
+  "toolchains": {
+    "toolchain": {
+      "cCompilerExecutable": "/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/bin/clang.lld",
+      "cppCompilerExecutable": "/home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++.lld"
+    }
+  },
+  "cFileExtensions": [
+    "c"
+  ],
+  "cppFileExtensions": [
+    "cpp"
+  ]
+}

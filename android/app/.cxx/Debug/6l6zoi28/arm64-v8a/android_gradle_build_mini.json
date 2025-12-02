@@ -1,0 +1,51 @@
+{
+  "buildFiles": [
+    "/home/dante/Documentos/personal/Whisk3D/CMakeLists.txt",
+    "/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/external/SDL2/CMakeLists.txt",
+    "/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/external/SDL2_image/CMakeLists.txt"
+  ],
+  "cleanCommandsComponents": [
+    [
+      "/usr/bin/ninja",
+      "-C",
+      "/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a",
+      "clean"
+    ]
+  ],
+  "buildTargetsCommandComponents": [
+    "/usr/bin/ninja",
+    "-C",
+    "/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a",
+    "{LIST_OF_TARGETS_TO_BUILD}"
+  ],
+  "libraries": {
+    "SDL2::@fc7b397d5a055aba6d5e": {
+      "artifactName": "SDL2",
+      "abi": "arm64-v8a",
+      "output": "/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/lib/libSDL2.so",
+      "runtimeFiles": []
+    },
+    "sdl_headers_copy::@fc7b397d5a055aba6d5e": {
+      "artifactName": "sdl_headers_copy",
+      "abi": "arm64-v8a",
+      "runtimeFiles": []
+    },
+    "hello_sdl2::@6890427a1f51a3e7e1df": {
+      "artifactName": "hello_sdl2",
+      "abi": "arm64-v8a",
+      "output": "/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/lib/libhello_sdl2.so",
+      "runtimeFiles": [
+        "/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/lib/libSDL2_image.so",
+        "/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/lib/libSDL2.so"
+      ]
+    },
+    "SDL2_image::@6b7ccc8d74ccd70fd666": {
+      "artifactName": "SDL2_image",
+      "abi": "arm64-v8a",
+      "output": "/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/lib/libSDL2_image.so",
+      "runtimeFiles": [
+        "/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/lib/libSDL2.so"
+      ]
+    }
+  }
+}

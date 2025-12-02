@@ -1294,10 +1294,13 @@ bool LeerMTL(const std::string& filepath, int objetosCargados) {
                 std::string texfile;
                 iss >> texfile;
 
-                std::filesystem::path absPath = std::filesystem::path(filepath).parent_path() / texfile;
+                //std::filesystem::path absPath = std::filesystem::path(filepath).parent_path() / texfile;
+                std::string absPath = getParentPath(filepath) + "/" + texfile;
 
                 // Normalizar separadores
-                std::string texPath = absPath.string();
+                //std::string texPath = absPath.string();
+                std::string texPath = absPath; // ya es std::string
+
                 std::replace(texPath.begin(), texPath.end(), '\\', '/');
 
                 Texture newTex;
@@ -1368,7 +1371,7 @@ bool ImportOBJ(const std::string& filepath) {
     // Archivo .mtl asociado
     std::string mtlFile = filepath.substr(0, filepath.size() - 4) + ".mtl";
 
-    if (std::filesystem::exists(mtlFile)) {
+    if (fileExists(mtlFile)) {
         if (!LeerMTL(mtlFile, objetosCargados)) {
             std::cerr << "Error al leer el archivo .mtl" << std::endl;
         }

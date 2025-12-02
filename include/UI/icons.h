@@ -4,7 +4,7 @@ GLshort IconLineMesh[8] = { 0,0, (GLshort)(RenglonHeight),0, 0, (GLshort)(Renglo
 int IconSize = 10;
 int IconSizeGS = IconSize;
 
-size_t ICON_TOTAL = 13;
+constexpr size_t ICON_TOTAL = 13;
 enum class IconType {
 	camera,
 	light,

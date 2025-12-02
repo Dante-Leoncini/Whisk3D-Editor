@@ -5,10 +5,10 @@ TARGET_LINUX = Whisk3D_Pre-alpha
 TARGET_WIN   = Whisk3D_Pre-alpha.exe
 
 BUILD  = ../../build/linux
-ASSETS_SRC = ../../assets
-ASSETS_DST = $(BUILD)/assets
+ASSETS_SRC = ../../res
+ASSETS_DST = $(BUILD)/res
 
-SRC = main.cpp ../../include/tinyfiledialogs.c
+SRC = ../../src/main.cpp ../../include/tinyfiledialogs.c
 
 # Elegir SDL: 2 por defecto, 3 opcional
 SDL ?= 2  

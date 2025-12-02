@@ -1,0 +1,21 @@
+# ninja log v5
+7376	7393	1764636601123220677	sdl_image-populate-prefix/src/sdl_image-populate-stamp/sdl_image-populate-install	6fe089cda88ad101
+7357	7376	1764636601105220991	/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/x86_64/_deps/sdl_image-subbuild/sdl_image-populate-prefix/src/sdl_image-populate-stamp/sdl_image-populate-build	af9f81491e01f75c
+7303	7320	1764636601050221952	/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/x86_64/_deps/sdl_image-subbuild/sdl_image-populate-prefix/src/sdl_image-populate-stamp/sdl_image-populate-update	1db61d8ebd3f7b59
+7320	7340	1764636601069221620	sdl_image-populate-prefix/src/sdl_image-populate-stamp/sdl_image-populate-patch	8e9338502932335f
+7340	7357	1764636601087221306	sdl_image-populate-prefix/src/sdl_image-populate-stamp/sdl_image-populate-configure	31c519541b965f73
+0	69	1764636593798348482	/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/x86_64/_deps/sdl_image-subbuild/sdl_image-populate-prefix/src/sdl_image-populate-stamp/sdl_image-populate-mkdir	dc257e9f19c95cd5
+7412	7440	1764636601169219873	sdl_image-populate-prefix/src/sdl_image-populate-stamp/sdl_image-populate-done	fa7afdc1bb3b07
+7412	7440	1764636601169219873	/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/x86_64/_deps/sdl_image-subbuild/sdl_image-populate-prefix/src/sdl_image-populate-stamp/sdl_image-populate-done	fa7afdc1bb3b07
+7412	7440	1764636601169219873	/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/x86_64/_deps/sdl_image-subbuild/CMakeFiles/sdl_image-populate-complete	fa7afdc1bb3b07
+7376	7393	1764636601123220677	/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/x86_64/_deps/sdl_image-subbuild/sdl_image-populate-prefix/src/sdl_image-populate-stamp/sdl_image-populate-install	6fe089cda88ad101
+7412	7440	1764636601169219873	CMakeFiles/sdl_image-populate-complete	fa7afdc1bb3b07
+7394	7412	1764636601141220362	sdl_image-populate-prefix/src/sdl_image-populate-stamp/sdl_image-populate-test	4717b6452c8abd71
+0	69	1764636593798348482	sdl_image-populate-prefix/src/sdl_image-populate-stamp/sdl_image-populate-mkdir	dc257e9f19c95cd5
+7357	7376	1764636601105220991	sdl_image-populate-prefix/src/sdl_image-populate-stamp/sdl_image-populate-build	af9f81491e01f75c
+7320	7340	1764636601069221620	/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/x86_64/_deps/sdl_image-subbuild/sdl_image-populate-prefix/src/sdl_image-populate-stamp/sdl_image-populate-patch	8e9338502932335f
+7394	7412	1764636601141220362	/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/x86_64/_deps/sdl_image-subbuild/sdl_image-populate-prefix/src/sdl_image-populate-stamp/sdl_image-populate-test	4717b6452c8abd71
+69	7303	1764636601032222267	sdl_image-populate-prefix/src/sdl_image-populate-stamp/sdl_image-populate-download	f85562e4e597a219
+69	7303	1764636601032222267	/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/x86_64/_deps/sdl_image-subbuild/sdl_image-populate-prefix/src/sdl_image-populate-stamp/sdl_image-populate-download	f85562e4e597a219
+7340	7357	1764636601087221306	/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/x86_64/_deps/sdl_image-subbuild/sdl_image-populate-prefix/src/sdl_image-populate-stamp/sdl_image-populate-configure	31c519541b965f73
+7303	7320	1764636601050221952	sdl_image-populate-prefix/src/sdl_image-populate-stamp/sdl_image-populate-update	1db61d8ebd3f7b59

@@ -87,17 +87,31 @@ class Viewport3D : public ViewportBase, public WithBorder  {
             ReloadLights();
 
             glMatrixMode(GL_PROJECTION);
-            glLoadIdentity();        
+            glLoadIdentity();
 
-            if ( orthographic ){
-                float size = 90.0f;
-                glOrtho(-size * aspect, size * aspect,
-                        -size, size,
-                        nearClip, farClip);
-            }
-            else {
-                gluPerspective(fovDeg, aspect, nearClip, farClip);
-            }
+            #ifdef ANDROID
+                // OpenGL ES 1.1 no tiene gluPerspective, usamos función propia
+                if ( orthographic ){
+                    float size = 90.0f;
+                    glOrtho(-size * aspect, size * aspect,
+                            -size, size,
+                            nearClip, farClip);
+                }
+                else {
+                    gluPerspectivef(fovDeg, aspect, nearClip, farClip);
+                }
+            #else
+                // OpenGL desktop sí tiene gluPerspective
+                if ( orthographic ){
+                    float size = 90.0f;
+                    glOrtho(-size * aspect, size * aspect,
+                            -size, size,
+                            nearClip, farClip);
+                }
+                else {
+                    gluPerspective(fovDeg, aspect, nearClip, farClip);
+                }
+            #endif
 
             // 1. Matriz limpia
             glMatrixMode(GL_MODELVIEW);
@@ -166,9 +180,17 @@ class Viewport3D : public ViewportBase, public WithBorder  {
             
             //se encarga de dibujar el layout 
             if (showOverlays){
-                glMaterialfv(   GL_FRONT_AND_BACK, GL_DIFFUSE,  ListaColores[negro] );
-                glMaterialfv(   GL_FRONT_AND_BACK, GL_AMBIENT,  ListaColores[negro] );
-                glMaterialfv(   GL_FRONT_AND_BACK, GL_SPECULAR, ListaColores[negro] );
+                #ifdef ANDROID
+                    // OpenGL ES 1.1 usa versiones "x" (fixed-point)
+                    glMaterialxv(GL_FRONT_AND_BACK, GL_DIFFUSE,  ListaColores[negro]);
+                    glMaterialxv(GL_FRONT_AND_BACK, GL_AMBIENT,  ListaColores[negro]);
+                    glMaterialxv(GL_FRONT_AND_BACK, GL_SPECULAR, ListaColores[negro]);
+                #else
+                    // OpenGL desktop usa versiones float
+                    glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE,  ListaColores[negro]);
+                    glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT,  ListaColores[negro]);
+                    glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, ListaColores[negro]);
+                #endif
 
                 glDisable( GL_CULL_FACE ); // Enable back face culling.
                 glDisable( GL_LIGHTING );
@@ -212,7 +234,11 @@ class Viewport3D : public ViewportBase, public WithBorder  {
                 glFogfv(GL_FOG_COLOR, scene->backgroundColor); 
             }
             else {
-                glFogfv(GL_FOG_COLOR, ListaColores[background]);
+                #ifdef ANDROID
+                    glFogxv(GL_FOG_COLOR, ListaColores[background]);
+                #else
+                    glFogfv(GL_FOG_COLOR, ListaColores[background]);
+                #endif
             }
             glLineWidth(1);	 
 
@@ -287,9 +313,17 @@ class Viewport3D : public ViewportBase, public WithBorder  {
 
         void RenderOverlay(){
             //el resto de objetos no usan materiales ni luces
-            glMaterialfv(   GL_FRONT_AND_BACK, GL_DIFFUSE,  ListaColores[negro] );
-            glMaterialfv(   GL_FRONT_AND_BACK, GL_AMBIENT,  ListaColores[negro] );
-            glMaterialfv(   GL_FRONT_AND_BACK, GL_SPECULAR, ListaColores[negro] );
+            #ifdef ANDROID
+                glMaterialxv(GL_FRONT_AND_BACK, GL_DIFFUSE,  ListaColores[negro]);
+                glMaterialxv(GL_FRONT_AND_BACK, GL_AMBIENT,  ListaColores[negro]);
+                glMaterialxv(GL_FRONT_AND_BACK, GL_SPECULAR, ListaColores[negro]);
+            #else
+                // Desktop OpenGL puede pasar el puntero completo
+                glMaterialfv(   GL_FRONT_AND_BACK, GL_DIFFUSE,  ListaColores[negro] );
+                glMaterialfv(   GL_FRONT_AND_BACK, GL_AMBIENT,  ListaColores[negro] );
+                glMaterialfv(   GL_FRONT_AND_BACK, GL_SPECULAR, ListaColores[negro] );
+            #endif
+
             glDisable( GL_CULL_FACE ); // Enable back face culling.
             glDisable( GL_LIGHTING );
             glEnable(GL_COLOR_MATERIAL);

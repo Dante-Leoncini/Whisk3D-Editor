@@ -61,28 +61,28 @@ void DrawTransformAxis() {
 	}
 	switch (axisSelect) {
 		case X:
-			glColor4fv(ListaColores[ColorTransformX]);
+            SetColor(ListaColores[ColorTransformX]);
 			glDrawElements(GL_LINES, 2, GL_UNSIGNED_SHORT, EjeRojo);
 			break;
 
 		case Y:
-			glColor4fv(ListaColores[ColorTransformY]);
+			SetColor(ListaColores[ColorTransformY]);
 			glDrawElements(GL_LINES, 2, GL_UNSIGNED_SHORT, EjeVerde);
 			break;
 
 		case Z:
-			glColor4fv(ListaColores[ColorTransformZ]);
+			SetColor(ListaColores[ColorTransformZ]);
 			glDrawElements(GL_LINES, 2, GL_UNSIGNED_SHORT, EjeAzul);
 			break;
 
 		case XYZ:
-			glColor4fv(ListaColores[ColorTransformX]);
+			SetColor(ListaColores[ColorTransformX]);
 			glDrawElements(GL_LINES, 2, GL_UNSIGNED_SHORT, EjeRojo);
 
-			glColor4fv(ListaColores[ColorTransformY]);
+			SetColor(ListaColores[ColorTransformY]);
 			glDrawElements(GL_LINES, 2, GL_UNSIGNED_SHORT, EjeVerde);
 
-			glColor4fv(ListaColores[ColorTransformZ]);
+			SetColor(ListaColores[ColorTransformZ]);
 			glDrawElements(GL_LINES, 2, GL_UNSIGNED_SHORT, EjeAzul);
 			break;
 	}
@@ -154,7 +154,7 @@ void RenderOrigins(){
 	glEnable( GL_TEXTURE_2D );
 	glBindTexture( GL_TEXTURE_2D, Textures[1].iID ); //selecciona la textura
 	glVertexPointer( 3, GL_SHORT, 0, pointVertex );
-	glTexEnvi( GL_POINT_SPRITE, GL_COORD_REPLACE, GL_TRUE );  
+    glTexEnvi(GL_POINT_SPRITE, GL_COORD_REPLACE, GL_TRUE);
 	glEnable( GL_BLEND );
 	// Enable point sprites.
 	glEnable( GL_POINT_SPRITE );

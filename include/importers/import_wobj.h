@@ -22,16 +22,16 @@ Mesh* LeerWOBJ(std::ifstream& file, const std::string& filename, Object* parent)
 
             Wobj.vertex.insert(Wobj.vertex.end(), {(GLfloat)x,(GLfloat)y,(GLfloat)z});
 
-            auto sat=[&](double v){ v*=255; return (unsigned char)std::clamp(v,0.0,255.0); };
+            //auto sat=[&](double v){ v*=255; return (unsigned char)std::clamp(v,0.0,255.0); };
             Wobj.vertexColor.insert(Wobj.vertexColor.end(),{sat(r),sat(g),sat(b),sat(a)});
         }
 
         // -------- normales ----------
-        else if(line.rfind("vn ",0)==0){
+        else if(line.rfind("vn ",0) == 0){
             std::istringstream ss(line.substr(3));
-            double nx,ny,nz; ss>>nx>>ny>>nz;
-            auto cv=[](double v){ v=((v+1)/2)*255-128; return (signed char)std::clamp(v,-128.0,127.0); };
-            Wobj.normals.insert(Wobj.normals.end(),{cv(nx),cv(ny),cv(nz)});
+            double nx, ny, nz;
+            ss >> nx >> ny >> nz;
+            Wobj.normals.insert(Wobj.normals.end(), { cv(nx), cv(ny), cv(nz) });
         }
 
         // -------- uv ----------
@@ -101,7 +101,7 @@ Mesh* ImportWOBJ(const std::string& filepath, Object* parent) {
     }
 
     std::string mtl = filepath.substr(0, filepath.size() - 5) + ".mtl";
-    if (std::filesystem::exists(mtl))
+    if (fileExists(mtl))
         LeerMTL(mtl, 1);
 
     return mesh;
