@@ -1,39 +1,31 @@
-class Rectangle : public Object2D {
+#ifndef REC2D_H
+#define REC2D_H
+
+#ifdef _WIN32
+    #include <windows.h>
+#endif
+
+#ifdef __ANDROID__
+    #include <GLES/gl.h>
+#else
+    #include <GL/gl.h>
+#endif
+
+#include "UI/object2D.h"
+
+class Rec2D : public Object2D {
 	public:
 		GLshort width = 10;
 		GLshort height = 10;
-
 		GLshort vertices[8] = { 0,0, 10,0, 0,10, 10,10 };
 
-    	// Constructor completo
-        Rectangle(Object2D* parent = nullptr): Object2D(parent){}
+		// Constructor
+		Rec2D(Object2D* parent = nullptr);
 
-		// Calcular los vértices una sola vez
-		void SetSize(GLshort x, GLshort y, GLshort w, GLshort h) {
-			width = w;
-			height = h;
-			vertices[0] = (GLshort)x;
-			vertices[1] = (GLshort)y;
-
-			vertices[2] = (GLshort)(x + w);
-			vertices[3] = (GLshort)y;
-
-			vertices[4] = (GLshort)x;
-			vertices[5] = (GLshort)(y + h);
-
-			vertices[6] = (GLshort)(x + w);
-			vertices[7] = (GLshort)(y + h);
-		}
-
-		void SetColor(GLubyte red, GLubyte green, GLubyte blue){
-			color[0] = red;
-			color[1] = green;
-			color[2] = blue;
-		}
-
-		void RenderObject(bool usarColorPropio = true) override {
-			if (usarColorPropio) glColor4ub(color[0], color[1], color[2], opacity);
-    		glVertexPointer(2, GL_SHORT, 0, vertices);
-			glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-		}
+		// Métodos
+		void SetSize(GLshort x, GLshort y, GLshort w, GLshort h);
+		void SetColor(GLubyte red, GLubyte green, GLubyte blue);
+		void RenderObject(bool usarColorPropio = true) override;
 };
+
+#endif

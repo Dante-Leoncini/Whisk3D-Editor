@@ -1,12 +1,14 @@
-#include <SDL.h> // Needed to properly handle main() on iOS
+#ifdef _WIN32
+    #include <windows.h>
+#endif
 
-//#include <SDL_image.h>
+#include <SDL.h>
 
 #if SDL_MAJOR_VERSION == 2
     //#include <SDL2/SDL.h>      
     //#include <SDL2/SDL_image.h>
     #include <SDL_image.h>
-    #include "../include/sdl_key_compat.h"
+    #include "sdl_key_compat.h"
 #elif SDL_MAJOR_VERSION == 3
     #include <SDL3/SDL.h>      
     //para las texturas
@@ -34,7 +36,7 @@
 #include <unordered_set>
 
 //utilidades de Whisk3D de uso general. mas que nada para manejo de punteros y memoria
-#include "../include/Whisk3Dutils.h"
+#include "Whisk3Dutils.h"
 
 #include <filesystem>
 #include <vector>
@@ -46,16 +48,7 @@
 #include <iomanip>
 
 //helpers para convertir funciones para android y openglES 1.1
-#include "../include/GLES_Android_helpers.h"
-
-//variables de SDL para Linux/Android
-SDL_Window* window = nullptr;  // definición real
-SDL_GameController* controller = nullptr;
-SDL_GLContext glContext = nullptr;
-
-int winW = 640; 
-int winH = 480;
-
+#include "GLES_Android_helpers.h"
 
 #ifdef __ANDROID__
 #elif defined(_WIN32)
@@ -92,18 +85,18 @@ int winH = 480;
 #endif
 
 //Whisk3D imports
-#include "../include/tablero.h"
+/*#include "../include/tablero.h"
 #include "../include/Floor.h"
 #include "../include/UI/GeometriaUI.h"
 
-#include "../include/clases.h"
-#include "../include/variables.h"
-#include "../include/UI/colores.h"
-#include "../include/OpcionesRender.h"
+#include "../include/clases.h"*/
+#include "variables.h"
+#include "UI/colores.h"
+//#include "../include/OpcionesRender.h"
 
-#include "../include/Objects/Textures.h"
+#include "Objects/Textures.h"
 
-#include "../include/UI/UI.h"
+/*#include "../include/UI/UI.h"
 #include "../include/UI/sprites.h"
 #include "../include/UI/object2D.h"
 #include "../include/UI/text.h"
@@ -111,22 +104,22 @@ int winH = 480;
 #include "../include/UI/rectangle.h"
 
 #include "../include/Objects/Materials.h"
-#include "../include/Objects/Objects.h"
+#include "../include/Objects/Objects.h"*/
 
-#include "../include/Animation.h"
-#include "../include/Objects/ObjectMode.h"
+#include "Animation.h"
+/*#include "../include/Objects/ObjectMode.h"
 #include "../include/render.h"
 #include "../include/importers/import_obj.h"
 //#include "../include/import_vertex_animation.h"
-#include "../include/lectura-escritura.h"
+#include "../include/lectura-escritura.h"*/
 
-#include "../include/ViewPorts/ViewPorts.h"
-#include "../include/ViewPorts/ViewPort3D.h"
-#include "../include/ViewPorts/Outliner.h"
+#include "ViewPorts/ViewPorts.h"
+//#include "../include/ViewPorts/ViewPort3D.h"
+//#include "../include/ViewPorts/Outliner.h"
 
-#include "../include/funciones.h"
-#include "../include/controles.h"
-#include "../include/constructor.h"
+/*#include "../include/funciones.h"*/
+#include "controles.h"
+#include "constructor.h"
 
 struct Config {
     bool fullscreen = false;
@@ -191,22 +184,22 @@ Config loadConfig(const std::string& filename) {
 
 bool loadColors(const std::string& filename) {
     static std::unordered_map<std::string, ColorID> colorMap = {
-        {"background", background},
-        {"blanco", blanco},
-        {"accent", accent},
-        {"accentDark", accentDark},
-        {"negro", negro},
-        {"gris", gris},
-        {"naranjaFace", naranjaFace},
-        {"headerColor", headerColor},
-        {"negroTransparente", negroTransparente},
-        {"grisUI", grisUI},
-        {"LineaPiso", LineaPiso},
-        {"LineaPisoRoja", LineaPisoRoja},
-        {"LineaPisoVerde", LineaPisoVerde},
-        {"ColorTransformX", ColorTransformX},
-        {"ColorTransformY", ColorTransformY},
-        {"ColorTransformZ", ColorTransformZ}
+        {"background", ColorID::background},
+        {"blanco", ColorID::blanco},
+        {"accent", ColorID::accent},
+        {"accentDark", ColorID::accentDark},
+        {"negro", ColorID::negro},
+        {"gris", ColorID::gris},
+        {"naranjaFace", ColorID::naranjaFace},
+        {"headerColor", ColorID::headerColor},
+        {"negroTransparente", ColorID::negroTransparente},
+        {"grisUI",ColorID:: grisUI},
+        {"LineaPiso", ColorID::LineaPiso},
+        {"LineaPisoRoja", ColorID::LineaPisoRoja},
+        {"LineaPisoVerde", ColorID::LineaPisoVerde},
+        {"ColorTransformX", ColorID::ColorTransformX},
+        {"ColorTransformY", ColorID::ColorTransformY},
+        {"ColorTransformZ", ColorID::ColorTransformZ}
     };
 
     std::istringstream fileStream;
@@ -248,7 +241,7 @@ bool loadColors(const std::string& filename) {
 
         auto it = colorMap.find(name);
         if (it != colorMap.end()) {
-            int idx = it->second;
+            int idx = static_cast<int>(it->second);
             ListaColores[idx][0] = r;
             ListaColores[idx][1] = g;
             ListaColores[idx][2] = b;

@@ -1,3 +1,18 @@
+#ifndef OBJECT2D_H
+#define OBJECT2D_H
+
+#ifdef _WIN32
+    #include <windows.h>
+#endif
+
+#include <vector>
+
+#ifdef __ANDROID__
+    #include <GLES/gl.h>
+#else
+    #include <GL/gl.h>
+#endif
+
 enum class Object2DType {
     text,
     empty,
@@ -6,41 +21,25 @@ enum class Object2DType {
 };
 
 class Object2D {
-	public:
-        Object2D* Parent = nullptr;
-		bool visible = true;
-		int x = 0, y = 0;
-		int scaleX = 1;
-		int scaleY = 1;
-		GLubyte opacity = 255;
-		//colores RGB
-		GLubyte color[3] = { 255, 255, 255 };
-        std::vector<Object2D*> Childrens;
+public:
+    Object2D* Parent = nullptr;
+    bool visible = true;
+    int x = 0, y = 0;
+    int scaleX = 1;
+    int scaleY = 1;
+    GLubyte opacity = 255;
 
-        Object2D(Object2D* parent): Parent(parent){}   
+    GLubyte color[3] = { 255, 255, 255 };
 
-        virtual Object2DType getType(){
-            return Object2DType::empty;
-        }
+    std::vector<Object2D*> Childrens;
 
-        virtual void RenderObject(bool usarColorPropio = true){}
+    Object2D(Object2D* parent = nullptr);
 
-        virtual ~Object2D(){
-            for (Object2D* c : Childrens){
-                delete c;
-            }
+    virtual Object2DType getType();
+    virtual void RenderObject(bool usarColorPropio = true);
+    virtual ~Object2D();
 
-            Childrens.clear();
-        };
-
-        void Render(bool usarColorPropio = true){   
-            if (!visible) return;
-
-            RenderObject(usarColorPropio);
-
-            // Procesar cada hijo
-            for (size_t c = 0; c < Childrens.size(); c++) {
-                Childrens[c]->Render();
-            }
-        }
+    void Render(bool usarColorPropio = true);
 };
+
+#endif

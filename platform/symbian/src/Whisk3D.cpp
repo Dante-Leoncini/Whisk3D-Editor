@@ -347,7 +347,7 @@ void CWhisk3D::AppInit( void ){
 	SetScreenSize( iScreenWidth, iScreenHeight );
 
     // Set the screen background color.
-	glClearColor( ListaColores[background][0], ListaColores[background][1], ListaColores[background][2], 1.f );
+	glClearColor( ListaColores[static_cast<int>(ColorID::background)][0], ListaColores[static_cast<int>(ColorID::background)][1], ListaColores[static_cast<int>(ColorID::background)][2], 1.f );
 
     // Enable depth testing, texturing, back face culling, and lighting.
     glEnable( GL_DEPTH_TEST );
@@ -787,7 +787,7 @@ void CWhisk3D::dibujarUI(){
 	DrawnRectangle();
 	
 	glEnable( GL_TEXTURE_2D ); // Permite usar texturas
-	glColor4f(ListaColores[blanco][0],ListaColores[blanco][1],ListaColores[blanco][2],ListaColores[blanco][3]);	
+	glColor4f(ListaColores[static_cast<int>(ColorID::blanco)][0],ListaColores[static_cast<int>(ColorID::blanco)][1],ListaColores[static_cast<int>(ColorID::blanco)][2],ListaColores[static_cast<int>(ColorID::blanco)][3]);	
 	glBindTexture( GL_TEXTURE_2D, Textures[1].iID ); 
     
 	//que editor esta abierto
@@ -812,7 +812,7 @@ void CWhisk3D::dibujarUI(){
 	DrawnRectangle();
 	
 	//en caso de que overlay este desactivado. ese es el valor que tiene que estar
-	glColor4f(ListaColores[blanco][0],ListaColores[blanco][1],ListaColores[blanco][2],ListaColores[blanco][3]);	
+	glColor4f(ListaColores[static_cast<int>(ColorID::blanco)][0],ListaColores[static_cast<int>(ColorID::blanco)][1],ListaColores[static_cast<int>(ColorID::blanco)][2],ListaColores[static_cast<int>(ColorID::blanco)][3]);	
 	glEnable( GL_TEXTURE_2D );
 
 	//grupo de shaders ancho, alto,
@@ -918,15 +918,15 @@ void CWhisk3D::DrawnRectangle(){
 void CWhisk3D::IconSelect(TBool activo){
 	if (activo){
 		glDisable( GL_TEXTURE_2D );
-		glColor4f(ListaColores[accent][0],ListaColores[accent][1],ListaColores[accent][2],ListaColores[accent][3]);	
+		glColor4f(ListaColores[static_cast<int>(ColorID::accent)][0],ListaColores[static_cast<int>(ColorID::accent)][1],ListaColores[static_cast<int>(ColorID::accent)][2],ListaColores[static_cast<int>(ColorID::accent)][3]);	
 		SetSpriteSize(18,18);
 		DrawnRectangle();
 		SetSpriteSize(14,14);
-		glColor4f(ListaColores[blanco][0],ListaColores[blanco][1],ListaColores[blanco][2],ListaColores[blanco][3]);	
+		glColor4f(ListaColores[static_cast<int>(ColorID::blanco)][0],ListaColores[static_cast<int>(ColorID::blanco)][1],ListaColores[static_cast<int>(ColorID::blanco)][2],ListaColores[static_cast<int>(ColorID::blanco)][3]);	
 		glEnable( GL_TEXTURE_2D );
 	}
 	else {
-		glColor4f(ListaColores[grisUI][0],ListaColores[grisUI][1],ListaColores[grisUI][2],ListaColores[grisUI][3]);
+		glColor4f(ListaColores[static_cast<int>(ColorID::grisUI)][0],ListaColores[static_cast<int>(ColorID::grisUI)][1],ListaColores[static_cast<int>(ColorID::grisUI)][2],ListaColores[static_cast<int>(ColorID::grisUI)][3]);
 	}
 }
 
@@ -1895,16 +1895,16 @@ void CWhisk3D::SetAmbientLight(){
 void CWhisk3D::SetViewportBackgroudColor(){
 	HBufC* noteBuf = HBufC::NewLC(100);
 	noteBuf->Des().Copy(_L("Red (0 - 100)"));
-	TInt valor = DialogNumber((TInt)(ListaColores[background][0]*100.f), 0, 100, noteBuf);
-	ListaColores[background][0] = (GLfloat)valor/100.0f;
+	TInt valor = DialogNumber((TInt)(ListaColores[static_cast<int>(ColorID::background)][0]*100.f), 0, 100, noteBuf);
+	ListaColores[static_cast<int>(ColorID::background)][0] = (GLfloat)valor/100.0f;
     redibujar = true;	
 	noteBuf->Des().Copy(_L("Green (0 - 100)"));
-	valor = DialogNumber((TInt)(ListaColores[background][1]*100.f), 0, 100, noteBuf);
-	ListaColores[background][1] = (GLfloat)valor/100.0f;
+	valor = DialogNumber((TInt)(ListaColores[static_cast<int>(ColorID::background)][1]*100.f), 0, 100, noteBuf);
+	ListaColores[static_cast<int>(ColorID::background)][1] = (GLfloat)valor/100.0f;
     redibujar = true;	
 	noteBuf->Des().Copy(_L("Blue (0 - 100)"));
-	valor = DialogNumber((TInt)(ListaColores[background][2]*100.f), 0, 100, noteBuf);
-	ListaColores[background][2] = (GLfloat)valor/100.0f;
+	valor = DialogNumber((TInt)(ListaColores[static_cast<int>(ColorID::background)][2]*100.f), 0, 100, noteBuf);
+	ListaColores[static_cast<int>(ColorID::background)][2] = (GLfloat)valor/100.0f;
 	CleanupStack::PopAndDestroy(noteBuf);
     redibujar = true;		
 }

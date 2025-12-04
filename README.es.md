@@ -45,14 +45,13 @@ cd platform/android && ./gradlew assembleDebug
 
 ## Nota para Windows
 Para compilar. 
-1) instala MSYS2 desde https://www.msys2.org/
-2) instala desde la consola GNU Make + MinGW-W64 con el comando "pacman -S make mingw-w64-x86_64-gcc"
-3) instala desde la consola "pacman -S mingw-w64-x86_64-gcc"
-4) instala la libreria de SDL2 (a menos que quieras usar SDL3 o SDL1) con "pacman -S mingw-w64-x86_64-SDL2" y "pacman -S mingw-w64-x86_64-SDL2_image"
-5) anda a la carpeta "Whisk3D/platform/windows"
-6) desde la terminal de MINGW64 (es azul) escribi "make windows"
-
-con eso tenes por defecto la version de 64bit de windwos en "Whisk3D/build/windows/Whisk3D_xxx.exe"
+1) en la carpeta raiz "git submodule update --init --recursive" (para tener los submodulos de SDL2 y SDL2_image)
+2) Instalar Visual Studio Code 2019 o mas nuevo y cmake desde https://cmake.org/download/
+3) si no lo tenes, en "Visual Studio Installer" vas a "Modificar" y tildas C++ Desktop Development "MSVC v142 - VS 2019 C++ x64/x86 Build Tools (Latest)", "C++ CMake tools for Window" y "Windows 10 SDK 10.0.19041.0" (o superior)
+4) Abrí Inicio → escribí Developer Command Prompt for VS 2018 (o el que tengas)
+5) anda al directorio cd C:\BLA BLA BLA\Whisk3D\platform\windows (aca adentro esta el CMakeLists.txt)
+6) cmake -S . -B ../../build/windows/x64 -G "Visual Studio 18 2026" -A x64
+7) cmake --build ../../build/windows/x64 --config Release
 
 ## Aclaraciones:
 

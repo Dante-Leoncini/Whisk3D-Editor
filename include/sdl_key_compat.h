@@ -1,3 +1,6 @@
+#ifndef SDLKEYCOMPAT_H
+#define SDLKEYCOMPAT_H
+
 // Si estás en SDL2 y no existen las versiones mayúsculas, definilas en base a las minúsculas.
 
 #ifndef SDLK_A
@@ -156,4 +159,6 @@
 // =====================================================
 #ifndef SDL_GL_DestroyContext
 #define SDL_GL_DestroyContext SDL_GL_DeleteContext
+#endif
+
 #endif

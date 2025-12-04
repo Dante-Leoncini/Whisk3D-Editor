@@ -9,3 +9,24 @@ android/distribution/android/app/.externalNativeBuild/
 
 # Gradle
 android/.gradle/
+
+# --- Build directories ---
+build/
+*/build/
+build-*/
+
+#windows
+/platform/windows/build/
+
+# --- Visual Studio ---
+*.sdf
+*.suo
+*.user
+*.vcxproj.user
+*.vcxproj.filters
+*.VSWorkspaceState.json
+.vs/
+
+# --- IDE configs ---
+.vscode/
+.settings/

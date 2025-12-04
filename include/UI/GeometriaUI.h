@@ -1,157 +1,39 @@
-//para los sprites
-static const GLshort pointVertex[3]={0, 0, 0};
+#ifndef GEOMETRIAUI_H
+#define GEOMETRIAUI_H
 
-static const int LineaLightVertexSize = 2 * 3;
-static const int LineaEdgeSize = 1 * 2;
+#ifdef _WIN32
+    #include <windows.h>
+#endif
 
-static GLfloat LineaLightVertex[LineaLightVertexSize] = {    
-    0.0f, 0.0f, 0.0f,
-    0.0f, -3.0f, 0.0f,
-};
+#include <GL/gl.h>
 
-static GLfloat LineaLinkChild[LineaLightVertexSize] = {    
-    0.0f, 0.0f, 0.0f,
-    0.0f, 1000.0f, 0.0f,
-};
+// Sprites y primitivas de UI
 
-static GLfloat lineUV[4] = {
-    0.0f,  0.0f,
-    0.0f,  0.0f
-};
+extern const GLshort pointVertex[3];
 
-static const GLshort LineaTimeline[6] = {    
-    0, 0, 0,
-    0, 16, 0,
-};
+extern const int LineaLightVertexSize;
+extern const int LineaEdgeSize;
 
-// Define los índices de las líneas
-static const GLushort LineaEdge[2] = {
-    0, 1
-};
+extern GLfloat LineaLightVertex[];
+extern GLfloat LineaLinkChild[];
+extern GLfloat lineUV[];
 
-static const int EmptyVertexSize = 6 * 3;
-static const int EmptyEdgesSize = 3 * 2;
+extern const GLshort LineaTimeline[6];
+extern const GLushort LineaEdge[2];
 
-static const GLshort EmptyVertices[EmptyVertexSize] = {
-    //eje1
-    0, 0, -2000,
-    0, 0, 2000,
-    //eje2
-    0, -2000, 0,
-    0, 2000, 0,
-    //eje3
-    -2000, 0, 0,
-    2000, 0, 0,
-};
+extern const int EmptyVertexSize;
+extern const int EmptyEdgesSize;
+extern const GLshort EmptyVertices[];
+extern const GLushort EmptyEdges[];
 
-static const GLushort EmptyEdges[EmptyEdgesSize]={
-	0, 1,
-	2, 3,
-	4, 5
-};
+extern const int Cursor3DVertexSize;
+extern const int Cursor3DEdgesSize;
+extern const GLfloat Cursor3DVertices[];
+extern const GLushort Cursor3DEdges[];
 
-static const int Cursor3DVertexSize = 12 * 3;
-static const int Cursor3DEdgesSize = 6 * 2;
+extern const int SpriteVertexSize;
+extern const int SpriteFacesSize;
+extern const int SpriteUvSize;
+extern const GLushort SpriteFaces[];
 
-static const GLfloat Cursor3DVertices[Cursor3DVertexSize] = {
-    //eje1
-    0.0f,  0.0f, -0.75f/2,
-    0.0f,  0.0f, -0.225f/2,
-    0.0f,  0.0f,  0.75f/2,
-    0.0f,  0.0f,  0.225f/2,
-    //eje2
-    0.0f, -0.75f/2,  0.0f,
-    0.0f, -0.225f/2, 0.0f,
-    0.0f,  0.75f/2,  0.0f,
-    0.0f,  0.225f/2, 0.0f,
-    //eje3
-    -0.75f/2,  0.0f, 0.0f,
-    -0.225f/2, 0.0f, 0.0f,
-     0.75f/2,  0.0f, 0.0f,
-     0.225f/2, 0.0f, 0.0f,
-};
-
-static const GLushort Cursor3DEdges[Cursor3DEdgesSize]={
-	0, 1,
-	2, 3,
-	4, 5,
-	6, 7,
-	8, 9,
-	10,11
-};
-
-static const int SpriteVertexSize = 16 * 3;
-static const int SpriteFacesSize = 18 * 3;
-static const int SpriteUvSize = 16 * 2;
-
-/* Define vertice coordinates for the ground plane */
-//en el sentido del reloj empezando de la esquina superior izquierda
-/*static GLshort SpriteVertices[SpriteVertexSize] = {
-	0,    0, 0,
-	256,    0, 0,
-    256, 256, 0,
-    0, 256, 0,
-    0, 0, 0,
-    0, 0, 0,
-    0, 0, 0,
-    0, 0, 0,
-    0, 0, 0,
-    0, 0, 0,
-    0, 0, 0,
-    0, 0, 0,
-    0, 0, 0,
-    0, 0, 0,
-};*/
-
-/** los dos triangulos */
-static const GLushort SpriteFaces[SpriteFacesSize]={
-    //1
-	0,1,2,
-	2,3,0,
-    //2
-	1,4,2,
-	2,5,4,
-    //3
-    4,5,6,
-    5,6,7,
-    //4
-    3,2,8,
-    8,2,9,
-    //5
-    2,9,5,
-    9,10,5,
-    //6
-    10,5,7,
-    10,11,7,
-    //7
-    8,12,9,
-    12,9,13,
-    //8
-    13,9,10,
-    13,10,14,
-    //9
-    14,10,11,
-    14,11,15
-};
-
-/* textura UV */
-//en el sentido del reloj empezando de la esquina superior izquierda
-/*static GLbyte SpriteUV[SpriteUvSize] ={
-    -128,  -128,
-    127,   -128,
-    127,    127,
-    -128,   127,
-    0,0,
-    0,0,
-    0, 0, 
-    0, 0, 
-    0, 0, 
-    0, 0, 
-    0, 0, 
-    0, 0, 
-    0, 0, 
-    0, 0, 
-    0, 0, 
-    0, 0 
-};*/
-//f v1/vt1/vn1 v2/vt2/vn2 v3/vt3/vn3 ...
+#endif

@@ -1,3 +1,6 @@
+#ifndef WHISK3DUTILS_H
+#define WHISK3DUTILS_H
+
 template <typename T>
 void AddPointerToList(T*** list, int& count) {
     // 1️⃣ Crear nueva lista de tamaño (count + 1)
@@ -20,3 +23,5 @@ void AddPointerToList(T*** list, int& count) {
     // 6️⃣ Aumentar el contador
     ++count;
 }
+
+#endif

@@ -1,3 +1,6 @@
+#ifndef SPRITES_H
+#define SPRITES_H
+
 class Sprite {
 	public:
 	    GLfloat uvs[8] = {
@@ -60,3 +63,5 @@ class Sprite {
 };
 
 //Sprite sprite;
+
+#endif

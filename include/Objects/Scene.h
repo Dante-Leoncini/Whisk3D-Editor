@@ -1,38 +1,36 @@
-#pragma once
+#ifndef SCENE_H
+#define SCENE_H
+
+#ifdef _WIN32
+    #include <windows.h>
+#endif
+
+#include <GL/gl.h>
+
+#include "UI/icons.h"
+#include "Objects/Objects.h"
 
 // Forward declaration
 class Scene;
 
-// Definición de variable global
-Scene* scene = nullptr;
+// Variable global
+extern Scene* scene;
 
 class Scene : public Object {
-    public:
-        bool limpiarPantalla = true;
-        GLfloat backgroundColor[4]  = { 0.0f, 0.0f, 0.0f, 0.0f};
+public:
+    bool limpiarPantalla;
+    GLfloat backgroundColor[4];
 
-        void SetLimpiarPantalla(){
-            limpiarPantalla = !limpiarPantalla;
-        }
+    Scene();  // constructor
 
-        void SetBackground(GLfloat R, GLfloat G, GLfloat B, GLfloat A){
-            backgroundColor[0] = R;
-            backgroundColor[1] = G;
-            backgroundColor[2] = B;
-            backgroundColor[3] = A;
-        }
+    void SetLimpiarPantalla();
+    void SetBackground(GLfloat R, GLfloat G, GLfloat B, GLfloat A);
 
-        Scene()
-            : Object(nullptr, "Scene Collection") {
-            IconType = static_cast<size_t>(IconType::archive);
-            scene = this;
-        }
+    ObjectType getType() override;
 
-        ObjectType getType() override{
-            return ObjectType::collection;
-        }
-
-		~Scene() {
-			delete name;
-		}
+    ~Scene();
 };
+
+extern Object* SceneCollection;
+
+#endif

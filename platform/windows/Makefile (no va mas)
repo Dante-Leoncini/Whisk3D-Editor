@@ -1,0 +1,169 @@
+# =============================
+#   CONFIG GENERAL
+# =============================
+
+TARGET_WIN = Whisk3D_Pre-alpha.exe
+
+SDL ?= 2
+ARCH ?= 64
+
+SRC = \
+    ../../src/main.cpp \
+    ../../src/GLES_Android_helpers.cpp \
+    ../../src/OpcionesRender.cpp \
+    ../../src/variables.cpp \
+    ../../src/clases.cpp \
+    ../../src/render.cpp \
+    ../../src/UI/colores.cpp \
+    ../../src/Animation.cpp \
+    ../../src/tinyfiledialogs.c \
+    ../../src/Floor.cpp \
+    ../../src/UI/GeometriaUI.cpp \
+    ../../src/UI/UI.cpp \
+    ../../src/UI/font.cpp \
+    ../../src/UI/icons.cpp \
+    ../../src/UI/text.cpp \
+    ../../src/UI/object2D.cpp \
+    ../../src/UI/rectangle.cpp \
+    ../../src/Objects/Camera.cpp \
+    ../../src/Objects/Collection.cpp \
+    ../../src/Objects/Gamepad.cpp \
+    ../../src/Objects/Instance.cpp \
+    ../../src/Objects/Light.cpp \
+    ../../src/Objects/Materials.cpp \
+    ../../src/Objects/Mesh.cpp \
+    ../../src/Objects/Mirror.cpp \
+    ../../src/Objects/Modifier.cpp \
+    ../../src/Objects/ObjectMode.cpp \
+    ../../src/Objects/Objects.cpp \
+    ../../src/Objects/Primitivas.cpp \
+    ../../src/Objects/Scene.cpp \
+    ../../src/Objects/Textures.cpp \
+    ../../src/importers/import_obj.cpp \
+    ../../src/importers/import_vertex_animation.cpp \
+    ../../src/importers/import_w3d.cpp \
+    ../../src/importers/import_wobj.cpp \
+    ../../src/ViewPorts/ViewPorts.cpp \
+    ../../src/ViewPorts/ViewPort3D.cpp \
+    ../../src/ViewPorts/Outliner.cpp \
+    ../../src/controles.cpp \
+    ../../src/lectura-escritura.cpp \
+    ../../src/constructor.cpp
+
+MINGW_PREFIX ?= /mingw64
+
+
+# =============================
+#   BUILD DIRS
+# =============================
+ifeq ($(ARCH),64)
+    BUILD = ../../build/windows/x64
+    RUNTIME_DLLS = libgcc_s_seh-1.dll libstdc++-6.dll libwinpthread-1.dll
+else
+    BUILD = ../../build/windows/x86
+    RUNTIME_DLLS = libgcc_s_dw2-1.dll libstdc++-6.dll libwinpthread-1.dll
+endif
+
+
+# =============================
+#   COMPILADOR
+# =============================
+ifeq ($(ARCH),64)
+    CXX_WIN = x86_64-w64-mingw32-g++
+    ARCH_FLAG = -m64
+else
+    CXX_WIN = i686-w64-mingw32-g++
+    ARCH_FLAG = -m32
+endif
+
+
+# =============================
+#   SDL FLAGS
+# =============================
+ifeq ($(SDL),3)
+
+    CXXFLAGS_WIN = -Wall -O2 $(ARCH_FLAG) -DUSE_SDL3 \
+        -I../include -I$(MINGW_PREFIX)/include/SDL3
+    LIBS_WIN = -L$(MINGW_PREFIX)/lib \
+        -lmingw32 -lSDL3 -lopengl32 -lglu32
+
+else
+
+    CXXFLAGS_WIN = -Wall -O2 $(ARCH_FLAG) -DUSE_SDL2 \
+        -I../include -I$(MINGW_PREFIX)/include/SDL2
+
+    LIBS_WIN = -L$(MINGW_PREFIX)/lib \
+        -lmingw32 -lSDL2main -lSDL2 -lSDL2_image \
+        -lopengl32 -lglu32 -lole32 -lcomdlg32
+
+endif
+
+
+
+# =============================
+#   TARGETS
+# =============================
+.PHONY: windows clean copy-dlls
+
+windows:
+	mkdir -p $(BUILD)
+
+	$(CXX_WIN) $(CXXFLAGS_WIN) $(SRC) \
+		-I../../include \
+		-o $(BUILD)/$(TARGET_WIN) $(LIBS_WIN)
+
+	$(MAKE) copy-dlls
+
+	@echo ""
+	@echo "================================"
+	@echo "      WINDOWS BUILD OK"
+	@echo "================================"
+	@echo "   SDL:  $(SDL)"
+	@echo "   ARCH: $(ARCH)-bit"
+	@echo "   OUT:  $(BUILD)/$(TARGET_WIN)"
+	@echo ""
+
+
+# =============================
+#   COPIA DE DLLs AUTOMÁTICA
+# =============================
+
+copy-dlls:
+	@echo "Copiando DLLs (Runtime + SDL + Depedencias)..."
+
+	# DLLs del runtime GCC
+	@for dll in $(RUNTIME_DLLS); do \
+		cp -f $(MINGW_PREFIX)/bin/$$dll $(BUILD)/ 2>/dev/null || true; \
+	done
+
+ifeq ($(SDL),2)
+	@echo "Copiando DLLs de SDL2..."
+
+	# SDL2 principales
+	@for f in SDL2.dll SDL2_image.dll; do \
+		cp -f $(MINGW_PREFIX)/bin/$$f $(BUILD)/ 2>/dev/null || true; \
+	done
+
+	# Formatos de imagen (todas las conocidas de SDL_image)
+	@for f in \
+		zlib1.dll \
+		libpng16-16.dll \
+		libjpeg-8.dll \
+		libwebp-7.dll \
+		libwebpdemux-2.dll \
+		libtiff-6.dll \
+		libjxl.dll \
+		libavif-16.dll \
+		labaom.dll \
+		libdav1d-7.dll \
+		librav1e.dll \
+		libyuv.dll \
+		libSvtAv1Enc-3.dll \
+		libsharpyuv-0.dll; do \
+		cp -f $(MINGW_PREFIX)/bin/$$f $(BUILD)/ 2>/dev/null || true; \
+	done
+endif
+
+
+clean:
+	rm -rf ../../build/windows
