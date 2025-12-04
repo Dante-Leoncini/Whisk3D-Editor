@@ -1,3 +1,6 @@
+#ifndef TABLERO_H
+#define TABLERO_H
+
 // MACROS
 //#define MATERIAL_MAX 1
 #define objVerticesModel    4
@@ -54,3 +57,5 @@ static const GLfloat objTexdataModelF[4 * 2] ={
     0.0f, 0.0f,   // esquina inferior izquierda
     0.0f, 1.0f    // esquina superior izquierda
 };
+
+#endif

@@ -1,23 +1,27 @@
-//interpolacion
-enum {lineal, closest};
+#ifndef OPCIONESRENDER_H
+#define OPCIONESRENDER_H
+
+#ifdef _WIN32
+    #include <windows.h>
+#endif
+
+#include <iostream>
+#include <GL/gl.h> // o GLES según corresponda
+
+// interpolación
+enum { lineal, closest };
 
 enum class RenderType { Solid, MaterialPreview, Rendered, ZBuffer };
 
-RenderType view = RenderType::MaterialPreview;
+// Declaraciones de variables globales
+extern RenderType view;
 
-RenderType StringToRenderType(const std::string& s){
-    if(s == "Solid")            return RenderType::Solid;
-    if(s == "MaterialPreview")  return RenderType::MaterialPreview;
-    if(s == "Rendered")         return RenderType::Rendered;
-    if(s == "ZBuffer")          return RenderType::ZBuffer;
+extern GLfloat MaterialPreviewAmbient[4];
+extern GLfloat MaterialPreviewDiffuse[4];
+extern GLfloat MaterialPreviewSpecular[4];
+extern GLfloat MaterialPreviewPosition[4];
 
-    std::cerr << "[StringToRenderType] WARNING: valor desconocido '" << s
-              << "' → usando RenderType::Solid" << std::endl;
-    return RenderType::Solid; // fallback seguro
-}
+// Declaración de función
+RenderType StringToRenderType(const std::string& s);
 
-//luz material preview
-GLfloat MaterialPreviewAmbient[4]  = { 0.3f, 0.3f, 0.3f, 1.0f };
-GLfloat MaterialPreviewDiffuse[4]   = { 1.0f, 1.0f, 1.0f, 1.0f };
-GLfloat MaterialPreviewSpecular[4]   = { 0.2f, 0.2f, 0.2f, 1.0f };
-GLfloat MaterialPreviewPosition[4]  = { -0.45f, 0.55f, 1.0f, 0.0f };
+#endif // OPCIONESRENDER_H

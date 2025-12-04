@@ -1,3 +1,6 @@
+#ifndef FUNCIONES_H
+#define FUNCIONES_H
+
 /*void NewMaterial(bool reemplazar){	
 	Material mat;	
 	mat.specular[0] = mat.specular[1] = mat.specular[2] = mat.specular[3] = 0.3;
@@ -69,3 +72,4 @@ void EliminarMesh(int indice){
 		}
 	}*/
 }
+#endif

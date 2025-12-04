@@ -1,53 +1,51 @@
-class Material;                 // forward declaration de la clase
-extern std::vector<Material*> Materials;   // forward declaration del vector global
+#ifndef MATERIALS_H
+#define MATERIALS_H
 
+#ifdef _WIN32
+    #include <windows.h>
+#endif
+
+#include <vector>
+#include <GL/gl.h>
+#include <string>
+
+#include "UI/text.h"
+#include "OpcionesRender.h"
+
+// Declaración adelantada de Material
+class Material;
+
+// Vector global de materiales
+extern std::vector<Material*> Materials;
+extern Material* MaterialDefecto;
+
+// ===================================================
+// Clase Material
+// ===================================================
 class Material { 
-	public:
-		bool textura = false;
-		bool transparent = false;
-		bool vertexColor = false;
-		bool lighting = true;
-		bool repeat = true;
-		bool uv8bit = false;
-		bool culling = true;
-		int interpolacion = lineal;
-		GLuint textureID = 0;
-		GLfloat diffuse[4]  = {1.0f, 1.0f, 1.0f, 1.0f};
-		GLfloat specular[4] = {0.3f, 0.3f, 0.3f, 1.0f};
-		GLfloat emission[4] = {0.0f, 0.0f, 0.0f, 1.0f};
-        Text* name = nullptr;
+public:
+    bool textura = false;
+    bool transparent = false;
+    bool vertexColor = false;
+    bool lighting = true;
+    bool repeat = true;
+    bool uv8bit = false;
+    bool culling = true;
+    int interpolacion = 0; // definir lineal en cpp
+    GLuint textureID = 0;
+    GLfloat diffuse[4]  = {1.0f, 1.0f, 1.0f, 1.0f};
+    GLfloat specular[4] = {0.3f, 0.3f, 0.3f, 1.0f};
+    GLfloat emission[4] = {0.0f, 0.0f, 0.0f, 1.0f};
+    Text* name = nullptr;
 
-        Material(const std::string& nombre, bool MaterialDefecto = false, bool TieneVertexColor = false) {
-            name = new Text(nombre);
-			if (!MaterialDefecto){
-				//std::cout << "Nuevo Material: " << nombre << std::endl;
-				Materials.push_back(this);
-			}
-			vertexColor = TieneVertexColor;
-        }
-
-		~Material() {
-			delete name;
-		}
+    Material(const std::string& nombre, bool MaterialDefecto = false, bool TieneVertexColor = false);
+    ~Material();
 };
 
-Material* MaterialDefecto;
-std::vector<Material*> Materials;
+// ===================================================
+// Funciones auxiliares
+// ===================================================
+Material* BuscarMaterialPorNombre(const std::string& name);
+int DuplicateMaterial(int srcId);
 
-Material* BuscarMaterialPorNombre(const std::string& name) {
-    for (size_t i = 0; i < Materials.size(); ++i){
-        if (Materials[i]->name->value == name) return Materials[i];
-		//std::cout << "name: " << name << " material: " << reinterpret_cast<Text*>(Materials[i]->name->data)->value << std::endl;
-	}
-    return nullptr;
-}
-
-int DuplicateMaterial(int srcId) {
-	return -1;
-    /*if (srcId < 0 || srcId >= (int)Materials.size()) return -1;
-
-    Material copy = Materials[srcId]; // copia completa
-    Materials.push_back(copy);
-
-    return (int)Materials.size() - 1; // devuelve el índice del duplicado*/
-}
+#endif

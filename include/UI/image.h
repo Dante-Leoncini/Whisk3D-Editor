@@ -1,3 +1,6 @@
+#ifndef IMAGE_H
+#define IMAGE_H
+
 #include "./icons.h"
 
 class Image {
@@ -61,3 +64,5 @@ Image* AddImage(Object2D& parent, int TextureID = 0, GLshort x = 0, GLshort y = 
 	// Retorna el índice
 	return static_cast<int>(Images.size()) - 1;	
 }*/
+
+#endif

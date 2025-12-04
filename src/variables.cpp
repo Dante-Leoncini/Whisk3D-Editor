@@ -1,0 +1,75 @@
+#include "variables.h"
+
+SDL_Window* window = nullptr;
+SDL_GameController* controller = nullptr;
+SDL_GLContext glContext = nullptr;
+
+int winW = 640;
+int winH = 480;
+
+// Inicialización de variables
+int axisSelect = X;
+
+GLshort TransformPivotPoint[3] = {0,0,0};
+GLfloat TransformPivotPointFloat[3] = {0.0f,0.0f,0.0f};
+
+float fovDeg = 45.0f;
+
+int nextLightId = GL_LIGHT1;
+
+float angle = 55.0f;
+int estado;
+int InteractionMode;
+int navegacionMode;
+
+std::string w3dPath = "";
+
+// Variables para el Mouse
+bool leftMouseDown = false;
+bool middleMouseDown = false;
+bool MouseWheel = false;
+int lastMouseX = 0;
+int lastMouseY = 0;
+
+// Cámara
+bool ViewPortClickDown = false;
+
+// Viewport3D valores globales
+bool showOverlayGlobal = false;
+
+GLfloat Cursor3DposX = 0.0f;
+GLfloat Cursor3DposZ = 0.0f;
+GLfloat Cursor3DposY = 0.0f;
+
+// Mouse
+GLshort mouseX = 0;
+GLshort mouseY = 0;
+bool mouseVisible = false;
+
+int ShiftCount = 0;
+int valorRotacion = 0;
+int NumTexturasWhisk3D = 0;
+
+// Cursores SDL
+SDL_Cursor* cursorDefault = nullptr;
+SDL_Cursor* cursorRotate = nullptr;
+SDL_Cursor* cursorScaleVertical = nullptr;
+SDL_Cursor* cursorScaleHorizontal = nullptr;
+SDL_Cursor* cursorTranslate = nullptr;
+
+// Función
+void InitCursors() {
+    #if SDL_MAJOR_VERSION == 2
+        cursorDefault         = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_ARROW);
+        cursorTranslate       = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZEALL);
+        cursorRotate          = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_CROSSHAIR);
+        cursorScaleVertical   = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZENS);
+        cursorScaleHorizontal = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZEWE);
+    #elif SDL_MAJOR_VERSION == 3
+        cursorDefault         = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_DEFAULT);
+        cursorTranslate       = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_MOVE);
+        cursorRotate          = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_CROSSHAIR);
+        cursorScaleVertical   = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_NS_RESIZE);
+        cursorScaleHorizontal = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_EW_RESIZE);
+    #endif
+}

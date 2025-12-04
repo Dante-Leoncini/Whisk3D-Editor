@@ -1,15 +1,20 @@
+#ifndef COLLECTION_H
+#define COLLECTION_H
+
+
+#include "./UI/icons.h"
+#include "./Objects.h"
+
 class Collection : public Object {
-    public:
-        Collection(Object* parent = nullptr)
-            : Object(parent, "Collection") {
-            IconType = static_cast<size_t>(IconType::archive);
-        }
+public:
+    // Constructor
+    Collection(Object* parent = nullptr);
 
-        ObjectType getType() override{
-            return ObjectType::collection;
-        }
+    // Métodos
+    ObjectType getType() override;
 
-		~Collection() {
-			delete name;
-		}
+    // Destructor
+    ~Collection();
 };
+
+#endif

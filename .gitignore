@@ -5,3 +5,24 @@ android/distribution/android/app/.cxx/
 android/distribution/android/app/intermediates/
 android/distribution/android/app/build/
 android/distribution/android/app/.externalNativeBuild/
+
+# --- Build directories ---
+build/
+*/build/
+build-*/
+
+#windows
+/platform/windows/build/
+
+# --- Visual Studio ---
+*.sdf
+*.suo
+*.user
+*.vcxproj.user
+*.vcxproj.filters
+*.VSWorkspaceState.json
+.vs/
+
+# --- IDE configs ---
+.vscode/
+.settings/
