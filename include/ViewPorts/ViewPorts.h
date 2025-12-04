@@ -137,6 +137,7 @@ class ViewportBase {
         virtual void event_key_up(SDL_Event &e) {}
         virtual void event_mouse_wheel(SDL_Event &e) {}
         virtual void mouse_button_up(SDL_Event &e) {}
+        virtual void event_finger_motion(float pinch) {}
 
 };
 

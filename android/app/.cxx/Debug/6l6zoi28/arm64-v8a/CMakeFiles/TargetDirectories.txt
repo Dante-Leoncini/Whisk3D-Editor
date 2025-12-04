@@ -1,0 +1,10 @@
+/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/hello_sdl2.dir
+/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/edit_cache.dir
+/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/CMakeFiles/rebuild_cache.dir
+/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/_deps/sdl-build/CMakeFiles/sdl_headers_copy.dir
+/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/_deps/sdl-build/CMakeFiles/SDL2.dir
+/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/_deps/sdl-build/CMakeFiles/edit_cache.dir
+/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/_deps/sdl-build/CMakeFiles/rebuild_cache.dir
+/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/_deps/sdl_image-build/CMakeFiles/SDL2_image.dir
+/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/_deps/sdl_image-build/CMakeFiles/edit_cache.dir
+/home/dante/Documentos/personal/Whisk3D/android/app/.cxx/Debug/6l6zoi28/arm64-v8a/_deps/sdl_image-build/CMakeFiles/rebuild_cache.dir

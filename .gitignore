@@ -1,3 +1,4 @@
+# Propiedades locales de Android
 /platform/android/local.properties
 
 # Archivos de construcción de CMake / NDK
@@ -5,3 +6,6 @@ android/distribution/android/app/.cxx/
 android/distribution/android/app/intermediates/
 android/distribution/android/app/build/
 android/distribution/android/app/.externalNativeBuild/
+
+# Gradle
+android/.gradle/

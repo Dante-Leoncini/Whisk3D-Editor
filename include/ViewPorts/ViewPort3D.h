@@ -634,6 +634,10 @@ class Viewport3D : public ViewportBase, public WithBorder  {
             posY+= e.wheel.y;
         }
 
+        void event_finger_motion(float pinch) override {
+            posY+= pinch;
+        }
+
         void event_mouse_motion(int mx, int my) override {
             //boton del medio del mouse
             #ifdef __ANDROID__

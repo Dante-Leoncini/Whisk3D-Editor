@@ -4,8 +4,54 @@ void Contadores(){
 	}
 }
 
+//para pantallas multitactiles
+struct Finger {
+    float x;
+    float y;
+};
+
+std::map<SDL_FingerID, Finger> fingers;
+float lastDistance = 0.0f;
+float PINCHposY = 0.0f;
+
 void InputUsuarioSDL3(SDL_Event &e){
 	RefreshInputControllerSDL(e);
+
+    switch(e.type) {
+        case SDL_FINGERDOWN:
+            fingers[e.tfinger.fingerId] = {e.tfinger.x, e.tfinger.y};
+            break;
+
+        case SDL_FINGERUP:
+            fingers.erase(e.tfinger.fingerId);
+            lastDistance = 0.0f; // reset
+            break;
+
+        case SDL_FINGERMOTION:
+            fingers[e.tfinger.fingerId] = {e.tfinger.x, e.tfinger.y};
+            if(fingers.size() == 2) {
+                auto it = fingers.begin();
+                Finger f1 = it->second;
+                ++it;
+                Finger f2 = it->second;
+
+                float dx = f2.x - f1.x;
+                float dy = f2.y - f1.y;
+                float dist = sqrt(dx*dx + dy*dy);
+
+                if(lastDistance != 0.0f) {
+                    float delta = dist - lastDistance;
+                    PINCHposY += delta * 1; // escalado a gusto
+                }
+
+                lastDistance = dist;
+            }
+		
+			if (viewPortActive){
+				viewPortActive->event_finger_motion(PINCHposY);
+			}
+            break;
+    }
 
     if (e.type == SDL_EVENT_MOUSE_MOTION){
 		int mx = e.motion.x;

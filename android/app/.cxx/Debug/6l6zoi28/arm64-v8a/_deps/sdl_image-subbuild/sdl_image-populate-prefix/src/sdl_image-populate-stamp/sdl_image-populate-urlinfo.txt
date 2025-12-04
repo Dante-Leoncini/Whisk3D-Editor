@@ -1,0 +1,3 @@
+repository='external project URL'
+module='https://github.com/libsdl-org/SDL_image/archive/release-2.8.2.zip'
+tag=''
