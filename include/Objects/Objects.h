@@ -571,9 +571,9 @@ class SaveState {
 		GLfloat rotX = 0.0f;
 		GLfloat rotY = 0.0f;
 		GLfloat rotZ = 0.0f;
-		GLfixed scaleX = 0;
-		GLfixed scaleY = 0;
-		GLfixed scaleZ = 0;
+		GLfloat scaleX = 0;
+		GLfloat scaleY = 0;
+		GLfloat scaleZ = 0;
 };
 std::vector<SaveState> estadoObjetos;
 

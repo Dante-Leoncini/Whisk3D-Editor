@@ -21,8 +21,3 @@ GLfloat MaterialPreviewAmbient[4]  = { 0.3f, 0.3f, 0.3f, 1.0f };
 GLfloat MaterialPreviewDiffuse[4]   = { 1.0f, 1.0f, 1.0f, 1.0f };
 GLfloat MaterialPreviewSpecular[4]   = { 0.2f, 0.2f, 0.2f, 1.0f };
 GLfloat MaterialPreviewPosition[4]  = { -0.45f, 0.55f, 1.0f, 0.0f };
-
-#include "./Objects/Textures.h"
-#include "./UI/UI.h"
-#include "./Objects/Materials.h"
-#include "./Objects/Objects.h"

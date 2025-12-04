@@ -43,6 +43,17 @@ Se puede compilar Whisk3D desde la carpeta "Linux" usando el comando "make". o "
 Para compilar. desde el directorio raiz usa
 cd platform/android && ./gradlew assembleDebug
 
+## Nota para Windows
+Para compilar. 
+1) instala MSYS2 desde https://www.msys2.org/
+2) instala desde la consola GNU Make + MinGW-W64 con el comando "pacman -S make mingw-w64-x86_64-gcc"
+3) instala desde la consola "pacman -S mingw-w64-x86_64-gcc"
+4) instala la libreria de SDL2 (a menos que quieras usar SDL3 o SDL1) con "pacman -S mingw-w64-x86_64-SDL2" y "pacman -S mingw-w64-x86_64-SDL2_image"
+5) anda a la carpeta "Whisk3D/platform/windows"
+6) desde la terminal de MINGW64 (es azul) escribi "make windows"
+
+con eso tenes por defecto la version de 64bit de windwos en "Whisk3D/build/windows/Whisk3D_xxx.exe"
+
 ## Aclaraciones:
 
 1. No es un port: Este programa no comparte código con el original.

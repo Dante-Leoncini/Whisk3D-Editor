@@ -30,9 +30,14 @@
 	}
 #endif
 
-inline GLfixed COLOR_CONVERT_FIXED(float x) {
-    return static_cast<GLfixed>(x * 65536.0f);
+
+
+//los colores fixed solo son para android
+#ifdef __ANDROID__
+    inline GLfixed COLOR_CONVERT_FIXED(float x) {
+        return static_cast<GLfixed>(x * 65536.0f);
 }
+#endif
 
 std::string getParentPath(const std::string &filepath) {
     size_t pos = filepath.find_last_of("/\\");

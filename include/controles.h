@@ -127,8 +127,8 @@ void InputUsuarioSDL3(SDL_Event &e){
 	}
 }
 
-void InputUsuarioSymbian(GLfixed aDeltaTimeSecs){
-	/*if (iInputHandler->IsInputPressed( EEscape )){
+/*void InputUsuarioSymbian(GLfixed aDeltaTimeSecs){
+	if (iInputHandler->IsInputPressed( EEscape )){
 		Cancelar();
 		return;
 	}
@@ -482,8 +482,8 @@ void InputUsuarioSymbian(GLfixed aDeltaTimeSecs){
 		else if (estado == translacion){
 			SetTranslacionObjetos(30, 0);		
 		}
-	}*/
-}
+	}
+}*/
 
 //Como es en SDL2
 /*void InputUsuarioSDL(SDL_Event &e){

@@ -581,9 +581,6 @@ class ViewportColumn : public ViewportBase {
         }
 };
 
-#include "./ViewPort3D.h"
-#include "./Outliner.h"
-
 ViewportBase* rootViewport = nullptr;
 
 /*ViewportBase* FindViewportUnderMouse(ViewportBase* vp, int mx, int my) {
