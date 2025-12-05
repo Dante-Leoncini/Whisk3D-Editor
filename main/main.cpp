@@ -110,14 +110,21 @@
                 }
             }
 
-            // 2. Ruta estándar de Linux (para .deb)
-            std::string systemPath = "/usr/share/Whisk3d/res";
-            if (std::filesystem::exists(systemPath)){
-                std::cout << "instalaste Whisk3D en tu linux! me caes bien. usando res en /usr/share/Whisk3D\n";
-                return systemPath;
+            // 2. Ruta usando XDG_DATA_DIRS (estándar Linux)
+            const char* xdgDataDirs = std::getenv("XDG_DATA_DIRS");
+            std::string dataDirs = xdgDataDirs ? xdgDataDirs : "/usr/local/share:/usr/share";
+
+            std::istringstream stream(dataDirs);
+            std::string dir;
+            while (std::getline(stream, dir, ':')) {
+                std::string systemPath = dir + "/Whisk3d/res";
+                if (std::filesystem::exists(systemPath)){
+                    std::cout << "instalaste Whisk3D en tu linux! me caes bien. usando res en " << systemPath << "\n";
+                    return systemPath;
+                }
             }
 
-            // 4. Si no hay nada, fallback
+            // 3. Si no hay nada, fallback
             std::cout << "esto seguro explota!\n";
             return "";
         #else

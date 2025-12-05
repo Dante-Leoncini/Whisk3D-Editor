@@ -86,3 +86,68 @@ if(WHISK3D_BUILD_ANDROID)
     message(STATUS "Building Whisk3D for Android")
     target_compile_definitions(whisk3d PRIVATE WHISK3D_ANDROID=1)
 endif()
+
+# ---------------------------------------------------
+# INSTALACION LINUX
+# ---------------------------------------------------
+
+if(WHISK3D_BUILD_LINUX)
+    install(TARGETS whisk3d
+        RUNTIME DESTINATION bin
+    )
+
+    install(DIRECTORY ${CMAKE_SOURCE_DIR}/res/
+        DESTINATION share/Whisk3d/res
+        FILES_MATCHING
+        PATTERN "*.png"
+        PATTERN "*.svg"
+        PATTERN "*.ini"
+        PATTERN "Skins/*"
+    )
+
+    install(FILES ${CMAKE_SOURCE_DIR}/main/whisk3d.desktop
+        DESTINATION share/applications
+    )
+
+    install(FILES ${CMAKE_SOURCE_DIR}/res/Whisk3D.svg
+        DESTINATION share/icons/hicolor/scalable/apps
+        RENAME whisk3d.svg
+    )
+
+    install(FILES ${CMAKE_SOURCE_DIR}/res/Whisk3D.png
+        DESTINATION share/icons/hicolor/256x256/apps
+        RENAME whisk3d.png
+    )
+
+    set(CPACK_GENERATOR "DEB;AppImage;RPM")
+
+    # Deb
+    set(CPACK_PACKAGE_NAME "whisk3d")
+    set(CPACK_PACKAGE_VERSION "25.12.04")
+    set(CPACK_PACKAGE_CONTACT "Dante Leoncini <dante_leoncini@outlook.com.ar>")
+    set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Dante Leoncini <dante_leoncini@outlook.com.ar>")
+    set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Whisk3D - editor y motor 3D retro multiplataforma")
+    set(CPACK_DEBIAN_PACKAGE_DESCRIPTION "Whisk3D - editor y motor 3D retro multiplataforma")
+    set(CPACK_DEBIAN_PACKAGE_SECTION "graphics")
+    set(CPACK_DEBIAN_PACKAGE_PRIORITY "optional")
+    set(CPACK_DEBIAN_PACKAGE_DEPENDS "libgl1, libglu1-mesa, libsdl2-2.0-0, libsdl2-image-2.0-0")
+    set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE "amd64")
+
+    # rpm
+    set(CPACK_RPM_PACKAGE_REQUIRES "mesa-libGL, mesa-libGLU, SDL2, SDL2_image")
+    set(CPACK_RPM_PACKAGE_LICENSE "MIT")
+    set(CPACK_RPM_PACKAGE_GROUP "Graphics")
+
+    # Appimage
+    #set(CPACK_APPIMAGE_TOOL_EXECUTABLE "/usr/bin/appimagetool")
+
+    set(CPACK_APPIMAGE_DESKTOP_FILE "whisk3d.desktop")
+    set(CPACK_APPIMAGE_ICON_FILE "whisk3d.png")
+    set(CPACK_PACKAGE_ICON "whisk3d.png")
+    set(CPACK_APPIMAGE_MAIN_EXECUTABLE "whisk3d")
+
+    #  AppImageUpdate info
+    #set(CPACK_APPIMAGE_UPDATE_INFORMATION "gh-releases-zsync|user|repo|latest|*.AppImage.zsync")
+
+    include(CPack)
+endif()
