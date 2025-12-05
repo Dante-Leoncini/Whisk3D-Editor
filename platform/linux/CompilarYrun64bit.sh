@@ -1,1 +1,0 @@
-make linux SDL=2 ARCH=64 && ../../build/linux/Whisk3D_Pre-alpha

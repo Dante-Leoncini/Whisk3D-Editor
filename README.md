@@ -1,63 +1,99 @@
-# Whisk 3D (Ex Blendersito)
+# Whisk 3D
 
-[![es](https://img.shields.io/badge/lang-es-yellow.svg)](/README.es.md)
+<p align="center">
+    <img src="logo_outlined.svg" width="400" alt="Whisk3D logo">
+</p>
 
-Whisk3D is a fully home-grown 3D creation tool developed from scratch, with the goal of bringing modeling, rendering, animation and game development to any device — even those considered “obsolete.”
+## Motor multiplataforma 2D y 3D estilo retro
 
-It began as a lightweight Blender-like tool made for Nokia phones, but today it has evolved into something much more: a creative environment focused on low-poly aesthetics and the visual identity of PlayStation, Dreamcast and retro PC graphics. Whisk3D prioritizes speed, accessibility and fun over unnecessary complexity.
+Whisk3D es una herramienta de creación 2D/3D estilo retro, con el objetivo de llevar el modelado, render, animación y desarrollo de videojuegos a cualquier dispositivo, incluso aquellos “Obsoletos”.
 
-The MIT license allows anyone to use it freely to create games, commercial, educational or artistic projects, and even fork or expand the tool without restrictions.
+Nació como un clon liviano de Blender para Nokia, pero hoy es mucho más: un entorno creativo, centrado en la estética low-poly y la identidad visual de PlayStation, Dreamcast y la PC retro. Whisk3D prioriza la velocidad, la accesibilidad y la diversión por encima de la complejidad excesiva.
 
-It is still in pre-alpha — an early glimpse of something that is growing — yet it already carries a clear vision: anyone should be able to model, animate, design, render and develop 3D games without needing modern hardware or facing overwhelming learning curves.
+## ¡Software Libre!
 
-Whisk3D is built on a simple philosophy: hardware shouldn’t die because software did. I want to prove that planned obsolescence can be reversed through code, and that a machine labeled as “old” can continue creating, imagining and producing new content.
+La licencia MIT permite que cualquiera pueda usarlo libremente para crear juegos, proyectos comerciales, educativos o artísticos, e incluso hacer forks y expandir la herramienta sin restricciones.
 
-The project — and the games made with it — aim to be sustained through voluntary donations, not microtransactions, intrusive ads, loot boxes, or systems designed to manipulate or create artificial engagement.
-Whisk3D does NOT install background services, track users, sell data, require an account or demand permanent connectivity. We respect creators and players.
+**Aun esta en pre-alpha**, una primera mirada a algo que todavía está creciendo, pero con una visión clara: que cualquier persona pueda modelar, animar, diseñar, renderizar y desarrollar juegos 3D sin necesitar una PC moderna ni enfrentar curvas de aprendizaje intimidantes.
+Whisk3D se construye con una filosofía sencilla: **el hardware no debería morir por el software**. Busco demostrar que la obsolescencia programada puede revertirse desde el código, que una máquina considerada “vieja” puede seguir creando, imaginando y generando contenido nuevo.
 
-We want to return control of software back to its users, democratize creation, and allow new generations to experiment with 3D without technical or financial barriers.
+El proyecto, y los videojuegos que se desarrollen con él, planean sostenerse mediante donaciones voluntarias, **no con microtransacciones, publicidad molesta, loot boxes, ni mecanismos diseñados para generar adicción o manipular al jugador.**
+Whisk3D **NO** instala servicios ocultos, no espía al usuario ni vende sus datos, no exige cuentas ni conexión permanente. **Respetamos a los creadores y jugadores**.
+
+Queremos **devolverte el control de tu software**, democratizar la creación y permitirle a las nuevas generaciones experimentar con el 3D ****sin barreras técnicas ni económicas**.
 
 ![](https://i.ibb.co/hp1w0DH/Captura-desde-2025-11-26-15-19-37.png)
 
 YouTube: [Youtube Video](https://youtu.be/dMe-Vit5OT0)
 
-## Instalation: 
-You need to have PyS60 installed, or it won’t run. If you don’t have it, I’ve included the installer in the "Dependencies" folder on GitHub. The latest version is always in the "sis" folder as "Whisk3D_gcce.sisx", though the latest version might not always work properly. The more polished versions are always in the "releases" folder, with their date and a name referencing the demos I show on [Instagram](https://www.instagram.com/dante_leoncini?igsh=MWpjYTd5YzU5dTBkNg==).
+## Instalacion en Symbian:
 
-The program isn’t production-ready and has several known bugs. It’s constantly evolving, and I’m always adding or removing features. For example, the 3D modeling feature was removed in the latest versions, but if you use versions like Whisk3D_gcce_beta_24-08-15_FERNET.sisx, it was still available.
+Necesitas tener instalado PyS60, o el programa no se ejecutará, Se ha incluido el instalador in la carpeta "Dependencies" del repositorio. La última versión estará siempre en la carpeta "sis" con el nombre de "Whisk3D_gcce.sisx", aunque la última versión quizás no funcione correctamente, la versión verificada estará siempre en la carpeta "releases" con la fecha de salida y nombre referenciando los videos e imágenes de demostración mostrados en [Instagram](https://www.instagram.com/dante_leoncini?igsh=MWpjYTd5YzU5dTBkNg==). 
 
-Finally, if the installer fails, it’s likely you’ll need to hack your phone to bypass Symbian’s restrictions on certificates. Here’s a video showing how to do it: [tutorial hack](https://www.youtube.com/watch?v=UJJICzbk3TA)
+Este programa no esta listo para producción y tiene una serie de errores conocidos, se encuentra en constante desarrollo, y se esta constantemente añadiendo o quitando características. Por ejemplo, la opción para modelado 3d ha sido removida en las últimas versiones, pero si usas una versión anterior como "Whisk3D_gcce_beta_24-08-15_FERNET.sisx", el modelado 3d sigue disponible.
 
-## Clarifications:
-1. Not a port: This program does not share any code with the original Blender.
-2. Basic functionality: The program is basic, and some media have exaggerated its current capabilities.
-3. Future updates: The ability to model, render, animate, and more is in development. Updates will be shared on social media.
-4. Planned obsolescence: The project's goal is to highlight the planned obsolescence of phones, both those from 18 years ago and current models. I aim to generate consumer demand for more sustainable and durable phones, reducing the vast amount of electronic waste. This would also help more people access technology through the recycling of these old devices.
-5. Knowledge in computing: We want to highlight the general lack of knowledge in computing. It shouldn't be surprising that Whisk 3D works on a Nokia N95, a phone that was top-of-the-line in its time, comparable to today's iPhone 15 Pro Max. I want to make it clear that with 300 MHz and 128 MB of RAM, tasks that today require phones with 8 GB of RAM and multicore processors can be performed.
-6. Use of the Blender logo: The Blender logo belongs to the Blender Foundation. I would like to discuss with the foundation the possibility of splitting the project into two: one entirely free as a 3D game engine with its own identity, and another that can be part of the Blender Foundation, using its logo and assets to avoid multiple clones of the project (as happens with Linux distributions). It would also be interesting if Whisk 3D could become compatible with the traditional Blender. The idea is to create something that adds value. "The Freedom to Create". Blender does a great job in this regard, and Whisk3D is just a way to allow more people to enter this wonderful world.
-7. Rendering and ray tracing: Whisk 3D can already perform renderings. Rendering, in computing terms, is the process of generating an image from a 2D or 3D model. While I haven't implemented ray tracing yet, the Nokia N95 is capable of it through its CPU and FPU (Floating Point Unit). In movies like Terminator 2 and Jurassic Park, SGI Onyx computers from 1993 were used. The Nokia N95, released in 2007, has 14 years of difference and is comparable in terms of power. It is concerning that so many people are surprised that an old phone can perform rendering.
-8. Graphics performance: Whisk 3D runs smoothly thanks to the N95's hardware graphics acceleration (PowerVR MBX Lite) and its FPU, which allows it to handle complex 3D models like Arthur Morgan from Red Dead Redemption 2.
-   
- ![](https://pbs.twimg.com/media/GPawZAKWsAA7Rw9?format=png) ![](https://pbs.twimg.com/media/GPawalTWUAAe-J1?format=png)
+Sí el instalador falla, probablemente debas de "hackear" tu teléfono para ignorar las restricciones y certificados de Symbian. Puedes ver el siguiente video mostrando como hacerlo: [Tutorial Hack](https://www.youtube.com/watch?v=UJJICzbk3TA)
 
-9. Project compatibility: This project works on all Nokia s60v3 devices. However, many phones, including later models, lack graphics acceleration due to Nokia's poor decision to save money by removing this feature. Although these phones may seem faster on paper than the N95, they are slower and more economical in practice due to the lack of graphics acceleration.
+## Linux
 
-## About Blender
-I am quite indignant about the many negative comments towards Blender, calling it heavy and inefficient on their computers. Blender is an extremely powerful program and can still run on fairly modest PC configurations. I've been using it for years and it's a software I love. You can even download older versions of Blender that work very well on older computers. I've used modern versions that also run excellently on computers from 10-15 years ago, solely with CPU graphics acceleration.
+Para compilar en Linux/Ubuntu hace falta instalar las dependencias y en la carpeta raiz usar cmake y los siguientes comandos:
 
-I highly recommend using Linux, installing an SSD in your PCs, and optimizing your projects according to your hardware and needs. You'll see that it's possible to work with old hardware without any issues.
+```bash
+cmake -B build-linux -DCMAKE_BUILD_TYPE=Release
+cmake --build build-linux --config Release -- -j8
+```
 
-## Thank You!
-Thank you to everyone who shared the project. I hope this effort helps raise awareness and urge companies to manufacture more durable and sustainable phones.
+si queres hacer un debug:
 
-#Thanks Marcig for the new Name!
-(Currently is not support for s60v5 aka Symbian belle. But in theory is not hard to achieve)
+```
+cmake -B build-linux -DCMAKE_BUILD_TYPE=Debug
+cmake --build build-linux --config Debug -- -j8
+```
+
+## Android
+
+Para compilar. desde el directorio raiz usa
+cd platform/android && ./gradlew assembleDebug
+
+## Windows
+
+Para compilar. 
+
+1) en la carpeta raiz "git submodule update --init --recursive" (para tener los submodulos de SDL2 y SDL2_image)
+2) Instalar Visual Studio Code 2019 o mas nuevo y cmake desde https://cmake.org/download/
+3) si no lo tenes, en "Visual Studio Installer" vas a "Modificar" y tildas C++ Desktop Development "MSVC v142 - VS 2019 C++ x64/x86 Build Tools (Latest)", "C++ CMake tools for Window" y "Windows 10 SDK 10.0.19041.0" (o superior)
+4) Abrí Inicio → escribí Developer Command Prompt for VS 2018 (o el que tengas)
+5) anda al directorio cd C:\BLA BLA BLA\Whisk3D\platform\windows (aca adentro esta el CMakeLists.txt)
+6) cmake -S . -B ../../build/windows/x64 -G "Visual Studio 18 2026" -A x64
+7) cmake --build ../../build/windows/x64 --config Release
+
+## Aclaraciones:
+
+1. No es un port: Este programa **no comparte** código con Blender.
+2. Funcionalidad básica: El programa es básico, y algunos medios han exagerado sus capacidades actuales.
+3. Futuras actualizaciones: Está en desarrollo la capacidad para modelar, renderizar, animar, entre otras funciones Las novedades se compartirán en redes sociales.
+4. Obsolescencia programada: El objetivo del proyecto **es evidenciar la obsolescencia programada** de los teléfonos, tanto de hace 18 años como de los actuales. Busco generar una demanda por parte de los consumidores de teléfonos más sostenibles y duraderos, reduciendo la enorme cantidad de residuos electrónicos. también ayudaría a que mas gente acceda a la tecnología gracias al reciclaje de estos antiguos dispositivos.
+5. Conocimiento en informática: Queremos resaltar la falta de conocimiento general en informática. No debería sorprender que Whisk 3D funcione en un Nokia N95, un teléfono que en su tiempo era de gama alta, comparable con un iPhone 15 Pro Max de hoy. Quiero dejar claro que con 300 MHz y 128 MB de RAM se pueden realizar tareas que hoy en día requieren teléfonos con 8 GB de RAM y procesadores multicore.
+6. Renderización y trazado de rayos: Whisk 3D ya puede hacer renderizaciones. La renderización, en términos informáticos, es el proceso de generar una imagen a partir de un modelo 2D o 3D. Si bien aún no he implementado el trazado de rayos, el Nokia N95 es capaz de hacerlo mediante su CPU y FPU (Unidad de Punto Flotante). En películas como Terminator 2 y Jurassic Park, se utilizaron computadoras SGI Onyx de 1993. El Nokia N95, lanzado en 2007, tiene 14 años de diferencia y es comparable en cuanto a potencia. Es preocupante que tanta gente se sorprenda de que un teléfono antiguo pueda realizar un render.
+7. Desempeño gráfico: Whisk 3D se ve fluido gracias a la **aceleración gráfica** por hardware del N95 (PowerVR MBX Lite) y su FPU, lo que permite mover modelos 3D complejos como Arthur Morgan de Red Dead Redemption 2.
+
+![](https://pbs.twimg.com/media/GPawZAKWsAA7Rw9?format=png) ![](https://pbs.twimg.com/media/GPawalTWUAAe-J1?format=png)
+
+9. Este proyecto funciona en todos los Nokia s60v3. Sin embargo, muchos teléfonos, incluso modelos lanzados posteriormente, no tienen aceleración gráfica debido a la mala decisión de Nokia de ahorrar dinero eliminando esta característica. Aunque estos teléfonos puedan parecer más rápidos en papel que el N95, en la práctica son más lentos y económicos debido a la falta de aceleración gráfica.
+
+## ¡Gracias!
+
+Gracias a todos los que compartieron el proyecto. Espero que este esfuerzo sirva para aumentar la conciencia y exigir a las empresas que fabriquen teléfonos más duraderos y sostenibles.
+#Gracias a Marcig por el nuevo nombre!
+
+(Actualmente no hay soporte para s60v5 o Symbian belle. Pero en teoría no sería difícil de lograr)
 
 [Primera Demo en Video](https://youtu.be/dMe-Vit5OT0)
 
-This program is optimized to run on a Nokia N95-3 with 128mb of ram.
-It can work in other Nokia's s60v3 with 64mb or less, but with the mayority has not graphic acceleration, it may not run as well as seen on the demos.
+Fue optimizado para funcionar en un Nokia N95-3 con 128mb de ram.
+Puede funcionar en otros Nokia s60v3 con 64mb o menos. pero como la mayoría no tiene aceleración gráfica, no se va a ver tan fluido como en las demos que estoy mostrando.
 
-Notes: it's necessary to have python installed in order to run! (pys60 2.0.0)
-# Contribute
-Please do contribute! Issues and pull requests are welcome.
+# ¡Participa!
+
+Tengo pensado agregar mas funciones. 
+Cualquier aporte que quiera realizar al código es Bienvenida.

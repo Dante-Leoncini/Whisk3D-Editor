@@ -1,0 +1,11 @@
+[submodule "thirdparty/SDL2"]
+	path = thirdparty/SDL2
+	url = https://github.com/libsdl-org/SDL
+	branch = SDL2
+[submodule "thirdparty/SDL2_image"]
+	path = thirdparty/SDL2_image
+	url = https://github.com/libsdl-org/SDL_image
+	branch = SDL2
+[submodule "thirdparty/tinyfiledialogs"]
+	path = thirdparty/tinyfiledialogs
+	url = https://github.com/native-toolkit/tinyfiledialogs.git

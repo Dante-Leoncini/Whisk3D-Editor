@@ -1,0 +1,20 @@
+{
+    "logs": [
+        {
+            "outputFile": "pvallet.com.github.hello_sdl2.app-mergeDebugResources-7:/values-watch-v20/values-watch-v20.xml",
+            "map": [
+                {
+                    "source": "/home/dante/.gradle/caches/8.9/transforms/05d6de65a18d1a783e452d0c6ac64abb/transformed/appcompat-1.1.0/res/values-watch-v20/values-watch-v20.xml",
+                    "from": {
+                        "startLines": "2,5,8",
+                        "startColumns": "4,4,4",
+                        "startOffsets": "55,214,385",
+                        "endLines": "4,7,10",
+                        "endColumns": "12,12,12",
+                        "endOffsets": "209,380,553"
+                    }
+                }
+            ]
+        }
+    ]
+}
