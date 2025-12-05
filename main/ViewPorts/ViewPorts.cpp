@@ -289,20 +289,19 @@ bool ViewportRow::isLeaf() const {
 
 // ------------------ Resize children ------------------
 void ViewportRow::SetSizeChildrens(int move) {
+    if (!childA || !childB) return;  // validar antes
+    
     int test_A = childA->width + move;
     int test_B = childB->width - move;
 
     if (test_A < MinViewportWidthGS || test_B < MinViewportWidthGS) return;
 
-    if (childA) {
-        childA->width += move;
-        childA->Resize(childA->width, childA->height);
-    }
-    if (childB) {
-        childB->x += move;
-        childB->width -= move;
-        childB->Resize(childB->width, childB->height);
-    }
+    childA->width += move;
+    childA->Resize(childA->width, childA->height);
+
+    childB->x += move;
+    childB->width -= move;
+    childB->Resize(childB->width, childB->height);
 
     splitFrac = static_cast<float>(childA->width) / static_cast<float>(width);
 }
@@ -368,20 +367,19 @@ bool ViewportColumn::isLeaf() const {
 
 // ------------------ Resize children vertical ------------------
 void ViewportColumn::SetSizeChildrens(int move) {
+    if (!childA || !childB) return;  // validar antes
+
     int test_A = childA->height - move;
     int test_B = childB->height + move;
 
     if (test_A < MinViewportHeightGS || test_B < MinViewportHeightGS) return;
 
-    if (childA) {
-        childA->height -= move;
-        childA->Resize(childA->width, childA->height);
-    }
-    if (childB) {
-        childB->y -= move;
-        childB->height += move;
-        childB->Resize(childB->width, childB->height);
-    }
+    childA->height -= move;
+    childA->Resize(childA->width, childA->height);
+
+    childB->y -= move;
+    childB->height += move;
+    childB->Resize(childB->width, childB->height);
 
     splitFrac = static_cast<float>(childA->height) / static_cast<float>(height);
 }
