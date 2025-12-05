@@ -1,5 +1,6 @@
 [Desktop Entry]
-Version=25.12.04
+#Version=1.5 # Version is for spec version, not app version
+X-AppVersion=25.12.04
 Type=Application
 Name=Whisk3D pre-alpha
 GenericName=Game Engine

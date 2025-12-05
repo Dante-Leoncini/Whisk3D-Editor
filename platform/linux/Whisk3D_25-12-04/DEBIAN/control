@@ -1,9 +1,0 @@
-Package: whisk3d
-Version: 25.12.04
-Section: graphics
-Priority: optional
-Architecture: amd64
-Depends: libgl1, libglu1-mesa, libsdl2-2.0-0, libsdl2-image-2.0-0
-Maintainer: Dante Leoncini <dante_leoncini@outlook.com.ar>
-Description: Whisk3D - editor y motor 3D retro multiplataforma
-
