@@ -94,11 +94,7 @@
         #ifdef __ANDROID__
             return "res"; // assets internos del APK
         #elif defined(WHISK3D_LINUX)
-            // 1. Si hay variable de entorno (útil para pruebas)
-            const char* envRes = std::getenv("WHISK3D_RES");
-            if (envRes && *envRes) return std::string(envRes);
-
-            // 2. Ruta relativa al ejecutable (para portable)
+            // 1. Ruta relativa al ejecutable (para portable)
             char exePath[PATH_MAX];
             ssize_t count = readlink("/proc/self/exe", exePath, PATH_MAX);
             if (count != -1) {
@@ -108,14 +104,21 @@
                     exeDir = exeDir.substr(0, pos);
 
                 std::string portablePath = exeDir + "/res";
-                if (std::filesystem::exists(portablePath)) return portablePath;
+                if (std::filesystem::exists(portablePath)){
+                    std::cout << "parece que es una version portable. se va a usar el res local\n";
+                    return portablePath;
+                }
             }
 
-            // 3. Ruta estándar de Linux (para .deb)
-            std::string systemPath = "/usr/share/Whisk3D";
-            if (std::filesystem::exists(systemPath)) return systemPath;
+            // 2. Ruta estándar de Linux (para .deb)
+            std::string systemPath = "/usr/share/Whisk3d/res";
+            if (std::filesystem::exists(systemPath)){
+                std::cout << "instalaste Whisk3D en tu linux! me caes bien. usando res en /usr/share/Whisk3D\n";
+                return systemPath;
+            }
 
             // 4. Si no hay nada, fallback
+            std::cout << "esto seguro explota!\n";
             return "";
         #else
             // build local o Windows

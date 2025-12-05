@@ -43,11 +43,10 @@ cmake -B build-linux -DCMAKE_BUILD_TYPE=Release
 cmake --build build-linux --config Release -- -j8
 ```
 
-si queres hacer un debug:
+en la carpeta /platform/linux se encuentra "Whisk3D_xx-xx-xx" podes crear un .deb para ubuntu editando esa carpeta y usando el comando
 
-```
-cmake -B build-linux -DCMAKE_BUILD_TYPE=Debug
-cmake --build build-linux --config Debug -- -j8
+```bash
+dpkg-deb --build Whisk3D_25-12-04/
 ```
 
 ## Android
