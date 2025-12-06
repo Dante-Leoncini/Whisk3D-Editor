@@ -68,6 +68,33 @@
 #else
     #include <unistd.h>
     #include <limits.h>
+
+    std::string getUserConfigDir() {
+        #ifdef WHISK3D_LINUX
+            const char* xdgConfigHome = std::getenv("XDG_CONFIG_HOME");
+            std::string configDir;
+
+            if (xdgConfigHome && strlen(xdgConfigHome) > 0) {
+                configDir = std::string(xdgConfigHome) + "/Whisk3d";
+            } else {
+                const char* home = std::getenv("HOME");
+                if (home) {
+                    configDir = std::string(home) + "/.config/Whisk3d";
+                }
+            }
+
+            // Create directory if it doesn't exist
+            if (!configDir.empty() && !std::filesystem::exists(configDir)) {
+                std::filesystem::create_directories(configDir);
+                std::cout << "Creado directorio de configuración de usuario: " << configDir << "\n";
+            }
+
+            return configDir;
+        #else
+            return "";
+        #endif
+    }
+
     std::string getExeDir() {
         #ifdef _WIN32
             char buffer[MAX_PATH];
@@ -94,26 +121,36 @@
         #ifdef __ANDROID__
             return "res"; // assets internos del APK
         #elif defined(WHISK3D_LINUX)
-            // 1. Ruta relativa al ejecutable (para portable)
+            std::string exeDir;
             char exePath[PATH_MAX];
             ssize_t count = readlink("/proc/self/exe", exePath, PATH_MAX);
             if (count != -1) {
-                std::string exeDir(exePath, count);
+                exeDir = std::string(exePath, count);
                 size_t pos = exeDir.find_last_of('/');
                 if (pos != std::string::npos)
                     exeDir = exeDir.substr(0, pos);
+            }
 
+            // 1. Ruta relativa al ejecutable (portable)
+            if (!exeDir.empty()) {
                 std::string portablePath = exeDir + "/res";
-                if (std::filesystem::exists(portablePath)){
+                if (std::filesystem::exists(portablePath)) {
                     std::cout << "parece que es una version portable. se va a usar el res local\n";
                     return portablePath;
                 }
             }
 
-            // 2. Ruta usando XDG_DATA_DIRS (estándar Linux)
+            if (!exeDir.empty()) {
+                std::string appImagePath = exeDir + "/../share/Whisk3d/res";
+                if (std::filesystem::exists(appImagePath)) {
+                    std::cout << "usando res de AppImage/bundle en " << appImagePath << "\n";
+                    return std::filesystem::canonical(appImagePath).string();
+                }
+            }
+
+            // 2. Ruta usando XDG_DATA_DIRS (instalación sistema)
             const char* xdgDataDirs = std::getenv("XDG_DATA_DIRS");
             std::string dataDirs = xdgDataDirs ? xdgDataDirs : "/usr/local/share:/usr/share";
-
             std::istringstream stream(dataDirs);
             std::string dir;
             while (std::getline(stream, dir, ':')) {
@@ -157,8 +194,8 @@ struct Config {
     bool enableAntialiasing = false;
     int width = 800;
     int height = 600;
-	int displayIndex = 0; // monitor 1
-	std::string SkinName = "Whisk3D"; // monitor 1
+    int displayIndex = 0;
+    std::string SkinName = "Whisk3D";
     std::string graphicsAPI = "opengl";
 };
 Config cfg;
@@ -167,11 +204,27 @@ Config cfg;
 Config loadConfig(const std::string& filename) {
     Config cfg;
 
+    std::string configPath = filename;
+
+    #ifdef WHISK3D_LINUX
+        // 1. Intentar primero desde config de usuario
+        std::string userConfigDir = getUserConfigDir();
+        if (!userConfigDir.empty()) {
+            std::string userConfigPath = userConfigDir + "/config.ini";
+            if (std::filesystem::exists(userConfigPath)) {
+                configPath = userConfigPath;
+                std::cout << "Usando config de usuario: " << configPath << "\n";
+            } else {
+                std::cout << "No se encontró config en directorio de usuario, usando sistema: " << filename << "\n";
+            }
+        }
+    #endif
+
     #ifdef __ANDROID__
-        SDL_RWops* rw = SDL_RWFromFile(filename.c_str(), "rb");
+        SDL_RWops* rw = SDL_RWFromFile(configPath.c_str(), "rb");
         if (!rw) {
-            __android_log_print(ANDROID_LOG_ERROR, "SDL_MAIN", "No se pudo abrir %s", filename.c_str());
-            return cfg; // devuelve defaults
+            __android_log_print(ANDROID_LOG_ERROR, "SDL_MAIN", "No se pudo abrir %s", configPath.c_str());
+            return cfg;
         }
 
         Sint64 size = SDL_RWsize(rw);
@@ -181,17 +234,15 @@ Config loadConfig(const std::string& filename) {
 
         std::istringstream iss(buffer.data());
     #else
-        std::ifstream file(filename);
+        std::ifstream file(configPath);
         if (!file.is_open()) {
-            std::cerr << "No se pudo abrir " << filename << ", usando valores por defecto.\n";
+            std::cerr << "No se pudo abrir " << configPath << ", usando valores por defecto.\n";
             return cfg;
         }
 
-        // Leer todo el archivo a un string
         std::string content((std::istreambuf_iterator<char>(file)),
                             std::istreambuf_iterator<char>());
 
-        // Declarar e inicializar el istringstream
         std::istringstream iss(content);
     #endif
 
@@ -233,25 +284,47 @@ bool loadColors(const std::string& filename) {
         {"ColorTransformZ", ColorID::ColorTransformZ}
     };
 
+    std::string skinPath = filename;
+
+    #ifdef WHISK3D_LINUX
+        // 1. Intentar primero desde config de usuario
+        std::string userConfigDir = getUserConfigDir();
+        if (!userConfigDir.empty()) {
+            // Extraer nombre del skin del path original
+            size_t skinsPos = filename.find("/Skins/");
+            if (skinsPos != std::string::npos) {
+                std::string skinRelPath = filename.substr(skinsPos);
+                std::string userSkinPath = userConfigDir + skinRelPath;
+
+                if (std::filesystem::exists(userSkinPath)) {
+                    skinPath = userSkinPath;
+                    std::cout << "Usando skin de usuario: " << skinPath << "\n";
+                } else {
+                    std::cout << "No se encontró skin en directorio de usuario, usando sistema: " << filename << "\n";
+                }
+            }
+        }
+    #endif
+
     std::istringstream fileStream;
 
     #ifdef __ANDROID__
-        SDL_RWops* rw = SDL_RWFromFile(filename.c_str(), "rb");
+        SDL_RWops* rw = SDL_RWFromFile(skinPath.c_str(), "rb");
         if (!rw) {
-            __android_log_print(ANDROID_LOG_ERROR, "SDL_MAIN", "No se pudo abrir %s", filename.c_str());
+            __android_log_print(ANDROID_LOG_ERROR, "SDL_MAIN", "No se pudo abrir %s", skinPath.c_str());
             return false;
         }
 
         Sint64 size = SDL_RWsize(rw);
-        std::vector<char> buffer(size + 1, 0); // +1 para null-terminator
+        std::vector<char> buffer(size + 1, 0);
         SDL_RWread(rw, buffer.data(), 1, size);
         SDL_RWclose(rw);
 
         fileStream.str(buffer.data());
     #else
-        std::ifstream file(filename);
+        std::ifstream file(skinPath);
         if (!file.is_open()) {
-            std::cerr << "No se pudo abrir " << filename << ", usando colores por defecto.\n";
+            std::cerr << "No se pudo abrir " << skinPath << ", usando colores por defecto.\n";
             return false;
         }
 
@@ -451,8 +524,28 @@ int main(int argc, char* argv[]) {
 
             SDL_FreeSurface(surf); // liberamos superficie después de crear la textura
         #else
-            // PC: ruta directa
-            std::string path = exeDir + "/Skins/" + cfg.SkinName + "/" + file;
+            // PC: ruta del tema
+            std::string path;
+
+            // --- 1) Primero buscar en el directorio de usuario ---
+            #ifdef WHISK3D_LINUX
+            {
+                std::string userConfigDir = getUserConfigDir();
+                if (!userConfigDir.empty()) {
+                    std::string userTexPath = userConfigDir + "/Skins/" + cfg.SkinName + "/" + file;
+                    if (std::filesystem::exists(userTexPath)) {
+                        path = userTexPath;
+                        std::cout << "Usando textura del usuario: " << path << "\n";
+                    }
+                }
+            }
+            #endif
+
+            // --- 2) Si no hay textura en el usuario, usar el exeDir ---
+            if (path.empty()) {
+                path = exeDir + "/Skins/" + cfg.SkinName + "/" + file;
+                std::cout << "Usando textura del sistema: " << path << "\n";
+            }
             if (!LoadTexture(path.c_str(), Textures.back()->iID)) {
                 std::cerr << "Error cargando " << path << std::endl;
                 return -1;
