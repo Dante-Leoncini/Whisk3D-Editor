@@ -716,7 +716,7 @@ TBool CWhisk3D::AppCycle( GLfloat aDeltaTimeSecs ){
 				pixels[i] = 255;
 			}
 			
-	    	glBindTexture( GL_TEXTURE_2D, Textures[3].iID); //iCursor3dTextura.iID
+	    	glBindTexture( GL_TEXTURE_2D, Textures[3]->iID); //iCursor3dTextura.iID
 			glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, iScreenWidth, iScreenHeight, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
 			//glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, iScreenWidth, iScreenHeight, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
 			glFlush();	

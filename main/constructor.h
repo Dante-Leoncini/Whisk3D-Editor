@@ -9,6 +9,8 @@
 #include <SDL2/SDL_image.h>
 #include <GL/gl.h>
 
+#include <filesystem>
+
 #include "objects/Camera.h"
 #include "objects/Collection.h"
 #include "objects/Mesh.h"

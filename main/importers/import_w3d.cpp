@@ -261,23 +261,21 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
         // --- convertir path a ruta absoluta basada en el .w3d ---
         std::string baseDir;
         size_t pos = w3dPath.find_last_of("/\\");
-        if(pos != std::string::npos) baseDir = w3dPath.substr(0,pos+1);
+        if(pos != std::string::npos) baseDir = w3dPath.substr(0, pos+1);
         else baseDir = "";
 
-        // si path YA es absoluto → no tocarlo
-        if(!(path.size()>0 && (path[0]=='/' || path[1]==':'))){
-            path = baseDir + path;  // 🔥 ruta final correcta
-        }
+        path = baseDir + path;
 
-        std::cout << "[WAVEFRONT] Path resuelto: " << path << "\n";
+        //std::cout << "w3dPath: " << w3dPath << " basedir: " << baseDir <<"\n";
+
+        std::cout << "[WOBJ] Path resuelto: " << path << "\n";
 
         // --- IMPORTACIÓN ---
         Mesh* mesh = ImportWOBJ(path, parent);
 
-        std::cout << "materialsGroup: " << mesh->materialsGroup.size() << std::endl;
+        /*std::cout << "materialsGroup: " << mesh->materialsGroup.size() << std::endl;
         std::cout << "vertexSize: " << mesh->vertexSize << std::endl;
-        std::cout << "facesSize: " << mesh->facesSize << std::endl;
-        std::cout << "ScaleX: " << mesh->scaleX << std::endl;
+        std::cout << "facesSize: " << mesh->facesSize << std::endl;*/
 
         if (!mesh){
             std::cerr << "[Wobj] Se importo mal el wobj!\n";

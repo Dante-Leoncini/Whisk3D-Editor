@@ -97,7 +97,7 @@ void Text::RenderObject(bool UsarColor) {
     if (UsarColor){ 
         glColor4ub(color[0], color[1], color[2], opacity);                
     }
-    glBindTexture(GL_TEXTURE_2D, Textures[0].iID);
+    glBindTexture(GL_TEXTURE_2D, Textures[0]->iID);
 
     if (interpolacion == closest){
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);

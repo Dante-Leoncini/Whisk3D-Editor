@@ -111,7 +111,7 @@ void Outliner::Render(){
     }
     glPopMatrix();  
 
-    glBindTexture(GL_TEXTURE_2D, Textures[0].iID);
+    glBindTexture(GL_TEXTURE_2D, Textures[0]->iID);
     glEnableClientState(GL_TEXTURE_COORD_ARRAY);  
     glEnable(GL_TEXTURE_2D);
     glEnable( GL_BLEND );

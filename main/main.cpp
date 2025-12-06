@@ -425,7 +425,7 @@ int main(int argc, char* argv[]) {
     };
 
     for (const auto& file : texFiles) {
-        Textures.push_back(Texture());
+        Textures.push_back(new Texture());
 
         #ifdef __ANDROID__
             // Para Android usamos SDL_RWFromFile para acceder al asset dentro del APK
@@ -442,7 +442,7 @@ int main(int argc, char* argv[]) {
                 return -1;
             }
 
-            if (!LoadTextureFromSurface(surf, Textures.back().iID)) {
+            if (!LoadTextureFromSurface(surf, Textures.back()->iID)) {
                 __android_log_print(ANDROID_LOG_ERROR, "SDL_MAIN", "Error creando textura %s", path.c_str());
                 SDL_FreeSurface(surf);
                 return -1;
@@ -453,7 +453,7 @@ int main(int argc, char* argv[]) {
         #else
             // PC: ruta directa
             std::string path = exeDir + "/Skins/" + cfg.SkinName + "/" + file;
-            if (!LoadTexture(path.c_str(), Textures.back().iID)) {
+            if (!LoadTexture(path.c_str(), Textures.back()->iID)) {
                 std::cerr << "Error cargando " << path << std::endl;
                 return -1;
             }

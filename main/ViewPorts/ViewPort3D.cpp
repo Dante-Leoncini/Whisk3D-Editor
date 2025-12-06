@@ -342,7 +342,7 @@ void Viewport3D::RenderRelantionshipsLines() {
     glTexCoordPointer(2, GL_FLOAT, 0, lineUV);
     glColor4f(ListaColores[static_cast<int>(ColorID::grisUI)][0], ListaColores[static_cast<int>(ColorID::grisUI)][1], 
               ListaColores[static_cast<int>(ColorID::grisUI)][2], ListaColores[static_cast<int>(ColorID::grisUI)][3]);
-    glBindTexture(GL_TEXTURE_2D, Textures[3].iID);
+    glBindTexture(GL_TEXTURE_2D, Textures[3]->iID);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -363,7 +363,7 @@ void Viewport3D::Render3Dcursor() {
     glEnable(GL_POINT_SPRITE);
     glPointSize(32);
     glVertexPointer(3, GL_SHORT, 0, pointVertex);
-    glBindTexture(GL_TEXTURE_2D, Textures[2].iID);
+    glBindTexture(GL_TEXTURE_2D, Textures[2]->iID);
     glTexEnvi(GL_POINT_SPRITE, GL_COORD_REPLACE, GL_TRUE);
     glColor4f(ListaColores[static_cast<int>(ColorID::accent)][0], ListaColores[static_cast<int>(ColorID::accent)][1], 
               ListaColores[static_cast<int>(ColorID::accent)][2], ListaColores[static_cast<int>(ColorID::accent)][3]);
@@ -403,7 +403,7 @@ void Viewport3D::RenderUI() {
     glDisable(GL_DEPTH_TEST);
     glEnable(GL_TEXTURE_2D);
     glEnable(GL_BLEND);
-    glBindTexture(GL_TEXTURE_2D, Textures[0].iID);
+    glBindTexture(GL_TEXTURE_2D, Textures[0]->iID);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 

@@ -24,7 +24,6 @@ extern Material* MaterialDefecto;
 // ===================================================
 class Material { 
 public:
-    bool textura = false;
     bool transparent = false;
     bool vertexColor = false;
     bool lighting = true;
@@ -32,7 +31,7 @@ public:
     bool uv8bit = false;
     bool culling = true;
     int interpolacion = 0; // definir lineal en cpp
-    GLuint textureID = 0;
+    Texture* texture = nullptr;
     GLfloat diffuse[4]  = {1.0f, 1.0f, 1.0f, 1.0f};
     GLfloat specular[4] = {0.3f, 0.3f, 0.3f, 1.0f};
     GLfloat emission[4] = {0.0f, 0.0f, 0.0f, 1.0f};

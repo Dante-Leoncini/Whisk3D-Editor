@@ -26,6 +26,10 @@ void ConstructUniversal(int argc, char* argv[]) {
     // ======================================================
     if(argc > 1) {
         w3dPath = argv[1];
+
+        // Convertir a ruta absoluta
+        w3dPath = std::filesystem::absolute(w3dPath).string();
+
         OpenW3D();
         return;
     }

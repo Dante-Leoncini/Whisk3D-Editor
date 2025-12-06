@@ -115,10 +115,10 @@ void Mesh::RenderObject() {
             if (mat->transparent) glEnable(GL_BLEND);
             else glDisable(GL_BLEND);
 
-            if (mat->textura) {
+            if (mat->texture) {
                 glEnable(GL_TEXTURE_2D);
                 glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-                glBindTexture(GL_TEXTURE_2D, mat->textureID);
+                glBindTexture(GL_TEXTURE_2D, mat->texture->iID);
 
                 if (mat->interpolacion == lineal) {
                     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);

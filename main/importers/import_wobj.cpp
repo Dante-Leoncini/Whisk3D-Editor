@@ -2,81 +2,125 @@
 
 Mesh* LeerWOBJ(std::ifstream& file, const std::string& filename, Object* parent){
     Mesh* mesh = new Mesh(parent, 0, 0, 0);
-    std::string base = ExtractBaseName(filename);
-    mesh->name->SetValue(mesh->SetName(base));
 
     Wavefront Wobj;
     Wobj.Reset();
     bool TieneVertexColor = false;
 
+    std::streampos startPos = 0;
     file.clear();
+    file.seekg(startPos);
 
     std::string line;
 
+    int acumuladoVertices = 0;
+    int acumuladoUVs = 0;
+    int acumuladoNormales = 0;
+
     while (std::getline(file, line)) {
+        startPos = file.tellg();
 
-        // -------- vertices ----------
-        if (line.rfind("v ",0)==0){
+        if (line.rfind("v ", 0) == 0) {
             std::istringstream ss(line.substr(2));
-            double x,y,z,r=1,g=1,b=1,a=1;
-            ss>>x>>y>>z;
-            if(ss>>r>>g>>b){ TieneVertexColor=true; ss>>a; if(!ss) a=1; }
+            double x, y, z, r, g, b, a;
 
-            Wobj.vertex.insert(Wobj.vertex.end(), {(GLfloat)x,(GLfloat)y,(GLfloat)z});
+            ss >> x >> y >> z;
 
-            //auto sat=[&](double v){ v*=255; return (unsigned char)std::clamp(v,0.0,255.0); };
-            Wobj.vertexColor.insert(Wobj.vertexColor.end(),{sat(r),sat(g),sat(b),sat(a)});
+            if (ss >> r >> g >> b) {
+                TieneVertexColor = true;
+                if (!(ss >> a)) a = 1.0;
+            } else {
+                r = g = b = 1.0;
+                a = 1.0;
+            }
+
+            Wobj.vertex.push_back((GLfloat)x);
+            Wobj.vertex.push_back((GLfloat)y);
+            Wobj.vertex.push_back((GLfloat)z);
+
+            auto saturar = [](double v) { 
+                double n = v * 255.0; 
+                if (n < 0) n = 0; 
+                if (n > 255.0) n = 255.0; 
+                return (unsigned char)n; 
+            };
+
+            Wobj.vertexColor.push_back(saturar(r));
+            Wobj.vertexColor.push_back(saturar(g));
+            Wobj.vertexColor.push_back(saturar(b));
+            Wobj.vertexColor.push_back(saturar(a));
+
+            acumuladoVertices++;
         }
-
-        // -------- normales ----------
-        else if(line.rfind("vn ",0) == 0){
+        else if (line.rfind("vn ", 0) == 0) {
             std::istringstream ss(line.substr(3));
             double nx, ny, nz;
             ss >> nx >> ny >> nz;
-            Wobj.normals.insert(Wobj.normals.end(), { cv(nx), cv(ny), cv(nz) });
-        }
 
-        // -------- uv ----------
-        else if(line.rfind("vt ",0)==0){
+            auto conv = [](double v) -> signed char {
+                v = ((v + 1.0) / 2.0) * 255.0 - 128.0;
+                if (v > 127) v = 127;
+                if (v < -128) v = -128;
+                return (signed char)v;
+            };
+
+            Wobj.normals.push_back(conv(nx));
+            Wobj.normals.push_back(conv(ny));
+            Wobj.normals.push_back(conv(nz));
+            acumuladoNormales++;
+        }
+        else if (line.rfind("vt ", 0) == 0) {
             std::istringstream ss(line.substr(3));
-            float u,v; ss>>u>>v;
-            Wobj.uv.push_back(u);
-            Wobj.uv.push_back(1-v);
-        }
+            double u, v;
+            ss >> u >> v;
 
-        // -------- caras ----------
-        else if(line.rfind("f ",0)==0){
+            Wobj.uv.push_back((float)u);
+            Wobj.uv.push_back(1.0f - (float)v);
+            acumuladoUVs++;
+        }
+        else if (line.rfind("f ", 0) == 0) {
             std::istringstream ss(line.substr(2));
-            std::string t; Face f;
+            std::string token;
+            Face newFace;
 
-            while(ss>>t){
-                FaceCorners c;
-                size_t p1=t.find('/'), p2=t.rfind('/');
-                c.vertex=stoi(t.substr(0,p1))-1;
-                c.uv    = (p1 != std::string::npos && p2 > p1) ? stoi(t.substr(p1+1,p2-p1-1)) - 1 : -1;
-                c.normal=(p2!=std::string::npos)?stoi(t.substr(p2+1))-1:-1;
-                f.corner.push_back(c);
+            while (ss >> token) {
+                FaceCorners fc;
+                size_t pos1 = token.find('/');
+                size_t pos2 = token.rfind('/');
+
+                fc.vertex = std::stoi(token.substr(0, pos1)) - 1;
+                fc.uv = (pos1 != std::string::npos && pos2 > pos1) ? std::stoi(token.substr(pos1+1, pos2-pos1-1))-1 : -1;
+                fc.normal = (pos2 != std::string::npos) ? std::stoi(token.substr(pos2+1))-1 : -1;
+
+                newFace.corner.push_back(fc);
             }
-            Wobj.faces.push_back(f);
-        }
 
-        // --- materiales ---
-        else if(line.rfind("usemtl ",0)==0){
-            std::string m=line.substr(7);
-            Material* mat = BuscarMaterialPorNombre(m);
-            if(!mat) mat=new Material(m,false,TieneVertexColor);
+            Wobj.faces.push_back(newFace);
+
+            if (!Wobj.materialsGroup.empty()) {
+                MaterialGroup& mg = Wobj.materialsGroup.back();
+                mg.count++;
+                mg.indicesDrawnCount += 3;
+                if (mg.count == 1) mg.startDrawn = (Wobj.faces.size() - 1) * 3;
+            }
+        }
+        else if (line.rfind("usemtl ", 0) == 0) {
+            std::string matName = line.substr(7);
+            Material* materialPuntero = BuscarMaterialPorNombre(matName);
+            if (!materialPuntero) materialPuntero = new Material(matName, false, TieneVertexColor);
 
             MaterialGroup mg;
-            mg.start=Wobj.faces.size();
-            mg.startDrawn=mg.start*3;
-            mg.material=mat;
+            mg.start = Wobj.faces.size();
+            mg.startDrawn = Wobj.faces.size() * 3;
+            mg.count = 0;
+            mg.indicesDrawnCount = 0;
+            mg.material = materialPuntero;
             Wobj.materialsGroup.push_back(mg);
         }
     }
 
     // ---------------- convertir y generar Mesh* ----------------
-    int av=0, an=0, au=0;
-    Wobj.ConvertToES1(mesh, &av, &an, &au);
+    Wobj.ConvertToES1(mesh, &acumuladoVertices, &acumuladoNormales, &acumuladoUVs);
 
     return mesh;
 }

@@ -1,6 +1,6 @@
 #include "Textures.h"
 
-std::vector<Texture> Textures;
+std::vector<Texture*> Textures;
 
 #if SDL_MAJOR_VERSION == 2
 

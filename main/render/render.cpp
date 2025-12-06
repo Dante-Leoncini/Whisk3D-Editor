@@ -138,7 +138,7 @@ void DibujarOrigen(Object* obj){
 
 void RenderOrigins(){    
     glEnable(GL_TEXTURE_2D);
-    glBindTexture(GL_TEXTURE_2D, Textures[1].iID);
+    glBindTexture(GL_TEXTURE_2D, Textures[1]->iID);
     glVertexPointer(3, GL_SHORT, 0, pointVertex);
     glTexEnvi(GL_POINT_SPRITE, GL_COORD_REPLACE, GL_TRUE);
     glEnable(GL_BLEND);
@@ -181,7 +181,7 @@ void DibujarIcono3D(Object* obj){
 void RenderIcons3D(){
     glDepthMask(GL_FALSE);  
     glEnable(GL_TEXTURE_2D);
-    glBindTexture(GL_TEXTURE_2D, Textures[4].iID);    
+    glBindTexture(GL_TEXTURE_2D, Textures[4]->iID);    
     glTexEnvi(GL_POINT_SPRITE, GL_COORD_REPLACE, GL_TRUE);  
     glVertexPointer(3, GL_SHORT, 0, pointVertex);
     glEnable(GL_BLEND);

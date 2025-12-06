@@ -20,15 +20,14 @@
 #endif
 
 class Texture {
-public:
-    GLuint iID = 0;
-    std::string path;
+    public:
+        GLuint iID = 0;
+        std::string path;
 
-    Texture(const std::string& p = "") : iID(0), path(p) {} // ahora correcto
+        Texture(const std::string& p = "") : iID(0), path(p) {} // ahora correcto
 };
 
-
-extern std::vector<Texture> Textures;
+extern std::vector<Texture*> Textures;
 
 // Funciones de carga de texturas
 #if SDL_MAJOR_VERSION == 2

@@ -289,6 +289,7 @@ bool LeerMTL(const std::string& filepath, int objetosCargados) {
         if (line.rfind("newmtl ", 0) == 0) {
             std::string matName = line.substr(7);
             mat = BuscarMaterialPorNombre(matName);
+            std::cout << "Cargando MTL: " << matName << " encontrado=" << (mat?"si":"no") << std::endl;
 
             if (!mat) {
                 std::cout << "LeerMTL: Material no encontrado! " << matName << std::endl;
@@ -323,15 +324,12 @@ bool LeerMTL(const std::string& filepath, int objetosCargados) {
                 std::string absPath = getParentPath(filepath) + "/" + texfile;
                 std::replace(absPath.begin(), absPath.end(), '\\', '/');
 
-                Texture newTex;
-                newTex.path = absPath;
+                Texture* newTex = new Texture();
+                newTex->path = absPath;
 
-                GLuint texid;
-                if (LoadTexture(absPath.c_str(), texid)) {
-                    newTex.iID = texid;
+                if (LoadTexture(absPath.c_str(), newTex->iID)) {
                     Textures.push_back(newTex);
-                    mat->textura = true;
-                    mat->textureID = texid;
+                    mat->texture = newTex;
                 } else {
                     std::cerr << "Error cargando textura: " << absPath << "\n";
                 }
