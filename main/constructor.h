@@ -11,6 +11,7 @@
 
 #include <filesystem>
 
+#include "variables.h"
 #include "objects/Camera.h"
 #include "objects/Collection.h"
 #include "objects/Mesh.h"

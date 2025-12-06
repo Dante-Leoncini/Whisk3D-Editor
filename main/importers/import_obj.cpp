@@ -102,11 +102,11 @@ void Wavefront::ConvertToES1(Mesh* TempMesh, int* acumuladoVertices, int* acumul
         TempMesh->materialsGroup.push_back(mg);
     }
 
-    std::cout << "\n[ConvertToES1 RESULTADO]\n";
+    /*std::cout << "\n[ConvertToES1 RESULTADO]\n";
     std::cout << "Vertices finales: " << newVertices.size()/3 << "\n";
     std::cout << "Normales final:   " << newNormals.size()/3 << "\n";
     std::cout << "UV final:         " << newUVs.size()/2 << "\n";
-    std::cout << "Caras triangulos: " << newFaces.size()/3 << "\n";
+    std::cout << "Caras triangulos: " << newFaces.size()/3 << "\n";*/
 
     Reset();
 }
@@ -289,10 +289,10 @@ bool LeerMTL(const std::string& filepath, int objetosCargados) {
         if (line.rfind("newmtl ", 0) == 0) {
             std::string matName = line.substr(7);
             mat = BuscarMaterialPorNombre(matName);
-            std::cout << "Cargando MTL: " << matName << " encontrado=" << (mat?"si":"no") << std::endl;
+            //std::cout << "Cargando MTL: " << matName << " encontrado=" << (mat?"si":"no") << std::endl;
 
             if (!mat) {
-                std::cout << "LeerMTL: Material no encontrado! " << matName << std::endl;
+                //std::cout << "LeerMTL: Material no encontrado! " << matName << std::endl;
                 mat = new Material(matName);
                 Materials.push_back(mat);
             }

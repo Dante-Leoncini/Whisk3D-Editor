@@ -16,6 +16,17 @@ extern SDL_GLContext glContext;
 extern int winW; 
 extern int winH;
 
+struct Config {
+    bool fullscreen = false;
+    bool enableAntialiasing = false;
+    int width = 800;
+    int height = 600;
+	int displayIndex = 0; // monitor 1
+	std::string SkinName = "Whisk3D"; // monitor 1
+    std::string graphicsAPI = "opengl";
+};
+extern Config cfg;
+
 // Enumeraciones
 enum { Constant, Linear, EaseInOut, EaseIn, EaseOut };
 enum { top, front, right, cameraView };
@@ -37,6 +48,7 @@ extern int estado;
 extern int InteractionMode;
 extern int navegacionMode;
 extern std::string w3dPath;
+extern std::string exeDir;
 
 // Mouse
 extern bool leftMouseDown;

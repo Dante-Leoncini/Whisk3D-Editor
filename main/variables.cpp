@@ -22,7 +22,11 @@ int estado;
 int InteractionMode;
 int navegacionMode;
 
+
+Config cfg;
+
 std::string w3dPath = "";
+std::string exeDir = "";
 
 // Variables para el Mouse
 bool leftMouseDown = false;
