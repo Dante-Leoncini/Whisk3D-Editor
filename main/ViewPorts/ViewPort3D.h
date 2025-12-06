@@ -22,6 +22,7 @@
 #include "GeometriaUI/Floor.h"
 #include "render/render.h"
 #include "lectura-escritura.h"
+#include "WithBorder.h"
 
 extern GLfloat LastRotX;
 extern GLfloat LastRotY;

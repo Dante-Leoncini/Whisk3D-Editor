@@ -8,7 +8,7 @@
 #include <GL/gl.h>
 #include <SDL2/SDL.h>
 
-#include "variables.h"
+//#include "variables.h"
 #include "ViewPorts.h"
 
 // Funciones globales

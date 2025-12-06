@@ -8,6 +8,7 @@
 #include "sdl_key_compat.h"
 #include "ViewPorts.h"
 #include "ScrollBar.h"
+#include "WithBorder.h"
 #include "objects/Objects.h"
 #include "objects/ObjectMode.h"
 #include "UI/rectangle.h"
