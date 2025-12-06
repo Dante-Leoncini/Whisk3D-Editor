@@ -11,7 +11,7 @@
 
 #include "UI/icons.h"
 #include "Objects.h"
-#include "Modifier.h"
+#include "Target.h"
 
 // Valores globales para controles
 extern float axisState[SDL_CONTROLLER_AXIS_MAX];
@@ -22,16 +22,16 @@ extern GLfloat velocidad;
 // Función para refrescar inputs del gamepad
 void RefreshInputControllerSDL(SDL_Event &e);
 
-class Gamepad : public Object, public Modifier {
-public:
-    Gamepad(Object* parent);
+class Gamepad : public Object, public Target {
+    public:
+        Gamepad(Object* parent);
 
-    ObjectType getType() override;
-    void Reload() override;
-    void RenderObject() override;
-    void Update();  // Solo declaración
+        ObjectType getType() override;
+        void Reload() override;
+        void RenderObject() override;
+        void Update();  // Solo declaración
 
-    ~Gamepad();
+        ~Gamepad();
 };
 
 #endif

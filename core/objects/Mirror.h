@@ -7,10 +7,10 @@
 
 #include "UI/icons.h"
 #include "Objects.h"
-#include "Modifier.h"
+#include "Target.h"
 #include <GL/gl.h>
 
-class Mirror : public Object, public Modifier {
+class Mirror : public Object, public Target {
 public:
     bool mirrorX = false;
     bool mirrorY = false;

@@ -236,7 +236,7 @@ Object* FindObjectByName(Object* node, const std::string& name){
     return nullptr; // no encontrado
 }
 
-#include "Modifier.h"
+#include "Target.h"
 #include "Scene.h"
 #include "Collection.h"
 #include "Light.h"
