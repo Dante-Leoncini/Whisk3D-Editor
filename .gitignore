@@ -1,6 +1,19 @@
 # Propiedades locales de Android
 /platform/android/local.properties
 
+/platform/android/app/build/
+/platform/android/app/.gradle/
+/platform/android/.gradle/
+/platform/android/.idea/
+/platform/android/local.properties
+*.iml
+*.dex
+*.apk
+*.ap_
+/platform/android/app/distribution/
+/platform/android/app/intermediates/
+/platform/android/app/outputs/
+
 # Archivos de construcción de CMake / NDK
 android/distribution/android/app/.cxx/
 android/distribution/android/app/intermediates/
