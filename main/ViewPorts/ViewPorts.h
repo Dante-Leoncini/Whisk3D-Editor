@@ -29,7 +29,6 @@ enum class View {
 
 // Adelantos de clases
 class ViewportBase;
-class Scrollable;
 class WithBorder;
 class ViewportRow;
 class ViewportColumn;
@@ -39,7 +38,6 @@ extern ViewportBase* viewPortActive;
 extern ViewportBase* rootViewport;
 
 // Funciones globales
-void CalcScrollUV(int texW, int texH);
 void CalcBorderUV(int texW, int texH);
 ViewportBase* FindViewportUnderMouse(ViewportBase* vp, int mx, int my);
 void SetGlobalScale(int scale);
@@ -47,9 +45,6 @@ void CheckWarpMouseInViewport(int mx, int my, const ViewportBase* vp);
 
 // Variables UV/indices
 extern GLubyte indicesBorder[];
-extern GLubyte indicesScrollbar[];
-extern GLfloat ScrollbarUV[16];
-extern GLfloat ScrollbarBigUV[16];
 extern GLfloat bourderUV[32];
 
 // -----------------------------
@@ -80,53 +75,6 @@ class ViewportBase {
 
         virtual void Render() = 0;
         virtual void Resize(int newW, int newH);
-};
-
-// -----------------------------
-// Scrollable
-// -----------------------------
-class Scrollable {
-    public:
-        // ------------------ Variables ------------------
-        int PosX = 0;
-        int PosY = 0;
-        int MaxPosX = 100;
-        int MaxPosY = 0;
-        bool scrollX = false;
-        bool scrollY = false;
-        bool mouseOverScrollY = false;
-        bool mouseOverScrollX = false;
-        bool mouseOverScrollYpress = false;
-        bool mouseOverScrollXpress = false;
-        bool leftMouseDown = false;
-        bool middleMouseDown = false;
-        bool ViewPortClickDown = false;
-
-        float scrollPosFactor = 0.0f;
-        float scrollDragFactor = 0.0f;
-        float scrollPosFactorX = 0.0f;
-        float scrollDragFactorX = 0.0f;
-
-        ViewportBase* viewPortActive = nullptr;
-
-        GLshort scrollVerticalMesh[16] = {0};
-        GLshort scrollVerticalBigMesh[16] = {0};
-        GLshort scrollHorizontalMesh[16] = {0};
-        GLshort scrollHorizontalBigMesh[16] = {0};
-
-        GLfloat* ScrollbarUV = nullptr;
-        GLfloat* ScrollbarBigUV = nullptr;
-        GLubyte* indicesScrollbar = nullptr;
-
-        // ------------------ Constructor ------------------
-        Scrollable();
-
-        // ------------------ Funciones ------------------
-        void ScrollY(int dy);
-        void ScrollX(int dx);
-        void ScrollMouseOver(ViewportBase* current, int mx, int my);
-        void ResizeScrollbar(int width, int height, int MaxX, int MaxY);
-        void DibujarScrollbar(ViewportBase* current);
 };
 
 // -----------------------------

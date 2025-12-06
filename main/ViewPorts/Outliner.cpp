@@ -298,7 +298,7 @@ void Outliner::FindMouseOver(int mx, int my){
     ScrollMouseOver(this, mx, my);
 }
 
-void Outliner::event_mouse_motion(int mx, int my){
+void Outliner::event_mouse_motion(int mx, int my) {
     if (middleMouseDown || leftMouseDown) {
         ViewPortClickDown = true;
 

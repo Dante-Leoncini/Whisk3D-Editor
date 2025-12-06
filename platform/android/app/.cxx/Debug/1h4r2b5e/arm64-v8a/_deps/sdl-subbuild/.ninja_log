@@ -1,0 +1,21 @@
+# ninja log v5
+0	77	1764907545744177640	sdl-populate-prefix/src/sdl-populate-stamp/sdl-populate-mkdir	fb354cdd5ff3b3cf
+0	77	1764907545744177640	/home/dante/Documentos/personal/Whisk3D/platform/android/app/.cxx/Debug/1h4r2b5e/arm64-v8a/_deps/sdl-subbuild/sdl-populate-prefix/src/sdl-populate-stamp/sdl-populate-mkdir	fb354cdd5ff3b3cf
+78	7992	1764907553659737208	sdl-populate-prefix/src/sdl-populate-stamp/sdl-populate-download	b5d4e73b44fe48f
+78	7992	1764907553659737208	/home/dante/Documentos/personal/Whisk3D/platform/android/app/.cxx/Debug/1h4r2b5e/arm64-v8a/_deps/sdl-subbuild/sdl-populate-prefix/src/sdl-populate-stamp/sdl-populate-download	b5d4e73b44fe48f
+7992	8014	1764907553680736041	sdl-populate-prefix/src/sdl-populate-stamp/sdl-populate-update	28f5bc82149435ab
+7992	8014	1764907553680736041	/home/dante/Documentos/personal/Whisk3D/platform/android/app/.cxx/Debug/1h4r2b5e/arm64-v8a/_deps/sdl-subbuild/sdl-populate-prefix/src/sdl-populate-stamp/sdl-populate-update	28f5bc82149435ab
+8014	8036	1764907553702734818	sdl-populate-prefix/src/sdl-populate-stamp/sdl-populate-patch	380c5a7d19dd4f83
+8014	8036	1764907553702734818	/home/dante/Documentos/personal/Whisk3D/platform/android/app/.cxx/Debug/1h4r2b5e/arm64-v8a/_deps/sdl-subbuild/sdl-populate-prefix/src/sdl-populate-stamp/sdl-populate-patch	380c5a7d19dd4f83
+8036	8058	1764907553725733540	sdl-populate-prefix/src/sdl-populate-stamp/sdl-populate-configure	fd2b620339647473
+8036	8058	1764907553725733540	/home/dante/Documentos/personal/Whisk3D/platform/android/app/.cxx/Debug/1h4r2b5e/arm64-v8a/_deps/sdl-subbuild/sdl-populate-prefix/src/sdl-populate-stamp/sdl-populate-configure	fd2b620339647473
+8058	8079	1764907553746732372	sdl-populate-prefix/src/sdl-populate-stamp/sdl-populate-build	9f20a52a75ef77df
+8058	8079	1764907553746732372	/home/dante/Documentos/personal/Whisk3D/platform/android/app/.cxx/Debug/1h4r2b5e/arm64-v8a/_deps/sdl-subbuild/sdl-populate-prefix/src/sdl-populate-stamp/sdl-populate-build	9f20a52a75ef77df
+8079	8100	1764907553767731205	sdl-populate-prefix/src/sdl-populate-stamp/sdl-populate-install	ea66ef8b2a08579f
+8079	8100	1764907553767731205	/home/dante/Documentos/personal/Whisk3D/platform/android/app/.cxx/Debug/1h4r2b5e/arm64-v8a/_deps/sdl-subbuild/sdl-populate-prefix/src/sdl-populate-stamp/sdl-populate-install	ea66ef8b2a08579f
+8100	8125	1764907553791729872	sdl-populate-prefix/src/sdl-populate-stamp/sdl-populate-test	13bc77a2ae152c42
+8100	8125	1764907553791729872	/home/dante/Documentos/personal/Whisk3D/platform/android/app/.cxx/Debug/1h4r2b5e/arm64-v8a/_deps/sdl-subbuild/sdl-populate-prefix/src/sdl-populate-stamp/sdl-populate-test	13bc77a2ae152c42
+8125	8161	1764907553828727815	CMakeFiles/sdl-populate-complete	9199a586a2ea58b1
+8125	8161	1764907553828727815	sdl-populate-prefix/src/sdl-populate-stamp/sdl-populate-done	9199a586a2ea58b1
+8125	8161	1764907553828727815	/home/dante/Documentos/personal/Whisk3D/platform/android/app/.cxx/Debug/1h4r2b5e/arm64-v8a/_deps/sdl-subbuild/CMakeFiles/sdl-populate-complete	9199a586a2ea58b1
+8125	8161	1764907553828727815	/home/dante/Documentos/personal/Whisk3D/platform/android/app/.cxx/Debug/1h4r2b5e/arm64-v8a/_deps/sdl-subbuild/sdl-populate-prefix/src/sdl-populate-stamp/sdl-populate-done	9199a586a2ea58b1

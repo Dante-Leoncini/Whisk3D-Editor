@@ -43,11 +43,41 @@ cmake -B build-linux -DCMAKE_BUILD_TYPE=Release
 cmake --build build-linux --config Release -- -j8
 ```
 
-en la carpeta /platform/linux se encuentra "Whisk3D_xx-xx-xx" podes crear un .deb para ubuntu editando esa carpeta y usando el comando
+Pra debug:
 
 ```bash
-dpkg-deb --build Whisk3D_25-12-04/
+cmake --build build-linux --config Debug -- -j8
+gdb ./build-linux/whisk3d
+run
 ```
+
+si crashea podes ver con detalle en que parte usando
+
+```bash
+bt full
+```
+
+Para generar los instaladores .DEB, RPM o AppImage. en la carpeta /buld-linux pueden usar el siguiente comando:
+
+```bash
+cpack
+```
+
+Nota: para creas los AppImage el Cmake que viene en ubuntu no sirve. podes instalarlo de la siguiente forma. actualiza cmake
+
+```bash
+pip install cmake --upgrade
+```
+
+necesitas "patchelf" y "appimagetool", podes instalarlos de la siguiente forma
+
+```bash
+sudo apt install patchelf
+wget https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+chmod +x appimagetool-x86_64.AppImage
+```
+
+y ahora con "cpack" los generas. excelente aporte de [**Zariep**](https://github.com/ItsZariep)
 
 ## Android
 

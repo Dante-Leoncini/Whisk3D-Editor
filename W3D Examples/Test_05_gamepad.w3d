@@ -1,0 +1,133 @@
+Whisk3D {
+    version: 20251127
+    Escena {
+        iconApp: Whisk3D_experiment.png
+        limpiarPantalla: true
+        background: "0.1, 0.15, 0.1, 1.0"
+
+        Camera {
+            name: "Camera"
+            x: -3.0
+            y: 2.5
+            z: 1.8
+            rx: 0
+            ry: -35
+            rz: 45
+        }
+
+        Gamepad {
+            name: "Control Cubo"
+            target: "Instance"
+            x: 0.0
+            y: 0.0
+            z: 0.0
+        }  
+
+        Collection {
+            name: "Collection"
+            x: 0.0
+            y: 0.0
+            z: 0.0
+
+            Light {
+                name: "Light"
+                LightID: GL_LIGHT0
+                x: -10.0
+                y: 2.25
+                z: 3.5
+                r: 1.0
+                g: 0.0
+                b: 0.0
+            } 
+
+            Light {
+                name: "Light2"
+                LightID: GL_LIGHT1
+                x: 4.0
+                y: 2.25
+                z: 3.5
+                r: 0.0
+                g: 0.0
+                b: 1.0
+            } 
+
+            Light {
+                name: "Light3"
+                LightID: GL_LIGHT2
+                x: -30.0
+                y: -5.25
+                z: 4.5
+                r: 0.0
+                g: 1.0
+                b: 0.0
+            } 
+
+            Mesh {
+                name: "Cube"
+                x: 0.0
+                y: 0.0
+                z: 1.0
+                scale: 1.0
+            } 
+
+            Instance {
+                name: "Instance"
+                target: "Cube"
+                count: 10
+                x: -3.0
+                y: 0.0
+                z: 0.0
+                rz: 5.0
+            }  
+        }
+
+        Mirror {
+            name: "Espejo"
+            target: "Collection"
+            x: 0.0
+            y: 0.0
+            z: 0.0
+        }  
+    }
+
+    Layout {
+        ViewportRow {
+            Viewport3D {
+                orthographic: false
+                ViewFromCameraActive: false
+                showOverlays: true
+                ShowUi: true
+                showFloor: true
+                showYaxis: true
+                showXaxis: true
+                CameraToView: false
+                showOrigins: true
+                show3DCursor: true
+                ShowRelantionshipsLines: true
+                view: Rendered
+                rotX: 270.0
+                posZ: -3.0
+            }
+            ViewportColumn {
+                Viewport3D {
+                    orthographic: false
+                    ViewFromCameraActive: false
+                    showOverlays: true
+                    ShowUi: true
+                    showFloor: true
+                    showYaxis: true
+                    showXaxis: true
+                    CameraToView: false
+                    showOrigins: true
+                    show3DCursor: true
+                    ShowRelantionshipsLines: true
+                    view: MaterialPreview
+                    rotX: 270.0
+                }
+                Outliner
+                Split: 0.7
+            }
+            Split: 0.7
+        }
+    }
+}
