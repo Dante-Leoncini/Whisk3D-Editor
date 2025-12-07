@@ -50,7 +50,6 @@ public:
     int facesSize = 0;
     GLushort* faces = nullptr;
     std::vector<MaterialGroup> materialsGroup;
-    std::vector<int> Modifiers;
 
     Mesh(Object* parent = nullptr, GLfloat px = 0.0f, GLfloat py = 0.0f, GLfloat pz = 0.0f);
 

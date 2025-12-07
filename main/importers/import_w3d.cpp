@@ -285,24 +285,30 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
         return mesh;
     }
 
-    if(n->type=="Mirror"){
+    if (n->type=="Mirror"){
         Mirror* mirror = new Mirror(parent);
         if(p.count("target")) mirror->SetTarget(p.at("target"));
         return mirror;
     }
 
-    if(n->type=="Instance"){
+    if (n->type=="Instance"){
         Instance* instance = new Instance(parent);
         if(p.count("target")) instance->SetTarget(p.at("target"));
         if(p.count("count")) instance->count = GetIntOrDefault(p, "count", 1);
         return instance;
     }
 
-    if(n->type=="Gamepad"){
+    if (n->type=="Gamepad"){
         Gamepad* gamepad = new Gamepad(parent);
         if(p.count("target")) gamepad->SetTarget(p.at("target"));
         return gamepad;
     }
+
+    if (n->type=="Constraint"){
+        Constraint* constraint = new Constraint(parent);
+        if(p.count("target")) constraint->SetTarget(p.at("target"));
+        return constraint;
+    }    
 
     if(n->type=="Camera"){
         return new Camera(parent,0,0,0, 0, 0, 0);

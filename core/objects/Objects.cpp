@@ -200,7 +200,7 @@ void Object::RenderObject(){}
 void Object::Render(){   
     if (!visible) return; 
     // Guardar la matriz actual
-    glPushMatrix();       
+    glPushMatrix();     
         
     // Aplicar las transformaciones del objeto
     glTranslatef(posX, posZ, posY);
@@ -237,6 +237,7 @@ Object* FindObjectByName(Object* node, const std::string& name){
 }
 
 #include "Target.h"
+#include "Constraint.h"
 #include "Scene.h"
 #include "Collection.h"
 #include "Light.h"

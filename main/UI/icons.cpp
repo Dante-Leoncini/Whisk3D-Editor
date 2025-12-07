@@ -33,6 +33,7 @@ void CrearIconos(int texW, int texH){
         { 25, 93, 10, 10 }, // array
         { 37, 93, 10, 10 },  // gamepad
         { 49, 93, 10, 10 }, // instance
+        { 61, 93, 10, 10 }, //constraint
     };
 
     // limpia por si se llama más de una vez

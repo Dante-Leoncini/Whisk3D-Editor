@@ -45,7 +45,6 @@ void Mesh::LiberarMemoria() {
 
     delete[] faces;
     materialsGroup.clear();
-    Modifiers.clear();
 }
 
 // ===================================================

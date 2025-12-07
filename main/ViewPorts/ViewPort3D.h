@@ -90,6 +90,7 @@ class Viewport3D : public ViewportBase, public WithBorder {
         void ClickE();
         void ClickQ();
         void SetEje(int eje);
+        void SetViewFromCameraActive(bool value);
         void event_key_down(SDL_Event &e) override;
         void event_key_up(SDL_Event &e) override; 
         void key_down_return();

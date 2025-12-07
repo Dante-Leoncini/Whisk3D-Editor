@@ -4,7 +4,6 @@
 #include <string>
 #include <iostream>
 
-#include "UI/icons.h"
 #include "Objects.h"
 
 class Target {

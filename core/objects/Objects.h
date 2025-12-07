@@ -24,7 +24,7 @@ extern Viewport3D* Viewport3DActive;
 
 enum class ObjectType {
     scene, mesh, camera, light, empty, armature, curve,
-    collection, baseObject, mirror, gamepad, instance
+    collection, baseObject, mirror, gamepad, instance, constraint
 };
 
 // Forward declarations
@@ -37,41 +37,41 @@ extern Object* ObjActivo;
 void DeseleccionarTodo(bool IncluirColecciones = false);
 
 class Object {
-public:
-    Object* Parent = nullptr;
-    std::vector<Object*> Childrens;
-    bool visible = true;
-    bool desplegado = true;
-    bool select = true;
-    Text* name = nullptr;
-    size_t IconType = 0;
+    public:
+        Object* Parent = nullptr;
+        std::vector<Object*> Childrens;
+        bool visible = true;
+        bool desplegado = true;
+        bool select = true;
+        Text* name = nullptr;
+        size_t IconType = 0;
 
-    GLfloat posX = 0.0f, posY = 0.0f, posZ = 0.0f;
-    GLfloat rotX = 0.0f, rotY = 0.0f, rotZ = 0.0f;
-    GLfloat scaleX = 1.0f, scaleY = 1.0f, scaleZ = 1.0f;
+        GLfloat posX = 0.0f, posY = 0.0f, posZ = 0.0f;
+        GLfloat rotX = 0.0f, rotY = 0.0f, rotZ = 0.0f;
+        GLfloat scaleX = 1.0f, scaleY = 1.0f, scaleZ = 1.0f;
 
-    virtual ObjectType getType() { return ObjectType::baseObject; }
+        virtual ObjectType getType() { return ObjectType::baseObject; }
 
-    Object(Object* parent, const std::string& nombre);
-    virtual ~Object();
+        Object(Object* parent, const std::string& nombre);
+        virtual ~Object();
 
-    void SetNameObj(const std::string& nombre);
+        void SetNameObj(const std::string& nombre);
 
-    void EliminarObjetosSeleccionados(bool IncluirCollecciones = false);
+        void EliminarObjetosSeleccionados(bool IncluirCollecciones = false);
 
-    std::string SetName(const std::string& baseName);
+        std::string SetName(const std::string& baseName);
 
-    void Seleccionar();
-    void Deseleccionar();
-    void DeseleccionarCompleto(bool IncluirColecciones = false);
-    bool EstaSeleccionado(bool IncluirColecciones = false);
-    bool SeleccionarCompleto(bool IncluirColecciones = false);
+        void Seleccionar();
+        void Deseleccionar();
+        void DeseleccionarCompleto(bool IncluirColecciones = false);
+        bool EstaSeleccionado(bool IncluirColecciones = false);
+        bool SeleccionarCompleto(bool IncluirColecciones = false);
 
-    virtual void Reload();
-    void ReloadAll();
+        virtual void Reload();
+        void ReloadAll();
 
-    virtual void RenderObject();
-    void Render();
+        virtual void RenderObject();
+        void Render();
 };
 
 // Funciones auxiliares

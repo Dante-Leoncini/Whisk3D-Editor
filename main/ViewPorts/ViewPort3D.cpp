@@ -148,15 +148,16 @@ void Viewport3D::Render() {
     glDisableClientState(GL_TEXTURE_COORD_ARRAY);
     glDisableClientState(GL_NORMAL_ARRAY);
 
-    if (ViewFromCameraActive) {
-        RecalcViewPos();
-    }
-
     if (view == RenderType::Solid || view == RenderType::MaterialPreview) {
         glLightfv(GL_LIGHT0, GL_POSITION, MaterialPreviewPosition);
     }
 
-    glTranslatef(posX, posZ, -cameraDistance + posY);
+    if (ViewFromCameraActive) {
+        RecalcViewPos();
+    }
+    else {
+        glTranslatef(posX, posZ, -cameraDistance + posY);
+    }
 
     glRotatef(rotY, 1, 0, 0);
     glRotatef(rotX, 0, 1, 0);
@@ -576,7 +577,7 @@ void Viewport3D::mouse_button_up(SDL_Event &e){
 }
 
 void Viewport3D::event_mouse_wheel(SDL_Event &e){
-    posY+= e.wheel.y;
+    if (!ViewFromCameraActive) posY+= e.wheel.y;
 }
 
 void Viewport3D::event_mouse_motion(int mx, int my){
@@ -880,6 +881,10 @@ void Viewport3D::SetEje(int eje){
     }	
 }
 
+void Viewport3D::SetViewFromCameraActive(bool value){
+    ViewFromCameraActive = value;
+}
+
 void Viewport3D::event_key_down(SDL_Event &e){
     #if SDL_MAJOR_VERSION == 2
         SDL_Keycode key = e.key.keysym.sym; //SDL2            
@@ -982,7 +987,7 @@ void Viewport3D::event_key_down(SDL_Event &e){
             case SDLK_KP_7: SetViewpoint(top); break;
             case SDLK_KP_8: BuscarVertexAnimation(); break;
             case SDLK_KP_9: abrir(); break;
-            //case SDLK_KP_0: numpad('0'); break;
+            case SDLK_KP_0: SetViewFromCameraActive(!ViewFromCameraActive); break;
             case SDLK_KP_PERIOD: {
                 EnfocarObject(); 
                 break;

@@ -18,6 +18,7 @@
 #include "objects/Objects.h"
 #include "objects/Mirror.h"
 #include "objects/Collection.h"
+#include "objects/Constraint.h"
 
 #include "ViewPorts/ViewPorts.h"
 #include "ViewPorts/ViewPort3D.h"
