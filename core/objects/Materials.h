@@ -30,7 +30,7 @@ class Material {
         bool repeat = true;
         bool uv8bit = false;
         bool culling = true;
-        int interpolacion = 0; // definir lineal en cpp
+        int interpolacion = 0;
         Texture* texture = nullptr;
         GLfloat diffuse[4]  = {1.0f, 1.0f, 1.0f, 1.0f};
         GLfloat specular[4] = {0.3f, 0.3f, 0.3f, 1.0f};

@@ -635,7 +635,7 @@ void Viewport3D::event_mouse_motion(int mx, int my){
                 SetRotacion(dx, dy);
                 break;
             case EditScale:
-                SetScale(dx, dy);
+                SetScale(dx, dy, 0.001f);
                 break;
             default:
                 // por si no coincide con nada

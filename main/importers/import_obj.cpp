@@ -417,6 +417,10 @@ bool LeerMTL(const std::string& filepath, int objetosCargados) {
             else if (prefix == "CLAMP_TO_EDGE") {
                 mat->repeat = false;
             }
+            //por defecto es lineal
+            else if (prefix == "PIXELATED") {
+                mat->interpolacion = closest;
+            }
             else if (prefix == "map_d") {
                 mat->transparent = true;
             }
