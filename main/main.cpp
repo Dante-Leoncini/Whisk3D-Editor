@@ -147,6 +147,7 @@
 #include "variables.h"
 #include "UI/colores.h"
 #include "objects/Textures.h"
+#include "objects/Materials.h"
 #include "animation/Animation.h"
 #include "ViewPorts/ViewPorts.h"
 #include "controles.h"
@@ -414,6 +415,7 @@ int main(int argc, char* argv[]) {
 
     while (running) {
         Contadores();
+        UpdateAnimatedMaterials();
 
         while (SDL_PollEvent(&e)) {
             if (e.type == SDL_QUIT) running = false;

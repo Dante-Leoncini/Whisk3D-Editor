@@ -3,11 +3,11 @@ Whisk3D {
     Escena {
         iconApp: Whisk3D_experiment.png
         limpiarPantalla: true
-        background: "0.3, 0.3, 0.3, 1.0"
+        background: "0.0, 0.0, 0.0, 1.0"
 
         Wavefront {
             name: "Textura Animada"
-            filePath: assets/Whisk3D_animado/Plano.obj
+            filePath: assets/Whisk3D_animado/Mesh_3D.obj
             x: 0.0
             y: 0.0
             z: 0.0
