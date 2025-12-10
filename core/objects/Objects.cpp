@@ -251,12 +251,6 @@ void Object::Render(){
     if (!visible) return; 
     // Guardar la matriz actual
     glPushMatrix();     
-        
-    // Aplicar las transformaciones del objeto
-    /*glTranslatef(posX, posZ, posY);
-    glRotatef(rotX, 1, 0, 0); // angulo, X Y Z
-    glRotatef(rotZ, 0, 1, 0); // angulo, X Y Z
-    glRotatef(rotY, 0, 0, 1); // angulo, X Y Z*/
 
     GetMatrix(M);
     glMultMatrixf(M);   // aplica T * R * S -> incluye traslación

@@ -110,8 +110,11 @@ bool RenderAxisTransform(Object* obj) {
 void DibujarOrigen(Object* obj){    
     if (!obj->visible) return;
 
-    glPushMatrix();    
-    glTranslatef(obj->pos.x, obj->pos.z, obj->pos.y);
+    glPushMatrix();   
+    
+    // Aplicar la matriz TRS igual que en Render()
+    obj->GetMatrix(obj->M);
+    glMultMatrixf(obj->M);
 
     if (obj->select || obj == ObjActivo){
         if (obj == ObjActivo){
