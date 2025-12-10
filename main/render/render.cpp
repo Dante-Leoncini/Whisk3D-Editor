@@ -78,7 +78,9 @@ void DrawTransformAxis() {
 bool RenderAxisTransform(Object* obj) {
     bool found = false;
     glPushMatrix();    
-    glTranslatef(obj->pos.x, obj->pos.z, obj->pos.y);
+
+    obj->GetMatrix(obj->M);
+    glMultMatrixf(obj->M);
     
     if (obj == ObjActivo) {
         if (estado == rotacion || estado == EditScale){
@@ -112,7 +114,6 @@ void DibujarOrigen(Object* obj){
 
     glPushMatrix();   
     
-    // Aplicar la matriz TRS igual que en Render()
     obj->GetMatrix(obj->M);
     glMultMatrixf(obj->M);
 
