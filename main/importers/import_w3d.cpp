@@ -222,8 +222,8 @@ void ApplyCommonProps(Object* obj, const std::map<std::string,std::string>& p){
 
     // Posición
     if(p.count("x")) obj->pos.x = GetFloatOrDefault(p,"x");
-    if(p.count("y")) obj->pos.y = GetFloatOrDefault(p,"y");
-    if(p.count("z")) obj->pos.z = GetFloatOrDefault(p,"z");
+    if(p.count("y")) obj->pos.z = GetFloatOrDefault(p,"y");
+    if(p.count("z")) obj->pos.y = GetFloatOrDefault(p,"z");
 
     // Rotación
     if(p.count("rx") || p.count("ry") || p.count("rz")){

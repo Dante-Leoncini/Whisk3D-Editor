@@ -12,8 +12,8 @@ Whisk3D {
                 y: 2.5
                 z: 1.8
                 rx: 0
-                ry: 35
-                rz: -45
+                ry: -45
+                rz: 35
             }
 
             Light {
