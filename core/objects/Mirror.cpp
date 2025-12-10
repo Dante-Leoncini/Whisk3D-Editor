@@ -30,7 +30,7 @@ void Mirror::RenderObject() {
         glPushMatrix();
 
         glScalef(1, -1, 1);
-        glScalef(scaleX, scaleZ, scaleY);
+        glScalef(scale.x, scale.z, scale.y);
         //glTranslatef(target->posX, target->posZ, target->posY);
         /*glRotatef(rotX, 1, 0, 0);
         glRotatef(rotZ, 0, 1, 0);

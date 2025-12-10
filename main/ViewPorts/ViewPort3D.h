@@ -57,15 +57,13 @@ class Viewport3D : public ViewportBase, public WithBorder {
         Vector3    viewPos;                  // posición de la cámara precalculada
         Vector3    pivot;                    // punto de interés a orbitar
         float      orbitDistance = 5.0f;     // distancia al pivote (zoom) 
-        float yawDeg   = 0.0f;                  // rotación alrededor de Y global (horizontal)
-        float pitchDeg = 0.0f;                  // rotación alrededor de X local (vertical)
 
         /*GLfloat LastPosX = 0;
         GLfloat LastPosY = 0;  
         GLfloat LastPosZ = 0;  
         GLfloat LastZoom = 0;*/
 
-        Viewport3D();
+        Viewport3D(Vector3 pos = Vector3(0,0,0));
 
         virtual ~Viewport3D();
 

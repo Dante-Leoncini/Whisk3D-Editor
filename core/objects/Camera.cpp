@@ -32,11 +32,11 @@ Object* CameraActive = nullptr;
 
 // ------------------- MÉTODOS -------------------
 
-Camera::Camera(Object* parent, Vector3 pos, GLfloat rx, GLfloat ry, GLfloat rz, GLfloat rw, GLfloat scale)
+Camera::Camera(Object* parent, Vector3 pos, GLfloat rx, GLfloat ry, GLfloat rz, GLfloat rw, GLfloat Scale)
     : Object(parent, "Camera", pos) 
 {
     rot.x = rx; rot.y = ry; rot.z = rz; rot.w = rw;
-    scaleX = scaleY = scaleZ = scale;
+    scale = scale;
     IconType = static_cast<size_t>(IconType::camera);
 
     if (!CameraActive){
@@ -52,7 +52,7 @@ void Camera::RenderObject() {
     if (!showOverlayGlobal || ViewFromCameraActiveGlobal) return;
 
     glPushMatrix();
-    glScalef(scaleX, scaleZ, scaleY);
+    //glScalef(scale.x, scale.z, scale.y);
 
     if (ObjActivo == this && select){
         glColor4f(ListaColores[static_cast<int>(ColorID::accent)][0],

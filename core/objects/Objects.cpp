@@ -6,8 +6,8 @@ Object* CollectionActive = nullptr;
 Object* ObjActivo = nullptr;
 std::vector<SaveState> estadoObjetos;
 
-Object::Object(Object* parent, const std::string& nombre, Vector3 pos = {0,0,0})
-    : Parent(parent), pos(pos) {
+Object::Object(Object* parent, const std::string& nombre, Vector3 pos, Vector3 Scale)
+    : Parent(parent), pos(pos), scale(Scale) {
     name = new Text(SetName(nombre));
 
     if (Parent) {
@@ -194,34 +194,28 @@ void Object::ReloadAll(){
     }      
 }
 
-// Construye matriz T * R * S y la exporta en formato column-major (GLfloat[16])
-void Object::GetMatrix(GLfloat out[16]) const {
+void Object::GetMatrix(Matrix4& out) const {
     // --- Rotación ---
-    GLfloat R[16];
-    rot.ToMatrix(R);
+    Matrix4 R;
+    R.Identity();
+    rot.ToMatrix(R.m);
 
     // --- Escala ---
-    GLfloat S[16] = {
-        scaleX, 0,      0,      0,
-        0,      scaleY, 0,      0,
-        0,      0,      scaleZ, 0,
-        0,      0,      0,      1
-    };
-
-    // R * S
-    GLfloat RS[16];
-    MultiplyMatrix(RS, R, S);
+    Matrix4 S;
+    S.Identity();
+    S.m[0]  = scale.x;
+    S.m[5]  = scale.y;
+    S.m[10] = scale.z;
 
     // --- Traslación ---
-    GLfloat T[16] = {
-        1, 0, 0, 0,
-        0, 1, 0, 0,
-        0, 0, 1, 0,
-        pos.x, pos.y, pos.z, 1
-    };
+    Matrix4 T;
+    T.Identity();
+    T.m[12] = pos.x;
+    T.m[13] = pos.y;
+    T.m[14] = pos.z;
 
-    // Matriz final = T * (R * S)
-    MultiplyMatrix(out, T, RS);
+    // out = T * (R * S)
+    out = T * (R * S);
 }
 
 void Object::RotateLocal(float pitch, float yaw, float roll){
@@ -253,7 +247,7 @@ void Object::Render(){
     glPushMatrix();     
 
     GetMatrix(M);
-    glMultMatrixf(M);   // aplica T * R * S -> incluye traslación
+    glMultMatrixf(M.m);   // aplica T * R * S -> incluye traslación
 
     // Si es visible y no es un mesh, lo dibuja
     RenderObject();

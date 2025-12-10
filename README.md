@@ -36,7 +36,13 @@ Sí el instalador falla, probablemente debas de "hackear" tu teléfono para igno
 
 ## Linux
 
-Para compilar en Linux/Ubuntu hace falta instalar las dependencias y en la carpeta raiz usar cmake y los siguientes comandos:
+Para compilar en Linux/Ubuntu hace falta instalar las dependencias y bajar los submodulos de git con el siguiente copmando:
+
+```bash
+git submodule update --init --recursive
+```
+
+en la carpeta raiz usar cmake y los siguientes comandos:
 
 ```bash
 cmake -B build-linux -DCMAKE_BUILD_TYPE=Release

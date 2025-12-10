@@ -1,18 +1,13 @@
 #include "ViewPorts/ViewPort3D.h"
 #include <cmath>
 
-Viewport3D::Viewport3D()
+Viewport3D::Viewport3D(Vector3 pos)
     : orthographic(false), ViewFromCameraActive(false), showOverlays(true), ShowUi(true),
       showFloor(true), showYaxis(true), showXaxis(true), CameraToView(false),
       showOrigins(true), show3DCursor(true), ShowRelantionshipsLines(true),
       view(RenderType::MaterialPreview),
-      orbitDistance(10.0f), aspect(1.0f), pivot(0.0f,0.0f,0.0f)
-      //viewRot(Quaternion::FromAxisAngle(Vector3(0,1,0), 180.0f))
+      orbitDistance(10.0f), aspect(1.0f), pivot(pos)
 {
-    yawDeg   = 0.0f;
-    pitchDeg = 0.0f;
-    pivot = Vector3(0,0,0);
-
     RecalcOrbitPosition();
 }
 

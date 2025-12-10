@@ -9,19 +9,9 @@ Instance::Instance(Object* parent, Object* instance)
     if (!instance) return;
 
     target = instance;
-    pos.x = instance->pos.x;
-    pos.y = instance->pos.y;
-    pos.z = instance->pos.z;
-    /*rotX = instance->rotX;
-    rotY = instance->rotY;
-    rotZ = instance->rotZ;*/
-    rot.x = instance->rot.x;
-    rot.y = instance->rot.y;
-    rot.z = instance->rot.z;
-    rot.w = instance->rot.w;
-    scaleX = instance->scaleX;
-    scaleY = instance->scaleY;
-    scaleZ = instance->scaleZ;
+    pos = instance->pos;
+    rot = instance->rot;
+    scale = instance->scale;
 }
 
 // Devuelve el tipo de objeto
@@ -45,7 +35,7 @@ void Instance::RenderObject() {
     glRotatef(target->rotY, 0, 0, 1);*/
 
     for(size_t i = 0; i < count; i++){
-        glScalef(scaleX, scaleY, scaleZ);
+        //glScalef(scale.x, scale.y, scale.z);
         target->RenderObject();
 
         if(RenderChildrens){

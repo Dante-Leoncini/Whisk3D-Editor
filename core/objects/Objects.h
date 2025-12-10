@@ -5,6 +5,7 @@
     #include <windows.h>
 #endif
 
+#include "math/Matrix4.h"
 #include "math/Vector3.h"
 #include "math/Quaternion.h"
 #include <vector>
@@ -48,15 +49,16 @@ class Object {
         Text* name = nullptr;
         size_t IconType = 0;
 
-        GLfloat M[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+        //GLfloat M[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+        Matrix4 M;
 
         Vector3 pos;    
         Quaternion rot; // NUEVO: reemplazamos rotX/Y/Z por cuaternión
-        GLfloat scaleX = 1.0f, scaleY = 1.0f, scaleZ = 1.0f;
+        Vector3 scale;
 
         virtual ObjectType getType() { return ObjectType::baseObject; }
 
-        Object(Object* parent, const std::string& nombre, Vector3 pos);
+        Object(Object* parent, const std::string& nombre = "Objeto", Vector3 pos = Vector3(0,0,0), Vector3 scale = Vector3(1.0f, 1.0f, 1.0f));
         virtual ~Object();
 
         void SetNameObj(const std::string& nombre);
@@ -72,7 +74,7 @@ class Object {
         bool SeleccionarCompleto(bool IncluirColecciones = false);
 
         //todo lo nuevo para tranformaciones locales/globales y quaternion
-        void GetMatrix(GLfloat out[16]) const;
+        void GetMatrix(Matrix4& out) const;
         void RotateLocal(float pitch, float yaw, float roll);
         Vector3 GetGlobalPosition() const;
 
@@ -105,7 +107,7 @@ class SaveState {
         Object* obj;
         Vector3 pos;
         Quaternion rot;  
-        GLfloat scaleX, scaleY, scaleZ;
+        Vector3 scale;
 };
 extern std::vector<SaveState> estadoObjetos;
 

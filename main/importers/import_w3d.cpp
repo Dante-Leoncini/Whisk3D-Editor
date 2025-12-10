@@ -138,16 +138,16 @@ void ApplyViewport3DProps(Viewport3D* v, const std::map<std::string,std::string>
     /*if(p.count("posX")) v->posX = F("posX");
     if(p.count("posY")) v->posY = F("posY");
     if(p.count("posZ")) v->posZ = F("posZ");
-    if(p.count("cameraDistance")) v->zoom = F("zoom", 10.0f);
+    if(p.count("cameraDistance")) v->zoom = F("zoom", 10.0f);*/
 
-    if(p.count("rotX")) v->rot.x = F("rotX");
-    if(p.count("rotY")) v->rot.y = F("rotY");
-    if(p.count("rotZ")) v->rot.z = F("rotZ");
-    if(p.count("rotW")) v->rot.w = F("rotW");*/
+    if(p.count("rotX")) v->viewRot.x = F("rotX");
+    if(p.count("rotY")) v->viewRot.y = F("rotY");
+    if(p.count("rotZ")) v->viewRot.z = F("rotZ");
+    if(p.count("rotW")) v->viewRot.w = F("rotW");
 
-    /*if(p.count("PivotX")) v->PivotX = F("PivotX");
-    if(p.count("PivotY")) v->PivotY = F("PivotY");
-    if(p.count("PivotZ")) v->PivotZ = F("PivotZ");*/
+    if(p.count("posX")) v->pivot.x = F("posX"); //PivotX
+    if(p.count("posY")) v->pivot.y = F("posY");
+    if(p.count("posZ")) v->pivot.z = F("posZ");
 
     if(p.count("view"))  // string → enum
          v->view = StringToRenderType(p.at("view"));
@@ -232,11 +232,11 @@ void ApplyCommonProps(Object* obj, const std::map<std::string,std::string>& p){
     // Escala
     if(p.count("scale")){
         float s = GetFloatOrDefault(p,"scale",1);
-        obj->scaleX=obj->scaleY=obj->scaleZ = s;
+        obj->scale.z=obj->scale.y=obj->scale.z = s;
     } else {
-        if(p.count("sx")) obj->scaleX = GetFloatOrDefault(p,"sx",1);
-        if(p.count("sy")) obj->scaleY = GetFloatOrDefault(p,"sy",1);
-        if(p.count("sz")) obj->scaleZ = GetFloatOrDefault(p,"sz",1);
+        if(p.count("sx")) obj->scale.x = GetFloatOrDefault(p,"sx",1);
+        if(p.count("sy")) obj->scale.y = GetFloatOrDefault(p,"sy",1);
+        if(p.count("sz")) obj->scale.z = GetFloatOrDefault(p,"sz",1);
     }
 }
 

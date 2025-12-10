@@ -80,7 +80,7 @@ bool RenderAxisTransform(Object* obj) {
     glPushMatrix();    
 
     obj->GetMatrix(obj->M);
-    glMultMatrixf(obj->M);
+    glMultMatrixf(obj->M.m);
     
     if (obj == ObjActivo) {
         if (estado == rotacion || estado == EditScale){
@@ -115,7 +115,7 @@ void DibujarOrigen(Object* obj){
     glPushMatrix();   
     
     obj->GetMatrix(obj->M);
-    glMultMatrixf(obj->M);
+    glMultMatrixf(obj->M.m);
 
     if (obj->select || obj == ObjActivo){
         if (obj == ObjActivo){
@@ -158,7 +158,7 @@ void DibujarIcono3D(Object* obj){
 
     glPushMatrix();    
     obj->GetMatrix(obj->M);
-    glMultMatrixf(obj->M);
+    glMultMatrixf(obj->M.m);
 
     if (obj->getType() == ObjectType::light){
         if (ObjActivo == obj && obj->select)

@@ -93,24 +93,16 @@ void Light::RenderObject() {
     glDisable(GL_BLEND);
     glLineWidth(1);
 
-    // Posición acumulada
-    /*GLfloat totalZ = posZ;
-    GLfloat rX = rotX, rY = rotY, rZ = rotZ;
-    Object* p = Parent;
-    while (p != nullptr) {
-        totalZ += p->posZ;
-        rX += p->rotX;
-        rY += p->rotY;
-        rZ += p->rotZ;
-        p = p->Parent;
-    }
-    LineaLightVertex[4] = -totalZ;*/
+    // 1. Matriz global del objeto
+    GetMatrix(M);
 
-    // Invertir rotaciones
-    /*glPushMatrix();    
-    glRotatef(-rX, 1, 0, 0);
-    glRotatef(-rZ, 0, 1, 0);
-    glRotatef(-rY, 0, 0, 1);*/
+    // 2. Posición global de la lámpara
+    Vector3 worldPos = M * Vector3(0, 0, 0);
+
+    // 3. Guardarlo como vértice 1 de la línea
+    //LineaLightVertex[4] = 0;
+    //LineaLightVertex[5] = 0;
+    LineaLightVertex[6] = -worldPos.z;
 
     glVertexPointer(3, GL_FLOAT, 0, LineaLightVertex);
     glDrawElements(GL_LINES, LineaEdgeSize, GL_UNSIGNED_SHORT, LineaEdge);

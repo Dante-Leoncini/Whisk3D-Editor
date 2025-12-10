@@ -7,10 +7,7 @@ void ReestablecerEstado(bool ClearEstado){
 			Object& obj = *estadoObj.obj;
 			obj.pos = estadoObj.pos;
 			obj.rot = estadoObj.rot;
-
-			obj.scaleX = estadoObj.scaleX;
-			obj.scaleY = estadoObj.scaleY;
-			obj.scaleZ = estadoObj.scaleZ;	
+			obj.scale = estadoObj.scale;
 		}	
 		//estadoObjetos.Close();
 		if (ClearEstado) estadoObjetos.clear();
@@ -115,10 +112,7 @@ void guardarEstadoRec(Object* obj){
         NuevoEstado.obj = obj;
         NuevoEstado.pos = obj->pos;
 		NuevoEstado.rot = obj->rot;
-
-        NuevoEstado.scaleX = obj->scaleX;
-        NuevoEstado.scaleY = obj->scaleY;
-        NuevoEstado.scaleZ = obj->scaleZ;
+        NuevoEstado.scale = obj->scale;
         estadoObjetos.push_back(NuevoEstado);
     }
 
@@ -277,24 +271,21 @@ void SetScale(int dx, int dy, float factor){
 		Object& obj = *estadoObjetos[o].obj;
 		switch (axisSelect) {
 			case X:
-				obj.scaleX += dxf;
-				obj.scaleX += dyf;
+				obj.scale.x += dxf;
+				obj.scale.x += dyf;
 				break;
 			case Y:
-				obj.scaleY += dxf;
-				obj.scaleY += dyf;
+				obj.scale.y += dxf;
+				obj.scale.y += dyf;
 				break;
 			case Z:
-				obj.scaleZ += dxf;
-				obj.scaleZ += dyf;
+				obj.scale.z += dxf;
+				obj.scale.z += dyf;
 				break;
 			case XYZ:
-				obj.scaleX += dxf;
-				obj.scaleY += dxf;
-				obj.scaleZ += dxf;
-				obj.scaleX += dyf;
-				obj.scaleY += dyf;
-				obj.scaleZ += dyf;
+				obj.scale.x += dxf + dyf;
+				obj.scale.y += dxf + dyf;
+				obj.scale.z += dxf + dyf;
 				break;
 		}
 	}
