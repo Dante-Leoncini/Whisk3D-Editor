@@ -113,7 +113,11 @@ void Viewport3D::RollOrbit(float angleDeg) {
 void Viewport3D::RecalcOrbitPosition(){
     Vector3 forward = viewRot * Vector3(0,0,-1);
     viewPos = pivot - forward * orbitDistance;
-    UpdatePrecalculos();
+
+    // Extraer ejes locales desde el quaternion de la vista
+    camRight   = viewRot * Vector3(1, 0, 0);
+    camUp      = viewRot * Vector3(0, 1, 0);
+    camForward = viewRot * Vector3(0, 0, -1);
 }
 
 void Viewport3D::SetViewpoint(Viewpoint value) {
@@ -657,31 +661,6 @@ void Viewport3D::mouse_button_up(SDL_Event &e){
 
 }
 
-// Método para actualizar cache
-void Viewport3D::UpdatePrecalculos() {
-    // === Convertir quaternion a pitch/yaw ===
-    /*float sinp = 2 * (rot.w * rot.x + rot.y * rot.z);
-    float pitchRad;
-    if (fabs(sinp) >= 1)
-        pitchRad = copysign(M_PI / 2, sinp);
-    else
-        pitchRad = asin(sinp);
-
-    float siny_cosp = 2 * (rot.w * rot.y - rot.z * rot.x);
-    float cosy_cosp = 1 - 2 * (rot.x * rot.x + rot.y * rot.y);
-    float yawRad = atan2(siny_cosp, cosy_cosp);
-
-    // Guardar
-    precalculado.pitchRad = pitchRad;
-    precalculado.yawRad = yawRad;
-
-    // Precomputar sin/cos
-    precalculado.cosX = cosf(pitchRad);
-    precalculado.sinX = sinf(pitchRad);
-    precalculado.cosY = cosf(yawRad);
-    precalculado.sinY = sinf(yawRad);*/
-}
-
 void Viewport3D::event_mouse_motion(int mx, int my){
     //boton del medio del mouse
     #ifdef __ANDROID__
@@ -998,11 +977,9 @@ void Viewport3D::event_key_down(SDL_Event &e){
                 break;
             case SDLK_D: {
                 if (LAltPressed){
-                    UpdatePrecalculos();
                     NewInstance();
                 }
                 else if (LShiftPressed){
-                    UpdatePrecalculos();
                     DuplicatedObject();
                 }
                 break;
@@ -1056,8 +1033,6 @@ void Viewport3D::event_key_down(SDL_Event &e){
                 SetRotacion();
                 break;
             case SDLK_G:  
-                // Para activar el cursor de mover/arrastrar
-                UpdatePrecalculos();
                 SetPosicion();
                 break;			
             case SDLK_S:   

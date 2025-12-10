@@ -104,7 +104,6 @@ class Viewport3D : public ViewportBase, public WithBorder {
         void TeclaIzquierda();
         void TeclaArriba();
         void TeclaAbajo();
-        void UpdatePrecalculos();
         void SetEje(int eje);
         void SetViewFromCameraActive(bool value);
         void event_key_down(SDL_Event &e) override;

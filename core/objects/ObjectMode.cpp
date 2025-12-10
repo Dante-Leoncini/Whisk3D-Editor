@@ -315,7 +315,7 @@ void SetTranslacionObjetos(int dx, int dy, float speed){
 		Object& obj = *estadoObjetos[o].obj;
 		switch (axisSelect) {
 			case ViewAxis: {
-				Vector3 disp = camRight * (dx * speed) + camUp * (dy * speed);
+				Vector3 disp = camRight * (dx * speed) + camUp * (-dy * speed);
 				obj.pos += disp;
                 break;
             }
