@@ -314,7 +314,7 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
     }    
 
     if(n->type=="Camera"){
-        return new Camera(parent, Vector3(0,0,0), 0, 0, 0);
+        return new Camera(parent, Vector3(0,0,0), Vector3(0, 0, 0));
     }
 
     if(n->type=="Light"){

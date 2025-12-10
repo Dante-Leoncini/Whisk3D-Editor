@@ -38,6 +38,7 @@ struct Quaternion {
     }
 
     static Quaternion FromEuler(float pitchDeg, float yawDeg, float rollDeg);
+    static Quaternion FromEulerXYZ(float pitch, float yaw, float roll);
 
     Quaternion Inverted() const {
         return Quaternion(w, -x, -y, -z);

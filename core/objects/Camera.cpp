@@ -12,7 +12,7 @@ GLfloat CameraVertices[CameraVertexSize] = {
     0.35f*2,  0.31f*2,  0,
 };
 
-const GLshort CameraFaceActive[3] = {5, 6, 7};
+const GLushort CameraFaceActive[3] = {5, 6, 7};
 
 const GLushort CameraEdges[CameraEdgesSize] = {
     0, 1,
@@ -32,10 +32,9 @@ Object* CameraActive = nullptr;
 
 // ------------------- MÉTODOS -------------------
 
-Camera::Camera(Object* parent, Vector3 pos, GLfloat rx, GLfloat ry, GLfloat rz, GLfloat rw)
-    : Object(parent, "Camera", pos) 
+Camera::Camera(Object* parent, Vector3 pos, Vector3 Rot)
+    : Object(parent, "Camera", pos, Rot) 
 {
-    rot.x = rx; rot.y = ry; rot.z = rz; rot.w = rw;
     IconType = static_cast<size_t>(IconType::camera);
 
     if (!CameraActive){

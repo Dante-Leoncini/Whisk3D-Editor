@@ -6,9 +6,23 @@ Object* CollectionActive = nullptr;
 Object* ObjActivo = nullptr;
 std::vector<SaveState> estadoObjetos;
 
-Object::Object(Object* parent, const std::string& nombre, Vector3 pos, Vector3 Scale)
+Object::Object(Object* parent, const std::string& nombre, Vector3 pos, Vector3 Rot, Vector3 Scale)
     : Parent(parent), pos(pos), scale(Scale) {
     name = new Text(SetName(nombre));
+
+    // Convertir los ángulos de Euler (Rot.x, Rot.y, Rot.z) a tres cuaterniones simples.
+    // Usaremos un orden común para una configuración inicial: YXZ (Yaw, Pitch, Roll)
+    // Orden de aplicación: Z (Roll) se aplica primero, luego X (Pitch), luego Y (Yaw).
+    
+    Quaternion qX = Quaternion::FromAxisAngle(Vector3(1, 0, 0), Rot.x); // Pitch (Eje X)
+    Quaternion qY = Quaternion::FromAxisAngle(Vector3(0, 1, 0), Rot.y); // Yaw (Eje Y)
+    Quaternion qZ = Quaternion::FromAxisAngle(Vector3(0, 0, 1), Rot.z); // Roll (Eje Z)
+
+    // Composición de Cuaterniones (ejemplo con orden YXZ):
+    // Multiplicación en C++: rot = qA * qB * qC  (qC se aplica primero)
+    // Para orden YXZ: qZ (Roll) primero, luego qX (Pitch), luego qY (Yaw).
+    
+    rot = qY * qX * qZ; // Aplicación: (Z) * (X) * (Y)
 
     if (Parent) {
         Parent->Childrens.push_back(this);

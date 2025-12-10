@@ -16,15 +16,14 @@ static const int CameraVertexSize = 8 * 3;
 static const int CameraEdgesSize = 11 * 2;
 
 extern GLfloat CameraVertices[CameraVertexSize];
-extern const GLshort CameraFaceActive[3];
+extern const GLushort CameraFaceActive[3];
 extern const GLushort CameraEdges[CameraEdgesSize];
 
 extern Object* CameraActive;
 
 class Camera : public Object {
 public:
-    Camera(Object* parent = nullptr, Vector3 pox = Vector3(0,0,0),
-           GLfloat rx = 0.0f, GLfloat ry = 0.0f, GLfloat rz = 0.0f, GLfloat rw = 0.0f);
+    Camera(Object* parent = nullptr, Vector3 pos = Vector3(0,0,0), Vector3 Rot = Vector3(0,0,0));
 
     ObjectType getType() override;
 

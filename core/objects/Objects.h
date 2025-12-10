@@ -58,7 +58,12 @@ class Object {
 
         virtual ObjectType getType() { return ObjectType::baseObject; }
 
-        Object(Object* parent, const std::string& nombre = "Objeto", Vector3 pos = Vector3(0,0,0), Vector3 scale = Vector3(1.0f, 1.0f, 1.0f));
+        Object(
+            Object* parent, 
+            const std::string& nombre = "Objeto", 
+            Vector3 pos = Vector3(0,0,0), 
+            Vector3 Rot = Vector3(0.0f, 0.0f, 0.0f),
+            Vector3 scale = Vector3(1.0f, 1.0f, 1.0f));
         virtual ~Object();
 
         void SetNameObj(const std::string& nombre);
