@@ -35,28 +35,28 @@ extern GLfloat LastPivotZ;
 
 class Viewport3D : public ViewportBase, public WithBorder {
     public:
-        bool orthographic;
-        bool ViewFromCameraActive;
-        bool showOverlays;
-        bool ShowUi;
-        bool showFloor;
-        bool showYaxis;
-        bool showXaxis;
-        bool CameraToView;
-        bool showOrigins;
-        bool show3DCursor;
-        bool ShowRelantionshipsLines;
-        RenderType view;
+        bool orthographic = false;
+        bool ViewFromCameraActive = false;
+        bool showOverlays = true;
+        bool ShowUi = true;
+        bool showFloor = true;
+        bool showYaxis = true;
+        bool showXaxis = true;
+        bool CameraToView = false;
+        bool showOrigins = true;
+        bool show3DCursor = true;
+        bool ShowRelantionshipsLines = true;
+        RenderType view = RenderType::MaterialPreview;
 
         GLfloat nearClip = 0.01f;
         GLfloat farClip = 1000.0f;
-        GLfloat aspect;
+        GLfloat aspect = 1.0f;
 
         // --- Rotación orbital / libre ---
-        Quaternion viewRot;                  // rotación de la cámara 
+        Quaternion viewRot = Quaternion::FromEuler(-30.0f, -23.0f, 0.0f); // rotación de la cámara 
         Vector3    viewPos;                  // posición de la cámara precalculada
         Vector3    pivot;                    // punto de interés a orbitar
-        float      orbitDistance = 5.0f;     // distancia al pivote (zoom) 
+        float      orbitDistance = 10.0f;    // distancia al pivote (zoom) 
 
         /*GLfloat LastPosX = 0;
         GLfloat LastPosY = 0;  

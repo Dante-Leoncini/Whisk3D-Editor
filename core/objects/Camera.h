@@ -24,7 +24,7 @@ extern Object* CameraActive;
 class Camera : public Object {
 public:
     Camera(Object* parent = nullptr, Vector3 pox = Vector3(0,0,0),
-           GLfloat rx = 0.0f, GLfloat ry = 0.0f, GLfloat rz = 0.0f, GLfloat rw = 0.0f, GLfloat Scale = 1.0f);
+           GLfloat rx = 0.0f, GLfloat ry = 0.0f, GLfloat rz = 0.0f, GLfloat rw = 0.0f);
 
     ObjectType getType() override;
 

@@ -232,7 +232,7 @@ void NewInstance(){
 }
 
 void SetRotacion(int dx, int dy){
-	float ang = (dx + dy) * 0.01f;   // sensibilidad (ajustable)
+	float ang = (dx + dy) * 0.1f;   // sensibilidad (ajustable)
 
 	for (size_t o = 0; o < estadoObjetos.size(); o++) {
 		Object& obj = *estadoObjetos[o].obj;

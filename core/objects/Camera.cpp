@@ -32,11 +32,10 @@ Object* CameraActive = nullptr;
 
 // ------------------- MÉTODOS -------------------
 
-Camera::Camera(Object* parent, Vector3 pos, GLfloat rx, GLfloat ry, GLfloat rz, GLfloat rw, GLfloat Scale)
+Camera::Camera(Object* parent, Vector3 pos, GLfloat rx, GLfloat ry, GLfloat rz, GLfloat rw)
     : Object(parent, "Camera", pos) 
 {
     rot.x = rx; rot.y = ry; rot.z = rz; rot.w = rw;
-    scale = scale;
     IconType = static_cast<size_t>(IconType::camera);
 
     if (!CameraActive){

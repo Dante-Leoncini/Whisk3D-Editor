@@ -1,13 +1,7 @@
 #include "ViewPorts/ViewPort3D.h"
 #include <cmath>
 
-Viewport3D::Viewport3D(Vector3 pos)
-    : orthographic(false), ViewFromCameraActive(false), showOverlays(true), ShowUi(true),
-      showFloor(true), showYaxis(true), showXaxis(true), CameraToView(false),
-      showOrigins(true), show3DCursor(true), ShowRelantionshipsLines(true),
-      view(RenderType::MaterialPreview),
-      orbitDistance(10.0f), aspect(1.0f), pivot(pos)
-{
+Viewport3D::Viewport3D(Vector3 pos){
     RecalcOrbitPosition();
 }
 

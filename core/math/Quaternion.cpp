@@ -30,6 +30,29 @@ Matrix4 Quaternion::ToMatrix() const {
     return m;
 }
 
+Quaternion Quaternion::FromEuler(float pitchDeg, float yawDeg, float rollDeg){
+    float xRad = pitchDeg * (M_PI / 180.0f);
+    float yRad = yawDeg  * (M_PI / 180.0f);
+    float zRad = rollDeg * (M_PI / 180.0f);
+
+    float cx = cosf(xRad * 0.5f);
+    float sx = sinf(xRad * 0.5f);
+
+    float cy = cosf(yRad * 0.5f);
+    float sy = sinf(yRad * 0.5f);
+
+    float cz = cosf(zRad * 0.5f);
+    float sz = sinf(zRad * 0.5f);
+
+    Quaternion q;
+    q.w = cx*cy*cz + sx*sy*sz;
+    q.x = sx*cy*cz - cx*sy*sz;
+    q.y = cx*sy*cz + sx*cy*sz;
+    q.z = cx*cy*sz - sx*sy*cz;
+
+    return q;
+}
+
 // out = A * B  (column-major, como espera glMultMatrixf)
 void MultiplyMatrix(GLfloat out[16], const GLfloat A[16], const GLfloat B[16]) {
     for (int r = 0; r < 4; ++r) {
