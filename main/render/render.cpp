@@ -157,7 +157,8 @@ void DibujarIcono3D(Object* obj){
     if (!obj->visible) return;
 
     glPushMatrix();    
-    glTranslatef(obj->pos.x, obj->pos.z, obj->pos.y);
+    obj->GetMatrix(obj->M);
+    glMultMatrixf(obj->M);
 
     if (obj->getType() == ObjectType::light){
         if (ObjActivo == obj && obj->select)
