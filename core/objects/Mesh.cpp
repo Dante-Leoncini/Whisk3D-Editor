@@ -49,7 +49,7 @@ void Mesh::LiberarMemoria() {
 // ===================================================
 void Mesh::RenderObject() {
     glPushMatrix();
-    glScalef(scale.x, scale.z, scale.y);
+    //glScalef(scale.x, scale.z, scale.y);
 
     glColor4f(ListaColores[static_cast<int>(ColorID::blanco)][0],
               ListaColores[static_cast<int>(ColorID::blanco)][1],
