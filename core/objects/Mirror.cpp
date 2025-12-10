@@ -1,8 +1,8 @@
 #include "Mirror.h"
 
 // Constructor
-Mirror::Mirror(Object* parent, bool x, bool y, bool z)
-    : Object(parent, "Mirror")
+Mirror::Mirror(Object* parent, Vector3 pos, bool x, bool y, bool z)
+    : Object(parent, "Mirror", pos)
 {
     IconType = static_cast<size_t>(IconType::mirror);
     mirrorX = x;
@@ -31,10 +31,10 @@ void Mirror::RenderObject() {
 
         glScalef(1, -1, 1);
         glScalef(scaleX, scaleZ, scaleY);
-        glTranslatef(target->posX, target->posZ, target->posY);
-        glRotatef(rotX, 1, 0, 0);
+        //glTranslatef(target->posX, target->posZ, target->posY);
+        /*glRotatef(rotX, 1, 0, 0);
         glRotatef(rotZ, 0, 1, 0);
-        glRotatef(rotY, 0, 0, 1);
+        glRotatef(rotY, 0, 0, 1);*/
 
         target->RenderObject();
 

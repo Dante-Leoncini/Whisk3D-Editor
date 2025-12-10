@@ -1,28 +1,177 @@
 #include "ViewPorts/ViewPort3D.h"
 #include <cmath>
 
-// Variables globales
-GLfloat LastRotX = 0;
-GLfloat LastRotY = 0;  
-GLfloat LastPivotX = 0;
-GLfloat LastPivotY = 0;
-GLfloat LastPivotZ = 0;
-
 Viewport3D::Viewport3D()
     : orthographic(false), ViewFromCameraActive(false), showOverlays(true), ShowUi(true),
       showFloor(true), showYaxis(true), showXaxis(true), CameraToView(false),
       showOrigins(true), show3DCursor(true), ShowRelantionshipsLines(true),
-      view(RenderType::MaterialPreview), nearClip(0.01f), farClip(1000.0f),
-      cameraDistance(10.0f), aspect(1.0f), posX(0.0f), posY(0.0f), posZ(0.0f),
-      rotX(23.5f), rotY(20.0f), PivotX(0.0f), PivotY(0.0f), PivotZ(0.0f) 
-{}
+      view(RenderType::MaterialPreview),
+      orbitDistance(10.0f), aspect(1.0f), pivot(0.0f,0.0f,0.0f)
+      //viewRot(Quaternion::FromAxisAngle(Vector3(0,1,0), 180.0f))
+{
+    yawDeg   = 0.0f;
+    pitchDeg = 0.0f;
+    pivot = Vector3(0,0,0);
+
+    RecalcOrbitPosition();
+}
 
 Viewport3D::~Viewport3D() {};
+
+void Viewport3D::event_mouse_wheel(SDL_Event &e) {
+    if (!ViewFromCameraActive) {
+        Zoom(e.wheel.y); //podria multiplciarse por un valor por sensibilidad  * 1.0f
+    }
+}
+
+void Viewport3D::EnfocarObject() {
+    if (!ObjSelects.empty()) {
+        SetTransformPivotPoint();
+        pivot = TransformPivotPoint;
+        RecalcOrbitPosition();
+    }
+}
+
+void Viewport3D::Zoom(float delta){
+    orbitDistance -= delta * 0.5f;
+
+    if (orbitDistance < 0.1f)
+        orbitDistance = 0.1f;
+
+    RecalcOrbitPosition();
+}
+
+void Viewport3D::UpdateViewOrbit() {
+    // La View Matrix es la inversa de la Transformación de Cámara.
+    // Para rotación pura, la inversa es el conjugado.
+    Quaternion viewRotInverse = viewRot.Inverted(); 
+    Matrix4 R = viewRotInverse.ToMatrix();
+
+    Matrix4 T;
+    T.Identity();
+    // Movemos el mundo en dirección opuesta a la cámara
+    T.m[12] = -viewPos.x;
+    T.m[13] = -viewPos.y;
+    T.m[14] = -viewPos.z;
+
+    // Orden estándar ViewMatrix: Rotacion * Traslacion
+    Matrix4 view = R * T;
+
+    glLoadMatrixf(view.m);
+}
+
+void Viewport3D::RotateOrbit() {
+    float sens = 0.3f;
+
+    // Usamos dx y dy como deltas directos
+    float deltaYaw = -dx * sens;
+    float deltaPitch = -dy * sens;
+
+    // 1. Crear cuaternión de Yaw (Eje Y Global)
+    Quaternion qYaw = Quaternion::FromAxisAngle(Vector3(0, 1, 0), deltaYaw);
+
+    // 2. Crear cuaternión de Pitch (Eje X Local)
+    // Nota: Usamos (1,0,0) puro porque al multiplicar a la derecha,
+    // el cuaternión interpreta esto como el eje X de la propia cámara.
+    Quaternion qPitch = Quaternion::FromAxisAngle(Vector3(1, 0, 0), deltaPitch);
+
+    // 3. Aplicar las rotaciones en orden "Sandwich":
+    // Yaw Global (Izquierda) * viewRot Actual * Pitch Local (Derecha)
+    viewRot = qYaw * viewRot * qPitch;
+
+    // 4. Normalizar siempre para evitar deformaciones por errores de flotantes
+    viewRot.normalize();
+
+    RecalcOrbitPosition();
+}
+
+void Viewport3D::Pan(){
+    const float speed = orbitDistance * 0.002f;
+
+    // mover en el plano de la cámara
+    Vector3 right = viewRot * Vector3(1,0,0);
+    Vector3 up    = viewRot * Vector3(0,1,0);
+
+    pivot = pivot - right * (dx * speed);
+    pivot = pivot + up    * (dy * speed);
+
+    RecalcOrbitPosition();
+}
+
+void Viewport3D::RollOrbit(float angleDeg) {
+    // Eje Z local (0, 0, 1) o (0, 0, -1). 
+    // Usamos -1 para que sea consistente con la dirección de la vista (Forward).
+    Quaternion qRoll = Quaternion::FromAxisAngle(Vector3(0, 0, -1), angleDeg);
+
+    // Multiplicar por la DERECHA = Rotación Local
+    viewRot = viewRot * qRoll; 
+    
+    viewRot.normalize();
+    RecalcOrbitPosition();
+}
+
+void Viewport3D::RecalcOrbitPosition(){
+    Vector3 forward = viewRot * Vector3(0,0,-1);
+    viewPos = pivot - forward * orbitDistance;
+    UpdatePrecalculos();
+}
+
+void Viewport3D::SetViewpoint(Viewpoint value) {
+    ViewFromCameraActive = false;
+    CameraToView = false;
+    
+    switch (value) {
+        case Viewpoint::front: {
+            // Front: Mirando hacia -Z. Up es +Y. (Identidad)
+            viewRot = Quaternion(1.0f, 0.0f, 0.0f, 0.0f);
+            break;
+        }
+        case Viewpoint::back: {
+            // Back: Mirando hacia +Z. Rotamos 180 en Y.
+            viewRot = Quaternion::FromAxisAngle(Vector3(0,1,0), 180.0f);
+            break;
+        }
+        case Viewpoint::right: {
+            // Right: Mirando hacia -X. Rotamos 90 grados a la derecha (Y).
+            // Nota: Dependiendo de tu convención puede ser 90 o -90.
+            // Generalmente +90 en Y convierte el vector Forward (-Z) en (-X).
+            viewRot = Quaternion::FromAxisAngle(Vector3(0,1,0), 90.0f);
+            break;
+        }
+        case Viewpoint::left: {
+            viewRot = Quaternion::FromAxisAngle(Vector3(0,1,0), -90.0f);
+            break;
+        }
+        case Viewpoint::top: {
+            // Top: Mirando hacia -Y. Up es -Z (para que el top de la pantalla sea Norte).
+            // Esto es rotar X en 90 grados (pitch down).
+            viewRot = Quaternion::FromAxisAngle(Vector3(1,0,0), -90.0f);
+            break;
+        }
+        case Viewpoint::bottom: {
+            // Bottom: Mirando hacia +Y.
+            viewRot = Quaternion::FromAxisAngle(Vector3(1,0,0), 90.0f);
+            break;
+        }
+    }
+    
+    // IMPORTANTE:
+    // 1. Normalizar por seguridad (aunque los hardcodeados ya son unitarios)
+    viewRot.normalize();
+    
+    // 2. Recalcular la posición física de la cámara basada en el nuevo ángulo y el pivote existente
+    RecalcOrbitPosition();
+}
 
 // Ejemplo de implementación de un método
 void Viewport3D::ReloadLights() {
     ::view = view;
     ::showOverlayGlobal = showOverlays;
+    ::ViewFromCameraActiveGlobal = ViewFromCameraActive;
+    /*::rotGlobal.x = rot.x;
+    ::rotGlobal.y = rot.y;
+    ::rotGlobal.z = rot.z;
+    ::rotGlobal.w = rot.w;*/
     Viewport3DActive = this;
     
     for(size_t l = 0; l < Lights.size(); l++) {
@@ -77,29 +226,21 @@ void Viewport3D::Render() {
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
 
-#ifdef ANDROID
-    // OpenGL ES 1.1 no tiene gluPerspective, usamos función propia
     if (orthographic) {
-        float size = 90.0f;
+        float size = 5.0f;
         glOrtho(-size * aspect, size * aspect,
                 -size, size,
                 nearClip, farClip);
     } 
     else {
-        gluPerspectivef(fovDeg, aspect, nearClip, farClip);
+        #ifdef ANDROID
+            // OpenGL ES 1.1 no tiene gluPerspective, usamos función propia
+            gluPerspectivef(fovDeg, aspect, nearClip, farClip);
+        #else
+            // OpenGL desktop sí tiene gluPerspective
+            gluPerspective(fovDeg, aspect, nearClip, farClip);
+        #endif
     }
-#else
-    // OpenGL desktop sí tiene gluPerspective
-    if (orthographic) {
-        float size = 90.0f;
-        glOrtho(-size * aspect, size * aspect,
-                -size, size,
-                nearClip, farClip);
-    } 
-    else {
-        gluPerspective(fovDeg, aspect, nearClip, farClip);
-    }
-#endif
 
     // Matriz de modelo
     glMatrixMode(GL_MODELVIEW);
@@ -152,28 +293,19 @@ void Viewport3D::Render() {
         glLightfv(GL_LIGHT0, GL_POSITION, MaterialPreviewPosition);
     }
 
-    if (ViewFromCameraActive) {
-        RecalcViewPos();
-    }
-    else {
-        glTranslatef(posX, posZ, -cameraDistance + posY);
-    }
-
-    glRotatef(rotY, 1, 0, 0);
-    glRotatef(rotX, 0, 1, 0);
-    glTranslatef(PivotX, PivotZ, PivotY);
+    UpdateViewOrbit();
 
     // Dibujar overlays
     if (showOverlays) {
-#ifdef ANDROID
-        glMaterialxv(GL_FRONT_AND_BACK, GL_DIFFUSE,  ListaColoresX[negro]);
-        glMaterialxv(GL_FRONT_AND_BACK, GL_AMBIENT,  ListaColoresX[negro]);
-        glMaterialxv(GL_FRONT_AND_BACK, GL_SPECULAR, ListaColoresX[negro]);
-#else
-        glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE,  ListaColores[static_cast<int>(ColorID::negro)]);
-        glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT,  ListaColores[static_cast<int>(ColorID::negro)]);
-        glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, ListaColores[static_cast<int>(ColorID::negro)]);
-#endif
+        #ifdef ANDROID
+            glMaterialxv(GL_FRONT_AND_BACK, GL_DIFFUSE,  ListaColoresX[negro]);
+            glMaterialxv(GL_FRONT_AND_BACK, GL_AMBIENT,  ListaColoresX[negro]);
+            glMaterialxv(GL_FRONT_AND_BACK, GL_SPECULAR, ListaColoresX[negro]);
+        #else
+            glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE,  ListaColores[static_cast<int>(ColorID::negro)]);
+            glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT,  ListaColores[static_cast<int>(ColorID::negro)]);
+            glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, ListaColores[static_cast<int>(ColorID::negro)]);
+        #endif
 
         glDisable(GL_CULL_FACE);
         glDisable(GL_LIGHTING);
@@ -357,7 +489,7 @@ void Viewport3D::RenderRelantionshipsLines() {
 void Viewport3D::Render3Dcursor() {
     glDisable(GL_DEPTH_TEST);
     glPushMatrix();
-    glTranslatef(Cursor3DposX, Cursor3DposZ, Cursor3DposY);
+    glTranslatef(cursor3D.pos.x, cursor3D.pos.z, cursor3D.pos.y);
 
     glEnable(GL_TEXTURE_2D);
     glEnable(GL_BLEND);
@@ -415,65 +547,14 @@ void Viewport3D::RenderUI() {
     DibujarBordes(this);
 }
 
-void Viewport3D::EnfocarObject() {
-    if (!ObjSelects.empty()) {
-        SetTransformPivotPoint();
-        PivotX = 0.0f - TransformPivotPointFloat[0];
-        PivotY = 0.0f - TransformPivotPointFloat[1];
-        PivotZ = 0.0f - TransformPivotPointFloat[2];
-    }
-}
-
-void Viewport3D::RecalcViewPos() {
-    Object& obj = *CameraActive;
-    rotX = -obj.rotZ + 90;
-    rotY = -obj.rotY;
-    PivotX = -obj.posX;
-    PivotY = -obj.posY;
-    PivotZ = -obj.posZ;
-}
-
-void Viewport3D::SetViewpoint(int opcion) {
-    switch (opcion) {
-        case top:
-            rotX = -180.0;
-            rotY = 90.0;
-            ViewFromCameraActive = false;
-            CameraToView = false;
-            break;
-        case front:
-            rotX = -180.0;
-            rotY = 0.0;
-            ViewFromCameraActive = false;
-            CameraToView = false;
-            break;
-        case right:
-            rotX = 90.0;
-            rotY = 0.0;
-            ViewFromCameraActive = false;
-            CameraToView = false;
-            break;
-        case cameraView:
-            if (CameraActive && !ViewFromCameraActive) {
-                LastRotX = rotX;
-                LastRotY = rotY;
-                LastPivotX = PivotX;
-                LastPivotY = PivotY;
-                LastPivotZ = PivotZ;
-                RecalcViewPos();
-                ViewFromCameraActive = true;
-            }
-            break;
-    }
-}
-
-void Viewport3D::RestaurarViewport(){
-    ViewFromCameraActive = false;
-    rotX = LastRotX;
-    rotY = LastRotY;	
-    PivotX = LastPivotX;
-    PivotY = LastPivotY;
-    PivotZ = LastPivotZ;
+bool Viewport3D::RecalcViewPos() {
+    if (!CameraActive) return false;
+    /*Object& camera = *CameraActive;
+    rot = camera.rot.Inverted();
+    posX = -camera.posX;
+    posY = -camera.posY;
+    posZ = -camera.posZ;*/
+    return true;
 }
 
 void Viewport3D::ChangePerspective(){
@@ -501,7 +582,7 @@ void Viewport3D::SetCursor3D(){// 1) Calcular base de la cámara (forward/right/
 
     // 2) Posición de la cámara
     Vec3 pivotPos(PivotX + posX, PivotY + posY, PivotZ + posZ);
-    Vec3 camPos = pivotPos - forward * cameraDistance;
+    Vec3 camPos = pivotPos - forward * zoom;
 
     // 3) Mouse a NDC
     float ndcX = (2.0f * (float)lastMouseX / (float)winW) - 1.0f;
@@ -576,8 +657,29 @@ void Viewport3D::mouse_button_up(SDL_Event &e){
 
 }
 
-void Viewport3D::event_mouse_wheel(SDL_Event &e){
-    if (!ViewFromCameraActive) posY+= e.wheel.y;
+// Método para actualizar cache
+void Viewport3D::UpdatePrecalculos() {
+    // === Convertir quaternion a pitch/yaw ===
+    /*float sinp = 2 * (rot.w * rot.x + rot.y * rot.z);
+    float pitchRad;
+    if (fabs(sinp) >= 1)
+        pitchRad = copysign(M_PI / 2, sinp);
+    else
+        pitchRad = asin(sinp);
+
+    float siny_cosp = 2 * (rot.w * rot.y - rot.z * rot.x);
+    float cosy_cosp = 1 - 2 * (rot.x * rot.x + rot.y * rot.y);
+    float yawRad = atan2(siny_cosp, cosy_cosp);
+
+    // Guardar
+    precalculado.pitchRad = pitchRad;
+    precalculado.yawRad = yawRad;
+
+    // Precomputar sin/cos
+    precalculado.cosX = cosf(pitchRad);
+    precalculado.sinX = sinf(pitchRad);
+    precalculado.cosY = cosf(yawRad);
+    precalculado.sinY = sinf(yawRad);*/
 }
 
 void Viewport3D::event_mouse_motion(int mx, int my){
@@ -597,7 +699,7 @@ void Viewport3D::event_mouse_motion(int mx, int my){
         bool shiftHeld = state[SDL_SCANCODE_LSHIFT] || state[SDL_SCANCODE_RSHIFT];
 
         if (shiftHeld) {
-            float radY = rotY * M_PI / 180.0f; // Yaw
+            /*float radY = rotY * M_PI / 180.0f; // Yaw
             float radX = rotX * M_PI / 180.0f; // Pitch
 
             float factor = 0.01f;
@@ -609,20 +711,13 @@ void Viewport3D::event_mouse_motion(int mx, int my){
 
             PivotZ -= dy * factor * cosY;
             PivotX += dx * factor * cosX - dy * factor * sinY * sinX;
-            PivotY += dx * factor * sinX + dy * factor * sinY * cosX;
+            PivotY += dx * factor * sinX + dy * factor * sinY * cosX;*/
+            Pan();
             LShiftPressed = false;
+            
         } 
         else {
-            // 🚀 ROTAR cámara
-            rotX += dx * 0.2f;  
-            rotY += dy * 0.2f;  
-
-            // Limitar rotY para evitar giros extremos
-            if(rotY > 180.0f) rotY -= 360.0f;
-            if(rotY < -180.0f) rotY += 360.0f;
-            if(rotX > 180.0f) rotX -= 360.0f;
-            if(rotX < -180.0f) rotX += 360.0f;
-            UpdatePrecalculos();
+            RotateOrbit();
         }
     }
     else if (estado == translacion || estado == rotacion || estado == EditScale){
@@ -658,29 +753,29 @@ void Viewport3D::TeclaDerecha(){
             if (CameraActive && ViewFromCameraActive && CameraToView){
                 Object& obj = *CameraActive;
                 // Convertir el angulo de rotX a radianes
-                GLfloat radRotX = obj.rotX * M_PI / 180.0;
+                /*GLfloat radRotX = obj.rotX * M_PI / 180.0;
 
                 obj.posX-= 30 * cos(radRotX);
-                obj.posY+= 30 * sin(radRotX);
+                obj.posY+= 30 * sin(radRotX);*/
             }
             else {
                 if (ViewFromCameraActive){
-                    RestaurarViewport();
+                    SetViewFromCameraActive(false);
                 }
-                rotX+= 0.5;	
+                //rotX+= 0.5;	
             }		
         }
         else if (navegacionMode == Fly){
             // Convertir el angulo de rotX a radianes
-            GLfloat radRotX = rotX * M_PI / 180.0;
+            /*GLfloat radRotX = rotX * M_PI / 180.0;
 
             // Calcular el vector de direccion hacia la izquierda (90 grados a la izquierda del angulo actual)
             GLfloat leftX = cos(radRotX);
-            GLfloat leftY = sin(radRotX);
+            GLfloat leftY = sin(radRotX);*/
 
             // Mover hacia la izquierda
-            PivotX -= 30 * leftX;
-            PivotY -= 30 * leftY;
+            //PivotX -= 30 * leftX;
+            //PivotY -= 30 * leftY;
         }
     }
     else if (estado == translacion){
@@ -713,29 +808,29 @@ void Viewport3D::TeclaIzquierda(){
             if (CameraActive && ViewFromCameraActive && CameraToView){
                 Object& obj = *CameraActive;
                 // Convertir el angulo de rotX a radianes
-                GLfloat radRotX = obj.rotX * M_PI / 180.0;
+                /*GLfloat radRotX = obj.rotX * M_PI / 180.0;
 
                 obj.posX+= 30 * cos(radRotX);
-                obj.posY-= 30 * sin(radRotX);
+                obj.posY-= 30 * sin(radRotX);*/
             }
             else {
                 if (ViewFromCameraActive){
-                    RestaurarViewport();
+                    SetViewFromCameraActive(false);
                 }
-                rotX-= 0.5;
+                //rotX-= 0.5;
             }
         }
         else if (navegacionMode == Fly){
             // Convertir el angulo de rotX a radianes
-            GLfloat radRotX = rotX * M_PI / 180.0;
+            /*GLfloat radRotX = rotX * M_PI / 180.0;
 
             // Calcular el vector de direccion hacia la izquierda (90 grados a la izquierda del angulo actual)
             GLfloat leftX = cos(radRotX);
-            GLfloat leftY = sin(radRotX);
+            GLfloat leftY = sin(radRotX);*/
 
             // Mover hacia la izquierda
-            PivotX += 30 * leftX;
-            PivotY += 30 * leftY;
+            //PivotX += 30 * leftX;
+            //PivotY += 30 * leftY;
         }	
     }
     else if (estado == translacion){	
@@ -770,27 +865,27 @@ void Viewport3D::TeclaArriba(){
             if (CameraActive && ViewFromCameraActive && CameraToView){
                 Object& obj = *CameraActive;
                 // Convertir el angulo de rotX a radianes
-                GLfloat radRotX = obj.rotX * M_PI / 180.0;
+                /*GLfloat radRotX = obj.rotX * M_PI / 180.0;
                 GLfloat radRotY = obj.rotY * M_PI / 180.0;
                 //GLfloat radRotZ = obj.rotZ * M_PI / 180.0;
 
                 obj.posX+= 30 * sin(radRotX);
                 //obj.posY-= 30 * cos(radRotX);
-                obj.posZ+= 30 * cos(radRotY);
+                obj.posZ+= 30 * cos(radRotY);*/
             }
             else {
                 if (ViewFromCameraActive){
-                    RestaurarViewport();
+                    SetViewFromCameraActive(false);
                 }
-                rotY-= 0.5;	
+                //rotY-= 0.5;	
             }			
         }
         else if (navegacionMode == Fly){
             // Convertir el angulo de rotX a radianes
-            GLfloat radRotX = rotX * M_PI / 180.0;
+            /*GLfloat radRotX = rotX * M_PI / 180.0;
 
             PivotY+= 30 * cos(radRotX);
-            PivotX-= 30 * sin(radRotX);
+            PivotX-= 30 * sin(radRotX);*/
         }		
     }
     else if (estado == EditScale){
@@ -813,27 +908,27 @@ void Viewport3D::TeclaAbajo(){
             if (CameraActive && ViewFromCameraActive && CameraToView){
                 Object& obj = *CameraActive;
                 // Convertir el angulo de rotX a radianes
-                GLfloat radRotX = obj.rotX * M_PI / 180.0;
-                GLfloat radRotY = obj.rotY * M_PI / 180.0;
+                //GLfloat radRotX = obj.rotX * M_PI / 180.0;
+                //GLfloat radRotY = obj.rotY * M_PI / 180.0;
                 //GLfloat radRotZ = obj.rotZ * M_PI / 180.0;
 
-                obj.posX-= 30 * sin(radRotX);
+                /*obj.posX-= 30 * sin(radRotX);
                 //obj.posY-= 30 * cos(radRotX);
-                obj.posZ-= 30 * cos(radRotY);
+                obj.posZ-= 30 * cos(radRotY);*/
             }
             else {
                 if (ViewFromCameraActive){
-                    RestaurarViewport();
+                    SetViewFromCameraActive(false);
                 }
-                rotY+= 0.5;	
+                //rotY+= 0.5;	
             }		
         }
         else if (navegacionMode == Fly){
             // Convertir el angulo de rotX a radianes
-            GLfloat radRotX = rotX * M_PI / 180.0;
+            /*GLfloat radRotX = rotX * M_PI / 180.0;
 
             PivotY-= 30 * cos(radRotX);
-            PivotX+= 30 * sin(radRotX);
+            PivotX+= 30 * sin(radRotX);*/
         }
     }
     else if (estado == EditScale){
@@ -844,36 +939,6 @@ void Viewport3D::TeclaAbajo(){
     }
 }
 
-// Método para actualizar cache
-void Viewport3D::UpdatePrecalculos() {
-    precalculado.radY = rotY * M_PI / 180.0f;
-    precalculado.radX = rotX * M_PI / 180.0f;
-
-    precalculado.cosX = cos(precalculado.radX);
-    precalculado.sinX = sin(precalculado.radX);
-    precalculado.cosY = cos(precalculado.radY);
-    precalculado.sinY = sin(precalculado.radY);
-}
-
-void Viewport3D::ClickD(){
-    if (LAltPressed){
-        UpdatePrecalculos();
-        NewInstance();
-    }
-    else if (LShiftPressed){
-        UpdatePrecalculos();
-        DuplicatedObject();
-    }
-}
-
-void Viewport3D::ClickE(){
-    posZ-= 1.0;
-}
-
-void Viewport3D::ClickQ(){
-    posZ+= 1.0;  
-}
-
 void Viewport3D::SetEje(int eje){
     if (estado != editNavegacion){
         ReestablecerEstado(false);
@@ -882,6 +947,20 @@ void Viewport3D::SetEje(int eje){
 }
 
 void Viewport3D::SetViewFromCameraActive(bool value){
+    if (!CameraActive) return;
+
+    if (value){
+        /*LastPosX = posX;
+        LastPosY = posY;
+        LastPosZ = posZ;
+        LastZoom = zoom;*/
+    }
+    else {
+        /*posX = LastPosX;
+        posY = LastPosY;
+        posZ = LastPosZ;
+        zoom = LastZoom;*/
+    }
     ViewFromCameraActive = value;
 }
 
@@ -917,9 +996,17 @@ void Viewport3D::event_key_down(SDL_Event &e){
             case SDLK_A:  
                 SeleccionarTodo();
                 break;
-            case SDLK_D:
-                ClickD();
+            case SDLK_D: {
+                if (LAltPressed){
+                    UpdatePrecalculos();
+                    NewInstance();
+                }
+                else if (LShiftPressed){
+                    UpdatePrecalculos();
+                    DuplicatedObject();
+                }
                 break;
+            }
             case SDLK_U:
                 scene->SetLimpiarPantalla();
                 break;
@@ -977,14 +1064,22 @@ void Viewport3D::event_key_down(SDL_Event &e){
                 SetEscala();
                 break;
             // Numpad
-            case SDLK_KP_1: SetViewpoint(front); break;
+            case SDLK_KP_1: SetViewpoint(Viewpoint::front); break;
             //case SDLK_KP_2: numpad('2'); break;
-            case SDLK_KP_3: SetViewpoint(right); break;
+            case SDLK_KP_3: SetViewpoint(Viewpoint::right); break;
+            case SDLK_KP_4: {
+                RollOrbit(-15);
+                break;
+            }
             case SDLK_KP_5: {
                 ChangePerspective(); 
                 break;
             };
-            case SDLK_KP_7: SetViewpoint(top); break;
+            case SDLK_KP_6: {
+                RollOrbit(15);
+                break;
+            }      
+            case SDLK_KP_7: SetViewpoint(Viewpoint::top); break;
             case SDLK_KP_8: BuscarVertexAnimation(); break;
             case SDLK_KP_9: abrir(); break;
             case SDLK_KP_0: SetViewFromCameraActive(!ViewFromCameraActive); break;
@@ -1019,24 +1114,18 @@ void Viewport3D::event_key_down(SDL_Event &e){
             case SDLK_A:   // Flecha derecha
                 SeleccionarTodo();
                 break;
-            case SDLK_E:   // Flecha derecha
-                ClickE();
-                break;
-            case SDLK_Q:    // Flecha izquierda
-                ClickQ();
-                break;
             // Numpad
             case SDLK_KP_1: {
-                SetViewpoint(front);
+                SetViewpoint(Viewpoint::front);
                 break;
             }
             //case SDLK_KP_2: numpad('2'); break;
             case SDLK_KP_3: {
-                SetViewpoint(right);
+                SetViewpoint(Viewpoint::right);
                 break;
-            }
+            }      
             case SDLK_KP_7: {
-                SetViewpoint(top);
+                SetViewpoint(Viewpoint::top);
                 break;
             }
             case SDLK_KP_8: BuscarVertexAnimation(); break;
@@ -1098,19 +1187,19 @@ void Gamepad::Update(){
     //Viewport3DActive->rotX   += axisState[SDL_CONTROLLER_AXIS_RIGHTX] * 1.0f;
     //Viewport3DActive->rotY   += axisState[SDL_CONTROLLER_AXIS_RIGHTY] * 1.0f;
 
-    target->rotX += axisState[SDL_CONTROLLER_AXIS_RIGHTX] * 0.3f;
-    target->rotZ += axisState[SDL_CONTROLLER_AXIS_RIGHTY] * 0.3f;
+    /*target->rotX += axisState[SDL_CONTROLLER_AXIS_RIGHTX] * 0.3f;
+    target->rotZ += axisState[SDL_CONTROLLER_AXIS_RIGHTY] * 0.3f;*/
 
     // Limitar rotY para evitar giros extremos
-    if(Viewport3DActive->rotY > 180.0f) Viewport3DActive->rotY -= 360.0f;
+    /*if(Viewport3DActive->rotY > 180.0f) Viewport3DActive->rotY -= 360.0f;
     if(Viewport3DActive->rotY < -180.0f) Viewport3DActive->rotY += 360.0f;
     if(Viewport3DActive->rotX > 180.0f) Viewport3DActive->rotX -= 360.0f;
-    if(Viewport3DActive->rotX < -180.0f) Viewport3DActive->rotX += 360.0f;
+    if(Viewport3DActive->rotX < -180.0f) Viewport3DActive->rotX += 360.0f;*/
 
     if (recalcularCamara || axisState[SDL_CONTROLLER_AXIS_RIGHTX] != 0.0f || axisState[SDL_CONTROLLER_AXIS_RIGHTY] != 0.0f ){
         //precalculos
-        radY = Viewport3DActive->rotY * M_PI / 180.0f; // Yaw
-        radX = Viewport3DActive->rotX * M_PI / 180.0f; // Pitch
+        /*radY = Viewport3DActive->rotY * M_PI / 180.0f; // Yaw
+        radX = Viewport3DActive->rotX * M_PI / 180.0f; // Pitch*/
 
         cosX = cos(radX);
         sinX = sin(radX);
@@ -1124,17 +1213,17 @@ void Gamepad::Update(){
     Viewport3DActive->PivotX -= axisState[SDL_CONTROLLER_AXIS_LEFTX] * factor * cosX - axisState[SDL_CONTROLLER_AXIS_LEFTY] * factor * sinY * sinX;
     Viewport3DActive->PivotY += axisState[SDL_CONTROLLER_AXIS_LEFTX] * factor * sinX + axisState[SDL_CONTROLLER_AXIS_LEFTY] * factor * sinY * cosX;*/
 
-    target->posZ += axisState[SDL_CONTROLLER_AXIS_LEFTY] * factor * cosY;
-    target->posX -= axisState[SDL_CONTROLLER_AXIS_LEFTX] * factor * cosX - axisState[SDL_CONTROLLER_AXIS_LEFTY] * factor * sinY * sinX;
-    target->posY += axisState[SDL_CONTROLLER_AXIS_LEFTX] * factor * sinX + axisState[SDL_CONTROLLER_AXIS_LEFTY] * factor * sinY * cosX;
+    target->pos.z += axisState[SDL_CONTROLLER_AXIS_LEFTY] * factor * cosY;
+    target->pos.x -= axisState[SDL_CONTROLLER_AXIS_LEFTX] * factor * cosX - axisState[SDL_CONTROLLER_AXIS_LEFTY] * factor * sinY * sinX;
+    target->pos.y += axisState[SDL_CONTROLLER_AXIS_LEFTX] * factor * sinX + axisState[SDL_CONTROLLER_AXIS_LEFTY] * factor * sinY * cosX;
 
     //std::cout << "PivotX: " << PivotX << " PivotY: " << PivotY << " PivotZ: " << PivotZ << std::endl;
     //std::cout << "rotY: " << rotY << std::endl;
 
     //Viewport3DActive->posY += (axisState[SDL_CONTROLLER_AXIS_TRIGGERRIGHT] - axisState[SDL_CONTROLLER_AXIS_TRIGGERLEFT]) * 0.1f;
-    target->scaleX += (axisState[SDL_CONTROLLER_AXIS_TRIGGERRIGHT] - axisState[SDL_CONTROLLER_AXIS_TRIGGERLEFT]) * 0.02f;
+    /*target->scaleX += (axisState[SDL_CONTROLLER_AXIS_TRIGGERRIGHT] - axisState[SDL_CONTROLLER_AXIS_TRIGGERLEFT]) * 0.02f;
     target->scaleY += (axisState[SDL_CONTROLLER_AXIS_TRIGGERRIGHT] - axisState[SDL_CONTROLLER_AXIS_TRIGGERLEFT]) * 0.02f;
-    target->scaleZ += (axisState[SDL_CONTROLLER_AXIS_TRIGGERRIGHT] - axisState[SDL_CONTROLLER_AXIS_TRIGGERLEFT]) * 0.02f;
+    target->scaleZ += (axisState[SDL_CONTROLLER_AXIS_TRIGGERRIGHT] - axisState[SDL_CONTROLLER_AXIS_TRIGGERLEFT]) * 0.02f;*/
 
     //target->posY += axisState[SDL_CONTROLLER_AXIS_LEFTX] * velocidad;
     //target->posX += axisState[SDL_CONTROLLER_AXIS_LEFTY] * velocidad; 

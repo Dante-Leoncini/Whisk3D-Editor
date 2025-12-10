@@ -1,5 +1,5 @@
 # Whisk3D. 
-# NO edita con blender o se van a perder las propiedades CLAMP_TO_EDGE, NoLight, BackfaceCullingOff
+# NO editar con blender o se van a perder las propiedades CLAMP_TO_EDGE, NoLight, BackfaceCullingOff
 
 newmtl vertexColorConLuz
 Ns 250.000000

@@ -8,7 +8,7 @@
 class Collection : public Object {
 public:
     // Constructor
-    Collection(Object* parent = nullptr);
+    Collection(Object* parent = nullptr, Vector3 pos = Vector3(0,0,0));
 
     // Métodos
     ObjectType getType() override;

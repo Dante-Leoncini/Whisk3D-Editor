@@ -129,7 +129,7 @@ bool LeerOBJ(std::ifstream& file,
              int* acumuladoNormales,
              int* acumuladoUVs) 
 {
-    Mesh* mesh = new Mesh(CollectionActive, 0, 0, 0);
+    Mesh* mesh = new Mesh(CollectionActive, Vector3(0, 0, 0));
 
     // usar filename para nombrar por defecto (y hacerlo único)
     std::string fileBase = ExtractBaseName(filename);

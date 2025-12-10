@@ -1,7 +1,6 @@
 #ifndef OBJECTMODE_H
 #define OBJECTMODE_H
 
-#include "clases.h"
 #include "variables.h"
 #include "Objects.h"
 #include "Instance.h"

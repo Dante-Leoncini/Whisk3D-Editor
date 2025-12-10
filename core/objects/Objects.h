@@ -5,6 +5,8 @@
     #include <windows.h>
 #endif
 
+#include "math/Vector3.h"
+#include "math/Quaternion.h"
 #include <vector>
 #include <string>
 #include <iostream>
@@ -46,13 +48,15 @@ class Object {
         Text* name = nullptr;
         size_t IconType = 0;
 
-        GLfloat posX = 0.0f, posY = 0.0f, posZ = 0.0f;
-        GLfloat rotX = 0.0f, rotY = 0.0f, rotZ = 0.0f;
+        GLfloat M[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+
+        Vector3 pos;    
+        Quaternion rot; // NUEVO: reemplazamos rotX/Y/Z por cuaternión
         GLfloat scaleX = 1.0f, scaleY = 1.0f, scaleZ = 1.0f;
 
         virtual ObjectType getType() { return ObjectType::baseObject; }
 
-        Object(Object* parent, const std::string& nombre);
+        Object(Object* parent, const std::string& nombre, Vector3 pos);
         virtual ~Object();
 
         void SetNameObj(const std::string& nombre);
@@ -66,6 +70,11 @@ class Object {
         void DeseleccionarCompleto(bool IncluirColecciones = false);
         bool EstaSeleccionado(bool IncluirColecciones = false);
         bool SeleccionarCompleto(bool IncluirColecciones = false);
+
+        //todo lo nuevo para tranformaciones locales/globales y quaternion
+        void GetMatrix(GLfloat out[16]) const;
+        void RotateLocal(float pitch, float yaw, float roll);
+        Vector3 GetGlobalPosition() const;
 
         virtual void Reload();
         void ReloadAll();
@@ -92,11 +101,11 @@ Object* GetFirstDFS();
 void changeSelect(SelectMode mode, bool IncluirColecciones = false);
 
 class SaveState {
-public:
-    Object* obj;
-    GLfloat posX, posY, posZ;
-    GLfloat rotX, rotY, rotZ;
-    GLfloat scaleX, scaleY, scaleZ;
+    public:
+        Object* obj;
+        Vector3 pos;
+        Quaternion rot;  
+        GLfloat scaleX, scaleY, scaleZ;
 };
 extern std::vector<SaveState> estadoObjetos;
 

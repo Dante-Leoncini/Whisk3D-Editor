@@ -5,12 +5,9 @@ void ReestablecerEstado(bool ClearEstado){
 		for(size_t o=0; o < estadoObjetos.size(); o++){
 			SaveState& estadoObj = estadoObjetos[o];
 			Object& obj = *estadoObj.obj;
-			obj.posX = estadoObj.posX;
-			obj.posY = estadoObj.posY;
-			obj.posZ = estadoObj.posZ;
-			obj.rotX = estadoObj.rotX;
-			obj.rotY = estadoObj.rotY;
-			obj.rotZ = estadoObj.rotZ;
+			obj.pos = estadoObj.pos;
+			obj.rot = estadoObj.rot;
+
 			obj.scaleX = estadoObj.scaleX;
 			obj.scaleY = estadoObj.scaleY;
 			obj.scaleZ = estadoObj.scaleZ;	
@@ -70,11 +67,8 @@ void Eliminar(bool IncluirCollecciones){
 }
 
 void CalcObjectsTransformPivotPoint(Object* obj){
-	if (obj->select){ //&& obj->getType() != ObjectType::collection
-		//std::cout << "Seleccionado " << obj->name->value << std::endl;
-		TransformPivotPointFloat[0] += obj->posX;
-		TransformPivotPointFloat[1] += obj->posY;
-		TransformPivotPointFloat[2] += obj->posZ;	
+	if (obj->select){
+		TransformPivotPoint += obj->pos;
 	};
 
 	for(size_t c=0; c < obj->Childrens.size(); c++){
@@ -84,16 +78,16 @@ void CalcObjectsTransformPivotPoint(Object* obj){
 
 void SetTransformPivotPoint(){
 	if (InteractionMode == ObjectMode){	
-		TransformPivotPointFloat[0] = 0.0f;
-		TransformPivotPointFloat[1] = 0.0f;
-		TransformPivotPointFloat[2] = 0.0f;
+		TransformPivotPoint.x = 0.0f;
+		TransformPivotPoint.y = 0.0f;
+		TransformPivotPoint.z = 0.0f;
 		for(size_t c=0; c < SceneCollection->Childrens.size(); c++){
 			CalcObjectsTransformPivotPoint(SceneCollection->Childrens[c]);
 		}
 		size_t SelectCount = ObjSelects.size();
-		TransformPivotPointFloat[0] = TransformPivotPointFloat[0]/SelectCount;
-		TransformPivotPointFloat[1] = TransformPivotPointFloat[1]/SelectCount;
-		TransformPivotPointFloat[2] = TransformPivotPointFloat[2]/SelectCount;
+		TransformPivotPoint.x = TransformPivotPoint.x/SelectCount;
+		TransformPivotPoint.y = TransformPivotPoint.y/SelectCount;
+		TransformPivotPoint.z = TransformPivotPoint.z/SelectCount;
 	}
 }
 
@@ -119,12 +113,9 @@ void guardarEstadoRec(Object* obj){
     if (obj->select && obj->visible) {
         SaveState NuevoEstado;
         NuevoEstado.obj = obj;
-        NuevoEstado.posX = obj->posX;
-        NuevoEstado.posY = obj->posY;
-        NuevoEstado.posZ = obj->posZ;
-        NuevoEstado.rotX = obj->rotX;
-        NuevoEstado.rotY = obj->rotY;
-        NuevoEstado.rotZ = obj->rotZ;
+        NuevoEstado.pos = obj->pos;
+		NuevoEstado.rot = obj->rot;
+
         NuevoEstado.scaleX = obj->scaleX;
         NuevoEstado.scaleY = obj->scaleY;
         NuevoEstado.scaleZ = obj->scaleZ;
@@ -147,7 +138,7 @@ bool guardarEstado(){
     guardarEstadoRec(SceneCollection);
 
 	if (estadoObjetos.empty()) return false;	
-	std::cout << "moviendo "<< estadoObjetos.size() << " objetos" << std::endl;
+	//std::cout << "moviendo "<< estadoObjetos.size() << " objetos" << std::endl;
 
     SetTransformPivotPoint();
 	return true;
@@ -247,29 +238,21 @@ void NewInstance(){
 }
 
 void SetRotacion(int dx, int dy){
+	float ang = (dx + dy) * 0.01f;   // sensibilidad (ajustable)
+
 	for (size_t o = 0; o < estadoObjetos.size(); o++) {
 		Object& obj = *estadoObjetos[o].obj;
 		switch (axisSelect) {
 			case ViewAxis:
-				/*Objects[estadoObjetos[o].indice].rotX -= valor;
-
-				Vec3 objPos = Objects[estadoObjetos[o].indice].pos;
-				Vec3 screenPos = ProjectToScreen(objPos); // convierte mundo -> pantalla
-
-				int dxScreen = mouseX - screenPos.x;
-				int dyScreen = mouseY - screenPos.y;*/
 				break;
 			case X:
-				obj.rotX -= dx;
-				obj.rotX -= dy;
+                obj.RotateLocal(ang, 0, 0);
 				break;
 			case Y:
-				obj.rotY -= dx;
-				obj.rotY -= dy;
+                obj.RotateLocal(0, ang, 0);
 				break;
 			case Z:
-				obj.rotZ -= dx;
-				obj.rotZ -= dy;
+                obj.RotateLocal(0, 0, ang);
 				break;
 		}
 	}
@@ -327,47 +310,26 @@ void SetEscala(){
 	}
 };
 
-void SetTranslacionObjetos(int dx, int dy, float factor){
+void SetTranslacionObjetos(int dx, int dy, float speed){
 	for (size_t o = 0; o < estadoObjetos.size(); o++) {
 		Object& obj = *estadoObjetos[o].obj;
 		switch (axisSelect) {
 			case ViewAxis: {
-                //float radY = Viewports3D[ViewportId].rotY * M_PI / 180.0f;
-                //float radX = Viewports3D[ViewportId].rotX * M_PI / 180.0f;
-
-                //float cosX = cos(radX);
-                //float sinX = sin(radX);
-                //float cosY = cos(radY);
-                //float sinY = sin(radY);
-
-                Object& obj = *estadoObjetos[o].obj;
-                obj.posZ -= dy * factor * precalculado.cosY;
-                obj.posX += dx * factor * precalculado.cosX - dy * factor * precalculado.sinY * precalculado.sinX;
-                obj.posY += dx * factor * precalculado.sinX + dy * factor * precalculado.sinY * precalculado.cosX;
-
-				/*std::cout << "cameraDistance " << cameraDistance 
-				        << " | PivotY " << PivotY						
-						<< " | posY: " << posY << std::endl;
-
-				// factor relativo a distancia
-				float factorDist = (cameraDistance - posY ) * 0.0055f;
-
-				obj.posZ -= dy * factor * cosY * factorDist;
-				obj.posX += dx * factor * cosX * factorDist - dy * factor * sinY * sinX * factorDist;
-				obj.posY += dx * factor * sinX * factorDist + dy * factor * sinY * cosX * factorDist;*/
+				Vector3 disp = camRight * (dx * speed) + camUp * (dy * speed);
+				obj.pos += disp;
                 break;
             }
 			case X:
-				obj.posX += dx * factor;
-				obj.posX += dy * factor;
+				obj.pos.x += dx * speed;
+				obj.pos.x += dy * speed;
 				break;
 			case Y:
-				obj.posY -= dx * factor;
-				obj.posY -= dy * factor;
+				obj.pos.y -= dx * speed;
+				obj.pos.y -= dy * speed;
 				break;
 			case Z:
-				obj.posZ -= dx * factor;
-				obj.posZ -= dy * factor;
+				obj.pos.z -= dx * speed;
+				obj.pos.z -= dy * speed;
 				break;
 		}
 	}

@@ -24,7 +24,7 @@ void RefreshInputControllerSDL(SDL_Event &e) {
 // ------------------- Gamepad -------------------
 
 Gamepad::Gamepad(Object* parent)
-    : Object(parent, "Gamepad")
+    : Object(parent, "Gamepad", {0,0,0})
 {
     IconType = static_cast<size_t>(IconType::gamepad);
 }

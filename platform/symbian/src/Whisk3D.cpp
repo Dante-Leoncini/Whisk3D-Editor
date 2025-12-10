@@ -1655,7 +1655,6 @@ void CWhisk3D::SetInterpolation(){
 }
 
 void CWhisk3D::SetTexture(){
-	//si solo estan las texturas de blender
 	if (Textures.Count() < NumTexturasWhisk3D+1){		
 		HBufC* noteBuf = HBufC::NewLC(100);	
 		noteBuf->Des().Copy(_L("No hay texturas cargadas"));	

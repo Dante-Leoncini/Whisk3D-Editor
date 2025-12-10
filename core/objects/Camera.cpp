@@ -32,12 +32,10 @@ Object* CameraActive = nullptr;
 
 // ------------------- MÉTODOS -------------------
 
-Camera::Camera(Object* parent, GLfloat x, GLfloat y, GLfloat z,
-               GLfloat rx, GLfloat ry, GLfloat rz, GLfloat scale)
-    : Object(parent, "Camera") 
+Camera::Camera(Object* parent, Vector3 pos, GLfloat rx, GLfloat ry, GLfloat rz, GLfloat rw, GLfloat scale)
+    : Object(parent, "Camera", pos) 
 {
-    posX = x; posY = y; posZ = z;
-    rotX = rx; rotY = ry; rotZ = rz;
+    rot.x = rx; rot.y = ry; rot.z = rz; rot.w = rw;
     scaleX = scaleY = scaleZ = scale;
     IconType = static_cast<size_t>(IconType::camera);
 
@@ -51,7 +49,7 @@ ObjectType Camera::getType() {
 }
 
 void Camera::RenderObject() {
-    if (!showOverlayGlobal) return;
+    if (!showOverlayGlobal || ViewFromCameraActiveGlobal) return;
 
     glPushMatrix();
     glScalef(scaleX, scaleZ, scaleY);

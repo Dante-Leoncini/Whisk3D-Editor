@@ -1,7 +1,7 @@
 #include "importers/import_wobj.h"
 
 Mesh* LeerWOBJ(std::ifstream& file, const std::string& filename, Object* parent){
-    Mesh* mesh = new Mesh(parent, 0, 0, 0);
+    Mesh* mesh = new Mesh(parent, Vector3(0, 0, 0));
 
     Wavefront Wobj;
     Wobj.Reset();

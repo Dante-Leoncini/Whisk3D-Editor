@@ -8,6 +8,7 @@
 #include <SDL2/SDL.h>
 #include <GL/gl.h>
 #include <string>
+#include "math/Quaternion.h"
 
 extern SDL_Window* window;
 extern SDL_GameController* controller;
@@ -27,9 +28,16 @@ struct Config {
 };
 extern Config cfg;
 
+struct Cursor3D {
+    Vector3 pos;
+    Quaternion rot;
+};
+extern Cursor3D cursor3D;
+
 // Enumeraciones
+enum class Viewpoint {top, bottom, front, back, left, right, camera};
+
 enum { Constant, Linear, EaseInOut, EaseIn, EaseOut };
-enum { top, front, right, cameraView };
 enum { ObjectMode };
 enum { pointLight, sunLight };
 enum { editNavegacion, EdgeMove, FaceMove, timelineMove, rotacion, EditScale, translacion };
@@ -39,8 +47,7 @@ typedef enum { X, Y, Z, XYZ, ViewAxis } Axis;
 
 // Declaraciones de variables (extern)
 extern int axisSelect;
-extern GLshort TransformPivotPoint[3];
-extern GLfloat TransformPivotPointFloat[3];
+extern Vector3 TransformPivotPoint;
 extern float fovDeg;
 extern int nextLightId;
 extern float angle;
@@ -62,9 +69,14 @@ extern bool ViewPortClickDown;
 
 // Viewport 3D
 extern bool showOverlayGlobal;
-extern GLfloat Cursor3DposX;
-extern GLfloat Cursor3DposZ;
-extern GLfloat Cursor3DposY;
+extern bool ViewFromCameraActiveGlobal;
+extern Quaternion rotGlobal;
+extern Vector3 camRight;
+extern Vector3 camUp;
+extern Vector3 camForward;
+/*extern GLfloat rotXGlobal;
+extern GLfloat rotYGlobal;
+extern GLfloat rotZGlobal;*/
 
 // Mouse
 extern GLshort mouseX;

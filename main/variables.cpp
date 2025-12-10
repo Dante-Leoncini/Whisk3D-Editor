@@ -10,9 +10,6 @@ int winH = 480;
 // Inicialización de variables
 int axisSelect = X;
 
-GLshort TransformPivotPoint[3] = {0,0,0};
-GLfloat TransformPivotPointFloat[3] = {0.0f,0.0f,0.0f};
-
 float fovDeg = 45.0f;
 
 int nextLightId = GL_LIGHT1;
@@ -40,10 +37,17 @@ bool ViewPortClickDown = false;
 
 // Viewport3D valores globales
 bool showOverlayGlobal = false;
+bool ViewFromCameraActiveGlobal = false;
+/*GLfloat rotXGlobal = 0.0f;
+GLfloat rotYGlobal = 0.0f;
+GLfloat rotZGlobal = 0.0f;*/
+Quaternion rotGlobal;
+Vector3 camRight;
+Vector3 camUp;
+Vector3 camForward;
+Vector3 TransformPivotPoint;
 
-GLfloat Cursor3DposX = 0.0f;
-GLfloat Cursor3DposZ = 0.0f;
-GLfloat Cursor3DposY = 0.0f;
+Cursor3D cursor3D;
 
 // Mouse
 GLshort mouseX = 0;

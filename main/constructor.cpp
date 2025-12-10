@@ -90,7 +90,7 @@ void ConstructUniversal(int argc, char* argv[]) {
     // ======================================================
     CollectionActive = new Collection(SceneCollection);
 
-    new Camera(CollectionActive, -3, 2.5, 1.8, 0, -35, 45);
+    new Camera(CollectionActive, Vector3(-3, 2.5, 1.8), 0, -35, 45);
     Light* L = Light::Create(CollectionActive, 1, 2.25, 2.25);
     L->SetDiffuse(1, 0, 0);
 

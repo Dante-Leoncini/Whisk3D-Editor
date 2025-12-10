@@ -5,12 +5,9 @@
 // ===================================================
 // Constructor
 // ===================================================
-Mesh::Mesh(Object* parent, GLfloat px, GLfloat py, GLfloat pz)
-    : Object(parent, "Mesh")
+Mesh::Mesh(Object* parent, Vector3 pos)
+    : Object(parent, "Mesh", pos)
 {
-    posX = px;
-    posY = py;
-    posZ = pz;
     IconType = static_cast<size_t>(IconType::mesh);
 }
 
@@ -162,7 +159,7 @@ void Mesh::RenderObject() {
 }
 
 Object* NewMesh(MeshType type, Object* parent, bool query){
-    Mesh* mesh = new Mesh(parent, Cursor3DposX, Cursor3DposY, Cursor3DposZ);
+    Mesh* mesh = new Mesh(parent, cursor3D.pos);
 
     //SetActive(NewMesh);
 	

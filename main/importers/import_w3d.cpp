@@ -133,19 +133,21 @@ void ApplyViewport3DProps(Viewport3D* v, const std::map<std::string,std::string>
     /// --- floats/doubles ---
     if(p.count("nearClip"))       v->nearClip       = F("nearClip", 0.01f);
     if(p.count("farClip"))        v->farClip        = F("farClip", 1000.0f);
-    if(p.count("cameraDistance")) v->cameraDistance = F("cameraDistance", 10.0f);
     if(p.count("aspect"))         v->aspect         = F("aspect", 1.0f);
 
-    if(p.count("posX")) v->posX = F("posX");
+    /*if(p.count("posX")) v->posX = F("posX");
     if(p.count("posY")) v->posY = F("posY");
     if(p.count("posZ")) v->posZ = F("posZ");
+    if(p.count("cameraDistance")) v->zoom = F("zoom", 10.0f);
 
-    if(p.count("rotX")) v->rotX = F("rotX");
-    if(p.count("rotY")) v->rotY = F("rotY");
+    if(p.count("rotX")) v->rot.x = F("rotX");
+    if(p.count("rotY")) v->rot.y = F("rotY");
+    if(p.count("rotZ")) v->rot.z = F("rotZ");
+    if(p.count("rotW")) v->rot.w = F("rotW");*/
 
-    if(p.count("PivotX")) v->PivotX = F("PivotX");
+    /*if(p.count("PivotX")) v->PivotX = F("PivotX");
     if(p.count("PivotY")) v->PivotY = F("PivotY");
-    if(p.count("PivotZ")) v->PivotZ = F("PivotZ");
+    if(p.count("PivotZ")) v->PivotZ = F("PivotZ");*/
 
     if(p.count("view"))  // string → enum
          v->view = StringToRenderType(p.at("view"));
@@ -217,14 +219,15 @@ void ApplyCommonProps(Object* obj, const std::map<std::string,std::string>& p){
 	}
 
     // Posición
-    if(p.count("x")) obj->posX = GetFloatOrDefault(p,"x");
-    if(p.count("y")) obj->posY = GetFloatOrDefault(p,"y");
-    if(p.count("z")) obj->posZ = GetFloatOrDefault(p,"z");
+    if(p.count("x")) obj->pos.x = GetFloatOrDefault(p,"x");
+    if(p.count("y")) obj->pos.y = GetFloatOrDefault(p,"y");
+    if(p.count("z")) obj->pos.z = GetFloatOrDefault(p,"z");
 
     // Rotación
-    if(p.count("rx")) obj->rotX = GetFloatOrDefault(p,"rx");
-    if(p.count("ry")) obj->rotY = GetFloatOrDefault(p,"ry");
-    if(p.count("rz")) obj->rotZ = GetFloatOrDefault(p,"rz");
+    if(p.count("rx")) obj->rot.x = GetFloatOrDefault(p,"rx");
+    if(p.count("ry")) obj->rot.y = GetFloatOrDefault(p,"ry");
+    if(p.count("rz")) obj->rot.z = GetFloatOrDefault(p,"rz");
+    if(p.count("rw")) obj->rot.w = GetFloatOrDefault(p,"rw");
 
     // Escala
     if(p.count("scale")){
@@ -311,7 +314,7 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
     }    
 
     if(n->type=="Camera"){
-        return new Camera(parent,0,0,0, 0, 0, 0);
+        return new Camera(parent, Vector3(0,0,0), 0, 0, 0);
     }
 
     if(n->type=="Light"){
