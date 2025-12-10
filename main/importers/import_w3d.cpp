@@ -226,10 +226,11 @@ void ApplyCommonProps(Object* obj, const std::map<std::string,std::string>& p){
     if(p.count("z")) obj->pos.z = GetFloatOrDefault(p,"z");
 
     // Rotación
-    if(p.count("rx") && p.count("ry") && p.count("rz")){
-        Quaternion qX = Quaternion::FromAxisAngle(Vector3(1, 0, 0), GetFloatOrDefault(p,"rx")); // Pitch (Eje X)
-        Quaternion qY = Quaternion::FromAxisAngle(Vector3(0, 1, 0), GetFloatOrDefault(p,"ry")); // Yaw (Eje Y)
-        Quaternion qZ = Quaternion::FromAxisAngle(Vector3(0, 0, 1), GetFloatOrDefault(p,"rz")); // Roll (Eje Z)
+    if(p.count("rx") || p.count("ry") || p.count("rz")){
+        //rz y ry estan invertidos por openGl
+        Quaternion qX = Quaternion::FromAxisAngle(Vector3(1, 0, 0), GetFloatOrDefault(p,"rx", 0)); // Pitch (Eje X)
+        Quaternion qY = Quaternion::FromAxisAngle(Vector3(0, 1, 0), GetFloatOrDefault(p,"rz", 0)); // Yaw (Eje Y)
+        Quaternion qZ = Quaternion::FromAxisAngle(Vector3(0, 0, 1), GetFloatOrDefault(p,"ry", 0)); // Roll (Eje Z)
         obj->rot = qY * qX * qZ; // Aplicación: (Z) * (X) * (Y)
     }
 
