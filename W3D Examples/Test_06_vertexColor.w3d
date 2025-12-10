@@ -30,8 +30,6 @@ Whisk3D {
                 show3DCursor: true
                 ShowRelantionshipsLines: true
                 view: Rendered
-                rotX: 0.0
-                posZ: -2.0
             }
             ViewportColumn {
                 Viewport3D {

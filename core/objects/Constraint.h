@@ -11,7 +11,12 @@
 
 class Constraint: public Object, public Target {
     public:
-        Constraint(Object* parent, Vector3 pos = Vector3(0,0,0));
+        bool useHorizontal;
+        bool usePitch;
+
+        Constraint(Object* parent, 
+            bool Horizontal = true, bool Pitch = false, 
+            Vector3 pos = Vector3(0,0,0));
 
         ObjectType getType() override;
         void Reload() override;

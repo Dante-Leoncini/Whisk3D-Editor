@@ -38,9 +38,7 @@ bool ViewPortClickDown = false;
 // Viewport3D valores globales
 bool showOverlayGlobal = false;
 bool ViewFromCameraActiveGlobal = false;
-/*GLfloat rotXGlobal = 0.0f;
-GLfloat rotYGlobal = 0.0f;
-GLfloat rotZGlobal = 0.0f;*/
+
 Quaternion rotGlobal;
 Vector3 camRight;
 Vector3 camUp;

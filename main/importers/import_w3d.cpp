@@ -15,6 +15,14 @@ int GetIntOrDefault(const std::map<std::string,std::string>& props, const std::s
     try{ return std::stoi(it->second); } catch(...){ return def; }
 }
 
+bool GetBoolOrDefault(const std::map<std::string,std::string>& props, const std::string& key, bool def=false){
+    auto it = props.find(key);
+    if(it == props.end()) return def;
+
+    std::string val = it->second;
+    return (val == "true" || val == "1");
+}
+
 GLenum GetLightIDOrDefault(std::string name, GLenum defaultLight){
     static std::unordered_map<std::string, GLenum> lightMap = {
         {"GL_LIGHT0", GL_LIGHT0},
@@ -135,19 +143,17 @@ void ApplyViewport3DProps(Viewport3D* v, const std::map<std::string,std::string>
     if(p.count("farClip"))        v->farClip        = F("farClip", 1000.0f);
     if(p.count("aspect"))         v->aspect         = F("aspect", 1.0f);
 
-    /*if(p.count("posX")) v->posX = F("posX");
-    if(p.count("posY")) v->posY = F("posY");
-    if(p.count("posZ")) v->posZ = F("posZ");*/
     if(p.count("orbitDistance")) v->orbitDistance = F("orbitDistance", 10.0f);
 
-    if(p.count("rotX")) v->viewRot.x = F("rotX");
-    if(p.count("rotY")) v->viewRot.y = F("rotY");
-    if(p.count("rotZ")) v->viewRot.z = F("rotZ");
-    if(p.count("rotW")) v->viewRot.w = F("rotW");
+    v->viewRot = Quaternion::FromEuler(
+        GetFloatOrDefault(p, "rotY", -30.0f),
+        GetFloatOrDefault(p, "rotX", -30.0f),
+        GetFloatOrDefault(p, "rotZ", 0.0f)
+    );
 
     if(p.count("posX")) v->pivot.x = F("posX"); //PivotX
-    if(p.count("posY")) v->pivot.y = F("posY");
-    if(p.count("posZ")) v->pivot.z = F("posZ");
+    if(p.count("posY")) v->pivot.z = F("posY");
+    if(p.count("posZ")) v->pivot.y = F("posZ");
 
     v->RecalcOrbitPosition();
 
@@ -237,8 +243,12 @@ void ApplyCommonProps(Object* obj, const std::map<std::string,std::string>& p){
     // Escala
     if(p.count("scale")){
         float s = GetFloatOrDefault(p,"scale",1);
-        obj->scale.z=obj->scale.y=obj->scale.z = s;
-    } else {
+        obj->scale.x = s;
+        obj->scale.y = s;
+        obj->scale.z = s;
+        //std::cout << "[ApplyCommonProps] scale = " << s << std::endl; // <-- para debug
+    } 
+    else {
         if(p.count("sx")) obj->scale.x = GetFloatOrDefault(p,"sx",1);
         if(p.count("sy")) obj->scale.y = GetFloatOrDefault(p,"sy",1);
         if(p.count("sz")) obj->scale.z = GetFloatOrDefault(p,"sz",1);
@@ -313,7 +323,10 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
     }
 
     if (n->type=="Constraint"){
-        Constraint* constraint = new Constraint(parent);
+        bool useHorizontal = GetBoolOrDefault(p, "useHorizontal", true);
+        bool usePitch      = GetBoolOrDefault(p, "usePitch", true);
+
+        Constraint* constraint = new Constraint(parent, useHorizontal, usePitch);
         if(p.count("target")) constraint->SetTarget(p.at("target"));
         return constraint;
     }    

@@ -1,8 +1,8 @@
 #include "Constraint.h"
 
 // ------------------- Constraint -------------------
-Constraint::Constraint(Object* parent, Vector3 pos)
-    : Object(parent, "Constraint", pos)
+Constraint::Constraint(Object* parent, bool horizontal, bool pitch, Vector3 pos)
+    : Object(parent, "Constraint", pos), useHorizontal(horizontal), usePitch(pitch)
 {
     IconType = static_cast<size_t>(IconType::constraint);
 }
@@ -16,22 +16,27 @@ void Constraint::Reload() {
 }
 
 void Constraint::RenderObject() {
-    if (!target && target != this) return;
+    if (!target) return;
 
-    // Posición acumulada
-    /*GLfloat totalZ = posZ;
-    GLfloat rX = 0, rY = 0, rZ = 0;
-    Object* p = Parent;
-    while (p != nullptr) {
-        totalZ += p->posZ;
-        rX += p->rotX;
-        rY += p->rotY;
-        rZ += p->rotZ;
-        p = p->Parent;
+    // Eje "forward" de la cámara
+    Vector3 forward = rotGlobal * Vector3(0,0,-1);
+
+    float pitchAngle = 0.0f;
+    float horizAngle = 0.0f;
+
+    // --- Horizontal (yaw) ---
+    if (useHorizontal) {
+        Vector3 forwardXZ = Vector3(forward.x, 0, forward.z).Normalized();
+        horizAngle = atan2f(forwardXZ.x, forwardXZ.z) * (180.0f / M_PI);
     }
-    target->rotX = rX - rotYGlobal;
-    target->rotY = rY;
-    target->rotZ = rZ - rotXGlobal;*/
+
+    // --- Inclinación (pitch) ---
+    if (usePitch) {
+        pitchAngle = asinf(forward.y) * (180.0f / M_PI);
+    }
+
+    // Construir quaternion final (roll siempre 0)
+    target->rot = Quaternion::FromEuler(-pitchAngle, horizAngle, 0.0f);
 }
 
 Constraint::~Constraint() {

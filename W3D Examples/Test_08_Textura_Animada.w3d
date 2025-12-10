@@ -32,8 +32,7 @@ Whisk3D {
                 view: Rendered
                 rotX: 0.0
                 rotY: 0.0
-                posY: 4.0
-                posZ: 0.0
+                orbitDistance: 5.0
             }
             ViewportColumn {
                 Viewport3D {
@@ -49,7 +48,6 @@ Whisk3D {
                     show3DCursor: true
                     ShowRelantionshipsLines: true
                     view: MaterialPreview
-                    rotX: 35.0
                 }
                 Outliner
                 Split: 0.7

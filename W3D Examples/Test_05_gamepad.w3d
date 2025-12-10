@@ -105,8 +105,9 @@ Whisk3D {
                 show3DCursor: true
                 ShowRelantionshipsLines: true
                 view: Rendered
-                rotX: 270.0
-                posZ: -3.0
+                rotX: 120.0
+                posZ: 3.0
+                posX: 3.0
             }
             ViewportColumn {
                 Viewport3D {

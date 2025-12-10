@@ -58,11 +58,6 @@ class Viewport3D : public ViewportBase, public WithBorder {
         Vector3    pivot;                    // punto de interés a orbitar
         float      orbitDistance = 10.0f;    // distancia al pivote (zoom) 
 
-        /*GLfloat LastPosX = 0;
-        GLfloat LastPosY = 0;  
-        GLfloat LastPosZ = 0;  
-        GLfloat LastZoom = 0;*/
-
         Viewport3D(Vector3 pos = Vector3(0,0,0));
 
         virtual ~Viewport3D();

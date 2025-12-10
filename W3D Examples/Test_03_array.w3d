@@ -27,6 +27,9 @@ Whisk3D {
     Layout {
         ViewportRow {
             Viewport3D {
+                posY: 5
+                posX: -5
+                rotX: 100.0
                 orbitDistance: 30.0
             }
             Outliner

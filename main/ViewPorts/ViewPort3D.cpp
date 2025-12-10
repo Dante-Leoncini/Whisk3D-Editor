@@ -9,7 +9,7 @@ Viewport3D::~Viewport3D() {};
 
 void Viewport3D::event_mouse_wheel(SDL_Event &e) {
     if (!ViewFromCameraActive) {
-        Zoom(e.wheel.y); //podria multiplciarse por un valor por sensibilidad  * 1.0f
+        Zoom(e.wheel.y* 2.0f); //podria multiplciarse por un valor por sensibilidad  * 1.0f
     }
 }
 
@@ -161,10 +161,7 @@ void Viewport3D::ReloadLights() {
     ::view = view;
     ::showOverlayGlobal = showOverlays;
     ::ViewFromCameraActiveGlobal = ViewFromCameraActive;
-    /*::rotGlobal.x = rot.x;
-    ::rotGlobal.y = rot.y;
-    ::rotGlobal.z = rot.z;
-    ::rotGlobal.w = rot.w;*/
+    ::rotGlobal = viewRot;
     Viewport3DActive = this;
     
     for(size_t l = 0; l < Lights.size(); l++) {
