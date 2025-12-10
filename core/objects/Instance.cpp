@@ -24,39 +24,48 @@ void Instance::Reload() {
     ReloadTarget(this);
 }
 
-// Renderizado de la instancia
+// Renderizado CORREGIDO (Acumulación en el bucle)
 void Instance::RenderObject() {
-    if (!target && target != this) return;
+    if (!target) return;
+
+    // 1. Pre-cálculo de transformaciones base de la INSTANCIA
+    Vector3 basePosDelta = pos;     // Traslación base (ej: 2.0m)
+    Quaternion baseRot = rot;       // Rotación base (ej: 15°)
+    
+    // 2. Obtener las matrices de inicio (del Target)
+    Matrix4 targetMatrix;
+    target->GetMatrix(targetMatrix); // Matriz T * R * S del Target
+    
+    // Obtener la rotación del target (para aplicarla al vector delta)
+    Quaternion targetRot = target->rot;
+    
+    Matrix4 deltaMatrix = target->BuildMatrix(basePosDelta, baseRot, Vector3(1,1,1));
 
     glPushMatrix();
-    //glTranslatef(target->posX, target->posZ, target->posY);
-    /*glRotatef(target->rotX, 1, 0, 0);
-    glRotatef(target->rotZ, 0, 1, 0);
-    glRotatef(target->rotY, 0, 0, 1);*/
+    glMultMatrixf(targetMatrix.m);
 
     for(size_t i = 0; i < count; i++){
-        //glScalef(scale.x, scale.y, scale.z);
-        target->RenderObject();
+        target->RenderObject(); 
 
-        if(RenderChildrens){
-            for(size_t c = 0; c < target->Childrens.size(); c++){
-                // cancela la rotación y traslación del target
-                //glTranslatef(-target->posX, -target->posZ, -target->posY);
-                /*glRotatef(target->rotX, -1, 0, 0);
-                glRotatef(target->rotZ, 0, -1, 0);
-                glRotatef(target->rotY, 0, 0, -1);*/
-
-                target->Childrens[c]->Render();
-            }
+        if (i > 0) {
+            targetRot = targetRot * baseRot; 
+            targetRot.normalize(); 
         }
 
-        //glTranslatef(posX, posZ, posY);
-        /*glRotatef(rotX, 1, 0, 0);
-        glRotatef(rotZ, 0, 1, 0);
-        glRotatef(rotY, 0, 0, 1);*/
+        Vector3 rotatedDeltaPos = targetRot * basePosDelta;
+    
+        Matrix4 T_rotada; T_rotada.Identity();
+        T_rotada.m[12] = rotatedDeltaPos.x;
+        T_rotada.m[13] = rotatedDeltaPos.y;
+        T_rotada.m[14] = rotatedDeltaPos.z;
+
+        Matrix4 R_delta = baseRot.ToMatrix();
+        glMultMatrixf(T_rotada.m);
+        glMultMatrixf(R_delta.m);
+
     }
 
-    glPopMatrix();
+    glPopMatrix(); // Vuelve a la Matriz del Padre/Mundo
 }
 
 // Destructor

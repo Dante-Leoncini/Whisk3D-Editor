@@ -137,8 +137,8 @@ void ApplyViewport3DProps(Viewport3D* v, const std::map<std::string,std::string>
 
     /*if(p.count("posX")) v->posX = F("posX");
     if(p.count("posY")) v->posY = F("posY");
-    if(p.count("posZ")) v->posZ = F("posZ");
-    if(p.count("cameraDistance")) v->zoom = F("zoom", 10.0f);*/
+    if(p.count("posZ")) v->posZ = F("posZ");*/
+    if(p.count("orbitDistance")) v->orbitDistance = F("orbitDistance", 10.0f);
 
     if(p.count("rotX")) v->viewRot.x = F("rotX");
     if(p.count("rotY")) v->viewRot.y = F("rotY");
@@ -148,6 +148,8 @@ void ApplyViewport3DProps(Viewport3D* v, const std::map<std::string,std::string>
     if(p.count("posX")) v->pivot.x = F("posX"); //PivotX
     if(p.count("posY")) v->pivot.y = F("posY");
     if(p.count("posZ")) v->pivot.z = F("posZ");
+
+    v->RecalcOrbitPosition();
 
     if(p.count("view"))  // string → enum
          v->view = StringToRenderType(p.at("view"));
@@ -224,20 +226,22 @@ void ApplyCommonProps(Object* obj, const std::map<std::string,std::string>& p){
     if(p.count("z")) obj->pos.z = GetFloatOrDefault(p,"z");
 
     // Rotación
-    if(p.count("rx")) obj->rot.x = GetFloatOrDefault(p,"rx");
-    if(p.count("ry")) obj->rot.y = GetFloatOrDefault(p,"ry");
-    if(p.count("rz")) obj->rot.z = GetFloatOrDefault(p,"rz");
-    if(p.count("rw")) obj->rot.w = GetFloatOrDefault(p,"rw");
+    if(p.count("rx") && p.count("ry") && p.count("rz")){
+        Quaternion qX = Quaternion::FromAxisAngle(Vector3(1, 0, 0), GetFloatOrDefault(p,"rx")); // Pitch (Eje X)
+        Quaternion qY = Quaternion::FromAxisAngle(Vector3(0, 1, 0), GetFloatOrDefault(p,"ry")); // Yaw (Eje Y)
+        Quaternion qZ = Quaternion::FromAxisAngle(Vector3(0, 0, 1), GetFloatOrDefault(p,"rz")); // Roll (Eje Z)
+        obj->rot = qY * qX * qZ; // Aplicación: (Z) * (X) * (Y)
+    }
 
     // Escala
-    if(p.count("scale")){
+    /*if(p.count("scale")){
         float s = GetFloatOrDefault(p,"scale",1);
         obj->scale.z=obj->scale.y=obj->scale.z = s;
     } else {
         if(p.count("sx")) obj->scale.x = GetFloatOrDefault(p,"sx",1);
         if(p.count("sy")) obj->scale.y = GetFloatOrDefault(p,"sy",1);
         if(p.count("sz")) obj->scale.z = GetFloatOrDefault(p,"sz",1);
-    }
+    }*/
 }
 
 Object* CreateObjectFromNode(Node* n, Object* parent){

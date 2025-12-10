@@ -49,11 +49,10 @@ class Object {
         Text* name = nullptr;
         size_t IconType = 0;
 
-        //GLfloat M[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
         Matrix4 M;
 
         Vector3 pos;    
-        Quaternion rot; // NUEVO: reemplazamos rotX/Y/Z por cuaternión
+        Quaternion rot;
         Vector3 scale;
 
         virtual ObjectType getType() { return ObjectType::baseObject; }
@@ -61,9 +60,10 @@ class Object {
         Object(
             Object* parent, 
             const std::string& nombre = "Objeto", 
-            Vector3 pos = Vector3(0,0,0), 
+            Vector3 Pos = Vector3(0,0,0), 
             Vector3 Rot = Vector3(0.0f, 0.0f, 0.0f),
-            Vector3 scale = Vector3(1.0f, 1.0f, 1.0f));
+            Vector3 scale = Vector3(1.0f, 1.0f, 1.0f)
+        );
         virtual ~Object();
 
         void SetNameObj(const std::string& nombre);
@@ -82,6 +82,8 @@ class Object {
         void GetMatrix(Matrix4& out) const;
         void RotateLocal(float pitch, float yaw, float roll);
         Vector3 GetGlobalPosition() const;
+
+        Matrix4 BuildMatrix(const Vector3& pos, const Quaternion& rot, const Vector3& scale);
 
         virtual void Reload();
         void ReloadAll();

@@ -6,8 +6,8 @@ Object* CollectionActive = nullptr;
 Object* ObjActivo = nullptr;
 std::vector<SaveState> estadoObjetos;
 
-Object::Object(Object* parent, const std::string& nombre, Vector3 pos, Vector3 Rot, Vector3 Scale)
-    : Parent(parent), pos(pos), scale(Scale) {
+Object::Object(Object* parent, const std::string& nombre, Vector3 Pos, Vector3 Rot, Vector3 Scale)
+    : Parent(parent), pos(Pos), scale(Scale) {
     name = new Text(SetName(nombre));
 
     // Convertir los ángulos de Euler (Rot.x, Rot.y, Rot.z) a tres cuaterniones simples.
@@ -208,7 +208,7 @@ void Object::ReloadAll(){
     }      
 }
 
-void Object::GetMatrix(Matrix4& out) const {
+/*void Object::GetMatrix(Matrix4& out) const {
     // --- Rotación ---
     Matrix4 R;
     R.Identity();
@@ -230,6 +230,27 @@ void Object::GetMatrix(Matrix4& out) const {
 
     // out = T * (R * S)
     out = T * (R * S);
+}*/
+
+void Object::GetMatrix(Matrix4& out) const {
+    // --- Rotación ---
+    Matrix4 R;
+    rot.ToMatrix(R.m);
+
+    // --- Escala ---
+    Matrix4 S;
+    S.Identity();
+    S.m[0]  = scale.x;
+    S.m[5]  = scale.y;
+    S.m[10] = scale.z;
+
+    Matrix4 T;
+    T.Identity();
+    T.m[12] = pos.x;
+    T.m[13] = pos.y;
+    T.m[14] = pos.z;
+
+    out = T * R * S;
 }
 
 void Object::RotateLocal(float pitch, float yaw, float roll){
@@ -250,6 +271,22 @@ Vector3 Object::GetGlobalPosition() const {
         q = q->Parent;
     }
     return p;
+}
+
+Matrix4 Object::BuildMatrix(const Vector3& pos, const Quaternion& rot, const Vector3& scale) {
+    Matrix4 R = rot.ToMatrix();
+    
+    // Aplicar Escala (S)
+    R.m[0] *= scale.x; R.m[1] *= scale.x; R.m[2] *= scale.x; 
+    R.m[4] *= scale.y; R.m[5] *= scale.y; R.m[6] *= scale.y;
+    R.m[8] *= scale.z; R.m[9] *= scale.z; R.m[10] *= scale.z;
+
+    // Aplicar Traslación (T)
+    R.m[12] = pos.x;
+    R.m[13] = pos.y;
+    R.m[14] = pos.z;
+    
+    return R; // Esta es la matriz T * R * S
 }
 
 void Object::RenderObject(){}

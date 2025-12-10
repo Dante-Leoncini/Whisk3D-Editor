@@ -82,9 +82,14 @@ void SetTransformPivotPoint(){
 			CalcObjectsTransformPivotPoint(SceneCollection->Childrens[c]);
 		}
 		size_t SelectCount = ObjSelects.size();
-		TransformPivotPoint.x = TransformPivotPoint.x/SelectCount;
-		TransformPivotPoint.y = TransformPivotPoint.y/SelectCount;
-		TransformPivotPoint.z = TransformPivotPoint.z/SelectCount;
+
+		float tx = TransformPivotPoint.x / SelectCount;
+		float ty = TransformPivotPoint.y / SelectCount;
+		float tz = TransformPivotPoint.z / SelectCount;
+
+		TransformPivotPoint.x = tx;
+		TransformPivotPoint.y = ty; // altura → Y OpenGL
+		TransformPivotPoint.z = tz; // profundidad → Z OpenGL
 	}
 }
 
@@ -243,10 +248,10 @@ void SetRotacion(int dx, int dy){
                 obj.RotateLocal(ang, 0, 0);
 				break;
 			case Y:
-                obj.RotateLocal(0, ang, 0);
+                obj.RotateLocal(0, 0, ang);
 				break;
 			case Z:
-                obj.RotateLocal(0, 0, ang);
+                obj.RotateLocal(0, ang, 0);
 				break;
 		}
 	}
@@ -271,16 +276,13 @@ void SetScale(int dx, int dy, float factor){
 		Object& obj = *estadoObjetos[o].obj;
 		switch (axisSelect) {
 			case X:
-				obj.scale.x += dxf;
-				obj.scale.x += dyf;
+				obj.scale.x += dxf + dyf;
 				break;
 			case Y:
-				obj.scale.y += dxf;
-				obj.scale.y += dyf;
+				obj.scale.z += dxf + dyf;
 				break;
 			case Z:
-				obj.scale.z += dxf;
-				obj.scale.z += dyf;
+				obj.scale.y += dxf + dyf;
 				break;
 			case XYZ:
 				obj.scale.x += dxf + dyf;
@@ -315,12 +317,13 @@ void SetTranslacionObjetos(int dx, int dy, float speed){
 				obj.pos.x += dy * speed;
 				break;
 			case Y:
-				obj.pos.y -= dx * speed;
-				obj.pos.y -= dy * speed;
-				break;
-			case Z:
+				//esto es porque en OpenGl el Z es profundidad y no "up"
 				obj.pos.z -= dx * speed;
 				obj.pos.z -= dy * speed;
+				break;
+			case Z:
+				obj.pos.y -= dx * speed;
+				obj.pos.y -= dy * speed;
 				break;
 		}
 	}

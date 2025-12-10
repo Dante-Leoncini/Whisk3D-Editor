@@ -43,6 +43,10 @@ class Vector3 {
             return (len == 0.0f) ? Vector3(0,0,0) : Vector3(x/len, y/len, z/len);
         }
 
+        float Dot(const Vector3& v) const {
+            return x*v.x + y*v.y + z*v.z;
+        }
+
         float Length() const {
             return std::sqrt(x*x + y*y + z*z);
         }
