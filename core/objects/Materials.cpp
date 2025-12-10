@@ -42,3 +42,29 @@ int DuplicateMaterial(int srcId) {
     return (int)Materials.size() - 1; // devuelve el índice del duplicado
     */
 }
+
+// ===================================================
+// Implementación de Material animado
+// ===================================================
+void AnimatedMaterial::Update() {
+    //std::cout << "Control detectado: " << SDL_GameControllerName(controller) << std::endl;
+    tickCounter++;
+
+    if (tickCounter >= frameDurations[frameIndex]) {
+        tickCounter = 0;
+        frameIndex = (frameIndex + 1) % frameTextures.size();
+        for (Material* target : targets) {
+            if (target)
+                target->texture = frameTextures[frameIndex];
+        }
+    }
+}
+
+std::vector<AnimatedMaterial*> AnimatedMaterials;
+
+void UpdateAnimatedMaterials() {
+    for (AnimatedMaterial* anim : AnimatedMaterials) {
+        if (anim)
+            anim->Update();
+    }
+}

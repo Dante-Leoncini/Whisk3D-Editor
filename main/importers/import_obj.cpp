@@ -102,11 +102,11 @@ void Wavefront::ConvertToES1(Mesh* TempMesh, int* acumuladoVertices, int* acumul
         TempMesh->materialsGroup.push_back(mg);
     }
 
-    std::cout << "\n[ConvertToES1 RESULTADO]\n";
+    /*std::cout << "\n[ConvertToES1 RESULTADO]\n";
     std::cout << "Vertices finales: " << newVertices.size()/3 << "\n";
     std::cout << "Normales final:   " << newNormals.size()/3 << "\n";
     std::cout << "UV final:         " << newUVs.size()/2 << "\n";
-    std::cout << "Caras triangulos: " << newFaces.size()/3 << "\n";
+    std::cout << "Caras triangulos: " << newFaces.size()/3 << "\n";*/
 
     Reset();
 }
@@ -129,7 +129,7 @@ bool LeerOBJ(std::ifstream& file,
              int* acumuladoNormales,
              int* acumuladoUVs) 
 {
-    Mesh* mesh = new Mesh(CollectionActive, 0, 0, 0);
+    Mesh* mesh = new Mesh(CollectionActive, Vector3(0, 0, 0));
 
     // usar filename para nombrar por defecto (y hacerlo único)
     std::string fileBase = ExtractBaseName(filename);
@@ -289,10 +289,10 @@ bool LeerMTL(const std::string& filepath, int objetosCargados) {
         if (line.rfind("newmtl ", 0) == 0) {
             std::string matName = line.substr(7);
             mat = BuscarMaterialPorNombre(matName);
-            std::cout << "Cargando MTL: " << matName << " encontrado=" << (mat?"si":"no") << std::endl;
+            //std::cout << "Cargando MTL: " << matName << " encontrado=" << (mat?"si":"no") << std::endl;
 
             if (!mat) {
-                std::cout << "LeerMTL: Material no encontrado! " << matName << std::endl;
+                //std::cout << "LeerMTL: Material no encontrado! " << matName << std::endl;
                 mat = new Material(matName);
                 Materials.push_back(mat);
             }
@@ -334,6 +334,80 @@ bool LeerMTL(const std::string& filepath, int objetosCargados) {
                     std::cerr << "Error cargando textura: " << absPath << "\n";
                 }
             }
+            //sprite animado. esto no es un estandar en MTL. es solo para whisk3D
+            else if (prefix == "map_Kd_ANIM") {
+                AnimatedMaterial* NewAM = new AnimatedMaterial;
+                NewAM->targets.push_back(mat);
+                std::string extension;
+                int totalFrames = 0;
+                int zeros = 0;
+                int speed = 1;
+
+                // Leer primeros parámetros
+                iss >> extension >> totalFrames >> zeros >> speed;
+
+                // Leer el resto de la línea crudo
+                std::string rest;
+                std::getline(iss, rest);
+
+                // Quitar espacios al inicio
+                rest.erase(0, rest.find_first_not_of(" \t"));
+
+                // Buscar comillas simples o dobles
+                char quote = 0;
+                if (!rest.empty() && (rest[0] == '"' || rest[0] == '\'')) {
+                    quote = rest[0];
+                } else {
+                    std::cerr << "ERROR: map_Kd_ANIM debe usar comillas para la ruta base.\n";
+                    return false;
+                }
+
+                // Buscar la última comilla del MISMO tipo
+                size_t end = rest.find_last_of(quote);
+                if (end == std::string::npos || end == 0) {
+                    std::cerr << "ERROR: comillas mal formadas en map_Kd_ANIM\n";
+                    return false;
+                }
+
+                // Extraer ruta sin comillas
+                std::string baseURL = rest.substr(1, end - 1);
+
+                // Normalizar slashes
+                std::replace(baseURL.begin(), baseURL.end(), '\\', '/');
+
+                // Generar frames
+                for (int i = 1; i <= totalFrames; i++) {
+                    NewAM->frameDurations.push_back(speed);
+
+                    std::ostringstream num;
+                    num << std::setw(zeros) << std::setfill('0') << i;
+
+                    std::string filename = baseURL + num.str() + "." + extension;
+
+                    std::string absPath =
+                        getParentPath(filepath) + "/" + filename;
+
+                    std::replace(absPath.begin(), absPath.end(), '\\', '/');
+
+                    Texture* newTex = new Texture();
+                    newTex->path = absPath;
+
+                    if (LoadTexture(absPath.c_str(), newTex->iID)) {
+                        Textures.push_back(newTex);
+                        NewAM->frameTextures.push_back(newTex);
+                    } 
+                    else {
+                        std::cerr << "Error cargando textura ANIM: " << absPath << "\n";
+                        delete newTex;
+                    }
+                }
+
+                AnimatedMaterials.push_back(NewAM);
+
+                std::cout << "Animación cargada con "
+                        << NewAM->frameTextures.size()
+                        << " frames para material " << mat->name << "\n";
+            }
             else if (prefix == "BackfaceCullingOff") {
                 mat->culling = false;
             }
@@ -342,6 +416,10 @@ bool LeerMTL(const std::string& filepath, int objetosCargados) {
             }
             else if (prefix == "CLAMP_TO_EDGE") {
                 mat->repeat = false;
+            }
+            //por defecto es lineal
+            else if (prefix == "PIXELATED") {
+                mat->interpolacion = closest;
             }
             else if (prefix == "map_d") {
                 mat->transparent = true;

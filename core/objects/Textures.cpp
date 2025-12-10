@@ -5,23 +5,23 @@ std::vector<Texture*> Textures;
 #if SDL_MAJOR_VERSION == 2
 
     #ifdef __ANDROID__
-    bool LoadTextureFromSurface(SDL_Surface* surf, GLuint &textureID) {
-        if (!surf) return false;
+        bool LoadTextureFromSurface(SDL_Surface* surf, GLuint &textureID) {
+            if (!surf) return false;
 
-        glGenTextures(1, &textureID);
-        glBindTexture(GL_TEXTURE_2D, textureID);
+            glGenTextures(1, &textureID);
+            glBindTexture(GL_TEXTURE_2D, textureID);
 
-        GLint mode = (surf->format->BytesPerPixel == 4) ? GL_RGBA : GL_RGB;
-        glTexImage2D(GL_TEXTURE_2D, 0, mode, surf->w, surf->h, 0, mode, GL_UNSIGNED_BYTE, surf->pixels);
+            GLint mode = (surf->format->BytesPerPixel == 4) ? GL_RGBA : GL_RGB;
+            glTexImage2D(GL_TEXTURE_2D, 0, mode, surf->w, surf->h, 0, mode, GL_UNSIGNED_BYTE, surf->pixels);
 
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-        glBindTexture(GL_TEXTURE_2D, 0);
-        return true;
-    }
+            glBindTexture(GL_TEXTURE_2D, 0);
+            return true;
+        }
     #endif
-
+    
     bool LoadTexture(const char* filename, GLuint &textureID) {
         SDL_Surface* surface = IMG_Load(filename);
         if (!surface) {

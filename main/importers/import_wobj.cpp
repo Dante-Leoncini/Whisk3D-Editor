@@ -1,7 +1,7 @@
 #include "importers/import_wobj.h"
 
 Mesh* LeerWOBJ(std::ifstream& file, const std::string& filename, Object* parent){
-    Mesh* mesh = new Mesh(parent, 0, 0, 0);
+    Mesh* mesh = new Mesh(parent, Vector3(0, 0, 0));
 
     Wavefront Wobj;
     Wobj.Reset();
@@ -127,8 +127,10 @@ Mesh* LeerWOBJ(std::ifstream& file, const std::string& filename, Object* parent)
 
 Mesh* ImportWOBJ(const std::string& filepath, Object* parent) {
 
-    if (filepath.size() < 5 || filepath.substr(filepath.size() - 5) != ".wobj") {
-        std::cerr << "Error: El archivo no es .wobj: "<< filepath <<"\n";
+    if (filepath.size() < 5 || 
+    (filepath.substr(filepath.size() - 5) != ".wobj" &&
+     filepath.substr(filepath.size() - 4) != ".obj")) {
+        std::cerr << "Error: El archivo no es ni .obj ni .wobj: "<< filepath <<"\n";
         return nullptr;
     }
 
@@ -146,7 +148,9 @@ Mesh* ImportWOBJ(const std::string& filepath, Object* parent) {
         return nullptr;
     }
 
-    std::string mtl = filepath.substr(0, filepath.size() - 5) + ".mtl";
+    int extensionSize = (filepath.substr(filepath.size() - 5) == ".wobj") ? 5 : 4;
+
+    std::string mtl = filepath.substr(0, filepath.size() - extensionSize) + ".mtl";
     if (fileExists(mtl))
         LeerMTL(mtl, 1);
 

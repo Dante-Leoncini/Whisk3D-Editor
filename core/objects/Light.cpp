@@ -6,10 +6,7 @@ std::vector<Light*> Lights;
 
 // Constructor privado
 Light::Light(Object* parent, GLfloat x, GLfloat y, GLfloat z)
-: Object(parent, "Light"), LightID(GL_LIGHT0) {
-    posX = x;
-    posY = y;
-    posZ = z;
+: Object(parent, "Light", {x, y, z}), LightID(GL_LIGHT0) {
     IconType = static_cast<size_t>(IconType::light);
 
     position[0] = x;
@@ -97,7 +94,7 @@ void Light::RenderObject() {
     glLineWidth(1);
 
     // Posición acumulada
-    GLfloat totalZ = posZ;
+    /*GLfloat totalZ = posZ;
     GLfloat rX = rotX, rY = rotY, rZ = rotZ;
     Object* p = Parent;
     while (p != nullptr) {
@@ -107,15 +104,15 @@ void Light::RenderObject() {
         rZ += p->rotZ;
         p = p->Parent;
     }
-    LineaLightVertex[4] = -totalZ;
+    LineaLightVertex[4] = -totalZ;*/
 
     // Invertir rotaciones
-    glPushMatrix();    
+    /*glPushMatrix();    
     glRotatef(-rX, 1, 0, 0);
     glRotatef(-rZ, 0, 1, 0);
-    glRotatef(-rY, 0, 0, 1);
+    glRotatef(-rY, 0, 0, 1);*/
 
     glVertexPointer(3, GL_FLOAT, 0, LineaLightVertex);
     glDrawElements(GL_LINES, LineaEdgeSize, GL_UNSIGNED_SHORT, LineaEdge);
-    glPopMatrix();
+    //glPopMatrix();
 }

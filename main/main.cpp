@@ -184,21 +184,11 @@
 #include "variables.h"
 #include "UI/colores.h"
 #include "objects/Textures.h"
+#include "objects/Materials.h"
 #include "animation/Animation.h"
 #include "ViewPorts/ViewPorts.h"
 #include "controles.h"
 #include "constructor.h"
-
-struct Config {
-    bool fullscreen = false;
-    bool enableAntialiasing = false;
-    int width = 800;
-    int height = 600;
-    int displayIndex = 0;
-    std::string SkinName = "Whisk3D";
-    std::string graphicsAPI = "opengl";
-};
-Config cfg;
 
 // Función simple para leer el ini
 Config loadConfig(const std::string& filename) {
@@ -370,7 +360,7 @@ bool loadColors(const std::string& filename) {
                     "Color %s cargado: R=%.3f G=%.3f B=%.3f A=%.3f",
                     name.c_str(), r, g, b, a);
             #else
-                std::cout << "Color " << name << " cargado: R=" << r << " G=" << g << " B=" << b << " A=" << a << "\n";
+                //std::cout << "Color " << name << " cargado: R=" << r << " G=" << g << " B=" << b << " A=" << a << "\n";
             #endif
         } else {
             std::cerr << "Color desconocido en colors.skin: " << name << "\n";
@@ -435,7 +425,7 @@ int main(int argc, char* argv[]) {
     #ifdef __ANDROID__
         Config cfg = loadConfig("res/config.ini");
     #else
-        std::string exeDir = getResDir();
+        exeDir = getResDir();
         Config cfg = loadConfig(exeDir + "/config.ini");
     #endif
     if (cfg.enableAntialiasing) {
@@ -492,74 +482,13 @@ int main(int argc, char* argv[]) {
             std::cout << "Control detectado: " << SDL_GameControllerName(controller) << std::endl;
     }
 
-    // Carga de texturas
-    const std::vector<std::string> texFiles = {
-        "font.png", "origen.png", "cursor3d.png", "relationshipLine.png", "lamp.png"
-    };
-
-    for (const auto& file : texFiles) {
-        Textures.push_back(new Texture());
-
-        #ifdef __ANDROID__
-            // Para Android usamos SDL_RWFromFile para acceder al asset dentro del APK
-            std::string path = "res/Skins/" + cfg.SkinName + "/" + file;
-            SDL_RWops* rw = SDL_RWFromFile(path.c_str(), "rb");
-            if (!rw) {
-                __android_log_print(ANDROID_LOG_ERROR, "SDL_MAIN", "No se pudo abrir %s: %s", path.c_str(), SDL_GetError());
-                return -1;
-            }
-
-            SDL_Surface* surf = IMG_Load_RW(rw, 1); // 1 = cierra rw automáticamente
-            if (!surf) {
-                __android_log_print(ANDROID_LOG_ERROR, "SDL_MAIN", "Error cargando %s: %s", path.c_str(), IMG_GetError());
-                return -1;
-            }
-
-            if (!LoadTextureFromSurface(surf, Textures.back()->iID)) {
-                __android_log_print(ANDROID_LOG_ERROR, "SDL_MAIN", "Error creando textura %s", path.c_str());
-                SDL_FreeSurface(surf);
-                return -1;
-            }
-            __android_log_print(ANDROID_LOG_VERBOSE, "SDL_MAIN", "Cargado %s", path.c_str());
-
-            SDL_FreeSurface(surf); // liberamos superficie después de crear la textura
-        #else
-            // PC: ruta del tema
-            std::string path;
-
-            // --- 1) Primero buscar en el directorio de usuario ---
-            #ifdef WHISK3D_LINUX
-            {
-                std::string userConfigDir = getUserConfigDir();
-                if (!userConfigDir.empty()) {
-                    std::string userTexPath = userConfigDir + "/Skins/" + cfg.SkinName + "/" + file;
-                    if (std::filesystem::exists(userTexPath)) {
-                        path = userTexPath;
-                        std::cout << "Usando textura del usuario: " << path << "\n";
-                    }
-                }
-            }
-            #endif
-
-            // --- 2) Si no hay textura en el usuario, usar el exeDir ---
-            if (path.empty()) {
-                path = exeDir + "/Skins/" + cfg.SkinName + "/" + file;
-                std::cout << "Usando textura del sistema: " << path << "\n";
-            }
-            if (!LoadTexture(path.c_str(), Textures.back()->iID)) {
-                std::cerr << "Error cargando " << path << std::endl;
-                return -1;
-            }
-            std::cout << "Cargado " << file << std::endl;
-        #endif
-    }
-
     SDL_Event e;
     running = true;
     rootViewport->Resize(winW, winH);
 
     while (running) {
         Contadores();
+        UpdateAnimatedMaterials();
 
         while (SDL_PollEvent(&e)) {
             if (e.type == SDL_QUIT) running = false;

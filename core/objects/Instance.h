@@ -7,23 +7,23 @@
 
 #include "UI/icons.h"
 #include "Objects.h"
-#include "Modifier.h"
+#include "Target.h"
 #include <GL/gl.h>
 
-class Instance : public Object, public Modifier {
-public:
-    bool RenderChildrens = true;
-    size_t count = 1;
+class Instance : public Object, public Target {
+    public:
+        bool RenderChildrens = true;
+        size_t count = 1;
 
-    Instance(Object* parent, Object* instance = nullptr);
+        Instance(Object* parent, Object* instance = nullptr);
 
-    ObjectType getType() override;
+        ObjectType getType() override;
 
-    void Reload() override;
+        void Reload() override;
 
-    void RenderObject() override;
+        void RenderObject() override;
 
-    ~Instance();
+        ~Instance();
 };
 
 #endif

@@ -1,0 +1,58 @@
+Whisk3D {
+    version: 20251127
+    Escena {
+        iconApp: Whisk3D_experiment.png
+        limpiarPantalla: true
+        background: "0.0, 0.0, 0.0, 1.0"
+
+        Wavefront {
+            name: "Vertex Color"
+            filePath: assets/VertexColor/VertexColor.obj
+            x: 0.0
+            y: 0.0
+            z: 0.0
+            scale: 1
+        } 
+    }
+
+    Layout {
+        ViewportRow {
+            Viewport3D {
+                orthographic: false
+                ViewFromCameraActive: false
+                showOverlays: true
+                ShowUi: true
+                showFloor: true
+                showYaxis: true
+                showXaxis: true
+                CameraToView: false
+                showOrigins: true
+                show3DCursor: true
+                ShowRelantionshipsLines: true
+                view: Rendered
+                rotX: 0.0
+                posZ: -2.0
+            }
+            ViewportColumn {
+                Viewport3D {
+                    orthographic: false
+                    ViewFromCameraActive: false
+                    showOverlays: true
+                    ShowUi: true
+                    showFloor: true
+                    showYaxis: true
+                    showXaxis: true
+                    CameraToView: false
+                    showOrigins: true
+                    show3DCursor: true
+                    ShowRelantionshipsLines: true
+                    view: MaterialPreview
+                    rotX: 35.0
+                }
+                Outliner
+                Split: 0.7
+            }
+            Split: 0.7
+        }
+    }
+}

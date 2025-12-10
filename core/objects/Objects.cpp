@@ -6,8 +6,8 @@ Object* CollectionActive = nullptr;
 Object* ObjActivo = nullptr;
 std::vector<SaveState> estadoObjetos;
 
-Object::Object(Object* parent, const std::string& nombre)
-    : Parent(parent) {
+Object::Object(Object* parent, const std::string& nombre, Vector3 pos = {0,0,0})
+    : Parent(parent), pos(pos) {
     name = new Text(SetName(nombre));
 
     if (Parent) {
@@ -194,19 +194,72 @@ void Object::ReloadAll(){
     }      
 }
 
+// Construye matriz T * R * S y la exporta en formato column-major (GLfloat[16])
+void Object::GetMatrix(GLfloat out[16]) const {
+    // --- Rotación ---
+    GLfloat R[16];
+    rot.ToMatrix(R);
+
+    // --- Escala ---
+    GLfloat S[16] = {
+        scaleX, 0,      0,      0,
+        0,      scaleY, 0,      0,
+        0,      0,      scaleZ, 0,
+        0,      0,      0,      1
+    };
+
+    // R * S
+    GLfloat RS[16];
+    MultiplyMatrix(RS, R, S);
+
+    // --- Traslación ---
+    GLfloat T[16] = {
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        pos.x, pos.y, pos.z, 1
+    };
+
+    // Matriz final = T * (R * S)
+    MultiplyMatrix(out, T, RS);
+}
+
+void Object::RotateLocal(float pitch, float yaw, float roll){
+    Quaternion qPitch = Quaternion::FromAxisAngle(1,0,0, pitch);
+    Quaternion qYaw   = Quaternion::FromAxisAngle(0,1,0, yaw);
+    Quaternion qRoll  = Quaternion::FromAxisAngle(0,0,1, roll);
+
+    rot = rot * qYaw * qPitch * qRoll;
+}
+
+// obtener posición global simple (suma rápida de translations)
+// útil si necesitás la posición del objeto en world (para LookAt)
+Vector3 Object::GetGlobalPosition() const {
+    Vector3 p = pos;              // usa el Vector3 del propio objeto
+    const Object* q = Parent;
+    while (q) {
+        p += q->pos;              // suma las traslaciones de los padres
+        q = q->Parent;
+    }
+    return p;
+}
+
 void Object::RenderObject(){}
 
 // Funcion recursiva para renderizar un objeto y sus hijos
 void Object::Render(){   
     if (!visible) return; 
     // Guardar la matriz actual
-    glPushMatrix();       
+    glPushMatrix();     
         
     // Aplicar las transformaciones del objeto
-    glTranslatef(posX, posZ, posY);
+    /*glTranslatef(posX, posZ, posY);
     glRotatef(rotX, 1, 0, 0); // angulo, X Y Z
     glRotatef(rotZ, 0, 1, 0); // angulo, X Y Z
-    glRotatef(rotY, 0, 0, 1); // angulo, X Y Z
+    glRotatef(rotY, 0, 0, 1); // angulo, X Y Z*/
+
+    GetMatrix(M);
+    glMultMatrixf(M);   // aplica T * R * S -> incluye traslación
 
     // Si es visible y no es un mesh, lo dibuja
     RenderObject();
@@ -236,7 +289,8 @@ Object* FindObjectByName(Object* node, const std::string& name){
     return nullptr; // no encontrado
 }
 
-#include "Modifier.h"
+#include "Target.h"
+#include "Constraint.h"
 #include "Scene.h"
 #include "Collection.h"
 #include "Light.h"

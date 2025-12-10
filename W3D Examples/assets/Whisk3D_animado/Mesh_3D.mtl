@@ -1,0 +1,39 @@
+# Blender 4.4.3 MTL File: 'Mesh_3D.blend'
+# www.blender.org
+
+newmtl Logo_animado
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Kd 0.800000 0.800000 0.800000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+d 1.000000
+illum 2
+BackfaceCullingOff
+NoLight
+CLAMP_TO_EDGE
+illum 2
+# sprite animado, formato, 
+# 15: numero de frames, 
+# 4: cuantos ceros tiene, 4 para 0001 o un 2 para 01. 
+# 3: la velocidad de animacion
+# "frames/frames_" el inicio de la ubicacion
+map_Kd_ANIM png 15 4 3 "frames/frames_"
+map_d frames/frames_0001.png
+
+newmtl Texto
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Kd 0.800000 0.800000 0.800000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+d 1.000000
+illum 2
+BackfaceCullingOff
+NoLight
+CLAMP_TO_EDGE
+illum 2
+map_Kd texto.png
+map_d texto.png

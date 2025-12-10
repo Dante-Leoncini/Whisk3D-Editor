@@ -1,12 +1,12 @@
-#include "Modifier.h"
+#include "Target.h"
 
 // Establece el nombre del target
-void Modifier::SetTarget(const std::string& NewValue) {
+void Target::SetTarget(const std::string& NewValue) {
     targetName = NewValue;
 }
 
 // Comprueba si possibleAncestor es un ancestro de node
-bool Modifier::IsMyAncestor(Object* node, Object* possibleAncestor) {
+bool Target::IsMyAncestor(Object* node, Object* possibleAncestor) {
     while (node) {
         if (node == possibleAncestor) return true;
         node = node->Parent;
@@ -15,7 +15,7 @@ bool Modifier::IsMyAncestor(Object* node, Object* possibleAncestor) {
 }
 
 // Busca y asigna el target según targetName
-void Modifier::ReloadTarget(Object* me) {
+void Target::ReloadTarget(Object* me) {
     // std::cout << "buscando target : " << targetName << std::endl;
     Object* FindTarget = FindObjectByName(SceneCollection, targetName);
     if (!FindTarget) return;

@@ -13,6 +13,8 @@
 
 #include "variables.h"
 #include "sdl_key_compat.h"
+#include "math/Vector3.h"
+#include "math/Matrix4.h"
 #include "objects/Light.h"
 #include "objects/Gamepad.h"
 #include "objects/Camera.h"
@@ -26,6 +28,7 @@
 
 extern GLfloat LastRotX;
 extern GLfloat LastRotY;
+extern GLfloat LastRotZ;
 extern GLfloat LastPivotX;
 extern GLfloat LastPivotY;
 extern GLfloat LastPivotZ;
@@ -45,13 +48,22 @@ class Viewport3D : public ViewportBase, public WithBorder {
         bool ShowRelantionshipsLines;
         RenderType view;
 
-        GLfloat nearClip;
-        GLfloat farClip;
-        GLfloat cameraDistance;
+        GLfloat nearClip = 0.01f;
+        GLfloat farClip = 1000.0f;
         GLfloat aspect;
-        GLfloat posX, posY, posZ;
-        GLfloat rotX, rotY;
-        GLfloat PivotX, PivotY, PivotZ;
+
+        // --- Rotación orbital / libre ---
+        Quaternion viewRot;                  // rotación de la cámara 
+        Vector3    viewPos;                  // posición de la cámara precalculada
+        Vector3    pivot;                    // punto de interés a orbitar
+        float      orbitDistance = 5.0f;     // distancia al pivote (zoom) 
+        float yawDeg   = 0.0f;                  // rotación alrededor de Y global (horizontal)
+        float pitchDeg = 0.0f;                  // rotación alrededor de X local (vertical)
+
+        /*GLfloat LastPosX = 0;
+        GLfloat LastPosY = 0;  
+        GLfloat LastPosZ = 0;  
+        GLfloat LastZoom = 0;*/
 
         Viewport3D();
 
@@ -67,12 +79,19 @@ class Viewport3D : public ViewportBase, public WithBorder {
         void RenderAllAxisTransform();
         void RenderOverlay();  
 
+        void UpdateViewOrbit();
+        void RotateOrbit();
+        void RollOrbit(float angleDeg);
+        void RecalcOrbitPosition();
+        void Pan();
+        void Zoom(float delta);
+
         void RenderRelantionshipsLines();
         void Render3Dcursor();
         void RenderUI();
         void EnfocarObject();
-        void RecalcViewPos();
-        void SetViewpoint(int opcion);
+        bool RecalcViewPos();
+        void SetViewpoint(Viewpoint value);
         void RestaurarViewport();
         void ChangePerspective();
         void SetCursor3D();
@@ -86,10 +105,8 @@ class Viewport3D : public ViewportBase, public WithBorder {
         void TeclaArriba();
         void TeclaAbajo();
         void UpdatePrecalculos();
-        void ClickD();
-        void ClickE();
-        void ClickQ();
         void SetEje(int eje);
+        void SetViewFromCameraActive(bool value);
         void event_key_down(SDL_Event &e) override;
         void event_key_up(SDL_Event &e) override; 
         void key_down_return();

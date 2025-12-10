@@ -26,40 +26,39 @@ public:
 };
 
 class MaterialGroup { 
-public:
-    int start = 0;              // índice del primer triángulo real
-    int count = 0;              // cantidad de triángulos reales
-    int startDrawn = 0;         // índice del primer triángulo a dibujar
-    int indicesDrawnCount = 0;  // cantidad de vertices a dibujar
-    Material* material = nullptr;
+    public:
+        int start = 0;              // índice del primer triángulo real
+        int count = 0;              // cantidad de triángulos reales
+        int startDrawn = 0;         // índice del primer triángulo a dibujar
+        int indicesDrawnCount = 0;  // cantidad de vertices a dibujar
+        Material* material = nullptr;
 };
 
 // ===================================================
 // Clase Mesh
 // ===================================================
 class Mesh : public Object { 
-public:
-    int vertexSize = 0;
-    GLfloat* vertex = nullptr;
+    public:
+        int vertexSize = 0;
+        GLfloat* vertex = nullptr;
 
-    std::vector<VertexGroup> vertexGroups;
-    GLubyte* vertexColor = nullptr;
-    GLbyte* normals = nullptr;
-    GLfloat* uv = nullptr;
+        std::vector<VertexGroup> vertexGroups;
+        GLubyte* vertexColor = nullptr;
+        GLbyte* normals = nullptr;
+        GLfloat* uv = nullptr;
 
-    int facesSize = 0;
-    GLushort* faces = nullptr;
-    std::vector<MaterialGroup> materialsGroup;
-    std::vector<int> Modifiers;
+        int facesSize = 0;
+        GLushort* faces = nullptr;
+        std::vector<MaterialGroup> materialsGroup;
 
-    Mesh(Object* parent = nullptr, GLfloat px = 0.0f, GLfloat py = 0.0f, GLfloat pz = 0.0f);
+        Mesh(Object* parent = nullptr, Vector3 pos = Vector3(0,0,0));
 
-    ~Mesh();
+        ~Mesh();
 
-    ObjectType getType() override;
+        ObjectType getType() override;
 
-    void LiberarMemoria();
-    void RenderObject() override;
+        void LiberarMemoria();
+        void RenderObject() override;
 };
 
 // ===================================================

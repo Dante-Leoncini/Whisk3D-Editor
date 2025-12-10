@@ -16,23 +16,21 @@ void DrawnLines(int LineWidth, int cantidad, const GLshort* vertexlines, const G
 
 void RenderLinkLines(Object* obj){
     glPushMatrix();
-    glTranslatef(obj->posX, obj->posZ, obj->posY);
-    glRotatef(obj->rotX, 1, 0, 0);
+    glTranslatef(obj->pos.x, obj->pos.z, obj->pos.y);
+    /*glRotatef(obj->rotX, 1, 0, 0);
     glRotatef(obj->rotZ, 0, 1, 0);
-    glRotatef(obj->rotY, 0, 0, 1);
+    glRotatef(obj->rotY, 0, 0, 1);*/
 
     for (size_t c = 0; c < obj->Childrens.size(); c++) {
         Object* objChild = obj->Childrens[c];
         if (!objChild->visible) continue;
         if (obj->getType()!= ObjectType::collection && obj->getType() != ObjectType::baseObject){
-            LineaLinkChild[3] = objChild->posX;
-            LineaLinkChild[4] = objChild->posZ;
-            LineaLinkChild[5] = objChild->posY;
+            LineaLinkChild[3] = objChild->pos.x;
+            LineaLinkChild[4] = objChild->pos.z;
+            LineaLinkChild[5] = objChild->pos.y;
 
-            GLfloat diffX = objChild->posX - obj->posX;
-            GLfloat diffY = objChild->posY - obj->posY;
-            GLfloat diffZ = objChild->posZ - obj->posZ;
-            GLfloat distancia = std::sqrt(diffX * diffX + diffY * diffY + diffZ * diffZ);
+            Vector3 diff = objChild->pos - obj->pos;
+            GLfloat distancia = std::sqrt(diff.x * diff.x + diff.y * diff.y + diff.z * diff.z);
 
             lineUV[3] = distancia*8;
             glVertexPointer( 3, GL_FLOAT, 0, LineaLinkChild );
@@ -47,9 +45,9 @@ void RenderLinkLines(Object* obj){
 void DrawTransformAxis() {
     glPushMatrix();
     if (InteractionMode == ObjectMode){
-        glTranslatef(TransformPivotPointFloat[0]/65000, 
-                     TransformPivotPointFloat[1]/65000, 
-                     TransformPivotPointFloat[2]/65000);    
+        glTranslatef(TransformPivotPoint.x/65000, 
+                     TransformPivotPoint.y/65000, 
+                     TransformPivotPoint.z/65000);    
     }
 
     switch (axisSelect) {
@@ -80,13 +78,13 @@ void DrawTransformAxis() {
 bool RenderAxisTransform(Object* obj) {
     bool found = false;
     glPushMatrix();    
-    glTranslatef(obj->posX, obj->posZ, obj->posY);
+    glTranslatef(obj->pos.x, obj->pos.z, obj->pos.y);
     
     if (obj == ObjActivo) {
         if (estado == rotacion || estado == EditScale){
-            glRotatef(obj->rotX, 1, 0, 0);
+            /*glRotatef(obj->rotX, 1, 0, 0);
             glRotatef(obj->rotZ, 0, 1, 0);
-            glRotatef(obj->rotY, 0, 0, 1);
+            glRotatef(obj->rotY, 0, 0, 1);*/
         }        
         if (estado == translacion || estado == rotacion || estado == EditScale){        
             DrawTransformAxis();
@@ -94,9 +92,9 @@ bool RenderAxisTransform(Object* obj) {
         found = true;
     } 
     else if (!obj->Childrens.empty()){    
-        glRotatef(obj->rotX, 1, 0, 0);
+        /*glRotatef(obj->rotX, 1, 0, 0);
         glRotatef(obj->rotZ, 0, 1, 0);
-        glRotatef(obj->rotY, 0, 0, 1);
+        glRotatef(obj->rotY, 0, 0, 1);*/
 
         for (size_t c = 0; c < obj->Childrens.size(); c++) {
             if (RenderAxisTransform(obj->Childrens[c])){
@@ -113,7 +111,7 @@ void DibujarOrigen(Object* obj){
     if (!obj->visible) return;
 
     glPushMatrix();    
-    glTranslatef(obj->posX, obj->posZ, obj->posY);
+    glTranslatef(obj->pos.x, obj->pos.z, obj->pos.y);
 
     if (obj->select || obj == ObjActivo){
         if (obj == ObjActivo){
@@ -126,9 +124,9 @@ void DibujarOrigen(Object* obj){
     }
 
     if (!obj->Childrens.empty()){    
-        glRotatef(obj->rotX, 1, 0, 0);
+        /*glRotatef(obj->rotX, 1, 0, 0);
         glRotatef(obj->rotZ, 0, 1, 0);
-        glRotatef(obj->rotY, 0, 0, 1);
+        glRotatef(obj->rotY, 0, 0, 1);*/
         for (size_t c = 0; c < obj->Childrens.size(); c++) {
             DibujarOrigen(obj->Childrens[c]);
         }
@@ -155,7 +153,7 @@ void DibujarIcono3D(Object* obj){
     if (!obj->visible) return;
 
     glPushMatrix();    
-    glTranslatef(obj->posX, obj->posZ, obj->posY);
+    glTranslatef(obj->pos.x, obj->pos.z, obj->pos.y);
 
     if (obj->getType() == ObjectType::light){
         if (ObjActivo == obj && obj->select)
@@ -168,9 +166,9 @@ void DibujarIcono3D(Object* obj){
     }
 
     if (!obj->Childrens.empty()){    
-        glRotatef(obj->rotX, 1, 0, 0);
+        /*glRotatef(obj->rotX, 1, 0, 0);
         glRotatef(obj->rotZ, 0, 1, 0);
-        glRotatef(obj->rotY, 0, 0, 1);
+        glRotatef(obj->rotY, 0, 0, 1);*/
         for (size_t c = 0; c < obj->Childrens.size(); c++) {
             DibujarIcono3D(obj->Childrens[c]);
         }

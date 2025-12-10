@@ -5,6 +5,8 @@
     #include <windows.h>
 #endif
 
+#include "math/Vector3.h"
+#include "math/Quaternion.h"
 #include <vector>
 #include <string>
 #include <iostream>
@@ -24,7 +26,7 @@ extern Viewport3D* Viewport3DActive;
 
 enum class ObjectType {
     scene, mesh, camera, light, empty, armature, curve,
-    collection, baseObject, mirror, gamepad, instance
+    collection, baseObject, mirror, gamepad, instance, constraint
 };
 
 // Forward declarations
@@ -37,41 +39,48 @@ extern Object* ObjActivo;
 void DeseleccionarTodo(bool IncluirColecciones = false);
 
 class Object {
-public:
-    Object* Parent = nullptr;
-    std::vector<Object*> Childrens;
-    bool visible = true;
-    bool desplegado = true;
-    bool select = true;
-    Text* name = nullptr;
-    size_t IconType = 0;
+    public:
+        Object* Parent = nullptr;
+        std::vector<Object*> Childrens;
+        bool visible = true;
+        bool desplegado = true;
+        bool select = true;
+        Text* name = nullptr;
+        size_t IconType = 0;
 
-    GLfloat posX = 0.0f, posY = 0.0f, posZ = 0.0f;
-    GLfloat rotX = 0.0f, rotY = 0.0f, rotZ = 0.0f;
-    GLfloat scaleX = 1.0f, scaleY = 1.0f, scaleZ = 1.0f;
+        GLfloat M[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 
-    virtual ObjectType getType() { return ObjectType::baseObject; }
+        Vector3 pos;    
+        Quaternion rot; // NUEVO: reemplazamos rotX/Y/Z por cuaternión
+        GLfloat scaleX = 1.0f, scaleY = 1.0f, scaleZ = 1.0f;
 
-    Object(Object* parent, const std::string& nombre);
-    virtual ~Object();
+        virtual ObjectType getType() { return ObjectType::baseObject; }
 
-    void SetNameObj(const std::string& nombre);
+        Object(Object* parent, const std::string& nombre, Vector3 pos);
+        virtual ~Object();
 
-    void EliminarObjetosSeleccionados(bool IncluirCollecciones = false);
+        void SetNameObj(const std::string& nombre);
 
-    std::string SetName(const std::string& baseName);
+        void EliminarObjetosSeleccionados(bool IncluirCollecciones = false);
 
-    void Seleccionar();
-    void Deseleccionar();
-    void DeseleccionarCompleto(bool IncluirColecciones = false);
-    bool EstaSeleccionado(bool IncluirColecciones = false);
-    bool SeleccionarCompleto(bool IncluirColecciones = false);
+        std::string SetName(const std::string& baseName);
 
-    virtual void Reload();
-    void ReloadAll();
+        void Seleccionar();
+        void Deseleccionar();
+        void DeseleccionarCompleto(bool IncluirColecciones = false);
+        bool EstaSeleccionado(bool IncluirColecciones = false);
+        bool SeleccionarCompleto(bool IncluirColecciones = false);
 
-    virtual void RenderObject();
-    void Render();
+        //todo lo nuevo para tranformaciones locales/globales y quaternion
+        void GetMatrix(GLfloat out[16]) const;
+        void RotateLocal(float pitch, float yaw, float roll);
+        Vector3 GetGlobalPosition() const;
+
+        virtual void Reload();
+        void ReloadAll();
+
+        virtual void RenderObject();
+        void Render();
 };
 
 // Funciones auxiliares
@@ -92,11 +101,11 @@ Object* GetFirstDFS();
 void changeSelect(SelectMode mode, bool IncluirColecciones = false);
 
 class SaveState {
-public:
-    Object* obj;
-    GLfloat posX, posY, posZ;
-    GLfloat rotX, rotY, rotZ;
-    GLfloat scaleX, scaleY, scaleZ;
+    public:
+        Object* obj;
+        Vector3 pos;
+        Quaternion rot;  
+        GLfloat scaleX, scaleY, scaleZ;
 };
 extern std::vector<SaveState> estadoObjetos;
 

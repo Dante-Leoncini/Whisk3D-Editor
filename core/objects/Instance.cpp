@@ -2,19 +2,23 @@
 
 // Constructor
 Instance::Instance(Object* parent, Object* instance)
-    : Object(parent, "Instance") 
+    : Object(parent, "Instance", {0,0,0}) 
 {
     IconType = static_cast<size_t>(IconType::instance);
 
     if (!instance) return;
 
     target = instance;
-    posX = instance->posX;
-    posY = instance->posY;
-    posZ = instance->posZ;
-    rotX = instance->rotX;
+    pos.x = instance->pos.x;
+    pos.y = instance->pos.y;
+    pos.z = instance->pos.z;
+    /*rotX = instance->rotX;
     rotY = instance->rotY;
-    rotZ = instance->rotZ;
+    rotZ = instance->rotZ;*/
+    rot.x = instance->rot.x;
+    rot.y = instance->rot.y;
+    rot.z = instance->rot.z;
+    rot.w = instance->rot.w;
     scaleX = instance->scaleX;
     scaleY = instance->scaleY;
     scaleZ = instance->scaleZ;
@@ -35,10 +39,10 @@ void Instance::RenderObject() {
     if (!target && target != this) return;
 
     glPushMatrix();
-    glTranslatef(target->posX, target->posZ, target->posY);
-    glRotatef(target->rotX, 1, 0, 0);
+    //glTranslatef(target->posX, target->posZ, target->posY);
+    /*glRotatef(target->rotX, 1, 0, 0);
     glRotatef(target->rotZ, 0, 1, 0);
-    glRotatef(target->rotY, 0, 0, 1);
+    glRotatef(target->rotY, 0, 0, 1);*/
 
     for(size_t i = 0; i < count; i++){
         glScalef(scaleX, scaleY, scaleZ);
@@ -47,19 +51,19 @@ void Instance::RenderObject() {
         if(RenderChildrens){
             for(size_t c = 0; c < target->Childrens.size(); c++){
                 // cancela la rotación y traslación del target
-                glTranslatef(-target->posX, -target->posZ, -target->posY);
-                glRotatef(target->rotX, -1, 0, 0);
+                //glTranslatef(-target->posX, -target->posZ, -target->posY);
+                /*glRotatef(target->rotX, -1, 0, 0);
                 glRotatef(target->rotZ, 0, -1, 0);
-                glRotatef(target->rotY, 0, 0, -1);
+                glRotatef(target->rotY, 0, 0, -1);*/
 
                 target->Childrens[c]->Render();
             }
         }
 
-        glTranslatef(posX, posZ, posY);
-        glRotatef(rotX, 1, 0, 0);
+        //glTranslatef(posX, posZ, posY);
+        /*glRotatef(rotX, 1, 0, 0);
         glRotatef(rotZ, 0, 1, 0);
-        glRotatef(rotY, 0, 0, 1);
+        glRotatef(rotY, 0, 0, 1);*/
     }
 
     glPopMatrix();

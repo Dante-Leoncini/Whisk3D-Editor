@@ -4,8 +4,8 @@
 Scene* scene = nullptr;
 
 // Constructor
-Scene::Scene()
-    : Object(nullptr, "Scene Collection"), limpiarPantalla(true) 
+Scene::Scene(Vector3 pos)
+    : Object(nullptr, "Scene Collection", pos), limpiarPantalla(true) 
 {
     // Color por defecto negro transparente
     backgroundColor[0] = 0.0f;
