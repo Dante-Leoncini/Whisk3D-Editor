@@ -22,20 +22,20 @@ void Mirror::Reload() {
 
 // Renderizado del mirror
 void Mirror::RenderObject() {
-    if (!target && target != this) return;
+    if (!target && target != this || (!mirrorX && !mirrorY && !mirrorZ)) return;
 
     glFrontFace(GL_CW); // invertir frente mientras renderea el espejo
 
+    glPushMatrix();
+
+    // Obtener matriz del target
+    target->GetMatrix(M);
+
+    // Invertir la posición del target en el eje espejo
     if (mirrorZ) {
-        glPushMatrix();
+        glScalef(1, -1, 1); // espejo en Z
 
-        glScalef(1, -1, 1);
-        //glScalef(scale.x, scale.z, scale.y);
-        //glTranslatef(target->posX, target->posZ, target->posY);
-        /*glRotatef(rotX, 1, 0, 0);
-        glRotatef(rotZ, 0, 1, 0);
-        glRotatef(rotY, 0, 0, 1);*/
-
+        glMultMatrixf(M.m);
         target->RenderObject();
 
         if (RenderChildrens) {
@@ -43,9 +43,9 @@ void Mirror::RenderObject() {
                 target->Childrens[c]->Render();
             }
         }
-
-        glPopMatrix();
     }
+
+    glPopMatrix();
 
     glFrontFace(GL_CCW); // restaurar
 }

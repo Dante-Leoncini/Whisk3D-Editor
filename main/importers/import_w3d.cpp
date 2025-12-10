@@ -235,14 +235,14 @@ void ApplyCommonProps(Object* obj, const std::map<std::string,std::string>& p){
     }
 
     // Escala
-    /*if(p.count("scale")){
+    if(p.count("scale")){
         float s = GetFloatOrDefault(p,"scale",1);
         obj->scale.z=obj->scale.y=obj->scale.z = s;
     } else {
         if(p.count("sx")) obj->scale.x = GetFloatOrDefault(p,"sx",1);
         if(p.count("sy")) obj->scale.y = GetFloatOrDefault(p,"sy",1);
         if(p.count("sz")) obj->scale.z = GetFloatOrDefault(p,"sz",1);
-    }*/
+    }
 }
 
 Object* CreateObjectFromNode(Node* n, Object* parent){
