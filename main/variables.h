@@ -71,12 +71,10 @@ extern bool ViewPortClickDown;
 extern bool showOverlayGlobal;
 extern bool ViewFromCameraActiveGlobal;
 extern Quaternion rotGlobal;
+extern Vector3 viewPosGlobal;
 extern Vector3 camRight;
 extern Vector3 camUp;
 extern Vector3 camForward;
-/*extern GLfloat rotXGlobal;
-extern GLfloat rotYGlobal;
-extern GLfloat rotZGlobal;*/
 
 // Mouse
 extern GLshort mouseX;

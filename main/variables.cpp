@@ -40,6 +40,7 @@ bool showOverlayGlobal = false;
 bool ViewFromCameraActiveGlobal = false;
 
 Quaternion rotGlobal;
+Vector3 viewPosGlobal;
 Vector3 camRight;
 Vector3 camUp;
 Vector3 camForward;

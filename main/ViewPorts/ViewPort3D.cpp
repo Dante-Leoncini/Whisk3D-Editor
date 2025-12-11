@@ -179,6 +179,7 @@ void Viewport3D::ReloadLights() {
     ::showOverlayGlobal = showOverlays;
     ::ViewFromCameraActiveGlobal = ViewFromCameraActive;
     ::rotGlobal = viewRot;
+    ::viewPosGlobal = viewPos;
     Viewport3DActive = this;
     
     for(size_t l = 0; l < Lights.size(); l++) {

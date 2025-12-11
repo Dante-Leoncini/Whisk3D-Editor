@@ -327,6 +327,12 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
         bool usePitch      = GetBoolOrDefault(p, "usePitch", true);
 
         Constraint* constraint = new Constraint(parent, useHorizontal, usePitch);
+
+        constraint->SetCopyPosition(
+            GetBoolOrDefault(p, "copyPosX", false),
+            GetBoolOrDefault(p, "copyPosY", false),
+            GetBoolOrDefault(p, "copyPosZ", false)
+        );
         if(p.count("target")) constraint->SetTarget(p.at("target"));
         return constraint;
     }    
