@@ -311,6 +311,8 @@ void Viewport3D::Render() {
 
     UpdateViewOrbit();
 
+    glEnable(GL_DEPTH_TEST);
+
     // Dibujar overlays
     if (showOverlays) {
         #ifdef ANDROID
@@ -343,8 +345,6 @@ void Viewport3D::Render() {
 
         if (showFloor || showXaxis || showYaxis) RenderFloor();
     }
-
-    glEnable(GL_DEPTH_TEST);
 
     // Renderiza la escena recursivamente
     SceneCollection->Render();
@@ -1170,50 +1170,60 @@ GLfloat sinX = 0.0f;
 GLfloat cosY = 0.0f;
 GLfloat sinY = 0.0f;
 
-void Gamepad::Update(){
-    if (!target || !Viewport3DActive) return;
+void Gamepad::Update() {
+    if (!target || !Viewport3DActive || !CameraActive) return;
 
-    //Viewport3DActive->rotX   += axisState[SDL_CONTROLLER_AXIS_RIGHTX] * 1.0f;
-    //Viewport3DActive->rotY   += axisState[SDL_CONTROLLER_AXIS_RIGHTY] * 1.0f;
+    // --- 1. CONFIGURACIÓN DE VECTORES DE MOVIMIENTO ---
+    Vector3 camForward = CameraActive->forwardVector;
+    Vector3 camRight   = CameraActive->rightVector;
+    
+    // Proyectar los vectores al plano XZ (el piso) y normalizar.
+    Vector3 Fwd_XZ = Vector3(camForward.x, 0.0f, camForward.z).Normalized();
+    Vector3 Rgt_XZ = Vector3(camRight.x, 0.0f, camRight.z).Normalized();
 
-    /*target->rotX += axisState[SDL_CONTROLLER_AXIS_RIGHTX] * 0.3f;
-    target->rotZ += axisState[SDL_CONTROLLER_AXIS_RIGHTY] * 0.3f;*/
+    float inputY = axisState[SDL_CONTROLLER_AXIS_LEFTY]; // Adelante/Atrás
+    float inputX = axisState[SDL_CONTROLLER_AXIS_LEFTX]; // Lateral/Giro
+    float speed = factor * 3.00f; 
 
-    // Limitar rotY para evitar giros extremos
-    /*if(Viewport3DActive->rotY > 180.0f) Viewport3DActive->rotY -= 360.0f;
-    if(Viewport3DActive->rotY < -180.0f) Viewport3DActive->rotY += 360.0f;
-    if(Viewport3DActive->rotX > 180.0f) Viewport3DActive->rotX -= 360.0f;
-    if(Viewport3DActive->rotX < -180.0f) Viewport3DActive->rotX += 360.0f;*/
-
-    if (recalcularCamara || axisState[SDL_CONTROLLER_AXIS_RIGHTX] != 0.0f || axisState[SDL_CONTROLLER_AXIS_RIGHTY] != 0.0f ){
-        //precalculos
-        /*radY = Viewport3DActive->rotY * M_PI / 180.0f; // Yaw
-        radX = Viewport3DActive->rotX * M_PI / 180.0f; // Pitch*/
-
-        cosX = cos(radX);
-        sinX = sin(radX);
-        cosY = cos(radY);
-        sinY = sin(radY);
-        recalcularCamara = false;
+    // Inversión de ejes para el control intuitivo
+    float correctedInputY = -inputY; 
+    float correctedInputX = -inputX;
+    
+    // Umbral para ignorar el ruido del stick
+    const float DeadZone = 0.1f;
+    
+    // --- 2. CALCULAR EL MOVIMIENTO TOTAL ---
+    Vector3 TotalMovement(0.0f, 0.0f, 0.0f);
+    
+    if (std::abs(correctedInputY) > DeadZone) {
+        // Avance/Retroceso
+        TotalMovement += Fwd_XZ * correctedInputY * speed;
     }
 
-    // Movimiento cámara según sticks y gatillos
-    /*Viewport3DActive->PivotZ += axisState[SDL_CONTROLLER_AXIS_LEFTY] * factor * cosY;
-    Viewport3DActive->PivotX -= axisState[SDL_CONTROLLER_AXIS_LEFTX] * factor * cosX - axisState[SDL_CONTROLLER_AXIS_LEFTY] * factor * sinY * sinX;
-    Viewport3DActive->PivotY += axisState[SDL_CONTROLLER_AXIS_LEFTX] * factor * sinX + axisState[SDL_CONTROLLER_AXIS_LEFTY] * factor * sinY * cosX;*/
+    if (std::abs(correctedInputX) > DeadZone) {
+        // Movimiento Lateral (Strafe)
+        TotalMovement += Rgt_XZ * correctedInputX * speed;
+    }
+    
+    // --- 3. APLICAR MOVIMIENTO Y ROTACIÓN ---
+    if (TotalMovement.LengthSq() > 0.0001f) {
+        
+        // A. Aplicar la traslación (movimiento)
+        target->pos += TotalMovement;
 
-    target->pos.z += axisState[SDL_CONTROLLER_AXIS_LEFTY] * factor * cosY;
-    target->pos.x -= axisState[SDL_CONTROLLER_AXIS_LEFTX] * factor * cosX - axisState[SDL_CONTROLLER_AXIS_LEFTY] * factor * sinY * sinX;
-    target->pos.y += axisState[SDL_CONTROLLER_AXIS_LEFTX] * factor * sinX + axisState[SDL_CONTROLLER_AXIS_LEFTY] * factor * sinY * cosX;
-
-    //std::cout << "PivotX: " << PivotX << " PivotY: " << PivotY << " PivotZ: " << PivotZ << std::endl;
-    //std::cout << "rotY: " << rotY << std::endl;
-
-    //Viewport3DActive->posY += (axisState[SDL_CONTROLLER_AXIS_TRIGGERRIGHT] - axisState[SDL_CONTROLLER_AXIS_TRIGGERLEFT]) * 0.1f;
-    /*target->scaleX += (axisState[SDL_CONTROLLER_AXIS_TRIGGERRIGHT] - axisState[SDL_CONTROLLER_AXIS_TRIGGERLEFT]) * 0.02f;
-    target->scaleY += (axisState[SDL_CONTROLLER_AXIS_TRIGGERRIGHT] - axisState[SDL_CONTROLLER_AXIS_TRIGGERLEFT]) * 0.02f;
-    target->scaleZ += (axisState[SDL_CONTROLLER_AXIS_TRIGGERRIGHT] - axisState[SDL_CONTROLLER_AXIS_TRIGGERLEFT]) * 0.02f;*/
-
-    //target->posY += axisState[SDL_CONTROLLER_AXIS_LEFTX] * velocidad;
-    //target->posX += axisState[SDL_CONTROLLER_AXIS_LEFTY] * velocidad; 
+        // B. CALCULAR LA ROTACIÓN
+        // El vector de dirección hacia el que mira el target es el vector de movimiento.
+        Vector3 newForward = TotalMovement.Normalized();
+        
+        // Asumo que tienes una función FromDirection que crea un cuaternión LookAt
+        // a partir de un solo vector de dirección.
+        Quaternion targetRotation = Quaternion::FromDirection(newForward, Vector3(0, 1, 0));
+        
+        // C. Aplicar Rotación (opcionalmente suavizada)
+        // Para evitar un giro instantáneo y brusco:
+        // target->rot = Quaternion::Slerp(target->rot, targetRotation, 0.1f); 
+        
+        // Aplicar rotación instantánea (sin Slerp/suavizado):
+        target->rot = targetRotation;
+    }
 }

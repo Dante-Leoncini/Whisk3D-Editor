@@ -27,6 +27,10 @@ extern Camera* CameraActive;
 
 class Camera : public Object, public Target {
     public:
+        // ¡Nuevas variables para guardar los ejes ya calculados!
+        Vector3 rightVector;
+        Vector3 forwardVector;
+
         Camera(Object* parent = nullptr, Vector3 pos = Vector3(0,0,0), Vector3 Rot = Vector3(0,0,0));
 
         ObjectType getType() override;

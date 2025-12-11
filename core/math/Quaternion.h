@@ -99,6 +99,7 @@ struct Quaternion {
     }
 
     static Quaternion FromMatrix(const Matrix4& m);
+    static Quaternion FromDirection(const Vector3& direction, const Vector3& worldUp);
 };
 
 // out = A * B  (column-major, como espera glMultMatrixf)

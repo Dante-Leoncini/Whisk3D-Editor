@@ -30,6 +30,40 @@ Matrix4 Quaternion::ToMatrix() const {
     return m;
 }
 
+// Método de ayuda dentro de tu clase Quaternion o utilidades:
+Quaternion Quaternion::FromDirection(const Vector3& direction, const Vector3& worldUp) {
+    
+    // 1. Vector de Dirección (que apunta HASTA DONDE SE MUEVE el personaje)
+    Vector3 moveDirection = direction.Normalized();
+
+    // 2. CORRECCIÓN CLAVE: El eje Z local del personaje debe ser opuesto al movimiento.
+    Vector3 forward = -moveDirection; // Eje Z local del personaje
+    
+    // 3. Eje Right (X local)
+    // El orden Cross(WorldUp, Forward) asegura que el Roll sea cero.
+    // Usamos el 'forward' ya invertido.
+    Vector3 right = Vector3::Cross(worldUp, forward).Normalized();
+    
+    // 4. Eje Up (Y local)
+    // Se calcula para ortogonalidad perfecta.
+    Vector3 up = Vector3::Cross(forward, right).Normalized();
+    
+    // 5. Construir Matriz de Orientación (Positivo [Right | Up | Forward])
+    Matrix4 M;
+    M.Identity();
+
+    // Columna X = Right
+    M.m[0] = right.x; M.m[1] = right.y; M.m[2] = right.z;
+    
+    // Columna Y = Up
+    M.m[4] = up.x; M.m[5] = up.y; M.m[6] = up.z;
+    
+    // Columna Z = Forward (es el vector -direction)
+    M.m[8] = forward.x; M.m[9] = forward.y; M.m[10] = forward.z;
+
+    return Quaternion::FromMatrix(M);
+}
+
 Quaternion Quaternion::FromMatrix(const Matrix4& m) {
     Quaternion q;
     float trace = m.m[0] + m.m[5] + m.m[10];

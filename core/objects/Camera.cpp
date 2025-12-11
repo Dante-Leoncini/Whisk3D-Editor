@@ -58,26 +58,26 @@ void Camera::UpdateLookAt() {
     //std::cout << "Camara pos X: " << pos.x << " Y: " << pos.y << " Z: " << pos.z << std::endl;
     //std::cout << "Target X: " << target->pos.x << " Y: " << target->pos.y << " Z: " << target->pos.z << std::endl;
 
-    Vector3 dir = (target->pos - pos).Normalized();
+    forwardVector = (target->pos - pos).Normalized();
     
     // CORRECCIÓN 1: Usar WorldUp POSITIVO (Y-Up estándar)
     Vector3 worldUp(0, 1, 0); 
 
     // Opcional pero recomendado: Anti-Gimbal Lock
-    if (std::abs(dir.Dot(worldUp)) > 0.999f) { 
+    if (std::abs(forwardVector.Dot(worldUp)) > 0.999f) { 
         worldUp = Vector3(1, 0, 0); 
     }
 
     // 2. Cálculo del Eje Right (X local) - Orden para que funcione el Yaw (no invertido)
     // Orden Canónico: Cross(WorldUp, Dir)
-    Vector3 right = Vector3::Cross(worldUp, dir).Normalized();
+    rightVector = Vector3::Cross(worldUp, forwardVector).Normalized();
 
     // 3. Cálculo del Eje Up (Y local)
     // El orden Cross(Right, Dir) es el estándar.
-    Vector3 up = Vector3::Cross(right, dir).Normalized(); 
+    Vector3 up = Vector3::Cross(rightVector, forwardVector).Normalized(); 
     
     // 4. Forward (Eje Z cámara de Vista)
-    Vector3 forward = (-dir).Normalized();
+    Vector3 forward = (-forwardVector).Normalized();
     
     // 5. Construcción de matriz (column-major)
     // Los signos deben ser: [-Right | -Up | +Forward] o [+Right | +Up | -Forward]
@@ -85,9 +85,9 @@ void Camera::UpdateLookAt() {
     M.Identity();
 
     // Columna X (Right): Invertimos el signo para corregir el Yaw.
-    M.m[0] = -right.x;
-    M.m[1] = -right.y;
-    M.m[2] = -right.z;
+    M.m[0] = -rightVector.x;
+    M.m[1] = -rightVector.y;
+    M.m[2] = -rightVector.z;
 
     // Columna Y (Up):
     M.m[4] = -up.x;
