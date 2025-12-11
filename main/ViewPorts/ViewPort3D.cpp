@@ -98,6 +98,7 @@ void Viewport3D::RotateOrbit() {
 }
 
 void Viewport3D::Pan(){
+    ShiftCount = 100;
     const float speed = orbitDistance * 0.002f;
 
     // mover en el plano de la cámara
@@ -962,6 +963,7 @@ void Viewport3D::event_key_down(SDL_Event &e){
     if (e.key.repeat == 0) { 
         switch (key) {
             case SDLK_LSHIFT:
+                ShiftCount = 0;
                 LShiftPressed = true;
                 break;
             case SDLK_LALT:
@@ -1139,7 +1141,6 @@ void Viewport3D::event_key_up(SDL_Event &e){
             if (ShiftCount < 20){
                 changeSelect(SelectMode::NextSingle);
             }
-            ShiftCount = 0;
             LShiftPressed = false;
             break;
         case SDLK_LALT:
