@@ -49,6 +49,9 @@ ObjectType Camera::getType() {
 void Camera::RenderObject() {
     if (!showOverlayGlobal || ViewFromCameraActiveGlobal) return;
 
+    glPushMatrix();    
+    glRotatef(90.0f, 0, 1, 0); 
+
     if (ObjActivo == this && select){
         glColor4f(ListaColores[static_cast<int>(ColorID::accent)][0],
                   ListaColores[static_cast<int>(ColorID::accent)][1],
@@ -85,6 +88,7 @@ void Camera::RenderObject() {
         glDisable(GL_CULL_FACE);	
         glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_SHORT, CameraFaceActive);	
     }
+    glPopMatrix();
 }
 
 Camera::~Camera() {

@@ -38,6 +38,9 @@ void Viewport3D::UpdateViewOrbit() {
         Quaternion camRotInv = CameraActive->rot.Inverted();
         Matrix4 R = camRotInv.ToMatrix();
 
+        ::viewPosGlobal = CameraActive->pos;
+        ::rotGlobal = CameraActive->rot;
+
         Matrix4 T;
         T.Identity();
         T.m[12] = -CameraActive->pos.x;
@@ -47,6 +50,9 @@ void Viewport3D::UpdateViewOrbit() {
         view = R * T;
     } 
     else {
+        ::viewPosGlobal = viewPos;
+        ::rotGlobal = viewRot;
+
         // La View Matrix es la inversa de la Transformación de Cámara.
         // Para rotación pura, la inversa es el conjugado.
         Quaternion viewRotInverse = viewRot.Inverted(); 
@@ -178,8 +184,6 @@ void Viewport3D::ReloadLights() {
     ::view = view;
     ::showOverlayGlobal = showOverlays;
     ::ViewFromCameraActiveGlobal = ViewFromCameraActive;
-    ::rotGlobal = viewRot;
-    ::viewPosGlobal = viewPos;
     Viewport3DActive = this;
     
     for(size_t l = 0; l < Lights.size(); l++) {
@@ -317,7 +321,6 @@ void Viewport3D::Render() {
 
         glDisable(GL_CULL_FACE);
         glDisable(GL_LIGHTING);
-        glEnable(GL_COLOR_MATERIAL);
         glDisable(GL_BLEND);
 
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -327,9 +330,12 @@ void Viewport3D::Render() {
         glEnable(GL_DEPTH_TEST);
         glDisable(GL_TEXTURE_2D);
 
-        glDisableClientState(GL_COLOR_ARRAY);
         glDisableClientState(GL_TEXTURE_COORD_ARRAY);
         glDisableClientState(GL_NORMAL_ARRAY);
+
+        glDisable(GL_COLOR_MATERIAL);
+        glDisableClientState(GL_COLOR_ARRAY);
+        glDepthMask(GL_TRUE);
 
         if (showFloor || showXaxis || showYaxis) RenderFloor();
     }
