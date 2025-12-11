@@ -450,7 +450,6 @@ int main(int argc, char* argv[]) {
     }
                       
     SDL_GetWindowSize(window, &winW, &winH);
-    //SDL_GL_GetDrawableSize(window, &w, &h);
 
     glContext = SDL_GL_CreateContext(window);
     if (!glContext) {

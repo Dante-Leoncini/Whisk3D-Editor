@@ -338,7 +338,9 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
     }    
 
     if(n->type=="Camera"){
-        return new Camera(parent, Vector3(0,0,0), Vector3(0, 0, 0));
+        Camera* camera = new Camera(parent, Vector3(0,0,0), Vector3(0, 0, 0));
+        if(p.count("target")) camera->SetTarget(p.at("target"));
+        return camera;
     }
 
     if(n->type=="Light"){

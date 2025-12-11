@@ -33,7 +33,10 @@ void Viewport3D::Zoom(float delta){
 void Viewport3D::UpdateViewOrbit() {
     Matrix4 view;
 
+    if (CameraActive) CameraActive->UpdateLookAt();
+
     if(ViewFromCameraActive && CameraActive) {
+
         // Tomar la rotación y posición de la cámara
         Quaternion camRotInv = CameraActive->rot.Inverted();
         Matrix4 R = camRotInv.ToMatrix();

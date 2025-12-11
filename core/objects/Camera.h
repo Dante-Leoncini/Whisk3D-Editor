@@ -8,6 +8,7 @@
 #include "variables.h"
 #include "UI/icons.h"
 #include "UI/colores.h"
+#include "Target.h"
 #include "Objects.h"
 #include <GL/gl.h>
 
@@ -19,17 +20,24 @@ extern GLfloat CameraVertices[CameraVertexSize];
 extern const GLushort CameraFaceActive[3];
 extern const GLushort CameraEdges[CameraEdgesSize];
 
-extern Object* CameraActive;
+// Forward declarations
+class Camera;
 
-class Camera : public Object {
-public:
-    Camera(Object* parent = nullptr, Vector3 pos = Vector3(0,0,0), Vector3 Rot = Vector3(0,0,0));
+extern Camera* CameraActive;
 
-    ObjectType getType() override;
+class Camera : public Object, public Target {
+    public:
+        Camera(Object* parent = nullptr, Vector3 pos = Vector3(0,0,0), Vector3 Rot = Vector3(0,0,0));
 
-    void RenderObject() override;
+        ObjectType getType() override;
 
-    ~Camera();
+        void Reload() override;
+        
+        void UpdateLookAt();
+
+        void RenderObject() override;
+
+        ~Camera();
 };
 
 #endif

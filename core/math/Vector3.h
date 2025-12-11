@@ -47,8 +47,12 @@ class Vector3 {
             return x*v.x + y*v.y + z*v.z;
         }
 
+        float LengthSq() const {
+            return x*x + y*y + z*z; // El cuadrado de la longitud
+        }
+
         float Length() const {
-            return std::sqrt(x*x + y*y + z*z);
+            return std::sqrt(LengthSq()); // Usar LengthSq aquí también
         }
 
         static Vector3 Cross(const Vector3& a, const Vector3& b) {

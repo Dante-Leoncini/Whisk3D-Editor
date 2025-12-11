@@ -66,6 +66,12 @@ struct Quaternion {
         }
     }
 
+    Quaternion Normalized() const {
+        Quaternion q = *this;
+        q.normalize();
+        return q;
+    }
+
     Matrix4 ToMatrix() const;
 
     void ToMatrix(float m[16]) const {
@@ -91,6 +97,8 @@ struct Quaternion {
         m[12] = m[13] = m[14] = 0;
         m[15] = 1;
     }
+
+    static Quaternion FromMatrix(const Matrix4& m);
 };
 
 // out = A * B  (column-major, como espera glMultMatrixf)

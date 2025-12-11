@@ -28,7 +28,7 @@ const GLushort CameraEdges[CameraEdgesSize] = {
     7, 5,
 };
 
-Object* CameraActive = nullptr;
+Camera* CameraActive = nullptr;
 
 // ------------------- MÉTODOS -------------------
 
@@ -46,11 +46,62 @@ ObjectType Camera::getType() {
     return ObjectType::camera;
 }
 
+void Camera::Reload() {
+    ReloadTarget(this);
+}
+
+#include <cmath> // Necesario para std::abs() y std::sqrt() si no está en Vector3.h
+
+void Camera::UpdateLookAt() {
+    if (!target) return;
+
+    // 1. Calcular el vector de dirección (Pos -> Target)
+    Vector3 toTarget = (target->pos - pos);
+    // Asumimos que aquí manejas la distancia mínima (Dot/LengthSq)
+    // if (toTarget.Dot(toTarget) < 0.000001f) return;
+    
+    Vector3 forward = toTarget.Normalized(); 
+
+    Vector3 worldUp(0, 1, 0); 
+    
+    // --- Anti-Roll/Gimbal Lock Check ---
+    // Si forward es vertical, usamos un worldUp alternativo (prevención de roll)
+    if (std::abs(forward.Dot(worldUp)) > 0.999f) { 
+        worldUp = Vector3(0, 0, 1);
+    }
+
+    // 2. Eje Right (X local)
+    // Cross(forward, worldUp) para asegurar Yaw y ortogonalidad
+    Vector3 right = Vector3::Cross(forward, worldUp).Normalized();
+
+    // 3. Eje Up (Y local)
+    // Cross(right, forward) para asegurar Pitch y ortogonalidad
+    Vector3 up = Vector3::Cross(right, forward).Normalized();
+    
+    // -----------------------------------------------------
+    // 4. ENSAMBLAJE DE LA MATRIZ FINAL (Corrección de Inversiones)
+    // -----------------------------------------------------
+    Matrix4 M;
+    M.Identity();
+
+    // Columna X (Right): Lo invertimos para corregir la Inversión Horizontal (Yaw)
+    M.m[0]  = -right.x;   M.m[1]  = -right.y;   M.m[2]  = -right.z;
+    
+    // Columna Y (Up): Lo invertimos para corregir la Inversión Vertical (Pitch)
+    M.m[4]  = -up.x;      M.m[5]  = -up.y;      M.m[6]  = -up.z;
+    
+    // Columna Z (Forward): Mantenemos la inversión que ya funcionaba bien (la que mira a -Z)
+    M.m[8]  = -forward.x; M.m[9]  = -forward.y; M.m[10] = -forward.z;
+
+    // Convertir matriz → quaternion
+    rot = Quaternion::FromMatrix(M);
+}
+
 void Camera::RenderObject() {
     if (!showOverlayGlobal || ViewFromCameraActiveGlobal) return;
 
     glPushMatrix();    
-    glRotatef(90.0f, 0, 1, 0); 
+    glRotatef(90.0f, 0, 1, 0);
 
     if (ObjActivo == this && select){
         glColor4f(ListaColores[static_cast<int>(ColorID::accent)][0],
