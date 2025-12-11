@@ -411,6 +411,9 @@ bool LeerMTL(const std::string& filepath, int objetosCargados) {
             else if (prefix == "BackfaceCullingOff") {
                 mat->culling = false;
             }
+            else if (prefix == "DepthMaskOff") {
+                mat->depthMask = false;
+            }
             else if (prefix == "NoLight") {
                 mat->lighting = false;
             }
@@ -421,7 +424,7 @@ bool LeerMTL(const std::string& filepath, int objetosCargados) {
             else if (prefix == "PIXELATED") {
                 mat->interpolacion = closest;
             }
-            else if (prefix == "map_d") {
+            else if (prefix == "map_d" || prefix == "alpha") {
                 mat->transparent = true;
             }
         }

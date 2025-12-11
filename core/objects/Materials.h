@@ -30,6 +30,7 @@ class Material {
         bool repeat = true;
         bool uv8bit = false;
         bool culling = true;
+        bool depthMask = true;
         int interpolacion = 0;
         Texture* texture = nullptr;
         GLfloat diffuse[4]  = {1.0f, 1.0f, 1.0f, 1.0f};

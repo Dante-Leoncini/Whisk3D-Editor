@@ -31,20 +31,37 @@ void Viewport3D::Zoom(float delta){
 }
 
 void Viewport3D::UpdateViewOrbit() {
-    // La View Matrix es la inversa de la Transformación de Cámara.
-    // Para rotación pura, la inversa es el conjugado.
-    Quaternion viewRotInverse = viewRot.Inverted(); 
-    Matrix4 R = viewRotInverse.ToMatrix();
+    Matrix4 view;
 
-    Matrix4 T;
-    T.Identity();
-    // Movemos el mundo en dirección opuesta a la cámara
-    T.m[12] = -viewPos.x;
-    T.m[13] = -viewPos.y;
-    T.m[14] = -viewPos.z;
+    if(ViewFromCameraActive && CameraActive) {
+        // Tomar la rotación y posición de la cámara
+        Quaternion camRotInv = CameraActive->rot.Inverted();
+        Matrix4 R = camRotInv.ToMatrix();
 
-    // Orden estándar ViewMatrix: Rotacion * Traslacion
-    Matrix4 view = R * T;
+        Matrix4 T;
+        T.Identity();
+        T.m[12] = -CameraActive->pos.x;
+        T.m[13] = -CameraActive->pos.y;
+        T.m[14] = -CameraActive->pos.z;
+
+        view = R * T;
+    } 
+    else {
+        // La View Matrix es la inversa de la Transformación de Cámara.
+        // Para rotación pura, la inversa es el conjugado.
+        Quaternion viewRotInverse = viewRot.Inverted(); 
+        Matrix4 R = viewRotInverse.ToMatrix();
+
+        Matrix4 T;
+        T.Identity();
+        // Movemos el mundo en dirección opuesta a la cámara
+        T.m[12] = -viewPos.x;
+        T.m[13] = -viewPos.y;
+        T.m[14] = -viewPos.z;
+
+        // Orden estándar ViewMatrix: Rotacion * Traslacion
+        view = R * T;
+    }
 
     glLoadMatrixf(view.m);
 }
