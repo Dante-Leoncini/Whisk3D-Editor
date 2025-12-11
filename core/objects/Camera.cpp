@@ -49,9 +49,6 @@ ObjectType Camera::getType() {
 void Camera::RenderObject() {
     if (!showOverlayGlobal || ViewFromCameraActiveGlobal) return;
 
-    glPushMatrix();
-    //glScalef(scale.x, scale.z, scale.y);
-
     if (ObjActivo == this && select){
         glColor4f(ListaColores[static_cast<int>(ColorID::accent)][0],
                   ListaColores[static_cast<int>(ColorID::accent)][1],
@@ -77,6 +74,9 @@ void Camera::RenderObject() {
     glDisable(GL_LIGHTING);
     glLineWidth(1);
     glDisableClientState(GL_NORMAL_ARRAY);
+    glDisable(GL_COLOR_MATERIAL);
+    glDisableClientState(GL_COLOR_ARRAY);
+    glDepthMask(GL_TRUE);
 
     glVertexPointer(3, GL_FLOAT, 0, CameraVertices);
     glDrawElements(GL_LINES, CameraEdgesSize, GL_UNSIGNED_SHORT, CameraEdges);
@@ -85,8 +85,6 @@ void Camera::RenderObject() {
         glDisable(GL_CULL_FACE);	
         glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_SHORT, CameraFaceActive);	
     }
-
-    glPopMatrix();
 }
 
 Camera::~Camera() {
