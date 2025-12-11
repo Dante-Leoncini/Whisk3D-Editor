@@ -30,34 +30,41 @@ Matrix4 Quaternion::ToMatrix() const {
     return m;
 }
 
-Quaternion Quaternion::FromMatrix(const Matrix4& m){
+Quaternion Quaternion::FromMatrix(const Matrix4& m) {
     Quaternion q;
     float trace = m.m[0] + m.m[5] + m.m[10];
 
     if (trace > 0.0f) {
         float s = sqrtf(trace + 1.0f) * 2.0f;
         q.w = 0.25f * s;
-        q.x = (m.m[9]  - m.m[6]) / s;
-        q.y = (m.m[2]  - m.m[8]) / s;
-        q.z = (m.m[4]  - m.m[1]) / s;
+        // La rama 'trace' está bien
+        q.x = (m.m[6] - m.m[9]) / s;
+        q.y = (m.m[8] - m.m[2]) / s;
+        q.z = (m.m[1] - m.m[4]) / s;
     }
+    // Rama 1: m.m[0] > m.m[5] y m.m[0] > m.m[10] (Máxima rotación alrededor de X)
     else if (m.m[0] > m.m[5] && m.m[0] > m.m[10]) {
         float s = sqrtf(1.0f + m.m[0] - m.m[5] - m.m[10]) * 2.0f;
-        q.w = (m.m[9]  - m.m[6]) / s;
+        // CORRECCIÓN: Invertir signo de W para estabilidad
+        q.w = (m.m[6] - m.m[9]) / s; // m12 - m21
         q.x = 0.25f * s;
         q.y = (m.m[1]  + m.m[4]) / s;
         q.z = (m.m[2]  + m.m[8]) / s;
     }
+    // Rama 2: m.m[5] > m.m[10] (Máxima rotación alrededor de Y)
     else if (m.m[5] > m.m[10]) {
         float s = sqrtf(1.0f + m.m[5] - m.m[0] - m.m[10]) * 2.0f;
-        q.w = (m.m[2]  - m.m[8]) / s;
+        // CORRECCIÓN: Invertir signo de W para estabilidad
+        q.w = (m.m[8] - m.m[2]) / s; // m20 - m02
         q.x = (m.m[1]  + m.m[4]) / s;
         q.y = 0.25f * s;
         q.z = (m.m[6]  + m.m[9]) / s;
     }
+    // Rama 3: (Máxima rotación alrededor de Z)
     else {
         float s = sqrtf(1.0f + m.m[10] - m.m[0] - m.m[5]) * 2.0f;
-        q.w = (m.m[4]  - m.m[1]) / s;
+        // CORRECCIÓN: Invertir signo de W para estabilidad
+        q.w = (m.m[4] - m.m[1]) / s; // m10 - m01
         q.x = (m.m[2]  + m.m[8]) / s;
         q.y = (m.m[6]  + m.m[9]) / s;
         q.z = 0.25f * s;

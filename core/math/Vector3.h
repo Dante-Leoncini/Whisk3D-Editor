@@ -37,6 +37,11 @@ class Vector3 {
             return *this;
         }
 
+        // Operador unario - (invierte el vector)
+        Vector3 operator-() const {
+            return Vector3(-x, -y, -z);
+        }
+
         // Normalizar
         Vector3 Normalized() const {
             float len = Length();
