@@ -1,60 +1,54 @@
 Whisk3D {
     Escena {
-        Collection {
-            name: "Collection"
+        Mesh {
+            name: "Cube01"
             x: 0.0
             y: 0.0
             z: 0.0
+            scale: 1.0
             Mesh {
-                name: "Cube01"
-                x: 0.0
+                name: "Cube02"
+                x: 3.0
                 y: 0.0
-                z: 0.0
+                z: 3.0
                 scale: 1.0
                 Mesh {
-                    name: "Cube02"
+                    name: "Cube03"
                     x: 3.0
                     y: 0.0
                     z: 3.0
                     scale: 1.0
                     Mesh {
-                        name: "Cube03"
+                        name: "Cube04"
                         x: 3.0
                         y: 0.0
                         z: 3.0
                         scale: 1.0
-                        Mesh {
-                            name: "Cube04"
-                            x: 3.0
-                            y: 0.0
-                            z: 3.0
-                            scale: 1.0
-                        }  
                     }  
                 }  
+            }  
+            Mesh {
+                name: "Cube5"
+                x: -3.0
+                y: 0.0
+                z: 3.0
+                scale: 1.0
                 Mesh {
-                    name: "Cube5"
+                    name: "Cube6"
                     x: -3.0
                     y: 0.0
                     z: 3.0
                     scale: 1.0
                     Mesh {
-                        name: "Cube6"
+                        name: "Cube7"
                         x: -3.0
                         y: 0.0
                         z: 3.0
                         scale: 1.0
-                        Mesh {
-                            name: "Cube7"
-                            x: -3.0
-                            y: 0.0
-                            z: 3.0
-                            scale: 1.0
-                        }  
                     }  
                 }  
             }  
-        }
+        }  
     }
 
     Layout {

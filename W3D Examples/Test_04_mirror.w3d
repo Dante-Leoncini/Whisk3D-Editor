@@ -5,16 +5,6 @@ Whisk3D {
         limpiarPantalla: true
         background: "0.2, 0.2, 0.2, 1.0"
 
-        Camera {
-            name: "Camera"
-            x: -3.0
-            y: 2.5
-            z: 1.8
-            rx: 0
-            ry: -35
-            rz: 45
-        }
-
         Collection {
             name: "Collection"
             x: 0.0
