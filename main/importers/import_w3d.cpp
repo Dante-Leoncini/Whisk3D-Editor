@@ -410,6 +410,17 @@ void BuildScene(Node* root){
         scene->limpiarPantalla = (v == "true" || v == "1");
     }
 
+    if(root->props.count("fullscreen")){
+        std::string v = root->props.at("fullscreen");
+        cfg.fullscreen = (v == "true" || v == "1");
+        SetFullScreen(cfg.fullscreen);
+    }
+
+    if(root->props.count("Antialiasing")){
+        std::string v = root->props.at("Antialiasing");
+        cfg.enableAntialiasing = (v == "true" || v == "1");
+    }
+
     if(root->props.count("background")){
         std::string bg = Unquote(root->props.at("background")); // <- quita comillas si las hay
         std::replace(bg.begin(), bg.end(), ',', ' '); // reemplaza comas por espacios

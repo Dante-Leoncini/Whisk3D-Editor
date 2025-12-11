@@ -10,6 +10,16 @@ void Contadores(){
     }
 }
 
+void SetFullScreen(bool value){
+    cfg.fullscreen = value;
+    if (value) {
+        SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP);
+    } 
+    else {
+        SDL_SetWindowFullscreen(window, 0);
+    }
+}
+
 void InputUsuarioSDL3(SDL_Event &e){
     RefreshInputControllerSDL(e);
 
@@ -113,6 +123,11 @@ void InputUsuarioSDL3(SDL_Event &e){
 
     // eventos del teclado
     if (e.type == SDL_EVENT_KEY_DOWN) {
+
+        // entrar o salir de la pantalla completa F11
+        if (e.key.keysym.sym == SDLK_F11) {
+            SetFullScreen(!cfg.fullscreen);
+        }
         viewPortActive->event_key_down(e);
     }   
     else if (e.type == SDL_EVENT_KEY_UP) {

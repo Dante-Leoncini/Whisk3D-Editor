@@ -17,6 +17,7 @@ extern std::map<SDL_FingerID, Finger> fingers;
 extern float lastDistance;
 extern float PINCHposY;
 
+void SetFullScreen(bool value);
 void InputUsuarioSDL3(SDL_Event &e);
 
 // Funciones de control
