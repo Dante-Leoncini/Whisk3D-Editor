@@ -17,6 +17,7 @@
 
 #include "objects/Objects.h"
 #include "objects/Mirror.h"
+#include "objects/Curve.h"
 #include "objects/Collection.h"
 #include "objects/Constraint.h"
 #include "controles.h"

@@ -338,6 +338,7 @@ Object* FindObjectByName(Object* node, const std::string& name){
 #include "Instance.h"
 #include "Mirror.h"
 #include "Gamepad.h"
+#include "Curve.h"
 
 bool DetectLoop(Object* node,
                 std::unordered_set<Object*>& visited,

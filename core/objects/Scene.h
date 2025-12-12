@@ -18,12 +18,10 @@ extern Scene* scene;
 
 class Scene : public Object {
 public:
-    bool limpiarPantalla;
     GLfloat backgroundColor[4];
 
     Scene(Vector3 pos = Vector3(0,0,0));  // constructor
 
-    void SetLimpiarPantalla();
     void SetBackground(GLfloat R, GLfloat G, GLfloat B, GLfloat A);
 
     ObjectType getType() override;

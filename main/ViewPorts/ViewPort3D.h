@@ -46,6 +46,7 @@ class Viewport3D : public ViewportBase, public WithBorder {
         bool showOrigins = true;
         bool show3DCursor = true;
         bool ShowRelantionshipsLines = true;
+        bool limpiarPantalla = true;
         RenderType view = RenderType::MaterialPreview;
 
         GLfloat nearClip = 0.01f;
@@ -102,6 +103,7 @@ class Viewport3D : public ViewportBase, public WithBorder {
         void event_key_down(SDL_Event &e) override;
         void event_key_up(SDL_Event &e) override; 
         void key_down_return();
+        void SetLimpiarPantalla(bool value);
 };
 
 #endif

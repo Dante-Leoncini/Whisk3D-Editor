@@ -15,7 +15,7 @@ Mesh::Mesh(Object* parent, Vector3 pos)
 // Destructor
 // ===================================================
 Mesh::~Mesh() {
-    //LiberarMemoria(); // opcional, depende de cómo se gestione la memoria
+    //LiberarMemoria();
     delete name;
 }
 

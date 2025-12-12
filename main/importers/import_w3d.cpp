@@ -137,6 +137,7 @@ void ApplyViewport3DProps(Viewport3D* v, const std::map<std::string,std::string>
     if(p.count("showOrigins"))            v->showOrigins = B("showOrigins");
     if(p.count("show3DCursor"))           v->show3DCursor = B("show3DCursor");
     if(p.count("ShowRelantionshipsLines"))v->ShowRelantionshipsLines = B("ShowRelantionshipsLines");
+    if(p.count("limpiarPantalla"))        v->limpiarPantalla = B("limpiarPantalla");
 
     /// --- floats/doubles ---
     if(p.count("nearClip"))       v->nearClip       = F("nearClip", 0.01f);
@@ -322,6 +323,11 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
         return gamepad;
     }
 
+    if (n->type=="Curve"){
+        Curve* curve = new Curve(parent);
+        return curve;        
+    }
+
     if (n->type=="Constraint"){
         bool useHorizontal = GetBoolOrDefault(p, "useHorizontal", true);
         bool usePitch      = GetBoolOrDefault(p, "usePitch", true);
@@ -404,12 +410,6 @@ void BuildScene(Node* root){
         SDL_Surface* icon = IMG_Load("Whisk3D.png");
         SDL_SetWindowIcon(window, icon);
         SDL_FreeSurface(icon);
-    }
-
-    // --- Propiedades de escena ---
-    if(root->props.count("limpiarPantalla")){
-        std::string v = root->props.at("limpiarPantalla");
-        scene->limpiarPantalla = (v == "true" || v == "1");
     }
 
     if(root->props.count("fullscreen")){

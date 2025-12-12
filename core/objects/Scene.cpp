@@ -5,7 +5,7 @@ Scene* scene = nullptr;
 
 // Constructor
 Scene::Scene(Vector3 pos)
-    : Object(nullptr, "Scene Collection", pos), limpiarPantalla(true) 
+    : Object(nullptr, "Scene Collection", pos)
 {
     // Color por defecto negro transparente
     backgroundColor[0] = 0.0f;
@@ -15,11 +15,6 @@ Scene::Scene(Vector3 pos)
 
     IconType = static_cast<size_t>(IconType::archive);
     scene = this;
-}
-
-// Métodos
-void Scene::SetLimpiarPantalla() {
-    limpiarPantalla = !limpiarPantalla;
 }
 
 void Scene::SetBackground(GLfloat R, GLfloat G, GLfloat B, GLfloat A) {

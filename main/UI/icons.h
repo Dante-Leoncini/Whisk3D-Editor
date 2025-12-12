@@ -17,7 +17,7 @@ extern GLshort IconLineMesh[8];
 extern int IconSize;
 extern int IconSizeGS;
 
-constexpr size_t ICON_TOTAL = 14;
+constexpr size_t ICON_TOTAL = 15;
 
 enum class IconType {
     camera,
@@ -33,7 +33,8 @@ enum class IconType {
     array,
     gamepad,
     instance,
-    constraint
+    constraint,
+    curve
 };
 
 struct IconRect {

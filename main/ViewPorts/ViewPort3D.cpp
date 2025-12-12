@@ -7,6 +7,10 @@ Viewport3D::Viewport3D(Vector3 pos){
 
 Viewport3D::~Viewport3D() {};
 
+void Viewport3D::SetLimpiarPantalla(bool value) {
+    limpiarPantalla = value;
+}
+
 void Viewport3D::event_mouse_wheel(SDL_Event &e) {
     if (!ViewFromCameraActive) {
         Zoom(e.wheel.y* 2.0f); //podria multiplciarse por un valor por sensibilidad  * 1.0f
@@ -279,7 +283,7 @@ void Viewport3D::Render() {
                      ListaColores[static_cast<int>(ColorID::background)][2], ListaColores[static_cast<int>(ColorID::background)][3]);
     }
 
-    if (scene->limpiarPantalla) {
+    if (limpiarPantalla) {
         if (view == RenderType::ZBuffer) {
             glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         } else if (view == RenderType::Rendered) {
@@ -1000,7 +1004,7 @@ void Viewport3D::event_key_down(SDL_Event &e){
                 break;
             }
             case SDLK_U:
-                scene->SetLimpiarPantalla();
+                SetLimpiarPantalla(!limpiarPantalla);
                 break;
             case SDLK_J:
                 ChangeViewType();

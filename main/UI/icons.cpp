@@ -34,6 +34,7 @@ void CrearIconos(int texW, int texH){
         { 37, 93, 10, 10 },  // gamepad
         { 49, 93, 10, 10 }, // instance
         { 61, 93, 10, 10 }, //constraint
+        { 73, 93, 10, 10 } //curve
     };
 
     // limpia por si se llama más de una vez
