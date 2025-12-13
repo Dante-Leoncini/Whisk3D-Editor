@@ -100,8 +100,8 @@ void Mesh::RenderObject() {
             if (mat->culling) glEnable(GL_CULL_FACE);
             else glDisable(GL_CULL_FACE);
 
-            if (mat->depthMask) glDepthMask(GL_TRUE);
-            else glDepthMask(GL_FALSE);  
+            if (mat->depth_test) glEnable(GL_DEPTH_TEST);
+            else glDisable(GL_DEPTH_TEST);  
 
             if (mat->lighting) {
                 glEnableClientState(GL_NORMAL_ARRAY);

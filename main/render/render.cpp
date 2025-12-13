@@ -23,7 +23,7 @@ void RenderLinkLines(Object* obj){
 
     for (size_t c = 0; c < obj->Childrens.size(); c++) {
         Object* objChild = obj->Childrens[c];
-        if (!objChild->visible) continue;
+        if (!objChild->visible || !objChild->showRelantionshipsLines ) continue;
         if (obj->getType()!= ObjectType::collection && obj->getType() != ObjectType::baseObject){
             LineaLinkChild[3] = objChild->pos.x;
             LineaLinkChild[4] = objChild->pos.z;

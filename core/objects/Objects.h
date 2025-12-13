@@ -45,6 +45,7 @@ class Object {
         std::vector<Object*> Childrens;
         bool visible = true;
         bool desplegado = true;
+        bool showRelantionshipsLines = true;
         bool select = true;
         Text* name = nullptr;
         size_t IconType = 0;

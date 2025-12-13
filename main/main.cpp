@@ -479,6 +479,13 @@ int main(int argc, char* argv[]) {
         controller = SDL_GameControllerOpen(0);
         if (controller)
             std::cout << "Control detectado: " << SDL_GameControllerName(controller) << std::endl;
+
+        /*
+        esto solo anda en versiones nuevas del SDL2 gamepad = SDL_OpenGamepad(0);
+        if (gamepad) {
+            // luz verde del mando de ps4
+            SDL_GamepadSetLED(gamepad, 255, 0, 0);
+        }*/
     }
 
     SDL_Event e;

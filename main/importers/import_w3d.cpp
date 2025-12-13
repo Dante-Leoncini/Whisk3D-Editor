@@ -45,6 +45,22 @@ std::string Unquote(const std::string& s){
     return s;
 }
 
+std::string GetFilePath(const std::string& raw){
+    // 1. Sacar comillas si hay
+    std::string filename = Unquote(raw);
+
+    // 2. Obtener base dir del archivo .w3d
+    std::string baseDir;
+    size_t pos = w3dPath.find_last_of("/\\");
+    if (pos != std::string::npos)
+        baseDir = w3dPath.substr(0, pos + 1);
+    else
+        baseDir = "";
+
+    // 3. Unir rutas
+    return baseDir + filename;
+}
+
 // ============================================
 // Tokenizer
 // ============================================
@@ -117,12 +133,12 @@ Node* ParseNode(std::vector<std::string>& tk, size_t& i){
 void ApplyViewport3DProps(Viewport3D* v, const std::map<std::string,std::string>& p){
     if(!v) return;
 
-    auto B = [&](const std::string& k, bool def=false){
-        return p.count(k) ? (p.at(k)=="true" || p.at(k)=="1") : def;
-    };
-
     auto F = [&](const std::string& k, float def=0.0f){
         return p.count(k) ? std::stof(p.at(k)) : def;
+    };
+
+    auto B = [&](const std::string& k, bool def=false){
+        return p.count(k) ? (p.at(k)=="true" || p.at(k)=="1") : def;
     };
 
     /// --- bools ---
@@ -221,6 +237,11 @@ ViewportBase* BuildLayout(Node* n){
 
 void ApplyCommonProps(Object* obj, const std::map<std::string,std::string>& p){
     if(!obj) return;
+
+    auto B = [&](const std::string& k, bool def=false){
+        return p.count(k) ? (p.at(k)=="true" || p.at(k)=="1") : def;
+    };
+
     // Nombre
     if(p.count("name")){
 		// Si ya existe el Text*, reemplazamos el nombre
@@ -240,6 +261,10 @@ void ApplyCommonProps(Object* obj, const std::map<std::string,std::string>& p){
         Quaternion qZ = Quaternion::FromAxisAngle(Vector3(0, 0, 1), GetFloatOrDefault(p,"ry", 0)); // Roll (Eje Z)
         obj->rot = qY * qX * qZ; // Aplicación: (Z) * (X) * (Y)
     }
+
+    
+    if(p.count("desplegado")) obj->desplegado = B("desplegado");
+    if(p.count("showRelantionshipsLines")) obj->showRelantionshipsLines = B("showRelantionshipsLines");    
 
     // Escala
     if(p.count("scale")){
@@ -271,30 +296,14 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
 
         // Si el archivo viene con comillas --> Unquote
         if(n->props.count("filePath"))
-            path = Unquote(n->props.at("filePath"));
+            path = GetFilePath(n->props.at("filePath"));
         else {
             std::cerr << "[Wavefront] Falta filePath\n";
             return nullptr;
         }
 
-        // --- convertir path a ruta absoluta basada en el .w3d ---
-        std::string baseDir;
-        size_t pos = w3dPath.find_last_of("/\\");
-        if(pos != std::string::npos) baseDir = w3dPath.substr(0, pos+1);
-        else baseDir = "";
-
-        path = baseDir + path;
-
-        //std::cout << "w3dPath: " << w3dPath << " basedir: " << baseDir <<"\n";
-
-        std::cout << "[WOBJ] Path resuelto: " << path << "\n";
-
         // --- IMPORTACIÓN ---
         Mesh* mesh = ImportWOBJ(path, parent);
-
-        /*std::cout << "materialsGroup: " << mesh->materialsGroup.size() << std::endl;
-        std::cout << "vertexSize: " << mesh->vertexSize << std::endl;
-        std::cout << "facesSize: " << mesh->facesSize << std::endl;*/
 
         if (!mesh){
             std::cerr << "[Wobj] Se importo mal el wobj!\n";
@@ -324,8 +333,21 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
     }
 
     if (n->type=="Curve"){
+        std::string path;
+
+        // Si el archivo viene con comillas --> Unquote
+        if(n->props.count("filePath"))
+            path = GetFilePath(n->props.at("filePath"));
+        else {
+            std::cerr << "[Curve] Falta filePath\n";
+            return nullptr;
+        }
+
         Curve* curve = new Curve(parent);
-        return curve;        
+        if (curve->LoadFromFile(path)){
+            return curve;     
+        }
+        return nullptr;        
     }
 
     if (n->type=="Constraint"){
@@ -346,6 +368,8 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
     if(n->type=="Camera"){
         Camera* camera = new Camera(parent, Vector3(0,0,0), Vector3(0, 0, 0));
         if(p.count("target")) camera->SetTarget(p.at("target"));
+        if(p.count("riel")) camera->SetRiel(p.at("riel"));
+        if(p.count("offsetRiel")) camera->offsetRiel = GetIntOrDefault(p, "offsetRiel", 0);
         return camera;
     }
 

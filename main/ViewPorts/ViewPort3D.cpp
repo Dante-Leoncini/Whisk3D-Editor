@@ -37,7 +37,10 @@ void Viewport3D::Zoom(float delta){
 void Viewport3D::UpdateViewOrbit() {
     Matrix4 view;
 
-    if (CameraActive) CameraActive->UpdateLookAt();
+    if (CameraActive){
+        CameraActive->UpdatePosition();
+        CameraActive->UpdateLookAt();
+    }
 
     if(ViewFromCameraActive && CameraActive) {
 

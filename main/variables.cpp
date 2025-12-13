@@ -2,6 +2,7 @@
 
 SDL_Window* window = nullptr;
 SDL_GameController* controller = nullptr;
+//SDL_Gamepad* gamepad = nullptr;
 SDL_GLContext glContext = nullptr;
 
 int winW = 640;
