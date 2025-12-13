@@ -1,6 +1,60 @@
 #include "Quaternion.h"
 #include "Matrix4.h"
 
+Quaternion Quaternion::Slerp(
+    const Quaternion& a,
+    const Quaternion& b,
+    float t
+) {
+    // Clamp
+    if (t <= 0.0f) return a;
+    if (t >= 1.0f) return b;
+
+    // Producto punto
+    float dot = a.x*b.x + a.y*b.y + a.z*b.z + a.w*b.w;
+
+    Quaternion end = b;
+
+    // Si el dot es negativo, invertimos uno para tomar
+    // el camino corto (MUY IMPORTANTE)
+    if (dot < 0.0f) {
+        dot = -dot;
+        end.x = -end.x;
+        end.y = -end.y;
+        end.z = -end.z;
+        end.w = -end.w;
+    }
+
+    // Si están muy cerca, usar LERP normal (más barato)
+    const float DOT_THRESHOLD = 0.9995f;
+    if (dot > DOT_THRESHOLD) {
+        Quaternion result;
+        result.x = a.x + t * (end.x - a.x);
+        result.y = a.y + t * (end.y - a.y);
+        result.z = a.z + t * (end.z - a.z);
+        result.w = a.w + t * (end.w - a.w);
+        return result.Normalized();
+    }
+
+    // SLERP real
+    float theta0 = acosf(dot);
+    float theta  = theta0 * t;
+
+    float sinTheta  = sinf(theta);
+    float sinTheta0 = sinf(theta0);
+
+    float s0 = cosf(theta) - dot * sinTheta / sinTheta0;
+    float s1 = sinTheta / sinTheta0;
+
+    Quaternion result;
+    result.x = (a.x * s0) + (end.x * s1);
+    result.y = (a.y * s0) + (end.y * s1);
+    result.z = (a.z * s0) + (end.z * s1);
+    result.w = (a.w * s0) + (end.w * s1);
+
+    return result;
+}
+
 Matrix4 Quaternion::ToMatrix() const {
     Matrix4 m;
     m.Identity();

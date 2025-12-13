@@ -132,7 +132,7 @@ void Camera::ReloadRiel(Object* me) {
 
     // 3) Asignar correctamente
     Riel = RielTarget;
-    std::cout << "Riel '"<< RielName <<"'encontrado!\n";
+    std::cout << "Riel '"<< RielName <<"' encontrado!\n";
 }
 
 void Camera::RenderObject() {

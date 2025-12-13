@@ -29,7 +29,7 @@ int abrir() {
 
     if (ruta) {
         std::cout << "Archivo seleccionado: " << ruta << std::endl;
-        ImportOBJ(ruta);
+        ImportOBJ(ruta, false);
     } else {
         std::cout << "No se seleccionó nada." << std::endl;
     }

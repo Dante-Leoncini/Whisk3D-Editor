@@ -37,6 +37,12 @@ struct Quaternion {
         );
     }
 
+    static Quaternion Slerp(
+        const Quaternion& a,
+        const Quaternion& b,
+        float t
+    );
+
     static Quaternion FromEuler(float pitchDeg, float yawDeg, float rollDeg);
 
     Quaternion Inverted() const {

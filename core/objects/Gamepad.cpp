@@ -34,7 +34,19 @@ ObjectType Gamepad::getType() {
 }
 
 void Gamepad::Reload() {
-    ReloadTarget(this);
+    ReloadTarget(this);   // ← acá se resuelve el Mesh*
+
+    Mesh* mesh = dynamic_cast<Mesh*>(target);
+    if (!mesh) return;
+
+    for (auto* anim : animations) {
+        anim->target = mesh;
+
+        if (anim->frames.empty()) {
+            anim->LoadFrames();
+            std::cout << "Anim '"<< anim->name <<"' con " << anim->frames.size() << " frames\n";
+        }
+    }
 }
 
 void Gamepad::RenderObject() {

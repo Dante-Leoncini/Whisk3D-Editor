@@ -57,6 +57,7 @@ public:
 
     void Reset();
     void ConvertToES1(Mesh* TempMesh, int* acumuladoVertices, int* acumuladoNormales, int* acumuladoUVs);
+    void ConvertToES1_NoMerge(Mesh* TempMesh);
 };
 
 // extraer nombre base del filename (sin path ni extensión)
@@ -68,12 +69,13 @@ bool LeerOBJ(std::ifstream& file,
              std::streampos& startPos,
              int* acumuladoVertices,
              int* acumuladoNormales,
-             int* acumuladoUVs);
+             int* acumuladoUVs,
+             bool NoMerge);
 
 // Función para leer archivos MTL y cargar materiales
 bool LeerMTL(const std::string& filepath, int objetosCargados);
 
 // Función principal para importar un OBJ
-bool ImportOBJ(const std::string& filepath);
+bool ImportOBJ(const std::string& filepath, bool NoMerge);
 
 #endif

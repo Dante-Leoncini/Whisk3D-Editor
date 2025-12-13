@@ -1180,25 +1180,27 @@ GLfloat sinY = 0.0f;
 void Gamepad::Update() {
     if (!target || !Viewport3DActive || !CameraActive) return;
 
+    UpdateAnimation();
+
     // --- 1. CONFIGURACIÓN DE VECTORES DE MOVIMIENTO ---
     Vector3 camForward = CameraActive->forwardVector;
     Vector3 camRight   = CameraActive->rightVector;
-    
+
     // Proyectar los vectores al plano XZ (el piso) y normalizar.
     Vector3 Fwd_XZ = Vector3(camForward.x, 0.0f, camForward.z).Normalized();
     Vector3 Rgt_XZ = Vector3(camRight.x, 0.0f, camRight.z).Normalized();
 
     float inputY = axisState[SDL_CONTROLLER_AXIS_LEFTY]; // Adelante/Atrás
     float inputX = axisState[SDL_CONTROLLER_AXIS_LEFTX]; // Lateral/Giro
-    float speed = factor * 3.00f; 
+    float speed = factor * 2.00f; 
 
     // Inversión de ejes para el control intuitivo
     float correctedInputY = -inputY; 
     float correctedInputX = -inputX;
-    
+
     // Umbral para ignorar el ruido del stick
     const float DeadZone = 0.1f;
-    
+
     // --- 2. CALCULAR EL MOVIMIENTO TOTAL ---
     Vector3 TotalMovement(0.0f, 0.0f, 0.0f);
     
@@ -1214,23 +1216,37 @@ void Gamepad::Update() {
     
     // --- 3. APLICAR MOVIMIENTO Y ROTACIÓN ---
     if (TotalMovement.LengthSq() > 0.0001f) {
-        
         // A. Aplicar la traslación (movimiento)
         target->pos += TotalMovement;
 
         // B. CALCULAR LA ROTACIÓN
-        // El vector de dirección hacia el que mira el target es el vector de movimiento.
         Vector3 newForward = TotalMovement.Normalized();
         
-        // Asumo que tienes una función FromDirection que crea un cuaternión LookAt
-        // a partir de un solo vector de dirección.
+        // Crear la rotación hacia el movimiento
         Quaternion targetRotation = Quaternion::FromDirection(newForward, Vector3(0, 1, 0));
-        
-        // C. Aplicar Rotación (opcionalmente suavizada)
-        // Para evitar un giro instantáneo y brusco:
-        // target->rot = Quaternion::Slerp(target->rot, targetRotation, 0.1f); 
-        
-        // Aplicar rotación instantánea (sin Slerp/suavizado):
-        target->rot = targetRotation;
+
+        // C. Aplicar Rotación (suavizada con Slerp)
+        target->rot = Quaternion::Slerp(target->rot, targetRotation, 0.1f); // Suaviza la rotación
+
+        // D. Mezclar animaciones
+        // Si se está moviendo, usar la animación de correr, sino usar la animación idle
+        //VertexAnimation* currentAnim = animations[0];
+        //float blendT = 0.0f;
+
+        //if (TotalMovement.Length() > 0.01f) {
+            // Si se mueve, correr
+            //currentAnim = animations[1];
+            //blendT = std::min(TotalMovement.Length() / speed, 1.0f);  // Calcula el blend en función de la velocidad
+        //}
+
+        // Aplicar la mezcla de vértices entre idle y correr
+        //if (currentAnim) {
+            //int frame = static_cast<int>((blendT * currentAnim->FrameCount()));
+            //ApplyVertexFrame(*currentAnim, frame);
+        //}
+    }
+    else {
+        // Si no hay movimiento, solo se mantiene en la animación idle
+        //ApplyVertexFrame(*animations[0], 0);  // Aplicamos el primer frame de idle (0)
     }
 }

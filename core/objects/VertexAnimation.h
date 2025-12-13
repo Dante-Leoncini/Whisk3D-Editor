@@ -12,22 +12,42 @@
 #include "UI/icons.h"
 #include "Mesh.h"
 
+#include <fstream>
+#include <sstream>
+#include <iostream>
+#include <iomanip>
+#include <cassert>
+#include <cstring>
+
 // Guarda SOLO posiciones de vértices para un frame
 struct VertexFrame {
     // puntero a array de floats [x,y,z,x,y,z,...]
-    const float* positions = nullptr;
+    const GLfloat* positions = nullptr;
 };
 
 class VertexAnimation {
     public:
-        // Malla objetivo donde se escribe el resultado final
+        // Nombre de la animación
+        std::string name;
+
+        // Declaración (desde .w3d)
+        std::string basePath;
+        int frameCount = 0;
+        int padding = 0;
+
+        // Runtime
         Mesh* target = nullptr;
 
         // Frames de la animación (solo posiciones)
         std::vector<VertexFrame*> frames;
 
         VertexAnimation() = default;
-        VertexAnimation(Mesh* tgt);
+        VertexAnimation(Mesh* tgt, const std::string& animName);
+
+        void AddFrame(VertexFrame* frame);
+    
+        // Cargar animaciones desde archivos .obj
+        bool LoadFrames();
 
         size_t FrameCount() const { return frames.size(); }
 };

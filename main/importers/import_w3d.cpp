@@ -302,8 +302,10 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
             return nullptr;
         }
 
+        bool NoMerge = GetBoolOrDefault(n->props, "noMerge", false);        
+
         // --- IMPORTACIÓN ---
-        Mesh* mesh = ImportWOBJ(path, parent);
+        Mesh* mesh = ImportWOBJ(path, parent, NoMerge);
 
         if (!mesh){
             std::cerr << "[Wobj] Se importo mal el wobj!\n";
@@ -329,6 +331,20 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
     if (n->type=="Gamepad"){
         Gamepad* gamepad = new Gamepad(parent);
         if(p.count("target")) gamepad->SetTarget(p.at("target"));
+
+        // recorrer hijos
+        for (auto* child : n->children) {
+            if (child->type == "Animation") {
+                auto& ap = child->props;
+
+                VertexAnimation* anim = new VertexAnimation(nullptr, ap.at("name"));
+                anim->basePath   = GetFilePath(ap.at("basePath"));
+                anim->frameCount = std::stoi(ap.at("frames"));
+                anim->padding    = std::stoi(ap.at("padding"));
+
+                gamepad->animations.push_back(anim);
+            }
+        }
         return gamepad;
     }
 

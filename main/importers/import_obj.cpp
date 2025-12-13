@@ -111,6 +111,125 @@ void Wavefront::ConvertToES1(Mesh* TempMesh, int* acumuladoVertices, int* acumul
     Reset();
 }
 
+void Wavefront::ConvertToES1_NoMerge(Mesh* TempMesh) {
+
+    // =========================================================
+    // 1) COPIAR VERTICES Y COLORES TAL CUAL
+    // =========================================================
+
+    TempMesh->vertexSize = vertex.size();
+    TempMesh->vertex = new GLfloat[vertex.size()];
+    std::copy(vertex.begin(), vertex.end(), TempMesh->vertex);
+
+    TempMesh->vertexColor = new GLubyte[vertexColor.size()];
+    std::copy(vertexColor.begin(), vertexColor.end(), TempMesh->vertexColor);
+
+    size_t vertCount = vertex.size() / 3;
+
+    // =========================================================
+    // 2) NORMALES Y UV INICIALMENTE EN CERO
+    // =========================================================
+
+    TempMesh->normals = new GLbyte[vertCount * 3];
+    memset(TempMesh->normals, 0, vertCount * 3);
+
+    TempMesh->uv = new GLfloat[vertCount * 2];
+    memset(TempMesh->uv, 0, sizeof(GLfloat) * vertCount * 2);
+
+    // =========================================================
+    // 3) CARAS + MATERIALES + PISAR NORMAL / UV
+    // =========================================================
+
+    std::vector<GLushort> newFaces;
+    TempMesh->materialsGroup.clear();
+
+    int currentMaterial = -1;
+
+    for (size_t i = 0; i < faces.size(); i++) {
+
+        // --- cambio de material ---
+        for (size_t m = 0; m < materialsGroup.size(); m++) {
+            if ((int)i == materialsGroup[m].start) {
+
+                MaterialGroup mg;
+                mg.material = materialsGroup[m].material;
+                mg.start = newFaces.size() / 3;
+                mg.count = 0;
+                mg.startDrawn = mg.start * 3;
+                mg.indicesDrawnCount = 0;
+
+                TempMesh->materialsGroup.push_back(mg);
+                currentMaterial = (int)TempMesh->materialsGroup.size() - 1;
+            }
+        }
+
+        Face& f = faces[i];
+        if (f.corner.size() < 3) continue;
+
+        for (size_t t = 1; t < f.corner.size() - 1; t++) {
+
+            FaceCorners corners[3] = {
+                f.corner[0],
+                f.corner[t],
+                f.corner[t + 1]
+            };
+
+            for (int c = 0; c < 3; c++) {
+
+                const FaceCorners& fc = corners[c];
+                int v = fc.vertex;
+
+                // -------- PISAR NORMAL --------
+                if (fc.normal >= 0) {
+                    TempMesh->normals[v * 3 + 0] = normals[fc.normal * 3 + 0];
+                    TempMesh->normals[v * 3 + 1] = normals[fc.normal * 3 + 1];
+                    TempMesh->normals[v * 3 + 2] = normals[fc.normal * 3 + 2];
+                }
+
+                // -------- PISAR UV --------
+                if (fc.uv >= 0) {
+                    TempMesh->uv[v * 2 + 0] = uv[fc.uv * 2 + 0];
+                    TempMesh->uv[v * 2 + 1] = uv[fc.uv * 2 + 1];
+                }
+
+                newFaces.push_back((GLushort)v);
+            }
+
+            if (currentMaterial >= 0) {
+                TempMesh->materialsGroup[currentMaterial].count++;
+                TempMesh->materialsGroup[currentMaterial].indicesDrawnCount += 3;
+            }
+        }
+    }
+
+    // =========================================================
+    // 4) COPIAR ÍNDICES
+    // =========================================================
+
+    TempMesh->facesSize = newFaces.size();
+    TempMesh->faces = new GLushort[newFaces.size()];
+    std::copy(newFaces.begin(), newFaces.end(), TempMesh->faces);
+
+    // =========================================================
+    // 5) DEBUG
+    // =========================================================
+
+    std::cout << "DEBUG Materiales:\n";
+    for (auto& mg : TempMesh->materialsGroup) {
+        std::cout << "Material \""
+                  << (mg.material ? reinterpret_cast<Text*>(mg.material->name)->value: "(null)")
+                  << "\" tiene "
+                  << mg.count
+                  << " caras\n";
+    }
+
+    std::cout << "Este objeto tenia "
+              << TempMesh->materialsGroup.size()
+              << " materiales\n\n";
+
+    Reset();
+}    
+
 // extraer nombre base del filename (sin path ni extensión)
 std::string ExtractBaseName(const std::string& filepath) {
     // quitar ruta
@@ -127,7 +246,8 @@ bool LeerOBJ(std::ifstream& file,
              std::streampos& startPos,
              int* acumuladoVertices,
              int* acumuladoNormales,
-             int* acumuladoUVs) 
+             int* acumuladoUVs,
+             bool NoMerge) 
 {
     Mesh* mesh = new Mesh(CollectionActive, Vector3(0, 0, 0));
 
@@ -266,7 +386,12 @@ bool LeerOBJ(std::ifstream& file,
     std::cout << "  uv       = " << Wobj.uv.size() / 2 << "\n";
     std::cout << "  faces    = " << Wobj.faces.size() / 3 << "\n\n";
 
-    Wobj.ConvertToES1(mesh, acumuladoVertices, acumuladoNormales, acumuladoUVs);
+    if (NoMerge){
+        Wobj.ConvertToES1_NoMerge(mesh);
+    }
+    else {
+        Wobj.ConvertToES1(mesh, acumuladoVertices, acumuladoNormales, acumuladoUVs);
+    }
 
     *acumuladoVertices += acumuladoVerticesProximo;
     *acumuladoNormales += acumuladoNormalesProximo;
@@ -437,7 +562,7 @@ bool LeerMTL(const std::string& filepath, int objetosCargados) {
     return true;
 }
 
-bool ImportOBJ(const std::string& filepath) {
+bool ImportOBJ(const std::string& filepath, bool NoMerge = false) {
     // Revisar extensión
     if (filepath.size() < 4 || filepath.substr(filepath.size() - 4) != ".obj") {
         std::cerr << "Error: El archivo seleccionado no tiene la extensión .obj" << std::endl;
@@ -456,7 +581,7 @@ bool ImportOBJ(const std::string& filepath) {
     int acumuladoNormales = 0;
     int acumuladoUVs = 0;
 
-    while (LeerOBJ(file, filepath, startPos, &acumuladoVertices, &acumuladoNormales, &acumuladoUVs)) {
+    while (LeerOBJ(file, filepath, startPos, &acumuladoVertices, &acumuladoNormales, &acumuladoUVs, NoMerge)) {
         objetosCargados++;
     }
 

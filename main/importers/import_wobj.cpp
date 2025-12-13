@@ -1,6 +1,6 @@
 #include "importers/import_wobj.h"
 
-Mesh* LeerWOBJ(std::ifstream& file, const std::string& filename, Object* parent){
+Mesh* LeerWOBJ(std::ifstream& file, const std::string& filename, Object* parent, bool NoMerge){
     Mesh* mesh = new Mesh(parent, Vector3(0, 0, 0));
 
     Wavefront Wobj;
@@ -120,12 +120,17 @@ Mesh* LeerWOBJ(std::ifstream& file, const std::string& filename, Object* parent)
     }
 
     // ---------------- convertir y generar Mesh* ----------------
-    Wobj.ConvertToES1(mesh, &acumuladoVertices, &acumuladoNormales, &acumuladoUVs);
+    if (NoMerge){
+        Wobj.ConvertToES1_NoMerge(mesh);
+    }
+    else {
+        Wobj.ConvertToES1(mesh, &acumuladoVertices, &acumuladoNormales, &acumuladoUVs);
+    }
 
     return mesh;
 }
 
-Mesh* ImportWOBJ(const std::string& filepath, Object* parent) {
+Mesh* ImportWOBJ(const std::string& filepath, Object* parent, bool NoMerge) {
 
     if (filepath.size() < 5 || 
     (filepath.substr(filepath.size() - 5) != ".wobj" &&
@@ -140,7 +145,7 @@ Mesh* ImportWOBJ(const std::string& filepath, Object* parent) {
         return nullptr;
     }
 
-    Mesh* mesh = LeerWOBJ(file, filepath, parent);
+    Mesh* mesh = LeerWOBJ(file, filepath, parent, NoMerge);
     file.close();
 
     if (!mesh) {
