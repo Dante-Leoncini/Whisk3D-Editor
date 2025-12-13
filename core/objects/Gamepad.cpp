@@ -38,9 +38,10 @@ void Gamepad::Reload() {
 
     Mesh* mesh = dynamic_cast<Mesh*>(target);
     if (!mesh) return;
+    meshToAnim = mesh;
 
     for (auto* anim : animations) {
-        anim->target = mesh;
+        anim->target = meshToAnim;
 
         if (anim->frames.empty()) {
             anim->LoadFrames();

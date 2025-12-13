@@ -11,6 +11,7 @@
 
 #include "UI/icons.h"
 #include "Objects.h"
+#include "Mesh.h"
 #include "Target.h"
 
 #include "VertexAnimation.h"
@@ -34,6 +35,8 @@ class Gamepad : public Object, public Target {
 
         int blendStep = 0;
 
+        Mesh* meshToAnim = nullptr;
+
         Gamepad(Object* parent);
 
         // las animaciones del target
@@ -45,18 +48,38 @@ class Gamepad : public Object, public Target {
         void Update();  // Solo declaración
 
         void UpdateAnimation(){
+            if (!meshToAnim) return;
+            // Avanza el blend
             blendStep++;
-            if (blendStep > 4){
+
+            float blendT = blendStep / 5.0f;
+            if (blendT > 1.0f) blendT = 1.0f;
+
+            // Mezcla entre frame actual y el siguiente (puede ser otra anim)
+            BlendVertexAnimations(
+                *animations[currentAnim],
+                *animations[nextAnim],
+                currentFrame,
+                nextFrame,
+                blendT,
+                meshToAnim
+            );
+
+            // Si terminó el blend
+            if (blendStep >= 5) {
                 blendStep = 0;
-                currentAnim = nextAnim;
-                currentFrame = nextFrame;                
+
+                // Consolidamos estado
+                currentAnim  = nextAnim;
+                currentFrame = nextFrame;
+
+                // Avanzar frame SOLO de la anim activa
                 nextFrame++;
 
-                if (nextFrame > animations[nextAnim]->frames.size() -1){
+                if (nextFrame >= animations[currentAnim]->frames.size()) {
                     nextFrame = 0;
                 }
             }
-            ApplyVertexFrame(*animations[currentAnim], currentFrame);
         }
 
         ~Gamepad();

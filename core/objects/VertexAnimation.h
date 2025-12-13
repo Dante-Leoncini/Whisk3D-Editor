@@ -63,7 +63,8 @@ void BlendVertexAnimations(
     const VertexAnimation& toAnim,
     size_t fromFrame,
     size_t toFrame,
-    float blendT
+    float blendT,
+    Mesh* mesh
 );
 
 // Copia directa de un frame a la malla target (sin mezcla)

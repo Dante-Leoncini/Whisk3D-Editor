@@ -1244,8 +1244,14 @@ void Gamepad::Update() {
             //int frame = static_cast<int>((blendT * currentAnim->FrameCount()));
             //ApplyVertexFrame(*currentAnim, frame);
         //}
+        if (nextAnim != 1){
+            nextAnim = 1;
+        }
     }
     else {
+        if (nextAnim != 0){
+            nextAnim = 0;
+        }
         // Si no hay movimiento, solo se mantiene en la animación idle
         //ApplyVertexFrame(*animations[0], 0);  // Aplicamos el primer frame de idle (0)
     }

@@ -84,7 +84,8 @@ void BlendVertexAnimations(
     const VertexAnimation& toAnim,
     size_t fromFrame,
     size_t toFrame,
-    float blendT
+    float blendT,
+    Mesh* mesh
 ) {
     assert(fromAnim.target);
     assert(fromAnim.target == toAnim.target);
@@ -103,13 +104,11 @@ void BlendVertexAnimations(
         return;
     }
 
-    Mesh* mesh = fromAnim.target;
-
     const float* A = fromAnim.frames[fromFrame]->positions;
     const float* B = toAnim.frames[toFrame]->positions;
 
     // Mezcla lineal por vértice
-    for (size_t i = 0; i < mesh->vertexSize * 3; ++i) {
+    for (size_t i = 0; i < mesh->vertexSize; ++i) {
         mesh->vertex[i] = A[i] * (1.0f - blendT) + B[i] * blendT;
     }
 }
