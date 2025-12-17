@@ -8,7 +8,7 @@ Properties::Properties() : ViewportBase() {
 void Properties::Resize(int newW, int newH){
     ViewportBase::Resize(newW, newH);
     ResizeBorder(newW, newH);
-    card->Resize(width-borderGS-borderGS, 100);
+    card->Resize(width-borderGS-borderGS, 300);
 }
 
 void Properties::Render(){
@@ -52,7 +52,6 @@ void Properties::Render(){
 
     if (ObjActivo){
         glPushMatrix();   
-        //std::cout << "PosX: " << PosX << " x: " << x << std::endl;
         glTranslatef(PosX + borderGS, PosY + borderGS, 0);   
 
         DibujarTitulo(ObjActivo);
@@ -65,16 +64,28 @@ void Properties::Render(){
 
         card->RenderObject(false);
 
+
+        glTranslatef(borderGS, borderGS, 0);
         CardTitulo(
-            IconsUV[static_cast<size_t>(IconType::arrowRight)]->uvs,
-            "Prueba de Texto"
+            IconsUV[static_cast<size_t>(IconType::arrow)]->uvs,
+            "Transform"
         );
 
-        /*glColor4f(ListaColores[static_cast<int>(ColorID::grisUI)][0], 
-                  ListaColores[static_cast<int>(ColorID::grisUI)][1],
-                  ListaColores[static_cast<int>(ColorID::grisUI)][2], 1.0f);
 
-        card->RenderBorder(false);*/
+        glPushMatrix();   
+        glTranslatef(0, RenglonHeightGS + gapGS, 0); 
+        RenderBitmapText(std::string("Location X ") + std::to_string(ObjActivo->pos.x));
+        glPopMatrix(); 
+
+        glPushMatrix();   
+        glTranslatef(0, (RenglonHeightGS + gapGS)*2, 0);
+        RenderBitmapText(std::string("         Y ") + std::to_string(ObjActivo->pos.z));
+        glPopMatrix(); 
+
+        glPushMatrix();      
+        glTranslatef(0, (RenglonHeightGS + gapGS)*3, 0);
+        RenderBitmapText(std::string("         Z ") + std::to_string(ObjActivo->pos.y));
+        glPopMatrix(); 
 
         glPopMatrix(); 
     }

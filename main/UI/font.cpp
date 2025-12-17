@@ -110,6 +110,32 @@ Font::Font(int texW, int texH, GLuint textureID)
     addGlyph('7', 43, 42, 5, 11);
     addGlyph('8', 49, 42, 5, 11);
     addGlyph('9', 55, 42, 5, 11);
+
+    addGlyph('+', 61, 42, 5, 11); 
+    addGlyph('-', 67, 42, 5, 11); 
+    addGlyph('=', 73, 42, 5, 11); 
+    addGlyph('(', 1, 52, 5, 11); 
+    addGlyph(')', 7, 52, 5, 11); 
+    addGlyph('[', 13, 52, 5, 11); 
+    addGlyph(']', 19, 52, 5, 11); 
+    addGlyph('{', 25, 52, 5, 11);
+    addGlyph('}', 31, 52, 5, 11); 
+    addGlyph('<', 37, 52, 5, 11); 
+    addGlyph('>', 43, 52, 5, 11); 
+    addGlyph('/', 49, 52, 5, 11);
+    addGlyph('*', 55, 52, 5, 11); 
+    addGlyph(':', 61, 52, 5, 11); 
+    addGlyph('#', 67, 52, 5, 11); 
+    addGlyph('%', 73, 52, 5, 11); 
+    addGlyph('!', 1, 63, 5, 11); 
+    addGlyph('?', 7, 63, 5, 11); 
+    addGlyph('.', 13, 63, 5, 11); 
+    addGlyph(',', 19, 63, 5, 11); 
+    addGlyph('\'', 25, 63, 5, 11);
+    addGlyph('\"', 31, 63, 5, 11); 
+    addGlyph('@', 37, 63, 5, 11); 
+    addGlyph('&', 43, 63, 5, 11); 
+    addGlyph('$', 49, 63, 5, 11); 
     addGlyph(0x00A1, 55, 63, 5, 11); // ¡
 }
 
