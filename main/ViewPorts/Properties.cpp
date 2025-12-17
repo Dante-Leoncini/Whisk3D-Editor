@@ -8,7 +8,9 @@ Properties::Properties() : ViewportBase() {
 void Properties::Resize(int newW, int newH){
     ViewportBase::Resize(newW, newH);
     ResizeBorder(newW, newH);
-    card->Resize(width-borderGS-borderGS, borderGS + borderGS + (RenglonHeightGS + gapGS)*10);
+    card->Resize(width-borderGS-borderGS, borderGS + borderGS + borderGS + (RenglonHeightGS + gapGS)*10);
+
+    ResizeScrollbar(newW, newH, 1000, 100000);
 }
 
 void Properties::Render(){
@@ -82,7 +84,7 @@ void Properties::Render(){
 
         Vector3 euler = ObjActivo->rot.ToEulerYXZ();
 
-        glTranslatef(0, RenglonHeightGS + gapGS, 0); 
+        glTranslatef(0, RenglonHeightGS + marginGS, 0); 
         DibujarPropiedadFloat("Rotation X ", euler.x);
 
         glTranslatef(0, RenglonHeightGS + gapGS, 0); 
@@ -91,7 +93,7 @@ void Properties::Render(){
         glTranslatef(0, RenglonHeightGS + gapGS, 0); 
         DibujarPropiedadFloat("         Z ", euler.y);
 
-        glTranslatef(0, RenglonHeightGS + gapGS, 0); 
+        glTranslatef(0, RenglonHeightGS + marginGS, 0); 
         DibujarPropiedadFloat("   Scale X ", ObjActivo->scale.x);
 
         glTranslatef(0, RenglonHeightGS + gapGS, 0); 
@@ -109,7 +111,9 @@ void Properties::Render(){
 }
 
 void Properties::DibujarPropiedadFloat(const std::string& text, float value){
-    RenderBitmapText(std::string(text) + std::to_string(value));
+    std::ostringstream ss;
+    ss << std::fixed << std::setprecision(4) << value;
+    RenderBitmapText(text + ss.str());
 }
 
 void Properties::CardTitulo(GLfloat* icon, const std::string& texto){
@@ -151,12 +155,26 @@ void Properties::mouse_button_up(SDL_Event &e){
 }
 
 void Properties::event_mouse_wheel(SDL_Event &e){
+    MouseWheel = true;
+    ScrollY(e.wheel.y*6*GlobalScale);
+    MouseWheel = false;
 }
 
 void Properties::FindMouseOver(int mx, int my){
 }
 
 void Properties::event_mouse_motion(int mx, int my) {
+    if (middleMouseDown || leftMouseDown) {
+        ViewPortClickDown = true;
+
+        ScrollX(dx);
+        ScrollY(dy);
+        return;
+    }
+    //si no se esta haciendo click. entonces miras si el mouse esta encima de algo
+    else if (scrollY){
+        FindMouseOver(mx, my);
+    }
 }
 
 void Properties::event_key_down(SDL_Event &e){         

@@ -2,12 +2,15 @@
 
 // Vertices for the Floor object. 
 const GLfloat objVertexdataFloor[102*3]={
-    0.0f, 0.0f, -1000.0f,
-    0.0f, 0.0f, 1000.0f,
-    -1000.0f, 0.0f, 0.0f,
-    1000.0f, 0.0f, 0.0f,
-    0.0f,  1000.0f,  0.0f,
-    0.0f, -1000.0f,  0.0f,
+    //EJES X Y Z
+    0.0f, 0.0f, -13.0f,
+    0.0f, 0.0f, 13.0f,
+    -13.0f, 0.0f, 0.0f,
+    13.0f, 0.0f, 0.0f,
+    0.0f,  13.0f,  0.0f,
+    0.0f, -13.0f,  0.0f,
+
+    //resto del piso
     1.0f, 0.0f, -13.0,
     1.0f, 0.0f,  13.0,
     2.0f, 0.0f, -13.0,

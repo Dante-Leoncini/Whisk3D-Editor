@@ -368,10 +368,10 @@ void Viewport3D::RenderFloor() {
     //excepto en ciertos angulos... parece un glich. pero es asi openGL viejo
     //la solucion seria poner un vertice en el medio de la linea. eso arreglaria bastante el problema
     //por ahora el fog se quita... triste
-    glDisable(GL_FOG);
+    glEnable(GL_FOG);
     glFogf(GL_FOG_MODE, GL_LINEAR);
     glFogf(GL_FOG_START, nearClip);
-    glFogf(GL_FOG_END, 100.0f);
+    glFogf(GL_FOG_END, 30.0f);
 
     if (view == RenderType::Rendered) {
         glFogfv(GL_FOG_COLOR, scene->backgroundColor); 
