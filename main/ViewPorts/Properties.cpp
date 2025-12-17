@@ -10,7 +10,7 @@ void Properties::Resize(int newW, int newH){
     ResizeBorder(newW, newH);
     card->Resize(width-borderGS-borderGS, borderGS + borderGS + borderGS + (RenglonHeightGS + gapGS)*10);
 
-    ResizeScrollbar(newW, newH, 1000, 100000);
+    ResizeScrollbar(newW, newH, 0, -1000);
 }
 
 void Properties::Render(){

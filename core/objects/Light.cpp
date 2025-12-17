@@ -9,9 +9,9 @@ Light::Light(Object* parent, GLfloat x, GLfloat y, GLfloat z)
 : Object(parent, "Light", {x, y, z}), LightID(GL_LIGHT0) {
     IconType = static_cast<size_t>(IconType::light);
 
-    position[0] = x;
-    position[1] = y;
-    position[2] = z;
+    position[0] = 0;
+    position[1] = 0;
+    position[2] = 0;
     position[3] = 1.0f;
 
     ambient[0] = ambient[1] = ambient[2] = 0.0f; ambient[3] = 1.0f;
