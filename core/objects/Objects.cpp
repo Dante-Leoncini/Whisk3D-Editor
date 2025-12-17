@@ -8,7 +8,7 @@ std::vector<SaveState> estadoObjetos;
 
 Object::Object(Object* parent, const std::string& nombre, Vector3 Pos, Vector3 Rot, Vector3 Scale)
     : Parent(parent), pos(Pos), scale(Scale) {
-    name = new Text(SetName(nombre));
+    name = nombre;
 
     // Convertir los ángulos de Euler (Rot.x, Rot.y, Rot.z) a tres cuaterniones simples.
     // Usaremos un orden común para una configuración inicial: YXZ (Yaw, Pitch, Roll)
@@ -39,14 +39,10 @@ Object::~Object() {
         c->Parent = Parent;
     }
     Childrens.clear();
-
-    if (name) {
-        name = nullptr;
-    }
 }
 
 void Object::SetNameObj(const std::string& nombre) {
-    name->SetValue(SetName(nombre));
+    name = nombre;
 }
 
 void Object::EliminarObjetosSeleccionados(bool IncluirCollecciones) {
@@ -54,7 +50,7 @@ void Object::EliminarObjetosSeleccionados(bool IncluirCollecciones) {
         Object* child = Childrens[i];
         child->EliminarObjetosSeleccionados(IncluirCollecciones);
         if (child->select && (IncluirCollecciones || child->getType() != ObjectType::collection)) {
-            std::cout << "Se borro '" << child->name->value << "'" << std::endl;
+            std::cout << "Se borro '" << child->name << "'" << std::endl;
             Childrens.erase(Childrens.begin() + i);
             delete child;
         }
@@ -77,8 +73,8 @@ std::string Object::SetName(const std::string& baseName) {
         if (!obj) return false;
 
         // Si este objeto NO es 'me' y tiene nombre igual -> existe
-        if (obj != me && obj->name) {
-            if (obj->name->value == name) return true;
+        if (obj != me) {
+            if (obj->name == name) return true;
         }
 
         for (const Object* child : obj->Childrens) {
@@ -316,7 +312,7 @@ Object* FindObjectByName(Object* node, const std::string& name){
     if (!node) return nullptr;
 
     // Coincide con este nodo → devolverlo
-    if (node->name && node->name->value == name)
+    if (node->name == name)
         return node;
 
     // Buscar en hijos
@@ -348,7 +344,7 @@ bool DetectLoop(Object* node,
 
     // Si el nodo ya está en recursion → BUCLE encontrado
     if (stack.count(node)) {
-        std::cout << "⚠ LOOP DETECTADO en nodo: " << node->name->value << std::endl;
+        std::cout << "⚠ LOOP DETECTADO en nodo: " << node->name << std::endl;
         return true;
     }
 
@@ -471,7 +467,7 @@ Object* GetNextDFS(Object* current) {
                 return nullptr;  // fin total del DFS
             } else {
                 std::cout << "[ERROR] Root inesperado diferente a SceneCollection " << parent << "\n";
-                std::cout << "Objeto: " << node->name->value << "\n";
+                std::cout << "Objeto: " << node->name << "\n";
                 return nullptr;
             }
         }

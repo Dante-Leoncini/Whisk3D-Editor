@@ -15,6 +15,7 @@
 #include "UI/colores.h"
 #include "GeometriaUI/Floor.h"
 #include "objects/Objects.h"
+#include "objects/Textures.h"
 #include "GLES_Android_helpers.h"
 
 // Funciones de render

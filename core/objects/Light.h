@@ -8,11 +8,12 @@
 #include <GL/gl.h>
 #include <vector>
 
-#include "variables.h" 
+//#include "variables.h" 
 #include "GeometriaUI/GeometriaUI.h"
 #include "UI/icons.h" 
 #include "UI/colores.h"
 #include "objects/Objects.h" 
+#include "render/OpcionesRender.h" 
 
 class Light : public Object {
 public:

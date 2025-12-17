@@ -13,5 +13,4 @@ ObjectType Collection::getType() {
 
 // Destructor
 Collection::~Collection() {
-    delete name;
 }

@@ -9,7 +9,7 @@ Material* MaterialDefecto = nullptr;
 // Implementación de Material
 // ===================================================
 Material::Material(const std::string& nombre, bool MaterialDefectoFlag, bool TieneVertexColor) {
-    name = new Text(nombre);
+    name = nombre;
     if (!MaterialDefectoFlag){
         Materials.push_back(this);
     }
@@ -17,16 +17,14 @@ Material::Material(const std::string& nombre, bool MaterialDefectoFlag, bool Tie
     interpolacion = lineal;
 }
 
-Material::~Material() {
-    delete name;
-}
+Material::~Material() {}
 
 // ===================================================
 // Funciones auxiliares
 // ===================================================
 Material* BuscarMaterialPorNombre(const std::string& name) {
     for (size_t i = 0; i < Materials.size(); ++i){
-        if (Materials[i]->name->value == name) return Materials[i];
+        if (Materials[i]->name == name) return Materials[i];
     }
     return nullptr;
 }

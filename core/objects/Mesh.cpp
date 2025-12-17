@@ -16,7 +16,6 @@ Mesh::Mesh(Object* parent, Vector3 pos)
 // ===================================================
 Mesh::~Mesh() {
     //LiberarMemoria();
-    delete name;
 }
 
 // ===================================================
@@ -277,7 +276,7 @@ Object* NewMesh(MeshType type, Object* parent, bool query){
 		for (int i = 0; i < tempFaceGroup.indicesDrawnCount; i++) {
 			mesh->faces[i] = CuboTriangles[i];
 		}
-		mesh->name->SetValue(mesh->SetName("Cube"));
+		mesh->name = "Cube";
 	}	
 
 	//le asignamos la mesh	

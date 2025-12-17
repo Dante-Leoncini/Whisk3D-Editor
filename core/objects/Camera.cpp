@@ -239,5 +239,4 @@ void Camera::UpdatePosition() {
 }
 
 Camera::~Camera() {
-    delete name;
 }

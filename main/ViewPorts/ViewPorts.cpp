@@ -285,12 +285,13 @@ void SetGlobalScale(int scale){
     MinViewportWidthGS = MinViewportWidth * scale;
 
     SetIconScale(scale);
+    WhiskFont->SetScale(scale);
 
-    for (size_t i = 0; i < SceneCollection->Childrens.size(); i++) {                  
+    /*for (size_t i = 0; i < SceneCollection->Childrens.size(); i++) {                  
         SceneCollection->Childrens[i]->name->scaleX = scale;                
         SceneCollection->Childrens[i]->name->scaleY = scale;    
         SceneCollection->Childrens[i]->name->UpdateCache();    
-    }
+    }*/
 }
 
 void CheckWarpMouseInViewport(int mx, int my, const ViewportBase* vp) {

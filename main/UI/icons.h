@@ -42,8 +42,8 @@ struct IconRect {
 };
 
 class IconUV {
-public:
-    GLfloat uvs[8];
+    public:
+        GLfloat uvs[8];
 };
 
 // ===================================================

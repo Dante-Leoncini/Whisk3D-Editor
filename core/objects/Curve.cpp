@@ -21,7 +21,6 @@ ObjectType Curve::getType() {
 // ===================================================
 Curve::~Curve() {
     delete[] vertex;
-    delete name;
 }
 
 void Curve::RenderObject() {

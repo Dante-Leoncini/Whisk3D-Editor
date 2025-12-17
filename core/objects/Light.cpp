@@ -33,7 +33,6 @@ Light* Light::Create(Object* parent, GLfloat x, GLfloat y, GLfloat z) {
 
 // Destructor
 Light::~Light() {
-    delete name;
 }
 
 // getType

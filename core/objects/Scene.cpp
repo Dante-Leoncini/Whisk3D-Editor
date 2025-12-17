@@ -30,7 +30,6 @@ ObjectType Scene::getType() {
 
 // Destructor
 Scene::~Scene() {
-    delete name;
 }
 
 Object* SceneCollection = new Scene();

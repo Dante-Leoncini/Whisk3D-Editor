@@ -56,5 +56,4 @@ void Constraint::RenderObject() {
 }
 
 Constraint::~Constraint() {
-    delete name;
 }

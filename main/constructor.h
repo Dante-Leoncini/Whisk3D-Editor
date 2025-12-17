@@ -16,9 +16,12 @@
 #include "objects/Collection.h"
 #include "objects/Mesh.h"
 
+#include "UI/card.h"
+
 #include "ViewPorts/ViewPorts.h"
 #include "ViewPorts/Outliner.h"
 #include "ViewPorts/ViewPort3D.h"
+#include "ViewPorts/Properties.h"
 
 #include "importers/import_w3d.h"
 

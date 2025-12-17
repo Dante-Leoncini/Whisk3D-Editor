@@ -9,8 +9,8 @@
 #include <GL/gl.h>
 #include <string>
 
-#include "UI/text.h"
 #include "render/OpcionesRender.h"
+#include "Textures.h"
 
 // Declaración adelantada de Material
 class Material;
@@ -36,7 +36,7 @@ class Material {
         GLfloat diffuse[4]  = {1.0f, 1.0f, 1.0f, 1.0f};
         GLfloat specular[4] = {0.3f, 0.3f, 0.3f, 1.0f};
         GLfloat emission[4] = {0.0f, 0.0f, 0.0f, 1.0f};
-        Text* name = nullptr;
+        std::string name = "";
 
         Material(const std::string& nombre, bool MaterialDefecto = false, bool TieneVertexColor = false);
         ~Material();

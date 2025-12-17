@@ -69,6 +69,4 @@ void Instance::RenderObject() {
 }
 
 // Destructor
-Instance::~Instance() {
-    delete name;
-}
+Instance::~Instance() {}

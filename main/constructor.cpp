@@ -17,8 +17,8 @@ void ConstructUniversal(int argc, char* argv[]) {
     // Tamaño de las texturas
     CrearIconos(128, 128);
     CalcBorderUV(128, 128);
+    CalcCardUV(128, 128);
     CalcScrollUV(128, 128);
-    SetGlobalScale(3);
     InitCursors();
 
     //ACA HAY QUE CARGAR LAS TEXTURAS!!!!
@@ -63,6 +63,10 @@ void ConstructUniversal(int argc, char* argv[]) {
         #endif
     }
 
+    //hace falta la textura antes o crashea
+    WhiskFont = new Font(128, 128, Textures[0]->iID);
+    SetGlobalScale(3);
+
     // ======================================================
     // Si se abrió un archivo .w3d al hacer doble click
     // ======================================================
@@ -90,15 +94,25 @@ void ConstructUniversal(int argc, char* argv[]) {
     // ======================================================
     CollectionActive = new Collection(SceneCollection);
 
-    new Camera(CollectionActive, Vector3(-3, 2.5, 1.8), Vector3(0.0f, 35.0f, -45.0f));
+    new Camera(CollectionActive, Vector3(-3, 2.5, 1.8), Vector3(-35.0f, -45.0f, 0.0f));
     Light* L = Light::Create(CollectionActive, 1, 2.25, 2.25);
     L->SetDiffuse(1, 0, 0);
 
     NewMesh(MeshType::cube, CollectionActive);
 
-    rootViewport = new ViewportColumn(
+    rootViewport = new ViewportRow(
+        new Viewport3D(),
+        new ViewportColumn(
+            new Properties(),
+            new Outliner(),
+            0.70f
+        ),
+        0.75f
+    );
+
+    /*rootViewport = new ViewportColumn(
         new Outliner(),
         new Viewport3D(),
         0.20f
-    );
+    );*/
 }

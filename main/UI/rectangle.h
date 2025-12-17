@@ -15,8 +15,6 @@
 
 class Rec2D : public Object2D {
 	public:
-		GLshort width = 10;
-		GLshort height = 10;
 		GLshort vertices[8] = { 0,0, 10,0, 0,10, 10,10 };
 
 		// Constructor

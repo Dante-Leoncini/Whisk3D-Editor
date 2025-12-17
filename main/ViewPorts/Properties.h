@@ -1,5 +1,5 @@
-#ifndef OUTLINER_H
-#define OUTLINER_H
+#ifndef PROPERTIES_H
+#define PROPERTIES_H
 
 #include <vector>
 #include <SDL2/SDL.h>
@@ -11,24 +11,24 @@
 #include "WithBorder.h"
 #include "objects/Objects.h"
 #include "objects/ObjectMode.h"
-#include "objects/Textures.h"
-#include "UI/rectangle.h"
+
+//para la UI 2d
+#include "UI/card.h"
 #include "UI/bitmapText.h"
 
-class Outliner : public ViewportBase, public WithBorder, public Scrollable {
+#include <GL/gl.h>
+
+class Properties : public ViewportBase, public WithBorder, public Scrollable {
     public:
-        size_t CantidadRenglones;
-        Rec2D* Renglon;
+        Card* card;
+        Properties();
+        ~Properties() override;
 
-        Outliner();
-        ~Outliner() override;
-
-        void CalcularRenglon(Object* obj, int* MaxPosXtemp, int* MaxPosYtemp);
         void Resize(int newW, int newH) override;
         void Render() override;
-        void DibujarRenglon(Object* obj, bool hidden);
-        void DibujarLineaDesplegada(Object* obj);
-        void DibujarOjos(Object* obj, bool hidden);
+
+        void DibujarTitulo(Object* obj);
+        void CardTitulo(GLfloat* icon, const std::string& texto);
 
         void button_left() override;
         void mouse_button_up(SDL_Event &e) override;

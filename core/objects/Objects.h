@@ -19,7 +19,6 @@
 #include <GL/gl.h>
 
 #include "UI/icons.h"
-#include "UI/text.h"
 #include "variables.h"
 
 class Viewport3D;
@@ -47,7 +46,7 @@ class Object {
         bool desplegado = true;
         bool showRelantionshipsLines = true;
         bool select = true;
-        Text* name = nullptr;
+        std::string name = "Object";
         size_t IconType = 0;
 
         Matrix4 M;

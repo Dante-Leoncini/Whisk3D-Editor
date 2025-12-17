@@ -12,6 +12,7 @@
 #include "UI/colores.h"
 #include "UI/UI.h"
 #include "UI/icons.h"
+#include "UI/font.h"
 #include "variables.h"
 #include "objects/Objects.h"
 
@@ -29,8 +30,6 @@ enum class View {
 
 // Adelantos de clases
 class ViewportBase;
-//class ViewportRow;
-//class ViewportColumn;
 
 // Variables globales
 extern ViewportBase* viewPortActive;

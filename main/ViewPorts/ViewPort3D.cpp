@@ -348,9 +348,10 @@ void Viewport3D::Render() {
 
         glDisable(GL_COLOR_MATERIAL);
         glDisableClientState(GL_COLOR_ARRAY);
-        glDepthMask(GL_TRUE);
+        //glDepthMask(GL_TRUE);
 
         if (showFloor || showXaxis || showYaxis) RenderFloor();
+        glDepthMask(GL_TRUE);
     }
 
     // Renderiza la escena recursivamente
@@ -361,10 +362,16 @@ void Viewport3D::Render() {
 }
 
 void Viewport3D::RenderFloor() {
-    glEnable(GL_FOG);
+    //hay un error en la malla 3d!!!
+    //explico... resulta que el fog se calcula en el vertice
+    //pero como el vertice esta fuera del nearClip y el farClip se ve mal casi siempre
+    //excepto en ciertos angulos... parece un glich. pero es asi openGL viejo
+    //la solucion seria poner un vertice en el medio de la linea. eso arreglaria bastante el problema
+    //por ahora el fog se quita... triste
+    glDisable(GL_FOG);
     glFogf(GL_FOG_MODE, GL_LINEAR);
     glFogf(GL_FOG_START, nearClip);
-    glFogf(GL_FOG_END, 25.0f);
+    glFogf(GL_FOG_END, 100.0f);
 
     if (view == RenderType::Rendered) {
         glFogfv(GL_FOG_COLOR, scene->backgroundColor); 

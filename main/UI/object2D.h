@@ -25,6 +25,8 @@ public:
     Object2D* Parent = nullptr;
     bool visible = true;
     int x = 0, y = 0;
+    GLshort width = 10;
+    GLshort height = 10;
     int scaleX = 1;
     int scaleY = 1;
     GLubyte opacity = 255;

@@ -55,5 +55,4 @@ void Gamepad::RenderObject() {
 }
 
 Gamepad::~Gamepad() {
-    delete name;
 }

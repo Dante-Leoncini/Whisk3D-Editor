@@ -52,5 +52,4 @@ void Mirror::RenderObject() {
 
 // Destructor
 Mirror::~Mirror() {
-    delete name;
 }

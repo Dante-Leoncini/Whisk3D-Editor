@@ -1,6 +1,7 @@
 #ifndef CONTROLES_H
 #define CONTROLES_H
 
+#include <map>
 #include "sdl_key_compat.h"
 #include "variables.h"
 #include "objects/Gamepad.h"

@@ -11,7 +11,7 @@ Outliner::Outliner() : ViewportBase() {
 void Outliner::CalcularRenglon(Object* obj, int* MaxPosXtemp, int* MaxPosYtemp){
     int rowWidth = marginGS + IconSizeGS + gapGS + IconSizeGS + gapGS + IconSizeGS + marginGS; 
     *MaxPosYtemp -= RenglonHeightGS;
-    int textWidth = obj->name->letters.size() * LetterWidthGS;
+    int textWidth = obj->name.size() * LetterWidthGS;
     rowWidth += textWidth + gapGS;
 
     // guardar ancho máximo
@@ -55,7 +55,7 @@ void Outliner::Resize(int newW, int newH){
     //este es el gap para la barra de desplazamiento de abajo
     MaxPosYtemp -= marginGS;
     //std::cout << "MaxPosXtemp: " << MaxPosXtemp << " width: " << width << std::endl;
-    std::cout << "MaxPosYtemp: "<< MaxPosYtemp << std::endl;
+    //std::cout << "MaxPosYtemp: "<< MaxPosYtemp << std::endl;
     //std::cout << "Ancho: " << newW << " Alto: "<< newH << std::endl;
     ResizeScrollbar(newW, newH, MaxPosXtemp, MaxPosYtemp);
 }
@@ -70,7 +70,10 @@ void Outliner::Render(){
     // Limpiar pantalla
     glEnable(GL_SCISSOR_TEST);
     glScissor(x, y, width, height); // igual a tu viewport
-    glClearColor(ListaColores[static_cast<int>(ColorID::background)][0],ListaColores[static_cast<int>(ColorID::background)][1],ListaColores[static_cast<int>(ColorID::background)][2],ListaColores[static_cast<int>(ColorID::background)][3]);
+    glClearColor(ListaColores[static_cast<int>(ColorID::background)][0],
+        ListaColores[static_cast<int>(ColorID::background)][1],
+        ListaColores[static_cast<int>(ColorID::background)][2],
+        ListaColores[static_cast<int>(ColorID::background)][3]);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glDisable(GL_SCISSOR_TEST);
 
@@ -207,7 +210,7 @@ void Outliner::DibujarRenglon(Object* obj, bool hidden){
 
     //texto render                   
     glTranslatef(IconSizeGS + gapGS, 0, 0);  
-    obj->name->Render(false);
+    RenderBitmapText(obj->name);
     
     glPopMatrix(); 
 

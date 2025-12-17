@@ -214,15 +214,6 @@ void Wavefront::ConvertToES1_NoMerge(Mesh* TempMesh) {
     // 5) DEBUG
     // =========================================================
 
-    std::cout << "DEBUG Materiales:\n";
-    for (auto& mg : TempMesh->materialsGroup) {
-        std::cout << "Material \""
-                  << (mg.material ? reinterpret_cast<Text*>(mg.material->name)->value: "(null)")
-                  << "\" tiene "
-                  << mg.count
-                  << " caras\n";
-    }
-
     std::cout << "Este objeto tenia "
               << TempMesh->materialsGroup.size()
               << " materiales\n\n";
@@ -253,7 +244,7 @@ bool LeerOBJ(std::ifstream& file,
 
     // usar filename para nombrar por defecto (y hacerlo único)
     std::string fileBase = ExtractBaseName(filename);
-    mesh->name->SetValue(mesh->SetName(fileBase));
+    mesh->name = fileBase;
 
     Wavefront Wobj;
     Wobj.Reset();

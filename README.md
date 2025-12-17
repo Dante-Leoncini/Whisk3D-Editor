@@ -49,7 +49,7 @@ cmake -B build-linux -DCMAKE_BUILD_TYPE=Release
 cmake --build build-linux --config Release -- -j8
 ```
 
-Pra debug:
+Para debug:
 
 ```bash
 cmake --build build-linux --config Debug -- -j8

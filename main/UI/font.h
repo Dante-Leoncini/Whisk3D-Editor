@@ -6,27 +6,55 @@
 #endif
 
 #include <map>
-#include <string>
+#include <cstdint>
 #include <GL/gl.h>
 
-class FontUV {
-public:
-    struct Glyph {
-        GLfloat uvs[8]; // cada letra tiene sus UV
-    };
+#include "objects/Textures.h"
 
-    FontUV(int texW, int texH);
-    const GLfloat* getUV(const std::string& c);
+class Font {
+    public:
+        struct Glyph {
+            GLfloat uvs[8];
+        };
 
-private:
-    void addGlyph(const std::string& c, int texW, int texH, int x, int y, int w, int h);
-    std::map<std::string, Glyph> atlas; // diccionario de letras
+        Font(int texW, int texH, GLuint textureID);
+
+        // Obtener UV por codepoint
+        const GLfloat* getUV(uint16_t codepoint) const;
+
+        // Malla compartida (quad)
+        const GLshort* getMesh() const;
+
+        GLuint getTexture() const { return FontTexture; }
+
+        void SetScale(GLshort scale);
+
+    private:
+        void addGlyph(uint16_t codepoint, int x, int y, int w, int h);
+
+        GLuint FontTexture;
+        int texWidth;
+        int texHeight;
+
+        std::map<uint16_t, Glyph> atlas;
+
+        GLshort mesh[8] = {
+            0,  0,
+            5, 0,
+            0,  5,
+            5, 5
+        };
+
+        Glyph fallback; // '?' o vacío
 };
 
-// Acceso global seguro
-inline FontUV& getFont() {
-    static FontUV fontInstance(128, 128);
-    return fontInstance;
-}
+
+// ================= UTF-8 helper =================
+
+uint16_t UTF8_Char(const char* s, size_t& i);
+
+// ================= GLOBAL =================
+
+extern Font* WhiskFont;
 
 #endif
