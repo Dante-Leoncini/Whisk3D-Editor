@@ -8,7 +8,7 @@ Properties::Properties() : ViewportBase() {
 void Properties::Resize(int newW, int newH){
     ViewportBase::Resize(newW, newH);
     ResizeBorder(newW, newH);
-    card->Resize(width-borderGS-borderGS, 300);
+    card->Resize(width-borderGS-borderGS, borderGS + borderGS + (RenglonHeightGS + gapGS)*10);
 }
 
 void Properties::Render(){
@@ -71,7 +71,6 @@ void Properties::Render(){
             "Transform"
         );
 
-
         glTranslatef(0, RenglonHeightGS + gapGS, 0); 
         DibujarPropiedadFloat("Location X ", ObjActivo->pos.x);
 
@@ -91,6 +90,15 @@ void Properties::Render(){
 
         glTranslatef(0, RenglonHeightGS + gapGS, 0); 
         DibujarPropiedadFloat("         Z ", euler.y);
+
+        glTranslatef(0, RenglonHeightGS + gapGS, 0); 
+        DibujarPropiedadFloat("   Scale X ", ObjActivo->scale.x);
+
+        glTranslatef(0, RenglonHeightGS + gapGS, 0); 
+        DibujarPropiedadFloat("         Y ", ObjActivo->scale.z);
+
+        glTranslatef(0, RenglonHeightGS + gapGS, 0); 
+        DibujarPropiedadFloat("         Z ", ObjActivo->scale.y);
 
         glPopMatrix();
     }
