@@ -161,6 +161,35 @@ Quaternion Quaternion::FromMatrix(const Matrix4& m) {
     return q.Normalized();
 }
 
+Vector3 Quaternion::ToEulerYXZ() const {
+    Vector3 euler;
+
+    // Pitch (X)
+    float sinp = 2.0f * (w * x - y * z);
+    if (fabs(sinp) >= 1.0f)
+        euler.x = copysignf(M_PI / 2.0f, sinp);
+    else
+        euler.x = asinf(sinp);
+
+    // Yaw (Y)
+    float siny = 2.0f * (w * y + x * z);
+    float cosy = 1.0f - 2.0f * (x * x + y * y);
+    euler.y = atan2f(siny, cosy);
+
+    // Roll (Z)
+    float sinr = 2.0f * (w * z + x * y);
+    float cosr = 1.0f - 2.0f * (x * x + z * z);
+    euler.z = atan2f(sinr, cosr);
+
+    // RAD → DEG
+    const float RAD2DEG = 57.2957795f;
+    euler.x *= RAD2DEG;
+    euler.y *= RAD2DEG;
+    euler.z *= RAD2DEG;
+
+    return euler;
+}
+
 Quaternion Quaternion::FromEuler(float pitchDeg, float yawDeg, float rollDeg){
     float xRad = pitchDeg * (M_PI / 180.0f);
     float yRad = yawDeg  * (M_PI / 180.0f);

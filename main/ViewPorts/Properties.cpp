@@ -72,27 +72,36 @@ void Properties::Render(){
         );
 
 
-        glPushMatrix();   
         glTranslatef(0, RenglonHeightGS + gapGS, 0); 
-        RenderBitmapText(std::string("Location X ") + std::to_string(ObjActivo->pos.x));
-        glPopMatrix(); 
+        DibujarPropiedadFloat("Location X ", ObjActivo->pos.x);
 
-        glPushMatrix();   
-        glTranslatef(0, (RenglonHeightGS + gapGS)*2, 0);
-        RenderBitmapText(std::string("         Y ") + std::to_string(ObjActivo->pos.z));
-        glPopMatrix(); 
+        glTranslatef(0, RenglonHeightGS + gapGS, 0); 
+        DibujarPropiedadFloat("         Y ", ObjActivo->pos.z);
 
-        glPushMatrix();      
-        glTranslatef(0, (RenglonHeightGS + gapGS)*3, 0);
-        RenderBitmapText(std::string("         Z ") + std::to_string(ObjActivo->pos.y));
-        glPopMatrix(); 
+        glTranslatef(0, RenglonHeightGS + gapGS, 0); 
+        DibujarPropiedadFloat("         Z ", ObjActivo->pos.y);
 
-        glPopMatrix(); 
+        Vector3 euler = ObjActivo->rot.ToEulerYXZ();
+
+        glTranslatef(0, RenglonHeightGS + gapGS, 0); 
+        DibujarPropiedadFloat("Rotation X ", euler.x);
+
+        glTranslatef(0, RenglonHeightGS + gapGS, 0); 
+        DibujarPropiedadFloat("         Y ", euler.z);
+
+        glTranslatef(0, RenglonHeightGS + gapGS, 0); 
+        DibujarPropiedadFloat("         Z ", euler.y);
+
+        glPopMatrix();
     }
 
     //glDisable(GL_SCISSOR_TEST);
     DibujarBordes(this);
     DibujarScrollbar(this);
+}
+
+void Properties::DibujarPropiedadFloat(const std::string& text, float value){
+    RenderBitmapText(std::string(text) + std::to_string(value));
 }
 
 void Properties::CardTitulo(GLfloat* icon, const std::string& texto){

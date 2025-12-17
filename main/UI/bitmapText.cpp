@@ -4,6 +4,7 @@ void RenderBitmapText(const std::string& text){
     glBindTexture(GL_TEXTURE_2D, WhiskFont->getTexture());
     glVertexPointer(2, GL_SHORT, 0, WhiskFont->getMesh());
 
+    glPushMatrix();      
     size_t i = 0;
     while (i < text.size()) {
         uint16_t cp = UTF8_Char(text.c_str(), i);
@@ -19,4 +20,5 @@ void RenderBitmapText(const std::string& text){
 
         glTranslatef(6 * GlobalScale, 0, 0);
     }
+    glPopMatrix(); 
 }

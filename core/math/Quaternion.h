@@ -104,6 +104,8 @@ struct Quaternion {
         m[15] = 1;
     }
 
+    Vector3 ToEulerYXZ() const;
+
     static Quaternion FromMatrix(const Matrix4& m);
     static Quaternion FromDirection(const Vector3& direction, const Vector3& worldUp);
 };

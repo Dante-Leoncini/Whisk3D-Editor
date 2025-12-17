@@ -29,6 +29,7 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
 
         void DibujarTitulo(Object* obj);
         void CardTitulo(GLfloat* icon, const std::string& texto);
+        void DibujarPropiedadFloat(const std::string& text, float value);
 
         void button_left() override;
         void mouse_button_up(SDL_Event &e) override;
