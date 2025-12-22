@@ -9,9 +9,13 @@ void ConstructorProperties(){
     propTransform->properties.push_back(new PropFloat("Y"));
     propTransform->properties.push_back(new PropFloat("Z"));
 
+    propTransform->properties.push_back(new PropGap(""));
+
     propTransform->properties.push_back(new PropFloat("Rotation X"));
     propTransform->properties.push_back(new PropFloat("Y"));
     propTransform->properties.push_back(new PropFloat("Z"));
+
+    propTransform->properties.push_back(new PropGap(""));
 
     propTransform->properties.push_back(new PropFloat("Scale X"));
     propTransform->properties.push_back(new PropFloat("Y"));
@@ -30,14 +34,14 @@ void Properties::RefreshTargetProperties(){
     static_cast<PropFloat*>(propTransform->properties[2])->value = &ObjActivo->pos.z;
 
     //rotacion
-    static_cast<PropFloat*>(propTransform->properties[3])->value = &ObjActivo->rot.x;
-    static_cast<PropFloat*>(propTransform->properties[4])->value = &ObjActivo->rot.y;
-    static_cast<PropFloat*>(propTransform->properties[5])->value = &ObjActivo->rot.z;
+    static_cast<PropFloat*>(propTransform->properties[4])->value = &ObjActivo->rot.x;
+    static_cast<PropFloat*>(propTransform->properties[5])->value = &ObjActivo->rot.y;
+    static_cast<PropFloat*>(propTransform->properties[6])->value = &ObjActivo->rot.z;
 
-    //escala
-    static_cast<PropFloat*>(propTransform->properties[6])->value = &ObjActivo->scale.x;
-    static_cast<PropFloat*>(propTransform->properties[7])->value = &ObjActivo->scale.y;
-    static_cast<PropFloat*>(propTransform->properties[8])->value = &ObjActivo->scale.z;
+    //escala NOTA: se saltea un numero por el gap
+    static_cast<PropFloat*>(propTransform->properties[8])->value = &ObjActivo->scale.x;
+    static_cast<PropFloat*>(propTransform->properties[9])->value = &ObjActivo->scale.y;
+    static_cast<PropFloat*>(propTransform->properties[10])->value = &ObjActivo->scale.z;
 }
 
 // Constructor

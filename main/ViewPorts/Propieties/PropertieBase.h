@@ -19,10 +19,10 @@ class PropertieBase {
         PropertieBase(const std::string& Name);
         virtual ~PropertieBase();
 
-        virtual void Resize(int Width, int Height);
         virtual void RenderPropertiBox(Card* propertiBox);
         virtual void RenderPropertiValue(Card* propertiBox);
         virtual void RenderPropertiLabel(Card* propertiBox);
+        virtual int GetHeight();
 };
 
 #endif

@@ -22,6 +22,7 @@
 #include "Propieties/PropertieBase.h" 
 #include "Propieties/GroupPropertie.h" 
 #include "Propieties/PropFloat.h" 
+#include "Propieties/PropGap.h" 
 
 void ConstructorProperties();
 

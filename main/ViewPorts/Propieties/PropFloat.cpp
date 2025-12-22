@@ -25,6 +25,6 @@ void PropFloat::RenderPropertiLabel(Card* propertiBox){
     }
 }
 
-void PropFloat::Resize(int Width, int Height){
-    //propertiBox->Resize(300, RenglonHeightGS);
+int PropFloat::GetHeight(){
+    return RenglonHeightGS + gapGS;
 }

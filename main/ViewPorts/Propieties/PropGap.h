@@ -1,14 +1,12 @@
-#ifndef PROPFLOAT_H
-#define PROPFLOAT_H
+#ifndef PROPGAP_H
+#define PROPGAP_H
 
 #include "PropertieBase.h"
 #include "UI/card.h"
 
-class PropFloat : public PropertieBase { 
+class PropGap : public PropertieBase { 
     public:
-        PropFloat(const std::string& Name);
-
-        float* value = nullptr;
+        PropGap(const std::string& Name);
 
         void RenderPropertiBox(Card* propertiBox) override;
         void RenderPropertiValue(Card* propertiBox) override;

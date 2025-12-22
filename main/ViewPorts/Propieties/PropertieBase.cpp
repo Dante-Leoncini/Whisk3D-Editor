@@ -35,8 +35,7 @@ PropertieBase::PropertieBase(const std::string& Name): name(Name){
 
 PropertieBase::~PropertieBase() {}
 
-void PropertieBase::Resize(int Width, int Height){};
-
 void PropertieBase::RenderPropertiBox(Card* propertiBox){};
 void PropertieBase::RenderPropertiValue(Card* propertiBox){};
 void PropertieBase::RenderPropertiLabel(Card* propertiBox){};
+int PropertieBase::GetHeight(){return 0;};

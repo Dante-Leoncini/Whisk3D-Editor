@@ -7,7 +7,11 @@ GroupPropertie::GroupPropertie(const std::string& Name): name(Name) {
 
 void GroupPropertie::Resize(int Width, int Height){
     width = Width;
-    height = (properties.size() + 1) * (RenglonHeightGS + gapGS) + borderGS;
+    height = RenglonHeightGS + gapGS + borderGS;
+    for (size_t i = 0; i < properties.size(); ++i){
+        height += properties[i]->GetHeight();
+    }
+    //height = (properties.size() + 1) * (RenglonHeightGS + gapGS) + borderGS;
     card->Resize(Width, height);
 
     int widthProperties = width - bordersGS;
