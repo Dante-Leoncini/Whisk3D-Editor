@@ -1,3 +1,0 @@
-repository='external project URL'
-module='https://github.com/libsdl-org/SDL/archive/refs/tags/release-2.30.10.zip'
-tag=''

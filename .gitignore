@@ -1,18 +1,23 @@
-# Propiedades locales de Android
-/platform/android/local.properties
+# ===============================
+# ANDROID / GRADLE / NDK
+# ===============================
 
-/platform/android/app/build/
-/platform/android/app/.gradle/
-/platform/android/.gradle/
-/platform/android/.idea/
-/platform/android/local.properties
-*.iml
-*.dex
+platform/android/local.properties
+platform/android/.gradle/
+platform/android/.idea/
+
+platform/android/app/build/
+platform/android/app/.gradle/
+platform/android/app/.cxx/
+platform/android/app/intermediates/
+platform/android/app/outputs/
+platform/android/app/distribution/
+
 *.apk
 *.ap_
-/platform/android/app/distribution/
-/platform/android/app/intermediates/
-/platform/android/app/outputs/
+*.dex
+*.jar
+*.iml
 
 # Archivos de construcción de CMake / NDK
 android/distribution/android/app/.cxx/
@@ -28,8 +33,18 @@ build/
 */build/
 build-*/
 
-#windows
-/platform/windows/build/
+# ===============================
+# WINDOWS / VISUAL STUDIO
+# ===============================
+
+platform/windows/build/
+.vs/
+*.sdf
+*.suo
+*.user
+*.vcxproj.user
+*.vcxproj.filters
+*.VSWorkspaceState.json
 
 # --- Visual Studio ---
 *.sdf
@@ -40,6 +55,9 @@ build-*/
 *.VSWorkspaceState.json
 .vs/
 
-# --- IDE configs ---
+# ===============================
+# IDEs
+# ===============================
+
 .vscode/
 .settings/

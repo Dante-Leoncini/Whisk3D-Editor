@@ -1,6 +1,0 @@
-CMake Error at CMakeLists.txt:62 (file):
-  file COPY cannot find
-  "/home/dante/Documentos/personal/Whisk3D/platform/android/res": No such
-  file or directory.
-
-
