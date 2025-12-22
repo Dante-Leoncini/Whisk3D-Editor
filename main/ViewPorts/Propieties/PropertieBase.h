@@ -10,8 +10,7 @@
 #include "UI/bitmapText.h"
 #include "objects/Objects.h"
 
-void CardTitulo(GLfloat* icon, const std::string& texto);
-void DibujarTitulo(Object* obj);
+void CardTitulo(GLfloat* icon, const std::string& texto, int maxPixels = 1920);
 
 class PropertieBase {
     public:

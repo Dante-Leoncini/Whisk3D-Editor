@@ -16,6 +16,7 @@ void GroupPropertie::Resize(int Width, int Height){
 
     int widthProperties = width - bordersGS;
     int heightProperties = height - bordersGS;
+    maxPixelsTitle = widthProperties - IconSizeGS - gapGS;
 
     propertiBox->Resize(widthProperties/2, RenglonHeightGS+GlobalScale*2);
 }
@@ -61,7 +62,7 @@ void GroupPropertie::Render(){
         open
             ? IconsUV[static_cast<size_t>(IconType::arrow)]->uvs
             : IconsUV[static_cast<size_t>(IconType::arrowRight)]->uvs,
-        name
+        name, maxPixelsTitle
     );
     
     glTranslatef(0, RenglonHeightGS + gapGS, 0); 

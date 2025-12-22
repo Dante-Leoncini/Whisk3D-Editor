@@ -24,6 +24,7 @@
 #include "Propieties/PropFloat.h" 
 #include "Propieties/PropGap.h" 
 
+void DibujarTitulo(Object* obj, int maxPixels);
 void ConstructorProperties();
 
 extern GroupPropertie* propTransform;
@@ -34,6 +35,7 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         ~Properties() override;
 
         Object* target = nullptr;
+        int maxPixelsTitle = 1920;
 
         void Resize(int newW, int newH) override;
         void Render() override;

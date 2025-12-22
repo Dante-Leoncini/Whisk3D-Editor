@@ -2,6 +2,23 @@
 
 GroupPropertie* propTransform;
 
+void DibujarTitulo(Object* obj, int maxPixels){
+    glColor4f(ListaColores[static_cast<int>(ColorID::blanco)][0], ListaColores[static_cast<int>(ColorID::blanco)][1],
+              ListaColores[static_cast<int>(ColorID::blanco)][2], 1.0f);
+
+    //icono de la coleccion
+    glVertexPointer(2, GL_SHORT, 0, IconMesh); //todos los iconos comparten los vertices y tamaño
+    glTexCoordPointer(2, GL_FLOAT, 0, IconsUV[obj->IconType]->uvs);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+    //texto render        
+    glPushMatrix();            
+    glTranslatef(IconSizeGS + gapGS, 0, 0);  
+    RenderBitmapText(obj->name, textAlign::left, maxPixels);
+    glPopMatrix(); 
+    glTranslatef(0, RenglonHeightGS + gapGS, 0);
+}
+
 void ConstructorProperties(){
     propTransform = new GroupPropertie("Transform");
 
@@ -54,6 +71,7 @@ void Properties::Resize(int newW, int newH){
 
     int WidthCard = width-borderGS-marginGS;
     int heightCard = borderGS + borderGS + borderGS + (RenglonHeightGS + gapGS)*10;
+    maxPixelsTitle = WidthCard - IconSizeGS - gapGS;
 
     for (size_t i=0; i < GroupProperties.size(); i++){
         GroupProperties[i]->Resize(WidthCard, heightCard);
@@ -107,7 +125,7 @@ void Properties::Render(){
         glPushMatrix();   
         glTranslatef(PosX + borderGS, PosY + borderGS, 0);   
 
-        DibujarTitulo(ObjActivo);
+        DibujarTitulo(ObjActivo, maxPixelsTitle);
 
         //render de los grupos de propiedades    
         for (size_t i=0; i < GroupProperties.size(); i++){

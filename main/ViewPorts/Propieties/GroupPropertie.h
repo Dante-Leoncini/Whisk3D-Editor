@@ -14,6 +14,7 @@ class GroupPropertie {
         bool open = true;
         int width = 300;
         int height = 300;
+        int maxPixelsTitle = 1920;
         std::vector<PropertieBase*> properties;
         void Render();
         void RenderPropertiBox();
