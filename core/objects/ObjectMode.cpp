@@ -7,6 +7,7 @@ void ReestablecerEstado(bool ClearEstado){
 			Object& obj = *estadoObj.obj;
 			obj.pos = estadoObj.pos;
 			obj.rot = estadoObj.rot;
+        	obj.rotEuler = obj.rot.ToEulerYXZ();
 			obj.scale = estadoObj.scale;
 		}	
 		//estadoObjetos.Close();
@@ -254,6 +255,7 @@ void SetRotacion(int dx, int dy){
                 obj.RotateLocal(0, ang, 0);
 				break;
 		}
+        obj.rotEuler = obj.rot.ToEulerYXZ();
 	}
 }
 

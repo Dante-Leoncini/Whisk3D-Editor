@@ -54,6 +54,7 @@ class Object {
         Vector3 pos;    
         Quaternion rot;
         Vector3 scale;
+        Vector3 rotEuler;
 
         virtual ObjectType getType() { return ObjectType::baseObject; }
 

@@ -1,7 +1,7 @@
 #include "PropFloat.h"
 
-PropFloat::PropFloat(const std::string& Name): 
-    PropertieBase(Name){
+PropFloat::PropFloat(const std::string& Name, const std::string& Unit): 
+    unit(Unit), PropertieBase(Name){
 };
 
 void PropFloat::RenderPropertiBox(Card* propertiBox){
@@ -13,7 +13,7 @@ void PropFloat::RenderPropertiBox(Card* propertiBox){
 
 void PropFloat::RenderPropertiValue(Card* propertiBox){
     if (value){
-        RenderBitmapFloat(*value, textAlign::left, propertiBox->width -bordersGS);
+        RenderBitmapFloat(*value, textAlign::left, propertiBox->width -bordersGS, unit);
         glTranslatef(0, RenglonHeightGS + gapGS, 0); 
     }
 }

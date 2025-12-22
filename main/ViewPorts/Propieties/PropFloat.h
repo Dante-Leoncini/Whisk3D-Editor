@@ -6,9 +6,10 @@
 
 class PropFloat : public PropertieBase { 
     public:
-        PropFloat(const std::string& Name);
+        PropFloat(const std::string& Name, const std::string& Unit = "");
 
         float* value = nullptr;
+        std::string unit = "";
 
         void RenderPropertiBox(Card* propertiBox) override;
         void RenderPropertiValue(Card* propertiBox) override;

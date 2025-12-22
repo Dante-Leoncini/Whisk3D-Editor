@@ -54,8 +54,8 @@ void RenderBitmapText(const std::string& text, textAlign align, int maxPixels){
     glPopMatrix();
 }
 
-void RenderBitmapFloat(float value, textAlign align, int maxPixels){
+void RenderBitmapFloat(float value, textAlign align, int maxPixels, const std::string& unit){
     std::ostringstream ss;
     ss << std::fixed << std::setprecision(4) << value;
-    RenderBitmapText(ss.str(), align, maxPixels);
+    RenderBitmapText(ss.str()+unit, align, maxPixels);
 }

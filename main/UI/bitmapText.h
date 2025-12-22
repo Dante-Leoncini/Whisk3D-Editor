@@ -23,6 +23,6 @@ enum class textAlign {
 
 void RenderBitmapText(const std::string& text, textAlign align = textAlign::left, int maxPixels = 1920);
 
-void RenderBitmapFloat(float value, textAlign align = textAlign::left, int maxPixels = 1920);
+void RenderBitmapFloat(float value, textAlign align = textAlign::left, int maxPixels = 1920, const std::string& unit = "");
 
 #endif

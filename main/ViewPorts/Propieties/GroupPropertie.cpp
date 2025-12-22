@@ -86,35 +86,6 @@ void GroupPropertie::Render(){
         glPopMatrix();
 
         RenderPropertiLabel();
-        
-        /*glTranslatef(0, RenglonHeightGS + gapGS, 0); 
-        DibujarPropiedadFloat("Location X ", ObjActivo->pos.x);
-
-        glTranslatef(0, RenglonHeightGS + gapGS, 0); 
-        DibujarPropiedadFloat("         Y ", ObjActivo->pos.z);
-
-        glTranslatef(0, RenglonHeightGS + gapGS, 0); 
-        DibujarPropiedadFloat("         Z ", ObjActivo->pos.y);
-
-        Vector3 euler = ObjActivo->rot.ToEulerYXZ();
-
-        glTranslatef(0, RenglonHeightGS + marginGS, 0); 
-        DibujarPropiedadFloat("Rotation X ", euler.x);
-
-        glTranslatef(0, RenglonHeightGS + gapGS, 0); 
-        DibujarPropiedadFloat("         Y ", euler.z);
-
-        glTranslatef(0, RenglonHeightGS + gapGS, 0); 
-        DibujarPropiedadFloat("         Z ", euler.y);
-
-        glTranslatef(0, RenglonHeightGS + marginGS, 0); 
-        DibujarPropiedadFloat("   Scale X ", ObjActivo->scale.x);
-
-        glTranslatef(0, RenglonHeightGS + gapGS, 0); 
-        DibujarPropiedadFloat("         Y ", ObjActivo->scale.z);
-
-        glTranslatef(0, RenglonHeightGS + gapGS, 0); 
-        DibujarPropiedadFloat("         Z ", ObjActivo->scale.y);*/
     }
 
     glTranslatef(-borderGS, borderGS + gapGS, 0);
