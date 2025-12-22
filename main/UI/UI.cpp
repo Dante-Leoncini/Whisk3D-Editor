@@ -11,17 +11,20 @@ int LetterHeight = 11;
 int paddingViewport = 3;
 int MinViewportHeight = 30;
 int MinViewportWidth = 30;
+int CharacterWidth = 6;
 
 int marginGS = margin;
 int paddingGS = padding;
 int gapGS = gap;
 int borderGS = border;
+int bordersGS = border*2;
 int RenglonHeightGS = RenglonHeight;
 int LetterWidthGS = LetterWidth;
 int LetterHeightGS = LetterHeight;
 int paddingViewportGS = paddingViewport;
 int MinViewportHeightGS = MinViewportHeight;
 int MinViewportWidthGS = MinViewportWidth;
+int CharacterWidthGS = CharacterWidth;
 
 int dx = 0;
 int dy = 0;

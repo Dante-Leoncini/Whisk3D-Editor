@@ -35,7 +35,7 @@ class Card : public Object2D {
 		Card(Object2D* parent = nullptr, int w = 10, int h = 10);
 
 		// Métodos
-		void Resize(int width, int height);
+		void Resize(int w, int h);
 		void SetColor(GLubyte red, GLubyte green, GLubyte blue);
 		void RenderObject(bool usarColorPropio = true) override;
         void RenderBorder(bool usarColorPropio);

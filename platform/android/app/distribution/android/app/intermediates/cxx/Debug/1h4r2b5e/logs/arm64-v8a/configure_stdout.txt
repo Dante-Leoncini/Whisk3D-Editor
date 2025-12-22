@@ -378,7 +378,7 @@
 -- Platform: Android-1
 -- 64-bit:   TRUE
 -- Compiler: /home/dante/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/bin/clang
--- Revision: SDL-2.30.10-g0c0ab9f
+-- Revision: SDL-2.30.10-ge62ad41
 -- 
 -- Subsystems:
 --   Atomic:	ON

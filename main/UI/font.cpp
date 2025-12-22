@@ -56,7 +56,7 @@ Font::Font(int texW, int texH, GLuint textureID)
     addGlyph('L', 67, 0, 5, 11);
     addGlyph('M', 73, 0, 5, 11);
     addGlyph('N', 1, 10, 5, 11);
-    addGlyph(0x00D1, 79, 10, 5, 11); // Ñ
+    addGlyph(0x00D1, 79, 0, 5, 11); // Ñ
     addGlyph('O', 7, 10, 5, 11);
     addGlyph('P', 13, 10, 5, 11);
     addGlyph('Q', 19, 10, 5, 11);
@@ -69,6 +69,7 @@ Font::Font(int texW, int texH, GLuint textureID)
     addGlyph('X', 61, 10, 5, 11);
     addGlyph('Y', 67, 10, 5, 11);
     addGlyph('Z', 73, 10, 5, 11);
+    addGlyph('_', 79, 10, 5, 11);
 
     // ===== MINÚSCULAS =====
     addGlyph('a', 1, 20, 5, 11);
@@ -127,16 +128,16 @@ Font::Font(int texW, int texH, GLuint textureID)
     addGlyph(':', 61, 52, 5, 11); 
     addGlyph('#', 67, 52, 5, 11); 
     addGlyph('%', 73, 52, 5, 11); 
-    addGlyph('!', 1, 63, 5, 11); 
-    addGlyph('?', 7, 63, 5, 11); 
+    addGlyph('!', 1, 64, 5, 11); 
+    addGlyph('?', 7, 64, 5, 11); 
     addGlyph('.', 13, 63, 5, 11); 
     addGlyph(',', 19, 63, 5, 11); 
-    addGlyph('\'', 25, 63, 5, 11);
-    addGlyph('\"', 31, 63, 5, 11); 
-    addGlyph('@', 37, 63, 5, 11); 
-    addGlyph('&', 43, 63, 5, 11); 
-    addGlyph('$', 49, 63, 5, 11); 
-    addGlyph(0x00A1, 55, 63, 5, 11); // ¡
+    addGlyph('\'', 25, 64, 5, 11);
+    addGlyph('\"', 31, 64, 5, 11); 
+    addGlyph('@', 37, 64, 5, 11); 
+    addGlyph('&', 43, 64, 5, 11); 
+    addGlyph('$', 49, 64, 5, 11); 
+    addGlyph(0x00A1, 55, 64, 5, 11); // ¡
 }
 
 // ================= API =================

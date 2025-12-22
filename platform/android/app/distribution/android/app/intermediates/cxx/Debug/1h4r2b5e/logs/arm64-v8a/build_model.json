@@ -27,10 +27,7 @@
     "variantName": "debug",
     "isDebuggableEnabled": true,
     "validAbiList": [
-      "armeabi-v7a",
-      "arm64-v8a",
-      "x86",
-      "x86_64"
+      "arm64-v8a"
     ],
     "buildTargetSet": [],
     "implicitBuildTargetSet": [],
@@ -155,6 +152,7 @@
         "rootBuildGradleFolder": "/home/dante/Documentos/personal/Whisk3D/platform/android",
         "sdkFolder": "/home/dante/Android/Sdk",
         "isBuildOnlyTargetAbiEnabled": true,
+        "ideBuildTargetAbi": "arm64-v8a,armeabi-v7a,armeabi",
         "isCmakeBuildCohabitationEnabled": false,
         "isPrefabEnabled": false
       },

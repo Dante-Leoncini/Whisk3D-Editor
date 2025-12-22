@@ -89,7 +89,9 @@ Card::Card(Object2D* parent, int w, int h) : Object2D(parent) {
 }
 
 // ------------------ Resize ------------------
-void Card::Resize(int width, int height) {
+void Card::Resize(int w, int h) {
+    width = w;
+    height = h;
     GLshort U[4] = { 0, (GLshort)(2*GlobalScale), (GLshort)(width - 2*GlobalScale), (GLshort)(width) };
     GLshort V[4] = { 0, (GLshort)(2*GlobalScale), (GLshort)(height - 2*GlobalScale), (GLshort)(height) };
 

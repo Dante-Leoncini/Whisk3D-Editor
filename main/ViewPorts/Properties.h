@@ -4,32 +4,40 @@
 #include <vector>
 #include <SDL2/SDL.h>
 
+#include <GL/gl.h>
+
 #include "variables.h"
 #include "sdl_key_compat.h"
 #include "ViewPorts.h"
 #include "ScrollBar.h"
 #include "WithBorder.h"
+
 #include "objects/Objects.h"
 #include "objects/ObjectMode.h"
 
-//para la UI 2d
-#include "UI/card.h"
-#include "UI/bitmapText.h"
+#include "objects/Light.h" 
+#include "objects/Camera.h" 
+#include "objects/Mesh.h" 
 
-#include <GL/gl.h>
+#include "Propieties/PropertieBase.h" 
+#include "Propieties/GroupPropertie.h" 
+#include "Propieties/PropFloat.h" 
+
+void ConstructorProperties();
+
+extern GroupPropertie* propTransform;
 
 class Properties : public ViewportBase, public WithBorder, public Scrollable {
-    public:
-        Card* card;
+    public:    
         Properties();
         ~Properties() override;
+
+        Object* target = nullptr;
 
         void Resize(int newW, int newH) override;
         void Render() override;
 
-        void DibujarTitulo(Object* obj);
-        void CardTitulo(GLfloat* icon, const std::string& texto);
-        void DibujarPropiedadFloat(const std::string& text, float value);
+        void RefreshTargetProperties();
 
         void button_left() override;
         void mouse_button_up(SDL_Event &e) override;

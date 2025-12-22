@@ -24,27 +24,28 @@
 18-->/home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml:9:9-54
 19        android:supportsRtl="true"
 19-->/home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml:10:9-35
-20        android:theme="@style/AppTheme" >
-20-->/home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml:11:9-40
-21        <activity
-21-->/home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml:12:9-21:20
-22            android:name="pvallet.com.github.hello_sdl2.HelloSDL2Activity"
-22-->/home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml:13:13-46
-23            android:exported="true"
-23-->/home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml:14:13-36
-24            android:label="@string/app_name" >
-24-->/home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml:15:13-45
-25            <intent-filter>
-25-->/home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml:16:13-20:29
-26                <action android:name="android.intent.action.MAIN" />
-26-->/home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml:17:17-69
-26-->/home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml:17:25-66
-27
-28                <category android:name="android.intent.category.LAUNCHER" />
-28-->/home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml:19:17-77
-28-->/home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml:19:27-74
-29            </intent-filter>
-30        </activity>
-31    </application>
-32
-33</manifest>
+20        android:testOnly="true"
+21        android:theme="@style/AppTheme" >
+21-->/home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml:11:9-40
+22        <activity
+22-->/home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml:12:9-21:20
+23            android:name="pvallet.com.github.hello_sdl2.HelloSDL2Activity"
+23-->/home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml:13:13-46
+24            android:exported="true"
+24-->/home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml:14:13-36
+25            android:label="@string/app_name" >
+25-->/home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml:15:13-45
+26            <intent-filter>
+26-->/home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml:16:13-20:29
+27                <action android:name="android.intent.action.MAIN" />
+27-->/home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml:17:17-69
+27-->/home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml:17:25-66
+28
+29                <category android:name="android.intent.category.LAUNCHER" />
+29-->/home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml:19:17-77
+29-->/home/dante/Documentos/personal/Whisk3D/platform/android/app/src/main/AndroidManifest.xml:19:27-74
+30            </intent-filter>
+31        </activity>
+32    </application>
+33
+34</manifest>

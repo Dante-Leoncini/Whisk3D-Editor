@@ -1,19 +1,66 @@
 #include "Properties.h"
 
+GroupPropertie* propTransform;
+
+void ConstructorProperties(){
+    propTransform = new GroupPropertie("Transform");
+
+    propTransform->properties.push_back(new PropFloat("Location X"));
+    propTransform->properties.push_back(new PropFloat("Y"));
+    propTransform->properties.push_back(new PropFloat("Z"));
+
+    propTransform->properties.push_back(new PropFloat("Rotation X"));
+    propTransform->properties.push_back(new PropFloat("Y"));
+    propTransform->properties.push_back(new PropFloat("Z"));
+
+    propTransform->properties.push_back(new PropFloat("Scale X"));
+    propTransform->properties.push_back(new PropFloat("Y"));
+    propTransform->properties.push_back(new PropFloat("Z"));
+
+    GroupProperties.push_back(propTransform);
+    GroupProperties.push_back(new GroupPropertie("Materials"));
+}
+
+void Properties::RefreshTargetProperties(){
+    if (!ObjActivo || ObjActivo == target ) return;
+
+    //posicion
+    static_cast<PropFloat*>(propTransform->properties[0])->value = &ObjActivo->pos.x;
+    static_cast<PropFloat*>(propTransform->properties[1])->value = &ObjActivo->pos.y;
+    static_cast<PropFloat*>(propTransform->properties[2])->value = &ObjActivo->pos.z;
+
+    //rotacion
+    static_cast<PropFloat*>(propTransform->properties[3])->value = &ObjActivo->rot.x;
+    static_cast<PropFloat*>(propTransform->properties[4])->value = &ObjActivo->rot.y;
+    static_cast<PropFloat*>(propTransform->properties[5])->value = &ObjActivo->rot.z;
+
+    //escala
+    static_cast<PropFloat*>(propTransform->properties[6])->value = &ObjActivo->scale.x;
+    static_cast<PropFloat*>(propTransform->properties[7])->value = &ObjActivo->scale.y;
+    static_cast<PropFloat*>(propTransform->properties[8])->value = &ObjActivo->scale.z;
+}
+
 // Constructor
 Properties::Properties() : ViewportBase() {
-    card = new Card(nullptr, 300, 300);
 }
         
 void Properties::Resize(int newW, int newH){
     ViewportBase::Resize(newW, newH);
     ResizeBorder(newW, newH);
-    card->Resize(width-borderGS-borderGS, borderGS + borderGS + borderGS + (RenglonHeightGS + gapGS)*10);
 
-    ResizeScrollbar(newW, newH, 0, -1000);
+    int WidthCard = width-borderGS-marginGS;
+    int heightCard = borderGS + borderGS + borderGS + (RenglonHeightGS + gapGS)*10;
+
+    for (size_t i=0; i < GroupProperties.size(); i++){
+        GroupProperties[i]->Resize(WidthCard, heightCard);
+    }
+
+    ResizeScrollbar(newW, newH, 0, -2000);
 }
 
 void Properties::Render(){
+    RefreshTargetProperties();
+
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
 
@@ -58,49 +105,83 @@ void Properties::Render(){
 
         DibujarTitulo(ObjActivo);
 
-        glTranslatef(0, RenglonHeightGS + gapGS, 0);
+        //render de los grupos de propiedades    
+        for (size_t i=0; i < GroupProperties.size(); i++){
+            GroupProperties[i]->Render();
+        }
 
-        glColor4f(ListaColores[static_cast<int>(ColorID::gris)][0], 
-                  ListaColores[static_cast<int>(ColorID::gris)][1],
-                  ListaColores[static_cast<int>(ColorID::gris)][2], 1.0f);
+        //si es lampara
+        /*if (ObjActivo->getType() == ObjectType::light){
+            Light* light = static_cast<Light*>(ObjActivo);
 
-        card->RenderObject(false);
+            glTranslatef(0, RenglonHeightGS + marginGS, 0);
+            DibujarPropiedadFloat(" Ambient R ", light->ambient[0]);
 
+            glTranslatef(0, RenglonHeightGS + gapGS, 0);
+            DibujarPropiedadFloat("         G ", light->ambient[1]);
 
-        glTranslatef(borderGS, borderGS, 0);
-        CardTitulo(
-            IconsUV[static_cast<size_t>(IconType::arrow)]->uvs,
-            "Transform"
-        );
+            glTranslatef(0, RenglonHeightGS + gapGS, 0);
+            DibujarPropiedadFloat("         B ", light->ambient[2]);
 
-        glTranslatef(0, RenglonHeightGS + gapGS, 0); 
-        DibujarPropiedadFloat("Location X ", ObjActivo->pos.x);
+            glTranslatef(0, RenglonHeightGS + marginGS, 0);
+            DibujarPropiedadFloat(" Diffuse R ", light->diffuse[0]);
 
-        glTranslatef(0, RenglonHeightGS + gapGS, 0); 
-        DibujarPropiedadFloat("         Y ", ObjActivo->pos.z);
+            glTranslatef(0, RenglonHeightGS + gapGS, 0);
+            DibujarPropiedadFloat("         G ", light->diffuse[1]);
 
-        glTranslatef(0, RenglonHeightGS + gapGS, 0); 
-        DibujarPropiedadFloat("         Z ", ObjActivo->pos.y);
+            glTranslatef(0, RenglonHeightGS + gapGS, 0);
+            DibujarPropiedadFloat("         B ", light->diffuse[2]);
 
-        Vector3 euler = ObjActivo->rot.ToEulerYXZ();
+            glTranslatef(0, RenglonHeightGS + marginGS, 0);
+            DibujarPropiedadFloat("Specular R ", light->specular[0]);
 
-        glTranslatef(0, RenglonHeightGS + marginGS, 0); 
-        DibujarPropiedadFloat("Rotation X ", euler.x);
+            glTranslatef(0, RenglonHeightGS + gapGS, 0);
+            DibujarPropiedadFloat("         G ", light->specular[1]);
 
-        glTranslatef(0, RenglonHeightGS + gapGS, 0); 
-        DibujarPropiedadFloat("         Y ", euler.z);
+            glTranslatef(0, RenglonHeightGS + gapGS, 0);
+            DibujarPropiedadFloat("         B ", light->specular[2]);
+        }
 
-        glTranslatef(0, RenglonHeightGS + gapGS, 0); 
-        DibujarPropiedadFloat("         Z ", euler.y);
+        //si es camara
+        if (ObjActivo->getType() == ObjectType::camera){
+            Camera* camera = static_cast<Camera*>(ObjActivo);
 
-        glTranslatef(0, RenglonHeightGS + marginGS, 0); 
-        DibujarPropiedadFloat("   Scale X ", ObjActivo->scale.x);
+            glTranslatef(0, RenglonHeightGS + marginGS, 0);
+            if (camera->Riel){
+                DibujarPropiedadFloat("Tiene Riel! ", 0.0f);
 
-        glTranslatef(0, RenglonHeightGS + gapGS, 0); 
-        DibujarPropiedadFloat("         Y ", ObjActivo->scale.z);
+                glTranslatef(0, RenglonHeightGS + marginGS, 0);
+                DibujarPropiedadFloat("Offset Riel: ", camera->offsetRiel);
+            }
+            else {
+                DibujarPropiedadFloat("No tiene Riel ", 0.0f);
+            }
+        }
 
-        glTranslatef(0, RenglonHeightGS + gapGS, 0); 
-        DibujarPropiedadFloat("         Z ", ObjActivo->scale.y);
+        //si es camara
+        if (ObjActivo->getType() == ObjectType::mesh){
+            Mesh* mesh = static_cast<Mesh*>(ObjActivo);
+
+            glColor4f(ListaColores[static_cast<int>(ColorID::blanco)][0], 
+                    ListaColores[static_cast<int>(ColorID::blanco)][1],
+                    ListaColores[static_cast<int>(ColorID::blanco)][2], 1.0f);
+
+            glTranslatef(0, RenglonHeightGS + marginGS, 0);
+            CardTitulo(
+                IconsUV[static_cast<size_t>(IconType::arrow)]->uvs,
+                "Materiales"
+            );
+
+            glColor4f(ListaColores[static_cast<int>(ColorID::grisUI)][0], 
+                    ListaColores[static_cast<int>(ColorID::grisUI)][1],
+                    ListaColores[static_cast<int>(ColorID::grisUI)][2], 1.0f);
+
+            for (size_t i = 0; i < mesh->materialsGroup.size(); ++i){
+                Material* mat = mesh->materialsGroup[i].material;
+                glTranslatef(0, RenglonHeightGS + marginGS, 0);
+                DibujarPropiedadInt(mat->name, mesh->materialsGroup.size());
+            }
+        }*/
 
         glPopMatrix();
     }
@@ -108,44 +189,6 @@ void Properties::Render(){
     //glDisable(GL_SCISSOR_TEST);
     DibujarBordes(this);
     DibujarScrollbar(this);
-}
-
-void Properties::DibujarPropiedadFloat(const std::string& text, float value){
-    std::ostringstream ss;
-    ss << std::fixed << std::setprecision(4) << value;
-    RenderBitmapText(text + ss.str());
-}
-
-void Properties::CardTitulo(GLfloat* icon, const std::string& texto){
-    glColor4f(ListaColores[static_cast<int>(ColorID::blanco)][0], ListaColores[static_cast<int>(ColorID::blanco)][1],
-              ListaColores[static_cast<int>(ColorID::blanco)][2], 1.0f);
-
-    //icono de la coleccion
-    glVertexPointer(2, GL_SHORT, 0, IconMesh); //todos los iconos comparten los vertices y tamaño
-    glTexCoordPointer(2, GL_FLOAT, 0, icon);
-    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-
-    //texto render        
-    glPushMatrix();            
-    glTranslatef(IconSizeGS + gapGS, 0, 0);  
-    RenderBitmapText(texto);
-    glPopMatrix(); 
-}
-
-void Properties::DibujarTitulo(Object* obj){
-    glColor4f(ListaColores[static_cast<int>(ColorID::blanco)][0], ListaColores[static_cast<int>(ColorID::blanco)][1],
-              ListaColores[static_cast<int>(ColorID::blanco)][2], 1.0f);
-
-    //icono de la coleccion
-    glVertexPointer(2, GL_SHORT, 0, IconMesh); //todos los iconos comparten los vertices y tamaño
-    glTexCoordPointer(2, GL_FLOAT, 0, IconsUV[obj->IconType]->uvs);
-    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-
-    //texto render        
-    glPushMatrix();            
-    glTranslatef(IconSizeGS + gapGS, 0, 0);  
-    RenderBitmapText(obj->name);
-    glPopMatrix(); 
 }
 
 void Properties::button_left(){

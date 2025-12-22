@@ -20,6 +20,7 @@ void ConstructUniversal(int argc, char* argv[]) {
     CalcCardUV(128, 128);
     CalcScrollUV(128, 128);
     InitCursors();
+    ConstructorProperties();
 
     //ACA HAY QUE CARGAR LAS TEXTURAS!!!!
     const std::vector<std::string> texFiles = {
@@ -107,7 +108,7 @@ void ConstructUniversal(int argc, char* argv[]) {
             new Outliner(),
             0.70f
         ),
-        0.75f
+        0.70f
     );
 
     /*rootViewport = new ViewportColumn(

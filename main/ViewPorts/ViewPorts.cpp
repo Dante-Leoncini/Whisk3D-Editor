@@ -278,11 +278,13 @@ void SetGlobalScale(int scale){
     gapGS = gap * scale;
     RenglonHeightGS = RenglonHeight * scale;
     borderGS = border * scale;
+    bordersGS = borderGS * 2;
     LetterWidthGS = LetterWidth * scale;
     LetterHeightGS = LetterHeight * scale;    
     paddingViewportGS = paddingViewport * scale;
     MinViewportHeightGS = MinViewportHeight * scale;
     MinViewportWidthGS = MinViewportWidth * scale;
+    CharacterWidthGS = CharacterWidth * scale;
 
     SetIconScale(scale);
     WhiskFont->SetScale(scale);

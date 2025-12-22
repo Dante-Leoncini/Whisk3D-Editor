@@ -16,25 +16,25 @@
 #include "render/OpcionesRender.h" 
 
 class Light : public Object {
-public:
-    GLenum LightID;
-    GLfloat position[4];
-    GLfloat ambient[4];
-    GLfloat diffuse[4];
-    GLfloat specular[4];
+    public:
+        GLenum LightID;
+        GLfloat position[4];
+        GLfloat ambient[4];
+        GLfloat diffuse[4];
+        GLfloat specular[4];
 
-    static Light* Create(Object* parent = nullptr, GLfloat x = 0, GLfloat y = 0, GLfloat z = 0);
+        static Light* Create(Object* parent = nullptr, GLfloat x = 0, GLfloat y = 0, GLfloat z = 0);
 
-    ObjectType getType() override;
+        ObjectType getType() override;
 
-    void SetDiffuse(GLfloat r = 1.0f, GLfloat g = 1.0f, GLfloat b = 1.0f);
-    void SetLightID(GLenum ID);
-    void RenderObject() override;
+        void SetDiffuse(GLfloat r = 1.0f, GLfloat g = 1.0f, GLfloat b = 1.0f);
+        void SetLightID(GLenum ID);
+        void RenderObject() override;
 
-    ~Light();
+        ~Light();
 
-private:
-    Light(Object* parent, GLfloat x, GLfloat y, GLfloat z);
+    private:
+        Light(Object* parent, GLfloat x, GLfloat y, GLfloat z);
 };
 
 // Contenedor global de luces
