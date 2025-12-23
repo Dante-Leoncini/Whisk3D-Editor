@@ -16,6 +16,11 @@ class GroupPropertie {
         int height = 300;
         int maxPixelsTitle = 1920;
         std::vector<PropertieBase*> properties;
+
+        //seleccion
+        int selectIndex = -2;
+        bool NextSelect();
+
         void Render();
         void RenderPropertiBox();
         void RenderPropertiValue();

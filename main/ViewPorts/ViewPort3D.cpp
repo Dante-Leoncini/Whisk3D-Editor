@@ -1109,10 +1109,10 @@ void Viewport3D::event_key_down(SDL_Event &e){
             case SDLK_LEFT:    // Flecha izquierda
                 TeclaIzquierda();
                 break;
-            case SDLK_UP:   // Flecha derecha
+            case SDLK_UP:   
                 TeclaArriba();
                 break;
-            case SDLK_DOWN:    // Flecha izquierda
+            case SDLK_DOWN:  
                 TeclaAbajo();
                 break;
             case SDLK_A:   // Flecha derecha

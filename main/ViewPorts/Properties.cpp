@@ -242,7 +242,38 @@ void Properties::event_mouse_motion(int mx, int my) {
     }
 }
 
-void Properties::event_key_down(SDL_Event &e){         
+void Properties::event_key_down(SDL_Event &e){       
+    #if SDL_MAJOR_VERSION == 2
+        SDL_Keycode key = e.key.keysym.sym; //SDL2            
+    #elif SDL_MAJOR_VERSION == 3
+        SDL_Keycode key = e.key.key; // SDL3
+    #endif
+    if (e.key.repeat == 0) { 
+        switch (key) {
+            case SDLK_LEFT:
+                NextSelect();
+                break;
+            case SDLK_RIGHT:
+                NextSelect();
+                break;
+            case SDLK_UP: 
+                NextSelect();
+                break;
+            case SDLK_DOWN:
+                NextSelect();
+                break;
+        };
+    }   
+}
+
+void Properties::NextSelect(){
+    if (GroupProperties[selectIndex]->NextSelect()){
+        selectIndex++;
+        if (selectIndex >= static_cast<int>(GroupProperties.size())){
+            selectIndex = 0;
+        }
+        GroupProperties[selectIndex]->selectIndex = -1;
+    }
 }
 
 void Properties::event_key_up(SDL_Event &e){

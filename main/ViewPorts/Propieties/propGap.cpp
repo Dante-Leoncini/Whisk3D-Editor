@@ -19,3 +19,7 @@ void PropGap::RenderPropertiLabel(Card* propertiBox){
 int PropGap::GetHeight(){
     return gapGS;
 }
+
+PropertyType PropGap::GetType(){
+    return PropertyType::Gap;
+}

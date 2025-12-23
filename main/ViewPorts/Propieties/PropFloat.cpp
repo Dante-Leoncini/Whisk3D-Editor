@@ -25,6 +25,10 @@ void PropFloat::RenderPropertiLabel(Card* propertiBox){
     }
 }
 
+PropertyType PropFloat::GetType(){
+    return PropertyType::Float;
+}
+
 int PropFloat::GetHeight(){
     return RenglonHeightGS + gapGS;
 }

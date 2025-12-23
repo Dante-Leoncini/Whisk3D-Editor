@@ -37,6 +37,9 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         Object* target = nullptr;
         int maxPixelsTitle = 1920;
 
+        int selectIndex = 0;
+        void NextSelect();
+
         void Resize(int newW, int newH) override;
         void Render() override;
 

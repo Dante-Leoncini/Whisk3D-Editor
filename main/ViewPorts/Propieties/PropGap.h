@@ -8,6 +8,8 @@ class PropGap : public PropertieBase {
     public:
         PropGap(const std::string& Name);
 
+        PropertyType GetType() override;
+        
         void RenderPropertiBox(Card* propertiBox) override;
         void RenderPropertiValue(Card* propertiBox) override;
         void RenderPropertiLabel(Card* propertiBox) override;

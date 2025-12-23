@@ -18,6 +18,10 @@ PropertieBase::PropertieBase(const std::string& Name): name(Name){
 
 PropertieBase::~PropertieBase() {}
 
+PropertyType PropertieBase::GetType(){
+    return PropertyType::Base;
+}
+
 void PropertieBase::RenderPropertiBox(Card* propertiBox){};
 void PropertieBase::RenderPropertiValue(Card* propertiBox){};
 void PropertieBase::RenderPropertiLabel(Card* propertiBox){};

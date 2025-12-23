@@ -139,6 +139,7 @@ Font::Font(int texW, int texH, GLuint textureID)
     addGlyph('$', 49, 64, 5, 11); 
     addGlyph(0x00A1, 55, 64, 5, 11); // ¡
     addGlyph(0x00B0, 61, 64, 5, 11); // °
+    addGlyph('|', 67, 64, 5, 11);
 }
 
 // ================= API =================

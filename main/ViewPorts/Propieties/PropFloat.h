@@ -11,6 +11,8 @@ class PropFloat : public PropertieBase {
         float* value = nullptr;
         std::string unit = "";
 
+        PropertyType GetType() override;
+
         void RenderPropertiBox(Card* propertiBox) override;
         void RenderPropertiValue(Card* propertiBox) override;
         void RenderPropertiLabel(Card* propertiBox) override;

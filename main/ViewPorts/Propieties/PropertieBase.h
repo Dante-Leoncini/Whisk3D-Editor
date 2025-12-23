@@ -10,6 +10,14 @@
 #include "UI/bitmapText.h"
 #include "objects/Objects.h"
 
+enum class PropertyType {
+    Base,
+    Gap,
+    Float,
+    Int,
+    Bool
+};
+
 void CardTitulo(GLfloat* icon, const std::string& texto, int maxPixels = 1920);
 
 class PropertieBase {
@@ -17,6 +25,8 @@ class PropertieBase {
         std::string name = "?";
         PropertieBase(const std::string& Name);
         virtual ~PropertieBase();
+
+        virtual PropertyType GetType();
 
         virtual void RenderPropertiBox(Card* propertiBox);
         virtual void RenderPropertiValue(Card* propertiBox);
