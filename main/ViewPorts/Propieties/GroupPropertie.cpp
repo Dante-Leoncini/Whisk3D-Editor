@@ -26,6 +26,32 @@ bool GroupPropertie::NextSelect(){
     }
 }
 
+bool GroupPropertie::PrevSelect(){
+    const int size = static_cast<int>(properties.size());
+
+    while (true){
+        selectIndex--;
+
+        // llegamos al inicio
+        if (selectIndex < 0){
+            selectIndex = -2;
+            return true;
+        }
+
+        // por seguridad (simetría con NextSelect)
+        if (selectIndex >= size){
+            selectIndex = size - 1;
+        }
+
+        // saltar gaps
+        if (properties[selectIndex]->GetType() == PropertyType::Gap)
+            continue;
+
+        // encontrado válido
+        return false;
+    }
+}
+
 GroupPropertie::GroupPropertie(const std::string& Name): name(Name) {
     card = new Card(nullptr, 300, 300);
     propertiBox = new Card(nullptr, 300, RenglonHeightGS);

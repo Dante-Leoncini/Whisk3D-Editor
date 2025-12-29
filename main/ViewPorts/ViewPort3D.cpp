@@ -1185,9 +1185,11 @@ GLfloat cosY = 0.0f;
 GLfloat sinY = 0.0f;
 
 void Gamepad::Update() {
-    if (!target || !Viewport3DActive || !CameraActive) return;
+    if (!target || !Viewport3DActive) return;
 
     UpdateAnimation();
+
+    if (!CameraActive) return;
 
     // --- 1. CONFIGURACIÓN DE VECTORES DE MOVIMIENTO ---
     Vector3 camForward = CameraActive->forwardVector;

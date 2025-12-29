@@ -332,12 +332,15 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
         Gamepad* gamepad = new Gamepad(parent);
         if(p.count("target")) gamepad->SetTarget(p.at("target"));
 
-        // recorrer hijos
         for (auto* child : n->children) {
             if (child->type == "Animation") {
                 auto& ap = child->props;
 
-                VertexAnimation* anim = new VertexAnimation(nullptr, ap.at("name"));
+                bool UseNormals = GetBoolOrDefault(ap, "UseNormals", false);
+
+                VertexAnimation* anim =
+                    new VertexAnimation(nullptr, ap.at("name"), UseNormals);
+
                 anim->basePath   = GetFilePath(ap.at("basePath"));
                 anim->frameCount = std::stoi(ap.at("frames"));
                 anim->padding    = std::stoi(ap.at("padding"));

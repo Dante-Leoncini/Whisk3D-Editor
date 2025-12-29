@@ -1,10 +1,6 @@
 #include "VertexAnimation.h"
 
-VertexAnimation::VertexAnimation(Mesh* tgt, const std::string& animName): target(tgt), name(animName) {}
-
-void VertexAnimation::AddFrame(VertexFrame* frame) {
-    frames.push_back(frame);
-}
+VertexAnimation::VertexAnimation(Mesh* tgt, const std::string& animName, bool useNormals): target(tgt), name(animName), UseNormals(useNormals) {}
 
 bool VertexAnimation::LoadFrames() {
     if (!target || !target->vertex || target->vertexSize <= 0)
@@ -28,34 +24,68 @@ bool VertexAnimation::LoadFrames() {
         }
 
         std::vector<GLfloat> verts;
+        std::vector<GLbyte>  tempNormals;
+        std::vector<Face>    faces;
+
         std::string line;
 
+        auto conv = [](double v) -> GLbyte {
+            v = ((v + 1.0) * 0.5) * 255.0 - 128.0;
+            if (v > 127) v = 127;
+            if (v < -128) v = -128;
+            return (GLbyte)v;
+        };
+
+        // ---------- PARSE OBJ ----------
         while (std::getline(file, line)) {
+
             if (line.rfind("v ", 0) == 0) {
                 GLfloat x, y, z;
-                std::sscanf(line.c_str(), "v %f %f %f", &x, &y, &z);
+                sscanf(line.c_str(), "v %f %f %f", &x, &y, &z);
                 verts.push_back(x);
                 verts.push_back(y);
                 verts.push_back(z);
-                //std::cerr << "["<< name <<"] x: "<< x <<" y: "<< y <<" z: "<< z << "\n";
+            }
+            else if (UseNormals && line.rfind("vn ", 0) == 0) {
+                double nx, ny, nz;
+                sscanf(line.c_str(), "vn %lf %lf %lf", &nx, &ny, &nz);
+
+                tempNormals.push_back(conv(nx));
+                tempNormals.push_back(conv(ny));
+                tempNormals.push_back(conv(nz));
+            }
+            else if (UseNormals && line.rfind("f ", 0) == 0) {
+                Face f;
+                ParseFace(line, f);
+                faces.push_back(f);
             }
         }
 
-        // chequeo CLAVE
+        // ---------- VALIDACIÓN ----------
         if ((int)verts.size() != target->vertexSize) {
             std::cerr << "[Anim] Vertex count mismatch en "
                       << path.str() << "\n";
             return false;
         }
 
-        //std::cerr << "["<< name <<"] Vertex count " << (verts.size()/3) << "\n";
+        // ---------- CONSTRUIR NORMALES ----------
+        GLbyte* finalNormals = nullptr;
 
-        VertexFrame* f = new VertexFrame;
-        f->positions = new float[verts.size()];
-        std::memcpy((void*)f->positions, verts.data(),
-                    verts.size() * sizeof(float));
+        if (UseNormals) {
+            size_t vcount = verts.size() / 3;
+            finalNormals = BuildVertexNormals(vcount, tempNormals, faces);
+        }
 
-        frames.push_back(f);
+        // ---------- CREAR FRAME ----------
+        VertexFrame* frame = new VertexFrame;
+
+        GLfloat* pos = new GLfloat[verts.size()];
+        std::memcpy(pos, verts.data(), verts.size() * sizeof(GLfloat));
+        frame->positions = pos;
+
+        frame->normals = finalNormals; // puede ser nullptr
+
+        frames.push_back(frame);
     }
 
     return true;
@@ -63,20 +93,38 @@ bool VertexAnimation::LoadFrames() {
 
 void ApplyVertexFrame(const VertexAnimation& anim, size_t frameIndex) {
     assert(anim.target);
-    if(frameIndex >= anim.frames.size()){
-        frameIndex = anim.frames.size()-1;
-    }
 
-    //std::cout << "ApplyVertexFrame "<< anim.name << " frameIndex: " << (frameIndex+1) << "/" << anim.frames.size() << "\n";
+    if (frameIndex >= anim.frames.size()) {
+        frameIndex = anim.frames.size() - 1;
+    }
 
     Mesh* mesh = anim.target;
-    const float* src = anim.frames[frameIndex]->positions;
+    const VertexFrame* frame = anim.frames[frameIndex];
 
-    //std::cout << "Vertex Mesh: "<< (mesh->vertexSize) << "\n";
-
+    // ---------- posiciones ----------
+    const GLfloat* srcPos = frame->positions;
     for (size_t i = 0; i < mesh->vertexSize; ++i) {
-        mesh->vertex[i] = src[i];
+        mesh->vertex[i] = srcPos[i];
     }
+
+    // ---------- normales (opcional) ----------
+    if (anim.UseNormals && frame->normals && mesh->normals) {
+        const GLbyte* srcNrm = frame->normals;
+        for (size_t i = 0; i < mesh->vertexSize; ++i) {
+            mesh->normals[i] = srcNrm[i];
+        }
+    }
+}
+
+static inline float NrmByteToFloat(GLbyte v) {
+    return (float(v) + 128.0f) / 255.0f * 2.0f - 1.0f;
+}
+
+static inline GLbyte NrmFloatToByte(float v) {
+    v = ((v + 1.0f) * 0.5f) * 255.0f - 128.0f;
+    if (v > 127) v = 127;
+    if (v < -128) v = -128;
+    return (GLbyte)v;
 }
 
 void BlendVertexAnimations(
@@ -93,22 +141,37 @@ void BlendVertexAnimations(
     assert(toFrame < toAnim.frames.size());
     assert(fromAnim.vertexCount == toAnim.vertexCount);
 
-    // Clamp
+    // Clamp rápido
     if (blendT <= 0.0f) {
         ApplyVertexFrame(fromAnim, fromFrame);
         return;
     }
-
     if (blendT >= 1.0f) {
         ApplyVertexFrame(toAnim, toFrame);
         return;
     }
 
-    const float* A = fromAnim.frames[fromFrame]->positions;
-    const float* B = toAnim.frames[toFrame]->positions;
+    const VertexFrame* A = fromAnim.frames[fromFrame];
+    const VertexFrame* B = toAnim.frames[toFrame];
 
-    // Mezcla lineal por vértice
+    // ---------- posiciones ----------
     for (size_t i = 0; i < mesh->vertexSize; ++i) {
-        mesh->vertex[i] = A[i] * (1.0f - blendT) + B[i] * blendT;
+        mesh->vertex[i] =
+            A->positions[i] * (1.0f - blendT) +
+            B->positions[i] * blendT;
+    }
+
+    // ---------- normales (solo si ambas animaciones las usan) ----------
+    if (fromAnim.UseNormals && toAnim.UseNormals &&
+        A->normals && B->normals && mesh->normals) {
+
+        for (size_t i = 0; i < mesh->vertexSize; ++i) {
+            float na = NrmByteToFloat(A->normals[i]);
+            float nb = NrmByteToFloat(B->normals[i]);
+
+            float n = na * (1.0f - blendT) + nb * blendT;
+
+            mesh->normals[i] = NrmFloatToByte(n);
+        }
     }
 }

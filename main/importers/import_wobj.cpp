@@ -84,7 +84,7 @@ Mesh* LeerWOBJ(std::ifstream& file, const std::string& filename, Object* parent,
             Face newFace;
 
             while (ss >> token) {
-                FaceCorners fc;
+                FaceCorner fc;
                 size_t pos1 = token.find('/');
                 size_t pos2 = token.rfind('/');
 

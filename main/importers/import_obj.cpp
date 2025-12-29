@@ -35,7 +35,7 @@ void Wavefront::ConvertToES1(Mesh* TempMesh, int* acumuladoVertices, int* acumul
         if (f.corner.size() < 3) continue;
 
         for (size_t t = 1; t < f.corner.size() - 1; t++) {
-            FaceCorners corners[3] = {f.corner[0], f.corner[t], f.corner[t+1]};
+            FaceCorner corners[3] = {f.corner[0], f.corner[t], f.corner[t+1]};
             for (int c = 0; c < 3; c++) {
                 VertexKey key = {corners[c].vertex, corners[c].normal, corners[c].uv, corners[c].vertex};
 
@@ -168,7 +168,7 @@ void Wavefront::ConvertToES1_NoMerge(Mesh* TempMesh) {
 
         for (size_t t = 1; t < f.corner.size() - 1; t++) {
 
-            FaceCorners corners[3] = {
+            FaceCorner corners[3] = {
                 f.corner[0],
                 f.corner[t],
                 f.corner[t + 1]
@@ -176,7 +176,7 @@ void Wavefront::ConvertToES1_NoMerge(Mesh* TempMesh) {
 
             for (int c = 0; c < 3; c++) {
 
-                const FaceCorners& fc = corners[c];
+                const FaceCorner& fc = corners[c];
                 int v = fc.vertex;
 
                 // -------- PISAR NORMAL --------
@@ -336,7 +336,7 @@ bool LeerOBJ(std::ifstream& file,
             Face newFace;
 
             while (ss >> token) {
-                FaceCorners fc;
+                FaceCorner fc;
                 size_t pos1 = token.find('/');
                 size_t pos2 = token.rfind('/');
 

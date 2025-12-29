@@ -257,7 +257,7 @@ void Properties::event_key_down(SDL_Event &e){
                 NextSelect();
                 break;
             case SDLK_UP: 
-                NextSelect();
+                PrevSelect();
                 break;
             case SDLK_DOWN:
                 NextSelect();
@@ -272,6 +272,18 @@ void Properties::NextSelect(){
         if (selectIndex >= static_cast<int>(GroupProperties.size())){
             selectIndex = 0;
         }
+        GroupProperties[selectIndex]->selectIndex = -1;
+    }
+}
+
+void Properties::PrevSelect(){
+    if (GroupProperties[selectIndex]->PrevSelect()){
+        selectIndex--;
+
+        if (selectIndex < 0){
+            selectIndex = static_cast<int>(GroupProperties.size()) - 1;
+        }
+
         GroupProperties[selectIndex]->selectIndex = -1;
     }
 }

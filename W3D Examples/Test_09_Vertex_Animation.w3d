@@ -1,0 +1,82 @@
+Whisk3D {
+    version: 20251127
+    Escena {
+        iconApp: Whisk3D_experiment.png
+        limpiarPantalla: true
+        background: "0.0, 0.0, 0.0, 1.0"
+
+        Gamepad {
+            name: "Control de Tela"
+            target: "Tela"
+
+            Animation {
+                name: "idle"
+                UseNormals: true
+                basePath: "assets/Vertex_animation/tela_"
+                frames: 70
+                padding: 2
+            }
+        }  
+
+        Wavefront {
+            name: "Tela"
+            filePath: assets/tela0001.obj
+            noMerge: true
+            x: 0.0
+            y: 0.0
+            z: 0.0
+            scale: 1
+        } 
+
+        Wavefront {
+            name: "Monkey"
+            filePath: assets/monkey.obj
+            x: 0.0
+            y: 0.0
+            z: 0.0
+            scale: 1
+        } 
+    }
+
+    Layout {
+        ViewportRow {
+            Viewport3D {
+                orthographic: false
+                ViewFromCameraActive: false
+                showOverlays: true
+                ShowUi: true
+                showFloor: false
+                showYaxis: false
+                showXaxis: false
+                CameraToView: false
+                showOrigins: true
+                show3DCursor: false
+                ShowRelantionshipsLines: true
+                view: Rendered
+                rotX: 35.0
+                rotY: -35.0
+                posZ: 1.0
+                orbitDistance: 10.0
+            }
+            ViewportColumn {
+                Viewport3D {
+                    orthographic: false
+                    ViewFromCameraActive: false
+                    showOverlays: true
+                    ShowUi: true
+                    showFloor: true
+                    showYaxis: true
+                    showXaxis: true
+                    CameraToView: false
+                    showOrigins: true
+                    show3DCursor: true
+                    ShowRelantionshipsLines: true
+                    view: MaterialPreview
+                }
+                Outliner
+                Split: 0.7
+            }
+            Split: 0.7
+        }
+    }
+}

@@ -16,7 +16,7 @@
 
 typedef GLshort Edge[2];
 
-class FaceCorners {
+class FaceCorner {
 	public:
 		int vertex;
 		int uv;
@@ -26,7 +26,7 @@ class FaceCorners {
 
 class Face { 
 	public:
-		std::vector<FaceCorners> corner;
+		std::vector<FaceCorner> corner;
 };
 
 struct VertexKey {

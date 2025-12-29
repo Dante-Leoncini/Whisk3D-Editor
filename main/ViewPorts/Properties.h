@@ -39,6 +39,7 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
 
         int selectIndex = 0;
         void NextSelect();
+        void PrevSelect();
 
         void Resize(int newW, int newH) override;
         void Render() override;
