@@ -190,7 +190,7 @@ ViewportBase* BuildLayout(Node* n){
     }
     if(n->type == "Outliner")  return new Outliner();
     if(n->type == "Properties")  return new Properties();
-    
+
     if(n->type == "ViewportRow" || n->type == "ViewportColumn"){
         bool isRow = (n->type == "ViewportRow");
         float split = GetFloatOrDefault(n->props, "Split", 0.5f);
@@ -313,6 +313,27 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
             return nullptr;
         }
 
+        for (auto* child : n->children) {
+            if (child->type == "Animation") {
+                auto& ap = child->props;
+
+                bool UseNormals = GetBoolOrDefault(ap, "UseNormals", false);
+
+                int speed = GetIntOrDefault(ap, "speed", 1);
+
+                VertexAnimation* anim =
+                    new VertexAnimation(nullptr, ap.at("name"), UseNormals, (float)speed);
+
+                anim->basePath   = GetFilePath(ap.at("basePath"));
+                anim->frameCount = std::stoi(ap.at("frames"));
+                anim->padding    = std::stoi(ap.at("padding"));
+
+                NewActiveVertexAnimation(mesh, anim);
+            }
+        }
+
+        LoadVertexFrames(mesh);
+        
         return mesh;
     }
 
@@ -333,24 +354,6 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
         Gamepad* gamepad = new Gamepad(parent);
         if(p.count("target")) gamepad->SetTarget(p.at("target"));
 
-        for (auto* child : n->children) {
-            if (child->type == "Animation") {
-                auto& ap = child->props;
-
-                bool UseNormals = GetBoolOrDefault(ap, "UseNormals", false);
-
-                int speed = GetIntOrDefault(ap, "speed", 1);
-
-                VertexAnimation* anim =
-                    new VertexAnimation(nullptr, ap.at("name"), UseNormals, (float)speed);
-
-                anim->basePath   = GetFilePath(ap.at("basePath"));
-                anim->frameCount = std::stoi(ap.at("frames"));
-                anim->padding    = std::stoi(ap.at("padding"));
-
-                gamepad->animations.push_back(anim);
-            }
-        }
         return gamepad;
     }
 

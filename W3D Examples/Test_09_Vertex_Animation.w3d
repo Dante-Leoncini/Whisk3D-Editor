@@ -5,9 +5,14 @@ Whisk3D {
         limpiarPantalla: true
         background: "0.0, 0.0, 0.0, 1.0"
 
-        Gamepad {
-            name: "Control de Tela"
-            target: "Tela"
+        Wavefront {
+            name: "Tela"
+            filePath: assets/tela0001.obj
+            noMerge: true
+            x: 0.0
+            y: 0.0
+            z: 0.0
+            scale: 1
 
             Animation {
                 name: "idle"
@@ -17,16 +22,6 @@ Whisk3D {
                 padding: 2
                 speed: 5
             }
-        }  
-
-        Wavefront {
-            name: "Tela"
-            filePath: assets/tela0001.obj
-            noMerge: true
-            x: 0.0
-            y: 0.0
-            z: 0.0
-            scale: 1
         } 
 
         Wavefront {

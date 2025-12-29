@@ -186,6 +186,7 @@
 #include "objects/Textures.h"
 #include "objects/Materials.h"
 #include "animation/Animation.h"
+#include "animation/VertexAnimation.h"
 #include "ViewPorts/ViewPorts.h"
 #include "controles.h"
 #include "constructor.h"
@@ -494,6 +495,8 @@ int main(int argc, char* argv[]) {
 
     while (running) {
         Contadores();
+
+        UpdateAnimations();
         UpdateAnimatedMaterials();
 
         while (SDL_PollEvent(&e)) {

@@ -92,7 +92,7 @@ Mesh* LeerWOBJ(std::ifstream& file, const std::string& filename, Object* parent,
                 fc.uv = (pos1 != std::string::npos && pos2 > pos1) ? std::stoi(token.substr(pos1+1, pos2-pos1-1))-1 : -1;
                 fc.normal = (pos2 != std::string::npos) ? std::stoi(token.substr(pos2+1))-1 : -1;
 
-                newFace.corner.push_back(fc);
+                newFace.corners.push_back(fc);
             }
 
             Wobj.faces.push_back(newFace);

@@ -5,20 +5,6 @@ Whisk3D {
         limpiarPantalla: true
         background: "0.0, 0.0, 0.0, 1.0"
 
-        Gamepad {
-            name: "Control Monkey"
-            target: "Monkey"
-
-            Animation {
-                name: "idle"
-                UseNormals: true
-                basePath: "assets/Normal_Animation/normal_animation_"
-                frames: 3
-                padding: 2
-                speed: 32
-            }
-        }
-
         Light {
             name: "Light"
             LightID: GL_LIGHT0
@@ -49,6 +35,15 @@ Whisk3D {
             y: 0.0
             z: 0.0
             scale: 1
+
+            Animation {
+                name: "idle"
+                UseNormals: true
+                basePath: "assets/Normal_Animation/normal_animation_"
+                frames: 3
+                padding: 2
+                speed: 32
+            }
         } 
     }
 

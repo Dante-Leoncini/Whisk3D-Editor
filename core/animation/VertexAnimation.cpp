@@ -176,3 +176,91 @@ void BlendVertexAnimations(
         }
     }
 }
+
+VertexAnimationActive::VertexAnimationActive(Mesh* mesh): 
+    meshToAnim(mesh) {
+
+}
+
+void VertexAnimationActive::UpdateAnimation(){
+    if (!meshToAnim || meshToAnim->animations.empty()) return;
+    // Avanza el blend
+    blendStep++;
+
+    VertexAnimation* anim = meshToAnim->animations[currentAnim];
+
+    float blendT = blendStep / anim->speed;
+    if (blendT > 1.0f) blendT = 1.0f;
+
+    // Mezcla entre frame actual y el siguiente (puede ser otra anim)
+    BlendVertexAnimations(
+        *anim,
+        *meshToAnim->animations[nextAnim],
+        currentFrame,
+        nextFrame,
+        blendT,
+        meshToAnim
+    );
+
+    // Si terminó el blend
+    if (blendStep >= anim->speed) {
+        blendStep = 0;
+
+        // Consolidamos estado
+        currentAnim  = nextAnim;
+        currentFrame = nextFrame;
+
+        // Avanzar frame SOLO de la anim activa
+        nextFrame++;
+
+        if (nextFrame >= anim->frames.size()) {
+            nextFrame = 0;
+        }
+    }
+}
+
+std::vector<VertexAnimationActive*> VertexAnimationActives;
+
+VertexAnimationActive* FindTargetAnim(Mesh* target) {
+    if (!target)
+        return nullptr;
+
+    for (VertexAnimationActive* active : VertexAnimationActives) {
+        if (!active) continue;
+
+        if (active->meshToAnim == target) {
+            return active;
+        }
+    }
+
+    return nullptr;
+}
+
+void NewActiveVertexAnimation(Mesh* mesh, VertexAnimation* anim){
+    if (!mesh) return;
+
+    mesh->animations.push_back(anim);
+
+    VertexAnimationActive* activeAnim = new VertexAnimationActive(mesh);
+    VertexAnimationActives.push_back(activeAnim);
+};
+
+void LoadVertexFrames(Mesh* mesh){
+    if (!mesh) return;
+
+    for (auto* anim : mesh->animations) {
+        anim->target = mesh;
+
+        if (anim->frames.empty()) {
+            anim->LoadFrames();
+            std::cout << "Anim '"<< anim->name <<"' con " << anim->frames.size() << " frames, Speed: " << anim->speed << "\n";
+            std::cout << "Animar Normals: "<< anim->UseNormals << "\n";
+        }
+    }
+}
+
+void UpdateAnimations(){
+    for (size_t i = 0; i < VertexAnimationActives.size(); ++i) {
+        VertexAnimationActives[i]->UpdateAnimation();
+    }
+}

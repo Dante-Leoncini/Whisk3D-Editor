@@ -36,55 +36,14 @@ ObjectType Gamepad::getType() {
 void Gamepad::Reload() {
     ReloadTarget(this);   // ← acá se resuelve el Mesh*
 
-    Mesh* mesh = dynamic_cast<Mesh*>(target);
-    if (!mesh) return;
-    meshToAnim = mesh;
+    targetAnim = nullptr;
 
-    for (auto* anim : animations) {
-        anim->target = meshToAnim;
+    // --- solo si el target ES un mesh ---
+    if (target && target->getType() == ObjectType::mesh) {
 
-        if (anim->frames.empty()) {
-            anim->LoadFrames();
-            std::cout << "Anim '"<< anim->name <<"' con " << anim->frames.size() << " frames, Speed: " << anim->speed << "\n";
-            std::cout << "Animar Normals: "<< anim->UseNormals << "\n";
-        }
-    }
-}
+        Mesh* mesh = static_cast<Mesh*>(target);
 
-void Gamepad::UpdateAnimation(){
-    if (!meshToAnim) return;
-    // Avanza el blend
-    blendStep++;
-
-    VertexAnimation* anim = animations[currentAnim];
-
-    float blendT = blendStep / anim->speed;
-    if (blendT > 1.0f) blendT = 1.0f;
-
-    // Mezcla entre frame actual y el siguiente (puede ser otra anim)
-    BlendVertexAnimations(
-        *anim,
-        *animations[nextAnim],
-        currentFrame,
-        nextFrame,
-        blendT,
-        meshToAnim
-    );
-
-    // Si terminó el blend
-    if (blendStep >= anim->speed) {
-        blendStep = 0;
-
-        // Consolidamos estado
-        currentAnim  = nextAnim;
-        currentFrame = nextFrame;
-
-        // Avanzar frame SOLO de la anim activa
-        nextFrame++;
-
-        if (nextFrame >= anim->frames.size()) {
-            nextFrame = 0;
-        }
+        targetAnim = FindTargetAnim(mesh);
     }
 }
 

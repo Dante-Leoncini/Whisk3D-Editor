@@ -14,21 +14,6 @@
 #include "render/GLES_Android_helpers.h"
 #include "objects/Mesh.h"
 
-typedef GLshort Edge[2];
-
-class FaceCorner {
-	public:
-		int vertex;
-		int uv;
-		int normal;
-		//seria genial agregar color despues
-};
-
-class Face { 
-	public:
-		std::vector<FaceCorner> corner;
-};
-
 struct VertexKey {
     int pos, normal, uv, color;
     bool operator==(const VertexKey &other) const;

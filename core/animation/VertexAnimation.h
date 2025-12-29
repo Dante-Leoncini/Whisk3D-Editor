@@ -10,7 +10,7 @@
 #include <GL/glext.h>
 
 #include "UI/icons.h"
-#include "Mesh.h"
+#include "objects/Mesh.h"
 
 #include <fstream>
 #include <sstream>
@@ -39,7 +39,7 @@ static void ParseFace(const std::string& line, Face& f) {
         fc.vertex = v - 1;
         fc.normal = n - 1;
 
-        f.corner.push_back(fc);
+        f.corners.push_back(fc);
     }
 }
 
@@ -55,13 +55,13 @@ static GLbyte* BuildVertexNormals(
         out[i] = 127;
 
     for (const Face& f : faces) {
-        if (f.corner.size() < 3) continue;
+        if (f.corners.size() < 3) continue;
 
-        for (size_t i = 1; i < f.corner.size() - 1; i++) {
+        for (size_t i = 1; i < f.corners.size() - 1; i++) {
             const FaceCorner tri[3] = {
-                f.corner[0],
-                f.corner[i],
-                f.corner[i + 1]
+                f.corners[0],
+                f.corners[i],
+                f.corners[i + 1]
             };
 
             for (int k = 0; k < 3; k++) {
@@ -116,6 +116,23 @@ class VertexAnimation {
         size_t FrameCount() const { return frames.size(); }
 };
 
+class VertexAnimationActive {
+    public:
+        Mesh* meshToAnim = nullptr;
+
+        int currentAnim = 0;  // animación activa (idle/run o la que sea)
+        int nextAnim    = 0;  // animación a la que queremos ir
+
+        int currentFrame = 0;
+        int nextFrame    = 1;
+
+        int blendStep = 0;
+
+        VertexAnimationActive(Mesh* mesh);
+
+        void UpdateAnimation();
+};
+
 // Mezcla dos animaciones y escribe en la malla target
 // - fromAnim: animación actual (ej: idle)
 // - toAnim: animación destino (ej: run)
@@ -136,5 +153,14 @@ void ApplyVertexFrame(
     const VertexAnimation& anim,
     size_t frameIndex
 );
+
+void LoadVertexFrames(Mesh* mesh);
+
+extern std::vector<VertexAnimationActive*> VertexAnimationActives;
+
+VertexAnimationActive* FindTargetAnim(Mesh* target);
+
+void UpdateAnimations();
+void NewActiveVertexAnimation(Mesh* mesh, VertexAnimation* anim);
 
 #endif

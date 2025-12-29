@@ -32,10 +32,10 @@ void Wavefront::ConvertToES1(Mesh* TempMesh, int* acumuladoVertices, int* acumul
 
     for (size_t i = 0; i < faces.size(); i++) {
         Face &f = faces[i];
-        if (f.corner.size() < 3) continue;
+        if (f.corners.size() < 3) continue;
 
-        for (size_t t = 1; t < f.corner.size() - 1; t++) {
-            FaceCorner corners[3] = {f.corner[0], f.corner[t], f.corner[t+1]};
+        for (size_t t = 1; t < f.corners.size() - 1; t++) {
+            FaceCorner corners[3] = {f.corners[0], f.corners[t], f.corners[t+1]};
             for (int c = 0; c < 3; c++) {
                 VertexKey key = {corners[c].vertex, corners[c].normal, corners[c].uv, corners[c].vertex};
 
@@ -164,14 +164,14 @@ void Wavefront::ConvertToES1_NoMerge(Mesh* TempMesh) {
         }
 
         Face& f = faces[i];
-        if (f.corner.size() < 3) continue;
+        if (f.corners.size() < 3) continue;
 
-        for (size_t t = 1; t < f.corner.size() - 1; t++) {
+        for (size_t t = 1; t < f.corners.size() - 1; t++) {
 
             FaceCorner corners[3] = {
-                f.corner[0],
-                f.corner[t],
-                f.corner[t + 1]
+                f.corners[0],
+                f.corners[t],
+                f.corners[t + 1]
             };
 
             for (int c = 0; c < 3; c++) {
@@ -344,7 +344,7 @@ bool LeerOBJ(std::ifstream& file,
                 fc.uv = (pos1 != std::string::npos && pos2 > pos1) ? std::stoi(token.substr(pos1+1, pos2-pos1-1))-1 : -1;
                 fc.normal = (pos2 != std::string::npos) ? std::stoi(token.substr(pos2+1))-1 : -1;
 
-                newFace.corner.push_back(fc);
+                newFace.corners.push_back(fc);
             }
 
             Wobj.faces.push_back(newFace);

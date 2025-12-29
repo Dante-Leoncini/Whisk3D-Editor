@@ -15,14 +15,31 @@
 #include "Materials.h"
 #include "Objects.h"
 
+typedef GLshort Edge[2];
+
+class FaceCorner {
+	public:
+		int vertex;
+		int uv;
+		int normal;
+		//seria genial agregar color despues
+};
+
+class Face { 
+	public:
+		std::vector<FaceCorner> corners;
+};
+
+class VertexAnimation;
+
 // ===================================================
 // Enumeraciones y estructuras auxiliares
 // ===================================================
 enum class MeshType { cube, UVsphere, IcoSphere, plane, vertice, circle };
 
 class VertexGroup { 
-public:
-    std::vector<int> indices;
+    public:
+        std::vector<int> indices;
 };
 
 class MaterialGroup { 
@@ -51,6 +68,9 @@ class Mesh : public Object {
         GLushort* faces = nullptr;
         std::vector<MaterialGroup> materialsGroup;
 
+        //animacion
+        std::vector<VertexAnimation*> animations;   
+
         Mesh(Object* parent = nullptr, Vector3 pos = Vector3(0,0,0));
 
         ~Mesh();
@@ -66,5 +86,7 @@ class Mesh : public Object {
 // ===================================================
 Object* NewMesh(MeshType type = MeshType::cube, Object* parent = nullptr, bool query = false);
 int DuplicateMesh(int meshIndex);
+
+#include "animation/VertexAnimation.h"
 
 #endif

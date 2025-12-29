@@ -1185,11 +1185,7 @@ GLfloat cosY = 0.0f;
 GLfloat sinY = 0.0f;
 
 void Gamepad::Update() {
-    if (!target || !Viewport3DActive) return;
-
-    UpdateAnimation();
-
-    if (!CameraActive) return;
+    if (!target || !Viewport3DActive || !CameraActive || !targetAnim) return;
 
     // --- 1. CONFIGURACIÓN DE VECTORES DE MOVIMIENTO ---
     Vector3 camForward = CameraActive->forwardVector;
@@ -1237,31 +1233,13 @@ void Gamepad::Update() {
         // C. Aplicar Rotación (suavizada con Slerp)
         target->rot = Quaternion::Slerp(target->rot, targetRotation, 0.1f); // Suaviza la rotación
 
-        // D. Mezclar animaciones
-        // Si se está moviendo, usar la animación de correr, sino usar la animación idle
-        //VertexAnimation* currentAnim = animations[0];
-        //float blendT = 0.0f;
-
-        //if (TotalMovement.Length() > 0.01f) {
-            // Si se mueve, correr
-            //currentAnim = animations[1];
-            //blendT = std::min(TotalMovement.Length() / speed, 1.0f);  // Calcula el blend en función de la velocidad
-        //}
-
-        // Aplicar la mezcla de vértices entre idle y correr
-        //if (currentAnim) {
-            //int frame = static_cast<int>((blendT * currentAnim->FrameCount()));
-            //ApplyVertexFrame(*currentAnim, frame);
-        //}
-        if (nextAnim != 1){
-            nextAnim = 1;
+        if (targetAnim->nextAnim != 1){
+            targetAnim->nextAnim = 1;
         }
     }
     else {
-        if (nextAnim != 0){
-            nextAnim = 0;
+        if (targetAnim->nextAnim != 0){
+            targetAnim->nextAnim = 0;
         }
-        // Si no hay movimiento, solo se mantiene en la animación idle
-        //ApplyVertexFrame(*animations[0], 0);  // Aplicamos el primer frame de idle (0)
     }
 }
