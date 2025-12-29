@@ -6,32 +6,45 @@ Whisk3D {
         background: "0.0, 0.0, 0.0, 1.0"
 
         Gamepad {
-            name: "Control de Tela"
-            target: "Tela"
+            name: "Control Monkey"
+            target: "Monkey"
 
             Animation {
                 name: "idle"
                 UseNormals: true
-                basePath: "assets/Vertex_animation/tela_"
-                frames: 70
+                basePath: "assets/Normal_Animation/normal_animation_"
+                frames: 3
                 padding: 2
-                speed: 5
+                speed: 32
             }
-        }  
+        }
 
-        Wavefront {
-            name: "Tela"
-            filePath: assets/tela0001.obj
-            noMerge: true
-            x: 0.0
-            y: 0.0
-            z: 0.0
-            scale: 1
-        } 
+        Light {
+            name: "Light"
+            LightID: GL_LIGHT0
+            x: -3.0
+            y: -3.0
+            z: 1.8
+            r: 1.0
+            g: 0.0
+            b: 0.0
+        }   
+
+        Light {
+            name: "Light"
+            LightID: GL_LIGHT1
+            x: 3.0
+            y: 3.0
+            z: 1.8
+            r: 0.0
+            g: 0.0
+            b: 0.2
+        }   
 
         Wavefront {
             name: "Monkey"
-            filePath: assets/monkey.obj
+            filePath: assets/Normal_Animation/normal_animation_02.obj
+            noMerge: true
             x: 0.0
             y: 0.0
             z: 0.0
@@ -60,20 +73,7 @@ Whisk3D {
                 orbitDistance: 10.0
             }
             ViewportColumn {
-                Viewport3D {
-                    orthographic: false
-                    ViewFromCameraActive: false
-                    showOverlays: true
-                    ShowUi: true
-                    showFloor: true
-                    showYaxis: true
-                    showXaxis: true
-                    CameraToView: false
-                    showOrigins: true
-                    show3DCursor: true
-                    ShowRelantionshipsLines: true
-                    view: MaterialPreview
-                }
+                Properties
                 Outliner
                 Split: 0.7
             }

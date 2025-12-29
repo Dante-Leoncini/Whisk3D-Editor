@@ -26,6 +26,7 @@
 #include "ViewPorts/ViewPorts.h"
 #include "ViewPorts/ViewPort3D.h"
 #include "ViewPorts/Outliner.h"
+#include "ViewPorts/Properties.h"
 
 #include "importers/import_wobj.h"
 
@@ -47,12 +48,6 @@ struct Node {
 
 Node* Find(Node* root, const std::string& type);
 Node* ParseNode(std::vector<std::string>& tk, size_t& i);
-
-// ----------------------------- Builders -----------------------------
-class Object;
-class ViewportBase;
-class Viewport3D;
-class Outliner;
 
 ViewportBase* BuildLayout(Node* n);
 void ApplyViewport3DProps(Viewport3D* v, const std::map<std::string,std::string>& p);

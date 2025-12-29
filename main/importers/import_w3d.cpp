@@ -189,7 +189,8 @@ ViewportBase* BuildLayout(Node* n){
         return v;
     }
     if(n->type == "Outliner")  return new Outliner();
-
+    if(n->type == "Properties")  return new Properties();
+    
     if(n->type == "ViewportRow" || n->type == "ViewportColumn"){
         bool isRow = (n->type == "ViewportRow");
         float split = GetFloatOrDefault(n->props, "Split", 0.5f);
@@ -338,8 +339,10 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
 
                 bool UseNormals = GetBoolOrDefault(ap, "UseNormals", false);
 
+                int speed = GetIntOrDefault(ap, "speed", 1);
+
                 VertexAnimation* anim =
-                    new VertexAnimation(nullptr, ap.at("name"), UseNormals);
+                    new VertexAnimation(nullptr, ap.at("name"), UseNormals, (float)speed);
 
                 anim->basePath   = GetFilePath(ap.at("basePath"));
                 anim->frameCount = std::stoi(ap.at("frames"));

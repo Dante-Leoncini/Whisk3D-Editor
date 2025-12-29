@@ -1,6 +1,7 @@
 #include "VertexAnimation.h"
 
-VertexAnimation::VertexAnimation(Mesh* tgt, const std::string& animName, bool useNormals): target(tgt), name(animName), UseNormals(useNormals) {}
+VertexAnimation::VertexAnimation(Mesh* tgt, const std::string& animName, bool useNormals, float Speed): 
+      target(tgt), name(animName), UseNormals(useNormals), speed(Speed) {}
 
 bool VertexAnimation::LoadFrames() {
     if (!target || !target->vertex || target->vertexSize <= 0)

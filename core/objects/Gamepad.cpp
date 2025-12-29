@@ -45,7 +45,7 @@ void Gamepad::Reload() {
 
         if (anim->frames.empty()) {
             anim->LoadFrames();
-            std::cout << "Anim '"<< anim->name <<"' con " << anim->frames.size() << " frames\n";
+            std::cout << "Anim '"<< anim->name <<"' con " << anim->frames.size() << " frames, Speed: " << anim->speed << "\n";
             std::cout << "Animar Normals: "<< anim->UseNormals << "\n";
         }
     }
@@ -56,12 +56,14 @@ void Gamepad::UpdateAnimation(){
     // Avanza el blend
     blendStep++;
 
-    float blendT = blendStep / 5.0f;
+    VertexAnimation* anim = animations[currentAnim];
+
+    float blendT = blendStep / anim->speed;
     if (blendT > 1.0f) blendT = 1.0f;
 
     // Mezcla entre frame actual y el siguiente (puede ser otra anim)
     BlendVertexAnimations(
-        *animations[currentAnim],
+        *anim,
         *animations[nextAnim],
         currentFrame,
         nextFrame,
@@ -70,7 +72,7 @@ void Gamepad::UpdateAnimation(){
     );
 
     // Si terminó el blend
-    if (blendStep >= 5) {
+    if (blendStep >= anim->speed) {
         blendStep = 0;
 
         // Consolidamos estado
@@ -80,7 +82,7 @@ void Gamepad::UpdateAnimation(){
         // Avanzar frame SOLO de la anim activa
         nextFrame++;
 
-        if (nextFrame >= animations[currentAnim]->frames.size()) {
+        if (nextFrame >= anim->frames.size()) {
             nextFrame = 0;
         }
     }

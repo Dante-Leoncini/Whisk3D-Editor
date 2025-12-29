@@ -96,6 +96,7 @@ class VertexAnimation {
         // Declaración (desde .w3d)
         std::string basePath;
         int frameCount = 0;
+        float speed = 1.0f;
         int padding = 0;
 
         // Runtime
@@ -107,7 +108,7 @@ class VertexAnimation {
         std::vector<VertexFrame*> frames;
 
         VertexAnimation() = default;
-        VertexAnimation(Mesh* tgt, const std::string& animName, bool useNormals = false);
+        VertexAnimation(Mesh* tgt, const std::string& animName, bool useNormals = false, float Speed = 1);
     
         // Cargar animaciones desde archivos .obj
         bool LoadFrames();
