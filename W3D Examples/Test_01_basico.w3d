@@ -40,9 +40,9 @@ Whisk3D {
         ViewportRow {
             Viewport3D
             ViewportColumn {
-                Viewport3D
+                Properties
                 Outliner
-                Split: 0.35
+                Split: 0.70
             }
             Split: 0.7
         }
