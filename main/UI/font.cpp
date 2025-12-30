@@ -130,8 +130,8 @@ Font::Font(int texW, int texH, GLuint textureID)
     addGlyph('%', 73, 52, 5, 11); 
     addGlyph('!', 1, 64, 5, 11); 
     addGlyph('?', 7, 64, 5, 11); 
-    addGlyph('.', 13, 64, 5, 11); 
-    addGlyph(',', 19, 64, 5, 11); 
+    addGlyph('.', 13, 63, 5, 11); 
+    addGlyph(',', 19, 63, 5, 11); 
     addGlyph('\'', 25, 64, 5, 11);
     addGlyph('\"', 31, 64, 5, 11); 
     addGlyph('@', 37, 64, 5, 11); 

@@ -44,6 +44,11 @@ class VertexGroup {
 
 class MaterialGroup { 
     public:
+        std::string name = "Mesh";
+        //podria ser triangulos GL_TRIANGLES, GL_TRIANGLE_STRIP, GL_TRIANGLE_FAN
+        //lineas: GL_LINES, GL_LINE_STRIP, GL_LINE_LOOP
+        //puntos: GL_POINTS
+        GLenum drawMode = GL_TRIANGLES;
         int start = 0;              // índice del primer triángulo real
         int count = 0;              // cantidad de triángulos reales
         int startDrawn = 0;         // índice del primer triángulo a dibujar

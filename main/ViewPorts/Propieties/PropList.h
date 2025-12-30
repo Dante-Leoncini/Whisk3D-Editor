@@ -1,18 +1,25 @@
-#ifndef PROPFLOAT_H
-#define PROPFLOAT_H
+#ifndef PROPLIST_H
+#define PROPLIST_H
 
 #include "PropertieBase.h"
 #include "UI/card.h"
+#include "objects/Mesh.h"
 
-class PropFloat : public PropertieBase { 
+class PropList : public PropertieBase { 
     public:
-        PropFloat(const std::string& Name, const std::string& Unit = "");
+        Card* listBox;
 
-        float* value = nullptr;
-        std::string unit = "";
+        PropList(const std::string& Name);
 
         PropertyType GetType() override;
+};
 
+class PropListMeshParts : public PropList { 
+    public:
+        PropListMeshParts(const std::string& Name);
+
+        Mesh* mesh = nullptr;
+        
         void RenderPropertiBox(Card* propertiBox) override;
         void RenderPropertiValue(Card* propertiBox) override;
         void RenderPropertiLabel(Card* propertiBox) override;

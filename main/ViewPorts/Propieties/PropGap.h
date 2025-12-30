@@ -13,7 +13,7 @@ class PropGap : public PropertieBase {
         void RenderPropertiBox(Card* propertiBox) override;
         void RenderPropertiValue(Card* propertiBox) override;
         void RenderPropertiLabel(Card* propertiBox) override;
-        int GetHeight() override;
+        int Resize(int width) override;
 };
 
 #endif

@@ -21,12 +21,13 @@ Whisk3D {
                 b: 0.0
             } 
 
-            Mesh {
-                name: "Cube"
+            Wavefront {
+                name: "Monkey"
+                filePath: assets/monkey.obj
                 x: 0.0
                 y: 0.0
-                z: 1.0
-                scale: 1.0
+                z: 0.53
+                scale: 1
             } 
         }
 
@@ -55,7 +56,11 @@ Whisk3D {
                 ShowRelantionshipsLines: true
                 view: Rendered
             }
-            Outliner
+            ViewportColumn {
+                Properties
+                Outliner
+                Split: 0.7
+            }
             Split: 0.7
         }
     }

@@ -15,7 +15,8 @@ enum class PropertyType {
     Gap,
     Float,
     Int,
-    Bool
+    Bool,
+    List
 };
 
 void CardTitulo(GLfloat* icon, const std::string& texto, int maxPixels = 1920);
@@ -23,6 +24,7 @@ void CardTitulo(GLfloat* icon, const std::string& texto, int maxPixels = 1920);
 class PropertieBase {
     public:
         std::string name = "?";
+
         PropertieBase(const std::string& Name);
         virtual ~PropertieBase();
 
@@ -31,7 +33,7 @@ class PropertieBase {
         virtual void RenderPropertiBox(Card* propertiBox);
         virtual void RenderPropertiValue(Card* propertiBox);
         virtual void RenderPropertiLabel(Card* propertiBox);
-        virtual int GetHeight();
+        virtual int Resize(int width);
 };
 
 #endif

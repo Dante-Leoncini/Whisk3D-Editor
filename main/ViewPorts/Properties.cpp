@@ -1,6 +1,7 @@
 #include "Properties.h"
 
 GroupPropertie* propTransform;
+GroupPropertie* propMeshParts;
 
 void DibujarTitulo(Object* obj, int maxPixels){
     glColor4f(ListaColores[static_cast<int>(ColorID::blanco)][0], ListaColores[static_cast<int>(ColorID::blanco)][1],
@@ -38,8 +39,13 @@ void ConstructorProperties(){
     propTransform->properties.push_back(new PropFloat("Y"));
     propTransform->properties.push_back(new PropFloat("Z"));
 
-    GroupProperties.push_back(propTransform);
-    GroupProperties.push_back(new GroupPropertie("Materials"));
+    GroupProperties.push_back(propTransform);                                                      
+
+    propMeshParts = new GroupPropertie("Mesh Parts");
+
+    propMeshParts->properties.push_back(new PropListMeshParts("Mesh Parts"));
+
+    GroupProperties.push_back(propMeshParts);
 }
 
 void Properties::RefreshTargetProperties(){
@@ -59,6 +65,18 @@ void Properties::RefreshTargetProperties(){
     static_cast<PropFloat*>(propTransform->properties[8])->value = &ObjActivo->scale.x;
     static_cast<PropFloat*>(propTransform->properties[9])->value = &ObjActivo->scale.y;
     static_cast<PropFloat*>(propTransform->properties[10])->value = &ObjActivo->scale.z;
+
+    //Mesh Parts
+    if (ObjActivo->getType() == ObjectType::mesh){
+        propMeshParts->visible = true;
+        Mesh* mesh = static_cast<Mesh*>(ObjActivo);
+        static_cast<PropListMeshParts*>(propMeshParts->properties[0])->mesh = mesh;
+    }
+    else {
+        propMeshParts->visible = false;
+        static_cast<PropListMeshParts*>(propMeshParts->properties[0])->mesh = nullptr;
+    }
+    Resize(width, height);
 }
 
 // Constructor
@@ -251,10 +269,10 @@ void Properties::event_key_down(SDL_Event &e){
     if (e.key.repeat == 0) { 
         switch (key) {
             case SDLK_LEFT:
-                NextSelect();
+                SetOpenGroup(false);
                 break;
             case SDLK_RIGHT:
-                NextSelect();
+                SetOpenGroup(true);
                 break;
             case SDLK_UP: 
                 PrevSelect();
@@ -264,6 +282,11 @@ void Properties::event_key_down(SDL_Event &e){
                 break;
         };
     }   
+}
+
+void Properties::SetOpenGroup(bool open){
+    GroupProperties[selectIndex]->open = open;
+    Resize(width, height);
 }
 
 void Properties::NextSelect(){

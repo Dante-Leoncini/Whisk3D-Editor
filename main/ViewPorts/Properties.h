@@ -23,11 +23,13 @@
 #include "Propieties/GroupPropertie.h" 
 #include "Propieties/PropFloat.h" 
 #include "Propieties/PropGap.h" 
+#include "Propieties/PropList.h" 
 
 void DibujarTitulo(Object* obj, int maxPixels);
 void ConstructorProperties();
 
 extern GroupPropertie* propTransform;
+extern GroupPropertie* propMeshParts;
 
 class Properties : public ViewportBase, public WithBorder, public Scrollable {
     public:    
@@ -40,6 +42,7 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         int selectIndex = 0;
         void NextSelect();
         void PrevSelect();
+        void SetOpenGroup(bool open);
 
         void Resize(int newW, int newH) override;
         void Render() override;

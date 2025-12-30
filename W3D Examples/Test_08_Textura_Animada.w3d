@@ -35,20 +35,7 @@ Whisk3D {
                 orbitDistance: 5.0
             }
             ViewportColumn {
-                Viewport3D {
-                    orthographic: false
-                    ViewFromCameraActive: false
-                    showOverlays: true
-                    ShowUi: true
-                    showFloor: true
-                    showYaxis: true
-                    showXaxis: true
-                    CameraToView: false
-                    showOrigins: true
-                    show3DCursor: true
-                    ShowRelantionshipsLines: true
-                    view: MaterialPreview
-                }
+                Properties
                 Outliner
                 Split: 0.7
             }

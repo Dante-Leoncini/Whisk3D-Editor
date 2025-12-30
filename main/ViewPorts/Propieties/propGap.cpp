@@ -16,7 +16,7 @@ void PropGap::RenderPropertiLabel(Card* propertiBox){
     glTranslatef(0, gapGS, 0); 
 }
 
-int PropGap::GetHeight(){
+int PropGap::Resize(int width){
     return gapGS;
 }
 

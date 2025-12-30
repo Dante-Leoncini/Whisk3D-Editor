@@ -60,13 +60,12 @@ GroupPropertie::GroupPropertie(const std::string& Name): name(Name) {
 void GroupPropertie::Resize(int Width, int Height){
     width = Width;
     height = RenglonHeightGS + gapGS + borderGS;
-    for (size_t i = 0; i < properties.size(); ++i){
-        height += properties[i]->GetHeight();
-    }
-    //height = (properties.size() + 1) * (RenglonHeightGS + gapGS) + borderGS;
-    card->Resize(Width, height);
-
     int widthProperties = width - bordersGS;
+
+    for (size_t i = 0; i < properties.size(); ++i){
+        height += properties[i]->Resize(width);
+    }
+    card->Resize(Width, height);
     int heightProperties = height - bordersGS;
     maxPixelsTitle = widthProperties - IconSizeGS - gapGS;
 
@@ -117,7 +116,9 @@ void GroupPropertie::RenderPropertiLabel(){
     glTranslatef(-propertiBox->width + gapGS, GlobalScale, 0); 
 };
 
-void GroupPropertie::Render(){    
+void GroupPropertie::Render(){  
+    if (!visible) return;
+
     glColor4f(ListaColores[static_cast<int>(ColorID::gris)][0], 
                 ListaColores[static_cast<int>(ColorID::gris)][1],
                 ListaColores[static_cast<int>(ColorID::gris)][2], 1.0f);

@@ -4,6 +4,8 @@
 #include "UI/card.h"
 #include "variables.h"
 #include "PropertieBase.h"
+#include "PropList.h"
+
 #include "UI/colores.h"
 
 class GroupPropertie {
@@ -12,6 +14,8 @@ class GroupPropertie {
         Card* card;
         Card* propertiBox;
         bool open = true;
+        bool visible = true;
+
         int width = 300;
         int height = 300;
         int maxPixelsTitle = 1920;

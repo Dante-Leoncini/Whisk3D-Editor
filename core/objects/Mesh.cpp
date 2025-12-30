@@ -276,6 +276,7 @@ Object* NewMesh(MeshType type, Object* parent, bool query){
 		for (int i = 0; i < tempFaceGroup.indicesDrawnCount; i++) {
 			mesh->faces[i] = CuboTriangles[i];
 		}
+        tempFaceGroup.name = "Cube";
 		mesh->name = "Cube";
 	}	
 
