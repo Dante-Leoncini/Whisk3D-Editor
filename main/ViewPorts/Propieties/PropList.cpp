@@ -40,7 +40,7 @@ void PropListMeshParts::RenderPropertiLabel(Card* propertiBox){
         for (size_t i = 0; i < mesh->materialsGroup.size(); ++i){
             Material* mat = mesh->materialsGroup[i].material;
             if (mat){
-                RenderBitmapText(mat->name, textAlign::left, propertiBox->width -bordersGS);
+                RenderBitmapText(mat->name, textAlign::left, width -bordersGS);
             }
             glTranslatef(0, RenglonHeightGS + gapGS, 0); 
         }
@@ -48,14 +48,15 @@ void PropListMeshParts::RenderPropertiLabel(Card* propertiBox){
     }
 }
 
-int PropListMeshParts::Resize(int width){
+int PropListMeshParts::Resize(int w){
+    width = w -bordersGS;
     int altura = bordersGS;
     if (mesh){
         altura += (RenglonHeightGS + gapGS) * mesh->materialsGroup.size() - gapGS;
-        std::cout << "altura List: "<< altura << "\n";
+        //std::cout << "altura List: "<< altura << "\n";
     }
 
-    listBox->Resize(width, altura);
+    listBox->Resize(w- bordersGS, altura);
 
     return altura + gapGS;
 }

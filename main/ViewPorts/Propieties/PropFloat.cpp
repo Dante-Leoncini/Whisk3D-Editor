@@ -29,6 +29,7 @@ PropertyType PropFloat::GetType(){
     return PropertyType::Float;
 }
 
-int PropFloat::Resize(int width){
+int PropFloat::Resize(int w){
+    width = w;
     return RenglonHeightGS + gapGS;
 }

@@ -62,8 +62,10 @@ void GroupPropertie::Resize(int Width, int Height){
     height = RenglonHeightGS + gapGS + borderGS;
     int widthProperties = width - bordersGS;
 
-    for (size_t i = 0; i < properties.size(); ++i){
-        height += properties[i]->Resize(width);
+    if (open){
+        for (size_t i = 0; i < properties.size(); ++i){
+            height += properties[i]->Resize(width);
+        }
     }
     card->Resize(Width, height);
     int heightProperties = height - bordersGS;

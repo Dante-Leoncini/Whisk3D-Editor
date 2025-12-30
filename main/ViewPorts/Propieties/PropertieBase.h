@@ -24,6 +24,7 @@ void CardTitulo(GLfloat* icon, const std::string& texto, int maxPixels = 1920);
 class PropertieBase {
     public:
         std::string name = "?";
+        int width = 300;
 
         PropertieBase(const std::string& Name);
         virtual ~PropertieBase();
@@ -33,7 +34,7 @@ class PropertieBase {
         virtual void RenderPropertiBox(Card* propertiBox);
         virtual void RenderPropertiValue(Card* propertiBox);
         virtual void RenderPropertiLabel(Card* propertiBox);
-        virtual int Resize(int width);
+        virtual int Resize(int w);
 };
 
 #endif
