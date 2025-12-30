@@ -21,6 +21,7 @@ class PropListMeshParts : public PropList {
         Mesh* mesh = nullptr;
         
         void RenderPropertiBox(Card* propertiBox) override;
+        void RenderPropertiBoxBorder(Card* propertiBox) override;
         void RenderPropertiValue(Card* propertiBox) override;
         void RenderPropertiLabel(Card* propertiBox) override;
         int Resize(int width) override;

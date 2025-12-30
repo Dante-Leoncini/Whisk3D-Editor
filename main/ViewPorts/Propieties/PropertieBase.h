@@ -32,6 +32,7 @@ class PropertieBase {
         virtual PropertyType GetType();
 
         virtual void RenderPropertiBox(Card* propertiBox);
+        virtual void RenderPropertiBoxBorder(Card* propertiBox);
         virtual void RenderPropertiValue(Card* propertiBox);
         virtual void RenderPropertiLabel(Card* propertiBox);
         virtual int Resize(int w);

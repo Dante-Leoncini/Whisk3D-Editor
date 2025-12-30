@@ -23,6 +23,7 @@ PropertyType PropertieBase::GetType(){
 }
 
 void PropertieBase::RenderPropertiBox(Card* propertiBox){};
+void PropertieBase::RenderPropertiBoxBorder(Card* propertiBox){};
 void PropertieBase::RenderPropertiValue(Card* propertiBox){};
 void PropertieBase::RenderPropertiLabel(Card* propertiBox){};
 int PropertieBase::Resize(int w){return 0;};

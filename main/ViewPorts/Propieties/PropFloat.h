@@ -14,6 +14,7 @@ class PropFloat : public PropertieBase {
         PropertyType GetType() override;
 
         void RenderPropertiBox(Card* propertiBox) override;
+        void RenderPropertiBoxBorder(Card* propertiBox) override;
         void RenderPropertiValue(Card* propertiBox) override;
         void RenderPropertiLabel(Card* propertiBox) override;
         int Resize(int w) override;

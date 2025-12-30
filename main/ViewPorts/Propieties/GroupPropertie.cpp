@@ -94,6 +94,17 @@ void GroupPropertie::RenderPropertiBox(){
     glTranslatef(propertiBox->width, -GlobalScale, 0); 
     for (size_t i = 0; i < properties.size(); ++i){
         properties[i]->RenderPropertiBox(propertiBox);
+
+        //dibujado del borde
+        if (selectIndex == i){
+            glColor4f(ListaColores[static_cast<int>(ColorID::blanco)][0], 
+                        ListaColores[static_cast<int>(ColorID::blanco)][1],
+                        ListaColores[static_cast<int>(ColorID::blanco)][2], 1.0f);
+            properties[i]->RenderPropertiBoxBorder(propertiBox);
+            glColor4f(ListaColores[static_cast<int>(ColorID::background)][0], 
+                    ListaColores[static_cast<int>(ColorID::background)][1],
+                    ListaColores[static_cast<int>(ColorID::background)][2], 1.0f);
+        }
     }
     glTranslatef(-propertiBox->width, GlobalScale, 0); 
 };
@@ -102,9 +113,9 @@ void GroupPropertie::RenderPropertiValue(){
     glTranslatef(propertiBox->width+borderGS, 0, 0); 
     for (size_t i = 0; i < properties.size(); ++i){
         if (selectIndex == i){
-            glColor4f(ListaColores[static_cast<int>(ColorID::accent)][0], 
-                        ListaColores[static_cast<int>(ColorID::accent)][1],
-                        ListaColores[static_cast<int>(ColorID::accent)][2], 1.0f);
+            glColor4f(ListaColores[static_cast<int>(ColorID::blanco)][0], 
+                        ListaColores[static_cast<int>(ColorID::blanco)][1],
+                        ListaColores[static_cast<int>(ColorID::blanco)][2], 1.0f);
         }
         else {
             glColor4f(ListaColores[static_cast<int>(ColorID::grisUI)][0], 
@@ -181,7 +192,7 @@ void GroupPropertie::Render(){
         RenderPropertiLabel();
     }
 
-    glTranslatef(-borderGS, borderGS + gapGS, 0);
+    glTranslatef(-borderGS, borderGS, 0);
 }
 
 std::vector<GroupPropertie*> GroupProperties;

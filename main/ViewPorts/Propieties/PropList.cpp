@@ -15,11 +15,15 @@ PropListMeshParts::PropListMeshParts(const std::string& Name):
 
 void PropListMeshParts::RenderPropertiBox(Card* propertiBox){
     glTranslatef(-propertiBox->width, 0, 0); 
-
     listBox->Render(false);
-
     glTranslatef(propertiBox->width, RenglonHeightGS + gapGS, 0); 
 }
+
+void PropListMeshParts::RenderPropertiBoxBorder(Card* propertiBox){
+    glTranslatef(-propertiBox->width, -RenglonHeightGS - gapGS, 0); 
+    listBox->RenderBorder(false);
+    glTranslatef(propertiBox->width, RenglonHeightGS + gapGS, 0); 
+};
 
 void PropListMeshParts::RenderPropertiValue(Card* propertiBox){
     if (mesh){

@@ -11,6 +11,14 @@ void PropFloat::RenderPropertiBox(Card* propertiBox){
     }
 }
 
+void PropFloat::RenderPropertiBoxBorder(Card* propertiBox){
+    if (value){
+        glTranslatef(0, -RenglonHeightGS - gapGS, 0); 
+        propertiBox->RenderBorder(false);
+        glTranslatef(0, RenglonHeightGS + gapGS, 0); 
+    }
+};
+
 void PropFloat::RenderPropertiValue(Card* propertiBox){
     if (value){
         RenderBitmapFloat(*value, textAlign::left, propertiBox->width -bordersGS, unit);
