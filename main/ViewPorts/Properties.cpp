@@ -286,6 +286,9 @@ void Properties::event_key_down(SDL_Event &e){
 
 void Properties::SetOpenGroup(bool open){
     GroupProperties[selectIndex]->open = open;
+    if (!open){
+        GroupProperties[selectIndex]->selectIndex = -1;
+    }
     Resize(width, height);
 }
 
@@ -307,7 +310,12 @@ void Properties::PrevSelect(){
             selectIndex = static_cast<int>(GroupProperties.size()) - 1;
         }
 
-        GroupProperties[selectIndex]->selectIndex = -1;
+        if (GroupProperties[selectIndex]->open){
+            GroupProperties[selectIndex]->selectLastIndexProperty();
+        }
+        else {
+            GroupProperties[selectIndex]->selectIndex = -1;
+        }
     }
 }
 

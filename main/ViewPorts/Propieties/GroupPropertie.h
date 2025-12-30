@@ -25,6 +25,7 @@ class GroupPropertie {
         int selectIndex = -2;
         bool NextSelect();
         bool PrevSelect();
+        void selectLastIndexProperty();
 
         void Render();
         void RenderPropertiBox();

@@ -1,6 +1,11 @@
 #include "GroupPropertie.h"
 
 bool GroupPropertie::NextSelect(){
+    if (!open){        
+        selectIndex = -2;
+        return true;
+    }
+
     const int size = static_cast<int>(properties.size());
 
     while (true){
@@ -27,15 +32,22 @@ bool GroupPropertie::NextSelect(){
 }
 
 bool GroupPropertie::PrevSelect(){
+    if (!open){        
+        selectIndex = -2;
+        return true;
+    }
+
     const int size = static_cast<int>(properties.size());
 
     while (true){
         selectIndex--;
 
         // llegamos al inicio
-        if (selectIndex < 0){
-            selectIndex = -2;
+        if (selectIndex < -1){
             return true;
+        }
+        if (selectIndex < 0){
+            return false;
         }
 
         // por seguridad (simetría con NextSelect)
@@ -50,6 +62,10 @@ bool GroupPropertie::PrevSelect(){
         // encontrado válido
         return false;
     }
+}
+
+void GroupPropertie::selectLastIndexProperty(){
+    selectIndex = properties.size() - 1;
 }
 
 GroupPropertie::GroupPropertie(const std::string& Name): name(Name) {
