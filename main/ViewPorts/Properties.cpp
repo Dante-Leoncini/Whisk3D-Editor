@@ -53,8 +53,8 @@ void Properties::RefreshTargetProperties(){
 
     //posicion
     static_cast<PropFloat*>(propTransform->properties[0])->value = &ObjActivo->pos.x;
-    static_cast<PropFloat*>(propTransform->properties[1])->value = &ObjActivo->pos.y;
-    static_cast<PropFloat*>(propTransform->properties[2])->value = &ObjActivo->pos.z;
+    static_cast<PropFloat*>(propTransform->properties[1])->value = &ObjActivo->pos.z;
+    static_cast<PropFloat*>(propTransform->properties[2])->value = &ObjActivo->pos.y;
 
     //rotacion
     static_cast<PropFloat*>(propTransform->properties[4])->value = &ObjActivo->rotEuler.x;
@@ -232,12 +232,29 @@ void Properties::Render(){
 }
 
 void Properties::button_left(){
+    if (!editando){
+        SetOpenGroup(false);
+    }
+    else {
+        GroupProperties[selectIndex]->button_left();
+    }
+}
+
+void Properties::button_right(){
+    if (!editando){
+        SetOpenGroup(true);
+    }
+    else {
+        GroupProperties[selectIndex]->button_right();
+    }
 }
 
 void Properties::mouse_button_up(SDL_Event &e){
+    if (!editando)  ViewPortClickDown = false;
 }
 
 void Properties::event_mouse_wheel(SDL_Event &e){
+    if (editando) return;
     MouseWheel = true;
     ScrollY(e.wheel.y*6*GlobalScale);
     MouseWheel = false;
@@ -247,6 +264,8 @@ void Properties::FindMouseOver(int mx, int my){
 }
 
 void Properties::event_mouse_motion(int mx, int my) {
+    if (editando) return;
+
     if (middleMouseDown || leftMouseDown) {
         ViewPortClickDown = true;
 
@@ -269,20 +288,53 @@ void Properties::event_key_down(SDL_Event &e){
     if (e.key.repeat == 0) { 
         switch (key) {
             case SDLK_LEFT:
-                SetOpenGroup(false);
+                button_left();
                 break;
             case SDLK_RIGHT:
-                SetOpenGroup(true);
+                button_right();
                 break;
             case SDLK_UP: 
-                PrevSelect();
+                button_up();
                 break;
             case SDLK_DOWN:
-                NextSelect();
+                button_down();
+                break;
+            case SDLK_RETURN:
+                EnterPropertieSelect();
+                break;
+            case SDLK_ESCAPE:
+                Cancel();
                 break;
         };
     }   
+    else {
+        // Evento repetido por mantener apretada
+        switch (key) {
+            case SDLK_LEFT:
+                button_left();
+                break;
+            case SDLK_RIGHT:
+                button_right();
+                break;
+            case SDLK_UP: 
+                button_up();
+                break;
+            case SDLK_DOWN:
+                button_down();
+                break;
+        }
+    }
 }
+
+void Properties::EnterPropertieSelect(){
+    editando = GroupProperties[selectIndex]->EnterPropertieSelect();
+    ViewPortClickDown = editando;
+}
+
+void Properties::Cancel(){
+    editando = GroupProperties[selectIndex]->Cancel();
+    ViewPortClickDown = editando;
+};
 
 void Properties::SetOpenGroup(bool open){
     GroupProperties[selectIndex]->open = open;
@@ -290,6 +342,24 @@ void Properties::SetOpenGroup(bool open){
         GroupProperties[selectIndex]->selectIndex = -1;
     }
     Resize(width, height);
+}
+
+void Properties::button_up(){
+    if (!editando){
+        PrevSelect();
+    }
+    else {
+        GroupProperties[selectIndex]->button_up();
+    }
+}
+
+void Properties::button_down(){
+    if (!editando){
+        NextSelect();
+    }
+    else {
+        GroupProperties[selectIndex]->button_down();
+    }
 }
 
 void Properties::NextSelect(){

@@ -19,6 +19,13 @@ class PropListMeshParts : public PropList {
         PropListMeshParts(const std::string& Name);
 
         Mesh* mesh = nullptr;
+
+        void button_up() override;
+        void button_down() override;
+        void button_left() override;
+        void button_right() override;
+
+        bool EditPropertie() override;
         
         void RenderPropertiBox(Card* propertiBox) override;
         void RenderPropertiBoxBorder(Card* propertiBox) override;

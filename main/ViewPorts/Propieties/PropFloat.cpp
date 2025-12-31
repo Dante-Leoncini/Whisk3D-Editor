@@ -31,7 +31,40 @@ void PropFloat::RenderPropertiLabel(Card* propertiBox){
         RenderBitmapText(name, textAlign::right, propertiBox->width -bordersGS);
         glTranslatef(0, RenglonHeightGS + gapGS, 0); 
     }
-}
+};
+
+void PropFloat::button_up(){
+    *value += 0.01f;
+};
+
+void PropFloat::button_down(){
+    *value -= 0.01f;
+};
+
+void PropFloat::button_left(){
+    *value -= 0.1f;
+};
+
+void PropFloat::button_right(){
+    *value += 0.1f;
+};
+
+bool PropFloat::Cancel(){
+    std::cout << "se cancelo originalValue: "<< originalValue << "\n";
+    *value = originalValue;
+    std::cout << "quedo asi: "<< *value << "\n";
+    editando = false;
+    return editando;
+};
+
+bool PropFloat::EditPropertie(){
+    editando = !editando;
+    if (editando){
+        originalValue = *value;
+        std::cout << "se guardo originalValue: "<< originalValue << "\n";
+    }
+    return editando;
+};
 
 PropertyType PropFloat::GetType(){
     return PropertyType::Float;

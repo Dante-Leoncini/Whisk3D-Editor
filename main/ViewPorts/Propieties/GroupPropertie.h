@@ -15,6 +15,7 @@ class GroupPropertie {
         Card* propertiBox;
         bool open = true;
         bool visible = true;
+        bool editando = false;
 
         int width = 300;
         int height = 300;
@@ -26,6 +27,13 @@ class GroupPropertie {
         bool NextSelect();
         bool PrevSelect();
         void selectLastIndexProperty();
+        bool EnterPropertieSelect();
+        bool Cancel();
+
+        void button_up();
+        void button_down();
+        void button_left();
+        void button_right();
 
         void Render();
         void RenderPropertiBox();

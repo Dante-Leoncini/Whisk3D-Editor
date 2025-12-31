@@ -22,7 +22,14 @@ PropertyType PropertieBase::GetType(){
     return PropertyType::Base;
 }
 
+void PropertieBase::button_up(){};
+void PropertieBase::button_down(){};
+void PropertieBase::button_left(){};
+void PropertieBase::button_right(){};
+bool PropertieBase::Cancel(){return false;};
+
 void PropertieBase::RenderPropertiBox(Card* propertiBox){};
+bool PropertieBase::EditPropertie(){return false;};
 void PropertieBase::RenderPropertiBoxBorder(Card* propertiBox){};
 void PropertieBase::RenderPropertiValue(Card* propertiBox){};
 void PropertieBase::RenderPropertiLabel(Card* propertiBox){};

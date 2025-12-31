@@ -64,6 +64,9 @@ class ViewportBase {
 
         virtual void event_mouse_motion(int mx, int my);
         virtual void button_left();
+        virtual void button_right();
+        virtual void button_up();
+        virtual void button_down();
         virtual void event_key_down(SDL_Event &e);
         virtual void event_key_up(SDL_Event &e);
 

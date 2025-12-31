@@ -107,7 +107,6 @@ void InputUsuarioSDL3(SDL_Event &e){
         }
     }
     else if (e.type == SDL_EVENT_MOUSE_BUTTON_UP) {
-        ViewPortClickDown = false;
         if (e.button.button == SDL_BUTTON_LEFT) {  
             leftMouseDown = false;
         }

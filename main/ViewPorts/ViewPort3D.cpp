@@ -686,7 +686,7 @@ void Viewport3D::button_left(){
 }
 
 void Viewport3D::mouse_button_up(SDL_Event &e){
-
+    ViewPortClickDown = false;
 }
 
 void Viewport3D::event_mouse_motion(int mx, int my){

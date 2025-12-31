@@ -44,12 +44,19 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         void PrevSelect();
         void SetOpenGroup(bool open);
 
+        bool editando = false;
+        void EnterPropertieSelect();
+
         void Resize(int newW, int newH) override;
         void Render() override;
 
         void RefreshTargetProperties();
 
         void button_left() override;
+        void button_right() override;
+        void button_up() override;
+        void button_down() override;
+        void Cancel();
         void mouse_button_up(SDL_Event &e) override;
         void event_mouse_wheel(SDL_Event &e) override;
         void FindMouseOver(int mx, int my);

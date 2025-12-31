@@ -31,6 +31,16 @@ class PropertieBase {
 
         virtual PropertyType GetType();
 
+        bool editando = false;
+
+        virtual void button_up();
+        virtual void button_down();
+        virtual void button_left();
+        virtual void button_right();
+        virtual bool Cancel();
+
+        virtual bool EditPropertie();
+
         virtual void RenderPropertiBox(Card* propertiBox);
         virtual void RenderPropertiBoxBorder(Card* propertiBox);
         virtual void RenderPropertiValue(Card* propertiBox);

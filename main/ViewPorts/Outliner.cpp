@@ -281,6 +281,7 @@ void Outliner::button_left(){
 }
 
 void Outliner::mouse_button_up(SDL_Event &e){
+    ViewPortClickDown = false;
     if (e.button.button == SDL_BUTTON_LEFT) {  
         mouseOverScrollYpress = false;
         mouseOverScrollXpress = false;

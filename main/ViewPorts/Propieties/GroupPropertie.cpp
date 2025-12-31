@@ -90,6 +90,55 @@ void GroupPropertie::Resize(int Width, int Height){
     propertiBox->Resize(widthProperties/2, RenglonHeightGS+GlobalScale*2);
 }
 
+bool GroupPropertie::Cancel(){
+    if (selectIndex < 0){
+        editando = false;
+        return false;
+    }
+
+    editando = properties[selectIndex]->Cancel();
+    return editando;
+}
+
+bool GroupPropertie::EnterPropertieSelect(){
+    if (selectIndex < 0){
+        open = !open;
+        editando = false;
+        return false;
+    }
+
+    editando = properties[selectIndex]->EditPropertie();
+    return editando;
+}
+
+void GroupPropertie::button_up(){
+    if (selectIndex < 0){
+        return;
+    }
+    properties[selectIndex]->button_up();
+};
+
+void GroupPropertie::button_down(){
+    if (selectIndex < 0){
+        return;
+    }
+    properties[selectIndex]->button_down();    
+};
+
+void GroupPropertie::button_left(){
+    if (selectIndex < 0){
+        return;
+    }
+    properties[selectIndex]->button_left();    
+};
+
+void GroupPropertie::button_right(){
+    if (selectIndex < 0){
+        return;
+    }
+    properties[selectIndex]->button_right();    
+};
+
 void GroupPropertie::RenderPropertiBox(){
     glTranslatef(propertiBox->width, -GlobalScale, 0); 
     for (size_t i = 0; i < properties.size(); ++i){
@@ -97,9 +146,16 @@ void GroupPropertie::RenderPropertiBox(){
 
         //dibujado del borde
         if (selectIndex == i){
-            glColor4f(ListaColores[static_cast<int>(ColorID::blanco)][0], 
-                        ListaColores[static_cast<int>(ColorID::blanco)][1],
-                        ListaColores[static_cast<int>(ColorID::blanco)][2], 1.0f);
+            if (editando){
+                glColor4f(ListaColores[static_cast<int>(ColorID::accent)][0], 
+                            ListaColores[static_cast<int>(ColorID::accent)][1],
+                            ListaColores[static_cast<int>(ColorID::accent)][2], 1.0f);
+            }
+            else {
+                glColor4f(ListaColores[static_cast<int>(ColorID::blanco)][0], 
+                            ListaColores[static_cast<int>(ColorID::blanco)][1],
+                            ListaColores[static_cast<int>(ColorID::blanco)][2], 1.0f);
+            }
             properties[i]->RenderPropertiBoxBorder(propertiBox);
             glColor4f(ListaColores[static_cast<int>(ColorID::background)][0], 
                     ListaColores[static_cast<int>(ColorID::background)][1],
@@ -113,9 +169,16 @@ void GroupPropertie::RenderPropertiValue(){
     glTranslatef(propertiBox->width+borderGS, 0, 0); 
     for (size_t i = 0; i < properties.size(); ++i){
         if (selectIndex == i){
-            glColor4f(ListaColores[static_cast<int>(ColorID::blanco)][0], 
-                        ListaColores[static_cast<int>(ColorID::blanco)][1],
-                        ListaColores[static_cast<int>(ColorID::blanco)][2], 1.0f);
+            if (editando){
+                glColor4f(ListaColores[static_cast<int>(ColorID::accent)][0], 
+                            ListaColores[static_cast<int>(ColorID::accent)][1],
+                            ListaColores[static_cast<int>(ColorID::accent)][2], 1.0f);
+            }
+            else {
+                glColor4f(ListaColores[static_cast<int>(ColorID::blanco)][0], 
+                            ListaColores[static_cast<int>(ColorID::blanco)][1],
+                            ListaColores[static_cast<int>(ColorID::blanco)][2], 1.0f);
+            }
         }
         else {
             glColor4f(ListaColores[static_cast<int>(ColorID::grisUI)][0], 

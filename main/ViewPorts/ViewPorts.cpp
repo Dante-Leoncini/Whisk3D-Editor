@@ -24,6 +24,9 @@ ViewportBase::ViewportBase() {}
 ViewportBase::~ViewportBase(){}
 void ViewportBase::event_mouse_motion(int mx, int my) {}
 void ViewportBase::button_left() {}
+void ViewportBase::button_right(){};
+void ViewportBase::button_up(){};
+void ViewportBase::button_down(){};
 void ViewportBase::event_key_down(SDL_Event &e) {}
 void ViewportBase::event_key_up(SDL_Event &e) {}
 void ViewportBase::event_mouse_wheel(SDL_Event &e) {}

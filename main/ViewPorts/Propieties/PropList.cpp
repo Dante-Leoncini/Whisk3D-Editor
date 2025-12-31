@@ -52,6 +52,15 @@ void PropListMeshParts::RenderPropertiLabel(Card* propertiBox){
     }
 }
 
+void PropListMeshParts::button_up(){};
+void PropListMeshParts::button_down(){};
+void PropListMeshParts::button_left(){};
+void PropListMeshParts::button_right(){};
+
+bool PropListMeshParts::EditPropertie(){
+    return false;
+};
+
 int PropListMeshParts::Resize(int w){
     width = w -bordersGS;
     int altura = bordersGS;
