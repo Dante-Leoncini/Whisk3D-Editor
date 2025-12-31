@@ -16,21 +16,17 @@ PropListMeshParts::PropListMeshParts(const std::string& Name):
 void PropListMeshParts::RenderPropertiBox(Card* propertiBox){
     glTranslatef(-propertiBox->width, 0, 0); 
     listBox->Render(false);
-    glTranslatef(propertiBox->width, RenglonHeightGS + gapGS, 0); 
+    glTranslatef(propertiBox->width, listBox->height + gapGS, 0);
 }
 
 void PropListMeshParts::RenderPropertiBoxBorder(Card* propertiBox){
-    glTranslatef(-propertiBox->width, -RenglonHeightGS - gapGS, 0); 
+    glTranslatef(-propertiBox->width, -listBox->height - gapGS, 0); 
     listBox->RenderBorder(false);
-    glTranslatef(propertiBox->width, RenglonHeightGS + gapGS, 0); 
+    glTranslatef(propertiBox->width, listBox->height + gapGS, 0); 
 };
 
 void PropListMeshParts::RenderPropertiValue(Card* propertiBox){
-    if (mesh){
-        for (size_t i = 0; i < mesh->materialsGroup.size(); ++i){
-            glTranslatef(0, RenglonHeightGS + gapGS, 0); 
-        }
-    }
+    glTranslatef(0, listBox->height + gapGS, 0);
 }
 
 void PropListMeshParts::RenderPropertiLabel(Card* propertiBox){
@@ -40,10 +36,7 @@ void PropListMeshParts::RenderPropertiLabel(Card* propertiBox){
                 ListaColores[static_cast<int>(ColorID::grisUI)][1],
                 ListaColores[static_cast<int>(ColorID::grisUI)][2], 1.0f);
 
-
         for (size_t i = 0; i < mesh->materialsGroup.size(); ++i){
-            //Material* mat = mesh->materialsGroup[i].material;
-            //if (mat){
             if (selectIndex == i){
                 glColor4f(ListaColores[static_cast<int>(ColorID::accent)][0], 
                         ListaColores[static_cast<int>(ColorID::accent)][1],
@@ -56,10 +49,9 @@ void PropListMeshParts::RenderPropertiLabel(Card* propertiBox){
                         ListaColores[static_cast<int>(ColorID::grisUI)][1],
                         ListaColores[static_cast<int>(ColorID::grisUI)][2], 1.0f);
             }
-            //}
             glTranslatef(0, RenglonHeightGS + gapGS, 0); 
         }
-        glTranslatef(propertiBox->width - gapGS - gapGS, 0, 0); 
+        glTranslatef(propertiBox->width - gapGS - gapGS, borderGS, 0); 
     }
 }
 

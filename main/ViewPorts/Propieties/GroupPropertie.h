@@ -5,6 +5,7 @@
 #include "variables.h"
 #include "PropertieBase.h"
 #include "PropList.h"
+#include "PropBool.h"
 
 #include "UI/colores.h"
 
@@ -13,6 +14,7 @@ class GroupPropertie {
         std::string name = "Propertie";
         Card* card;
         Card* propertiBox;
+        Card* checkBox;
         bool open = true;
         bool visible = true;
         bool editando = false;

@@ -45,8 +45,55 @@ void ConstructorProperties(){
 
     propMeshParts->properties.push_back(new PropListMeshParts("Mesh Parts"));
 
+    propMeshParts->properties.push_back(new PropBool("Texture"));
+    propMeshParts->properties.push_back(new PropBool("Transparent"));
+    propMeshParts->properties.push_back(new PropBool("Vertex Color"));
+    propMeshParts->properties.push_back(new PropBool("Lighting"));
+    propMeshParts->properties.push_back(new PropBool("Repeat"));
+    propMeshParts->properties.push_back(new PropBool("Culling"));
+    propMeshParts->properties.push_back(new PropBool("Depth Test"));
+    
+
     GroupProperties.push_back(propMeshParts);
 }
+
+
+void Properties::RefreshPropMeshParts(){
+    if (ObjActivo->getType() != ObjectType::mesh){
+        propMeshParts->visible = false;
+        static_cast<PropListMeshParts*>(propMeshParts->properties[0])->mesh = nullptr;
+        return;
+    }
+
+    propMeshParts->visible = true;
+    Mesh* mesh = static_cast<Mesh*>(ObjActivo);
+    static_cast<PropListMeshParts*>(propMeshParts->properties[0])->mesh = mesh;
+    static_cast<PropListMeshParts*>(propMeshParts->properties[0])->selectIndex = 0;
+
+    if (mesh->materialsGroup.empty()) return;
+
+    MaterialGroup& mg = mesh->materialsGroup[0];
+    if (!mg.material) return;
+    Material* material = mg.material;
+
+    static_cast<PropBool*>(propMeshParts->properties[1])->value = &material->transparent;
+    static_cast<PropBool*>(propMeshParts->properties[2])->value = &material->transparent;
+    static_cast<PropBool*>(propMeshParts->properties[3])->value = &material->vertexColor;
+    static_cast<PropBool*>(propMeshParts->properties[4])->value = &material->lighting;
+    static_cast<PropBool*>(propMeshParts->properties[5])->value = &material->repeat;
+    static_cast<PropBool*>(propMeshParts->properties[6])->value = &material->culling;
+    static_cast<PropBool*>(propMeshParts->properties[7])->value = &material->depth_test;
+
+    /*
+    bool culling = true;
+    bool uv8bit = false;
+    int interpolacion = 0;
+    Texture* texture = nullptr;
+    GLfloat diffuse[4]  = {1.0f, 1.0f, 1.0f, 1.0f};
+    GLfloat specular[4] = {0.3f, 0.3f, 0.3f, 1.0f};
+    GLfloat emission[4] = {0.0f, 0.0f, 0.0f, 1.0f};
+    std::string name = "";*/
+};
 
 void Properties::RefreshTargetProperties(){
     if (!ObjActivo || ObjActivo == target ) return;
@@ -67,15 +114,8 @@ void Properties::RefreshTargetProperties(){
     static_cast<PropFloat*>(propTransform->properties[10])->value = &ObjActivo->scale.z;
 
     //Mesh Parts
-    if (ObjActivo->getType() == ObjectType::mesh){
-        propMeshParts->visible = true;
-        Mesh* mesh = static_cast<Mesh*>(ObjActivo);
-        static_cast<PropListMeshParts*>(propMeshParts->properties[0])->mesh = mesh;
-    }
-    else {
-        propMeshParts->visible = false;
-        static_cast<PropListMeshParts*>(propMeshParts->properties[0])->mesh = nullptr;
-    }
+    RefreshPropMeshParts();
+
     Resize(width, height);
 }
 
@@ -250,13 +290,13 @@ void Properties::button_right(){
 }
 
 void Properties::mouse_button_up(SDL_Event &e){
-    if (!editando)  ViewPortClickDown = false;
+    if (!editando) ViewPortClickDown = false;
 }
 
 void Properties::event_mouse_wheel(SDL_Event &e){
     if (editando) return;
     MouseWheel = true;
-    ScrollY(e.wheel.y*6*GlobalScale);
+    ScrollY(e.wheel.y*12*GlobalScale);
     MouseWheel = false;
 }
 

@@ -71,6 +71,7 @@ void GroupPropertie::selectLastIndexProperty(){
 GroupPropertie::GroupPropertie(const std::string& Name): name(Name) {
     card = new Card(nullptr, 300, 300);
     propertiBox = new Card(nullptr, 300, RenglonHeightGS);
+    checkBox = new Card(nullptr, RenglonHeightGS, RenglonHeightGS);
 }
 
 void GroupPropertie::Resize(int Width, int Height){
@@ -88,6 +89,7 @@ void GroupPropertie::Resize(int Width, int Height){
     maxPixelsTitle = widthProperties - IconSizeGS - gapGS;
 
     propertiBox->Resize(widthProperties/2, RenglonHeightGS+GlobalScale*2);
+    checkBox->Resize(RenglonHeightGS+GlobalScale*2, RenglonHeightGS+GlobalScale*2);
 }
 
 bool GroupPropertie::Cancel(){
@@ -142,7 +144,24 @@ void GroupPropertie::button_right(){
 void GroupPropertie::RenderPropertiBox(){
     glTranslatef(propertiBox->width, -GlobalScale, 0); 
     for (size_t i = 0; i < properties.size(); ++i){
-        properties[i]->RenderPropertiBox(propertiBox);
+        Card* cardToUse = propertiBox;
+
+        if (properties[i]->GetType() == PropertyType::Bool){
+            cardToUse = checkBox;
+            if (static_cast<PropBool*>(properties[i])->value && *static_cast<PropBool*>(properties[i])->value){
+                glColor4f(ListaColores[static_cast<int>(ColorID::grisUI)][0], 
+                            ListaColores[static_cast<int>(ColorID::grisUI)][1],
+                            ListaColores[static_cast<int>(ColorID::grisUI)][2], 1.0f);
+            }
+        }
+
+        properties[i]->RenderPropertiBox(cardToUse);
+
+        if (cardToUse == checkBox){
+            glColor4f(ListaColores[static_cast<int>(ColorID::background)][0], 
+                    ListaColores[static_cast<int>(ColorID::background)][1],
+                    ListaColores[static_cast<int>(ColorID::background)][2], 1.0f);
+        }
 
         //dibujado del borde
         if (selectIndex == i){
@@ -156,7 +175,7 @@ void GroupPropertie::RenderPropertiBox(){
                             ListaColores[static_cast<int>(ColorID::blanco)][1],
                             ListaColores[static_cast<int>(ColorID::blanco)][2], 1.0f);
             }
-            properties[i]->RenderPropertiBoxBorder(propertiBox);
+            properties[i]->RenderPropertiBoxBorder(cardToUse);        
             glColor4f(ListaColores[static_cast<int>(ColorID::background)][0], 
                     ListaColores[static_cast<int>(ColorID::background)][1],
                     ListaColores[static_cast<int>(ColorID::background)][2], 1.0f);

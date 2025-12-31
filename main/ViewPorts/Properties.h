@@ -24,6 +24,7 @@
 #include "Propieties/PropFloat.h" 
 #include "Propieties/PropGap.h" 
 #include "Propieties/PropList.h" 
+#include "Propieties/PropBool.h"
 
 void DibujarTitulo(Object* obj, int maxPixels);
 void ConstructorProperties();
@@ -51,6 +52,7 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         void Render() override;
 
         void RefreshTargetProperties();
+        void RefreshPropMeshParts();
 
         void button_left() override;
         void button_right() override;
