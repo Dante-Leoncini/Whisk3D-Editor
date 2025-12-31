@@ -90,6 +90,7 @@ void Wavefront::ConvertToES1(Mesh* TempMesh, int* acumuladoVertices, int* acumul
             mg.startDrawn = mgOrig.startDrawn;
             mg.indicesDrawnCount = mgOrig.indicesDrawnCount;
             mg.material = mgOrig.material;
+            mg.name = mgOrig.material->name;
             TempMesh->materialsGroup.push_back(mg);
         }
     } else {
@@ -153,6 +154,7 @@ void Wavefront::ConvertToES1_NoMerge(Mesh* TempMesh) {
 
                 MaterialGroup mg;
                 mg.material = materialsGroup[m].material;
+                mg.name = materialsGroup[m].material->name;
                 mg.start = newFaces.size() / 3;
                 mg.count = 0;
                 mg.startDrawn = mg.start * 3;
@@ -362,6 +364,7 @@ bool LeerOBJ(std::ifstream& file,
             if (!materialPuntero) materialPuntero = new Material(matName, false, TieneVertexColor);
 
             MaterialGroup mg;
+            mg.name = materialPuntero->name;
             mg.start = Wobj.faces.size();
             mg.startDrawn = Wobj.faces.size() * 3;
             mg.count = 0;

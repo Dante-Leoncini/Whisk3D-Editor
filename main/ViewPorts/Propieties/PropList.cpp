@@ -42,21 +42,21 @@ void PropListMeshParts::RenderPropertiLabel(Card* propertiBox){
 
 
         for (size_t i = 0; i < mesh->materialsGroup.size(); ++i){
-            Material* mat = mesh->materialsGroup[i].material;
-            if (mat){
-                if (selectIndex == i){
-                    glColor4f(ListaColores[static_cast<int>(ColorID::accent)][0], 
-                            ListaColores[static_cast<int>(ColorID::accent)][1],
-                            ListaColores[static_cast<int>(ColorID::accent)][2], 1.0f);
-                }
-                RenderBitmapText(mat->name, textAlign::left, width -bordersGS);
-
-                if (selectIndex == i){
-                    glColor4f(ListaColores[static_cast<int>(ColorID::grisUI)][0], 
-                            ListaColores[static_cast<int>(ColorID::grisUI)][1],
-                            ListaColores[static_cast<int>(ColorID::grisUI)][2], 1.0f);
-                }
+            //Material* mat = mesh->materialsGroup[i].material;
+            //if (mat){
+            if (selectIndex == i){
+                glColor4f(ListaColores[static_cast<int>(ColorID::accent)][0], 
+                        ListaColores[static_cast<int>(ColorID::accent)][1],
+                        ListaColores[static_cast<int>(ColorID::accent)][2], 1.0f);
             }
+            RenderBitmapText(mesh->materialsGroup[i].name, textAlign::left, width -bordersGS);
+
+            if (selectIndex == i){
+                glColor4f(ListaColores[static_cast<int>(ColorID::grisUI)][0], 
+                        ListaColores[static_cast<int>(ColorID::grisUI)][1],
+                        ListaColores[static_cast<int>(ColorID::grisUI)][2], 1.0f);
+            }
+            //}
             glTranslatef(0, RenglonHeightGS + gapGS, 0); 
         }
         glTranslatef(propertiBox->width - gapGS - gapGS, 0, 0); 
