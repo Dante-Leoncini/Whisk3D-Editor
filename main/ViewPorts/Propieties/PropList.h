@@ -8,8 +8,13 @@
 class PropList : public PropertieBase { 
     public:
         Card* listBox;
+        int selectIndex = 0;
+        int originalIndex = 0;
 
         PropList(const std::string& Name);
+
+        bool EditPropertie() override;
+        bool Cancel() override;
 
         PropertyType GetType() override;
 };
@@ -24,8 +29,6 @@ class PropListMeshParts : public PropList {
         void button_down() override;
         void button_left() override;
         void button_right() override;
-
-        bool EditPropertie() override;
         
         void RenderPropertiBox(Card* propertiBox) override;
         void RenderPropertiBoxBorder(Card* propertiBox) override;

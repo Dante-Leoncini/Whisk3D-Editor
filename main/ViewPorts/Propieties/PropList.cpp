@@ -44,7 +44,18 @@ void PropListMeshParts::RenderPropertiLabel(Card* propertiBox){
         for (size_t i = 0; i < mesh->materialsGroup.size(); ++i){
             Material* mat = mesh->materialsGroup[i].material;
             if (mat){
+                if (selectIndex == i){
+                    glColor4f(ListaColores[static_cast<int>(ColorID::accent)][0], 
+                            ListaColores[static_cast<int>(ColorID::accent)][1],
+                            ListaColores[static_cast<int>(ColorID::accent)][2], 1.0f);
+                }
                 RenderBitmapText(mat->name, textAlign::left, width -bordersGS);
+
+                if (selectIndex == i){
+                    glColor4f(ListaColores[static_cast<int>(ColorID::grisUI)][0], 
+                            ListaColores[static_cast<int>(ColorID::grisUI)][1],
+                            ListaColores[static_cast<int>(ColorID::grisUI)][2], 1.0f);
+                }
             }
             glTranslatef(0, RenglonHeightGS + gapGS, 0); 
         }
@@ -52,13 +63,31 @@ void PropListMeshParts::RenderPropertiLabel(Card* propertiBox){
     }
 }
 
-void PropListMeshParts::button_up(){};
-void PropListMeshParts::button_down(){};
 void PropListMeshParts::button_left(){};
 void PropListMeshParts::button_right(){};
 
-bool PropListMeshParts::EditPropertie(){
-    return false;
+bool PropList::Cancel(){
+    selectIndex = originalIndex;
+    editando = false;
+    return editando;
+};
+
+bool PropList::EditPropertie(){
+    editando = !editando;
+    if (editando){
+        originalIndex = selectIndex;
+    }
+    return editando;
+};
+
+void PropListMeshParts::button_up(){
+    selectIndex--;
+    if (selectIndex < 0) selectIndex = mesh->materialsGroup.size() - 1;
+};
+
+void PropListMeshParts::button_down(){
+    selectIndex++;
+    if (selectIndex >= mesh->materialsGroup.size()) selectIndex = 0;
 };
 
 int PropListMeshParts::Resize(int w){

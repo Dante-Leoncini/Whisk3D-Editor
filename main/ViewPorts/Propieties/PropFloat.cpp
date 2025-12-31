@@ -50,9 +50,9 @@ void PropFloat::button_right(){
 };
 
 bool PropFloat::Cancel(){
-    std::cout << "se cancelo originalValue: "<< originalValue << "\n";
+    //std::cout << "se cancelo originalValue: "<< originalValue << "\n";
     *value = originalValue;
-    std::cout << "quedo asi: "<< *value << "\n";
+    //std::cout << "quedo asi: "<< *value << "\n";
     editando = false;
     return editando;
 };
@@ -61,7 +61,7 @@ bool PropFloat::EditPropertie(){
     editando = !editando;
     if (editando){
         originalValue = *value;
-        std::cout << "se guardo originalValue: "<< originalValue << "\n";
+        //std::cout << "se guardo originalValue: "<< originalValue << "\n";
     }
     return editando;
 };
