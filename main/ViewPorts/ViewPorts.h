@@ -97,6 +97,7 @@ class ViewportRow : public ViewportBase {
         void Resize(int newW, int newH) override;
         void Render() override;
         void button_left() override;
+        void mouse_button_up(SDL_Event &e) override;
         void event_mouse_motion(int mx, int my) override;
 
         // ------------------ Funciones propias ------------------
@@ -122,6 +123,7 @@ class ViewportColumn : public ViewportBase {
         void Render() override;
 
         void button_left() override;
+        void mouse_button_up(SDL_Event &e) override;
         void event_mouse_motion(int mx, int my) override;
 };
 

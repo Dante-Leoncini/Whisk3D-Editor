@@ -109,6 +109,10 @@ void ViewportRow::button_left() {
     ViewPortClickDown = true;
 }
 
+void ViewportRow::mouse_button_up(SDL_Event &e){
+    ViewPortClickDown = false;
+}
+
 void ViewportRow::event_mouse_motion(int mx, int my) {
     if (leftMouseDown) {
         ViewPortClickDown = true;
@@ -185,6 +189,10 @@ void ViewportColumn::Render() {
 void ViewportColumn::button_left() {
     leftMouseDown = true;
     ViewPortClickDown = true;
+}
+
+void ViewportColumn::mouse_button_up(SDL_Event &e){
+    ViewPortClickDown = false;
 }
 
 void ViewportColumn::event_mouse_motion(int mx, int my) {

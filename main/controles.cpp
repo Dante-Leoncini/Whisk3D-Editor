@@ -114,7 +114,10 @@ void InputUsuarioSDL3(SDL_Event &e){
             middleMouseDown = false;
         }
         GuardarMousePos();
-        viewPortActive->mouse_button_up(e);
+
+        if (viewPortActive){
+            viewPortActive->mouse_button_up(e);
+        }
 
         int oglY = winH - lastMouseY;
         viewPortActive = FindViewportUnderMouse(rootViewport, lastMouseX, oglY);
