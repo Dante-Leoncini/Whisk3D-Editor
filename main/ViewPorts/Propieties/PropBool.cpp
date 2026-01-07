@@ -1,5 +1,7 @@
 #include "PropBool.h"
 
+std::string unicodeCheck = "✔";
+
 PropBool::PropBool(const std::string& Name): 
     PropertieBase(Name){
 };
@@ -21,7 +23,7 @@ void PropBool::RenderPropertiBoxBorder(Card* propertiBox){
 
 void PropBool::RenderPropertiValue(Card* propertiBox){
     if (value){
-        //RenderBitmapFloat(*value, textAlign::left, propertiBox->width -bordersGS);
+        RenderBitmapText(unicodeCheck, textAlign::left, propertiBox->width -bordersGS);
         glTranslatef(0, RenglonHeightGS + gapGS, 0); 
     }
 }

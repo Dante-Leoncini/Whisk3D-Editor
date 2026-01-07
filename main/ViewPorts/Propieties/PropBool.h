@@ -4,6 +4,8 @@
 #include "PropertieBase.h"
 #include "UI/card.h"
 
+extern std::string unicodeCheck;
+
 class PropBool : public PropertieBase { 
     public:
         PropBool(const std::string& Name);

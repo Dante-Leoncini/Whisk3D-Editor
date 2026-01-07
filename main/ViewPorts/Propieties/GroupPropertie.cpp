@@ -187,7 +187,13 @@ void GroupPropertie::RenderPropertiBox(){
 void GroupPropertie::RenderPropertiValue(){
     glTranslatef(propertiBox->width+borderGS, 0, 0); 
     for (size_t i = 0; i < properties.size(); ++i){
-        if (selectIndex == i){
+        //si es checkbox
+        if (properties[i]->GetType() == PropertyType::Bool){
+            glColor4f(ListaColores[static_cast<int>(ColorID::background)][0], 
+                        ListaColores[static_cast<int>(ColorID::background)][1],
+                        ListaColores[static_cast<int>(ColorID::background)][2], 1.0f);
+        }
+        else if (selectIndex == i){
             if (editando){
                 glColor4f(ListaColores[static_cast<int>(ColorID::accent)][0], 
                             ListaColores[static_cast<int>(ColorID::accent)][1],

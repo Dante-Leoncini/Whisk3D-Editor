@@ -5,19 +5,35 @@
 uint16_t UTF8_Char(const char* s, size_t& i) {
     unsigned char c = (unsigned char)s[i];
 
+    // ASCII
     if (c < 0x80) {
         i += 1;
         return c;
     }
 
-    // UTF-8 de 2 bytes (suficiente para español)
-    uint16_t cp = ((c & 0x1F) << 6) |
-                  ((unsigned char)s[i + 1] & 0x3F);
-    i += 2;
-    return cp;
+    // UTF-8 2 bytes
+    if ((c & 0xE0) == 0xC0) {
+        uint16_t cp =
+            ((c & 0x1F) << 6) |
+            ((unsigned char)s[i + 1] & 0x3F);
+        i += 2;
+        return cp;
+    }
+
+    // UTF-8 3 bytes
+    if ((c & 0xF0) == 0xE0) {
+        uint16_t cp =
+            ((c & 0x0F) << 12) |
+            (((unsigned char)s[i + 1] & 0x3F) << 6) |
+            ((unsigned char)s[i + 2] & 0x3F);
+        i += 3;
+        return cp;
+    }
+
+    // Fallback
+    i += 1;
+    return '?';
 }
-
-
 
 void Font::SetScale(GLshort scale){
     /*GLshort mesh[8] = {
@@ -55,8 +71,9 @@ Font::Font(int texW, int texH, GLuint textureID)
     addGlyph('K', 61, 0, 5, 11);
     addGlyph('L', 67, 0, 5, 11);
     addGlyph('M', 73, 0, 5, 11);
-    addGlyph('N', 1, 10, 5, 11);
     addGlyph(0x00D1, 79, 0, 5, 11); // Ñ
+    addGlyph(0x2714, 85, 0, 5, 11); // ✔ tilde
+    addGlyph('N', 1, 10, 5, 11);
     addGlyph('O', 7, 10, 5, 11);
     addGlyph('P', 13, 10, 5, 11);
     addGlyph('Q', 19, 10, 5, 11);
