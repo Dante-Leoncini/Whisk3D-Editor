@@ -52,7 +52,10 @@ void ConstructorProperties(){
     propMeshParts->properties.push_back(new PropBool("Repeat"));
     propMeshParts->properties.push_back(new PropBool("Culling"));
     propMeshParts->properties.push_back(new PropBool("Depth Test"));
-    
+
+    propMeshParts->properties.push_back(new PropColor("Base Color"));    
+    propMeshParts->properties.push_back(new PropColor("Specular"));    
+    propMeshParts->properties.push_back(new PropColor("Emission")); 
 
     GroupProperties.push_back(propMeshParts);
 }
@@ -83,6 +86,14 @@ void Properties::RefreshPropMeshParts(){
     static_cast<PropBool*>(propMeshParts->properties[5])->value = &material->repeat;
     static_cast<PropBool*>(propMeshParts->properties[6])->value = &material->culling;
     static_cast<PropBool*>(propMeshParts->properties[7])->value = &material->depth_test;
+
+    static_cast<PropColor*>(propMeshParts->properties[8])->value = material->diffuse;
+    static_cast<PropColor*>(propMeshParts->properties[9])->value = material->specular;
+    static_cast<PropColor*>(propMeshParts->properties[10])->value = material->emission;
+
+    /*GLfloat diffuse[4]  = {1.0f, 1.0f, 1.0f, 1.0f};
+    GLfloat specular[4] = {0.3f, 0.3f, 0.3f, 1.0f};
+    GLfloat emission[4] = {0.0f, 0.0f, 0.0f, 1.0f};*/
 
     /*
     bool culling = true;

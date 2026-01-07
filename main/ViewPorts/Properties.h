@@ -25,6 +25,7 @@
 #include "Propieties/PropGap.h" 
 #include "Propieties/PropList.h" 
 #include "Propieties/PropBool.h"
+#include "Propieties/PropColor.h"
 
 void DibujarTitulo(Object* obj, int maxPixels);
 void ConstructorProperties();

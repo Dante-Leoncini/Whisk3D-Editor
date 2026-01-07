@@ -154,6 +154,9 @@ void GroupPropertie::RenderPropertiBox(){
                             ListaColores[static_cast<int>(ColorID::grisUI)][2], 1.0f);
             }
         }
+        else if (properties[i]->GetType() == PropertyType::Color){
+            static_cast<PropColor*>(properties[i])->SetGlColor();
+        }
 
         properties[i]->RenderPropertiBox(cardToUse);
 

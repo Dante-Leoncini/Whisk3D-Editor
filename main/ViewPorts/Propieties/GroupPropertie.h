@@ -6,6 +6,7 @@
 #include "PropertieBase.h"
 #include "PropList.h"
 #include "PropBool.h"
+#include "PropColor.h"
 
 #include "UI/colores.h"
 

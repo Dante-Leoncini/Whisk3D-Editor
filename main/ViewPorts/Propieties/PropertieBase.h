@@ -17,7 +17,8 @@ enum class PropertyType {
     Int,
     Bool,
     List,
-    SelectText
+    SelectText,
+    Color
 };
 
 void CardTitulo(GLfloat* icon, const std::string& texto, int maxPixels = 1920);
