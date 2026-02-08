@@ -44,6 +44,8 @@ void Gamepad::Reload() {
         Mesh* mesh = static_cast<Mesh*>(target);
 
         targetAnim = FindTargetAnim(mesh);
+
+        //std::cout << "targetAnim: "<< targetAnim << "\n";
     }
 }
 

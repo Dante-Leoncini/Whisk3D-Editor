@@ -184,36 +184,57 @@ VertexAnimationActive::VertexAnimationActive(Mesh* mesh):
 
 void VertexAnimationActive::UpdateAnimation(){
     if (!meshToAnim || meshToAnim->animations.empty()) return;
+
+    VertexAnimation* fromAnim = meshToAnim->animations[currentAnim];
+    VertexAnimation* toAnim   = meshToAnim->animations[nextAnim];
+    
+    if (!fromAnim || !toAnim) return;
+    if (fromAnim->frames.empty() || toAnim->frames.empty()) return;
+
     // Avanza el blend
     blendStep++;
 
-    VertexAnimation* anim = meshToAnim->animations[currentAnim];
+    float speed = fromAnim->speed;
+    if (speed <= 0.0f) speed = 1.0f;
 
-    float blendT = blendStep / anim->speed;
+    float blendT = blendStep / speed;
     if (blendT > 1.0f) blendT = 1.0f;
+
+    size_t fromFrame = static_cast<size_t>(currentFrame) % fromAnim->frames.size();
+    size_t toFrame = (currentAnim == nextAnim)
+        ? static_cast<size_t>(nextFrame) % fromAnim->frames.size()
+        : 0;
 
     // Mezcla entre frame actual y el siguiente (puede ser otra anim)
     BlendVertexAnimations(
-        *anim,
-        *meshToAnim->animations[nextAnim],
-        currentFrame,
-        nextFrame,
+        *fromAnim,
+        *toAnim,
+        fromFrame,
+        toFrame,
         blendT,
         meshToAnim
     );
 
     // Si terminó el blend
-    if (blendStep >= anim->speed) {
+    if (blendStep >= speed) {
         blendStep = 0;
+
+        bool changedAnim = (currentAnim != nextAnim);
 
         // Consolidamos estado
         currentAnim  = nextAnim;
-        currentFrame = nextFrame;
 
-        // Avanzar frame SOLO de la anim activa
-        nextFrame++;
+        if (changedAnim) {
+            currentFrame = 0;
+            nextFrame = 1;
+        } else {
+            currentFrame = nextFrame;
+            nextFrame++;
+        }
 
-        if (nextFrame >= anim->frames.size()) {
+        VertexAnimation* anim = meshToAnim->animations[currentAnim];
+        if (anim && !anim->frames.empty() &&
+            nextFrame >= static_cast<int>(anim->frames.size())) {
             nextFrame = 0;
         }
     }
@@ -241,8 +262,11 @@ void NewActiveVertexAnimation(Mesh* mesh, VertexAnimation* anim){
 
     mesh->animations.push_back(anim);
 
-    VertexAnimationActive* activeAnim = new VertexAnimationActive(mesh);
-    VertexAnimationActives.push_back(activeAnim);
+    // Un solo controlador activo por mesh; si ya existe, no crear otro.
+    if (!FindTargetAnim(mesh)) {
+        VertexAnimationActive* activeAnim = new VertexAnimationActive(mesh);
+        VertexAnimationActives.push_back(activeAnim);
+    }
 };
 
 void LoadVertexFrames(Mesh* mesh){

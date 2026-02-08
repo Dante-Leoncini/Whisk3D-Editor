@@ -1177,7 +1177,7 @@ bool recalcularCamara = true;
 GLfloat radY = 0.0f;
 GLfloat radX = 0.0f;
 
-GLfloat factor = 0.01f;
+GLfloat factor = 0.03f;
 
 GLfloat cosX = 0.0f;
 GLfloat sinX = 0.0f;
@@ -1208,6 +1208,8 @@ void Gamepad::Update() {
 
     // --- 2. CALCULAR EL MOVIMIENTO TOTAL ---
     Vector3 TotalMovement(0.0f, 0.0f, 0.0f);
+
+    //std::cout << "nextAnim: "<< targetAnim->nextAnim << "\n";
     
     if (std::abs(correctedInputY) > DeadZone) {
         // Avance/Retroceso

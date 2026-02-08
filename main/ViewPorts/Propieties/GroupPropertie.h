@@ -1,3 +1,6 @@
+#ifndef GROUPPROPERTIE_H
+#define GROUPPROPERTIE_H
+
 #include <vector>
 #include <string>
 
@@ -49,3 +52,5 @@ class GroupPropertie {
 };
 
 extern std::vector<GroupPropertie*> GroupProperties;
+
+#endif

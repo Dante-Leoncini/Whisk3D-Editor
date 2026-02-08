@@ -22,6 +22,8 @@
 #include "ViewPorts/Outliner.h"
 #include "ViewPorts/ViewPort3D.h"
 #include "ViewPorts/Properties.h"
+#include "ViewPorts/PopUp/PopUpBase.h"
+#include "ViewPorts/PopUp/ColorPicker.h"
 
 #include "importers/import_w3d.h"
 

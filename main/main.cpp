@@ -188,6 +188,8 @@
 #include "animation/Animation.h"
 #include "animation/VertexAnimation.h"
 #include "ViewPorts/ViewPorts.h"
+#include "ViewPorts/PopUp/PopUpBase.h"
+#include "ViewPorts/PopUp/ColorPicker.h"
 #include "controles.h"
 #include "constructor.h"
 
@@ -523,6 +525,9 @@ int main(int argc, char* argv[]) {
             lastRenderTime = now;
             if (rootViewport){
                 rootViewport->Render();
+            }
+            if (PopUpActive){
+                PopUpActive->Render();                
             }
             SDL_GL_SwapWindow(window);
         }

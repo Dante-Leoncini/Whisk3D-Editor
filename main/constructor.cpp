@@ -22,6 +22,9 @@ void ConstructUniversal(int argc, char* argv[]) {
     InitCursors();
     ConstructorProperties();
 
+    /*colorPicker = new ColorPicker();
+    PopUpActive = colorPicker;*/
+
     //ACA HAY QUE CARGAR LAS TEXTURAS!!!!
     const std::vector<std::string> texFiles = {
         "font.png", "origen.png", "cursor3d.png", "relationshipLine.png", "lamp.png"
