@@ -11,7 +11,6 @@ rls_string STRING_r_app_caption_string       "Whisk3D"
 rls_string STRING_r_app_short_caption_string "Whisk3D"
 
 rls_string STRING_r_whisk3D_exit         "Quit"
-rls_string STRING_r_whisk3D_menu         "Whisk3D Menu"
 
 rls_string STRING_r_whisk3D_lighting     "Luces"
 rls_string STRING_r_whisk3D_lights_on    "Turn lights on"
@@ -172,16 +171,5 @@ rls_string STRING_r_InsertKeyframeScale     "Insert keyframe Scale"
 rls_string STRING_r_RemoveKeyframes  "Remove keyframes"
 rls_string STRING_r_ClearKeyframes   "Clear keyframes"
 
-//
-// For list query tittle message
-//
-rls_string STRING_r_aknexquery_list_title        "Welcome note :"
-
-//
-// For list single pane
-//
-rls_string STRING_r_aknexquery_list_item1        "Edit"
-rls_string STRING_r_aknexquery_list_item2        "On"
-rls_string STRING_r_aknexquery_list_item3        "Off"
 
 // End of File

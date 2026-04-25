@@ -17,10 +17,6 @@
 
 #include <aknconsts.h>
 
-//para mostrar menus con listas
-#include <aknlistquerydialog.h> // Para el popup
-
-
 // ================= MEMBER FUNCTIONS =======================
 //
 // ----------------------------------------------------------
@@ -298,6 +294,9 @@ TKeyResponse CWhisk3DAppUi::HandleKeyEventL(const TKeyEvent& aKeyEvent, TEventCo
                 case(196): //llamada
                     iAppContainer->iWhisk3D->ChangeEje();
                     return EKeyWasConsumed;
+                case(65): //A
+                    iAppContainer->iWhisk3D->SeleccionarTodo();
+                    return EKeyWasConsumed;
                 case(71): //G
                     iAppContainer->iWhisk3D->SetPosicion();
                     return EKeyWasConsumed;
@@ -375,29 +374,6 @@ TKeyResponse CWhisk3DAppUi::HandleKeyEventL(const TKeyEvent& aKeyEvent, TEventCo
 	}
     return EKeyWasNotConsumed;
 }
-
-void CWhisk3DAppUi::TestTouch(){
-	/*TInt selectedIndex = 0; // Variable para almacenar el índice seleccionado
-    CAknListQueryDialog* dialog = new (ELeave) CAknListQueryDialog(&selectedIndex);
-    
-    // Configurar los elementos para el diálogo
-    CDesCArrayFlat* items = new (ELeave) CDesCArrayFlat(5);
-    CleanupStack::PushL(items);
-    items->AppendL(_L("Item 1"));
-    items->AppendL(_L("Item 2"));
-    items->AppendL(_L("Item 3"));
-    dialog->SetItemTextArray(items);
-    dialog->SetOwnershipType(ELbmOwnsItemArray);
-
-    // Mostrar el diálogo
-    if (dialog->ExecuteLD(R_CE_DEFAULT_SORTING_PARAM_QUERY)){
-        // Procesar el índice seleccionado
-        CEikonEnv::Static()->InfoMsg(_L("Seleccionaste un ítem"));
-    }
-
-    CleanupStack::PopAndDestroy(items); // items*/
-}
-
 
 enum{
 	cubo, esfera, cilindro, plane, vacio, camara,

@@ -72,4 +72,3 @@ TARGETPATH 	  \private\10003a3f\import\apps
 END
 CAPABILITY ReadUserData WriteUserData ReadDeviceData
 CAPABILITY Location
-

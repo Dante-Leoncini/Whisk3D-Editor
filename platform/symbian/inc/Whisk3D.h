@@ -42,6 +42,8 @@ class Object;
 #define FRUSTUM_RIGHT   1.f     //right vertical clipping plane
 #define FRUSTUM_BOTTOM -1.f     //bottom horizontal clipping plane
 #define FRUSTUM_TOP     1.f     //top horizontal clipping plane
+#define FRUSTUM_NEAR    3.f     //near depth clipping plane
+#define FRUSTUM_FAR  1000.f     //far depth clipping plane
 
 // CLASS DECLARATION
 class Mesh;
@@ -114,11 +116,6 @@ class CWhisk3D : public CFiniteStateMachine, public MTextureLoadingListener
         
         //mover al siguiente casillero
         void InputUsuario( GLfixed aDeltaTimeSecs );
-
-        //pantalla tactil
-        void StartTactil(TPoint touchPosition);
-        void ActualizarTactil(TPoint touchPosition);
-        void TerminaTactil(TPoint touchPosition);
         
         GLfloat GradosARadianes(TInt grados);
         void SetRotacion( void );
@@ -143,7 +140,10 @@ class CWhisk3D : public CFiniteStateMachine, public MTextureLoadingListener
         void EjecutarScriptPython();
         void CalculateMillisecondsPerFrame(TInt aFPS);
         
+        void dibujarUI();
+        void guardarEstado();
         void ReestablecerEstado();
+        void SeleccionarTodo();
         void SetEje( TInt eje );     
         void AddMesh( TInt modelo );
         void CursorToWorldOrigin();
@@ -151,6 +151,8 @@ class CWhisk3D : public CFiniteStateMachine, public MTextureLoadingListener
         void AddObject( TInt tipo );
         void SetTexture(); //int textureID 
         void SetMaterial();
+        void DuplicatedObject();
+        void DuplicatedLinked();
         void ActivarTextura();
         void SetInterpolation();
         void SetTransparencia();
@@ -170,6 +172,7 @@ class CWhisk3D : public CFiniteStateMachine, public MTextureLoadingListener
         void RemoveKeyframes();
         void ClearKeyframes();
         void SetEmission();
+        void SetPerspectiva( TBool redibuja = true );
         void EnfocarObject();
         void CursorToSelect();
         void SelectToCursor();
@@ -208,7 +211,9 @@ class CWhisk3D : public CFiniteStateMachine, public MTextureLoadingListener
         void RenderLinkLines(TInt objId);
         void TecladoNumerico(TInt numero);
         void InsertarValor();
+        void RecalcViewPos();
         void SetCameraToView();
+        void DeseleccionarTodo();
         void ImportOBJ();
 
         void SetTrackTo();
@@ -216,7 +221,9 @@ class CWhisk3D : public CFiniteStateMachine, public MTextureLoadingListener
         void SetCopyLocation();
         void SetFollowPath();
         void ClearConstraints();
+        void ReloadViewport(TBool hacerRedibujo);
 
+        void ImportAnimation();
         void SetMixNormals();
         void SetMixFaces();
         void SetSpeedMix();
@@ -271,14 +278,6 @@ class CWhisk3D : public CFiniteStateMachine, public MTextureLoadingListener
         //TInt DialogSelectOption(const TDesC& aPrompt, CDesCArray& aOptions);
         TInt ShowOptionsDialogL();
         void Tab();
-
-        //interfaz tactil!    
-        void ShowMenu();  
-        void ShowAddMenu();  
-        void ShowObjectMenu();
-        void ShowTransformMenu();
-        void ShowAnimationMenu();
-        void ShowTimelineMenu();
         
         //cambiar el shader en el viewport
         void SetShading( TInt valor );        
@@ -330,11 +329,15 @@ class CWhisk3D : public CFiniteStateMachine, public MTextureLoadingListener
         TBool showOutlineSelect;
         TBool showOrigins;
         TBool ShowTimeline;
+        TBool ShowRelantionshipsLines;
+        TBool PlayAnimation;    
         TBool iShiftPressed; 
         TBool iAltPressed;
         TBool iCtrlPressed;
+        TBool CameraToView;
         RArray<Object> Objects;
         TInt SelectActivo;
+        TInt CameraActive;
 
 		/**
 		 * Application states:
@@ -345,6 +348,10 @@ class CWhisk3D : public CFiniteStateMachine, public MTextureLoadingListener
 			ELoadingTextures,
 			ERunning
 		};
+        
+        TInt estado;
+        TInt InteractionMode;
+        TInt navegacionMode;
 
     private:  // Data
         CAknWaitDialog* iWaitDialog;

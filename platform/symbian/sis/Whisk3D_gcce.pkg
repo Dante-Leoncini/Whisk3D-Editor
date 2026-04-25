@@ -15,10 +15,10 @@
 [0x101F7961], 0, 0, 0, {"S60v5-compatible App"}
 
 ;Files to install
-"..\..\..\..\epoc32\release\gcce\urel\Whisk3D.exe"                       -"!:\sys\bin\Whisk3D.exe"
-"..\..\..\..\epoc32\data\z\resource\apps\Whisk3D.RSC"                    -"!:\resource\apps\Whisk3D.RSC"
-"..\..\..\..\epoc32\data\Z\private\10003a3f\import\apps\whisk3D_reg.RSC" -"!:\private\10003a3f\import\apps\whisk3D_reg.RSC"
-"..\..\..\..\epoc32\data\z\resource\apps\whisk3D_icon.mif"  			        -"!:\resource\apps\whisk3D_icon.mif"
+"$(EPOCROOT)epoc32\release\gcce\urel\Whisk3D.exe"                       -"!:\sys\bin\Whisk3D.exe"
+"$(EPOCROOT)epoc32\data\z\resource\apps\Whisk3D.RSC"                    -"!:\resource\apps\Whisk3D.RSC"
+"$(EPOCROOT)epoc32\data\Z\private\10003a3f\import\apps\whisk3D_reg.RSC" -"!:\private\10003a3f\import\apps\whisk3D_reg.RSC"
+"$(EPOCROOT)epoc32\data\z\resource\apps\whisk3D_icon.mif"  			        -"!:\resource\apps\whisk3D_icon.mif"
 
 "..\inc\texturas\origen.png"   -"!:\private\A00D021D\origen.png"
 "..\inc\texturas\lamp.png"   -"!:\private\A00D021D\lamp.png"
