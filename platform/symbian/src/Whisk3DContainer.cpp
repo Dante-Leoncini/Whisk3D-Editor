@@ -110,7 +110,7 @@ void CWhisk3DContainer::ConstructL(const TRect& /*aRect*/){
 
     // Define properties for requesting a full-screen antialiased window surface
     const EGLint attrib_list_fsaa[] = {
-				EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
+		EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
         EGL_BUFFER_SIZE,  BufferSize,
         EGL_DEPTH_SIZE,   16,
         //EGL_RENDER_BUFFER, EGL_BACK_BUFFER, // Habilita doble buffer
@@ -131,37 +131,33 @@ void CWhisk3DContainer::ConstructL(const TRect& /*aRect*/){
 
     // Define properties for requesting a non-antialiased window surface
     const EGLint attrib_list[] = {
-				EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
+		EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
         EGL_BUFFER_SIZE,  BufferSize,
         EGL_DEPTH_SIZE,   16,
         EGL_NONE
     };
 
     // Choose an EGLConfig that best matches to the properties in attrib_list_fsaa
-    //if ( eglChooseConfig( iEglDisplay, attrib_list_fsaa, configList, configSize, &numOfConfigs ) == EGL_FALSE )
-    if ( eglChooseConfig( iEglDisplay, attrib_list_fsaa, configList, configSize, &numOfConfigs ) == EGL_FALSE )
-        {
+    //if ( eglChooseConfig( iEglDisplay, attrib_list_fsaa, configList, configSize, &numOfConfigs ) == EGL_FALSE ){
+    if ( eglChooseConfig( iEglDisplay, attrib_list, configList, configSize, &numOfConfigs ) == EGL_FALSE ){
         _LIT( KChooseConfigFailed, "eglChooseConfig failed" );
         User::Panic( KChooseConfigFailed, 0 );
-        }
+    }
 
     // Check if no configurations were found
-    if ( numOfConfigs == 0 )
-        {
+    if ( numOfConfigs == 0 ){
         // No configs with antialising were found. Try to get the non-antialiased config
-		    if ( eglChooseConfig( iEglDisplay, attrib_list, configList, configSize, &numOfConfigs ) == EGL_FALSE )
-			      {
-	          _LIT( KChooseConfigFailed, "eglChooseConfig failed" );
-	          User::Panic( KChooseConfigFailed, 0 );
-			      }
+		if ( eglChooseConfig( iEglDisplay, attrib_list, configList, configSize, &numOfConfigs ) == EGL_FALSE ){
+		  _LIT( KChooseConfigFailed, "eglChooseConfig failed" );
+		  User::Panic( KChooseConfigFailed, 0 );
+			  }
 
-		    if ( numOfConfigs == 0 )
-			      {
-			      // No configs found without antialiasing
-	          _LIT( KNoConfig, "Can't find the requested config." );
-	          User::Panic( KNoConfig, 0 );
-	          }
-	      }
+		if ( numOfConfigs == 0 ){
+	      // No configs found without antialiasing
+		  _LIT( KNoConfig, "Can't find the requested config." );
+		  User::Panic( KNoConfig, 0 );
+		}
+	}
 
     Config = configList[0];   // Choose the best EGLConfig. EGLConfigs
                               // returned by eglChooseConfig are sorted so
