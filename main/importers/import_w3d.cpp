@@ -1,5 +1,30 @@
 #include "importers/import_w3d.h"
 
+//ESTO DESPUES TIENE QUE IR A UN ARCHIVO SEPARADOOOOO
+SDL_Surface* LoadSurfaceSTB(const std::string& path) {
+
+    int width, height, channels;
+
+    stbi_uc* pixels = stbi_load(path.c_str(), &width, &height, &channels, 4);
+
+    if (!pixels)
+        return nullptr;
+
+    SDL_Surface* surface = SDL_CreateRGBSurfaceFrom(
+        pixels,
+        width,
+        height,
+        32,
+        width * 4,
+        0x000000ff,
+        0x0000ff00,
+        0x00ff0000,
+        0xff000000
+    );
+
+    return surface;
+}
+
 // ============================================
 // Helpers
 // ============================================
@@ -446,7 +471,8 @@ void BuildScene(Node* root){
 
         std::cout << "[BuildScene] Icon path: " << iconPath << std::endl;
 
-        SDL_Surface* icon = IMG_Load(iconPath.c_str());
+        //SDL_Surface* icon = IMG_Load(iconPath.c_str());
+        SDL_Surface* icon = LoadSurfaceSTB(iconPath);
         if(icon){
             SDL_SetWindowIcon(window, icon);
             SDL_FreeSurface(icon);
@@ -456,7 +482,8 @@ void BuildScene(Node* root){
     }
     //por defecto
     else {
-        SDL_Surface* icon = IMG_Load("Whisk3D.png");
+        //SDL_Surface* icon = IMG_Load("Whisk3D.png");
+        SDL_Surface* icon = LoadSurfaceSTB("Whisk3D.png");
         SDL_SetWindowIcon(window, icon);
         SDL_FreeSurface(icon);
     }

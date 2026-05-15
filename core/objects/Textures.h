@@ -10,14 +10,16 @@
 #include <iostream>
 
 #include <GL/gl.h>
+#include <SDL2/SDL.h>
+
 #ifdef __ANDROID__
-    #include <SDL2/SDL.h>
     //#include <SDL2/SDL_image.h>
 #else
-    #include <SDL2/SDL.h>
     //#include <SDL2/SDL_image.h>
     #include <GL/glu.h>
 #endif
+
+#include "../../thirdparty/stb/stb_image.h"
 
 class Texture {
     public:

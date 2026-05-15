@@ -48,16 +48,15 @@
 #include <iomanip>
 
 
-#if defined(_WIN32)
-    // ============================
-    // WINDOWS
-    // ============================
+#ifdef _WIN32
     #include <windows.h>
+#else
+    #include <unistd.h>
+    #include <limits.h>
 #endif
 
 std::string getExeDir() {
     #ifdef _WIN32
-
         char buffer[MAX_PATH];
         GetModuleFileNameA(NULL, buffer, MAX_PATH);
 
@@ -68,9 +67,7 @@ std::string getExeDir() {
             path = path.substr(0, pos);
 
         return path;
-
     #else
-
         char result[PATH_MAX];
         ssize_t count = readlink("/proc/self/exe", result, PATH_MAX);
 
@@ -85,7 +82,6 @@ std::string getExeDir() {
         }
 
         return path;
-
     #endif
 }
 
@@ -94,9 +90,6 @@ std::string getExeDir() {
 #include "render/GLES_Android_helpers.h"
 
 #else
-    #include <unistd.h>
-    #include <limits.h>
-
     std::string getUserConfigDir() {
         #ifdef WHISK3D_LINUX
             const char* xdgConfigHome = std::getenv("XDG_CONFIG_HOME");
@@ -122,29 +115,7 @@ std::string getExeDir() {
             return "";
         #endif
     }
-
-    std::string getExeDir() {
-        #ifdef _WIN32
-            char buffer[MAX_PATH];
-            GetModuleFileNameA(NULL, buffer, MAX_PATH);
-            std::string path(buffer);
-            size_t pos = path.find_last_of("\\/");
-            if (pos != std::string::npos)
-                path = path.substr(0, pos);
-            return path;
-        #else
-            char result[PATH_MAX];
-            ssize_t count = readlink("/proc/self/exe", result, PATH_MAX);
-            std::string path;
-            if (count != -1) {
-                path = std::string(result, count);
-                size_t pos = path.find_last_of('/');
-                if (pos != std::string::npos)
-                    path = path.substr(0, pos);
-            }
-            return path;
-        #endif
-    }
+    
     std::string getResDir() {
         #ifdef __ANDROID__
             return "res"; // assets internos del APK

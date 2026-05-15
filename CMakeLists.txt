@@ -45,13 +45,12 @@ file(GLOB_RECURSE SRC_FILES
 # Platform specific renderer
 # ---------------------------------------------------
 
-if(WIN32)
-
-    message(STATUS "Building Whisk3D for Windows")
+if(WIN32 OR (UNIX AND NOT ANDROID))
 
     list(APPEND SRC_FILES
         ${CMAKE_SOURCE_DIR}/engine/opengl/w3dOpenGL.cpp
     )
+
 
 endif()
 
@@ -142,6 +141,10 @@ if(UNIX AND NOT ANDROID)
         dl
         OpenGL::GL
         GLU
+    )
+
+    target_compile_definitions(whisk3d PRIVATE
+        W3D_OPENGL
     )
 
 endif()

@@ -156,7 +156,8 @@ Mesh* ImportWOBJ(const std::string& filepath, Object* parent, bool NoMerge) {
     int extensionSize = (filepath.substr(filepath.size() - 5) == ".wobj") ? 5 : 4;
 
     std::string mtl = filepath.substr(0, filepath.size() - extensionSize) + ".mtl";
-    if (fileExists(mtl))
+    //if (fileExists(mtl))
+    if (std::filesystem::exists(mtl))
         LeerMTL(mtl, 1);
 
     return mesh;

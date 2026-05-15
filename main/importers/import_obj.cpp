@@ -440,7 +440,8 @@ bool LeerMTL(const std::string& filepath, int objetosCargados) {
             else if (prefix == "map_Kd") {
                 std::string texfile;
                 iss >> texfile;
-                std::string absPath = getParentPath(filepath) + "/" + texfile;
+                //std::string absPath = getParentPath(filepath) + "/" + texfile;
+                std::string absPath = (std::filesystem::path(filepath).parent_path() / texfile).string();
                 std::replace(absPath.begin(), absPath.end(), '\\', '/');
 
                 Texture* newTex = new Texture();
@@ -504,7 +505,8 @@ bool LeerMTL(const std::string& filepath, int objetosCargados) {
                     std::string filename = baseURL + num.str() + "." + extension;
 
                     std::string absPath =
-                        getParentPath(filepath) + "/" + filename;
+                        //getParentPath(filepath) + "/" + filename;
+                        (std::filesystem::path(filepath).parent_path() / filename).string();
 
                     std::replace(absPath.begin(), absPath.end(), '\\', '/');
 
@@ -584,7 +586,8 @@ bool ImportOBJ(const std::string& filepath, bool NoMerge = false) {
     // Archivo .mtl asociado
     std::string mtlFile = filepath.substr(0, filepath.size() - 4) + ".mtl";
 
-    if (fileExists(mtlFile)) {
+    //if (fileExists(mtlFile)) {
+    if (std::filesystem::exists(mtlFile)) {
         if (!LeerMTL(mtlFile, objetosCargados)) {
             std::cerr << "Error al leer el archivo .mtl" << std::endl;
         }

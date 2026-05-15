@@ -1,5 +1,8 @@
 #include "constructor.h"
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "../../thirdparty/stb/stb_image.h"
+
 // Variable global que estabas usando
 bool running = false;
 
@@ -87,10 +90,30 @@ void ConstructUniversal(int argc, char* argv[]) {
     // ======================================================
     // Configurar icono de ventana
     // ======================================================
-    SDL_Surface* icon = IMG_Load("./assets/Whisk3D.png"); // o BMP si no usas SDL_image
-    if(icon) {
-        SDL_SetWindowIcon(window, icon);
-        SDL_FreeSurface(icon);
+    int width, height, channels;
+
+    stbi_uc* pixels = stbi_load("./assets/Whisk3D.png", &width, &height, &channels, 4);
+
+    if (pixels) {
+
+        SDL_Surface* icon = SDL_CreateRGBSurfaceFrom(
+            pixels,
+            width,
+            height,
+            32,
+            width * 4,
+            0x000000ff,
+            0x0000ff00,
+            0x00ff0000,
+            0xff000000
+        );
+
+        if (icon) {
+            SDL_SetWindowIcon(window, icon);
+            SDL_FreeSurface(icon);
+        }
+
+        stbi_image_free(pixels);
     }
 
     // ======================================================

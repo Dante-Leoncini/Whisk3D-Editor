@@ -11,8 +11,10 @@
 #include <fstream>
 #include <unordered_map>
 
+#include <filesystem>
+
 #ifdef __ANDROID__
-#include "render/GLES_Android_helpers.h"
+//#include "render/GLES_Android_helpers.h"
 #endif
 #include "objects/Mesh.h"
 
