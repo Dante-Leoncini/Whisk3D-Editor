@@ -10,11 +10,6 @@ set(BUILD_SHARED_LIBS OFF)
 set(SDL_SHARED OFF)
 set(SDL_STATIC ON)
 
-set(SDL2IMAGE_BUILD_SHARED OFF)
-set(SDL2IMAGE_BUILD_STATIC ON)
-
-set(SDL2IMAGE_SDL2_FOUND TRUE)
-
 # ===============================
 # SDL2
 # ===============================
@@ -25,17 +20,6 @@ if (TARGET SDL2-static)
     list(APPEND WHISK3D_THIRDPARTY_LIBS SDL2-static)
 elseif (TARGET SDL2)
     list(APPEND WHISK3D_THIRDPARTY_LIBS SDL2)
-endif()
-
-# ===============================
-# SDL2_image
-# ===============================
-add_subdirectory(SDL2_image)
-
-if (TARGET SDL2_image-static)
-    list(APPEND WHISK3D_THIRDPARTY_LIBS SDL2_image-static)
-elseif (TARGET SDL2_image)
-    list(APPEND WHISK3D_THIRDPARTY_LIBS SDL2_image)
 endif()
 
 # ===============================

@@ -52,23 +52,23 @@ void DrawTransformAxis() {
 
     switch (axisSelect) {
         case X:
-            SetColor(ListaColores[static_cast<int>(ColorID::ColorTransformX)]);
+            w3dSetColor(ListaColores[static_cast<int>(ColorID::ColorTransformX)]);
             glDrawElements(GL_LINES, 2, GL_UNSIGNED_SHORT, EjeRojo);
             break;
         case Y:
-            SetColor(ListaColores[static_cast<int>(ColorID::ColorTransformY)]);
+            w3dSetColor(ListaColores[static_cast<int>(ColorID::ColorTransformY)]);
             glDrawElements(GL_LINES, 2, GL_UNSIGNED_SHORT, EjeVerde);
             break;
         case Z:
-            SetColor(ListaColores[static_cast<int>(ColorID::ColorTransformZ)]);
+            w3dSetColor(ListaColores[static_cast<int>(ColorID::ColorTransformZ)]);
             glDrawElements(GL_LINES, 2, GL_UNSIGNED_SHORT, EjeAzul);
             break;
         case XYZ:
-            SetColor(ListaColores[static_cast<int>(ColorID::ColorTransformX)]);
+            w3dSetColor(ListaColores[static_cast<int>(ColorID::ColorTransformX)]);
             glDrawElements(GL_LINES, 2, GL_UNSIGNED_SHORT, EjeRojo);
-            SetColor(ListaColores[static_cast<int>(ColorID::ColorTransformY)]);
+            w3dSetColor(ListaColores[static_cast<int>(ColorID::ColorTransformY)]);
             glDrawElements(GL_LINES, 2, GL_UNSIGNED_SHORT, EjeVerde);
-            SetColor(ListaColores[static_cast<int>(ColorID::ColorTransformZ)]);
+            w3dSetColor(ListaColores[static_cast<int>(ColorID::ColorTransformZ)]);
             glDrawElements(GL_LINES, 2, GL_UNSIGNED_SHORT, EjeAzul);
             break;
     }

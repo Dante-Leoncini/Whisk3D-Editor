@@ -8,7 +8,9 @@
 #include <vector>
 #include <GL/gl.h>
 #include <GL/glu.h>
-#include <GL/glext.h> 
+#ifndef _WIN32
+#include <GL/glext.h>
+#endif
 #include <SDL2/SDL.h>
 
 #include "variables.h"

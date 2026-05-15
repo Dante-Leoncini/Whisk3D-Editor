@@ -1,4 +1,6 @@
-#include "GLES_Android_helpers.h"
+#ifdef __ANDROID__
+#include "render/GLES_Android_helpers.h"
+#endif
 #include <cmath>
 
 #ifdef __ANDROID__
@@ -12,13 +14,6 @@
         glFrustumf(-fW, fW, -fH, fH, zNear, zFar);
     }
 #endif
-    void SetColor(const ColorType c[4]) {
-#ifdef __ANDROID__
-    glColor4f(c[0], c[1], c[2], c[3]);
-#else
-    glColor4fv(c);
-#endif
-}
 
 std::string getParentPath(const std::string &filepath) {
     size_t pos = filepath.find_last_of("/\\");

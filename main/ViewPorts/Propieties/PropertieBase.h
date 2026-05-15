@@ -1,6 +1,10 @@
 #ifndef PROPERTIEBASE_H
 #define PROPERTIEBASE_H
 
+#ifdef _WIN32
+    #include <windows.h>
+#endif
+
 #include <string>
 #include <GL/gl.h>
 

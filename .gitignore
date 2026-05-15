@@ -33,6 +33,10 @@ build/
 */build/
 build-*/
 
+#symbian
+*.sis
+*.sisx
+
 # ===============================
 # WINDOWS / VISUAL STUDIO
 # ===============================

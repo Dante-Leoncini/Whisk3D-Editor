@@ -11,7 +11,9 @@
 #include <fstream>
 #include <unordered_map>
 
+#ifdef __ANDROID__
 #include "render/GLES_Android_helpers.h"
+#endif
 #include "objects/Mesh.h"
 
 struct VertexKey {

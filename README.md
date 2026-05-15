@@ -94,13 +94,20 @@ cd platform/android && ./gradlew assembleDebug
 
 Para compilar. 
 
-1) en la carpeta raiz "git submodule update --init --recursive" (para tener los submodulos de SDL2 y SDL2_image)
-2) Instalar Visual Studio Code 2019 o mas nuevo y cmake desde https://cmake.org/download/
+1) Instalar bash y cmake desde https://cmake.org/download/
+2) para tener los submodulos de SDL2 usa en la carpeta raiz "git submodule update --init --recursive"
+```bash
+git submodule update --init --recursive
+```
 3) si no lo tenes, en "Visual Studio Installer" vas a "Modificar" y tildas C++ Desktop Development "MSVC v142 - VS 2019 C++ x64/x86 Build Tools (Latest)", "C++ CMake tools for Window" y "Windows 10 SDK 10.0.19041.0" (o superior)
 4) Abrí Inicio → escribí Developer Command Prompt for VS 2018 (o el que tengas)
 5) anda al directorio cd C:\BLA BLA BLA\Whisk3D\platform\windows (aca adentro esta el CMakeLists.txt)
 6) cmake -S . -B ../../build/windows/x64 -G "Visual Studio 18 2026" -A x64
 7) cmake --build ../../build/windows/x64 --config Release
+```bash
+cmake -B build-windows -DCMAKE_BUILD_TYPE=Release
+cmake --build build-windows --config Release -j8
+```
 
 ## Aclaraciones:
 

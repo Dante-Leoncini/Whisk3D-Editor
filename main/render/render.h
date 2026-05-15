@@ -1,12 +1,7 @@
-#ifndef RENDER_H
-#define RENDER_H
+#pragma once
 
-#ifdef _WIN32
-    #include <windows.h>
-#endif
+#include "../../engine/w3dBase.h"
 
-#include <GL/gl.h>
-#include <GL/glext.h> 
 #include <vector>
 #include <cmath>
 
@@ -16,7 +11,9 @@
 #include "GeometriaUI/Floor.h"
 #include "objects/Objects.h"
 #include "objects/Textures.h"
-#include "GLES_Android_helpers.h"
+/*#ifdef __ANDROID__
+#include "render/GLES_Android_helpers.h"
+#endif*/
 
 // Funciones de render
 void DrawnLines(int LineWidth, int cantidad, GLshort* vertexlines, GLushort* lineasIndices);
@@ -29,5 +26,3 @@ void RenderOrigins();
 void DibujarIcono3D(Object* obj);
 void RenderIcons3D();
 void RenderVK();
-
-#endif

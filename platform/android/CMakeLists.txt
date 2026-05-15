@@ -26,11 +26,11 @@ FetchContent_Declare(
   SOURCE_DIR     ${CMAKE_BINARY_DIR}/external/SDL2
 )
 
-FetchContent_Declare(
-  SDL_IMAGE
-  URL            https://github.com/libsdl-org/SDL_image/archive/release-2.8.2.zip
-  SOURCE_DIR     ${CMAKE_BINARY_DIR}/external/SDL2_image
-)
+#FetchContent_Declare(
+#  SDL_IMAGE
+#  URL            https://github.com/libsdl-org/SDL_image/archive/release-2.8.2.zip
+#  SOURCE_DIR     ${CMAKE_BINARY_DIR}/external/SDL2_image
+#)
 
 # Only build the shared library for SDL2
 set(BUILD_SHARED_LIBS ON)
@@ -44,15 +44,16 @@ endif()
 
 # Make sure debug libs have the same name as release ones
 set(SDL_CMAKE_DEBUG_POSTFIX "" CACHE STRING "" FORCE)
-set(SDL2IMAGE_DEBUG_POSTFIX "" CACHE STRING "" FORCE)
+#set(SDL2IMAGE_DEBUG_POSTFIX "" CACHE STRING "" FORCE)
 
-FetchContent_MakeAvailable(SDL SDL_IMAGE)
+#FetchContent_MakeAvailable(SDL SDL_IMAGE)
+FetchContent_MakeAvailable(SDL)
 
 # Making sure libraries don't generate symlinks
 set_property(TARGET SDL2 PROPERTY VERSION)
 set_property(TARGET SDL2 PROPERTY SOVERSION)
-set_property(TARGET SDL2_image PROPERTY VERSION)
-set_property(TARGET SDL2_image PROPERTY SOVERSION)
+#set_property(TARGET SDL2_image PROPERTY VERSION)
+#set_property(TARGET SDL2_image PROPERTY SOVERSION)
 
 # Copying needed files for the android project
 set(SDL_ACTIVITY_FOLDER app/src/main/java/org/libsdl/app/)
@@ -72,6 +73,7 @@ foreach (_headerFile ${HEADER_FILES})
 endforeach()
 
 include_directories(${INCLUDE_DIRS})
+include_directories(thirdparty/stb)
 
 if (IOS) 
   # Remove main.cpp as it's manually added to the XCode project directly as the entry point
@@ -83,8 +85,7 @@ elseif(ANDROID)
 
   # Link libraries for Android GLES1
   target_link_libraries(${PROJECT_NAME}
-      SDL2
-      SDL2_image
+      SDL2 #SDL2_image quitamos el sdl2_image
       GLESv1_CM   # <- OpenGL ES 1.1
       EGL         # <- para inicializar el contexto GLES
       log         # <- necesario en Android para printf/log
@@ -95,4 +96,5 @@ else()
   target_link_libraries( ${PROJECT_NAME} SDL2main )
 endif()
 
-target_link_libraries( ${PROJECT_NAME} SDL2 SDL2_image )
+#target_link_libraries( ${PROJECT_NAME} SDL2 SDL2_image )
+target_link_libraries( ${PROJECT_NAME} SDL2 )

@@ -5,7 +5,7 @@
 #if SDL_MAJOR_VERSION == 2
     #include <SDL2/SDL.h>      
     //#include <SDL2/SDL_image.h>
-    #include <SDL_image.h>
+    //#include <SDL_image.h>
     #include "sdl_key_compat.h"
 #elif SDL_MAJOR_VERSION == 3
     #include <SDL3/SDL.h>      
@@ -21,7 +21,9 @@
 #else
     #include <GL/gl.h>      // OpenGL Desktop
     #include <GL/glu.h>
-    #include <GL/glext.h> 
+    #ifndef _WIN32
+    #include <GL/glext.h>
+    #endif
 #endif
 
 //esto es solo para linux/android
@@ -45,26 +47,52 @@
 #include <iostream>
 #include <iomanip>
 
-//helpers para convertir funciones para android y openglES 1.1
-#include "render/GLES_Android_helpers.h"
 
-#ifdef __ANDROID__
-#elif defined(_WIN32)
+#if defined(_WIN32)
     // ============================
     // WINDOWS
     // ============================
     #include <windows.h>
-    std::string getExeDir() {
+#endif
+
+std::string getExeDir() {
+    #ifdef _WIN32
+
         char buffer[MAX_PATH];
         GetModuleFileNameA(NULL, buffer, MAX_PATH);
 
         std::string path(buffer);
+
         size_t pos = path.find_last_of("\\/");
         if (pos != std::string::npos)
             path = path.substr(0, pos);
 
         return path;
-    }
+
+    #else
+
+        char result[PATH_MAX];
+        ssize_t count = readlink("/proc/self/exe", result, PATH_MAX);
+
+        std::string path;
+
+        if (count != -1) {
+            path = std::string(result, count);
+
+            size_t pos = path.find_last_of('/');
+            if (pos != std::string::npos)
+                path = path.substr(0, pos);
+        }
+
+        return path;
+
+    #endif
+}
+
+#ifdef __ANDROID__
+//helpers para convertir funciones para android y openglES 1.1
+#include "render/GLES_Android_helpers.h"
+
 #else
     #include <unistd.h>
     #include <limits.h>

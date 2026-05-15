@@ -7,7 +7,9 @@
 
 #include <vector>
 #include <GL/gl.h>
+#ifndef _WIN32
 #include <GL/glext.h>
+#endif
 
 #include "UI/icons.h"
 #include "objects/Mesh.h"

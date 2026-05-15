@@ -29,7 +29,10 @@ SOURCE          Whisk3D.cpp
 SOURCE          Whisk3Dapp.cpp
 SOURCE          Whisk3Dappui.cpp
 SOURCE          Whisk3Ddocument.cpp
-SOURCE          Whisk3Dcontainer.cpp Whisk3Dinput.cpp Dialogs.cpp
+SOURCE          Whisk3Dcontainer.cpp 
+SOURCE          Whisk3Dinput.cpp 
+SOURCE          Dialogs.cpp
+SOURCE          hidinputmonitor.cpp
 
 START RESOURCE  ..\data\whisk3D.rss
 HEADER

@@ -1,6 +1,8 @@
 #ifndef QUATERNION_H
 #define QUATERNION_H
 
+#include "../crossplatform.h"
+
 #include <math.h>
 #include "Vector3.h"
 #include <GL/gl.h>

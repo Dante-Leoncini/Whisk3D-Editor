@@ -12,10 +12,10 @@
 #include <GL/gl.h>
 #ifdef __ANDROID__
     #include <SDL2/SDL.h>
-    #include <SDL2/SDL_image.h>
+    //#include <SDL2/SDL_image.h>
 #else
     #include <SDL2/SDL.h>
-    #include <SDL2/SDL_image.h>
+    //#include <SDL2/SDL_image.h>
     #include <GL/glu.h>
 #endif
 

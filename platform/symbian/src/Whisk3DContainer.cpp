@@ -5,17 +5,9 @@
  * ==============================================================================
  */
 
-#include <eikprogi.h>
-#include <aknnotecontrol.h>
-
 // INCLUDE FILES
 #include <eiklabel.h>
 #include <e32math.h>
-#include <aknglobalnote.h>
-#include <aknwaitdialog.h>
-//#include <aknexnote.rsg>
-#include <eikprogi.h>
-#include <aknnotecontrol.h>
 
 #include "Whisk3DContainer.h"
 #include "Whisk3DAppUi.h"
@@ -39,6 +31,9 @@ void CWhisk3DContainer::ConstructL(const TRect& /*aRect*/){
 
     SetExtentToWholeScreen();                // Take the whole screen into use
     ActivateL();
+    
+    //creamos el monitor del mouse bluetooth    
+    iHIDMonitor = CHIDEventMonitor::NewL();
 
     iFrame = 0;                              // Frame counter
 
