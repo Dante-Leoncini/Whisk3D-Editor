@@ -2,6 +2,7 @@
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "../../thirdparty/stb/stb_image.h"
+#include "w3dFilesystem.h"
 
 // Variable global que estabas usando
 bool running = false;
@@ -92,7 +93,9 @@ void ConstructUniversal(int argc, char* argv[]) {
     // ======================================================
     int width, height, channels;
 
-    stbi_uc* pixels = stbi_load(getResDir() + "Whisk3D.png", &width, &height, &channels, 4);
+    stbi_uc* pixels = //stbi_load(w3dFileSystem::GetResDir() + "Whisk3D.png", &width, &height, &channels, 4);
+                    stbi_load((w3dFileSystem::GetResDir() + "/Whisk3D.png").c_str(),
+                        &width, &height, &channels, 4);
 
     if (pixels) {
 

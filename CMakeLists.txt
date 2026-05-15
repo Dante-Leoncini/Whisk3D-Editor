@@ -51,8 +51,11 @@ if(WIN32 OR (UNIX AND NOT ANDROID))
         ${CMAKE_SOURCE_DIR}/engine/opengl/w3dOpenGL.cpp
     )
 
-
 endif()
+
+list(APPEND SRC_FILES
+    ${CMAKE_SOURCE_DIR}/engine/w3dFilesystem.cpp
+)
 
 if(ANDROID)
 

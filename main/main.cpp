@@ -57,153 +57,7 @@
     #include <limits.h>
 #endif
 
-std::string getExeDir() {
-    #ifdef _WIN32
-        char buffer[MAX_PATH];
-        GetModuleFileNameA(NULL, buffer, MAX_PATH);
-
-        std::string path(buffer);
-
-        size_t pos = path.find_last_of("\\/");
-        if (pos != std::string::npos)
-            path = path.substr(0, pos);
-
-        return path;
-    #else
-        char result[PATH_MAX];
-        ssize_t count = readlink("/proc/self/exe", result, PATH_MAX);
-
-        std::string path;
-
-        if (count != -1) {
-            path = std::string(result, count);
-
-            size_t pos = path.find_last_of('/');
-            if (pos != std::string::npos)
-                path = path.substr(0, pos);
-        }
-
-        return path;
-    #endif
-}
-
-#ifdef __ANDROID__
-//helpers para convertir funciones para android y openglES 1.1
-#include "render/GLES_Android_helpers.h"
-#endif
-
-std::string getUserConfigDir() {
-    #ifdef WHISK3D_LINUX
-        const char* xdgConfigHome = std::getenv("XDG_CONFIG_HOME");
-        std::string configDir;
-
-        if (xdgConfigHome && strlen(xdgConfigHome) > 0) {
-            configDir = std::string(xdgConfigHome) + "/Whisk3d";
-        } else {
-            const char* home = std::getenv("HOME");
-            if (home) {
-                configDir = std::string(home) + "/.config/Whisk3d";
-            }
-        }
-
-        // Create directory if it doesn't exist
-        if (!configDir.empty() && !std::filesystem::exists(configDir)) {
-            std::filesystem::create_directories(configDir);
-            std::cout << "Creado directorio de configuración de usuario: " << configDir << "\n";
-        }
-
-        return configDir;
-    #else
-        return "";
-    #endif
-}
-    
-std::string getResDir() {
-
-    #ifdef __ANDROID__
-
-        return "res";
-
-    #elif defined(WHISK3D_LINUX)
-
-        std::string exeDir;
-
-        char exePath[PATH_MAX];
-
-        ssize_t count = readlink("/proc/self/exe", exePath, PATH_MAX);
-
-        if (count != -1) {
-
-            exeDir = std::string(exePath, count);
-
-            size_t pos = exeDir.find_last_of('/');
-
-            if (pos != std::string::npos)
-                exeDir = exeDir.substr(0, pos);
-        }
-
-        // portable
-        if (!exeDir.empty()) {
-
-            std::string portablePath = exeDir + "/res";
-
-            if (std::filesystem::exists(portablePath)) {
-                return portablePath;
-            }
-        }
-
-        // appimage
-        if (!exeDir.empty()) {
-
-            std::string appImagePath = exeDir + "/../share/Whisk3d/res";
-
-            if (std::filesystem::exists(appImagePath)) {
-                return std::filesystem::canonical(appImagePath).string();
-            }
-        }
-
-        // system install
-        const char* xdgDataDirs = std::getenv("XDG_DATA_DIRS");
-
-        std::string dataDirs =
-            xdgDataDirs ? xdgDataDirs : "/usr/local/share:/usr/share";
-
-        std::istringstream stream(dataDirs);
-
-        std::string dir;
-
-        while (std::getline(stream, dir, ':')) {
-
-            std::string systemPath = dir + "/Whisk3d/res";
-
-            if (std::filesystem::exists(systemPath)) {
-                return systemPath;
-            }
-        }
-
-        return "";
-
-    #elif defined(_WIN32)
-
-        char buffer[MAX_PATH];
-
-        GetModuleFileNameA(NULL, buffer, MAX_PATH);
-
-        std::string path(buffer);
-
-        size_t pos = path.find_last_of("\\/");
-
-        if (pos != std::string::npos)
-            path = path.substr(0, pos);
-
-        return path + "/res";
-
-    #else
-
-        return "res";
-
-    #endif
-}
+#include "w3dFilesystem.h"
 
 //Whisk3D imports
 #include "variables.h"
@@ -437,6 +291,8 @@ int main(int argc, char* argv[]) {
         return -1;
     }
 
+    w3dFileSystem::Init();
+
     // Configuración OpenGL
     #ifdef __ANDROID__
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 1);
@@ -453,7 +309,7 @@ int main(int argc, char* argv[]) {
     #ifdef __ANDROID__
         Config cfg = loadConfig("res/config.ini");
     #else
-        exeDir = getResDir();
+        exeDir = w3dFileSystem::GetResDir();
         Config cfg = loadConfig(exeDir + "/config.ini");
     #endif
     if (cfg.enableAntialiasing) {

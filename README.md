@@ -120,6 +120,13 @@ cmake -B build-windows -DCMAKE_BUILD_TYPE=Release
 cmake --build build-windows --config Release -j8
 ```
 
+para windows 7 de 32bit:
+
+```bash
+cmake -B build-win32 -A Win32 -DCMAKE_BUILD_TYPE=Release
+cmake --build build-win32 --config Release -j8
+```
+
 ## Aclaraciones:
 
 1. No es un port: Este programa **no comparte** código con Blender.
