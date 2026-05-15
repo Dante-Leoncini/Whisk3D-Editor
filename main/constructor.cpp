@@ -92,7 +92,7 @@ void ConstructUniversal(int argc, char* argv[]) {
     // ======================================================
     int width, height, channels;
 
-    stbi_uc* pixels = stbi_load("./assets/Whisk3D.png", &width, &height, &channels, 4);
+    stbi_uc* pixels = stbi_load(getResDir() + "Whisk3D.png", &width, &height, &channels, 4);
 
     if (pixels) {
 
