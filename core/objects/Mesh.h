@@ -2,11 +2,17 @@
 #define MESH_H
 
 #ifdef _WIN32
+    #define NOMINMAX
     #include <windows.h>
 #endif
 
 #include <vector>
 #include <GL/gl.h>
+
+#ifndef GL_CLAMP_TO_EDGE
+#define GL_CLAMP_TO_EDGE 0x812F
+#endif
+
 #ifndef _WIN32
 #include <GL/glext.h>
 #endif

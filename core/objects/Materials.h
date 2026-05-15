@@ -2,6 +2,7 @@
 #define MATERIALS_H
 
 #ifdef _WIN32
+    #define NOMINMAX
     #include <windows.h>
 #endif
 

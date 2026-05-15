@@ -110,13 +110,13 @@ int Curve::FindNearest(const Vector3& target) const{
         int axis = depth % 3;
         float delta = target[axis] - node->point[axis];
 
-        KDNode* near = delta < 0 ? node->left : node->right;
-        KDNode* far  = delta < 0 ? node->right : node->left;
+        KDNode* nearNode = delta < 0 ? node->left : node->right;
+        KDNode* farNode  = delta < 0 ? node->right : node->left;
 
-        search(near, depth+1);
+        search(nearNode, depth+1);
 
-        if (delta*delta < bestDist)
-            search(far, depth+1);
+        if (delta * delta < bestDist)
+            search(farNode, depth+1);
     };
 
     search(kdRoot, 0);

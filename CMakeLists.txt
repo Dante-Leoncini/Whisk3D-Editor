@@ -125,6 +125,7 @@ if(WIN32)
         opengl32
         glu32
     )
+    target_compile_definitions(whisk3d PRIVATE SDL_MAIN_HANDLED)
 
 endif()
 

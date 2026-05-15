@@ -2,6 +2,9 @@
 #define VECTOR3_H
 
 #include <cmath>
+#ifdef WIN32
+    #include <algorithm>
+#endif
 
 class Vector3 {
     public:
