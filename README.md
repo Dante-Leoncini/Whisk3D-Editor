@@ -34,12 +34,23 @@ Este programa no esta listo para producción y tiene una serie de errores conoci
 
 Sí el instalador falla, probablemente debas de "hackear" tu teléfono para ignorar las restricciones y certificados de Symbian. Puedes ver el siguiente video mostrando como hacerlo: [Tutorial Hack](https://www.youtube.com/watch?v=UJJICzbk3TA)
 
-## Linux
+## gnu/Linux (Ubuntu)
 
-Para compilar en Linux/Ubuntu hace falta instalar las dependencias y bajar los submodulos de git con el siguiente copmando:
+Para compilar en gnu/Linux (Ubuntu) hace falta instalar las dependencias y bajar los submodulos de git con el siguiente copmando:
 
 ```bash
 git submodule update --init --recursive
+```
+
+necesitas ciertas dependencias para compilar:
+
+```bash
+sudo apt update
+sudo apt install git build-essential cmake \
+libgl1-mesa-dev \
+libglu1-mesa-dev \
+mesa-common-dev \
+install libsdl2-dev
 ```
 
 en la carpeta raiz usar cmake y los siguientes comandos:
@@ -63,7 +74,7 @@ si crashea podes ver con detalle en que parte usando
 bt full
 ```
 
-Para generar los instaladores .DEB, RPM o AppImage. en la carpeta /buld-linux pueden usar el siguiente comando:
+Para generar los instaladores .DEB, RPM o AppImage. en la carpeta /buld-linux pueden usar el siguiente comando (gracias Zariep por este aporte!):
 
 ```bash
 cpack
