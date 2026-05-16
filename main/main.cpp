@@ -80,7 +80,7 @@ Config loadConfig(const std::string& filename) {
 
     #ifdef WHISK3D_LINUX
         // 1. Intentar primero desde config de usuario
-        std::string userConfigDir = getUserConfigDir();
+        std::string userConfigDir = GetResDir();
         if (!userConfigDir.empty()) {
             std::string userConfigPath = userConfigDir + "/config.ini";
             if (std::filesystem::exists(userConfigPath)) {
@@ -160,7 +160,7 @@ bool loadColors(const std::string& filename) {
 
     #ifdef WHISK3D_LINUX
         // 1. Intentar primero desde config de usuario
-        std::string userConfigDir = getUserConfigDir();
+        std::string userConfigDir = GetResDir();
         if (!userConfigDir.empty()) {
             // Extraer nombre del skin del path original
             size_t skinsPos = filename.find("/Skins/");
@@ -309,8 +309,7 @@ int main(int argc, char* argv[]) {
     #ifdef __ANDROID__
         Config cfg = loadConfig("res/config.ini");
     #else
-        exeDir = w3dFileSystem::GetResDir();
-        Config cfg = loadConfig(exeDir + "/config.ini");
+        Config cfg = loadConfig(w3dFileSystem::GetResDir() + "/config.ini");
     #endif
     if (cfg.enableAntialiasing) {
         SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
@@ -351,7 +350,7 @@ int main(int argc, char* argv[]) {
     #ifdef __ANDROID__
         std::string skinPath = "res/Skins/" + cfg.SkinName + "/skin.ini";
     #else
-        std::string skinPath = exeDir + "/Skins/" + cfg.SkinName + "/skin.ini";
+        std::string skinPath = w3dFileSystem::GetResDir() + "/Skins/" + cfg.SkinName + "/skin.ini";
     #endif
     loadColors(skinPath);
 

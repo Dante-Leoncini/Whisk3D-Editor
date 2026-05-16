@@ -22,7 +22,6 @@ namespace w3dFileSystem {
 
     static std::string gExeDir;
     static std::string gResDir;
-    static std::string gUserConfigDir;
 
     // ========================================================
     // Obtener directorio del ejecutable
@@ -69,125 +68,65 @@ namespace w3dFileSystem {
     }
 
     // ========================================================
-    // Obtener config dir usuario
-    // ========================================================
-
-    static std::string DetectUserConfigDir() {
-
-    #ifdef WHISK3D_LINUX
-
-        const char* xdgConfigHome = std::getenv("XDG_CONFIG_HOME");
-
-        std::string configDir;
-
-        if (xdgConfigHome && strlen(xdgConfigHome) > 0) {
-
-            configDir = std::string(xdgConfigHome) + "/Whisk3d";
-
-        } else {
-
-            const char* home = std::getenv("HOME");
-
-            if (home)
-                configDir = std::string(home) + "/.config/Whisk3d";
-        }
-
-        if (!configDir.empty() &&
-            !std::filesystem::exists(configDir)) {
-
-            std::filesystem::create_directories(configDir);
-
-            std::cout
-                << "Creado directorio config usuario: "
-                << configDir << "\n";
-        }
-
-        return configDir;
-
-    #else
-
-        return "";
-
-    #endif
-    }
-
-    // ========================================================
     // Obtener carpeta res
     // ========================================================
 
     static std::string DetectResDir() {
-
     #ifdef __ANDROID__
-
         return "res";
-
-    #elif defined(WHISK3D_LINUX)
+    #endif
 
         std::string exeDir = gExeDir;
 
-        // portable
+        // ======================================================
+        // 1. Portable: ./res al lado del exe
+        // ======================================================
         if (!exeDir.empty()) {
-
-            std::string portablePath = exeDir + "/res";
-
-            if (std::filesystem::exists(portablePath)) {
-
-                std::cout
-                    << "Usando res portable\n";
-
-                return portablePath;
+            std::string portable = exeDir + "/res";
+            if (std::filesystem::exists(portable)) {
+                std::cout << "Usando res portable\n";
+                return portable;
             }
         }
 
-        // appimage
-        if (!exeDir.empty()) {
+    #ifndef _WIN32
 
-            std::string appImagePath =
-                exeDir + "/../share/Whisk3d/res";
+        // ======================================================
+        // 2. Instalación del sistema (Linux)
+        // ======================================================
 
-            if (std::filesystem::exists(appImagePath)) {
+        const char* xdg = std::getenv("XDG_DATA_DIRS");
+        std::string dirs = xdg ? xdg : "/usr/local/share:/usr/share";
 
-                return std::filesystem
-                    ::canonical(appImagePath)
-                    .string();
-            }
-        }
-
-        // system install
-        const char* xdgDataDirs =
-            std::getenv("XDG_DATA_DIRS");
-
-        std::string dataDirs =
-            xdgDataDirs
-                ? xdgDataDirs
-                : "/usr/local/share:/usr/share";
-
-        std::istringstream stream(dataDirs);
-
+        std::istringstream stream(dirs);
         std::string dir;
 
         while (std::getline(stream, dir, ':')) {
 
-            std::string systemPath =
-                dir + "/Whisk3d/res";
+            std::string path = dir + "/Whisk3d/res";
 
-            if (std::filesystem::exists(systemPath)) {
-
-                return systemPath;
+            if (std::filesystem::exists(path)) {
+                std::cout << "Usando res sistema: " << path << "\n";
+                return path;
             }
         }
 
-        return "";
+        // fallback directo seguro
+        std::string fallback = "/usr/share/Whisk3d/res";
 
-    #elif defined(_WIN32)
-
-        return gExeDir + "/res";
-
-    #else
-
-        return "res";
+        if (std::filesystem::exists(fallback))
+            return fallback;
 
     #endif
+
+    #ifdef _WIN32
+        return exeDir + "/res";
+    #endif
+
+        // ======================================================
+        // 3. Último fallback seguro (CRÍTICO)
+        // ======================================================
+        return exeDir + "/res";
     }
 
     // ========================================================
@@ -195,22 +134,10 @@ namespace w3dFileSystem {
     // ========================================================
 
     void Init() {
-
         gExeDir = DetectExeDir();
-
-        gUserConfigDir = DetectUserConfigDir();
-
         gResDir = DetectResDir();
-
         std::cout << "ExeDir: " << gExeDir << "\n";
         std::cout << "ResDir: " << gResDir << "\n";
-
-        if (!gUserConfigDir.empty()) {
-            std::cout
-                << "UserConfigDir: "
-                << gUserConfigDir
-                << "\n";
-        }
     }
 
     // ========================================================
@@ -223,9 +150,5 @@ namespace w3dFileSystem {
 
     const std::string& GetResDir() {
         return gResDir;
-    }
-
-    const std::string& GetUserConfigDir() {
-        return gUserConfigDir;
     }
 }

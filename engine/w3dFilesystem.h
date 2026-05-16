@@ -9,6 +9,5 @@ namespace w3dFileSystem {
     // rutas cacheadas
     const std::string& GetExeDir();
     const std::string& GetResDir();
-    const std::string& GetUserConfigDir();
 
 }

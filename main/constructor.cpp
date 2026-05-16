@@ -62,7 +62,11 @@ void ConstructUniversal(int argc, char* argv[]) {
             SDL_FreeSurface(surf); // liberamos superficie después de crear la textura
         #else
             // PC: ruta directa
-            std::string path = exeDir + "/Skins/" + cfg.SkinName + "/" + file;
+            std::string path = w3dFileSystem::GetResDir()
+                            + "/Skins/"
+                            + cfg.SkinName
+                            + "/"
+                            + file;
             if (!LoadTexture(path.c_str(), Textures.back()->iID)) {
                 std::cerr << "Error cargando " << path << std::endl;
                 return;
