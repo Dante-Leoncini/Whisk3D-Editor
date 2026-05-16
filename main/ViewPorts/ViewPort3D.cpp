@@ -1177,7 +1177,7 @@ bool recalcularCamara = true;
 GLfloat radY = 0.0f;
 GLfloat radX = 0.0f;
 
-GLfloat factor = 0.03f;
+//GLfloat factor = 0.03f;
 
 GLfloat cosX = 0.0f;
 GLfloat sinX = 0.0f;
@@ -1197,7 +1197,11 @@ void Gamepad::Update() {
 
     float inputY = axisState[SDL_CONTROLLER_AXIS_LEFTY]; // Adelante/Atrás
     float inputX = axisState[SDL_CONTROLLER_AXIS_LEFTX]; // Lateral/Giro
-    float speed = factor * 2.00f; 
+
+    bool botonSalto = SDL_GameControllerGetButton(
+        controller,
+        SDL_CONTROLLER_BUTTON_A
+    );
 
     // Inversión de ejes para el control intuitivo
     float correctedInputY = -inputY; 
@@ -1206,42 +1210,105 @@ void Gamepad::Update() {
     // Umbral para ignorar el ruido del stick
     const float DeadZone = 0.1f;
 
-    // --- 2. CALCULAR EL MOVIMIENTO TOTAL ---
-    Vector3 TotalMovement(0.0f, 0.0f, 0.0f);
+    bool grounded = (target->pos.y <= piso + 0.001f);
 
-    //std::cout << "nextAnim: "<< targetAnim->nextAnim << "\n";
-    
-    if (std::abs(correctedInputY) > DeadZone) {
-        // Avance/Retroceso
-        TotalMovement += Fwd_XZ * correctedInputY * speed;
+    bool justLanded = (!wasGrounded && grounded);
+    wasGrounded = grounded;
+
+    // =========================
+    // 1. INPUT → HORIZONTAL VELOCITY (INERCIA)
+    // =========================
+
+    Vector3 desiredMove(0,0,0);
+
+    if (std::abs(inputY) > DeadZone)
+        desiredMove += Fwd_XZ * (-inputY);
+
+    if (std::abs(inputX) > DeadZone)
+        desiredMove += Rgt_XZ * (-inputX);
+
+    float accel = velocidad;
+
+    // inercia suave
+    velocity.x += desiredMove.x * accel;
+    velocity.z += desiredMove.z * accel;
+
+    // freno rápido (clave)
+    velocity.x *= 0.85f;
+    velocity.z *= 0.85f;
+
+    // =========================
+    // 2. GRAVEDAD
+    // =========================
+
+    velocity.y -= gravedad;
+
+    // clamp caída
+    if (velocity.y < -velocidadMaximaCaida)
+        velocity.y = -velocidadMaximaCaida;
+
+    // =========================
+    // 3. SALTO
+    // =========================
+
+    if (grounded && botonSalto) {
+        velocity.y = potenciaSalto;
     }
 
-    if (std::abs(correctedInputX) > DeadZone) {
-        // Movimiento Lateral (Strafe)
-        TotalMovement += Rgt_XZ * correctedInputX * speed;
+    // =========================
+    // 4. APLICAR MOVIMIENTO
+    // =========================
+
+    target->pos += velocity;
+
+    // =========================
+    // 5. PISO
+    // =========================
+
+    if (target->pos.y <= piso) {
+        target->pos.y = piso;
+        velocity.y = 0;
+        grounded = true;
     }
-    
-    // --- 3. APLICAR MOVIMIENTO Y ROTACIÓN ---
-    if (TotalMovement.LengthSq() > 0.0001f) {
-        // A. Aplicar la traslación (movimiento)
-        target->pos += TotalMovement;
 
-        // B. CALCULAR LA ROTACIÓN
-        Vector3 newForward = TotalMovement.Normalized();
-        
-        // Crear la rotación hacia el movimiento
-        Quaternion targetRotation = Quaternion::FromDirection(newForward, Vector3(0, 1, 0));
+    // =========================
+    // 6. LIMITES XZ
+    // =========================
 
-        // C. Aplicar Rotación (suavizada con Slerp)
-        target->rot = Quaternion::Slerp(target->rot, targetRotation, 0.1f); // Suaviza la rotación
+    if (target->pos.x < limiteIzquierdo) target->pos.x = limiteIzquierdo;
+    if (target->pos.x > limiteDerecho)   target->pos.x = limiteDerecho;
+    if (target->pos.z < limiteFrente)    target->pos.z = limiteFrente;
+    if (target->pos.z > limiteFondo)     target->pos.z = limiteFondo;
 
-        if (targetAnim->nextAnim != 1){
-            targetAnim->nextAnim = 1;
+    // =========================
+    // 7. ROTACIÓN SOLO SI ESTÁ EN TIERRA
+    // =========================
+
+    Vector3 horizontalVel = velocity;
+    horizontalVel.y = 0;
+
+    bool moving = horizontalVel.LengthSq() > 0.001f;
+
+    if (moving) {
+        Vector3 dir = horizontalVel.Normalized();
+
+        Quaternion rot = Quaternion::FromDirection(dir, Vector3(0,1,0));
+        target->rot = Quaternion::Slerp(target->rot, rot, 0.2f);
+
+        if (grounded){
+            targetAnim->nextAnim = 1; // correr
+        }
+        else if (targetAnim->nextAnim != 2){
+            targetAnim->nextAnim = 3; // gira en el aire
         }
     }
-    else {
-        if (targetAnim->nextAnim != 0){
-            targetAnim->nextAnim = 0;
-        }
+    else if (justLanded) {
+        targetAnim->nextAnim = 4;
+    }
+    else if (!grounded && targetAnim->nextAnim != 3) {
+        targetAnim->nextAnim = 2; // caer
+    }
+    else if (grounded && targetAnim->nextAnim != 4){
+        targetAnim->nextAnim = 0; // idle
     }
 }

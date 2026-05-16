@@ -4,7 +4,7 @@
 float axisState[SDL_CONTROLLER_AXIS_MAX] = {0.0f};
 bool buttonState[SDL_CONTROLLER_BUTTON_MAX] = {false};
 GLfloat deadzone = 0.20f;
-GLfloat velocidad = 0.05f;
+//GLfloat velocidad = 0.05f;
 
 // Función para refrescar inputs del gamepad
 void RefreshInputControllerSDL(SDL_Event &e) {    
@@ -23,10 +23,20 @@ void RefreshInputControllerSDL(SDL_Event &e) {
 
 // ------------------- Gamepad -------------------
 
-Gamepad::Gamepad(Object* parent)
-    : Object(parent, "Gamepad", Vector3(0,0,0))
+Gamepad::Gamepad(Object* parent, GLfloat velocidad, 
+            GLfloat piso, 
+            GLfloat gravedad, 
+            GLfloat limiteIzquierdo, 
+            GLfloat limiteDerecho, 
+            GLfloat limiteFondo, 
+            GLfloat limiteFrente
+) : Object(parent, "Gamepad", Vector3(0,0,0))
 {
+    velocity = Vector3(0,0,0);
+    onGround = true;
+    wasGrounded = false;
     IconType = static_cast<size_t>(IconType::gamepad);
+    velocidad = velocidad;
 }
 
 ObjectType Gamepad::getType() {

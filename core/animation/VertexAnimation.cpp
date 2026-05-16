@@ -1,7 +1,7 @@
 #include "VertexAnimation.h"
 
-VertexAnimation::VertexAnimation(Mesh* tgt, const std::string& animName, bool useNormals, float Speed): 
-      target(tgt), name(animName), UseNormals(useNormals), speed(Speed) {}
+VertexAnimation::VertexAnimation(Mesh* tgt, const std::string& animName, bool useNormals, float Speed, bool Repeat, int ProximaAnimacion): 
+      target(tgt), name(animName), UseNormals(useNormals), speed(Speed), repeat(Repeat), proximaAnimacion(ProximaAnimacion) {}
 
 bool VertexAnimation::LoadFrames() {
     if (!target || !target->vertex || target->vertexSize <= 0)
@@ -222,7 +222,7 @@ void VertexAnimationActive::UpdateAnimation(){
         bool changedAnim = (currentAnim != nextAnim);
 
         // Consolidamos estado
-        currentAnim  = nextAnim;
+        currentAnim = nextAnim;
 
         if (changedAnim) {
             currentFrame = 0;
@@ -233,9 +233,25 @@ void VertexAnimationActive::UpdateAnimation(){
         }
 
         VertexAnimation* anim = meshToAnim->animations[currentAnim];
-        if (anim && !anim->frames.empty() &&
+        /*if (anim && !anim->frames.empty() &&
             nextFrame >= static_cast<int>(anim->frames.size())) {
             nextFrame = 0;
+        }*/
+
+        if (anim && !anim->frames.empty()) {
+            int lastFrame = (int)anim->frames.size() - 1;
+
+            if (nextFrame > lastFrame){
+                if (anim->proximaAnimacion >= 0){
+                    nextFrame = 0;
+                    nextAnim = anim->proximaAnimacion;
+                }
+                else if (anim->repeat) {
+                    nextFrame = 0; // loop
+                } else {
+                    nextFrame = lastFrame; // HOLD último frame
+                }
+            }
         }
     }
 }

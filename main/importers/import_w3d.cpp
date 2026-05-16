@@ -344,10 +344,14 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
 
                 bool UseNormals = GetBoolOrDefault(ap, "UseNormals", false);
 
+                bool repeat = GetBoolOrDefault(ap, "repeat", true);
+
                 int speed = GetIntOrDefault(ap, "speed", 1);
 
+                int proximaAnimacion = GetIntOrDefault(ap, "proximaAnimacion", -1);
+
                 VertexAnimation* anim =
-                    new VertexAnimation(nullptr, ap.at("name"), UseNormals, (float)speed);
+                    new VertexAnimation(nullptr, ap.at("name"), UseNormals, (float)speed, repeat, proximaAnimacion);
 
                 anim->basePath   = GetFilePath(ap.at("basePath"));
                 anim->frameCount = std::stoi(ap.at("frames"));
@@ -378,6 +382,17 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
     if (n->type=="Gamepad"){
         Gamepad* gamepad = new Gamepad(parent);
         if(p.count("target")) gamepad->SetTarget(p.at("target"));
+
+        // leer float "velocidad"
+        gamepad->velocidad = GetFloatOrDefault(p, "velocidad", 0.1f);
+        gamepad->piso = GetFloatOrDefault(p, "piso", 0.0f);
+        gamepad->gravedad = GetFloatOrDefault(p, "gravedad", 1.0f);        
+        gamepad->limiteIzquierdo = GetFloatOrDefault(p, "limiteIzquierdo", -2.0f);
+        gamepad->limiteDerecho = GetFloatOrDefault(p, "limiteDerecho", 2.0f);
+        gamepad->limiteFondo = GetFloatOrDefault(p, "limiteFondo", -2.0f);
+        gamepad->limiteFrente = GetFloatOrDefault(p, "limiteFrente", 2.0f);
+        gamepad->velocidadMaximaCaida = GetFloatOrDefault(p, "velocidadMaximaCaida", 2.0f);
+        gamepad->potenciaSalto = GetFloatOrDefault(p, "potenciaSalto", 2.0f);
 
         return gamepad;
     }

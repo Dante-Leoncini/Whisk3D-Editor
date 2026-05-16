@@ -20,18 +20,38 @@
 extern float axisState[SDL_CONTROLLER_AXIS_MAX];
 extern bool buttonState[SDL_CONTROLLER_BUTTON_MAX];
 extern GLfloat deadzone;
-extern GLfloat velocidad;
+//extern GLfloat velocidad;
 
 // Función para refrescar inputs del gamepad
 void RefreshInputControllerSDL(SDL_Event &e);
 
 class Gamepad : public Object, public Target {
     public:
-        Gamepad(Object* parent);
+        Gamepad(Object* parent, GLfloat velocidad = 0.03f, 
+            GLfloat piso = 0.0f, 
+            GLfloat gravedad = 0.03f, 
+            GLfloat limiteIzquierdo = -2.0f, 
+            GLfloat limiteDerecho = 2.0f, 
+            GLfloat limiteFondo = -2.0f, 
+            GLfloat limiteFrente = 2.0f);
 
         VertexAnimationActive* targetAnim = nullptr;
 
         ObjectType getType() override;
+        Vector3 velocity;
+        bool onGround;
+        bool wasGrounded;
+        GLfloat velocidad;
+        GLfloat piso;
+        GLfloat gravedad;
+        GLfloat limiteIzquierdo;
+        GLfloat limiteDerecho;
+        GLfloat limiteFondo;
+        GLfloat limiteFrente;
+        GLfloat velocidadMaximaCaida;
+        GLfloat potenciaSalto;
+
+        GLfloat deadzone = 0.20f;
         void Reload() override;
         void RenderObject() override;
         void Update();  // Solo declaración

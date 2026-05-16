@@ -99,8 +99,10 @@ class VertexAnimation {
         // Declaración (desde .w3d)
         std::string basePath;
         int frameCount = 0;
+        int proximaAnimacion = -1;
         float speed = 1.0f;
         int padding = 0;
+        bool repeat = true;
 
         // Runtime
         Mesh* target = nullptr;
@@ -111,7 +113,7 @@ class VertexAnimation {
         std::vector<VertexFrame*> frames;
 
         VertexAnimation() = default;
-        VertexAnimation(Mesh* tgt, const std::string& animName, bool useNormals = false, float Speed = 1);
+        VertexAnimation(Mesh* tgt, const std::string& animName, bool useNormals = false, float Speed = 1, bool Repeat = true, int ProximaAnimacion = -1);
     
         // Cargar animaciones desde archivos .obj
         bool LoadFrames();
