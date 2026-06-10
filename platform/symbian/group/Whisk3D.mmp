@@ -13,8 +13,12 @@ UID             0x100039CE 0xA00D021D
 EPOCSTACKSIZE   30000 //originalmente estaba en 30000 67108864
 EPOCHEAPSIZE    0x10000 0x4000000  // Tama�o del heap: 64 KB m�nimo y 64 MB m�ximo
 
-//no logro conseguir el compilador... esto tendria que hacer que ande mejor
-//OPTION_REPLACE  ARMCC --arm -O3 -Otime --cpu 6 --fpu VFPv2 --fpmode fast
+// Compilador RVCT 2.2 (ARMV6 en bld.inf): forzar ARM, ARMv6 y FPU por hardware.
+// Es lo que aprovecha la VFP del N95/N8 (igual que el proyecto de Half-Life).
+ALWAYS_BUILD_AS_ARM
+OPTION_REPLACE  ARMCC --cpu 6
+OPTION_REPLACE  ARMCC --fpu vfpv2 --fpmode fast
+OPTION_REPLACE  ARMCC -O2 -Otime
 
 VENDORID        0
 
@@ -32,7 +36,8 @@ SOURCE          Whisk3Ddocument.cpp
 SOURCE          Whisk3Dcontainer.cpp 
 SOURCE          Whisk3Dinput.cpp 
 SOURCE          Dialogs.cpp
-SOURCE          hidinputmonitor.cpp
+// new/delete propios para no importar scppnwdl.dll (no existe en el N95)
+SOURCE          newdel_compat.cpp
 
 START RESOURCE  ..\data\whisk3D.rss
 HEADER
@@ -45,11 +50,16 @@ USERINCLUDE     ..\inc
 USERINCLUDE     ..\Utils
 
 SYSTEMINCLUDE   .
-//necesario para python
-SYSTEMINCLUDE   \epoc32\include\python25
 SYSTEMINCLUDE   \epoc32\include\stdapis
 
 SYSTEMINCLUDE   \epoc32\include
+// El SDK de Symbian^3 reorganizo las cabeceras en subcarpetas (antes estaban
+// planas en \epoc32\include en el SDK de S60v5). Sin estas rutas faltan
+// eikon.rh/avkon.rh/CommonDialogs.rh (-> mw) y e32svr.h (-> platform).
+SYSTEMINCLUDE   \epoc32\include\mw
+SYSTEMINCLUDE   \epoc32\include\app
+SYSTEMINCLUDE   \epoc32\include\platform
+SYSTEMINCLUDE   \epoc32\include\platform\mw
 
 LIBRARY         avkon.lib euser.lib apparc.lib cone.lib eikcore.lib
 LIBRARY         eikcoctl.lib estlib.lib fbscli.lib
@@ -60,7 +70,6 @@ LIBRARY         ws32.lib commondialogs.lib
 LIBRARY         estor.lib eikctl.lib aknnotify.lib apgrfx.lib eikdlg.lib charconv.lib 
 
 LIBRARY         libc.lib
-LIBRARY         python25.lib
 
 //acelerometro
 //LIBRARY         NokiaAccSensor.lib
@@ -73,5 +82,9 @@ TARGETPATH 	  \private\10003a3f\apps
 TARGETPATH 	  \private\10003a3f\import\apps
 #endif
 END
-CAPABILITY ReadUserData WriteUserData ReadDeviceData
-CAPABILITY Location
+// Solo capabilities auto-firmables (igual que el Half-Life). ReadDeviceData
+// necesita DevCert de Symbian y Location no es auto-firmable en el 9.2 del
+// N95: con cualquiera de las dos el telefono rechaza el binario self-signed
+// ("funcion no admitida"). La app no las usaba (el acelerometro esta
+// comentado); si algun dia hacen falta, hay que firmarse con Open Signed.
+CAPABILITY ReadUserData WriteUserData

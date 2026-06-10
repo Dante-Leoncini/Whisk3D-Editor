@@ -32,9 +32,6 @@ void CWhisk3DContainer::ConstructL(const TRect& /*aRect*/){
     SetExtentToWholeScreen();                // Take the whole screen into use
     ActivateL();
     
-    //creamos el monitor del mouse bluetooth    
-    iHIDMonitor = CHIDEventMonitor::NewL();
-
     iFrame = 0;                              // Frame counter
 
     EGLConfig Config;                        // Describes the format, type and
@@ -229,7 +226,7 @@ CWhisk3DContainer::~CWhisk3DContainer(){
         delete iWhisk3D;
     }
     delete iInputHandler;
-    
+
     eglMakeCurrent( iEglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT );
     eglDestroySurface( iEglDisplay, iEglSurface );
     eglDestroyContext( iEglDisplay, iEglContext );

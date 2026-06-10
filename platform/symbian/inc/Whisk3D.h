@@ -19,9 +19,6 @@
 //para el cuadro de wait
 #include <AknWaitDialog.h>
 
-//PYTHON
-#include <Python.h>
-
 //acelerometro
 /*#include <SensrvChannel.h>
 #include <SensrvChannelFinder.h>
@@ -137,7 +134,6 @@ class CWhisk3D : public CFiniteStateMachine, public MTextureLoadingListener
         void SeleccionarProximo();
         void SetViewportBackgroudColor();
         void CheckCameraState();
-        void EjecutarScriptPython();
         void CalculateMillisecondsPerFrame(TInt aFPS);
         
         void dibujarUI();

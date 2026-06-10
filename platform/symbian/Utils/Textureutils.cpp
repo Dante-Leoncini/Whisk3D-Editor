@@ -12,6 +12,7 @@
 // INCLUDE FILES
 
 #include "Textureutils.h"
+#include "fscompat.h" // FsCloseCompat: cerrar RFs sin importar efsrv@390 (Symbian^3)
 
 #include <whisk3D.rsg>
 #include <aknmessagequerydialog.h>		// DialogAlertL
@@ -431,7 +432,7 @@ void CTextureManager::ConstructL(
     TPath privateDir;
     User::LeaveIfError( iFs.PrivatePath( privateDir ) );
     fullTexturePath.Append( privateDir );
-    iFs.Close();
+    FsCloseCompat(iFs);
 
     ConstructL( fullTexturePath, aScreenWidth, aScreenHeight,
                 aFrustumTop, aFrustumBottom, aFrustumRight,
@@ -498,7 +499,7 @@ CTextureManager::~CTextureManager( )
 	delete iBitmap;
 	delete iBitmapMask;
 	DeleteTextures();
-	iFs.Close();
+	FsCloseCompat(iFs);
 	}
 
 // -----------------------------------------------------------------------------

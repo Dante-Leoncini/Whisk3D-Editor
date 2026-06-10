@@ -15,5 +15,6 @@
 		<nature>org.eclipse.cdt.core.cnature</nature>
 		<nature>org.eclipse.cdt.core.ccnature</nature>
 		<nature>com.nokia.carbide.cdt.builder.carbideCPPBuilderNature</nature>
+		<nature>com.nokia.carbide.cdt.builder.carbideSBSv2BuilderNature</nature>
 	</natures>
 </projectDescription>

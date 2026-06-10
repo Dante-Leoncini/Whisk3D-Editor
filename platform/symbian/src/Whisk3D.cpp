@@ -9,6 +9,8 @@
 #include <e32std.h>
 #include <e32math.h>
 #include <e32base.h>
+#include <math.h> // sqrt/sin/cos de libc
+#include "fscompat.h" // FsCloseCompat: cerrar RFs sin importar efsrv@390 (Symbian^3)
 
 //para leer archivos
 #include <s32file.h>
@@ -612,7 +614,7 @@ void CWhisk3D::AppInit( void ){
     TFileName RootDirectory = Parse.DriveAndPath().Left( 2 );
 
     User::LeaveIfError(fs.PrivatePath(privateDir));
-    fs.Close();
+    FsCloseCompat(fs);
 
 	// Push the textures into the loading queue.
 	_LIT( KOriginTexture, "origen.png" );
@@ -3768,85 +3770,7 @@ void CWhisk3D::EnfocarObject(){
 	PivotX = PivotX-TransformPivotPointFloat[0]; 
 	PivotY = PivotY-TransformPivotPointFloat[1];
 	PivotZ = PivotZ-TransformPivotPointFloat[2];
-	//EjecutarScriptPython();
     redibujar = true;
-}
-
-// Función para obtener el valor de la variable global
-/*PyObject* CWhisk3D::GetShowOverlays(PyObject* self, PyObject* args){
-    return PyBool_FromLong(showOverlays ? 1 : 0);
-}*/
-
-void CWhisk3D::EjecutarScriptPython(){
-    // Inicializa el intérprete de Python
-    Py_Initialize();
-    
-	// Script Python a ejecutar
-	const char* script = "print('Python esta funcionando')\n"
-                         "from time import time,ctime\n"
-                         "print('Today is', ctime(time()))\n";
-
-	const char* script2 =  "try:\n"
-	        "    import appuifw\n"
-	        "    appuifw.note(u'Importaci�n exitosa', 'info')\n"
-	        "except ImportError:\n"
-	        "    print('appuifw no est� disponible')\n";
-    
-	const char* script3 = "import appuifw\n"
-		"print('Python está funcionando')\n"
-		"L = [u'Fer', u'Dante', u'Leandro']\n"
-		"test = appuifw.popup_menu(L, u'Quien es el mas lindo?')\n"
-		"if test == 0:\n"
-		"    appuifw.note(u'lo siento, segui participando :p', 'error')\n"
-		"elif test == 1:\n"
-		"    appuifw.note(u'obio! xD', 'conf')\n"
-		"elif test == 2:\n"
-		"    appuifw.note(u'no en mi juego xD', 'error')\n";
-
-	// Ejecuta el script Python usando PyRun_SimpleString
-	int result = PyRun_SimpleString(script);
-	if (result != 0) {
-		// Si hay un error en la ejecuci�n del script, imprime el error
-		PyErr_Print();
-		_LIT(KFormatString, "Error al ejecutar el script");
-		HBufC* noteBuf = HBufC::NewLC(50);
-		noteBuf->Des().Format(KFormatString);
-		CDialogs::Alert(noteBuf);  
-		CleanupStack::PopAndDestroy(noteBuf);
-	}
-	result = PyRun_SimpleString(script2);
-	if (result != 0) {
-		// Si hay un error en la ejecuci�n del script, imprime el error
-		PyErr_Print();
-		_LIT(KFormatString, "Error al ejecutar el script");
-		HBufC* noteBuf = HBufC::NewLC(50);
-		noteBuf->Des().Format(KFormatString);
-		CDialogs::Alert(noteBuf);  
-		CleanupStack::PopAndDestroy(noteBuf);
-	}
-	
-	// Ruta del archivo de script
-    _LIT8(KScriptPath, "E:/hola.py");
-
-    // Convertir TDesC8 a const char*
-    TPtrC8 ptrC8 = KScriptPath();
-    const char* scriptPath = reinterpret_cast<const char*>(ptrC8.Ptr());
-
-    // Abre el archivo de script
-    FILE* fp = fopen(scriptPath, "r");
-    if (fp != NULL){
-        // Ejecuta el archivo de script
-    	PyRun_SimpleFile(fp, scriptPath);
-        fclose(fp);
-    }
-    else{
-        // Si no se puede abrir el archivo, muestra un mensaje de error
-        CAknInformationNote* note = new (ELeave) CAknInformationNote();
-        note->ExecuteLD(_L("No se pudo abrir el script hola.py"));
-    }
-
-    // Finaliza el intérprete de Python
-    //Py_Finalize();
 }
 
 
@@ -4749,7 +4673,7 @@ void CWhisk3D::LeerMTL(const TFileName& aFile, TInt objetosCargados) {
 			noteBuf->Des().Format(KFormatString);
 			MensajeError(noteBuf);
     		rFile.Close();	
-    		fsSession2.Close();	
+    		FsCloseCompat(fsSession2);	
             //CleanupStack::PopAndDestroy(&fsSession);
 			break;
 		}      
@@ -4916,7 +4840,7 @@ void CWhisk3D::LeerMTL(const TFileName& aFile, TInt objetosCargados) {
 							noteBuf3->Des().Format(KFileNotFound, texturePath16);
 							MensajeError(noteBuf3);
 						}
-						fs.Close();
+						FsCloseCompat(fs);
 						CleanupStack::PopAndDestroy(texturePath16);
 					}				
 				}
@@ -4930,7 +4854,7 @@ void CWhisk3D::LeerMTL(const TFileName& aFile, TInt objetosCargados) {
 	CleanupStack::PopAndDestroy(materialName16);
 	CleanupStack::PopAndDestroy(noteBuf3);
     rFile.Close();	
-    fsSession2.Close();	
+    FsCloseCompat(fsSession2);	
 
 	//si hay texturas. las lee
 	if (HaytexturasQueCargar){		
@@ -5208,7 +5132,7 @@ void CWhisk3D::ImportAnimation(){
     if (AknCommonDialogs::RunSelectDlgLD(file, R_WHISK3D_SELECT_DIALOG, KTitle)){		
     	RFs fsSession;	
     	User::LeaveIfError(fsSession.Connect());
-    	CleanupClosePushL(fsSession);
+    	CleanupCloseFsPushL(fsSession);
 
 		// Revisar la extension del archivo
 		TPtrC extension = file.Right(4);  // Obtiene las ultimas 4 letras del nombre del archivo
@@ -5218,7 +5142,7 @@ void CWhisk3D::ImportAnimation(){
 			noteBuf->Des().Format(KExtensionError);
 			MensajeError(noteBuf);
 			CleanupStack::PopAndDestroy(noteBuf);
-			fsSession.Close();
+			FsCloseCompat(fsSession);
 			return;
 		}
 
@@ -5233,7 +5157,7 @@ void CWhisk3D::ImportAnimation(){
 			MensajeError(noteBuf);
 			CleanupStack::PopAndDestroy(noteBuf);
 			rFile.Close();
-			fsSession.Close();
+			FsCloseCompat(fsSession);
 			return;
 		}	
 
@@ -5678,7 +5602,7 @@ void CWhisk3D::ImportAnimation(){
 
 		// Cerrar el archivo
 		rFile.Close();
-		fsSession.Close();
+		FsCloseCompat(fsSession);
 		/*AnimationObject& anim = AnimationObjects[animIndex];
 		AnimProperty& prop = anim.Propertys[propIndex];
 		prop.SortKeyFrames();*/
@@ -5700,7 +5624,7 @@ void CWhisk3D::ImportOBJ(){
     if (AknCommonDialogs::RunSelectDlgLD(file, R_WHISK3D_SELECT_DIALOG, KTitle)){		
     	RFs fsSession;	
     	User::LeaveIfError(fsSession.Connect());
-    	CleanupClosePushL(fsSession);
+    	CleanupCloseFsPushL(fsSession);
 
 		// Revisar la extension del archivo
 		TPtrC extension = file.Right(4);  // Obtiene las últimas 4 letras del nombre del archivo
@@ -5710,7 +5634,7 @@ void CWhisk3D::ImportOBJ(){
 			noteBuf->Des().Format(KExtensionError);
 			MensajeError(noteBuf);
 			CleanupStack::PopAndDestroy(noteBuf);
-			fsSession.Close();
+			FsCloseCompat(fsSession);
 			return;
 		}
 
@@ -5725,7 +5649,7 @@ void CWhisk3D::ImportOBJ(){
 			MensajeError(noteBuf);
 			CleanupStack::PopAndDestroy(noteBuf); 
 			rFile.Close();
-			fsSession.Close();
+			FsCloseCompat(fsSession);
 			return;
 		}	
 		/*if (file){
@@ -5751,14 +5675,14 @@ void CWhisk3D::ImportOBJ(){
 
 		// Cerrar el archivo
 		rFile.Close();
-		fsSession.Close();
+		FsCloseCompat(fsSession);
 
 		TFileName mtlFile = file;
 		mtlFile.Replace(file.Length() - 4, 4, _L(".mtl"));
 
 		RFs fs;
 	    User::LeaveIfError(fs.Connect()); // Asegurarse de que fs se conecta correctamente
-	    CleanupClosePushL(fs);
+	    CleanupCloseFsPushL(fs);
 	    
 		TEntry entry;
 		err = fs.Entry(mtlFile, entry);
@@ -5782,7 +5706,7 @@ void CWhisk3D::ImportOBJ(){
             MensajeError(noteBuf);
             CleanupStack::PopAndDestroy(noteBuf);
         }
-		fs.Close();
+		FsCloseCompat(fs);
 
 		redibujar = true;
 	}	
@@ -6235,6 +6159,17 @@ TBool CWhisk3D::LeerOBJ(RFs* fsSession, RFile* rFile, TFileName* file, TInt64* s
 	return hayMasObjetos;
 };
 
+// RVCT necesita su calificador __packed para generar accesos byte a byte a los
+// campos desalineados (bfSize/bfOffBits); con la sintaxis GNU sola da C2056W.
+#ifdef __ARMCC_VERSION
+__packed struct TBMPFileHeader {
+    TUint16 bfType;
+    TUint32 bfSize;
+    TUint16 bfReserved1;
+    TUint16 bfReserved2;
+    TUint32 bfOffBits;
+};
+#else
 struct __attribute__((packed)) TBMPFileHeader {
     TUint16 bfType;
     TUint32 bfSize;
@@ -6242,6 +6177,7 @@ struct __attribute__((packed)) TBMPFileHeader {
     TUint16 bfReserved2;
     TUint32 bfOffBits;
 };
+#endif
 
 struct TBMPInfoHeader {
     TUint32 biSize;
@@ -6269,13 +6205,13 @@ void CWhisk3D::SaveAsBMP(int width, int height, const GLubyte* pixels, const TDe
     _LIT(KDirName, "E:\\whisk3D\\");
     err = fsSession.MkDirAll(KDirName);
     if (err != KErrNone && err != KErrAlreadyExists) {
-		fsSession.Close();
+		FsCloseCompat(fsSession);
 		return;
     }
 
 	err = file.Replace(fsSession, fileName, EFileWrite);
     if (err != KErrNone) {
-        fsSession.Close();
+        FsCloseCompat(fsSession);
         return;
     }
 
@@ -6333,7 +6269,7 @@ void CWhisk3D::SaveAsBMP(int width, int height, const GLubyte* pixels, const TDe
 
     delete[] rgbPixels;
     file.Close();
-    fsSession.Close();
+    FsCloseCompat(fsSession);
 }
 
 void CWhisk3D::SaveCanvasToImage(TBool secuencia, TBool showUi)  {

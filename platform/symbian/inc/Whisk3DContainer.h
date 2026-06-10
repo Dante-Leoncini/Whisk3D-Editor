@@ -22,9 +22,6 @@
 #include "Whisk3D.h"
 #include "Whisk3Dinput.h"
 
-//necesario para el monitor bluetooth del mouse y teclado
-#include "hidinputmonitor.h"
-
 /**
  * Container control class that handles the OpenGL ES initialization and deinitializations.
  * Also uses the CWhisk3D class to do the actual OpenGL ES rendering.
@@ -137,9 +134,6 @@ class CWhisk3DContainer : public CCoeControl, MCoeControlObserver {
         
         /** Input handler that maps keycodes to inputs and stores the current state for each key. */
         CWhisk3DInput* iInputHandler;
-        
-        //para usar el mouse y teclado bluetooth hay que crear el monitor que escucha
-        CHIDEventMonitor* iHIDMonitor;
 
     public:  //data
 
