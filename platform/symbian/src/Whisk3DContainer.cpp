@@ -192,7 +192,15 @@ void CWhisk3DContainer::ConstructL(const TRect& /*aRect*/){
 
     iOpenGlInitialized = ETrue;
 
-    iPeriodic = CPeriodic::NewL( CActive::EPriorityIdle );         // Create an active object for
+    // Prioridad MUY por debajo de EPriorityIdle (-100): este timer dispara
+    // cada 100us y esta siempre listo, y el active scheduler ante igual
+    // prioridad elige el AO mas viejo de la lista -> con EPriorityIdle el
+    // render le ganaba SIEMPRE a los AOs del decoder de imagenes (ICL) y la
+    // carga de texturas de un OBJ quedaba colgada para siempre (la app
+    // clavada en ELoadingTextures). Con -200 cualquier AO del sistema o del
+    // decoder que este listo pasa primero por construccion, y el render usa
+    // todo el tiempo restante (no se nota diferencia de fps).
+    iPeriodic = CPeriodic::NewL( -200 );                          // Create an active object for
                                                                   // animating the scene
     iPeriodic->Start( 100, 100,
                       TCallBack( CWhisk3DContainer::DrawCallBack, this ) );
@@ -331,6 +339,12 @@ int CWhisk3DContainer::DrawCallBack( TAny* aInstance )
         WLOGF(_L("heartbeat: frame=%d estadoWhisk3D=%d"),
             instance->iFrame, instance->iWhisk3D ? instance->iWhisk3D->GetState() : -1);
         }
+
+    // NOTA: aca NO va ningun User::After ni salteo de frames durante la
+    // carga de texturas. User::After dentro de este callback hace
+    // WaitForRequest y se COME las señales de completado del decoder de
+    // imagenes (la carga quedaba colgada para siempre). La convivencia con
+    // el decoder se resuelve con la prioridad del CPeriodic (ver ConstructL).
 
     // Compute the elapsed time in seconds since the startup of the example
 #ifdef __WINS__
