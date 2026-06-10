@@ -2603,21 +2603,27 @@ void CWhisk3D::InputUsuario(GLfloat aDeltaTimeSecs){
 // Mouse bluetooth (MHidObserver, eventos desde CHidMonitor)
 // ============================================================================
 
-// estado de los botones (arrastrar con medio O derecho = orbitar la camara;
-// el derecho esta porque hay mouses con el boton del medio flojo)
+// Estado de los botones. OJO: el driver HID NO manda movimientos mientras un
+// boton esta apretado (los acumula y los larga de golpe al soltar), asi que
+// "mantener y arrastrar" para orbitar es IMPOSIBLE con este driver. En su
+// lugar el click DERECHO es un TOGGLE de modo orbita: un click entra (el
+// cursor se oculta y mover el mouse rota la camara), otro click sale y
+// vuelve el cursor. El boton del medio queda como "mantener" para mouses
+// cuyo driver si lo permita. Los botones ademas REBOTAN (varios down/up por
+// click fisico, a ~8ms): por eso el debounce de 300ms.
 static TBool hidMiddleDown = EFalse;
-static TBool hidRightDown = EFalse;
+static TBool hidOrbitMode = EFalse;
+static TUint hidLastRightTick = 0;
 
 void CWhisk3D::HidMouseMove(TInt aDx, TInt aDy){
-	// diagnostico (1 de cada 32): que decision toma el movimiento
-	static TInt moveLog = 0;
-	if ((++moveLog & 0x1F) == 1){
-		WLOGF(_L("HidMove: dx=%d dy=%d mid=%d der=%d estado=%d nav=%d"),
-			aDx, aDy, (TInt)hidMiddleDown, (TInt)hidRightDown, (TInt)estado, (TInt)navegacionMode);
+	// el delta gigante que el driver acumula mientras un boton esta apretado
+	// y larga al soltar se descarta: ni el cursor ni la camara deben saltar
+	if (aDx > 100 || aDx < -100 || aDy > 100 || aDy < -100){
+		return;
 	}
-	if ((hidMiddleDown || hidRightDown) && estado == editNavegacion && navegacionMode == Orbit){
-		// arrastre con el boton del medio = rotacion orbital, igual que las
-		// flechas del telefono. Sensibilidad en grados por cuenta de mouse.
+	if ((hidMiddleDown || hidOrbitMode) && estado == editNavegacion && navegacionMode == Orbit){
+		// modo orbita = rotacion orbital, igual que las flechas del
+		// telefono. Sensibilidad en grados por cuenta de mouse.
 		if (ViewFromCameraActive){
 			RestaurarViewport();
 		}
@@ -2644,7 +2650,6 @@ void CWhisk3D::HidMouseMove(TInt aDx, TInt aDy){
 }
 
 void CWhisk3D::HidMouseButton(TInt aButton, TBool aDown){
-	WLOGF(_L("HidBtn: btn=%d down=%d"), aButton, (TInt)aDown);
 	if (aButton == EMouseButtonLeft){
 		if (aDown){
 			ClickSelect();
@@ -2654,16 +2659,26 @@ void CWhisk3D::HidMouseButton(TInt aButton, TBool aDown){
 		hidMiddleDown = aDown;
 	}
 	else if (aButton != EMouseButtonNull){
-		// derecho (y cualquier otro boton extra: hay mouses que reportan el
-		// derecho como Side/Forward/Back) = mantener para orbitar
-		hidRightDown = aDown;
+		// derecho (o cualquier boton extra: hay mouses que reportan el
+		// derecho como Side/Forward/Back) = TOGGLE de modo orbita, con
+		// debounce porque un solo click fisico llega como varios down/up
+		if (aDown){
+			TUint now = User::NTickCount();
+			if (now - hidLastRightTick > 300){
+				hidLastRightTick = now;
+				hidOrbitMode = !hidOrbitMode;
+				// sin cursor = "estas orbitando"; al salir reaparece
+				mouseVisible = !hidOrbitMode;
+				redibujar = true;
+				WLOGF(_L("HidBtn: modo orbita=%d"), (TInt)hidOrbitMode);
+			}
+		}
 	}
 	else if (!aDown){
 		// boton Null en el UP: algunos drivers reportan el boton en el DOWN
-		// pero iValue=0 al soltar (visto en el Half-Life): soltamos todo
-		// para que la camara no quede "agarrada" al mouse
+		// pero iValue=0 al soltar (visto en el Half-Life): soltamos el del
+		// medio para que la camara no quede "agarrada" al mouse
 		hidMiddleDown = EFalse;
-		hidRightDown = EFalse;
 	}
 }
 
@@ -2800,6 +2815,15 @@ void CWhisk3D::ClickSelect(){
 		return;
 	}
 	if (Objects.Count() < 1){ return; }
+
+	// debounce: el boton izquierdo rebota (varios down por click fisico, a
+	// ~8ms); sin esto el ciclado de solapados avanza solo
+	static TUint lastClickTick = 0;
+	TUint now = User::NTickCount();
+	if (now - lastClickTick < 250){
+		return;
+	}
+	lastClickTick = now;
 
 	// si el click cae cerca del anterior (~3px) seguimos ciclando entre los
 	// solapados, como Blender; si no, arranca un ciclo nuevo
