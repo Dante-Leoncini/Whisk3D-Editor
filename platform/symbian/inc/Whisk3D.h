@@ -112,7 +112,7 @@ class CWhisk3D : public CFiniteStateMachine, public MTextureLoadingListener
 		void OnEndLoadingTexturesL();
         
         //mover al siguiente casillero
-        void InputUsuario( GLfixed aDeltaTimeSecs );
+        void InputUsuario( GLfloat aDeltaTimeSecs );
         
         GLfloat GradosARadianes(TInt grados);
         void SetRotacion( void );
@@ -125,8 +125,10 @@ class CWhisk3D : public CFiniteStateMachine, public MTextureLoadingListener
         void PressTab( void );
 
         void SetTranslacionVertices(TInt valor);
-        void SetTranslacionObjetos(TInt valor);
-        void SetRotacion(TInt valor);
+        // GLfloat (antes TInt): los pasos por frame ahora se escalan por el
+        // delta de tiempo y pueden ser fraccionarios (ver InputUsuario)
+        void SetTranslacionObjetos(GLfloat valor);
+        void SetRotacion(GLfloat valor);
         void BorrarObjeto(TInt indice);
         void BorrarMesh(TInt indice);
         void BorrarAnimaciones(TInt indice);
@@ -157,7 +159,7 @@ class CWhisk3D : public CFiniteStateMachine, public MTextureLoadingListener
 
         //nueva forma de editar vertices
         void CalcScaleVectors();
-        void SetScale(TInt fuerza);
+        void SetScale(GLfloat fuerza);
 
         void SetCulling();
         void SetLighting();

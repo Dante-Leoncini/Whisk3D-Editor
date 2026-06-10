@@ -1501,9 +1501,9 @@ TBool CWhisk3D::AppCycle( GLfloat aDeltaTimeSecs ){
         return false;
     }
 	GLfixed fixedDeltaTimeSecs = FLOAT_2_FIXED( aDeltaTimeSecs );
-	// Controles
+	// Controles (el delta va en segundos: el movimiento se escala adentro)
 	if (!dialogoSymbian){
-		InputUsuario( fixedDeltaTimeSecs );
+		InputUsuario( aDeltaTimeSecs );
 	}
 	
 	if ( !redibujar && !PlayAnimation ){	
@@ -2199,7 +2199,7 @@ void CWhisk3D::SeleccionarTodo(){
 	redibujar = true;
 }
 
-void CWhisk3D::SetTranslacionObjetos(TInt valor){
+void CWhisk3D::SetTranslacionObjetos(GLfloat valor){
 	for (int o = 0; o < estadoObjetos.Count(); o++) {
 		switch (axisSelect) {
 			case X:
@@ -2221,7 +2221,7 @@ GLfloat CWhisk3D::GradosARadianes(TInt grados) {
 }
 
 TInt valorRotacion = 0;
-void CWhisk3D::SetRotacion(TInt valor){
+void CWhisk3D::SetRotacion(GLfloat valor){
 	for (int o = 0; o < estadoObjetos.Count(); o++) {
 		switch (axisSelect) {
 			case X:
@@ -2237,31 +2237,48 @@ void CWhisk3D::SetRotacion(TInt valor){
 	}
 }
 
-void CWhisk3D::SetScale(TInt valor){
-	valor = valor*1000;
+void CWhisk3D::SetScale(GLfloat valor){
+	// scaleX/Y/Z son GLfixed: el paso (posiblemente fraccionario por el
+	// escalado por delta de tiempo) se convierte una sola vez aca
+	GLfixed paso = (GLfixed)(valor * 1000.0f);
 	for (int o = 0; o < estadoObjetos.Count(); o++) {
 		switch (axisSelect) {
 			case X:
-				Objects[estadoObjetos[o].indice].scaleX += valor;
+				Objects[estadoObjetos[o].indice].scaleX += paso;
 				break;
 			case Y:
-				Objects[estadoObjetos[o].indice].scaleY += valor;
+				Objects[estadoObjetos[o].indice].scaleY += paso;
 				break;
 			case Z:
-				Objects[estadoObjetos[o].indice].scaleZ += valor;
+				Objects[estadoObjetos[o].indice].scaleZ += paso;
 				break;
 			case XYZ:
-				Objects[estadoObjetos[o].indice].scaleX += valor;
-				Objects[estadoObjetos[o].indice].scaleY += valor;
-				Objects[estadoObjetos[o].indice].scaleZ += valor;
+				Objects[estadoObjetos[o].indice].scaleX += paso;
+				Objects[estadoObjetos[o].indice].scaleY += paso;
+				Objects[estadoObjetos[o].indice].scaleZ += paso;
 				break;
 		}
-	}	
+	}
 	redibujar = true;
 }
 
 TInt ShiftCount = 0;
-void CWhisk3D::InputUsuario(GLfixed aDeltaTimeSecs){
+void CWhisk3D::InputUsuario(GLfloat aDeltaTimeSecs){
+	// Movimiento independiente del framerate (estilo Half-Life / Quake):
+	// las velocidades de esta funcion estaban afinadas "por frame" a ~60fps.
+	// frameScale convierte cada paso a "frames de 60fps equivalentes" usando
+	// el tiempo real del ultimo frame: a 60fps vale ~1 (todo igual que
+	// siempre), a 30fps vale 2, a 10fps vale 6 -> la camara gira y todo se
+	// mueve a la MISMA velocidad real aunque el render se arrastre con
+	// modelos pesados.
+	GLfloat frameScale = aDeltaTimeSecs * 60.0f;
+	if (frameScale > 6.0f){ frameScale = 6.0f; }  // tope: un tiron (dialogo, carga) no teletransporta la camara
+	if (frameScale <= 0.0f){ frameScale = 1.0f; } // delta degenerado (resolucion del timer): paso clasico
+
+	// el cursor se mueve en pixeles enteros: paso redondeado, minimo 1
+	GLshort mouseStep = (GLshort)(frameScale + 0.5f);
+	if (mouseStep < 1){ mouseStep = 1; }
+
 	if (iInputHandler->IsInputPressed( EEscape )){
 		Cancelar();
 		return;
@@ -2346,26 +2363,25 @@ void CWhisk3D::InputUsuario(GLfixed aDeltaTimeSecs){
 	if( flechasEstados[FlechaIzquierda].activo ){
 		//mueve el mouse
 		if (mouseVisible){
-			mouseX--;
+			mouseX = (GLshort)(mouseX - mouseStep);
 			if (mouseX < 0){mouseX = 0;};
 		}
 
-		//rotX += fixedMul( 0.1, aDeltaTimeSecs );
-		if (estado == editNavegacion){ 
+		if (estado == editNavegacion){
 			if (navegacionMode == Orbit){
 				if (ViewFromCameraActive && CameraToView){
 					Object& obj = Objects[CameraActive];
 					// Convertir el angulo de rotX a radianes
 					GLfloat radRotX = obj.rotX * PI / 180.0;
 
-					obj.posX+= 30 * cos(radRotX);
-					obj.posY-= 30 * sin(radRotX);
+					obj.posX+= 30 * frameScale * cos(radRotX);
+					obj.posY-= 30 * frameScale * sin(radRotX);
 				}
 				else {
 					if (ViewFromCameraActive){
 						RestaurarViewport();
 					}
-					rotX-= 0.5;
+					rotX-= 0.5 * frameScale;
 				}
 			}
 			else if (navegacionMode == Fly){
@@ -2377,18 +2393,18 @@ void CWhisk3D::InputUsuario(GLfixed aDeltaTimeSecs){
 				GLfloat leftY = sin(radRotX);
 
 				// Mover hacia la izquierda
-				PivotX += 30 * leftX;
-				PivotY += 30 * leftY;
-			}	
+				PivotX += 30 * frameScale * leftX;
+				PivotY += 30 * frameScale * leftY;
+			}
 		}
-		else if (estado == translacion){	
-			SetTranslacionObjetos(30);		
+		else if (estado == translacion){
+			SetTranslacionObjetos(30 * frameScale);
 		}
 		else if (estado == rotacion){
-			SetRotacion(1);
+			SetRotacion(1 * frameScale);
 		}
 		else if (estado == EditScale){
-			SetScale(-1);
+			SetScale(-1 * frameScale);
 		}
 		else if (estado == timelineMove){
 			CurrentFrame--;
@@ -2404,27 +2420,26 @@ void CWhisk3D::InputUsuario(GLfixed aDeltaTimeSecs){
 	if( iInputHandler->IsInputPressed( EJoystickRight ) ){
 		//mueve el mouse
 		if (mouseVisible){
-			mouseX++;
+			mouseX = (GLshort)(mouseX + mouseStep);
 			if (mouseX > iScreenWidth-11){mouseX = iScreenWidth-11;};
 		}
 
-		//rotX -= fixedMul( 1, aDeltaTimeSecs );
-		if (estado == editNavegacion){				
+		if (estado == editNavegacion){
 			if (navegacionMode == Orbit){
 				if (ViewFromCameraActive && CameraToView){
 					Object& obj = Objects[CameraActive];
 					// Convertir el angulo de rotX a radianes
 					GLfloat radRotX = obj.rotX * PI / 180.0;
 
-					obj.posX-= 30 * cos(radRotX);
-					obj.posY+= 30 * sin(radRotX);
+					obj.posX-= 30 * frameScale * cos(radRotX);
+					obj.posY+= 30 * frameScale * sin(radRotX);
 				}
 				else {
 					if (ViewFromCameraActive){
 						RestaurarViewport();
 					}
-					rotX+= 0.5;	
-				}		
+					rotX+= 0.5 * frameScale;
+				}
 			}
 			else if (navegacionMode == Fly){
 				// Convertir el angulo de rotX a radianes
@@ -2435,18 +2450,18 @@ void CWhisk3D::InputUsuario(GLfixed aDeltaTimeSecs){
 				GLfloat leftY = sin(radRotX);
 
 				// Mover hacia la izquierda
-				PivotX -= 30 * leftX;
-				PivotY -= 30 * leftY;
+				PivotX -= 30 * frameScale * leftX;
+				PivotY -= 30 * frameScale * leftY;
 			}
 		}
 		else if (estado == translacion){
-			SetTranslacionObjetos(-30);		
+			SetTranslacionObjetos(-30 * frameScale);
 		}
 		else if (estado == rotacion){
-			SetRotacion(-1);
+			SetRotacion(-1 * frameScale);
 		}
 		else if (estado == EditScale){
-			SetScale(1);	
+			SetScale(1 * frameScale);
 		}
 		else if (estado == timelineMove){
 			CurrentFrame++;
@@ -2459,11 +2474,11 @@ void CWhisk3D::InputUsuario(GLfixed aDeltaTimeSecs){
 	if( iInputHandler->IsInputPressed( EJoystickUp ) ){
 		//mueve el mouse
 		if (mouseVisible){
-			mouseY--;
+			mouseY = (GLshort)(mouseY - mouseStep);
 			if (mouseY < 0){mouseY = 0;};
 		}
 
-		if (estado == editNavegacion){	
+		if (estado == editNavegacion){
 			if (navegacionMode == Orbit){
 				if (ViewFromCameraActive && CameraToView){
 					Object& obj = Objects[CameraActive];
@@ -2472,41 +2487,41 @@ void CWhisk3D::InputUsuario(GLfixed aDeltaTimeSecs){
 					GLfloat radRotY = obj.rotY * PI / 180.0;
 					//GLfloat radRotZ = obj.rotZ * PI / 180.0;
 
-					obj.posX+= 30 * sin(radRotX);
+					obj.posX+= 30 * frameScale * sin(radRotX);
 					//obj.posY-= 30 * cos(radRotX);
-					obj.posZ+= 30 * cos(radRotY);
+					obj.posZ+= 30 * frameScale * cos(radRotY);
 				}
 				else {
 					if (ViewFromCameraActive){
 						RestaurarViewport();
 					}
-					rotY-= 0.5;	
-				}			
+					rotY-= 0.5 * frameScale;
+				}
 			}
 			else if (navegacionMode == Fly){
 				// Convertir el angulo de rotX a radianes
 				GLfloat radRotX = rotX * PI / 180.0;
 
-				PivotY+= 30 * cos(radRotX);
-				PivotX-= 30 * sin(radRotX);
-			}		
+				PivotY+= 30 * frameScale * cos(radRotX);
+				PivotX-= 30 * frameScale * sin(radRotX);
+			}
 		}
 		else if (estado == EditScale){
-			SetScale(1);	
+			SetScale(1 * frameScale);
 		}
 		else if (estado == translacion){
-			SetTranslacionObjetos(-30);
+			SetTranslacionObjetos(-30 * frameScale);
 		}
 	    ReloadViewport(true);
 	}
 	if( iInputHandler->IsInputPressed( EJoystickDown ) ){
 		//mueve el mouse
 		if (mouseVisible){
-			mouseY++;
+			mouseY = (GLshort)(mouseY + mouseStep);
 			if (mouseY > iScreenHeight-17){mouseY = iScreenHeight-17;};
 		}
 
-		if (estado == editNavegacion){ 			
+		if (estado == editNavegacion){
 			if (navegacionMode == Orbit){
 				if (ViewFromCameraActive && CameraToView){
 					Object& obj = Objects[CameraActive];
@@ -2515,30 +2530,30 @@ void CWhisk3D::InputUsuario(GLfixed aDeltaTimeSecs){
 					GLfloat radRotY = obj.rotY * PI / 180.0;
 					//GLfloat radRotZ = obj.rotZ * PI / 180.0;
 
-					obj.posX-= 30 * sin(radRotX);
+					obj.posX-= 30 * frameScale * sin(radRotX);
 					//obj.posY-= 30 * cos(radRotX);
-					obj.posZ-= 30 * cos(radRotY);
+					obj.posZ-= 30 * frameScale * cos(radRotY);
 				}
 				else {
 					if (ViewFromCameraActive){
 						RestaurarViewport();
 					}
-					rotY+= 0.5;	
-				}		
+					rotY+= 0.5 * frameScale;
+				}
 			}
 			else if (navegacionMode == Fly){
 				// Convertir el angulo de rotX a radianes
 				GLfloat radRotX = rotX * PI / 180.0;
 
-				PivotY-= 30 * cos(radRotX);
-				PivotX+= 30 * sin(radRotX);
+				PivotY-= 30 * frameScale * cos(radRotX);
+				PivotX+= 30 * frameScale * sin(radRotX);
 			}
 		}
 		else if (estado == EditScale){
-			SetScale(-1);	
+			SetScale(-1 * frameScale);
 		}
 		else if (estado == translacion){
-			SetTranslacionObjetos(30);		
+			SetTranslacionObjetos(30 * frameScale);
 		}
 	    ReloadViewport(true);
 	}
