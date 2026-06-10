@@ -646,6 +646,14 @@ void CWhisk3D::AppInit( void ){
 	// de la declaracion ya hace una unica reserva grande en el primer Append.
 	for (TInt i = 0; i < NumTexturasWhisk3D; ++i) {
 	    TTexture texture;
+	    // TTexture es un struct sin constructor: en el stack viene con
+	    // basura. iID=0 importa: es lo que indica "textura no cargada"
+	    // (p.ej. para el fallback del cursor del mouse).
+	    texture.iID = 0;
+	    texture.iTextureWidth = 0;
+	    texture.iTextureHeight = 0;
+	    texture.iTextureHasColorKey = EFalse;
+	    texture.iGenerateMipmaps = EFalse;
 	    Textures.Append(texture);
 	}
 	
@@ -1973,13 +1981,40 @@ void CWhisk3D::dibujarUI(){
 		glPopMatrix(); //reinicia la matrix a donde se guardo	
 	}
 
-	//dibuja el mouse por arriba de todo (textura propia mouse.png, 16x32)
+	//dibuja el mouse por arriba de todo (textura propia mouse.png, 16x32).
+	//estado GL explicito: el timeline y otros bloques de la UI apagan
+	//GL_TEXTURE_2D o cambian el color y el cursor salia invisible
 	if (mouseVisible){
-		glBindTexture( GL_TEXTURE_2D, Textures[6].iID );
+		glPushMatrix();
+		glLoadIdentity(); // posicion absoluta: no depender de lo que dejo la UI
+		glEnable( GL_BLEND );
+		glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
+		glDisable( GL_DEPTH_TEST );
+
+		// CURSOR: arrays constantes propios. OJO: NO usar el sistema de
+		// sprites de la UI (SetSpriteSize/SpriteVertices) para el cursor:
+		// ese array compartido se muta entre draws y el driver del N95
+		// captura los datos tarde -> los quads salen colapsados (es el mismo
+		// motivo por el que algunos iconos de la barra se ven corridos).
+		// El hotspot (punto de click) es la esquina superior izquierda,
+		// como la flecha de Windows.
 		UiMoveTo(mouseX,mouseY);
-		SetUvSprite(0,0,255,255); // (byte+128)/255 -> UV 0..1: textura completa
-		SetSpriteSize(16,32);
-		DrawnRectangle();
+		{
+		static const GLshort CursorVerts[] = { 0,0,0,  17,0,0,  17,33,0,  0,33,0 };
+		static const GLbyte  CursorUV[]    = { -128,-128,  127,-128,  127,127,  -128,127 };
+		static const GLushort CursorFaces[] = { 0,1,2, 0,2,3 };
+		glEnable( GL_TEXTURE_2D );
+		glColor4f(1.0f, 1.0f, 1.0f, 1.0f); // blanco pleno: la textura sin tinte
+		glBindTexture( GL_TEXTURE_2D, Textures[6].iID );
+		glVertexPointer(3, GL_SHORT, 0, CursorVerts);
+		glTexCoordPointer(2, GL_BYTE, 0, CursorUV);
+		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, CursorFaces);
+		// restaurar los punteros de la UI
+		glVertexPointer(3, GL_SHORT, 0, SpriteVertices);
+		glTexCoordPointer(2, GL_BYTE, 0, SpriteUV);
+		}
+
+		glPopMatrix();
 	}
 
 	//resetea la perspectiva	
@@ -2426,7 +2461,7 @@ void CWhisk3D::InputUsuario(GLfloat aDeltaTimeSecs){
 		//mueve el mouse
 		if (mouseVisible){
 			mouseX = (GLshort)(mouseX + mouseStep);
-			if (mouseX > iScreenWidth-11){mouseX = iScreenWidth-11;};
+			if (mouseX > iScreenWidth-1){mouseX = (GLshort)(iScreenWidth-1);};
 		}
 
 		if (estado == editNavegacion){
@@ -2523,7 +2558,7 @@ void CWhisk3D::InputUsuario(GLfloat aDeltaTimeSecs){
 		//mueve el mouse
 		if (mouseVisible){
 			mouseY = (GLshort)(mouseY + mouseStep);
-			if (mouseY > iScreenHeight-17){mouseY = iScreenHeight-17;};
+			if (mouseY > iScreenHeight-1){mouseY = (GLshort)(iScreenHeight-1);};
 		}
 
 		if (estado == editNavegacion){
@@ -2568,11 +2603,19 @@ void CWhisk3D::InputUsuario(GLfloat aDeltaTimeSecs){
 // Mouse bluetooth (MHidObserver, eventos desde CHidMonitor)
 // ============================================================================
 
-// estado del boton del medio (arrastrar = orbitar la camara)
+// estado de los botones (arrastrar con medio O derecho = orbitar la camara;
+// el derecho esta porque hay mouses con el boton del medio flojo)
 static TBool hidMiddleDown = EFalse;
+static TBool hidRightDown = EFalse;
 
 void CWhisk3D::HidMouseMove(TInt aDx, TInt aDy){
-	if (hidMiddleDown && estado == editNavegacion && navegacionMode == Orbit){
+	// diagnostico (1 de cada 32): que decision toma el movimiento
+	static TInt moveLog = 0;
+	if ((++moveLog & 0x1F) == 1){
+		WLOGF(_L("HidMove: dx=%d dy=%d mid=%d der=%d estado=%d nav=%d"),
+			aDx, aDy, (TInt)hidMiddleDown, (TInt)hidRightDown, (TInt)estado, (TInt)navegacionMode);
+	}
+	if ((hidMiddleDown || hidRightDown) && estado == editNavegacion && navegacionMode == Orbit){
 		// arrastre con el boton del medio = rotacion orbital, igual que las
 		// flechas del telefono. Sensibilidad en grados por cuenta de mouse.
 		if (ViewFromCameraActive){
@@ -2590,23 +2633,37 @@ void CWhisk3D::HidMouseMove(TInt aDx, TInt aDy){
 		}
 		mouseX = (GLshort)(mouseX + aDx);
 		mouseY = (GLshort)(mouseY + aDy);
+		// como la flecha de Windows: el hotspot (esquina superior izquierda)
+		// puede llegar hasta el ultimo pixel de la pantalla
 		if (mouseX < 0){mouseX = 0;}
-		if (mouseX > iScreenWidth-11){mouseX = (GLshort)(iScreenWidth-11);}
+		if (mouseX > iScreenWidth-1){mouseX = (GLshort)(iScreenWidth-1);}
 		if (mouseY < 0){mouseY = 0;}
-		if (mouseY > iScreenHeight-17){mouseY = (GLshort)(iScreenHeight-17);}
+		if (mouseY > iScreenHeight-1){mouseY = (GLshort)(iScreenHeight-1);}
 		redibujar = true;
 	}
 }
 
 void CWhisk3D::HidMouseButton(TInt aButton, TBool aDown){
-	if (aButton == EMouseButtonMiddle){
+	WLOGF(_L("HidBtn: btn=%d down=%d"), aButton, (TInt)aDown);
+	if (aButton == EMouseButtonLeft){
+		if (aDown){
+			ClickSelect();
+		}
+	}
+	else if (aButton == EMouseButtonMiddle){
 		hidMiddleDown = aDown;
 	}
-	else if (!aDown && aButton == EMouseButtonNull){
-		// algunos drivers HID reportan el boton en el DOWN pero iValue=0 en
-		// el UP (visto en el Half-Life): soltamos todo para que la camara no
-		// quede "agarrada" al mouse
+	else if (aButton != EMouseButtonNull){
+		// derecho (y cualquier otro boton extra: hay mouses que reportan el
+		// derecho como Side/Forward/Back) = mantener para orbitar
+		hidRightDown = aDown;
+	}
+	else if (!aDown){
+		// boton Null en el UP: algunos drivers reportan el boton en el DOWN
+		// pero iValue=0 al soltar (visto en el Half-Life): soltamos todo
+		// para que la camara no quede "agarrada" al mouse
 		hidMiddleDown = EFalse;
+		hidRightDown = EFalse;
 	}
 }
 
@@ -2621,6 +2678,155 @@ void CWhisk3D::HidMouseWheel(TInt aDelta){
 
 void CWhisk3D::HidKey(TInt /*aScanCode*/, TBool /*aDown*/){
 	// teclado bluetooth: pendiente (arrancamos por el mouse)
+}
+
+// ============================================================================
+// Seleccion con click izquierdo: color picking estilo Blender
+// ============================================================================
+
+// cubo clickeable para objetos sin malla (luces, camaras, emptys): sus gizmos
+// reales son lineas de 1px imposibles de clickear. El gizmo del empty mide
+// +-2000, este cubo +-500 da un area de click comoda sin tapar la escena.
+static const GLshort PickCubeVerts[8*3] = {
+	-500,-500,-500,   500,-500,-500,   500, 500,-500,  -500, 500,-500,
+	-500,-500, 500,   500,-500, 500,   500, 500, 500,  -500, 500, 500,
+};
+static const GLushort PickCubeFaces[12*3] = {
+	0,1,2, 0,2,3,  4,6,5, 4,7,6,  0,4,5, 0,5,1,
+	3,2,6, 3,6,7,  0,3,7, 0,7,4,  1,5,6, 1,6,2,
+};
+
+// ciclado de solapados: clicks repetidos en el mismo lugar van rotando entre
+// los objetos apilados (los ya elegidos se excluyen del proximo pick)
+static TInt pickCiclo[32];
+static TInt pickCicloCount = 0;
+static TInt pickLastX = -100;
+static TInt pickLastY = -100;
+
+static TBool PickEstaExcluido(TInt aIndice){
+	for (TInt i = 0; i < pickCicloCount; i++){
+		if (pickCiclo[i] == aIndice){ return ETrue; }
+	}
+	return EFalse;
+}
+
+void CWhisk3D::PickRenderObjeto(TInt aIndice){
+	Object& obj = Objects[aIndice];
+	glPushMatrix();
+	// mismas transformaciones que RenderMeshAndChildren/RenderObjectAndChildrens
+	glTranslatef(obj.posX, obj.posZ, obj.posY);
+	glRotatef(obj.rotX, 1, 0, 0);
+	glRotatef(obj.rotZ, 0, 1, 0);
+	glRotatef(obj.rotY, 0, 0, 1);
+
+	if (obj.visible && !PickEstaExcluido(aIndice)){
+		// color = indice+1 repartido en R(5 bits)+G(3 bits) para sobrevivir
+		// a un framebuffer de 16bpp (565); alcanza para 255 objetos
+		TInt id = aIndice + 1;
+		glColor4f( (GLfloat)(id & 0x1F) / 31.0f,
+		           (GLfloat)((id >> 5) & 0x3F) / 63.0f,
+		           0.0f, 1.0f );
+		if (obj.type == mesh){
+			Mesh& pMesh = Meshes[obj.Id];
+			glPushMatrix();
+			glScalex(obj.scaleX, obj.scaleZ, obj.scaleY);
+			glVertexPointer(3, GL_SHORT, 0, pMesh.vertex);
+			glDrawElements(GL_TRIANGLES, pMesh.facesSize, GL_UNSIGNED_SHORT, pMesh.faces);
+			glPopMatrix();
+		}
+		else {
+			glVertexPointer(3, GL_SHORT, 0, PickCubeVerts);
+			glDrawElements(GL_TRIANGLES, 12*3, GL_UNSIGNED_SHORT, PickCubeFaces);
+		}
+	}
+
+	for (TInt c = 0; c < obj.Childrens.Count(); c++){
+		PickRenderObjeto(obj.Childrens[c].Id);
+	}
+	glPopMatrix();
+}
+
+TInt CWhisk3D::PickRender(TInt aScreenX, TInt aScreenY){
+	// Render invisible (NO se hace eglSwapBuffers, asi que nunca se ve):
+	// cada objeto se pinta plano con un color que codifica su indice y se
+	// lee el pixel clickeado. Pixel-perfect contra la geometria real, sin
+	// raycasting contra las mallas.
+	glDisable(GL_DITHER); // el dithering de 16bpp arruina la lectura exacta
+	glDisable(GL_LIGHTING);
+	glDisable(GL_TEXTURE_2D);
+	glDisable(GL_BLEND);
+	glDisable(GL_FOG);
+	glDisableClientState(GL_COLOR_ARRAY);
+	glEnable(GL_DEPTH_TEST);
+
+	SetPerspectiva(false); // misma proyeccion que la escena
+	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glLoadIdentity();
+	// misma camara que AppRender
+	if (ViewFromCameraActive){
+		RecalcViewPos();
+	}
+	glTranslatef(posX, posZ, -cameraDistance+posY);
+	glRotatef(rotY, 1, 0, 0);
+	glRotatef(rotX, 0, 1, 0);
+	glScalex(1 << 10, 1 << 10, 1 << 10);
+	glTranslatef(PivotX, PivotZ, PivotY);
+
+	for (TInt o = 0; o < Collection.Count(); o++){
+		PickRenderObjeto(Collection[o]);
+	}
+
+	// leer el pixel del click (el eje Y de OpenGL va de abajo hacia arriba)
+	GLubyte pix[4] = {0,0,0,0};
+	glReadPixels(aScreenX, iScreenHeight - 1 - aScreenY, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pix);
+
+	glEnable(GL_DITHER);
+	redibujar = true; // el proximo frame pisa este render con la escena real
+
+	// decodificar cuantizando a 5/6 bits: funciona igual en 16 y 32 bpp
+	TInt id = ((pix[1] >> 2) << 5) | (pix[0] >> 3);
+	WLOGF(_L("Pick: pixel(%d,%d) rgb=%d,%d,%d -> id=%d"), aScreenX, aScreenY, pix[0], pix[1], pix[2], id);
+	if (id <= 0 || id > Objects.Count()){
+		return -1;
+	}
+	return id - 1;
+}
+
+void CWhisk3D::ClickSelect(){
+	// solo en modo objeto, navegando, sin dialogos abiertos y sin carga
+	if (GetState() != ERunning || dialogoSymbian ||
+	    InteractionMode != ObjectMode || estado != editNavegacion){
+		return;
+	}
+	if (Objects.Count() < 1){ return; }
+
+	// si el click cae cerca del anterior (~3px) seguimos ciclando entre los
+	// solapados, como Blender; si no, arranca un ciclo nuevo
+	TInt dx = mouseX - pickLastX;
+	TInt dy = mouseY - pickLastY;
+	if ((dx*dx + dy*dy) > 9){
+		pickCicloCount = 0;
+	}
+	pickLastX = mouseX;
+	pickLastY = mouseY;
+
+	TInt idx = PickRender(mouseX, mouseY);
+	if (idx < 0 && pickCicloCount > 0){
+		// se agoto la pila de solapados: reiniciar el ciclo desde el primero
+		pickCicloCount = 0;
+		idx = PickRender(mouseX, mouseY);
+	}
+
+	DeseleccionarTodo();
+	if (idx >= 0){
+		if (pickCicloCount < 32){ pickCiclo[pickCicloCount++] = idx; }
+		Objects[idx].seleccionado = true;
+		SelectActivo = idx;
+		SelectCount = 1;
+	}
+	// click al vacio = deseleccionar todo (ya quedo hecho arriba)
+	redibujar = true;
 }
 
 void CWhisk3D::SetRotacion(){

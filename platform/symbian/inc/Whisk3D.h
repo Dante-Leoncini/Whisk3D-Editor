@@ -122,6 +122,13 @@ class CWhisk3D : public CFiniteStateMachine, public MTextureLoadingListener, pub
         void HidMouseButton(TInt aButton, TBool aDown);
         void HidMouseWheel(TInt aDelta);
         void HidKey(TInt aScanCode, TBool aDown);
+
+        // --- seleccion con click izquierdo (color picking estilo Blender) ---
+        // render invisible con un color por objeto + lectura del pixel del
+        // click; clicks repetidos en el mismo lugar ciclan entre solapados
+        void ClickSelect();
+        TInt PickRender(TInt aScreenX, TInt aScreenY);
+        void PickRenderObjeto(TInt aIndice);
         
         GLfloat GradosARadianes(TInt grados);
         void SetRotacion( void );
