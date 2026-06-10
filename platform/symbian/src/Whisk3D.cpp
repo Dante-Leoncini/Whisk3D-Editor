@@ -11,6 +11,7 @@
 #include <e32base.h>
 #include <math.h> // sqrt/sin/cos de libc
 #include "fscompat.h" // FsCloseCompat: cerrar RFs sin importar efsrv@390 (Symbian^3)
+#include "whisklog.h" // log de diagnostico E:\whisk3d.log (modo dev)
 
 //para leer archivos
 #include <s32file.h>
@@ -530,7 +531,15 @@ CWhisk3D::~CWhisk3D(){
 // and select the shading mode.
 // -----------------------------------------------------------------------------
 //
-RArray<TTexture> Textures;
+// OJO: el CTextureManager encola PUNTEROS a los elementos de este array
+// (RequestToLoad hace AddLast(*aTexture) con &Textures[i]) y esa cola vive
+// para siempre. Con la granularidad por defecto (8), al cargar un OBJ con
+// varias texturas el Append realoca el array, lo MUEVE, y toda la cola queda
+// apuntando a memoria liberada: la carga se corta y la app queda clavada en
+// ELoadingTextures (modelo sin textura y UI congelada). Granularidad 128 =
+// una sola allocacion, los elementos no se mueven nunca (limite: 128
+// texturas; si algun dia hace falta mas, subir el numero).
+RArray<TTexture> Textures(128);
 TInt NumTexturasWhisk3D = 0;
 void CWhisk3D::AppInit( void ){
     // Construct a texture manager that uses the application's private
@@ -608,6 +617,8 @@ void CWhisk3D::AppInit( void ){
     
     RFs fs;
     User::LeaveIfError(fs.Connect());
+    WhiskLogReset();
+    WLOG("AppInit: inicio");
     TFileName privateDir;
 	
     TParsePtrC Parse( CEikonEnv::Static()->EikAppUi()->Application()->AppFullName() );
@@ -625,7 +636,11 @@ void CWhisk3D::AppInit( void ){
 	_LIT( KRelationshipLineTextura, "relationshipLine.png" );	
 	
 	NumTexturasWhisk3D = 6;
-	Textures.ReserveL(NumTexturasWhisk3D); // Reservar espacio para las texturas
+	// OJO: nada de ReserveL aca. ReserveL(6) reservaba capacidad EXACTA para
+	// 6 y el primer Append de una textura de OBJ realocaba y MOVIA el array,
+	// dejando colgados los punteros que guarda la cola del CTextureManager
+	// (ver el comentario en la declaracion de Textures). La granularidad 128
+	// de la declaracion ya hace una unica reserva grande en el primer Append.
 	for (TInt i = 0; i < NumTexturasWhisk3D; ++i) {
 	    TTexture texture;
 	    Textures.Append(texture);
@@ -642,7 +657,9 @@ void CWhisk3D::AppInit( void ){
 	iTextureManager->RequestToLoad( KRelationshipLineTextura, fullFilePath, &Textures[5], false );
 	
 	//Start to load the textures.
+	WLOGF(_L("AppInit: 6 texturas UI encoladas desde '%S', DoLoadL..."), &fullFilePath);
 	iTextureManager->DoLoadL();
+	WLOG("AppInit: DoLoadL retorno");
 }
 
 
@@ -2096,6 +2113,7 @@ void CWhisk3D::ToggleValue(TBool& valueToUpdate){
 // -------------------------------------------------------------------------------------------------------
 
 void CWhisk3D::OnStartLoadingTexturesL(){
+    WLOG("CWhisk3D: OnStartLoadingTexturesL (UI bloqueada hasta que termine)");
     SetStateL( ELoadingTextures );
 }
 
@@ -2104,8 +2122,10 @@ void CWhisk3D::OnStartLoadingTexturesL(){
 // Called for a MTextureLoadingListener by the texture manager when texture loading operation is completed
 // ------------------------------------------------------------------------------------------------------------
 void CWhisk3D::OnEndLoadingTexturesL(){
+	WLOGF(_L("CWhisk3D: OnEndLoadingTexturesL (estado=%d)"), GetState());
 	if ( GetState() == ELoadingTextures ){
 		SetStateL( ERunning );
+		WLOG("CWhisk3D: estado ERunning, UI desbloqueada");
 	}
 }
 
@@ -4579,10 +4599,10 @@ void CWhisk3D::NewTexture(){
     _LIT(KTitle, "Selecciona la Textura");
     TFileName filePath;
     if (AknCommonDialogs::RunSelectDlgLD(filePath, R_WHISK3D_SELECT_DIALOG, KTitle)) {
-		
-		iTextureManager = CTextureManager::NewL ( iScreenWidth, iScreenHeight,
-												FRUSTUM_TOP, FRUSTUM_BOTTOM, FRUSTUM_RIGHT, FRUSTUM_LEFT, FRUSTUM_NEAR,
-												this );
+
+		// NO recrear el CTextureManager aca: se reusa el de AppInit (ver el
+		// comentario largo en LeerMTL; un manager nuevo queda sin CPU por el
+		// CPeriodic del render y su primera carga no termina nunca).
 		TTexture newTexture;
 
 		// Crear un objeto TParse para analizar la ruta del archivo
@@ -4613,6 +4633,7 @@ void CWhisk3D::NewTexture(){
 }
 
 void CWhisk3D::LeerMTL(const TFileName& aFile, TInt objetosCargados) {
+	WLOGF(_L("LeerMTL: inicio '%S'"), &aFile);
 	RFs fsSession2;	
 	User::LeaveIfError(fsSession2.Connect());
 
@@ -4660,9 +4681,16 @@ void CWhisk3D::LeerMTL(const TFileName& aFile, TInt objetosCargados) {
 
 	// Cargar la textura desde la ruta absoluta
 	TBool HaytexturasQueCargar = false;
-	iTextureManager = CTextureManager::NewL(iScreenWidth, iScreenHeight,
-											FRUSTUM_TOP, FRUSTUM_BOTTOM, FRUSTUM_RIGHT, FRUSTUM_LEFT, FRUSTUM_NEAR,
-											this); 
+	// OJO: NO crear un CTextureManager nuevo aca (antes habia un NewL que
+	// pisaba iTextureManager). El CImageHandler de un manager creado a esta
+	// altura queda DESPUES del CPeriodic del render en la lista del active
+	// scheduler (misma prioridad): el periodic, siempre listo, lo deja sin
+	// CPU y el decode de la primera textura no termina NUNCA -> la app queda
+	// clavada en ELoadingTextures (modelo sin textura, render congelado).
+	// El manager original de AppInit se registro ANTES que el periodic, asi
+	// que sus decodes si completan; y con iTextureLocation por textura, su
+	// cola recarga las texturas de la UI desde la carpeta privada y las del
+	// OBJ desde la carpeta del OBJ sin pisarse.
 
 	while (startPos < fileSize) {
 		// Leer una linea del archivo desde la posicion actual
@@ -4826,7 +4854,8 @@ void CWhisk3D::LeerMTL(const TFileName& aFile, TInt objetosCargados) {
 						//User::LeaveIfError(fs.Connect());
 						TEntry entry;
 						TInt err = fs.Entry(absolutePath, entry);
-						if (err == KErrNone) {						
+						WLOGF(_L("LeerMTL: map_Kd '%S' existe(err)=%d"), &absolutePath, err);
+						if (err == KErrNone) {
 							TTexture newTexture;
 							newTexture.iTextureName = *texturePath16;
 							Textures.Append(newTexture);
@@ -4834,6 +4863,7 @@ void CWhisk3D::LeerMTL(const TFileName& aFile, TInt objetosCargados) {
 							mat->textureID = Textures.Count();
 
 							iTextureManager->RequestToLoad(newTexture.iTextureName, fileParser.DriveAndPath(), &Textures[Textures.Count() - 1], false);
+							WLOGF(_L("LeerMTL: encolada [%d] '%S'"), Textures.Count() - 1, texturePath16);
 						} else {
 							// El archivo no existe, manejar el error
 							_LIT(KFileNotFound, "No existe la textura '%S'");
@@ -4857,8 +4887,10 @@ void CWhisk3D::LeerMTL(const TFileName& aFile, TInt objetosCargados) {
     FsCloseCompat(fsSession2);	
 
 	//si hay texturas. las lee
-	if (HaytexturasQueCargar){		
+	WLOGF(_L("LeerMTL: parse terminado, hayTexturas=%d"), (TInt)HaytexturasQueCargar);
+	if (HaytexturasQueCargar){
 		iTextureManager->DoLoadL();
+		WLOG("LeerMTL: DoLoadL retorno");
 	}
     //CleanupStack::PopAndDestroy(&fsSession);
 }
@@ -5618,11 +5650,12 @@ void CWhisk3D::ImportAnimation(){
     }
 }
 
-void CWhisk3D::ImportOBJ(){    
+void CWhisk3D::ImportOBJ(){
     _LIT(KTitle, "Import Wavefront (.obj)");
     TFileName file(KNullDesC);
-    if (AknCommonDialogs::RunSelectDlgLD(file, R_WHISK3D_SELECT_DIALOG, KTitle)){		
-    	RFs fsSession;	
+    if (AknCommonDialogs::RunSelectDlgLD(file, R_WHISK3D_SELECT_DIALOG, KTitle)){
+    	WLOGF(_L("ImportOBJ: archivo '%S'"), &file);
+    	RFs fsSession;
     	User::LeaveIfError(fsSession.Connect());
     	CleanupCloseFsPushL(fsSession);
 
@@ -5671,7 +5704,9 @@ void CWhisk3D::ImportOBJ(){
 		TInt acumuladoUVs = 0;
 		while (LeerOBJ(&fsSession, &rFile, &file, &startPos, &acumuladoVertices, &acumuladoNormales, &acumuladoUVs)) { // && objetosCargados < 1
 			objetosCargados++;
+			WLOGF(_L("ImportOBJ: objeto %d leido"), objetosCargados);
 		}
+		WLOGF(_L("ImportOBJ: geometria lista, %d objetos"), objetosCargados);
 
 		// Cerrar el archivo
 		rFile.Close();
@@ -5687,9 +5722,11 @@ void CWhisk3D::ImportOBJ(){
 		TEntry entry;
 		err = fs.Entry(mtlFile, entry);
 
+		WLOGF(_L("ImportOBJ: mtl '%S' existe(err)=%d"), &mtlFile, err);
 		//si el archivo existe. no tendria que marcar error
 		if (err == KErrNone) {
 			TRAP(err, LeerMTL(mtlFile, objetosCargados));
+			WLOGF(_L("ImportOBJ: LeerMTL termino err=%d"), err);
 			//si ocurrio algun error al leerlo
 			if (err != KErrNone) {
 				_LIT(KFormatString, "Error al leer el archivo .mtl");
@@ -5708,8 +5745,9 @@ void CWhisk3D::ImportOBJ(){
         }
 		FsCloseCompat(fs);
 
+		WLOG("ImportOBJ: fin");
 		redibujar = true;
-	}	
+	}
     else {
     	_LIT(KFormatString, "Error al leer el Archivo");
 		HBufC* noteBuf = HBufC::NewLC(24);

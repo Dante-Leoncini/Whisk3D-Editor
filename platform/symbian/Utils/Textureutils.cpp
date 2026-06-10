@@ -13,6 +13,7 @@
 
 #include "Textureutils.h"
 #include "fscompat.h" // FsCloseCompat: cerrar RFs sin importar efsrv@390 (Symbian^3)
+#include "whisklog.h" // log de diagnostico E:\whisk3d.log (modo dev)
 
 #include <whisk3D.rsg>
 #include <aknmessagequerydialog.h>		// DialogAlertL
@@ -120,6 +121,9 @@ void CFiniteStateMachine::SetStateL( TInt aNewState )
 		{
 		if ( aNewState != iState)
 			{
+			// el puntero this distingue las dos maquinas: CWhisk3D
+			// (0=ELoadingTextures 1=ERunning) y CTextureManager (0=EIdle 1=ELoading)
+			WLOGF(_L("FSM %x: estado %d -> %d"), (TUint)this, iState, aNewState);
 			 if ( iPrevState != -1 )
 				{
 				OnLeaveStateL( iState );
@@ -287,6 +291,8 @@ void CImageHandler::LoadFileL(const TFileName& aFileName, TInt aSelectedFrame){
 	iFrameInfo = iDecoder->FrameInfo(aSelectedFrame);
 	// Resize to fit.
 	TRect bitmapSize = iFrameInfo.iFrameCoordsInPixels;
+	WLOGF(_L("ImgHandler: decoder ok %dx%d flags=%x"),
+		bitmapSize.Width(), bitmapSize.Height(), (TInt)iFrameInfo.iFlags);
 	iBitmap->Resize(bitmapSize.Size());
 
     // Check for alpha channel availability
@@ -303,6 +309,7 @@ void CImageHandler::LoadFileL(const TFileName& aFileName, TInt aSelectedFrame){
         }
 
 	SetActive();
+	WLOG("ImgHandler: Convert lanzado (esperando al decoder...)");
 }
 
 // -----------------------------------------------------------------------------
@@ -322,6 +329,7 @@ const TFrameInfo& CImageHandler::FrameInfo() const
 //
 void CImageHandler::RunL()
 	{
+	WLOGF(_L("ImgHandler: decode completo status=%d"), iStatus.Int());
 	// Invoke callback.
 	iCallback.ImageOperationCompleteL(iStatus.Int());
 	}
@@ -599,6 +607,7 @@ void CTextureManager::RequestToLoad( const TDesC &aTextureName,
 //
 void CTextureManager::DoLoadL()
 	{
+	WLOGF(_L("TexMgr: DoLoadL (estado actual=%d)"), GetState());
 	switch ( GetState() )
 		{
 		case EIdle:
@@ -640,8 +649,10 @@ void CTextureManager::OnEnterStateL( TInt aState)
 					iTextureNameCount++;
 					}
 
+				WLOGF(_L("TexMgr: %d texturas en cola, glGenTextures..."), iTextureNameCount);
 				iTextureNames = new (ELeave) GLuint [iTextureNameCount];
 				glGenTextures( iTextureNameCount, iTextureNames );
+				WLOGF(_L("TexMgr: glGenTextures ok (glErr=%x)"), glGetError());
 				iIndex = 0;
 				iLoadingQueueIterator.SetToFirst();
 				LoadNextTextureL();
@@ -664,6 +675,7 @@ void CTextureManager::OnLeaveStateL( TInt aState )
 		case EIdle:
 			break;
 		case ELoading:
+			WLOG("TexMgr: OnLeaveStateL(ELoading) -> avisando fin de carga");
 			if ( iTextureLoadingListener != NULL )
 				iTextureLoadingListener->OnEndLoadingTexturesL(); //Signals the MTextureLoadingListener client
 																  //That texture loading is completed.
@@ -682,16 +694,49 @@ void CTextureManager::LoadNextTextureL()
 	{
 	TFileName FullTextureName;
 
-	iCurrentRequest = iLoadingQueueIterator++;
-	if ( iCurrentRequest == NULL )
+	// Bucle: si una textura falla (archivo inexistente, formato sin decoder),
+	// se saltea y se sigue con la proxima. Antes el Leave de LoadFileL abortaba
+	// toda la cadena y la app quedaba clavada en ELoadingTextures (modelo sin
+	// textura y UI congelada) porque nunca se volvia al estado EIdle.
+	for (;;)
 		{
-		SetStateL( EIdle );
-		}
-	else
-		{
-		FullTextureName.Append( iTexturePath );
+		iCurrentRequest = iLoadingQueueIterator++;
+		if ( iCurrentRequest == NULL )
+			{
+			WLOG("TexMgr: cola terminada -> EIdle");
+			SetStateL( EIdle );
+			return;
+			}
+
+		// Cada textura recuerda su propia carpeta (iTextureLocation): las de
+		// la UI viven en la carpeta privada de la app y las de un OBJ en la
+		// carpeta del OBJ. Antes se usaba iTexturePath (global, pisado por el
+		// ultimo RequestToLoad): al recargar la cola despues de importar un
+		// OBJ, las texturas de la UI se buscaban en la carpeta del OBJ, no se
+		// encontraban, y la carga entera abortaba.
+		FullTextureName.Zero();
+		if ( iCurrentRequest->iTextureLocation.Length() > 0 )
+			{
+			FullTextureName.Append( iCurrentRequest->iTextureLocation );
+			}
+		else
+			{
+			FullTextureName.Append( iTexturePath );
+			}
 		FullTextureName.Append( iCurrentRequest->iTextureName );
-		iBmapUtil->LoadFileL(FullTextureName, 0);
+
+		WLOGF(_L("TexMgr: cargando [%d] '%S'"), iIndex, &FullTextureName);
+		TRAPD( loadErr, iBmapUtil->LoadFileL( FullTextureName, 0 ) );
+		if ( loadErr == KErrNone )
+			{
+			return; // decodificando; la cadena sigue en ImageOperationCompleteL
+			}
+
+		// No se pudo abrir/decodificar: saltear esta textura. iIndex avanza
+		// igual para que iTextureNames[] siga alineado con la cola (la
+		// textura salteada queda con su id generado pero sin datos: blanca).
+		WLOGF(_L("TexMgr: FALLO err=%d, salteada '%S'"), loadErr, &FullTextureName);
+		iIndex++;
 		}
 	}
 
@@ -707,11 +752,17 @@ void CTextureManager::LoadNextTextureL()
 //
 void CTextureManager::ImageOperationCompleteL(TInt aError)
 	{
-	_LIT(KConvErr, "Conversion failed!");
 	if ( aError )
 		{
-		User::Panic( KConvErr, aError );
+		// La decodificacion fallo: saltear esta textura (queda blanca) y
+		// seguir con la proxima en vez de panickear y matar la app.
+		WLOGF(_L("TexMgr: decode FALLO err=%d, salteada"), aError);
+		iIndex++;
+		LoadNextTextureL();
+		return;
 		}
+
+	WLOGF(_L("TexMgr: subiendo a GL [%d] '%S'"), iIndex, &iCurrentRequest->iTextureName);
 
     glBindTexture( GL_TEXTURE_2D, iTextureNames[iIndex] );
     glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
@@ -812,6 +863,9 @@ void CTextureManager::ImageOperationCompleteL(TInt aError)
 
 	// Ask the bitmap heap to be unlocked if this is a large bitmap
 	iBitmap->UnlockHeap( EFalse );
+
+	WLOGF(_L("TexMgr: glTexImage2D ok %dx%d (glErr=%x)"),
+		iCurrentRequest->iTextureWidth, iCurrentRequest->iTextureHeight, glGetError());
 
 	iIndex++;
 

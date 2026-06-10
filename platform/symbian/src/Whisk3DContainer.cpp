@@ -12,6 +12,7 @@
 #include "Whisk3DContainer.h"
 #include "Whisk3DAppUi.h"
 #include "whisk3D.hrh"
+#include "whisklog.h" // log de diagnostico E:\whisk3d.log (modo dev)
 
 // CONSTANTS
 #include "Whisk3DConstants.h"
@@ -320,6 +321,16 @@ int CWhisk3DContainer::DrawCallBack( TAny* aInstance )
     {
     CWhisk3DContainer* instance = (CWhisk3DContainer*) aInstance;
     instance->iFrame++;
+
+    // Heartbeat de diagnostico: una linea cada 300 frames. Si despues de un
+    // cuelgue el log sigue creciendo, el loop de render esta vivo y el
+    // problema es el ESTADO (clavado en ELoadingTextures); si no crece mas,
+    // el thread principal esta bloqueado de verdad.
+    if ( (instance->iFrame % 300) == 0 )
+        {
+        WLOGF(_L("heartbeat: frame=%d estadoWhisk3D=%d"),
+            instance->iFrame, instance->iWhisk3D ? instance->iWhisk3D->GetState() : -1);
+        }
 
     // Compute the elapsed time in seconds since the startup of the example
 #ifdef __WINS__

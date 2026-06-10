@@ -38,6 +38,8 @@ SOURCE          Whisk3Dinput.cpp
 SOURCE          Dialogs.cpp
 // new/delete propios para no importar scppnwdl.dll (no existe en el N95)
 SOURCE          newdel_compat.cpp
+// log de diagnostico en E:\whisk3d.log (modo dev, ver whisklog.h)
+SOURCE          whisklog.cpp
 
 START RESOURCE  ..\data\whisk3D.rss
 HEADER
