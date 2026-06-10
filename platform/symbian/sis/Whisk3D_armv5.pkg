@@ -26,6 +26,7 @@
 "..\inc\texturas\cursor.png"   -"!:\private\A00D021D\cursor.png"
 "..\inc\texturas\keyframe.png"   -"!:\private\A00D021D\keyframe.png"
 "..\inc\texturas\relationshipLine.png"   -"!:\private\A00D021D\relationshipLine.png"
+"..\inc\texturas\mouse.png"   -"!:\private\A00D021D\mouse.png"
 
 ;required for application to be covered by backup/restore facility
 "backup_registration.xml"						                                    -"!:\private\A00D021D\backup_registration.xml"

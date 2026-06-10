@@ -15,6 +15,7 @@
 #include "Utils3d.h" // Utilities (texmanager, textures etc.)
 #include "Glutils.h" // Misc GLU and GLUT functions
 #include "Whisk3Dinput.h"
+#include "hidmonitor.h" // mouse/teclado bluetooth (MHidObserver)
 
 //para el cuadro de wait
 #include <AknWaitDialog.h>
@@ -48,7 +49,7 @@ class Mesh;
 /**
  * Class that does the actual OpenGL ES rendering.
  */
-class CWhisk3D : public CFiniteStateMachine, public MTextureLoadingListener
+class CWhisk3D : public CFiniteStateMachine, public MTextureLoadingListener, public MHidObserver
     {
     public:  // Constructors and destructor
 
@@ -113,6 +114,14 @@ class CWhisk3D : public CFiniteStateMachine, public MTextureLoadingListener
         
         //mover al siguiente casillero
         void InputUsuario( GLfloat aDeltaTimeSecs );
+
+        // --- MHidObserver: eventos del mouse/teclado bluetooth ---
+        // mover = cursor virtual; arrastrar con boton del medio = orbitar la
+        // camara; rueda = zoom. Llegan desde CHidMonitor (container).
+        void HidMouseMove(TInt aDx, TInt aDy);
+        void HidMouseButton(TInt aButton, TBool aDown);
+        void HidMouseWheel(TInt aDelta);
+        void HidKey(TInt aScanCode, TBool aDown);
         
         GLfloat GradosARadianes(TInt grados);
         void SetRotacion( void );

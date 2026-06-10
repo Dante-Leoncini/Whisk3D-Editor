@@ -50,7 +50,9 @@
 #define MATERIAL_MAX 1
 #define LIGHT_MAX    1
 
-#define cameraDistance 270
+// antes era #define 270: ahora es variable para poder hacer zoom con la
+// rueda del mouse bluetooth (ver HidMouseWheel)
+static GLfloat cameraDistance = 270.0f;
 
 #define MATERIALCOLOR(r, g, b, a)     \
        (GLfloat)(r * MATERIAL_MAX),   \
@@ -633,9 +635,10 @@ void CWhisk3D::AppInit( void ){
 	_LIT( KLampTexture, "lamp.png" );		
 	_LIT( KCursor3dTextura, "cursor3d.png" );	
 	_LIT( KkeyframeTextura, "keyframe.png" );	
-	_LIT( KRelationshipLineTextura, "relationshipLine.png" );	
-	
-	NumTexturasWhisk3D = 6;
+	_LIT( KRelationshipLineTextura, "relationshipLine.png" );
+	_LIT( KMousePointerTextura, "mouse.png" );
+
+	NumTexturasWhisk3D = 7;
 	// OJO: nada de ReserveL aca. ReserveL(6) reservaba capacidad EXACTA para
 	// 6 y el primer Append de una textura de OBJ realocaba y MOVIA el array,
 	// dejando colgados los punteros que guarda la cola del CTextureManager
@@ -655,7 +658,8 @@ void CWhisk3D::AppInit( void ){
 	iTextureManager->RequestToLoad( KCursor3dTextura, fullFilePath, &Textures[3], false );
 	iTextureManager->RequestToLoad( KkeyframeTextura, fullFilePath, &Textures[4], false );
 	iTextureManager->RequestToLoad( KRelationshipLineTextura, fullFilePath, &Textures[5], false );
-	
+	iTextureManager->RequestToLoad( KMousePointerTextura, fullFilePath, &Textures[6], false );
+
 	//Start to load the textures.
 	WLOGF(_L("AppInit: 6 texturas UI encoladas desde '%S', DoLoadL..."), &fullFilePath);
 	iTextureManager->DoLoadL();
@@ -1969,11 +1973,12 @@ void CWhisk3D::dibujarUI(){
 		glPopMatrix(); //reinicia la matrix a donde se guardo	
 	}
 
-	//dibuja el mouse por arriba de todo
+	//dibuja el mouse por arriba de todo (textura propia mouse.png, 16x32)
 	if (mouseVisible){
+		glBindTexture( GL_TEXTURE_2D, Textures[6].iID );
 		UiMoveTo(mouseX,mouseY);
-		SetUvSprite(1,1,20,23);
-		SetSpriteSize(10,17);
+		SetUvSprite(0,0,255,255); // (byte+128)/255 -> UV 0..1: textura completa
+		SetSpriteSize(16,32);
 		DrawnRectangle();
 	}
 
@@ -2559,15 +2564,74 @@ void CWhisk3D::InputUsuario(GLfloat aDeltaTimeSecs){
 	}
 }
 
+// ============================================================================
+// Mouse bluetooth (MHidObserver, eventos desde CHidMonitor)
+// ============================================================================
+
+// estado del boton del medio (arrastrar = orbitar la camara)
+static TBool hidMiddleDown = EFalse;
+
+void CWhisk3D::HidMouseMove(TInt aDx, TInt aDy){
+	if (hidMiddleDown && estado == editNavegacion && navegacionMode == Orbit){
+		// arrastre con el boton del medio = rotacion orbital, igual que las
+		// flechas del telefono. Sensibilidad en grados por cuenta de mouse.
+		if (ViewFromCameraActive){
+			RestaurarViewport();
+		}
+		rotX += aDx * 0.4f;
+		rotY += aDy * 0.4f;
+		ReloadViewport(true);
+	}
+	else {
+		// mover el cursor virtual (aparece solo al mover el mouse);
+		// mismos limites de pantalla que el movimiento con flechas
+		if (!mouseVisible){
+			mouseVisible = true;
+		}
+		mouseX = (GLshort)(mouseX + aDx);
+		mouseY = (GLshort)(mouseY + aDy);
+		if (mouseX < 0){mouseX = 0;}
+		if (mouseX > iScreenWidth-11){mouseX = (GLshort)(iScreenWidth-11);}
+		if (mouseY < 0){mouseY = 0;}
+		if (mouseY > iScreenHeight-17){mouseY = (GLshort)(iScreenHeight-17);}
+		redibujar = true;
+	}
+}
+
+void CWhisk3D::HidMouseButton(TInt aButton, TBool aDown){
+	if (aButton == EMouseButtonMiddle){
+		hidMiddleDown = aDown;
+	}
+	else if (!aDown && aButton == EMouseButtonNull){
+		// algunos drivers HID reportan el boton en el DOWN pero iValue=0 en
+		// el UP (visto en el Half-Life): soltamos todo para que la camara no
+		// quede "agarrada" al mouse
+		hidMiddleDown = EFalse;
+	}
+}
+
+void CWhisk3D::HidMouseWheel(TInt aDelta){
+	// rueda = zoom orbital: acerca/aleja la camara del pivot.
+	// + (rueda arriba) acerca; paso de 20 unidades por click de rueda.
+	cameraDistance -= aDelta * 20.0f;
+	if (cameraDistance < 40.0f){cameraDistance = 40.0f;}     // no atravesar el pivot
+	if (cameraDistance > 2000.0f){cameraDistance = 2000.0f;} // no perderse en el fondo
+	redibujar = true;
+}
+
+void CWhisk3D::HidKey(TInt /*aScanCode*/, TBool /*aDown*/){
+	// teclado bluetooth: pendiente (arrancamos por el mouse)
+}
+
 void CWhisk3D::SetRotacion(){
 	//si no hay objetos
 	if (Objects.Count() < 1){return;}
 	else if (Objects[SelectActivo].seleccionado && estado == editNavegacion){
 		guardarEstado();
-		estado = rotacion;	
+		estado = rotacion;
 		valorRotacion = 0;
 		if (axisSelect > 2){axisSelect = X;}
-	}	
+	}
 	else {
 		axisSelect = Y;
 	}

@@ -190,6 +190,16 @@ void CWhisk3DContainer::ConstructL(const TRect& /*aRect*/){
     iWhisk3D = CWhisk3D::NewL( size.iWidth, size.iHeight, iInputHandler ); // Create an instance of Whisk3D
     iWhisk3D->AppInit();                                       // Initialize OpenGL ES
 
+    // Mouse/teclado bluetooth (HID). hidsrv.dll se carga en runtime: si el
+    // telefono no tiene el driver, NewL deja y seguimos sin mouse (por eso
+    // el TRAPD: un Leave aca abortaria la construccion de la app entera).
+    iHidMonitor = NULL;
+    TRAPD(hidErr, iHidMonitor = CHidMonitor::NewL(*iWhisk3D));
+    if (hidErr != KErrNone)
+        {
+        WLOGF(_L("HidMonitor: no disponible (err=%d), seguimos sin mouse BT"), hidErr);
+        }
+
     iOpenGlInitialized = ETrue;
 
     // Prioridad MUY por debajo de EPriorityIdle (-100): este timer dispara
@@ -235,6 +245,9 @@ CWhisk3DContainer::~CWhisk3DContainer(){
         delete iWhisk3D;
     }
     delete iInputHandler;
+    // el monitor HID es un CActive: si no se borra queda escuchando despues
+    // de destruir el container
+    delete iHidMonitor;
 
     eglMakeCurrent( iEglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT );
     eglDestroySurface( iEglDisplay, iEglSurface );

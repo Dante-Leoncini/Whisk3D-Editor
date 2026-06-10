@@ -40,6 +40,8 @@ SOURCE          Dialogs.cpp
 SOURCE          newdel_compat.cpp
 // log de diagnostico en E:\whisk3d.log (modo dev, ver whisklog.h)
 SOURCE          whisklog.cpp
+// mouse/teclado bluetooth via hidsrv.dll (cargada en runtime, no se linkea)
+SOURCE          hidmonitor.cpp
 
 START RESOURCE  ..\data\whisk3D.rss
 HEADER
