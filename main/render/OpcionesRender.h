@@ -2,16 +2,29 @@
 #define OPCIONESRENDER_H
 
 #ifdef _WIN32
+#ifndef W3D_SYMBIAN
     #include <windows.h>
+#endif
 #endif
 
 #include <iostream>
-#include <GL/gl.h> // o GLES según corresponda
+#ifdef W3D_SYMBIAN
+    #include <GLES/gl.h>
+#else
+    #include <GL/gl.h>
+#endif // o GLES según corresponda
 
 // interpolación
 enum { lineal, closest };
 
-enum class RenderType { Solid, MaterialPreview, Rendered, ZBuffer };
+// dialecto C++03 compartido
+struct RenderType {
+    enum Enum { Solid, MaterialPreview, Rendered, ZBuffer, Wireframe };
+    Enum v;
+    RenderType() : v(Solid) {}
+    RenderType(Enum e) : v(e) {}
+    operator Enum() const { return v; }
+};
 
 // Declaraciones de variables globales
 extern RenderType view;
@@ -20,6 +33,35 @@ extern GLfloat MaterialPreviewAmbient[4];
 extern GLfloat MaterialPreviewDiffuse[4];
 extern GLfloat MaterialPreviewSpecular[4];
 extern GLfloat MaterialPreviewPosition[4];
+
+// MASTER de overlays: false = "limpieza de pantalla" (sin grilla, gizmos, CONTORNOS de seleccion,
+// ni overlay de edit -verts/bordes/caras-). El render del core (Mesh::Render) lo lee para no dibujar
+// el contorno/edit. El viewport lo setea = showOverlays por frame antes de renderizar la escena.
+extern bool g_mostrarOverlays;
+// overlay de normales (toggles + tamano de la linea). Solo en meshes seleccionadas.
+extern bool OverlayVertexNormal; // amarillo: promedio de caras por POSICION
+extern bool OverlayCustomNormal; // magenta: normal guardada por vertice
+extern bool OverlayFaceNormal;   // cian: normal de cada cara (triangulo)
+extern float OverlayNormalSize;  // largo de la linea (default 0.10)
+
+// overlay de estadisticas (texto blanco arriba a la derecha del viewport 3D)
+extern bool OverlayStatistics;   // "vertex: agrupados/reales" + "faces: logicas/triangulos"
+extern bool OverlayFps;          // "fps: N"
+extern float g_fpsActual;        // FPS actual (lo actualiza cada plataforma 1x/frame)
+
+// render EVENT-DRIVEN: el loop (PC/Symbian) solo redibuja si g_redraw esta en true
+// (lo prende cualquier input / resize) o si hay una animacion en play. Sino no hace
+// nada -> CPU casi 0 en reposo (como Blender). Cada plataforma lo prende en su input.
+extern bool g_redraw;
+
+// === EDITOR: ajustes de transformacion (NO son del core/motor) ===
+// punto de pivote de la transformacion (rotar/escalar): desde donde y como giran
+// los objetos y sub-elementos de malla. Estilo Blender. Default = MedianPoint.
+enum TransformPivot { PivotCursor3D, PivotIndividual, PivotMedian, PivotActive };
+extern int g_transformPivot;
+// editar la malla 3D SIN tocar las normales (checkbox). Si esta en false (default),
+// las normales se recalculan al CONFIRMAR el move/rotate/scale (no frame a frame).
+extern bool g_editLockNormales;
 
 // Declaración de función
 RenderType StringToRenderType(const std::string& s);

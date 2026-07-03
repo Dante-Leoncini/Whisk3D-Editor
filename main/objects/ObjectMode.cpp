@@ -1,0 +1,1076 @@
+#include "ObjectMode.h"
+#include "render/OpcionesRender.h" // g_transformPivot + enum TransformPivot (editor)
+#include "objects/Mesh.h"      // snap del cursor al centro de la malla en Edit Mode
+#include "EditMesh.h"  // CentroSeleccion
+#include "Undo.h"      // Ctrl+Z: capturar transform / limpiar al borrar
+
+void ReestablecerEstado(bool ClearEstado){
+	if (InteractionMode == ObjectMode){
+		for(size_t o=0; o < estadoObjetos.size(); o++){
+			SaveState& estadoObj = estadoObjetos[o];
+			Object& obj = *estadoObj.obj;
+			obj.pos = estadoObj.pos;
+			obj.rot = estadoObj.rot;
+        	obj.ActualizarDisplayRot();
+			obj.scale = estadoObj.scale;
+		}
+		//estadoObjetos.Close();
+		if (ClearEstado) estadoObjetos.clear();
+	}
+	if (ClearEstado) {
+		estado = editNavegacion;
+	}
+};
+
+// ---- orientacion de la transformacion (global / local / vista) ----
+// eje del mundo (engine Y-up) para el enum: X=derecha, Y=profundidad(engine Z),
+// Z=arriba(engine Y). Misma convencion que usa el resto del modelo.
+static Vector3 EjeMundo(int a){
+	if (a == X) return Vector3(1, 0, 0);
+	if (a == Y) return Vector3(0, 0, 1);
+	return Vector3(0, 1, 0); // Z = arriba
+}
+// el eje constrenido EN WORLD segun la orientacion actual. La ESCALA es un caso
+// especial: siempre local (no existe escala global/desde-la-vista), sin importar
+// la orientacion elegida en el menu.
+Vector3 EjeOrientado(Object& obj, int a){
+	if (estado == EditScale || transformOrientation == LocalOrient){
+		Vector3 v = obj.rot * EjeMundo(a);
+		return v.Normalized();
+	}
+	if (transformOrientation == ViewOrient){
+		if (a == X) return camRight;
+		if (a == Y) return camForward;
+		return camUp; // Z
+	}
+	if (transformOrientation == NormalOrient) return gTransformNormal; // la normal (extrude / menu Normal)
+	return EjeMundo(a); // global
+}
+
+// cicla eje/orientacion DURANTE un transform (tecla X/Y/Z en PC, 1/2/3 en
+// Symbian). Primer toque de un eje: lo constriñe en GLOBAL. Re-apretar el
+// MISMO eje: cicla Global -> Local -> View -> LIBRE (3 ejes). Se restaura el
+// estado guardado para re-aplicar con el nuevo eje (como Blender).
+void CiclarEjeTransform(int eje){
+	if (estado == editNavegacion) return;
+	// si el transform venia constrenido a la NORMAL (extrude o orientacion Normal) y se aprieta
+	// X/Y/Z, el usuario quiere el EJE (no la normal): se sale a GLOBAL + ese eje (= comportamiento
+	// de "mover"). Unifica el extrude con el operador normal: nada de codigo aparte.
+	if (gEVuseCustom){
+		gEVuseCustom = false;
+		transformOrientation = GlobalOrient;
+		axisSelect = eje;
+		ReestablecerEstado(false);
+		return;
+	}
+	if (estado == EditScale){
+		// la ESCALA es siempre local: solo eje-unico (local) <-> 3 ejes. No tiene
+		// global ni "desde la vista" (no existe escalar desde la vista).
+		transformOrientation = LocalOrient;
+		axisSelect = (axisSelect == eje) ? XYZ : eje; // re-apretar el mismo -> 3 ejes
+		ReestablecerEstado(false);
+		return;
+	}
+	// rotacion/translacion: ciclo de orientacion del eje. La ROTACION agrega un
+	// paso ORBITAL/gimbal entre 'view' y el trackball (libre). El ciclo es:
+	//   trackball -> eje global -> eje local -> eje view -> orbital -> trackball...
+	if (axisSelect != eje){
+		if (estado == rotacion && axisSelect == OrbitalAxis){
+			// orbital -> trackball: cierra el ciclo y resetea la orientacion a global
+			axisSelect = ViewAxis; transformOrientation = GlobalOrient; gTrackballCap = false;
+		} else {
+			axisSelect = eje; // 1er toque: mantiene la orientacion ACTUAL (la del menu)
+		}
+	} else {
+		if (transformOrientation == GlobalOrient)     transformOrientation = LocalOrient;
+		else if (transformOrientation == LocalOrient) transformOrientation = ViewOrient;
+		else if (estado == rotacion)                  axisSelect = OrbitalAxis; // view -> orbital
+		else { axisSelect = ViewAxis; transformOrientation = GlobalOrient; } // translacion: view -> libre
+	}
+	ReestablecerEstado(false);
+}
+
+// Shift+eje: constriñe a un PLANO (excluye 'eje', mueve en los otros dos).
+// Mismo plano re-apretado: cicla Global -> Local -> View -> libre.
+void CiclarPlanoTransform(int eje){
+	if (estado == editNavegacion) return;
+	if (gEVuseCustom){ // salir de la normal (extrude / Normal) a un PLANO global (como mover)
+		gEVuseCustom = false; transformOrientation = GlobalOrient;
+		axisSelect = (eje == X) ? PlaneX : (eje == Y) ? PlaneY : PlaneZ;
+		ReestablecerEstado(false); return;
+	}
+	int plano = (eje == X) ? PlaneX : (eje == Y) ? PlaneY : PlaneZ;
+	if (estado == EditScale){
+		// escala: plano siempre local, sin ciclar orientacion (re-apretar -> 3 ejes)
+		transformOrientation = LocalOrient;
+		axisSelect = (axisSelect == plano) ? XYZ : plano;
+		ReestablecerEstado(false);
+		return;
+	}
+	if (axisSelect != plano){
+		axisSelect = plano; // orientacion actual (la del menu)
+	} else {
+		if (transformOrientation == GlobalOrient)     transformOrientation = LocalOrient;
+		else if (transformOrientation == LocalOrient) transformOrientation = ViewOrient;
+		else { axisSelect = ViewAxis; transformOrientation = GlobalOrient; } // libre + reset
+	}
+	ReestablecerEstado(false);
+}
+
+void Cancelar(){
+	// Mostrar el cursor
+#ifndef W3D_SYMBIAN
+	#if SDL_MAJOR_VERSION == 2
+		SDL_ShowCursor(SDL_ENABLE);
+	#elif SDL_MAJOR_VERSION == 3
+		SDL_ShowCursor();
+	#endif
+#endif
+
+	if (estado != editNavegacion){
+		UndoTransformCancelar(); // descarta el undo pendiente del transform cancelado
+		ReestablecerEstado();
+	}
+	ViewPortClickDown = false;
+};
+
+#ifdef W3D_SYMBIAN
+void EliminarAnimaciones(Object&) {} // animacion: pendiente en Symbian
+#else
+void EliminarAnimaciones(Object& obj){
+	for(size_t a = 0; a < AnimationObjects.size(); a++) {
+		if (AnimationObjects[a].obj == &obj) {
+			for(size_t p = 0; p < AnimationObjects[a].Propertys.size(); p++) {
+				AnimationObjects[a].Propertys[p].keyframes.clear();
+			}
+			AnimationObjects[a].Propertys.clear();
+			//AnimationObjects.Remove(a);
+			if (a >= 0 && a < AnimationObjects.size()) {
+				AnimationObjects.erase(AnimationObjects.begin() + a);
+			}
+		}
+	}
+}
+#endif
+
+void Eliminar(bool IncluirCollecciones){
+	if (InteractionMode == ObjectMode){
+		//si no hay nada seleccionado. no borra
+		if (!HayObjetosSeleccionados(IncluirCollecciones)){
+#ifndef W3D_SYMBIAN
+			std::cout << "nada seleccionado para borrar" << std::endl;
+#endif
+			return;
+		}
+		Cancelar();
+
+		if (!SceneCollection) return;
+
+		// Ctrl+Z de borrar: NO libera los objetos -> los DETACHA de la escena y los guarda el comando
+		// (UndoCapturarBorrado), que los re-inserta al deshacer. Reemplaza al delete real + al UndoLimpiar.
+		UndoCapturarBorrado(IncluirCollecciones);
+		ObjActivo = NULL;
+		ObjSelects.clear();
+	}
+}
+
+void CalcObjectsTransformPivotPoint(Object* obj){
+	if (obj->select){
+		// el pivote de TRANSFORM (Median Point) usa el ORIGEN del objeto, no su
+		// centro geometrico. El FOCO ('.') si usa el centro geometrico, pero por
+		// otro camino (CentroFocoSeleccion). Son cosas distintas.
+		TransformPivotPoint += obj->GetGlobalPosition();
+	};
+
+	for(size_t c=0; c < obj->Childrens.size(); c++){
+		CalcObjectsTransformPivotPoint(obj->Childrens[c]);
+	}
+}
+
+// suma/promedia el PUNTO DE FOCO (centro geometrico para mallas, origen para el
+// resto) de los seleccionados. Lo usa el FOCO ('.'), que SIEMPRE mira la geometria
+// -no los origenes ni el modo de pivote-.
+static void CalcFocoRec(Object* obj, Vector3& suma, int& n){
+	if (obj->select){ suma += obj->PuntoFoco(); n++; }
+	for(size_t c=0; c < obj->Childrens.size(); c++) CalcFocoRec(obj->Childrens[c], suma, n);
+}
+Vector3 CentroFocoSeleccion(){
+	Vector3 suma(0.0f, 0.0f, 0.0f); int n = 0;
+	if (SceneCollection)
+		for(size_t c=0; c < SceneCollection->Childrens.size(); c++)
+			CalcFocoRec(SceneCollection->Childrens[c], suma, n);
+	return n > 0 ? suma * (1.0f / (float)n) : Vector3(0.0f, 0.0f, 0.0f);
+}
+
+void SetTransformPivotPoint(){
+	if (InteractionMode == ObjectMode){
+		// 3D Cursor: pivote = el cursor 3D
+		if (g_transformPivot == PivotCursor3D) { TransformPivotPoint = cursor3D.pos; return; }
+		// Active Element: pivote = el origen del objeto activo
+		if (g_transformPivot == PivotActive && ObjActivo) {
+			TransformPivotPoint = ObjActivo->GetGlobalPosition(); return;
+		}
+		// Median Point (default) + Individual (el apply lo ignora): promedio de
+		// los focos de los seleccionados (la Mesh aporta su centro geometrico)
+		TransformPivotPoint.x = 0.0f;
+		TransformPivotPoint.y = 0.0f;
+		TransformPivotPoint.z = 0.0f;
+		for(size_t c=0; c < SceneCollection->Childrens.size(); c++){
+			CalcObjectsTransformPivotPoint(SceneCollection->Childrens[c]);
+		}
+		size_t SelectCount = ObjSelects.size();
+		if (SelectCount == 0) return;
+		TransformPivotPoint.x /= SelectCount;
+		TransformPivotPoint.y /= SelectCount; // altura → Y OpenGL
+		TransformPivotPoint.z /= SelectCount; // profundidad → Z OpenGL
+	}
+}
+
+// Función para guardar la posición actual del mouse
+void GuardarMousePos() {
+#ifdef W3D_SYMBIAN
+	lastMouseX = mouseX; // el cursor virtual HID del N95
+	lastMouseY = mouseY;
+	return;
+#endif
+	#if SDL_MAJOR_VERSION == 2
+		int mx, my;                  // SDL2 usa enteros
+		SDL_GetMouseState(&mx, &my); // OK
+		lastMouseX = (float)mx;      // convertimos después
+		lastMouseY = (float)my;
+	#elif SDL_MAJOR_VERSION == 3
+		float mx, my;                       // variables temporales
+		SDL_GetMouseState(&mx, &my);      // SDL devuelve int
+		lastMouseX = mx;           // convertimos a float
+		lastMouseY = my;
+	#endif
+}
+
+void guardarEstadoRec(Object* obj){
+    if (!obj) return;
+
+    // Si está seleccionado, guardar estado
+    if (obj->select && obj->visible) {
+        SaveState NuevoEstado;
+        NuevoEstado.obj = obj;
+        NuevoEstado.pos = obj->pos;
+		NuevoEstado.rot = obj->rot;
+        NuevoEstado.scale = obj->scale;
+        NuevoEstado.worldPos = obj->GetGlobalPosition(); // para rotar/escalar desde el pivot
+        estadoObjetos.push_back(NuevoEstado);
+    }
+
+    // Recursión: recorrer hijos
+    for (size_t i = 0; i < obj->Childrens.size(); i++) {
+        guardarEstadoRec(obj->Childrens[i]);
+    }
+}
+
+bool guardarEstado(){
+    if (!SceneCollection) return false;
+
+    GuardarMousePos();
+    estadoObjetos.clear();
+
+    // Recorrer todo el árbol desde la raíz
+    guardarEstadoRec(SceneCollection);
+
+	if (estadoObjetos.empty()) return false;
+	//std::cout << "moviendo "<< estadoObjetos.size() << " objetos" << std::endl;
+
+    UndoTransformIniciar(); // captura pos/rot/escala PREVIAS (se confirma al aceptar el transform)
+    SetTransformPivotPoint();
+	return true;
+}
+
+void SetPosicion(){
+	if (ObjActivo && InteractionMode == ObjectMode && ObjActivo->select && estado == editNavegacion){
+		if (!guardarEstado()) return;
+		estado = translacion; g_xformPrimerMov = true; // primer motion en cero (no salta)
+		axisSelect = ViewAxis;
+	}
+};
+
+// duplica los objetos seleccionados (deep copy). Implementacion NUEVA y
+// compartida: reemplaza al cuerpo viejo comentado (era del modelo viejo).
+#include "objects/Mesh.h"
+#include "Instance.h"
+#include "objects/Light.h"
+#include "Camera.h"
+#include "Empty.h"
+#include <string.h>
+
+static Object* W3dDuplicarUno(Object* src) {
+    Object* nuevo = NULL;
+    if (src->getType() == ObjectType::mesh) {
+        Mesh* m = (Mesh*)src;
+        Mesh* d = new Mesh(src->Parent, src->pos);
+        d->vertexSize = m->vertexSize;
+        if (m->vertex) {
+            d->vertex = new GLfloat[m->vertexSize * 3];
+            memcpy(d->vertex, m->vertex, sizeof(GLfloat) * m->vertexSize * 3);
+        }
+        if (m->normals) {
+            d->normals = new GLbyte[m->vertexSize * 3];
+            memcpy(d->normals, m->normals, m->vertexSize * 3);
+        }
+        if (m->vertexColor) {
+            d->vertexColor = new GLubyte[m->vertexSize * 4];
+            memcpy(d->vertexColor, m->vertexColor, m->vertexSize * 4);
+        }
+        if (m->uv) {
+            d->uv = new GLfloat[m->vertexSize * 2];
+            memcpy(d->uv, m->uv, sizeof(GLfloat) * m->vertexSize * 2);
+        }
+        d->facesSize = m->facesSize;
+        if (m->faces) {
+            d->faces = new MeshIndex[m->facesSize];
+            memcpy(d->faces, m->faces, sizeof(MeshIndex) * m->facesSize);
+        }
+        d->materialsGroup = m->materialsGroup; // comparte Material* (ok)
+        // caras logicas, bordes y params (sino el duplicado no tiene contorno
+        // ni wireframe ni se puede editar). faces3d/edges se copian tal cual.
+        d->faces3d = m->faces3d;
+        d->edges = m->edges;
+        d->meshTipo = m->meshTipo;
+        d->meshSize = m->meshSize; d->meshSize2 = m->meshSize2; d->meshDepth = m->meshDepth;
+        d->meshVerts = m->meshVerts; d->meshVerts2 = m->meshVerts2;
+        d->meshSmooth = m->meshSmooth;
+        // buffers PRECALCULADOS: se copian tal cual (mismas posiciones) -> el
+        // duplicado queda identico (mismo contorno y MISMAS vertex-normals, sin
+        // recalcular). Antes posRep no se copiaba y la vertex-normal del duplicado
+        // salia distinta (no agrupaba por posicion -> 1 normal por vertice suelto).
+        d->posRep = m->posRep;
+        d->vertsAgrupados = m->vertsAgrupados;
+        d->bordesBuf = m->bordesBuf;
+        d->normFaceBuf = m->normFaceBuf;
+        d->normCustomBuf = m->normCustomBuf;
+        d->normVertBuf = m->normVertBuf;
+        d->overlayLcache = m->overlayLcache;
+        nuevo = d;
+    }
+    else if (src->getType() == ObjectType::light) {
+        Light* l = Light::Create(src->Parent, 0, 0, 0);
+        if (l) {
+            Light* sl = (Light*)src;
+            for (int i = 0; i < 4; i++) {
+                l->diffuse[i] = sl->diffuse[i];
+                l->ambient[i] = sl->ambient[i];
+                l->specular[i] = sl->specular[i];
+            }
+        }
+        nuevo = l;
+    }
+    else if (src->getType() == ObjectType::camera) {
+        nuevo = new Camera(src->Parent, src->pos, src->rotEuler);
+    }
+    else if (src->getType() == ObjectType::empty) {
+        nuevo = new Empty(src->Parent, src->pos);
+    }
+    if (nuevo) {
+        nuevo->pos = src->pos;
+        nuevo->rotEuler = src->rotEuler;
+        nuevo->rot = src->rot;
+        nuevo->scale = src->scale;
+        nuevo->name = src->name + ".001";
+    }
+    return nuevo;
+}
+
+void DuplicatedObject(){
+    if (estado != editNavegacion || InteractionMode != ObjectMode) return;
+    if (!SceneCollection) return;
+
+    // TODOS los seleccionados estan en ObjSelects, sin importar en que
+    // coleccion esten. (Antes miraba solo los hijos DIRECTOS de SceneCollection
+    // y por eso no duplicaba lo que estaba dentro de una Collection -> "no
+    // andaba". NewInstance ya usaba ObjSelects, por eso ese si funcionaba.)
+    // Se COPIA el vector: el ctor de cada copia llama DeseleccionarTodo y vacia
+    // ObjSelects, asi que no podemos iterarlo en vivo.
+    std::vector<Object*> seleccionados = ObjSelects;
+    if (seleccionados.empty()) return;
+
+    // copia REAL de cada uno (malla -> deep copy; luz/camara/empty -> sus
+    // propiedades; NUNCA un link, eso es NewInstance/Duplicate Linked)
+    std::vector<Object*> duplicados;
+    for (size_t i = 0; i < seleccionados.size(); i++) {
+        Object* d = W3dDuplicarUno(seleccionados[i]);
+        if (d) duplicados.push_back(d);
+    }
+    if (duplicados.empty()) return;
+
+    // dejar seleccionadas SOLO las copias y entrar en modo mover (como Blender:
+    // Shift+D duplica y agarra; sino la copia queda justo encima y "no anda").
+    // Es lo mismo que hace NewInstance, que ya funciona.
+    DeseleccionarTodo();
+    for (size_t i = 0; i < duplicados.size(); i++) duplicados[i]->Seleccionar();
+    SetPosicion();
+}
+
+void Notificar(const std::string& msg, bool error); // LayoutInput.cpp (toasts); forward-decl (no incluir el header)
+
+// invierte una matriz AFIN 4x4 (columna-major: m[col*4+fila]; m[12..14]=traslacion; fila inferior [0,0,0,1]).
+// Invierte la parte lineal 3x3 (adjugada/det) y la traslacion (-Ainv*t). false si es singular (escala 0).
+static bool InvertAffine(const Matrix4& in, Matrix4& out) {
+    const float* m = in.m;
+    float a=m[0], b=m[4], c=m[8];   // A[fila][col] = m[col*4+fila]
+    float d=m[1], e=m[5], f=m[9];
+    float g=m[2], h=m[6], i=m[10];
+    float det = a*(e*i - f*h) + b*(f*g - d*i) + c*(d*h - e*g);
+    if (det > -1e-12f && det < 1e-12f) { out = in; return false; }
+    float invDet = 1.0f/det;
+    float i00=(e*i-f*h)*invDet, i01=(c*h-b*i)*invDet, i02=(b*f-c*e)*invDet;
+    float i10=(f*g-d*i)*invDet, i11=(a*i-c*g)*invDet, i12=(c*d-a*f)*invDet;
+    float i20=(d*h-e*g)*invDet, i21=(b*g-a*h)*invDet, i22=(a*e-b*d)*invDet;
+    float tx=m[12], ty=m[13], tz=m[14];
+    out.m[0]=i00; out.m[1]=i10; out.m[2]=i20; out.m[3]=0;   // out.m[col*4+fila] = Ainv[fila][col]
+    out.m[4]=i01; out.m[5]=i11; out.m[6]=i21; out.m[7]=0;
+    out.m[8]=i02; out.m[9]=i12; out.m[10]=i22; out.m[11]=0;
+    out.m[12]=-(i00*tx + i01*ty + i02*tz);
+    out.m[13]=-(i10*tx + i11*ty + i12*tz);
+    out.m[14]=-(i20*tx + i21*ty + i22*tz);
+    out.m[15]=1;
+    return true;
+}
+
+// JOIN (Ctrl+J, menu Object): une las MALLAS seleccionadas DENTRO del objeto ACTIVO, que conserva su transform
+// EXACTO (pos/rot/escala, aunque sea hijo-de-hijo-de-hijo). Cada objeto mergeado se lleva al espacio local del
+// activo con inv(worldActivo)*worldOtro -> queda visualmente donde estaba al mergear (aunque el activo o el otro
+// esten movidos/rotados/escalados/anidados). Requiere: activo = Mesh + al menos otra Mesh seleccionada; los
+// objetos NO-Mesh se ignoran; sin activo no hay join. Undo ATOMICO (Ctrl+Z restaura geo + objetos en 1 paso).
+void JoinObjetos(){
+    if (estado != editNavegacion || InteractionMode != ObjectMode) return;
+    Object* active = ObjActivo;
+    if (!active || active->getType() != ObjectType::mesh) { Notificar("Join: no active mesh object", true); return; }
+    Mesh* am = (Mesh*)active;
+
+    std::vector<Object*> merged; // mallas seleccionadas != activo (no-Mesh se ignoran)
+    for (size_t i = 0; i < ObjSelects.size(); i++) {
+        Object* o = ObjSelects[i];
+        if (o && o != active && o->getType() == ObjectType::mesh) merged.push_back(o);
+    }
+    if (merged.empty()) { Notificar("Join: select 2+ mesh objects (active is the target)", true); return; }
+
+    Matrix4 Wa; active->GetWorldMatrix(Wa);   // mundo->local del activo (cadena de padres completa)
+    Matrix4 invWa; InvertAffine(Wa, invWa);
+
+    UndoJoinIniciar(am); // snapshot de la geo del activo ANTES de anexar (undo atomico)
+
+    for (size_t i = 0; i < merged.size(); i++) {
+        Matrix4 Wo; merged[i]->GetWorldMatrix(Wo);
+        Matrix4 M = invWa * Wo;               // local(otro) -> mundo -> local(activo)
+        am->AnexarMallaTransformada((Mesh*)merged[i], M);
+    }
+    // rebuild: rearma las capas UV/color desde el render concatenado, regenera (normales limpias + merge de verts)
+    am->LiberarCapas();
+    am->PoblarCapas();
+    am->GenerarRender();
+
+    // borrar los mergeados (undo atomico): dejar select=true SOLO en ellos
+    for (size_t i = 0; i < ObjSelects.size(); i++) if (ObjSelects[i]) ObjSelects[i]->select = false;
+    for (size_t i = 0; i < merged.size(); i++) merged[i]->select = true;
+    UndoJoinConfirmar(); // DeleteUndo(los select=true) empaquetado con la geo -> 1 comando
+
+    DeseleccionarTodo(); // seleccion final: solo el activo (resultado del join)
+    active->Seleccionar();
+    ObjActivo = active;
+    Notificar(std::string("Joined into ") + active->name, false);
+}
+
+// APPLY (Alt+A, menu Object > Apply): hornea el transform del objeto en la MALLA y resetea ese componente, dejando
+// la malla VISUALMENTE en su lugar. what: 0=Location, 1=Rotation, 2=Scale, 3=All Transforms.
+//   Location -> pos queda (0,0,0) (el origen va al 0; la malla queda donde estaba)
+//   Rotation -> rot queda 0° (la malla queda rotada donde estaba)
+//   Scale    -> scale queda 1 (una escala 1.34 pasa a 1; la malla mantiene su tamaño)
+// Matematica: v_new = inv(M_reset) * M_actual * v, con M = T*R*S LOCAL del objeto -> M_reset*v_new = M_actual*v
+// (la malla no se mueve en el espacio del padre). Aplica a TODAS las mallas seleccionadas. Undo atomico.
+void AplicarTransform(int what){
+    if (estado != editNavegacion || InteractionMode != ObjectMode) return;
+    std::vector<Object*> mallas;
+    for (size_t i=0;i<ObjSelects.size();i++){ Object* o=ObjSelects[i];
+        if (o && o->getType()==ObjectType::mesh) mallas.push_back(o); }
+    if (mallas.empty()) { Notificar("Apply: select mesh object(s)", true); return; }
+
+    Quaternion idRot = Quaternion::FromEulerXYZ(0.0f,0.0f,0.0f); // identidad
+    UndoApplyIniciar(); // snapshot de transforms + geo de los seleccionados (undo atomico: geo + transform)
+
+    for (size_t i=0;i<mallas.size();i++){
+        Object* o = mallas[i];
+        Vector3 pos2 = o->pos; Quaternion rot2 = o->rot; Vector3 scl2 = o->scale; // valores reseteados
+        if (what==0 || what==3) pos2 = Vector3(0,0,0);
+        if (what==1 || what==3) rot2 = idRot;
+        if (what==2 || what==3) scl2 = Vector3(1,1,1);
+        Matrix4 M  = o->BuildMatrix(o->pos, o->rot, o->scale); // actual (T*R*S)
+        Matrix4 Mp = o->BuildMatrix(pos2,  rot2,  scl2);       // reseteado
+        Matrix4 invMp; InvertAffine(Mp, invMp);
+        Matrix4 B = invMp * M;                                 // v_new = inv(M_reset)*M_actual*v
+        ((Mesh*)o)->AplicarMatriz(B);
+        o->pos = pos2; o->rot = rot2; o->scale = scl2;         // resetear el componente en el objeto
+        o->ActualizarDisplayRot();
+    }
+    UndoApplyConfirmar();
+    const char* nom = (what==0)?"Location":(what==1)?"Rotation":(what==2)?"Scale":"All Transforms";
+    Notificar(std::string("Apply ") + nom + ": baked into mesh", false);
+}
+
+// Set Active Object as Camera (Ctrl+Numpad 0 / menu View > Cameras): hace que el objeto ACTIVO sea la CAMARA
+// activa de la escena. Solo si el activo ES una camara (si no es camara NO se puede -> no hace nada, false).
+bool SetActiveObjectAsCamera(){
+    if (!ObjActivo || ObjActivo->getType() != ObjectType::camera) { Notificar("Set Active Camera: the active object is not a camera", true); return false; }
+    CameraActive = (Camera*)ObjActivo; // Camera : public Object (1ra base) -> cast offset 0
+    return true;
+}
+
+static void W3dReparent(Object* obj, Object* nuevoPadre) {
+    if (!obj || !nuevoPadre || obj == nuevoPadre) return;
+    Object* viejoPadre = obj->Parent ? obj->Parent : SceneCollection;
+    if (viejoPadre == nuevoPadre) return;
+    // conservar la posicion GLOBAL (v1: solo traslacion)
+    Vector3 g = obj->GetGlobalPosition();
+    Vector3 gp = nuevoPadre->GetGlobalPosition();
+    for (size_t i = 0; i < viejoPadre->Childrens.size(); i++) {
+        if (viejoPadre->Childrens[i] == obj) {
+            viejoPadre->Childrens.erase(viejoPadre->Childrens.begin() + i);
+            break;
+        }
+    }
+    nuevoPadre->Childrens.push_back(obj);
+    obj->Parent = nuevoPadre;
+    obj->pos = g - gp;
+}
+
+// rotacion GLOBAL por la cadena de padres (R = R_padre * R_local). NO-static:
+// el transform de sub-elementos de malla (editor) la usa para world<->local.
+Quaternion RotGlobalDe(Object* o) {
+    if (!o) return Quaternion(1, 0, 0, 0);
+    if (!o->Parent) return o->rot;
+    return RotGlobalDe(o->Parent) * o->rot;
+}
+
+// escala GLOBAL acumulada (componente a componente, sin shear)
+Vector3 ScaleGlobalDe(Object* o) {
+    Vector3 s(1.0f, 1.0f, 1.0f);
+    while (o) {
+        s.x *= o->scale.x;
+        s.y *= o->scale.y;
+        s.z *= o->scale.z;
+        o = o->Parent;
+    }
+    return s;
+}
+
+static void QuitarDePadre(Object* obj) {
+    Object* p = obj->Parent ? obj->Parent : SceneCollection;
+    if (!p) return;
+    for (size_t i = 0; i < p->Childrens.size(); i++) {
+        if (p->Childrens[i] == obj) {
+            p->Childrens.erase(p->Childrens.begin() + i);
+            break;
+        }
+    }
+}
+
+// el nuevo padre no puede ser el mismo objeto ni un descendiente
+static bool ReparentValido(Object* obj, Object* nuevoPadre) {
+    if (!obj || !nuevoPadre || obj == nuevoPadre) return false;
+    for (Object* q = nuevoPadre; q; q = q->Parent) {
+        if (q == obj) return false;
+    }
+    return true;
+}
+
+// reparenta conservando la transformacion LOCAL (el objeto puede saltar)
+void ReparentSimple(Object* obj, Object* nuevoPadre) {
+    if (!ReparentValido(obj, nuevoPadre)) return;
+    if ((obj->Parent ? obj->Parent : SceneCollection) == nuevoPadre) return;
+    QuitarDePadre(obj);
+    nuevoPadre->Childrens.push_back(obj);
+    obj->Parent = nuevoPadre;
+}
+
+// reparenta MANTENIENDO la transformacion GLOBAL: recalcula pos, rot y
+// escala locales para que el objeto quede exactamente donde estaba
+void ReparentKeepTransform(Object* obj, Object* nuevoPadre) {
+    if (!ReparentValido(obj, nuevoPadre)) return;
+    if ((obj->Parent ? obj->Parent : SceneCollection) == nuevoPadre) return;
+
+    Quaternion rg = RotGlobalDe(obj);
+    Vector3 sg = ScaleGlobalDe(obj);
+    Vector3 pg = obj->GetGlobalPosition();
+
+    Quaternion prg = RotGlobalDe(nuevoPadre);
+    Vector3 psg = ScaleGlobalDe(nuevoPadre);
+    Vector3 ppg = nuevoPadre->GetGlobalPosition();
+
+    QuitarDePadre(obj);
+    nuevoPadre->Childrens.push_back(obj);
+    obj->Parent = nuevoPadre;
+
+    Quaternion ipr = prg.Inverted();
+    Vector3 d = ipr * (pg - ppg); // el delta en el espacio del padre
+    obj->pos = Vector3(psg.x != 0.0f ? d.x / psg.x : d.x,
+                       psg.y != 0.0f ? d.y / psg.y : d.y,
+                       psg.z != 0.0f ? d.z / psg.z : d.z);
+    obj->rot = ipr * rg;
+    obj->rot.normalize();
+    obj->ActualizarDisplayRot();
+    obj->scale = Vector3(psg.x != 0.0f ? sg.x / psg.x : sg.x,
+                         psg.y != 0.0f ? sg.y / psg.y : sg.y,
+                         psg.z != 0.0f ? sg.z / psg.z : sg.z);
+}
+
+// reordena: pone a obj justo antes/despues de ref (mismo padre que ref),
+// manteniendo la transformacion global si cambia de padre
+void MoverJuntoA(Object* obj, Object* ref, bool despues) {
+    if (!obj || !ref || obj == ref) return;
+    Object* padre = ref->Parent ? ref->Parent : SceneCollection;
+    if (!ReparentValido(obj, padre) && padre != (obj->Parent ? obj->Parent : SceneCollection)) return;
+    if ((obj->Parent ? obj->Parent : SceneCollection) != padre) {
+        ReparentKeepTransform(obj, padre);
+        if ((obj->Parent ? obj->Parent : SceneCollection) != padre) return;
+    }
+    // reubicar dentro del vector del padre
+    QuitarDePadre(obj);
+    size_t idx = padre->Childrens.size();
+    for (size_t i = 0; i < padre->Childrens.size(); i++) {
+        if (padre->Childrens[i] == ref) {
+            idx = i + (despues ? 1 : 0);
+            break;
+        }
+    }
+    padre->Childrens.insert(padre->Childrens.begin() + idx, obj);
+    obj->Parent = padre;
+}
+
+void SetParentSeleccion() {
+    if (!ObjActivo || !SceneCollection) return;
+    // todos los seleccionados (menos el activo) pasan a ser hijos del activo
+    std::vector<Object*> sel;
+    for (size_t c = 0; c < SceneCollection->Childrens.size(); c++) {
+        Object* o = SceneCollection->Childrens[c];
+        if (o->select && o != ObjActivo) sel.push_back(o);
+    }
+    for (size_t i = 0; i < sel.size(); i++) {
+        W3dReparent(sel[i], ObjActivo);
+    }
+}
+
+void ClearParentSeleccion() {
+    if (!SceneCollection) return;
+    // los seleccionados vuelven a colgar de la raiz (recorrer copia DFS)
+    std::vector<Object*> sel;
+    for (size_t c = 0; c < SceneCollection->Childrens.size(); c++) {
+        // buscar seleccionados anidados
+        std::vector<Object*> pila;
+        pila.push_back(SceneCollection->Childrens[c]);
+        while (!pila.empty()) {
+            Object* o = pila.back();
+            pila.pop_back();
+            if (o->select && o->Parent && o->Parent != SceneCollection) sel.push_back(o);
+            for (size_t h = 0; h < o->Childrens.size(); h++) pila.push_back(o->Childrens[h]);
+        }
+    }
+    for (size_t i = 0; i < sel.size(); i++) {
+        W3dReparent(sel[i], SceneCollection);
+    }
+}
+
+void NewInstance(){
+	if (estado != editNavegacion || InteractionMode != ObjectMode){return;};
+
+	// ITERAMOS AL REVÉS PARA PODER ELIMINAR SIN ROMPER EL ÍNDICE
+    for (int i = (int)ObjSelects.size() - 1; i >= 0; i--) {
+        Object* obj = ObjSelects[i];     // objeto original
+        if (!obj) continue;
+
+		Instance* instance = new Instance(obj->Parent, obj);
+		obj->select = false;
+		instance->select = true;
+		if (ObjActivo == obj) ObjActivo = instance;
+	}
+	SetPosicion();
+}
+
+// reconstruye el quaternion REAL del objeto activo desde los valores de DISPLAY
+// que se editaron, segun el modo de rotacion. La llaman los campos del editor.
+void SincronizarRotacionActiva(){
+	if (!ObjActivo) return;
+	if (ObjActivo->rotMode == RotQuaternion){
+		ObjActivo->rot.normalize();             // se editaron w/x/y/z directo
+	} else if (ObjActivo->rotMode == RotAxisAngle){
+		// el eje tiene que ser unitario para que el angulo sea correcto
+		ObjActivo->rot = Quaternion::FromAxisAngle(ObjActivo->rotAxis.Normalized(),
+		                                           ObjActivo->rotAngle);
+	} else { // RotEulerXYZ
+		ObjActivo->rot = Quaternion::FromEulerXYZ(ObjActivo->rotEuler.x,
+		                                          ObjActivo->rotEuler.y,
+		                                          ObjActivo->rotEuler.z);
+	}
+}
+
+void SetRotacion(int dx, int dy){
+	float ang = (dx + dy) * 0.1f;   // sensibilidad (ajustable)
+	gAnguloTransform += ang;        // total acumulado (para la barra de estado)
+
+	for (size_t o = 0; o < estadoObjetos.size(); o++) {
+		Object& obj = *estadoObjetos[o].obj;
+		// rotar alrededor del eje constrenido EN WORLD (la identidad de
+		// conjugacion hace que pre-multiplicar funcione para global/local/view:
+		// local = el propio eje rotado por obj.rot).
+		Vector3 axis;
+		if (axisSelect == ViewAxis || axisSelect == XYZ) axis = camForward; // libre = eje de vista
+		else axis = EjeOrientado(obj, axisSelect);
+		obj.rot = Quaternion::FromAxisAngle(axis, ang) * obj.rot;
+		obj.rot.normalize();
+		obj.ActualizarDisplayRot();
+	}
+	AplicarPivotATransform(); // gira las posiciones alrededor del pivote
+}
+
+// rotacion ORBITAL/gimbal: gira alrededor de los ejes de la VISTA (en mundo).
+// izq/der (dx) -> yaw sobre el eje vertical de la vista (camUp); arr/ab (dy) ->
+// pitch sobre el horizontal (camRight). Incremental sobre obj.rot (como
+// SetRotacion), con quaterniones (sin gimbal-lock). Tecla V (PC) / 0 (Symbian).
+void RotarOrbital(int dx, int dy){
+	float yaw   = dx * 0.1f;
+	float pitch = dy * 0.1f;
+	gAnguloTransform += (dx + dy) * 0.1f; // total para la barra de estado
+	Quaternion q = Quaternion::FromAxisAngle(camUp, yaw)      // izq/der: era -yaw (invertido)
+	             * Quaternion::FromAxisAngle(camRight, pitch);
+	for (size_t o = 0; o < estadoObjetos.size(); o++) {
+		Object& obj = *estadoObjetos[o].obj;
+		obj.rot = q * obj.rot; // pre-multiplica: gira en los ejes de la vista
+		obj.rot.normalize();
+		obj.ActualizarDisplayRot();
+	}
+	AplicarPivotATransform(); // gira las posiciones alrededor del pivote
+}
+
+// alterna el modo de rotacion LIBRE entre trackball (eje de vista) y ORBITAL.
+void ToggleRotacionOrbital(){
+	if (estado != rotacion) return;
+	axisSelect = (axisSelect == OrbitalAxis) ? ViewAxis : OrbitalAxis;
+	gTrackballCap = false; // re-captura el angulo si vuelve al trackball
+	ReestablecerEstado(false);
+}
+
+void SetRotacion(){
+	//si no hay objetos. En Edit Mode NO se transforma el objeto (es para editar la malla)
+	if (ObjActivo && InteractionMode == ObjectMode && ObjActivo->select && estado == editNavegacion){
+		if (!guardarEstado()) return;
+		estado = rotacion; g_xformPrimerMov = true; // primer motion en cero (no salta)
+		valorRotacion = 0;
+		gAnguloTransform = 0.0f; // arranca el conteo del angulo
+		gTrackballCap = false;   // re-captura el angulo inicial del trackball
+		// R arranca LIBRE = "rotar desde la vista" (trackball alrededor del eje
+		// de camara, angulo segun el mouse al pivot). X/Y/Z constriñen a un eje.
+		axisSelect = ViewAxis;
+	}
+};
+
+void SetScale(int dx, int dy, float factor){
+	//std::cout << "estadoObjetos size: " << estadoObjetos.size() << std::endl;
+	float d = (dx + dy) * factor;
+	for (size_t o = 0; o < estadoObjetos.size(); o++) {
+		Object& obj = *estadoObjetos[o].obj;
+		// enum: X->scale.x, Y->scale.z, Z->scale.y (mismo swap Y/Z del modelo)
+		switch (axisSelect) {
+			case X:      obj.scale.x += d; break;
+			case Y:      obj.scale.z += d; break;
+			case Z:      obj.scale.y += d; break;
+			case PlaneX: obj.scale.z += d; obj.scale.y += d; break; // excluye X
+			case PlaneY: obj.scale.x += d; obj.scale.y += d; break; // excluye Y
+			case PlaneZ: obj.scale.x += d; obj.scale.z += d; break; // excluye Z
+			default:     obj.scale.x += d; obj.scale.y += d; obj.scale.z += d; break; // libre
+		}
+	}
+	AplicarPivotATransform(); // aleja/acerca las posiciones del pivote segun el factor
+}
+
+void SetEscala(){
+	//XYZ tiene escala. En Edit Mode NO se transforma el objeto (es para editar la malla)
+	if (ObjActivo && InteractionMode == ObjectMode && ObjActivo->select && estado == editNavegacion){
+		if (!guardarEstado()) return;
+		estado = EditScale; g_xformPrimerMov = true; // primer motion en cero (no salta)
+		axisSelect = XYZ;
+	}
+};
+
+// suma de los ejes ACTIVOS (en MUNDO, segun orientacion) para el valor numerico
+static Vector3 EjesActivosObj(Object& o){
+	if (axisSelect==X||axisSelect==Y||axisSelect==Z) return EjeOrientado(o, axisSelect);
+	if (axisSelect==PlaneX) return EjeOrientado(o,Y)+EjeOrientado(o,Z);
+	if (axisSelect==PlaneY) return EjeOrientado(o,X)+EjeOrientado(o,Z);
+	if (axisSelect==PlaneZ) return EjeOrientado(o,X)+EjeOrientado(o,Y);
+	return EjeOrientado(o,X)+EjeOrientado(o,Y)+EjeOrientado(o,Z); // libre
+}
+
+// ENTRADA NUMERICA: aplica un valor EXACTO al transform de OBJETOS en curso, desde el
+// estado guardado (snapshot). translate=distancia, rotacion=grados, escala=factor.
+void SetTransformNumerico(float v){
+	for (size_t o = 0; o < estadoObjetos.size(); o++) {
+		SaveState& st = estadoObjetos[o];
+		Object& obj = *st.obj;
+		if (estado == translacion){
+			obj.pos = st.pos + EjesActivosObj(obj) * v;
+		} else if (estado == rotacion){
+			Vector3 ax;
+			if (axisSelect==ViewAxis||axisSelect==XYZ||axisSelect==OrbitalAxis) ax = camForward;
+			else ax = EjeOrientado(obj, axisSelect);
+			obj.rot = Quaternion::FromAxisAngle(ax, v) * st.rot;
+			obj.rot.normalize(); obj.ActualizarDisplayRot();
+		} else { // EditScale: factor v en los ejes activos (swap Y/Z del modelo)
+			Vector3 s = st.scale;
+			switch (axisSelect){
+				case X:      s.x*=v; break;
+				case Y:      s.z*=v; break;
+				case Z:      s.y*=v; break;
+				case PlaneX: s.z*=v; s.y*=v; break;
+				case PlaneY: s.x*=v; s.y*=v; break;
+				case PlaneZ: s.x*=v; s.z*=v; break;
+				default:     s.x*=v; s.y*=v; s.z*=v; break;
+			}
+			obj.scale = s;
+		}
+	}
+	gAnguloTransform = v;
+	AplicarPivotATransform();
+}
+
+void SetTranslacionObjetos(int dx, int dy, float speed){
+	for (size_t o = 0; o < estadoObjetos.size(); o++) {
+		Object& obj = *estadoObjetos[o].obj;
+		Vector3 libre = camRight * (dx * speed) + camUp * (-dy * speed); // plano camara
+		if (axisSelect == X || axisSelect == Y || axisSelect == Z) {
+			// un eje: proyectar el movimiento de PANTALLA sobre la direccion en
+			// que se ve el eje (relativo a la vista). Asi arrastrar "hacia donde
+			// apunta el eje en pantalla" mueve en +eje (no se invierte).
+			Vector3 axis = EjeOrientado(obj, axisSelect);
+			float amount = (dx * axis.Dot(camRight) - dy * axis.Dot(camUp)) * speed;
+			obj.pos += axis * amount;
+		} else if (axisSelect == PlaneX || axisSelect == PlaneY || axisSelect == PlaneZ) {
+			// plano: movimiento libre MENOS la componente del eje excluido
+			int ex = (axisSelect == PlaneX) ? X : (axisSelect == PlaneY) ? Y : Z;
+			Vector3 axis = EjeOrientado(obj, ex);
+			obj.pos += libre - axis * libre.Dot(axis);
+		} else {
+			obj.pos += libre; // libre (3 ejes)
+		}
+	}
+}
+
+// ====================================================================
+// SNAP (menu shift+s, estilo Blender): mueve la seleccion o el cursor 3D
+// ====================================================================
+
+// pone el origen de o en la posicion GLOBAL g (convierte a local segun el
+// padre, misma matematica que ReparentKeepTransform)
+static void PonerEnGlobal(Object* o, const Vector3& g) {
+    Object* p = o->Parent;
+    if (!p) { o->pos = g; return; }
+    Quaternion prg = RotGlobalDe(p);
+    Vector3 psg = ScaleGlobalDe(p);
+    Vector3 ppg = p->GetGlobalPosition();
+    Vector3 d = prg.Inverted() * (g - ppg);
+    o->pos = Vector3(psg.x != 0.0f ? d.x / psg.x : d.x,
+                     psg.y != 0.0f ? d.y / psg.y : d.y,
+                     psg.z != 0.0f ? d.z / psg.z : d.z);
+}
+
+// Reposiciona los objetos seleccionados ALREDEDOR del pivote (TransformPivotPoint),
+// segun cuanto rotaron/escalaron desde el estado guardado. Se llama tras cada apply
+// de rotar/escalar. En modo "Individual Origins" NO hace nada (cada uno en su origen).
+void AplicarPivotATransform(){
+    if (g_transformPivot == PivotIndividual) return; // cada uno rota/escala en su lugar
+    if (estado != rotacion && estado != EditScale) return; // translate no usa pivot
+    Vector3 pivot = TransformPivotPoint;
+    for (size_t o = 0; o < estadoObjetos.size(); o++){
+        SaveState& st = estadoObjetos[o];
+        Object& obj = *st.obj;
+        Vector3 off = st.worldPos - pivot; // offset inicial respecto al pivote
+        Vector3 nw;
+        if (estado == rotacion){
+            // rotacion acumulada desde el inicio (en mundo p/ objetos top-level)
+            Quaternion delta = obj.rot * st.rot.Inverted();
+            nw = pivot + delta * off;
+        } else { // EditScale: la distancia al pivote escala con el factor (por eje)
+            float fx = st.scale.x != 0.0f ? obj.scale.x / st.scale.x : 1.0f;
+            float fy = st.scale.y != 0.0f ? obj.scale.y / st.scale.y : 1.0f;
+            float fz = st.scale.z != 0.0f ? obj.scale.z / st.scale.z : 1.0f;
+            nw = pivot + Vector3(off.x*fx, off.y*fy, off.z*fz);
+        }
+        PonerEnGlobal(&obj, nw);
+    }
+}
+
+// redondea a la unidad de grilla mas cercana (1.0, como Blender por defecto)
+static float RedondearGrid(float v) {
+    return (float)((int)(v + (v >= 0.0f ? 0.5f : -0.5f)));
+}
+static Vector3 RedondearGrid(const Vector3& v) {
+    return Vector3(RedondearGrid(v.x), RedondearGrid(v.y), RedondearGrid(v.z));
+}
+
+// junta todos los seleccionados (DFS desde la raiz)
+static void RecolectarSnap(Object* nodo, std::vector<Object*>& out) {
+    if (!nodo) return;
+    for (size_t i = 0; i < nodo->Childrens.size(); i++) {
+        Object* o = nodo->Childrens[i];
+        if (o->select) out.push_back(o);
+        RecolectarSnap(o, out);
+    }
+}
+
+void SnapSeleccionAlCursor(bool mantenerOffset) {
+    // Edit Mode: TODO mover los VERTICES seleccionados al cursor (Fase 2a); por
+    // ahora NO mover el objeto entero (seria incorrecto en edicion de malla).
+    if (InteractionMode == EditMode) return;
+    std::vector<Object*> sel;
+    RecolectarSnap(SceneCollection, sel);
+    if (sel.empty()) return;
+    if (mantenerOffset && ObjActivo) {
+        // toda la seleccion se mueve para que el ACTIVO caiga en el cursor,
+        // conservando los offsets relativos entre los seleccionados.
+        // Capturo las globales ANTES de mover nada (si un padre y su hijo
+        // estan ambos seleccionados, mover el padre cambiaria la del hijo).
+        Vector3 delta = cursor3D.pos - ObjActivo->GetGlobalPosition();
+        std::vector<Vector3> g(sel.size());
+        for (size_t i = 0; i < sel.size(); i++) g[i] = sel[i]->GetGlobalPosition();
+        for (size_t i = 0; i < sel.size(); i++) PonerEnGlobal(sel[i], g[i] + delta);
+    } else {
+        for (size_t i = 0; i < sel.size(); i++)
+            PonerEnGlobal(sel[i], cursor3D.pos);
+    }
+}
+
+void SnapSeleccionAlActivo() {
+    if (InteractionMode == EditMode) return; // edit: TODO sub-elementos (Fase 2a)
+    if (!ObjActivo) return;
+    Vector3 destino = ObjActivo->GetGlobalPosition();
+    std::vector<Object*> sel;
+    RecolectarSnap(SceneCollection, sel);
+    for (size_t i = 0; i < sel.size(); i++)
+        if (sel[i] != ObjActivo) PonerEnGlobal(sel[i], destino);
+}
+
+void SnapSeleccionAlGrid() {
+    if (InteractionMode == EditMode) return; // edit: TODO sub-elementos (Fase 2a)
+    std::vector<Object*> sel;
+    RecolectarSnap(SceneCollection, sel);
+    // snapshot de globales antes de mover (padre+hijo seleccionados)
+    std::vector<Vector3> g(sel.size());
+    for (size_t i = 0; i < sel.size(); i++) g[i] = sel[i]->GetGlobalPosition();
+    for (size_t i = 0; i < sel.size(); i++)
+        PonerEnGlobal(sel[i], RedondearGrid(g[i]));
+}
+
+void SnapCursorAlGrid() {
+    cursor3D.pos = RedondearGrid(cursor3D.pos);
+}
+
+void SnapCursorAlOrigen() {
+    cursor3D.pos = Vector3(0.0f, 0.0f, 0.0f);
+}
+
+// ====================================================================
+// SET ORIGIN (submenu del menu Object): mueve el ORIGEN del objeto y/o la
+// GEOMETRIA. Respeta pos/rot/escala/padre. Opera sobre las MALLAS seleccionadas.
+// ====================================================================
+
+// resta un offset (local) a TODOS los vertices de la malla (translacion: no toca
+// normales) y recalcula bordes/centro.
+static void DesplazarVertices(Mesh* m, const Vector3& d) {
+    if (!m->vertex) return;
+    for (int i = 0; i < m->vertexSize; i++) {
+        m->vertex[i*3]   += d.x;
+        m->vertex[i*3+1] += d.y;
+        m->vertex[i*3+2] += d.z;
+    }
+    m->CalcularBordes(); // recalcula centroGeom + edges + bordesBuf (+ invalida edit)
+}
+
+// (R*S)^-1 * d : pasa un vector de PARENT-local a MESH-local (deshace rot+escala
+// del objeto). Sirve para que los vertices compensen un movimiento del origen.
+static Vector3 ParentLocalAMeshLocal(Mesh* m, const Vector3& d) {
+    Vector3 rd = m->rot.Inverted() * d; // R^-1
+    return Vector3(m->scale.x != 0.0f ? rd.x / m->scale.x : rd.x,  // S^-1
+                   m->scale.y != 0.0f ? rd.y / m->scale.y : rd.y,
+                   m->scale.z != 0.0f ? rd.z / m->scale.z : rd.z);
+}
+
+static void RecolectarMallasSel(std::vector<Mesh*>& out) {
+    std::vector<Object*> sel;
+    RecolectarSnap(SceneCollection, sel);
+    for (size_t i = 0; i < sel.size(); i++)
+        if (sel[i]->getType() == ObjectType::mesh) out.push_back((Mesh*)sel[i]);
+}
+
+// 1) Geometry to Origin: la geometria se mueve para que su BARICENTRO caiga en el
+//    origen del objeto. El objeto (pos/rot/escala) NO se mueve.
+void SetOriginGeometryToOrigin() {
+    std::vector<Mesh*> ms; RecolectarMallasSel(ms);
+    for (size_t i = 0; i < ms.size(); i++)
+        DesplazarVertices(ms[i], ms[i]->centroGeom * -1.0f); // verts -= baricentro
+}
+
+// 2) Origin to Geometry: el ORIGEN se mueve al baricentro y la geometria queda EN SU
+//    LUGAR. Los vertices se mueven igual que (1), pero el objeto se mueve al reves
+//    (pos += R*S*baricentro) para compensar.
+void SetOriginOriginToGeometry() {
+    std::vector<Mesh*> ms; RecolectarMallasSel(ms);
+    for (size_t i = 0; i < ms.size(); i++) {
+        Mesh* m = ms[i];
+        Vector3 c = m->centroGeom;
+        // baricentro local -> offset en parent-local (aplica escala y rotacion del obj)
+        Vector3 sc(m->scale.x*c.x, m->scale.y*c.y, m->scale.z*c.z);
+        m->pos += m->rot * sc;       // el origen va a donde estaba el baricentro
+        DesplazarVertices(m, c * -1.0f); // verts -= baricentro (la geometria no se mueve)
+    }
+}
+
+// 3) Origin to 3D Cursor: el ORIGEN se mueve al cursor 3D y la geometria queda en su
+//    lugar. Lo que se movio el objeto, los vertices lo compensan al reves.
+void SetOriginToCursor() {
+    std::vector<Mesh*> ms; RecolectarMallasSel(ms);
+    for (size_t i = 0; i < ms.size(); i++) {
+        Mesh* m = ms[i];
+        Vector3 oldPos = m->pos;
+        PonerEnGlobal(m, cursor3D.pos);  // origen -> cursor (world->local, respeta padre)
+        // los vertices compensan (oldPos - newPos) llevado a mesh-local
+        DesplazarVertices(m, ParentLocalAMeshLocal(m, oldPos - m->pos));
+    }
+}
+
+void SnapCursorALoSeleccionado() {
+    // Edit Mode: el cursor al CENTRO de los sub-elementos seleccionados de la malla
+    // (mismo calculo que el foco; en mundo via LocalAMundo). Da igual vertex/edge/face.
+    if (InteractionMode == EditMode && g_editMesh) {
+        Mesh* m = (Mesh*)g_editMesh;
+        m->EnsureEdit();
+        float cx, cy, cz;
+        if (m->edit && m->edit->CentroSeleccion(cx, cy, cz))
+            cursor3D.pos = m->LocalAMundo(Vector3(cx, cy, cz));
+        return;
+    }
+    std::vector<Object*> sel;
+    RecolectarSnap(SceneCollection, sel);
+    if (sel.empty()) return;
+    Vector3 suma(0.0f, 0.0f, 0.0f);
+    for (size_t i = 0; i < sel.size(); i++) suma += sel[i]->GetGlobalPosition();
+    cursor3D.pos = suma * (1.0f / (float)sel.size()); // mediana ~ promedio
+}
+
+void SnapCursorAlActivo() {
+    // Edit Mode: por ahora el centro de la seleccion de la malla (igual que Selected).
+    // TODO: el sub-elemento ACTIVO exacto (vertice/arista/cara activa) cuando este.
+    if (InteractionMode == EditMode && g_editMesh) {
+        Mesh* m = (Mesh*)g_editMesh;
+        m->EnsureEdit();
+        float cx, cy, cz;
+        if (m->edit && m->edit->CentroSeleccion(cx, cy, cz))
+            cursor3D.pos = m->LocalAMundo(Vector3(cx, cy, cz));
+        return;
+    }
+    if (!ObjActivo) return;
+    cursor3D.pos = ObjActivo->GetGlobalPosition();
+}

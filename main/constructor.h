@@ -2,11 +2,12 @@
 #define CONSTRUCTOR_H
 
 #ifdef _WIN32
+#ifndef W3D_SYMBIAN
     #include <windows.h>
+#endif
 #endif
 
 #include <SDL2/SDL.h>
-//#include <SDL2/SDL_image.h>
 #include <GL/gl.h>
 
 #include <filesystem>
@@ -16,7 +17,7 @@
 #include "objects/Collection.h"
 #include "objects/Mesh.h"
 
-#include "UI/card.h"
+#include "WhiskUI/card.h"
 
 #include "ViewPorts/ViewPorts.h"
 #include "ViewPorts/Outliner.h"

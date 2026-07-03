@@ -6,8 +6,10 @@
  */
 
 PRJ_PLATFORMS
-//DEFAULT ARMV5_ABIV2
-DEFAULT GCCE
+// ARMV6 -> usa el compilador RVCT (C:/ARM/RVCT/Programs/2.2) y permite FPU por
+// hardware (VFPv2). GCCE no aprovecha la VFP del N95/N8 igual. Ver Whisk3D.mmp.
+DEFAULT ARMV6
+//DEFAULT GCCE
 //DEFAULT ARMV5
 
 PRJ_MMPFILES

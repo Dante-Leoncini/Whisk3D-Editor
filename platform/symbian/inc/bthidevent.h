@@ -11,7 +11,7 @@ enum TMouseButtonID
 	EMouseButtonMiddle,
 	EMouseButtonSide,
 	EMouseButtonForward,
-	EMouseButtonBack,   
+	EMouseButtonBack,
     };
 
 enum TMouseEventType
@@ -28,32 +28,32 @@ enum TKeyEventType
     EEventHIDKeyUp,
     EEventHIDKeyDown
     };
-    
+
 enum TConsumerEventCode
     {
     EConsumerNone,
     };
-    
+
 class THIDKeyEvent
     {
     public:
         inline TKeyEventType Type();
         inline TInt ScanCode();
-        
+
         TKeyEventType iType;
         TInt iScanCode;
     };
-    
+
 TKeyEventType THIDKeyEvent::Type()
     {
     return iType;
     }
-    
+
 TInt THIDKeyEvent::ScanCode()
     {
     return iScanCode;
     }
-    
+
 class TMouseEvent
     {
     public:
@@ -65,17 +65,17 @@ class TMouseEvent
         TInt iValue;
         TPoint iPosition;
     };
-    
+
 TMouseEventType TMouseEvent::Type()
     {
     return iType;
     }
-    
+
 TInt TMouseEvent::Value()
     {
     return iValue;
     }
-    
+
 const TPoint& TMouseEvent::Position()
     {
     return iPosition;
@@ -86,7 +86,7 @@ class THIDConsumerEvent
     public:
         inline TKeyEventType Type();
         inline TConsumerEventCode ButtonCode();
-        
+
         TKeyEventType iType;
         TConsumerEventCode iButtonCode;
     };
@@ -95,7 +95,7 @@ TKeyEventType THIDConsumerEvent::Type()
     {
     return iType;
     }
-    
+
 TConsumerEventCode THIDConsumerEvent::ButtonCode()
     {
     return iButtonCode;
@@ -112,7 +112,7 @@ class THIDEvent
         EKeyEvent,
         EConsumerEvent
         };
-        
+
     public:
         inline THIDEvent();
         inline void SetType(THIDEventType aType);
@@ -148,7 +148,7 @@ THIDKeyEvent* THIDEvent::Key() const
     {
     return (THIDKeyEvent*)(iEventData+4);
     }
-    
+
 THIDConsumerEvent* THIDEvent::Consumer() const
     {
     return (THIDConsumerEvent*)(iEventData+4);

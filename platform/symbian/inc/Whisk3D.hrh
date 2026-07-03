@@ -2,160 +2,17 @@
  * ==============================================================================
  *  Name        : whisk3D.hrh
  *  Part of     : OpenGLEx / Whisk3D
+ *
+ *  El enum de comandos del menu S60 (TWhisk3DMenuCommands, ~120 IDs) se borro:
+ *  la UI nativa quedo solo con Exit (EAknCmdExit, de avkon). Toda la interfaz
+ *  real (viewports / menus desplegables / propiedades / cursor) es la COMPARTIDA
+ *  con PC, dibujada en el viewport GL.
  * ==============================================================================
  */
 
 #ifndef WHISK3D_HRH
 #define WHISK3D_HRH
-	
-// DATA TYPES
-enum TWhisk3DMenuCommands
-{    	    	
-    ETestNada,
 
-    ECameraView,
-    ETopView,
-    EWhisk3DFrontView,
-    EWhisk3DRightView,
-    EWhisk3DPerspectiva,
-    EWhisk3DObjFocus,
-    EWhisk3DCambiarObject,
-    EWhisk3DNavegacion,
-    EWhisk3DBorrar,
-
-    ESelectInvert,
-    
-    EMaterial,
-    ESetMaterial,
-    ESetTexture,
-    ENewMaterial,
-    ERemoveMaterial,
-    ERemoveTexture,
-    ESetActiveTexture,
-    ESetEmission,
-    ESetSpecular,
-    ESetDiffuse,
-    ESetInterpolation,
-    ESetTransparent, 
-    ESetTextureRepeat,
-    ESetCulling,
-    ESetLighting,
-    ESetVertexColor,
-    ESetAmbientLight,
-    
-    EViewportObject,
-    EWhisk3DInfoObject,
-    EWhisk3DSetEscala,
-    EWhisk3DSetPosicion,
-    EWhisk3DSetRotacion,
-    
-    ESetParent,
-	EClearParent,
-
-    ERenderImage,
-    ERenderAnimation,
-    ERenderMenu,
-    ERenderUI,
-    ERenderUIanimation,
-
-    ETransformMenu,
-    
-    EWhisk3DSeleccionar,
-    EWhisk3DSetTipoVertex,
-    EWhisk3DSetTipoEdge,
-    EWhisk3DSetTipoFace,
-    
-    EWhisk3DVista3D,
-    EWhisk3DViewSolid,
-    EWhisk3DViewMaterial,
-    EViewRendered,
-    
-    EWhisk3DModificadores,
-    EWhisk3DModificadorArray,
-    EWhisk3DModificadorMirror,
-    EWhisk3DModificadorScrew,
-
-    EViewportBackgroudColor,
-    EWhisk3DWidescreen,
-    EImportOBJ,
-    EOldImportOBJ,
-    ENewTexture,
-
-    EWhisk3DProgressNote,
-    EWhisk3DWaitNote,
-
-    EViewportSetOverlay,
-    EViewportSet3DCursor,
-
-    EViewportSetShowFloor,
-    EViewportSetShowYaxis,  
-    EViewportSetShowXaxis,
-    EViewportSetOutlineSelect,
-    EViewportSetOrigins,
-
-    EViewportAdd,
-    EPlane,
-    ECube,
-    ECircle,
-    ECamera,
-    ELight,
-    EVertex,
-    EEmpty,
-
-    EDuplicatedObject,
-    EDuplicatedLinked,  
-
-    ECameraMenu,  
-    ESetActiveObjectAsCamera,     
-    ESetCameraToView,      
-
-    ESnapMenu,
-    ECursorToWorldOrigin,
-    ECursorToSelect,
-    ESelectToCursor,
-
-    ETimelineMenu,
-    ETimelinePlayStop,
-    ETimelineShowTimeline,
-    ETimelineSetCurrentFrame,    
-    ETimelineSetEndFrame,
-    ETimelineSetStartFrame,
-    ESetFrameRate,
-
-    EAnimationMenu,
-    EImportAnimation,
-    ESetMixNormals,
-    ESetMixFaces,
-    ESetSpeedMix,
-    ESetShapekeysInterpolation,
-    ESetAnimation,
-
-    EConstraints,
-    ETrackTo,
-    ECopyRotation,
-    ECopyLocation,
-    EFollowPath,
-    EClearConstraints,
-
-    EInsertKeyframeLocation,
-    EInsertKeyframeRotation,
-    EInsertKeyframeScale,
-
-    EInsertKeyframe,
-    ERemoveKeyframes,
-    EClearKeyframes
-};
-
-enum TAknExNoteNoteControlIds {
-    EAknExNoteCtrlIdErrorNote = 0x100,
-    EAknExNoteCtrlIdProgressNote,
-    EAknExNoteCtrlIdWaitNote,
-    EAknExNoteCtrlIdDynamicText    
-};
-
-//enum TWhisk3DNoteControlIds {
-//    EWhisk3DProgressNote,
-//    EWhisk3DWaitNote
-//};
+// (sin comandos propios: el unico menu nativo es Exit -> EAknCmdExit de avkon)
 
 #endif      // WHISK3D_HRH

@@ -2,11 +2,17 @@
 #define WITHBORDER_H
 
 #ifdef _WIN32
+#ifndef W3D_SYMBIAN
     #include <windows.h>
 #endif
+#endif
 
-#include <GL/gl.h>
-#include <SDL2/SDL.h>
+#ifdef W3D_SYMBIAN
+    #include <GLES/gl.h>
+#else
+    #include <GL/gl.h>
+    #include <SDL2/SDL.h>
+#endif
 
 #include "ViewPorts.h"
 
@@ -23,12 +29,14 @@ extern GLfloat bourderUV[32];
 class WithBorder {
     public:
         // ------------------ Mesh ------------------
-        GLshort borderMesh[32] = { 
-            0,0,   6,0,   12,0,   18,0,
-            0,6,   6,6,   12,6,   18,6,
-            0,12,  6,12,  12,12,  18,12,
-            0,18,  6,18,  12,18,  18,18
-        };
+        GLshort borderMesh[32];
+#ifdef W3D_SYMBIAN
+        // el driver del N95 no dibuja glDrawElements en la fase 2D: la
+        // version GLES expande los indices a 48 vertices sueltos (float)
+        GLfloat borderMeshExp[96];
+#endif
+
+        WithBorder(); // C++03: el mesh default se arma en el constructor
 
         // ------------------ Funciones ------------------
         void DibujarBordes(ViewportBase* current);
