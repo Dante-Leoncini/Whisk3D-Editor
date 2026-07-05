@@ -1215,7 +1215,6 @@ void LayoutMenuEditContexto(int mx, int my) {
         if (!gMenuFace) {
             gMenuFace = new PopupMenu(); gMenuFace->titulo = "Face"; gMenuFace->action = LayoutAccionObject;
             gMenuFace->Agregar("Extrude Faces", 300)->atajo = "E";
-            gMenuFace->Agregar("Duplicate", 314)->atajo = "Shift D";
             gMenuFace->Agregar("Loop Cut and Slide", 340)->atajo = "Ctrl R";
             gMenuFace->Agregar("Rip", 341)->atajo = "V";
             gMenuFace->Agregar("Shade Smooth", 320);
@@ -1229,7 +1228,6 @@ void LayoutMenuEditContexto(int mx, int my) {
         if (!gMenuEdge) {
             gMenuEdge = new PopupMenu(); gMenuEdge->titulo = "Edge"; gMenuEdge->action = LayoutAccionObject;
             gMenuEdge->Agregar("Extrude Edges", 300)->atajo = "E";
-            gMenuEdge->Agregar("Duplicate", 314)->atajo = "Shift D";
             gMenuEdge->Agregar("Loop Cut and Slide", 340)->atajo = "Ctrl R";
             gMenuEdge->Agregar("Rip", 341)->atajo = "V";
             gMenuEdge->Agregar("Mark Sharp", 330)->atajo = "W";
@@ -1242,7 +1240,6 @@ void LayoutMenuEditContexto(int mx, int my) {
             gMenuVertex = new PopupMenu(); gMenuVertex->titulo = "Vertex"; gMenuVertex->action = LayoutAccionObject;
             gMenuVertex->Agregar("New Edge/Face from Vertices", 310)->atajo = "F";
             gMenuVertex->Agregar("Extrude Vertices", 300)->atajo = "E";
-            gMenuVertex->Agregar("Duplicate", 314)->atajo = "Shift D";
             gMenuVertex->Agregar("Rip", 341)->atajo = "V";
             // (Delete se movio al menu "Mesh": es comun a vertice/borde/cara)
         }
@@ -2658,15 +2655,44 @@ static int EditPickIndex(int modo, int mx, int my, int vx, int vy, int vw, int v
     w3dEngine::EnableArray(w3dEngine::TexCoordArray); // baseline de la UI
 
     int ccx = cxw - x0, ccy = cyw - y0; // donde cae el centro real dentro del area
-    int id = 0; long bestDist = 1L << 30;
-    for (int dy = 0; dy < WD; dy++) for (int dx = 0; dx < WD; dx++) {
-        GLubyte* px = &area[(dy*WD + dx) * 4];
-        int cand = (px[0] >> 3) | ((px[1] >> 2) << 5) | ((px[2] >> 3) << 11);
-        if (cand <= 0 || cand > N) continue;
-        long ex = dx - ccx, ey = dy - ccy, dist = ex*ex + ey*ey;
-        if (dist < bestDist) { bestDist = dist; id = cand; }
+    // MSAA-robusto: NO tomamos el pixel valido mas cercano al centro (que puede ser BASURA de un borde que el
+    // antialiasing mezclo -> decodifica a un id CUALQUIERA y selecciona un vert lejano en cualquier direccion).
+    // En su lugar VOTAMOS: cada id suma 1 por pixel. Un vert real cubre un BLOQUE solido; un artefacto de MSAA es
+    // un pixel suelto -> pierde. Desempate por cercania al centro (para elegir el vert justo bajo el click).
+    int id = 0;
+    {
+        std::map<int,int> cnt; std::map<int,long> nearest;
+        for (int dy = 0; dy < WD; dy++) for (int dx = 0; dx < WD; dx++) {
+            GLubyte* px = &area[(dy*WD + dx) * 4];
+            int cand = (px[0] >> 3) | ((px[1] >> 2) << 5) | ((px[2] >> 3) << 11);
+            if (cand <= 0 || cand > N) continue;
+            long ex = dx - ccx, ey = dy - ccy, d = ex*ex + ey*ey;
+            cnt[cand]++;
+            std::map<int,long>::iterator itn = nearest.find(cand);
+            if (itn == nearest.end() || d < itn->second) nearest[cand] = d;
+        }
+        int bestCnt = 0; long bestNear = 1L << 30;
+        for (std::map<int,int>::iterator it = cnt.begin(); it != cnt.end(); ++it) {
+            long nr = nearest[it->first];
+            if (it->second > bestCnt || (it->second == bestCnt && nr < bestNear)) { bestCnt = it->second; bestNear = nr; id = it->first; }
+        }
     }
     int k = id - 1;
+    // --- DIAGNOSTICO TEMPORAL del pick (se saca cuando se resuelva el bug de seleccion) ---
+    {
+        FILE* lf = fopen("whisk3d_pick.log", "a");
+        if (lf) {
+            int centerId = -1;
+            if (ccx>=0 && ccx<WD && ccy>=0 && ccy<WD){ GLubyte* p=&area[(ccy*WD+ccx)*4]; centerId=(p[0]>>3)|((p[1]>>2)<<5)|((p[2]>>3)<<11); }
+            fprintf(lf, "PICK modo=%d click=(%d,%d) vp=(%d,%d,%d,%d) sh=%d glY=%d read0=(%d,%d) centro=(%d,%d) N=%d -> id=%d k=%d centerPix=%d\n",
+                    modo, mx, my, vx, vy, vw, vh, screenH, glY, x0, y0, ccx, ccy, N, id, k, centerId-1);
+            if (k>=0 && k<N && !faceMode && !edgeMode) fprintf(lf, "  winner pos=(%.3f,%.3f,%.3f)\n", e->pos[k*3], e->pos[k*3+1], e->pos[k*3+2]);
+            for (int dy=WD-1; dy>=0; dy--){ for (int dx=0; dx<WD; dx++){ GLubyte* px=&area[(dy*WD+dx)*4];
+                int cand=(px[0]>>3)|((px[1]>>2)<<5)|((px[2]>>3)<<11);
+                fprintf(lf, cand>0&&cand<=N ? "%3d " : "  . ", cand>0&&cand<=N?cand:0); } fprintf(lf, "\n"); }
+            fclose(lf);
+        }
+    }
     return (k >= 0 && k < N) ? k : -1;
 }
 

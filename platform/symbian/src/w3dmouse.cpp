@@ -165,6 +165,22 @@ void CWhisk3D::DrawMouseCursor(){
         w3dEngine::Enable(w3dEngine::Texture2D);
     }
 
+    // CRUZ de mira EXACTA en (mouseX,mouseY) = el punto donde LEE el pick. El sprite/flecha de arriba lo CLAMPEA
+    // el driver (tamano de punto) y lo corre del punto real -> apuntabas con la flecha pero el pick leia hasta
+    // ~16px corrido y seleccionaba otro vertice. Esta cruz (lineas, SIN clamping) marca el click real: apunta ESTO.
+    w3dEngine::Disable(w3dEngine::Texture2D);
+    w3dEngine::DisableArray(w3dEngine::TexCoordArray);
+    {
+        static const GLfloat cross[] = { -6,0,0,  6,0,0,   0,-6,0,  0,6,0 };
+        glColor4f(1.0f, 0.15f, 0.15f, 1.0f); // rojo (el "punto rojo": apunta esto al vertice)
+        w3dEngine::LineWidth(1.0f);
+        glVertexPointer(3, GL_FLOAT, 0, cross);
+        glDrawArrays(GL_LINES, 0, 4);
+        glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+    }
+    w3dEngine::EnableArray(w3dEngine::TexCoordArray);
+    w3dEngine::Enable(w3dEngine::Texture2D);
+
     w3dEngine::EnableArray(w3dEngine::NormalArray);
     glPopMatrix();
 }

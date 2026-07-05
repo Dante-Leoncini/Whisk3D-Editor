@@ -151,6 +151,7 @@ Viewport3D::Viewport3D(Vector3 pos){
         MenuMesh = new PopupMenu();
         MenuMesh->titulo = "Mesh";
         MenuMesh->Agregar("Transform", 0, -1, MenuTransform);            // arriba de todo (Move/Rotate/Scale)
+        MenuMesh->Agregar("Duplicate", 314)->atajo = "Shift D";          // comun a vertice/borde/cara
         MenuMesh->Agregar("Merge", 0, -1, LayoutSubmenuMerge())->atajo = "M"; // suelda verts (limpia duplicados)
         MenuMesh->Agregar("Snap", 0, -1, LayoutSubmenuSnap())->atajo = "Shift S";
         MenuMesh->Agregar("Delete", 360, -1, LayoutSubmenuDelete())->atajo = "X"; // abajo de todo

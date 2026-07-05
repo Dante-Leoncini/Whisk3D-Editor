@@ -519,21 +519,18 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 					W3dNewTransformEnd(EFalse);
 					return EKeyWasConsumed;
 				}
-				// MOUSE VIRTUAL visible: OK = click izquierdo -> selecciona el vert/edge/
-				// face/objeto bajo el cursor (mismo pick que el mouse BT). shift+OK = multi
-				// (el pick lee LShiftPressed). LAPIZ + OK = LOOP SELECT en el cursor.
+				// MOUSE VIRTUAL visible: OK = click izquierdo -> selecciona el vert/edge/face/objeto bajo el cursor
+				// (mismo pick que el mouse BT). LAPIZ/shift + OK = click ADITIVO: suma a la seleccion, el ultimo
+				// clickeado queda de ACTIVO (igual que Shift+click de PC). Asi se juntan varias cosas + un activo
+				// para Set Parent, etc. (antes el lapiz+OK hacia loop select y el tap del lapiz ciclaba -> desastre).
 				if (mouseVisible){
 					// PRIMERO la UI bajo el cursor (menus/barras/paneles/popups/'x' de notificaciones), igual que el
 					// BT mouse y PC. Antes el OK virtual hacia SIEMPRE pick 3D -> la cruz de cerrar no respondia (Dante).
 					if (W3dLayoutClickUI(mouseX, mouseY)){ return EKeyWasConsumed; }
 					extern bool LShiftPressed;
-					LShiftPressed = iWhisk3D->iShiftPressed ? true : false;
-					if (gLapizHeld){                  // lapiz mantenido + OK = loop select
-						iWhisk3D->ClickLoopSelect();
-						gLapizArrowUsed = ETrue;       // que soltar el lapiz NO cicle la seleccion
-					} else {
-						iWhisk3D->ClickSelect();
-					}
+					LShiftPressed = (gLapizHeld || iWhisk3D->iShiftPressed) ? true : false; // lapiz mantenido = shift
+					iWhisk3D->ClickSelect();
+					if (gLapizHeld) gLapizArrowUsed = ETrue; // que soltar el lapiz NO cicle la seleccion
 					return EKeyWasConsumed;
 				}
 				// OK al panel ACTIVO (propiedades/outliner) por teclado, sin mouse
@@ -591,7 +588,7 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 			if (usc == EStdKeyHash){ gHashHeld = EFalse; return EKeyWasConsumed; } // # soltada: fin primera persona
 			if (usc == EStdKeyLeftShift){ // LAPIZ (solo shift ahora)
 				TUint dt = User::NTickCount() - gLapizDownTick; // lapiz soltado: corto + sin flecha = ciclar
-				if (gLapizHeld && !gLapizArrowUsed && dt < 500 && !W3dNewTransformActive()){ W3dNewCycleSelect(); }
+				if (gLapizHeld && !gLapizArrowUsed && dt < 500 && !W3dNewTransformActive() && !mouseVisible){ W3dNewCycleSelect(); } // con mouse virtual el lapiz es shift (no cicla)
 				gLapizHeld = EFalse;
 				return EKeyWasConsumed;
 			}
