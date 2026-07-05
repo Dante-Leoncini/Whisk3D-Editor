@@ -114,6 +114,8 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropBool*  propMirX; PropBool* propMirY; PropBool* propMirZ; // ejes
         PropButton* propMirTarget; // "Mirror Object" (dropdown: cualquier objeto)
         PropBool*  propMirMerge; PropFloat* propMirDist; PropBool* propMirClip; // merge + distancia + clipping
+        // Subdivision Surface: modo (Catmull-Clark/Simple) + niveles viewport/render
+        PropBool*  propSubSimple; PropFloat* propSubLevel; PropFloat* propSubRender;
         PropButton* propBtnApplyMod; // "Apply Modifier": hornea la malla generada en malla real editable
         PropListMeshParts* propListUV;    // lista de UV maps (modo=1)
         PropListMeshParts* propListColor; // lista de capas de color (modo=2)

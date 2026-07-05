@@ -393,6 +393,19 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         if (m->modificadorActivo<0 || m->modificadorActivo>=(int)m->modificadores.size()){err="sin modificador activo";return false;}
         int on=1; ss>>on; m->modificadores[m->modificadorActivo]->clipping=on; return true;
     }
+    // ---- modsub <level> <simple 0|1> : setea el nivel viewport + modo (Simple/Catmull) del subsurf activo + regenera ----
+    if (cmd == "modsub") {
+        Mesh* m = ScriptActiveMesh(); if(!m){err="no hay malla activa";return false;}
+        if (m->modificadorActivo<0 || m->modificadorActivo>=(int)m->modificadores.size()){err="sin modificador activo";return false;}
+        Modifier* mod = m->modificadores[m->modificadorActivo];
+        int lvl=1, simple=0; ss>>lvl>>simple; mod->subLevel=lvl; mod->subSimple=(simple!=0);
+        m->GenerarMallaModificada(); return true;
+    }
+    // ---- rendermode <0|1> : setea g_modRenderMode (Subdivision usa subRenderLevel) + regenera la malla activa ----
+    if (cmd == "rendermode") {
+        extern bool g_modRenderMode; Mesh* m = ScriptActiveMesh(); if(!m){err="no hay malla activa";return false;}
+        int on=0; ss>>on; g_modRenderMode=(on!=0); m->GenerarMallaModificada(); return true;
+    }
     // ---- modmostrar <viewport|edit> <0|1> : toggle de visibilidad del modificador activo + regenera ----
     if (cmd == "modmostrar") {
         Mesh* m = ScriptActiveMesh(); if(!m){err="no hay malla activa";return false;}
