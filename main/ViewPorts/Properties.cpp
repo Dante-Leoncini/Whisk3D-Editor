@@ -916,6 +916,10 @@ void Properties::ConstruirGrupos(){
     propRender->properties.push_back(propRenderNormal);
     propRenderAlpha = new PropBool("Alpha"); propRenderAlpha->value = &renderAlpha;
     propRender->properties.push_back(propRenderAlpha);
+    // color de FONDO del render (global g_renderBg, solo para el pase Rendered). Se edita con el color picker.
+    propRenderBg = new PropColor("Background");
+    propRenderBg->value = g_renderBg; // el array global decae a puntero (igual que los colores de material/luz)
+    propRender->properties.push_back(propRenderBg);
     // boton con action real (antes era no-op)
     PropButton* pbRenderImg = new PropButton("Render Image");
     pbRenderImg->action = AccionRenderImage;

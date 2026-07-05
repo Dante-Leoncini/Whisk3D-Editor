@@ -87,9 +87,14 @@ class Viewport3D : public ViewportBase, public WithBorder {
         bool limpiarPantalla; 
         RenderType view; 
 
-        GLfloat nearClip; 
-        GLfloat farClip; 
-        GLfloat aspect; 
+        GLfloat nearClip;
+        GLfloat farClip;
+        GLfloat aspect;
+
+        // color de fondo del viewport en modo solid/wireframe/material (POR-VIEWPORT, editable en codigo).
+        // Sentinel alpha < 0 = usar el color del tema (ListaColores[background]), que es el comportamiento
+        // por defecto. Es OTRO color que el fondo del RENDER (g_renderBg, global). Sin UI por ahora.
+        float bgSolido[4];
 
         // --- Rotación orbital / libre ---
         Quaternion viewRot; // rotación de la cámara

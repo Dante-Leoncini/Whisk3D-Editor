@@ -29,6 +29,10 @@ struct RenderType {
 // Declaraciones de variables globales
 extern RenderType view;
 
+// color de FONDO del RENDER (pase Rendered). GLOBAL y en un solo lugar: es SOLO para el render view (el
+// menu Render lo edita). El fondo del viewport en solid/wireframe/material es OTRO color (por-viewport).
+extern float g_renderBg[4];
+
 extern GLfloat MaterialPreviewAmbient[4];
 extern GLfloat MaterialPreviewDiffuse[4];
 extern GLfloat MaterialPreviewSpecular[4];

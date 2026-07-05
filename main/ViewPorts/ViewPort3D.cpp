@@ -236,6 +236,7 @@ Viewport3D::Viewport3D(Vector3 pos){
     nearClip = 0.01f;
     farClip = 1000.0f;
     aspect = 1.0f;
+    bgSolido[0] = bgSolido[1] = bgSolido[2] = bgSolido[3] = -1.0f; // sentinel: usar el color del tema
     viewRot = Quaternion::FromEuler(-30.0f, -23.0f, 0.0f);
     orbitDistance = 10.0f;
 
@@ -759,11 +760,14 @@ void Viewport3D::Render() {
         if (view == RenderType::ZBuffer || view == RenderType::Alpha) {
             w3dEngine::ClearColor(0.0f, 0.0f, 0.0f, 1.0f); // ZBuffer y Alpha: fondo NEGRO
         } else if (view == RenderType::Rendered) {
-            w3dEngine::ClearColor(scene->backgroundColor[0], scene->backgroundColor[1],
-                         scene->backgroundColor[2], scene->backgroundColor[3]);
+            w3dEngine::ClearColor(g_renderBg[0], g_renderBg[1], g_renderBg[2], g_renderBg[3]); // fondo GLOBAL del render
         } else {
-            w3dEngine::ClearColor(ListaColores[static_cast<int>(ColorID::background)][0], ListaColores[static_cast<int>(ColorID::background)][1],
-                         ListaColores[static_cast<int>(ColorID::background)][2], ListaColores[static_cast<int>(ColorID::background)][3]);
+            // solid / wireframe / material / normal: fondo POR-VIEWPORT (bgSolido). Sentinel alpha<0 = tema.
+            if (bgSolido[3] >= 0.0f)
+                w3dEngine::ClearColor(bgSolido[0], bgSolido[1], bgSolido[2], bgSolido[3]);
+            else
+                w3dEngine::ClearColor(ListaColores[static_cast<int>(ColorID::background)][0], ListaColores[static_cast<int>(ColorID::background)][1],
+                             ListaColores[static_cast<int>(ColorID::background)][2], ListaColores[static_cast<int>(ColorID::background)][3]);
         }
         w3dEngine::Clear(w3dEngine::ColorBuffer | w3dEngine::DepthBuffer);
     } else {
@@ -902,6 +906,11 @@ bool Viewport3D::RenderAPNG(int outW, int outH, RenderType::Enum pass, const cha
 
     // fijar el PASE (sin overlay): modo + luces + flags del Core, una sola vez
     RenderType viewPrev = view; bool overlaysPrev = showOverlays;
+    bool camPrev = ViewFromCameraActive;
+    // el render se hace DESDE la camara activa (como F12 en Blender): si hay camara, forzamos su POV.
+    // Sin camara queda la vista del viewport (orbita). La proyeccion sigue con fovDeg (la Camera del editor
+    // no tiene lente propio todavia). El gizmo de la camara no sale (showOverlays=false + este flag).
+    if (CameraActive) ViewFromCameraActive = true;
     view = pass; showOverlays = false;
     ReloadLights();
     g_mostrarOverlays = false; w3dRenderOverlays = false;
@@ -915,9 +924,8 @@ bool Viewport3D::RenderAPNG(int outW, int outH, RenderType::Enum pass, const cha
     // color de fondo del pase
     float bg[4];
     if (pass == RenderType::ZBuffer || pass == RenderType::Alpha){ bg[0]=bg[1]=bg[2]=0.0f; bg[3]=1.0f; } // NEGRO (matte blanco sobre negro)
-    else if (pass == RenderType::Rendered && scene){
-        bg[0]=scene->backgroundColor[0]; bg[1]=scene->backgroundColor[1];
-        bg[2]=scene->backgroundColor[2]; bg[3]=scene->backgroundColor[3];               // fondo de escena
+    else if (pass == RenderType::Rendered){
+        bg[0]=g_renderBg[0]; bg[1]=g_renderBg[1]; bg[2]=g_renderBg[2]; bg[3]=g_renderBg[3]; // color de fondo GLOBAL del render
     } else { bg[0]=bg[1]=bg[2]=0.0f; bg[3]=0.0f; }                                       // normal: transparente (composicion)
 
     // tiles en coords BOTTOM-LEFT (como GL); el flip vertical lo hace SavePNG al final
@@ -979,7 +987,7 @@ bool Viewport3D::RenderAPNG(int outW, int outH, RenderType::Enum pass, const cha
 
     // restaurar el estado del viewport (los flags de pase se re-setean solos en el proximo Render,
     // pero los limpiamos ya por las dudas de que algo dibuje antes)
-    view = viewPrev; showOverlays = overlaysPrev;
+    view = viewPrev; showOverlays = overlaysPrev; ViewFromCameraActive = camPrev;
     w3dRenderAlpha = false; w3dRenderSinLuz = false; w3dRenderNormalColor = false;
     ReloadLights();
 

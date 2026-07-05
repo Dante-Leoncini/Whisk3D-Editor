@@ -196,6 +196,8 @@ TKeyResponse CWhisk3DAppUi::HandleKeyEventL(const TKeyEvent& aKeyEvent, TEventCo
                 case(17): //abajo
                     iAppContainer->iWhisk3D->Tab();
                     return EKeyWasNotConsumed;*/
+                case EStdKeyNo: // tecla ROJA "cortar llamada" (end): NO cerrar la app -> consumir
+                    return EKeyWasConsumed;
                 default:
                     iAppContainer->iWhisk3D->EventKeyDown(scan);
                     return EKeyWasNotConsumed;
@@ -226,6 +228,8 @@ TKeyResponse CWhisk3DAppUi::HandleKeyEventL(const TKeyEvent& aKeyEvent, TEventCo
                     return EKeyWasConsumed;
                 case(20): //left  Alt
                     iAppContainer->iWhisk3D->iAltPressed = EFalse;
+                    return EKeyWasConsumed;
+                case EStdKeyNo: // tecla ROJA (end): no cerrar la app
                     return EKeyWasConsumed;
                 default:
                     return EKeyWasNotConsumed;

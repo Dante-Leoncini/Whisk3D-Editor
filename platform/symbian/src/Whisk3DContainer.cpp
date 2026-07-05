@@ -395,6 +395,12 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 				gGreenUsado = EFalse;
 				return EKeyWasConsumed;
 			}
+			// tecla ROJA "cortar llamada" (end key): la CONSUMIMOS y no hacemos nada -> que NO cierre la app.
+			// Por defecto S60 la lleva a HandleCommandL(EEikCmdExit) -> Exit(). El app SI la recibe (igual que
+			// la verde), asi que consumirla aca alcanza para que no cierre.
+			if (sc == EStdKeyNo){
+				return EKeyWasConsumed;
+			}
 			// FLECHAS: con el viewport 3D activo se MANTIENEN (gHeld*) y el loop de
 			// frame las aplica continuo (fluido). Si el activo NO es 3D, caen al
 			// ruteo de paneles de abajo (mouse BT).
@@ -563,6 +569,7 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 				gGreenHeld = EFalse;
 				return EKeyWasConsumed;
 			}
+			if (usc == EStdKeyNo){ return EKeyWasConsumed; } // tecla ROJA (end): consumida, no cierra la app
 			if (usc == '0'){ // 0 soltada: tap SIN flecha = enfocar (como antes); con flecha ya hizo zoom
 				if (g0Held && !g0ArrowUsed) W3dNewEnfocar();
 				g0Held = EFalse;

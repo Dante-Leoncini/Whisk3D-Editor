@@ -3,6 +3,9 @@
 // Definición de variables
 RenderType view = RenderType::MaterialPreview;
 
+// fondo del RENDER (pase Rendered): gris oscuro por defecto, editable desde el menu Render (color picker).
+float g_renderBg[4] = { 0.2f, 0.2f, 0.2f, 1.0f };
+
 GLfloat MaterialPreviewAmbient[4]  = { 0.3f, 0.3f, 0.3f, 1.0f };
 GLfloat MaterialPreviewDiffuse[4]  = { 1.0f, 1.0f, 1.0f, 1.0f };
 GLfloat MaterialPreviewSpecular[4] = { 0.2f, 0.2f, 0.2f, 1.0f };

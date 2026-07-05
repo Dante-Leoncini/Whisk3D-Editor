@@ -406,6 +406,7 @@ TBool W3dNewTreeItem(TInt aIdx, char* aName, TInt aNameMax,
 // importar un .obj con el importador COMPARTIDO de PC (fase 4)
 TBool W3dNewImportObj(const char* aPath) {
     if (!aPath || !aPath[0]) return EFalse;
+    w3dLogf("W3dNewImportObj: aPath='%s'", aPath); // diagnostico: confirma que se dispara el import + el path crudo
     bool ok = ImportOBJ(std::string(aPath), false);
     w3dLogf("importObj: ok=%d hijos=%d", (TInt)ok,
         SceneCollection ? (TInt)SceneCollection->Childrens.size() : -1);

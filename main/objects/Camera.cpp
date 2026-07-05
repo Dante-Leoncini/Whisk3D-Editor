@@ -159,6 +159,9 @@ void Camera::ReloadRiel(Object* me) {
 
 void Camera::RenderObject() {
 #ifdef W3D_SYMBIAN
+    // MISMO gate que PC: sin overlays (render a PNG / limpieza de pantalla) o mirando DESDE la camara
+    // -> no dibujar el gizmo. Antes Symbian lo dibujaba SIEMPRE (se veia en el render del N95).
+    if (!showOverlayGlobal || ViewFromCameraActiveGlobal) return;
     // gizmo de PC (piramide de lineas + triangulo si es la activa) pero con
     // drawArrays: vertices expandidos una sola vez desde CameraEdges
     static GLfloat lineV[CameraEdgesSize * 3];

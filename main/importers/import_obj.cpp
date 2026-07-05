@@ -7,6 +7,7 @@
 #include "objects/ObjectMode.h" // RotGlobalDe (normales a mundo en el export)
 #include "ViewPorts/PopUp/ProgressPopup.h" // barra de progreso (export/import, clave en el N95 lento)
 #include "ViewPorts/LayoutInput.h"          // Notificar (toast de exito/error)
+#include "w3dlog.h" // diagnostico del import (clave en N95: ubicar donde crashea)
 #include <cstdio> // sprintf para FloatStr
 
 // formateo de float SIN operator<< ni %f: ambos ROTOS en STLport/Symbian (el export escribia basura tipo
@@ -974,7 +975,9 @@ bool ExportOBJ(const std::string& filepath, bool selectedOnly, bool applyModifie
 }
 
 bool ImportOBJ(const std::string& filepath, bool NoMerge = false) {
+    w3dLogf("ImportOBJ: INICIO '%s' (len=%d)", filepath.c_str(), (int)filepath.size());
     if (filepath.size() < 4 || filepath.substr(filepath.size() - 4) != ".obj") {
+        w3dLog("ImportOBJ: rechazado (no termina en .obj)");
 #ifndef W3D_SYMBIAN
         std::cerr << "Error: El archivo seleccionado no tiene la extension .obj" << std::endl;
 #endif
@@ -985,6 +988,7 @@ bool ImportOBJ(const std::string& filepath, bool NoMerge = false) {
     // por linea -> antes eran ~663k allocs/2.7s para 200k verts). fileData vive hasta el final del parseo (lines
     // apunta adentro). BINARY: que el tokenizador vea el \r crudo y lo limpie el (no doble traduccion del runtime).
     std::ifstream file(filepath.c_str(), std::ios::binary);
+    w3dLogf("ImportOBJ: open is_open=%d", (int)file.is_open());
     if (!file.is_open()) {
 #ifndef W3D_SYMBIAN
         std::cerr << "Error al abrir: " << filepath << std::endl;
@@ -995,8 +999,12 @@ bool ImportOBJ(const std::string& filepath, bool NoMerge = false) {
     // N95 son menos confiables). Anda igual en PC y Symbian. read() devuelve el stream (falso al leer parcial en EOF) ->
     // el "|| gcount()>0" agarra el ultimo bloque parcial.
     std::string fileData;
-    char _chunk[65536];
-    while (file.read(_chunk, sizeof(_chunk)) || file.gcount() > 0)
+    // buffer de lectura en el HEAP (NO en el stack): 64KB en el stack revienta el stack chico del hilo
+    // principal del N95 (Symbian) -> crash al hacer file.read. En el heap anda igual en PC y N95.
+    const int CHUNK = 65536;
+    std::vector<char> _chunkBuf(CHUNK);
+    char* _chunk = &_chunkBuf[0];
+    while (file.read(_chunk, CHUNK) || file.gcount() > 0)
         fileData.append(_chunk, (size_t)file.gcount());
     file.close();
 
@@ -1018,6 +1026,7 @@ bool ImportOBJ(const std::string& filepath, bool NoMerge = false) {
         }
     }
 
+    w3dLogf("ImportOBJ: '%s' -> %d lineas", filepath.c_str(), (int)lines.size());
     ProgresoIniciar("Importing model..."); // barra de progreso (clave en el N95: importar tarda)
 
     size_t idx = 0;
@@ -1032,7 +1041,9 @@ bool ImportOBJ(const std::string& filepath, bool NoMerge = false) {
     while (idx < lines.size() && hayMas) {
         hayMas = LeerOBJ(lines, idx, filepath, &acumuladoVertices, &acumuladoNormales, &acumuladoUVs, &acumuladoColores, NoMerge);
         objetosCargados++;
+        w3dLogf("ImportOBJ: obj %d parseado (idx=%d v=%d)", objetosCargados, (int)idx, acumuladoVertices);
     }
+    w3dLogf("ImportOBJ: parse OK (%d objetos, %d verts)", objetosCargados, acumuladoVertices);
 
     // Archivo .mtl asociado
     std::string mtlFile = filepath.substr(0, filepath.size() - 4) + ".mtl";
@@ -1041,6 +1052,7 @@ bool ImportOBJ(const std::string& filepath, bool NoMerge = false) {
         std::ifstream probe(mtlFile.c_str());
         mtlExiste = probe.good();
     }
+    w3dLogf("ImportOBJ: mtl '%s' existe=%d", mtlFile.c_str(), (int)mtlExiste);
     if (mtlExiste) {
         if (!LeerMTL(mtlFile, objetosCargados)) {
 #ifndef W3D_SYMBIAN
@@ -1053,6 +1065,7 @@ bool ImportOBJ(const std::string& filepath, bool NoMerge = false) {
 #endif
     }
 
+    w3dLog("ImportOBJ: FIN OK (si crashea despues de esto, es el render de la malla importada)");
     ProgresoFin();
     Notificar("OBJ imported successfully!", false); // toast verde de exito
     return true;

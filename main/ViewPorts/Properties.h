@@ -121,6 +121,7 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropText* propRenderOutput;  // campo editable "Output" del render
         PropFloat* propRenderW; PropFloat* propRenderH;         // ancho/alto del render en pixeles (editable)
         PropBool*  propRenderZbuffer; PropBool* propRenderNormal; PropBool* propRenderAlpha; // pases extra
+        PropColor* propRenderBg;     // color de fondo del render (global g_renderBg, solo pase Rendered)
         float renderW; float renderH;          // valores del render (default 640 x 480)
         bool  renderZbuffer; bool renderNormal; bool renderAlpha; // pases extra tildados (el beauty siempre)
         PropText* propExportName;    // campo editable del nombre/path del .obj
