@@ -13,7 +13,6 @@
 #include "importers/import_obj.h" // ExportOBJ (boton Wavefront.obj de la tarjeta Export)
 #include "render/OpcionesRender.h" // g_redraw (scroll de la lista con la rueda)
 #include "ViewPorts/ViewPort3D.h"  // Viewport3D::RenderAPNG + Viewport3DActive (render a PNG)
-#include "animation/Animation.h"   // CurrentFrame (sufijo _0001 del nombre del render)
 #include <cstdio>
 #include <string>
 #ifdef W3D_SYMBIAN
@@ -646,8 +645,13 @@ static std::string RenderFileNamePNG(const std::string& out, const char* tag){
         base = base.substr(0, dot); // saca la extension del campo Output
     if (base.empty()) base = "render";
     if (tag && tag[0]) { base += "_"; base += tag; }
+    int frame = 0;
+#ifndef W3D_SYMBIAN
+    extern int CurrentFrame; // frame de animacion actual (Animation.cpp; en N95 no se linkea todavia)
+    frame = CurrentFrame;
+#endif
     char suf[24];
-    snprintf(suf, sizeof(suf), "_%04d.png", CurrentFrame);
+    snprintf(suf, sizeof(suf), "_%04d.png", frame);
     base += suf;
     return base;
 }
