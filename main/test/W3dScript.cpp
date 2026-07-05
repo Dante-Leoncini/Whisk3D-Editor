@@ -200,6 +200,14 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         return true;
     }
 
+    // ---- editdelete : borra la seleccion en Edit Mode segun el selmode actual (Vertices/Edges/Faces) ----
+    if (cmd == "editdelete") {
+        if (InteractionMode != EditMode) { err = "editdelete necesita Edit Mode"; return false; }
+        Mesh* m = ScriptActiveMesh(); if(!m){err="no hay malla activa";return false;}
+        m->BorrarSeleccionEdit(EditSelectMode);
+        return true;
+    }
+
     // ---- move <amt> (mueve la seleccion 'amt' en el eje X; usa el MISMO path G/R/S -> testea EditMoveUndo) ----
     if (cmd == "move") {
         float amt = 0.0f; ss >> amt;
@@ -352,8 +360,9 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
     if (cmd == "editinfo") {
         Mesh* m = ScriptActiveMesh(); if(!m){err="no hay malla activa";return false;}
         int tri=0,quad=0,ngon=0; for(size_t f=0;f<m->faces3d.size();f++){ int s=(int)m->faces3d[f].idx.size(); if(s==3)tri++; else if(s==4)quad++; else if(s>4)ngon++; }
-        printf("      [edit] verts=%d faces3d=%d (tris=%d quads=%d ngons=%d) render tris=%d\n",
-               m->vertexSize, (int)m->faces3d.size(), tri, quad, ngon, m->facesSize/3);
+        printf("      [edit] verts=%d faces3d=%d (tris=%d quads=%d ngons=%d) render tris=%d looseE=%d looseV=%d\n",
+               m->vertexSize, (int)m->faces3d.size(), tri, quad, ngon, m->facesSize/3,
+               (int)(m->looseEdges.size()/2), (int)m->looseVerts.size());
         return true;
     }
     // ---- editbbox : bounding box de la malla EDITABLE (vertex[]) ----
@@ -399,6 +408,15 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         if (m->modificadorActivo<0 || m->modificadorActivo>=(int)m->modificadores.size()){err="sin modificador activo";return false;}
         Modifier* mod = m->modificadores[m->modificadorActivo];
         int lvl=1, simple=0; ss>>lvl>>simple; mod->subLevel=lvl; mod->subSimple=(simple!=0);
+        m->GenerarMallaModificada(); return true;
+    }
+    // ---- modscrew <angle> <height> <steps> <axis 0|1|2> : setea el screw activo + regenera ----
+    if (cmd == "modscrew") {
+        Mesh* m = ScriptActiveMesh(); if(!m){err="no hay malla activa";return false;}
+        if (m->modificadorActivo<0 || m->modificadorActivo>=(int)m->modificadores.size()){err="sin modificador activo";return false;}
+        Modifier* mod = m->modificadores[m->modificadorActivo];
+        float ang=360, hei=0, st=16; int ax=2; ss>>ang>>hei>>st>>ax;
+        mod->screwAngle=ang; mod->screwHeight=hei; mod->screwSteps=st; mod->screwAxis=ax;
         m->GenerarMallaModificada(); return true;
     }
     // ---- rendermode <0|1> : setea g_modRenderMode (Subdivision usa subRenderLevel) + regenera la malla activa ----

@@ -152,6 +152,7 @@ class MeshGeoUndo : public UndoCmd {
     std::vector<MeshIndex> faces;
     std::vector<MeshFace> faces3d;
     std::vector<int>      looseEdges;
+    std::vector<int>      looseVerts;
     std::vector<MaterialGroup> materialsGroup;
     std::vector<UVMap>       uvMaps;       int uvMapActivo;
     std::vector<ColorLayer>  colorLayers;  int colorActivo;
@@ -169,7 +170,7 @@ class MeshGeoUndo : public UndoCmd {
         if (s->uv)          uv.assign(s->uv, s->uv + vertexSize * 2);
         if (s->vertexColor) color.assign(s->vertexColor, s->vertexColor + vertexSize * 4);
         if (s->faces)       faces.assign(s->faces, s->faces + facesSize);
-        faces3d = s->faces3d; looseEdges = s->looseEdges; materialsGroup = s->materialsGroup;
+        faces3d = s->faces3d; looseEdges = s->looseEdges; looseVerts = s->looseVerts; materialsGroup = s->materialsGroup;
         for (size_t i = 0; i < s->uvMaps.size(); i++)       uvMaps.push_back(*s->uvMaps[i]);
         for (size_t i = 0; i < s->colorLayers.size(); i++)  colorLayers.push_back(*s->colorLayers[i]);
         for (size_t i = 0; i < s->vertexGroups.size(); i++) vertexGroups.push_back(*s->vertexGroups[i]);
@@ -187,7 +188,7 @@ class MeshGeoUndo : public UndoCmd {
         if (!uv.empty())      { s->uv = new GLfloat[uv.size()];                for (size_t i=0;i<uv.size();i++)      s->uv[i]          = uv[i]; }
         if (!color.empty())   { s->vertexColor = new GLubyte[color.size()];    for (size_t i=0;i<color.size();i++)   s->vertexColor[i] = color[i]; }
         if (!faces.empty())   { s->faces = new MeshIndex[faces.size()];         for (size_t i=0;i<faces.size();i++)   s->faces[i]       = faces[i]; }
-        s->faces3d = faces3d; s->looseEdges = looseEdges; s->materialsGroup = materialsGroup;
+        s->faces3d = faces3d; s->looseEdges = looseEdges; s->looseVerts = looseVerts; s->materialsGroup = materialsGroup;
         s->sharpEdges = sharpEdges; s->seamEdges = seamEdges; s->meshSmooth = meshSmooth;
         s->LiberarCapas();
         for (size_t i = 0; i < uvMaps.size(); i++)       s->uvMaps.push_back(new UVMap(uvMaps[i]));
@@ -207,7 +208,7 @@ public:
         // queda con lo que estaba vivo (para rehacer): intercambia los buffers con cur
         vertexSize = cur.vertexSize; facesSize = cur.facesSize;
         vertex.swap(cur.vertex); normals.swap(cur.normals); uv.swap(cur.uv); color.swap(cur.color);
-        faces.swap(cur.faces); faces3d.swap(cur.faces3d); looseEdges.swap(cur.looseEdges);
+        faces.swap(cur.faces); faces3d.swap(cur.faces3d); looseEdges.swap(cur.looseEdges); looseVerts.swap(cur.looseVerts);
         materialsGroup.swap(cur.materialsGroup);
         uvMaps.swap(cur.uvMaps); colorLayers.swap(cur.colorLayers); vertexGroups.swap(cur.vertexGroups);
         uvMapActivo = cur.uvMapActivo; colorActivo = cur.colorActivo; grupoActivo = cur.grupoActivo;
