@@ -1023,7 +1023,7 @@ void Properties::ConstruirGrupos(){
     propMirDist = new PropFloat("Merge Distance", "m"); propMirDist->onChange = AccionModParamChanged;
     propMirDist->SetRango(0.0f, 1.0f); propMirDist->stepFino = 0.0001f; propMirDist->dragStep = 0.0005f;
     propModifierProps->properties.push_back(propMirDist);
-    // Clipping (edit-time, PENDIENTE: el checkbox guarda el flag)
+    // Clipping (edit-time): clampea los verts al plano al moverlos y, una vez pegados, los deja pegados (arranca ON)
     propMirClip = new PropBool("Clipping"); propMirClip->onChange = AccionModParamChanged; propModifierProps->properties.push_back(propMirClip);
     // Apply Modifier (cualquier modificador): hornea la malla generada en la editable
     propBtnApplyMod = new PropButton("Apply Modifier");

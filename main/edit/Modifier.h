@@ -34,13 +34,15 @@ class Modifier {
         bool  merge;            // "soldar" (visual) los verts que tocan el plano: los snapea al plano + alinea
                                 // sus normales (media sobre el eje) -> una media esfera se ve esfera perfecta.
         float mergeDist;        // distancia del merge (default 0.001 m)
-        bool  clipping;         // (edit-time, PENDIENTE) clampea los verts al plano al moverlos
+        bool  clipping;         // (edit-time) clampea los verts al plano al moverlos y, una vez pegados, los
+                                // deja pegados a esa pared por el resto del transform (solo deslizan por el plano).
+                                // ARRANCA EN ON (el flujo tipico de Mirror lo quiere activado).
 
         Modifier(int t, const std::string& n)
             : tipo(t), nombre(n),
               mostrarViewport(true), mostrarEdit(true),
               ejeX(true), ejeY(false), ejeZ(false), target(NULL),
-              merge(true), mergeDist(0.001f), clipping(false) {}
+              merge(true), mergeDist(0.001f), clipping(true) {}
         virtual ~Modifier() {}
 };
 

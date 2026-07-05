@@ -84,6 +84,7 @@ void LayoutMenuPivot(int mx, int my);
 bool EditXformStart(int est, int eje); // arranca un transform de malla (G/R/S): setea estado/eje + captura undo
 bool EditXformActivo();              // hay un transform de malla en curso
 void EditXformIniciar();            // snapshot de la seleccion (lo llaman los starters G/R/S)
+void ClipMirrorReset();             // (def. en MeshEdit.cpp) olvida los verts "pegados" al plano del mirror clipping
 void EditXformReiniciar();          // restaura al snapshot (cambio de eje X/Y/Z)
 void EditXformConfirmar();          // fija: recalcula bordes + normales (salvo Lock Normals)
 void EditXformCancelar();           // descarta: restaura el snapshot

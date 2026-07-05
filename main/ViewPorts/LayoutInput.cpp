@@ -1327,6 +1327,7 @@ float   EditXformScaleFactor(){ return 1.0f + gEVscaleAmt; }
 void EditXformIniciar(){
     g_xformPrimerMov = true; // el primer motion arranca en cero (no usa el delta viejo)
     gEVsnap.clear(); gEVmesh = NULL;
+    ClipMirrorReset(); // nuevo transform: ningun vert esta "pegado" al plano del mirror todavia
     if (InteractionMode != EditMode || !g_editMesh) return;
     Mesh* m = (Mesh*)g_editMesh; m->EnsureEdit();
     if (!m->edit || !m->vertex) return;

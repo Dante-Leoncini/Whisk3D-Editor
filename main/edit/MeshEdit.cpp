@@ -370,6 +370,10 @@ void Mesh::ReconstruirEditSel(const std::vector<char>& selVertNuevo) {
 // Duplica los verts de la "tapa" (offset epsilon, asi NO quedan pegados al original) y
 // los deja seleccionados para que el editor los mueva. Direccion = normal promedio de
 // las caras adyacentes; si no hay (suelto) outConstrain=false (mov libre) + fallback.
+// (def. mas abajo, tras NormMod) true si la arista (ra,rb) esta sobre un plano de espejo con
+// clipping: es una COSTURA, no contorno real -> no hay que hacerle pared (la taparia el mirror).
+static bool AristaEnPlanoMirror(Mesh* m, int ra, int rb);
+
 bool Mesh::ExtruirEdit(Vector3& outDirLocal, bool& outConstrain) {
     EnsureEdit();
     if (!edit || !vertex || vertexSize <= 0) return false;
@@ -538,6 +542,10 @@ bool Mesh::ExtruirEdit(Vector3& outDirLocal, bool& outConstrain) {
         for (std::map<std::pair<int,int>,int>::iterator it=edgeCount.begin(); it!=edgeCount.end(); ++it) {
             if (it->second != 1) continue;
             int ra=edgeDir[it->first].first, rb=edgeDir[it->first].second;
+            // COSTURA del mirror: si la arista del contorno cae sobre el plano de espejo (clipping), NO se le hace
+            // pared -> no genera geometria interna invisible que el mirror tapa y que arruina la topologia. La tapa
+            // repuntada deja igual la arista nueva sobre el plano; el mirror la suelda con su reflejo.
+            if (AristaEnPlanoMirror(this, ra, rb)) continue;
             std::map<int,int>::iterator na=newOf.find(ra), nb=newOf.find(rb);
             if (na==newOf.end()||nb==newOf.end()) continue;
             std::vector<int> w; w.push_back(nb->second); w.push_back(na->second); w.push_back(ra); w.push_back(rb);
@@ -1496,10 +1504,16 @@ bool Mesh::TriangularSeleccionEdit() {
 static bool InvAffineMod(const Matrix4& in, Matrix4& out);
 static Vector3 NormMod(Vector3 v);
 
+// verts que YA se pegaron al plano en ESTE transform (clave = editK<<3 | (mi<<2) | eje). Una vez pegado, queda
+// pegado a esa pared por el resto del arrastre: aunque la muevas para el lado libre, solo desliza por el plano.
+// Se limpia en cada arranque de transform (EditXformIniciar -> ClipMirrorReset).
+static std::set<long long> gClipStuck;
+void ClipMirrorReset(){ gClipStuck.clear(); }
+
 // CLIPPING del modificador Mirror (edit-time): impide que los verts CRUCEN el plano del mirror mientras se mueven
-// (half-space, estilo Blender). Para cada vert, mira de que lado ARRANCO el transform (startLocal): si arranco a
-// <mergeDist del plano queda PEGADO al plano (costura); si no, se lo clampea para que no pase al OTRO lado (el que
-// genera el mirror). Asi podes empujar un vert contra el plano y no lo cruza, sin importar la velocidad. Local space.
+// (half-space, estilo Blender) y, una vez que un vert se PEGA al plano, lo deja pegado a esa pared por el resto del
+// transform (solo desliza por el plano; el eje del espejo queda clavado en 0). Para cada vert mira el lado ACTUAL y
+// el lado al EMPEZAR (startLocal): se pega si entra a la banda, si cruza el plano, o si YA se habia pegado. Local space.
 void Mesh::ClipMirrorVerts(const std::vector<int>& editKs, const std::vector<Vector3>& startLocal) {
     if (!edit || modificadores.empty()) return;
     for (size_t mi=0; mi<modificadores.size(); mi++){
@@ -1524,9 +1538,14 @@ void Mesh::ClipMirrorVerts(const std::vector<int>& editKs, const std::vector<Vec
             for (int a=0;a<3;a++){ if(!en[a]) continue; const Vector3& n=ax[a];
                 float d  = (px-c.x)*n.x + (py-c.y)*n.y + (pz-c.z)*n.z;      // lado ACTUAL
                 float d0 = (s0.x-c.x)*n.x + (s0.y-c.y)*n.y + (s0.z-c.z)*n.z; // lado al EMPEZAR
+                long long key = ((long long)k << 8) | ((long long)mi << 2) | a; // pegado por-vert(>>8)-por-modif(2..7)-por-eje(0..1)
+                bool yaPegado    = gClipStuck.count(key) != 0;                   // ya se habia pegado antes en este arrastre
                 bool dentroBanda = (d > -md && d < md);                          // esta dentro del margen -> snap a la costura
                 bool cruza = (d0 >= 0.0f && d < 0.0f) || (d0 < 0.0f && d > 0.0f); // cruzo el plano (saltandose la banda)
-                if (dentroBanda || cruza){ px-=d*n.x; py-=d*n.y; pz-=d*n.z; }     // clampea AL plano (d=0)
+                if (yaPegado || dentroBanda || cruza){
+                    px-=d*n.x; py-=d*n.y; pz-=d*n.z;   // clampea AL plano (d=0)
+                    gClipStuck.insert(key);            // y queda pegado a esta pared por el resto del transform
+                }
             }
             edit->pos[k*3]=px; edit->pos[k*3+1]=py; edit->pos[k*3+2]=pz;
         }
@@ -1672,6 +1691,36 @@ static bool InvAffineMod(const Matrix4& in, Matrix4& out){
     return true;
 }
 static Vector3 NormMod(Vector3 v){ float l=sqrtf(v.x*v.x+v.y*v.y+v.z*v.z); if(l>1e-6f){v.x/=l;v.y/=l;v.z/=l;} return v; }
+
+// true si la arista (ra,rb) (reps GPU de la malla) esta apoyada sobre ALGUN plano de un Mirror con clipping:
+// AMBOS extremos a <= tolerancia del mismo plano. En ese caso la arista es una COSTURA del espejo, no un contorno
+// real, y el extrude no debe hacerle pared (seria geometria interna que el mirror tapa). Todo en espacio LOCAL.
+static bool AristaEnPlanoMirror(Mesh* m, int ra, int rb){
+    if (!m || !m->vertex || ra<0 || rb<0 || ra>=m->vertexSize || rb>=m->vertexSize) return false;
+    Vector3 A(m->vertex[ra*3], m->vertex[ra*3+1], m->vertex[ra*3+2]);
+    Vector3 B(m->vertex[rb*3], m->vertex[rb*3+1], m->vertex[rb*3+2]);
+    for (size_t mi=0; mi<m->modificadores.size(); mi++){
+        Modifier* mod = m->modificadores[mi];
+        if (mod->tipo != ModifierType::Mirror || !mod->clipping) continue;
+        Vector3 c(0,0,0), ax0(1,0,0), ax1(0,1,0), ax2(0,0,1);
+        if (mod->target){ // plano del target -> espacio LOCAL del objeto (igual que ClipMirrorVerts)
+            Matrix4 Wo, Wt; m->GetWorldMatrix(Wo); mod->target->GetWorldMatrix(Wt);
+            Matrix4 iWo; InvAffineMod(Wo, iWo); Matrix4 M = iWo * Wt;
+            c   = Vector3(M.m[12],M.m[13],M.m[14]);
+            ax0 = NormMod(Vector3(M.m[0],M.m[1],M.m[2]));
+            ax1 = NormMod(Vector3(M.m[4],M.m[5],M.m[6]));
+            ax2 = NormMod(Vector3(M.m[8],M.m[9],M.m[10]));
+        }
+        Vector3 ax[3] = { ax0, ax1, ax2 }; bool en[3] = { mod->ejeX, mod->ejeY, mod->ejeZ };
+        float md = mod->mergeDist; if (md < 1e-3f) md = 1e-3f; // tolerancia (los verts de costura estan en d~0)
+        for (int a=0;a<3;a++){ if(!en[a]) continue; const Vector3& n=ax[a];
+            float da = (A.x-c.x)*n.x + (A.y-c.y)*n.y + (A.z-c.z)*n.z;
+            float db = (B.x-c.x)*n.x + (B.y-c.y)*n.y + (B.z-c.z)*n.z;
+            if (da>-md && da<md && db>-md && db<md) return true; // ambos sobre ESTE plano
+        }
+    }
+    return false;
+}
 
 // espeja la geometria a traves del plano (c, n): duplica verts REFLEJADOS + tris con winding REVERTIDO (normal
 // afuera). merge: los verts a <mergeDist del plano se SNAPEAN al plano + su normal se ALINEA (quita la componente
