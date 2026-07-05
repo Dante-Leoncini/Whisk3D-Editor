@@ -13,6 +13,7 @@
 #include <string>
 
 class Quaternion; // para la firma del trackball (EditXformRotAbs)
+class Mesh;       // para la firma de MergeVertsEdit (Mesh* + Vector3&)
 
 // teclas abstractas (cada plataforma traduce las suyas)
 //  Enter  = OK/activar el elemento enfocado (abre carpeta, etc.)
@@ -85,6 +86,8 @@ bool EditXformStart(int est, int eje); // arranca un transform de malla (G/R/S):
 bool EditXformActivo();              // hay un transform de malla en curso
 void EditXformIniciar();            // snapshot de la seleccion (lo llaman los starters G/R/S)
 void ClipMirrorReset();             // (def. en MeshEdit.cpp) olvida los verts "pegados" al plano del mirror clipping
+// (def. en MeshEdit.cpp) MERGE de la seleccion: 0 At Center, 1 At Cursor (cursorLocal), 2 Collapse, 3 By Distance(<dist)
+void MergeVertsEdit(Mesh* m, int modo, float dist, const Vector3& cursorLocal);
 void EditXformReiniciar();          // restaura al snapshot (cambio de eje X/Y/Z)
 void EditXformConfirmar();          // fija: recalcula bordes + normales (salvo Lock Normals)
 void EditXformCancelar();           // descarta: restaura el snapshot
@@ -147,6 +150,14 @@ void  NotificarHintClear();
 // menu de contexto de Edit Mode (W / boton de barra): abre el menu Vertex/Edge/Face
 // segun el sub-modo, en (mx,my). Los menus son separados (no submenus de "Mesh").
 void LayoutMenuEditContexto(int mx, int my);
+// submenus reutilizables para embeber en los menus de barra construidos en ViewPort3D.cpp
+// (el menu "Mesh" de Edit Mode: Transform arriba, Snap y Delete; y el menu Object: Set/Clear Parent):
+PopupMenu* LayoutSubmenuSnap();        // Snap (cursor/seleccion) -> menu Mesh
+PopupMenu* LayoutSubmenuDelete();      // Delete (vertices/aristas/caras/loops) -> menu Mesh
+PopupMenu* LayoutSubmenuMerge();       // Merge (At Center/Cursor/Collapse/By Distance) -> menu Mesh
+void LayoutMenuMerge(int mx, int my);  // tecla M en Edit Mode: abre el menu Merge en el cursor
+PopupMenu* LayoutSubmenuSetParent();   // Set Parent To -> menu Object
+PopupMenu* LayoutSubmenuClearParent(); // Clear Parent  -> menu Object
 
 // ===== ENTRADA NUMERICA / FORMULAS durante un transform (COMPARTIDA 4 OS) =====
 // Cada plataforma alimenta los caracteres tipeados por NumInputChar (PC: SDL_TEXTINPUT;

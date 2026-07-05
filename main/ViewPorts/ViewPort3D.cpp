@@ -81,6 +81,8 @@ Viewport3D::Viewport3D(Vector3 pos){
     b = new Button("View"); b->rol = BR_View; b->desplegable = true; BarButtons.push_back(b); // Viewpoint (antes de Select)
     b = new Button("Select"); b->rol = BR_Select; b->desplegable = true; BarButtons.push_back(b);
     b = new Button("Add"); b->rol = BR_Add; b->desplegable = true; BarButtons.push_back(b);
+    b = new Button("Mesh"); b->rol = BR_Mesh;                               // Transform/Snap/Delete comun
+        b->desplegable = true; b->visible = false; BarButtons.push_back(b); // SOLO en edit mode
     b = new Button("Object"); b->rol = BR_Object;
         b->desplegable = true; b->visible = false; BarButtons.push_back(b); // solo con seleccion (no edit)
     b = new Button("Overlays"); b->rol = BR_Overlays; b->desplegable = true; BarButtons.push_back(b);
@@ -139,28 +141,19 @@ Viewport3D::Viewport3D(Vector3 pos){
         MenuObject->Agregar("Duplicate Objects", 1)->atajo = "Shift D";
         MenuObject->Agregar("Duplicate Linked", 2)->atajo = "Alt D";
         MenuObject->Agregar("Join", 5)->atajo = "Ctrl J"; // une las mallas seleccionadas en el objeto activo
+        // Set/Clear Parent (Ctrl P / Ctrl Alt P): submenus construidos en LayoutInput.cpp (reusan los mismos que
+        // los atajos). Solo aparecen aca -> solo en Object Mode (MenuObject no se muestra en Edit).
+        MenuObject->Agregar("Set Parent",   0, -1, LayoutSubmenuSetParent())->atajo = "Ctrl P";
+        MenuObject->Agregar("Clear Parent", 0, -1, LayoutSubmenuClearParent())->atajo = "Ctrl Alt P";
         MenuObject->Agregar("Delete", 3)->atajo = "X";
-        // menu "Mesh" (Edit Mode): submenus Vertex/Edge/Face/UV (estilo Blender) +
-        // Transform. Comparte la accion con Object (LayoutAccionObject maneja todos
-        // los ids: 100-102 transform, 300 extrude, 310 F, 314 duplicate, 315 UV).
-        PopupMenu* mV = new PopupMenu();
-        mV->Agregar("New Edge/Face from Vertices", 310)->atajo = "F";
-        mV->Agregar("Extrude Vertices", 300)->atajo = "E";
-        mV->Agregar("Duplicate", 314)->atajo = "Shift D";
-        PopupMenu* mE = new PopupMenu();
-        mE->Agregar("Extrude Edges", 300)->atajo = "E";
-        mE->Agregar("Duplicate", 314)->atajo = "Shift D";
-        PopupMenu* mF = new PopupMenu();
-        mF->Agregar("Extrude Faces", 300)->atajo = "E";
-        mF->Agregar("Duplicate", 314)->atajo = "Shift D";
-        PopupMenu* mUV = new PopupMenu();
-        mUV->Agregar("Unwrap", 315); // (pendiente)
+        // menu "Mesh" (Edit Mode): comun a vertice/borde/cara. Transform (arriba), Snap y Delete (abajo). Los
+        // submenus Snap/Delete se reusan de LayoutInput.cpp. La accion (LayoutAccionMesh) se asigna al abrirlo.
         MenuMesh = new PopupMenu();
-        MenuMesh->Agregar("Transform", 0, -1, MenuTransform);
-        MenuMesh->Agregar("Vertex", 0, -1, mV);
-        MenuMesh->Agregar("Edge", 0, -1, mE);
-        MenuMesh->Agregar("Face", 0, -1, mF);
-        MenuMesh->Agregar("UV", 0, -1, mUV);
+        MenuMesh->titulo = "Mesh";
+        MenuMesh->Agregar("Transform", 0, -1, MenuTransform);            // arriba de todo (Move/Rotate/Scale)
+        MenuMesh->Agregar("Merge", 0, -1, LayoutSubmenuMerge())->atajo = "M"; // suelda verts (limpia duplicados)
+        MenuMesh->Agregar("Snap", 0, -1, LayoutSubmenuSnap())->atajo = "Shift S";
+        MenuMesh->Agregar("Delete", 360, -1, LayoutSubmenuDelete())->atajo = "X"; // abajo de todo
     }
     if (!MenuView){
         // boton "View" (antes de Select): submenu Viewpoint con los 7 puntos de vista (mismos atajos del numpad).
@@ -1304,6 +1297,8 @@ void Viewport3D::RenderUI() {
             }
             Button* bUV = BarRolBtn(BarButtons, BR_UV);       // UV: SOLO en edit
             if (bUV) bUV->visible = enEdit;
+            Button* bMesh = BarRolBtn(BarButtons, BR_Mesh);   // Mesh (Transform/Snap/Delete): SOLO en edit
+            if (bMesh) bMesh->visible = enEdit;
             Button* bAdd = BarRolBtn(BarButtons, BR_Add);     // Add: SOLO en Object Mode
             if (bAdd) bAdd->visible = (InteractionMode == ObjectMode);
             Button* bPiv = BarRolBtn(BarButtons, BR_Pivot);   // Pivot: solo icono = el modo actual

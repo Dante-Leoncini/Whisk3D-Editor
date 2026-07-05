@@ -488,6 +488,10 @@ void LayoutMarkSharp(bool sharp) {
 }
 
 static void LayoutAccionObject(int aId); // (definida mas abajo; la usa el menu UV)
+static void LayoutAccionMesh(int aId);   // (def. mas abajo) accion del menu "Mesh" de Edit Mode
+static void AccionMerge(int modo);       // (def. mas abajo) Merge de la seleccion (At Center/Cursor/Collapse/By Distance)
+static void AccionSetParent(int aId);    // (def. mas abajo) emparentar los seleccionados al activo
+static void AccionClearParent(int aId);  // (def. mas abajo) desemparentar los seleccionados
 
 // ===== menu UV (tecla U / "UV"): Mark/Clear Seam + proyecciones =====
 // Mark/Clear Seam: bordes MAGENTA donde el unwrap abre la costura del UV.
@@ -632,6 +636,11 @@ static void LayoutAccionObject(int aId) {
         case 200: SetOriginGeometryToOrigin(); break; // Set Origin > Geometry to Origin
         case 201: SetOriginOriginToGeometry(); break; // Set Origin > Origin to Geometry
         case 202: SetOriginToCursor();         break; // Set Origin > Origin to 3D Cursor
+        // Set Parent (Ctrl P) / Clear Parent (Ctrl Alt P): submenus de Object + standalone. Ids unicos ->
+        // despachan por ESTA accion sea como submenu (menu top = Object) o standalone (menu top = el propio).
+        case 230: case 231: case 232: case 233: AccionSetParent(aId - 230); break; // Object / Keep T. / Without Inv. / Keep T. Without Inv.
+        case 240: case 241: case 242:           AccionClearParent(aId - 240); break; // Clear / Clear+Keep T. / Clear Inverse
+        case 380: case 381: case 382: case 383: AccionMerge(aId - 380); break; // Merge: At Center / At Cursor / Collapse / By Distance
     }
 }
 
@@ -878,7 +887,7 @@ bool LayoutAbrirMenuDeBarra(ViewportBase* vp, int mx, int my) {
     Button* bAdd  = BarRolBtn(B, BR_Add);    Button* bObj  = BarRolBtn(B, BR_Object);
     Button* bOvl  = BarRolBtn(B, BR_Overlays); Button* bRnd = BarRolBtn(B, BR_Render);
     Button* bOri  = BarRolBtn(B, BR_Orient); Button* bUV   = BarRolBtn(B, BR_UV);
-    Button* bView = BarRolBtn(B, BR_View);
+    Button* bView = BarRolBtn(B, BR_View);   Button* bMesh = BarRolBtn(B, BR_Mesh);
     if (MenuMode && bMode && bMode->visible && bMode->Contains(mx, my)) {
         objetivo = MenuMode; boton = bMode;
         if (!MenuMode->action) MenuMode->action = LayoutAccionMode;
@@ -900,6 +909,10 @@ bool LayoutAbrirMenuDeBarra(ViewportBase* vp, int mx, int my) {
     } else if (MenuAdd && bAdd && bAdd->visible && bAdd->Contains(mx, my)) {
         objetivo = MenuAdd; boton = bAdd;
         if (!MenuAdd->action) MenuAdd->action = LayoutAccionAdd;
+    } else if (MenuMesh && bMesh && bMesh->visible && bMesh->Contains(mx, my)) {
+        // Edit Mode: menu "Mesh" (Transform/Snap/Delete), comun a vertice/borde/cara.
+        objetivo = MenuMesh; boton = bMesh;
+        if (!MenuMesh->action) MenuMesh->action = LayoutAccionMesh;
     } else if (bObj && bObj->visible && bObj->Contains(mx, my)) {
         // Edit Mode -> menu de contexto Vertex/Edge/Face; Object Mode -> menu "Object".
         if (InteractionMode == EditMode) {
@@ -996,6 +1009,7 @@ static void LayoutCambiarMenuBarra(int dir) {
         else if (MenuAbierto == MenuAdd) rol = BR_Add;
         else if (MenuAbierto == MenuObject || MenuAbierto == gMenuVertex ||
                  MenuAbierto == gMenuEdge  || MenuAbierto == gMenuFace) rol = BR_Object;
+        else if (MenuAbierto == MenuMesh) rol = BR_Mesh; // menu "Mesh" de Edit Mode
         else if (MenuAbierto == MenuOverlays) rol = BR_Overlays;
         else if (MenuAbierto == MenuView) rol = BR_View; // FIX: faltaba -> izq/der se clavaba en el menu View
         else if (MenuAbierto == MenuRender) rol = BR_Render;
@@ -1094,31 +1108,43 @@ static void AccionClearParent(int aId) {
     }
 }
 
+// Los menus Set/Clear Parent se usan de DOS formas: standalone (Ctrl+P / Ctrl+Alt+P) y como SUBMENUS del menu
+// "Object" de la barra. Para que anden igual en ambos casos usan ids UNICOS (230-233 / 240-242) + la accion
+// LayoutAccionObject (que rutea esos ids a AccionSetParent/AccionClearParent), como el submenu Apply/Delete.
+PopupMenu* LayoutSubmenuSetParent() {
+    if (!gMenuSetParent) {
+        gMenuSetParent = new PopupMenu();
+        gMenuSetParent->titulo = "Set Parent To";
+        gMenuSetParent->action = LayoutAccionObject;
+        gMenuSetParent->Agregar("Object", 230);
+        gMenuSetParent->Agregar("Object (Keep Transform)", 231);
+        gMenuSetParent->Agregar("Object (Without Inverse)", 232);
+        gMenuSetParent->Agregar("Object (Keep Transform Without Inverse)", 233);
+    }
+    return gMenuSetParent;
+}
+PopupMenu* LayoutSubmenuClearParent() {
+    if (!gMenuClearParent) {
+        gMenuClearParent = new PopupMenu();
+        gMenuClearParent->titulo = "Clear Parent";
+        gMenuClearParent->action = LayoutAccionObject;
+        gMenuClearParent->Agregar("Clear Parent", 240);
+        gMenuClearParent->Agregar("Clear and Keep Transformation", 241);
+        gMenuClearParent->Agregar("Clear Parent Inverse", 242);
+    }
+    return gMenuClearParent;
+}
+
 void LayoutMenuParent(bool aClear, int mx, int my) {
     if (aClear) {
-        if (!gMenuClearParent) {
-            gMenuClearParent = new PopupMenu();
-            gMenuClearParent->titulo = "Clear Parent";
-            gMenuClearParent->action = AccionClearParent;
-            gMenuClearParent->Agregar("Clear Parent", 0);
-            gMenuClearParent->Agregar("Clear and Keep Transformation", 1);
-            gMenuClearParent->Agregar("Clear Parent Inverse", 2);
-        }
-        gMenuClearParent->Abrir(mx, my, MenuPantallaW, MenuPantallaH);
-        MenuAbierto = gMenuClearParent;
+        PopupMenu* m = LayoutSubmenuClearParent();
+        m->Abrir(mx, my, MenuPantallaW, MenuPantallaH);
+        MenuAbierto = m;
     } else {
         if (!ObjActivo) return; // no hay a quien emparentar
-        if (!gMenuSetParent) {
-            gMenuSetParent = new PopupMenu();
-            gMenuSetParent->titulo = "Set Parent To";
-            gMenuSetParent->action = AccionSetParent;
-            gMenuSetParent->Agregar("Object", 0);
-            gMenuSetParent->Agregar("Object (Keep Transform)", 1);
-            gMenuSetParent->Agregar("Object (Without Inverse)", 2);
-            gMenuSetParent->Agregar("Object (Keep Transform Without Inverse)", 3);
-        }
-        gMenuSetParent->Abrir(mx, my, MenuPantallaW, MenuPantallaH);
-        MenuAbierto = gMenuSetParent;
+        PopupMenu* m = LayoutSubmenuSetParent();
+        m->Abrir(mx, my, MenuPantallaW, MenuPantallaH);
+        MenuAbierto = m;
     }
 }
 
@@ -1184,7 +1210,6 @@ void LayoutApplyMenu(int mx, int my) {
 // (gMenuVertex/Edge/Face se declaran mas arriba: los usan dispatch + nav.)
 void LayoutMenuEditContexto(int mx, int my) {
     if (InteractionMode != EditMode) return;
-    EnsureMenuDelete(); // el submenu "Delete" de los menus de contexto necesita gMenuDelete ya creado
     PopupMenu* m = NULL;
     if (EditSelectMode == SelFace) {
         if (!gMenuFace) {
@@ -1197,7 +1222,7 @@ void LayoutMenuEditContexto(int mx, int my) {
             gMenuFace->Agregar("Shade Flat", 321);
             gMenuFace->Agregar("Recalculate Normals", 322);
             gMenuFace->Agregar("Triangulate Faces", 323)->atajo = "Ctrl T";
-            gMenuFace->Agregar("Delete", 360, -1, gMenuDelete)->atajo = "X"; // submenu (flecha der): Vertices/Edges/Faces/Edge Loops
+            // (Delete se movio al menu "Mesh": es comun a vertice/borde/cara)
         }
         m = gMenuFace;
     } else if (EditSelectMode == SelEdge) {
@@ -1209,7 +1234,7 @@ void LayoutMenuEditContexto(int mx, int my) {
             gMenuEdge->Agregar("Rip", 341)->atajo = "V";
             gMenuEdge->Agregar("Mark Sharp", 330)->atajo = "W";
             gMenuEdge->Agregar("Clear Sharp", 331);
-            gMenuEdge->Agregar("Delete", 360, -1, gMenuDelete)->atajo = "X"; // submenu (flecha der): Vertices/Edges/Faces/Edge Loops
+            // (Delete se movio al menu "Mesh": es comun a vertice/borde/cara)
         }
         m = gMenuEdge;
     } else {
@@ -1219,7 +1244,7 @@ void LayoutMenuEditContexto(int mx, int my) {
             gMenuVertex->Agregar("Extrude Vertices", 300)->atajo = "E";
             gMenuVertex->Agregar("Duplicate", 314)->atajo = "Shift D";
             gMenuVertex->Agregar("Rip", 341)->atajo = "V";
-            gMenuVertex->Agregar("Delete", 360, -1, gMenuDelete)->atajo = "X"; // submenu (flecha der): Vertices/Edges/Faces/Edge Loops
+            // (Delete se movio al menu "Mesh": es comun a vertice/borde/cara)
         }
         m = gMenuVertex;
     }
@@ -1677,7 +1702,10 @@ static void AccionSnap(int aId) {
     }
 }
 
-void LayoutMenuSnap(int mx, int my) {
+// El menu Snap se usa standalone (Shift+S) Y como submenu del menu "Mesh" de Edit Mode. Ids 0-7 + accion
+// AccionSnap: como submenu del Mesh, LayoutAccionMesh rutea esos mismos ids a AccionSnap (no chocan con el
+// resto del Mesh, que usa 100-102 y 361-364).
+PopupMenu* LayoutSubmenuSnap() {
     if (!gMenuSnap) {
         gMenuSnap = new PopupMenu();
         gMenuSnap->titulo = "Snap";
@@ -1691,8 +1719,65 @@ void LayoutMenuSnap(int mx, int my) {
         gMenuSnap->Agregar("Cursor to Grid", 6);
         gMenuSnap->Agregar("Cursor to Active", 7);
     }
-    gMenuSnap->Abrir(mx, my, MenuPantallaW, MenuPantallaH);
-    MenuAbierto = gMenuSnap;
+    return gMenuSnap;
+}
+
+// submenu Delete (vertices/aristas/caras/loops) para embeber en el menu Mesh. Es el MISMO gMenuDelete del
+// atajo X (ids 361-364 + accion LayoutAccionObject) -> anda igual embebido o standalone.
+PopupMenu* LayoutSubmenuDelete() {
+    EnsureMenuDelete();
+    return gMenuDelete;
+}
+
+void LayoutMenuSnap(int mx, int my) {
+    PopupMenu* m = LayoutSubmenuSnap();
+    m->Abrir(mx, my, MenuPantallaW, MenuPantallaH);
+    MenuAbierto = m;
+}
+
+// ===== menu MERGE (tecla M / submenu del menu "Mesh"): suelda los verts seleccionados =====
+static PopupMenu* gMenuMerge = NULL;
+
+// modo: 0 At Center, 1 At Cursor, 2 Collapse, 3 By Distance. Corre sobre la malla en Edit Mode.
+static void AccionMerge(int modo) {
+    if (InteractionMode != EditMode || !g_editMesh) return;
+    Mesh* m = (Mesh*)g_editMesh;
+    // cursor 3d (MUNDO) -> LOCAL del mesh (para At Cursor): misma matematica que Snap Selection to Cursor.
+    Quaternion rg = RotGlobalDe(m); Vector3 sg = ScaleGlobalDe(m);
+    Vector3 dloc = rg.Inverted() * (cursor3D.pos - m->GetGlobalPosition());
+    Vector3 cursorLocal(sg.x!=0.0f?dloc.x/sg.x:dloc.x, sg.y!=0.0f?dloc.y/sg.y:dloc.y, sg.z!=0.0f?dloc.z/sg.z:dloc.z);
+    MergeVertsEdit(m, modo, g_mergeDist, cursorLocal);
+    g_redraw = true;
+}
+
+// submenu Merge (ids 380-383 + accion LayoutAccionObject): anda igual embebido en el menu "Mesh" o standalone (tecla M)
+PopupMenu* LayoutSubmenuMerge() {
+    if (!gMenuMerge) {
+        gMenuMerge = new PopupMenu();
+        gMenuMerge->titulo = "Merge";
+        gMenuMerge->action = LayoutAccionObject;
+        gMenuMerge->Agregar("At Center", 380);
+        gMenuMerge->Agregar("At Cursor", 381);
+        gMenuMerge->Agregar("Collapse", 382);
+        gMenuMerge->Agregar("By Distance", 383);
+    }
+    return gMenuMerge;
+}
+
+// tecla M en Edit Mode: abre el menu Merge en el cursor
+void LayoutMenuMerge(int mx, int my) {
+    if (InteractionMode != EditMode) return;
+    PopupMenu* m = LayoutSubmenuMerge();
+    if (MenuAbierto) MenuAbierto->Cerrar();
+    m->Abrir(mx, my, MenuPantallaW, MenuPantallaH);
+    MenuAbierto = m;
+}
+
+// accion del menu "Mesh" (Edit Mode): los ids del submenu Snap (0-7) van a AccionSnap; el resto (Transform
+// 100-102, Delete 361-364) lo maneja el dispatcher comun de objeto/malla.
+static void LayoutAccionMesh(int aId) {
+    if (aId >= 0 && aId <= 7) { AccionSnap(aId); return; }
+    LayoutAccionObject(aId);
 }
 
 // ====================================================================

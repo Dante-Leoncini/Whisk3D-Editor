@@ -53,7 +53,7 @@ extern PopupMenu* MenuSelect;   // el desplegable del boton "Select"
 extern PopupMenu* MenuObject;   // el desplegable del boton "Object"
 extern PopupMenu* MenuApply;    // submenu de "Object": Apply Location/Rotation/Scale/All (Ctrl A)
 extern PopupMenu* MenuView;     // el desplegable del boton "View" (antes de Select): submenu Viewpoint
-extern PopupMenu* MenuMesh;     // edit mode: reemplaza a "Object" (Transform + Extrude)
+extern PopupMenu* MenuMesh;     // edit mode: menu "Mesh" comun (Transform arriba, Snap, Delete abajo)
 extern PopupMenu* MenuOverlays; // el desplegable del boton "Overlays"
 extern PopupMenu* MenuRender;   // el desplegable del boton "Render" (modos)
 extern PopupMenu* MenuOrient;   // el desplegable del boton "Orient" (transform)
@@ -64,7 +64,8 @@ extern PopupMenu* MenuSelMode;  // edit mode: sub-elemento Vertex/Edge/Face
 // (BarRolBtn / BarRolIdx), NO por indice -> reordenar la barra (mover botones) NO rompe nada.
 enum BarRol3D {
     BR_Mode = 1, BR_SelMode, BR_Pivot, BR_Select, BR_Add,
-    BR_Object, BR_Overlays, BR_Render, BR_Orient, BR_UV, BR_View
+    BR_Object, BR_Overlays, BR_Render, BR_Orient, BR_UV, BR_View,
+    BR_Mesh // menu "Mesh" de Edit Mode (Transform/Snap/Delete), comun a vertice/borde/cara
 };
 class Button;
 Button* BarRolBtn(std::vector<Button*>& B, int rol); // el boton con ese rol (NULL si no esta)

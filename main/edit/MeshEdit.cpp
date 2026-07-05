@@ -196,7 +196,7 @@ void Mesh::BorrarSeleccionEdit(int deleteType) {
         if (!delF[f]) {
             std::vector<int> ring; bool ok = true;
             for (int c = 0; c < m; c++) { int gi = idx[c]; if (gi<0||gi>=nV||delV[gi]) { ok=false; break; } ring.push_back(gi); }
-            if (ok && ring.size() >= 3) { MeshFace mf; mf.idx = ring; nf3d.push_back(mf); for (int c=0;c<m;c++) survCorner.push_back(Lold+c); }
+            if (ok && ring.size() >= 3) { MeshFace mf; mf.idx = ring; mf.mat = faces3d[f].mat; mf.smooth = faces3d[f].smooth; nf3d.push_back(mf); for (int c=0;c<m;c++) survCorner.push_back(Lold+c); } // conserva mesh part + shading
         }
         Lold += m;
     }
@@ -220,6 +220,130 @@ void Mesh::BorrarSeleccionEdit(int deleteType) {
     CompactarCapas(this,survCorner); // las capas se quedan solo con los corners sobrevivientes
     GenerarRender();            // descarta verts no referenciados + remapea + re-triangula + materialsGroup + CalcularBordes
     ReconstruirEditSelPorPos(posSel);
+}
+
+// union-find: raiz de x (con la ruta corta). Lo usa el clustering del merge.
+static int UFind(std::vector<int>& uf, int x){ while (uf[x]!=x) x=uf[x]; return x; }
+
+// MERGE (soldar) los verts seleccionados para SIMPLIFICAR la malla y quitar duplicados. modo:
+//   0 At Center   -> toda la seleccion a un solo vert en su centro
+//   1 At Cursor   -> toda la seleccion a un solo vert en el cursor 3d (cursorLocal, en espacio local del mesh)
+//   2 Collapse    -> cada GRUPO CONEXO (por aristas seleccionadas) a su propio centro
+//   3 By Distance -> los verts a <= dist entre si se agrupan y cada grupo va a su centro
+// Cada grupo se suelda a UN vertice; las caras que colapsan a <3 verts distintos y las aristas que quedan en un
+// punto se descartan (no tiene sentido que existan). Free function (accede a los miembros publicos del Mesh).
+void MergeVertsEdit(Mesh* m, int modo, float dist, const Vector3& cursorLocal) {
+    if (!m) return;
+    m->EnsureEdit();
+    if (!m->edit || !m->vertex) return;
+    EditMesh* e = m->edit;
+    const int nV = m->vertexSize;
+    if (nV <= 0) return;
+    const bool hayRep = ((int)m->posRep.size() == nV);
+    #define MREP(gi) (hayRep ? m->posRep[gi] : (gi))
+
+    // 0) reps seleccionados segun el modo de seleccion (vertex/edge/face)
+    std::vector<char> selRep(nV, 0);
+    if (EditSelectMode == SelVertex) {
+        for (size_t k=0;k<e->editVerts.size();k++)
+            if (k<e->vertSel.size() && e->vertSel[k] && e->editVerts[k]>=0 && e->editVerts[k]<nV) selRep[MREP(e->editVerts[k])]=1;
+    } else if (EditSelectMode == SelEdge) {
+        for (size_t eg=0;eg<e->edgeSel.size();eg++) if (e->edgeSel[eg]){
+            int ea=e->lineIdx[eg*2], eb=e->lineIdx[eg*2+1];
+            if (ea>=0&&ea<(int)e->editVerts.size()&&e->editVerts[ea]<nV) selRep[MREP(e->editVerts[ea])]=1;
+            if (eb>=0&&eb<(int)e->editVerts.size()&&e->editVerts[eb]<nV) selRep[MREP(e->editVerts[eb])]=1;
+        }
+    } else {
+        for (size_t f=0;f<e->faces.size();f++) if (f<e->faceSel.size()&&e->faceSel[f])
+            for (size_t c=0;c<e->faces[f].size();c++){ int ev=e->faces[f][c];
+                if (ev>=0&&ev<(int)e->editVerts.size()&&e->editVerts[ev]<nV) selRep[MREP(e->editVerts[ev])]=1; }
+    }
+    std::vector<int> sreps; for (int r=0;r<nV;r++) if (selRep[r]) sreps.push_back(r);
+    if (sreps.empty()) return;
+
+    // 1) clusters de reps por union-find (regla segun el modo)
+    std::map<int,int> repIdx; for (size_t i=0;i<sreps.size();i++) repIdx[sreps[i]]=(int)i;
+    std::vector<int> uf(sreps.size()); for (size_t i=0;i<uf.size();i++) uf[i]=(int)i;
+    if (modo == 0 || modo == 1) {
+        for (size_t i=1;i<sreps.size();i++){ int ra=UFind(uf,0), rb=UFind(uf,(int)i); if(ra!=rb) uf[rb]=ra; }
+    } else if (modo == 2) { // conexos por aristas con AMBOS extremos seleccionados
+        for (size_t ie=0; ie+1 < m->edges.size(); ie+=2){
+            int a=m->edges[ie], b=m->edges[ie+1];
+            if (a<0||b<0||a>=nV||b>=nV||!selRep[a]||!selRep[b]) continue;
+            int ra=UFind(uf,repIdx[a]), rb=UFind(uf,repIdx[b]); if(ra!=rb) uf[rb]=ra;
+        }
+    } else { // 3 = by distance: agrupa pares a <= dist
+        float d2 = dist*dist;
+        for (size_t i=0;i<sreps.size();i++) for (size_t j=i+1;j<sreps.size();j++){
+            int a=sreps[i], b=sreps[j];
+            float dx=m->vertex[a*3]-m->vertex[b*3], dy=m->vertex[a*3+1]-m->vertex[b*3+1], dz=m->vertex[a*3+2]-m->vertex[b*3+2];
+            if (dx*dx+dy*dy+dz*dz <= d2){ int ra=UFind(uf,(int)i), rb=UFind(uf,(int)j); if(ra!=rb) uf[rb]=ra; }
+        }
+    }
+
+    // 2) por cluster: miembros, centro y rep canonico (el de menor indice). Solo MERGEA si tiene >=2 (o At Cursor).
+    std::map<int,std::vector<int> > clusters; // root -> indices en sreps
+    for (size_t i=0;i<sreps.size();i++){ int root=UFind(uf,(int)i); clusters[root].push_back((int)i); }
+    std::vector<int>  mergedRoot(nV, -1);  // rep -> rep canonico de su cluster mergeado (-1 = no mergea)
+    std::vector<Vector3> targetPos(nV);    // rep canonico -> posicion destino
+    std::vector<Vector3> posSel;           // para reseleccionar tras el rebuild
+    bool algo = false;
+    for (std::map<int,std::vector<int> >::iterator it=clusters.begin(); it!=clusters.end(); ++it){
+        std::vector<int>& mem = it->second;
+        bool mergea = (mem.size() >= 2) || (modo == 1 && mem.size() >= 1);
+        int canon = sreps[mem[0]]; for (size_t k=1;k<mem.size();k++) if (sreps[mem[k]]<canon) canon=sreps[mem[k]];
+        Vector3 centro(0,0,0);
+        for (size_t k=0;k<mem.size();k++){ int r=sreps[mem[k]]; centro.x+=m->vertex[r*3]; centro.y+=m->vertex[r*3+1]; centro.z+=m->vertex[r*3+2]; }
+        centro = centro * (1.0f/(float)mem.size());
+        Vector3 destino = (modo == 1) ? cursorLocal : centro;
+        if (mergea){
+            algo = true;
+            for (size_t k=0;k<mem.size();k++) mergedRoot[sreps[mem[k]]] = canon;
+            targetPos[canon] = destino;
+            posSel.push_back(destino);
+        } else {
+            // cluster de 1: no mergea, queda donde esta (pero sigue seleccionado)
+            posSel.push_back(Vector3(m->vertex[canon*3], m->vertex[canon*3+1], m->vertex[canon*3+2]));
+        }
+    }
+    if (!algo) return; // nada para soldar
+
+    UndoCapturarMallaGeo(m); // Ctrl+Z: snapshot antes del merge
+
+    // 3) MOVER los verts de cada cluster que mergea a su destino (los coincidentes los suelda GenerarRender por pos+uv+normal)
+    for (int gi=0; gi<nV; gi++){ int r=MREP(gi); if (r<0||r>=nV) continue; int cr=mergedRoot[r];
+        if (cr>=0){ Vector3& t=targetPos[cr]; m->vertex[gi*3]=t.x; m->vertex[gi*3+1]=t.y; m->vertex[gi*3+2]=t.z; } }
+
+    // identidad "mergeada" de un vert: el rep canonico del cluster si mergea, sino su rep normal
+    #define MID(gi) ( mergedRoot[MREP(gi)]>=0 ? mergedRoot[MREP(gi)] : MREP(gi) )
+
+    // 4) reconstruir faces3d: dedup de corners por identidad mergeada (tira los que colapsan), <3 -> cara muerta
+    m->PoblarCapas();
+    std::vector<MeshFace> nf3d; std::vector<int> survCorner; int Lold = 0;
+    for (size_t f=0; f<m->faces3d.size(); f++){
+        const std::vector<int>& idx = m->faces3d[f].idx; int mm=(int)idx.size();
+        std::vector<int> ring; std::vector<int> ringCorner; std::set<int> vistos;
+        for (int c=0;c<mm;c++){ int gi=idx[c]; if (gi<0||gi>=nV) continue; int id=MID(gi);
+            if (vistos.count(id)) continue; // ya esta esa identidad en el anillo -> corner colapsado
+            vistos.insert(id); ring.push_back(gi); ringCorner.push_back(Lold+c);
+        }
+        if (ring.size() >= 3){ MeshFace mf; mf.idx = ring; mf.mat = m->faces3d[f].mat; mf.smooth = m->faces3d[f].smooth;
+            nf3d.push_back(mf); for (size_t c=0;c<ringCorner.size();c++) survCorner.push_back(ringCorner[c]); }
+        Lold += mm;
+    }
+    // 5) loose edges: descartar los que quedan en un punto (mismos extremos mergeados)
+    std::vector<int> nLoose;
+    for (size_t le=0; le+1 < m->looseEdges.size(); le+=2){ int a=m->looseEdges[le], b=m->looseEdges[le+1];
+        if (a<0||a>=nV||b<0||b>=nV) continue; if (MID(a)==MID(b)) continue; nLoose.push_back(a); nLoose.push_back(b); }
+    #undef MID
+    #undef MREP
+
+    // 6) aplicar por la puerta de rebuild (igual que BorrarSeleccionEdit)
+    m->faces3d.swap(nf3d);
+    m->looseEdges.swap(nLoose);
+    CompactarCapas(m, survCorner);
+    m->GenerarRender();               // suelda coincidentes (pos+uv+normal+color) + re-triangula + materialsGroup + CalcularBordes
+    m->ReconstruirEditSelPorPos(posSel);
 }
 
 // DELETE > EDGE LOOPS (inverso del loop cut, pedido Dante): disuelve el edge loop seleccionado uniendo los quads de
@@ -413,6 +537,7 @@ bool Mesh::ExtruirEdit(Vector3& outDirLocal, bool& outConstrain) {
     std::set<std::pair<int,int> > selEdgesSet;           // edge mode: undirected
     std::map<std::pair<int,int>,int> edgeCount;          // faces mode
     std::map<std::pair<int,int>,std::pair<int,int> > edgeDir;
+    std::map<std::pair<int,int>,int> edgeMat;            // material (mesh part) de la cara sel duena de cada arista -> las paredes lo heredan
 
     // ELEMENTO EFECTIVO = el mas ALTO que forman los verts seleccionados (NO el modo
     // de la UI): en modo vertice, seleccionar los verts de una cara extruye la CARA; 2
@@ -433,7 +558,7 @@ bool Mesh::ExtruirEdit(Vector3& outDirLocal, bool& outConstrain) {
             for (int c = 0; c < m; c++) {
                 int ra=XREP(idx[c]), rb=XREP(idx[(c+1)%m]); if (ra==rb) continue;
                 int lo=ra<rb?ra:rb, hi=ra<rb?rb:ra; std::pair<int,int> key(lo,hi);
-                if (edgeCount.find(key)==edgeCount.end()){ edgeCount[key]=0; edgeDir[key]=std::make_pair(ra,rb); }
+                if (edgeCount.find(key)==edgeCount.end()){ edgeCount[key]=0; edgeDir[key]=std::make_pair(ra,rb); edgeMat[key]=faces3d[f].mat; }
                 edgeCount[key]++;
             }
         }
@@ -447,6 +572,16 @@ bool Mesh::ExtruirEdit(Vector3& outDirLocal, bool& outConstrain) {
         for (std::set<int>::iterator it=regionReps.begin(); it!=regionReps.end(); ++it)
             if (!capReps.count(*it)) interiorReps.insert(*it);
     } else {
+        // material (mesh part) de cada arista de la malla, buscando la cara que la contiene: las paredes
+        // del extrude de aristas lo heredan (asi conservan el color de la cara de la que salen).
+        for (size_t f = 0; f < faces3d.size(); f++) {
+            const std::vector<int>& idx = faces3d[f].idx; int m=(int)idx.size();
+            for (int c = 0; c < m; c++) {
+                int ra=XREP(idx[c]), rb=XREP(idx[(c+1)%m]); if (ra==rb) continue;
+                int lo=ra<rb?ra:rb, hi=ra<rb?rb:ra; std::pair<int,int> key(lo,hi);
+                if (edgeMat.find(key)==edgeMat.end()) edgeMat[key]=faces3d[f].mat;
+            }
+        }
         // aristas de la malla (edges = pares de reps) con AMBOS extremos seleccionados
         for (size_t i = 0; i+1 < edges.size(); i += 2) {
             int ra=edges[i], rb=edges[i+1];
@@ -536,7 +671,7 @@ bool Mesh::ExtruirEdit(Vector3& outDirLocal, bool& outConstrain) {
             for (size_t c = 0; c < idx.size(); c++) { int gi=idx[c]; int r=XREP(gi); ring.push_back(capReps.count(r)? newOf[r] : gi); }
         } else ring = idx; // resto: sin tocar
         if (ring.size() < 3) continue;
-        MeshFace mf; mf.idx = ring; nf3d.push_back(mf);
+        MeshFace mf; mf.idx = ring; mf.mat = faces3d[f].mat; mf.smooth = faces3d[f].smooth; nf3d.push_back(mf); // conserva mesh part + shading
     }
     if (mode == SelFace) { // PAREDES en el contorno: quad [b_new,a_new,a_old,b_old]
         for (std::map<std::pair<int,int>,int>::iterator it=edgeCount.begin(); it!=edgeCount.end(); ++it) {
@@ -549,7 +684,7 @@ bool Mesh::ExtruirEdit(Vector3& outDirLocal, bool& outConstrain) {
             std::map<int,int>::iterator na=newOf.find(ra), nb=newOf.find(rb);
             if (na==newOf.end()||nb==newOf.end()) continue;
             std::vector<int> w; w.push_back(nb->second); w.push_back(na->second); w.push_back(ra); w.push_back(rb);
-            MeshFace mf; mf.idx=w; nf3d.push_back(mf);
+            MeshFace mf; mf.idx=w; mf.mat=edgeMat[it->first]; nf3d.push_back(mf); // la pared hereda el mesh part de la cara del contorno
             // la pared hereda uv/color de los verts que conecta (b_new/b_old<-rb, a_new/a_old<-ra)
             AgregarCornerCapas(this,vertCorner[rb]); AgregarCornerCapas(this,vertCorner[ra]);
             AgregarCornerCapas(this,vertCorner[ra]); AgregarCornerCapas(this,vertCorner[rb]);
@@ -558,7 +693,8 @@ bool Mesh::ExtruirEdit(Vector3& outDirLocal, bool& outConstrain) {
         for (size_t i = 0; i < selEdgesDir.size(); i++) {
             int ra=selEdgesDir[i].first, rb=selEdgesDir[i].second;
             std::vector<int> w; w.push_back(ra); w.push_back(rb); w.push_back(newOf[rb]); w.push_back(newOf[ra]);
-            MeshFace mf; mf.idx=w; nf3d.push_back(mf);
+            int lo=ra<rb?ra:rb, hi=ra<rb?rb:ra; std::map<std::pair<int,int>,int>::iterator em=edgeMat.find(std::make_pair(lo,hi));
+            MeshFace mf; mf.idx=w; if (em!=edgeMat.end()) mf.mat=em->second; nf3d.push_back(mf); // hereda el mesh part de la cara de la arista
             AgregarCornerCapas(this,vertCorner[ra]); AgregarCornerCapas(this,vertCorner[rb]);
             AgregarCornerCapas(this,vertCorner[rb]); AgregarCornerCapas(this,vertCorner[ra]);
         }
@@ -897,7 +1033,7 @@ bool Mesh::DuplicarSeleccionEdit() {
     std::vector<int> faceOff(nFacesOrig); { int Lc=0; for (size_t f=0;f<nFacesOrig;f++){ faceOff[f]=Lc; Lc+=(int)faces3d[f].idx.size(); } }
     for (size_t f=0;f<nFacesOrig;f++){ if (!selFace[f]) continue;
         std::vector<int> ring; { const std::vector<int>& idx=faces3d[f].idx; for (size_t c=0;c<idx.size();c++) ring.push_back(newOf[DREP(idx[c])]); }
-        MeshFace mf; mf.idx=ring; faces3d.push_back(mf);
+        MeshFace mf; mf.idx=ring; mf.mat=faces3d[f].mat; mf.smooth=faces3d[f].smooth; faces3d.push_back(mf); // la copia conserva mesh part + shading
         for (size_t c=0;c<ring.size();c++) AgregarCornerCapas(this,faceOff[f]+(int)c); // copia las capas del corner original
     }
     // BORDES sueltos copiados (los que no quedaron dentro de una cara duplicada)

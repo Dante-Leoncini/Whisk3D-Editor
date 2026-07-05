@@ -314,10 +314,11 @@ void InputUsuarioSDL3(SDL_Event &e){
                 LayoutCiclarViewportActivo(LShiftPressed ? -1 : +1);
             atajoMenu = true;
         }
-        // 'm' abre/cierra la barra de menu del viewport activo (= soft-izq en
-        // Symbian). Teclado-solo: el primer menu se abre sin preseleccionar.
+        // 'm' en Edit Mode = menu MERGE (soldar verts, estilo Blender); en el resto abre/cierra la barra de
+        // menu del viewport activo (= soft-izq en Symbian). Teclado-solo: el primer menu se abre sin preseleccionar.
         if (e.key.keysym.sym == SDLK_m && !PopUpActive) {
-            LayoutToggleBarraViewportActivo();
+            if (InteractionMode == EditMode) LayoutMenuMerge(lastMouseX, lastMouseY);
+            else                             LayoutToggleBarraViewportActivo();
             atajoMenu = true;
         }
         // backspace durante un transform: borra del valor numerico tipeado (los

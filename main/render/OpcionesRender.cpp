@@ -29,6 +29,7 @@ bool g_redraw = true;
 // ajustes de transformacion del EDITOR (pivot + normales). Default Blender.
 int g_transformPivot = PivotMedian;   // pivote por defecto = punto medio
 bool g_editLockNormales = false;      // por defecto SI recalcula normales (al confirmar)
+float g_mergeDist = 0.0001f;          // Merge > By Distance: suelda verts a <= 0.0001 m (como Blender)
 
 // Implementación de función
 RenderType StringToRenderType(const std::string& s){
