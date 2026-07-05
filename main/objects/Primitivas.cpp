@@ -122,8 +122,21 @@ Object* NewMesh(MeshType type, Object* parent, bool query){
                    : (type == MeshType::UVsphere) ? "UVSphere"
                    : (type == MeshType::cone)     ? "Cone"
                    : (type == MeshType::cylinder) ? "Cylinder" : "Circle";
+    } else if (type == MeshType::vertice) {
+        // 1 VERT SUELTO en el origen local (la malla ya se ubica en el cursor 3D). looseVerts lo preserva en el
+        // rebuild (sino, al no estar en ninguna cara/arista, GenerarRender lo descartaria). Se ve en Edit Mode.
+        mesh->vertexSize = 1;
+        mesh->vertex      = new GLfloat[3]; mesh->vertex[0]=0.0f; mesh->vertex[1]=0.0f; mesh->vertex[2]=0.0f;
+        mesh->normals     = new GLbyte[3];  mesh->normals[0]=0; mesh->normals[1]=127; mesh->normals[2]=0;
+        mesh->uv          = new GLfloat[2]; mesh->uv[0]=0.0f; mesh->uv[1]=0.0f;
+        mesh->vertexColor = new GLubyte[4]; mesh->vertexColor[0]=255; mesh->vertexColor[1]=255; mesh->vertexColor[2]=255; mesh->vertexColor[3]=255;
+        mesh->looseVerts.push_back(0);
+        MaterialGroup g; g.startDrawn = 0; g.material = MaterialDefecto;
+        mesh->materialsGroup.push_back(g);
+        mesh->CalcularBordes();
+        mesh->name = "Vertex";
     } else {
-        // vertice / otros: malla vacia con su grupo (como antes)
+        // otros: malla vacia con su grupo (como antes)
         MaterialGroup g; g.startDrawn = 0; g.material = MaterialDefecto;
         mesh->materialsGroup.push_back(g);
     }

@@ -116,6 +116,9 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropBool*  propMirMerge; PropFloat* propMirDist; PropBool* propMirClip; // merge + distancia + clipping
         // Subdivision Surface: modo (Catmull-Clark/Simple) + niveles viewport/render
         PropBool*  propSubSimple; PropFloat* propSubLevel; PropFloat* propSubRender;
+        // Screw: angle, screw(height), steps viewport/render, eje (dropdown X/Y/Z), stretch U/V
+        PropFloat* propScrewAngle; PropFloat* propScrewHeight; PropFloat* propScrewSteps; PropFloat* propScrewRender;
+        PropButton* propScrewAxis; PropBool* propScrewStretchU; PropBool* propScrewStretchV;
         PropButton* propBtnApplyMod; // "Apply Modifier": hornea la malla generada en malla real editable
         PropListMeshParts* propListUV;    // lista de UV maps (modo=1)
         PropListMeshParts* propListColor; // lista de capas de color (modo=2)

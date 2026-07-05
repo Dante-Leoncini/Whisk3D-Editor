@@ -598,6 +598,20 @@ static void AccionMenuModTarget(){
         MenuModTarget->Agregar(gTargetCandidatos[i]->name, 1+(int)i, (int)IconoDeObjeto(gTargetCandidatos[i]));
     AbrirMenuBajoBoton(MenuModTarget, PropsActivo->propMirTarget->button);
 }
+// menu "Axis" del Screw: dropdown X/Y/Z (como el modo de rotacion; nada de pestaña rara)
+static PopupMenu* MenuScrewAxis = NULL;
+static void AccionScrewAxisElegido(int id){
+    Modifier* mod = ModActivoUI(); if (!mod) return;
+    mod->screwAxis = id; // 0=X, 1=Y, 2=Z
+    AccionModParamChanged();
+}
+static void AccionMenuScrewAxis(){
+    if (!PropsActivo || !PropsActivo->propScrewAxis) return;
+    if (!MenuScrewAxis){ MenuScrewAxis = new PopupMenu(); MenuScrewAxis->action = AccionScrewAxisElegido; }
+    MenuScrewAxis->Limpiar();
+    MenuScrewAxis->Agregar("X", 0); MenuScrewAxis->Agregar("Y", 1); MenuScrewAxis->Agregar("Z", 2);
+    AbrirMenuBajoBoton(MenuScrewAxis, PropsActivo->propScrewAxis->button);
+}
 // "Apply Modifier": hornea la malla generada en la editable + saca el modificador del stack
 static void AccionAplicarModificador(){
     if (!ObjActivo || ObjActivo->getType()!=ObjectType::mesh) return;
@@ -1045,6 +1059,19 @@ void Properties::ConstruirGrupos(){
     propSubLevel->SetRango(0.0f, 6.0f); propSubLevel->entero = true; propModifierProps->properties.push_back(propSubLevel);
     propSubRender = new PropFloat("Render"); propSubRender->onChange = AccionModParamChanged;
     propSubRender->SetRango(0.0f, 6.0f); propSubRender->entero = true; propModifierProps->properties.push_back(propSubRender);
+    // Screw: angle (grados), screw (subida por el eje), steps viewport/render, eje (dropdown), stretch U/V (UV)
+    propScrewAngle = new PropFloat("Angle", "\xc2\xb0"); propScrewAngle->onChange = AccionModParamChanged;
+    propScrewAngle->SetRango(-3600.0f, 3600.0f); propModifierProps->properties.push_back(propScrewAngle);
+    propScrewHeight = new PropFloat("Screw", "m"); propScrewHeight->onChange = AccionModParamChanged;
+    propScrewHeight->SetRango(-1000.0f, 1000.0f); propModifierProps->properties.push_back(propScrewHeight);
+    propScrewAxis = new PropButton("Axis"); propScrewAxis->button->desplegable = true; propScrewAxis->action = AccionMenuScrewAxis;
+    propModifierProps->properties.push_back(propScrewAxis);
+    propScrewSteps = new PropFloat("Steps Viewport"); propScrewSteps->onChange = AccionModParamChanged;
+    propScrewSteps->SetRango(2.0f, 512.0f); propScrewSteps->entero = true; propModifierProps->properties.push_back(propScrewSteps);
+    propScrewRender = new PropFloat("Render"); propScrewRender->onChange = AccionModParamChanged;
+    propScrewRender->SetRango(2.0f, 512.0f); propScrewRender->entero = true; propModifierProps->properties.push_back(propScrewRender);
+    propScrewStretchU = new PropBool("Stretch U"); propScrewStretchU->onChange = AccionModParamChanged; propModifierProps->properties.push_back(propScrewStretchU);
+    propScrewStretchV = new PropBool("Stretch V"); propScrewStretchV->onChange = AccionModParamChanged; propModifierProps->properties.push_back(propScrewStretchV);
     // Apply Modifier (cualquier modificador): hornea la malla generada en la editable
     propBtnApplyMod = new PropButton("Apply Modifier");
     propBtnApplyMod->action = AccionAplicarModificador;
@@ -1330,6 +1357,9 @@ Properties::Properties() : ViewportBase() {
     propModVerViewport = NULL; propModVerEdit = NULL;
     propModVacio = NULL; propMirX = NULL; propMirY = NULL; propMirZ = NULL; propMirTarget = NULL;
     propMirMerge = NULL; propMirDist = NULL; propMirClip = NULL; propBtnApplyMod = NULL;
+    propSubSimple = NULL; propSubLevel = NULL; propSubRender = NULL;
+    propScrewAngle = NULL; propScrewHeight = NULL; propScrewSteps = NULL; propScrewRender = NULL;
+    propScrewAxis = NULL; propScrewStretchU = NULL; propScrewStretchV = NULL;
     propListUV = NULL; propListColor = NULL; propBtnColorMode = NULL;
     propRotMode = NULL;
     propMsgDefault = NULL; propSepMat = NULL;
@@ -1439,6 +1469,7 @@ void Properties::ActualizarPestanias(){
         Modifier* mod = haySel ? mm->modificadores[mm->modificadorActivo] : NULL;
         bool esMirror = (mod && mod->tipo == ModifierType::Mirror);
         bool esSub    = (mod && mod->tipo == ModifierType::SubdivisionSurface);
+        bool esScrew  = (mod && mod->tipo == ModifierType::Screw);
         if (propModifierProps) {
             propModifierProps->visible = haySel;               // 2da tarjeta: solo con un modificador seleccionado
             if (mod) propModifierProps->name = mod->nombre;    // titulo = su nombre
@@ -1447,10 +1478,19 @@ void Properties::ActualizarPestanias(){
         // display toggles: para CUALQUIER modificador seleccionado (no solo Mirror)
         if (propModVerViewport) propModVerViewport->value = haySel ? &mod->mostrarViewport : NULL;
         if (propModVerEdit)     propModVerEdit->value     = haySel ? &mod->mostrarEdit : NULL;
-        if (propModVacio) propModVacio->oculto = (esMirror || esSub); // "(no properties yet)" solo para tipos sin params
+        if (propModVacio) propModVacio->oculto = (esMirror || esSub || esScrew); // "(no properties yet)" solo tipos sin params
         if (propSubSimple) propSubSimple->value = esSub ? &mod->subSimple    : NULL;
         if (propSubLevel)  propSubLevel->value  = esSub ? &mod->subLevel      : NULL;
         if (propSubRender) propSubRender->value = esSub ? &mod->subRenderLevel: NULL;
+        // Screw
+        if (propScrewAngle)   propScrewAngle->value   = esScrew ? &mod->screwAngle       : NULL;
+        if (propScrewHeight)  propScrewHeight->value  = esScrew ? &mod->screwHeight       : NULL;
+        if (propScrewSteps)   propScrewSteps->value   = esScrew ? &mod->screwSteps        : NULL;
+        if (propScrewRender)  propScrewRender->value  = esScrew ? &mod->screwRenderSteps  : NULL;
+        if (propScrewStretchU)propScrewStretchU->value= esScrew ? &mod->screwStretchU     : NULL;
+        if (propScrewStretchV)propScrewStretchV->value= esScrew ? &mod->screwStretchV     : NULL;
+        if (propScrewAxis){ propScrewAxis->oculto = !esScrew;
+            if (esScrew) propScrewAxis->button->text = (mod->screwAxis==0)?"X":(mod->screwAxis==1)?"Y":"Z"; }
         if (propMirX) propMirX->value = esMirror ? &mod->ejeX : NULL;
         if (propMirY) propMirY->value = esMirror ? &mod->ejeY : NULL;
         if (propMirZ) propMirZ->value = esMirror ? &mod->ejeZ : NULL;

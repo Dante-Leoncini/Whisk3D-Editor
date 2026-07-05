@@ -43,12 +43,23 @@ class Modifier {
         float subRenderLevel;   // niveles en el RENDER (default 2)
         bool  subSimple;        // false = Catmull-Clark (suaviza), true = Simple (subdivide sin mover verts)
 
+        // --- SCREW --- barre el perfil (aristas) alrededor de un eje. steps como float (PropFloat entero).
+        float screwAngle;       // grados que gira del primero al ultimo (default 360)
+        float screwHeight;      // cuanto SUBE por el eje del primero al ultimo (el "screw"; default 0 = torno)
+        float screwSteps;       // copias del perfil en el VIEWPORT (default 16)
+        float screwRenderSteps; // copias en el RENDER (default 32)
+        int   screwAxis;        // 0=X, 1=Y, 2=Z (default Z)
+        bool  screwStretchU;    // genera U (a lo largo del giro) para textura cilindrica
+        bool  screwStretchV;    // genera V (a lo largo del perfil)
+
         Modifier(int t, const std::string& n)
             : tipo(t), nombre(n),
               mostrarViewport(true), mostrarEdit(true),
               ejeX(true), ejeY(false), ejeZ(false), target(NULL),
               merge(true), mergeDist(0.001f), clipping(true),
-              subLevel(1.0f), subRenderLevel(2.0f), subSimple(false) {}
+              subLevel(1.0f), subRenderLevel(2.0f), subSimple(false),
+              screwAngle(360.0f), screwHeight(0.0f), screwSteps(16.0f), screwRenderSteps(32.0f),
+              screwAxis(2), screwStretchU(true), screwStretchV(true) {}
         virtual ~Modifier() {}
 };
 
