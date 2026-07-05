@@ -9,7 +9,9 @@
 #define WHISK3DCONTAINER_H
 
 #ifdef _WIN32
+#ifndef W3D_SYMBIAN
     #include <windows.h>
+#endif
 #endif
 
 // INCLUDES
@@ -21,9 +23,7 @@
 
 #include "Whisk3D.h"
 #include "Whisk3Dinput.h"
-
-//necesario para el monitor bluetooth del mouse y teclado
-#include "hidinputmonitor.h"
+#include "hidmonitor.h" // mouse/teclado bluetooth
 
 /**
  * Container control class that handles the OpenGL ES initialization and deinitializations.
@@ -52,8 +52,6 @@ class CWhisk3DContainer : public CCoeControl, MCoeControlObserver {
          */
         static int DrawCallBack( TAny* aInstance );
         
-        //Para cambiar al modo Widescreen
-        void SetWidescreen(); 
 
     private: // Functions from base classes
 
@@ -137,9 +135,9 @@ class CWhisk3DContainer : public CCoeControl, MCoeControlObserver {
         
         /** Input handler that maps keycodes to inputs and stores the current state for each key. */
         CWhisk3DInput* iInputHandler;
-        
-        //para usar el mouse y teclado bluetooth hay que crear el monitor que escucha
-        CHIDEventMonitor* iHIDMonitor;
+
+        /** Monitor del mouse/teclado bluetooth (NULL si no hay hidsrv.dll). */
+        CHidMonitor* iHidMonitor;
 
     public:  //data
 

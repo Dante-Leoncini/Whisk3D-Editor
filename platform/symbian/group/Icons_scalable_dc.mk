@@ -30,12 +30,15 @@ LIB : do_nothing
 
 CLEANLIB : do_nothing
 
-#RESOURCE :	
+#RESOURCE :
 #	mifconv $(ICONTARGETFILENAME) /h$(HEADERFILENAME) /FIcons.miflist
-	
-RESOURCE : #capaz rompi el icono
+
+# /V3: el mifconv del SDK de Symbian^3 convierte el SVG a NVG (formato que solo
+# entienden telefonos Symbian^3) y el N95/S60v3-v5 muestra el icono roto.
+# /V3 fuerza el SVGB clasico (RGB/fixed point), que entienden todos.
+RESOURCE :
 	mifconv $(ICONTARGETFILENAME) \
-		/c32 $(ICONDIR)\qgn_menu_whisk3D.svg
+		/V3 /c32 $(ICONDIR)\qgn_menu_whisk3D.svg
 
 FREEZE : do_nothing
 

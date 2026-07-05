@@ -1,4 +1,5 @@
 #include "importers/import_w3d.h"
+#include "stb/stb_image.h" // stb ahora vive en libs/Whisk3DCore/thirdparty
 
 //ESTO DESPUES TIENE QUE IR A UN ARCHIVO SEPARADOOOOO
 SDL_Surface* LoadSurfaceSTB(const std::string& path) {

@@ -1,15 +1,19 @@
 #include "variables.h"
 
-SDL_Window* window = nullptr;
-SDL_GameController* controller = nullptr;
-//SDL_Gamepad* gamepad = nullptr;
-SDL_GLContext glContext = nullptr;
+#ifndef W3D_SYMBIAN
+SDL_Window* window = NULL;
+SDL_GameController* controller = NULL;
+//SDL_Gamepad* gamepad = NULL;
+SDL_GLContext glContext = NULL;
+#endif
 
 int winW = 640;
 int winH = 480;
 
 // Inicialización de variables
 int axisSelect = X;
+int transformOrientation = GlobalOrient;
+bool gTrackballCap = false;
 
 float fovDeg = 45.0f;
 
@@ -17,6 +21,9 @@ int nextLightId = GL_LIGHT1;
 
 float angle = 55.0f;
 int estado;
+bool g_xformPrimerMov = false;
+bool gEVuseCustom = false;             // transform constrenido a la NORMAL (extrude / orientacion Normal)
+Vector3 gTransformNormal(0, 1, 0);     // esa normal, en MUNDO
 int InteractionMode;
 int navegacionMode;
 
@@ -49,21 +56,30 @@ Vector3 TransformPivotPoint;
 
 Cursor3D cursor3D;
 
-// Mouse
+// Mouse (en el N95 el cursor vive en w3dmouse.cpp)
+#ifndef W3D_SYMBIAN
 GLshort mouseX = 0;
 GLshort mouseY = 0;
 bool mouseVisible = false;
+#endif
 
+// globales compartidos por los 4 OS (input/transform). Antes el N95 los
+// redefinia en Whisk3D.cpp; ahora viven aca para todos (limpieza final).
 int ShiftCount = 0;
 int valorRotacion = 0;
-int NumTexturasWhisk3D = 0;
+float gAnguloTransform = 0.0f;
 
+#ifndef W3D_SYMBIAN
+int NumTexturasWhisk3D = 0;
+#endif
+
+#ifndef W3D_SYMBIAN
 // Cursores SDL
-SDL_Cursor* cursorDefault = nullptr;
-SDL_Cursor* cursorRotate = nullptr;
-SDL_Cursor* cursorScaleVertical = nullptr;
-SDL_Cursor* cursorScaleHorizontal = nullptr;
-SDL_Cursor* cursorTranslate = nullptr;
+SDL_Cursor* cursorDefault = NULL;
+SDL_Cursor* cursorRotate = NULL;
+SDL_Cursor* cursorScaleVertical = NULL;
+SDL_Cursor* cursorScaleHorizontal = NULL;
+SDL_Cursor* cursorTranslate = NULL;
 
 // Función
 void InitCursors() {
@@ -81,3 +97,4 @@ void InitCursors() {
         cursorScaleHorizontal = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_EW_RESIZE);
     #endif
 }
+#endif // !W3D_SYMBIAN

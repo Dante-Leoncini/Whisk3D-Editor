@@ -2,7 +2,9 @@
 #define IMPORTSVERTEXANIMATION_H
 
 #ifdef _WIN32
+#ifndef W3D_SYMBIAN
     #include <windows.h>
+#endif
 #endif
 
 #include <vector>

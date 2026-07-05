@@ -1,6 +1,6 @@
 #include "Floor.h"
 
-// Vertices for the Floor object. 
+// Vertices for the Floor object.
 const GLfloat objVertexdataFloor[102*3]={
     //EJES X Y Z
     0.0f, 0.0f, -13.0f,
@@ -109,24 +109,12 @@ const GLfloat objVertexdataFloor[102*3]={
     -13.0, 0.0f,  -12.0f
 };
 
-// Define normals for the cube 
-const GLbyte objNormaldataFloor[]={
-    0,127,0,
-    0,127,0,
-    0,127,0,
-    0,127,0,
-    0,127,0,
-    0,127,0,
-    0,127,0,
-    0,127,0
-};
-
 // Indices to the Floor object vertices.
 const GLushort EjeVerde[2]={0, 1};
 const GLushort EjeRojo[2]={2, 3};
 const GLushort EjeAzul[2]={4, 5};
 
-const GLushort objFacedataFloor[48*2]={	
+const GLushort objFacedataFloor[48*2]={
     6,  7,
     8,  9,
     10, 11,

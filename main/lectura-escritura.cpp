@@ -2,59 +2,28 @@
 #include <iostream>
 #include "importers/import_obj.h"
 
-#ifdef ANDROID
+#if defined(ANDROID) || defined(W3D_SYMBIAN)
 
-int abrir() {
-    // TODO: Implementar picker de archivos en Android
-    return 0;
-}
-
-int BuscarVertexAnimation() {
-    // TODO: Implementar picker de archivos en Android
-    return 0;
-}
+int abrir() { return 0; }              // TODO: picker propio
+int BuscarVertexAnimation() { return 0; }
 
 #else
 
+#include "ViewPorts/PopUp/FileBrowser.h" // el explorador COMPARTIDO (reemplaza tinyfd)
+
+static void ImportObjElegido(const std::string& path) {
+    ImportOBJ(path, false);
+}
+
 int abrir() {
-    const char* filtros[] = { "*.obj" };
-
-    const char* ruta = tinyfd_openFileDialog(
-        "Abrir archivo",
-        "",
-        1, filtros,
-        "Archivos Wavefront OBJ",
-        0
-    );
-
-    if (ruta) {
-        std::cout << "Archivo seleccionado: " << ruta << std::endl;
-        ImportOBJ(ruta, false);
-    } else {
-        std::cout << "No se seleccionó nada." << std::endl;
-    }
-
+    // mismo flujo que el menu Add > import: abre el File browser compartido
+    AbrirFileBrowser("Importar modelo", "Import Wavefront OBJ", ".obj", ImportObjElegido);
     return 0;
 }
 
 int BuscarVertexAnimation() {
-    const char* filtros[] = { "*.txt" };
-
-    const char* ruta = tinyfd_openFileDialog(
-        "Abrir archivo",
-        "",
-        1, filtros,
-        "Archivos txt con animacion",
-        0
-    );
-
-    if (ruta) {
-        std::cout << "Archivo seleccionado: " << ruta << std::endl;
-        // ImportVertexAnimation(ruta);
-    } else {
-        std::cout << "No se seleccionó nada." << std::endl;
-    }
-
+    // (la animacion por vertices todavia no esta implementada; cuando lo este
+    //  se abre el browser con filtro .txt y se carga. Sin dialogo nativo.)
     return 0;
 }
 
