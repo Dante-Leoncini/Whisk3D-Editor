@@ -2536,9 +2536,18 @@ static int EditPickIndex(int modo, int mx, int my, int vx, int vy, int vw, int v
     w3dEngine::Enable(w3dEngine::ScissorTest);
     w3dEngine::MatrixMode(w3dEngine::Projection);
     w3dEngine::LoadIdentity();
-    w3dEngine::Perspective(fovDeg, (float)vw / (float)vh,
-        Viewport3DActive ? Viewport3DActive->nearClip : 0.01f,
-        Viewport3DActive ? Viewport3DActive->farClip : 1000.0f);
+    float pkNear = Viewport3DActive ? Viewport3DActive->nearClip : 0.01f;
+    float pkFar  = Viewport3DActive ? Viewport3DActive->farClip  : 1000.0f;
+    float pkAspect = (float)vw / (float)vh;
+    if (Viewport3DActive && Viewport3DActive->orthographic) {
+        // MISMA proyeccion ortografica que Render() (size = orbitDistance*tan(fov/2)); antes pickeaba SIEMPRE con
+        // perspectiva -> en orto el click caia corrido. Ahora el color-id usa el mismo volumen que se ve.
+        float size = Viewport3DActive->orbitDistance * tanf(fovDeg * 0.5f * 3.14159265f / 180.0f);
+        if (size < 0.001f) size = 0.001f;
+        w3dEngine::Ortho(-size * pkAspect, size * pkAspect, -size, size, pkNear, Viewport3DActive->orbitDistance + pkFar);
+    } else {
+        w3dEngine::Perspective(fovDeg, pkAspect, pkNear, pkFar);
+    }
     w3dEngine::MatrixMode(w3dEngine::ModelView);
     w3dEngine::LoadIdentity();
     if (Viewport3DActive) Viewport3DActive->UpdateViewOrbit();
@@ -3280,9 +3289,17 @@ bool ScenePick3D(int mx, int my, int vx, int vy, int vw, int vh, int screenH) {
         w3dEngine::Enable(w3dEngine::ScissorTest);
         w3dEngine::MatrixMode(w3dEngine::Projection);
         w3dEngine::LoadIdentity();
-    w3dEngine::Perspective(fovDeg, (float)vw / (float)vh,
-            Viewport3DActive ? Viewport3DActive->nearClip : 0.01f,
-            Viewport3DActive ? Viewport3DActive->farClip : 1000.0f);
+        float pkNear = Viewport3DActive ? Viewport3DActive->nearClip : 0.01f;
+        float pkFar  = Viewport3DActive ? Viewport3DActive->farClip  : 1000.0f;
+        float pkAspect = (float)vw / (float)vh;
+        if (Viewport3DActive && Viewport3DActive->orthographic) {
+            // orto: mismo volumen que Render() (sino el pick de objetos cae corrido al zoomear en ortografica)
+            float size = Viewport3DActive->orbitDistance * tanf(fovDeg * 0.5f * 3.14159265f / 180.0f);
+            if (size < 0.001f) size = 0.001f;
+            w3dEngine::Ortho(-size * pkAspect, size * pkAspect, -size, size, pkNear, Viewport3DActive->orbitDistance + pkFar);
+        } else {
+            w3dEngine::Perspective(fovDeg, pkAspect, pkNear, pkFar);
+        }
         w3dEngine::MatrixMode(w3dEngine::ModelView);
         w3dEngine::LoadIdentity();
         if (Viewport3DActive) Viewport3DActive->UpdateViewOrbit();

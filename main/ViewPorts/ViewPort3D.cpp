@@ -499,8 +499,9 @@ bool Viewport3D::ProyectarPunto(const Vector3& p, float& sx, float& sy){
     float aspectR = (height > 0) ? (float)width / (float)height : 1.0f;
     float ndcX, ndcY;
     if (orthographic) {
-        // ORTOGRAFICA: sin division por ez (mismo extent que el Render: size=5)
-        const float size = 5.0f;
+        // ORTOGRAFICA: sin division por ez. MISMO extent que Render(): size = orbitDistance*tan(fov/2) (zoom).
+        float size = orbitDistance * tanf(fovDeg * 0.5f * 3.14159265f / 180.0f);
+        if (size < 0.001f) size = 0.001f;
         ndcX = ex / (size * aspectR);
         ndcY = ey / size;
     } else {
@@ -530,7 +531,9 @@ static Vector3 GizmoPivot(){
 float Viewport3D::VelocidadArrastreMundo(){
     if (height <= 0) return 0.01f;                // guarda (no deberia pasar)
     if (orthographic) {
-        const float size = 5.0f;                 // mismo extent que Render() y ProyectarPunto()
+        // mismo extent que Render() y ProyectarPunto(): size = orbitDistance*tan(fov/2) (sigue el zoom)
+        float size = orbitDistance * tanf(fovDeg * 0.5f * 3.14159265f / 180.0f);
+        if (size < 0.001f) size = 0.001f;
         return 2.0f * size / (float)height;      // ortho: mundo-por-pixel constante (no depende de z)
     }
     Vector3 cf = viewRot * Vector3(0, 0, -1);    // hacia la escena (igual que ProyectarPunto)
@@ -712,10 +715,15 @@ void Viewport3D::Render() {
     w3dEngine::LoadIdentity();
 
     if (orthographic) {
-        float size = 5.0f;
-    w3dEngine::Ortho(-size * aspect, size * aspect,
-                -size, size,
-                nearClip, farClip);
+        // En ORTOGRAFICA la distancia camara->objeto NO cambia el tamaño aparente: el "zoom" es la escala del
+        // volumen visible (glOrtho), no la distancia. Atamos el half-height a orbitDistance*tan(fov/2) para que
+        // zoomear agrande/achique igual que en perspectiva (y al alternar perspectiva/orto el objeto quede del
+        // mismo tamaño). El far se corre con la distancia asi el objeto no se corta por el far al alejarse.
+        float size = orbitDistance * tanf(fovDeg * 0.5f * 3.14159265f / 180.0f);
+        if (size < 0.001f) size = 0.001f;
+        w3dEngine::Ortho(-size * aspect, size * aspect,
+                    -size, size,
+                    nearClip, orbitDistance + farClip);
     }
     else {
         w3dEngine::Perspective(fovDeg, aspect, nearClip, farClip);
@@ -896,7 +904,9 @@ bool Viewport3D::RenderAPNG(int outW, int outH, RenderType::Enum pass, const cha
     float aspectR = (float)outW / (float)outH;
     float top, bottom, left, right;
     if (orthographic){
-        const float size = 5.0f;
+        // igual que el viewport: el tamaño del volumen orto sigue el zoom (orbitDistance), no un valor fijo
+        float size = orbitDistance * tanf(fovDeg * 0.5f * 3.14159265f / 180.0f);
+        if (size < 0.001f) size = 0.001f;
         top = size; bottom = -size; right = size * aspectR; left = -right;
     } else {
         top = nearClip * tanf(fovDeg * 0.5f * 3.14159265f / 180.0f);
@@ -942,7 +952,7 @@ bool Viewport3D::RenderAPNG(int outW, int outH, RenderType::Enum pass, const cha
 
             w3dEngine::MatrixMode(w3dEngine::Projection);
             w3dEngine::LoadIdentity();
-            if (orthographic) w3dEngine::Ortho(l, r, b, t, nearClip, farClip);
+            if (orthographic) w3dEngine::Ortho(l, r, b, t, nearClip, orbitDistance + farClip); // far corrido: no cortar el objeto al alejar
             else              w3dEngine::Frustum(l, r, b, t, nearClip, farClip);
 
             w3dEngine::Viewport(0, 0, tw, th); // el tile en la esquina del framebuffer

@@ -147,6 +147,11 @@ static void MeshOverlayHook(Mesh* m) {
         const float* col = gRenderColors[cid];
         m->RenderBordes(col, 3.0f, false);
         RenderNormales(m);
+    } else if (m->facesSize == 0) {
+        // malla SIN caras (solo lineas/verts sueltos): dibuja sus bordes como OVERLAY del editor asi no queda
+        // invisible en modo objeto (sino no hay forma de saber que hay algo). Es overlay -> NO sale en el render
+        // final (donde las lineas no se ven). Los verts sueltos no se dibujan (ok, alcanza con las lineas).
+        m->RenderBordes(gRenderColors[RC_wireframe], 1.5f, false);
     }
 }
 struct MeshOverlayHookReg { MeshOverlayHookReg() { g_meshOverlayHook = MeshOverlayHook; } };
