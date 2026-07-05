@@ -1879,37 +1879,121 @@ static bool AristaEnPlanoMirror(Mesh* m, int ra, int rb){
 // espeja la geometria a traves del plano (c, n): duplica verts REFLEJADOS + tris con winding REVERTIDO (normal
 // afuera). merge: los verts a <mergeDist del plano se SNAPEAN al plano + su normal se ALINEA (quita la componente
 // en n) y NO se duplican (compartidos) -> la union se ve "soldada" (media esfera -> esfera). El merge es VISUAL.
-static void MirrorPlano(const Vector3& c, const Vector3& n, bool merge, float mergeDist,
-                        std::vector<GLfloat>& vp, std::vector<GLbyte>& vn, std::vector<GLfloat>& vu,
-                        std::vector<GLubyte>& vc, std::vector<MeshIndex>& vf, std::vector<int>& triMat) {
-    int nV = (int)(vp.size()/3);
-    std::vector<int> mir(nV);
-    for (int i=0;i<nV;i++){
-        float px=vp[i*3], py=vp[i*3+1], pz=vp[i*3+2];
-        float d = (px-c.x)*n.x + (py-c.y)*n.y + (pz-c.z)*n.z; // distancia FIRMADA al plano
-        float nx=vn[i*3]/127.0f, ny=vn[i*3+1]/127.0f, nz=vn[i*3+2]/127.0f;
-        if (merge && d>-mergeDist && d<mergeDist){
-            vp[i*3]=px-d*n.x; vp[i*3+1]=py-d*n.y; vp[i*3+2]=pz-d*n.z;          // snap al plano
-            float dn=nx*n.x+ny*n.y+nz*n.z; nx-=dn*n.x; ny-=dn*n.y; nz-=dn*n.z; // normal alineada al plano
-            float l=sqrtf(nx*nx+ny*ny+nz*nz); if(l>1e-4f){nx/=l;ny/=l;nz/=l;}
-            vn[i*3]=(GLbyte)(nx*127); vn[i*3+1]=(GLbyte)(ny*127); vn[i*3+2]=(GLbyte)(nz*127);
-            mir[i]=i; // compartido (no se duplica)
-        } else {
-            float dn=nx*n.x+ny*n.y+nz*n.z; float rnx=nx-2*dn*n.x, rny=ny-2*dn*n.y, rnz=nz-2*dn*n.z; // normal reflejada
-            float u0=vu[i*2], u1=vu[i*2+1];
-            GLubyte q0=vc[i*4],q1=vc[i*4+1],q2=vc[i*4+2],q3=vc[i*4+3];
-            vp.push_back(px-2*d*n.x); vp.push_back(py-2*d*n.y); vp.push_back(pz-2*d*n.z); // v' = v - 2*d*n
-            vn.push_back((GLbyte)(rnx*127)); vn.push_back((GLbyte)(rny*127)); vn.push_back((GLbyte)(rnz*127));
-            vu.push_back(u0); vu.push_back(u1);
-            vc.push_back(q0); vc.push_back(q1); vc.push_back(q2); vc.push_back(q3);
-            mir[i]=(int)(vp.size()/3)-1;
+// ============================================================================
+//  Pipeline de modificadores por POLIGONOS (NO triangulos): Catmull-Clark necesita las caras + adyacencia y verts
+//  TOPOLOGICOS (deduplicados por posicion). Se lleva la malla como poligonos con uv/color POR CORNER (preserva
+//  costuras) y material POR CARA; se triangula al final. Mirror se aplica tambien sobre poligonos.
+// ============================================================================
+struct PolyMesh {
+    std::vector<Vector3>                    P;    // posiciones topologicas (unicas por lugar)
+    std::vector<std::vector<int> >          F;    // caras: indices a P
+    std::vector<int>                        Fmat; // material (mesh part) por cara
+    std::vector<std::vector<float> >        Fuv;  // uv POR CORNER (2 por corner)
+    std::vector<std::vector<unsigned char> >Fcol; // color POR CORNER (4 por corner)
+};
+
+// arma la PolyMesh desde faces3d: deduplica los verts de render por POSICION (posRep) -> verts topologicos.
+static void ConstruirPolyMesh(Mesh* m, PolyMesh& W) {
+    const int nV = m->vertexSize;
+    const bool hayRep = ((int)m->posRep.size() == nV);
+    std::map<int,int> repToTopo; std::vector<int> gpuToTopo(nV, -1);
+    for (int gi=0; gi<nV; gi++){ int r = hayRep ? m->posRep[gi] : gi; if (r<0||r>=nV) r=gi;
+        std::map<int,int>::iterator it = repToTopo.find(r);
+        if (it==repToTopo.end()){ int t=(int)W.P.size(); repToTopo[r]=t; gpuToTopo[gi]=t;
+            W.P.push_back(Vector3(m->vertex[r*3], m->vertex[r*3+1], m->vertex[r*3+2])); }
+        else gpuToTopo[gi]=it->second;
+    }
+    for (size_t f=0; f<m->faces3d.size(); f++){ const std::vector<int>& idx=m->faces3d[f].idx; if (idx.size()<3) continue;
+        std::vector<int> face; std::vector<float> uv; std::vector<unsigned char> col;
+        for (size_t c=0;c<idx.size();c++){ int gi=idx[c]; if (gi<0||gi>=nV){ face.clear(); break; }
+            face.push_back(gpuToTopo[gi]);
+            uv.push_back(m->uv?m->uv[gi*2]:0.0f); uv.push_back(m->uv?m->uv[gi*2+1]:0.0f);
+            for (int q=0;q<4;q++) col.push_back(m->vertexColor?m->vertexColor[gi*4+q]:(unsigned char)255);
+        }
+        if (face.size()<3) continue;
+        W.F.push_back(face); W.Fmat.push_back(m->faces3d[f].mat); W.Fuv.push_back(uv); W.Fcol.push_back(col);
+    }
+}
+
+// UN nivel de subdivision. simple=true -> Simple (subdivide sin mover verts); false -> Catmull-Clark (suaviza).
+static void SubdividirUnNivel(PolyMesh& W, bool simple) {
+    const int nP=(int)W.P.size(), nF=(int)W.F.size(); if (nP==0||nF==0) return;
+    // 1) punto de CARA (centroide) + uv/color promedio
+    std::vector<Vector3> FP(nF); std::vector<float> FPu(nF*2,0.0f), FPc(nF*4,0.0f);
+    for (int f=0; f<nF; f++){ int m=(int)W.F[f].size(); Vector3 c(0,0,0); float u=0,v=0,cc[4]={0,0,0,0};
+        for (int i=0;i<m;i++){ int vi=W.F[f][i]; c=c+W.P[vi]; u+=W.Fuv[f][i*2]; v+=W.Fuv[f][i*2+1];
+            for(int q=0;q<4;q++) cc[q]+=W.Fcol[f][i*4+q]; }
+        float im=1.0f/(float)m; FP[f]=c*im; FPu[f*2]=u*im; FPu[f*2+1]=v*im; for(int q=0;q<4;q++) FPc[f*4+q]=cc[q]*im; }
+    // 2) aristas -> id + caras adyacentes
+    std::map<std::pair<int,int>,int> eid; std::vector<std::pair<int,int> > ev; std::vector<std::vector<int> > eface;
+    for (int f=0; f<nF; f++){ int m=(int)W.F[f].size(); for (int i=0;i<m;i++){ int a=W.F[f][i], b=W.F[f][(i+1)%m];
+        std::pair<int,int> k(a<b?a:b, a<b?b:a); std::map<std::pair<int,int>,int>::iterator it=eid.find(k); int e;
+        if (it==eid.end()){ e=(int)ev.size(); eid[k]=e; ev.push_back(k); eface.push_back(std::vector<int>()); } else e=it->second;
+        eface[e].push_back(f); } }
+    const int nE=(int)ev.size();
+    // 3) punto de ARISTA
+    std::vector<Vector3> EP(nE);
+    for (int e=0;e<nE;e++){ int a=ev[e].first, b=ev[e].second;
+        if (simple || eface[e].size()<2) EP[e]=(W.P[a]+W.P[b])*0.5f;
+        else EP[e]=(W.P[a]+W.P[b]+FP[eface[e][0]]+FP[eface[e][1]])*0.25f; }
+    // 4) punto de VERTICE (Catmull-Clark mueve; Simple lo deja)
+    std::vector<Vector3> VP(W.P);
+    if (!simple){
+        std::vector<Vector3> Favg(nP,Vector3(0,0,0)); std::vector<int> Fcnt(nP,0);
+        std::vector<Vector3> Ravg(nP,Vector3(0,0,0)); std::vector<int> Rcnt(nP,0);
+        std::vector<bool> bord(nP,false); std::vector<Vector3> bAcc(nP,Vector3(0,0,0)); std::vector<int> bCnt(nP,0);
+        for (int f=0; f<nF; f++){ int m=(int)W.F[f].size(); for (int i=0;i<m;i++){ int vi=W.F[f][i]; Favg[vi]=Favg[vi]+FP[f]; Fcnt[vi]++; } }
+        for (int e=0;e<nE;e++){ int a=ev[e].first, b=ev[e].second; Vector3 mid=(W.P[a]+W.P[b])*0.5f;
+            Ravg[a]=Ravg[a]+mid; Rcnt[a]++; Ravg[b]=Ravg[b]+mid; Rcnt[b]++;
+            if (eface[e].size()<2){ bord[a]=bord[b]=true; bAcc[a]=bAcc[a]+W.P[b]; bCnt[a]++; bAcc[b]=bAcc[b]+W.P[a]; bCnt[b]++; } }
+        for (int v=0; v<nP; v++){
+            if (bord[v]){ if (bCnt[v]>0){ Vector3 nb=bAcc[v]*(1.0f/(float)bCnt[v]); VP[v]=W.P[v]*0.75f+nb*0.25f; } }
+            else if (Fcnt[v]>0 && Rcnt[v]>0){ int nn=Fcnt[v]; if (nn<3) nn=3;
+                Vector3 F_=Favg[v]*(1.0f/(float)Fcnt[v]); Vector3 R_=Ravg[v]*(1.0f/(float)Rcnt[v]);
+                VP[v]=(F_ + R_*2.0f + W.P[v]*(float)(nn-3))*(1.0f/(float)nn); } }
+    }
+    // 5) nueva malla: verts VP(0..) + FP(baseF..) + EP(baseE..); por corner de cada cara -> un quad
+    PolyMesh out; out.P.reserve(nP+nF+nE);
+    for (int v=0;v<nP;v++) out.P.push_back(VP[v]);
+    int baseF=(int)out.P.size(); for (int f=0;f<nF;f++) out.P.push_back(FP[f]);
+    int baseE=(int)out.P.size(); for (int e=0;e<nE;e++) out.P.push_back(EP[e]);
+    for (int f=0; f<nF; f++){ int m=(int)W.F[f].size();
+        for (int i=0;i<m;i++){ int pi=(i+m-1)%m, ni=(i+1)%m; int vi=W.F[f][i], vprev=W.F[f][pi], vnext=W.F[f][ni];
+            int eN=eid[std::make_pair(vi<vnext?vi:vnext, vi<vnext?vnext:vi)];
+            int eP=eid[std::make_pair(vprev<vi?vprev:vi, vprev<vi?vi:vprev)];
+            std::vector<int> q; q.push_back(vi); q.push_back(baseE+eN); q.push_back(baseF+f); q.push_back(baseE+eP);
+            out.F.push_back(q); out.Fmat.push_back(W.Fmat[f]);
+            std::vector<float> qu; std::vector<unsigned char> qc;
+            // V (corner i)
+            qu.push_back(W.Fuv[f][i*2]); qu.push_back(W.Fuv[f][i*2+1]); for(int z=0;z<4;z++) qc.push_back(W.Fcol[f][i*4+z]);
+            // E(v,next) = promedio corner i y next
+            qu.push_back((W.Fuv[f][i*2]+W.Fuv[f][ni*2])*0.5f); qu.push_back((W.Fuv[f][i*2+1]+W.Fuv[f][ni*2+1])*0.5f);
+            for(int z=0;z<4;z++) qc.push_back((unsigned char)(((int)W.Fcol[f][i*4+z]+(int)W.Fcol[f][ni*4+z])/2));
+            // F (cara)
+            qu.push_back(FPu[f*2]); qu.push_back(FPu[f*2+1]); for(int z=0;z<4;z++) qc.push_back((unsigned char)FPc[f*4+z]);
+            // E(prev,v) = promedio corner prev e i
+            qu.push_back((W.Fuv[f][pi*2]+W.Fuv[f][i*2])*0.5f); qu.push_back((W.Fuv[f][pi*2+1]+W.Fuv[f][i*2+1])*0.5f);
+            for(int z=0;z<4;z++) qc.push_back((unsigned char)(((int)W.Fcol[f][pi*4+z]+(int)W.Fcol[f][i*4+z])/2));
+            out.Fuv.push_back(qu); out.Fcol.push_back(qc);
         }
     }
-    int nT=(int)(vf.size()/3);
-    for (int t=0;t<nT;t++){
-        int a=vf[t*3], b=vf[t*3+1], cc=vf[t*3+2];
-        vf.push_back((MeshIndex)mir[a]); vf.push_back((MeshIndex)mir[cc]); vf.push_back((MeshIndex)mir[b]); // winding revertido
-        triMat.push_back(triMat[t]);
+    W.P.swap(out.P); W.F.swap(out.F); W.Fmat.swap(out.Fmat); W.Fuv.swap(out.Fuv); W.Fcol.swap(out.Fcol);
+}
+
+// MIRROR sobre poligonos: refleja los verts a traves del plano (c,n) y agrega las caras reflejadas con winding
+// REVERTIDO. merge: los verts a <mergeDist del plano se SNAPEAN y se comparten (la costura queda soldada; la
+// normal continua sale sola al recalcular smooth por simetria).
+static void MirrorPoly(PolyMesh& W, const Vector3& c, const Vector3& n, bool merge, float mergeDist) {
+    int nP=(int)W.P.size(); std::vector<int> mir(nP);
+    for (int i=0;i<nP;i++){ float d=(W.P[i].x-c.x)*n.x+(W.P[i].y-c.y)*n.y+(W.P[i].z-c.z)*n.z;
+        if (merge && d>-mergeDist && d<mergeDist){ W.P[i]=W.P[i]-n*d; mir[i]=i; }
+        else { mir[i]=(int)W.P.size(); W.P.push_back(W.P[i]-n*(2*d)); } }
+    int nF=(int)W.F.size();
+    for (int f=0; f<nF; f++){ int m=(int)W.F[f].size();
+        std::vector<int> nf; std::vector<float> nu; std::vector<unsigned char> nc;
+        for (int i=m-1;i>=0;i--){ nf.push_back(mir[W.F[f][i]]); nu.push_back(W.Fuv[f][i*2]); nu.push_back(W.Fuv[f][i*2+1]);
+            for(int z=0;z<4;z++) nc.push_back(W.Fcol[f][i*4+z]); }
+        W.F.push_back(nf); W.Fmat.push_back(W.Fmat[f]); W.Fuv.push_back(nu); W.Fcol.push_back(nc);
     }
 }
 
@@ -1923,22 +2007,25 @@ void Mesh::GenerarMallaModificada() {
       for (size_t i=0;i<modificadores.size();i++){ Modifier* md=modificadores[i];
           if (!md->mostrarViewport) continue; if (enEdit && !md->mostrarEdit) continue; alguno=true; break; }
       if (!alguno){ genValido=false; return; } }
-    std::vector<GLfloat> vp(vertex, vertex+vertexSize*3);
-    std::vector<GLbyte>  vn; if(normals) vn.assign(normals, normals+vertexSize*3); else vn.assign((size_t)vertexSize*3, (GLbyte)0);
-    std::vector<GLfloat> vu; if(uv) vu.assign(uv, uv+vertexSize*2); else vu.assign((size_t)vertexSize*2, 0.0f);
-    std::vector<GLubyte> vc; if(vertexColor) vc.assign(vertexColor, vertexColor+vertexSize*4); else vc.assign((size_t)vertexSize*4, (GLubyte)255);
-    std::vector<MeshIndex> vf(faces, faces+facesSize);
-    std::vector<int> triMat(facesSize/3, 0); // material POR TRIANGULO (para reconstruir los grupos tras el mirror)
-    for (size_t gi=0; gi<materialsGroup.size(); gi++){ int s=materialsGroup[gi].startDrawn/3, cnt=materialsGroup[gi].indicesDrawnCount/3;
-        for (int t=s; t<s+cnt && t<(int)triMat.size(); t++) triMat[t]=(int)gi; }
+    extern bool g_modRenderMode; // (OpcionesRender): true en el render final -> Subdivision usa subRenderLevel
 
-    int aplicados = 0;                                 // cuantos modificadores corrieron de verdad (para caer al render normal si 0)
+    // 1) malla de POLIGONOS desde faces3d (verts topologicos + uv/color por corner + material por cara)
+    PolyMesh W; ConstruirPolyMesh(this, W);
+    if (W.F.empty()){ genValido=false; return; }
+
+    // 2) aplicar el stack SOBRE poligonos (subdivision necesita caras; mirror refleja poligonos)
+    int aplicados = 0; bool huboCatmull = false;
     for (size_t i=0; i<modificadores.size(); i++){
         Modifier* mod = modificadores[i];
-        if (!mod->mostrarViewport) continue;        // "display in viewport" OFF -> NUNCA se calcula (se saltea)
+        if (!mod->mostrarViewport) continue;        // "display in viewport" OFF -> NUNCA se calcula
         if (enEdit && !mod->mostrarEdit) continue;  // "display in edit mode" OFF -> se saltea SOLO en Edit Mode
         aplicados++;
-        if (mod->tipo == ModifierType::Mirror){
+        if (mod->tipo == ModifierType::SubdivisionSurface){
+            int lvl = (int)((g_modRenderMode ? mod->subRenderLevel : mod->subLevel) + 0.5f);
+            if (lvl < 0) lvl = 0; if (lvl > 6) lvl = 6; // tope (cada nivel x4 caras)
+            for (int L=0; L<lvl; L++) SubdividirUnNivel(W, mod->subSimple);
+            if (!mod->subSimple && lvl>0) huboCatmull = true;
+        } else if (mod->tipo == ModifierType::Mirror){
             Vector3 c(0,0,0), axX(1,0,0), axY(0,1,0), axZ(0,0,1);
             if (mod->target){ // el plano sale del TARGET (posicion + rotacion en mundo, llevado al local del objeto)
                 Matrix4 Wo, Wt; GetWorldMatrix(Wo); mod->target->GetWorldMatrix(Wt);
@@ -1948,27 +2035,61 @@ void Mesh::GenerarMallaModificada() {
                 axY = NormMod(Vector3(M.m[4],M.m[5],M.m[6]));
                 axZ = NormMod(Vector3(M.m[8],M.m[9],M.m[10]));
             }
-            if (mod->ejeX) MirrorPlano(c, axX, mod->merge, mod->mergeDist, vp,vn,vu,vc,vf,triMat);
-            if (mod->ejeY) MirrorPlano(c, axY, mod->merge, mod->mergeDist, vp,vn,vu,vc,vf,triMat);
-            if (mod->ejeZ) MirrorPlano(c, axZ, mod->merge, mod->mergeDist, vp,vn,vu,vc,vf,triMat);
+            if (mod->ejeX) MirrorPoly(W, c, axX, mod->merge, mod->mergeDist);
+            if (mod->ejeY) MirrorPoly(W, c, axY, mod->merge, mod->mergeDist);
+            if (mod->ejeZ) MirrorPoly(W, c, axZ, mod->merge, mod->mergeDist);
         }
     }
+    if (aplicados==0 || W.F.empty()){ genValido=false; return; } // nada corrio -> render editable normal
 
-    if (aplicados==0){ genValido=false; return; } // ningun modificador corrio (todos filtrados) -> render editable normal
-    genVertexSize=(int)(vp.size()/3);
-    if (genVertexSize<=0 || vf.empty()){ genValido=false; return; }
-    genVertex=new GLfloat[vp.size()]; for(size_t k=0;k<vp.size();k++) genVertex[k]=vp[k];
-    genNormals=new GLbyte[vn.size()]; for(size_t k=0;k<vn.size();k++) genNormals[k]=vn[k];
-    genUV=new GLfloat[vu.size()];     for(size_t k=0;k<vu.size();k++) genUV[k]=vu[k];
-    genColor=new GLubyte[vc.size()];  for(size_t k=0;k<vc.size();k++) genColor[k]=vc[k];
-    // reagrupar los triangulos por material (contiguos) + rangos startDrawn/count (mismo formato que faces[])
-    std::vector<MeshIndex> vf2; vf2.reserve(vf.size());
-    genMaterialsGroup = materialsGroup; // copia nombre + Material*; los rangos se setean aca
-    for (size_t g=0; g<genMaterialsGroup.size(); g++){
-        genMaterialsGroup[g].startDrawn=(int)vf2.size();
-        for (size_t t=0;t<triMat.size();t++) if (triMat[t]==(int)g){ vf2.push_back(vf[t*3]); vf2.push_back(vf[t*3+1]); vf2.push_back(vf[t*3+2]); }
-        genMaterialsGroup[g].indicesDrawnCount=(int)vf2.size()-genMaterialsGroup[g].startDrawn;
+    // 3) normales: SMOOTH si el mesh es smooth o hubo Catmull-Clark (superficie suave); sino FLAT por cara
+    const bool smooth = meshSmooth || huboCatmull;
+    std::vector<Vector3> faceN(W.F.size());
+    for (size_t f=0; f<W.F.size(); f++){ Vector3 nrm(0,0,0); int m=(int)W.F[f].size(); // Newell
+        for (int i=0;i<m;i++){ Vector3& a=W.P[W.F[f][i]]; Vector3& b=W.P[W.F[f][(i+1)%m]];
+            nrm.x+=(a.y-b.y)*(a.z+b.z); nrm.y+=(a.z-b.z)*(a.x+b.x); nrm.z+=(a.x-b.x)*(a.y+b.y); }
+        float l=sqrtf(nrm.x*nrm.x+nrm.y*nrm.y+nrm.z*nrm.z); faceN[f] = (l>1e-6f) ? nrm*(1.0f/l) : Vector3(0,1,0); }
+    std::vector<Vector3> vertN;
+    if (smooth){ vertN.assign(W.P.size(), Vector3(0,0,0));
+        for (size_t f=0; f<W.F.size(); f++) for (size_t c=0;c<W.F[f].size();c++) vertN[W.F[f][c]] = vertN[W.F[f][c]] + faceN[f];
+        for (size_t v=0; v<vertN.size(); v++){ float l=sqrtf(vertN[v].x*vertN[v].x+vertN[v].y*vertN[v].y+vertN[v].z*vertN[v].z);
+            vertN[v] = (l>1e-6f) ? vertN[v]*(1.0f/l) : Vector3(0,1,0); } }
+
+    // 4) triangular + verts de render deduplicados (pos+uv+normal+color) + material por triangulo
+    std::map<std::string,int> mp;
+    std::vector<GLfloat> gvp; std::vector<GLbyte> gvn; std::vector<GLfloat> gvu; std::vector<GLubyte> gvc;
+    std::vector<MeshIndex> tri; std::vector<int> triMat;
+    for (size_t f=0; f<W.F.size(); f++){ int m=(int)W.F[f].size(); if (m<3) continue;
+        std::vector<int> ci(m);
+        for (int c=0;c<m;c++){ int v=W.F[f][c]; Vector3 nn = smooth ? vertN[v] : faceN[f];
+            float px=W.P[v].x, py=W.P[v].y, pz=W.P[v].z, u0=W.Fuv[f][c*2], u1=W.Fuv[f][c*2+1];
+            GLbyte nx=(GLbyte)(nn.x*127), ny=(GLbyte)(nn.y*127), nz=(GLbyte)(nn.z*127);
+            GLubyte r=W.Fcol[f][c*4], g=W.Fcol[f][c*4+1], b=W.Fcol[f][c*4+2], a=W.Fcol[f][c*4+3];
+            char buf[40]; int p=0;
+            memcpy(buf+p,&px,4);p+=4; memcpy(buf+p,&py,4);p+=4; memcpy(buf+p,&pz,4);p+=4;
+            memcpy(buf+p,&u0,4);p+=4; memcpy(buf+p,&u1,4);p+=4;
+            buf[p++]=(char)nx;buf[p++]=(char)ny;buf[p++]=(char)nz; buf[p++]=(char)r;buf[p++]=(char)g;buf[p++]=(char)b;buf[p++]=(char)a;
+            std::string key(buf,p); std::map<std::string,int>::iterator it=mp.find(key); int gi;
+            if (it!=mp.end()) gi=it->second;
+            else { gi=(int)(gvp.size()/3); gvp.push_back(px);gvp.push_back(py);gvp.push_back(pz);
+                gvn.push_back(nx);gvn.push_back(ny);gvn.push_back(nz); gvu.push_back(u0);gvu.push_back(u1);
+                gvc.push_back(r);gvc.push_back(g);gvc.push_back(b);gvc.push_back(a); mp[key]=gi; }
+            ci[c]=gi;
+        }
+        for (int t=1; t+1<m; t++){ tri.push_back((MeshIndex)ci[0]); tri.push_back((MeshIndex)ci[t]); tri.push_back((MeshIndex)ci[t+1]); triMat.push_back(W.Fmat[f]); }
     }
+    genVertexSize=(int)(gvp.size()/3);
+    if (genVertexSize<=0 || tri.empty()){ genValido=false; return; }
+    genVertex=new GLfloat[gvp.size()]; for(size_t k=0;k<gvp.size();k++) genVertex[k]=gvp[k];
+    genNormals=new GLbyte[gvn.size()]; for(size_t k=0;k<gvn.size();k++) genNormals[k]=gvn[k];
+    genUV=new GLfloat[gvu.size()];     for(size_t k=0;k<gvu.size();k++) genUV[k]=gvu[k];
+    genColor=new GLubyte[gvc.size()];  for(size_t k=0;k<gvc.size();k++) genColor[k]=gvc[k];
+    // agrupar tris por material (contiguos), mismo formato que faces[] (startDrawn/indicesDrawnCount)
+    std::vector<MeshIndex> vf2; vf2.reserve(tri.size());
+    genMaterialsGroup = materialsGroup;
+    for (size_t g=0; g<genMaterialsGroup.size(); g++){ genMaterialsGroup[g].startDrawn=(int)vf2.size();
+        for (size_t t=0;t<triMat.size();t++) if (triMat[t]==(int)g){ vf2.push_back(tri[t*3]); vf2.push_back(tri[t*3+1]); vf2.push_back(tri[t*3+2]); }
+        genMaterialsGroup[g].indicesDrawnCount=(int)vf2.size()-genMaterialsGroup[g].startDrawn; }
     genFacesSize=(int)vf2.size();
     genFaces=new MeshIndex[vf2.size()]; for(size_t k=0;k<vf2.size();k++) genFaces[k]=vf2[k];
     genValido=true;

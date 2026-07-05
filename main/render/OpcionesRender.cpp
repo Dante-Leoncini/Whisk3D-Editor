@@ -32,6 +32,7 @@ bool g_editLockNormales = false;      // por defecto SI recalcula normales (al c
 float g_mergeDist = 0.0002f;          // Merge > By Distance: suelda verts a <= 0.0002 m. El editor cuantiza los
                                       // verts a una grilla de 1e-4, asi que 0.0002 es el minimo util (justo por
                                       // encima) y alcanza para soldar la tapa de un extrude "dejado en su lugar"
+bool g_modRenderMode = false;         // true SOLO durante el render final (Subdivision usa subRenderLevel)
 
 // Implementación de función
 RenderType StringToRenderType(const std::string& s){

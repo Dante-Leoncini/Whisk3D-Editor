@@ -38,11 +38,17 @@ class Modifier {
                                 // deja pegados a esa pared por el resto del transform (solo deslizan por el plano).
                                 // ARRANCA EN ON (el flujo tipico de Mirror lo quiere activado).
 
+        // --- SUBDIVISION SURFACE --- (level como float para bindear directo a PropFloat entero; se castea a int)
+        float subLevel;         // niveles en el VIEWPORT (default 1)
+        float subRenderLevel;   // niveles en el RENDER (default 2)
+        bool  subSimple;        // false = Catmull-Clark (suaviza), true = Simple (subdivide sin mover verts)
+
         Modifier(int t, const std::string& n)
             : tipo(t), nombre(n),
               mostrarViewport(true), mostrarEdit(true),
               ejeX(true), ejeY(false), ejeZ(false), target(NULL),
-              merge(true), mergeDist(0.001f), clipping(true) {}
+              merge(true), mergeDist(0.001f), clipping(true),
+              subLevel(1.0f), subRenderLevel(2.0f), subSimple(false) {}
         virtual ~Modifier() {}
 };
 

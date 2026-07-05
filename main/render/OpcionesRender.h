@@ -68,6 +68,8 @@ extern int g_transformPivot;
 extern bool g_editLockNormales;
 // distancia del Merge > By Distance (suelda verts a <= esta distancia). Default 0.0001 m (como Blender).
 extern float g_mergeDist;
+// modificadores: true durante el RENDER final -> Subdivision usa subRenderLevel en vez de subLevel (viewport).
+extern bool g_modRenderMode;
 
 // Declaración de función
 RenderType StringToRenderType(const std::string& s);

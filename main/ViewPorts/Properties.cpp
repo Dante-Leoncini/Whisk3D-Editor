@@ -674,6 +674,14 @@ static std::string RenderFileNamePNG(const std::string& out, const char* tag){
 
 // boton "Render Image": guarda el pase beauty (siempre) + los pases tildados (zbuffer/normal)
 // como PNG a la resolucion pedida. El render por tiles permite tamanos mayores que la ventana.
+// regenera la malla modificada de TODAS las mallas de la escena (para aplicar el cambio de nivel viewport<->render)
+static void RegenerarModsEscena(Object* nodo){
+    if (!nodo) return;
+    for (size_t i=0; i<nodo->Childrens.size(); i++){ Object* o = nodo->Childrens[i]; if (!o) continue;
+        if (o->getType()==ObjectType::mesh){ Mesh* m=(Mesh*)o; if (!m->modificadores.empty()) m->GenerarMallaModificada(); }
+        RegenerarModsEscena(o); }
+}
+
 static void AccionRenderImage(){
     if (!PropsActivo) return;
     Viewport3D* vp = Viewport3DActive;
@@ -689,6 +697,10 @@ static void AccionRenderImage(){
     int tpp    = vp->TilesNecesarios(w, h);
     int total  = nPases * tpp;
 
+    // Subdivision (y cualquier modificador con nivel de render): regenerar con el nivel de RENDER antes de renderizar
+    extern bool g_modRenderMode;
+    g_modRenderMode = true; RegenerarModsEscena(SceneCollection);
+
     ProgresoIniciar("Rendering...");
     int fallos = 0, base = 0;
     if (!vp->RenderAPNG(w, h, RenderType::Rendered, RenderFileNamePNG(out, "").c_str(), base, total)) fallos++;
@@ -697,6 +709,8 @@ static void AccionRenderImage(){
     if (doN){ if (!vp->RenderAPNG(w, h, RenderType::NormalView, RenderFileNamePNG(out, "normal").c_str(),  base, total)) fallos++; base += tpp; }
     if (doA){ if (!vp->RenderAPNG(w, h, RenderType::Alpha,      RenderFileNamePNG(out, "alpha").c_str(),   base, total)) fallos++; base += tpp; }
     ProgresoFin();
+
+    g_modRenderMode = false; RegenerarModsEscena(SceneCollection); // volver al nivel de VIEWPORT
 
     if (fallos == 0) Notificar("Render saved!", false);
     else             Notificar("Error: could not save the render", true);
@@ -1025,6 +1039,12 @@ void Properties::ConstruirGrupos(){
     propModifierProps->properties.push_back(propMirDist);
     // Clipping (edit-time): clampea los verts al plano al moverlos y, una vez pegados, los deja pegados (arranca ON)
     propMirClip = new PropBool("Clipping"); propMirClip->onChange = AccionModParamChanged; propModifierProps->properties.push_back(propMirClip);
+    // Subdivision Surface: modo Simple (OFF = Catmull-Clark, suaviza) + niveles viewport/render (enteros 0..6)
+    propSubSimple = new PropBool("Simple"); propSubSimple->onChange = AccionModParamChanged; propModifierProps->properties.push_back(propSubSimple);
+    propSubLevel = new PropFloat("Levels Viewport"); propSubLevel->onChange = AccionModParamChanged;
+    propSubLevel->SetRango(0.0f, 6.0f); propSubLevel->entero = true; propModifierProps->properties.push_back(propSubLevel);
+    propSubRender = new PropFloat("Render"); propSubRender->onChange = AccionModParamChanged;
+    propSubRender->SetRango(0.0f, 6.0f); propSubRender->entero = true; propModifierProps->properties.push_back(propSubRender);
     // Apply Modifier (cualquier modificador): hornea la malla generada en la editable
     propBtnApplyMod = new PropButton("Apply Modifier");
     propBtnApplyMod->action = AccionAplicarModificador;
@@ -1418,6 +1438,7 @@ void Properties::ActualizarPestanias(){
         bool haySel = (nm > 0 && mm->modificadorActivo >= 0 && mm->modificadorActivo < nm);
         Modifier* mod = haySel ? mm->modificadores[mm->modificadorActivo] : NULL;
         bool esMirror = (mod && mod->tipo == ModifierType::Mirror);
+        bool esSub    = (mod && mod->tipo == ModifierType::SubdivisionSurface);
         if (propModifierProps) {
             propModifierProps->visible = haySel;               // 2da tarjeta: solo con un modificador seleccionado
             if (mod) propModifierProps->name = mod->nombre;    // titulo = su nombre
@@ -1426,7 +1447,10 @@ void Properties::ActualizarPestanias(){
         // display toggles: para CUALQUIER modificador seleccionado (no solo Mirror)
         if (propModVerViewport) propModVerViewport->value = haySel ? &mod->mostrarViewport : NULL;
         if (propModVerEdit)     propModVerEdit->value     = haySel ? &mod->mostrarEdit : NULL;
-        if (propModVacio) propModVacio->oculto = esMirror;     // "(no properties yet)" solo para tipos sin params
+        if (propModVacio) propModVacio->oculto = (esMirror || esSub); // "(no properties yet)" solo para tipos sin params
+        if (propSubSimple) propSubSimple->value = esSub ? &mod->subSimple    : NULL;
+        if (propSubLevel)  propSubLevel->value  = esSub ? &mod->subLevel      : NULL;
+        if (propSubRender) propSubRender->value = esSub ? &mod->subRenderLevel: NULL;
         if (propMirX) propMirX->value = esMirror ? &mod->ejeX : NULL;
         if (propMirY) propMirY->value = esMirror ? &mod->ejeY : NULL;
         if (propMirZ) propMirZ->value = esMirror ? &mod->ejeZ : NULL;
