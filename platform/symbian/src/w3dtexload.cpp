@@ -189,6 +189,40 @@ bool LoadTexture(const char* path, unsigned int& outId, int* outW, int* outH) {
     return (e == 0 && outId != 0);
 }
 
+// SAVE (firma del motor): EncodePNG (portable, w3dTexture.cpp) + escritura con RFile. En PC/Web
+// SavePNG usa stdio (w3dTexture.cpp); aca es el sink de N95. Sin leaves: usa codigos de retorno.
+bool SavePNG(const char* path, const unsigned char* rgba, int w, int h, bool flipY) {
+    if (!path) { return false; }
+    int len = 0;
+    unsigned char* png = EncodePNG(rgba, w, h, flipY, &len); // buffer PNG en el heap
+    if (!png) { return false; }
+
+    // char* -> TFileName (los slashes de unix -> backslash de Symbian)
+    TFileName nombre;
+    for (const char* p = path; *p && nombre.Length() < 255; p++) {
+        TChar c = (TUint8)*p;
+        if (c == '/') { c = '\\'; }
+        nombre.Append(c);
+    }
+
+    RFs fs;
+    TInt err = fs.Connect();
+    if (err == KErrNone) {
+        fs.MkDirAll(nombre); // crea la carpeta (E:\whisk3d\render\) si no existe; ignora KErrAlreadyExists
+        RFile file;
+        err = file.Replace(fs, nombre, EFileWrite); // crea/sobrescribe
+        if (err == KErrNone) {
+            TPtrC8 ptr((const TUint8*)png, len);
+            err = file.Write(ptr);
+            file.Close();
+        }
+        FsCloseCompat(fs); // cierre de RFs compatible (fscompat.h)
+    }
+    w3dLogf("SavePNG: '%s' %dx%d %d bytes err=%d", path, w, h, len, (TInt)err);
+    delete[] png;
+    return (err == KErrNone);
+}
+
 } // namespace w3dEngine
 
 // firma vieja (core/objects/Textures.h) que usan el importador OBJ y el

@@ -158,19 +158,23 @@ TInt W3dNewTransformModo() {
 }
 
 void W3dNewTransformMove(TInt aDx, TInt aDy) {
+    // velocidad de arrastre = mundo-por-pixel a la PROFUNDIDAD del pivot de transform (igual que el
+    // mouse/flechas de PC). Asi el paso de las flechas del N95 se siente CONSTANTE en pantalla a
+    // cualquier zoom (antes era 0.01 fijo: de cerca iba rapido, de lejos lento).
+    float velMov = Viewport3DActive ? Viewport3DActive->VelocidadArrastreMundo() : 0.01f;
     // EDIT MODE: aplica el delta a la seleccion de MALLA segun el estado COMPARTIDO
     // (vale para cualquier starter: keypad G/R/S, extrude, duplicar). VA ANTES del
     // gate de gTMode porque extrude/duplicar no setean gTMode.
     if (InteractionMode == EditMode && EditXformActivo()) {
         if (estado == rotacion)       EditXformRotEje(aDx, aDy);
         else if (estado == EditScale) EditXformScale(aDx, aDy, 0.001f);
-        else                          EditXformTraslacion(aDx, aDy, 0.01f);
+        else                          EditXformTraslacion(aDx, aDy, velMov);
         return;
     }
     if (!gTMode) return;
     // OBJECT MODE: transform COMPARTIDO con PC (respeta axisSelect/orientacion: 1/2/3=X/Y/Z,
     // direccion relativa a la vista, etc.). Lo usan el mouse BT y las flechas.
-    if (gTMode == 1)      SetTranslacionObjetos(aDx, aDy, 0.01f);
+    if (gTMode == 1)      SetTranslacionObjetos(aDx, aDy, velMov);
     else if (gTMode == 2) {
         if (axisSelect == OrbitalAxis) RotarOrbital(aDx, aDy); // orbital: camUp/camRight
         else                           SetRotacion(aDx, aDy);

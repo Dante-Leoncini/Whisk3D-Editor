@@ -120,9 +120,9 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropButton* propBtnColorMode;   // toggle Per-Vertex / Per-Corner color
         PropText* propRenderOutput;  // campo editable "Output" del render
         PropFloat* propRenderW; PropFloat* propRenderH;         // ancho/alto del render en pixeles (editable)
-        PropBool*  propRenderZbuffer; PropBool* propRenderNormal; // pases extra a exportar
+        PropBool*  propRenderZbuffer; PropBool* propRenderNormal; PropBool* propRenderAlpha; // pases extra
         float renderW; float renderH;          // valores del render (default 640 x 480)
-        bool  renderZbuffer; bool renderNormal; // pases extra tildados (el beauty siempre se guarda)
+        bool  renderZbuffer; bool renderNormal; bool renderAlpha; // pases extra tildados (el beauty siempre)
         PropText* propExportName;    // campo editable del nombre/path del .obj
         PropButton* propBtnRenameMat; // boton "Rename Material" (se oculta si el material es el por defecto;
                                       // al renombrar se vuelve input via Button::editField)

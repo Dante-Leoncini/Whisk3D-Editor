@@ -33,6 +33,7 @@ RenderType StringToRenderType(const std::string& s){
     if(s == "MaterialPreview")  return RenderType::MaterialPreview;
     if(s == "Rendered")         return RenderType::Rendered;
     if(s == "ZBuffer")          return RenderType::ZBuffer;
+    if(s == "Alpha")            return RenderType::Alpha;
 
     std::cerr << "[StringToRenderType] WARNING: valor desconocido '" << s
               << "' → usando RenderType::Solid" << std::endl;

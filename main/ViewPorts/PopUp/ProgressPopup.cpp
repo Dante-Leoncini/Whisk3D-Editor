@@ -144,6 +144,16 @@ void ProgresoActualizar(float frac) {
     if (LayoutSwapBuffers) LayoutSwapBuffers();
 }
 
+// como ProgresoActualizar, pero redibuja el popup ENTERO (clear + fondo + borde + mensaje + barra) + swap.
+// El render por TILES pisa todo el framebuffer en cada tile -> la barra sola no alcanza (el fondo del popup
+// ya no esta). Sin throttle: cada tile es un paso grueso (en el N95, lento, se ve el avance bien).
+void ProgresoActualizarFull(float frac) {
+    if (!g_progresoActivo || !progressPopup) return;
+    g_progresoUltimo = frac;
+    progressPopup->frac = frac;
+    ProgresoDibujarTodo();
+}
+
 void ProgresoFin() {
     g_progresoActivo = false;
     g_progresoUltimo = -1.0f;

@@ -34,6 +34,8 @@ extern ProgressPopup* progressPopup;
 // ---- API compartida (no-op si no se llamo ProgresoIniciar -> el harness sin GUI no rompe) ----
 void ProgresoIniciar(const std::string& msg); // abre la barra (frac 0) y dibuja un primer frame
 void ProgresoActualizar(float frac);          // setea el avance + redibuja (con throttle); frac en 0..1
+void ProgresoActualizarFull(float frac);      // como Actualizar pero redibuja el popup ENTERO (clear+fondo+barra):
+                                              // para operaciones que PISAN el framebuffer (render por tiles)
 void ProgresoFin();                           // cierra la barra
 
 // hook de PLATAFORMA: intercambiar buffers (PC = SDL_GL_SwapWindow; Symbian = egl swap). Lo setea cada OS.

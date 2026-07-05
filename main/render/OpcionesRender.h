@@ -19,7 +19,7 @@ enum { lineal, closest };
 
 // dialecto C++03 compartido
 struct RenderType {
-    enum Enum { Solid, MaterialPreview, Rendered, ZBuffer, Wireframe, NormalView };
+    enum Enum { Solid, MaterialPreview, Rendered, ZBuffer, Wireframe, NormalView, Alpha };
     Enum v;
     RenderType() : v(Solid) {}
     RenderType(Enum e) : v(e) {}

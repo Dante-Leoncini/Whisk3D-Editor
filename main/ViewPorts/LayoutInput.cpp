@@ -645,6 +645,7 @@ static void LayoutAccionRender(int aId) {
         case 3: Viewport3DActive->view = RenderType::Wireframe;       break;
         case 4: Viewport3DActive->view = RenderType::ZBuffer;         break;
         case 5: Viewport3DActive->view = RenderType::NormalView;      break;
+        case 6: Viewport3DActive->view = RenderType::Alpha;           break;
     }
 }
 

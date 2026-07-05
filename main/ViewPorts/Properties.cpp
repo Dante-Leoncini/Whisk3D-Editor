@@ -6,6 +6,7 @@
 #include "WhiskUI/PopupMenu.h"
 #include "PopUp/ColorPicker.h"
 #include "PopUp/FileBrowser.h" // explorador para elegir la carpeta de export
+#include "PopUp/ProgressPopup.h" // barra "Rendering..." durante el render (clave en N95)
 #include "ViewPorts/LayoutInput.h" // Notificar (toasts de exito/error)
 #include "objects/Camera.h"   // selector de target de la camara
 #include "objects/Instance.h" // selector de target de instance/array/mirror
@@ -608,8 +609,15 @@ static void AccionAplicarModificador(){
 // boton "Wavefront.obj" de la tarjeta Export: exporta al path del campo editable
 static void AccionExportObj(){
     if (!PropsActivo || !PropsActivo->propExportName) return;
-    const std::string& path = PropsActivo->propExportName->field.text;
+    std::string path = PropsActivo->propExportName->field.text;
     if (path.empty()) { Notificar("No export path set", true); return; }
+#ifdef W3D_SYMBIAN
+    // N95: carpeta FIJA E:/whisk3d/models/ (creada en AppInit). Toma solo el nombre del campo.
+    size_t sl = path.find_last_of("/\\");
+    std::string nombre = (sl == std::string::npos) ? path : path.substr(sl + 1);
+    if (nombre.empty()) nombre = "model.obj";
+    path = std::string("E:/whisk3d/models/") + nombre;
+#endif
     bool ok = ExportOBJ(path, PropsActivo->exportSelectedOnly, PropsActivo->exportApplyModifiers, PropsActivo->exportApplyTransforms);
     if (ok) Notificar("OBJ saved successfully!", false);
     else    Notificar("Error: could not save the OBJ", true);
@@ -643,7 +651,15 @@ static std::string RenderFileNamePNG(const std::string& out, const char* tag){
     size_t slash = base.find_last_of("/\\");
     if (dot != std::string::npos && (slash == std::string::npos || dot > slash))
         base = base.substr(0, dot); // saca la extension del campo Output
+#ifdef W3D_SYMBIAN
+    // N95: carpeta FIJA E:/whisk3d/render/ (prolijo + sabes donde queda). Toma solo el nombre del campo.
+    size_t sl = base.find_last_of("/\\");
+    std::string nombre = (sl == std::string::npos) ? base : base.substr(sl + 1);
+    if (nombre.empty()) nombre = "render";
+    base = std::string("E:/whisk3d/render/") + nombre;
+#else
     if (base.empty()) base = "render";
+#endif
     if (tag && tag[0]) { base += "_"; base += tag; }
     int frame = 0;
 #ifndef W3D_SYMBIAN
@@ -667,12 +683,20 @@ static void AccionRenderImage(){
     int w = (int)(PropsActivo->renderW + 0.5f); if (w < 1) w = 1;
     int h = (int)(PropsActivo->renderH + 0.5f); if (h < 1) h = 1;
 
-    int fallos = 0;
-    if (!vp->RenderAPNG(w, h, RenderType::Rendered,   RenderFileNamePNG(out, "").c_str()))        fallos++;
-    if (PropsActivo->renderZbuffer &&
-        !vp->RenderAPNG(w, h, RenderType::ZBuffer,    RenderFileNamePNG(out, "zbuffer").c_str())) fallos++;
-    if (PropsActivo->renderNormal &&
-        !vp->RenderAPNG(w, h, RenderType::NormalView, RenderFileNamePNG(out, "normal").c_str()))  fallos++;
+    // barra de progreso 0..100%: total = PASES x TILES (frames = 1 en Render Image; la animacion sera x frames).
+    bool doZ = PropsActivo->renderZbuffer, doN = PropsActivo->renderNormal, doA = PropsActivo->renderAlpha;
+    int nPases = 1 + (doZ?1:0) + (doN?1:0) + (doA?1:0); // beauty siempre + los tildados
+    int tpp    = vp->TilesNecesarios(w, h);
+    int total  = nPases * tpp;
+
+    ProgresoIniciar("Rendering...");
+    int fallos = 0, base = 0;
+    if (!vp->RenderAPNG(w, h, RenderType::Rendered, RenderFileNamePNG(out, "").c_str(), base, total)) fallos++;
+    base += tpp;
+    if (doZ){ if (!vp->RenderAPNG(w, h, RenderType::ZBuffer,    RenderFileNamePNG(out, "zbuffer").c_str(), base, total)) fallos++; base += tpp; }
+    if (doN){ if (!vp->RenderAPNG(w, h, RenderType::NormalView, RenderFileNamePNG(out, "normal").c_str(),  base, total)) fallos++; base += tpp; }
+    if (doA){ if (!vp->RenderAPNG(w, h, RenderType::Alpha,      RenderFileNamePNG(out, "alpha").c_str(),   base, total)) fallos++; base += tpp; }
+    ProgresoFin();
 
     if (fallos == 0) Notificar("Render saved!", false);
     else             Notificar("Error: could not save the render", true);
@@ -885,11 +909,13 @@ void Properties::ConstruirGrupos(){
     propRenderH->value = &renderH;
     propRender->properties.push_back(propRenderH);
     // pases EXTRA a exportar (el beauty/render siempre se guarda). Nombre: base_zbuffer_0001.png, etc.
-    renderZbuffer = false; renderNormal = false;
+    renderZbuffer = false; renderNormal = false; renderAlpha = false;
     propRenderZbuffer = new PropBool("ZBuffer"); propRenderZbuffer->value = &renderZbuffer;
     propRender->properties.push_back(propRenderZbuffer);
     propRenderNormal = new PropBool("Normal"); propRenderNormal->value = &renderNormal;
     propRender->properties.push_back(propRenderNormal);
+    propRenderAlpha = new PropBool("Alpha"); propRenderAlpha->value = &renderAlpha;
+    propRender->properties.push_back(propRenderAlpha);
     // boton con action real (antes era no-op)
     PropButton* pbRenderImg = new PropButton("Render Image");
     pbRenderImg->action = AccionRenderImage;

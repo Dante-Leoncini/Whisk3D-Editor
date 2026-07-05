@@ -14,6 +14,7 @@
 #include "objects/EditMesh.h"      // foco al centro de la seleccion en edit mode
 #include "ViewPorts/LayoutInput.h" // LayoutDeleteEdit (menu Delete en edit mode)
 #include "ViewPorts/PopUp/ConfirmarPopup.h" // AbrirConfirmarBorrado (popup al borrar con la tecla)
+#include "ViewPorts/PopUp/ProgressPopup.h"  // barra "Rendering..." durante el render por tiles (clave en N95)
 #ifdef W3D_SYMBIAN
 extern int W3dPantallaAlto; // los headers GLES + tipos GL los da GeometriaUI.h (via ViewPort3D.h)
 #ifndef GL_POINT_SPRITE
@@ -189,6 +190,7 @@ Viewport3D::Viewport3D(Vector3 pos){
         MenuRender->Agregar("Wireframe Preview", 3);
         MenuRender->Agregar("ZBuffer Preview", 4);
         MenuRender->Agregar("Normal View", 5); // simula normal map con 3 luces R/G/B
+        MenuRender->Agregar("Alpha Preview", 6); // matte blanco/negro por alpha (debug del pase alpha)
     }
     if (!MenuOrient){
         // orientacion usada al constrenir a un eje (X/Y/Z) y por el extrude. Default Global.
@@ -674,18 +676,24 @@ void Viewport3D::ReloadLights() {
             w3dEngine::Disable(w3dEngine::Light0);
             break;
 
+        case RenderType::Alpha:
+            // matte blanco unlit (lo dibuja el Core: w3dRenderAlpha). Sin luz.
+            w3dEngine::Disable(w3dEngine::Light0);
+            break;
+
         default:
             break;
     }
 }
 
-// Cicla los modos de vista: Material Preview -> Render -> Wireframe -> Solid -> (vuelve)
+// Cicla los modos de vista: MaterialPreview -> Solid -> NormalView -> Wireframe -> ZBuffer -> Alpha -> Rendered -> (vuelve)
 void Viewport3D::ChangeViewType(){
     if      (view == RenderType::MaterialPreview) view = RenderType::Solid;
     else if (view == RenderType::Solid)           view = RenderType::NormalView;
     else if (view == RenderType::NormalView)      view = RenderType::Wireframe;
     else if (view == RenderType::Wireframe)       view = RenderType::ZBuffer;
-    else if (view == RenderType::ZBuffer)         view = RenderType::Rendered;
+    else if (view == RenderType::ZBuffer)         view = RenderType::Alpha;
+    else if (view == RenderType::Alpha)           view = RenderType::Rendered;
     else                                          view = RenderType::MaterialPreview; // Rendered/otro -> vuelve
 }
 
@@ -748,8 +756,8 @@ void Viewport3D::Render() {
     }
 
     if (limpiarPantalla) {
-        if (view == RenderType::ZBuffer) {
-            w3dEngine::ClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        if (view == RenderType::ZBuffer || view == RenderType::Alpha) {
+            w3dEngine::ClearColor(0.0f, 0.0f, 0.0f, 1.0f); // ZBuffer y Alpha: fondo NEGRO
         } else if (view == RenderType::Rendered) {
             w3dEngine::ClearColor(scene->backgroundColor[0], scene->backgroundColor[1],
                          scene->backgroundColor[2], scene->backgroundColor[3]);
@@ -826,6 +834,7 @@ void Viewport3D::Render() {
     w3dRenderNormalColor = (view == RenderType::NormalView);
     w3dRenderSinLuz    = (view == RenderType::ZBuffer);
     w3dRenderLuces     = (view == RenderType::Rendered);
+    w3dRenderAlpha     = (view == RenderType::Alpha); // pase Alpha: solo por render (el viewport no lo usa)
 
     // ZBuffer: RE-seteamos el fog de profundidad JUSTO antes de dibujar las mallas (RenderFloor lo pisa
     // con su propio fog). Asi las mallas se sombrean por profundidad: cerca claro -> lejos oscuro.
@@ -855,7 +864,19 @@ void Viewport3D::Render() {
 //  glReadPixels y se pega en la imagen final. 'pass' = Rendered / ZBuffer /
 //  NormalView. glReadPixels es bottom-left -> SavePNG hace el flip vertical.
 // ============================================================================
-bool Viewport3D::RenderAPNG(int outW, int outH, RenderType::Enum pass, const char* filename){
+// cuantos TILES hacen falta para un render de outW x outH (para el total de la barra de progreso).
+// Mismo tope de tile que RenderAPNG (el tamano del viewport).
+int Viewport3D::TilesNecesarios(int outW, int outH) const {
+    if (outW <= 0 || outH <= 0) return 0;
+    int capW = (width  > 0) ? width  : outW;
+    int capH = (height > 0) ? height : outH;
+    int tileW = (outW < capW) ? outW : capW;
+    int tileH = (outH < capH) ? outH : capH;
+    if (tileW <= 0 || tileH <= 0) return 0;
+    return ((outW + tileW - 1) / tileW) * ((outH + tileH - 1) / tileH);
+}
+
+bool Viewport3D::RenderAPNG(int outW, int outH, RenderType::Enum pass, const char* filename, int progBase, int progTotal){
     if (outW <= 0 || outH <= 0 || !SceneCollection) return false;
 
     // tope de tile = lo que entra seguro en el framebuffer (el viewport ya entra en la ventana).
@@ -889,16 +910,18 @@ bool Viewport3D::RenderAPNG(int outW, int outH, RenderType::Enum pass, const cha
     w3dRenderNormalColor = (pass == RenderType::NormalView);
     w3dRenderSinLuz      = (pass == RenderType::ZBuffer);
     w3dRenderLuces       = (pass == RenderType::Rendered);
+    w3dRenderAlpha       = (pass == RenderType::Alpha);
 
     // color de fondo del pase
     float bg[4];
-    if (pass == RenderType::ZBuffer){ bg[0]=bg[1]=bg[2]=0.0f; bg[3]=1.0f; }              // negro
+    if (pass == RenderType::ZBuffer || pass == RenderType::Alpha){ bg[0]=bg[1]=bg[2]=0.0f; bg[3]=1.0f; } // NEGRO (matte blanco sobre negro)
     else if (pass == RenderType::Rendered && scene){
         bg[0]=scene->backgroundColor[0]; bg[1]=scene->backgroundColor[1];
         bg[2]=scene->backgroundColor[2]; bg[3]=scene->backgroundColor[3];               // fondo de escena
     } else { bg[0]=bg[1]=bg[2]=0.0f; bg[3]=0.0f; }                                       // normal: transparente (composicion)
 
     // tiles en coords BOTTOM-LEFT (como GL); el flip vertical lo hace SavePNG al final
+    int tileIdx = 0; // para la barra: frac = (progBase + tiles hechos) / progTotal
     for (int ty = 0; ty < outH; ty += tileH){
         int th = (ty + tileH <= outH) ? tileH : (outH - ty);
         for (int tx = 0; tx < outW; tx += tileW){
@@ -947,11 +970,17 @@ bool Viewport3D::RenderAPNG(int outW, int outH, RenderType::Enum pass, const cha
                        tile + (size_t)(row * tw) * 4,
                        (size_t)tw * 4);
             }
+            // barra de progreso: redibujo COMPLETO por tile (el render pisa el framebuffer). progTotal
+            // cuenta pases x tiles (lo arma AccionRenderImage); progBase = tiles de los pases anteriores.
+            ++tileIdx;
+            if (progTotal > 0) ProgresoActualizarFull((float)(progBase + tileIdx) / (float)progTotal);
         }
     }
 
-    // restaurar el estado del viewport
+    // restaurar el estado del viewport (los flags de pase se re-setean solos en el proximo Render,
+    // pero los limpiamos ya por las dudas de que algo dibuje antes)
     view = viewPrev; showOverlays = overlaysPrev;
+    w3dRenderAlpha = false; w3dRenderSinLuz = false; w3dRenderNormalColor = false;
     ReloadLights();
 
     bool ok = w3dEngine::SavePNG(filename, full, outW, outH, true);

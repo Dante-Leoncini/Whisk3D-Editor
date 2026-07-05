@@ -111,8 +111,11 @@ class Viewport3D : public ViewportBase, public WithBorder {
         void Render() override;
 
         // render de la escena a un PNG de outW x outH (puede ser mayor que la ventana; por tiles,
-        // anda hasta en el N95). Sin overlay. pass = Rendered / ZBuffer / NormalView. true si guardo.
-        bool RenderAPNG(int outW, int outH, RenderType::Enum pass, const char* filename);
+        // anda hasta en el N95). Sin overlay. pass = Rendered / ZBuffer / NormalView / Alpha. true si guardo.
+        // progBase/progTotal: para la barra de progreso (tiles previos / total). 0 = sin barra.
+        int  TilesNecesarios(int outW, int outH) const; // tiles de un render (para el total de la barra)
+        bool RenderAPNG(int outW, int outH, RenderType::Enum pass, const char* filename,
+                        int progBase = 0, int progTotal = 0);
 
         void RenderFloor();
         void RenderAllAxisTransform();

@@ -66,6 +66,13 @@ void CWhisk3D::AppInit( void ){
     User::LeaveIfError(fs.Connect());
     w3dLogReset();
     w3dLog("AppInit: inicio");
+
+    // carpetas de SALIDA del editor: render PNG en E:\whisk3d\render, export OBJ en E:\whisk3d\models.
+    // Se crean al arrancar si no estan (MkDirAll ignora KErrAlreadyExists). Asi las salidas quedan
+    // prolijas y el usuario sabe donde buscarlas.
+    fs.MkDirAll(_L("E:\\whisk3d\\render\\"));
+    fs.MkDirAll(_L("E:\\whisk3d\\models\\"));
+
     TFileName privateDir;
 	
     // unidad donde corre la app (c: / e:): de la ruta del propio exe. No
