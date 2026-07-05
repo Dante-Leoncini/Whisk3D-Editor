@@ -13,16 +13,18 @@ UID             0x100039CE 0xA00D021D
 EPOCSTACKSIZE   30000 //originalmente estaba en 30000 67108864
 EPOCHEAPSIZE    0x10000 0x4000000  // Tama�o del heap: 64 KB m�nimo y 64 MB m�ximo
 
-//no logro conseguir el compilador... esto tendria que hacer que ande mejor
-//OPTION_REPLACE  ARMCC --arm -O3 -Otime --cpu 6 --fpu VFPv2 --fpmode fast
+// Fase 3 unificacion: el codigo compartido del core se compila con este
+// define (activa el dialecto Symbian: GLES/gl.h, shims de app-state, etc.)
+MACRO           W3D_SYMBIAN
+
+// Compilador RVCT 2.2 (ARMV6 en bld.inf): forzar ARM, ARMv6 y FPU por hardware.
+// Es lo que aprovecha la VFP del N95/N8 (igual que el proyecto de Half-Life).
+ALWAYS_BUILD_AS_ARM
+OPTION_REPLACE  ARMCC --cpu 6
+OPTION_REPLACE  ARMCC --fpu vfpv2 --fpmode fast
+OPTION_REPLACE  ARMCC -O2 -Otime
 
 VENDORID        0
-
-SOURCEPATH      ..\Utils
-SOURCE          Mathutils.cpp
-SOURCE          Glutils.cpp
-SOURCE          Utils3d.cpp
-SOURCE          Textureutils.cpp
 
 SOURCEPATH      ..\src
 SOURCE          Whisk3D.cpp
@@ -31,8 +33,102 @@ SOURCE          Whisk3Dappui.cpp
 SOURCE          Whisk3Ddocument.cpp
 SOURCE          Whisk3Dcontainer.cpp 
 SOURCE          Whisk3Dinput.cpp 
-SOURCE          Dialogs.cpp
-SOURCE          hidinputmonitor.cpp
+// new/delete propios para no importar scppnwdl.dll (no existe en el N95)
+SOURCE          newdel_compat.cpp
+// mouse/teclado bluetooth via hidsrv.dll (cargada en runtime, no se linkea)
+SOURCE          hidmonitor.cpp
+// Fase 1 unificacion: hojas/armado del layout para Symbian
+SOURCE          w3dlayout.cpp
+// Fase 3c: puente al modelo nuevo (unico TU de symbian que ve el core)
+SOURCE          w3dnewscene.cpp
+SOURCE          w3dtexload.cpp
+SOURCE          w3dmouse.cpp // cursor virtual de Symbian
+SOURCE          w3dinput.cpp // input propio del telefono (teclado/keypad)
+
+// motor compartido (Whisk3DCore / libs\Whisk3DCore): texturas + estado de graficos + log
+SOURCEPATH      ..\..\..\libs\Whisk3DCore
+SOURCE          w3dTexture.cpp
+SOURCE          w3dGraphics.cpp
+SOURCE          w3dlog.cpp
+SOURCE          w3dFilesystem.cpp // backend del File browser (POSIX en Symbian)
+
+// Fase C re-split: W3dColors/W3dViewports son del EDITOR -> main\ui (W3dFont es UI -> WhiskUI, abajo)
+SOURCEPATH      ..\..\..\main\ui
+SOURCE          W3dViewports.cpp
+SOURCE          W3dColors.cpp
+
+// matematica del ENGINE (Vector3/Quaternion/Matrix4) — antes en core\math, es
+// del motor (Whisk3DCore), no exclusiva de Whisk3D. Se incluye como "math/X.h"
+// (la USERINCLUDE de libs\Whisk3DCore la resuelve).
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\math
+SOURCE          Vector3.cpp
+SOURCE          Quaternion.cpp
+SOURCE          Matrix4.cpp
+
+// Fase C re-split: SOLO el modelo de datos del CORE queda en libs\Whisk3DCore\objects
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\objects
+SOURCE          Objects.cpp
+SOURCE          Materials.cpp
+SOURCE          Mesh.cpp
+SOURCE          CameraBase.cpp // camara BASE del core (la vista que usa el render)
+SOURCE          RenderColors.cpp // paleta de render del core (Fase D, sin depender de la UI)
+SOURCE          Light.cpp
+
+// Fase C re-split: los objetos del EDITOR se movieron a main\objects (no son del core)
+SOURCEPATH      ..\..\..\main\objects
+SOURCE          Scene.cpp
+SOURCE          Collection.cpp
+SOURCE          EditMesh.cpp
+SOURCE          Primitivas.cpp
+SOURCE          Empty.cpp
+SOURCE          Camera.cpp Target.cpp Curve.cpp ObjectMode.cpp Instance.cpp
+
+// Fase 4: importador OBJ compartido con PC
+SOURCEPATH      ..\..\..\main\importers
+SOURCE          import_obj.cpp
+
+// ViewportBase REAL de PC (fase outliner)
+SOURCEPATH      ..\..\..\main\ViewPorts
+SOURCE          ViewPorts.cpp WithBorder.cpp ScrollBar.cpp Outliner.cpp Properties.cpp ViewPort3D.cpp UVEditor.cpp LayoutInput.cpp
+
+// Fase A re-split core/editor: la logica de EDICION de la malla (deref EditMesh) se movio
+// de Mesh.cpp a main/edit/ para que el core (Mesh) no dependa del editor (EditMesh)
+SOURCEPATH      ..\..\..\main\edit
+SOURCE          MeshEdit.cpp
+
+SOURCEPATH      ..\..\..\main\render
+SOURCE          render.cpp OpcionesRender.cpp
+
+SOURCEPATH      ..\..\..\main
+SOURCE          variables.cpp
+SOURCE          W3dInitUI.cpp // init de UI compartido
+SOURCE          Undo.cpp // Ctrl+Z (undo por comandos; lo llaman ObjectMode/LayoutInput/Properties)
+
+SOURCEPATH      ..\..\..\main\GeometriaUI
+SOURCE          GeometriaUI.cpp Floor.cpp
+
+SOURCEPATH      ..\..\..\libs\WhiskUI\Propieties
+SOURCE          PropertieBase.cpp GroupPropertie.cpp PropFloat.cpp
+SOURCE          propGap.cpp PropBool.cpp PropList.cpp PropColor.cpp
+SOURCE          PropSelectText.cpp PropButton.cpp PropLabel.cpp
+
+// pila de UI de PC (fase outliner real)
+SOURCEPATH      ..\..\..\main\ViewPorts\PopUp
+SOURCE          PopUpBase.cpp ColorPicker.cpp FileBrowser.cpp RedoMeshPanel.cpp ConfirmarPopup.cpp ProgressPopup.cpp
+
+// La UI (WhiskUI) es su propia capa reutilizable en libs/. Ver documentacion/ui.html
+SOURCEPATH      ..\..\..\libs\WhiskUI
+SOURCE          UI.cpp colores.cpp object2D.cpp rectangle.cpp font.cpp bitmapText.cpp icons.cpp glesdraw.cpp card.cpp Button.cpp PopupMenu.cpp Tab.cpp
+SOURCE          W3dFont.cpp // datos de glifos (Fase C: era libs\Whisk3DCore\ui, ahora UI)
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\objects
+
+// OJO: volver al SOURCEPATH local (las rutas de recursos de abajo se
+// resuelven contra el ultimo SOURCEPATH)
+SOURCEPATH      ..\src
+
+// OJO: volver al SOURCEPATH local ANTES de los START RESOURCE de abajo
+// (las rutas de recursos se resuelven contra el ultimo SOURCEPATH)
+SOURCEPATH      ..\src
 
 START RESOURCE  ..\data\whisk3D.rss
 HEADER
@@ -42,14 +138,32 @@ END //RESOURCE
 
 USERINCLUDE     .
 USERINCLUDE     ..\inc
-USERINCLUDE     ..\Utils
+// Fase C: W3dColors/W3dViewports en main\ui ("ui/W3dColors.h" resuelve por el USERINCLUDE de main)
+// core/ se unio a libs\Whisk3DCore/: los headers compartidos ("math/Vector3.h", "objects/Objects.h")
+// resuelven via libs\Whisk3DCore (mismo include path que usa PC)
+USERINCLUDE     ..\..\..\libs\Whisk3DCore
+USERINCLUDE     ..\..\..\main
+// capas reutilizables en libs/: la UI se incluye como "WhiskUI/icons.h" (libs/WhiskUI)
+// (igual que en PC, que tiene libs/ en su include path).
+USERINCLUDE     ..\..\..\libs
 
 SYSTEMINCLUDE   .
-//necesario para python
-SYSTEMINCLUDE   \epoc32\include\python25
 SYSTEMINCLUDE   \epoc32\include\stdapis
+// STL para el modelo compartido de PC (Fase 3: std::vector/string en
+// core/objects). MISMA receta que el Half-Life en el N95 (probada en este
+// telefono): STLport v4 + libstdcpp v1, SIN el keyword STDCPP. La variante
+// v5 referencia backend_free de libstdcppv5.dll, que no esta en el firmware.
+SYSTEMINCLUDE   \epoc32\include\stdapis\stlport
+SYSTEMINCLUDE   \epoc32\include\stdapis\stlport\stl
 
 SYSTEMINCLUDE   \epoc32\include
+// El SDK de Symbian^3 reorganizo las cabeceras en subcarpetas (antes estaban
+// planas en \epoc32\include en el SDK de S60v5). Sin estas rutas faltan
+// eikon.rh/avkon.rh/CommonDialogs.rh (-> mw) y e32svr.h (-> platform).
+SYSTEMINCLUDE   \epoc32\include\mw
+SYSTEMINCLUDE   \epoc32\include\app
+SYSTEMINCLUDE   \epoc32\include\platform
+SYSTEMINCLUDE   \epoc32\include\platform\mw
 
 LIBRARY         avkon.lib euser.lib apparc.lib cone.lib eikcore.lib
 LIBRARY         eikcoctl.lib estlib.lib fbscli.lib
@@ -60,7 +174,10 @@ LIBRARY         ws32.lib commondialogs.lib
 LIBRARY         estor.lib eikctl.lib aknnotify.lib apgrfx.lib eikdlg.lib charconv.lib 
 
 LIBRARY         libc.lib
-LIBRARY         python25.lib
+// variantes float de math (sinf/cosf/acosf...) usadas por libs\Whisk3DCore/math de PC
+LIBRARY         libm.lib
+// runtime C++ de Open C++ (v1, como el Half-Life): STL del modelo compartido
+LIBRARY         libstdcpp.lib
 
 //acelerometro
 //LIBRARY         NokiaAccSensor.lib
@@ -73,5 +190,9 @@ TARGETPATH 	  \private\10003a3f\apps
 TARGETPATH 	  \private\10003a3f\import\apps
 #endif
 END
-CAPABILITY ReadUserData WriteUserData ReadDeviceData
-CAPABILITY Location
+// Solo capabilities auto-firmables (igual que el Half-Life). ReadDeviceData
+// necesita DevCert de Symbian y Location no es auto-firmable en el 9.2 del
+// N95: con cualquiera de las dos el telefono rechaza el binario self-signed
+// ("funcion no admitida"). La app no las usaba (el acelerometro esta
+// comentado); si algun dia hacen falta, hay que firmarse con Open Signed.
+CAPABILITY ReadUserData WriteUserData

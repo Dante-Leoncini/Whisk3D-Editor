@@ -1,17 +1,17 @@
 #include "constructor.h"
+#include "ViewPorts/UVEditor.h" // el layout PC parte el 3D en columna [3D / UV editor]
 
 #define STB_IMAGE_IMPLEMENTATION
-#include "../../thirdparty/stb/stb_image.h"
+#include "stb/stb_image.h"
 #include "w3dFilesystem.h"
+#include "W3dInitUI.h"
 
 // Variable global que estabas usando
 bool running = false;
 
 void ConstructUniversal(int argc, char* argv[]) {
-    // Configuración básica de OpenGL
-    glEnable(GL_NORMALIZE);
-    glShadeModel(GL_SMOOTH);
-    glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_FASTEST);
+    // estado de graficos inicial: el MISMO inicializador universal que Symbian
+    W3dInitGraphics();
 
     // Siempre un material por defecto
     MaterialDefecto = new Material("Default", true);
@@ -19,70 +19,20 @@ void ConstructUniversal(int argc, char* argv[]) {
     CalculateMillisecondsPerFrame(60);
 
     // Tamaño de las texturas
-    CrearIconos(128, 128);
-    CalcBorderUV(128, 128);
-    CalcCardUV(128, 128);
-    CalcScrollUV(128, 128);
     InitCursors();
-    ConstructorProperties();
+    // (los grupos de propiedades ahora los construye cada panel)
 
-    /*colorPicker = new ColorPicker();
-    PopUpActive = colorPicker;*/
-
-    //ACA HAY QUE CARGAR LAS TEXTURAS!!!!
-    const std::vector<std::string> texFiles = {
-        "font.png", "origen.png", "cursor3d.png", "relationshipLine.png", "lamp.png"
-    };
-
-    for (const auto& file : texFiles) {
-        Textures.push_back(new Texture());
-
-        #ifdef __ANDROID__
-            // Para Android usamos SDL_RWFromFile para acceder al asset dentro del APK
-            std::string path = "res/Skins/" + cfg.SkinName + "/" + file;
-            SDL_RWops* rw = SDL_RWFromFile(path.c_str(), "rb");
-            if (!rw) {
-                __android_log_print(ANDROID_LOG_ERROR, "SDL_MAIN", "No se pudo abrir %s: %s", path.c_str(), SDL_GetError());
-                return -1;
-            }
-
-            SDL_Surface* surf = IMG_Load_RW(rw, 1); // 1 = cierra rw automáticamente
-            if (!surf) {
-                __android_log_print(ANDROID_LOG_ERROR, "SDL_MAIN", "Error cargando %s: %s", path.c_str(), IMG_GetError());
-                return -1;
-            }
-
-            if (!LoadTextureFromSurface(surf, Textures.back()->iID)) {
-                __android_log_print(ANDROID_LOG_ERROR, "SDL_MAIN", "Error creando textura %s", path.c_str());
-                SDL_FreeSurface(surf);
-                return -1;
-            }
-            __android_log_print(ANDROID_LOG_VERBOSE, "SDL_MAIN", "Cargado %s", path.c_str());
-
-            SDL_FreeSurface(surf); // liberamos superficie después de crear la textura
-        #else
-            // PC: ruta directa
-            std::string path = w3dFileSystem::GetResDir()
-                            + "/Skins/"
-                            + cfg.SkinName
-                            + "/"
-                            + file;
-            if (!LoadTexture(path.c_str(), Textures.back()->iID)) {
-                std::cerr << "Error cargando " << path << std::endl;
-                return;
-            }
-            //std::cout << "Cargado " << file << std::endl;
-        #endif
-    }
-
-    //hace falta la textura antes o crashea
-    WhiskFont = new Font(128, 128, Textures[0]->iID);
-    SetGlobalScale(3);
+    // UI compartida (texturas + fuente + iconos): mismo init que Symbian
+    std::string skinDir = w3dFileSystem::GetResDir() + "/Skins/" + cfg.SkinName + "/";
+    W3dInitUI(skinDir);
+    SetGlobalScale(cfg.scale > 0 ? cfg.scale : 3); // configurable (config.ini "scale"); 1 = estilo N95
 
     // ======================================================
     // Si se abrió un archivo .w3d al hacer doble click
     // ======================================================
-    if(argc > 1) {
+    // argv[1] = archivo .w3d a abrir (doble click). Un FLAG (--script, etc.) NO es un
+    // archivo: se ignora aca -> se arma la escena default y el flag lo maneja main().
+    if(argc > 1 && argv[1][0] != '-') {
         w3dPath = argv[1];
 
         // Convertir a ruta absoluta
@@ -134,15 +84,27 @@ void ConstructUniversal(int argc, char* argv[]) {
 
     NewMesh(MeshType::cube, CollectionActive);
 
-    rootViewport = new ViewportRow(
-        new Viewport3D(),
-        new ViewportColumn(
-            new Properties(),
-            new Outliner(),
+    Viewport3D* vp3dInicial = new Viewport3D();
+    // el layout se adapta a la orientacion (igual que Symbian, ver w3dlayout.cpp):
+    if (winH > winW) {
+        // PORTRAIT (ej. N95 240x320): viewport ARRIBA, fila [outliner | propiedades] ABAJO
+        rootViewport = new ViewportColumn(
+            vp3dInicial,
+            new ViewportRow(new Outliner(), new Properties(), 0.40f),
             0.70f
-        ),
-        0.70f
-    );
+        );
+    } else {
+        // LANDSCAPE (PC): a la IZQUIERDA una columna [viewport3D ARRIBA / UV editor ABAJO al 30%];
+        // a la DERECHA outliner sobre propiedades.
+        rootViewport = new ViewportRow(
+            new ViewportColumn(vp3dInicial, new UVEditor(), 0.70f), // 3D 70% arriba, UV editor 30% abajo
+            new ViewportColumn(new Outliner(), new Properties(), 0.40f),
+            0.70f
+        );
+    }
+    // siempre hay un viewport activo (borde verde) por defecto: sin mouse
+    // (Symbian) es la unica referencia; con mouse el hover lo pisa enseguida.
+    viewPortActive = vp3dInicial;
 
     /*rootViewport = new ViewportColumn(
         new Outliner(),

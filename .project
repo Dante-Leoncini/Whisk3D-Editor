@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <projectDescription>
-	<name>Whisk3D</name>
+	<name>Whisk3D-Editor</name>
 	<comment></comment>
 	<projects>
 	</projects>
@@ -15,5 +15,6 @@
 		<nature>org.eclipse.cdt.core.cnature</nature>
 		<nature>org.eclipse.cdt.core.ccnature</nature>
 		<nature>com.nokia.carbide.cdt.builder.carbideCPPBuilderNature</nature>
+		<nature>com.nokia.carbide.cdt.builder.carbideSBSv2BuilderNature</nature>
 	</natures>
 </projectDescription>

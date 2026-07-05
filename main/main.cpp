@@ -1,19 +1,79 @@
+#include "w3dGraphics.h" // abstraccion de graficos (independencia de OpenGL)
+#include "test/W3dScript.h" // modo test: whisk3d --script <ruta>
 #ifdef _WIN32
     #define NOMINMAX
-    #include <windows.h>
+    #include "ViewPorts/LayoutInput.h" // ruteo compartido + overlay del menu
+#include "lectura-escritura.h"      // abrir(): dialogo + ImportOBJ
+#include "ViewPorts/PopUp/FileBrowser.h" // explorador de archivos COMPARTIDO
+#include "ViewPorts/PopUp/ProgressPopup.h" // barra de progreso + hook LayoutSwapBuffers
+#include "importers/import_obj.h"        // ImportOBJ (el importador real)
+
+// accion del File browser al elegir un .obj
+static void ImportObjDesdeBrowser(const std::string& path) {
+    ImportOBJ(path, false);
+}
+
+// el callback del menu Add (LayoutImportObj): abre el explorador compartido
+static void PCImportObj() {
+    AbrirFileBrowser("Importar modelo", "Import Wavefront OBJ", ".obj",
+                     ImportObjDesdeBrowser);
+}
+
+// hook de swap para la barra de progreso (se redibuja DENTRO del export/import bloqueante)
+static SDL_Window* g_swapWindow = NULL;
+static void PCSwapBuffers() { if (g_swapWindow) SDL_GL_SwapWindow(g_swapWindow); }
+
+#include "ViewPorts/Properties.h" // DialogoCargarTextura
+#include "objects/Textures.h"
+#include "objects/Materials.h"    // Material (asignar la textura cargada)
+
+// warp del mouse real (los drags que no deben salirse de un rect)
+static void PCWarpMouse(int x, int y) {
+    SDL_WarpMouseInWindow(window, x, y);
+    lastMouseX = x;
+    lastMouseY = y;
+}
+
+// "Load Texture": el browser COMPARTIDO elige la imagen (png/jpg/bmp...) y la
+// carga al material que la pidio (async: el browser es modal)
+extern void RebindMaterialMeshPart(); // Properties.cpp
+static Material* gTexMat = NULL;
+extern bool gCargarTexturaComoNormal; // Properties.cpp: el "Load Texture" del normal map lo prende (compartido 4 OS)
+static void TexturaElegida(const std::string& path) {
+    if (!gTexMat) return;
+    GLuint id = 0;
+    if (LoadTexture(path.c_str(), id)) {
+        Texture* t = new Texture(path);
+        t->iID = id;
+        Textures.push_back(t);
+        if (gCargarTexturaComoNormal) { gTexMat->normalTexture = t; }
+        else { gTexMat->texture = t; gTexMat->textureOn = true; }
+        RebindMaterialMeshPart();
+    }
+    gTexMat = NULL; gCargarTexturaComoNormal = false;
+}
+// "Load Texture" (base Y normal map): el MISMO browser. Quien lo llama ya dejo gCargarTexturaComoNormal en el
+// valor correcto (false=textura, true=normal); el callback de arriba decide el destino.
+static void PCCargarTexturaEn(Material* mat) {
+    gTexMat = mat;
+    AbrirFileBrowser(gCargarTexturaComoNormal ? "Cargar normal map" : "Cargar textura",
+                     gCargarTexturaComoNormal ? "Abrir normal map" : "Abrir textura",
+                     ".png .jpg .jpeg .bmp .tga", TexturaElegida);
+}
+#include "WhiskUI/PopupMenu.h" // MenuPantallaW/H (desplegables)
+#include "WhiskUI/glesdraw.h"  // W3dPantallaAlto (flip de Y)
+#include <windows.h>
 #endif
 
 #if SDL_MAJOR_VERSION == 2
     #define SDL_MAIN_HANDLED
     #include <SDL2/SDL.h>      
-    //#include <SDL2/SDL_image.h>
-    //#include <SDL_image.h>
     #include "sdl_key_compat.h"
 #elif SDL_MAJOR_VERSION == 3
     #include <SDL3/SDL.h>      
     //para las texturas
     #define STB_IMAGE_IMPLEMENTATION
-    #include "stb_image.h"
+    #include "stb/stb_image.h"
 #endif
 
 #ifdef __ANDROID__
@@ -37,8 +97,6 @@
 #include <cstring>
 #include <unordered_set>
 
-//utilidades de Whisk3D de uso general. mas que nada para manejo de punteros y memoria
-#include "Whisk3Dutils.h"
 
 #include <filesystem>
 #include <vector>
@@ -61,7 +119,9 @@
 
 //Whisk3D imports
 #include "variables.h"
-#include "UI/colores.h"
+#include "WhiskUI/colores.h"
+#include "ui/W3dColors.h" // W3dColores(Ubyte) + carga de colores del editor + Sincronizar
+#include "objects/RenderColors.h" // paleta de render del core (Fase D: el sync de loadColors la llena)
 #include "objects/Textures.h"
 #include "objects/Materials.h"
 #include "animation/Animation.h"
@@ -71,6 +131,10 @@
 #include "ViewPorts/PopUp/ColorPicker.h"
 #include "controles.h"
 #include "constructor.h"
+
+// Reloj de ms para el core (Animation declara w3dGetTicks en Animation.h y NO incluye
+// SDL). Aca el EDITOR/plataforma PC lo implementa con SDL. Symbian pondria el suyo.
+unsigned int w3dGetTicks() { return SDL_GetTicks(); }
 
 // Función simple para leer el ini
 Config loadConfig(const std::string& filename) {
@@ -128,6 +192,7 @@ Config loadConfig(const std::string& filename) {
             else if (key == "width") cfg.width = std::stoi(value);
             else if (key == "height") cfg.height = std::stoi(value);
             else if (key == "displayIndex") cfg.displayIndex = std::stoi(value);
+            else if (key == "scale") cfg.scale = std::stoi(value);
             else if (key == "SkinName") cfg.SkinName = value;
             else if (key == "graphicsAPI") cfg.graphicsAPI = value;
         }
@@ -144,16 +209,9 @@ bool loadColors(const std::string& filename) {
         {"accentDark", ColorID::accentDark},
         {"negro", ColorID::negro},
         {"gris", ColorID::gris},
-        {"naranjaFace", ColorID::naranjaFace},
         {"headerColor", ColorID::headerColor},
         {"negroTransparente", ColorID::negroTransparente},
-        {"grisUI",ColorID:: grisUI},
-        {"LineaPiso", ColorID::LineaPiso},
-        {"LineaPisoRoja", ColorID::LineaPisoRoja},
-        {"LineaPisoVerde", ColorID::LineaPisoVerde},
-        {"ColorTransformX", ColorID::ColorTransformX},
-        {"ColorTransformY", ColorID::ColorTransformY},
-        {"ColorTransformZ", ColorID::ColorTransformZ}
+        {"grisUI", ColorID::grisUI}
     };
 
     std::string skinPath = filename;
@@ -223,15 +281,6 @@ bool loadColors(const std::string& filename) {
             ListaColores[idx][2] = b;
             ListaColores[idx][3] = a;
 
-            //los colores fixed solo son para android
-            #ifdef __ANDROID__
-                // Convertimos a GLfixed
-                ListaColoresX[idx][0] = COLOR_CONVERT_FIXED(r);
-                ListaColoresX[idx][1] = COLOR_CONVERT_FIXED(g);
-                ListaColoresX[idx][2] = COLOR_CONVERT_FIXED(b);
-                ListaColoresX[idx][3] = COLOR_CONVERT_FIXED(a);
-            #endif
-
             ListaColoresUbyte[idx][0] = (GLubyte)(r*255);
             ListaColoresUbyte[idx][1] = (GLubyte)(g*255);
             ListaColoresUbyte[idx][2] = (GLubyte)(b*255);
@@ -245,20 +294,36 @@ bool loadColors(const std::string& filename) {
                 //std::cout << "Color " << name << " cargado: R=" << r << " G=" << g << " B=" << b << " A=" << a << "\n";
             #endif
         } else {
-            std::cerr << "Color desconocido en colors.skin: " << name << "\n";
+            int eidx = editorColorIdPorNombre(name.c_str());
+            if (eidx >= 0) {
+                W3dColores[eidx][0] = r;
+                W3dColores[eidx][1] = g;
+                W3dColores[eidx][2] = b;
+                W3dColores[eidx][3] = a;
+                W3dColoresUbyte[eidx][0] = (GLubyte)(r*255);
+                W3dColoresUbyte[eidx][1] = (GLubyte)(g*255);
+                W3dColoresUbyte[eidx][2] = (GLubyte)(b*255);
+                W3dColoresUbyte[eidx][3] = (GLubyte)(a*255);
+            } else {
+                std::cerr << "Color desconocido en colors.skin: " << name << "\n";
+            }
         }
     }
+
+    // Fase D: copiar la paleta de la UI a la de RENDER del core. Ahora COMPARTIDO
+    // (colores.cpp), asi Symbian -que carga por loadColorsW3d- tambien lo hace.
+    SincronizarRenderColores();
 
     return true;
 }
 
 void initGL(int width, int height) {
     #ifdef __ANDROID__
-        glViewport(0, 0, width, height);
+        w3dEngine::Viewport(0, 0, width, height);
 
         // Proyección simple (similar a gluPerspective)
-        glMatrixMode(GL_PROJECTION);
-        glLoadIdentity();
+        w3dEngine::MatrixMode(w3dEngine::Projection);
+        w3dEngine::LoadIdentity();
         GLfloat ratio = (GLfloat)width / (GLfloat)height;
         GLfloat fov = 60.0f * 3.14159265f / 180.0f;
         GLfloat nearClip = 0.1f;
@@ -267,22 +332,22 @@ void initGL(int width, int height) {
         GLfloat bottom = -top;
         GLfloat left = bottom * ratio;
         GLfloat right = top * ratio;
-        glFrustumf(left, right, bottom, top, nearClip, farClip);
+        w3dEngine::Frustum(left, right, bottom, top, nearClip, farClip);
 
-        glMatrixMode(GL_MODELVIEW);
-        glLoadIdentity();
+        w3dEngine::MatrixMode(w3dEngine::ModelView);
+        w3dEngine::LoadIdentity();
     #else
-        glViewport(0, 0, width, height);
-        glMatrixMode(GL_PROJECTION);
-        glLoadIdentity();
-        gluPerspective(60.0f, (float)width / height, 0.1f, 100.0f);
-        glMatrixMode(GL_MODELVIEW);
-        glLoadIdentity();
+        w3dEngine::Viewport(0, 0, width, height);
+        w3dEngine::MatrixMode(w3dEngine::Projection);
+        w3dEngine::LoadIdentity();
+        w3dEngine::Perspective(60.0f, (float)width / height, 0.1f, 100.0f);
+        w3dEngine::MatrixMode(w3dEngine::ModelView);
+        w3dEngine::LoadIdentity();
     #endif
 
-    glEnable(GL_DEPTH_TEST);
-    glEnable(GL_CULL_FACE);
-    glClearColor(0.2f, 0.2f, 0.25f, 1.0f);
+    w3dEngine::Enable(w3dEngine::DepthTest);
+    w3dEngine::Enable(w3dEngine::CullFace);
+    w3dEngine::ClearColor(0.2f, 0.2f, 0.25f, 1.0f);
 }
 
 int main(int argc, char* argv[]) {
@@ -306,11 +371,15 @@ int main(int argc, char* argv[]) {
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
 
+    // OJO: asignar el cfg GLOBAL (no declarar uno local que lo tape) -> asi ConstructUniversal
+    // y todo lo demas ven los valores cargados (ej. scale para SetGlobalScale).
     #ifdef __ANDROID__
-        Config cfg = loadConfig("res/config.ini");
+        cfg = loadConfig("res/config.ini");
     #else
-        Config cfg = loadConfig(w3dFileSystem::GetResDir() + "/config.ini");
+        cfg = loadConfig(w3dFileSystem::GetResDir() + "/config.ini");
     #endif
+    winW = cfg.width;  winH = cfg.height;  // aplicar el tamano del config a la ventana
+                                           // (antes quedaba el default 640x480: el config no se usaba)
     if (cfg.enableAntialiasing) {
         SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
         SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 4);
@@ -322,7 +391,10 @@ int main(int argc, char* argv[]) {
                                 winW, winH,
                                 SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
     #else
-        Uint32 windowFlags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_MAXIMIZED;
+        // fullscreen -> maximizada; sino respeta width/height del config (util para
+        // probar tamanos chicos, ej. 240x320 estilo N95 con scale=1)
+        Uint32 windowFlags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE;
+        if (cfg.fullscreen) windowFlags |= SDL_WINDOW_MAXIMIZED;
         window = SDL_CreateWindow("Whisk3D Pre-Alpha", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, winW, winH, windowFlags);
     #endif
 
@@ -357,6 +429,12 @@ int main(int argc, char* argv[]) {
     // Constructor de Whisk3D universal (Android, PC)
     ConstructUniversal(argc, argv);
 
+    // "Add > import Wavefront" del menu: abre el File browser compartido
+    LayoutImportObj = PCImportObj;
+    DialogoCargarTextura = PCCargarTexturaEn; // "Load Texture" (base Y normal map) -> browser compartido
+    LayoutWarpMouse = PCWarpMouse;
+    g_swapWindow = window; LayoutSwapBuffers = PCSwapBuffers; // barra de progreso (export/import)
+
     // Detectar primer mando
     if (SDL_NumJoysticks() > 0 && SDL_IsGameController(0)) {
         controller = SDL_GameControllerOpen(0);
@@ -373,7 +451,22 @@ int main(int argc, char* argv[]) {
 
     SDL_Event e;
     running = true;
+    // arbol en coordenadas ARRIBA-izquierda (unificado con Symbian);
+    // el flip a GL pasa solo en glViewport/glScissor con este alto
+    W3dPantallaAlto = winH;
+    MenuPantallaW = winW;
+    MenuPantallaH = winH;
     rootViewport->Resize(winW, winH);
+
+    // MODO TEST: "whisk3d --script <ruta>" corre un script de comandos (sin GUI) y
+    // sale (0 = todo OK, 1 = fallo). Ver main/test/W3dScript.cpp.
+    for (int ai = 1; ai < argc; ai++) {
+        if (std::string(argv[ai]) == "--script" && ai + 1 < argc) {
+            bool ok = W3dRunScript(argv[ai + 1]);
+            SDL_Quit();
+            return ok ? 0 : 1;
+        }
+    }
 
     while (running) {
         Contadores();
@@ -382,10 +475,14 @@ int main(int argc, char* argv[]) {
         UpdateAnimatedMaterials();
 
         while (SDL_PollEvent(&e)) {
+            g_redraw = true; // cualquier evento (tecla/mouse/resize) -> hay que redibujar
             if (e.type == SDL_QUIT) running = false;
             if (e.type == SDL_WINDOWEVENT && e.window.event == SDL_WINDOWEVENT_RESIZED) {
                 winW = e.window.data1;
                 winH = e.window.data2;
+                W3dPantallaAlto = winH;
+                MenuPantallaW = winW;
+                MenuPantallaH = winH;
                 rootViewport->Resize(winW, winH);
             } else {
                 InputUsuarioSDL3(e);
@@ -400,16 +497,31 @@ int main(int argc, char* argv[]) {
             ReloadAnimation();
         }
 
-        // Render 3D
-        if (now - lastRenderTime >= 16) {  // ~60hz
+        // notificaciones (toasts): corre el timer (las de exito se cierran solas) y
+        // mantiene vivo el render mientras haya alguna de exito activa
+        static Uint32 lastNotif = now;
+        NotificacionesTick((float)(now - lastNotif) / 1000.0f);
+        lastNotif = now;
+
+        // CARGA DIFERIDA de texturas del import: 1 por frame (decode+upload). Prende g_redraw al cargar una -> el
+        // modelo aparece enseguida y las texturas entran solas. No-op si no hay pendientes.
+        { extern void CargarTexturasPendientes(); CargarTexturasPendientes(); }
+
+        // Render EVENT-DRIVEN: solo si algo cambio (g_redraw) o hay una animacion EN
+        // PLAY (vertex-anim o materiales animados activos). Sino no se dibuja nada ->
+        // CPU casi 0 en reposo (como Blender), en vez de renderizar 60 veces/seg al pedo.
+        bool animando = HayAnimacionActiva() || !VertexAnimationActives.empty();
+        if ((g_redraw || animando) && now - lastRenderTime >= 16) {  // ~60hz
             lastRenderTime = now;
             if (rootViewport){
                 rootViewport->Render();
             }
-            if (PopUpActive){
-                PopUpActive->Render();                
-            }
+            // popups y desplegables (los dibuja el modulo compartido)
+            LayoutRenderMenu(winW, winH);
+            NotificacionesRender(winW, winH); // toasts ENCIMA de todo
+            LayoutTickFPS(now); // overlay de fps (reloj de PC: SDL_GetTicks)
             SDL_GL_SwapWindow(window);
+            g_redraw = false;
         }
 
         SDL_Delay(8); // liberar CPU

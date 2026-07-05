@@ -22,18 +22,8 @@ elseif (TARGET SDL2)
     list(APPEND WHISK3D_THIRDPARTY_LIBS SDL2)
 endif()
 
-# ===============================
-# tinyfiledialogs
-# ===============================
-if(NOT WHISK3D_ANDROID)
-    set(TINYFD_SRC "${CMAKE_CURRENT_SOURCE_DIR}/tinyfiledialogs/tinyfiledialogs.c")
-    set(TINYFD_INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/tinyfiledialogs")
-
-    # Lo agregamos como biblioteca estática
-    add_library(tinyfiledialogs STATIC ${TINYFD_SRC})
-    target_include_directories(tinyfiledialogs PUBLIC ${TINYFD_INCLUDE})
-    list(APPEND WHISK3D_THIRDPARTY_LIBS tinyfiledialogs)
-endif()
+# (tinyfiledialogs se borro: los dialogos de archivo nativos los reemplaza el
+#  File browser COMPARTIDO, main/ViewPorts/PopUp/FileBrowser)
 
 # ===============================
 # Exportar variable

@@ -1,18 +1,143 @@
 #include "import_obj.h"
+#include <sstream>
+#include <stdlib.h>
+#include <algorithm>
+#include <set>
+#include <map>
+#include "objects/ObjectMode.h" // RotGlobalDe (normales a mundo en el export)
+#include "ViewPorts/PopUp/ProgressPopup.h" // barra de progreso (export/import, clave en el N95 lento)
+#include "ViewPorts/LayoutInput.h"          // Notificar (toast de exito/error)
+#include <cstdio> // sprintf para FloatStr
+
+// formateo de float SIN operator<< ni %f: ambos ROTOS en STLport/Symbian (el export escribia basura tipo
+// 2.31e-307 Y era lentisimo -> el N95 se "colgaba"). Replica de RenderBitmapFloat: entero.fraccion con %d.
+static std::string FloatStr(float v) {
+    char buf[40];
+    int neg = (v < 0.0f) ? 1 : 0;
+    float av = neg ? -v : v;
+    int ent = (int)av;
+    int frac = (int)((av - (float)ent) * 1000000.0f + 0.5f); // 6 decimales
+    if (frac >= 1000000) { ent++; frac -= 1000000; }
+    sprintf(buf, "%s%d.%06d", neg ? "-" : "", ent, frac);
+    return std::string(buf);
+}
+
+// int -> string (para los indices de las caras del export). SSO (sin heap para enteros chicos).
+static std::string IntStr(int n) {
+    char buf[16]; sprintf(buf, "%d", n); return std::string(buf);
+}
+
+// ===== APPEND directo al buffer del export, SIN sprintf (era el cuello: ~2.6M sprintf para 200k verts = ~7s) ni
+// std::string temporal. Extraen los digitos a mano. AppendFloat replica EXACTO el formato de FloatStr (signo +
+// entero + '.' + 6 decimales redondeados) para que el round-trip no cambie. =====
+static void AppendInt(std::string& out, int v) {
+    if (v < 0) { out += '-'; v = -v; }
+    char tmp[12]; int i = 0;
+    if (v == 0) tmp[i++] = '0';
+    else while (v > 0) { tmp[i++] = (char)('0' + v % 10); v /= 10; }
+    while (i > 0) out += tmp[--i]; // los digitos salieron al reves
+}
+static void AppendFloat(std::string& out, float v) {
+    int neg = (v < 0.0f) ? 1 : 0;
+    float av = neg ? -v : v;
+    int ent = (int)av;
+    int frac = (int)((av - (float)ent) * 1000000.0f + 0.5f); // 6 decimales, redondeado
+    if (frac >= 1000000) { ent++; frac -= 1000000; }
+    if (neg) out += '-';
+    AppendInt(out, ent);  // ent >= 0 aca
+    out += '.';
+    char fd[6]; // fraccion: 6 digitos con ceros a la izquierda
+    for (int k = 5; k >= 0; k--) { fd[k] = (char)('0' + frac % 10); frac /= 10; }
+    out.append(fd, 6);
+}
 
 bool VertexKey::operator==(const VertexKey &other) const {
     return pos == other.pos && normal == other.normal
            && uv == other.uv && color == other.color;
 }
 
+bool VertexKey::operator<(const VertexKey &other) const {
+    if (pos != other.pos) return pos < other.pos;
+    if (normal != other.normal) return normal < other.normal;
+    if (uv != other.uv) return uv < other.uv;
+    return color < other.color;
+}
+
+#ifndef W3D_SYMBIAN
 size_t std::hash<VertexKey>::operator()(const VertexKey &k) const {
     return ((size_t)k.pos * 73856093) ^ ((size_t)k.normal * 19349663)
            ^ ((size_t)k.uv * 83492791) ^ ((size_t)k.color * 49979693);
+}
+#endif
+
+#ifdef W3D_SYMBIAN
+typedef std::map<VertexKey, MeshIndex> TVertexMap;
+typedef std::map<std::string, int> TPosMap;            // STLport: sin unordered_map (export en N95 = modelos chicos)
+#else
+typedef std::unordered_map<VertexKey, MeshIndex> TVertexMap;
+typedef std::unordered_map<std::string, int> TPosMap;  // HASH: dedup de posiciones del export O(n) en vez de O(n log n)
+#endif
+
+// directorio de un path (reemplaza a std::filesystem: portable a C++03)
+static std::string DirOf(const std::string& ruta) {
+    size_t i = ruta.find_last_of("/\\");
+    return (i == std::string::npos) ? std::string("") : ruta.substr(0, i + 1);
+}
+
+// saturar [0..1] -> byte (era una lambda: C++03)
+static unsigned char ObjSaturar(double v) {
+    double n = v * 255.0;
+    if (n < 0) n = 0;
+    if (n > 255.0) n = 255.0;
+    return (unsigned char)n;
+}
+
+// normal [-1..1] -> GLbyte (era una lambda: C++03)
+static signed char ObjConvNormal(double v) {
+    v = ((v + 1.0) / 2.0) * 255.0 - 128.0;
+    if (v > 127) v = 127;
+    if (v < -128) v = -128;
+    return (signed char)v;
+}
+
+// ===== CARGA DIFERIDA DE TEXTURAS (Dante: el import de modelos grandes tardaba ~17s SOLO decodificando los PNG del
+// MTL -upper 24MB, lower 18MB...-). Ahora el import NO decodifica: ENCOLA (material, ruta) y el modelo aparece
+// enseguida (gris). El loop principal (PC y N95) llama CargarTexturasPendientes() 1 vez por frame -> decodifica +
+// sube UNA textura por frame (hilo principal, sin threads) y la asigna; las texturas "aparecen" solas. =====
+struct TexPendiente { Material* mat; std::string path; };
+static std::vector<TexPendiente> g_texPendientes;
+static size_t g_texPendIdx = 0;
+
+static void EncolarTextura(Material* mat, const std::string& path) {
+    TexPendiente tp; tp.mat = mat; tp.path = path; g_texPendientes.push_back(tp);
+}
+
+void CargarTexturasPendientes() {
+    if (g_texPendIdx >= g_texPendientes.size()) {
+        if (!g_texPendientes.empty()) { g_texPendientes.clear(); g_texPendIdx = 0; } // termino -> liberar la cola
+        return;
+    }
+    extern bool g_redraw;
+    TexPendiente& tp = g_texPendientes[g_texPendIdx++];
+    // el material pudo borrarse mientras tanto -> cargar solo si sigue vivo en Materials (sino quedaria colgado)
+    bool vivo = false;
+    for (size_t i = 0; i < Materials.size(); i++) if (Materials[i] == tp.mat) { vivo = true; break; }
+    if (vivo) {
+        Texture* newTex = new Texture();
+        newTex->path = tp.path;
+        if (LoadTexture(tp.path.c_str(), newTex->iID)) {
+            Textures.push_back(newTex);
+            tp.mat->texture = newTex;
+            tp.mat->textureOn = true;
+        } else delete newTex;
+    }
+    g_redraw = true; // redibujar con la textura recien cargada (las texturas "aparecen")
 }
 
 void Wavefront::Reset() {
     vertex.clear();
     vertexColor.clear();
+    cornerColors.clear();
     normals.clear();
     uv.clear();
     faces.clear();
@@ -22,92 +147,140 @@ void Wavefront::Reset() {
 }
 
 void Wavefront::ConvertToES1(Mesh* TempMesh, int* acumuladoVertices, int* acumuladoNormales, int* acumuladoUVs) {
+    (void)acumuladoVertices; (void)acumuladoNormales; (void)acumuladoUVs; // ya se restaron al parsear
     std::vector<GLfloat> newVertices;
     std::vector<GLubyte> newColors;
     std::vector<GLbyte> newNormals;
     std::vector<GLfloat> newUVs;
-    std::vector<GLushort> newFaces;
+    std::vector<MeshIndex> newFaces;
 
-    std::unordered_map<VertexKey, GLushort> vertexMap;
+    TVertexMap vertexMap;
+
+    // un OBJ puede venir SIN normales o SIN UVs ("f v", "f v//vn", "f v/vt"):
+    // los indices que faltan llegan en -1 y se completan con 0
+    bool hayNormales = !normals.empty();
+    bool hayUVs = !uv.empty();
+
+    // grupos de material recomputados sobre la triangulacion REAL (un quad son 2
+    // triangulos, un ngon N-2): antes se asumia 1 triangulo por cara y los
+    // quads/ngones renderizaban a medias.
+    TempMesh->materialsGroup.clear();
+    int currentMaterial = -1;
 
     for (size_t i = 0; i < faces.size(); i++) {
+        // cambio de material (start = indice de CARA donde arranca el material)
+        for (size_t m = 0; m < materialsGroup.size(); m++) {
+            if ((int)i == materialsGroup[m].start) {
+                MaterialGroup mg;
+                mg.material = materialsGroup[m].material;
+                mg.name = materialsGroup[m].material ? materialsGroup[m].material->name : std::string("Mesh");
+                mg.start = (int)(newFaces.size() / 3);
+                mg.startDrawn = (int)newFaces.size();
+                mg.count = 0;
+                mg.indicesDrawnCount = 0;
+                TempMesh->materialsGroup.push_back(mg);
+                currentMaterial = (int)TempMesh->materialsGroup.size() - 1;
+            }
+        }
+
         Face &f = faces[i];
         if (f.corners.size() < 3) continue;
 
-        for (size_t t = 1; t < f.corners.size() - 1; t++) {
-            FaceCorner corners[3] = {f.corners[0], f.corners[t], f.corners[t+1]};
-            for (int c = 0; c < 3; c++) {
-                VertexKey key = {corners[c].vertex, corners[c].normal, corners[c].uv, corners[c].vertex};
-
-                auto it = vertexMap.find(key);
-                GLushort idx;
-                if (it != vertexMap.end()) {
-                    idx = it->second;
-                } else {
-                    idx = newVertices.size() / 3;
-                    vertexMap[key] = idx;
-
-                    for (int v = 0; v < 3; v++) {
-                        newVertices.push_back(vertex[corners[c].vertex*3+v]);
-                        newNormals.push_back(normals[corners[c].normal*3+v]);
-                    }
-                    for (int v = 0; v < 4; v++) {
-                        newColors.push_back(vertexColor[corners[c].vertex*4+v]);
-                    }
-                    for (int u = 0; u < 2; u++) {
-                        newUVs.push_back(uv[corners[c].uv*2+u]);
+        // dedup de CADA esquina de la cara (una vez) -> indices del vertex buffer
+        std::vector<MeshIndex> faceIdx;
+        for (size_t c = 0; c < f.corners.size(); c++) {
+            FaceCorner& fc = f.corners[c];
+            // color: por ESQUINA (fc.color>=0 -> cornerColors) o por VERTICE (vertexColor[fc.vertex]).
+            // el key del color usa un indice NEGATIVO para el por-esquina (no colisiona con el por-vertice).
+            int colorKey = (fc.color >= 0) ? -(fc.color + 1) : fc.vertex;
+            VertexKey key = {fc.vertex, fc.normal, fc.uv, colorKey};
+            TVertexMap::iterator it = vertexMap.find(key);
+            MeshIndex idx;
+            if (it != vertexMap.end()) {
+                idx = it->second;
+            } else {
+                idx = (MeshIndex)(newVertices.size() / 3);
+                vertexMap[key] = idx;
+                for (int v = 0; v < 3; v++) {
+                    size_t vi = (size_t)fc.vertex * 3 + v;
+                    newVertices.push_back(vi < vertex.size() ? vertex[vi] : 0.0f);
+                    if (hayNormales) {
+                        size_t ni = (size_t)(fc.normal < 0 ? 0 : fc.normal) * 3 + v;
+                        newNormals.push_back(ni < normals.size() ? normals[ni] : (GLbyte)0);
                     }
                 }
-                newFaces.push_back(idx);
+                for (int v = 0; v < 4; v++) {
+                    if (fc.color >= 0) { size_t ci = (size_t)fc.color * 4 + v;
+                        newColors.push_back(ci < cornerColors.size() ? cornerColors[ci] : (GLubyte)255); }
+                    else { size_t ci = (size_t)fc.vertex * 4 + v;
+                        newColors.push_back(ci < vertexColor.size() ? vertexColor[ci] : (GLubyte)255); }
+                }
+                if (hayUVs) {
+                    for (int u = 0; u < 2; u++) {
+                        size_t ui = (size_t)(fc.uv < 0 ? 0 : fc.uv) * 2 + u;
+                        newUVs.push_back(ui < uv.size() ? uv[ui] : 0.0f);
+                    }
+                }
             }
+            faceIdx.push_back(idx);
         }
+
+        // triangulacion en abanico (tri=1, quad=2, ngon=N-2)
+        int trisCara = 0;
+        for (size_t t = 1; t + 1 < faceIdx.size(); t++) {
+            newFaces.push_back(faceIdx[0]);
+            newFaces.push_back(faceIdx[t]);
+            newFaces.push_back(faceIdx[t+1]);
+            trisCara++;
+        }
+        if (currentMaterial >= 0) {
+            TempMesh->materialsGroup[currentMaterial].count += trisCara;
+            TempMesh->materialsGroup[currentMaterial].indicesDrawnCount += trisCara * 3;
+        }
+
+        // CARA LOGICA: preserva el quad/ngon (overlay = 1 normal por cara; edicion)
+        MeshFace mf;
+        for (size_t k = 0; k < faceIdx.size(); k++) mf.idx.push_back((int)faceIdx[k]);
+        TempMesh->faces3d.push_back(mf);
     }
 
-    // Asignar a TempMesh
-    TempMesh->vertexSize = newVertices.size();
+    // Asignar a TempMesh (vertexSize = cantidad de VERTICES, no de floats: asi lo
+    // usan las primitivas, ObjectMode (duplicar) y el overlay de normales)
+    TempMesh->vertexSize = (int)(newVertices.size() / 3);
     TempMesh->vertex = new GLfloat[newVertices.size()];
     std::copy(newVertices.begin(), newVertices.end(), TempMesh->vertex);
 
-    TempMesh->normals = new GLbyte[newNormals.size()];
-    std::copy(newNormals.begin(), newNormals.end(), TempMesh->normals);
+    if (newNormals.empty()) {
+        TempMesh->normals = NULL; // OBJ sin "vn": que el render lo sepa
+    } else {
+        TempMesh->normals = new GLbyte[newNormals.size()];
+        std::copy(newNormals.begin(), newNormals.end(), TempMesh->normals);
+    }
 
     TempMesh->vertexColor = new GLubyte[newColors.size()];
     std::copy(newColors.begin(), newColors.end(), TempMesh->vertexColor);
 
-    TempMesh->uv = new GLfloat[newUVs.size()];
-    std::copy(newUVs.begin(), newUVs.end(), TempMesh->uv);
+    if (newUVs.empty()) {
+        TempMesh->uv = NULL; // OBJ sin "vt": el render usa el dummy
+    } else {
+        TempMesh->uv = new GLfloat[newUVs.size()];
+        std::copy(newUVs.begin(), newUVs.end(), TempMesh->uv);
+    }
 
-    TempMesh->facesSize = newFaces.size();
-    TempMesh->faces = new GLushort[newFaces.size()];
+    TempMesh->facesSize = (int)newFaces.size();
+    TempMesh->faces = new MeshIndex[newFaces.size() ? newFaces.size() : 1];
     std::copy(newFaces.begin(), newFaces.end(), TempMesh->faces);
 
-    // MaterialGroup
-    if (!materialsGroup.empty()) {
-        for (const MaterialGroup& mgOrig : materialsGroup) {
-            MaterialGroup mg;
-            mg.start = mgOrig.start;
-            mg.count = mgOrig.count;
-            mg.startDrawn = mgOrig.startDrawn;
-            mg.indicesDrawnCount = mgOrig.indicesDrawnCount;
-            mg.material = mgOrig.material;
-            mg.name = mgOrig.material->name;
-            TempMesh->materialsGroup.push_back(mg);
-        }
-    } else {
+    // sin materiales: un grupo unico que dibuja todo
+    if (TempMesh->materialsGroup.empty()) {
         MaterialGroup mg;
         mg.start = 0;
-        mg.count = faces.size();
+        mg.count = (int)(newFaces.size() / 3);
         mg.startDrawn = 0;
         mg.indicesDrawnCount = TempMesh->facesSize;
         mg.material = 0;
         TempMesh->materialsGroup.push_back(mg);
     }
-
-    /*std::cout << "\n[ConvertToES1 RESULTADO]\n";
-    std::cout << "Vertices finales: " << newVertices.size()/3 << "\n";
-    std::cout << "Normales final:   " << newNormals.size()/3 << "\n";
-    std::cout << "UV final:         " << newUVs.size()/2 << "\n";
-    std::cout << "Caras triangulos: " << newFaces.size()/3 << "\n";*/
 
     Reset();
 }
@@ -118,7 +291,7 @@ void Wavefront::ConvertToES1_NoMerge(Mesh* TempMesh) {
     // 1) COPIAR VERTICES Y COLORES TAL CUAL
     // =========================================================
 
-    TempMesh->vertexSize = vertex.size();
+    TempMesh->vertexSize = (int)(vertex.size() / 3); // cantidad de VERTICES (no floats)
     TempMesh->vertex = new GLfloat[vertex.size()];
     std::copy(vertex.begin(), vertex.end(), TempMesh->vertex);
 
@@ -141,7 +314,7 @@ void Wavefront::ConvertToES1_NoMerge(Mesh* TempMesh) {
     // 3) CARAS + MATERIALES + PISAR NORMAL / UV
     // =========================================================
 
-    std::vector<GLushort> newFaces;
+    std::vector<MeshIndex> newFaces;
     TempMesh->materialsGroup.clear();
 
     int currentMaterial = -1;
@@ -194,7 +367,7 @@ void Wavefront::ConvertToES1_NoMerge(Mesh* TempMesh) {
                     TempMesh->uv[v * 2 + 1] = uv[fc.uv * 2 + 1];
                 }
 
-                newFaces.push_back((GLushort)v);
+                newFaces.push_back((MeshIndex)v);
             }
 
             if (currentMaterial >= 0) {
@@ -209,19 +382,21 @@ void Wavefront::ConvertToES1_NoMerge(Mesh* TempMesh) {
     // =========================================================
 
     TempMesh->facesSize = newFaces.size();
-    TempMesh->faces = new GLushort[newFaces.size()];
+    TempMesh->faces = new MeshIndex[newFaces.size()];
     std::copy(newFaces.begin(), newFaces.end(), TempMesh->faces);
 
     // =========================================================
     // 5) DEBUG
     // =========================================================
 
+#ifndef W3D_SYMBIAN
     std::cout << "Este objeto tenia "
               << TempMesh->materialsGroup.size()
               << " materiales\n\n";
+#endif
 
     Reset();
-}    
+}
 
 // extraer nombre base del filename (sin path ni extensión)
 std::string ExtractBaseName(const std::string& filepath) {
@@ -234,19 +409,23 @@ std::string ExtractBaseName(const std::string& filepath) {
     return name;
 }
 
-bool LeerOBJ(std::ifstream& file,
+// prefijo de linea (sobre const char*: las lineas del OBJ son punteros a un buffer, sin std::string por linea)
+static bool LineaEmpieza(const char* s, const char* p) {
+    while (*p) { if (*s != *p) return false; s++; p++; }
+    return true;
+}
+
+bool LeerOBJ(const std::vector<const char*>& lines,
+             size_t& idx,
              const std::string& filename,
-             std::streampos& startPos,
              int* acumuladoVertices,
              int* acumuladoNormales,
              int* acumuladoUVs,
-             bool NoMerge) 
+             int* acumuladoColores,
+             bool NoMerge)
 {
     Mesh* mesh = new Mesh(CollectionActive, Vector3(0, 0, 0));
-
-    // usar filename para nombrar por defecto (y hacerlo único)
-    std::string fileBase = ExtractBaseName(filename);
-    mesh->name = fileBase;
+    mesh->name = ExtractBaseName(filename);
 
     Wavefront Wobj;
     Wobj.Reset();
@@ -258,111 +437,115 @@ bool LeerOBJ(std::ifstream& file,
     int acumuladoVerticesProximo = 0;
     int acumuladoNormalesProximo = 0;
     int acumuladoUVsProximo = 0;
+    int acumuladoColoresProximo = 0;
 
-    file.clear();
-    file.seekg(startPos);
+    while (idx < lines.size()) {
+        if ((idx & 4095) == 0 && !lines.empty()) ProgresoActualizar((float)idx / (float)lines.size()); // barra (cada 4096 lineas; ya throttlea a 1.5%)
+        const char* line = lines[idx];
 
-    std::string line;
-    while (std::getline(file, line)) {
-        startPos = file.tellg();
-
-        if (line.rfind("o ", 0) == 0) {
+        if (LineaEmpieza(line, "o ")) {
             if (!NombreEncontrado) {
                 NombreEncontrado = true;
+                std::string nom(line + 2);
+                while (!nom.empty() && (nom[nom.size()-1]==' ' || nom[nom.size()-1]=='	'))
+                    nom.erase(nom.size()-1);
+                if (!nom.empty()) mesh->name = nom;
+                idx++;
             } else {
+                // proximo objeto: NO consumir su 'o' (lo lee el siguiente LeerOBJ)
                 hayMasObjetos = true;
                 break;
             }
         }
-        else if (line.rfind("v ", 0) == 0) {
-            std::istringstream ss(line.substr(2));
-            double x, y, z, r, g, b, a;
-
-            ss >> x >> y >> z;
-
-            if (ss >> r >> g >> b) {
-                TieneVertexColor = true;
-                if (!(ss >> a)) a = 1.0;
-            } else {
-                r = g = b = 1.0;
-                a = 1.0;
+        // PARSEO MANUAL (strtod/strtol sobre el c_str): NADA de istringstream ni substr -> ~5-10x mas rapido en
+        // modelos grandes (200k+ verts). El istringstream construia un stream + locale POR LINEA (~660k veces).
+        else if (LineaEmpieza(line, "v ")) {
+            const char* p = line + 2; char* e;
+            double val[7]; int n = 0;
+            while (n < 7) { double d = strtod(p, &e); if (e == p) break; val[n++] = d; p = e; }
+            if (n >= 3) {
+                Wobj.vertex.push_back((GLfloat)val[0]);
+                Wobj.vertex.push_back((GLfloat)val[1]);
+                Wobj.vertex.push_back((GLfloat)val[2]);
+                if (n >= 6) { TieneVertexColor = true; // v x y z r g b [a] -> vertex color
+                    Wobj.vertexColor.push_back(ObjSaturar(val[3]));
+                    Wobj.vertexColor.push_back(ObjSaturar(val[4]));
+                    Wobj.vertexColor.push_back(ObjSaturar(val[5]));
+                    Wobj.vertexColor.push_back(ObjSaturar(n >= 7 ? val[6] : 1.0));
+                } else { // sin color -> blanco
+                    Wobj.vertexColor.push_back(255); Wobj.vertexColor.push_back(255);
+                    Wobj.vertexColor.push_back(255); Wobj.vertexColor.push_back(255);
+                }
+                acumuladoVerticesProximo++;
             }
-
-            Wobj.vertex.push_back((GLfloat)x);
-            Wobj.vertex.push_back((GLfloat)y);
-            Wobj.vertex.push_back((GLfloat)z);
-
-            auto saturar = [](double v) { 
-                double n = v * 255.0; 
-                if (n < 0) n = 0; 
-                if (n > 255.0) n = 255.0; 
-                return (unsigned char)n; 
-            };
-
-            Wobj.vertexColor.push_back(saturar(r));
-            Wobj.vertexColor.push_back(saturar(g));
-            Wobj.vertexColor.push_back(saturar(b));
-            Wobj.vertexColor.push_back(saturar(a));
-
-            acumuladoVerticesProximo++;
+            idx++;
         }
-        else if (line.rfind("vn ", 0) == 0) {
-            std::istringstream ss(line.substr(3));
-            double nx, ny, nz;
-            ss >> nx >> ny >> nz;
-
-            auto conv = [](double v) -> signed char {
-                v = ((v + 1.0) / 2.0) * 255.0 - 128.0;
-                if (v > 127) v = 127;
-                if (v < -128) v = -128;
-                return (signed char)v;
-            };
-
-            Wobj.normals.push_back(conv(nx));
-            Wobj.normals.push_back(conv(ny));
-            Wobj.normals.push_back(conv(nz));
+        else if (LineaEmpieza(line, "vn ")) {
+            const char* p = line + 3; char* e;
+            double nx = strtod(p, &e); p = e;
+            double ny = strtod(p, &e); p = e;
+            double nz = strtod(p, &e);
+            Wobj.normals.push_back(ObjConvNormal(nx));
+            Wobj.normals.push_back(ObjConvNormal(ny));
+            Wobj.normals.push_back(ObjConvNormal(nz));
             acumuladoNormalesProximo++;
+            idx++;
         }
-        else if (line.rfind("vt ", 0) == 0) {
-            std::istringstream ss(line.substr(3));
-            double u, v;
-            ss >> u >> v;
-
+        else if (LineaEmpieza(line, "vt ")) {
+            const char* p = line + 3; char* e;
+            double u = strtod(p, &e); p = e;
+            double v = strtod(p, &e);
             Wobj.uv.push_back((float)u);
             Wobj.uv.push_back(1.0f - (float)v);
             acumuladoUVsProximo++;
+            idx++;
         }
-        else if (line.rfind("f ", 0) == 0) {
-            std::istringstream ss(line.substr(2));
-            std::string token;
+        else if (LineaEmpieza(line, "vc ")) { // COLOR POR ESQUINA (extension Whisk3D)
+            const char* p = line + 3; char* e;
+            double c[4]; int n = 0;
+            while (n < 4) { double d = strtod(p, &e); if (e == p) break; c[n++] = d; p = e; }
+            Wobj.cornerColors.push_back(ObjSaturar(n > 0 ? c[0] : 1.0));
+            Wobj.cornerColors.push_back(ObjSaturar(n > 1 ? c[1] : 1.0));
+            Wobj.cornerColors.push_back(ObjSaturar(n > 2 ? c[2] : 1.0));
+            Wobj.cornerColors.push_back(ObjSaturar(n > 3 ? c[3] : 1.0));
+            TieneVertexColor = true;
+            acumuladoColoresProximo++;
+            idx++;
+        }
+        else if (LineaEmpieza(line, "f ")) {
+            const char* p = line + 2;
             Face newFace;
-
-            while (ss >> token) {
+            while (*p) {
+                while (*p==' '||*p=='\t'||*p=='\r'||*p=='\n') p++; // separa los corners por espacio
+                if (!*p) break;
                 FaceCorner fc;
-                size_t pos1 = token.find('/');
-                size_t pos2 = token.rfind('/');
-
-                fc.vertex = std::stoi(token.substr(0, pos1)) - 1;
-                fc.uv = (pos1 != std::string::npos && pos2 > pos1) ? std::stoi(token.substr(pos1+1, pos2-pos1-1))-1 : -1;
-                fc.normal = (pos2 != std::string::npos) ? std::stoi(token.substr(pos2+1))-1 : -1;
-
+                int parts[4]; bool has[4];
+                for (int i = 0; i < 4; i++) { parts[i] = 0; has[i] = false; }
+                // corner = v[/vt[/vn[/vc]]] (campos vacios en "v//vn")
+                for (int pi = 0; pi < 4; pi++) {
+                    if ((*p>='0'&&*p<='9') || *p=='-') { char* e; parts[pi] = (int)strtol(p, &e, 10); has[pi] = true; p = e; }
+                    if (*p == '/') p++; else break; // proximo campo, o fin del corner
+                }
+                // indices GLOBALES del .obj -> LOCALES (resto lo acumulado antes)
+                fc.vertex = parts[0] - 1 - *acumuladoVertices;
+                fc.uv     = has[1] ? parts[1] - 1 - *acumuladoUVs     : -1;
+                fc.normal = has[2] ? parts[2] - 1 - *acumuladoNormales : -1;
+                fc.color  = has[3] ? parts[3] - 1 - *acumuladoColores : -1; // color por esquina
                 newFace.corners.push_back(fc);
             }
-
             Wobj.faces.push_back(newFace);
-
             if (!Wobj.materialsGroup.empty()) {
                 MaterialGroup& mg = Wobj.materialsGroup.back();
                 mg.count++;
                 mg.indicesDrawnCount += 3;
                 if (mg.count == 1) mg.startDrawn = (Wobj.faces.size() - 1) * 3;
             }
+            idx++;
         }
-        else if (line.rfind("usemtl ", 0) == 0) {
-            std::string matName = line.substr(7);
+        else if (LineaEmpieza(line, "usemtl ")) {
+            std::string matName(line + 7);
             Material* materialPuntero = BuscarMaterialPorNombre(matName);
             if (!materialPuntero) materialPuntero = new Material(matName, false, TieneVertexColor);
-
             MaterialGroup mg;
             mg.name = materialPuntero->name;
             mg.start = Wobj.faces.size();
@@ -371,37 +554,61 @@ bool LeerOBJ(std::ifstream& file,
             mg.indicesDrawnCount = 0;
             mg.material = materialPuntero;
             Wobj.materialsGroup.push_back(mg);
+            idx++;
+        }
+        else {
+            idx++;
         }
     }
 
-    std::cout << "DEBUG Wobj:\n";
-    std::cout << "  vertices = " << Wobj.vertex.size() / 3 << "\n";
-    std::cout << "  normals  = " << Wobj.normals.size() / 3 << "\n";
-    std::cout << "  uv       = " << Wobj.uv.size() / 2 << "\n";
-    std::cout << "  faces    = " << Wobj.faces.size() / 3 << "\n\n";
+#ifdef W3D_SYMBIAN
+    // N95 = GLES 1.1: el index buffer es de 16 bits (max 65535 vertices por malla; glDrawElements solo soporta
+    // GL_UNSIGNED_SHORT). Si el OBJ pasa ese limite -> CARTEL + NO importar (sino los indices se truncan = geometria
+    // rota, y ademas armar 200k+ verts revienta la RAM del N95). En PC/Android/WebGL/N8 esto NO corre: MeshIndex es de
+    // 32 bits y entra de una (ver crossplatform.h).
+    if ((int)(Wobj.vertex.size() / 3) > W3D_MAX_INDEX16) {
+        Notificar("Modelo muy grande para el N95: pasa 65535 vertices (limite de 16 bits)", true);
+        delete mesh;   // borra la malla recien creada (vacia; el dtor de Object la detacha del padre)
+        return false;  // no importar este objeto
+    }
+#endif
 
     if (NoMerge){
         Wobj.ConvertToES1_NoMerge(mesh);
-    }
-    else {
+    } else {
         Wobj.ConvertToES1(mesh, acumuladoVertices, acumuladoNormales, acumuladoUVs);
     }
+
+    mesh->CalcularBordes(); // bordes unicos para contorno de seleccion / wireframe
+
+    // El OBJ no traia normales (vn) -> CALCULARLAS smooth (como Blender), sino la malla sale NEGRA/sin luz (Dante:
+    // "se ve mal"). posRep ya esta listo de CalcularBordes; RecalcularNormales promedia por posicion (smooth).
+    if (!mesh->normals && mesh->vertexSize > 0) {
+        mesh->normals = new GLbyte[mesh->vertexSize * 3];
+        mesh->meshSmooth = true;
+        mesh->RecalcularNormales();
+    }
+
+    mesh->OptimizarCacheRender(); // reordena el index buffer para el cache de vertices del GPU (perf en tile-based / N95)
 
     *acumuladoVertices += acumuladoVerticesProximo;
     *acumuladoNormales += acumuladoNormalesProximo;
     *acumuladoUVs += acumuladoUVsProximo;
+    *acumuladoColores += acumuladoColoresProximo;
     return hayMasObjetos;
 }
 
 bool LeerMTL(const std::string& filepath, int objetosCargados) {
-    std::ifstream file(filepath);
+    std::ifstream file(filepath.c_str());
     if (!file.is_open()) {
+#ifndef W3D_SYMBIAN
         std::cerr << "Error al abrir: " << filepath << std::endl;
+#endif
         return false;
     }
 
     std::string line;
-    Material* mat = nullptr;
+    Material* mat = NULL;
     bool HaytexturasQueCargar = false;
 
     while (std::getline(file, line)) {
@@ -441,20 +648,15 @@ bool LeerMTL(const std::string& filepath, int objetosCargados) {
                 std::string texfile;
                 iss >> texfile;
                 //std::string absPath = getParentPath(filepath) + "/" + texfile;
-                std::string absPath = (std::filesystem::path(filepath).parent_path() / texfile).string();
+                std::string absPath = DirOf(filepath) + texfile;
                 std::replace(absPath.begin(), absPath.end(), '\\', '/');
 
-                Texture* newTex = new Texture();
-                newTex->path = absPath;
-
-                if (LoadTexture(absPath.c_str(), newTex->iID)) {
-                    Textures.push_back(newTex);
-                    mat->texture = newTex;
-                } else {
-                    std::cerr << "Error cargando textura: " << absPath << "\n";
-                }
+                // CARGA DIFERIDA: no decodificar aca (bloquea el import ~17s con los PNG grandes). Encolar -> el loop
+                // principal la carga en los frames siguientes (el modelo aparece gris y las texturas entran solas).
+                EncolarTextura(mat, absPath);
             }
             //sprite animado. esto no es un estandar en MTL. es solo para whisk3D
+#ifndef W3D_SYMBIAN // sprites animados del MTL: pendiente en Symbian
             else if (prefix == "map_Kd_ANIM") {
                 AnimatedMaterial* NewAM = new AnimatedMaterial;
                 NewAM->targets.push_back(mat);
@@ -478,14 +680,18 @@ bool LeerMTL(const std::string& filepath, int objetosCargados) {
                 if (!rest.empty() && (rest[0] == '"' || rest[0] == '\'')) {
                     quote = rest[0];
                 } else {
+#ifndef W3D_SYMBIAN
                     std::cerr << "ERROR: map_Kd_ANIM debe usar comillas para la ruta base.\n";
+#endif
                     return false;
                 }
 
                 // Buscar la última comilla del MISMO tipo
                 size_t end = rest.find_last_of(quote);
                 if (end == std::string::npos || end == 0) {
+#ifndef W3D_SYMBIAN
                     std::cerr << "ERROR: comillas mal formadas en map_Kd_ANIM\n";
+#endif
                     return false;
                 }
 
@@ -504,9 +710,7 @@ bool LeerMTL(const std::string& filepath, int objetosCargados) {
 
                     std::string filename = baseURL + num.str() + "." + extension;
 
-                    std::string absPath =
-                        //getParentPath(filepath) + "/" + filename;
-                        (std::filesystem::path(filepath).parent_path() / filename).string();
+                    std::string absPath = DirOf(filepath) + filename;
 
                     std::replace(absPath.begin(), absPath.end(), '\\', '/');
 
@@ -516,19 +720,24 @@ bool LeerMTL(const std::string& filepath, int objetosCargados) {
                     if (LoadTexture(absPath.c_str(), newTex->iID)) {
                         Textures.push_back(newTex);
                         NewAM->frameTextures.push_back(newTex);
-                    } 
+                    }
                     else {
+#ifndef W3D_SYMBIAN
                         std::cerr << "Error cargando textura ANIM: " << absPath << "\n";
+#endif
                         delete newTex;
                     }
                 }
 
                 AnimatedMaterials.push_back(NewAM);
 
+#ifndef W3D_SYMBIAN
                 std::cout << "Animación cargada con "
                         << NewAM->frameTextures.size()
                         << " frames para material " << mat->name << "\n";
+#endif
             }
+#endif // !W3D_SYMBIAN
             else if (prefix == "BackfaceCullingOff") {
                 mat->culling = false;
             }
@@ -542,9 +751,11 @@ bool LeerMTL(const std::string& filepath, int objetosCargados) {
                 mat->repeat = false;
             }
             //por defecto es lineal
+#ifndef W3D_SYMBIAN
             else if (prefix == "PIXELATED") {
                 mat->interpolacion = closest;
             }
+#endif
             else if (prefix == "map_d" || prefix == "alpha") {
                 mat->transparent = true;
             }
@@ -552,48 +763,297 @@ bool LeerMTL(const std::string& filepath, int objetosCargados) {
     }
 
     if (HaytexturasQueCargar) {
+#ifndef W3D_SYMBIAN
         std::cout << "Se encontraron texturas para cargar." << std::endl;
+#endif
     }
 
     return true;
 }
 
+// ============================================================================
+//  EXPORTAR OBJ + MTL (con normales, vertex color, UV, texturas y los extras de
+//  material de Whisk3D: BackfaceCullingOff / NoLight / etc.). Mismo formato que
+//  lee el importador. Coordenadas en MUNDO (preserva el layout de la escena).
+// ============================================================================
+static void RecolectarMeshesExport(Object* o, bool selectedOnly, std::vector<Mesh*>& out) {
+    if (!o) return;
+    for (size_t i = 0; i < o->Childrens.size(); i++) {
+        Object* c = o->Childrens[i];
+        if (c->getType() == ObjectType::mesh && (!selectedOnly || c->select))
+            out.push_back((Mesh*)c);
+        RecolectarMeshesExport(c, selectedOnly, out);
+    }
+}
+
+// basename de una textura (sin carpeta): el MTL lo lee relativo a su propia carpeta
+static std::string BaseNameTex(const std::string& p) {
+    size_t s = p.find_last_of("/\\");
+    return (s == std::string::npos) ? p : p.substr(s + 1);
+}
+
+static void EscribirMaterialMTL(std::ofstream& mtl, Material* mat) {
+    if (!mat) return;
+    mtl << "newmtl " << mat->name << "\n";
+    mtl << "Kd " << FloatStr(mat->diffuse[0]) << " " << FloatStr(mat->diffuse[1]) << " " << FloatStr(mat->diffuse[2]) << "\n";
+    mtl << "Ke " << FloatStr(mat->emission[0]) << " " << FloatStr(mat->emission[1]) << " " << FloatStr(mat->emission[2]) << "\n";
+    mtl << "Ns " << FloatStr(mat->specular[0] * 1000.0f) << "\n";
+    mtl << "d " << FloatStr(mat->diffuse[3]) << "\n";
+    if (mat->texture && !mat->texture->path.empty())
+        mtl << "map_Kd " << BaseNameTex(mat->texture->path) << "\n";
+    // extras propios de Whisk3D (los lee LeerMTL)
+    if (!mat->culling)    mtl << "BackfaceCullingOff\n";
+    if (!mat->depth_test) mtl << "GL_DEPTH_TEST_OFF\n";
+    if (!mat->lighting)   mtl << "NoLight\n";
+    if (!mat->repeat)     mtl << "CLAMP_TO_EDGE\n";
+#ifndef W3D_SYMBIAN
+    if (mat->interpolacion == closest) mtl << "PIXELATED\n";
+#endif
+    mtl << "\n";
+}
+
+bool ExportOBJ(const std::string& filepath, bool selectedOnly, bool applyModifiers, bool applyTransforms) {
+    std::vector<Mesh*> meshes;
+    RecolectarMeshesExport(SceneCollection, selectedOnly, meshes);
+    if (meshes.empty()) return false;
+
+    std::ofstream obj(filepath.c_str());
+    if (!obj.is_open()) return false;
+
+    ProgresoIniciar("Exporting model..."); // barra de progreso (no-op sin GUI; clave en el N95)
+
+    std::string base   = ExtractBaseName(filepath);
+    std::string mtlNom = base + ".mtl";
+    // SE ARMA TODO EN UN BUFFER `out` y se escribe de UNA al final (con obj.write). Antes eran millones de `obj <<`
+    // (cada uno una llamada al stream + formato): lentisimo en Debug. FloatStr/IntStr (sprintf+SSO) -> append.
+    std::string out;
+#ifdef W3D_SYMBIAN
+    out.reserve(256 * 1024);      // N95: export de modelos chicos (el guard del import rechaza >65535 verts) + poca RAM
+#else
+    out.reserve(8 * 1024 * 1024); // PC/Android/WebGL: modelos grandes -> evita reallocs del buffer de 20-40MB
+#endif
+    out += "# creado con Whisk3D\n";
+    out += "mtllib "; out += mtlNom; out += "\n";
+
+    int vOff = 0, vtOff = 0, vnOff = 0, vcOff = 0; // offsets 1-based acumulados (vc = color por esquina)
+    std::set<Material*> matsUsados;
+
+    for (size_t mi = 0; mi < meshes.size(); mi++) {
+        ProgresoActualizar((float)mi / (float)meshes.size()); // avance de la barra (por malla)
+        Mesh* m = meshes[mi];
+        if (!m->vertex || m->vertexSize <= 0) continue;
+
+        // FUENTE de geometria: con applyModifiers y stack presente -> malla GENERADA (mirror, etc.); sino la editable.
+        // applyTransforms -> posiciones/normales a MUNDO; sino en LOCAL. AMBOS afectan SOLO el archivo, no la escena.
+        bool useGen = applyModifiers && !m->modificadores.empty();
+        if (useGen) m->GenerarMallaModificada(); // refresca (en Object mode = todos los modificadores de viewport)
+        useGen = useGen && m->genValido && m->genVertex && m->genFaces && m->genVertexSize > 0;
+        const GLfloat* Vp = useGen ? m->genVertex     : m->vertex;
+        const GLbyte*  Vn = useGen ? m->genNormals    : m->normals;
+        const GLfloat* Vu = useGen ? m->genUV         : m->uv;
+        const GLubyte* Vc = useGen ? m->genColor      : m->vertexColor;
+        const int nV      = useGen ? m->genVertexSize : m->vertexSize;
+        const std::vector<MaterialGroup>& mgrp = useGen ? m->genMaterialsGroup : m->materialsGroup;
+
+        // caras (indices en Vp) + su mesh part (indice en mgrp). gen = triangulos por grupo; editable = faces3d (quads/ngons).
+        std::vector<std::vector<int> > faceList; std::vector<int> faceMat;
+        if (useGen) {
+            for (size_t g=0; g<mgrp.size(); g++){ const MaterialGroup& G=mgrp[g];
+                for (int k=G.startDrawn; k+2 < G.startDrawn+G.indicesDrawnCount; k+=3){
+                    std::vector<int> t(3); t[0]=m->genFaces[k]; t[1]=m->genFaces[k+1]; t[2]=m->genFaces[k+2];
+                    faceList.push_back(t); faceMat.push_back((int)g); } }
+        } else {
+            for (size_t f=0; f<m->faces3d.size(); f++){ if (m->faces3d[f].idx.size()<3) continue;
+                faceList.push_back(m->faces3d[f].idx); int mt=m->faces3d[f].mat; if (mt<0||mt>=(int)mgrp.size()) mt=0; faceMat.push_back(mt); } }
+
+        Quaternion R = RotGlobalDe(m); // para llevar las normales a mundo (solo si applyTransforms)
+        const bool hayN  = (Vn != NULL);
+        const bool hayUV = (Vu != NULL);
+        const bool hayCol= (Vc != NULL);
+
+        out += "o "; out += (m->name.empty() ? std::string("Mesh") : m->name); out += "\n";
+
+        // DEDUP de POSICIONES: los render verts COINCIDENTES comparten el indice 'v' (igual que el
+        // editor, donde mover una esquina mueve los 3 verts asociados). Asi Blender los ve UNIDOS y
+        // no "flotando". vt/vn quedan POR ESQUINA (cada render vert) -> 'f v/vt/vn' comparte la 'v'.
+        TPosMap posMap;
+        std::vector<int> vDe(nV);       // vDe[i] = indice (0-based, local) de la posicion del vert i
+        std::vector<int> repDe;         // repDe[g] = primer render vert del grupo g (color/posicion)
+        for (int i = 0; i < nV; i++) {
+            std::string key((const char*)&Vp[i*3], 12); // 3 floats = 12 bytes (match EXACTO)
+            TPosMap::iterator it = posMap.find(key);
+            if (it == posMap.end()) { int g = (int)repDe.size(); posMap[key] = g; vDe[i] = g; repDe.push_back(i); }
+            else vDe[i] = it->second;
+        }
+        const int nPos = (int)repDe.size();
+
+        // COLOR per-corner? AUTO-DETECT: si dos render verts en la MISMA posicion tienen colores
+        // DISTINTOS -> el color es por esquina (vc + f .../vc). Si todos los del grupo son iguales ->
+        // por vertice (color en 'v', Blender). Asi el round-trip no depende de la capa (que puede no
+        // existir aun tras importar). El flag ColorLayer::porVertice es para EDITAR (pestaña Vertices).
+        bool colCorner = false;
+        if (hayCol) for (int i = 0; i < nV && !colCorner; i++) {
+            int rep = repDe[vDe[i]];
+            if (Vc[i*4]   != Vc[rep*4]   || Vc[i*4+1] != Vc[rep*4+1] ||
+                Vc[i*4+2] != Vc[rep*4+2] || Vc[i*4+3] != Vc[rep*4+3])
+                colCorner = true;
+        }
+
+        // v: uno por POSICION unica + color representativo del grupo (per-vertex, Blender). applyTransforms -> a MUNDO.
+        for (int g = 0; g < nPos; g++) {
+            int rep = repDe[g];
+            Vector3 lp(Vp[rep*3], Vp[rep*3+1], Vp[rep*3+2]);
+            Vector3 wp = applyTransforms ? m->LocalAMundo(lp) : lp;
+            out += "v "; AppendFloat(out, wp.x); out += ' '; AppendFloat(out, wp.y); out += ' '; AppendFloat(out, wp.z);
+            // color en 'v' SOLO si la capa es por-vertice (Blender lo lee); por-corner va en 'vc'
+            if (hayCol && !colCorner) {
+                out += ' '; AppendFloat(out, Vc[rep*4]/255.0f); out += ' '; AppendFloat(out, Vc[rep*4+1]/255.0f);
+                out += ' '; AppendFloat(out, Vc[rep*4+2]/255.0f); out += ' '; AppendFloat(out, Vc[rep*4+3]/255.0f);
+            }
+            out += '\n';
+        }
+        if (hayN) for (int i = 0; i < nV; i++) {
+            Vector3 ln0(Vn[i*3]/127.0f, Vn[i*3+1]/127.0f, Vn[i*3+2]/127.0f);
+            Vector3 wn = applyTransforms ? (R * ln0) : ln0;
+            float ln = sqrtf(wn.x*wn.x+wn.y*wn.y+wn.z*wn.z); if (ln>1e-6f) wn=wn*(1.0f/ln);
+            out += "vn "; AppendFloat(out, wn.x); out += ' '; AppendFloat(out, wn.y); out += ' '; AppendFloat(out, wn.z); out += '\n';
+        }
+        if (hayUV) for (int i = 0; i < nV; i++) { // el importador hace 1-v: lo deshago
+            out += "vt "; AppendFloat(out, Vu[i*2]); out += ' '; AppendFloat(out, 1.0f - Vu[i*2+1]); out += '\n';
+        }
+        // COLOR POR ESQUINA (capa por-corner): una linea 'vc r g b a' por render vert (esquina).
+        if (colCorner) for (int i = 0; i < nV; i++) {
+            out += "vc "; AppendFloat(out, Vc[i*4]/255.0f); out += ' '; AppendFloat(out, Vc[i*4+1]/255.0f);
+            out += ' '; AppendFloat(out, Vc[i*4+2]/255.0f); out += ' '; AppendFloat(out, Vc[i*4+3]/255.0f); out += '\n';
+        }
+
+        // caras (faceList: quads/ngons de faces3d o triangulos del gen) con su material (por cara = faceMat).
+        // f POSICION_COMPARTIDA/vt/vn (vt y vn por esquina = render vert)
+        int curMat = -1;
+        for (size_t f = 0; f < faceList.size(); f++) {
+            if (!faceList.empty()) // barra GRANULAR (antes saltaba 0->100): avance por cara dentro de la malla
+                ProgresoActualizar(((float)mi + (float)f / (float)faceList.size()) / (float)meshes.size());
+            const std::vector<int>& idx = faceList[f];
+            if (idx.size() < 3) continue;
+            int mt = faceMat[f];
+            if (mt != curMat) { curMat = mt; // usemtl al cambiar de mesh part
+                if (mt>=0 && mt<(int)mgrp.size() && mgrp[mt].material) {
+                    out += "usemtl "; out += mgrp[mt].material->name; out += "\n";
+                    matsUsados.insert(mgrp[mt].material);
+                }
+            }
+            out += "f";
+            for (size_t c = 0; c < idx.size(); c++) {
+                int rv = idx[c];
+                out += ' '; AppendInt(out, vOff + vDe[rv] + 1); // POSICION compartida (1-based global)
+                if (hayUV || hayN || colCorner) {   // f v/vt/vn[/vc] (vc = color por esquina, opcional)
+                    out += '/'; if (hayUV) AppendInt(out, vtOff + rv + 1);
+                    if (hayN || colCorner) { out += '/'; if (hayN) AppendInt(out, vnOff + rv + 1); }
+                    if (colCorner) { out += '/'; AppendInt(out, vcOff + rv + 1); }
+                }
+            }
+            out += '\n';
+        }
+        vOff += nPos; if (hayN) vnOff += nV; if (hayUV) vtOff += nV; if (colCorner) vcOff += nV;
+    }
+    obj.write(out.data(), (std::streamsize)out.size()); // UNA sola escritura de todo el OBJ
+    obj.close();
+
+    // MTL al lado del OBJ
+    std::string mtlPath = DirOf(filepath) + mtlNom;
+    std::ofstream mtl(mtlPath.c_str());
+    if (mtl.is_open()) {
+        mtl.precision(7);
+        mtl << "# creado con Whisk3D\n\n";
+        for (std::set<Material*>::iterator it = matsUsados.begin(); it != matsUsados.end(); ++it)
+            EscribirMaterialMTL(mtl, *it);
+        mtl.close();
+    }
+    ProgresoFin();
+    return true;
+}
+
 bool ImportOBJ(const std::string& filepath, bool NoMerge = false) {
-    // Revisar extensión
     if (filepath.size() < 4 || filepath.substr(filepath.size() - 4) != ".obj") {
-        std::cerr << "Error: El archivo seleccionado no tiene la extensión .obj" << std::endl;
+#ifndef W3D_SYMBIAN
+        std::cerr << "Error: El archivo seleccionado no tiene la extension .obj" << std::endl;
+#endif
         return false;
     }
 
-    std::ifstream file(filepath);
+    // Leemos el archivo ENTERO a UN buffer y tokenizamos en punteros const char* (un solo alloc, sin un std::string
+    // por linea -> antes eran ~663k allocs/2.7s para 200k verts). fileData vive hasta el final del parseo (lines
+    // apunta adentro). BINARY: que el tokenizador vea el \r crudo y lo limpie el (no doble traduccion del runtime).
+    std::ifstream file(filepath.c_str(), std::ios::binary);
     if (!file.is_open()) {
+#ifndef W3D_SYMBIAN
         std::cerr << "Error al abrir: " << filepath << std::endl;
+#endif
         return false;
     }
+    // lectura PORTABLE en bloques de 64KB hasta EOF: SIN seekg/tellg (el modo texto los rompia, y en STLport/Open C del
+    // N95 son menos confiables). Anda igual en PC y Symbian. read() devuelve el stream (falso al leer parcial en EOF) ->
+    // el "|| gcount()>0" agarra el ultimo bloque parcial.
+    std::string fileData;
+    char _chunk[65536];
+    while (file.read(_chunk, sizeof(_chunk)) || file.gcount() > 0)
+        fileData.append(_chunk, (size_t)file.gcount());
+    file.close();
 
-    std::streampos startPos = 0;
+    // tokenizar en lugar: cada '\n' (y el final) -> '\0'; el \r de Windows tambien -> '\0'. lines[i] = puntero al
+    // inicio de cada linea dentro de fileData.
+    std::vector<const char*> lines;
+    if (!fileData.empty()) {
+        char* base = &fileData[0];
+        size_t n = fileData.size();
+        lines.reserve(n / 16 + 16); // estimacion grosera (~16 bytes/linea) para evitar reallocs del vector
+        size_t start = 0;
+        for (size_t i = 0; i <= n; i++) {
+            if (i == n || base[i] == '\n') {
+                if (i > start && base[i-1] == '\r') base[i-1] = '\0'; // strip \r (Windows)
+                if (i < n) base[i] = '\0';                            // terminar la linea (el final ya tiene el \0 del std::string)
+                lines.push_back(base + start);
+                start = i + 1;
+            }
+        }
+    }
+
+    ProgresoIniciar("Importing model..."); // barra de progreso (clave en el N95: importar tarda)
+
+    size_t idx = 0;
     int objetosCargados = 0;
     int acumuladoVertices = 0;
     int acumuladoNormales = 0;
     int acumuladoUVs = 0;
+    int acumuladoColores = 0;
 
-    while (LeerOBJ(file, filepath, startPos, &acumuladoVertices, &acumuladoNormales, &acumuladoUVs, NoMerge)) {
+    // cada LeerOBJ crea UN objeto (avanza idx) y devuelve si hay mas
+    bool hayMas = true;
+    while (idx < lines.size() && hayMas) {
+        hayMas = LeerOBJ(lines, idx, filepath, &acumuladoVertices, &acumuladoNormales, &acumuladoUVs, &acumuladoColores, NoMerge);
         objetosCargados++;
     }
 
-    file.close();
-
     // Archivo .mtl asociado
     std::string mtlFile = filepath.substr(0, filepath.size() - 4) + ".mtl";
-
-    //if (fileExists(mtlFile)) {
-    if (std::filesystem::exists(mtlFile)) {
+    bool mtlExiste = false;
+    {
+        std::ifstream probe(mtlFile.c_str());
+        mtlExiste = probe.good();
+    }
+    if (mtlExiste) {
         if (!LeerMTL(mtlFile, objetosCargados)) {
+#ifndef W3D_SYMBIAN
             std::cerr << "Error al leer el archivo .mtl" << std::endl;
+#endif
         }
     } else {
+#ifndef W3D_SYMBIAN
         std::cerr << "El archivo .mtl no existe" << std::endl;
+#endif
     }
 
+    ProgresoFin();
+    Notificar("OBJ imported successfully!", false); // toast verde de exito
     return true;
 }

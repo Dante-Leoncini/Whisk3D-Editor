@@ -2,13 +2,20 @@
 #define SCROLLBAR_H
 
 #ifdef _WIN32
+#ifndef W3D_SYMBIAN
     #include <windows.h>
 #endif
+#endif
 
-#include <GL/gl.h>
-#include <SDL2/SDL.h>
+#ifdef W3D_SYMBIAN
+    #include <GLES/gl.h>
+    extern bool middleMouseDown; // shims de variables.h (glesdraw.cpp)
+    extern bool MouseWheel;
+#else
+    #include <GL/gl.h>
+    #include <SDL2/SDL.h>
+#endif
 
-//#include "variables.h"
 #include "ViewPorts.h"
 
 // Funciones globales
@@ -24,43 +31,22 @@ extern GLfloat ScrollbarBigUV[16];
 // -----------------------------
 class Scrollable {
     public:
-        int PosX = 0;
-        int PosY = 0;
-        int MaxPosX = 100;
-        int MaxPosY = 0;
-        bool scrollX = false;
-        bool scrollY = false;
-        bool mouseOverScrollY = false;
-        bool mouseOverScrollX = false;
-        bool mouseOverScrollYpress = false;
-        bool mouseOverScrollXpress = false;
+        int PosX, PosY;          // (inicializados en el ctor: C++03)
+        int MaxPosX, MaxPosY;
+        bool scrollX, scrollY;
+        bool mouseOverScrollY, mouseOverScrollX;
+        bool mouseOverScrollYpress, mouseOverScrollXpress;
 
-        float scrollPosFactor = 0.0f;
-        float scrollDragFactor = 0.0f;
-        float scrollPosFactorX = 0.0f;
-        float scrollDragFactorX = 0.0f;
+        int scrollTopOffset; // alto reservado arriba (barra de botones)
+        float scrollPosFactor, scrollDragFactor;
+        float scrollPosFactorX, scrollDragFactorX;
 
-        ViewportBase* viewPortActive = nullptr;
+        ViewportBase* viewPortActive;
 
-        GLshort scrollVerticalMesh[16] = { 
-            0,0,   6,0,   12,0,   18,0,
-            0,6,   6,6,   12,6,   18,6
-        };
-
-        GLshort scrollVerticalBigMesh[16] = { 
-            0,0,   6,0,   12,0,   18,0,
-            0,6,   6,6,   12,6,   18,6
-        };
-
-        GLshort scrollHorizontalMesh[16] = { 
-            0,0,   6,0,   12,0,   18,0,
-            0,6,   6,6,   12,6,   18,6
-        };
-
-        GLshort scrollHorizontalBigMesh[16] = { 
-            0,0,   6,0,   12,0,   18,0,
-            0,6,   6,6,   12,6,   18,6
-        };
+        GLshort scrollVerticalMesh[16];
+        GLshort scrollVerticalBigMesh[16];
+        GLshort scrollHorizontalMesh[16];
+        GLshort scrollHorizontalBigMesh[16];
 
         // ------------------ Constructor ------------------
         Scrollable();
@@ -69,7 +55,8 @@ class Scrollable {
         void ScrollY(int dy);
         void ScrollX(int dx);
         void ScrollMouseOver(ViewportBase* current, int mx, int my);
-        void ResizeScrollbar(int width, int height, int MaxX, int MaxY);
+        void ResizeScrollbar(int width, int height, int MaxX, int MaxY,
+                             int topOffset = 0);
         void DibujarScrollbar(ViewportBase* current);
 };
 

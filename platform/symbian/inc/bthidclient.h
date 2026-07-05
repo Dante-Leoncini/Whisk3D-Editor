@@ -5,7 +5,7 @@
 #include <e32std.h>
 #include <e32cmn.h>
 
-#include <bthidevent.h>
+#include "bthidevent.h"
 
 class MHIDSrvClient : public CBase
     {
@@ -30,4 +30,3 @@ NONSHARABLE_CLASS(RHIDSrvClient) : public RSessionBase, public MHIDSrvClient
 IMPORT_C MHIDSrvClient* GetHIDClientAPI();
 
 #endif
-

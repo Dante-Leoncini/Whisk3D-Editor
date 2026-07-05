@@ -1,7 +1,10 @@
+[submodule "libs/Whisk3DCore"]
+	path = libs/Whisk3DCore
+	url = https://github.com/Dante-Leoncini/Whisk3Dcore
+[submodule "libs/WhiskUI"]
+	path = libs/WhiskUI
+	url = https://github.com/Dante-Leoncini/Whisk3D-UI
 [submodule "thirdparty/SDL2"]
 	path = thirdparty/SDL2
 	url = https://github.com/libsdl-org/SDL
 	branch = SDL2
-[submodule "thirdparty/tinyfiledialogs"]
-	path = thirdparty/tinyfiledialogs
-	url = https://github.com/native-toolkit/tinyfiledialogs.git
