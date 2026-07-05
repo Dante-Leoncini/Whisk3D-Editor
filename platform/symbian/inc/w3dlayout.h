@@ -71,6 +71,12 @@ TBool W3dLayoutUVActivo(); // query: el viewport activo es el editor UV
 // ETrue si lo consumio (el 3D devuelve EFalse: lo maneja orbit/transform).
 TBool W3dLayoutTeclaPanel(TInt aScan);
 
+// EDICION NUMERICA por texto de un PropFloat: hay una en curso? + meter un caracter (0-9, '.', 8=borrar) al campo.
+// El contenedor rutea aca los digitos del keypad cuando W3dNumEditActivo() para que escriban el valor en vez de
+// disparar transform/zoom.
+TBool W3dNumEditActivo();
+void  W3dTextFieldChar(TInt c);
+
 // el viewport activo es el outliner? (para que "1" entre al modo mover ahi)
 TBool W3dOutlinerActivo();
 // "1" sobre el outliner: entra al modo MOVER (o confirma si ya esta moviendo)

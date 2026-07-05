@@ -10,6 +10,10 @@ void RebindMaterialMeshPart(); // (def en Properties.cpp) refresca el panel de m
 extern bool RenameActivo();
 extern void RenameCommit();
 extern void RenameCancel();
+// edicion numerica por texto de un PropFloat (click/OK -> tipear + enter). Declarado en WhiskUI/PropFloat.
+extern bool NumEditActivo();
+extern void NumEditCommit();
+extern void NumEditCancel();
 
 std::map<SDL_FingerID, Finger> fingers;
 float lastDistance = 0.0f;
@@ -151,6 +155,9 @@ void InputUsuarioSDL3(SDL_Event &e){
             GuardarMousePos();
             return;
         }
+        // edicion numerica por texto: un click en cualquier lado APLICA lo tipeado (no consume el click -> si fue
+        // sobre otro campo, ese arranca su propia edicion en el mouse-up).
+        if (NumEditActivo()) NumEditCommit();
         ViewPortClickDown = true;
         if (e.button.button == SDL_BUTTON_LEFT) {
             leftMouseDown = true;
@@ -246,8 +253,8 @@ void InputUsuarioSDL3(SDL_Event &e){
             SDL_Keycode k = e.key.keysym.sym;
             // si es un RENAME (mesh part / material): Enter ACEPTA, ESC CANCELA (escribe / descarta el
             // nombre). En un campo normal (export/output) ambos solo desenfocan (edicion en vivo).
-            if (k == SDLK_RETURN || k == SDLK_KP_ENTER) { if (RenameActivo()) RenameCommit(); else g_textFieldActivo = NULL; }
-            else if (k == SDLK_ESCAPE) { if (RenameActivo()) RenameCancel(); else g_textFieldActivo = NULL; }
+            if (k == SDLK_RETURN || k == SDLK_KP_ENTER) { if (RenameActivo()) RenameCommit(); else if (NumEditActivo()) NumEditCommit(); else g_textFieldActivo = NULL; }
+            else if (k == SDLK_ESCAPE) { if (RenameActivo()) RenameCancel(); else if (NumEditActivo()) NumEditCancel(); else g_textFieldActivo = NULL; }
             else if (k == SDLK_LEFT)  { g_textFieldActivo->CaretIzq();  g_redraw = true; }
             else if (k == SDLK_RIGHT) { g_textFieldActivo->CaretDer();  g_redraw = true; }
             else if (k == SDLK_BACKSPACE) { g_textFieldActivo->Backspace();  g_redraw = true; }

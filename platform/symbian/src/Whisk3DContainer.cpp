@@ -373,6 +373,18 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 				W3dLayoutTecla(sc, mouseX, mouseY);
 				return EKeyWasConsumed; // modal: traga el resto tambien
 			}
+			// EDICION NUMERICA por texto en curso (un PropFloat en Propiedades): el keypad ESCRIBE el valor.
+			// 0-9 = digitos, '*' = punto decimal, C(backspace) borra un digito, OK aplica, soft-IZQ(164) cancela,
+			// izq/der mueven el caret. Todo lo demas se consume (no toca la escena). Va ANTES de softkeys/1-2-3/etc.
+			if (W3dNumEditActivo()){
+				if (sc >= '0' && sc <= '9'){ W3dTextFieldChar(sc); return EKeyWasConsumed; }
+				if (sc == '*'){ W3dTextFieldChar('.'); return EKeyWasConsumed; }
+				if (sc == EStdKeyBackspace){ W3dTextFieldChar(8); return EKeyWasConsumed; }
+				if (sc == EStdKeyLeftArrow || sc == EStdKeyRightArrow){ W3dLayoutTeclaPanel(sc); return EKeyWasConsumed; }
+				if (sc == EStdKeyDevice3 || sc == EStdKeyEnter){ W3dLayoutTeclaPanel(EStdKeyDevice3); return EKeyWasConsumed; }
+				if (sc == 164){ W3dLayoutTeclaPanel(EStdKeyEscape); return EKeyWasConsumed; } // soft-IZQ = cancelar
+				return EKeyWasConsumed; // mientras se tipea, ninguna otra tecla toca la escena
+			}
 			// soft IZQ sin nada abierto: abre la barra de menu del viewport
 			// activo (el primer desplegable, sin preseleccionar item).
 			if (sc == 164){

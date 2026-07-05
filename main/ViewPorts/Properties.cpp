@@ -1116,6 +1116,8 @@ static int gListaFilas0 = 3;
 // arrastre de un PropFloat con el mouse: click + mover horizontal acumula el
 // delta 'dx' en el valor (como en Blender). NULL = no se esta arrastrando.
 static PropFloat* gFloatDrag = NULL;
+static bool  gFloatDragMoved = false; // se paso el umbral de arrastre? (si NO al soltar -> fue un click -> editar texto)
+static float gFloatDragAccum = 0.0f;  // delta acumulado desde el mouse-down (zona muerta antes de arrastrar)
 
 // el rebind global opera sobre el panel con el que se interactuo
 void RebindMaterialMeshPart(){
@@ -1862,7 +1864,13 @@ void Properties::button_right(){
 
 #ifndef W3D_SYMBIAN
 void Properties::mouse_button_up(SDL_Event &e){
-    gFloatDrag = NULL; // soltar el mouse termina el arrastre de un PropFloat
+    // si se apreto sobre un PropFloat y NO se arrastro (click puro) -> abrir la edicion por TEXTO (todo seleccionado,
+    // tipear reemplaza + enter). Si se arrastro, el valor ya cambio y no se edita.
+    if (gFloatDrag && !gFloatDragMoved && e.button.button == SDL_BUTTON_LEFT) {
+        PropsActivo = this;
+        gFloatDrag->IniciarEdicionTexto();
+    }
+    gFloatDrag = NULL; gFloatDragMoved = false; gFloatDragAccum = 0.0f;
     if (!editando) ViewPortClickDown = false;
 }
 #endif
@@ -1952,6 +1960,13 @@ void Properties::event_mouse_motion(int mx, int my) {
     // mouse en horizontal cambia el valor. Va ANTES del check de 'editando'.
     if (gFloatDrag) {
         if (!leftMouseDown) { gFloatDrag = NULL; return; }
+        // ZONA MUERTA: hasta que el mouse no se movio unos pixeles NO cambia el valor -> un click puro (sin mover)
+        // deja el valor intacto y al soltar abre la edicion por TEXTO. Pasado el umbral, arrastra como siempre.
+        gFloatDragAccum += dx;
+        if (!gFloatDragMoved) {
+            if (fabsf(gFloatDragAccum) < 4.0f * GlobalScale) return; // sigue siendo un click potencial
+            gFloatDragMoved = true;
+        }
         ViewPortClickDown = true; // mantiene el viewport activo durante el arrastre
         // 'dx' GLOBAL = delta por evento que YA neutraliza la teletransportacion
         // del cursor (CheckWarpMouseInViewport pone dx=0 al wrappear). Por eso
@@ -2097,6 +2112,13 @@ void Properties::EnterPropertieSelect(){
             gColorAbierto = pc;
             editando = true; ViewPortClickDown = true;
         }
+    }
+    // OK/Enter sobre un FLOAT: abrir la edicion por TEXTO (tipear el numero exacto + Enter). En el Nokia las teclas
+    // 0-9 escriben y '*' es el punto. Mas rapido y preciso que ajustar con flechas. (El input llega por g_textFieldActivo.)
+    if (g->selectIndex >= 0 && g->selectIndex < (int)g->properties.size() &&
+        g->properties[g->selectIndex]->GetType() == PropertyType::Float) {
+        PropFloat* pf = (PropFloat*)g->properties[g->selectIndex];
+        if (pf->value) { pf->IniciarEdicionTexto(); editando = true; ViewPortClickDown = true; }
     }
 }
 
@@ -2327,10 +2349,10 @@ void Properties::ClickEn(int mx, int my) {
                         }
                     }
                     else if (prop->GetType() == PropertyType::Float) {
-                        // arranca el arrastre del valor con el mouse (Enter +
-                        // flechas siguen andando igual)
+                        // arma el POSIBLE arrastre del valor: si el mouse se mueve arrastra; si no, al soltar abre
+                        // la edicion por texto (mouse_button_up). Las flechas del teclado siguen andando igual.
                         PropFloat* pf = (PropFloat*)prop;
-                        if (pf->value) gFloatDrag = pf;
+                        if (pf->value) { gFloatDrag = pf; gFloatDragMoved = false; gFloatDragAccum = 0.0f; }
                     }
                     else if (prop->GetType() == PropertyType::Text) {
                         prop->EditPropertie(); // ENFOCA la caja: el texto entra por SDL_TEXTINPUT

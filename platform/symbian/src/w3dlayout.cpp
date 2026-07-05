@@ -580,6 +580,13 @@ TBool W3dLayoutTecla(TInt aScan, TInt aMx, TInt aMy) {
     return EFalse;
 }
 
+// EDICION NUMERICA por texto (un PropFloat): el contenedor rutea los digitos del keypad al campo enfocado.
+// W3dNumEditActivo dice si hay una edicion numerica en curso; W3dTextFieldChar mete un caracter (0-9, '.', 8=borrar).
+extern bool NumEditActivo();        // WhiskUI/PropFloat.cpp
+extern bool TextFieldInputChar(int c); // main/ViewPorts/LayoutInput.cpp (declarada en TextField.h)
+TBool W3dNumEditActivo() { return NumEditActivo() ? ETrue : EFalse; }
+void  W3dTextFieldChar(TInt c) { TextFieldInputChar((int)c); }
+
 // flecha MANTENIDA (frame-based) al popup activo: SOLO ajusta valores (color picker: R/G/B/A o circulo/
 // value). El container la llama CADA frame segun gHeld* -> subir/bajar un color manteniendo es fluido.
 // NO navega (la navegacion entre elementos sigue 1-por-tap via W3dLayoutTecla en el key-down).

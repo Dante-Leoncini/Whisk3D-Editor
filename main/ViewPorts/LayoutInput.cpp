@@ -1633,6 +1633,10 @@ static bool EvalExpr(const std::string& str, float& out){
 
 // CAJA DE TEXTO EDITABLE: el campo enfocado + el ruteo de caracteres (compartido).
 TextField* g_textFieldActivo = NULL;
+// edicion numerica por texto de un PropFloat (WhiskUI/PropFloat): Enter aplica, Cancel descarta.
+extern bool NumEditActivo();
+extern void NumEditCommit();
+extern void NumEditCancel();
 bool TextFieldInputChar(int c){
     if (!g_textFieldActivo) return false;
     if (c == 8)       g_textFieldActivo->Backspace();
@@ -2097,6 +2101,18 @@ bool LayoutTeclaUI(int tecla, int mx, int my) {
         return true; // mientras este abierto no le roban teclas
     }
 
+    // EDICION NUMERICA por texto en curso (un PropFloat): el teclado va al campo. Enter APLICA, Cancel DESCARTA,
+    // izq/der mueven el caret. Los digitos 0-9 / '*'(punto) los inyecta el contenedor Symbian o SDL_TEXTINPUT (PC).
+    if (NumEditActivo()) {
+        switch (tecla) {
+            case LayoutKey::Enter:  NumEditCommit(); return true;
+            case LayoutKey::Cancel: NumEditCancel(); return true;
+            case LayoutKey::Left:   if (g_textFieldActivo) g_textFieldActivo->CaretIzq(); g_redraw = true; return true;
+            case LayoutKey::Right:  if (g_textFieldActivo) g_textFieldActivo->CaretDer(); g_redraw = true; return true;
+        }
+        return true; // mientras edita, consume el resto (no navega ni ajusta la escena)
+    }
+
     // editando una propiedad: ese panel tiene el foco SIN importar hover
     Properties* pe = LayoutPropsEditando(rootViewport);
     if (pe) {
@@ -2151,6 +2167,17 @@ bool LayoutTeclaUI(int tecla, int mx, int my) {
 // (kind 3) y outliner (kind 2). El 3D (kind 1) devuelve false: lo maneja la
 // orbita/transform. Es lo que usa Symbian con el keypad cuando no hay mouse BT.
 bool LayoutTeclaPanelActivo(int tecla) {
+    // edicion numerica por texto en curso: Enter aplica, Cancel descarta, izq/der = caret (los digitos los mete
+    // el contenedor). Va ANTES de todo asi el keypad no navega la escena mientras se tipea un valor.
+    if (NumEditActivo()) {
+        switch (tecla) {
+            case LayoutKey::Enter:  NumEditCommit(); return true;
+            case LayoutKey::Cancel: NumEditCancel(); return true;
+            case LayoutKey::Left:   if (g_textFieldActivo) g_textFieldActivo->CaretIzq(); g_redraw = true; return true;
+            case LayoutKey::Right:  if (g_textFieldActivo) g_textFieldActivo->CaretDer(); g_redraw = true; return true;
+        }
+        return true;
+    }
     if (!viewPortActive || !viewPortActive->isLeaf()) return false;
     if (viewPortActive->ViewportKind() == 3) {
         Properties* p = (Properties*)viewPortActive;
