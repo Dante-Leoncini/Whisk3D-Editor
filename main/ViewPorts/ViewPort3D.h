@@ -129,6 +129,9 @@ class Viewport3D : public ViewportBase, public WithBorder {
         // 0..h, y hacia abajo). false si esta detras de la camara. Lo usa el
         // "rotar desde la vista" (trackball) para el angulo del mouse al pivot.
         bool ProyectarPunto(const Vector3& p, float& sx, float& sy);
+        // mundo-por-pixel al arrastrar (mover/extrude): a la PROFUNDIDAD del pivot de transform, para
+        // que lo agarrado se mueva 1:1 con el mouse/flechas en pantalla a cualquier zoom.
+        float VelocidadArrastreMundo();
         // actualiza los endpoints de la linea punteada pivot->mouse (rotar/
         // escalar). mx,my = mouse en coords de ventana. Compartido PC/Symbian.
         void ActualizarLineaTransform(int mx, int my);

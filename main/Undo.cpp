@@ -227,16 +227,16 @@ public:
 // esos campos (NO name/texture/capas -> esos tienen su propio undo y no hay que revertirlos de mas).
 class MaterialModUndo : public UndoCmd {
     Material* mat;
-    bool b[11]; int rmode; GLfloat shin; // rmode = reflectMode (era el bool chromeEquirect, ahora int de 3 modos)
-    static void Leer(Material* s, bool* bo, int& rm, GLfloat& sh) {
+    bool b[10]; int rmode; float shin; // rmode = reflectMode (era el bool chromeEquirect, ahora int de 3 modos)
+    static void Leer(Material* s, bool* bo, int& rm, float& sh) {
         bo[0]=s->textureOn; bo[1]=s->filtrado; bo[2]=s->transparent; bo[3]=s->vertexColor;
         bo[4]=s->lighting; bo[5]=s->repeat; bo[6]=s->uv8bit; bo[7]=s->culling;
-        bo[8]=s->depth_test; bo[9]=s->smooth; bo[10]=s->chrome; rm=s->reflectMode; sh=s->shininess;
+        bo[8]=s->depth_test; bo[9]=s->chrome; rm=s->reflectMode; sh=s->shininess;
     }
-    static void Escribir(Material* s, const bool* bo, int rm, GLfloat sh) {
+    static void Escribir(Material* s, const bool* bo, int rm, float sh) {
         s->textureOn=bo[0]; s->filtrado=bo[1]; s->transparent=bo[2]; s->vertexColor=bo[3];
         s->lighting=bo[4]; s->repeat=bo[5]; s->uv8bit=bo[6]; s->culling=bo[7];
-        s->depth_test=bo[8]; s->smooth=bo[9]; s->chrome=bo[10]; s->reflectMode=rm; s->shininess=sh;
+        s->depth_test=bo[8]; s->chrome=bo[9]; s->reflectMode=rm; s->shininess=sh;
     }
 public:
     MaterialModUndo(Material* M) : mat(M), rmode(0), shin(0) { if (mat) Leer(mat, b, rmode, shin); }

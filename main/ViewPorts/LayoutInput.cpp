@@ -643,6 +643,8 @@ static void LayoutAccionRender(int aId) {
         case 1: Viewport3DActive->view = RenderType::MaterialPreview; break;
         case 2: Viewport3DActive->view = RenderType::Solid;           break;
         case 3: Viewport3DActive->view = RenderType::Wireframe;       break;
+        case 4: Viewport3DActive->view = RenderType::ZBuffer;         break;
+        case 5: Viewport3DActive->view = RenderType::NormalView;      break;
     }
 }
 
@@ -666,6 +668,7 @@ static void LayoutAccionView(int aId) {
         case 404: Viewport3DActive->SetViewpoint(Viewpoint::back);   break; // Ctrl Num 1
         case 405: Viewport3DActive->SetViewpoint(Viewpoint::right);  break; // Num 3
         case 406: Viewport3DActive->SetViewpoint(Viewpoint::left);   break; // Ctrl Num 3
+        case 407: Viewport3DActive->ChangePerspective();            break; // Num 5: alterna perspectiva/ortografica
         // submenu Cameras:
         case 410: SetActiveObjectAsCamera(); break; // Set Active Object as Camera (Ctrl Num 0): SOLO setea la camara activa, NO cambia la vista
         case 411: Viewport3DActive->SetViewFromCameraActive(!Viewport3DActive->ViewFromCameraActive);   break; // Active Camera (Num 0): ver desde la camara
@@ -993,6 +996,7 @@ static void LayoutCambiarMenuBarra(int dir) {
         else if (MenuAbierto == MenuObject || MenuAbierto == gMenuVertex ||
                  MenuAbierto == gMenuEdge  || MenuAbierto == gMenuFace) rol = BR_Object;
         else if (MenuAbierto == MenuOverlays) rol = BR_Overlays;
+        else if (MenuAbierto == MenuView) rol = BR_View; // FIX: faltaba -> izq/der se clavaba en el menu View
         else if (MenuAbierto == MenuRender) rol = BR_Render;
         else if (MenuAbierto == MenuOrient) rol = BR_Orient;
         else if (MenuAbierto == gMenuUVops) rol = BR_UV; // FIX: faltaba -> izq/der no salia del menu UV
