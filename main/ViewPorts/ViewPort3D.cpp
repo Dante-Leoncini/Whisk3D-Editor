@@ -170,6 +170,7 @@ Viewport3D::Viewport3D(Vector3 pos){
         MenuViewpoint->Agregar("Back",   404)->atajo = "Ctrl Num 1";
         MenuViewpoint->Agregar("Right",  405)->atajo = "Num 3";
         MenuViewpoint->Agregar("Left",   406)->atajo = "Ctrl Num 3";
+        MenuViewpoint->Agregar("Perspective/Ortho", 407)->atajo = "Num 5"; // alterna perspectiva/ortografica
         // submenu Cameras: setear el objeto activo como camara / ver desde la camara activa
         MenuCameras = new PopupMenu();
         MenuCameras->Agregar("Set Active Object as Camera", 410)->atajo = "Ctrl Num 0";
@@ -184,6 +185,8 @@ Viewport3D::Viewport3D(Vector3 pos){
         MenuRender->Agregar("Material Preview", 1);
         MenuRender->Agregar("Solid Preview", 2);
         MenuRender->Agregar("Wireframe Preview", 3);
+        MenuRender->Agregar("ZBuffer Preview", 4);
+        MenuRender->Agregar("Normal View", 5); // simula normal map con 3 luces R/G/B
     }
     if (!MenuOrient){
         // orientacion usada al constrenir a un eje (X/Y/Z) y por el extrude. Default Global.
@@ -521,6 +524,24 @@ static Vector3 GizmoPivot(){
     return TransformPivotPoint;
 }
 
+// VELOCIDAD de arrastre en MUNDO por pixel de pantalla, a la PROFUNDIDAD del pivot de transform.
+// Con esto, al arrastrar N pixeles (mouse o flechas) lo agarrado se mueve N pixeles EN PANTALLA a
+// cualquier zoom -> se siente "pegado" al cursor. Antes era un 0.01 FIJO que ignoraba el zoom (de
+// cerca movia muchisimo, de lejos poquito). Es la inversa exacta de ProyectarPunto (misma base/FOV).
+float Viewport3D::VelocidadArrastreMundo(){
+    if (height <= 0) return 0.01f;                // guarda (no deberia pasar)
+    if (orthographic) {
+        const float size = 5.0f;                 // mismo extent que Render() y ProyectarPunto()
+        return 2.0f * size / (float)height;      // ortho: mundo-por-pixel constante (no depende de z)
+    }
+    Vector3 cf = viewRot * Vector3(0, 0, -1);    // hacia la escena (igual que ProyectarPunto)
+    float ez = (GizmoPivot() - viewPos).Dot(cf); // profundidad (eye-space) del pivot de transform
+    if (ez < nearClip) ez = nearClip;            // no detras de la camara
+    float fRad = fovDeg * 3.14159265f / 180.0f;
+    // alto visible del frustum a esa profundidad, repartido en 'height' pixeles = mundo por pixel
+    return 2.0f * ez * tanf(fRad * 0.5f) / (float)height;
+}
+
 void Viewport3D::ActualizarLineaTransform(int mx, int my){
     if ((estado == rotacion || estado == EditScale) && ObjActivo){
         float px, py;
@@ -646,6 +667,11 @@ void Viewport3D::ReloadLights() {
             w3dEngine::Disable(w3dEngine::Light0);
             break;
 
+        case RenderType::NormalView:
+            // color por normal (unlit): lo dibuja el Core (w3dRenderNormalColor). Sin luz de escena.
+            w3dEngine::Disable(w3dEngine::Light0);
+            break;
+
         default:
             break;
     }
@@ -653,10 +679,12 @@ void Viewport3D::ReloadLights() {
 
 // Cicla los modos de vista: Material Preview -> Render -> Wireframe -> Solid -> (vuelve)
 void Viewport3D::ChangeViewType(){
-    if      (view == RenderType::MaterialPreview) view = RenderType::Rendered;
-    else if (view == RenderType::Rendered)        view = RenderType::Wireframe;
-    else if (view == RenderType::Wireframe)       view = RenderType::Solid;
-    else                                          view = RenderType::MaterialPreview; // Solid/otro -> vuelve
+    if      (view == RenderType::MaterialPreview) view = RenderType::Solid;
+    else if (view == RenderType::Solid)           view = RenderType::NormalView;
+    else if (view == RenderType::NormalView)      view = RenderType::Wireframe;
+    else if (view == RenderType::Wireframe)       view = RenderType::ZBuffer;
+    else if (view == RenderType::ZBuffer)         view = RenderType::Rendered;
+    else                                          view = RenderType::MaterialPreview; // Rendered/otro -> vuelve
 }
 
 // Redimensiona el viewport
@@ -697,11 +725,18 @@ void Viewport3D::Render() {
     w3dEngine::Enable(w3dEngine::ScissorTest);
     w3dEngine::Scissor(x, glY, width, height);
 
+    // ZBuffer: fog de profundidad con rango FIJO en unidades de mundo (NO depende de la escena ni del
+    // zoom). Es SOLO la distancia camara->objeto: en la camara = blanco, a fogFar o mas lejos = negro.
+    // Al mover/zoomear la camara cambian las distancias -> TODO se aclara al acercarse y se oscurece al
+    // alejarse por igual (incluido el objeto mas cercano). Para afinar el contraste, cambiar fogFar.
+    const float fogNear = nearClip; // ~camara = blanco
+    const float fogFar  = 40.0f;    // a 40 de la camara (o mas lejos) = negro
+
     if (view == RenderType::ZBuffer) {
         w3dEngine::Enable(w3dEngine::Fog);
         w3dEngine::FogMode(true);
-        w3dEngine::FogStart(nearClip);
-        w3dEngine::FogEnd(farClip);
+        w3dEngine::FogStart(fogNear); // rango FIJO: solo la distancia a la camara define el tono
+        w3dEngine::FogEnd(fogFar);
         GLfloat fogColor[] = {0.0f, 0.0f, 0.0f, 1.0f};
         w3dEngine::FogColor(fogColor);
     } else {
@@ -781,6 +816,25 @@ void Viewport3D::Render() {
     // master de overlays para el render del CORE (Mesh::Render lee g_mostrarOverlays para no dibujar
     // contornos de seleccion ni el overlay de edit). Se setea por frame = el showOverlays del viewport.
     g_mostrarOverlays = showOverlays;
+    w3dRenderOverlays = showOverlays; // el Core lo lee (Mesh::RenderObject); g_mostrarOverlays sigue siendo del editor
+
+    // el Core dibuja segun estos flags; los derivamos del RenderType/view del editor (el Core no lo conoce)
+    w3dRenderWireframe = (view == RenderType::Wireframe);
+    w3dRenderSolido    = (view == RenderType::Solid);
+    w3dRenderNormalColor = (view == RenderType::NormalView);
+    w3dRenderSinLuz    = (view == RenderType::ZBuffer);
+    w3dRenderLuces     = (view == RenderType::Rendered);
+
+    // ZBuffer: RE-seteamos el fog de profundidad JUSTO antes de dibujar las mallas (RenderFloor lo pisa
+    // con su propio fog). Asi las mallas se sombrean por profundidad: cerca claro -> lejos oscuro.
+    if (view == RenderType::ZBuffer) {
+        w3dEngine::Enable(w3dEngine::Fog);
+        w3dEngine::FogMode(true);
+        w3dEngine::FogStart(fogNear); // mismo rango FIJO que arriba
+        w3dEngine::FogEnd(fogFar);
+        GLfloat fogZ[] = {0.0f, 0.0f, 0.0f, 1.0f};
+        w3dEngine::FogColor(fogZ);
+    }
 
     // Renderiza la escena recursivamente
     SceneCollection->Render();
@@ -1582,8 +1636,8 @@ void Viewport3D::event_mouse_motion(int mx, int my){
         const bool edit = (InteractionMode == EditMode && EditXformActivo());
         switch (estado) {
             case translacion:
-                if (edit) EditXformTraslacion(dx, dy, 0.01f);
-                else      SetTranslacionObjetos(dx, dy, 0.01f);
+                if (edit) EditXformTraslacion(dx, dy, VelocidadArrastreMundo());
+                else      SetTranslacionObjetos(dx, dy, VelocidadArrastreMundo());
                 break;
             case rotacion:
                 if (axisSelect == ViewAxis) {
@@ -1657,7 +1711,7 @@ void Viewport3D::TeclaDerecha(){
         }
     }
     else if (estado == translacion){
-        SetTranslacionObjetos(5, 0, 0.01f);
+        SetTranslacionObjetos(5, 0, VelocidadArrastreMundo());
     }
     else if (estado == rotacion){
         if (axisSelect == OrbitalAxis) RotarOrbital(20, 0); // orbital: yaw (camUp)
@@ -1720,7 +1774,7 @@ void Viewport3D::TeclaIzquierda(){
         }
     }
     else if (estado == translacion){
-        SetTranslacionObjetos(-5, 0, 0.01f);
+        SetTranslacionObjetos(-5, 0, VelocidadArrastreMundo());
     }
     else if (estado == rotacion){
         if (axisSelect == OrbitalAxis) RotarOrbital(-20, 0); // orbital: yaw (camUp)
@@ -1789,7 +1843,7 @@ void Viewport3D::TeclaArriba(){
         RotarOrbital(0, -20); // orbital: pitch (camRight) hacia arriba
     }
     else if (estado == translacion){
-        SetTranslacionObjetos(0, -5, 0.01f);
+        SetTranslacionObjetos(0, -5, VelocidadArrastreMundo());
     }
 }
 #endif
@@ -1842,7 +1896,7 @@ void Viewport3D::TeclaAbajo(){
         RotarOrbital(0, 20); // orbital: pitch (camRight) hacia abajo
     }
     else if (estado == translacion){
-        SetTranslacionObjetos(0, 5, 0.01f);
+        SetTranslacionObjetos(0, 5, VelocidadArrastreMundo());
     }
 }
 #endif

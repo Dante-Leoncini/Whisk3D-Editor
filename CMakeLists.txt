@@ -161,6 +161,11 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         ${CMAKE_SOURCE_DIR}/res
         $<TARGET_FILE_DIR:whisk3d>/res
+    # res/installer = imagenes SOLO para el instalador de Windows (NSIS las lee al empaquetar, ver
+    # CPACK_NSIS_MUI_* mas abajo). NO son recursos de runtime -> no van al lado del exe. Los install()
+    # de win/linux ya las excluyen (FILES_MATCHING solo png/svg/ico/ini/Skins). Aca se copia todo res
+    # y se saca installer para que el build de desarrollo tampoco las arrastre.
+    COMMAND ${CMAKE_COMMAND} -E remove_directory $<TARGET_FILE_DIR:whisk3d>/res/installer
 )
 
 # ---------------------------------------------------

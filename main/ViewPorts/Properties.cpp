@@ -765,7 +765,7 @@ void Properties::ConstruirGrupos(){
     propBtnReflectMode->action = AccionMenuReflectMode;
     // ORDEN VISUAL (Dante: "Normal Mapping ARRIBA de Reflection -> al activar normal map y desaparecer el reflejo
     // queda mas natural"): Filtering..Smooth Shading, luego NORMAL MAPPING + su selector, luego REFLECTION + su dropdown.
-    for (int i = 0; i < 8; i++) propMaterial->properties.push_back(propMatChk[i]); // [0..7] comunes
+    for (int i = 0; i < 7; i++) propMaterial->properties.push_back(propMatChk[i]); // [0..6] comunes (Smooth Shading [7] se quito: el shading es de la malla, no del material)
     propMaterial->properties.push_back(propMatChk[10]); // Normal Mapping
     propMaterial->properties.push_back(propBtnNormalTex);
     propMaterial->properties.push_back(propMatChk[8]);  // Reflection
@@ -994,7 +994,7 @@ void Properties::Rebind(){
     propMatChk[4]->value = esDefault ? NULL : &material->repeat;
     propMatChk[5]->value = esDefault ? NULL : &material->culling;
     propMatChk[6]->value = esDefault ? NULL : &material->depth_test;
-    propMatChk[7]->value = esDefault ? NULL : &material->smooth;
+    propMatChk[7]->value = NULL; // Smooth Shading se quito del material (el shading lo dan las normales de la malla)
     // "Reflection" (chrome) se OCULTA cuando hay Normal Mapping (excluyentes: mismo combiner).
     propMatChk[8]->value = (esDefault || material->normalMap) ? NULL : &material->chrome; // Reflection on/off
     propMatChk[9]->value = NULL; // viejo "Chrome 360": SIEMPRE oculto -> lo reemplaza el dropdown propBtnReflectMode
