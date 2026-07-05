@@ -71,6 +71,11 @@ TBool W3dLayoutUVActivo(); // query: el viewport activo es el editor UV
 // ETrue si lo consumio (el 3D devuelve EFalse: lo maneja orbit/transform).
 TBool W3dLayoutTeclaPanel(TInt aScan);
 
+// el viewport activo es el outliner? (para que "1" entre al modo mover ahi)
+TBool W3dOutlinerActivo();
+// "1" sobre el outliner: entra al modo MOVER (o confirma si ya esta moviendo)
+void W3dOutlinerMoverToggle();
+
 // rueda sobre el outliner: scroll (consume el evento)
 TBool W3dLayoutWheelOutliner(TInt aX, TInt aY, TInt aDelta);
 

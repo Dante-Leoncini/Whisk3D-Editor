@@ -612,9 +612,25 @@ TBool W3dLayoutTeclaPanel(TInt aScan) {
         case EStdKeyRightArrow: k = LayoutKey::Right; break;
         case EStdKeyDevice3:
         case EStdKeyEnter:      k = LayoutKey::Enter; break;
+        case EStdKeyBackspace: // C del telefono
+        case EStdKeyEscape:     k = LayoutKey::Cancel; break; // cancela el modo mover del outliner
     }
     if (k < 0) return EFalse;
     return LayoutTeclaPanelActivo(k) ? ETrue : EFalse;
+}
+
+// el viewport ACTIVO es el outliner? (para que "1" entre al modo mover ahi, sin mouse)
+TBool W3dOutlinerActivo() {
+    return (viewPortActive && viewPortActive->isLeaf() &&
+            viewPortActive->ViewportKind() == 2) ? ETrue : EFalse;
+}
+
+// "1" sobre el outliner: entra al modo MOVER; si ya esta moviendo, confirma (toggle).
+void W3dOutlinerMoverToggle() {
+    if (!W3dOutlinerActivo()) return;
+    Outliner* out = (Outliner*)viewPortActive;
+    if (out->ModoMover()) out->MoverConfirmar();
+    else                  out->MoverIniciar();
 }
 
 // rueda sobre el outliner: scroll REAL de PC

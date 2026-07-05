@@ -41,7 +41,7 @@ size_t IconoDeObjeto(Object* o) {
 }
 
 // Constructor
-static Object* W3dObjetoEnFila(int fila);
+static Object* W3dObjetoEnFila(int fila, int* profOut = 0); // profOut (opcional) = profundidad del objeto
 
 Outliner::Outliner() : ViewportBase() {
     Renglon = new Rec2D();
@@ -52,6 +52,11 @@ Outliner::Outliner() : ViewportBase() {
     dragY0 = 0;
     dropFila = -1;
     dropZona = -2;
+    dropProf = 0;
+    moviendo = false;
+    moverObj = NULL;
+    moverPadreOrig = NULL;
+    moverAnteriorOrig = NULL;
     BarCrear();
 }
 
@@ -246,8 +251,11 @@ void Outliner::Render(){
         w3dEngine::Color4f(ListaColores[static_cast<int>(ColorID::accent)][0],
                   ListaColores[static_cast<int>(ColorID::accent)][1],
                   ListaColores[static_cast<int>(ColorID::accent)][2], 1.0f);
-        linea->SetSize((GLshort)borderGS, (GLshort)(lineY - GlobalScale),
-                       (GLshort)(width - bordersGS), (GLshort)(2 * GlobalScale));
+        // la linea se INDENTA al nivel del destino: si el objeto va a quedar emparentado (nivel > 0)
+        // arranca mas a la derecha y es mas angosta; a la raiz (nivel 0) ocupa todo el ancho.
+        int indent = dropProf * (IconSizeGS + gapGS);
+        linea->SetSize((GLshort)(borderGS + indent), (GLshort)(lineY - GlobalScale),
+                       (GLshort)(width - bordersGS - indent), (GLshort)(2 * GlobalScale));
         linea->RenderObject(false);
         w3dEngine::Enable(w3dEngine::Texture2D);
     }
@@ -264,7 +272,14 @@ void Outliner::DibujarRenglon(Object* obj, bool hidden){
     w3dEngine::PushMatrix();
     GLfloat opacityRow = hidden ? 0.5f : 1.0f;
 
-    if (dragging){
+    if (moviendo && obj == moverObj){
+        // MODO MOVER con teclado: el objeto que se esta moviendo se resalta (accent),
+        // para que en el N95 (sin mouse) se vea claro cual se esta reordenando.
+        w3dEngine::Color4f(ListaColores[static_cast<int>(ColorID::accent)][0],
+                  ListaColores[static_cast<int>(ColorID::accent)][1],
+                  ListaColores[static_cast<int>(ColorID::accent)][2], opacityRow);
+    }
+    else if (dragging){
         // mientras se ARRASTRA el outliner entero se ve deseleccionado;
         // solo el objeto arrastrado queda marcado (la seleccion vuelve
         // a verse normal al soltar)
@@ -424,7 +439,9 @@ void Outliner::event_mouse_motion(int mx, int my) {
                     dropFila = rel / RenglonHeightGS;
                     int resto = rel % RenglonHeightGS;
                     int f = dropFila;
-                    Object* destino = W3dObjetoEnFila(f);
+                    int prof = 0;
+                    Object* destino = W3dObjetoEnFila(f, &prof);
+                    dropProf = prof; // profundidad del destino: la linea de insercion se indenta a ese nivel
                     if (!destino) dropZona = -1; // al vacio: a la raiz
                     else if (destino == dragObjeto) dropZona = -2;
                     else if (resto < RenglonHeightGS / 4) dropZona = 0;
@@ -456,7 +473,22 @@ void Outliner::event_key_down(SDL_Event &e){
         SDL_Keycode key = e.key.key; // SDL3
     #endif
     if (e.key.repeat == 0) {
+        // MODO MOVER: las flechas reordenan/reparentan en vez de navegar; OK confirma; C/backspace/Esc cancela.
+        if (moviendo) {
+            switch (key) {
+                case SDLK_UP:    MoverPaso(0); return;
+                case SDLK_DOWN:  MoverPaso(1); return;
+                case SDLK_LEFT:  MoverPaso(2); return; // izquierda = SACAR (unparent)
+                case SDLK_RIGHT: MoverPaso(3); return; // derecha = METER (parent bajo el hermano anterior)
+                case SDLK_RETURN: case SDLK_KP_ENTER: MoverConfirmar(); return;
+                case SDLK_ESCAPE: case SDLK_BACKSPACE: case SDLK_C: MoverCancelar(); return;
+                default: return; // en modo mover se traga el resto
+            }
+        }
         switch (key) {
+            case SDLK_G: // g = entrar en modo MOVER (reordenar / reparentar el objeto activo)
+                MoverIniciar();
+                break;
             case SDLK_A:
                 SeleccionarTodo(true);
                 break;
@@ -520,11 +552,11 @@ static Object* W3dFilaVisible(Object* obj, int& fila, int prof, int* profOut) {
     return NULL;
 }
 
-// objeto en la fila visible N del arbol completo
-static Object* W3dObjetoEnFila(int fila) {
+// objeto en la fila visible N del arbol completo (+ su profundidad en profOut, si se pide)
+static Object* W3dObjetoEnFila(int fila, int* profOut) {
     if (!SceneCollection) return NULL;
     for (size_t c = 0; c < SceneCollection->Childrens.size(); c++) {
-        Object* r = W3dFilaVisible(SceneCollection->Childrens[c], fila, 0, NULL);
+        Object* r = W3dFilaVisible(SceneCollection->Childrens[c], fila, 0, profOut);
         if (r) return r;
     }
     return NULL;
@@ -585,6 +617,66 @@ void Outliner::SoltarDrag(int mx, int my) {
         }
     }
     Resize(width, height);
+}
+
+// ---- MODO MOVER con teclado (reordenar / reparentar sin mouse) ----
+// El objeto que se mueve es el ACTIVO. Guarda su posicion original para poder cancelar.
+void Outliner::MoverIniciar() {
+    if (moviendo) return;
+    if (!ObjActivo || !SceneCollection) return;
+    moverObj = ObjActivo;
+    moverPadreOrig = moverObj->Parent;   // NULL = raiz
+    moverAnteriorOrig = NULL;
+    Object* padre = moverObj->Parent ? moverObj->Parent : SceneCollection;
+    for (size_t i = 0; i < padre->Childrens.size(); i++)
+        if (padre->Childrens[i] == moverObj) { if (i > 0) moverAnteriorOrig = padre->Childrens[i-1]; break; }
+    moviendo = true;
+}
+
+// dir: 0=arriba 1=abajo (reordena entre hermanos) 2=afuera(unparent) 3=adentro(parent bajo el hermano anterior)
+void Outliner::MoverPaso(int dir) {
+    if (!moviendo || !moverObj || !SceneCollection) return;
+    Object* padre = moverObj->Parent ? moverObj->Parent : SceneCollection;
+    int idx = -1;
+    for (size_t i = 0; i < padre->Childrens.size(); i++)
+        if (padre->Childrens[i] == moverObj) { idx = (int)i; break; }
+    if (idx < 0) return;
+    if (dir == 0) {                         // ARRIBA: antes del hermano anterior
+        if (idx > 0) { Object* ref = padre->Childrens[idx-1]; MoverJuntoA(moverObj, ref, false); }
+    } else if (dir == 1) {                  // ABAJO: despues del hermano siguiente
+        if (idx + 1 < (int)padre->Childrens.size()) { Object* ref = padre->Childrens[idx+1]; MoverJuntoA(moverObj, ref, true); }
+    } else if (dir == 2) {                  // AFUERA (unparent): al abuelo, justo despues del padre
+        if (padre != SceneCollection) {
+            Object* viejoPadre = padre;
+            Object* abuelo = padre->Parent ? padre->Parent : SceneCollection;
+            ReparentKeepTransform(moverObj, abuelo);
+            MoverJuntoA(moverObj, viejoPadre, true);
+        }
+    } else if (dir == 3) {                  // ADENTRO (parent): hijo del hermano anterior
+        if (idx > 0) {
+            Object* nuevoPadre = padre->Childrens[idx-1];
+            ReparentKeepTransform(moverObj, nuevoPadre);
+            nuevoPadre->desplegado = true;
+        }
+    }
+    Resize(width, height); // recalcular el scroll
+}
+
+void Outliner::MoverConfirmar() { moviendo = false; moverObj = NULL; }
+
+void Outliner::MoverCancelar() {
+    if (moviendo && moverObj && SceneCollection) {
+        Object* padreOrig = moverPadreOrig ? moverPadreOrig : SceneCollection;
+        ReparentKeepTransform(moverObj, padreOrig); // restaura el padre + el transform local (el mundo se mantuvo)
+        if (moverAnteriorOrig) {
+            MoverJuntoA(moverObj, moverAnteriorOrig, true); // justo despues del hermano que estaba antes
+        } else {
+            for (size_t i = 0; i < padreOrig->Childrens.size(); i++) // era el PRIMERO: al frente
+                if (padreOrig->Childrens[i] != moverObj) { MoverJuntoA(moverObj, padreOrig->Childrens[i], false); break; }
+        }
+        Resize(width, height);
+    }
+    moviendo = false; moverObj = NULL;
 }
 
 void Outliner::ClickSeleccionar(int mx, int my) {

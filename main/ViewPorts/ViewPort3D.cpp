@@ -759,6 +759,11 @@ void Viewport3D::Render() {
     if (limpiarPantalla) {
         if (view == RenderType::ZBuffer || view == RenderType::Alpha) {
             w3dEngine::ClearColor(0.0f, 0.0f, 0.0f, 1.0f); // ZBuffer y Alpha: fondo NEGRO
+        } else if (view == RenderType::NormalView) {
+            // Normal: fondo = AZUL de normal-map. Una normal que mira de frente a la camara es
+            // (0,0,1) en view-space, que el Core codifica como (0.5,0.5,1.0). Asi el "vacio" se lee
+            // como una superficie de frente, igual que la base de un normal map.
+            w3dEngine::ClearColor(0.5f, 0.5f, 1.0f, 1.0f);
         } else if (view == RenderType::Rendered) {
             w3dEngine::ClearColor(g_renderBg[0], g_renderBg[1], g_renderBg[2], g_renderBg[3]); // fondo GLOBAL del render
         } else {
@@ -924,9 +929,10 @@ bool Viewport3D::RenderAPNG(int outW, int outH, RenderType::Enum pass, const cha
     // color de fondo del pase
     float bg[4];
     if (pass == RenderType::ZBuffer || pass == RenderType::Alpha){ bg[0]=bg[1]=bg[2]=0.0f; bg[3]=1.0f; } // NEGRO (matte blanco sobre negro)
+    else if (pass == RenderType::NormalView){ bg[0]=0.5f; bg[1]=0.5f; bg[2]=1.0f; bg[3]=1.0f; } // AZUL normal-map: normal (0,0,1) de frente = (0.5,0.5,1.0)
     else if (pass == RenderType::Rendered){
         bg[0]=g_renderBg[0]; bg[1]=g_renderBg[1]; bg[2]=g_renderBg[2]; bg[3]=g_renderBg[3]; // color de fondo GLOBAL del render
-    } else { bg[0]=bg[1]=bg[2]=0.0f; bg[3]=0.0f; }                                       // normal: transparente (composicion)
+    } else { bg[0]=bg[1]=bg[2]=0.0f; bg[3]=0.0f; }                                       // resto: transparente (composicion)
 
     // tiles en coords BOTTOM-LEFT (como GL); el flip vertical lo hace SavePNG al final
     int tileIdx = 0; // para la barra: frac = (progBase + tiles hechos) / progTotal

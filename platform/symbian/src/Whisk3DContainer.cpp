@@ -452,6 +452,13 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 				W3dNewToggleOrbital(); // 0 durante rotacion: trackball <-> orbital
 				return EKeyWasConsumed;
 			}
+			// "1" sobre el outliner (sin transform 3D en curso) = entrar/confirmar el modo MOVER:
+			// reordenar/reparentar el objeto activo sin mouse. Clave en el N95 para poner las
+			// lamparas ANTES de los objetos que iluminan. Va antes del 1/2/3 del transform 3D.
+			if (sc == '1' && W3dOutlinerActivo() && !W3dNewTransformActive()){
+				W3dOutlinerMoverToggle();
+				return EKeyWasConsumed;
+			}
 			if (sc == '1' || sc == '2' || sc == '3'){
 				// solo con el mouse sobre el 3D (el hover decide, como PC)
 				extern TBool W3dHayMouseBT();
@@ -545,6 +552,11 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 					if (GuiadoUnClickActivo()){ LayoutGuiadoCancelar(); return EKeyWasConsumed; } // C = cancela Select Linked / Loop Select guiados
 				if (W3dNewTransformActive()){
 					W3dNewTransformEnd(ETrue);
+					return EKeyWasConsumed;
+				}
+				// outliner en modo mover: C/backspace CANCELA (restaura la posicion original en el arbol).
+				// Solo consume si realmente estaba moviendo (sino LayoutTeclaPanelActivo devuelve false).
+				if (W3dLayoutTeclaPanel(EStdKeyBackspace)){
 					return EKeyWasConsumed;
 				}
 				if (W3dLayoutTecla(EStdKeyBackspace, 0, 0)){

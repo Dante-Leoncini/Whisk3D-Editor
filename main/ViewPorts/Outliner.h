@@ -54,7 +54,21 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable {
         // 0 antes de la fila, 1 hijo de la fila, 2 despues
         int dropFila;
         int dropZona;
+        int dropProf; // profundidad (nivel de sangria) del destino: la linea de insercion se indenta a ese nivel
         void SoltarDrag(int mx, int my);
+
+        // MODO MOVER con teclado (sin mouse, clave en N95 para ordenar lamparas antes de los objetos):
+        // g (PC) / 1 (Symbian) entra; flechas reordenan (arriba/abajo) o reparentan (izq=sacar / der=meter);
+        // OK/Enter confirma; C/backspace cancela (restaura la posicion original en el arbol).
+        bool moviendo;
+        Object* moverObj;          // el objeto que se esta moviendo (= el activo al entrar)
+        Object* moverPadreOrig;    // padre original (NULL = raiz) para cancelar
+        Object* moverAnteriorOrig; // hermano que estaba ANTES de moverObj (NULL = era el primero) para cancelar
+        void MoverIniciar();       // entra en modo mover con el objeto activo
+        void MoverPaso(int dir);   // 0=arriba 1=abajo 2=afuera(unparent) 3=adentro(parent)
+        void MoverConfirmar();     // sale del modo (deja la posicion nueva)
+        void MoverCancelar();      // restaura la posicion original y sale
+        bool ModoMover() const { return moviendo; }
         int ViewportKind() const { return 2; } // (menu de tipo)
         void ClearHover() { hoverFila = -1; } // el mouse se fue
 

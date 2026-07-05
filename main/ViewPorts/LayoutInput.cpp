@@ -2085,6 +2085,20 @@ bool LayoutTeclaPanelActivo(int tecla) {
         return false;
     }
     if (viewPortActive->ViewportKind() == 2) {
+        Outliner* out = (Outliner*)viewPortActive;
+        // MODO MOVER (sin mouse, N95): las flechas reordenan/reparentan el objeto
+        // activo en vez de navegar; OK confirma; C/backspace/Esc cancela.
+        if (out->ModoMover()) {
+            switch (tecla) {
+                case LayoutKey::Up:     out->MoverPaso(0);      return true;
+                case LayoutKey::Down:   out->MoverPaso(1);      return true;
+                case LayoutKey::Left:   out->MoverPaso(2);      return true; // izquierda = SACAR (unparent)
+                case LayoutKey::Right:  out->MoverPaso(3);      return true; // derecha = METER (parent)
+                case LayoutKey::Enter:  out->MoverConfirmar();  return true;
+                case LayoutKey::Cancel: out->MoverCancelar();   return true;
+            }
+            return true; // en modo mover se traga todo (que nada mas se cuele)
+        }
         switch (tecla) {
             case LayoutKey::Up:    changeSelect(SelectMode::PrevSingle, true); return true;
             case LayoutKey::Down:  changeSelect(SelectMode::NextSingle, true); return true;
