@@ -48,9 +48,15 @@ class Modifier {
         float screwHeight;      // cuanto SUBE por el eje del primero al ultimo (el "screw"; default 0 = torno)
         float screwSteps;       // copias del perfil en el VIEWPORT (default 16)
         float screwRenderSteps; // copias en el RENDER (default 32)
-        int   screwAxis;        // 0=X, 1=Y, 2=Z (default Z)
+        int   screwAxis;        // 0=X, 1=Y, 2=Z. Default Y: en este motor (Y arriba) un perfil dibujado en la vista
+                                // frontal lathea vertical alrededor de Y (como una botella parada).
         bool  screwStretchU;    // genera U (a lo largo del giro) para textura cilindrica
         bool  screwStretchV;    // genera V (a lo largo del perfil)
+        bool  screwSmooth;      // normales SUAVES (perfil redondito) en vez de facetado plano. Default ON (un lathe casi
+                                // siempre se quiere suave).
+        bool  screwMerge;       // suelda verts coincidentes (polos donde el perfil toca el eje + costura del torno 360)
+                                // -> topologia limpia y sin costura. Default ON.
+        bool  screwFlip;        // invierte el winding (normales para el otro lado) si la superficie quedo del reves.
 
         Modifier(int t, const std::string& n)
             : tipo(t), nombre(n),
@@ -59,7 +65,8 @@ class Modifier {
               merge(true), mergeDist(0.001f), clipping(true),
               subLevel(1.0f), subRenderLevel(2.0f), subSimple(false),
               screwAngle(360.0f), screwHeight(0.0f), screwSteps(16.0f), screwRenderSteps(32.0f),
-              screwAxis(2), screwStretchU(true), screwStretchV(true) {}
+              screwAxis(1), screwStretchU(true), screwStretchV(true),
+              screwSmooth(true), screwMerge(true), screwFlip(false) {}
         virtual ~Modifier() {}
 };
 

@@ -147,10 +147,11 @@ static void MeshOverlayHook(Mesh* m) {
         const float* col = gRenderColors[cid];
         m->RenderBordes(col, 3.0f, false);
         RenderNormales(m);
-    } else if (m->facesSize == 0) {
-        // malla SIN caras (solo lineas/verts sueltos): dibuja sus bordes como OVERLAY del editor asi no queda
-        // invisible en modo objeto (sino no hay forma de saber que hay algo). Es overlay -> NO sale en el render
-        // final (donde las lineas no se ven). Los verts sueltos no se dibujan (ok, alcanza con las lineas).
+    } else if (m->facesSize == 0 && !(m->genValido && m->genVertex && m->genFaces)) {
+        // malla SIN caras propias NI malla generada (un wireframe suelto, no un perfil de modificador): dibuja sus
+        // bordes como OVERLAY del editor asi no queda invisible en modo objeto (sino no hay forma de saber que hay
+        // algo). Es overlay -> NO sale en el render final. Los verts sueltos no se dibujan (ok, alcanza con lineas).
+        // Con malla generada (ej. Screw) NO se dibuja el perfil: en modo objeto solo se ve el resultado (como Blender).
         m->RenderBordes(gRenderColors[RC_wireframe], 1.5f, false);
     }
 }

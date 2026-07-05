@@ -119,6 +119,7 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         // Screw: angle, screw(height), steps viewport/render, eje (dropdown X/Y/Z), stretch U/V
         PropFloat* propScrewAngle; PropFloat* propScrewHeight; PropFloat* propScrewSteps; PropFloat* propScrewRender;
         PropButton* propScrewAxis; PropBool* propScrewStretchU; PropBool* propScrewStretchV;
+        PropBool* propScrewSmooth; PropBool* propScrewMerge; PropBool* propScrewFlip; // suave / soldar / invertir normales
         PropButton* propBtnApplyMod; // "Apply Modifier": hornea la malla generada en malla real editable
         PropListMeshParts* propListUV;    // lista de UV maps (modo=1)
         PropListMeshParts* propListColor; // lista de capas de color (modo=2)

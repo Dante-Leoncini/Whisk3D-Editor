@@ -415,8 +415,12 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         Mesh* m = ScriptActiveMesh(); if(!m){err="no hay malla activa";return false;}
         if (m->modificadorActivo<0 || m->modificadorActivo>=(int)m->modificadores.size()){err="sin modificador activo";return false;}
         Modifier* mod = m->modificadores[m->modificadorActivo];
-        float ang=360, hei=0, st=16; int ax=2; ss>>ang>>hei>>st>>ax;
+        float ang=360, hei=0, st=16; int ax=1; ss>>ang>>hei>>st>>ax;
         mod->screwAngle=ang; mod->screwHeight=hei; mod->screwSteps=st; mod->screwAxis=ax;
+        int sm, mg, fl; // opcionales: smooth / merge / flip (solo se aplican si vienen)
+        if (ss>>sm) mod->screwSmooth=(sm!=0);
+        if (ss>>mg) mod->screwMerge=(mg!=0);
+        if (ss>>fl) mod->screwFlip=(fl!=0);
         m->GenerarMallaModificada(); return true;
     }
     // ---- rendermode <0|1> : setea g_modRenderMode (Subdivision usa subRenderLevel) + regenera la malla activa ----

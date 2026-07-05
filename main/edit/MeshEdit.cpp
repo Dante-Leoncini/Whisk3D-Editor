@@ -2038,10 +2038,32 @@ static Vector3 RotarEje(const Vector3& v, int axis, float ang){
     return Vector3(v.x*c - v.y*s, v.x*s + v.y*c, v.z);                   // eje Z
 }
 
+// suelda verts coincidentes (misma posicion cuantizada a 1e-4) del PolyMesh: remapea las caras, tira corners
+// consecutivos duplicados y caras degeneradas (<3). Lo usa el Screw (merge) para colapsar los polos (perfil que
+// toca el eje) y la costura del torno 360 -> topologia limpia. Preserva UV/color por corner.
+static void SoldarPolyPorPos(PolyMesh& W){
+    const int nP=(int)W.P.size(); if(nP==0) return;
+    std::map<std::string,int> mp; std::vector<int> remap(nP); std::vector<Vector3> np;
+    for (int i=0;i<nP;i++){ int q[3]={ (int)floorf(W.P[i].x*10000.0f+0.5f),(int)floorf(W.P[i].y*10000.0f+0.5f),(int)floorf(W.P[i].z*10000.0f+0.5f) };
+        std::string k((const char*)q,sizeof(q)); std::map<std::string,int>::iterator it=mp.find(k);
+        if (it!=mp.end()) remap[i]=it->second; else { remap[i]=(int)np.size(); mp[k]=remap[i]; np.push_back(W.P[i]); } }
+    std::vector<std::vector<int> > nf; std::vector<int> nfm; std::vector<std::vector<float> > nfu; std::vector<std::vector<unsigned char> > nfc;
+    for (size_t f=0;f<W.F.size();f++){ int m=(int)W.F[f].size();
+        std::vector<int> r; std::vector<float> ru; std::vector<unsigned char> rc;
+        for (int c=0;c<m;c++){ int v=remap[W.F[f][c]]; if(!r.empty() && r.back()==v) continue; // corner colapsado
+            r.push_back(v); ru.push_back(W.Fuv[f][c*2]); ru.push_back(W.Fuv[f][c*2+1]);
+            rc.push_back(W.Fcol[f][c*4]);rc.push_back(W.Fcol[f][c*4+1]);rc.push_back(W.Fcol[f][c*4+2]);rc.push_back(W.Fcol[f][c*4+3]); }
+        if (r.size()>=2 && r.front()==r.back()){ r.pop_back(); ru.pop_back();ru.pop_back(); for(int k=0;k<4;k++) rc.pop_back(); }
+        if (r.size()<3) continue;
+        nf.push_back(r); nfm.push_back(W.Fmat[f]); nfu.push_back(ru); nfc.push_back(rc); }
+    W.P.swap(np); W.F.swap(nf); W.Fmat.swap(nfm); W.Fuv.swap(nfu); W.Fcol.swap(nfc);
+}
+
 // SCREW: barre el perfil (aristas W.E) alrededor del eje. Copia el perfil 'steps' veces girando 'angleDeg' del
 // primero al ultimo y subiendo 'height' por el eje; conecta cada arista entre copias consecutivas -> quad. Si es
 // vuelta completa (360) sin subida, cierra el anillo (torno). stretchU/V generan UV cilindrica (U=giro, V=perfil).
-static void ScrewPoly(PolyMesh& W, int axis, float angleDeg, float height, int steps, bool stretchU, bool stretchV) {
+// flip = invierte el winding (normales al otro lado). merge = suelda verts coincidentes (polos + costura) al final.
+static void ScrewPoly(PolyMesh& W, int axis, float angleDeg, float height, int steps, bool stretchU, bool stretchV, bool flip, bool merge) {
     if (steps < 2) steps = 2;
     const int nP=(int)W.P.size(); if (nP==0) return;
     if (axis<0||axis>2) axis=2;
@@ -2069,12 +2091,16 @@ static void ScrewPoly(PolyMesh& W, int axis, float angleDeg, float height, int s
         float u1 = closed ? ((float)(s+1)/(float)steps) : (float)(s+1)/(float)(steps-1);
         if (!stretchU){ u0=0; u1=0; }
         for (size_t e=0;e<W.E.size();e++){ int a=W.E[e].first, b=W.E[e].second;
-            std::vector<int> q; q.push_back(s0*nP+a); q.push_back(s0*nP+b); q.push_back(s1*nP+b); q.push_back(s1*nP+a);
-            out.F.push_back(q); out.Fmat.push_back(W.Emat);
             float va=stretchV?vertV[a]:0.0f, vb=stretchV?vertV[b]:0.0f;
-            std::vector<float> qu; qu.push_back(u0);qu.push_back(va); qu.push_back(u0);qu.push_back(vb);
-                qu.push_back(u1);qu.push_back(vb); qu.push_back(u1);qu.push_back(va);
-            out.Fuv.push_back(qu);
+            // corners del quad + su UV, en un orden base; 'flip=false' lo invierte -> normal hacia AFUERA por
+            // defecto (una botella/lathe cerrado se ve solida). flip=true = winding base (por si quedo al reves).
+            int   qi[4] = { s0*nP+a, s0*nP+b, s1*nP+b, s1*nP+a };
+            float qU[4] = { u0, u0, u1, u1 };
+            float qV[4] = { va, vb, vb, va };
+            std::vector<int> q; std::vector<float> qu;
+            if (flip) { for (int i=0;i<4;i++){ q.push_back(qi[i]); qu.push_back(qU[i]); qu.push_back(qV[i]); } }
+            else      { for (int i=3;i>=0;i--){ q.push_back(qi[i]); qu.push_back(qU[i]); qu.push_back(qV[i]); } }
+            out.F.push_back(q); out.Fmat.push_back(W.Emat); out.Fuv.push_back(qu);
             std::vector<unsigned char> qc(16,255); out.Fcol.push_back(qc);
         }
     }
@@ -2083,12 +2109,13 @@ static void ScrewPoly(PolyMesh& W, int axis, float angleDeg, float height, int s
         for (size_t f=0;f<W.F.size();f++){ std::vector<int> nf; for(size_t c=0;c<W.F[f].size();c++) nf.push_back(base+W.F[f][c]);
             out.F.push_back(nf); out.Fmat.push_back(W.Fmat[f]); out.Fuv.push_back(W.Fuv[f]); out.Fcol.push_back(W.Fcol[f]); } }
     W.P.swap(out.P); W.F.swap(out.F); W.Fmat.swap(out.Fmat); W.Fuv.swap(out.Fuv); W.Fcol.swap(out.Fcol); W.E.clear();
+    if (merge) SoldarPolyPorPos(W); // suelda polos + costura del torno 360
 }
 
 // aplica el STACK de modificadores sobre poligonos. render=true usa los niveles/steps de RENDER (sino los de
-// viewport). Devuelve false si nada corrio. huboCatmull -> normales smooth. (free function: miembros publicos del Mesh)
-static bool Mesh_AplicarStack(Mesh* m, bool render, PolyMesh& W, bool& huboCatmull) {
-    huboCatmull = false;
+// viewport). Devuelve false si nada corrio. outSmooth -> normales smooth. (free function: miembros publicos del Mesh)
+static bool Mesh_AplicarStack(Mesh* m, bool render, PolyMesh& W, bool& outSmooth) {
+    outSmooth = false;
     const bool enEdit = ((Object*)m == g_editMesh); // en Edit Mode se saltean los mods con mostrarEdit=false
     { bool alguno=false; for (size_t i=0;i<m->modificadores.size();i++){ Modifier* md=m->modificadores[i];
         if (!md->mostrarViewport) continue; if (enEdit && !md->mostrarEdit) continue; alguno=true; break; }
@@ -2104,11 +2131,12 @@ static bool Mesh_AplicarStack(Mesh* m, bool render, PolyMesh& W, bool& huboCatmu
             int lvl = (int)((render ? mod->subRenderLevel : mod->subLevel) + 0.5f);
             if (lvl < 0) lvl = 0; if (lvl > 6) lvl = 6; // tope (cada nivel x4 caras)
             for (int L=0; L<lvl; L++) SubdividirUnNivel(W, mod->subSimple);
-            if (!mod->subSimple && lvl>0) huboCatmull = true;
+            if (!mod->subSimple && lvl>0) outSmooth = true;
         } else if (mod->tipo == ModifierType::Screw){
             int st = (int)((render ? mod->screwRenderSteps : mod->screwSteps) + 0.5f);
             if (st < 2) st = 2; if (st > 512) st = 512;
-            ScrewPoly(W, mod->screwAxis, mod->screwAngle, mod->screwHeight, st, mod->screwStretchU, mod->screwStretchV);
+            ScrewPoly(W, mod->screwAxis, mod->screwAngle, mod->screwHeight, st, mod->screwStretchU, mod->screwStretchV, mod->screwFlip, mod->screwMerge);
+            if (mod->screwSmooth) outSmooth = true; // normales suaves -> lathe redondito
         } else if (mod->tipo == ModifierType::Mirror){
             Vector3 c(0,0,0), axX(1,0,0), axY(0,1,0), axZ(0,0,1);
             if (mod->target){ Matrix4 Wo, Wt; m->GetWorldMatrix(Wo); mod->target->GetWorldMatrix(Wt);
@@ -2166,9 +2194,9 @@ void Mesh::GenerarMallaModificada() {
     if (modificadores.empty() || !vertex || vertexSize<=0) return;
     extern bool g_modRenderMode; // (OpcionesRender): true en el render final -> usa los niveles/steps de RENDER
 
-    PolyMesh W; bool huboCatmull=false;
-    if (!Mesh_AplicarStack(this, g_modRenderMode, W, huboCatmull)){ genValido=false; return; }
-    const bool smooth = meshSmooth || huboCatmull;
+    PolyMesh W; bool outSmooth=false;
+    if (!Mesh_AplicarStack(this, g_modRenderMode, W, outSmooth)){ genValido=false; return; }
+    const bool smooth = meshSmooth || outSmooth;
 
     std::vector<GLfloat> gvp; std::vector<GLbyte> gvn; std::vector<GLfloat> gvu; std::vector<GLubyte> gvc;
     std::vector<std::vector<int> > poly; std::vector<int> polyMat;
@@ -2271,9 +2299,9 @@ void Mesh::AplicarModificadorActivo() {
     // OTROS tipos (Subdivision, Screw): hornear MANTENIENDO LOS QUADS (no triangulado). Usa el mismo pipeline de
     // poligonos y baja los POLIGONOS a faces3d -> quedas con topologia de quads limpia para seguir editando.
     UndoCapturarMallaGeo(this); // Ctrl+Z: snapshot pre-apply
-    PolyMesh W; bool huboCatmull=false;
-    if (!Mesh_AplicarStack(this, false, W, huboCatmull)){ QuitarModificadorActivo(); return; } // nivel de VIEWPORT
-    const bool smooth = meshSmooth || huboCatmull;
+    PolyMesh W; bool outSmooth=false;
+    if (!Mesh_AplicarStack(this, false, W, outSmooth)){ QuitarModificadorActivo(); return; } // nivel de VIEWPORT
+    const bool smooth = meshSmooth || outSmooth;
     std::vector<GLfloat> gvp; std::vector<GLbyte> gvn; std::vector<GLfloat> gvu; std::vector<GLubyte> gvc;
     std::vector<std::vector<int> > poly; std::vector<int> polyMat;
     PolyARenderVerts(W, smooth, gvp,gvn,gvu,gvc, poly, polyMat);

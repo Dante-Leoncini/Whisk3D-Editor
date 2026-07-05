@@ -1072,6 +1072,9 @@ void Properties::ConstruirGrupos(){
     propScrewRender->SetRango(2.0f, 512.0f); propScrewRender->entero = true; propModifierProps->properties.push_back(propScrewRender);
     propScrewStretchU = new PropBool("Stretch U"); propScrewStretchU->onChange = AccionModParamChanged; propModifierProps->properties.push_back(propScrewStretchU);
     propScrewStretchV = new PropBool("Stretch V"); propScrewStretchV->onChange = AccionModParamChanged; propModifierProps->properties.push_back(propScrewStretchV);
+    propScrewSmooth = new PropBool("Smooth"); propScrewSmooth->onChange = AccionModParamChanged; propModifierProps->properties.push_back(propScrewSmooth);
+    propScrewMerge = new PropBool("Merge"); propScrewMerge->onChange = AccionModParamChanged; propModifierProps->properties.push_back(propScrewMerge);
+    propScrewFlip = new PropBool("Flip Normals"); propScrewFlip->onChange = AccionModParamChanged; propModifierProps->properties.push_back(propScrewFlip);
     // Apply Modifier (cualquier modificador): hornea la malla generada en la editable
     propBtnApplyMod = new PropButton("Apply Modifier");
     propBtnApplyMod->action = AccionAplicarModificador;
@@ -1360,6 +1363,7 @@ Properties::Properties() : ViewportBase() {
     propSubSimple = NULL; propSubLevel = NULL; propSubRender = NULL;
     propScrewAngle = NULL; propScrewHeight = NULL; propScrewSteps = NULL; propScrewRender = NULL;
     propScrewAxis = NULL; propScrewStretchU = NULL; propScrewStretchV = NULL;
+    propScrewSmooth = NULL; propScrewMerge = NULL; propScrewFlip = NULL;
     propListUV = NULL; propListColor = NULL; propBtnColorMode = NULL;
     propRotMode = NULL;
     propMsgDefault = NULL; propSepMat = NULL;
@@ -1489,6 +1493,9 @@ void Properties::ActualizarPestanias(){
         if (propScrewRender)  propScrewRender->value  = esScrew ? &mod->screwRenderSteps  : NULL;
         if (propScrewStretchU)propScrewStretchU->value= esScrew ? &mod->screwStretchU     : NULL;
         if (propScrewStretchV)propScrewStretchV->value= esScrew ? &mod->screwStretchV     : NULL;
+        if (propScrewSmooth)  propScrewSmooth->value  = esScrew ? &mod->screwSmooth        : NULL;
+        if (propScrewMerge)   propScrewMerge->value   = esScrew ? &mod->screwMerge         : NULL;
+        if (propScrewFlip)    propScrewFlip->value    = esScrew ? &mod->screwFlip          : NULL;
         if (propScrewAxis){ propScrewAxis->oculto = !esScrew;
             if (esScrew) propScrewAxis->button->text = (mod->screwAxis==0)?"X":(mod->screwAxis==1)?"Y":"Z"; }
         if (propMirX) propMirX->value = esMirror ? &mod->ejeX : NULL;
