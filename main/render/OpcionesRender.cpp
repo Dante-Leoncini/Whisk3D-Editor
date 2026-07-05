@@ -29,7 +29,9 @@ bool g_redraw = true;
 // ajustes de transformacion del EDITOR (pivot + normales). Default Blender.
 int g_transformPivot = PivotMedian;   // pivote por defecto = punto medio
 bool g_editLockNormales = false;      // por defecto SI recalcula normales (al confirmar)
-float g_mergeDist = 0.0001f;          // Merge > By Distance: suelda verts a <= 0.0001 m (como Blender)
+float g_mergeDist = 0.0002f;          // Merge > By Distance: suelda verts a <= 0.0002 m. El editor cuantiza los
+                                      // verts a una grilla de 1e-4, asi que 0.0002 es el minimo util (justo por
+                                      // encima) y alcanza para soldar la tapa de un extrude "dejado en su lugar"
 
 // Implementación de función
 RenderType StringToRenderType(const std::string& s){

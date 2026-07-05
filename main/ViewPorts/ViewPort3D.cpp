@@ -2181,10 +2181,10 @@ void Viewport3D::event_key_down(SDL_Event &e){
                     LayoutMenuUV(lastMouseX, lastMouseY);
                 break;
             case SDLK_J:
+                // Ctrl+J: une las mallas seleccionadas en el objeto activo (Join). J sola: por ahora NADA
+                // (reservada para el futuro en el viewport 3D; antes cambiaba el render view, sacado a pedido).
                 if (LCtrlPressed && estado == editNavegacion && InteractionMode == ObjectMode)
-                    JoinObjetos();        // Ctrl+J: une las mallas seleccionadas en el objeto activo
-                else
-                    ChangeViewType();
+                    JoinObjetos();
                 break;
             case SDLK_H:
                 ChangeVisibilityObj();

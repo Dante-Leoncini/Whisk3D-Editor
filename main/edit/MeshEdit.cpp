@@ -258,51 +258,69 @@ void MergeVertsEdit(Mesh* m, int modo, float dist, const Vector3& cursorLocal) {
             for (size_t c=0;c<e->faces[f].size();c++){ int ev=e->faces[f][c];
                 if (ev>=0&&ev<(int)e->editVerts.size()&&e->editVerts[ev]<nV) selRep[MREP(e->editVerts[ev])]=1; }
     }
-    std::vector<int> sreps; for (int r=0;r<nV;r++) if (selRep[r]) sreps.push_back(r);
-    if (sreps.empty()) return;
+    // GPU verts seleccionados: TODOS los que comparten un rep seleccionado. Un rep agrupa los gpu verts del MISMO
+    // lugar (duplicados coincidentes). Clave para el extrude-in-place: la tapa nueva queda sobre la vieja -> son gpu
+    // verts distintos en el MISMO punto, hay que soldarlos (a nivel rep parecen uno solo y el merge no los veia).
+    std::vector<char> selG(nV, 0);
+    for (int gi=0; gi<nV; gi++){ int r=MREP(gi); if (r>=0 && r<nV && selRep[r]) selG[gi]=1; }
+    std::vector<int> sg; for (int gi=0; gi<nV; gi++) if (selG[gi]) sg.push_back(gi);
+    if (sg.empty()) return;
 
-    // 1) clusters de reps por union-find (regla segun el modo)
-    std::map<int,int> repIdx; for (size_t i=0;i<sreps.size();i++) repIdx[sreps[i]]=(int)i;
-    std::vector<int> uf(sreps.size()); for (size_t i=0;i<uf.size();i++) uf[i]=(int)i;
-    if (modo == 0 || modo == 1) {
-        for (size_t i=1;i<sreps.size();i++){ int ra=UFind(uf,0), rb=UFind(uf,(int)i); if(ra!=rb) uf[rb]=ra; }
-    } else if (modo == 2) { // conexos por aristas con AMBOS extremos seleccionados
+    // 1) clusters de GPU verts por union-find sobre TODOS los verts (nV). By Distance suelda lo seleccionado con
+    //    los verts CERCANOS aunque NO esten seleccionados (pedido: "unir los verts mas cercanos a lo seleccionado").
+    std::vector<int> uf(nV); for (int i=0;i<nV;i++) uf[i]=i;
+    if (modo == 0 || modo == 1) {                  // At Center / At Cursor: todo lo SELECCIONADO en un cluster
+        int first=-1; for (size_t i=0;i<sg.size();i++){ if(first<0) first=sg[i]; else { int ra=UFind(uf,first), rb=UFind(uf,sg[i]); if(ra!=rb) uf[rb]=ra; } }
+    } else if (modo == 2) {                         // Collapse: coincidentes sel (mismo rep) + conexos por aristas sel
+        std::map<int,int> firstSelPorRep;
+        for (size_t i=0;i<sg.size();i++){ int r=MREP(sg[i]); std::map<int,int>::iterator it=firstSelPorRep.find(r);
+            if (it==firstSelPorRep.end()) firstSelPorRep[r]=sg[i]; else { int ra=UFind(uf,it->second), rb=UFind(uf,sg[i]); if(ra!=rb) uf[rb]=ra; } }
         for (size_t ie=0; ie+1 < m->edges.size(); ie+=2){
             int a=m->edges[ie], b=m->edges[ie+1];
             if (a<0||b<0||a>=nV||b>=nV||!selRep[a]||!selRep[b]) continue;
-            int ra=UFind(uf,repIdx[a]), rb=UFind(uf,repIdx[b]); if(ra!=rb) uf[rb]=ra;
+            std::map<int,int>::iterator ia=firstSelPorRep.find(a), ib=firstSelPorRep.find(b);
+            if (ia==firstSelPorRep.end()||ib==firstSelPorRep.end()) continue;
+            int ra=UFind(uf,ia->second), rb=UFind(uf,ib->second); if(ra!=rb) uf[rb]=ra;
         }
-    } else { // 3 = by distance: agrupa pares a <= dist
+    } else {                                        // 3 = By Distance: cada vert SELECCIONADO se une con CUALQUIER vert a <= dist
         float d2 = dist*dist;
-        for (size_t i=0;i<sreps.size();i++) for (size_t j=i+1;j<sreps.size();j++){
-            int a=sreps[i], b=sreps[j];
-            float dx=m->vertex[a*3]-m->vertex[b*3], dy=m->vertex[a*3+1]-m->vertex[b*3+1], dz=m->vertex[a*3+2]-m->vertex[b*3+2];
-            if (dx*dx+dy*dy+dz*dz <= d2){ int ra=UFind(uf,(int)i), rb=UFind(uf,(int)j); if(ra!=rb) uf[rb]=ra; }
-        }
+        for (size_t i=0;i<sg.size();i++){ int a=sg[i];
+            for (int b=0; b<nV; b++){ if (b==a) continue;
+                float dx=m->vertex[a*3]-m->vertex[b*3], dy=m->vertex[a*3+1]-m->vertex[b*3+1], dz=m->vertex[a*3+2]-m->vertex[b*3+2];
+                if (dx*dx+dy*dy+dz*dz <= d2){ int ra=UFind(uf,a), rb=UFind(uf,b); if(ra!=rb) uf[rb]=ra; } } }
     }
 
-    // 2) por cluster: miembros, centro y rep canonico (el de menor indice). Solo MERGEA si tiene >=2 (o At Cursor).
-    std::map<int,std::vector<int> > clusters; // root -> indices en sreps
-    for (size_t i=0;i<sreps.size();i++){ int root=UFind(uf,(int)i); clusters[root].push_back((int)i); }
-    std::vector<int>  mergedRoot(nV, -1);  // rep -> rep canonico de su cluster mergeado (-1 = no mergea)
-    std::vector<Vector3> targetPos(nV);    // rep canonico -> posicion destino
+    // 2) clusters: root -> gpu verts. Recolecta TODOS los verts (incluye los NO seleccionados arrastrados por By
+    //    Distance) cuyo root sea el de algun vert seleccionado.
+    std::set<int> rootsSel; for (size_t i=0;i<sg.size();i++) rootsSel.insert(UFind(uf,sg[i]));
+    std::map<int,std::vector<int> > clusters;
+    for (int gi=0; gi<nV; gi++){ int root=UFind(uf,gi); if (rootsSel.count(root)) clusters[root].push_back(gi); }
+    std::vector<int>  mergedRoot(nV, -1);  // gpu vert -> gpu canonico de su cluster mergeado (-1 = no mergea)
+    std::vector<Vector3> targetPos(nV);    // gpu canonico -> posicion destino
     std::vector<Vector3> posSel;           // para reseleccionar tras el rebuild
     bool algo = false;
     for (std::map<int,std::vector<int> >::iterator it=clusters.begin(); it!=clusters.end(); ++it){
         std::vector<int>& mem = it->second;
+        if (mem.empty()) continue;
         bool mergea = (mem.size() >= 2) || (modo == 1 && mem.size() >= 1);
-        int canon = sreps[mem[0]]; for (size_t k=1;k<mem.size();k++) if (sreps[mem[k]]<canon) canon=sreps[mem[k]];
-        Vector3 centro(0,0,0);
-        for (size_t k=0;k<mem.size();k++){ int r=sreps[mem[k]]; centro.x+=m->vertex[r*3]; centro.y+=m->vertex[r*3+1]; centro.z+=m->vertex[r*3+2]; }
+        int canon = mem[0]; for (size_t k=1;k<mem.size();k++) if (mem[k]<canon) canon=mem[k];
+        // destino: At Cursor -> el cursor. Si el cluster arrastro verts NO seleccionados, se snapea a ELLOS (la base
+        // no se mueve): centro de los no-seleccionados. Si son todos seleccionados -> su centro.
+        Vector3 centro(0,0,0); Vector3 centroUnsel(0,0,0); int nUnsel=0;
+        for (size_t k=0;k<mem.size();k++){ int g=mem[k];
+            centro.x+=m->vertex[g*3]; centro.y+=m->vertex[g*3+1]; centro.z+=m->vertex[g*3+2];
+            if (!selG[g]){ centroUnsel.x+=m->vertex[g*3]; centroUnsel.y+=m->vertex[g*3+1]; centroUnsel.z+=m->vertex[g*3+2]; nUnsel++; } }
         centro = centro * (1.0f/(float)mem.size());
-        Vector3 destino = (modo == 1) ? cursorLocal : centro;
+        Vector3 destino;
+        if (modo == 1)        destino = cursorLocal;
+        else if (nUnsel > 0)  destino = centroUnsel * (1.0f/(float)nUnsel);
+        else                  destino = centro;
         if (mergea){
             algo = true;
-            for (size_t k=0;k<mem.size();k++) mergedRoot[sreps[mem[k]]] = canon;
+            for (size_t k=0;k<mem.size();k++) mergedRoot[mem[k]] = canon;
             targetPos[canon] = destino;
             posSel.push_back(destino);
         } else {
-            // cluster de 1: no mergea, queda donde esta (pero sigue seleccionado)
             posSel.push_back(Vector3(m->vertex[canon*3], m->vertex[canon*3+1], m->vertex[canon*3+2]));
         }
     }
@@ -310,12 +328,11 @@ void MergeVertsEdit(Mesh* m, int modo, float dist, const Vector3& cursorLocal) {
 
     UndoCapturarMallaGeo(m); // Ctrl+Z: snapshot antes del merge
 
-    // 3) MOVER los verts de cada cluster que mergea a su destino (los coincidentes los suelda GenerarRender por pos+uv+normal)
-    for (int gi=0; gi<nV; gi++){ int r=MREP(gi); if (r<0||r>=nV) continue; int cr=mergedRoot[r];
-        if (cr>=0){ Vector3& t=targetPos[cr]; m->vertex[gi*3]=t.x; m->vertex[gi*3+1]=t.y; m->vertex[gi*3+2]=t.z; } }
+    // 3) mover los gpu verts que mergean a su destino (GenerarRender re-splitea por normal -> conserva el flat shading)
+    for (int gi=0; gi<nV; gi++){ int cr=mergedRoot[gi]; if (cr>=0){ Vector3& t=targetPos[cr]; m->vertex[gi*3]=t.x; m->vertex[gi*3+1]=t.y; m->vertex[gi*3+2]=t.z; } }
 
-    // identidad "mergeada" de un vert: el rep canonico del cluster si mergea, sino su rep normal
-    #define MID(gi) ( mergedRoot[MREP(gi)]>=0 ? mergedRoot[MREP(gi)] : MREP(gi) )
+    // identidad "mergeada" de un corner: el gpu canonico de su cluster si mergea, sino el gpu mismo
+    #define MID(gi) ( mergedRoot[gi]>=0 ? mergedRoot[gi] : (gi) )
 
     // 4) reconstruir faces3d: dedup de corners por identidad mergeada (tira los que colapsan), <3 -> cara muerta
     m->PoblarCapas();
@@ -628,7 +645,8 @@ bool Mesh::ExtruirEdit(Vector3& outDirLocal, bool& outConstrain) {
     outDirLocal = nrm;
 
     // ---- crecer arrays: +1 vert por rep de la TAPA (offset eps), mover interiores ----
-    const float eps = 1e-3f; // > umbral posRep (1e-4) -> la tapa es posicion distinta
+    const float eps = 1.5e-4f; // apenas > umbral posRep (1e-4) -> la tapa es un rep distinto pero casi coincidente,
+                               // asi "extruir y dejar en el lugar" + Merge By Distance vuelve a la malla original
     Vector3 off = nrm * eps;
     int nuevoN = nV + (int)capReps.size();
     bool tNor=(normals!=NULL), tUV=(uv!=NULL), tCol=(vertexColor!=NULL);

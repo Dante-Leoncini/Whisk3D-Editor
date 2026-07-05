@@ -455,6 +455,22 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         return true;
     }
 
+    // ---- merge <center|cursor|collapse|bydistance> (suelda la seleccion; bydistance usa g_mergeDist) ----
+    if (cmd == "merge") {
+        extern float g_mergeDist;
+        std::string what; ss >> what;
+        Mesh* m = ScriptActiveMesh();
+        if (!m) { err = "no hay malla activa"; return false; }
+        int modo = 3;
+        if      (what == "center")   modo = 0;
+        else if (what == "cursor")   modo = 1;
+        else if (what == "collapse") modo = 2;
+        else if (what == "bydistance" || what == "distance") modo = 3;
+        else { err = "merge desconocido: '" + what + "' (center|cursor|collapse|bydistance)"; return false; }
+        MergeVertsEdit(m, modo, g_mergeDist, Vector3(0,0,0));
+        return true;
+    }
+
     // ---- shade <smooth|flat> ----
     if (cmd == "shade") {
         std::string s; ss >> s;
