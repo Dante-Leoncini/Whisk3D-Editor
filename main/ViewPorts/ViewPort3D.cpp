@@ -2,7 +2,9 @@
 #include "ViewPorts/ViewPort3D.h"
 #include "Undo.h" // Ctrl+Z: confirmar transform
 #include "objects/CameraBase.h" // camara base del core (la vista)
+#include "w3dTexture.h" // w3dEngine::SavePNG (render a PNG)
 #include <cmath>
+#include <cstring> // memcpy (stitch de tiles del render)
 #include <cstdio>  // sprintf (formateo portable de la barra de estado)
 #include <string>
 #include "WhiskUI/glesdraw.h"
@@ -843,6 +845,119 @@ void Viewport3D::Render() {
 
     if (showOverlays) RenderOverlay();
     if (ShowUi) RenderUI();
+}
+
+// ============================================================================
+//  RENDER A PNG por TILES — dibuja la escena a un PNG de outW x outH (puede ser
+//  MAS GRANDE que la ventana/pantalla). Sin overlay ni UI. Anda en todos lados
+//  (incluido el N95): la imagen se rinde en pedazos que entran en el framebuffer
+//  (tope = tamano del viewport), cada tile con su SUB-FRUSTUM, se lee con
+//  glReadPixels y se pega en la imagen final. 'pass' = Rendered / ZBuffer /
+//  NormalView. glReadPixels es bottom-left -> SavePNG hace el flip vertical.
+// ============================================================================
+bool Viewport3D::RenderAPNG(int outW, int outH, RenderType::Enum pass, const char* filename){
+    if (outW <= 0 || outH <= 0 || !SceneCollection) return false;
+
+    // tope de tile = lo que entra seguro en el framebuffer (el viewport ya entra en la ventana).
+    int capW = (width  > 0) ? width  : outW;
+    int capH = (height > 0) ? height : outH;
+    int tileW = (outW < capW) ? outW : capW;
+    int tileH = (outH < capH) ? outH : capH;
+    if (tileW <= 0 || tileH <= 0) return false;
+
+    unsigned char* full = new unsigned char[(size_t)outW * outH * 4];
+    unsigned char* tile = new unsigned char[(size_t)tileW * tileH * 4];
+
+    // extension del frustum de la imagen COMPLETA (aspect = outW/outH, NO el del viewport)
+    float aspectR = (float)outW / (float)outH;
+    float top, bottom, left, right;
+    if (orthographic){
+        const float size = 5.0f;
+        top = size; bottom = -size; right = size * aspectR; left = -right;
+    } else {
+        top = nearClip * tanf(fovDeg * 0.5f * 3.14159265f / 180.0f);
+        bottom = -top; right = top * aspectR; left = -right;
+    }
+
+    // fijar el PASE (sin overlay): modo + luces + flags del Core, una sola vez
+    RenderType viewPrev = view; bool overlaysPrev = showOverlays;
+    view = pass; showOverlays = false;
+    ReloadLights();
+    g_mostrarOverlays = false; w3dRenderOverlays = false;
+    w3dRenderWireframe   = false;
+    w3dRenderSolido      = (pass == RenderType::Solid);
+    w3dRenderNormalColor = (pass == RenderType::NormalView);
+    w3dRenderSinLuz      = (pass == RenderType::ZBuffer);
+    w3dRenderLuces       = (pass == RenderType::Rendered);
+
+    // color de fondo del pase
+    float bg[4];
+    if (pass == RenderType::ZBuffer){ bg[0]=bg[1]=bg[2]=0.0f; bg[3]=1.0f; }              // negro
+    else if (pass == RenderType::Rendered && scene){
+        bg[0]=scene->backgroundColor[0]; bg[1]=scene->backgroundColor[1];
+        bg[2]=scene->backgroundColor[2]; bg[3]=scene->backgroundColor[3];               // fondo de escena
+    } else { bg[0]=bg[1]=bg[2]=0.0f; bg[3]=0.0f; }                                       // normal: transparente (composicion)
+
+    // tiles en coords BOTTOM-LEFT (como GL); el flip vertical lo hace SavePNG al final
+    for (int ty = 0; ty < outH; ty += tileH){
+        int th = (ty + tileH <= outH) ? tileH : (outH - ty);
+        for (int tx = 0; tx < outW; tx += tileW){
+            int tw = (tx + tileW <= outW) ? tileW : (outW - tx);
+
+            float l = left   + (right  - left)   * (float)tx        / (float)outW;
+            float r = left   + (right  - left)   * (float)(tx + tw) / (float)outW;
+            float b = bottom + (top    - bottom) * (float)ty        / (float)outH;
+            float t = bottom + (top    - bottom) * (float)(ty + th) / (float)outH;
+
+            w3dEngine::MatrixMode(w3dEngine::Projection);
+            w3dEngine::LoadIdentity();
+            if (orthographic) w3dEngine::Ortho(l, r, b, t, nearClip, farClip);
+            else              w3dEngine::Frustum(l, r, b, t, nearClip, farClip);
+
+            w3dEngine::Viewport(0, 0, tw, th); // el tile en la esquina del framebuffer
+
+            w3dEngine::MatrixMode(w3dEngine::ModelView);
+            w3dEngine::LoadIdentity();
+            UpdateViewOrbit(); // carga la matriz de vista de la camara del viewport
+
+            w3dEngine::Disable(w3dEngine::Texture2D);
+            w3dEngine::Disable(w3dEngine::Blend);
+            w3dEngine::Disable(w3dEngine::ColorMaterial);
+            w3dEngine::EnableArray(w3dEngine::VertexArray);
+            w3dEngine::DisableArray(w3dEngine::TexCoordArray);
+            w3dEngine::DisableArray(w3dEngine::NormalArray);
+            w3dEngine::Enable(w3dEngine::DepthTest);
+
+            if (pass == RenderType::ZBuffer){
+                w3dEngine::Enable(w3dEngine::Fog); w3dEngine::FogMode(true);
+                w3dEngine::FogStart(nearClip); w3dEngine::FogEnd(40.0f);
+                GLfloat fz[4] = {0.0f, 0.0f, 0.0f, 1.0f}; w3dEngine::FogColor(fz);
+            } else {
+                w3dEngine::Disable(w3dEngine::Fog);
+            }
+
+            w3dEngine::ClearColor(bg[0], bg[1], bg[2], bg[3]);
+            w3dEngine::Clear(w3dEngine::ColorBuffer | w3dEngine::DepthBuffer);
+
+            SceneCollection->Render();
+
+            w3dEngine::ReadPixelsRGBA(0, 0, tw, th, tile);
+            for (int row = 0; row < th; row++){
+                memcpy(full + (size_t)((ty + row) * outW + tx) * 4,
+                       tile + (size_t)(row * tw) * 4,
+                       (size_t)tw * 4);
+            }
+        }
+    }
+
+    // restaurar el estado del viewport
+    view = viewPrev; showOverlays = overlaysPrev;
+    ReloadLights();
+
+    bool ok = w3dEngine::SavePNG(filename, full, outW, outH, true);
+    delete[] full;
+    delete[] tile;
+    return ok;
 }
 
 void Viewport3D::RenderFloor() {

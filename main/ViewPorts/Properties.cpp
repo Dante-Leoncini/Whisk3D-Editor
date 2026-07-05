@@ -12,7 +12,10 @@
 #include "edit/Modifier.h"    // ModifierType (ids del menu Add del stack de modificadores)
 #include "importers/import_obj.h" // ExportOBJ (boton Wavefront.obj de la tarjeta Export)
 #include "render/OpcionesRender.h" // g_redraw (scroll de la lista con la rueda)
+#include "ViewPorts/ViewPort3D.h"  // Viewport3D::RenderAPNG + Viewport3DActive (render a PNG)
+#include "animation/Animation.h"   // CurrentFrame (sufijo _0001 del nombre del render)
 #include <cstdio>
+#include <string>
 #ifdef W3D_SYMBIAN
 extern int W3dPantallaAlto; // flip de Y (glesdraw.cpp)
 #endif
@@ -633,6 +636,44 @@ static void AccionBrowseExport(){
     AbrirFileBrowser("Exportar a...", "Select Folder", ".obj", ExportFolderElegido, true);
 }
 
+// arma "base[_tag]_0001.png" desde el campo Output, el pase (tag) y el frame de animacion actual.
+// el _0001 es CurrentFrame (para secuencias mas adelante).
+static std::string RenderFileNamePNG(const std::string& out, const char* tag){
+    std::string base = out;
+    size_t dot   = base.find_last_of('.');
+    size_t slash = base.find_last_of("/\\");
+    if (dot != std::string::npos && (slash == std::string::npos || dot > slash))
+        base = base.substr(0, dot); // saca la extension del campo Output
+    if (base.empty()) base = "render";
+    if (tag && tag[0]) { base += "_"; base += tag; }
+    char suf[24];
+    snprintf(suf, sizeof(suf), "_%04d.png", CurrentFrame);
+    base += suf;
+    return base;
+}
+
+// boton "Render Image": guarda el pase beauty (siempre) + los pases tildados (zbuffer/normal)
+// como PNG a la resolucion pedida. El render por tiles permite tamanos mayores que la ventana.
+static void AccionRenderImage(){
+    if (!PropsActivo) return;
+    Viewport3D* vp = Viewport3DActive;
+    if (!vp) { Notificar("No active 3D viewport", true); return; }
+    std::string out = PropsActivo->propRenderOutput ? PropsActivo->propRenderOutput->field.text
+                                                    : std::string("render.png");
+    int w = (int)(PropsActivo->renderW + 0.5f); if (w < 1) w = 1;
+    int h = (int)(PropsActivo->renderH + 0.5f); if (h < 1) h = 1;
+
+    int fallos = 0;
+    if (!vp->RenderAPNG(w, h, RenderType::Rendered,   RenderFileNamePNG(out, "").c_str()))        fallos++;
+    if (PropsActivo->renderZbuffer &&
+        !vp->RenderAPNG(w, h, RenderType::ZBuffer,    RenderFileNamePNG(out, "zbuffer").c_str())) fallos++;
+    if (PropsActivo->renderNormal &&
+        !vp->RenderAPNG(w, h, RenderType::NormalView, RenderFileNamePNG(out, "normal").c_str()))  fallos++;
+
+    if (fallos == 0) Notificar("Render saved!", false);
+    else             Notificar("Error: could not save the render", true);
+}
+
 // === pestaña VERTICES: helpers + acciones (UV Maps + capas de color) ===
 static Mesh* VerticesMesh() {
     return (ObjActivo && ObjActivo->getType() == ObjectType::mesh) ? (Mesh*)ObjActivo : NULL;
@@ -827,8 +868,29 @@ void Properties::ConstruirGrupos(){
     propRender->anchoValores = 0.62f; // columna de valor ANCHA (paths)
     propRenderOutput = new PropText("Output", "render.png");
     propRender->properties.push_back(propRenderOutput);
-    propRender->properties.push_back(new PropButton("Render Image"));     // no-op por ahora
-    propRender->properties.push_back(new PropButton("Render Animation")); // no-op por ahora
+    // resolucion editable (default 640x480). Puede ser MAYOR que la ventana: se rinde por tiles.
+    renderW = 640.0f; renderH = 480.0f;
+    propRenderW = new PropFloat("Width");
+    propRenderW->SetRango(1.0f, 8192.0f); propRenderW->entero = true;
+    propRenderW->stepFino = 1.0f; propRenderW->stepGrueso = 16.0f; propRenderW->dragStep = 1.0f;
+    propRenderW->value = &renderW;
+    propRender->properties.push_back(propRenderW);
+    propRenderH = new PropFloat("Height");
+    propRenderH->SetRango(1.0f, 8192.0f); propRenderH->entero = true;
+    propRenderH->stepFino = 1.0f; propRenderH->stepGrueso = 16.0f; propRenderH->dragStep = 1.0f;
+    propRenderH->value = &renderH;
+    propRender->properties.push_back(propRenderH);
+    // pases EXTRA a exportar (el beauty/render siempre se guarda). Nombre: base_zbuffer_0001.png, etc.
+    renderZbuffer = false; renderNormal = false;
+    propRenderZbuffer = new PropBool("ZBuffer"); propRenderZbuffer->value = &renderZbuffer;
+    propRender->properties.push_back(propRenderZbuffer);
+    propRenderNormal = new PropBool("Normal"); propRenderNormal->value = &renderNormal;
+    propRender->properties.push_back(propRenderNormal);
+    // boton con action real (antes era no-op)
+    PropButton* pbRenderImg = new PropButton("Render Image");
+    pbRenderImg->action = AccionRenderImage;
+    propRender->properties.push_back(pbRenderImg);
+    propRender->properties.push_back(new PropButton("Render Animation")); // TODO: loop StartFrame..EndFrame
     GroupProperties.push_back(propRender);
 
     propExport = new GroupPropertie("Export");

@@ -110,6 +110,10 @@ class Viewport3D : public ViewportBase, public WithBorder {
         void AbrirMenuOverlays(int x, int y);
         void Render() override;
 
+        // render de la escena a un PNG de outW x outH (puede ser mayor que la ventana; por tiles,
+        // anda hasta en el N95). Sin overlay. pass = Rendered / ZBuffer / NormalView. true si guardo.
+        bool RenderAPNG(int outW, int outH, RenderType::Enum pass, const char* filename);
+
         void RenderFloor();
         void RenderAllAxisTransform();
         void RenderOverlay();
