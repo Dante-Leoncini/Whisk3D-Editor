@@ -2,6 +2,8 @@
 #include "Properties.h"
 #include "Undo.h" // Ctrl+Z: capturar rename
 #include "edit/MeshEdit.h" // Nuevo/Borrar/MoverMeshPart (funciones libres del editor)
+#include "objects/EditMesh.h" // CentroSeleccion (campos X/Y/Z de posicion en Edit Mode)
+#include "objects/ObjectMode.h" // MoverSeleccionEditLocal (aplicar los campos X/Y/Z a la seleccion)
 #include "WhiskUI/glesdraw.h"
 #include "WhiskUI/PopupMenu.h"
 #include "PopUp/ColorPicker.h"
@@ -580,6 +582,18 @@ static void AccionModParamChanged(){
     if (ObjActivo && ObjActivo->getType()==ObjectType::mesh) ((Mesh*)ObjActivo)->GenerarMallaModificada();
     g_redraw = true;
 }
+// EDIT MODE: al editar un campo X/Y/Z del panel de Vertices, traslada RIGIDO la seleccion para que su centro caiga
+// en el valor tipeado. Convencion Z-up del panel: campo X->local x, campo Y->local z, campo Z->local y (igual que
+// el transform de objeto). Permite dejar un vert EXACTO (ej. X e Y en 0 -> sobre el eje del Screw).
+static void AccionEditPos(){
+    if (InteractionMode != EditMode || !g_editMesh || !PropsActivo) return;
+    Mesh* m = (Mesh*)g_editMesh; m->EnsureEdit();
+    if (!m->edit) return;
+    float cx, cy, cz; if (!m->edit->CentroSeleccion(cx, cy, cz)) return; // centro LOCAL actual
+    Vector3 delta(PropsActivo->editPosX - cx, PropsActivo->editPosZ - cy, PropsActivo->editPosY - cz);
+    MoverSeleccionEditLocal(m, delta); // no-op si delta=0
+    g_redraw = true;
+}
 // menu "Mirror Object": elegir CUALQUIER objeto de la escena como target del mirror (reusa RecolectarTargets)
 static PopupMenu* MenuModTarget = NULL;
 static void AccionModTargetElegido(int id){
@@ -976,6 +990,14 @@ void Properties::ConstruirGrupos(){
     propExport->properties.push_back(pbExp);
     GroupProperties.push_back(propExport);
 
+    // pestaña VERTICES (icono mesh): card "Transform" (posicion X/Y/Z del centro de la seleccion, editable ->
+    // traslada rigido) ARRIBA + 3 tarjetas (UV/Color/Anim). Solo en Edit Mode con algo seleccionado.
+    propEditItem = new GroupPropertie("Transform");
+    { PropFloat* px = new PropFloat("X"); px->value = &editPosX; px->onChange = AccionEditPos; propEditItem->properties.push_back(px);
+      PropFloat* py = new PropFloat("Y"); py->value = &editPosY; py->onChange = AccionEditPos; propEditItem->properties.push_back(py);
+      PropFloat* pz = new PropFloat("Z"); pz->value = &editPosZ; pz->onChange = AccionEditPos; propEditItem->properties.push_back(pz); }
+    GroupProperties.push_back(propEditItem);
+
     // pestaña VERTICES (icono mesh): 3 TARJETAS. Las listas REUSAN PropListMeshParts (con scroll,
     // resize, etc., el MISMO componente que el selector de mesh part) en modo 1 (uvmaps) / 2 (colors).
     propUVMaps = new GroupPropertie("UV Maps");
@@ -1355,6 +1377,7 @@ Properties::Properties() : ViewportBase() {
     // luz: punteros nuevos a NULL (si no se inicializan quedan BASURA y el rebind crashea antes de ConstruirGrupos)
     propLightDir = NULL; propLightGL = NULL; propLightDiffuse = NULL; propLightAmbient = NULL; propLightSpecular = NULL;
     propLightAttC = NULL; propLightAttL = NULL; propLightAttQ = NULL; propLightSpotCut = NULL; propLightSpotExp = NULL;
+    propEditItem = NULL; editPosX = editPosY = editPosZ = 0.0f;
     propUVMaps = NULL; propColorLayers = NULL; propVertexAnim = NULL; propModifiers = NULL;
     propListModifiers = NULL; propRowMod = NULL; propRowModMove = NULL; propModifierProps = NULL;
     propModVerViewport = NULL; propModVerEdit = NULL;
@@ -1452,6 +1475,17 @@ void Properties::ActualizarPestanias(){
     if (propCamera)    propCamera->visible    = (pestaniaActiva == 2 && esCam);
     if (propInstance)  propInstance->visible  = (pestaniaActiva == 2 && esInst);
     bool vertTab = (pestaniaActiva == 3 && esMesh);
+    // card "Transform" (X/Y/Z de la seleccion): solo en Edit Mode con algo seleccionado. Recalcula el centro LOCAL
+    // cada frame y lo mapea a los campos con la convencion Z-up del panel (campo Y = local z, campo Z = local y).
+    if (propEditItem) {
+        bool haySel = false; float cx=0,cy=0,cz=0;
+        if (vertTab && InteractionMode == EditMode && g_editMesh) {
+            Mesh* em = (Mesh*)g_editMesh; em->EnsureEdit();
+            if (em->edit) haySel = em->edit->CentroSeleccion(cx, cy, cz);
+        }
+        propEditItem->visible = haySel;
+        if (haySel) { editPosX = cx; editPosY = cz; editPosZ = cy; }
+    }
     if (propUVMaps)      propUVMaps->visible      = vertTab;
     if (propColorLayers) propColorLayers->visible = vertTab;
     if (propVertexAnim)  propVertexAnim->visible  = vertTab;

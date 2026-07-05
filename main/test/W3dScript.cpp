@@ -200,6 +200,17 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         return true;
     }
 
+    // ---- editcenter <x> <y> <z> : mueve la seleccion (Edit Mode) para que su CENTRO local caiga en (x,y,z) ----
+    if (cmd == "editcenter") {
+        if (InteractionMode != EditMode) { err = "editcenter necesita Edit Mode"; return false; }
+        Mesh* m = ScriptActiveMesh(); if(!m){err="no hay malla activa";return false;}
+        m->EnsureEdit(); if(!m->edit){err="sin edit mesh";return false;}
+        float tx=0,ty=0,tz=0; ss>>tx>>ty>>tz;
+        float cx,cy,cz; if(!m->edit->CentroSeleccion(cx,cy,cz)){err="nada seleccionado";return false;}
+        MoverSeleccionEditLocal(m, Vector3(tx-cx, ty-cy, tz-cz));
+        return true;
+    }
+
     // ---- editdelete : borra la seleccion en Edit Mode segun el selmode actual (Vertices/Edges/Faces) ----
     if (cmd == "editdelete") {
         if (InteractionMode != EditMode) { err = "editdelete necesita Edit Mode"; return false; }

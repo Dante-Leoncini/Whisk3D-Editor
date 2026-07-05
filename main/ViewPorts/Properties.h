@@ -100,6 +100,9 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         GroupPropertie* propRender;  // pestania RENDER: tarjeta "Render" (output)
         GroupPropertie* propExport;  // pestania RENDER: tarjeta "Export" (.obj)
         // pestania VERTICES (icono mesh): 3 tarjetas. Las listas REUSAN PropListMeshParts (modo 1/2).
+        GroupPropertie* propEditItem;   // EDIT MODE: tarjeta "Transform" con X/Y/Z del centro (pivote) de la seleccion
+        float editPosX, editPosY, editPosZ; // posicion del centro de la seleccion (convencion Z-up del panel; se
+                                            // recalcula cada frame; editarla traslada rigido lo seleccionado)
         GroupPropertie* propUVMaps;     // tarjeta "UV Maps" (lista de UV maps)
         GroupPropertie* propColorLayers;// tarjeta "Color" (lista de capas + modo per-vertex/corner)
         GroupPropertie* propVertexAnim; // tarjeta "Vertex Animation"

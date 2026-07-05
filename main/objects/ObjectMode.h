@@ -9,6 +9,8 @@
 #include "animation/Animation.h"
 #endif
 
+class Mesh; // MoverSeleccionEditLocal opera sobre una malla en Edit Mode
+
 void ReestablecerEstado(bool ClearEstado = true);
 void Cancelar();
 void EliminarAnimaciones(Object& obj);
@@ -65,6 +67,11 @@ void SetEscala();
 void SetTranslacionObjetos(int dx, int dy, float factor = 1.0f);
 // entrada numerica: aplica un valor EXACTO al transform de objetos en curso
 void SetTransformNumerico(float v);
+
+// EDIT MODE: traslada RIGIDO los verts seleccionados por 'deltaLocal' (coords LOCALES del mesh) + persiste
+// (empuja al render, rebordes, normales, preview de modificadores, undo). Lo usan el snap y los campos X/Y/Z
+// de posicion del panel de Vertices.
+void MoverSeleccionEditLocal(Mesh* m, const Vector3& deltaLocal);
 
 // snap (menu shift+s): mueve la seleccion o el cursor 3D estilo Blender
 void SnapSeleccionAlCursor(bool mantenerOffset);

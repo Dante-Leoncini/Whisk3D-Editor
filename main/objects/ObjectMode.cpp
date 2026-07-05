@@ -921,6 +921,38 @@ static void RecolectarSnap(Object* nodo, std::vector<Object*>& out) {
     }
 }
 
+// traslada RIGIDO los verts seleccionados (segun el modo vertex/edge/face) por 'delta' en coords LOCALES y
+// persiste todo (render + overlay + bordes + normales + preview de mods + undo). Extraido de SnapSeleccionAlCursor.
+void MoverSeleccionEditLocal(Mesh* m, const Vector3& delta) {
+    if (!m) return;
+    m->EnsureEdit();
+    EditMesh* e = m->edit;
+    if (!e) return;
+    if (delta.x == 0.0f && delta.y == 0.0f && delta.z == 0.0f) return;
+    UndoCapturarMallaGeo(m); // Ctrl+Z: snapshot antes de mover
+    // que VERTICES editables toca la seleccion segun el modo (vertex/edge/face)
+    std::vector<char> selV(e->editVerts.size(), 0);
+    if (EditSelectMode == SelVertex) {
+        for (size_t k = 0; k < e->vertSel.size(); k++) if (e->vertSel[k]) selV[k] = 1;
+    } else if (EditSelectMode == SelEdge) {
+        for (size_t eg = 0; eg < e->edgeSel.size(); eg++) if (e->edgeSel[eg]) {
+            selV[e->lineIdx[eg*2]] = 1; selV[e->lineIdx[eg*2+1]] = 1;
+        }
+    } else {
+        for (size_t f = 0; f < e->faces.size(); f++) if (f < e->faceSel.size() && e->faceSel[f])
+            for (size_t c = 0; c < e->faces[f].size(); c++) selV[e->faces[f][c]] = 1;
+    }
+    for (size_t k = 0; k < selV.size(); k++) { if (!selV[k]) continue;
+        if (k*3+2 < e->pos.size()) { e->pos[k*3] += delta.x; e->pos[k*3+1] += delta.y; e->pos[k*3+2] += delta.z; }
+    }
+    // persistir: empuja al render + rearma overlay + bordes/normales + preview de modificadores (igual que el confirm de un move)
+    e->EmpujarPosiciones(); e->RefrescarOverlay();
+    m->CalcularBordes(false);
+    if (!g_editLockNormales) m->RecalcularNormales();
+    if (!m->modificadores.empty()) m->GenerarMallaModificada();
+    g_redraw = true;
+}
+
 void SnapSeleccionAlCursor(bool mantenerOffset) {
     // Edit Mode: traslada RIGIDO los sub-elementos seleccionados para que su CENTRO caiga en el cursor 3d
     // (el inverso exacto de "Cursor to Selected"). Conservan su forma; solo se desplaza el grupo. En edicion
@@ -939,29 +971,7 @@ void SnapSeleccionAlCursor(bool mantenerOffset) {
         Vector3    d  = rg.Inverted() * (cursor3D.pos - m->GetGlobalPosition());
         Vector3 cursorLocal(sg.x!=0.0f?d.x/sg.x:d.x, sg.y!=0.0f?d.y/sg.y:d.y, sg.z!=0.0f?d.z/sg.z:d.z);
         Vector3 delta(cursorLocal.x - cx, cursorLocal.y - cy, cursorLocal.z - cz);
-        if (delta.x == 0.0f && delta.y == 0.0f && delta.z == 0.0f) return; // el centro ya esta en el cursor
-        UndoCapturarMallaGeo(m); // Ctrl+Z: snapshot antes de mover
-        // que VERTICES editables toca la seleccion segun el modo (vertex/edge/face)
-        std::vector<char> selV(e->editVerts.size(), 0);
-        if (EditSelectMode == SelVertex) {
-            for (size_t k = 0; k < e->vertSel.size(); k++) if (e->vertSel[k]) selV[k] = 1;
-        } else if (EditSelectMode == SelEdge) {
-            for (size_t eg = 0; eg < e->edgeSel.size(); eg++) if (e->edgeSel[eg]) {
-                selV[e->lineIdx[eg*2]] = 1; selV[e->lineIdx[eg*2+1]] = 1;
-            }
-        } else {
-            for (size_t f = 0; f < e->faces.size(); f++) if (f < e->faceSel.size() && e->faceSel[f])
-                for (size_t c = 0; c < e->faces[f].size(); c++) selV[e->faces[f][c]] = 1;
-        }
-        for (size_t k = 0; k < selV.size(); k++) { if (!selV[k]) continue;
-            if (k*3+2 < e->pos.size()) { e->pos[k*3] += delta.x; e->pos[k*3+1] += delta.y; e->pos[k*3+2] += delta.z; }
-        }
-        // persistir: empuja al render + rearma overlay + bordes/normales + preview de modificadores (igual que el confirm de un move)
-        e->EmpujarPosiciones(); e->RefrescarOverlay();
-        m->CalcularBordes(false);
-        if (!g_editLockNormales) m->RecalcularNormales();
-        if (!m->modificadores.empty()) m->GenerarMallaModificada();
-        g_redraw = true;
+        MoverSeleccionEditLocal(m, delta); // traslada rigido la seleccion + persiste (no-op si delta=0)
         return;
     }
     std::vector<Object*> sel;
