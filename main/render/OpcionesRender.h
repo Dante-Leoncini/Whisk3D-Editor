@@ -54,6 +54,9 @@ extern bool OverlayFps;          // "fps: N"
 extern float g_fpsActual;        // FPS actual (lo actualiza cada plataforma 1x/frame)
 extern long g_genMallaCount;     // DIAGNOSTICO: veces que se regenero la malla de un modificador (subsurf/screw).
                                  // Se muestra en Statistics; al ROTAR NO debe subir (la malla se cachea en genValido).
+extern bool g_objetosMovidos;    // lo prenden los transforms de OBJETO (mover/rotar/escalar/snap). El unico modificador
+                                 // que depende de la posicion en el mundo es el MIRROR con TARGET: si el objeto o su
+                                 // target se movieron, hay que regenerar su preview. Se chequea/limpia 1x/frame.
 
 // render EVENT-DRIVEN: el loop (PC/Symbian) solo redibuja si g_redraw esta en true
 // (lo prende cualquier input / resize) o si hay una animacion en play. Sino no hace

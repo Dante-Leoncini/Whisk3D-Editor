@@ -23,6 +23,7 @@ bool OverlayStatistics = false;
 bool OverlayFps        = false;
 float g_fpsActual      = 0.0f;
 long g_genMallaCount   = 0; // diagnostico de regeneracion de modificadores (ver OpcionesRender.h)
+bool g_objetosMovidos  = false; // un objeto se movio -> regenerar los Mirror con target (ver OpcionesRender.h)
 
 // arranca en true para dibujar el primer frame
 bool g_redraw = true;

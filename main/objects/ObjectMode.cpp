@@ -725,6 +725,7 @@ void SetRotacion(int dx, int dy){
 		obj.ActualizarDisplayRot();
 	}
 	AplicarPivotATransform(); // gira las posiciones alrededor del pivote
+	{ extern bool g_objetosMovidos; g_objetosMovidos = true; } // Mirror con target depende de la rotacion/posicion
 }
 
 // rotacion ORBITAL/gimbal: gira alrededor de los ejes de la VISTA (en mundo).
@@ -744,6 +745,7 @@ void RotarOrbital(int dx, int dy){
 		obj.ActualizarDisplayRot();
 	}
 	AplicarPivotATransform(); // gira las posiciones alrededor del pivote
+	{ extern bool g_objetosMovidos; g_objetosMovidos = true; } // Mirror con target depende de la rotacion/posicion
 }
 
 // alterna el modo de rotacion LIBRE entre trackball (eje de vista) y ORBITAL.
@@ -785,6 +787,7 @@ void SetScale(int dx, int dy, float factor){
 		}
 	}
 	AplicarPivotATransform(); // aleja/acerca las posiciones del pivote segun el factor
+	{ extern bool g_objetosMovidos; g_objetosMovidos = true; } // Mirror con target depende de la posicion/escala
 }
 
 void SetEscala(){
@@ -857,6 +860,7 @@ void SetTranslacionObjetos(int dx, int dy, float speed){
 			obj.pos += libre; // libre (3 ejes)
 		}
 	}
+	{ extern bool g_objetosMovidos; g_objetosMovidos = true; } // Mirror con target: su plano depende de la posicion
 }
 
 // ====================================================================
@@ -866,6 +870,7 @@ void SetTranslacionObjetos(int dx, int dy, float speed){
 // pone el origen de o en la posicion GLOBAL g (convierte a local segun el
 // padre, misma matematica que ReparentKeepTransform)
 static void PonerEnGlobal(Object* o, const Vector3& g) {
+    { extern bool g_objetosMovidos; g_objetosMovidos = true; } // snap mueve el objeto -> Mirror con target puede cambiar
     Object* p = o->Parent;
     if (!p) { o->pos = g; return; }
     Quaternion prg = RotGlobalDe(p);

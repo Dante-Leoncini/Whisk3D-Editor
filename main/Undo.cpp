@@ -213,6 +213,9 @@ public:
         uvMaps.swap(cur.uvMaps); colorLayers.swap(cur.colorLayers); vertexGroups.swap(cur.vertexGroups);
         uvMapActivo = cur.uvMapActivo; colorActivo = cur.colorActivo; grupoActivo = cur.grupoActivo;
         sharpEdges.swap(cur.sharpEdges); seamEdges.swap(cur.seamEdges); meshSmooth = cur.meshSmooth;
+        // la geometria cambio -> refrescar el preview del modificador (subdivision/screw). Antes esto lo hacia el
+        // regen POR FRAME de ActualizarEditMeshActivo; ahora que ese esta gateado, hay que pedirlo aca explicito.
+        if (!m->modificadores.empty()) m->GenerarMallaModificada();
     }
 };
 

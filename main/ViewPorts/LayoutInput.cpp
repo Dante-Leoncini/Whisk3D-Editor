@@ -17,6 +17,7 @@
 #include "objects/Instance.h"
 #include "objects/Collection.h"
 #include "objects/ObjectMode.h"
+#include "edit/Modifier.h" // ModifierType::Mirror + target (regen de mirrors al mover objetos)
 #include "objects/Primitivas.h"
 #include "objects/Textures.h"
 #include "variables.h"
@@ -689,13 +690,45 @@ static void LayoutAccionView(int aId) {
 // llamarla cada vez que cambia InteractionMode o ObjActivo. COMPARTIDA PC+Symbian: antes
 // solo la seteaba el render de PC (ViewPort3D::Render), asi que en Symbian g_editMesh
 // quedaba NULL -> en Edit Mode no se podia ni seleccionar ni mover sub-elementos.
+// regenera el preview SOLO de las mallas que tienen un modificador MIRROR con TARGET (su plano de espejo sale del
+// mundo del target relativo al objeto -> si cualquiera de los dos se movio, cambia). El resto de modificadores es
+// local y no depende de la posicion. Recorre el arbol; barato: los que no tienen modificadores se saltean.
+static void RegenerarMirrorsConTargetRec(Object* nodo){
+    if (!nodo) return;
+    for (size_t i=0;i<nodo->Childrens.size();i++){
+        Object* o = nodo->Childrens[i];
+        if (o->getType()==ObjectType::mesh){
+            Mesh* m=(Mesh*)o;
+            for (size_t k=0;k<m->modificadores.size();k++)
+                if (m->modificadores[k]->tipo==ModifierType::Mirror && m->modificadores[k]->target){ m->GenerarMallaModificada(); break; }
+        }
+        RegenerarMirrorsConTargetRec(o);
+    }
+}
+
 void ActualizarEditMeshActivo() {
     g_editMesh = (InteractionMode == EditMode && ObjActivo &&
                   ObjActivo->getType() == ObjectType::mesh) ? ObjActivo : NULL;
-    // el filtro de modificadores depende del modo (mostrarEdit): al entrar/salir de Edit -> regenerar el preview
-    if (ObjActivo && ObjActivo->getType() == ObjectType::mesh) {
-        Mesh* m = (Mesh*)ObjActivo;
-        if (!m->modificadores.empty()) { m->GenerarMallaModificada(); g_redraw = true; }
+    // MIRROR con TARGET: si se movio algun objeto (flag que prenden los transforms de objeto), su plano cambio ->
+    // regenerar SOLO esos previews. Chequeo barato (1 bool/frame); no corre nada al orbitar/idle.
+    if (g_objetosMovidos) {
+        g_objetosMovidos = false;
+        if (SceneCollection) RegenerarMirrorsConTargetRec(SceneCollection);
+        g_redraw = true;
+    }
+    // Esta funcion se llama CADA FRAME (ViewPort3D::Render). El UNICO motivo para regenerar aca es el CAMBIO DE MODO
+    // (entrar/salir de Edit): el filtro mostrarEdit puede saltear un modificador en Edit, asi que el preview cambia.
+    // NO se regenera por seleccionar/activar un objeto (seleccionar no cambia la geometria -> el preview ya esta
+    // cacheado en genValido), NI cada frame (antes se recalculaba la subdivision/screw en cada redibujo -> lentisimo
+    // en el N95). Los demas cambios (params del modificador, mover verts, cortes, undo) los regeneran por su cuenta;
+    // el mirror con TARGET lo regenera el confirm de mover objetos.
+    static int prevMode = -999;
+    if (InteractionMode != prevMode) {
+        prevMode = InteractionMode;
+        if (ObjActivo && ObjActivo->getType() == ObjectType::mesh) {
+            Mesh* m = (Mesh*)ObjActivo;
+            if (!m->modificadores.empty()) { m->GenerarMallaModificada(); g_redraw = true; }
+        }
     }
 }
 
