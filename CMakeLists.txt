@@ -29,8 +29,11 @@ endif()
 # Debug flags
 # ---------------------------------------------------
 
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /Od")
-set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /Od")
+# /Od es flag de MSVC (Windows). En Linux/gcc con -DCMAKE_BUILD_TYPE=Debug rompe -> solo aplicarlo con MSVC.
+if(MSVC)
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /Od")
+    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /Od")
+endif()
 
 # ---------------------------------------------------
 # Sources

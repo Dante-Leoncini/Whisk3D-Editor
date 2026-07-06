@@ -1,6 +1,7 @@
 #include "w3dGraphics.h" // abstraccion de graficos (independencia de OpenGL)
 #include "test/W3dScript.h" // modo test: whisk3d --script <ruta>
-#ifdef _WIN32
+#if !defined(__ANDROID__) // ESCRITORIO (Windows + Linux): codigo compartido de PC (import/export, browser, texturas,
+                          // warp del mouse, swap). Android tiene su propia entrada de plataforma y no lo usa.
     #define NOMINMAX
     #include "ViewPorts/LayoutInput.h" // ruteo compartido + overlay del menu
 #include "lectura-escritura.h"      // abrir(): dialogo + ImportOBJ
@@ -62,7 +63,9 @@ static void PCCargarTexturaEn(Material* mat) {
 }
 #include "WhiskUI/PopupMenu.h" // MenuPantallaW/H (desplegables)
 #include "WhiskUI/glesdraw.h"  // W3dPantallaAlto (flip de Y)
-#include <windows.h>
+#ifdef _WIN32
+    #include <windows.h> // SOLO Windows (el resto del bloque es escritorio compartido Win+Linux)
+#endif
 #endif
 
 #if SDL_MAJOR_VERSION == 2
@@ -429,11 +432,14 @@ int main(int argc, char* argv[]) {
     // Constructor de Whisk3D universal (Android, PC)
     ConstructUniversal(argc, argv);
 
-    // "Add > import Wavefront" del menu: abre el File browser compartido
+    // "Add > import Wavefront" del menu + Load Texture + warp/swap: hooks de ESCRITORIO (Windows + Linux). En Android
+    // no existen esas funciones (el bloque de PC no se compila); los hooks quedan NULL (se chequean antes de usar).
+#if !defined(__ANDROID__)
     LayoutImportObj = PCImportObj;
     DialogoCargarTextura = PCCargarTexturaEn; // "Load Texture" (base Y normal map) -> browser compartido
     LayoutWarpMouse = PCWarpMouse;
     g_swapWindow = window; LayoutSwapBuffers = PCSwapBuffers; // barra de progreso (export/import)
+#endif
 
     // Detectar primer mando
     if (SDL_NumJoysticks() > 0 && SDL_IsGameController(0)) {
