@@ -178,6 +178,8 @@ class Viewport3D : public ViewportBase, public WithBorder {
         void event_mouse_wheel(SDL_Event &e) override;
 #endif
         void event_mouse_motion(int mx, int my) override;
+        void event_finger_gesture(float zoomDelta, float panDx, float panDy) override; // 2 dedos: zoom + paneo
+        bool event_finger_scroll(int px, int py, int dx, int dy) override; // 1 dedo sobre el TOOLBAR = scroll horiz
         void TeclaDerecha();
         void TeclaIzquierda();
         void TeclaArriba();

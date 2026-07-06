@@ -87,12 +87,18 @@ void ConstructUniversal(int argc, char* argv[]) {
     Viewport3D* vp3dInicial = new Viewport3D();
     // el layout se adapta a la orientacion (igual que Symbian, ver w3dlayout.cpp):
     if (winH > winW) {
+#ifdef __EMSCRIPTEN__
+        // WEB / movil VERTICAL: solo PROPIEDADES abajo. Outliner + propiedades juntos quedan muy
+        // apretados en un celular; el outliner se ve rotando a horizontal.
+        rootViewport = new ViewportColumn(vp3dInicial, new Properties(), 0.70f);
+#else
         // PORTRAIT (ej. N95 240x320): viewport ARRIBA, fila [outliner | propiedades] ABAJO
         rootViewport = new ViewportColumn(
             vp3dInicial,
             new ViewportRow(new Outliner(), new Properties(), 0.40f),
             0.70f
         );
+#endif
     } else {
         // LANDSCAPE (PC): a la IZQUIERDA una columna [viewport3D ARRIBA / UV editor ABAJO al 30%];
         // a la DERECHA outliner sobre propiedades.

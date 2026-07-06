@@ -105,6 +105,12 @@ void Scrollable::ScrollX(int dx){
     }
 }
 
+// ------------------ Scroll por TOUCH (arrastrar el contenido con el dedo, 1:1) ------------------
+void Scrollable::ScrollByTouch(int dx, int dy){
+    PosY += dy; if (PosY > 0) PosY = 0; if (MaxPosY > PosY) PosY = MaxPosY;
+    PosX += dx; if (PosX > 0) PosX = 0; if (MaxPosX > PosX) PosX = MaxPosX;
+}
+
 // ------------------ Mouse Over ------------------
 void Scrollable::ScrollMouseOver(ViewportBase* current, int mx, int my){
     // (mx, my vienen LOCALES al viewport)

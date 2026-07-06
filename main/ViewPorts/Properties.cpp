@@ -1898,6 +1898,10 @@ void Properties::mouse_button_up(SDL_Event &e){
 #ifndef W3D_SYMBIAN
 void Properties::event_mouse_wheel(SDL_Event &e){
     if (editando) return;
+    // rueda sobre las PESTAÑAS (barra superior) = scroll horizontal (para llegar a Modifiers cuando el
+    // panel es angosto). Mismo comportamiento que la barra del viewport 3D. Fuera de la barra -> vertical.
+    { int mx, my; SDL_GetMouseState(&mx, &my);
+      if (BarScrollHorizontal(mx, my, (int)(e.wheel.y * 40))) return; }
     // si el mouse esta sobre una LISTA (mesh parts / selector), la rueda la scrollea A
     // ELLA (antes solo scrolleaba el panel entero -> el componente "obligaba" al estilo
     // Symbian de Enter+flechas). Reusa el hover ya trackeado (PropHoverGroup/Fila).
@@ -1973,6 +1977,13 @@ void Properties::FindMouseOver(int mx, int my){
         }
         yCursor += g->height + borderGS + (g->open ? GlobalScale : 0);
     }
+}
+
+// TOUCH: arrastrar 1 dedo. Sobre las PESTAÑAS (barra superior) = scroll horizontal; sino = vertical.
+bool Properties::event_finger_scroll(int px, int py, int dx, int dy){
+    if (BarScrollHorizontal(px, py, dx)) return true; // sobre las pestañas -> horizontal (llegar a Modifiers)
+    ScrollByTouch(0, dy); // resto del panel -> vertical
+    return true;
 }
 
 void Properties::event_mouse_motion(int mx, int my) {

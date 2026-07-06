@@ -51,7 +51,22 @@ void ViewportBase::event_key_up(SDL_Event &e) {}
 void ViewportBase::event_mouse_wheel(SDL_Event &e) {}
 void ViewportBase::mouse_button_up(SDL_Event &e) {}
 #endif
-void ViewportBase::event_finger_motion(float pinch){}
+void ViewportBase::event_finger_gesture(float zoomDelta, float panDx, float panDy){} // base: no-op (los paneles no zoomean/panean)
+bool ViewportBase::event_finger_scroll(int px, int py, int dx, int dy){ return false; } // base: no scrollea (el viewport 3D orbita)
+
+// scroll HORIZONTAL de la barra superior (botones + pestañas), unificado rueda/touch en todos los viewports.
+extern bool g_redraw;
+bool ViewportBase::BarScrollHorizontal(int px, int py, int delta){
+    if (!barCard || (BarButtons.empty() && BarTabs.empty())) return false; // no hay barra
+    int barH = BarHeight();
+    int yBar = barAbajo ? (y + height - barH) : y;
+    if (px < x || px >= x + width || py < yBar || py >= yBar + barH) return false; // el evento no cae en la barra
+    barScrollManual -= delta; // delta>0 (rueda arriba / dedo a la derecha) = mostrar lo de la izquierda
+    if (barScrollManual < 0) barScrollManual = 0;
+    ActualizarBarra(); // re-clampea contra el ancho total (deja el maximo si te pasas)
+    g_redraw = true;
+    return true;
+}
 
 // ------------------ Constructor / Destructor ------------------
 ViewportRow::ViewportRow(ViewportBase* a, ViewportBase* b, float frac)

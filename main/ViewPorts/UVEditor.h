@@ -50,6 +50,8 @@ class UVEditor : public ViewportBase, public WithBorder {
         void Render() override;
         void Resize(int newW, int newH) override;
         void event_mouse_motion(int mx, int my) override;
+        bool event_finger_scroll(int px, int py, int dx, int dy) override;             // 1 dedo: panear la vista UV
+        void event_finger_gesture(float zoomDelta, float panDx, float panDy) override; // 2 dedos: zoom + paneo
         void button_left() override; // click izquierdo = seleccionar UV (o confirmar transform)
         void button_right() override; // click derecho = cancelar transform
         // pick en coords LOCALES del viewport (lx,ly); add=true -> toggle/sumar (shift), false -> reemplazar.

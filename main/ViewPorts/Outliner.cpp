@@ -408,6 +408,8 @@ void Outliner::mouse_button_up(SDL_Event &e){
 
 #ifndef W3D_SYMBIAN
 void Outliner::event_mouse_wheel(SDL_Event &e){
+    { int mx, my; SDL_GetMouseState(&mx, &my);
+      if (BarScrollHorizontal(mx, my, (int)(e.wheel.y * 40))) return; } // sobre la barra -> horizontal
     MouseWheel = true;
     ScrollY(e.wheel.y*6*GlobalScale);
     MouseWheel = false;
@@ -417,6 +419,13 @@ void Outliner::event_mouse_wheel(SDL_Event &e){
 void Outliner::FindMouseOver(int mx, int my){
     // (el hover de las barras lo calcula LayoutInput con la zona del
     // agarre; la llamada vieja a ScrollMouseOver pisaba ese estado)
+}
+
+// TOUCH: arrastrar 1 dedo. Sobre la barra superior = scroll horizontal; sino = scroll del contenido (v/h).
+bool Outliner::event_finger_scroll(int px, int py, int dx, int dy){
+    if (BarScrollHorizontal(px, py, dx)) return true;
+    ScrollByTouch(dx, dy);
+    return true;
 }
 
 void Outliner::event_mouse_motion(int mx, int my) {

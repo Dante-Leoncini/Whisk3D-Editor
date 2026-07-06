@@ -200,6 +200,7 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         void Cancel();
         void FindMouseOver(int mx, int my);
         void event_mouse_motion(int mx, int my) override;
+        bool event_finger_scroll(int px, int py, int dx, int dy) override; // touch: arrastrar = scroll vertical
 #ifndef W3D_SYMBIAN
         void mouse_button_up(SDL_Event &e) override;
         void event_mouse_wheel(SDL_Event &e) override;

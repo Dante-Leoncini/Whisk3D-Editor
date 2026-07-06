@@ -54,6 +54,7 @@ class Scrollable {
         // ------------------ Funciones ------------------
         void ScrollY(int dy);
         void ScrollX(int dx);
+        void ScrollByTouch(int dx, int dy); // touch: arrastrar el CONTENIDO 1:1 (sin tocar la barra)
         void ScrollMouseOver(ViewportBase* current, int mx, int my);
         void ResizeScrollbar(int width, int height, int MaxX, int MaxY,
                              int topOffset = 0);

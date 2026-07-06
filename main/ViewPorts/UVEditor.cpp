@@ -404,6 +404,19 @@ void UVEditor::CancelarXform(Mesh* m) {    // restaura los uv originales
 // paneo de la vista UV (compartido PC/Symbian). dx>0 mueve el contenido a la derecha (revela la izquierda).
 void UVEditor::Panear(float dx, float dy) { panX += dx; panY += dy; g_redraw = true; }
 
+// TOUCH: 1 dedo. Sobre la barra superior = scroll horizontal; sino = panear la vista UV.
+bool UVEditor::event_finger_scroll(int px, int py, int dx, int dy){
+    if (BarScrollHorizontal(px, py, dx)) return true;
+    Panear((float)dx, (float)dy);
+    return true;
+}
+// TOUCH: 2 dedos = zoom (pinch) + paneo del centroide.
+void UVEditor::event_finger_gesture(float zoomDelta, float panDx, float panDy){
+    if (zoomDelta > 1.0f)       ZoomCentro(1);
+    else if (zoomDelta < -1.0f) ZoomCentro(-1);
+    if (panDx != 0.0f || panDy != 0.0f) Panear(panDx, panDy);
+}
+
 // zoom CENTRADO en el viewport (sin cursor; para el teclado 0+arriba/abajo de Symbian). Es el zoom de la rueda
 // con el "cursor" en el centro: ahi (curX-uvCx) = -panX -> panX queda *= f (el centro de pantalla no se mueve).
 void UVEditor::ZoomCentro(int dir) {
@@ -441,6 +454,8 @@ void UVEditor::event_key_down(SDL_Event &e) {
 
 void UVEditor::event_mouse_wheel(SDL_Event &e) {
     if (PopUpActive) return;                    // dejar que el popup (file browser) maneje la rueda
+    { int mx, my; SDL_GetMouseState(&mx, &my);
+      if (BarScrollHorizontal(mx, my, (int)(e.wheel.y * 40))) return; } // sobre la barra -> scroll horizontal
     float f = (e.wheel.y > 0) ? 1.1f : (1.0f / 1.1f);
     float nz = zoom * f;
     if (nz < 0.05f) nz = 0.05f;

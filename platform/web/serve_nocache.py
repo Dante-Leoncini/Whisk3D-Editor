@@ -17,6 +17,8 @@ class NoCache(http.server.SimpleHTTPRequestHandler):
 
 handler = functools.partial(NoCache, directory=DIRECTORY)
 socketserver.TCPServer.allow_reuse_address = True
-with socketserver.TCPServer(("127.0.0.1", PORT), handler) as httpd:
-    print("Sirviendo %s en http://127.0.0.1:%d (sin cache)" % (DIRECTORY, PORT))
+# 0.0.0.0 = escucha en TODAS las interfaces -> se puede abrir desde el CELULAR en la misma red
+# (usar http://<IP-de-esta-PC>:8000/whisk3d.html). En la PC sigue andando http://127.0.0.1:8000.
+with socketserver.TCPServer(("0.0.0.0", PORT), handler) as httpd:
+    print("Sirviendo %s en http://0.0.0.0:%d (sin cache; accesible desde el celu por la IP de la PC)" % (DIRECTORY, PORT))
     httpd.serve_forever()

@@ -19,6 +19,8 @@ extern void NumEditSalirDelPanel(); // limpia el 'editando' del panel al termina
 std::map<SDL_FingerID, Finger> fingers;
 float lastDistance = 0.0f;
 float PINCHposY = 0.0f;
+float lastCentroidX = 0.0f, lastCentroidY = 0.0f; // 2 dedos: punto medio anterior (para el paneo)
+bool g_fingerScrolling = false; // 1 dedo esta scrolleando un panel/toolbar -> el UP no debe seleccionar
 
 void Contadores(){
     if (LShiftPressed){
@@ -42,40 +44,53 @@ void InputUsuarioSDL3(SDL_Event &e){
     switch(e.type) {
         case SDL_FINGERDOWN:
             fingers[e.tfinger.fingerId] = {e.tfinger.x, e.tfinger.y};
+            if (fingers.size() == 1) g_fingerScrolling = false; // toque nuevo: arranca sin scroll
+            if (fingers.size() >= 2) {
+                // 2do dedo -> arranca el gesto de 2 dedos: cortamos el orbit/drag del mouse (1 dedo
+                // sintetizado) para que el pinch/paneo no pelee con la orbita.
+                leftMouseDown = middleMouseDown = ViewPortClickDown = false;
+                lastDistance = 0.0f; // re-arma pinch/paneo desde este toque
+            }
             break;
 
         case SDL_FINGERUP:
             fingers.erase(e.tfinger.fingerId);
             lastDistance = 0.0f; // reset
+            if (fingers.size() < 2) {
+                // volvimos a <2 dedos -> cortar el drag (el dedo que queda no debe "saltar" a orbitar)
+                leftMouseDown = middleMouseDown = ViewPortClickDown = false;
+            }
             break;
 
         case SDL_FINGERMOTION:
             fingers[e.tfinger.fingerId] = {e.tfinger.x, e.tfinger.y};
-            if(fingers.size() == 2) {
-                auto it = fingers.begin();
-                Finger f1 = it->second;
-                ++it;
-                Finger f2 = it->second;
-
-                float dx = f2.x - f1.x;
-                float dy = f2.y - f1.y;
-                float dist = sqrt(dx*dx + dy*dy);
-
-                if(lastDistance != 0.0f) {
-                    float delta = dist - lastDistance;
-                    PINCHposY += delta * 1; // escalado a gusto
+            if (fingers.size() == 2 && viewPortActive) {
+                std::map<SDL_FingerID, Finger>::iterator it = fingers.begin();
+                Finger f1 = it->second; ++it; Finger f2 = it->second;
+                float ex = f2.x - f1.x, ey = f2.y - f1.y;
+                float dist = sqrtf(ex*ex + ey*ey);                          // distancia entre dedos (pinch)
+                float cx = (f1.x + f2.x) * 0.5f, cy = (f1.y + f2.y) * 0.5f; // punto medio (paneo)
+                if (lastDistance != 0.0f) {
+                    // dedos vienen NORMALIZADOS (0-1). Zoom: abrir dedos = acercar. Paneo: mover el
+                    // punto medio (a pixeles del viewport). Solo el Viewport3D responde (los paneles no).
+                    float zoomDelta = (dist - lastDistance) * 60.0f;
+                    float panDx = (cx - lastCentroidX) * (float)viewPortActive->width;
+                    float panDy = (cy - lastCentroidY) * (float)viewPortActive->height;
+                    viewPortActive->event_finger_gesture(zoomDelta, panDx, panDy);
+                    g_redraw = true;
                 }
-
-                lastDistance = dist;
+                lastDistance = dist; lastCentroidX = cx; lastCentroidY = cy;
             }
 		
-			if (viewPortActive){
-				viewPortActive->event_finger_motion(PINCHposY);
-			}
+            // (el gesto de 2 dedos ya se aplico arriba con event_finger_gesture)
             break;
     }
 
     if (e.type == SDL_EVENT_MOUSE_MOTION){
+        // 2+ dedos: el mouse lo sintetiza el touch desde 1 dedo -> NO orbitar mientras se hace
+        // pinch/paneo (el gesto de 2 dedos ya se maneja en SDL_FINGERMOTION).
+        if (fingers.size() >= 2) return;
+
         int mx = e.motion.x;
         int my = e.motion.y;
 
@@ -94,6 +109,17 @@ void InputUsuarioSDL3(SDL_Event &e){
         // de SDL ya viene asi, sin flip
         if (!ViewPortClickDown){
             viewPortActive = FindViewportUnderMouse(rootViewport, mx, my);
+        }
+
+        // TOUCH: arrastrar 1 dedo sobre un PANEL (outliner/propiedades) o el TOOLBAR = scrollear, NO
+        // orbitar/seleccionar. El mouse lo sintetiza el touch (fingers.size()==1) y leftMouseDown =
+        // se esta arrastrando. Si el panel lo consume (true) cortamos aca; el viewport 3D devuelve
+        // false (salvo su toolbar) y sigue de largo -> orbita como siempre.
+        if (fingers.size() == 1 && leftMouseDown && viewPortActive &&
+            viewPortActive->event_finger_scroll(mx, my, e.motion.xrel, e.motion.yrel)) {
+            g_fingerScrolling = true;
+            g_redraw = true;
+            return;
         }
 
         if (viewPortActive){
@@ -224,6 +250,9 @@ void InputUsuarioSDL3(SDL_Event &e){
             middleMouseDown = false;
         }
         GuardarMousePos();
+
+        // si el dedo venia SCROLLEANDO un panel, el "soltar" NO es un click de seleccion -> lo ignoramos
+        if (g_fingerScrolling) { g_fingerScrolling = false; return; }
 
         if (viewPortActive){
             viewPortActive->mouse_button_up(e);

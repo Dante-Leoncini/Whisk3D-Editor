@@ -278,17 +278,10 @@ void Viewport3D::SetLimpiarPantalla(bool value) {
 
 #ifndef W3D_SYMBIAN
 void Viewport3D::event_mouse_wheel(SDL_Event &e) {
-    // si el mouse esta sobre la BARRA, la rueda la scrollea (en PC no entran
-    // todos los botones); si no, hace zoom de la camara.
+    // rueda sobre la BARRA superior = scroll horizontal (en PC no entran todos los botones); sino zoom.
+    // Unificado con la barra de propiedades (BarScrollHorizontal).
     int mx, my; SDL_GetMouseState(&mx, &my);
-    int barH = BarHeight();
-    int yBar = barAbajo ? (y + height - barH) : y;
-    if (mx >= x && mx < x + width && my >= yBar && my < yBar + barH) {
-        barScrollManual -= (int)(e.wheel.y * 40); // rueda arriba = scroll a la izquierda
-        if (barScrollManual < 0) barScrollManual = 0;
-        ActualizarBarra(); // re-clampea contra el ancho total
-        return;
-    }
+    if (BarScrollHorizontal(mx, my, (int)(e.wheel.y * 40))) return;
     if (!ViewFromCameraActive) {
         Zoom(e.wheel.y* 2.0f); //podria multiplciarse por un valor por sensibilidad  * 1.0f
     }
@@ -447,6 +440,24 @@ void Viewport3D::PanFlecha(int ndx, int ndy){
     dx = (float)ndx; dy = (float)ndy;
     Pan();
     dx = odx; dy = ody;
+}
+
+// GESTO DE 2 DEDOS (web / movil): pinch = ZOOM (abrir dedos = acercar); arrastrar el punto medio = PANEO.
+// El 1 dedo (orbitar / seleccionar) lo maneja el mouse sintetizado desde el touch; esto es solo 2 dedos.
+void Viewport3D::event_finger_gesture(float zoomDelta, float panDx, float panDy){
+    if (zoomDelta != 0.0f) Zoom(zoomDelta);
+    if (panDx != 0.0f || panDy != 0.0f){
+        float odx = dx, ody = dy;       // Pan() usa dx/dy; los guardamos y restauramos (como PanFlecha)
+        dx = panDx; dy = panDy;
+        Pan();
+        dx = odx; dy = ody;
+    }
+}
+
+// TOUCH: arrastrar 1 dedo sobre el TOOLBAR (menu superior, muy ancho en el celu) = scroll horizontal
+// (unificado con la barra de propiedades). Fuera del toolbar devuelve false -> el 3D orbita.
+bool Viewport3D::event_finger_scroll(int px, int py, int dx, int dy){
+    return BarScrollHorizontal(px, py, dx);
 }
 
 // PRIMERA PERSONA (#+flechas en el N95): la camara NO se mueve, GIRA la mirada. Rota viewRot (yaw global +
@@ -1759,8 +1770,9 @@ void Viewport3D::event_mouse_motion(int mx, int my){
     if (estado != rotacion) gTrackballCap = false;
     if (estado != rotacion && estado != EditScale) gLineaValida = false;
 
-    //boton del medio del mouse
-    #ifdef __ANDROID__
+    //boton del medio del mouse (en Android/WebGL tambien el IZQUIERDO: el touch sintetiza click izq ->
+    // 1 dedo arrastrado tiene que orbitar. El tap-vs-drag distingue seleccionar de orbitar.)
+    #if defined(__ANDROID__) || defined(__EMSCRIPTEN__)
         if (middleMouseDown || leftMouseDown) {
     #else
         if (middleMouseDown) {

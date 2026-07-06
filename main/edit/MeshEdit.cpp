@@ -2666,8 +2666,13 @@ void Mesh::GenerarRender() {
     looseEdges.swap(nLoose); // bordes sueltos remapeados a los GPU nuevos
     looseVerts.swap(nLooseV); // verts sueltos remapeados
     ReagruparMeshParts(); // arma el index buffer + los rangos por mesh part (mf.mat)
-    GenerarMallaModificada(); // EDITOR: re-aplica el stack de modificadores -> malla generada (render). No-op sin stack
+    // ORDEN IMPORTANTE: CalcularBordes PRIMERO (recomputa posRep = conectividad topologica) y RECIEN
+    // despues GenerarMallaModificada. El stack de modificadores (subdivision/screw) arma la PolyMesh
+    // deduplicando los verts de render por posRep; si posRep esta viejo (topologia cambiada por un
+    // extrude/loop cut) suelda mal y la subdivision sale deforme hasta mover un vertice. Con posRep
+    // fresco antes de aplicar el stack, queda bien al instante (bug reportado por Dante).
     CalcularBordes(); // recomputa posRep/edges/centroGeom + invalida el edit (geometria nueva)
+    GenerarMallaModificada(); // EDITOR: re-aplica el stack de modificadores -> malla generada (render). No-op sin stack
 }
 
 // ============================================================================

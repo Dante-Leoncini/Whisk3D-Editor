@@ -98,7 +98,16 @@ class ViewportBase {
         virtual void event_mouse_wheel(SDL_Event &e);
         virtual void mouse_button_up(SDL_Event &e);
 #endif
-        virtual void event_finger_motion(float pinch);
+        // gesto de 2 dedos (web/movil): zoomDelta = pinch (abrir dedos = acercar); panDx/panDy = arrastre
+        // del punto medio en pixeles. Default vacio; lo implementa el Viewport3D (zoom + paneo).
+        virtual void event_finger_gesture(float zoomDelta, float panDx, float panDy);
+        // arrastre de 1 dedo sobre un PANEL: scrollear (px/py = pos del dedo; dx/dy = delta). Devuelve
+        // true si lo consumio (paneles + toolbar del viewport) -> ahi el mouse NO orbita/selecciona.
+        virtual bool event_finger_scroll(int px, int py, int dx, int dy);
+        // scroll HORIZONTAL de la barra superior (botones + pestañas), UNIFICADO para rueda y touch en
+        // TODOS los viewports. delta>0 = mostrar contenido de la izquierda. Devuelve true si (px,py) cae
+        // en la barra (ahi consume el evento). La usan los event_mouse_wheel / event_finger_scroll.
+        bool BarScrollHorizontal(int px, int py, int delta);
 
         virtual void Render() = 0;
         virtual void Resize(int newW, int newH);
