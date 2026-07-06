@@ -2276,6 +2276,7 @@ static void PolyARenderVerts(const PolyMesh& W, bool smooth,
 }
 
 void Mesh::GenerarMallaModificada() {
+    { extern long g_genMallaCount; g_genMallaCount++; } // DIAGNOSTICO (Statistics): contar regeneraciones. Al ROTAR no debe subir.
     LiberarMallaModificada();
     // NO exige caras: el Screw barre un PERFIL que puede ser solo aristas sueltas (una botella sin caras).
     if (modificadores.empty() || !vertex || vertexSize<=0) return;

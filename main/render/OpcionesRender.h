@@ -52,6 +52,8 @@ extern float OverlayNormalSize;  // largo de la linea (default 0.10)
 extern bool OverlayStatistics;   // "vertex: agrupados/reales" + "faces: logicas/triangulos"
 extern bool OverlayFps;          // "fps: N"
 extern float g_fpsActual;        // FPS actual (lo actualiza cada plataforma 1x/frame)
+extern long g_genMallaCount;     // DIAGNOSTICO: veces que se regenero la malla de un modificador (subsurf/screw).
+                                 // Se muestra en Statistics; al ROTAR NO debe subir (la malla se cachea en genValido).
 
 // render EVENT-DRIVEN: el loop (PC/Symbian) solo redibuja si g_redraw esta en true
 // (lo prende cualquier input / resize) o si hay una animacion en play. Sino no hace

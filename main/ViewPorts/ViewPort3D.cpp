@@ -1590,6 +1590,11 @@ void Viewport3D::RenderEstadisticas(){
         sprintf(buf, "faces: %d/%d", fLog, fTri);
         w3dEngine::PushMatrix(); w3dEngine::Translatef((GLfloat)(width - margen), (GLfloat)ly, 0);
         RenderBitmapText(buf, textAlign::right, width); w3dEngine::PopMatrix(); ly += lineH;
+        // DIAGNOSTICO de performance: regeneraciones de la malla de modificadores. Al ROTAR la camara NO debe subir
+        // (la subdivision/screw se cachea en genValido). Si sube al rotar -> se esta recalculando de mas.
+        sprintf(buf, "modgen: %ld", g_genMallaCount);
+        w3dEngine::PushMatrix(); w3dEngine::Translatef((GLfloat)(width - margen), (GLfloat)ly, 0);
+        RenderBitmapText(buf, textAlign::right, width); w3dEngine::PopMatrix(); ly += lineH;
     }
     if (OverlayFps){
         sprintf(buf, "fps: %d", (int)(g_fpsActual + 0.5f));

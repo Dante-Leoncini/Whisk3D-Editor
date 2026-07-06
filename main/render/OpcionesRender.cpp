@@ -22,6 +22,7 @@ float OverlayNormalSize  = 0.10f;
 bool OverlayStatistics = false;
 bool OverlayFps        = false;
 float g_fpsActual      = 0.0f;
+long g_genMallaCount   = 0; // diagnostico de regeneracion de modificadores (ver OpcionesRender.h)
 
 // arranca en true para dibujar el primer frame
 bool g_redraw = true;
