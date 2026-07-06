@@ -3041,6 +3041,8 @@ static int  gLoopCutEdge = -1;      // arista (edit mesh) bajo el mouse = start 
 static int  gLoopCutSlideX0 = 0;    // X del mouse al empezar el slide
 static int  gLoopCutSlideW = 800;   // ancho del viewport (escala del slide)
 static std::vector<float> gLoopCutSegs; // preview (segmentos locales) -> lo dibuja el viewport
+bool gLoopCutEsPunto = false; // true = el corte es de UN borde suelto (perfil): el preview son PUNTOS, no lineas.
+                              // Lo setea Mesh::LoopCutPreview (MeshEdit) segun si hay anillo de quads o no.
 // fase ORIENTACION: solo al arrancar el loop cut desde un QUAD activo (menu). Antes de
 // elegir los cortes, las flechas eligen cual de las 2 direcciones del quad cortar.
 static bool gLoopCutOrientando = false;
@@ -3051,7 +3053,7 @@ bool LoopCutOrientando(){ return gLoopCutOrientando; }
 // snapshot de la geometria PRE-corte (para re-cortar en slide / redo)
 struct LCSnap { std::vector<GLfloat> vp; std::vector<GLbyte> vn; std::vector<GLfloat> vu;
                 std::vector<GLubyte> vc; int vsz; std::vector<MeshFace> f3d;
-                std::vector<MaterialGroup> mg; bool tiene; };
+                std::vector<MaterialGroup> mg; std::vector<int> le, lv; bool tiene; }; // le/lv = looseEdges/looseVerts
 static LCSnap gLCSnap;
 
 static void LCGuardar(Mesh* m){
@@ -3060,7 +3062,9 @@ static void LCGuardar(Mesh* m){
     if (m->normals)     gLCSnap.vn.assign(m->normals, m->normals + m->vertexSize*3); else gLCSnap.vn.clear();
     if (m->uv)          gLCSnap.vu.assign(m->uv, m->uv + m->vertexSize*2); else gLCSnap.vu.clear();
     if (m->vertexColor) gLCSnap.vc.assign(m->vertexColor, m->vertexColor + m->vertexSize*4); else gLCSnap.vc.clear();
-    gLCSnap.f3d = m->faces3d; gLCSnap.mg = m->materialsGroup; gLCSnap.tiene = true;
+    gLCSnap.f3d = m->faces3d; gLCSnap.mg = m->materialsGroup;
+    gLCSnap.le = m->looseEdges; gLCSnap.lv = m->looseVerts; // sin esto el corte de un borde SUELTO (perfil) perdia las lineas al re-cortar
+    gLCSnap.tiene = true;
 }
 static void LCRestaurar(Mesh* m){
     if (!gLCSnap.tiene) return;
@@ -3071,6 +3075,7 @@ static void LCRestaurar(Mesh* m){
     if (!gLCSnap.vu.empty()){ delete[] m->uv; m->uv=new GLfloat[gLCSnap.vsz*2]; for (int i=0;i<gLCSnap.vsz*2;i++) m->uv[i]=gLCSnap.vu[i]; }
     if (!gLCSnap.vc.empty()){ delete[] m->vertexColor; m->vertexColor=new GLubyte[gLCSnap.vsz*4]; for (int i=0;i<gLCSnap.vsz*4;i++) m->vertexColor[i]=gLCSnap.vc[i]; }
     m->faces3d = gLCSnap.f3d; m->materialsGroup = gLCSnap.mg;
+    m->looseEdges = gLCSnap.le; m->looseVerts = gLCSnap.lv; // restaurar el perfil suelto (sino desaparece al re-cortar)
     std::vector<GLushort> tris;
     for (size_t f=0;f<m->faces3d.size();f++){ const std::vector<int>& idx=m->faces3d[f].idx;
         for (size_t k=1;k+1<idx.size();k++){ tris.push_back((GLushort)idx[0]);tris.push_back((GLushort)idx[k]);tris.push_back((GLushort)idx[k+1]); } }
@@ -3258,10 +3263,16 @@ void LoopCutRenderPreview(){
     w3dEngine::DisableArray(w3dEngine::NormalArray); w3dEngine::DisableArray(w3dEngine::ColorArray); w3dEngine::DisableArray(w3dEngine::TexCoordArray);
     w3dEngine::EnableArray(w3dEngine::VertexArray);
     w3dEngine::Color4f(1.0f, 0.95f, 0.2f, 1.0f); // amarillo (como Blender)
-    w3dEngine::LineWidth(3.0f);
     w3dEngine::VertexPointer3f(0, &gLoopCutSegs[0]);
-    w3dEngine::DrawLines((int)(gLoopCutSegs.size()/3));
-    w3dEngine::LineWidth(1.0f);
+    if (gLoopCutEsPunto){ // corte de un BORDE SUELTO: el corte es un PUNTO en la arista, no una linea
+        w3dEngine::PointSize(9.0f);
+        w3dEngine::DrawPoints((int)(gLoopCutSegs.size()/3));
+        w3dEngine::PointSize(1.0f);
+    } else {
+        w3dEngine::LineWidth(3.0f);
+        w3dEngine::DrawLines((int)(gLoopCutSegs.size()/3));
+        w3dEngine::LineWidth(1.0f);
+    }
     w3dEngine::Enable(w3dEngine::DepthTest);
     w3dEngine::PopMatrix();
 }
