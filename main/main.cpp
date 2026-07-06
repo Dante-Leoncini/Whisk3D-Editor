@@ -65,6 +65,90 @@ static void PCCargarTexturaEn(Material* mat) {
                      gCargarTexturaComoNormal ? "Abrir normal map" : "Abrir textura",
                      ".png .jpg .jpeg .bmp .tga", TexturaElegida);
 }
+
+#ifdef __EMSCRIPTEN__
+// ============================================================================
+//  WEB: cargar texturas / OBJ con el SELECTOR DE ARCHIVOS DEL NAVEGADOR
+// ----------------------------------------------------------------------------
+//  El file browser interno navega el FS virtual de emscripten (no ve los archivos
+//  reales del usuario). En web abrimos un <input type=file> nativo: el navegador
+//  deja elegir del disco, leemos el archivo, lo escribimos en /uploads del FS de
+//  emscripten y llamamos a la MISMA logica de carga (TexturaElegida / ImportOBJ).
+//  Para el OBJ el <input multiple> deja elegir el .obj + su .mtl + las texturas
+//  juntos: quedan en la misma carpeta (/uploads) y el importador los resuelve.
+// ============================================================================
+extern "C" {
+// las llama el JS del picker cuando el archivo ya esta escrito en el FS de emscripten
+EMSCRIPTEN_KEEPALIVE void WebTexturaCargada(const char* path) { TexturaElegida(std::string(path)); }
+EMSCRIPTEN_KEEPALIVE void WebObjCargado(const char* path)     { ImportOBJ(std::string(path), false); }
+}
+
+// abre el picker de UNA imagen -> la escribe en /uploads y avisa a WebTexturaCargada
+EM_JS(void, WebAbrirPickerTextura, (void), {
+    var input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/png,image/jpeg,image/bmp,.png,.jpg,.jpeg,.bmp,.tga';
+    input.onchange = function(e) {
+        var f = e.target.files[0];
+        if (!f) return;
+        var r = new FileReader();
+        r.onload = function() {
+            try { FS.mkdir('/uploads'); } catch (_e) {}
+            var p = '/uploads/' + f.name;
+            FS.writeFile(p, new Uint8Array(r.result));
+            ccall('WebTexturaCargada', null, ['string'], [p]);
+        };
+        r.readAsArrayBuffer(f);
+    };
+    input.click();
+});
+
+// abre el picker MULTI-archivo (obj + mtl + texturas) -> los escribe todos en /uploads
+// y avisa a WebObjCargado con el path del .obj (recien cuando bajaron todos)
+EM_JS(void, WebAbrirPickerObj, (void), {
+    var input = document.createElement('input');
+    input.type = 'file';
+    input.multiple = true;
+    input.accept = '.obj,.mtl,image/*,.png,.jpg,.jpeg,.bmp,.tga';
+    input.onchange = function(e) {
+        var files = Array.prototype.slice.call(e.target.files);
+        if (!files.length) return;
+        try { FS.mkdir('/uploads'); } catch (_e) {}
+        var objPath = null, pending = files.length;
+        files.forEach(function(f) {
+            var r = new FileReader();
+            r.onload = function() {
+                var p = '/uploads/' + f.name;
+                FS.writeFile(p, new Uint8Array(r.result));
+                if (f.name.toLowerCase().endsWith('.obj')) objPath = p;
+                if (--pending === 0) {
+                    if (objPath) ccall('WebObjCargado', null, ['string'], [objPath]);
+                }
+            };
+            r.readAsArrayBuffer(f);
+        });
+    };
+    input.click();
+});
+
+static void WebCargarTexturaEn(Material* mat) { gTexMat = mat; WebAbrirPickerTextura(); }
+static void WebImportObj() { WebAbrirPickerObj(); }
+
+// descarga un archivo del FS de emscripten al DISCO del usuario (export OBJ/mtl y renders PNG).
+// La llaman Properties.cpp (export OBJ) y ViewPort3D.cpp (render) via forward-declaration.
+EM_JS(void, WebDescargarArchivo, (const char* pathPtr, const char* namePtr), {
+    var path = UTF8ToString(pathPtr), name = UTF8ToString(namePtr);
+    try {
+        var data = FS.readFile(path); // Uint8Array del FS virtual
+        var blob = new Blob([data], { type: 'application/octet-stream' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url; a.download = name;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+    } catch (e) { console.error('descarga fallo:', path, e); }
+});
+#endif // __EMSCRIPTEN__
 #include "WhiskUI/PopupMenu.h" // MenuPantallaW/H (desplegables)
 #include "WhiskUI/glesdraw.h"  // W3dPantallaAlto (flip de Y)
 #ifdef _WIN32
@@ -426,7 +510,17 @@ static void MainLoopFrame() {
     // PLAY (vertex-anim o materiales animados activos). Sino no se dibuja nada ->
     // CPU casi 0 en reposo (como Blender), en vez de renderizar 60 veces/seg al pedo.
     bool animando = HayAnimacionActiva() || !VertexAnimationActives.empty();
-    if ((g_redraw || animando) && now - lastRenderTime >= 16) {  // ~60hz
+#ifdef __EMSCRIPTEN__
+    // WebGL: renderizar SIEMPRE (no event-driven). Motivos: 1) el canvas WebGL usa
+    // preserveDrawingBuffer=false -> en un frame sin dibujar el browser BORRA el canvas a negro
+    // (parpadeos/negro al quedar quieto); 2) el color-ID pick (hover/loop cut) limpia el framebuffer
+    // visible y hay que taparlo cada frame. El RAF ya limita a la tasa del monitor y se PAUSA en
+    // tabs ocultas, asi que no quema GPU de fondo. (En escritorio se mantiene el event-driven.)
+    bool doRender = true; (void)animando;
+#else
+    bool doRender = (g_redraw || animando) && (now - lastRenderTime >= 16); // ~60hz
+#endif
+    if (doRender) {
         lastRenderTime = now;
         if (rootViewport){
             rootViewport->Render();
@@ -557,6 +651,12 @@ int main(int argc, char* argv[]) {
     DialogoCargarTextura = PCCargarTexturaEn; // "Load Texture" (base Y normal map) -> browser compartido
     LayoutWarpMouse = PCWarpMouse;
     g_swapWindow = window; LayoutSwapBuffers = PCSwapBuffers; // barra de progreso (export/import)
+#endif
+#ifdef __EMSCRIPTEN__
+    // en web pisamos import/textura con el SELECTOR DEL NAVEGADOR (el browser interno solo ve el FS
+    // virtual de emscripten, no los archivos del usuario). El resto de hooks (warp/swap) sirven igual.
+    LayoutImportObj = WebImportObj;
+    DialogoCargarTextura = WebCargarTexturaEn;
 #endif
 
     // Detectar primer mando

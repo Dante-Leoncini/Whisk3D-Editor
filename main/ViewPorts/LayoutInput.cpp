@@ -730,6 +730,15 @@ void ActualizarEditMeshActivo() {
             if (!m->modificadores.empty()) { m->GenerarMallaModificada(); g_redraw = true; }
         }
     }
+    // EDICION QUE CAMBIA LA TOPOLOGIA (extrude, loop cut, delete, merge, subdivide...): todas llaman
+    // GenerarRender() -> genValido=false (la malla generada quedo stale). Regeneramos el modificador
+    // UNA sola vez: al hacerlo genValido vuelve a true, asi que NO es un regen por-frame (GenerarRender
+    // solo lo llaman las ops de edicion, nunca el render). Sin esto, tras extrude/loop cut el
+    // modificador (subdivision/screw) mostraba geometria vieja hasta mover un vertice.
+    if (ObjActivo && ObjActivo->getType() == ObjectType::mesh) {
+        Mesh* m = (Mesh*)ObjActivo;
+        if (!m->modificadores.empty() && !m->genValido) { m->GenerarMallaModificada(); g_redraw = true; }
+    }
 }
 
 // opcion del menu Mode: cambia el modo del objeto ACTIVO (Object/Edit/Paint).
@@ -2714,13 +2723,19 @@ static int EditPickIndex(int modo, int mx, int my, int vx, int vy, int vw, int v
     // leer un AREA chica (no 1 pixel) y tomar el ID mas cercano al centro: tolera
     // que el cursor virtual del telefono caiga un par de pixeles corrido + el
     // clamping del tamano de punto/linea del driver. Clampeado al viewport.
+#ifdef __EMSCRIPTEN__
+    // WebGL clampea glLineWidth a 1px (las aristas del pick se dibujan de 1px en vez de 9) y limita
+    // el tamano de punto -> leemos un AREA MAS GRANDE para pescar aristas/caras finas bajo el click.
+    const int RAD = 7, WD = 15; // WD = 2*RAD+1
+#else
     const int RAD = 3, WD = 7; // WD = 2*RAD+1
+#endif
     int cxw = mx, cyw = screenH - 1 - my; // centro en coords de ventana (GL)
     int x0 = cxw - RAD, y0 = cyw - RAD;
     if (x0 < vx) x0 = vx; if (x0 + WD > vx + vw) x0 = vx + vw - WD;
     if (y0 < glY) y0 = glY; if (y0 + WD > glY + vh) y0 = glY + vh - WD;
     if (x0 < 0) x0 = 0; if (y0 < 0) y0 = 0;
-    GLubyte area[7 * 7 * 4]; // = WD*WD*4
+    GLubyte area[15 * 15 * 4]; // dimensionado para el WD mas grande (web); en desktop usa 7*7*4
     w3dEngine::ReadPixelsRGBA(x0, y0, WD, WD, area);
     w3dEngine::Enable(w3dEngine::Dither);
     w3dEngine::Enable(w3dEngine::Multisample); // restaurar el MSAA para el render normal
