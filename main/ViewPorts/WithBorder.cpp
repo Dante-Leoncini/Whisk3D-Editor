@@ -1,5 +1,6 @@
 #include "w3dGraphics.h" // abstraccion de graficos (independencia de OpenGL)
 #include "ViewPorts/WithBorder.h"
+#include "objects/Textures.h" // Textures[0] = atlas de iconos (el borde es texturizado)
 #ifdef W3D_SYMBIAN
     #include "ui/W3dColors.h"
 // UVs expandidos por indice para drawArrays (se llenan en CalcBorderUV)
@@ -84,6 +85,21 @@ void WithBorder::DibujarBordes(ViewportBase* current) {
     w3dEngine::VertexPointer2f(0, borderMeshExp);
     w3dEngine::DrawTrianglesArray(48);
 #else
+    // el borde es TEXTURIZADO (arte del atlas de iconos, con alpha). Hay que dejar TODO el estado que
+    // necesita, IGUAL que el UV editor: Texture2D + Blend + arrays de VERTICE y TexCoord habilitados +
+    // el atlas (Textures[0]) bindeado. Sin VertexArray habilitado el VertexPointer no se usa (nada
+    // dibuja); sin bindear el atlas toma la textura del mesh del viewport y sale invisible en ES2/WebGL.
+    // el borde va en el BORDE del viewport: si quedo un scissor del render 3D (recorta al area
+    // interior), el marco se ve "recortado" / no se ve. Lo apagamos (como el UV editor).
+    w3dEngine::Disable(w3dEngine::ScissorTest);
+    w3dEngine::Enable(w3dEngine::Texture2D);
+    w3dEngine::Enable(w3dEngine::Blend); w3dEngine::BlendAlpha();
+    w3dEngine::EnableArray(w3dEngine::VertexArray);
+    w3dEngine::EnableArray(w3dEngine::TexCoordArray);
+    w3dEngine::DisableArray(w3dEngine::ColorArray);
+    w3dEngine::DisableArray(w3dEngine::NormalArray);
+    if (!Textures.empty() && Textures[0]) w3dEngine::BindTexture(Textures[0]->iID);
+
     if (current == viewPortActive)
         w3dEngine::Color4f(ListaColores[static_cast<int>(ColorID::accent)][0], ListaColores[static_cast<int>(ColorID::accent)][1],
                   ListaColores[static_cast<int>(ColorID::accent)][2], ListaColores[static_cast<int>(ColorID::accent)][3]);

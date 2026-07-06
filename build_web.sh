@@ -41,6 +41,9 @@ DEF="-DW3D_WEBGL"
 #   --preload-file res@/res  empaqueta res/ y lo monta en /res (= GetResDir() en web)
 #   --shell-file           HTML propio (canvas fullscreen + pantalla de carga)
 EMFLAGS="-sUSE_SDL=2 -sINITIAL_MEMORY=268435456"
+#   -sEXPORTED_RUNTIME_METHODS=ccall,FS,UTF8ToString  el picker (EM_JS) usa ccall (llamar a C) y FS
+#                                        (leer/escribir archivos); la descarga usa UTF8ToString
+EMFLAGS="$EMFLAGS -sEXPORTED_RUNTIME_METHODS=ccall,FS,UTF8ToString"
 EMFLAGS="$EMFLAGS --preload-file res@/res --shell-file platform/web/shell.html"
 
 echo "Compilando editor Whisk3D para WebGL ($(echo $SRC | wc -w) fuentes)..."

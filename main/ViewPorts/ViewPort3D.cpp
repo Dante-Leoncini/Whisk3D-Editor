@@ -887,6 +887,9 @@ int Viewport3D::TilesNecesarios(int outW, int outH) const {
     return ((outW + tileW - 1) / tileW) * ((outH + tileH - 1) / tileH);
 }
 
+#ifdef __EMSCRIPTEN__
+extern "C" void WebDescargarArchivo(const char* path, const char* name); // main.cpp (EM_JS): baja un archivo del FS al disco
+#endif
 bool Viewport3D::RenderAPNG(int outW, int outH, RenderType::Enum pass, const char* filename, int progBase, int progTotal){
     if (outW <= 0 || outH <= 0 || !SceneCollection) return false;
 
@@ -1002,6 +1005,14 @@ bool Viewport3D::RenderAPNG(int outW, int outH, RenderType::Enum pass, const cha
     ReloadLights();
 
     bool ok = w3dEngine::SavePNG(filename, full, outW, outH, true);
+#ifdef __EMSCRIPTEN__
+    if (ok) {
+        // web: bajar el PNG al disco del usuario (el FS de emscripten es virtual)
+        std::string nm = filename;
+        size_t sl = nm.find_last_of("/\\"); if (sl != std::string::npos) nm = nm.substr(sl + 1);
+        WebDescargarArchivo(filename, nm.c_str());
+    }
+#endif
     delete[] full;
     delete[] tile;
     return ok;

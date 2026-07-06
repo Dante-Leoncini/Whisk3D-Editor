@@ -638,6 +638,10 @@ static void AccionAplicarModificador(){
     Notificar("Modifier applied", false);
 }
 
+#ifdef __EMSCRIPTEN__
+extern "C" void WebDescargarArchivo(const char* path, const char* name); // main.cpp (EM_JS): baja un archivo del FS al disco
+#endif
+
 // boton "Wavefront.obj" de la tarjeta Export: exporta al path del campo editable
 static void AccionExportObj(){
     if (!PropsActivo || !PropsActivo->propExportName) return;
@@ -651,8 +655,20 @@ static void AccionExportObj(){
     path = std::string("E:/whisk3d/models/") + nombre;
 #endif
     bool ok = ExportOBJ(path, PropsActivo->exportSelectedOnly, PropsActivo->exportApplyModifiers, PropsActivo->exportApplyTransforms);
-    if (ok) Notificar("OBJ saved successfully!", false);
-    else    Notificar("Error: could not save the OBJ", true);
+    if (ok) {
+        Notificar("OBJ saved successfully!", false);
+#ifdef __EMSCRIPTEN__
+        // web: bajar el .obj y su .mtl al disco del usuario (el FS de emscripten es virtual).
+        // ExportOBJ escribe el .mtl como ExtractBaseName(path)+".mtl" (nombre relativo).
+        std::string objName = path;
+        size_t sl = objName.find_last_of("/\\"); if (sl != std::string::npos) objName = objName.substr(sl + 1);
+        std::string mtl = ExtractBaseName(path) + ".mtl";
+        WebDescargarArchivo(path.c_str(), objName.c_str());
+        WebDescargarArchivo(mtl.c_str(), mtl.c_str());
+#endif
+    } else {
+        Notificar("Error: could not save the OBJ", true);
+    }
 }
 
 // el explorador (modo guardar) devolvio una CARPETA (o un .obj a sobrescribir): se
