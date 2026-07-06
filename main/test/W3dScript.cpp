@@ -200,6 +200,17 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         return true;
     }
 
+    // ---- loopcut <editEdge> <cuts> <factor> : loop cut / subdivide sobre la arista de EDICION indicada ----
+    if (cmd == "loopcut") {
+        if (InteractionMode != EditMode) { err = "loopcut necesita Edit Mode"; return false; }
+        Mesh* m = ScriptActiveMesh(); if(!m){err="no hay malla activa";return false;}
+        m->EnsureEdit(); if(!m->edit){err="sin edit mesh";return false;}
+        int eg=0, cuts=1; float factor=0.0f; ss>>eg>>cuts>>factor;
+        bool ok = m->LoopCutEdit(eg, cuts, factor);
+        printf("      [loopcut] edge=%d cuts=%d factor=%.2f -> %s\n", eg, cuts, factor, ok?"ok":"no-op");
+        return true;
+    }
+
     // ---- editcenter <x> <y> <z> : mueve la seleccion (Edit Mode) para que su CENTRO local caiga en (x,y,z) ----
     if (cmd == "editcenter") {
         if (InteractionMode != EditMode) { err = "editcenter necesita Edit Mode"; return false; }

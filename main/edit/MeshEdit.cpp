@@ -1350,6 +1350,75 @@ bool Mesh::LoopCutRecorrido(int startEditEdge, std::vector<int>& rungEg, std::ve
     return !loopFaces.empty();
 }
 
+extern bool gLoopCutEsPunto; // (LayoutInput.cpp) preview de PUNTO (borde suelto) vs LINEA (anillo de quads)
+
+// la arista de edicion 'startEditEdge' es una arista SUELTA (esta en looseEdges, sin caras)? Lo usan el loop cut y
+// su preview para decidir el fallback de "subdividir un solo borde" (agrega un vert) en vez del anillo de quads.
+static bool BordeEsSuelto(Mesh* m, int startEditEdge){
+    EditMesh* e = m->edit; if (!e) return false;
+    if (startEditEdge<0 || startEditEdge>=e->NumEdges()) return false;
+    const int nV=m->vertexSize; const bool hayRep=((int)m->posRep.size()==nV);
+    int ea=e->lineIdx[startEditEdge*2], eb=e->lineIdx[startEditEdge*2+1];
+    if (ea<0||eb<0||ea>=(int)e->editVerts.size()||eb>=(int)e->editVerts.size()) return false;
+    int ga=e->editVerts[ea], gb=e->editVerts[eb]; if(ga<0||gb<0||ga>=nV||gb>=nV) return false;
+    int repA=hayRep?m->posRep[ga]:ga, repB=hayRep?m->posRep[gb]:gb; if(repA==repB) return false;
+    for (size_t i=0;i+1<m->looseEdges.size();i+=2){ int p=m->looseEdges[i],q=m->looseEdges[i+1];
+        int rp=hayRep?m->posRep[p]:p, rq=hayRep?m->posRep[q]:q;
+        if ((rp==repA&&rq==repB)||(rp==repB&&rq==repA)) return true; }
+    return false;
+}
+
+// SUBDIVIDIR una ARISTA SUELTA (sin caras): agrega numCuts verts sobre ella (factor desliza) y la parte en
+// numCuts+1 aristas sueltas. Es el fallback del loop cut sobre el perfil del Screw (aristas sueltas). El UV no
+// importa (el Screw lo recalcula). outSel = posiciones LOCALES de los verts nuevos (para dejarlos seleccionados).
+// Devuelve false si la arista NO es suelta (tiene caras: ese caso lo maneja el loop cut de anillo).
+static bool SubdivBordeSuelto(Mesh* m, int startEditEdge, int numCuts, float factor, std::vector<Vector3>* outSel){
+    m->EnsureEdit(); EditMesh* e = m->edit; if (!e || !m->vertex) return false;
+    if (!BordeEsSuelto(m, startEditEdge)) return false;
+    if (numCuts < 1) numCuts = 1;
+    const int nV = m->vertexSize;
+    const bool hayRep = ((int)m->posRep.size()==nV);
+    int ea=e->lineIdx[startEditEdge*2], eb=e->lineIdx[startEditEdge*2+1];
+    int ga=e->editVerts[ea], gb=e->editVerts[eb];
+    int repA=hayRep?m->posRep[ga]:ga, repB=hayRep?m->posRep[gb]:gb;
+    // verts nuevos (pos interpolada A->B; normal Y+, uv/color default: el Screw los recalcula)
+    std::vector<GLfloat> vp(m->vertex, m->vertex+nV*3);
+    std::vector<GLbyte>  vn; if(m->normals) vn.assign(m->normals,m->normals+nV*3); else vn.assign((size_t)nV*3,(GLbyte)0);
+    std::vector<GLfloat> vu; if(m->uv) vu.assign(m->uv,m->uv+nV*2); else vu.assign((size_t)nV*2,0.0f);
+    std::vector<GLubyte> vc; if(m->vertexColor) vc.assign(m->vertexColor,m->vertexColor+nV*4); else vc.assign((size_t)nV*4,(GLubyte)255);
+    std::vector<int> nuevo(numCuts);
+    if (outSel) outSel->clear();
+    for (int j=0;j<numCuts;j++){ float s=(float)(j+1+factor)/(float)(numCuts+1); if(s<0)s=0; if(s>1)s=1;
+        int gi=(int)(vp.size()/3);
+        float px=m->vertex[ga*3]*(1-s)+m->vertex[gb*3]*s, py=m->vertex[ga*3+1]*(1-s)+m->vertex[gb*3+1]*s, pz=m->vertex[ga*3+2]*(1-s)+m->vertex[gb*3+2]*s;
+        vp.push_back(px);vp.push_back(py);vp.push_back(pz);
+        vn.push_back(0);vn.push_back(127);vn.push_back(0); vu.push_back(0);vu.push_back(0);
+        vc.push_back(255);vc.push_back(255);vc.push_back(255);vc.push_back(255);
+        nuevo[j]=gi; if (outSel) outSel->push_back(Vector3(px,py,pz));
+    }
+    int nN=(int)(vp.size()/3);
+    delete[] m->vertex;      m->vertex=new GLfloat[nN*3];      for(int i=0;i<nN*3;i++) m->vertex[i]=vp[i];
+    delete[] m->normals;     m->normals=new GLbyte[nN*3];      for(int i=0;i<nN*3;i++) m->normals[i]=vn[i];
+    delete[] m->uv;          m->uv=new GLfloat[nN*2];          for(int i=0;i<nN*2;i++) m->uv[i]=vu[i];
+    delete[] m->vertexColor; m->vertexColor=new GLubyte[nN*4]; for(int i=0;i<nN*4;i++) m->vertexColor[i]=vc[i];
+    m->vertexSize=nN;
+    // partir las aristas sueltas (a,b) -> cadena a -> cuts -> b (orden segun la direccion de la arista)
+    std::vector<int> nLoose;
+    for (size_t i=0;i+1<m->looseEdges.size();i+=2){ int p=m->looseEdges[i],q=m->looseEdges[i+1];
+        int rp=hayRep?m->posRep[p]:p, rq=hayRep?m->posRep[q]:q;
+        if ((rp==repA&&rq==repB)||(rp==repB&&rq==repA)){
+            std::vector<int> chain; chain.push_back(p);
+            if (rp==repA) { for(int k=0;k<numCuts;k++) chain.push_back(nuevo[k]); }    // p==A: A->B directo
+            else          { for(int k=numCuts-1;k>=0;k--) chain.push_back(nuevo[k]); } // p==B: B->A invertido
+            chain.push_back(q);
+            for(size_t k=0;k+1<chain.size();k++){ nLoose.push_back(chain[k]); nLoose.push_back(chain[k+1]); }
+        } else { nLoose.push_back(p); nLoose.push_back(q); }
+    }
+    m->looseEdges.swap(nLoose);
+    m->GenerarRender();
+    return true;
+}
+
 // vista previa del loop cut: devuelve los SEGMENTOS de linea (pares de puntos LOCALES)
 // del corte que se generaria, sin tocar la geometria. Para que el viewport lo dibuje.
 bool Mesh::LoopCutPreview(int startEditEdge, int numCuts, float factor, std::vector<float>& outSegs) {
@@ -1358,7 +1427,17 @@ bool Mesh::LoopCutPreview(int startEditEdge, int numCuts, float factor, std::vec
     if (numCuts < 1) numCuts = 1;
     EditMesh* e = edit;
     std::vector<int> rungEg, rungA, rungB, loopFaces; bool cerrado=false;
-    if (!LoopCutRecorrido(startEditEdge, rungEg, rungA, rungB, loopFaces, cerrado)) return false;
+    if (!LoopCutRecorrido(startEditEdge, rungEg, rungA, rungB, loopFaces, cerrado)) {
+        // sin anillo de quads: si es un BORDE SUELTO, el preview son PUNTO(s) sobre la arista (no una linea)
+        if (!BordeEsSuelto(this, startEditEdge)) { gLoopCutEsPunto=false; return false; }
+        int a=e->lineIdx[startEditEdge*2], b=e->lineIdx[startEditEdge*2+1];
+        if (a<0||b<0||a*3+2>=(int)e->pos.size()||b*3+2>=(int)e->pos.size()){ gLoopCutEsPunto=false; return false; }
+        for (int j=0;j<numCuts;j++){ float s=(float)(j+1+factor)/(float)(numCuts+1); if(s<0)s=0; if(s>1)s=1;
+            for (int q=0;q<3;q++) outSegs.push_back(e->pos[a*3+q]*(1-s)+e->pos[b*3+q]*s); } // 1 PUNTO por corte
+        gLoopCutEsPunto = true;
+        return !outSegs.empty();
+    }
+    gLoopCutEsPunto = false; // hay anillo -> preview de LINEAS
     const int L = (int)loopFaces.size();
     if (L == 0) return false;
     std::vector<float> sj(numCuts);
@@ -1387,7 +1466,7 @@ bool Mesh::LoopCutPreview(int startEditEdge, int numCuts, float factor, std::vec
 // Solo quads (tri/ngones cortan el loop). Devuelve false si no se puede.
 bool Mesh::LoopCutEdit(int startEditEdge, int numCuts, float factor) {
     EnsureEdit();
-    if (!edit || !vertex || vertexSize <= 0 || faces3d.empty()) return false;
+    if (!edit || !vertex || vertexSize <= 0) return false;
     // NO captura undo aca: el loop cut RE-CORTA en cada frame del slide / panel redo -> inundaria el stack.
     // La captura (1 sola vez, pre-corte) la hace el caller del editor cuando arranca el corte (ver LCGuardar).
     if (numCuts < 1) numCuts = 1;
@@ -1396,7 +1475,13 @@ bool Mesh::LoopCutEdit(int startEditEdge, int numCuts, float factor) {
     const bool hayRep = ((int)posRep.size() == nV);
 
     std::vector<int> rungEg, rungA, rungB, loopFaces; bool cerrado = false;
-    if (!LoopCutRecorrido(startEditEdge, rungEg, rungA, rungB, loopFaces, cerrado)) return false;
+    if (!LoopCutRecorrido(startEditEdge, rungEg, rungA, rungB, loopFaces, cerrado)) {
+        // sin anillo de quads (perfil del Screw / arista suelta) -> subdividir SOLO ese borde: agrega numCuts verts.
+        std::vector<Vector3> selPos;
+        bool ok = SubdivBordeSuelto(this, startEditEdge, numCuts, factor, &selPos);
+        if (ok) ReconstruirEditSelPorPos(selPos); // deja los verts nuevos seleccionados
+        return ok;
+    }
     const int L = (int)loopFaces.size();
     if (L == 0) return false;
 
@@ -2077,7 +2162,9 @@ static void ScrewPoly(PolyMesh& W, int axis, float angleDeg, float height, int s
     if (stretchV){ float mn=1e30f, mx=-1e30f;
         for (int p=0;p<nP;p++){ float a=(axis==0?W.P[p].x:axis==1?W.P[p].y:W.P[p].z); if(a<mn)mn=a; if(a>mx)mx=a; }
         float rng=(mx-mn); if (rng<1e-6f) rng=1.0f;
-        for (int p=0;p<nP;p++){ float a=(axis==0?W.P[p].x:axis==1?W.P[p].y:W.P[p].z); vertV[p]=(a-mn)/rng; } }
+        // V INVERTIDO (1 arriba del eje, 0 abajo): asi la textura no queda dada vuelta en Y (convencion de imagen:
+        // fila 0 = arriba). U (giro) queda bien; V escala bien, solo habia que voltearlo.
+        for (int p=0;p<nP;p++){ float a=(axis==0?W.P[p].x:axis==1?W.P[p].y:W.P[p].z); vertV[p]=1.0f-(a-mn)/rng; } }
     PolyMesh out;
     // verts: copia s -> perfil rotado + subido
     for (int s=0; s<copies; s++){
