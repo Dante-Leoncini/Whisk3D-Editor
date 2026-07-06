@@ -163,22 +163,27 @@ static MeshOverlayHookReg g_meshOverlayHookReg;
 // (linea + color segun seleccion). Overlay del EDITOR; en Symbian el icono lo hace RenderIcons3D.
 static void LightOverlayHook(Light* l) {
     if (!showOverlayGlobal) return;
+    namespace gfx = w3dEngine;
     if (ObjActivo == (Object*)l && l->select) {
-        glColor4f(gRenderColors[RC_selActive][0], gRenderColors[RC_selActive][1], gRenderColors[RC_selActive][2], gRenderColors[RC_selActive][3]);
+        gfx::Color4fv(gRenderColors[RC_selActive]);
     } else if (l->select) {
-        glColor4f(gRenderColors[RC_gizmoDark][0], gRenderColors[RC_gizmoDark][1], gRenderColors[RC_gizmoDark][2], gRenderColors[RC_gizmoDark][3]);
+        gfx::Color4fv(gRenderColors[RC_gizmoDark]);
     } else {
-        glColor4f(gRenderColors[RC_wireframe][0], gRenderColors[RC_wireframe][1], gRenderColors[RC_wireframe][2], gRenderColors[RC_wireframe][3]);
+        gfx::Color4fv(gRenderColors[RC_wireframe]);
     }
-    glDisable(GL_LIGHTING);
-    glDisable(GL_TEXTURE_2D);
-    glDisable(GL_BLEND);
-    glLineWidth(1);
+    gfx::Disable(gfx::Lighting);
+    gfx::Disable(gfx::Texture2D);
+    gfx::Disable(gfx::Blend);
+    gfx::DisableArray(gfx::NormalArray);
+    gfx::DisableArray(gfx::ColorArray);
+    gfx::DisableArray(gfx::TexCoordArray);
+    gfx::LineWidth(1);
     l->GetMatrix(l->M);
     Vector3 worldPos = l->M * Vector3(0, 0, 0);
     LineaLightVertex[6] = -worldPos.z;
-    glVertexPointer(3, GL_FLOAT, 0, LineaLightVertex);
-    glDrawElements(GL_LINES, LineaEdgeSize, GL_UNSIGNED_SHORT, LineaEdge);
+    gfx::VertexPointer3f(0, LineaLightVertex);
+    gfx::DrawLinesIndexed(LineaEdgeSize, LineaEdge);
+    gfx::Invalidate();
 }
 struct LightOverlayHookReg { LightOverlayHookReg() { g_lightOverlayHook = LightOverlayHook; } };
 static LightOverlayHookReg g_lightOverlayHookReg;

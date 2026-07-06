@@ -60,6 +60,15 @@ platform/windows/build/
 .vs/
 
 # ===============================
+# WEBGL / EMSCRIPTEN
+# ===============================
+
+# salida compilada del build web (build_web.sh): whisk3d.html/.js/.wasm/.data.
+# Se regenera con emcc, NO se sube. OJO: solo la carpeta RAIZ /web (con barra
+# inicial) -> platform/web/ (shim de GL + shell.html, que SI van al repo) queda.
+/web/
+
+# ===============================
 # IDEs
 # ===============================
 

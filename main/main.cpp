@@ -1,5 +1,9 @@
 #include "w3dGraphics.h" // abstraccion de graficos (independencia de OpenGL)
 #include "test/W3dScript.h" // modo test: whisk3d --script <ruta>
+#ifdef __EMSCRIPTEN__       // WebGL: el browser es 1 hilo -> el loop es emscripten_set_main_loop
+#include <emscripten.h>
+#include <emscripten/html5.h> // tamano del canvas (resize) + cancelar el loop al salir
+#endif
 #if !defined(__ANDROID__) // ESCRITORIO (Windows + Linux): codigo compartido de PC (import/export, browser, texturas,
                           // warp del mouse, swap). Android tiene su propia entrada de plataforma y no lo usa.
     #define NOMINMAX
@@ -353,8 +357,113 @@ void initGL(int width, int height) {
     w3dEngine::ClearColor(0.2f, 0.2f, 0.25f, 1.0f);
 }
 
+// UN FRAME del editor: procesa eventos y, si algo cambio, redibuja. En escritorio la corre el
+// while(running); en WebGL la llama el browser (emscripten_set_main_loop). Todo lo que usa es
+// global (window, winW/winH, rootViewport, running, g_redraw, last*Time...) salvo el SDL_Event local.
+static void MainLoopFrame() {
+    Contadores();
+
+    UpdateAnimations();
+    UpdateAnimatedMaterials();
+
+#ifdef __EMSCRIPTEN__
+    // el canvas puede cambiar de tamano (ventana del browser). SDL2/Emscripten no siempre emite el
+    // WINDOWEVENT_RESIZED, asi que chequeamos el tamano del canvas cada frame y resincronizamos.
+    {
+        double cw = 0, ch = 0;
+        emscripten_get_element_css_size("#canvas", &cw, &ch);
+        int nw = (int)cw, nh = (int)ch;
+        if (nw > 0 && nh > 0 && (nw != winW || nh != winH)) {
+            emscripten_set_canvas_element_size("#canvas", nw, nh); // resolucion = display (nitido)
+            SDL_SetWindowSize(window, nw, nh);
+            winW = nw; winH = nh;
+            W3dPantallaAlto = winH; MenuPantallaW = winW; MenuPantallaH = winH;
+            rootViewport->Resize(winW, winH);
+            g_redraw = true;
+        }
+    }
+#endif
+
+    SDL_Event e;
+    while (SDL_PollEvent(&e)) {
+        g_redraw = true; // cualquier evento (tecla/mouse/resize) -> hay que redibujar
+        if (e.type == SDL_QUIT) running = false;
+        if (e.type == SDL_WINDOWEVENT && e.window.event == SDL_WINDOWEVENT_RESIZED) {
+            winW = e.window.data1;
+            winH = e.window.data2;
+            W3dPantallaAlto = winH;
+            MenuPantallaW = winW;
+            MenuPantallaH = winH;
+            rootViewport->Resize(winW, winH);
+        } else {
+            InputUsuarioSDL3(e);
+        }
+    }
+
+#ifdef __EMSCRIPTEN__
+    if (!running) { emscripten_cancel_main_loop(); return; } // SDL_QUIT -> salir del loop del browser
+#endif
+
+    // Animación
+    Uint32 now = SDL_GetTicks();
+    if (now - lastAnimTime >= millisecondsPerFrame) {
+        lastAnimTime = now;
+        // Actualizar frame
+        ReloadAnimation();
+    }
+
+    // notificaciones (toasts): corre el timer (las de exito se cierran solas) y
+    // mantiene vivo el render mientras haya alguna de exito activa
+    static Uint32 lastNotif = now;
+    NotificacionesTick((float)(now - lastNotif) / 1000.0f);
+    lastNotif = now;
+
+    // CARGA DIFERIDA de texturas del import: 1 por frame (decode+upload). Prende g_redraw al cargar una -> el
+    // modelo aparece enseguida y las texturas entran solas. No-op si no hay pendientes.
+    { extern void CargarTexturasPendientes(); CargarTexturasPendientes(); }
+
+    // Render EVENT-DRIVEN: solo si algo cambio (g_redraw) o hay una animacion EN
+    // PLAY (vertex-anim o materiales animados activos). Sino no se dibuja nada ->
+    // CPU casi 0 en reposo (como Blender), en vez de renderizar 60 veces/seg al pedo.
+    bool animando = HayAnimacionActiva() || !VertexAnimationActives.empty();
+    if ((g_redraw || animando) && now - lastRenderTime >= 16) {  // ~60hz
+        lastRenderTime = now;
+        if (rootViewport){
+            rootViewport->Render();
+        }
+        // popups y desplegables (los dibuja el modulo compartido)
+        LayoutRenderMenu(winW, winH);
+        NotificacionesRender(winW, winH); // toasts ENCIMA de todo
+        LayoutTickFPS(now); // overlay de fps (reloj de PC: SDL_GetTicks)
+        SDL_GL_SwapWindow(window);
+        g_redraw = false;
+
+#ifdef __EMSCRIPTEN__
+        // apenas dibujamos el PRIMER frame, ocultamos la pantalla de carga del shell. Es lo mas
+        // robusto: no depende de setStatus('')/onRuntimeInitialized (que con emscripten_set_main_loop
+        // pueden no dispararse porque main() no retorna). Se hace una sola vez.
+        static bool loaderOculto = false;
+        if (!loaderOculto) {
+            loaderOculto = true;
+            EM_ASM({ var l = document.getElementById('loader'); if (l) l.classList.add('hidden'); });
+        }
+#endif
+    }
+
+#ifndef __EMSCRIPTEN__
+    SDL_Delay(8); // liberar CPU (en web el timing lo maneja el browser via requestAnimationFrame)
+#endif
+}
+
 int main(int argc, char* argv[]) {
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER) != 0) {
+#ifdef __EMSCRIPTEN__
+    SDL_SetMainReady(); // web: no arrancamos por el main de SDL
+    // en web solo VIDEO: el subsistema de gamepad puede no estar y haria fallar todo el SDL_Init
+    Uint32 initFlags = SDL_INIT_VIDEO;
+#else
+    Uint32 initFlags = SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER;
+#endif
+    if (SDL_Init(initFlags) != 0) {
         std::cerr << "Error SDL_Init: " << SDL_GetError() << std::endl;
         return -1;
     }
@@ -366,6 +475,9 @@ int main(int argc, char* argv[]) {
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 1);
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+    #elif defined(__EMSCRIPTEN__)
+        // WebGL: Emscripten crea el contexto WebGL (ES2) por su cuenta; no hay que forzar
+        // version ni profile (igual que en los ejemplos). El backend ES2 se prende con GLES2Init.
     #else
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
@@ -417,6 +529,12 @@ int main(int argc, char* argv[]) {
         return -1;
     }
 
+#ifdef W3D_WEBGL
+    // backend ES2/WebGL: carga GL2.0 + compila los shaders. TIENE que ir antes de initGL
+    // (initGL ya dibuja por la abstraccion); sin esto el canvas queda en negro.
+    w3dEngine::GLES2Init((void* (*)(const char*))SDL_GL_GetProcAddress);
+#endif
+
     //hay que ver que onda estos dos
     SDL_GL_SetSwapInterval(1);
     initGL(winW, winH);
@@ -455,7 +573,6 @@ int main(int argc, char* argv[]) {
         }*/
     }
 
-    SDL_Event e;
     running = true;
     // arbol en coordenadas ARRIBA-izquierda (unificado con Symbian);
     // el flip a GL pasa solo en glViewport/glScissor con este alto
@@ -474,64 +591,14 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    while (running) {
-        Contadores();
-
-        UpdateAnimations();
-        UpdateAnimatedMaterials();
-
-        while (SDL_PollEvent(&e)) {
-            g_redraw = true; // cualquier evento (tecla/mouse/resize) -> hay que redibujar
-            if (e.type == SDL_QUIT) running = false;
-            if (e.type == SDL_WINDOWEVENT && e.window.event == SDL_WINDOWEVENT_RESIZED) {
-                winW = e.window.data1;
-                winH = e.window.data2;
-                W3dPantallaAlto = winH;
-                MenuPantallaW = winW;
-                MenuPantallaH = winH;
-                rootViewport->Resize(winW, winH);
-            } else {
-                InputUsuarioSDL3(e);
-            }
-        }
-
-        // Animación
-        Uint32 now = SDL_GetTicks();
-        if (now - lastAnimTime >= millisecondsPerFrame) {
-            lastAnimTime = now;
-            // Actualizar frame
-            ReloadAnimation();
-        }
-
-        // notificaciones (toasts): corre el timer (las de exito se cierran solas) y
-        // mantiene vivo el render mientras haya alguna de exito activa
-        static Uint32 lastNotif = now;
-        NotificacionesTick((float)(now - lastNotif) / 1000.0f);
-        lastNotif = now;
-
-        // CARGA DIFERIDA de texturas del import: 1 por frame (decode+upload). Prende g_redraw al cargar una -> el
-        // modelo aparece enseguida y las texturas entran solas. No-op si no hay pendientes.
-        { extern void CargarTexturasPendientes(); CargarTexturasPendientes(); }
-
-        // Render EVENT-DRIVEN: solo si algo cambio (g_redraw) o hay una animacion EN
-        // PLAY (vertex-anim o materiales animados activos). Sino no se dibuja nada ->
-        // CPU casi 0 en reposo (como Blender), en vez de renderizar 60 veces/seg al pedo.
-        bool animando = HayAnimacionActiva() || !VertexAnimationActives.empty();
-        if ((g_redraw || animando) && now - lastRenderTime >= 16) {  // ~60hz
-            lastRenderTime = now;
-            if (rootViewport){
-                rootViewport->Render();
-            }
-            // popups y desplegables (los dibuja el modulo compartido)
-            LayoutRenderMenu(winW, winH);
-            NotificacionesRender(winW, winH); // toasts ENCIMA de todo
-            LayoutTickFPS(now); // overlay de fps (reloj de PC: SDL_GetTicks)
-            SDL_GL_SwapWindow(window);
-            g_redraw = false;
-        }
-
-        SDL_Delay(8); // liberar CPU
-    }
+#ifdef __EMSCRIPTEN__
+    // WebGL: el browser es de 1 solo hilo, no podemos bloquear con un while(). Le pasamos el
+    // frame y el browser lo llama (~60 veces/seg via requestAnimationFrame). El 3er arg = 1
+    // "simula" un loop infinito (no se ejecuta lo de abajo). El cleanup queda solo para escritorio.
+    emscripten_set_main_loop(MainLoopFrame, 0, 1);
+#else
+    while (running) MainLoopFrame();
+#endif
 
     if (controller) SDL_GameControllerClose(controller);
     SDL_GL_DeleteContext(glContext);

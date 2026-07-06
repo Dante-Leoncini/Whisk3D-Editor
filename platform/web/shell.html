@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Whisk3D</title>
+<style>
+  html, body { margin:0; padding:0; width:100%; height:100%; overflow:hidden;
+               background:#14171c; color:#c9d1d9; font-family:system-ui,Segoe UI,Roboto,sans-serif; }
+  /* el canvas ocupa toda la ventana; el editor ajusta su resolucion al tamano CSS cada frame */
+  #canvas { display:block; width:100vw; height:100vh; border:0; outline:none; }
+
+  /* pantalla de carga: el editor precarga res/ (skins/fuentes) -> tarda un momento */
+  #loader { position:fixed; inset:0; display:flex; flex-direction:column;
+            align-items:center; justify-content:center; gap:14px;
+            background:#14171c; transition:opacity .4s; z-index:10; }
+  #loader.hidden { opacity:0; pointer-events:none; }
+  #loader h1 { margin:0; font-size:22px; letter-spacing:2px; font-weight:600; }
+  #loader small { opacity:.6; font-size:12px; }
+  .spin { width:34px; height:34px; border:3px solid #2b323c; border-top-color:#e8913a;
+          border-radius:50%; animation:spin 1s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+</style>
+</head>
+<body>
+  <canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex="0"></canvas>
+
+  <div id="loader">
+    <div class="spin"></div>
+    <h1>WHISK3D</h1>
+    <small id="loadstatus">cargando&hellip;</small>
+  </div>
+
+  <script>
+    var statusEl = document.getElementById('loadstatus');
+    var loaderEl = document.getElementById('loader');
+    var canvasEl = document.getElementById('canvas');
+
+    function ocultarLoader() {
+      loaderEl.classList.add('hidden');
+      canvasEl.focus(); // que el teclado llegue al editor
+    }
+
+    var Module = {
+      canvas: (function () {
+        // si el navegador pierde el contexto WebGL, avisamos en vez de quedar en negro
+        canvasEl.addEventListener('webglcontextlost', function (e) {
+          e.preventDefault();
+          statusEl.textContent = 'se perdio el contexto WebGL (recarga la pagina)';
+          loaderEl.classList.remove('hidden');
+        }, false);
+        return canvasEl;
+      })(),
+      printErr: function (t) { console.error(t); },
+      // texto de progreso mientras baja el .wasm/.data
+      setStatus: function (t) { if (statusEl && t) statusEl.textContent = t; },
+      // cuando el runtime esta listo el editor ya arranco (main() NO retorna: usa
+      // emscripten_set_main_loop) -> ocultamos el loader un toque despues del 1er frame
+      onRuntimeInitialized: function () { setTimeout(ocultarLoader, 400); }
+    };
+
+    // red de seguridad: si por lo que sea onRuntimeInitialized no corre, igual lo sacamos
+    window.addEventListener('load', function () { setTimeout(ocultarLoader, 6000); });
+
+    // el teclado va al canvas: al hacer click le damos foco
+    canvasEl.addEventListener('mousedown', function () { canvasEl.focus(); });
+  </script>
+  {{{ SCRIPT }}}
+</body>
+</html>
