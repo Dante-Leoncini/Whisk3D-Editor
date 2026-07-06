@@ -24,6 +24,10 @@ extern int W3dPantallaAlto; // flip de Y (glesdraw.cpp)
 
 Properties* PropsActivo = NULL;
 
+// SALIR de la edicion del panel activo tras confirmar/cancelar la edicion numerica por texto: limpia 'editando' para
+// que la navegacion (button_up/down) vuelva a moverse por las propiedades en vez de ajustar el valor (bug del "clavado").
+void NumEditSalirDelPanel(){ if (PropsActivo) PropsActivo->editando = false; }
+
 void DibujarTitulo(Object* obj, int maxPixels){
     w3dEngine::Color4f(ListaColores[static_cast<int>(ColorID::blanco)][0], ListaColores[static_cast<int>(ColorID::blanco)][1],
               ListaColores[static_cast<int>(ColorID::blanco)][2], 1.0f);

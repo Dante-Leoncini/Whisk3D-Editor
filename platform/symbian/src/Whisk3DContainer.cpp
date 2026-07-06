@@ -437,8 +437,11 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 					else if (sc == EStdKeyRightArrow) UndoRehacer();
 					return EKeyWasConsumed;
 				}
-				// LAPIZ mantenido + flecha = navegar la seleccion (sub-elemento de malla; objeto = ciclado)
-				if (gLapizHeld){
+				// LAPIZ mantenido + flecha = navegar la seleccion (sub-elemento de malla; objeto = ciclado). SOLO
+				// sin mouse virtual: con el mouse visible el lapiz es SHIFT (para shift+click = seleccion multiple) y
+				// las flechas deben MOVER EL CURSOR (uno instintivamente manteniene shift y mueve con flechas). Sin
+				// mouse virtual, ahi si las flechas navegan la seleccion (todo/nada/siguiente/anterior).
+				if (gLapizHeld && !mouseVisible){
 					gLapizArrowUsed = ETrue;
 					bool enEdit;
 					if (sc == EStdKeyRightArrow)      enEdit = EditSelAvanzar(1, true);   // mantiene + siguiente

@@ -2138,8 +2138,10 @@ bool LayoutTeclaUI(int tecla, int mx, int my) {
     // izq/der mueven el caret. Los digitos 0-9 / '*'(punto) los inyecta el contenedor Symbian o SDL_TEXTINPUT (PC).
     if (NumEditActivo()) {
         switch (tecla) {
-            case LayoutKey::Enter:  NumEditCommit(); return true;
-            case LayoutKey::Cancel: NumEditCancel(); return true;
+            // aceptar/cancelar tiene que SALIR del editando del panel, sino te clava en la propiedad (button_up/down
+            // seguirian ajustando el valor en vez de navegar).
+            case LayoutKey::Enter:  NumEditCommit(); if (PropsActivo) PropsActivo->editando = false; return true;
+            case LayoutKey::Cancel: NumEditCancel(); if (PropsActivo) PropsActivo->editando = false; return true;
             case LayoutKey::Left:   if (g_textFieldActivo) g_textFieldActivo->CaretIzq(); g_redraw = true; return true;
             case LayoutKey::Right:  if (g_textFieldActivo) g_textFieldActivo->CaretDer(); g_redraw = true; return true;
         }
@@ -2204,8 +2206,10 @@ bool LayoutTeclaPanelActivo(int tecla) {
     // el contenedor). Va ANTES de todo asi el keypad no navega la escena mientras se tipea un valor.
     if (NumEditActivo()) {
         switch (tecla) {
-            case LayoutKey::Enter:  NumEditCommit(); return true;
-            case LayoutKey::Cancel: NumEditCancel(); return true;
+            // al aceptar/cancelar hay que SALIR de la edicion del panel (editando=false): sino button_up/down siguen
+            // ajustando el valor en vez de navegar -> te quedabas CLAVADO en la propiedad. (Bug reportado en Symbian.)
+            case LayoutKey::Enter:  NumEditCommit(); if (PropsActivo) PropsActivo->editando = false; return true;
+            case LayoutKey::Cancel: NumEditCancel(); if (PropsActivo) PropsActivo->editando = false; return true;
             case LayoutKey::Left:   if (g_textFieldActivo) g_textFieldActivo->CaretIzq(); g_redraw = true; return true;
             case LayoutKey::Right:  if (g_textFieldActivo) g_textFieldActivo->CaretDer(); g_redraw = true; return true;
         }
