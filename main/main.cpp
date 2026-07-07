@@ -4,10 +4,11 @@
 #include <emscripten.h>
 #include <emscripten/html5.h> // tamano del canvas (resize) + cancelar el loop al salir
 #endif
+#include "ViewPorts/LayoutInput.h" // ruteo compartido + overlay del menu
 #if !defined(__ANDROID__) // ESCRITORIO (Windows + Linux): codigo compartido de PC (import/export, browser, texturas,
-                          // warp del mouse, swap). Android tiene su propia entrada de plataforma y no lo usa.
+                        // warp del mouse, swap). Android tiene su propia entrada de plataforma y no lo usa.
     #define NOMINMAX
-    #include "ViewPorts/LayoutInput.h" // ruteo compartido + overlay del menu
+
 #include "lectura-escritura.h"      // abrir(): dialogo + ImportOBJ
 #include "ViewPorts/PopUp/FileBrowser.h" // explorador de archivos COMPARTIDO
 #include "ViewPorts/PopUp/ProgressPopup.h" // barra de progreso + hook LayoutSwapBuffers
@@ -21,7 +22,7 @@ static void ImportObjDesdeBrowser(const std::string& path) {
 // el callback del menu Add (LayoutImportObj): abre el explorador compartido
 static void PCImportObj() {
     AbrirFileBrowser("Importar modelo", "Import Wavefront OBJ", ".obj",
-                     ImportObjDesdeBrowser);
+                    ImportObjDesdeBrowser);
 }
 
 // hook de swap para la barra de progreso (se redibuja DENTRO del export/import bloqueante)
@@ -62,8 +63,8 @@ static void TexturaElegida(const std::string& path) {
 static void PCCargarTexturaEn(Material* mat) {
     gTexMat = mat;
     AbrirFileBrowser(gCargarTexturaComoNormal ? "Cargar normal map" : "Cargar textura",
-                     gCargarTexturaComoNormal ? "Abrir normal map" : "Abrir textura",
-                     ".png .jpg .jpeg .bmp .tga", TexturaElegida);
+                    gCargarTexturaComoNormal ? "Abrir normal map" : "Abrir textura",
+                    ".png .jpg .jpeg .bmp .tga", TexturaElegida);
 }
 
 #ifdef __EMSCRIPTEN__
@@ -192,11 +193,13 @@ EM_JS(void, WebDescargarArchivo, (const char* pathPtr, const char* namePtr), {
 #endif
 
 #if SDL_MAJOR_VERSION == 2
-    #define SDL_MAIN_HANDLED
-    #include <SDL2/SDL.h>      
+    #ifndef __ANDROID__
+        #define SDL_MAIN_HANDLED
+    #endif
+    #include <SDL2/SDL.h>
     #include "sdl_key_compat.h"
 #elif SDL_MAJOR_VERSION == 3
-    #include <SDL3/SDL.h>      
+    #include <SDL3/SDL.h>
     //para las texturas
     #define STB_IMAGE_IMPLEMENTATION
     #include "stb/stb_image.h"
@@ -414,7 +417,7 @@ bool loadColors(const std::string& filename) {
             ListaColoresUbyte[idx][3] = (GLubyte)(a*255);
 
             #ifdef __ANDROID__
-                __android_log_print(ANDROID_LOG_VERBOSE, "SDL_MAIN", 
+                __android_log_print(ANDROID_LOG_VERBOSE, "SDL_MAIN",
                     "Color %s cargado: R=%.3f G=%.3f B=%.3f A=%.3f",
                     name.c_str(), r, g, b, a);
             #else
@@ -627,13 +630,19 @@ int main(int argc, char* argv[]) {
         cfg = loadConfig(w3dFileSystem::GetResDir() + "/config.ini");
     #endif
     winW = cfg.width;  winH = cfg.height;  // aplicar el tamano del config a la ventana
-                                           // (antes quedaba el default 640x480: el config no se usaba)
+                                        // (antes quedaba el default 640x480: el config no se usaba)
+
+    //TODO: Esto muy probablemente de problemas en gama baja? no se si deba configurable
     if (cfg.enableAntialiasing) {
         SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
         SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 4);
     }
 
     #ifdef __ANDROID__
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+
         window = SDL_CreateWindow("Whisk3D Pre-Alpha",
                                 SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                                 winW, winH,
@@ -651,7 +660,7 @@ int main(int argc, char* argv[]) {
         SDL_Quit();
         return -1;
     }
-                      
+
     SDL_GetWindowSize(window, &winW, &winH);
 
     glContext = SDL_GL_CreateContext(window);
@@ -666,6 +675,9 @@ int main(int argc, char* argv[]) {
     // backend ES2/WebGL: carga GL2.0 + compila los shaders. TIENE que ir antes de initGL
     // (initGL ya dibuja por la abstraccion); sin esto el canvas queda en negro.
     w3dEngine::GLES2Init((void* (*)(const char*))SDL_GL_GetProcAddress);
+#endif
+#ifdef __ANDROID__
+    w3dEngine::GLES2Init(nullptr);
 #endif
 
     //hay que ver que onda estos dos
