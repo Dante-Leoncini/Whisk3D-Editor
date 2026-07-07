@@ -424,6 +424,7 @@ bool EditXformStart(int est, int eje) { // expuesto (lo usa el harness para test
     UndoEditMoveIniciar((Mesh*)g_editMesh); // Ctrl+Z: captura posiciones PREVIAS (move PURO; se confirma al aceptar)
     EditXformIniciar();
     if (!EditXformActivo()) estado = editNavegacion; // sin seleccion: no-op
+    else ToolbarRegistrarAccion(est == rotacion ? TBRotate : est == EditScale ? TBScale : TBMove); // historial
     return true;
 }
 
@@ -442,6 +443,7 @@ void LayoutExtrudeFaces() {
         EditXformIniciar();
         if (!EditXformActivo()) estado = editNavegacion;
     }
+    if (EditXformActivo()) ToolbarRegistrarAccion(TBExtrude); // historial (el extrude arranco de verdad)
 }
 
 // DUPLICATE en Edit Mode (Shift+D): copia la seleccion y arranca un move LIBRE.
@@ -665,6 +667,24 @@ static void LayoutAccionOrient(int aId) {
     else if (aId == 1) transformOrientation = LocalOrient;
     else if (aId == 2) transformOrientation = ViewOrient;
     else if (aId == 3) transformOrientation = NormalOrient; // = la normal de la seleccion (extrude)
+    // VIEW no tiene eje Y (es la profundidad de la vista): si el constraint lo incluia, se libera
+    if (transformOrientation == ViewOrient &&
+        (axisSelect == Y || axisSelect == PlaneX || axisSelect == PlaneZ))
+        axisSelect = (estado == EditScale) ? XYZ : ViewAxis;
+    // con un transform EN CURSO la nueva orientacion se re-aplica al instante (como las teclas X/Y/Z)
+    if (estado != editNavegacion) ReestablecerEstado(false);
+}
+
+// abre el menu de ORIENTACION desde la barra de HERRAMIENTAS (abajo): el menu crece hacia
+// ARRIBA del boton (syTop = borde superior de la barra) para no salirse de la pantalla.
+void LayoutMenuOrientToolbar(int sx, int syTop){
+    if (!MenuOrient) return;
+    MenuOrient->action = LayoutAccionOrient;
+    MenuOrient->Resize();
+    int my = syTop - MenuOrient->height;
+    if (my < 0) my = 0;
+    MenuOrient->Abrir(sx, my, MenuPantallaW, MenuPantallaH);
+    MenuAbierto = MenuOrient;
 }
 
 // opcion del menu View > Viewpoint: cambia el punto de vista del viewport activo (los MISMOS atajos del numpad,
@@ -683,6 +703,7 @@ static void LayoutAccionView(int aId) {
         // submenu Cameras:
         case 410: SetActiveObjectAsCamera(); break; // Set Active Object as Camera (Ctrl Num 0): SOLO setea la camara activa, NO cambia la vista
         case 411: Viewport3DActive->SetViewFromCameraActive(!Viewport3DActive->ViewFromCameraActive);   break; // Active Camera (Num 0): ver desde la camara
+        case 420: Viewport3DActive->EnfocarObject(); break; // Frame Selected (Numpad .): enfoca la seleccion
     }
 }
 
@@ -1998,6 +2019,9 @@ bool LayoutClickUI(int mx, int my) {
 
     ViewportBase* under = FindViewportUnderMouse(rootViewport, mx, my);
     if (!under || !under->isLeaf()) return false;
+
+    // 0) la barra de HERRAMIENTAS del viewport 3D (abajo): historial + orientacion + ejes + tilde/cruz
+    if (under->ViewportKind() == 1 && ((Viewport3D*)under)->ToolbarClick(mx, my)) return true;
 
     // 1) la barra de botones del viewport
     if (under->BarClick(mx, my)) {

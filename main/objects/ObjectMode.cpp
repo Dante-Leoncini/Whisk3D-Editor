@@ -288,6 +288,7 @@ void SetPosicion(){
 		if (!guardarEstado()) return;
 		estado = translacion; g_xformPrimerMov = true; // primer motion en cero (no salta)
 		axisSelect = ViewAxis;
+		ToolbarRegistrarAccion(TBMove); // historial de la barra de herramientas
 	}
 };
 
@@ -767,6 +768,7 @@ void SetRotacion(){
 		// R arranca LIBRE = "rotar desde la vista" (trackball alrededor del eje
 		// de camara, angulo segun el mouse al pivot). X/Y/Z constriñen a un eje.
 		axisSelect = ViewAxis;
+		ToolbarRegistrarAccion(TBRotate); // historial de la barra de herramientas
 	}
 };
 
@@ -796,6 +798,7 @@ void SetEscala(){
 		if (!guardarEstado()) return;
 		estado = EditScale; g_xformPrimerMov = true; // primer motion en cero (no salta)
 		axisSelect = XYZ;
+		ToolbarRegistrarAccion(TBScale); // historial de la barra de herramientas
 	}
 };
 

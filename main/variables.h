@@ -32,11 +32,20 @@ struct Config {
     int height;
     int displayIndex;
     int scale;          // escala global de la UI (3 = PC; 1 = chico, estilo N95 240x320)
+    // false = usuario EXPERIMENTADO (atajos de teclado, menos cosas en pantalla): oculta la barra de
+    // HERRAMIENTAS de abajo del viewport 3D. Default: visible en PC/Android/Web; oculta en Symbian
+    // (el N95 va a teclas; un N8 tactil puede prenderla por config).
+    bool nuevoUsuario;
     std::string SkinName;
     std::string graphicsAPI;
     Config()
         : fullscreen(false), enableAntialiasing(false),
           width(800), height(600), displayIndex(0), scale(3),
+#ifdef W3D_SYMBIAN
+          nuevoUsuario(false),
+#else
+          nuevoUsuario(true),
+#endif
           SkinName("Whisk3D"), graphicsAPI("opengl") {}
 };
 extern Config cfg;
@@ -74,6 +83,11 @@ typedef enum { X, Y, Z, XYZ, ViewAxis, PlaneX, PlaneY, PlaneZ, OrbitalAxis } Axi
 // objeto, o relativa a la vista. La cicla X/Y/Z (re-apretar) y el menu.
 // NormalOrient = la direccion de la NORMAL de la seleccion (lo que hace el extrude por defecto).
 typedef enum { GlobalOrient, LocalOrient, ViewOrient, NormalOrient } TransformOrient;
+
+// barra de HERRAMIENTAS (abajo del viewport 3D): ids del historial de acciones (MRU, max 8,
+// separado por modo objeto/edicion). ToolbarRegistrarAccion la llaman los starters (G/R/S/E...).
+enum { TBMove, TBRotate, TBScale, TBExtrude };
+void ToolbarRegistrarAccion(int id); // def en ViewPort3D.cpp
 
 // Declaraciones de variables (extern)
 extern int axisSelect;

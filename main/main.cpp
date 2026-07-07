@@ -319,6 +319,7 @@ Config loadConfig(const std::string& filename) {
             else if (key == "height") cfg.height = std::stoi(value);
             else if (key == "displayIndex") cfg.displayIndex = std::stoi(value);
             else if (key == "scale") cfg.scale = std::stoi(value);
+            else if (key == "nuevoUsuario") cfg.nuevoUsuario = (value == "true" || value == "1"); // barra de herramientas
             else if (key == "SkinName") cfg.SkinName = value;
             else if (key == "graphicsAPI") cfg.graphicsAPI = value;
         }

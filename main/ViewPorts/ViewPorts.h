@@ -108,8 +108,9 @@ class ViewportBase {
         // TODOS los viewports. delta>0 = mostrar contenido de la izquierda. Devuelve true si (px,py) cae
         // en la barra (ahi consume el evento). La usan los event_mouse_wheel / event_finger_scroll.
         bool BarScrollHorizontal(int px, int py, int delta);
-        bool OnBar(int px, int py);      // (px,py) cae en la barra superior? (hit-test, sin scrollear)
-        void BarScrollBy(int delta);     // scroll horizontal de la barra SIN hit-test (gesto ya lockeado)
+        // virtuales: el Viewport3D agrega su barra de HERRAMIENTAS (abajo) al hit-test/scroll
+        virtual bool OnBar(int px, int py);  // (px,py) cae en una barra? (hit-test, sin scrollear)
+        virtual void BarScrollBy(int delta); // scroll horizontal de la barra SIN hit-test (gesto ya lockeado)
         // touch: (mx,my) cae sobre un campo NUMERICO editable (value box)? Default false; lo redefine
         // Properties. Si true, el arrastre horizontal edita (slider) en vez de scrollear.
         virtual bool PuntoEnCampoNumerico(int mx, int my) { return false; }

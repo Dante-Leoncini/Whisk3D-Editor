@@ -77,6 +77,8 @@ bool LayoutEstaMaximizado(); // hay un viewport en fullscreen?
 // menu TRANSFORM PIVOT POINT (objeto + edit): sale cerca de (mx,my). Setea el
 // pivote (g_transformPivot) que usan rotar/escalar + el checkbox Lock Normals.
 void LayoutMenuPivot(int mx, int my);
+// menu de ORIENTACION (Global/Local/Normal/View) desde la barra de HERRAMIENTAS: crece hacia arriba
+void LayoutMenuOrientToolbar(int sx, int syTop);
 
 // ===== TRANSFORM de sub-elementos en EDIT MODE (G/R/S sobre verts/aristas/caras) =====
 // Mueve/rota/escala los VERTICES seleccionados de la malla en edicion (no el

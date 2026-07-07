@@ -642,6 +642,9 @@ static void AccionAplicarModificador(){
 extern "C" void WebDescargarArchivo(const char* path, const char* name); // main.cpp (EM_JS): baja un archivo del FS al disco
 #endif
 extern bool g_uiTapEnCurso; // (controles.cpp) el LayoutClickUI actual es un TAP tactil diferido (no click de mouse)
+#ifndef W3D_SYMBIAN
+#include "ViewPorts/PopUp/NumPad.h" // teclado numerico tactil (popup abajo)
+#endif
 
 // boton "Wavefront.obj" de la tarjeta Export: exporta al path del campo editable
 static void AccionExportObj(){
@@ -2384,12 +2387,12 @@ void Properties::ClickEn(int mx, int my) {
                         // arma el POSIBLE arrastre del valor: si el mouse se mueve arrastra; si no, al soltar abre
                         // la edicion por texto (mouse_button_up). Las flechas del teclado siguen andando igual.
                         PropFloat* pf = (PropFloat*)prop;
-#ifdef __EMSCRIPTEN__
-                        // TAP tactil (el arrastre ya lo maneja el slider aparte): abre el editor INLINE de Whisk3D
-                        // + levanta el teclado del celu. NO arma gFloatDrag (evita el mouse_button_up del slider).
+#ifndef W3D_SYMBIAN
+                        // TAP TACTIL (el arrastre ya lo maneja el slider aparte): edicion inline + el TECLADO
+                        // NUMERICO de Whisk3D (popup abajo). Con mouse (PC) y en Symbian sigue el camino clasico.
                         if (pf->value && g_uiTapEnCurso) {
                             pf->IniciarEdicionTexto(); editando = true; ViewPortClickDown = true;
-                            SDL_StartTextInput();
+                            NumPadAbrir();
                             return;
                         }
 #endif
