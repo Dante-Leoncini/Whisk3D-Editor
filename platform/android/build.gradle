@@ -3,26 +3,23 @@
 buildscript {
     repositories {
         google()
-        jcenter()
+        mavenCentral()
     }
     dependencies {
         classpath 'com.android.tools.build:gradle:8.7.3'
-
-        // NOTE: Do not place your application dependencies here; they belong
-        // in the individual module build.gradle files
     }
 }
 
 // Instead of having a build dir inside android app dir use the same project top level build dir to reduce clutter
 buildDir = file("distribution/${rootProject.name}/${project.name}")
 subprojects {
-	buildDir = file("distribution/${rootProject.name}/${project.name}")
+    buildDir = file("distribution/${rootProject.name}/${project.name}")
 }
 
 allprojects {
     repositories {
-        jcenter()
         google()
+        mavenCentral()
     }
 }
 

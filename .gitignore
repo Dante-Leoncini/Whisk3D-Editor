@@ -13,6 +13,10 @@ platform/android/app/intermediates/
 platform/android/app/outputs/
 platform/android/app/distribution/
 
+platform/android/app/src/main/jniLibs/arm64-v8a/*.so
+platform/android/app/src/main/jniLibs/armeabi-v7a/*.so
+platform/android/app/src/main/jniLibs/x86_64/*.so
+
 *.apk
 *.ap_
 *.dex
