@@ -90,6 +90,18 @@ Viewport3D::Viewport3D(Vector3 pos){
     b = new Button("UV"); b->rol = BR_UV;                                  // Mark Seam + proyecciones
         b->desplegable = true; b->visible = false; BarButtons.push_back(b); // SOLO en edit
     barAlpha = 0.5f; // en el 3D la barra deja ver la escena detras
+    // barra de HERRAMIENTAS (abajo): MISMOS Button que la barra de arriba. La visibilidad/colores
+    // se setean por frame en ToolbarActualizar (contextual: historial vs controles del transform).
+    toolScroll = 0; toolGesto = false;
+    b = new Button("", (int)IconType::notifOk);    b->rol = TBR_Aceptar;  b->centrado = true; ToolButtons.push_back(b);
+    b = new Button("", (int)IconType::notifError); b->rol = TBR_Cancelar; b->centrado = true; ToolButtons.push_back(b);
+    b = new Button("Global"); b->rol = TBR_Orient; b->desplegable = true; ToolButtons.push_back(b);
+    b = new Button("X"); b->rol = TBR_EjeX; b->centrado = true; ToolButtons.push_back(b);
+    b = new Button("Y"); b->rol = TBR_EjeY; b->centrado = true; ToolButtons.push_back(b);
+    b = new Button("Z"); b->rol = TBR_EjeZ; b->centrado = true; ToolButtons.push_back(b);
+    for (int i = 0; i < 8; i++){ // historial de acciones (MRU, hasta 8)
+        b = new Button(""); b->rol = TBR_Hist + i; b->visible = false; ToolButtons.push_back(b);
+    }
     if (!MenuAdd){
         // el desplegable del Add (las opciones todavia no hacen nada)
         MenuAdd = new PopupMenu();
@@ -167,7 +179,6 @@ Viewport3D::Viewport3D(Vector3 pos){
         MenuViewpoint->Agregar("Back",   404)->atajo = "Ctrl Num 1";
         MenuViewpoint->Agregar("Right",  405)->atajo = "Num 3";
         MenuViewpoint->Agregar("Left",   406)->atajo = "Ctrl Num 3";
-        MenuViewpoint->Agregar("Perspective/Ortho", 407)->atajo = "Num 5"; // alterna perspectiva/ortografica
         // submenu Cameras: setear el objeto activo como camara / ver desde la camara activa
         MenuCameras = new PopupMenu();
         MenuCameras->Agregar("Set Active Object as Camera", 410)->atajo = "Ctrl Num 0";
@@ -175,6 +186,8 @@ Viewport3D::Viewport3D(Vector3 pos){
         MenuView = new PopupMenu();
         MenuView->Agregar("Cameras",   0, -1, MenuCameras);   // abre submenu (antes de Viewpoint, como Blender)
         MenuView->Agregar("Viewpoint", 0, -1, MenuViewpoint); // abre submenu
+        MenuView->Agregar("Frame Selected", 420)->atajo = "Numpad ."; // enfocar la seleccion (EnfocarObject)
+        MenuView->Agregar("Perspective/Ortho", 407)->atajo = "Num 5"; // alterna perspectiva/ortografica
     }
     if (!MenuRender){
         MenuRender = new PopupMenu();
@@ -282,6 +295,7 @@ void Viewport3D::event_mouse_wheel(SDL_Event &e) {
     // Unificado con la barra de propiedades (BarScrollHorizontal).
     int mx, my; SDL_GetMouseState(&mx, &my);
     if (BarScrollHorizontal(mx, my, (int)(e.wheel.y * 40))) return;
+    if (OnToolbar(mx, my)) { ToolbarScrollBy((int)(e.wheel.y * 40)); return; } // barra de HERRAMIENTAS (abajo)
     if (!ViewFromCameraActive) {
         Zoom(e.wheel.y* 2.0f); //podria multiplciarse por un valor por sensibilidad  * 1.0f
     }
@@ -1352,6 +1366,9 @@ void Viewport3D::RenderUI() {
                                    (transformOrientation == NormalOrient) ? "Normal" : "Global";
             RenderBar();
         }
+        // barra de HERRAMIENTAS (abajo): historial + orientacion + ejes + aceptar/cancelar tactil.
+        // Se dibuja TAMBIEN durante un transform (ahi viven el tilde/cruz y los ejes X/Y/Z).
+        RenderToolbar();
         // estadisticas/fps (texto blanco arriba a la derecha; misma ortho 2D)
         RenderEstadisticas();
     }
@@ -1771,9 +1788,11 @@ void Viewport3D::event_mouse_motion(int mx, int my){
     if (estado != rotacion && estado != EditScale) gLineaValida = false;
 
     //boton del medio del mouse (en Android/WebGL tambien el IZQUIERDO: el touch sintetiza click izq ->
-    // 1 dedo arrastrado tiene que orbitar. El tap-vs-drag distingue seleccionar de orbitar.)
+    // 1 dedo arrastrado tiene que orbitar. El tap-vs-drag distingue seleccionar de orbitar.
+    // OJO: durante un TRANSFORM el izquierdo NO orbita: el dedo apretado esta MOVIENDO el transform
+    // (en tactil se confirma con el tilde de la barra de herramientas, no soltando).
     #if defined(__ANDROID__) || defined(__EMSCRIPTEN__)
-        if (middleMouseDown || leftMouseDown) {
+        if (middleMouseDown || (leftMouseDown && estado == editNavegacion)) {
     #else
         if (middleMouseDown) {
     #endif
@@ -2092,6 +2111,236 @@ void Viewport3D::TeclaAbajo(){
     }
 }
 #endif
+
+// ============================================================================
+//  BARRA DE HERRAMIENTAS (abajo del viewport 3D). Solo si cfg.nuevoUsuario
+//  (el experimentado usa atajos; en Symbian default off, un N8 tactil la prende).
+//  [tilde verde / cruz roja: aceptar-cancelar el transform, SOLO tactil]
+//  [orientacion: Global/Local/View/Normal] [X][Y][Z: constrenir ejes, combinables]
+//  [historial de acciones MRU (max 8, sin repetir, separado por modo)]
+// ============================================================================
+extern bool g_redraw;
+#ifndef W3D_SYMBIAN
+extern Uint32 g_lastFingerTicks; // controles.cpp: hubo input tactil en la sesion
+static bool ToolbarUsaTactil(){ return g_lastFingerTicks != 0; }
+#else
+static bool ToolbarUsaTactil(){ return false; } // (cuando el N8 tenga touch, cablear aca)
+#endif
+
+// historial MRU por modo. Arranca con Move/Rotate/Scale (defaults); usar una accion la sube adelante.
+static std::vector<int> gToolHistObj;
+static std::vector<int> gToolHistEdit;
+static std::vector<int>& ToolbarHist(){
+    std::vector<int>& h = (InteractionMode == EditMode) ? gToolHistEdit : gToolHistObj;
+    if (h.empty()){ h.push_back(TBMove); h.push_back(TBRotate); h.push_back(TBScale); }
+    return h;
+}
+void ToolbarRegistrarAccion(int id){
+    std::vector<int>& h = ToolbarHist();
+    for (size_t i = 0; i < h.size(); i++)
+        if (h[i] == id){ h.erase(h.begin() + i); break; } // sin repetir
+    h.insert(h.begin(), id);                              // la ultima usada, primera
+    if (h.size() > 8) h.pop_back();                       // hasta 8
+    g_redraw = true;
+}
+static const char* ToolbarLabel(int id){
+    switch (id){
+        case TBMove:    return "Move";
+        case TBRotate:  return "Rotate";
+        case TBScale:   return "Scale";
+        case TBExtrude: return "Extrude";
+    }
+    return "?";
+}
+static void ToolbarEjecutar(int id){
+    switch (id){ // mismos starters que las teclas G/R/S/E (edit mode primero; sino objeto)
+        case TBMove:    if (!EditXformStart(translacion, ViewAxis)) SetPosicion(); break;
+        case TBRotate:  if (!EditXformStart(rotacion,    ViewAxis)) SetRotacion(); break;
+        case TBScale:   if (!EditXformStart(EditScale,   XYZ))      SetEscala();   break;
+        case TBExtrude: LayoutExtrudeFaces(); break;
+    }
+}
+
+// ejes como mascara de bits (x=1,y=2,z=4) <-> axisSelect. Dos ejes prendidos = el PLANO que
+// los contiene (excluye el tercero); ninguno (o los 3) = libre.
+static int ToolbarEjesMask(){
+    switch (axisSelect){
+        case X: return 1;      case Y: return 2;      case Z: return 4;
+        case PlaneZ: return 3; case PlaneY: return 5; case PlaneX: return 6;
+    }
+    return 0; // XYZ / ViewAxis / OrbitalAxis = libre
+}
+static void ToolbarToggleEje(int bit){
+    int m = ToolbarEjesMask() ^ bit;
+    if (gEVuseCustom){ gEVuseCustom = false; transformOrientation = GlobalOrient; } // extrude/Normal -> eje comun
+    switch (m){
+        case 1: axisSelect = X; break;      case 2: axisSelect = Y; break;      case 4: axisSelect = Z; break;
+        case 3: axisSelect = PlaneZ; break; case 5: axisSelect = PlaneY; break; case 6: axisSelect = PlaneX; break;
+        default: axisSelect = (estado == EditScale) ? XYZ : ViewAxis; break; // libre
+    }
+    if (estado != editNavegacion) ReestablecerEstado(false); // re-aplica el transform con el eje nuevo
+    g_redraw = true;
+}
+
+static bool ToolbarTransformando(){
+    return (estado == translacion || estado == rotacion || estado == EditScale) &&
+           (InteractionMode == ObjectMode || (InteractionMode == EditMode && EditXformActivo()));
+}
+
+bool Viewport3D::ToolbarVisible() const { return cfg.nuevoUsuario; }
+int  Viewport3D::ToolbarHeight() const { return BarHeight(); }
+
+bool Viewport3D::OnToolbar(int px, int py){
+    if (!ToolbarVisible()) return false;
+    int barH = ToolbarHeight();
+    int yBar = y + height - barH; // pegada abajo (la barra de menu esta arriba)
+    return px >= x && px < x + width && py >= yBar && py < yBar + barH;
+}
+
+// colores de los ejes (X rojo / Y verde / Z azul) + fondos "iluminados" (se llenan por frame)
+static const float kTbEje[3][3] = { {0.90f,0.25f,0.25f}, {0.30f,0.85f,0.30f}, {0.35f,0.55f,1.00f} };
+static float sTbEjeBg[3][3];
+static const float kTbRojo[3]   = { 0.92f, 0.28f, 0.24f };
+static const float kTbRojoBg[3] = { 0.41f, 0.13f, 0.11f };
+static float sTbVerdeBg[3];
+
+// visibilidad CONTEXTUAL + colores + layout (sx/sy absolutos con el scroll aplicado).
+// Sin transform: SOLO el historial. Durante un transform: orientacion + ejes (View: sin Y,
+// que es la profundidad de la vista) + tilde/cruz si el input es tactil. Mismos Button de arriba.
+void Viewport3D::ToolbarActualizar(){
+    bool transformando = (Viewport3DActive == this) && ToolbarTransformando();
+    bool tactil = ToolbarUsaTactil();
+    const float* accent = ListaColores[static_cast<int>(ColorID::accent)];
+    const float* blanco = ListaColores[static_cast<int>(ColorID::blanco)];
+    for (int i = 0; i < 3; i++){
+        sTbVerdeBg[i] = accent[i] * 0.40f;
+        for (int e = 0; e < 3; e++) sTbEjeBg[e][i] = kTbEje[e][i] * 0.45f;
+    }
+    int mask = transformando ? ToolbarEjesMask() : 0;
+    std::vector<int>& h = ToolbarHist();
+
+    // visibilidad + contenido + colores
+    for (size_t i = 0; i < ToolButtons.size(); i++){
+        Button* btn = ToolButtons[i];
+        int rol = btn->rol;
+        if (rol == TBR_Aceptar){
+            btn->visible = transformando && tactil;
+            btn->tinte = sTbVerdeBg; btn->colorTexto = accent;
+        } else if (rol == TBR_Cancelar){
+            btn->visible = transformando && tactil;
+            btn->tinte = kTbRojoBg; btn->colorTexto = kTbRojo;
+        } else if (rol == TBR_Orient){
+            btn->visible = transformando;
+            btn->text = (transformOrientation == LocalOrient)  ? "Local"  :
+                        (transformOrientation == ViewOrient)   ? "View"   :
+                        (transformOrientation == NormalOrient) ? "Normal" : "Global";
+        } else if (rol >= TBR_EjeX && rol <= TBR_EjeZ){
+            int e = rol - TBR_EjeX;
+            // en orientacion VIEW no hay eje Y (es la profundidad de la vista): solo X y Z
+            btn->visible = transformando && !(transformOrientation == ViewOrient && e == 1);
+            bool on = (mask & (1 << e)) != 0;
+            btn->tinte = on ? sTbEjeBg[e] : NULL;     // encendido: fondo de SU color
+            btn->colorTexto = on ? blanco : kTbEje[e]; // apagado: la letra en su color
+        } else { // historial de acciones (solo FUERA de un transform)
+            int hi = rol - TBR_Hist;
+            btn->visible = !transformando && hi >= 0 && hi < (int)h.size();
+            if (btn->visible) btn->text = ToolbarLabel(h[hi]);
+        }
+    }
+
+    // layout: igual que la barra de arriba (Resize + posiciones acumuladas), en dos pasadas
+    // (primero el ancho total para clampear el scroll, despues los sx/sy absolutos)
+    int barH = ToolbarHeight();
+    int yBar = y + height - barH;
+    int btnGap = gapGS / 2 + 1;
+    int total = gapGS;
+    for (size_t i = 0; i < ToolButtons.size(); i++){
+        Button* btn = ToolButtons[i];
+        if (!btn->visible) continue;
+        btn->Resize(width - gapGS * 2);
+        if (btn->rol >= TBR_EjeX && btn->rol <= TBR_EjeZ){ // X/Y/Z cuadrados
+            btn->width = btn->height;
+            btn->card->Resize(btn->width, btn->height);
+        }
+        total += btn->width + btnGap;
+    }
+    int maxS = total - width; if (maxS < 0) maxS = 0;
+    if (toolScroll > maxS) toolScroll = maxS;
+    int bx = gapGS - toolScroll;
+    for (size_t i = 0; i < ToolButtons.size(); i++){
+        Button* btn = ToolButtons[i];
+        if (!btn->visible){ btn->sx = -10000; btn->sy = -10000; btn->hover = false; continue; }
+        btn->sx = x + bx;
+        btn->sy = yBar + (barH - btn->height) / 2;
+        btn->hover = btn->Contains(lastMouseX, lastMouseY);
+        bx += btn->width + btnGap;
+    }
+}
+
+void Viewport3D::ToolbarScrollBy(int delta){
+    toolScroll -= delta;
+    if (toolScroll < 0) toolScroll = 0;
+    ToolbarActualizar(); // re-clampea contra el ancho total actual
+    g_redraw = true;
+}
+
+bool Viewport3D::ToolbarClick(int mx, int my){
+    if (!OnToolbar(mx, my)) return false;
+    ToolbarActualizar(); // sx/sy frescos
+    for (size_t i = 0; i < ToolButtons.size(); i++){
+        Button* btn = ToolButtons[i];
+        if (!btn->visible || !btn->Contains(mx, my)) continue;
+        int rol = btn->rol;
+        if (rol == TBR_Aceptar) Aceptar();                    // tilde verde: confirma el transform
+        else if (rol == TBR_Cancelar){                        // cruz roja: cancela (mismo camino que el click derecho)
+            if (InteractionMode == EditMode && EditXformActivo()) EditXformCancelar();
+            else Cancelar();
+            NumInputReset();
+        }
+        else if (rol == TBR_Orient) LayoutMenuOrientToolbar(btn->sx, y + height - ToolbarHeight());
+        else if (rol >= TBR_EjeX && rol <= TBR_EjeZ) ToolbarToggleEje(1 << (rol - TBR_EjeX)); // combinables
+        else ToolbarEjecutar( ToolbarHist()[rol - TBR_Hist] ); // historial: arranca la accion
+        g_redraw = true;
+        return true;
+    }
+    return true; // dentro de la barra pero en el gap: consumir igual (no pasa al 3D)
+}
+
+void Viewport3D::RenderToolbar(){
+    if (!ToolbarVisible()) return;
+    ToolbarActualizar();
+    int barH = ToolbarHeight();
+
+    w3dEngine::PushMatrix();
+    w3dEngine::Translatef(0, (GLfloat)(height - barH), 0);
+    // fondo translucido como la barra de arriba
+    const float* gris = ListaColores[static_cast<int>(ColorID::gris)];
+    w3dEngine::Color4f(gris[0], gris[1], gris[2], barAlpha);
+    barCard->Resize(width, barH);
+    barCard->RenderObject(false);
+    // botones en sus sx/sy (ya con scroll). Local = sx-x, sy-y-(height-barH). Mismo patron que RenderBar.
+    for (size_t i = 0; i < ToolButtons.size(); i++){
+        Button* btn = ToolButtons[i];
+        if (!btn->visible) continue;
+        w3dEngine::PushMatrix();
+        w3dEngine::Translatef((GLfloat)(btn->sx - x), (GLfloat)(btn->sy - y - (height - barH)), 0);
+        btn->Render();
+        w3dEngine::PopMatrix();
+    }
+    w3dEngine::PopMatrix();
+}
+
+// la barra de menu (arriba) O la de herramientas (abajo): el gesto de arrastre queda lockeado
+// a la que se toco (toolGesto) para que BarScrollBy scrollee la correcta.
+bool Viewport3D::OnBar(int px, int py){
+    if (ViewportBase::OnBar(px, py)){ toolGesto = false; return true; }
+    if (OnToolbar(px, py)){ toolGesto = true; return true; }
+    return false;
+}
+void Viewport3D::BarScrollBy(int delta){
+    if (toolGesto) ToolbarScrollBy(delta);
+    else ViewportBase::BarScrollBy(delta);
+}
 
 void Viewport3D::SetEje(int eje){
 #ifdef W3D_SYMBIAN

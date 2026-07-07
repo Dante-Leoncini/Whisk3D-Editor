@@ -67,6 +67,11 @@ enum BarRol3D {
     BR_Object, BR_Overlays, BR_Render, BR_Orient, BR_UV, BR_View,
     BR_Mesh // menu "Mesh" de Edit Mode (Transform/Snap/Delete), comun a vertice/borde/cara
 };
+// roles de la barra de HERRAMIENTAS (abajo). TBR_Hist+i = boton i del historial de acciones.
+enum ToolbarRol3D {
+    TBR_Aceptar = 100, TBR_Cancelar, TBR_Orient, TBR_EjeX, TBR_EjeY, TBR_EjeZ,
+    TBR_Hist = 110 // .. TBR_Hist+7
+};
 class Button;
 Button* BarRolBtn(std::vector<Button*>& B, int rol); // el boton con ese rol (NULL si no esta)
 int     BarRolIdx(std::vector<Button*>& B, int rol); // su INDICE (para la nav izq/der), -1 si no esta
@@ -186,6 +191,22 @@ class Viewport3D : public ViewportBase, public WithBorder {
         void TeclaAbajo();
         void SetEje(int eje);
         void SetViewFromCameraActive(bool value);
+
+        // ---- BARRA DE HERRAMIENTAS (abajo): mismos Button que la barra de arriba. CONTEXTUAL:
+        // sin transform = historial de acciones; durante un transform = orientacion + ejes X/Y/Z
+        // (+ aceptar/cancelar si es tactil). Solo si cfg.nuevoUsuario (Symbian default: off). ----
+        std::vector<Button*> ToolButtons; // botones persistentes (roles TBR_*)
+        int  toolScroll;                  // scroll horizontal manual de la barra
+        bool toolGesto;                   // el gesto de arrastre actual arranco sobre ESTA barra (no la de arriba)
+        bool ToolbarVisible() const;      // cfg.nuevoUsuario
+        int  ToolbarHeight() const;       // = BarHeight()
+        bool OnToolbar(int px, int py);   // (px,py) cae en la barra de herramientas?
+        void ToolbarScrollBy(int delta);
+        void ToolbarActualizar();          // visibilidad contextual + colores + layout (sx/sy con scroll)
+        bool ToolbarClick(int mx, int my); // teclas de la barra (true = consumido)
+        void RenderToolbar();
+        bool OnBar(int px, int py) override;      // barra de arriba O la de herramientas (setea toolGesto)
+        void BarScrollBy(int delta) override;     // rutea el scroll a la barra donde arranco el gesto
 #ifndef W3D_SYMBIAN
         void event_key_down(SDL_Event &e) override;
 #endif

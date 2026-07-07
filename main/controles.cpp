@@ -123,6 +123,16 @@ void InputUsuarioSDL3(SDL_Event &e){
         // pinch/paneo (el gesto de 2 dedos ya se maneja en SDL_FINGERMOTION).
         if (fingers.size() >= 2) return;
 
+        // TACTIL durante un TRANSFORM: el touchStart teletransporta el mouse virtual (motion sintetizado
+        // que llega ANTES del button-down) -> ese salto NO debe mover el transform (tocar el tilde de la
+        // barra corria el objeto; y re-apoyar el dedo para seguir moviendo saltaba). El drag real llega
+        // con leftMouseDown y pasa normal.
+        if (e.motion.which == SDL_TOUCH_MOUSEID && !leftMouseDown && estado != editNavegacion) {
+            g_xformPrimerMov = true; // el proximo motion ignora su delta (absorbe el salto)
+            GuardarMousePos();
+            return;
+        }
+
         int mx = e.motion.x;
         int my = e.motion.y;
 
@@ -258,14 +268,18 @@ void InputUsuarioSDL3(SDL_Event &e){
             GuardarMousePos();
             return;
         }
+        // click DENTRO de un popup modal (teclado numerico, color picker): NO commitea la edicion ni
+        // desenfoca el campo (las teclas del popup EDITAN ese campo; sino el 1er tap al teclado lo cerraba)
+        bool clickEnPopup = PopUpActive && PopUpActive->Contains((int)e.button.x, (int)e.button.y);
         // edicion numerica por texto: un click en cualquier lado APLICA lo tipeado (no consume el click -> si fue
         // sobre otro campo, ese arranca su propia edicion en el mouse-up).
-        if (NumEditActivo()) { NumEditCommit(); NumEditSalirDelPanel(); }
+        if (NumEditActivo() && !clickEnPopup) { NumEditCommit(); NumEditSalirDelPanel(); }
         ViewPortClickDown = true;
         if (e.button.button == SDL_BUTTON_LEFT) {
             leftMouseDown = true;
-            g_textFieldActivo = NULL; // click en cualquier lado desenfoca el texto
-                                      // (ClickEn de Properties re-enfoca en el up si es una caja)
+            if (!clickEnPopup)
+                g_textFieldActivo = NULL; // click en cualquier lado desenfoca el texto
+                                          // (ClickEn de Properties re-enfoca en el up si es una caja)
             // TOUCH se detecta por el which del evento (SDL_TOUCH_MOUSEID), NO por el mapa de dedos: SDL
             // sintetiza este mouse-down ANTES de pushear el SDL_FINGERDOWN -> en este punto 'fingers'
             // todavia esta VACIO y chequearlo hacia caer el touch al flujo de mouse (clickeaba al apoyar).
@@ -288,10 +302,25 @@ void InputUsuarioSDL3(SDL_Event &e){
                 // consumido: no propagar el click
             }
             else if (habiaTransform) {
-                // durante un transform (mover/rotar/escalar, o ubicar un
-                // duplicado) el click CONFIRMA, este donde este el mouse
-                // (incluso sobre la barra/menu): la UI no lo consume
-                if (Viewport3DActive) Viewport3DActive->Aceptar();
+                if (esTouch) {
+                    // TACTIL: tocar NO confirma el transform (la pantalla se usa para MOVER; sin ella no
+                    // podes ni arrastrar). Confirmar/cancelar = tilde/cruz de la barra de HERRAMIENTAS.
+                    if (MenuAbierto) {
+                        // menu abierto desde la barra (orientacion): el tap elige la opcion / lo cierra
+                        LayoutClickUI((int)e.button.x, (int)e.button.y);
+                    }
+                    else if (vpDown && vpDown->ViewportKind() == 1)
+                        ((Viewport3D*)vpDown)->ToolbarClick((int)e.button.x, (int)e.button.y);
+                    // fuera de la barra: nada en el down; el arrastre del dedo mueve el transform
+                }
+                // durante un transform (mover/rotar/escalar, o ubicar un duplicado) el CLICK de mouse
+                // CONFIRMA, este donde este (incluso sobre la barra/menu): la UI no lo consume
+                else if (Viewport3DActive) Viewport3DActive->Aceptar();
+            }
+            // POPUP MODAL (teclado numerico, color picker) bajo el click: va directo, sin diferir -> las
+            // teclas responden al DOWN (y el drag sobre el popup no scrollea el panel de atras).
+            else if (clickEnPopup) {
+                LayoutClickUI((int)e.button.x, (int)e.button.y);
             }
             // BARRA superior (MOUSE o touch): NO abrir la pestaña/menu en el DOWN. Si se ARRASTRA = scroll
             // horizontal; si se SUELTA sin mover = abre en el mouse-up. Vale para mouse PORQUE en la barra del
