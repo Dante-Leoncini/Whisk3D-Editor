@@ -2412,6 +2412,49 @@ void NotificacionesMotion(int mx, int my) {
     if (sobre != gNotifSobreX) { gNotifSobreX = sobre; g_redraw = true; }
 }
 
+// envuelve un texto a <= maxLin lineas de a lo sumo 'cpl' caracteres (fuente monoespaciada). Corta por
+// palabras; una palabra mas larga que la linea se parte. Si no entra todo, la ultima linea termina en "..."
+static std::vector<std::string> NotifWrap(const std::string& s, int cpl, int maxLin){
+    std::vector<std::string> out;
+    if (cpl < 1) cpl = 1;
+    if (maxLin < 1) maxLin = 1;
+    std::vector<std::string> words; std::string w;
+    for (size_t i = 0; i < s.size(); i++){
+        char c = s[i];
+        if (c == ' ' || c == '\n' || c == '\t'){ if (!w.empty()){ words.push_back(w); w.clear(); } }
+        else w += c;
+    }
+    if (!w.empty()) words.push_back(w);
+    std::string cur; bool corte = false;
+    for (size_t wi = 0; wi < words.size() && !corte; wi++){
+        std::string word = words[wi];
+        while ((int)word.size() > cpl){                 // palabra mas larga que la linea: partirla
+            if (!cur.empty()){ out.push_back(cur); cur.clear(); }
+            if ((int)out.size() >= maxLin){ corte = true; break; }
+            out.push_back(word.substr(0, cpl));
+            word = word.substr(cpl);
+        }
+        if (corte) break;
+        if (cur.empty()) cur = word;
+        else if ((int)(cur.size() + 1 + word.size()) <= cpl) cur += " " + word;
+        else {
+            out.push_back(cur); cur.clear();
+            if ((int)out.size() >= maxLin){ corte = true; break; }
+            cur = word;
+        }
+    }
+    if (!corte && !cur.empty() && (int)out.size() < maxLin) out.push_back(cur);
+    else if (!cur.empty()) corte = true; // quedo texto sin colocar -> se trunco
+    if (corte && !out.empty()){          // marcar el recorte con "..."
+        std::string& last = out.back();
+        int room = cpl - 3; if (room < 0) room = 0;
+        if ((int)last.size() > room) last = last.substr(0, room);
+        last += "...";
+    }
+    if (out.empty()) out.push_back("");
+    return out;
+}
+
 void NotificacionesRender(int screenW, int screenH) {
     if (gNotifs.empty()) return;
     if (!gNotifCard) gNotifCard = new Card(NULL, 10, 10);
@@ -2436,20 +2479,31 @@ void NotificacionesRender(int screenW, int screenH) {
 
     const int margin = gapGS * 2;
     const int pad    = gapGS;
-    const int cardH  = RenglonHeightGS + pad * 2;
+    const int lineH  = RenglonHeightGS;   // alto de cada linea de texto
     const int xBtnW  = RenglonHeightGS;
-    int y = screenH - margin - cardH; // el de MAS ABAJO (el mas viejo); sube hacia arriba
+    int yBottom = screenH - margin;       // borde inferior de la pila (el mas viejo va abajo); sube hacia arriba
 
     for (int i = (int)gNotifs.size() - 1; i >= 0; i--) { // viejo abajo -> nuevo arriba
         Notif& n = gNotifs[i];
         const float* col = n.error ? rojo : (n.hint ? azul : accent);
-        int textW = (int)n.msg.size() * CharacterWidthGS;
-        int cardW = pad + IconSizeGS + gapGS + textW + pad + (n.error ? xBtnW : 0);
-        if (cardW > screenW - margin*2) cardW = screenW - margin*2;
+        int textW  = (int)n.msg.size() * CharacterWidthGS;
+        int maxCardW = screenW - margin*2;
+        int cardW  = pad + IconSizeGS + gapGS + textW + pad + (n.error ? xBtnW : 0);
+        bool wrap = false;
+        if (cardW > maxCardW){ cardW = maxCardW; wrap = true; } // no cabe en 1 linea -> envolver
 #ifdef W3D_SYMBIAN
-        cardW = screenW - margin*2; // N95: ancho COMPLETO de la ventana (poca resolucion -> aprovecharla)
+        cardW = maxCardW; wrap = true;                          // N95: ancho COMPLETO (poca resolucion)
 #endif
+        int txtMax = cardW - pad - IconSizeGS - gapGS - pad - (n.error ? xBtnW : 0);
+        // hasta 3 lineas (pedido Dante): un mensaje largo NUNCA se recorta a media palabra sin avisar
+        std::vector<std::string> lineas;
+        if (wrap && CharacterWidthGS > 0) lineas = NotifWrap(n.msg, txtMax / CharacterWidthGS, 3);
+        else lineas.push_back(n.msg);
+        int nlin  = (int)lineas.size(); if (nlin < 1) nlin = 1;
+        int cardH = lineH * nlin + pad * 2;
+
         int x = margin;
+        int y = yBottom - cardH;                 // top de esta card
         n.rx=x; n.ry=y; n.rw=cardW; n.rh=cardH;
 
         // fondo + borde de color
@@ -2460,21 +2514,22 @@ void NotificacionesRender(int screenW, int screenH) {
         w3dEngine::Color4f(col[0], col[1], col[2], 1.0f);      gNotifCard->RenderBorder(false);
         w3dEngine::PopMatrix();
 
-        // icono (tinte rojo/verde) a la izquierda, centrado vertical
+        // icono (tinte rojo/verde) a la izquierda, alineado con la PRIMERA linea
         w3dEngine::PushMatrix();
-        w3dEngine::Translatef((GLfloat)(x + pad), (GLfloat)(y + (cardH - IconSizeGS)/2), 0);
+        w3dEngine::Translatef((GLfloat)(x + pad), (GLfloat)(y + pad + (lineH - IconSizeGS)/2), 0);
         w3dEngine::Color4f(col[0], col[1], col[2], 1.0f);
         int icon = n.error ? (int)IconType::notifError : (int)IconType::notifOk;
         W3dDrawStrip4(IconMesh, IconsUV[icon]->uvs);
         w3dEngine::PopMatrix();
 
-        // texto
-        w3dEngine::PushMatrix();
-        w3dEngine::Translatef((GLfloat)(x + pad + IconSizeGS + gapGS), (GLfloat)(y + pad), 0);
+        // texto (1 a 3 lineas)
         w3dEngine::Color4f(blanco[0], blanco[1], blanco[2], 1.0f);
-        int txtMax = cardW - pad - IconSizeGS - gapGS - pad - (n.error ? xBtnW : 0);
-        RenderBitmapText(n.msg, textAlign::left, txtMax);
-        w3dEngine::PopMatrix();
+        for (int L = 0; L < nlin; L++){
+            w3dEngine::PushMatrix();
+            w3dEngine::Translatef((GLfloat)(x + pad + IconSizeGS + gapGS), (GLfloat)(y + pad + L*lineH), 0);
+            RenderBitmapText(lineas[L], textAlign::left, txtMax);
+            w3dEngine::PopMatrix();
+        }
 
         // 'x' de cerrar (solo error): chica, en la ESQUINA superior derecha.
         // gris por defecto; blanca al pasar el mouse. El glyph 'x' del font tiene
@@ -2495,7 +2550,7 @@ void NotificacionesRender(int screenW, int screenH) {
             RenderBitmapText("x", textAlign::center, bw);
             w3dEngine::PopMatrix();
         }
-        y -= cardH + gapGS; // siguiente arriba
+        yBottom = y - gapGS; // la proxima (mas nueva) va ARRIBA de esta
     }
 }
 

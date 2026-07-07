@@ -211,6 +211,15 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         // (compartido; en PC se cablea a mouse_button_up)
         void ClickEn(int mx, int my);
 
+        // touch: (mx,my) cae sobre el VALUE BOX de un PropFloat? -> ahi el arrastre horizontal EDITA (slider);
+        // en el label / otras filas el arrastre SCROLLEA. Lo usa el ruteo tactil en controles.cpp.
+        bool PuntoEnCampoNumerico(int mx, int my) override;
+        bool TouchSliderArmar(int mx, int my) override;
+        void TouchSliderMover(int dx) override;
+        void TouchSliderSoltar() override;
+        // PropFloat cuyo value box cae bajo (mx,my), o NULL (recorrido de filas comun a lo de arriba)
+        PropFloat* PropFloatEnValueBox(int mx, int my);
+
         void key_down_return();
 };
 

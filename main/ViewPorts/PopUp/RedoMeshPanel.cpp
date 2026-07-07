@@ -230,8 +230,12 @@ void RedoMeshPanel::Reubicar(){
     int margen = gapGS * 2;
     x = vx + margen;
     y = vy + vh - popUpWindow->height - margen; // pegado al borde inferior-IZQ
-    if (x < 0) x = 0;
-    if (y < 0) y = 0;
+    // NUNCA salirse de la pantalla (en vertical el viewport3D es angosto y el panel sobresalia a la
+    // derecha / abajo). Se reencuadra dentro de [margen, Pantalla-margen].
+    if (x + popUpWindow->width  + margen > MenuPantallaW) x = MenuPantallaW - popUpWindow->width  - margen;
+    if (y + popUpWindow->height + margen > MenuPantallaH) y = MenuPantallaH - popUpWindow->height - margen;
+    if (x < margen) x = margen;
+    if (y < margen) y = margen;
 }
 
 RedoMeshPanel::~RedoMeshPanel(){
@@ -240,6 +244,8 @@ RedoMeshPanel::~RedoMeshPanel(){
 
 void RedoMeshPanel::ResizeGrupo(){
     int w = 200 * GlobalScale;
+    int maxW = MenuPantallaW - gapGS * 4; // que quepa en pantalla (en vertical el ancho es chico)
+    if (w > maxW) w = maxW;               // al achicarse, la tarjeta trunca los labels sola (RenderBitmapText)
     grupo->Resize(w, 0);
     popUpWindow->Resize(w, grupo->height);
 }

@@ -421,9 +421,8 @@ void Outliner::FindMouseOver(int mx, int my){
     // agarre; la llamada vieja a ScrollMouseOver pisaba ese estado)
 }
 
-// TOUCH: arrastrar 1 dedo. Sobre la barra superior = scroll horizontal; sino = scroll del contenido (v/h).
+// TOUCH: arrastrar 1 dedo sobre el CONTENIDO = scroll (v/h). La barra la maneja el gesto lockeado.
 bool Outliner::event_finger_scroll(int px, int py, int dx, int dy){
-    if (BarScrollHorizontal(px, py, dx)) return true;
     ScrollByTouch(dx, dy);
     return true;
 }

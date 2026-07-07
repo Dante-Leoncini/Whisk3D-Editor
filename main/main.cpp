@@ -83,53 +83,75 @@ EMSCRIPTEN_KEEPALIVE void WebTexturaCargada(const char* path) { TexturaElegida(s
 EMSCRIPTEN_KEEPALIVE void WebObjCargado(const char* path)     { ImportOBJ(std::string(path), false); }
 }
 
-// abre el picker de UNA imagen -> la escribe en /uploads y avisa a WebTexturaCargada
-EM_JS(void, WebAbrirPickerTextura, (void), {
+// overlay con un BOTON real: el <input type=file>.click() se dispara DENTRO del tap del boton (gesto DOM
+// genuino). Necesario para iOS Safari: ahi input.click() llamado desde el RAF (fuera de un gesto de usuario)
+// NO abre el selector -> "al hacerle click no ocurre nada". El input va en el DOM (otro requisito de iOS).
+// tipo: 0 = textura (1 imagen), 1 = OBJ (multi: obj+mtl+texturas).
+EM_JS(void, WebAbrirPicker, (int tipo), {
+    var prev = document.getElementById('w3d-pick'); if (prev && prev.parentNode) prev.parentNode.removeChild(prev);
+    var ov = document.createElement('div');
+    ov.id = 'w3d-pick';
+    ov.style.cssText = 'position:fixed;left:0;top:0;right:0;bottom:0;z-index:99999;'
+        + 'background:rgba(0,0,0,0.5);display:flex;align-items:flex-start;justify-content:center;';
+    var card = document.createElement('div');
+    card.style.cssText = 'margin-top:8vh;width:92%;max-width:440px;background:#2b2b2b;border:1px solid #555;'
+        + 'border-radius:10px;padding:16px;box-shadow:0 6px 30px rgba(0,0,0,0.6);font-family:sans-serif;color:#ddd;';
+    var lab = document.createElement('div');
+    lab.textContent = tipo ? 'Importar OBJ (.obj + .mtl + texturas)' : 'Cargar textura (imagen)';
+    lab.style.cssText = 'font-size:15px;margin-bottom:12px;color:#9ac9ff;';
     var input = document.createElement('input');
     input.type = 'file';
-    input.accept = 'image/png,image/jpeg,image/bmp,.png,.jpg,.jpeg,.bmp,.tga';
-    input.onchange = function(e) {
-        var f = e.target.files[0];
-        if (!f) return;
-        var r = new FileReader();
-        r.onload = function() {
-            try { FS.mkdir('/uploads'); } catch (_e) {}
-            var p = '/uploads/' + f.name;
-            FS.writeFile(p, new Uint8Array(r.result));
-            ccall('WebTexturaCargada', null, ['string'], [p]);
-        };
-        r.readAsArrayBuffer(f);
-    };
-    input.click();
-});
-
-// abre el picker MULTI-archivo (obj + mtl + texturas) -> los escribe todos en /uploads
-// y avisa a WebObjCargado con el path del .obj (recien cuando bajaron todos)
-EM_JS(void, WebAbrirPickerObj, (void), {
-    var input = document.createElement('input');
-    input.type = 'file';
-    input.multiple = true;
-    input.accept = '.obj,.mtl,image/*,.png,.jpg,.jpeg,.bmp,.tga';
+    if (tipo) { input.multiple = true; input.accept = '.obj,.mtl,image/*,.png,.jpg,.jpeg,.bmp,.tga'; }
+    else      { input.accept = 'image/png,image/jpeg,image/bmp,.png,.jpg,.jpeg,.bmp,.tga'; }
+    input.style.cssText = 'position:absolute;left:-9999px;width:1px;height:1px;opacity:0;'; // en el DOM pero oculto
     input.onchange = function(e) {
         var files = Array.prototype.slice.call(e.target.files);
-        if (!files.length) return;
+        if (!files.length) { cerrar(); return; }
         try { FS.mkdir('/uploads'); } catch (_e) {}
-        var objPath = null, pending = files.length;
-        files.forEach(function(f) {
-            var r = new FileReader();
+        if (!tipo) {
+            var f = files[0], r = new FileReader();
             r.onload = function() {
                 var p = '/uploads/' + f.name;
                 FS.writeFile(p, new Uint8Array(r.result));
-                if (f.name.toLowerCase().endsWith('.obj')) objPath = p;
-                if (--pending === 0) {
-                    if (objPath) ccall('WebObjCargado', null, ['string'], [objPath]);
-                }
+                ccall('WebTexturaCargada', null, ['string'], [p]);
             };
-            r.readAsArrayBuffer(f);
-        });
+            r.readAsArrayBuffer(f); cerrar();
+        } else {
+            var objPath = null, pending = files.length;
+            files.forEach(function(f) {
+                var r = new FileReader();
+                r.onload = function() {
+                    var p = '/uploads/' + f.name;
+                    FS.writeFile(p, new Uint8Array(r.result));
+                    if (f.name.toLowerCase().endsWith('.obj')) objPath = p;
+                    if (--pending === 0 && objPath) ccall('WebObjCargado', null, ['string'], [objPath]);
+                };
+                r.readAsArrayBuffer(f);
+            });
+            cerrar();
+        }
     };
-    input.click();
+    var btnPick = document.createElement('button');
+    btnPick.textContent = 'Elegir archivo';
+    btnPick.style.cssText = 'width:100%;font-size:17px;padding:14px;border:none;border-radius:6px;'
+        + 'background:#3a8f68;color:#fff;font-weight:bold;';
+    var btnC = document.createElement('button');
+    btnC.textContent = 'Cancelar';
+    btnC.style.cssText = 'width:100%;margin-top:10px;font-size:15px;padding:11px;border:none;border-radius:6px;background:#444;color:#ddd;';
+    function cerrar(){ if (ov.parentNode) ov.parentNode.removeChild(ov); }
+    // el click del boton ES el gesto de usuario -> input.click() adentro SI abre el selector en iOS
+    btnPick.addEventListener('click', function(){ input.click(); });
+    btnC.addEventListener('click', function(){ cerrar(); });
+    ov.addEventListener('mousedown', function(e){ if (e.target === ov) cerrar(); });
+    ov.addEventListener('touchend', function(e){ if (e.target === ov) cerrar(); });
+    ['mousedown','mouseup','touchstart','touchmove','touchend','pointerdown','pointerup'].forEach(function(ev){
+        card.addEventListener(ev, function(e){ e.stopPropagation(); });
+    });
+    card.appendChild(lab); card.appendChild(input); card.appendChild(btnPick); card.appendChild(btnC);
+    ov.appendChild(card); document.body.appendChild(ov);
 });
+static void WebAbrirPickerTextura(){ WebAbrirPicker(0); }
+static void WebAbrirPickerObj(){ WebAbrirPicker(1); }
 
 static void WebCargarTexturaEn(Material* mat) { gTexMat = mat; WebAbrirPickerTextura(); }
 static void WebImportObj() { WebAbrirPickerObj(); }
@@ -138,16 +160,29 @@ static void WebImportObj() { WebAbrirPickerObj(); }
 // La llaman Properties.cpp (export OBJ) y ViewPort3D.cpp (render) via forward-declaration.
 EM_JS(void, WebDescargarArchivo, (const char* pathPtr, const char* namePtr), {
     var path = UTF8ToString(pathPtr), name = UTF8ToString(namePtr);
-    try {
-        var data = FS.readFile(path); // Uint8Array del FS virtual
-        var blob = new Blob([data], { type: 'application/octet-stream' });
-        var url = URL.createObjectURL(blob);
-        var a = document.createElement('a');
-        a.href = url; a.download = name;
-        document.body.appendChild(a); a.click(); document.body.removeChild(a);
-        setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
-    } catch (e) { console.error('descarga fallo:', path, e); }
+    // COLA espaciada: Safari (sobre todo iOS) ignora descargas programaticas disparadas juntas -> de un
+    // export OBJ+MTL o de varios renders solo bajaba UNO. Las encolamos y disparamos de a una con un gap.
+    if (!window.__w3dDlQueue) window.__w3dDlQueue = [];
+    window.__w3dDlQueue.push({ path: path, name: name });
+    if (window.__w3dDlBusy) return;
+    window.__w3dDlBusy = true;
+    function next(){
+        if (!window.__w3dDlQueue.length) { window.__w3dDlBusy = false; return; }
+        var it = window.__w3dDlQueue.shift();
+        try {
+            var data = FS.readFile(it.path); // Uint8Array del FS virtual
+            var blob = new Blob([data], { type: 'application/octet-stream' });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url; a.download = it.name; a.rel = 'noopener';
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+        } catch (e) { console.error('descarga fallo:', it.path, e); }
+        setTimeout(next, 700); // gap entre descargas (Safari necesita respiro entre a.click())
+    }
+    next();
 });
+
 #endif // __EMSCRIPTEN__
 #include "WhiskUI/PopupMenu.h" // MenuPantallaW/H (desplegables)
 #include "WhiskUI/glesdraw.h"  // W3dPantallaAlto (flip de Y)
@@ -552,6 +587,9 @@ static void MainLoopFrame() {
 int main(int argc, char* argv[]) {
 #ifdef __EMSCRIPTEN__
     SDL_SetMainReady(); // web: no arrancamos por el main de SDL
+    // touch -> mouse SIEMPRE sintetizado por SDL (which = SDL_TOUCH_MOUSEID): el ruteo tactil de
+    // controles.cpp distingue por ese which los eventos del dedo de los mouse FANTASMA del browser.
+    SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "1");
     // en web solo VIDEO: el subsistema de gamepad puede no estar y haria fallar todo el SDL_Init
     Uint32 initFlags = SDL_INIT_VIDEO;
 #else

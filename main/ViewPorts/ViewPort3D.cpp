@@ -454,10 +454,10 @@ void Viewport3D::event_finger_gesture(float zoomDelta, float panDx, float panDy)
     }
 }
 
-// TOUCH: arrastrar 1 dedo sobre el TOOLBAR (menu superior, muy ancho en el celu) = scroll horizontal
-// (unificado con la barra de propiedades). Fuera del toolbar devuelve false -> el 3D orbita.
+// El viewport 3D no scrollea CONTENIDO: el gesto de 1 dedo fuera de la barra orbita (lo maneja
+// controles.cpp). La barra superior la agarra el gesto lockeado por OnBar/BarScrollBy.
 bool Viewport3D::event_finger_scroll(int px, int py, int dx, int dy){
-    return BarScrollHorizontal(px, py, dx);
+    return false;
 }
 
 // PRIMERA PERSONA (#+flechas en el N95): la camara NO se mueve, GIRA la mirada. Rota viewRot (yaw global +

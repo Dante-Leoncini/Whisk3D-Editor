@@ -21,6 +21,20 @@ float lastDistance = 0.0f;
 float PINCHposY = 0.0f;
 float lastCentroidX = 0.0f, lastCentroidY = 0.0f; // 2 dedos: punto medio anterior (para el paneo)
 bool g_fingerScrolling = false; // 1 dedo esta scrolleando un panel/toolbar -> el UP no debe seleccionar
+// GESTO de scroll LOCKEADO: apenas el dedo se mueve, el scroll queda "pegado" a ese viewport (barra o
+// contenido) para todo el arrastre. Sin esto, al salir de la barra/viewport empezaba a orbitar y al
+// pasar por las pestañas las abria. Se resetea al levantar el dedo.
+ViewportBase* g_scrollView = NULL;  // viewport lockeado para scrollear (NULL = gesto sin decidir)
+bool g_scrollBar = false;           // el scroll lockeado es de la BARRA (true) o del CONTENIDO (false)
+bool g_barTapPending = false;       // toque sobre una barra: si LEVANTA sin arrastrar = tap (abre); si arrastra = scroll
+bool g_contentTapPending = false;   // toque sobre el CONTENIDO de un panel (properties/outliner): si LEVANTA sin
+                                    // arrastrar = tap (togglea checkbox / selecciona); si arrastra = scroll (NO togglea)
+bool g_slideNum = false;            // arrastre HORIZONTAL sobre un campo numerico -> editar el valor (slider tactil)
+ViewportBase* g_barTapView = NULL;  // viewport cuya barra/contenido se toco (para lockear el scroll a ESE, no al hover)
+int g_tapStartX = 0, g_tapStartY = 0; // posicion del down (umbral: hasta que no se mueve N px sigue siendo TAP)
+bool g_uiTapEnCurso = false;        // el LayoutClickUI que corre es un TAP tactil diferido (no un click de mouse)
+Uint32 g_lastFingerTicks = 0;       // ultimo evento de DEDO: filtra los mouse FANTASMA que el browser sintetiza
+                                    // tras el touch (llegan como mouse "real" y clickeaban/abrian al soltar)
 
 void Contadores(){
     if (LShiftPressed){
@@ -43,18 +57,23 @@ void InputUsuarioSDL3(SDL_Event &e){
 
     switch(e.type) {
         case SDL_FINGERDOWN:
+            // OJO ORDEN: SDL sintetiza el MOUSEBUTTONDOWN ANTES de pushear este FINGERDOWN -> el reset del
+            // gesto va en el down del mouse (aca borraria los flags recien seteados por ese down).
             fingers[e.tfinger.fingerId] = {e.tfinger.x, e.tfinger.y};
-            if (fingers.size() == 1) g_fingerScrolling = false; // toque nuevo: arranca sin scroll
+            g_lastFingerTicks = SDL_GetTicks();
             if (fingers.size() >= 2) {
                 // 2do dedo -> arranca el gesto de 2 dedos: cortamos el orbit/drag del mouse (1 dedo
-                // sintetizado) para que el pinch/paneo no pelee con la orbita.
+                // sintetizado) y cancelamos el gesto de 1 dedo a medio decidir (tap/scroll/slider).
                 leftMouseDown = middleMouseDown = ViewPortClickDown = false;
+                g_barTapPending = g_contentTapPending = g_slideNum = false;
+                g_scrollView = NULL;
                 lastDistance = 0.0f; // re-arma pinch/paneo desde este toque
             }
             break;
 
         case SDL_FINGERUP:
             fingers.erase(e.tfinger.fingerId);
+            g_lastFingerTicks = SDL_GetTicks();
             lastDistance = 0.0f; // reset
             if (fingers.size() < 2) {
                 // volvimos a <2 dedos -> cortar el drag (el dedo que queda no debe "saltar" a orbitar)
@@ -64,6 +83,7 @@ void InputUsuarioSDL3(SDL_Event &e){
 
         case SDL_FINGERMOTION:
             fingers[e.tfinger.fingerId] = {e.tfinger.x, e.tfinger.y};
+            g_lastFingerTicks = SDL_GetTicks();
             if (fingers.size() == 2 && viewPortActive) {
                 std::map<SDL_FingerID, Finger>::iterator it = fingers.begin();
                 Finger f1 = it->second; ++it; Finger f2 = it->second;
@@ -86,6 +106,18 @@ void InputUsuarioSDL3(SDL_Event &e){
             break;
     }
 
+    // MOUSE FANTASMA: tras un gesto tactil el browser sintetiza mousedown/move/up de "compatibilidad" que
+    // llegan como mouse REAL (which != SDL_TOUCH_MOUSEID) cuando ya no queda ningun dedo -> caian al flujo
+    // de mouse y clickeaban/abrian el editor al soltar el scroll. Se descartan si hubo un dedo hace <500ms.
+    // (Con dedos APOYADOS no se filtra: el mouse sintetizado del touch es el gesto en curso. En desktop
+    // g_lastFingerTicks queda en 0 y no filtra nunca.)
+    if (g_lastFingerTicks != 0 && fingers.empty() &&
+        (SDL_GetTicks() - g_lastFingerTicks) < 500) {
+        if (e.type == SDL_EVENT_MOUSE_MOTION && e.motion.which != SDL_TOUCH_MOUSEID) return;
+        if ((e.type == SDL_EVENT_MOUSE_BUTTON_DOWN || e.type == SDL_EVENT_MOUSE_BUTTON_UP) &&
+            e.button.which != SDL_TOUCH_MOUSEID) return;
+    }
+
     if (e.type == SDL_EVENT_MOUSE_MOTION){
         // 2+ dedos: el mouse lo sintetiza el touch desde 1 dedo -> NO orbitar mientras se hace
         // pinch/paneo (el gesto de 2 dedos ya se maneja en SDL_FINGERMOTION).
@@ -100,6 +132,61 @@ void InputUsuarioSDL3(SDL_Event &e){
         // loop cut en curso: el motion maneja el preview (sigue la arista) o el slide
         if (LoopCutActivo()) { LoopCutMotion(mx, my); return; }
 
+        // GESTO TACTIL DE SCROLL (1 dedo arrastrado). VA ANTES de LayoutMotionUI: sino el hover de la
+        // barra consume el motion sobre un boton y el scroll SOLO andaba tocando el gap entre botones.
+        // Queda LOCKEADO al viewport del down (g_barTapView) hasta levantar el dedo: NO orbita ni abre
+        // menus aunque el dedo se salga. El mouse lo sintetiza el touch (fingers.size()==1).
+        // gesto de scroll con 1 dedo O con el mouse (fingers<=1). El scroll de BARRA (g_barTapPending) vale para
+        // ambos; el de CONTENIDO de panel y el slider numerico son solo touch (en PC el mouse usa scrollbar/rueda
+        // + el drag numerico clasico). Lockeado al viewport del down hasta soltar.
+        if (leftMouseDown && fingers.size() <= 1) {
+            if (g_slideNum) {                                        // slider numerico lockeado -> el arrastre EDITA
+                if (g_barTapView) g_barTapView->TouchSliderMover(e.motion.xrel);
+                g_fingerScrolling = true; g_redraw = true; return;
+            }
+            if (g_scrollView) {                                      // scroll lockeado (barra o contenido)
+                if (g_scrollBar) g_scrollView->BarScrollBy(e.motion.xrel);
+                else             g_scrollView->event_finger_scroll(mx, my, e.motion.xrel, e.motion.yrel);
+                g_fingerScrolling = true; g_redraw = true; return;
+            }
+            // gesto SIN decidir (down sobre barra o contenido de panel): sigue siendo TAP hasta pasar el
+            // umbral. Recien ahi decide barra/scroll/slider. Asi un tap con jitter chico igual togglea/abre.
+            if (g_barTapPending || g_contentTapPending) {
+                int ddx = mx - g_tapStartX; if (ddx < 0) ddx = -ddx;
+                int ddy = my - g_tapStartY; if (ddy < 0) ddy = -ddy;
+                if (ddx + ddy < 8 * GlobalScale) { g_redraw = true; return; } // aun es tap
+                if (g_barTapPending) {                               // BARRA -> scroll horizontal (mouse o touch)
+                    g_barTapPending = false;
+                    g_scrollView = g_barTapView; g_scrollBar = true;
+                    if (g_barTapView) g_barTapView->BarScrollBy(e.motion.xrel);
+                } else {                                             // CONTENIDO de panel (touch): decidir por DIRECCION
+                    g_contentTapPending = false;
+                    // arrastre HORIZONTAL que arranco DENTRO del value box de un campo numerico -> editar (slider).
+                    // Cualquier otro (vertical, o sobre el label) -> SCROLL vertical. Asi el scroll NUNCA se rompe
+                    // por tocar un campo, y solo se edita arrastrando horizontal adentro del campo.
+                    if (ddx > ddy && g_barTapView &&
+                        g_barTapView->PuntoEnCampoNumerico(g_tapStartX, g_tapStartY) &&
+                        g_barTapView->TouchSliderArmar(g_tapStartX, g_tapStartY)) {
+                        g_slideNum = true;
+                        g_barTapView->TouchSliderMover(e.motion.xrel);
+                    } else {
+                        g_scrollView = g_barTapView; g_scrollBar = false;
+                        if (g_barTapView) g_barTapView->event_finger_scroll(mx, my, e.motion.xrel, e.motion.yrel);
+                    }
+                }
+                g_fingerScrolling = true; g_redraw = true; return;
+            }
+            // fallback SOLO touch (editor UV que panea, etc.): el viewport del down decide si scrollea.
+            // Touch por el which del evento (el mapa de dedos puede no estar al dia por el orden de eventos).
+            if (e.motion.which == SDL_TOUCH_MOUSEID && viewPortActive &&
+                viewPortActive->ViewportKind() == 4 &&
+                viewPortActive->event_finger_scroll(mx, my, e.motion.xrel, e.motion.yrel)) {
+                g_scrollView = viewPortActive; g_scrollBar = false;
+                g_fingerScrolling = true; g_redraw = true; return;
+            }
+            // ni barra ni contenido diferido (viewport 3D) -> sigue de largo al event_mouse_motion -> orbita
+        }
+
         // menu desplegable abierto / hover de barras (ruteo compartido)
         if (LayoutMotionUI(mx, my)) {
             return;
@@ -109,17 +196,6 @@ void InputUsuarioSDL3(SDL_Event &e){
         // de SDL ya viene asi, sin flip
         if (!ViewPortClickDown){
             viewPortActive = FindViewportUnderMouse(rootViewport, mx, my);
-        }
-
-        // TOUCH: arrastrar 1 dedo sobre un PANEL (outliner/propiedades) o el TOOLBAR = scrollear, NO
-        // orbitar/seleccionar. El mouse lo sintetiza el touch (fingers.size()==1) y leftMouseDown =
-        // se esta arrastrando. Si el panel lo consume (true) cortamos aca; el viewport 3D devuelve
-        // false (salvo su toolbar) y sigue de largo -> orbita como siempre.
-        if (fingers.size() == 1 && leftMouseDown && viewPortActive &&
-            viewPortActive->event_finger_scroll(mx, my, e.motion.xrel, e.motion.yrel)) {
-            g_fingerScrolling = true;
-            g_redraw = true;
-            return;
         }
 
         if (viewPortActive){
@@ -190,11 +266,23 @@ void InputUsuarioSDL3(SDL_Event &e){
             leftMouseDown = true;
             g_textFieldActivo = NULL; // click en cualquier lado desenfoca el texto
                                       // (ClickEn de Properties re-enfoca en el up si es una caja)
+            // TOUCH se detecta por el which del evento (SDL_TOUCH_MOUSEID), NO por el mapa de dedos: SDL
+            // sintetiza este mouse-down ANTES de pushear el SDL_FINGERDOWN -> en este punto 'fingers'
+            // todavia esta VACIO y chequearlo hacia caer el touch al flujo de mouse (clickeaba al apoyar).
+            bool esTouch = (e.button.which == SDL_TOUCH_MOUSEID);
+            // gesto NUEVO: limpiar lo que quedo del anterior (scroll lockeado, tap a medio decidir, slider)
+            g_fingerScrolling = false; g_scrollView = NULL; g_slideNum = false;
+            g_barTapPending = false; g_contentTapPending = false;
             // si habia un transform activo, este click lo ACEPTA y NO
             // debe ademas cambiar la seleccion (como en Symbian)
             bool habiaTransform = (estado == translacion ||
                                    estado == rotacion ||
                                    estado == EditScale);
+            // viewport bajo el click (lo usa el diferido de barra/contenido, abajo)
+            ViewportBase* vpDown = FindViewportUnderMouse(rootViewport, (int)e.button.x, (int)e.button.y);
+            // touch NO genera hover antes del down -> viewPortActive podia quedar stale y el motion/up
+            // (slide del campo numerico, mouse_button_up del panel) iban al viewport equivocado.
+            if (esTouch && vpDown) viewPortActive = vpDown;
             // la 'x' de una notificacion de error la cierra (esta encima de todo)
             if (NotificacionesClick((int)e.button.x, (int)e.button.y)) {
                 // consumido: no propagar el click
@@ -204,6 +292,21 @@ void InputUsuarioSDL3(SDL_Event &e){
                 // duplicado) el click CONFIRMA, este donde este el mouse
                 // (incluso sobre la barra/menu): la UI no lo consume
                 if (Viewport3DActive) Viewport3DActive->Aceptar();
+            }
+            // BARRA superior (MOUSE o touch): NO abrir la pestaña/menu en el DOWN. Si se ARRASTRA = scroll
+            // horizontal; si se SUELTA sin mover = abre en el mouse-up. Vale para mouse PORQUE en la barra del
+            // viewport 3D la rueda hace ZOOM -> en PC la unica forma de scrollear esa barra es arrastrandola.
+            else if (vpDown && vpDown->OnBar((int)e.button.x, (int)e.button.y)) {
+                g_barTapPending = true;
+                g_barTapView = vpDown; g_tapStartX = (int)e.button.x; g_tapStartY = (int)e.button.y;
+            }
+            // CONTENIDO de un panel (properties=3 / outliner=2), SOLO en TOUCH: no ejecutar el click en el down
+            // (sino togglea/selecciona apenas apoyas). En PC el mouse usa scrollbar/rueda + el drag numerico
+            // clasico (gFloatDrag), asi que ahi NO se difiere. Se decide en el 1er motion (dir) o al soltar (tap).
+            else if (esTouch && vpDown &&
+                     (vpDown->ViewportKind() == 2 || vpDown->ViewportKind() == 3)) {
+                g_contentTapPending = true;
+                g_barTapView = vpDown; g_tapStartX = (int)e.button.x; g_tapStartY = (int)e.button.y;
             }
             // la UI compartida (menu/barras/paneles) consume primero
             else if (!LayoutClickUI((int)e.button.x, (int)e.button.y)) {
@@ -251,8 +354,26 @@ void InputUsuarioSDL3(SDL_Event &e){
         }
         GuardarMousePos();
 
-        // si el dedo venia SCROLLEANDO un panel, el "soltar" NO es un click de seleccion -> lo ignoramos
+        // fin del gesto tactil: soltar el lock del scroll. Si venia SCROLLEANDO, el soltar NO es un click de
+        // seleccion. Si fue un TAP sobre una barra (toco sin arrastrar), RECIEN AHORA abrimos la pestaña/menu
+        // (lo diferimos del down para no abrir menus al scrollear).
+        bool wasBarTap = g_barTapPending;      // tap sobre una BARRA (mouse o touch) -> abre menu/pestaña
+        bool wasContentTap = g_contentTapPending; // tap sobre CONTENIDO de panel (touch) -> togglea/selecciona/edita
+        g_barTapPending = false;
+        g_contentTapPending = false;
+        g_scrollView = NULL;
+        // slider numerico tactil: el arrastre YA edito el valor; soltar NO es un click (no abre el editor)
+        if (g_slideNum) { if (g_barTapView) g_barTapView->TouchSliderSoltar(); g_slideNum = false; g_fingerScrolling = false; GuardarMousePos(); return; }
         if (g_fingerScrolling) { g_fingerScrolling = false; return; }
+        // tap sin arrastrar sobre la UI: RECIEN AHORA ejecutamos el click (abre menu/pestaña, togglea checkbox,
+        // selecciona, o abre el editor de un campo numerico/texto). g_uiTapEnCurso solo para el CONTENIDO tactil
+        // (ahi el campo numerico abre el editor inline); en la barra es un click normal.
+        if (wasBarTap || wasContentTap) {
+            g_uiTapEnCurso = wasContentTap;
+            LayoutClickUI((int)e.button.x, (int)e.button.y);
+            g_uiTapEnCurso = false;
+            return;
+        }
 
         if (viewPortActive){
             viewPortActive->mouse_button_up(e);

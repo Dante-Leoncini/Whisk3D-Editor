@@ -404,9 +404,8 @@ void UVEditor::CancelarXform(Mesh* m) {    // restaura los uv originales
 // paneo de la vista UV (compartido PC/Symbian). dx>0 mueve el contenido a la derecha (revela la izquierda).
 void UVEditor::Panear(float dx, float dy) { panX += dx; panY += dy; g_redraw = true; }
 
-// TOUCH: 1 dedo. Sobre la barra superior = scroll horizontal; sino = panear la vista UV.
+// TOUCH: 1 dedo sobre el CONTENIDO = panear la vista UV. La barra la maneja el gesto lockeado.
 bool UVEditor::event_finger_scroll(int px, int py, int dx, int dy){
-    if (BarScrollHorizontal(px, py, dx)) return true;
     Panear((float)dx, (float)dy);
     return true;
 }

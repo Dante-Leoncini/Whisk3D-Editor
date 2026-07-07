@@ -68,6 +68,24 @@ bool ViewportBase::BarScrollHorizontal(int px, int py, int delta){
     return true;
 }
 
+// (px,py) cae en la barra superior? (hit-test puro, sin scrollear)
+bool ViewportBase::OnBar(int px, int py){
+    if (!barCard || (BarButtons.empty() && BarTabs.empty())) return false;
+    int barH = BarHeight();
+    int yBar = barAbajo ? (y + height - barH) : y;
+    return px >= x && px < x + width && py >= yBar && py < yBar + barH;
+}
+
+// scroll horizontal de la barra SIN hit-test: para cuando el gesto de scroll YA arranco sobre la barra
+// y hay que seguir aunque el dedo se salga de ella (gesto lockeado).
+void ViewportBase::BarScrollBy(int delta){
+    if (!barCard || (BarButtons.empty() && BarTabs.empty())) return;
+    barScrollManual -= delta;
+    if (barScrollManual < 0) barScrollManual = 0;
+    ActualizarBarra();
+    g_redraw = true;
+}
+
 // ------------------ Constructor / Destructor ------------------
 ViewportRow::ViewportRow(ViewportBase* a, ViewportBase* b, float frac)
     : childA(a), childB(b), splitFrac(frac) {}
@@ -455,6 +473,14 @@ void ViewportBase::ActualizarBarra(){
         btn->Resize(width - gapGS * 2);
         if ((int)b == barFocusIndex){ focoX = total; focoW = btn->width; }
         total += btn->width + btnGap;
+    }
+    // las PESTAÑAS tambien cuentan para el ancho total (sino el scroll maximo salia mal: en propiedades hay
+    // 1 boton + varias pestañas -> maxS quedaba ~0 y las pestañas NO scrolleaban aunque se salieran de pantalla).
+    for (size_t t = 0; t < BarTabs.size(); t++){
+        Tab* tab = BarTabs[t];
+        if (!tab->visible) continue;
+        tab->Resize(width - gapGS * 2);
+        total += tab->width + GlobalScale;
     }
     int maxS = total - width; if (maxS < 0) maxS = 0; // sin hueco a la derecha
     if (focoX >= 0){

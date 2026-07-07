@@ -641,6 +641,7 @@ static void AccionAplicarModificador(){
 #ifdef __EMSCRIPTEN__
 extern "C" void WebDescargarArchivo(const char* path, const char* name); // main.cpp (EM_JS): baja un archivo del FS al disco
 #endif
+extern bool g_uiTapEnCurso; // (controles.cpp) el LayoutClickUI actual es un TAP tactil diferido (no click de mouse)
 
 // boton "Wavefront.obj" de la tarjeta Export: exporta al path del campo editable
 static void AccionExportObj(){
@@ -1888,7 +1889,7 @@ void Properties::mouse_button_up(SDL_Event &e){
     // tipear reemplaza + enter). Si se arrastro, el valor ya cambio y no se edita.
     if (gFloatDrag && !gFloatDragMoved && e.button.button == SDL_BUTTON_LEFT) {
         PropsActivo = this;
-        gFloatDrag->IniciarEdicionTexto();
+        gFloatDrag->IniciarEdicionTexto(); // editor INLINE de Whisk3D (el texto entra por SDL_TEXTINPUT como siempre)
     }
     gFloatDrag = NULL; gFloatDragMoved = false; gFloatDragAccum = 0.0f;
     if (!editando) ViewPortClickDown = false;
@@ -1979,10 +1980,10 @@ void Properties::FindMouseOver(int mx, int my){
     }
 }
 
-// TOUCH: arrastrar 1 dedo. Sobre las PESTAÑAS (barra superior) = scroll horizontal; sino = vertical.
+// TOUCH: arrastrar 1 dedo sobre el CONTENIDO = scroll vertical. (La barra de pestañas la maneja el gesto
+// lockeado en controles.cpp con BarScrollBy; aca solo el contenido.)
 bool Properties::event_finger_scroll(int px, int py, int dx, int dy){
-    if (BarScrollHorizontal(px, py, dx)) return true; // sobre las pestañas -> horizontal (llegar a Modifiers)
-    ScrollByTouch(0, dy); // resto del panel -> vertical
+    ScrollByTouch(0, dy);
     return true;
 }
 
@@ -2383,10 +2384,22 @@ void Properties::ClickEn(int mx, int my) {
                         // arma el POSIBLE arrastre del valor: si el mouse se mueve arrastra; si no, al soltar abre
                         // la edicion por texto (mouse_button_up). Las flechas del teclado siguen andando igual.
                         PropFloat* pf = (PropFloat*)prop;
+#ifdef __EMSCRIPTEN__
+                        // TAP tactil (el arrastre ya lo maneja el slider aparte): abre el editor INLINE de Whisk3D
+                        // + levanta el teclado del celu. NO arma gFloatDrag (evita el mouse_button_up del slider).
+                        if (pf->value && g_uiTapEnCurso) {
+                            pf->IniciarEdicionTexto(); editando = true; ViewPortClickDown = true;
+                            SDL_StartTextInput();
+                            return;
+                        }
+#endif
                         if (pf->value) { gFloatDrag = pf; gFloatDragMoved = false; gFloatDragAccum = 0.0f; }
                     }
                     else if (prop->GetType() == PropertyType::Text) {
                         prop->EditPropertie(); // ENFOCA la caja: el texto entra por SDL_TEXTINPUT
+#ifdef __EMSCRIPTEN__
+                        if (g_uiTapEnCurso) SDL_StartTextInput(); // solo en TAP tactil: levanta el teclado del celu
+#endif
                     }
                     return;
                 }
@@ -2397,6 +2410,52 @@ void Properties::ClickEn(int mx, int my) {
         yCursor += g->height + borderGS + (g->open ? GlobalScale : 0);
     }
 }
+
+// campo numerico EN ARRASTRE TACTIL (slider), independiente del gFloatDrag del mouse. Asi el gesto tactil no
+// se pisa con el flujo de mouse (era la causa de que el scroll se rompiera al quedar gFloatDrag colgado).
+static PropFloat* gTouchSlide = NULL;
+
+// PropFloat cuyo VALUE BOX (columna de valores) esta bajo (mx,my), o NULL. Mismo recorrido de filas que ClickEn.
+PropFloat* Properties::PropFloatEnValueBox(int mx, int my){
+    if (!ObjActivo || !Contains(mx, my)) return NULL;
+    int yCursor = y + BarTopOffset() + PosY + borderGS + RenglonHeightGS + gapGS;
+    for (size_t i = 0; i < GroupProperties.size(); i++) {
+        GroupPropertie* g = GroupProperties[i];
+        if (!g->visible) continue;
+        int hCabecera = borderGS + RenglonHeightGS + gapGS;
+        if (my >= yCursor && my < yCursor + hCabecera) return NULL;  // cabecera del grupo
+        if (g->open) {
+            int yFila = yCursor + hCabecera;
+            for (size_t j = 0; j < g->properties.size(); j++) {
+                PropertieBase* prop = g->properties[j];
+                int hFila = prop->Resize(g->width);
+                if (hFila > 0 && prop->GetType() != PropertyType::Gap &&
+                    prop->Seleccionable() && my >= yFila && my < yFila + hFila) {
+                    if (prop->GetType() != PropertyType::Float) return NULL;
+                    // borde izq de la columna de valores DE ESTE grupo (el global PropColEtiqueta queda con
+                    // el valor del ultimo grupo renderizado -> el hit-test salia corrido en los demas)
+                    int colValor = x + PosX + borderGS + borderGS + g->colEtiqueta;
+                    return (mx >= colValor) ? (PropFloat*)prop : NULL; // en el label -> no es el campo
+                }
+                yFila += hFila;
+            }
+        }
+        yCursor += g->height + borderGS + (g->open ? GlobalScale : 0);
+    }
+    return NULL;
+}
+
+bool Properties::PuntoEnCampoNumerico(int mx, int my){ return PropFloatEnValueBox(mx, my) != NULL; }
+
+bool Properties::TouchSliderArmar(int mx, int my){
+    PropFloat* pf = PropFloatEnValueBox(mx, my);
+    gTouchSlide = (pf && pf->value) ? pf : NULL;
+    return gTouchSlide != NULL;
+}
+void Properties::TouchSliderMover(int dx){
+    if (gTouchSlide && gTouchSlide->value) gTouchSlide->Set(*gTouchSlide->value + dx * gTouchSlide->dragStep);
+}
+void Properties::TouchSliderSoltar(){ gTouchSlide = NULL; }
 
 void Properties::key_down_return(){
     PropsActivo = this; // este panel pasa a ser el activo

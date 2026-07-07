@@ -5,10 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
 <title>Whisk3D</title>
 <style>
-  html, body { margin:0; padding:0; width:100%; height:100%; overflow:hidden;
+  html, body { margin:0; padding:0; width:100%; height:100vh; height:100dvh; overflow:hidden;
                background:#14171c; color:#c9d1d9; font-family:system-ui,Segoe UI,Roboto,sans-serif; }
-  /* el canvas ocupa toda la ventana; el editor ajusta su resolucion al tamano CSS cada frame */
-  #canvas { display:block; width:100vw; height:100vh; border:0; outline:none; }
+  /* el canvas ocupa el area VISIBLE. 100dvh (dynamic viewport height) = alto sin el toolbar del navegador:
+     en iOS Safari 100vh incluye la zona bajo la barra de direcciones -> tapaba la UI de abajo (Propiedades
+     en vertical). Con dvh el canvas sigue el area visible aunque el iPhone muestre/oculte el toolbar. */
+  #canvas { display:block; width:100vw; height:100vh; height:100dvh; border:0; outline:none; }
 
   /* pantalla de carga: el editor precarga res/ (skins/fuentes) -> tarda un momento */
   #loader { position:fixed; inset:0; display:flex; flex-direction:column;
