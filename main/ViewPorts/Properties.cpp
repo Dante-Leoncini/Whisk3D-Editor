@@ -926,42 +926,47 @@ void Properties::ConstruirGrupos(){
     propBtnTextura->button->desplegable = true;
     propBtnTextura->action = AccionMenuTexturas;
     propMaterial->properties.push_back(propBtnTextura);
-    // COLORES + Shininess ARRIBA (pedido Dante); los checkboxes ABAJO. Rebind los setea por member
-    // (propMatCol/propMatShin/propMatChk), asi que el orden de push NO importa para el bind.
+    // Se CONSTRUYE todo primero (el bind es por member, no importa el orden de construccion); el PUSH define el
+    // orden VISUAL, que se reorganizo (pedido Dante): Lighting arriba de todo, Vertex Color sobre Base Color, y los
+    // "pro" (Culling / Depth Test) abajo de todo.
     const char* nombresCol[3] = { "Base Color","Specular","Emission" };
-    for (int i = 0; i < 3; i++) { propMatCol[i] = new PropColor(nombresCol[i]); propMaterial->properties.push_back(propMatCol[i]); }
+    for (int i = 0; i < 3; i++) propMatCol[i] = new PropColor(nombresCol[i]);
     propMatShin = new PropFloat("Shininess");
     propMatShin->SetRango(0.0f, 255.0f);
     propMatShin->stepFino = 1.0f; propMatShin->stepGrueso = 10.0f; propMatShin->dragStep = 1.0f;
     propMatShin->entero = true;   // es un entero (Dante: "que sea entero"), no float
     propMatShin->acelera = true;  // izq/der arranca en 1 y acelera (Dante: "empieza lento y despues acelera")
-    propMaterial->properties.push_back(propMatShin);
-    // [8]="Reflection" (antes "Chrome"); [9] quedo SIN uso (lo reemplazo el dropdown de modo -> oculto en Rebind);
-    // [10]="Normal Mapping". Se CONSTRUYEN [0..10] pero se PUSHEAN en orden VISUAL (ver abajo).
+    // [8]="Reflection"; [9] SIN uso (lo reemplaza el dropdown de modo -> oculto en Rebind); [10]="Normal Mapping".
     const char* nombresChk[11] = { "Filtering","Transparent","Vertex Color","Lighting","Repeat","Culling","Depth Test","Smooth Shading","Reflection","(reflect mode)","Normal Mapping" };
     for (int i = 0; i < 11; i++) {
         propMatChk[i] = new PropBool(nombresChk[i]);
-        // onChange = re-Rebind: togglear CUALQUIER checkbox de material re-arma la tarjeta -> los checkboxes/filas
-        // que dependen de otro (Reflection muestra su dropdown, Normal Mapping su selector) aparecen/desaparecen al
-        // instante. Va EN EL CHECKBOX (no en el handler de click) -> dispara IGUAL por click (PC) o teclado (Symbian).
+        // onChange = re-Rebind: togglear CUALQUIER checkbox re-arma la tarjeta -> aparecen/desaparecen al instante los
+        // que dependen de otro (Base Color si Vertex Color; Shininess/Emission/Specular si Lighting; etc).
         propMatChk[i]->onChange = RebindMaterialMeshPart;
     }
-    // selector de la TEXTURA del normal map (aparece si Normal Mapping ON) y dropdown del MODO de Reflection (aparece
-    // si Reflection ON; reemplaza el viejo checkbox "Chrome 360"). Se construyen aca, se pushean en el orden de abajo.
     propBtnNormalTex = new PropButton("No Normal Map", IconType::textura);
     propBtnNormalTex->button->desplegable = true;
     propBtnNormalTex->action = AccionMenuTexturasNormal;
     propBtnReflectMode = new PropButton("Matcap (hardware)", IconType::material);
     propBtnReflectMode->button->desplegable = true;
     propBtnReflectMode->action = AccionMenuReflectMode;
-    // ORDEN VISUAL (Dante: "Normal Mapping ARRIBA de Reflection -> al activar normal map y desaparecer el reflejo
-    // queda mas natural"): Filtering..Smooth Shading, luego NORMAL MAPPING + su selector, luego REFLECTION + su dropdown.
-    for (int i = 0; i < 7; i++) propMaterial->properties.push_back(propMatChk[i]); // [0..6] comunes (Smooth Shading [7] se quito: el shading es de la malla, no del material)
+    // --- ORDEN VISUAL (pedido Dante) ---
+    propMaterial->properties.push_back(propMatChk[3]);  // Lighting  (ARRIBA DE TODO)
+    propMaterial->properties.push_back(propMatChk[2]);  // Vertex Color (sobre Base Color)
+    propMaterial->properties.push_back(propMatCol[0]);  // Base Color (se oculta si Vertex Color ON)
+    propMaterial->properties.push_back(propMatCol[1]);  // Specular  (se oculta si Lighting OFF)
+    propMaterial->properties.push_back(propMatCol[2]);  // Emission  (se oculta si Lighting OFF)
+    propMaterial->properties.push_back(propMatShin);    // Shininess (se oculta si Lighting OFF)
+    propMaterial->properties.push_back(propMatChk[0]);  // Filtering
+    propMaterial->properties.push_back(propMatChk[1]);  // Transparent
+    propMaterial->properties.push_back(propMatChk[4]);  // Repeat
     propMaterial->properties.push_back(propMatChk[10]); // Normal Mapping
     propMaterial->properties.push_back(propBtnNormalTex);
     propMaterial->properties.push_back(propMatChk[8]);  // Reflection
     propMaterial->properties.push_back(propMatChk[9]);  // (oculto: reemplazado por el dropdown)
     propMaterial->properties.push_back(propBtnReflectMode);
+    propMaterial->properties.push_back(propMatChk[5]);  // Culling    (ABAJO DE TODO: pro)
+    propMaterial->properties.push_back(propMatChk[6]);  // Depth Test (ABAJO DE TODO: pro)
     GroupProperties.push_back(propMaterial);
 
     // pestania de LUZ: TODAS las propiedades editables de la luz de OpenGL (pedido Dante). Se ve solo si el
@@ -1274,10 +1279,12 @@ void Properties::Rebind(){
         propBtnNormalTex->button->text = (material && material->normalTexture)
             ? NombreDeTextura(material->normalTexture) : std::string("No Normal Map");
     }
-    propMatCol[0]->value = esDefault ? NULL : material->diffuse;
-    propMatCol[1]->value = esDefault ? NULL : material->specular;
-    propMatCol[2]->value = esDefault ? NULL : material->emission;
-    propMatShin->value   = esDefault ? NULL : &material->shininess;
+    // Base Color: se OCULTA si Vertex Color esta ON (ahi manda el color del vertice, la base "no se ve" -> al pepe).
+    propMatCol[0]->value = (esDefault || material->vertexColor) ? NULL : material->diffuse;
+    // Specular / Emission / Shininess: solo tienen sentido con LIGHTING ON -> se ocultan si esta OFF.
+    propMatCol[1]->value = (esDefault || !material->lighting) ? NULL : material->specular;
+    propMatCol[2]->value = (esDefault || !material->lighting) ? NULL : material->emission;
+    propMatShin->value   = (esDefault || !material->lighting) ? NULL : &material->shininess;
 
     // el selector muestra el material actual del mesh part
     if (propBtnNewMaterial) {

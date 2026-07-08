@@ -13,17 +13,19 @@
 // ============================================================================
 class NumPad : public PopUpBase {
     public:
-        NumPad();
+        NumPad(bool transform = false); // transform=true: edita el transform de la barra (sin display propio)
 
         void Render() override;
         bool Click(int mx, int my) override;
         bool Tecla(int tecla) override; // Enter fisico = Aceptar, Esc = Cancelar
-        void Cerrar() override;         // click AFUERA = commit (igual que la edicion inline)
+        void Cerrar() override;         // click AFUERA = commit (float) / deja el transform (transform)
 
     private:
         Card* keyCard;               // tarjeta reusada para dibujar cada tecla
         int keyW, keyH, dispH;       // medidas calculadas en Reubicar()
+        bool modoTransform;          // true = alimenta NumInput* (barra de estado); false = PropFloat
         void Reubicar();             // ancho de ventana, pegado al borde inferior
+        void Feed(int c);            // rutea un caracter/backspace al destino segun el modo
         void AccionTecla(int fila, int col);
         void Aceptar();              // evalua la expresion -> commit -> cierra
         void Cancelar();             // descarta -> cierra
@@ -31,5 +33,8 @@ class NumPad : public PopUpBase {
 
 // abre el teclado (reemplaza la instancia anterior) para el PropFloat en edicion
 void NumPadAbrir();
+// abre el teclado en modo TRANSFORM: edita directamente el transform de la barra de estado
+// (mover/rotar/escalar) como un teclado fisico en PC. Sin popup/textinput propio.
+void NumPadAbrirTransform();
 
 #endif // NUMPAD_H

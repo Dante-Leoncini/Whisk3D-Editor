@@ -391,8 +391,14 @@ void InputUsuarioSDL3(SDL_Event &e){
                         // menu abierto desde la barra (orientacion): el tap elige la opcion / lo cierra
                         LayoutClickUI((int)e.button.x, (int)e.button.y);
                     }
-                    else if (vpDown && vpDown->ViewportKind() == 1)
-                        ((Viewport3D*)vpDown)->ToolbarClick((int)e.button.x, (int)e.button.y);
+                    // tap en la barra de ESTADO del transform ("Move: ... = ..."): abre el teclado
+                    // numerico para editar el valor exacto (como tipear en PC). Si no cayo ahi, la
+                    // barra de HERRAMIENTAS (tilde/cruz/ejes) maneja el tap.
+                    else if (vpDown && vpDown->ViewportKind() == 1) {
+                        Viewport3D* v3 = (Viewport3D*)vpDown;
+                        if (!v3->ClickBarraTransform((int)e.button.x, (int)e.button.y))
+                            v3->ToolbarClick((int)e.button.x, (int)e.button.y);
+                    }
                     // fuera de la barra: nada en el down; el arrastre del dedo mueve el transform
                 }
                 // durante un transform (mover/rotar/escalar, o ubicar un duplicado) el CLICK de mouse

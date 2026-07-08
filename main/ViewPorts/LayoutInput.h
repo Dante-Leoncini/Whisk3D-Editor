@@ -173,6 +173,13 @@ void NumInputReset();              // limpia (al terminar/cancelar el transform)
 const std::string& NumInputBuffer(); // la expresion (para la barra de estado)
 bool NumInputNegado();             // el signo '-' esta activo
 bool NumInputValor(float& out);    // valor evaluado (false si la expresion esta incompleta)
+int  NumInputCaret();              // posicion del caret en el buffer (para dibujarlo)
+void NumInputLeft();               // mueve el caret a la izquierda (teclado tactil ←)
+void NumInputRight();              // mueve el caret a la derecha (teclado tactil →)
+void NumInputBegin();              // teclado tactil: activa la entrada (muestra "[|]" en la barra)
+void NumInputConfirmar();          // teclado tactil OK: confirma el transform
+void NumInputCancelar();           // teclado tactil X: cancela el transform
+bool NumInputTransformEnCurso();   // hay un transform activo (el teclado tactil se cierra si no)
 
 // caja de texto editable (reutilizable): el struct + el ruteo viven en UI/TextField.h
 #include "WhiskUI/TextField.h"
