@@ -91,7 +91,11 @@ void ProgressPopup::Render() {
     w3dEngine::PushMatrix();
     w3dEngine::Translatef((GLfloat)pad, (GLfloat)pad, 0);
     w3dEngine::Color4f(blanco[0], blanco[1], blanco[2], 1.0f);
-    RenderBitmapText(mensaje.c_str(), textAlign::center, contW);
+    // mensaje + porcentaje EN VIVO (ej: "Importing model...  45%")
+    int pct = (int)((frac < 0 ? 0.0f : (frac > 1 ? 1.0f : frac)) * 100.0f + 0.5f);
+    char suf[8]; snprintf(suf, sizeof(suf), "  %d%%", pct);
+    std::string linea = mensaje + suf;
+    RenderBitmapText(linea.c_str(), textAlign::center, contW);
     w3dEngine::PopMatrix();
     DibujarBarra();
     endView();
@@ -113,8 +117,10 @@ static void ProgresoDibujarTodo() {
     if (!progressPopup) return;
     w3dEngine::Disable(w3dEngine::ScissorTest);
     w3dEngine::Viewport(0, 0, MenuPantallaW, MenuPantallaH);
-    const float* bg = ListaColores[static_cast<int>(ColorID::background)];
-    w3dEngine::ClearColor(bg[0], bg[1], bg[2], 1.0f);
+    // limpiar a NEGRO (pedido Dante): asi el popup resalta y NO se ve nada viejo (file browser/escena)
+    // alrededor. Se hace en CADA update -> el frame mostrado siempre es negro+popup, sin importar cuantos
+    // buffers tenga el swap-chain (2 o 3): eso elimina el parpadeo con el file browser.
+    w3dEngine::ClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     w3dEngine::Clear(w3dEngine::ColorBuffer | w3dEngine::DepthBuffer);
     progressPopup->Render(); // hace su propio initView/endView (scissor a la ventana)
     if (LayoutSwapBuffers) LayoutSwapBuffers();
@@ -138,10 +144,9 @@ void ProgresoActualizar(float frac) {
     if (frac < 1.0f && frac < g_progresoUltimo + 0.015f) return; // throttle: ~1 frame cada 1.5% (no por cada cara)
     g_progresoUltimo = frac;
     progressPopup->frac = frac;
-    // SIMPLE (pedido Dante): NO se limpia el GL ni se redibuja fondo/borde/mensaje. SOLO la barra. El track
-    // opaco tapa la barra anterior. El popup ya esta dibujado en ambos buffers desde ProgresoIniciar.
-    progressPopup->RenderBar();
-    if (LayoutSwapBuffers) LayoutSwapBuffers();
+    // clear NEGRO + popup COMPLETO (fondo + mensaje + % + barra) + swap. Redibujar TODO cada update (no solo
+    // la barra) evita el parpadeo del file browser: no dependemos de que los N buffers esten pre-dibujados.
+    ProgresoDibujarTodo();
 }
 
 // como ProgresoActualizar, pero redibuja el popup ENTERO (clear + fondo + borde + mensaje + barra) + swap.

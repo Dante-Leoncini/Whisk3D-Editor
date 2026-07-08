@@ -127,13 +127,15 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropListMeshParts* propListUV;    // lista de UV maps (modo=1)
         PropListMeshParts* propListColor; // lista de capas de color (modo=2)
         PropButton* propBtnColorMode;   // toggle Per-Vertex / Per-Corner color
-        PropText* propRenderOutput;  // campo editable "Output" del render
+        PropText* propRenderPath;    // campo editable "Path" del render (carpeta de salida)
+        PropText* propRenderOutput;  // campo editable "File name" del render (solo el nombre + .png)
         PropFloat* propRenderW; PropFloat* propRenderH;         // ancho/alto del render en pixeles (editable)
         PropBool*  propRenderZbuffer; PropBool* propRenderNormal; PropBool* propRenderAlpha; // pases extra
         PropColor* propRenderBg;     // color de fondo del render (global g_renderBg, solo pase Rendered)
         float renderW; float renderH;          // valores del render (default 640 x 480)
         bool  renderZbuffer; bool renderNormal; bool renderAlpha; // pases extra tildados (el beauty siempre)
-        PropText* propExportName;    // campo editable del nombre/path del .obj
+        PropText* propExportPath;    // campo editable "Path" del export (carpeta de salida)
+        PropText* propExportName;    // campo editable "File name" del export (solo el nombre + .obj)
         PropButton* propBtnRenameMat; // boton "Rename Material" (se oculta si el material es el por defecto;
                                       // al renombrar se vuelve input via Button::editField)
         PropButton* propBtnRenameUV;    // "Rename" de la UV map activa (tab Vertices)

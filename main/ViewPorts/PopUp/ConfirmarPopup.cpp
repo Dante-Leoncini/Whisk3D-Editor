@@ -34,25 +34,51 @@ void ConfirmarPopup::Abrir(const std::string& msg, void (*cb)()) {
     PopUpActive = this; // el layout (ancho/posicion) se calcula en Render con las metricas ACTUALES
 }
 
+// parte 's' en renglones de <= maxChars, cortando en un espacio si puede (la fuente es monoespaciada).
+// SIN limite de renglones: el mensaje entra completo (por eso el popup crece en alto).
+static void WrapMensaje(const std::string& s, int maxChars, std::vector<std::string>& out) {
+    out.clear();
+    if (maxChars < 1) maxChars = 1;
+    size_t pos = 0;
+    while (pos < s.size()) {
+        while (pos < s.size() && s[pos] == ' ') pos++;      // saltar espacios
+        if (pos >= s.size()) break;
+        if ((int)(s.size() - pos) <= maxChars) { out.push_back(s.substr(pos)); break; }
+        size_t brk = s.rfind(' ', pos + maxChars);           // espacio mas a la derecha que entre
+        if (brk != std::string::npos && brk > pos) { out.push_back(s.substr(pos, brk - pos)); pos = brk + 1; }
+        else { out.push_back(s.substr(pos, maxChars)); pos += maxChars; } // palabra sin espacios: partir
+    }
+    if (out.empty()) out.push_back(s);
+}
+
 // BARRA al fondo, ANCHO COMPLETO de la pantalla (simula los soft keys de Symbian). Se recalcula cada frame
 // para adaptarse al tamaño/orientacion actual (y porque al abrir las metricas pueden no estar listas).
-// padding UNIFORME en los 4 lados (el contenido = fila del mensaje + gap + fila de botones)
+// padding UNIFORME en los 4 lados (el contenido = N renglones del mensaje + gap + fila de botones)
 int ConfirmarPopup::Padding() const { return borderGS + GlobalScale * 3; } // borde + ~3px de aire (antes marginGS+borderGS = demasiado)
-int ConfirmarPopup::AltoBarra()  const { return Padding() * 2 + RenglonHeightGS + gapGS + (RenglonHeightGS + bordersGS); }
+int ConfirmarPopup::LineHeight() const { return LetterHeightGS + GlobalScale * 3; } // renglon de mensaje (con aire)
+int ConfirmarPopup::AltoBarra()  const {
+    int nL = lineas.empty() ? 1 : (int)lineas.size();       // el mensaje ocupa N renglones (word-wrap)
+    return Padding() * 2 + nL * LineHeight() + gapGS + (RenglonHeightGS + bordersGS);
+}
 
 void ConfirmarPopup::Layout() {
-    int h = AltoBarra();
+    // ancho del dialogo primero (independiente del alto), para saber cuantos caracteres entran por renglon
 #ifdef W3D_SYMBIAN
-    // SYMBIAN (keypad / soft keys): barra al FONDO, ancho COMPLETO (ahi estan los soft keys)
-    int w = MenuPantallaW;
+    int w = MenuPantallaW; // barra al FONDO, ancho COMPLETO (ahi estan los soft keys)
+#else
+    int w = MenuPantallaW / 2;
+    if (w < 200) w = MenuPantallaW; // pantallas muy chicas: ancho completo
+#endif
+    // word-wrap del mensaje al ancho INTERIOR (w - padding a ambos lados). Asi nunca se corta.
+    int cw = (CharacterWidthGS > 0) ? CharacterWidthGS : 1;
+    int maxChars = (w - Padding() * 2) / cw;
+    WrapMensaje(mensaje, maxChars, lineas);
+    int h = AltoBarra(); // usa lineas.size() (ya calculado)
     popUpWindow->Resize(w, h);
+#ifdef W3D_SYMBIAN
     x = 0;
     y = MenuPantallaH - h;
 #else
-    // PC / pantallas TACTILES: dialogo CENTRADO en la ventana
-    int w = MenuPantallaW / 2;
-    if (w < 200) w = MenuPantallaW; // pantallas muy chicas: ancho completo
-    popUpWindow->Resize(w, h);
     x = (MenuPantallaW - w) / 2;
     y = (MenuPantallaH - h) / 2;
 #endif
@@ -76,18 +102,24 @@ void ConfirmarPopup::Render() {
     int w = popUpWindow->width;
     int pad = Padding(); // mismo padding arriba/abajo/lados
 
-    // mensaje, centrado, en su fila (arriba)
-    w3dEngine::PushMatrix();
-    w3dEngine::Translatef((GLfloat)pad, (GLfloat)pad, 0);
-    w3dEngine::Color4f(blanco[0], blanco[1], blanco[2], 1.0f);
-    RenderBitmapText(mensaje.c_str(), textAlign::center, w - pad * 2);
-    w3dEngine::PopMatrix();
+    // mensaje, centrado, en N renglones (word-wrap) apilados desde arriba
+    int lineH = LineHeight();
+    int ty = pad;
+    for (size_t i = 0; i < lineas.size(); i++) {
+        w3dEngine::PushMatrix();
+        w3dEngine::Translatef((GLfloat)pad, (GLfloat)ty, 0);
+        w3dEngine::Color4f(blanco[0], blanco[1], blanco[2], 1.0f);
+        RenderBitmapText(lineas[i].c_str(), textAlign::center, w - pad * 2);
+        w3dEngine::PopMatrix();
+        ty += lineH;
+    }
 
-    // botones: No a la IZQUIERDA, Si a la DERECHA (ancho 50% cada uno)
+    // botones: No a la IZQUIERDA, Si a la DERECHA (ancho 50% cada uno), debajo del mensaje
     int izq = pad;
     int contW = w - pad * 2;
     int mitad = (contW - gapGS) / 2;
-    int btnY = pad + RenglonHeightGS + gapGS;
+    int nL = lineas.empty() ? 1 : (int)lineas.size();
+    int btnY = pad + nL * lineH + gapGS;
 
     btnNo->Resize(mitad);
     btnSi->Resize(mitad); // Si queda ROJO siempre (colorTexto), sin resaltado verde de foco (es el de borrar)

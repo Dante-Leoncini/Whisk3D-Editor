@@ -185,6 +185,39 @@ void LayoutRedimensionarViewportActivo(int dx, int dy, float paso) {
     rootViewport->Resize(rootViewport->width, rootViewport->height); // relayout
 }
 
+// ARRASTRE de la ESQUINA (boton de menu, arriba-izq de cada viewport), estilo esquina de Windows:
+// mueve el borde IZQUIERDO (dx) y el SUPERIOR (dy) del viewport a la vez. Solo se mueve un borde si
+// el viewport esta del lado childB del divisor de ese eje (o sea, tiene un vecino a la IZQUIERDA /
+// ARRIBA). Si esta pegado a ese borde de la ventana (no hay vecino), ese eje no se mueve: el viewport
+// superior-izquierdo no se puede redimensionar, y uno pegado al borde izquierdo solo sube/baja.
+void LayoutResizeEsquina(ViewportBase* aVp, int dx, int dy) {
+    if (!aVp || !rootViewport) return;
+    // borde IZQUIERDO: primer ancestro Row donde aVp cae del lado childB (derecha del split)
+    if (dx != 0) {
+        ViewportBase* nodo = aVp;
+        while (nodo) {
+            ViewportBase* padre = LayoutPadreDe(rootViewport, nodo);
+            if (!padre) break;
+            if (padre->ContainerKind() == 1 && ((ViewportRow*)padre)->childB == nodo) {
+                ((ViewportRow*)padre)->SetSizeChildrens(dx); break; // dx<0 (arrastrar a la izq) = crece aVp
+            }
+            nodo = padre;
+        }
+    }
+    // borde SUPERIOR: primer ancestro Column donde aVp cae del lado childB (abajo del split)
+    if (dy != 0) {
+        ViewportBase* nodo = aVp;
+        while (nodo) {
+            ViewportBase* padre = LayoutPadreDe(rootViewport, nodo);
+            if (!padre) break;
+            if (padre->ContainerKind() == 2 && ((ViewportColumn*)padre)->childB == nodo) {
+                ((ViewportColumn*)padre)->SetSizeChildrens(dy); break; // dy<0 (arrastrar arriba) = crece aVp
+            }
+            nodo = padre;
+        }
+    }
+}
+
 // tras un cambio estructural: punteros frescos + relayout completo
 static void LayoutRescan(ViewportBase* aFoco, int aW, int aH) {
     viewPortActive = aFoco;
@@ -704,6 +737,7 @@ static void LayoutAccionView(int aId) {
         case 410: SetActiveObjectAsCamera(); break; // Set Active Object as Camera (Ctrl Num 0): SOLO setea la camara activa, NO cambia la vista
         case 411: Viewport3DActive->SetViewFromCameraActive(!Viewport3DActive->ViewFromCameraActive);   break; // Active Camera (Num 0): ver desde la camara
         case 420: Viewport3DActive->EnfocarObject(); break; // Frame Selected (Numpad .): enfoca la seleccion
+        case 421: Viewport3DActive->lockOrbit = !Viewport3DActive->lockOrbit; break; // Lock Orbit: orbitar -> panear
     }
 }
 
@@ -965,6 +999,9 @@ bool LayoutAbrirMenuDeBarra(ViewportBase* vp, int mx, int my) {
     } else if (MenuView && bView && bView->visible && bView->Contains(mx, my)) {
         objetivo = MenuView; boton = bView;   // "View" (antes de Select): submenu Viewpoint
         if (!MenuView->action) MenuView->action = LayoutAccionView;
+        // refrescar el tilde de "Lock Orbit" con el estado del viewport activo (el menu se arma 1 sola vez)
+        extern MenuItem* MenuItemLockOrbit;
+        if (MenuItemLockOrbit && Viewport3DActive) MenuItemLockOrbit->verde = Viewport3DActive->lockOrbit;
     } else if (MenuSelect && bSel && bSel->visible && bSel->Contains(mx, my)) {
         objetivo = MenuSelect; boton = bSel;
         LayoutRebuildMenuSelect();   // mode-aware: agrega Loop Select en Edit (cara/borde)
@@ -2370,13 +2407,9 @@ static bool gNotifSobreX = false;         // estaba sobre alguna 'x' el frame pr
 void Notificar(const std::string& msg, bool error) {
     w3dLog(msg.c_str());  // tambien al log de diagnostico
     Notif n; n.msg = msg; n.error = error; n.hint = false;
-#ifdef W3D_SYMBIAN
-    // Symbian: el error TAMBIEN se auto-cierra (no hay forma de tocar la 'x' con el mouse virtual). Dura mas
-    // que el de exito para alcanzar a leerlo. (Dante: exito 6s, error 10s.)
+    // TODAS las plataformas: se auto-cierran con un timer (como Symbian). El error dura mas para alcanzar
+    // a leerlo. Ademas se pueden cerrar tocando el mensaje (NotificacionesClick). (Dante: exito 6s, error 10s.)
     n.ttl = error ? 10.0f : 6.0f;
-#else
-    n.ttl = error ? 0.0f : 6.0f;   // PC: exito 6s; error queda hasta la 'x' (el mouse anda)
-#endif
     n.rx=n.ry=n.rw=n.rh=n.xx=n.xy=n.xw=n.xh=0;
     gNotifs.insert(gNotifs.begin(), n); // el NUEVO arriba de todo
     if (gNotifs.size() > 8) gNotifs.pop_back();
@@ -2413,11 +2446,14 @@ void NotificacionesTick(float dt) {
     if (hayTimer) g_redraw = true; // seguir renderizando para que corra el timer
 }
 
-// click sobre la 'x' de una notif de error -> la cierra. true si lo consumio.
+// click sobre una notificacion -> la cierra. Se cierra tocando CUALQUIER parte del mensaje (no solo la 'x',
+// que en tactil es dificil de embocar). Los hints (tutorial guiado) NO se cierran a mano (los maneja el codigo).
+// true si lo consumio.
 bool NotificacionesClick(int mx, int my) {
     for (size_t i = 0; i < gNotifs.size(); i++) {
         Notif& n = gNotifs[i];
-        if (n.error && mx >= n.xx && mx < n.xx + n.xw && my >= n.xy && my < n.xy + n.xh) {
+        if (n.hint) continue; // el cartel-tutorial se cierra por codigo, no con el toque
+        if (mx >= n.rx && mx < n.rx + n.rw && my >= n.ry && my < n.ry + n.rh) {
             gNotifs.erase(gNotifs.begin()+i); g_redraw = true; return true;
         }
     }

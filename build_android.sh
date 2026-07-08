@@ -45,22 +45,30 @@ done
 
 mkdir -p "$AAPK_PATH"
 
+# Recursos del editor -> assets del APK. Se REGENERA en cada build desde el res/
+# canonico (esta gitignoreado y NO se commitea, para no duplicar/desactualizar).
+echo "Copiando res/ al APK (assets)..."
+rm -rf "$APROJECT_PATH/app/src/main/assets/res"
+cp -r res "$APROJECT_PATH/app/src/main/assets/res"
+
 build_one() {
 	local abi="$1"
 
 	echo "[BUILD] $abi"
 
+	# jni/ vive en platform/android -> NDK_PROJECT_PATH ahi (libs/ y obj/ salen adentro
+	# de platform/android, no en la raiz del repo al lado de los submodulos).
 	"$NDK_BUILD" \
 		-j"$(nproc)" \
 		-s \
 		APP_ABI="$abi" \
-		NDK_PROJECT_PATH=. \
-		APP_BUILD_SCRIPT=./jni/Android.mk \
-		NDK_APPLICATION_MK=./jni/Application.mk \
+		NDK_PROJECT_PATH="$APROJECT_PATH" \
+		APP_BUILD_SCRIPT="$APROJECT_PATH/jni/Android.mk" \
+		NDK_APPLICATION_MK="$APROJECT_PATH/jni/Application.mk" \
 		>/dev/null
 
 	mkdir -p "$AAPK_PATH/$abi"
-	cp libs/"$abi"/*.so "$AAPK_PATH/$abi"/
+	cp "$APROJECT_PATH/libs/$abi"/*.so "$AAPK_PATH/$abi"/
 
 	echo "[ OK ] $abi"
 }
@@ -92,5 +100,6 @@ echo "  $AAPK_PATH"
 echo "Empaquetando con gradlew..."
 cd $APROJECT_PATH
 ./gradlew assembleDebug
-echo "Aplicación empaquetada con gradlew."
-echo "output: $APROJECT_PATH/app/distribution/android/app/outputs/apk/debug/app-debug.apk"
+echo "Aplicación empaquetada con gradlew (firmada con el keystore de debug)."
+APK=$(ls -t "$APROJECT_PATH/app/distribution/android/app/outputs/apk/debug/"whisk3d-*-Android.apk 2>/dev/null | head -1)
+echo "output: ${APK:-$APROJECT_PATH/app/distribution/android/app/outputs/apk/debug/}"

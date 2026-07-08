@@ -8,6 +8,8 @@
 #include "WhiskUI/PopupMenu.h"
 #include "PopUp/ColorPicker.h"
 #include "PopUp/FileBrowser.h" // explorador para elegir la carpeta de export
+#include "PopUp/ConfirmarPopup.h" // confirmacion de sobrescritura (render / export)
+#include "w3dFilesystem.h" // FileExists / GetDefaultOutputDir / JoinPath (rutas de salida)
 #include "PopUp/ProgressPopup.h" // barra "Rendering..." durante el render (clave en N95)
 #include "ViewPorts/LayoutInput.h" // Notificar (toasts de exito/error)
 #include "objects/Camera.h"   // selector de target de la camara
@@ -646,72 +648,83 @@ extern bool g_uiTapEnCurso; // (controles.cpp) el LayoutClickUI actual es un TAP
 #include "ViewPorts/PopUp/NumPad.h" // teclado numerico tactil (popup abajo)
 #endif
 
-// boton "Wavefront.obj" de la tarjeta Export: exporta al path del campo editable
-static void AccionExportObj(){
-    if (!PropsActivo || !PropsActivo->propExportName) return;
-    std::string path = PropsActivo->propExportName->field.text;
-    if (path.empty()) { Notificar("No export path set", true); return; }
-#ifdef W3D_SYMBIAN
-    // N95: carpeta FIJA E:/whisk3d/models/ (creada en AppInit). Toma solo el nombre del campo.
-    size_t sl = path.find_last_of("/\\");
-    std::string nombre = (sl == std::string::npos) ? path : path.substr(sl + 1);
-    if (nombre.empty()) nombre = "model.obj";
-    path = std::string("E:/whisk3d/models/") + nombre;
-#endif
+// solo el nombre de archivo de una ruta (sin carpetas)
+static std::string SoloNombre(const std::string& p){
+    size_t s = p.find_last_of("/\\");
+    return (s == std::string::npos) ? p : p.substr(s + 1);
+}
+// une el campo Path (carpeta) + el campo File name en una ruta completa. Path vacio -> carpeta
+// de salida por defecto (Android: Descargas). El nombre se limpia de carpetas por las dudas.
+static std::string CombinarSalida(const std::string& dir, const std::string& nombre, const char* nombreDefecto){
+    std::string carpeta = dir.empty() ? w3dFileSystem::GetDefaultOutputDir() : dir;
+    std::string nm = SoloNombre(nombre);
+    if (nm.empty()) nm = nombreDefecto;
+    return w3dFileSystem::JoinPath(carpeta, nm);
+}
+
+// ---------- EXPORT OBJ (Path + File name + confirmacion de sobrescritura) ----------
+// ConfirmarPopup::onSi no lleva argumentos -> se guarda la ruta pendiente en un estatico.
+static std::string g_pendingExportPath;
+static void HacerExportObj(){
+    std::string path = g_pendingExportPath;
+    if (!PropsActivo) return;
     bool ok = ExportOBJ(path, PropsActivo->exportSelectedOnly, PropsActivo->exportApplyModifiers, PropsActivo->exportApplyTransforms);
     if (ok) {
         Notificar("OBJ saved successfully!", false);
 #ifdef __EMSCRIPTEN__
         // web: bajar el .obj y su .mtl al disco del usuario (el FS de emscripten es virtual).
-        // ExportOBJ escribe el .mtl como ExtractBaseName(path)+".mtl" (nombre relativo).
-        std::string objName = path;
-        size_t sl = objName.find_last_of("/\\"); if (sl != std::string::npos) objName = objName.substr(sl + 1);
         std::string mtl = ExtractBaseName(path) + ".mtl";
-        WebDescargarArchivo(path.c_str(), objName.c_str());
-        WebDescargarArchivo(mtl.c_str(), mtl.c_str());
+        WebDescargarArchivo(path.c_str(), SoloNombre(path).c_str());
+        WebDescargarArchivo(mtl.c_str(), SoloNombre(mtl).c_str());
 #endif
     } else {
         Notificar("Error: could not save the OBJ", true);
     }
 }
-
-// el explorador (modo guardar) devolvio una CARPETA (o un .obj a sobrescribir): se
-// arma el path completo carpeta + nombre actual y se pone en el campo File.
-static void ExportFolderElegido(const std::string& elegido){
+// boton "Wavefront.obj": arma Path + File name, y si el archivo ya existe pide confirmacion.
+static void AccionExportObj(){
     if (!PropsActivo || !PropsActivo->propExportName) return;
-    std::string actual = PropsActivo->propExportName->field.text;
-    // nombre = basename del campo actual (o Cube.obj)
-    size_t s = actual.find_last_of("/\\");
-    std::string nombre = (s == std::string::npos) ? actual : actual.substr(s + 1);
-    if (nombre.empty()) nombre = "export.obj";
-    // si el usuario eligio un .obj existente -> usar ese path tal cual (sobrescribir)
-    bool esObj = (elegido.size() >= 4 && elegido.substr(elegido.size() - 4) == ".obj");
-    std::string full = esObj ? elegido : (elegido + "/" + nombre);
-    PropsActivo->propExportName->field.SetText(full);
-}
-
-// boton de la carpeta: abre el explorador para elegir DONDE guardar el .obj
-static void AccionBrowseExport(){
-    AbrirFileBrowser("Exportar a...", "Select Folder", ".obj", ExportFolderElegido, true);
-}
-
-// arma "base[_tag]_0001.png" desde el campo Output, el pase (tag) y el frame de animacion actual.
-// el _0001 es CurrentFrame (para secuencias mas adelante).
-static std::string RenderFileNamePNG(const std::string& out, const char* tag){
-    std::string base = out;
-    size_t dot   = base.find_last_of('.');
-    size_t slash = base.find_last_of("/\\");
-    if (dot != std::string::npos && (slash == std::string::npos || dot > slash))
-        base = base.substr(0, dot); // saca la extension del campo Output
+    std::string dir    = PropsActivo->propExportPath ? PropsActivo->propExportPath->field.text : std::string();
+    std::string nombre = PropsActivo->propExportName->field.text;
+    std::string full   = CombinarSalida(dir, nombre, "model.obj");
 #ifdef W3D_SYMBIAN
-    // N95: carpeta FIJA E:/whisk3d/render/ (prolijo + sabes donde queda). Toma solo el nombre del campo.
-    size_t sl = base.find_last_of("/\\");
-    std::string nombre = (sl == std::string::npos) ? base : base.substr(sl + 1);
-    if (nombre.empty()) nombre = "render";
-    base = std::string("E:/whisk3d/render/") + nombre;
-#else
-    if (base.empty()) base = "render";
+    // N95: carpeta FIJA E:/whisk3d/models/ (creada en AppInit). Toma solo el nombre.
+    full = std::string("E:/whisk3d/models/") + SoloNombre(nombre.empty() ? "model.obj" : nombre);
 #endif
+    g_pendingExportPath = full;
+#ifndef W3D_SYMBIAN
+    if (w3dFileSystem::FileExists(full)) {
+        if (!confirmarPopup) confirmarPopup = new ConfirmarPopup();
+        confirmarPopup->Abrir("The file \"" + SoloNombre(full) + "\" already exists. Do you want to replace it?", HacerExportObj);
+        return;
+    }
+#endif
+    HacerExportObj();
+}
+// el explorador (modo guardar) devolvio una CARPETA: se pone en el campo Path (el nombre no se toca).
+static void ExportFolderElegido(const std::string& elegido){
+    if (!PropsActivo || !PropsActivo->propExportPath) return;
+    // si el usuario eligio un .obj existente -> separar carpeta y nombre
+    bool esObj = (elegido.size() >= 4 && elegido.substr(elegido.size() - 4) == ".obj");
+    if (esObj) {
+        PropsActivo->propExportPath->field.SetText(w3dFileSystem::ParentPath(elegido));
+        if (PropsActivo->propExportName) PropsActivo->propExportName->field.SetText(SoloNombre(elegido));
+    } else {
+        PropsActivo->propExportPath->field.SetText(elegido);
+    }
+}
+// boton de la carpeta: abre el explorador para elegir la carpeta de salida del .obj
+static void AccionBrowseExport(){
+    AbrirFileBrowser("Export to...", "Select Folder", ".obj", ExportFolderElegido, true);
+}
+
+// ---------- RENDER (Path + File name + confirmacion) ----------
+// base del render = Path/FileName-sin-extension (seteada por AccionRenderImage); RenderFileNamePNG
+// le agrega "[_tag]_0001.png". El _0001 es CurrentFrame (para secuencias mas adelante).
+static std::string g_pendingRenderBase;
+static std::string RenderFileNamePNG(const char* tag){
+    std::string base = g_pendingRenderBase;
+    if (base.empty()) base = "render";
     if (tag && tag[0]) { base += "_"; base += tag; }
     int frame = 0;
 #ifndef W3D_SYMBIAN
@@ -722,6 +735,35 @@ static std::string RenderFileNamePNG(const std::string& out, const char* tag){
     snprintf(suf, sizeof(suf), "_%04d.png", frame);
     base += suf;
     return base;
+}
+// arma g_pendingRenderBase (Path/FileName-sin-ext) desde los dos campos.
+static void CalcularRenderBase(){
+    std::string dir = (PropsActivo && PropsActivo->propRenderPath) ? PropsActivo->propRenderPath->field.text : std::string();
+    std::string nm  = (PropsActivo && PropsActivo->propRenderOutput) ? PropsActivo->propRenderOutput->field.text : std::string("render.png");
+    std::string full = CombinarSalida(dir, nm, "render.png");
+    // sacar la extension -> queda dir/nombre
+    size_t dot = full.find_last_of('.'), sl = full.find_last_of("/\\");
+    std::string base = (dot != std::string::npos && (sl == std::string::npos || dot > sl)) ? full.substr(0, dot) : full;
+#ifdef W3D_SYMBIAN
+    // N95: carpeta FIJA E:/whisk3d/render/ (prolijo + sabes donde queda). Toma solo el nombre.
+    std::string nombre = SoloNombre(base); if (nombre.empty()) nombre = "render";
+    base = std::string("E:/whisk3d/render/") + nombre;
+#endif
+    g_pendingRenderBase = base;
+}
+// carpeta elegida para el render -> al campo Path
+static void RenderFolderElegido(const std::string& elegido){
+    if (!PropsActivo || !PropsActivo->propRenderPath) return;
+    bool esPng = (elegido.size() >= 4 && elegido.substr(elegido.size() - 4) == ".png");
+    if (esPng) {
+        PropsActivo->propRenderPath->field.SetText(w3dFileSystem::ParentPath(elegido));
+        if (PropsActivo->propRenderOutput) PropsActivo->propRenderOutput->field.SetText(SoloNombre(elegido));
+    } else {
+        PropsActivo->propRenderPath->field.SetText(elegido);
+    }
+}
+static void AccionBrowseRender(){
+    AbrirFileBrowser("Render to...", "Select Folder", ".png", RenderFolderElegido, true);
 }
 
 // boton "Render Image": guarda el pase beauty (siempre) + los pases tildados (zbuffer/normal)
@@ -734,12 +776,11 @@ static void RegenerarModsEscena(Object* nodo){
         RegenerarModsEscena(o); }
 }
 
-static void AccionRenderImage(){
+// hace el render REAL (llamado directo, o desde el "Si" de la confirmacion de sobrescritura).
+static void HacerRenderImage(){
     if (!PropsActivo) return;
     Viewport3D* vp = Viewport3DActive;
     if (!vp) { Notificar("No active 3D viewport", true); return; }
-    std::string out = PropsActivo->propRenderOutput ? PropsActivo->propRenderOutput->field.text
-                                                    : std::string("render.png");
     int w = (int)(PropsActivo->renderW + 0.5f); if (w < 1) w = 1;
     int h = (int)(PropsActivo->renderH + 0.5f); if (h < 1) h = 1;
 
@@ -755,17 +796,32 @@ static void AccionRenderImage(){
 
     ProgresoIniciar("Rendering...");
     int fallos = 0, base = 0;
-    if (!vp->RenderAPNG(w, h, RenderType::Rendered, RenderFileNamePNG(out, "").c_str(), base, total)) fallos++;
+    if (!vp->RenderAPNG(w, h, RenderType::Rendered, RenderFileNamePNG("").c_str(), base, total)) fallos++;
     base += tpp;
-    if (doZ){ if (!vp->RenderAPNG(w, h, RenderType::ZBuffer,    RenderFileNamePNG(out, "zbuffer").c_str(), base, total)) fallos++; base += tpp; }
-    if (doN){ if (!vp->RenderAPNG(w, h, RenderType::NormalView, RenderFileNamePNG(out, "normal").c_str(),  base, total)) fallos++; base += tpp; }
-    if (doA){ if (!vp->RenderAPNG(w, h, RenderType::Alpha,      RenderFileNamePNG(out, "alpha").c_str(),   base, total)) fallos++; base += tpp; }
+    if (doZ){ if (!vp->RenderAPNG(w, h, RenderType::ZBuffer,    RenderFileNamePNG("zbuffer").c_str(), base, total)) fallos++; base += tpp; }
+    if (doN){ if (!vp->RenderAPNG(w, h, RenderType::NormalView, RenderFileNamePNG("normal").c_str(),  base, total)) fallos++; base += tpp; }
+    if (doA){ if (!vp->RenderAPNG(w, h, RenderType::Alpha,      RenderFileNamePNG("alpha").c_str(),   base, total)) fallos++; base += tpp; }
     ProgresoFin();
 
     g_modRenderMode = false; RegenerarModsEscena(SceneCollection); // volver al nivel de VIEWPORT
 
     if (fallos == 0) Notificar("Render saved!", false);
     else             Notificar("Error: could not save the render", true);
+}
+// boton "Render Image": arma Path + File name; si el PNG (pase beauty) ya existe, pide confirmacion.
+static void AccionRenderImage(){
+    if (!PropsActivo) return;
+    if (!Viewport3DActive) { Notificar("No active 3D viewport", true); return; }
+    CalcularRenderBase(); // setea g_pendingRenderBase desde los campos Path + File name
+#ifndef W3D_SYMBIAN
+    std::string beauty = RenderFileNamePNG(""); // el pase principal
+    if (w3dFileSystem::FileExists(beauty)) {
+        if (!confirmarPopup) confirmarPopup = new ConfirmarPopup();
+        confirmarPopup->Abrir("The file \"" + SoloNombre(beauty) + "\" already exists. Do you want to replace it?", HacerRenderImage);
+        return;
+    }
+#endif
+    HacerRenderImage();
 }
 
 // === pestaña VERTICES: helpers + acciones (UV Maps + capas de color) ===
@@ -960,8 +1016,15 @@ void Properties::ConstruirGrupos(){
     // ===== pestania RENDER: tarjeta "Render" (arriba) + tarjeta "Export" (abajo) =====
     propRender = new GroupPropertie("Render");
     propRender->anchoValores = 0.62f; // columna de valor ANCHA (paths)
-    propRenderOutput = new PropText("Output", "render.png");
+    // salida partida en dos campos: Path (carpeta) + File name (nombre.png), como pidio Dante.
+    // Default del path: carpeta de salida por defecto (Android = Descargas).
+    propRenderPath = new PropText("Path", w3dFileSystem::GetDefaultOutputDir());
+    propRender->properties.push_back(propRenderPath);
+    propRenderOutput = new PropText("File name", "render.png");
     propRender->properties.push_back(propRenderOutput);
+    PropButton* pbBrowseR = new PropButton("Browse folder...", IconType::carpeta);
+    pbBrowseR->action = AccionBrowseRender; // elige la carpeta -> campo Path
+    propRender->properties.push_back(pbBrowseR);
     // resolucion editable (default 640x480). Puede ser MAYOR que la ventana: se rinde por tiles.
     renderW = 640.0f; renderH = 480.0f;
     propRenderW = new PropFloat("Width");
@@ -1004,10 +1067,13 @@ void Properties::ConstruirGrupos(){
     PropBool* pbXf = new PropBool("Apply Transforms"); // ON = hornea el transform del objeto en el .obj (mundo)
     pbXf->value = &exportApplyTransforms;
     propExport->properties.push_back(pbXf);
-    propExportName = new PropText("File", "cube.obj");
+    // salida partida en dos: Path (carpeta) + File name (nombre.obj). Default del path: Descargas en Android.
+    propExportPath = new PropText("Path", w3dFileSystem::GetDefaultOutputDir());
+    propExport->properties.push_back(propExportPath);
+    propExportName = new PropText("File name", "cube.obj");
     propExport->properties.push_back(propExportName);
     PropButton* pbBrowse = new PropButton("Browse folder...", IconType::carpeta);
-    pbBrowse->action = AccionBrowseExport; // abre el explorador -> setea el path en File
+    pbBrowse->action = AccionBrowseExport; // abre el explorador -> setea la carpeta en Path
     propExport->properties.push_back(pbBrowse);
     PropButton* pbExp = new PropButton("Wavefront.obj", IconType::mesh);
     pbExp->action = AccionExportObj;
@@ -1479,15 +1545,10 @@ void Properties::ActualizarPestanias(){
         BarTabs[i]->foco   = (focoEnTabs && (int)i == pestaniaActiva);
     }
 
-    // nombre del export por defecto = nombre del objeto activo (al cambiar de objeto)
+    // File name del export por defecto = nombre del objeto activo (al cambiar de objeto). Solo el
+    // NOMBRE: la carpeta la maneja el campo Path (default Descargas en Android / Home en PC).
     if (propExportName && ObjActivo && ObjActivo != exportLastObj){
-        // Symbian: por defecto guardar en la RAIZ de E: (memoria, accesible por el usuario).
-        // En PC el path arranca relativo (el usuario navega con "Browse folder...").
-#ifdef W3D_SYMBIAN
-        propExportName->field.SetText(std::string("E:\\") + ObjActivo->name + ".obj");
-#else
         propExportName->field.SetText(ObjActivo->name + ".obj");
-#endif
         exportLastObj = ObjActivo;
     }
 

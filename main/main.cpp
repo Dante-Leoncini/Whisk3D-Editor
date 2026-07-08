@@ -5,8 +5,8 @@
 #include <emscripten/html5.h> // tamano del canvas (resize) + cancelar el loop al salir
 #endif
 #include "ViewPorts/LayoutInput.h" // ruteo compartido + overlay del menu
-#if !defined(__ANDROID__) // ESCRITORIO (Windows + Linux): codigo compartido de PC (import/export, browser, texturas,
-                        // warp del mouse, swap). Android tiene su propia entrada de plataforma y no lo usa.
+#if !defined(W3D_SYMBIAN) // Desktop (Win/Linux) + Web + ANDROID: comparten el file browser interno + la
+                        // carga por w3dEngine (import/export, browser, texturas, warp, swap). Symbian tiene lo suyo.
     #define NOMINMAX
 
 #include "lectura-escritura.h"      // abrir(): dialogo + ImportOBJ
@@ -209,6 +209,10 @@ EM_JS(void, WebDescargarArchivo, (const char* pathPtr, const char* namePtr), {
     #include <android/log.h>
     #include <GLES/gl.h>    // OpenGL ES 1.1
     #include <GLES/glext.h>
+    // para pasarle el AAssetManager del APK al Core (que lee texturas sin SDL)
+    #include <jni.h>
+    #include <android/asset_manager.h>
+    #include <android/asset_manager_jni.h>
 #else
     #include <GL/gl.h>      // OpenGL Desktop
     #include <GL/glu.h>
@@ -245,6 +249,7 @@ EM_JS(void, WebDescargarArchivo, (const char* pathPtr, const char* namePtr), {
 #endif
 
 #include "w3dFilesystem.h"
+#include "w3dTexture.h"   // w3dEngine::LoadTexture (carga de texturas del Core, lee via w3dFileSystem)
 
 //Whisk3D imports
 #include "variables.h"
@@ -606,6 +611,41 @@ int main(int argc, char* argv[]) {
 
     w3dFileSystem::Init();
 
+    // Carpeta ESCRIBIBLE por-app para config/bookmarks. SDL_GetPrefPath la crea si no
+    // existe (Win: AppData, Linux: ~/.local/share, Android: internal storage). En Android
+    // el GetResDir es el APK (solo lectura) -> sin esto los bookmarks no se guardaban.
+    {
+        char* pref = SDL_GetPrefPath("Whisk3D", "Whisk3D");
+        if (pref) { w3dFileSystem::SetUserDataDir(pref); SDL_free(pref); }
+    }
+
+    // Android: los recursos van dentro del APK (assets). El Core los lee con el
+    // AAssetManager del NDK (NO SDL); aca -en la capa de plataforma, que si usa
+    // SDL- lo sacamos del Activity via JNI y se lo pasamos una sola vez al Core.
+    #ifdef __ANDROID__
+    {
+        JNIEnv* env = (JNIEnv*)SDL_AndroidGetJNIEnv();
+        jobject activity = (jobject)SDL_AndroidGetActivity();
+        if (env && activity) {
+            jclass clazz = env->GetObjectClass(activity);
+            jmethodID mid = env->GetMethodID(clazz, "getAssets", "()Landroid/content/res/AssetManager;");
+            jobject amJava = env->CallObjectMethod(activity, mid);
+            AAssetManager* am = AAssetManager_fromJava(env, amJava);
+            w3dFileSystem::SetAssetManager(am);
+            env->DeleteLocalRef(amJava);
+            env->DeleteLocalRef(clazz);
+            env->DeleteLocalRef(activity);
+        }
+    }
+    // Pedir el permiso de lectura del almacenamiento para poder navegar/cargar
+    // texturas y modelos del telefono (el file browser interno lista por opendir).
+    SDL_AndroidRequestPermission("android.permission.READ_EXTERNAL_STORAGE");
+    // ...y el de ESCRITURA: exportar OBJ/MTL y guardar el render PNG escriben al
+    // almacenamiento. Con requestLegacyExternalStorage (API 29) esto habilita fopen
+    // a /sdcard; sin el permiso, la exportacion y el render fallaban en silencio.
+    SDL_AndroidRequestPermission("android.permission.WRITE_EXTERNAL_STORAGE");
+    #endif
+
     // Configuración OpenGL
     #ifdef __ANDROID__
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 1);
@@ -626,6 +666,9 @@ int main(int argc, char* argv[]) {
     // y todo lo demas ven los valores cargados (ej. scale para SetGlobalScale).
     #ifdef __ANDROID__
         cfg = loadConfig("res/config.ini");
+        // Android es de alta densidad y se usa con el dedo -> forzamos escala 3
+        // (el config compartido viene en 2 para PC). Asi la UI queda comoda al tacto.
+        cfg.scale = 3;
     #else
         cfg = loadConfig(w3dFileSystem::GetResDir() + "/config.ini");
     #endif
@@ -702,6 +745,14 @@ int main(int argc, char* argv[]) {
     DialogoCargarTextura = PCCargarTexturaEn; // "Load Texture" (base Y normal map) -> browser compartido
     LayoutWarpMouse = PCWarpMouse;
     g_swapWindow = window; LayoutSwapBuffers = PCSwapBuffers; // barra de progreso (export/import)
+#endif
+#ifdef __ANDROID__
+    // Android: import OBJ + "Load Texture" usan el MISMO file browser interno que PC
+    // (navega el almacenamiento del telefono; el permiso se pide arriba). La lectura
+    // la hace la abstraccion del Core y la carga de textura w3dEngine::LoadTexture.
+    LayoutImportObj = PCImportObj;
+    DialogoCargarTextura = PCCargarTexturaEn;
+    g_swapWindow = window; LayoutSwapBuffers = PCSwapBuffers;
 #endif
 #ifdef __EMSCRIPTEN__
     // en web pisamos import/textura con el SELECTOR DEL NAVEGADOR (el browser interno solo ve el FS

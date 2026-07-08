@@ -68,6 +68,15 @@ namespace { class FBPane : public ViewportBase { public: void Render() {} }; }
 // para el drag del scroll: ultimo Y del mouse
 static int gDragMy = 0;
 
+// Tap vs arrastre en la LISTA (para el tactil): al presionar una entrada NO se abre;
+// se guarda y se abre al SOLTAR si fue un tap. Si el dedo se arrastra mas que el umbral,
+// se scrollea la lista y ya no se abre. En mouse funciona igual (click sin mover = abre).
+static bool gListPressed    = false; // hubo press dentro del area de la lista
+static int  gListPressEntry = -1;    // entrada bajo el press (se abre al soltar si fue tap)
+static int  gListPressY     = 0;     // Y del press (umbral tap/arrastre)
+static int  gListLastY      = 0;     // ultimo Y para el delta de scroll
+static bool gListDragging   = false;
+
 // ============================================================================
 
 FileBrowser::FileBrowser(const std::string& title, const std::string& accionLabel,
@@ -451,8 +460,11 @@ bool FileBrowser::Click(int mx, int my) {
     if (mouseOverScrollY) { mouseOverScrollYpress = true; gDragMy = my; return true; }
     int bm = BookmarkAt(mx, my);
     if (bm >= 0) { selBm = bm; if (bookmarks[bm].path != currentPath) Navegar(bookmarks[bm].path, true); return true; }
+    // Press dentro del area de la lista: NO abrir ahora. Se guarda y se abre al SOLTAR
+    // (si fue un tap). Si el dedo se arrastra, Motion() lo convierte en scroll y no abre.
     int e = EntryAt(mx, my);
-    if (e >= 0) { AbrirEntrada(e); return true; }
+    gListPressed = true; gListPressEntry = e;
+    gListPressY = my; gListLastY = my; gListDragging = false;
     return true;
 }
 
@@ -464,6 +476,16 @@ bool FileBrowser::Motion(int mx, int my) {
         int d = my - gDragMy; gDragMy = my;
         ScrollY(d);
         return true;
+    }
+    // arrastre con el dedo/mouse SOBRE LA LISTA -> scrollear (y cancelar el tap: no abre)
+    if (leftMouseDown && gListPressed) {
+        if (!gListDragging && abs(my - gListPressY) > 8 * GlobalScale) gListDragging = true;
+        if (gListDragging) {
+            ViewPortClickDown = true;
+            // arrastre del CONTENIDO 1:1 (ScrollY solo mueve sobre la barra o con la rueda)
+            ScrollByTouch(0, my - gListLastY); gListLastY = my;
+            return true;
+        }
     }
     hover = EntryAt(mx, my);
     hoverBm = BookmarkAt(mx, my);
@@ -480,7 +502,12 @@ void FileBrowser::Wheel(int delta) {
     MouseWheel = false;
 }
 
-void FileBrowser::Soltar() { mouseOverScrollYpress = false; ViewPortClickDown = false; }
+void FileBrowser::Soltar() {
+    mouseOverScrollYpress = false; ViewPortClickDown = false;
+    // fue un TAP (press + soltar sin arrastrar) sobre una entrada -> recien ahi se abre
+    if (gListPressed && !gListDragging && gListPressEntry >= 0) AbrirEntrada(gListPressEntry);
+    gListPressed = false; gListPressEntry = -1; gListDragging = false;
+}
 
 void FileBrowser::EnsureVisible(int idx) {
     if (idx < 0) return;

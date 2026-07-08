@@ -8,7 +8,10 @@
 #include "ViewPorts/PopUp/ProgressPopup.h" // barra de progreso (export/import, clave en el N95 lento)
 #include "ViewPorts/LayoutInput.h"          // Notificar (toast de exito/error)
 #include "w3dlog.h" // diagnostico del import (clave en N95: ubicar donde crashea)
+#include "w3dFilesystem.h" // lectura de archivos UNIFICADA del Core (un solo camino por OS)
 #include <cstdio> // sprintf para FloatStr
+#include <cerrno>  // errno del ofstream fallido (diagnostico del export en Android)
+#include <cstring> // strerror
 
 // formateo de float SIN operator<< ni %f: ambos ROTOS en STLport/Symbian (el export escribia basura tipo
 // 2.31e-307 Y era lentisimo -> el N95 se "colgaba"). Replica de RenderBitmapFloat: entero.fraccion con %d.
@@ -816,10 +819,11 @@ static void EscribirMaterialMTL(std::ofstream& mtl, Material* mat) {
 bool ExportOBJ(const std::string& filepath, bool selectedOnly, bool applyModifiers, bool applyTransforms) {
     std::vector<Mesh*> meshes;
     RecolectarMeshesExport(SceneCollection, selectedOnly, meshes);
-    if (meshes.empty()) return false;
+    if (meshes.empty()) { w3dLogfE("ExportOBJ: NO hay meshes para exportar"); return false; }
 
+    errno = 0;
     std::ofstream obj(filepath.c_str());
-    if (!obj.is_open()) return false;
+    if (!obj.is_open()) { w3dLogfE("ExportOBJ: no se pudo abrir '%s' errno=%d (%s)", filepath.c_str(), errno, strerror(errno)); return false; }
 
     ProgresoIniciar("Exporting model..."); // barra de progreso (no-op sin GUI; clave en el N95)
 
@@ -987,26 +991,18 @@ bool ImportOBJ(const std::string& filepath, bool NoMerge = false) {
     // Leemos el archivo ENTERO a UN buffer y tokenizamos en punteros const char* (un solo alloc, sin un std::string
     // por linea -> antes eran ~663k allocs/2.7s para 200k verts). fileData vive hasta el final del parseo (lines
     // apunta adentro). BINARY: que el tokenizador vea el \r crudo y lo limpie el (no doble traduccion del runtime).
-    std::ifstream file(filepath.c_str(), std::ios::binary);
-    w3dLogf("ImportOBJ: open is_open=%d", (int)file.is_open());
-    if (!file.is_open()) {
+    // Leemos el archivo ENTERO por la ABSTRACCION del Core (w3dFileSystem::ReadTextFile):
+    // UN solo camino para todas las plataformas (en Android resuelve solo si es asset del
+    // APK o archivo real de /storage). fileData vive hasta el final del parseo (lines apunta adentro).
+    bool _okRead = false;
+    std::string fileData = w3dFileSystem::ReadTextFile(filepath, &_okRead);
+    w3dLogf("ImportOBJ: open ok=%d", (int)_okRead);
+    if (!_okRead) {
 #ifndef W3D_SYMBIAN
         std::cerr << "Error al abrir: " << filepath << std::endl;
 #endif
         return false;
     }
-    // lectura PORTABLE en bloques de 64KB hasta EOF: SIN seekg/tellg (el modo texto los rompia, y en STLport/Open C del
-    // N95 son menos confiables). Anda igual en PC y Symbian. read() devuelve el stream (falso al leer parcial en EOF) ->
-    // el "|| gcount()>0" agarra el ultimo bloque parcial.
-    std::string fileData;
-    // buffer de lectura en el HEAP (NO en el stack): 64KB en el stack revienta el stack chico del hilo
-    // principal del N95 (Symbian) -> crash al hacer file.read. En el heap anda igual en PC y N95.
-    const int CHUNK = 65536;
-    std::vector<char> _chunkBuf(CHUNK);
-    char* _chunk = &_chunkBuf[0];
-    while (file.read(_chunk, CHUNK) || file.gcount() > 0)
-        fileData.append(_chunk, (size_t)file.gcount());
-    file.close();
 
     // tokenizar en lugar: cada '\n' (y el final) -> '\0'; el \r de Windows tambien -> '\0'. lines[i] = puntero al
     // inicio de cada linea dentro de fileData.

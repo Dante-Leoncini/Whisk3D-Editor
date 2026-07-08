@@ -33,6 +33,7 @@ PopupMenu* MenuTransform = NULL; // submenu de Object: Move / Rotate / Scale
 PopupMenu* MenuSetOrigin = NULL; // submenu de Object: Geometry/Origin/Cursor
 PopupMenu* MenuApply = NULL;     // submenu de Object: Apply Location/Rotation/Scale/All (Ctrl A)
 PopupMenu* MenuView = NULL;      // boton "View" (antes de Select): submenus Cameras + Viewpoint
+MenuItem* MenuItemLockOrbit = NULL; // el item "Lock Orbit" del menu View (para refrescar su tilde al abrir)
 PopupMenu* MenuViewpoint = NULL; // submenu de View: Camera/Top/Bottom/Front/Back/Right/Left (numpad)
 PopupMenu* MenuCameras = NULL;   // submenu de View: Set Active Object as Camera / Active Camera
 PopupMenu* MenuOverlays = NULL;  // overlays del viewport (checkboxes)
@@ -99,6 +100,10 @@ Viewport3D::Viewport3D(Vector3 pos){
     b = new Button("X"); b->rol = TBR_EjeX; b->centrado = true; ToolButtons.push_back(b);
     b = new Button("Y"); b->rol = TBR_EjeY; b->centrado = true; ToolButtons.push_back(b);
     b = new Button("Z"); b->rol = TBR_EjeZ; b->centrado = true; ToolButtons.push_back(b);
+    // modificadores TACTILES (Android/WebGL sin teclado): Shift y Ctrl. Toggle -> quedan encendidos (verde)
+    // y togglean LShiftPressed/LCtrlPressed (multi-seleccion, shortest path). Solo visibles con pantalla tactil.
+    b = new Button("Shift"); b->rol = TBR_Shift; b->centrado = true; ToolButtons.push_back(b);
+    b = new Button("Ctrl");  b->rol = TBR_Ctrl;  b->centrado = true; ToolButtons.push_back(b);
     for (int i = 0; i < 8; i++){ // historial de acciones (MRU, hasta 8)
         b = new Button(""); b->rol = TBR_Hist + i; b->visible = false; ToolButtons.push_back(b);
     }
@@ -188,6 +193,9 @@ Viewport3D::Viewport3D(Vector3 pos){
         MenuView->Agregar("Viewpoint", 0, -1, MenuViewpoint); // abre submenu
         MenuView->Agregar("Frame Selected", 420)->atajo = "Numpad ."; // enfocar la seleccion (EnfocarObject)
         MenuView->Agregar("Perspective/Ortho", 407)->atajo = "Num 5"; // alterna perspectiva/ortografica
+        // Lock Orbit: item REGULAR (no checkbox) -> al tocarlo togglea Y CIERRA el menu (pedido Dante). El
+        // tilde (verde) se refresca al abrir el menu, con el estado del viewport activo (LayoutInput).
+        MenuItemLockOrbit = MenuView->Agregar("Lock Orbit", 421);
     }
     if (!MenuRender){
         MenuRender = new PopupMenu();
@@ -239,6 +247,7 @@ Viewport3D::Viewport3D(Vector3 pos){
     show3DCursor = true;
     ShowRelantionshipsLines = true;
     limpiarPantalla = true;
+    lockOrbit = false; // por defecto se orbita normal; el usuario lo activa para modo tablero 2D
     view = RenderType::MaterialPreview;
     nearClip = 0.01f;
     farClip = 1000.0f;
@@ -403,6 +412,11 @@ void Viewport3D::UpdateViewOrbit() {
 }
 
 void Viewport3D::RotateOrbit() {
+    // "Lock Orbit" ON: NUNCA gira el orbital. Todo lo que orbitaria (arrastre de mouse, 1 dedo tactil,
+    // flechas via OrbitarFlecha) PANEA en su lugar. Usa el mismo dx/dy que ya seteo el que llama. El zoom
+    // (rueda / pinch) no pasa por aca, asi que sigue igual. Ideal para usar el viewport como tablero 2D.
+    if (lockOrbit) { Pan(); return; }
+
     float sens = 0.3f;
 
     // Usamos dx y dy como deltas directos
@@ -2241,6 +2255,13 @@ void Viewport3D::ToolbarActualizar(){
             bool on = (mask & (1 << e)) != 0;
             btn->tinte = on ? sTbEjeBg[e] : NULL;     // encendido: fondo de SU color
             btn->colorTexto = on ? blanco : kTbEje[e]; // apagado: la letra en su color
+        } else if (rol == TBR_Shift || rol == TBR_Ctrl){
+            // modificadores tactiles: SIEMPRE visibles con pantalla tactil (no dependen del transform).
+            // Encendidos (verde) reflejan LShiftPressed / LCtrlPressed (que setea el propio toggle).
+            btn->visible = tactil;
+            bool on = (rol == TBR_Shift) ? LShiftPressed : LCtrlPressed;
+            btn->tinte = on ? sTbVerdeBg : NULL;       // ON: fondo verde accent
+            btn->colorTexto = on ? accent : blanco;    // ON: texto verde; OFF: blanco
         } else { // historial de acciones (solo FUERA de un transform)
             int hi = rol - TBR_Hist;
             btn->visible = !transformando && hi >= 0 && hi < (int)h.size();
@@ -2287,23 +2308,41 @@ void Viewport3D::ToolbarScrollBy(int delta){
 bool Viewport3D::ToolbarClick(int mx, int my){
     if (!OnToolbar(mx, my)) return false;
     ToolbarActualizar(); // sx/sy frescos
-    for (size_t i = 0; i < ToolButtons.size(); i++){
+    // Buscar el boton: match EXACTO, o si el toque cayo al lado (dedo gordo sobre botones chicos) el MAS
+    // CERCANO en X dentro de una tolerancia. Asi un tap un poco desviado igual pulsa el boton que se queria
+    // en vez de caer en el gap y no hacer nada. La barra es una franja horizontal -> decide el X.
+    Button* target = NULL;
+    for (size_t i = 0; i < ToolButtons.size(); i++){       // 1) match exacto
         Button* btn = ToolButtons[i];
-        if (!btn->visible || !btn->Contains(mx, my)) continue;
-        int rol = btn->rol;
+        if (btn->visible && btn->Contains(mx, my)) { target = btn; break; }
+    }
+    if (!target){                                          // 2) sin exacto: el mas cercano en X
+        int mejorD = 1 << 30;
+        for (size_t i = 0; i < ToolButtons.size(); i++){
+            Button* b = ToolButtons[i];
+            if (!b->visible) continue;
+            int cx = b->sx + b->width / 2;
+            int d = (mx > cx) ? (mx - cx) : (cx - mx);
+            if (d < mejorD) { mejorD = d; target = b; }
+        }
+        if (target && mejorD > target->width) target = NULL; // gap real (lejos): sin accion
+    }
+    if (target){
+        int rol = target->rol;
         if (rol == TBR_Aceptar) Aceptar();                    // tilde verde: confirma el transform
         else if (rol == TBR_Cancelar){                        // cruz roja: cancela (mismo camino que el click derecho)
             if (InteractionMode == EditMode && EditXformActivo()) EditXformCancelar();
             else Cancelar();
             NumInputReset();
         }
-        else if (rol == TBR_Orient) LayoutMenuOrientToolbar(btn->sx, y + height - ToolbarHeight());
+        else if (rol == TBR_Orient) LayoutMenuOrientToolbar(target->sx, y + height - ToolbarHeight());
         else if (rol >= TBR_EjeX && rol <= TBR_EjeZ) ToolbarToggleEje(1 << (rol - TBR_EjeX)); // combinables
+        else if (rol == TBR_Shift) LShiftPressed = !LShiftPressed; // modificador tactil: queda encendido (verde)
+        else if (rol == TBR_Ctrl)  LCtrlPressed  = !LCtrlPressed;
         else ToolbarEjecutar( ToolbarHist()[rol - TBR_Hist] ); // historial: arranca la accion
         g_redraw = true;
-        return true;
     }
-    return true; // dentro de la barra pero en el gap: consumir igual (no pasa al 3D)
+    return true; // dentro de la barra: consumir igual (no pasa al 3D)
 }
 
 void Viewport3D::RenderToolbar(){

@@ -17,6 +17,13 @@ platform/android/app/src/main/jniLibs/arm64-v8a/*.so
 platform/android/app/src/main/jniLibs/armeabi-v7a/*.so
 platform/android/app/src/main/jniLibs/x86_64/*.so
 
+# salida del ndk-build (NDK_PROJECT_PATH=platform/android): libs/<abi> + obj.
+platform/android/obj/
+platform/android/libs/
+
+# recursos copiados al APK: los regenera build_android.sh desde el res/ canonico.
+platform/android/app/src/main/assets/res/
+
 *.apk
 *.ap_
 *.dex

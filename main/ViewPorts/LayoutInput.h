@@ -51,6 +51,9 @@ void LayoutToggleBarraViewportActivo();
 // redimensiona el viewport activo en un eje (dx izq/der, dy arr/ab) ajustando
 // el divisor del ancestro correcto. verde+flechas en Symbian.
 void LayoutRedimensionarViewportActivo(int dx, int dy, float paso);
+// arrastre de la ESQUINA (boton de menu) de un viewport: mueve su borde izq (dx) y sup (dy). El
+// superior-izquierdo no se mueve; uno pegado al borde izq solo sube/baja. Ver .cpp.
+void LayoutResizeEsquina(ViewportBase* aVp, int dx, int dy);
 
 // arrastre de la barra de scroll: true si hay una agarrada; Soltar la
 // suelta (PC lo llama al soltar el boton izquierdo)

@@ -207,7 +207,9 @@ if(UNIX AND NOT ANDROID)
 
     # Deb
     set(CPACK_PACKAGE_NAME "whisk3d")
-    set(CPACK_PACKAGE_VERSION "25.12.04")
+    # version = fecha AA.MM.DD (2 digitos) del momento en que se CONFIGURA (cmake -S -B).
+    # Igual formato que Windows. Para refrescar la fecha hay que reconfigurar.
+    string(TIMESTAMP CPACK_PACKAGE_VERSION "%y.%m.%d")
     set(CPACK_PACKAGE_CONTACT "Dante Leoncini <dante_leoncini@outlook.com.ar>")
     set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Dante Leoncini <dante_leoncini@outlook.com.ar>")
     set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Whisk3D - editor y motor 3D retro multiplataforma")
@@ -262,10 +264,10 @@ if(WIN32)
     set(CPACK_GENERATOR "NSIS")
     set(CPACK_PACKAGE_NAME "Whisk3D")
     set(CPACK_PACKAGE_VENDOR "Dante Leoncini")
-    # version = fecha AAAA.MM.DD del momento en que se CONFIGURA (cmake -S -B).
-    # Asi el .exe queda como Whisk3D-2026.06.20-win64.exe y se sabe que build es.
+    # version = fecha AA.MM.DD (2 digitos) del momento en que se CONFIGURA (cmake -S -B).
+    # Asi el .exe queda como Whisk3D-26.06.20-win64.exe y se sabe que build es.
     # (Para refrescar la fecha hay que reconfigurar, no solo --build.)
-    string(TIMESTAMP CPACK_PACKAGE_VERSION "%Y.%m.%d")
+    string(TIMESTAMP CPACK_PACKAGE_VERSION "%y.%m.%d")
     set(CPACK_PACKAGE_CONTACT "Dante Leoncini <dante_leoncini@outlook.com.ar>")
     set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Whisk3D - editor y motor 3D retro multiplataforma")
     set(CPACK_PACKAGE_INSTALL_DIRECTORY "Whisk3D")

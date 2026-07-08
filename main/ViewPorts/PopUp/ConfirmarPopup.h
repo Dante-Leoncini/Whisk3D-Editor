@@ -3,6 +3,7 @@
 
 #include "PopUpBase.h"
 #include <string>
+#include <vector>
 
 class Button;
 
@@ -12,6 +13,7 @@ class Button;
 class ConfirmarPopup : public PopUpBase {
     public:
         std::string mensaje;
+        std::vector<std::string> lineas; // mensaje partido en renglones (word-wrap al ancho disponible)
         void (*onSi)();   // callback al confirmar (Si)
         Button* btnSi;    // "Si" (rojo, derecha) = soft key derecho / Accept / flecha derecha
         Button* btnNo;    // "No" (izquierda)     = soft key izquierdo / Cancel / flecha izquierda
@@ -24,7 +26,8 @@ class ConfirmarPopup : public PopUpBase {
         void Abrir(const std::string& msg, void (*cb)());
         void Layout(); // recalcula posicion/tamaño (ancho completo, abajo) con las metricas actuales
         int Padding() const;   // padding UNIFORME de la ventana (4 lados)
-        int AltoBarra() const; // alto total (pad + mensaje + gap + botones + pad)
+        int LineHeight() const; // alto de un renglon de mensaje
+        int AltoBarra() const; // alto total (pad + N renglones de mensaje + gap + botones + pad)
         void Render();
         bool Click(int mx, int my);
         bool Motion(int mx, int my); // actualiza el hover de los botones (iluminacion al pasar el mouse)

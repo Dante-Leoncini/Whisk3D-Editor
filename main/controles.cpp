@@ -31,6 +31,13 @@ bool g_contentTapPending = false;   // toque sobre el CONTENIDO de un panel (pro
                                     // arrastrar = tap (togglea checkbox / selecciona); si arrastra = scroll (NO togglea)
 bool g_slideNum = false;            // arrastre HORIZONTAL sobre un campo numerico -> editar el valor (slider tactil)
 ViewportBase* g_barTapView = NULL;  // viewport cuya barra/contenido se toco (para lockear el scroll a ESE, no al hover)
+bool g_popupFinger = false;         // un dedo esta manejando el popup activo (bypass de la sintesis de mouse de SDL)
+bool g_popupOpenedByMouseDown = false; // el popup lo abrio el mouse-down de ESTE toque (menu->accion): el FINGERDOWN
+                                    // que sigue NO debe cerrarlo (caeria "afuera", en la posicion del item del menu)
+// ESQUINA (boton de menu [0] de cada viewport) = redimension estilo esquina de Windows: ARRASTRAR
+// cambia el tamaño (borde izq + sup del viewport), un TAP abre el menu desplegable. Vale mouse y touch.
+ViewportBase* g_cornerVp = NULL;    // viewport cuyo boton-esquina se apreto; NULL = ninguno
+bool g_cornerResizing = false;      // ya se decidio que ESTE gesto redimensiona (paso el umbral)
 int g_tapStartX = 0, g_tapStartY = 0; // posicion del down (umbral: hasta que no se mueve N px sigue siendo TAP)
 bool g_uiTapEnCurso = false;        // el LayoutClickUI que corre es un TAP tactil diferido (no un click de mouse)
 Uint32 g_lastFingerTicks = 0;       // ultimo evento de DEDO: filtra los mouse FANTASMA que el browser sintetiza
@@ -52,6 +59,13 @@ void SetFullScreen(bool value){
     }
 }
 
+// coords en PIXELES de un evento de dedo (normalizado 0..1 -> pixeles de ventana, igual que la sintesis
+// de SDL: mx = fx * ancho_ventana). Se usa para manejar el popup activo directo desde el touch.
+static void FingerPix(const SDL_TouchFingerEvent& tf, int& mx, int& my){
+    int ww = 0, hh = 0; if (window) SDL_GetWindowSize(window, &ww, &hh);
+    mx = (int)(tf.x * ww); my = (int)(tf.y * hh);
+}
+
 void InputUsuarioSDL3(SDL_Event &e){
     RefreshInputControllerSDL(e);
 
@@ -61,12 +75,28 @@ void InputUsuarioSDL3(SDL_Event &e){
             // gesto va en el down del mouse (aca borraria los flags recien seteados por ese down).
             fingers[e.tfinger.fingerId] = {e.tfinger.x, e.tfinger.y};
             g_lastFingerTicks = SDL_GetTicks();
+            // POPUP activo (explorador, etc): lo maneja el DEDO directo (la sintesis de mouse de SDL se
+            // desincroniza). 1 dedo = click del popup; si Click devuelve false (afuera) se cierra.
+            if (PopUpActive && fingers.size() == 1) {
+                // ...salvo que el popup lo ACABE de abrir el mouse-down de ESTE toque (menu Delete, etc):
+                // ese finger-down caeria afuera (en la posicion del item del menu) y lo cerraria. Se ignora.
+                if (g_popupOpenedByMouseDown) { g_popupOpenedByMouseDown = false; break; }
+                int mx, my; FingerPix(e.tfinger, mx, my);
+                leftMouseDown = true; g_popupFinger = true;
+                if (!PopUpActive->Click(mx, my)) {   // afuera del popup -> cerrarlo (como LayoutClickUI)
+                    PopUpActive->Cerrar();
+                    g_popupFinger = false; leftMouseDown = false;
+                }
+                break; // el popup ya lo manejo: no seguir al flujo de gestos de viewport
+            }
             if (fingers.size() >= 2) {
                 // 2do dedo -> arranca el gesto de 2 dedos: cortamos el orbit/drag del mouse (1 dedo
                 // sintetizado) y cancelamos el gesto de 1 dedo a medio decidir (tap/scroll/slider).
+                if (g_popupFinger) { if (PopUpActive) PopUpActive->Soltar(); g_popupFinger = false; }
                 leftMouseDown = middleMouseDown = ViewPortClickDown = false;
                 g_barTapPending = g_contentTapPending = g_slideNum = false;
                 g_scrollView = NULL;
+                g_cornerVp = NULL; g_cornerResizing = false; // 2do dedo: cancela el gesto de esquina
                 lastDistance = 0.0f; // re-arma pinch/paneo desde este toque
             }
             break;
@@ -75,6 +105,12 @@ void InputUsuarioSDL3(SDL_Event &e){
             fingers.erase(e.tfinger.fingerId);
             g_lastFingerTicks = SDL_GetTicks();
             lastDistance = 0.0f; // reset
+            // POPUP manejado por el dedo: soltar (dispara tap/abre entrada/termina scroll) al levantar
+            if (g_popupFinger) {
+                if (PopUpActive) PopUpActive->Soltar();
+                g_popupFinger = false; leftMouseDown = false;
+                break;
+            }
             if (fingers.size() < 2) {
                 // volvimos a <2 dedos -> cortar el drag (el dedo que queda no debe "saltar" a orbitar)
                 leftMouseDown = middleMouseDown = ViewPortClickDown = false;
@@ -83,6 +119,14 @@ void InputUsuarioSDL3(SDL_Event &e){
 
         case SDL_FINGERMOTION:
             fingers[e.tfinger.fingerId] = {e.tfinger.x, e.tfinger.y};
+            // POPUP manejado por el dedo: arrastre = Motion del popup (scroll de la lista, etc)
+            if (g_popupFinger && PopUpActive && fingers.size() == 1) {
+                g_lastFingerTicks = SDL_GetTicks();
+                int mx, my; FingerPix(e.tfinger, mx, my);
+                PopUpActive->Motion(mx, my);
+                g_redraw = true;
+                break;
+            }
             g_lastFingerTicks = SDL_GetTicks();
             if (fingers.size() == 2 && viewPortActive) {
                 std::map<SDL_FingerID, Finger>::iterator it = fingers.begin();
@@ -118,6 +162,16 @@ void InputUsuarioSDL3(SDL_Event &e){
             e.button.which != SDL_TOUCH_MOUSEID) return;
     }
 
+    // POPUP en TACTIL: lo maneja el path de FINGER directo (abajo), porque la sintesis touch->mouse de SDL
+    // se DESINCRONIZA con toques rapidos (deja de mandar mouse-down y el explorador quedaba "atrapado").
+    // Aca se DESCARTAN los mouse SINTETIZADOS del touch mientras hay un popup: el dedo ya lo maneja, y asi
+    // no hay doble proceso. (El mouse REAL de escritorio -which != TOUCH- sigue manejando el popup normal.)
+    if (PopUpActive) {
+        if (e.type == SDL_EVENT_MOUSE_MOTION && e.motion.which == SDL_TOUCH_MOUSEID) return;
+        if ((e.type == SDL_EVENT_MOUSE_BUTTON_DOWN || e.type == SDL_EVENT_MOUSE_BUTTON_UP) &&
+            e.button.which == SDL_TOUCH_MOUSEID) return;
+    }
+
     if (e.type == SDL_EVENT_MOUSE_MOTION){
         // 2+ dedos: el mouse lo sintetiza el touch desde 1 dedo -> NO orbitar mientras se hace
         // pinch/paneo (el gesto de 2 dedos ya se maneja en SDL_FINGERMOTION).
@@ -150,6 +204,22 @@ void InputUsuarioSDL3(SDL_Event &e){
         // ambos; el de CONTENIDO de panel y el slider numerico son solo touch (en PC el mouse usa scrollbar/rueda
         // + el drag numerico clasico). Lockeado al viewport del down hasta soltar.
         if (leftMouseDown && fingers.size() <= 1) {
+            // ESQUINA (boton de menu): si se ARRASTRA, redimensiona el viewport (borde izq + sup). Un TAP
+            // (sin pasar el umbral) NO entra aca -> al soltar abre el menu como siempre.
+            if (g_cornerVp) {
+                if (!g_cornerResizing) {
+                    int cdx = mx - g_tapStartX; if (cdx < 0) cdx = -cdx;
+                    int cdy = my - g_tapStartY; if (cdy < 0) cdy = -cdy;
+                    if (cdx + cdy > 8 * GlobalScale) {
+                        g_cornerResizing = true;
+                        g_barTapPending = false; g_contentTapPending = false; // cancela el tap->menu / scroll de barra
+                    }
+                }
+                if (g_cornerResizing) {
+                    LayoutResizeEsquina(g_cornerVp, e.motion.xrel, e.motion.yrel); // dx=borde izq, dy=borde sup
+                    g_fingerScrolling = true; g_redraw = true; return;
+                }
+            }
             if (g_slideNum) {                                        // slider numerico lockeado -> el arrastre EDITA
                 if (g_barTapView) g_barTapView->TouchSliderMover(e.motion.xrel);
                 g_fingerScrolling = true; g_redraw = true; return;
@@ -277,6 +347,7 @@ void InputUsuarioSDL3(SDL_Event &e){
         ViewPortClickDown = true;
         if (e.button.button == SDL_BUTTON_LEFT) {
             leftMouseDown = true;
+            bool popupAntes = (PopUpActive != NULL); // para detectar si ESTE down abre un popup (menu->accion)
             if (!clickEnPopup)
                 g_textFieldActivo = NULL; // click en cualquier lado desenfoca el texto
                                           // (ClickEn de Properties re-enfoca en el up si es una caja)
@@ -294,6 +365,17 @@ void InputUsuarioSDL3(SDL_Event &e){
                                    estado == EditScale);
             // viewport bajo el click (lo usa el diferido de barra/contenido, abajo)
             ViewportBase* vpDown = FindViewportUnderMouse(rootViewport, (int)e.button.x, (int)e.button.y);
+            // ESQUINA: down sobre el boton de menu [0] del viewport -> candidato a redimension por arrastre
+            // (el tap sigue abriendo el menu via el diferido de barra). Vale mouse y touch. NO si hay un
+            // popup/menu modal abierto (p.ej. el explorador de archivos): esos son duenos del input y el
+            // corner-drag secuestraria/bloquearia sus botones y su scroll.
+            g_cornerVp = NULL; g_cornerResizing = false;
+            if (!clickEnPopup && !PopUpActive && !LayoutMenuAbierto() &&
+                vpDown && vpDown->isLeaf() && !vpDown->BarButtons.empty() &&
+                vpDown->BarButtons[0]->Contains((int)e.button.x, (int)e.button.y)) {
+                g_cornerVp = vpDown;
+                g_tapStartX = (int)e.button.x; g_tapStartY = (int)e.button.y;
+            }
             // touch NO genera hover antes del down -> viewPortActive podia quedar stale y el motion/up
             // (slide del campo numerico, mouse_button_up del panel) iban al viewport equivocado.
             if (esTouch && vpDown) viewPortActive = vpDown;
@@ -352,6 +434,9 @@ void InputUsuarioSDL3(SDL_Event &e){
                                 W3dPantallaAlto);
                 }
             }
+            // si ESTE mouse-down tactil abrio un popup (p.ej. menu Delete -> ConfirmarPopup), avisar al
+            // FINGERDOWN del mismo toque para que NO lo cierre (caeria afuera del popup recien abierto).
+            if (esTouch && !popupAntes && PopUpActive) g_popupOpenedByMouseDown = true;
             GuardarMousePos();
         }
         else if (e.button.button == SDL_BUTTON_MIDDLE) {
@@ -373,8 +458,9 @@ void InputUsuarioSDL3(SDL_Event &e){
         }
     }
     else if (e.type == SDL_EVENT_MOUSE_BUTTON_UP) {
-        if (e.button.button == SDL_BUTTON_LEFT) {  
+        if (e.button.button == SDL_BUTTON_LEFT) {
             leftMouseDown = false;
+            g_cornerVp = NULL; g_cornerResizing = false; // fin del gesto de esquina
             // suelta scroll agarrado y dropea el drag del outliner
             LayoutSoltar((int)e.button.x, (int)e.button.y);
         }

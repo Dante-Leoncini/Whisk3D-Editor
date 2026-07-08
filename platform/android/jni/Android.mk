@@ -1,6 +1,7 @@
 LOCAL_PATH := $(call my-dir)
 MY_PATH := $(LOCAL_PATH)
-PROJECT_ROOT := $(MY_PATH)/..
+# jni/ vive en platform/android/jni -> la raiz del repo esta 3 niveles arriba
+PROJECT_ROOT := $(MY_PATH)/../../..
 
 # ============================================================================
 #  jni/Android.mk - build nativo de Whisk3D para Android via ndk-build

@@ -70,6 +70,7 @@ enum BarRol3D {
 // roles de la barra de HERRAMIENTAS (abajo). TBR_Hist+i = boton i del historial de acciones.
 enum ToolbarRol3D {
     TBR_Aceptar = 100, TBR_Cancelar, TBR_Orient, TBR_EjeX, TBR_EjeY, TBR_EjeZ,
+    TBR_Shift, TBR_Ctrl, // modificadores TACTILES (sin teclado): togglean LShiftPressed / LCtrlPressed
     TBR_Hist = 110 // .. TBR_Hist+7
 };
 class Button;
@@ -90,8 +91,10 @@ class Viewport3D : public ViewportBase, public WithBorder {
         bool showOrigins; 
         bool show3DCursor; 
         bool ShowRelantionshipsLines; 
-        bool limpiarPantalla; 
-        RenderType view; 
+        bool limpiarPantalla;
+        bool lockOrbit; // "Lock Orbit": si ON, TODO lo que orbita (mouse/touch/flechas) PANEA en su lugar
+                        // (el orbital nunca gira). Para usar el viewport como tablero 2D. El zoom no cambia.
+        RenderType view;
 
         GLfloat nearClip;
         GLfloat farClip;
