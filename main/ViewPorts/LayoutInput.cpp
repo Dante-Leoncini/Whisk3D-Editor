@@ -1690,6 +1690,7 @@ void EditXformCancelar(){
 static std::string gNumBuf;       // la expresion tipeada (sin el signo)
 static bool        gNumActivo = false;
 static bool        gNumNegar = false; // el toggle del '-'
+static int         gNumCaret = 0;     // posicion del caret en gNumBuf (para editar en el medio; teclado tactil ← →)
 
 // --- evaluador de expresiones (+ * / parentesis, numeros con punto). Parse de
 //     numero MANUAL (sin strtod) para no depender del locale (',' vs '.'). ---
@@ -1748,8 +1749,11 @@ bool TextFieldInputChar(int c){
 }
 
 bool NumInputActivo(){ return gNumActivo; }
-void NumInputReset(){ gNumBuf.clear(); gNumActivo=false; gNumNegar=false; }
+void NumInputReset(){ gNumBuf.clear(); gNumActivo=false; gNumNegar=false; gNumCaret=0; }
 const std::string& NumInputBuffer(){ return gNumBuf; }
+int  NumInputCaret(){ return gNumCaret; }                 // posicion del caret (para dibujarlo en la barra)
+void NumInputLeft(){  if (gNumCaret>0) { gNumCaret--; g_redraw=true; } }
+void NumInputRight(){ if (gNumCaret<(int)gNumBuf.size()) { gNumCaret++; g_redraw=true; } }
 bool NumInputNegado(){ return gNumNegar; }
 // valor actual (false si la expresion esta incompleta -> no aplicar todavia)
 bool NumInputValor(float& out){
@@ -1769,13 +1773,14 @@ static void NumInputAplicar(){
 // lo consumio (hay un transform activo y el caracter es relevante). c==8 = backspace.
 bool NumInputChar(int c){
     if (estado == editNavegacion) return false; // solo durante un transform
-    if (c == 8){ // backspace: borra el ultimo char, o el signo si no hay nada
-        if (!gNumBuf.empty()) gNumBuf.erase(gNumBuf.size()-1);
-        else gNumNegar = false;
+    if (c == 8){ // backspace: borra el char ANTES del caret (o el signo si esta vacio)
+        if (gNumCaret > 0 && !gNumBuf.empty()) { gNumBuf.erase(gNumCaret-1, 1); gNumCaret--; }
+        else if (gNumBuf.empty()) gNumNegar = false;
     } else if (c == '-'){
         gNumNegar = !gNumNegar; gNumActivo = true;
     } else if ((c>='0'&&c<='9') || c=='.' || c=='(' || c==')' || c=='*' || c=='/' || c=='+'){
-        gNumBuf.push_back((char)c); gNumActivo = true;
+        if (gNumCaret < 0) gNumCaret = 0; if (gNumCaret > (int)gNumBuf.size()) gNumCaret = (int)gNumBuf.size();
+        gNumBuf.insert(gNumBuf.begin()+gNumCaret, (char)c); gNumCaret++; gNumActivo = true; // inserta EN el caret
     } else {
         return false; // no es un caracter numerico
     }
@@ -1783,6 +1788,32 @@ bool NumInputChar(int c){
     NumInputAplicar();
     g_redraw = true;
     return true;
+}
+
+// El teclado tactil (NumPad en modo transform) llama a estas para editar el transform
+// que se muestra ARRIBA (sin popup/textinput propio), igual que un teclado fisico en PC.
+void NumInputBegin(){ // marca la entrada activa asi la barra muestra "[|]" apenas se abre el teclado
+    if (!gNumActivo){ gNumBuf.clear(); gNumCaret=0; gNumNegar=false; gNumActivo=true; }
+    g_redraw = true;
+}
+void NumInputConfirmar(){ // OK del teclado: confirma el transform (Aceptar ya hace NumInputReset)
+    if (Viewport3DActive) Viewport3DActive->Aceptar();
+    g_redraw = true;
+}
+void NumInputCancelar(){ // X del teclado: descarta el transform (mismo camino que la cruz de la barra)
+    if (InteractionMode == EditMode && EditXformActivo()) EditXformCancelar();
+    else Cancelar(); // objeto: descarta el transform (free function de ObjectMode)
+    NumInputReset();
+    g_redraw = true;
+}
+// hay un transform en curso? (mismo criterio que la barra de estado que lo muestra). El teclado
+// tactil en modo transform se cierra solo si esto deja de ser cierto (se confirmo/cancelo).
+bool NumInputTransformEnCurso(){
+    if (!Viewport3DActive) return false;
+    if (!(estado == translacion || estado == rotacion || estado == EditScale)) return false;
+    if (InteractionMode == ObjectMode) return true;
+    if (InteractionMode == EditMode && EditXformActivo()) return true;
+    return false;
 }
 
 // ====================================================================

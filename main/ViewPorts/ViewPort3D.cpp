@@ -13,6 +13,7 @@
 #include "objects/Mesh.h"          // overlay de estadisticas (vertsAgrupados, faces3d)
 #include "objects/EditMesh.h"      // foco al centro de la seleccion en edit mode
 #include "ViewPorts/LayoutInput.h" // LayoutDeleteEdit (menu Delete en edit mode)
+#include "ViewPorts/PopUp/NumPad.h" // NumPadAbrirTransform (teclado tactil sobre la barra de estado)
 #include "ViewPorts/PopUp/ConfirmarPopup.h" // AbrirConfirmarBorrado (popup al borrar con la tecla)
 #include "ViewPorts/PopUp/ProgressPopup.h"  // barra "Rendering..." durante el render por tiles (clave en N95)
 #ifdef W3D_SYMBIAN
@@ -1493,7 +1494,10 @@ static std::string W3dTextoTransform(){
         float v = 0.0f; bool valido = NumInputValor(v);
         const char* op = (estado==rotacion) ? "Rotate" : (estado==EditScale) ? "Scale" : "Move";
         const char* unit = (estado==rotacion) ? "\xC2\xB0" : "";
-        std::string expr = (NumInputNegado() ? "-[" : "[") + NumInputBuffer() + "]";
+        std::string buf = NumInputBuffer();
+        int car = NumInputCaret(); if (car<0) car=0; if (car>(int)buf.size()) car=(int)buf.size();
+        buf.insert(buf.begin()+car, '|'); // caret visible (editable en el medio con las flechas del teclado tactil)
+        std::string expr = (NumInputNegado() ? "-[" : "[") + buf + "]";
         std::string val = valido ? (W3dFmtF(v, 4) + unit) : "?";
         std::string suf = (estado==rotacion && (axisSelect==ViewAxis||axisSelect==XYZ||axisSelect==OrbitalAxis)) ? "" : W3dSufijoEjes();
         return std::string(op) + ": " + expr + " = " + val + suf;
@@ -1605,6 +1609,21 @@ void Viewport3D::RenderBarraTransform(){
     w3dEngine::Translatef((GLfloat)(gapGS * 2), (GLfloat)ty, 0);
     RenderBitmapText(txt, textAlign::left, width - gapGS * 2);
     w3dEngine::PopMatrix();
+}
+
+// TACTIL: un tap sobre la barra de estado del transform (la que dice "Move: ... = ...")
+// abre el teclado numerico en modo transform para editar el valor EXACTO como en PC.
+// Solo cuando hay un transform en curso y este es el viewport activo.
+bool Viewport3D::ClickBarraTransform(int mx, int my){
+    if (Viewport3DActive != this) return false;
+    if (!(estado == translacion || estado == rotacion || estado == EditScale)) return false;
+    if (!(InteractionMode == ObjectMode ||
+          (InteractionMode == EditMode && EditXformActivo()))) return false;
+    int barH = BarHeight();
+    int yBar = barAbajo ? (y + height - barH) : y; // misma franja que RenderBarraTransform
+    if (mx < x || mx >= x + width || my < yBar || my >= yBar + barH) return false;
+    NumPadAbrirTransform();
+    return true;
 }
 
 // suma recursiva de las estadisticas de malla de toda la escena

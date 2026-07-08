@@ -207,6 +207,7 @@ class Viewport3D : public ViewportBase, public WithBorder {
         void ToolbarScrollBy(int delta);
         void ToolbarActualizar();          // visibilidad contextual + colores + layout (sx/sy con scroll)
         bool ToolbarClick(int mx, int my); // teclas de la barra (true = consumido)
+        bool ClickBarraTransform(int mx, int my); // tap TACTIL en la barra de estado del transform -> abre el teclado numerico
         void RenderToolbar();
         bool OnBar(int px, int py) override;      // barra de arriba O la de herramientas (setea toolGesto)
         void BarScrollBy(int delta) override;     // rutea el scroll a la barra donde arranco el gesto

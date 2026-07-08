@@ -191,9 +191,11 @@ void UVEditor::Render() {
         // --- el wireframe de las UV encima: caras LOGICAS (quads/ngons), SIN triangular ---
         // SYNC SELECTION: ON -> dibuja TODO; las caras seleccionadas en 3D van verde (accent) y el
         // resto gris. OFF -> SOLO las caras seleccionadas. En Object Mode (sin seleccion) = todo verde.
-        if (m->uv && !m->faces3d.empty()) {
+        // en OBJECT MODE no se dibuja el wireframe de la malla sobre la textura (pedido Dante): solo se ve
+        // la textura. El wireframe (para editar las UV) aparece solo en EDIT MODE de esta malla.
+        const bool enEdit = ((Object*)m == g_editMesh);
+        if (m->uv && !m->faces3d.empty() && enEdit) {
             const int nVerts = m->vertexSize;
-            const bool enEdit = ((Object*)m == g_editMesh);
             std::vector<unsigned char> sel3d(m->faces3d.size(), 0);
             if (enEdit) { m->EnsureEdit();
                 if (m->edit) for (size_t f = 0; f < m->edit->faceSel.size(); f++)
