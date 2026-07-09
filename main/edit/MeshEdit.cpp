@@ -1981,6 +1981,7 @@ void Mesh::LiberarMallaModificada() {
     delete[] genVertex; delete[] genNormals; delete[] genUV; delete[] genColor; delete[] genFaces;
     genVertex=NULL; genNormals=NULL; genUV=NULL; genColor=NULL; genFaces=NULL;
     genVertexSize=0; genFacesSize=0; genMaterialsGroup.clear(); genBordesBuf.clear(); genValido=false;
+    delete[] genChromeExpPos; delete[] genChromeExpUV; genChromeExpPos=NULL; genChromeExpUV=NULL; genChromeCount=0; genChromeValid=false; // el reflejo gen se recalcula
 }
 
 // invierte una afin 4x4 columna-major (misma que Join, duplicada porque aquella es static en ObjectMode.cpp).

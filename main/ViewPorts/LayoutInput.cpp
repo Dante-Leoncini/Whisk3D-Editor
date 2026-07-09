@@ -657,6 +657,7 @@ static void LayoutAccionObject(int aId) {
         case 100: if (!EditXformStart(translacion, ViewAxis)) SetPosicion(); break; // Move  (G)
         case 101: if (!EditXformStart(rotacion,    ViewAxis)) SetRotacion(); break; // Rotate(R)
         case 102: if (!EditXformStart(EditScale,   XYZ))      SetEscala();   break; // Scale (S)
+        case 103: LayoutShrinkFatten(); break; // Shrink/Fatten (Alt+S): cada vert por su normal
         case 300: LayoutExtrudeFaces(); break; // Extrude (segun el modo) (E)
         case 310: LayoutNewFaceEdit(); break;  // Vertex > New Edge/Face from Vertices (F)
         case 314: LayoutDuplicarEdit(); break; // Duplicate (Shift D)
@@ -1430,6 +1431,7 @@ struct EditVtxSnap {
     int editK;      // indice del vertice editable; su pos[] es autoritativa (un valor por
                     // posicion; los GPU duplicados los empuja EmpujarPosiciones via posRep)
     Vector3 world0; // posicion de MUNDO al empezar
+    Vector3 worldNormal; // normal del vertice en MUNDO (para Shrink/Fatten: cada vert se mueve por SU normal)
 };
 static std::vector<EditVtxSnap> gEVsnap;
 static Mesh*      gEVmesh   = NULL;
@@ -1440,7 +1442,9 @@ static Vector3    gEVpivot;         // pivote en MUNDO
 // acumuladores (segun 'estado' solo uno esta activo)
 static Vector3    gEVtrans;         // translacion de mundo acumulada
 static Quaternion gEVrotTotal(1,0,0,0); // rotacion acumulada
-static float      gEVscaleAmt = 0;  // factor de escala acumulado (f = 1 + amt)
+static float      gEVscaleAmt = 0;  // factor de escala acumulado (f = 1 + amt); en SHRINK = distancia por la normal
+static bool       gEVshrink = false; // SHRINK/FATTEN (Alt+S): reusa EditScale pero cada vert se mueve por SU normal
+bool EditShrinkActivo(){ return gEVshrink; }
 // EXTRUDE / orientacion NORMAL: la translacion se constriñe a gTransformNormal (la normal en mundo).
 // gEVuseCustom + gTransformNormal son GLOBALES (variables.h) para que CiclarEje/EjeOrientado los vean.
 
@@ -1458,10 +1462,12 @@ bool EditXformActivo(){ return gEVmesh != NULL; }
 // valores acumulados para la barra de estado (la rotacion usa gAnguloTransform)
 Vector3 EditXformTransDelta(){ return gEVtrans; }       // translacion de MUNDO (engine xyz)
 float   EditXformScaleFactor(){ return 1.0f + gEVscaleAmt; }
+float   EditXformShrinkAmt(){ return gEVscaleAmt; }     // distancia por la normal (Shrink/Fatten)
 
 void EditXformIniciar(){
     g_xformPrimerMov = true; // el primer motion arranca en cero (no usa el delta viejo)
     gEVsnap.clear(); gEVmesh = NULL;
+    gEVshrink = false; // por defecto es un transform comun; el starter de Shrink/Fatten lo prende despues
     ClipMirrorReset(); // nuevo transform: ningun vert esta "pegado" al plano del mirror todavia
     if (InteractionMode != EditMode || !g_editMesh) return;
     Mesh* m = (Mesh*)g_editMesh; m->EnsureEdit();
@@ -1496,8 +1502,11 @@ void EditXformIniciar(){
         // posicion EDITABLE (autoritativa) -> mundo. No lee el render (vertex[]).
         Vector3 l0(e->pos[k*3], e->pos[k*3+1], e->pos[k*3+2]);
         s.world0 = EVLocalAMundo(l0);
+        // normal del vertice en MUNDO (para Shrink/Fatten). rotacion global (la escala no cambia el sentido).
+        Vector3 ln = m->normals ? Vector3(m->normals[rep*3]/127.0f, m->normals[rep*3+1]/127.0f, m->normals[rep*3+2]/127.0f) : Vector3(0,1,0);
+        s.worldNormal = (gEVrg * ln).Normalized();
         gEVsnap.push_back(s);
-        if (m->normals) nNormAcum = nNormAcum + Vector3(m->normals[rep*3]/127.0f, m->normals[rep*3+1]/127.0f, m->normals[rep*3+2]/127.0f);
+        if (m->normals) nNormAcum = nNormAcum + ln;
     }
     if (gEVsnap.empty()){ gEVmesh = NULL; return; } // nada seleccionado
 
@@ -1545,6 +1554,8 @@ static void EVEscribir(){
             wn = s.world0 + gEVtrans;
         } else if (estado == rotacion){
             wn = gEVpivot + gEVrotTotal * (s.world0 - gEVpivot);
+        } else if (gEVshrink){ // SHRINK/FATTEN: cada vert se mueve por SU normal (mundo) * distancia acumulada
+            wn = s.world0 + s.worldNormal * gEVscaleAmt;
         } else { // EditScale: escala DIRECCIONAL segun el eje/plano (orientacion)
             Vector3 off = s.world0 - gEVpivot;
             if (axisSelect==X||axisSelect==Y||axisSelect==Z){
@@ -1652,10 +1663,26 @@ void EditXformNumValor(float v){
         else if (axisSelect==ViewAxis||axisSelect==XYZ||axisSelect==OrbitalAxis) ax = camForward;
         else ax = EjeOrientado(*gEVmesh, axisSelect);
         gEVrotTotal = Quaternion::FromAxisAngle(ax, v); gAnguloTransform = v;
+    } else if (gEVshrink){ // Shrink/Fatten: el valor es la DISTANCIA por la normal
+        gEVscaleAmt = v;
     } else { // EditScale
         gEVscaleAmt = v - 1.0f;
     }
     EVEscribir();
+}
+
+// SHRINK/FATTEN (Alt+S, menu Mesh > Transform): cada vertice seleccionado se mueve por SU normal (engorda/
+// adelgaza). Reusa la maquina de EditScale (toolbar/confirmar/cancelar/tactil) con el flag gEVshrink -> solo
+// cambia el calculo (mover por normal en vez de escalar desde el pivote). Confirma/cancela como cualquier transform.
+void LayoutShrinkFatten() {
+    if (InteractionMode != EditMode || !g_editMesh) return;
+    if (EditXformActivo()) EditXformConfirmar(); // encadenar: confirma el transform anterior
+    estado = EditScale; axisSelect = XYZ;        // libre (la direccion la da la normal de cada vertice)
+    UndoEditMoveIniciar((Mesh*)g_editMesh);      // Ctrl+Z: captura posiciones previas
+    EditXformIniciar();                          // snapshot de la seleccion (calcula las normales por vert)
+    if (!EditXformActivo()){ estado = editNavegacion; return; }
+    gEVshrink = true;                            // <- ahora si: mover por la normal
+    ToolbarRegistrarAccion(TBScale);             // historial (reusa el de escala)
 }
 
 // fija el resultado: recalcula bordes/centro/posRep (sin invalidar el edit) y las
