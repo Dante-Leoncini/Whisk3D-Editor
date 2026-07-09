@@ -176,9 +176,16 @@ Viewport3D::Viewport3D(Vector3 pos){
         MenuObject->Agregar("Delete", 3)->atajo = "X";
         // menu "Mesh" (Edit Mode): comun a vertice/borde/cara. Transform (arriba), Snap y Delete (abajo). Los
         // submenus Snap/Delete se reusan de LayoutInput.cpp. La accion (LayoutAccionMesh) se asigna al abrirlo.
+        // submenu Transform de EDIT (como el de objeto pero + Shrink/Fatten, que solo tiene sentido en malla)
+        static PopupMenu* MenuTransformEdit = NULL;
+        MenuTransformEdit = new PopupMenu();
+        MenuTransformEdit->Agregar("Move", 100)->atajo = "G";
+        MenuTransformEdit->Agregar("Rotate", 101)->atajo = "R";
+        MenuTransformEdit->Agregar("Scale", 102)->atajo = "S";
+        MenuTransformEdit->Agregar("Shrink/Fatten", 103)->atajo = "Alt S"; // cada vert por su normal
         MenuMesh = new PopupMenu();
         MenuMesh->titulo = "Mesh";
-        MenuMesh->Agregar("Transform", 0, -1, MenuTransform);            // arriba de todo (Move/Rotate/Scale)
+        MenuMesh->Agregar("Transform", 0, -1, MenuTransformEdit);        // arriba de todo (Move/Rotate/Scale/Shrink)
         MenuMesh->Agregar("Duplicate", 314)->atajo = "Shift D";          // comun a vertice/borde/cara
         MenuMesh->Agregar("Merge", 0, -1, LayoutSubmenuMerge())->atajo = "M"; // suelda verts (limpia duplicados)
         MenuMesh->Agregar("Normals", 0, -1, LayoutSubmenuNormals()); // Recalculate Normals + Flip
@@ -1503,7 +1510,7 @@ static std::string W3dTextoTransform(){
     // "Move: [(2*3)+3] = 9  along global X"). Vale para objetos y malla.
     if (NumInputActivo()){
         float v = 0.0f; bool valido = NumInputValor(v);
-        const char* op = (estado==rotacion) ? "Rotate" : (estado==EditScale) ? "Scale" : "Move";
+        const char* op = (estado==rotacion) ? "Rotate" : (estado==EditScale) ? (EditShrinkActivo() ? "Shrink/Fatten" : "Scale") : "Move";
         const char* unit = (estado==rotacion) ? "\xC2\xB0" : "";
         std::string buf = NumInputBuffer();
         int car = NumInputCaret(); if (car<0) car=0; if (car>(int)buf.size()) car=(int)buf.size();
@@ -1523,6 +1530,7 @@ static std::string W3dTextoTransform(){
             return W3dLineaTransform("Translate", d.x, d.z, d.y);
         }
         if (estado == EditScale){
+            if (EditShrinkActivo()) return std::string("Shrink/Fatten: ") + W3dFmtF(EditXformShrinkAmt(), 4);
             float f = EditXformScaleFactor();
             return W3dLineaTransform("Scale", f, f, f);
         }
@@ -1911,7 +1919,9 @@ void Viewport3D::event_mouse_motion(int mx, int my){
                 }
                 break;
             case EditScale:
-                if (edit) EditXformScale(dx, dy, 0.001f);
+                // Shrink/Fatten (edit): la distancia por la normal es en MUNDO -> velocidad tipo "mover"
+                // para que se sienta pegado al dedo/mouse. Escala normal: factor chico de siempre.
+                if (edit) EditXformScale(dx, dy, EditShrinkActivo() ? VelocidadArrastreMundo() : 0.001f);
                 else      SetScale(dx, dy, 0.001f);
                 break;
             default:
@@ -2651,7 +2661,9 @@ void Viewport3D::event_key_down(SDL_Event &e){
                 if (!EditXformStart(translacion, ViewAxis)) SetPosicion();
                 break;
             case SDLK_S:
-                if (!EditXformStart(EditScale, XYZ)) SetEscala();
+                // Alt+S en Edit Mode = Shrink/Fatten (cada vert por su normal). Sin Alt = Scale.
+                if (LAltPressed && InteractionMode == EditMode && g_editMesh) LayoutShrinkFatten();
+                else if (!EditXformStart(EditScale, XYZ)) SetEscala();
                 break;
             case SDLK_E:
                 // Edit Mode: extrude de las caras seleccionadas (arranca el move por

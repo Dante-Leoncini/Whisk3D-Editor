@@ -100,6 +100,8 @@ void EditXformIniciarExtrude(const Vector3& normalLocal); // move de la tapa del
 void EditXformNumValor(float v); // entrada numerica: aplica el valor exacto (malla)
 void LayoutExtrudeFaces(); // E: extruye la seleccion (vert/arista/cara) + arranca el move
 bool ExtrudeEnCurso();     // el transform en curso es un extrude (para el boton "Repeat" del toolbar)
+void LayoutShrinkFatten(); // Alt+S: mueve cada vertice sel por SU normal (Shrink/Fatten)
+bool EditShrinkActivo();   // el transform en curso es un Shrink/Fatten (reusa EditScale)
 void LayoutDuplicarEdit(); // Shift+D en edit: duplica la seleccion + move libre
 void LayoutRipEdit();      // V en edit: separa la malla a lo largo de la seleccion
 void LayoutNewFaceEdit();  // F: crea arista/cara desde los verts seleccionados
@@ -196,6 +198,7 @@ void EditXformScale(int dx, int dy, float factor);
 // valores acumulados para la barra de estado (Translate/Scale; la rotacion usa gAnguloTransform)
 Vector3 EditXformTransDelta();
 float   EditXformScaleFactor();
+float   EditXformShrinkAmt(); // distancia por la normal (Shrink/Fatten)
 
 // dibuja el desplegable abierto encima de todo (ortho de pantalla)
 void LayoutRenderMenu(int screenW, int screenH);
