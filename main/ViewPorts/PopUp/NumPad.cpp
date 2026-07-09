@@ -82,9 +82,17 @@ static NumPad* gNumPad = NULL;
 
 NumPad::NumPad(bool transform) : PopUpBase("NumPad") {
     modoTransform = transform;
+    prevPopup = NULL;
     keyCard = new Card(NULL, 10, 10);
     keyW = keyH = dispH = 0;
     Reubicar();
+}
+
+// cierra el numpad devolviendo el foco al popup que estaba antes (ej: el panel redo del loop cut),
+// en vez de dejar PopUpActive en NULL. Sin esto, editar un campo del panel lo hacia desaparecer.
+void NumPad::CerrarRestaurando(){
+    if (PopUpActive == this) PopUpActive = prevPopup;
+    if (prevPopup) g_redraw = true;
 }
 
 void NumPad::Reubicar(){
@@ -103,7 +111,7 @@ void NumPad::Reubicar(){
 void NumPad::Render(){
     // la edicion pudo terminar por OTRO camino: el teclado se va solo.
     if (modoTransform){
-        if (!NumInputTransformEnCurso()){ PopUpBase::Cerrar(); g_redraw = true; return; }
+        if (!NumInputTransformEnCurso()){ CerrarRestaurando(); g_redraw = true; return; }
     } else {
         if (!g_propFloatEditando){ Cerrar(); return; } // Enter fisico / click que commiteo
     }
@@ -223,7 +231,7 @@ bool NumPad::Tecla(int tecla){
 }
 
 void NumPad::Aceptar(){
-    if (modoTransform){ NumInputConfirmar(); PopUpBase::Cerrar(); g_redraw = true; return; }
+    if (modoTransform){ NumInputConfirmar(); CerrarRestaurando(); g_redraw = true; return; }
     if (g_propFloatEditando){
         double v = 0.0;
         if (EvaluarExpresion(g_propFloatEditando->field.text, &v)){
@@ -234,30 +242,33 @@ void NumPad::Aceptar(){
         NumEditCommit();
         NumEditSalirDelPanel();
     }
-    PopUpBase::Cerrar();
+    CerrarRestaurando();
     g_redraw = true;
 }
 
 void NumPad::Cancelar(){
-    if (modoTransform){ NumInputCancelar(); PopUpBase::Cerrar(); g_redraw = true; return; }
+    if (modoTransform){ NumInputCancelar(); CerrarRestaurando(); g_redraw = true; return; }
     NumEditCancel();
     NumEditSalirDelPanel();
-    PopUpBase::Cerrar();
+    CerrarRestaurando();
     g_redraw = true;
 }
 
 void NumPad::Cerrar(){
     // cerrado desde AFUERA (tap fuera del popup).
-    if (modoTransform){ PopUpBase::Cerrar(); g_redraw = true; return; } // deja el transform como quedo (valores ya aplicados en vivo)
+    if (modoTransform){ CerrarRestaurando(); g_redraw = true; return; } // deja el transform como quedo (valores ya aplicados en vivo)
     // modo float: commitea lo tipeado, igual que la edicion inline
     if (g_propFloatEditando){ NumEditCommit(); NumEditSalirDelPanel(); }
-    PopUpBase::Cerrar();
+    CerrarRestaurando();
     g_redraw = true;
 }
 
 void NumPadAbrir(){
+    PopUpBase* prev = PopUpActive; // si se abre SOBRE un popup (ej: panel redo del loop cut), se restaura al cerrar
+    if (prev == gNumPad) prev = NULL; // no restaurarse a si mismo (y evita puntero colgante al borrar gNumPad)
     if (gNumPad){ delete gNumPad; gNumPad = NULL; } // reemplaza la instancia anterior
     gNumPad = new NumPad(false);
+    gNumPad->prevPopup = prev;
     PopUpActive = gNumPad;
     g_redraw = true;
 }

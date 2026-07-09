@@ -30,6 +30,8 @@ bool g_barTapPending = false;       // toque sobre una barra: si LEVANTA sin arr
 bool g_contentTapPending = false;   // toque sobre el CONTENIDO de un panel (properties/outliner): si LEVANTA sin
                                     // arrastrar = tap (togglea checkbox / selecciona); si arrastra = scroll (NO togglea)
 bool g_slideNum = false;            // arrastre HORIZONTAL sobre un campo numerico -> editar el valor (slider tactil)
+bool g_view3dTapPending = false;    // toque sobre el VIEWPORT 3D (tactil): si LEVANTA sin arrastrar = TAP (selecciona);
+                                    // si arrastra = orbita/panea (NO cambia la seleccion). Antes se perdia al orbitar.
 ViewportBase* g_barTapView = NULL;  // viewport cuya barra/contenido se toco (para lockear el scroll a ESE, no al hover)
 bool g_popupFinger = false;         // un dedo esta manejando el popup activo (bypass de la sintesis de mouse de SDL)
 bool g_popupOpenedByMouseDown = false; // el popup lo abrio el mouse-down de ESTE toque (menu->accion): el FINGERDOWN
@@ -89,12 +91,22 @@ void InputUsuarioSDL3(SDL_Event &e){
                 }
                 break; // el popup ya lo manejo: no seguir al flujo de gestos de viewport
             }
+            // LOOP CUT en fase de ORIENTACION: el dedo elige la direccion tocando un punto. Igual que el
+            // popup, lo maneja el dedo DIRECTO (la sintesis touch->mouse se desincroniza). Si el mouse
+            // sintetizado ya lo proceso (llega ANTES del FINGERDOWN), gLoopCutOrientando ya es false y esto
+            // no hace nada; si se desincronizo, este es el unico camino que registra el toque.
+            if (LoopCutActivo() && LoopCutOrientando() && fingers.size() == 1) {
+                int mx, my; FingerPix(e.tfinger, mx, my);
+                LoopCutClickIzq(mx, my);
+                break;
+            }
             if (fingers.size() >= 2) {
                 // 2do dedo -> arranca el gesto de 2 dedos: cortamos el orbit/drag del mouse (1 dedo
                 // sintetizado) y cancelamos el gesto de 1 dedo a medio decidir (tap/scroll/slider).
                 if (g_popupFinger) { if (PopUpActive) PopUpActive->Soltar(); g_popupFinger = false; }
                 leftMouseDown = middleMouseDown = ViewPortClickDown = false;
                 g_barTapPending = g_contentTapPending = g_slideNum = false;
+                g_view3dTapPending = false; // 2do dedo (pan/zoom): NO seleccionar al soltar
                 g_scrollView = NULL;
                 g_cornerVp = NULL; g_cornerResizing = false; // 2do dedo: cancela el gesto de esquina
                 lastDistance = 0.0f; // re-arma pinch/paneo desde este toque
@@ -204,6 +216,14 @@ void InputUsuarioSDL3(SDL_Event &e){
         // ambos; el de CONTENIDO de panel y el slider numerico son solo touch (en PC el mouse usa scrollbar/rueda
         // + el drag numerico clasico). Lockeado al viewport del down hasta soltar.
         if (leftMouseDown && fingers.size() <= 1) {
+            // VIEWPORT 3D en tactil: el down NO selecciono (g_view3dTapPending). Si el dedo paso el umbral,
+            // es un orbit/paneo -> se cancela el tap (la seleccion NO cambia) y se sigue de largo al
+            // event_mouse_motion (que orbita). Un jitter chico sigue siendo TAP (selecciona al soltar).
+            if (g_view3dTapPending) {
+                int vdx = mx - g_tapStartX; if (vdx < 0) vdx = -vdx;
+                int vdy = my - g_tapStartY; if (vdy < 0) vdy = -vdy;
+                if (vdx + vdy > 8 * GlobalScale) g_view3dTapPending = false;
+            }
             // ESQUINA (boton de menu): si se ARRASTRA, redimensiona el viewport (borde izq + sup). Un TAP
             // (sin pasar el umbral) NO entra aca -> al soltar abre el menu como siempre.
             if (g_cornerVp) {
@@ -275,7 +295,12 @@ void InputUsuarioSDL3(SDL_Event &e){
         // arbol en coordenadas ARRIBA-izquierda (como Symbian): el mouse
         // de SDL ya viene asi, sin flip
         if (!ViewPortClickDown){
-            viewPortActive = FindViewportUnderMouse(rootViewport, mx, my);
+            // NO perder el foco al cruzar un GAP/SEPARADOR: si el mouse virtual (touch) cae entre viewports
+            // FindViewportUnderMouse devuelve NULL. Antes eso dejaba viewPortActive=NULL y, con ViewPortClickDown
+            // trabado, el 'if (!viewPortActive) return' de mas abajo bloqueaba TODOS los clicks (no se podia
+            // confirmar/cancelar ni tocar nada; solo el hover andaba). Mantenemos el ultimo viewport valido.
+            ViewportBase* vpBajoCursor = FindViewportUnderMouse(rootViewport, mx, my);
+            if (vpBajoCursor) viewPortActive = vpBajoCursor;
         }
 
         if (viewPortActive){
@@ -304,6 +329,15 @@ void InputUsuarioSDL3(SDL_Event &e){
         }
     }
 
+    // ANTI-TRABA (red de seguridad): si por cualquier camino viewPortActive quedo NULL, un BOTON del mouse/
+    // touch recupera el foco desde la posicion del click y destraba ViewPortClickDown. Sin esto, el
+    // 'if (!viewPortActive) return' de abajo mataba toda la interaccion (bug nefasto del pinch de 2 dedos:
+    // un dedo cae en un gap -> viewPortActive NULL -> no se podia aceptar/cancelar un extrude ni tocar nada).
+    if (!viewPortActive &&
+        (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN || e.type == SDL_EVENT_MOUSE_BUTTON_UP)) {
+        viewPortActive = FindViewportUnderMouse(rootViewport, (int)e.button.x, (int)e.button.y);
+        if (viewPortActive) ViewPortClickDown = false;
+    }
     if (!viewPortActive) return;
 
     // rueda del mouse (bloqueada con un desplegable abierto)
@@ -320,8 +354,12 @@ void InputUsuarioSDL3(SDL_Event &e){
     if (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
         // loop cut en curso: izq aplica/confirma, der centra+confirma (o cancela en preview)
         if (LoopCutActivo()) {
+            bool popupAntes = (PopUpActive != NULL);
             if (e.button.button == SDL_BUTTON_LEFT)       LoopCutClickIzq((int)e.button.x, (int)e.button.y);
             else if (e.button.button == SDL_BUTTON_RIGHT) LoopCutClickDer();
+            // si este toque (tactil) abrio el panel redo del loop cut, avisar al FINGERDOWN del mismo
+            // toque para que NO lo cierre (caeria afuera del panel recien abierto). Igual que el menu Delete.
+            if (e.button.which == SDL_TOUCH_MOUSEID && !popupAntes && PopUpActive) g_popupOpenedByMouseDown = true;
             GuardarMousePos();
             return;
         }
@@ -427,17 +465,25 @@ void InputUsuarioSDL3(SDL_Event &e){
             }
             // la UI compartida (menu/barras/paneles) consume primero
             else if (!LayoutClickUI((int)e.button.x, (int)e.button.y)) {
-                viewPortActive->button_left();
-                // click sobre un viewport 3D: seleccion compartida por
-                // color picking
+                // click sobre un viewport 3D: seleccion compartida por color picking
                 ViewportBase* hoja3d = FindViewportUnderMouse(
                     rootViewport, (int)e.button.x, (int)e.button.y);
-                if (hoja3d && hoja3d->isLeaf() &&
-                    hoja3d->ViewportKind() == 1 && estado == editNavegacion) {
-                    ScenePick3D((int)e.button.x, (int)e.button.y,
-                                hoja3d->x, hoja3d->y,
-                                hoja3d->width, hoja3d->height,
-                                W3dPantallaAlto);
+                bool es3Dnav = hoja3d && hoja3d->isLeaf() &&
+                               hoja3d->ViewportKind() == 1 && estado == editNavegacion;
+                // TACTIL sobre el viewport 3D: NO seleccionar en el DOWN. Si el dedo se arrastra = orbita/
+                // panea (la seleccion NO cambia); si es un TAP simple, se pickea al SOLTAR. Antes cualquier
+                // orbit/paneo pisaba la seleccion (se deseleccionaba al tocar el fondo para orbitar).
+                if (esTouch && es3Dnav) {
+                    g_view3dTapPending = true;
+                    g_barTapView = hoja3d; g_tapStartX = (int)e.button.x; g_tapStartY = (int)e.button.y;
+                } else {
+                    viewPortActive->button_left();
+                    if (es3Dnav) {
+                        ScenePick3D((int)e.button.x, (int)e.button.y,
+                                    hoja3d->x, hoja3d->y,
+                                    hoja3d->width, hoja3d->height,
+                                    W3dPantallaAlto);
+                    }
                 }
             }
             // si ESTE mouse-down tactil abrio un popup (p.ej. menu Delete -> ConfirmarPopup), avisar al
@@ -486,6 +532,18 @@ void InputUsuarioSDL3(SDL_Event &e){
         // slider numerico tactil: el arrastre YA edito el valor; soltar NO es un click (no abre el editor)
         if (g_slideNum) { if (g_barTapView) g_barTapView->TouchSliderSoltar(); g_slideNum = false; g_fingerScrolling = false; GuardarMousePos(); return; }
         if (g_fingerScrolling) { g_fingerScrolling = false; return; }
+        // TAP simple sobre el viewport 3D (tactil): RECIEN AHORA se pickea la seleccion. Si hubo orbit/paneo,
+        // g_view3dTapPending ya se limpio en el motion -> la seleccion NO cambia (era lo molesto que pedia Dante).
+        if (g_view3dTapPending) {
+            g_view3dTapPending = false;
+            ViewportBase* h = g_barTapView;
+            if (h && h->isLeaf() && h->ViewportKind() == 1 && estado == editNavegacion) {
+                if (viewPortActive) viewPortActive->button_left(); // GuardarMousePos + cursor 3D en el punto tocado
+                ScenePick3D((int)e.button.x, (int)e.button.y, h->x, h->y, h->width, h->height, W3dPantallaAlto);
+            }
+            GuardarMousePos();
+            return;
+        }
         // tap sin arrastrar sobre la UI: RECIEN AHORA ejecutamos el click (abre menu/pestaña, togglea checkbox,
         // selecciona, o abre el editor de un campo numerico/texto). g_uiTapEnCurso solo para el CONTENIDO tactil
         // (ahi el campo numerico abre el editor inline); en la barra es un click normal.
@@ -500,7 +558,9 @@ void InputUsuarioSDL3(SDL_Event &e){
             viewPortActive->mouse_button_up(e);
         }
 
-        viewPortActive = FindViewportUnderMouse(rootViewport, lastMouseX, lastMouseY);
+        // idem: no dejar viewPortActive en NULL si el up cayo en un gap/separador (se trababa todo)
+        ViewportBase* vpUp = FindViewportUnderMouse(rootViewport, lastMouseX, lastMouseY);
+        if (vpUp) viewPortActive = vpUp;
     }
 
     // eventos del teclado
@@ -540,7 +600,9 @@ void InputUsuarioSDL3(SDL_Event &e){
         if (LoopCutActivo()) {
             SDL_Keycode k = e.key.keysym.sym;
             if (k == SDLK_ESCAPE || k == SDLK_BACKSPACE)      { LoopCutClickDer(); return; }
-            if (k == SDLK_RETURN  || k == SDLK_KP_ENTER)      { LoopCutClickIzq(lastMouseX, lastMouseY); return; }
+            // Enter en orientacion (teclado) = confirma la direccion de las FLECHAS -> preview clasico
+            // (el picker de puntos es solo click/tactil). En las demas fases, Enter aplica/confirma.
+            if (k == SDLK_RETURN  || k == SDLK_KP_ENTER)      { if (LoopCutOrientando()) LoopCutOrientConfirmarTeclado(); else LoopCutClickIzq(lastMouseX, lastMouseY); return; }
             if (k == SDLK_LEFT)  { LoopCutTecla(0); return; }
             if (k == SDLK_RIGHT) { LoopCutTecla(1); return; }
             if (k == SDLK_UP)    { LoopCutTecla(2); return; }

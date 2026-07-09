@@ -71,6 +71,9 @@ enum BarRol3D {
 enum ToolbarRol3D {
     TBR_Aceptar = 100, TBR_Cancelar, TBR_Orient, TBR_EjeX, TBR_EjeY, TBR_EjeZ,
     TBR_Shift, TBR_Ctrl, // modificadores TACTILES (sin teclado): togglean LShiftPressed / LCtrlPressed
+    TBR_Undo, TBR_Redo,  // deshacer / rehacer: SIEMPRE visibles (PC y tactil), a la izquierda de la barra
+    TBR_Repeat = 120,    // "Repeat" (solo en extrude): acepta el extrude y vuelve a extruir la seleccion
+    TBR_View = 121,      // "View" (toggle, Edit Mode): 1 dedo orbita/panea/zoom aunque haya una operacion en curso
     TBR_Hist = 110 // .. TBR_Hist+7
 };
 class Button;

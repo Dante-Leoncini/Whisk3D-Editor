@@ -491,10 +491,14 @@ std::vector<Vector3> Mesh::CapturarPosSel(const std::vector<char>& selPorGPU) {
 // marca todo vert cuya posicion coincida con alguna de posSel y arma el edit + seleccion.
 void Mesh::ReconstruirEditSelPorPos(const std::vector<Vector3>& posSel) {
     std::vector<char> sel(vertexSize, 0);
+    // por DISTANCIA (no por eje): un offset chico DIAGONAL (ej. la normal de una esquina del cubo, ~9e-5 por eje)
+    // caia dentro de la caja per-eje de 1e-4 y seleccionaba tambien el vertice ORIGINAL, no solo la tapa. Eso hacia
+    // que el 2do extrude de un vertice viera 2 verts (un borde) y saliera un quad en vez de una linea (bug Dante).
     for (int gv=0; gv<vertexSize; gv++)
-        for (size_t i=0;i<posSel.size();i++)
-            if (fabsf(vertex[gv*3]-posSel[i].x)<1e-4f && fabsf(vertex[gv*3+1]-posSel[i].y)<1e-4f &&
-                fabsf(vertex[gv*3+2]-posSel[i].z)<1e-4f) { sel[gv]=1; break; }
+        for (size_t i=0;i<posSel.size();i++){
+            float dx=vertex[gv*3]-posSel[i].x, dy=vertex[gv*3+1]-posSel[i].y, dz=vertex[gv*3+2]-posSel[i].z;
+            if (dx*dx+dy*dy+dz*dz < 1e-8f) { sel[gv]=1; break; } // < 1e-4 de distancia
+        }
     ReconstruirEditSel(sel);
 }
 
@@ -653,15 +657,19 @@ bool Mesh::ExtruirEdit(Vector3& outDirLocal, bool& outConstrain) {
         float ln=sqrtf(nx*nx+ny*ny+nz*nz); if (ln>1e-6f){ nrm.x+=nx/ln; nrm.y+=ny/ln; nrm.z+=nz/ln; }
     }
     { float ln=sqrtf(nrm.x*nrm.x+nrm.y*nrm.y+nrm.z*nrm.z);
-      if (ln>1e-6f){ nrm.x/=ln; nrm.y/=ln; nrm.z/=ln; outConstrain=true; }
-      else { // sin caras: fallback a la normal guardada de los verts (o +Y); mov LIBRE
-          outConstrain=false; nrm=Vector3(0,0,0);
+      if (ln>1e-6f){ nrm.x/=ln; nrm.y/=ln; nrm.z/=ln; }
+      else { // sin caras: fallback a la normal guardada de los verts (o +Y), solo para el offset
+          nrm=Vector3(0,0,0);
           if (normals) for (std::set<int>::iterator it=capReps.begin(); it!=capReps.end(); ++it){
               int r=*it; nrm.x+=normals[r*3]/127.0f; nrm.y+=normals[r*3+1]/127.0f; nrm.z+=normals[r*3+2]/127.0f; }
           ln=sqrtf(nrm.x*nrm.x+nrm.y*nrm.y+nrm.z*nrm.z);
           if (ln>1e-6f){ nrm.x/=ln; nrm.y/=ln; nrm.z/=ln; } else nrm=Vector3(0,1,0);
       }
     }
+    // SOLO la CARA tiene normal -> el extrude se constrine a esa normal. Un VERTICE o un BORDE NO tienen
+    // normal (aunque toquen caras): su extrude es LIBRE, desde la VISTA (pedido Dante). nrm queda solo para
+    // el offset chico de separacion.
+    outConstrain = (mode == SelFace);
     outDirLocal = nrm;
 
     // ---- crecer arrays: +1 vert por rep de la TAPA (offset eps), mover interiores ----
@@ -1649,6 +1657,49 @@ bool Mesh::RecalcularOrientacionEdit(bool inside) {
     return true;
 }
 
+// FLIP NORMALS (menu Mesh > Normals > Flip): invierte el winding de las caras objetivo (seleccionadas, o
+// TODAS si no hay seleccion) SIN condicion -> simplemente da vuelta las normales. Mas simple que Recalculate:
+// si miran para un lado, quedan para el otro. No cambia la geometria (solo el orden de los verts + sus capas).
+bool Mesh::FlipNormalesEdit() {
+    EnsureEdit();
+    if (!edit || !vertex || vertexSize <= 0 || faces3d.empty()) return false;
+    UndoCapturarMallaGeo(this); // Ctrl+Z
+    EditMesh* e = edit;
+    const int nV = vertexSize;
+    const bool hayRep = ((int)posRep.size() == nV);
+    #define FREP(gi) (hayRep ? posRep[gi] : (gi))
+    std::vector<char> selRep(nV, 0);
+    if (EditSelectMode == SelVertex) {
+        for (size_t k=0;k<e->editVerts.size();k++) if (k<e->vertSel.size()&&e->vertSel[k]&&e->editVerts[k]>=0&&e->editVerts[k]<nV) selRep[e->editVerts[k]]=1;
+    } else if (EditSelectMode == SelEdge) {
+        for (size_t eg=0;eg<e->edgeSel.size();eg++) if (e->edgeSel[eg]){ selRep[e->editVerts[e->lineIdx[eg*2]]]=1; selRep[e->editVerts[e->lineIdx[eg*2+1]]]=1; }
+    } else {
+        for (size_t fe=0;fe<e->faces.size();fe++) if (fe<e->faceSel.size()&&e->faceSel[fe]){ const std::vector<int>& p=e->faces[fe]; for (size_t c=0;c<p.size();c++) selRep[e->editVerts[p[c]]]=1; }
+    }
+    std::vector<char> objetivo(faces3d.size(), 0); int nObj=0;
+    for (size_t f=0;f<faces3d.size();f++){ const std::vector<int>& idx=faces3d[f].idx; if (idx.size()<3) continue;
+        bool todos=true; for (size_t c=0;c<idx.size();c++){ int gi=idx[c]; if (gi<0||gi>=nV||!selRep[FREP(gi)]){todos=false;break;} }
+        if (todos){ objetivo[f]=1; nObj++; } }
+    if (nObj==0) { for (size_t f=0;f<faces3d.size();f++) if (faces3d[f].idx.size()>=3){ objetivo[f]=1; nObj++; } } // sin sel: TODAS
+    if (nObj==0) return false;
+    PoblarCapas();
+    int Loff=0;
+    for (size_t f=0;f<faces3d.size();f++){
+        std::vector<int>& idx=faces3d[f].idx; int mc2=(int)idx.size();
+        if (objetivo[f] && mc2>=3){
+            for (int a=0,b=mc2-1;a<b;a++,b--){ int t=idx[a]; idx[a]=idx[b]; idx[b]=t; } // revertir winding
+            ReverseCapasDeCorner(this,Loff,mc2); // las capas siguen el flip
+        }
+        Loff += mc2;
+    }
+    #undef FREP
+    std::vector<Vector3> posSel = CapturarPosSel(selRep);
+    RecalcularNormales();
+    GenerarRender();
+    ReconstruirEditSelPorPos(posSel);
+    return true;
+}
+
 // SHADE SMOOTH / FLAT sobre las caras SELECCIONADAS (menu Face). Ahora es POR CARA (flag faces3d[f].smooth):
 // solo afecta a la seleccion, NO a toda la malla. GenerarRender recalcula las normales respetando el flag por cara
 // (CornerNormalConSharp: una cara flat corta el grupo de suavizado en sus bordes -> flat; una smooth se funde con
@@ -1929,7 +1980,7 @@ std::string Mesh::NombreModificador(int i) const {
 void Mesh::LiberarMallaModificada() {
     delete[] genVertex; delete[] genNormals; delete[] genUV; delete[] genColor; delete[] genFaces;
     genVertex=NULL; genNormals=NULL; genUV=NULL; genColor=NULL; genFaces=NULL;
-    genVertexSize=0; genFacesSize=0; genMaterialsGroup.clear(); genValido=false;
+    genVertexSize=0; genFacesSize=0; genMaterialsGroup.clear(); genBordesBuf.clear(); genValido=false;
 }
 
 // invierte una afin 4x4 columna-major (misma que Join, duplicada porque aquella es static en ObjectMode.cpp).
@@ -2307,6 +2358,24 @@ void Mesh::GenerarMallaModificada() {
         genMaterialsGroup[g].indicesDrawnCount=(int)vf2.size()-genMaterialsGroup[g].startDrawn; }
     genFacesSize=(int)vf2.size();
     genFaces=new MeshIndex[vf2.size()]; for(size_t k=0;k<vf2.size();k++) genFaces[k]=vf2[k];
+    // CONTORNO de seleccion: aristas de POLIGONO (no las diagonales de la triangulacion), dedup. Con esto
+    // el objeto con modificadores (subdiv/screw) SI muestra que esta seleccionado (antes quedaba sin borde).
+    {
+        std::set<std::pair<int,int> > eset;
+        genBordesBuf.clear();
+        for (size_t f=0; f<poly.size(); f++){
+            int mm=(int)poly[f].size();
+            for (int i=0;i<mm;i++){
+                int a=poly[f][i], b=poly[f][(i+1)%mm];
+                if (a==b || a<0 || b<0 || a>=genVertexSize || b>=genVertexSize) continue;
+                std::pair<int,int> key = (a<b) ? std::make_pair(a,b) : std::make_pair(b,a);
+                if (eset.insert(key).second){
+                    genBordesBuf.push_back(gvp[a*3]); genBordesBuf.push_back(gvp[a*3+1]); genBordesBuf.push_back(gvp[a*3+2]);
+                    genBordesBuf.push_back(gvp[b*3]); genBordesBuf.push_back(gvp[b*3+1]); genBordesBuf.push_back(gvp[b*3+2]);
+                }
+            }
+        }
+    }
     genValido=true;
 }
 

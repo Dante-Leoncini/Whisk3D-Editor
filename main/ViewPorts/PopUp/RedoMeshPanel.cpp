@@ -4,6 +4,7 @@
 #include "ViewPorts/LayoutInput.h" // LayoutKey
 #include "ViewPorts/ViewPort3D.h"  // Viewport3DActive (rect del viewport que crea)
 #include "WhiskUI/PopupMenu.h"          // MenuPantallaW / MenuPantallaH (tamano ventana)
+#include "NumPad.h"                     // teclado numerico (editar el valor por texto/formula)
 
 // la malla que el panel esta editando + un espejo float de los vertices (los
 // PropFloat trabajan con float*; meshVerts es int). onChange unico para todos.
@@ -38,7 +39,7 @@ static void RedoLoopCutOnChange(){
 }
 
 RedoMeshPanel::RedoMeshPanel(Mesh* m, int modo)
-    : PopUpBase("Add"), grupo(NULL), dragField(NULL), lastDragMx(0) {
+    : PopUpBase("Add"), grupo(NULL), dragField(NULL), dragMoved(false), lastDragMx(0) {
     gRedoMesh = m;
 
     if (modo == 1) { // Recalculate Normals: una tarjeta con la tilde "Inside"
@@ -288,7 +289,7 @@ bool RedoMeshPanel::Click(int mx, int my){
                     if (lx >= boxStart && lx < boxStart + aw){ pf->button_left();  return true; }
                     if (lx >= boxStart + boxW - aw && lx < boxStart + boxW){ pf->button_right(); return true; }
                 }
-                dragField = pf; lastDragMx = mx; // resto del box: arrastrar
+                dragField = pf; dragMoved = false; lastDragMx = mx; // resto del box: ARRASTRAR (mueve) o TAP (abre teclado al soltar)
             } else if (grupo->properties[j]->GetType() == PropertyType::Bool){
                 grupo->properties[j]->EditPropertie(); // togglea + onChange (Regenerar)
             }
@@ -305,6 +306,7 @@ bool RedoMeshPanel::Motion(int mx, int my){
     if (dragField && dragField->value){
         int dmx = mx - lastDragMx;
         lastDragMx = mx;
+        if (dmx != 0) dragMoved = true; // hubo arrastre real -> al soltar NO abrir el teclado
         dragField->Set(*dragField->value + dmx * dragField->dragStep);
     }
     return true;
@@ -348,6 +350,12 @@ bool RedoMeshPanel::Tecla(int tecla){
 }
 
 void RedoMeshPanel::Soltar(){
+    // TAP sobre el value box (sin arrastrar) -> abrir el TECLADO NUMERICO para editar el valor por
+    // texto/formula. El numpad restaura ESTE panel al cerrar (prevPopup), y su onChange re-corta en vivo.
+    if (dragField && !dragMoved && dragField->value){
+        dragField->IniciarEdicionTexto();
+        NumPadAbrir();
+    }
     dragField = NULL;
 }
 

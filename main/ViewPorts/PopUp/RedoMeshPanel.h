@@ -27,7 +27,8 @@ class RedoMeshPanel : public PopUpBase {
 
     private:
         GroupPropertie* grupo;
-        PropFloat* dragField; // campo que se esta arrastrando (NULL = ninguno)
+        PropFloat* dragField; // campo bajo el toque: si se ARRASTRA cambia el valor; si es un TAP abre el teclado
+        bool dragMoved;       // el dedo/mouse se movio (arrastre) -> no abrir el teclado al soltar
         int lastDragMx;       // X del ultimo evento (el popup no warpea el mouse)
         Viewport3D* vpCreador;  // el viewport3D que creo la forma (se lee su rect ACTUAL)
         void ResizeGrupo();

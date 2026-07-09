@@ -99,11 +99,13 @@ void EditXformCancelar();           // descarta: restaura el snapshot
 void EditXformIniciarExtrude(const Vector3& normalLocal); // move de la tapa del extrude
 void EditXformNumValor(float v); // entrada numerica: aplica el valor exacto (malla)
 void LayoutExtrudeFaces(); // E: extruye la seleccion (vert/arista/cara) + arranca el move
+bool ExtrudeEnCurso();     // el transform en curso es un extrude (para el boton "Repeat" del toolbar)
 void LayoutDuplicarEdit(); // Shift+D en edit: duplica la seleccion + move libre
 void LayoutRipEdit();      // V en edit: separa la malla a lo largo de la seleccion
 void LayoutNewFaceEdit();  // F: crea arista/cara desde los verts seleccionados
 void LayoutShade(bool smooth); // Face > Shade Smooth/Flat (redondea/aplana)
-void LayoutRecalcNormales();   // Face > Recalculate Normals (re-orienta hacia afuera + panel Inside)
+void LayoutRecalcNormales();   // Recalculate Normals (re-orienta hacia afuera + panel Inside)
+void LayoutFlipNormales();     // Flip: invierte las normales de la seleccion (o todas)
 void LayoutTriangulate();      // Face > Triangulate Faces (Ctrl T): parte las caras sel de >3 lados en tris
 void LayoutMarkSharp(bool sharp);     // Edge > Mark/Clear Sharp (borde afilado en malla smooth)
 void LayoutMenuSharp(int mx, int my); // tecla W: menu Mark/Clear Sharp en el cursor
@@ -126,6 +128,7 @@ void  LoopCutRedoAplicar(int cortes, float factor); // panel redo: re-corta desd
 int   LoopCutGetCortes();
 float LoopCutGetFactor();
 void  LoopCutTecla(int dir);             // flechas en el modal (0=izq 1=der 2=arriba 3=abajo)
+void  LoopCutOrientConfirmarTeclado();   // Enter en orientacion (teclado): confirma la direccion -> preview clasico
 bool  LoopCutOrientando();               // true en la fase de elegir orientacion del quad
 void  LayoutLoopCutDesdeActivo();        // menu Edge/Face: loop cut sobre el borde/quad ACTIVO
 void  LoopCutRenderPreview();            // dibuja el preview (lo llama el viewport 3D)
@@ -160,6 +163,7 @@ void LayoutMenuEditContexto(int mx, int my);
 PopupMenu* LayoutSubmenuSnap();        // Snap (cursor/seleccion) -> menu Mesh
 PopupMenu* LayoutSubmenuDelete();      // Delete (vertices/aristas/caras/loops) -> menu Mesh
 PopupMenu* LayoutSubmenuMerge();       // Merge (At Center/Cursor/Collapse/By Distance) -> menu Mesh
+PopupMenu* LayoutSubmenuNormals();     // Normals (Recalculate + Flip) -> menu Mesh
 void LayoutMenuMerge(int mx, int my);  // tecla M en Edit Mode: abre el menu Merge en el cursor
 PopupMenu* LayoutSubmenuSetParent();   // Set Parent To -> menu Object
 PopupMenu* LayoutSubmenuClearParent(); // Clear Parent  -> menu Object

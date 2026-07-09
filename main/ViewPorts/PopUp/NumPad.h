@@ -20,10 +20,13 @@ class NumPad : public PopUpBase {
         bool Tecla(int tecla) override; // Enter fisico = Aceptar, Esc = Cancelar
         void Cerrar() override;         // click AFUERA = commit (float) / deja el transform (transform)
 
+        PopUpBase* prevPopup;        // popup a restaurar al cerrar (ej: el panel redo del loop cut). NULL = ninguno
+
     private:
         Card* keyCard;               // tarjeta reusada para dibujar cada tecla
         int keyW, keyH, dispH;       // medidas calculadas en Reubicar()
         bool modoTransform;          // true = alimenta NumInput* (barra de estado); false = PropFloat
+        void CerrarRestaurando();    // cierra el numpad restaurando prevPopup (en vez de dejar PopUpActive en NULL)
         void Reubicar();             // ancho de ventana, pegado al borde inferior
         void Feed(int c);            // rutea un caracter/backspace al destino segun el modo
         void AccionTecla(int fila, int col);

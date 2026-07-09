@@ -446,6 +446,11 @@ static void LayoutRebuildMenuSelect() {
 
 // arranca un transform en EDIT MODE (sobre la seleccion de malla). Devuelve true si
 // estamos en Edit Mode (lo manejo aca); false = Object Mode (usar los SetPosicion...).
+// el transform de malla en curso es un EXTRUDE (no un Move/Rotate/Scale comun). Lo usa el boton
+// "Repeat" del toolbar (solo aparece en extrude): confirma y vuelve a extruir la seleccion.
+static bool g_extrudeEnCurso = false;
+bool ExtrudeEnCurso(){ return g_extrudeEnCurso; }
+
 bool EditXformStart(int est, int eje) { // expuesto (lo usa el harness para testear el move undo)
     if (InteractionMode != EditMode || !g_editMesh) return false;
     // ENCADENAR G->R->S sin click de confirmacion: si ya hay un transform en curso, CONFIRMARLO primero
@@ -476,7 +481,7 @@ void LayoutExtrudeFaces() {
         EditXformIniciar();
         if (!EditXformActivo()) estado = editNavegacion;
     }
-    if (EditXformActivo()) ToolbarRegistrarAccion(TBExtrude); // historial (el extrude arranco de verdad)
+    if (EditXformActivo()){ ToolbarRegistrarAccion(TBExtrude); g_extrudeEnCurso = true; } // historial + marca extrude
 }
 
 // DUPLICATE en Edit Mode (Shift+D): copia la seleccion y arranca un move LIBRE.
@@ -621,6 +626,13 @@ void LayoutRecalcNormales() {
     }
 }
 
+// Flip Normals (menu Mesh > Normals > Flip): invierte las normales de la seleccion (o todas). Simple.
+void LayoutFlipNormales() {
+    if (InteractionMode != EditMode || !g_editMesh) return;
+    Mesh* m = (Mesh*)g_editMesh;
+    if (m->FlipNormalesEdit()) g_redraw = true;
+}
+
 // Triangulate Faces (Ctrl+T, menu Face): parte las caras seleccionadas de >3 lados en triangulos.
 void LayoutTriangulate() {
     if (InteractionMode != EditMode || !g_editMesh) return;
@@ -654,8 +666,9 @@ static void LayoutAccionObject(int aId) {
         case 315: break;                       // UV > Unwrap (pendiente)
         case 320: LayoutShade(true);  break;   // Face > Shade Smooth
         case 321: LayoutShade(false); break;   // Face > Shade Flat
-        case 322: LayoutRecalcNormales(); break; // Face > Recalculate Normals
+        case 322: LayoutRecalcNormales(); break; // Recalculate Normals (Face / Mesh>Normals)
         case 323: LayoutTriangulate();    break; // Face > Triangulate Faces (Ctrl T)
+        case 324: LayoutFlipNormales();   break; // Mesh > Normals > Flip
         case 330: LayoutMarkSharp(true);  break; // Edge > Mark Sharp
         case 331: LayoutMarkSharp(false); break; // Edge > Clear Sharp
         case 340: LayoutLoopCutDesdeActivo(); break; // Edge/Face > Loop Cut and Slide (elemento activo)
@@ -1657,6 +1670,7 @@ void EditXformConfirmar(){
     }
     gEVsnap.clear(); gEVmesh = NULL;
     estado = editNavegacion;
+    g_extrudeEnCurso = false; // termino el transform
 }
 
 // descarta: restaura las posiciones del snapshot (mundo -> local) y limpia.
@@ -1677,6 +1691,7 @@ void EditXformCancelar(){
     }
     gEVsnap.clear(); gEVmesh = NULL;
     estado = editNavegacion;
+    g_extrudeEnCurso = false; // termino el transform
 }
 
 // ====================================================================
@@ -1894,6 +1909,19 @@ PopupMenu* LayoutSubmenuMerge() {
         gMenuMerge->Agregar("By Distance", 383);
     }
     return gMenuMerge;
+}
+
+// submenu Normals (Recalculate + Flip) para embeber en el menu "Mesh". Ids 322/324 + accion LayoutAccionObject.
+static PopupMenu* gMenuNormals = NULL;
+PopupMenu* LayoutSubmenuNormals() {
+    if (!gMenuNormals) {
+        gMenuNormals = new PopupMenu();
+        gMenuNormals->titulo = "Normals";
+        gMenuNormals->action = LayoutAccionObject;
+        gMenuNormals->Agregar("Recalculate Normals", 322)->atajo = "Shift N"; // orienta hacia afuera (cubo/esfera OK)
+        gMenuNormals->Agregar("Flip", 324);                                    // simplemente invierte las normales
+    }
+    return gMenuNormals;
 }
 
 // tecla M en Edit Mode: abre el menu Merge en el cursor
@@ -2700,7 +2728,12 @@ static void PickPaint(Object* obj) {
         w3dEngine::MultMatrix(M.m);
         if (obj->getType() == ObjectType::mesh) {
             Mesh* m = (Mesh*)obj;
-            if (m->vertex && m->faces) {
+            // con modificadores (subdiv/screw) se dibuja la malla GENERADA para el pick: es lo que se VE.
+            // Sin esto, un Screw (perfil sin caras) no pinta nada -> no se podia clickear/seleccionar.
+            if (m->genValido && m->genVertex && m->genFaces && m->genFacesSize > 0) {
+                w3dEngine::VertexPointer3f(0, m->genVertex);
+                w3dEngine::DrawTriangles(m->genFacesSize, m->genFaces);
+            } else if (m->vertex && m->faces) {
                 w3dEngine::VertexPointer3f(0, m->vertex);
                 w3dEngine::DrawTriangles(m->facesSize, m->faces);
             }
@@ -2729,6 +2762,14 @@ static void PickResolve(Object* obj, int target) {
         PickResolve(obj->Childrens[i], target);
     }
 }
+
+// hubo input TACTIL en la sesion? (para agrandar el pick de vertices en pantallas tactiles)
+#ifndef W3D_SYMBIAN
+extern Uint32 g_lastFingerTicks; // controles.cpp
+static bool PickEsTactil(){ return g_lastFingerTicks != 0; }
+#else
+static bool PickEsTactil(){ return false; }
+#endif
 
 // EDIT MODE: pick de VERTICE o ARISTA por color-ID (segun EditSelectMode). Dibuja
 // los sub-elementos con un color = (id+1) en R5G6B5 (tolera framebuffer 16-bit:
@@ -2861,7 +2902,10 @@ static int EditPickIndex(int modo, int mx, int my, int vx, int vy, int vw, int v
         }
         w3dEngine::VertexPointer3f(0, &e->pos[0]);
         w3dEngine::ColorPointer4ub(&idcol[0]);
-        w3dEngine::PointSize(22.0f); // el doble de grande -> mas facil de clickear
+        // TOUCH: punto de pick un poco mas grande (los vertices son puntitos, dificiles con el dedo), pero
+        // SIN exagerar: puntos muy grandes se solapan en mallas densas y sesgan el voto. La tolerancia real
+        // la da el area de lectura ampliada (abajo). Con mouse queda igual (22).
+        w3dEngine::PointSize(PickEsTactil() ? 28.0f : 22.0f);
         w3dEngine::DrawPoints(N);
         w3dEngine::PointSize(1.0f);
     }
@@ -2872,16 +2916,20 @@ static int EditPickIndex(int modo, int mx, int my, int vx, int vy, int vw, int v
 #ifdef __EMSCRIPTEN__
     // WebGL clampea glLineWidth a 1px (las aristas del pick se dibujan de 1px en vez de 9) y limita
     // el tamano de punto -> leemos un AREA MAS GRANDE para pescar aristas/caras finas bajo el click.
-    const int RAD = 7, WD = 15; // WD = 2*RAD+1
+    int RAD = 7;
 #else
-    const int RAD = 3, WD = 7; // WD = 2*RAD+1
+    int RAD = 3;
 #endif
+    // VERTICE + TOUCH: area de lectura GRANDE -> el vertice mas cercano al dedo gana (el voto por
+    // pixeles favorece al que tiene el punto mas centrado). Aristas/caras y mouse quedan igual.
+    if (!faceMode && !edgeMode && PickEsTactil()) RAD = 16;
+    const int WD = 2 * RAD + 1;
     int cxw = mx, cyw = screenH - 1 - my; // centro en coords de ventana (GL)
     int x0 = cxw - RAD, y0 = cyw - RAD;
     if (x0 < vx) x0 = vx; if (x0 + WD > vx + vw) x0 = vx + vw - WD;
     if (y0 < glY) y0 = glY; if (y0 + WD > glY + vh) y0 = glY + vh - WD;
     if (x0 < 0) x0 = 0; if (y0 < 0) y0 = 0;
-    GLubyte area[15 * 15 * 4]; // dimensionado para el WD mas grande (web); en desktop usa 7*7*4
+    GLubyte area[33 * 33 * 4]; // dimensionado para el WD mas grande (vertice+touch: 33); otros modos usan menos
     w3dEngine::ReadPixelsRGBA(x0, y0, WD, WD, area);
     w3dEngine::Enable(w3dEngine::Dither);
     w3dEngine::Enable(w3dEngine::Multisample); // restaurar el MSAA para el render normal
@@ -2912,21 +2960,6 @@ static int EditPickIndex(int modo, int mx, int my, int vx, int vy, int vw, int v
         }
     }
     int k = id - 1;
-    // --- DIAGNOSTICO TEMPORAL del pick (se saca cuando se resuelva el bug de seleccion) ---
-    {
-        FILE* lf = fopen("whisk3d_pick.log", "a");
-        if (lf) {
-            int centerId = -1;
-            if (ccx>=0 && ccx<WD && ccy>=0 && ccy<WD){ GLubyte* p=&area[(ccy*WD+ccx)*4]; centerId=(p[0]>>3)|((p[1]>>2)<<5)|((p[2]>>3)<<11); }
-            fprintf(lf, "PICK modo=%d click=(%d,%d) vp=(%d,%d,%d,%d) sh=%d glY=%d read0=(%d,%d) centro=(%d,%d) N=%d -> id=%d k=%d centerPix=%d\n",
-                    modo, mx, my, vx, vy, vw, vh, screenH, glY, x0, y0, ccx, ccy, N, id, k, centerId-1);
-            if (k>=0 && k<N && !faceMode && !edgeMode) fprintf(lf, "  winner pos=(%.3f,%.3f,%.3f)\n", e->pos[k*3], e->pos[k*3+1], e->pos[k*3+2]);
-            for (int dy=WD-1; dy>=0; dy--){ for (int dx=0; dx<WD; dx++){ GLubyte* px=&area[(dy*WD+dx)*4];
-                int cand=(px[0]>>3)|((px[1]>>2)<<5)|((px[2]>>3)<<11);
-                fprintf(lf, cand>0&&cand<=N ? "%3d " : "  . ", cand>0&&cand<=N?cand:0); } fprintf(lf, "\n"); }
-            fclose(lf);
-        }
-    }
     return (k >= 0 && k < N) ? k : -1;
 }
 
@@ -3247,6 +3280,21 @@ static bool gLoopCutOrientando = false;
 static int  gLoopCutOrient = 0;           // 0 / 1
 static int  gLoopCutOrientEdge[2] = {-1,-1}; // los 2 bordes perpendiculares del quad
 bool LoopCutOrientando(){ return gLoopCutOrientando; }
+// PICKER de direccion (click/tactil): en la fase de orientacion se dibujan los DOS cortes posibles
+// (amarillo 0.5) + 4 PUNTOS grandes amarillos (centro de cada borde del quad). Tocar/clickear un punto
+// elige la direccion de una. 2 puntos = una direccion, los otros 2 = la otra. gLoopCutSegs2 = el 2do corte.
+static std::vector<float> gLoopCutSegs2;      // preview del corte de la OTRA direccion (solo en orientacion)
+static float gLoopCutOrientPt[4][3];          // 4 midpoints (LOCAL) de los bordes del quad
+static int   gLoopCutOrientPtDir[4] = {0,0,0,0}; // a que direccion (0/1) pertenece cada punto
+static int   gLoopCutOrientNPts = 0;          // 4 cuando el picker esta activo
+static void LoopCutAplicarYPanel(); // (def mas abajo) aplica el corte + abre el panel de edicion
+// en tactil no hay rueda ni flechas -> el loop cut se ajusta desde el panel redo (cortes + slide)
+#ifndef W3D_SYMBIAN
+extern Uint32 g_lastFingerTicks; // controles.cpp: hubo input tactil en la sesion
+static bool LoopCutTactil(){ return g_lastFingerTicks != 0; }
+#else
+static bool LoopCutTactil(){ return false; } // Symbian: va a teclado (flechas + Enter)
+#endif
 
 // snapshot de la geometria PRE-corte (para re-cortar en slide / redo)
 struct LCSnap { std::vector<GLfloat> vp; std::vector<GLbyte> vn; std::vector<GLfloat> vu;
@@ -3297,7 +3345,7 @@ static void LoopCutActualizarPreview(int mx, int my){
 // cartel-tutorial del loop cut, segun la fase (orientacion / cortes / slide). Se cierra al confirmar/cancelar.
 static void LoopCutHint(){
     if (!gLoopCutOn){ NotificarHintClear(); return; }
-    if (gLoopCutOrientando) NotificarHint("Loop Cut: arrows = direction, Enter to confirm");
+    if (gLoopCutOrientando) NotificarHint("Loop Cut: tap a yellow dot to pick the cut direction (or arrows + Enter)");
     else if (gLoopCutSlide) NotificarHint("Loop Cut: move = slide, Enter to confirm, Esc = center");
     else                    NotificarHint("Loop Cut: scroll = number of cuts, Enter to confirm");
 }
@@ -3310,9 +3358,53 @@ void LoopCutIniciar(int mx, int my){
     LoopCutHint();
 }
 
-// Loop Cut desde el menu Edge/Face, sobre el elemento ACTIVO (sin hover del mouse):
-//  - borde activo -> el corte cruza ese borde directo.
-//  - quad activo  -> fase ORIENTACION (las flechas eligen 1 de las 2 direcciones). SOLO quads.
+// setup del loop cut sobre un BORDE conocido (direccion automatica). En tactil aplica+panel;
+// en PC/Symbian sigue el flujo clasico (rueda = cortes, click aplica + slide).
+static void LoopCutIniciarBorde(Mesh* m, int edgeIdx){
+    gLoopCutOn=true; gLoopCutSlide=false; gLoopCutOrientando=false;
+    gLoopCutCortes=1; gLoopCutFactor=0.0f; gLCSnap.tiene=false;
+    gLoopCutEdge = edgeIdx;
+    gLoopCutSegs.clear(); m->LoopCutPreview(gLoopCutEdge, gLoopCutCortes, 0.0f, gLoopCutSegs);
+    gLoopCutSegs2.clear(); gLoopCutOrientNPts=0;
+    g_redraw=true;
+    if (LoopCutTactil()){ LoopCutAplicarYPanel(); return; }
+    LoopCutHint();
+}
+
+// setup del loop cut sobre un QUAD conocido: fase ORIENTACION (2 cortes en 0.5 + 4 puntos para
+// elegir direccion con un click/toque; en PC/Symbian tambien flechas + Enter).
+static void LoopCutIniciarQuad(Mesh* m, EditMesh* e, int faceIdx){
+    gLoopCutOn=true; gLoopCutSlide=false; gLoopCutOrientando=true;
+    gLoopCutCortes=1; gLoopCutFactor=0.0f; gLCSnap.tiene=false;
+    gLoopCutOrient=0;
+    gLoopCutOrientEdge[0] = e->faceEdges[faceIdx][0]; // las 2 direcciones perpendiculares
+    gLoopCutOrientEdge[1] = e->faceEdges[faceIdx][1];
+    gLoopCutEdge = gLoopCutOrientEdge[0];
+    // preview de LAS DOS direcciones (se dibujan ambas en 0.5)
+    gLoopCutSegs.clear();  m->LoopCutPreview(gLoopCutOrientEdge[0], gLoopCutCortes, 0.0f, gLoopCutSegs);
+    gLoopCutSegs2.clear(); m->LoopCutPreview(gLoopCutOrientEdge[1], gLoopCutCortes, 0.0f, gLoopCutSegs2);
+    // 4 PUNTOS = midpoint de cada borde del quad. Bordes 0,2 -> direccion 0; bordes 1,3 -> direccion 1.
+    gLoopCutOrientNPts = 0;
+    for (int k=0; k<4 && k<(int)e->faceEdges[faceIdx].size(); k++){
+        int eg = e->faceEdges[faceIdx][k];
+        if (eg<0 || eg*2+1 >= (int)e->lineIdx.size()) continue;
+        int a = e->lineIdx[eg*2], b = e->lineIdx[eg*2+1];
+        int n = gLoopCutOrientNPts;
+        gLoopCutOrientPt[n][0] = (e->pos[a*3+0]+e->pos[b*3+0])*0.5f;
+        gLoopCutOrientPt[n][1] = (e->pos[a*3+1]+e->pos[b*3+1])*0.5f;
+        gLoopCutOrientPt[n][2] = (e->pos[a*3+2]+e->pos[b*3+2])*0.5f;
+        gLoopCutOrientPtDir[n] = (k % 2 == 0) ? 0 : 1; // bordes opuestos 0/2 y 1/3
+        gLoopCutOrientNPts++;
+    }
+    g_redraw=true;
+    LoopCutHint();
+}
+
+// Loop Cut desde el menu Edge/Face/Vertex, sobre el elemento ACTIVO / la SELECCION (sin hover):
+//  - modo BORDE: el borde activo -> el corte cruza ese borde directo (direccion obvia).
+//  - modo CARA:  el quad activo  -> fase ORIENTACION (elegir 1 de las 2 direcciones). SOLO quads.
+//  - modo VERTICE: por la seleccion. 2 verts = un borde (direccion obvia); 4 verts = un quad
+//                  (elegir direccion). Cualquier otra cantidad (3, sueltos, etc.) = invalido.
 void LayoutLoopCutDesdeActivo(){
     if (InteractionMode!=EditMode || !g_editMesh){ Notificar("Loop Cut: enter Edit Mode first", true); return; }
     Mesh* m=(Mesh*)g_editMesh; m->EnsureEdit(); if (!m->edit) return;
@@ -3320,39 +3412,74 @@ void LayoutLoopCutDesdeActivo(){
     int act = e->activeIdx;
     if (EditSelectMode == SelEdge){
         if (act < 0 || act >= e->NumEdges()){ Notificar("Loop Cut: no active edge (click an edge first)", true); return; }
-        gLoopCutOn=true; gLoopCutSlide=false; gLoopCutOrientando=false;
-        gLoopCutCortes=1; gLoopCutFactor=0.0f; gLCSnap.tiene=false;
-        gLoopCutEdge = act;
-        gLoopCutSegs.clear(); m->LoopCutPreview(gLoopCutEdge, gLoopCutCortes, 0.0f, gLoopCutSegs);
-        g_redraw=true;
-        LoopCutHint();
+        LoopCutIniciarBorde(m, act);
     } else if (EditSelectMode == SelFace){
         if (act < 0 || act >= (int)e->faces.size()){ Notificar("Loop Cut: no active face (click a face first)", true); return; }
         if (e->faces[act].size() != 4){ Notificar("Loop Cut: the active face is not a quad", true); return; } // SOLO quads
         if (act >= (int)e->faceEdges.size() || e->faceEdges[act].size() < 2){ Notificar("Loop Cut: the active face has no edges", true); return; }
-        gLoopCutOn=true; gLoopCutSlide=false; gLoopCutOrientando=true;
-        gLoopCutCortes=1; gLoopCutFactor=0.0f; gLCSnap.tiene=false;
-        gLoopCutOrient=0;
-        gLoopCutOrientEdge[0] = e->faceEdges[act][0]; // las 2 direcciones perpendiculares
-        gLoopCutOrientEdge[1] = e->faceEdges[act][1];
-        gLoopCutEdge = gLoopCutOrientEdge[0];
-        gLoopCutSegs.clear(); m->LoopCutPreview(gLoopCutEdge, gLoopCutCortes, 0.0f, gLoopCutSegs);
-        g_redraw=true;
-        LoopCutHint();
-    } else {
-        Notificar("Loop Cut: switch to edge or face mode", true);
+        LoopCutIniciarQuad(m, e, act);
+    } else { // SelVertex: decide por la SELECCION
+        std::vector<int> sel;
+        for (int k=0; k<(int)e->vertSel.size(); k++) if (e->vertSel[k]) sel.push_back(k);
+        if (sel.size() == 2){
+            // 2 verts: el borde que los une -> direccion obvia
+            int eg = -1;
+            for (int i=0; i<e->NumEdges(); i++){
+                int a=e->lineIdx[i*2], b=e->lineIdx[i*2+1];
+                if ((a==sel[0]&&b==sel[1]) || (a==sel[1]&&b==sel[0])){ eg=i; break; }
+            }
+            if (eg<0){ Notificar("Loop Cut: the 2 selected vertices are not an edge", true); return; }
+            LoopCutIniciarBorde(m, eg);
+        } else if (sel.size() == 4){
+            // 4 verts: la cara (quad) cuyos 4 vertices son EXACTAMENTE los seleccionados -> elegir direccion
+            int f = -1;
+            for (int i=0; i<(int)e->faces.size(); i++){
+                if (e->faces[i].size()!=4) continue;
+                bool todos=true;
+                for (int j=0;j<4;j++){ if (!e->vertSel[e->faces[i][j]]){ todos=false; break; } }
+                if (todos){ f=i; break; }
+            }
+            if (f<0 || f>=(int)e->faceEdges.size() || e->faceEdges[f].size()<2){ Notificar("Loop Cut: select the 4 vertices of one quad", true); return; }
+            LoopCutIniciarQuad(m, e, f);
+        } else {
+            Notificar("Loop Cut: select an edge (2 verts) or a quad (4 verts)", true); // 3 o algo raro = invalido
+        }
     }
 }
 
 static void LoopCutConfirmar(){
-    gLoopCutOn=false; gLoopCutSlide=false; gLoopCutSegs.clear();
+    gLoopCutOn=false; gLoopCutSlide=false; gLoopCutSegs.clear(); gLoopCutSegs2.clear(); gLoopCutOrientNPts=0;
     NotificarHintClear();
     AbrirRedoLoopCutPanel((Mesh*)g_editMesh); // panel redo (cortes + factor); usa el snapshot
     g_redraw=true;
 }
 
+// aplica el corte con los defaults (1 corte, factor 0) y abre el panel redo para editar cortes/slide.
+// Es el camino de UN CLICK/TOUCH: como no hay flechas ni rueda en tactil, se ajusta desde el panel.
+static void LoopCutAplicarYPanel(){
+    if (gLoopCutEdge<0 || !g_editMesh){ LoopCutCancelar(); return; }
+    Mesh* m=(Mesh*)g_editMesh;
+    UndoCapturarMallaGeo(m);           // Ctrl+Z: 1 sola captura, PRE-corte
+    LCGuardar(m);
+    m->LoopCutEdit(gLoopCutEdge, gLoopCutCortes, 0.0f);
+    LoopCutConfirmar();                // cierra el modal + abre el panel (cortes + factor)
+}
+
+// ENTER en la fase de orientacion (teclado PC/Symbian): confirma la direccion elegida con las
+// flechas y sigue al flujo clasico (preview con rueda -> click aplica+slide). El PICKER de puntos
+// (click/tactil) NO pasa por aca: ese va directo a aplicar + panel.
+void LoopCutOrientConfirmarTeclado(){
+    if (!gLoopCutOrientando) return;
+    gLoopCutOrientando=false; gLoopCutOrientNPts=0; gLoopCutSegs2.clear();
+    gLoopCutSegs.clear();
+    if (g_editMesh) ((Mesh*)g_editMesh)->LoopCutPreview(gLoopCutEdge, gLoopCutCortes, 0.0f, gLoopCutSegs);
+    g_redraw=true;
+    LoopCutHint(); // ayuda de la fase de cortes
+}
+
 void LoopCutMotion(int mx, int my){
     if (!gLoopCutOn) return;
+    if (gLoopCutOrientando) return; // orientacion: los 2 previews son fijos (no re-pickear por hover)
     if (!gLoopCutSlide){ LoopCutActualizarPreview(mx,my); g_redraw=true; }
     else {
         float f = (float)(mx - gLoopCutSlideX0) / (float)(gLoopCutSlideW*0.4f);
@@ -3403,9 +3530,32 @@ void LoopCutTecla(int dir){
 void LoopCutClickIzq(int mx, int my){
     if (!gLoopCutOn) return;
     if (gLoopCutOrientando){
-        gLoopCutOrientando=false; // confirma la orientacion del quad -> pasa a la fase de cortes
+        // PICKER: elegir la direccion tocando/clickeando el PUNTO mas cercano (uno de los 4
+        // midpoints del quad). Con un solo click sacamos la direccion; despues se aplica el
+        // corte y se abre el panel (cortes + slide) porque en tactil no hay flechas ni rueda.
+        int best = -1; float bestD = 1e18f;
+        if (Viewport3DActive && g_editMesh && gLoopCutOrientNPts > 0){
+            Mesh* m=(Mesh*)g_editMesh; Matrix4 W; m->GetWorldMatrix(W);
+            float lmx = (float)mx - (float)Viewport3DActive->x;
+            float lmy = (float)my - (float)Viewport3DActive->y;
+            for (int i=0;i<gLoopCutOrientNPts;i++){
+                Vector3 wp = W * Vector3(gLoopCutOrientPt[i][0], gLoopCutOrientPt[i][1], gLoopCutOrientPt[i][2]);
+                float sx=0, sy=0;
+                if (!Viewport3DActive->ProyectarPunto(wp, sx, sy)) continue;
+                float dx=sx-lmx, dy=sy-lmy; float d=dx*dx+dy*dy;
+                if (d < bestD){ bestD = d; best = i; }
+            }
+        }
+        if (best >= 0){
+            gLoopCutOrient = gLoopCutOrientPtDir[best];
+            gLoopCutEdge   = gLoopCutOrientEdge[gLoopCutOrient];
+            gLoopCutOrientando=false;
+            LoopCutAplicarYPanel();   // aplica + abre el panel de edicion (cortes/slide)
+        } else {
+            // sin puntos proyectables: fallback al confirm clasico (sigue al preview)
+            LoopCutOrientConfirmarTeclado();
+        }
         g_redraw=true;
-        LoopCutHint();            // ayuda de la fase de cortes
         return;
     }
     if (!gLoopCutSlide){
@@ -3453,23 +3603,41 @@ float LoopCutGetFactor(){ return gLoopCutFactor; }
 // dibuja el preview del corte (segmentos locales) con la matriz de mundo del objeto.
 // Lo llama el viewport 3D despues de renderizar la escena.
 void LoopCutRenderPreview(){
-    if (!gLoopCutOn || gLoopCutSegs.empty() || !g_editMesh) return;
+    if (!gLoopCutOn || !g_editMesh) return;
+    if (gLoopCutSegs.empty() && !gLoopCutOrientando) return;
     Mesh* m=(Mesh*)g_editMesh;
     Matrix4 W; m->GetWorldMatrix(W);
     w3dEngine::PushMatrix(); w3dEngine::MultMatrix(W.m);
     w3dEngine::Disable(w3dEngine::Lighting); w3dEngine::Disable(w3dEngine::Texture2D); w3dEngine::Disable(w3dEngine::DepthTest);
     w3dEngine::DisableArray(w3dEngine::NormalArray); w3dEngine::DisableArray(w3dEngine::ColorArray); w3dEngine::DisableArray(w3dEngine::TexCoordArray);
     w3dEngine::EnableArray(w3dEngine::VertexArray);
-    w3dEngine::Color4f(1.0f, 0.95f, 0.2f, 1.0f); // amarillo (como Blender)
-    w3dEngine::VertexPointer3f(0, &gLoopCutSegs[0]);
-    if (gLoopCutEsPunto){ // corte de un BORDE SUELTO: el corte es un PUNTO en la arista, no una linea
-        w3dEngine::PointSize(9.0f);
-        w3dEngine::DrawPoints((int)(gLoopCutSegs.size()/3));
-        w3dEngine::PointSize(1.0f);
-    } else {
+
+    if (gLoopCutOrientando){
+        // FASE ORIENTACION (quad): los DOS cortes posibles en amarillo 0.5 + 4 PUNTOS grandes 100% opacos.
+        w3dEngine::Color4f(1.0f, 0.95f, 0.2f, 0.5f); // amarillo semitransparente
         w3dEngine::LineWidth(3.0f);
-        w3dEngine::DrawLines((int)(gLoopCutSegs.size()/3));
+        if (!gLoopCutSegs.empty()){  w3dEngine::VertexPointer3f(0, &gLoopCutSegs[0]);  w3dEngine::DrawLines((int)(gLoopCutSegs.size()/3)); }
+        if (!gLoopCutSegs2.empty()){ w3dEngine::VertexPointer3f(0, &gLoopCutSegs2[0]); w3dEngine::DrawLines((int)(gLoopCutSegs2.size()/3)); }
         w3dEngine::LineWidth(1.0f);
+        if (gLoopCutOrientNPts > 0){ // los puntos que se tocan para elegir la direccion
+            w3dEngine::Color4f(1.0f, 0.95f, 0.2f, 1.0f); // amarillo opaco
+            w3dEngine::PointSize(22.0f);
+            w3dEngine::VertexPointer3f(0, &gLoopCutOrientPt[0][0]);
+            w3dEngine::DrawPoints(gLoopCutOrientNPts);
+            w3dEngine::PointSize(1.0f);
+        }
+    } else {
+        w3dEngine::Color4f(1.0f, 0.95f, 0.2f, 1.0f); // amarillo (como Blender)
+        w3dEngine::VertexPointer3f(0, &gLoopCutSegs[0]);
+        if (gLoopCutEsPunto){ // corte de un BORDE SUELTO: el corte es un PUNTO en la arista, no una linea
+            w3dEngine::PointSize(9.0f);
+            w3dEngine::DrawPoints((int)(gLoopCutSegs.size()/3));
+            w3dEngine::PointSize(1.0f);
+        } else {
+            w3dEngine::LineWidth(3.0f);
+            w3dEngine::DrawLines((int)(gLoopCutSegs.size()/3));
+            w3dEngine::LineWidth(1.0f);
+        }
     }
     w3dEngine::Enable(w3dEngine::DepthTest);
     w3dEngine::PopMatrix();

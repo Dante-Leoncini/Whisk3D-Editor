@@ -86,7 +86,7 @@ typedef enum { GlobalOrient, LocalOrient, ViewOrient, NormalOrient } TransformOr
 
 // barra de HERRAMIENTAS (abajo del viewport 3D): ids del historial de acciones (MRU, max 8,
 // separado por modo objeto/edicion). ToolbarRegistrarAccion la llaman los starters (G/R/S/E...).
-enum { TBMove, TBRotate, TBScale, TBExtrude };
+enum { TBMove, TBRotate, TBScale, TBExtrude, TBLoopCut, TBDelete };
 void ToolbarRegistrarAccion(int id); // def en ViewPort3D.cpp
 
 // Declaraciones de variables (extern)

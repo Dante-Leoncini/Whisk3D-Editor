@@ -16,6 +16,7 @@
 #include "ViewPorts/PopUp/NumPad.h" // NumPadAbrirTransform (teclado tactil sobre la barra de estado)
 #include "ViewPorts/PopUp/ConfirmarPopup.h" // AbrirConfirmarBorrado (popup al borrar con la tecla)
 #include "ViewPorts/PopUp/ProgressPopup.h"  // barra "Rendering..." durante el render por tiles (clave en N95)
+void RebindMaterialMeshPart(); // (def en Properties.cpp) refresca el panel de material tras undo/redo
 #ifdef W3D_SYMBIAN
 extern int W3dPantallaAlto; // los headers GLES + tipos GL los da GeometriaUI.h (via ViewPort3D.h)
 #ifndef GL_POINT_SPRITE
@@ -95,16 +96,25 @@ Viewport3D::Viewport3D(Vector3 pos){
     // barra de HERRAMIENTAS (abajo): MISMOS Button que la barra de arriba. La visibilidad/colores
     // se setean por frame en ToolbarActualizar (contextual: historial vs controles del transform).
     toolScroll = 0; toolGesto = false;
+    // Undo / Redo: SIEMPRE presentes (PC y tactil), primeros (izquierda) para que no se pierdan.
+    // Flecha izquierda = deshacer (como el "atras" del navegador); derecha = rehacer.
+    b = new Button("", (int)IconType::arrowRight); b->rol = TBR_Undo; b->iconFlip = 1; b->centrado = true; ToolButtons.push_back(b);
+    b = new Button("", (int)IconType::arrowRight); b->rol = TBR_Redo; b->centrado = true; ToolButtons.push_back(b);
     b = new Button("", (int)IconType::notifOk);    b->rol = TBR_Aceptar;  b->centrado = true; ToolButtons.push_back(b);
+    // "Repeat" (solo en extrude): acepta el extrude y vuelve a extruir la seleccion, sin buscar el boton Extrude.
+    b = new Button("Repeat"); b->rol = TBR_Repeat; b->centrado = true; ToolButtons.push_back(b);
     b = new Button("", (int)IconType::notifError); b->rol = TBR_Cancelar; b->centrado = true; ToolButtons.push_back(b);
+    // modificadores TACTILES (Android/WebGL sin teclado): Shift y Ctrl. Toggle -> quedan encendidos (verde) y
+    // togglean LShiftPressed/LCtrlPressed (multi-seleccion, shortest path). Solo visibles con pantalla tactil.
+    // Van ANTES de orientacion/ejes: sino durante un transform quedaban al final y se salian de la pantalla.
+    b = new Button("Shift"); b->rol = TBR_Shift; b->centrado = true; ToolButtons.push_back(b);
+    b = new Button("Ctrl");  b->rol = TBR_Ctrl;  b->centrado = true; ToolButtons.push_back(b);
+    // "View" (toggle): en Edit Mode, con 1 dedo orbitar/panear/zoom aunque haya una operacion en curso.
+    b = new Button("View");  b->rol = TBR_View;  b->centrado = true; ToolButtons.push_back(b);
     b = new Button("Global"); b->rol = TBR_Orient; b->desplegable = true; ToolButtons.push_back(b);
     b = new Button("X"); b->rol = TBR_EjeX; b->centrado = true; ToolButtons.push_back(b);
     b = new Button("Y"); b->rol = TBR_EjeY; b->centrado = true; ToolButtons.push_back(b);
     b = new Button("Z"); b->rol = TBR_EjeZ; b->centrado = true; ToolButtons.push_back(b);
-    // modificadores TACTILES (Android/WebGL sin teclado): Shift y Ctrl. Toggle -> quedan encendidos (verde)
-    // y togglean LShiftPressed/LCtrlPressed (multi-seleccion, shortest path). Solo visibles con pantalla tactil.
-    b = new Button("Shift"); b->rol = TBR_Shift; b->centrado = true; ToolButtons.push_back(b);
-    b = new Button("Ctrl");  b->rol = TBR_Ctrl;  b->centrado = true; ToolButtons.push_back(b);
     for (int i = 0; i < 8; i++){ // historial de acciones (MRU, hasta 8)
         b = new Button(""); b->rol = TBR_Hist + i; b->visible = false; ToolButtons.push_back(b);
     }
@@ -171,6 +181,7 @@ Viewport3D::Viewport3D(Vector3 pos){
         MenuMesh->Agregar("Transform", 0, -1, MenuTransform);            // arriba de todo (Move/Rotate/Scale)
         MenuMesh->Agregar("Duplicate", 314)->atajo = "Shift D";          // comun a vertice/borde/cara
         MenuMesh->Agregar("Merge", 0, -1, LayoutSubmenuMerge())->atajo = "M"; // suelda verts (limpia duplicados)
+        MenuMesh->Agregar("Normals", 0, -1, LayoutSubmenuNormals()); // Recalculate Normals + Flip
         MenuMesh->Agregar("Snap", 0, -1, LayoutSubmenuSnap())->atajo = "Shift S";
         MenuMesh->Agregar("Delete", 360, -1, LayoutSubmenuDelete())->atajo = "X"; // abajo de todo
     }
@@ -1824,8 +1835,11 @@ void Viewport3D::event_mouse_motion(int mx, int my){
     // 1 dedo arrastrado tiene que orbitar. El tap-vs-drag distingue seleccionar de orbitar.
     // OJO: durante un TRANSFORM el izquierdo NO orbita: el dedo apretado esta MOVIENDO el transform
     // (en tactil se confirma con el tilde de la barra de herramientas, no soltando).
+    // modo VIEW (toggle de Edit Mode): con 1 dedo se ORBITA aunque haya una operacion en curso (mover/rotar/
+    // extrude/strip) -> se puede mirar desde otro angulo sin cancelar; se apaga View y sigue editando.
     #if defined(__ANDROID__) || defined(__EMSCRIPTEN__)
-        if (middleMouseDown || (leftMouseDown && estado == editNavegacion)) {
+        bool viewOrbita = (g_viewEditMode && InteractionMode == EditMode);
+        if (middleMouseDown || (leftMouseDown && (estado == editNavegacion || viewOrbita))) {
     #else
         if (middleMouseDown) {
     #endif
@@ -2165,7 +2179,15 @@ static std::vector<int> gToolHistObj;
 static std::vector<int> gToolHistEdit;
 static std::vector<int>& ToolbarHist(){
     std::vector<int>& h = (InteractionMode == EditMode) ? gToolHistEdit : gToolHistObj;
-    if (h.empty()){ h.push_back(TBMove); h.push_back(TBRotate); h.push_back(TBScale); }
+    if (h.empty()){
+        h.push_back(TBMove); h.push_back(TBRotate); h.push_back(TBScale);
+        if (InteractionMode == EditMode){
+            // edit: las mas usadas a mano por defecto -> Extrude, Loop Cut, Delete
+            h.push_back(TBExtrude); h.push_back(TBLoopCut); h.push_back(TBDelete);
+        } else {
+            h.push_back(TBDelete); // objeto: Delete a mano (ultima opcion al arrancar)
+        }
+    }
     return h;
 }
 void ToolbarRegistrarAccion(int id){
@@ -2182,6 +2204,8 @@ static const char* ToolbarLabel(int id){
         case TBRotate:  return "Rotate";
         case TBScale:   return "Scale";
         case TBExtrude: return "Extrude";
+        case TBLoopCut: return "Loop Cut";
+        case TBDelete:  return "Delete";
     }
     return "?";
 }
@@ -2191,6 +2215,11 @@ static void ToolbarEjecutar(int id){
         case TBRotate:  if (!EditXformStart(rotacion,    ViewAxis)) SetRotacion(); break;
         case TBScale:   if (!EditXformStart(EditScale,   XYZ))      SetEscala();   break;
         case TBExtrude: LayoutExtrudeFaces(); break;
+        case TBLoopCut: LayoutLoopCutDesdeActivo(); break; // sobre el borde/quad ACTIVO (quad -> elegir direccion)
+        case TBDelete:
+            if (InteractionMode == EditMode) LayoutDeleteEdit(lastMouseX, lastMouseY); // menu Delete (verts/edges/faces/loops)
+            else                             AbrirConfirmarBorrado();                  // objeto: confirmar y borrar
+            break;
     }
 }
 
@@ -2220,7 +2249,13 @@ static bool ToolbarTransformando(){
            (InteractionMode == ObjectMode || (InteractionMode == EditMode && EditXformActivo()));
 }
 
-bool Viewport3D::ToolbarVisible() const { return cfg.nuevoUsuario; }
+bool Viewport3D::ToolbarVisible() const {
+#ifdef W3D_SYMBIAN
+    return cfg.nuevoUsuario; // el N95 va a teclas; un N8 tactil la prende por config
+#else
+    return true; // PC/Android/Web: SIEMPRE (Undo/Redo tienen que estar; el experimentado ve solo esos)
+#endif
+}
 int  Viewport3D::ToolbarHeight() const { return BarHeight(); }
 
 bool Viewport3D::OnToolbar(int px, int py){
@@ -2245,6 +2280,7 @@ void Viewport3D::ToolbarActualizar(){
     bool tactil = ToolbarUsaTactil();
     const float* accent = ListaColores[static_cast<int>(ColorID::accent)];
     const float* blanco = ListaColores[static_cast<int>(ColorID::blanco)];
+    const float* grisUI = ListaColores[static_cast<int>(ColorID::grisUI)];
     for (int i = 0; i < 3; i++){
         sTbVerdeBg[i] = accent[i] * 0.40f;
         for (int e = 0; e < 3; e++) sTbEjeBg[e][i] = kTbEje[e][i] * 0.45f;
@@ -2256,8 +2292,18 @@ void Viewport3D::ToolbarActualizar(){
     for (size_t i = 0; i < ToolButtons.size(); i++){
         Button* btn = ToolButtons[i];
         int rol = btn->rol;
-        if (rol == TBR_Aceptar){
+        if (rol == TBR_Undo || rol == TBR_Redo){
+            // Siempre visibles, MENOS durante una edicion en curso (transform): ahi la barra es
+            // aceptar/cancelar/ejes y undo/redo estorban. Se atenuan (gris) si no hay nada que des/rehacer.
+            btn->visible = !transformando;
+            bool hay = (rol == TBR_Undo) ? UndoHayAlgo() : UndoHayRedo();
+            btn->tinte = NULL; btn->colorTexto = hay ? blanco : grisUI;
+        } else if (rol == TBR_Aceptar){
             btn->visible = transformando && tactil;
+            btn->tinte = sTbVerdeBg; btn->colorTexto = accent;
+        } else if (rol == TBR_Repeat){
+            // solo durante un EXTRUDE (tactil): acepta y vuelve a extruir. Verde como el OK.
+            btn->visible = transformando && tactil && ExtrudeEnCurso();
             btn->tinte = sTbVerdeBg; btn->colorTexto = accent;
         } else if (rol == TBR_Cancelar){
             btn->visible = transformando && tactil;
@@ -2275,17 +2321,26 @@ void Viewport3D::ToolbarActualizar(){
             btn->tinte = on ? sTbEjeBg[e] : NULL;     // encendido: fondo de SU color
             btn->colorTexto = on ? blanco : kTbEje[e]; // apagado: la letra en su color
         } else if (rol == TBR_Shift || rol == TBR_Ctrl){
-            // modificadores tactiles: SIEMPRE visibles con pantalla tactil (no dependen del transform).
-            // Encendidos (verde) reflejan LShiftPressed / LCtrlPressed (que setea el propio toggle).
-            btn->visible = tactil;
+            // modificadores tactiles: visibles con pantalla tactil, MENOS durante una edicion en curso
+            // (transform/extrude/strip) -> ahi estorban (pedido Dante). Encendidos (verde) = LShift/LCtrlPressed.
+            btn->visible = tactil && !transformando;
             bool on = (rol == TBR_Shift) ? LShiftPressed : LCtrlPressed;
             btn->tinte = on ? sTbVerdeBg : NULL;       // ON: fondo verde accent
             btn->colorTexto = on ? accent : blanco;    // ON: texto verde; OFF: blanco
+        } else if (rol == TBR_View){
+            // toggle VIEW: solo en Edit Mode y con pantalla tactil (en PC el mouse orbita distinto). Verde = ON.
+            btn->visible = tactil && (InteractionMode == EditMode);
+            btn->tinte = g_viewEditMode ? sTbVerdeBg : NULL;
+            btn->colorTexto = g_viewEditMode ? accent : blanco;
         } else { // historial de acciones (solo FUERA de un transform)
             int hi = rol - TBR_Hist;
             btn->visible = !transformando && hi >= 0 && hi < (int)h.size();
             if (btn->visible) btn->text = ToolbarLabel(h[hi]);
         }
+        // usuario EXPERIMENTADO (cfg.nuevoUsuario=false): barra MINIMA con SOLO Undo/Redo (que
+        // "siempre tienen que estar"); el resto se oculta. EXCEPTO durante un transform: ahi hay que
+        // dejar los controles (tilde/cruz/ejes) para poder confirmar/cancelar en tactil.
+        if (!cfg.nuevoUsuario && !transformando && rol != TBR_Undo && rol != TBR_Redo) btn->visible = false;
     }
 
     // layout: igual que la barra de arriba (Resize + posiciones acumuladas), en dos pasadas
@@ -2298,7 +2353,8 @@ void Viewport3D::ToolbarActualizar(){
         Button* btn = ToolButtons[i];
         if (!btn->visible) continue;
         btn->Resize(width - gapGS * 2);
-        if (btn->rol >= TBR_EjeX && btn->rol <= TBR_EjeZ){ // X/Y/Z cuadrados
+        if ((btn->rol >= TBR_EjeX && btn->rol <= TBR_EjeZ) ||
+            btn->rol == TBR_Undo || btn->rol == TBR_Redo){ // X/Y/Z y Undo/Redo: cuadrados (solo icono)
             btn->width = btn->height;
             btn->card->Resize(btn->width, btn->height);
         }
@@ -2348,7 +2404,13 @@ bool Viewport3D::ToolbarClick(int mx, int my){
     }
     if (target){
         int rol = target->rol;
-        if (rol == TBR_Aceptar) Aceptar();                    // tilde verde: confirma el transform
+        if (rol == TBR_Undo){ UndoDeshacer(); RebindMaterialMeshPart(); }      // flecha izquierda: deshacer
+        else if (rol == TBR_Redo){ UndoRehacer(); RebindMaterialMeshPart(); }  // flecha derecha: rehacer
+        else if (rol == TBR_Aceptar) Aceptar();               // tilde verde: confirma el transform
+        else if (rol == TBR_Repeat){                          // "Repeat": acepta el extrude y vuelve a extruir
+            Aceptar();              // confirma el extrude actual (deja la tapa seleccionada)
+            LayoutExtrudeFaces();   // y extruye de nuevo esa seleccion + arranca el move
+        }
         else if (rol == TBR_Cancelar){                        // cruz roja: cancela (mismo camino que el click derecho)
             if (InteractionMode == EditMode && EditXformActivo()) EditXformCancelar();
             else Cancelar();
@@ -2358,6 +2420,7 @@ bool Viewport3D::ToolbarClick(int mx, int my){
         else if (rol >= TBR_EjeX && rol <= TBR_EjeZ) ToolbarToggleEje(1 << (rol - TBR_EjeX)); // combinables
         else if (rol == TBR_Shift) LShiftPressed = !LShiftPressed; // modificador tactil: queda encendido (verde)
         else if (rol == TBR_Ctrl)  LCtrlPressed  = !LCtrlPressed;
+        else if (rol == TBR_View)  g_viewEditMode = !g_viewEditMode; // toggle: orbitar/panear con el dedo durante una operacion
         else ToolbarEjecutar( ToolbarHist()[rol - TBR_Hist] ); // historial: arranca la accion
         g_redraw = true;
     }
