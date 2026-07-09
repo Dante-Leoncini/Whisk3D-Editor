@@ -1874,6 +1874,33 @@ static void SnapAjustarEditRot(){
     g_snapHit = true; g_snapSx = sx; g_snapSy = sy;
 }
 
+// SNAP de ESCALA: escala la seleccion desde el pivote (gEVpivot = centro/cursor) de modo que el vert BASE (el activo
+// en modo Active, o el mas cercano al target en Closest) se mueva RADIALMENTE -"como un radio"- hasta el punto mas
+// cercano al target sobre su recta de escala. Puede NO tocar el target (queda en el punto mas cercano de esa recta);
+// toca exacto cuando el target esta sobre la recta (ej: rotar primero la aguja al target y luego escalar).
+static void SnapAjustarEditScale(){
+    g_snapHit = false;
+    if (!g_snap.enabled || !g_snap.afScale || !Viewport3DActive || InteractionMode!=EditMode || !gEVmesh) return;
+    if (gEVsnap.empty() || gEVshrink) return; // Shrink/Fatten mueve cada vert por su normal -> no aplica este snap
+    Vector3 T; float sx=0, sy=0;
+    if (!SnapBuscarTarget(g_snapCurX, g_snapCurY, Viewport3DActive, T, sx, sy)) return;
+    const Vector3 P = gEVpivot;
+    // BASE: Active = el elemento activo; Closest (y otros) = el vert de la seleccion mas cercano al target
+    Vector3 B0; bool any=false;
+    if (g_snap.base==SNAP_ACTIVE) any = SnapNeedleActivo(B0);
+    if (!any){ float bd=1e30f; for (size_t i=0;i<gEVsnap.size();i++){ Vector3 d=gEVsnap[i].world0-T; float dd=d.Dot(d); if(dd<bd){bd=dd;B0=gEVsnap[i].world0;any=true;} } }
+    if (!any) return;
+    // direccion en la que la ESCALA mueve al base (segun el eje): D=off0 (uniforme), la componente del eje (X/Y/Z),
+    // o la del plano. B(amt) = B0 + amt*D -> amt que lo acerca al target = proyeccion de (T-B0) sobre D.
+    Vector3 off0 = B0 - P, D;
+    if (axisSelect==X||axisSelect==Y||axisSelect==Z){ Vector3 a=EjeOrientado(*gEVmesh,axisSelect); D=a*off0.Dot(a); }
+    else if (axisSelect==PlaneX||axisSelect==PlaneY||axisSelect==PlaneZ){ int ex=(axisSelect==PlaneX)?X:(axisSelect==PlaneY)?Y:Z; Vector3 a=EjeOrientado(*gEVmesh,ex); D=off0 - a*off0.Dot(a); }
+    else D=off0;
+    float dd=D.Dot(D); if (dd<1e-12f) return; // el base esta en el pivote/eje -> la escala no lo mueve
+    gEVscaleAmt = (T - B0).Dot(D) / dd;
+    g_snapHit = true; g_snapSx = sx; g_snapSy = sy;
+}
+
 void EditXformTraslacion(int dx,int dy,float speed){
     if (!gEVmesh) return;
     // EXTRUDE: constreñido a un eje arbitrario (la normal). Proyecta el mouse igual
@@ -1921,7 +1948,9 @@ void EditXformRotAbs(const Quaternion& qAbs){ // trackball: rotacion absoluta de
 }
 void EditXformScale(int dx,int dy,float factor){
     if (!gEVmesh) return;
-    gEVscaleAmt += (dx+dy)*factor; EVEscribir();
+    gEVscaleAmt += (dx+dy)*factor;
+    SnapAjustarEditScale(); // imanta el vert base al target radialmente (si snap ON)
+    EVEscribir();
 }
 
 // suma de los ejes ACTIVOS (en MUNDO, segun la orientacion) para el valor numerico
