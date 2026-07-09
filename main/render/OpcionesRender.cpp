@@ -36,6 +36,8 @@ float g_mergeDist = 0.0002f;          // Merge > By Distance: suelda verts a <= 
                                       // verts a una grilla de 1e-4, asi que 0.0002 es el minimo util (justo por
                                       // encima) y alcanza para soldar la tapa de un extrude "dejado en su lugar"
 bool g_modRenderMode = false;         // true SOLO durante el render final (Subdivision usa subRenderLevel)
+bool g_autoMerge = false;             // Auto Merge (menu Mesh): OFF por defecto. Al confirmar un move, suelda los verts
+float g_autoMergeThreshold = 0.001f;  // movidos con cualquier vert a <= threshold (opt-in; sin esto el snap NO funde)
 
 // Implementación de función
 RenderType StringToRenderType(const std::string& s){

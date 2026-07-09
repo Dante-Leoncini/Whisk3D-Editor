@@ -1083,7 +1083,15 @@ bool Mesh::DuplicarSeleccionEdit() {
         for (size_t c=0;c<ring.size();c++) AgregarCornerCapas(this,faceOff[f]+(int)c); // copia las capas del corner original
     }
     // BORDES sueltos copiados (los que no quedaron dentro de una cara duplicada)
-    for (size_t i=0;i<selEdgesDir.size();i++){ looseEdges.push_back(newOf[selEdgesDir[i].first]); looseEdges.push_back(newOf[selEdgesDir[i].second]); }
+    std::set<int> repEnBorde;
+    for (size_t i=0;i<selEdgesDir.size();i++){ looseEdges.push_back(newOf[selEdgesDir[i].first]); looseEdges.push_back(newOf[selEdgesDir[i].second]);
+        repEnBorde.insert(selEdgesDir[i].first); repEnBorde.insert(selEdgesDir[i].second); }
+    // VERTS sueltos COPIADOS: los dupReps que no quedaron en una cara ni en un borde copiado son VERTS SUELTOS
+    // -> hay que registrarlos en looseVerts (sino la copia queda como vertice HUERFANO: invisible, no seleccionable,
+    // y el siguiente GenerarRender la descarta -> "duplico un vertice solito y no lo puedo extruir", bug Dante).
+    for (std::set<int>::iterator it=dupReps.begin(); it!=dupReps.end(); ++it){ int r=*it;
+        if (repEnCara.count(r) || repEnBorde.count(r)) continue;
+        looseVerts.push_back(newOf[r]); }
     #undef DREP
     // Si se agrego TOPOLOGIA (caras y/o bordes sueltos, en cualquier modo) -> rebuild por GenerarRender
     // (re-triangula + materialsGroup + CalcularBordes + remapea loose edges + capas). Si SOLO se duplicaron
@@ -2834,29 +2842,32 @@ static void OptimizarCacheVertices(MeshIndex* idx, int numTris, int numVerts) {
 // recalcula los BORDES unicos desde faces3d, dedup por POSICION (no por indice:
 // asi un borde compartido por 2 caras con vertices distintos -mismo lugar- no se
 // repite). Cada par (edges[2i], edges[2i+1]) es una arista.
-void Mesh::CalcularBordes(bool invalidarEdit) {
+void Mesh::CalcularBordes(bool invalidarEdit, bool reagruparPosRep) {
     edges.clear();
-    posRep.clear();
     bordesBuf.clear();
     vertsAgrupados = 0;
     overlayLcache = -1.0f; // la geometria cambio -> rehacer los overlays de normales
-    if (!vertex || vertexSize <= 0) return;
+    if (!vertex || vertexSize <= 0) { posRep.clear(); return; }
     const int nV = vertexSize;
     // representante de cada vertice por posicion: el menor indice entre los verts coincidentes. HASH por posicion
     // CUANTIZADA a 1e-4 -> O(n log n). (Antes era un doble loop O(n^2) que con una esfera de 45+ segmentos TRABABA
     // la app al regenerar -en el redo panel el slider regenera muchas veces-: Mismo resultado, mucho mas
     // rapido: a 64x64 son ~4k verts -> 4k*log4k en vez de 16M comparaciones.) Se cachea en posRep (overlay O(n)/frame).
-    posRep.assign(nV, 0);
-    std::map<std::string,int> posMap;
-    for (int i = 0; i < nV; i++) {
-        int q[3];
-        q[0] = (int)floorf(vertex[i*3]   * 10000.0f + 0.5f); // cuantiza a 1e-4 (coincidentes -> misma celda)
-        q[1] = (int)floorf(vertex[i*3+1] * 10000.0f + 0.5f);
-        q[2] = (int)floorf(vertex[i*3+2] * 10000.0f + 0.5f);
-        std::string key((const char*)q, sizeof(q));
-        std::map<std::string,int>::iterator it = posMap.find(key);
-        if (it != posMap.end()) posRep[i] = it->second; // ya vimos esta posicion -> su representante (menor indice)
-        else { posRep[i] = i; posMap[key] = i; }         // 1ra vez -> este vert es el representante
+    // reagruparPosRep=false: CONSERVA el posRep existente (mismo nV) -> NO re-suelda por posicion. Lo usa el confirm
+    // de un move para que el snap pueda dejar verts encimados SIN fundirlos (el Auto Merge, opt-in, hace la soldadura).
+    if (reagruparPosRep || (int)posRep.size() != nV) {
+        posRep.assign(nV, 0);
+        std::map<std::string,int> posMap;
+        for (int i = 0; i < nV; i++) {
+            int q[3];
+            q[0] = (int)floorf(vertex[i*3]   * 10000.0f + 0.5f); // cuantiza a 1e-4 (coincidentes -> misma celda)
+            q[1] = (int)floorf(vertex[i*3+1] * 10000.0f + 0.5f);
+            q[2] = (int)floorf(vertex[i*3+2] * 10000.0f + 0.5f);
+            std::string key((const char*)q, sizeof(q));
+            std::map<std::string,int>::iterator it = posMap.find(key);
+            if (it != posMap.end()) posRep[i] = it->second; // ya vimos esta posicion -> su representante (menor indice)
+            else { posRep[i] = i; posMap[key] = i; }         // 1ra vez -> este vert es el representante
+        }
     }
     // cantidad de posiciones unicas + CENTRO GEOMETRICO (promedio de las posiciones
     // unicas = los grupos de vertice). El foco/pivot lo usan en vez del origen.

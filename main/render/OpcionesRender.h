@@ -79,6 +79,9 @@ extern bool g_editLockNormales;
 extern float g_mergeDist;
 // modificadores: true durante el RENDER final -> Subdivision usa subRenderLevel en vez de subLevel (viewport).
 extern bool g_modRenderMode;
+// Auto Merge (menu Mesh, opt-in): al confirmar un move suelda los verts movidos con los que queden a <= threshold.
+extern bool g_autoMerge;
+extern float g_autoMergeThreshold;
 
 // Declaración de función
 RenderType StringToRenderType(const std::string& s);

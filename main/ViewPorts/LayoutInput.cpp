@@ -466,6 +466,124 @@ bool EditXformStart(int est, int eje) { // expuesto (lo usa el harness para test
     return true;
 }
 
+// ============================================================================
+//  SNAP (imantado): estado + buscador del punto de snap bajo el cursor.
+// ============================================================================
+SnapCfg g_snap = { false, SNAP_CLOSEST, SNAP_VERTEX, true,true,true, true,true,true };
+bool SnapEnabled(){ return g_snap.enabled; }
+void SnapToggle(){ g_snap.enabled = !g_snap.enabled; Notificar(g_snap.enabled ? "Snap: ON" : "Snap: OFF", false); g_redraw = true; }
+// resultado del ultimo snap (para dibujar el recuadro verde en el viewport)
+bool  g_snapHit = false;   // hubo snap en el ultimo move
+float g_snapSx = 0, g_snapSy = 0; // su posicion en pantalla (viewport-relativa)
+
+// una malla candidata a snap? (segun Target Selection). isEdited/isActive: la editada / el objeto activo.
+static bool SnapMallaCandidata(Mesh* m){
+    bool isEdited = ((Object*)m == g_editMesh);
+    bool isActive = (ObjActivo == (Object*)m);
+    if (isEdited) return g_snap.tsEdited;
+    if (isActive) return g_snap.tsActive;
+    return g_snap.tsNonEdited;
+}
+// recolecta las mallas VISIBLES de la escena
+static void SnapRecolectar(Object* o, std::vector<Mesh*>& out){
+    if (!o) return;
+    if (o->getType()==ObjectType::mesh && o->visible && SnapMallaCandidata((Mesh*)o)) out.push_back((Mesh*)o);
+    for (size_t i=0;i<o->Childrens.size();i++) SnapRecolectar(o->Childrens[i], out);
+}
+
+// busca el punto de snap bajo el cursor. Devuelve true + el punto en MUNDO + su posicion en pantalla.
+bool SnapBuscarTarget(int mx, int my, Viewport3D* vp, Vector3& outWorld, float& outSx, float& outSy,
+                      Vector3* outEdgeA, Vector3* outEdgeB){
+    if (!vp || !SceneCollection) return false;
+    float lmx = (float)mx - (float)vp->x, lmy = (float)my - (float)vp->y; // a coords del viewport (ProyectarPunto)
+    std::vector<Mesh*> meshes; SnapRecolectar(SceneCollection, meshes);
+    if (meshes.empty()) return false;
+    const float RAD = 18.0f; // radio de enganche en pantalla (px)
+    float bestD = RAD*RAD; bool found = false;
+    // en modo edicion no se snapea a la PROPIA seleccion que se mueve (sino se pega a si misma)
+    Mesh* em = (InteractionMode==EditMode) ? (Mesh*)g_editMesh : NULL;
+    EditMesh* ee = (em && em->edit) ? em->edit : NULL;
+
+    for (size_t mi=0; mi<meshes.size(); mi++){
+        Mesh* m = meshes[mi];
+        if (!m->vertex || m->vertexSize<=0) continue;
+        Matrix4 W; m->GetWorldMatrix(W);
+        bool esEdit = (m == em);
+
+        if (g_snap.target==SNAP_VERTEX){
+            for (int v=0; v<m->vertexSize; v++){
+                if (esEdit && ee){ // saltar los verts seleccionados (se estan moviendo)
+                    // busca el editable de esta pos rep; si esta seleccionado, saltar
+                    int rep = (int)m->posRep.size()==m->vertexSize ? m->posRep[v] : v;
+                    bool sel=false; for (size_t k=0;k<ee->editVerts.size();k++) if (ee->editVerts[k]==rep && k<ee->vertSel.size() && ee->vertSel[k]){ sel=true; break; }
+                    if (sel) continue;
+                }
+                Vector3 wp = W * Vector3(m->vertex[v*3], m->vertex[v*3+1], m->vertex[v*3+2]);
+                float sx,sy; if (!vp->ProyectarPunto(wp, sx, sy)) continue;
+                float dx=sx-lmx, dy=sy-lmy, d=dx*dx+dy*dy;
+                if (d<bestD){ bestD=d; outWorld=wp; outSx=sx; outSy=sy; found=true; }
+            }
+        } else if (g_snap.target==SNAP_EDGECENTER || g_snap.target==SNAP_EDGE){
+            for (size_t e=0; e+1<m->edges.size(); e+=2){
+                int a=m->edges[e], b=m->edges[e+1];
+                if (a<0||b<0||a>=m->vertexSize||b>=m->vertexSize) continue;
+                Vector3 wa = W * Vector3(m->vertex[a*3],m->vertex[a*3+1],m->vertex[a*3+2]);
+                Vector3 wb = W * Vector3(m->vertex[b*3],m->vertex[b*3+1],m->vertex[b*3+2]);
+                if (g_snap.target==SNAP_EDGECENTER){
+                    Vector3 wc = (wa+wb)*0.5f;
+                    float sx,sy; if (!vp->ProyectarPunto(wc,sx,sy)) continue;
+                    float dx=sx-lmx,dy=sy-lmy,d=dx*dx+dy*dy;
+                    if (d<bestD){ bestD=d; outWorld=wc; outSx=sx; outSy=sy; found=true; }
+                } else { // EDGE: punto mas cercano del segmento (en pantalla) al cursor
+                    float sax,say,sbx,sby; if (!vp->ProyectarPunto(wa,sax,say)||!vp->ProyectarPunto(wb,sbx,sby)) continue;
+                    float ex=sbx-sax, ey=sby-say; float len2=ex*ex+ey*ey; float t=0.0f;
+                    if (len2>1e-4f) t=((lmx-sax)*ex+(lmy-say)*ey)/len2; if (t<0)t=0; if (t>1)t=1;
+                    float px=sax+ex*t, py=say+ey*t; float dx=px-lmx,dy=py-lmy,d=dx*dx+dy*dy;
+                    if (d<bestD){ bestD=d; outWorld=wa+(wb-wa)*t; outSx=px; outSy=py; found=true;
+                        if (outEdgeA) *outEdgeA=wa; if (outEdgeB) *outEdgeB=wb; } // extremos del borde ganador (mundo)
+                }
+            }
+        } else { // SNAP_FACE / SNAP_FACECENTER: recorre las caras (trianguladas por abanico)
+            for (size_t f=0; f<m->faces3d.size(); f++){
+                const std::vector<int>& idx = m->faces3d[f].idx; int nc=(int)idx.size(); if (nc<3) continue;
+                if (g_snap.target==SNAP_FACECENTER){
+                    Vector3 c(0,0,0); for (int k=0;k<nc;k++){ int vi=idx[k]; c=c+Vector3(m->vertex[vi*3],m->vertex[vi*3+1],m->vertex[vi*3+2]); }
+                    c = W * (c*(1.0f/(float)nc));
+                    float sx,sy; if (!vp->ProyectarPunto(c,sx,sy)) continue;
+                    float dx=sx-lmx,dy=sy-lmy,d=dx*dx+dy*dy;
+                    if (d<bestD){ bestD=d; outWorld=c; outSx=sx; outSy=sy; found=true; }
+                } else { // FACE: proyecta el cursor sobre la cara (baricentrico en pantalla) -> retopologia
+                    for (int t=1; t+1<nc; t++){
+                        int i0=idx[0], i1=idx[t], i2=idx[t+1];
+                        Vector3 w0=W*Vector3(m->vertex[i0*3],m->vertex[i0*3+1],m->vertex[i0*3+2]);
+                        Vector3 w1=W*Vector3(m->vertex[i1*3],m->vertex[i1*3+1],m->vertex[i1*3+2]);
+                        Vector3 w2=W*Vector3(m->vertex[i2*3],m->vertex[i2*3+1],m->vertex[i2*3+2]);
+                        float x0,y0,x1,y1,x2,y2, pw0,pw1,pw2;
+                        if (!vp->ProyectarPunto(w0,x0,y0,&pw0)||!vp->ProyectarPunto(w1,x1,y1,&pw1)||!vp->ProyectarPunto(w2,x2,y2,&pw2)) continue;
+                        // baricentrico del cursor en el triangulo de PANTALLA
+                        float d00=(x1-x0), d01=(y1-y0), d10=(x2-x0), d11=(y2-y0);
+                        float den=d00*d11-d10*d01; if (fabsf(den)<1e-4f) continue;
+                        float vx=lmx-x0, vy=lmy-y0;
+                        float bb=(vx*d11 - vy*d10)/den; float cc=(d00*vy - d01*vx)/den; float aa=1.0f-bb-cc;
+                        if (aa< -0.001f||bb< -0.001f||cc< -0.001f) continue; // el cursor NO esta dentro del triangulo
+                        // PERSPECTIVE-CORRECT: el baricentrico de PANTALLA no interpola bien la posicion de MUNDO en
+                        // perspectiva (mismo problema que el texturado afin). Se divide cada peso por la profundidad
+                        // del vertice y se renormaliza -> el punto cae EXACTO bajo el cursor. (En ortho pw=1 -> afin.)
+                        float ia=aa/pw0, ib=bb/pw1, ic=cc/pw2, isum=ia+ib+ic;
+                        if (fabsf(isum)<1e-8f) continue; ia/=isum; ib/=isum; ic/=isum;
+                        Vector3 wp = w0*ia + w1*ib + w2*ic; // punto sobre la cara (mundo), corregido por perspectiva
+                        // nearest a la CAMARA: usamos la profundidad en pantalla como desempate (mas cerca = gana)
+                        float d = 0.0f; // el cursor esta dentro -> priorizamos por depth (aprox: menor |mundo-cam|)
+                        Vector3 dcam = wp - vp->viewPos; d = dcam.x*dcam.x+dcam.y*dcam.y+dcam.z*dcam.z;
+                        if (!found || d<bestD){ bestD=d; outWorld=wp; outSx=lmx; outSy=lmy; found=true; }
+                    }
+                }
+            }
+        }
+    }
+    return found;
+}
+
 // EXTRUDE (E / menus Vertex-Edge-Face): extruye la seleccion segun el modo y arranca
 // el move de la tapa. Con caras adyacentes el move se constriñe a la normal; si no
 // (verts/aristas sueltas) es LIBRE (plano de la camara). Solo en Edit Mode.
@@ -999,6 +1117,7 @@ bool LayoutAbrirMenuDeBarra(ViewportBase* vp, int mx, int my) {
     Button* bOvl  = BarRolBtn(B, BR_Overlays); Button* bRnd = BarRolBtn(B, BR_Render);
     Button* bOri  = BarRolBtn(B, BR_Orient); Button* bUV   = BarRolBtn(B, BR_UV);
     Button* bView = BarRolBtn(B, BR_View);   Button* bMesh = BarRolBtn(B, BR_Mesh);
+    Button* bSnap = BarRolBtn(B, BR_Snap);
     if (MenuMode && bMode && bMode->visible && bMode->Contains(mx, my)) {
         objetivo = MenuMode; boton = bMode;
         if (!MenuMode->action) MenuMode->action = LayoutAccionMode;
@@ -1009,6 +1128,11 @@ bool LayoutAbrirMenuDeBarra(ViewportBase* vp, int mx, int my) {
         // Pivot: el menu se REARMA cada vez (marca el activo) -> via LayoutMenuPivot
         if (MenuAbierto) MenuAbierto->Cerrar();
         LayoutMenuPivot(bPiv->sx, bPiv->sy + bPiv->height - GlobalScale);
+        return true;
+    } else if (bSnap && bSnap->visible && bSnap->Contains(mx, my)) {
+        // Snap: el menu se REARMA cada vez (Base/Target marcan el activo + labels) -> via LayoutMenuSnapTool
+        if (MenuAbierto) MenuAbierto->Cerrar();
+        LayoutMenuSnapTool(bSnap->sx, bSnap->sy + bSnap->height - GlobalScale);
         return true;
     } else if (MenuView && bView && bView->visible && bView->Contains(mx, my)) {
         objetivo = MenuView; boton = bView;   // "View" (antes de Select): submenu Viewpoint
@@ -1399,6 +1523,44 @@ static void AccionPivot(int aId) {
     // id 9 = el checkbox Lock Normals (lo maneja AgregarCheck, no hace falta accion)
 }
 
+// ===== menu SNAP (boton "Snap" de la barra): Enable + Snap Base + Snap Target + Affect + Target Selection =====
+static PopupMenu* gMenuSnapTool=NULL, *gMenuSnapBase=NULL, *gMenuSnapTarget=NULL;
+static void AccionSnapBase(int id){ g_snap.base=id; g_redraw=true; }
+static void AccionSnapTarget(int id){ g_snap.target=id; g_redraw=true; }
+// El dispatch (LayoutClickUI) SIEMPRE llama al action del menu TOP con el id del item elegido,
+// aunque el item venga de un submenu. Por eso el id de Base/Target se rutea aca por RANGO
+// (100+base, 200+target); los checkbox del top usan id 0 y su toggle lo hace el propio item.
+static void AccionSnapRouter(int id){
+    if (id >= 200) AccionSnapTarget(id - 200);
+    else if (id >= 100) AccionSnapBase(id - 100);
+}
+static const char* SnapBaseNom(int b){ return b==SNAP_CLOSEST?"Closest":b==SNAP_CENTER?"Center":b==SNAP_MEDIAN?"Median":"Active"; }
+static const char* SnapTargetNom(int t){ return t==SNAP_VERTEX?"Vertex":t==SNAP_EDGE?"Edge":t==SNAP_FACE?"Face":t==SNAP_EDGECENTER?"Edge Center":"Face Center"; }
+void LayoutMenuSnapTool(int mx, int my){
+    if (!gMenuSnapBase){ gMenuSnapBase=new PopupMenu(); gMenuSnapBase->titulo="Snap Base"; }
+    gMenuSnapBase->Limpiar();
+    for (int b=SNAP_CLOSEST;b<=SNAP_ACTIVE;b++) gMenuSnapBase->Agregar(SnapBaseNom(b), 100+b)->verde=(g_snap.base==b);
+    if (!gMenuSnapTarget){ gMenuSnapTarget=new PopupMenu(); gMenuSnapTarget->titulo="Snap Target"; }
+    gMenuSnapTarget->Limpiar();
+    for (int t=SNAP_VERTEX;t<=SNAP_FACECENTER;t++) gMenuSnapTarget->Agregar(SnapTargetNom(t), 200+t)->verde=(g_snap.target==t);
+    if (!gMenuSnapTool){ gMenuSnapTool=new PopupMenu(); gMenuSnapTool->titulo="Snap"; gMenuSnapTool->action=AccionSnapRouter; }
+    gMenuSnapTool->Limpiar();
+    gMenuSnapTool->AgregarCheck("Enable", 0, &g_snap.enabled)->atajo="Shift Tab";
+    // el resto se ve en GRIS cuando el snap esta apagado (->gris = &g_snap.enabled): sin snap
+    // ninguna de estas opciones hace efecto, igual que "Show Overlays" grisa sus hijos.
+    gMenuSnapTool->Agregar(std::string("Snap Base: ")+SnapBaseNom(g_snap.base), 0, -1, gMenuSnapBase)->gris = &g_snap.enabled;
+    gMenuSnapTool->Agregar(std::string("Snap Target: ")+SnapTargetNom(g_snap.target), 0, -1, gMenuSnapTarget)->gris = &g_snap.enabled;
+    gMenuSnapTool->AgregarCheck("Affect Move",   0, &g_snap.afMove)->gris = &g_snap.enabled;
+    gMenuSnapTool->AgregarCheck("Affect Rotate", 0, &g_snap.afRot)->gris = &g_snap.enabled;
+    gMenuSnapTool->AgregarCheck("Affect Scale",  0, &g_snap.afScale)->gris = &g_snap.enabled;
+    gMenuSnapTool->AgregarCheck("Include Active",     0, &g_snap.tsActive)->gris = &g_snap.enabled;
+    gMenuSnapTool->AgregarCheck("Include Edited",     0, &g_snap.tsEdited)->gris = &g_snap.enabled;
+    gMenuSnapTool->AgregarCheck("Include Non-Edited", 0, &g_snap.tsNonEdited)->gris = &g_snap.enabled;
+    if (MenuAbierto) MenuAbierto->Cerrar();
+    gMenuSnapTool->Abrir(mx, my, MenuPantallaW, MenuPantallaH);
+    MenuAbierto = gMenuSnapTool;
+}
+
 void LayoutMenuPivot(int mx, int my) {
     if (!gMenuPivot) {
         gMenuPivot = new PopupMenu();
@@ -1597,6 +1759,121 @@ void EditXformReiniciar(){ // cambio de eje (X/Y/Z): restaura al snapshot
     EVEscribir();
 }
 
+// cursor actual (coords de pantalla) durante un transform -> lo usa el snap para buscar el target bajo el mouse.
+int g_snapCurX = 0, g_snapCurY = 0;
+
+// EJE BLOQUEADO + target BORDE: cuanto hay que avanzar desde B por el eje 'a' (unitario) para TOCAR el segmento
+// [E0,E1] -> el punto de la recta (B + s*a) mas cercano al segmento (interseccion de bordes en la vista). Devuelve
+// false si el segmento es degenerado o el eje es paralelo al borde (no hay toque util -> se usa el fallback viejo).
+static bool SnapEjeTocaSegmento(const Vector3& B, const Vector3& a, const Vector3& E0, const Vector3& E1, float& outS){
+    Vector3 d = E1 - E0;
+    float E = d.Dot(d); if (E < 1e-12f) return false;         // segmento degenerado
+    float Bd = a.Dot(d);
+    float denom = E - Bd*Bd; if (denom < 1e-9f) return false; // eje || borde -> sin interseccion util
+    Vector3 r = B - E0;
+    float u = (d.Dot(r) - Bd*a.Dot(r)) / denom;               // parametro sobre la recta del borde
+    if (u < 0.0f) u = 0.0f; if (u > 1.0f) u = 1.0f;           // clamp al SEGMENTO
+    Vector3 Q = E0 + d*u;                                     // punto del borde mas cercano a la recta del eje
+    outS = a.Dot(Q - B);                                      // proyeccion sobre el eje (a unitario) -> avance
+    return true;
+}
+
+// ajusta gEVtrans para PEGAR la seleccion al target de snap (base Closest). Constreñido al mismo eje/plano que el
+// move; libre = offset completo (proyeccion a la cara = retopologia). Setea g_snapHit + pos para el recuadro verde.
+static void SnapAjustarEditTrans(){
+    g_snapHit = false;
+    if (!g_snap.enabled || !g_snap.afMove || !Viewport3DActive || InteractionMode!=EditMode || !gEVmesh) return;
+    Vector3 T; float sx=0, sy=0;
+    Vector3 eA, eB; // extremos del borde target (si target==SNAP_EDGE): para el snap con eje bloqueado
+    if (!SnapBuscarTarget(g_snapCurX, g_snapCurY, Viewport3DActive, T, sx, sy, &eA, &eB)) return;
+    // BASE: el punto de la seleccion (ya movida por gEVtrans) que se PEGA al target.
+    //  Closest = el vert mas cercano al target;  Center = centro del bounding box;
+    //  Median = promedio de los verts;  Active = el vertice activo (o Median si no hay).
+    Vector3 B; bool any=false;
+    if (gEVsnap.empty()) return;
+    if (g_snap.base==SNAP_CLOSEST){
+        float bd = 1e30f;
+        for (size_t i=0;i<gEVsnap.size();i++){ Vector3 p=gEVsnap[i].world0+gEVtrans; Vector3 d=p-T; float dd=d.Dot(d); if (dd<bd){bd=dd;B=p;any=true;} }
+    } else if (g_snap.base==SNAP_CENTER){
+        Vector3 mn=gEVsnap[0].world0, mx=gEVsnap[0].world0;
+        for (size_t i=1;i<gEVsnap.size();i++){ const Vector3& w=gEVsnap[i].world0;
+            if (w.x<mn.x)mn.x=w.x; if (w.y<mn.y)mn.y=w.y; if (w.z<mn.z)mn.z=w.z;
+            if (w.x>mx.x)mx.x=w.x; if (w.y>mx.y)mx.y=w.y; if (w.z>mx.z)mx.z=w.z; }
+        B = (mn+mx)*0.5f + gEVtrans; any=true;
+    } else if (g_snap.base==SNAP_ACTIVE){
+        int act = (gEVmesh->edit) ? gEVmesh->edit->activeIdx : -1;
+        for (size_t i=0;i<gEVsnap.size();i++) if (gEVsnap[i].editK==act){ B=gEVsnap[i].world0+gEVtrans; any=true; break; }
+    }
+    if (!any){ // MEDIAN (y fallback de Active/Center si algo faltara)
+        Vector3 c(0,0,0); for (size_t i=0;i<gEVsnap.size();i++) c += gEVsnap[i].world0;
+        B = c*(1.0f/(float)gEVsnap.size()) + gEVtrans;
+    }
+    Vector3 off = T - B;
+    // EJE BLOQUEADO (X/Y/Z o la normal del extrude): si el target es un BORDE, en vez de solo igualar la coordenada
+    // del eje, avanzamos por el eje hasta TOCAR el borde (la recta del eje ∩ el segmento) -> intersecar 2 bordes facil.
+    bool ejeUnico = false; Vector3 ejeA;
+    if (gEVuseCustom){ ejeUnico=true; ejeA=gTransformNormal; }                                   // extrude / orientacion Normal
+    else if (axisSelect==X||axisSelect==Y||axisSelect==Z){ ejeUnico=true; ejeA=EjeOrientado(*gEVmesh,axisSelect); }
+    if (ejeUnico){
+        float s;
+        if (g_snap.target==SNAP_EDGE && SnapEjeTocaSegmento(B, ejeA, eA, eB, s)) off = ejeA*s; // tocar el borde por el eje
+        else off = ejeA*off.Dot(ejeA);                                                          // fallback: igualar coordenada
+    }
+    else if (axisSelect==PlaneX||axisSelect==PlaneY||axisSelect==PlaneZ){ int ex=(axisSelect==PlaneX)?X:(axisSelect==PlaneY)?Y:Z; Vector3 a=EjeOrientado(*gEVmesh,ex); off = off - a*off.Dot(a); }
+    gEVtrans += off;
+    // el recuadro verde en el TARGET (el punto bajo/cerca del cursor al que se pega), como devuelve SnapBuscarTarget
+    g_snapHit = true; g_snapSx = sx; g_snapSy = sy;
+}
+
+// world0 (posicion original) del ELEMENTO ACTIVO (vert/borde/cara segun el modo): la "aguja" del snap de rotacion.
+// activeIdx indexa vertSel / edgeSel / faceSel segun EditSelectMode. Los verts del activo estan seleccionados ->
+// su world0 esta en gEVsnap. Borde = punto medio de sus 2 verts; cara = centro. false si no hay activo.
+static bool SnapNeedleActivo(Vector3& out){
+    if (!gEVmesh || !gEVmesh->edit) return false;
+    EditMesh* e = gEVmesh->edit;
+    int act = e->activeIdx; if (act < 0) return false;
+    std::vector<int> ks; // editVerts que forman el elemento activo
+    if (EditSelectMode==SelVertex){ ks.push_back(act); }
+    else if (EditSelectMode==SelEdge){ if (act*2+1 < (int)e->lineIdx.size()){ ks.push_back(e->lineIdx[act*2]); ks.push_back(e->lineIdx[act*2+1]); } }
+    else { if (act < (int)e->faces.size()) for (size_t c=0;c<e->faces[act].size();c++) ks.push_back(e->faces[act][c]); }
+    if (ks.empty()) return false;
+    Vector3 sum(0,0,0); int n=0;
+    for (size_t j=0;j<ks.size();j++){ int k=ks[j];
+        for (size_t i=0;i<gEVsnap.size();i++) if (gEVsnap[i].editK==k){ sum+=gEVsnap[i].world0; n++; break; } }
+    if (n==0) return false;
+    out = sum*(1.0f/(float)n); return true;
+}
+
+// SNAP de ROTACION (comportamiento propio de Whisk3D, distinto a Blender): gira la seleccion alrededor del pivote
+// (gEVpivot = cursor 3d o centro de la geometria, NUNCA el activo) como una AGUJA de reloj hasta que el ELEMENTO
+// ACTIVO (vert/borde/cara) apunte al target de snap. La aguja es SIEMPRE el activo (no depende del Snap Base).
+// Ajuste MINIMO sobre lo que venia del drag. Solo con un eje definido (ViewAxis o X/Y/Z); el orbital no tiene plano.
+static void SnapAjustarEditRot(){
+    g_snapHit = false;
+    if (!g_snap.enabled || !g_snap.afRot || !Viewport3DActive || InteractionMode!=EditMode || !gEVmesh) return;
+    if (gEVsnap.empty() || axisSelect==OrbitalAxis) return;
+    Vector3 axis = (axisSelect==ViewAxis||axisSelect==XYZ) ? camForward : EjeOrientado(*gEVmesh, axisSelect);
+    { float al=sqrtf(axis.Dot(axis)); if (al<1e-6f) return; axis=axis*(1.0f/al); }
+    Vector3 B0; if (!SnapNeedleActivo(B0)) return; // sin activo -> no hay aguja (hay que seleccionar una "punta")
+    Vector3 T; float sx=0, sy=0;
+    if (!SnapBuscarTarget(g_snapCurX, g_snapCurY, Viewport3DActive, T, sx, sy)) return;
+    const Vector3 P = gEVpivot;
+    // direcciones (en el plano perpendicular al eje): de la aguja YA rotada, y del target -> angulo firmado entre ellas
+    Vector3 Bc = P + gEVrotTotal*(B0 - P);
+    Vector3 vB = Bc - P; vB = vB - axis*vB.Dot(axis);
+    Vector3 vT = T  - P; vT = vT - axis*vT.Dot(axis);
+    float lB=sqrtf(vB.Dot(vB)), lT=sqrtf(vT.Dot(vT));
+    if (lB<1e-5f || lT<1e-5f) return; // aguja o target sobre el eje -> sin angulo
+    vB=vB*(1.0f/lB); vT=vT*(1.0f/lT);
+    float cosA=vB.Dot(vT); if(cosA>1)cosA=1; if(cosA<-1)cosA=-1;
+    Vector3 cross(vB.y*vT.z-vB.z*vT.y, vB.z*vT.x-vB.x*vT.z, vB.x*vT.y-vB.y*vT.x);
+    float deltaDeg = atan2f(cross.Dot(axis), cosA) * 180.0f / 3.14159265f; // firmado alrededor del eje
+    gEVrotTotal = Quaternion::FromAxisAngle(axis, deltaDeg) * gEVrotTotal; gEVrotTotal.normalize();
+    gAnguloTransform += deltaDeg;
+    // recuadro verde en el TARGET (el vertice bajo/cerca del cursor al que apunta la aguja), no en la punta activa
+    g_snapHit = true; g_snapSx = sx; g_snapSy = sy;
+}
+
 void EditXformTraslacion(int dx,int dy,float speed){
     if (!gEVmesh) return;
     // EXTRUDE: constreñido a un eje arbitrario (la normal). Proyecta el mouse igual
@@ -1604,7 +1881,7 @@ void EditXformTraslacion(int dx,int dy,float speed){
     if (gEVuseCustom){
         Vector3 a = gTransformNormal;
         float amt = (dx*a.Dot(camRight) - dy*a.Dot(camUp))*speed;
-        gEVtrans += a*amt; EVEscribir(); return;
+        gEVtrans += a*amt; SnapAjustarEditTrans(); EVEscribir(); return;
     }
     Vector3 libre = camRight*(dx*speed) + camUp*(-dy*speed); // plano de la camara
     Vector3 T;
@@ -1617,13 +1894,16 @@ void EditXformTraslacion(int dx,int dy,float speed){
         Vector3 a=EjeOrientado(*gEVmesh, ex);
         T = libre - a*libre.Dot(a);
     } else T = libre;
-    gEVtrans += T; EVEscribir();
+    gEVtrans += T;
+    SnapAjustarEditTrans(); // imantar la seleccion al target de snap (si esta ON)
+    EVEscribir();
 }
 void EditXformRotEje(int dx,int dy){
     if (!gEVmesh) return;
     float ang=(dx+dy)*0.1f; gAnguloTransform+=ang;
     Vector3 axis = (axisSelect==ViewAxis||axisSelect==XYZ)?camForward:EjeOrientado(*gEVmesh,axisSelect);
     gEVrotTotal = Quaternion::FromAxisAngle(axis,ang)*gEVrotTotal; gEVrotTotal.normalize();
+    SnapAjustarEditRot(); // imanta la aguja al target (si snap ON)
     EVEscribir();
 }
 void EditXformRotOrbital(int dx,int dy){
@@ -1635,7 +1915,9 @@ void EditXformRotOrbital(int dx,int dy){
 }
 void EditXformRotAbs(const Quaternion& qAbs){ // trackball: rotacion absoluta desde el inicio
     if (!gEVmesh) return;
-    gEVrotTotal = qAbs; EVEscribir();
+    gEVrotTotal = qAbs;
+    SnapAjustarEditRot(); // imanta la aguja al target (si snap ON) -> gira desde el pivote hacia el target
+    EVEscribir();
 }
 void EditXformScale(int dx,int dy,float factor){
     if (!gEVmesh) return;
@@ -1691,8 +1973,13 @@ void EditXformConfirmar(){
     UndoEditMoveConfirmar(); // Ctrl+Z: el move PURO se acepto -> pushea el pendiente (NULL si fue extrude)
     if (gEVmesh){
         Mesh* m = gEVmesh;
-        m->CalcularBordes(false);             // posRep/centroGeom/bordes; conserva el edit
+        // CONSERVA posRep (reagruparPosRep=false): un move NO cambia la topologia, y si el snap dejo 2 verts
+        // INDEPENDIENTES encimados, rederivar posRep por posicion los SOLDARIA (caras y edit desincronizados: bug Dante).
+        m->CalcularBordes(false, false);      // posRep(conserva)/centroGeom/bordes; conserva el edit
         if (!g_editLockNormales) m->RecalcularNormales();
+        // AUTO MERGE (opt-in, OFF por defecto): recien AHORA, si el usuario lo pidio, se sueldan los verts movidos
+        // con cualquier vert a <= threshold. No-op si no hay nada cerca (MergeVertsEdit retorna sin tocar nada).
+        if (g_autoMerge) MergeVertsEdit(m, 3 /*By Distance*/, g_autoMergeThreshold, Vector3(0,0,0));
         if (!m->modificadores.empty()) m->GenerarMallaModificada(); // regen final (toma las normales recalculadas)
     }
     gEVsnap.clear(); gEVmesh = NULL;

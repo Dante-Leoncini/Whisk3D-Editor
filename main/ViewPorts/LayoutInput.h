@@ -15,6 +15,32 @@
 class Quaternion; // para la firma del trackball (EditXformRotAbs)
 class Mesh;       // para la firma de MergeVertsEdit (Mesh* + Vector3&)
 
+// ============================================================================
+//  SNAP (imantado): al mover/rotar/escalar, la seleccion se "pega" a la geometria bajo el cursor. Objeto y edicion.
+// ============================================================================
+enum { SNAP_VERTEX=0, SNAP_EDGE, SNAP_FACE, SNAP_EDGECENTER, SNAP_FACECENTER };   // Snap Target
+enum { SNAP_CLOSEST=0, SNAP_CENTER, SNAP_MEDIAN, SNAP_ACTIVE };                   // Snap Base
+struct SnapCfg {
+    bool enabled;                          // ON/OFF (Shift+Tab). Boton verde si ON.
+    int  base;                             // que punto de la seleccion se pega (SNAP_CLOSEST por defecto)
+    int  target;                           // a que se pega (SNAP_VERTEX por defecto)
+    bool afMove, afRot, afScale;           // "Affect": el snap solo actua en esas operaciones
+    bool tsActive, tsEdited, tsNonEdited;  // "Target Selection": que geometria es candidata a snap
+};
+extern SnapCfg g_snap;
+bool SnapEnabled();  // g_snap.enabled
+void SnapToggle();   // Shift+Tab
+// busca el punto de snap bajo el cursor (target actual, entre la geometria candidata). true + outWorld si engancho.
+// outSx/outSy = su posicion en pantalla (para el recuadro verde). vp = el viewport 3D.
+// outEdgeA/outEdgeB (opcionales): si el target es un BORDE, devuelve sus 2 extremos en MUNDO (para que el snap
+// con eje bloqueado lleve el vertice a TOCAR el borde a lo largo del eje, no solo a igualar la coordenada).
+bool SnapBuscarTarget(int mx, int my, class Viewport3D* vp, Vector3& outWorld, float& outSx, float& outSy,
+                      Vector3* outEdgeA = 0, Vector3* outEdgeB = 0);
+void LayoutMenuSnapTool(int mx, int my); // abre el menu Snap (boton de la barra)
+extern int g_snapCurX, g_snapCurY;       // cursor durante un transform (para el snap)
+extern bool g_snapHit; extern float g_snapSx, g_snapSy; // ultimo snap (para el recuadro verde)
+
+
 // teclas abstractas (cada plataforma traduce las suyas)
 //  Enter  = OK/activar el elemento enfocado (abre carpeta, etc.)
 //  Cancel = volver/cerrar (en Symbian: tecla soft IZQUIERDA del File browser)

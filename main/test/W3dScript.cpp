@@ -512,6 +512,14 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         return true;
     }
 
+    // ---- automerge <on|off> [threshold] : Auto Merge (menu Mesh). Al confirmar un move suelda lo movido <= threshold ----
+    if (cmd == "automerge") {
+        extern bool g_autoMerge; extern float g_autoMergeThreshold;
+        std::string on; ss >> on; g_autoMerge = (on == "on" || on == "1" || on == "true");
+        float th; if (ss >> th) g_autoMergeThreshold = th;
+        return true;
+    }
+
     // ---- merge <center|cursor|collapse|bydistance> (suelda la seleccion; bydistance usa g_mergeDist) ----
     if (cmd == "merge") {
         extern float g_mergeDist;

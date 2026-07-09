@@ -651,8 +651,9 @@ void InputUsuarioSDL3(SDL_Event &e){
         // si no, cicla el viewport activo (borde verde). La logica del toggle vive
         // en LayoutToggleEditMode (la comparte Symbian).
         if (e.key.keysym.sym == SDLK_TAB) {
-            if (!LayoutToggleEditMode())
-                LayoutCiclarViewportActivo(LShiftPressed ? -1 : +1);
+            if (LShiftPressed) SnapToggle();  // Shift+Tab = toggle SNAP (imantado), como Blender
+            else if (!LayoutToggleEditMode())
+                LayoutCiclarViewportActivo(+1);
             atajoMenu = true;
         }
         // 'm' en Edit Mode = menu MERGE (soldar verts, estilo Blender); en el resto abre/cierra la barra de

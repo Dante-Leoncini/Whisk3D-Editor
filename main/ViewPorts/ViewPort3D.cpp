@@ -81,6 +81,8 @@ Viewport3D::Viewport3D(Vector3 pos){
         b->desplegable = true; BarButtons.push_back(b);
     b = new Button("Orient"); b->rol = BR_Orient;                          // orientacion del transform
         b->desplegable = true; BarButtons.push_back(b);                    // (movido ANTES de Select)
+    b = new Button("Snap"); b->rol = BR_Snap;                              // SNAP (imanta al mover): verde si esta ON
+        b->desplegable = true; BarButtons.push_back(b);
     b = new Button("View"); b->rol = BR_View; b->desplegable = true; BarButtons.push_back(b); // Viewpoint (antes de Select)
     b = new Button("Select"); b->rol = BR_Select; b->desplegable = true; BarButtons.push_back(b);
     b = new Button("Add"); b->rol = BR_Add; b->desplegable = true; BarButtons.push_back(b);
@@ -188,6 +190,12 @@ Viewport3D::Viewport3D(Vector3 pos){
         MenuMesh->Agregar("Transform", 0, -1, MenuTransformEdit);        // arriba de todo (Move/Rotate/Scale/Shrink)
         MenuMesh->Agregar("Duplicate", 314)->atajo = "Shift D";          // comun a vertice/borde/cara
         MenuMesh->Agregar("Merge", 0, -1, LayoutSubmenuMerge())->atajo = "M"; // suelda verts (limpia duplicados)
+        // Auto Merge (opt-in, OFF por defecto): al confirmar un move suelda los verts movidos con los que queden
+        // a <= Threshold. Con el auto merge apagado, "Threshold" se ve en gris (->gris = &g_autoMerge).
+        // ids 390/391: fuera del rango 0-7 (que LayoutAccionMesh rutea a Snap) y sin caso en LayoutAccionObject
+        // (no-op). El toggle del check y el set del slider los hace el propio item; la accion no tiene que hacer nada.
+        MenuMesh->AgregarCheck("Auto Merge", 390, &g_autoMerge);
+        MenuMesh->AgregarFloat("Threshold", 391, &g_autoMergeThreshold, 0.0f, 0.1f)->gris = &g_autoMerge;
         MenuMesh->Agregar("Normals", 0, -1, LayoutSubmenuNormals()); // Recalculate Normals + Flip
         MenuMesh->Agregar("Snap", 0, -1, LayoutSubmenuSnap())->atajo = "Shift S";
         MenuMesh->Agregar("Delete", 360, -1, LayoutSubmenuDelete())->atajo = "X"; // abajo de todo
@@ -557,7 +565,7 @@ void Viewport3D::RecalcOrbitPosition(){
     camForward = viewRot * Vector3(0, 0, -1);
 }
 
-bool Viewport3D::ProyectarPunto(const Vector3& p, float& sx, float& sy){
+bool Viewport3D::ProyectarPunto(const Vector3& p, float& sx, float& sy, float* outW){
     // ejes de camara de ESTE viewport (no los globals, que pisa el ultimo
     // renderizado en multi-3D)
     Vector3 cr = viewRot * Vector3(1, 0, 0);
@@ -566,6 +574,9 @@ bool Viewport3D::ProyectarPunto(const Vector3& p, float& sx, float& sy){
     Vector3 rel = p - viewPos;
     float ez = rel.Dot(cf);                   // distancia hacia adelante
     if (ez < 0.0001f) return false;           // detras de la camara
+    // divisor de perspectiva: en perspectiva es la profundidad (para interpolar perspective-correct); en
+    // ortografica NO hay division -> 1.0 (la proyeccion es afin, el baricentrico de pantalla ya es el real).
+    if (outW) *outW = orthographic ? 1.0f : ez;
     float ex = rel.Dot(cr);
     float ey = rel.Dot(cu);
     float aspectR = (height > 0) ? (float)width / (float)height : 1.0f;
@@ -969,6 +980,31 @@ void Viewport3D::Render() {
     if (showOverlays) RenderOverlay();
     RenderCamPassepartout(); // marco de camara (lo que se va a renderizar) + oscurecido afuera. Antes de la UI (queda debajo).
     if (ShowUi) RenderUI();
+    RenderSnapIndicador(); // recuadro verde en el target de snap (encima de todo)
+}
+
+// SNAP: recuadro verde (solo borde) en el target bajo el cursor mientras se mueve con snap ON. Asi sabes
+// que esta enganchando y donde. g_snapSx/Sy son coords del viewport (las setea SnapBuscarTarget/SnapAjustar).
+void Viewport3D::RenderSnapIndicador(){
+    if (!g_snap.enabled || !g_snapHit) return;
+    if (!(Viewport3DActive == this && (estado==translacion||estado==rotacion||estado==EditScale))) return;
+    namespace gfx = w3dEngine;
+    gfx::MatrixMode(gfx::Projection); gfx::LoadIdentity();
+    gfx::Ortho(0, width, height, 0, -1, 1);
+    gfx::MatrixMode(gfx::ModelView); gfx::LoadIdentity();
+    gfx::Disable(gfx::DepthTest); gfx::Disable(gfx::Lighting); gfx::Disable(gfx::Texture2D);
+    gfx::DisableArray(gfx::TexCoordArray); gfx::DisableArray(gfx::NormalArray); gfx::DisableArray(gfx::ColorArray);
+    gfx::EnableArray(gfx::VertexArray);
+    float h = 6.0f; // recuadro de ~12px (6 de medio)
+    float x0 = g_snapSx - h, x1 = g_snapSx + h, y0 = g_snapSy - h, y1 = g_snapSy + h;
+    gfx::Color4f(0.15f, 1.0f, 0.2f, 1.0f); // verde
+    gfx::LineWidth(2.0f);
+    GLfloat b[] = { x0,y0, x1,y0,  x1,y0, x1,y1,  x1,y1, x0,y1,  x0,y1, x0,y0 };
+    gfx::VertexPointer2f(0, b);
+    gfx::DrawLines(8);
+    gfx::LineWidth(1.0f);
+    gfx::Enable(gfx::Texture2D); gfx::EnableArray(gfx::TexCoordArray);
+    gfx::Invalidate();
 }
 
 // PASSEPARTOUT de camara: al mirar DESDE la camara, dibuja el BORDE BLANCO del render y OSCURECE afuera (0.5 negro).
@@ -1486,6 +1522,14 @@ void Viewport3D::RenderUI() {
             if (bOri) bOri->text = (transformOrientation == LocalOrient)  ? "Local" :
                                    (transformOrientation == ViewOrient)   ? "View"  :
                                    (transformOrientation == NormalOrient) ? "Normal" : "Global";
+            // SNAP: el boton se ilumina VERDE cuando esta ON (para saber que el imantado esta activo)
+            Button* bSnap = BarRolBtn(BarButtons, BR_Snap);
+            if (bSnap){
+                static float snapVerde[3]; const float* acc = ListaColores[static_cast<int>(ColorID::accent)];
+                for (int i=0;i<3;i++) snapVerde[i]=acc[i]*0.4f;
+                bSnap->tinte = g_snap.enabled ? snapVerde : NULL;
+                bSnap->colorTexto = g_snap.enabled ? acc : NULL;
+            }
             RenderBar();
         }
         // barra de HERRAMIENTAS (abajo): historial + orientacion + ejes + aceptar/cancelar tactil.
@@ -1982,6 +2026,7 @@ void Viewport3D::event_mouse_motion(int mx, int my){
             if (dx != 0 || dy != 0) g_xformPrimerMov = false;
             dx = 0; dy = 0; // este motion arranca SIEMPRE en cero
         }
+        g_snapCurX = mx; g_snapCurY = my; // cursor para el SNAP (busca el target bajo el mouse)
         // si el usuario esta tipeando un valor EXACTO, el mouse NO pisa el transform
         if (NumInputActivo()) { ActualizarLineaTransform(mx, my); return; }
         // Ocultar el cursor

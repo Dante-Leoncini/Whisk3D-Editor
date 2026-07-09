@@ -64,7 +64,7 @@ extern PopupMenu* MenuSelMode;  // edit mode: sub-elemento Vertex/Edge/Face
 // (BarRolBtn / BarRolIdx), NO por indice -> reordenar la barra (mover botones) NO rompe nada.
 enum BarRol3D {
     BR_Mode = 1, BR_SelMode, BR_Pivot, BR_Select, BR_Add,
-    BR_Object, BR_Overlays, BR_Render, BR_Orient, BR_UV, BR_View,
+    BR_Object, BR_Overlays, BR_Render, BR_Orient, BR_UV, BR_View, BR_Snap,
     BR_Mesh // menu "Mesh" de Edit Mode (Transform/Snap/Delete), comun a vertice/borde/cara
 };
 // roles de la barra de HERRAMIENTAS (abajo). TBR_Hist+i = boton i del historial de acciones.
@@ -89,6 +89,7 @@ class Viewport3D : public ViewportBase, public WithBorder {
         // viewport. camFrameOn = hay marco; camFrameNX/NY = medias-extensiones del marco en NDC (para el overlay 2D).
         bool camFrameOn; float camFrameNX; float camFrameNY;
         void RenderCamPassepartout(); // dibuja el borde blanco + oscurece afuera del marco (lo que NO sale en el render)
+        void RenderSnapIndicador();   // recuadro verde en el target de snap bajo el cursor
         // INSPECCION en vista de camara: paneo/zoom de la VISTA (no mueve la camara) para ver con detalle dentro y
         // fuera del marco. Se aplica a la proyeccion + al marco. La camara NO se toca (el render no cambia).
         float camViewZoom; float camViewPanX; float camViewPanY;
@@ -159,7 +160,9 @@ class Viewport3D : public ViewportBase, public WithBorder {
         // proyecta un punto del mundo a coords de PANTALLA del viewport (0..w,
         // 0..h, y hacia abajo). false si esta detras de la camara. Lo usa el
         // "rotar desde la vista" (trackball) para el angulo del mouse al pivot.
-        bool ProyectarPunto(const Vector3& p, float& sx, float& sy);
+        // outW (opcional): el divisor de perspectiva del punto (profundidad eye-space en perspectiva, 1.0 en
+        // ortografica). Sirve para interpolar dentro de un triangulo de forma PERSPECTIVE-CORRECT (bary/outW).
+        bool ProyectarPunto(const Vector3& p, float& sx, float& sy, float* outW = 0);
         // mundo-por-pixel al arrastrar (mover/extrude): a la PROFUNDIDAD del pivot de transform, para
         // que lo agarrado se mueva 1:1 con el mouse/flechas en pantalla a cualquier zoom.
         float VelocidadArrastreMundo();
