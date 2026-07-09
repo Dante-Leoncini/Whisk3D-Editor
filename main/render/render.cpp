@@ -145,7 +145,7 @@ static void MeshOverlayHook(Mesh* m) {
     } else if (m->select) {
         int cid = ((Object*)m == ObjActivo) ? RC_selActive : RC_selInactive;
         const float* col = gRenderColors[cid];
-        m->RenderBordes(col, 3.0f, false);
+        m->RenderBordes(col, 3.0f, true); // pushBack=true: el contorno se empuja ATRAS (DepthRange), sin adelantar las caras
         RenderNormales(m);
     } else if (m->facesSize == 0 && !(m->genValido && m->genVertex && m->genFaces)) {
         // malla SIN caras propias NI malla generada (un wireframe suelto, no un perfil de modificador): dibuja sus

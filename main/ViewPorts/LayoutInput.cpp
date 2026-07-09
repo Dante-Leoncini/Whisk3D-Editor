@@ -507,6 +507,8 @@ bool SnapBuscarTarget(int mx, int my, Viewport3D* vp, Vector3& outWorld, float& 
     for (size_t mi=0; mi<meshes.size(); mi++){
         Mesh* m = meshes[mi];
         if (!m->vertex || m->vertexSize<=0) continue;
+        // en MODO OBJETO no se snapea a la propia seleccion que se mueve (todos los objetos seleccionados)
+        if (InteractionMode==ObjectMode && m->select) continue;
         Matrix4 W; m->GetWorldMatrix(W);
         bool esEdit = (m == em);
 

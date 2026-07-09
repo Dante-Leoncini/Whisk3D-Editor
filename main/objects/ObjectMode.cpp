@@ -3,6 +3,14 @@
 #include "objects/Mesh.h"      // snap del cursor al centro de la malla en Edit Mode
 #include "EditMesh.h"  // CentroSeleccion
 #include "Undo.h"      // Ctrl+Z: capturar transform / limpiar al borrar
+#include "ViewPorts/LayoutInput.h" // SNAP en modo objeto (SnapBuscarTarget, g_snap, enums)
+
+// SNAP en MODO OBJETO: se snapshotean los "puntos de snap" de la seleccion al empezar el transform (todos los
+// verts de las mallas + el ORIGEN de camara/lampara/empty) y move/rotate/scale imantan la BASE al target.
+static void SnapObjCapturar();
+static void SnapAjustarObjMove();
+void SnapAjustarObjRot(); // publica: la rotacion "desde la vista" (trackball) esta en ViewPort3D.cpp
+static void SnapAjustarObjScale();
 
 // (LayoutInput) transform de MALLA en curso + su reset: al cambiar de eje (X/Y/Z) en Edit Mode hay que
 // RESETEAR el acumulado (translate/extrude/scale) a cero y re-aplicar con el eje nuevo, como en Object Mode.
@@ -290,6 +298,7 @@ bool guardarEstado(){
 
     UndoTransformIniciar(); // captura pos/rot/escala PREVIAS (se confirma al aceptar el transform)
     SetTransformPivotPoint();
+    SnapObjCapturar(); // snapshot de los puntos de snap (verts + origenes) para el imantado
 	return true;
 }
 
@@ -736,6 +745,7 @@ void SetRotacion(int dx, int dy){
 		obj.ActualizarDisplayRot();
 	}
 	AplicarPivotATransform(); // gira las posiciones alrededor del pivote
+	SnapAjustarObjRot(); // imanta: el activo apunta al target (si snap ON)
 	{ extern bool g_objetosMovidos; g_objetosMovidos = true; } // Mirror con target depende de la rotacion/posicion
 }
 
@@ -799,6 +809,7 @@ void SetScale(int dx, int dy, float factor){
 		}
 	}
 	AplicarPivotATransform(); // aleja/acerca las posiciones del pivote segun el factor
+	SnapAjustarObjScale(); // imanta: la base toca el target radialmente (si snap ON)
 	{ extern bool g_objetosMovidos; g_objetosMovidos = true; } // Mirror con target depende de la posicion/escala
 }
 
@@ -873,6 +884,7 @@ void SetTranslacionObjetos(int dx, int dy, float speed){
 			obj.pos += libre; // libre (3 ejes)
 		}
 	}
+	SnapAjustarObjMove(); // imanta la base de la seleccion al target (si snap ON)
 	{ extern bool g_objetosMovidos; g_objetosMovidos = true; } // Mirror con target: su plano depende de la posicion
 }
 
@@ -919,6 +931,113 @@ void AplicarPivotATransform(){
         }
         PonerEnGlobal(&obj, nw);
     }
+}
+
+// ============================================================================
+//  SNAP en MODO OBJETO (move/rotate/scale). La seleccion se trata como si TODOS sus verts estuvieran seleccionados
+//  (camara/lampara/empty aportan su ORIGEN). Se snapshotean al empezar y la BASE se imanta al target bajo el cursor.
+// ============================================================================
+static std::vector<Vector3> g_objSnapPts; // puntos de snap (MUNDO) de la seleccion, capturados al empezar
+static Vector3 g_objSnapActivo;           // origen del objeto ACTIVO (aguja de la rotacion / base Active)
+static bool    g_objSnapHayAct = false;
+
+static void SnapObjCapturar(){
+    g_objSnapPts.clear(); g_objSnapHayAct = false;
+    for (size_t o=0;o<estadoObjetos.size();o++){
+        Object* ob = estadoObjetos[o].obj; if (!ob) continue;
+        bool verts=false;
+        if (ob->getType()==ObjectType::mesh){
+            Mesh* m=(Mesh*)ob;
+            if (m->vertex && m->vertexSize>0){
+                Matrix4 W; m->GetWorldMatrix(W);
+                for (int v=0; v<m->vertexSize; v++)
+                    g_objSnapPts.push_back(W * Vector3(m->vertex[v*3], m->vertex[v*3+1], m->vertex[v*3+2]));
+                verts=true;
+            }
+        }
+        if (!verts) g_objSnapPts.push_back(ob->GetGlobalPosition()); // sin verts (camara/lampara/empty) -> el origen
+        if (ob==ObjActivo){ g_objSnapActivo = ob->GetGlobalPosition(); g_objSnapHayAct = true; }
+    }
+}
+
+// base del snap (Closest/Center/Median/Active) entre los puntos snapshot, respecto al target T.
+static bool SnapObjBase(const Vector3& T, Vector3& out){
+    if (g_objSnapPts.empty()) return false;
+    if (g_snap.base==SNAP_ACTIVE && g_objSnapHayAct){ out=g_objSnapActivo; return true; }
+    if (g_snap.base==SNAP_CENTER){
+        Vector3 mn=g_objSnapPts[0], mx=g_objSnapPts[0];
+        for (size_t i=1;i<g_objSnapPts.size();i++){ const Vector3&w=g_objSnapPts[i];
+            if(w.x<mn.x)mn.x=w.x; if(w.y<mn.y)mn.y=w.y; if(w.z<mn.z)mn.z=w.z;
+            if(w.x>mx.x)mx.x=w.x; if(w.y>mx.y)mx.y=w.y; if(w.z>mx.z)mx.z=w.z; }
+        out=(mn+mx)*0.5f; return true;
+    }
+    if (g_snap.base==SNAP_MEDIAN){
+        Vector3 c(0,0,0); for (size_t i=0;i<g_objSnapPts.size();i++) c+=g_objSnapPts[i];
+        out=c*(1.0f/(float)g_objSnapPts.size()); return true;
+    }
+    // CLOSEST (y fallback de Active sin activo): el punto mas cercano al target
+    float bd=1e30f; bool any=false;
+    for (size_t i=0;i<g_objSnapPts.size();i++){ Vector3 d=g_objSnapPts[i]-T; float dd=d.Dot(d); if(dd<bd){bd=dd;out=g_objSnapPts[i];any=true;} }
+    return any;
+}
+
+// MOVE: desplaza toda la seleccion (desde el snapshot) para que la BASE quede en el target (o su componente de eje).
+static void SnapAjustarObjMove(){
+    g_snapHit=false;
+    if (!g_snap.enabled || !g_snap.afMove || !Viewport3DActive || InteractionMode!=ObjectMode || estadoObjetos.empty()) return;
+    Vector3 T; float sx=0,sy=0;
+    if (!SnapBuscarTarget(g_snapCurX,g_snapCurY,Viewport3DActive,T,sx,sy)) return;
+    Vector3 B; if (!SnapObjBase(T,B)) return;
+    Vector3 off = T - B;
+    Object* ref = ObjActivo ? ObjActivo : estadoObjetos[0].obj;
+    if (axisSelect==X||axisSelect==Y||axisSelect==Z){ Vector3 a=EjeOrientado(*ref,axisSelect); off=a*off.Dot(a); }
+    else if (axisSelect==PlaneX||axisSelect==PlaneY||axisSelect==PlaneZ){ int ex=(axisSelect==PlaneX)?X:(axisSelect==PlaneY)?Y:Z; Vector3 a=EjeOrientado(*ref,ex); off=off-a*off.Dot(a); }
+    for (size_t o=0;o<estadoObjetos.size();o++){ SaveState& st=estadoObjetos[o]; PonerEnGlobal(st.obj, st.worldPos + off); }
+    g_snapHit=true; g_snapSx=sx; g_snapSy=sy;
+}
+
+// ROTATE: gira toda la seleccion alrededor del pivote (TransformPivotPoint) para que el objeto ACTIVO apunte al target.
+void SnapAjustarObjRot(){
+    g_snapHit=false;
+    if (!g_snap.enabled || !g_snap.afRot || !Viewport3DActive || InteractionMode!=ObjectMode || estadoObjetos.empty()) return;
+    if (axisSelect==OrbitalAxis || !g_objSnapHayAct) return; // orbital no tiene plano; sin activo no hay aguja
+    Object* ref = ObjActivo ? ObjActivo : estadoObjetos[0].obj;
+    Vector3 axis = (axisSelect==ViewAxis||axisSelect==XYZ) ? camForward : EjeOrientado(*ref, axisSelect);
+    { float al=sqrtf(axis.Dot(axis)); if(al<1e-6f) return; axis=axis*(1.0f/al); }
+    Vector3 T; float sx=0,sy=0;
+    if (!SnapBuscarTarget(g_snapCurX,g_snapCurY,Viewport3DActive,T,sx,sy)) return;
+    const Vector3 P = TransformPivotPoint;
+    Vector3 vN = g_objSnapActivo - P; vN = vN - axis*vN.Dot(axis); // aguja = origen del activo (snapshot)
+    Vector3 vT = T - P;               vT = vT - axis*vT.Dot(axis);
+    float lN=sqrtf(vN.Dot(vN)), lT=sqrtf(vT.Dot(vT));
+    if (lN<1e-5f || lT<1e-5f) return; // activo sobre el eje/pivote -> sin angulo
+    vN=vN*(1.0f/lN); vT=vT*(1.0f/lT);
+    float cosA=vN.Dot(vT); if(cosA>1)cosA=1; if(cosA<-1)cosA=-1;
+    Vector3 cross(vN.y*vT.z-vN.z*vT.y, vN.z*vT.x-vN.x*vT.z, vN.x*vT.y-vN.y*vT.x);
+    float angDeg = atan2f(cross.Dot(axis), cosA)*180.0f/3.14159265f; // absoluto -> obj.rot desde el snapshot
+    for (size_t o=0;o<estadoObjetos.size();o++){ SaveState& st=estadoObjetos[o]; Object& ob=*st.obj;
+        ob.rot = Quaternion::FromAxisAngle(axis, angDeg) * st.rot; ob.rot.normalize(); ob.ActualizarDisplayRot(); }
+    AplicarPivotATransform();
+    gAnguloTransform = angDeg;
+    g_snapHit=true; g_snapSx=sx; g_snapSy=sy;
+}
+
+// SCALE (uniforme): la BASE se mueve radialmente desde el pivote hasta el punto mas cercano al target. Bajo escala
+// uniforme de objeto, un punto del mundo se mueve radial al pivote (el reposicionar el origen + escalar los verts
+// se combinan en un puro escalado desde el pivote), asi que un factor k uniforme desde el snapshot lo resuelve.
+static void SnapAjustarObjScale(){
+    g_snapHit=false;
+    if (!g_snap.enabled || !g_snap.afScale || !Viewport3DActive || InteractionMode!=ObjectMode || estadoObjetos.empty()) return;
+    if (axisSelect!=XYZ && axisSelect!=ViewAxis) return; // solo escala UNIFORME (con eje bloqueado el radial no vale)
+    Vector3 T; float sx=0,sy=0;
+    if (!SnapBuscarTarget(g_snapCurX,g_snapCurY,Viewport3DActive,T,sx,sy)) return;
+    Vector3 B; if (!SnapObjBase(T,B)) return;
+    const Vector3 P = TransformPivotPoint;
+    Vector3 d = B - P; float dd=d.Dot(d); if (dd<1e-12f) return; // base en el pivote -> la escala no la mueve
+    float k = (T-P).Dot(d)/dd; if (k < 1e-4f) k = 1e-4f; // no colapsar/invertir
+    for (size_t o=0;o<estadoObjetos.size();o++){ SaveState& st=estadoObjetos[o]; st.obj->scale = st.scale * k; }
+    AplicarPivotATransform();
+    g_snapHit=true; g_snapSx=sx; g_snapSy=sy;
 }
 
 // redondea a la unidad de grilla mas cercana (1.0, como Blender por defecto)

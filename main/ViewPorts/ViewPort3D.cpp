@@ -662,6 +662,7 @@ void Viewport3D::RotarDesdeVista(int mx, int my){
         ob.rotEuler = ob.rot.ToEulerYXZ();
     }
     AplicarPivotATransform(); // gira las posiciones alrededor del pivote
+    { extern void SnapAjustarObjRot(); SnapAjustarObjRot(); } // imanta: el activo apunta al target (si snap ON)
 }
 
 void Viewport3D::SetViewpoint(Viewpoint value) {
