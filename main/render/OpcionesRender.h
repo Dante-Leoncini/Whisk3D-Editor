@@ -33,6 +33,10 @@ extern RenderType view;
 // menu Render lo edita). El fondo del viewport en solid/wireframe/material es OTRO color (por-viewport).
 extern float g_renderBg[4];
 
+// ASPECTO del render (ancho/alto). La GEOMETRIA de las camaras (el rectangulo del "film" + el triangulito de
+// arriba) se adapta a esto: 1:1 = cuadrada, 4:3 = 4:3, etc. Se actualiza al cambiar Width/Height del render.
+extern float g_renderAspect;
+
 extern GLfloat MaterialPreviewAmbient[4];
 extern GLfloat MaterialPreviewDiffuse[4];
 extern GLfloat MaterialPreviewSpecular[4];

@@ -145,6 +145,7 @@ void Wavefront::Reset() {
     normals.clear();
     uv.clear();
     faces.clear();
+    looseEdges.clear();
     materialsGroup.clear();
     facesSize = 0;
     facesCount = 0;
@@ -159,6 +160,7 @@ void Wavefront::ConvertToES1(Mesh* TempMesh, int* acumuladoVertices, int* acumul
     std::vector<MeshIndex> newFaces;
 
     TVertexMap vertexMap;
+    std::vector<int> posToMesh((size_t)(vertex.size()/3), -1); // posicion OBJ -> primer vertice de malla (para 'l')
 
     // un OBJ puede venir SIN normales o SIN UVs ("f v", "f v//vn", "f v/vt"):
     // los indices que faltan llegan en -1 y se completan con 0
@@ -227,6 +229,7 @@ void Wavefront::ConvertToES1(Mesh* TempMesh, int* acumuladoVertices, int* acumul
                 }
             }
             faceIdx.push_back(idx);
+            if (fc.vertex>=0 && fc.vertex<(int)posToMesh.size() && posToMesh[fc.vertex]<0) posToMesh[fc.vertex]=idx; // 1er vert de esa pos (para 'l')
         }
 
         // triangulacion en abanico (tri=1, quad=2, ngon=N-2)
@@ -246,6 +249,27 @@ void Wavefront::ConvertToES1(Mesh* TempMesh, int* acumuladoVertices, int* acumul
         MeshFace mf;
         for (size_t k = 0; k < faceIdx.size(); k++) mf.idx.push_back((int)faceIdx[k]);
         TempMesh->faces3d.push_back(mf);
+    }
+
+    // BORDES SUELTOS (lineas 'l'): cada posicion -> vertice de malla. Si la posicion NO la usa ninguna cara,
+    // se crea un vertice nuevo (perfil suelto: Screw / planos). Preserva las aristas para el editor.
+    if (!looseEdges.empty()) {
+        const int nPos = (int)(vertex.size()/3);
+        for (size_t i = 0; i + 1 < looseEdges.size(); i += 2) {
+            int ab[2] = { looseEdges[i], looseEdges[i+1] }, mm[2] = { -1, -1 };
+            for (int s = 0; s < 2; s++) {
+                int pos = ab[s];
+                if (pos < 0 || pos >= nPos) continue;
+                if (posToMesh[pos] >= 0) { mm[s] = posToMesh[pos]; continue; }
+                int nuevo = (int)(newVertices.size()/3); // posicion no usada por caras -> vert nuevo
+                for (int v = 0; v < 3; v++) newVertices.push_back(vertex[(size_t)pos*3+v]);
+                if (hayNormales) { newNormals.push_back(0); newNormals.push_back(127); newNormals.push_back(0); }
+                for (int v = 0; v < 4; v++) { size_t ci=(size_t)pos*4+v; newColors.push_back(ci<vertexColor.size()?vertexColor[ci]:(GLubyte)255); }
+                if (hayUVs) { newUVs.push_back(0.0f); newUVs.push_back(0.0f); }
+                posToMesh[pos] = nuevo; mm[s] = nuevo;
+            }
+            if (mm[0]>=0 && mm[1]>=0 && mm[0]!=mm[1]) { TempMesh->looseEdges.push_back(mm[0]); TempMesh->looseEdges.push_back(mm[1]); }
+        }
     }
 
     // Asignar a TempMesh (vertexSize = cantidad de VERTICES, no de floats: asi lo
@@ -388,6 +412,13 @@ void Wavefront::ConvertToES1_NoMerge(Mesh* TempMesh) {
     TempMesh->facesSize = newFaces.size();
     TempMesh->faces = new MeshIndex[newFaces.size()];
     std::copy(newFaces.begin(), newFaces.end(), TempMesh->faces);
+
+    // BORDES SUELTOS (lineas 'l'): sin merge los verts van 1:1, asi que las posiciones = indices de malla.
+    int nvNM = (int)(vertex.size()/3);
+    for (size_t i = 0; i + 1 < looseEdges.size(); i += 2) {
+        int a = looseEdges[i], b = looseEdges[i+1];
+        if (a>=0 && a<nvNM && b>=0 && b<nvNM && a!=b) { TempMesh->looseEdges.push_back(a); TempMesh->looseEdges.push_back(b); }
+    }
 
     // =========================================================
     // 5) DEBUG
@@ -543,6 +574,23 @@ bool LeerOBJ(const std::vector<const char*>& lines,
                 mg.count++;
                 mg.indicesDrawnCount += 3;
                 if (mg.count == 1) mg.startDrawn = (Wobj.faces.size() - 1) * 3;
+            }
+            idx++;
+        }
+        else if (LineaEmpieza(line, "l ")) {
+            // BORDES SUELTOS: 'l v1 v2 v3 ...' es una POLILINEA -> aristas (v1,v2),(v2,v3),... Indices de POSICION
+            // globales (1-based) -> locales. Solo posiciones (l no lleva vt/vn). Sirven de perfil (Screw) / planos.
+            const char* p = line + 2;
+            int prev = -1;
+            while (*p) {
+                while (*p==' '||*p=='\t'||*p=='\r'||*p=='\n') p++;
+                if (!*p) break;
+                if (!((*p>='0'&&*p<='9') || *p=='-')) { p++; continue; }
+                char* e; long gv = strtol(p, &e, 10); p = e;
+                while (*p=='/' || (*p>='0'&&*p<='9')) p++; // por si viniera 'l v/vt' (raro): ignoramos vt
+                int loc = (int)gv - 1 - *acumuladoVertices;
+                if (prev >= 0 && prev != loc) { Wobj.looseEdges.push_back(prev); Wobj.looseEdges.push_back(loc); }
+                prev = loc;
             }
             idx++;
         }
@@ -958,6 +1006,16 @@ bool ExportOBJ(const std::string& filepath, bool selectedOnly, bool applyModifie
                 }
             }
             out += '\n';
+        }
+        // BORDES SUELTOS: aristas SIN cara -> lineas 'l a b' (Blender las lee/escribe asi). Sirven de PERFIL
+        // (Screw) o para dibujar planos. Usan la POSICION compartida (vDe), igual que las caras. Solo sin gen
+        // (con modificadores aplicados el perfil ya paso a ser superficie).
+        if (!useGen) {
+            for (size_t i = 0; i + 1 < m->looseEdges.size(); i += 2) {
+                int a = m->looseEdges[i], b = m->looseEdges[i+1];
+                if (a<0||a>=nV||b<0||b>=nV) continue;
+                out += "l "; AppendInt(out, vOff + vDe[a] + 1); out += ' '; AppendInt(out, vOff + vDe[b] + 1); out += '\n';
+            }
         }
         vOff += nPos; if (hayN) vnOff += nV; if (hayUV) vtOff += nV; if (colCorner) vcOff += nV;
     }

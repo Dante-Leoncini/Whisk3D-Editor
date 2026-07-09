@@ -3,6 +3,7 @@
 #include <math.h>
 #include <algorithm>
 #include "WhiskUI/colores.h"
+#include "render/OpcionesRender.h" // g_renderAspect (la geometria de la camara sigue el aspecto del render)
 #ifdef W3D_SYMBIAN
     #endif
 
@@ -19,6 +20,33 @@ GLfloat CameraVertices[CameraVertexSize] = {
 };
 
 const MeshIndex CameraFaceActive[3] = {5, 6, 7};
+
+// RESPONSIVE: reescribe CameraVertices para que el rectangulo del "film" y el triangulito de arriba sigan el
+// ASPECTO del render (ancho/alto). Se FIJA la ALTURA y se escala el ANCHO (z) por el aspecto: 1:1 = cuadrada,
+// 4:3 = 4:3, 16:9 = ancha, etc. Barato -> se llama por frame antes de dibujar el gizmo. Devuelve true si cambio.
+static float gCamGeomAspect = -1.0f; // ultimo aspecto con el que se armo la geometria
+bool ActualizarGeometriaCamara() {
+    float aspect = g_renderAspect;
+    if (aspect < 0.05f) aspect = 0.05f; if (aspect > 20.0f) aspect = 20.0f;
+    if (aspect == gCamGeomAspect) return false; // sin cambios
+    gCamGeomAspect = aspect;
+    const float x = 0.7f;      // profundidad del film (0.35*2, como el original)
+    const float H = 0.288f;    // MEDIA-altura fija del rectangulo (0.144*2)
+    float Wd = H * aspect;     // MEDIA-ancho segun el aspecto (4:3 -> 0.384, = original)
+    float Zt = Wd * (0.256f / 0.384f); // el triangulito escala con el ancho (misma proporcion que el original)
+    GLfloat v[CameraVertexSize] = {
+        0, 0, 0,          // origen (apex del frustum)
+        x,  H,  Wd,       // 1  esquinas del rectangulo (film)
+        x, -H,  Wd,       // 2
+        x, -H, -Wd,       // 3
+        x,  H, -Wd,       // 4
+        x, 0.34f,  Zt,    // 5  triangulito de arriba (camara activa): base
+        x, 0.34f, -Zt,    // 6
+        x, 0.62f, 0,      // 7  apice del triangulito
+    };
+    for (int i = 0; i < CameraVertexSize; i++) CameraVertices[i] = v[i];
+    return true;
+}
 
 const GLushort CameraEdges[CameraEdgesSize] = {
     0, 1,
@@ -162,12 +190,13 @@ void Camera::RenderObject() {
     // MISMO gate que PC: sin overlays (render a PNG / limpieza de pantalla) o mirando DESDE la camara
     // -> no dibujar el gizmo. Antes Symbian lo dibujaba SIEMPRE (se veia en el render del N95).
     if (!showOverlayGlobal || ViewFromCameraActiveGlobal) return;
+    bool geomCambio = ActualizarGeometriaCamara(); // geometria responsive al aspecto del render
     // gizmo de PC (piramide de lineas + triangulo si es la activa) pero con
-    // drawArrays: vertices expandidos una sola vez desde CameraEdges
+    // drawArrays: vertices expandidos una sola vez desde CameraEdges (re-expande si cambio el aspecto)
     static GLfloat lineV[CameraEdgesSize * 3];
     static GLfloat faceV[9];
     static bool armado = false;
-    if (!armado) {
+    if (!armado || geomCambio) {
         for (int i = 0; i < CameraEdgesSize; i++) {
             int vi = CameraEdges[i];
             lineV[i*3+0] = CameraVertices[vi*3+0];
@@ -210,8 +239,9 @@ void Camera::RenderObject() {
     return;
 #else
     if (!showOverlayGlobal || ViewFromCameraActiveGlobal) return;
+    ActualizarGeometriaCamara(); // geometria responsive al aspecto del render (usa CameraVertices directo)
 
-    w3dEngine::PushMatrix();    
+    w3dEngine::PushMatrix();
     w3dEngine::Rotatef(90.0f, 0, 1, 0);
 
     if (ObjActivo == this && select){

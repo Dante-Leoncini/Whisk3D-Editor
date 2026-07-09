@@ -5,6 +5,7 @@ RenderType view = RenderType::MaterialPreview;
 
 // fondo del RENDER (pase Rendered): NEGRO por defecto, editable desde el menu Render (color picker).
 float g_renderBg[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+float g_renderAspect = 640.0f / 480.0f; // 4:3 por defecto (igual que el default del render 640x480)
 
 GLfloat MaterialPreviewAmbient[4]  = { 0.3f, 0.3f, 0.3f, 1.0f };
 GLfloat MaterialPreviewDiffuse[4]  = { 1.0f, 1.0f, 1.0f, 1.0f };

@@ -83,8 +83,15 @@ int     BarRolIdx(std::vector<Button*>& B, int rol); // su INDICE (para la nav i
 class Viewport3D : public ViewportBase, public WithBorder {
     public:
         int ViewportKind() const { return 1; } // (menu de tipo)
-        bool orthographic; 
-        bool ViewFromCameraActive; 
+        bool orthographic;
+        bool ViewFromCameraActive;
+        // PASSEPARTOUT de camara: cuando se mira DESDE la camara, el marco (aspecto del render) encuadrado en el
+        // viewport. camFrameOn = hay marco; camFrameNX/NY = medias-extensiones del marco en NDC (para el overlay 2D).
+        bool camFrameOn; float camFrameNX; float camFrameNY;
+        void RenderCamPassepartout(); // dibuja el borde blanco + oscurece afuera del marco (lo que NO sale en el render)
+        // INSPECCION en vista de camara: paneo/zoom de la VISTA (no mueve la camara) para ver con detalle dentro y
+        // fuera del marco. Se aplica a la proyeccion + al marco. La camara NO se toca (el render no cambia).
+        float camViewZoom; float camViewPanX; float camViewPanY;
         bool showOverlays; 
         bool ShowUi; 
         bool showFloor; 

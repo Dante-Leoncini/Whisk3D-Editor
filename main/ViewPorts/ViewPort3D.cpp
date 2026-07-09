@@ -256,6 +256,8 @@ Viewport3D::Viewport3D(Vector3 pos){
     // (eran inicializadores de clase: C++03)
     orthographic = false;
     ViewFromCameraActive = false;
+    camFrameOn = false; camFrameNX = 1.0f; camFrameNY = 1.0f;
+    camViewZoom = 1.0f; camViewPanX = 0.0f; camViewPanY = 0.0f;
     showOverlays = true;
     ShowUi = true;
     showFloor = true;
@@ -324,9 +326,7 @@ void Viewport3D::event_mouse_wheel(SDL_Event &e) {
     int mx, my; SDL_GetMouseState(&mx, &my);
     if (BarScrollHorizontal(mx, my, (int)(e.wheel.y * 40))) return;
     if (OnToolbar(mx, my)) { ToolbarScrollBy((int)(e.wheel.y * 40)); return; } // barra de HERRAMIENTAS (abajo)
-    if (!ViewFromCameraActive) {
-        Zoom(e.wheel.y* 2.0f); //podria multiplciarse por un valor por sensibilidad  * 1.0f
-    }
+    Zoom(e.wheel.y * 2.0f); // Zoom() ya distingue: viewport normal = distancia; vista de camara = inspeccion
 }
 #endif
 
@@ -382,6 +382,12 @@ void Viewport3D::EncuadrarRadio(const Vector3& centro, float radio){
 }
 
 void Viewport3D::Zoom(float delta){
+    // vista de camara: el zoom es de INSPECCION (escala la vista + el marco), NO mueve la camara.
+    if (ViewFromCameraActive){
+        camViewZoom *= expf(delta * 0.03f);
+        if (camViewZoom < 0.2f) camViewZoom = 0.2f; if (camViewZoom > 20.0f) camViewZoom = 20.0f;
+        g_redraw = true; return;
+    }
     // zoom PROPORCIONAL a la distancia (multiplicativo/exponencial): el paso se adapta al tamaño de
     // lo que se ve. Cerca de algo chico el paso es chico (suave, usable en vertices/triangulos);
     // lejos de algo grande el paso es grande (fuerte). delta>0 = acercar; ~12% por notch de rueda.
@@ -431,6 +437,8 @@ void Viewport3D::UpdateViewOrbit() {
 }
 
 void Viewport3D::RotateOrbit() {
+    // vista de camara: NO se orbita (la camara define la mirada); el arrastre PANEA la inspeccion (ver detalle).
+    if (ViewFromCameraActive) { Pan(); return; }
     // "Lock Orbit" ON: NUNCA gira el orbital. Todo lo que orbitaria (arrastre de mouse, 1 dedo tactil,
     // flechas via OrbitarFlecha) PANEA en su lugar. Usa el mismo dx/dy que ya seteo el que llama. El zoom
     // (rueda / pinch) no pasa por aca, asi que sigue igual. Ideal para usar el viewport como tablero 2D.
@@ -468,6 +476,12 @@ void Viewport3D::OrbitarFlecha(int ndx, int ndy){
 }
 
 void Viewport3D::Pan(){
+    // vista de camara: el paneo es de INSPECCION (mueve la VISTA + el marco), NO mueve la camara.
+    if (ViewFromCameraActive){
+        camViewPanX += 2.0f * dx / (float)(width  > 0 ? width  : 1);
+        camViewPanY -= 2.0f * dy / (float)(height > 0 ? height : 1);
+        g_redraw = true; return;
+    }
     ShiftCount = 100;
     const float speed = orbitDistance * 0.002f;
 
@@ -641,6 +655,8 @@ void Viewport3D::RotarDesdeVista(int mx, int my){
 
 void Viewport3D::SetViewpoint(Viewpoint value) {
     ViewFromCameraActive = false;
+    camFrameOn = false; camFrameNX = 1.0f; camFrameNY = 1.0f;
+    camViewZoom = 1.0f; camViewPanX = 0.0f; camViewPanY = 0.0f;
     CameraToView = false;
 
     switch (value) {
@@ -772,6 +788,21 @@ void Viewport3D::Render() {
     w3dEngine::MatrixMode(w3dEngine::Projection);
     w3dEngine::LoadIdentity();
 
+    // PASSEPARTOUT: mirando DESDE la camara, el viewport muestra EXACTAMENTE lo que sale en el render (aspecto
+    // g_renderAspect) ENCUADRADO adentro (letterbox/pillarbox). Se ajusta el frustum para que el render ocupe un
+    // sub-rectangulo centrado del viewport; afuera se oscurece. Asi sabes que se va a renderizar. Responsive.
+    camFrameOn = false;
+    bool camFrame = (ViewFromCameraActive && CameraActive);
+    float camNX = 1.0f, camNY = 1.0f; // medias-extensiones NDC del marco (1 = todo el viewport)
+    if (camFrame) {
+        float va = (aspect > 1e-4f) ? aspect : 1.0f; // aspecto del viewport
+        float ra = (g_renderAspect > 1e-4f) ? g_renderAspect : 1.0f; // aspecto del render
+        const float margin = 0.92f; // aire alrededor del marco
+        if (ra >= va) { camNX = margin;              camNY = margin * va / ra; } // render mas ANCHO -> fit por ancho
+        else          { camNY = margin;              camNX = margin * ra / va; } // render mas ALTO  -> fit por alto
+        camFrameOn = true; camFrameNX = camNX; camFrameNY = camNY;
+    }
+
     if (orthographic) {
         // En ORTOGRAFICA la distancia camara->objeto NO cambia el tamaño aparente: el "zoom" es la escala del
         // volumen visible (glOrtho), no la distancia. Atamos el half-height a orbitDistance*tan(fov/2) para que
@@ -779,12 +810,26 @@ void Viewport3D::Render() {
         // mismo tamaño). El far se corre con la distancia asi el objeto no se corta por el far al alejarse.
         float size = orbitDistance * tanf(fovDeg * 0.5f * 3.14159265f / 180.0f);
         if (size < 0.001f) size = 0.001f;
-        w3dEngine::Ortho(-size * aspect, size * aspect,
-                    -size, size,
-                    nearClip, orbitDistance + farClip);
+        if (camFrame) { // el render (aspecto ra) ocupa el marco [±camNX,±camNY] del viewport (+ zoom/pan de inspeccion)
+            float ra = (g_renderAspect > 1e-4f) ? g_renderAspect : 1.0f;
+            w3dEngine::Translatef(camViewPanX, camViewPanY, 0);
+            w3dEngine::Scalef(camViewZoom, camViewZoom, 1.0f);
+            w3dEngine::Ortho(-size * ra / camNX, size * ra / camNX, -size / camNY, size / camNY, nearClip, orbitDistance + farClip);
+        } else {
+            w3dEngine::Ortho(-size * aspect, size * aspect, -size, size, nearClip, orbitDistance + farClip);
+        }
     }
     else {
-        w3dEngine::Perspective(fovDeg, aspect, nearClip, farClip);
+        if (camFrame) { // frustum que mete el render (fov vertical + aspecto ra) en el marco centrado (+ zoom/pan)
+            float ra = (g_renderAspect > 1e-4f) ? g_renderAspect : 1.0f;
+            float top = nearClip * tanf(fovDeg * 0.5f * 3.14159265f / 180.0f);
+            float T = top / camNY, R = top * ra / camNX;
+            w3dEngine::Translatef(camViewPanX, camViewPanY, 0); // inspeccion: pan (NDC) + zoom (escala) de la vista
+            w3dEngine::Scalef(camViewZoom, camViewZoom, 1.0f);
+            w3dEngine::Frustum(-R, R, -T, T, nearClip, farClip);
+        } else {
+            w3dEngine::Perspective(fovDeg, aspect, nearClip, farClip);
+        }
     }
 
     // Matriz de modelo
@@ -922,7 +967,51 @@ void Viewport3D::Render() {
     LoopCutRenderPreview(); // preview del corte (loop cut) encima de la escena
 
     if (showOverlays) RenderOverlay();
+    RenderCamPassepartout(); // marco de camara (lo que se va a renderizar) + oscurecido afuera. Antes de la UI (queda debajo).
     if (ShowUi) RenderUI();
+}
+
+// PASSEPARTOUT de camara: al mirar DESDE la camara, dibuja el BORDE BLANCO del render y OSCURECE afuera (0.5 negro).
+// Lo de adentro del marco es EXACTAMENTE lo que va a salir en el render. Se adapta al viewport y al aspecto del render.
+void Viewport3D::RenderCamPassepartout(){
+    if (!camFrameOn) return;
+    namespace gfx = w3dEngine;
+    // 2D local del viewport (0..width, 0..height ; y hacia abajo)
+    gfx::MatrixMode(gfx::Projection); gfx::LoadIdentity();
+    gfx::Ortho(0, width, height, 0, -1, 1);
+    gfx::MatrixMode(gfx::ModelView); gfx::LoadIdentity();
+    gfx::Disable(gfx::DepthTest); gfx::Disable(gfx::Lighting); gfx::Disable(gfx::Texture2D);
+    gfx::Enable(gfx::Blend); gfx::BlendAlpha();
+    gfx::DisableArray(gfx::TexCoordArray); gfx::DisableArray(gfx::NormalArray); gfx::DisableArray(gfx::ColorArray);
+    gfx::EnableArray(gfx::VertexArray);
+    float W = (float)width, H = (float)height;
+    // el marco sigue el zoom/pan de INSPECCION (misma transform que la proyeccion). NDC->pixeles (y hacia abajo).
+    float cx = (camViewPanX * 0.5f + 0.5f) * W;
+    float cy = (0.5f - camViewPanY * 0.5f) * H;
+    float hw = camFrameNX * camViewZoom * W * 0.5f, hh = camFrameNY * camViewZoom * H * 0.5f;
+    float x0 = cx - hw, x1 = cx + hw, y0 = cy - hh, y1 = cy + hh;
+    // bandas oscuras acotadas al viewport (el marco puede estar parcialmente afuera al panear/zoomear)
+    float bx0 = x0<0?0:(x0>W?W:x0), bx1 = x1<0?0:(x1>W?W:x1);
+    float by0 = y0<0?0:(y0>H?H:y0), by1 = y1<0?0:(y1>H?H:y1);
+    // OSCURECER afuera del marco: 4 bandas (arriba/abajo/izq/der), negro 0.5 alpha
+    gfx::Color4f(0.0f, 0.0f, 0.0f, 0.5f);
+    GLfloat bands[] = {
+        0,0,   W,0,   W,by0,    0,0,   W,by0,  0,by0,        // arriba
+        0,by1, W,by1, W,H,      0,by1, W,H,    0,H,          // abajo
+        0,by0, bx0,by0, bx0,by1, 0,by0, bx0,by1, 0,by1,      // izquierda
+        bx1,by0, W,by0, W,by1,  bx1,by0, W,by1, bx1,by1,     // derecha
+    };
+    gfx::VertexPointer2f(0, bands);
+    gfx::DrawTrianglesArray(24);
+    // BORDE BLANCO del marco = lo que se va a renderizar
+    gfx::Color4f(1.0f, 1.0f, 1.0f, 1.0f);
+    gfx::LineWidth(1.0f);
+    GLfloat border[] = { x0,y0, x1,y0,  x1,y0, x1,y1,  x1,y1, x0,y1,  x0,y1, x0,y0 };
+    gfx::VertexPointer2f(0, border);
+    gfx::DrawLines(8);
+    // restaurar textura + texcoords para la UI que sigue (texto/botones)
+    gfx::Enable(gfx::Texture2D); gfx::EnableArray(gfx::TexCoordArray);
+    gfx::Invalidate();
 }
 
 // ============================================================================
@@ -2489,6 +2578,7 @@ void Viewport3D::SetEje(int eje){
 
 void Viewport3D::SetViewFromCameraActive(bool value){
     if (!CameraActive) return;
+    camViewZoom = 1.0f; camViewPanX = 0.0f; camViewPanY = 0.0f; // al entrar/salir de vista de camara, resetea la inspeccion
 
     if (value){
         /*LastPosX = posX;

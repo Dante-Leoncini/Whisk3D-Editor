@@ -776,6 +776,14 @@ static void RegenerarModsEscena(Object* nodo){
         RegenerarModsEscena(o); }
 }
 
+// al cambiar Width/Height del render -> actualiza el aspecto global (la geometria de las camaras lo sigue,
+// responsive: 1:1 cuadrada, 4:3 en 4:3, etc.). onChange de propRenderW/propRenderH.
+static void ActualizarAspectoRender(){
+    if (!PropsActivo) return;
+    float w = PropsActivo->renderW, h = PropsActivo->renderH;
+    g_renderAspect = (h > 0.5f) ? (w / h) : 1.0f;
+}
+
 // hace el render REAL (llamado directo, o desde el "Si" de la confirmacion de sobrescritura).
 static void HacerRenderImage(){
     if (!PropsActivo) return;
@@ -1032,15 +1040,16 @@ void Properties::ConstruirGrupos(){
     propRender->properties.push_back(pbBrowseR);
     // resolucion editable (default 640x480). Puede ser MAYOR que la ventana: se rinde por tiles.
     renderW = 640.0f; renderH = 480.0f;
+    g_renderAspect = renderW / renderH; // arranca con el aspecto por defecto (4:3)
     propRenderW = new PropFloat("Width");
     propRenderW->SetRango(1.0f, 8192.0f); propRenderW->entero = true;
     propRenderW->stepFino = 1.0f; propRenderW->stepGrueso = 16.0f; propRenderW->dragStep = 1.0f;
-    propRenderW->value = &renderW;
+    propRenderW->value = &renderW; propRenderW->onChange = ActualizarAspectoRender; // geometria de camaras responsive
     propRender->properties.push_back(propRenderW);
     propRenderH = new PropFloat("Height");
     propRenderH->SetRango(1.0f, 8192.0f); propRenderH->entero = true;
     propRenderH->stepFino = 1.0f; propRenderH->stepGrueso = 16.0f; propRenderH->dragStep = 1.0f;
-    propRenderH->value = &renderH;
+    propRenderH->value = &renderH; propRenderH->onChange = ActualizarAspectoRender;
     propRender->properties.push_back(propRenderH);
     // pases EXTRA a exportar (el beauty/render siempre se guarda). Nombre: base_zbuffer_0001.png, etc.
     renderZbuffer = false; renderNormal = false; renderAlpha = false;

@@ -4,6 +4,11 @@
 #include "EditMesh.h"  // CentroSeleccion
 #include "Undo.h"      // Ctrl+Z: capturar transform / limpiar al borrar
 
+// (LayoutInput) transform de MALLA en curso + su reset: al cambiar de eje (X/Y/Z) en Edit Mode hay que
+// RESETEAR el acumulado (translate/extrude/scale) a cero y re-aplicar con el eje nuevo, como en Object Mode.
+extern bool EditXformActivo();
+extern void EditXformReiniciar();
+
 void ReestablecerEstado(bool ClearEstado){
 	if (InteractionMode == ObjectMode){
 		for(size_t o=0; o < estadoObjetos.size(); o++){
@@ -16,6 +21,11 @@ void ReestablecerEstado(bool ClearEstado){
 		}
 		//estadoObjetos.Close();
 		if (ClearEstado) estadoObjetos.clear();
+	}
+	// EDIT MODE: resetear el transform de MALLA (gEVtrans/gEVscaleAmt/...) al cambiar de eje (antes no se reseteaba
+	// -> el movimiento del vertice quedaba acumulado del eje anterior). No se resetea al CONFIRMAR (ClearEstado).
+	else if (InteractionMode == EditMode && !ClearEstado && EditXformActivo()){
+		EditXformReiniciar();
 	}
 	if (ClearEstado) {
 		estado = editNavegacion;

@@ -46,6 +46,7 @@ public:
     std::vector<GLbyte> normals;
     std::vector<GLfloat> uv;
     std::vector<Face> faces;
+    std::vector<int> looseEdges; // pares de indices de POSICION (0-based local) de las lineas 'l' (aristas sin cara)
     int facesSize;
     int facesCount;
     std::vector<MaterialGroup> materialsGroup;
