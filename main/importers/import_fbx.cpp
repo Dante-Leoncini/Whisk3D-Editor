@@ -1,0 +1,507 @@
+#include "import_fbx.h"
+#include "import_obj.h"          // Wavefront / Face / FaceCorner / ExtractBaseName / EncolarTextura
+#include "objects/Mesh.h"
+#include "objects/Armature.h"    // esqueleto (bones) importado del FBX
+#include "objects/Materials.h"   // Material / Materials / MaterialDefecto
+#include "objects/Objects.h"     // CollectionActive
+#include "w3dFilesystem.h"       // ReadFileBytes / FileExists / DirOf(inline abajo)
+#include "w3dCompress.h"         // w3dEngine::Inflate (arrays zlib del FBX)
+#include "w3dlog.h"
+#include <vector>
+#include <string>
+#include <map>
+#include <cstring>
+#include <cstdint>
+#include <cmath>
+
+// ============================================================================
+//  Importador FBX BINARIO. Formato: header "Kaydara FBX Binary  \0" + version, y
+//  un arbol de nodos. Cada nodo: [endOffset numProps propLen][nameLen name][props][hijos]. En version <7500 esos
+//  3 campos son de 32 bits; en >=7500 de 64. Las properties escalares (Y/C/I/F/D/L/S/R) o arrays (f/d/l/i/b) con
+//  encoding raw o zlib. Solo se lee geometria (Vertices/PolygonVertexIndex), normales, UV y la 1ra textura.
+// ============================================================================
+
+namespace {
+
+// ---- lector de bytes (little-endian; el FBX es LE en todas las plataformas) ----
+struct Rd {
+    const unsigned char* p; const unsigned char* end;
+    bool avail(size_t n) const { return p + n <= end; }
+    uint8_t  u8()  { if (!avail(1)) { p = end; return 0; } return *p++; }
+    uint16_t u16() { uint16_t v = 0; if (avail(2)) { memcpy(&v, p, 2); p += 2; } else p = end; return v; }
+    uint32_t u32() { uint32_t v = 0; if (avail(4)) { memcpy(&v, p, 4); p += 4; } else p = end; return v; }
+    uint64_t u64() { uint64_t v = 0; if (avail(8)) { memcpy(&v, p, 8); p += 8; } else p = end; return v; }
+    float    f32() { float  v = 0; if (avail(4)) { memcpy(&v, p, 4); p += 4; } else p = end; return v; }
+    double   f64() { double v = 0; if (avail(8)) { memcpy(&v, p, 8); p += 8; } else p = end; return v; }
+};
+
+// ---- una property: escalar (i o d o s) o array (ad = doubles, ai = enteros) ----
+struct FProp {
+    char type;
+    long long i; double d; std::string s;
+    std::vector<double>    ad; // arrays f/d -> double
+    std::vector<long long> ai; // arrays i/l/b -> long long
+    FProp() : type(0), i(0), d(0) {}
+};
+
+struct FNode {
+    std::string name;
+    std::vector<FProp> props;
+    std::vector<FNode> kids;
+    const FNode* child(const char* n) const {
+        for (size_t i = 0; i < kids.size(); i++) if (kids[i].name == n) return &kids[i];
+        return 0;
+    }
+};
+
+static void LeerProp(Rd& r, FProp& pr) {
+    pr.type = (char)r.u8();
+    switch (pr.type) {
+        case 'Y': pr.i = (int16_t)r.u16(); break;
+        case 'C': pr.i = r.u8(); break;
+        case 'I': pr.i = (int32_t)r.u32(); break;
+        case 'F': pr.d = r.f32(); break;
+        case 'D': pr.d = r.f64(); break;
+        case 'L': pr.i = (long long)r.u64(); break;
+        case 'S': case 'R': {
+            uint32_t len = r.u32();
+            if (r.avail(len)) { pr.s.assign((const char*)r.p, len); r.p += len; } else r.p = r.end;
+            break;
+        }
+        case 'f': case 'd': case 'l': case 'i': case 'b': {
+            uint32_t len = r.u32(), enc = r.u32(), clen = r.u32();
+            int esz = (pr.type == 'd' || pr.type == 'l') ? 8 : (pr.type == 'f' || pr.type == 'i') ? 4 : 1;
+            size_t rawBytes = (size_t)len * esz;
+            std::vector<unsigned char> raw;
+            const unsigned char* data = 0;
+            if (enc == 1) { // zlib
+                raw.resize(rawBytes ? rawBytes : 1);
+                if (r.avail(clen) && w3dEngine::Inflate(r.p, (int)clen, raw.data(), (int)rawBytes)) data = raw.data();
+                r.p += clen;
+            } else {        // raw
+                if (r.avail(rawBytes)) { data = r.p; r.p += rawBytes; } else r.p = r.end;
+            }
+            if (data) {
+                for (uint32_t k = 0; k < len; k++) {
+                    switch (pr.type) {
+                        case 'd': { double v; memcpy(&v, data + (size_t)k * 8, 8); pr.ad.push_back(v); } break;
+                        case 'f': { float  v; memcpy(&v, data + (size_t)k * 4, 4); pr.ad.push_back((double)v); } break;
+                        case 'l': { long long v; memcpy(&v, data + (size_t)k * 8, 8); pr.ai.push_back(v); } break;
+                        case 'i': { int32_t v; memcpy(&v, data + (size_t)k * 4, 4); pr.ai.push_back((long long)v); } break;
+                        case 'b': { pr.ai.push_back((long long)(signed char)data[k]); } break;
+                    }
+                }
+            }
+            break;
+        }
+        default: r.p = r.end; break; // property desconocida: no podemos seguir con seguridad
+    }
+}
+
+// lee UN nodo (recursivo). base = inicio del archivo (los offsets son ABSOLUTOS). w64 = version>=7500 (offsets 64-bit).
+// devuelve false si es el "null record" (fin de la lista de hijos) o si algo se rompio.
+static bool LeerNodo(Rd& r, const unsigned char* base, bool w64, FNode& out) {
+    uint64_t endOff, numProps, propLen;
+    if (w64) { endOff = r.u64(); numProps = r.u64(); propLen = r.u64(); }
+    else     { endOff = r.u32(); numProps = r.u32(); propLen = r.u32(); }
+    uint8_t nameLen = r.u8();
+    if (endOff == 0) return false; // null record
+    if (r.avail(nameLen)) { out.name.assign((const char*)r.p, nameLen); r.p += nameLen; } else { r.p = r.end; return false; }
+    const unsigned char* propsEnd = r.p + propLen;
+    for (uint64_t i = 0; i < numProps && r.p < r.end; i++) { FProp pr; LeerProp(r, pr); out.props.push_back(pr); }
+    if (propsEnd <= r.end) r.p = propsEnd; // saltar cualquier property no leida
+    // hijos: hasta base+endOff
+    while (r.p < base + endOff && base + endOff <= r.end) {
+        size_t rem = (size_t)((base + endOff) - r.p);
+        if (rem < (w64 ? 25u : 13u)) break; // no entra ni el null record
+        FNode kid;
+        if (!LeerNodo(r, base, w64, kid)) break;
+        out.kids.push_back(kid);
+    }
+    if (base + endOff <= r.end) r.p = base + endOff; // saltar al final del nodo
+    return true;
+}
+
+// normal float [-1,1] -> GLbyte [-127,127]
+static GLbyte NrmB(double n) {
+    long v = (long)(n * 127.0 + (n >= 0 ? 0.5 : -0.5));
+    if (v > 127) v = 127; if (v < -127) v = -127;
+    return (GLbyte)v;
+}
+static std::string DirDe(const std::string& ruta) {
+    size_t i = ruta.find_last_of("/\\");
+    return (i == std::string::npos) ? std::string() : ruta.substr(0, i + 1);
+}
+static std::string SoloNombre(const std::string& ruta) {
+    size_t i = ruta.find_last_of("/\\");
+    return (i == std::string::npos) ? ruta : ruta.substr(i + 1);
+}
+// resuelve la ruta REAL de una textura referenciada por el FBX: prueba carpetas (junto al FBX, ./textures/,
+// ../textures/) y extensiones (la original + las que decodifica stb) -> muchos FBX referencian .tga pero el autor
+// dejo un .png convertido en otra carpeta (justo el caso del banana). Devuelve la ruta existente, o "".
+static std::string ResolverTextura(const std::string& fbxDir, const std::string& ref) {
+    std::string t = ref;
+    for (size_t j = 0; j < t.size(); j++) if (t[j] == '\\') t[j] = '/'; // FBX usa backslash
+    // 1) el relative-path completo tal cual (por si trae subcarpetas validas)
+    { std::string c = w3dFileSystem::JoinPath(fbxDir, t); if (w3dFileSystem::FileExists(c)) return c; }
+    std::string nom = SoloNombre(t), stem = nom;
+    size_t dot = stem.find_last_of('.'); if (dot != std::string::npos) stem = stem.substr(0, dot);
+    const char* dirs[] = { "", "textures/", "Textures/", "../textures/", "../Textures/", "source/" };
+    const char* exts[] = { "", ".png", ".jpg", ".jpeg", ".tga", ".bmp" }; // ""=nombre tal cual; el resto = swap de ext
+    for (size_t di = 0; di < sizeof(dirs) / sizeof(dirs[0]); di++) {
+        std::string bdir = w3dFileSystem::JoinPath(fbxDir, dirs[di]);
+        for (size_t ei = 0; ei < sizeof(exts) / sizeof(exts[0]); ei++) {
+            std::string fname = (exts[ei][0] == '\0') ? nom : (stem + exts[ei]);
+            std::string c = w3dFileSystem::JoinPath(bdir, fname);
+            if (w3dFileSystem::FileExists(c)) return c;
+        }
+    }
+    return std::string();
+}
+
+// lee una propiedad numerica de GlobalSettings/Properties70 (P: "nombre", type, ..., valor). Ej: UnitScaleFactor.
+static double LeerGlobalD(const FNode& root, const char* nombre, double def) {
+    const FNode* gs = root.child("GlobalSettings"); if (!gs) return def;
+    const FNode* p70 = gs->child("Properties70"); if (!p70) return def;
+    for (size_t i = 0; i < p70->kids.size(); i++) {
+        const FNode& p = p70->kids[i];
+        if (p.name == "P" && !p.props.empty() && p.props[0].type == 'S' && p.props[0].s == nombre) {
+            for (size_t j = p.props.size(); j-- > 0; ) { // el valor es la ultima property numerica
+                char t = p.props[j].type;
+                if (t == 'D' || t == 'F') return p.props[j].d;
+                if (t == 'I' || t == 'L' || t == 'Y' || t == 'C') return (double)p.props[j].i;
+            }
+        }
+    }
+    return def;
+}
+
+// arma una malla de Whisk3D desde un nodo Geometry(Mesh). Devuelve la malla o NULL. mat = material (con textura) a
+// asignar. parent = objeto padre (la armature si hay esqueleto, si no CollectionActive). El TRANSFORM de correccion
+// (unidades + eje) NO se hornea aca: lo aplica el caller (a la armature si hay, o a la malla si no).
+static Mesh* MallaDesdeGeometry(const FNode& geo, const std::string& nombre, Material* mat, Object* parent) {
+    const FNode* nVert = geo.child("Vertices");
+    const FNode* nPoly = geo.child("PolygonVertexIndex");
+    if (!nVert || !nPoly || nVert->props.empty() || nPoly->props.empty()) return 0;
+    const std::vector<double>&    V  = nVert->props[0].ad; // x,y,z por control-point
+    const std::vector<long long>& PI = nPoly->props[0].ai; // indices de polygon-vertex (fin de poligono = ~x)
+    if (V.size() < 9 || PI.size() < 3) return 0;
+
+    // ---- normales (LayerElementNormal) ----
+    const std::vector<double>* NRM = 0; const std::vector<long long>* NIDX = 0;
+    std::string nMap = "ByPolygonVertex", nRef = "Direct";
+    if (const FNode* le = geo.child("LayerElementNormal")) {
+        if (const FNode* c = le->child("Normals")) if (!c->props.empty()) NRM = &c->props[0].ad;
+        if (const FNode* c = le->child("NormalsIndex")) if (!c->props.empty()) NIDX = &c->props[0].ai;
+        if (const FNode* c = le->child("MappingInformationType")) if (!c->props.empty()) nMap = c->props[0].s;
+        if (const FNode* c = le->child("ReferenceInformationType")) if (!c->props.empty()) nRef = c->props[0].s;
+    }
+    // ---- UV (LayerElementUV) ----
+    const std::vector<double>* UVA = 0; const std::vector<long long>* UIDX = 0;
+    std::string uMap = "ByPolygonVertex", uRef = "IndexToDirect";
+    if (const FNode* le = geo.child("LayerElementUV")) {
+        if (const FNode* c = le->child("UV")) if (!c->props.empty()) UVA = &c->props[0].ad;
+        if (const FNode* c = le->child("UVIndex")) if (!c->props.empty()) UIDX = &c->props[0].ai;
+        if (const FNode* c = le->child("MappingInformationType")) if (!c->props.empty()) uMap = c->props[0].s;
+        if (const FNode* c = le->child("ReferenceInformationType")) if (!c->props.empty()) uRef = c->props[0].s;
+    }
+    const bool nByVert = (nMap == "ByVertice" || nMap == "ByVertex" || nMap == "ByControlPoint");
+    const bool uByVert = (uMap == "ByVertice" || uMap == "ByVertex" || uMap == "ByControlPoint");
+
+    Wavefront Wobj; Wobj.Reset();
+    // posiciones (control points)
+    Wobj.vertex.reserve(V.size());
+    for (size_t i = 0; i < V.size(); i++) Wobj.vertex.push_back((GLfloat)V[i]);
+
+    // recorrer los poligonos: cada corner tiene un control-point (cp) y un indice de corner corrido (c)
+    Face cara;
+    int c = 0; // indice global de corner
+    for (size_t k = 0; k < PI.size(); k++) {
+        long long raw = PI[k];
+        bool fin = (raw < 0);
+        int cp = (int)(fin ? (~raw) : raw); // el ultimo del poligono viene como ~cp
+
+        FaceCorner fc; fc.vertex = cp; fc.color = -1; fc.normal = -1; fc.uv = -1;
+
+        // NORMAL para este corner
+        if (NRM) {
+            int base = nByVert ? cp : c;
+            int idx = base;
+            if (nRef == "IndexToDirect" && NIDX && base < (int)NIDX->size()) idx = (int)(*NIDX)[base];
+            if (idx >= 0 && (size_t)idx * 3 + 2 < NRM->size()) {
+                Wobj.normals.push_back(NrmB((*NRM)[idx*3]));
+                Wobj.normals.push_back(NrmB((*NRM)[idx*3+1]));
+                Wobj.normals.push_back(NrmB((*NRM)[idx*3+2]));
+                fc.normal = (int)(Wobj.normals.size() / 3) - 1;
+            }
+        }
+        // UV para este corner
+        if (UVA) {
+            int base = uByVert ? cp : c;
+            int idx = base;
+            if (uRef == "IndexToDirect" && UIDX && base < (int)UIDX->size()) idx = (int)(*UIDX)[base];
+            if (idx >= 0 && (size_t)idx * 2 + 1 < UVA->size()) {
+                Wobj.uv.push_back((GLfloat)(*UVA)[idx*2]);
+                Wobj.uv.push_back((GLfloat)(1.0 - (*UVA)[idx*2+1])); // FBX V va al reves que OpenGL
+                fc.uv = (int)(Wobj.uv.size() / 2) - 1;
+            }
+        }
+        cara.corners.push_back(fc);
+        c++;
+        if (fin) { if (cara.corners.size() >= 3) Wobj.faces.push_back(cara); cara.corners.clear(); }
+    }
+    if (Wobj.faces.empty()) return 0;
+
+    // un solo material (con la textura, si hay) para toda la malla
+    if (mat) { MaterialGroup mg; mg.material = mat; mg.name = mat->name; mg.start = 0; mg.count = 0;
+               mg.startDrawn = 0; mg.indicesDrawnCount = 0; Wobj.materialsGroup.push_back(mg); }
+
+    Mesh* mesh = new Mesh(parent, Vector3(0, 0, 0));
+    mesh->name = nombre;
+    int a0 = 0, a1 = 0, a2 = 0;
+    Wobj.ConvertToES1(mesh, &a0, &a1, &a2);
+    mesh->CalcularBordes();
+    if (!mesh->normals && mesh->vertexSize > 0) { // sin normales -> smooth (como el OBJ)
+        mesh->normals = new GLbyte[mesh->vertexSize * 3];
+        mesh->meshSmooth = true;
+        mesh->RecalcularNormales();
+    }
+    mesh->OptimizarCacheRender();
+    return mesh;
+}
+
+// aplica la correccion FBX a un objeto. escalar = escala de UNIDADES (UnitScaleFactor/100: FBX en cm, Whisk3D en
+// metros). rotar = -90° en X para pasar de Z-up (geometria del mesh) a Y-up (Whisk3D). OJO: la GEOMETRIA del mesh
+// viene Z-up (necesita el -90°), pero los HUESOS del esqueleto YA vienen Y-up (matrices TransformLink en el espacio
+// de escena del FBX) -> la armature NO se rota, solo se escala; el -90° va en la malla. Si no hay esqueleto, la malla
+// lleva ambos. Es lo mismo que Blender: el esqueleto queda con escala 0.01 y la malla parada.
+static void AplicarTransformFBX(Object* o, double escala, bool rotar, bool escalar) {
+    if (!o) return;
+    if (escalar && escala > 0.0 && escala != 1.0) o->scale = Vector3((float)escala, (float)escala, (float)escala);
+    if (rotar) { o->rot = Quaternion::FromAxisAngle(Vector3(1.0f, 0.0f, 0.0f), -90.0f); o->rot.normalize(); }
+    o->ActualizarDisplayRot(); // refresca rotEuler para Properties
+}
+
+// busca recursivamente el 1er RelativeFilename/FileName de un nodo Texture/Video (la ruta de la textura)
+static void JuntarTexturas(const FNode& objs, std::vector<std::string>& out) {
+    for (size_t i = 0; i < objs.kids.size(); i++) {
+        const FNode& k = objs.kids[i];
+        if (k.name == "Texture" || k.name == "Video") {
+            std::string rel, abs;
+            if (const FNode* c = k.child("RelativeFilename")) if (!c->props.empty()) rel = c->props[0].s;
+            if (const FNode* c = k.child("FileName"))         if (!c->props.empty()) abs = c->props[0].s;
+            if (const FNode* c = k.child("Filename"))         if (!c->props.empty() && abs.empty()) abs = c->props[0].s;
+            if (!rel.empty()) out.push_back(rel);
+            else if (!abs.empty()) out.push_back(abs);
+        }
+    }
+}
+
+// limpia el nombre de un Model FBX: en binario viene "pelvis\0\1Model" -> "pelvis"
+static std::string LimpiarNombreFBX(const std::string& s) {
+    size_t z = s.find('\0');
+    return (z == std::string::npos) ? s : s.substr(0, z);
+}
+// lee un array de 16 doubles (matriz col-major) de un hijo por nombre. true si existe.
+static bool LeerMat16(const FNode& n, const char* hijo, double m[16]) {
+    const FNode* c = n.child(hijo);
+    if (!c || c->props.empty() || c->props[0].ad.size() < 16) return false;
+    for (int i = 0; i < 16; i++) m[i] = c->props[0].ad[i];
+    return true;
+}
+
+// un grupo de vertices (pesos de UN hueso sobre UNA malla). verts = indices de CONTROL-POINT del FBX (crudos: sirven
+// para mostrar el nombre del grupo y guardar el dato; el mapeo exacto al vertex[] de render se hara al deformar).
+struct VGrupo { std::string bone; std::vector<int> verts; std::vector<float> pesos; };
+struct EsqueletoFBX {
+    std::vector<W3dBone> bones;                          // huesos (rest pose, espacio crudo del FBX)
+    std::map<long long, std::vector<VGrupo> > vgPorGeo;  // geoId -> grupos de vertices (uno por hueso)
+    bool hay() const { return !bones.empty(); }
+};
+
+// Parsea el esqueleto y los pesos: recorre los Deformer(Cluster) -> cada uno referencia UN hueso (Model LimbNode) via
+// Connections, trae su matriz global de bind (TransformLink -> head del hueso) y los pesos por control-point. El
+// parentado de huesos sale de las Connections OO entre Models. Rellena 'out'.
+static void ParsearEsqueleto(const FNode& root, const FNode& objs, EsqueletoFBX& out) {
+    // 1) Models: id -> nombre / tipo
+    std::map<long long, std::string> modelName, modelType;
+    for (size_t i = 0; i < objs.kids.size(); i++) {
+        const FNode& k = objs.kids[i];
+        if (k.name != "Model" || k.props.size() < 3) continue;
+        modelName[k.props[0].i] = LimpiarNombreFBX(k.props[1].s);
+        modelType[k.props[0].i] = k.props[2].s;
+    }
+    // 2) Connections OO: child -> parent (primer id = origen/hijo, segundo = destino/padre)
+    std::map<long long, long long> parentOf;
+    std::multimap<long long, long long> childrenOf;
+    if (const FNode* conns = root.child("Connections")) {
+        for (size_t i = 0; i < conns->kids.size(); i++) {
+            const FNode& c = conns->kids[i];
+            if (c.name != "C" || c.props.size() < 3 || c.props[0].s != "OO") continue;
+            long long ch = c.props[1].i, pa = c.props[2].i;
+            parentOf[ch] = pa;
+            childrenOf.insert(std::make_pair(pa, ch));
+        }
+    }
+    // 3) Clusters -> huesos + grupos de vertices
+    std::map<long long, int> boneIdx; // boneModelId -> indice en out.bones
+    for (size_t i = 0; i < objs.kids.size(); i++) {
+        const FNode& k = objs.kids[i];
+        if (k.name != "Deformer" || k.props.size() < 3 || k.props[2].s != "Cluster") continue;
+        long long clusterId = k.props[0].i;
+        // hueso = el Model conectado al cluster (hijo del cluster en el grafo OO)
+        long long boneId = -1;
+        std::pair<std::multimap<long long, long long>::iterator, std::multimap<long long, long long>::iterator>
+            rg = childrenOf.equal_range(clusterId);
+        for (std::multimap<long long, long long>::iterator it = rg.first; it != rg.second; ++it)
+            if (modelType.count(it->second)) { boneId = it->second; break; }
+        if (boneId < 0) continue;
+        // geometria: cluster -> skin -> geometry (subiendo por parentOf)
+        long long geoId = -1;
+        if (parentOf.count(clusterId)) { long long skinId = parentOf[clusterId];
+            if (parentOf.count(skinId)) geoId = parentOf[skinId]; }
+        std::string bname = modelName.count(boneId) ? modelName[boneId] : std::string("bone");
+        // head del hueso = translacion de TransformLink (matriz global de bind)
+        if (!boneIdx.count(boneId)) {
+            double TL[16];
+            W3dBone b; b.name = bname;
+            if (LeerMat16(k, "TransformLink", TL))
+                b.head = Vector3((float)TL[12], (float)TL[13], (float)TL[14]);
+            b.tail = b.head; // se corrige abajo
+            boneIdx[boneId] = (int)out.bones.size();
+            out.bones.push_back(b);
+        }
+        // grupo de vertices de esa geometria
+        if (geoId >= 0) {
+            VGrupo vg; vg.bone = bname;
+            if (const FNode* nI = k.child("Indexes")) if (!nI->props.empty())
+                for (size_t j = 0; j < nI->props[0].ai.size(); j++) vg.verts.push_back((int)nI->props[0].ai[j]);
+            if (const FNode* nW = k.child("Weights")) if (!nW->props.empty())
+                for (size_t j = 0; j < nW->props[0].ad.size(); j++) vg.pesos.push_back((float)nW->props[0].ad[j]);
+            out.vgPorGeo[geoId].push_back(vg);
+        }
+    }
+    // 4) parentado: subir por parentOf hasta encontrar OTRO hueso
+    std::vector<long long> idPorIdx(out.bones.size(), -1);
+    for (std::map<long long, int>::iterator it = boneIdx.begin(); it != boneIdx.end(); ++it)
+        idPorIdx[it->second] = it->first;
+    for (int bi = 0; bi < (int)out.bones.size(); bi++) {
+        long long p = parentOf.count(idPorIdx[bi]) ? parentOf[idPorIdx[bi]] : -1;
+        while (p != -1 && !boneIdx.count(p)) p = parentOf.count(p) ? parentOf[p] : -1;
+        out.bones[bi].parent = (p != -1 && boneIdx.count(p)) ? boneIdx[p] : -1;
+    }
+    // 5) tail: si tiene hijos -> tail = head del 1er hijo; si es hoja -> prolonga la direccion padre->hueso
+    std::vector<int> primerHijo(out.bones.size(), -1);
+    for (int bi = 0; bi < (int)out.bones.size(); bi++) {
+        int par = out.bones[bi].parent;
+        if (par >= 0 && primerHijo[par] < 0) primerHijo[par] = bi;
+    }
+    for (int bi = 0; bi < (int)out.bones.size(); bi++) {
+        if (primerHijo[bi] >= 0) { out.bones[bi].tail = out.bones[primerHijo[bi]].head; continue; }
+        int par = out.bones[bi].parent;
+        Vector3 d = (par >= 0) ? (out.bones[bi].head - out.bones[par].head) : Vector3(0, 1, 0);
+        float len = d.Length(); if (len < 1e-4f) { d = Vector3(0, 1, 0); len = 5.0f; }
+        out.bones[bi].tail = out.bones[bi].head + d * (1.0f / d.Length()) * len;
+    }
+}
+
+} // namespace
+
+bool ImportFBX(const std::string& filepath) {
+    std::vector<unsigned char> bytes;
+    if (!w3dFileSystem::ReadFileBytes(filepath, bytes) || bytes.size() < 27) {
+        w3dLogfE("ImportFBX: no se pudo leer '%s'", filepath.c_str());
+        return false;
+    }
+    if (memcmp(bytes.data(), "Kaydara FBX Binary  ", 20) != 0) {
+        w3dLogfE("ImportFBX: no es FBX BINARIO (ASCII no soportado): %s", filepath.c_str());
+        return false;
+    }
+    uint32_t version = 0; memcpy(&version, bytes.data() + 23, 4);
+    bool w64 = (version >= 7500);
+
+    Rd r; r.p = bytes.data() + 27; r.end = bytes.data() + bytes.size();
+    const unsigned char* base = bytes.data();
+
+    // nodos top-level hasta el null record
+    FNode root; root.name = "<root>";
+    while (r.p < r.end) {
+        size_t rem = (size_t)(r.end - r.p);
+        if (rem < (w64 ? 25u : 13u)) break;
+        FNode n;
+        if (!LeerNodo(r, base, w64, n)) break;
+        root.kids.push_back(n);
+    }
+
+    const FNode* objs = root.child("Objects");
+    if (!objs) { w3dLogfE("ImportFBX: sin nodo Objects"); return false; }
+
+    // UNIDADES: el FBX suele venir en cm (UnitScaleFactor=1) y Whisk3D usa metros -> escala = UnitScaleFactor/100
+    // (0.01 para este banana; = la escala 0.01 que Blender le pone al esqueleto). Si es 0/raro -> 1.
+    double unit = LeerGlobalD(root, "UnitScaleFactor", 1.0);
+    double escala = unit / 100.0; if (escala <= 0.0) escala = 1.0;
+
+    // texturas: se junta la 1ra que exista en disco (relativa al FBX) -> un material con esa textura para todo
+    Material* mat = 0;
+    {
+        std::vector<std::string> texs; JuntarTexturas(*objs, texs);
+        std::string dir = DirDe(filepath);
+        for (size_t i = 0; i < texs.size() && !mat; i++) {
+            std::string res = ResolverTextura(dir, texs[i]);
+            if (!res.empty()) {
+                mat = new Material(ExtractBaseName(filepath) + "_mat");
+                Materials.push_back(mat);
+                EncolarTextura(mat, res); // carga diferida (1 por frame), como el OBJ
+            }
+        }
+    }
+
+    // ESQUELETO: si el FBX tiene huesos (Cluster/LimbNode), armar una Armature. La malla se PARENTA a ella y el
+    // transform de correccion (-90° X + escala) va en la ARMATURE (igual que Blender: el esqueleto tiene la escala
+    // 0.01 y la malla cuelga en identidad). Si no hay huesos, el transform va en cada malla (como antes).
+    EsqueletoFBX esq; ParsearEsqueleto(root, *objs, esq);
+    Armature* arm = 0;
+    Object* parentMallas = CollectionActive;
+    if (esq.hay()) {
+        arm = new Armature(CollectionActive, Vector3(0, 0, 0));
+        arm->name = ExtractBaseName(filepath) + "_rig";
+        arm->bones = esq.bones;
+        AplicarTransformFBX(arm, escala, false, true); // esqueleto: SOLO escala (los huesos ya vienen Y-up)
+        parentMallas = arm;               // las mallas cuelgan del esqueleto (heredan la escala)
+        w3dLogf("ImportFBX: esqueleto con %d hueso(s)", (int)esq.bones.size());
+    }
+
+    // cada Geometry(Mesh) -> una malla (parentada a la armature si hay). Se guarda el id de la Geometry para poder
+    // colgarle sus grupos de vertices (pesos por hueso) despues.
+    int importadas = 0;
+    std::string baseNom = ExtractBaseName(filepath);
+    for (size_t i = 0; i < objs->kids.size(); i++) {
+        const FNode& k = objs->kids[i];
+        if (k.name != "Geometry") continue;
+        std::string nom = baseNom;
+        if (importadas > 0) { char buf[16]; snprintf(buf, sizeof(buf), ".%03d", importadas); nom += buf; }
+        Mesh* m = MallaDesdeGeometry(k, nom, mat, parentMallas);
+        if (!m) continue;
+        // la geometria del mesh viene Z-up -> SIEMPRE -90° X para pararla. La escala la hereda de la armature; si no
+        // hay esqueleto, la malla tambien lleva la escala.
+        AplicarTransformFBX(m, escala, true, !arm);
+        // grupos de vertices (huesos que deforman esta malla): por id de Geometry
+        long long geoId = k.props.empty() ? -1 : k.props[0].i;
+        std::map<long long, std::vector<VGrupo> >::iterator vit = esq.vgPorGeo.find(geoId);
+        if (vit != esq.vgPorGeo.end()) {
+            for (size_t g = 0; g < vit->second.size(); g++) {
+                VGrupo& vg = vit->second[g];
+                VertexGroup* grp = new VertexGroup(vg.bone);
+                grp->verts = vg.verts;
+                grp->pesos.assign(vg.pesos.begin(), vg.pesos.end());
+                m->vertexGroups.push_back(grp);
+            }
+            if (!m->vertexGroups.empty()) m->grupoActivo = 0;
+        }
+        importadas++;
+    }
+
+    if (importadas == 0) { w3dLogfE("ImportFBX: no se pudo armar ninguna malla"); return false; }
+    w3dLogf("ImportFBX: %d malla(s) importada(s) de %s", importadas, filepath.c_str());
+    return true;
+}

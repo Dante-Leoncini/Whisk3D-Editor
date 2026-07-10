@@ -32,6 +32,7 @@ $(PROJECT_ROOT)/libs/$(CORE)/animation $(PROJECT_ROOT)/libs/WhiskUI \
 -name '*.cpp')
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/w3dFilesystem.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/w3dTexture.cpp
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/w3dCompress.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/w3dlog.cpp
 # SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/w3dGraphics.cpp #1.1
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/gles2/w3dGraphicsGLES2.cpp

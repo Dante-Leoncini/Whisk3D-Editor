@@ -112,7 +112,7 @@ struct TexPendiente { Material* mat; std::string path; };
 static std::vector<TexPendiente> g_texPendientes;
 static size_t g_texPendIdx = 0;
 
-static void EncolarTextura(Material* mat, const std::string& path) {
+void EncolarTextura(Material* mat, const std::string& path) { // (la usa tambien el importador FBX)
     TexPendiente tp; tp.mat = mat; tp.path = path; g_texPendientes.push_back(tp);
 }
 
@@ -838,13 +838,43 @@ static void RecolectarMeshesExport(Object* o, bool selectedOnly, std::vector<Mes
     }
 }
 
-// basename de una textura (sin carpeta): el MTL lo lee relativo a su propia carpeta
+// basename de una textura (sin carpeta): fallback cuando no se puede armar una ruta relativa
 static std::string BaseNameTex(const std::string& p) {
     size_t s = p.find_last_of("/\\");
     return (s == std::string::npos) ? p : p.substr(s + 1);
 }
+static bool RutaEsAbsoluta(const std::string& p) {
+    if (p.empty()) return false;
+    if (p[0] == '/' || p[0] == '\\') return true;
+    if (p.size() >= 2 && p[1] == ':') return true; // C:\ ...
+    return false;
+}
+static void PartirRuta(const std::string& p, std::vector<std::string>& out) {
+    std::string cur;
+    for (size_t i = 0; i < p.size(); i++) {
+        char c = p[i];
+        if (c == '/' || c == '\\') { if (!cur.empty()) { out.push_back(cur); cur.clear(); } }
+        else cur += c;
+    }
+    if (!cur.empty()) out.push_back(cur);
+}
+// ruta de la TEXTURA (archivo) relativa al DIRECTORIO del export, para que el .mtl sea portable (OBJ+MTL+textura se
+// mueven juntos). Ej: export a /a/b/, textura en /a/b/tex/x.png -> "tex/x.png"; en /a/c/x.png -> "../c/x.png".
+// Si no son comparables (raiz distinta, o la textura ya es relativa/asset) cae al basename o a la ruta tal cual.
+static std::string RutaTexturaRelativa(const std::string& dir, const std::string& target) {
+    if (!RutaEsAbsoluta(target)) return target;   // ya es relativa (o asset del APK): dejar como esta
+    if (!RutaEsAbsoluta(dir))    return BaseNameTex(target);
+    std::vector<std::string> a, b; PartirRuta(dir, a); PartirRuta(target, b);
+    size_t common = 0;
+    while (common < a.size() && common + 1 < b.size() && a[common] == b[common]) common++;
+    if (common == 0) return BaseNameTex(target); // sin prefijo comun (raiz/unidad distinta)
+    std::string rel;
+    for (size_t i = common; i < a.size(); i++) rel += "../";
+    for (size_t i = common; i < b.size(); i++) { rel += b[i]; if (i + 1 < b.size()) rel += "/"; }
+    return rel.empty() ? BaseNameTex(target) : rel;
+}
 
-static void EscribirMaterialMTL(std::ofstream& mtl, Material* mat) {
+static void EscribirMaterialMTL(std::ofstream& mtl, Material* mat, const std::string& exportDir) {
     if (!mat) return;
     mtl << "newmtl " << mat->name << "\n";
     mtl << "Kd " << FloatStr(mat->diffuse[0]) << " " << FloatStr(mat->diffuse[1]) << " " << FloatStr(mat->diffuse[2]) << "\n";
@@ -852,7 +882,7 @@ static void EscribirMaterialMTL(std::ofstream& mtl, Material* mat) {
     mtl << "Ns " << FloatStr(mat->specular[0] * 1000.0f) << "\n";
     mtl << "d " << FloatStr(mat->diffuse[3]) << "\n";
     if (mat->texture && !mat->texture->path.empty())
-        mtl << "map_Kd " << BaseNameTex(mat->texture->path) << "\n";
+        mtl << "map_Kd " << RutaTexturaRelativa(exportDir, mat->texture->path) << "\n";
     // extras propios de Whisk3D (los lee LeerMTL)
     if (!mat->culling)    mtl << "BackfaceCullingOff\n";
     if (!mat->depth_test) mtl << "GL_DEPTH_TEST_OFF\n";
@@ -1028,8 +1058,9 @@ bool ExportOBJ(const std::string& filepath, bool selectedOnly, bool applyModifie
     if (mtl.is_open()) {
         mtl.precision(7);
         mtl << "# creado con Whisk3D\n\n";
+        std::string exportDir = DirOf(filepath); // el .mtl y el .obj estan aca -> las texturas se referencian relativas a esto
         for (std::set<Material*>::iterator it = matsUsados.begin(); it != matsUsados.end(); ++it)
-            EscribirMaterialMTL(mtl, *it);
+            EscribirMaterialMTL(mtl, *it, exportDir);
         mtl.close();
     }
     ProgresoFin();

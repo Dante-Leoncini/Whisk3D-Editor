@@ -105,6 +105,7 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
                                             // recalcula cada frame; editarla traslada rigido lo seleccionado)
         GroupPropertie* propUVMaps;     // tarjeta "UV Maps" (lista de UV maps)
         GroupPropertie* propColorLayers;// tarjeta "Color" (lista de capas + modo per-vertex/corner)
+        GroupPropertie* propVertexGroups;// tarjeta "Vertex Groups" (huesos del rig: pelvis, spine_01, ...)
         GroupPropertie* propVertexAnim; // tarjeta "Vertex Animation"
         GroupPropertie* propModifiers;     // pestania "Modifiers" (mesh): selector del stack + Add/Remove/Move
         PropListMeshParts* propListModifiers; // selector del stack de modificadores (modo 3)
@@ -126,6 +127,7 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropButton* propBtnApplyMod; // "Apply Modifier": hornea la malla generada en malla real editable
         PropListMeshParts* propListUV;    // lista de UV maps (modo=1)
         PropListMeshParts* propListColor; // lista de capas de color (modo=2)
+        PropListMeshParts* propListVertGroups; // lista de grupos de vertices / huesos (modo=4)
         PropButton* propBtnColorMode;   // toggle Per-Vertex / Per-Corner color
         PropText* propRenderPath;    // campo editable "Path" del render (carpeta de salida)
         PropText* propRenderOutput;  // campo editable "File name" del render (solo el nombre + .png)

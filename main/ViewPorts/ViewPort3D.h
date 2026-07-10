@@ -90,6 +90,7 @@ class Viewport3D : public ViewportBase, public WithBorder {
         bool camFrameOn; float camFrameNX; float camFrameNY;
         void RenderCamPassepartout(); // dibuja el borde blanco + oscurece afuera del marco (lo que NO sale en el render)
         void RenderSnapIndicador();   // recuadro verde en el target de snap bajo el cursor
+        void RenderArmaturasEncima(Object* node); // huesos del esqueleto (lineas azules) encima de todo
         // INSPECCION en vista de camara: paneo/zoom de la VISTA (no mueve la camara) para ver con detalle dentro y
         // fuera del marco. Se aplica a la proyeccion + al marco. La camara NO se toca (el render no cambia).
         float camViewZoom; float camViewPanX; float camViewPanY;

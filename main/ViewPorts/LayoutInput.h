@@ -260,6 +260,7 @@ extern void (*LayoutWarpMouse)(int x, int y);
 
 // importar OBJ: el dialogo de archivos es de cada plataforma
 extern void (*LayoutImportObj)();
+extern void (*LayoutImportFbx)();
 // el arbol cambio (cambio de tipo / expand / split): la plataforma
 // refresca sus punteros cacheados si los tiene
 extern void (*LayoutArbolCambiado)();

@@ -13,16 +13,24 @@
 #include "ViewPorts/PopUp/FileBrowser.h" // explorador de archivos COMPARTIDO
 #include "ViewPorts/PopUp/ProgressPopup.h" // barra de progreso + hook LayoutSwapBuffers
 #include "importers/import_obj.h"        // ImportOBJ (el importador real)
+#include "importers/import_fbx.h"        // ImportFBX
 
-// accion del File browser al elegir un .obj
+// accion del File browser al elegir un modelo: por EXTENSION (.fbx -> FBX; resto -> OBJ)
 static void ImportObjDesdeBrowser(const std::string& path) {
-    ImportOBJ(path, false);
+    size_t d = path.find_last_of('.');
+    std::string ext = (d == std::string::npos) ? std::string() : path.substr(d);
+    for (size_t i = 0; i < ext.size(); i++) if (ext[i] >= 'A' && ext[i] <= 'Z') ext[i] += 32;
+    if (ext == ".fbx") ImportFBX(path);
+    else               ImportOBJ(path, false);
 }
 
-// el callback del menu Add (LayoutImportObj): abre el explorador compartido
+// el callback del menu "Add > Import OBJ": abre el explorador filtrado a .obj
 static void PCImportObj() {
-    AbrirFileBrowser("Importar modelo", "Import Wavefront OBJ", ".obj",
-                    ImportObjDesdeBrowser);
+    AbrirFileBrowser("Import OBJ", "Import OBJ", ".obj", ImportObjDesdeBrowser);
+}
+// "Add > Import FBX": mismo explorador, filtrado a .fbx (ImportObjDesdeBrowser rutea por extension -> ImportFBX)
+static void PCImportFbx() {
+    AbrirFileBrowser("Import FBX", "Import FBX", ".fbx", ImportObjDesdeBrowser);
 }
 
 // hook de swap para la barra de progreso (se redibuja DENTRO del export/import bloqueante)
@@ -749,6 +757,7 @@ int main(int argc, char* argv[]) {
     // no existen esas funciones (el bloque de PC no se compila); los hooks quedan NULL (se chequean antes de usar).
 #if !defined(__ANDROID__)
     LayoutImportObj = PCImportObj;
+    LayoutImportFbx = PCImportFbx;
     DialogoCargarTextura = PCCargarTexturaEn; // "Load Texture" (base Y normal map) -> browser compartido
     LayoutWarpMouse = PCWarpMouse;
     g_swapWindow = window; LayoutSwapBuffers = PCSwapBuffers; // barra de progreso (export/import)
@@ -758,6 +767,7 @@ int main(int argc, char* argv[]) {
     // (navega el almacenamiento del telefono; el permiso se pide arriba). La lectura
     // la hace la abstraccion del Core y la carga de textura w3dEngine::LoadTexture.
     LayoutImportObj = PCImportObj;
+    LayoutImportFbx = PCImportFbx;
     DialogoCargarTextura = PCCargarTexturaEn;
     g_swapWindow = window; LayoutSwapBuffers = PCSwapBuffers;
 #endif

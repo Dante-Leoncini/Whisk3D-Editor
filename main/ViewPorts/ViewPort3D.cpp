@@ -12,6 +12,7 @@
 #include "render/OpcionesRender.h" // flags del overlay de normales
 #include "objects/Mesh.h"          // overlay de estadisticas (vertsAgrupados, faces3d)
 #include "objects/EditMesh.h"      // foco al centro de la seleccion en edit mode
+#include "objects/Armature.h"      // dibujar huesos del esqueleto encima de todo
 #include "ViewPorts/LayoutInput.h" // LayoutDeleteEdit (menu Delete en edit mode)
 #include "ViewPorts/PopUp/NumPad.h" // NumPadAbrirTransform (teclado tactil sobre la barra de estado)
 #include "ViewPorts/PopUp/ConfirmarPopup.h" // AbrirConfirmarBorrado (popup al borrar con la tecla)
@@ -134,7 +135,8 @@ Viewport3D::Viewport3D(Vector3 pos){
         MenuAdd->Agregar("Camera", 5, IconType::camera);
         MenuAdd->Agregar("Light", 6, IconType::light);
         MenuAdd->Agregar("Collection", 8, IconType::archive);
-        MenuAdd->Agregar("import Wavefront", 7, IconType::archive);
+        MenuAdd->Agregar("Import OBJ", 7, IconType::mesh);
+        MenuAdd->Agregar("Import FBX", 15, IconType::mesh);
         // objetos especiales linkeados a un objeto (target): renderizan a otro
         MenuAdd->Agregar("Duplicate Linked", 9, IconType::instance);
         MenuAdd->Agregar("Array", 10, IconType::array);
@@ -980,12 +982,56 @@ void Viewport3D::Render() {
     // Renderiza la escena recursivamente
     SceneCollection->Render();
 
+    RenderArmaturasEncima(SceneCollection); // huesos AZULES encima de todo (ignoran z-buffer)
+
     LoopCutRenderPreview(); // preview del corte (loop cut) encima de la escena
 
     if (showOverlays) RenderOverlay();
     RenderCamPassepartout(); // marco de camara (lo que se va a renderizar) + oscurecido afuera. Antes de la UI (queda debajo).
     if (ShowUi) RenderUI();
     RenderSnapIndicador(); // recuadro verde en el target de snap (encima de todo)
+}
+
+// ARMATURE: dibuja los huesos de TODAS las armatures de la escena como lineas AZULES, encima de todo (z-test OFF),
+// asi se ven a traves del mesh. Se hace DESPUES de renderizar la escena (no dentro del recorrido del arbol) para que
+// el mesh hijo no las tape. Usa la matriz de MUNDO de cada armature: head/tail estan en su espacio local (rest pose).
+void Viewport3D::RenderArmaturasEncima(Object* node){
+    if (!node) return;
+    if (node->visible && node->getType() == ObjectType::armature){
+        Armature* arm = static_cast<Armature*>(node);
+        if (!arm->bones.empty()){
+            namespace gfx = w3dEngine;
+            Matrix4 W; arm->GetWorldMatrix(W);
+            gfx::MatrixMode(gfx::ModelView);
+            gfx::PushMatrix();
+            gfx::MultMatrix(W.m);
+            GLboolean luz = gfx::IsEnabled(gfx::Lighting);
+            gfx::Disable(gfx::Lighting);
+            gfx::Disable(gfx::Texture2D);
+            gfx::Disable(gfx::DepthTest);   // encima de todo
+            gfx::DisableArray(gfx::NormalArray);
+            gfx::DisableArray(gfx::ColorArray);
+            gfx::DisableArray(gfx::TexCoordArray);
+            gfx::Color4f(0.28f, 0.55f, 1.0f, 1.0f); // azul
+            gfx::LineWidth(2.0f);
+            std::vector<GLfloat> buf; buf.reserve(arm->bones.size() * 6);
+            for (size_t i = 0; i < arm->bones.size(); i++){
+                const W3dBone& b = arm->bones[i];
+                buf.push_back(b.head.x); buf.push_back(b.head.y); buf.push_back(b.head.z);
+                buf.push_back(b.tail.x); buf.push_back(b.tail.y); buf.push_back(b.tail.z);
+            }
+            gfx::VertexPointer3f(0, &buf[0]);
+            gfx::DrawLines((int)(buf.size() / 3));
+            gfx::LineWidth(1.0f);
+            gfx::Enable(gfx::DepthTest);
+            gfx::EnableArray(gfx::NormalArray);
+            if (luz) gfx::Enable(gfx::Lighting);
+            gfx::PopMatrix();
+            gfx::Invalidate();
+        }
+    }
+    for (size_t c = 0; c < node->Childrens.size(); c++)
+        RenderArmaturasEncima(node->Childrens[c]);
 }
 
 // SNAP: recuadro verde (solo borde) en el target bajo el cursor mientras se mueve con snap ON. Asi sabes

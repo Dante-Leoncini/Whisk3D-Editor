@@ -50,6 +50,7 @@ file(GLOB_RECURSE SRC_FILES
 list(APPEND SRC_FILES
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/w3dFilesystem.cpp
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/w3dTexture.cpp
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/w3dCompress.cpp
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/w3dGraphics.cpp
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/w3dlog.cpp
     # matematica del engine (antes en core/math): Vector3/Quaternion/Matrix4.
