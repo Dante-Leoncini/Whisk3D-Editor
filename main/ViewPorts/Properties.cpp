@@ -250,6 +250,11 @@ static void RenameIniciar(Button* boton, std::string* destino, std::string (*uni
     g_renameField.SelectAll();   // TODO seleccionado: la 1ra tecla reemplaza
     boton->editField = &g_renameField; // el boton se dibuja como input
     g_textFieldActivo = &g_renameField;
+    // TACTIL (Android/Symbian): abrir el teclado QWERTY, igual que al tocar un campo de texto (antes el rename
+    // enfocaba el campo pero no salia teclado -> inconsistente con render/export). En PC/web sigue el camino normal.
+#if !defined(__EMSCRIPTEN__)
+    { extern bool g_uiTapEnCurso; void QwertyAbrir(); if (g_uiTapEnCurso) QwertyAbrir(); }
+#endif
 }
 static void AccionRenameMeshPart(){ // las PARTES si pueden repetir nombre (no uniquifica)
     Mesh* m = MaterialMesh(); int idx = MeshPartActivoIdx(m); if (idx < 0 || !PropsActivo) return;
@@ -275,9 +280,20 @@ static void AccionRenameColor(){
     if (m->colorActivo < 0 || m->colorActivo >= (int)m->colorLayers.size()) return;
     RenameIniciar(PropsActivo->propBtnRenameColor->button, &m->colorLayers[m->colorActivo]->nombre, UniqColor);
 }
-static void AccionRenameObjeto(){
-    if (!ObjActivo || !PropsActivo || !PropsActivo->propBtnRenameObj) return;
-    RenameIniciar(PropsActivo->propBtnRenameObj->button, &ObjActivo->name, UniqObjeto); // todos los objetos
+// NOMBRE del objeto: el campo propNameObj muestra ObjActivo->name (cuando NO se edita) y, al perder el foco,
+// escribe lo tipeado (uniquificado) en ObjActivo->name. Se llama por frame desde RefreshTargetProperties.
+static std::string* g_nameEditTarget = NULL; // != NULL mientras se edita el nombre (captura el destino al enfocar)
+static void SincronizarNombreObjeto(){
+    if (!PropsActivo || !PropsActivo->propNameObj) return;
+    PropText* pt = PropsActivo->propNameObj;
+    bool foco = (g_textFieldActivo == &pt->field);
+    if (foco && !g_nameEditTarget && ObjActivo) g_nameEditTarget = &ObjActivo->name; // empezo a editar este nombre
+    if (!foco && g_nameEditTarget){                                                  // termino -> commit uniquificado
+        UndoCapturarRename(g_nameEditTarget);
+        *g_nameEditTarget = UniqObjeto(pt->field.text, g_nameEditTarget);
+        g_nameEditTarget = NULL;
+    }
+    if (!foco && ObjActivo) pt->field.SetText(ObjActivo->name); // sync display cuando NO se edita
 }
 
 // nombre corto de una textura (el archivo, sin la ruta)
@@ -840,6 +856,12 @@ static Mesh* VerticesMesh() {
 // PropertiesLayoutDirty = recalcula alturas + la SCROLLBAR (sino no se podia scrollear al item nuevo)
 static void AccionVertAddUVMap()  { Mesh* m = VerticesMesh(); if (m) { DuplicarUVMapActivo(m); PropertiesLayoutDirty = true; g_redraw = true; } }
 static void AccionVertAddColor()  { Mesh* m = VerticesMesh(); if (m) { DuplicarColorLayerActivo(m); PropertiesLayoutDirty = true; g_redraw = true; } }
+static void AccionVertDelUVMap()  { Mesh* m = VerticesMesh(); if (m) { BorrarUVMapActivo(m);   m->AplicarCapasAlRender(); PropertiesLayoutDirty = true; g_redraw = true; } }
+static void AccionVertUVMapUp()   { Mesh* m = VerticesMesh(); if (m) { MoverUVMapActivo(m,-1);  m->AplicarCapasAlRender(); PropertiesLayoutDirty = true; g_redraw = true; } }
+static void AccionVertUVMapDown() { Mesh* m = VerticesMesh(); if (m) { MoverUVMapActivo(m,+1);  m->AplicarCapasAlRender(); PropertiesLayoutDirty = true; g_redraw = true; } }
+static void AccionVertDelColor()  { Mesh* m = VerticesMesh(); if (m) { BorrarColorLayerActivo(m);  m->AplicarCapasAlRender(); PropertiesLayoutDirty = true; g_redraw = true; } }
+static void AccionVertColorUp()   { Mesh* m = VerticesMesh(); if (m) { MoverColorLayerActivo(m,-1); m->AplicarCapasAlRender(); PropertiesLayoutDirty = true; g_redraw = true; } }
+static void AccionVertColorDown() { Mesh* m = VerticesMesh(); if (m) { MoverColorLayerActivo(m,+1); m->AplicarCapasAlRender(); PropertiesLayoutDirty = true; g_redraw = true; } }
 static void AccionVertColorMode() {   // toggle Per-Vertex / Per-Corner de la capa de color activa
     Mesh* m = VerticesMesh(); if (!m) return;
     if (m->colorActivo >= 0 && m->colorActivo < (int)m->colorLayers.size()) {
@@ -878,10 +900,12 @@ void Properties::ConstruirGrupos(){
     propTransform->properties.push_back(new PropFloat("Y"));
     propTransform->properties.push_back(new PropFloat("Z"));
 
-    // "Rename" del OBJETO (abajo de todo): aplica a CUALQUIER objeto; nombre unico. Se vuelve input al apretar.
-    propBtnRenameObj = new PropButton("Rename", -1);
-    propBtnRenameObj->action = AccionRenameObjeto;
-    propTransform->properties.push_back(propBtnRenameObj);
+    // NOMBRE del objeto (campo de texto tipo render, NO un boton): se ve el nombre y al clickear se edita (teclado en
+    // tactil). El commit -> ObjActivo->name (uniquificado) lo hace SincronizarNombreObjeto por frame. Antes era un boton
+    // "Rename" que se volvia input pero no sacaba teclado en Android (inconsistente). El nombre del objeto no se ve en
+    // otro lado, asi que aca SI conviene el campo (en material/uv/color el nombre ya se ve -> se dejaron como boton).
+    propNameObj = new PropText("Name", "");
+    propTransform->properties.push_back(propNameObj);
 
     GroupProperties.push_back(propTransform);
 
@@ -1032,12 +1056,10 @@ void Properties::ConstruirGrupos(){
     // salida partida en dos campos: Path (carpeta) + File name (nombre.png), como pidio Dante.
     // Default del path: carpeta de salida por defecto (Android = Descargas).
     propRenderPath = new PropText("Path", w3dFileSystem::GetDefaultOutputDir());
+    propRenderPath->onClick = AccionBrowseRender; // el campo Path ES el "Browse folder": al clickear abre el explorador
     propRender->properties.push_back(propRenderPath);
     propRenderOutput = new PropText("File name", "render.png");
     propRender->properties.push_back(propRenderOutput);
-    PropButton* pbBrowseR = new PropButton("Browse folder...", IconType::carpeta);
-    pbBrowseR->action = AccionBrowseRender; // elige la carpeta -> campo Path
-    propRender->properties.push_back(pbBrowseR);
     // resolucion editable (default 640x480). Puede ser MAYOR que la ventana: se rinde por tiles.
     renderW = 640.0f; renderH = 480.0f;
     g_renderAspect = renderW / renderH; // arranca con el aspecto por defecto (4:3)
@@ -1064,10 +1086,10 @@ void Properties::ConstruirGrupos(){
     propRenderBg->value = g_renderBg; // el array global decae a puntero (igual que los colores de material/luz)
     propRender->properties.push_back(propRenderBg);
     // boton con action real (antes era no-op)
-    PropButton* pbRenderImg = new PropButton("Render Image");
+    PropButton* pbRenderImg = new PropButton("Render Image", IconType::textura); // icono de textura (imagen)
     pbRenderImg->action = AccionRenderImage;
     propRender->properties.push_back(pbRenderImg);
-    propRender->properties.push_back(new PropButton("Render Animation")); // TODO: loop StartFrame..EndFrame
+    propRender->properties.push_back(new PropButton("Render Animation", IconType::camera)); // icono de camara; TODO: loop StartFrame..EndFrame
     GroupProperties.push_back(propRender);
 
     propExport = new GroupPropertie("Export");
@@ -1083,12 +1105,10 @@ void Properties::ConstruirGrupos(){
     propExport->properties.push_back(pbXf);
     // salida partida en dos: Path (carpeta) + File name (nombre.obj). Default del path: Descargas en Android.
     propExportPath = new PropText("Path", w3dFileSystem::GetDefaultOutputDir());
+    propExportPath->onClick = AccionBrowseExport; // el campo Path ES el "Browse folder": al clickear abre el explorador
     propExport->properties.push_back(propExportPath);
     propExportName = new PropText("File name", "cube.obj");
     propExport->properties.push_back(propExportName);
-    PropButton* pbBrowse = new PropButton("Browse folder...", IconType::carpeta);
-    pbBrowse->action = AccionBrowseExport; // abre el explorador -> setea la carpeta en Path
-    propExport->properties.push_back(pbBrowse);
     PropButton* pbExp = new PropButton("Wavefront.obj", IconType::mesh);
     pbExp->action = AccionExportObj;
     propExport->properties.push_back(pbExp);
@@ -1113,6 +1133,12 @@ void Properties::ConstruirGrupos(){
     propBtnRenameUV = new PropButton("Rename", -1); // renombra la UV map activa (nombre unico por malla)
     propBtnRenameUV->action = AccionRenameUVMap;
     propUVMaps->properties.push_back(propBtnRenameUV);
+    // fila Delete | Move Up | Move Down (toda la fila oculta con 1 sola UV map)
+    propRowUVOps = new PropButtonRow();
+    propRowUVOps->Agregar("Delete",    AccionVertDelUVMap);
+    propRowUVOps->Agregar("Move Up",   AccionVertUVMapUp);
+    propRowUVOps->Agregar("Move Down", AccionVertUVMapDown);
+    propUVMaps->properties.push_back(propRowUVOps);
     GroupProperties.push_back(propUVMaps);
 
     propColorLayers = new GroupPropertie("Color");
@@ -1127,6 +1153,12 @@ void Properties::ConstruirGrupos(){
     propBtnRenameColor = new PropButton("Rename", -1); // renombra la capa de color activa (nombre unico)
     propBtnRenameColor->action = AccionRenameColor;
     propColorLayers->properties.push_back(propBtnRenameColor);
+    // fila Delete | Move Up | Move Down (toda la fila oculta con 1 sola capa de color)
+    propRowColorOps = new PropButtonRow();
+    propRowColorOps->Agregar("Delete",    AccionVertDelColor);
+    propRowColorOps->Agregar("Move Up",   AccionVertColorUp);
+    propRowColorOps->Agregar("Move Down", AccionVertColorDown);
+    propColorLayers->properties.push_back(propRowColorOps);
     GroupProperties.push_back(propColorLayers);
 
     propVertexAnim = new GroupPropertie("Vertex Animation");
@@ -1387,6 +1419,7 @@ void Properties::RefreshTargetProperties(){
         PropertiesLayoutDirty = false;
         Resize(width, height); // tambien recalcula la scrollbar
     }
+    SincronizarNombreObjeto(); // el campo "Name": muestra el nombre del objeto y commitea lo editado al perder foco
     if (!ObjActivo) {
         if (target) {
             target = NULL;
@@ -1496,10 +1529,11 @@ Properties::Properties() : ViewportBase() {
     propScrewAxis = NULL; propScrewStretchU = NULL; propScrewStretchV = NULL;
     propScrewSmooth = NULL; propScrewMerge = NULL; propScrewFlip = NULL;
     propListUV = NULL; propListColor = NULL; propBtnColorMode = NULL;
+    propRowUVOps = NULL; propRowColorOps = NULL;
     propRotMode = NULL;
     propMsgDefault = NULL; propSepMat = NULL;
     propMaterial = NULL; propBtnRenameMat = NULL;
-    propBtnRenameUV = NULL; propBtnRenameColor = NULL; propBtnRenameObj = NULL;
+    propBtnRenameUV = NULL; propBtnRenameColor = NULL; propNameObj = NULL;
     propRowPartOps = NULL; propRowDelRen = NULL; propRowPartMove = NULL;
     for (int i = 0; i < 10; i++) propMatChk[i] = NULL;
     for (int i = 0; i < 3; i++) propMatCol[i] = NULL;
@@ -1655,6 +1689,15 @@ void Properties::ActualizarPestanias(){
         if (propBtnColorMode && mv->colorActivo >= 0 && mv->colorActivo < (int)mv->colorLayers.size())
             propBtnColorMode->button->text =
                 mv->colorLayers[mv->colorActivo]->porVertice ? "Per-Vertex" : "Per-Corner";
+        // Delete | Move Up | Move Down: toda la fila solo si hay >1 elemento (borrar/reordenar necesita >=2)
+        if (propRowUVOps && propRowUVOps->botones.size() >= 3){
+            bool mas = (mv->uvMaps.size() > 1);
+            for (int b = 0; b < 3; b++) propRowUVOps->botones[b]->visible = mas;
+        }
+        if (propRowColorOps && propRowColorOps->botones.size() >= 3){
+            bool mas = (mv->colorLayers.size() > 1);
+            for (int b = 0; b < 3; b++) propRowColorOps->botones[b]->visible = mas;
+        }
     }
 
     // el boton de target muestra el objeto apuntado (se actualiza cada frame
@@ -2476,9 +2519,13 @@ void Properties::ClickEn(int mx, int my) {
                         if (pf->value) { gFloatDrag = pf; gFloatDragMoved = false; gFloatDragAccum = 0.0f; }
                     }
                     else if (prop->GetType() == PropertyType::Text) {
+                        PropText* pt = static_cast<PropText*>(prop);
+                        if (pt->onClick) { pt->onClick(); return; } // campo "Path": al clickear abre el explorador (no se edita)
                         prop->EditPropertie(); // ENFOCA la caja: el texto entra por SDL_TEXTINPUT
 #ifdef __EMSCRIPTEN__
                         if (g_uiTapEnCurso) SDL_StartTextInput(); // solo en TAP tactil: levanta el teclado del celu
+#else
+                        if (g_uiTapEnCurso) QwertyAbrir(); // TAP TACTIL (Android/Symbian): teclado QWERTY de Whisk3D
 #endif
                     }
                     return;

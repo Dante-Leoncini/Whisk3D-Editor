@@ -14,6 +14,10 @@ void MoverMeshPart(Mesh* m, int idx, int dir);  // reordena (dir -1 sube/+1 baja
 // o reconstruyen los datos de todas las capas de la malla (no son del render).
 void DuplicarUVMapActivo(Mesh* m);
 void DuplicarColorLayerActivo(Mesh* m);
+void BorrarUVMapActivo(Mesh* m);       // borra la UV map activa (queda >=1)
+void MoverUVMapActivo(Mesh* m, int dir);   // reordena la UV map activa (dir=-1 up / +1 down)
+void BorrarColorLayerActivo(Mesh* m);  // borra la capa de color activa (queda >=1)
+void MoverColorLayerActivo(Mesh* m, int dir);
 void ReverseCapasDeCorner(Mesh* m, int L, int count);
 void AgregarCornerCapas(Mesh* m, int srcL);
 void CompactarCapas(Mesh* m, const std::vector<int>& survCorner);
