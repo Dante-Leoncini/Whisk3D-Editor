@@ -96,6 +96,22 @@ chmod +x appimagetool-x86_64.AppImage
 
 y ahora con "cpack" los generas. excelente aporte de [**Zariep**](https://github.com/ItsZariep)
 
+## macOS
+
+Necesitas las herramientas de linea de comandos de Xcode y CMake:
+
+```bash
+xcode-select --install
+./build_mac.sh
+```
+
+El script descarga los submodulos, compila SDL2 estaticamente y genera la
+aplicacion en `build-mac/Whisk3D.app`. Puedes abrirla con:
+
+```bash
+open build-mac/Whisk3D.app
+```
+
 ## Android
 
 Para compilar. desde el directorio raiz usa

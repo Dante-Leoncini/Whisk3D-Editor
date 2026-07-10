@@ -81,6 +81,10 @@ endif()
 
 add_executable(whisk3d ${SRC_FILES})
 
+if(APPLE)
+    include(${CMAKE_SOURCE_DIR}/platform/mac/CMakeLists.txt)
+endif()
+
 # ---------------------------------------------------
 # Include directories
 # ---------------------------------------------------
@@ -134,7 +138,7 @@ endif()
 # OpenGL (Linux)
 # ---------------------------------------------------
 
-if(UNIX AND NOT ANDROID)
+if(UNIX AND NOT APPLE AND NOT ANDROID)
 
     find_package(OpenGL REQUIRED)
 
@@ -181,7 +185,7 @@ add_custom_command(
 # INSTALACION LINUX
 # ---------------------------------------------------
 
-if(UNIX AND NOT ANDROID)
+if(UNIX AND NOT APPLE AND NOT ANDROID)
     install(TARGETS whisk3d
         RUNTIME DESTINATION bin
     )
