@@ -637,13 +637,23 @@ int main(int argc, char* argv[]) {
             env->DeleteLocalRef(activity);
         }
     }
-    // Pedir el permiso de lectura del almacenamiento para poder navegar/cargar
-    // texturas y modelos del telefono (el file browser interno lista por opendir).
-    SDL_AndroidRequestPermission("android.permission.READ_EXTERNAL_STORAGE");
-    // ...y el de ESCRITURA: exportar OBJ/MTL y guardar el render PNG escriben al
-    // almacenamiento. Con requestLegacyExternalStorage (API 29) esto habilita fopen
-    // a /sdcard; sin el permiso, la exportacion y el render fallaban en silencio.
-    SDL_AndroidRequestPermission("android.permission.WRITE_EXTERNAL_STORAGE");
+    // PERMISOS por NIVEL DE API. OJO: SDL_AndroidRequestPermission BLOQUEA el arranque esperando el callback del
+    // sistema. Pedir un permiso que NO esta en el manifest para esa API (ej. WRITE_EXTERNAL_STORAGE en API>=30, que
+    // lleva maxSdkVersion=29) es inutil (scoped storage: no se puede otorgar) y ademas RIESGOSO: puede no llegar el
+    // callback y colgar la app al iniciar -> "no anda en Android 11+". Por eso se piden SOLO los que corresponden.
+    int androidApi = SDL_GetAndroidSDKVersion();
+    // LECTURA (navegar/cargar texturas y modelos): API>=33 (Android 13) usa READ_MEDIA_IMAGES; API<=32, READ_EXTERNAL_STORAGE.
+    if (androidApi >= 33) SDL_AndroidRequestPermission("android.permission.READ_MEDIA_IMAGES");
+    else                  SDL_AndroidRequestPermission("android.permission.READ_EXTERNAL_STORAGE");
+    // ESCRITURA: WRITE_EXTERNAL_STORAGE solo sirve/existe hasta API 29 (legacy storage). En API>=30 la salida va al
+    // directorio EXTERNO PROPIO de la app (no requiere permiso, ver GetDefaultOutputDir).
+    if (androidApi <= 29) SDL_AndroidRequestPermission("android.permission.WRITE_EXTERNAL_STORAGE");
+    // API>=30 (scoped storage): no se puede escribir a Descargas por fopen. La salida por defecto de render/export
+    // va al dir EXTERNO PROPIO de la app (/sdcard/Android/data/<pkg>/files): NO requiere permiso y anda en todo Android.
+    if (androidApi >= 30) {
+        const char* extDir = SDL_AndroidGetExternalStoragePath();
+        if (extDir && *extDir) w3dFileSystem::SetDefaultOutputDir(extDir);
+    }
     #endif
 
     // Configuración OpenGL
