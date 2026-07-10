@@ -250,6 +250,9 @@ void EditMesh::Render() {
     gfx::Disable(gfx::Texture2D);
     gfx::DisableArray(gfx::NormalArray);
     gfx::DisableArray(gfx::TexCoordArray);
+    // X-RAY: los bordes/vertices (incluso los de ATRAS de las caras) se dibujan SIEMPRE encima (sin z-test),
+    // asi se pueden ver y seleccionar los que estaban ocultos. Se restaura al final.
+    if (g_xray) gfx::Disable(gfx::DepthTest);
 
     // 1) CARAS seleccionadas: verde 50%, blend, sin escribir z (para no tapar lo de arriba)
     if (!faceTriDyn.empty()) {
@@ -291,6 +294,7 @@ void EditMesh::Render() {
         gfx::PointSize(1.0f);
     }
 
+    if (g_xray) gfx::Enable(gfx::DepthTest); // restaurar el z-test tras el overlay X-Ray
     gfx::DisableArray(gfx::ColorArray);
     if (src && src->vertex) gfx::VertexPointer3f(0, src->vertex);
     gfx::Invalidate();

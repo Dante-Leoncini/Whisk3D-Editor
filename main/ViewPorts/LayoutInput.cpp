@@ -469,7 +469,7 @@ bool EditXformStart(int est, int eje) { // expuesto (lo usa el harness para test
 // ============================================================================
 //  SNAP (imantado): estado + buscador del punto de snap bajo el cursor.
 // ============================================================================
-SnapCfg g_snap = { false, SNAP_CLOSEST, SNAP_VERTEX, true,true,true, true,true,true };
+SnapCfg g_snap = { false, SNAP_CLOSEST, SNAP_VERTEX, true,true,true, true,true,true, false,false };
 bool SnapEnabled(){ return g_snap.enabled; }
 void SnapToggle(){ g_snap.enabled = !g_snap.enabled; Notificar(g_snap.enabled ? "Snap: ON" : "Snap: OFF", false); g_redraw = true; }
 // resultado del ultimo snap (para dibujar el recuadro verde en el viewport)
@@ -1526,7 +1526,7 @@ static void AccionPivot(int aId) {
 }
 
 // ===== menu SNAP (boton "Snap" de la barra): Enable + Snap Base + Snap Target + Affect + Target Selection =====
-static PopupMenu* gMenuSnapTool=NULL, *gMenuSnapBase=NULL, *gMenuSnapTarget=NULL;
+static PopupMenu* gMenuSnapTool=NULL, *gMenuSnapBase=NULL, *gMenuSnapTarget=NULL, *gMenuSnapIndiv=NULL;
 static void AccionSnapBase(int id){ g_snap.base=id; g_redraw=true; }
 static void AccionSnapTarget(int id){ g_snap.target=id; g_redraw=true; }
 // El dispatch (LayoutClickUI) SIEMPRE llama al action del menu TOP con el id del item elegido,
@@ -1552,6 +1552,15 @@ void LayoutMenuSnapTool(int mx, int my){
     // ninguna de estas opciones hace efecto, igual que "Show Overlays" grisa sus hijos.
     gMenuSnapTool->Agregar(std::string("Snap Base: ")+SnapBaseNom(g_snap.base), 0, -1, gMenuSnapBase)->gris = &g_snap.enabled;
     gMenuSnapTool->Agregar(std::string("Snap Target: ")+SnapTargetNom(g_snap.target), 0, -1, gMenuSnapTarget)->gris = &g_snap.enabled;
+    // SOLO en target FACE: proyeccion POR VERTICE (retopologia). Submenu con 2 tildes INDEPENDIENTES (no radio):
+    // Face Project (a lo largo del rayo de la vista) y Face Nearest (al punto mas cercano de la superficie).
+    if (g_snap.target == SNAP_FACE){
+        if (!gMenuSnapIndiv){ gMenuSnapIndiv=new PopupMenu(); gMenuSnapIndiv->titulo="Individual Elements"; }
+        gMenuSnapIndiv->Limpiar();
+        gMenuSnapIndiv->AgregarCheck("Face Project", 0, &g_snap.faceProject);
+        gMenuSnapIndiv->AgregarCheck("Face Nearest", 0, &g_snap.faceNearest);
+        gMenuSnapTool->Agregar("Snap Target for Individual Elements", 0, -1, gMenuSnapIndiv)->gris = &g_snap.enabled;
+    }
     gMenuSnapTool->AgregarCheck("Affect Move",   0, &g_snap.afMove)->gris = &g_snap.enabled;
     gMenuSnapTool->AgregarCheck("Affect Rotate", 0, &g_snap.afRot)->gris = &g_snap.enabled;
     gMenuSnapTool->AgregarCheck("Affect Scale",  0, &g_snap.afScale)->gris = &g_snap.enabled;
@@ -1706,16 +1715,85 @@ void EditXformIniciarExtrude(const Vector3& normalLocal){
     if (ln > 1e-6f){ gTransformNormal = Vector3(a.x/ln, a.y/ln, a.z/ln); gEVuseCustom = true; }
 }
 
+// ===== Face Project / Nearest (retopologia): proyectar CADA vert por separado sobre la superficie de OTRA geometria =====
+static bool SnapRayTri(const Vector3& ro, const Vector3& rd, const Vector3& a, const Vector3& b, const Vector3& c, float& tOut){
+    Vector3 e1=b-a, e2=c-a;
+    Vector3 pv(rd.y*e2.z-rd.z*e2.y, rd.z*e2.x-rd.x*e2.z, rd.x*e2.y-rd.y*e2.x); // rd x e2
+    float det=e1.Dot(pv); if (det>-1e-8f && det<1e-8f) return false;
+    float inv=1.0f/det; Vector3 tv=ro-a;
+    float u=tv.Dot(pv)*inv; if (u<-1e-4f||u>1.0f+1e-4f) return false;
+    Vector3 qv(tv.y*e1.z-tv.z*e1.y, tv.z*e1.x-tv.x*e1.z, tv.x*e1.y-tv.y*e1.x); // tv x e1
+    float v=rd.Dot(qv)*inv; if (v<-1e-4f||u+v>1.0f+1e-4f) return false;
+    tOut=e2.Dot(qv)*inv; return tOut>1e-5f; // delante de la camara
+}
+// punto mas cercano de un triangulo a p (Ericson, Real-Time Collision Detection)
+static Vector3 SnapClosestTri(const Vector3& p, const Vector3& a, const Vector3& b, const Vector3& c){
+    Vector3 ab=b-a, ac=c-a, ap=p-a; float d1=ab.Dot(ap), d2=ac.Dot(ap);
+    if (d1<=0 && d2<=0) return a;
+    Vector3 bp=p-b; float d3=ab.Dot(bp), d4=ac.Dot(bp);
+    if (d3>=0 && d4<=d3) return b;
+    float vc=d1*d4-d3*d2; if (vc<=0 && d1>=0 && d3<=0){ float t=d1/(d1-d3); return a+ab*t; }
+    Vector3 cp=p-c; float d5=ab.Dot(cp), d6=ac.Dot(cp);
+    if (d6>=0 && d5<=d6) return c;
+    float vb=d5*d2-d1*d6; if (vb<=0 && d2>=0 && d6<=0){ float t=d2/(d2-d6); return a+ac*t; }
+    float va=d3*d6-d5*d4; if (va<=0 && (d4-d3)>=0 && (d5-d6)>=0){ float t=(d4-d3)/((d4-d3)+(d5-d6)); return b+(c-b)*t; }
+    float den=1.0f/(va+vb+vc); float v=vb*den, w=vc*den; return a+ab*v+ac*w;
+}
+// proyecta p (mundo) sobre las caras de la geometria candidata (menos la malla en edicion). modo 0=rayo de la vista,
+// 1=punto mas cercano. Devuelve false si no hay superficie -> el vert se queda donde estaba (move normal).
+static bool SnapFaceProyectarPunto(const Vector3& p, int modo, Vector3& out){
+    if (!SceneCollection || !Viewport3DActive) return false;
+    std::vector<Mesh*> meshes; SnapRecolectar(SceneCollection, meshes);
+    if (meshes.empty()) return false;
+    Mesh* em = (InteractionMode==EditMode) ? (Mesh*)g_editMesh : NULL;
+    Vector3 cam = Viewport3DActive->viewPos;
+    Vector3 rd = p - cam; float rl=sqrtf(rd.Dot(rd)); if (rl<1e-9f) return false; rd=rd*(1.0f/rl);
+    bool found=false; float bestT=1e30f, bestD=1e30f; Vector3 best;
+    for (size_t mi=0; mi<meshes.size(); mi++){
+        Mesh* m=meshes[mi]; if (m==em) continue; // no proyectar sobre la propia malla en edicion (retopo -> otra geometria)
+        if (!m->vertex || m->vertexSize<=0) continue;
+        Matrix4 W; m->GetWorldMatrix(W);
+        for (size_t f=0; f<m->faces3d.size(); f++){
+            const std::vector<int>& idx=m->faces3d[f].idx; int nc=(int)idx.size(); if (nc<3) continue;
+            Vector3 w0=W*Vector3(m->vertex[idx[0]*3],m->vertex[idx[0]*3+1],m->vertex[idx[0]*3+2]);
+            for (int t=1; t+1<nc; t++){
+                Vector3 w1=W*Vector3(m->vertex[idx[t]*3],  m->vertex[idx[t]*3+1],  m->vertex[idx[t]*3+2]);
+                Vector3 w2=W*Vector3(m->vertex[idx[t+1]*3],m->vertex[idx[t+1]*3+1],m->vertex[idx[t+1]*3+2]);
+                if (modo==0){ float tt; if (SnapRayTri(cam,rd,w0,w1,w2,tt) && tt<bestT){ bestT=tt; best=cam+rd*tt; found=true; } }
+                else { Vector3 c=SnapClosestTri(p,w0,w1,w2); Vector3 d=c-p; float dd=d.Dot(d); if (dd<bestD){ bestD=dd; best=c; found=true; } }
+            }
+        }
+    }
+    if (found) out=best;
+    return found;
+}
+// proyeccion POR VERTICE activa? Solo en target FACE, Edit Mode, move LIBRE (desde la vista, sin eje ni extrude).
+static bool SnapFaceIndividualActivo(){
+    return g_snap.enabled && g_snap.afMove && g_snap.target==SNAP_FACE &&
+           (g_snap.faceProject || g_snap.faceNearest) &&
+           InteractionMode==EditMode && gEVmesh && !gEVuseCustom && axisSelect==ViewAxis;
+}
+// posicion final del vert 'wn' (ya trasladado) con Face Project/Nearest. Project (rayo) tiene prioridad; si no pega,
+// prueba Nearest; si tampoco, queda donde estaba (move normal).
+static Vector3 SnapFaceIndividualPunto(const Vector3& wn){
+    Vector3 pr;
+    if (g_snap.faceProject && SnapFaceProyectarPunto(wn, 0, pr)) return pr;
+    if (g_snap.faceNearest && SnapFaceProyectarPunto(wn, 1, pr)) return pr;
+    return wn;
+}
+
 // recomputa cada vertice desde su world0 + el acumulado activo y lo escribe en la
 // malla (todos los GPU del grupo) + refresca el overlay.
 static void EVEscribir(){
     if (!gEVmesh) return;
     Mesh* m = gEVmesh;
+    const bool faceIndiv = (estado == translacion) && SnapFaceIndividualActivo(); // proyeccion por-vertice (retopo)
     for (size_t i=0;i<gEVsnap.size();i++){
         EditVtxSnap& s = gEVsnap[i];
         Vector3 wn;
         if (estado == translacion){
             wn = s.world0 + gEVtrans;
+            if (faceIndiv) wn = SnapFaceIndividualPunto(wn); // cada vert se pega a la superficie de atras (o queda igual)
         } else if (estado == rotacion){
             wn = gEVpivot + gEVrotTotal * (s.world0 - gEVpivot);
         } else if (gEVshrink){ // SHRINK/FATTEN: cada vert se mueve por SU normal (mundo) * distancia acumulada
@@ -1924,7 +2002,9 @@ void EditXformTraslacion(int dx,int dy,float speed){
         T = libre - a*libre.Dot(a);
     } else T = libre;
     gEVtrans += T;
-    SnapAjustarEditTrans(); // imantar la seleccion al target de snap (si esta ON)
+    // con proyeccion POR VERTICE (Face Project/Nearest) NO se hace el snap de la seleccion entera: cada vert se
+    // proyecta solo (en EVEscribir). Sino, el imantado normal de la seleccion al target bajo el cursor.
+    if (!SnapFaceIndividualActivo()) SnapAjustarEditTrans();
     EVEscribir();
 }
 void EditXformRotEje(int dx,int dy){
@@ -3187,7 +3267,9 @@ static int EditPickIndex(int modo, int mx, int my, int vx, int vy, int vw, int v
     // malla en el render- NO sean clickeables. Solo se pickea lo que se VE adelante.
     // (En PC el depth-test de los puntos ya lo resolvia; en Symbian no, y se
     // seleccionaba un elemento de atras que caia cerca en pantalla.)
-    if (m->vertex && m->faces && m->facesSize >= 3) {
+    // X-RAY (solo verts/aristas, NO caras): se SALTEA la oclusion -> los verts/bordes de atras tambien se pickean.
+    const bool xrayPick = g_xray && !faceMode;
+    if (!xrayPick && m->vertex && m->faces && m->facesSize >= 3) {
         w3dEngine::ColorMask(false, false, false, false);
         w3dEngine::Disable(w3dEngine::CullFace);
         w3dEngine::DisableArray(w3dEngine::ColorArray);

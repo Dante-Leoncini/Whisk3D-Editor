@@ -318,6 +318,10 @@ void Viewport3D::AbrirMenuOverlays(int x, int y){
     // Show Overlays). Apagarlo gana rendimiento en juegos/renders donde la escena llena la pantalla.
     // ON por defecto (limpiarPantalla = true en el ctor).
     MenuOverlays->AgregarCheck("Clear Screen", 13, &limpiarPantalla);
+    // X-Ray (retopologia): la malla EN EDICION se dibuja semitransparente (30%) sin z-test y sus bordes/vertices
+    // siempre encima -> se ven y se pueden SELECCIONAR los verts/aristas de atras (los tapados por las caras).
+    // Modo propio, NO se grisa con Show Overlays. Global (una sola malla en edicion a la vez).
+    MenuOverlays->AgregarCheck("X-Ray", 14, &g_xray);
     MenuOverlays->action = NULL; // el toggle lo hace el propio item (checkbox)
     MenuOverlays->Abrir(x, y, MenuPantallaW, MenuPantallaH);
     MenuAbierto = MenuOverlays;

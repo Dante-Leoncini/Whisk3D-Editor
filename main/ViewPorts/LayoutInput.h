@@ -26,6 +26,9 @@ struct SnapCfg {
     int  target;                           // a que se pega (SNAP_VERTEX por defecto)
     bool afMove, afRot, afScale;           // "Affect": el snap solo actua en esas operaciones
     bool tsActive, tsEdited, tsNonEdited;  // "Target Selection": que geometria es candidata a snap
+    // SOLO en target FACE: proyeccion POR VERTICE (retopologia). Cada vert movido, individualmente, se pega a la
+    // superficie de OTRA geometria. faceProject = a lo largo del rayo de la vista; faceNearest = al punto mas cercano.
+    bool faceProject, faceNearest;
 };
 extern SnapCfg g_snap;
 bool SnapEnabled();  // g_snap.enabled
