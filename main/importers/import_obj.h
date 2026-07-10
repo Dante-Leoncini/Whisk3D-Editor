@@ -54,7 +54,11 @@ public:
     Wavefront() { Reset(); }
 
     void Reset();
-    void ConvertToES1(Mesh* TempMesh, int* acumuladoVertices, int* acumuladoNormales, int* acumuladoUVs);
+    // vertToCP (opcional): por cada vertice de render que se crea, empuja el indice de CONTROL-POINT (fc.vertex) del
+    // que salio. Lo usa el importador FBX para mapear los pesos del skin (indexados por control-point) a los vertices
+    // de render (weight paint). NULL = no se arma (OBJ normal no lo necesita).
+    void ConvertToES1(Mesh* TempMesh, int* acumuladoVertices, int* acumuladoNormales, int* acumuladoUVs,
+                      std::vector<int>* vertToCP = NULL);
     void ConvertToES1_NoMerge(Mesh* TempMesh);
 };
 

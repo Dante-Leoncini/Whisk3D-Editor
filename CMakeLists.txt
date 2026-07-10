@@ -9,6 +9,11 @@ project(Whisk3D)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Version = fecha de compilacion YY.MM.DD (mismo criterio que el APK / .deb / .exe). Se inyecta como define
+# para mostrarla en el titulo de ventana y en el header del .obj exportado (asi una captura dice de que version es).
+string(TIMESTAMP W3D_VER "%y.%m.%d")
+add_compile_definitions(W3D_VERSION="${W3D_VER}")
+
 # ---------------------------------------------------
 # Build type
 # ---------------------------------------------------

@@ -1,4 +1,5 @@
 #include "import_obj.h"
+#include "w3dVersion.h" // W3dVersion() para el header del .obj exportado
 #include <sstream>
 #include <stdlib.h>
 #include <algorithm>
@@ -151,8 +152,10 @@ void Wavefront::Reset() {
     facesCount = 0;
 }
 
-void Wavefront::ConvertToES1(Mesh* TempMesh, int* acumuladoVertices, int* acumuladoNormales, int* acumuladoUVs) {
+void Wavefront::ConvertToES1(Mesh* TempMesh, int* acumuladoVertices, int* acumuladoNormales, int* acumuladoUVs,
+                             std::vector<int>* vertToCP) {
     (void)acumuladoVertices; (void)acumuladoNormales; (void)acumuladoUVs; // ya se restaron al parsear
+    if (vertToCP) vertToCP->clear();
     std::vector<GLfloat> newVertices;
     std::vector<GLubyte> newColors;
     std::vector<GLbyte> newNormals;
@@ -207,6 +210,7 @@ void Wavefront::ConvertToES1(Mesh* TempMesh, int* acumuladoVertices, int* acumul
             } else {
                 idx = (MeshIndex)(newVertices.size() / 3);
                 vertexMap[key] = idx;
+                if (vertToCP) vertToCP->push_back(fc.vertex); // este vertice de render sale del control-point fc.vertex
                 for (int v = 0; v < 3; v++) {
                     size_t vi = (size_t)fc.vertex * 3 + v;
                     newVertices.push_back(vi < vertex.size() ? vertex[vi] : 0.0f);
@@ -915,7 +919,7 @@ bool ExportOBJ(const std::string& filepath, bool selectedOnly, bool applyModifie
 #else
     out.reserve(8 * 1024 * 1024); // PC/Android/WebGL: modelos grandes -> evita reallocs del buffer de 20-40MB
 #endif
-    out += "# creado con Whisk3D\n";
+    out += "# creado con Whisk3D "; out += W3dVersion(); out += "\n"; // version (fecha de build) para identificar la captura
     out += "mtllib "; out += mtlNom; out += "\n";
 
     int vOff = 0, vtOff = 0, vnOff = 0, vcOff = 0; // offsets 1-based acumulados (vc = color por esquina)

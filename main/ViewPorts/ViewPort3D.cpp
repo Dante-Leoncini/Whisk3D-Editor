@@ -132,6 +132,7 @@ Viewport3D::Viewport3D(Vector3 pos){
         MenuAdd->Agregar("Cylinder", 14, IconType::cilindro);
         MenuAdd->Agregar("Vertex", 3, IconType::mesh);
         MenuAdd->Agregar("Empty", 4, IconType::empty);
+        MenuAdd->Agregar("Armature", 16, IconType::armature);
         MenuAdd->Agregar("Camera", 5, IconType::camera);
         MenuAdd->Agregar("Light", 6, IconType::light);
         MenuAdd->Agregar("Collection", 8, IconType::archive);
@@ -799,6 +800,19 @@ void Viewport3D::SetShowOverlays(bool valor) {
     showOverlays = valor;
 }
 
+// WEIGHT PAINT: en modo Weight Paint, prende el degradado de peso en el mesh ACTIVO (y lo apaga en el que se dejo de
+// pintar). Recalcula el color cada frame (barato y refleja el cambio de grupo activo al instante). Fuera del modo,
+// apaga el ultimo. Se llama antes de renderizar la escena.
+static Mesh* g_wpMesh = NULL;
+static void WeightPaintActualizar() {
+    Mesh* target = NULL;
+    if (InteractionMode == WeightPaint && ObjActivo && ObjActivo->getType() == ObjectType::mesh)
+        target = (Mesh*)ObjActivo;
+    if (g_wpMesh && g_wpMesh != target) g_wpMesh->weightPaintOn = false; // apaga el anterior
+    g_wpMesh = target;
+    if (target) { target->weightPaintOn = true; target->ConstruirColorPeso(target->grupoActivo); }
+}
+
 void Viewport3D::Render() {
     ReloadLights();
 
@@ -979,6 +993,8 @@ void Viewport3D::Render() {
         w3dEngine::FogColor(fogZ);
     }
 
+    WeightPaintActualizar(); // prende/apaga el degradado de peso en el mesh activo (modo Weight Paint)
+
     // Renderiza la escena recursivamente
     SceneCollection->Render();
 
@@ -1012,16 +1028,38 @@ void Viewport3D::RenderArmaturasEncima(Object* node){
             gfx::DisableArray(gfx::NormalArray);
             gfx::DisableArray(gfx::ColorArray);
             gfx::DisableArray(gfx::TexCoordArray);
-            gfx::Color4f(0.28f, 0.55f, 1.0f, 1.0f); // azul
-            gfx::LineWidth(2.0f);
-            std::vector<GLfloat> buf; buf.reserve(arm->bones.size() * 6);
+            // huesos: linea SOLIDA head->tail (azul). Ademas, para cada hueso cuyo head NO coincide con el tail de su
+            // padre (hueso emparentado pero "separado"), una linea PUNTEADA padre.tail->head para que quede clara la
+            // conexion en la jerarquia (igual que Blender). El punteado se fabrica a mano (GLES no tiene line stipple).
+            std::vector<GLfloat> buf, dash; buf.reserve(arm->bones.size() * 6);
             for (size_t i = 0; i < arm->bones.size(); i++){
                 const W3dBone& b = arm->bones[i];
                 buf.push_back(b.head.x); buf.push_back(b.head.y); buf.push_back(b.head.z);
                 buf.push_back(b.tail.x); buf.push_back(b.tail.y); buf.push_back(b.tail.z);
+                if (b.parent >= 0 && b.parent < (int)arm->bones.size()){
+                    Vector3 A = arm->bones[b.parent].tail, B = b.head;
+                    Vector3 d = B - A; float L = d.Length();
+                    if (L > 0.5f){ // no coinciden -> gap: punteado A->B
+                        Vector3 u = d * (1.0f / L); const float dl = 2.0f; // guion de ~2 unidades (raw)
+                        for (float t = 0.0f; t < L; t += 2.0f * dl){
+                            float t2 = t + dl; if (t2 > L) t2 = L;
+                            Vector3 P = A + u * t, Q = A + u * t2;
+                            dash.push_back(P.x); dash.push_back(P.y); dash.push_back(P.z);
+                            dash.push_back(Q.x); dash.push_back(Q.y); dash.push_back(Q.z);
+                        }
+                    }
+                }
             }
+            gfx::Color4f(0.28f, 0.55f, 1.0f, 1.0f); // azul
+            gfx::LineWidth(2.0f);
             gfx::VertexPointer3f(0, &buf[0]);
             gfx::DrawLines((int)(buf.size() / 3));
+            if (!dash.empty()){ // conexiones punteadas: mas finas y un pelin mas apagadas
+                gfx::LineWidth(1.0f);
+                gfx::Color4f(0.35f, 0.55f, 0.9f, 1.0f);
+                gfx::VertexPointer3f(0, &dash[0]);
+                gfx::DrawLines((int)(dash.size() / 3));
+            }
             gfx::LineWidth(1.0f);
             gfx::Enable(gfx::DepthTest);
             gfx::EnableArray(gfx::NormalArray);

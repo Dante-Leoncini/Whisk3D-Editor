@@ -296,11 +296,48 @@ static void RecolectarBorrar(Object* node, bool incCol, std::vector<DelEntry>& o
     }
 }
 
+// hijo que se REPARENTA al abuelo cuando se borra su padre (asi no desaparece de la escena; queda como hijo del
+// abuelo preservando su posicion global, v1: solo traslacion, igual que W3dReparent).
+struct RepEntry { Object* child; Object* abuelo; Object* borrado; Vector3 posBajoAbuelo; Vector3 posBajoBorrado; };
+
 class DeleteUndo : public UndoCmd {
     std::vector<DelEntry> ents;
+    std::vector<RepEntry> reps;    // hijos de los borrados, reparentados al abuelo
+    bool repsListos;               // las reps se computan UNA vez (en el 1er detach)
     std::vector<Object*>  selPrev; Object* actPrev; Camera* camPrev;
     bool enEscena; // true = los objetos estan en la escena; false = los tiene este comando (detachados)
+    void QuitarHijo(Object* p, Object* c) {
+        for (size_t k = 0; k < p->Childrens.size(); k++)
+            if (p->Childrens[k] == c) { p->Childrens.erase(p->Childrens.begin()+k); break; }
+    }
     void Detachar() {
+        // 1) computar (1 sola vez) el reparentado de los hijos de cada objeto borrado hacia el ABUELO. Un hijo que
+        //    TAMBIEN se borra (esta en ents) se va con su root -> no se reparenta.
+        if (!repsListos) {
+            for (size_t i = 0; i < ents.size(); i++) { DelEntry& e = ents[i];
+                Vector3 gAbuelo = e.parent->GetGlobalPosition();
+                std::vector<Object*> kids = e.obj->Childrens; // snapshot (lo vamos a modificar)
+                for (size_t k = 0; k < kids.size(); k++) {
+                    Object* ch = kids[k];
+                    bool tambienBorrado = false;
+                    for (size_t j = 0; j < ents.size(); j++) if (ents[j].obj == ch) { tambienBorrado = true; break; }
+                    if (tambienBorrado) continue;
+                    RepEntry r; r.child = ch; r.abuelo = e.parent; r.borrado = e.obj;
+                    r.posBajoBorrado = ch->pos;
+                    r.posBajoAbuelo  = ch->GetGlobalPosition() - gAbuelo; // preserva posicion global
+                    reps.push_back(r);
+                }
+            }
+            repsListos = true;
+        }
+        // 2) mover los hijos reparentados al abuelo (ANTES de detachar el borrado, asi sus luces no se detachan)
+        for (size_t i = 0; i < reps.size(); i++) { RepEntry& r = reps[i];
+            QuitarHijo(r.borrado, r.child);
+            r.child->Parent = r.abuelo;
+            r.child->pos = r.posBajoAbuelo;
+            r.abuelo->Childrens.push_back(r.child);
+        }
+        // 3) detachar cada objeto borrado (ya sin esos hijos)
         for (size_t i = 0; i < ents.size(); i++) { DelEntry& e = ents[i];
             for (size_t k = 0; k < e.parent->Childrens.size(); k++)
                 if (e.parent->Childrens[k] == e.obj) { e.index = (int)k; e.parent->Childrens.erase(e.parent->Childrens.begin()+k); break; }
@@ -310,7 +347,7 @@ class DeleteUndo : public UndoCmd {
         enEscena = false;
     }
 public:
-    DeleteUndo(bool incCol) : actPrev(NULL), camPrev(NULL), enEscena(true) {
+    DeleteUndo(bool incCol) : repsListos(false), actPrev(NULL), camPrev(NULL), enEscena(true) {
         selPrev = ObjSelects; actPrev = ObjActivo; camPrev = CameraActive;
         if (SceneCollection) RecolectarBorrar(SceneCollection, incCol, ents);
         Detachar(); // el borrado YA paso: los saca de la escena (sin liberar)
@@ -323,6 +360,13 @@ public:
             int idx = e.index; if (idx < 0) idx = 0; if (idx > (int)e.parent->Childrens.size()) idx = (int)e.parent->Childrens.size();
             e.parent->Childrens.insert(e.parent->Childrens.begin()+idx, e.obj);
             ReattacharLuces(e.obj);
+        }
+        // devolver los hijos reparentados a su objeto original (restaurando su posicion local)
+        for (size_t i = 0; i < reps.size(); i++) { RepEntry& r = reps[i];
+            QuitarHijo(r.abuelo, r.child);
+            r.child->Parent = r.borrado;
+            r.child->pos = r.posBajoBorrado;
+            r.borrado->Childrens.push_back(r.child);
         }
         CameraActive = camPrev; ObjSelects = selPrev; ObjActivo = actPrev; // restaura seleccion + camara activa
         for (size_t i = 0; i < ObjSelects.size(); i++) if (ObjSelects[i]) ObjSelects[i]->select = true;

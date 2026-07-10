@@ -142,8 +142,10 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
                                       // al renombrar se vuelve input via Button::editField)
         PropButton* propBtnRenameUV;    // "Rename" de la UV map activa (tab Vertices)
         PropButton* propBtnRenameColor; // "Rename" de la capa de color activa (tab Vertices)
+        PropButton* propBtnRenameGroup; // "Rename" del grupo de vertices activo (tab Vertices)
         PropButtonRow* propRowUVOps;    // fila Delete | Move Up | Move Down de UV maps (oculta con 1 sola)
         PropButtonRow* propRowColorOps; // fila Delete | Move Up | Move Down de capas de color (oculta con 1 sola)
+        PropButtonRow* propRowGroupOps; // fila Delete | Move Up | Move Down de grupos de vertices
         PropText*   propNameObj;        // campo "Name" del OBJETO activo (tab Objeto): se ve el nombre y se edita al clickear
         bool exportSelectedOnly;     // checkbox "Selected only"
         bool exportApplyModifiers;   // checkbox "Apply Modifiers" (default ON): exporta la malla generada por los mods
@@ -225,8 +227,13 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         void TouchSliderSoltar() override;
         // PropFloat cuyo value box cae bajo (mx,my), o NULL (recorrido de filas comun a lo de arriba)
         PropFloat* PropFloatEnValueBox(int mx, int my);
+        // mini-listado (PropListMeshParts) bajo la coordenada py, o NULL (para el scroll tactil de la lista)
+        PropListMeshParts* ListaBajoY(int py);
 
         void key_down_return();
 };
+
+// limpia el latch del scroll tactil de listas (lo llama controles.cpp al soltar el dedo). Definida en Properties.cpp.
+void PropertiesTouchScrollFin();
 
 #endif

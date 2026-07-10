@@ -14,6 +14,7 @@
 #include "objects/Light.h"
 #include "objects/Camera.h"
 #include "objects/Empty.h"
+#include "objects/Armature.h"
 #include "objects/Instance.h"
 #include "objects/Collection.h"
 #include "objects/ObjectMode.h"
@@ -347,6 +348,14 @@ static void LayoutAccionAdd(int aId) {
         case 2: nuevo = NewMesh(MeshType::circle, NULL, false); break;
         case 3: nuevo = NewMesh(MeshType::vertice, NULL, false); break;
         case 4: nuevo = new Empty(NULL, cursor3D.pos); break;
+        case 16: { // Armature: un solo hueso desde el origen, 0.3 hacia arriba (Y). Empieza en el cursor 3D.
+            Armature* arm = new Armature(NULL, cursor3D.pos);
+            W3dBone b; b.name = "Bone"; b.parent = -1;
+            b.head = Vector3(0.0f, 0.0f, 0.0f); b.tail = Vector3(0.0f, 0.3f, 0.0f);
+            arm->bones.push_back(b);
+            nuevo = arm;
+            break;
+        }
         case 5: nuevo = new Camera(NULL, cursor3D.pos, Vector3(-35.0f, -45.0f, 0.0f)); break;
         case 6: {
             Light* l = Light::Create(NULL, 0, 0, 0);
@@ -3145,14 +3154,17 @@ static bool PickSeleccionable(Object* obj) {
 
 static void PickPaint(Object* obj) {
     if (!obj) return;
+    // IGUAL que Object::Render: se aplica la matriz LOCAL y los hijos se pintan DENTRO de ella (acumulando el
+    // transform del padre). Antes el push/pop envolvia solo a este objeto y los hijos se pintaban en el ORIGEN del
+    // mundo -> un objeto EMPARENTADO se pickeaba en el lugar equivocado (bug Dante: no se podia clickear un hijo).
+    w3dEngine::PushMatrix();
+    Matrix4 M;
+    obj->GetMatrix(M);
+    w3dEngine::MultMatrix(M.m);
     if (PickSeleccionable(obj)) {
         pickCounter++;
         int id = pickCounter; // 1..N
         w3dEngine::Color4f(((id & 0x1F)) / 31.0f, ((id >> 5) & 0x3F) / 63.0f, 0.0f, 1.0f);
-        w3dEngine::PushMatrix();
-        Matrix4 M;
-        obj->GetMatrix(M);
-        w3dEngine::MultMatrix(M.m);
         if (obj->getType() == ObjectType::mesh) {
             Mesh* m = (Mesh*)obj;
             // con modificadores (subdiv/screw) se dibuja la malla GENERADA para el pick: es lo que se VE.
@@ -3172,11 +3184,11 @@ static void PickPaint(Object* obj) {
             w3dEngine::VertexPointer3f(0, origen);
             w3dEngine::DrawPoints(1);
         }
-        w3dEngine::PopMatrix();
     }
     for (size_t i = 0; i < obj->Childrens.size(); i++) {
         PickPaint(obj->Childrens[i]);
     }
+    w3dEngine::PopMatrix();
 }
 
 static void PickResolve(Object* obj, int target) {

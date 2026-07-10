@@ -54,7 +54,9 @@ $(PROJECT_ROOT)/thirdparty \
 $(PROJECT_ROOT)/thirdparty/SDL2/include
 
 LOCAL_CPP_FEATURES := exceptions rtti
-LOCAL_CPPFLAGS := -std=c++17
+# Version = fecha de compilacion YY.MM.DD (igual que el versionName del APK). Se recalcula en CADA build (shell date)
+# -> siempre fresca. Sirve para el titulo de ventana y el header del .obj exportado.
+LOCAL_CPPFLAGS := -std=c++17 -DW3D_VERSION=\"$(shell date +%y.%m.%d)\"
 
 LOCAL_SHARED_LIBRARIES := SDL2
 #LOCAL_LDLIBS := -lGLESv1_CM -llog -landroid # Descomentar si en un futuro se necesitan builds 1.1

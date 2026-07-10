@@ -14,6 +14,7 @@
 #include "ViewPorts/PopUp/ProgressPopup.h" // barra de progreso + hook LayoutSwapBuffers
 #include "importers/import_obj.h"        // ImportOBJ (el importador real)
 #include "importers/import_fbx.h"        // ImportFBX
+#include "w3dVersion.h"                   // W3dVersion() para el titulo de ventana
 
 // accion del File browser al elegir un modelo: por EXTENSION (.fbx -> FBX; resto -> OBJ)
 static void ImportObjDesdeBrowser(const std::string& path) {
@@ -712,6 +713,12 @@ int main(int argc, char* argv[]) {
         if (cfg.fullscreen) windowFlags |= SDL_WINDOW_MAXIMIZED;
         window = SDL_CreateWindow("Whisk3D Pre-Alpha", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, winW, winH, windowFlags);
     #endif
+
+    if (window) { // titulo con la VERSION (fecha de build): asi una captura de pantalla dice de que version es
+        char titulo[64];
+        snprintf(titulo, sizeof(titulo), "Whisk3D Pre-Alpha %s", W3dVersion());
+        SDL_SetWindowTitle(window, titulo);
+    }
 
     if (!window) {
         std::cerr << "Error SDL_CreateWindow: " << SDL_GetError() << std::endl;

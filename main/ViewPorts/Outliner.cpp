@@ -26,6 +26,7 @@ size_t IconoDeObjeto(Object* o) {
         case ObjectType::camera:     return (size_t)IconType::camera;
         case ObjectType::collection: return (size_t)IconType::archive;
         case ObjectType::empty:      return (size_t)IconType::empty;
+        case ObjectType::armature:   return (size_t)IconType::armature;
         case ObjectType::curve:      return (size_t)IconType::curve;
         case ObjectType::mirror:     return (size_t)IconType::mirror;
         case ObjectType::gamepad:    return (size_t)IconType::gamepad;

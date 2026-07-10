@@ -6,6 +6,8 @@
 #include "objects/Objects.h"     // CollectionActive
 #include "w3dFilesystem.h"       // ReadFileBytes / FileExists / DirOf(inline abajo)
 #include "w3dCompress.h"         // w3dEngine::Inflate (arrays zlib del FBX)
+#include "ViewPorts/PopUp/ProgressPopup.h" // barra de progreso (clave en el N95: importar tarda)
+#include "ViewPorts/LayoutInput.h"        // Notificar (toast de exito, igual que el OBJ)
 #include "w3dlog.h"
 #include <vector>
 #include <string>
@@ -179,7 +181,8 @@ static double LeerGlobalD(const FNode& root, const char* nombre, double def) {
 // arma una malla de Whisk3D desde un nodo Geometry(Mesh). Devuelve la malla o NULL. mat = material (con textura) a
 // asignar. parent = objeto padre (la armature si hay esqueleto, si no CollectionActive). El TRANSFORM de correccion
 // (unidades + eje) NO se hornea aca: lo aplica el caller (a la armature si hay, o a la malla si no).
-static Mesh* MallaDesdeGeometry(const FNode& geo, const std::string& nombre, Material* mat, Object* parent) {
+static Mesh* MallaDesdeGeometry(const FNode& geo, const std::string& nombre, Material* mat, Object* parent,
+                                float progBase, float progSpan) {
     const FNode* nVert = geo.child("Vertices");
     const FNode* nPoly = geo.child("PolygonVertexIndex");
     if (!nVert || !nPoly || nVert->props.empty() || nPoly->props.empty()) return 0;
@@ -217,6 +220,7 @@ static Mesh* MallaDesdeGeometry(const FNode& geo, const std::string& nombre, Mat
     Face cara;
     int c = 0; // indice global de corner
     for (size_t k = 0; k < PI.size(); k++) {
+        if ((k & 4095) == 0) ProgresoActualizar(progBase + progSpan * ((float)k / (float)PI.size())); // barra (cada 4096)
         long long raw = PI[k];
         bool fin = (raw < 0);
         int cp = (int)(fin ? (~raw) : raw); // el ultimo del poligono viene como ~cp
@@ -259,7 +263,7 @@ static Mesh* MallaDesdeGeometry(const FNode& geo, const std::string& nombre, Mat
     Mesh* mesh = new Mesh(parent, Vector3(0, 0, 0));
     mesh->name = nombre;
     int a0 = 0, a1 = 0, a2 = 0;
-    Wobj.ConvertToES1(mesh, &a0, &a1, &a2);
+    Wobj.ConvertToES1(mesh, &a0, &a1, &a2, &mesh->vertCtrlPoint); // guarda vertice->control-point (para weight paint)
     mesh->CalcularBordes();
     if (!mesh->normals && mesh->vertexSize > 0) { // sin normales -> smooth (como el OBJ)
         mesh->normals = new GLbyte[mesh->vertexSize * 3];
@@ -331,8 +335,11 @@ static void ParsearEsqueleto(const FNode& root, const FNode& objs, EsqueletoFBX&
         modelName[k.props[0].i] = LimpiarNombreFBX(k.props[1].s);
         modelType[k.props[0].i] = k.props[2].s;
     }
-    // 2) Connections OO: child -> parent (primer id = origen/hijo, segundo = destino/padre)
-    std::map<long long, long long> parentOf;
+    // 2) Connections OO: child -> parent (primer id = origen/hijo, segundo = destino/padre). OJO: un hueso (Model)
+    // se conecta como "hijo" a DOS destinos -> su hueso PADRE y su Cluster; un mapa simple se pisaria. Por eso, para
+    // la JERARQUIA de huesos usamos 'modelParentOf' (SOLO conexiones Model->Model). 'parentOf' sirve para la cadena
+    // cluster->skin->geometry (nodos no-Model).
+    std::map<long long, long long> parentOf, modelParentOf;
     std::multimap<long long, long long> childrenOf;
     if (const FNode* conns = root.child("Connections")) {
         for (size_t i = 0; i < conns->kids.size(); i++) {
@@ -341,6 +348,7 @@ static void ParsearEsqueleto(const FNode& root, const FNode& objs, EsqueletoFBX&
             long long ch = c.props[1].i, pa = c.props[2].i;
             parentOf[ch] = pa;
             childrenOf.insert(std::make_pair(pa, ch));
+            if (modelType.count(ch) && modelType.count(pa)) modelParentOf[ch] = pa; // hueso -> hueso padre
         }
     }
     // 3) Clusters -> huesos + grupos de vertices
@@ -386,8 +394,10 @@ static void ParsearEsqueleto(const FNode& root, const FNode& objs, EsqueletoFBX&
     for (std::map<long long, int>::iterator it = boneIdx.begin(); it != boneIdx.end(); ++it)
         idPorIdx[it->second] = it->first;
     for (int bi = 0; bi < (int)out.bones.size(); bi++) {
-        long long p = parentOf.count(idPorIdx[bi]) ? parentOf[idPorIdx[bi]] : -1;
-        while (p != -1 && !boneIdx.count(p)) p = parentOf.count(p) ? parentOf[p] : -1;
+        // subir por la cadena Model->Model hasta encontrar otro hueso QUE TENGA cluster (este en boneIdx). Asi los
+        // huesos intermedios sin peso (ej. algun "root") no rompen la jerarquia: el hijo se cuelga del proximo hueso real.
+        long long p = modelParentOf.count(idPorIdx[bi]) ? modelParentOf[idPorIdx[bi]] : -1;
+        while (p != -1 && !boneIdx.count(p)) p = modelParentOf.count(p) ? modelParentOf[p] : -1;
         out.bones[bi].parent = (p != -1 && boneIdx.count(p)) ? boneIdx[p] : -1;
     }
     // 5) tail: si tiene hijos -> tail = head del 1er hijo; si es hoja -> prolonga la direccion padre->hueso
@@ -420,10 +430,13 @@ bool ImportFBX(const std::string& filepath) {
     uint32_t version = 0; memcpy(&version, bytes.data() + 23, 4);
     bool w64 = (version >= 7500);
 
+    ProgresoIniciar("Importing FBX..."); // barra de progreso (clave en el N95: parsear + convertir tarda)
+
     Rd r; r.p = bytes.data() + 27; r.end = bytes.data() + bytes.size();
     const unsigned char* base = bytes.data();
 
-    // nodos top-level hasta el null record
+    // nodos top-level hasta el null record (parseo del arbol: descomprime los arrays zlib -> lo mas pesado junto a
+    // la conversion de la malla). Va llenando la barra hasta ~0.35 por nodo top-level.
     FNode root; root.name = "<root>";
     while (r.p < r.end) {
         size_t rem = (size_t)(r.end - r.p);
@@ -431,10 +444,12 @@ bool ImportFBX(const std::string& filepath) {
         FNode n;
         if (!LeerNodo(r, base, w64, n)) break;
         root.kids.push_back(n);
+        ProgresoActualizar(0.35f * (float)(r.p - base) / (float)bytes.size()); // avance por bytes consumidos
     }
 
     const FNode* objs = root.child("Objects");
-    if (!objs) { w3dLogfE("ImportFBX: sin nodo Objects"); return false; }
+    if (!objs) { w3dLogfE("ImportFBX: sin nodo Objects"); ProgresoFin(); return false; }
+    ProgresoActualizar(0.40f);
 
     // UNIDADES: el FBX suele venir en cm (UnitScaleFactor=1) y Whisk3D usa metros -> escala = UnitScaleFactor/100
     // (0.01 para este banana; = la escala 0.01 que Blender le pone al esqueleto). Si es 0/raro -> 1.
@@ -470,17 +485,26 @@ bool ImportFBX(const std::string& filepath) {
         parentMallas = arm;               // las mallas cuelgan del esqueleto (heredan la escala)
         w3dLogf("ImportFBX: esqueleto con %d hueso(s)", (int)esq.bones.size());
     }
+    ProgresoActualizar(0.45f);
+
+    // cuantas Geometry hay (para repartir el tramo 0.45..0.98 de la barra entre las mallas)
+    int totalGeo = 0;
+    for (size_t i = 0; i < objs->kids.size(); i++) if (objs->kids[i].name == "Geometry") totalGeo++;
+    if (totalGeo < 1) totalGeo = 1;
 
     // cada Geometry(Mesh) -> una malla (parentada a la armature si hay). Se guarda el id de la Geometry para poder
     // colgarle sus grupos de vertices (pesos por hueso) despues.
-    int importadas = 0;
+    int importadas = 0, geoVistas = 0;
     std::string baseNom = ExtractBaseName(filepath);
     for (size_t i = 0; i < objs->kids.size(); i++) {
         const FNode& k = objs->kids[i];
         if (k.name != "Geometry") continue;
         std::string nom = baseNom;
         if (importadas > 0) { char buf[16]; snprintf(buf, sizeof(buf), ".%03d", importadas); nom += buf; }
-        Mesh* m = MallaDesdeGeometry(k, nom, mat, parentMallas);
+        float pBase = 0.45f + 0.53f * ((float)geoVistas / (float)totalGeo);
+        float pSpan = 0.53f / (float)totalGeo;
+        geoVistas++;
+        Mesh* m = MallaDesdeGeometry(k, nom, mat, parentMallas, pBase, pSpan);
         if (!m) continue;
         // la geometria del mesh viene Z-up -> SIEMPRE -90° X para pararla. La escala la hereda de la armature; si no
         // hay esqueleto, la malla tambien lleva la escala.
@@ -501,7 +525,9 @@ bool ImportFBX(const std::string& filepath) {
         importadas++;
     }
 
-    if (importadas == 0) { w3dLogfE("ImportFBX: no se pudo armar ninguna malla"); return false; }
+    if (importadas == 0) { w3dLogfE("ImportFBX: no se pudo armar ninguna malla"); ProgresoFin(); return false; }
     w3dLogf("ImportFBX: %d malla(s) importada(s) de %s", importadas, filepath.c_str());
+    ProgresoFin();
+    Notificar("FBX imported successfully!", false); // toast verde de exito (igual que el OBJ)
     return true;
 }

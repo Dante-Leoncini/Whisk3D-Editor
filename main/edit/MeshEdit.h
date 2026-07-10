@@ -18,6 +18,9 @@ void BorrarUVMapActivo(Mesh* m);       // borra la UV map activa (queda >=1)
 void MoverUVMapActivo(Mesh* m, int dir);   // reordena la UV map activa (dir=-1 up / +1 down)
 void BorrarColorLayerActivo(Mesh* m);  // borra la capa de color activa (queda >=1)
 void MoverColorLayerActivo(Mesh* m, int dir);
+void CrearVertexGroup(Mesh* m);        // crea un grupo de vertices vacio (nombre unico) y lo deja activo
+void BorrarVertexGroupActivo(Mesh* m); // borra el grupo de vertices activo (puede quedar 0)
+void MoverVertexGroupActivo(Mesh* m, int dir);
 void ReverseCapasDeCorner(Mesh* m, int L, int count);
 void AgregarCornerCapas(Mesh* m, int srcL);
 void CompactarCapas(Mesh* m, const std::vector<int>& survCorner);

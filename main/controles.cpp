@@ -1,4 +1,5 @@
 #include "ViewPorts/LayoutInput.h" // ruteo compartido (menus/barras/paneles)
+#include "ViewPorts/Properties.h" // PropertiesTouchScrollFin (fin del scroll tactil de listas)
 #include "ViewPorts/ViewPort3D.h" // Viewport3DActive->Aceptar() en el transform
 #include "ViewPorts/PopUp/PopUpBase.h" // PopUpActive (la X cancela)
 #include "WhiskUI/glesdraw.h"        // W3dPantallaAlto
@@ -529,6 +530,7 @@ void InputUsuarioSDL3(SDL_Event &e){
         g_barTapPending = false;
         g_contentTapPending = false;
         g_scrollView = NULL;
+        PropertiesTouchScrollFin(); // fin del gesto: libera el latch del scroll tactil de listas
         // slider numerico tactil: el arrastre YA edito el valor; soltar NO es un click (no abre el editor)
         if (g_slideNum) { if (g_barTapView) g_barTapView->TouchSliderSoltar(); g_slideNum = false; g_fingerScrolling = false; GuardarMousePos(); return; }
         if (g_fingerScrolling) { g_fingerScrolling = false; return; }
