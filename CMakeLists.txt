@@ -81,6 +81,10 @@ endif()
 
 add_executable(whisk3d ${SRC_FILES})
 
+# Whisk3DCore owns graphics backend selection and native graphics dependencies.
+include(${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/cmake/w3dGraphicsBackend.cmake)
+w3d_configure_graphics_backend(whisk3d)
+
 if(APPLE)
     include(${CMAKE_SOURCE_DIR}/platform/mac/CMakeLists.txt)
 endif()
@@ -106,51 +110,7 @@ target_include_directories(whisk3d PRIVATE
 if(WIN32)
 
     target_compile_definitions(whisk3d PRIVATE
-        W3D_OPENGL
         _CRT_SECURE_NO_WARNINGS
-    )
-
-endif()
-
-if(ANDROID)
-
-    target_compile_definitions(whisk3d PRIVATE
-        W3D_GLES1
-    )
-
-endif()
-
-# ---------------------------------------------------
-# OpenGL (Windows)
-# ---------------------------------------------------
-
-if(WIN32)
-
-    target_link_libraries(whisk3d PRIVATE
-        opengl32
-        glu32
-    )
-    target_compile_definitions(whisk3d PRIVATE SDL_MAIN_HANDLED)
-
-endif()
-
-# ---------------------------------------------------
-# OpenGL (Linux)
-# ---------------------------------------------------
-
-if(UNIX AND NOT APPLE AND NOT ANDROID)
-
-    find_package(OpenGL REQUIRED)
-
-    target_link_libraries(whisk3d PRIVATE
-        pthread
-        dl
-        OpenGL::GL
-        GLU
-    )
-
-    target_compile_definitions(whisk3d PRIVATE
-        W3D_OPENGL
     )
 
 endif()

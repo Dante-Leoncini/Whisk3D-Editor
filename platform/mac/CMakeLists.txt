@@ -9,20 +9,4 @@ set_target_properties(whisk3d PROPERTIES
     OUTPUT_NAME "Whisk3D"
 )
 
-target_include_directories(whisk3d PRIVATE
-    ${CMAKE_CURRENT_LIST_DIR}/include
-)
-
-find_package(OpenGL REQUIRED)
-
-target_link_libraries(whisk3d PRIVATE
-    OpenGL::GL
-    OpenGL::GLU
-)
-
-target_compile_definitions(whisk3d PRIVATE
-    W3D_OPENGL
-    GL_SILENCE_DEPRECATION
-)
-
 install(TARGETS whisk3d BUNDLE DESTINATION .)
