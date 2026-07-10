@@ -5,6 +5,7 @@
 #include "WhiskUI/Propieties/PropFloat.h"   // g_propFloatEditando + NumEditCommit/Cancel
 #include "WhiskUI/TextField.h"              // TextFieldInputChar (mismo camino que el teclado fisico)
 #include "WhiskUI/bitmapText.h"
+#include "WhiskUI/font.h"                   // WhiskFont->getMeshTri (barra de espacio: guion estirado)
 #include <cstdio>   // snprintf (resultado -> texto)
 #include <cstdlib>  // strtod (evaluador)
 #include <cstring>  // strcmp (tokens de tecla: "OK" "DEL" "<" ">")
@@ -122,6 +123,7 @@ void NumPad::Render(){
     const float* accent = ListaColores[static_cast<int>(ColorID::accent)];
     const float* blanco = ListaColores[static_cast<int>(ColorID::blanco)];
     const float* grisUI = ListaColores[static_cast<int>(ColorID::grisUI)];
+    const float* negro  = ListaColores[static_cast<int>(ColorID::negro)];
     const float rojo[3] = { 0.92f, 0.28f, 0.24f }; // mismo rojo que las notificaciones de error
 
     initView();
@@ -144,17 +146,26 @@ void NumPad::Render(){
         RenderBitmapText(g_propFloatEditando->name, textAlign::left, colLabel);
         w3dEngine::PopMatrix();
 
+        // ---- CAJA de input (fondo oscuro + borde claro, como en Properties) con el valor a la DERECHA ----
         TextField& f = g_propFloatEditando->field;
+        int boxX = popUpWindow->width / 2;
+        int boxW = popUpWindow->width - borderGS - gapGS - boxX;
+        int boxH = RenglonHeightGS + gapGS;
         w3dEngine::PushMatrix();
-        w3dEngine::Translatef((GLfloat)(popUpWindow->width - borderGS - gapGS), (GLfloat)ty, 0);
+        w3dEngine::Translatef((GLfloat)boxX, (GLfloat)(borderGS + gapGS / 2), 0);
+        w3dEngine::Color4f(negro[0], negro[1], negro[2], 1.0f);
+        keyCard->Resize(boxW, boxH); keyCard->RenderObject(false);
+        w3dEngine::Color4f(grisUI[0], grisUI[1], grisUI[2], 1.0f);
+        keyCard->RenderBorder(false);
+        w3dEngine::Translatef((GLfloat)(boxW - gapGS), (GLfloat)((boxH - RenglonHeightGS) / 2), 0);
         if (f.selectAll){
             // TODO seleccionado (recien abierto): valor en accent, tipear lo reemplaza
             w3dEngine::Color4f(accent[0], accent[1], accent[2], 1.0f);
-            RenderBitmapText(f.text, textAlign::right, colLabel);
+            RenderBitmapText(f.text, textAlign::right, boxW - gapGS * 2);
         } else {
             std::string shown = f.text.substr(0, f.caret) + "|" + f.text.substr(f.caret);
             w3dEngine::Color4f(blanco[0], blanco[1], blanco[2], 1.0f);
-            RenderBitmapText(shown, textAlign::right, colLabel);
+            RenderBitmapText(shown, textAlign::right, boxW - gapGS * 2);
         }
         w3dEngine::PopMatrix();
     }
@@ -278,5 +289,214 @@ void NumPadAbrirTransform(){
     gNumPad = new NumPad(true);
     PopUpActive = gNumPad;
     NumInputBegin(); // muestra "[|]" en la barra de estado apenas se abre
+    g_redraw = true;
+}
+
+// ===========================================================================
+//  TECLADO QWERTY (español, con ñ). Teclas de ANCHO PONDERADO (peso relativo);
+//  2 modos: LETRAS y SIMBOLOS ("123"/"ABC"). "Aa" = mayusculas, "___" = barra de
+//  espacio (un guion bajo ESTIRADO), "DEL" retroceso, "<"/">" caret, "OK" acepta.
+// ===========================================================================
+extern bool RenameActivo();   // controles.cpp: hay un rename en curso?
+extern void RenameCommit();   // aceptar el rename
+extern void RenameCancel();   // descartar el rename
+
+struct QKey { const char* t; float w; };      // etiqueta + peso de ancho (fila = suma de pesos)
+#define QP_FILAS 4
+// terminador de fila: {NULL, 0}
+static const QKey kFilasLetra[QP_FILAS][12] = {
+    {{"q",1},{"w",1},{"e",1},{"r",1},{"t",1},{"y",1},{"u",1},{"i",1},{"o",1},{"p",1},{NULL,0}},
+    {{"a",1},{"s",1},{"d",1},{"f",1},{"g",1},{"h",1},{"j",1},{"k",1},{"l",1},{"\xC3\xB1",1},{NULL,0}}, // ñ
+    {{"Aa",1.5f},{"z",1},{"x",1},{"c",1},{"v",1},{"b",1},{"n",1},{"m",1},{".",1},{"DEL",1.5f},{NULL,0}},
+    {{"123",1.6f},{"___",5.4f},{"<",1},{">",1},{"OK",2.0f},{NULL,0}},
+};
+static const QKey kFilasSimbolo[QP_FILAS][12] = {
+    {{"1",1},{"2",1},{"3",1},{"4",1},{"5",1},{"6",1},{"7",1},{"8",1},{"9",1},{"0",1},{NULL,0}},
+    {{"-",1},{"_",1},{"/",1},{":",1},{"(",1},{")",1},{"$",1},{"&",1},{"@",1},{"\"",1},{NULL,0}},
+    {{".",1},{",",1},{"?",1},{"!",1},{"'",1},{"#",1},{"%",1},{"=",1},{"+",1},{"DEL",1.5f},{NULL,0}},
+    {{"ABC",1.6f},{"___",5.4f},{"<",1},{">",1},{"OK",2.0f},{NULL,0}},
+};
+
+static QwertyPad* gQwerty = NULL;
+static bool gQwertySimbolos = false; // modo actual (persiste entre aperturas)
+
+// geometria de una fila: cuenta teclas + suma de pesos, y el ancho util (con gaps)
+static const QKey* QpFila(bool simbolos, int fila){ return simbolos ? kFilasSimbolo[fila] : kFilasLetra[fila]; }
+
+QwertyPad::QwertyPad() : PopUpBase("Qwerty") {
+    prevPopup = NULL;
+    keyCard = new Card(NULL, 10, 10);
+    keyH = dispH = 0; caps = false;
+    Reubicar();
+}
+
+void QwertyPad::Reubicar(){
+    dispH = RenglonHeightGS + gapGS * 3;          // caja de input (texto que se edita)
+    keyH  = RenglonHeightGS * 2;                   // alto de tecla (dedos); 4 filas
+    int w = MenuPantallaW;
+    int h = borderGS * 2 + dispH + (keyH + gapGS) * QP_FILAS;
+    x = 0;
+    y = MenuPantallaH - h;
+    popUpWindow->Resize(w, h);
+}
+
+void QwertyPad::FeedStr(const char* s){
+    if (!g_textFieldActivo) return;
+    for (const char* p = s; *p; p++) g_textFieldActivo->InsertChar((unsigned char)*p); // byte a byte (ñ = 2 bytes)
+    g_redraw = true;
+}
+
+// geometria de una fila: llena kx[]/kw[] (ancho PONDERADO por peso) y devuelve la cantidad de teclas.
+static int QpRowGeom(bool simbolos, int fila, int fullW, int kx[12], int kw[12]){
+    const QKey* row = QpFila(simbolos, fila);
+    int n = 0; float totalW = 0;
+    for (; row[n].t; n++) totalW += row[n].w;
+    if (n == 0 || totalW <= 0) return 0;
+    int avail = fullW - borderGS * 2 - gapGS * (n - 1);
+    int cx = borderGS;
+    for (int i = 0; i < n; i++){
+        int w = (int)(avail * row[i].w / totalW + 0.5f);
+        kx[i] = cx; kw[i] = w; cx += w + gapGS;
+    }
+    return n;
+}
+
+void QwertyPad::Render(){
+    if (!g_textFieldActivo){ Cerrar(); return; } // la edicion termino por otro camino -> el teclado se va solo
+    Reubicar();
+
+    const float* gris   = ListaColores[static_cast<int>(ColorID::gris)];
+    const float* header = ListaColores[static_cast<int>(ColorID::headerColor)];
+    const float* accent = ListaColores[static_cast<int>(ColorID::accent)];
+    const float* blanco = ListaColores[static_cast<int>(ColorID::blanco)];
+    const float* negro  = ListaColores[static_cast<int>(ColorID::negro)];
+    const float* grisUI = ListaColores[static_cast<int>(ColorID::grisUI)];
+
+    initView();
+    w3dEngine::Color4f(gris[0], gris[1], gris[2], 0.98f);
+    popUpWindow->RenderObject(false);
+    w3dEngine::Color4f(accent[0], accent[1], accent[2], 1.0f);
+    popUpWindow->RenderBorder(false);
+
+    // ---- caja de INPUT (fondo oscuro + borde claro, como en Properties) con el texto + caret ----
+    {
+        int boxH = RenglonHeightGS + gapGS;
+        int boxW = popUpWindow->width - 2 * (borderGS + gapGS);
+        w3dEngine::PushMatrix();
+        w3dEngine::Translatef((GLfloat)(borderGS + gapGS), (GLfloat)(borderGS + gapGS), 0);
+        w3dEngine::Color4f(negro[0], negro[1], negro[2], 1.0f);
+        keyCard->Resize(boxW, boxH); keyCard->RenderObject(false);
+        w3dEngine::Color4f(grisUI[0], grisUI[1], grisUI[2], 1.0f);
+        keyCard->RenderBorder(false);
+        TextField& f = *g_textFieldActivo;
+        std::string shown = f.selectAll ? f.text : (f.text.substr(0, f.caret) + "|" + f.text.substr(f.caret));
+        w3dEngine::Translatef((GLfloat)gapGS, (GLfloat)((boxH - RenglonHeightGS) / 2), 0);
+        w3dEngine::Color4f(blanco[0], blanco[1], blanco[2], 1.0f);
+        RenderBitmapText(shown, textAlign::left, boxW - gapGS * 2);
+        w3dEngine::PopMatrix();
+    }
+
+    int textoY = (keyH - RenglonHeightGS) / 2;
+    int kx[12], kw[12];
+    for (int fila = 0; fila < QP_FILAS; fila++){
+        const QKey* row = QpFila(gQwertySimbolos, fila);
+        int n = QpRowGeom(gQwertySimbolos, fila, popUpWindow->width, kx, kw);
+        int ky = borderGS + dispH + fila * (keyH + gapGS);
+        for (int i = 0; i < n; i++){
+            const char* t = row[i].t;
+            w3dEngine::PushMatrix();
+            w3dEngine::Translatef((GLfloat)kx[i], (GLfloat)ky, 0);
+            // fondo: OK / Aa(caps) en accent; resto gris de header
+            if      (!strcmp(t, "OK")) w3dEngine::Color4f(accent[0]*0.55f, accent[1]*0.55f, accent[2]*0.55f, 1.0f);
+            else if (!strcmp(t, "Aa") && caps) w3dEngine::Color4f(accent[0]*0.55f, accent[1]*0.55f, accent[2]*0.55f, 1.0f);
+            else                       w3dEngine::Color4f(header[0], header[1], header[2], 1.0f);
+            keyCard->Resize(kw[i], keyH); keyCard->RenderObject(false);
+            // etiqueta
+            if (!strcmp(t, "OK")) w3dEngine::Color4f(accent[0], accent[1], accent[2], 1.0f);
+            else                  w3dEngine::Color4f(blanco[0], blanco[1], blanco[2], 1.0f);
+            if (!strcmp(t, "___")){
+                // BARRA DE ESPACIO: un guion bajo ESTIRADO a lo ancho de la tecla (el glifo mide getMeshTri()[2])
+                const GLfloat* mt = WhiskFont ? WhiskFont->getMeshTri() : NULL;
+                float gw = (mt && mt[2] > 1.0f) ? mt[2] : 5.0f;
+                float sc = (float)(kw[i] - gapGS * 2) / gw;
+                w3dEngine::PushMatrix();
+                w3dEngine::Translatef((GLfloat)gapGS, (GLfloat)textoY, 0);
+                w3dEngine::Scalef(sc, 1.0f, 1.0f);
+                RenderBitmapText("_", textAlign::left, 1000000); // sin recorte
+                w3dEngine::PopMatrix();
+            } else {
+                const char* lbl = t; char up[3] = {0,0,0};
+                if (caps){
+                    if (t[1]=='\0' && t[0]>='a' && t[0]<='z'){ up[0]=(char)(t[0]-32); lbl=up; }
+                    else if (!strcmp(t, "\xC3\xB1")){ up[0]='\xC3'; up[1]='\x91'; lbl=up; } // Ñ
+                }
+                w3dEngine::Translatef(0, (GLfloat)textoY, 0);
+                RenderBitmapText(lbl, textAlign::center, kw[i]);
+            }
+            w3dEngine::PopMatrix();
+        }
+    }
+    endView();
+}
+
+void QwertyPad::AccionTecla(int fila, int col){
+    const QKey* row = QpFila(gQwertySimbolos, fila);
+    int n = 0; for (; row[n].t; n++) {}
+    if (col < 0 || col >= n) return;
+    const char* t = row[col].t;
+    if (!strcmp(t, "OK")) { Aceptar(); return; }
+    if (!strcmp(t, "123") || !strcmp(t, "ABC")) { gQwertySimbolos = !gQwertySimbolos; g_redraw = true; return; }
+    if (!strcmp(t, "Aa")) { caps = !caps; g_redraw = true; return; }
+    if (!strcmp(t, "DEL")){ if (g_textFieldActivo){ g_textFieldActivo->Backspace(); g_redraw = true; } return; }
+    if (!strcmp(t, "<"))  { if (g_textFieldActivo){ g_textFieldActivo->CaretIzq(); g_redraw = true; } return; }
+    if (!strcmp(t, ">"))  { if (g_textFieldActivo){ g_textFieldActivo->CaretDer(); g_redraw = true; } return; }
+    if (!strcmp(t, "___")){ FeedStr(" "); return; }
+    if (!strcmp(t, "\xC3\xB1")){ FeedStr(caps ? "\xC3\x91" : "\xC3\xB1"); return; } // Ñ / ñ
+    if (t[1]=='\0' && t[0]>='a' && t[0]<='z'){ char u[2] = { (char)(caps ? t[0]-32 : t[0]), 0 }; FeedStr(u); return; }
+    FeedStr(t); // digito / simbolo
+}
+
+bool QwertyPad::Click(int mx, int my){
+    if (!Contains(mx, my)) return false; // afuera: LayoutClickUI cierra (Cerrar commitea)
+    int ly = my - y - borderGS - dispH;
+    if (ly < 0) return true;             // caja de input: consumir sin accion
+    int fila = ly / (keyH + gapGS); if (fila < 0) fila = 0; if (fila > QP_FILAS - 1) fila = QP_FILAS - 1;
+    int kx[12], kw[12];
+    int n = QpRowGeom(gQwertySimbolos, fila, popUpWindow->width, kx, kw);
+    int lx = mx - x; int col = n - 1;
+    for (int i = 0; i < n; i++){ if (lx < kx[i] + kw[i] + gapGS / 2){ col = i; break; } }
+    AccionTecla(fila, col);
+    return true;
+}
+
+bool QwertyPad::Tecla(int tecla){
+    if (tecla == LayoutKey::Enter || tecla == LayoutKey::Accept) { Aceptar(); return true; }
+    if (tecla == LayoutKey::Cancel) { Cancelar(); return true; }
+    return true;
+}
+
+void QwertyPad::Aceptar(){
+    if (RenameActivo()) RenameCommit(); else g_textFieldActivo = NULL; // el texto ya esta en field (live)
+    if (PopUpActive == this) PopUpActive = prevPopup;
+    g_redraw = true;
+}
+void QwertyPad::Cancelar(){
+    if (RenameActivo()) RenameCancel(); else g_textFieldActivo = NULL;
+    if (PopUpActive == this) PopUpActive = prevPopup;
+    g_redraw = true;
+}
+void QwertyPad::Cerrar(){ // click AFUERA = commit (igual que el Enter fisico)
+    if (RenameActivo()) RenameCommit(); else g_textFieldActivo = NULL;
+    if (PopUpActive == this) PopUpActive = prevPopup;
+    g_redraw = true;
+}
+
+void QwertyAbrir(){
+    PopUpBase* prev = PopUpActive;
+    if (prev == gQwerty) prev = NULL;
+    if (gQwerty){ delete gQwerty; gQwerty = NULL; }
+    gQwerty = new QwertyPad();
+    gQwerty->prevPopup = prev;
+    PopUpActive = gQwerty;
     g_redraw = true;
 }

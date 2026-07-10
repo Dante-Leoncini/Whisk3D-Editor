@@ -2552,6 +2552,31 @@ void DuplicarColorLayerActivo(Mesh* m) {
     m->colorLayers.push_back(nw); m->colorActivo = (int)m->colorLayers.size() - 1;
 }
 
+// BORRAR / MOVER la UV map o la capa de color ACTIVA (menu Properties). Siempre queda al menos 1 (los botones
+// Delete/Move se ocultan con 1 solo elemento). El caller re-hornea con AplicarCapasAlRender.
+void BorrarUVMapActivo(Mesh* m) {
+    if ((int)m->uvMaps.size() <= 1) return;
+    int i = m->uvMapActivo; if (i < 0 || i >= (int)m->uvMaps.size()) return;
+    delete m->uvMaps[i]; m->uvMaps.erase(m->uvMaps.begin() + i);
+    if (m->uvMapActivo >= (int)m->uvMaps.size()) m->uvMapActivo = (int)m->uvMaps.size() - 1;
+}
+void MoverUVMapActivo(Mesh* m, int dir) {
+    int i = m->uvMapActivo, j = i + dir;
+    if (i < 0 || i >= (int)m->uvMaps.size() || j < 0 || j >= (int)m->uvMaps.size()) return;
+    UVMap* t = m->uvMaps[i]; m->uvMaps[i] = m->uvMaps[j]; m->uvMaps[j] = t; m->uvMapActivo = j;
+}
+void BorrarColorLayerActivo(Mesh* m) {
+    if ((int)m->colorLayers.size() <= 1) return;
+    int i = m->colorActivo; if (i < 0 || i >= (int)m->colorLayers.size()) return;
+    delete m->colorLayers[i]; m->colorLayers.erase(m->colorLayers.begin() + i);
+    if (m->colorActivo >= (int)m->colorLayers.size()) m->colorActivo = (int)m->colorLayers.size() - 1;
+}
+void MoverColorLayerActivo(Mesh* m, int dir) {
+    int i = m->colorActivo, j = i + dir;
+    if (i < 0 || i >= (int)m->colorLayers.size() || j < 0 || j >= (int)m->colorLayers.size()) return;
+    ColorLayer* t = m->colorLayers[i]; m->colorLayers[i] = m->colorLayers[j]; m->colorLayers[j] = t; m->colorActivo = j;
+}
+
 // reversa los datos de TODAS las capas de los corners [L .. L+count). Lo usa el flip de
 // winding para que cada corner siga llevando el dato del vert al que ahora apunta.
 void ReverseCapasDeCorner(Mesh* m, int L, int count) {

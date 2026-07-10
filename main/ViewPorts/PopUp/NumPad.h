@@ -40,4 +40,30 @@ void NumPadAbrir();
 // (mover/rotar/escalar) como un teclado fisico en PC. Sin popup/textinput propio.
 void NumPadAbrirTransform();
 
+// ============================================================================
+//  TECLADO QWERTY (tactil, español -> con ñ): al ANCHO COMPLETO, pegado abajo.
+//  Edita el campo de texto enfocado (g_textFieldActivo) igual que el teclado
+//  fisico. Se abre desde Properties al tocar un campo de TEXTO en tactil (Android).
+// ============================================================================
+class QwertyPad : public PopUpBase {
+    public:
+        QwertyPad();
+        void Render() override;
+        bool Click(int mx, int my) override;
+        bool Tecla(int tecla) override; // Enter = Aceptar, Esc = Cancelar
+        void Cerrar() override;         // click AFUERA = commitea el texto
+        PopUpBase* prevPopup;           // popup a restaurar al cerrar (NULL = ninguno)
+    private:
+        Card* keyCard;
+        int   keyH, dispH;
+        bool  caps;                     // mayusculas (toggle): letras -> A-Z, ñ -> Ñ
+        void Reubicar();
+        void FeedStr(const char* s);    // inserta una cadena UTF-8 en el campo activo (soporta ñ = 2 bytes)
+        void AccionTecla(int fila, int col);
+        void Aceptar();
+        void Cancelar();
+};
+// abre el teclado QWERTY para el campo de texto enfocado (g_textFieldActivo)
+void QwertyAbrir();
+
 #endif // NUMPAD_H

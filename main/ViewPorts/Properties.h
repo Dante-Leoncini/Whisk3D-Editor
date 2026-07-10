@@ -140,7 +140,9 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
                                       // al renombrar se vuelve input via Button::editField)
         PropButton* propBtnRenameUV;    // "Rename" de la UV map activa (tab Vertices)
         PropButton* propBtnRenameColor; // "Rename" de la capa de color activa (tab Vertices)
-        PropButton* propBtnRenameObj;   // "Rename" del OBJETO activo (tab Objeto; abajo de todo)
+        PropButtonRow* propRowUVOps;    // fila Delete | Move Up | Move Down de UV maps (oculta con 1 sola)
+        PropButtonRow* propRowColorOps; // fila Delete | Move Up | Move Down de capas de color (oculta con 1 sola)
+        PropText*   propNameObj;        // campo "Name" del OBJETO activo (tab Objeto): se ve el nombre y se edita al clickear
         bool exportSelectedOnly;     // checkbox "Selected only"
         bool exportApplyModifiers;   // checkbox "Apply Modifiers" (default ON): exporta la malla generada por los mods
         bool exportApplyTransforms;  // checkbox "Apply Transforms" (default ON): hornea el transform en el .obj
