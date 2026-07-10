@@ -1161,6 +1161,14 @@ void Properties::ConstruirGrupos(){
     propColorLayers->properties.push_back(propRowColorOps);
     GroupProperties.push_back(propColorLayers);
 
+    // tarjeta "Vertex Groups": los grupos de vertices = huesos del rig (pelvis, spine_01, ...). Por ahora SOLO se
+    // listan (los crea/puebla el importador FBX a partir de los pesos del skin); mas adelante serviran para deformar
+    // la malla con la armature. La lista reusa PropListMeshParts en modo 4 (mesh->vertexGroups).
+    propVertexGroups = new GroupPropertie("Vertex Groups");
+    propListVertGroups = new PropListMeshParts("Vertex Groups"); propListVertGroups->modo = 4;
+    propVertexGroups->properties.push_back(propListVertGroups);
+    GroupProperties.push_back(propVertexGroups);
+
     propVertexAnim = new GroupPropertie("Vertex Animation");
     propVertexAnim->properties.push_back(new PropLabel("(coming soon)")); // placeholder
     GroupProperties.push_back(propVertexAnim);
@@ -1519,7 +1527,7 @@ Properties::Properties() : ViewportBase() {
     propLightDir = NULL; propLightGL = NULL; propLightDiffuse = NULL; propLightAmbient = NULL; propLightSpecular = NULL;
     propLightAttC = NULL; propLightAttL = NULL; propLightAttQ = NULL; propLightSpotCut = NULL; propLightSpotExp = NULL;
     propEditItem = NULL; editPosX = editPosY = editPosZ = 0.0f;
-    propUVMaps = NULL; propColorLayers = NULL; propVertexAnim = NULL; propModifiers = NULL;
+    propUVMaps = NULL; propColorLayers = NULL; propVertexGroups = NULL; propVertexAnim = NULL; propModifiers = NULL;
     propListModifiers = NULL; propRowMod = NULL; propRowModMove = NULL; propModifierProps = NULL;
     propModVerViewport = NULL; propModVerEdit = NULL;
     propModVacio = NULL; propMirX = NULL; propMirY = NULL; propMirZ = NULL; propMirTarget = NULL;
@@ -1528,7 +1536,7 @@ Properties::Properties() : ViewportBase() {
     propScrewAngle = NULL; propScrewHeight = NULL; propScrewSteps = NULL; propScrewRender = NULL;
     propScrewAxis = NULL; propScrewStretchU = NULL; propScrewStretchV = NULL;
     propScrewSmooth = NULL; propScrewMerge = NULL; propScrewFlip = NULL;
-    propListUV = NULL; propListColor = NULL; propBtnColorMode = NULL;
+    propListUV = NULL; propListColor = NULL; propListVertGroups = NULL; propBtnColorMode = NULL;
     propRowUVOps = NULL; propRowColorOps = NULL;
     propRotMode = NULL;
     propMsgDefault = NULL; propSepMat = NULL;
@@ -1625,6 +1633,7 @@ void Properties::ActualizarPestanias(){
     }
     if (propUVMaps)      propUVMaps->visible      = vertTab;
     if (propColorLayers) propColorLayers->visible = vertTab;
+    if (propVertexGroups) propVertexGroups->visible = vertTab;
     if (propVertexAnim)  propVertexAnim->visible  = vertTab;
     // pestaña Modifiers: card del stack + una 2da card con las props del modificador seleccionado (vacia).
     bool modsTab = (pestaniaActiva == 4 && esMesh);
@@ -1686,6 +1695,7 @@ void Properties::ActualizarPestanias(){
         if (mv->uvMaps.empty() || mv->colorLayers.empty()) mv->PoblarCapas(); // crea la 1ra si falta
         if (propListUV)    propListUV->mesh    = mv;
         if (propListColor) propListColor->mesh = mv;
+        if (propListVertGroups) propListVertGroups->mesh = mv; // grupos de vertices (huesos del rig)
         if (propBtnColorMode && mv->colorActivo >= 0 && mv->colorActivo < (int)mv->colorLayers.size())
             propBtnColorMode->button->text =
                 mv->colorLayers[mv->colorActivo]->porVertice ? "Per-Vertex" : "Per-Corner";

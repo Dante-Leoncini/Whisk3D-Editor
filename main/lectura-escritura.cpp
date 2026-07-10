@@ -10,14 +10,20 @@ int BuscarVertexAnimation() { return 0; }
 #else
 
 #include "ViewPorts/PopUp/FileBrowser.h" // el explorador COMPARTIDO (reemplaza tinyfd)
+#include "importers/import_fbx.h"        // ImportFBX
 
-static void ImportObjElegido(const std::string& path) {
-    ImportOBJ(path, false);
+// dispatch por EXTENSION: .fbx -> ImportFBX; el resto (.obj) -> ImportOBJ
+static void ImportModeloElegido(const std::string& path) {
+    size_t d = path.find_last_of('.');
+    std::string ext = (d == std::string::npos) ? std::string() : path.substr(d);
+    for (size_t i = 0; i < ext.size(); i++) if (ext[i] >= 'A' && ext[i] <= 'Z') ext[i] += 32;
+    if (ext == ".fbx") ImportFBX(path);
+    else               ImportOBJ(path, false);
 }
 
 int abrir() {
-    // mismo flujo que el menu Add > import: abre el File browser compartido
-    AbrirFileBrowser("Importar modelo", "Import Wavefront OBJ", ".obj", ImportObjElegido);
+    // mismo flujo que el menu Add > import: abre el File browser compartido (OBJ + FBX)
+    AbrirFileBrowser("Importar modelo", "Import 3D model", ".obj .fbx", ImportModeloElegido);
     return 0;
 }
 

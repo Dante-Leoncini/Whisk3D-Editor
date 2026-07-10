@@ -6,8 +6,10 @@
 #include "WhiskUI/icons.h"
 #include "WhiskUI/glesdraw.h" // W3dDrawStrip4 / W3dPantallaAlto
 #include "objects/Textures.h"
+#include "w3dTexture.h"  // miniaturas: DecodeThumbnail / UploadRGBA / DeleteTexture / FreeImage
 #include "variables.h"
 #include <cstring>
+#include <map>
 
 extern bool leftMouseDown;
 extern bool ViewPortClickDown; // lo usa Scrollable para el verde al arrastrar
@@ -35,14 +37,77 @@ static bool TerminaEn(const std::string& s, const char* ext) {
     }
     return true;
 }
+// es una imagen que podemos previsualizar? (los formatos que stb decodifica)
+static bool EsImagen(const std::string& name) {
+    return TerminaEn(name, ".png") || TerminaEn(name, ".jpg") || TerminaEn(name, ".jpeg") ||
+           TerminaEn(name, ".bmp") || TerminaEn(name, ".tga") || TerminaEn(name, ".gif");
+}
 // icono segun el tipo de archivo
 static int IconoEntrada(const w3dFileSystem::DirEntry& e) {
     if (e.isDir) return (int)IconType::carpeta;
-    if (TerminaEn(e.name, ".obj")) return (int)IconType::mesh;
-    if (TerminaEn(e.name, ".png") || TerminaEn(e.name, ".jpg") || TerminaEn(e.name, ".jpeg") ||
-        TerminaEn(e.name, ".bmp") || TerminaEn(e.name, ".tga") || TerminaEn(e.name, ".gif"))
-        return (int)IconType::foto;
+    if (TerminaEn(e.name, ".obj") || TerminaEn(e.name, ".fbx")) return (int)IconType::mesh;
+    if (EsImagen(e.name)) return (int)IconType::foto;
     return (int)IconType::archive;
+}
+
+// MINIATURAS del browser. LIVIANO: pocas por frame (no traba el scroll), la foto full nunca queda entera en RAM
+// (DecodeThumbnail la libera adentro), y se LIBERAN TODAS al cambiar de carpeta o cerrar. tex=0 = intento fallido.
+namespace { struct FBThumb { unsigned int tex; int w, h; }; }
+static std::map<std::string, FBThumb> gFBThumbs;
+static int gFBThumbsFrame = 0;          // generadas en el frame actual
+static const int kFBThumbMax = 48;      // lado maximo de la miniatura (px)
+static const int kFBThumbPorFrame = 2;  // tope de generaciones por frame
+
+static void FBLiberarThumbs() {
+    for (std::map<std::string, FBThumb>::iterator it = gFBThumbs.begin(); it != gFBThumbs.end(); ++it)
+        if (it->second.tex) w3dEngine::DeleteTexture(it->second.tex);
+    gFBThumbs.clear();
+}
+// miniatura _PAlbTN del gestor de fotos de Symbian (N95): <dir>/_PAlbTN/170x128/<archivo>_170x128. Son JPEG SIN
+// extension (stb e ICL las decodifican por contenido). Se prefiere ESA a decodificar la foto entera de 5MP. El
+// 56x42 es MBM propietario (no stb) -> se ignora. "" si no existe.
+static std::string FBThumbPAlbTN(const std::string& imgPath) {
+    size_t s = imgPath.find_last_of("/\\");
+    std::string dir  = (s == std::string::npos) ? std::string() : imgPath.substr(0, s + 1);
+    std::string name = (s == std::string::npos) ? imgPath : imgPath.substr(s + 1);
+    std::string cand = dir + "_PAlbTN/170x128/" + name + "_170x128";
+    return w3dFileSystem::FileExists(cand) ? cand : std::string();
+}
+static const FBThumb* FBObtenerThumb(const std::string& path) {
+    std::map<std::string, FBThumb>::iterator it = gFBThumbs.find(path);
+    if (it != gFBThumbs.end()) return it->second.tex ? &it->second : 0;
+    if (gFBThumbsFrame >= kFBThumbPorFrame) return 0; // se generara en un frame proximo
+    gFBThumbsFrame++;
+    FBThumb t; t.tex = 0; t.w = t.h = 0;
+    unsigned char* rgba = 0; int tw = 0, th = 0;
+    std::string pal = FBThumbPAlbTN(path); // JPEG chico del N95, si esta
+#ifdef W3D_SYMBIAN
+    // Symbian (N95): SOLO via _PAlbTN. Decodificar la foto de 5MP con ICL seria una locura; el JPEG chico si (ICL).
+    if (!pal.empty() && w3dEngine::DecodeImage(pal.c_str(), &rgba, &tw, &th) && rgba) {
+        t.tex = w3dEngine::UploadRGBA(rgba, tw, th, true); t.w = tw; t.h = th; w3dEngine::FreeImage(rgba);
+    }
+#else
+    // PC/Android/Web: si hay _PAlbTN (copiado del N95) se decodifica ESE (mas rapido); si no, la imagen entera reducida.
+    const std::string& src = pal.empty() ? path : pal;
+    if (w3dEngine::DecodeThumbnail(src.c_str(), kFBThumbMax, &rgba, &tw, &th) && rgba) {
+        t.tex = w3dEngine::UploadRGBA(rgba, tw, th, true); t.w = tw; t.h = th; w3dEngine::FreeImage(rgba);
+    }
+#endif
+    gFBThumbs[path] = t;
+    return t.tex ? &gFBThumbs[path] : 0;
+}
+// dibuja la miniatura encajada (aspecto) en el cuadro (ix,iy,isz). Rebindea el atlas de iconos al salir.
+static void FBDibujarThumb(const FBThumb* th, int ix, int iy, int isz) {
+    int dw = isz, dh = isz;
+    if (th->w >= th->h) { if (th->w) dh = th->h * isz / th->w; } else { if (th->h) dw = th->w * isz / th->h; }
+    if (dw < 1) dw = 1; if (dh < 1) dh = 1;
+    int ox = ix + (isz - dw) / 2, oy = iy + (isz - dh) / 2;
+    GLshort v[8] = { (GLshort)ox,(GLshort)oy, (GLshort)(ox+dw),(GLshort)oy, (GLshort)ox,(GLshort)(oy+dh), (GLshort)(ox+dw),(GLshort)(oy+dh) };
+    static const GLfloat uv[8] = { 0,0, 1,0, 0,1, 1,1 };
+    w3dEngine::Color4f(1.0f, 1.0f, 1.0f, 1.0f);
+    w3dEngine::BindTexture(th->tex);
+    W3dDrawStrip4(v, uv);
+    w3dEngine::BindTexture(Textures[0]->iID); // atlas de iconos para los siguientes
 }
 
 // parte 's' en hasta 'maxLines' renglones de <= maxChars. Corta en un espacio
@@ -146,6 +211,7 @@ void FileBrowser::Recargar() {
 void FileBrowser::Navegar(const std::string& dir, bool pushHistory) {
     std::vector<w3dFileSystem::DirEntry> prueba;
     if (!w3dFileSystem::ListDir(dir, prueba)) return;
+    FBLiberarThumbs(); // cambiar de carpeta libera TODAS las miniaturas (no acumular RAM/VRAM)
     currentPath = dir;
     if (pushHistory) {
         while ((int)history.size() > histPos + 1) history.pop_back();
@@ -359,6 +425,7 @@ void FileBrowser::Render() {
     int baseY = fileY + borderGS + PosY; // PosY: offset del Scrollable (<=0)
     int rowPitch = RenglonHeightGS + GlobalScale; // 1px de gap entre renglones
     int contentW = fileW - (borderGS + 9 * GlobalScale) - gapGS; // sin pisar el scroll
+    gFBThumbsFrame = 0; // limite de miniaturas nuevas por frame (se rearma cada frame)
     for (int i = 0; i < (int)entries.size(); i++) {
         int cx, cy, cw, ch;
         if (gridView) { cx = fileX + borderGS + (i % cols) * cellW; cy = baseY + (i / cols) * cellH; cw = cellW; ch = cellH; }
@@ -378,9 +445,15 @@ void FileBrowser::Render() {
         int iconIdx = IconoEntrada(entries[i]);
         if (gridView) {
             int isz = 26 * GlobalScale, ix = cx + (cw - isz) / 2, iy = cy + gapGS * 2;
-            GLshort v[8] = { (GLshort)ix,(GLshort)iy,(GLshort)(ix+isz),(GLshort)iy,(GLshort)ix,(GLshort)(iy+isz),(GLshort)(ix+isz),(GLshort)(iy+isz) };
-            w3dEngine::Color4f(iconCol[0], iconCol[1], iconCol[2], 1.0f);
-            W3dDrawStrip4(v, IconsUV[iconIdx]->uvs);
+            const FBThumb* thmb = (!entries[i].isDir && EsImagen(entries[i].name))
+                ? FBObtenerThumb(w3dFileSystem::JoinPath(currentPath, entries[i].name)) : 0;
+            if (thmb) FBDibujarThumb(thmb, ix, iy, isz);
+            else
+            {
+                GLshort v[8] = { (GLshort)ix,(GLshort)iy,(GLshort)(ix+isz),(GLshort)iy,(GLshort)ix,(GLshort)(iy+isz),(GLshort)(ix+isz),(GLshort)(iy+isz) };
+                w3dEngine::Color4f(iconCol[0], iconCol[1], iconCol[2], 1.0f);
+                W3dDrawStrip4(v, IconsUV[iconIdx]->uvs);
+            }
             // nombre: hasta 3 renglones, cada uno CENTRADO en la celda
             int textW = cw - 2 * gapGS, maxChars = textW / CharacterWidthGS;
             std::vector<std::string> lines; WrapText(entries[i].name, maxChars, 3, lines);
@@ -395,9 +468,15 @@ void FileBrowser::Render() {
             }
         } else {
             int isz = IconSizeGS, iy = cy + (ch - isz) / 2, ix = ex + gapGS;
-            GLshort v[8] = { (GLshort)ix,(GLshort)iy,(GLshort)(ix+isz),(GLshort)iy,(GLshort)ix,(GLshort)(iy+isz),(GLshort)(ix+isz),(GLshort)(iy+isz) };
-            w3dEngine::Color4f(iconCol[0], iconCol[1], iconCol[2], 1.0f);
-            W3dDrawStrip4(v, IconsUV[iconIdx]->uvs);
+            const FBThumb* thmb = (!entries[i].isDir && EsImagen(entries[i].name))
+                ? FBObtenerThumb(w3dFileSystem::JoinPath(currentPath, entries[i].name)) : 0;
+            if (thmb) FBDibujarThumb(thmb, ix, iy, isz);
+            else
+            {
+                GLshort v[8] = { (GLshort)ix,(GLshort)iy,(GLshort)(ix+isz),(GLshort)iy,(GLshort)ix,(GLshort)(iy+isz),(GLshort)(ix+isz),(GLshort)(iy+isz) };
+                w3dEngine::Color4f(iconCol[0], iconCol[1], iconCol[2], 1.0f);
+                W3dDrawStrip4(v, IconsUV[iconIdx]->uvs);
+            }
             w3dEngine::PushMatrix();
             w3dEngine::Translatef((GLfloat)(ix + isz + gapGS), (GLfloat)(cy + (ch - LetterHeightGS) / 2), 0);
             w3dEngine::Color4f(blanco[0], blanco[1], blanco[2], 1.0f);
@@ -645,7 +724,10 @@ bool FileBrowser::Tecla(int tecla) {
     return true;
 }
 
-void FileBrowser::Cerrar() { if (PopUpActive == this) { PopUpActive = NULL; delete this; } }
+void FileBrowser::Cerrar() {
+    FBLiberarThumbs(); // cerrar el explorador libera TODAS las miniaturas
+    if (PopUpActive == this) { PopUpActive = NULL; delete this; }
+}
 
 // ============================================================================
 void AbrirFileBrowser(const std::string& title, const std::string& accionLabel,

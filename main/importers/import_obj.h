@@ -78,6 +78,9 @@ bool LeerMTL(const std::string& filepath, int objetosCargados);
 // Función principal para importar un OBJ
 bool ImportOBJ(const std::string& filepath, bool NoMerge);
 
+// encola una textura (material, ruta) para la carga diferida (1 por frame). Compartida con el importador FBX.
+void EncolarTextura(Material* mat, const std::string& path);
+
 // EXPORTAR a OBJ + MTL (geometria, normales, vertex color, UV, texturas y los
 // extras de material de Whisk3D). selectedOnly = solo los objetos seleccionados.
 // applyModifiers = exporta la malla GENERADA por los modificadores (mirror, etc.) en vez de la editable.

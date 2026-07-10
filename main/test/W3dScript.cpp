@@ -6,6 +6,7 @@
 #include "objects/EditMesh.h"  // EditMesh
 #include "ViewPorts/LayoutInput.h" // LayoutToggleEditMode/ExtrudeFaces, EditXform*
 #include "importers/import_obj.h"   // ExportOBJ
+#include "importers/import_fbx.h"  // ImportFBX
 #include "objects/ObjectMode.h" // Eliminar (test del borrado + su undo)
 #include "objects/Light.h"      // Light::Create + Lights (test del borrado de luces)
 #include "Undo.h"               // UndoCapturarSeleccionEdit / UndoDeshacer (test del Ctrl+Z)
@@ -25,6 +26,23 @@ static Mesh* ScriptActiveMesh() {
     if (g_editMesh) return (Mesh*)g_editMesh;
     if (ObjActivo && ObjActivo->getType() == ObjectType::mesh) return (Mesh*)ObjActivo;
     return NULL;
+}
+
+// vuelca la escena en arbol (recursivo). Para mallas muestra el # de grupos de vertices (huesos del rig).
+static void ScriptDumpEscena(Object* o, int nivel) {
+    if (!o) return;
+    char sangria[64]; int n = nivel*2; if (n > 62) n = 62;
+    for (int i=0;i<n;i++) sangria[i]=' '; sangria[n]='\0';
+    Mesh* m = (o->getType()==ObjectType::mesh) ? (Mesh*)o : NULL;
+    if (m && !m->vertexGroups.empty()) {
+        std::string muestra;
+        for (size_t g=0; g<m->vertexGroups.size() && g<8; g++){ if(g) muestra+=","; muestra+=m->vertexGroups[g]->nombre; }
+        printf("      [scene] %s'%s' type=%d children=%d vgroups=%d (%s...)\n", sangria, o->name.c_str(),
+               (int)o->getType(), (int)o->Childrens.size(), (int)m->vertexGroups.size(), muestra.c_str());
+    }
+    else
+        printf("      [scene] %s'%s' type=%d children=%d\n", sangria, o->name.c_str(), (int)o->getType(), (int)o->Childrens.size());
+    for (size_t i=0;i<o->Childrens.size();i++) ScriptDumpEscena(o->Childrens[i], nivel+1);
 }
 
 static Material* ScriptActiveMaterial() {
@@ -317,10 +335,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
     // ---- scene : lista los hijos top-level (nombre/tipo/hijos) ----
     if (cmd == "scene") {
         if (!SceneCollection) { err = "sin escena"; return false; }
-        for (size_t i=0;i<SceneCollection->Childrens.size();i++){
-            Object* o=SceneCollection->Childrens[i];
-            printf("      [scene] [%d] '%s' type=%d children=%d\n", (int)i, o->name.c_str(), (int)o->getType(), (int)o->Childrens.size());
-        }
+        ScriptDumpEscena(SceneCollection, 0);
         return true;
     }
     // ---- join : une las mallas seleccionadas en el objeto activo (Ctrl+J) ----
@@ -567,11 +582,14 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         return true;
     }
 
-    // ---- import <ruta.obj> ----
+    // ---- import <ruta.obj|.fbx> ----
     if (cmd == "import") {
         std::string path; ss >> path;
         if (path.empty()) { err = "falta la ruta del import"; return false; }
-        if (!ImportOBJ(path, false)) { err = "ImportOBJ fallo (ruta: " + path + ")"; return false; }
+        std::string ext = path.size() >= 4 ? path.substr(path.size() - 4) : std::string();
+        for (size_t i = 0; i < ext.size(); i++) if (ext[i] >= 'A' && ext[i] <= 'Z') ext[i] += 32;
+        bool ok = (ext == ".fbx") ? ImportFBX(path) : ImportOBJ(path, false);
+        if (!ok) { err = "import fallo (ruta: " + path + ")"; return false; }
         return true;
     }
 

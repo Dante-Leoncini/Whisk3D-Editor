@@ -32,6 +32,7 @@
 // (los tipos GL + el dibujo vienen del engine: w3dGraphics.h / w3dEngine, ya incluido arriba)
 
 void (*LayoutImportObj)() = NULL;
+void (*LayoutImportFbx)() = NULL; // "Add > Import FBX": abre el explorador filtrado a .fbx (lo cablea la plataforma)
 void (*LayoutWarpMouse)(int x, int y) = NULL;
 void (*LayoutArbolCambiado)() = NULL;
 
@@ -354,6 +355,7 @@ static void LayoutAccionAdd(int aId) {
             break;
         }
         case 7: if (LayoutImportObj) LayoutImportObj(); break;
+        case 15: if (LayoutImportFbx) LayoutImportFbx(); break; // Import FBX (explorador filtrado a .fbx)
         case 8:
             // una Collection nueva (colgada de la activa)
             nuevo = new Collection(CollectionActive ? CollectionActive
