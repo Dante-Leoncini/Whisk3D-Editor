@@ -349,9 +349,12 @@ void MergeVertsEdit(Mesh* m, int modo, float dist, const Vector3& cursorLocal) {
     // identidad "mergeada" de un corner: el gpu canonico de su cluster si mergea, sino el gpu mismo
     #define MID(gi) ( mergedRoot[gi]>=0 ? mergedRoot[gi] : (gi) )
 
-    // 4) reconstruir faces3d: dedup de corners por identidad mergeada (tira los que colapsan), <3 -> cara muerta
+    // 4) reconstruir faces3d: dedup de corners por identidad mergeada (tira los que colapsan), <3 -> cara muerta.
+    //    Ademas DEDUP de CARAS: si dos caras quedan con el MISMO conjunto de vertices (mismas identidades mergeadas,
+    //    sin importar el orden) queda UNA sola (bug Dante: un "merge at center" fallido dejaba caras encimadas).
     m->PoblarCapas();
     std::vector<MeshFace> nf3d; std::vector<int> survCorner; int Lold = 0;
+    std::set<std::vector<int> > carasVistas; // conjunto ORDENADO de identidades por cara (para dedup)
     for (size_t f=0; f<m->faces3d.size(); f++){
         const std::vector<int>& idx = m->faces3d[f].idx; int mm=(int)idx.size();
         std::vector<int> ring; std::vector<int> ringCorner; std::set<int> vistos;
@@ -359,8 +362,13 @@ void MergeVertsEdit(Mesh* m, int modo, float dist, const Vector3& cursorLocal) {
             if (vistos.count(id)) continue; // ya esta esa identidad en el anillo -> corner colapsado
             vistos.insert(id); ring.push_back(gi); ringCorner.push_back(Lold+c);
         }
-        if (ring.size() >= 3){ MeshFace mf; mf.idx = ring; mf.mat = m->faces3d[f].mat; mf.smooth = m->faces3d[f].smooth;
-            nf3d.push_back(mf); for (size_t c=0;c<ringCorner.size();c++) survCorner.push_back(ringCorner[c]); }
+        if (ring.size() >= 3){
+            std::vector<int> clave(vistos.begin(), vistos.end()); // identidades ordenadas (std::set ya viene ordenado)
+            if (carasVistas.count(clave)) { Lold += mm; continue; } // cara duplicada (mismos verts) -> descartar
+            carasVistas.insert(clave);
+            MeshFace mf; mf.idx = ring; mf.mat = m->faces3d[f].mat; mf.smooth = m->faces3d[f].smooth;
+            nf3d.push_back(mf); for (size_t c=0;c<ringCorner.size();c++) survCorner.push_back(ringCorner[c]);
+        }
         Lold += mm;
     }
     // 5) loose edges: descartar los que quedan en un punto (mismos extremos mergeados)
@@ -1276,6 +1284,17 @@ bool Mesh::CrearCaraEdit() {
             std::vector<float> ang(ring.size());
             for (size_t i=0;i<ring.size();i++){ Vector3 d(vertex[ring[i]*3]-c.x,vertex[ring[i]*3+1]-c.y,vertex[ring[i]*3+2]-c.z); ang[i]=atan2f(d.x*ejeV.x+d.y*ejeV.y+d.z*ejeV.z, d.x*ejeU.x+d.y*ejeU.y+d.z*ejeU.z); }
             for (size_t i=1;i<ring.size();i++){ int rv=ring[i]; float av=ang[i]; int j=(int)i-1; while (j>=0 && ang[j]>av){ ring[j+1]=ring[j]; ang[j+1]=ang[j]; j--; } ring[j+1]=rv; ang[j+1]=av; }
+        }
+        // NO DUPLICAR: si ya existe una cara con EXACTAMENTE el mismo conjunto de posiciones (sin importar el orden),
+        // no crear otra. Antes, apretar "F" de nuevo sobre los mismos verts apilaba caras iguales encimadas (bug Dante:
+        // el quad "no se veia" por z-fight / winding opuesto). Se compara por posRep (posicion), no por indice gpu.
+        {
+            const bool hayRep = ((int)posRep.size() == nV);
+            std::set<int> nueva; for (size_t i=0;i<ring.size();i++){ int g=ring[i]; if(g>=0&&g<nV) nueva.insert(hayRep?posRep[g]:g); }
+            for (size_t f=0; f<faces3d.size(); f++){ const std::vector<int>& ix=faces3d[f].idx;
+                std::set<int> s; for (size_t c=0;c<ix.size();c++){ int g=ix[c]; if(g>=0&&g<nV) s.insert(hayRep?posRep[g]:g); }
+                if (s.size()==nueva.size() && s==nueva){ ReconstruirEditSelPorPos(posSel); return false; } // ya existe -> no duplicar
+            }
         }
         // vert -> primer corner (sobre faces3d ACTUAL) para que la cara nueva herede el
         // uv/color del corner existente de cada vert (asi se funde con lo que la rodea)
@@ -2575,6 +2594,31 @@ void MoverColorLayerActivo(Mesh* m, int dir) {
     int i = m->colorActivo, j = i + dir;
     if (i < 0 || i >= (int)m->colorLayers.size() || j < 0 || j >= (int)m->colorLayers.size()) return;
     ColorLayer* t = m->colorLayers[i]; m->colorLayers[i] = m->colorLayers[j]; m->colorLayers[j] = t; m->colorActivo = j;
+}
+
+// GRUPOS DE VERTICES (huesos del rig / pesos). A diferencia de UV/color pueden ser 0 (no hay que poblar por defecto).
+void CrearVertexGroup(Mesh* m) {
+    if (!m) return;
+    // nombre unico "Group.NNN"
+    std::string base = "Group", nombre = base; int suf = 0;
+    for (;;){ bool choca = false;
+        for (size_t i=0;i<m->vertexGroups.size();i++) if (m->vertexGroups[i]->nombre == nombre){ choca=true; break; }
+        if (!choca) break;
+        ++suf; char b[16]; sprintf(b, ".%03d", suf); nombre = base + b; }
+    m->vertexGroups.push_back(new VertexGroup(nombre));
+    m->grupoActivo = (int)m->vertexGroups.size() - 1;
+}
+void BorrarVertexGroupActivo(Mesh* m) {
+    if (!m) return;
+    int i = m->grupoActivo; if (i < 0 || i >= (int)m->vertexGroups.size()) return;
+    delete m->vertexGroups[i]; m->vertexGroups.erase(m->vertexGroups.begin() + i);
+    if (m->grupoActivo >= (int)m->vertexGroups.size()) m->grupoActivo = (int)m->vertexGroups.size() - 1;
+}
+void MoverVertexGroupActivo(Mesh* m, int dir) {
+    if (!m) return;
+    int i = m->grupoActivo, j = i + dir;
+    if (i < 0 || i >= (int)m->vertexGroups.size() || j < 0 || j >= (int)m->vertexGroups.size()) return;
+    VertexGroup* t = m->vertexGroups[i]; m->vertexGroups[i] = m->vertexGroups[j]; m->vertexGroups[j] = t; m->grupoActivo = j;
 }
 
 // reversa los datos de TODAS las capas de los corners [L .. L+count). Lo usa el flip de

@@ -332,6 +332,13 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         if (!co || !po) { err = "parent: objeto no encontrado"; return false; }
         ReparentSimple(co, po); return true;
     }
+    // ---- selobj <nombre> : selecciona un objeto de la escena por nombre (activo + select). Para tests. ----
+    if (cmd == "selobj") {
+        std::string n; ss >> n;
+        Object* o = SceneCollection ? FindObjectByName(SceneCollection, n) : NULL;
+        if (!o) { err = "selobj: objeto no encontrado"; return false; }
+        DeseleccionarTodo(); o->Seleccionar(); ObjActivo = o; return true;
+    }
     // ---- scene : lista los hijos top-level (nombre/tipo/hijos) ----
     if (cmd == "scene") {
         if (!SceneCollection) { err = "sin escena"; return false; }
@@ -551,6 +558,13 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         return true;
     }
 
+    // ---- crearcara : crea cara/borde desde los verts seleccionados (tecla F). Para testear el anti-duplicado. ----
+    if (cmd == "crearcara") {
+        Mesh* m = ScriptActiveMesh(); if (!m) { err = "no hay malla activa"; return false; }
+        bool ok = m->CrearCaraEdit();
+        printf("      [crearcara] ok=%d faces3d=%d\n", (int)ok, (int)m->faces3d.size());
+        return true;
+    }
     // ---- shade <smooth|flat> ----
     if (cmd == "shade") {
         std::string s; ss >> s;

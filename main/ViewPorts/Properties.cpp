@@ -202,6 +202,12 @@ static std::string UniqColor(const std::string& n, std::string* excl){
         for (size_t i = 0; i < m->colorLayers.size(); i++) v.push_back(&m->colorLayers[i]->nombre); }
     return UniqueNombre(n, excl, v);
 }
+static std::string UniqVGroup(const std::string& n, std::string* excl){
+    std::vector<std::string*> v;
+    if (ObjActivo && ObjActivo->getType() == ObjectType::mesh){ Mesh* m = (Mesh*)ObjActivo;
+        for (size_t i = 0; i < m->vertexGroups.size(); i++) v.push_back(&m->vertexGroups[i]->nombre); }
+    return UniqueNombre(n, excl, v);
+}
 static void RecolectarNombresObj(Object* o, std::vector<std::string*>& v){
     v.push_back(&o->name);
     for (size_t i = 0; i < o->Childrens.size(); i++) RecolectarNombresObj(o->Childrens[i], v);
@@ -279,6 +285,12 @@ static void AccionRenameColor(){
     Mesh* m = (Mesh*)ObjActivo;
     if (m->colorActivo < 0 || m->colorActivo >= (int)m->colorLayers.size()) return;
     RenameIniciar(PropsActivo->propBtnRenameColor->button, &m->colorLayers[m->colorActivo]->nombre, UniqColor);
+}
+static void AccionRenameGroup(){
+    if (!ObjActivo || ObjActivo->getType() != ObjectType::mesh || !PropsActivo || !PropsActivo->propBtnRenameGroup) return;
+    Mesh* m = (Mesh*)ObjActivo;
+    if (m->grupoActivo < 0 || m->grupoActivo >= (int)m->vertexGroups.size()) return;
+    RenameIniciar(PropsActivo->propBtnRenameGroup->button, &m->vertexGroups[m->grupoActivo]->nombre, UniqVGroup);
 }
 // NOMBRE del objeto: el campo propNameObj muestra ObjActivo->name (cuando NO se edita) y, al perder el foco,
 // escribe lo tipeado (uniquificado) en ObjActivo->name. Se llama por frame desde RefreshTargetProperties.
@@ -862,6 +874,10 @@ static void AccionVertUVMapDown() { Mesh* m = VerticesMesh(); if (m) { MoverUVMa
 static void AccionVertDelColor()  { Mesh* m = VerticesMesh(); if (m) { BorrarColorLayerActivo(m);  m->AplicarCapasAlRender(); PropertiesLayoutDirty = true; g_redraw = true; } }
 static void AccionVertColorUp()   { Mesh* m = VerticesMesh(); if (m) { MoverColorLayerActivo(m,-1); m->AplicarCapasAlRender(); PropertiesLayoutDirty = true; g_redraw = true; } }
 static void AccionVertColorDown() { Mesh* m = VerticesMesh(); if (m) { MoverColorLayerActivo(m,+1); m->AplicarCapasAlRender(); PropertiesLayoutDirty = true; g_redraw = true; } }
+static void AccionVertAddGroup()  { Mesh* m = VerticesMesh(); if (m) { CrearVertexGroup(m);         PropertiesLayoutDirty = true; g_redraw = true; } }
+static void AccionVertDelGroup()  { Mesh* m = VerticesMesh(); if (m) { BorrarVertexGroupActivo(m);  PropertiesLayoutDirty = true; g_redraw = true; } }
+static void AccionVertGroupUp()   { Mesh* m = VerticesMesh(); if (m) { MoverVertexGroupActivo(m,-1); PropertiesLayoutDirty = true; g_redraw = true; } }
+static void AccionVertGroupDown() { Mesh* m = VerticesMesh(); if (m) { MoverVertexGroupActivo(m,+1); PropertiesLayoutDirty = true; g_redraw = true; } }
 static void AccionVertColorMode() {   // toggle Per-Vertex / Per-Corner de la capa de color activa
     Mesh* m = VerticesMesh(); if (!m) return;
     if (m->colorActivo >= 0 && m->colorActivo < (int)m->colorLayers.size()) {
@@ -1122,8 +1138,26 @@ void Properties::ConstruirGrupos(){
       PropFloat* pz = new PropFloat("Z"); pz->value = &editPosZ; pz->onChange = AccionEditPos; propEditItem->properties.push_back(pz); }
     GroupProperties.push_back(propEditItem);
 
-    // pestaña VERTICES (icono mesh): 3 TARJETAS. Las listas REUSAN PropListMeshParts (con scroll,
-    // resize, etc., el MISMO componente que el selector de mesh part) en modo 1 (uvmaps) / 2 (colors).
+    // pestaña VERTICES (icono mesh): TARJETAS. Las listas REUSAN PropListMeshParts (con scroll, resize, etc., el
+    // MISMO componente que el selector de mesh part) en modo 4 (vertex groups) / 1 (uvmaps) / 2 (colors).
+    // "Vertex Groups" va PRIMERA: es la mas importante (huesos del rig, pesos para deformar la malla).
+    propVertexGroups = new GroupPropertie("Vertex Groups");
+    propListVertGroups = new PropListMeshParts("Vertex Groups"); propListVertGroups->modo = 4;
+    propVertexGroups->properties.push_back(propListVertGroups);
+    PropButton* pbAddGrp = new PropButton("Add Vertex Group", IconType::mesh);
+    pbAddGrp->action = AccionVertAddGroup;
+    propVertexGroups->properties.push_back(pbAddGrp);
+    propBtnRenameGroup = new PropButton("Rename", -1); // renombra el grupo activo (nombre unico por malla)
+    propBtnRenameGroup->action = AccionRenameGroup;
+    propVertexGroups->properties.push_back(propBtnRenameGroup);
+    // fila Delete | Move Up | Move Down (Delete si hay >=1; Move si hay >=2)
+    propRowGroupOps = new PropButtonRow();
+    propRowGroupOps->Agregar("Delete",    AccionVertDelGroup);
+    propRowGroupOps->Agregar("Move Up",   AccionVertGroupUp);
+    propRowGroupOps->Agregar("Move Down", AccionVertGroupDown);
+    propVertexGroups->properties.push_back(propRowGroupOps);
+    GroupProperties.push_back(propVertexGroups);
+
     propUVMaps = new GroupPropertie("UV Maps");
     propListUV = new PropListMeshParts("UV Maps"); propListUV->modo = 1;
     propUVMaps->properties.push_back(propListUV);
@@ -1160,14 +1194,6 @@ void Properties::ConstruirGrupos(){
     propRowColorOps->Agregar("Move Down", AccionVertColorDown);
     propColorLayers->properties.push_back(propRowColorOps);
     GroupProperties.push_back(propColorLayers);
-
-    // tarjeta "Vertex Groups": los grupos de vertices = huesos del rig (pelvis, spine_01, ...). Por ahora SOLO se
-    // listan (los crea/puebla el importador FBX a partir de los pesos del skin); mas adelante serviran para deformar
-    // la malla con la armature. La lista reusa PropListMeshParts en modo 4 (mesh->vertexGroups).
-    propVertexGroups = new GroupPropertie("Vertex Groups");
-    propListVertGroups = new PropListMeshParts("Vertex Groups"); propListVertGroups->modo = 4;
-    propVertexGroups->properties.push_back(propListVertGroups);
-    GroupProperties.push_back(propVertexGroups);
 
     propVertexAnim = new GroupPropertie("Vertex Animation");
     propVertexAnim->properties.push_back(new PropLabel("(coming soon)")); // placeholder
@@ -1256,6 +1282,11 @@ void Properties::ConstruirGrupos(){
 static bool gListaResize = false;
 static int gListaResizeY0 = 0;
 static int gListaFilas0 = 3;
+// DRAG-SCROLL tactil de un mini-listado (UV/color/grupos/modificadores/parts): al arrastrar el dedo sobre la lista
+// se scrollea ELLA (scrollFila), no el panel entero. Antes solo se podia con la rueda -> inusable en tactil.
+static PropListMeshParts* gListaScrollLista = NULL;
+static int gListaScrollY0 = 0;   // my del press
+static int gListaScroll0 = 0;    // scrollFila al empezar el arrastre
 
 // arrastre de un PropFloat con el mouse: click + mover horizontal acumula el
 // delta 'dx' en el valor (como en Blender). NULL = no se esta arrastrando.
@@ -1537,7 +1568,7 @@ Properties::Properties() : ViewportBase() {
     propScrewAxis = NULL; propScrewStretchU = NULL; propScrewStretchV = NULL;
     propScrewSmooth = NULL; propScrewMerge = NULL; propScrewFlip = NULL;
     propListUV = NULL; propListColor = NULL; propListVertGroups = NULL; propBtnColorMode = NULL;
-    propRowUVOps = NULL; propRowColorOps = NULL;
+    propRowUVOps = NULL; propRowColorOps = NULL; propRowGroupOps = NULL; propBtnRenameGroup = NULL;
     propRotMode = NULL;
     propMsgDefault = NULL; propSepMat = NULL;
     propMaterial = NULL; propBtnRenameMat = NULL;
@@ -1707,6 +1738,14 @@ void Properties::ActualizarPestanias(){
         if (propRowColorOps && propRowColorOps->botones.size() >= 3){
             bool mas = (mv->colorLayers.size() > 1);
             for (int b = 0; b < 3; b++) propRowColorOps->botones[b]->visible = mas;
+        }
+        // Vertex Groups: pueden ser 0. Rename + Delete se ven con >=1; Move Up/Down con >=2.
+        bool hayGrp = !mv->vertexGroups.empty();
+        if (propBtnRenameGroup) propBtnRenameGroup->oculto = !hayGrp;
+        if (propRowGroupOps && propRowGroupOps->botones.size() >= 3){
+            propRowGroupOps->botones[0]->visible = hayGrp;                      // Delete
+            propRowGroupOps->botones[1]->visible = (mv->vertexGroups.size() > 1); // Move Up
+            propRowGroupOps->botones[2]->visible = (mv->vertexGroups.size() > 1); // Move Down
         }
     }
 
@@ -2025,6 +2064,7 @@ void Properties::mouse_button_up(SDL_Event &e){
         gFloatDrag->IniciarEdicionTexto(); // editor INLINE de Whisk3D (el texto entra por SDL_TEXTINPUT como siempre)
     }
     gFloatDrag = NULL; gFloatDragMoved = false; gFloatDragAccum = 0.0f;
+    gListaScrollLista = NULL; // fin del drag-scroll de la lista
     if (!editando) ViewPortClickDown = false;
 }
 #endif
@@ -2115,7 +2155,45 @@ void Properties::FindMouseOver(int mx, int my){
 
 // TOUCH: arrastrar 1 dedo sobre el CONTENIDO = scroll vertical. (La barra de pestañas la maneja el gesto
 // lockeado en controles.cpp con BarScrollBy; aca solo el contenido.)
+// TACTIL: latch del mini-listado que se esta scrolleando con el dedo (se decide en el 1er evento del gesto, cuando el
+// dedo esta ~sobre el punto del down, y se mantiene hasta soltar aunque el dedo se salga del box). Separado del latch
+// de mouse (gListaScrollLista) para que no se pisen. Lo limpia PropertiesTouchScrollFin() en el up.
+static PropListMeshParts* gTouchScrollLista = NULL;
+static bool  gTouchScrollDecidido = false;
+static float gTouchScrollAccum = 0.0f;
+
+void PropertiesTouchScrollFin(){ // llamada desde controles.cpp al soltar (fin del gesto tactil)
+    gTouchScrollLista = NULL; gTouchScrollDecidido = false; gTouchScrollAccum = 0.0f;
+    gListaScrollLista = NULL; // por las dudas, tambien el latch de mouse
+}
+
 bool Properties::event_finger_scroll(int px, int py, int dx, int dy){
+    // 1er evento del gesto: decidir si el dedo empezo sobre un mini-listado con contenido scrolleable
+    if (!gTouchScrollDecidido) {
+        gTouchScrollDecidido = true;
+        gTouchScrollAccum = 0.0f;
+        PropListMeshParts* l = ListaBajoY(py);
+        if (l) { int n = l->ListaCount(); int vis = n < l->filasMax ? n : l->filasMax;
+                 gTouchScrollLista = (n > vis) ? l : NULL; }
+        else gTouchScrollLista = NULL;
+    }
+    if (gTouchScrollLista) {
+        int n = gTouchScrollLista->ListaCount();
+        int vis = n < gTouchScrollLista->filasMax ? n : gTouchScrollLista->filasMax;
+        if (n > vis) {
+            int rowH = RenglonHeightGS + gapGS; if (rowH < 1) rowH = 1;
+            gTouchScrollAccum += (float)dy;               // dedo hacia abajo (dy>0) = ver items de arriba
+            int steps = (int)(gTouchScrollAccum / rowH);
+            if (steps != 0) {
+                gTouchScrollAccum -= (float)(steps * rowH);
+                int nuevo = gTouchScrollLista->scrollFila - steps;
+                if (nuevo > n - vis) nuevo = n - vis;
+                if (nuevo < 0) nuevo = 0;
+                if (nuevo != gTouchScrollLista->scrollFila) { gTouchScrollLista->scrollFila = nuevo; g_redraw = true; }
+            }
+            return true; // consumido por la lista: el panel NO scrollea
+        }
+    }
     ScrollByTouch(0, dy);
     return true;
 }
@@ -2160,6 +2238,25 @@ void Properties::event_mouse_motion(int mx, int my) {
             }
         }
         return;
+    }
+
+    // DRAG-SCROLL de un mini-listado: si el press empezo sobre una lista, arrastrar vertical scrollea ESA lista
+    // (scrollFila sigue al dedo) en vez del panel entero. Se suelta al levantar el dedo.
+    if (gListaScrollLista) {
+        if (!leftMouseDown) { gListaScrollLista = NULL; }
+        else {
+            int n = gListaScrollLista->ListaCount();
+            int vis = n < gListaScrollLista->filasMax ? n : gListaScrollLista->filasMax;
+            if (n > vis) {
+                int rowH = RenglonHeightGS + gapGS; if (rowH < 1) rowH = 1;
+                int nuevo = gListaScroll0 - (my - gListaScrollY0) / rowH; // dedo hacia abajo = ver items de arriba
+                if (nuevo > n - vis) nuevo = n - vis;
+                if (nuevo < 0) nuevo = 0;
+                if (nuevo != gListaScrollLista->scrollFila) { gListaScrollLista->scrollFila = nuevo; g_redraw = true; }
+            }
+            ViewPortClickDown = true;
+            return; // consumido por la lista: el panel NO scrollea
+        }
     }
 
     if (middleMouseDown || leftMouseDown) {
@@ -2405,6 +2502,32 @@ void Properties::event_key_up(SDL_Event &e){
 }
 #endif
 
+// devuelve el mini-listado (PropListMeshParts) cuyo BOX cae bajo la coordenada 'py' (o NULL). Mismo recorrido de
+// filas que ClickEn/PropFloatEnValueBox. Lo usa el scroll TACTIL para saber si el dedo empezo sobre una lista.
+PropListMeshParts* Properties::ListaBajoY(int py) {
+    if (!ObjActivo) return NULL;
+    int yCursor = y + BarTopOffset() + PosY + borderGS + RenglonHeightGS + gapGS;
+    for (size_t i = 0; i < GroupProperties.size(); i++) {
+        GroupPropertie* g = GroupProperties[i];
+        if (!g->visible) continue;
+        int hCabecera = borderGS + RenglonHeightGS + gapGS;
+        if (py >= yCursor && py < yCursor + hCabecera) return NULL; // cabecera del grupo
+        if (g->open) {
+            int yFila = yCursor + hCabecera;
+            for (size_t j = 0; j < g->properties.size(); j++) {
+                PropertieBase* prop = g->properties[j];
+                int hFila = prop->Resize(g->width);
+                if (hFila > 0 && prop->GetType() == PropertyType::List &&
+                    py >= yFila && py < yFila + hFila)
+                    return (PropListMeshParts*)prop;
+                yFila += hFila;
+            }
+        }
+        yCursor += g->height + borderGS + (g->open ? GlobalScale : 0);
+    }
+    return NULL;
+}
+
 void Properties::ClickEn(int mx, int my) {
     PropsActivo = this; // este panel pasa a ser el activo
     g_textFieldActivo = NULL; // cualquier click des-enfoca; abajo se re-enfoca si es texto
@@ -2512,6 +2635,10 @@ void Properties::ClickEn(int mx, int my) {
                             lista->ListaSeleccionar(item); // setea el activo + re-bind/re-bake
                             lista->AjustarVentana();
                         }
+                        // armar el drag-scroll tactil de ESTA lista (si se arrastra vertical, scrollea la lista)
+                        gListaScrollLista = lista;
+                        gListaScrollY0 = my;
+                        gListaScroll0 = lista->scrollFila;
                     }
                     else if (prop->GetType() == PropertyType::Float) {
                         // arma el POSIBLE arrastre del valor: si el mouse se mueve arrastra; si no, al soltar abre
