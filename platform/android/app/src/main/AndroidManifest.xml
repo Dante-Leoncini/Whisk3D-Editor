@@ -11,6 +11,10 @@
          que es donde el file browser escribe a /sdcard por fopen. -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
                      android:maxSdkVersion="29" />
+    <!-- API 30+ (Android 11): para leer/escribir ARCHIVOS arbitrarios (modelos .obj/.w3d, texturas) con el file
+         browser interno (opendir/fopen). Los permisos de media solo dan imagenes/videos -> no se cargaban modelos.
+         "All files access": se pide en runtime (el Activity abre la pantalla de Settings). Mantiene nuestro browser. -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
 
     <application
         android:requestLegacyExternalStorage="true"

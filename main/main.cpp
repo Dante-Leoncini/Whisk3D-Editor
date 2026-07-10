@@ -638,22 +638,19 @@ int main(int argc, char* argv[]) {
         }
     }
     // PERMISOS por NIVEL DE API. OJO: SDL_AndroidRequestPermission BLOQUEA el arranque esperando el callback del
-    // sistema. Pedir un permiso que NO esta en el manifest para esa API (ej. WRITE_EXTERNAL_STORAGE en API>=30, que
-    // lleva maxSdkVersion=29) es inutil (scoped storage: no se puede otorgar) y ademas RIESGOSO: puede no llegar el
-    // callback y colgar la app al iniciar -> "no anda en Android 11+". Por eso se piden SOLO los que corresponden.
+    // sistema; pedir un permiso NO declarado para esa API (ej. WRITE_EXTERNAL_STORAGE en API>=30, maxSdkVersion=29)
+    // es inutil (scoped storage: no se puede otorgar) y RIESGOSO (puede no llegar el callback y colgar el inicio ->
+    // "no anda en Android 11+"). Por eso se piden SOLO los que corresponden.
     int androidApi = SDL_GetAndroidSDKVersion();
-    // LECTURA (navegar/cargar texturas y modelos): API>=33 (Android 13) usa READ_MEDIA_IMAGES; API<=32, READ_EXTERNAL_STORAGE.
-    if (androidApi >= 33) SDL_AndroidRequestPermission("android.permission.READ_MEDIA_IMAGES");
-    else                  SDL_AndroidRequestPermission("android.permission.READ_EXTERNAL_STORAGE");
-    // ESCRITURA: WRITE_EXTERNAL_STORAGE solo sirve/existe hasta API 29 (legacy storage). En API>=30 la salida va al
-    // directorio EXTERNO PROPIO de la app (no requiere permiso, ver GetDefaultOutputDir).
-    if (androidApi <= 29) SDL_AndroidRequestPermission("android.permission.WRITE_EXTERNAL_STORAGE");
-    // API>=30 (scoped storage): no se puede escribir a Descargas por fopen. La salida por defecto de render/export
-    // va al dir EXTERNO PROPIO de la app (/sdcard/Android/data/<pkg>/files): NO requiere permiso y anda en todo Android.
-    if (androidApi >= 30) {
-        const char* extDir = SDL_AndroidGetExternalStoragePath();
-        if (extDir && *extDir) w3dFileSystem::SetDefaultOutputDir(extDir);
+    if (androidApi <= 29) {
+        // Android <=10 (legacy storage): permisos clasicos. Con requestLegacyExternalStorage, el fopen a /sdcard anda.
+        SDL_AndroidRequestPermission("android.permission.READ_EXTERNAL_STORAGE");
+        SDL_AndroidRequestPermission("android.permission.WRITE_EXTERNAL_STORAGE");
     }
+    // Android 11+ (API>=30): "All files access" (MANAGE_EXTERNAL_STORAGE) para leer/escribir ARCHIVOS arbitrarios
+    // (modelos/texturas) con el file browser interno; lo pide el Activity (Whisk3DActivity.onCreate abre Settings).
+    // Los permisos de media NO sirven (solo imagenes/videos). Con "All files access" otorgado, Descargas vuelve a ser
+    // escribible por fopen -> la salida por defecto sigue siendo Descargas (ver GetDefaultOutputDir), como en Android<=10.
     #endif
 
     // Configuración OpenGL
