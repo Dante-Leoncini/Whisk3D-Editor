@@ -20,7 +20,7 @@ mkdir -p "$OUT"
 
 # --- fuentes: mismo set que el CMakeLists, pero con el backend ES2 en vez del de desktop ---
 SRC=$(find main "$CORE/objects" "$CORE/animation" libs/WhiskUI -name '*.cpp')
-SRC="$SRC $CORE/w3dFilesystem.cpp $CORE/w3dTexture.cpp $CORE/w3dlog.cpp"
+SRC="$SRC $CORE/w3dFilesystem.cpp $CORE/w3dTexture.cpp $CORE/w3dCompress.cpp $CORE/w3dlog.cpp"
 SRC="$SRC $CORE/math/Vector3.cpp $CORE/math/Quaternion.cpp $CORE/math/Matrix4.cpp"
 SRC="$SRC $CORE/gles2/w3dGraphicsGLES2.cpp"
 
