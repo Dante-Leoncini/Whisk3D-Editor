@@ -399,9 +399,11 @@ void InputUsuarioSDL3(SDL_Event &e){
             g_barTapPending = false; g_contentTapPending = false;
             // si habia un transform activo, este click lo ACEPTA y NO
             // debe ademas cambiar la seleccion (como en Symbian)
+            extern int g_poseModo; // Pose Mode: transform de huesos (G/R/S) en curso -> el click lo CONFIRMA igual
             bool habiaTransform = (estado == translacion ||
                                    estado == rotacion ||
-                                   estado == EditScale);
+                                   estado == EditScale ||
+                                   g_poseModo != 0);
             // viewport bajo el click (lo usa el diferido de barra/contenido, abajo)
             ViewportBase* vpDown = FindViewportUnderMouse(rootViewport, (int)e.button.x, (int)e.button.y);
             // ESQUINA: down sobre el boton de menu [0] del viewport -> candidato a redimension por arrastre
@@ -442,6 +444,7 @@ void InputUsuarioSDL3(SDL_Event &e){
                 }
                 // durante un transform (mover/rotar/escalar, o ubicar un duplicado) el CLICK de mouse
                 // CONFIRMA, este donde este (incluso sobre la barra/menu): la UI no lo consume
+                else if (g_poseModo){ extern void PoseXformConfirm(); PoseXformConfirm(); }
                 else if (Viewport3DActive) Viewport3DActive->Aceptar();
             }
             // POPUP MODAL (teclado numerico, color picker) bajo el click: va directo, sin diferir -> las

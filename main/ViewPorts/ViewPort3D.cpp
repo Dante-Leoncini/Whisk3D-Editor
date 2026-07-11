@@ -35,6 +35,7 @@ PopupMenu* MenuSelect = NULL;    // seleccion: All / None / Invert
 PopupMenu* MenuObject = NULL;    // operaciones de objeto (solo si hay seleccion)
 PopupMenu* MenuMesh = NULL;      // edit mode: operaciones de malla (Transform + Extrude)
 PopupMenu* MenuTransform = NULL; // submenu de Object: Move / Rotate / Scale
+PopupMenu* MenuPose = NULL;      // menu "Pose" (Pose Mode): Insert Keyframe + Transform
 PopupMenu* MenuSetOrigin = NULL; // submenu de Object: Geometry/Origin/Cursor
 PopupMenu* MenuApply = NULL;     // submenu de Object: Apply Location/Rotation/Scale/All (Ctrl A)
 PopupMenu* MenuView = NULL;      // boton "View" (antes de Select): submenus Cameras + Viewpoint
@@ -181,6 +182,12 @@ Viewport3D::Viewport3D(Vector3 pos){
         MenuObject->Agregar("Set Parent",   0, -1, LayoutSubmenuSetParent())->atajo = "Ctrl P";
         MenuObject->Agregar("Clear Parent", 0, -1, LayoutSubmenuClearParent())->atajo = "Ctrl Alt P";
         MenuObject->Agregar("Delete", 3)->atajo = "X";
+        // menu "Pose" (Pose Mode): Insert Keyframe + submenu Transform (Move/Rotate/Scale). Reusa MenuTransform.
+        extern PopupMenu* MenuPose;
+        MenuPose = new PopupMenu();
+        MenuPose->titulo = "Pose";
+        MenuPose->Agregar("Insert Keyframe", 500, IconType::armature)->atajo = "I"; // guarda la pose en el frame actual
+        MenuPose->Agregar("Transform", 0, -1, MenuTransform); // Move(G)/Rotate(R)/Scale(S) -> ids 100/101/102
         // menu "Mesh" (Edit Mode): comun a vertice/borde/cara. Transform (arriba), Snap y Delete (abajo). Los
         // submenus Snap/Delete se reusan de LayoutInput.cpp. La accion (LayoutAccionMesh) se asigna al abrirlo.
         // submenu Transform de EDIT (como el de objeto pero + Shrink/Fatten, que solo tiene sentido en malla)
@@ -1105,7 +1112,7 @@ void Viewport3D::RenderArmaturasEncima(Object* node){
             // (ACTIVO verde / seleccionado verde-secundario / no seleccionado azul, como el resto de objetos).
             bool activo = (arm == (Armature*)ObjActivo);
             const float* col;
-            if (poseMode)          { static const float negro[4] = {0.0f, 0.0f, 0.0f, 1.0f}; col = negro; }
+            if (poseMode)          { static const float azulH[4] = {0.28f, 0.55f, 1.0f, 1.0f}; col = azulH; } // sin seleccionar = AZUL (el negro se perdia en el fondo)
             else if (activo)         col = ListaColores[(int)ColorID::accent];
             else if (arm->select)    col = ListaColores[(int)ColorID::accentDark];
             else { static const float azul[4] = {0.28f, 0.55f, 1.0f, 1.0f}; col = azul; }
@@ -1683,10 +1690,12 @@ void Viewport3D::RenderUI() {
                                    (g_transformPivot == PivotIndividual) ? (int)IconType::pivotIndividual :
                                    (g_transformPivot == PivotActive)     ? (int)IconType::pivotActive :
                                                                            (int)IconType::pivotMedian;
-            Button* bObj = BarRolBtn(BarButtons, BR_Object);  // "Object" / contexto Vertex/Edge/Face
+            Button* bObj = BarRolBtn(BarButtons, BR_Object);  // "Object" / "Pose" / contexto Vertex/Edge/Face
             if (bObj) {
-                bObj->visible = HayObjetosSeleccionados();
-                bObj->text = !enEdit ? "Object" :
+                bool poseM = (InteractionMode == PoseMode && ObjActivo && ObjActivo->getType() == ObjectType::armature);
+                bObj->visible = HayObjetosSeleccionados() || poseM;
+                bObj->text = poseM ? "Pose" :
+                    !enEdit ? "Object" :
                     (EditSelectMode == SelEdge) ? "Edge" :
                     (EditSelectMode == SelFace) ? "Face" : "Vertex";
             }
@@ -2132,6 +2141,8 @@ void Viewport3D::mouse_button_up(SDL_Event &e){
 void Viewport3D::event_mouse_motion(int mx, int my){
     // el viewport 3D bajo el mouse pasa a ser el ACTIVO (multi-viewport)
     Viewport3DActive = this;
+    // POSE MODE: si hay un transform de huesos en curso (G/R/S), el arrastre lo aplica a la pose y NO orbita/transforma objetos.
+    { extern int g_poseModo; if (g_poseModo){ extern void PoseXformApply(int,int); PoseXformApply((int)dx, (int)dy); return; } }
 
 #ifdef W3D_SYMBIAN
     // estado/input de PC (variables.h): el N95 maneja esto via HID por ahora
@@ -2871,7 +2882,9 @@ void Viewport3D::event_key_down(SDL_Event &e){
                 else SeleccionarTodoForzado();          // A: seleccionar todo
                 break;
             case SDLK_I:
-                if (LCtrlPressed) InvertirSeleccion();  // Ctrl+I: invertir seleccion
+                // Pose Mode: I = Insert Keyframe (guarda la pose de los huesos seleccionados en el frame actual).
+                if (InteractionMode == PoseMode && !LCtrlPressed){ extern void PoseInsertKeyframe(); PoseInsertKeyframe(); }
+                else if (LCtrlPressed) InvertirSeleccion();  // Ctrl+I: invertir seleccion
                 break;
             case SDLK_D: {
                 if (LAltPressed){
@@ -2954,6 +2967,8 @@ void Viewport3D::event_key_down(SDL_Event &e){
                     LoopCutIniciar(lastMouseX, lastMouseY);
                     break;
                 }
+                // POSE MODE: R rota los huesos seleccionados (poseR).
+                if (InteractionMode == PoseMode){ extern void PoseXformStart(int); PoseXformStart(2); break; }
                 // R arranca la rotacion (trackball); R de nuevo alterna
                 // trackball <-> orbital/gimbal (sin tener que ciclar X/Y/Z).
                 // En Edit Mode el transform actua sobre los vertices seleccionados.
@@ -2964,10 +2979,12 @@ void Viewport3D::event_key_down(SDL_Event &e){
                 }
                 break;
             case SDLK_G:
+                if (InteractionMode == PoseMode){ extern void PoseXformStart(int); PoseXformStart(1); break; } // POSE: mover huesos
                 // EditXformStart (no EditXformIniciar directo) -> en Edit Mode CAPTURA el undo del move (Ctrl+Z)
                 if (!EditXformStart(translacion, ViewAxis)) SetPosicion();
                 break;
             case SDLK_S:
+                if (InteractionMode == PoseMode){ extern void PoseXformStart(int); PoseXformStart(3); break; } // POSE: escalar huesos
                 // Alt+S en Edit Mode = Shrink/Fatten (cada vert por su normal). Sin Alt = Scale.
                 if (LAltPressed && InteractionMode == EditMode && g_editMesh) LayoutShrinkFatten();
                 else if (!EditXformStart(EditScale, XYZ)) SetEscala();

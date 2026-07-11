@@ -16,6 +16,7 @@
 #include "objects/Camera.h"
 #include "objects/Empty.h"
 #include "objects/Armature.h"
+#include "animation/SkeletalAnimation.h" // InsertarKeyframeEsqueleto (Pose Mode: Insert Keyframe)
 #include "objects/Instance.h"
 #include "objects/Collection.h"
 #include "objects/ObjectMode.h"
@@ -777,6 +778,8 @@ void LayoutTriangulate() {
 
 static void AccionDelete(int aId); // ejecuta Delete Vertices/Edges/Faces/Edge Loops (ids 361-364); definida mas abajo
 
+// Pose Mode transform (definidos mas abajo): los usan el menu Pose y sus atajos
+void PoseXformStart(int modo); void PoseInsertKeyframe();
 // opcion del menu Object/Mesh y su submenu Transform (ids 100-102, 300=extrude)
 static void LayoutAccionObject(int aId) {
     switch (aId) {
@@ -788,9 +791,10 @@ static void LayoutAccionObject(int aId) {
         case 221: AplicarTransform(1); break;   // Apply Rotation
         case 222: AplicarTransform(2); break;   // Apply Scale
         case 223: AplicarTransform(3); break;   // Apply All Transforms
-        case 100: if (!EditXformStart(translacion, ViewAxis)) SetPosicion(); break; // Move  (G)
-        case 101: if (!EditXformStart(rotacion,    ViewAxis)) SetRotacion(); break; // Rotate(R)
-        case 102: if (!EditXformStart(EditScale,   XYZ))      SetEscala();   break; // Scale (S)
+        case 100: if (InteractionMode==PoseMode) PoseXformStart(1); else if (!EditXformStart(translacion, ViewAxis)) SetPosicion(); break; // Move  (G)
+        case 101: if (InteractionMode==PoseMode) PoseXformStart(2); else if (!EditXformStart(rotacion,    ViewAxis)) SetRotacion(); break; // Rotate(R)
+        case 102: if (InteractionMode==PoseMode) PoseXformStart(3); else if (!EditXformStart(EditScale,   XYZ))      SetEscala();   break; // Scale (S)
+        case 500: PoseInsertKeyframe(); break; // Pose Mode: Insert Keyframe
         case 103: LayoutShrinkFatten(); break; // Shrink/Fatten (Alt+S): cada vert por su normal
         case 300: LayoutExtrudeFaces(); break; // Extrude (segun el modo) (E)
         case 310: LayoutNewFaceEdit(); break;  // Vertex > New Edge/Face from Vertices (F)
@@ -947,6 +951,63 @@ void ActualizarEditMeshActivo() {
         if (!m->modificadores.empty()) SincronizarSkinConModificador(m);
     }
 }
+
+// ===== POSE MODE: transform interactivo de huesos (G/R/S) sobre poseT/R/S de los seleccionados =====
+// Primera version: Grab traslada poseT en el plano de vista; Rotate gira poseR alrededor de un eje (cicla con X/Y/Z);
+// Scale escala poseS uniforme. El pivote (rotate) es el baricentro de los huesos seleccionados. Confirm = click; Cancel = Esc.
+int g_poseModo = 0; // 0=none 1=grab 2=rotate 3=scale
+static int g_poseAxis = 2; // eje de rotacion (0=X 1=Y 2=Z), default Z; cicla con X/Y/Z
+static float g_poseAccX = 0.0f, g_poseAccY = 0.0f;
+struct PoseSnap { int b; Vector3 T, R, S; };
+static std::vector<PoseSnap> g_poseSnap;
+static Armature* PoseArmActiva(){
+    return (InteractionMode == PoseMode && ObjActivo && ObjActivo->getType() == ObjectType::armature) ? (Armature*)ObjActivo : NULL;
+}
+void PoseXformStart(int modo){
+    Armature* a = PoseArmActiva(); if (!a) return;
+    g_poseSnap.clear();
+    for (size_t i = 0; i < a->bones.size(); i++){ W3dBone& b = a->bones[i];
+        if (b.select || (int)i == a->boneActivo){ PoseSnap s; s.b=(int)i; s.T=b.poseT; s.R=b.poseR; s.S=b.poseS; g_poseSnap.push_back(s); } }
+    if (g_poseSnap.empty()) return;
+    g_poseModo = modo; g_poseAxis = 2; g_poseAccX = 0.0f; g_poseAccY = 0.0f;
+}
+static void PoseInvalidar(Armature* a){
+    if (!a) return; a->poseDirty = true;
+    struct L { static void rec(Object* o, Armature* arm){ if (!o) return;
+        if (o->getType()==ObjectType::mesh){ Mesh* m=(Mesh*)o; if (m->skinArmature==arm) m->lastSkinFrame=-999999; }
+        for (size_t i=0;i<o->Childrens.size();i++) rec(o->Childrens[i], arm); } };
+    L::rec(SceneCollection, a);
+    g_redraw = true;
+}
+void PoseXformApply(int dx, int dy){
+    Armature* a = PoseArmActiva(); if (!a || !g_poseModo) return;
+    g_poseAccX += (float)dx; g_poseAccY += (float)dy;
+    for (size_t k = 0; k < g_poseSnap.size(); k++){
+        PoseSnap& s = g_poseSnap[k]; if (s.b < 0 || s.b >= (int)a->bones.size()) continue;
+        W3dBone& b = a->bones[s.b];
+        if (g_poseModo == 1){        // GRAB: traslada en el plano de vista (X pantalla / -Y pantalla). Escala del rig ~grande.
+            b.poseT = s.T + Vector3(g_poseAccX, -g_poseAccY, 0.0f);
+        } else if (g_poseModo == 2){ // ROTATE: mouse-X en grados alrededor del eje elegido (local del hueso)
+            Vector3 d = s.R; float ang = g_poseAccX * 0.5f;
+            if (g_poseAxis==0) d.x += ang; else if (g_poseAxis==1) d.y += ang; else d.z += ang;
+            b.poseR = d;
+        } else if (g_poseModo == 3){ // SCALE: uniforme por mouse-X
+            float f = 1.0f + g_poseAccX * 0.01f; if (f < 0.01f) f = 0.01f;
+            b.poseS = s.S * f;
+        }
+    }
+    PoseInvalidar(a);
+}
+void PoseXformConfirm(){ g_poseModo = 0; g_poseSnap.clear(); } // deja la pose editada (se guarda con Insert Keyframe)
+void PoseXformCancel(){
+    Armature* a = PoseArmActiva();
+    if (a) for (size_t k=0;k<g_poseSnap.size();k++){ PoseSnap& s=g_poseSnap[k]; if (s.b>=0 && s.b<(int)a->bones.size()){
+        a->bones[s.b].poseT=s.T; a->bones[s.b].poseR=s.R; a->bones[s.b].poseS=s.S; } }
+    if (a) PoseInvalidar(a);
+    g_poseModo = 0; g_poseSnap.clear();
+}
+void PoseCiclarEje(int eje){ if (g_poseModo==2){ g_poseAxis = eje; g_poseAccX = g_poseAccY = 0.0f; } } // X/Y/Z cambian el eje de rotacion
+void PoseInsertKeyframe(){ Armature* a = PoseArmActiva(); if (a){ InsertarKeyframeEsqueleto(a); PoseInvalidar(a); } }
 
 // opcion del menu Mode: cambia el modo del objeto ACTIVO.
 //  - MALLA:     Object/Edit/Paint (Edit y Paint todavia son placeholders).
@@ -1195,11 +1256,14 @@ bool LayoutAbrirMenuDeBarra(ViewportBase* vp, int mx, int my) {
         objetivo = MenuMesh; boton = bMesh;
         if (!MenuMesh->action) MenuMesh->action = LayoutAccionMesh;
     } else if (bObj && bObj->visible && bObj->Contains(mx, my)) {
-        // Edit Mode -> menu de contexto Vertex/Edge/Face; Object Mode -> menu "Object".
+        // Edit Mode -> menu de contexto Vertex/Edge/Face; Pose Mode -> menu "Pose"; Object Mode -> menu "Object".
         if (InteractionMode == EditMode) {
             if (MenuAbierto) MenuAbierto->Cerrar();
             LayoutMenuEditContexto(bObj->sx, bObj->sy + bObj->height - GlobalScale);
             return true;
+        } else if (InteractionMode == PoseMode) {
+            extern PopupMenu* MenuPose;
+            if (MenuPose){ objetivo = MenuPose; boton = bObj; if (!MenuPose->action) MenuPose->action = LayoutAccionObject; } // reusa ids 100/101/102/500
         } else if (MenuObject) {
             objetivo = MenuObject; boton = bObj;
             if (!MenuObject->action) MenuObject->action = LayoutAccionObject;

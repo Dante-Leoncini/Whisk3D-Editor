@@ -435,6 +435,11 @@ static void ParsearEsqueleto(const FNode& root, const FNode& objs, EsqueletoFBX&
                 b.restR = LeerP70Vec3(mn, "Lcl Rotation",    Vector3(0,0,0));
                 b.restS = LeerP70Vec3(mn, "Lcl Scaling",     Vector3(1,1,1));
                 b.preRot= LeerP70Vec3(mn, "PreRotation",     Vector3(0,0,0));
+                b.postRot  = LeerP70Vec3(mn, "PostRotation",   Vector3(0,0,0));
+                b.rotPivot = LeerP70Vec3(mn, "RotationPivot",  Vector3(0,0,0));
+                b.rotOffset= LeerP70Vec3(mn, "RotationOffset", Vector3(0,0,0));
+                b.sclPivot = LeerP70Vec3(mn, "ScalingPivot",   Vector3(0,0,0));
+                b.sclOffset= LeerP70Vec3(mn, "ScalingOffset",  Vector3(0,0,0));
                 b.rotOrder = (int)LeerP70D(mn, "RotationOrder", 0);
                 b.hasRest = true;
             }

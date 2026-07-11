@@ -965,11 +965,11 @@ static W3dBone* BoneActivoUI(){
     if (!a || a->boneActivo < 0 || a->boneActivo >= (int)a->bones.size()) return NULL;
     return &a->bones[a->boneActivo];
 }
-// invalida el cache de pose del armature Y el de skinning de las mallas que lo usan (sino, al editar en el MISMO
-// frame, SkinearMesh cortaria por lastSkinFrame y no se veria el cambio).
+// marca la pose como editada (para re-FK sin refrescar desde la curva) e invalida el skin de las mallas que usan
+// este armature (sino, al posar en el MISMO frame, SkinearMesh cortaria por lastSkinFrame y no se veria el cambio).
 static void InvalidarPoseYSkin(Armature* a){
     if (!a) return;
-    a->lastPoseFrame = -999999; a->lastPoseAnim = -999;
+    a->poseDirty = true;
     extern Object* SceneCollection; // ojo: es global del core
     struct L { static void rec(Object* o, Armature* arm){ if (!o) return;
         if (o->getType()==ObjectType::mesh){ Mesh* m=(Mesh*)o; if (m->skinArmature==arm) m->lastSkinFrame=-999999; }
@@ -978,19 +978,20 @@ static void InvalidarPoseYSkin(Armature* a){
 }
 static void AccionBoneTransform(){
     W3dBone* b = BoneActivoUI(); if (!b) return;
-    b->restT = Vector3(g_bonePosX, g_bonePosY, g_bonePosZ);
-    b->restR = Vector3(g_boneRotX, g_boneRotY, g_boneRotZ);
-    b->restS = Vector3(g_boneSclX, g_boneSclY, g_boneSclZ);
+    // se edita la POSE (no el rest): se ve al toque pero NO se guarda en la animacion hasta "Insert Keyframe".
+    b->poseT = Vector3(g_bonePosX, g_bonePosY, g_bonePosZ);
+    b->poseR = Vector3(g_boneRotX, g_boneRotY, g_boneRotZ);
+    b->poseS = Vector3(g_boneSclX, g_boneSclY, g_boneSclZ);
     InvalidarPoseYSkin(ArmActiva());
     g_redraw = true;
 }
-// mirrors <- hueso activo (Rebind / cambio de seleccion): los campos muestran el transform del hueso elegido.
+// mirrors <- hueso activo (Rebind / cambio de seleccion): los campos muestran la POSE actual del hueso elegido.
 static void SincronizarCamposBone(){
     W3dBone* b = BoneActivoUI();
     if (!b) { g_bonePosX=g_bonePosY=g_bonePosZ=0; g_boneRotX=g_boneRotY=g_boneRotZ=0; g_boneSclX=g_boneSclY=g_boneSclZ=1; return; }
-    g_bonePosX=b->restT.x; g_bonePosY=b->restT.y; g_bonePosZ=b->restT.z;
-    g_boneRotX=b->restR.x; g_boneRotY=b->restR.y; g_boneRotZ=b->restR.z;
-    g_boneSclX=b->restS.x; g_boneSclY=b->restS.y; g_boneSclZ=b->restS.z;
+    g_bonePosX=b->poseT.x; g_bonePosY=b->poseT.y; g_bonePosZ=b->poseT.z;
+    g_boneRotX=b->poseR.x; g_boneRotY=b->poseR.y; g_boneRotZ=b->poseR.z;
+    g_boneSclX=b->poseS.x; g_boneSclY=b->poseS.y; g_boneSclZ=b->poseS.z;
 }
 static void AccionVertColorMode() {   // toggle Per-Vertex / Per-Corner de la capa de color activa
     Mesh* m = VerticesMesh(); if (!m) return;

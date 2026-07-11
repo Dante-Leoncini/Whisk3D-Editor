@@ -48,6 +48,10 @@ build-*/
 *.sis
 *.sisx
 
+# log de la app (se genera al correr; no se sube)
+whisk3d.log
+*.log
+
 # ===============================
 # WINDOWS / VISUAL STUDIO
 # ===============================

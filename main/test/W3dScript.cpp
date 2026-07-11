@@ -175,9 +175,34 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         }
         printf("      [bind] bones=%d  |FK-rest - TransformLink| avg=%.3f worst=%.3f (%s)\n",
                n, n?sum/n:0.0, worst, worstB>=0?a->bones[worstB].name.c_str():"-");
+        // pivots/offsets FBX: si son != 0, el FK debe aplicarlos (sino no coincide con el TransformLink)
+        { int nPiv=0; for (size_t i=0;i<a->bones.size();i++){ W3dBone& b=a->bones[i];
+            if (b.rotPivot.Length()>0.01f||b.rotOffset.Length()>0.01f||b.sclPivot.Length()>0.01f||b.postRot.Length()>0.01f) nPiv++; }
+          printf("      [bind] huesos con pivot/offset/postRot != 0: %d de %d\n", nPiv, (int)a->bones.size());
+          if (worstB>=0){ W3dBone& b=a->bones[worstB];
+            printf("      [bind]   %s rotPivot=(%.2f,%.2f,%.2f) rotOffset=(%.2f,%.2f,%.2f) postRot=(%.2f,%.2f,%.2f) preRot=(%.2f,%.2f,%.2f)\n",
+                b.name.c_str(), b.rotPivot.x,b.rotPivot.y,b.rotPivot.z, b.rotOffset.x,b.rotOffset.y,b.rotOffset.z,
+                b.postRot.x,b.postRot.y,b.postRot.z, b.preRot.x,b.preRot.y,b.preRot.z); } }
         if (worstB>=0){ Vector3 tl(a->bones[worstB].bind.m[12],a->bones[worstB].bind.m[13],a->bones[worstB].bind.m[14]);
             printf("      [bind]   %s FK-rest=(%.2f,%.2f,%.2f) TransformLink=(%.2f,%.2f,%.2f)\n", a->bones[worstB].name.c_str(),
                    a->bones[worstB].poseHead.x,a->bones[worstB].poseHead.y,a->bones[worstB].poseHead.z, tl.x,tl.y,tl.z); }
+        return true;
+    }
+    // ---- posekey : posa el hueso 5 (poseR=Y45), inserta keyframe en frame 10, re-evalua y verifica el roundtrip ----
+    if (cmd == "posekey") {
+        Armature* a = (ObjActivo && ObjActivo->getType()==ObjectType::armature) ? (Armature*)ObjActivo : NULL;
+        if (!a || a->bones.size() < 6) { err="posekey: sin armature (o <6 huesos)"; return false; }
+        a->boneActivo = 5; a->bones[5].select = true;
+        CurrentFrame = 10; a->lastPoseFrame = -999999; EvaluarPoseEsqueleto(a, 10); // pose base del frame
+        a->bones[5].poseR = a->bones[5].poseR + Vector3(0, 45, 0); // posar: +45 en Y
+        a->poseDirty = true;
+        InsertarKeyframeEsqueleto(a); // guarda la pose en la curva
+        // re-evaluar DESDE la curva en frame 10 -> debe reproducir el poseR guardado
+        a->lastPoseFrame = -999999; a->poseDirty = false;
+        Vector3 antes = a->bones[5].poseR;
+        EvaluarPoseEsqueleto(a, 10);
+        printf("      [posekey] bone5 poseR guardado=(%.1f,%.1f,%.1f) reevaluado=(%.1f,%.1f,%.1f) clips=%d\n",
+               antes.x,antes.y,antes.z, a->bones[5].poseR.x,a->bones[5].poseR.y,a->bones[5].poseR.z, (int)a->animations.size());
         return true;
     }
     // ---- skinformula <0|1> : elige la formula de skinning (A/B testing headless) ----
@@ -195,11 +220,15 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         // representante render-vert de cada control-point (posiciones duplicadas por corner son identicas)
         std::map<int,int> rep;
         for (int ri=0; ri<nv; ri++) if (!rep.count(m->vertCtrlPoint[ri])) rep[m->vertCtrlPoint[ri]] = ri;
-        // pose REST (sin clip) -> baseline
+        // pose BIND -> baseline. Si el skinning usa el TransformLink real (banana), el bind es b.head/b.tail
+        // (donde fue skinneada la malla), NO la Lcl-rest del FK. Sino (LISA) el baseline es el FK-rest.
         int animSave = a->animActiva; a->animActiva = -1; a->lastPoseFrame = -999999;
         EvaluarPoseEsqueleto(a, f);
         std::vector<Vector3> rH(a->bones.size()), rT(a->bones.size());
-        for (size_t b=0;b<a->bones.size();b++){ rH[b]=a->bones[b].poseHead; rT[b]=a->bones[b].poseTail; }
+        for (size_t b=0;b<a->bones.size();b++){
+            if (a->skinUsaBind){ rH[b]=a->bones[b].head; rT[b]=a->bones[b].tail; }   // bind real (TransformLink)
+            else               { rH[b]=a->bones[b].poseHead; rT[b]=a->bones[b].poseTail; } // FK-rest (LISA)
+        }
         // pose ANIMADA + skin
         a->animActiva = animSave; a->lastPoseFrame = -999999; m->lastSkinFrame = -999999;
         CurrentFrame = f;

@@ -137,6 +137,8 @@ void CiclarPlanoTransform(int eje){
 }
 
 void Cancelar(){
+	// POSE MODE: si hay un transform de huesos en curso, se cancela ese (restaura la pose previa) y listo.
+	{ extern int g_poseModo; if (g_poseModo){ extern void PoseXformCancel(); PoseXformCancel(); return; } }
 	// Mostrar el cursor
 #ifndef W3D_SYMBIAN
 	#if SDL_MAJOR_VERSION == 2
