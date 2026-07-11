@@ -15,6 +15,8 @@
 #include "objects/Camera.h"   // selector de target de la camara
 #include "objects/Instance.h" // selector de target de instance/array/mirror
 #include "edit/Modifier.h"    // ModifierType (ids del menu Add del stack de modificadores)
+#include "objects/Armature.h" // pestania Animation: clips del esqueleto
+#include "animation/SkeletalAnimation.h" // CrearAnimacion/BorrarAnimacionActiva/MoverAnimacionActiva
 #include "importers/import_obj.h" // ExportOBJ (boton Wavefront.obj de la tarjeta Export)
 #include "render/OpcionesRender.h" // g_redraw (scroll de la lista con la rueda)
 #include "ViewPorts/ViewPort3D.h"  // Viewport3D::RenderAPNG + Viewport3DActive (render a PNG)
@@ -208,6 +210,16 @@ static std::string UniqVGroup(const std::string& n, std::string* excl){
         for (size_t i = 0; i < m->vertexGroups.size(); i++) v.push_back(&m->vertexGroups[i]->nombre); }
     return UniqueNombre(n, excl, v);
 }
+// armature activo (o NULL): fuente de la pestania Animation
+static Armature* ArmActiva(){
+    return (ObjActivo && ObjActivo->getType() == ObjectType::armature) ? (Armature*)ObjActivo : NULL;
+}
+static std::string UniqAnim(const std::string& n, std::string* excl){
+    std::vector<std::string*> v;
+    if (Armature* a = ArmActiva())
+        for (size_t i = 0; i < a->animations.size(); i++) v.push_back(&a->animations[i]->name);
+    return UniqueNombre(n, excl, v);
+}
 static void RecolectarNombresObj(Object* o, std::vector<std::string*>& v){
     v.push_back(&o->name);
     for (size_t i = 0; i < o->Childrens.size(); i++) RecolectarNombresObj(o->Childrens[i], v);
@@ -291,6 +303,12 @@ static void AccionRenameGroup(){
     Mesh* m = (Mesh*)ObjActivo;
     if (m->grupoActivo < 0 || m->grupoActivo >= (int)m->vertexGroups.size()) return;
     RenameIniciar(PropsActivo->propBtnRenameGroup->button, &m->vertexGroups[m->grupoActivo]->nombre, UniqVGroup);
+}
+static void AccionRenameAnim(){
+    Armature* a = ArmActiva();
+    if (!a || !PropsActivo || !PropsActivo->propBtnRenameAnim) return;
+    if (a->animActiva < 0 || a->animActiva >= (int)a->animations.size()) return;
+    RenameIniciar(PropsActivo->propBtnRenameAnim->button, &a->animations[a->animActiva]->name, UniqAnim);
 }
 // NOMBRE del objeto: el campo propNameObj muestra ObjActivo->name (cuando NO se edita) y, al perder el foco,
 // escribe lo tipeado (uniquificado) en ObjActivo->name. Se llama por frame desde RefreshTargetProperties.
@@ -494,6 +512,7 @@ static void AccionMenuAddModifier(){
         MenuAddModifier->Agregar("Array",               ModifierType::Array);
         MenuAddModifier->Agregar("Subdivision Surface", ModifierType::SubdivisionSurface);
         MenuAddModifier->Agregar("Boolean",             ModifierType::Boolean);
+        MenuAddModifier->Agregar("Armature",            ModifierType::Armature, (int)IconType::armature);
     }
     if (PropsActivo->propRowMod && !PropsActivo->propRowMod->botones.empty()){
         AbrirMenuBajoBoton(MenuAddModifier, PropsActivo->propRowMod->botones[0]); // el boton "Add"
@@ -645,6 +664,51 @@ static void AccionMenuModTarget(){
     for (size_t i=0;i<gTargetCandidatos.size();i++)
         MenuModTarget->Agregar(gTargetCandidatos[i]->name, 1+(int)i, (int)IconoDeObjeto(gTargetCandidatos[i]));
     AbrirMenuBajoBoton(MenuModTarget, PropsActivo->propMirTarget->button);
+}
+// ===== target del modificador ARMATURE: SOLO esqueletos. Al elegirlo, la malla se skinnea a ese rig =====
+static std::vector<Object*> gArmTargets;
+static void RecolectarArmatures(Object* nodo){
+    if (!nodo) return;
+    for (size_t i = 0; i < nodo->Childrens.size(); i++){ Object* c = nodo->Childrens[i];
+        if (c->getType() == ObjectType::armature) gArmTargets.push_back(c);
+        RecolectarArmatures(c); }
+}
+// sincroniza mesh->skinArmature con el target del modificador Armature del stack (o NULL si no hay)
+static void ActualizarSkinArmature(Mesh* m){
+    if (!m) return;
+    Object* arm = NULL;
+    bool enEdit = ((Object*)m == g_editMesh); // en Edit Mode se respeta "Display in Edit Mode"
+    for (size_t i = 0; i < m->modificadores.size(); i++){
+        Modifier* md = m->modificadores[i];
+        if (md->tipo != ModifierType::Armature) continue;
+        // el modificador MANDA sobre el skinning: target=none, "Display in viewport" OFF, o (en Edit) "Display in
+        // Edit Mode" OFF -> NO se deforma (la malla se ve en bind, igual que con target=none).
+        if (!md->target || !md->mostrarViewport || (enEdit && !md->mostrarEdit)) arm = NULL;
+        else arm = md->target;
+        break;
+    }
+    if ((Object*)m->skinArmature != arm){ m->skinArmature = (Armature*)arm; m->lastSkinFrame = -999999; g_redraw = true; }
+}
+// wrapper publico: lo llama el update por-frame (ActualizarEditMeshActivo) para que "Display in viewport/Edit"
+// y el cambio de modo (entrar/salir de Edit) actualicen el skinning aunque el panel de Propiedades no este abierto.
+void SincronizarSkinConModificador(Mesh* m){ ActualizarSkinArmature(m); }
+static PopupMenu* MenuArmTarget = NULL;
+static void AccionArmTargetElegido(int id){
+    Modifier* mod = ModActivoUI(); if (!mod) return;
+    int idx = id - 1;
+    mod->target = (idx >= 0 && idx < (int)gArmTargets.size()) ? gArmTargets[idx] : NULL;
+    if (ObjActivo && ObjActivo->getType() == ObjectType::mesh) ActualizarSkinArmature((Mesh*)ObjActivo);
+    g_redraw = true;
+}
+static void AccionMenuArmTarget(){
+    if (!PropsActivo || !PropsActivo->propArmTarget) return;
+    if (!MenuArmTarget){ MenuArmTarget = new PopupMenu(); MenuArmTarget->action = AccionArmTargetElegido; }
+    MenuArmTarget->Limpiar();
+    MenuArmTarget->Agregar("None", 0);
+    gArmTargets.clear(); RecolectarArmatures(SceneCollection);
+    for (size_t i = 0; i < gArmTargets.size(); i++)
+        MenuArmTarget->Agregar(gArmTargets[i]->name, 1 + (int)i, (int)IconType::armature);
+    AbrirMenuBajoBoton(MenuArmTarget, PropsActivo->propArmTarget->button);
 }
 // menu "Axis" del Screw: dropdown X/Y/Z (como el modo de rotacion; nada de pestaña rara)
 static PopupMenu* MenuScrewAxis = NULL;
@@ -845,6 +909,13 @@ static void HacerRenderImage(){
     else             Notificar("Error: could not save the render", true);
 }
 // boton "Render Image": arma Path + File name; si el PNG (pase beauty) ya existe, pide confirmacion.
+// FPS de reproduccion de animaciones (pestania Render): espejo float del global AnimFPS
+static float g_animFpsF = 30.0f;
+static PropFloat* gPropAnimFps = NULL; // el campo "FPS" (para sincronizar su display con AnimFPS)
+static void AccionAnimFps(){ int f = (int)(g_animFpsF + 0.5f); if (f < 1) f = 1; if (f > 120) f = 120; AnimFPS = f; g_animFpsF = (float)f; }
+// el campo FPS SIEMPRE refleja el AnimFPS real (que el import cambia al fps del archivo). Sin esto, el campo
+// mostraba 30 pero se reproducia a 24 -> "no se que pasa". Lo llama RefreshTargetProperties cada frame.
+void SincronizarAnimFps(){ if (gPropAnimFps && g_propFloatEditando != gPropAnimFps) g_animFpsF = (float)AnimFPS; }
 static void AccionRenderImage(){
     if (!PropsActivo) return;
     if (!Viewport3DActive) { Notificar("No active 3D viewport", true); return; }
@@ -878,6 +949,49 @@ static void AccionVertAddGroup()  { Mesh* m = VerticesMesh(); if (m) { CrearVert
 static void AccionVertDelGroup()  { Mesh* m = VerticesMesh(); if (m) { BorrarVertexGroupActivo(m);  PropertiesLayoutDirty = true; g_redraw = true; } }
 static void AccionVertGroupUp()   { Mesh* m = VerticesMesh(); if (m) { MoverVertexGroupActivo(m,-1); PropertiesLayoutDirty = true; g_redraw = true; } }
 static void AccionVertGroupDown() { Mesh* m = VerticesMesh(); if (m) { MoverVertexGroupActivo(m,+1); PropertiesLayoutDirty = true; g_redraw = true; } }
+// ARMATURE: crear / borrar / mover el clip de animacion activo (mismo patron que los vertex groups)
+static void AccionAnimAdd()  { Armature* a = ArmActiva(); if (a) { CrearAnimacion(a);         PropertiesLayoutDirty = true; g_redraw = true; } }
+static void AccionAnimDel()  { Armature* a = ArmActiva(); if (a) { BorrarAnimacionActiva(a);  PropertiesLayoutDirty = true; g_redraw = true; } }
+static void AccionAnimUp()   { Armature* a = ArmActiva(); if (a) { MoverAnimacionActiva(a,-1); PropertiesLayoutDirty = true; g_redraw = true; } }
+static void AccionAnimDown() { Armature* a = ArmActiva(); if (a) { MoverAnimacionActiva(a,+1); PropertiesLayoutDirty = true; g_redraw = true; } }
+// ARMATURE / Pose Mode: transform del HUESO activo. Los campos PropFloat escriben en estos mirrors; el callback los
+// vuelca a restT/restR/restS del hueso (la pose de rest, que es la que se ve cuando el clip activo no anima ese hueso).
+static float g_bonePosX=0, g_bonePosY=0, g_bonePosZ=0;
+static float g_boneRotX=0, g_boneRotY=0, g_boneRotZ=0;
+static float g_boneSclX=1, g_boneSclY=1, g_boneSclZ=1;
+static void BoneParentNoop(){} // el campo "Parent" es solo lectura (onClick no-op -> no se edita)
+static W3dBone* BoneActivoUI(){
+    Armature* a = ArmActiva();
+    if (!a || a->boneActivo < 0 || a->boneActivo >= (int)a->bones.size()) return NULL;
+    return &a->bones[a->boneActivo];
+}
+// invalida el cache de pose del armature Y el de skinning de las mallas que lo usan (sino, al editar en el MISMO
+// frame, SkinearMesh cortaria por lastSkinFrame y no se veria el cambio).
+static void InvalidarPoseYSkin(Armature* a){
+    if (!a) return;
+    a->lastPoseFrame = -999999; a->lastPoseAnim = -999;
+    extern Object* SceneCollection; // ojo: es global del core
+    struct L { static void rec(Object* o, Armature* arm){ if (!o) return;
+        if (o->getType()==ObjectType::mesh){ Mesh* m=(Mesh*)o; if (m->skinArmature==arm) m->lastSkinFrame=-999999; }
+        for (size_t i=0;i<o->Childrens.size();i++) rec(o->Childrens[i], arm); } };
+    L::rec(SceneCollection, a);
+}
+static void AccionBoneTransform(){
+    W3dBone* b = BoneActivoUI(); if (!b) return;
+    b->restT = Vector3(g_bonePosX, g_bonePosY, g_bonePosZ);
+    b->restR = Vector3(g_boneRotX, g_boneRotY, g_boneRotZ);
+    b->restS = Vector3(g_boneSclX, g_boneSclY, g_boneSclZ);
+    InvalidarPoseYSkin(ArmActiva());
+    g_redraw = true;
+}
+// mirrors <- hueso activo (Rebind / cambio de seleccion): los campos muestran el transform del hueso elegido.
+static void SincronizarCamposBone(){
+    W3dBone* b = BoneActivoUI();
+    if (!b) { g_bonePosX=g_bonePosY=g_bonePosZ=0; g_boneRotX=g_boneRotY=g_boneRotZ=0; g_boneSclX=g_boneSclY=g_boneSclZ=1; return; }
+    g_bonePosX=b->restT.x; g_bonePosY=b->restT.y; g_bonePosZ=b->restT.z;
+    g_boneRotX=b->restR.x; g_boneRotY=b->restR.y; g_boneRotZ=b->restR.z;
+    g_boneSclX=b->restS.x; g_boneSclY=b->restS.y; g_boneSclZ=b->restS.z;
+}
 static void AccionVertColorMode() {   // toggle Per-Vertex / Per-Corner de la capa de color activa
     Mesh* m = VerticesMesh(); if (!m) return;
     if (m->colorActivo >= 0 && m->colorActivo < (int)m->colorLayers.size()) {
@@ -1089,6 +1203,13 @@ void Properties::ConstruirGrupos(){
     propRenderH->stepFino = 1.0f; propRenderH->stepGrueso = 16.0f; propRenderH->dragStep = 1.0f;
     propRenderH->value = &renderH; propRenderH->onChange = ActualizarAspectoRender;
     propRender->properties.push_back(propRenderH);
+    // FPS de reproduccion de las animaciones (default 30). La UI puede ir a 60; el frame se repite sin recalcular.
+    { PropFloat* propFps = new PropFloat("FPS");
+      propFps->SetRango(1.0f, 120.0f); propFps->entero = true;
+      propFps->stepFino = 1.0f; propFps->stepGrueso = 5.0f; propFps->dragStep = 1.0f;
+      g_animFpsF = (float)AnimFPS; propFps->value = &g_animFpsF; propFps->onChange = AccionAnimFps;
+      gPropAnimFps = propFps; // para sincronizar el display con AnimFPS
+      propRender->properties.push_back(propFps); }
     // pases EXTRA a exportar (el beauty/render siempre se guarda). Nombre: base_zbuffer_0001.png, etc.
     renderZbuffer = false; renderNormal = false; renderAlpha = false;
     propRenderZbuffer = new PropBool("ZBuffer"); propRenderZbuffer->value = &renderZbuffer;
@@ -1157,6 +1278,42 @@ void Properties::ConstruirGrupos(){
     propRowGroupOps->Agregar("Move Down", AccionVertGroupDown);
     propVertexGroups->properties.push_back(propRowGroupOps);
     GroupProperties.push_back(propVertexGroups);
+
+    // ===== pestania ARMATURE: tarjeta "Animation" (lista de clips del esqueleto + Add / Rename / Delete / Move) =====
+    // MISMO componente que la lista de vertex groups (PropListMeshParts), pero en modo 5 (lee arm->animations).
+    propArmAnim = new GroupPropertie("Animation");
+    propListAnims = new PropListMeshParts("Animation"); propListAnims->modo = 5;
+    propArmAnim->properties.push_back(propListAnims);
+    PropButton* pbAddAnim = new PropButton("Add Animation", IconType::armature);
+    pbAddAnim->action = AccionAnimAdd;
+    propArmAnim->properties.push_back(pbAddAnim);
+    propBtnRenameAnim = new PropButton("Rename", -1); // renombra el clip activo (nombre unico por armature)
+    propBtnRenameAnim->action = AccionRenameAnim;
+    propArmAnim->properties.push_back(propBtnRenameAnim);
+    // fila Delete | Move Up | Move Down (Delete si hay >=1; Move si hay >=2)
+    propRowAnimOps = new PropButtonRow();
+    propRowAnimOps->Agregar("Delete",    AccionAnimDel);
+    propRowAnimOps->Agregar("Move Up",   AccionAnimUp);
+    propRowAnimOps->Agregar("Move Down", AccionAnimDown);
+    propArmAnim->properties.push_back(propRowAnimOps);
+    GroupProperties.push_back(propArmAnim);
+
+    // ===== pestania ARMATURE: tarjeta "Bones" (Pose Mode): lista de huesos + parent + pos/rot/scale del hueso activo =====
+    propArmBones = new GroupPropertie("Bones");
+    propListBones = new PropListMeshParts("Bones"); propListBones->modo = 6; // lee arm->bones (mismo componente de lista)
+    propArmBones->properties.push_back(propListBones);
+    propBoneParent = new PropText("Parent", ""); propBoneParent->onClick = BoneParentNoop; // solo lectura (onClick != NULL)
+    propArmBones->properties.push_back(propBoneParent);
+    { PropFloat* px=new PropFloat("Pos X"); px->value=&g_bonePosX; px->onChange=AccionBoneTransform; propArmBones->properties.push_back(px);
+      PropFloat* py=new PropFloat("Pos Y"); py->value=&g_bonePosY; py->onChange=AccionBoneTransform; propArmBones->properties.push_back(py);
+      PropFloat* pz=new PropFloat("Pos Z"); pz->value=&g_bonePosZ; pz->onChange=AccionBoneTransform; propArmBones->properties.push_back(pz); }
+    { PropFloat* rx=new PropFloat("Rot X"); rx->value=&g_boneRotX; rx->onChange=AccionBoneTransform; propArmBones->properties.push_back(rx);
+      PropFloat* ry=new PropFloat("Rot Y"); ry->value=&g_boneRotY; ry->onChange=AccionBoneTransform; propArmBones->properties.push_back(ry);
+      PropFloat* rz=new PropFloat("Rot Z"); rz->value=&g_boneRotZ; rz->onChange=AccionBoneTransform; propArmBones->properties.push_back(rz); }
+    { PropFloat* sx=new PropFloat("Scale X"); sx->value=&g_boneSclX; sx->onChange=AccionBoneTransform; propArmBones->properties.push_back(sx);
+      PropFloat* sy=new PropFloat("Scale Y"); sy->value=&g_boneSclY; sy->onChange=AccionBoneTransform; propArmBones->properties.push_back(sy);
+      PropFloat* sz=new PropFloat("Scale Z"); sz->value=&g_boneSclZ; sz->onChange=AccionBoneTransform; propArmBones->properties.push_back(sz); }
+    GroupProperties.push_back(propArmBones);
 
     propUVMaps = new GroupPropertie("UV Maps");
     propListUV = new PropListMeshParts("UV Maps"); propListUV->modo = 1;
@@ -1238,6 +1395,10 @@ void Properties::ConstruirGrupos(){
     propMirTarget = new PropButton("Mirror Object", IconType::object);
     propMirTarget->button->desplegable = true; propMirTarget->action = AccionMenuModTarget;
     propModifierProps->properties.push_back(propMirTarget);
+    // Armature: target (dropdown solo esqueletos). La malla se deforma (skinning) al rig elegido.
+    propArmTarget = new PropButton("Target", IconType::armature);
+    propArmTarget->button->desplegable = true; propArmTarget->action = AccionMenuArmTarget;
+    propModifierProps->properties.push_back(propArmTarget);
     // Merge (soldar los verts del plano) + distancia
     propMirMerge = new PropBool("Merge"); propMirMerge->onChange = AccionModParamChanged; propModifierProps->properties.push_back(propMirMerge);
     propMirDist = new PropFloat("Merge Distance", "m"); propMirDist->onChange = AccionModParamChanged;
@@ -1441,6 +1602,7 @@ static PropColor* gColorAbierto = NULL;
 static int gColorSelSx = 0, gColorSelSy = 0;
 
 void Properties::RefreshTargetProperties(){
+    SincronizarAnimFps(); // el campo "FPS" refleja el AnimFPS real (el import lo pone al fps del archivo)
     // al cerrarse el picker, la fila del color pierde el borde verde
     if (gColorAbierto && !PopUpActive) {
         gColorAbierto->editando = false;
@@ -1561,7 +1723,7 @@ Properties::Properties() : ViewportBase() {
     propUVMaps = NULL; propColorLayers = NULL; propVertexGroups = NULL; propVertexAnim = NULL; propModifiers = NULL;
     propListModifiers = NULL; propRowMod = NULL; propRowModMove = NULL; propModifierProps = NULL;
     propModVerViewport = NULL; propModVerEdit = NULL;
-    propModVacio = NULL; propMirX = NULL; propMirY = NULL; propMirZ = NULL; propMirTarget = NULL;
+    propModVacio = NULL; propMirX = NULL; propMirY = NULL; propMirZ = NULL; propMirTarget = NULL; propArmTarget = NULL;
     propMirMerge = NULL; propMirDist = NULL; propMirClip = NULL; propBtnApplyMod = NULL;
     propSubSimple = NULL; propSubLevel = NULL; propSubRender = NULL;
     propScrewAngle = NULL; propScrewHeight = NULL; propScrewSteps = NULL; propScrewRender = NULL;
@@ -1569,6 +1731,8 @@ Properties::Properties() : ViewportBase() {
     propScrewSmooth = NULL; propScrewMerge = NULL; propScrewFlip = NULL;
     propListUV = NULL; propListColor = NULL; propListVertGroups = NULL; propBtnColorMode = NULL;
     propRowUVOps = NULL; propRowColorOps = NULL; propRowGroupOps = NULL; propBtnRenameGroup = NULL;
+    propArmAnim = NULL; propListAnims = NULL; propBtnRenameAnim = NULL; propRowAnimOps = NULL;
+    propArmBones = NULL; propListBones = NULL; propBoneParent = NULL;
     propRotMode = NULL;
     propMsgDefault = NULL; propSepMat = NULL;
     propMaterial = NULL; propBtnRenameMat = NULL;
@@ -1614,13 +1778,15 @@ void Properties::ActualizarPestanias(){
     bool esLuz  = (tipo == (int)ObjectType::light);
     bool esCam  = (tipo == (int)ObjectType::camera);
     bool esInst = (tipo == (int)ObjectType::instance);
-    bool hayTab3 = esMesh || esLuz || esCam || esInst; // 3ra pestania (contextual)
+    bool esArm  = (tipo == (int)ObjectType::armature);
+    bool hayTab3 = esMesh || esLuz || esCam || esInst || esArm; // 3ra pestania (contextual)
 
     if (BarTabs.size() >= 3){
         BarTabs[2]->visible = hayTab3;
         int icono = (int)IconType::material;          // mesh
         if (esLuz)       icono = (int)IconType::light;
         else if (esCam)  icono = (int)IconType::camera;
+        else if (esArm)  icono = (int)IconType::armature;      // esqueleto: pestania Animation
         else if (esInst) icono = (int)IconoDeObjeto(ObjActivo); // instance/array/mirror
         BarTabs[2]->icon = icono;
     }
@@ -1650,6 +1816,38 @@ void Properties::ActualizarPestanias(){
     if (propLight)     propLight->visible     = (pestaniaActiva == 2 && esLuz);
     if (propCamera)    propCamera->visible    = (pestaniaActiva == 2 && esCam);
     if (propInstance)  propInstance->visible  = (pestaniaActiva == 2 && esInst);
+    // pestania ARMATURE: tarjeta "Animation" (clips del esqueleto). Bindeo + visibilidad de Delete/Move mas abajo.
+    bool armTab = (pestaniaActiva == 2 && esArm);
+    if (propArmAnim) propArmAnim->visible = armTab;
+    if (armTab) {
+        Armature* a = (Armature*)ObjActivo;
+        if (propListAnims) propListAnims->arm = a;             // la lista sigue al armature activo (modo 5)
+        int na = (int)a->animations.size();
+        if (propRowAnimOps && propRowAnimOps->botones.size() >= 3) {
+            propRowAnimOps->botones[0]->visible = (na >= 1);   // Delete: con >=1 clip
+            bool hay2 = (na >= 2);                             // Move Up/Down: con >=2 clips (reordenar tiene sentido)
+            propRowAnimOps->botones[1]->visible = hay2;
+            propRowAnimOps->botones[2]->visible = hay2;
+        }
+        if (propBtnRenameAnim) propBtnRenameAnim->oculto = (na < 1); // Rename: solo si hay un clip activo
+    }
+    // tarjeta "Bones" (Pose Mode): lista de huesos + parent + transform del hueso activo
+    if (propArmBones) propArmBones->visible = armTab;
+    if (armTab) {
+        Armature* a = (Armature*)ObjActivo;
+        if (propListBones) propListBones->arm = a;
+        // sincronizar los campos SOLO al cambiar de hueso (sino se pisaria lo que el usuario esta tipeando)
+        static int lastBoneSync = -999; static Armature* lastArm = NULL;
+        if (a->boneActivo != lastBoneSync || a != lastArm) {
+            SincronizarCamposBone();
+            lastBoneSync = a->boneActivo; lastArm = a;
+            if (propBoneParent) {
+                W3dBone* b = BoneActivoUI();
+                std::string pn = (b && b->parent >= 0 && b->parent < (int)a->bones.size()) ? a->bones[b->parent].name : std::string("-");
+                propBoneParent->field.SetText(pn);
+            }
+        }
+    }
     bool vertTab = (pestaniaActiva == 3 && esMesh);
     // card "Transform" (X/Y/Z de la seleccion): solo en Edit Mode con algo seleccionado. Recalcula el centro LOCAL
     // cada frame y lo mapea a los campos con la convencion Z-up del panel (campo Y = local z, campo Z = local y).
@@ -1693,7 +1891,7 @@ void Properties::ActualizarPestanias(){
         // display toggles: para CUALQUIER modificador seleccionado (no solo Mirror)
         if (propModVerViewport) propModVerViewport->value = haySel ? &mod->mostrarViewport : NULL;
         if (propModVerEdit)     propModVerEdit->value     = haySel ? &mod->mostrarEdit : NULL;
-        if (propModVacio) propModVacio->oculto = (esMirror || esSub || esScrew); // "(no properties yet)" solo tipos sin params
+        if (propModVacio) propModVacio->oculto = (esMirror || esSub || esScrew || (mod && mod->tipo==ModifierType::Armature)); // "(no properties yet)" solo tipos sin params
         if (propSubSimple) propSubSimple->value = esSub ? &mod->subSimple    : NULL;
         if (propSubLevel)  propSubLevel->value  = esSub ? &mod->subLevel      : NULL;
         if (propSubRender) propSubRender->value = esSub ? &mod->subRenderLevel: NULL;
@@ -1717,6 +1915,10 @@ void Properties::ActualizarPestanias(){
         if (propMirClip)  propMirClip->value  = esMirror ? &mod->clipping : NULL;
         if (propMirTarget) { propMirTarget->oculto = !esMirror;
             if (esMirror) propMirTarget->button->text = mod->target ? mod->target->name : std::string("None"); }
+        bool esArmMod = (mod && mod->tipo == ModifierType::Armature);
+        if (propArmTarget) { propArmTarget->oculto = !esArmMod;
+            if (esArmMod) propArmTarget->button->text = mod->target ? mod->target->name : std::string("None"); }
+        if (esArmMod) ActualizarSkinArmature(mm); // mantener skinArmature en sync con el modificador
         if (propBtnApplyMod) propBtnApplyMod->oculto = !haySel; // Apply: con cualquier modificador seleccionado
     } else if (propModifierProps) propModifierProps->visible = false;
 
@@ -2583,8 +2785,9 @@ void Properties::ClickEn(int mx, int my) {
                             // selector de color (popup); la fila queda
                             // con BORDE VERDE mientras se edita
                             if (!colorPicker) colorPicker = new ColorPicker();
-                            colorPicker->Abrir(pc->value,
-                                x + PosX + borderGS + borderGS, yFila);
+                            // abrir CERCA del click (con el cursor DENTRO del popup, arriba-izq): antes se abria pegado
+                            // al borde IZQUIERDO del panel, lejos del mouse -> al acercarse "salia del area" y se cerraba.
+                            colorPicker->Abrir(pc->value, mx - GlobalScale * 10, my - GlobalScale * 6);
                             pc->editando = true;
                             gColorAbierto = pc;
                         }

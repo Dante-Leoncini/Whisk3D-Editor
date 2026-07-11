@@ -117,6 +117,7 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropLabel* propModVacio;   // "(no properties yet)" para tipos sin params todavia
         PropBool*  propMirX; PropBool* propMirY; PropBool* propMirZ; // ejes
         PropButton* propMirTarget; // "Mirror Object" (dropdown: cualquier objeto)
+        PropButton* propArmTarget; // "Target" del modificador Armature (dropdown: solo esqueletos)
         PropBool*  propMirMerge; PropFloat* propMirDist; PropBool* propMirClip; // merge + distancia + clipping
         // Subdivision Surface: modo (Catmull-Clark/Simple) + niveles viewport/render
         PropBool*  propSubSimple; PropFloat* propSubLevel; PropFloat* propSubRender;
@@ -128,6 +129,16 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropListMeshParts* propListUV;    // lista de UV maps (modo=1)
         PropListMeshParts* propListColor; // lista de capas de color (modo=2)
         PropListMeshParts* propListVertGroups; // lista de grupos de vertices / huesos (modo=4)
+        // pestania ARMATURE (icono esqueleto): tarjeta "Animation" (lista de clips + Add / Rename / Delete / Move).
+        // REUSA PropListMeshParts en modo 5 (lee arm->animations), igual que la lista de vertex groups.
+        GroupPropertie* propArmAnim;       // tarjeta "Animation" (clips del esqueleto)
+        PropListMeshParts* propListAnims;  // lista de clips de animacion (modo=5)
+        PropButton* propBtnRenameAnim;     // "Rename" del clip activo (nombre unico por armature)
+        PropButtonRow* propRowAnimOps;     // fila Delete | Move Up | Move Down de clips
+        // tarjeta "Bones" (Pose Mode): lista de huesos (modo=6) + parent + transform (pos/rot/scale) del hueso activo
+        GroupPropertie* propArmBones;
+        PropListMeshParts* propListBones;  // lista de huesos (modo=6)
+        PropText* propBoneParent;          // hueso padre (solo lectura)
         PropButton* propBtnColorMode;   // toggle Per-Vertex / Per-Corner color
         PropText* propRenderPath;    // campo editable "Path" del render (carpeta de salida)
         PropText* propRenderOutput;  // campo editable "File name" del render (solo el nombre + .png)

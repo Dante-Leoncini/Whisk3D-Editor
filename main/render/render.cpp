@@ -159,34 +159,10 @@ struct MeshOverlayHookReg { MeshOverlayHookReg() { g_meshOverlayHook = MeshOverl
 static MeshOverlayHookReg g_meshOverlayHookReg;
 
 #ifndef W3D_SYMBIAN
-// El Core Light::RenderObject (en PC) llama a este hook para dibujar el GIZMO de la lampara
-// (linea + color segun seleccion). Overlay del EDITOR; en Symbian el icono lo hace RenderIcons3D.
-static void LightOverlayHook(Light* l) {
-    if (!showOverlayGlobal) return;
-    namespace gfx = w3dEngine;
-    if (ObjActivo == (Object*)l && l->select) {
-        gfx::Color4fv(gRenderColors[RC_selActive]);
-    } else if (l->select) {
-        gfx::Color4fv(gRenderColors[RC_gizmoDark]);
-    } else {
-        gfx::Color4fv(gRenderColors[RC_wireframe]);
-    }
-    gfx::Disable(gfx::Lighting);
-    gfx::Disable(gfx::Texture2D);
-    gfx::Disable(gfx::Blend);
-    gfx::DisableArray(gfx::NormalArray);
-    gfx::DisableArray(gfx::ColorArray);
-    gfx::DisableArray(gfx::TexCoordArray);
-    gfx::LineWidth(1);
-    l->GetMatrix(l->M);
-    Vector3 worldPos = l->M * Vector3(0, 0, 0);
-    LineaLightVertex[6] = -worldPos.z;
-    gfx::VertexPointer3f(0, LineaLightVertex);
-    gfx::DrawLinesIndexed(LineaEdgeSize, LineaEdge);
-    gfx::Invalidate();
-}
-struct LightOverlayHookReg { LightOverlayHookReg() { g_lightOverlayHook = LightOverlayHook; } };
-static LightOverlayHookReg g_lightOverlayHookReg;
+// NOTA: la luz se representa con (a) su ICONO (RenderIcons3D/DibujarIcono3D) y (b) la LINEA al piso
+// (RenderLightLines), ambos con color de seleccion y gateados por el toggle "Lights". El viejo hook dibujaba
+// ADEMAS una linea local (0,0,0 -> 0,-3,0) que quedaba mal/redundante -> se quito (pedido Dante). Sin registrar
+// el hook, Light::RenderObject no dibuja ninguna linea extra (g_lightOverlayHook queda NULL).
 #endif // !W3D_SYMBIAN
 
 // Definiciones de funciones
@@ -407,7 +383,8 @@ void DibujarIcono3D(Object* obj){
     obj->GetMatrix(obj->M);
     w3dEngine::MultMatrix(obj->M.m);
 
-    if (obj->getType() == ObjectType::light){
+    extern bool g_showLights; // toggle "Lights" del submenu "Objects": oculta tambien el icono de la luz
+    if (obj->getType() == ObjectType::light && g_showLights){
         if (ObjActivo == obj && obj->select)
             w3dEngine::Color4fv(ListaColores[static_cast<int>(ColorID::accent)]);
         else if (obj->select)

@@ -6,6 +6,7 @@
 #include "ViewPorts/Outliner.h"
 #include "ViewPorts/Properties.h"
 #include "ViewPorts/UVEditor.h"
+#include "ViewPorts/Timeline.h"
 #include "WhiskUI/glesdraw.h"
 #include "WhiskUI/rectangle.h" // el velo del modo foco
 #include "objects/Objects.h"
@@ -47,6 +48,7 @@ static ViewportBase* LayoutCrearViewport(int aId) {
         case 1: return new Outliner();
         case 2: return new Properties();
         case 3: return new UVEditor();
+        case 4: return new Timeline();
     }
     return NULL;
 }
@@ -318,10 +320,11 @@ static void LayoutAccionTipo(int aId) {
     ViewportBase* vp = gMenuTipoDe;
     gMenuTipoDe = NULL;
     if (aId >= 100) return; // ids de los checkbox del UV editor: el item los togglea solo
-    if (aId == 7) { LayoutMaximizar(); return; }          // Maximize / Minimize (fullscreen del activo)
-    if (aId == 4) { LayoutExpandir(vp); return; }
-    if (aId == 5) { LayoutDividir(vp, true); return; }   // Split Row
-    if (aId == 6) { LayoutDividir(vp, false); return; }  // Split Column
+    // acciones de layout: ids ALTOS para no chocar con los tipos de viewport (0..9 = tipos)
+    if (aId == 23) { LayoutMaximizar(); return; }         // Maximize / Minimize (fullscreen del activo)
+    if (aId == 20) { LayoutExpandir(vp); return; }
+    if (aId == 21) { LayoutDividir(vp, true); return; }   // Split Row
+    if (aId == 22) { LayoutDividir(vp, false); return; }  // Split Column
     if (vp->ViewportKind() == aId + 1) return; // ya es de ese tipo
     int w = rootViewport->width;
     int h = rootViewport->height;
@@ -938,17 +941,42 @@ void ActualizarEditMeshActivo() {
     if (ObjActivo && ObjActivo->getType() == ObjectType::mesh) {
         Mesh* m = (Mesh*)ObjActivo;
         if (!m->modificadores.empty() && !m->genValido) { m->GenerarMallaModificada(); g_redraw = true; }
+        // SKINNING: sincronizar con el modificador Armature (target / "Display in viewport" / "Display in Edit Mode").
+        // Barato (recorre modificadores); mantiene el skinning coherente con los flags y el modo actual.
+        extern void SincronizarSkinConModificador(Mesh*);
+        if (!m->modificadores.empty()) SincronizarSkinConModificador(m);
     }
 }
 
-// opcion del menu Mode: cambia el modo del objeto ACTIVO (Object/Edit/Paint).
-// Solo aplica a una MALLA; Edit y los Paint todavia no hacen nada (placeholder).
+// opcion del menu Mode: cambia el modo del objeto ACTIVO.
+//  - MALLA:     Object/Edit/Paint (Edit y Paint todavia son placeholders).
+//  - ARMATURE:  Object / Edit (placeholder) / Pose (posa el esqueleto).
 static void LayoutAccionMode(int aId) {
     if (ObjActivo && ObjActivo->getType() == ObjectType::mesh)
         InteractionMode = aId;
+    else if (ObjActivo && ObjActivo->getType() == ObjectType::armature)
+        InteractionMode = (aId == PoseMode || aId == EditMode) ? aId : ObjectMode; // Object/Edit/Pose
     else
         InteractionMode = ObjectMode;
     ActualizarEditMeshActivo(); // refresca g_editMesh (PC + Symbian)
+}
+
+// REARMA el menu Mode segun el objeto activo (como LayoutRebuildMenuSelect):
+//   malla -> Object/Edit/Vertex/Weight/Texture ; armature -> Object/Edit/Pose.
+// Asi el mismo boton sirve para los dos tipos sin mostrar modos que no aplican.
+static void LayoutRebuildMenuMode() {
+    if (!MenuMode) return;
+    MenuMode->Limpiar();
+    bool esArm = (ObjActivo && ObjActivo->getType() == ObjectType::armature);
+    MenuMode->Agregar("Object Mode", ObjectMode, IconType::object);
+    MenuMode->Agregar("Edit Mode",   EditMode,   esArm ? IconType::armature : IconType::mesh);
+    if (esArm) {
+        MenuMode->Agregar("Pose Mode", PoseMode, IconType::armature);
+    } else {
+        MenuMode->Agregar("Vertex Paint",  VertexPaint,  IconType::mesh);
+        MenuMode->Agregar("Weight Paint",  WeightPaint,  IconType::mesh);
+        MenuMode->Agregar("Texture Paint", TexturePaint, IconType::mesh);
+    }
 }
 
 // opcion del menu SelMode (edit): sub-elemento Vertex/Edge/Face. Al cambiar de
@@ -976,16 +1004,17 @@ void LayoutAbrirMenuTipo(ViewportBase* aVp) {
     gMenuTipo->Limpiar();
     if (LayoutEstaMaximizado()) {
         // en FULLSCREEN no se cambia tipo/split/expand: solo restaurar el layout
-        gMenuTipo->Agregar("Minimize", 7);
+        gMenuTipo->Agregar("Minimize", 23);
     } else {
         gMenuTipo->Agregar("3D Viewport", 0);
         gMenuTipo->Agregar("Outliner", 1);
         gMenuTipo->Agregar("Properties", 2);
         gMenuTipo->Agregar("UV Editor", 3);
-        if (aVp != rootViewport) gMenuTipo->Agregar("Expand", 4);
-        gMenuTipo->Agregar("Split Row", 5);
-        gMenuTipo->Agregar("Split Column", 6);
-        if (aVp != rootViewport) gMenuTipo->Agregar("Maximize", 7); // fullscreen del viewport activo
+        gMenuTipo->Agregar("Timeline", 4);
+        if (aVp != rootViewport) gMenuTipo->Agregar("Expand", 20);
+        gMenuTipo->Agregar("Split Row", 21);
+        gMenuTipo->Agregar("Split Column", 22);
+        if (aVp != rootViewport) gMenuTipo->Agregar("Maximize", 23); // fullscreen del viewport activo
     }
     gMenuTipoDe = aVp;
     if (MenuAbierto && MenuAbierto != gMenuTipo) MenuAbierto->Cerrar();
@@ -1133,6 +1162,7 @@ bool LayoutAbrirMenuDeBarra(ViewportBase* vp, int mx, int my) {
     Button* bSnap = BarRolBtn(B, BR_Snap);
     if (MenuMode && bMode && bMode->visible && bMode->Contains(mx, my)) {
         objetivo = MenuMode; boton = bMode;
+        LayoutRebuildMenuMode();   // mode-aware: malla -> Paints ; armature -> Pose
         if (!MenuMode->action) MenuMode->action = LayoutAccionMode;
     } else if (MenuSelMode && bSelM && bSelM->visible && bSelM->Contains(mx, my)) {
         objetivo = MenuSelMode; boton = bSelM;
@@ -2562,6 +2592,8 @@ bool LayoutClickUI(int mx, int my) {
             ((Properties*)under)->ClickTab(mx, my); // pestanias Objeto/Mesh
         } else if (under->ViewportKind() == 4) {
             LayoutClickBarraUV((UVEditor*)under, mx, my); // boton "View" -> checkboxes
+        } else if (under->ViewportKind() == 5) {
+            ((Timeline*)under)->ClickBarButton(mx, my); // transporte + campos Start/End
         } else {
             LayoutAbrirMenuDeBarra(under, mx, my); // Select/Add/Object/Overlays
         }
@@ -3147,12 +3179,23 @@ static Object* pickFound = NULL;
 static bool PickSeleccionable(Object* obj) {
     if (!obj->visible) return false;
     ObjectType t = obj->getType();
+    // si el overlay de ese TIPO esta oculto (submenu "Objects"), tampoco se puede pickear (no se ve -> no se clickea).
+    extern bool g_showLights, g_showCamera, g_showEmpty;
+    if (t == ObjectType::light  && !g_showLights) return false;
+    if (t == ObjectType::camera && !g_showCamera) return false;
+    if (t == ObjectType::empty  && !g_showEmpty)  return false;
     return t == ObjectType::mesh || t == ObjectType::camera ||
            t == ObjectType::light || t == ObjectType::empty ||
-           t == ObjectType::instance;
+           t == ObjectType::instance || t == ObjectType::armature;
+}
+// pick en 2 pasadas: primero NO-armatures (con z-buffer), despues armatures (XRAY, sin z, encima de todo)
+// para que el esqueleto se pickee EXACTAMENTE como se ve. 'armaturePass' filtra que se pinta/cuenta en cada pasada.
+static bool PickEnPasada(Object* obj, bool armaturePass) {
+    if (!PickSeleccionable(obj)) return false;
+    return (obj->getType() == ObjectType::armature) == armaturePass;
 }
 
-static void PickPaint(Object* obj) {
+static void PickPaint(Object* obj, bool armaturePass) {
     if (!obj) return;
     // IGUAL que Object::Render: se aplica la matriz LOCAL y los hijos se pintan DENTRO de ella (acumulando el
     // transform del padre). Antes el push/pop envolvia solo a este objeto y los hijos se pintaban en el ORIGEN del
@@ -3161,7 +3204,7 @@ static void PickPaint(Object* obj) {
     Matrix4 M;
     obj->GetMatrix(M);
     w3dEngine::MultMatrix(M.m);
-    if (PickSeleccionable(obj)) {
+    if (PickEnPasada(obj, armaturePass)) {
         pickCounter++;
         int id = pickCounter; // 1..N
         w3dEngine::Color4f(((id & 0x1F)) / 31.0f, ((id >> 5) & 0x3F) / 63.0f, 0.0f, 1.0f);
@@ -3176,6 +3219,22 @@ static void PickPaint(Object* obj) {
                 w3dEngine::VertexPointer3f(0, m->vertex);
                 w3dEngine::DrawTriangles(m->facesSize, m->faces);
             }
+        } else if (obj->getType() == ObjectType::armature) {
+            // XRAY: los HUESOS como lineas GRUESAS, sin z-test (se pickean como se ven, encima de todo)
+            Armature* arm = (Armature*)obj;
+            if (!arm->bones.empty()) {
+                std::vector<GLfloat> buf; buf.reserve(arm->bones.size() * 6);
+                for (size_t bi = 0; bi < arm->bones.size(); bi++) {
+                    const W3dBone& b = arm->bones[bi]; // pose animada (la setea el render); en rest = head/tail
+                    buf.push_back(b.poseHead.x); buf.push_back(b.poseHead.y); buf.push_back(b.poseHead.z);
+                    buf.push_back(b.poseTail.x); buf.push_back(b.poseTail.y); buf.push_back(b.poseTail.z);
+                }
+                w3dEngine::Disable(w3dEngine::DepthTest);      // xray (esta pasada es toda de armatures)
+                w3dEngine::LineWidth(9.0f * (float)GlobalScale); // grueso: facil de clickear
+                w3dEngine::VertexPointer3f(0, &buf[0]);
+                w3dEngine::DrawLines((int)(buf.size() / 3));
+                w3dEngine::LineWidth(1.0f);
+            }
         } else {
             // icono (camara/luz/empty/instancia): un punto clickeable en el
             // origen, del MISMO tamaño que el icono 3D (16 * GlobalScale)
@@ -3186,19 +3245,19 @@ static void PickPaint(Object* obj) {
         }
     }
     for (size_t i = 0; i < obj->Childrens.size(); i++) {
-        PickPaint(obj->Childrens[i]);
+        PickPaint(obj->Childrens[i], armaturePass);
     }
     w3dEngine::PopMatrix();
 }
 
-static void PickResolve(Object* obj, int target) {
+static void PickResolve(Object* obj, int target, bool armaturePass) {
     if (!obj || pickFound) return;
-    if (PickSeleccionable(obj)) {
+    if (PickEnPasada(obj, armaturePass)) {
         pickCounter++;
         if (pickCounter == target) { pickFound = obj; return; }
     }
     for (size_t i = 0; i < obj->Childrens.size(); i++) {
-        PickResolve(obj->Childrens[i], target);
+        PickResolve(obj->Childrens[i], target, armaturePass);
     }
 }
 
@@ -4089,6 +4148,19 @@ bool ScenePick3D(int mx, int my, int vx, int vy, int vw, int vh, int screenH) {
     // Ctrl+Z: en Object Mode el click va a cambiar la seleccion -> guardar la previa.
     // (la seleccion de sub-elementos en Edit Mode es 2da tanda)
     if (InteractionMode != EditMode) UndoCapturarSeleccion();
+    // POSE MODE: el click selecciona un HUESO del armature activo (no un objeto de la escena). Shift = agrega/saca.
+    if (InteractionMode == PoseMode && ObjActivo && ObjActivo->getType() == ObjectType::armature && Viewport3DActive) {
+        Armature* arm = (Armature*)ObjActivo;
+        int b = Viewport3DActive->PickBone(arm, (float)(mx - vx), (float)(my - vy));
+        if (!LShiftPressed) for (size_t i = 0; i < arm->bones.size(); i++) arm->bones[i].select = false;
+        if (b >= 0) {
+            bool nuevo = !(LShiftPressed && arm->bones[b].select); // shift sobre uno ya seleccionado -> lo saca
+            arm->bones[b].select = nuevo;
+            arm->boneActivo = nuevo ? b : -1;
+        } else if (!LShiftPressed) arm->boneActivo = -1;
+        g_redraw = true;
+        return true;
+    }
     // en Edit Mode el click selecciona sub-elementos (no objetos)
     if (InteractionMode == EditMode && g_editMesh) {
         UndoCapturarSeleccionEdit((Mesh*)g_editMesh); // Ctrl+Z: el click va a cambiar la seleccion de sub-elementos
@@ -4161,7 +4233,9 @@ bool ScenePick3D(int mx, int my, int vx, int vy, int vw, int vh, int screenH) {
     w3dEngine::Clear(w3dEngine::ColorBuffer | w3dEngine::DepthBuffer);
 
     pickCounter = 0;
-    PickPaint(SceneCollection);
+    PickPaint(SceneCollection, false); // 1ra pasada: NO-armatures (con z-buffer)
+    PickPaint(SceneCollection, true);  // 2da pasada: armatures XRAY (sin z, encima) -> se pickean como se ven
+    w3dEngine::Enable(w3dEngine::DepthTest); // restaurar (la pasada xray lo dejo off)
 
     GLubyte pix[4] = {0, 0, 0, 0};
     w3dEngine::ReadPixelsRGBA(mx, screenH - 1 - my, 1, 1, pix);
@@ -4178,7 +4252,8 @@ bool ScenePick3D(int mx, int my, int vx, int vy, int vw, int vh, int screenH) {
     if (id > 0) {
         pickCounter = 0;
         pickFound = NULL;
-        PickResolve(SceneCollection, id);
+        PickResolve(SceneCollection, id, false);              // 1ra pasada: NO-armatures
+        if (!pickFound) PickResolve(SceneCollection, id, true); // 2da pasada: armatures (continua el contador)
         if (pickFound) {
             if (LShiftPressed && pickFound->select) {
                 pickFound->select = false; // shift: sacar de la seleccion

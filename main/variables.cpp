@@ -45,6 +45,9 @@ bool ViewPortClickDown = false;
 
 // Viewport3D valores globales
 bool showOverlayGlobal = false;
+bool g_showLights = true;   // overlays por tipo (submenu "Objects"); sincronizados por el viewport
+bool g_showCamera = true;
+bool g_showEmpty  = true;
 bool ViewFromCameraActiveGlobal = false;
 
 Quaternion rotGlobal;

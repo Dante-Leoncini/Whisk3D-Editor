@@ -91,6 +91,7 @@ class Viewport3D : public ViewportBase, public WithBorder {
         void RenderCamPassepartout(); // dibuja el borde blanco + oscurece afuera del marco (lo que NO sale en el render)
         void RenderSnapIndicador();   // recuadro verde en el target de snap bajo el cursor
         void RenderArmaturasEncima(Object* node); // huesos del esqueleto (lineas azules) encima de todo
+        int  PickBone(class Armature* arm, float lmx, float lmy); // Pose Mode: hueso mas cercano al click (px), o -1
         // INSPECCION en vista de camara: paneo/zoom de la VISTA (no mueve la camara) para ver con detalle dentro y
         // fuera del marco. Se aplica a la proyeccion + al marco. La camara NO se toca (el render no cambia).
         float camViewZoom; float camViewPanX; float camViewPanY;
@@ -100,8 +101,12 @@ class Viewport3D : public ViewportBase, public WithBorder {
         bool showYaxis; 
         bool showXaxis; 
         bool CameraToView; 
-        bool showOrigins; 
-        bool show3DCursor; 
+        bool showOrigins;
+        bool showArmature; // overlays por tipo de objeto (submenu "Objects" del menu de overlays)
+        bool showLights;
+        bool showCamera;
+        bool showEmpty;
+        bool show3DCursor;
         bool ShowRelantionshipsLines; 
         bool limpiarPantalla;
         bool lockOrbit; // "Lock Orbit": si ON, TODO lo que orbita (mouse/touch/flechas) PANEA en su lugar

@@ -14,7 +14,7 @@ class Object; // el target del Mirror puede ser CUALQUIER objeto de la escena (s
 //  El Mesh (core) guarda esto como Modifier* FORWARD-DECLARADO: el core no conoce esta clase ni la procesa.
 // ============================================================================
 struct ModifierType {
-    enum Enum { Screw = 0, Mirror, Array, SubdivisionSurface, Boolean };
+    enum Enum { Screw = 0, Mirror, Array, SubdivisionSurface, Boolean, Armature };
 };
 
 class Modifier {
@@ -78,6 +78,7 @@ inline const char* NombreTipoModificador(int t) {
         case ModifierType::Array:              return "Array";
         case ModifierType::SubdivisionSurface: return "Subdivision Surface";
         case ModifierType::Boolean:            return "Boolean";
+        case ModifierType::Armature:           return "Armature";
     }
     return "Modifier";
 }

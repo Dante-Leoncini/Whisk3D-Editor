@@ -185,7 +185,10 @@ void Camera::ReloadRiel(Object* me) {
 #endif
 }
 
+extern bool g_showCamera; // toggle del submenu "Objects" (overlays)
+
 void Camera::RenderObject() {
+    if (!g_showCamera) return; // oculto por el toggle "Camera" del menu de overlays
 #ifdef W3D_SYMBIAN
     // MISMO gate que PC: sin overlays (render a PNG / limpieza de pantalla) o mirando DESDE la camara
     // -> no dibujar el gizmo. Antes Symbian lo dibujaba SIEMPRE (se veia en el render del N95).

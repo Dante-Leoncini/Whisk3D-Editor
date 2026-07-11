@@ -2284,12 +2284,14 @@ static bool Mesh_AplicarStack(Mesh* m, bool render, PolyMesh& W, bool& outSmooth
     outSmooth = false;
     const bool enEdit = ((Object*)m == g_editMesh); // en Edit Mode se saltean los mods con mostrarEdit=false
     { bool alguno=false; for (size_t i=0;i<m->modificadores.size();i++){ Modifier* md=m->modificadores[i];
+        if (md->tipo == ModifierType::Armature) continue; // el Armature NO genera malla (deform por-frame en el render)
         if (!md->mostrarViewport) continue; if (enEdit && !md->mostrarEdit) continue; alguno=true; break; }
       if (!alguno) return false; }
     ConstruirPolyMesh(m, W);
     if (W.F.empty() && W.E.empty()) return false; // sin caras ni aristas -> nada que modificar
     int aplicados = 0;
     for (size_t i=0; i<m->modificadores.size(); i++){ Modifier* mod = m->modificadores[i];
+        if (mod->tipo == ModifierType::Armature) continue; // skinning: deform por-frame en el render, no gen
         if (!mod->mostrarViewport) continue;        // OFF -> NUNCA se calcula
         if (enEdit && !mod->mostrarEdit) continue;  // OFF -> se saltea SOLO en Edit Mode
         aplicados++;

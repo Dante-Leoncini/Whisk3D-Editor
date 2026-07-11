@@ -2,6 +2,10 @@
 #include "import_obj.h"          // Wavefront / Face / FaceCorner / ExtractBaseName / EncolarTextura
 #include "objects/Mesh.h"
 #include "objects/Armature.h"    // esqueleto (bones) importado del FBX
+#include "animation/SkeletalAnimation.h" // animaciones (clips) importadas del FBX
+#include "animation/Animation.h"         // AnimProperty/keyFrame + enum AnimPosition/Rotation/Scale
+#include "edit/Modifier.h"                // modificador Armature (auto-add al importar)
+#include <algorithm>                      // sort/unique (resampleo de curvas)
 #include "objects/Materials.h"   // Material / Materials / MaterialDefecto
 #include "objects/Objects.h"     // CollectionActive
 #include "w3dFilesystem.h"       // ReadFileBytes / FileExists / DirOf(inline abajo)
@@ -178,6 +182,46 @@ static double LeerGlobalD(const FNode& root, const char* nombre, double def) {
     return def;
 }
 
+// lee un Vector3 de un Properties70 (las ultimas 3 numericas de la P 'nombre'): Lcl Translation/Rotation/Scaling, PreRotation...
+static Vector3 LeerP70Vec3(const FNode& node, const char* nombre, Vector3 def) {
+    const FNode* p70 = node.child("Properties70"); if (!p70) return def;
+    for (size_t i = 0; i < p70->kids.size(); i++) {
+        const FNode& p = p70->kids[i];
+        if (p.name == "P" && !p.props.empty() && p.props[0].type == 'S' && p.props[0].s == nombre) {
+            std::vector<double> v;
+            for (size_t j = 0; j < p.props.size(); j++) { char t = p.props[j].type;
+                if (t=='D'||t=='F') v.push_back(p.props[j].d);
+                else if (t=='I'||t=='L'||t=='Y'||t=='C') v.push_back((double)p.props[j].i); }
+            if (v.size() >= 3) return Vector3((float)v[v.size()-3], (float)v[v.size()-2], (float)v[v.size()-1]);
+        }
+    }
+    return def;
+}
+static double LeerP70D(const FNode& node, const char* nombre, double def) {
+    const FNode* p70 = node.child("Properties70"); if (!p70) return def;
+    for (size_t i = 0; i < p70->kids.size(); i++) { const FNode& p = p70->kids[i];
+        if (p.name == "P" && !p.props.empty() && p.props[0].type=='S' && p.props[0].s==nombre)
+            for (size_t j = p.props.size(); j-- > 0; ) { char t=p.props[j].type;
+                if (t=='D'||t=='F') return p.props[j].d; if (t=='I'||t=='L'||t=='Y'||t=='C') return (double)p.props[j].i; }
+    }
+    return def;
+}
+
+// frame rate REAL del FBX (GlobalSettings.TimeMode). Clave para mapear KeyTime->frame sin gaps ni desincronizar
+// las rotaciones (si se asume 30 y el archivo es 24, cae 1 de cada 5 frames y la animacion "gira loca").
+static double FbxFrameRate(const FNode& root) {
+    int tm = (int)LeerGlobalD(root, "TimeMode", 6);
+    double custom = LeerGlobalD(root, "CustomFrameRate", -1.0);
+    switch (tm) {
+        case 1: return 120; case 2: return 100; case 3: return 60;  case 4: return 50;
+        case 5: return 48;  case 6: case 7: return 30; case 8: case 9: return 29.97;
+        case 10: return 25; case 11: return 24;  case 12: return 1000; case 13: return 24;
+        case 15: return 96; case 16: return 72;  case 17: return 59.94;
+        case 14: return custom > 0 ? custom : 24; // eCustom
+        default: return custom > 0 ? custom : 24;
+    }
+}
+
 // arma una malla de Whisk3D desde un nodo Geometry(Mesh). Devuelve la malla o NULL. mat = material (con textura) a
 // asignar. parent = objeto padre (la armature si hay esqueleto, si no CollectionActive). El TRANSFORM de correccion
 // (unidades + eje) NO se hornea aca: lo aplica el caller (a la armature si hay, o a la malla si no).
@@ -187,6 +231,9 @@ static Mesh* MallaDesdeGeometry(const FNode& geo, const std::string& nombre, Mat
     const FNode* nPoly = geo.child("PolygonVertexIndex");
     if (!nVert || !nPoly || nVert->props.empty() || nPoly->props.empty()) return 0;
     const std::vector<double>&    V  = nVert->props[0].ad; // x,y,z por control-point
+#ifdef W3D_DEBUG_FBXANIM
+    printf("  [geo] controlPoints=%d corners(PI)=%d\n", (int)(V.size()/3), (int)nPoly->props[0].ai.size());
+#endif
     const std::vector<long long>& PI = nPoly->props[0].ai; // indices de polygon-vertex (fin de poligono = ~x)
     if (V.size() < 9 || PI.size() < 3) return 0;
 
@@ -320,6 +367,7 @@ struct VGrupo { std::string bone; std::vector<int> verts; std::vector<float> pes
 struct EsqueletoFBX {
     std::vector<W3dBone> bones;                          // huesos (rest pose, espacio crudo del FBX)
     std::map<long long, std::vector<VGrupo> > vgPorGeo;  // geoId -> grupos de vertices (uno por hueso)
+    std::map<long long, int> boneModelId;                // Model id (LimbNode) -> indice en bones (para las animaciones)
     bool hay() const { return !bones.empty(); }
 };
 
@@ -327,13 +375,15 @@ struct EsqueletoFBX {
 // Connections, trae su matriz global de bind (TransformLink -> head del hueso) y los pesos por control-point. El
 // parentado de huesos sale de las Connections OO entre Models. Rellena 'out'.
 static void ParsearEsqueleto(const FNode& root, const FNode& objs, EsqueletoFBX& out) {
-    // 1) Models: id -> nombre / tipo
+    // 1) Models: id -> nombre / tipo / nodo (para leer los transforms locales de rest)
     std::map<long long, std::string> modelName, modelType;
+    std::map<long long, const FNode*> modelNode;
     for (size_t i = 0; i < objs.kids.size(); i++) {
         const FNode& k = objs.kids[i];
         if (k.name != "Model" || k.props.size() < 3) continue;
         modelName[k.props[0].i] = LimpiarNombreFBX(k.props[1].s);
         modelType[k.props[0].i] = k.props[2].s;
+        modelNode[k.props[0].i] = &k;
     }
     // 2) Connections OO: child -> parent (primer id = origen/hijo, segundo = destino/padre). OJO: un hueso (Model)
     // se conecta como "hijo" a DOS destinos -> su hueso PADRE y su Cluster; un mapa simple se pisaria. Por eso, para
@@ -373,9 +423,21 @@ static void ParsearEsqueleto(const FNode& root, const FNode& objs, EsqueletoFBX&
         if (!boneIdx.count(boneId)) {
             double TL[16];
             W3dBone b; b.name = bname;
-            if (LeerMat16(k, "TransformLink", TL))
+            if (LeerMat16(k, "TransformLink", TL)) {
                 b.head = Vector3((float)TL[12], (float)TL[13], (float)TL[14]);
+                for (int mi = 0; mi < 16; mi++) b.bind.m[mi] = (float)TL[mi]; // bind global (para el skinning)
+                b.hasSkin = true;
+            }
             b.tail = b.head; // se corrige abajo
+            // transform LOCAL de rest (del Model del hueso) para el FK
+            if (modelNode.count(boneId)) { const FNode& mn = *modelNode[boneId];
+                b.restT = LeerP70Vec3(mn, "Lcl Translation", Vector3(0,0,0));
+                b.restR = LeerP70Vec3(mn, "Lcl Rotation",    Vector3(0,0,0));
+                b.restS = LeerP70Vec3(mn, "Lcl Scaling",     Vector3(1,1,1));
+                b.preRot= LeerP70Vec3(mn, "PreRotation",     Vector3(0,0,0));
+                b.rotOrder = (int)LeerP70D(mn, "RotationOrder", 0);
+                b.hasRest = true;
+            }
             boneIdx[boneId] = (int)out.bones.size();
             out.bones.push_back(b);
         }
@@ -412,6 +474,160 @@ static void ParsearEsqueleto(const FNode& root, const FNode& objs, EsqueletoFBX&
         Vector3 d = (par >= 0) ? (out.bones[bi].head - out.bones[par].head) : Vector3(0, 1, 0);
         float len = d.Length(); if (len < 1e-4f) { d = Vector3(0, 1, 0); len = 5.0f; }
         out.bones[bi].tail = out.bones[bi].head + d * (1.0f / d.Length()) * len;
+    }
+    out.boneModelId = boneIdx; // Model id -> indice de hueso (lo usan las animaciones)
+}
+
+// ============================================================================
+//  ANIMACIONES FBX -> SkeletalAnimation. Grafo:
+//    AnimationStack (take) <-OO- AnimationLayer <-OO- AnimationCurveNode <-OP("Lcl Translation/Rotation/Scaling")- Model(hueso)
+//    AnimationCurveNode <-OP("d|X"/"d|Y"/"d|Z")- AnimationCurve (KeyTime[int64], KeyValueFloat[float])
+//  El KeyTime esta en unidades FBX (1/46186158000 s). frame = KeyTime * fps / 46186158000.
+// ============================================================================
+static const long long FBX_TIME_UNIT = 46186158000LL; // ktime por segundo
+
+struct FCurve { std::vector<long long> t; std::vector<float> v; }; // una curva (un eje)
+
+static int PropDeNombre(const std::string& p) {           // "Lcl Translation/Rotation/Scaling" -> AnimPosition/Rotation/Scale
+    if (p.find("Translation") != std::string::npos) return AnimPosition;
+    if (p.find("Rotation")    != std::string::npos) return AnimRotation;
+    if (p.find("Scaling")     != std::string::npos) return AnimScale;
+    return -1;
+}
+static int EjeDeNombre(const std::string& p) {            // "d|X"/"d|Y"/"d|Z" -> 0/1/2
+    if (!p.empty()) { char c = p[p.size()-1]; if (c=='X') return 0; if (c=='Y') return 1; if (c=='Z') return 2; }
+    return -1;
+}
+// valor de una curva (un eje) en el frame f: escalon/lineal entre sus keys (frames ya convertidos)
+static float EvalEje(const std::vector<int>& fr, const std::vector<float>& va, int f) {
+    if (fr.empty()) return 0.0f;
+    if (f <= fr.front()) return va.front();
+    if (f >= fr.back())  return va.back();
+    for (size_t i = 1; i < fr.size(); i++) if (fr[i] >= f) {
+        int f0 = fr[i-1], f1 = fr[i]; float v0 = va[i-1], v1 = va[i];
+        if (f1 == f0) return v1;
+        return v0 + (v1 - v0) * (float)(f - f0) / (float)(f1 - f0);
+    }
+    return va.back();
+}
+
+// arma los clips de animacion del FBX y los mete en 'anims' (uno por AnimationStack)
+static void ParsearAnimaciones(const FNode& root, const FNode& objs, const EsqueletoFBX& esq,
+                               std::vector<SkeletalAnimation*>& anims, int fps, float escala) {
+    if (esq.bones.empty()) return;
+    // 1) juntar objetos de animacion por id
+    std::map<long long, std::string> stackName;              // AnimationStack id -> nombre
+    std::map<long long, FCurve> curves;                      // AnimationCurve id -> keys (t,v)
+    std::vector<long long> nodeIds;                          // AnimationCurveNode ids (presencia)
+    std::map<long long,bool> esNode, esLayer;
+    for (size_t i = 0; i < objs.kids.size(); i++) {
+        const FNode& k = objs.kids[i];
+        if (k.props.empty()) continue;
+        long long id = k.props[0].i;
+        if (k.name == "AnimationStack" && k.props.size() >= 2) stackName[id] = LimpiarNombreFBX(k.props[1].s);
+        else if (k.name == "AnimationLayer") esLayer[id] = true;
+        else if (k.name == "AnimationCurveNode") esNode[id] = true;
+        else if (k.name == "AnimationCurve") {
+            FCurve fc;
+            if (const FNode* kt = k.child("KeyTime")) if (!kt->props.empty())
+                for (size_t j = 0; j < kt->props[0].ai.size(); j++) fc.t.push_back(kt->props[0].ai[j]);
+            if (const FNode* kv = k.child("KeyValueFloat")) if (!kv->props.empty())
+                for (size_t j = 0; j < kv->props[0].ad.size(); j++) fc.v.push_back((float)kv->props[0].ad[j]);
+            curves[id] = fc;
+        }
+    }
+    if (stackName.empty()) return; // FBX sin animaciones
+    // 2) conexiones: OO (node->layer->stack) y OP (curve->node "d|X"; node->model "Lcl ...")
+    std::map<long long, long long> layerDeNode, stackDeLayer; // OO
+    std::map<long long, std::pair<long long,std::string> > nodeDeCurve; // curveId -> (nodeId, "d|X")
+    std::map<long long, std::pair<long long,std::string> > modelDeNode; // nodeId  -> (modelId, "Lcl ...")
+    if (const FNode* conns = root.child("Connections")) {
+        for (size_t i = 0; i < conns->kids.size(); i++) {
+            const FNode& c = conns->kids[i];
+            if (c.name != "C" || c.props.size() < 3) continue;
+            long long ch = c.props[1].i, pa = c.props[2].i;
+            if (c.props[0].s == "OO") {
+                if (esNode.count(ch) && esLayer.count(pa)) layerDeNode[ch] = pa;
+                else if (esLayer.count(ch) && stackName.count(pa)) stackDeLayer[ch] = pa;
+            } else if (c.props[0].s == "OP" && c.props.size() >= 4) {
+                std::string prop = c.props[3].s;
+                if (curves.count(ch) && esNode.count(pa)) nodeDeCurve[ch] = std::make_pair(pa, prop);
+                else if (esNode.count(ch) && esq.boneModelId.count(pa)) modelDeNode[ch] = std::make_pair(pa, prop);
+            }
+        }
+    }
+    // 3) un clip por stack
+    std::map<long long, SkeletalAnimation*> clipDeStack;
+    for (std::map<long long,std::string>::iterator it = stackName.begin(); it != stackName.end(); ++it) {
+        SkeletalAnimation* a = new SkeletalAnimation(it->second.empty() ? "Animation" : it->second);
+        a->FrameRate = fps; clipDeStack[it->first] = a; anims.push_back(a);
+    }
+    // 4) volcar cada curva al hueso/propiedad/eje que corresponde
+    // acumulador: clip -> bone -> prop -> eje -> (frame->valor)
+    for (std::map<long long, FCurve>::iterator it = curves.begin(); it != curves.end(); ++it) {
+        long long curveId = it->first; const FCurve& fc = it->second;
+        if (!nodeDeCurve.count(curveId)) continue;
+        long long nodeId = nodeDeCurve[curveId].first;
+        int eje = EjeDeNombre(nodeDeCurve[curveId].second);
+        if (eje < 0 || !modelDeNode.count(nodeId)) continue;
+        long long modelId = modelDeNode[nodeId].first;
+        int prop = PropDeNombre(modelDeNode[nodeId].second);
+        if (prop < 0 || !esq.boneModelId.count(modelId)) continue;
+        int bone = esq.boneModelId.find(modelId)->second;
+        // clip: por la cadena node->layer->stack
+        SkeletalAnimation* clip = NULL;
+        if (layerDeNode.count(nodeId) && stackDeLayer.count(layerDeNode[nodeId]))
+            clip = clipDeStack.count(stackDeLayer[layerDeNode[nodeId]]) ? clipDeStack[stackDeLayer[layerDeNode[nodeId]]] : NULL;
+        if (!clip && !anims.empty()) clip = anims[0]; // fallback: 1er clip
+        if (!clip) continue;
+        // el FK va en espacio RAW del FBX (el Object de la armature aplica la escala 0.01 al dibujar): NO escalar aca
+        std::vector<int> fr; std::vector<float> va;
+        for (size_t j = 0; j < fc.t.size() && j < fc.v.size(); j++) {
+            fr.push_back((int)((fc.t[j] * (long long)fps) / FBX_TIME_UNIT) + 1); // +1: FBX arranca en 0, el timeline en 1
+            va.push_back((float)fc.v[j]);
+        }
+        if (fr.empty()) continue;
+        BoneTrack& tr = clip->TrackDe(bone);
+        AnimProperty& ap = tr.PropertyDe(prop);
+        // resamplear: unir el set de frames existentes + los de esta curva, y setear el eje en cada uno
+        std::vector<int> frames;
+        for (size_t j = 0; j < ap.keyframes.size(); j++) frames.push_back(ap.keyframes[j].frame);
+        for (size_t j = 0; j < fr.size(); j++) frames.push_back(fr[j]);
+        std::sort(frames.begin(), frames.end());
+        frames.erase(std::unique(frames.begin(), frames.end()), frames.end());
+        std::vector<keyFrame> nuevos; nuevos.reserve(frames.size());
+        for (size_t j = 0; j < frames.size(); j++) {
+            keyFrame kf; kf.frame = frames[j]; kf.Interpolation = 0;
+            // otros ejes: INTERPOLAR lineal los keyframes existentes en este frame (NO "hold": el escalon rompia
+            // las rotaciones -> el hueso giraba loco). Asi cada eje queda continuo aunque los ejes tengan keys distintos.
+            kf.valueX = kf.valueY = kf.valueZ = 0.0f;
+            const std::vector<keyFrame>& K = ap.keyframes; int f = frames[j];
+            if (!K.empty()) {
+                if (f <= K.front().frame)      { kf.valueX=K.front().valueX; kf.valueY=K.front().valueY; kf.valueZ=K.front().valueZ; }
+                else if (f >= K.back().frame)  { kf.valueX=K.back().valueX;  kf.valueY=K.back().valueY;  kf.valueZ=K.back().valueZ; }
+                else for (size_t p = 1; p < K.size(); p++) if (K[p].frame >= f) {
+                    int f0=K[p-1].frame, f1=K[p].frame; float t = (f1==f0)?0.0f:(float)(f-f0)/(float)(f1-f0);
+                    kf.valueX = K[p-1].valueX + (K[p].valueX-K[p-1].valueX)*t;
+                    kf.valueY = K[p-1].valueY + (K[p].valueY-K[p-1].valueY)*t;
+                    kf.valueZ = K[p-1].valueZ + (K[p].valueZ-K[p-1].valueZ)*t; break;
+                }
+            }
+            float ev = EvalEje(fr, va, frames[j]);
+            if (eje == 0) kf.valueX = ev; else if (eje == 1) kf.valueY = ev; else kf.valueZ = ev;
+            nuevos.push_back(kf);
+        }
+        ap.keyframes = nuevos;
+    }
+    // 5) rango [startFrame..endFrame] de cada clip = min/max de sus keyframes
+    for (size_t a = 0; a < anims.size(); a++) {
+        int mn = 0x7fffffff, mx = 0;
+        for (size_t t = 0; t < anims[a]->tracks.size(); t++)
+            for (size_t p = 0; p < anims[a]->tracks[t].Propertys.size(); p++)
+                for (size_t k = 0; k < anims[a]->tracks[t].Propertys[p].keyframes.size(); k++) {
+                    int f = anims[a]->tracks[t].Propertys[p].keyframes[k].frame;
+                    if (f < mn) mn = f; if (f > mx) mx = f;
+                }
+        if (mx >= mn) { anims[a]->startFrame = mn; anims[a]->endFrame = mx; }
     }
 }
 
@@ -484,6 +700,14 @@ bool ImportFBX(const std::string& filepath) {
         AplicarTransformFBX(arm, escala, false, true); // esqueleto: SOLO escala (los huesos ya vienen Y-up)
         parentMallas = arm;               // las mallas cuelgan del esqueleto (heredan la escala)
         w3dLogf("ImportFBX: esqueleto con %d hueso(s)", (int)esq.bones.size());
+        // ANIMACIONES (takes): un clip por AnimationStack, con sus curvas por hueso. fps REAL del FBX (24/30/...)
+        // el fps del ARCHIVO se usa SOLO para mapear KeyTime->frame (frames contiguos, sin gaps). La REPRODUCCION
+        // queda en AnimFPS (default 30): el banana dice 24 pero se ve bien a 30 (metadato del FBX incorrecto, pedido Dante).
+        int fps = (int)(FbxFrameRate(root) + 0.5); if (fps < 1) fps = 24;
+        ParsearAnimaciones(root, *objs, esq, arm->animations, fps, escala);
+        PrepararSkin(arm); // matrices de skinning (bind) de cada hueso
+        if (!arm->animations.empty()) { arm->animActiva = 0;
+            w3dLogf("ImportFBX: %d animacion(es) importada(s)", (int)arm->animations.size()); }
     }
     ProgresoActualizar(0.45f);
 
@@ -521,6 +745,14 @@ bool ImportFBX(const std::string& filepath) {
                 m->vertexGroups.push_back(grp);
             }
             if (!m->vertexGroups.empty()) m->grupoActivo = 0;
+        }
+        // AUTO: si hay esqueleto + animacion + pesos, agregar el modificador Armature (skinning) apuntando al rig
+        if (arm && !arm->animations.empty() && !m->vertexGroups.empty()) {
+            Modifier* amod = new Modifier(ModifierType::Armature, "Armature");
+            amod->target = arm;
+            m->modificadores.push_back(amod);
+            m->modificadorActivo = (int)m->modificadores.size() - 1;
+            m->skinArmature = arm; // el core deforma la malla a la pose del esqueleto
         }
         importadas++;
     }

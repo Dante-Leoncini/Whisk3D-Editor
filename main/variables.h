@@ -69,7 +69,7 @@ enum { Constant, Linear, EaseInOut, EaseIn, EaseOut };
 // modos del viewport (selector estilo Blender; solo con una MALLA activa). Edit
 // y los Paint todavia no estan implementados: por ahora el selector solo cambia
 // InteractionMode (la edicion/pintura de malla viene despues).
-enum { ObjectMode, EditMode, VertexPaint, WeightPaint, TexturePaint };
+enum { ObjectMode, EditMode, VertexPaint, WeightPaint, TexturePaint, PoseMode };
 enum { pointLight, sunLight };
 enum { editNavegacion, EdgeMove, FaceMove, timelineMove, rotacion, EditScale, translacion };
 enum { Orbit, Fly, Apuntar };
@@ -122,6 +122,11 @@ extern bool ViewPortClickDown;
 
 // Viewport 3D
 extern bool showOverlayGlobal;
+// overlays por TIPO de objeto (submenu "Objects"): el viewport los sincroniza desde sus miembros antes de
+// renderizar la escena; los rinde el traversal del CORE (Empty/Camera/gizmo de luz) que no ve al viewport.
+extern bool g_showLights;
+extern bool g_showCamera;
+extern bool g_showEmpty;
 extern bool ViewFromCameraActiveGlobal;
 extern Quaternion rotGlobal;
 extern Vector3 viewPosGlobal;

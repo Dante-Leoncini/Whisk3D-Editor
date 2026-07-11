@@ -13,6 +13,8 @@
 #include "objects/Mesh.h"          // overlay de estadisticas (vertsAgrupados, faces3d)
 #include "objects/EditMesh.h"      // foco al centro de la seleccion en edit mode
 #include "objects/Armature.h"      // dibujar huesos del esqueleto encima de todo
+#include "animation/SkeletalAnimation.h" // EvaluarPoseEsqueleto (pose al reproducir)
+#include "animation/Animation.h"          // CurrentFrame
 #include "ViewPorts/LayoutInput.h" // LayoutDeleteEdit (menu Delete en edit mode)
 #include "ViewPorts/PopUp/NumPad.h" // NumPadAbrirTransform (teclado tactil sobre la barra de estado)
 #include "ViewPorts/PopUp/ConfirmarPopup.h" // AbrirConfirmarBorrado (popup al borrar con la tecla)
@@ -276,6 +278,10 @@ Viewport3D::Viewport3D(Vector3 pos){
     showXaxis = true;
     CameraToView = false;
     showOrigins = true;
+    showArmature = true;
+    showLights = true;
+    showCamera = true;
+    showEmpty = true;
     show3DCursor = true;
     ShowRelantionshipsLines = true;
     limpiarPantalla = true;
@@ -307,6 +313,15 @@ void Viewport3D::AbrirMenuOverlays(int x, int y){
     MenuOverlays->AgregarCheck("X Axis", 2, &showXaxis)->gris = &showOverlays;
     MenuOverlays->AgregarCheck("Y Axis", 3, &showYaxis)->gris = &showOverlays;
     MenuOverlays->AgregarCheck("Origins", 4, &showOrigins)->gris = &showOverlays;
+    // submenu "Objects": mostrar/ocultar el overlay de cada tipo de objeto (esqueleto / luces / camaras / empties)
+    static PopupMenu* MenuOverlayObjects = NULL;
+    if (!MenuOverlayObjects) { MenuOverlayObjects = new PopupMenu(); MenuOverlayObjects->titulo = "Objects"; }
+    MenuOverlayObjects->Limpiar();
+    MenuOverlayObjects->AgregarCheck("Armature", 13, &showArmature, IconType::armature);
+    MenuOverlayObjects->AgregarCheck("Lights",   14, &showLights,   IconType::light);
+    MenuOverlayObjects->AgregarCheck("Camera",   15, &showCamera,   IconType::camera);
+    MenuOverlayObjects->AgregarCheck("Empty",    16, &showEmpty,    IconType::empty);
+    MenuOverlays->Agregar("Objects", 13, IconType::object, MenuOverlayObjects)->gris = &showOverlays;
     MenuOverlays->AgregarCheck("3D Cursor", 5, &show3DCursor)->gris = &showOverlays;
     MenuOverlays->AgregarCheck("Relationship Lines", 6, &ShowRelantionshipsLines)->gris = &showOverlays;
     // Normales (solo en meshes seleccionadas): 3 toggles + slider de tamano
@@ -603,6 +618,28 @@ bool Viewport3D::ProyectarPunto(const Vector3& p, float& sx, float& sy, float* o
     sx = (ndcX * 0.5f + 0.5f) * (float)width;
     sy = (1.0f - (ndcY * 0.5f + 0.5f)) * (float)height; // pantalla: Y hacia abajo
     return true;
+}
+
+// PICK de HUESO (Pose Mode): proyecta cada hueso (poseHead->poseTail, en world) a pantalla y devuelve el indice
+// del mas cercano al click (lmx,lmy en coords LOCALES del viewport), o -1 si ninguno esta dentro del umbral (px).
+int Viewport3D::PickBone(Armature* arm, float lmx, float lmy){
+    if (!arm || arm->bones.empty()) return -1;
+    EvaluarPoseEsqueleto(arm, CurrentFrame); // asegurar la pose al frame actual (poseHead/poseTail)
+    Matrix4 W; arm->GetWorldMatrix(W);
+    int best = -1; float bestD = 14.0f; // umbral de seleccion en pixeles
+    for (size_t i = 0; i < arm->bones.size(); i++){
+        Vector3 h = W * arm->bones[i].poseHead, t = W * arm->bones[i].poseTail;
+        float hx,hy,tx,ty;
+        if (!ProyectarPunto(h,hx,hy) || !ProyectarPunto(t,tx,ty)) continue;
+        // distancia del click al SEGMENTO 2D (hx,hy)-(tx,ty)
+        float dx=tx-hx, dy=ty-hy; float len2=dx*dx+dy*dy;
+        float u = (len2>1e-6f) ? ((lmx-hx)*dx+(lmy-hy)*dy)/len2 : 0.0f;
+        if (u<0) u=0; else if (u>1) u=1;
+        float px=hx+u*dx, py=hy+u*dy;
+        float d = sqrtf((lmx-px)*(lmx-px)+(lmy-py)*(lmy-py));
+        if (d < bestD){ bestD=d; best=(int)i; }
+    }
+    return best;
 }
 
 // pivote del GIZMO de transform (linea punteada + lineas de eje X/Y/Z): es el
@@ -973,6 +1010,8 @@ void Viewport3D::Render() {
     // contornos de seleccion ni el overlay de edit). Se setea por frame = el showOverlays del viewport.
     g_mostrarOverlays = showOverlays;
     w3dRenderOverlays = showOverlays; // el Core lo lee (Mesh::RenderObject); g_mostrarOverlays sigue siendo del editor
+    // overlays por tipo (submenu "Objects"): del viewport -> globales que lee el traversal del Core (Empty/Camera/luz)
+    g_showLights = showLights; g_showCamera = showCamera; g_showEmpty = showEmpty;
 
     // el Core dibuja segun estos flags; los derivamos del RenderType/view del editor (el Core no lo conoce)
     w3dRenderWireframe = (view == RenderType::Wireframe);
@@ -998,7 +1037,9 @@ void Viewport3D::Render() {
     // Renderiza la escena recursivamente
     SceneCollection->Render();
 
-    RenderArmaturasEncima(SceneCollection); // huesos AZULES encima de todo (ignoran z-buffer)
+    // huesos encima de todo (ignoran z-buffer). Es OVERLAY del editor: se apaga con "Show Overlays"
+    // o con su propio toggle "Armature" del menu de overlays.
+    if (showOverlays && showArmature) RenderArmaturasEncima(SceneCollection);
 
     LoopCutRenderPreview(); // preview del corte (loop cut) encima de la escena
 
@@ -1017,6 +1058,7 @@ void Viewport3D::RenderArmaturasEncima(Object* node){
         Armature* arm = static_cast<Armature*>(node);
         if (!arm->bones.empty()){
             namespace gfx = w3dEngine;
+            EvaluarPoseEsqueleto(arm, CurrentFrame); // pose animada (o rest si no hay clip) -> poseHead/poseTail
             Matrix4 W; arm->GetWorldMatrix(W);
             gfx::MatrixMode(gfx::ModelView);
             gfx::PushMatrix();
@@ -1031,13 +1073,22 @@ void Viewport3D::RenderArmaturasEncima(Object* node){
             // huesos: linea SOLIDA head->tail (azul). Ademas, para cada hueso cuyo head NO coincide con el tail de su
             // padre (hueso emparentado pero "separado"), una linea PUNTEADA padre.tail->head para que quede clara la
             // conexion en la jerarquia (igual que Blender). El punteado se fabrica a mano (GLES no tiene line stipple).
-            std::vector<GLfloat> buf, dash; buf.reserve(arm->bones.size() * 6);
+            // POSE MODE: cada hueso se colorea segun seleccion -> sin seleccionar NEGRO, seleccionado VERDE, activo BLANCO
+            // (multi-seleccion). En Object Mode todos van a 'buf' con el color del armature (verde/azul de objeto).
+            bool poseMode = (InteractionMode == PoseMode && arm == (Armature*)ObjActivo);
+            std::vector<GLfloat> buf, dash, bufSel, bufAct; buf.reserve(arm->bones.size() * 6);
             for (size_t i = 0; i < arm->bones.size(); i++){
                 const W3dBone& b = arm->bones[i];
-                buf.push_back(b.head.x); buf.push_back(b.head.y); buf.push_back(b.head.z);
-                buf.push_back(b.tail.x); buf.push_back(b.tail.y); buf.push_back(b.tail.z);
+                std::vector<GLfloat>* dst = &buf;
+                if (poseMode){
+                    if ((int)i == arm->boneActivo) dst = &bufAct;   // activo = blanco
+                    else if (b.select)             dst = &bufSel;   // seleccionado = verde
+                    // sino queda en buf (negro, ver mas abajo)
+                }
+                dst->push_back(b.poseHead.x); dst->push_back(b.poseHead.y); dst->push_back(b.poseHead.z);
+                dst->push_back(b.poseTail.x); dst->push_back(b.poseTail.y); dst->push_back(b.poseTail.z);
                 if (b.parent >= 0 && b.parent < (int)arm->bones.size()){
-                    Vector3 A = arm->bones[b.parent].tail, B = b.head;
+                    Vector3 A = arm->bones[b.parent].poseTail, B = b.poseHead;
                     Vector3 d = B - A; float L = d.Length();
                     if (L > 0.5f){ // no coinciden -> gap: punteado A->B
                         Vector3 u = d * (1.0f / L); const float dl = 2.0f; // guion de ~2 unidades (raw)
@@ -1050,13 +1101,38 @@ void Viewport3D::RenderArmaturasEncima(Object* node){
                     }
                 }
             }
-            gfx::Color4f(0.28f, 0.55f, 1.0f, 1.0f); // azul
+            // color de 'buf': en Pose Mode = NEGRO (huesos sin seleccionar); en Object Mode = color del armature
+            // (ACTIVO verde / seleccionado verde-secundario / no seleccionado azul, como el resto de objetos).
+            bool activo = (arm == (Armature*)ObjActivo);
+            const float* col;
+            if (poseMode)          { static const float negro[4] = {0.0f, 0.0f, 0.0f, 1.0f}; col = negro; }
+            else if (activo)         col = ListaColores[(int)ColorID::accent];
+            else if (arm->select)    col = ListaColores[(int)ColorID::accentDark];
+            else { static const float azul[4] = {0.28f, 0.55f, 1.0f, 1.0f}; col = azul; }
             gfx::LineWidth(2.0f);
-            gfx::VertexPointer3f(0, &buf[0]);
-            gfx::DrawLines((int)(buf.size() / 3));
+            if (!buf.empty()){
+                gfx::Color4f(col[0], col[1], col[2], 1.0f);
+                gfx::VertexPointer3f(0, &buf[0]);
+                gfx::DrawLines((int)(buf.size() / 3));
+            }
+            // huesos SELECCIONADOS (Pose Mode): VERDE, mas gruesos, encima.
+            if (!bufSel.empty()){
+                const float* sc = ListaColores[(int)ColorID::accent];
+                gfx::Color4f(sc[0], sc[1], sc[2], 1.0f);
+                gfx::LineWidth(3.0f);
+                gfx::VertexPointer3f(0, &bufSel[0]);
+                gfx::DrawLines((int)(bufSel.size() / 3));
+            }
+            // hueso ACTIVO (Pose Mode): BLANCO, el mas grueso, encima de todo.
+            if (!bufAct.empty()){
+                gfx::Color4f(1.0f, 1.0f, 1.0f, 1.0f);
+                gfx::LineWidth(3.5f);
+                gfx::VertexPointer3f(0, &bufAct[0]);
+                gfx::DrawLines((int)(bufAct.size() / 3));
+            }
             if (!dash.empty()){ // conexiones punteadas: mas finas y un pelin mas apagadas
                 gfx::LineWidth(1.0f);
-                gfx::Color4f(0.35f, 0.55f, 0.9f, 1.0f);
+                gfx::Color4f(col[0]*0.85f, col[1]*0.85f, col[2]*0.9f, 1.0f);
                 gfx::VertexPointer3f(0, &dash[0]);
                 gfx::DrawLines((int)(dash.size() / 3));
             }
@@ -1441,7 +1517,7 @@ void Viewport3D::RenderOverlay() {
 
         w3dEngine::Disable(w3dEngine::DepthTest);
 
-        RenderLightLines(); // linea de cada luz al piso (espacio mundo)
+        if (showLights) RenderLightLines(); // linea de cada luz al piso (espacio mundo); respeta el toggle "Lights"
         if (showOrigins) RenderOrigins();
 
         w3dEngine::Disable(w3dEngine::Blend);
@@ -1568,19 +1644,26 @@ void Viewport3D::RenderUI() {
         if (transformando) {
             RenderBarraTransform();
         } else {
-            // el boton [1] (modo) solo si el objeto ACTIVO es una malla; muestra el
-            // modo actual con su icono (object en Object Mode, mesh en el resto).
+            // el boton [1] (modo) para MALLA (Object/Edit/Paint) o ARMATURE (Object/Edit/Pose);
+            // muestra el modo actual con su icono.
             bool esMesh = ObjActivo && ObjActivo->getType() == ObjectType::mesh;
+            bool esArm  = ObjActivo && ObjActivo->getType() == ObjectType::armature;
             // se buscan por ROL (no por indice) -> reordenar la barra no rompe esto.
-            Button* bMode = BarRolBtn(BarButtons, BR_Mode); // solo si el activo es malla
+            Button* bMode = BarRolBtn(BarButtons, BR_Mode);
             if (bMode) {
-                bMode->visible = esMesh;
-                if (!esMesh) InteractionMode = ObjectMode;
+                bMode->visible = esMesh || esArm;
+                if (!esMesh && !esArm) InteractionMode = ObjectMode;
+                // un armature no tiene Paint: si quedo en un modo de malla, volver a Object
+                if (esArm && InteractionMode != EditMode && InteractionMode != PoseMode) InteractionMode = ObjectMode;
+                // una malla no tiene Pose: si venia de un armature en Pose, volver a Object
+                if (esMesh && InteractionMode == PoseMode) InteractionMode = ObjectMode;
                 bMode->text = (InteractionMode == EditMode)     ? "Edit Mode" :
+                              (InteractionMode == PoseMode)     ? "Pose Mode" :
                               (InteractionMode == VertexPaint)  ? "Vertex Paint" :
                               (InteractionMode == WeightPaint)  ? "Weight Paint" :
                               (InteractionMode == TexturePaint) ? "Texture Paint" : "Object Mode";
-                bMode->icon = (InteractionMode == ObjectMode) ? (int)IconType::object : (int)IconType::mesh;
+                bMode->icon = (InteractionMode == ObjectMode) ? (int)IconType::object :
+                              esArm                            ? (int)IconType::armature : (int)IconType::mesh;
             }
             bool enEdit = (esMesh && InteractionMode == EditMode);
             Button* bSelM = BarRolBtn(BarButtons, BR_SelMode); // sub-elemento, SOLO en edit (icono)

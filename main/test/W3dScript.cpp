@@ -9,6 +9,8 @@
 #include "importers/import_fbx.h"  // ImportFBX
 #include "objects/ObjectMode.h" // Eliminar (test del borrado + su undo)
 #include "objects/Light.h"      // Light::Create + Lights (test del borrado de luces)
+#include "objects/Armature.h"   // test de la pestania Animation (clips del esqueleto)
+#include "animation/SkeletalAnimation.h" // CrearAnimacion/BorrarAnimacionActiva/MoverAnimacionActiva
 #include "Undo.h"               // UndoCapturarSeleccionEdit / UndoDeshacer (test del Ctrl+Z)
 #include "variables.h"         // InteractionMode, enum { ObjectMode, EditMode, ... }
 #include <fstream>
@@ -22,6 +24,14 @@
 
 // malla "activa" del script: la de edicion si estamos en Edit Mode, sino el
 // objeto activo si es una malla.
+// distancia punto-segmento (metrica del skincheck: vertices vs hueso)
+static float ScriptDistSeg(const Vector3& p, const Vector3& A, const Vector3& B){
+    Vector3 d = B - A; float L2 = d.LengthSq();
+    float t = (L2 > 1e-9f) ? (p - A).Dot(d) / L2 : 0.0f;
+    if (t < 0) t = 0; if (t > 1) t = 1;
+    return (p - (A + d * t)).Length();
+}
+
 static Mesh* ScriptActiveMesh() {
     if (g_editMesh) return (Mesh*)g_editMesh;
     if (ObjActivo && ObjActivo->getType() == ObjectType::mesh) return (Mesh*)ObjActivo;
@@ -80,6 +90,292 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         if (!o) { err = "NewMesh devolvio NULL"; return false; }
         DeseleccionarTodo();
         o->Seleccionar();
+        return true;
+    }
+
+    // ---- addarmature : crea un Armature (2 huesos en cadena) y lo deja activo ----
+    if (cmd == "addarmature") {
+        Armature* a = new Armature(NULL, Vector3(0,0,0));
+        W3dBone r; r.name="root";  r.parent=-1; r.head=Vector3(0,0,0); r.tail=Vector3(0,1,0);
+        W3dBone c; c.name="child"; c.parent=0;  c.head=Vector3(0,1,0); c.tail=Vector3(0,2,0);
+        a->bones.push_back(r); a->bones.push_back(c);
+        DeseleccionarTodo();
+        a->Seleccionar();
+        return true;
+    }
+    // ---- animkey <bone> <pos|rot|scale> <frame> <x> <y> <z> : setea un keyframe en el clip activo ----
+    if (cmd == "animkey") {
+        Armature* a = (ObjActivo && ObjActivo->getType()==ObjectType::armature) ? (Armature*)ObjActivo : NULL;
+        if (!a || a->animActiva<0 || a->animActiva>=(int)a->animations.size()) { err="animkey: sin clip activo"; return false; }
+        int bone=0, frame=0; std::string prop; float vx=0,vy=0,vz=0; ss>>bone>>prop>>frame>>vx>>vy>>vz;
+        int pr = (prop=="pos")?AnimPosition : (prop=="rot")?AnimRotation : (prop=="scale")?AnimScale : -1;
+        if (pr<0) { err="animkey: prop debe ser pos|rot|scale"; return false; }
+        BoneTrack& tr = a->animations[a->animActiva]->TrackDe(bone);
+        AnimProperty& ap = tr.PropertyDe(pr);
+        keyFrame kf; kf.frame=frame; kf.valueX=vx; kf.valueY=vy; kf.valueZ=vz; kf.Interpolation=0;
+        ap.keyframes.push_back(kf); ap.SortKeyFrames();
+        return true;
+    }
+    // ---- animkeys <bone> <pos|rot|scale> <from> <to> : vuelca los keyframes de esa propiedad en el rango ----
+    if (cmd == "animkeys") {
+        Armature* a = (ObjActivo && ObjActivo->getType()==ObjectType::armature) ? (Armature*)ObjActivo : NULL;
+        if (!a || a->animActiva<0) { err="animkeys: sin clip"; return false; }
+        int bone=0, from=0, to=999999; std::string prop; ss>>bone>>prop>>from>>to;
+        int pr = (prop=="pos")?AnimPosition : (prop=="rot")?AnimRotation : AnimScale;
+        SkeletalAnimation* an = a->animations[a->animActiva];
+        for (size_t t=0;t<an->tracks.size();t++) if (an->tracks[t].bone==bone)
+            for (size_t p=0;p<an->tracks[t].Propertys.size();p++) if (an->tracks[t].Propertys[p].Property==pr){
+                AnimProperty& ap=an->tracks[t].Propertys[p];
+                for (size_t k=0;k<ap.keyframes.size();k++){ int f=ap.keyframes[k].frame; if(f<from||f>to) continue;
+                    printf("      [key] bone=%d %s f=%d (%.2f,%.2f,%.2f)\n", bone, prop.c_str(), f,
+                           ap.keyframes[k].valueX, ap.keyframes[k].valueY, ap.keyframes[k].valueZ); }
+            }
+        return true;
+    }
+    // ---- skindump <frame> : skinnea el mesh activo y vuelca el desplazamiento (verifica que no explote) ----
+    if (cmd == "skindump") {
+        Mesh* m = (ObjActivo && ObjActivo->getType()==ObjectType::mesh) ? (Mesh*)ObjActivo : NULL;
+        if (!m || !m->skinArmature) { err="skindump: mesh sin skinArmature"; return false; }
+        int f=1; ss>>f; CurrentFrame=f; m->lastSkinFrame=-999999;
+        SkinearMesh(m);
+        if (!m->skinVertex) { err="skindump: sin skinVertex"; return false; }
+        int nv=m->vertexSize; double maxd=0, sum=0;
+        for (int i=0;i<nv;i++){ double dx=m->skinVertex[i*3]-m->vertex[i*3], dy=m->skinVertex[i*3+1]-m->vertex[i*3+1], dz=m->skinVertex[i*3+2]-m->vertex[i*3+2];
+            double d=dx*dx+dy*dy+dz*dz; if(d>maxd)maxd=d; sum+=d; }
+        printf("      [skin] f=%d nv=%d maxDelta=%.2f avgDelta=%.2f v0=(%.1f,%.1f,%.1f)->(%.1f,%.1f,%.1f)\n",
+               f, nv, (float)(maxd>0?__builtin_sqrt(maxd):0), (float)(nv?__builtin_sqrt(sum/nv):0),
+               m->vertex[0],m->vertex[1],m->vertex[2], m->skinVertex[0],m->skinVertex[1],m->skinVertex[2]);
+        return true;
+    }
+    // ---- xforms : world matrix de la malla activa y de su esqueleto (para cazar el OFFSET malla<->armature) ----
+    if (cmd == "xforms") {
+        Mesh* m = (ObjActivo && ObjActivo->getType()==ObjectType::mesh) ? (Mesh*)ObjActivo : NULL;
+        if (!m || !m->skinArmature) { err="xforms: mesh sin skinArmature"; return false; }
+        Matrix4 MW, AW; m->GetWorldMatrix(MW); m->skinArmature->GetWorldMatrix(AW);
+        printf("      [xf] mesh world T=(%.3f,%.3f,%.3f) diag=(%.3f,%.3f,%.3f)\n", MW.m[12],MW.m[13],MW.m[14], MW.m[0],MW.m[5],MW.m[10]);
+        printf("      [xf] arm  world T=(%.3f,%.3f,%.3f) diag=(%.3f,%.3f,%.3f)\n", AW.m[12],AW.m[13],AW.m[14], AW.m[0],AW.m[5],AW.m[10]);
+        printf("      [xf] mesh pos=(%.3f,%.3f,%.3f) scale=(%.3f,%.3f,%.3f)\n", m->pos.x,m->pos.y,m->pos.z, m->scale.x,m->scale.y,m->scale.z);
+        printf("      [xf] arm  pos=(%.3f,%.3f,%.3f) scale=(%.3f,%.3f,%.3f)\n", m->skinArmature->pos.x,m->skinArmature->pos.y,m->skinArmature->pos.z, m->skinArmature->scale.x,m->skinArmature->scale.y,m->skinArmature->scale.z);
+        return true;
+    }
+    // ---- bindcheck : compara el bind del FK-rest (NodeToYup del FK con Lcl de rest) contra el TransformLink real
+    //      del FBX (b.head/b.bind). Si difieren, la malla (skinneada al TransformLink) queda OFFSET de los huesos FK. ----
+    if (cmd == "bindcheck") {
+        Armature* a = (ObjActivo && ObjActivo->getType()==ObjectType::armature) ? (Armature*)ObjActivo : NULL;
+        if (!a) { err="bindcheck: sin armature activo"; return false; }
+        int save=a->animActiva; a->animActiva=-1; a->lastPoseFrame=-999999;
+        EvaluarPoseEsqueleto(a, 1); // rest FK -> poseHead = NodeToYup(FK-rest.origin)
+        a->animActiva=save; a->lastPoseFrame=-999999;
+        double sum=0; float worst=0; int worstB=-1, n=0;
+        for (size_t i=0;i<a->bones.size();i++){
+            if (!a->bones[i].hasSkin) continue;
+            Vector3 tl(a->bones[i].bind.m[12], a->bones[i].bind.m[13], a->bones[i].bind.m[14]); // TransformLink origin
+            float d=(a->bones[i].poseHead - tl).Length(); sum+=d; n++;
+            if (d>worst){ worst=d; worstB=(int)i; }
+        }
+        printf("      [bind] bones=%d  |FK-rest - TransformLink| avg=%.3f worst=%.3f (%s)\n",
+               n, n?sum/n:0.0, worst, worstB>=0?a->bones[worstB].name.c_str():"-");
+        if (worstB>=0){ Vector3 tl(a->bones[worstB].bind.m[12],a->bones[worstB].bind.m[13],a->bones[worstB].bind.m[14]);
+            printf("      [bind]   %s FK-rest=(%.2f,%.2f,%.2f) TransformLink=(%.2f,%.2f,%.2f)\n", a->bones[worstB].name.c_str(),
+                   a->bones[worstB].poseHead.x,a->bones[worstB].poseHead.y,a->bones[worstB].poseHead.z, tl.x,tl.y,tl.z); }
+        return true;
+    }
+    // ---- skinformula <0|1> : elige la formula de skinning (A/B testing headless) ----
+    if (cmd == "skinformula") { int n=1; ss>>n; g_skinFormula = n; return true; }
+    // ---- skincheck <frame> : POR HUESO, distancia del centroide (ponderado) de sus vertices skinneados al
+    //      segmento del hueso animado. Si el skinning es correcto, cada grupo queda PEGADO a su hueso.
+    //      'rest' = misma medida en bind (verts originales vs hueso en FK-rest): baseline del archivo. ----
+    if (cmd == "skincheck") {
+        Mesh* m = (ObjActivo && ObjActivo->getType()==ObjectType::mesh) ? (Mesh*)ObjActivo : NULL;
+        if (!m || !m->skinArmature) { err="skincheck: mesh sin skinArmature"; return false; }
+        Armature* a = m->skinArmature;
+        int f=1; ss>>f;
+        int nv = m->vertexSize;
+        if ((int)m->vertCtrlPoint.size() < nv) { err="skincheck: sin vertCtrlPoint"; return false; }
+        // representante render-vert de cada control-point (posiciones duplicadas por corner son identicas)
+        std::map<int,int> rep;
+        for (int ri=0; ri<nv; ri++) if (!rep.count(m->vertCtrlPoint[ri])) rep[m->vertCtrlPoint[ri]] = ri;
+        // pose REST (sin clip) -> baseline
+        int animSave = a->animActiva; a->animActiva = -1; a->lastPoseFrame = -999999;
+        EvaluarPoseEsqueleto(a, f);
+        std::vector<Vector3> rH(a->bones.size()), rT(a->bones.size());
+        for (size_t b=0;b<a->bones.size();b++){ rH[b]=a->bones[b].poseHead; rT[b]=a->bones[b].poseTail; }
+        // pose ANIMADA + skin
+        a->animActiva = animSave; a->lastPoseFrame = -999999; m->lastSkinFrame = -999999;
+        CurrentFrame = f;
+        SkinearMesh(m);
+        if (!m->skinVertex) { err="skincheck: sin skinVertex"; return false; }
+        // por vertex group (= hueso): centroides ponderados, raw y skinneado (NodeToYup = (x,z,-y) como el display)
+        double sumErr=0, sumRest=0; int nb=0; float worstE=-1; std::string worstN;
+        for (size_t g=0; g<m->vertexGroups.size(); g++){
+            VertexGroup* vg = m->vertexGroups[g];
+            int bi=-1; for (size_t b=0;b<a->bones.size();b++) if (a->bones[b].name==vg->nombre){ bi=(int)b; break; }
+            if (bi<0) continue;
+            Vector3 accS(0,0,0), accR(0,0,0); float wsum=0;
+            for (size_t j=0;j<vg->verts.size() && j<vg->pesos.size();j++){
+                std::map<int,int>::iterator it = rep.find(vg->verts[j]); if (it==rep.end()) continue;
+                int ri = it->second; float w = vg->pesos[j];
+                accS += Vector3(m->skinVertex[ri*3],m->skinVertex[ri*3+1],m->skinVertex[ri*3+2])*w;
+                accR += Vector3(m->vertex[ri*3],   m->vertex[ri*3+1],   m->vertex[ri*3+2])*w;
+                wsum += w;
+            }
+            if (wsum < 0.01f) continue;
+            accS = accS*(1.0f/wsum); accR = accR*(1.0f/wsum);
+            Vector3 pS(accS.x, accS.z, -accS.y), pR(accR.x, accR.z, -accR.y); // NodeToYup
+            float eA = ScriptDistSeg(pS, a->bones[bi].poseHead, a->bones[bi].poseTail);
+            float eR = ScriptDistSeg(pR, rH[bi], rT[bi]);
+            sumErr+=eA; sumRest+=eR; nb++;
+            if (eA > worstE){ worstE = eA; worstN = vg->nombre; }
+            if (eA > 15.0f) printf("      [skchk] %-16s w=%.0f rest=%.1f anim=%.1f\n", vg->nombre.c_str(), wsum, eR, eA);
+        }
+        printf("      [skchk] f=%d formula=%d bones=%d restAvg=%.2f animAvg=%.2f worst=%.1f (%s)\n",
+               f, g_skinFormula, nb, nb?sumRest/nb:0.0, nb?sumErr/nb:0.0, worstE, worstN.c_str());
+        // ---- caza de VERTICES SUELTOS: sin peso (quedan en bind -> spikes) o lejos de TODO hueso ----
+        { std::vector<float> wTot(nv, 0.0f); int cpMax=-1, gvMax=-1;
+          for (int ri=0; ri<nv; ri++) if (m->vertCtrlPoint[ri] > cpMax) cpMax = m->vertCtrlPoint[ri];
+          std::map<int,float> cpWt;
+          for (size_t g=0; g<m->vertexGroups.size(); g++){ VertexGroup* vg=m->vertexGroups[g];
+              for (size_t j=0;j<vg->verts.size() && j<vg->pesos.size();j++){
+                  if (vg->verts[j] > gvMax) gvMax = vg->verts[j];
+                  cpWt[vg->verts[j]] += vg->pesos[j]; } }
+          int sinPeso=0; for (int ri=0; ri<nv; ri++){ std::map<int,float>::iterator it=cpWt.find(m->vertCtrlPoint[ri]);
+              wTot[ri] = (it!=cpWt.end())?it->second:0.0f; if (wTot[ri] < 0.01f) sinPeso++; }
+          int voladores=0; float peor=0; int peorRi=-1;
+          for (int ri=0; ri<nv; ri++){
+              Vector3 p(m->skinVertex[ri*3], m->skinVertex[ri*3+2], -m->skinVertex[ri*3+1]); // NodeToYup
+              float mind=1e9f;
+              for (size_t b=0;b<a->bones.size();b++){ float d=ScriptDistSeg(p, a->bones[b].poseHead, a->bones[b].poseTail); if (d<mind) mind=d; }
+              if (mind > 40.0f){ voladores++; if (mind>peor){ peor=mind; peorRi=ri; } }
+          }
+          printf("      [skchk] nv=%d sinPeso=%d voladores(>40)=%d peor=%.1f cpMax=%d grpVertMax=%d\n",
+                 nv, sinPeso, voladores, peor, cpMax, gvMax);
+          // ---- MULTI-HUESO: cp -> lista de (hueso,peso). Aisla los verts influidos por >=2 huesos y mide
+          //      su distancia a SUS PROPIOS huesos (no al mas cercano). Es lo que Dante ve romperse (rodillas/codos). ----
+          { std::map<int, std::vector<std::pair<int,float> > > cpB;
+            for (size_t g=0; g<m->vertexGroups.size(); g++){ VertexGroup* vg=m->vertexGroups[g];
+                int bi=-1; for (size_t b=0;b<a->bones.size();b++) if (a->bones[b].name==vg->nombre){ bi=(int)b; break; }
+                if (bi<0) continue;
+                for (size_t j=0;j<vg->verts.size() && j<vg->pesos.size();j++)
+                    if (vg->pesos[j] > 0.001f) cpB[vg->verts[j]].push_back(std::make_pair(bi, vg->pesos[j])); }
+            int nMulti=0, nMultiMal=0; float peorM=0; int peorMri=-1; double sumDevM=0;
+            for (int ri=0; ri<nv; ri++){
+                std::map<int, std::vector<std::pair<int,float> > >::iterator it=cpB.find(m->vertCtrlPoint[ri]);
+                if (it==cpB.end() || it->second.size() < 2) continue; // solo multi-hueso
+                nMulti++;
+                // hueso PRIMARIO (mayor peso) del vert
+                int bi=it->second[0].first; float wmax=it->second[0].second;
+                for (size_t k=1;k<it->second.size();k++) if (it->second[k].second>wmax){ wmax=it->second[k].second; bi=it->second[k].first; }
+                Vector3 pS(m->skinVertex[ri*3], m->skinVertex[ri*3+2], -m->skinVertex[ri*3+1]); // NodeToYup skin
+                Vector3 pR(m->vertex[ri*3],    m->vertex[ri*3+2],    -m->vertex[ri*3+1]);        // NodeToYup bind
+                // DEV = cuanto cambia su distancia al hueso primario (rest vs anim). Un vert bien skinneado la conserva.
+                float dev = ScriptDistSeg(pS, a->bones[bi].poseHead, a->bones[bi].poseTail)
+                          - ScriptDistSeg(pR, rH[bi], rT[bi]);
+                if (dev<0) dev=-dev; sumDevM += dev;
+                if (dev > 10.0f){ nMultiMal++; if (dev>peorM){ peorM=dev; peorMri=ri; } }
+            }
+            printf("      [skchk] MULTI-hueso=%d devAvg=%.2f rotos(dev>10)=%d peor=%.1f\n",
+                   nMulti, nMulti?sumDevM/nMulti:0.0, nMultiMal, peorM);
+            if (peorMri>=0){ int cp=m->vertCtrlPoint[peorMri];
+                printf("      [skchk]   peorMulti ri=%d cp=%d skin=(%.1f,%.1f,%.1f)\n", peorMri, cp,
+                       m->skinVertex[peorMri*3],m->skinVertex[peorMri*3+1],m->skinVertex[peorMri*3+2]);
+                std::map<int, std::vector<std::pair<int,float> > >::iterator it=cpB.find(cp);
+                if (it!=cpB.end()) for (size_t k=0;k<it->second.size();k++)
+                    printf("      [skchk]     hueso '%s' w=%.3f\n", a->bones[it->second[k].first].name.c_str(), it->second[k].second); }
+          }
+          // DISPERSION RIGIDA: un vert dominado (>90%) por UN hueso conserva su distancia al hueso al animar
+          // (la rotacion preserva distancias). dev = |dist(skin, huesoAnim) - dist(raw, huesoRest)|. Si es alta,
+          // ese vert recibe la matriz EQUIVOCADA (mapeo de pesos roto) aunque el centroide del grupo este bien.
+          { std::map<int, std::pair<int,float> > cpBest; // cp -> (huesoDominante, wMax)
+            for (size_t g=0; g<m->vertexGroups.size(); g++){ VertexGroup* vg=m->vertexGroups[g];
+                int bi=-1; for (size_t b=0;b<a->bones.size();b++) if (a->bones[b].name==vg->nombre){ bi=(int)b; break; }
+                if (bi<0) continue;
+                for (size_t j=0;j<vg->verts.size() && j<vg->pesos.size();j++){
+                    std::map<int,std::pair<int,float> >::iterator it=cpBest.find(vg->verts[j]);
+                    if (it==cpBest.end() || vg->pesos[j] > it->second.second) cpBest[vg->verts[j]] = std::make_pair(bi, vg->pesos[j]); } }
+            int nDom=0, nMal=0; double sumDev=0; float worstDev=0; int worstB=-1;
+            for (int ri=0; ri<nv; ri++){
+                std::map<int,std::pair<int,float> >::iterator it=cpBest.find(m->vertCtrlPoint[ri]);
+                if (it==cpBest.end() || wTot[ri]<0.01f || it->second.second/wTot[ri] < 0.9f) continue;
+                int bi = it->second.first; nDom++;
+                Vector3 pS(m->skinVertex[ri*3], m->skinVertex[ri*3+2], -m->skinVertex[ri*3+1]);
+                Vector3 pR(m->vertex[ri*3],    m->vertex[ri*3+2],    -m->vertex[ri*3+1]);
+                float dev = ScriptDistSeg(pS, a->bones[bi].poseHead, a->bones[bi].poseTail)
+                          - ScriptDistSeg(pR, rH[bi], rT[bi]);
+                if (dev < 0) dev = -dev;
+                sumDev += dev; if (dev > 10.0f) nMal++;
+                if (dev > worstDev){ worstDev = dev; worstB = bi; }
+            }
+            printf("      [skchk] dominados=%d devAvg=%.2f devMal(>10)=%d worstDev=%.1f (%s)\n",
+                   nDom, nDom?sumDev/nDom:0.0, nMal, worstDev, worstB>=0?a->bones[worstB].name.c_str():"-");
+          }
+          if (peorRi>=0){ int cp=m->vertCtrlPoint[peorRi];
+              printf("      [skchk] peorVert ri=%d cp=%d wTot=%.2f raw=(%.1f,%.1f,%.1f) skin=(%.1f,%.1f,%.1f)\n",
+                     peorRi, cp, wTot[peorRi], m->vertex[peorRi*3],m->vertex[peorRi*3+1],m->vertex[peorRi*3+2],
+                     m->skinVertex[peorRi*3],m->skinVertex[peorRi*3+1],m->skinVertex[peorRi*3+2]);
+              // que grupos pesan ese cp
+              for (size_t g=0; g<m->vertexGroups.size(); g++){ VertexGroup* vg=m->vertexGroups[g];
+                  for (size_t j=0;j<vg->verts.size() && j<vg->pesos.size();j++)
+                      if (vg->verts[j]==cp) printf("      [skchk]   grupo '%s' w=%.3f\n", vg->nombre.c_str(), vg->pesos[j]); }
+          }
+        }
+        return true;
+    }
+    // ---- animpose <frame> : evalua la pose por FK y vuelca poseHead/poseTail de cada hueso ----
+    if (cmd == "animpose") {
+        Armature* a = (ObjActivo && ObjActivo->getType()==ObjectType::armature) ? (Armature*)ObjActivo : NULL;
+        if (!a) { err="animpose: sin armature activo"; return false; }
+        int frame=1; ss>>frame;
+        EvaluarPoseEsqueleto(a, frame);
+        for (size_t i=0;i<a->bones.size();i++)
+            printf("      [pose] %s f=%d head=(%.2f,%.2f,%.2f) tail=(%.2f,%.2f,%.2f)\n",
+                   a->bones[i].name.c_str(), frame,
+                   a->bones[i].poseHead.x,a->bones[i].poseHead.y,a->bones[i].poseHead.z,
+                   a->bones[i].poseTail.x,a->bones[i].poseTail.y,a->bones[i].poseTail.z);
+        return true;
+    }
+    // ---- anim <add|del|up|down|count|list|rename <txt>> : gestion de clips del armature activo ----
+    if (cmd == "anim") {
+        Armature* a = (ObjActivo && ObjActivo->getType()==ObjectType::armature) ? (Armature*)ObjActivo : NULL;
+        if (!a) { err = "no hay armature activo"; return false; }
+        std::string sub; ss >> sub;
+        if (sub == "add")       CrearAnimacion(a);
+        else if (sub == "del")  BorrarAnimacionActiva(a);
+        else if (sub == "up")   MoverAnimacionActiva(a, -1);
+        else if (sub == "down") MoverAnimacionActiva(a, +1);
+        else if (sub == "count") printf("      [anim] count=%d active=%d\n", (int)a->animations.size(), a->animActiva);
+        else if (sub == "list") { for (size_t i=0;i<a->animations.size();i++){ SkeletalAnimation* an=a->animations[i];
+                                      int nkf=0; for(size_t t=0;t<an->tracks.size();t++) for(size_t p=0;p<an->tracks[t].Propertys.size();p++) nkf+=(int)an->tracks[t].Propertys[p].keyframes.size();
+                                      printf("      [anim] %d: '%s' fps=%d start=%d end=%d tracks=%d keys=%d\n",
+                                             (int)i, an->name.c_str(), an->FrameRate, an->startFrame, an->endFrame, (int)an->tracks.size(), nkf); } }
+        else if (sub == "rename") { std::string nm; std::getline(ss, nm);
+                                    size_t p=nm.find_first_not_of(" \t"); if(p!=std::string::npos) nm=nm.substr(p);
+                                    if (a->animActiva>=0 && a->animActiva<(int)a->animations.size()) a->animations[a->animActiva]->name = nm; }
+        else { err = "subcomando anim desconocido: '"+sub+"'"; return false; }
+        return true;
+    }
+    // ---- importfbx <ruta> : importa un FBX (para testear el import de animaciones headless) ----
+    if (cmd == "importfbx") {
+        std::string ruta; std::getline(ss, ruta);
+        size_t p = ruta.find_first_not_of(" \t"); if (p!=std::string::npos) ruta = ruta.substr(p);
+        if (ruta.empty()) { err = "importfbx: falta la ruta"; return false; }
+        bool ok = ImportFBX(ruta);
+        printf("      [importfbx] %s -> %s\n", ruta.c_str(), ok?"OK":"FALLO");
+        return ok;
+    }
+    // ---- timeline <play|pause|rev|start|end|goto <n>|range <s> <e>|tick|state> : motor de playback global ----
+    if (cmd == "timeline") {
+        std::string sub; ss >> sub;
+        if (sub == "play")       { PlayAnimation = true; AnimPlayDir = 1; }
+        else if (sub == "rev")   { PlayAnimation = true; AnimPlayDir = -1; }
+        else if (sub == "pause") { PlayAnimation = false; }
+        else if (sub == "start") { CurrentFrame = StartFrame; }
+        else if (sub == "end")   { CurrentFrame = EndFrame; }
+        else if (sub == "goto")  { int n=0; ss>>n; CurrentFrame = n; }
+        else if (sub == "range") { int s=0,e=0; ss>>s>>e; StartFrame=s; EndFrame=e; }
+        else if (sub == "tick")  { int n=1; ss>>n; if(n<1)n=1; for(int i=0;i<n;i++) AnimTick(); }
+        else if (sub == "state") { printf("      [timeline] cur=%d start=%d end=%d play=%d dir=%d\n",
+                                          CurrentFrame, StartFrame, EndFrame, PlayAnimation?1:0, AnimPlayDir); }
+        else { err = "subcomando timeline desconocido: '"+sub+"'"; return false; }
         return true;
     }
 

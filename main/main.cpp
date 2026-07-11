@@ -1,5 +1,6 @@
 #include "w3dGraphics.h" // abstraccion de graficos (independencia de OpenGL)
 #include "test/W3dScript.h" // modo test: whisk3d --script <ruta>
+
 #ifdef __EMSCRIPTEN__       // WebGL: el browser es 1 hilo -> el loop es emscripten_set_main_loop
 #include <emscripten.h>
 #include <emscripten/html5.h> // tamano del canvas (resize) + cancelar el loop al salir
@@ -543,8 +544,13 @@ static void MainLoopFrame() {
 
     // Animación
     Uint32 now = SDL_GetTicks();
-    if (now - lastAnimTime >= millisecondsPerFrame) {
+    // el avance de frames va al ritmo de AnimFPS (default 30), independiente de los fps de la UI (que puede ir a 60).
+    // Asi la animacion NO va "muy rapido": un frame de animacion dura 1000/AnimFPS ms aunque se dibuje 2 veces.
+    unsigned int animMs = (AnimFPS > 0) ? (unsigned int)(1000 / AnimFPS) : 33;
+    if (now - lastAnimTime >= animMs) {
         lastAnimTime = now;
+        // Timeline: si esta en PLAY, avanzar CurrentFrame (loop Start..End) y forzar redibujo
+        if (PlayAnimation) { AnimTick(); g_redraw = true; }
         // Actualizar frame
         ReloadAnimation();
     }
@@ -562,7 +568,7 @@ static void MainLoopFrame() {
     // Render EVENT-DRIVEN: solo si algo cambio (g_redraw) o hay una animacion EN
     // PLAY (vertex-anim o materiales animados activos). Sino no se dibuja nada ->
     // CPU casi 0 en reposo (como Blender), en vez de renderizar 60 veces/seg al pedo.
-    bool animando = HayAnimacionActiva() || !VertexAnimationActives.empty();
+    bool animando = HayAnimacionActiva() || !VertexAnimationActives.empty() || PlayAnimation;
 #ifdef __EMSCRIPTEN__
     // WebGL: renderizar SIEMPRE (no event-driven). Motivos: 1) el canvas WebGL usa
     // preserveDrawingBuffer=false -> en un frame sin dibujar el browser BORRA el canvas a negro

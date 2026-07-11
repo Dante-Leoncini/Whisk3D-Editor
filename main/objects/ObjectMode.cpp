@@ -4,6 +4,7 @@
 #include "EditMesh.h"  // CentroSeleccion
 #include "Undo.h"      // Ctrl+Z: capturar transform / limpiar al borrar
 #include "ViewPorts/LayoutInput.h" // SNAP en modo objeto (SnapBuscarTarget, g_snap, enums)
+#include "edit/Modifier.h" // deep-copy de modificadores al duplicar
 
 // SNAP en MODO OBJETO: se snapshotean los "puntos de snap" de la seleccion al empezar el transform (todos los
 // verts de las mallas + el ORIGEN de camara/lampara/empty) y move/rotate/scale imantan la BASE al target.
@@ -367,6 +368,18 @@ static Object* W3dDuplicarUno(Object* src) {
         d->normCustomBuf = m->normCustomBuf;
         d->normVertBuf = m->normVertBuf;
         d->overlayLcache = m->overlayLcache;
+        // CAPAS EDITABLES (deep copy). Sin esto el duplicado perdia sus uv maps / color layers y, sobre todo, sus
+        // VERTEX GROUPS (pesos de skinning) -> el modificador Armature no tenia a que aplicar y la malla no deformaba.
+        for (size_t i = 0; i < m->uvMaps.size(); i++)       d->uvMaps.push_back(new UVMap(*m->uvMaps[i]));
+        for (size_t i = 0; i < m->colorLayers.size(); i++)  d->colorLayers.push_back(new ColorLayer(*m->colorLayers[i]));
+        for (size_t i = 0; i < m->vertexGroups.size(); i++) d->vertexGroups.push_back(new VertexGroup(*m->vertexGroups[i]));
+        d->uvMapActivo = m->uvMapActivo; d->colorActivo = m->colorActivo; d->grupoActivo = m->grupoActivo;
+        d->vertCtrlPoint = m->vertCtrlPoint; // vertice-render -> control-point (skinning / weight paint)
+        // MODIFICADORES (deep copy). Modifier no tiene recursos propios y su 'target' es un puntero COMPARTIDO
+        // (el mismo esqueleto / objeto espejo) -> copia plana correcta.
+        for (size_t i = 0; i < m->modificadores.size(); i++) d->modificadores.push_back(new Modifier(*m->modificadores[i]));
+        d->modificadorActivo = m->modificadorActivo;
+        d->skinArmature = m->skinArmature; // mismo esqueleto (los buffers skin* se regeneran en el primer render)
         nuevo = d;
     }
     else if (src->getType() == ObjectType::light) {
