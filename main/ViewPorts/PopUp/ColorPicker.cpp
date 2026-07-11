@@ -85,7 +85,7 @@ ColorPicker::ColorPicker() : PopUpBase("Color") {
     filaCard = new Card(NULL, 10, 10);
     btnOk = new Button("OK");
     btnCancel = new Button("Cancel");
-    btnUnidad = new Button("Switch to 0-100%");
+    btnUnidad = new Button("Switch to %");
     btnOk->adaptar = false;
     btnCancel->adaptar = false;
     btnUnidad->adaptar = false;
@@ -495,8 +495,8 @@ void ColorPicker::Render() {
         int contW = popUpWindow->width - izq - marginGS - borderGS;
         if (pestania == 0) {
             // solo en RGB (HSV es flotante 0..1 y Hex no usa unidad)
-            btnUnidad->text = ColorPickerUnidad ? "Switch to 0-255"
-                                                : "Switch to 0-100%";
+            btnUnidad->text = ColorPickerUnidad ? "Switch to 0"
+                                                : "Switch to %";
             btnUnidad->focoMenu = (fila == Filas()); // enfocado con flechas (la fila del switch en RGB)
             btnUnidad->Resize(contW);
             w3dEngine::PushMatrix();
