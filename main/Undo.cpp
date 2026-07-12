@@ -5,6 +5,8 @@
 #include "objects/EditMesh.h"    // EditMesh (seleccion de sub-elementos: vertSel/edgeSel/faceSel)
 #include "objects/ObjectMode.h"
 #include "objects/Light.h"       // Lights (global): el borrado de luces lo des/re-registra
+#include "edit/Modifier.h"       // Modifier (limpiar target de Armature/Mirror/Boolean al borrar el objeto apuntado)
+#include "objects/Armature.h"    // Armature (cast correcto Object*<->Armature* al limpiar/restaurar skinArmature)
 // CameraActive: NO incluyo Camera.h (header pesado del editor, arrastra Target/Curve/icons -> riesgo en el
 // build de Symbian). Forward-declaro: solo necesito el puntero (Object es la 1ra base -> el cast a Object* es offset 0).
 class Camera; extern Camera* CameraActive;
@@ -300,10 +302,38 @@ static void RecolectarBorrar(Object* node, bool incCol, std::vector<DelEntry>& o
 // abuelo preservando su posicion global, v1: solo traslacion, igual que W3dReparent).
 struct RepEntry { Object* child; Object* abuelo; Object* borrado; Vector3 posBajoAbuelo; Vector3 posBajoBorrado; };
 
+// referencia de una malla a un objeto que se BORRA: el target de un modificador (Armature/Mirror/Boolean) o el
+// skinArmature directo. Hay que LIMPIARLA al borrar, sino queda COLGANDO: la malla sigue deformando/animando contra
+// un esqueleto borrado (bug Dante: "borre el esqueleto y el modelo sigue con la animacion") y cuando el comando de
+// undo se cae del stack (delete del obj) es un puntero MUERTO -> crash. Se restaura en el undo.
+struct RefEntry { Mesh* mesh; Modifier* mod; Object* target; }; // mod!=NULL: era mod->target; mod==NULL: era skinArmature
+static bool EnSubarbol(Object* raiz, Object* buscado){
+    if (!raiz) return false;
+    if (raiz == buscado) return true;
+    for (size_t i = 0; i < raiz->Childrens.size(); i++) if (EnSubarbol(raiz->Childrens[i], buscado)) return true;
+    return false;
+}
+static bool ApuntaABorrado(Object* target, const std::vector<DelEntry>& ents){
+    if (!target) return false;
+    for (size_t i = 0; i < ents.size(); i++) if (EnSubarbol(ents[i].obj, target)) return true;
+    return false;
+}
+// recorre la escena y junta toda referencia (modificador o skinArmature) que apunte a un objeto que se borra.
+static void RecolectarRefs(Object* node, const std::vector<DelEntry>& ents, std::vector<RefEntry>& out){
+    if (!node) return;
+    if (node->getType() == ObjectType::mesh){ Mesh* m = (Mesh*)node;
+        for (size_t i = 0; i < m->modificadores.size(); i++){ Modifier* md = m->modificadores[i];
+            if (md && ApuntaABorrado(md->target, ents)){ RefEntry r; r.mesh=m; r.mod=md; r.target=md->target; out.push_back(r); } }
+        if (ApuntaABorrado((Object*)m->skinArmature, ents)){ RefEntry r; r.mesh=m; r.mod=NULL; r.target=(Object*)m->skinArmature; out.push_back(r); }
+    }
+    for (size_t i = 0; i < node->Childrens.size(); i++) RecolectarRefs(node->Childrens[i], ents, out);
+}
+
 class DeleteUndo : public UndoCmd {
     std::vector<DelEntry> ents;
     std::vector<RepEntry> reps;    // hijos de los borrados, reparentados al abuelo
-    bool repsListos;               // las reps se computan UNA vez (en el 1er detach)
+    std::vector<RefEntry> refs;    // refs de mallas (modificador/skinArmature) a los objetos borrados -> limpiar/restaurar
+    bool repsListos;               // las reps (y refs) se computan UNA vez (en el 1er detach)
     std::vector<Object*>  selPrev; Object* actPrev; Camera* camPrev;
     bool enEscena; // true = los objetos estan en la escena; false = los tiene este comando (detachados)
     void QuitarHijo(Object* p, Object* c) {
@@ -328,6 +358,8 @@ class DeleteUndo : public UndoCmd {
                     reps.push_back(r);
                 }
             }
+            // refs de OTRAS mallas al subarbol borrado (modificador Armature/Mirror/Boolean, o skinArmature directo)
+            if (SceneCollection) RecolectarRefs(SceneCollection, ents, refs);
             repsListos = true;
         }
         // 2) mover los hijos reparentados al abuelo (ANTES de detachar el borrado, asi sus luces no se detachan)
@@ -343,6 +375,12 @@ class DeleteUndo : public UndoCmd {
                 if (e.parent->Childrens[k] == e.obj) { e.index = (int)k; e.parent->Childrens.erase(e.parent->Childrens.begin()+k); break; }
             DetacharLuces(e.obj);
             if (ContieneCamActiva(e.obj)) CameraActive = NULL;
+        }
+        // 4) limpiar las refs colgantes: el modificador vuelve a target=NULL ("none") y skinArmature a NULL -> la malla
+        //    deja de deformar (vuelve a bind) y no queda apuntando al esqueleto borrado (que este comando liberara).
+        for (size_t i = 0; i < refs.size(); i++){ RefEntry& r = refs[i];
+            if (r.mod) r.mod->target = NULL; else if (r.mesh) r.mesh->skinArmature = NULL;
+            if (r.mesh) r.mesh->lastSkinFrame = -999999;
         }
         enEscena = false;
     }
@@ -367,6 +405,12 @@ public:
             r.child->Parent = r.borrado;
             r.child->pos = r.posBajoBorrado;
             r.borrado->Childrens.push_back(r.child);
+        }
+        // restaurar las refs (el armature/target volvio a la escena): el modificador recupera su target y skinArmature
+        // su puntero -> la malla vuelve a deformar como antes del borrado.
+        for (size_t i = 0; i < refs.size(); i++){ RefEntry& r = refs[i];
+            if (r.mod) r.mod->target = r.target; else if (r.mesh) r.mesh->skinArmature = (Armature*)r.target;
+            if (r.mesh) r.mesh->lastSkinFrame = -999999;
         }
         CameraActive = camPrev; ObjSelects = selPrev; ObjActivo = actPrev; // restaura seleccion + camara activa
         for (size_t i = 0; i < ObjSelects.size(); i++) if (ObjSelects[i]) ObjSelects[i]->select = true;

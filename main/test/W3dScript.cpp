@@ -443,6 +443,81 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         printf("      [importfbx] %s -> %s\n", ruta.c_str(), ok?"OK":"FALLO");
         return ok;
     }
+    // ---- armdeltest : borra el armature con una malla skinneada -> verifica que skinArmature queda NULL (no cuelga),
+    //      que skinnear no crashea, y que el undo lo restaura. (bug: borrar esqueleto y la malla sigue animando/crash). ----
+    if (cmd == "armdeltest") {
+        Armature* a=NULL; Mesh* m=NULL;
+        { std::vector<Object*> st; if(SceneCollection) st.push_back(SceneCollection);
+          while(!st.empty()){ Object* o=st.back(); st.pop_back();
+            if (o->getType()==ObjectType::armature && !a) a=(Armature*)o;
+            if (o->getType()==ObjectType::mesh && ((Mesh*)o)->skinArmature && !m) m=(Mesh*)o;
+            for(size_t i=0;i<o->Childrens.size();i++) st.push_back(o->Childrens[i]); } }
+        if (!a || !m) { err="armdeltest: falta armature o mesh skinneado"; return false; }
+        printf("      [armdel] antes: skinArmature=%p armature=%p\n", (void*)m->skinArmature, (void*)a);
+        if (InteractionMode != ObjectMode) {}
+        DeseleccionarTodo(); ObjActivo=(Object*)a; a->Seleccionar();
+        Eliminar(false); // borra el armature seleccionado (lo detacha al undo + limpia refs)
+        printf("      [armdel] tras borrar: skinArmature=%p (0 = OK, no cuelga)\n", (void*)m->skinArmature);
+        CurrentFrame=5; m->lastSkinFrame=-999999; SkinearMesh(m); // NO debe crashear (skinArmature NULL -> no deforma)
+        printf("      [armdel] SkinearMesh tras borrar: OK (sin crash)\n");
+        UndoDeshacer(); // undo -> re-inserta el armature y restaura skinArmature
+        printf("      [armdel] tras undo: skinArmature=%p (debe volver a %p)\n", (void*)m->skinArmature, (void*)a);
+        m->lastSkinFrame=-999999; SkinearMesh(m);
+        printf("      [armdel] SkinearMesh tras undo: OK\n");
+        return true;
+    }
+    // ---- bordercheck : diagnostica el contorno skinneado. Cuenta aristas cuyos 2 extremos caen en DISTINTO vertex
+    //      group (hueso) -> posRep las soldo cruzando piezas y el contorno estira mal (el drama de los pies de LISA). ----
+    if (cmd == "bordercheck") {
+        Mesh* found=NULL;
+        { std::vector<Object*> stack; if (SceneCollection) stack.push_back(SceneCollection);
+          while(!stack.empty() && !found){ Object* o=stack.back(); stack.pop_back();
+            if (o->getType()==ObjectType::mesh && ((Mesh*)o)->skinArmature) found=(Mesh*)o;
+            for (size_t i=0;i<o->Childrens.size();i++) stack.push_back(o->Childrens[i]); } }
+        if (!found) { err="bordercheck: no hay malla con skinArmature"; return false; }
+        Mesh* m=found;
+        int nv=m->vertexSize;
+        // control-point -> grupo (hueso) dominante. Un render-vert -> su control-point -> grupo.
+        std::map<int,int> cpGrupo; // control-point -> indice de grupo
+        for (size_t g=0; g<m->vertexGroups.size(); g++)
+            for (size_t j=0;j<m->vertexGroups[g]->verts.size();j++) cpGrupo[m->vertexGroups[g]->verts[j]] = (int)g;
+        int cross=0, sinGrupo=0, total=0;
+        for (size_t e=0; e+1<m->edges.size(); e+=2){
+            int a=m->edges[e], b=m->edges[e+1];
+            if (a<0||a>=nv||b<0||b>=nv) continue;
+            int ca=(a<(int)m->vertCtrlPoint.size())?m->vertCtrlPoint[a]:-1;
+            int cb=(b<(int)m->vertCtrlPoint.size())?m->vertCtrlPoint[b]:-1;
+            std::map<int,int>::iterator ia=cpGrupo.find(ca), ib=cpGrupo.find(cb);
+            total++;
+            if (ia==cpGrupo.end()||ib==cpGrupo.end()){ sinGrupo++; continue; }
+            if (ia->second != ib->second) cross++;
+        }
+        printf("      [border] edges=%d  cruzan-2-huesos=%d  con-extremo-sin-grupo=%d  (posRep suelda por posicion de bind)\n",
+               total, cross, sinGrupo);
+        return true;
+    }
+    // ---- skinbench <frames> : mide el costo de SkinearMesh (forzando recompute cada frame) sobre la 1er malla skinneada. ----
+    if (cmd == "skinbench") {
+        int nf=200; ss>>nf; if(nf<1)nf=1;
+        Mesh* found=NULL;
+        { std::vector<Object*> stack; if (SceneCollection) stack.push_back(SceneCollection);
+          while(!stack.empty() && !found){ Object* o=stack.back(); stack.pop_back();
+            if (o->getType()==ObjectType::mesh && ((Mesh*)o)->skinArmature) found=(Mesh*)o;
+            for (size_t i=0;i<o->Childrens.size();i++) stack.push_back(o->Childrens[i]); } }
+        if (!found) { err="skinbench: no hay malla con skinArmature"; return false; }
+        Armature* a=found->skinArmature;
+        clock_t t0=clock();
+        for (int f=0; f<nf; f++){
+            CurrentFrame = 1 + (f % 30);            // varia el frame -> fuerza re-FK + re-skin
+            a->lastPoseFrame=-999999; found->lastSkinFrame=-999999;
+            SkinearMesh(found);
+        }
+        clock_t t1=clock();
+        double ms = 1000.0*(double)(t1-t0)/CLOCKS_PER_SEC;
+        printf("      [skinbench] malla='%s' nv=%d bones=%d frames=%d -> %.2f ms total, %.3f ms/frame\n",
+               found->name.c_str(), found->vertexSize, (int)a->bones.size(), nf, ms, ms/nf);
+        return true;
+    }
     // ---- skinexport <frame> <archivo> : busca la 1er malla con skinArmature, la skinnea en <frame> y vuelca
     //      TODOS los vertices skinneados (x y z por linea) a <archivo>. Para Procrustes vs Blender (ground truth). ----
     if (cmd == "skinexport") {

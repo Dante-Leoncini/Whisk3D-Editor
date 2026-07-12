@@ -24,9 +24,16 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
+        <!-- launchMode=singleTask: reabrir desde el launcher/recientes TRAE la instancia existente (onResume), NO crea
+             otra Activity. Sin esto, con los globals C++ estaticos vivos, main() se relanzaba y ConstructUniversal
+             DUPLICABA la escena (aparecia otro cubo + camara + luz encima de lo que ya habia).
+             configChanges: rotar / mostrar teclado / cambiar densidad NO destruye ni recrea la Activity (sino tambien
+             se relanzaba main -> misma duplicacion + perdida del contexto GL = texturas negras). SDL maneja el resize. -->
         <activity
             android:name=".Whisk3DActivity"
             android:exported="true"
+            android:launchMode="singleTask"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden|keyboard|navigation|uiMode|density|touchscreen|locale|fontScale"
             android:label="@string/app_name">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

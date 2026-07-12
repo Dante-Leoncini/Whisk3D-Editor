@@ -27,6 +27,12 @@ void ConstructUniversal(int argc, char* argv[]) {
     W3dInitUI(skinDir);
     SetGlobalScale(cfg.scale > 0 ? cfg.scale : 3); // configurable (config.ini "scale"); 1 = estilo N95
 
+    // RE-ENTRADA (Android): si la Activity fue destruida y main() se relanza con los globals C++ estaticos VIVOS, ya
+    // existe el layout (rootViewport). NO recrear la escena default (sino DUPLICA: otro cubo + camara + luz sobre lo
+    // que habia). El W3dInitGraphics/W3dInitUI de arriba ya re-subio las texturas de UI al contexto GL nuevo.
+    // El manifest (singleTask + configChanges) + BLOCK_ON_PAUSE deberian evitar llegar aca; esto es la red de seguridad.
+    if (rootViewport != NULL) return;
+
     // ======================================================
     // Si se abrió un archivo .w3d al hacer doble click
     // ======================================================

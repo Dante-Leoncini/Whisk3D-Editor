@@ -81,4 +81,8 @@ class UVEditor : public ViewportBase, public WithBorder {
 #endif
 };
 
+// dropdown "Texture" de la barra del UV editor: fija a mano que parte/textura del modelo se muestra (-1 = auto).
+// Lo llama LayoutClickBarraUV (LayoutInput.cpp) al elegir una opcion del menu.
+void UVSetTexOverride(Mesh* m, int part);
+
 #endif

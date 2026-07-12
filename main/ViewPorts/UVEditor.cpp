@@ -35,6 +35,8 @@ UVEditor::UVEditor() {
     BarButtons[3]->desplegable = true;
     BarButtons.push_back(new Button("Snap"));                        // [4] snap cursor<->seleccion
     BarButtons[4]->desplegable = true;
+    BarButtons.push_back(new Button("Texture"));                     // [5] dropdown: elegir que textura ver
+    BarButtons[5]->desplegable = true;
 }
 
 // modo de seleccion EFECTIVO del editor UV: en sync sigue al 3D; si no, el propio.
@@ -59,6 +61,25 @@ static int UVParteActiva(Mesh* m) {
     }
     return 0;
 }
+
+// --- override MANUAL de la parte/textura a mostrar (dropdown "Texture" de la barra). -1 = auto (la parte activa).
+// El override CAE al cambiar de malla o de seleccion de parte: asi se respeta el auto-cambio al seleccionar objeto/
+// meshpart/material, pero mientras tanto podes elegir a mano CUALQUIER textura del modelo desde el dropdown.
+static int   g_uvTexOverride = -1;
+static Mesh* g_uvTexOvrMesh  = NULL;
+static int   g_uvAutoAtOvr   = -1;   // UVParteActiva al fijar el override (detecta cambio de seleccion)
+static int UVParteEfectiva(Mesh* m){
+    if (!m) return -1;
+    int autoPart = UVParteActiva(m);
+    if (g_uvTexOverride >= 0 && (g_uvTexOvrMesh != m || autoPart != g_uvAutoAtOvr ||
+                                 g_uvTexOverride >= (int)m->materialsGroup.size())){
+        g_uvTexOverride = -1; g_uvTexOvrMesh = NULL; // cambio la seleccion/malla -> vuelve al auto
+    }
+    return (g_uvTexOverride >= 0) ? g_uvTexOverride : autoPart;
+}
+// lo llama el dropdown de la barra (LayoutInput.cpp): fija a mano la parte/textura a ver.
+void UVSetTexOverride(Mesh* m, int part){ g_uvTexOverride = part; g_uvTexOvrMesh = m; g_uvAutoAtOvr = UVParteActiva(m); }
+int  UVParteMostrada(Mesh* m){ return UVParteEfectiva(m); } // para la barra (nombre del boton)
 
 // un punto (u,v) del espacio UV -> pixel del viewport. V=0 va ARRIBA: la convencion del engine
 // es V=0 = arriba de la imagen (stb top-first + el importador OBJ hace 1-v), asi la textura
@@ -131,10 +152,10 @@ void UVEditor::Render() {
 
     Mesh* m = (ObjActivo && ObjActivo->getType() == ObjectType::mesh)
                   ? (Mesh*)ObjActivo : NULL;
-    CalcAspectoUV(m, m ? UVParteActiva(m) : -1); // aspect ratio de la textura activa (antes de cualquier UVtoScreen)
+    CalcAspectoUV(m, m ? UVParteEfectiva(m) : -1); // aspect ratio de la textura MOSTRADA (auto o la elegida en el dropdown)
     // botones SelMode/Pivot/Snap solo en Edit Mode sobre esta malla; iconos = modo/pivot actual
     const bool enEditUV = (m && (Object*)m == g_editMesh);
-    if (BarButtons.size() > 4) {
+    if (BarButtons.size() > 5) {
         BarButtons[2]->visible = enEditUV; BarButtons[3]->visible = enEditUV; BarButtons[4]->visible = enEditUV;
         int mUV = ModoUV();
         BarButtons[2]->icon = (mUV == SelEdge) ? (int)IconType::selEdge :
@@ -143,6 +164,16 @@ void UVEditor::Render() {
                               (g_transformPivot == PivotIndividual) ? (int)IconType::pivotIndividual :
                               (g_transformPivot == PivotActive)     ? (int)IconType::pivotActive :
                                                                       (int)IconType::pivotMedian;
+        // [5] Texture: visible si la malla tiene >=2 partes; el texto = nombre de archivo de la TEXTURA mostrada.
+        bool hayTex = (m && m->materialsGroup.size() >= 2);
+        BarButtons[5]->visible = hayTex;
+        if (hayTex){ int p = UVParteEfectiva(m);
+            Material* mm = (p >= 0 && p < (int)m->materialsGroup.size()) ? m->materialsGroup[p].material : NULL;
+            std::string lbl = "Texture";
+            if (mm && mm->texture && !mm->texture->path.empty()){ const std::string& pt = mm->texture->path;
+                size_t sl = pt.find_last_of("/\\"); lbl = (sl==std::string::npos) ? pt : pt.substr(sl+1); }
+            BarButtons[5]->text = lbl;
+        }
     }
 
     // contorno del cuadrado UV (0..1): referencia de los limites de la imagen
@@ -162,7 +193,7 @@ void UVEditor::Render() {
     }
 
     if (m) {
-        const int part = UVParteActiva(m);
+        const int part = UVParteEfectiva(m); // auto (parte activa) o la elegida a mano en el dropdown "Texture"
         Material* mat = (part < (int)m->materialsGroup.size())
                             ? m->materialsGroup[part].material : NULL;
 

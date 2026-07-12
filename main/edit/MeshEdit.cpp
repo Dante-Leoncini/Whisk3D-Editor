@@ -2914,6 +2914,7 @@ static void OptimizarCacheVertices(MeshIndex* idx, int numTris, int numVerts) {
 // asi un borde compartido por 2 caras con vertices distintos -mismo lugar- no se
 // repite). Cada par (edges[2i], edges[2i+1]) es una arista.
 void Mesh::CalcularBordes(bool invalidarEdit, bool reagruparPosRep) {
+    skinGeomVersion++; // la geometria de render se regenero -> invalida el cache CSR de skinning (aunque nV no cambie)
     edges.clear();
     bordesBuf.clear();
     vertsAgrupados = 0;

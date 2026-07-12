@@ -11,6 +11,8 @@
 #include "WhiskUI/rectangle.h" // el velo del modo foco
 #include "objects/Objects.h"
 #include "objects/Mesh.h"
+#include "objects/Materials.h" // Material (mat->texture) para el dropdown "Texture" del UV editor
+#include "objects/Textures.h"  // Texture (path) para las etiquetas del dropdown
 #include "objects/EditMesh.h"
 #include "objects/Light.h"
 #include "objects/Camera.h"
@@ -1198,6 +1200,46 @@ static void LayoutAbrirMenuUVSelMode(UVEditor* uv, int x, int y) {
 }
 
 // click en la barra del UV editor: [1]=View, [2]=SelMode (propio), [3]=Pivot (= menu del 3D), [4]=Snap
+// dropdown "Texture" del UV editor (boton [5] de la barra): elegir a mano que textura/parte del modelo ver.
+static UVEditor*  gUVTexTarget = NULL;
+static Mesh*      gUVTexMesh   = NULL;
+static PopupMenu* gMenuUVTex   = NULL;
+static void LayoutAccionUVTex(int id) {
+    if (!gUVTexMesh) return;
+    if (id >= 9000) UVSetTexOverride(gUVTexMesh, -1);   // "Auto": vuelve a seguir la parte activa
+    else            UVSetTexOverride(gUVTexMesh, id);   // ver a mano la parte (material) 'id'
+    g_redraw = true;
+}
+static void LayoutAbrirMenuUVTex(UVEditor* uv, int x, int y) {
+    if (!uv) return;
+    Mesh* m = (ObjActivo && ObjActivo->getType() == ObjectType::mesh) ? (Mesh*)ObjActivo : NULL;
+    if (!m || m->materialsGroup.empty()) return;
+    gUVTexTarget = uv; gUVTexMesh = m;
+    if (!gMenuUVTex) gMenuUVTex = new PopupMenu();
+    gMenuUVTex->Limpiar();
+    gMenuUVTex->titulo = "Texture";
+    gMenuUVTex->Agregar("Auto (active part)", 9000);
+    // lista las TEXTURAS DISTINTAS del modelo (dedup por puntero). El id de cada opcion = la parte que la usa, asi el
+    // UV editor muestra esa textura + las UV de esa parte. (Dante: "el dropdown es de texturas, no de materiales".)
+    std::vector<Texture*> vistas;
+    for (size_t i = 0; i < m->materialsGroup.size(); i++) {
+        Material* mm = m->materialsGroup[i].material;
+        Texture* t = mm ? mm->texture : NULL;
+        if (!t) continue;
+        bool dup = false; for (size_t k = 0; k < vistas.size(); k++) if (vistas[k] == t) { dup = true; break; }
+        if (dup) continue;
+        vistas.push_back(t);
+        std::string lbl; char buf[24]; sprintf(buf, "Texture %d", (int)vistas.size());
+        if (!t->path.empty()){ size_t sl = t->path.find_last_of("/\\"); lbl = (sl==std::string::npos) ? t->path : t->path.substr(sl+1); }
+        else lbl = buf;
+        gMenuUVTex->Agregar(lbl, (int)i); // id = parte que usa esta textura
+    }
+    gMenuUVTex->action = LayoutAccionUVTex;
+    if (MenuAbierto && MenuAbierto != gMenuUVTex) MenuAbierto->Cerrar();
+    gMenuUVTex->Abrir(x, y, MenuPantallaW, MenuPantallaH);
+    MenuAbierto = gMenuUVTex;
+}
+
 static bool LayoutClickBarraUV(UVEditor* uv, int mx, int my) {
     if (!uv) return false;
     std::vector<Button*>& B = uv->BarButtons;
@@ -1219,6 +1261,11 @@ static bool LayoutClickBarraUV(UVEditor* uv, int mx, int my) {
     if (B.size() > 4 && B[4]->visible && B[4]->Contains(mx, my)) {        // Snap
         uv->ActualizarBarra();
         LayoutAbrirMenuUVSnap(uv, B[4]->sx, B[4]->sy + B[4]->height - GlobalScale);
+        return true;
+    }
+    if (B.size() > 5 && B[5]->visible && B[5]->Contains(mx, my)) {        // Texture (dropdown)
+        uv->ActualizarBarra();
+        LayoutAbrirMenuUVTex(uv, B[5]->sx, B[5]->sy + B[5]->height - GlobalScale);
         return true;
     }
     return false;
@@ -3308,11 +3355,17 @@ static void PickPaint(Object* obj, bool armaturePass) {
         w3dEngine::Color4f(((id & 0x1F)) / 31.0f, ((id >> 5) & 0x3F) / 63.0f, 0.0f, 1.0f);
         if (obj->getType() == ObjectType::mesh) {
             Mesh* m = (Mesh*)obj;
-            // con modificadores (subdiv/screw) se dibuja la malla GENERADA para el pick: es lo que se VE.
-            // Sin esto, un Screw (perfil sin caras) no pinta nada -> no se podia clickear/seleccionar.
+            // El pick tiene que pintar EXACTAMENTE lo que dibuja Mesh::Render (solid), sino el click no coincide.
+            // PRIORIDAD (igual que Render): (1) malla GENERADA por modificador (subdiv/screw) -> es lo que se VE
+            // (sin esto un Screw sin caras no se podia clickear); (2) malla DEFORMADA por esqueleto (skinVertex) ->
+            // el click sigue la animacion (sino cae en el bind: el drama de LISA); (3) el bind crudo.
             if (m->genValido && m->genVertex && m->genFaces && m->genFacesSize > 0) {
                 w3dEngine::VertexPointer3f(0, m->genVertex);
                 w3dEngine::DrawTriangles(m->genFacesSize, m->genFaces);
+            } else if (m->skinArmature && m->faces && m->facesSize > 0) {
+                extern void SkinearMesh(Mesh*); SkinearMesh(m); // asegura skinVertex al frame actual (cacheado)
+                const GLfloat* pb = m->skinVertex ? m->skinVertex : m->vertex; // guard: si no hay skinVertex, bind
+                if (pb) { w3dEngine::VertexPointer3f(0, pb); w3dEngine::DrawTriangles(m->facesSize, m->faces); }
             } else if (m->vertex && m->faces) {
                 w3dEngine::VertexPointer3f(0, m->vertex);
                 w3dEngine::DrawTriangles(m->facesSize, m->faces);

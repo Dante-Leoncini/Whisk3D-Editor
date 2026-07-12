@@ -631,6 +631,12 @@ int main(int argc, char* argv[]) {
 #else
     Uint32 initFlags = SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER;
 #endif
+#ifdef __ANDROID__
+    // Al minimizar: SDL BLOQUEA el loop de main (NO mata el hilo nativo) y conserva el contexto GL. Sin esto, al volver
+    // a abrir se relanzaba main() con los globals C++ estaticos vivos -> ConstructUniversal duplicaba la escena (otro
+    // cubo/camara/luz) y las texturas quedaban negras (contexto GL nuevo). Junto con launchMode=singleTask del manifest.
+    SDL_SetHint(SDL_HINT_ANDROID_BLOCK_ON_PAUSE, "1");
+#endif
     if (SDL_Init(initFlags) != 0) {
         std::cerr << "Error SDL_Init: " << SDL_GetError() << std::endl;
         return -1;
