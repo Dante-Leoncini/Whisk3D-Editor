@@ -10,6 +10,13 @@ SDL_GLContext glContext = NULL;
 int winW = 640;
 int winH = 480;
 
+#ifdef W3D_SYMBIAN
+// tap tactil diferido en curso (abre el teclado de Whisk3D al tocar un campo). En las plataformas SDL lo
+// define y maneja controles.cpp; ese archivo NO esta en el .mmp de Symbian -> lo definimos aca (el N95 no es
+// tactil: queda en false; un Symbian tactil (N8) lo puede setear desde su input).
+bool g_uiTapEnCurso = false;
+#endif
+
 // Inicialización de variables
 int axisSelect = X;
 int transformOrientation = GlobalOrient;

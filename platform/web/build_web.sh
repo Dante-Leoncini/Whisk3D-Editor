@@ -12,10 +12,10 @@
 #  w3dGraphics.cpp de escritorio. Todo el editor dibuja por w3dEngine.
 # ============================================================================
 set -e
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/../.." # el script vive en platform/web/ -> raiz del repo 2 niveles arriba
 
 CORE=libs/Whisk3DCore
-OUT=web
+OUT=platform/web/build
 mkdir -p "$OUT"
 
 # --- fuentes: mismo set que el CMakeLists, pero con el backend ES2 en vez del de desktop ---

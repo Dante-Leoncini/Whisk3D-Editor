@@ -120,11 +120,9 @@ SOURCE          PopUpBase.cpp ColorPicker.cpp FileBrowser.cpp RedoMeshPanel.cpp 
 SOURCEPATH      ..\..\..\libs\WhiskUI
 SOURCE          UI.cpp colores.cpp object2D.cpp rectangle.cpp font.cpp bitmapText.cpp icons.cpp glesdraw.cpp card.cpp Button.cpp PopupMenu.cpp Tab.cpp
 SOURCE          W3dFont.cpp // datos de glifos (Fase C: era libs\Whisk3DCore\ui, ahora UI)
-SOURCEPATH      ..\..\..\libs\Whisk3DCore\objects
 
 // OJO: volver al SOURCEPATH local (las rutas de recursos de abajo se
 // resuelven contra el ultimo SOURCEPATH)
-SOURCEPATH      ..\src
 
 // OJO: volver al SOURCEPATH local ANTES de los START RESOURCE de abajo
 // (las rutas de recursos se resuelven contra el ultimo SOURCEPATH)
@@ -196,3 +194,23 @@ END
 // ("funcion no admitida"). La app no las usaba (el acelerometro esta
 // comentado); si algun dia hacen falta, hay que firmarse con Open Signed.
 CAPABILITY ReadUserData WriteUserData
+
+SOURCEPATH ..\..\..\main\ViewPorts\PopUp
+SOURCE NumPad.cpp
+
+// --- subsistema de ANIMACION (pull FBX/skinning): las piezas C++03 se compilan de verdad;
+//     el ESQUELETO/SKINNING (C++11) va como stubs no-op (ver w3dskelstubs.cpp). ---
+SOURCEPATH ..\..\..\main
+SOURCE w3dVersion.cpp              // W3dVersion() (header del .obj exportado)
+
+SOURCEPATH ..\..\..\libs\Whisk3DCore\animation
+SOURCE Animation.cpp              // globales de playback: CurrentFrame / AnimFPS / Start-EndFrame / PlayAnimation + keyframes
+
+SOURCEPATH ..\..\..\libs\Whisk3DCore\objects
+SOURCE Armature.cpp              // clase Armature (PuntoFoco/RadioFoco/RenderObject) — C++03, render de esqueleto
+
+SOURCEPATH ..\..\..\main\ViewPorts
+SOURCE Timeline.cpp              // viewport Timeline (los metodos SDL van #ifndef W3D_SYMBIAN; el resto compila)
+
+SOURCEPATH ..\src
+SOURCE w3dskelstubs.cpp          // stubs no-op de SkeletalAnimation + w3dGetTicks (reloj de ms del core)

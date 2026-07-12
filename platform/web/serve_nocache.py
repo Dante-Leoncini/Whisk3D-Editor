@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-# Sirve el build web (carpeta web/) SIN cache -> cada reload trae el .wasm/.data fresco.
-# El server default de python manda Last-Modified pero no Cache-Control, y el navegador
-# cachea los binarios grandes sin revalidar (se sigue viendo el build viejo). Uso:
-#   python platform/web/serve_nocache.py            (desde la raiz del editor)
+# Sirve el build web (platform/web/build/, lo que genera build_web.sh) SIN cache -> cada reload
+# trae el .wasm/.data fresco. El server default de python manda Last-Modified pero no Cache-Control,
+# y el navegador cachea los binarios grandes sin revalidar (se sigue viendo el build viejo). Uso:
+#   python platform/web/serve_nocache.py            (desde cualquier lado)
 import http.server, socketserver, os, functools
 
 PORT = 8000
-DIRECTORY = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "web")
+# el script vive en platform/web/ -> la salida del build es ./build (al lado)
+DIRECTORY = os.path.join(os.path.dirname(os.path.abspath(__file__)), "build")
 
 class NoCache(http.server.SimpleHTTPRequestHandler):
     def end_headers(self):

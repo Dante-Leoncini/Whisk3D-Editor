@@ -49,6 +49,8 @@ class Timeline : public ViewportBase, public WithBorder {
         bool scrubbing;    // tocando/arrastrando en la BARRA DE NUMEROS -> mueve el frame
         bool panning;      // arrastrando en el CUERPO -> scroll (paneo) con un dedo
         int  lastMx, lastMy;
+        int  pressMx, pressMy; // pos del down en el CUERPO: distingue CLICK puro (mouse: saltar el
+                               // frame ahi) de un arrastre (panear). El touch solo panea/tapea.
 
         Timeline();
         virtual ~Timeline();

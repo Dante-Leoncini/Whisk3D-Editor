@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/../.." # el script vive en platform/android/ -> raiz del repo 2 niveles arriba
 
 ANDROID_NDK="${ANDROID_NDK:-/opt/android-ndk}"
 NDK_BUILD="$ANDROID_NDK/ndk-build"

@@ -2,8 +2,8 @@
 
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BUILD_DIR="${BUILD_DIR:-${ROOT_DIR}/build-mac}"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)" # el script vive en platform/mac/ -> raiz 2 niveles arriba
+BUILD_DIR="${BUILD_DIR:-${ROOT_DIR}/platform/mac/build}"
 BUILD_TYPE="${BUILD_TYPE:-Release}"
 
 if [[ "$(uname -s)" != "Darwin" ]]; then

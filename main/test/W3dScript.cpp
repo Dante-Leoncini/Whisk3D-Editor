@@ -1,4 +1,5 @@
 #include "test/W3dScript.h"
+#include <cmath>               // sqrt (skindump)
 #include "objects/Objects.h"   // ObjActivo, g_editMesh, EditSelectMode, Sel*, DeseleccionarTodo
 #include "objects/Mesh.h"      // NewMesh, MeshType, Mesh
 #include "edit/Modifier.h"     // Modifier (params del Mirror en el harness)
@@ -143,7 +144,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         for (int i=0;i<nv;i++){ double dx=m->skinVertex[i*3]-m->vertex[i*3], dy=m->skinVertex[i*3+1]-m->vertex[i*3+1], dz=m->skinVertex[i*3+2]-m->vertex[i*3+2];
             double d=dx*dx+dy*dy+dz*dz; if(d>maxd)maxd=d; sum+=d; }
         printf("      [skin] f=%d nv=%d maxDelta=%.2f avgDelta=%.2f v0=(%.1f,%.1f,%.1f)->(%.1f,%.1f,%.1f)\n",
-               f, nv, (float)(maxd>0?__builtin_sqrt(maxd):0), (float)(nv?__builtin_sqrt(sum/nv):0),
+               f, nv, (float)(maxd>0?sqrt(maxd):0), (float)(nv?sqrt(sum/nv):0), // sqrt: __builtin_sqrt no existe en MSVC
                m->vertex[0],m->vertex[1],m->vertex[2], m->skinVertex[0],m->skinVertex[1],m->skinVertex[2]);
         return true;
     }

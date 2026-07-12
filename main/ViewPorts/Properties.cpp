@@ -735,10 +735,10 @@ static void AccionAplicarModificador(){
 #ifdef __EMSCRIPTEN__
 extern "C" void WebDescargarArchivo(const char* path, const char* name); // main.cpp (EM_JS): baja un archivo del FS al disco
 #endif
-extern bool g_uiTapEnCurso; // (controles.cpp) el LayoutClickUI actual es un TAP tactil diferido (no click de mouse)
-#ifndef W3D_SYMBIAN
-#include "ViewPorts/PopUp/NumPad.h" // teclado numerico tactil (popup abajo)
-#endif
+extern bool g_uiTapEnCurso; // (controles.cpp; en Symbian lo define variables.cpp) tap tactil diferido en curso
+// teclado tactil de Whisk3D (NumPad numerico + QWERTY). TAMBIEN en Symbian: NumPad.cpp esta en el .mmp y la
+// edicion por tap abre QwertyAbrir() (ver rama Text de ClickEn). Antes iba guardado -> QwertyAbrir sin declarar.
+#include "ViewPorts/PopUp/NumPad.h"
 
 // solo el nombre de archivo de una ruta (sin carpetas)
 static std::string SoloNombre(const std::string& p){

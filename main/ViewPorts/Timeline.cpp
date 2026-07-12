@@ -129,7 +129,7 @@ static void TL_onCur()  { if (g_tlActivo) g_tlActivo->ApplyCur();   }
 Timeline::Timeline(){
     pxPerFrame = (float)GlobalScale * 7.0f;
     viewStartF = -2.0f;                 // arranca mostrando un par de frames negativos (frame 0 prolijo)
-    scrubbing = false; panning = false; lastMx = lastMy = 0;
+    scrubbing = false; panning = false; lastMx = lastMy = 0; pressMx = pressMy = 0;
     stripY = numY = barH2 = 0; curBtnX = curBtnW = 0;
     fStart=(float)StartFrame; fEnd=(float)EndFrame; fCur=(float)CurrentFrame;
 
@@ -403,8 +403,9 @@ void Timeline::button_left(){
     // BARRA DE NUMEROS -> scrub: pone el frame donde tocas. NO se setea en el down (se setea en el drag o al soltar)
     // para que un 2do dedo (zoom) pueda cancelar el scrub SIN mover el frame ("dos dedos no cambian el frame").
     if (ly >= numY - GlobalScale*2 && ly < stripY){ scrubbing = true; panning = false; return; }
-    // CUERPO (bandas) -> un dedo/arrastre PANEA (scroll). NO scrubbea (el salto molesto que pedia sacar Dante).
-    if (ly >= stripY){ panning = true; scrubbing = false; }
+    // CUERPO (bandas) -> un dedo/arrastre PANEA (scroll). NO scrubbea en el down; con MOUSE un
+    // CLICK puro (sin arrastrar) salta el frame ahi (se decide al soltar, ver mouse_button_up).
+    if (ly >= stripY){ panning = true; scrubbing = false; pressMx = lastMx; pressMy = lastMy; }
 #endif
 }
 void Timeline::event_mouse_motion(int mx, int my){
@@ -429,10 +430,16 @@ void Timeline::event_mouse_wheel(SDL_Event &e){
     ZoomBy(e.wheel.y>0 ? 1.1f : 1.0f/1.1f, lastMx - x);
 }
 void Timeline::mouse_button_up(SDL_Event &e){
-    (void)e;
     // TAP en los numeros (down sin arrastre): recien aca fijamos el frame. Asi un 2do dedo (zoom) pudo cancelar
     // el scrub antes de soltar y el frame NO se movio. Si hubo arrastre ya se fue seteando en event_mouse_motion.
     if (scrubbing) SetFrameFromX(lastMx - x);
+    // CLICK de MOUSE en el CUERPO (down+up SIN arrastre): salta el frame actual a donde se clickeo.
+    // Con TOUCH no (which = SDL_TOUCH_MOUSEID): el dedo panea, y un tap no debe mover el playhead.
+    else if (panning && e.button.which != SDL_TOUCH_MOUSEID){
+        int ddx = lastMx - pressMx; if (ddx < 0) ddx = -ddx;
+        int ddy = lastMy - pressMy; if (ddy < 0) ddy = -ddy;
+        if (ddx + ddy < 4 * GlobalScale) SetFrameFromX(lastMx - x);
+    }
     scrubbing=false; panning=false; ViewPortClickDown=false; g_redraw=true;
 }
 void Timeline::event_key_down(SDL_Event &e){

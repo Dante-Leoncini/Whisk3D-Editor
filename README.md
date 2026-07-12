@@ -1,7 +1,7 @@
 # Whisk 3D
 
 <p align="center">
-    <img src="logo_outlined.svg" width="400" alt="Whisk3D logo">
+    <img src="logo_outlined.svg" width="400" alt="Whisk3D logo">
 </p>
 
 ## Motor multiplataforma 2D y 3D estilo retro
@@ -26,122 +26,14 @@ Queremos **devolverte el control de tu software**, democratizar la creación y p
 
 YouTube: [Youtube Video](https://youtu.be/dMe-Vit5OT0)
 
-## Instalacion en Symbian:
+## Compilar e instalar
 
-Necesitas tener instalado PyS60, o el programa no se ejecutará, Se ha incluido el instalador in la carpeta "Dependencies" del repositorio. La última versión estará siempre en la carpeta "sis" con el nombre de "Whisk3D_gcce.sisx", aunque la última versión quizás no funcione correctamente, la versión verificada estará siempre en la carpeta "releases" con la fecha de salida y nombre referenciando los videos e imágenes de demostración mostrados en [Instagram](https://www.instagram.com/dante_leoncini?igsh=MWpjYTd5YzU5dTBkNg==). 
+Whisk3D corre en Linux, Windows, Mac, Android, Symbian y Web actualmente. Las instrucciones de cada sistema están en:
 
-Este programa no esta listo para producción y tiene una serie de errores conocidos, se encuentra en constante desarrollo, y se esta constantemente añadiendo o quitando características. Por ejemplo, la opción para modelado 3d ha sido removida en las últimas versiones, pero si usas una versión anterior como "Whisk3D_gcce_beta_24-08-15_FERNET.sisx", el modelado 3d sigue disponible.
+- [Windows](platform/windows/README.md) · [GNU/Linux](platform/linux/README.md) · [macOS](platform/mac/README.md)
+- [Web (WebGL)](platform/web/README.md) · [Android](platform/android/README.md) · [Symbian s60v3/s60v5/Symbian^3 (N95/N8)](platform/symbian/README.md)
 
-Sí el instalador falla, probablemente debas de "hackear" tu teléfono para ignorar las restricciones y certificados de Symbian. Puedes ver el siguiente video mostrando como hacerlo: [Tutorial Hack](https://www.youtube.com/watch?v=UJJICzbk3TA)
-
-## gnu/Linux (Ubuntu)
-
-Para compilar en gnu/Linux (Ubuntu) hace falta instalar las dependencias y bajar los submodulos de git con el siguiente copmando:
-
-```bash
-git submodule update --init --recursive
-```
-
-necesitas ciertas dependencias para compilar:
-
-```bash
-sudo apt update
-sudo apt install git build-essential cmake \
-libgl1-mesa-dev \
-libglu1-mesa-dev \
-mesa-common-dev \
-install libsdl2-dev
-```
-
-en la carpeta raiz usar cmake y los siguientes comandos:
-
-```bash
-cmake -B build-linux -DCMAKE_BUILD_TYPE=Release
-cmake --build build-linux --config Release -- -j8
-```
-
-Para debug:
-
-```bash
-cmake --build build-linux --config Debug -- -j8
-gdb ./build-linux/whisk3d
-run
-```
-
-si crashea podes ver con detalle en que parte usando
-
-```bash
-bt full
-```
-
-Para generar los instaladores .DEB, RPM o AppImage. en la carpeta /buld-linux pueden usar el siguiente comando (gracias Zariep por este aporte!):
-
-```bash
-cpack
-```
-
-Nota: para creas los AppImage el Cmake que viene en ubuntu no sirve. podes instalarlo de la siguiente forma. actualiza cmake
-
-```bash
-pip install cmake --upgrade
-```
-
-necesitas "patchelf" y "appimagetool", podes instalarlos de la siguiente forma
-
-```bash
-sudo apt install patchelf
-wget https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
-chmod +x appimagetool-x86_64.AppImage
-```
-
-y ahora con "cpack" los generas. excelente aporte de [**Zariep**](https://github.com/ItsZariep)
-
-## macOS
-
-Necesitas las herramientas de linea de comandos de Xcode y CMake:
-
-```bash
-xcode-select --install
-./build_mac.sh
-```
-
-El script descarga los submodulos, compila SDL2 estaticamente y genera la
-aplicacion en `build-mac/Whisk3D.app`. Puedes abrirla con:
-
-```bash
-open build-mac/Whisk3D.app
-```
-
-## Android
-
-Para compilar. desde el directorio raiz usa
-cd platform/android && ./gradlew assembleDebug
-
-## Windows
-
-Para compilar. 
-
-1) Instalar bash y cmake desde https://cmake.org/download/
-2) para tener los submodulos de SDL2 usa en la carpeta raiz "git submodule update --init --recursive"
-```bash
-git submodule update --init --recursive
-```
-3) si no lo tenes, en "Visual Studio Installer" vas a "Modificar" y tildas C++ Desktop Development "MSVC v142 - VS 2019 C++ x64/x86 Build Tools (Latest)", "C++ CMake tools for Window" y "Windows 10 SDK 10.0.19041.0" (o superior)
-4) Abrí Inicio → escribí Developer Command Prompt for VS 2018 (o el que tengas)
-5) anda al directorio cd C:\BLA BLA BLA\Whisk3D\platform\windows (aca adentro esta el CMakeLists.txt)
-6) cmake -S . -B ../../build/windows/x64 -G "Visual Studio 18 2026" -A x64
-7) cmake --build ../../build/windows/x64 --config Release
-```bash
-cmake -B build-windows -DCMAKE_BUILD_TYPE=Release
-cmake --build build-windows --config Release -j8
-```
-
-para windows 7 de 32bit:
-
-```bash
-cmake -B build-win32 -A Win32 -DCMAKE_BUILD_TYPE=Release
-cmake --build build-win32 --config Release -j8
-```
+En todos, primero: `git submodule update --init --recursive` (los scripts `platform/<sistema>/build_*` ya lo hacen por vos).
 
 ## Aclaraciones:
 
