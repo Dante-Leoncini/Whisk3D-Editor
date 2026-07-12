@@ -92,6 +92,7 @@ extern "C" {
 // las llama el JS del picker cuando el archivo ya esta escrito en el FS de emscripten
 EMSCRIPTEN_KEEPALIVE void WebTexturaCargada(const char* path) { TexturaElegida(std::string(path)); }
 EMSCRIPTEN_KEEPALIVE void WebObjCargado(const char* path)     { ImportOBJ(std::string(path), false); }
+EMSCRIPTEN_KEEPALIVE void WebFbxCargado(const char* path)     { ImportFBX(std::string(path)); }
 }
 
 // overlay con un BOTON real: el <input type=file>.click() se dispara DENTRO del tap del boton (gesto DOM
@@ -108,18 +109,27 @@ EM_JS(void, WebAbrirPicker, (int tipo), {
     card.style.cssText = 'margin-top:8vh;width:92%;max-width:440px;background:#2b2b2b;border:1px solid #555;'
         + 'border-radius:10px;padding:16px;box-shadow:0 6px 30px rgba(0,0,0,0.6);font-family:sans-serif;color:#ddd;';
     var lab = document.createElement('div');
-    lab.textContent = tipo ? 'Importar OBJ (.obj + .mtl + texturas)' : 'Cargar textura (imagen)';
+    lab.textContent = (tipo == 2) ? 'Importar FBX (.fbx)' : tipo ? 'Importar OBJ (.obj + .mtl + texturas)' : 'Cargar textura (imagen)';
     lab.style.cssText = 'font-size:15px;margin-bottom:12px;color:#9ac9ff;';
     var input = document.createElement('input');
     input.type = 'file';
-    if (tipo) { input.multiple = true; input.accept = '.obj,.mtl,image/*,.png,.jpg,.jpeg,.bmp,.tga'; }
-    else      { input.accept = 'image/png,image/jpeg,image/bmp,.png,.jpg,.jpeg,.bmp,.tga'; }
+    if (tipo == 2)   { input.accept = '.fbx'; }                                                  // FBX: un solo archivo binario
+    else if (tipo)   { input.multiple = true; input.accept = '.obj,.mtl,image/*,.png,.jpg,.jpeg,.bmp,.tga'; }
+    else             { input.accept = 'image/png,image/jpeg,image/bmp,.png,.jpg,.jpeg,.bmp,.tga'; }
     input.style.cssText = 'position:absolute;left:-9999px;width:1px;height:1px;opacity:0;'; // en el DOM pero oculto
     input.onchange = function(e) {
         var files = Array.prototype.slice.call(e.target.files);
         if (!files.length) { cerrar(); return; }
         try { FS.mkdir('/uploads'); } catch (_e) {}
-        if (!tipo) {
+        if (tipo == 2) {                       // FBX: un solo archivo binario -> WebFbxCargado
+            var f = files[0], r = new FileReader();
+            r.onload = function() {
+                var p = '/uploads/' + f.name;
+                FS.writeFile(p, new Uint8Array(r.result));
+                ccall('WebFbxCargado', null, ['string'], [p]);
+            };
+            r.readAsArrayBuffer(f); cerrar();
+        } else if (!tipo) {
             var f = files[0], r = new FileReader();
             r.onload = function() {
                 var p = '/uploads/' + f.name;
@@ -163,9 +173,11 @@ EM_JS(void, WebAbrirPicker, (int tipo), {
 });
 static void WebAbrirPickerTextura(){ WebAbrirPicker(0); }
 static void WebAbrirPickerObj(){ WebAbrirPicker(1); }
+static void WebAbrirPickerFbx(){ WebAbrirPicker(2); }
 
 static void WebCargarTexturaEn(Material* mat) { gTexMat = mat; WebAbrirPickerTextura(); }
 static void WebImportObj() { WebAbrirPickerObj(); }
+static void WebImportFbx() { WebAbrirPickerFbx(); } // web: FBX por el selector NATIVO del navegador (como OBJ/texturas)
 
 // descarga un archivo del FS de emscripten al DISCO del usuario (export OBJ/mtl y renders PNG).
 // La llaman Properties.cpp (export OBJ) y ViewPort3D.cpp (render) via forward-declaration.
@@ -788,6 +800,7 @@ int main(int argc, char* argv[]) {
     // en web pisamos import/textura con el SELECTOR DEL NAVEGADOR (el browser interno solo ve el FS
     // virtual de emscripten, no los archivos del usuario). El resto de hooks (warp/swap) sirven igual.
     LayoutImportObj = WebImportObj;
+    LayoutImportFbx = WebImportFbx; // web: FBX tambien por el selector nativo (antes caia al explorador interno)
     DialogoCargarTextura = WebCargarTexturaEn;
 #endif
 

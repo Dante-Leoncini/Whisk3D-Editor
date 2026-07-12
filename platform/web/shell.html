@@ -43,6 +43,18 @@
       canvasEl.focus(); // que el teclado llegue al editor
     }
 
+    // ERROR VISIBLE EN PANTALLA: si el WASM no instancia (iOS Safari, memoria, feature no soportada) el usuario
+    // solo veia "cargando" -> pantalla en blanco. Mostramos el error en el loader para poder diagnosticar.
+    function mostrarError(msg) {
+      if (!statusEl) return;
+      statusEl.style.color = '#ff6b6b'; statusEl.style.whiteSpace = 'pre-wrap'; statusEl.style.fontSize = '12px';
+      statusEl.style.maxWidth = '92vw'; statusEl.style.display = 'block';
+      statusEl.textContent = 'ERROR: ' + String(msg).slice(0, 400);
+      if (loaderEl) loaderEl.classList.remove('hidden');
+    }
+    window.addEventListener('error', function (e) { mostrarError((e && (e.message || e.error)) || 'error desconocido'); });
+    window.addEventListener('unhandledrejection', function (e) { mostrarError((e && e.reason && (e.reason.message || e.reason)) || 'promise rechazada'); });
+
     var Module = {
       canvas: (function () {
         // si el navegador pierde el contexto WebGL, avisamos en vez de quedar en negro
@@ -53,7 +65,8 @@
         }, false);
         return canvasEl;
       })(),
-      printErr: function (t) { console.error(t); },
+      onAbort: function (what) { mostrarError('abort: ' + what); }, // emscripten aborta (ej: no pudo alocar memoria)
+      printErr: function (t) { console.error(t); if (/abort|memory|Out of|RangeError|cannot enlarge/i.test(String(t))) mostrarError(t); },
       // texto de progreso mientras baja el .wasm/.data
       setStatus: function (t) { if (statusEl && t) statusEl.textContent = t; },
       // cuando el runtime esta listo el editor ya arranco (main() NO retorna: usa

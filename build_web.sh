@@ -34,13 +34,16 @@ DEF="-DW3D_WEBGL"
 
 # --- flags de Emscripten ---
 #   -sUSE_SDL=2            ventana + eventos (mismo SDL2 que los ejemplos web)
-#   -sINITIAL_MEMORY=256MB  memoria FIJA. OJO: NO usar -sALLOW_MEMORY_GROWTH: con growth la
+#   -sINITIAL_MEMORY=128MB  memoria FIJA. OJO: NO usar -sALLOW_MEMORY_GROWTH: con growth la
 #                           memoria WASM es un ArrayBuffer "resizable" y el Chrome/Firefox nuevos
 #                           rechazan TextDecoder.decode() sobre eso -> crash al arrancar (pantalla
 #                           negra + cuelgue). Con memoria fija es un buffer normal y anda.
+#                           128MB (antes 256): iOS Safari fallaba al alocar el bloque fijo de 256MB
+#                           -> "no carga" (pantalla en blanco). 128 alcanza para el editor + un modelo
+#                           y es mucho mas facil de alocar en iOS. Sigue FIJA (no rompe Chrome/Firefox).
 #   --preload-file res@/res  empaqueta res/ y lo monta en /res (= GetResDir() en web)
 #   --shell-file           HTML propio (canvas fullscreen + pantalla de carga)
-EMFLAGS="-sUSE_SDL=2 -sINITIAL_MEMORY=268435456"
+EMFLAGS="-sUSE_SDL=2 -sINITIAL_MEMORY=134217728"
 #   -sEXPORTED_RUNTIME_METHODS=ccall,FS,UTF8ToString  el picker (EM_JS) usa ccall (llamar a C) y FS
 #                                        (leer/escribir archivos); la descarga usa UTF8ToString
 EMFLAGS="$EMFLAGS -sEXPORTED_RUNTIME_METHODS=ccall,FS,UTF8ToString"

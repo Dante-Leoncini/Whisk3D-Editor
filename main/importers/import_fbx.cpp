@@ -428,6 +428,10 @@ static void ParsearEsqueleto(const FNode& root, const FNode& objs, EsqueletoFBX&
                 for (int mi = 0; mi < 16; mi++) b.bind.m[mi] = (float)TL[mi]; // bind global (para el skinning)
                 b.hasSkin = true;
             }
+            // matriz 'Transform' del cluster (geometria->bind): necesaria para el inverse-bind estandar FBX en rigs
+            // cuyo TransformLink es degenerado (ej LISA: TL = solo escala, y el swap de ejes vive aca).
+            double TR[16];
+            if (LeerMat16(k, "Transform", TR)) for (int mi = 0; mi < 16; mi++) b.clusterTransform.m[mi] = (float)TR[mi];
             b.tail = b.head; // se corrige abajo
             // transform LOCAL de rest (del Model del hueso) para el FK
             if (modelNode.count(boneId)) { const FNode& mn = *modelNode[boneId];

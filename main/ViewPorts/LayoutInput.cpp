@@ -957,8 +957,10 @@ void ActualizarEditMeshActivo() {
 // Scale escala poseS uniforme. El pivote (rotate) es el baricentro de los huesos seleccionados. Confirm = click; Cancel = Esc.
 int g_poseModo = 0; // 0=none 1=grab 2=rotate 3=scale
 static int g_poseAxis = 2; // eje de rotacion (0=X 1=Y 2=Z), default Z; cicla con X/Y/Z
+static int g_poseOrient = 2; // orientacion de rotacion: 0=LOCAL 1=GLOBAL 2=VIEW (default View: el trackball mas util)
 static float g_poseAccX = 0.0f, g_poseAccY = 0.0f;
-struct PoseSnap { int b; Vector3 T, R, S; };
+static int g_poseLastX = 0, g_poseLastY = 0; // ultima pos del mouse (para el delta CON SIGNO; las globales dx/dy no se actualizan en pose)
+struct PoseSnap { int b; Vector3 T, R, S; Matrix4 parentW; };
 static std::vector<PoseSnap> g_poseSnap;
 static Armature* PoseArmActiva(){
     return (InteractionMode == PoseMode && ObjActivo && ObjActivo->getType() == ObjectType::armature) ? (Armature*)ObjActivo : NULL;
@@ -967,9 +969,19 @@ void PoseXformStart(int modo){
     Armature* a = PoseArmActiva(); if (!a) return;
     g_poseSnap.clear();
     for (size_t i = 0; i < a->bones.size(); i++){ W3dBone& b = a->bones[i];
-        if (b.select || (int)i == a->boneActivo){ PoseSnap s; s.b=(int)i; s.T=b.poseT; s.R=b.poseR; s.S=b.poseS; g_poseSnap.push_back(s); } }
+        if (b.select || (int)i == a->boneActivo){ PoseSnap s; s.b=(int)i; s.T=b.poseT; s.R=b.poseR; s.S=b.poseS;
+            s.parentW = SkelBoneWorldNode(a, b.parent); // world del padre (nodo) al arrancar: pivote de la conversion
+            g_poseSnap.push_back(s); } }
     if (g_poseSnap.empty()) return;
     g_poseModo = modo; g_poseAxis = 2; g_poseAccX = 0.0f; g_poseAccY = 0.0f;
+    g_poseLastX = lastMouseX; g_poseLastY = lastMouseY; // ancla del delta con signo
+}
+// llamada desde event_mouse_motion: calcula el delta CON SIGNO desde la pos del mouse (mx,my) y aplica.
+void PoseXformMotion(int mx, int my){
+    if (!g_poseModo) return;
+    int pdx = mx - g_poseLastX, pdy = my - g_poseLastY;
+    g_poseLastX = mx; g_poseLastY = my;
+    extern void PoseXformApply(int,int); PoseXformApply(pdx, pdy);
 }
 static void PoseInvalidar(Armature* a){
     if (!a) return; a->poseDirty = true;
@@ -987,10 +999,31 @@ void PoseXformApply(int dx, int dy){
         W3dBone& b = a->bones[s.b];
         if (g_poseModo == 1){        // GRAB: traslada en el plano de vista (X pantalla / -Y pantalla). Escala del rig ~grande.
             b.poseT = s.T + Vector3(g_poseAccX, -g_poseAccY, 0.0f);
-        } else if (g_poseModo == 2){ // ROTATE: mouse-X en grados alrededor del eje elegido (local del hueso)
-            Vector3 d = s.R; float ang = g_poseAccX * 0.5f;
-            if (g_poseAxis==0) d.x += ang; else if (g_poseAxis==1) d.y += ang; else d.z += ang;
-            b.poseR = d;
+        } else if (g_poseModo == 2){ // ROTATE: LOCAL / GLOBAL / VIEW (g_poseOrient)
+            float ang = g_poseAccX * 0.5f; // grados totales desde el inicio (absoluto -> sin drift)
+            if (g_poseOrient == 0){      // LOCAL: euler directo sobre el eje del hueso (X/Y/Z)
+                Vector3 d = s.R;
+                if (g_poseAxis==0) d.x += ang; else if (g_poseAxis==1) d.y += ang; else d.z += ang;
+                b.poseR = d;
+            } else {                     // GLOBAL / VIEW: rotacion en eje-MUNDO -> convertir a euler LOCAL del hueso
+                Vector3 axisWorld;
+                if (g_poseOrient == 2)   // VIEW: alrededor del forward de la camara (trackball)
+                    axisWorld = Viewport3DActive ? (Viewport3DActive->viewRot * Vector3(0,0,-1)) : Vector3(0,0,1);
+                else                     // GLOBAL: eje-mundo del motor (X=(1,0,0) Y=(0,0,1) Z=(0,1,0))
+                    axisWorld = (g_poseAxis==0)?Vector3(1,0,0):(g_poseAxis==1)?Vector3(0,0,1):Vector3(0,1,0);
+                // eje-mundo (engine Y-up) -> espacio NODO del hueso (como DIRECCION: restar el origen)
+                Matrix4 AW; a->GetWorldMatrix(AW);
+                Matrix4 M = SkelNodeToYupMat().Inverse() * AW.Inverse();
+                Vector3 o = M * Vector3(0,0,0);
+                Vector3 axisNode = (M * axisWorld) - o; float ln = axisNode.Length(); if (ln>1e-6f) axisNode = axisNode*(1.0f/ln);
+                Matrix4 Rdelta = Quaternion::FromAxisAngle(axisNode, ang).ToMatrix();
+                Matrix4 Rp = s.parentW; Rp.m[12]=Rp.m[13]=Rp.m[14]=0; // rotacion del padre (sin traslacion) = pivote
+                Matrix4 D = Rp.Inverse() * Rdelta * Rp;               // delta expresado en el frame del padre
+                Matrix4 Rpre = SkelMatRotEuler(a->bones[s.b].preRot, 0);
+                // poseR va DESPUES del PreRot en LocalMat -> quitar PreRot, aplicar el delta, recomponer y extraer euler
+                Matrix4 Mnew = Rpre.Inverse() * D * Rpre * SkelMatRotEuler(s.R, a->bones[s.b].rotOrder);
+                b.poseR = SkelMatrizAEulerFBX(Mnew, a->bones[s.b].rotOrder);
+            }
         } else if (g_poseModo == 3){ // SCALE: uniforme por mouse-X
             float f = 1.0f + g_poseAccX * 0.01f; if (f < 0.01f) f = 0.01f;
             b.poseS = s.S * f;
@@ -1006,7 +1039,8 @@ void PoseXformCancel(){
     if (a) PoseInvalidar(a);
     g_poseModo = 0; g_poseSnap.clear();
 }
-void PoseCiclarEje(int eje){ if (g_poseModo==2){ g_poseAxis = eje; g_poseAccX = g_poseAccY = 0.0f; } } // X/Y/Z cambian el eje de rotacion
+void PoseCiclarEje(int eje){ if (g_poseModo==2){ g_poseAxis = eje; g_poseAccX = g_poseAccY = 0.0f; g_poseLastX=lastMouseX; g_poseLastY=lastMouseY; } } // X/Y/Z: eje de rotacion (Global/Local)
+void PoseCiclarOrient(){ if (g_poseModo==2){ g_poseOrient = (g_poseOrient+1)%3; g_poseAccX = g_poseAccY = 0.0f; g_poseLastX=lastMouseX; g_poseLastY=lastMouseY; } } // R de nuevo: View->Global->Local
 void PoseInsertKeyframe(){ Armature* a = PoseArmActiva(); if (a){ InsertarKeyframeEsqueleto(a); PoseInvalidar(a); } }
 
 // opcion del menu Mode: cambia el modo del objeto ACTIVO.

@@ -129,7 +129,7 @@ static void TL_onCur()  { if (g_tlActivo) g_tlActivo->ApplyCur();   }
 Timeline::Timeline(){
     pxPerFrame = (float)GlobalScale * 7.0f;
     viewStartF = -2.0f;                 // arranca mostrando un par de frames negativos (frame 0 prolijo)
-    scrubbing = false; lastMx = lastMy = 0;
+    scrubbing = false; panning = false; lastMx = lastMy = 0;
     stripY = numY = barH2 = 0; curBtnX = curBtnW = 0;
     fStart=(float)StartFrame; fEnd=(float)EndFrame; fCur=(float)CurrentFrame;
 
@@ -398,22 +398,27 @@ void Timeline::button_left(){
 #ifndef W3D_SYMBIAN
     if (PopUpActive) return;
     int lx = lastMx - x, ly = lastMy - y;
-    // boton VERDE del frame actual (sobresale por arriba de los numeros) -> editar por texto
+    // boton VERDE del frame actual (sobresale por arriba de los numeros) -> editar por texto (teclado / pad numerico)
     if (ly >= numY - GlobalScale*2 && ly < stripY && lx >= curBtnX && lx <= curBtnX + curBtnW){ EditarCampo(2); return; }
-    // cuerpo -> scrub del playhead
-    if (ly >= stripY){ scrubbing = true; SetFrameFromX(lx); }
+    // BARRA DE NUMEROS -> scrub: pone el frame donde tocas. NO se setea en el down (se setea en el drag o al soltar)
+    // para que un 2do dedo (zoom) pueda cancelar el scrub SIN mover el frame ("dos dedos no cambian el frame").
+    if (ly >= numY - GlobalScale*2 && ly < stripY){ scrubbing = true; panning = false; return; }
+    // CUERPO (bandas) -> un dedo/arrastre PANEA (scroll). NO scrubbea (el salto molesto que pedia sacar Dante).
+    if (ly >= stripY){ panning = true; scrubbing = false; }
 #endif
 }
 void Timeline::event_mouse_motion(int mx, int my){
     if (PopUpActive){ lastMx=mx; lastMy=my; return; }
-    if (scrubbing && leftMouseDown) SetFrameFromX(mx - x);
-    else if (middleMouseDown) PanFrames(-(float)(mx - lastMx) / (pxPerFrame>0.01f?pxPerFrame:0.01f));
+    if (scrubbing && leftMouseDown)      SetFrameFromX(mx - x);                                          // numeros: scrub
+    else if (panning && leftMouseDown)   PanFrames(-(float)(mx - lastMx) / (pxPerFrame>0.01f?pxPerFrame:0.01f)); // cuerpo: 1 dedo scroll
+    else if (middleMouseDown)            PanFrames(-(float)(mx - lastMx) / (pxPerFrame>0.01f?pxPerFrame:0.01f)); // rueda/medio: pan
     lastMx = mx; lastMy = my;
 }
 bool Timeline::event_finger_scroll(int px, int py, int dx, int dy){
     PanFrames(-(float)dx / (pxPerFrame>0.01f?pxPerFrame:0.01f)); return true;
 }
 void Timeline::event_finger_gesture(float zoomDelta, float panDx, float panDy){
+    scrubbing = false; panning = false; // 2 dedos: es zoom/paneo de VISTA -> NO tocar el frame (cancela cualquier scrub)
     if (zoomDelta > 1.0f) ZoomBy(1.1f, width/2); else if (zoomDelta < -1.0f) ZoomBy(1.0f/1.1f, width/2);
     if (panDx != 0.0f) PanFrames(-panDx / (pxPerFrame>0.01f?pxPerFrame:0.01f));
 }
@@ -423,7 +428,13 @@ void Timeline::event_mouse_wheel(SDL_Event &e){
     { int mx,my; SDL_GetMouseState(&mx,&my); if (BarScrollHorizontal(mx,my,(int)(e.wheel.y*40))) return; }
     ZoomBy(e.wheel.y>0 ? 1.1f : 1.0f/1.1f, lastMx - x);
 }
-void Timeline::mouse_button_up(SDL_Event &e){ (void)e; scrubbing=false; ViewPortClickDown=false; g_redraw=true; }
+void Timeline::mouse_button_up(SDL_Event &e){
+    (void)e;
+    // TAP en los numeros (down sin arrastre): recien aca fijamos el frame. Asi un 2do dedo (zoom) pudo cancelar
+    // el scrub antes de soltar y el frame NO se movio. Si hubo arrastre ya se fue seteando en event_mouse_motion.
+    if (scrubbing) SetFrameFromX(lastMx - x);
+    scrubbing=false; panning=false; ViewPortClickDown=false; g_redraw=true;
+}
 void Timeline::event_key_down(SDL_Event &e){
     if (PopUpActive || g_textFieldActivo) return;
     SDL_Keycode k = e.key.keysym.sym;

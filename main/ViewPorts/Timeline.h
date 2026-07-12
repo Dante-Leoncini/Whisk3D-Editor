@@ -46,7 +46,8 @@ class Timeline : public ViewportBase, public WithBorder {
         int numY, barH2;   // barra negra de numeros (Y y alto = alto del menu)
         int curBtnX, curBtnW; // rect del boton VERDE del frame actual (para click -> editar)
 
-        bool scrubbing;    // arrastrando el playhead en el cuerpo
+        bool scrubbing;    // tocando/arrastrando en la BARRA DE NUMEROS -> mueve el frame
+        bool panning;      // arrastrando en el CUERPO -> scroll (paneo) con un dedo
         int  lastMx, lastMy;
 
         Timeline();

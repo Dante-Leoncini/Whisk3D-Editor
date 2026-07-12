@@ -2141,8 +2141,9 @@ void Viewport3D::mouse_button_up(SDL_Event &e){
 void Viewport3D::event_mouse_motion(int mx, int my){
     // el viewport 3D bajo el mouse pasa a ser el ACTIVO (multi-viewport)
     Viewport3DActive = this;
-    // POSE MODE: si hay un transform de huesos en curso (G/R/S), el arrastre lo aplica a la pose y NO orbita/transforma objetos.
-    { extern int g_poseModo; if (g_poseModo){ extern void PoseXformApply(int,int); PoseXformApply((int)dx, (int)dy); return; } }
+    // POSE MODE: si hay un transform de huesos en curso (G/R/S), el arrastre lo aplica a la pose y NO orbita/transforma
+    // objetos. Usa mx/my (delta con signo real), NO las globales dx/dy que no se actualizan durante el transform de hueso.
+    { extern int g_poseModo; if (g_poseModo){ extern void PoseXformMotion(int,int); PoseXformMotion(mx, my); return; } }
 
 #ifdef W3D_SYMBIAN
     // estado/input de PC (variables.h): el N95 maneja esto via HID por ahora
@@ -2932,6 +2933,8 @@ void Viewport3D::event_key_down(SDL_Event &e){
                 SetShowOverlays(!showOverlays);
                 break;
             case SDLK_X:
+                // Pose Mode: X = eje X de la rotacion (para Global/Local)
+                if (InteractionMode == PoseMode){ extern int g_poseModo; extern void PoseCiclarEje(int); if (g_poseModo){ PoseCiclarEje(0); break; } }
                 // durante un transform: X = eje X (re-apretar cicla
                 // Global->Local->View->libre); Shift+X = plano (mueve en Y,Z).
                 if (estado != editNavegacion){
@@ -2948,6 +2951,7 @@ void Viewport3D::event_key_down(SDL_Event &e){
                     AbrirConfirmarBorrado();
                 break;
             case SDLK_Y:
+                if (InteractionMode == PoseMode){ extern int g_poseModo; extern void PoseCiclarEje(int); if (g_poseModo){ PoseCiclarEje(1); break; } }
                 if (estado != editNavegacion){
                     if (LShiftPressed) CiclarPlanoTransform(Y);
                     else CiclarEjeTransform(Y);
@@ -2955,6 +2959,7 @@ void Viewport3D::event_key_down(SDL_Event &e){
                 }
                 break;
             case SDLK_Z:
+                if (InteractionMode == PoseMode){ extern int g_poseModo; extern void PoseCiclarEje(int); if (g_poseModo){ PoseCiclarEje(2); break; } }
                 if (estado != editNavegacion){
                     if (LShiftPressed) CiclarPlanoTransform(Z);
                     else CiclarEjeTransform(Z);
@@ -2967,8 +2972,9 @@ void Viewport3D::event_key_down(SDL_Event &e){
                     LoopCutIniciar(lastMouseX, lastMouseY);
                     break;
                 }
-                // POSE MODE: R rota los huesos seleccionados (poseR).
-                if (InteractionMode == PoseMode){ extern void PoseXformStart(int); PoseXformStart(2); break; }
+                // POSE MODE: R rota los huesos seleccionados; R de nuevo (ya rotando) cicla la orientacion View->Global->Local.
+                if (InteractionMode == PoseMode){ extern int g_poseModo; extern void PoseXformStart(int); extern void PoseCiclarOrient();
+                    if (g_poseModo == 2) PoseCiclarOrient(); else PoseXformStart(2); break; }
                 // R arranca la rotacion (trackball); R de nuevo alterna
                 // trackball <-> orbital/gimbal (sin tener que ciclar X/Y/Z).
                 // En Edit Mode el transform actua sobre los vertices seleccionados.

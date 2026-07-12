@@ -205,6 +205,58 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
                antes.x,antes.y,antes.z, a->bones[5].poseR.x,a->bones[5].poseR.y,a->bones[5].poseR.z, (int)a->animations.size());
         return true;
     }
+    // ---- rigidcheck <frame> : mide si cada PIEZA (vertex group) se deforma RIGIDA (preserva forma). Un skinA con
+    //      escala/shear mal distorsiona la pieza aunque su CENTRO quede en el hueso (el drama de LISA). ratio~1 = rigido. ----
+    if (cmd == "rigidcheck") {
+        Mesh* m = (ObjActivo && ObjActivo->getType()==ObjectType::mesh) ? (Mesh*)ObjActivo : NULL;
+        if (!m || !m->skinArmature) { err="rigidcheck: mesh sin skinArmature"; return false; }
+        int f=20; ss>>f; CurrentFrame=f; m->lastSkinFrame=-999999; SkinearMesh(m);
+        if (!m->skinVertex) { err="rigidcheck: sin skinVertex"; return false; }
+        int nv=m->vertexSize;
+        std::map<int,int> rep; for (int ri=0; ri<nv; ri++) if (!rep.count(m->vertCtrlPoint[ri])) rep[m->vertCtrlPoint[ri]]=ri;
+        double sumR=0; int nPairs=0; double worst=0; int worstG=-1;
+        for (size_t g=0; g<m->vertexGroups.size(); g++){ VertexGroup* vg=m->vertexGroups[g];
+            // pares de verts DENTRO de la pieza: dist skinneada / dist bind (deberia ser ~1 si es rigido)
+            std::vector<int> ris; for (size_t j=0;j<vg->verts.size();j++){ std::map<int,int>::iterator it=rep.find(vg->verts[j]); if (it!=rep.end()) ris.push_back(it->second); }
+            double gR=0; int gN=0;
+            for (size_t a=0;a<ris.size() && a<40;a++) for (size_t b=a+1;b<ris.size() && b<40;b++){
+                int ra=ris[a], rb=ris[b];
+                double bx=m->vertex[ra*3]-m->vertex[rb*3], by=m->vertex[ra*3+1]-m->vertex[rb*3+1], bz=m->vertex[ra*3+2]-m->vertex[rb*3+2];
+                double sx=m->skinVertex[ra*3]-m->skinVertex[rb*3], sy=m->skinVertex[ra*3+1]-m->skinVertex[rb*3+1], sz=m->skinVertex[ra*3+2]-m->skinVertex[rb*3+2];
+                double db=sqrt(bx*bx+by*by+bz*bz), ds=sqrt(sx*sx+sy*sy+sz*sz);
+                if (db>1e-3){ double r=ds/db; sumR+=r; nPairs++; gR+=r; gN++; } }
+            if (gN>0){ double avg=gR/gN; double dev=avg>1?avg-1:1-avg; if (dev>worst){ worst=dev; worstG=(int)g; } }
+        }
+        printf("      [rigid] f=%d pares=%d ratioAvg=%.3f (1.0=rigido perfecto) peorGrupo='%s' devRatio=%.3f\n",
+               f, nPairs, nPairs?sumR/nPairs:0.0, worstG>=0?m->vertexGroups[worstG]->nombre.c_str():"-", worst);
+        return true;
+    }
+    // ---- matdump : escala de skinA / skinMatrix / bind / clusterTransform para ubicar la escala 0.01 de LISA ----
+    if (cmd == "matdump") {
+        Armature* a = (ObjActivo && ObjActivo->getType()==ObjectType::armature) ? (Armature*)ObjActivo : NULL;
+        if (!a || a->bones.size()<6) { err="matdump: sin armature"; return false; }
+        a->lastPoseFrame=-999999; EvaluarPoseEsqueleto(a, 20);
+        for (int bi=3; bi<6 && bi<(int)a->bones.size(); bi++){ W3dBone& b=a->bones[bi];
+            // escala aproximada = largo de la columna X (col-major m[0..2])
+            #define COLLEN(M,c) sqrt((double)M.m[(c)*4]*M.m[(c)*4]+(double)M.m[(c)*4+1]*M.m[(c)*4+1]+(double)M.m[(c)*4+2]*M.m[(c)*4+2])
+            printf("      [mat] %s bind|X|=%.3f cluster|X|=%.3f skinA|X|=%.3f skinMatrix|X|=%.3f\n",
+                   b.name.c_str(), COLLEN(b.bind,0), COLLEN(b.clusterTransform,0), COLLEN(b.skinA,0), COLLEN(b.skinMatrix,0));
+            // worldFK = skinMatrix * inv(skinA)
+            Matrix4 wf = b.skinMatrix * b.skinA.Inverse();
+            printf("      [mat]   worldFK|X|=%.3f restS=(%.2f,%.2f,%.2f) poseS=(%.2f,%.2f,%.2f) restT=(%.0f,%.0f,%.0f)\n",
+                   COLLEN(wf,0), b.restS.x,b.restS.y,b.restS.z, b.poseS.x,b.poseS.y,b.poseS.z, b.restT.x,b.restT.y,b.restT.z);
+        }
+        return true;
+    }
+    // ---- eulertest : roundtrip euler->matriz->euler (verifica SkelMatRotEuler / SkelMatrizAEulerFBX del transform de pose) ----
+    if (cmd == "eulertest") {
+        Vector3 casos[4] = { Vector3(30,-45,60), Vector3(10,20,30), Vector3(-80,15,-25), Vector3(0,89,0) };
+        for (int i=0;i<4;i++){ Vector3 e=casos[i]; Matrix4 M=SkelMatRotEuler(e,0); Vector3 o=SkelMatrizAEulerFBX(M,0);
+            // re-armar desde la salida y comparar las MATRICES (el euler puede diferir por equivalencia +-360/gimbal)
+            Matrix4 M2=SkelMatRotEuler(o,0); float d=0; for(int k=0;k<16;k++){ float df=M.m[k]-M2.m[k]; d+=df*df; }
+            printf("      [euler] in=(%.1f,%.1f,%.1f) out=(%.1f,%.1f,%.1f) matDiff=%.4f\n", e.x,e.y,e.z, o.x,o.y,o.z, d); }
+        return true;
+    }
     // ---- skinformula <0|1> : elige la formula de skinning (A/B testing headless) ----
     if (cmd == "skinformula") { int n=1; ss>>n; g_skinFormula = n; return true; }
     // ---- skincheck <frame> : POR HUESO, distancia del centroide (ponderado) de sus vertices skinneados al
@@ -390,6 +442,60 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         bool ok = ImportFBX(ruta);
         printf("      [importfbx] %s -> %s\n", ruta.c_str(), ok?"OK":"FALLO");
         return ok;
+    }
+    // ---- skinexport <frame> <archivo> : busca la 1er malla con skinArmature, la skinnea en <frame> y vuelca
+    //      TODOS los vertices skinneados (x y z por linea) a <archivo>. Para Procrustes vs Blender (ground truth). ----
+    if (cmd == "skinexport") {
+        int f=1; std::string path; ss>>f>>path;
+        if (path.empty()) { err="skinexport: falta el archivo"; return false; }
+        // walk de la escena buscando la malla con skinArmature
+        Mesh* found=NULL;
+        { std::vector<Object*> stack; if (SceneCollection) stack.push_back(SceneCollection);
+          while(!stack.empty() && !found){ Object* o=stack.back(); stack.pop_back();
+            if (o->getType()==ObjectType::mesh && ((Mesh*)o)->skinArmature) found=(Mesh*)o;
+            for (size_t i=0;i<o->Childrens.size();i++) stack.push_back(o->Childrens[i]); } }
+        if (!found) { err="skinexport: no hay malla con skinArmature"; return false; }
+        ObjActivo = found; // dejar activa para comandos siguientes (rigidcheck, skincheck)
+        CurrentFrame=f; found->lastSkinFrame=-999999; SkinearMesh(found);
+        if (!found->skinVertex) { err="skinexport: sin skinVertex"; return false; }
+        int nv=found->vertexSize;
+        // exportar POR CONTROL-POINT (orden FBX 0..nCtrl-1) = mismo orden que Blender.data.vertices -> correspondencia directa.
+        int nCtrl=0; for (int i=0;i<nv && i<(int)found->vertCtrlPoint.size(); i++) if (found->vertCtrlPoint[i]+1>nCtrl) nCtrl=found->vertCtrlPoint[i]+1;
+        std::vector<int> rep(nCtrl,-1);
+        for (int i=0;i<nv && i<(int)found->vertCtrlPoint.size(); i++){ int c=found->vertCtrlPoint[i]; if (c>=0 && c<nCtrl && rep[c]<0) rep[c]=i; }
+        FILE* fp=fopen(path.c_str(),"w"); if(!fp){ err="skinexport: no pude abrir "+path; return false; }
+        bool bind = (f==-999); // frame sentinela -999 = exportar el BIND (m->vertex) en vez del skinneado
+        for (int c=0;c<nCtrl;c++){ int i=rep[c]; if (i<0){ fprintf(fp,"nan nan nan\n"); continue; }
+            const float* src = bind ? found->vertex : found->skinVertex;
+            fprintf(fp,"%.5f %.5f %.5f\n", src[i*3], src[i*3+1], src[i*3+2]); }
+        fclose(fp);
+        printf("      [skinexport] f=%d nCtrl=%d (nv=%d) -> %s (malla '%s')\n", f, nCtrl, nv, path.c_str(), found->name.c_str());
+        return true;
+    }
+    // ---- matexport <frame> <archivo> : vuelca por hueso skinMatrix/skinA/worldFK (row-major, 16 floats) al frame. ----
+    if (cmd == "matexport") {
+        int f=1; std::string path; ss>>f>>path;
+        if (path.empty()) { err="matexport: falta el archivo"; return false; }
+        Armature* a=NULL;
+        { std::vector<Object*> stack; if (SceneCollection) stack.push_back(SceneCollection);
+          while(!stack.empty() && !a){ Object* o=stack.back(); stack.pop_back();
+            if (o->getType()==ObjectType::armature) a=(Armature*)o;
+            for (size_t i=0;i<o->Childrens.size();i++) stack.push_back(o->Childrens[i]); } }
+        if (!a) { err="matexport: no hay armature"; return false; }
+        CurrentFrame=f; a->lastPoseFrame=-999999; EvaluarPoseEsqueleto(a, f);
+        FILE* fp=fopen(path.c_str(),"w"); if(!fp){ err="matexport: no pude abrir "+path; return false; }
+        for (size_t i=0;i<a->bones.size();i++){ W3dBone& b=a->bones[i];
+            fprintf(fp,"BONE %s\n", b.name.c_str());
+            #define ROWMAJ(M) do{ for(int r=0;r<4;r++)for(int c=0;c<4;c++) fprintf(fp,"%.6f ", (M).m[c*4+r]); fprintf(fp,"\n"); }while(0)
+            fprintf(fp,"skinMatrix "); ROWMAJ(b.skinMatrix);
+            fprintf(fp,"skinA "); ROWMAJ(b.skinA);
+            fprintf(fp,"skinInvBind "); ROWMAJ(b.skinInvBind);
+            fprintf(fp,"clusterTransform "); ROWMAJ(b.clusterTransform);
+            fprintf(fp,"bind "); ROWMAJ(b.bind);
+        }
+        fclose(fp);
+        printf("      [matexport] f=%d bones=%d -> %s\n", f, (int)a->bones.size(), path.c_str());
+        return true;
     }
     // ---- timeline <play|pause|rev|start|end|goto <n>|range <s> <e>|tick|state> : motor de playback global ----
     if (cmd == "timeline") {
