@@ -48,6 +48,7 @@ mkdir -p "$AAPK_PATH"
 # Recursos del editor -> assets del APK. Se REGENERA en cada build desde el res/
 # canonico (esta gitignoreado y NO se commitea, para no duplicar/desactualizar).
 echo "Copiando res/ al APK (assets)..."
+mkdir -p "$APROJECT_PATH/app/src/main/assets"   # assets/ esta gitignoreado (no se commitea) -> crearlo si no existe
 rm -rf "$APROJECT_PATH/app/src/main/assets/res"
 cp -r res "$APROJECT_PATH/app/src/main/assets/res"
 

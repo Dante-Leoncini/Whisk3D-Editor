@@ -22,7 +22,7 @@ platform/web/build_web.sh
 
 Genera `platform/web/build/whisk3d.html` + `.js` + `.wasm` + `.data` (con `res/` empaquetado adentro).
 
-> Notas del build: memoria fija de 256 MB (**sin** `-sALLOW_MEMORY_GROWTH`: con growth los navegadores nuevos rechazan `TextDecoder` sobre el buffer resizable → pantalla negra). El shell HTML propio está en `platform/web/shell.html`.
+> Notas del build: memoria fija de 128 MB (**sin** `-sALLOW_MEMORY_GROWTH`: con growth los navegadores nuevos rechazan `TextDecoder` sobre el buffer resizable → pantalla negra). Es 128 y no 256 porque iOS Safari fallaba al alocar el bloque fijo de 256 MB (pantalla en blanco). El shell HTML propio está en `platform/web/shell.html`.
 
 ## Probar
 

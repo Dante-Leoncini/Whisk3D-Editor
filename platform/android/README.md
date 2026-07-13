@@ -5,7 +5,9 @@ Backend GLES1 + SDL2, empaquetado como APK con Gradle.
 ## Requisitos
 
 - **Android NDK** (define `ANDROID_NDK` o dejalo en `/opt/android-ndk`).
-- **JDK** + el `gradlew` que ya viene en `platform/android/`.
+- **JDK 17** + el `gradlew` que ya viene en `platform/android/`. Gradle necesita `JAVA_HOME` apuntando al JDK
+  (si no, falla con *"JAVA_HOME is not set"*), por ejemplo:
+  `export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64`
 
 ## Compilar (lo más fácil)
 
