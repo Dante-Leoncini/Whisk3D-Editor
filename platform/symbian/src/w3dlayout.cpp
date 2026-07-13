@@ -25,6 +25,7 @@
 #include "ViewPorts/Outliner.h" // Outliner REAL de PC
 #include "ViewPorts/ViewPort3D.h" // Viewport3D REAL de PC
 #include "ViewPorts/Properties.h" // Properties REAL de PC
+#include "W3dProfile.h"           // profiler del frame (ms por categoria) tambien en el N95
 #include "WhiskUI/card.h"
 #include "ViewPorts/ScrollBar.h"
 #include "objects/Textures.h"
@@ -292,6 +293,8 @@ void W3dLayoutBuild(CWhisk3D* aWhisk, TInt aWidth, TInt aHeight) {
 
 void W3dLayoutRender() {
     if (!gRoot) return;
+    W3dProfBegin(); // profiler: arranca el frame (scene/viewport3d se acumulan dentro de rootViewport->Render)
+    double _profR0 = W3dNowMs();
 
     glDisable(GL_SCISSOR_TEST);
     // matriz de TEXTURA siempre identidad: si algo viejo la toca, los UV
@@ -312,6 +315,8 @@ void W3dLayoutRender() {
 
     LayoutRenderMenu(gScreenW, gScreenH); // desplegable abierto (compartido)
     { extern void NotificacionesRender(int, int); NotificacionesRender(gScreenW, gScreenH); } // toasts encima (export/import)
+    g_prof.render = W3dNowMs() - _profR0; // profiler: TODO el render (viewports 3D + paneles + menus). En Symbian el
+    W3dProfEnd();                          // swap/logic van en el event loop (no aca) -> quedan en 0; scene/3d/ui reales.
     LayoutTickFPS(User::NTickCount());     // overlay de fps (reloj de Symbian, ~ms)
 
     // diagnostico: estado del GL al terminar el arbol (cada ~128 frames)

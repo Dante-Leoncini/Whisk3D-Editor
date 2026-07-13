@@ -52,8 +52,12 @@ extern bool OverlayCustomNormal; // magenta: normal guardada por vertice
 extern bool OverlayFaceNormal;   // cian: normal de cada cara (triangulo)
 extern float OverlayNormalSize;  // largo de la linea (default 0.10)
 
-// overlay de estadisticas (texto blanco arriba a la derecha del viewport 3D)
-extern bool OverlayStatistics;   // "vertex: agrupados/reales" + "faces: logicas/triangulos"
+// overlay de estadisticas (texto blanco arriba a la derecha del viewport 3D). Submenu "Statistics": cada linea
+// se prende/apaga por separado (como el submenu "Objects"), sin master.
+extern bool OverlayStatVertices; // "vertex: agrupados/reales"
+extern bool OverlayStatFaces;    // "faces: logicas/triangulos"
+extern bool OverlayStatModgen;   // "modgen: N" (regeneraciones de malla de modificadores)
+extern bool OverlayStatTimes;    // "ms scn/3d/ui/log/swap/tot" (profiler por categoria)
 extern bool OverlayFps;          // "fps: N"
 extern float g_fpsActual;        // FPS actual (lo actualiza cada plataforma 1x/frame)
 extern long g_genMallaCount;     // DIAGNOSTICO: veces que se regenero la malla de un modificador (subsurf/screw).

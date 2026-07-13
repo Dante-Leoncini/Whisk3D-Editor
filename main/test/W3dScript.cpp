@@ -189,6 +189,39 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
                    a->bones[worstB].poseHead.x,a->bones[worstB].poseHead.y,a->bones[worstB].poseHead.z, tl.x,tl.y,tl.z); }
         return true;
     }
+    // ---- armdump : auto-encuentra el armature, evalua la pose REST y dumpea por hueso: parent, restR, origen del
+    //      FK-rest (poseHead, espacio nodo) y origen del TransformLink (bind real). Ver si el FK-rest esta DISPARADO. ----
+    if (cmd == "armdump") {
+        Armature* a=NULL;
+        { std::vector<Object*> st; if(SceneCollection) st.push_back(SceneCollection);
+          while(!st.empty()){ Object* o=st.back(); st.pop_back();
+            if (o->getType()==ObjectType::armature && !a) a=(Armature*)o;
+            for(size_t i=0;i<o->Childrens.size();i++) st.push_back(o->Childrens[i]); } }
+        if (!a) { err="armdump: sin armature"; return false; }
+        int save=a->animActiva; a->animActiva=-1; a->lastPoseFrame=-999999;
+        EvaluarPoseEsqueleto(a, 1); // rest FK -> poseHead = origen del FK-rest (espacio nodo)
+        a->animActiva=save; a->lastPoseFrame=-999999;
+        int N=(int)a->bones.size();
+        // bounding de los origenes FK-rest y de los TransformLink (para ver dispersion = "disparo")
+        Vector3 fmn(1e9f,1e9f,1e9f), fmx(-1e9f,-1e9f,-1e9f), tmn(1e9f,1e9f,1e9f), tmx(-1e9f,-1e9f,-1e9f);
+        for (int i=0;i<N;i++){ W3dBone& b=a->bones[i]; if(!b.hasSkin) continue;
+            Vector3 fk=b.poseHead, tl(b.bind.m[12],b.bind.m[13],b.bind.m[14]);
+            if(fk.x<fmn.x)fmn.x=fk.x; if(fk.y<fmn.y)fmn.y=fk.y; if(fk.z<fmn.z)fmn.z=fk.z;
+            if(fk.x>fmx.x)fmx.x=fk.x; if(fk.y>fmx.y)fmx.y=fk.y; if(fk.z>fmx.z)fmx.z=fk.z;
+            if(tl.x<tmn.x)tmn.x=tl.x; if(tl.y<tmn.y)tmn.y=tl.y; if(tl.z<tmn.z)tmn.z=tl.z;
+            if(tl.x>tmx.x)tmx.x=tl.x; if(tl.y>tmx.y)tmx.y=tl.y; if(tl.z>tmx.z)tmx.z=tl.z; }
+        printf("      [armdump] %d huesos. armPos=(%.2f,%.2f,%.2f) armScale=%.4f skinUsaBind=%d\n",
+               N, a->pos.x,a->pos.y,a->pos.z, a->scale.x, a->skinUsaBind?1:0);
+        printf("      [armdump] FK-rest bbox=(%.1f,%.1f,%.1f)..(%.1f,%.1f,%.1f)  TL bbox=(%.1f,%.1f,%.1f)..(%.1f,%.1f,%.1f)\n",
+               fmn.x,fmn.y,fmn.z,fmx.x,fmx.y,fmx.z, tmn.x,tmn.y,tmn.z,tmx.x,tmx.y,tmx.z);
+        int lim = N<16?N:16;
+        for (int i=0;i<lim;i++){ W3dBone& b=a->bones[i];
+            Vector3 tl(b.bind.m[12],b.bind.m[13],b.bind.m[14]);
+            printf("      [armdump] %2d p=%2d restR=(%.0f,%.0f,%.0f) restT=(%.1f,%.1f,%.1f) FK=(%.1f,%.1f,%.1f) TL=(%.1f,%.1f,%.1f) '%s'\n",
+                i, b.parent, b.restR.x,b.restR.y,b.restR.z, b.restT.x,b.restT.y,b.restT.z,
+                b.poseHead.x,b.poseHead.y,b.poseHead.z, tl.x,tl.y,tl.z, b.name.c_str()); }
+        return true;
+    }
     // ---- posekey : posa el hueso 5 (poseR=Y45), inserta keyframe en frame 10, re-evalua y verifica el roundtrip ----
     if (cmd == "posekey") {
         Armature* a = (ObjActivo && ObjActivo->getType()==ObjectType::armature) ? (Armature*)ObjActivo : NULL;

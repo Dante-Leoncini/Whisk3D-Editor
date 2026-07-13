@@ -15,6 +15,8 @@
 #include "ViewPorts/PopUp/ProgressPopup.h" // barra de progreso + hook LayoutSwapBuffers
 #include "importers/import_obj.h"        // ImportOBJ (el importador real)
 #include "importers/import_fbx.h"        // ImportFBX
+#include "ViewPorts/ViewPort3D.h"        // Viewport3DActive->EnfocarObject() para --framesel
+#include "W3dProfile.h"                  // profiler del frame (ms por categoria)
 #include "w3dVersion.h"                   // W3dVersion() para el titulo de ventana
 
 // accion del File browser al elegir un modelo: por EXTENSION (.fbx -> FBX; resto -> OBJ)
@@ -510,8 +512,34 @@ void initGL(int width, int height) {
 // UN FRAME del editor: procesa eventos y, si algo cambio, redibuja. En escritorio la corre el
 // while(running); en WebGL la llama el browser (emscripten_set_main_loop). Todo lo que usa es
 // global (window, winW/winH, rootViewport, running, g_redraw, last*Time...) salvo el SDL_Event local.
+bool g_didRender = false; // el ultimo MainLoopFrame DIBUJO? -> el loop de escritorio pacea a 60fps si dibujo, o bloquea en eventos si no
+
+// procesa UN evento SDL. COMPARTIDO: lo llaman el poll del frame Y la espera de reposo del loop (asi el manejo de
+// input no esta duplicado). Cualquier evento marca g_redraw (hay que redibujar).
+static void ProcesarEvento(SDL_Event& e) {
+    g_redraw = true;
+    if (e.type == SDL_QUIT) { running = false; return; }
+    if (e.type == SDL_WINDOWEVENT && e.window.event == SDL_WINDOWEVENT_RESIZED) {
+        winW = e.window.data1;
+        winH = e.window.data2;
+        W3dPantallaAlto = winH;
+        MenuPantallaW = winW;
+        MenuPantallaH = winH;
+        rootViewport->Resize(winW, winH);
+    } else {
+        InputUsuarioSDL3(e);
+    }
+}
+
 static void MainLoopFrame() {
     Contadores();
+    W3dProfBegin(); // profiler: reset del frame
+    double _profFrame0 = W3dNowMs();
+
+    // CAPTURA + RESET de g_redraw al INICIO del frame: los subsistemas (anim de materiales, eventos, notificaciones,
+    // carga diferida de texturas) lo vuelven a PRENDER si generan cambios este frame -> el idle-block de abajo lo ve el
+    // frame SIGUIENTE (toasts/import fluidos) y en reposo REAL (nada prende g_redraw) bloquea en eventos (0% CPU).
+    bool _needRender = g_redraw; g_redraw = false;
 
     UpdateAnimations();
     UpdateAnimatedMaterials();
@@ -535,20 +563,14 @@ static void MainLoopFrame() {
 #endif
 
     SDL_Event e;
-    while (SDL_PollEvent(&e)) {
-        g_redraw = true; // cualquier evento (tecla/mouse/resize) -> hay que redibujar
-        if (e.type == SDL_QUIT) running = false;
-        if (e.type == SDL_WINDOWEVENT && e.window.event == SDL_WINDOWEVENT_RESIZED) {
-            winW = e.window.data1;
-            winH = e.window.data2;
-            W3dPantallaAlto = winH;
-            MenuPantallaW = winW;
-            MenuPantallaH = winH;
-            rootViewport->Resize(winW, winH);
-        } else {
-            InputUsuarioSDL3(e);
-        }
-    }
+#ifndef __EMSCRIPTEN__
+    // REPOSO: si no hay animacion NI nada pendiente para redibujar, BLOQUEAR esperando el 1er evento (0% CPU, como
+    // Blender). Esto reemplaza el busy-spin (que corria todo esto en loop cerrado). En emscripten NO se bloquea (el
+    // requestAnimationFrame del browser no se puede frenar). El paceo cuando SI animamos lo hace el while de abajo.
+    { bool _animPre = HayAnimacionActiva() || !VertexAnimationActives.empty() || PlayAnimation;
+      if (!_animPre && !_needRender && !g_redraw && SDL_WaitEventTimeout(&e, 200)) ProcesarEvento(e); }
+#endif
+    while (SDL_PollEvent(&e)) ProcesarEvento(e); // manejo compartido (mismo que la espera de reposo)
 
 #ifdef __EMSCRIPTEN__
     if (!running) { emscripten_cancel_main_loop(); return; } // SDL_QUIT -> salir del loop del browser
@@ -581,18 +603,23 @@ static void MainLoopFrame() {
     // PLAY (vertex-anim o materiales animados activos). Sino no se dibuja nada ->
     // CPU casi 0 en reposo (como Blender), en vez de renderizar 60 veces/seg al pedo.
     bool animando = HayAnimacionActiva() || !VertexAnimationActives.empty() || PlayAnimation;
+    double _renderNowMs = W3dNowMs(); // reloj de alta resolucion (para el profiler)
 #ifdef __EMSCRIPTEN__
     // WebGL: renderizar SIEMPRE (no event-driven). Motivos: 1) el canvas WebGL usa
     // preserveDrawingBuffer=false -> en un frame sin dibujar el browser BORRA el canvas a negro
     // (parpadeos/negro al quedar quieto); 2) el color-ID pick (hover/loop cut) limpia el framebuffer
     // visible y hay que taparlo cada frame. El RAF ya limita a la tasa del monitor y se PAUSA en
     // tabs ocultas, asi que no quema GPU de fondo. (En escritorio se mantiene el event-driven.)
-    bool doRender = true; (void)animando;
+    bool doRender = true; (void)animando; (void)_renderNowMs;
 #else
-    bool doRender = (g_redraw || animando) && (now - lastRenderTime >= 16); // ~60hz
+    bool doRender = (_needRender || g_redraw || animando); // _needRender = del frame previo; g_redraw = eventos/subsistemas de este.
+    // El CAP a 60fps lo hace el LOOP (paceo por sleep), no aca -> sin busy-spin.
 #endif
+    g_didRender = doRender; // el loop de escritorio lo lee: si dibujo -> pacea 60fps; si no -> bloquea en eventos (0% CPU)
+    g_prof.logic = _renderNowMs - _profFrame0; // profiler: input + anim + notificaciones + carga diferida de texturas
     if (doRender) {
         lastRenderTime = now;
+        double _profRender0 = W3dNowMs();
         if (rootViewport){
             rootViewport->Render();
         }
@@ -600,8 +627,12 @@ static void MainLoopFrame() {
         LayoutRenderMenu(winW, winH);
         NotificacionesRender(winW, winH); // toasts ENCIMA de todo
         LayoutTickFPS(now); // overlay de fps (reloj de PC: SDL_GetTicks)
+        g_prof.render = W3dNowMs() - _profRender0; // profiler: TODO el render (viewports 3D + paneles UI + menus)
+        double _profSwap0 = W3dNowMs();
         SDL_GL_SwapWindow(window);
-        g_redraw = false;
+        g_prof.swap = W3dNowMs() - _profSwap0; // profiler: swap (con vsync ON = espera al vblank)
+        W3dProfEnd(); // profiler: suaviza g_profShow hacia g_prof (numeros estables). NO se resetea g_redraw aca: se
+        // capturo+reseteo al inicio del frame; lo que los subsistemas (notif/texturas) prendieron queda para el proximo.
 
 #ifdef __EMSCRIPTEN__
         // apenas dibujamos el PRIMER frame, ocultamos la pantalla de carga del shell. Es lo mas
@@ -854,6 +885,25 @@ int main(int argc, char* argv[]) {
             g_redraw = true;
         }
     }
+    // "whisk3d --frame N" fija CurrentFrame al arrancar (para ver/depurar una pose ANIMADA en un screenshot, no solo el bind)
+    for (int ai = 1; ai < argc; ai++) {
+        if (std::string(argv[ai]) == "--frame" && ai + 1 < argc) {
+            extern int CurrentFrame; CurrentFrame = atoi(argv[ai + 1]); g_redraw = true;
+        }
+    }
+    // "whisk3d --framesel" encuadra el objeto seleccionado (Frame Selected) al arrancar (depuracion: ver el modelo importado)
+    for (int ai = 1; ai < argc; ai++) {
+        if (std::string(argv[ai]) == "--framesel") {
+            extern Viewport3D* Viewport3DActive;
+            if (Viewport3DActive) Viewport3DActive->EnfocarObject();
+            g_redraw = true;
+        }
+    }
+    // "whisk3d --stats" prende el overlay Statistics (con el profiler de ms); "--play" arranca la animacion en PLAY
+    for (int ai = 1; ai < argc; ai++) {
+        if (std::string(argv[ai]) == "--stats") { extern bool OverlayStatVertices, OverlayStatFaces, OverlayStatModgen, OverlayStatTimes, OverlayFps; OverlayStatVertices = OverlayStatFaces = OverlayStatModgen = OverlayStatTimes = OverlayFps = true; g_redraw = true; }
+        if (std::string(argv[ai]) == "--play")  { extern bool PlayAnimation;     PlayAnimation = true;     g_redraw = true; }
+    }
 
 #ifdef __EMSCRIPTEN__
     // WebGL: el browser es de 1 solo hilo, no podemos bloquear con un while(). Le pasamos el
@@ -861,7 +911,23 @@ int main(int argc, char* argv[]) {
     // "simula" un loop infinito (no se ejecuta lo de abajo). El cleanup queda solo para escritorio.
     emscripten_set_main_loop(MainLoopFrame, 0, 1);
 #else
-    while (running) MainLoopFrame();
+    // Loop de escritorio PACEADO (reemplaza el busy-spin viejo): MainLoopFrame ya bloquea en REPOSO (0% CPU). Cuando
+    // SI dibuja (animando/interactuando), dormimos hasta el proximo frame -> 60fps parejos y CPU baja. Acumulador
+    // (nextFrame) para no driftear; si nos atrasamos mucho no acumulamos deuda.
+    const double frameMs = 1000.0 / 60.0;
+    double nextFrame = W3dNowMs();
+    while (running) {
+        MainLoopFrame();
+        if (g_didRender) {
+            nextFrame += frameMs;
+            double ahora = W3dNowMs();
+            if (nextFrame < ahora - frameMs) nextFrame = ahora; // atraso grande (frame lento): resincronizar
+            double espera = nextFrame - ahora;
+            if (espera > 1.0) SDL_Delay((Uint32)espera); // duerme el resto del frame (yield de CPU)
+        } else {
+            nextFrame = W3dNowMs(); // estuvimos en reposo (MainLoopFrame bloqueo) -> resincronizar al reanudar
+        }
+    }
 #endif
 
     if (controller) SDL_GameControllerClose(controller);

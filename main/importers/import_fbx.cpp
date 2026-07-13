@@ -719,11 +719,36 @@ struct MatsFBX {
     }
 };
 
+// Materializa una textura EMBEBIDA (bytes del Content de un nodo Video) a un archivo junto al FBX y devuelve su
+// ruta (o "" si no se pudo escribir). Muchos FBX de 3ds Max (chicken, nani) embeben la imagen y su RelativeFilename
+// apunta a una ruta de otra maquina inexistente -> hay que volcar estos bytes a disco porque el pipeline decodifica
+// por ARCHIVO. El nombre sale del RelativeFilename (conserva extension); si no, se detecta por magic bytes.
+static std::string MaterializarTexturaEmbebida(const std::string& fbxDir, const std::string& nombre, const std::string& bytes) {
+    if (bytes.empty()) return std::string();
+    std::string fn = nombre;
+    if (fn.empty()) {
+        const unsigned char* b = (const unsigned char*)&bytes[0]; size_t n = bytes.size();
+        const char* ext = ".bin";
+        if      (n >= 4 && b[0]==0x89 && b[1]=='P' && b[2]=='N' && b[3]=='G') ext = ".png";
+        else if (n >= 3 && b[0]==0xFF && b[1]==0xD8 && b[2]==0xFF)            ext = ".jpg";
+        else if (n >= 2 && b[0]=='B'  && b[1]=='M')                           ext = ".bmp";
+        else if (n >= 4 && b[0]=='D'  && b[1]=='D' && b[2]=='S' && b[3]==' ') ext = ".dds";
+        static int cont = 0; char buf[40]; sprintf(buf, "embedded_%d%s", cont++, ext); fn = buf;
+    }
+    std::string ruta = w3dFileSystem::JoinPath(fbxDir, fn);
+    if (w3dFileSystem::FileExists(ruta)) return ruta;          // ya existe (materializada antes o el autor la dejo)
+    if (!w3dFileSystem::WriteTextFile(ruta, bytes)) return std::string();
+    w3dLogf("ImportFBX: textura embebida extraida -> %s (%d bytes)", fn.c_str(), (int)bytes.size());
+    return ruta;
+}
+
 static void ParsearMaterialesFBX(const FNode& root, const FNode& objs, const std::string& filepath, MatsFBX& out) {
     // 1) recolectar ids de Material / Texture / Geometry / Model (para clasificar las conexiones)
     std::set<long long> matIds, texIds, geoIds, modelIds;
     std::map<long long, std::string> matNombre;  // id material -> nombre limpio
     std::map<long long, std::string> texRel;      // id textura  -> ruta relativa
+    std::map<long long, std::string> texContent;      // id (Texture/Video) -> bytes de imagen EMBEBIDA (Content)
+    std::map<long long, std::string> texContentName;  // id -> nombre de archivo (del RelativeFilename) para materializar
     for (size_t i = 0; i < objs.kids.size(); i++) {
         const FNode& k = objs.kids[i]; if (k.props.empty()) continue;
         long long id = k.props[0].i;
@@ -733,6 +758,13 @@ static void ParsearMaterialesFBX(const FNode& root, const FNode& objs, const std
             if (const FNode* c = k.child("RelativeFilename")) if (!c->props.empty()) rel = c->props[0].s;
             if (rel.empty()) if (const FNode* c = k.child("FileName")) if (!c->props.empty()) rel = c->props[0].s;
             if (!rel.empty()) { texIds.insert(id); texRel[id] = rel; }
+            // textura EMBEBIDA: el nodo Video trae los bytes de la imagen en su hijo Content (prop 'R'). Se guardan
+            // para materializarlos si no se resuelve un archivo en disco (el RelativeFilename suele no existir aca).
+            if (const FNode* c = k.child("Content")) if (!c->props.empty() && !c->props[0].s.empty()) {
+                texIds.insert(id);
+                texContent[id] = c->props[0].s;
+                texContentName[id] = SoloNombre(rel);
+            }
         }
         else if (k.name == "Geometry") geoIds.insert(id);
         else if (k.name == "Model")    modelIds.insert(id);
@@ -741,6 +773,7 @@ static void ParsearMaterialesFBX(const FNode& root, const FNode& objs, const std
 
     // 2) conexiones: material->Model (orden = indice de material), textura->material (prioriza DiffuseColor), geometria->Model
     std::map<long long, long long> texDeMat;  // id material -> id textura elegida
+    std::map<long long, long long> contentDeTex; // id Texture -> id nodo (Video) con el Content embebido (via OO)
     std::set<long long> matDifusoElegido;     // material que ya fijo su textura DiffuseColor (no la pisa una secundaria)
     if (const FNode* conns = root.child("Connections")) {
         for (size_t i = 0; i < conns->kids.size(); i++) {
@@ -755,6 +788,7 @@ static void ParsearMaterialesFBX(const FNode& root, const FNode& objs, const std
                 if (difuso) { texDeMat[dst] = src; matDifusoElegido.insert(dst); }
                 else if (!matDifusoElegido.count(dst) && texDeMat.find(dst) == texDeMat.end()) texDeMat[dst] = src; // 1ra secundaria si no hay difusa
             }
+            else if (texContent.count(src) && texIds.count(dst) && !matIds.count(dst)) contentDeTex[dst] = src; // Video(Content) -> Texture
         }
     }
 
@@ -766,9 +800,22 @@ static void ParsearMaterialesFBX(const FNode& root, const FNode& objs, const std
         Materials.push_back(mat);
         out.porId[id] = mat;
         std::map<long long,long long>::iterator td = texDeMat.find(id);
-        if (td != texDeMat.end()) {
-            std::map<long long,std::string>::iterator tr = texRel.find(td->second);
-            if (tr != texRel.end()) { std::string res = ResolverTextura(dir, tr->second); if (!res.empty()) EncolarTextura(mat, res); }
+        if (td == texDeMat.end()) continue;
+        long long tid = td->second;
+        // a) archivo en disco (ruta relativa del FBX)
+        std::map<long long,std::string>::iterator tr = texRel.find(tid);
+        std::string res;
+        if (tr != texRel.end()) res = ResolverTextura(dir, tr->second);
+        if (!res.empty()) { EncolarTextura(mat, res); continue; }
+        // b) textura EMBEBIDA: bytes en el propio Texture, o en el Video conectado por OO. Se materializa junto al FBX.
+        long long cid = tid;
+        if (!texContent.count(cid)) { std::map<long long,long long>::iterator vd = contentDeTex.find(tid); if (vd != contentDeTex.end()) cid = vd->second; }
+        std::map<long long,std::string>::iterator cc = texContent.find(cid);
+        if (cc != texContent.end()) {
+            std::string nom = texContentName.count(cid) ? texContentName[cid] : std::string();
+            if (nom.empty() && tr != texRel.end()) nom = SoloNombre(tr->second); // usar el nombre del Texture si el Video no lo tenia
+            std::string ruta = MaterializarTexturaEmbebida(dir, nom, cc->second);
+            if (!ruta.empty()) EncolarTextura(mat, ruta);
         }
     }
     w3dLogf("ImportFBX: %d material(es), %d con textura conectada", (int)matIds.size(), (int)texDeMat.size());

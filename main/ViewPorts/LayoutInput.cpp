@@ -3116,20 +3116,23 @@ void LayoutTimelineBarActivar() {
 // overlay: el desplegable abierto, encima de todo
 // ====================================================================
 
-// FPS compartido: cada plataforma lo llama UNA vez por frame con su reloj de
-// pared en milisegundos (PC: SDL_GetTicks; Symbian: User::NTickCount). El
-// promedio se refresca cada ~500ms para que el numero no titile.
+// FPS compartido: cada plataforma lo llama UNA vez por frame dibujado con su reloj de pared en ms (PC:
+// SDL_GetTicks; Symbian: User::NTickCount). Mide el TIEMPO ENTRE FRAMES REALES con promedio exponencial ->
+// g_fpsActual = 1000/ms-por-frame. Refleja el costo REAL del frame en curso (liviano=UI/escena vacia -> fps
+// alto; pesado=skinning en play -> fps bajo): son valores CORRECTOS, no un bug, el numero sigue a lo que se dibuja.
 void LayoutTickFPS(unsigned long wallMs) {
-    static unsigned long t0 = 0;
-    static int frames = 0;
-    if (t0 == 0) t0 = wallMs;
-    frames++;
-    unsigned long dt = wallMs - t0;
-    if (dt >= 500) {
-        g_fpsActual = (float)frames * 1000.0f / (float)dt;
-        frames = 0;
-        t0 = wallMs;
-    }
+    static unsigned long lastFrame = 0;
+    static float frameMsProm = 0.0f; // ms por frame (promedio exponencial)
+    if (lastFrame == 0) { lastFrame = wallMs; return; } // 1er frame: sin delta todavia
+    unsigned long dt = wallMs - lastFrame;
+    lastFrame = wallMs;
+    // Render EVENT-DRIVEN: si nada cambia (quieto) NO se dibujan frames. Al retomar, el 1er frame trae un HUECO
+    // enorme (todo el tiempo quieto) que NO es "lento" -> no promediarlo (marcaria fps bajos falsos). Se deja
+    // g_fpsActual en el ultimo valor ACTIVO (lo que rinde CUANDO dibuja). Un render continuo >=2.5fps no entra aca.
+    if (dt == 0 || dt > 400) return;
+    if (frameMsProm <= 0.0f) frameMsProm = (float)dt;
+    else                     frameMsProm = frameMsProm * 0.8f + (float)dt * 0.2f; // suavizado: estable y responsivo
+    g_fpsActual = 1000.0f / frameMsProm;
 }
 
 // Tab (PC) / tecla equivalente (Symbian BT): alterna Object <-> Edit Mode del

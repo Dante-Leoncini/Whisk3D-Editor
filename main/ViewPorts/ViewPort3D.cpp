@@ -6,6 +6,9 @@
 #include <cmath>
 #include <cstring> // memcpy (stitch de tiles del render)
 #include <cstdio>  // sprintf (formateo portable de la barra de estado)
+#ifdef W3D_SYMBIAN
+#include <e32std.h> // User::NTickCount() (reloj del profiler en el N95; ~ms, el mismo que usa LayoutTickFPS)
+#endif
 #include <string>
 #include "WhiskUI/glesdraw.h"
 #include "ui/W3dColors.h" // W3dColores: colores del editor (piso, ejes de transformacion)
@@ -20,6 +23,25 @@
 #include "ViewPorts/PopUp/ConfirmarPopup.h" // AbrirConfirmarBorrado (popup al borrar con la tecla)
 #include "ViewPorts/PopUp/ProgressPopup.h"  // barra "Rendering..." durante el render por tiles (clave en N95)
 void RebindMaterialMeshPart(); // (def en Properties.cpp) refresca el panel de material tras undo/redo
+#include "W3dProfile.h" // profiler del frame (ms por categoria) para el overlay Statistics
+// globales + reloj del profiler (se definen aca, un .cpp compilado en TODAS las plataformas)
+W3dProf g_prof = {0,0,0,0,0};
+W3dProf g_profShow = {0,0,0,0,0};
+double W3dNowMs() {
+#ifndef W3D_SYMBIAN
+    return (double)SDL_GetPerformanceCounter() * 1000.0 / (double)SDL_GetPerformanceFrequency(); // reloj de PARED (alta res)
+#else
+    return (double)User::NTickCount(); // N95: nanokernel tick ~= ms (mismo reloj de pared que LayoutTickFPS)
+#endif
+}
+void W3dProfBegin() { g_prof.logic = g_prof.scene = g_prof.viewport3d = g_prof.render = g_prof.swap = 0.0; }
+void W3dProfEnd() {
+    g_profShow.logic      = g_profShow.logic      * 0.9 + g_prof.logic      * 0.1;
+    g_profShow.scene      = g_profShow.scene      * 0.9 + g_prof.scene      * 0.1;
+    g_profShow.viewport3d = g_profShow.viewport3d * 0.9 + g_prof.viewport3d * 0.1;
+    g_profShow.render     = g_profShow.render     * 0.9 + g_prof.render     * 0.1;
+    g_profShow.swap       = g_profShow.swap       * 0.9 + g_prof.swap       * 0.1;
+}
 #ifdef W3D_SYMBIAN
 extern int W3dPantallaAlto; // los headers GLES + tipos GL los da GeometriaUI.h (via ViewPort3D.h)
 #ifndef GL_POINT_SPRITE
@@ -322,7 +344,7 @@ void Viewport3D::AbrirMenuOverlays(int x, int y){
     MenuOverlays->AgregarCheck("Origins", 4, &showOrigins)->gris = &showOverlays;
     // submenu "Objects": mostrar/ocultar el overlay de cada tipo de objeto (esqueleto / luces / camaras / empties)
     static PopupMenu* MenuOverlayObjects = NULL;
-    if (!MenuOverlayObjects) { MenuOverlayObjects = new PopupMenu(); MenuOverlayObjects->titulo = "Objects"; }
+    if (!MenuOverlayObjects) MenuOverlayObjects = new PopupMenu(); // sin titulo (ya sabes que es al abrirlo)
     MenuOverlayObjects->Limpiar();
     MenuOverlayObjects->AgregarCheck("Armature", 13, &showArmature, IconType::armature);
     MenuOverlayObjects->AgregarCheck("Lights",   14, &showLights,   IconType::light);
@@ -331,14 +353,25 @@ void Viewport3D::AbrirMenuOverlays(int x, int y){
     MenuOverlays->Agregar("Objects", 13, IconType::object, MenuOverlayObjects)->gris = &showOverlays;
     MenuOverlays->AgregarCheck("3D Cursor", 5, &show3DCursor)->gris = &showOverlays;
     MenuOverlays->AgregarCheck("Relationship Lines", 6, &ShowRelantionshipsLines)->gris = &showOverlays;
-    // Normales (solo en meshes seleccionadas): 3 toggles + slider de tamano
-    MenuOverlays->AgregarCheck("Vertex Normal", 7, &OverlayVertexNormal, IconType::normalVertex)->gris = &showOverlays;
-    MenuOverlays->AgregarCheck("Custom Normal", 8, &OverlayCustomNormal, IconType::normalCustom)->gris = &showOverlays;
-    MenuOverlays->AgregarCheck("Face Normal",   9, &OverlayFaceNormal,   IconType::normalFace)->gris = &showOverlays;
-    MenuOverlays->AgregarFloat("Normal Size",  10, &OverlayNormalSize, 0.0f, 1.0f)->gris = &showOverlays;
-    // texto blanco arriba a la derecha del viewport
-    MenuOverlays->AgregarCheck("Statistics", 11, &OverlayStatistics)->gris = &showOverlays;
-    MenuOverlays->AgregarCheck("FPS",        12, &OverlayFps)->gris = &showOverlays;
+    // submenu "Normals" (solo en meshes seleccionadas): 3 toggles + slider de tamano. Sin titulo (ya sabes que es al abrirlo).
+    static PopupMenu* MenuOverlayNormals = NULL;
+    if (!MenuOverlayNormals) MenuOverlayNormals = new PopupMenu();
+    MenuOverlayNormals->Limpiar();
+    MenuOverlayNormals->AgregarCheck("Vertex Normal", 7, &OverlayVertexNormal, IconType::normalVertex);
+    MenuOverlayNormals->AgregarCheck("Custom Normal", 8, &OverlayCustomNormal, IconType::normalCustom);
+    MenuOverlayNormals->AgregarCheck("Face Normal",   9, &OverlayFaceNormal,   IconType::normalFace);
+    MenuOverlayNormals->AgregarFloat("Normal Size",  10, &OverlayNormalSize, 0.0f, 1.0f);
+    MenuOverlays->Agregar("Normals", 7, IconType::normalVertex, MenuOverlayNormals)->gris = &showOverlays;
+    // submenu "Statistics": texto blanco arriba a la derecha del viewport. Cada linea es un toggle independiente. Sin titulo.
+    static PopupMenu* MenuOverlayStats = NULL;
+    if (!MenuOverlayStats) MenuOverlayStats = new PopupMenu();
+    MenuOverlayStats->Limpiar();
+    MenuOverlayStats->AgregarCheck("FPS",      12, &OverlayFps);
+    MenuOverlayStats->AgregarCheck("Vertices", 17, &OverlayStatVertices);
+    MenuOverlayStats->AgregarCheck("Faces",    18, &OverlayStatFaces);
+    MenuOverlayStats->AgregarCheck("Modgen",   19, &OverlayStatModgen);
+    MenuOverlayStats->AgregarCheck("Times",    20, &OverlayStatTimes);
+    MenuOverlays->Agregar("Statistics", 11, -1, MenuOverlayStats)->gris = &showOverlays;
     // Clear Screen: limpia el framebuffer (glClear) cada frame. NO es un overlay (no se grisa con
     // Show Overlays). Apagarlo gana rendimiento en juegos/renders donde la escena llena la pantalla.
     // ON por defecto (limpiarPantalla = true en el ctor).
@@ -862,6 +895,7 @@ static void WeightPaintActualizar() {
 }
 
 void Viewport3D::Render() {
+    double _tVp0 = W3dNowMs(); // profiler: tiempo total de este viewport 3D
     ReloadLights();
 
     // Configuración de la matriz de proyección
@@ -1046,7 +1080,7 @@ void Viewport3D::Render() {
     WeightPaintActualizar(); // prende/apaga el degradado de peso en el mesh activo (modo Weight Paint)
 
     // Renderiza la escena recursivamente
-    SceneCollection->Render();
+    { double _tScn0 = W3dNowMs(); SceneCollection->Render(); g_prof.scene += W3dNowMs() - _tScn0; } // profiler: escena (skinning + modelos)
 
     // huesos encima de todo (ignoran z-buffer). Es OVERLAY del editor: se apaga con "Show Overlays"
     // o con su propio toggle "Armature" del menu de overlays.
@@ -1058,6 +1092,7 @@ void Viewport3D::Render() {
     RenderCamPassepartout(); // marco de camara (lo que se va a renderizar) + oscurecido afuera. Antes de la UI (queda debajo).
     if (ShowUi) RenderUI();
     RenderSnapIndicador(); // recuadro verde en el target de snap (encima de todo)
+    g_prof.viewport3d += W3dNowMs() - _tVp0; // profiler: cierra el tiempo de este viewport 3D
 }
 
 // ARMATURE: dibuja los huesos de TODAS las armatures de la escena como lineas AZULES, encima de todo (z-test OFF),
@@ -1982,7 +2017,7 @@ static void W3dContarMallas(Object* o, int& vAgr, int& vReal, int& fLog, int& fT
 // seteados). Los contadores por malla estan precalculados (no se cuenta por frame).
 void Viewport3D::RenderEstadisticas(){
     if (!showOverlays) return;
-    if (!OverlayStatistics && !OverlayFps) return;
+    if (!OverlayStatVertices && !OverlayStatFaces && !OverlayStatModgen && !OverlayStatTimes && !OverlayFps) return;
     w3dEngine::Color4f(ListaColores[static_cast<int>(ColorID::blanco)][0],
               ListaColores[static_cast<int>(ColorID::blanco)][1],
               ListaColores[static_cast<int>(ColorID::blanco)][2], 1.0f);
@@ -1990,18 +2025,37 @@ void Viewport3D::RenderEstadisticas(){
     const int lineH = LetterHeightGS + gapGS;
     int ly = (barAbajo ? 0 : BarHeight()) + gapGS; // debajo de la barra si esta arriba
     char buf[64];
-    if (OverlayStatistics){
+    if (OverlayStatVertices || OverlayStatFaces){
         int vAgr=0, vReal=0, fLog=0, fTri=0;
         W3dContarMallas(SceneCollection, vAgr, vReal, fLog, fTri);
-        sprintf(buf, "vertex: %d/%d", vAgr, vReal);
-        w3dEngine::PushMatrix(); w3dEngine::Translatef((GLfloat)(width - margen), (GLfloat)ly, 0);
-        RenderBitmapText(buf, textAlign::right, width); w3dEngine::PopMatrix(); ly += lineH;
-        sprintf(buf, "faces: %d/%d", fLog, fTri);
-        w3dEngine::PushMatrix(); w3dEngine::Translatef((GLfloat)(width - margen), (GLfloat)ly, 0);
-        RenderBitmapText(buf, textAlign::right, width); w3dEngine::PopMatrix(); ly += lineH;
+        if (OverlayStatVertices){
+            sprintf(buf, "vertex: %d/%d", vAgr, vReal);
+            w3dEngine::PushMatrix(); w3dEngine::Translatef((GLfloat)(width - margen), (GLfloat)ly, 0);
+            RenderBitmapText(buf, textAlign::right, width); w3dEngine::PopMatrix(); ly += lineH;
+        }
+        if (OverlayStatFaces){
+            sprintf(buf, "faces: %d/%d", fLog, fTri);
+            w3dEngine::PushMatrix(); w3dEngine::Translatef((GLfloat)(width - margen), (GLfloat)ly, 0);
+            RenderBitmapText(buf, textAlign::right, width); w3dEngine::PopMatrix(); ly += lineH;
+        }
+    }
+    if (OverlayStatModgen){
         // DIAGNOSTICO de performance: regeneraciones de la malla de modificadores. Al ROTAR la camara NO debe subir
         // (la subdivision/screw se cachea en genValido). Si sube al rotar -> se esta recalculando de mas.
         sprintf(buf, "modgen: %ld", g_genMallaCount);
+        w3dEngine::PushMatrix(); w3dEngine::Translatef((GLfloat)(width - margen), (GLfloat)ly, 0);
+        RenderBitmapText(buf, textAlign::right, width); w3dEngine::PopMatrix(); ly += lineH;
+    }
+    if (OverlayStatTimes){
+        // PROFILER: ms por categoria del frame (para saber a que atacar). scene=modelo+skinning; 3d=overhead del
+        // viewport (grilla/overlays/huesos); ui=paneles (outliner/props/timeline); log=input+anim; swap=espera vsync.
+        sprintf(buf, "ms scn:%.1f 3d:%.1f", g_profShow.scene, g_profShow.viewport3d - g_profShow.scene);
+        w3dEngine::PushMatrix(); w3dEngine::Translatef((GLfloat)(width - margen), (GLfloat)ly, 0);
+        RenderBitmapText(buf, textAlign::right, width); w3dEngine::PopMatrix(); ly += lineH;
+        sprintf(buf, "ms ui:%.1f log:%.1f", g_profShow.render - g_profShow.viewport3d, g_profShow.logic);
+        w3dEngine::PushMatrix(); w3dEngine::Translatef((GLfloat)(width - margen), (GLfloat)ly, 0);
+        RenderBitmapText(buf, textAlign::right, width); w3dEngine::PopMatrix(); ly += lineH;
+        sprintf(buf, "ms swap:%.1f tot:%.1f", g_profShow.swap, g_profShow.logic + g_profShow.render + g_profShow.swap);
         w3dEngine::PushMatrix(); w3dEngine::Translatef((GLfloat)(width - margen), (GLfloat)ly, 0);
         RenderBitmapText(buf, textAlign::right, width); w3dEngine::PopMatrix(); ly += lineH;
     }

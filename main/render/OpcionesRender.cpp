@@ -19,9 +19,12 @@ bool OverlayCustomNormal = false;
 bool OverlayFaceNormal   = false;
 float OverlayNormalSize  = 0.10f;
 
-// overlay de estadisticas / fps (apagados por defecto)
-bool OverlayStatistics = false;
-bool OverlayFps        = false;
+// overlay de estadisticas / fps (apagados por defecto). Cada linea del submenu Statistics es independiente.
+bool OverlayStatVertices = false;
+bool OverlayStatFaces    = false;
+bool OverlayStatModgen   = false;
+bool OverlayStatTimes    = false;
+bool OverlayFps          = false;
 float g_fpsActual      = 0.0f;
 long g_genMallaCount   = 0; // diagnostico de regeneracion de modificadores (ver OpcionesRender.h)
 bool g_objetosMovidos  = false; // un objeto se movio -> regenerar los Mirror con target (ver OpcionesRender.h)

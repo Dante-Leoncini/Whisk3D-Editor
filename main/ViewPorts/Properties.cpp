@@ -1843,9 +1843,11 @@ void Properties::ActualizarPestanias(){
         exportLastObj = ObjActivo;
     }
 
-    // mostrar SOLO los grupos de la pestania activa
+    // mostrar SOLO los grupos de la pestania activa. Render (0) es GLOBAL (ajustes de salida/pases): siempre
+    // visible con la pestania activa, con o sin seleccion. El export OBJ SI depende de la seleccion (sin objeto
+    // no hay nada que exportar).
     if (propRender)    propRender->visible    = (pestaniaActiva == 0);
-    if (propExport)    propExport->visible    = (pestaniaActiva == 0);
+    if (propExport)    propExport->visible    = (pestaniaActiva == 0 && ObjActivo != NULL);
     if (propTransform) propTransform->visible = (pestaniaActiva == 1);
     if (propMeshParts) propMeshParts->visible = (pestaniaActiva == 2 && esMesh);
     if (propMaterial)  propMaterial->visible  = (pestaniaActiva == 2 && esMesh);
@@ -2019,9 +2021,9 @@ void Properties::Resize(int newW, int newH){
     ResizeBorder(newW, newH);
     ActualizarPestanias(); // visibilidad de grupos antes de medir el contenido
 
-    if (!ObjActivo) {
-        // sin objeto: sin contenido ni scrollbar (antes quedaba la barra
-        // con el tamano viejo)
+    if (!ObjActivo && pestaniaActiva != 0) {
+        // sin objeto Y fuera de la pestania Render (global): sin contenido ni scrollbar (antes quedaba la
+        // barra con el tamano viejo). En la pestania Render se mide su contenido global aunque no haya seleccion.
         PosY = 0;
         ResizeScrollbar(newW, newH, 0, 0, BarTopOffset());
         return;
@@ -2098,7 +2100,9 @@ void Properties::Render(){
     w3dEngine::TexFilter(false);
 #endif
 
-    if (ObjActivo){
+    // la pestania Render (0) tiene ajustes GLOBALES (salida/pases): se dibuja SIEMPRE, con o sin seleccion.
+    // Las demas pestanias son del objeto activo -> sin seleccion no hay contenido.
+    if (ObjActivo || pestaniaActiva == 0){
         // los GRUPOS son globales y otro panel de propiedades pudo
         // haberlos acomodado con OTRO ancho: relayout con el propio
         // antes de dibujar (mitigacion hasta hacerlos por-instancia)
@@ -2114,7 +2118,7 @@ void Properties::Render(){
         w3dEngine::PushMatrix();
         w3dEngine::Translatef(PosX + borderGS, PosY + borderGS + BarTopOffset(), 0);
 
-        DibujarTitulo(ObjActivo, maxPixelsTitle);
+        if (ObjActivo) DibujarTitulo(ObjActivo, maxPixelsTitle); // sin seleccion (pestania Render global): sin titulo de objeto
 
         //render de los grupos de propiedades, con CULLING: el grupo que
         //queda completo fuera del viewport no se dibuja (solo se avanza
@@ -2365,7 +2369,7 @@ void Properties::FindMouseOver(int mx, int my){
     PropHoverGroup = NULL;
     PropHoverFila = -1;
     if (mouseOverScrollY) return; // el "scrollbar area" esta reservada
-    if (!ObjActivo || !Contains(mx, my)) return;
+    if ((!ObjActivo && pestaniaActiva != 0) || !Contains(mx, my)) return; // pestania Render (global): hover sin seleccion
     int yCursor = y + BarTopOffset() + PosY + borderGS + RenglonHeightGS + gapGS;
     for (size_t i = 0; i < GroupProperties.size(); i++) {
         GroupPropertie* g = GroupProperties[i];
@@ -2747,7 +2751,7 @@ void Properties::event_key_up(SDL_Event &e){
 // devuelve el mini-listado (PropListMeshParts) cuyo BOX cae bajo la coordenada 'py' (o NULL). Mismo recorrido de
 // filas que ClickEn/PropFloatEnValueBox. Lo usa el scroll TACTIL para saber si el dedo empezo sobre una lista.
 PropListMeshParts* Properties::ListaBajoY(int py) {
-    if (!ObjActivo) return NULL;
+    if (!ObjActivo && pestaniaActiva != 0) return NULL;
     int yCursor = y + BarTopOffset() + PosY + borderGS + RenglonHeightGS + gapGS;
     for (size_t i = 0; i < GroupProperties.size(); i++) {
         GroupPropertie* g = GroupProperties[i];
@@ -2779,7 +2783,7 @@ void Properties::ClickEn(int mx, int my) {
         EnterPropertieSelect();
         return;
     }
-    if (!ObjActivo) return; // sin objeto no hay filas (y sin crashes)
+    if (!ObjActivo && pestaniaActiva != 0) return; // sin objeto no hay filas (salvo pestania Render, global)
     // mismo recorrido que el render: el titulo avanza RenglonHeightGS+gapGS
     // (no marginGS) y cada fila mide lo que devuelve su Resize (PropGap es
     // gapGS, checkbox sin valor es 0): antes el mapeo quedaba corrido y el
@@ -2924,7 +2928,7 @@ static PropFloat* gTouchSlide = NULL;
 
 // PropFloat cuyo VALUE BOX (columna de valores) esta bajo (mx,my), o NULL. Mismo recorrido de filas que ClickEn.
 PropFloat* Properties::PropFloatEnValueBox(int mx, int my){
-    if (!ObjActivo || !Contains(mx, my)) return NULL;
+    if ((!ObjActivo && pestaniaActiva != 0) || !Contains(mx, my)) return NULL;
     int yCursor = y + BarTopOffset() + PosY + borderGS + RenglonHeightGS + gapGS;
     for (size_t i = 0; i < GroupProperties.size(); i++) {
         GroupPropertie* g = GroupProperties[i];

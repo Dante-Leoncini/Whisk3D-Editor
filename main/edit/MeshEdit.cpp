@@ -2697,7 +2697,28 @@ void ReconstruirCapasDesde(Mesh* m, const std::vector<CornerSrc>& src) {
 // FOCO de camara (menu '.'): centro/radio del bounding de la malla en MUNDO. Es ayuda del
 // editor/viewport; antes vivia en el Core. Se dejan como Mesh:: (override de Object::Foco).
 // ===================================================
-Vector3 Mesh::PuntoFoco() const { return LocalAMundo(centroGeom); }
+// Si la malla esta SKINNEADA, el foco tiene que encuadrar la pose DEFORMADA del frame actual (skinVertex),
+// no el bind: centroGeom se calcula del bind (vertex, control points sin deformar) -> un personaje animado
+// enfocaba una nube colapsada (LISA parada enfocaba los pies). Bounding LOCAL de skinVertex. false si no hay
+// skinning o todavia no se skinneo (se skinnea en el render; si aun no se dibujo, cae al bind).
+static bool CentroRadioSkinLocal(const Mesh* m, Vector3& c, float& r) {
+    if (!m->skinArmature || !m->skinVertex || m->vertexSize <= 0) return false;
+    const GLfloat* sv = m->skinVertex;
+    Vector3 mn(sv[0], sv[1], sv[2]), mx = mn;
+    for (int i = 1; i < m->vertexSize; i++) {
+        float x = sv[i*3], y = sv[i*3+1], z = sv[i*3+2];
+        if (x<mn.x)mn.x=x; if (y<mn.y)mn.y=y; if (z<mn.z)mn.z=z;
+        if (x>mx.x)mx.x=x; if (y>mx.y)mx.y=y; if (z>mx.z)mx.z=z;
+    }
+    c = (mn + mx) * 0.5f;
+    r = (mx - c).Length();
+    return true;
+}
+Vector3 Mesh::PuntoFoco() const {
+    Vector3 c; float r;
+    if (CentroRadioSkinLocal(this, c, r)) return LocalAMundo(c);
+    return LocalAMundo(centroGeom);
+}
 
 // escala un radio LOCAL a MUNDO transformando 3 puntos sobre los ejes y tomando el mayor
 // (asi una escala no uniforme no subestima el bounding).
@@ -2708,7 +2729,11 @@ float Mesh::EscalarRadioLocal(const Vector3& cLocal, float rLocal) const {
     for (int i = 0; i < 3; i++) { float d = (LocalAMundo(cLocal + ax[i]) - c).Length(); if (d > r) r = d; }
     return r;
 }
-float Mesh::RadioFoco() const { return EscalarRadioLocal(centroGeom, radioGeom); }
+float Mesh::RadioFoco() const {
+    Vector3 c; float r;
+    if (CentroRadioSkinLocal(this, c, r)) return EscalarRadioLocal(c, r);
+    return EscalarRadioLocal(centroGeom, radioGeom);
+}
 
 // ===================================================
 // GenerarRender (rebuild editable->render) + CalcularBordes (bordes/centro geometrico).
