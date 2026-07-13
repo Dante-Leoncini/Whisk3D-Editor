@@ -21,6 +21,13 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable {
         size_t CantidadRenglones;
         Rec2D* Renglon;
 
+        // CULLING vertical: DibujarRenglon/DibujarOjos recorren TODA la jerarquia (avanzan la matriz igual), pero SALTEAN
+        // el DRAW (iconos + texto) de las filas fuera del area visible. Sin esto, una escena con muchos objetos dibuja
+        // miles de filas/nombres que el Scissor descarta despues (pagando igual los draw-calls). filaDFS = indice de fila
+        // en orden DFS (mapea 1:1 con la Y de la matriz); cullBaseY = Y en pantalla de la 1er fila del recorrido actual.
+        int cullBaseY;
+        unsigned filaDFS;
+
         Outliner();
         ~Outliner() override;
 

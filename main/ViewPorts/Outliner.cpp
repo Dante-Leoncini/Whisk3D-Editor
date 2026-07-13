@@ -214,6 +214,7 @@ void Outliner::Render(){
     }
 
     RenglonesY = 0;
+    cullBaseY = PosY + borderGS + BarTopOffset(); filaDFS = 0; // culling: Y de la 1er fila del recorrido de NOMBRES
     w3dEngine::PushMatrix();
     w3dEngine::Translatef(marginGS + PosX, PosY + borderGS + BarTopOffset(), 0);
     for (size_t c = 0; c < SceneCollection->Childrens.size(); c++){
@@ -236,6 +237,7 @@ void Outliner::Render(){
         w3dEngine::Scissor(x, glY, width - marginGS - borderGS, height); // igual a tu viewport - los ojos
     }
 
+    cullBaseY = GlobalScale + PosY + borderGS + BarTopOffset(); filaDFS = 0; // culling: Y de la 1er fila del recorrido de OJOS
     for (size_t c = 0; c < SceneCollection->Childrens.size(); c++) {
         DibujarOjos(SceneCollection->Childrens[c], !SceneCollection->Childrens[c]->visible);
     }
@@ -270,6 +272,11 @@ void Outliner::Render(){
 }
 
 void Outliner::DibujarRenglon(Object* obj, bool hidden){
+    // CULLING: solo se DIBUJA la fila si cae en el area visible. El traversal de hijos (mas abajo) avanza la matriz
+    // igual, asi que las filas visibles quedan bien ubicadas. Margen de 1 fila arriba/abajo (no cortar filas al borde).
+    int myY = cullBaseY + (int)filaDFS * (int)RenglonHeightGS; filaDFS++;
+    bool filaVisible = (myY + (int)RenglonHeightGS * 2 > 0) && (myY < (int)height + (int)RenglonHeightGS);
+    if (filaVisible) {
     w3dEngine::PushMatrix();
     GLfloat opacityRow = hidden ? 0.5f : 1.0f;
 
@@ -331,6 +338,7 @@ void Outliner::DibujarRenglon(Object* obj, bool hidden){
     RenderBitmapText(obj->name);
 
     w3dEngine::PopMatrix();
+    } // fin del DRAW de la fila (culling); el traversal de hijos de abajo corre siempre
 
     //si no tiene hijos. o no esta desplegado se ahorra todos los bucles siguentes
     if (obj->Childrens.size() < 1 || !obj->desplegado) return;
@@ -367,14 +375,17 @@ void Outliner::DibujarLineaDesplegada(Object* obj){
 }
 
 void Outliner::DibujarOjos(Object* obj, bool hidden){
-    GLfloat opacityRow = hidden ? 0.5f : 1.0f;
-    //std::cout << "dibujo ojo '" << reinterpret_cast<Text*>(obj->name->data)->value << "'"<< std::endl;
-    w3dEngine::Color4f(ListaColores[static_cast<int>(ColorID::grisUI)][0], ListaColores[static_cast<int>(ColorID::grisUI)][1], ListaColores[static_cast<int>(ColorID::grisUI)][2], opacityRow);
-    if (obj->visible){
-        W3dDrawStrip4(IconMesh, IconsUV[static_cast<size_t>(IconType::visible)]->uvs);
-    }
-    else {
-        W3dDrawStrip4(IconMesh, IconsUV[static_cast<size_t>(IconType::hidden)]->uvs);
+    // CULLING: mismo criterio que DibujarRenglon (el Translatef de avance de abajo corre siempre para ubicar a los hijos)
+    int myY = cullBaseY + (int)filaDFS * (int)RenglonHeightGS; filaDFS++;
+    if ((myY + (int)RenglonHeightGS * 2 > 0) && (myY < (int)height + (int)RenglonHeightGS)) {
+        GLfloat opacityRow = hidden ? 0.5f : 1.0f;
+        w3dEngine::Color4f(ListaColores[static_cast<int>(ColorID::grisUI)][0], ListaColores[static_cast<int>(ColorID::grisUI)][1], ListaColores[static_cast<int>(ColorID::grisUI)][2], opacityRow);
+        if (obj->visible){
+            W3dDrawStrip4(IconMesh, IconsUV[static_cast<size_t>(IconType::visible)]->uvs);
+        }
+        else {
+            W3dDrawStrip4(IconMesh, IconsUV[static_cast<size_t>(IconType::hidden)]->uvs);
+        }
     }
     w3dEngine::Translatef(0, RenglonHeightGS, 0);
 

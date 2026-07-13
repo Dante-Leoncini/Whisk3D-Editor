@@ -842,6 +842,19 @@ int main(int argc, char* argv[]) {
         }
     }
 
+    // "whisk3d --open <archivo>" IMPORTA un modelo al arrancar (util para probar/depurar render + skinning sin el
+    // file browser). Rutea por extension: .fbx -> ImportFBX; el resto -> ImportOBJ.
+    for (int ai = 1; ai < argc; ai++) {
+        if (std::string(argv[ai]) == "--open" && ai + 1 < argc) {
+            std::string path = argv[ai + 1];
+            size_t dot = path.find_last_of('.');
+            std::string ext = (dot != std::string::npos) ? path.substr(dot) : std::string();
+            bool esFbx = (ext == ".fbx" || ext == ".FBX" || ext == ".Fbx");
+            if (esFbx) ImportFBX(path); else ImportOBJ(path, false);
+            g_redraw = true;
+        }
+    }
+
 #ifdef __EMSCRIPTEN__
     // WebGL: el browser es de 1 solo hilo, no podemos bloquear con un while(). Le pasamos el
     // frame y el browser lo llama (~60 veces/seg via requestAnimationFrame). El 3er arg = 1
