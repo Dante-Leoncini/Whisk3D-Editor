@@ -72,6 +72,8 @@ void W3dNewTreeSelect(TInt aIdx);
 
 // importa un .obj con el importador compartido de PC
 TBool W3dNewImportObj(const char* aPath);
+// importa un .fbx BINARIO con el importador compartido de PC (geometria + esqueleto + materiales)
+TBool W3dNewImportFbx(const char* aPath);
 
 // (de ObjectMode.cpp compartido; declarado aca porque los TUs viejos de
 // Symbian no pueden incluir los headers del core por el clash de Object)

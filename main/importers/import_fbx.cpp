@@ -17,7 +17,8 @@
 #include <string>
 #include <map>
 #include <cstring>
-#include <cstdint>
+#include <stdint.h> // uintN_t: <stdint.h> (C) resuelve en los 4 OS; <cstdint> es C++11 (no en STLport/Symbian)
+#include <stdio.h>  // snprintf (global, C99) -> resuelve en Symbian/Open C; <cstdio> no garantiza snprintf en STLport
 #include <cmath>
 
 // ============================================================================
@@ -81,8 +82,8 @@ static void LeerProp(Rd& r, FProp& pr) {
             std::vector<unsigned char> raw;
             const unsigned char* data = 0;
             if (enc == 1) { // zlib
-                raw.resize(rawBytes ? rawBytes : 1);
-                if (r.avail(clen) && w3dEngine::Inflate(r.p, (int)clen, raw.data(), (int)rawBytes)) data = raw.data();
+                raw.resize(rawBytes ? rawBytes : 1); // nunca vacio -> &raw[0] valido (C++03: vector no tiene .data())
+                if (r.avail(clen) && w3dEngine::Inflate(r.p, (int)clen, &raw[0], (int)rawBytes)) data = &raw[0];
                 r.p += clen;
             } else {        // raw
                 if (r.avail(rawBytes)) { data = r.p; r.p += rawBytes; } else r.p = r.end;
@@ -267,7 +268,7 @@ static Mesh* MallaDesdeGeometry(const FNode& geo, const std::string& nombre, Mat
     Face cara;
     int c = 0; // indice global de corner
     for (size_t k = 0; k < PI.size(); k++) {
-        if ((k & 4095) == 0) ProgresoActualizar(progBase + progSpan * ((float)k / (float)PI.size())); // barra (cada 4096)
+        if ((k & 4095) == 0) ProgresoActualizar(progBase + progSpan * 0.6f * ((float)k / (float)PI.size())); // 1er 60% del tramo (el resto = pasos post-loop, que en el N95 son lo pesado)
         long long raw = PI[k];
         bool fin = (raw < 0);
         int cp = (int)(fin ? (~raw) : raw); // el ultimo del poligono viene como ~cp
@@ -311,13 +312,22 @@ static Mesh* MallaDesdeGeometry(const FNode& geo, const std::string& nombre, Mat
     mesh->name = nombre;
     int a0 = 0, a1 = 0, a2 = 0;
     Wobj.ConvertToES1(mesh, &a0, &a1, &a2, &mesh->vertCtrlPoint); // guarda vertice->control-point (para weight paint)
+    ProgresoActualizar(progBase + progSpan * 0.75f); // dedup listo; lo de abajo es lo pesado en el N95
     mesh->CalcularBordes();
+    ProgresoActualizar(progBase + progSpan * 0.92f);
     if (!mesh->normals && mesh->vertexSize > 0) { // sin normales -> smooth (como el OBJ)
         mesh->normals = new GLbyte[mesh->vertexSize * 3];
         mesh->meshSmooth = true;
         mesh->RecalcularNormales();
+    } else if (mesh->normals && mesh->vertexSize > 0) {
+        // CON normales del FBX: detectar smooth/flat para que al editar un vertice no se recalcule todo flat (Dante)
+        mesh->meshSmooth = MeshShadingImportadoEsSmooth(mesh);
     }
-    mesh->OptimizarCacheRender();
+#ifndef W3D_SYMBIAN
+    mesh->OptimizarCacheRender(); // cache de vertices (Forsyth): caro y de beneficio ~nulo en el render del N95;
+                                  // se saltea alli para no eternizar el import (el orden de indices no cambia la imagen).
+#endif
+    ProgresoActualizar(progBase + progSpan);
     return mesh;
 }
 
@@ -648,17 +658,17 @@ bool ImportFBX(const std::string& filepath) {
         w3dLogfE("ImportFBX: no se pudo leer '%s'", filepath.c_str());
         return false;
     }
-    if (memcmp(bytes.data(), "Kaydara FBX Binary  ", 20) != 0) {
+    if (memcmp(&bytes[0], "Kaydara FBX Binary  ", 20) != 0) { // bytes.size()>=27 arriba -> &bytes[0] valido (sin .data(), C++03)
         w3dLogfE("ImportFBX: no es FBX BINARIO (ASCII no soportado): %s", filepath.c_str());
         return false;
     }
-    uint32_t version = 0; memcpy(&version, bytes.data() + 23, 4);
+    uint32_t version = 0; memcpy(&version, &bytes[0] + 23, 4);
     bool w64 = (version >= 7500);
 
     ProgresoIniciar("Importing FBX..."); // barra de progreso (clave en el N95: parsear + convertir tarda)
 
-    Rd r; r.p = bytes.data() + 27; r.end = bytes.data() + bytes.size();
-    const unsigned char* base = bytes.data();
+    Rd r; r.p = &bytes[0] + 27; r.end = &bytes[0] + bytes.size();
+    const unsigned char* base = &bytes[0];
 
     // nodos top-level hasta el null record (parseo del arbol: descomprime los arrays zlib -> lo mas pesado junto a
     // la conversion de la malla). Va llenando la barra hasta ~0.35 por nodo top-level.
@@ -715,6 +725,12 @@ bool ImportFBX(const std::string& filepath) {
         int fps = (int)(FbxFrameRate(root) + 0.5); if (fps < 1) fps = 24;
         ParsearAnimaciones(root, *objs, esq, arm->animations, fps, escala);
         PrepararSkin(arm); // matrices de skinning (bind) de cada hueso
+        // BIND POSE inicial: poseHead/poseTail (lo que DIBUJA el armature) = head/tail. En PC el pose-eval real los
+        // recalcula al reproducir; en Symbian ese eval esta stub -> sin esto los huesos quedan en (0,0,0) e invisibles.
+        for (size_t bi = 0; bi < arm->bones.size(); bi++) {
+            arm->bones[bi].poseHead = arm->bones[bi].head;
+            arm->bones[bi].poseTail = arm->bones[bi].tail;
+        }
         if (!arm->animations.empty()) { arm->animActiva = 0;
             w3dLogf("ImportFBX: %d animacion(es) importada(s)", (int)arm->animations.size()); }
     }

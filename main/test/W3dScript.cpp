@@ -519,6 +519,19 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
                found->name.c_str(), found->vertexSize, (int)a->bones.size(), nf, ms, ms/nf);
         return true;
     }
+    // ---- vgsimplify : "1 hueso por vertice" sobre la 1er malla con vertex groups (destructivo; para medir el skin). ----
+    if (cmd == "vgsimplify") {
+        Mesh* found=NULL;
+        { std::vector<Object*> stack; if (SceneCollection) stack.push_back(SceneCollection);
+          while(!stack.empty() && !found){ Object* o=stack.back(); stack.pop_back();
+            if (o->getType()==ObjectType::mesh && !((Mesh*)o)->vertexGroups.empty()) found=(Mesh*)o;
+            for (size_t i=0;i<o->Childrens.size();i++) stack.push_back(o->Childrens[i]); } }
+        if (!found) { err="vgsimplify: no hay malla con vertex groups"; return false; }
+        extern void OptimizarVertexGroups1Hueso(Mesh*);
+        OptimizarVertexGroups1Hueso(found);
+        printf("      [vgsimplify] malla='%s' -> 1 hueso/vertice\n", found->name.c_str());
+        return true;
+    }
     // ---- skinexport <frame> <archivo> : busca la 1er malla con skinArmature, la skinnea en <frame> y vuelca
     //      TODOS los vertices skinneados (x y z por linea) a <archivo>. Para Procrustes vs Blender (ground truth). ----
     if (cmd == "skinexport") {

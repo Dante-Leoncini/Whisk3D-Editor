@@ -732,6 +732,24 @@ static void AccionAplicarModificador(){
     Notificar("Modifier applied", false);
 }
 
+// "Optimize Vertex Groups" (1 hueso por vertice): DESTRUCTIVO -> confirmar antes. ConfirmarPopup::onSi no lleva
+// argumentos -> se guarda la malla objetivo en un estatico (mismo patron que el export).
+static Mesh* g_pendingOptVGMesh = NULL;
+static void HacerOptimizarVG(){
+    if (!g_pendingOptVGMesh) return;
+    extern void OptimizarVertexGroups1Hueso(Mesh*); // main/edit/MeshEdit.cpp
+    OptimizarVertexGroups1Hueso(g_pendingOptVGMesh);
+    g_pendingOptVGMesh = NULL;
+    g_redraw = true;
+    Notificar("Vertex groups optimized (1 bone/vertex)", false);
+}
+static void AccionOptimizarVertexGroups(){
+    if (!ObjActivo || ObjActivo->getType() != ObjectType::mesh) return;
+    g_pendingOptVGMesh = (Mesh*)ObjActivo;
+    if (!confirmarPopup) confirmarPopup = new ConfirmarPopup();
+    confirmarPopup->Abrir("Esto modificara el vertex group y lo simplificara a 1 hueso por vertice (skinning mas rapido). Puede haber perdida de datos.", HacerOptimizarVG);
+}
+
 #ifdef __EMSCRIPTEN__
 extern "C" void WebDescargarArchivo(const char* path, const char* name); // main.cpp (EM_JS): baja un archivo del FS al disco
 #endif
@@ -1429,6 +1447,11 @@ void Properties::ConstruirGrupos(){
     propScrewSmooth = new PropBool("Smooth"); propScrewSmooth->onChange = AccionModParamChanged; propModifierProps->properties.push_back(propScrewSmooth);
     propScrewMerge = new PropBool("Merge"); propScrewMerge->onChange = AccionModParamChanged; propModifierProps->properties.push_back(propScrewMerge);
     propScrewFlip = new PropBool("Flip Normals"); propScrewFlip->onChange = AccionModParamChanged; propModifierProps->properties.push_back(propScrewFlip);
+    // "Optimize Vertex Groups" (SOLO modificador Armature): colapsa a 1 hueso por vertice -> skinning mucho mas
+    // rapido en el N95 (destructivo -> pide confirmacion). Se oculta salvo en el Armature (ActualizarPropiedades).
+    propBtnOptVG = new PropButton("Optimize Vertex Groups");
+    propBtnOptVG->action = AccionOptimizarVertexGroups;
+    propModifierProps->properties.push_back(propBtnOptVG);
     // Apply Modifier (cualquier modificador): hornea la malla generada en la editable
     propBtnApplyMod = new PropButton("Apply Modifier");
     propBtnApplyMod->action = AccionAplicarModificador;
@@ -1919,6 +1942,7 @@ void Properties::ActualizarPestanias(){
         bool esArmMod = (mod && mod->tipo == ModifierType::Armature);
         if (propArmTarget) { propArmTarget->oculto = !esArmMod;
             if (esArmMod) propArmTarget->button->text = mod->target ? mod->target->name : std::string("None"); }
+        if (propBtnOptVG) propBtnOptVG->oculto = !esArmMod; // "Optimize Vertex Groups": solo en el modificador Armature
         if (esArmMod) ActualizarSkinArmature(mm); // mantener skinArmature en sync con el modificador
         if (propBtnApplyMod) propBtnApplyMod->oculto = !haySel; // Apply: con cualquier modificador seleccionado
     } else if (propModifierProps) propModifierProps->visible = false;

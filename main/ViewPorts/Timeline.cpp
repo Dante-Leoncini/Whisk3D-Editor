@@ -149,6 +149,16 @@ Timeline::Timeline(){
     btnAnim  = new Button("Animation", (int)IconType::armature); btnAnim->rol = TL_ROL_ANIM; btnAnim->desplegable = true;
     btnAnim->visible = false;           // solo visible con un armature con clips
     BarButtons.push_back(btnAnim);
+#ifdef W3D_SYMBIAN
+    // N95 (240px): la barra completa (8 transportes + Start/End + anim) es demasiada para navegar sin mouse.
+    // Dejamos SOLO lo esencial: inicio(0), play(4), final(7) + Start/End + dropdown de animacion. Los demas se
+    // OCULTAN (no se borran) -> siguen existiendo para PC/Android, donde la barra entra entera.
+    btnT[1]->visible = false; // kf anterior
+    btnT[2]->visible = false; // frame anterior
+    btnT[3]->visible = false; // play reversa
+    btnT[5]->visible = false; // frame siguiente
+    btnT[6]->visible = false; // kf siguiente
+#endif
     g_tlActivo = this;
 }
 Timeline::~Timeline(){

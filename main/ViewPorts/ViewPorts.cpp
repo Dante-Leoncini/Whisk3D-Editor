@@ -520,9 +520,11 @@ void ViewportBase::ActualizarBarra(){
 void ViewportBase::RenderBar(){
     // se llama al final del Render del viewport (con su ortho 2D activo)
     if (!barCard || BarButtons.empty()) return;
-    // sin ningun menu abierto el foco se apaga (la barra vuelve a la normalidad)
+    // sin ningun menu abierto el foco se apaga (la barra vuelve a la normalidad). EXCEPCION: el Timeline (kind 5)
+    // navega sus botones de transporte SIN abrir menu -> su foco lo maneja el ruteo de teclado (LayoutTimelineBar*),
+    // no se apaga aca (sino se perderia cada frame).
     extern bool LayoutMenuAbierto();
-    if (!LayoutMenuAbierto()) barFocusIndex = -1;
+    if (!LayoutMenuAbierto() && ViewportKind() != 5) barFocusIndex = -1;
     ActualizarBarra(); // layout + auto-scroll + sx/sy frescos
     int barH = BarHeight();
     int yBar = barAbajo ? height - barH : 0;

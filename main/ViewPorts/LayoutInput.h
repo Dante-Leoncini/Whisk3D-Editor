@@ -67,6 +67,11 @@ bool LayoutPopupRepeat(int tecla); // flecha MANTENIDA al popup activo (solo aju
 // El 3D devuelve false (lo maneja orbit/transform). Keyboard-solo (Symbian).
 bool LayoutTeclaPanelActivo(int tecla);
 bool LayoutUVNavFrame(int dx, int dy, bool zoomMode); // editor UV: paneo constante (o zoom si 0) por flecha mantenida
+bool LayoutTimelineNavFrame(int dx, int dy, bool zoomMode, bool panMode); // Timeline: scrub / zoom(0) / paneo(*) por flecha mantenida
+// Timeline: navegacion de la barra de transporte por teclado (soft-izq entra/sale; flechas mueven el foco; OK activa)
+void LayoutTimelineBarToggle();
+void LayoutTimelineBarMover(int dir);
+void LayoutTimelineBarActivar();
 
 bool LayoutMenuAbierto();
 

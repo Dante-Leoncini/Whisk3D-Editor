@@ -732,6 +732,7 @@ void LayoutProyectarUVDesdeVista(bool bounds) {
 }
 // el menu UV (tecla U o el header "UV"): operaciones sobre las CARAS seleccionadas.
 static PopupMenu* gMenuUVops = NULL; // file-static: LayoutCambiarMenuBarra lo necesita (izq/der para salir del menu UV)
+static PopupMenu* gMenuSnapTool = NULL; // idem: LayoutCambiarMenuBarra lo necesita (izq/der para salir del menu Snap)
 void LayoutMenuUV(int mx, int my) {
     if (InteractionMode != EditMode || !g_editMesh) return;
     if (!gMenuUVops) {
@@ -946,7 +947,14 @@ void ActualizarEditMeshActivo() {
     // modificador (subdivision/screw) mostraba geometria vieja hasta mover un vertice.
     if (ObjActivo && ObjActivo->getType() == ObjectType::mesh) {
         Mesh* m = (Mesh*)ObjActivo;
-        if (!m->modificadores.empty() && !m->genValido) { m->GenerarMallaModificada(); g_redraw = true; }
+        // solo re-generar si hay un modificador que PRODUCE geometria (Mirror/Array/Subsurf/Screw/Boolean). Un stack de
+        // SOLO Armature no genera malla (el skinning se aplica aparte en el render -> genValido queda false, que es lo
+        // correcto: el render usa la malla base + skinVertex). Sin este filtro, GenerarMallaModificada dejaba
+        // genValido=false y el retry se disparaba CADA FRAME (el 'modgen' subia sin parar al orbitar un FBX, pedido Dante).
+        bool hayGeomMod = false;
+        for (size_t k = 0; k < m->modificadores.size(); k++)
+            if (m->modificadores[k]->tipo != ModifierType::Armature) { hayGeomMod = true; break; }
+        if (hayGeomMod && !m->genValido) { m->GenerarMallaModificada(); g_redraw = true; }
         // SKINNING: sincronizar con el modificador Armature (target / "Display in viewport" / "Display in Edit Mode").
         // Barato (recorre modificadores); mantiene el skinning coherente con los flags y el modo actual.
         extern void SincronizarSkinConModificador(Mesh*);
@@ -1406,6 +1414,10 @@ void LayoutToggleBarraViewportActivo() {
         // propiedades: foco en la PESTAÑA activa (te ahorra subir hasta arriba).
         // Desde ahi izq/der cambian de pestaña; izq en la 1ra llega al [0].
         ((Properties*)vp)->focoEnTabs = true;
+    } else if (vp->ViewportKind() == 5) {
+        // Timeline: entra/sale del foco de la barra de TRANSPORTE (play/inicio/fin/Start/End/anim). Antes caia en
+        // el else -> abria el menu de tipo/split, que no es lo que se quiere navegar (pedido Dante).
+        LayoutTimelineBarToggle();
     } else {
         // outliner (u otros sin menus de barra): abre el menu de tipo/split ([0])
         LayoutAbrirMenuTipo(vp);
@@ -1440,6 +1452,7 @@ static void LayoutCambiarMenuBarra(int dir) {
         else if (MenuAbierto == MenuView) rol = BR_View; // FIX: faltaba -> izq/der se clavaba en el menu View
         else if (MenuAbierto == MenuRender) rol = BR_Render;
         else if (MenuAbierto == MenuOrient) rol = BR_Orient;
+        else if (MenuAbierto == gMenuSnapTool) rol = BR_Snap; // FIX: faltaba -> izq/der se clavaba en el menu Snap
         else if (MenuAbierto == gMenuUVops) rol = BR_UV; // FIX: faltaba -> izq/der no salia del menu UV
         if (rol >= 0) idx = BarRolIdx(B, rol);
     }
@@ -1712,7 +1725,7 @@ static void AccionPivot(int aId) {
 }
 
 // ===== menu SNAP (boton "Snap" de la barra): Enable + Snap Base + Snap Target + Affect + Target Selection =====
-static PopupMenu* gMenuSnapTool=NULL, *gMenuSnapBase=NULL, *gMenuSnapTarget=NULL, *gMenuSnapIndiv=NULL;
+static PopupMenu* gMenuSnapBase=NULL, *gMenuSnapTarget=NULL, *gMenuSnapIndiv=NULL; // gMenuSnapTool: declarado arriba
 static void AccionSnapBase(int id){ g_snap.base=id; g_redraw=true; }
 static void AccionSnapTarget(int id){ g_snap.target=id; g_redraw=true; }
 // El dispatch (LayoutClickUI) SIEMPRE llama al action del menu TOP con el id del item elegido,
@@ -1731,7 +1744,8 @@ void LayoutMenuSnapTool(int mx, int my){
     if (!gMenuSnapTarget){ gMenuSnapTarget=new PopupMenu(); gMenuSnapTarget->titulo="Snap Target"; }
     gMenuSnapTarget->Limpiar();
     for (int t=SNAP_VERTEX;t<=SNAP_FACECENTER;t++) gMenuSnapTarget->Agregar(SnapTargetNom(t), 200+t)->verde=(g_snap.target==t);
-    if (!gMenuSnapTool){ gMenuSnapTool=new PopupMenu(); gMenuSnapTool->titulo="Snap"; gMenuSnapTool->action=AccionSnapRouter; }
+    // sin titulo: el boton "Snap" de la barra ya lo dice; una cabecera "Snap" gastaria una fila (240p Symbian)
+    if (!gMenuSnapTool){ gMenuSnapTool=new PopupMenu(); gMenuSnapTool->action=AccionSnapRouter; }
     gMenuSnapTool->Limpiar();
     gMenuSnapTool->AgregarCheck("Enable", 0, &g_snap.enabled)->atajo="Shift Tab";
     // el resto se ve en GRIS cuando el snap esta apagado (->gris = &g_snap.enabled): sin snap
@@ -3007,6 +3021,20 @@ bool LayoutTeclaPanelActivo(int tecla) {
         }
         return false;
     }
+    if (viewPortActive->ViewportKind() == 5) { // Timeline
+        Timeline* tl = (Timeline*)viewPortActive;
+        if (tl->barFocusIndex >= 0) { // foco de barra (soft-izq): flechas mueven el foco, OK activa, C sale
+            switch (tecla) {
+                case LayoutKey::Left:   LayoutTimelineBarMover(-1); return true;
+                case LayoutKey::Right:  LayoutTimelineBarMover(+1); return true;
+                case LayoutKey::Enter:  LayoutTimelineBarActivar(); return true;
+                case LayoutKey::Cancel: tl->barFocusIndex = -1; g_redraw = true; return true;
+            }
+            return false;
+        }
+        if (tecla == LayoutKey::Enter) { tl->TogglePlay(+1); return true; } // sin foco: OK = play (flechas -> NavFrame)
+        return false;
+    }
     return false;
 }
 
@@ -3023,6 +3051,65 @@ bool LayoutUVNavFrame(int dx, int dy, bool zoomMode) {
         if (dx || dy) uv->Panear(-(float)dx * pp, -(float)dy * pp); // signos = iguales al per-key (Left=+pp)
     }
     return true;
+}
+
+// nav del Timeline con flechas MANTENIDAS (frame-based, Symbian): izq/der = mover el frame actual (scrub),
+// 0-mantenido + arriba/abajo = ZOOM centrado, * -mantenido + izq/der = PANEO de la vista. Devuelve true si el
+// viewport activo es el Timeline (asi AplicarFlechas3D corta y no orbita la camara 3D). Con dx=dy=0 no hace
+// nada pero igual devuelve true -> sirve de query "el activo es el Timeline?".
+bool LayoutTimelineNavFrame(int dx, int dy, bool zoomMode, bool panMode) {
+    if (!viewPortActive || !viewPortActive->isLeaf() || viewPortActive->ViewportKind() != 5) return false;
+    Timeline* tl = (Timeline*)viewPortActive;
+    if (tl->barFocusIndex >= 0) return false; // foco de barra activo (soft-izq): las flechas navegan la barra, no scrollean
+    if (panMode) {                                       // * + flechas = panear la vista (frames, horizontal)
+        if (dx) tl->PanFrames((float)dx * 1.5f);         // paso suave por frame de loop
+    } else if (zoomMode) {                               // 0 + flechas = zoom. arriba/derecha acerca; abajo/izquierda aleja
+        int z = (dy < 0 || dx > 0) ? 1 : ((dy > 0 || dx < 0) ? -1 : 0); // izq/der ADEMAS del arr/aba (instintivo en un timeline)
+        if (z != 0) tl->ZoomBy(z > 0 ? 1.06f : 0.94f, tl->width / 2);
+    } else {                                             // flechas solas = mover el frame actual (scrub)
+        if (dx) tl->StepFrame(dx > 0 ? 1 : -1);
+    }
+    return true;
+}
+
+// ---- Timeline: navegacion de la BARRA de transporte por teclado (Symbian, sin mouse). soft-izq entra/sale del
+// modo foco (barFocusIndex>=0); flechas mueven el foco entre los botones VISIBLES (salteando el [0] tipo/split y
+// los ocultos); OK activa el enfocado via ClickBarButton (play/inicio/fin/Start/End/dropdown de animacion). Con el
+// foco activo, LayoutTimelineNavFrame devuelve false -> las flechas navegan la barra en vez de scrollear. ----
+static Timeline* TimelineActivoPtr() {
+    if (viewPortActive && viewPortActive->isLeaf() && viewPortActive->ViewportKind() == 5) return (Timeline*)viewPortActive;
+    return NULL;
+}
+void LayoutTimelineBarMover(int dir) {
+    Timeline* tl = TimelineActivoPtr(); if (!tl) return;
+    std::vector<Button*>& B = tl->BarButtons;
+    int maxIdx = (int)B.size() - 1;
+    if (maxIdx < 0) return;
+    int idx = tl->barFocusIndex;
+    for (int k = 0; k <= maxIdx; k++) {
+        idx += dir;
+        if (idx > maxIdx) idx = 0;                // wrap
+        if (idx < 0) idx = maxIdx;
+        if (idx == 0 || B[idx]->visible) break;   // el [0] (tipo/split) SIEMPRE es navegable -> asi se puede cambiar el viewport
+    }
+    tl->barFocusIndex = idx;
+    tl->ActualizarBarra();                        // auto-scroll para mostrar el enfocado (RenderBar centra el foco)
+    g_redraw = true;
+}
+void LayoutTimelineBarToggle() {
+    Timeline* tl = TimelineActivoPtr(); if (!tl) return;
+    if (tl->barFocusIndex >= 0) tl->barFocusIndex = -1;   // salir del modo foco
+    else { tl->barFocusIndex = 0; LayoutTimelineBarMover(+1); } // entrar: primer boton de transporte (izq llega al [0] tipo)
+    g_redraw = true;
+}
+void LayoutTimelineBarActivar() {
+    Timeline* tl = TimelineActivoPtr(); if (!tl) return;
+    int idx = tl->barFocusIndex;
+    if (idx < 0 || idx > (int)tl->BarButtons.size() - 1) return;
+    tl->ActualizarBarra();                        // sx/sy frescos antes del hit-test
+    if (idx == 0) { LayoutAbrirMenuTipo(tl); return; } // [0] = menu tipo/split: cambiar el viewport a otro (3D/outliner/etc.)
+    Button* b = tl->BarButtons[idx];
+    if (b->visible) tl->ClickBarButton(b->sx + b->width / 2, b->sy + b->height / 2);
 }
 
 // ====================================================================

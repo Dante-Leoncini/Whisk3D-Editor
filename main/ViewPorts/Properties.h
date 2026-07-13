@@ -118,6 +118,7 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropBool*  propMirX; PropBool* propMirY; PropBool* propMirZ; // ejes
         PropButton* propMirTarget; // "Mirror Object" (dropdown: cualquier objeto)
         PropButton* propArmTarget; // "Target" del modificador Armature (dropdown: solo esqueletos)
+        PropButton* propBtnOptVG;  // "Optimize Vertex Groups" (1 hueso/vertice) del modificador Armature (destructivo, con confirm)
         PropBool*  propMirMerge; PropFloat* propMirDist; PropBool* propMirClip; // merge + distancia + clipping
         // Subdivision Surface: modo (Catmull-Clark/Simple) + niveles viewport/render
         PropBool*  propSubSimple; PropFloat* propSubLevel; PropFloat* propSubRender;

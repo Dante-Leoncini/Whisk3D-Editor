@@ -189,6 +189,16 @@ static void W3dImportObjMenu() {
                      W3dImportObjElegido);
 }
 
+// Import FBX: mismo explorador compartido, filtrando .fbx (antes "Add > Import FBX" no hacia nada en el N95
+// porque el puntero LayoutImportFbx quedaba sin cablear -> ver el cableado abajo).
+static void W3dImportFbxElegido(const std::string& aPath) {
+    W3dNewImportFbx(aPath.c_str());
+}
+static void W3dImportFbxMenu() {
+    AbrirFileBrowser("Importar FBX", "Import FBX", ".fbx",
+                     W3dImportFbxElegido);
+}
+
 extern bool gCargarTexturaComoNormal; // Properties.cpp: el "Load Texture" del normal map lo prende (compartido 4 OS)
 static Material* gSymTexMat = NULL;
 static void W3dTexturaElegida(const std::string& aPath) {
@@ -266,7 +276,8 @@ void W3dLayoutBuild(CWhisk3D* aWhisk, TInt aWidth, TInt aHeight) {
     if (!viewPortActive) viewPortActive = gView3D;
     LayoutWarpMouse = W3dMouseWarp;
     LayoutArbolCambiado = W3dArbolCambiadoHook;
-    LayoutImportObj = W3dImportObjMenu;        // Add > import: el browser compartido
+    LayoutImportObj = W3dImportObjMenu;        // Add > Import OBJ: el browser compartido
+    LayoutImportFbx = W3dImportFbxMenu;        // Add > Import FBX: idem (antes NULL -> el item no hacia nada)
     DialogoCargarTextura = W3dCargarTexturaEn; // cargar textura: idem
 
 
@@ -608,6 +619,14 @@ TBool W3dLayoutUVNav(TInt aDx, TInt aDy, TBool aZoom) {
 }
 // query: el viewport activo es el editor UV? (LayoutUVNavFrame con 0,0 no panea, solo devuelve si es UV)
 TBool W3dLayoutUVActivo() { return LayoutUVNavFrame(0, 0, false) ? ETrue : EFalse; }
+
+// Timeline activo: flecha MANTENIDA = scrub (izq/der); 0-mantenido + arriba/abajo = zoom; * -mantenido + flechas
+// = paneo. ETrue si lo manejo (es el Timeline).
+TBool W3dLayoutTimelineNav(TInt aDx, TInt aDy, TBool aZoom, TBool aPan) {
+    return LayoutTimelineNavFrame(aDx, aDy, aZoom ? true : false, aPan ? true : false) ? ETrue : EFalse;
+}
+// query: el viewport activo es el Timeline? (con 0,0 no hace nada, solo devuelve si es Timeline)
+TBool W3dLayoutTimelineActivo() { return LayoutTimelineNavFrame(0, 0, false, false) ? ETrue : EFalse; }
 
 // keypad SIN mouse: rutea la flecha/OK al viewport ACTIVO (propiedades/outliner)
 TBool W3dLayoutTeclaPanel(TInt aScan) {

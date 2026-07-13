@@ -507,6 +507,10 @@ void Viewport3D::RotateOrbit() {
 
 void Viewport3D::OrbitarFlecha(int ndx, int ndy){
     float odx = dx, ody = dy;        // preservar el delta del mouse
+    // Lock Orbit ON: las flechas PANEAN (RotateOrbit deriva a Pan). El pan por flechas de '*' (W3dNewPan) NIEGA el
+    // delta ("las flechas iban al reves"); aca hay que negar igual, sino el mismo Pan() quedaba INVERTIDO con lock
+    // respecto al de '*'. El mouse no pasa por aca (usa RotateOrbit directo, estilo "agarrar", sin negar). (Dante)
+    if (lockOrbit) { ndx = -ndx; ndy = -ndy; }
     dx = (float)ndx; dy = (float)ndy;
     RotateOrbit();
     dx = odx; dy = ody;

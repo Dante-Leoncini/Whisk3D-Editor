@@ -657,6 +657,7 @@ void FileBrowser::MoverFoco(int dir) {
         if (dir == LayoutKey::Up) {
             if (selBm - bc >= 0) selBm -= bc;
             else if (horizontal) { focoZona = FZ_TOP; focoIdx = 0; }   // horizontal: arriba=barra
+            else if (entries.empty()) { focoZona = FZ_TOP; focoIdx = 0; } // carpeta VACIA: no hay ficheros que atravesar -> directo a la barra (Back/Up), sino quedabas atrapado (Dante)
             else { focoZona = FZ_FILES; if (selected < 0) selected = (int)entries.size() - 1; EnsureVisible(selected); } // vertical: arriba=ficheros
         } else if (dir == LayoutKey::Down) {
             if (selBm + bc < (int)bookmarks.size()) selBm += bc;

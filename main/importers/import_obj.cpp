@@ -317,6 +317,30 @@ void Wavefront::ConvertToES1(Mesh* TempMesh, int* acumuladoVertices, int* acumul
     Reset();
 }
 
+// Detecta si un mesh IMPORTADO (con normales) tiene shading SMOOTH o FLAT, para setear meshSmooth. Sin esto el flag
+// quedaba flat y, al mover un vertice, GenerarRender recalculaba TODA la malla en flat aunque hubiera venido smooth.
+// Heuristica: agrupa los render-verts por POSICION (posRep, ya listo tras CalcularBordes) y ve si las normales dentro
+// de cada grupo COINCIDEN. Un smooth comparte la normal (los splits que quedan son por costura de UV); un flat tiene
+// una normal por CARA (normales distintas en la misma posicion). Empate o mayoria que coincide -> smooth.
+bool MeshShadingImportadoEsSmooth(Mesh* m) {
+    if (!m || !m->normals || m->vertexSize <= 0 || (int)m->posRep.size() != m->vertexSize) return true;
+    int coincide = 0, difiere = 0;
+    std::vector<int> ref((size_t)m->vertexSize, -1); // representante de posicion -> primer render-vert (para comparar)
+    for (int i = 0; i < m->vertexSize; i++) {
+        int r = m->posRep[i];
+        if (r < 0 || r >= m->vertexSize) continue;
+        if (ref[r] < 0) { ref[r] = i; continue; } // 1er vert del grupo de posicion
+        int j = ref[r];
+        float ax=m->normals[i*3], ay=m->normals[i*3+1], az=m->normals[i*3+2];
+        float bx=m->normals[j*3], by=m->normals[j*3+1], bz=m->normals[j*3+2];
+        float dot = ax*bx + ay*by + az*bz;
+        float la = ax*ax+ay*ay+az*az, lb = bx*bx+by*by+bz*bz;
+        // ~<32 grados = "misma" normal (dot>0 y dot^2 > 0.72*la*lb; sin sqrt, GLbyte escala ~127)
+        if (la > 1.0f && lb > 1.0f && dot > 0.0f && dot*dot > 0.72f * la * lb) coincide++; else difiere++;
+    }
+    return difiere <= coincide;
+}
+
 void Wavefront::ConvertToES1_NoMerge(Mesh* TempMesh) {
 
     // =========================================================
@@ -643,6 +667,9 @@ bool LeerOBJ(const std::vector<const char*>& lines,
         mesh->normals = new GLbyte[mesh->vertexSize * 3];
         mesh->meshSmooth = true;
         mesh->RecalcularNormales();
+    } else if (mesh->normals && mesh->vertexSize > 0) {
+        // CON normales (vn): detectar smooth/flat para que al mover un vertice NO se recalcule todo flat (Dante)
+        mesh->meshSmooth = MeshShadingImportadoEsSmooth(mesh);
     }
 
     mesh->OptimizarCacheRender(); // reordena el index buffer para el cache de vertices del GPU (perf en tile-based / N95)

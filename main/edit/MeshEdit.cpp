@@ -2913,6 +2913,47 @@ static void OptimizarCacheVertices(MeshIndex* idx, int numTris, int numVerts) {
 // recalcula los BORDES unicos desde faces3d, dedup por POSICION (no por indice:
 // asi un borde compartido por 2 caras con vertices distintos -mismo lugar- no se
 // repite). Cada par (edges[2i], edges[2i+1]) es una arista.
+
+// "Optimizar Vertex Groups" (1 hueso por vertice): por cada control-point deja SOLO el hueso de MAYOR peso, con
+// peso 1, y lo saca del resto de los grupos. DESTRUCTIVO (se pierde la mezcla de pesos). Acelera el skinning en el
+// N95: el blend por vertice pasa de N influencias a 1 (un solo M*v, sin division ni acumular). Invalida el CSR de
+// skinning para que se reconstruya con 1 influencia por vertex.
+void OptimizarVertexGroups1Hueso(Mesh* m){
+    if (!m || m->vertexGroups.empty()) return;
+    std::map<int, std::pair<int,float> > mejor; // control-point -> (indice de grupo/hueso, peso maximo visto)
+    for (size_t g = 0; g < m->vertexGroups.size(); g++){
+        VertexGroup* vg = m->vertexGroups[g];
+        for (size_t j = 0; j < vg->verts.size() && j < vg->pesos.size(); j++){
+            int cp = vg->verts[j]; float w = vg->pesos[j];
+            std::map<int,std::pair<int,float> >::iterator it = mejor.find(cp);
+            if (it == mejor.end() || w > it->second.second) mejor[cp] = std::make_pair((int)g, w);
+        }
+    }
+    // invertir el mapa: por grupo, la lista de control-points que le quedan (todos con peso 1)
+    std::vector<std::vector<int> > cpsPorGrupo(m->vertexGroups.size());
+    for (std::map<int,std::pair<int,float> >::iterator it = mejor.begin(); it != mejor.end(); ++it)
+        cpsPorGrupo[it->second.first].push_back(it->first);
+    for (size_t g = 0; g < m->vertexGroups.size(); g++){
+        VertexGroup* vg = m->vertexGroups[g];
+        vg->verts = cpsPorGrupo[g];
+        vg->pesos.assign(cpsPorGrupo[g].size(), 1.0f);
+    }
+    m->skinGeomVersion++;       // invalida el CSR de skinning -> se reconstruye con 1 influencia por vertex
+    m->lastSkinFrame = -999999; // forzar re-skin en el proximo frame
+}
+
+// key de POSICION cuantizada (3 ints) para el dedup de CalcularBordes: NUMERICA en vez de std::string -> sin una
+// alloc de string por vertice (mortal en el N95 al importar mallas grandes; mismo resultado). C++03: el struct va a
+// nivel de archivo (los tipos LOCALES no se pueden usar como argumento de template).
+namespace { struct PosKeyBordes {
+    int a, b, c;
+    bool operator<(const PosKeyBordes& o) const {
+        if (a != o.a) return a < o.a;
+        if (b != o.b) return b < o.b;
+        return c < o.c;
+    }
+}; }
+
 void Mesh::CalcularBordes(bool invalidarEdit, bool reagruparPosRep) {
     skinGeomVersion++; // la geometria de render se regenero -> invalida el cache CSR de skinning (aunque nV no cambie)
     edges.clear();
@@ -2929,16 +2970,15 @@ void Mesh::CalcularBordes(bool invalidarEdit, bool reagruparPosRep) {
     // de un move para que el snap pueda dejar verts encimados SIN fundirlos (el Auto Merge, opt-in, hace la soldadura).
     if (reagruparPosRep || (int)posRep.size() != nV) {
         posRep.assign(nV, 0);
-        std::map<std::string,int> posMap;
+        std::map<PosKeyBordes,int> posMap;
         for (int i = 0; i < nV; i++) {
-            int q[3];
-            q[0] = (int)floorf(vertex[i*3]   * 10000.0f + 0.5f); // cuantiza a 1e-4 (coincidentes -> misma celda)
-            q[1] = (int)floorf(vertex[i*3+1] * 10000.0f + 0.5f);
-            q[2] = (int)floorf(vertex[i*3+2] * 10000.0f + 0.5f);
-            std::string key((const char*)q, sizeof(q));
-            std::map<std::string,int>::iterator it = posMap.find(key);
+            PosKeyBordes k;
+            k.a = (int)floorf(vertex[i*3]   * 10000.0f + 0.5f); // cuantiza a 1e-4 (coincidentes -> misma celda)
+            k.b = (int)floorf(vertex[i*3+1] * 10000.0f + 0.5f);
+            k.c = (int)floorf(vertex[i*3+2] * 10000.0f + 0.5f);
+            std::map<PosKeyBordes,int>::iterator it = posMap.find(k);
             if (it != posMap.end()) posRep[i] = it->second; // ya vimos esta posicion -> su representante (menor indice)
-            else { posRep[i] = i; posMap[key] = i; }         // 1ra vez -> este vert es el representante
+            else { posRep[i] = i; posMap[k] = i; }           // 1ra vez -> este vert es el representante
         }
     }
     // cantidad de posiciones unicas + CENTRO GEOMETRICO (promedio de las posiciones

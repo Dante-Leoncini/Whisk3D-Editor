@@ -66,6 +66,9 @@ TBool W3dLayoutTeclaRepeat(TInt aScan);
 // editor UV activo: paneo constante (o zoom si aZoom) por flecha mantenida. ETrue si lo manejo.
 TBool W3dLayoutUVNav(TInt aDx, TInt aDy, TBool aZoom);
 TBool W3dLayoutUVActivo(); // query: el viewport activo es el editor UV
+// Timeline activo: flecha MANTENIDA = scrub (izq/der); 0 + arriba/abajo = zoom; * + flechas = paneo. ETrue si lo manejo.
+TBool W3dLayoutTimelineNav(TInt aDx, TInt aDy, TBool aZoom, TBool aPan);
+TBool W3dLayoutTimelineActivo(); // query: el viewport activo es el Timeline
 
 // keypad SIN mouse: rutea flecha/OK al viewport ACTIVO (propiedades/outliner).
 // ETrue si lo consumio (el 3D devuelve EFalse: lo maneja orbit/transform).

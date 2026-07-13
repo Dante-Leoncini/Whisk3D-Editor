@@ -205,6 +205,7 @@ SOURCE w3dVersion.cpp              // W3dVersion() (header del .obj exportado)
 
 SOURCEPATH ..\..\..\libs\Whisk3DCore\animation
 SOURCE Animation.cpp              // globales de playback: CurrentFrame / AnimFPS / Start-EndFrame / PlayAnimation + keyframes
+SOURCE SkeletalAnimation.cpp      // ESQUELETO/SKINNING real (C++03): FK + linear blend skinning. Antes stubbeado; ya deforma en el N95.
 
 SOURCEPATH ..\..\..\libs\Whisk3DCore\objects
 SOURCE Armature.cpp              // clase Armature (PuntoFoco/RadioFoco/RenderObject) — C++03, render de esqueleto
@@ -213,4 +214,13 @@ SOURCEPATH ..\..\..\main\ViewPorts
 SOURCE Timeline.cpp              // viewport Timeline (los metodos SDL van #ifndef W3D_SYMBIAN; el resto compila)
 
 SOURCEPATH ..\src
-SOURCE w3dskelstubs.cpp          // stubs no-op de SkeletalAnimation + w3dGetTicks (reloj de ms del core)
+SOURCE w3dskelstubs.cpp          // solo w3dGetTicks (reloj de ms del core); los stubs del esqueleto ya no van (SkeletalAnimation.cpp compila)
+
+// --- IMPORT FBX en el N95 (usa el subsistema de animacion de arriba + comparte el file browser con el OBJ).
+//     El descompresor zlib (w3dCompress) es self-contained/multiplataforma -> compila aca sin stb ni libs
+//     externas; sera tambien la base del formato propio .w3d (archivo comprimido). ---
+SOURCEPATH ..\..\..\libs\Whisk3DCore
+SOURCE w3dCompress.cpp           // inflate DEFLATE/zlib self-contained (arrays comprimidos del FBX + futuro .w3d)
+
+SOURCEPATH ..\..\..\main\importers
+SOURCE import_fbx.cpp            // importador FBX binario (parseo + descompresion + malla/esqueleto/materiales)

@@ -26,6 +26,7 @@
 #include "objects/Camera.h"
 #include "objects/ObjectMode.h" // estado/G-R-S REALES de PC
 #include "importers/import_obj.h"
+#include "importers/import_fbx.h" // ImportFBX (binario): mismo file browser que el OBJ
 #include "ViewPorts/ViewPort3D.h" // el viewport REAL de PC
 #include "objects/Empty.h"
 #include <string.h> // strncpy
@@ -409,6 +410,17 @@ TBool W3dNewImportObj(const char* aPath) {
     w3dLogf("W3dNewImportObj: aPath='%s'", aPath); // diagnostico: confirma que se dispara el import + el path crudo
     bool ok = ImportOBJ(std::string(aPath), false);
     w3dLogf("importObj: ok=%d hijos=%d", (TInt)ok,
+        SceneCollection ? (TInt)SceneCollection->Childrens.size() : -1);
+    return ok ? ETrue : EFalse;
+}
+
+// importar un .fbx BINARIO con el importador COMPARTIDO de PC. En el N95 trae geometria + esqueleto +
+// materiales + los datos de animacion (el skinning/pose no deforman: van como stubs, ver w3dskelstubs.cpp).
+TBool W3dNewImportFbx(const char* aPath) {
+    if (!aPath || !aPath[0]) return EFalse;
+    w3dLogf("W3dNewImportFbx: aPath='%s'", aPath);
+    bool ok = ImportFBX(std::string(aPath));
+    w3dLogf("importFbx: ok=%d hijos=%d", (TInt)ok,
         SceneCollection ? (TInt)SceneCollection->Childrens.size() : -1);
     return ok ? ETrue : EFalse;
 }

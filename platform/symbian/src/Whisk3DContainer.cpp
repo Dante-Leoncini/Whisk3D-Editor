@@ -17,7 +17,8 @@
 #include "w3dnewscene.h"
 #include <GLES/gl.h> // modelo compartido de PC (Fase 3c): init+render
 #include "render/OpcionesRender.h"     // g_redraw (render event-driven)
-#include "objects/Materials.h"         // HayAnimacionActiva
+#include "objects/Materials.h"         // HayAnimacionActiva / UpdateAnimatedMaterials
+#include "animation/Animation.h"       // PlayAnimation / AnimFPS / AnimTick / ReloadAnimation (avance del play)
 
 // BARRA DE PROGRESO (export/import OBJ): el hook de swap que faltaba en Symbian. ProgresoIniciar/Actualizar lo
 // llaman para mostrar la barra DURANTE la operacion bloqueante (sin esto, ProgresoIniciar hacia return y la
@@ -322,6 +323,8 @@ static void AplicarFlechas3D(){
 	}
 	// EDITOR UV activo (sin mouse): flechas MANTENIDAS = paneo CONSTANTE suave; 0 + arriba/abajo = ZOOM.
 	if (W3dLayoutUVNav(dx, dy, g0Held)){ if (g0Held) g0ArrowUsed = ETrue; return; }
+	// TIMELINE activo (sin mouse): izq/der = mover el frame (scrub); 0 + arriba/abajo = zoom; * + flechas = paneo.
+	if (W3dLayoutTimelineNav(dx, dy, g0Held, gStarHeld)){ if (g0Held) g0ArrowUsed = ETrue; return; }
 	if (!W3dLayout3DActivo()) return;
 	// MODIFICADORES de camara del keypad (mantener tecla + flechas), prioridad sobre orbit/transform:
 	if (g0Held){ if (dy != 0) W3dNewZoom(-dy); g0ArrowUsed = ETrue; return; }   // 0 + arriba/abajo = ZOOM
@@ -451,7 +454,7 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 					if (!enEdit && (sc == EStdKeyRightArrow || sc == EStdKeyDownArrow) && !W3dNewTransformActive()) W3dNewCycleSelect();
 					return EKeyWasConsumed;
 				}
-				if (gGreenHeld || W3dLayout3DActivo() || mouseVisible || W3dLayoutUVActivo()){ // 3D=orbita, UV=paneo, mouse=cursor
+				if (gGreenHeld || W3dLayout3DActivo() || mouseVisible || W3dLayoutUVActivo() || W3dLayoutTimelineActivo()){ // 3D=orbita, UV/timeline=paneo/scrub, mouse=cursor
 					if (gGreenHeld) gGreenUsado = ETrue; // verde+flecha = resize (no ciclar)
 					if (sc == EStdKeyLeftArrow)       gHeldLeft = ETrue;
 					else if (sc == EStdKeyRightArrow) gHeldRight = ETrue;
@@ -768,6 +771,27 @@ int CWhisk3DContainer::DrawCallBack( TAny* aInstance )
     // modelo aparece enseguida y las texturas entran solas. No-op si no hay pendientes. (Va ANTES del check de
     // g_redraw para que corra aunque la escena este quieta.)
     { extern void CargarTexturasPendientes(); CargarTexturasPendientes(); }
+
+    // ANIMACION: materiales/UV animados cada frame + avance del frame en PLAY al ritmo de AnimFPS (independiente de
+    // los fps de la UI). En PC vive en MainLoopFrame; en el N95 FALTABA -> el play quedaba "clavado" en el frame 1 y
+    // los materiales animados no corrian. (UpdateAnimations -vertex anim, VertexAnimation.cpp- NO se compila en el
+    // .mmp -> se saltea; el skinning/pose de esqueleto siguen stub -> el frame avanza pero la malla no deforma.)
+    UpdateAnimatedMaterials();
+    {
+    #ifdef __WINS__
+        const TUint tickHz = 200;  // el emulador corre NTickCount a 200Hz
+    #else
+        const TUint tickHz = 1000; // el device (N95) a 1000Hz = ms reales
+    #endif
+        static TUint gLastAnimTick = 0;
+        TUint nowA = User::NTickCount();
+        TUint animTicks = (AnimFPS > 0) ? (TUint)(tickHz / AnimFPS) : (tickHz / 30);
+        if (nowA - gLastAnimTick >= animTicks) {
+            gLastAnimTick = nowA;
+            if (PlayAnimation) { AnimTick(); g_redraw = true; } // avanza CurrentFrame (loop Start..End del clip)
+            ReloadAnimation();
+        }
+    }
 
     // Render EVENT-DRIVEN: solo dibujar+cursor+swap si algo CAMBIO (g_redraw, lo
     // prende cualquier tecla/cursor/flecha) o hay una animacion en play. Si la escena
