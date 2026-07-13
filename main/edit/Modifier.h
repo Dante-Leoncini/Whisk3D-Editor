@@ -58,6 +58,10 @@ class Modifier {
                                 // -> topologia limpia y sin costura. Default ON.
         bool  screwFlip;        // invierte el winding (normales para el otro lado) si la superficie quedo del reves.
 
+        // --- ARMATURE: cache de vertex-animation (bakea el skinning por frame -> reproduccion sin recomputar) ---
+        bool  cacheAnim;        // Cache Animation: guarda las poses deformadas en memoria (default OFF)
+        float cacheSkip;        // Frame Skip: 0=todos los frames; N=guarda cada N+1 e interpola (menos memoria). float para PropFloat entero.
+
         Modifier(int t, const std::string& n)
             : tipo(t), nombre(n),
               mostrarViewport(true), mostrarEdit(true),
@@ -66,7 +70,8 @@ class Modifier {
               subLevel(1.0f), subRenderLevel(2.0f), subSimple(false),
               screwAngle(360.0f), screwHeight(0.0f), screwSteps(16.0f), screwRenderSteps(32.0f),
               screwAxis(1), screwStretchU(true), screwStretchV(true),
-              screwSmooth(true), screwMerge(true), screwFlip(false) {}
+              screwSmooth(true), screwMerge(true), screwFlip(false),
+              cacheAnim(false), cacheSkip(0.0f) {}
         virtual ~Modifier() {}
 };
 

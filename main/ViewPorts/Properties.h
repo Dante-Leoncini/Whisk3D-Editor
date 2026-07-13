@@ -119,6 +119,8 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropButton* propMirTarget; // "Mirror Object" (dropdown: cualquier objeto)
         PropButton* propArmTarget; // "Target" del modificador Armature (dropdown: solo esqueletos)
         PropButton* propBtnOptVG;  // "Optimize Vertex Groups" (1 hueso/vertice) del modificador Armature (destructivo, con confirm)
+        PropBool*   propArmCache;      // "Cache Animation" del modificador Armature (bakea el skinning por frame)
+        PropFloat*  propArmCacheSkip;  // "Frame Skip" del cache (0=todos; N=cada N+1 e interpola -> menos memoria)
         PropBool*  propMirMerge; PropFloat* propMirDist; PropBool* propMirClip; // merge + distancia + clipping
         // Subdivision Surface: modo (Catmull-Clark/Simple) + niveles viewport/render
         PropBool*  propSubSimple; PropFloat* propSubLevel; PropFloat* propSubRender;

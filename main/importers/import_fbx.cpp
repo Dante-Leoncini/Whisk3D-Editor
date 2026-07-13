@@ -16,6 +16,7 @@
 #include <vector>
 #include <string>
 #include <map>
+#include <set>     // std::set: clasificar ids (material/textura/geometria/model) al mapear las Connections del FBX
 #include <cstring>
 #include <stdint.h> // uintN_t: <stdint.h> (C) resuelve en los 4 OS; <cstdint> es C++11 (no en STLport/Symbian)
 #include <stdio.h>  // snprintf (global, C99) -> resuelve en Symbian/Open C; <cstdio> no garantiza snprintf en STLport
@@ -226,7 +227,7 @@ static double FbxFrameRate(const FNode& root) {
 // arma una malla de Whisk3D desde un nodo Geometry(Mesh). Devuelve la malla o NULL. mat = material (con textura) a
 // asignar. parent = objeto padre (la armature si hay esqueleto, si no CollectionActive). El TRANSFORM de correccion
 // (unidades + eje) NO se hornea aca: lo aplica el caller (a la armature si hay, o a la malla si no).
-static Mesh* MallaDesdeGeometry(const FNode& geo, const std::string& nombre, Material* mat, Object* parent,
+static Mesh* MallaDesdeGeometry(const FNode& geo, const std::string& nombre, const std::vector<Material*>& mats, Object* parent,
                                 float progBase, float progSpan) {
     const FNode* nVert = geo.child("Vertices");
     const FNode* nPoly = geo.child("PolygonVertexIndex");
@@ -259,6 +260,17 @@ static Mesh* MallaDesdeGeometry(const FNode& geo, const std::string& nombre, Mat
     const bool nByVert = (nMap == "ByVertice" || nMap == "ByVertex" || nMap == "ByControlPoint");
     const bool uByVert = (uMap == "ByVertice" || uMap == "ByVertex" || uMap == "ByControlPoint");
 
+    // ---- material POR POLIGONO (LayerElementMaterial) -> varios mesh parts. ByPolygon: 1 indice por poligono (en el
+    //      orden de PolygonVertexIndex); AllSame: todo el mesh usa el indice [0]. El indice mapea a 'mats' (la lista
+    //      ORDENADA de materiales conectados al Model de esta geometria; ver ParsearMaterialesFBX). ----
+    const std::vector<long long>* MATIDX = 0; std::string mMap = "AllSame";
+    if (const FNode* le = geo.child("LayerElementMaterial")) {
+        if (const FNode* c = le->child("Materials")) if (!c->props.empty()) MATIDX = &c->props[0].ai;
+        if (const FNode* c = le->child("MappingInformationType")) if (!c->props.empty()) mMap = c->props[0].s;
+    }
+    const bool matByPoly = (mMap == "ByPolygon" && MATIDX && !MATIDX->empty());
+    const int  matAllSame = (MATIDX && !MATIDX->empty()) ? (int)(*MATIDX)[0] : 0; // AllSame o sin LEM -> indice unico
+
     Wavefront Wobj; Wobj.Reset();
     // posiciones (control points)
     Wobj.vertex.reserve(V.size());
@@ -266,7 +278,9 @@ static Mesh* MallaDesdeGeometry(const FNode& geo, const std::string& nombre, Mat
 
     // recorrer los poligonos: cada corner tiene un control-point (cp) y un indice de corner corrido (c)
     Face cara;
-    int c = 0; // indice global de corner
+    int c = 0;               // indice global de corner
+    int polyIdx = 0;         // indice de poligono (para LayerElementMaterial ByPolygon)
+    std::vector<int> faceMat; // indice de material por cara (paralelo a Wobj.faces)
     for (size_t k = 0; k < PI.size(); k++) {
         if ((k & 4095) == 0) ProgresoActualizar(progBase + progSpan * 0.6f * ((float)k / (float)PI.size())); // 1er 60% del tramo (el resto = pasos post-loop, que en el N95 son lo pesado)
         long long raw = PI[k];
@@ -300,13 +314,43 @@ static Mesh* MallaDesdeGeometry(const FNode& geo, const std::string& nombre, Mat
         }
         cara.corners.push_back(fc);
         c++;
-        if (fin) { if (cara.corners.size() >= 3) Wobj.faces.push_back(cara); cara.corners.clear(); }
+        if (fin) {
+            if (cara.corners.size() >= 3) {
+                Wobj.faces.push_back(cara);
+                int mi = matByPoly ? (polyIdx < (int)MATIDX->size() ? (int)(*MATIDX)[polyIdx] : 0) : matAllSame;
+                if (mi < 0) mi = 0;
+                faceMat.push_back(mi);
+            }
+            cara.corners.clear();
+            polyIdx++; // cuenta TODOS los poligonos (aunque sean degenerados) -> alinea con el array ByPolygon del FBX
+        }
     }
     if (Wobj.faces.empty()) return 0;
 
-    // un solo material (con la textura, si hay) para toda la malla
-    if (mat) { MaterialGroup mg; mg.material = mat; mg.name = mat->name; mg.start = 0; mg.count = 0;
-               mg.startDrawn = 0; mg.indicesDrawnCount = 0; Wobj.materialsGroup.push_back(mg); }
+    // ---- MESH PARTS: bucketear las caras por indice de material (contiguo) y crear un MaterialGroup por material USADO.
+    //      ConvertToES1 agrupa por materialsGroup[m].start = 1er cara del grupo -> las caras tienen que quedar ordenadas
+    //      por material (el FBX ByPolygon puede intercalarlos). Si no hay materiales (mats vacio) -> 1 grupo default. ----
+    int nMats = (int)mats.size();
+    if (nMats <= 1) {
+        // caso simple: 1 material (o ninguno) para toda la malla -> 1 grupo (comportamiento clasico)
+        Material* mat = nMats == 1 ? mats[0] : NULL;
+        if (mat) { MaterialGroup mg; mg.material = mat; mg.name = mat->name; mg.start = 0; mg.count = 0;
+                   mg.startDrawn = 0; mg.indicesDrawnCount = 0; Wobj.materialsGroup.push_back(mg); }
+    } else {
+        for (size_t i = 0; i < faceMat.size(); i++) if (faceMat[i] >= nMats) faceMat[i] = nMats - 1; // clamp defensivo
+        std::vector<Face> ordFaces; ordFaces.reserve(Wobj.faces.size());
+        for (int mi = 0; mi < nMats; mi++) {
+            int start = (int)ordFaces.size();
+            for (size_t f = 0; f < faceMat.size(); f++) if (faceMat[f] == mi) ordFaces.push_back(Wobj.faces[f]);
+            int cnt = (int)ordFaces.size() - start;
+            if (cnt <= 0) continue; // material sin caras en esta malla -> no crear mesh part vacio
+            MaterialGroup mg; mg.material = mats[mi];
+            mg.name = mats[mi] ? mats[mi]->name : std::string("Mesh");
+            mg.start = start; mg.count = 0; mg.startDrawn = 0; mg.indicesDrawnCount = 0;
+            Wobj.materialsGroup.push_back(mg);
+        }
+        Wobj.faces.swap(ordFaces); // caras reordenadas por material (los fc.normal/fc.uv siguen apuntando bien: son indices a arrays propios)
+    }
 
     Mesh* mesh = new Mesh(parent, Vector3(0, 0, 0));
     mesh->name = nombre;
@@ -650,6 +694,86 @@ static void ParsearAnimaciones(const FNode& root, const FNode& objs, const Esque
     }
 }
 
+// ============================================================================
+//  MATERIALES FBX: cada geometria (mesh) tiene N materiales, uno por "mesh part". El grafo del FBX es:
+//    Texture --OP("DiffuseColor")--> Material --OO--> Model <--OO-- Geometry
+//  El indice de material de LayerElementMaterial (por poligono) es la POSICION del material en la lista de
+//  materiales conectados a ese Model (en el orden de las Connections). Aca se arma ese mapeo.
+// ============================================================================
+struct MatsFBX {
+    std::map<long long, Material*>              porId;      // id material FBX -> Material creado
+    std::map<long long, std::vector<long long> > deModel;   // id Model -> ids de material EN ORDEN (indice = posicion)
+    std::map<long long, long long>              modelDeGeo; // id Geometry -> id Model
+    // lista ORDENADA de Material* para una geometria (via su Model). Vacia si no se resolvio (-> fallback en el caller).
+    std::vector<Material*> deGeometria(long long geoId) const {
+        std::vector<Material*> out;
+        std::map<long long,long long>::const_iterator mg = modelDeGeo.find(geoId);
+        if (mg == modelDeGeo.end()) return out;
+        std::map<long long, std::vector<long long> >::const_iterator ml = deModel.find(mg->second);
+        if (ml == deModel.end()) return out;
+        for (size_t i = 0; i < ml->second.size(); i++) {
+            std::map<long long,Material*>::const_iterator it = porId.find(ml->second[i]);
+            out.push_back(it == porId.end() ? (Material*)NULL : it->second);
+        }
+        return out;
+    }
+};
+
+static void ParsearMaterialesFBX(const FNode& root, const FNode& objs, const std::string& filepath, MatsFBX& out) {
+    // 1) recolectar ids de Material / Texture / Geometry / Model (para clasificar las conexiones)
+    std::set<long long> matIds, texIds, geoIds, modelIds;
+    std::map<long long, std::string> matNombre;  // id material -> nombre limpio
+    std::map<long long, std::string> texRel;      // id textura  -> ruta relativa
+    for (size_t i = 0; i < objs.kids.size(); i++) {
+        const FNode& k = objs.kids[i]; if (k.props.empty()) continue;
+        long long id = k.props[0].i;
+        if (k.name == "Material") { matIds.insert(id); matNombre[id] = (k.props.size() > 1 ? LimpiarNombreFBX(k.props[1].s) : std::string("mat")); }
+        else if (k.name == "Texture" || k.name == "Video") {
+            std::string rel;
+            if (const FNode* c = k.child("RelativeFilename")) if (!c->props.empty()) rel = c->props[0].s;
+            if (rel.empty()) if (const FNode* c = k.child("FileName")) if (!c->props.empty()) rel = c->props[0].s;
+            if (!rel.empty()) { texIds.insert(id); texRel[id] = rel; }
+        }
+        else if (k.name == "Geometry") geoIds.insert(id);
+        else if (k.name == "Model")    modelIds.insert(id);
+    }
+    if (matIds.empty()) return; // FBX sin nodos Material -> el caller usa el fallback (1ra textura suelta)
+
+    // 2) conexiones: material->Model (orden = indice de material), textura->material (prioriza DiffuseColor), geometria->Model
+    std::map<long long, long long> texDeMat;  // id material -> id textura elegida
+    std::set<long long> matDifusoElegido;     // material que ya fijo su textura DiffuseColor (no la pisa una secundaria)
+    if (const FNode* conns = root.child("Connections")) {
+        for (size_t i = 0; i < conns->kids.size(); i++) {
+            const FNode& c = conns->kids[i];
+            if (c.name != "C" || c.props.size() < 3) continue;
+            long long src = c.props[1].i, dst = c.props[2].i;
+            if (matIds.count(src) && modelIds.count(dst))      out.deModel[dst].push_back(src); // material -> Model (en orden)
+            else if (geoIds.count(src) && modelIds.count(dst)) out.modelDeGeo[src] = dst;        // geometria -> Model
+            else if (texIds.count(src) && matIds.count(dst)) {                                    // textura -> material
+                std::string prop = c.props.size() > 3 ? c.props[3].s : std::string();
+                bool difuso = (prop == "DiffuseColor" || prop == "Maya|baseColor" || prop == "3dsMax|Parameters|base_color_map" || prop == "baseColor");
+                if (difuso) { texDeMat[dst] = src; matDifusoElegido.insert(dst); }
+                else if (!matDifusoElegido.count(dst) && texDeMat.find(dst) == texDeMat.end()) texDeMat[dst] = src; // 1ra secundaria si no hay difusa
+            }
+        }
+    }
+
+    // 3) crear un Material por material FBX, resolviendo su textura (encolada como el resto; puede no existir en disco)
+    std::string dir = DirDe(filepath);
+    for (std::set<long long>::iterator it = matIds.begin(); it != matIds.end(); ++it) {
+        long long id = *it;
+        Material* mat = new Material(matNombre.count(id) ? matNombre[id] : std::string("mat"));
+        Materials.push_back(mat);
+        out.porId[id] = mat;
+        std::map<long long,long long>::iterator td = texDeMat.find(id);
+        if (td != texDeMat.end()) {
+            std::map<long long,std::string>::iterator tr = texRel.find(td->second);
+            if (tr != texRel.end()) { std::string res = ResolverTextura(dir, tr->second); if (!res.empty()) EncolarTextura(mat, res); }
+        }
+    }
+    w3dLogf("ImportFBX: %d material(es), %d con textura conectada", (int)matIds.size(), (int)texDeMat.size());
+}
+
 } // namespace
 
 bool ImportFBX(const std::string& filepath) {
@@ -691,17 +815,19 @@ bool ImportFBX(const std::string& filepath) {
     double unit = LeerGlobalD(root, "UnitScaleFactor", 1.0);
     double escala = unit / 100.0; if (escala <= 0.0) escala = 1.0;
 
-    // texturas: se junta la 1ra que exista en disco (relativa al FBX) -> un material con esa textura para todo
-    Material* mat = 0;
-    {
+    // MATERIALES: un Material por cada Material del FBX (con su textura difusa), mapeados por Model a cada geometria
+    // -> varios mesh parts. Si el FBX no declara materiales, FALLBACK: 1 material con la 1ra textura suelta que exista.
+    MatsFBX matsInfo; ParsearMaterialesFBX(root, *objs, filepath, matsInfo);
+    Material* matFallback = 0;
+    if (matsInfo.porId.empty()) {
         std::vector<std::string> texs; JuntarTexturas(*objs, texs);
         std::string dir = DirDe(filepath);
-        for (size_t i = 0; i < texs.size() && !mat; i++) {
+        for (size_t i = 0; i < texs.size() && !matFallback; i++) {
             std::string res = ResolverTextura(dir, texs[i]);
             if (!res.empty()) {
-                mat = new Material(ExtractBaseName(filepath) + "_mat");
-                Materials.push_back(mat);
-                EncolarTextura(mat, res); // carga diferida (1 por frame), como el OBJ
+                matFallback = new Material(ExtractBaseName(filepath) + "_mat");
+                Materials.push_back(matFallback);
+                EncolarTextura(matFallback, res); // carga diferida (1 por frame), como el OBJ
             }
         }
     }
@@ -753,7 +879,11 @@ bool ImportFBX(const std::string& filepath) {
         float pBase = 0.45f + 0.53f * ((float)geoVistas / (float)totalGeo);
         float pSpan = 0.53f / (float)totalGeo;
         geoVistas++;
-        Mesh* m = MallaDesdeGeometry(k, nom, mat, parentMallas, pBase, pSpan);
+        // materiales (ORDENADOS) de esta geometria via su Model; si no se resolvieron, el fallback (1ra textura suelta)
+        long long geoIdMat = k.props.empty() ? -1 : k.props[0].i;
+        std::vector<Material*> matsGeo = matsInfo.deGeometria(geoIdMat);
+        if (matsGeo.empty() && matFallback) matsGeo.push_back(matFallback);
+        Mesh* m = MallaDesdeGeometry(k, nom, matsGeo, parentMallas, pBase, pSpan);
         if (!m) continue;
         // la geometria del mesh viene Z-up -> SIEMPRE -90° X para pararla. La escala la hereda de la armature; si no
         // hay esqueleto, la malla tambien lleva la escala.

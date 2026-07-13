@@ -685,6 +685,11 @@ static void ActualizarSkinArmature(Mesh* m){
         // Edit Mode" OFF -> NO se deforma (la malla se ve en bind, igual que con target=none).
         if (!md->target || !md->mostrarViewport || (enEdit && !md->mostrarEdit)) arm = NULL;
         else arm = md->target;
+        // CACHE de vertex-animation: sincronizar on/off + skip desde el modificador. Si el skip cambia, la firma del
+        // cache cambia (SkinCacheFirma) y se re-dimensiona solo en el proximo SkinearMesh. Apagar libera la memoria.
+        m->skinCacheOn = md->cacheAnim;
+        int nuevoSkip = (int)(md->cacheSkip + 0.5f); if (nuevoSkip < 0) nuevoSkip = 0;
+        m->skinCacheSkip = nuevoSkip;
         break;
     }
     if ((Object*)m->skinArmature != arm){ m->skinArmature = (Armature*)arm; m->lastSkinFrame = -999999; g_redraw = true; }
@@ -1452,6 +1457,13 @@ void Properties::ConstruirGrupos(){
     propBtnOptVG = new PropButton("Optimize Vertex Groups");
     propBtnOptVG->action = AccionOptimizarVertexGroups;
     propModifierProps->properties.push_back(propBtnOptVG);
+    // "Cache Animation" (SOLO Armature): bakea el skinning por frame -> reproduccion sin recomputar (4fps -> techo de
+    // render). "Frame Skip": 0 = todos los frames; N = guarda cada N+1 e interpola (menos memoria en el N95).
+    propArmCache = new PropBool("Cache Animation"); propArmCache->onChange = AccionModParamChanged;
+    propModifierProps->properties.push_back(propArmCache);
+    propArmCacheSkip = new PropFloat("Frame Skip"); propArmCacheSkip->SetRango(0.0f, 10.0f); propArmCacheSkip->entero = true;
+    propArmCacheSkip->onChange = AccionModParamChanged;
+    propModifierProps->properties.push_back(propArmCacheSkip);
     // Apply Modifier (cualquier modificador): hornea la malla generada en la editable
     propBtnApplyMod = new PropButton("Apply Modifier");
     propBtnApplyMod->action = AccionAplicarModificador;
@@ -1943,6 +1955,9 @@ void Properties::ActualizarPestanias(){
         if (propArmTarget) { propArmTarget->oculto = !esArmMod;
             if (esArmMod) propArmTarget->button->text = mod->target ? mod->target->name : std::string("None"); }
         if (propBtnOptVG) propBtnOptVG->oculto = !esArmMod; // "Optimize Vertex Groups": solo en el modificador Armature
+        // Cache Animation + Frame Skip: solo en el Armature (PropBool/PropFloat se ocultan con value=NULL)
+        if (propArmCache)     propArmCache->value     = esArmMod ? &mod->cacheAnim : NULL;
+        if (propArmCacheSkip) propArmCacheSkip->value = esArmMod ? &mod->cacheSkip : NULL;
         if (esArmMod) ActualizarSkinArmature(mm); // mantener skinArmature en sync con el modificador
         if (propBtnApplyMod) propBtnApplyMod->oculto = !haySel; // Apply: con cualquier modificador seleccionado
     } else if (propModifierProps) propModifierProps->visible = false;

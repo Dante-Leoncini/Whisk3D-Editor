@@ -498,6 +498,33 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         return true;
     }
     // ---- skinbench <frames> : mide el costo de SkinearMesh (forzando recompute cada frame) sobre la 1er malla skinneada. ----
+    // ---- skincache <on> [skip] : activa/desactiva el cache de vertex-animation en la 1er malla skinneada (para medir). ----
+    // ---- meshinfo : lista las mallas de la escena con sus MESH PARTS (materiales) -> verificar el import multi-material. ----
+    if (cmd == "meshinfo") {
+        std::vector<Object*> st; if(SceneCollection) st.push_back(SceneCollection);
+        int nm=0;
+        while(!st.empty()){ Object* o=st.back(); st.pop_back();
+            if (o->getType()==ObjectType::mesh){ Mesh* m=(Mesh*)o; nm++;
+                printf("      [mesh] '%s' verts=%d tris=%d meshParts=%d\n", m->name.c_str(), m->vertexSize, m->facesSize/3, (int)m->materialsGroup.size());
+                for (size_t g=0; g<m->materialsGroup.size(); g++){ MaterialGroup& mg=m->materialsGroup[g];
+                    printf("         part[%d] mat='%s' tris=%d\n", (int)g, mg.material?mg.material->name.c_str():"(none)", mg.indicesDrawnCount/3); }
+            }
+            for(size_t i=0;i<o->Childrens.size();i++) st.push_back(o->Childrens[i]); }
+        printf("      [meshinfo] %d malla(s)\n", nm);
+        return true;
+    }
+    if (cmd == "skincache") {
+        int on=1, skip=0; ss>>on; ss>>skip;
+        Mesh* found=NULL;
+        { std::vector<Object*> st; if(SceneCollection) st.push_back(SceneCollection);
+          while(!st.empty()&&!found){ Object* o=st.back(); st.pop_back();
+            if (o->getType()==ObjectType::mesh && ((Mesh*)o)->skinArmature) found=(Mesh*)o;
+            for(size_t i=0;i<o->Childrens.size();i++) st.push_back(o->Childrens[i]); } }
+        if (!found){ err="skincache: no hay malla con skinArmature"; return false; }
+        found->skinCacheOn = (on!=0); if(skip<0)skip=0; found->skinCacheSkip = skip; found->LiberarSkinCache();
+        printf("      [skincache] on=%d skip=%d\n", on, skip);
+        return true;
+    }
     if (cmd == "skinbench") {
         int nf=200; ss>>nf; if(nf<1)nf=1;
         Mesh* found=NULL;
@@ -507,6 +534,17 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
             for (size_t i=0;i<o->Childrens.size();i++) stack.push_back(o->Childrens[i]); } }
         if (!found) { err="skinbench: no hay malla con skinArmature"; return false; }
         Armature* a=found->skinArmature;
+        // DIAGNOSTICO de dedup: skinnea 1 vez (arma el CSR) y reporta render-verts vs control-points UNICOS + influencias.
+        // El ratio render/ctrl mide cuanto se ahorraria skinneando por control-point (verts que comparten CP = mismo bind).
+        { CurrentFrame=1; a->lastPoseFrame=-999999; found->lastSkinFrame=-999999; SkinearMesh(found);
+          int nvd=found->vertexSize, nCtrl=0;
+          for (int i=0;i<nvd && i<(int)found->vertCtrlPoint.size(); i++) if (found->vertCtrlPoint[i]+1>nCtrl) nCtrl=found->vertCtrlPoint[i]+1;
+          std::vector<char> seen(nCtrl>0?nCtrl:1,0); int cpUsados=0;
+          for (int i=0;i<nvd && i<(int)found->vertCtrlPoint.size(); i++){ int c=found->vertCtrlPoint[i]; if(c>=0&&c<nCtrl&&!seen[c]){seen[c]=1;cpUsados++;} }
+          int totInf=(int)found->skinCpBone.size(), cpsPeso=0;
+          for (int c=0;c+1<(int)found->skinCpOff.size(); c++) if (found->skinCpOff[c+1]>found->skinCpOff[c]) cpsPeso++;
+          printf("      [skinbench-diag] nv(render)=%d  ctrlPoints(unicos)=%d  ratio=%.2fx  influencias(por-CP)=%d (avg %.2f/CP)  cpsConPeso=%d\n",
+                 nvd, cpUsados, cpUsados>0?(float)nvd/(float)cpUsados:0.0f, totInf, cpsPeso>0?(float)totInf/cpsPeso:0.0f, cpsPeso); }
         clock_t t0=clock();
         for (int f=0; f<nf; f++){
             CurrentFrame = 1 + (f % 30);            // varia el frame -> fuerza re-FK + re-skin
