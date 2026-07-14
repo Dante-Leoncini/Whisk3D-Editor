@@ -296,6 +296,10 @@ struct GltfDoc {
     }
 };
 
+// (control-point, hueso, peso) -> vertexGroups. A NIVEL DE ARCHIVO: un tipo LOCAL no puede ser argumento de template
+// (std::vector<PesoCP>) en C++03/STLport (Symbian: "a template argument may not reference a local type").
+struct PesoCP { int cp; int joint; float w; };
+
 } // namespace
 
 // ============================================================================
@@ -538,10 +542,8 @@ bool ImportGLTF(const std::string& filepath) {
         const JVal* prims = gm.find("primitives"); if (!prims || prims->t != JVal::ARR) continue;
 
         Wavefront Wobj; Wobj.Reset();
-        std::vector<int> cpToJointWeights_dummy; // (los pesos se arman por vertex group abajo)
         // por-primitiva: control-points (posiciones), normales/uv por corner, caras, material group
-        struct PesoCP { int cp; int joint; float w; };
-        std::vector<PesoCP> pesos; // (control-point, hueso, peso) -> vertexGroups
+        std::vector<PesoCP> pesos; // (control-point, hueso, peso) -> vertexGroups (PesoCP definido a nivel de archivo)
         int cpBase = 0;
         for (size_t p = 0; p < prims->size(); p++) {
             const JVal& pr = prims->arr[p];
