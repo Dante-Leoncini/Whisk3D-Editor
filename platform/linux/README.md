@@ -47,7 +47,7 @@ Si crashea, para ver en detalle dónde:
 bt full
 ```
 
-## Instaladores (.deb / .rpm / AppImage)
+## Instalador `.deb` (Debian / Ubuntu)
 
 Desde `platform/linux/build` (¡gracias [**Zariep**](https://github.com/ItsZariep) por este aporte!):
 
@@ -55,20 +55,14 @@ Desde `platform/linux/build` (¡gracias [**Zariep**](https://github.com/ItsZarie
 cpack
 ```
 
-### Para el AppImage
+Genera `whisk3d-<ver>-Linux.deb`. (RPM: agregá `RPM` a `CPACK_GENERATOR` en `CMakeLists.txt` si tenés `rpmbuild`.)
 
-El CMake que viene en Ubuntu no alcanza; actualizalo:
+## AppImage (portable)
 
-```bash
-pip install cmake --upgrade
-```
-
-Y necesitás `patchelf` y `appimagetool`:
+El cmake estándar **no** trae generador CPack de AppImage (`cpack` aborta con *"Could not create CPack generator: AppImage"*). Se arma con un script propio que usa `linuxdeploy` + `appimagetool`:
 
 ```bash
-sudo apt install patchelf
-wget https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
-chmod +x appimagetool-x86_64.AppImage
+platform/linux/build_appimage.sh
 ```
 
-Ahora `cpack` genera también el AppImage.
+Genera `platform/linux/build/Whisk3D-<ver>-x86_64.AppImage`. Descarga `linuxdeploy`/`appimagetool` a `~/.cache/whisk3d-appimage` la primera vez (o los toma del PATH si ya están). Requiere haber compilado antes (`build_linux.sh`).

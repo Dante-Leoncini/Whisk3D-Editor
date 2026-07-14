@@ -173,7 +173,10 @@ if(UNIX AND NOT APPLE AND NOT ANDROID)
         RENAME whisk3d.png
     )
 
-    set(CPACK_GENERATOR "DEB;AppImage;RPM")
+    # Solo DEB por cpack. El cmake estandar NO trae generador "AppImage" (cpack aborta con "Could not create CPack
+    # generator: AppImage") -> el AppImage se arma aparte con platform/linux/build_appimage.sh (linuxdeploy+appimagetool).
+    # RPM se puede agregar aca si esta rpmbuild instalado.
+    set(CPACK_GENERATOR "DEB")
 
     # Deb
     set(CPACK_PACKAGE_NAME "whisk3d")
