@@ -14,6 +14,11 @@ class Mesh; // MoverSeleccionEditLocal opera sobre una malla en Edit Mode
 void ReestablecerEstado(bool ClearEstado = true);
 void Cancelar();
 void EliminarAnimaciones(Object& obj);
+// animacion de OBJETOS (transform pos/rot/escala; menu Object > Animation)
+void InsertarKeyframeObjeto(); // Insert Keyframe: guarda el transform de los seleccionados en el frame actual
+void BorrarKeyframeObjeto();   // Delete Keyframe: saca el keyframe del frame actual
+void LimpiarKeyframeObjeto();  // Clear Keyframe: borra toda la animacion del objeto
+void AplicarAnimacionObjetos();// PLAYBACK: aplica los keyframes al transform en el frame actual (al cambiar de frame)
 void Eliminar(bool IncluirCollecciones = false);
 void CalcObjectsTransformPivotPoint(Object* obj);
 void SetTransformPivotPoint();

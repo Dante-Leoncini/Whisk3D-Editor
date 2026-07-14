@@ -1,5 +1,6 @@
 #include "constructor.h"
-#include "ViewPorts/UVEditor.h" // el layout PC parte el 3D en columna [3D / UV editor]
+#include "ViewPorts/UVEditor.h" // el UV editor (ya no en el layout default de PC; accesible por el selector de tipo)
+#include "ViewPorts/Timeline.h" // el layout PC parte el 3D en columna [3D / Timeline]
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb/stb_image.h"
@@ -107,10 +108,10 @@ void ConstructUniversal(int argc, char* argv[]) {
         );
 #endif
     } else {
-        // LANDSCAPE (PC): a la IZQUIERDA una columna [viewport3D ARRIBA / UV editor ABAJO al 30%];
-        // a la DERECHA outliner sobre propiedades.
+        // LANDSCAPE (PC): a la IZQUIERDA una columna [viewport3D ARRIBA / Timeline ABAJO, bajito]; a la DERECHA
+        // outliner sobre propiedades. El Timeline no necesita ser alto -> 85% para el 3D, 15% para el Timeline.
         rootViewport = new ViewportRow(
-            new ViewportColumn(vp3dInicial, new UVEditor(), 0.70f), // 3D 70% arriba, UV editor 30% abajo
+            new ViewportColumn(vp3dInicial, new Timeline(), 0.85f), // 3D 85% arriba, Timeline 15% abajo (bajito)
             new ViewportColumn(new Outliner(), new Properties(), 0.40f),
             0.70f
         );

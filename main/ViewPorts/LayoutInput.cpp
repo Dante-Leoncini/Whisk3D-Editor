@@ -790,6 +790,9 @@ static void LayoutAccionObject(int aId) {
         case 2: NewInstance();      break; // Duplicate Linked  (Alt D)
         case 3: AbrirConfirmarBorrado(); break; // Delete (X): popup de confirmacion -> Si borra (con undo)
         case 5: JoinObjetos(); break;           // Join (Ctrl J): une las mallas seleccionadas en el objeto activo
+        case 510: InsertarKeyframeObjeto(); break; // Object > Animation: Insert Keyframe (pos/rot/escala en el frame actual)
+        case 511: BorrarKeyframeObjeto();   break; // Object > Animation: Delete Keyframe (del frame actual)
+        case 512: LimpiarKeyframeObjeto();  break; // Object > Animation: Clear Keyframe (toda la animacion del objeto)
         case 220: AplicarTransform(0); break;   // Apply Location
         case 221: AplicarTransform(1); break;   // Apply Rotation
         case 222: AplicarTransform(2); break;   // Apply Scale

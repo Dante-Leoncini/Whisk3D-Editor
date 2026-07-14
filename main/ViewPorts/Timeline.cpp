@@ -26,13 +26,13 @@ extern bool leftMouseDown, middleMouseDown, ViewPortClickDown;
 // roles de los botones de la barra (para el dispatch del click; no chocan con los BR_* del 3D)
 enum { TL_ROL_T0 = 300, TL_ROL_START = 320, TL_ROL_END = 321, TL_ROL_ANIM = 322 };
 
-// dropdown de animacion: al elegir una opcion, cambia el clip activo del armature
+// dropdown de animacion: menu JERARQUICO (Scenes + un submenu por armadura) construido por Properties.cpp; la
+// seleccion (escena o clip) se aplica con AnimSelPorId (compartida con la tarjeta Animation).
+extern void ConstruirMenuAnim(PopupMenu* menu); // Properties.cpp
+extern void AnimSelPorId(int id);               // Properties.cpp
 static PopupMenu* g_tlMenuAnim = NULL;
 static void TL_menuAnimAction(int id){
-    if (ObjActivo && ObjActivo->getType() == ObjectType::armature){
-        Armature* a = (Armature*)ObjActivo;
-        if (id >= 0 && id < (int)a->animations.size()) a->animActiva = id;
-    }
+    AnimSelPorId(id);
     if (MenuAbierto == g_tlMenuAnim) g_tlMenuAnim->Cerrar();
     g_redraw = true;
 }
@@ -111,12 +111,12 @@ static void CollectKeyframes(std::vector<int>& out){
     out.erase(std::unique(out.begin(), out.end()), out.end());
 }
 
-// clip de animacion ACTIVO (armature activo + su animActiva) o NULL
+// clip de animacion ACTIVO segun la seleccion APP-WIDE (no depende del objeto seleccionado) o NULL si la animacion
+// activa es una ESCENA. Asi clickear un armature NO cambia el rango/seleccion del timeline.
 static SkeletalAnimation* ClipActivo(){
-    if (ObjActivo && ObjActivo->getType() == ObjectType::armature){
-        Armature* a = (Armature*)ObjActivo;
-        if (a->animActiva >= 0 && a->animActiva < (int)a->animations.size()) return a->animations[a->animActiva];
-    }
+    if (ActiveAnimKind == 1 && ActiveAnimArm &&
+        ActiveAnimArm->animActiva >= 0 && ActiveAnimArm->animActiva < (int)ActiveAnimArm->animations.size())
+        return ActiveAnimArm->animations[ActiveAnimArm->animActiva];
     return NULL;
 }
 
@@ -146,8 +146,9 @@ Timeline::Timeline(){
     }
     btnStart = new Button("Start:1");   btnStart->rol = TL_ROL_START; BarButtons.push_back(btnStart);
     btnEnd   = new Button("End:250");   btnEnd->rol   = TL_ROL_END;   BarButtons.push_back(btnEnd);
-    btnAnim  = new Button("Animation", (int)IconType::armature); btnAnim->rol = TL_ROL_ANIM; btnAnim->desplegable = true;
-    btnAnim->visible = false;           // solo visible con un armature con clips
+    btnAnim  = new Button("Scene", (int)IconType::camera); btnAnim->rol = TL_ROL_ANIM; btnAnim->desplegable = true;
+    btnAnim->caretMenu = true; // aca SI conviene la flechita (dropdown de animacion)
+    // SIEMPRE visible (Scene por defecto); SyncFields actualiza texto/icono segun la animacion activa
     BarButtons.push_back(btnAnim);
 #ifdef W3D_SYMBIAN
     // N95 (240px): la barra completa (8 transportes + Start/End + anim) es demasiada para navegar sin mouse.
@@ -179,9 +180,8 @@ int Timeline::TickStep() const {
 }
 
 void Timeline::SyncFields(){
-    // si hay un clip activo, el RANGO del timeline (y del play) es el del clip: lo espejamos a los globales
-    SkeletalAnimation* clip = ClipActivo();
-    if (clip){ StartFrame = clip->startFrame; EndFrame = clip->endFrame; }
+    // el rango/fps de la animacion activa YA vive en los globales StartFrame/EndFrame/AnimFPS (se cargan al
+    // seleccionarla con AnimCargarRangoActivo). Aca solo se refleja en los campos.
     // Start / End: si NO se editan, mostrar el valor; si se editan, el boton es el input (editField)
     if (g_propFloatEditando == pfStart){ btnStart->editField = &pfStart->field; }
     else { btnStart->editField = NULL; char b[24]; snprintf(b,sizeof b,"Start:%d",StartFrame); btnStart->text=b; fStart=(float)StartFrame; }
@@ -194,10 +194,12 @@ void Timeline::SyncFields(){
     btnT[3]->tinte = pr ? TL_VERDE_BTN : NULL;
     btnT[4]->tinte = pf ? TL_VERDE_BTN : NULL;
 
-    // dropdown de animacion: visible solo con un armature CON clips; muestra el nombre del clip activo
-    bool hayArm = (ObjActivo && ObjActivo->getType()==ObjectType::armature && !((Armature*)ObjActivo)->animations.empty());
-    btnAnim->visible = hayArm;
-    if (hayArm){ SkeletalAnimation* c = ClipActivo(); btnAnim->text = c ? c->name : std::string("(select)"); }
+    // dropdown de animacion: SIEMPRE visible (Scene por defecto). Muestra la animacion ACTIVA: icono camara = escena,
+    // icono esqueleto = clip de armature. No depende del objeto seleccionado.
+    btnAnim->visible = true;
+    SkeletalAnimation* c = ClipActivo();
+    if (c){ btnAnim->text = c->name; btnAnim->icon = (int)IconType::armature; }
+    else  { btnAnim->text = NombreEscenaActiva(); btnAnim->icon = (int)IconType::camera; }
 }
 
 // ------------------------------------------------------------------ Render
@@ -362,11 +364,11 @@ void Timeline::SetFrameFromX(int lx){
     CurrentFrame = f; g_redraw = true;
 }
 void Timeline::ApplyStart(){ int v=(int)(fStart+0.5f); if(v<0)v=0;
-    SkeletalAnimation* clip=ClipActivo(); if(clip) clip->startFrame=v;   // editar Start = editar el clip activo
-    StartFrame=v; if(CurrentFrame<StartFrame)CurrentFrame=StartFrame; g_redraw=true; }
+    AnimSetStart(v);   // editar Start = editar el Start PROPIO de la animacion activa (escena o clip)
+    if(CurrentFrame<StartFrame)CurrentFrame=StartFrame; g_redraw=true; }
 void Timeline::ApplyEnd(){   int v=(int)(fEnd+0.5f);   if(v<0)v=0;
-    SkeletalAnimation* clip=ClipActivo(); if(clip) clip->endFrame=v;     // editar End = editar el clip activo
-    EndFrame=v; if(CurrentFrame>EndFrame && EndFrame>=StartFrame)CurrentFrame=EndFrame; g_redraw=true; }
+    AnimSetEnd(v);     // editar End = editar el End PROPIO de la animacion activa (escena o clip)
+    if(CurrentFrame>EndFrame && EndFrame>=StartFrame)CurrentFrame=EndFrame; g_redraw=true; }
 void Timeline::ApplyCur(){   int v=(int)(fCur+0.5f);   if(v<0)v=0; CurrentFrame=v; g_redraw=true; }
 void Timeline::EditarCampo(int i){
     g_tlActivo = this;
@@ -390,12 +392,10 @@ bool Timeline::ClickBarButton(int mx, int my){
     for (int i=0;i<8;i++) if (btnT[i]->visible && btnT[i]->Contains(mx,my)){ TransportAction(i); return true; }
     if (btnStart->Contains(mx,my)){ EditarCampo(0); return true; }
     if (btnEnd->Contains(mx,my)){   EditarCampo(1); return true; }
-    // dropdown de animacion: lista los clips del armature; elegir uno -> animActiva
-    if (btnAnim->visible && btnAnim->Contains(mx,my) && ObjActivo && ObjActivo->getType()==ObjectType::armature){
-        Armature* a = (Armature*)ObjActivo;
+    // dropdown de animacion: menu jerarquico (submenu "Scenes" + un submenu por armadura con sus clips)
+    if (btnAnim->visible && btnAnim->Contains(mx,my)){
         if (!g_tlMenuAnim){ g_tlMenuAnim = new PopupMenu(); g_tlMenuAnim->action = TL_menuAnimAction; }
-        g_tlMenuAnim->Limpiar();
-        for (size_t i=0;i<a->animations.size();i++) g_tlMenuAnim->Agregar(a->animations[i]->name, (int)i);
+        ConstruirMenuAnim(g_tlMenuAnim);
         if (MenuAbierto && MenuAbierto != g_tlMenuAnim) MenuAbierto->Cerrar();
         g_tlMenuAnim->Abrir(btnAnim->sx, btnAnim->sy + btnAnim->height, MenuPantallaW, MenuPantallaH);
         MenuAbierto = g_tlMenuAnim;
@@ -410,19 +410,16 @@ void Timeline::button_left(){
     int lx = lastMx - x, ly = lastMy - y;
     // boton VERDE del frame actual (sobresale por arriba de los numeros) -> editar por texto (teclado / pad numerico)
     if (ly >= numY - GlobalScale*2 && ly < stripY && lx >= curBtnX && lx <= curBtnX + curBtnW){ EditarCampo(2); return; }
-    // BARRA DE NUMEROS -> scrub: pone el frame donde tocas. NO se setea en el down (se setea en el drag o al soltar)
-    // para que un 2do dedo (zoom) pueda cancelar el scrub SIN mover el frame ("dos dedos no cambian el frame").
-    if (ly >= numY - GlobalScale*2 && ly < stripY){ scrubbing = true; panning = false; return; }
-    // CUERPO (bandas) -> un dedo/arrastre PANEA (scroll). NO scrubbea en el down; con MOUSE un
-    // CLICK puro (sin arrastrar) salta el frame ahi (se decide al soltar, ver mouse_button_up).
-    if (ly >= stripY){ panning = true; scrubbing = false; pressMx = lastMx; pressMy = lastMy; }
+    // CLICK IZQUIERDO en TODO el cuerpo (numeros + bandas) = SCRUB: fija el frame YA (en el DOWN) y lo sigue con el
+    // arrastre. El PAN/scroll del timeline es con el boton del MEDIO (ver event_mouse_motion). Antes el cuerpo paneaba
+    // con el izquierdo y el frame recien saltaba al SOLTAR -> molesto.
+    if (ly >= numY - GlobalScale*2){ scrubbing = true; panning = false; SetFrameFromX(lx); }
 #endif
 }
 void Timeline::event_mouse_motion(int mx, int my){
     if (PopUpActive){ lastMx=mx; lastMy=my; return; }
-    if (scrubbing && leftMouseDown)      SetFrameFromX(mx - x);                                          // numeros: scrub
-    else if (panning && leftMouseDown)   PanFrames(-(float)(mx - lastMx) / (pxPerFrame>0.01f?pxPerFrame:0.01f)); // cuerpo: 1 dedo scroll
-    else if (middleMouseDown)            PanFrames(-(float)(mx - lastMx) / (pxPerFrame>0.01f?pxPerFrame:0.01f)); // rueda/medio: pan
+    if (scrubbing && leftMouseDown)  SetFrameFromX(mx - x);                                              // izquierdo: scrub (arrastra el frame actual)
+    else if (middleMouseDown)        PanFrames(-(float)(mx - lastMx) / (pxPerFrame>0.01f?pxPerFrame:0.01f)); // MEDIO: pan/scroll del timeline
     lastMx = mx; lastMy = my;
 }
 bool Timeline::event_finger_scroll(int px, int py, int dx, int dy){
@@ -440,16 +437,8 @@ void Timeline::event_mouse_wheel(SDL_Event &e){
     ZoomBy(e.wheel.y>0 ? 1.1f : 1.0f/1.1f, lastMx - x);
 }
 void Timeline::mouse_button_up(SDL_Event &e){
-    // TAP en los numeros (down sin arrastre): recien aca fijamos el frame. Asi un 2do dedo (zoom) pudo cancelar
-    // el scrub antes de soltar y el frame NO se movio. Si hubo arrastre ya se fue seteando en event_mouse_motion.
-    if (scrubbing) SetFrameFromX(lastMx - x);
-    // CLICK de MOUSE en el CUERPO (down+up SIN arrastre): salta el frame actual a donde se clickeo.
-    // Con TOUCH no (which = SDL_TOUCH_MOUSEID): el dedo panea, y un tap no debe mover el playhead.
-    else if (panning && e.button.which != SDL_TOUCH_MOUSEID){
-        int ddx = lastMx - pressMx; if (ddx < 0) ddx = -ddx;
-        int ddy = lastMy - pressMy; if (ddy < 0) ddy = -ddy;
-        if (ddx + ddy < 4 * GlobalScale) SetFrameFromX(lastMx - x);
-    }
+    (void)e;
+    // el frame YA se fijo en el DOWN + el arrastre (scrub); al soltar solo se limpia el estado.
     scrubbing=false; panning=false; ViewPortClickDown=false; g_redraw=true;
 }
 void Timeline::event_key_down(SDL_Event &e){

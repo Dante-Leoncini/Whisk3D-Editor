@@ -98,6 +98,11 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         GroupPropertie* propCamera;  // pestania de camara: target (look-at)
         GroupPropertie* propInstance;// pestania de instance/array/mirror: target
         GroupPropertie* propRender;  // pestania RENDER: tarjeta "Render" (output)
+        GroupPropertie* propAnimation; // pestania RENDER: tarjeta "Animation" (selector + New/Delete + Render Animation)
+        PropButton* propBtnAnimSel;    // dropdown: animacion ACTIVA (Scene(s) / clips del armature seleccionado)
+        PropButtonRow* propRowAnimNewDel; // fila: New | Delete (Delete oculto si no hay nada que borrar)
+        PropButton* propBtnAnimRename; // "Rename" de la animacion activa (escena o clip)
+        PropButton* propBtnAnimRender; // "Render Animation" (gris si no hay animaciones)
         GroupPropertie* propExport;  // pestania RENDER: tarjeta "Export" (.obj)
         // pestania VERTICES (icono mesh): 3 tarjetas. Las listas REUSAN PropListMeshParts (modo 1/2).
         GroupPropertie* propEditItem;   // EDIT MODE: tarjeta "Transform" con X/Y/Z del centro (pivote) de la seleccion

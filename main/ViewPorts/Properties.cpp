@@ -313,9 +313,12 @@ static void AccionRenameAnim(){
 // NOMBRE del objeto: el campo propNameObj muestra ObjActivo->name (cuando NO se edita) y, al perder el foco,
 // escribe lo tipeado (uniquificado) en ObjActivo->name. Se llama por frame desde RefreshTargetProperties.
 static std::string* g_nameEditTarget = NULL; // != NULL mientras se edita el nombre (captura el destino al enfocar)
-static void SincronizarNombreObjeto(){
-    if (!PropsActivo || !PropsActivo->propNameObj) return;
-    PropText* pt = PropsActivo->propNameObj;
+static void SincronizarNombreObjeto(Properties* p){
+    // usa el panel que se esta renderizando (this), NO el global PropsActivo: al arrancar PropsActivo es NULL hasta
+    // el 1er click, y el campo Name quedaba vacio hasta el 1er hover. Como esto corre ANTES de dibujar los campos
+    // (RefreshTargetProperties al inicio de Render), el nombre ya se ve en el primer frame.
+    if (!p || !p->propNameObj) return;
+    PropText* pt = p->propNameObj;
     bool foco = (g_textFieldActivo == &pt->field);
     if (foco && !g_nameEditTarget && ObjActivo) g_nameEditTarget = &ObjActivo->name; // empezo a editar este nombre
     if (!foco && g_nameEditTarget){                                                  // termino -> commit uniquificado
@@ -323,7 +326,10 @@ static void SincronizarNombreObjeto(){
         *g_nameEditTarget = UniqObjeto(pt->field.text, g_nameEditTarget);
         g_nameEditTarget = NULL;
     }
-    if (!foco && ObjActivo) pt->field.SetText(ObjActivo->name); // sync display cuando NO se edita
+    // sync display cuando NO se edita. Solo si CAMBIO (sino redibuja infinito) + pide un redraw: el loop es
+    // event-driven, sin esto el campo quedaba vacio al arrancar (se seteaba para el frame siguiente que no llegaba
+    // hasta el 1er hover). Con el g_redraw se muestra el nombre apenas arranca.
+    if (!foco && ObjActivo && pt->field.text != ObjActivo->name){ pt->field.SetText(ObjActivo->name); g_redraw = true; }
 }
 
 // nombre corto de una textura (el archivo, sin la ruta)
@@ -899,46 +905,60 @@ static void ActualizarAspectoRender(){
     g_renderAspect = (h > 0.5f) ? (w / h) : 1.0f;
 }
 
-// hace el render REAL (llamado directo, o desde el "Si" de la confirmacion de sobrescritura).
+// pases activos a guardar: beauty (siempre) + los tildados (zbuffer/normal/alpha)
+static int PasesActivos(){
+    return 1 + (PropsActivo->renderZbuffer?1:0) + (PropsActivo->renderNormal?1:0) + (PropsActivo->renderAlpha?1:0);
+}
+// rendea los pases de UN frame, avanzando la barra de progreso desde 'progBase' hacia 'progTotal' (contados en
+// TILES). Devuelve cuantos tiles consumio (para que el caller acumule el base entre frames). Suma a 'fallos'.
+// El 'total' NO se resetea aca -> Render Image usa 1 frame; Render Animation usa frames x pases x tiles.
+static int RenderPasesFrame(Viewport3D* vp, int w, int h, int progBase, int progTotal, int& fallos){
+    bool doZ = PropsActivo->renderZbuffer, doN = PropsActivo->renderNormal, doA = PropsActivo->renderAlpha;
+    int tpp = vp->TilesNecesarios(w, h);
+    // Subdivision (y cualquier modificador con nivel de render): regenerar con el nivel de RENDER antes de renderizar
+    extern bool g_modRenderMode;
+    g_modRenderMode = true; RegenerarModsEscena(SceneCollection);
+    int base = progBase;
+    if (!vp->RenderAPNG(w, h, RenderType::Rendered, RenderFileNamePNG("").c_str(), base, progTotal)) fallos++;
+    base += tpp;
+    if (doZ){ if (!vp->RenderAPNG(w, h, RenderType::ZBuffer,    RenderFileNamePNG("zbuffer").c_str(), base, progTotal)) fallos++; base += tpp; }
+    if (doN){ if (!vp->RenderAPNG(w, h, RenderType::NormalView, RenderFileNamePNG("normal").c_str(),  base, progTotal)) fallos++; base += tpp; }
+    if (doA){ if (!vp->RenderAPNG(w, h, RenderType::Alpha,      RenderFileNamePNG("alpha").c_str(),   base, progTotal)) fallos++; base += tpp; }
+    g_modRenderMode = false; RegenerarModsEscena(SceneCollection); // volver al nivel de VIEWPORT
+    return base - progBase; // tiles consumidos por este frame (nPases * tpp)
+}
+
+// hace el render REAL de UNA imagen (llamado directo, o desde el "Si" de la confirmacion de sobrescritura).
 static void HacerRenderImage(){
     if (!PropsActivo) return;
     Viewport3D* vp = Viewport3DActive;
     if (!vp) { Notificar("No active 3D viewport", true); return; }
     int w = (int)(PropsActivo->renderW + 0.5f); if (w < 1) w = 1;
     int h = (int)(PropsActivo->renderH + 0.5f); if (h < 1) h = 1;
-
-    // barra de progreso 0..100%: total = PASES x TILES (frames = 1 en Render Image; la animacion sera x frames).
-    bool doZ = PropsActivo->renderZbuffer, doN = PropsActivo->renderNormal, doA = PropsActivo->renderAlpha;
-    int nPases = 1 + (doZ?1:0) + (doN?1:0) + (doA?1:0); // beauty siempre + los tildados
-    int tpp    = vp->TilesNecesarios(w, h);
-    int total  = nPases * tpp;
-
-    // Subdivision (y cualquier modificador con nivel de render): regenerar con el nivel de RENDER antes de renderizar
-    extern bool g_modRenderMode;
-    g_modRenderMode = true; RegenerarModsEscena(SceneCollection);
-
+    int total = PasesActivos() * vp->TilesNecesarios(w, h); // 1 frame: PASES x TILES
     ProgresoIniciar("Rendering...");
-    int fallos = 0, base = 0;
-    if (!vp->RenderAPNG(w, h, RenderType::Rendered, RenderFileNamePNG("").c_str(), base, total)) fallos++;
-    base += tpp;
-    if (doZ){ if (!vp->RenderAPNG(w, h, RenderType::ZBuffer,    RenderFileNamePNG("zbuffer").c_str(), base, total)) fallos++; base += tpp; }
-    if (doN){ if (!vp->RenderAPNG(w, h, RenderType::NormalView, RenderFileNamePNG("normal").c_str(),  base, total)) fallos++; base += tpp; }
-    if (doA){ if (!vp->RenderAPNG(w, h, RenderType::Alpha,      RenderFileNamePNG("alpha").c_str(),   base, total)) fallos++; base += tpp; }
+    int fallos = 0;
+    RenderPasesFrame(vp, w, h, 0, total, fallos);
     ProgresoFin();
-
-    g_modRenderMode = false; RegenerarModsEscena(SceneCollection); // volver al nivel de VIEWPORT
-
     if (fallos == 0) Notificar("Render saved!", false);
     else             Notificar("Error: could not save the render", true);
 }
 // boton "Render Image": arma Path + File name; si el PNG (pase beauty) ya existe, pide confirmacion.
-// FPS de reproduccion de animaciones (pestania Render): espejo float del global AnimFPS
-static float g_animFpsF = 30.0f;
-static PropFloat* gPropAnimFps = NULL; // el campo "FPS" (para sincronizar su display con AnimFPS)
-static void AccionAnimFps(){ int f = (int)(g_animFpsF + 0.5f); if (f < 1) f = 1; if (f > 120) f = 120; AnimFPS = f; g_animFpsF = (float)f; }
-// el campo FPS SIEMPRE refleja el AnimFPS real (que el import cambia al fps del archivo). Sin esto, el campo
-// mostraba 30 pero se reproducia a 24 -> "no se que pasa". Lo llama RefreshTargetProperties cada frame.
-void SincronizarAnimFps(){ if (gPropAnimFps && g_propFloatEditando != gPropAnimFps) g_animFpsF = (float)AnimFPS; }
+// Start / End / FPS de la animacion (tarjeta Animation): espejos float de los int globales StartFrame/EndFrame/AnimFPS
+static float g_animFpsF = 30.0f, g_animStartF = 1.0f, g_animEndF = 250.0f;
+static PropFloat* gPropAnimFps = NULL;   // campo "FPS"
+static PropFloat* gPropAnimStart = NULL; // campo "Start"
+static PropFloat* gPropAnimEnd = NULL;   // campo "End"
+static void AccionAnimFps(){ int f = (int)(g_animFpsF + 0.5f); if (f < 1) f = 1; if (f > 120) f = 120; AnimSetFps(f); g_animFpsF = (float)f; }
+static void AccionAnimStart(){ int v = (int)(g_animStartF + 0.5f); if (v < 0) v = 0; AnimSetStart(v); }
+static void AccionAnimEnd(){ int v = (int)(g_animEndF + 0.5f); if (v < 1) v = 1; AnimSetEnd(v); }
+// los campos SIEMPRE reflejan los globales reales (que el import / el timeline cambian). Sin esto el display
+// mostraba 30 pero se reproducia a 24. Lo llama RefreshTargetProperties cada frame (salvo el campo en edicion).
+void SincronizarAnimFps(){
+    if (gPropAnimFps   && g_propFloatEditando != gPropAnimFps)   g_animFpsF   = (float)AnimFPS;
+    if (gPropAnimStart && g_propFloatEditando != gPropAnimStart) g_animStartF = (float)StartFrame;
+    if (gPropAnimEnd   && g_propFloatEditando != gPropAnimEnd)   g_animEndF   = (float)EndFrame;
+}
 static void AccionRenderImage(){
     if (!PropsActivo) return;
     if (!Viewport3DActive) { Notificar("No active 3D viewport", true); return; }
@@ -952,6 +972,44 @@ static void AccionRenderImage(){
     }
 #endif
     HacerRenderImage();
+}
+
+// "Render Animation": rendea la SECUENCIA de PNGs de StartFrame..EndFrame (loop del timeline). Cada frame evalua la
+// animacion (esqueleto + transform de objetos) y guarda base_0001.png, base_0002.png, ... (RenderFileNamePNG usa
+// CurrentFrame). Se restaura el frame al terminar.
+static void HacerRenderAnimation(){
+    if (!PropsActivo || !Viewport3DActive) return;
+    Viewport3D* vp = Viewport3DActive;
+    extern int CurrentFrame, StartFrame, EndFrame;
+    extern void ReloadAnimation(); extern void AplicarAnimacionObjetos();
+    int w = (int)(PropsActivo->renderW + 0.5f); if (w < 1) w = 1;
+    int h = (int)(PropsActivo->renderH + 0.5f); if (h < 1) h = 1;
+    int f0 = StartFrame, f1 = EndFrame; if (f1 < f0){ int t=f0; f0=f1; f1=t; }
+    int nFrames = f1 - f0 + 1;
+    // barra de progreso UNICA para TODA la secuencia: total = FRAMES x PASES x TILES. Cada imagen (frame+pase)
+    // es una fraccion del total -> 50 frames x 2 pases = 100 imagenes, cada una ~1%. (Antes iba 0..100 por frame.)
+    int total = nFrames * PasesActivos() * vp->TilesNecesarios(w, h);
+    int guardado = CurrentFrame;
+    CalcularRenderBase();
+    ProgresoIniciar("Rendering animation...");
+    int fallos = 0, base = 0;
+    for (int f = f0; f <= f1; f++){
+        CurrentFrame = f;
+        ReloadAnimation();         // vertex/skeleton al frame f
+        AplicarAnimacionObjetos(); // transform de objetos al frame f
+        base += RenderPasesFrame(vp, w, h, base, total, fallos); // rendea el frame; avanza la barra GLOBAL
+    }
+    ProgresoFin();
+    CurrentFrame = guardado;
+    ReloadAnimation(); AplicarAnimacionObjetos(); // volver la escena al frame que estaba
+    if (fallos == 0) Notificar("Animation rendered!", false);
+    else             Notificar("Error rendering animation", true);
+    g_redraw = true;
+}
+static void AccionRenderAnimation(){
+    if (!PropsActivo) return;
+    if (!Viewport3DActive) { Notificar("No active 3D viewport", true); return; }
+    HacerRenderAnimation();
 }
 
 // === pestaña VERTICES: helpers + acciones (UV Maps + capas de color) ===
@@ -977,6 +1035,92 @@ static void AccionAnimAdd()  { Armature* a = ArmActiva(); if (a) { CrearAnimacio
 static void AccionAnimDel()  { Armature* a = ArmActiva(); if (a) { BorrarAnimacionActiva(a);  PropertiesLayoutDirty = true; g_redraw = true; } }
 static void AccionAnimUp()   { Armature* a = ArmActiva(); if (a) { MoverAnimacionActiva(a,-1); PropertiesLayoutDirty = true; g_redraw = true; } }
 static void AccionAnimDown() { Armature* a = ArmActiva(); if (a) { MoverAnimacionActiva(a,+1); PropertiesLayoutDirty = true; g_redraw = true; } }
+
+// ===== tarjeta ANIMATION: selector de la animacion ACTIVA (Scene(s) / clips del armature seleccionado) + New/Delete
+// + Rename + Render Animation. La seleccion es APP-WIDE (ActiveAnimKind/ActiveAnimArm/SceneAnimActiva en el core): la
+// comparten esta card y el Timeline, y NO depende del objeto seleccionado (clickear un armature no la cambia). =====
+// El menu del selector es JERARQUICO (sino un esqueleto con 200 clips seria inmanejable): un submenu "Scenes" con
+// todas las animaciones de escena, y un submenu por ARMADURA (con el nombre del esqueleto) con SUS clips. Asi las
+// animaciones de todas las armaduras estan disponibles sin tener que seleccionar el objeto.
+// ids: [0..) = escena; [BASE + armIdx*STRIDE + clipIdx] = clip. armIdx indexa g_animMenuArms (llenado al construir).
+static const int ANIM_CLIP_BASE = 100000;
+static const int ANIM_CLIP_STRIDE = 1000; // hasta 1000 clips por armadura
+static std::vector<PopupMenu*> g_animSubmenus; // pool reutilizable (0 = Scenes, 1.. = por armadura); persiste entre aperturas
+static std::vector<Armature*>  g_animMenuArms; // armaduras (con clips) en el orden del menu, para decodificar el id
+static std::string NombreAnimActiva(){
+    if (ActiveAnimKind == 1 && ActiveAnimArm &&
+        ActiveAnimArm->animActiva >= 0 && ActiveAnimArm->animActiva < (int)ActiveAnimArm->animations.size() &&
+        ActiveAnimArm->animations[ActiveAnimArm->animActiva])
+        return ActiveAnimArm->animations[ActiveAnimArm->animActiva]->name;
+    return NombreEscenaActiva();
+}
+static void RecolectarArmaduras(Object* nodo, std::vector<Armature*>& out){
+    if (!nodo) return;
+    for (size_t i=0;i<nodo->Childrens.size();i++){ Object* o=nodo->Childrens[i]; if(!o) continue;
+        if (o->getType()==ObjectType::armature) out.push_back((Armature*)o);
+        RecolectarArmaduras(o, out); }
+}
+static PopupMenu* AnimSubmenuPool(size_t i){ while (g_animSubmenus.size() <= i) g_animSubmenus.push_back(new PopupMenu()); return g_animSubmenus[i]; }
+// construye el menu jerarquico en 'menu' (lo comparten la tarjeta y el timeline). El id de los items bubbles hasta
+// menu->action (ver PopupMenu::Click), asi que los submenus heredan la misma action.
+void ConstruirMenuAnim(PopupMenu* menu){
+    menu->Limpiar();
+    InitSceneAnimations();
+    PopupMenu* subEsc = AnimSubmenuPool(0); subEsc->Limpiar(); subEsc->action = menu->action; // submenu "Scenes"
+    for (size_t i=0;i<SceneAnimations.size();i++) subEsc->Agregar(SceneAnimations[i]->name, (int)i, IconType::camera);
+    menu->Agregar("Scenes", 0, IconType::camera, subEsc);
+    g_animMenuArms.clear();                                                   // un submenu por armadura CON clips
+    std::vector<Armature*> todas; RecolectarArmaduras(SceneCollection, todas);
+    for (size_t t=0;t<todas.size();t++){
+        Armature* arm = todas[t]; if (arm->animations.empty()) continue;      // sin clips no aporta al selector
+        int a = (int)g_animMenuArms.size(); g_animMenuArms.push_back(arm);
+        PopupMenu* sub = AnimSubmenuPool(a+1); sub->Limpiar(); sub->action = menu->action;
+        for (size_t c=0;c<arm->animations.size();c++)
+            sub->Agregar(arm->animations[c] ? arm->animations[c]->name : std::string("Animation"),
+                         ANIM_CLIP_BASE + a*ANIM_CLIP_STRIDE + (int)c, IconType::armature);
+        menu->Agregar(arm->name, 0, IconType::armature, sub);
+    }
+}
+// aplica la seleccion segun el id del menu (escena o clip de una armadura). La comparten la card y el timeline.
+void AnimSelPorId(int id){
+    if (id >= ANIM_CLIP_BASE){
+        int k = id - ANIM_CLIP_BASE, armIdx = k / ANIM_CLIP_STRIDE, clipIdx = k % ANIM_CLIP_STRIDE;
+        if (armIdx >= 0 && armIdx < (int)g_animMenuArms.size()){
+            Armature* a = g_animMenuArms[armIdx];
+            if (a && clipIdx >= 0 && clipIdx < (int)a->animations.size()){ ActiveAnimKind = 1; ActiveAnimArm = a; a->animActiva = clipIdx; }
+        }
+    } else { ActiveAnimKind = 0; SetEscenaActiva(id); }
+    AnimCargarRangoActivo(); // Start/End/FPS propios de la animacion elegida
+}
+static void AccionAnimSelElegida(int id){ AnimSelPorId(id); PropertiesLayoutDirty = true; g_redraw = true; }
+static PopupMenu* MenuAnimSel = NULL;
+static void AccionMenuAnimSel(){
+    if (!PropsActivo || !PropsActivo->propBtnAnimSel) return;
+    if (!MenuAnimSel){ MenuAnimSel = new PopupMenu(); MenuAnimSel->action = AccionAnimSelElegida; }
+    ConstruirMenuAnim(MenuAnimSel);
+    AbrirMenuBajoBoton(MenuAnimSel, PropsActivo->propBtnAnimSel->button);
+}
+static void AccionAnimNewCard(){
+    if (ActiveAnimKind == 1 && ActiveAnimArm) CrearAnimacion(ActiveAnimArm); // nuevo clip del armature activo
+    else { NuevaEscena(); ActiveAnimKind = 0; }                             // nueva animacion de ESCENA
+    AnimCargarRangoActivo(); // la animacion nueva arranca con su rango/fps por defecto
+    PropertiesLayoutDirty = true; g_redraw = true;
+}
+static void AccionAnimDelCard(){
+    if (ActiveAnimKind == 1 && ActiveAnimArm){
+        BorrarAnimacionActiva(ActiveAnimArm);
+        if (ActiveAnimArm->animations.empty()){ ActiveAnimKind = 0; ActiveAnimArm = NULL; } // sin clips -> volver a escena
+    } else BorrarEscenaActiva();
+    AnimCargarRangoActivo(); // cargar el rango/fps de la animacion que quedo activa
+    PropertiesLayoutDirty = true; g_redraw = true;
+}
+static void AccionAnimRenameCard(){                                          // renombra la animacion activa in-place
+    if (!PropsActivo || !PropsActivo->propBtnAnimRename) return;
+    if (ActiveAnimKind == 1 && ActiveAnimArm &&
+        ActiveAnimArm->animActiva >= 0 && ActiveAnimArm->animActiva < (int)ActiveAnimArm->animations.size())
+        RenameIniciar(PropsActivo->propBtnAnimRename->button, &ActiveAnimArm->animations[ActiveAnimArm->animActiva]->name, UniqAnim);
+    else { InitSceneAnimations(); RenameIniciar(PropsActivo->propBtnAnimRename->button, &SceneAnimations[SceneAnimActiva]->name); }
+}
 // ARMATURE / Pose Mode: transform del HUESO activo. Los campos PropFloat escriben en estos mirrors; el callback los
 // vuelca a restT/restR/restS del hueso (la pose de rest, que es la que se ve cuando el clip activo no anima ese hueso).
 static float g_bonePosX=0, g_bonePosY=0, g_bonePosZ=0;
@@ -1227,13 +1371,7 @@ void Properties::ConstruirGrupos(){
     propRenderH->stepFino = 1.0f; propRenderH->stepGrueso = 16.0f; propRenderH->dragStep = 1.0f;
     propRenderH->value = &renderH; propRenderH->onChange = ActualizarAspectoRender;
     propRender->properties.push_back(propRenderH);
-    // FPS de reproduccion de las animaciones (default 30). La UI puede ir a 60; el frame se repite sin recalcular.
-    { PropFloat* propFps = new PropFloat("FPS");
-      propFps->SetRango(1.0f, 120.0f); propFps->entero = true;
-      propFps->stepFino = 1.0f; propFps->stepGrueso = 5.0f; propFps->dragStep = 1.0f;
-      g_animFpsF = (float)AnimFPS; propFps->value = &g_animFpsF; propFps->onChange = AccionAnimFps;
-      gPropAnimFps = propFps; // para sincronizar el display con AnimFPS
-      propRender->properties.push_back(propFps); }
+    // (el FPS de reproduccion se movio a la tarjeta Animation, junto a Start/End)
     // pases EXTRA a exportar (el beauty/render siempre se guarda). Nombre: base_zbuffer_0001.png, etc.
     renderZbuffer = false; renderNormal = false; renderAlpha = false;
     propRenderZbuffer = new PropBool("ZBuffer"); propRenderZbuffer->value = &renderZbuffer;
@@ -1250,8 +1388,44 @@ void Properties::ConstruirGrupos(){
     PropButton* pbRenderImg = new PropButton("Render Image", IconType::textura); // icono de textura (imagen)
     pbRenderImg->action = AccionRenderImage;
     propRender->properties.push_back(pbRenderImg);
-    propRender->properties.push_back(new PropButton("Render Animation", IconType::camera)); // icono de camara; TODO: loop StartFrame..EndFrame
     GroupProperties.push_back(propRender);
+
+    // tarjeta "Animation" (pestania Render): selector de la animacion ACTIVA (Scene(s) / clips del armature) + Start/End/
+    // FPS + New|Delete + Rename + Render Animation (rendea la SECUENCIA StartFrame..EndFrame). Delete se oculta sin nada
+    // que borrar y Render se grisa sin animaciones.
+    propAnimation = new GroupPropertie("Animation");
+    propAnimation->anchoValores = 0.55f; // Start/End/FPS son campos numericos: mas lugar al valor
+    propBtnAnimSel = new PropButton("Scene", IconType::camera); // dropdown: animacion activa (Scene por defecto)
+    propBtnAnimSel->button->desplegable = true;
+    propBtnAnimSel->button->caretMenu = true; // aca SI conviene la flechita (no es obvio que es un selector)
+    propBtnAnimSel->action = AccionMenuAnimSel;
+    propAnimation->properties.push_back(propBtnAnimSel);
+    // Start / End / FPS de la animacion (espejos float de los int StartFrame/EndFrame/AnimFPS)
+    { PropFloat* pS = new PropFloat("Start");
+      pS->SetRango(0.0f, 100000.0f); pS->entero = true; pS->stepFino = 1.0f; pS->stepGrueso = 10.0f; pS->dragStep = 1.0f;
+      g_animStartF = (float)StartFrame; pS->value = &g_animStartF; pS->onChange = AccionAnimStart; gPropAnimStart = pS;
+      propAnimation->properties.push_back(pS); }
+    { PropFloat* pE = new PropFloat("End");
+      pE->SetRango(1.0f, 100000.0f); pE->entero = true; pE->stepFino = 1.0f; pE->stepGrueso = 10.0f; pE->dragStep = 1.0f;
+      g_animEndF = (float)EndFrame; pE->value = &g_animEndF; pE->onChange = AccionAnimEnd; gPropAnimEnd = pE;
+      propAnimation->properties.push_back(pE); }
+    { PropFloat* pF = new PropFloat("FPS");
+      pF->SetRango(1.0f, 120.0f); pF->entero = true; pF->stepFino = 1.0f; pF->stepGrueso = 5.0f; pF->dragStep = 1.0f;
+      g_animFpsF = (float)AnimFPS; pF->value = &g_animFpsF; pF->onChange = AccionAnimFps; gPropAnimFps = pF;
+      propAnimation->properties.push_back(pF); }
+    // New | Delete en UNA fila
+    propRowAnimNewDel = new PropButtonRow();
+    propRowAnimNewDel->Agregar("New", AccionAnimNewCard, IconType::armature);
+    propRowAnimNewDel->Agregar("Delete", AccionAnimDelCard);
+    propAnimation->properties.push_back(propRowAnimNewDel);
+    // Rename de la animacion activa (escena o clip): el boton se vuelve input in-place
+    propBtnAnimRename = new PropButton("Rename", -1);
+    propBtnAnimRename->action = AccionAnimRenameCard;
+    propAnimation->properties.push_back(propBtnAnimRename);
+    propBtnAnimRender = new PropButton("Render Animation", IconType::foto);
+    propBtnAnimRender->action = AccionRenderAnimation;
+    propAnimation->properties.push_back(propBtnAnimRender);
+    GroupProperties.push_back(propAnimation);
 
     propExport = new GroupPropertie("Export");
     propExport->anchoValores = 0.62f;
@@ -1656,7 +1830,7 @@ void Properties::RefreshTargetProperties(){
         PropertiesLayoutDirty = false;
         Resize(width, height); // tambien recalcula la scrollbar
     }
-    SincronizarNombreObjeto(); // el campo "Name": muestra el nombre del objeto y commitea lo editado al perder foco
+    SincronizarNombreObjeto(this); // el campo "Name": muestra el nombre del objeto y commitea lo editado al perder foco
     if (!ObjActivo) {
         if (target) {
             target = NULL;
@@ -1847,7 +2021,25 @@ void Properties::ActualizarPestanias(){
     // visible con la pestania activa, con o sin seleccion. El export OBJ SI depende de la seleccion (sin objeto
     // no hay nada que exportar).
     if (propRender)    propRender->visible    = (pestaniaActiva == 0);
+    if (propAnimation) propAnimation->visible = (pestaniaActiva == 0); // tarjeta Animation: global, como Render
     if (propExport)    propExport->visible    = (pestaniaActiva == 0 && ObjActivo != NULL);
+    // tarjeta Animation: el dropdown muestra la animacion activa (icono camara=escena / esqueleto=clip); Delete se
+    // OCULTA cuando no hay nada que borrar; Render se GRISA sin animaciones. New y Rename siempre visibles.
+    if (propAnimation && pestaniaActiva == 0){
+        InitSceneAnimations();
+        Armature* aSel = ArmActiva();
+        int nClips = aSel ? (int)aSel->animations.size() : 0;
+        bool clipActivo = (ActiveAnimKind == 1 && ActiveAnimArm);
+        bool hayAnim = (nClips > 0) || !AnimationObjects.empty() || SceneAnimations.size() > 1;
+        if (propBtnAnimSel && propBtnAnimSel->button){
+            propBtnAnimSel->button->text = NombreAnimActiva();
+            propBtnAnimSel->button->icon = clipActivo ? (int)IconType::armature : (int)IconType::camera;
+        }
+        // Delete visible si hay un clip activo, o mas de una escena, o la escena activa tiene keyframes (algo que borrar)
+        if (propRowAnimNewDel && propRowAnimNewDel->botones.size() >= 2)
+            propRowAnimNewDel->botones[1]->visible = clipActivo || SceneAnimations.size() > 1 || !AnimationObjects.empty();
+        if (propBtnAnimRender) propBtnAnimRender->gris = !hayAnim; // sin animaciones -> gris (no rendea)
+    }
     if (propTransform) propTransform->visible = (pestaniaActiva == 1);
     if (propMeshParts) propMeshParts->visible = (pestaniaActiva == 2 && esMesh);
     if (propMaterial)  propMaterial->visible  = (pestaniaActiva == 2 && esMesh);
@@ -2905,6 +3097,10 @@ void Properties::ClickEn(int mx, int my) {
                     else if (prop->GetType() == PropertyType::Text) {
                         PropText* pt = static_cast<PropText*>(prop);
                         if (pt->onClick) { pt->onClick(); return; } // campo "Path": al clickear abre el explorador (no se edita)
+                        // el campo "Name" se sincroniza con ObjActivo->name solo cuando NO esta enfocado (ver
+                        // SincronizarNombreObjeto). Si se clickea el mismo frame en que se reconstruyo el panel, el
+                        // campo todavia esta vacio -> lo poblamos ACA (al empezar a editar) con el nombre actual.
+                        if (pt == propNameObj && ObjActivo) pt->field.SetText(ObjActivo->name);
                         prop->EditPropertie(); // ENFOCA la caja: el texto entra por SDL_TEXTINPUT
 #ifdef __EMSCRIPTEN__
                         if (g_uiTapEnCurso) SDL_StartTextInput(); // solo en TAP tactil: levanta el teclado del celu

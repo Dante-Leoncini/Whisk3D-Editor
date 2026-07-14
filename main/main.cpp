@@ -588,6 +588,9 @@ static void MainLoopFrame() {
         // Actualizar frame
         ReloadAnimation();
     }
+    // ANIMACION DE OBJETOS (transform pos/rot/escala): aplica los keyframes al frame actual (play o scrub del timeline).
+    // Guard interno: solo trabaja al CAMBIAR de frame -> editar/keyframear un objeto en un frame fijo no lo resnapea.
+    { extern void AplicarAnimacionObjetos(); AplicarAnimacionObjetos(); }
 
     // notificaciones (toasts): corre el timer (las de exito se cierran solas) y
     // mantiene vivo el render mientras haya alguna de exito activa

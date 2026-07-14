@@ -214,12 +214,30 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
                N, a->pos.x,a->pos.y,a->pos.z, a->scale.x, a->skinUsaBind?1:0);
         printf("      [armdump] FK-rest bbox=(%.1f,%.1f,%.1f)..(%.1f,%.1f,%.1f)  TL bbox=(%.1f,%.1f,%.1f)..(%.1f,%.1f,%.1f)\n",
                fmn.x,fmn.y,fmn.z,fmx.x,fmx.y,fmx.z, tmn.x,tmn.y,tmn.z,tmx.x,tmx.y,tmx.z);
-        int lim = N<16?N:16;
+        int lim = N<12?N:12;
         for (int i=0;i<lim;i++){ W3dBone& b=a->bones[i];
             Vector3 tl(b.bind.m[12],b.bind.m[13],b.bind.m[14]);
             printf("      [armdump] %2d p=%2d restR=(%.0f,%.0f,%.0f) restT=(%.1f,%.1f,%.1f) FK=(%.1f,%.1f,%.1f) TL=(%.1f,%.1f,%.1f) '%s'\n",
                 i, b.parent, b.restR.x,b.restR.y,b.restR.z, b.restT.x,b.restT.y,b.restT.z,
                 b.poseHead.x,b.poseHead.y,b.poseHead.z, tl.x,tl.y,tl.z, b.name.c_str()); }
+        // escala de las columnas de tlNode / restLcl de un hueso medio -> ver escala bakeada (rompe el delta)
+        if (N > 3){ W3dBone& b=a->bones[3];
+            float ts0=Vector3(b.tlNode.m[0],b.tlNode.m[1],b.tlNode.m[2]).Length(), ts1=Vector3(b.tlNode.m[4],b.tlNode.m[5],b.tlNode.m[6]).Length(), ts2=Vector3(b.tlNode.m[8],b.tlNode.m[9],b.tlNode.m[10]).Length();
+            printf("      [armdump] reconstruirFK=%d  tlNode[3] escCols=(%.3f,%.3f,%.3f)  restS[3]=(%.3f,%.3f,%.3f)\n",
+                a->skinReconstruirFK?1:0, ts0,ts1,ts2, b.restS.x,b.restS.y,b.restS.z);
+        }
+        // FRAME ANIMADO: evaluar con el clip a un frame medio -> ver si el FK se DISPARA al animar (bbox gigante)
+        if (save >= 0){
+            a->lastPoseFrame=-999999; EvaluarPoseEsqueleto(a, 8);
+            Vector3 amn(1e9f,1e9f,1e9f), amx(-1e9f,-1e9f,-1e9f); float worst=0; int worstB=-1;
+            for (int i=0;i<N;i++){ W3dBone& b=a->bones[i]; if(!b.hasSkin) continue; Vector3 fk=b.poseHead;
+                if(fk.x<amn.x)amn.x=fk.x; if(fk.y<amn.y)amn.y=fk.y; if(fk.z<amn.z)amn.z=fk.z;
+                if(fk.x>amx.x)amx.x=fk.x; if(fk.y>amx.y)amx.y=fk.y; if(fk.z>amx.z)amx.z=fk.z;
+                if(fk.Length()>worst){worst=fk.Length();worstB=i;} }
+            printf("      [armdump] FRAME 8 (animado) FK bbox=(%.0f,%.0f,%.0f)..(%.0f,%.0f,%.0f)  peor=%.0f (%s)\n",
+                   amn.x,amn.y,amn.z,amx.x,amx.y,amx.z, worst, (worstB>=0)?a->bones[worstB].name.c_str():"-");
+            a->lastPoseFrame=-999999;
+        }
         return true;
     }
     // ---- posekey : posa el hueso 5 (poseR=Y45), inserta keyframe en frame 10, re-evalua y verifica el roundtrip ----
@@ -774,11 +792,13 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         return true;
     }
 
-    // ---- selectall / deselectall (seleccion de OBJETOS top-level, object mode) ----
+    // ---- selectall / deselectall (seleccion RECURSIVA de objetos, object mode) ----
     if (cmd == "selectall" || cmd == "deselectall") {
         DeseleccionarTodo();
-        if (cmd == "selectall" && SceneCollection)
-            for (size_t i = 0; i < SceneCollection->Childrens.size(); i++) SceneCollection->Childrens[i]->Seleccionar();
+        if (cmd == "selectall" && SceneCollection) {
+            std::vector<Object*> st; for (size_t i=0;i<SceneCollection->Childrens.size();i++) st.push_back(SceneCollection->Childrens[i]);
+            for (size_t k=0;k<st.size();k++){ st[k]->Seleccionar(); for (size_t i=0;i<st[k]->Childrens.size();i++) st.push_back(st[k]->Childrens[i]); }
+        }
         return true;
     }
 
@@ -802,10 +822,40 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         return true;
     }
 
-    // ---- delete (borra los objetos seleccionados; object mode) -> testea el undo de borrado ----
+    // ---- objkeytest : keyframea la 1ra malla en frame 1 (pos 0) y 20 (pos 10), interpola en frame 10 (~5) ----
+    if (cmd == "objkeytest") {
+        Object* o = NULL;
+        { std::vector<Object*> st; if(SceneCollection) st.push_back(SceneCollection);
+          while(!st.empty() && !o){ Object* n=st.back(); st.pop_back();
+            if (n->getType()==ObjectType::mesh) o=n;
+            for(size_t i=0;i<n->Childrens.size();i++) st.push_back(n->Childrens[i]); } }
+        if (!o) { err="objkeytest: sin malla"; return false; }
+        DeseleccionarTodo(); ObjActivo=o; o->Seleccionar(); ObjSelects.clear(); ObjSelects.push_back(o);
+        CurrentFrame=1;  o->pos=Vector3(0,0,0);   InsertarKeyframeObjeto();
+        CurrentFrame=20; o->pos=Vector3(10,0,0);  InsertarKeyframeObjeto();
+        CurrentFrame=10; o->pos=Vector3(999,999,999); // ensuciar -> el playback debe corregirlo a la interpolacion
+        AplicarAnimacionObjetos();
+        printf("      [objkeytest] frame10 pos=(%.2f,%.2f,%.2f)  (esperado ~4.7,0,0)\n", o->pos.x,o->pos.y,o->pos.z);
+        return true;
+    }
+    // ---- delete [col] (borra los seleccionados; 'col' incluye colecciones, como el outliner) -> testea undo de borrado ----
     if (cmd == "delete") {
         if (InteractionMode != ObjectMode) { err = "delete necesita Object Mode"; return false; }
-        Eliminar(false);
+        std::string sub; ss >> sub;
+        Eliminar(sub == "col");
+        return true;
+    }
+    // ---- colactive : reporta si CollectionActive esta viva en la escena (para el bug de borrar la coleccion default) ----
+    if (cmd == "colactive") {
+        bool viva = false;
+        if (CollectionActive && SceneCollection) {
+            std::vector<Object*> st; st.push_back(SceneCollection);
+            while (!st.empty() && !viva){ Object* o=st.back(); st.pop_back();
+                if (o == CollectionActive) viva = true;
+                for (size_t i=0;i<o->Childrens.size();i++) st.push_back(o->Childrens[i]); }
+        }
+        printf("      [colactive] CollectionActive=%p viva=%d (=Scene:%d)\n",
+               (void*)CollectionActive, viva?1:0, CollectionActive==SceneCollection?1:0);
         return true;
     }
 

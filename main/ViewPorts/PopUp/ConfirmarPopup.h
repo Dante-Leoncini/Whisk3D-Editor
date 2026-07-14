@@ -37,6 +37,6 @@ class ConfirmarPopup : public PopUpBase {
 extern ConfirmarPopup* confirmarPopup;
 
 // arma el mensaje "Borrar \"XXX\"?" (o "Borrar N objetos?") y abre el popup; Si -> borra (con undo). Object mode.
-void AbrirConfirmarBorrado();
+void AbrirConfirmarBorrado(bool incluirCollecciones = false);
 
 #endif // CONFIRMARPOPUP_H

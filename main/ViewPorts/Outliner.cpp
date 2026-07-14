@@ -7,6 +7,7 @@
 #include "WhiskUI/glesdraw.h"
 #include "objects/ObjectMode.h" // reparent del drag&drop
 #include "objects/Instance.h"   // IconoDeObjeto: array/mirror/instance segun el modo
+#include "ViewPorts/PopUp/ConfirmarPopup.h" // AbrirConfirmarBorrado (confirmar antes de borrar)
 #ifdef W3D_SYMBIAN
     #include <GLES/gl.h>
     extern int W3dPantallaAlto;  // alto de pantalla (flip de Y; glesdraw.cpp)
@@ -517,7 +518,7 @@ void Outliner::event_key_down(SDL_Event &e){
                 break;
             case SDLK_X:
                 if (estado == editNavegacion){
-                    Eliminar(true);
+                    AbrirConfirmarBorrado(true); // popup de confirmacion (incluye colecciones); Si -> borra con undo
                 }
                 break;
             case SDLK_LEFT:

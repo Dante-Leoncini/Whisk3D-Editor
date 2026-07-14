@@ -168,21 +168,22 @@ bool ConfirmarPopup::Tecla(int tecla) {
 
 // ----------------------------------------------------------------
 
-static void ConfirmarBorradoSi() { Eliminar(false); } // el borrado real (con su undo) al confirmar
+static void ConfirmarBorradoSi()    { Eliminar(false); } // el borrado real (con su undo) al confirmar
+static void ConfirmarBorradoSiCol() { Eliminar(true); }  // desde el outliner: incluye colecciones
 
-void AbrirConfirmarBorrado() {
+void AbrirConfirmarBorrado(bool incluirCollecciones) {
     if (InteractionMode != ObjectMode) return;          // Edit Mode tiene su propio menu Delete
-    if (!HayObjetosSeleccionados(false)) return;
+    if (!HayObjetosSeleccionados(incluirCollecciones)) return;
 
     int n = 0; Object* uno = NULL;
     for (size_t i = 0; i < ObjSelects.size(); i++)
         if (ObjSelects[i] && ObjSelects[i]->select) { n++; uno = ObjSelects[i]; }
-    if (n == 0) return;
 
     char buf[128];
     if (n == 1 && uno) sprintf(buf, "Delete \"%s\"?", uno->name.c_str());
-    else               sprintf(buf, "Delete %d objects?", n);
+    else if (n > 1)    sprintf(buf, "Delete %d objects?", n);
+    else               sprintf(buf, "Delete selected?"); // ej. una coleccion (no esta en ObjSelects)
 
     if (!confirmarPopup) confirmarPopup = new ConfirmarPopup();
-    confirmarPopup->Abrir(buf, ConfirmarBorradoSi);
+    confirmarPopup->Abrir(buf, incluirCollecciones ? ConfirmarBorradoSiCol : ConfirmarBorradoSi);
 }

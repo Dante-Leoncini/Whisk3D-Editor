@@ -204,6 +204,12 @@ Viewport3D::Viewport3D(Vector3 pos){
         MenuObject->Agregar("Set Parent",   0, -1, LayoutSubmenuSetParent())->atajo = "Ctrl P";
         MenuObject->Agregar("Clear Parent", 0, -1, LayoutSubmenuClearParent())->atajo = "Ctrl Alt P";
         MenuObject->Agregar("Delete", 3)->atajo = "X";
+        // submenu "Animation" (Object Mode): keyframes del TRANSFORM (pos/rot/escala) del objeto seleccionado
+        PopupMenu* MenuAnimObj = new PopupMenu();
+        MenuAnimObj->Agregar("Insert Keyframe", 510)->atajo = "I";
+        MenuAnimObj->Agregar("Delete Keyframe", 511);
+        MenuAnimObj->Agregar("Clear Keyframe",  512);
+        MenuObject->Agregar("Animation", 0, -1, MenuAnimObj);
         // menu "Pose" (Pose Mode): Insert Keyframe + submenu Transform (Move/Rotate/Scale). Reusa MenuTransform.
         extern PopupMenu* MenuPose;
         MenuPose = new PopupMenu();
@@ -2944,6 +2950,7 @@ void Viewport3D::event_key_down(SDL_Event &e){
                 // Pose Mode: I = Insert Keyframe (guarda la pose de los huesos seleccionados en el frame actual).
                 if (InteractionMode == PoseMode && !LCtrlPressed){ extern void PoseInsertKeyframe(); PoseInsertKeyframe(); }
                 else if (LCtrlPressed) InvertirSeleccion();  // Ctrl+I: invertir seleccion
+                else if (InteractionMode == ObjectMode){ extern void InsertarKeyframeObjeto(); InsertarKeyframeObjeto(); } // Object Mode: I = Insert Keyframe (transform)
                 break;
             case SDLK_D: {
                 if (LAltPressed){

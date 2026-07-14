@@ -334,7 +334,7 @@ class DeleteUndo : public UndoCmd {
     std::vector<RepEntry> reps;    // hijos de los borrados, reparentados al abuelo
     std::vector<RefEntry> refs;    // refs de mallas (modificador/skinArmature) a los objetos borrados -> limpiar/restaurar
     bool repsListos;               // las reps (y refs) se computan UNA vez (en el 1er detach)
-    std::vector<Object*>  selPrev; Object* actPrev; Camera* camPrev;
+    std::vector<Object*>  selPrev; Object* actPrev; Camera* camPrev; Object* colPrev; // CollectionActive previa
     bool enEscena; // true = los objetos estan en la escena; false = los tiene este comando (detachados)
     void QuitarHijo(Object* p, Object* c) {
         for (size_t k = 0; k < p->Childrens.size(); k++)
@@ -346,13 +346,21 @@ class DeleteUndo : public UndoCmd {
         if (!repsListos) {
             for (size_t i = 0; i < ents.size(); i++) { DelEntry& e = ents[i];
                 Vector3 gAbuelo = e.parent->GetGlobalPosition();
-                std::vector<Object*> kids = e.obj->Childrens; // snapshot (lo vamos a modificar)
-                for (size_t k = 0; k < kids.size(); k++) {
-                    Object* ch = kids[k];
-                    bool tambienBorrado = false;
-                    for (size_t j = 0; j < ents.size(); j++) if (ents[j].obj == ch) { tambienBorrado = true; break; }
-                    if (tambienBorrado) continue;
-                    RepEntry r; r.child = ch; r.abuelo = e.parent; r.borrado = e.obj;
+                // recorre el SUBARBOL del borrado: los descendientes NO seleccionados se PRESERVAN (reparent al abuelo);
+                // los SELECCIONADOS se borran con el (se baja a sus hijos). Antes reparentaba TODO hijo directo -> los
+                // hijos seleccionados (ej. las mallas de un armature al "borrar todo") sobrevivian en vez de borrarse.
+                std::vector<Object*> pila; for (size_t k = 0; k < e.obj->Childrens.size(); k++) pila.push_back(e.obj->Childrens[k]);
+                for (size_t k = 0; k < pila.size(); k++) {
+                    Object* ch = pila[k];
+                    bool esRoot = false;
+                    for (size_t j = 0; j < ents.size(); j++) if (ents[j].obj == ch) { esRoot = true; break; }
+                    if (esRoot) continue; // ya es su propio delete-root (no deberia caer dentro de otro subarbol)
+                    if (ch->select) { // seleccionado -> se borra con el subarbol; seguir bajando a sus hijos
+                        for (size_t j = 0; j < ch->Childrens.size(); j++) pila.push_back(ch->Childrens[j]);
+                        continue;
+                    }
+                    // NO seleccionado -> preservar: reparent al abuelo (no se recursea adentro; queda como estaba)
+                    RepEntry r; r.child = ch; r.abuelo = e.parent; r.borrado = ch->Parent ? ch->Parent : e.obj;
                     r.posBajoBorrado = ch->pos;
                     r.posBajoAbuelo  = ch->GetGlobalPosition() - gAbuelo; // preserva posicion global
                     reps.push_back(r);
@@ -382,11 +390,20 @@ class DeleteUndo : public UndoCmd {
             if (r.mod) r.mod->target = NULL; else if (r.mesh) r.mesh->skinArmature = NULL;
             if (r.mesh) r.mesh->lastSkinFrame = -999999;
         }
+        // 5) si CollectionActive quedo FUERA de la escena (se borro), reapuntarla a una coleccion valida (otra bajo la
+        //    escena, o la propia SceneCollection). Sin esto, Add Collection / Import parentan a memoria liberada
+        //    (no aparecen / crash). El undo la restaura (colPrev).
+        if (SceneCollection && (!CollectionActive || !EnSubarbol(SceneCollection, CollectionActive))) {
+            Object* c = NULL;
+            for (size_t i = 0; i < SceneCollection->Childrens.size() && !c; i++)
+                if (SceneCollection->Childrens[i]->getType() == ObjectType::collection) c = SceneCollection->Childrens[i];
+            CollectionActive = c ? c : SceneCollection;
+        }
         enEscena = false;
     }
 public:
-    DeleteUndo(bool incCol) : repsListos(false), actPrev(NULL), camPrev(NULL), enEscena(true) {
-        selPrev = ObjSelects; actPrev = ObjActivo; camPrev = CameraActive;
+    DeleteUndo(bool incCol) : repsListos(false), actPrev(NULL), camPrev(NULL), colPrev(NULL), enEscena(true) {
+        selPrev = ObjSelects; actPrev = ObjActivo; camPrev = CameraActive; colPrev = CollectionActive;
         if (SceneCollection) RecolectarBorrar(SceneCollection, incCol, ents);
         Detachar(); // el borrado YA paso: los saca de la escena (sin liberar)
     }
@@ -412,7 +429,7 @@ public:
             if (r.mod) r.mod->target = r.target; else if (r.mesh) r.mesh->skinArmature = (Armature*)r.target;
             if (r.mesh) r.mesh->lastSkinFrame = -999999;
         }
-        CameraActive = camPrev; ObjSelects = selPrev; ObjActivo = actPrev; // restaura seleccion + camara activa
+        CameraActive = camPrev; ObjSelects = selPrev; ObjActivo = actPrev; CollectionActive = colPrev; // restaura seleccion + camara + coleccion activa
         for (size_t i = 0; i < ObjSelects.size(); i++) if (ObjSelects[i]) ObjSelects[i]->select = true;
         enEscena = true;
     }

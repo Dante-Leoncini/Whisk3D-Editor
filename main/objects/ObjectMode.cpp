@@ -157,6 +157,10 @@ void Cancelar(){
 
 #ifdef W3D_SYMBIAN
 void EliminarAnimaciones(Object&) {} // animacion: pendiente en Symbian
+void InsertarKeyframeObjeto() {}
+void BorrarKeyframeObjeto() {}
+void LimpiarKeyframeObjeto() {}
+void AplicarAnimacionObjetos() {}
 #else
 void EliminarAnimaciones(Object& obj){
 	for(size_t a = 0; a < AnimationObjects.size(); a++) {
@@ -169,6 +173,85 @@ void EliminarAnimaciones(Object& obj){
 			if (a >= 0 && a < AnimationObjects.size()) {
 				AnimationObjects.erase(AnimationObjects.begin() + a);
 			}
+		}
+	}
+}
+
+// ===== ANIMACION DE OBJETOS (keyframes de pos/rot/escala; menu Object > Animation) =====
+// La animacion de OBJETOS (transform) se guarda en AnimationObjects (uno por objeto, con curvas Position/Rotation/
+// Scale). Distinta de la de ESQUELETO (clips por armature) y de la de VERTICES. Rotacion en euler XYZ (grados).
+extern bool g_redraw;
+static AnimationObject& AnimObjDe(Object* o){
+	for (size_t i=0;i<AnimationObjects.size();i++) if (AnimationObjects[i].obj==o) return AnimationObjects[i];
+	AnimationObject ao; ao.obj=o; ao.FirstKeyFrame=0; ao.LastKeyFrame=0; AnimationObjects.push_back(ao);
+	return AnimationObjects.back();
+}
+static AnimProperty& PropObjDe(AnimationObject& ao, int prop){
+	for (size_t i=0;i<ao.Propertys.size();i++) if (ao.Propertys[i].Property==prop) return ao.Propertys[i];
+	AnimProperty p; p.Property=prop; p.firstFrameIndex=0; p.lastFrameIndex=0; ao.Propertys.push_back(p);
+	return ao.Propertys.back();
+}
+static void SetKeyProp(AnimProperty& p, int frame, float x, float y, float z){
+	for (size_t i=0;i<p.keyframes.size();i++) if (p.keyframes[i].frame==frame){
+		p.keyframes[i].valueX=x; p.keyframes[i].valueY=y; p.keyframes[i].valueZ=z; return; } // reemplaza el existente
+	keyFrame k; k.frame=frame; k.valueX=x; k.valueY=y; k.valueZ=z; k.Interpolation=0;
+	p.keyframes.push_back(k); p.SortKeyFrames();
+}
+static Vector3 EvalPropObj(const AnimProperty& ap, int frame){ // interp LINEAL entre keyframes
+	const std::vector<keyFrame>& k = ap.keyframes;
+	if (k.empty()) return Vector3(0,0,0);
+	if (frame <= k.front().frame) return Vector3(k.front().valueX,k.front().valueY,k.front().valueZ);
+	if (frame >= k.back().frame)  return Vector3(k.back().valueX,k.back().valueY,k.back().valueZ);
+	for (size_t i=1;i<k.size();i++) if (k[i].frame>=frame){
+		int f0=k[i-1].frame, f1=k[i].frame; float t=(f1==f0)?0.0f:(float)(frame-f0)/(float)(f1-f0);
+		return Vector3(k[i-1].valueX+(k[i].valueX-k[i-1].valueX)*t,
+		               k[i-1].valueY+(k[i].valueY-k[i-1].valueY)*t,
+		               k[i-1].valueZ+(k[i].valueZ-k[i-1].valueZ)*t); }
+	return Vector3(k.back().valueX,k.back().valueY,k.back().valueZ);
+}
+// Insert Keyframe (i): guarda pos+rot+escala de cada objeto SELECCIONADO en el frame actual
+void InsertarKeyframeObjeto(){
+	for (size_t s=0;s<ObjSelects.size();s++){ Object* o=ObjSelects[s]; if (!o) continue;
+		o->ActualizarDisplayRot(); // rotEuler al dia
+		AnimationObject& ao = AnimObjDe(o);
+		SetKeyProp(PropObjDe(ao, AnimPosition), CurrentFrame, o->pos.x, o->pos.y, o->pos.z);
+		SetKeyProp(PropObjDe(ao, AnimRotation), CurrentFrame, o->rotEuler.x, o->rotEuler.y, o->rotEuler.z);
+		SetKeyProp(PropObjDe(ao, AnimScale),    CurrentFrame, o->scale.x, o->scale.y, o->scale.z);
+		ao.UpdateFirstLastFrame();
+	}
+	g_redraw = true;
+}
+// Delete Keyframe: saca los keyframes del frame actual de cada objeto seleccionado
+void BorrarKeyframeObjeto(){
+	for (size_t s=0;s<ObjSelects.size();s++){ Object* o=ObjSelects[s]; if (!o) continue;
+		for (size_t i=0;i<AnimationObjects.size();i++) if (AnimationObjects[i].obj==o)
+			for (size_t p=0;p<AnimationObjects[i].Propertys.size();p++){
+				std::vector<keyFrame>& kf = AnimationObjects[i].Propertys[p].keyframes;
+				for (size_t k=0;k<kf.size();k++) if (kf[k].frame==CurrentFrame){ kf.erase(kf.begin()+k); break; } } }
+	g_redraw = true;
+}
+// Clear Keyframe: borra TODA la animacion de los objetos seleccionados
+void LimpiarKeyframeObjeto(){
+	for (size_t s=0;s<ObjSelects.size();s++) if (ObjSelects[s]) EliminarAnimaciones(*ObjSelects[s]);
+	g_redraw = true;
+}
+// PLAYBACK: aplica los keyframes al transform de cada objeto animado en el frame actual. Solo al CAMBIAR de frame
+// (play o scrub) -> editar/keyframear un objeto en un frame fijo no lo "resnapea". Rotacion via euler XYZ.
+void AplicarAnimacionObjetos(){
+	// las curvas de objetos SON la animacion de ESCENA: solo reproducen cuando la animacion activa es una escena
+	// (kind 0). Con un clip de armature activo (kind 1) la escena no reproduce -> los objetos quedan quietos.
+	extern int ActiveAnimKind;
+	if (ActiveAnimKind != 0) return;
+	static int ultimoFrame = -999999;
+	if (CurrentFrame == ultimoFrame) return;
+	ultimoFrame = CurrentFrame;
+	for (size_t i=0;i<AnimationObjects.size();i++){ AnimationObject& ao=AnimationObjects[i]; if (!ao.obj) continue;
+		for (size_t p=0;p<ao.Propertys.size();p++){ AnimProperty& ap=ao.Propertys[p];
+			if (ap.keyframes.empty()) continue;
+			Vector3 v = EvalPropObj(ap, CurrentFrame);
+			if      (ap.Property==AnimPosition) ao.obj->pos   = v;
+			else if (ap.Property==AnimScale)    ao.obj->scale = v;
+			else if (ap.Property==AnimRotation){ ao.obj->rot = Quaternion::FromEulerXYZ(v.x,v.y,v.z); ao.obj->ActualizarDisplayRot(); }
 		}
 	}
 }

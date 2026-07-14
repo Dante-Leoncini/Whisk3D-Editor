@@ -347,7 +347,13 @@ void InputUsuarioSDL3(SDL_Event &e){
         if (PopUpActive) {
             PopUpActive->Wheel(e.wheel.y); // popup modal (file browser, etc)
         } else if (!LayoutMenuAbierto()) {
-            viewPortActive->event_mouse_wheel(e);
+            // la rueda va al viewport BAJO EL CURSOR, no al activo: si le di play (o toque el timeline) y muevo el
+            // mouse a Properties, scrollear tiene que scrollear Properties, no zoomear el timeline. Fallback al
+            // activo si el cursor cae en un gap/separador (FindViewportUnderMouse -> NULL).
+            int wmx, wmy; SDL_GetMouseState(&wmx, &wmy);
+            ViewportBase* vpRueda = FindViewportUnderMouse(rootViewport, wmx, wmy);
+            if (vpRueda && !ViewPortClickDown) viewPortActive = vpRueda; // el foco (borde verde) tambien sigue al cursor
+            (vpRueda ? vpRueda : viewPortActive)->event_mouse_wheel(e);
         }
     }
 

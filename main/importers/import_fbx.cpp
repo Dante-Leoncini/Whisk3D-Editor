@@ -906,6 +906,30 @@ bool ImportFBX(const std::string& filepath) {
         }
         if (!arm->animations.empty()) { arm->animActiva = 0;
             w3dLogf("ImportFBX: %d animacion(es) importada(s)", (int)arm->animations.size()); }
+
+        // AXIS-FIX del ARMATURE (chicken y similares Y-up): si el esqueleto RENDERIZADO (FK-rest, ya pasado por
+        // NodeToYup) queda ACOSTADO (mas alto en Z) pero el TransformLink dice PARADO (mas alto en Y), el modelo vino
+        // Y-up y el -90°X (que se le mete a la malla) + el NodeToYup (huesos) lo acostaron. Se compensa rotando el
+        // ARMATURE +90°X: como las mallas cuelgan del armature y los huesos viven en su espacio, esa rotacion PARA a
+        // los dos. banana/otros Z-up coinciden FK<->TL -> no se tocan.
+        {
+            int saveAA = arm->animActiva; arm->animActiva = -1; arm->lastPoseFrame = -999999;
+            EvaluarPoseEsqueleto(arm, 1); // FK-rest -> poseHead (lo que se dibuja)
+            arm->animActiva = saveAA; arm->lastPoseFrame = -999999;
+            Vector3 fmn(1e9f,1e9f,1e9f), fmx(-1e9f,-1e9f,-1e9f), tmn(1e9f,1e9f,1e9f), tmx(-1e9f,-1e9f,-1e9f);
+            for (size_t bi = 0; bi < arm->bones.size(); bi++){ W3dBone& b = arm->bones[bi]; if (!b.hasSkin) continue;
+                Vector3 fk = b.poseHead, tl(b.bind.m[12], b.bind.m[13], b.bind.m[14]);
+                if(fk.x<fmn.x)fmn.x=fk.x; if(fk.y<fmn.y)fmn.y=fk.y; if(fk.z<fmn.z)fmn.z=fk.z;
+                if(fk.x>fmx.x)fmx.x=fk.x; if(fk.y>fmx.y)fmx.y=fk.y; if(fk.z>fmx.z)fmx.z=fk.z;
+                if(tl.x<tmn.x)tmn.x=tl.x; if(tl.y<tmn.y)tmn.y=tl.y; if(tl.z<tmn.z)tmn.z=tl.z;
+                if(tl.x>tmx.x)tmx.x=tl.x; if(tl.y>tmx.y)tmx.y=tl.y; if(tl.z>tmx.z)tmx.z=tl.z; }
+            float fkY=fmx.y-fmn.y, fkZ=fmx.z-fmn.z, tlY=tmx.y-tmn.y, tlZ=tmx.z-tmn.z;
+            if (tlY > tlZ * 1.2f && fkZ > fkY * 1.2f){ // TL parado (Y) + FK-rest acostado (Z), con margen
+                arm->rot = Quaternion::FromAxisAngle(Vector3(1.0f, 0.0f, 0.0f), 90.0f);
+                arm->rot.normalize(); arm->ActualizarDisplayRot();
+                w3dLogf("ImportFBX: armature Y-up detectado -> +90X para pararlo (chicken)");
+            }
+        }
     }
     ProgresoActualizar(0.45f);
 
