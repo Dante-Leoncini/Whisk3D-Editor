@@ -2678,6 +2678,7 @@ bool LayoutMenuDragSoltar(int mx, int my){
     if (!g_menuDrag) return false;
     bool moved = g_menuDragMoved; g_menuDrag = NULL;
     if (!moved && MenuAbierto){
+        extern void MenuLimpiarGuardAbrir(); MenuLimpiarGuardAbrir(); // el tap diferido es DELIBERADO: no lo bloquea el guard de submenu-recien-abierto
         PopupMenu* m = MenuAbierto; // Click puede CERRAR el menu (MenuAbierto=NULL) -> capturar antes de usar m->action
         int id = m->Click(mx, my);
         if (id >= 0 && m->action) m->action(id);
