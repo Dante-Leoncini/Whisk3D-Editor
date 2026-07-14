@@ -2030,7 +2030,6 @@ void Properties::ActualizarPestanias(){
         Armature* aSel = ArmActiva();
         int nClips = aSel ? (int)aSel->animations.size() : 0;
         bool clipActivo = (ActiveAnimKind == 1 && ActiveAnimArm);
-        bool hayAnim = (nClips > 0) || !AnimationObjects.empty() || SceneAnimations.size() > 1;
         if (propBtnAnimSel && propBtnAnimSel->button){
             propBtnAnimSel->button->text = NombreAnimActiva();
             propBtnAnimSel->button->icon = clipActivo ? (int)IconType::armature : (int)IconType::camera;
@@ -2038,7 +2037,9 @@ void Properties::ActualizarPestanias(){
         // Delete visible si hay un clip activo, o mas de una escena, o la escena activa tiene keyframes (algo que borrar)
         if (propRowAnimNewDel && propRowAnimNewDel->botones.size() >= 2)
             propRowAnimNewDel->botones[1]->visible = clipActivo || SceneAnimations.size() > 1 || !AnimationObjects.empty();
-        if (propBtnAnimRender) propBtnAnimRender->gris = !hayAnim; // sin animaciones -> gris (no rendea)
+        // Render Animation: se grisa solo si hay CERO animaciones. Siempre existe la escena "Scene" (rendea su rango
+        // aunque no tenga keyframes: secuencia estatica) -> nunca se desactiva.
+        if (propBtnAnimRender) propBtnAnimRender->gris = (SceneAnimations.empty() && nClips == 0);
     }
     if (propTransform) propTransform->visible = (pestaniaActiva == 1);
     if (propMeshParts) propMeshParts->visible = (pestaniaActiva == 2 && esMesh);

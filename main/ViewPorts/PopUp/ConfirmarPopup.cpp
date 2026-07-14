@@ -157,7 +157,8 @@ bool ConfirmarPopup::Click(int mx, int my) {
 bool ConfirmarPopup::Tecla(int tecla) {
     switch (tecla) {
         case LayoutKey::Right:   // flecha derecha / soft key derecho = Si
-        case LayoutKey::Accept:  // OK / Enter = Si (borrar)
+        case LayoutKey::Enter:   // ENTER (teclado PC) = Si: el boton de borrar es el default resaltado
+        case LayoutKey::Accept:  // OK / soft key derecho (Symbian) = Si (borrar)
             { void (*cb)() = onSi; Cerrar(); if (cb) cb(); } return true;
         case LayoutKey::Left:    // flecha izquierda / soft key izquierdo = No
         case LayoutKey::Cancel:  // Esc / C = No (cancela)

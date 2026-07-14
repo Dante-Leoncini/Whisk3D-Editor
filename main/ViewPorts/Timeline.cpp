@@ -88,24 +88,23 @@ static void DrawGlyph(int gx, int gy, int gw, int gh, int tipo, bool pausa){
     }
 }
 
-// keyframes (frames) del objeto activo
+// keyframes (frames) de la ANIMACION ACTIVA (la que estamos viendo), NO del objeto seleccionado
 static void CollectKeyframes(std::vector<int>& out){
     out.clear();
-    if (ObjActivo && ObjActivo->getType() == ObjectType::armature){
-        Armature* a = (Armature*)ObjActivo;
-        if (a->animActiva >= 0 && a->animActiva < (int)a->animations.size()){
-            SkeletalAnimation* an = a->animations[a->animActiva];
-            for (size_t t=0;t<an->tracks.size();t++)
-                for (size_t p=0;p<an->tracks[t].Propertys.size();p++)
-                    for (size_t k=0;k<an->tracks[t].Propertys[p].keyframes.size();k++)
-                        out.push_back(an->tracks[t].Propertys[p].keyframes[k].frame);
-        }
-    }
-    for (size_t i=0;i<AnimationObjects.size();i++){
-        if (ObjActivo && AnimationObjects[i].obj != ObjActivo) continue;
-        for (size_t p=0;p<AnimationObjects[i].Propertys.size();p++)
-            for (size_t k=0;k<AnimationObjects[i].Propertys[p].keyframes.size();k++)
-                out.push_back(AnimationObjects[i].Propertys[p].keyframes[k].frame);
+    if (ActiveAnimKind == 1 && ActiveAnimArm &&
+        ActiveAnimArm->animActiva >= 0 && ActiveAnimArm->animActiva < (int)ActiveAnimArm->animations.size()){
+        // clip de armature ACTIVO: sus keyframes (de todos los huesos)
+        SkeletalAnimation* an = ActiveAnimArm->animations[ActiveAnimArm->animActiva];
+        for (size_t t=0;t<an->tracks.size();t++)
+            for (size_t p=0;p<an->tracks[t].Propertys.size();p++)
+                for (size_t k=0;k<an->tracks[t].Propertys[p].keyframes.size();k++)
+                    out.push_back(an->tracks[t].Propertys[p].keyframes[k].frame);
+    } else {
+        // animacion de ESCENA activa: keyframes de TODOS los objetos de la escena (AnimationObjects = escena activa)
+        for (size_t i=0;i<AnimationObjects.size();i++)
+            for (size_t p=0;p<AnimationObjects[i].Propertys.size();p++)
+                for (size_t k=0;k<AnimationObjects[i].Propertys[p].keyframes.size();k++)
+                    out.push_back(AnimationObjects[i].Propertys[p].keyframes[k].frame);
     }
     std::sort(out.begin(), out.end());
     out.erase(std::unique(out.begin(), out.end()), out.end());

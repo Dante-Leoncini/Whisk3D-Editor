@@ -929,6 +929,18 @@ bool ImportFBX(const std::string& filepath) {
                 arm->rot.normalize(); arm->ActualizarDisplayRot();
                 w3dLogf("ImportFBX: armature Y-up detectado -> +90X para pararlo (chicken)");
             }
+            // ESCALA DE UNIDADES del biped: tras quitar el figure scale, el modelo queda a su tamaño natural (barney
+            // ~65u, nani ~1.5u). Se elige la escala del armature (unidades del FBX vs metros) que lo deje a tamaño
+            // humano (~1.7m): barney en cm (0.65m con 0.01), nani es metros (1.5m con escala 1, vs 0.015m con 0.01).
+            if (arm->skinReconstruirFK){
+                float d = (fmx - fmn).Length();
+                if (d > 1e-4f){
+                    float rEsc = (float)escala, sEsc = d * rEsc, s1 = d * 1.0f;
+                    float esc = (fabsf(s1 - 1.7f) < fabsf(sEsc - 1.7f)) ? 1.0f : rEsc; // la mas cercana a ~1.7m
+                    arm->scale = Vector3(esc, esc, esc);
+                    w3dLogf("ImportFBX: biped escala de unidades -> armScale=%.4f (modelo ~%.2fu)", esc, d);
+                }
+            }
         }
     }
     ProgresoActualizar(0.45f);

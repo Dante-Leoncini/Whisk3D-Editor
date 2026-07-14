@@ -346,6 +346,8 @@ void InputUsuarioSDL3(SDL_Event &e){
         if (LoopCutActivo()) { LoopCutWheel(e.wheel.y > 0 ? 1 : -1); return; } // mas/menos cortes
         if (PopUpActive) {
             PopUpActive->Wheel(e.wheel.y); // popup modal (file browser, etc)
+        } else if (LayoutMenuAbierto() && MenuAbierto) {
+            MenuAbierto->Wheel(e.wheel.y > 0 ? 1 : -1); g_redraw = true; // menu desplegable largo (ej: 129 clips) -> scroll
         } else if (!LayoutMenuAbierto()) {
             // la rueda va al viewport BAJO EL CURSOR, no al activo: si le di play (o toque el timeline) y muevo el
             // mouse a Properties, scrollear tiene que scrollear Properties, no zoomear el timeline. Fallback al
@@ -523,6 +525,8 @@ void InputUsuarioSDL3(SDL_Event &e){
         if (e.button.button == SDL_BUTTON_LEFT) {
             leftMouseDown = false;
             g_cornerVp = NULL; g_cornerResizing = false; // fin del gesto de esquina
+            // DRAG-SCROLL de menu largo: el soltar resuelve (drag=solo scrolleo; tap=selecciona el item). Consume el up.
+            { extern bool LayoutMenuDragSoltar(int, int); if (LayoutMenuDragSoltar((int)e.button.x, (int)e.button.y)) { GuardarMousePos(); return; } }
             // suelta scroll agarrado y dropea el drag del outliner
             LayoutSoltar((int)e.button.x, (int)e.button.y);
         }

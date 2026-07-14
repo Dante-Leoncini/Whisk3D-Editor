@@ -238,6 +238,20 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
                    amn.x,amn.y,amn.z,amx.x,amx.y,amx.z, worst, (worstB>=0)?a->bones[worstB].name.c_str():"-");
             a->lastPoseFrame=-999999;
         }
+        // DIAG: bbox de la malla skinneada (local) + clusterTransform de un hueso -> ver el mismatch malla<->bind
+        { Mesh* m=NULL; std::vector<Object*> st2; if(SceneCollection) st2.push_back(SceneCollection);
+          while(!st2.empty()){ Object* o=st2.back(); st2.pop_back();
+            if (o->getType()==ObjectType::mesh && ((Mesh*)o)->skinArmature && !m) m=(Mesh*)o;
+            for(size_t i=0;i<o->Childrens.size();i++) st2.push_back(o->Childrens[i]); }
+          if (m && m->vertex){ Vector3 vmn(1e9f,1e9f,1e9f), vmx(-1e9f,-1e9f,-1e9f);
+            for (int i=0;i<m->vertexSize;i++){ float x=m->vertex[i*3],y=m->vertex[i*3+1],z=m->vertex[i*3+2];
+              if(x<vmn.x)vmn.x=x;if(y<vmn.y)vmn.y=y;if(z<vmn.z)vmn.z=z; if(x>vmx.x)vmx.x=x;if(y>vmx.y)vmx.y=y;if(z>vmx.z)vmx.z=z; }
+            printf("      [armdump] MESH '%s' vertBbox=(%.1f,%.1f,%.1f)..(%.1f,%.1f,%.1f) diag=%.1f\n",
+              m->name.c_str(), vmn.x,vmn.y,vmn.z,vmx.x,vmx.y,vmx.z, (vmx-vmn).Length()); }
+          if (N>3){ W3dBone& b=a->bones[3]; Matrix4& ct=b.clusterTransform;
+            float cs0=Vector3(ct.m[0],ct.m[1],ct.m[2]).Length(), cs1=Vector3(ct.m[4],ct.m[5],ct.m[6]).Length(), cs2=Vector3(ct.m[8],ct.m[9],ct.m[10]).Length();
+            printf("      [armdump] clusterTransform[3] t=(%.1f,%.1f,%.1f) escCols=(%.3f,%.3f,%.3f)\n", ct.m[12],ct.m[13],ct.m[14], cs0,cs1,cs2); }
+        }
         return true;
     }
     // ---- posekey : posa el hueso 5 (poseR=Y45), inserta keyframe en frame 10, re-evalua y verifica el roundtrip ----

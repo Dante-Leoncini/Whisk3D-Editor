@@ -2649,6 +2649,38 @@ static void LayoutHoverArbol(ViewportBase* aNodo, ViewportBase* aUnder,
     }
 }
 
+// DRAG-SCROLL de menus desplegables largos (ej: armature con 129 clips): arrastrar el dedo/mouse scrollea la lista;
+// un toque sin arrastrar selecciona. La seleccion normal es en el DOWN, pero si el menu es SCROLLABLE se DIFIERE al
+// UP para distinguir tap (selecciona) de drag (scrollea).
+static PopupMenu* g_menuDrag = NULL;   // submenu mas profundo que se esta arrastrando (NULL = no)
+static int  g_menuDragY0 = 0, g_menuDragScroll0 = 0;
+static bool g_menuDragMoved = false;
+static PopupMenu* MenuScrollBajoCursor(int mx, int my){
+    if (!MenuAbierto) return NULL;
+    PopupMenu* t = MenuAbierto;
+    while (t->submenuAbierto && t->submenuAbierto->abierto && t->submenuAbierto->Contains(mx, my)) t = t->submenuAbierto;
+    return (t->Contains(mx, my) && t->MaxScroll() > 0) ? t : NULL;
+}
+// llamado en el DOWN sobre un menu SCROLLABLE: arranca un posible drag/tap (difiere la seleccion). true = diferido.
+bool LayoutMenuDragArrancar(int mx, int my){
+    PopupMenu* sc = MenuScrollBajoCursor(mx, my);
+    if (!sc) return false;
+    g_menuDrag = sc; g_menuDragY0 = my; g_menuDragScroll0 = sc->scroll; g_menuDragMoved = false;
+    return true;
+}
+// llamado en el UP: si NO se arrastro (fue un tap), selecciona el item bajo el cursor. true = consumido.
+bool LayoutMenuDragSoltar(int mx, int my){
+    if (!g_menuDrag) return false;
+    bool moved = g_menuDragMoved; g_menuDrag = NULL;
+    if (!moved && MenuAbierto){
+        PopupMenu* m = MenuAbierto; // Click puede CERRAR el menu (MenuAbierto=NULL) -> capturar antes de usar m->action
+        int id = m->Click(mx, my);
+        if (id >= 0 && m->action) m->action(id);
+    }
+    g_redraw = true;
+    return true;
+}
+
 bool LayoutMotionUI(int mx, int my) {
     if (!rootViewport) return false;
     if (PopUpActive) {
@@ -2676,6 +2708,19 @@ bool LayoutMotionUI(int mx, int my) {
         return true;
     }
     if (LayoutMenuAbierto()) {
+        // DRAG-SCROLL: si el boton esta apretado sobre un menu scrollable, arrastrar mueve la LISTA (no resalta ni
+        // cambia de menu). Un umbral chico distingue drag de tap.
+        if (g_menuDrag) {
+            int dy = my - g_menuDragY0;
+            if (!g_menuDragMoved && (dy > 6 * GlobalScale || dy < -6 * GlobalScale)) g_menuDragMoved = true;
+            if (g_menuDragMoved) {
+                int rowH = RenglonHeightGS + gapGS;
+                int s = g_menuDragScroll0 - dy / rowH; // arrastrar hacia ABAJO muestra items ANTERIORES (grab & pull)
+                int ms = g_menuDrag->MaxScroll(); if (s < 0) s = 0; if (s > ms) s = ms;
+                g_menuDrag->scroll = s; g_redraw = true;
+            }
+            return true;
+        }
         // si el mouse pasa por OTRO boton de menu de la barra, cambiar de menu
         // (cierra el actual y abre el del boton) sin necesidad de click
         ViewportBase* bajo = FindViewportUnderMouse(rootViewport, mx, my);
@@ -2724,6 +2769,9 @@ bool LayoutClickUI(int mx, int my) {
         if (!semimodal) return true;
     }
     if (LayoutMenuAbierto()) {
+        // menu SCROLLABLE (ej: 129 clips): NO seleccionar en el DOWN -> diferir al UP para poder arrastrar y
+        // scrollear (el UP decide: tap=selecciona, drag=solo scrolleo). Menus cortos: click normal en el down.
+        if (LayoutMenuDragArrancar(mx, my)) return true;
         // el menu se queda con el click (adentro o el que lo cierra)
         PopupMenu* m = MenuAbierto;
         int id = m->Click(mx, my);
