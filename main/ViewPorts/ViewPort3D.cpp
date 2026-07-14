@@ -53,6 +53,7 @@ extern int W3dPantallaAlto; // los headers GLES + tipos GL los da GeometriaUI.h 
 #endif
 
 PopupMenu* MenuAdd = NULL;
+PopupMenu* MenuImports = NULL; // submenu "Add > Imports": OBJ / FBX / glTF / GLB
 PopupMenu* MenuSelect = NULL;    // seleccion: All / None / Invert
 PopupMenu* MenuObject = NULL;    // operaciones de objeto (solo si hay seleccion)
 PopupMenu* MenuMesh = NULL;      // edit mode: operaciones de malla (Transform + Extrude)
@@ -161,8 +162,13 @@ Viewport3D::Viewport3D(Vector3 pos){
         MenuAdd->Agregar("Camera", 5, IconType::camera);
         MenuAdd->Agregar("Light", 6, IconType::light);
         MenuAdd->Agregar("Collection", 8, IconType::archive);
-        MenuAdd->Agregar("Import OBJ", 7, IconType::mesh);
-        MenuAdd->Agregar("Import FBX", 15, IconType::mesh);
+        // submenu Imports (ya son varios): OBJ / FBX / glTF / GLB. Los items despachan por LayoutAccionAdd (ids 7/15/17/18).
+        MenuImports = new PopupMenu();
+        MenuImports->Agregar("OBJ", 7, IconType::mesh);
+        MenuImports->Agregar("FBX", 15, IconType::mesh);
+        MenuImports->Agregar("glTF", 17, IconType::mesh);
+        MenuImports->Agregar("GLB", 18, IconType::mesh);
+        MenuAdd->Agregar("Imports", 19, IconType::mesh, MenuImports);
         // objetos especiales linkeados a un objeto (target): renderizan a otro
         MenuAdd->Agregar("Duplicate Linked", 9, IconType::instance);
         MenuAdd->Agregar("Array", 10, IconType::array);

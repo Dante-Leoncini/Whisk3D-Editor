@@ -11,6 +11,7 @@ int BuscarVertexAnimation() { return 0; }
 
 #include "ViewPorts/PopUp/FileBrowser.h" // el explorador COMPARTIDO (reemplaza tinyfd)
 #include "importers/import_fbx.h"        // ImportFBX
+#include "importers/import_gltf.h"       // ImportGLTF (.gltf/.glb)
 
 // dispatch por EXTENSION: .fbx -> ImportFBX; el resto (.obj) -> ImportOBJ
 static void ImportModeloElegido(const std::string& path) {
@@ -18,12 +19,13 @@ static void ImportModeloElegido(const std::string& path) {
     std::string ext = (d == std::string::npos) ? std::string() : path.substr(d);
     for (size_t i = 0; i < ext.size(); i++) if (ext[i] >= 'A' && ext[i] <= 'Z') ext[i] += 32;
     if (ext == ".fbx") ImportFBX(path);
+    else if (ext == ".gltf" || ext == ".glb") ImportGLTF(path);
     else               ImportOBJ(path, false);
 }
 
 int abrir() {
-    // mismo flujo que el menu Add > import: abre el File browser compartido (OBJ + FBX)
-    AbrirFileBrowser("Importar modelo", "Import 3D model", ".obj .fbx", ImportModeloElegido);
+    // mismo flujo que el menu Add > import: abre el File browser compartido (OBJ + FBX + glTF/GLB)
+    AbrirFileBrowser("Importar modelo", "Import 3D model", ".obj .fbx .gltf .glb", ImportModeloElegido);
     return 0;
 }
 

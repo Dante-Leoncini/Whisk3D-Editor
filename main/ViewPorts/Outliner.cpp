@@ -48,6 +48,7 @@ static Object* W3dObjetoEnFila(int fila, int* profOut = 0); // profOut (opcional
 Outliner::Outliner() : ViewportBase() {
     Renglon = new Rec2D();
     CantidadRenglones = 5;
+    lastContentRows = -1;
     hoverFila = -1;
     dragObjeto = NULL;
     dragging = false;
@@ -126,6 +127,17 @@ void Outliner::Resize(int newW, int newH){
 }
 
 void Outliner::Render(){
+    // AUTO-REFRESH del scrollbar: si cambio la cantidad de FILAS VISIBLES (importar/agregar/borrar/desplegar) se
+    // recalcula el rango de scroll. Antes solo se recalculaba al REDIMENSIONAR el viewport -> tras importar objetos
+    // el scrollbar quedaba viejo y no se podia scrollear hasta cambiar el tamanio de un viewport a mano.
+    if (SceneCollection){
+        struct C { static int rec(Object* o){ int n = 1;
+            if (o->Childrens.size() >= 1 && o->desplegado) for (size_t i = 0; i < o->Childrens.size(); i++) n += rec(o->Childrens[i]);
+            return n; } };
+        int filas = 0;
+        for (size_t c = 0; c < SceneCollection->Childrens.size(); c++) filas += C::rec(SceneCollection->Childrens[c]);
+        if (filas != lastContentRows){ lastContentRows = filas; Resize(width, height); }
+    }
     w3dEngine::MatrixMode(w3dEngine::Projection);
     w3dEngine::LoadIdentity();
 

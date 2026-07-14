@@ -45,7 +45,7 @@ static bool EsImagen(const std::string& name) {
 // icono segun el tipo de archivo
 static int IconoEntrada(const w3dFileSystem::DirEntry& e) {
     if (e.isDir) return (int)IconType::carpeta;
-    if (TerminaEn(e.name, ".obj") || TerminaEn(e.name, ".fbx")) return (int)IconType::mesh;
+    if (TerminaEn(e.name, ".obj") || TerminaEn(e.name, ".fbx") || TerminaEn(e.name, ".gltf") || TerminaEn(e.name, ".glb")) return (int)IconType::mesh;
     if (EsImagen(e.name)) return (int)IconType::foto;
     return (int)IconType::archive;
 }

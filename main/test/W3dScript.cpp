@@ -254,6 +254,111 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         }
         return true;
     }
+    // ---- skelexport <substr> <frame> <file> : activa el clip, evalua el frame y vuelca por hueso: idx parent
+    //      headX headY headZ tailX tailY tailZ |poseT-restT|. Para dibujar el ESQUELETO (stick figure) y ver si la
+    //      pose es coherente (persona) o basura, y cuantos huesos TRASLADAN (Tdelta del root motion). ----
+    if (cmd == "skelexport") {
+        std::string sub, path; int frame=1; ss>>sub>>frame>>path;
+        if (path.empty()){ err="skelexport: uso: skelexport <substr> <frame> <file>"; return false; }
+        extern int ActiveAnimKind; extern Armature* ActiveAnimArm;
+        Armature* a=NULL;
+        { std::vector<Object*> st; if(SceneCollection) st.push_back(SceneCollection);
+          while(!st.empty()){ Object* o=st.back(); st.pop_back();
+            if (o->getType()==ObjectType::armature && !a) a=(Armature*)o;
+            for(size_t i=0;i<o->Childrens.size();i++) st.push_back(o->Childrens[i]); } }
+        if (!a){ err="skelexport: sin armature"; return false; }
+        int clip=-1; for (size_t i=0;i<a->animations.size();i++) if (sub.empty()||a->animations[i]->name.find(sub)!=std::string::npos){ clip=(int)i; break; }
+        if (clip<0){ err="skelexport: clip no encontrado"; return false; }
+        ActiveAnimKind=1; ActiveAnimArm=a; a->animActiva=clip;
+        CurrentFrame=frame; a->lastPoseFrame=-999999; EvaluarPoseEsqueleto(a, frame);
+        FILE* fp=fopen(path.c_str(),"w"); if(!fp){ err="skelexport: no pude abrir "+path; return false; }
+        int nT=0;
+        for (size_t i=0;i<a->bones.size();i++){ W3dBone& b=a->bones[i];
+            float dt=(b.poseT-b.restT).Length(); if (dt>0.5f) nT++;
+            fprintf(fp,"%d %d %.4f %.4f %.4f %.4f %.4f %.4f %.4f\n", (int)i, b.parent,
+                b.poseHead.x,b.poseHead.y,b.poseHead.z, b.poseTail.x,b.poseTail.y,b.poseTail.z, dt); }
+        fclose(fp);
+        printf("      [skelexport] clip='%s' f=%d bones=%d huesosQueTrasladan(dt>0.5)=%d -> %s\n",
+               a->animations[clip]->name.c_str(), frame, (int)a->bones.size(), nT, path.c_str());
+        return true;
+    }
+    // ---- animtrace <substr> : reproduce el clip SECUENCIALMENTE (2 vueltas, como el play) y por frame vuelca el bbox
+    //      del esqueleto + la deformacion max de la malla. Detecta: (a) acumulacion (vuelta2 != vuelta1), (b) explosion
+    //      de la deformacion (maxDelta gigante = "super deforme"), (c) sin root motion (bbox centro fijo). ----
+    if (cmd == "animtrace") {
+        std::string sub; std::getline(ss, sub);
+        { size_t p=sub.find_first_not_of(" \t"); sub = (p==std::string::npos)?"":sub.substr(p); }
+        extern int ActiveAnimKind; extern Armature* ActiveAnimArm;
+        Mesh* m=NULL; Armature* a=NULL;
+        { std::vector<Object*> st; if(SceneCollection) st.push_back(SceneCollection);
+          while(!st.empty()){ Object* o=st.back(); st.pop_back();
+            if (o->getType()==ObjectType::mesh && ((Mesh*)o)->skinArmature && !m){ m=(Mesh*)o; a=m->skinArmature; }
+            for(size_t i=0;i<o->Childrens.size();i++) st.push_back(o->Childrens[i]); } }
+        if (!m || !a) { err="animtrace: sin malla skinneada"; return false; }
+        int clip=-1; for (size_t i=0;i<a->animations.size();i++) if (sub.empty()||a->animations[i]->name.find(sub)!=std::string::npos){ clip=(int)i; break; }
+        if (clip<0){ err="animtrace: clip no encontrado"; return false; }
+        ActiveAnimKind=1; ActiveAnimArm=a; a->animActiva=clip;
+        SkeletalAnimation* an=a->animations[clip];
+        int f0=an->startFrame, f1=an->endFrame; if (f1<=f0) f1=f0+12;
+        printf("      [animtrace] clip[%d]='%s' start=%d end=%d fps=%d\n", clip, an->name.c_str(), f0, f1, an->FrameRate);
+        for (int vuelta=0; vuelta<2; vuelta++){
+            for (int f=f0; f<=f1; f++){
+                CurrentFrame=f; a->lastPoseFrame=-999999; m->lastSkinFrame=-999999; m->skinPoseSerial=0; a->poseSerial++;
+                SkinearMesh(m);
+                // bbox del esqueleto (poseHead) + peor largo
+                Vector3 mn(1e9f,1e9f,1e9f), mx(-1e9f,-1e9f,-1e9f); float worst=0; int wb=-1;
+                for (size_t i=0;i<a->bones.size();i++){ if(!a->bones[i].hasSkin) continue; Vector3 h=a->bones[i].poseHead;
+                    if(h.x<mn.x)mn.x=h.x;if(h.y<mn.y)mn.y=h.y;if(h.z<mn.z)mn.z=h.z; if(h.x>mx.x)mx.x=h.x;if(h.y>mx.y)mx.y=h.y;if(h.z>mx.z)mx.z=h.z;
+                    if(h.Length()>worst){worst=h.Length();wb=(int)i;} }
+                // deformacion de la malla: max|skinVertex - vertex|
+                double maxd=0; if (m->skinVertex) for (int i=0;i<m->vertexSize;i++){
+                    double dx=m->skinVertex[i*3]-m->vertex[i*3],dy=m->skinVertex[i*3+1]-m->vertex[i*3+1],dz=m->skinVertex[i*3+2]-m->vertex[i*3+2];
+                    double d=dx*dx+dy*dy+dz*dz; if(d>maxd)maxd=d; }
+                if (f==f0 || f==(f0+f1)/2 || f==f1)
+                    printf("      [animtrace] v%d f=%d skelBbox=(%.0f,%.0f,%.0f)..(%.0f,%.0f,%.0f) peorHueso=%.0f(%s) maxDeform=%.1f\n",
+                        vuelta, f, mn.x,mn.y,mn.z,mx.x,mx.y,mx.z, worst, wb>=0?a->bones[wb].name.c_str():"-", (float)sqrt(maxd));
+            }
+        }
+        return true;
+    }
+    // ---- rootmotion <substr> : busca el clip cuyo nombre contiene <substr>, lo activa (gating) y por varios frames
+    //      vuelca los 3 huesos con mayor |poseT-restT| (= donde vive el ROOT MOTION del Lcl Translation) + su poseHead.
+    //      Sirve para ver si la traslacion animada existe en el Lcl y a que ESCALA (para el Tdelta del biped). ----
+    if (cmd == "rootmotion") {
+        std::string sub; std::getline(ss, sub);
+        { size_t p=sub.find_first_not_of(" \t"); sub = (p==std::string::npos)?"":sub.substr(p); }
+        Armature* a=NULL;
+        { std::vector<Object*> st; if(SceneCollection) st.push_back(SceneCollection);
+          while(!st.empty()){ Object* o=st.back(); st.pop_back();
+            if (o->getType()==ObjectType::armature && !a) a=(Armature*)o;
+            for(size_t i=0;i<o->Childrens.size();i++) st.push_back(o->Childrens[i]); } }
+        if (!a) { err="rootmotion: sin armature"; return false; }
+        int clipIdx=-1;
+        for (size_t i=0;i<a->animations.size();i++){ if (sub.empty() || a->animations[i]->name.find(sub)!=std::string::npos){ clipIdx=(int)i; break; } }
+        if (clipIdx<0) { err="rootmotion: clip no encontrado ('"+sub+"')"; return false; }
+        extern int ActiveAnimKind; extern Armature* ActiveAnimArm;
+        ActiveAnimKind=1; ActiveAnimArm=a; a->animActiva=clipIdx;
+        SkeletalAnimation* an=a->animations[clipIdx];
+        printf("      [rootm] clip[%d]='%s' start=%d end=%d fps=%d figureScale=%.3f\n",
+               clipIdx, an->name.c_str(), an->startFrame, an->endFrame, an->FrameRate, a->figureScale);
+        int f0 = an->startFrame, f1 = an->endFrame; if (f1<=f0) f1=f0+12;
+        int frames[5]; for (int k=0;k<5;k++) frames[k]=f0 + (f1-f0)*k/4;
+        for (int k=0;k<5;k++){ int f=frames[k]; a->lastPoseFrame=-999999; EvaluarPoseEsqueleto(a, f);
+            // top-3 huesos por |poseT-restT|
+            int b0=-1,b1=-1,b2=-1; float d0=-1,d1=-1,d2=-1;
+            for (size_t i=0;i<a->bones.size();i++){ float d=(a->bones[i].poseT - a->bones[i].restT).Length();
+                if (d>d0){ d2=d1;b2=b1; d1=d0;b1=b0; d0=d;b0=(int)i; }
+                else if (d>d1){ d2=d1;b2=b1; d1=d;b1=(int)i; }
+                else if (d>d2){ d2=d;b2=(int)i; } }
+            printf("      [rootm] f=%d:\n", f);
+            int bs[3]={b0,b1,b2};
+            for (int j=0;j<3;j++){ int i=bs[j]; if(i<0) continue; W3dBone& b=a->bones[i];
+                printf("      [rootm]   #%d '%s' |dT|=%.2f restT=(%.2f,%.2f,%.2f) poseT=(%.2f,%.2f,%.2f) poseHead=(%.1f,%.1f,%.1f)\n",
+                    i, b.name.c_str(), (b.poseT-b.restT).Length(), b.restT.x,b.restT.y,b.restT.z,
+                    b.poseT.x,b.poseT.y,b.poseT.z, b.poseHead.x,b.poseHead.y,b.poseHead.z); }
+        }
+        return true;
+    }
     // ---- posekey : posa el hueso 5 (poseR=Y45), inserta keyframe en frame 10, re-evalua y verifica el roundtrip ----
     if (cmd == "posekey") {
         Armature* a = (ObjActivo && ObjActivo->getType()==ObjectType::armature) ? (Armature*)ObjActivo : NULL;
@@ -507,6 +612,16 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         if (ruta.empty()) { err = "importfbx: falta la ruta"; return false; }
         bool ok = ImportFBX(ruta);
         printf("      [importfbx] %s -> %s\n", ruta.c_str(), ok?"OK":"FALLO");
+        return ok;
+    }
+    // ---- importgltf <ruta> : importa un glTF/GLB (para testear el import headless) ----
+    if (cmd == "importgltf") {
+        std::string ruta; std::getline(ss, ruta);
+        size_t p = ruta.find_first_not_of(" \t"); if (p!=std::string::npos) ruta = ruta.substr(p);
+        if (ruta.empty()) { err = "importgltf: falta la ruta"; return false; }
+        extern bool ImportGLTF(const std::string&);
+        bool ok = ImportGLTF(ruta);
+        printf("      [importgltf] %s -> %s\n", ruta.c_str(), ok?"OK":"FALLO");
         return ok;
     }
     // ---- armdeltest : borra el armature con una malla skinneada -> verifica que skinArmature queda NULL (no cuelga),

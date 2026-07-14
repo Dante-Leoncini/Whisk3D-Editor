@@ -285,6 +285,15 @@ static bool ContieneCamActiva(Object* o) {
     for (size_t i = 0; i < o->Childrens.size(); i++) if (ContieneCamActiva(o->Childrens[i])) return true;
     return false;
 }
+// el ESQUELETO cuyo clip esta activo (ActiveAnimArm/kind): si se borra, la seleccion de animacion queda colgada
+// (el timeline seguia mostrando el clip borrado). Al detacharlo se vuelve a ESCENA (kind 0). El destructor del
+// Armature tambien lo hace, pero el borrado DETACHA (no destruye, por el undo) -> hay que resetearlo aca.
+extern int ActiveAnimKind; extern Armature* ActiveAnimArm;
+static bool ContieneAnimActiva(Object* o) {
+    if (ActiveAnimArm && (Object*)ActiveAnimArm == o) return true;
+    for (size_t i = 0; i < o->Childrens.size(); i++) if (ContieneAnimActiva(o->Childrens[i])) return true;
+    return false;
+}
 
 struct DelEntry { Object* obj; Object* parent; int index; };
 // recolecta los "delete-roots": cada objeto SELECCIONADO y borrable (no-collection salvo incCol) cuyo
@@ -335,6 +344,7 @@ class DeleteUndo : public UndoCmd {
     std::vector<RefEntry> refs;    // refs de mallas (modificador/skinArmature) a los objetos borrados -> limpiar/restaurar
     bool repsListos;               // las reps (y refs) se computan UNA vez (en el 1er detach)
     std::vector<Object*>  selPrev; Object* actPrev; Camera* camPrev; Object* colPrev; // CollectionActive previa
+    int animKindPrev; Armature* animArmPrev; // seleccion de animacion previa (para restaurar al deshacer)
     bool enEscena; // true = los objetos estan en la escena; false = los tiene este comando (detachados)
     void QuitarHijo(Object* p, Object* c) {
         for (size_t k = 0; k < p->Childrens.size(); k++)
@@ -383,6 +393,7 @@ class DeleteUndo : public UndoCmd {
                 if (e.parent->Childrens[k] == e.obj) { e.index = (int)k; e.parent->Childrens.erase(e.parent->Childrens.begin()+k); break; }
             DetacharLuces(e.obj);
             if (ContieneCamActiva(e.obj)) CameraActive = NULL;
+            if (ContieneAnimActiva(e.obj)) { ActiveAnimArm = NULL; ActiveAnimKind = 0; } // clip activo borrado -> a ESCENA
         }
         // 4) limpiar las refs colgantes: el modificador vuelve a target=NULL ("none") y skinArmature a NULL -> la malla
         //    deja de deformar (vuelve a bind) y no queda apuntando al esqueleto borrado (que este comando liberara).
@@ -404,6 +415,7 @@ class DeleteUndo : public UndoCmd {
 public:
     DeleteUndo(bool incCol) : repsListos(false), actPrev(NULL), camPrev(NULL), colPrev(NULL), enEscena(true) {
         selPrev = ObjSelects; actPrev = ObjActivo; camPrev = CameraActive; colPrev = CollectionActive;
+        animKindPrev = ActiveAnimKind; animArmPrev = ActiveAnimArm;
         if (SceneCollection) RecolectarBorrar(SceneCollection, incCol, ents);
         Detachar(); // el borrado YA paso: los saca de la escena (sin liberar)
     }
@@ -430,6 +442,7 @@ public:
             if (r.mesh) r.mesh->lastSkinFrame = -999999;
         }
         CameraActive = camPrev; ObjSelects = selPrev; ObjActivo = actPrev; CollectionActive = colPrev; // restaura seleccion + camara + coleccion activa
+        ActiveAnimKind = animKindPrev; ActiveAnimArm = animArmPrev; // restaura la seleccion de animacion (el esqueleto volvio)
         for (size_t i = 0; i < ObjSelects.size(); i++) if (ObjSelects[i]) ObjSelects[i]->select = true;
         enEscena = true;
     }

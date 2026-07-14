@@ -463,14 +463,15 @@ void InputUsuarioSDL3(SDL_Event &e){
             // BARRA superior (MOUSE o touch): NO abrir la pestaña/menu en el DOWN. Si se ARRASTRA = scroll
             // horizontal; si se SUELTA sin mover = abre en el mouse-up. Vale para mouse PORQUE en la barra del
             // viewport 3D la rueda hace ZOOM -> en PC la unica forma de scrollear esa barra es arrastrandola.
-            else if (vpDown && vpDown->OnBar((int)e.button.x, (int)e.button.y)) {
+            else if (!LayoutMenuAbierto() && vpDown && vpDown->OnBar((int)e.button.x, (int)e.button.y)) {
                 g_barTapPending = true;
                 g_barTapView = vpDown; g_tapStartX = (int)e.button.x; g_tapStartY = (int)e.button.y;
             }
             // CONTENIDO de un panel (properties=3 / outliner=2), SOLO en TOUCH: no ejecutar el click en el down
             // (sino togglea/selecciona apenas apoyas). En PC el mouse usa scrollbar/rueda + el drag numerico
             // clasico (gFloatDrag), asi que ahi NO se difiere. Se decide en el 1er motion (dir) o al soltar (tap).
-            else if (esTouch && vpDown &&
+            // (con un desplegable abierto NO se difiere: el click es del MENU, va directo a LayoutClickUI de abajo.)
+            else if (esTouch && !LayoutMenuAbierto() && vpDown &&
                      (vpDown->ViewportKind() == 2 || vpDown->ViewportKind() == 3)) {
                 g_contentTapPending = true;
                 g_barTapView = vpDown; g_tapStartX = (int)e.button.x; g_tapStartY = (int)e.button.y;

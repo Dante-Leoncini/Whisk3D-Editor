@@ -282,7 +282,7 @@ static TBool gHashHeld = EFalse;
 static TBool gCHeld = EFalse, gCArrowUsed = EFalse;
 // del editor/undo compartido (extern inline para no arrastrar headers pesados en Symbian)
 extern void UndoDeshacer(); extern void UndoRehacer();
-extern void AbrirConfirmarBorrado();
+extern void AbrirConfirmarBorrado(bool incluirCollecciones = false); // firma con bool (sino: undefined symbol en ARM)
 extern bool LayoutDeleteEdit(int mx, int my);
 extern void LayoutMaximizar(); // verde + OK = maximizar/restaurar el viewport activo
 extern void LayoutExtrudeFaces();      // 7 = Extrude (se protege sola: no-op fuera de Edit Mode)

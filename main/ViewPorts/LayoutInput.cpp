@@ -37,7 +37,9 @@
 // (los tipos GL + el dibujo vienen del engine: w3dGraphics.h / w3dEngine, ya incluido arriba)
 
 void (*LayoutImportObj)() = NULL;
-void (*LayoutImportFbx)() = NULL; // "Add > Import FBX": abre el explorador filtrado a .fbx (lo cablea la plataforma)
+void (*LayoutImportFbx)() = NULL; // "Add > Imports > FBX": abre el explorador filtrado a .fbx (lo cablea la plataforma)
+void (*LayoutImportGltf)() = NULL; // "Add > Imports > glTF": explorador filtrado a .gltf
+void (*LayoutImportGlb)() = NULL;  // "Add > Imports > GLB": explorador filtrado a .glb
 void (*LayoutWarpMouse)(int x, int y) = NULL;
 void (*LayoutArbolCambiado)() = NULL;
 
@@ -370,7 +372,10 @@ static void LayoutAccionAdd(int aId) {
             break;
         }
         case 7: if (LayoutImportObj) LayoutImportObj(); break;
-        case 15: if (LayoutImportFbx) LayoutImportFbx(); break; // Import FBX (explorador filtrado a .fbx)
+        case 15: if (LayoutImportFbx) LayoutImportFbx(); break;   // Imports > FBX
+        case 17: if (LayoutImportGltf) LayoutImportGltf(); break; // Imports > glTF
+        case 18: if (LayoutImportGlb) LayoutImportGlb(); break;   // Imports > GLB
+        case 19: break; // "Imports": item padre del submenu (no hace nada; solo abre el submenu)
         case 8:
             // una Collection nueva (colgada de la activa)
             nuevo = new Collection(CollectionActive ? CollectionActive
@@ -2721,13 +2726,21 @@ bool LayoutMotionUI(int mx, int my) {
             }
             return true;
         }
-        // si el mouse pasa por OTRO boton de menu de la barra, cambiar de menu
-        // (cierra el actual y abre el del boton) sin necesidad de click
-        ViewportBase* bajo = FindViewportUnderMouse(rootViewport, mx, my);
-        LayoutAbrirMenuDeBarra(bajo, mx, my);
-        // resaltar el boton bajo el mouse y APAGAR el del que se abrio el menu
-        // (sino quedaba con borde blanco el primero clickeado)
-        LayoutHoverArbol(rootViewport, bajo, mx, my);
+        // el cursor esta SOBRE el desplegable abierto (su lista o cualquier submenu abierto)? Entonces el movimiento
+        // es DEL MENU: NO tocar las barras/viewport de atras. Sin este guard, un desplegable dibujado ENCIMA de la
+        // barra de otro panel disparaba LayoutAbrirMenuDeBarra/HoverArbol al pasar el mouse -> cambiaba/cerraba el
+        // menu y resaltaba botones de atras (el hover "se colaba" al viewport).
+        bool sobreMenu = false;
+        for (PopupMenu* mm = MenuAbierto; mm && mm->abierto; mm = mm->submenuAbierto){
+            if (mm->Contains(mx, my)){ sobreMenu = true; break; }
+            if (!mm->submenuAbierto || !mm->submenuAbierto->abierto) break;
+        }
+        if (!sobreMenu){
+            // el cursor SALIO del menu (esta sobre una barra): permitir el SLIDE entre menus de barra sin click
+            ViewportBase* bajo = FindViewportUnderMouse(rootViewport, mx, my);
+            LayoutAbrirMenuDeBarra(bajo, mx, my);
+            LayoutHoverArbol(rootViewport, bajo, mx, my);
+        }
         // hover de las opciones + auto-cierre si el mouse se aleja
         if (MenuAbierto) MenuAbierto->MouseMove(mx, my);
         return true; // el menu se queda con el movimiento

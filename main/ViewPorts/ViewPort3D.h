@@ -49,6 +49,7 @@ extern GLfloat LastPivotZ;
 
 #include "WhiskUI/PopupMenu.h"
 extern PopupMenu* MenuAdd;      // el desplegable del boton "Add"
+extern PopupMenu* MenuImports;  // submenu "Add > Imports": OBJ / FBX / glTF / GLB
 extern PopupMenu* MenuSelect;   // el desplegable del boton "Select"
 extern PopupMenu* MenuObject;   // el desplegable del boton "Object"
 extern PopupMenu* MenuApply;    // submenu de "Object": Apply Location/Rotation/Scale/All (Ctrl A)

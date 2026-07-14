@@ -19,6 +19,8 @@
 class Outliner : public ViewportBase, public WithBorder, public Scrollable {
     public:
         size_t CantidadRenglones;
+        int lastContentRows;   // filas visibles del ultimo render: si cambian (import/add/delete/desplegar) se recalcula
+                               // el scrollbar (antes solo se recalculaba al redimensionar -> tras importar no scrolleaba)
         Rec2D* Renglon;
 
         // CULLING vertical: DibujarRenglon/DibujarOjos recorren TODA la jerarquia (avanzan la matriz igual), pero SALTEAN

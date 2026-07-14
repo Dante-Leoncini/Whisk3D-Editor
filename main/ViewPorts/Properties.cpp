@@ -1082,6 +1082,17 @@ void ConstruirMenuAnim(PopupMenu* menu){
     }
 }
 // aplica la seleccion segun el id del menu (escena o clip de una armadura). La comparten la card y el timeline.
+// al cambiar de animacion activa: invalidar pose+skin de TODA la escena para que la malla se deforme YA a la pose del
+// frame actual (sin esperar al play). Cada armature re-evalua su pose; cada malla skinneada re-skinnea en el proximo render.
+static void InvalidarSkinEscena(){
+    extern Object* SceneCollection;
+    struct L { static void rec(Object* o){ if (!o) return;
+        if (o->getType()==ObjectType::armature) ((Armature*)o)->lastPoseFrame = -999999;
+        else if (o->getType()==ObjectType::mesh){ Mesh* m=(Mesh*)o; if (m->skinArmature) m->lastSkinFrame = -999999; }
+        for (size_t i=0;i<o->Childrens.size();i++) rec(o->Childrens[i]); } };
+    L::rec(SceneCollection);
+    g_redraw = true;
+}
 void AnimSelPorId(int id){
     if (id >= ANIM_CLIP_BASE){
         int k = id - ANIM_CLIP_BASE, armIdx = k / ANIM_CLIP_STRIDE, clipIdx = k % ANIM_CLIP_STRIDE;
@@ -1091,6 +1102,7 @@ void AnimSelPorId(int id){
         }
     } else { ActiveAnimKind = 0; SetEscenaActiva(id); }
     AnimCargarRangoActivo(); // Start/End/FPS propios de la animacion elegida
+    InvalidarSkinEscena();   // deformar la malla YA a la pose del frame actual (sin esperar al play)
 }
 static void AccionAnimSelElegida(int id){ AnimSelPorId(id); PropertiesLayoutDirty = true; g_redraw = true; }
 static PopupMenu* MenuAnimSel = NULL;
