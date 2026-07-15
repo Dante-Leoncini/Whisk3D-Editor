@@ -113,6 +113,14 @@ if(WIN32)
         _CRT_SECURE_NO_WARNINGS
     )
 
+    # Icono embebido en el exe (menu inicio, Explorador, barra de tareas, Alt+Tab). El .rc se genera
+    # con la ruta absoluta del .ico y se compila junto al exe (MSVC compila los .rc del target solo).
+    set(W3D_ICON_ABS "${CMAKE_SOURCE_DIR}/res/Whisk3D.ico")
+    configure_file(
+        ${CMAKE_SOURCE_DIR}/platform/windows/whisk3d.rc.in
+        ${CMAKE_BINARY_DIR}/whisk3d.rc @ONLY)
+    target_sources(whisk3d PRIVATE ${CMAKE_BINARY_DIR}/whisk3d.rc)
+
 endif()
 
 # ---------------------------------------------------
@@ -237,10 +245,12 @@ if(WIN32)
     set(CPACK_GENERATOR "NSIS")
     set(CPACK_PACKAGE_NAME "Whisk3D")
     set(CPACK_PACKAGE_VENDOR "Dante Leoncini")
-    # version = fecha AA.MM.DD (2 digitos) del momento en que se CONFIGURA (cmake -S -B).
-    # Asi el .exe queda como Whisk3D-26.06.20-win64.exe y se sabe que build es.
-    # (Para refrescar la fecha hay que reconfigurar, no solo --build.)
+    # version = fecha AA.MM.DD (2 digitos) del momento en que se EMPAQUETA (cpack).
+    # El string(TIMESTAMP) de aca corre al CONFIGURAR (default/fallback), pero CPackDate.cmake
+    # (CPACK_PROJECT_CONFIG_FILE, abajo) lo RECALCULA en cada corrida de cpack -> el .exe siempre
+    # queda con la fecha del dia en que se genera (Whisk3D-AA.MM.DD-win64.exe), sin reconfigurar.
     string(TIMESTAMP CPACK_PACKAGE_VERSION "%y.%m.%d")
+    set(CPACK_PROJECT_CONFIG_FILE "${CMAKE_SOURCE_DIR}/platform/windows/CPackDate.cmake")
     set(CPACK_PACKAGE_CONTACT "Dante Leoncini <dante_leoncini@outlook.com.ar>")
     set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Whisk3D - editor y motor 3D retro multiplataforma")
     set(CPACK_PACKAGE_INSTALL_DIRECTORY "Whisk3D")
