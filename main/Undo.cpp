@@ -16,6 +16,7 @@ class Camera; extern Camera* CameraActive;
 // SceneCollection (raiz de la escena) viene de objects/Objects.h
 
 extern void ActualizarEditMeshActivo(); // LayoutInput.cpp (refresca g_editMesh al cambiar de modo)
+extern void InvalidarSkinDeArmature(Armature* a); // ObjectMode.cpp (libera el cache de vertex-anim de las mallas del rig)
 
 // ============================================================================
 //  Comandos de UNDO/REDO. Cada comando guarda UN snapshot del estado y su
@@ -81,6 +82,7 @@ public:
             Vector3 cp = o->pos; Quaternion cr = o->rot; Vector3 cs = o->scale; // vivo
             o->pos = e[i].pos; o->rot = e[i].rot; o->scale = e[i].scale;
             e[i].pos = cp; e[i].rot = cr; e[i].scale = cs; // guarda lo vivo
+            o->ActualizarDisplayRot(); // sincroniza el euler del panel con el quaternion restaurado (sino queda stale)
         }
     }
 };
@@ -495,31 +497,62 @@ void UndoJoinConfirmar() {
     g_pendingJoin = NULL;                    // ahora lo posee el JoinUndo
 }
 
+// ARMATURE: snapshot de la REST (T/R/S/preRot/rotOrder/tlNode/head/tail/pose) de todos los huesos, para deshacer un
+// Apply Transform sobre el armature (que la hornea). Aplicar() = SWAP + invalida el cache de skin de las mallas del rig.
+struct BoneRestEst { Vector3 restT, restR, restS, preRot, head, tail, poseT, poseR, poseS; int rotOrder; Matrix4 tlNode; };
+class ArmatureBonesUndo : public UndoCmd {
+    Armature* a; std::vector<BoneRestEst> e;
+public:
+    ArmatureBonesUndo(Armature* arm) : a(arm) {
+        if (!a) return;
+        for (size_t i=0;i<a->bones.size();i++){ W3dBone& b=a->bones[i];
+            BoneRestEst t; t.restT=b.restT; t.restR=b.restR; t.restS=b.restS; t.preRot=b.preRot; t.rotOrder=b.rotOrder;
+            t.tlNode=b.tlNode; t.head=b.head; t.tail=b.tail; t.poseT=b.poseT; t.poseR=b.poseR; t.poseS=b.poseS;
+            e.push_back(t); }
+    }
+    bool Vacio() const { return e.empty(); }
+    void Aplicar() {
+        if (!a || e.size()!=a->bones.size()) return;
+        for (size_t i=0;i<e.size();i++){ W3dBone& b=a->bones[i]; BoneRestEst& t=e[i];
+            Vector3 rt=b.restT,rr=b.restR,rs=b.restS,pr=b.preRot,hd=b.head,tl=b.tail,pt=b.poseT,pR=b.poseR,pS=b.poseS; int ro=b.rotOrder; Matrix4 tn=b.tlNode;
+            b.restT=t.restT; b.restR=t.restR; b.restS=t.restS; b.preRot=t.preRot; b.rotOrder=t.rotOrder; b.tlNode=t.tlNode;
+            b.head=t.head; b.tail=t.tail; b.poseT=t.poseT; b.poseR=t.poseR; b.poseS=t.poseS;
+            t.restT=rt; t.restR=rr; t.restS=rs; t.preRot=pr; t.rotOrder=ro; t.tlNode=tn; t.head=hd; t.tail=tl; t.poseT=pt; t.poseR=pR; t.poseS=pS; }
+        a->poseSerial++; // la pose se recalcula (rest nueva)
+        InvalidarSkinDeArmature(a); // libera el cache stale + fuerza re-skin (la firma del cache no ve la rest)
+    }
+};
+
 // ============================================================================
 //  APPLY (Alt+A): comando ATOMICO = geometria (MeshGeoUndo por malla) + transform (TransformUndo de los
-//  seleccionados). Un Ctrl+Z restaura la geo horneada Y los pos/rot/scale reseteados en 1 solo paso.
+//  seleccionados) + rest de huesos (ArmatureBonesUndo por armature). Un Ctrl+Z restaura la geo horneada, los
+//  pos/rot/scale reseteados Y la rest de los huesos en 1 solo paso.
 // ============================================================================
 class ApplyUndo : public UndoCmd {
-    std::vector<MeshGeoUndo*> geos; TransformUndo* xf;
+    std::vector<MeshGeoUndo*> geos; TransformUndo* xf; std::vector<ArmatureBonesUndo*> arms;
 public:
-    ApplyUndo(const std::vector<MeshGeoUndo*>& g, TransformUndo* x) : geos(g), xf(x) {}
-    ~ApplyUndo() { for (size_t i=0;i<geos.size();i++) delete geos[i]; delete xf; }
-    void Aplicar() { for (size_t i=0;i<geos.size();i++) geos[i]->Aplicar(); if (xf) xf->Aplicar(); } // toggles independientes
+    ApplyUndo(const std::vector<MeshGeoUndo*>& g, TransformUndo* x, const std::vector<ArmatureBonesUndo*>& ar) : geos(g), xf(x), arms(ar) {}
+    ~ApplyUndo() { for (size_t i=0;i<geos.size();i++) delete geos[i]; delete xf; for (size_t i=0;i<arms.size();i++) delete arms[i]; }
+    void Aplicar() { for (size_t i=0;i<geos.size();i++) geos[i]->Aplicar(); if (xf) xf->Aplicar(); for (size_t i=0;i<arms.size();i++) arms[i]->Aplicar(); } // toggles independientes
 };
 static std::vector<MeshGeoUndo*> g_pendingApplyGeos;
 static TransformUndo* g_pendingApplyXf = NULL;
+static std::vector<ArmatureBonesUndo*> g_pendingApplyArms;
 
 void UndoApplyIniciar() {
     for (size_t i=0;i<g_pendingApplyGeos.size();i++) delete g_pendingApplyGeos[i];
     g_pendingApplyGeos.clear();
+    for (size_t i=0;i<g_pendingApplyArms.size();i++) delete g_pendingApplyArms[i];
+    g_pendingApplyArms.clear();
     delete g_pendingApplyXf; g_pendingApplyXf = new TransformUndo(); // snapshot de pos/rot/scale de los seleccionados
-    for (size_t i=0;i<ObjSelects.size();i++){ Object* o=ObjSelects[i];
-        if (o && o->getType()==ObjectType::mesh) g_pendingApplyGeos.push_back(new MeshGeoUndo((Mesh*)o)); }
+    for (size_t i=0;i<ObjSelects.size();i++){ Object* o=ObjSelects[i]; if(!o) continue;
+        if (o->getType()==ObjectType::mesh) g_pendingApplyGeos.push_back(new MeshGeoUndo((Mesh*)o));
+        else if (o->getType()==ObjectType::armature) g_pendingApplyArms.push_back(new ArmatureBonesUndo((Armature*)o)); }
 }
 void UndoApplyConfirmar() {
-    if (g_pendingApplyGeos.empty() && !g_pendingApplyXf) return;
-    Push(new ApplyUndo(g_pendingApplyGeos, g_pendingApplyXf)); // 1 comando (geo + transform)
-    g_pendingApplyGeos.clear(); g_pendingApplyXf = NULL;
+    if (g_pendingApplyGeos.empty() && g_pendingApplyArms.empty() && !g_pendingApplyXf) return;
+    Push(new ApplyUndo(g_pendingApplyGeos, g_pendingApplyXf, g_pendingApplyArms)); // 1 comando (geo + transform + rest)
+    g_pendingApplyGeos.clear(); g_pendingApplyXf = NULL; g_pendingApplyArms.clear();
 }
 
 void UndoDeshacer() {

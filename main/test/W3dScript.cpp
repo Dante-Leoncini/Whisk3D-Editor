@@ -1357,6 +1357,47 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
             clip?clip->startFrame:-1, clip?clip->endFrame:-1, clip?clip->FrameRate:-1);
         return true;
     }
+    // ---- applyarmtest <what> <frame> : pone un transform NO trivial (pos+rot+scale) en el armature y hace Apply
+    //      (what: 0=location 1=rotation 2=scale 3=all) via Ctrl+A. Mide el bbox MUNDIAL (GetWorldMatrix*skinVertex) de
+    //      la malla deformada ANTES, DESPUES del apply (no-op visual -> identico) y tras UNDO (restaura -> identico). ----
+    if (cmd == "applyarmtest") {
+        int what=2, frame=15; ss>>what>>frame;
+        Mesh* m=NULL; { std::vector<Object*> st; if(SceneCollection) st.push_back(SceneCollection);
+          while(!st.empty()){ Object* o=st.back(); st.pop_back();
+            if (o->getType()==ObjectType::mesh && ((Mesh*)o)->skinArmature && !m) m=(Mesh*)o;
+            for(size_t i=0;i<o->Childrens.size();i++) st.push_back(o->Childrens[i]); } }
+        if(!m){err="applyarmtest: no hay malla skinneada";return false;}
+        Armature* a=m->skinArmature;
+        extern int ActiveAnimKind; extern Armature* ActiveAnimArm;
+        if(!a->animations.empty()){ActiveAnimKind=1;ActiveAnimArm=a;a->animActiva=0;}
+        // transform NO trivial (simula el rig movido/rotado/achicado por el usuario)
+        a->pos=Vector3(1.2f,0.5f,-0.8f); a->rotEuler=Vector3(20,35,-15); a->rot=Quaternion::FromEulerXYZ(20*3.14159265f/180,35*3.14159265f/180,-15*3.14159265f/180);
+        a->scale=Vector3(0.37f,0.37f,0.37f); a->lastPoseFrame=-999999; a->poseSerial++; m->LiberarSkinCache(); m->lastSkinFrame=-999999;
+        CurrentFrame=frame; SkinearMesh(m); if(!m->skinVertex){err="applyarmtest: sin skinVertex";return false;}
+        struct BB { static void medir(Mesh* mm, float* b){ Matrix4 W; mm->GetWorldMatrix(W);
+            for(int k=0;k<3;k++){b[k]=1e30f;b[k+3]=-1e30f;}
+            for(int i=0;i<mm->vertexSize;i++){ Vector3 p=W*Vector3(mm->skinVertex[i*3],mm->skinVertex[i*3+1],mm->skinVertex[i*3+2]);
+                float pv[3]={p.x,p.y,p.z}; for(int c=0;c<3;c++){ if(pv[c]<b[c])b[c]=pv[c]; if(pv[c]>b[c+3])b[c+3]=pv[c]; } } } };
+        float b0[6]; BB::medir(m,b0);
+        const char* wn=(what==0)?"Location":(what==1)?"Rotation":(what==2)?"Scale":"All";
+        printf("      [applyarmtest] Apply %s | armT(%.2f,%.2f,%.2f) armR(%.0f,%.0f,%.0f) armS(%.3f,%.3f,%.3f)\n",
+            wn, a->pos.x,a->pos.y,a->pos.z, a->rotEuler.x,a->rotEuler.y,a->rotEuler.z, a->scale.x,a->scale.y,a->scale.z);
+        estado=editNavegacion; InteractionMode=ObjectMode;
+        DeseleccionarTodo(); ObjSelects.clear(); a->Seleccionar(); ObjSelects.push_back((Object*)a); ObjActivo=(Object*)a;
+        AplicarTransform(what);
+        m->lastSkinFrame=-999999; SkinearMesh(m);
+        float b1[6]; BB::medir(m,b1);
+        float d1=0; for(int k=0;k<6;k++){ float d=fabsf(b1[k]-b0[k]); if(d>d1)d1=d; }
+        UndoDeshacer();
+        a->lastPoseFrame=-999999; m->LiberarSkinCache(); m->lastSkinFrame=-999999; SkinearMesh(m);
+        float b2[6]; BB::medir(m,b2);
+        float d2=0; for(int k=0;k<6;k++){ float d=fabsf(b2[k]-b0[k]); if(d>d2)d2=d; }
+        printf("      [applyarmtest] tras apply armT(%.2f,%.2f,%.2f) armR(%.0f,%.0f,%.0f) armS(%.3f,%.3f,%.3f)\n         world ANTES =(%.2f,%.2f,%.2f)..(%.2f,%.2f,%.2f)\n         world APPLY =(%.2f,%.2f,%.2f)..(%.2f,%.2f,%.2f)  maxdiff=%.5f %s\n         world UNDO  =(%.2f,%.2f,%.2f)..(%.2f,%.2f,%.2f)  maxdiff=%.5f %s\n",
+            a->pos.x,a->pos.y,a->pos.z, a->rotEuler.x,a->rotEuler.y,a->rotEuler.z, a->scale.x,a->scale.y,a->scale.z,
+            b0[0],b0[1],b0[2],b0[3],b0[4],b0[5], b1[0],b1[1],b1[2],b1[3],b1[4],b1[5], d1, d1<0.05f?"OK":"DIFF!",
+            b2[0],b2[1],b2[2],b2[3],b2[4],b2[5], d2, d2<0.05f?"OK":"DIFF!");
+        return true;
+    }
     // ---- applyarm [frame] : Apply del modificador Armature -> hornea la pose deformada del frame en la malla editable.
     //      Verifica que skinArmature queda NULL, el modificador se saca, y el bbox de vertex[] paso a la pose deformada. ----
     if (cmd == "applyarm") {

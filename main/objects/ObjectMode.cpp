@@ -5,6 +5,8 @@
 #include "Undo.h"      // Ctrl+Z: capturar transform / limpiar al borrar
 #include "ViewPorts/LayoutInput.h" // SNAP en modo objeto (SnapBuscarTarget, g_snap, enums)
 #include "edit/Modifier.h" // deep-copy de modificadores al duplicar
+#include "objects/Armature.h" // Apply Transform sobre armature: hornear en los huesos
+#include "animation/SkeletalAnimation.h" // HornearTransformEnHuesos
 
 // SNAP en MODO OBJETO: se snapshotean los "puntos de snap" de la seleccion al empezar el transform (todos los
 // verts de las mallas + el ORIGEN de camara/lampara/empty) y move/rotate/scale imantan la BASE al target.
@@ -618,16 +620,30 @@ void JoinObjetos(){
 //   Scale    -> scale queda 1 (una escala 1.34 pasa a 1; la malla mantiene su tamaño)
 // Matematica: v_new = inv(M_reset) * M_actual * v, con M = T*R*S LOCAL del objeto -> M_reset*v_new = M_actual*v
 // (la malla no se mueve en el espacio del padre). Aplica a TODAS las mallas seleccionadas. Undo atomico.
+// libera el cache de vertex-animation + fuerza el re-skin de TODAS las mallas de la escena que deforman con 'a'. Tras
+// hornear el transform del objeto en los huesos, el cache tiene deformaciones VIEJAS y su firma NO incluye la rest ->
+// hay que liberarlo a mano, sino SkinearMesh reproduce el frame stale en vez de re-skinnear. (Lo usa tambien el undo.)
+void InvalidarSkinDeArmature(Armature* a){
+    if (!a || !SceneCollection) return;
+    struct L { static void rec(Object* o, Armature* a){ if(!o) return;
+        if (o->getType()==ObjectType::mesh){ Mesh* m=(Mesh*)o; if (m->skinArmature==a){ m->LiberarSkinCache(); m->lastSkinFrame=-999999; } }
+        for (size_t i=0;i<o->Childrens.size();i++) rec(o->Childrens[i], a); } };
+    L::rec(SceneCollection, a);
+    a->lastPoseFrame=-999999; a->lastPoseAnim=-999; a->poseDirty=false;
+}
+
 void AplicarTransform(int what){
     if (estado != editNavegacion || InteractionMode != ObjectMode) return;
-    std::vector<Object*> mallas;
-    for (size_t i=0;i<ObjSelects.size();i++){ Object* o=ObjSelects[i];
-        if (o && o->getType()==ObjectType::mesh) mallas.push_back(o); }
-    if (mallas.empty()) { Notificar("Apply: select mesh object(s)", true); return; }
+    std::vector<Object*> mallas; std::vector<Armature*> arms;
+    for (size_t i=0;i<ObjSelects.size();i++){ Object* o=ObjSelects[i]; if(!o) continue;
+        if (o->getType()==ObjectType::mesh) mallas.push_back(o);
+        else if (o->getType()==ObjectType::armature) arms.push_back((Armature*)o); }
+    if (mallas.empty() && arms.empty()) { Notificar("Apply: select mesh or armature object(s)", true); return; }
 
     Quaternion idRot = Quaternion::FromEulerXYZ(0.0f,0.0f,0.0f); // identidad
-    UndoApplyIniciar(); // snapshot de transforms + geo de los seleccionados (undo atomico: geo + transform)
+    UndoApplyIniciar(); // snapshot de transforms + geo de mallas + rest de huesos de armatures (undo atomico)
 
+    // MALLAS: hornear el transform en los VERTICES (v_new = inv(M_reset)*M_actual*v)
     for (size_t i=0;i<mallas.size();i++){
         Object* o = mallas[i];
         Vector3 pos2 = o->pos; Quaternion rot2 = o->rot; Vector3 scl2 = o->scale; // valores reseteados
@@ -642,9 +658,25 @@ void AplicarTransform(int what){
         o->pos = pos2; o->rot = rot2; o->scale = scl2;         // resetear el componente en el objeto
         o->ActualizarDisplayRot();
     }
+    // ARMATURES: hornear el transform del objeto en los HUESOS (rest). Como skinA no cambia -> skinMatrix'=B*skinMatrix
+    // y las mallas skinneadas HIJAS quedan identicas al resetear el transform del armature (ej: normalizar un rig 100x).
+    for (size_t i=0;i<arms.size();i++){
+        Armature* a = arms[i];
+        Vector3 pos2 = a->pos; Quaternion rot2 = a->rot; Vector3 scl2 = a->scale;
+        if (what==0 || what==3) pos2 = Vector3(0,0,0);
+        if (what==1 || what==3) rot2 = idRot;
+        if (what==2 || what==3) scl2 = Vector3(1,1,1);
+        Matrix4 M  = a->BuildMatrix(a->pos, a->rot, a->scale); // M_arm actual
+        Matrix4 Mp = a->BuildMatrix(pos2,  rot2,  scl2);       // M_arm reseteado
+        Matrix4 invMp; InvertAffine(Mp, invMp);
+        Matrix4 B = invMp * M;                                 // se hornea en espacio nodo (world_FK'=B*world_FK)
+        HornearTransformEnHuesos(a, B);
+        a->pos = pos2; a->rot = rot2; a->scale = scl2; a->ActualizarDisplayRot();
+        InvalidarSkinDeArmature(a); // libera el cache + re-skinnea las mallas hijas a la nueva rest
+    }
     UndoApplyConfirmar();
     const char* nom = (what==0)?"Location":(what==1)?"Rotation":(what==2)?"Scale":"All Transforms";
-    Notificar(std::string("Apply ") + nom + ": baked into mesh", false);
+    Notificar(std::string("Apply ") + nom + ": baked", false);
 }
 
 // Set Active Object as Camera (Ctrl+Numpad 0 / menu View > Cameras): hace que el objeto ACTIVO sea la CAMARA
