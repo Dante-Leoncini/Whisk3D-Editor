@@ -26,7 +26,9 @@
 #include <stdint.h>
 
 #ifdef __EMSCRIPTEN__
-void WebDescargarArchivo(const char* rutaVFS, const char* nombreSugerido); // main.cpp
+// extern "C": la def es un EM_JS en main.cpp (linkage C). Sin esto el link falla con "undefined symbol
+// WebDescargarArchivo(char const*, char const*)" (busca el simbolo C++-mangled). Igual que Properties.cpp / ViewPort3D.cpp.
+extern "C" void WebDescargarArchivo(const char* rutaVFS, const char* nombreSugerido); // main.cpp
 #endif
 
 // ============================================================================
