@@ -9,6 +9,7 @@
 #include "objects/Objects.h"             // CollectionActive
 #include "w3dFilesystem.h"               // w3dFileSystem::ReadFileBytes / FileExists
 #include "ViewPorts/LayoutInput.h"       // Notificar (toast)
+#include "ViewPorts/PopUp/ProgressPopup.h" // barra de progreso (import: clave en el N95 lento, faltaba en glTF)
 #include "math/Quaternion.h"
 #include "math/Matrix4.h"
 #include "math/Vector3.h"
@@ -335,6 +336,9 @@ bool ImportGLTF(const std::string& filepath) {
         Notificar("glTF: JSON invalido", true); return false;
     }
 
+    ProgresoIniciar("Importing glTF..."); // barra de progreso (no-op sin GUI; clave en el N95). Faltaba en glTF.
+    ProgresoActualizar(0.1f);
+
     // ---- buffers ----
     const JVal* bufs = doc.arr("buffers");
     if (bufs) for (size_t i = 0; i < bufs->size(); i++) {
@@ -534,9 +538,13 @@ bool ImportGLTF(const std::string& filepath) {
     // ---- mallas: una por NODO con "mesh" (mezcla las primitivas del mesh en mesh-parts) ----
     const JVal* meshes = doc.arr("meshes");
     int importadas = 0;
+    ProgresoActualizar(0.4f);
+    int nMeshNodes = 0; if (meshes && nodes) for (int q = 0; q < nNodes; q++) if (nodes->arr[q].getI("mesh", -1) >= 0) nMeshNodes++;
+    int meshNodeIdx = 0;
     for (int nd = 0; nd < nNodes && meshes; nd++) {
         const JVal& node = nodes->arr[nd];
         int mi = node.getI("mesh", -1); if (mi < 0 || mi >= (int)meshes->size()) continue;
+        ProgresoActualizar(0.4f + 0.6f * (nMeshNodes ? (float)(meshNodeIdx++) / (float)nMeshNodes : 0.0f)); // 40%..100% por malla
         bool skinned = node.has("skin") && arm;
         const JVal& gm = meshes->arr[mi];
         const JVal* prims = gm.find("primitives"); if (!prims || prims->t != JVal::ARR) continue;
@@ -630,7 +638,8 @@ bool ImportGLTF(const std::string& filepath) {
         importadas++;
     }
 
-    if (importadas == 0 && !arm) { w3dLogfE("ImportGLTF: sin mallas ni esqueleto"); Notificar("glTF: nada que importar", true); return false; }
+    if (importadas == 0 && !arm) { w3dLogfE("ImportGLTF: sin mallas ni esqueleto"); ProgresoFin(); Notificar("glTF: nada que importar", true); return false; }
+    ProgresoFin();
     w3dLogf("ImportGLTF: %d malla(s), %s", importadas, filepath.c_str());
     Notificar("glTF imported successfully!", false);
     return true;

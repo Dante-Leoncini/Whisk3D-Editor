@@ -2,6 +2,8 @@
 #include "edit/MeshEdit.h"      // funciones libres de edicion de malla (mesh parts, etc.)
 #include "objects/EditMesh.h"   // malla de EDICION (editor): este TU SI puede verla
 #include "edit/Modifier.h"      // stack de modificadores (clase del EDITOR; el core solo guarda Modifier*)
+#include "animation/SkeletalAnimation.h" // SkinearMesh (Apply del modificador Armature: hornear la pose)
+#include "animation/Animation.h"         // CurrentFrame
 #include "Undo.h"               // Ctrl+Z: snapshot de geometria antes de los ops
 #include "w3dGraphics.h"
 #include "WhiskUI/colores.h"
@@ -1952,6 +1954,23 @@ void Mesh::AnexarMallaTransformada(Mesh* otra, const Matrix4& M) {
         looseEdges.push_back(otra->looseEdges[i]+base);
         looseEdges.push_back(otra->looseEdges[i+1]+base);
     }
+
+    // --- SKINNING: mergear vertCtrlPoint (render->control-point) + vertex groups. Sin esto el join rompia las mallas
+    // skinneadas (perdian los pesos -> colapsaban). Los control-points de 'otra' se DESPLAZAN despues de los de esta;
+    // los vertex groups se mergean POR NOMBRE (mismo hueso = mismo grupo). GenerarRender (del caller) despues remapea
+    // vertCtrlPoint al render dedupeado (ver el fix en GenerarRender). ---
+    if (!vertCtrlPoint.empty() || !otra->vertCtrlPoint.empty()){
+        int cpOffset = 0; for (size_t i=0;i<vertCtrlPoint.size();i++) if (vertCtrlPoint[i]+1 > cpOffset) cpOffset = vertCtrlPoint[i]+1; // #control-points de ESTA
+        if ((int)vertCtrlPoint.size() < base) vertCtrlPoint.resize(base, -1); // esta malla sin skin -> sus verts van sin CP
+        for (int i=0;i<add;i++){ int cp = (i < (int)otra->vertCtrlPoint.size()) ? otra->vertCtrlPoint[i] : -1;
+            vertCtrlPoint.push_back(cp >= 0 ? cp + cpOffset : -1); }
+        for (size_t g=0; g<otra->vertexGroups.size(); g++){ VertexGroup* bg = otra->vertexGroups[g]; if (!bg) continue;
+            VertexGroup* ag = NULL; for (size_t k=0;k<vertexGroups.size();k++) if (vertexGroups[k] && vertexGroups[k]->nombre==bg->nombre){ ag=vertexGroups[k]; break; }
+            if (!ag){ ag = new VertexGroup(bg->nombre); vertexGroups.push_back(ag); }
+            for (size_t v=0; v<bg->verts.size() && v<bg->pesos.size(); v++){ ag->verts.push_back(bg->verts[v] + cpOffset); ag->pesos.push_back(bg->pesos[v]); }
+        }
+        if (!skinArmature && otra->skinArmature) skinArmature = otra->skinArmature; // heredar el rig si esta no estaba skinneada
+    }
 }
 
 // APPLY (Alt+A): hornea la matriz B en la geometria. Transforma cada vertice (v -> B*v) y regenera el render
@@ -2463,6 +2482,21 @@ static void MirrorEditableAxis(Mesh* m, const Vector3& c, const Vector3& n, bool
 void Mesh::AplicarModificadorActivo() {
     if (modificadorActivo < 0 || modificadorActivo >= (int)modificadores.size()) return;
     Modifier* mod = modificadores[modificadorActivo];
+    if (mod->tipo == ModifierType::Armature) {
+        // APPLY ARMATURE: hornea la POSE deformada del frame actual en la malla editable (mueve vertices + normales a
+        // la posicion actual, como pidio Dante) y saca el modificador. El skinning deja de deformar (queda congelado).
+        // NO toca el esqueleto ni el export (el export exporta el rig sin hornear; esto es la accion manual opuesta).
+        if (!skinArmature || !vertex || vertexSize <= 0) { QuitarModificadorActivo(); return; }
+        UndoCapturarMallaGeo(this);       // Ctrl+Z: snapshot pre-apply
+        lastSkinFrame = -999999;          // forzar el re-skin a la pose ACTUAL (evita el cache por frame)
+        SkinearMesh(this);                // deforma a CurrentFrame -> skinVertex (mismo espacio local que vertex)
+        if (skinVertex) for (int i = 0; i < vertexSize * 3; i++) vertex[i] = skinVertex[i]; // verts -> pose actual
+        skinArmature = NULL;              // corta la deformacion: la malla queda congelada en la pose horneada
+        QuitarModificadorActivo();        // el Armature ya esta horneado -> fuera del stack
+        PoblarCapas();                    // asegura las capas UV/color desde el render antes de regenerar
+        GenerarRender();                  // recompone las normales de la geo horneada + preserva UV/color + bordes
+        return;
+    }
     if (mod->tipo == ModifierType::Mirror) {
         UndoCapturarMallaGeo(this); // Ctrl+Z: snapshot completo de la geometria pre-apply
         Vector3 c(0,0,0), axX(1,0,0), axY(0,1,0), axZ(0,0,1);
@@ -2836,6 +2870,15 @@ void Mesh::GenerarRender() {
     delete[] uv;          uv=new GLfloat[nuevoN*2];      for(int i=0;i<nuevoN*2;i++) uv[i]=vu[i];
     delete[] vertexColor; vertexColor=new GLubyte[nuevoN*4]; for(int i=0;i<nuevoN*4;i++) vertexColor[i]=vc[i];
     vertexSize=nuevoN;
+    // SKINNING: remapear vertCtrlPoint (render-vert -> control-point) al render NUEVO. El merge de arriba re-dedupea
+    // los render verts, asi que el mapeo viejo queda invalido: sin esto, editar/joinear una malla skinneada rompia el
+    // skin (los verts sin CP -> peso 0 -> la malla colapsaba). oldToNew mapea viejo->nuevo; verts nuevos (loose) = -1.
+    if (!vertCtrlPoint.empty()){
+        std::vector<int> nCP(nuevoN, -1);
+        for (int i=0;i<(int)oldToNew.size() && i<(int)vertCtrlPoint.size();i++)
+            if (oldToNew[i]>=0 && oldToNew[i]<nuevoN) nCP[oldToNew[i]] = vertCtrlPoint[i];
+        vertCtrlPoint.swap(nCP);
+    }
     faces3d.swap(nf3d);   // misma cantidad/orden de corners -> las capas siguen validas
     looseEdges.swap(nLoose); // bordes sueltos remapeados a los GPU nuevos
     looseVerts.swap(nLooseV); // verts sueltos remapeados
@@ -3267,12 +3310,18 @@ void Mesh::CornerNormalConSharp(){
 //  (declarados en Mesh.h). El Core ya no las define.
 // ============================================================================
 // libera las capas persistentes (uv/color/groups). Lo llaman el destructor y Regenerar.
-void Mesh::LiberarCapas() {
+void Mesh::LiberarCapas(bool incluirGrupos) {
     for (size_t i=0;i<uvMaps.size();i++)       delete uvMaps[i];
     for (size_t i=0;i<colorLayers.size();i++)  delete colorLayers[i];
-    for (size_t i=0;i<vertexGroups.size();i++) delete vertexGroups[i];
-    uvMaps.clear(); colorLayers.clear(); vertexGroups.clear();
-    uvMapActivo = -1; colorActivo = -1; grupoActivo = -1;
+    uvMaps.clear(); colorLayers.clear();
+    uvMapActivo = -1; colorActivo = -1;
+    // vertex groups: NO son una "capa" derivable del render (PoblarCapas NO los rehace). Solo se borran cuando se
+    // pide (reset total / geometria nueva / destructor). En un JOIN/APPLY hay que PRESERVARLOS (incluirGrupos=false),
+    // sino se perdia el skinning y la malla colapsaba (bug del Ctrl+J sobre mallas skinneadas).
+    if (incluirGrupos) {
+        for (size_t i=0;i<vertexGroups.size();i++) delete vertexGroups[i];
+        vertexGroups.clear(); grupoActivo = -1;
+    }
     cornerNormal.clear(); // se rehace en PoblarCapas desde normals[]
 }
 

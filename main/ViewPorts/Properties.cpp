@@ -18,6 +18,7 @@
 #include "objects/Armature.h" // pestania Animation: clips del esqueleto
 #include "animation/SkeletalAnimation.h" // CrearAnimacion/BorrarAnimacionActiva/MoverAnimacionActiva
 #include "importers/import_obj.h" // ExportOBJ (boton Wavefront.obj de la tarjeta Export)
+#include "importers/export_gltf.h" // ExportGLTF (glTF/GLB: rig + animaciones, sin hornear el skinning)
 #include "render/OpcionesRender.h" // g_redraw (scroll de la lista con la rueda)
 #include "ViewPorts/ViewPort3D.h"  // Viewport3D::RenderAPNG + Viewport3DActive (render a PNG)
 #include <cstdio>
@@ -783,60 +784,114 @@ static std::string CombinarSalida(const std::string& dir, const std::string& nom
     return w3dFileSystem::JoinPath(carpeta, nm);
 }
 
-// ---------- EXPORT OBJ (Path + File name + confirmacion de sobrescritura) ----------
+// ---------- EXPORT (dropdown de formato: OBJ / FBX / glTF / GLB + Path + File name) ----------
+// Formato: 0=OBJ 1=FBX 2=glTF 3=GLB. OBJ solo malla (avisa que pierde rig/animaciones); glTF/GLB llevan
+// el rig y sus clips SIN hornear el skinning (import_gltf es su inverso). FBX (binario) todavia no exporta.
+static const char* ExtDeFormato(int f){ return (f==0)?".obj":(f==1)?".fbx":(f==2)?".gltf":".glb"; }
+static const char* NombreFormato(int f){ return (f==0)?"Wavefront .obj":(f==1)?"FBX":(f==2)?"glTF":"GLB"; }
+
+// cambia la extension del File name al formato elegido (respeta el nombre base)
+static void ActualizarExtensionExport(){
+    if (!PropsActivo || !PropsActivo->propExportName) return;
+    std::string nom = PropsActivo->propExportName->field.text;
+    size_t dot = nom.find_last_of('.');
+    std::string base = (dot == std::string::npos) ? nom : nom.substr(0, dot);
+    if (base.empty()) base = "model";
+    PropsActivo->propExportName->field.SetText(base + ExtDeFormato(PropsActivo->exportFormat));
+}
+
+// true si el modelo a exportar tiene rig (skinArmature) o vertex groups -> el OBJ los perderia (aviso).
+static bool ExportMeshPierdeRig(Object* o, bool selOnly){
+    if (!o) return false;
+    for (size_t i = 0; i < o->Childrens.size(); i++) { Object* c = o->Childrens[i];
+        if (c->getType() == ObjectType::mesh && (!selOnly || c->select)) { Mesh* m = (Mesh*)c;
+            if (m->skinArmature || !m->vertexGroups.empty()) return true; }
+        if (ExportMeshPierdeRig(c, selOnly)) return true; }
+    return false;
+}
+
 // ConfirmarPopup::onSi no lleva argumentos -> se guarda la ruta pendiente en un estatico.
 static std::string g_pendingExportPath;
-static void HacerExportObj(){
-    std::string path = g_pendingExportPath;
+static void HacerExportActual(){
     if (!PropsActivo) return;
-    bool ok = ExportOBJ(path, PropsActivo->exportSelectedOnly, PropsActivo->exportApplyModifiers, PropsActivo->exportApplyTransforms);
-    if (ok) {
-        Notificar("OBJ saved successfully!", false);
+    std::string path = g_pendingExportPath;
+    int f = PropsActivo->exportFormat;
+    if (f == 1) { Notificar("FBX export: not available yet", true); return; } // el exportador FBX binario todavia no esta
+    bool ok = false;
+    if (f == 0) {
+        ok = ExportOBJ(path, PropsActivo->exportSelectedOnly, PropsActivo->exportApplyModifiers, PropsActivo->exportApplyTransforms);
+        if (ok) Notificar("OBJ saved successfully!", false); else Notificar("Error: could not save the OBJ", true);
 #ifdef __EMSCRIPTEN__
-        // web: bajar el .obj y su .mtl al disco del usuario (el FS de emscripten es virtual).
-        std::string mtl = ExtractBaseName(path) + ".mtl";
-        WebDescargarArchivo(path.c_str(), SoloNombre(path).c_str());
-        WebDescargarArchivo(mtl.c_str(), SoloNombre(mtl).c_str());
+        if (ok) { std::string mtl = ExtractBaseName(path) + ".mtl"; // web: bajar .obj + .mtl (FS virtual de emscripten)
+            WebDescargarArchivo(path.c_str(), SoloNombre(path).c_str()); WebDescargarArchivo(mtl.c_str(), SoloNombre(mtl).c_str()); }
 #endif
     } else {
-        Notificar("Error: could not save the OBJ", true);
+        ok = ExportGLTF(path, PropsActivo->exportSelectedOnly, f == 3); // f==2 glTF (texto), f==3 GLB (binario)
+        // ExportGLTF ya tira su propia notificacion + autodescarga en web
     }
+    (void)ok;
 }
-// boton "Wavefront.obj": arma Path + File name, y si el archivo ya existe pide confirmacion.
-static void AccionExportObj(){
+// boton "Export": arma Path + File name segun formato. OBJ avisa la perdida del rig; sino pide sobrescritura.
+static void AccionExport(){
     if (!PropsActivo || !PropsActivo->propExportName) return;
+    int f = PropsActivo->exportFormat;
     std::string dir    = PropsActivo->propExportPath ? PropsActivo->propExportPath->field.text : std::string();
     std::string nombre = PropsActivo->propExportName->field.text;
-    std::string full   = CombinarSalida(dir, nombre, "model.obj");
+    std::string porDefecto = std::string("model") + ExtDeFormato(f);
+    std::string full   = CombinarSalida(dir, nombre, porDefecto.c_str());
 #ifdef W3D_SYMBIAN
     // N95: carpeta FIJA E:/whisk3d/models/ (creada en AppInit). Toma solo el nombre.
-    full = std::string("E:/whisk3d/models/") + SoloNombre(nombre.empty() ? "model.obj" : nombre);
+    full = std::string("E:/whisk3d/models/") + SoloNombre(nombre.empty() ? porDefecto : nombre);
 #endif
     g_pendingExportPath = full;
+    // OBJ con rig: un SOLO cartel que avisa la perdida (y que se sobrescribe si existe) -> Continuar = exportar.
+    if (f == 0 && ExportMeshPierdeRig(SceneCollection, PropsActivo->exportSelectedOnly)) {
+        if (!confirmarPopup) confirmarPopup = new ConfirmarPopup();
+        confirmarPopup->Abrir("OBJ does not store the skeleton or animations: only the mesh will be exported (vertex groups, armature and clips will be lost). It will overwrite the file if it already exists. Continue?", HacerExportActual);
+        return;
+    }
 #ifndef W3D_SYMBIAN
     if (w3dFileSystem::FileExists(full)) {
         if (!confirmarPopup) confirmarPopup = new ConfirmarPopup();
-        confirmarPopup->Abrir("The file \"" + SoloNombre(full) + "\" already exists. Do you want to replace it?", HacerExportObj);
+        confirmarPopup->Abrir("The file \"" + SoloNombre(full) + "\" already exists. Do you want to replace it?", HacerExportActual);
         return;
     }
 #endif
-    HacerExportObj();
+    HacerExportActual();
+}
+// dropdown de formato: elige OBJ/FBX/glTF/GLB y ajusta la extension del File name.
+static PopupMenu* MenuExportFormat = NULL;
+static void AccionExportFormatElegido(int id){
+    if (!PropsActivo) return;
+    if (id >= 0 && id <= 3) { PropsActivo->exportFormat = id; ActualizarExtensionExport(); }
+    PropertiesLayoutDirty = true; g_redraw = true;
+}
+static void AccionMenuExportFormat(){
+    if (!PropsActivo || !PropsActivo->propExportFormat) return;
+    if (!MenuExportFormat) { MenuExportFormat = new PopupMenu(); MenuExportFormat->action = AccionExportFormatElegido; }
+    MenuExportFormat->Limpiar();
+    MenuExportFormat->Agregar("Wavefront .obj", 0, IconType::mesh);
+    MenuExportFormat->Agregar("FBX", 1, IconType::armature);
+    MenuExportFormat->Agregar("glTF", 2, IconType::mesh);
+    MenuExportFormat->Agregar("GLB", 3, IconType::mesh);
+    AbrirMenuBajoBoton(MenuExportFormat, PropsActivo->propExportFormat->button);
 }
 // el explorador (modo guardar) devolvio una CARPETA: se pone en el campo Path (el nombre no se toca).
 static void ExportFolderElegido(const std::string& elegido){
     if (!PropsActivo || !PropsActivo->propExportPath) return;
-    // si el usuario eligio un .obj existente -> separar carpeta y nombre
-    bool esObj = (elegido.size() >= 4 && elegido.substr(elegido.size() - 4) == ".obj");
-    if (esObj) {
+    // si el usuario eligio un archivo de modelo existente -> separar carpeta y nombre
+    size_t dot = elegido.find_last_of('.');
+    bool esArchivo = (dot != std::string::npos && dot + 1 < elegido.size() && elegido.find_last_of("/\\") < dot);
+    if (esArchivo) {
         PropsActivo->propExportPath->field.SetText(w3dFileSystem::ParentPath(elegido));
         if (PropsActivo->propExportName) PropsActivo->propExportName->field.SetText(SoloNombre(elegido));
     } else {
         PropsActivo->propExportPath->field.SetText(elegido);
     }
 }
-// boton de la carpeta: abre el explorador para elegir la carpeta de salida del .obj
+// boton de la carpeta: abre el explorador para elegir la carpeta de salida
 static void AccionBrowseExport(){
-    AbrirFileBrowser("Export to...", "Select Folder", ".obj", ExportFolderElegido, true);
+    AbrirFileBrowser("Export to...", "Select Folder", ".obj .gltf .glb .fbx", ExportFolderElegido, true);
 }
 
 // ---------- RENDER (Path + File name + confirmacion) ----------
@@ -1031,7 +1086,9 @@ static void AccionVertDelGroup()  { Mesh* m = VerticesMesh(); if (m) { BorrarVer
 static void AccionVertGroupUp()   { Mesh* m = VerticesMesh(); if (m) { MoverVertexGroupActivo(m,-1); PropertiesLayoutDirty = true; g_redraw = true; } }
 static void AccionVertGroupDown() { Mesh* m = VerticesMesh(); if (m) { MoverVertexGroupActivo(m,+1); PropertiesLayoutDirty = true; g_redraw = true; } }
 // ARMATURE: crear / borrar / mover el clip de animacion activo (mismo patron que los vertex groups)
-static void AccionAnimAdd()  { Armature* a = ArmActiva(); if (a) { CrearAnimacion(a);         PropertiesLayoutDirty = true; g_redraw = true; } }
+static void InvalidarSkinEscena(); // def mas abajo (re-deforma las mallas skinneadas a la pose actual)
+static void AccionAnimAdd()  { Armature* a = ArmActiva(); if (a) { CrearAnimacion(a); InvalidarSkinEscena(); PropertiesLayoutDirty = true; g_redraw = true; } } // New Animation: clip vacio en pose reset
+static void AccionAnimDup()  { Armature* a = ArmActiva(); if (a && a->animActiva >= 0) { DuplicarAnimacionActiva(a); PropertiesLayoutDirty = true; g_redraw = true; } } // Duplicate: copia el clip activo
 static void AccionAnimDel()  { Armature* a = ArmActiva(); if (a) { BorrarAnimacionActiva(a);  PropertiesLayoutDirty = true; g_redraw = true; } }
 static void AccionAnimUp()   { Armature* a = ArmActiva(); if (a) { MoverAnimacionActiva(a,-1); PropertiesLayoutDirty = true; g_redraw = true; } }
 static void AccionAnimDown() { Armature* a = ArmActiva(); if (a) { MoverAnimacionActiva(a,+1); PropertiesLayoutDirty = true; g_redraw = true; } }
@@ -1105,6 +1162,15 @@ void AnimSelPorId(int id){
     InvalidarSkinEscena();   // deformar la malla YA a la pose del frame actual (sin esperar al play)
 }
 static void AccionAnimSelElegida(int id){ AnimSelPorId(id); PropertiesLayoutDirty = true; g_redraw = true; }
+// hook de la LISTA de animaciones (PropList modo 5, tab Armature): al elegir un clip ahi, sincroniza la seleccion
+// APP-WIDE (igual que el selector del timeline) + carga Start/End/FPS. Antes la lista solo cambiaba animActiva y el
+// timeline no se enteraba (bug: "el selector de animation no cambia la animacion del timeline").
+static void SincronizarAnimClipDesdeLista(Armature* a, int clipIdx){
+    if (!a || clipIdx < 0 || clipIdx >= (int)a->animations.size()) return;
+    ActiveAnimKind = 1; ActiveAnimArm = a; a->animActiva = clipIdx;
+    AnimCargarRangoActivo(); InvalidarSkinEscena();
+    PropertiesLayoutDirty = true; g_redraw = true;
+}
 static PopupMenu* MenuAnimSel = NULL;
 static void AccionMenuAnimSel(){
     if (!PropsActivo || !PropsActivo->propBtnAnimSel) return;
@@ -1113,9 +1179,15 @@ static void AccionMenuAnimSel(){
     AbrirMenuBajoBoton(MenuAnimSel, PropsActivo->propBtnAnimSel->button);
 }
 static void AccionAnimNewCard(){
-    if (ActiveAnimKind == 1 && ActiveAnimArm) CrearAnimacion(ActiveAnimArm); // nuevo clip del armature activo
+    if (ActiveAnimKind == 1 && ActiveAnimArm){ CrearAnimacion(ActiveAnimArm); InvalidarSkinEscena(); } // nuevo clip (arranca en pose reset)
     else { NuevaEscena(); ActiveAnimKind = 0; }                             // nueva animacion de ESCENA
     AnimCargarRangoActivo(); // la animacion nueva arranca con su rango/fps por defecto
+    PropertiesLayoutDirty = true; g_redraw = true;
+}
+static void AccionAnimDupCard(){ // Duplicate: copia el clip activo del armature (solo si hay clip)
+    if (ActiveAnimKind == 1 && ActiveAnimArm && ActiveAnimArm->animActiva >= 0){
+        DuplicarAnimacionActiva(ActiveAnimArm); AnimCargarRangoActivo();
+    }
     PropertiesLayoutDirty = true; g_redraw = true;
 }
 static void AccionAnimDelCard(){
@@ -1428,6 +1500,7 @@ void Properties::ConstruirGrupos(){
     // New | Delete en UNA fila
     propRowAnimNewDel = new PropButtonRow();
     propRowAnimNewDel->Agregar("New", AccionAnimNewCard, IconType::armature);
+    propRowAnimNewDel->Agregar("Duplicate", AccionAnimDupCard); // duplica el clip activo (se oculta sin clips)
     propRowAnimNewDel->Agregar("Delete", AccionAnimDelCard);
     propAnimation->properties.push_back(propRowAnimNewDel);
     // Rename de la animacion activa (escena o clip): el boton se vuelve input in-place
@@ -1441,23 +1514,29 @@ void Properties::ConstruirGrupos(){
 
     propExport = new GroupPropertie("Export");
     propExport->anchoValores = 0.62f;
+    // dropdown de FORMATO (arriba de todo): OBJ / FBX / glTF / GLB. La etiqueta muestra el formato activo.
+    propExportFormat = new PropButton(NombreFormato(exportFormat), IconType::mesh);
+    propExportFormat->button->desplegable = true;
+    propExportFormat->button->caretMenu = true; // flechita: es un selector de formato
+    propExportFormat->action = AccionMenuExportFormat;
+    propExport->properties.push_back(propExportFormat);
     PropBool* pbSel = new PropBool("Selected only");
     pbSel->value = &exportSelectedOnly;
     propExport->properties.push_back(pbSel);
-    PropBool* pbMods = new PropBool("Apply Modifiers"); // ON = exporta la malla generada por los modificadores
+    PropBool* pbMods = new PropBool("Apply Modifiers"); // OBJ: ON = exporta la malla generada por los modificadores
     pbMods->value = &exportApplyModifiers;
     propExport->properties.push_back(pbMods);
-    PropBool* pbXf = new PropBool("Apply Transforms"); // ON = hornea el transform del objeto en el .obj (mundo)
+    PropBool* pbXf = new PropBool("Apply Transforms"); // OBJ: ON = hornea el transform del objeto en el .obj (mundo)
     pbXf->value = &exportApplyTransforms;
     propExport->properties.push_back(pbXf);
-    // salida partida en dos: Path (carpeta) + File name (nombre.obj). Default del path: Descargas en Android.
+    // salida partida en dos: Path (carpeta) + File name (nombre + extension del formato). Default: Descargas en Android.
     propExportPath = new PropText("Path", w3dFileSystem::GetDefaultOutputDir());
     propExportPath->onClick = AccionBrowseExport; // el campo Path ES el "Browse folder": al clickear abre el explorador
     propExport->properties.push_back(propExportPath);
-    propExportName = new PropText("File name", "cube.obj");
+    propExportName = new PropText("File name", std::string("model") + ExtDeFormato(exportFormat));
     propExport->properties.push_back(propExportName);
-    PropButton* pbExp = new PropButton("Wavefront.obj", IconType::mesh);
-    pbExp->action = AccionExportObj;
+    PropButton* pbExp = new PropButton("Export", IconType::mesh);
+    pbExp->action = AccionExport;
     propExport->properties.push_back(pbExp);
     GroupProperties.push_back(propExport);
 
@@ -1494,9 +1573,12 @@ void Properties::ConstruirGrupos(){
     propArmAnim = new GroupPropertie("Animation");
     propListAnims = new PropListMeshParts("Animation"); propListAnims->modo = 5;
     propArmAnim->properties.push_back(propListAnims);
-    PropButton* pbAddAnim = new PropButton("Add Animation", IconType::armature);
+    PropButton* pbAddAnim = new PropButton("New Animation", IconType::armature); // crea un clip vacio en pose reset
     pbAddAnim->action = AccionAnimAdd;
     propArmAnim->properties.push_back(pbAddAnim);
+    propBtnDupAnim = new PropButton("Duplicate", IconType::armature); // duplica el clip activo (se oculta sin clips)
+    propBtnDupAnim->action = AccionAnimDup;
+    propArmAnim->properties.push_back(propBtnDupAnim);
     propBtnRenameAnim = new PropButton("Rename", -1); // renombra el clip activo (nombre unico por armature)
     propBtnRenameAnim->action = AccionRenameAnim;
     propArmAnim->properties.push_back(propBtnRenameAnim);
@@ -1953,7 +2035,7 @@ Properties::Properties() : ViewportBase() {
     propScrewSmooth = NULL; propScrewMerge = NULL; propScrewFlip = NULL;
     propListUV = NULL; propListColor = NULL; propListVertGroups = NULL; propBtnColorMode = NULL;
     propRowUVOps = NULL; propRowColorOps = NULL; propRowGroupOps = NULL; propBtnRenameGroup = NULL;
-    propArmAnim = NULL; propListAnims = NULL; propBtnRenameAnim = NULL; propRowAnimOps = NULL;
+    propArmAnim = NULL; propListAnims = NULL; propBtnRenameAnim = NULL; propBtnDupAnim = NULL; propRowAnimOps = NULL;
     propArmBones = NULL; propListBones = NULL; propBoneParent = NULL;
     propRotMode = NULL;
     propMsgDefault = NULL; propSepMat = NULL;
@@ -1964,7 +2046,9 @@ Properties::Properties() : ViewportBase() {
     for (int i = 0; i < 3; i++) propMatCol[i] = NULL;
     propMatShin = NULL;
     pestaniaActiva = 1;      // arranca en "Objeto" (transforms); 0 = Render
-    exportSelectedOnly = false;
+    exportFormat = 2;             // por defecto glTF (el formato con rig + animaciones)
+    exportSelectedOnly = true;    // por defecto ON (pedido Dante): exporta solo lo seleccionado
+    OnSeleccionarAnimClip = SincronizarAnimClipDesdeLista; // la lista de anims (tab Armature) sincroniza el timeline
     exportApplyModifiers = true;  // por defecto ON (como Blender)
     exportApplyTransforms = true; // por defecto ON
     exportLastObj = NULL;
@@ -2022,11 +2106,17 @@ void Properties::ActualizarPestanias(){
         BarTabs[i]->foco   = (focoEnTabs && (int)i == pestaniaActiva);
     }
 
-    // File name del export por defecto = nombre del objeto activo (al cambiar de objeto). Solo el
-    // NOMBRE: la carpeta la maneja el campo Path (default Descargas en Android / Home en PC).
-    if (propExportName && ObjActivo && ObjActivo != exportLastObj){
-        propExportName->field.SetText(ObjActivo->name + ".obj");
-        exportLastObj = ObjActivo;
+    // File name del export por defecto = nombre de lo SELECCIONADO a exportar (mesh/armature) + extension del formato.
+    // Sigue la SELECCION (ObjSelects), no solo ObjActivo: al importar, ObjActivo suele quedar en el Cube por defecto, y
+    // el export mostraba "cube" en vez del modelo seleccionado. Prioriza el 1er mesh/armature seleccionado.
+    { extern std::vector<Object*> ObjSelects;
+      Object* expObj = NULL;
+      for (size_t i = 0; i < ObjSelects.size() && !expObj; i++) if (ObjSelects[i] && (ObjSelects[i]->getType()==ObjectType::mesh || ObjSelects[i]->getType()==ObjectType::armature)) expObj = ObjSelects[i];
+      if (!expObj && ObjActivo && (ObjActivo->getType()==ObjectType::mesh || ObjActivo->getType()==ObjectType::armature)) expObj = ObjActivo;
+      if (propExportName && expObj && expObj != exportLastObj){
+          propExportName->field.SetText(expObj->name + ExtDeFormato(exportFormat));
+          exportLastObj = expObj;
+      }
     }
 
     // mostrar SOLO los grupos de la pestania activa. Render (0) es GLOBAL (ajustes de salida/pases): siempre
@@ -2046,9 +2136,14 @@ void Properties::ActualizarPestanias(){
             propBtnAnimSel->button->text = NombreAnimActiva();
             propBtnAnimSel->button->icon = clipActivo ? (int)IconType::armature : (int)IconType::camera;
         }
-        // Delete visible si hay un clip activo, o mas de una escena, o la escena activa tiene keyframes (algo que borrar)
-        if (propRowAnimNewDel && propRowAnimNewDel->botones.size() >= 2)
-            propRowAnimNewDel->botones[1]->visible = clipActivo || SceneAnimations.size() > 1 || !AnimationObjects.empty();
+        // dropdown de formato del export: la etiqueta refleja el formato activo
+        if (propExportFormat && propExportFormat->button)
+            propExportFormat->button->text = NombreFormato(exportFormat);
+        // fila New(0) | Duplicate(1) | Delete(2): Duplicate solo con un clip activo; Delete si hay algo que borrar.
+        if (propRowAnimNewDel && propRowAnimNewDel->botones.size() >= 3){
+            propRowAnimNewDel->botones[1]->visible = clipActivo; // Duplicate: solo si hay un clip de armature activo
+            propRowAnimNewDel->botones[2]->visible = clipActivo || SceneAnimations.size() > 1 || !AnimationObjects.empty();
+        }
         // Render Animation: se grisa solo si hay CERO animaciones. Siempre existe la escena "Scene" (rendea su rango
         // aunque no tenga keyframes: secuencia estatica) -> nunca se desactiva.
         if (propBtnAnimRender) propBtnAnimRender->gris = (SceneAnimations.empty() && nClips == 0);
@@ -2065,6 +2160,7 @@ void Properties::ActualizarPestanias(){
     if (armTab) {
         Armature* a = (Armature*)ObjActivo;
         if (propListAnims) propListAnims->arm = a;             // la lista sigue al armature activo (modo 5)
+        if (propBtnDupAnim) propBtnDupAnim->oculto = !(a && !a->animations.empty()); // Duplicate: solo con clips (oculto = no ocupa fila)
         int na = (int)a->animations.size();
         if (propRowAnimOps && propRowAnimOps->botones.size() >= 3) {
             propRowAnimOps->botones[0]->visible = (na >= 1);   // Delete: con >=1 clip

@@ -558,14 +558,26 @@ static bool InvertAffine(const Matrix4& in, Matrix4& out) {
 // objetos NO-Mesh se ignoran; sin activo no hay join. Undo ATOMICO (Ctrl+Z restaura geo + objetos en 1 paso).
 void JoinObjetos(){
     if (estado != editNavegacion || InteractionMode != ObjectMode) return;
+    // el TARGET tiene que ser una malla SELECCIONADA. Si el activo no lo es (ej. quedo en el Cube por
+    // defecto tras importar, fuera del armature) se hornearia todo en ese objeto extrano y se borrarian
+    // las mallas del armature. Fallback: primera malla seleccionada.
     Object* active = ObjActivo;
-    if (!active || active->getType() != ObjectType::mesh) { Notificar("Join: no active mesh object", true); return; }
+    if (!active || active->getType() != ObjectType::mesh || !active->select) {
+        active = NULL;
+        for (size_t i = 0; i < ObjSelects.size(); i++) {
+            Object* o = ObjSelects[i];
+            if (o && o->select && o->getType() == ObjectType::mesh) { active = o; break; }
+        }
+    }
+    if (!active) { Notificar("Join: no active mesh object", true); return; }
     Mesh* am = (Mesh*)active;
 
-    std::vector<Object*> merged; // mallas seleccionadas != activo (no-Mesh se ignoran)
+    std::vector<Object*> merged; // mallas seleccionadas != activo (no-Mesh se ignoran; SIN duplicados)
     for (size_t i = 0; i < ObjSelects.size(); i++) {
         Object* o = ObjSelects[i];
-        if (o && o != active && o->getType() == ObjectType::mesh) merged.push_back(o);
+        if (!o || o == active || !o->select || o->getType() != ObjectType::mesh) continue; // !select: pudo quedar en ObjSelects deseleccionado
+        bool dup = false; for (size_t k = 0; k < merged.size(); k++) if (merged[k] == o) { dup = true; break; } // ObjSelects puede traer
+        if (!dup) merged.push_back(o); // la misma malla repetida -> sin este dedup se anexaba 2 veces (caras dobladas -> malla "invisible"/rota)
     }
     if (merged.empty()) { Notificar("Join: select 2+ mesh objects (active is the target)", true); return; }
 
@@ -579,13 +591,17 @@ void JoinObjetos(){
         Matrix4 M = invWa * Wo;               // local(otro) -> mundo -> local(activo)
         am->AnexarMallaTransformada((Mesh*)merged[i], M);
     }
-    // rebuild: rearma las capas UV/color desde el render concatenado, regenera (normales limpias + merge de verts)
-    am->LiberarCapas();
+    // rebuild: rearma las capas UV/color desde el render concatenado, regenera (normales limpias + merge de verts).
+    // LiberarCapas(false) PRESERVA los vertex groups (mergeados en AnexarMallaTransformada) -> el skinning sobrevive al join.
+    am->LiberarCapas(false);
     am->PoblarCapas();
     am->GenerarRender();
+    am->lastSkinFrame = -999999; // si el join era de mallas skinneadas: forzar el re-skin (el frame-gate sino lo saltaba)
 
-    // borrar los mergeados (undo atomico): dejar select=true SOLO en ellos
-    for (size_t i = 0; i < ObjSelects.size(); i++) if (ObjSelects[i]) ObjSelects[i]->select = false;
+    // borrar los mergeados (undo atomico): dejar select=true SOLO en ellos. Se limpia la seleccion de
+    // TODA la escena (no solo ObjSelects) porque el DeleteUndo borra por el flag select recorriendo la
+    // escena: una malla con select=true fuera de ObjSelects se borraria SIN haberse anexado.
+    if (SceneCollection) SceneCollection->DeseleccionarCompleto(true);
     for (size_t i = 0; i < merged.size(); i++) merged[i]->select = true;
     UndoJoinConfirmar(); // DeleteUndo(los select=true) empaquetado con la geo -> 1 comando
 

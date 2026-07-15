@@ -142,6 +142,7 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         GroupPropertie* propArmAnim;       // tarjeta "Animation" (clips del esqueleto)
         PropListMeshParts* propListAnims;  // lista de clips de animacion (modo=5)
         PropButton* propBtnRenameAnim;     // "Rename" del clip activo (nombre unico por armature)
+        PropButton* propBtnDupAnim;        // "Duplicate" del clip activo (se oculta sin clips)
         PropButtonRow* propRowAnimOps;     // fila Delete | Move Up | Move Down de clips
         // tarjeta "Bones" (Pose Mode): lista de huesos (modo=6) + parent + transform (pos/rot/scale) del hueso activo
         GroupPropertie* propArmBones;
@@ -156,7 +157,8 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         float renderW; float renderH;          // valores del render (default 640 x 480)
         bool  renderZbuffer; bool renderNormal; bool renderAlpha; // pases extra tildados (el beauty siempre)
         PropText* propExportPath;    // campo editable "Path" del export (carpeta de salida)
-        PropText* propExportName;    // campo editable "File name" del export (solo el nombre + .obj)
+        PropText* propExportName;    // campo editable "File name" del export (solo el nombre + extension del formato)
+        PropButton* propExportFormat;// dropdown de formato de export (OBJ / FBX / glTF / GLB)
         PropButton* propBtnRenameMat; // boton "Rename Material" (se oculta si el material es el por defecto;
                                       // al renombrar se vuelve input via Button::editField)
         PropButton* propBtnRenameUV;    // "Rename" de la UV map activa (tab Vertices)
@@ -166,6 +168,7 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropButtonRow* propRowColorOps; // fila Delete | Move Up | Move Down de capas de color (oculta con 1 sola)
         PropButtonRow* propRowGroupOps; // fila Delete | Move Up | Move Down de grupos de vertices
         PropText*   propNameObj;        // campo "Name" del OBJETO activo (tab Objeto): se ve el nombre y se edita al clickear
+        int  exportFormat;           // formato de export: 0=OBJ 1=FBX 2=glTF 3=GLB (dropdown propExportFormat)
         bool exportSelectedOnly;     // checkbox "Selected only"
         bool exportApplyModifiers;   // checkbox "Apply Modifiers" (default ON): exporta la malla generada por los mods
         bool exportApplyTransforms;  // checkbox "Apply Transforms" (default ON): hornea el transform en el .obj

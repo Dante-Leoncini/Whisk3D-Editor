@@ -159,6 +159,7 @@ class MeshGeoUndo : public UndoCmd {
     std::vector<UVMap>       uvMaps;       int uvMapActivo;
     std::vector<ColorLayer>  colorLayers;  int colorActivo;
     std::vector<VertexGroup> vertexGroups; int grupoActivo;
+    std::vector<int>         vertCtrlPoint; int skinNCtrl; // SKINNING: mapeo render-vert -> control-point (sino el undo de una malla skinneada deja el mapeo viejo -> skin roto)
     std::set<std::string>    sharpEdges, seamEdges; // bordes sharp/seam (por POSICION). meshSmooth = shading
     bool                     meshSmooth;
 
@@ -177,6 +178,7 @@ class MeshGeoUndo : public UndoCmd {
         for (size_t i = 0; i < s->colorLayers.size(); i++)  colorLayers.push_back(*s->colorLayers[i]);
         for (size_t i = 0; i < s->vertexGroups.size(); i++) vertexGroups.push_back(*s->vertexGroups[i]);
         uvMapActivo = s->uvMapActivo; colorActivo = s->colorActivo; grupoActivo = s->grupoActivo;
+        vertCtrlPoint = s->vertCtrlPoint; skinNCtrl = s->skinNCtrl; // skinning: mapeo render->control-point
     }
     void AplicarA(Mesh* s) { // escribe los miembros (snapshot) a la malla viva
         delete[] s->vertex;      s->vertex = NULL;
@@ -197,10 +199,12 @@ class MeshGeoUndo : public UndoCmd {
         for (size_t i = 0; i < colorLayers.size(); i++)  s->colorLayers.push_back(new ColorLayer(colorLayers[i]));
         for (size_t i = 0; i < vertexGroups.size(); i++) s->vertexGroups.push_back(new VertexGroup(vertexGroups[i]));
         s->uvMapActivo = uvMapActivo; s->colorActivo = colorActivo; s->grupoActivo = grupoActivo;
+        s->vertCtrlPoint = vertCtrlPoint; s->skinNCtrl = skinNCtrl; // restaurar el mapeo render->control-point (skinning)
+        s->lastSkinFrame = -999999; // forzar re-skin con la geo/mapeo restaurados (CalcularBordes ya bumpea skinGeomVersion)
         s->CalcularBordes(); // recomputa edges/centroGeom + invalida el edit (se rearma de la geo restaurada)
     }
 public:
-    MeshGeoUndo(Mesh* M) : m(M), vertexSize(0), facesSize(0), uvMapActivo(0), colorActivo(0), grupoActivo(0) {
+    MeshGeoUndo(Mesh* M) : m(M), vertexSize(0), facesSize(0), uvMapActivo(0), colorActivo(0), grupoActivo(0), skinNCtrl(0) {
         if (m) CapturarDe(m);
     }
     void Aplicar() {

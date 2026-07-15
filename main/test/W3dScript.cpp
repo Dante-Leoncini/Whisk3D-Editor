@@ -591,6 +591,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         if (!a) { err = "no hay armature activo"; return false; }
         std::string sub; ss >> sub;
         if (sub == "add")       CrearAnimacion(a);
+        else if (sub == "dup")  DuplicarAnimacionActiva(a);
         else if (sub == "del")  BorrarAnimacionActiva(a);
         else if (sub == "up")   MoverAnimacionActiva(a, -1);
         else if (sub == "down") MoverAnimacionActiva(a, +1);
@@ -622,6 +623,16 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         extern bool ImportGLTF(const std::string&);
         bool ok = ImportGLTF(ruta);
         printf("      [importgltf] %s -> %s\n", ruta.c_str(), ok?"OK":"FALLO");
+        return ok;
+    }
+    // ---- exportgltf/exportglb <ruta> : exporta la escena a glTF (texto) o GLB (binario) para round-trip headless ----
+    if (cmd == "exportgltf" || cmd == "exportglb") {
+        std::string ruta; std::getline(ss, ruta);
+        size_t p = ruta.find_first_not_of(" \t"); if (p!=std::string::npos) ruta = ruta.substr(p);
+        if (ruta.empty()) { err = cmd + ": falta la ruta"; return false; }
+        extern bool ExportGLTF(const std::string&, bool, bool);
+        bool ok = ExportGLTF(ruta, false, cmd == "exportglb");
+        printf("      [%s] %s -> %s\n", cmd.c_str(), ruta.c_str(), ok?"OK":"FALLO");
         return ok;
     }
     // ---- armdeltest : borra el armature con una malla skinneada -> verifica que skinArmature queda NULL (no cuelga),
@@ -685,7 +696,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         int nm=0;
         while(!st.empty()){ Object* o=st.back(); st.pop_back();
             if (o->getType()==ObjectType::mesh){ Mesh* m=(Mesh*)o; nm++;
-                printf("      [mesh] '%s' verts=%d tris=%d meshParts=%d\n", m->name.c_str(), m->vertexSize, m->facesSize/3, (int)m->materialsGroup.size());
+                printf("      [mesh] '%s' verts=%d faces3d=%d tris(idx/3)=%d meshParts=%d\n", m->name.c_str(), m->vertexSize, (int)m->faces3d.size(), m->facesSize/3, (int)m->materialsGroup.size());
                 for (size_t g=0; g<m->materialsGroup.size(); g++){ MaterialGroup& mg=m->materialsGroup[g];
                     printf("         part[%d] mat='%s' tris=%d\n", (int)g, mg.material?mg.material->name.c_str():"(none)", mg.indicesDrawnCount/3); }
             }
@@ -1117,6 +1128,106 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
     }
     // ---- join : une las mallas seleccionadas en el objeto activo (Ctrl+J) ----
     if (cmd == "join") { JoinObjetos(); return true; }
+    // ---- undo : Ctrl+Z (deshace el ultimo comando) ----
+    if (cmd == "undo") { UndoDeshacer(); return true; }
+    // ---- outliner : dump del arbol de objetos (nombre + tipo + padre) para ver la jerarquia tras un join/delete. ----
+    if (cmd == "outliner") {
+        struct L { static void rec(Object* o, int d){ if(!o) return;
+            for(size_t i=0;i<o->Childrens.size();i++){ Object* c=o->Childrens[i]; std::string ind(d*2,' ');
+                const char* t = c->getType()==ObjectType::mesh?"mesh":c->getType()==ObjectType::armature?"armature":c->getType()==ObjectType::collection?"coll":"obj";
+                printf("      [outliner] %s%s (%s) parent=%s\n", ind.c_str(), c->name.c_str(), t, c->Parent?c->Parent->name.c_str():"NULL");
+                rec(c, d+1); } } };
+        L::rec(SceneCollection, 0);
+        return true;
+    }
+    // ---- realjoin <A> <B> : camino COMPLETO de Ctrl+J (JoinObjetos con estado+seleccion). Verifica que el join real
+    //      preserva el skinning end-to-end. ----
+    if (cmd == "realjoin") {
+        std::string na, nb; ss >> na >> nb;
+        Object* a = SceneCollection ? FindObjectByName(SceneCollection, na) : NULL;
+        Object* b = SceneCollection ? FindObjectByName(SceneCollection, nb) : NULL;
+        if (!a || !b || a->getType()!=ObjectType::mesh || b->getType()!=ObjectType::mesh) { err="realjoin: mallas no encontradas"; return false; }
+        estado = editNavegacion; InteractionMode = ObjectMode;
+        DeseleccionarTodo(); ObjActivo=a; a->Seleccionar(); b->Seleccionar();
+        ObjSelects.clear(); ObjSelects.push_back(a); ObjSelects.push_back(b);
+        Mesh* ma=(Mesh*)a; int vA=ma->vertexSize, gA=(int)ma->vertexGroups.size();
+        JoinObjetos();
+        printf("      [realjoin] estado=%d IM=%d '%s' v %d->%d g %d->%d skin=%s\n", estado, InteractionMode,
+            na.c_str(), vA, ma->vertexSize, gA, (int)ma->vertexGroups.size(), ma->skinArmature?"SI":"NO");
+        ObjActivo=a; return true;
+    }
+    // ---- joinall : selecciona TODAS las mallas hijas del 1er armature (una activa) y las une (Ctrl+J). Reproduce el
+    //      caso real de Dante (mallas dentro del armature). Reporta el resultado + deformacion. ----
+    if (cmd == "joinall") {
+        Armature* arm=NULL; { std::vector<Object*> st; if(SceneCollection) st.push_back(SceneCollection);
+          while(!st.empty() && !arm){ Object* o=st.back(); st.pop_back(); if(o->getType()==ObjectType::armature) arm=(Armature*)o; for(size_t i=0;i<o->Childrens.size();i++) st.push_back(o->Childrens[i]); } }
+        if(!arm){err="joinall: sin armature";return false;}
+        std::vector<Mesh*> ms; { std::vector<Object*> st; st.push_back(arm);
+          while(!st.empty()){ Object* o=st.back(); st.pop_back(); if(o->getType()==ObjectType::mesh) ms.push_back((Mesh*)o); for(size_t i=0;i<o->Childrens.size();i++) st.push_back(o->Childrens[i]); } }
+        if(ms.size()<2){err="joinall: <2 mallas en el armature";return false;}
+        estado = editNavegacion; InteractionMode = ObjectMode;
+        DeseleccionarTodo(); ObjSelects.clear();
+        for(size_t i=0;i<ms.size();i++){ ms[i]->Seleccionar(); ObjSelects.push_back((Object*)ms[i]); }
+        ObjActivo = (Object*)ms[0]; // activo = la primera
+        printf("      [joinall] %d mallas del armature, activo='%s'\n", (int)ms.size(), ms[0]->name.c_str());
+        JoinObjetos();
+        Mesh* r=(Mesh*)ms[0]; ObjActivo=(Object*)r;
+        printf("      [joinall] resultado '%s' v=%d g=%d skin=%s\n", r->name.c_str(), r->vertexSize, (int)r->vertexGroups.size(), r->skinArmature?"SI":"NO");
+        return true;
+    }
+    // ---- joinbug : reproduce el ESTADO ROTO del outliner viejo (shift-range): TODAS las mallas del armature con
+    //      select=true PERO solo la 1ra y la ultima en ObjSelects (las del medio quedaban fuera). Antes esas mallas
+    //      del medio se BORRABAN sin unirse ("desaparecen todas"). Verifica que el JoinObjetos blindado NO pierde nada. ----
+    if (cmd == "joinbug") {
+        Armature* arm=NULL; { std::vector<Object*> st; if(SceneCollection) st.push_back(SceneCollection);
+          while(!st.empty() && !arm){ Object* o=st.back(); st.pop_back(); if(o->getType()==ObjectType::armature) arm=(Armature*)o; for(size_t i=0;i<o->Childrens.size();i++) st.push_back(o->Childrens[i]); } }
+        if(!arm){err="joinbug: sin armature";return false;}
+        std::vector<Mesh*> ms; { std::vector<Object*> st; st.push_back(arm);
+          while(!st.empty()){ Object* o=st.back(); st.pop_back(); if(o->getType()==ObjectType::mesh) ms.push_back((Mesh*)o); for(size_t i=0;i<o->Childrens.size();i++) st.push_back(o->Childrens[i]); } }
+        if(ms.size()<3){err="joinbug: <3 mallas en el armature";return false;}
+        estado = editNavegacion; InteractionMode = ObjectMode;
+        DeseleccionarTodo(); ObjSelects.clear();
+        // ESTADO ROTO: todas select=true; SOLO 1ra y ultima en ObjSelects (como el shift-range viejo)
+        for(size_t i=0;i<ms.size();i++) ms[i]->select = true;
+        ObjSelects.push_back((Object*)ms[0]);
+        ObjSelects.push_back((Object*)ms[ms.size()-1]);
+        ObjActivo = (Object*)ms[ms.size()-1]; // activo = la ultima (clickeada)
+        int antes=(int)ms.size();
+        printf("      [joinbug] %d mallas, ObjSelects=%d (1ra+ultima), resto select=true fuera de ObjSelects\n", antes, (int)ObjSelects.size());
+        JoinObjetos();
+        // contar mallas que SIGUEN bajo el armature (ninguna deberia haberse perdido sin unirse)
+        int quedan=0; { std::vector<Object*> st; st.push_back(arm);
+          while(!st.empty()){ Object* o=st.back(); st.pop_back(); if(o->getType()==ObjectType::mesh) quedan++; for(size_t i=0;i<o->Childrens.size();i++) st.push_back(o->Childrens[i]); } }
+        printf("      [joinbug] tras join: %d mallas bajo el armature (antes %d). NINGUNA borrada-sin-unir = OK\n", quedan, antes);
+        return true;
+    }
+    // ---- regen <name> : corre GenerarRender sobre la malla (para ver el conteo de verts dedupeado + si preserva skin). ----
+    if (cmd == "regen") {
+        std::string nm; ss >> nm; Object* o = SceneCollection ? FindObjectByName(SceneCollection, nm) : NULL;
+        if (!o || o->getType()!=ObjectType::mesh){ err="regen: malla no encontrada"; return false; }
+        Mesh* m=(Mesh*)o; int v0=m->vertexSize, g0=(int)m->vertexGroups.size();
+        m->LiberarCapas(false); m->PoblarCapas(); m->GenerarRender(); m->lastSkinFrame=-999999; ObjActivo=o;
+        printf("      [regen] '%s' v %d->%d g %d->%d skin=%s\n", nm.c_str(), v0, m->vertexSize, g0, (int)m->vertexGroups.size(), m->skinArmature?"SI":"NO");
+        return true;
+    }
+    // ---- jointest <A> <B> : anexa B a A (mismo camino que Ctrl+J: AnexarMallaTransformada + GenerarRender) y verifica
+    //      el merge de mallas SKINNEADAS (vertex groups + vertCtrlPoint). Aisla el fix del join sin el plumbing de seleccion. ----
+    if (cmd == "jointest") {
+        std::string na, nb; ss >> na >> nb;
+        Object* a = SceneCollection ? FindObjectByName(SceneCollection, na) : NULL;
+        Object* b = SceneCollection ? FindObjectByName(SceneCollection, nb) : NULL;
+        if (!a || !b || a->getType()!=ObjectType::mesh || b->getType()!=ObjectType::mesh) { err="jointest: mallas no encontradas"; return false; }
+        Mesh* ma=(Mesh*)a; Mesh* mb=(Mesh*)b;
+        int vA=ma->vertexSize, gA=(int)ma->vertexGroups.size(), cpA=(int)ma->vertCtrlPoint.size();
+        int vB=mb->vertexSize, gB=(int)mb->vertexGroups.size();
+        Matrix4 M; M.Identity();
+        ma->AnexarMallaTransformada(mb, M);
+        ma->LiberarCapas(false); ma->PoblarCapas(); ma->GenerarRender(); ma->lastSkinFrame = -999999;
+        ObjActivo = a; // para skinbbox despues
+        printf("      [jointest] '%s'(v=%d g=%d cp=%d) + '%s'(v=%d g=%d) -> v=%d g=%d cp=%d skin=%s\n",
+            na.c_str(),vA,gA,cpA, nb.c_str(),vB,gB, ma->vertexSize, (int)ma->vertexGroups.size(), (int)ma->vertCtrlPoint.size(), ma->skinArmature?"SI":"NO");
+        return true;
+    }
     // ---- apply <location|rotation|scale|all> : hornea el transform en la malla (Ctrl+A) ----
     if (cmd == "apply") {
         std::string w; ss >> w;
@@ -1170,6 +1281,110 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
     }
     // ---- modapply : hornea la malla generada del modificador activo en la editable (Apply Modifier) ----
     if (cmd == "modapply") { Mesh* m = ScriptActiveMesh(); if(!m){err="no hay malla activa";return false;} m->AplicarModificadorActivo(); return true; }
+    // ---- animlistsel <idx> : simula el click en la LISTA de animaciones (tab Armature) via el hook OnSeleccionarAnimClip
+    //      y verifica que sincroniza la seleccion app-wide (ActiveAnimKind/ActiveAnimArm) que lee el timeline. ----
+    if (cmd == "animlistsel") {
+        int idx=1; ss>>idx;
+        Armature* a=NULL; { std::vector<Object*> st; if(SceneCollection) st.push_back(SceneCollection);
+          while(!st.empty() && !a){ Object* o=st.back(); st.pop_back(); if(o->getType()==ObjectType::armature) a=(Armature*)o; for(size_t i=0;i<o->Childrens.size();i++) st.push_back(o->Childrens[i]); } }
+        if(!a){err="animlistsel: sin armature";return false;}
+        extern int ActiveAnimKind; extern Armature* ActiveAnimArm;
+        ActiveAnimKind=0; ActiveAnimArm=NULL; // estado inicial: escena activa (como si no estuviera seleccionado el clip)
+        printf("      [animlistsel] hook=%s\n", OnSeleccionarAnimClip?"SET":"NULL");
+        if (OnSeleccionarAnimClip) OnSeleccionarAnimClip(a, idx); // == click en la lista (PropList modo 5)
+        printf("      [animlistsel] clip %d -> ActiveAnimKind=%d ActiveAnimArm==arm=%d animActiva=%d\n",
+            idx, ActiveAnimKind, (ActiveAnimArm==a)?1:0, a->animActiva);
+        return true;
+    }
+    // ---- bonepose <substr> <frame> : activa el clip 0 y dumpea la pose ANIMADA (euler + world head/tail) del 1er hueso
+    //      cuyo nombre contiene <substr>. Para comparar la rotacion de un hueso (ej brazo) baseline vs reimportado. ----
+    if (cmd == "bonepose") {
+        std::string sub; int frame=15; ss >> sub >> frame;
+        Armature* a=NULL; { std::vector<Object*> st; if(SceneCollection) st.push_back(SceneCollection);
+          while(!st.empty() && !a){ Object* o=st.back(); st.pop_back(); if(o->getType()==ObjectType::armature) a=(Armature*)o; for(size_t i=0;i<o->Childrens.size();i++) st.push_back(o->Childrens[i]); } }
+        if(!a){err="bonepose: sin armature";return false;}
+        int bi=-1; for(size_t b=0;b<a->bones.size();b++) if(a->bones[b].name.find(sub)!=std::string::npos){ bi=(int)b; break; }
+        if(bi<0){err="bonepose: hueso '"+sub+"' no encontrado";return false;}
+        extern int ActiveAnimKind; extern Armature* ActiveAnimArm;
+        if(!a->animations.empty()){ ActiveAnimKind=1; ActiveAnimArm=a; a->animActiva=0; }
+        a->poseDirty=false; a->lastPoseFrame=-999999; CurrentFrame=frame; EvaluarPoseEsqueleto(a, frame);
+        W3dBone& b=a->bones[bi];
+        printf("      [bonepose] '%s' p=%d restT=(%.2f,%.2f,%.2f) restR=(%.1f,%.1f,%.1f) restS=(%.3f,%.3f,%.3f) poseT=(%.2f,%.2f,%.2f) poseR=(%.1f,%.1f,%.1f) head=(%.2f,%.2f,%.2f)\n",
+            b.name.c_str(), b.parent, b.restT.x,b.restT.y,b.restT.z, b.restR.x,b.restR.y,b.restR.z, b.restS.x,b.restS.y,b.restS.z,
+            b.poseT.x,b.poseT.y,b.poseT.z, b.poseR.x,b.poseR.y,b.poseR.z, b.poseHead.x,b.poseHead.y,b.poseHead.z);
+        return true;
+    }
+    // ---- meshskin : lista cada malla de la escena con su nombre, verts, si tiene skinArmature y cuantos vertex groups. ----
+    if (cmd == "meshskin") {
+        int n = 0; std::vector<Object*> st; if(SceneCollection) st.push_back(SceneCollection);
+        while(!st.empty()){ Object* o=st.back(); st.pop_back();
+            if (o->getType()==ObjectType::mesh){ Mesh* m=(Mesh*)o;
+                printf("      [meshskin] '%s' verts=%d skin=%s grupos=%d mats=%d\n", m->name.c_str(), m->vertexSize,
+                    m->skinArmature?"SI":"NO", (int)m->vertexGroups.size(), (int)m->materialsGroup.size()); n++; }
+            for(size_t i=0;i<o->Childrens.size();i++) st.push_back(o->Childrens[i]); }
+        printf("      [meshskin] total mallas=%d\n", n);
+        return true;
+    }
+    // ---- loadtex : procesa TODA la cola de texturas pendientes (headless normalmente no corre frames). Deja
+    //      mat->texture/textureOn seteados para poder testear el export de texturas sin la GUI. ----
+    if (cmd == "loadtex") {
+        extern void CargarTexturasPendientes();
+        for (int i = 0; i < 100000; i++) CargarTexturasPendientes(); // vacia la cola (idempotente al terminar)
+        int conTex = 0; for (size_t i = 0; i < Materials.size(); i++) if (Materials[i]->textureOn && Materials[i]->texture) conTex++;
+        printf("      [loadtex] materiales con textura=%d de %d\n", conTex, (int)Materials.size());
+        return true;
+    }
+    // ---- skinbbox [frame] : activa el clip 0 en 'frame' y dumpea el bbox de la malla DEFORMADA (skinVertex). Sirve
+    //      para comparar la animacion baseline vs re-importada (el export hornea la pose por-frame). ----
+    if (cmd == "skinbbox") {
+        int frame=20; ss>>frame;
+        Mesh* m = (ObjActivo && ObjActivo->getType()==ObjectType::mesh && ((Mesh*)ObjActivo)->skinArmature) ? (Mesh*)ObjActivo : NULL; // preferir el activo
+        if(!m){ std::vector<Object*> st; if(SceneCollection) st.push_back(SceneCollection);
+          while(!st.empty()){ Object* o=st.back(); st.pop_back();
+            if (o->getType()==ObjectType::mesh && ((Mesh*)o)->skinArmature && !m) m=(Mesh*)o;
+            for(size_t i=0;i<o->Childrens.size();i++) st.push_back(o->Childrens[i]); } }
+        if(!m){err="skinbbox: no hay malla skinneada";return false;}
+        Armature* a=m->skinArmature;
+        extern int ActiveAnimKind; extern Armature* ActiveAnimArm;
+        if(!a->animations.empty()){ActiveAnimKind=1;ActiveAnimArm=a;a->animActiva=0;}
+        CurrentFrame=frame; m->lastSkinFrame=-999999; SkinearMesh(m);
+        if(!m->skinVertex){err="skinbbox: sin skinVertex";return false;}
+        float mn[3]={1e30f,1e30f,1e30f},mx[3]={-1e30f,-1e30f,-1e30f};
+        for(int i=0;i<m->vertexSize;i++) for(int c=0;c<3;c++){ float v=m->skinVertex[i*3+c]; if(v<mn[c])mn[c]=v; if(v>mx[c])mx[c]=v; }
+        SkeletalAnimation* clip = (!a->animations.empty()) ? a->animations[0] : NULL;
+        printf("      [skinbbox] f=%d mesh='%s' deformado=(%.2f,%.2f,%.2f)..(%.2f,%.2f,%.2f)  clip[0] start=%d end=%d fps=%d\n",
+            frame, m->name.c_str(), mn[0],mn[1],mn[2],mx[0],mx[1],mx[2],
+            clip?clip->startFrame:-1, clip?clip->endFrame:-1, clip?clip->FrameRate:-1);
+        return true;
+    }
+    // ---- applyarm [frame] : Apply del modificador Armature -> hornea la pose deformada del frame en la malla editable.
+    //      Verifica que skinArmature queda NULL, el modificador se saca, y el bbox de vertex[] paso a la pose deformada. ----
+    if (cmd == "applyarm") {
+        int frame = 20; ss >> frame;
+        Mesh* m = NULL; // primera malla skinneada de la escena
+        { std::vector<Object*> st; if(SceneCollection) st.push_back(SceneCollection);
+          while(!st.empty()){ Object* o=st.back(); st.pop_back();
+            if (o->getType()==ObjectType::mesh && ((Mesh*)o)->skinArmature && !m) m=(Mesh*)o;
+            for(size_t i=0;i<o->Childrens.size();i++) st.push_back(o->Childrens[i]); } }
+        if (!m) { err="applyarm: no hay malla skinneada"; return false; }
+        Armature* a = m->skinArmature;
+        extern int ActiveAnimKind; extern Armature* ActiveAnimArm;
+        if (!a->animations.empty()) { ActiveAnimKind=1; ActiveAnimArm=a; a->animActiva=0; } // activar el clip 0 para posar
+        CurrentFrame = frame;
+        int armMod=-1; for(size_t i=0;i<m->modificadores.size();i++) if(m->modificadores[i]->tipo==ModifierType::Armature) armMod=(int)i;
+        if (armMod<0){ err="applyarm: la malla no tiene modificador Armature"; return false; }
+        m->modificadorActivo = armMod;
+        float b0[6]={1e30f,1e30f,1e30f,-1e30f,-1e30f,-1e30f};
+        for(int i=0;i<m->vertexSize;i++) for(int c=0;c<3;c++){ float v=m->vertex[i*3+c]; if(v<b0[c])b0[c]=v; if(v>b0[c+3])b0[c+3]=v; }
+        int nAntes=(int)m->modificadores.size();
+        m->AplicarModificadorActivo();
+        float b1[6]={1e30f,1e30f,1e30f,-1e30f,-1e30f,-1e30f};
+        for(int i=0;i<m->vertexSize;i++) for(int c=0;c<3;c++){ float v=m->vertex[i*3+c]; if(v<b1[c])b1[c]=v; if(v>b1[c+3])b1[c+3]=v; }
+        printf("      [applyarm] f=%d skinArmature=%p (0=OK) mods=%d->%d\n         bind   bbox=(%.1f,%.1f,%.1f)..(%.1f,%.1f,%.1f)\n         horneado bbox=(%.1f,%.1f,%.1f)..(%.1f,%.1f,%.1f)\n",
+            frame, (void*)m->skinArmature, nAntes, (int)m->modificadores.size(),
+            b0[0],b0[1],b0[2],b0[3],b0[4],b0[5], b1[0],b1[1],b1[2],b1[3],b1[4],b1[5]);
+        return true;
+    }
     // ---- editinfo : imprime la malla EDITABLE (verts + faces3d) con histograma de lados (tris/quads/ngons) ----
     if (cmd == "editinfo") {
         Mesh* m = ScriptActiveMesh(); if(!m){err="no hay malla activa";return false;}

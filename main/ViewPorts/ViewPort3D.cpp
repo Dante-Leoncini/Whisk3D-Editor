@@ -222,6 +222,14 @@ Viewport3D::Viewport3D(Vector3 pos){
         MenuPose->titulo = "Pose";
         MenuPose->Agregar("Insert Keyframe", 500, IconType::armature)->atajo = "I"; // guarda la pose en el frame actual
         MenuPose->Agregar("Transform", 0, -1, MenuTransform); // Move(G)/Rotate(R)/Scale(S) -> ids 100/101/102
+        // Clear Transform: resetea la pose de los huesos SELECCIONADOS a rest. All (T+R+S) / Translation / Rotation / Scale.
+        static PopupMenu* MenuClearPose = NULL;
+        MenuClearPose = new PopupMenu();
+        MenuClearPose->Agregar("All", 520, IconType::armature);          // T+R+S -> PoseClearTransform(0)
+        MenuClearPose->Agregar("Translation", 521)->atajo = "Alt G";     // PoseClearTransform(1)
+        MenuClearPose->Agregar("Rotation", 522)->atajo = "Alt R";        // PoseClearTransform(2)
+        MenuClearPose->Agregar("Scale", 523)->atajo = "Alt S";           // PoseClearTransform(3)
+        MenuPose->Agregar("Clear Transform", 0, -1, MenuClearPose);
         // menu "Mesh" (Edit Mode): comun a vertice/borde/cara. Transform (arriba), Snap y Delete (abajo). Los
         // submenus Snap/Delete se reusan de LayoutInput.cpp. La accion (LayoutAccionMesh) se asigna al abrirlo.
         // submenu Transform de EDIT (como el de objeto pero + Shrink/Fatten, que solo tiene sentido en malla)
@@ -3044,8 +3052,9 @@ void Viewport3D::event_key_down(SDL_Event &e){
                     break;
                 }
                 // POSE MODE: R rota los huesos seleccionados; R de nuevo (ya rotando) cicla la orientacion View->Global->Local.
-                if (InteractionMode == PoseMode){ extern int g_poseModo; extern void PoseXformStart(int); extern void PoseCiclarOrient();
-                    if (g_poseModo == 2) PoseCiclarOrient(); else PoseXformStart(2); break; }
+                if (InteractionMode == PoseMode){ extern int g_poseModo; extern void PoseXformStart(int); extern void PoseCiclarOrient(); extern void PoseClearTransform(int);
+                    if (LAltPressed) PoseClearTransform(2);                       // Alt+R: Clear Rotation
+                    else if (g_poseModo == 2) PoseCiclarOrient(); else PoseXformStart(2); break; }
                 // R arranca la rotacion (trackball); R de nuevo alterna
                 // trackball <-> orbital/gimbal (sin tener que ciclar X/Y/Z).
                 // En Edit Mode el transform actua sobre los vertices seleccionados.
@@ -3056,12 +3065,14 @@ void Viewport3D::event_key_down(SDL_Event &e){
                 }
                 break;
             case SDLK_G:
-                if (InteractionMode == PoseMode){ extern void PoseXformStart(int); PoseXformStart(1); break; } // POSE: mover huesos
+                if (InteractionMode == PoseMode){ extern void PoseXformStart(int); extern void PoseClearTransform(int);
+                    if (LAltPressed) PoseClearTransform(1); else PoseXformStart(1); break; } // POSE: Alt+G limpia translacion; G mueve
                 // EditXformStart (no EditXformIniciar directo) -> en Edit Mode CAPTURA el undo del move (Ctrl+Z)
                 if (!EditXformStart(translacion, ViewAxis)) SetPosicion();
                 break;
             case SDLK_S:
-                if (InteractionMode == PoseMode){ extern void PoseXformStart(int); PoseXformStart(3); break; } // POSE: escalar huesos
+                if (InteractionMode == PoseMode){ extern void PoseXformStart(int); extern void PoseClearTransform(int);
+                    if (LAltPressed) PoseClearTransform(3); else PoseXformStart(3); break; } // POSE: Alt+S limpia escala; S escala
                 // Alt+S en Edit Mode = Shrink/Fatten (cada vert por su normal). Sin Alt = Scale.
                 if (LAltPressed && InteractionMode == EditMode && g_editMesh) LayoutShrinkFatten();
                 else if (!EditXformStart(EditScale, XYZ)) SetEscala();

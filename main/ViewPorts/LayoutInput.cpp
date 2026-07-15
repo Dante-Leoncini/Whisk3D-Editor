@@ -787,7 +787,7 @@ void LayoutTriangulate() {
 static void AccionDelete(int aId); // ejecuta Delete Vertices/Edges/Faces/Edge Loops (ids 361-364); definida mas abajo
 
 // Pose Mode transform (definidos mas abajo): los usan el menu Pose y sus atajos
-void PoseXformStart(int modo); void PoseInsertKeyframe();
+void PoseXformStart(int modo); void PoseInsertKeyframe(); void PoseClearTransformAll(); void PoseClearTransform(int what);
 // opcion del menu Object/Mesh y su submenu Transform (ids 100-102, 300=extrude)
 static void LayoutAccionObject(int aId) {
     switch (aId) {
@@ -806,6 +806,10 @@ static void LayoutAccionObject(int aId) {
         case 101: if (InteractionMode==PoseMode) PoseXformStart(2); else if (!EditXformStart(rotacion,    ViewAxis)) SetRotacion(); break; // Rotate(R)
         case 102: if (InteractionMode==PoseMode) PoseXformStart(3); else if (!EditXformStart(EditScale,   XYZ))      SetEscala();   break; // Scale (S)
         case 500: PoseInsertKeyframe(); break; // Pose Mode: Insert Keyframe
+        case 520: PoseClearTransform(0); break; // Pose Mode: Clear Transform > All (T+R+S de los huesos seleccionados)
+        case 521: PoseClearTransform(1); break; // Clear Translation (Alt+G)
+        case 522: PoseClearTransform(2); break; // Clear Rotation (Alt+R)
+        case 523: PoseClearTransform(3); break; // Clear Scale (Alt+S)
         case 103: LayoutShrinkFatten(); break; // Shrink/Fatten (Alt+S): cada vert por su normal
         case 300: LayoutExtrudeFaces(); break; // Extrude (segun el modo) (E)
         case 310: LayoutNewFaceEdit(); break;  // Vertex > New Edge/Face from Vertices (F)
@@ -1060,6 +1064,20 @@ void PoseXformCancel(){
 void PoseCiclarEje(int eje){ if (g_poseModo==2){ g_poseAxis = eje; g_poseAccX = g_poseAccY = 0.0f; g_poseLastX=lastMouseX; g_poseLastY=lastMouseY; } } // X/Y/Z: eje de rotacion (Global/Local)
 void PoseCiclarOrient(){ if (g_poseModo==2){ g_poseOrient = (g_poseOrient+1)%3; g_poseAccX = g_poseAccY = 0.0f; g_poseLastX=lastMouseX; g_poseLastY=lastMouseY; } } // R de nuevo: View->Global->Local
 void PoseInsertKeyframe(){ Armature* a = PoseArmActiva(); if (a){ InsertarKeyframeEsqueleto(a); PoseInvalidar(a); } }
+// Pose Mode > Clear Transform: resetea la pose de los huesos SELECCIONADOS a su rest (si no hay seleccion, TODOS).
+// what: 0=All (T+R+S), 1=Translation (Alt+G), 2=Rotation (Alt+R), 3=Scale (Alt+S). No inserta keyframe.
+void PoseClearTransform(int what){
+    Armature* a = PoseArmActiva(); if (!a) return;
+    bool haySel = false; for (size_t b = 0; b < a->bones.size(); b++) if (a->bones[b].select){ haySel = true; break; }
+    for (size_t b = 0; b < a->bones.size(); b++){ W3dBone& bo = a->bones[b];
+        if (haySel && !bo.select) continue; // solo los seleccionados; si no hay ninguno seleccionado -> todos
+        if (what == 0 || what == 1) bo.poseT = bo.restT;
+        if (what == 0 || what == 2) bo.poseR = bo.restR;
+        if (what == 0 || what == 3) bo.poseS = bo.restS;
+    }
+    PoseInvalidar(a);
+}
+void PoseClearTransformAll(){ PoseClearTransform(0); } // compat
 
 // opcion del menu Mode: cambia el modo del objeto ACTIVO.
 //  - MALLA:     Object/Edit/Paint (Edit y Paint todavia son placeholders).
@@ -3205,9 +3223,17 @@ void LayoutTickFPS(unsigned long wallMs) {
 // otra cosa, p.ej. ciclar el viewport). La logica va aca -> PC y Symbian la usan.
 bool LayoutToggleEditMode() {
     if (estado != editNavegacion) return false; // no en medio de un transform
-    if (!ObjActivo || ObjActivo->getType() != ObjectType::mesh) return false;
+    if (!ObjActivo) return false;
+    // ARMATURE: Tab alterna Object <-> Pose (antes Tab no hacia nada con un esqueleto seleccionado).
+    if (ObjActivo->getType() == ObjectType::armature) {
+        UndoCapturarModo(); // Ctrl+Z: guarda el modo PREVIO
+        InteractionMode = (InteractionMode == PoseMode) ? ObjectMode : PoseMode;
+        ActualizarEditMeshActivo();
+        return true;
+    }
+    if (ObjActivo->getType() != ObjectType::mesh) return false;
     UndoCapturarModo(); // Ctrl+Z: guarda el modo PREVIO antes de togglear
-    InteractionMode = (InteractionMode == EditMode) ? ObjectMode : EditMode;
+    InteractionMode = (InteractionMode == EditMode) ? ObjectMode : EditMode; // MALLA: Object <-> Edit
     ActualizarEditMeshActivo(); // refresca g_editMesh (PC + Symbian)
     return true;
 }

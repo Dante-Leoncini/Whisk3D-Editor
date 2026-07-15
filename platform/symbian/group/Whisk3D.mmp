@@ -225,3 +225,4 @@ SOURCE w3dCompress.cpp           // inflate DEFLATE/zlib self-contained (arrays 
 SOURCEPATH ..\..\..\main\importers
 SOURCE import_fbx.cpp            // importador FBX binario (parseo + descompresion + malla/esqueleto/materiales)
 SOURCE import_gltf.cpp           // importador glTF 2.0 / GLB (JSON propio + accessors + malla/esqueleto/animaciones)
+SOURCE export_gltf.cpp           // exportador glTF 2.0 / GLB (inverso: bind pose + skin + huesos + clips, sin hornear)

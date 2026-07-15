@@ -200,6 +200,21 @@ static void W3dImportFbxMenu() {
                      W3dImportFbxElegido);
 }
 
+// Import glTF / GLB: mismo explorador compartido. ImportGLTF (via W3dNewImportGltf) detecta el GLB por el
+// magic, asi que el mismo callback sirve para ambos; solo cambia el filtro del browser (.gltf vs .glb).
+// Antes "Add > Imports > glTF/GLB" no hacia nada en el N95 porque LayoutImportGltf/Glb quedaban sin cablear.
+static void W3dImportGltfElegido(const std::string& aPath) {
+    W3dNewImportGltf(aPath.c_str());
+}
+static void W3dImportGltfMenu() {
+    AbrirFileBrowser("Importar glTF", "Import glTF", ".gltf",
+                     W3dImportGltfElegido);
+}
+static void W3dImportGlbMenu() {
+    AbrirFileBrowser("Importar GLB", "Import GLB", ".glb",
+                     W3dImportGltfElegido);
+}
+
 extern bool gCargarTexturaComoNormal; // Properties.cpp: el "Load Texture" del normal map lo prende (compartido 4 OS)
 static Material* gSymTexMat = NULL;
 static void W3dTexturaElegida(const std::string& aPath) {
@@ -279,6 +294,8 @@ void W3dLayoutBuild(CWhisk3D* aWhisk, TInt aWidth, TInt aHeight) {
     LayoutArbolCambiado = W3dArbolCambiadoHook;
     LayoutImportObj = W3dImportObjMenu;        // Add > Import OBJ: el browser compartido
     LayoutImportFbx = W3dImportFbxMenu;        // Add > Import FBX: idem (antes NULL -> el item no hacia nada)
+    LayoutImportGltf = W3dImportGltfMenu;      // Add > Imports > glTF: idem (antes NULL -> el item no abria el browser)
+    LayoutImportGlb = W3dImportGlbMenu;        // Add > Imports > GLB: idem
     DialogoCargarTextura = W3dCargarTexturaEn; // cargar textura: idem
 
 

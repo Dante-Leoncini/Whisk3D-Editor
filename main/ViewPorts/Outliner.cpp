@@ -751,13 +751,18 @@ void Outliner::ClickSeleccionar(int mx, int my) {
                     int b = desde < filaClick ? filaClick : desde;
                     for (int f = a; f <= b; f++) {
                         Object* o = W3dObjetoEnFila(f);
-                        if (o) o->select = true;
+                        // el rango tiene que quedar en ObjSelects, no solo con select=true:
+                        // operaciones como Join arman su lista desde ObjSelects pero borran por el
+                        // flag select -> un rango select=true fuera de ObjSelects se borra SIN unirse
+                        // (las mallas intermedias "desaparecen"). Mantener ambos consistentes.
+                        if (o && !o->select) { o->select = true; ObjSelects.push_back(o); }
                     }
                     hit->Seleccionar(); // el clickeado queda activo
                 }
             } else if (LCtrlPressed) {
-                // ctrl+click: agregar/sacar UNO de la seleccion
-                if (hit->select) { hit->select = false; }
+                // ctrl+click: agregar/sacar UNO de la seleccion (Deseleccionar lo saca de ObjSelects,
+                // no solo select=false -> sino quedaba en ObjSelects y ops como Join lo procesaban igual)
+                if (hit->select) { hit->Deseleccionar(); if (ObjActivo == hit) ObjActivo = NULL; }
                 else { hit->Seleccionar(); }
             } else {
                 DeseleccionarTodo();

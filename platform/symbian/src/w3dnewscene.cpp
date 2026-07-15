@@ -27,6 +27,7 @@
 #include "objects/ObjectMode.h" // estado/G-R-S REALES de PC
 #include "importers/import_obj.h"
 #include "importers/import_fbx.h" // ImportFBX (binario): mismo file browser que el OBJ
+#include "importers/import_gltf.h" // ImportGLTF (.gltf/.glb): detecta GLB por el magic, mismo browser
 #include "ViewPorts/ViewPort3D.h" // el viewport REAL de PC
 #include "objects/Empty.h"
 #include <string.h> // strncpy
@@ -421,6 +422,17 @@ TBool W3dNewImportFbx(const char* aPath) {
     w3dLogf("W3dNewImportFbx: aPath='%s'", aPath);
     bool ok = ImportFBX(std::string(aPath));
     w3dLogf("importFbx: ok=%d hijos=%d", (TInt)ok,
+        SceneCollection ? (TInt)SceneCollection->Childrens.size() : -1);
+    return ok ? ETrue : EFalse;
+}
+
+// importar un .gltf / .glb con el importador COMPARTIDO de PC. ImportGLTF detecta el GLB por el magic
+// (glTF binario) -> el mismo callback sirve para ambos, solo cambia el filtro del browser (ver w3dlayout.cpp).
+TBool W3dNewImportGltf(const char* aPath) {
+    if (!aPath || !aPath[0]) return EFalse;
+    w3dLogf("W3dNewImportGltf: aPath='%s'", aPath);
+    bool ok = ImportGLTF(std::string(aPath));
+    w3dLogf("importGltf: ok=%d hijos=%d", (TInt)ok,
         SceneCollection ? (TInt)SceneCollection->Childrens.size() : -1);
     return ok ? ETrue : EFalse;
 }
