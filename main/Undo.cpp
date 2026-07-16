@@ -7,6 +7,8 @@
 #include "objects/Light.h"       // Lights (global): el borrado de luces lo des/re-registra
 #include "edit/Modifier.h"       // Modifier (limpiar target de Armature/Mirror/Boolean al borrar el objeto apuntado)
 #include "objects/Armature.h"    // Armature (cast correcto Object*<->Armature* al limpiar/restaurar skinArmature)
+#include "animation/SkeletalAnimation.h" // KeyframesUndo: recorrer las curvas del clip activo (tracks/Propertys)
+#include "animation/Animation.h"         // AnimationObjects / keyFrame / ActiveAnimKind
 // CameraActive: NO incluyo Camera.h (header pesado del editor, arrastra Target/Curve/icons -> riesgo en el
 // build de Symbian). Forward-declaro: solo necesito el puntero (Object es la 1ra base -> el cast a Object* es offset 0).
 class Camera; extern Camera* CameraActive;
@@ -555,6 +557,94 @@ void UndoApplyConfirmar() {
     g_pendingApplyGeos.clear(); g_pendingApplyXf = NULL; g_pendingApplyArms.clear();
 }
 
+// ============================================================================
+//  POSE (G/R/S de huesos en Pose Mode): snapshot de la POSE (poseT/R/S) de todos los huesos antes del transform.
+//  Ctrl+Z restaura la pose previa. La pose se guarda a la curva recien con Insert Keyframe (esto solo deshace el drag).
+// ============================================================================
+struct PoseEst { Vector3 T, R, S; };
+class PoseUndo : public UndoCmd {
+    Armature* a; std::vector<PoseEst> e;
+public:
+    PoseUndo(Armature* arm) : a(arm) {
+        if (!a) return;
+        for (size_t i=0;i<a->bones.size();i++){ PoseEst p; p.T=a->bones[i].poseT; p.R=a->bones[i].poseR; p.S=a->bones[i].poseS; e.push_back(p); }
+    }
+    bool Vacio() const { return e.empty(); }
+    bool Cambio() const { // hubo cambio real respecto al snapshot? (evita empujar un undo vacio si G+Esc / click sin mover)
+        if (!a || e.size()!=a->bones.size()) return false;
+        for (size_t i=0;i<e.size();i++){ const W3dBone& b=a->bones[i];
+            if (b.poseT.x!=e[i].T.x||b.poseT.y!=e[i].T.y||b.poseT.z!=e[i].T.z) return true;
+            if (b.poseR.x!=e[i].R.x||b.poseR.y!=e[i].R.y||b.poseR.z!=e[i].R.z) return true;
+            if (b.poseS.x!=e[i].S.x||b.poseS.y!=e[i].S.y||b.poseS.z!=e[i].S.z) return true; }
+        return false;
+    }
+    void Aplicar(){
+        if (!a || e.size()!=a->bones.size()) return;
+        for (size_t i=0;i<e.size();i++){ W3dBone& b=a->bones[i]; Vector3 t=b.poseT,r=b.poseR,s=b.poseS;
+            b.poseT=e[i].T; b.poseR=e[i].R; b.poseS=e[i].S; e[i].T=t; e[i].R=r; e[i].S=s; }
+        a->poseDirty=true; a->poseSerial++; InvalidarSkinDeArmature(a);
+    }
+};
+// ============================================================================
+//  KEYFRAMES (dope sheet: borrar / mover): snapshot de TODAS las curvas de la animacion ACTIVA (clip de armature
+//  o escena). Editar keyframes NO cambia la ESTRUCTURA (tracks/propiedades), solo el contenido de cada curva ->
+//  alcanza con recolectar los vectores en el mismo orden y hacer swap. Ctrl+Z devuelve los keyframes.
+// ============================================================================
+static void RecolectarCurvas(std::vector<std::vector<keyFrame>*>& out){
+    out.clear();
+    if (ActiveAnimKind == 1 && ActiveAnimArm &&
+        ActiveAnimArm->animActiva >= 0 && ActiveAnimArm->animActiva < (int)ActiveAnimArm->animations.size()){
+        SkeletalAnimation* an = ActiveAnimArm->animations[ActiveAnimArm->animActiva];
+        for (size_t t=0;t<an->tracks.size();t++)
+            for (size_t p=0;p<an->tracks[t].Propertys.size();p++) out.push_back(&an->tracks[t].Propertys[p].keyframes);
+    } else {
+        for (size_t i=0;i<AnimationObjects.size();i++)
+            for (size_t p=0;p<AnimationObjects[i].Propertys.size();p++) out.push_back(&AnimationObjects[i].Propertys[p].keyframes);
+    }
+}
+class KeyframesUndo : public UndoCmd {
+    std::vector<std::vector<keyFrame> > snap;
+public:
+    KeyframesUndo(){ std::vector<std::vector<keyFrame>*> c; RecolectarCurvas(c);
+        snap.resize(c.size()); for (size_t i=0;i<c.size();i++) snap[i] = *c[i]; }
+    bool Vacio() const { return snap.empty(); }
+    bool Cambio() const { // hubo cambio real? (no empujar un undo vacio)
+        std::vector<std::vector<keyFrame>*> c; RecolectarCurvas(c);
+        if (c.size() != snap.size()) return true;
+        for (size_t i=0;i<c.size();i++){ if (c[i]->size() != snap[i].size()) return true;
+            for (size_t k=0;k<snap[i].size();k++){
+                const keyFrame& a = (*c[i])[k]; const keyFrame& b = snap[i][k];
+                // OJO: tambien la INTERPOLACION y los HANDLES. Curvar un tramo no mueve el keyframe (mismo frame y
+                // mismo valor): si solo se miraban esos dos, el undo de una curva se descartaba por "no hubo cambio".
+                if (a.frame != b.frame || a.value != b.value) return true;
+                if (a.Interpolation != b.Interpolation || a.handleType != b.handleType) return true;
+                if (a.inDF != b.inDF || a.inDV != b.inDV || a.outDF != b.outDF || a.outDV != b.outDV) return true; } }
+        return false;
+    }
+    void Aplicar(){
+        std::vector<std::vector<keyFrame>*> c; RecolectarCurvas(c);
+        if (c.size() != snap.size()) return; // la estructura cambio (otra animacion activa): no tocar nada
+        for (size_t i=0;i<c.size();i++) c[i]->swap(snap[i]);
+        if (ActiveAnimArm){ ActiveAnimArm->lastPoseFrame = -999999; ActiveAnimArm->poseDirty = true; ActiveAnimArm->poseSerial++;
+                            InvalidarSkinDeArmature(ActiveAnimArm); }
+    }
+};
+static KeyframesUndo* g_pendingKeys = NULL;
+void UndoKeyframesIniciar(){ delete g_pendingKeys; g_pendingKeys = new KeyframesUndo(); }
+void UndoKeyframesConfirmar(){
+    if (!g_pendingKeys) return;
+    if (g_pendingKeys->Vacio() || !g_pendingKeys->Cambio()){ delete g_pendingKeys; g_pendingKeys = NULL; return; }
+    Push(g_pendingKeys); g_pendingKeys = NULL;
+}
+
+static PoseUndo* g_pendingPose = NULL;
+void UndoPoseIniciar(Armature* a){ delete g_pendingPose; g_pendingPose = a ? new PoseUndo(a) : NULL; }
+void UndoPoseConfirmar(){
+    if (!g_pendingPose) return;
+    if (g_pendingPose->Vacio() || !g_pendingPose->Cambio()){ delete g_pendingPose; g_pendingPose = NULL; return; }
+    Push(g_pendingPose); g_pendingPose = NULL;
+}
+
 void UndoDeshacer() {
     if (g_undo.empty()) return;
     UndoCmd* c = g_undo.back(); g_undo.pop_back();
@@ -574,6 +664,11 @@ void UndoLimpiar() {
     if (g_pendingT)  { delete g_pendingT;  g_pendingT  = NULL; }
     if (g_pendingEM) { delete g_pendingEM; g_pendingEM = NULL; }
     if (g_pendingMat){ delete g_pendingMat; g_pendingMat = NULL; }
+    // Ningun pendiente puede sobrevivir a un reset de escena. PoseUndo se queda con un Armature* crudo: si la
+    // escena se rehace con un transform de pose a medio hacer, ese puntero queda colgado y el proximo
+    // UndoPoseConfirmar lo desreferencia.
+    if (g_pendingKeys){ delete g_pendingKeys; g_pendingKeys = NULL; }
+    if (g_pendingPose){ delete g_pendingPose; g_pendingPose = NULL; }
 }
 bool UndoHayAlgo() { return !g_undo.empty(); }
 bool UndoHayRedo() { return !g_redo.empty(); }

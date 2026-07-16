@@ -368,15 +368,31 @@ bool ExportGLTF(const std::string& filepath, bool selectedOnly, bool binary) {
                 BoneTrack& tr = clip->tracks[ti];
                 int bone = tr.bone; if (bone < 0 || bone >= nBones) continue;
                 int rotOrder = arm->bones[bone].rotOrder;
-                for (size_t pi = 0; pi < tr.Propertys.size(); pi++) {
-                    AnimProperty& ap = tr.Propertys[pi]; if (ap.keyframes.empty()) continue;
-                    int prop = ap.Property; const char* path = (prop == AnimPosition) ? "translation" : (prop == AnimRotation) ? "rotation" : (prop == AnimScale) ? "scale" : NULL;
-                    if (!path) continue;
-                    std::vector<float> times(ap.keyframes.size()), vals;
-                    for (size_t k = 0; k < ap.keyframes.size(); k++) { const keyFrame& kf = ap.keyframes[k]; times[k] = (float)(kf.frame - 1) / fps;
-                        if (prop == AnimRotation) { float qx, qy, qz, qw; EulerAQuat(Vector3(kf.valueX, kf.valueY, kf.valueZ), rotOrder, qx, qy, qz, qw); vals.push_back(qx); vals.push_back(qy); vals.push_back(qz); vals.push_back(qw); }
-                        else { vals.push_back(kf.valueX); vals.push_back(kf.valueY); vals.push_back(kf.valueZ); } }
-                    if (prop == AnimRotation) for (size_t k = 1; k < ap.keyframes.size(); k++) { float* c = &vals[k*4]; float* p = &vals[(k-1)*4];
+                // Un sampler de glTF necesita los 3 componentes en los MISMOS tiempos, pero en el modelo cada
+                // componente (X/Y/Z) es una CURVA con sus propios keyframes. Por eso: por propiedad se UNEN los
+                // frames de sus 3 curvas y se EVALUA cada componente en cada frame de la union (EvalPropVec).
+                const int propsExp[3] = { AnimPosition, AnimRotation, AnimScale };
+                for (int pe = 0; pe < 3; pe++) {
+                    int prop = propsExp[pe];
+                    const char* path = (prop == AnimPosition) ? "translation" : (prop == AnimRotation) ? "rotation" : "scale";
+                    std::vector<int> frames; // union de los frames de las curvas X/Y/Z de esta propiedad
+                    for (size_t pi = 0; pi < tr.Propertys.size(); pi++){
+                        if (tr.Propertys[pi].Property != prop) continue;
+                        for (size_t k = 0; k < tr.Propertys[pi].keyframes.size(); k++) frames.push_back(tr.Propertys[pi].keyframes[k].frame);
+                    }
+                    if (frames.empty()) continue;
+                    std::sort(frames.begin(), frames.end());
+                    frames.erase(std::unique(frames.begin(), frames.end()), frames.end());
+                    // valor de reposo del hueso para los componentes que no tengan curva propia
+                    Vector3 def = (prop == AnimPosition) ? arm->bones[bone].restT : (prop == AnimRotation) ? arm->bones[bone].restR : arm->bones[bone].restS;
+                    std::vector<float> times(frames.size()), vals;
+                    for (size_t k = 0; k < frames.size(); k++) {
+                        times[k] = (float)(frames[k] - 1) / fps;
+                        Vector3 v = EvalPropVec(tr.Propertys, prop, frames[k], def);
+                        if (prop == AnimRotation) { float qx, qy, qz, qw; EulerAQuat(v, rotOrder, qx, qy, qz, qw); vals.push_back(qx); vals.push_back(qy); vals.push_back(qz); vals.push_back(qw); }
+                        else { vals.push_back(v.x); vals.push_back(v.y); vals.push_back(v.z); }
+                    }
+                    if (prop == AnimRotation) for (size_t k = 1; k < frames.size(); k++) { float* c = &vals[k*4]; float* p = &vals[(k-1)*4];
                         if (c[0]*p[0]+c[1]*p[1]+c[2]*p[2]+c[3]*p[3] < 0) { c[0]=-c[0]; c[1]=-c[1]; c[2]=-c[2]; c[3]=-c[3]; } } // hemisferio para LINEAR
                     int inAcc = buf.addFloats(times, 1, "SCALAR", 0, true);
                     int outAcc = buf.addFloats(vals, prop == AnimRotation ? 4 : 3, prop == AnimRotation ? "VEC4" : "VEC3", 0, false);
@@ -386,7 +402,10 @@ bool ExportGLTF(const std::string& filepath, bool selectedOnly, bool binary) {
                 }
             }
             if (channels.empty()) continue;
-            animsJson.push_back("{\"name\":\"" + Jesc(clip->name) + "\",\"channels\":[" + JoinArr(channels) + "],\"samplers\":[" + JoinArr(samplers) + "]}");
+            // extras.frameRate: guardar el fps del clip. glTF NO tiene metadato de fps y el importer lo ADIVINA del
+            // espaciado de tiempos -> con keyframes sparse (ej frame 1 y 20) adivina fps=1 y colapsa el rango a 1..2.
+            // Con extras el round-trip es exacto (glTF estandar; otros viewers lo ignoran).
+            animsJson.push_back("{\"name\":\"" + Jesc(clip->name) + "\",\"extras\":{\"frameRate\":" + Itos((long)fps) + "},\"channels\":[" + JoinArr(channels) + "],\"samplers\":[" + JoinArr(samplers) + "]}");
         }
     }
     // ---- animaciones (FBX biped): se HORNEA la pose por-frame (el Lcl-FK del biped es degenerado). En cada frame se
@@ -450,7 +469,8 @@ bool ExportGLTF(const std::string& filepath, bool selectedOnly, bool binary) {
                 channels.push_back("{\"sampler\":"+Itos(base+2)+",\"target\":{\"node\":"+Itos(j)+",\"path\":\"scale\"}}");
             }
             if (channels.empty()) continue;
-            animsJson.push_back("{\"name\":\""+Jesc(clip->name)+"\",\"channels\":["+JoinArr(channels)+"],\"samplers\":["+JoinArr(samplers)+"]}");
+            // extras.frameRate: mismo motivo que el path clean (preservar el fps para el round-trip exacto)
+            animsJson.push_back("{\"name\":\""+Jesc(clip->name)+"\",\"extras\":{\"frameRate\":"+Itos((long)fps)+"},\"channels\":["+JoinArr(channels)+"],\"samplers\":["+JoinArr(samplers)+"]}");
         }
         // restaurar el estado de animacion del editor
         arm->animActiva = savActiva; ActiveAnimKind = savKind; ActiveAnimArm = savArm; g_skelAnimPreview = savPrev;

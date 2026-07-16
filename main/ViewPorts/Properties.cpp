@@ -1,4 +1,5 @@
 #include "w3dGraphics.h" // abstraccion de graficos (independencia de OpenGL)
+#include "ViewPorts/Timeline.h"   // keyframe ACTIVO + InvalidarAnimYRedraw (tarjeta "Keyframe")
 #include "Properties.h"
 #include "Undo.h" // Ctrl+Z: capturar rename
 #include "edit/MeshEdit.h" // Nuevo/Borrar/MoverMeshPart (funciones libres del editor)
@@ -1253,6 +1254,107 @@ static void AccionVertColorMode() {   // toggle Per-Vertex / Per-Corner de la ca
     }
 }
 
+
+// ============================================================================
+//  Tarjeta "Keyframe": edita con EXACTITUD el keyframe elegido en el editor de curvas (el ultimo clickeado).
+//  Los campos son espejos float; cada onChange escribe en la curva VIVA y re-evalua la animacion.
+//  Se resuelve el keyframe en cada acceso (DopeKeyframeActivo): el vector se reordena al moverlo.
+// ============================================================================
+static float g_kfFrame = 0.0f, g_kfValor = 0.0f;
+static float g_kfInDF = 0.0f, g_kfInDV = 0.0f, g_kfOutDF = 0.0f, g_kfOutDV = 0.0f;
+static PropFloat *gKfFrame=NULL, *gKfValor=NULL, *gKfInDF=NULL, *gKfInDV=NULL, *gKfOutDF=NULL, *gKfOutDV=NULL;
+static PropButton *gKfInterp=NULL, *gKfHandle=NULL;
+static PopupMenu* g_menuKfInterp = NULL;
+static PopupMenu* g_menuKfHandle = NULL;
+
+static const char* KfNombreInterp(int i){
+    return (i==KfConstant)?"Constant" : (i==KfLinear)?"Linear" : "Bezier";
+}
+static const char* KfNombreHandle(int h){
+    switch (h){ case HFree: return "Free"; case HAligned: return "Aligned"; case HVector: return "Vector";
+                case HAuto: return "Automatic"; default: return "Auto Clamped"; }
+}
+static void KfAplicado(){ AplicarAnimacionObjetos(); InvalidarAnimYRedraw(); }
+
+static void AccionKfFrame(){
+    int i; AnimProperty* ap = DopeKeyframeActivo(&i); if (!ap) return;
+    int nf = (int)floorf(g_kfFrame + 0.5f);
+    if (nf == ap->keyframes[i].frame) return;
+    UndoKeyframesIniciar();
+    // el frame de destino puede estar ocupado: gana el que se mueve (misma regla que arrastrarlo en el timeline)
+    for (size_t k=ap->keyframes.size(); k-- > 0; )
+        if ((int)k != i && ap->keyframes[k].frame == nf) ap->keyframes.erase(ap->keyframes.begin()+k);
+    int j; ap = DopeKeyframeActivo(&j); if (!ap) return;   // el erase pudo correr el indice
+    ap->keyframes[j].frame = nf;
+    ap->SortKeyFrames();
+    DopeKeyframeActivoReFrame(nf);
+    UndoKeyframesConfirmar(); KfAplicado();
+}
+static void AccionKfValor(){
+    int i; AnimProperty* ap = DopeKeyframeActivo(&i); if (!ap) return;
+    if (ap->keyframes[i].value == g_kfValor) return;
+    UndoKeyframesIniciar(); ap->keyframes[i].value = g_kfValor; UndoKeyframesConfirmar(); KfAplicado();
+}
+static void AccionKfHandles(){
+    int i; AnimProperty* ap = DopeKeyframeActivo(&i); if (!ap) return;
+    keyFrame& k = ap->keyframes[i];
+    // tocar un handle a mano solo tiene sentido si el tipo es de los que se guardan
+    if (k.handleType != HFree && k.handleType != HAligned) return;
+    UndoKeyframesIniciar();
+    k.inDF = g_kfInDF; k.inDV = g_kfInDV; k.outDF = g_kfOutDF; k.outDV = g_kfOutDV;
+    UndoKeyframesConfirmar(); KfAplicado();
+}
+static void AccionMenuKfInterp(int id){
+    if (id >= 0){ int i; AnimProperty* ap = DopeKeyframeActivo(&i);
+        if (ap){ UndoKeyframesIniciar(); ap->keyframes[i].Interpolation = id;
+                 if (id == KfBezier && ap->keyframes[i].handleType != HFree && ap->keyframes[i].handleType != HAligned)
+                     ap->keyframes[i].handleType = HAuto;
+                 UndoKeyframesConfirmar(); KfAplicado(); } }
+    if (g_menuKfInterp && MenuAbierto == g_menuKfInterp) g_menuKfInterp->Cerrar();
+}
+static void AccionMenuKfHandle(int id){
+    if (id >= 0){ int i; AnimProperty* ap = DopeKeyframeActivo(&i);
+        if (ap){ UndoKeyframesIniciar();
+                 keyFrame& k = ap->keyframes[i];
+                 if (id == HFree || id == HAligned){   // congelar lo que se veia (los calculados no guardan nada)
+                     float aDF,aDV,bDF,bDV;
+                     ap->HandleEfectivo((size_t)i, false, aDF, aDV);
+                     ap->HandleEfectivo((size_t)i, true,  bDF, bDV);
+                     k.inDF=aDF; k.inDV=aDV; k.outDF=bDF; k.outDV=bDV;
+                 }
+                 k.handleType = id;
+                 UndoKeyframesConfirmar(); KfAplicado(); } }
+    if (g_menuKfHandle && MenuAbierto == g_menuKfHandle) g_menuKfHandle->Cerrar();
+}
+static void AccionKfBtnInterp(){
+    if (!gKfInterp) return;
+    if (!g_menuKfInterp){ g_menuKfInterp = new PopupMenu(); g_menuKfInterp->action = AccionMenuKfInterp;
+                          g_menuKfInterp->titulo = "Interpolation"; }
+    g_menuKfInterp->Limpiar();
+    g_menuKfInterp->Agregar("Constant", KfConstant);
+    g_menuKfInterp->Agregar("Linear", KfLinear);
+    g_menuKfInterp->Agregar("Bezier", KfBezier);
+    if (MenuAbierto && MenuAbierto != g_menuKfInterp) MenuAbierto->Cerrar();
+    g_menuKfInterp->Abrir(gKfInterp->button->sx, gKfInterp->button->sy + gKfInterp->button->height,
+                          MenuPantallaW, MenuPantallaH);
+    MenuAbierto = g_menuKfInterp;
+}
+static void AccionKfBtnHandle(){
+    if (!gKfHandle) return;
+    if (!g_menuKfHandle){ g_menuKfHandle = new PopupMenu(); g_menuKfHandle->action = AccionMenuKfHandle;
+                          g_menuKfHandle->titulo = "Handle Type"; }
+    g_menuKfHandle->Limpiar();
+    g_menuKfHandle->Agregar("Free", HFree);
+    g_menuKfHandle->Agregar("Aligned", HAligned);
+    g_menuKfHandle->Agregar("Vector", HVector);
+    g_menuKfHandle->Agregar("Automatic", HAuto);
+    g_menuKfHandle->Agregar("Auto Clamped", HAutoClamped);
+    if (MenuAbierto && MenuAbierto != g_menuKfHandle) MenuAbierto->Cerrar();
+    g_menuKfHandle->Abrir(gKfHandle->button->sx, gKfHandle->button->sy + gKfHandle->button->height,
+                          MenuPantallaW, MenuPantallaH);
+    MenuAbierto = g_menuKfHandle;
+}
+
 void Properties::ConstruirGrupos(){
     propTransform = new GroupPropertie("Transform");
 
@@ -1511,6 +1613,42 @@ void Properties::ConstruirGrupos(){
     propBtnAnimRender->action = AccionRenderAnimation;
     propAnimation->properties.push_back(propBtnAnimRender);
     GroupProperties.push_back(propAnimation);
+
+    // ===== Tarjeta "Keyframe": el keyframe elegido en el editor de curvas, con numeros exactos =====
+    // Aparece SOLO cuando hay uno elegido. X = frame (entero), Y = valor. Los handles son puntos (offset desde el
+    // keyframe) y solo se pueden tipear si el tipo los guarda (Free/Aligned); con los calculados quedan grises.
+    propKeyframe = new GroupPropertie("Keyframe");
+    propKeyframe->anchoValores = 0.55f;
+    { PropFloat* p1 = new PropFloat("Frame X");
+      p1->entero = true; p1->stepFino = 1.0f; p1->stepGrueso = 10.0f; p1->dragStep = 1.0f;
+      p1->value = &g_kfFrame; p1->onChange = AccionKfFrame; gKfFrame = p1;
+      propKeyframe->properties.push_back(p1); }
+    { PropFloat* p1 = new PropFloat("Value Y");
+      p1->value = &g_kfValor; p1->onChange = AccionKfValor; gKfValor = p1;
+      propKeyframe->properties.push_back(p1); }
+    propKeyframe->properties.push_back(new PropGap(""));
+    gKfInterp = new PropButton("Interpolation");
+    gKfInterp->button->desplegable = true; gKfInterp->button->caretMenu = true;
+    gKfInterp->action = AccionKfBtnInterp;
+    propKeyframe->properties.push_back(gKfInterp);
+    gKfHandle = new PropButton("Handle Type");
+    gKfHandle->button->desplegable = true; gKfHandle->button->caretMenu = true;
+    gKfHandle->action = AccionKfBtnHandle;
+    propKeyframe->properties.push_back(gKfHandle);
+    propKeyframe->properties.push_back(new PropGap(""));
+    { PropFloat* p1 = new PropFloat("Left Handle X");
+      p1->value = &g_kfInDF; p1->onChange = AccionKfHandles; gKfInDF = p1;
+      propKeyframe->properties.push_back(p1); }
+    { PropFloat* p1 = new PropFloat("Y");
+      p1->value = &g_kfInDV; p1->onChange = AccionKfHandles; gKfInDV = p1;
+      propKeyframe->properties.push_back(p1); }
+    { PropFloat* p1 = new PropFloat("Right Handle X");
+      p1->value = &g_kfOutDF; p1->onChange = AccionKfHandles; gKfOutDF = p1;
+      propKeyframe->properties.push_back(p1); }
+    { PropFloat* p1 = new PropFloat("Y");
+      p1->value = &g_kfOutDV; p1->onChange = AccionKfHandles; gKfOutDV = p1;
+      propKeyframe->properties.push_back(p1); }
+    GroupProperties.push_back(propKeyframe);
 
     propExport = new GroupPropertie("Export");
     propExport->anchoValores = 0.62f;
@@ -2124,6 +2262,35 @@ void Properties::ActualizarPestanias(){
     // no hay nada que exportar).
     if (propRender)    propRender->visible    = (pestaniaActiva == 0);
     if (propAnimation) propAnimation->visible = (pestaniaActiva == 0); // tarjeta Animation: global, como Render
+    // tarjeta Keyframe: SOLO si hay un keyframe elegido en el editor de curvas. Los campos se refrescan desde la
+    // curva viva (que la puede haber movido el propio timeline), salvo el que se este editando a mano.
+    if (propKeyframe){
+        int ki; AnimProperty* kap = DopeKeyframeActivo(&ki);
+        propKeyframe->visible = (pestaniaActiva == 0) && kap != NULL;
+        if (propKeyframe->visible){
+            const keyFrame& k = kap->keyframes[ki];
+            std::string canal = DopeKeyframeActivoCanal();
+            propKeyframe->name = canal.empty() ? "Keyframe" : ("Keyframe - " + canal);
+            if (g_propFloatEditando != gKfFrame) g_kfFrame = (float)k.frame;
+            if (g_propFloatEditando != gKfValor) g_kfValor = k.value;
+            if (g_propFloatEditando != gKfInDF)  g_kfInDF  = k.inDF;
+            if (g_propFloatEditando != gKfInDV)  g_kfInDV  = k.inDV;
+            if (g_propFloatEditando != gKfOutDF) g_kfOutDF = k.outDF;
+            if (g_propFloatEditando != gKfOutDV) g_kfOutDV = k.outDV;
+            if (gKfInterp) gKfInterp->button->text = KfNombreInterp(k.Interpolation);
+            if (gKfHandle) gKfHandle->button->text = KfNombreHandle(k.handleType);
+            // los handles SOLO existen si el tramo es bezier, y solo se pueden tipear si el TIPO los guarda
+            // (con Vector/Automatic/Auto Clamped los calcula la curva sola: mostrarlos editables seria mentir).
+            // value = NULL OCULTA la fila: es el idioma del panel (Resize la mide en 0 y el teclado la saltea).
+            bool bez = (k.Interpolation == KfBezier) || (ki > 0 && kap->keyframes[ki-1].Interpolation == KfBezier);
+            bool editables = bez && (k.handleType == HFree || k.handleType == HAligned);
+            if (gKfInDF)  gKfInDF->value  = editables ? &g_kfInDF  : NULL;
+            if (gKfInDV)  gKfInDV->value  = editables ? &g_kfInDV  : NULL;
+            if (gKfOutDF) gKfOutDF->value = editables ? &g_kfOutDF : NULL;
+            if (gKfOutDV) gKfOutDV->value = editables ? &g_kfOutDV : NULL;
+            if (gKfHandle) gKfHandle->button->visible = bez;
+        }
+    }
     if (propExport)    propExport->visible    = (pestaniaActiva == 0 && ObjActivo != NULL);
     // tarjeta Animation: el dropdown muestra la animacion activa (icono camara=escena / esqueleto=clip); Delete se
     // OCULTA cuando no hay nada que borrar; Render se GRISA sin animaciones. New y Rename siempre visibles.

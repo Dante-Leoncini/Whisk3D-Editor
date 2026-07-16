@@ -6,6 +6,7 @@
 #include "edit/MeshEdit.h"     // Nuevo/MoverMeshPart (funciones libres del editor)
 #include "objects/EditMesh.h"  // EditMesh
 #include "ViewPorts/LayoutInput.h" // LayoutToggleEditMode/ExtrudeFaces, EditXform*
+#include "ViewPorts/Timeline.h"    // dopedump: arma las filas del dope sheet
 #include "importers/import_obj.h"   // ExportOBJ
 #include "importers/import_fbx.h"  // ImportFBX
 #include "objects/ObjectMode.h" // Eliminar (test del borrado + su undo)
@@ -112,24 +113,26 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         int pr = (prop=="pos")?AnimPosition : (prop=="rot")?AnimRotation : (prop=="scale")?AnimScale : -1;
         if (pr<0) { err="animkey: prop debe ser pos|rot|scale"; return false; }
         BoneTrack& tr = a->animations[a->animActiva]->TrackDe(bone);
-        AnimProperty& ap = tr.PropertyDe(pr);
-        keyFrame kf; kf.frame=frame; kf.valueX=vx; kf.valueY=vy; kf.valueZ=vz; kf.Interpolation=0;
-        ap.keyframes.push_back(kf); ap.SortKeyFrames();
+        // cada componente es una CURVA propia -> se setea en las 3 (una por bloque: PropertyDe puede reallocar)
+        { AnimProperty& ap = tr.PropertyDe(pr, AnimX); SetKeyCurva(ap, frame, vx); }
+        { AnimProperty& ap = tr.PropertyDe(pr, AnimY); SetKeyCurva(ap, frame, vy); }
+        { AnimProperty& ap = tr.PropertyDe(pr, AnimZ); SetKeyCurva(ap, frame, vz); }
         return true;
     }
-    // ---- animkeys <bone> <pos|rot|scale> <from> <to> : vuelca los keyframes de esa propiedad en el rango ----
+    // ---- animkeys <bone> <pos|rot|scale> <from> <to> : vuelca los keyframes de esa propiedad, POR COMPONENTE ----
     if (cmd == "animkeys") {
         Armature* a = (ObjActivo && ObjActivo->getType()==ObjectType::armature) ? (Armature*)ObjActivo : NULL;
         if (!a || a->animActiva<0) { err="animkeys: sin clip"; return false; }
         int bone=0, from=0, to=999999; std::string prop; ss>>bone>>prop>>from>>to;
         int pr = (prop=="pos")?AnimPosition : (prop=="rot")?AnimRotation : AnimScale;
         SkeletalAnimation* an = a->animations[a->animActiva];
+        const char* cn[3] = {"X","Y","Z"};
         for (size_t t=0;t<an->tracks.size();t++) if (an->tracks[t].bone==bone)
             for (size_t p=0;p<an->tracks[t].Propertys.size();p++) if (an->tracks[t].Propertys[p].Property==pr){
                 AnimProperty& ap=an->tracks[t].Propertys[p];
+                int c = ap.component; if (c<0||c>2) c=0;
                 for (size_t k=0;k<ap.keyframes.size();k++){ int f=ap.keyframes[k].frame; if(f<from||f>to) continue;
-                    printf("      [key] bone=%d %s f=%d (%.2f,%.2f,%.2f)\n", bone, prop.c_str(), f,
-                           ap.keyframes[k].valueX, ap.keyframes[k].valueY, ap.keyframes[k].valueZ); }
+                    printf("      [key] bone=%d %s.%s f=%d = %.2f\n", bone, prop.c_str(), cn[c], f, ap.keyframes[k].value); }
             }
         return true;
     }
@@ -1294,6 +1297,893 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         if (OnSeleccionarAnimClip) OnSeleccionarAnimClip(a, idx); // == click en la lista (PropList modo 5)
         printf("      [animlistsel] clip %d -> ActiveAnimKind=%d ActiveAnimArm==arm=%d animActiva=%d\n",
             idx, ActiveAnimKind, (ActiveAnimArm==a)?1:0, a->animActiva);
+        return true;
+    }
+    // ---- posetest <1=grab|2=rotate|3=scale> <valor> : maneja el transform de POSE via valor numerico exacto sobre 2
+    //      huesos y verifica que se transforman alrededor del PIVOTE compartido (median): rotate/scale preservan/escalan
+    //      la distancia al pivote y los huesos SE MUEVEN; translate los desplaza igual. Verifica la matematica del overhaul. ----
+    if (cmd == "posetest") {
+        int mode=2; float val=45; ss>>mode>>val;
+        Armature* a=NULL; { std::vector<Object*> st; if(SceneCollection) st.push_back(SceneCollection);
+          while(!st.empty() && !a){ Object* o=st.back(); st.pop_back(); if(o->getType()==ObjectType::armature) a=(Armature*)o; for(size_t i=0;i<o->Childrens.size();i++) st.push_back(o->Childrens[i]); } }
+        if(!a || a->bones.size()<3){err="posetest: sin armature o <3 huesos";return false;}
+        for(size_t i=0;i<a->bones.size();i++){ a->bones[i].poseT=a->bones[i].restT; a->bones[i].poseR=a->bones[i].restR; a->bones[i].poseS=a->bones[i].restS; } // pose = rest (headless no evalua FK)
+        estado = editNavegacion; InteractionMode = PoseMode; ObjActivo=(Object*)a;
+        // elegir 2 huesos con cabezas separadas del baricentro (evitar la raiz en el origen)
+        int b0=1, b1=(int)a->bones.size()-1;
+        for(size_t i=0;i<a->bones.size();i++) a->bones[i].select=false;
+        a->bones[b0].select=true; a->bones[b1].select=true; a->boneActivo=b0;
+        Vector3 h0a=SkelBoneWorldNode(a,b0)*Vector3(0,0,0), h0b=SkelBoneWorldNode(a,b1)*Vector3(0,0,0);
+        Vector3 piv=(h0a+h0b)*0.5f;
+        float d0a=(h0a-piv).Length(), d0b=(h0b-piv).Length();
+        extern void PoseXformStart(int); extern void PoseXformNumValor(float); extern void PoseXformConfirm();
+        extern int axisSelect; extern int transformOrientation;
+        PoseXformStart(mode);
+        if(mode!=3){ axisSelect=(mode==2)?Z:X; transformOrientation=GlobalOrient; } // eje global determinista para el test
+        PoseXformNumValor(val);
+        PoseXformConfirm();
+        Vector3 h1a=SkelBoneWorldNode(a,b0)*Vector3(0,0,0), h1b=SkelBoneWorldNode(a,b1)*Vector3(0,0,0);
+        float d1a=(h1a-piv).Length(), d1b=(h1b-piv).Length();
+        float mova=(h1a-h0a).Length(), movb=(h1b-h0b).Length();
+        const char* mn=(mode==1)?"GRAB":(mode==2)?"ROTATE":"SCALE";
+        printf("      [posetest] %s val=%.2f huesos b%d,b%d pivote=(%.2f,%.2f,%.2f)\n", mn, val, b0, b1, piv.x,piv.y,piv.z);
+        printf("         b%d: dist_pivote %.3f->%.3f  movio=%.3f\n", b0, d0a, d1a, mova);
+        printf("         b%d: dist_pivote %.3f->%.3f  movio=%.3f\n", b1, d0b, d1b, movb);
+        bool ok=false;
+        if(mode==2) ok = (fabsf(d1a-d0a)<0.01f*(d0a+1) && fabsf(d1b-d0b)<0.01f*(d0b+1) && mova>0.001f && movb>0.001f); // rotate: distancia preservada + se movio
+        else if(mode==3) ok = (fabsf(d1a-val*d0a)<0.02f*(d0a+1) && fabsf(d1b-val*d0b)<0.02f*(d0b+1)); // scale: distancia * factor
+        else ok = (mova>0.001f && movb>0.001f && fabsf(mova-movb)<0.01f*(mova+1)); // grab: los 2 se mueven IGUAL
+        printf("         -> %s\n", ok?"OK (transform alrededor del pivote correcto)":"FALLO");
+        return true;
+    }
+    // ---- dopedump : arma las filas del DOPE SHEET con la seleccion/animacion actual y las dumpea (verifica el
+    //      filtrado por seleccion, el summary = union, y que el armature solo salga en Pose Mode con huesos elegidos). ----
+    if (cmd == "dopedump") {
+        Timeline* tl = new Timeline(); tl->Resize(900, 300);
+        tl->ConstruirDopeRows();
+        printf("      [dopedump] panelW=%d filas=%d (0 filas = panel vacio -> timeline clasico)\n", tl->panelW, (int)tl->dopeRows.size());
+        for (size_t i=0;i<tl->dopeRows.size();i++){
+            Timeline::DopeRow& d = tl->dopeRows[i];
+            const char* t = (d.tipo==0)?"SUMMARY":(d.tipo==1)?"objeto":(d.tipo==2)?"grupo":"canal";
+            std::string ind(d.nivel*3, ' ');
+            printf("         %s%-7s '%s' keys=%d @", ind.c_str(), t, d.nombre.c_str(), (int)d.keys.size());
+            for (size_t k=0;k<d.keys.size() && k<10;k++) printf(" %d", d.keys[k]);
+            printf("%s\n", d.keys.size()>10?" ...":"");
+        }
+        delete tl; return true;
+    }
+    // ---- dopexform <g|s> <expr> [center|cur] : selecciona TODOS los keyframes del dope sheet y les aplica el
+    //      transform tipeando el valor tal cual lo haria el usuario ('g' 2 = mover 2 frames; 's' 2 = lo que
+    //      duraba 2 frames pasa a durar 4). Verifica el redondeo a entero, el pivote y que NO se clampee. ----
+    if (cmd == "dopexform") {
+        std::string modoS, expr, pivS; ss>>modoS>>expr>>pivS;
+        int modo = (modoS=="s"||modoS=="scale") ? Timeline::DOPE_ESC : Timeline::DOPE_MOV;
+        Timeline* tl = new Timeline(); tl->Resize(900, 300);
+        tl->ConstruirDopeRows();
+        tl->DopeSetPivot((pivS=="cur"||pivS=="curframe") ? 1 : 0);
+        tl->DopeSelectAll();
+        tl->DopeMoveStart(modo);
+        if (!tl->DopeMoviendo()){ printf("      [dopexform] no arranco (no hay keyframes seleccionados)\n"); delete tl; return true; }
+        for (size_t i=0;i<expr.size();i++) tl->DopeNumChar((int)(unsigned char)expr[i]);
+        printf("      [dopexform] %s  (frame actual=%d)\n", tl->DopeTextoTransform().c_str(), CurrentFrame);
+        tl->DopeMoveConfirm();
+        tl->ConstruirDopeRows();
+        for (size_t i=0;i<tl->dopeRows.size();i++){
+            Timeline::DopeRow& d = tl->dopeRows[i];
+            if (d.tipo!=0 && d.tipo!=3) continue;               // solo Summary y canales
+            const char* t = (d.tipo==0)?"SUMMARY":"canal";
+            printf("         %-7s '%s' keys=%d @", t, d.nombre.c_str(), (int)d.keys.size());
+            for (size_t k=0;k<d.keys.size() && k<12;k++) printf(" %d", d.keys[k]);
+            printf("%s\n", d.keys.size()>12?" ...":"");
+        }
+        delete tl; return true;
+    }
+    // ---- dopeframesel : View > Frame Selected sobre TODOS los keyframes. Reporta donde cae cada extremo en
+    //      pixeles (el 1ro debe quedar contra el borde IZQUIERDO y el ultimo contra el DERECHO; si todos cayeron
+    //      en un mismo frame, al MEDIO y sin tocar el zoom). ----
+    if (cmd == "dopeframesel") {
+        Timeline* tl = new Timeline(); tl->Resize(900, 300);
+        tl->ConstruirDopeRows();
+        if (tl->dopeRows.empty()){ printf("      [dopeframesel] sin filas\n"); delete tl; return true; }
+        tl->DopeSelectAll();
+        float zoom0 = tl->pxPerFrame;
+        tl->DopeFrameSelected();
+        int mn, mx; if (!tl->DopeRangoSeleccion(mn, mx)){ printf("      [dopeframesel] sin seleccion\n"); delete tl; return true; }
+        float xa = tl->FrameToX((float)mn), xb = tl->FrameToX((float)mx);
+        int izq = tl->panelW, der = tl->width, medio = (izq + der)/2;
+        printf("      [dopeframesel] keys sel=[%d..%d]  strip=[%d..%d] (medio=%d)  zoom %.2f -> %.2f\n",
+               mn, mx, izq, der, medio, zoom0, tl->pxPerFrame);
+        if (mn == mx)
+            printf("         1 solo keyframe: x=%.1f (medio=%d, error=%.1fpx) zoom %s\n",
+                   xa, medio, xa-(float)medio, (tl->pxPerFrame==zoom0)?"INTACTO OK":"CAMBIO!");
+        else
+            printf("         primero x=%.1f (borde izq=%d, margen=%.1fpx) | ultimo x=%.1f (borde der=%d, margen=%.1fpx)\n",
+                   xa, izq, xa-(float)izq, xb, der, (float)der-xb);
+        delete tl; return true;
+    }
+    // ---- curvatest : el evaluador de curvas. Arma una curva a mano y verifica los 3 modos de interpolacion
+    //      (Constant/Linear/Bezier), que bezier PASE por los keyframes, que sea SUAVE (sin quiebre en el keyframe
+    //      del medio, que es lo que lineal NO tiene) y que Eval(int) == EvalF(int). ----
+    if (cmd == "curvatest") {
+        AnimProperty ap; ap.Property = AnimPosition; ap.component = AnimX;
+        SetKeyCurva(ap, 0, 0.0f); SetKeyCurva(ap, 10, 10.0f); SetKeyCurva(ap, 20, 0.0f);
+        struct S {
+            static void modo(AnimProperty& ap, int interp, const char* nom){
+                for (size_t i=0;i<ap.keyframes.size();i++){ ap.keyframes[i].Interpolation = interp;
+                    ap.keyframes[i].handleType = HAuto; }
+                printf("      [curvatest] %-8s f=0,5,10,15,20 -> %.3f %.3f %.3f %.3f %.3f\n", nom,
+                    ap.EvalF(0,0), ap.EvalF(5,0), ap.EvalF(10,0), ap.EvalF(15,0), ap.EvalF(20,0));
+            }
+        };
+        S::modo(ap, KfConstant, "Constant"); S::modo(ap, KfLinear, "Linear"); S::modo(ap, KfBezier, "Bezier");
+        // TODOS los modos tienen que dar el valor del keyframe EN el frame del keyframe. El escalon es el que se
+        // puede escapar: retenia a.value tambien en el frame de b (llegaba un frame tarde) y el editor lo dibujaba
+        // en b -> lo que veias no era lo que corria.
+        for (int interp=0; interp<=2; interp++){
+            for (size_t i=0;i<ap.keyframes.size();i++) ap.keyframes[i].Interpolation = interp;
+            const char* nm = (interp==KfConstant)?"Constant":(interp==KfLinear)?"Linear":"Bezier";
+            bool ok = true; float peor = 0.0f;
+            for (size_t i=0;i<ap.keyframes.size();i++){
+                float d = fabsf(ap.EvalF((float)ap.keyframes[i].frame, 0.0f) - ap.keyframes[i].value);
+                if (d > peor) peor = d;
+                if (d > 1e-4f) ok = false;
+            }
+            printf("         %-8s vale lo del keyframe EN cada keyframe: %s (peor=%.5f)\n", nm, ok?"OK":"NO!", peor);
+        }
+        // SUAVE en el keyframe del medio: la pendiente de antes y la de despues tienen que coincidir.
+        // (con lineal ahi hay un pico: +1 y luego -1 -> quiebre de 2.0)
+        float h = 0.01f;
+        float dAntes  = (ap.EvalF(10,0) - ap.EvalF(10-h,0)) / h;
+        float dDespues= (ap.EvalF(10+h,0) - ap.EvalF(10,0)) / h;
+        printf("         bezier pendiente antes=%.3f despues=%.3f quiebre=%.4f -> %s\n",
+               dAntes, dDespues, fabsf(dAntes-dDespues), (fabsf(dAntes-dDespues)<0.05f)?"SUAVE OK":"QUIEBRE!");
+        for (size_t i=0;i<ap.keyframes.size();i++) ap.keyframes[i].Interpolation = KfLinear;
+        float lAntes = (ap.EvalF(10,0)-ap.EvalF(10-h,0))/h, lDespues = (ap.EvalF(10+h,0)-ap.EvalF(10,0))/h;
+        printf("         lineal pendiente antes=%.3f despues=%.3f quiebre=%.4f (tiene que QUEBRAR: es una recta)\n",
+               lAntes, lDespues, fabsf(lAntes-lDespues));
+        // Eval(int) tiene que ser identico a EvalF(int): la animacion no cambia por agregar el evaluador continuo
+        float maxd = 0.0f;
+        for (int interp=0; interp<=2; interp++){
+            for (size_t i=0;i<ap.keyframes.size();i++) ap.keyframes[i].Interpolation = interp;
+            for (int f=-2; f<=22; f++){ float d = fabsf(ap.Eval(f,0.0f) - ap.EvalF((float)f,0.0f)); if (d>maxd) maxd=d; }
+        }
+        printf("         Eval(int) vs EvalF(float) maxdiff=%.7f -> %s\n", maxd, (maxd<1e-6f)?"OK":"DIFIEREN!");
+        // handles PLANOS explicitos (Free, dV=0 a los dos lados) = ease: arranca y llega frenado
+        for (size_t i=0;i<ap.keyframes.size();i++){ keyFrame& k = ap.keyframes[i];
+            k.Interpolation = KfBezier; k.handleType = HFree;
+            k.inDF = -3.0f; k.inDV = 0.0f; k.outDF = 3.0f; k.outDV = 0.0f; }
+        printf("         bezier handles PLANOS f=2,5,8 -> %.3f %.3f %.3f (ease: arranca y llega frenado)\n",
+               ap.EvalF(2,0), ap.EvalF(5,0), ap.EvalF(8,0));
+        return true;
+    }
+    // ---- curvaedit : el EDITOR de curvas. Verifica el switch de modo, que en curvas NO haya scrollbar, el mapeo
+    //      valor<->Y (centro = cero) con zoom de 2 ejes independientes, el arrastre de un HANDLE (que curva el
+    //      tramo) y el ROTAR de keyframes (que en dope sheet no existe y en curvas si). ----
+    if (cmd == "curvaedit") {
+        Timeline* tl = new Timeline(); tl->Resize(900, 300);
+        tl->ConstruirDopeRows();
+        if (tl->dopeRows.empty()){ err="curvaedit: sin filas (importa algo animado y selecciona)"; delete tl; return false; }
+        printf("      [curvaedit] modo=%s scrollbar=%s\n", tl->modo?"CURVAS":"DOPE", tl->scrollY?"si":"no");
+        tl->modo = Timeline::TL_MODO_CURVAS;
+        tl->ConstruirDopeRows();
+        printf("      [curvaedit] modo=%s scrollbar=%s (en curvas NO tiene que haber scrollbar)\n",
+               tl->modo?"CURVAS":"DOPE", tl->scrollY?"si":"no");
+        // eje vertical: el CENTRO es el CERO
+        float yCero = tl->ValueToY(0.0f);
+        printf("         valor 0 -> y=%.1f (centro del strip=%d) | ida y vuelta v=3.5 -> y=%.1f -> v=%.4f\n",
+               yCero, tl->CentroVertical(), tl->ValueToY(3.5f), tl->YToValue(tl->ValueToY(3.5f)));
+        // ZOOM DE 2 EJES: estirar el vertical NO toca el horizontal
+        float px0 = tl->pxPerFrame, pu0 = tl->pxPerUnit;
+        tl->ZoomVBy(2.0f);
+        printf("         ZoomV x2: pxPerFrame %.2f -> %.2f (%s) | pxPerUnit %.2f -> %.2f\n",
+               px0, tl->pxPerFrame, (tl->pxPerFrame==px0)?"INTACTO OK":"SE MOVIO!", pu0, tl->pxPerUnit);
+        // ---- HANDLE: agarrar el de SALIDA de un keyframe y arrastrarlo -> el tramo pasa a BEZIER ----
+        Timeline::DopeRow* canal = NULL;
+        for (size_t i=0;i<tl->dopeRows.size();i++) if (tl->dopeRows[i].propId>=0 && tl->dopeRows[i].keys.size()>=3){ canal=&tl->dopeRows[i]; break; }
+        if (canal){
+            AnimProperty* ap = tl->CurvaDeFila(*canal);
+            if (ap && ap->keyframes.size()>=3){
+                const int idx = 1;                       // un keyframe del medio (tiene vecinos de los dos lados)
+                int f0 = ap->keyframes[idx].frame;
+                float val0 = ap->keyframes[idx].value;
+                tl->DopeSelectNone();
+                printf("         canal '%s' (eje %s) keyframe f=%d interp ANTES=%d\n", canal->nombre.c_str(),
+                       (canal->compId==AnimX)?"X rojo":(canal->compId==AnimY)?"Y verde":"Z azul", f0, ap->keyframes[idx].Interpolation);
+                // 1) CLICK sobre el keyframe -> lo selecciona (hit-test 2D real). Recien ahi aparecen los handles.
+                int kx = (int)(tl->x + tl->FrameToX((float)f0)), ky = (int)(tl->y + tl->ValueToY(val0));
+                bool tomo = tl->CurvaClickStrip(kx, ky);
+                printf("         click en el keyframe (%d,%d) -> seleccionado: %s\n", kx, ky, tomo?"SI":"NO");
+                // el handle SOLO existe si el tramo es BEZIER (una recta no tiene nada que ajustar)
+                tl->SetInterpolacionSel(KfBezier);
+                float v1 = ap->EvalF((float)f0 + 0.5f, 0.0f);   // valor a mitad de tramo ANTES de tocar el handle
+                // 2) CLICK sobre el HANDLE de salida, en la MISMA posicion que usan el dibujo y el hit-test
+                float phx, phy; tl->HandlePos(ap, (size_t)idx, true, phx, phy);
+                int hx = (int)(tl->x + phx), hy = (int)(tl->y + phy);
+                bool agarro = tl->CurvaClickStrip(hx, hy) && tl->HandleArrastrando();
+                printf("         click en el handle de SALIDA (%d,%d) -> agarrado: %s, lado=%s\n", hx, hy,
+                       agarro?"SI":"NO", tl->HandleEsSalida()?"SALIDA OK":"ENTRADA (agarro el equivocado!)");
+                if (agarro){
+                    int mx = (int)(tl->x + phx);
+                    int my = (int)(tl->y + tl->ValueToY(val0 + 8.0f));      // tirar el handle hacia ARRIBA
+                    tl->HandleApply(mx, my);
+                    tl->HandleSoltar();
+                    float v2 = ap->EvalF((float)f0 + 0.5f, 0.0f);
+                    printf("         valor a mitad de tramo %.4f -> %.4f -> %s\n", v1, v2,
+                           (fabsf(v2-v1)>1e-4f)?"LA CURVA CAMBIO OK":"no cambio!");
+                    printf("         handle de salida = PUNTO (dF=%.3f, dV=%.3f) tipo=%d | el keyframe NO se movio: f=%d val=%.4f -> %s\n",
+                           ap->keyframes[idx].outDF, ap->keyframes[idx].outDV, ap->keyframes[idx].handleType,
+                           ap->keyframes[idx].frame, ap->keyframes[idx].value,
+                           (ap->keyframes[idx].frame==f0 && ap->keyframes[idx].value==val0)?"OK":"SE MOVIO!");
+                }
+            }
+        }
+        // ---- ROTAR: solo en curvas. 180 grados alrededor del pivote ESPEJA en los dos ejes (tiempo y valor).
+        //      El RANGO de frames no sirve para verificarlo (es simetrico: espejarlo da lo mismo) -> se miran
+        //      keyframes CONCRETOS: cada uno tiene que terminar en 2*pivote - original. ----
+        if (canal){
+            AnimProperty* ap = tl->CurvaDeFila(*canal);
+            if (ap && ap->keyframes.size()>=3){
+                tl->DopeSelectAll();
+                std::vector<keyFrame> antes = ap->keyframes;
+                // Rotar 180 EFECTIVAMENTE mueve las curvas...
+                tl->DopeMoveStart(Timeline::DOPE_ROT);
+                if (!tl->DopeMoviendo()){ printf("         ROTAR no arranco\n"); delete tl; return true; }
+                for (const char* p="180"; *p; ++p) tl->DopeNumChar(*p);
+                printf("         %s\n", tl->DopeTextoTransform().c_str());
+                tl->DopeMoveConfirm();
+                float dmaxV = 0.0f; int movidos = 0;
+                for (size_t i=0;i<antes.size() && i<ap->keyframes.size();i++){
+                    float dv = fabsf(ap->keyframes[i].value - antes[i].value); if (dv>dmaxV) dmaxV=dv;
+                    if (dv > 1e-5f) movidos++; }
+                printf("         ROTAR 180 sobre '%s' (%d keyframes): cambiaron %d valores, maxdiff=%.4f -> %s\n",
+                       canal->nombre.c_str(), (int)antes.size(), movidos, dmaxV,
+                       (movidos>0)?"la rotacion TOCA el eje del valor OK":"NO se movio nada!");
+                // ...y rotar 180 OTRA VEZ tiene que volver EXACTO al original. Es la verificacion buena: no depende
+                // de saber donde cayo el pivote (que se calcula sobre TODA la seleccion, no sobre esta curva sola).
+                tl->DopeSelectAll();
+                tl->DopeMoveStart(Timeline::DOPE_ROT);
+                for (const char* p="180"; *p; ++p) tl->DopeNumChar(*p);
+                tl->DopeMoveConfirm();
+                int fdif = 0; float vdif = 0.0f;
+                for (size_t i=0;i<antes.size() && i<ap->keyframes.size();i++){
+                    if (ap->keyframes[i].frame != antes[i].frame) fdif++;
+                    float dv = fabsf(ap->keyframes[i].value - antes[i].value); if (dv>vdif) vdif=dv; }
+                printf("         ROTAR 180 dos veces = identidad: frames distintos=%d valor maxdiff=%.6f -> %s\n",
+                       fdif, vdif, (fdif==0 && vdif<1e-4f)?"VUELVE EXACTO OK":"NO VOLVIO!");
+            }
+        }
+        delete tl; return true;
+    }
+    // ---- curvaperf [reps] : costo de ARMAR el trazo de las curvas (lo que se hacia pixel por pixel). Cuenta los
+    //      vertices generados y los tramos que el culling descarta. No mide GL: mide el trabajo por frame, que es
+    //      donde estaba el problema (un draw call y un escaneo de keyframes por CADA pixel de CADA curva). ----
+    if (cmd == "curvaperf") {
+        int reps = 60; ss >> reps; if (reps < 1) reps = 1;
+        Timeline* tl = new Timeline(); tl->Resize(900, 300);
+        tl->modo = Timeline::TL_MODO_CURVAS;
+        tl->ConstruirDopeRows();
+        if (tl->dopeRows.empty()){ err="curvaperf: sin filas"; delete tl; return false; }
+        int canales = 0; for (size_t i=0;i<tl->dopeRows.size();i++) if (tl->dopeRows[i].propId>=0) canales++;
+        unsigned int t0 = w3dGetTicks();
+        long long verts = 0;
+        for (int i=0;i<reps;i++) verts = tl->CurvaTrazoCosto();
+        unsigned int t1 = w3dGetTicks();
+        printf("      [curvaperf] %d canales, %d frames simulados en %ums (%.3f ms/frame)\n",
+               canales, reps, t1-t0, (float)(t1-t0)/(float)reps);
+        // ConstruirDopeRows se rearma en CADA Render: cuanto cuesta al lado del trazo?
+        unsigned int t2 = w3dGetTicks();
+        for (int i=0;i<reps;i++) tl->ConstruirDopeRows();
+        unsigned int t3 = w3dGetTicks();
+        printf("         ConstruirDopeRows (se rearma en cada redibujo): %ums / %d = %.3f ms/frame\n",
+               t3-t2, reps, (float)(t3-t2)/(float)reps);
+        printf("         vertices del trazo por frame = %lld  (antes: 1 draw call + 1 EvalF por PIXEL de cada curva)\n", verts);
+        // ahora TODO fuera de la vista: el culling tiene que tirar casi todo
+        tl->viewCenterV = 1.0e6f;    // la vista se va lejisimos de las curvas
+        long long vFuera = tl->CurvaTrazoCosto();
+        printf("         con la vista LEJOS de las curvas: vertices = %lld -> %s\n", vFuera,
+               (vFuera < verts/10)?"el culling descarta lo que no se ve OK":"NO esta culleando!");
+
+        // ---- lo IMPORTANTE del culling: una curva SI se puede llegar a ver aunque NINGUN keyframe se vea ----
+        tl->viewCenterV = 0.0f; tl->pxPerUnit = 1.0f;   // se ven ~150 unidades para arriba y para abajo
+        tl->viewStartF = -2.0f;
+        { // A) los dos keyframes MUY fuera (uno arriba, otro abajo): la recta CRUZA la vista -> HAY que dibujarla
+          AnimProperty cruza; cruza.Property=AnimPosition; cruza.component=AnimX;
+          SetKeyCurva(cruza, 0, 1000.0f); SetKeyCurva(cruza, 10, -1000.0f);
+          int v = tl->CurvaTrazo(&cruza, 1.0f);
+          printf("         keyframes en +1000 y -1000 (los DOS fuera de pantalla, la recta cruza): vertices=%d -> %s\n",
+                 v, (v>0)?"SE DIBUJA OK":"SE PERDIO! (culling de mas)");
+          // B) los dos keyframes arriba y la recta tambien: no se ve nada -> NO se dibuja
+          AnimProperty lejos; lejos.Property=AnimPosition; lejos.component=AnimX;
+          SetKeyCurva(lejos, 0, 1000.0f); SetKeyCurva(lejos, 10, 1200.0f);
+          int v2 = tl->CurvaTrazo(&lejos, 1.0f);
+          printf("         keyframes en +1000 y +1200 (todo el tramo arriba de la vista): vertices=%d -> %s\n",
+                 v2, (v2==0)?"culleada OK":"se dibuja al pedo!");
+          // C) BEZIER con sobrepico: los keyframes se ven pero la curva se va MUY arriba -> el hull lo tiene que notar
+          AnimProperty bez; bez.Property=AnimPosition; bez.component=AnimX;
+          SetKeyCurva(bez, 0, 0.0f); SetKeyCurva(bez, 10, 0.0f);
+          bez.keyframes[0].Interpolation = KfBezier; bez.keyframes[0].handleType = HFree;
+          bez.keyframes[0].outDF = 3.0f; bez.keyframes[0].outDV = 1500.0f;   // handle enorme hacia arriba
+          bez.keyframes[1].Interpolation = KfBezier; bez.keyframes[1].handleType = HFree;
+          bez.keyframes[1].inDF = -3.0f; bez.keyframes[1].inDV = 1500.0f;
+          int v3 = tl->CurvaTrazo(&bez, 1.0f);
+          printf("         bezier con handles enormes (keyframes en 0 pero la curva se dispara): vertices=%d\n", v3);
+        }
+        delete tl; return true;
+    }
+    // ---- curvakey : menu Key. Duplicar (Shift+D: copia + agarra, y Esc tiene que BORRAR las copias) y los ejes
+    //      X/Y durante el move de curvas (X = solo tiempo, Y = solo valor). ----
+    if (cmd == "curvakey") {
+        Timeline* tl = new Timeline(); tl->Resize(900, 300);
+        tl->modo = Timeline::TL_MODO_CURVAS;
+        tl->ConstruirDopeRows();
+        Timeline::DopeRow* canal = NULL;
+        for (size_t i=0;i<tl->dopeRows.size();i++) if (tl->dopeRows[i].propId>=0 && tl->dopeRows[i].keys.size()>=3){ canal=&tl->dopeRows[i]; break; }
+        if (!canal){ err="curvakey: sin canal con keyframes"; delete tl; return false; }
+        AnimProperty* ap = tl->CurvaDeFila(*canal);
+        std::string ck = canal->claveFila;
+        int n0 = (int)ap->keyframes.size();
+
+        // ---- DUPLICAR + CANCELAR: tiene que quedar TODO como estaba (las copias se borran) ----
+        tl->DopeSelectAll();
+        tl->DopeDuplicarSeleccion();
+        int nDup = (int)ap->keyframes.size();
+        printf("      [curvakey] Shift+D: %d keyframes -> %d (duplico) | move activo=%s\n", n0, nDup, tl->DopeMoviendo()?"SI":"NO");
+        tl->DopeMoveCancel();
+        int nCanc = (int)ap->keyframes.size();
+        printf("         Esc despues de duplicar: %d keyframes -> %s (las copias NO pueden quedar tiradas)\n",
+               nCanc, (nCanc==n0)?"volvio al original OK":"QUEDARON COPIAS!");
+
+        // ---- DUPLICAR + CONFIRMAR + mover con valor exacto ----
+        tl->ConstruirDopeRows(); tl->DopeSelectAll();
+        tl->DopeDuplicarSeleccion();
+        if (tl->DopeMoviendo()){
+            for (const char* p="10"; *p; ++p) tl->DopeNumChar(*p);   // correr las copias 10 frames
+            printf("         %s\n", tl->DopeTextoTransform().c_str());
+            tl->DopeMoveConfirm();
+        }
+        printf("         Shift+D + mover 10 + confirmar: %d keyframes (mas que %d = las copias quedaron)\n",
+               (int)ap->keyframes.size(), n0);
+
+        // ---- EJES X / Y durante el MOVE (curvas) ----
+        tl->ConstruirDopeRows();
+        for (size_t i=0;i<tl->dopeRows.size();i++) if (tl->dopeRows[i].claveFila==ck){ canal=&tl->dopeRows[i]; break; }
+        ap = tl->CurvaDeFila(*canal);
+        struct S { static void probar(Timeline* tl, AnimProperty* ap, int eje, const char* nom){
+            std::vector<keyFrame> antes = ap->keyframes;
+            tl->DopeSelectAll();
+            tl->DopeMoveStart(Timeline::DOPE_MOV);
+            if (!tl->DopeMoviendo()){ printf("         %s: no arranco\n", nom); return; }
+            tl->DopeCiclarEje(eje);
+            for (const char* p="5"; *p; ++p) tl->DopeNumChar(*p);
+            tl->DopeMoveConfirm();
+            int fCambio=0; float vMax=0.0f;
+            for (size_t i=0;i<antes.size() && i<ap->keyframes.size();i++){
+                if (ap->keyframes[i].frame != antes[i].frame) fCambio++;
+                float dv = fabsf(ap->keyframes[i].value - antes[i].value); if (dv>vMax) vMax=dv; }
+            printf("         mover 5 con eje %s -> frames que cambiaron=%d, valor maxdiff=%.5f\n", nom, fCambio, vMax);
+        } };
+        // eje X (1) = solo TIEMPO: los frames se corren y el valor NO se toca
+        S::probar(tl, ap, Timeline::DOPE_EJE_X, "X (solo tiempo)");
+        // eje Y (2) = solo VALOR: el valor cambia y los frames NO
+        S::probar(tl, ap, Timeline::DOPE_EJE_Y, "Y (solo valor)");
+        delete tl; return true;
+    }
+    // ---- dopecubre : el ownerKey de una fila PADRE no puede cubrir al de otro hueso solo por ser prefijo de su
+    //      nombre ("arm:rig/b3" es prefijo de "arm:rig/b30"). Al borrar, eso se llevaba puesta animacion ajena. ----
+    if (cmd == "dopecubre") {
+        struct C { const char* padre; const char* hijo; bool esperado; };
+        const C casos[] = {
+            { "arm:rig/b3",  "arm:rig/b3",   true  },  // el hueso cubre sus propios canales (mismo ownerKey)
+            { "arm:rig/b3",  "arm:rig/b30",  false },  // <- el bug: el hueso 3 se llevaba al 30
+            { "arm:rig/b3",  "arm:rig/b31",  false },
+            { "arm:rig",     "arm:rig/b3",   true  },  // el armature cubre a sus huesos
+            { "arm:rig",     "arm:rig2/b1",  false },  // ...pero no a OTRO armature con nombre parecido
+            { "obj:Cube",    "obj:Cube",     true  },
+            { "obj:Cube",    "obj:Cube.001", false },  // <- el mismo bug con objetos
+            { "",            "arm:rig/b7",   true  },  // el Summary cubre todo
+        };
+        int fallas = 0;
+        for (int i=0;i<8;i++){
+            bool r = W3dScriptDopeCubre(casos[i].padre, casos[i].hijo);
+            bool ok = (r == casos[i].esperado);
+            if (!ok) fallas++;
+            printf("      [dopecubre] '%s' cubre '%s' -> %s (esperado %s) %s\n",
+                   casos[i].padre, casos[i].hijo, r?"si":"no", casos[i].esperado?"si":"no", ok?"":"<-- MAL");
+        }
+        printf("      [dopecubre] %d/8 OK\n", 8-fallas);
+        if (fallas){ err="dopecubre: el match de ownerKey esta mal"; return false; }
+        return true;
+    }
+    // ---- dopewrap : al escalar/rotar keyframes el cursor se ENVUELVE de un borde al otro del timeline para poder
+    //      seguir sin quedarse sin pantalla. El transform NO puede enterarse del salto: usa un cursor VIRTUAL que
+    //      acumula dx/dy (que CheckWarpMouseInViewport pone en 0 justo en el frame del salto).
+    //      Se simula el recorrido del mouse SIN envolver y CON envolver: tienen que dar EXACTAMENTE lo mismo. ----
+    if (cmd == "dopewrap") {
+        Timeline* tl = new Timeline(); tl->Resize(900, 300);
+        tl->modo = Timeline::TL_MODO_CURVAS;
+        tl->ConstruirDopeRows();
+        Timeline::DopeRow* canal = NULL;
+        for (size_t i=0;i<tl->dopeRows.size();i++) if (tl->dopeRows[i].propId>=0 && tl->dopeRows[i].keys.size()>=3){ canal=&tl->dopeRows[i]; break; }
+        if (!canal){ err="dopewrap: sin canal con keyframes"; delete tl; return false; }
+        std::string ck = canal->claveFila;
+
+        // recorre 'pasos' de a 'paso' px hacia la derecha. envolver=true -> el cursor real salta al borde opuesto
+        // cada vez que se pasa (y ahi dx=0, que es lo que hace el warp de verdad).
+        struct S {
+            // la curva viva de la fila 'ck' (para poder guardarla y restaurarla entre corridas)
+            static AnimProperty* curva(Timeline* tl, const std::string& ck){
+                for (size_t i=0;i<tl->dopeRows.size();i++) if (tl->dopeRows[i].claveFila==ck) return tl->CurvaDeFila(tl->dopeRows[i]);
+                return NULL;
+            }
+            // TODAS las curvas: el pivote del escalado se calcula sobre la seleccion ENTERA (18 canales), asi que
+            // restaurar solo la que se mira dejaria las otras movidas y el pivote saldria distinto.
+            static void guardar(Timeline* tl, std::vector<std::vector<keyFrame> >& out){
+                out.clear();
+                for (size_t i=0;i<tl->dopeRows.size();i++){
+                    AnimProperty* p = tl->CurvaDeFila(tl->dopeRows[i]);
+                    if (p) out.push_back(p->keyframes);
+                }
+            }
+            static void restaurar(Timeline* tl, const std::vector<std::vector<keyFrame> >& in){
+                size_t k = 0;
+                for (size_t i=0;i<tl->dopeRows.size() && k<in.size();i++){
+                    AnimProperty* p = tl->CurvaDeFila(tl->dopeRows[i]);
+                    if (p) p->keyframes = in[k++];
+                }
+            }
+            static std::vector<int> correr(Timeline* tl, const std::string& ck, int modo, int pasos, int paso, bool envolver){
+                tl->ConstruirDopeRows(); tl->DopeSelectAll();
+                tl->lastMx = tl->x + 500; tl->lastMy = tl->y + 150;
+                tl->DopeMoveStart(modo);
+                int mx = tl->lastMx, my = tl->lastMy;
+                int bordeDer = tl->x + tl->width - 2;
+                tl->event_mouse_motion(mx, my);        // 1er motion: ignora el delta viejo (arranca en cero)
+                for (int i=0;i<pasos;i++){
+                    int nx = mx + paso;
+                    bool salto = envolver && nx >= bordeDer;
+                    if (salto){
+                        // el warp de verdad: el cursor real vuelve al otro borde y dx queda en 0 ese frame
+                        dx = 0; dy = 0;
+                        mx = tl->x + 2;
+                        tl->event_mouse_motion(mx, my);
+                        // ...y el proximo motion ya lleva el delta normal
+                        dx = paso; dy = 0; mx += paso;
+                        tl->event_mouse_motion(mx, my);
+                    } else {
+                        dx = paso; dy = 0; mx = nx;
+                        tl->event_mouse_motion(mx, my);
+                    }
+                }
+                std::string txt = tl->DopeTextoTransform();
+                tl->DopeMoveConfirm();
+                tl->ConstruirDopeRows();
+                std::vector<int> fr;
+                for (size_t i=0;i<tl->dopeRows.size();i++) if (tl->dopeRows[i].claveFila==ck){
+                    fr = tl->dopeRows[i].keys; break; }
+                printf("         %-9s %s -> %s\n", envolver?"CON warp":"sin warp", txt.c_str(), "");
+                return fr;
+            }
+        };
+        // ---- El transform NO puede arrastrar la distancia que hoveraste desde el ultimo click ----
+        // lastMouseX/Y globales solo los refrescan el CLICK y CheckWarpMouseInViewport; hoverando no corre ninguno.
+        // Si al apretar 'g' no se sincronizan, el primer dx que calcula CheckWarp es (donde estas - ULTIMO CLICK) y
+        // el cursor virtual se lo come: el transform arranca corrido esa distancia ENTERA, y para siempre.
+        {
+            std::vector<std::vector<keyFrame> > pre; S::guardar(tl, pre);
+            tl->ConstruirDopeRows(); tl->DopeSelectAll();
+            lastMouseX = (float)(tl->x + 100);      // el ultimo CLICK quedo lejos...
+            lastMouseY = (float)(tl->y + 150);
+            tl->lastMx = tl->x + 600;               // ...y el mouse hoveo hasta aca (500px a la derecha)
+            tl->lastMy = tl->y + 150;
+            tl->DopeMoveStart(Timeline::DOPE_MOV);
+            // dos motions SIN mover el mouse: si el arranque se contamina, el 2do se come los 500px
+            dx = 0; dy = 0;
+            tl->event_mouse_motion(tl->x + 600, tl->y + 150);
+            dx = (int)((float)(tl->x + 600) - lastMouseX); dy = 0;   // lo que calcularia CheckWarp si no se sincroniza
+            tl->event_mouse_motion(tl->x + 600, tl->y + 150);
+            std::string txt = tl->DopeTextoTransform();
+            tl->DopeMoveCancel();
+            S::restaurar(tl, pre);
+            printf("      [dopewrap] 'g' tras hoverear 500px desde el ultimo click, sin mover: %s\n", txt.c_str());
+            printf("         tiene que decir 0 frames (si dice ~43 se comio el hover) -> %s\n",
+                   (txt.find("Move: 0 frames") != std::string::npos) ? "OK" : "SE COMIO EL HOVER!");
+            if (txt.find("Move: 0 frames") == std::string::npos){
+                err="dopewrap: el transform arranca corrido por la distancia hovereada"; delete tl; return false;
+            }
+        }
+
+        // OJO: cada corrida CONFIRMA y deja la curva movida -> hay que restaurarla, o la 2da arranca desde el
+        // resultado de la 1ra y "difieren" por eso y no por el warp.
+        AnimProperty* ap = S::curva(tl, ck);
+        if (!ap){ err="dopewrap: no resolvio la curva"; delete tl; return false; }
+        std::vector<std::vector<keyFrame> > base; S::guardar(tl, base);
+
+        // el recorrido es MAS LARGO que el viewport a proposito: sin envolver te quedarias sin pantalla
+        printf("      [dopewrap] MOVER: 40 pasos de 30px (1200px) en un timeline de %dpx de ancho\n", tl->width);
+        std::vector<int> a = S::correr(tl, ck, Timeline::DOPE_MOV, 40, 30, false);
+        S::restaurar(tl, base);                                  // volver al estado inicial (TODAS las curvas)
+        std::vector<int> b = S::correr(tl, ck, Timeline::DOPE_MOV, 40, 30, true);
+        S::restaurar(tl, base);
+        bool ok1 = (a.size()==b.size() && !a.empty());
+        for (size_t i=0;i<a.size() && ok1;i++) if (a[i]!=b[i]) ok1=false;
+        printf("         primer/ultimo frame: sin warp [%d..%d] | CON warp [%d..%d] -> %s\n",
+               a.empty()?0:a[0], a.empty()?0:a[a.size()-1], b.empty()?0:b[0], b.empty()?0:b[b.size()-1],
+               ok1?"IDENTICO OK (el salto del cursor no se ve)":"DISTINTOS!");
+        printf("      [dopewrap] ESCALAR: idem\n");
+        std::vector<int> c = S::correr(tl, ck, Timeline::DOPE_ESC, 40, 30, false);
+        S::restaurar(tl, base);
+        std::vector<int> d = S::correr(tl, ck, Timeline::DOPE_ESC, 40, 30, true);
+        S::restaurar(tl, base);
+        bool ok2 = (c.size()==d.size() && !c.empty());
+        for (size_t i=0;i<c.size() && ok2;i++) if (c[i]!=d[i]) ok2=false;
+        printf("         primer/ultimo frame: sin warp [%d..%d] | CON warp [%d..%d] -> %s\n",
+               c.empty()?0:c[0], c.empty()?0:c[c.size()-1], d.empty()?0:d[0], d.empty()?0:d[d.size()-1],
+               ok2?"IDENTICO OK":"DISTINTOS!");
+        delete tl;
+        if (!ok1 || !ok2){ err="dopewrap: el warp cambia el resultado del transform"; return false; }
+        return true;
+    }
+    // ---- handletest : los 5 tipos de handle y el transform de handles (r/s sobre UN solo keyframe). ----
+    if (cmd == "handletest") {
+        // curva en pico: 0 -> 10 -> 0. Es la que muestra la diferencia entre Automatic y Auto Clamped.
+        AnimProperty ap; ap.Property = AnimPosition; ap.component = AnimX;
+        SetKeyCurva(ap, 0, 0.0f); SetKeyCurva(ap, 10, 10.0f); SetKeyCurva(ap, 20, 0.0f);
+        struct S { static void tipo(AnimProperty& ap, int t, const char* nom){
+            for (size_t i=0;i<ap.keyframes.size();i++){ ap.keyframes[i].Interpolation = KfBezier;
+                ap.keyframes[i].handleType = t; }
+            float mx = -1e9f;
+            for (int f=0; f<=20; f++){ float v = ap.EvalF((float)f,0); if (v>mx) mx=v; }
+            printf("      [handletest] %-13s f=5,10,15 -> %6.3f %6.3f %6.3f   maximo=%.3f\n", nom,
+                   ap.EvalF(5,0), ap.EvalF(10,0), ap.EvalF(15,0), mx);
+        } };
+        S::tipo(ap, HVector,      "Vector");
+        S::tipo(ap, HAuto,        "Automatic");
+        S::tipo(ap, HAutoClamped, "Auto Clamped");
+        // VECTOR tiene que dar lo MISMO que lineal: los handles apuntan al vecino -> el tramo sale recto
+        for (size_t i=0;i<ap.keyframes.size();i++) ap.keyframes[i].handleType = HVector;
+        float vb = ap.EvalF(5,0);
+        for (size_t i=0;i<ap.keyframes.size();i++) ap.keyframes[i].Interpolation = KfLinear;
+        float vl = ap.EvalF(5,0);
+        printf("         Vector=%.4f vs Linear=%.4f -> %s\n", vb, vl,
+               (fabsf(vb-vl)<1e-3f)?"IGUAL OK (vector = recta)":"DIFIEREN!");
+        // AUTO CLAMPED no puede pasarse del valor del keyframe (10); AUTOMATIC en este pico tampoco sobrepica,
+        // asi que se prueba con un pico ASIMETRICO, que es donde Automatic si se pasa.
+        // Pico ASIMETRICO y filoso: el keyframe de 10 tiene los dos vecinos abajo (es un maximo local) pero uno
+        // muy cerca. Ahi Automatic apunta el handle hacia arriba y la curva SE PASA de 10; Auto Clamped lo aplana.
+        // Se muestrea fino (0.05) porque el sobrepico cae ENTRE frames enteros.
+        AnimProperty pk; pk.Property = AnimPosition; pk.component = AnimX;
+        SetKeyCurva(pk, 0, 0.0f); SetKeyCurva(pk, 10, 10.0f); SetKeyCurva(pk, 11, 9.9f); SetKeyCurva(pk, 20, 0.0f);
+        struct P { static float pico(AnimProperty& p, int t){
+            for (size_t i=0;i<p.keyframes.size();i++){ p.keyframes[i].Interpolation = KfBezier; p.keyframes[i].handleType = t; }
+            float mx=-1e9f; for (float f=0.0f; f<=20.0f; f+=0.05f){ float v=p.EvalF(f,0); if (v>mx) mx=v; } return mx;
+        } };
+        float pAuto = P::pico(pk, HAuto), pClamp = P::pico(pk, HAutoClamped);
+        printf("         pico filoso (el keyframe mas alto vale 10): Automatic llega a %.4f (se pasa %.4f) | Auto Clamped a %.4f\n",
+               pAuto, pAuto-10.0f, pClamp);
+        printf("         -> Automatic SE PASA: %s | Auto Clamped NO se pasa: %s\n",
+               (pAuto > 10.0f + 1e-3f)?"si (es lo esperado)":"no (el caso no lo dispara)",
+               (pClamp <= 10.0f + 1e-3f)?"OK":"SE PASO!");
+
+        // ---- ROTAR / ESCALAR los handles de UN solo keyframe ----
+        Timeline* tl = new Timeline(); tl->Resize(900, 300);
+        tl->modo = Timeline::TL_MODO_CURVAS;
+        tl->ConstruirDopeRows();
+        Timeline::DopeRow* canal = NULL;
+        for (size_t i=0;i<tl->dopeRows.size();i++) if (tl->dopeRows[i].propId>=0 && tl->dopeRows[i].keys.size()>=3){ canal=&tl->dopeRows[i]; break; }
+        if (canal){
+            AnimProperty* c = tl->CurvaDeFila(*canal);
+            const int idx = 1;
+            int f0 = c->keyframes[idx].frame;
+            float vf0 = c->keyframes[idx].value;
+            // seleccionar SOLO ese keyframe (por el camino real: click) y ponerlo bezier
+            // Hay 18 canales encimados cerca del valor 0: un click ahi elige el keyframe MAS CERCANO, que no tiene
+            // por que ser el de esta curva. Se centra la vista en el valor del keyframe buscado y se estira el eje
+            // vertical, asi los de las otras curvas quedan lejos y el click es inequivoco.
+            tl->viewCenterV = vf0; tl->pxPerUnit = 20000.0f;
+            tl->DopeSelectNone();
+            bool sel1 = tl->CurvaClickStrip((int)(tl->x + tl->FrameToX((float)f0)), (int)(tl->y + tl->ValueToY(vf0)));
+            tl->SetInterpolacionSel(KfBezier);
+            tl->SetHandleTypeSel(HAligned);
+            printf("         keyframe f=%d seleccionado=%s interp=%d tipoHandle=%d out=(%.4f,%.4f)\n",
+                   f0, sel1?"si":"NO", c->keyframes[idx].Interpolation, c->keyframes[idx].handleType,
+                   c->keyframes[idx].outDF, c->keyframes[idx].outDV);
+            float oDF0 = c->keyframes[idx].outDF, oDV0 = c->keyframes[idx].outDV;
+            float L0 = sqrtf(oDF0*oDF0*tl->pxPerFrame*tl->pxPerFrame + oDV0*oDV0*tl->pxPerUnit*tl->pxPerUnit);
+            // ESCALAR x2: la DISTANCIA del handle se duplica
+            tl->lastMx = tl->x + 500; tl->lastMy = tl->y + 150;
+            tl->DopeMoveStart(Timeline::DOPE_ESC);
+            for (const char* p="2"; *p; ++p) tl->DopeNumChar(*p);
+            tl->DopeMoveConfirm();
+            float oDF1 = c->keyframes[idx].outDF, oDV1 = c->keyframes[idx].outDV;
+            float L1 = sqrtf(oDF1*oDF1*tl->pxPerFrame*tl->pxPerFrame + oDV1*oDV1*tl->pxPerUnit*tl->pxPerUnit);
+            printf("         ESCALAR x2 el handle de un keyframe solo: largo %.2fpx -> %.2fpx (razon %.3f) -> %s\n",
+                   L0, L1, L0>1e-6f?L1/L0:0.0f, (L0>1e-6f && fabsf(L1/L0 - 2.0f)<0.05f)?"OK":"MAL");
+            printf("         el keyframe NO se movio: f=%d val=%.4f -> %s\n", c->keyframes[idx].frame, c->keyframes[idx].value,
+                   (c->keyframes[idx].frame==f0 && fabsf(c->keyframes[idx].value-vf0)<1e-5f)?"OK":"SE MOVIO!");
+            // ROTAR 180: el handle se da vuelta (pero el tiempo lo frena para que x siga siendo monotono)
+            float aDF0 = c->keyframes[idx].inDF, aDV0 = c->keyframes[idx].inDV;
+            tl->DopeMoveStart(Timeline::DOPE_ROT);
+            for (const char* p="180"; *p; ++p) tl->DopeNumChar(*p);
+            printf("         %s\n", tl->DopeTextoTransform().c_str());
+            tl->DopeMoveConfirm();
+            printf("         ROTAR 180 el handle de ENTRADA: dV %.3f -> %.3f -> %s\n", aDV0, c->keyframes[idx].inDV,
+                   (fabsf(c->keyframes[idx].inDV + aDV0) < 0.01f*(1.0f+fabsf(aDV0)))?"se dio vuelta OK":"?");
+        }
+        delete tl; return true;
+    }
+    // ---- objbezier : REPRO del crash. Animacion de OBJETO (mover un cubo y keyframearlo), modo curvas, y ponerle
+    //      Bezier a los keyframes (lo que hace 't' -> Bezier). La animacion de objeto NO pasa por el mismo camino
+    //      que la de armature. ----
+    if (cmd == "objbezier") {
+        Timeline* tl = new Timeline(); tl->Resize(900, 300);
+        tl->modo = Timeline::TL_MODO_CURVAS;
+        tl->ConstruirDopeRows();
+        printf("      [objbezier] filas del dope sheet = %d\n", (int)tl->dopeRows.size());
+        if (tl->dopeRows.empty()){ err="objbezier: sin filas (corre objkeytest antes)"; delete tl; return false; }
+        tl->DopeSelectAll();
+        printf("      [objbezier] poniendo Bezier a todo lo seleccionado...\n");
+        tl->SetInterpolacionSel(KfBezier);
+        printf("      [objbezier] interpolacion aplicada OK\n");
+        // evaluar la animacion (lo que hace el playback) y dibujar el trazo: aca es donde revienta si algo esta mal
+        AplicarAnimacionObjetos();
+        printf("      [objbezier] AplicarAnimacionObjetos OK\n");
+        long long v = tl->CurvaTrazoCosto();
+        printf("      [objbezier] trazo de las curvas OK (%lld vertices)\n", v);
+        // y el handle type, que es lo otro que toca 'v'
+        tl->SetHandleTypeSel(HAligned);
+        AplicarAnimacionObjetos();
+        printf("      [objbezier] Handle Type OK\n");
+
+        // ---- EL CRASH DE VERDAD: por el camino REAL del menu. 't' abre Interpolation Mode SOLO (sin haber
+        //      abierto nunca el menu Key), y al elegir un item Click() ya cierra el menu -> MenuAbierto = NULL.
+        //      Si la accion compara MenuAbierto contra un menu que TAMBIEN es NULL, "NULL == NULL" da true y
+        //      llama Cerrar() sobre NULL. Se simula igual que LayoutMenuDragSoltar: Click + action. ----
+        struct M {
+            static bool elegir(PopupMenu* m, int fila){        // click en la fila N, como lo calcula PopupMenu::Click
+                int oy = m->titulo.empty() ? 0 : (RenglonHeightGS + gapGS);
+                int my = m->y + borderGS + oy + fila*(RenglonHeightGS + gapGS) + 1;
+                int mx = m->x + m->width/2;
+                int id = m->Click(mx, my);
+                if (id >= 0 && m->action) m->action(id);       // <-- aca crasheaba
+                return id >= 0;
+            }
+        };
+        tl->DopeSelectAll();
+        tl->AbrirMenuInterp(100, 100);
+        printf("      [objbezier] 't' abrio Interpolation Mode (menu Key nunca abierto)\n");
+        if (!MenuAbierto){ err="objbezier: el menu no quedo abierto"; delete tl; return false; }
+        bool ok = M::elegir(MenuAbierto, 2);                   // fila 2 = Bezier
+        printf("      [objbezier] elegido 'Bezier' desde el menu -> %s (si llegaste aca, no crasheo)\n",
+               ok?"OK":"no se eligio nada");
+        // y ahora el de Handle Type ('v'), por las dudas
+        tl->AbrirMenuHandle(100, 100);
+        if (MenuAbierto) M::elegir(MenuAbierto, 4);            // fila 4 = Auto Clamped
+        printf("      [objbezier] elegido 'Auto Clamped' desde el menu 'v' -> OK\n");
+        AplicarAnimacionObjetos();
+        delete tl; return true;
+    }
+    // ---- menudump : estructura de la barra y del menu Key. Verifica que no haya menus DUPLICADOS, que 'Key'
+    //      este siempre, y que Handle Type viva adentro de Key. ----
+    if (cmd == "menudump") {
+        Timeline* tl = new Timeline(); tl->Resize(900, 300);
+        for (int paso=0; paso<2; paso++){
+            bool conSel = (paso==1);
+            DeseleccionarTodo(); ObjSelects.clear(); ObjActivo=NULL;
+            // el que TIENE animacion (el que keyframeo objkeytest), no cualquiera
+            if (conSel && !AnimationObjects.empty() && AnimationObjects[0].obj){
+                Object* o = AnimationObjects[0].obj;
+                ObjActivo=o; o->Seleccionar(); ObjSelects.clear(); ObjSelects.push_back(o);
+            }
+            tl->modo = Timeline::TL_MODO_CURVAS;
+            tl->ConstruirDopeRows();
+            tl->SyncFields();          // la visibilidad de la barra sale de aca (Render los llama en este orden)
+            printf("      [menudump] %s seleccion -> filas=%d | botones visibles de la barra:",
+                   conSel?"CON":"SIN", (int)tl->dopeRows.size());
+            for (size_t i=0;i<tl->BarButtons.size();i++){
+                Button* b = tl->BarButtons[i];
+                if (b->visible && !b->text.empty()) printf(" [%s]", b->text.c_str());
+            }
+            printf("\n");
+        }
+        // el menu Key y sus submenus
+        tl->AbrirMenuKey(100, 100);
+        PopupMenu* m = MenuAbierto;
+        if (!m){ err="menudump: el menu Key no abrio"; delete tl; return false; }
+        printf("      [menudump] menu 'Key':\n");
+        for (size_t i=0;i<m->items.size();i++){
+            MenuItem* it = m->items[i];
+            printf("         %-20s %s\n", it->text.c_str(), it->submenu ? "(submenu)" : "");
+            if (it->submenu) for (size_t j=0;j<it->submenu->items.size();j++)
+                printf("              - %s\n", it->submenu->items[j]->text.c_str());
+        }
+        delete tl; return true;
+    }
+    // ---- ojotest : el OJO de las filas del dope sheet. Apagarlo tiene que sacar la curva del dibujo Y de la
+    //      edicion (si no, seguirias moviendo lo que no ves). Y el de un PADRE baja a sus canales. ----
+    if (cmd == "ojotest") {
+        Timeline* tl = new Timeline(); tl->Resize(900, 300);
+        tl->modo = Timeline::TL_MODO_CURVAS;
+        tl->ConstruirDopeRows();
+        if (tl->dopeRows.empty()){ err="ojotest: sin filas"; delete tl; return false; }
+        tl->DopeSelectAll();
+        long long v0 = tl->CurvaTrazoCosto();
+        int sel0 = 0; for (size_t i=0;i<tl->dopeRows.size();i++) if (tl->dopeRows[i].propId>=0) sel0++;
+        printf("      [ojotest] %d canales | trazo=%lld vertices | columna de ojos en x=%d (panel=%d)\n",
+               sel0, v0, tl->DopeOjoX(), tl->panelW);
+        // apagar el ojo de UN canal: click en su ojo (camino real)
+        int fila = -1; for (size_t i=0;i<tl->dopeRows.size();i++) if (tl->dopeRows[i].propId>=0){ fila=(int)i; break; }
+        std::string nom = tl->dopeRows[fila].nombre;
+        int oy = tl->stripY + fila*tl->rowH + tl->PosY + tl->rowH/2;
+        tl->DopeClickPanel(tl->x + tl->DopeOjoX() + 1, tl->y + oy);
+        tl->ConstruirDopeRows();
+        int ocultas = 0; for (size_t i=0;i<tl->dopeRows.size();i++) if (tl->dopeRows[i].oculto) ocultas++;
+        long long v1 = tl->CurvaTrazoCosto();
+        tl->DopeSelectAll();
+        printf("         apagado el ojo de '%s': filas ocultas=%d | trazo=%lld -> %s\n",
+               nom.c_str(), ocultas, v1, (v1 < v0)?"la curva NO se dibuja OK":"SIGUE DIBUJANDOSE!");
+        // ...y el ojo de una fila PADRE apaga a todos sus hijos
+        int padre = -1; for (size_t i=0;i<tl->dopeRows.size();i++) if (tl->dopeRows[i].tipo==0){ padre=(int)i; break; }
+        if (padre >= 0){
+            int py = tl->stripY + padre*tl->rowH + tl->PosY + tl->rowH/2;
+            tl->DopeClickPanel(tl->x + tl->DopeOjoX() + 1, tl->y + py);
+            tl->ConstruirDopeRows();
+            int todas = 0, tot = (int)tl->dopeRows.size();
+            for (size_t i=0;i<tl->dopeRows.size();i++) if (tl->dopeRows[i].oculto) todas++;
+            long long v2 = tl->CurvaTrazoCosto();
+            tl->DopeSelectAll();
+            printf("         apagado el ojo del Summary: ocultas=%d de %d | trazo=%lld -> %s\n",
+                   todas, tot, v2, (todas==tot && v2==0)?"baja a TODOS los hijos OK":"NO bajo!");
+        }
+        delete tl; return true;
+    }
+    // ---- kfcard : la tarjeta "Keyframe" del panel de propiedades. Aparece SOLO con un keyframe elegido, y sus
+    //      campos tienen que reflejar la curva VIVA (frame, valor, interpolacion, tipo y los dos handles). ----
+    if (cmd == "kfcard") {
+        Timeline* tl = new Timeline(); tl->Resize(900, 300);
+        tl->modo = Timeline::TL_MODO_CURVAS;
+        tl->ConstruirDopeRows();
+        if (tl->dopeRows.empty()){ err="kfcard: sin filas"; delete tl; return false; }
+        int idx = -1;
+        printf("      [kfcard] sin keyframe elegido -> DopeKeyframeActivo=%s\n",
+               DopeKeyframeActivo(&idx) ? "algo (MAL)" : "NULL (la tarjeta no se muestra) OK");
+        // elegir uno por el camino real (click), separando las curvas para que no sea ambiguo
+        Timeline::DopeRow* canal = NULL;
+        for (size_t i=0;i<tl->dopeRows.size();i++) if (tl->dopeRows[i].propId>=0 && tl->dopeRows[i].keys.size()>=3){ canal=&tl->dopeRows[i]; break; }
+        AnimProperty* c = tl->CurvaDeFila(*canal);
+        int f0 = c->keyframes[1].frame; float v0 = c->keyframes[1].value;
+        tl->viewCenterV = v0; tl->pxPerUnit = 20000.0f;
+        tl->DopeSelectNone();
+        tl->CurvaClickStrip((int)(tl->x + tl->FrameToX((float)f0)), (int)(tl->y + tl->ValueToY(v0)));
+        AnimProperty* ap = DopeKeyframeActivo(&idx);
+        printf("      [kfcard] click en un keyframe -> activo=%s canal='%s'\n",
+               ap?"si":"NO", DopeKeyframeActivoCanal().c_str());
+        if (!ap){ err="kfcard: el click no dejo keyframe activo"; delete tl; return false; }
+        const keyFrame& k = ap->keyframes[idx];
+        printf("         Frame X=%d | Value Y=%.4f | Interp=%d | HandleType=%d\n",
+               k.frame, k.value, k.Interpolation, k.handleType);
+        printf("         Left Handle=(%.3f, %.3f) | Right Handle=(%.3f, %.3f)\n",
+               k.inDF, k.inDV, k.outDF, k.outDV);
+        // MOVER el keyframe con 'g' no puede hacer desaparecer la tarjeta: el activo se identifica por
+        // (curva, frame), asi que el transform lo tiene que SEGUIR.
+        tl->lastMx = tl->x + 500; tl->lastMy = tl->y + 150;
+        tl->DopeMoveStart(Timeline::DOPE_MOV);
+        for (const char* q="5"; *q; ++q) tl->DopeNumChar(*q);
+        tl->DopeMoveConfirm();
+        int i2; AnimProperty* ap2 = DopeKeyframeActivo(&i2);
+        printf("         tras mover el keyframe 5 frames con 'g' -> la tarjeta sigue: %s (frame ahora=%d, esperado=%d)\n",
+               ap2 ? "SI OK" : "NO (se perdio el activo)", ap2 ? ap2->keyframes[i2].frame : -1, f0+5);
+        if (!ap2 || ap2->keyframes[i2].frame != f0 + 5){
+            err="kfcard: el keyframe activo no siguio al transform"; delete tl; return false; }
+        // deseleccionar -> la tarjeta se tiene que ir
+        tl->DopeSelectNone();
+        printf("         deseleccionado -> DopeKeyframeActivo=%s\n",
+               DopeKeyframeActivo(&idx) ? "algo (MAL: la tarjeta quedaria)" : "NULL OK");
+        delete tl; return true;
+    }
+    // ---- normstats <name> : normales de la malla -> #verts, normales DISTINTAS y posiciones con MAS DE UNA normal
+    //      (= verts "split" = bordes FILOSOS). Si un rebuild promedia las normales, los splits desaparecen. ----
+    if (cmd == "normstats" || cmd == "normtest") {
+        std::string nm; ss>>nm; Object* o = SceneCollection ? FindObjectByName(SceneCollection, nm) : NULL;
+        if(!o || o->getType()!=ObjectType::mesh){ err=cmd+": malla no encontrada"; return false; }
+        Mesh* m=(Mesh*)o;
+        struct S { static void stats(Mesh* m, int& nv, int& distintas, int& splits, double& sum){
+            nv = m->vertexSize; distintas=0; splits=0; sum=0;
+            if(!m->normals||!m->vertex||m->vertexSize<=0) return;
+            std::set<std::string> setN; std::map<std::string, std::set<std::string> > porPos;
+            for(int i=0;i<m->vertexSize;i++){
+                char nb[3]={(char)m->normals[i*3],(char)m->normals[i*3+1],(char)m->normals[i*3+2]};
+                std::string kn(nb,3); setN.insert(kn);
+                char pb[12]; memcpy(pb,&m->vertex[i*3],4); memcpy(pb+4,&m->vertex[i*3+1],4); memcpy(pb+8,&m->vertex[i*3+2],4);
+                porPos[std::string(pb,12)].insert(kn);
+                sum += (double)m->normals[i*3]*3 + (double)m->normals[i*3+1]*5 + (double)m->normals[i*3+2]*7; }
+            distintas=(int)setN.size();
+            for(std::map<std::string,std::set<std::string> >::iterator it=porPos.begin();it!=porPos.end();++it) if(it->second.size()>1) splits++;
+        } };
+        int nv0,d0,s0; double c0; S::stats(m,nv0,d0,s0,c0);
+        printf("      [normstats] '%s' verts=%d normales_distintas=%d posiciones_con_split(bordes filosos)=%d checksum=%.0f\n", nm.c_str(), nv0,d0,s0,c0);
+        if (cmd == "normtest"){
+            m->GenerarRender(false); int nv1,d1,s1; double c1; S::stats(m,nv1,d1,s1,c1);
+            printf("      [normtest] tras GenerarRender(FALSE=preservar): verts=%d distintas=%d splits=%d checksum=%.0f -> %s\n",
+                nv1,d1,s1,c1, (s1==s0 && d1==d0)?"OK (normales PRESERVADAS)":"CAMBIARON!");
+            m->GenerarRender(true);  int nv2,d2,s2; double c2; S::stats(m,nv2,d2,s2,c2);
+            printf("      [normtest] tras GenerarRender(TRUE=recomputar):  verts=%d distintas=%d splits=%d checksum=%.0f -> %s\n",
+                nv2,d2,s2,c2, (s2!=s0||d2!=d0)?"recomputo (los splits/normales cambian = lo que rompia el join)":"sin cambio");
+        }
+        return true;
+    }
+    // ---- matdist <name> : cuenta cuantas caras (faces3d) hay por indice de material -> verifica que reimport preserva
+    //      el material POR-CARA (bug: ConvertToES1 dejaba todas en mat=0 -> colapso de meshparts al rebuildear/exportar). ----
+    if (cmd == "matdist") {
+        std::string nm; ss>>nm; Object* o = SceneCollection ? FindObjectByName(SceneCollection, nm) : NULL;
+        if(!o || o->getType()!=ObjectType::mesh){ err="matdist: malla no encontrada"; return false; }
+        Mesh* m=(Mesh*)o; std::vector<int> cnt(m->materialsGroup.size()+1, 0); int noCero=0;
+        for(size_t f=0;f<m->faces3d.size();f++){ int mm=m->faces3d[f].mat; if(mm<0||mm>=(int)m->materialsGroup.size()) mm=(int)m->materialsGroup.size(); cnt[mm]++; }
+        for(size_t g=0;g<m->materialsGroup.size();g++){ if(cnt[g]>0) noCero++; }
+        printf("      [matdist] '%s' grupos=%d caras=%d | grupos con caras=%d\n", nm.c_str(), (int)m->materialsGroup.size(), (int)m->faces3d.size(), noCero);
+        for(size_t g=0;g<m->materialsGroup.size();g++) printf("         mat[%d] '%s' caras=%d\n", (int)g, m->materialsGroup[g].name.c_str(), cnt[g]);
+        return true;
+    }
+    // ---- fpstest : crea un clip SPARSE (2 keyframes: frame 1 y 20) en el 1er armature, exporta glTF, reimporta y dumpea
+    //      los frames del clip reimportado -> verifica que el fps se preserva (bug: adivinaba fps=1 -> frame 20 -> frame 2). ----
+    if (cmd == "fpstest") {
+        Armature* a=NULL; { std::vector<Object*> st; if(SceneCollection) st.push_back(SceneCollection);
+          while(!st.empty() && !a){ Object* o=st.back(); st.pop_back(); if(o->getType()==ObjectType::armature) a=(Armature*)o; for(size_t i=0;i<o->Childrens.size();i++) st.push_back(o->Childrens[i]); } }
+        if(!a){err="fpstest: sin armature";return false;}
+        CrearAnimacion(a); int ci=a->animActiva; SkeletalAnimation* clip=a->animations[ci]; clip->name="SparseTest"; clip->FrameRate=24;
+        BoneTrack& tr=clip->TrackDe(0);
+        // curvas INDEPENDIENTES por componente: X en los frames 1 y 20; Y solo en el 10 -> se prueba que cada canal
+        // guarda SUS propios frames (con el modelo viejo X/Y/Z estaban obligados a compartirlos).
+        { AnimProperty& ap=tr.PropertyDe(AnimRotation, AnimX); SetKeyCurva(ap, 1, 0.0f); SetKeyCurva(ap, 20, 45.0f); }
+        { AnimProperty& ap=tr.PropertyDe(AnimRotation, AnimY); SetKeyCurva(ap, 10, 30.0f); }
+        clip->startFrame=1; clip->endFrame=20;
+        extern int ActiveAnimKind; extern Armature* ActiveAnimArm; ActiveAnimKind=1; ActiveAnimArm=a; a->animActiva=ci;
+        printf("      [fpstest] clip SPARSE creado: 2 keyframes @ frames 1,20 fps=24 rango[1..20]\n");
+        std::string path="C:/Users/dante/AppData/Local/Temp/claude/c--Symbian-Carbide-workspace-Whisk3Decosystem/dc888d7b-5375-4a95-a9de-8b709335a3d6/scratchpad/fpstest.gltf";
+        extern bool ExportGLTF(const std::string&, bool, bool); extern bool ImportGLTF(const std::string&);
+        if(!ExportGLTF(path, false, false)){ err="fpstest: fallo export"; return false; }
+        if(!ImportGLTF(path)){ err="fpstest: fallo import"; return false; }
+        // buscar el ULTIMO armature con un clip 'SparseTest'
+        Armature* re=NULL; SkeletalAnimation* rc=NULL; { std::vector<Object*> st; if(SceneCollection) st.push_back(SceneCollection);
+          while(!st.empty()){ Object* o=st.back(); st.pop_back(); if(o->getType()==ObjectType::armature){ Armature* ar=(Armature*)o;
+            for(size_t k=0;k<ar->animations.size();k++) if(ar->animations[k]->name.find("SparseTest")!=std::string::npos){ re=ar; rc=ar->animations[k]; } }
+            for(size_t i=0;i<o->Childrens.size();i++) st.push_back(o->Childrens[i]); } }
+        if(!rc){ err="fpstest: no se encontro el clip reimportado"; return false; }
+        printf("      [fpstest] REIMPORTADO clip '%s' fps=%d rango[%d..%d]\n", rc->name.c_str(), rc->FrameRate, rc->startFrame, rc->endFrame);
+        const char* cn[3] = {"X","Y","Z"};
+        for(size_t t=0;t<rc->tracks.size();t++) for(size_t p=0;p<rc->tracks[t].Propertys.size();p++){ AnimProperty& ap=rc->tracks[t].Propertys[p];
+            if(ap.Property!=AnimRotation) continue; int c=ap.component; if(c<0||c>2)c=0;
+            printf("         Rot.%s bone=%d: %d keys @", cn[c], rc->tracks[t].bone, (int)ap.keyframes.size());
+            for(size_t k=0;k<ap.keyframes.size();k++) printf(" %d(%.1f)", ap.keyframes[k].frame, ap.keyframes[k].value); printf("\n"); }
+        return true;
+    }
+    // ---- animdensity : dumpea la densidad de KEYFRAMES del clip 0 del 1er armature (para saber si la animacion se guardo
+    //      sparse -o horneada frame a frame-). Total de keys, rango, keys/property y densidad (keys / span de frames). ----
+    if (cmd == "animdensity") {
+        // junta TODOS los armatures y elige el 1ro CON clips (puede haber armatures auxiliares sin animacion)
+        std::vector<Armature*> arms; { std::vector<Object*> st; if(SceneCollection) st.push_back(SceneCollection);
+          while(!st.empty()){ Object* o=st.back(); st.pop_back(); if(o->getType()==ObjectType::armature) arms.push_back((Armature*)o); for(size_t i=0;i<o->Childrens.size();i++) st.push_back(o->Childrens[i]); } }
+        if(arms.empty()){err="animkeys: sin armature";return false;}
+        Armature* a=NULL; for(size_t i=0;i<arms.size();i++){ printf("      [animkeys] armature '%s' clips=%d\n", arms[i]->name.c_str(), (int)arms[i]->animations.size()); if(!a && !arms[i]->animations.empty()) a=arms[i]; }
+        if(!a){err="animkeys: ningun armature tiene clips";return false;}
+        SkeletalAnimation* c=a->animations[0];
+        long totalKeys=0; int props=0; int minF=0x7fffffff,maxF=0; int maxKeysProp=0;
+        for(size_t t=0;t<c->tracks.size();t++) for(size_t p=0;p<c->tracks[t].Propertys.size();p++){
+            int nk=(int)c->tracks[t].Propertys[p].keyframes.size(); totalKeys+=nk; props++;
+            if(nk>maxKeysProp)maxKeysProp=nk;
+            for(int k=0;k<nk;k++){ int f=c->tracks[t].Propertys[p].keyframes[k].frame; if(f<minF)minF=f; if(f>maxF)maxF=f; } }
+        int span = (maxF>=minF)?(maxF-minF+1):0;
+        printf("      [animkeys] clip '%s' rango[%d..%d] span=%d frames | huesos animados=%d properties=%d\n",
+            c->name.c_str(), c->startFrame, c->endFrame, span, (int)c->tracks.size(), props);
+        printf("      [animkeys] TOTAL keyframes=%ld | max keys en una property=%d | densidad=%.2f keys/frame por property (1.0 = horneado frame a frame)\n",
+            totalKeys, maxKeysProp, span>0?((float)maxKeysProp/(float)span):0.0f);
+        // muestra 1 hueso: sus properties y las primeras frames de cada una
+        if(!c->tracks.empty()){ BoneTrack& tr=c->tracks[0]; int bi=tr.bone;
+            printf("      [animkeys] ej hueso '%s':\n", (bi>=0&&bi<(int)a->bones.size())?a->bones[bi].name.c_str():"?");
+            for(size_t p=0;p<tr.Propertys.size();p++){ AnimProperty& ap=tr.Propertys[p];
+                const char* pn=(ap.Property==AnimPosition)?"Pos":(ap.Property==AnimRotation)?"Rot":"Scl";
+                printf("         %s: %d keys @ frames", pn, (int)ap.keyframes.size());
+                for(size_t k=0;k<ap.keyframes.size() && k<12;k++) printf(" %d", ap.keyframes[k].frame);
+                printf("%s\n", ap.keyframes.size()>12?" ...":""); } }
         return true;
     }
     // ---- bonepose <substr> <frame> : activa el clip 0 y dumpea la pose ANIMADA (euler + world head/tail) del 1er hueso

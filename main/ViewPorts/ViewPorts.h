@@ -16,6 +16,8 @@
 #include "WhiskUI/Tab.h"       // pestanias de la barra (properties)
 #include "variables.h" // REAL, ahora portable
 
+class Scrollable; // ScrollBar.h (que incluye a este: por eso va declarada, no incluida)
+
 // El icono de un objeto se DERIVA de su tipo (el core ya no guarda iconos de UI).
 // Compartido por Outliner + Properties; definido en Outliner.cpp.
 size_t IconoDeObjeto(Object* o);
@@ -83,8 +85,15 @@ class ViewportBase {
         virtual bool isLeaf() const;
         // 0 = hoja, 1 = fila, 2 = columna (sin RTTI: RVCT no tiene)
         virtual int ContainerKind() const { return 0; }
-        // tipo de hoja: 1 = 3D, 2 = outliner, 3 = properties
+        // tipo de hoja: 1 = 3D, 2 = outliner, 3 = properties, 4 = UV, 5 = timeline
         virtual int ViewportKind() const { return 0; }
+
+        // Barra de scroll: un viewport que scrollea hereda Scrollable y devuelve 'this' aca. El ruteo de input
+        // (hover / agarre / arrastre / touch) es UNO SOLO y generico para todos: ver LayoutInput.
+        // Antes esto era una tabla de downcasts a mano indexada por ViewportKind(), en LayoutInput: para que un
+        // viewport nuevo tuviera scroll habia que acordarse de agregarlo ALLA. Si te olvidabas, la barra se
+        // dibujaba y no respondia a nada. Asi el enganche vive en el propio viewport y es una linea.
+        virtual Scrollable* ComoScrollable() { return NULL; }
 
         virtual void event_mouse_motion(int mx, int my);
         virtual void button_left();

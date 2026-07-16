@@ -65,6 +65,7 @@ extern Properties* PropsActivo;
 
 class Properties : public ViewportBase, public WithBorder, public Scrollable {
     public:
+        Scrollable* ComoScrollable() { return this; }
         Properties();
         ~Properties() override;
 
@@ -99,6 +100,7 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         GroupPropertie* propInstance;// pestania de instance/array/mirror: target
         GroupPropertie* propRender;  // pestania RENDER: tarjeta "Render" (output)
         GroupPropertie* propAnimation; // pestania RENDER: tarjeta "Animation" (selector + New/Delete + Render Animation)
+        GroupPropertie* propKeyframe;  // tarjeta "Keyframe": el keyframe elegido en el editor de curvas, con numeros exactos
         PropButton* propBtnAnimSel;    // dropdown: animacion ACTIVA (Scene(s) / clips del armature seleccionado)
         PropButtonRow* propRowAnimNewDel; // fila: New | Delete (Delete oculto si no hay nada que borrar)
         PropButton* propBtnAnimRename; // "Rename" de la animacion activa (escena o clip)

@@ -372,7 +372,8 @@ bool loadColors(const std::string& filename) {
         {"gris", ColorID::gris},
         {"headerColor", ColorID::headerColor},
         {"negroTransparente", ColorID::negroTransparente},
-        {"grisUI", ColorID::grisUI}
+        {"grisUI", ColorID::grisUI},
+        {"grisLinea", ColorID::grisLinea}
     };
 
     std::string skinPath = filename;

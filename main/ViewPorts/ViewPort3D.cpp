@@ -1549,6 +1549,16 @@ void Viewport3D::RenderAllAxisTransform() {
     bool drawX = (a == X || a == XYZ || a == PlaneY || a == PlaneZ);
     bool drawY = (a == Y || a == XYZ || a == PlaneX || a == PlaneZ);
     bool drawZ = (a == Z || a == XYZ || a == PlaneX || a == PlaneY);
+    // POSE MODE: los ejes son los del HUESO (en "Local" el eje local es el del hueso, NO el del objeto armature).
+    // Se piden los MISMOS que usa el transform de pose -> la guia coincide siempre con la rotacion real.
+    { extern bool PoseEjesMundo(Vector3&, Vector3&, Vector3&);
+      Vector3 pex, pey, pez;
+      if (PoseEjesMundo(pex, pey, pez)){
+        if (drawX) DibujarLineaEjeMundo(c, pex, W3dColor_ColorTransformX);
+        if (drawY) DibujarLineaEjeMundo(c, pey, W3dColor_ColorTransformY);
+        if (drawZ) DibujarLineaEjeMundo(c, pez, W3dColor_ColorTransformZ);
+        return;
+      } }
     if (drawX) DibujarLineaEjeMundo(c, EjeOrientado(*ObjActivo, X), W3dColor_ColorTransformX);
     if (drawY) DibujarLineaEjeMundo(c, EjeOrientado(*ObjActivo, Y), W3dColor_ColorTransformY);
     if (drawZ) DibujarLineaEjeMundo(c, EjeOrientado(*ObjActivo, Z), W3dColor_ColorTransformZ);
@@ -1703,10 +1713,12 @@ void Viewport3D::RenderUI() {
         w3dEngine::TexFilter(false);
         // durante un transform (mover/rotar/escalar, o ubicar un duplicado) la
         // barra de botones se reemplaza por una barra de estado con los valores
+        extern int g_poseModo;
         bool transformando = (Viewport3DActive == this &&
             (estado == translacion || estado == rotacion || estado == EditScale) &&
             (InteractionMode == ObjectMode ||
-             (InteractionMode == EditMode && EditXformActivo())));
+             (InteractionMode == EditMode && EditXformActivo()) ||
+             (InteractionMode == PoseMode && g_poseModo)));
         if (transformando) {
             RenderBarraTransform();
         } else {
@@ -1909,6 +1921,14 @@ static std::string W3dTextoTransform(){
         }
         // rotacion: cae al bloque comun (gAnguloTransform + axisSelect/orientacion)
     }
+    // POSE Mode: translate/scale muestran el valor de la POSE (no el del objeto armature). Rotate cae al bloque comun
+    // (usa gAnguloTransform, que el transform de pose setea). El numerico ya lo cubre el bloque de arriba.
+    { extern int PoseHeaderModo(); extern float PoseHeaderValor();
+      if (InteractionMode == PoseMode && PoseHeaderModo()){
+        int pm = PoseHeaderModo();
+        if (pm == 1) return std::string("Translate: ") + W3dFmtF(PoseHeaderValor(), 4) + W3dSufijoEjes();
+        if (pm == 3) return std::string("Scale: ") + W3dFmtF(PoseHeaderValor(), 3);
+      } }
     if (!ObjActivo) return "";
     SaveState* st = W3dEstadoGuardado(ObjActivo);
     if (estado == translacion){
@@ -2187,6 +2207,9 @@ void Viewport3D::Aceptar() {
         }
     } else if (InteractionMode == EditMode && EditXformActivo()){
         EditXformConfirmar(); // fija el transform de malla (recalcula bordes+normales)
+    } else if (InteractionMode == PoseMode){
+        extern int g_poseModo; extern void PoseXformConfirm();
+        if (g_poseModo) PoseXformConfirm(); // fija la pose editada (Enter / tick del toolbar); idempotente con el click
     }
     NumInputReset(); // termina el transform -> limpia el valor numerico tipeado
     ViewPortClickDown = false;
@@ -2651,8 +2674,10 @@ static void ToolbarToggleEje(int bit){
 }
 
 static bool ToolbarTransformando(){
+    extern int g_poseModo;
     return (estado == translacion || estado == rotacion || estado == EditScale) &&
-           (InteractionMode == ObjectMode || (InteractionMode == EditMode && EditXformActivo()));
+           (InteractionMode == ObjectMode || (InteractionMode == EditMode && EditXformActivo()) ||
+            (InteractionMode == PoseMode && g_poseModo)); // POSE: tambien muestra tilde/cruz + ejes en el tactil
 }
 
 bool Viewport3D::ToolbarVisible() const {
@@ -3012,8 +3037,8 @@ void Viewport3D::event_key_down(SDL_Event &e){
                 SetShowOverlays(!showOverlays);
                 break;
             case SDLK_X:
-                // Pose Mode: X = eje X de la rotacion (para Global/Local)
-                if (InteractionMode == PoseMode){ extern int g_poseModo; extern void PoseCiclarEje(int); if (g_poseModo){ PoseCiclarEje(0); break; } }
+                // Pose Mode: X = eje X (Shift+X = plano YZ); cicla Global/Local/View al re-apretar
+                if (InteractionMode == PoseMode){ extern int g_poseModo; extern void PoseCiclarEje(int); extern void PoseCiclarPlano(int); if (g_poseModo){ if (LShiftPressed) PoseCiclarPlano(0); else PoseCiclarEje(0); break; } }
                 // durante un transform: X = eje X (re-apretar cicla
                 // Global->Local->View->libre); Shift+X = plano (mueve en Y,Z).
                 if (estado != editNavegacion){
@@ -3030,7 +3055,7 @@ void Viewport3D::event_key_down(SDL_Event &e){
                     AbrirConfirmarBorrado();
                 break;
             case SDLK_Y:
-                if (InteractionMode == PoseMode){ extern int g_poseModo; extern void PoseCiclarEje(int); if (g_poseModo){ PoseCiclarEje(1); break; } }
+                if (InteractionMode == PoseMode){ extern int g_poseModo; extern void PoseCiclarEje(int); extern void PoseCiclarPlano(int); if (g_poseModo){ if (LShiftPressed) PoseCiclarPlano(1); else PoseCiclarEje(1); break; } }
                 if (estado != editNavegacion){
                     if (LShiftPressed) CiclarPlanoTransform(Y);
                     else CiclarEjeTransform(Y);
@@ -3038,7 +3063,7 @@ void Viewport3D::event_key_down(SDL_Event &e){
                 }
                 break;
             case SDLK_Z:
-                if (InteractionMode == PoseMode){ extern int g_poseModo; extern void PoseCiclarEje(int); if (g_poseModo){ PoseCiclarEje(2); break; } }
+                if (InteractionMode == PoseMode){ extern int g_poseModo; extern void PoseCiclarEje(int); extern void PoseCiclarPlano(int); if (g_poseModo){ if (LShiftPressed) PoseCiclarPlano(2); else PoseCiclarEje(2); break; } }
                 if (estado != editNavegacion){
                     if (LShiftPressed) CiclarPlanoTransform(Z);
                     else CiclarEjeTransform(Z);

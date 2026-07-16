@@ -2,6 +2,7 @@
 #include "ViewPorts/Properties.h" // PropertiesTouchScrollFin (fin del scroll tactil de listas)
 #include "ViewPorts/ViewPort3D.h" // Viewport3DActive->Aceptar() en el transform
 #include "ViewPorts/PopUp/PopUpBase.h" // PopUpActive (la X cancela)
+#include "ViewPorts/Timeline.h"    // DopeNumInputChar (valor numerico del transform de keyframes)
 #include "WhiskUI/glesdraw.h"        // W3dPantallaAlto
 #include "controles.h"
 #include "Undo.h" // Ctrl+Z
@@ -311,7 +312,17 @@ void InputUsuarioSDL3(SDL_Event &e){
         if ((leftMouseDown || middleMouseDown) && viewPortActive) {
             CheckWarpMouseInViewport(mx, my, viewPortActive);
         }
-        else if (estado == translacion || estado == rotacion || estado == EditScale){
+        // POSE Mode NO envuelve el cursor: el transform de huesos usa el delta REAL mx/my (PoseXformMotion). Si se
+        // envolviera, el salto del cursor al borde daria un delta enorme y la pose pegaria un tiron.
+        else if ((estado == translacion || estado == rotacion || estado == EditScale) && InteractionMode != PoseMode){
+            ViewPortClickDown = true;
+            CheckWarpMouseInViewport(mx, my, viewPortActive);
+        }
+        // TRANSFORM DE KEYFRAMES del timeline (g/s/r): mismo trato que el del 3D. Envolver el cursor deja seguir
+        // escalando/rotando sin quedarse sin pantalla. Puede: usa un cursor VIRTUAL que acumula dx/dy (que el warp
+        // pone en 0 justo en el salto), no la posicion real. ViewPortClickDown congela el foco en el timeline: sin
+        // eso, al envolverse el cursor podria caer en otro viewport y el warp pasaria a usar EL RECT EQUIVOCADO.
+        else if (DopeXformActivo() && viewPortActive && viewPortActive->ViewportKind() == 5){
             ViewPortClickDown = true;
             CheckWarpMouseInViewport(mx, my, viewPortActive);
         }
@@ -666,6 +677,10 @@ void InputUsuarioSDL3(SDL_Event &e){
         // Tab: si el activo es una malla, alterna Object<->Edit Mode (como Blender);
         // si no, cicla el viewport activo (borde verde). La logica del toggle vive
         // en LayoutToggleEditMode (la comparte Symbian).
+        // Tab cambia de modo o cicla de viewport POR ENCIMA del ruteo a los viewports. Si el timeline tiene un
+        // transform de keyframes a medio hacer hay que cancelarlo: se maneja con el foco congelado
+        // (ViewPortClickDown) y, al irse el foco, ya nadie podria confirmarlo ni cancelarlo.
+        if (e.key.keysym.sym == SDLK_TAB && DopeXformActivo()) DopeXformCancelar();
         if (e.key.keysym.sym == SDLK_TAB) {
             if (LShiftPressed) SnapToggle();  // Shift+Tab = toggle SNAP (imantado), como Blender
             else if (!LayoutToggleEditMode())
@@ -681,7 +696,7 @@ void InputUsuarioSDL3(SDL_Event &e){
         }
         // backspace durante un transform: borra del valor numerico tipeado (los
         // numeros/operadores entran por SDL_TEXTINPUT; el backspace no genera texto)
-        if (e.key.keysym.sym == SDLK_BACKSPACE && (TextFieldInputChar(8) || NumInputChar(8))) {
+        if (e.key.keysym.sym == SDLK_BACKSPACE && (TextFieldInputChar(8) || NumInputChar(8) || DopeNumInputChar(8))) {
             atajoMenu = true;
         }
         // primero el ruteo compartido (menu abierto / edicion / hover)
@@ -727,9 +742,10 @@ void InputUsuarioSDL3(SDL_Event &e){
     // desde su propio teclado/keypad.)
     #if SDL_MAJOR_VERSION == 2
     else if (e.type == SDL_TEXTINPUT) {
-        // prioridad: una caja de texto enfocada; si no, el valor numerico del transform
+        // prioridad: una caja de texto enfocada; si no, el transform del 3D; si no, el de los keyframes del dope sheet
         for (const char* p = e.text.text; *p; ++p)
-            if (!TextFieldInputChar((unsigned char)*p)) NumInputChar((unsigned char)*p);
+            if (!TextFieldInputChar((unsigned char)*p) && !NumInputChar((unsigned char)*p))
+                DopeNumInputChar((unsigned char)*p);
     }
     #endif
 }

@@ -1,6 +1,7 @@
 #include "w3dGraphics.h" // abstraccion de graficos (independencia de OpenGL)
 #include "NumPad.h"
 #include "ViewPorts/LayoutInput.h"          // LayoutKey + NumInput* (modo transform)
+#include "ViewPorts/Timeline.h"             // DopeNumInputChar (transform de keyframes del dope sheet)
 #include "WhiskUI/PopupMenu.h"              // MenuPantallaW / MenuPantallaH
 #include "WhiskUI/Propieties/PropFloat.h"   // g_propFloatEditando + NumEditCommit/Cancel
 #include "WhiskUI/TextField.h"              // TextFieldInputChar (mismo camino que el teclado fisico)
@@ -201,7 +202,7 @@ void NumPad::Render(){
 
 // alimenta un caracter (o 8=backspace) al destino segun el modo
 void NumPad::Feed(int c){
-    if (modoTransform) NumInputChar(c);
+    if (modoTransform){ if (!NumInputChar(c)) DopeNumInputChar(c); } // 3D; si no, el transform de keyframes
     else               TextFieldInputChar(c);
 }
 

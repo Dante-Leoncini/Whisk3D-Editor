@@ -1917,10 +1917,23 @@ void Mesh::AnexarMallaTransformada(Mesh* otra, const Matrix4& M) {
     }
     delete[] vertex; vertex=nv;
 
-    // --- normales (crudas; GenerarRender las recomputa de la geo mergeada) ---
+    // --- normales: las de ESTA quedan como estan; las de 'otra' se ROTAN por la MATRIZ NORMAL de M (transpuesta de
+    //     la inversa de su parte lineal) para que sigan apuntando bien en el espacio de esta malla. El join las
+    //     PRESERVA (el caller usa GenerarRender(false)): recalcularlas promediaria y REDONDEARIA los bordes filosos
+    //     que el archivo trae como splits de normal. ---
+    Matrix4 NM = M; NM.m[12]=NM.m[13]=NM.m[14]=0.0f; NM = NM.Inverse(); // n' = transpuesta(inv(lineal)) * n
     GLbyte* nn = new GLbyte[nN*3];
     for (int i=0;i<base*3;i++) nn[i] = normals ? normals[i] : (GLbyte)((i%3==1)?127:0);
-    for (int i=0;i<add*3;i++)  nn[base*3+i] = otra->normals ? otra->normals[i] : (GLbyte)((i%3==1)?127:0);
+    for (int i=0;i<add;i++){
+        float nx = otra->normals ? otra->normals[i*3]/127.0f   : 0.0f;
+        float ny = otra->normals ? otra->normals[i*3+1]/127.0f : 1.0f;
+        float nz = otra->normals ? otra->normals[i*3+2]/127.0f : 0.0f;
+        float tx = NM.m[0]*nx + NM.m[1]*ny + NM.m[2]*nz;   // fila r de la transpuesta = NM.m[r*4+c]
+        float ty = NM.m[4]*nx + NM.m[5]*ny + NM.m[6]*nz;
+        float tz = NM.m[8]*nx + NM.m[9]*ny + NM.m[10]*nz;
+        float l = sqrtf(tx*tx+ty*ty+tz*tz); if (l>1e-8f){ tx/=l; ty/=l; tz/=l; } else { tx=0.0f; ty=1.0f; tz=0.0f; }
+        nn[(base+i)*3]=(GLbyte)(tx*127.0f); nn[(base+i)*3+1]=(GLbyte)(ty*127.0f); nn[(base+i)*3+2]=(GLbyte)(tz*127.0f);
+    }
     delete[] normals; normals=nn;
 
     // --- uv ---
@@ -2779,7 +2792,7 @@ float Mesh::RadioFoco() const {
 // del render ante cambios de TOPOLOGIA: las edit-ops construyen faces3d + las capas y llaman
 // aca (asi TODAS las capas sobreviven, sin meter interpolacion en cada op). LENTO -> usar
 // solo cuando cambia la topologia; para mover/pintar usar RefrescarRender (in-place).
-void Mesh::GenerarRender() {
+void Mesh::GenerarRender(bool recomputarNormales) {
     int nC = ContarCorners();
     // Sin caras (nC=0) igual seguimos si hay geometria SUELTA (loose edges/verts): para preservarla y, sobre todo,
     // para reconstruir faces[] a vacio (sino quedan triangulos fantasma del estado anterior). Solo cortamos si no
@@ -2793,9 +2806,15 @@ void Mesh::GenerarRender() {
     // un borde sharp corta el grupo). Sin bordes sharp = todo suave; con sharp = cilindro.
     // Path rapido PorCara SOLO si es flat global y NINGUNA cara tiene override per-cara (Face>Shade sobre seleccion);
     // si hay override o es smooth -> ConSharp (respeta el flag smooth POR CARA de cada faces3d).
+    if (!recomputarNormales){
+        // CONSERVAR las normales actuales (JOIN): cornerNormal se llena DESDE normals[] -> el merge de abajo usa la
+        // normal real de cada vertice (la del archivo, con sus splits) y NO se redondean los bordes filosos.
+        SincronizarCornerNormal();
+    } else {
     bool hayOverride=false; for (size_t f=0;f<faces3d.size();f++) if (faces3d[f].smooth>=0){ hayOverride=true; break; }
     if (!meshSmooth && !hayOverride) CornerNormalPorCara();
     else                            CornerNormalConSharp();
+    }
     UVMap* um = (uvMapActivo>=0 && uvMapActivo<(int)uvMaps.size()) ? uvMaps[uvMapActivo] : NULL;
     ColorLayer* cl = (colorActivo>=0 && colorActivo<(int)colorLayers.size()) ? colorLayers[colorActivo] : NULL;
     bool tUV  = um && (int)um->uv.size()==nC*2;

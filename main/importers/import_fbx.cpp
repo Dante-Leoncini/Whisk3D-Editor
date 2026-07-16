@@ -650,36 +650,13 @@ static void ParsearAnimaciones(const FNode& root, const FNode& objs, const Esque
             va.push_back((float)fc.v[j]);
         }
         if (fr.empty()) continue;
+        // Cada curva del FBX es UN eje de UNA propiedad -> mapea DIRECTO a su AnimProperty (prop, componente).
+        // Antes habia que RESAMPLEAR (unir los frames de los 3 ejes e interpolar los otros dos en cada frame nuevo)
+        // porque X/Y/Z compartian el keyframe; con curvas por componente eso ya no hace falta: se guardan los
+        // keyframes ORIGINALES de cada eje, tal cual vienen (menos keys y sin error de resampleo).
         BoneTrack& tr = clip->TrackDe(bone);
-        AnimProperty& ap = tr.PropertyDe(prop);
-        // resamplear: unir el set de frames existentes + los de esta curva, y setear el eje en cada uno
-        std::vector<int> frames;
-        for (size_t j = 0; j < ap.keyframes.size(); j++) frames.push_back(ap.keyframes[j].frame);
-        for (size_t j = 0; j < fr.size(); j++) frames.push_back(fr[j]);
-        std::sort(frames.begin(), frames.end());
-        frames.erase(std::unique(frames.begin(), frames.end()), frames.end());
-        std::vector<keyFrame> nuevos; nuevos.reserve(frames.size());
-        for (size_t j = 0; j < frames.size(); j++) {
-            keyFrame kf; kf.frame = frames[j]; kf.Interpolation = 0;
-            // otros ejes: INTERPOLAR lineal los keyframes existentes en este frame (NO "hold": el escalon rompia
-            // las rotaciones -> el hueso giraba loco). Asi cada eje queda continuo aunque los ejes tengan keys distintos.
-            kf.valueX = kf.valueY = kf.valueZ = 0.0f;
-            const std::vector<keyFrame>& K = ap.keyframes; int f = frames[j];
-            if (!K.empty()) {
-                if (f <= K.front().frame)      { kf.valueX=K.front().valueX; kf.valueY=K.front().valueY; kf.valueZ=K.front().valueZ; }
-                else if (f >= K.back().frame)  { kf.valueX=K.back().valueX;  kf.valueY=K.back().valueY;  kf.valueZ=K.back().valueZ; }
-                else for (size_t p = 1; p < K.size(); p++) if (K[p].frame >= f) {
-                    int f0=K[p-1].frame, f1=K[p].frame; float t = (f1==f0)?0.0f:(float)(f-f0)/(float)(f1-f0);
-                    kf.valueX = K[p-1].valueX + (K[p].valueX-K[p-1].valueX)*t;
-                    kf.valueY = K[p-1].valueY + (K[p].valueY-K[p-1].valueY)*t;
-                    kf.valueZ = K[p-1].valueZ + (K[p].valueZ-K[p-1].valueZ)*t; break;
-                }
-            }
-            float ev = EvalEje(fr, va, frames[j]);
-            if (eje == 0) kf.valueX = ev; else if (eje == 1) kf.valueY = ev; else kf.valueZ = ev;
-            nuevos.push_back(kf);
-        }
-        ap.keyframes = nuevos;
+        AnimProperty& ap = tr.PropertyDe(prop, (eje==0)?AnimX : (eje==1)?AnimY : AnimZ);
+        for (size_t j = 0; j < fr.size(); j++) SetKeyCurva(ap, fr[j], va[j]);
     }
     // 5) rango [startFrame..endFrame] de cada clip = min/max de sus keyframes
     for (size_t a = 0; a < anims.size(); a++) {

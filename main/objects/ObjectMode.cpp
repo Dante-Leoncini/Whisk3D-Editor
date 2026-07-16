@@ -188,37 +188,22 @@ static AnimationObject& AnimObjDe(Object* o){
 	AnimationObject ao; ao.obj=o; ao.FirstKeyFrame=0; ao.LastKeyFrame=0; AnimationObjects.push_back(ao);
 	return AnimationObjects.back();
 }
-static AnimProperty& PropObjDe(AnimationObject& ao, int prop){
-	for (size_t i=0;i<ao.Propertys.size();i++) if (ao.Propertys[i].Property==prop) return ao.Propertys[i];
-	AnimProperty p; p.Property=prop; p.firstFrameIndex=0; p.lastFrameIndex=0; ao.Propertys.push_back(p);
-	return ao.Propertys.back();
-}
-static void SetKeyProp(AnimProperty& p, int frame, float x, float y, float z){
-	for (size_t i=0;i<p.keyframes.size();i++) if (p.keyframes[i].frame==frame){
-		p.keyframes[i].valueX=x; p.keyframes[i].valueY=y; p.keyframes[i].valueZ=z; return; } // reemplaza el existente
-	keyFrame k; k.frame=frame; k.valueX=x; k.valueY=y; k.valueZ=z; k.Interpolation=0;
-	p.keyframes.push_back(k); p.SortKeyFrames();
-}
-static Vector3 EvalPropObj(const AnimProperty& ap, int frame){ // interp LINEAL entre keyframes
-	const std::vector<keyFrame>& k = ap.keyframes;
-	if (k.empty()) return Vector3(0,0,0);
-	if (frame <= k.front().frame) return Vector3(k.front().valueX,k.front().valueY,k.front().valueZ);
-	if (frame >= k.back().frame)  return Vector3(k.back().valueX,k.back().valueY,k.back().valueZ);
-	for (size_t i=1;i<k.size();i++) if (k[i].frame>=frame){
-		int f0=k[i-1].frame, f1=k[i].frame; float t=(f1==f0)?0.0f:(float)(frame-f0)/(float)(f1-f0);
-		return Vector3(k[i-1].valueX+(k[i].valueX-k[i-1].valueX)*t,
-		               k[i-1].valueY+(k[i].valueY-k[i-1].valueY)*t,
-		               k[i-1].valueZ+(k[i].valueZ-k[i-1].valueZ)*t); }
-	return Vector3(k.back().valueX,k.back().valueY,k.back().valueZ);
+// keyframe en las TRES curvas (X/Y/Z) de una propiedad del objeto. Cada componente es una curva independiente
+// (PropertyDeLista las crea/encuentra por (propiedad, componente)); keyar toca las 3 en el mismo frame, pero
+// despues se mueven/borran/curvan por separado desde el dope sheet.
+static void SetKeyObj3(AnimationObject& ao, int prop, int frame, float x, float y, float z){
+	SetKeyCurva(PropertyDeLista(ao.Propertys, prop, AnimX), frame, x);
+	SetKeyCurva(PropertyDeLista(ao.Propertys, prop, AnimY), frame, y);
+	SetKeyCurva(PropertyDeLista(ao.Propertys, prop, AnimZ), frame, z);
 }
 // Insert Keyframe (i): guarda pos+rot+escala de cada objeto SELECCIONADO en el frame actual
 void InsertarKeyframeObjeto(){
 	for (size_t s=0;s<ObjSelects.size();s++){ Object* o=ObjSelects[s]; if (!o) continue;
 		o->ActualizarDisplayRot(); // rotEuler al dia
 		AnimationObject& ao = AnimObjDe(o);
-		SetKeyProp(PropObjDe(ao, AnimPosition), CurrentFrame, o->pos.x, o->pos.y, o->pos.z);
-		SetKeyProp(PropObjDe(ao, AnimRotation), CurrentFrame, o->rotEuler.x, o->rotEuler.y, o->rotEuler.z);
-		SetKeyProp(PropObjDe(ao, AnimScale),    CurrentFrame, o->scale.x, o->scale.y, o->scale.z);
+		SetKeyObj3(ao, AnimPosition, CurrentFrame, o->pos.x, o->pos.y, o->pos.z);
+		SetKeyObj3(ao, AnimRotation, CurrentFrame, o->rotEuler.x, o->rotEuler.y, o->rotEuler.z);
+		SetKeyObj3(ao, AnimScale,    CurrentFrame, o->scale.x, o->scale.y, o->scale.z);
 		ao.UpdateFirstLastFrame();
 	}
 	g_redraw = true;
@@ -248,13 +233,17 @@ void AplicarAnimacionObjetos(){
 	if (CurrentFrame == ultimoFrame) return;
 	ultimoFrame = CurrentFrame;
 	for (size_t i=0;i<AnimationObjects.size();i++){ AnimationObject& ao=AnimationObjects[i]; if (!ao.obj) continue;
-		for (size_t p=0;p<ao.Propertys.size();p++){ AnimProperty& ap=ao.Propertys[p];
-			if (ap.keyframes.empty()) continue;
-			Vector3 v = EvalPropObj(ap, CurrentFrame);
-			if      (ap.Property==AnimPosition) ao.obj->pos   = v;
-			else if (ap.Property==AnimScale)    ao.obj->scale = v;
-			else if (ap.Property==AnimRotation){ ao.obj->rot = Quaternion::FromEulerXYZ(v.x,v.y,v.z); ao.obj->ActualizarDisplayRot(); }
-		}
+		// que propiedades tienen ALGUNA curva con keyframes? (cada componente X/Y/Z es una curva propia)
+		bool hayP=false, hayR=false, hayS=false;
+		for (size_t p=0;p<ao.Propertys.size();p++){ if (ao.Propertys[p].keyframes.empty()) continue;
+			if      (ao.Propertys[p].Property==AnimPosition) hayP=true;
+			else if (ao.Propertys[p].Property==AnimRotation) hayR=true;
+			else if (ao.Propertys[p].Property==AnimScale)    hayS=true; }
+		// EvalPropVec evalua X/Y/Z por separado; el componente sin curva propia queda en el valor actual del objeto
+		if (hayP) ao.obj->pos   = EvalPropVec(ao.Propertys, AnimPosition, CurrentFrame, ao.obj->pos);
+		if (hayS) ao.obj->scale = EvalPropVec(ao.Propertys, AnimScale,    CurrentFrame, ao.obj->scale);
+		if (hayR){ Vector3 e = EvalPropVec(ao.Propertys, AnimRotation, CurrentFrame, ao.obj->rotEuler);
+			ao.obj->rot = Quaternion::FromEulerXYZ(e.x,e.y,e.z); ao.obj->ActualizarDisplayRot(); }
 	}
 }
 #endif
@@ -593,11 +582,14 @@ void JoinObjetos(){
         Matrix4 M = invWa * Wo;               // local(otro) -> mundo -> local(activo)
         am->AnexarMallaTransformada((Mesh*)merged[i], M);
     }
-    // rebuild: rearma las capas UV/color desde el render concatenado, regenera (normales limpias + merge de verts).
+    // rebuild: rearma las capas UV/color desde el render concatenado y re-mergea los verts.
     // LiberarCapas(false) PRESERVA los vertex groups (mergeados en AnexarMallaTransformada) -> el skinning sobrevive al join.
+    // GenerarRender(false) PRESERVA las normales: el join no cambia la forma de ninguna de las mallas, asi que sus
+    // normales siguen valiendo. Recalcularlas promediaba y REDONDEABA los bordes filosos que traia el archivo
+    // (glTF/FBX guardan splits de normal); ahora quedan como estaban.
     am->LiberarCapas(false);
     am->PoblarCapas();
-    am->GenerarRender();
+    am->GenerarRender(false);
     am->lastSkinFrame = -999999; // si el join era de mallas skinneadas: forzar el re-skin (el frame-gate sino lo saltaba)
 
     // borrar los mergeados (undo atomico): dejar select=true SOLO en ellos. Se limpia la seleccion de

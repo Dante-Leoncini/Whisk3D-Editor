@@ -360,7 +360,11 @@ void SetGlobalScale(int scale){
     LetterWidthGS = LetterWidth * scale;
     LetterHeightGS = LetterHeight * scale;
     paddingViewportGS = paddingViewport * scale;
-    MinViewportHeightGS = MinViewportHeight * scale;
+    // ALTO MINIMO de un viewport = EXACTAMENTE el alto de la BARRA de menu (mismo calculo que BarHeight(), con el
+    // separador de 1px de las barras que no son del 3D). Asi se puede achicar un viewport hasta que queden SOLO sus
+    // controles: p.ej. dejar el timeline como una tira con el transporte y nada mas. Antes MinViewportHeight era un
+    // valor fijo mas grande y siempre sobraba un hueco inutil debajo de la barra.
+    MinViewportHeightGS = UIBotonAltura() + UIBarPadding() * 2 + scale * 2;
     MinViewportWidthGS = MinViewportWidth * scale;
     CharacterWidthGS = CharacterWidth * scale;
 

@@ -38,6 +38,16 @@ void UndoCapturarColor(float* target, const float* viejo); // COLOR de material/
 void UndoMaterialModIniciar(Material* m);       // antes de tocar checkbox/shininess de un material (snapshot)
 void UndoMaterialModCommit();                   // al soltar el mouse: pushea el cambio de material si difiere
 
+// CURVAS de animacion: snapshot de todos los keyframes (frames, valores, interpolacion y handles) del clip/escena
+// activa. Lo usan el editor de curvas y la tarjeta "Keyframe" del panel de propiedades. Si no hubo cambio real,
+// Confirmar descarta el snapshot y no ensucia el stack.
+void UndoKeyframesIniciar();
+void UndoKeyframesConfirmar();
+// POSE de un esqueleto (mismo criterio: pendiente hasta confirmar)
+class Armature;
+void UndoPoseIniciar(Armature* a);
+void UndoPoseConfirmar();
+
 // transform (object mode): pendiente hasta confirmar, asi un transform CANCELADO no deja un undo no-op.
 void UndoTransformIniciar();   // captura pos/rot/escala de los seleccionados (al empezar)
 void UndoTransformConfirmar(); // al aceptar el transform: pushea el pendiente al stack

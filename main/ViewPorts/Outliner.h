@@ -18,6 +18,7 @@
 
 class Outliner : public ViewportBase, public WithBorder, public Scrollable {
     public:
+        Scrollable* ComoScrollable() { return this; }
         size_t CantidadRenglones;
         int lastContentRows;   // filas visibles del ultimo render: si cambian (import/add/delete/desplegar) se recalcula
                                // el scrollbar (antes solo se recalculaba al redimensionar -> tras importar no scrolleaba)

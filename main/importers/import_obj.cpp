@@ -251,6 +251,10 @@ void Wavefront::ConvertToES1(Mesh* TempMesh, int* acumuladoVertices, int* acumul
 
         // CARA LOGICA: preserva el quad/ngon (overlay = 1 normal por cara; edicion)
         MeshFace mf;
+        // TAG del mesh part: sin esto toda cara importada quedaba con mat=0 (default) y los materiales/meshparts
+        // se COLAPSABAN a uno solo apenas se rebuildeaba faces[] desde faces3d (edit / Ctrl+J / re-export). Los rangos
+        // de render (materialsGroup) ya se arman bien arriba; faltaba propagar el material a la cara logica.
+        mf.mat = (currentMaterial >= 0) ? currentMaterial : 0;
         for (size_t k = 0; k < faceIdx.size(); k++) mf.idx.push_back((int)faceIdx[k]);
         TempMesh->faces3d.push_back(mf);
     }

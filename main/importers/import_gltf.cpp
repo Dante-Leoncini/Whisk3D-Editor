@@ -430,12 +430,17 @@ bool ImportGLTF(const std::string& filepath) {
             const JVal* chans = an.find("channels"); const JVal* samps = an.find("samplers");
             if (!chans || !samps) continue;
             SkeletalAnimation* clip = new SkeletalAnimation(an.getS("name", "Animation"));
-            // detectar fps del clip: menor delta entre tiempos de sus samplers (los tiempos glTF son SEGUNDOS)
+            // fps del clip: los tiempos glTF son SEGUNDOS y glTF NO guarda fps. PRIMERO leer extras.frameRate (lo
+            // escribe nuestro exporter -> round-trip exacto). Si no esta (archivos de terceros), ADIVINAR del menor
+            // delta entre tiempos -> OJO: con keyframes sparse (ej solo frame 1 y 20) el unico delta es grande y da
+            // fps=1, colapsando el rango a 1..2. Por eso extras es la fuente confiable; la deteccion es solo fallback.
             float dtMin = 1e9f, tMax = 0.0f;
             for (size_t s = 0; s < samps->size(); s++) { int inAcc = samps->arr[s].getI("input", -1); if (inAcc < 0) continue;
                 std::vector<float> ts; int c = 0, nc = 0; if (!doc.readFloats(inAcc, ts, c, nc)) continue;
                 for (int k = 0; k < c; k++) { if (ts[k] > tMax) tMax = ts[k]; if (k > 0) { float d = ts[k] - ts[k-1]; if (d > 1e-5f && d < dtMin) dtMin = d; } } }
-            int fps = (dtMin < 1e8f && dtMin > 1e-5f) ? (int)(1.0f / dtMin + 0.5f) : 30; if (fps < 1) fps = 30; if (fps > 240) fps = 240;
+            int fps = 0; { const JVal* ex = an.find("extras"); if (ex) fps = ex->getI("frameRate", 0); } // fuente confiable
+            if (fps <= 0) fps = (dtMin < 1e8f && dtMin > 1e-5f) ? (int)(1.0f / dtMin + 0.5f) : 30;        // fallback: adivinar
+            if (fps < 1) fps = 30; if (fps > 240) fps = 240;
             clip->FrameRate = fps; clip->startFrame = 1; clip->endFrame = (int)(tMax * fps + 0.5f) + 1;
 
             for (size_t c = 0; c < chans->size(); c++) {
@@ -466,34 +471,33 @@ bool ImportGLTF(const std::string& filepath) {
                 float psp = 1.0f; if (hayPrefix) { psp = sqrtf(prefix.m[0]*prefix.m[0] + prefix.m[1]*prefix.m[1] + prefix.m[2]*prefix.m[2]); if (psp < 1e-6f) psp = 1.0f; }
 
                 BoneTrack& tr = clip->TrackDe(bone);
-                AnimProperty& ap = tr.PropertyDe(prop);
+                // Los samplers de glTF traen los 3 componentes JUNTOS por key. Se arma primero la lista de valores
+                // (y para la rotacion se corrige la continuidad euler, que NECESITA los 3 juntos) y recien despues se
+                // reparten en las 3 CURVAS independientes (una por componente).
+                std::vector<int> kfr((size_t)tc); std::vector<Vector3> kv((size_t)tc);
                 for (int k = 0; k < tc; k++) {
-                    keyFrame kf; kf.frame = (int)(times[k] * fps + 0.5f) + 1; kf.Interpolation = 0;
+                    kfr[k] = (int)(times[k] * fps + 0.5f) + 1;
                     if (prop == AnimRotation) {
                         size_t o = ((size_t)k * stepV + voff) * 4;
                         Matrix4 Rm = QuatMat(vals[o], vals[o+1], vals[o+2], vals[o+3]);
                         if (hayPrefix) Rm = prefix * Rm; // solo rota (la traslacion/escala del prefix no afecta la rotacion pura)
-                        Vector3 e = SkelMatrizAEulerFBX(Rm, 0);
-                        kf.valueX = e.x; kf.valueY = e.y; kf.valueZ = e.z;
+                        kv[k] = SkelMatrizAEulerFBX(Rm, 0);
                     } else {
                         size_t o = ((size_t)k * stepV + voff) * 3;
                         Vector3 v(vals[o], vals[o+1], vals[o+2]);
                         if (hayPrefix) { if (prop == AnimPosition) v = MatXform(prefix, v); else v = v * psp; }
-                        kf.valueX = v.x; kf.valueY = v.y; kf.valueZ = v.z;
+                        kv[k] = v;
                     }
-                    ap.keyframes.push_back(kf);
                 }
-                ap.SortKeyFrames();
                 // EULER CONTINUO (rotacion): cada keyframe se saco del cuaternion por separado, asi que puede (a) SALTAR
                 // 360 al cruzar +-180, y (b) FLIPEAR de representacion cerca del gimbal (y~+-90) -> la interpolacion lineal
                 // gira por el lado largo o pega un tiron (el "hombro rotado de mas"). Se elige, por keyframe, la euler mas
                 // CONTINUA con la anterior: se prueba la representacion alterna (x+180,180-y,z+180) -MISMA rotacion, se
                 // verifica por matriz- y se destuerce cada componente a <180 del anterior; gana la que menos se aleja.
-                if (prop == AnimRotation) for (size_t k = 1; k < ap.keyframes.size(); k++) {
-                    keyFrame& c = ap.keyframes[k]; const keyFrame& pv = ap.keyframes[k-1];
-                    float px = pv.valueX, py = pv.valueY, pz = pv.valueZ;
-                    float ax = c.valueX, ay = c.valueY, az = c.valueZ;             // candidato A: tal cual
-                    float bx = c.valueX + 180.0f, by = 180.0f - c.valueY, bz = c.valueZ + 180.0f; // B: flip de gimbal
+                if (prop == AnimRotation) for (size_t k = 1; k < kv.size(); k++) {
+                    float px = kv[k-1].x, py = kv[k-1].y, pz = kv[k-1].z;
+                    float ax = kv[k].x, ay = kv[k].y, az = kv[k].z;                       // candidato A: tal cual
+                    float bx = kv[k].x + 180.0f, by = 180.0f - kv[k].y, bz = kv[k].z + 180.0f; // B: flip de gimbal
                     #define UNW(v, ref) do { while ((v)-(ref) > 180.0f) (v)-=360.0f; while ((v)-(ref) < -180.0f) (v)+=360.0f; } while(0)
                     UNW(ax,px); UNW(ay,py); UNW(az,pz); UNW(bx,px); UNW(by,py); UNW(bz,pz);
                     #undef UNW
@@ -505,9 +509,13 @@ bool ImportGLTF(const std::string& filepath) {
                         float diff = 0; for (int q = 0; q < 16; q++){ float d = MA.m[q]-MB.m[q]; diff += d*d; }
                         usarB = (diff < 0.001f);
                     }
-                    if (usarB) { c.valueX = bx; c.valueY = by; c.valueZ = bz; }
-                    else       { c.valueX = ax; c.valueY = ay; c.valueZ = az; }
+                    if (usarB) kv[k] = Vector3(bx,by,bz); else kv[k] = Vector3(ax,ay,az);
                 }
+                // repartir en las 3 curvas. OJO: PropertyDe puede CREAR la propiedad (realloc del vector) -> se
+                // resuelve una por bloque y se usa dentro del bloque (nunca dos referencias vivas a la vez).
+                { AnimProperty& a = tr.PropertyDe(prop, AnimX); for (int k=0;k<tc;k++) SetKeyCurva(a, kfr[k], kv[k].x); }
+                { AnimProperty& a = tr.PropertyDe(prop, AnimY); for (int k=0;k<tc;k++) SetKeyCurva(a, kfr[k], kv[k].y); }
+                { AnimProperty& a = tr.PropertyDe(prop, AnimZ); for (int k=0;k<tc;k++) SetKeyCurva(a, kfr[k], kv[k].z); }
             }
             arm->animations.push_back(clip);
         }
