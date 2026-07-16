@@ -525,6 +525,9 @@ void InputUsuarioSDL3(SDL_Event &e){
             GuardarMousePos();
         }
         else if (e.button.button == SDL_BUTTON_RIGHT) {
+            // transform de KEYFRAMES (timeline): mismo trato que el del 3D -> derecho CANCELA. No usa 'estado'
+            // (ese es el del viewport 3D), asi que necesita su propio chequeo.
+            if (DopeXformActivo()){ DopeXformCancelar(); GuardarMousePos(); return; }
             if (estado == translacion || estado == EditScale || estado == rotacion){
                 // Edit Mode con transform de malla en curso: descarta el snapshot
                 if (InteractionMode == EditMode && EditXformActivo()) EditXformCancelar();

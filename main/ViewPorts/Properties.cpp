@@ -1618,6 +1618,7 @@ void Properties::ConstruirGrupos(){
     // Aparece SOLO cuando hay uno elegido. X = frame (entero), Y = valor. Los handles son puntos (offset desde el
     // keyframe) y solo se pueden tipear si el tipo los guarda (Free/Aligned); con los calculados quedan grises.
     propKeyframe = new GroupPropertie("Keyframe");
+    propKeyframe->icono = (int)IconType::keyframe;   // el rombo, igual que el del timeline
     propKeyframe->anchoValores = 0.55f;
     { PropFloat* p1 = new PropFloat("Frame X");
       p1->entero = true; p1->stepFino = 1.0f; p1->stepGrueso = 10.0f; p1->dragStep = 1.0f;

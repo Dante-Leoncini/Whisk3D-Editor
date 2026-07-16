@@ -55,6 +55,7 @@ class Timeline : public ViewportBase, public WithBorder, public Scrollable {
         Button* btnStart;  // campo Start
         Button* btnEnd;    // campo End
         Button* btnAnim;   // dropdown: elegir la animacion del esqueleto (solo si hay armature con clips)
+        Button* btnAutoKey;// AUTO KEY (toggle): rojo = graba los canales que toques al transformar
         Button* btnModo;   // switch Dope Sheet <-> Curves
         Button* btnSelect; // dope sheet: menu Select (All / None / Invert). Al FINAL de la barra; solo con filas
         Button* btnView;   // dope sheet: menu View (Frame Selected)
@@ -187,7 +188,18 @@ class Timeline : public ViewportBase, public WithBorder, public Scrollable {
         void CurvaFrameSelected();           // View > Frame Selected en modo curva (encuadra tiempo Y valor)
         void SetInterpolacionSel(int interp);// Interpolation Mode -> a los keyframes seleccionados
         void SetHandleTypeSel(int tipo);     // Handle Type ('v') -> a los keyframes seleccionados
+        // Smart Euler: saca las vueltas de mas de los keyframes de ROTACION seleccionados (405 -> 45). La pose no
+        // cambia (un angulo se repite cada 360); lo que cambia es que la curva deja de dar la vuelta al pedo.
+        // Devuelve cuantos keyframes corrigio.
+        int  SmartEulerSel();
         // aperturas de menu COMPARTIDAS por el boton de la barra y el atajo de teclado (no pueden divergir)
+        // el ruteo compartido llama a esta al PASAR el mouse (sin click) -> deslizarse de un menu de la barra a
+        // otro, igual que en el viewport 3D. Por eso los menus van SEPARADOS de las acciones de la barra.
+        bool AbrirMenuDeBarra(int mx, int my) override;
+        void AbrirMenuSelect(int mx, int my);   // menu Select (All / None / Invert)
+        void AbrirMenuPivot(int mx, int my);    // menu Pivot (Center / Current Frame)
+        void AbrirMenuAnim(int mx, int my);     // dropdown de animacion
+        void AbrirMenuView(int mx, int my);     // menu View (Frame Selected + Auto frame)
         void AbrirMenuKey(int mx, int my);      // menu Key
         void AbrirMenuInterp(int mx, int my);   // Interpolation Mode ('t')
         void AbrirMenuHandle(int mx, int my);   // Handle Type ('v')
@@ -229,8 +241,10 @@ bool DopeXformActivo();
 AnimProperty* DopeKeyframeActivo(int* idx);
 std::string   DopeKeyframeActivoCanal();          // nombre del canal ("X Location", ...) para el titulo
 void          DopeKeyframeActivoReFrame(int nuevoFrame); // el frame cambio: seguirlo (y mover la seleccion)
-// Cancela ese transform desde afuera (lo usa el Tab, que cambia de viewport por encima del ruteo del timeline).
+// Aceptar / cancelar ese transform desde AFUERA: el click izq/der de PC, el OK/backspace de Symbian y el Tab
+// (que cambia de viewport por encima del ruteo del timeline). Un solo par de funciones para todas las plataformas.
 void DopeXformCancelar();
+void DopeXformAceptar();
 
 // Regla de pertenencia fila padre -> canal (ownerKey). La expone el test 'dopecubre'.
 bool W3dScriptDopeCubre(const std::string& padre, const std::string& hijo);

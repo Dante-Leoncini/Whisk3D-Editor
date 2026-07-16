@@ -797,7 +797,9 @@ static void LayoutAccionObject(int aId) {
         case 5: JoinObjetos(); break;           // Join (Ctrl J): une las mallas seleccionadas en el objeto activo
         case 510: InsertarKeyframeObjeto(); break; // Object > Animation: Insert Keyframe (pos/rot/escala en el frame actual)
         case 511: BorrarKeyframeObjeto();   break; // Object > Animation: Delete Keyframe (del frame actual)
-        case 512: LimpiarKeyframeObjeto();  break; // Object > Animation: Clear Keyframe (toda la animacion del objeto)
+        case 512: LimpiarKeyframeObjeto();  break; // Animation: Clear Keyframe (toda la animacion del objeto)
+        case 513: g_redraw = true; break;          // Animation > Motion Trail: el checkbox ya lo toggleo PopupMenu
+                                                   // (y a proposito NO cierra el menu)
         case 220: AplicarTransform(0); break;   // Apply Location
         case 221: AplicarTransform(1); break;   // Apply Rotation
         case 222: AplicarTransform(2); break;   // Apply Scale
@@ -1182,7 +1184,23 @@ static void PoseAplicar(Armature* a){
     }
     PoseInvalidar(a);
 }
-void PoseXformConfirm(){ if (!g_poseModo) return; g_poseModo = 0; g_poseSnap.clear(); estado = editNavegacion; NumInputReset(); UndoPoseConfirmar(); } // deja la pose (Insert Keyframe la guarda)
+void PoseXformConfirm(){
+    if (!g_poseModo) return;
+    // AUTO KEY: va ANTES de limpiar g_poseSnap, que es contra lo que se mide QUE canal cambio. Solo los huesos
+    // que se movieron de verdad dejan keyframe, y solo en sus canales.
+    if (AutoKeyOn){
+        Armature* a = PoseArmActiva();
+        if (a && AutoKeyEsqueletoPrep(a)){
+            int n = 0;
+            for (size_t k=0;k<g_poseSnap.size();k++){
+                PoseSnap& sn = g_poseSnap[k];
+                n += AutoKeyHueso(a, sn.b, sn.T, sn.R, sn.S);
+            }
+            if (n) AutoKeyEsqueletoFin(a);
+        }
+    }
+    g_poseModo = 0; g_poseSnap.clear(); estado = editNavegacion; NumInputReset(); UndoPoseConfirmar();
+} // deja la pose (Insert Keyframe la guarda a mano; con Auto Key se guarda sola)
 void PoseXformCancel(){
     Armature* a = PoseArmActiva();
     if (a) for (size_t k=0;k<g_poseSnap.size();k++){ PoseSnap& s=g_poseSnap[k]; if (s.b>=0 && s.b<(int)a->bones.size()){
@@ -1502,7 +1520,10 @@ static PopupMenu* gMenuFace   = NULL;
 // nuevo (cambio por hover / click); si el de ese boton ya esta abierto, nada.
 // Devuelve true si quedo abierto un menu de la barra.
 bool LayoutAbrirMenuDeBarra(ViewportBase* vp, int mx, int my) {
-    if (!vp || !vp->isLeaf() || vp->ViewportKind() != 1) return false;
+    if (!vp || !vp->isLeaf()) return false;
+    // el viewport 3D tiene su cadena propia (abajo); los demas se abren solos por el virtual compartido, asi no
+    // hay que repetir aca el if de cada boton de cada panel
+    if (vp->ViewportKind() != 1) return vp->AbrirMenuDeBarra(mx, my);
     std::vector<Button*>& B = vp->BarButtons;
 
     PopupMenu* objetivo = NULL;     // menu desplegable a abrir
@@ -1516,6 +1537,7 @@ bool LayoutAbrirMenuDeBarra(ViewportBase* vp, int mx, int my) {
     Button* bOri  = BarRolBtn(B, BR_Orient); Button* bUV   = BarRolBtn(B, BR_UV);
     Button* bView = BarRolBtn(B, BR_View);   Button* bMesh = BarRolBtn(B, BR_Mesh);
     Button* bSnap = BarRolBtn(B, BR_Snap);
+    Button* bAnim = BarRolBtn(B, BR_Animation);
     if (MenuMode && bMode && bMode->visible && bMode->Contains(mx, my)) {
         objetivo = MenuMode; boton = bMode;
         LayoutRebuildMenuMode();   // mode-aware: malla -> Paints ; armature -> Pose
@@ -1550,6 +1572,12 @@ bool LayoutAbrirMenuDeBarra(ViewportBase* vp, int mx, int my) {
         // Edit Mode: menu "Mesh" (Transform/Snap/Delete), comun a vertice/borde/cara.
         objetivo = MenuMesh; boton = bMesh;
         if (!MenuMesh->action) MenuMesh->action = LayoutAccionMesh;
+    } else if (MenuAnimation && bAnim && bAnim->visible && bAnim->Contains(mx, my)) {
+        // menu "Animation": keyframes del objeto + Motion Trail. Es su PROPIO boton de la barra -> rama propia
+        // (estaba anidado adentro del Contains de "Object": pedia el cursor sobre los DOS botones a la vez y no
+        //  se abria nunca).
+        objetivo = MenuAnimation; boton = bAnim;
+        if (!MenuAnimation->action) MenuAnimation->action = LayoutAccionObject; // ids 510..513
     } else if (bObj && bObj->visible && bObj->Contains(mx, my)) {
         // Edit Mode -> menu de contexto Vertex/Edge/Face; Pose Mode -> menu "Pose"; Object Mode -> menu "Object".
         if (InteractionMode == EditMode) {

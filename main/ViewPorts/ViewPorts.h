@@ -99,6 +99,10 @@ class ViewportBase {
         virtual void button_left();
         virtual void button_right();
         virtual void button_up();
+        // El viewport abre el menu de barra que este bajo (mx,my), si hay alguno. Lo llama el ruteo compartido al
+        // pasar el mouse SIN click, para deslizarse de un menu a otro. Solo menus: deslizarse por encima de un
+        // boton de accion no puede dispararla. false = ahi no hay ningun menu.
+        virtual bool AbrirMenuDeBarra(int mx, int my) { (void)mx; (void)my; return false; }
         virtual void button_down();
 #ifndef W3D_SYMBIAN
         virtual void event_key_down(SDL_Event &e);

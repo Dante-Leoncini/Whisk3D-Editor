@@ -56,6 +56,7 @@ PopupMenu* MenuAdd = NULL;
 PopupMenu* MenuImports = NULL; // submenu "Add > Imports": OBJ / FBX / glTF / GLB
 PopupMenu* MenuSelect = NULL;    // seleccion: All / None / Invert
 PopupMenu* MenuObject = NULL;    // operaciones de objeto (solo si hay seleccion)
+PopupMenu* MenuAnimation = NULL; // "Animation": keyframes del objeto + Motion Trail (solo con seleccion)
 PopupMenu* MenuMesh = NULL;      // edit mode: operaciones de malla (Transform + Extrude)
 PopupMenu* MenuTransform = NULL; // submenu de Object: Move / Rotate / Scale
 PopupMenu* MenuPose = NULL;      // menu "Pose" (Pose Mode): Insert Keyframe + Transform
@@ -115,6 +116,9 @@ Viewport3D::Viewport3D(Vector3 pos){
     b = new Button("Add"); b->rol = BR_Add; b->desplegable = true; BarButtons.push_back(b);
     b = new Button("Mesh"); b->rol = BR_Mesh;                               // Transform/Snap/Delete comun
         b->desplegable = true; b->visible = false; BarButtons.push_back(b); // SOLO en edit mode
+    b = new Button("Animation"); b->rol = BR_Animation;
+    b->desplegable = true;
+    BarButtons.push_back(b);
     b = new Button("Object"); b->rol = BR_Object;
         b->desplegable = true; b->visible = false; BarButtons.push_back(b); // solo con seleccion (no edit)
     b = new Button("Overlays"); b->rol = BR_Overlays; b->desplegable = true; BarButtons.push_back(b);
@@ -210,12 +214,13 @@ Viewport3D::Viewport3D(Vector3 pos){
         MenuObject->Agregar("Set Parent",   0, -1, LayoutSubmenuSetParent())->atajo = "Ctrl P";
         MenuObject->Agregar("Clear Parent", 0, -1, LayoutSubmenuClearParent())->atajo = "Ctrl Alt P";
         MenuObject->Agregar("Delete", 3)->atajo = "X";
-        // submenu "Animation" (Object Mode): keyframes del TRANSFORM (pos/rot/escala) del objeto seleccionado
-        PopupMenu* MenuAnimObj = new PopupMenu();
-        MenuAnimObj->Agregar("Insert Keyframe", 510)->atajo = "I";
-        MenuAnimObj->Agregar("Delete Keyframe", 511);
-        MenuAnimObj->Agregar("Clear Keyframe",  512);
-        MenuObject->Agregar("Animation", 0, -1, MenuAnimObj);
+        // menu "Animation" (barra, Object Mode): keyframes del TRANSFORM del objeto + Motion Trail. Antes era un
+        // SUBMENU de "Object"; es su propio menu de la barra (queda a un click, no a dos).
+        MenuAnimation = new PopupMenu();
+        MenuAnimation->Agregar("Insert Keyframe", 510)->atajo = "I";
+        MenuAnimation->Agregar("Delete Keyframe", 511);
+        MenuAnimation->Agregar("Clear Keyframe",  512);
+        MenuAnimation->AgregarCheck("Motion Trail", 513, &MotionTrailOn);
         // menu "Pose" (Pose Mode): Insert Keyframe + submenu Transform (Move/Rotate/Scale). Reusa MenuTransform.
         extern PopupMenu* MenuPose;
         MenuPose = new PopupMenu();
@@ -1105,6 +1110,8 @@ void Viewport3D::Render() {
     // huesos encima de todo (ignoran z-buffer). Es OVERLAY del editor: se apaga con "Show Overlays"
     // o con su propio toggle "Armature" del menu de overlays.
     if (showOverlays && showArmature) RenderArmaturasEncima(SceneCollection);
+    // Motion Trail: mismo criterio (overlay del editor, en x-ray). Lo prende el menu Animation.
+    if (showOverlays) RenderMotionTrail();
 
     LoopCutRenderPreview(); // preview del corte (loop cut) encima de la escena
 
@@ -1118,6 +1125,95 @@ void Viewport3D::Render() {
 // ARMATURE: dibuja los huesos de TODAS las armatures de la escena como lineas AZULES, encima de todo (z-test OFF),
 // asi se ven a traves del mesh. Se hace DESPUES de renderizar la escena (no dentro del recorrido del arbol) para que
 // el mesh hijo no las tape. Usa la matriz de MUNDO de cada armature: head/tail estan en su espacio local (rest pose).
+
+// ============================================================================
+//  MOTION TRAIL: el camino que recorre el origen de los objetos SELECCIONADOS que tienen animacion de posicion.
+//  Se dibuja en X-RAY (sin depth test), como los huesos: es una ayuda de edicion, tiene que verse siempre.
+//  La linea alterna CLARO/OSCURO en cada FRAME. Eso es lo que la hace util: no se dibuja un punto por frame (con
+//  20 frames entre dos keyframes serian 20 puntos y no se ve nada), pero contando los tramos claros/oscuros sabes
+//  cuantos frames hay entre un keyframe y el siguiente. Donde la animacion va rapido los tramos son largos; donde
+//  va lenta, cortos.
+//  Los KEYFRAMES si llevan punto, con el mismo tamaño que los vertices del Edit Mode.
+// ============================================================================
+void Viewport3D::RenderMotionTrail(){
+    namespace gfx = w3dEngine;
+    if (!MotionTrailOn || ObjSelects.empty()) return;
+    static std::vector<GLfloat> claro, oscuro, puntos;
+    claro.clear(); oscuro.clear(); puntos.clear();
+    std::vector<Vector3> pts; std::vector<int> keys; int desde, hasta;
+    // ---- POSE MODE: el camino de los HUESOS seleccionados (el trail del objeto armature no dice nada: lo que
+    //      se mueve son los huesos). Los puntos vienen en espacio NODO -> se pasan a mundo con el world del
+    //      armature, igual que se dibujan los huesos.
+    if (InteractionMode == PoseMode && ObjActivo && ObjActivo->getType() == ObjectType::armature){
+        Armature* a = (Armature*)ObjActivo;
+        Matrix4 AW; a->GetWorldMatrix(AW);
+        for (size_t b = 0; b < a->bones.size(); b++){
+            if (!(a->bones[b].select || (int)b == a->boneActivo)) continue;
+            if (!MotionTrailHuesoNodo(a, (int)b, pts, keys, desde, hasta)) continue;
+            for (size_t i = 0; i < pts.size(); i++) pts[i] = AW * pts[i];
+            for (size_t i = 1; i < pts.size(); i++){
+                std::vector<GLfloat>& dst = ((i & 1) ? claro : oscuro);
+                dst.push_back(pts[i-1].x); dst.push_back(pts[i-1].y); dst.push_back(pts[i-1].z);
+                dst.push_back(pts[i].x);   dst.push_back(pts[i].y);   dst.push_back(pts[i].z);
+            }
+            for (size_t k = 0; k < keys.size(); k++){
+                int idx = keys[k] - desde;
+                if (idx < 0 || idx >= (int)pts.size()) continue;
+                puntos.push_back(pts[idx].x); puntos.push_back(pts[idx].y); puntos.push_back(pts[idx].z);
+            }
+        }
+    }
+    else
+    for (size_t s2 = 0; s2 < ObjSelects.size(); s2++){
+        if (!MotionTrailDe(ObjSelects[s2], pts, keys, desde, hasta)) continue;
+        // tramos: uno por FRAME, alternando el buffer -> claro/oscuro/claro...
+        for (size_t i = 1; i < pts.size(); i++){
+            std::vector<GLfloat>& dst = ((i & 1) ? claro : oscuro);
+            dst.push_back(pts[i-1].x); dst.push_back(pts[i-1].y); dst.push_back(pts[i-1].z);
+            dst.push_back(pts[i].x);   dst.push_back(pts[i].y);   dst.push_back(pts[i].z);
+        }
+        // un punto por KEYFRAME (no por frame)
+        for (size_t k = 0; k < keys.size(); k++){
+            int idx = keys[k] - desde;
+            if (idx < 0 || idx >= (int)pts.size()) continue;
+            puntos.push_back(pts[idx].x); puntos.push_back(pts[idx].y); puntos.push_back(pts[idx].z);
+        }
+    }
+    if (claro.empty() && oscuro.empty()) return;
+
+    GLboolean luz = gfx::IsEnabled(gfx::Lighting);
+    gfx::Disable(gfx::Lighting);
+    gfx::Disable(gfx::Texture2D);
+    gfx::Disable(gfx::DepthTest);        // X-RAY: encima de todo, como los huesos
+    gfx::DisableArray(gfx::NormalArray);
+    gfx::DisableArray(gfx::ColorArray);
+    gfx::DisableArray(gfx::TexCoordArray);
+    gfx::LineWidth(2.0f);
+    if (!oscuro.empty()){
+        gfx::Color4f(0.30f, 0.30f, 0.35f, 1.0f);
+        gfx::VertexPointer3f(0, &oscuro[0]);
+        gfx::DrawLines((int)(oscuro.size() / 3));
+    }
+    if (!claro.empty()){
+        gfx::Color4f(0.95f, 0.95f, 1.00f, 1.0f);
+        gfx::VertexPointer3f(0, &claro[0]);
+        gfx::DrawLines((int)(claro.size() / 3));
+    }
+    if (!puntos.empty()){                // los KEYFRAMES: mismo tamaño que los vertices del Edit Mode
+        gfx::PointSize(6.0f);   // el MISMO que los vertices del Edit Mode
+        const float* acc = ListaColores[static_cast<int>(ColorID::accent)];
+        gfx::Color4f(acc[0], acc[1], acc[2], 1.0f);
+        gfx::VertexPointer3f(0, &puntos[0]);
+        gfx::DrawPoints((int)(puntos.size() / 3));
+        gfx::PointSize(1.0f);
+    }
+    gfx::LineWidth(1.0f);
+    gfx::Enable(gfx::DepthTest);
+    gfx::EnableArray(gfx::NormalArray);
+    if (luz) gfx::Enable(gfx::Lighting);
+    gfx::Invalidate();
+}
+
 void Viewport3D::RenderArmaturasEncima(Object* node){
     if (!node) return;
     if (node->visible && node->getType() == ObjectType::armature){
@@ -1770,6 +1866,10 @@ void Viewport3D::RenderUI() {
                     (EditSelectMode == SelEdge) ? "Edge" :
                     (EditSelectMode == SelFace) ? "Face" : "Vertex";
             }
+            // "Animation": keyframes del objeto + Motion Trail. Solo con algo seleccionado y en Object Mode
+            // (en Pose Mode los keyframes van por el menu "Pose").
+            Button* bAnim = BarRolBtn(BarButtons, BR_Animation);
+            if (bAnim) bAnim->visible = (InteractionMode == ObjectMode) && HayObjetosSeleccionados();
             Button* bOri = BarRolBtn(BarButtons, BR_Orient);  // muestra la orientacion actual
             if (bOri) bOri->text = (transformOrientation == LocalOrient)  ? "Local" :
                                    (transformOrientation == ViewOrient)   ? "View"  :
@@ -2202,6 +2302,10 @@ void Viewport3D::Aceptar() {
 
     if ( InteractionMode == ObjectMode ){
         if (estado != editNavegacion){
+            // AUTO KEY: va ANTES de UndoTransformConfirmar, que es lo que puede limpiar estadoObjetos (el
+            // snapshot contra el que se mide QUE canal cambio). Y antes tambien para que los keyframes que
+            // guarda entren en el MISMO comando de undo que el transform.
+            AutoKeyObjetos();
             UndoTransformConfirmar(); // Ctrl+Z: el transform se ACEPTO -> pushea el undo pendiente
             estado = editNavegacion;
         }

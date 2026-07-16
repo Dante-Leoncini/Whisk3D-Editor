@@ -16,6 +16,17 @@ void Cancelar();
 void EliminarAnimaciones(Object& obj);
 // animacion de OBJETOS (transform pos/rot/escala; menu Object > Animation)
 void InsertarKeyframeObjeto(); // Insert Keyframe: guarda el transform de los seleccionados en el frame actual
+// AUTO KEY: al confirmar un transform guarda SOLO los canales que cambiaron (si solo rotaste en X, solo X Euler
+// Rotation). Se mide contra estadoObjetos (el snapshot del transform) -> hay que llamarla ANTES de limpiarlo.
+// Devuelve cuantos canales guardo. El boton del timeline prende/apaga AutoKeyOn.
+extern bool AutoKeyOn;
+int AutoKeyObjetos();
+
+// MOTION TRAIL: el camino (SOLO POSICION) que recorre el origen del objeto, muestreado frame a frame entre su
+// primer y ultimo keyframe de posicion. 'keys' = los frames que tienen keyframe (para marcarlos).
+// false = el objeto no tiene curvas de posicion.
+bool MotionTrailDe(Object* o, std::vector<Vector3>& pts, std::vector<int>& keys, int& desde, int& hasta);
+extern bool MotionTrailOn;   // el checkbox del menu Animation del viewport 3D
 void BorrarKeyframeObjeto();   // Delete Keyframe: saca el keyframe del frame actual
 void LimpiarKeyframeObjeto();  // Clear Keyframe: borra toda la animacion del objeto
 void AplicarAnimacionObjetos();// PLAYBACK: aplica los keyframes al transform en el frame actual (al cambiar de frame)

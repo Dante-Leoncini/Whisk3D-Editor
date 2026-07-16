@@ -196,6 +196,129 @@ static void SetKeyObj3(AnimationObject& ao, int prop, int frame, float x, float 
 	SetKeyCurva(PropertyDeLista(ao.Propertys, prop, AnimY), frame, y);
 	SetKeyCurva(PropertyDeLista(ao.Propertys, prop, AnimZ), frame, z);
 }
+
+// ============================================================================
+//  AUTO KEY: al confirmar un transform, guarda SOLO los canales que CAMBIARON.
+//  El "cambio" se mide contra estadoObjetos, que es el snapshot que el propio transform toma al empezar. Por eso
+//  hay que llamarla ANTES de limpiarlo (ver Viewport3D::Aceptar).
+//  Es por CANAL, no por propiedad: si solo rotaste en X, se guarda X Euler Rotation y NADA mas. Eso es lo que
+//  permite el modelo de curvas por componente (cada X/Y/Z es una curva propia).
+// ============================================================================
+bool AutoKeyOn = false;      // lo prende/apaga el boton del timeline
+bool MotionTrailOn = false;  // menu Animation del viewport 3D: ver el camino de los objetos animados
+
+// un canal cambio? Se compara con una tolerancia relativa: el transform pasa por matrices y trigonometria, asi
+// que un valor que "no se toco" vuelve con basura en el ultimo bit y == daria cambios fantasma en los 9 canales.
+static bool AutoKeyCambio(float a, float b){
+	float d = a - b; if (d < 0) d = -d;
+	float m = (a < 0 ? -a : a); float mb = (b < 0 ? -b : b); if (mb > m) m = mb;
+	return d > 1e-5f * (1.0f + m);
+}
+// guarda el canal (prop, comp) si cambio. Devuelve true si guardo.
+static bool AutoKeyCanal(AnimationObject& ao, int prop, int comp, int frame, float valor, float viejo){
+	if (!AutoKeyCambio(valor, viejo)) return false;
+	SetKeyCurva(PropertyDeLista(ao.Propertys, prop, comp), frame, valor);
+	return true;
+}
+// Devuelve cuantos canales guardo (0 = no hubo cambios -> no se ensucia la animacion ni el undo).
+int AutoKeyObjetos(){
+	if (!AutoKeyOn) return 0;
+	int n = 0;
+	for (size_t e = 0; e < estadoObjetos.size(); e++){
+		Object* o = estadoObjetos[e].obj; if (!o) continue;
+		o->ActualizarDisplayRot();                 // rotEuler al dia (el transform trabaja sobre el quaternion)
+		// el euler de ANTES sale del quaternion del snapshot, que es lo unico que se guardo
+		Vector3 rotVieja = estadoObjetos[e].rot.ToEulerXYZ();   // el MISMO camino que usa ActualizarDisplayRot
+		AnimationObject& ao = AnimObjDe(o);
+		const Vector3& p0 = estadoObjetos[e].pos;
+		const Vector3& s0 = estadoObjetos[e].scale;
+		if (AutoKeyCanal(ao, AnimPosition, AnimX, CurrentFrame, o->pos.x, p0.x)) n++;
+		if (AutoKeyCanal(ao, AnimPosition, AnimY, CurrentFrame, o->pos.y, p0.y)) n++;
+		if (AutoKeyCanal(ao, AnimPosition, AnimZ, CurrentFrame, o->pos.z, p0.z)) n++;
+		if (AutoKeyCanal(ao, AnimRotation, AnimX, CurrentFrame, o->rotEuler.x, rotVieja.x)) n++;
+		if (AutoKeyCanal(ao, AnimRotation, AnimY, CurrentFrame, o->rotEuler.y, rotVieja.y)) n++;
+		if (AutoKeyCanal(ao, AnimRotation, AnimZ, CurrentFrame, o->rotEuler.z, rotVieja.z)) n++;
+		if (AutoKeyCanal(ao, AnimScale,    AnimX, CurrentFrame, o->scale.x, s0.x)) n++;
+		if (AutoKeyCanal(ao, AnimScale,    AnimY, CurrentFrame, o->scale.y, s0.y)) n++;
+		if (AutoKeyCanal(ao, AnimScale,    AnimZ, CurrentFrame, o->scale.z, s0.z)) n++;
+		if (n) ao.UpdateFirstLastFrame();
+	}
+	if (n) g_redraw = true;
+	return n;
+}
+
+// El transform de UN objeto en el frame f: su animacion si la tiene, y si no su transform actual. Cada canal se
+// mira por separado (X/Y/Z son curvas propias: puede estar animado solo X).
+static void TransformEnFrame(Object* o, int f, Vector3& T, Vector3& R, Vector3& S){
+	o->ActualizarDisplayRot();
+	T = o->pos; R = o->rotEuler; S = o->scale;
+	for (size_t i=0;i<AnimationObjects.size();i++){
+		if (AnimationObjects[i].obj != o) continue;
+		const std::vector<AnimProperty>& P = AnimationObjects[i].Propertys;
+		T = EvalPropVec(P, AnimPosition, f, T);
+		R = EvalPropVec(P, AnimRotation, f, R);
+		S = EvalPropVec(P, AnimScale,    f, S);
+		break;
+	}
+}
+// Matriz de MUNDO de 'o' EN EL FRAME f: sube por la cadena de padres evaluando la animacion de CADA UNO en ese
+// frame. Sin esto el trail de un objeto emparentado sale mal apenas el padre tambien se mueve: se dibujaba con el
+// world ACTUAL del padre, o sea el camino del hijo pegado a donde el padre esta AHORA, no a donde estaba en cada
+// frame. NULL -> identidad (no tiene padre).
+Matrix4 WorldEnFrame(Object* o, int f){
+	Matrix4 M; M.Identity();
+	if (!o) return M;
+	// de la raiz hacia abajo: world = padre * local
+	std::vector<Object*> cadena;
+	for (Object* p = o; p; p = p->Parent){
+		cadena.push_back(p);
+		if (cadena.size() > 256) break;   // guarda contra un ciclo en el arbol
+	}
+	for (size_t i = cadena.size(); i-- > 0; ){
+		Vector3 T, R, S;
+		TransformEnFrame(cadena[i], f, T, R, S);
+		M = M * W3dLocalTRS(T, Quaternion::FromEulerXYZ(R.x, R.y, R.z), S);
+	}
+	return M;
+}
+
+// ============================================================================
+//  MOTION TRAIL: por donde PASA el origen de un objeto animado. Es SOLO POSICION: la curva que traza el objeto
+//  en el espacio. Se muestrea frame a frame (enteros) porque es lo unico que la animacion pisa de verdad: la
+//  linea que se ve ES el camino real, no una aproximacion.
+//  Devuelve false si el objeto no tiene curvas de posicion (nada que dibujar).
+//  'desde'/'hasta' salen de los keyframes de la propia curva, no del rango del clip: el trail muestra lo que el
+//  objeto hace, aunque el clip sea mas largo.
+// ============================================================================
+bool MotionTrailDe(Object* o, std::vector<Vector3>& pts, std::vector<int>& keys, int& desde, int& hasta){
+	pts.clear(); keys.clear(); desde = 0; hasta = -1;
+	if (!o) return false;
+	const AnimationObject* ao = NULL;
+	for (size_t i=0;i<AnimationObjects.size();i++) if (AnimationObjects[i].obj==o){ ao=&AnimationObjects[i]; break; }
+	if (!ao) return false;
+	// rango + frames con keyframe: la UNION de las 3 curvas de posicion (X/Y/Z son curvas independientes: un
+	// keyframe puede estar solo en X)
+	int mn = 0x7fffffff, mx = -0x7fffffff;
+	for (size_t p2=0;p2<ao->Propertys.size();p2++){
+		const AnimProperty& ap = ao->Propertys[p2];
+		if (ap.Property != AnimPosition || ap.keyframes.empty()) continue;
+		for (size_t k=0;k<ap.keyframes.size();k++){
+			int f = ap.keyframes[k].frame;
+			if (f < mn) mn = f; if (f > mx) mx = f;
+			bool ya=false; for (size_t j=0;j<keys.size();j++) if (keys[j]==f){ ya=true; break; }
+			if (!ya) keys.push_back(f);
+		}
+	}
+	if (mn > mx) return false;           // sin curvas de posicion
+	std::sort(keys.begin(), keys.end());
+	desde = mn; hasta = mx;
+	for (int f = mn; f <= mx; f++){
+		Vector3 p = EvalPropVec(ao->Propertys, AnimPosition, f, o->pos);
+		pts.push_back(WorldEnFrame(o->Parent, f) * p);   // el world del PADRE en ESE frame (puede estar animado)
+	}
+	return true;
+}
+
 // Insert Keyframe (i): guarda pos+rot+escala de cada objeto SELECCIONADO en el frame actual
 void InsertarKeyframeObjeto(){
 	for (size_t s=0;s<ObjSelects.size();s++){ Object* o=ObjSelects[s]; if (!o) continue;

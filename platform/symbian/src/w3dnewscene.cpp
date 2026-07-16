@@ -10,6 +10,7 @@
  */
 
 #include "w3dnewscene.h"
+#include "ViewPorts/Timeline.h"  // DopeXformActivo/Aceptar/Cancelar (transform de keyframes)
 #include "w3dlayout.h"
 
 #ifndef GL_POINT_SPRITE_OES
@@ -146,6 +147,9 @@ TBool W3dNewTransformActive() {
     // tambien cuenta como activo -> la maquinaria de Symbian (flechas/BT move, accept/
     // cancel, todo gateado por esta funcion) lo maneja igual que el de objetos.
     if (InteractionMode == EditMode && EditXformActivo()) return ETrue;
+    // idem el transform de KEYFRAMES del timeline (g/s/r del dope sheet / editor de curvas): asi el backspace
+    // lo CANCELA y el OK lo ACEPTA por el mismo camino, sin duplicar el ruteo de teclas.
+    if (DopeXformActivo()) return ETrue;
     return gTMode != 0;
 }
 
@@ -217,6 +221,12 @@ void W3dNewPan(TInt aDx, TInt aDy)  { if (Viewport3DActive) Viewport3DActive->Pa
 void W3dNewLook(TInt aDx, TInt aDy) { if (Viewport3DActive) Viewport3DActive->MirarPrimeraPersona(aDx, aDy); }
 
 void W3dNewTransformEnd(TBool aCancel) {
+    // TIMELINE: el transform de keyframes se acepta/cancela solo (no toca gTMode ni estado)
+    if (DopeXformActivo()) {
+        if (aCancel) DopeXformCancelar(); else DopeXformAceptar();
+        w3dLogf("transform KEYFRAMES: fin (cancel=%d)", (TInt)aCancel);
+        return;
+    }
     // EDIT MODE: confirmar (fija + recalcula bordes/normales) o cancelar (restaura snapshot)
     // el transform de MALLA (compartido con PC).
     if (InteractionMode == EditMode && EditXformActivo()) {

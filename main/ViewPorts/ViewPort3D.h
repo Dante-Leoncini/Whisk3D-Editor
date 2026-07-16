@@ -51,7 +51,8 @@ extern GLfloat LastPivotZ;
 extern PopupMenu* MenuAdd;      // el desplegable del boton "Add"
 extern PopupMenu* MenuImports;  // submenu "Add > Imports": OBJ / FBX / glTF / GLB
 extern PopupMenu* MenuSelect;   // el desplegable del boton "Select"
-extern PopupMenu* MenuObject;   // el desplegable del boton "Object"
+extern PopupMenu* MenuObject;
+extern PopupMenu* MenuAnimation; // el desplegable del boton "Animation"   // el desplegable del boton "Object"
 extern PopupMenu* MenuApply;    // submenu de "Object": Apply Location/Rotation/Scale/All (Ctrl A)
 extern PopupMenu* MenuView;     // el desplegable del boton "View" (antes de Select): submenu Viewpoint
 extern PopupMenu* MenuMesh;     // edit mode: menu "Mesh" comun (Transform arriba, Snap, Delete abajo)
@@ -66,7 +67,8 @@ extern PopupMenu* MenuSelMode;  // edit mode: sub-elemento Vertex/Edge/Face
 enum BarRol3D {
     BR_Mode = 1, BR_SelMode, BR_Pivot, BR_Select, BR_Add,
     BR_Object, BR_Overlays, BR_Render, BR_Orient, BR_UV, BR_View, BR_Snap,
-    BR_Mesh // menu "Mesh" de Edit Mode (Transform/Snap/Delete), comun a vertice/borde/cara
+    BR_Mesh, // menu "Mesh" de Edit Mode (Transform/Snap/Delete), comun a vertice/borde/cara
+    BR_Animation // menu "Animation": keyframes del objeto + Motion Trail. Solo con algo seleccionado.
 };
 // roles de la barra de HERRAMIENTAS (abajo). TBR_Hist+i = boton i del historial de acciones.
 enum ToolbarRol3D {
@@ -90,6 +92,7 @@ class Viewport3D : public ViewportBase, public WithBorder {
         // viewport. camFrameOn = hay marco; camFrameNX/NY = medias-extensiones del marco en NDC (para el overlay 2D).
         bool camFrameOn; float camFrameNX; float camFrameNY;
         void RenderCamPassepartout(); // dibuja el borde blanco + oscurece afuera del marco (lo que NO sale en el render)
+        void RenderMotionTrail();     // Motion Trail: el camino de los objetos animados, en x-ray
         void RenderSnapIndicador();   // recuadro verde en el target de snap bajo el cursor
         void RenderArmaturasEncima(Object* node); // huesos del esqueleto (lineas azules) encima de todo
         int  PickBone(class Armature* arm, float lmx, float lmy); // Pose Mode: hueso mas cercano al click (px), o -1

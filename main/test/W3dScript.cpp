@@ -6,7 +6,11 @@
 #include "edit/MeshEdit.h"     // Nuevo/MoverMeshPart (funciones libres del editor)
 #include "objects/EditMesh.h"  // EditMesh
 #include "ViewPorts/LayoutInput.h" // LayoutToggleEditMode/ExtrudeFaces, EditXform*
-#include "ViewPorts/Timeline.h"    // dopedump: arma las filas del dope sheet
+#include "ViewPorts/Timeline.h"
+#include "WhiskUI/Propieties/GroupPropertie.h" // icontest: la tarjeta "Keyframe" y su icono
+#include "ViewPorts/Properties.h"
+#include "ViewPorts/ViewPort3D.h"   // animmenu: la barra del 3D (BR_Animation / BarRolBtn)
+bool LayoutAbrirMenuDeBarra(ViewportBase* vp, int mx, int my); // LayoutInput.cpp (animmenu: el camino real del click)           // icontest: crear el panel arma las tarjetas    // dopedump: arma las filas del dope sheet
 #include "importers/import_obj.h"   // ExportOBJ
 #include "importers/import_fbx.h"  // ImportFBX
 #include "objects/ObjectMode.h" // Eliminar (test del borrado + su undo)
@@ -2079,6 +2083,845 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         printf("         deseleccionado -> DopeKeyframeActivo=%s\n",
                DopeKeyframeActivo(&idx) ? "algo (MAL: la tarjeta quedaria)" : "NULL OK");
         delete tl; return true;
+    }
+    // ---- icontest : el icono "keyframe" del atlas. Verifica que sus UV apunten al pixel que corresponde
+    //      (95,10 de 10x10) y que la tarjeta "Keyframe" lo tenga puesto. Si el enum y la lista de UVs se
+    //      desalinean, TODOS los iconos de ahi para abajo salen corridos y no se nota mirando uno solo. ----
+    if (cmd == "icontest") {
+        printf("      [icontest] ICON_TOTAL=%d | IconsUV cargados=%d -> %s\n",
+               (int)ICON_TOTAL, (int)IconsUV.size(),
+               (IconsUV.size() == ICON_TOTAL) ? "coinciden OK" : "DESALINEADOS!");
+        if (IconsUV.size() != ICON_TOTAL){ err="icontest: el enum y la lista de UVs no tienen el mismo largo"; return false; }
+        size_t ik = (size_t)IconType::keyframe;
+        if (ik >= IconsUV.size()){ err="icontest: keyframe fuera de rango"; return false; }
+        // Los UV son FRACCION del atlas. Se vuelven a pixeles usando el tamano real del archivo (font.png, que
+        // es de donde CrearIconos los saca) y se comparan contra el pixel pedido. Asi el test falla tambien si
+        // alguien mete un icono en el medio de la lista y desalinea todo lo de abajo.
+        const int AW = 128, AH = 128;   // font.png
+        const GLfloat* uv = IconsUV[ik]->uvs;
+        int px = (int)(uv[0]*AW + 0.5f), py = (int)(uv[1]*AH + 0.5f);
+        int pw = (int)((uv[6]-uv[0])*AW + 0.5f), ph = (int)((uv[7]-uv[1])*AH + 0.5f);
+        printf("      [icontest] keyframe uv=(%.4f,%.4f)..(%.4f,%.4f) -> pixel (%d,%d) de %dx%d (esperado 95,10 de 10x10) -> %s\n",
+               uv[0], uv[1], uv[6], uv[7], px, py, pw, ph,
+               (px==95 && py==10 && pw==10 && ph==10) ? "OK" : "MAL");
+        if (!(px==95 && py==10 && pw==10 && ph==10)){ err="icontest: el UV del keyframe no cae en 95,10"; return false; }
+        // y que la tarjeta lo tenga. Las tarjetas las arma Properties::ConstruirGrupos, que corre al crear el
+        // viewport: en headless no hay ninguno, asi que se crea uno aca.
+        Properties* pr = new Properties();
+        // OJO: las tarjetas van al vector MIEMBRO del panel (Properties::GroupProperties), que ENSOMBRECE al
+        // global del mismo nombre declarado en GroupPropertie.h. El global queda vacio.
+        GroupPropertie* g = NULL;
+        for (size_t i=0;i<pr->GroupProperties.size();i++)
+            if (pr->GroupProperties[i]->name.compare(0,8,"Keyframe")==0){ g = pr->GroupProperties[i]; break; }
+        printf("      [icontest] Properties armo %d tarjetas\n", (int)pr->GroupProperties.size());
+        printf("      [icontest] tarjeta 'Keyframe': %s | icono=%d (keyframe=%d) -> %s\n",
+               g?"existe":"NO EXISTE", g?g->icono:-99, (int)IconType::keyframe,
+               (g && g->icono == (int)IconType::keyframe) ? "OK" : "MAL");
+        bool okCard = (g && g->icono == (int)IconType::keyframe);
+        delete pr;
+        if (!okCard){ err="icontest: la tarjeta Keyframe no tiene el icono"; return false; }
+        return true;
+    }
+    // ---- handlewrap : arrastrar un HANDLE mas alla del borde. El cursor se envuelve (el warp corre porque el
+    //      boton esta apretado) y el arrastre NO se tiene que enterar: arrastrando para ABAJO el handle tiene que
+    //      SEGUIR BAJANDO, aunque el cursor reaparezca arriba. Se compara el recorrido sin warp contra el mismo
+    //      recorrido CON warp: tienen que dar el mismo handle. ----
+    if (cmd == "handlewrap") {
+        Timeline* tl = new Timeline(); tl->Resize(900, 300);
+        tl->modo = Timeline::TL_MODO_CURVAS;
+        tl->ConstruirDopeRows();
+        Timeline::DopeRow* canal = NULL;
+        for (size_t i=0;i<tl->dopeRows.size();i++) if (tl->dopeRows[i].propId>=0 && tl->dopeRows[i].keys.size()>=3){ canal=&tl->dopeRows[i]; break; }
+        if (!canal){ err="handlewrap: sin canal"; delete tl; return false; }
+        AnimProperty* ap = tl->CurvaDeFila(*canal);
+        const int idx = 1;
+        int f0 = ap->keyframes[idx].frame; float v0 = ap->keyframes[idx].value;
+        // separar las curvas para que el click sea inequivoco (18 canales encimados cerca del 0)
+        tl->viewCenterV = v0; tl->pxPerUnit = 20000.0f;
+        tl->DopeSelectNone();
+        tl->CurvaClickStrip((int)(tl->x + tl->FrameToX((float)f0)), (int)(tl->y + tl->ValueToY(v0)));
+        tl->SetInterpolacionSel(KfBezier);
+        tl->SetHandleTypeSel(HFree);
+        std::vector<keyFrame> base = ap->keyframes;
+
+        // arrastra el handle 'pasos' de a 'paso' px hacia ABAJO. envolver=true -> el cursor real salta arriba al
+        // pasarse del borde (y ahi dx/dy quedan en 0, que es lo que hace el warp de verdad).
+        struct S {
+            static void arrastrar(Timeline* tl, AnimProperty* ap, int idx, int pasos, int paso, bool envolver){
+                int f0 = ap->keyframes[idx].frame; float v0 = ap->keyframes[idx].value;
+                float hx, hy; tl->HandlePos(ap, (size_t)idx, true, hx, hy);
+                leftMouseDown = true;
+                tl->CurvaClickStrip((int)(tl->x + hx), (int)(tl->y + hy));   // agarrar el handle
+                int mx = (int)(tl->x + hx), my = (int)(tl->y + hy);
+                int bordeAbajo = tl->y + tl->height - 2;
+                dx = 0; dy = 0;
+                tl->event_mouse_motion(mx, my);          // 1er motion: ignora el delta viejo
+                for (int i=0;i<pasos;i++){
+                    int ny = my + paso;                  // ABAJO
+                    if (envolver && ny >= bordeAbajo){
+                        dx = 0; dy = 0;                  // el warp: el cursor real vuelve ARRIBA y dy=0 ese frame
+                        my = tl->y + tl->stripY + 2;
+                        tl->event_mouse_motion(mx, my);
+                        dx = 0; dy = paso; my += paso;   // y el proximo motion ya lleva el delta normal
+                        tl->event_mouse_motion(mx, my);
+                    } else {
+                        dx = 0; dy = paso; my = ny;
+                        tl->event_mouse_motion(mx, my);
+                    }
+                }
+                tl->HandleSoltar();
+                leftMouseDown = false;
+                (void)f0; (void)v0;
+            }
+        };
+        printf("      [handlewrap] arrastrando el handle 40 pasos de 20px hacia ABAJO (800px) en un strip de %dpx\n",
+               tl->height - tl->stripY);
+        S::arrastrar(tl, ap, idx, 40, 20, false);
+        float sinF = ap->keyframes[idx].outDF, sinV = ap->keyframes[idx].outDV;
+        ap->keyframes = base;
+        S::arrastrar(tl, ap, idx, 40, 20, true);
+        float conF = ap->keyframes[idx].outDF, conV = ap->keyframes[idx].outDV;
+        ap->keyframes = base;
+        printf("         sin warp: handle=(%.4f, %.4f)\n", sinF, sinV);
+        printf("         CON warp: handle=(%.4f, %.4f)\n", conF, conV);
+        bool ok = fabsf(sinF-conF) < 1e-3f && fabsf(sinV-conV) < 1e-3f*(1.0f+fabsf(sinV));
+        printf("         -> %s\n", ok ? "IDENTICO OK (el salto del cursor no se ve; sigue bajando)"
+                                      : "DISTINTOS! (el handle salta con el cursor)");
+        // y que efectivamente haya BAJADO (dV negativo: arrastramos para abajo, y el valor baja hacia abajo)
+        printf("         el handle BAJO (dV<0): %s\n", (sinV < 0.0f) ? "si OK" : "NO (no siguio el arrastre)");
+        delete tl;
+        if (!ok){ err="handlewrap: el warp cambia el arrastre del handle"; return false; }
+        return true;
+    }
+    // ---- autokeytest : AUTO KEY. Lo central: guardar SOLO los canales que CAMBIARON. Si solo se rota en X, tiene
+    //      que quedar UN keyframe en "X Euler Rotation" y NADA en los otros 8 canales. ----
+    if (cmd == "autokeytest") {
+        Object* o = NULL;
+        { std::vector<Object*> st; if(SceneCollection) st.push_back(SceneCollection);
+          while(!st.empty() && !o){ Object* n=st.back(); st.pop_back();
+            if (n->getType()==ObjectType::mesh) o=n;
+            for(size_t i=0;i<n->Childrens.size();i++) st.push_back(n->Childrens[i]); } }
+        if (!o){ err="autokeytest: sin malla"; return false; }
+        DeseleccionarTodo(); ObjActivo=o; o->Seleccionar(); ObjSelects.clear(); ObjSelects.push_back(o);
+        EliminarAnimaciones(*o);   // arrancar sin animacion
+
+        struct S {
+            // cuantos keyframes tiene cada canal del objeto
+            static void dump(Object* o, const char* titulo){
+                const char* nP[3] = {"X Location","Y Location","Z Location"};
+                const char* nR[3] = {"X Euler Rotation","Y Euler Rotation","Z Euler Rotation"};
+                const char* nS[3] = {"X Scale","Y Scale","Z Scale"};
+                const char* const* noms[3] = { nP, nR, nS };
+                const int props[3] = { AnimPosition, AnimRotation, AnimScale };
+                printf("         %s ->", titulo);
+                bool algo = false;
+                for (size_t i=0;i<AnimationObjects.size();i++){
+                    if (AnimationObjects[i].obj != o) continue;
+                    for (int p=0;p<3;p++) for (int c=0;c<3;c++){
+                        for (size_t q=0;q<AnimationObjects[i].Propertys.size();q++){
+                            AnimProperty& ap = AnimationObjects[i].Propertys[q];
+                            if (ap.Property!=props[p] || ap.component!=((c==0)?AnimX:(c==1)?AnimY:AnimZ)) continue;
+                            if (ap.keyframes.empty()) continue;
+                            printf(" %s(%d)", noms[p][c], (int)ap.keyframes.size()); algo = true;
+                        }
+                    }
+                }
+                if (!algo) printf(" (nada)");
+                printf("\n");
+            }
+            static int canales(Object* o){
+                int n = 0;
+                for (size_t i=0;i<AnimationObjects.size();i++){ if (AnimationObjects[i].obj != o) continue;
+                    for (size_t q=0;q<AnimationObjects[i].Propertys.size();q++)
+                        if (!AnimationObjects[i].Propertys[q].keyframes.empty()) n++; }
+                return n;
+            }
+            // simula un transform: snapshot -> cambiar -> confirmar (que es lo que llama al auto key)
+            static void xform(Object* o){
+                estadoObjetos.clear();
+                SaveState st; st.obj=o; st.pos=o->pos; st.rot=o->rot; st.scale=o->scale; st.worldPos=o->pos;
+                estadoObjetos.push_back(st);
+            }
+        };
+
+        // ---- AUTO KEY APAGADO: no tiene que guardar NADA ----
+        AutoKeyOn = false;
+        CurrentFrame = 1;
+        S::xform(o);
+        o->pos.x += 5.0f;
+        AutoKeyObjetos();
+        printf("      [autokeytest] auto key APAGADO, movi en X: canales con keyframes=%d -> %s\n",
+               S::canales(o), (S::canales(o)==0) ? "no guardo nada OK" : "GUARDO CON AUTOKEY APAGADO!");
+        if (S::canales(o) != 0){ err="autokeytest: guardo con auto key apagado"; return false; }
+
+        // ---- AUTO KEY PRENDIDO: solo el canal que cambio ----
+        AutoKeyOn = true;
+        EliminarAnimaciones(*o);
+        CurrentFrame = 1;
+        S::xform(o);
+        o->pos.x += 5.0f;                       // SOLO position X
+        int n1 = AutoKeyObjetos();
+        printf("      [autokeytest] movi SOLO en X: guardo %d canal(es)\n", n1);
+        S::dump(o, "canales");
+        bool ok1 = (n1 == 1 && S::canales(o) == 1);
+        printf("         -> %s\n", ok1 ? "SOLO X Location OK" : "MAL (guardo canales que no cambiaron)");
+        if (!ok1){ err="autokeytest: no guardo solo el canal que cambio"; return false; }
+
+        // ---- otro frame, SOLO rotacion X: no puede tocar los canales de position ----
+        CurrentFrame = 20;
+        S::xform(o);
+        // FromAxisAngle es ESTATICA y toma GRADOS (llamarla como metodo de instancia compila pero descarta el
+        // resultado -> el quaternion quedaba identidad y no rotaba nada)
+        { Quaternion qx = Quaternion::FromAxisAngle(Vector3(1,0,0), 30.0f); o->rot = qx * o->rot; o->ActualizarDisplayRot(); }
+        int n2 = AutoKeyObjetos();
+        printf("      [autokeytest] frame 20, rote SOLO en X: guardo %d canal(es)\n", n2);
+        S::dump(o, "canales");
+        // X Location sigue con 1 solo keyframe (el del frame 1): la rotacion no lo tiene que tocar
+        int kfLocX = 0;
+        for (size_t i=0;i<AnimationObjects.size();i++){ if (AnimationObjects[i].obj != o) continue;
+            for (size_t q=0;q<AnimationObjects[i].Propertys.size();q++){
+                AnimProperty& ap = AnimationObjects[i].Propertys[q];
+                if (ap.Property==AnimPosition && ap.component==AnimX) kfLocX = (int)ap.keyframes.size(); } }
+        printf("         X Location sigue con %d keyframe(s) (esperado 1: la rotacion no lo toca) -> %s\n",
+               kfLocX, (kfLocX==1) ? "OK" : "MAL");
+        if (kfLocX != 1){ err="autokeytest: la rotacion ensucio los canales de position"; return false; }
+
+        // ---- transform que NO cambia nada: no guarda ----
+        int antes = S::canales(o);
+        CurrentFrame = 30;
+        S::xform(o);
+        int n3 = AutoKeyObjetos();     // sin tocar nada
+        printf("      [autokeytest] confirmar SIN cambiar nada: guardo %d canal(es) -> %s\n",
+               n3, (n3==0 && S::canales(o)==antes) ? "no ensucia OK" : "GUARDO DE GEDE!");
+        if (n3 != 0){ err="autokeytest: guardo sin que cambiara nada"; return false; }
+        AutoKeyOn = false;
+        estadoObjetos.clear();
+        return true;
+    }
+    // ---- autoframetest : AUTO FRAME (View > Auto frame, prendido por defecto). Clickear una fila del panel tiene
+    //      que elegir TODA su curva y encuadrarla sola, sin apretar numpad '.'. Apagado, la vista no se mueve. ----
+    if (cmd == "autoframetest") {
+        Timeline* tl = new Timeline(); tl->Resize(900, 300);
+        tl->modo = Timeline::TL_MODO_CURVAS;
+        tl->ConstruirDopeRows();
+        if (tl->dopeRows.empty()){ err="autoframetest: sin filas"; delete tl; return false; }
+        // el menu View: Frame Selected + el checkbox Auto frame
+        tl->AbrirMenuView(100, 100);
+        PopupMenu* m = MenuAbierto;
+        if (!m){ err="autoframetest: el menu View no abrio"; delete tl; return false; }
+        printf("      [autoframetest] menu 'View':\n");
+        bool hayCheck = false; bool* estado = NULL;
+        for (size_t i=0;i<m->items.size();i++){
+            printf("         %-16s %s\n", m->items[i]->text.c_str(),
+                   m->items[i]->checkbox ? (*m->items[i]->checkbox ? "[x] checkbox" : "[ ] checkbox") : "");
+            if (m->items[i]->checkbox){ hayCheck = true; estado = m->items[i]->checkbox; }
+        }
+        if (!hayCheck){ err="autoframetest: no hay checkbox en View"; delete tl; return false; }
+        printf("      [autoframetest] Auto frame por defecto: %s -> %s\n",
+               *estado ? "PRENDIDO" : "apagado", *estado ? "OK" : "MAL (tiene que venir prendido)");
+        if (!*estado){ err="autoframetest: Auto frame no viene prendido"; delete tl; return false; }
+        m->Cerrar();
+
+        // buscar la fila de un CANAL y clickearla (el camino real)
+        int fila = -1;
+        for (size_t i=0;i<tl->dopeRows.size();i++) if (tl->dopeRows[i].propId>=0 && tl->dopeRows[i].keys.size()>=2){ fila=(int)i; break; }
+        if (fila < 0){ err="autoframetest: sin canal"; delete tl; return false; }
+        std::string nom = tl->dopeRows[fila].nombre;
+
+        struct S {
+            static void clickFila(Timeline* tl, int fila){
+                int fy = tl->stripY + fila*tl->rowH + tl->PosY + tl->rowH/2;
+                tl->DopeClickPanel(tl->x + tl->panelW/2, tl->y + fy);   // en el NOMBRE (no en la flecha ni el ojo)
+            }
+        };
+
+        // ---- PRENDIDO: elige la curva Y encuadra ----
+        tl->DopeSelectNone();
+        tl->viewStartF = -500.0f; tl->pxPerFrame = 1.0f;   // vista lejos y desencuadrada
+        float vs0 = tl->viewStartF, px0 = tl->pxPerFrame;
+        S::clickFila(tl, fila);
+        int sel = 0, mn, mx;
+        bool hayRango = tl->DopeRangoSeleccion(mn, mx);
+        for (size_t i=0;i<tl->dopeRows.size();i++){} // (la seleccion se cuenta por el rango)
+        printf("      [autoframetest] click en '%s' con Auto frame PRENDIDO:\n", nom.c_str());
+        printf("         curva elegida: %s (keyframes %d..%d)\n", hayRango?"si":"NO", hayRango?mn:0, hayRango?mx:0);
+        printf("         vista: viewStartF %.1f -> %.1f | pxPerFrame %.2f -> %.2f -> %s\n",
+               vs0, tl->viewStartF, px0, tl->pxPerFrame,
+               (tl->viewStartF != vs0 || tl->pxPerFrame != px0) ? "ENCUADRO SOLO OK" : "no encuadro!");
+        if (!hayRango){ err="autoframetest: el click no eligio la curva"; delete tl; return false; }
+        bool encuadro = (tl->viewStartF != vs0 || tl->pxPerFrame != px0);
+        if (!encuadro){ err="autoframetest: no encuadro con Auto frame prendido"; delete tl; return false; }
+        // el 1er keyframe tiene que quedar DENTRO del strip (eso es "estar encuadrado")
+        float xa = tl->FrameToX((float)mn), xb = tl->FrameToX((float)mx);
+        printf("         1er keyframe en x=%.1f, ultimo en x=%.1f (strip=[%d..%d]) -> %s\n",
+               xa, xb, tl->panelW, tl->width,
+               (xa >= tl->panelW && xb <= tl->width) ? "los dos ENTRAN OK" : "quedaron fuera!");
+
+        // ---- APAGADO: elige la curva pero NO mueve la vista ----
+        *estado = false;
+        tl->DopeSelectNone();
+        tl->viewStartF = -500.0f; tl->pxPerFrame = 1.0f;
+        vs0 = tl->viewStartF; px0 = tl->pxPerFrame;
+        S::clickFila(tl, fila);
+        bool hayRango2 = tl->DopeRangoSeleccion(mn, mx);
+        printf("      [autoframetest] click con Auto frame APAGADO: curva elegida=%s | vista quieta=%s -> %s\n",
+               hayRango2?"si":"no",
+               (tl->viewStartF == vs0 && tl->pxPerFrame == px0) ? "si" : "NO",
+               (hayRango2 && tl->viewStartF == vs0 && tl->pxPerFrame == px0) ? "OK" : "MAL");
+        if (!(hayRango2 && tl->viewStartF == vs0 && tl->pxPerFrame == px0)){
+            err="autoframetest: apagado no se porta bien"; delete tl; return false; }
+        *estado = true;   // dejarlo como estaba (default)
+        (void)sel;
+        delete tl; return true;
+    }
+    // ---- menuhover : el menu del timeline tiene que portarse como el del viewport 3D: pasar el mouse por una
+    //      opcion con submenu lo ABRE, y pasar a otra lo CIERRA. Y las flechas izq/der (Symbian) lo mismo. ----
+    if (cmd == "menuhover") {
+        Timeline* tl = new Timeline(); tl->Resize(900, 300);
+        tl->modo = Timeline::TL_MODO_CURVAS;
+        tl->ConstruirDopeRows();
+        tl->AbrirMenuKey(100, 100);
+        PopupMenu* m = MenuAbierto;
+        if (!m){ err="menuhover: el menu Key no abrio"; delete tl; return false; }
+        // filas con submenu
+        int fTrans = -1, fInterp = -1;
+        for (size_t i=0;i<m->items.size();i++){
+            if (!m->items[i]->submenu) continue;
+            if (fTrans < 0) fTrans = (int)i; else if (fInterp < 0) fInterp = (int)i;
+        }
+        printf("      [menuhover] menu Key: titulo='%s' | fila con submenu: %d ('%s') y %d ('%s')\n",
+               m->titulo.c_str(), fTrans, fTrans>=0?m->items[fTrans]->text.c_str():"",
+               fInterp, fInterp>=0?m->items[fInterp]->text.c_str():"");
+        if (fTrans < 0 || fInterp < 0){ err="menuhover: no hay 2 submenus"; delete tl; return false; }
+
+        struct H { static void mover(PopupMenu* m, int fila){
+            int oy = m->titulo.empty() ? 0 : (RenglonHeightGS + gapGS);
+            int my = m->y + borderGS + oy + fila*(RenglonHeightGS + gapGS) + 1;
+            m->MouseMove(m->x + m->width/2, my);
+        } };
+
+        // ---- HOVER: pasar por Transform lo abre ----
+        H::mover(m, fTrans);
+        bool abrio1 = (m->submenuAbierto == m->items[fTrans]->submenu && m->submenuAbierto->abierto);
+        printf("      [menuhover] mouse sobre '%s' -> su submenu: %s\n",
+               m->items[fTrans]->text.c_str(), abrio1 ? "ABIERTO OK" : "cerrado (no hay hover)");
+        // ---- ...y pasar a la otra CIERRA la primera y abre la segunda ----
+        H::mover(m, fInterp);
+        bool abrio2 = (m->submenuAbierto == m->items[fInterp]->submenu && m->submenuAbierto->abierto);
+        bool cerro1 = !m->items[fTrans]->submenu->abierto;
+        printf("      [menuhover] mouse sobre '%s' -> su submenu: %s | el anterior: %s\n",
+               m->items[fInterp]->text.c_str(), abrio2 ? "ABIERTO OK" : "cerrado",
+               cerro1 ? "CERRADO OK" : "quedo abierto!");
+
+        // ---- FLECHAS (Symbian): derecha entra al submenu, izquierda vuelve ----
+        m->selectIndex = fTrans;
+        m->SincronizarSubmenu();
+        bool derecha = m->AbrirSubmenuActual();
+        printf("      [menuhover] flecha DERECHA sobre '%s' -> entro al submenu: %s\n",
+               m->items[fTrans]->text.c_str(), derecha ? "si OK" : "NO");
+        // (la flecha IZQUIERDA la rutea LayoutTeclaUI, que cierra el submenu abierto; aca alcanza con comprobar
+        //  que la DERECHA entra, que es la mitad que puede faltar)
+
+        m->Cerrar();
+
+        // ---- ACEPTAR / CANCELAR desde AFUERA (click der = cancelar, click izq / OK = aceptar) ----
+        Timeline::DopeRow* canal = NULL;
+        for (size_t i=0;i<tl->dopeRows.size();i++) if (tl->dopeRows[i].propId>=0 && tl->dopeRows[i].keys.size()>=2){ canal=&tl->dopeRows[i]; break; }
+        if (canal){
+            AnimProperty* ap = tl->CurvaDeFila(*canal);
+            std::vector<keyFrame> base = ap->keyframes;
+            int f0 = ap->keyframes[0].frame;
+            tl->DopeSelectAll();
+            tl->lastMx = tl->x + 500; tl->lastMy = tl->y + 150;
+            tl->DopeMoveStart(Timeline::DOPE_MOV);
+            printf("      [menuhover] transform de keyframes activo: %s (lo ve DopeXformActivo: %s)\n",
+                   tl->DopeMoviendo()?"si":"no", DopeXformActivo()?"si OK":"NO");
+            for (const char* q="7"; *q; ++q) tl->DopeNumChar(*q);
+            DopeXformCancelar();     // <- lo que hace el click DERECHO (y el backspace de Symbian)
+            printf("      [menuhover] CANCELAR desde afuera: activo=%s | 1er frame %d -> %d -> %s\n",
+                   DopeXformActivo()?"si":"no", f0, ap->keyframes[0].frame,
+                   (!DopeXformActivo() && ap->keyframes[0].frame==f0) ? "volvio atras OK" : "MAL");
+            if (DopeXformActivo() || ap->keyframes[0].frame != f0){
+                err="menuhover: cancelar desde afuera no anda"; delete tl; return false; }
+            // ACEPTAR
+            tl->DopeSelectAll();
+            tl->DopeMoveStart(Timeline::DOPE_MOV);
+            for (const char* q="7"; *q; ++q) tl->DopeNumChar(*q);
+            DopeXformAceptar();      // <- lo que hace el click IZQUIERDO (y el OK de Symbian)
+            printf("      [menuhover] ACEPTAR desde afuera: activo=%s | 1er frame %d -> %d -> %s\n",
+                   DopeXformActivo()?"si":"no", f0, ap->keyframes[0].frame,
+                   (!DopeXformActivo() && ap->keyframes[0].frame==f0+7) ? "quedo movido OK" : "MAL");
+            if (DopeXformActivo() || ap->keyframes[0].frame != f0+7){
+                err="menuhover: aceptar desde afuera no anda"; delete tl; return false; }
+            ap->keyframes = base;
+        }
+
+        bool ok = abrio1 && abrio2 && cerro1;
+        delete tl;
+        if (!ok){ err="menuhover: el hover de submenus no anda en el timeline"; return false; }
+        return true;
+    }
+    // ---- smarteuler : el ejemplo de Dante. 3 keyframes de rotacion: frame 10 = 0 grados, frame 20 = 405,
+    //      frame 30 = 90. 405 es la MISMA rotacion que 45 (405 = 45 + 360), pero la curva interpola por el VALOR:
+    //      con 405 el objeto da una vuelta entera de mas y vuelve. Smart Euler tiene que dejar 0 -> 45 -> 90.
+    //      Lo CRITICO: la pose de cada keyframe NO puede cambiar (mod 360 tiene que dar lo mismo). ----
+    if (cmd == "smarteuler") {
+        Object* o = NULL;
+        { std::vector<Object*> st; if(SceneCollection) st.push_back(SceneCollection);
+          while(!st.empty() && !o){ Object* n2=st.back(); st.pop_back();
+            if (n2->getType()==ObjectType::mesh) o=n2;
+            for(size_t i=0;i<n2->Childrens.size();i++) st.push_back(n2->Childrens[i]); } }
+        if (!o){ err="smarteuler: sin malla"; return false; }
+        DeseleccionarTodo(); ObjActivo=o; o->Seleccionar(); ObjSelects.clear(); ObjSelects.push_back(o);
+        EliminarAnimaciones(*o);
+
+        // el caso de Dante, en la curva Z Euler Rotation. (AnimObjDe es static en ObjectMode.cpp: aca se busca
+        //  o se crea el AnimationObject a mano, que es lo mismo que hace.)
+        AnimationObject* pao = NULL;
+        for (size_t i=0;i<AnimationObjects.size();i++) if (AnimationObjects[i].obj==o){ pao=&AnimationObjects[i]; break; }
+        if (!pao){ AnimationObject nuevo; nuevo.obj=o; nuevo.FirstKeyFrame=0; nuevo.LastKeyFrame=0;
+                   AnimationObjects.push_back(nuevo); pao=&AnimationObjects[AnimationObjects.size()-1]; }
+        AnimationObject& ao = *pao;
+        AnimProperty& ap = PropertyDeLista(ao.Propertys, AnimRotation, AnimZ);
+        SetKeyCurva(ap, 10,   0.0f);
+        SetKeyCurva(ap, 20, 405.0f);
+        SetKeyCurva(ap, 30,  90.0f);
+
+        struct S { static void dump(AnimProperty& a, const char* t){
+            printf("         %-8s ->", t);
+            for (size_t i=0;i<a.keyframes.size();i++) printf("  f%d=%.1f", a.keyframes[i].frame, a.keyframes[i].value);
+            printf("\n"); } };
+        S::dump(ap, "antes");
+
+        Timeline* tl = new Timeline(); tl->Resize(900, 300);
+        tl->modo = Timeline::TL_MODO_CURVAS;
+        tl->ConstruirDopeRows();
+        tl->DopeSelectAll();
+        // el valor de la curva ANTES, muestreado fino: la POSE (mod 360) no puede cambiar en ningun frame
+        std::vector<float> antes;
+        for (int f=10; f<=30; f++) antes.push_back(ap.EvalF((float)f, 0.0f));
+
+        int n = tl->SmartEulerSel();
+        S::dump(ap, "despues");
+        printf("      [smarteuler] corrigio %d keyframe(s)\n", n);
+
+        bool ok = (fabsf(ap.keyframes[0].value - 0.0f) < 1e-3f &&
+                   fabsf(ap.keyframes[1].value - 45.0f) < 1e-3f &&
+                   fabsf(ap.keyframes[2].value - 90.0f) < 1e-3f);
+        printf("      [smarteuler] esperado 0 -> 45 -> 90 : %s\n", ok ? "OK" : "MAL");
+
+        // LA POSE de cada keyframe NO cambio (mod 360 da lo mismo)
+        float peor = 0.0f;
+        const float orig[3] = { 0.0f, 405.0f, 90.0f };
+        for (int i=0;i<3;i++){
+            float d = ap.keyframes[i].value - orig[i];
+            float vueltas = floorf(d/360.0f + 0.5f);
+            float resto = fabsf(d - vueltas*360.0f);
+            if (resto > peor) peor = resto;
+        }
+        printf("      [smarteuler] la POSE de los keyframes no cambio (todo es multiplo exacto de 360): peor=%.6f -> %s\n",
+               peor, (peor < 1e-3f) ? "OK" : "CAMBIO LA POSE!");
+
+        // y el recorrido: antes daba una vuelta de mas
+        float recorridoAntes = 0.0f, recorridoDespues = 0.0f;
+        for (size_t i=1;i<antes.size();i++) recorridoAntes += fabsf(antes[i]-antes[i-1]);
+        std::vector<float> desp;
+        for (int f=10; f<=30; f++) desp.push_back(ap.EvalF((float)f, 0.0f));
+        for (size_t i=1;i<desp.size();i++) recorridoDespues += fabsf(desp[i]-desp[i-1]);
+        printf("      [smarteuler] grados recorridos por la curva: %.0f -> %.0f (se ahorro %.0f = %.2f vueltas) -> %s\n",
+               recorridoAntes, recorridoDespues, recorridoAntes-recorridoDespues,
+               (recorridoAntes-recorridoDespues)/360.0f,
+               (recorridoDespues < recorridoAntes) ? "gira derecho OK" : "no mejoro!");
+
+        // ---- una curva que YA esta bien no se toca ----
+        AnimProperty& ap2 = PropertyDeLista(ao.Propertys, AnimRotation, AnimX);
+        SetKeyCurva(ap2, 10, 0.0f); SetKeyCurva(ap2, 20, 45.0f); SetKeyCurva(ap2, 30, 90.0f);
+        tl->ConstruirDopeRows(); tl->DopeSelectAll();
+        int n2 = tl->SmartEulerSel();
+        printf("      [smarteuler] sobre una curva que ya esta bien (0/45/90): corrigio %d -> %s\n",
+               n2, (n2==0) ? "no la toca OK" : "la toco de gede!");
+
+        // ---- POSITION no se toca: ahi +360 NO es lo mismo ----
+        AnimProperty& ap3 = PropertyDeLista(ao.Propertys, AnimPosition, AnimX);
+        SetKeyCurva(ap3, 10, 0.0f); SetKeyCurva(ap3, 20, 405.0f); SetKeyCurva(ap3, 30, 90.0f);
+        tl->ConstruirDopeRows(); tl->DopeSelectAll();
+        tl->SmartEulerSel();
+        bool posIntacta = (fabsf(ap3.keyframes[1].value - 405.0f) < 1e-3f);
+        printf("      [smarteuler] X Location con 405: quedo en %.1f -> %s\n",
+               ap3.keyframes[1].value, posIntacta ? "NO se toca OK (en position 405 != 45)" : "LA ROMPIO!");
+
+        delete tl;
+        if (!ok || peor > 1e-3f || n2 != 0 || !posIntacta){ err="smarteuler: no se porta como corresponde"; return false; }
+        return true;
+    }
+    // ---- trailtest : MOTION TRAIL. Solo POSICION. Con keyframes en el frame 1 y el 20, el trail tiene que tener
+    //      UN punto por frame (20) pero solo DOS keyframes marcados: contando los tramos claro/oscuro se sabe
+    //      cuantos frames hay entre uno y otro. ----
+    if (cmd == "trailtest") {
+        Object* o = NULL;
+        { std::vector<Object*> st; if(SceneCollection) st.push_back(SceneCollection);
+          while(!st.empty() && !o){ Object* n2=st.back(); st.pop_back();
+            if (n2->getType()==ObjectType::mesh) o=n2;
+            for(size_t i=0;i<n2->Childrens.size();i++) st.push_back(n2->Childrens[i]); } }
+        if (!o){ err="trailtest: sin malla"; return false; }
+        DeseleccionarTodo(); ObjActivo=o; o->Seleccionar(); ObjSelects.clear(); ObjSelects.push_back(o);
+        EliminarAnimaciones(*o);
+
+        std::vector<Vector3> pts; std::vector<int> keys; int desde, hasta;
+        // ---- sin animacion: no hay trail ----
+        printf("      [trailtest] objeto SIN animacion -> trail: %s\n",
+               MotionTrailDe(o, pts, keys, desde, hasta) ? "hay (MAL)" : "no hay OK");
+        if (MotionTrailDe(o, pts, keys, desde, hasta)){ err="trailtest: dio trail sin animacion"; return false; }
+
+        // ---- el caso de Dante: keyframes en el frame 1 y el 20 ----
+        CurrentFrame = 1;  o->pos = Vector3(0,0,0);   InsertarKeyframeObjeto();
+        CurrentFrame = 20; o->pos = Vector3(19,0,0);  InsertarKeyframeObjeto();
+        if (!MotionTrailDe(o, pts, keys, desde, hasta)){ err="trailtest: no dio trail"; return false; }
+        printf("      [trailtest] keyframes en 1 y 20 -> rango [%d..%d] | puntos del camino=%d | keyframes marcados=%d\n",
+               desde, hasta, (int)pts.size(), (int)keys.size());
+        bool okPts = ((int)pts.size() == 20);   // un punto por FRAME (1..20)
+        bool okKf  = ((int)keys.size() == 2);   // pero SOLO 2 keyframes
+        printf("         un punto por frame (20): %s | solo 2 keyframes marcados: %s\n",
+               okPts?"OK":"MAL", okKf?"OK":"MAL");
+        // los tramos: 19 (uno por par de frames) -> alternando claro/oscuro se cuentan los frames
+        printf("         tramos de la linea = %d (alternan claro/oscuro: contarlos dice cuantos frames hay)\n",
+               (int)pts.size()-1);
+        // la curva es LINEAL entre 0 y 19 -> el punto del frame 10 tiene que estar en x=9
+        printf("         frame 1 en x=%.2f | frame 10 en x=%.2f (esperado 9) | frame 20 en x=%.2f\n",
+               pts[0].x, pts[9].x, pts[19].x);
+        bool okInterp = (fabsf(pts[0].x - 0.0f) < 1e-3f && fabsf(pts[9].x - 9.0f) < 1e-3f &&
+                         fabsf(pts[19].x - 19.0f) < 1e-3f);
+        printf("         el camino sigue la curva: %s\n", okInterp?"OK":"MAL");
+
+        // ---- SOLO POSICION: rotar/escalar no genera trail ----
+        EliminarAnimaciones(*o);
+        AnimationObject* pao = NULL;
+        for (size_t i=0;i<AnimationObjects.size();i++) if (AnimationObjects[i].obj==o){ pao=&AnimationObjects[i]; break; }
+        if (!pao){ AnimationObject nv; nv.obj=o; nv.FirstKeyFrame=0; nv.LastKeyFrame=0;
+                   AnimationObjects.push_back(nv); pao=&AnimationObjects[AnimationObjects.size()-1]; }
+        SetKeyCurva(PropertyDeLista(pao->Propertys, AnimRotation, AnimZ), 1, 0.0f);
+        SetKeyCurva(PropertyDeLista(pao->Propertys, AnimRotation, AnimZ), 20, 90.0f);
+        bool soloRot = MotionTrailDe(o, pts, keys, desde, hasta);
+        printf("      [trailtest] objeto con SOLO rotacion animada -> trail: %s\n",
+               soloRot ? "hay (MAL: el trail es de POSICION)" : "no hay OK");
+
+        if (!okPts || !okKf || !okInterp || soloRot){ err="trailtest: el trail no se porta bien"; return false; }
+        return true;
+    }
+    // ---- animmenu : el menu "Animation" de la barra del viewport 3D tiene que ABRIRSE al clickear su boton.
+    //      Se va por el camino REAL (LayoutAbrirMenuDeBarra con las coords del boton), que es el que estaba roto:
+    //      la rama del menu habia quedado ANIDADA adentro del Contains de "Object" -> pedia el cursor sobre los
+    //      dos botones a la vez y no abria nunca. ----
+    if (cmd == "animmenu") {
+        Object* o = NULL;
+        { std::vector<Object*> st; if(SceneCollection) st.push_back(SceneCollection);
+          while(!st.empty() && !o){ Object* n2=st.back(); st.pop_back();
+            if (n2->getType()==ObjectType::mesh) o=n2;
+            for(size_t i=0;i<n2->Childrens.size();i++) st.push_back(n2->Childrens[i]); } }
+        if (!o){ err="animmenu: sin malla"; return false; }
+        // El viewport se crea ACA: en headless no hay ninguno. Render() es GL puro, asi que no se llama; lo que se
+        // testea es el RUTEO del click (que es lo que estaba roto: la rama del menu habia quedado anidada adentro
+        // del Contains de "Object"). El boton se posiciona a mano, como lo hace la barra al dibujarse.
+        Viewport3D* vp = new Viewport3D();
+        vp->Resize(900, 600);
+        InteractionMode = ObjectMode;
+        ObjActivo=o; o->Seleccionar(); ObjSelects.clear(); ObjSelects.push_back(o);
+        Button* bAnim = BarRolBtn(vp->BarButtons, BR_Animation);
+        if (!bAnim){ err="animmenu: no existe el boton Animation en la barra"; delete vp; return false; }
+        printf("      [animmenu] el boton 'Animation' existe en la barra (rol=%d)\n", bAnim->rol);
+        bAnim->visible = true; bAnim->sx = 200; bAnim->sy = 10; bAnim->width = 80; bAnim->height = 20;
+        bool okSin = true;
+
+        if (MenuAbierto) MenuAbierto->Cerrar();
+        // el camino REAL: click en el CENTRO del boton
+        bool abrio = LayoutAbrirMenuDeBarra(vp, bAnim->sx + bAnim->width/2, bAnim->sy + bAnim->height/2);
+        printf("      [animmenu] click en el boton -> LayoutAbrirMenuDeBarra=%s | MenuAbierto=%s\n",
+               abrio?"true":"false",
+               (MenuAbierto == MenuAnimation) ? "el menu Animation OK" : (MenuAbierto ? "OTRO menu!" : "NINGUNO"));
+        bool okAbre = (abrio && MenuAbierto == MenuAnimation);
+        if (okAbre){
+            printf("      [animmenu] items:\n");
+            for (size_t i=0;i<MenuAnimation->items.size();i++)
+                printf("         %-16s %s\n", MenuAnimation->items[i]->text.c_str(),
+                       MenuAnimation->items[i]->checkbox ? (*MenuAnimation->items[i]->checkbox?"[x]":"[ ]") : "");
+        }
+        if (MenuAbierto) MenuAbierto->Cerrar();
+
+        // ---- y el boton "Object" sigue abriendo SU menu (el nuevo no lo tapo) ----
+        Button* bObj = BarRolBtn(vp->BarButtons, BR_Object);
+        bool okObj = false;
+        if (bObj){
+            bObj->visible = true; bObj->sx = 300; bObj->sy = 10; bObj->width = 60; bObj->height = 20;
+            LayoutAbrirMenuDeBarra(vp, bObj->sx + bObj->width/2, bObj->sy + bObj->height/2);
+            okObj = (MenuAbierto == MenuObject);
+            printf("      [animmenu] el boton 'Object' sigue abriendo SU menu: %s\n", okObj ? "OK" : "SE ROMPIO!");
+            if (MenuAbierto) MenuAbierto->Cerrar();
+        }
+        delete vp;
+        if (!okSin || !okAbre || !okObj){ err="animmenu: el menu Animation no se porta bien"; return false; }
+        return true;
+    }
+    // ---- trailparent : el motion trail de un objeto EMPARENTADO a un padre ANIMADO. El trail es el camino en
+    //      MUNDO, asi que en cada frame hay que usar el world del padre EN ESE FRAME. Antes se usaba su world
+    //      ACTUAL -> el camino del hijo salia pegado a donde el padre esta AHORA, no a donde estaba. ----
+    if (cmd == "trailparent") {
+        // dos mallas: la 1ra es el padre, la 2da el hijo
+        std::vector<Object*> ms;
+        { std::vector<Object*> st; if(SceneCollection) st.push_back(SceneCollection);
+          while(!st.empty()){ Object* n2=st.back(); st.pop_back();
+            if (n2->getType()==ObjectType::mesh) ms.push_back(n2);
+            for(size_t i=0;i<n2->Childrens.size();i++) st.push_back(n2->Childrens[i]); } }
+        if (ms.size() < 2){ err="trailparent: hacen falta 2 mallas"; return false; }
+        Object* padre = ms[0]; Object* hijo = ms[1];
+        EliminarAnimaciones(*padre); EliminarAnimaciones(*hijo);
+
+        // emparentar de verdad
+        if (hijo->Parent){ std::vector<Object*>& hs = hijo->Parent->Childrens;
+            for (size_t i=0;i<hs.size();i++) if (hs[i]==hijo){ hs.erase(hs.begin()+i); break; } }
+        hijo->Parent = padre; padre->Childrens.push_back(hijo);
+        padre->pos = Vector3(0,0,0); padre->rot = Quaternion(1,0,0,0); padre->scale = Vector3(1,1,1);
+        hijo->rot = Quaternion(1,0,0,0); hijo->scale = Vector3(1,1,1);
+
+        struct S { static void key(Object* o, int f, Vector3 p){
+            DeseleccionarTodo(); ObjActivo=o; o->Seleccionar(); ObjSelects.clear(); ObjSelects.push_back(o);
+            CurrentFrame=f; o->pos=p; InsertarKeyframeObjeto(); } };
+
+        // el PADRE se mueve en X: 0 -> 100 (frames 1..10). El HIJO queda quieto en su local (5,0,0).
+        S::key(padre, 1,  Vector3(0,0,0));
+        S::key(padre, 10, Vector3(100,0,0));
+        S::key(hijo,  1,  Vector3(5,0,0));
+        S::key(hijo,  10, Vector3(5,0,0));
+
+        DeseleccionarTodo(); ObjActivo=hijo; hijo->Seleccionar(); ObjSelects.clear(); ObjSelects.push_back(hijo);
+        std::vector<Vector3> pts; std::vector<int> keys; int desde, hasta;
+        if (!MotionTrailDe(hijo, pts, keys, desde, hasta)){ err="trailparent: sin trail"; return false; }
+        printf("      [trailparent] padre animado 0->100 en X | hijo quieto en su local (5,0,0)\n");
+        printf("         trail del hijo (MUNDO): f1 x=%.2f | f5 x=%.2f | f10 x=%.2f\n",
+               pts[0].x, pts[4].x, pts[9].x);
+        // el hijo en MUNDO tiene que ARRASTRARSE con el padre: 5 -> 105
+        bool ok = (fabsf(pts[0].x - 5.0f) < 1e-2f && fabsf(pts[9].x - 105.0f) < 1e-2f);
+        printf("         esperado f1=5 y f10=105 (el hijo se mueve CON el padre) -> %s\n",
+               ok ? "OK" : "MAL (esta usando el world ACTUAL del padre, no el del frame)");
+        // ...y el del medio tiene que seguir la curva del padre, no quedarse quieto
+        printf("         f5 = %.2f (esperado ~49.4: la curva del padre en el frame 5, + 5) -> %s\n",
+               pts[4].x, (pts[4].x > 5.5f && pts[4].x < 104.5f) ? "sigue al padre OK" : "NO lo sigue!");
+        bool okMedio = (pts[4].x > 5.5f && pts[4].x < 104.5f);
+
+        // limpiar: desemparentar
+        for (size_t i=0;i<padre->Childrens.size();i++) if (padre->Childrens[i]==hijo){ padre->Childrens.erase(padre->Childrens.begin()+i); break; }
+        hijo->Parent = NULL;
+        if (!ok || !okMedio){ err="trailparent: el trail no respeta al padre animado"; return false; }
+        return true;
+    }
+    // ---- trailhueso : MOTION TRAIL de un HUESO (Pose Mode). Reusa EvaluarPoseEsqueleto, que PISA la pose viva:
+    //      lo critico es que al salir el esqueleto quede EXACTAMENTE como estaba. ----
+    if (cmd == "trailhueso") {
+        Armature* a = NULL;
+        { std::vector<Object*> st; if(SceneCollection) st.push_back(SceneCollection);
+          while(!st.empty() && !a){ Object* n2=st.back(); st.pop_back();
+            if (n2->getType()==ObjectType::armature) a=(Armature*)n2;
+            for(size_t i=0;i<n2->Childrens.size();i++) st.push_back(n2->Childrens[i]); } }
+        if (!a){ err="trailhueso: sin armature"; return false; }
+        if (a->animActiva < 0){ err="trailhueso: sin clip activo (corre skinbbox antes)"; return false; }
+
+        // un hueso que tenga curvas de posicion
+        int bone = -1;
+        SkeletalAnimation* clip = a->animations[a->animActiva];
+        for (size_t t=0;t<clip->tracks.size() && bone<0;t++)
+            for (size_t p2=0;p2<clip->tracks[t].Propertys.size();p2++)
+                if (clip->tracks[t].Propertys[p2].Property==AnimPosition && !clip->tracks[t].Propertys[p2].keyframes.empty()){
+                    bone = clip->tracks[t].bone; break; }
+        if (bone < 0){ err="trailhueso: ningun hueso con curvas de posicion"; return false; }
+
+        // ---- la pose VIVA antes: se posa un hueso a mano para que haya algo que perder ----
+        CurrentFrame = 5;
+        EvaluarPoseEsqueleto(a, 5);
+        a->bones[bone].poseR = Vector3(11.0f, 22.0f, 33.0f);   // pose "a mano"
+        a->poseDirty = true;
+        std::vector<Vector3> T0(a->bones.size()), R0(a->bones.size()), S0(a->bones.size());
+        for (size_t i=0;i<a->bones.size();i++){ T0[i]=a->bones[i].poseT; R0[i]=a->bones[i].poseR; S0[i]=a->bones[i].poseS; }
+        int lpf0 = a->lastPoseFrame;
+
+        std::vector<Vector3> pts; std::vector<int> keys; int desde, hasta;
+        unsigned int t0 = w3dGetTicks();
+        bool hay = MotionTrailHuesoNodo(a, bone, pts, keys, desde, hasta);
+        unsigned int t1 = w3dGetTicks();
+        printf("      [trailhueso] hueso %d ('%s') -> trail: %s | rango [%d..%d] | puntos=%d | keyframes=%d | %ums\n",
+               bone, a->bones[bone].name.c_str(), hay?"si":"no", desde, hasta, (int)pts.size(), (int)keys.size(), t1-t0);
+        if (!hay){ err="trailhueso: no dio trail"; return false; }
+        bool okPts = ((int)pts.size() == hasta-desde+1);
+        printf("         un punto por frame (%d): %s\n", hasta-desde+1, okPts?"OK":"MAL");
+        // el camino tiene que MOVERSE (si diera todo el mismo punto, el FK no se estaria re-evaluando)
+        float dmax = 0.0f;
+        for (size_t i=1;i<pts.size();i++){ float d=(pts[i]-pts[0]).Length(); if (d>dmax) dmax=d; }
+        printf("         el hueso RECORRE %.3f unidades -> %s\n", dmax,
+               (dmax > 1e-4f) ? "el camino existe OK" : "todos los puntos iguales (no se evaluo)!");
+
+        // ---- LO CRITICO: la pose viva quedo INTACTA ----
+        float peor = 0.0f;
+        for (size_t i=0;i<a->bones.size();i++){
+            float d;
+            d = (a->bones[i].poseT - T0[i]).Length(); if (d>peor) peor=d;
+            d = (a->bones[i].poseR - R0[i]).Length(); if (d>peor) peor=d;
+            d = (a->bones[i].poseS - S0[i]).Length(); if (d>peor) peor=d;
+        }
+        printf("         la POSE VIVA quedo intacta: peor diferencia=%.6f | lastPoseFrame %d -> %d -> %s\n",
+               peor, lpf0, a->lastPoseFrame,
+               (peor < 1e-4f && a->lastPoseFrame == lpf0) ? "OK (no pisa lo que estas editando)" : "LA PISO!");
+        bool okPose = (peor < 1e-4f && a->lastPoseFrame == lpf0);
+        if (!okPts || dmax <= 1e-4f || !okPose){ err="trailhueso: no se porta bien"; return false; }
+        return true;
+    }
+    // ---- simpltest : borrar un keyframe de un BEZIER manteniendo la forma. Se mide el ERROR contra la curva
+    //      ORIGINAL: el borrado que ajusta los handles tiene que quedar MUCHO mas cerca que el borrado crudo. ----
+    if (cmd == "simpltest") {
+        struct S {
+            // curva bezier en S: 0 -> 5 -> 10 con handles automaticos
+            static void armar(AnimProperty& a){
+                a.keyframes.clear();
+                SetKeyCurva(a, 0,  0.0f); SetKeyCurva(a, 10, 8.0f); SetKeyCurva(a, 20, 10.0f);
+                for (size_t i=0;i<a.keyframes.size();i++){ a.keyframes[i].Interpolation = KfBezier;
+                                                           a.keyframes[i].handleType = HAuto; }
+            }
+            static float error(AnimProperty& a, const std::vector<float>& orig, int f0, int f1){
+                float peor = 0.0f; size_t k = 0;
+                for (int f=f0; f<=f1; f++, k++){ float d = fabsf(a.EvalF((float)f,0) - orig[k]); if (d>peor) peor=d; }
+                return peor;
+            }
+        };
+        AnimProperty ap; ap.Property = AnimPosition; ap.component = AnimX;
+        S::armar(ap);
+        // la curva ORIGINAL, frame a frame
+        std::vector<float> orig;
+        for (int f=0; f<=20; f++) orig.push_back(ap.EvalF((float)f, 0.0f));
+        printf("      [simpltest] bezier 0/10/20 con valores 0 / 8 / 10\n");
+        printf("         original f5=%.3f f10=%.3f f15=%.3f\n", orig[5], orig[10], orig[15]);
+
+        // ---- borrado CRUDO (el de antes): erase y listo ----
+        AnimProperty crudo = ap;
+        for (size_t i=0;i<crudo.keyframes.size();i++) if (crudo.keyframes[i].frame==10){ crudo.keyframes.erase(crudo.keyframes.begin()+i); break; }
+        float eCrudo = S::error(crudo, orig, 0, 20);
+        printf("         borrado CRUDO      -> f5=%.3f f15=%.3f | error maximo=%.4f\n",
+               crudo.EvalF(5,0), crudo.EvalF(15,0), eCrudo);
+
+        // ---- borrado que MANTIENE LA FORMA ----
+        BorrarKeyframeManteniendoForma(ap, 10);
+        float eFit = S::error(ap, orig, 0, 20);
+        printf("         MANTENIENDO FORMA  -> f5=%.3f f15=%.3f | error maximo=%.4f\n",
+               ap.EvalF(5,0), ap.EvalF(15,0), eFit);
+        printf("         -> %.1fx mas parecido a la original -> %s\n",
+               (eFit > 1e-6f) ? eCrudo/eFit : 999.0f, (eFit < eCrudo) ? "OK" : "NO MEJORO!");
+        // los EXTREMOS no se tocan nunca
+        bool okExt = (fabsf(ap.EvalF(0,0) - 0.0f) < 1e-3f && fabsf(ap.EvalF(20,0) - 10.0f) < 1e-3f);
+        printf("         los extremos quedan intactos (0 y 10): %s\n", okExt?"OK":"MAL");
+        printf("         keyframes: %d (el del medio se fue)\n", (int)ap.keyframes.size());
+        // se exige una mejora REAL, no "por un pelo": si el ajuste no hace nada, el error queda igual al crudo
+        if (eFit > eCrudo*0.7f || !okExt || ap.keyframes.size()!=2){ err="simpltest: la simplificacion no mantiene la forma"; return false; }
+
+        // ---- un tramo LINEAL no se toca: borrar deja la recta (no hay forma que mantener) ----
+        AnimProperty li; li.Property = AnimPosition; li.component = AnimX;
+        SetKeyCurva(li, 0, 0.0f); SetKeyCurva(li, 10, 8.0f); SetKeyCurva(li, 20, 10.0f);
+        BorrarKeyframeManteniendoForma(li, 10);
+        printf("      [simpltest] curva LINEAL: keyframes=%d | f10=%.3f (esperado 5 = la recta 0->10) -> %s\n",
+               (int)li.keyframes.size(), li.EvalF(10,0),
+               (li.keyframes.size()==2 && fabsf(li.EvalF(10,0)-5.0f)<1e-3f) ? "OK (borrado comun)" : "MAL");
+        if (li.keyframes.size()!=2 || fabsf(li.EvalF(10,0)-5.0f)>1e-3f){ err="simpltest: el lineal no se porta bien"; return false; }
+        return true;
+    }
+    // ---- afcurva : el AUTO FRAME tiene que encuadrar LA CURVA, no solo los keyframes. Una bezier se PASA de los
+    //      valores de sus keyframes (sobrepico), asi que midiendo solo los keyframes la curva sale RECORTADA. ----
+    if (cmd == "afcurva") {
+        Object* o = NULL;
+        { std::vector<Object*> st; if(SceneCollection) st.push_back(SceneCollection);
+          while(!st.empty() && !o){ Object* n2=st.back(); st.pop_back();
+            if (n2->getType()==ObjectType::mesh) o=n2;
+            for(size_t i=0;i<n2->Childrens.size();i++) st.push_back(n2->Childrens[i]); } }
+        if (!o){ err="afcurva: sin malla"; return false; }
+        DeseleccionarTodo(); ObjActivo=o; o->Seleccionar(); ObjSelects.clear(); ObjSelects.push_back(o);
+        EliminarAnimaciones(*o);
+
+        AnimationObject* pao = NULL;
+        for (size_t i=0;i<AnimationObjects.size();i++) if (AnimationObjects[i].obj==o){ pao=&AnimationObjects[i]; break; }
+        if (!pao){ AnimationObject nv; nv.obj=o; nv.FirstKeyFrame=0; nv.LastKeyFrame=0;
+                   AnimationObjects.push_back(nv); pao=&AnimationObjects[AnimationObjects.size()-1]; }
+        // curva con SOBREPICO: keyframes en 0 y 10 los dos en valor 0, pero con handles enormes hacia arriba ->
+        // la curva se dispara MUY por encima de 0 en el medio. Encuadrar por los keyframes daria un rango de
+        // altura CERO y no se veria nada de la panza.
+        AnimProperty& ap = PropertyDeLista(pao->Propertys, AnimPosition, AnimX);
+        SetKeyCurva(ap, 0, 0.0f); SetKeyCurva(ap, 10, 0.0f);
+        ap.keyframes[0].Interpolation = KfBezier; ap.keyframes[0].handleType = HFree;
+        ap.keyframes[0].outDF = 3.0f; ap.keyframes[0].outDV = 40.0f;
+        ap.keyframes[1].Interpolation = KfBezier; ap.keyframes[1].handleType = HFree;
+        ap.keyframes[1].inDF = -3.0f; ap.keyframes[1].inDV = 40.0f;
+
+        float pico = -1e30f, valle = 1e30f;
+        for (int f=0; f<=10; f++){ float v = ap.EvalF((float)f,0); if (v>pico) pico=v; if (v<valle) valle=v; }
+        printf("      [afcurva] keyframes: f0=0.0 f10=0.0 | pero LA CURVA llega a %.3f (sobrepico)\n", pico);
+
+        Timeline* tl = new Timeline(); tl->Resize(900, 300);
+        tl->modo = Timeline::TL_MODO_CURVAS;
+        tl->ConstruirDopeRows();
+        tl->DopeSelectAll();
+        tl->CurvaFrameSelected();
+
+        // donde cae el PICO de la curva en pantalla? Tiene que ENTRAR en el strip.
+        float yPico  = tl->ValueToY(pico);
+        float yValle = tl->ValueToY(valle);
+        printf("      [afcurva] tras Auto frame: pico en y=%.1f | valle en y=%.1f | strip=[%d..%d]\n",
+               yPico, yValle, tl->stripY, tl->height);
+        bool entra = (yPico >= (float)tl->stripY && yPico <= (float)tl->height &&
+                      yValle >= (float)tl->stripY && yValle <= (float)tl->height);
+        printf("         la curva ENTERA entra en el strip: %s\n",
+               entra ? "OK (encuadra la curva)" : "NO (sale recortada: esta midiendo solo los keyframes)");
+        // ...y que no quede ridiculamente chica (que use el alto): el pico y el valle tienen que estar separados
+        float usa = fabsf(yValle - yPico) / (float)(tl->height - tl->stripY);
+        printf("         usa el %.0f%% del alto del strip\n", usa*100.0f);
+        delete tl;
+        if (!entra){ err="afcurva: el auto frame recorta la curva"; return false; }
+        return true;
+    }
+    // ---- rot360 : se puede animar una vuelta ENTERA? El transform guarda la rotacion como QUATERNION, y el euler
+    //      se DERIVA de el (ToEulerXYZ usa asin/atan2 -> rango canonico). Un giro de 360 vuelve al mismo
+    //      quaternion, asi que el euler derivado vuelve a 0 y la vuelta se PIERDE. ----
+    if (cmd == "rot360") {
+        Object* o = NULL;
+        { std::vector<Object*> st; if(SceneCollection) st.push_back(SceneCollection);
+          while(!st.empty() && !o){ Object* n2=st.back(); st.pop_back();
+            if (n2->getType()==ObjectType::mesh) o=n2;
+            for(size_t i=0;i<n2->Childrens.size();i++) st.push_back(n2->Childrens[i]); } }
+        if (!o){ err="rot360: sin malla"; return false; }
+        DeseleccionarTodo(); ObjActivo=o; o->Seleccionar(); ObjSelects.clear(); ObjSelects.push_back(o);
+        EliminarAnimaciones(*o);
+        o->rot = Quaternion(1,0,0,0); o->ActualizarDisplayRot();
+
+        struct S { static float ez(Object* o){ o->ActualizarDisplayRot(); return o->rotEuler.z; } };
+
+        printf("      [rot360] el euler que el editor DERIVA del quaternion:\n");
+        const float angs[6] = { 0.0f, 90.0f, 180.0f, 270.0f, 360.0f, 405.0f };
+        for (int i=0;i<6;i++){
+            o->rot = Quaternion::FromAxisAngle(Vector3(0,0,1), angs[i]);
+            printf("         rotado %6.0f grados -> rotEuler.z = %8.2f%s\n", angs[i], S::ez(o),
+                   (fabsf(S::ez(o) - angs[i]) > 1.0f) ? "   <-- NO es lo que se pidio" : "");
+        }
+
+        // ---- AUTO KEY con una vuelta entera ----
+        AutoKeyOn = true;
+        EliminarAnimaciones(*o);
+        o->rot = Quaternion(1,0,0,0); o->ActualizarDisplayRot();
+        CurrentFrame = 1;
+        estadoObjetos.clear();
+        { SaveState st; st.obj=o; st.pos=o->pos; st.rot=o->rot; st.scale=o->scale; st.worldPos=o->pos;
+          estadoObjetos.push_back(st); }
+        o->rot = Quaternion::FromAxisAngle(Vector3(0,0,1), 360.0f);   // UNA VUELTA ENTERA
+        o->ActualizarDisplayRot();
+        int n = AutoKeyObjetos();
+        printf("      [rot360] auto key tras rotar 360 grados: guardo %d canal(es) -> %s\n", n,
+               (n == 0) ? "NADA (la vuelta se perdio)" : "algo");
+        AutoKeyOn = false;
+        estadoObjetos.clear();
+        printf("      [rot360] -> el quaternion no distingue 0 de 360, y el euler se DERIVA de el.\n");
+        printf("               Para animar vueltas hace falta que el euler sea el dato AUTORITATIVO.\n");
+        return true;
     }
     // ---- normstats <name> : normales de la malla -> #verts, normales DISTINTAS y posiciones con MAS DE UNA normal
     //      (= verts "split" = bordes FILOSOS). Si un rebuild promedia las normales, los splits desaparecen. ----
