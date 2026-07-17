@@ -1,4 +1,7 @@
 #include "test/W3dScript.h"
+#include "w3dFilesystem.h"   // el test de Ajustes lee el config.ini de vuelta del disco
+#include "W3dLang.h"
+#include "W3dLangTabla.h"
 #include <cmath>               // sqrt (skindump)
 #include "objects/Objects.h"   // ObjActivo, g_editMesh, EditSelectMode, Sel*, DeseleccionarTodo
 #include "objects/Mesh.h"      // NewMesh, MeshType, Mesh
@@ -2101,10 +2104,10 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         const GLfloat* uv = IconsUV[ik]->uvs;
         int px = (int)(uv[0]*AW + 0.5f), py = (int)(uv[1]*AH + 0.5f);
         int pw = (int)((uv[6]-uv[0])*AW + 0.5f), ph = (int)((uv[7]-uv[1])*AH + 0.5f);
-        printf("      [icontest] keyframe uv=(%.4f,%.4f)..(%.4f,%.4f) -> pixel (%d,%d) de %dx%d (esperado 95,10 de 10x10) -> %s\n",
+        printf("      [icontest] keyframe uv=(%.4f,%.4f)..(%.4f,%.4f) -> pixel (%d,%d) de %dx%d (esperado 94,10 de 10x10) -> %s\n",
                uv[0], uv[1], uv[6], uv[7], px, py, pw, ph,
-               (px==95 && py==10 && pw==10 && ph==10) ? "OK" : "MAL");
-        if (!(px==95 && py==10 && pw==10 && ph==10)){ err="icontest: el UV del keyframe no cae en 95,10"; return false; }
+               (px==94 && py==10 && pw==10 && ph==10) ? "OK" : "MAL");
+        if (!(px==94 && py==10 && pw==10 && ph==10)){ err="icontest: el UV del keyframe no cae en 94,10"; return false; }
         // y que la tarjeta lo tenga. Las tarjetas las arma Properties::ConstruirGrupos, que corre al crear el
         // viewport: en headless no hay ninguno, asi que se crea uno aca.
         Properties* pr = new Properties();
@@ -2239,7 +2242,8 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
             // simula un transform: snapshot -> cambiar -> confirmar (que es lo que llama al auto key)
             static void xform(Object* o){
                 estadoObjetos.clear();
-                SaveState st; st.obj=o; st.pos=o->pos; st.rot=o->rot; st.scale=o->scale; st.worldPos=o->pos;
+                SaveState st; st.obj=o; st.pos=o->pos; st.rot=o->rot; st.rotEuler=o->rotEuler;
+                st.scale=o->scale; st.worldPos=o->pos;   // rotEuler tambien: el auto key se mide contra el
                 estadoObjetos.push_back(st);
             }
         };
@@ -2880,9 +2884,8 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         if (!entra){ err="afcurva: el auto frame recorta la curva"; return false; }
         return true;
     }
-    // ---- rot360 : se puede animar una vuelta ENTERA? El transform guarda la rotacion como QUATERNION, y el euler
-    //      se DERIVA de el (ToEulerXYZ usa asin/atan2 -> rango canonico). Un giro de 360 vuelve al mismo
-    //      quaternion, asi que el euler derivado vuelve a 0 y la vuelta se PIERDE. ----
+    // ---- rot360 : se puede animar una VUELTA ENTERA? El quaternion no distingue 0 de 360, asi que el euler tiene
+    //      que conservar sus vueltas por su cuenta. Lo critico: conservarlas SIN cambiar la orientacion real.
     if (cmd == "rot360") {
         Object* o = NULL;
         { std::vector<Object*> st; if(SceneCollection) st.push_back(SceneCollection);
@@ -2892,35 +2895,666 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         if (!o){ err="rot360: sin malla"; return false; }
         DeseleccionarTodo(); ObjActivo=o; o->Seleccionar(); ObjSelects.clear(); ObjSelects.push_back(o);
         EliminarAnimaciones(*o);
-        o->rot = Quaternion(1,0,0,0); o->ActualizarDisplayRot();
 
-        struct S { static float ez(Object* o){ o->ActualizarDisplayRot(); return o->rotEuler.z; } };
-
-        printf("      [rot360] el euler que el editor DERIVA del quaternion:\n");
-        const float angs[6] = { 0.0f, 90.0f, 180.0f, 270.0f, 360.0f, 405.0f };
-        for (int i=0;i<6;i++){
-            o->rot = Quaternion::FromAxisAngle(Vector3(0,0,1), angs[i]);
-            printf("         rotado %6.0f grados -> rotEuler.z = %8.2f%s\n", angs[i], S::ez(o),
-                   (fabsf(S::ez(o) - angs[i]) > 1.0f) ? "   <-- NO es lo que se pidio" : "");
+        // ---- 1) girar de a poco, como hace el transform (paso chico, muchas veces) ----
+        o->rot = Quaternion(1,0,0,0); o->rotEuler = Vector3(0,0,0); o->ActualizarDisplayRot();
+        const float paso = 10.0f;
+        for (int i = 0; i < 36; i++){        // 36 x 10 = 360 grados
+            o->rot = Quaternion::FromAxisAngle(Vector3(0,0,1), paso) * o->rot;
+            o->rot.normalize();
+            o->ActualizarDisplayRot();
         }
+        printf("      [rot360] girando de a %.0f grados hasta completar una vuelta -> rotEuler.z = %.2f\n",
+               paso, o->rotEuler.z);
+        bool okVuelta = (fabsf(o->rotEuler.z - 360.0f) < 1.0f);
+        printf("         esperado 360 (la vuelta se ACUMULA) -> %s\n", okVuelta ? "OK" : "MAL (se perdio)");
+        // ...y la ORIENTACION real tiene que seguir siendo la correcta (identidad tras una vuelta)
+        Quaternion qDeEuler = Quaternion::FromEulerXYZ(o->rotEuler.x, o->rotEuler.y, o->rotEuler.z);
+        Matrix4 A, B; o->rot.ToMatrix(A.m); qDeEuler.ToMatrix(B.m);
+        float dm = 0.0f; for (int i=0;i<16;i++){ float d = fabsf(A.m[i]-B.m[i]); if (d>dm) dm=d; }
+        printf("         el euler con vueltas da la MISMA rotacion que el quaternion: maxdiff=%.6f -> %s\n",
+               dm, (dm < 1e-3f) ? "OK" : "CAMBIO LA ORIENTACION!");
+        bool okOrient = (dm < 1e-3f);
 
-        // ---- AUTO KEY con una vuelta entera ----
+        // ---- 2) seguir girando: 2 vueltas ----
+        for (int i = 0; i < 36; i++){
+            o->rot = Quaternion::FromAxisAngle(Vector3(0,0,1), paso) * o->rot;
+            o->rot.normalize(); o->ActualizarDisplayRot();
+        }
+        printf("      [rot360] otra vuelta mas -> rotEuler.z = %.2f (esperado 720) -> %s\n",
+               o->rotEuler.z, (fabsf(o->rotEuler.z - 720.0f) < 1.0f) ? "OK" : "MAL");
+        bool ok2 = (fabsf(o->rotEuler.z - 720.0f) < 1.0f);
+
+        // ---- 3) AUTO KEY: ahora una vuelta SI se guarda ----
         AutoKeyOn = true;
         EliminarAnimaciones(*o);
-        o->rot = Quaternion(1,0,0,0); o->ActualizarDisplayRot();
+        o->rot = Quaternion(1,0,0,0); o->rotEuler = Vector3(0,0,0); o->ActualizarDisplayRot();
         CurrentFrame = 1;
         estadoObjetos.clear();
-        { SaveState st; st.obj=o; st.pos=o->pos; st.rot=o->rot; st.scale=o->scale; st.worldPos=o->pos;
+        { SaveState st; st.obj=o; st.pos=o->pos; st.rot=o->rot; st.rotEuler=o->rotEuler; st.scale=o->scale; st.worldPos=o->pos;
           estadoObjetos.push_back(st); }
-        o->rot = Quaternion::FromAxisAngle(Vector3(0,0,1), 360.0f);   // UNA VUELTA ENTERA
-        o->ActualizarDisplayRot();
+        for (int i = 0; i < 36; i++){       // la vuelta entera
+            o->rot = Quaternion::FromAxisAngle(Vector3(0,0,1), paso) * o->rot;
+            o->rot.normalize(); o->ActualizarDisplayRot();
+        }
         int n = AutoKeyObjetos();
-        printf("      [rot360] auto key tras rotar 360 grados: guardo %d canal(es) -> %s\n", n,
-               (n == 0) ? "NADA (la vuelta se perdio)" : "algo");
+        float guardado = 0.0f;
+        for (size_t i=0;i<AnimationObjects.size();i++){ if (AnimationObjects[i].obj != o) continue;
+            for (size_t q=0;q<AnimationObjects[i].Propertys.size();q++){
+                AnimProperty& ap = AnimationObjects[i].Propertys[q];
+                if (ap.Property==AnimRotation && ap.component==AnimZ && !ap.keyframes.empty())
+                    guardado = ap.keyframes[0].value; } }
+        printf("      [rot360] AUTO KEY tras una vuelta: guardo %d canal(es), Z Euler Rotation = %.2f -> %s\n",
+               n, guardado, (n >= 1 && fabsf(guardado - 360.0f) < 1.0f) ? "OK (la vuelta se guarda)" : "MAL");
+        bool okKey = (n >= 1 && fabsf(guardado - 360.0f) < 1.0f);
+        AutoKeyOn = false; estadoObjetos.clear();
+
+        // ---- 4) el caso que ROMPIA animaciones importadas: keyframear encima de una curva que ya tiene 405 ----
+        EliminarAnimaciones(*o);
+        AnimationObject* pao = NULL;
+        for (size_t i=0;i<AnimationObjects.size();i++) if (AnimationObjects[i].obj==o){ pao=&AnimationObjects[i]; break; }
+        if (!pao){ AnimationObject nv; nv.obj=o; nv.FirstKeyFrame=0; nv.LastKeyFrame=0;
+                   AnimationObjects.push_back(nv); pao=&AnimationObjects[AnimationObjects.size()-1]; }
+        SetKeyCurva(PropertyDeLista(pao->Propertys, AnimRotation, AnimZ), 1,  0.0f);
+        SetKeyCurva(PropertyDeLista(pao->Propertys, AnimRotation, AnimZ), 20, 405.0f);   // como lo trae un FBX
+        // scrollear al frame 20 (playback) y keyframear ahi SIN tocar nada
+        CurrentFrame = 20;
+        AplicarAnimacionObjetos();
+        printf("      [rot360] curva importada con 405 | tras scrollear al frame 20: rotEuler.z = %.2f\n", o->rotEuler.z);
+        InsertarKeyframeObjeto();
+        float tras = 0.0f;
+        for (size_t q=0;q<pao->Propertys.size();q++){
+            AnimProperty& ap = pao->Propertys[q];
+            if (ap.Property==AnimRotation && ap.component==AnimZ)
+                for (size_t k=0;k<ap.keyframes.size();k++) if (ap.keyframes[k].frame==20) tras = ap.keyframes[k].value; }
+        printf("      [rot360] Insert Keyframe encima -> el keyframe del frame 20 quedo en %.2f -> %s\n",
+               tras, (fabsf(tras - 405.0f) < 1.0f) ? "OK (la vuelta sobrevive)" : "APLASTO LA VUELTA!");
+        bool okImp = (fabsf(tras - 405.0f) < 1.0f);
+
+        // ---- 5) EL CAMINO NUMERICO: tipear "r 360" + Enter. Rota DESDE EL SNAPSHOT de una sola vez (absoluto),
+        //         no de a pasos chicos. Es el caso que reporto Dante.
+        AutoKeyOn = true;
+        EliminarAnimaciones(*o);
+        o->rot = Quaternion(1,0,0,0); o->rotEuler = Vector3(0,0,0); o->ActualizarDisplayRot();
+        CurrentFrame = 1;
+        DeseleccionarTodo(); ObjActivo=o; o->Seleccionar(); ObjSelects.clear(); ObjSelects.push_back(o);
+        // EjeMundo: el eje "Y" del editor es el CRUDO (0,0,1) -> es el que mueve rotEuler.z (el resto del test
+        // rota alrededor de (0,0,1) a mano, asi que asi queda todo mirando el mismo componente).
+        estado = rotacion; axisSelect = Y; transformOrientation = GlobalOrient;
+        estadoObjetos.clear(); guardarEstadoRec(SceneCollection);  // el snapshot, igual que el transform real
+        SetTransformNumerico(360.0f);           // <- lo que hace tipear "360" + Enter
+        printf("      [rot360] camino NUMERICO (r 360 + Enter): rotEuler.z = %.2f\n", o->rotEuler.z);
+        int nNum = AutoKeyObjetos();
+        float gNum = -1.0f;
+        for (size_t i=0;i<AnimationObjects.size();i++){ if (AnimationObjects[i].obj != o) continue;
+            for (size_t q=0;q<AnimationObjects[i].Propertys.size();q++){
+                AnimProperty& ap = AnimationObjects[i].Propertys[q];
+                if (ap.Property==AnimRotation && ap.component==AnimZ && !ap.keyframes.empty())
+                    gNum = ap.keyframes[0].value; } }
+        printf("      [rot360] auto key tras 'r 360': guardo %d canal(es), Z = %.2f -> %s\n",
+               nNum, gNum, (nNum >= 1 && fabsf(gNum - 360.0f) < 1.0f) ? "OK" : "MAL (la vuelta se perdio)");
+        bool okNum = (nNum >= 1 && fabsf(gNum - 360.0f) < 1.0f);
+        estado = editNavegacion; estadoObjetos.clear();
+
+        // ---- 6) el auto key NO puede inventar keyframes. Con el objeto YA en 360 (rot = identidad) y sin tocar
+        //         nada, comparar contra el euler DERIVADO del snapshot daria "de 0 a 360" = un cambio FANTASMA.
+        EliminarAnimaciones(*o);
+        o->rot = Quaternion(1,0,0,0); o->rotEuler = Vector3(0,0,360.0f);   // una vuelta dada: rot es identidad
+        CurrentFrame = 5;
+        estadoObjetos.clear(); guardarEstadoRec(SceneCollection);
+        int nFant = AutoKeyObjetos();                 // sin mover NADA
+        printf("      [rot360] objeto ya en 360 (rot=identidad), sin tocar nada -> auto key guardo %d canal(es) -> %s\n",
+               nFant, (nFant == 0) ? "OK (no inventa keyframes)" : "KEYFRAME FANTASMA!");
+        bool okFant = (nFant == 0);
+        estadoObjetos.clear(); AutoKeyOn = false;
+
+        EliminarAnimaciones(*o);
+        o->rot = Quaternion(1,0,0,0); o->rotEuler = Vector3(0,0,0); o->ActualizarDisplayRot();
+        if (!okVuelta || !okOrient || !ok2 || !okKey || !okImp || !okNum || !okFant){ err="rot360: el euler no conserva las vueltas"; return false; }
+        return true;
+    }
+    // ---- symbnav : lo de Symbian que se puede medir desde PC. (1) el paso de las flechas del timeline depende
+    //      del ZOOM; (2) el lapiz+flechas navega KEYFRAMES; (3) en Pose el lapiz cicla HUESOS, no objetos. ----
+    if (cmd == "symbnav") {
+        Timeline* tl = new Timeline(); tl->Resize(900, 300);
+        tl->ConstruirDopeRows();
+
+        // ---- 1) la velocidad del scrub con la flecha mantenida, segun el zoom ----
+        // Se aplica cada frame de la UI: lo que importa es cuanto se corre EN PANTALLA por tick, no en frames.
+        printf("      [symbnav] scrub con la flecha mantenida (30 ticks), segun el zoom:\n");
+        const float zooms[5] = { 40.0f, 14.0f, 4.0f, 1.0f, 0.2f };
+        bool okVel = true;
+        for (int i=0;i<5;i++){
+            tl->pxPerFrame = zooms[i];
+            CurrentFrame = 500; EndFrame = 100000; StartFrame = -100000;
+            int f0 = CurrentFrame;
+            for (int t=0;t<30;t++) tl->ScrubFlecha(1);
+            float px = (float)(CurrentFrame - f0) * zooms[i] / 30.0f;   // pixeles de pantalla por tick
+            printf("         pxPerFrame=%5.1f -> %4d frames en 30 ticks = %.2f px por tick\n",
+                   zooms[i], CurrentFrame - f0, px);
+            if (px < 2.3f || px > 4.3f) okVel = false;                  // ~3.3 px/tick con CUALQUIER zoom
+        }
+        printf("         ~3 px por tick con cualquier zoom: %s\n", okVel ? "OK" : "MAL");
+        // con mucho zoom un frame cuesta VARIOS ticks (control fino). Antes se redondeaba a 1 frame minimo por
+        // tick -> con zoom alto volaba (era el "se mueve muy rapido").
+        tl->pxPerFrame = 40.0f; CurrentFrame = 500;
+        int ticks = 0; while (CurrentFrame == 500 && ticks < 100){ tl->ScrubFlecha(1); ticks++; }
+        printf("      [symbnav] con zoom alto (40 px/frame): %d ticks para correr 1 frame -> %s\n",
+               ticks, (ticks > 1) ? "control fino OK" : "MAL (1 frame por tick: volaba)");
+        bool okFino = (ticks > 1 && ticks < 100);
+        CurrentFrame = 1;
+
+        // ---- 2) el lapiz navega keyframes ----
+        if (tl->dopeRows.empty()){ err="symbnav: sin filas"; delete tl; return false; }
+        std::vector<int> fr; tl->DopeFramesNav(fr);
+        printf("      [symbnav] frames navegables (los del summary) = %d (de %d filas)\n",
+               (int)fr.size(), (int)tl->dopeRows.size());
+        tl->DopeSelectNone();
+        int mn, mx;
+        bool a1 = tl->DopeSelAvanzar(1, false);
+        bool hay1 = tl->DopeRangoSeleccion(mn, mx);
+        printf("         lapiz (avanzar): eligio keyframes: %s (frame %d)\n", hay1?"si":"NO", hay1?mn:-1);
+        // + derecha con extender: se SUMA otro, la seleccion crece
+        tl->DopeSelAvanzar(1, true);
+        int mn2, mx2; tl->DopeRangoSeleccion(mn2, mx2);
+        printf("         + derecha (mantener y sumar): rango [%d..%d] -> %s\n", mn2, mx2,
+               (mx2 > mx) ? "la seleccion CRECIO OK" : "no crecio");
+        bool okExt = (mx2 > mx);
+        // arriba = todos / abajo = ninguno
+        tl->DopeSelTodoNav();
+        bool okTodo = tl->DopeRangoSeleccion(mn, mx);
+        tl->DopeSelNadaNav();
+        bool okNada = !tl->DopeRangoSeleccion(mn, mx);
+        printf("         + arriba (todos): %s | + abajo (ninguno): %s\n",
+               okTodo?"OK":"MAL", okNada?"OK":"MAL");
+        delete tl;
+        if (!okVel || !okFino || !a1 || !hay1 || !okExt || !okTodo || !okNada){
+            err="symbnav: la navegacion por teclado no anda"; return false; }
+        return true;
+    }
+    // ---- autokeyreal : el AUTO KEY por el camino COMPLETO y REAL, como lo usa Dante: apretar el BOTON del
+    //      timeline, mover el cubo con el transform de verdad, y confirmar con Aceptar(). Los tests anteriores
+    //      llamaban a AutoKeyObjetos() a mano y se salteaban justo los eslabones que pueden estar rotos. ----
+    if (cmd == "autokeyreal") {
+        Object* o = NULL;
+        { std::vector<Object*> st; if(SceneCollection) st.push_back(SceneCollection);
+          while(!st.empty() && !o){ Object* n2=st.back(); st.pop_back();
+            if (n2->getType()==ObjectType::mesh) o=n2;
+            for(size_t i=0;i<n2->Childrens.size();i++) st.push_back(n2->Childrens[i]); } }
+        if (!o){ err="autokeyreal: sin malla"; return false; }
+        DeseleccionarTodo(); ObjActivo=o; o->Seleccionar(); ObjSelects.clear(); ObjSelects.push_back(o);
+        EliminarAnimaciones(*o);
+        InteractionMode = ObjectMode;
         AutoKeyOn = false;
-        estadoObjetos.clear();
-        printf("      [rot360] -> el quaternion no distingue 0 de 360, y el euler se DERIVA de el.\n");
-        printf("               Para animar vueltas hace falta que el euler sea el dato AUTORITATIVO.\n");
+
+        // ---- 1) el BOTON del timeline prende el auto key (camino real: ClickBarButton) ----
+        Timeline* tl = new Timeline(); tl->Resize(900, 300);
+        tl->ConstruirDopeRows(); tl->SyncFields();     // la barra decide visibilidad al sincronizar
+        Button* b = NULL;
+        for (size_t i=0;i<tl->BarButtons.size();i++) if (tl->BarButtons[i]->text == "Auto Key"){ b = tl->BarButtons[i]; break; }
+        if (!b){ err="autokeyreal: no existe el boton Auto Key"; delete tl; return false; }
+        printf("      [autokeyreal] boton 'Auto Key': visible=%s\n", b->visible?"si":"NO");
+        b->sx = 100; b->sy = 10; b->width = 70; b->height = 20;   // posicionarlo (Render es GL, no corre aca)
+        bool tomo = tl->ClickBarButton(b->sx + b->width/2, b->sy + b->height/2);
+        printf("      [autokeyreal] click en el boton -> consumido=%s | AutoKeyOn=%s -> %s\n",
+               tomo?"si":"no", AutoKeyOn?"si":"NO", (tomo && AutoKeyOn) ? "OK" : "EL BOTON NO PRENDE EL AUTO KEY!");
+        bool okBoton = (tomo && AutoKeyOn);
+
+        // ---- 2) mover el cubo con el TRANSFORM REAL y confirmar con Aceptar() ----
+        CurrentFrame = 7;
+        Vector3 antes = o->pos;
+        estado = translacion; axisSelect = X; transformOrientation = GlobalOrient;
+        estadoObjetos.clear(); guardarEstadoRec(SceneCollection);
+        printf("      [autokeyreal] snapshot: %d objeto(s) | estado=%d (translacion=%d)\n",
+               (int)estadoObjetos.size(), estado, (int)translacion);
+        SetTransformNumerico(5.0f);                     // mover 5 en X (lo que hace tipear "5" + Enter)
+        printf("      [autokeyreal] el cubo se movio: (%.2f) -> (%.2f)\n", antes.x, o->pos.x);
+        bool movio = (fabsf(o->pos.x - antes.x) > 1e-3f);
+
+        // el CONFIRM real: lo mismo que hace el click / el Enter
+        if (Viewport3DActive) Viewport3DActive->Aceptar();
+        else { AutoKeyObjetos(); estado = editNavegacion; }   // headless: sin viewport, el mismo par de llamadas
+
+        // ---- 3) se guardo? ----
+        int canales = 0; float kx = -999.0f;
+        for (size_t i=0;i<AnimationObjects.size();i++){ if (AnimationObjects[i].obj != o) continue;
+            for (size_t q=0;q<AnimationObjects[i].Propertys.size();q++){
+                AnimProperty& ap = AnimationObjects[i].Propertys[q];
+                if (ap.keyframes.empty()) continue;
+                canales++;
+                if (ap.Property==AnimPosition && ap.component==AnimX) kx = ap.keyframes[0].value; } }
+        printf("      [autokeyreal] tras confirmar: canales con keyframes=%d | X Location=%.2f -> %s\n",
+               canales, kx, (canales >= 1 && fabsf(kx - o->pos.x) < 1e-2f) ? "GUARDO OK" : "NO GUARDO NADA!");
+        bool okGuardo = (canales >= 1 && fabsf(kx - o->pos.x) < 1e-2f);
+
+        estado = editNavegacion; estadoObjetos.clear(); AutoKeyOn = false;
+        EliminarAnimaciones(*o);
+        delete tl;
+        if (!okBoton || !movio || !okGuardo){ err="autokeyreal: el auto key no guarda por el camino real"; return false; }
+        return true;
+    }
+    // ---- symbkeys : las teclas del timeline en Symbian. (1) 1/2/3 transforman los KEYFRAMES, no el objeto;
+    //      (2) * + arriba/abajo panea (antes no hacia nada); (3) flechas arriba/abajo saltan keyframes;
+    //      (5) 0 + arriba/abajo es zoom VERTICAL, no horizontal. ----
+    if (cmd == "symbkeys") {
+        Object* o = NULL;
+        { std::vector<Object*> st; if(SceneCollection) st.push_back(SceneCollection);
+          while(!st.empty() && !o){ Object* n2=st.back(); st.pop_back();
+            if (n2->getType()==ObjectType::mesh) o=n2;
+            for(size_t i=0;i<n2->Childrens.size();i++) st.push_back(n2->Childrens[i]); } }
+        if (!o){ err="symbkeys: sin malla"; return false; }
+        DeseleccionarTodo(); ObjActivo=o; o->Seleccionar(); ObjSelects.clear(); ObjSelects.push_back(o);
+        EliminarAnimaciones(*o);
+        for (int f = 5; f <= 25; f += 10){ CurrentFrame = f; o->pos.x = (float)f; InsertarKeyframeObjeto(); }
+        CurrentFrame = 1;
+
+        Timeline* tl = new Timeline(); tl->Resize(900, 300);
+        tl->ConstruirDopeRows();
+        ViewportBase* vpPrev = viewPortActive;
+        viewPortActive = tl;                                  // el timeline es el viewport ACTIVO
+
+        // ---- [5] 0 + flechas: cada eje su zoom ----
+        tl->modo = Timeline::TL_MODO_CURVAS;
+        float f0 = tl->pxPerFrame, u0 = tl->pxPerUnit;
+        LayoutTimelineNavFrame(1, 0, true, false);            // 0 + derecha
+        float f1 = tl->pxPerFrame, u1 = tl->pxPerUnit;
+        printf("      [symbkeys] 0+derecha : pxPerFrame %.2f -> %.2f | pxPerUnit %.2f -> %.2f\n", f0,f1,u0,u1);
+        bool okZH = (f1 > f0 + 1e-4f) && (fabsf(u1 - u0) < 1e-4f);
+        printf("                 zoom HORIZONTAL y el vertical intacto: %s\n", okZH?"OK":"MAL");
+        LayoutTimelineNavFrame(0, -1, true, false);           // 0 + arriba
+        float f2 = tl->pxPerFrame, u2 = tl->pxPerUnit;
+        printf("      [symbkeys] 0+arriba  : pxPerFrame %.2f -> %.2f | pxPerUnit %.2f -> %.2f\n", f1,f2,u1,u2);
+        bool okZV = (u2 > u1 + 1e-4f) && (fabsf(f2 - f1) < 1e-4f);
+        printf("                 zoom VERTICAL y el horizontal intacto: %s\n",
+               okZV ? "OK" : "MAL (arriba/abajo tocaba el zoom horizontal!)");
+
+        // ---- [2] * + arriba/abajo: panea (antes: nada) ----
+        float v0 = tl->viewCenterV;
+        LayoutTimelineNavFrame(0, -1, false, true);           // * + arriba
+        printf("      [symbkeys] *+arriba  : centro del valor %.3f -> %.3f -> %s\n", v0, tl->viewCenterV,
+               (fabsf(tl->viewCenterV - v0) > 1e-5f) ? "PANEA OK" : "NO HACE NADA!");
+        bool okPan = (fabsf(tl->viewCenterV - v0) > 1e-5f);
+
+        // ---- [3] flechas arriba/abajo = tecla al VIEWPORT ACTIVO (en el timeline: saltar de keyframe) ----
+        CurrentFrame = 1;
+        bool okSalto1 = LayoutTeclaViewport(W3dK_UP, false);
+        int fr1 = CurrentFrame;
+        LayoutTeclaViewport(W3dK_UP, false);
+        int fr2 = CurrentFrame;
+        LayoutTeclaViewport(W3dK_DOWN, false);
+        int fr3 = CurrentFrame;
+        printf("      [symbkeys] tecla arriba/abajo al viewport activo: frame 1 -> %d -> %d -> %d (keys en 5/15/25)\n",
+               fr1, fr2, fr3);
+        bool okSalto = okSalto1 && fr1 == 5 && fr2 == 15 && fr3 == 5;
+        printf("                 salta a los keyframes: %s\n", okSalto?"OK":"MAL");
+        // la repeticion de flecha mantenida NO salta (corre cada frame: serian 30 saltos por segundo)
+        CurrentFrame = 1;
+        LayoutTimelineNavFrame(0, -1, false, false);
+        printf("      [symbkeys] flecha MANTENIDA (cada frame): frame %d -> %s\n", CurrentFrame,
+               (CurrentFrame == 1) ? "no salta OK" : "SALTA EN LA REPETICION!");
+        bool okNoRep = (CurrentFrame == 1);
+
+        // ---- [1] el '1' del telefono ES la g de PC: va al VIEWPORT ACTIVO y mueve los KEYFRAMES ----
+        tl->DopeSelectAll();
+        int frameAntes = CurrentFrame;
+        bool tomo = LayoutTeclaViewport(W3dK_G, false);
+        printf("      [symbkeys] '1' del telefono = tecla g al viewport activo -> transform de keyframes: %s\n",
+               (tomo && DopeXformActivo()) ? "OK" : "MAL (movia el objeto del viewport3d!)");
+        bool okXf = (tomo && DopeXformActivo());
+        printf("                 el frame actual quedo QUIETO: %s\n",
+               (CurrentFrame == frameAntes) ? "OK" : "MAL");
+        bool okQuieto = (CurrentFrame == frameAntes);
+        if (DopeXformActivo()) DopeXformCancelar();
+
+        viewPortActive = vpPrev;
+        delete tl;
+        EliminarAnimaciones(*o); CurrentFrame = 1;
+        if (!okZH || !okZV || !okPan || !okSalto || !okNoRep || !okXf || !okQuieto){
+            err="symbkeys: las teclas del timeline en symbian no andan"; return false; }
+        return true;
+    }
+    // ---- addref : Add > Reference (plano parado + material + selector de textura) y Add > Vertex (entra a
+    //      Edit Mode con el vertice ya elegido). ----
+    if (cmd == "addref") {
+        // el selector de textura no puede abrirse headless: se anota que lo PIDIERON y con que material
+        static Material* gPedido = NULL;
+        struct H { static void Abrir(Material* m){ gPedido = m; } };
+        void (*prev)(Material*) = DialogoCargarTextura;
+        DialogoCargarTextura = H::Abrir; gPedido = NULL;
+
+        // ---- Reference ----
+        int antes = (int)AnimationObjects.size(); (void)antes;
+        LayoutAccionAdd(20);
+        Object* r = ObjActivo;
+        bool esMalla = (r && r->getType() == ObjectType::mesh);
+        printf("      [addref] Reference creada: nombre='%s' | tipo malla=%s\n",
+               r ? r->name.c_str() : "(nada)", esMalla ? "si" : "NO");
+        bool okNom = (r && r->name == "Reference");
+        Vector3 e = r ? r->rotEuler : Vector3(0,0,0);
+        printf("      [addref] rotacion: X=%.1f Y=%.1f Z=%.1f -> %s\n", e.x, e.y, e.z,
+               (fabsf(e.x - 90.0f) < 0.01f && fabsf(e.y) < 0.01f && fabsf(e.z) < 0.01f)
+                   ? "parada (90 en X) OK" : "MAL");
+        bool okRot = (r && fabsf(e.x - 90.0f) < 0.01f && fabsf(e.y) < 0.01f && fabsf(e.z) < 0.01f);
+        Material* mat = (esMalla && !((Mesh*)r)->materialsGroup.empty())
+                        ? ((Mesh*)r)->materialsGroup[0].material : NULL;
+        printf("      [addref] material propio: %s | selector de textura abierto para ESE material: %s\n",
+               mat ? mat->name.c_str() : "NINGUNO!", (gPedido && gPedido == mat) ? "OK" : "NO SE ABRIO!");
+        bool okMat = (mat != NULL) && (gPedido == mat) && mat->textureOn;
+        printf("      [addref] lighting del material: %s -> %s\n", (mat && mat->lighting) ? "PRENDIDO" : "apagado",
+               (mat && !mat->lighting) ? "OK (la referencia no se sombrea)" : "MAL");
+        if (mat && mat->lighting) okMat = false;
+
+        // ---- Vertex ----
+        InteractionMode = ObjectMode;
+        LayoutAccionAdd(3);
+        Object* v = ObjActivo;
+        bool okEdit = (InteractionMode == EditMode);
+        int nv = (v && v->getType() == ObjectType::mesh) ? ((Mesh*)v)->vertexSize : 0;
+        // "esta seleccionado" se prueba COMO SE USA: el transform lo tiene que agarrar. EditXformIniciar toma el
+        // snapshot de la seleccion y no se activa si no hay nada elegido.
+        ActualizarEditMeshActivo();
+        estado = translacion; axisSelect = ViewAxis;
+        EditXformIniciar();
+        bool agarra = EditXformActivo();
+        if (agarra) EditXformCancelar();
+        estado = editNavegacion;
+        printf("      [addref] Vertex: modo=%s | vertices=%d | el transform lo agarra: %s -> %s\n",
+               okEdit ? "EDIT" : "OBJECT", nv, agarra ? "si" : "NO",
+               (okEdit && agarra && nv == 1) ? "listo para mover OK" : "MAL");
+        bool okVert = okEdit && agarra && (nv == 1);
+
+        DialogoCargarTextura = prev;
+        InteractionMode = ObjectMode;
+        if (!esMalla || !okNom || !okRot || !okMat || !okVert){
+            err = "addref: Add > Reference / Vertex no quedan listos para usar"; return false; }
+        return true;
+    }
+    // ---- vistas : # + flechas en Symbian = vistas por cuadrante (el 1/3/7 del numpad que el telefono no tiene) ----
+    if (cmd == "vistas") {
+        Viewport3D* vp = new Viewport3D(); vp->Resize(600, 400);
+        const char* NOM[3][4] = { {"bottom","bottom+90","bottom+180","bottom+270"},
+                                  {"front","right","back","left"},
+                                  {"top","top+90","top+180","top+270"} };
+        struct L { static const char* nom(Viewport3D* v, const char* (*N)[4]){
+            int y,p2; bool ex; v->VistaCuadranteActual(y,p2,ex);
+            return N[p2+1][y]; } };
+        bool ok = true;
+
+        // ---- 1) orbitando LIBRE: la primera flecha solo ENCUADRA al mas cercano (no saltea) ----
+        vp->SetViewpoint(Viewpoint::front);
+        vp->viewRot = Quaternion::FromAxisAngle(Vector3(0,1,0), 20.0f); // apenas girado desde front
+        vp->viewRot.normalize();
+        vp->VistaCuadranteNav(1, 0);   // # + derecha
+        const char* n1 = L::nom(vp, NOM);
+        printf("      [vistas] orbitando 20 grados desde front + derecha -> %s (%s)\n", n1,
+               strcmp(n1,"front")==0 ? "solo ENCUADRA OK" : "MAL: se saltea un cuadrante");
+        if (strcmp(n1,"front") != 0) ok = false;
+
+        // ---- 2) el anillo: front -> right -> back -> left -> front ----
+        const char* esperado[4] = { "right", "back", "left", "front" };
+        for (int i = 0; i < 4; i++){
+            vp->VistaCuadranteNav(1, 0);
+            const char* n = L::nom(vp, NOM);
+            printf("      [vistas] + derecha -> %-6s (esperado %-6s) %s\n", n, esperado[i],
+                   strcmp(n,esperado[i])==0 ? "OK" : "MAL");
+            if (strcmp(n,esperado[i]) != 0) ok = false;
+        }
+        // ---- 3) front + izquierda = left (el anillo al reves) ----
+        vp->VistaCuadranteNav(-1, 0);
+        const char* nL = L::nom(vp, NOM);
+        printf("      [vistas] front + izquierda -> %s %s\n", nL, strcmp(nL,"left")==0?"OK":"MAL");
+        if (strcmp(nL,"left") != 0) ok = false;
+
+        // ---- 4) arriba = top, y de top NO se sigue girando ----
+        vp->SetViewpoint(Viewpoint::front);
+        vp->VistaCuadranteNav(0, -1);
+        const char* nT = L::nom(vp, NOM);
+        vp->VistaCuadranteNav(0, -1);   // otra vez arriba: tiene que quedarse
+        const char* nT2 = L::nom(vp, NOM);
+        printf("      [vistas] front + arriba -> %s | + arriba otra vez -> %s %s\n", nT, nT2,
+               (strcmp(nT,"top")==0 && strcmp(nT2,"top")==0) ? "OK (de top no gira mas)" : "MAL");
+        if (strcmp(nT,"top") != 0 || strcmp(nT2,"top") != 0) ok = false;
+
+        // ---- 5) desde el top, izq/der rotan 90 ----
+        vp->VistaCuadranteNav(1, 0);
+        const char* nTR = L::nom(vp, NOM);
+        printf("      [vistas] top + derecha -> %s %s\n", nTR, strcmp(nTR,"top+90")==0?"OK (rota 90)":"MAL");
+        if (strcmp(nTR,"top+90") != 0) ok = false;
+
+        // ---- 6) abajo = bottom, con tope ----
+        vp->SetViewpoint(Viewpoint::front);
+        vp->VistaCuadranteNav(0, 1); vp->VistaCuadranteNav(0, 1);
+        const char* nB = L::nom(vp, NOM);
+        printf("      [vistas] front + abajo x2 -> %s %s\n", nB, strcmp(nB,"bottom")==0?"OK (tope)":"MAL");
+        if (strcmp(nB,"bottom") != 0) ok = false;
+
+        // ---- 7) el tap del # : ortografica <-> perspectiva ----
+        bool o0 = vp->orthographic; vp->ChangePerspective();
+        bool o1 = vp->orthographic; vp->ChangePerspective();
+        printf("      [vistas] tap de # : orto=%d -> %d -> %d %s\n", o0?1:0, o1?1:0, vp->orthographic?1:0,
+               (o1 != o0 && vp->orthographic == o0) ? "OK (alterna)" : "MAL");
+        if (!(o1 != o0 && vp->orthographic == o0)) ok = false;
+
+        delete vp;
+        if (!ok){ err = "vistas: la navegacion por cuadrante no sigue la logica pedida"; return false; }
+        return true;
+    }
+    // ---- viewicon : el boton "View" es el icono de monitor (sin texto) -> su menu lleva TITULO (regla de
+    //      diseno). Y el Lock Orbit avisa con un cartel. ----
+    if (cmd == "viewicon") {
+        bool ok = true;
+        // el icono nuevo existe y la tabla quedo del tamano declarado
+        printf("      [viewicon] iconos en la tabla: %d (ICON_TOTAL=%d) | monitor = indice %d\n",
+               (int)IconsUV.size(), (int)ICON_TOTAL, (int)IconType::monitor);
+        if ((int)IconsUV.size() != (int)ICON_TOTAL) { ok = false; printf("                 MAL: la tabla no coincide con ICON_TOTAL\n"); }
+        if ((int)IconType::monitor >= (int)ICON_TOTAL) { ok = false; printf("                 MAL: monitor se sale de la tabla\n"); }
+
+        // ---- el boton del timeline: icono, sin texto ----
+        Timeline* tl = new Timeline(); tl->Resize(900, 300);
+        Button* bv = tl->btnView;
+        if (!bv){ err="viewicon: el timeline no tiene boton View"; delete tl; return false; }
+        printf("      [viewicon] timeline: texto='%s' icono=%d -> %s\n", bv->text.c_str(), bv->icon,
+               (bv->text.empty() && bv->icon == (int)IconType::monitor) ? "monitor sin texto OK" : "MAL");
+        if (!(bv->text.empty() && bv->icon == (int)IconType::monitor)) ok = false;
+
+        // ---- la REGLA: sin texto -> el menu lleva titulo ----
+        tl->AbrirMenuView(0, 0);   // el abridor REAL del boton (el hit-test necesita posiciones, que las pone Render)
+        extern PopupMenu* MenuAbierto;
+        std::string tit = MenuAbierto ? MenuAbierto->titulo : std::string("(no abrio)");
+        printf("      [viewicon] su menu: titulo='%s' -> %s\n", tit.c_str(),
+               (tit == T("View")) ? "OK (se abre desde un icono: lleva titulo)" : "MAL");
+        // contra T("View"): el titulo sale TRADUCIDO al idioma del sistema, que es el punto de todo esto
+        if (tit != T("View")) ok = false;
+        if (MenuAbierto) MenuAbierto->Cerrar();
+        delete tl;
+
+        // ---- la barra del viewport3d: los botones que pasaron a ICONO no llevan texto (es el punto: ganar
+        //      ancho). OJO: icono+texto es valido en general ("Object Mode" lo usa) -> se miran ESTOS, no todos.
+        Viewport3D* v3 = new Viewport3D(); v3->Resize(800, 600);
+        const int QUIERO[5] = { (int)IconType::monitor, (int)IconType::visible, (int)IconType::camera,
+                                (int)IconType::snap,    (int)IconType::object };
+        const char* NOMB[5] = { "View", "Overlays", "Render", "Snap", "Object" };
+        for (int q = 0; q < 5; q++){
+            bool hay = false;
+            for (size_t i = 0; i < v3->BarButtons.size(); i++){
+                Button* b = v3->BarButtons[i];
+                if (b->icon == QUIERO[q] && b->text.empty()){ hay = true; break; }
+            }
+            printf("      [viewicon] barra 3D: %-8s icono=%2d sin texto -> %s\n", NOMB[q], QUIERO[q],
+                   hay ? "OK" : "MAL (sigue con texto / sin icono)");
+            if (!hay) ok = false;
+        }
+        // El boton de CONTEXTO se refresca por frame: no alcanza con mirar como nacio, hay que correr el sync
+        // (era justo el agujero: el constructor lo dejaba sin texto y el render se lo volvia a poner).
+        Object* om = NULL;
+        { std::vector<Object*> st; if(SceneCollection) st.push_back(SceneCollection);
+          while(!st.empty() && !om){ Object* n2=st.back(); st.pop_back();
+            if (n2->getType()==ObjectType::mesh) om=n2;
+            for(size_t q=0;q<n2->Childrens.size();q++) st.push_back(n2->Childrens[q]); } }
+        if (om){ DeseleccionarTodo(); ObjActivo=om; om->Seleccionar(); ObjSelects.clear(); ObjSelects.push_back(om); }
+        InteractionMode = ObjectMode;
+        v3->SyncBotonContexto();
+        Button* bo = NULL;
+        for (size_t i=0;i<v3->BarButtons.size();i++)
+            if (v3->BarButtons[i]->icon == (int)IconType::object && v3->BarButtons[i]->text.empty()) bo = v3->BarButtons[i];
+        printf("      [viewicon] boton de contexto tras el sync: %s\n",
+               bo ? "sin texto, icono cubo OK" : "MAL (el sync le devuelve el texto)");
+        if (!bo) ok = false;
+        // en Edit Mode pasa a ser el icono del sub-elemento, y SIGUE sin texto
+        InteractionMode = EditMode; EditSelectMode = SelFace;
+        v3->SyncBotonContexto();
+        Button* bf = NULL;
+        for (size_t i=0;i<v3->BarButtons.size();i++)
+            if (v3->BarButtons[i]->icon == (int)IconType::selFace && v3->BarButtons[i]->text.empty()) bf = v3->BarButtons[i];
+        printf("      [viewicon] en Edit Mode (caras): %s\n",
+               bf ? "icono de cara, sin texto OK" : "MAL");
+        if (!bf) ok = false;
+        InteractionMode = ObjectMode;
+        delete v3;
+
+        // ---- Lock Orbit: el toggle (el cartel lo manda Notificar; gNotifs es privado y no se expone por un test)
+        Viewport3D* vp = new Viewport3D(); vp->Resize(600, 400);
+        Viewport3D* prev = (Viewport3D*)Viewport3DActive; Viewport3DActive = vp;
+        vp->lockOrbit = false;
+        LayoutLockOrbitToggle(); bool l1 = vp->lockOrbit;
+        LayoutLockOrbitToggle(); bool l2 = vp->lockOrbit;
+        printf("      [viewicon] 9: lock=%d -> otra vez -> lock=%d -> %s\n", l1?1:0, l2?1:0,
+               (l1 && !l2) ? "bloquea y desbloquea OK" : "MAL");
+        if (!(l1 && !l2)) ok = false;
+        Viewport3DActive = prev; delete vp;
+
+        if (!ok){ err = "viewicon: el icono/titulo/lock orbit no quedaron como se pidio"; return false; }
+        return true;
+    }
+    // ---- lang : el sistema de idiomas del editor. La clave ES el ingles -> lo no traducido sale en ingles. ----
+    if (cmd == "lang") {
+        bool ok = true;
+        W3dIdioma prev = g_idioma;
+
+        // ---- lo que DETECTA en esta maquina, de verdad (no un caso de prueba) ----
+        W3dIdioma prevDet = g_idioma;
+        W3dIdiomaDetectar();
+        printf("      [lang] idioma detectado del SISTEMA: %s\n", W3dIdiomaNombre(g_idioma));
+        g_idioma = prevDet;
+
+        // ---- la tabla esta ORDENADA: de eso depende la biseccion de T() ----
+        bool ordenada = true;
+        for (unsigned int i = 1; i < W3D_LANG_ENTRADAS; i++)
+            if (strcmp(W3dLangTabla[i-1].en, W3dLangTabla[i].en) >= 0) ordenada = false;
+        printf("      [lang] tabla: %u entradas | ordenada (la biseccion lo exige): %s\n",
+               W3D_LANG_ENTRADAS, ordenada ? "OK" : "MAL");
+        if (!ordenada) ok = false;
+
+        // ---- ingles = la clave, tal cual ----
+        W3dIdiomaSet(W3dLangEN);
+        printf("      [lang] EN: T(\"Add\")='%s' -> %s\n", T("Add"), strcmp(T("Add"),"Add")==0 ? "OK" : "MAL");
+        if (strcmp(T("Add"), "Add") != 0) ok = false;
+
+        // ---- espaniol / portugues: se contrasta contra LA TABLA, no contra una traduccion escrita a mano
+        //      (clavarla aca solo prueba que la copie bien, y se rompe cada vez que se mejora una palabra) ----
+        W3dIdiomaSet(W3dLangES);
+        const char* es = T("Add");
+        W3dIdiomaSet(W3dLangPT);
+        const char* pt = T("Add");
+        printf("      [lang] T(\"Add\") -> ES:'%s' PT:'%s' -> %s\n", es, pt,
+               (strcmp(es,"Add") != 0 && strcmp(pt,"Add") != 0) ? "traducido en los dos OK" : "MAL");
+        if (strcmp(es,"Add") == 0 || strcmp(pt,"Add") == 0) ok = false;
+
+        // ---- lo que NO esta en la tabla cae al ingles: nunca vacio, nunca una clave ----
+        W3dIdiomaSet(W3dLangES);
+        const char* falta = T("Esto No Existe En La Tabla");
+        printf("      [lang] sin traducir -> '%s' %s\n", falta,
+               strcmp(falta, "Esto No Existe En La Tabla")==0 ? "OK (cae al ingles)" : "MAL");
+        if (strcmp(falta, "Esto No Existe En La Tabla") != 0) ok = false;
+
+        // ---- la biseccion encuentra TODAS las entradas (no solo la del medio) ----
+        int fallos = 0;
+        W3dIdiomaSet(W3dLangES);
+        for (unsigned int i = 0; i < W3D_LANG_ENTRADAS; i++){
+            const char* r = T(W3dLangTabla[i].en);
+            const char* esperado = (W3dLangTabla[i].es[0]) ? W3dLangTabla[i].es : W3dLangTabla[i].en;
+            if (strcmp(r, esperado) != 0) fallos++;
+        }
+        printf("      [lang] biseccion sobre las %u entradas: %d fallos -> %s\n",
+               W3D_LANG_ENTRADAS, fallos, fallos==0 ? "OK" : "MAL");
+        if (fallos) ok = false;
+
+        // ---- los codigos del SO: variante regional = mismo idioma ----
+        struct C { const char* cod; W3dIdioma esp; };
+        const C casos[] = { {"es", W3dLangES}, {"es-AR", W3dLangES}, {"es_MX.UTF-8", W3dLangES},
+                            {"ES", W3dLangES}, {"pt", W3dLangPT}, {"pt-BR", W3dLangPT},
+                            {"en", W3dLangEN}, {"en-US", W3dLangEN}, {"de", W3dLangEN},
+                            {"fr_FR", W3dLangEN}, {"e", W3dLangEN}, {"", W3dLangEN} };
+        int malos = 0;
+        for (int i = 0; i < 12; i++){
+            W3dIdioma r = W3dIdiomaDe(casos[i].cod);
+            if (r != casos[i].esp){ malos++;
+                printf("         '%s' -> %s (esperado %s) MAL\n", casos[i].cod,
+                       W3dIdiomaNombre(r), W3dIdiomaNombre(casos[i].esp)); }
+        }
+        printf("      [lang] codigos del SO (12 casos, con variantes regionales): %d mal -> %s\n",
+               malos, malos==0 ? "OK" : "MAL");
+        if (malos) ok = false;
+        printf("      [lang] NULL no rompe: T(NULL)='%s' | W3dIdiomaDe(NULL)=%s\n",
+               T(NULL), W3dIdiomaNombre(W3dIdiomaDe(NULL)));
+
+        g_idioma = prev;
+        if (!ok){ err = "lang: el sistema de idiomas no anda"; return false; }
+        return true;
+    }
+    // ---- ajustes : la tarjeta "Ajustes" de la pestania Render (el config.ini editable desde adentro) ----
+    if (cmd == "ajustes") {
+        bool ok = true;
+        Properties* pr = new Properties(); pr->Resize(300, 700);
+        printf("      [ajustes] la tarjeta existe: %s\n", pr->propAjustes ? "si" : "NO");
+        if (!pr->propAjustes){ err="ajustes: no se creo la tarjeta"; delete pr; return false; }
+        printf("      [ajustes] titulo='%s' | filas=%d\n", pr->propAjustes->name.c_str(),
+               (int)pr->propAjustes->properties.size());
+        // idioma / antialiasing / backend / skin / guardar = 5
+        bool okFilas = ((int)pr->propAjustes->properties.size() == 5);
+        printf("      [ajustes] idioma=%s antialias=%s backend=%s skin=%s -> %s\n",
+               pr->propAjIdioma?"si":"NO", pr->propAjAntialias?"si":"NO",
+               pr->propAjBackend?"si":"NO", pr->propAjSkin?"si":"NO",
+               (okFilas && pr->propAjIdioma && pr->propAjAntialias && pr->propAjBackend && pr->propAjSkin) ? "OK" : "MAL");
+        if (!okFilas || !pr->propAjIdioma || !pr->propAjAntialias || !pr->propAjBackend || !pr->propAjSkin) ok = false;
+
+        // el tilde escribe el config REAL (no una copia)
+        printf("      [ajustes] el tilde apunta a cfg.enableAntialiasing: %s\n",
+               (pr->propAjAntialias->value == &cfg.enableAntialiasing) ? "OK" : "MAL");
+        if (pr->propAjAntialias->value != &cfg.enableAntialiasing) ok = false;
+
+        // ABAJO DE TODO en SU pestania: despues de Render y de Export. (Ser la ultima GLOBAL no corresponde:
+        // mas abajo se cargan las tarjetas de las OTRAS pestanias, que no comparten pantalla con esta.)
+        int iRen = -1, iExp = -1, iAj = -1;
+        for (size_t q = 0; q < pr->GroupProperties.size(); q++){
+            if (pr->GroupProperties[q] == pr->propRender)  iRen = (int)q;
+            if (pr->GroupProperties[q] == pr->propExport)  iExp = (int)q;
+            if (pr->GroupProperties[q] == pr->propAjustes) iAj  = (int)q;
+        }
+        bool abajo = (iRen >= 0 && iExp >= 0 && iAj > iRen && iAj > iExp);
+        printf("      [ajustes] orden en Render: Render=%d Export=%d Ajustes=%d -> %s\n",
+               iRen, iExp, iAj, abajo ? "OK (abajo de todo)" : "MAL");
+        if (!abajo) ok = false;
+
+        // guardar y volver a leer: el ida y vuelta REAL contra el disco
+        extern bool W3dConfigGuardar();
+        W3dIdioma prevL = g_idioma; bool prevAA = cfg.enableAntialiasing;
+        W3dIdiomaSet(W3dLangPT); cfg.enableAntialiasing = !prevAA;
+        bool escribio = W3dConfigGuardar();
+        std::string ruta = w3dFileSystem::GetResDir() + "/config.ini";
+        std::string txt; { FILE* f = fopen(ruta.c_str(), "rb");
+            if (f){ char b[512]; size_t n; while ((n = fread(b,1,sizeof b,f)) > 0) txt.append(b,n); fclose(f); } }
+        bool tieneIdioma = (txt.find("idioma = pt") != std::string::npos);
+        bool tieneAA = (txt.find(std::string("enableAntialiasing = ") + (cfg.enableAntialiasing?"true":"false")) != std::string::npos);
+        printf("      [ajustes] guardado: escribio=%s | 'idioma = pt' en el ini=%s | antialias=%s -> %s\n",
+               escribio?"si":"NO", tieneIdioma?"si":"NO", tieneAA?"si":"NO",
+               (escribio && tieneIdioma && tieneAA) ? "OK" : "MAL");
+        if (!(escribio && tieneIdioma && tieneAA)) ok = false;
+        // dejar el config como estaba (el test no le cambia la config al usuario)
+        W3dIdiomaSet(prevL); cfg.enableAntialiasing = prevAA; W3dConfigGuardar();
+
+        delete pr;
+        if (!ok){ err = "ajustes: la tarjeta no quedo como se pidio"; return false; }
         return true;
     }
     // ---- normstats <name> : normales de la malla -> #verts, normales DISTINTAS y posiciones con MAS DE UNA normal

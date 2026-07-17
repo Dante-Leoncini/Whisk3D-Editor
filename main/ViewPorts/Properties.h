@@ -54,6 +54,9 @@ void DibujarTitulo(Object* obj, int maxPixels);
 // una imagen y la asigna al material 'mat' (async: puede abrir un modal).
 class Material;
 extern void (*DialogoCargarTextura)(Material* mat);
+// Crea un material nuevo (Material, Material.001, ...) en el mesh part indicado y lo devuelve. NULL si el indice no
+// existe. Lo usa el Add > Reference para dejar el material listo y abrirle el selector de textura enseguida.
+Material* NuevoMaterialEnMeshPart(Mesh* mesh, int idx);
 // "Load Texture" del normal map: prende este flag y usa el MISMO DialogoCargarTextura (browser compartido 4 OS);
 // el callback de carga de cada plataforma asigna a mat->normalTexture en vez de mat->texture cuando esta en true.
 extern bool gCargarTexturaComoNormal;
@@ -233,11 +236,20 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         void FindMouseOver(int mx, int my);
         void event_mouse_motion(int mx, int my) override;
         bool event_finger_scroll(int px, int py, int dx, int dy) override; // touch: arrastrar = scroll vertical
+        // tarjeta "Ajustes" (pestania Render): el config.ini editable desde adentro del programa.
+        // FUERA del #ifndef: son DATOS de la tarjeta, no metodos de SDL. La tarjeta se arma igual en el telefono
+        // -- de hecho ahi es donde mas sirve, que es donde no hay un editor de texto para tocar el .ini a mano.
+        GroupPropertie* propAjustes;
+        PropButton* propAjIdioma;   // dropdown de idioma
+        PropBool*   propAjAntialias;
+        PropButton* propAjBackend;  // dropdown del backend grafico
+        PropButton* propAjSkin;     // dropdown del skin
+
 #ifndef W3D_SYMBIAN
-        void mouse_button_up(SDL_Event &e) override;
-        void event_mouse_wheel(SDL_Event &e) override;
-        void event_key_down(SDL_Event &e) override;
-        void event_key_up(SDL_Event &e) override;
+        void mouse_button_up(int boton) override;
+        void event_mouse_wheel(float dy, int mx, int my) override;
+        void event_key_down(int tecla, bool repeticion) override;
+        void event_key_up(int tecla) override;
 #endif
         // click: plegar/desplegar el grupo cuyo titulo este bajo el mouse
         // (compartido; en PC se cablea a mouse_button_up)

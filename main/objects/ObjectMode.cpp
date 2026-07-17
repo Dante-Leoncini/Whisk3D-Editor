@@ -1,4 +1,5 @@
 #include "ObjectMode.h"
+#include "W3dLang.h"   // T(): los textos salen en el idioma del sistema
 #include "render/OpcionesRender.h" // g_transformPivot + enum TransformPivot (editor)
 #include "objects/Mesh.h"      // snap del cursor al centro de la malla en Edit Mode
 #include "EditMesh.h"  // CentroSeleccion
@@ -27,7 +28,8 @@ void ReestablecerEstado(bool ClearEstado){
 			Object& obj = *estadoObj.obj;
 			obj.pos = estadoObj.pos;
 			obj.rot = estadoObj.rot;
-        	obj.ActualizarDisplayRot();
+			obj.rotEuler = estadoObj.rotEuler;  // ANTES de ActualizarDisplayRot: es la referencia de las vueltas
+			obj.ActualizarDisplayRot();
 			obj.scale = estadoObj.scale;
 		}
 		//estadoObjetos.Close();
@@ -157,13 +159,11 @@ void Cancelar(){
 	ViewPortClickDown = false;
 };
 
-#ifdef W3D_SYMBIAN
-void EliminarAnimaciones(Object&) {} // animacion: pendiente en Symbian
-void InsertarKeyframeObjeto() {}
-void BorrarKeyframeObjeto() {}
-void LimpiarKeyframeObjeto() {}
-void AplicarAnimacionObjetos() {}
-#else
+// Toggles de animacion. Van FUERA del #ifdef de abajo: son estado, no implementacion, y los usan las dos
+// plataformas. AutoKeyOn en particular lo lee el auto key de POSE (que vive en el Core y SI anda en Symbian).
+bool AutoKeyOn = false;      // lo prende/apaga el boton del timeline
+bool MotionTrailOn = false;  // menu Animation del viewport 3D: ver el camino de los objetos animados
+
 void EliminarAnimaciones(Object& obj){
 	for(size_t a = 0; a < AnimationObjects.size(); a++) {
 		if (AnimationObjects[a].obj == &obj) {
@@ -204,8 +204,6 @@ static void SetKeyObj3(AnimationObject& ao, int prop, int frame, float x, float 
 //  Es por CANAL, no por propiedad: si solo rotaste en X, se guarda X Euler Rotation y NADA mas. Eso es lo que
 //  permite el modelo de curvas por componente (cada X/Y/Z es una curva propia).
 // ============================================================================
-bool AutoKeyOn = false;      // lo prende/apaga el boton del timeline
-bool MotionTrailOn = false;  // menu Animation del viewport 3D: ver el camino de los objetos animados
 
 // un canal cambio? Se compara con una tolerancia relativa: el transform pasa por matrices y trigonometria, asi
 // que un valor que "no se toco" vuelve con basura en el ultimo bit y == daria cambios fantasma en los 9 canales.
@@ -228,7 +226,9 @@ int AutoKeyObjetos(){
 		Object* o = estadoObjetos[e].obj; if (!o) continue;
 		o->ActualizarDisplayRot();                 // rotEuler al dia (el transform trabaja sobre el quaternion)
 		// el euler de ANTES sale del quaternion del snapshot, que es lo unico que se guardo
-		Vector3 rotVieja = estadoObjetos[e].rot.ToEulerXYZ();   // el MISMO camino que usa ActualizarDisplayRot
+		// el euler de ANTES sale del snapshot TAL CUAL (con sus vueltas). Derivarlo del quaternion del snapshot
+		// lo devolvia canonico: rotar 360 daba "de 0 a 0" y el auto key no guardaba nada.
+		Vector3 rotVieja = estadoObjetos[e].rotEuler;
 		AnimationObject& ao = AnimObjDe(o);
 		const Vector3& p0 = estadoObjetos[e].pos;
 		const Vector3& s0 = estadoObjetos[e].scale;
@@ -265,7 +265,7 @@ static void TransformEnFrame(Object* o, int f, Vector3& T, Vector3& R, Vector3& 
 // frame. Sin esto el trail de un objeto emparentado sale mal apenas el padre tambien se mueve: se dibujaba con el
 // world ACTUAL del padre, o sea el camino del hijo pegado a donde el padre esta AHORA, no a donde estaba en cada
 // frame. NULL -> identidad (no tiene padre).
-Matrix4 WorldEnFrame(Object* o, int f){
+static Matrix4 WorldEnFrame(Object* o, int f){   // solo la usa MotionTrailDe, aca mismo
 	Matrix4 M; M.Identity();
 	if (!o) return M;
 	// de la raiz hacia abajo: world = padre * local
@@ -365,11 +365,12 @@ void AplicarAnimacionObjetos(){
 		// EvalPropVec evalua X/Y/Z por separado; el componente sin curva propia queda en el valor actual del objeto
 		if (hayP) ao.obj->pos   = EvalPropVec(ao.Propertys, AnimPosition, CurrentFrame, ao.obj->pos);
 		if (hayS) ao.obj->scale = EvalPropVec(ao.Propertys, AnimScale,    CurrentFrame, ao.obj->scale);
+		// la CURVA es el dato: puede traer 405 (una vuelta y monedas) y hay que respetarlo tal cual. Con
+		// rot=... + ActualizarDisplayRot el euler quedaba en 45 y un Insert Keyframe encima aplastaba la vuelta.
 		if (hayR){ Vector3 e = EvalPropVec(ao.Propertys, AnimRotation, CurrentFrame, ao.obj->rotEuler);
-			ao.obj->rot = Quaternion::FromEulerXYZ(e.x,e.y,e.z); ao.obj->ActualizarDisplayRot(); }
+			ao.obj->SetRotEuler(e); }
 	}
 }
-#endif
 
 void Eliminar(bool IncluirCollecciones){
 	if (InteractionMode == ObjectMode){
@@ -473,6 +474,7 @@ void guardarEstadoRec(Object* obj){
         NuevoEstado.obj = obj;
         NuevoEstado.pos = obj->pos;
 		NuevoEstado.rot = obj->rot;
+		NuevoEstado.rotEuler = obj->rotEuler;   // con sus vueltas (el quaternion solo no alcanza)
         NuevoEstado.scale = obj->scale;
         NuevoEstado.worldPos = obj->GetGlobalPosition(); // para rotar/escalar desde el pivot
         estadoObjetos.push_back(NuevoEstado);
@@ -683,7 +685,7 @@ void JoinObjetos(){
             if (o && o->select && o->getType() == ObjectType::mesh) { active = o; break; }
         }
     }
-    if (!active) { Notificar("Join: no active mesh object", true); return; }
+    if (!active) { Notificar(T("Join: no active mesh object"), true); return; }
     Mesh* am = (Mesh*)active;
 
     std::vector<Object*> merged; // mallas seleccionadas != activo (no-Mesh se ignoran; SIN duplicados)
@@ -693,7 +695,7 @@ void JoinObjetos(){
         bool dup = false; for (size_t k = 0; k < merged.size(); k++) if (merged[k] == o) { dup = true; break; } // ObjSelects puede traer
         if (!dup) merged.push_back(o); // la misma malla repetida -> sin este dedup se anexaba 2 veces (caras dobladas -> malla "invisible"/rota)
     }
-    if (merged.empty()) { Notificar("Join: select 2+ mesh objects (active is the target)", true); return; }
+    if (merged.empty()) { Notificar(T("Join: select 2+ mesh objects (active is the target)"), true); return; }
 
     Matrix4 Wa; active->GetWorldMatrix(Wa);   // mundo->local del activo (cadena de padres completa)
     Matrix4 invWa; InvertAffine(Wa, invWa);
@@ -753,7 +755,7 @@ void AplicarTransform(int what){
     for (size_t i=0;i<ObjSelects.size();i++){ Object* o=ObjSelects[i]; if(!o) continue;
         if (o->getType()==ObjectType::mesh) mallas.push_back(o);
         else if (o->getType()==ObjectType::armature) arms.push_back((Armature*)o); }
-    if (mallas.empty() && arms.empty()) { Notificar("Apply: select mesh or armature object(s)", true); return; }
+    if (mallas.empty() && arms.empty()) { Notificar(T("Apply: select mesh or armature object(s)"), true); return; }
 
     Quaternion idRot = Quaternion::FromEulerXYZ(0.0f,0.0f,0.0f); // identidad
     UndoApplyIniciar(); // snapshot de transforms + geo de mallas + rest de huesos de armatures (undo atomico)
@@ -797,7 +799,7 @@ void AplicarTransform(int what){
 // Set Active Object as Camera (Ctrl+Numpad 0 / menu View > Cameras): hace que el objeto ACTIVO sea la CAMARA
 // activa de la escena. Solo si el activo ES una camara (si no es camara NO se puede -> no hace nada, false).
 bool SetActiveObjectAsCamera(){
-    if (!ObjActivo || ObjActivo->getType() != ObjectType::camera) { Notificar("Set Active Camera: the active object is not a camera", true); return false; }
+    if (!ObjActivo || ObjActivo->getType() != ObjectType::camera) { Notificar(T("Set Active Camera: the active object is not a camera"), true); return false; }
     CameraActive = (Camera*)ObjActivo; // Camera : public Object (1ra base) -> cast offset 0
     return true;
 }
@@ -978,14 +980,14 @@ void SincronizarRotacionActiva(){
 	if (!ObjActivo) return;
 	if (ObjActivo->rotMode == RotQuaternion){
 		ObjActivo->rot.normalize();             // se editaron w/x/y/z directo
+		ObjActivo->ActualizarDisplayRot();      // refresca el euler (conservando sus vueltas) y el axis/angle
 	} else if (ObjActivo->rotMode == RotAxisAngle){
 		// el eje tiene que ser unitario para que el angulo sea correcto
 		ObjActivo->rot = Quaternion::FromAxisAngle(ObjActivo->rotAxis.Normalized(),
 		                                           ObjActivo->rotAngle);
-	} else { // RotEulerXYZ
-		ObjActivo->rot = Quaternion::FromEulerXYZ(ObjActivo->rotEuler.x,
-		                                          ObjActivo->rotEuler.y,
-		                                          ObjActivo->rotEuler.z);
+		ObjActivo->ActualizarDisplayRot();
+	} else { // RotEulerXYZ: el euler que se tipeo ES el dato (puede ser 405) -> el quaternion se deriva de el
+		ObjActivo->SetRotEuler(ObjActivo->rotEuler);
 	}
 }
 
@@ -1106,7 +1108,27 @@ void SetTransformNumerico(float v){
 			if (axisSelect==ViewAxis||axisSelect==XYZ||axisSelect==OrbitalAxis) ax = camForward;
 			else ax = EjeOrientado(obj, axisSelect);
 			obj.rot = Quaternion::FromAxisAngle(ax, v) * st.rot;
-			obj.rot.normalize(); obj.ActualizarDisplayRot();
+			obj.rot.normalize();
+			// El euler NO se puede re-derivar acá: este camino aplica el angulo de UNA sola vez desde el snapshot
+			// (tipeaste "360"), y conservar vueltas eligiendo "la forma mas parecida a la anterior" solo funciona
+			// con pasos chicos: para un salto de 360 la mas parecida a 0 es 0, y la vuelta se perdia.
+			// El angulo pedido (v) ES el dato: se le suma al euler del snapshot sobre el eje en el que se roto.
+			// Con un eje X/Y/Z global el euler es exactamente el del snapshot + v en ese componente; en cualquier
+			// otro eje (vista, local, plano) el euler no se descompone asi -> ahi se re-deriva como siempre.
+			bool ejeSimple = (transformOrientation == GlobalOrient &&
+			                  (axisSelect == X || axisSelect == Y || axisSelect == Z));
+			if (ejeSimple){
+				Vector3 e = st.rotEuler;
+				// EjeMundo: user X->x, Y->z (profundidad), Z->y (arriba)
+				if (axisSelect == X)      e.x += v;
+				else if (axisSelect == Y) e.z += v;
+				else                      e.y += v;
+				obj.rotEuler = e;
+				obj.rot.ToAxisAngle(obj.rotAngle, obj.rotAxis);
+			} else {
+				obj.rotEuler = st.rotEuler;   // referencia: las vueltas que ya traia
+				obj.ActualizarDisplayRot();
+			}
 		} else { // EditScale: factor v en los ejes activos (swap Y/Z del modelo)
 			Vector3 s = st.scale;
 			switch (axisSelect){

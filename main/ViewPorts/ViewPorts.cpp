@@ -45,12 +45,12 @@ void ViewportBase::button_left() {}
 void ViewportBase::button_right(){};
 void ViewportBase::button_up(){};
 void ViewportBase::button_down(){};
-#ifndef W3D_SYMBIAN
-void ViewportBase::event_key_down(SDL_Event &e) {}
-void ViewportBase::event_key_up(SDL_Event &e) {}
-void ViewportBase::event_mouse_wheel(SDL_Event &e) {}
-void ViewportBase::mouse_button_up(SDL_Event &e) {}
-#endif
+// base: no-op. El viewport que quiera teclas/rueda las overridea (hoy: Timeline en las dos plataformas; el resto
+// todavia solo en PC). Asi el ruteo puede mandarle a cualquiera sin preguntar quien es.
+void ViewportBase::event_key_down(int tecla, bool repeticion) {}
+void ViewportBase::event_key_up(int tecla) {}
+void ViewportBase::event_mouse_wheel(float dy, int mx, int my) {}
+void ViewportBase::mouse_button_up(int boton) {}
 void ViewportBase::event_finger_gesture(float zoomDelta, float panDx, float panDy){} // base: no-op (los paneles no zoomean/panean)
 bool ViewportBase::event_finger_scroll(int px, int py, int dx, int dy){ return false; } // base: no scrollea (el viewport 3D orbita)
 
@@ -162,11 +162,9 @@ void ViewportRow::button_left() {
     ViewPortClickDown = true;
 }
 
-#ifndef W3D_SYMBIAN
-void ViewportRow::mouse_button_up(SDL_Event &e){
+void ViewportRow::mouse_button_up(int boton){
     ViewPortClickDown = false;
 }
-#endif
 
 void ViewportRow::event_mouse_motion(int mx, int my) {
     if (leftMouseDown) {
@@ -247,11 +245,9 @@ void ViewportColumn::button_left() {
     ViewPortClickDown = true;
 }
 
-#ifndef W3D_SYMBIAN
-void ViewportColumn::mouse_button_up(SDL_Event &e){
+void ViewportColumn::mouse_button_up(int boton){
     ViewPortClickDown = false;
 }
-#endif
 
 void ViewportColumn::event_mouse_motion(int mx, int my) {
     if (leftMouseDown) {

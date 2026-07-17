@@ -45,7 +45,6 @@ void W3dNewTransformEnd(TBool aCancel);   // izq=aceptar, der=cancelar
 void W3dNewOrbit(TInt aDx, TInt aDy);
 void W3dNewZoom(TInt aDelta);       // 0 + flechas arriba/abajo = zoom (keypad N95)
 void W3dNewPan(TInt aDx, TInt aDy);  // * + flechas = paneo
-void W3dNewLook(TInt aDx, TInt aDy); // # + flechas = primera persona (girar la mirada)
 // 1/2/3 durante un transform = eje X/Y/Z (cicla global/local/view/libre)
 void W3dNewTransformEje(TInt aEje);
 // 0 durante una rotacion: alterna trackball <-> orbital/gimbal

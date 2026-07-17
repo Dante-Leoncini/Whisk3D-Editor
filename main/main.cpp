@@ -1,4 +1,5 @@
 #include "w3dGraphics.h" // abstraccion de graficos (independencia de OpenGL)
+#include "W3dLang.h"   // config.ini: "idioma = es" fuerza el idioma por encima del SO
 #include "test/W3dScript.h" // modo test: whisk3d --script <ruta>
 
 #ifdef __EMSCRIPTEN__       // WebGL: el browser es 1 hilo -> el loop es emscripten_set_main_loop
@@ -356,6 +357,10 @@ Config loadConfig(const std::string& filename) {
             else if (key == "nuevoUsuario") cfg.nuevoUsuario = (value == "true" || value == "1"); // barra de herramientas
             else if (key == "SkinName") cfg.SkinName = value;
             else if (key == "graphicsAPI") cfg.graphicsAPI = value;
+            else if (key == "idioma") {
+                // "auto" (o ausente) = seguir al sistema. Cualquier otra cosa FUERZA ese idioma.
+                if (value != "auto" && !value.empty()) { g_idioma = W3dIdiomaDe(value.c_str()); g_idiomaForzado = true; }
+            }
         }
     }
 

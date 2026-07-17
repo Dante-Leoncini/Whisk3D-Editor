@@ -46,10 +46,10 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable {
         void event_mouse_motion(int mx, int my) override;
         bool event_finger_scroll(int px, int py, int dx, int dy) override; // touch: arrastrar = scroll v/h
 #ifndef W3D_SYMBIAN
-        void mouse_button_up(SDL_Event &e) override;
-        void event_mouse_wheel(SDL_Event &e) override;
-        void event_key_down(SDL_Event &e) override;
-        void event_key_up(SDL_Event &e) override;
+        void mouse_button_up(int boton) override;
+        void event_mouse_wheel(float dy, int mx, int my) override;
+        void event_key_down(int tecla, bool repeticion) override;
+        void event_key_up(int tecla) override;
 #endif
         // click para seleccionar la fila (compartido; en el N95 lo llama el
         // router del mouse HID, en PC se puede cablear a mouse_button_up)

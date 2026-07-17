@@ -2,6 +2,7 @@
 //  Init de la UI COMPARTIDO (los 4 OS). Ver W3dInitUI.h.
 // ============================================================================
 #include "W3dInitUI.h"
+#include "W3dLang.h"                       // idioma del sistema (los textos salen traducidos desde el primer frame)
 
 #include "objects/Textures.h"          // Textures (vector global)
 #include "w3dTexture.h"                // w3dEngine::LoadTexture
@@ -14,6 +15,11 @@
 #include "ViewPorts/ScrollBar.h"       // CalcScrollUV
 
 void W3dInitUI(const std::string& skinDir) {
+    // El IDIOMA va primero: la UI que se arma abajo ya pide sus textos con T(), asi que tiene que estar resuelto
+    // antes. Aca y no en cada plataforma: este init lo comparten las cinco, y el detector ya sabe preguntarle a
+    // cada SO por su lado.
+    W3dIdiomaDetectar();
+
     // mismo ORDEN que esperan el resto de los modulos (constructor.cpp de PC):
     // 0=font (atlas), 1=origen, 2=cursor3d, 3=relationshipLine, 4=lampara
     static const char* archivos[5] = {

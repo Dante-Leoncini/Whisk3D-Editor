@@ -6,6 +6,60 @@
 #include "WhiskUI/glesdraw.h"        // W3dPantallaAlto
 #include "controles.h"
 #include "Undo.h" // Ctrl+Z
+
+// ---------------------------------------------------------------------------------------------------------------
+//  SDL -> el evento propio del editor (ViewPorts/W3dInput.h). Los viewports no hablan SDL: mientras lo hicieron,
+//  sus 4 metodos de input se compilaban afuera en Symbian y el telefono tenia que reinventar cada tecla por su
+//  cuenta. Aca es donde PC hace SU traduccion; el telefono hace la suya con TKeyEvent y de ahi para adentro es
+//  todo el mismo codigo.
+//  Los imprimibles ya coinciden (SDLK_g es 'g'): solo hay que mapear los que no tienen ASCII.
+// ---------------------------------------------------------------------------------------------------------------
+// La identidad de los imprimibles no es una suposicion: si SDL cambiara de numeracion, esto no compila en vez de
+// morirse en silencio dejando todos los atajos rotos.
+static_assert(SDLK_g == W3dK_G && SDLK_x == W3dK_X && SDLK_0 == W3dK_0 && SDLK_SPACE == W3dK_SPACE,
+              "SDL dejo de numerar los imprimibles por su ASCII: revisar W3dTeclaDesdeSDL");
+static_assert(SDL_BUTTON_LEFT == W3dMB_IZQ && SDL_BUTTON_MIDDLE == W3dMB_MEDIO && SDL_BUTTON_RIGHT == W3dMB_DER,
+              "SDL cambio los numeros de los botones: revisar W3dBotonDesdeSDL");
+
+static int W3dTeclaDesdeSDL(SDL_Keycode k){
+    switch (k){
+        case SDLK_RETURN:    return W3dK_RETURN;
+        case SDLK_ESCAPE:    return W3dK_ESCAPE;
+        case SDLK_BACKSPACE: return W3dK_BACKSPACE;
+        case SDLK_DELETE:    return W3dK_DELETE;
+        case SDLK_TAB:       return W3dK_TAB;
+        case SDLK_HOME:      return W3dK_HOME;
+        case SDLK_END:       return W3dK_END;
+        case SDLK_LEFT:      return W3dK_LEFT;
+        case SDLK_RIGHT:     return W3dK_RIGHT;
+        case SDLK_UP:        return W3dK_UP;
+        case SDLK_DOWN:      return W3dK_DOWN;
+        case SDLK_LSHIFT:    return W3dK_LSHIFT;
+        case SDLK_LCTRL:     return W3dK_LCTRL;
+        case SDLK_LALT:      return W3dK_LALT;
+        case SDLK_KP_0:      return W3dK_KP_0;
+        case SDLK_KP_1:      return W3dK_KP_1;
+        case SDLK_KP_2:      return W3dK_KP_2;
+        case SDLK_KP_3:      return W3dK_KP_3;
+        case SDLK_KP_4:      return W3dK_KP_4;
+        case SDLK_KP_5:      return W3dK_KP_5;
+        case SDLK_KP_6:      return W3dK_KP_6;
+        case SDLK_KP_7:      return W3dK_KP_7;
+        case SDLK_KP_8:      return W3dK_KP_8;
+        case SDLK_KP_9:      return W3dK_KP_9;
+        case SDLK_KP_ENTER:  return W3dK_KP_ENTER;
+        case SDLK_KP_PERIOD: return W3dK_KP_PERIOD;
+        default: break;
+    }
+    if (k >= 32 && k < 127) return (int)k;   // imprimible: vale su ASCII
+    return W3dK_NADA;
+}
+static int W3dBotonDesdeSDL(Uint8 b){
+    if (b == SDL_BUTTON_LEFT)   return W3dMB_IZQ;
+    if (b == SDL_BUTTON_MIDDLE) return W3dMB_MEDIO;
+    if (b == SDL_BUTTON_RIGHT)  return W3dMB_DER;
+    return W3dMB_NINGUNO;
+}
 void RebindMaterialMeshPart(); // (def en Properties.cpp) refresca el panel de material tras undo/redo
 
 // rename de mesh part / material (def en Properties.cpp): el textfield se acepta/cancela aca
@@ -366,7 +420,7 @@ void InputUsuarioSDL3(SDL_Event &e){
             int wmx, wmy; SDL_GetMouseState(&wmx, &wmy);
             ViewportBase* vpRueda = FindViewportUnderMouse(rootViewport, wmx, wmy);
             if (vpRueda && !ViewPortClickDown) viewPortActive = vpRueda; // el foco (borde verde) tambien sigue al cursor
-            (vpRueda ? vpRueda : viewPortActive)->event_mouse_wheel(e);
+            (vpRueda ? vpRueda : viewPortActive)->event_mouse_wheel((float)e.wheel.y, wmx, wmy);
         }
     }
 
@@ -585,7 +639,7 @@ void InputUsuarioSDL3(SDL_Event &e){
         }
 
         if (viewPortActive){
-            viewPortActive->mouse_button_up(e);
+            viewPortActive->mouse_button_up(W3dBotonDesdeSDL(e.button.button));
         }
 
         // idem: no dejar viewPortActive en NULL si el up cayo en un gap/separador (se trababa todo)
@@ -697,6 +751,12 @@ void InputUsuarioSDL3(SDL_Event &e){
             else                             LayoutToggleBarraViewportActivo();
             atajoMenu = true;
         }
+        // barra de espacio = play/pausa de la animacion, este donde este el foco (el timeline no tiene por que
+        // estar activo para querer ver la animacion correr en el 3D). Si estas tipeando en un campo, el espacio
+        // es un espacio.
+        if (e.key.keysym.sym == SDLK_SPACE && !g_textFieldActivo && !PopUpActive && TL_TogglePlay()) {
+            atajoMenu = true;
+        }
         // backspace durante un transform: borra del valor numerico tipeado (los
         // numeros/operadores entran por SDL_TEXTINPUT; el backspace no genera texto)
         if (e.key.keysym.sym == SDLK_BACKSPACE && (TextFieldInputChar(8) || NumInputChar(8) || DopeNumInputChar(8))) {
@@ -729,15 +789,15 @@ void InputUsuarioSDL3(SDL_Event &e){
             if (PopUpActive && PopUpActive->CierraConViewport()) {
                 if (!PopUpActive->Contains(lastMouseX, lastMouseY)) {
                     PopUpActive->Cerrar();
-                    viewPortActive->event_key_down(e);
+                    viewPortActive->event_key_down(W3dTeclaDesdeSDL(e.key.keysym.sym), e.key.repeat != 0);
                 }
             } else {
-                viewPortActive->event_key_down(e);
+                viewPortActive->event_key_down(W3dTeclaDesdeSDL(e.key.keysym.sym), e.key.repeat != 0);
             }
         }
     }
     else if (e.type == SDL_EVENT_KEY_UP) {
-        viewPortActive->event_key_up(e);
+        viewPortActive->event_key_up(W3dTeclaDesdeSDL(e.key.keysym.sym));
     }
     // ENTRADA NUMERICA: el texto tipeado (respeta el layout del teclado: parentesis,
     // *, /, etc.) alimenta el valor exacto del transform. NumInputChar ignora todo si

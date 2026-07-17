@@ -73,11 +73,11 @@ class UVEditor : public ViewportBase, public WithBorder {
         void Panear(float dx, float dy); // paneo de la vista UV (flechas; COMPARTIDO PC/Symbian -> FUERA del #ifndef SDL)
         void ZoomCentro(int dir);        // zoom centrado en el viewport (sin cursor): teclado 0+arriba/abajo (Symbian)
 #ifndef W3D_SYMBIAN
-        void event_key_down(SDL_Event &e) override; // G/R/S + ESC/ENTER (transform)
-        void event_mouse_wheel(SDL_Event &e) override;
+        void event_key_down(int tecla, bool repeticion) override; // G/R/S + ESC/ENTER (transform)
+        void event_mouse_wheel(float dy, int mx, int my) override;
         // IMPRESCINDIBLE: resetear ViewPortClickDown al soltar (sino queda en true y
         // viewPortActive se CONGELA -> el borde verde no cambia + no se puede resize).
-        void mouse_button_up(SDL_Event &e) override;
+        void mouse_button_up(int boton) override;
 #endif
 };
 

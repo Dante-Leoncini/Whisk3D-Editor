@@ -1,4 +1,5 @@
 #include "w3dGraphics.h"            // abstraccion de graficos (independencia de OpenGL)
+#include "W3dLang.h"   // T(): los textos salen en el idioma del sistema
 #include "ConfirmarPopup.h"
 #include "ViewPorts/LayoutInput.h"  // LayoutKey
 #include "WhiskUI/UI.h"             // metricas (RenglonHeightGS/borderGS/marginGS/gapGS/...) + RenderBitmapText
@@ -16,8 +17,8 @@ static const float ROJO_BORRAR[4] = { 0.92f, 0.26f, 0.26f, 1.0f }; // rojo del b
 ConfirmarPopup::ConfirmarPopup() : PopUpBase("Confirmar") {
     onSi = NULL;
     foco = 1; // por defecto resaltado en "Si" (la accion principal)
-    btnSi = new Button("Yes");
-    btnNo = new Button("No");
+    btnSi = new Button(T("Yes"));
+    btnNo = new Button(T("No"));
     btnSi->adaptar = false; btnSi->centrado = true;
     btnNo->adaptar = false; btnNo->centrado = true;
     btnSi->colorTexto = ROJO_BORRAR; // borrar = ROJO
@@ -181,9 +182,9 @@ void AbrirConfirmarBorrado(bool incluirCollecciones) {
         if (ObjSelects[i] && ObjSelects[i]->select) { n++; uno = ObjSelects[i]; }
 
     char buf[128];
-    if (n == 1 && uno) sprintf(buf, "Delete \"%s\"?", uno->name.c_str());
-    else if (n > 1)    sprintf(buf, "Delete %d objects?", n);
-    else               sprintf(buf, "Delete selected?"); // ej. una coleccion (no esta en ObjSelects)
+    if (n == 1 && uno) sprintf(buf, T("Delete \"%s\"?"), uno->name.c_str());
+    else if (n > 1)    sprintf(buf, T("Delete %d objects?"), n);
+    else               sprintf(buf, "%s", T("Delete selected?")); // ej. una coleccion (no esta en ObjSelects)
 
     if (!confirmarPopup) confirmarPopup = new ConfirmarPopup();
     confirmarPopup->Abrir(buf, incluirCollecciones ? ConfirmarBorradoSiCol : ConfirmarBorradoSi);

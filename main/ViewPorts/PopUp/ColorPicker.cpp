@@ -1,4 +1,5 @@
 #include "w3dGraphics.h" // abstraccion de graficos (independencia de OpenGL)
+#include "W3dLang.h"   // T(): los textos salen en el idioma del sistema
 #include "ColorPicker.h"
 #include "ViewPorts/LayoutInput.h" // LayoutKey
 #include "WhiskUI/UI.h"
@@ -84,8 +85,8 @@ ColorPicker::ColorPicker() : PopUpBase("Color") {
     rect = new Rec2D();
     filaCard = new Card(NULL, 10, 10);
     btnOk = new Button("OK");
-    btnCancel = new Button("Cancel");
-    btnUnidad = new Button("Switch to 0-100%");
+    btnCancel = new Button(T("Cancel"));
+    btnUnidad = new Button(T("Switch to 0-100%"));
     btnOk->adaptar = false;
     btnCancel->adaptar = false;
     btnUnidad->adaptar = false;

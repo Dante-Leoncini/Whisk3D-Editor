@@ -1,6 +1,8 @@
 #ifndef VIEWPORTS_H
 #define VIEWPORTS_H
 
+#include "W3dInput.h"   // teclas/botones propios: los viewports no dependen de SDL (ver el header)
+
 #ifdef _WIN32
 #ifndef W3D_SYMBIAN
     #include <windows.h>
@@ -104,13 +106,17 @@ class ViewportBase {
         // boton de accion no puede dispararla. false = ahi no hay ningun menu.
         virtual bool AbrirMenuDeBarra(int mx, int my) { (void)mx; (void)my; return false; }
         virtual void button_down();
-#ifndef W3D_SYMBIAN
-        virtual void event_key_down(SDL_Event &e);
-        virtual void event_key_up(SDL_Event &e);
-
-        virtual void event_mouse_wheel(SDL_Event &e);
-        virtual void mouse_button_up(SDL_Event &e);
-#endif
+        // Input: teclas/rueda/soltar. Ya no dependen de SDL (ver W3dInput.h), asi que existen en TODAS las
+        // plataformas: es lo que permite que el ruteo por viewport activo sea UNO SOLO. Mientras pedian un
+        // SDL_Event, en el telefono se compilaban afuera y cada tecla habia que reinventarla desde el otro lado.
+        virtual void event_key_down(int tecla, bool repeticion);
+        virtual void event_key_up(int tecla);
+        // La rueda ocurre EN una posicion, y esa posicion VIENE CON EL EVENTO. No se lee de lastMouseX/Y: esos
+        // son el ULTIMO CLICK, no donde esta el cursor -- solo los refrescan el click y el warp. Con el global, la
+        // rueda sobre Properties no scrolleaba hasta que clickeabas algo (la barra se la comia por una posicion
+        // vieja).
+        virtual void event_mouse_wheel(float dy, int mx, int my);
+        virtual void mouse_button_up(int boton);
         // gesto de 2 dedos (web/movil): zoomDelta = pinch (abrir dedos = acercar); panDx/panDy = arrastre
         // del punto medio en pixeles. Default vacio; lo implementa el Viewport3D (zoom + paneo).
         virtual void event_finger_gesture(float zoomDelta, float panDx, float panDy);
@@ -187,9 +193,7 @@ class ViewportRow : public ViewportBase {
         void Resize(int newW, int newH) override;
         void Render() override;
         void button_left() override;
-#ifndef W3D_SYMBIAN
-        void mouse_button_up(SDL_Event &e) override;
-#endif
+        void mouse_button_up(int boton) override;
         void event_mouse_motion(int mx, int my) override;
 
         // ------------------ Funciones propias ------------------
@@ -216,9 +220,7 @@ class ViewportColumn : public ViewportBase {
         void Render() override;
 
         void button_left() override;
-#ifndef W3D_SYMBIAN
-        void mouse_button_up(SDL_Event &e) override;
-#endif
+        void mouse_button_up(int boton) override;
         void event_mouse_motion(int mx, int my) override;
 };
 

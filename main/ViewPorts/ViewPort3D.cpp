@@ -1,4 +1,5 @@
 #include "w3dGraphics.h" // abstraccion de graficos (independencia de OpenGL)
+#include "W3dLang.h"   // T(): los textos salen en el idioma del sistema
 #include "ViewPorts/ViewPort3D.h"
 #include "Undo.h" // Ctrl+Z: confirmar transform
 #include "objects/CameraBase.h" // camara base del core (la vista)
@@ -101,28 +102,31 @@ Viewport3D::Viewport3D(Vector3 pos){
     // Cada boton lleva su ROL estable; el dispatch los busca por rol (BarRolBtn) -> el ORDEN
     // VISUAL de aca se puede cambiar libremente sin tocar el dispatch. Orient va ANTES de Select.
     Button* b;
-    b = new Button("Object Mode", (int)IconType::object); b->rol = BR_Mode;
+    b = new Button(T("Object Mode"), (int)IconType::object); b->rol = BR_Mode;
         b->desplegable = true; b->visible = false; BarButtons.push_back(b); // solo si el activo es malla
     b = new Button("", (int)IconType::selVertex); b->rol = BR_SelMode;     // SOLO icono (Vertex/Edge/Face)
         b->desplegable = true; b->visible = false; BarButtons.push_back(b); // solo en edit mode
     b = new Button("", (int)IconType::pivotMedian); b->rol = BR_Pivot;     // Transform Pivot (solo icono)
         b->desplegable = true; BarButtons.push_back(b);
-    b = new Button("Orient"); b->rol = BR_Orient;                          // orientacion del transform
+    b = new Button(T("Orient")); b->rol = BR_Orient;                          // orientacion del transform
         b->desplegable = true; BarButtons.push_back(b);                    // (movido ANTES de Select)
-    b = new Button("Snap"); b->rol = BR_Snap;                              // SNAP (imanta al mover): verde si esta ON
+    b = new Button("", IconType::snap); b->rol = BR_Snap;                  // SNAP (imanta al mover): verde si esta ON
         b->desplegable = true; BarButtons.push_back(b);
-    b = new Button("View"); b->rol = BR_View; b->desplegable = true; BarButtons.push_back(b); // Viewpoint (antes de Select)
-    b = new Button("Select"); b->rol = BR_Select; b->desplegable = true; BarButtons.push_back(b);
-    b = new Button("Add"); b->rol = BR_Add; b->desplegable = true; BarButtons.push_back(b);
-    b = new Button("Mesh"); b->rol = BR_Mesh;                               // Transform/Snap/Delete comun
+    // "View" es un ICONO (monitor): el texto ocupaba ancho de barra, que es lo que escasea (sobre todo en el N95).
+    b = new Button("", IconType::monitor); b->rol = BR_View; b->desplegable = true; BarButtons.push_back(b);
+    b = new Button(T("Select")); b->rol = BR_Select; b->desplegable = true; BarButtons.push_back(b);
+    b = new Button(T("Add")); b->rol = BR_Add; b->desplegable = true; BarButtons.push_back(b);
+    b = new Button(T("Mesh")); b->rol = BR_Mesh;                               // Transform/Snap/Delete comun
         b->desplegable = true; b->visible = false; BarButtons.push_back(b); // SOLO en edit mode
-    b = new Button("Animation"); b->rol = BR_Animation;
+    b = new Button(T("Animation")); b->rol = BR_Animation;
     b->desplegable = true;
     BarButtons.push_back(b);
-    b = new Button("Object"); b->rol = BR_Object;
+    b = new Button("", IconType::object); b->rol = BR_Object;              // cubo
         b->desplegable = true; b->visible = false; BarButtons.push_back(b); // solo con seleccion (no edit)
-    b = new Button("Overlays"); b->rol = BR_Overlays; b->desplegable = true; BarButtons.push_back(b);
-    b = new Button("Render"); b->rol = BR_Render; b->desplegable = true; BarButtons.push_back(b);
+    // Overlays y Render son ICONOS: el texto comia ancho de barra. El OJO del overlay ademas dice el estado
+    // (abierto = se ven; cerrado = apagados), asi que se elige por frame mas abajo, no aca.
+    b = new Button("", IconType::visible); b->rol = BR_Overlays; b->desplegable = true; BarButtons.push_back(b);
+    b = new Button("", IconType::camera);  b->rol = BR_Render;   b->desplegable = true; BarButtons.push_back(b);
     b = new Button("UV"); b->rol = BR_UV;                                  // Mark Seam + proyecciones
         b->desplegable = true; b->visible = false; BarButtons.push_back(b); // SOLO en edit
     barAlpha = 0.5f; // en el 3D la barra deja ver la escena detras
@@ -135,7 +139,7 @@ Viewport3D::Viewport3D(Vector3 pos){
     b = new Button("", (int)IconType::arrowRight); b->rol = TBR_Redo; b->centrado = true; ToolButtons.push_back(b);
     b = new Button("", (int)IconType::notifOk);    b->rol = TBR_Aceptar;  b->centrado = true; ToolButtons.push_back(b);
     // "Repeat" (solo en extrude): acepta el extrude y vuelve a extruir la seleccion, sin buscar el boton Extrude.
-    b = new Button("Repeat"); b->rol = TBR_Repeat; b->centrado = true; ToolButtons.push_back(b);
+    b = new Button(T("Repeat")); b->rol = TBR_Repeat; b->centrado = true; ToolButtons.push_back(b);
     b = new Button("", (int)IconType::notifError); b->rol = TBR_Cancelar; b->centrado = true; ToolButtons.push_back(b);
     // modificadores TACTILES (Android/WebGL sin teclado): Shift y Ctrl. Toggle -> quedan encendidos (verde) y
     // togglean LShiftPressed/LCtrlPressed (multi-seleccion, shortest path). Solo visibles con pantalla tactil.
@@ -143,7 +147,7 @@ Viewport3D::Viewport3D(Vector3 pos){
     b = new Button("Shift"); b->rol = TBR_Shift; b->centrado = true; ToolButtons.push_back(b);
     b = new Button("Ctrl");  b->rol = TBR_Ctrl;  b->centrado = true; ToolButtons.push_back(b);
     // "View" (toggle): en Edit Mode, con 1 dedo orbitar/panear/zoom aunque haya una operacion en curso.
-    b = new Button("View");  b->rol = TBR_View;  b->centrado = true; ToolButtons.push_back(b);
+    b = new Button(T("View"));  b->rol = TBR_View;  b->centrado = true; ToolButtons.push_back(b);
     b = new Button("Global"); b->rol = TBR_Orient; b->desplegable = true; ToolButtons.push_back(b);
     b = new Button("X"); b->rol = TBR_EjeX; b->centrado = true; ToolButtons.push_back(b);
     b = new Button("Y"); b->rol = TBR_EjeY; b->centrado = true; ToolButtons.push_back(b);
@@ -154,171 +158,184 @@ Viewport3D::Viewport3D(Vector3 pos){
     if (!MenuAdd){
         // el desplegable del Add (las opciones todavia no hacen nada)
         MenuAdd = new PopupMenu();
-        MenuAdd->Agregar("Plane", 0, IconType::plane);
-        MenuAdd->Agregar("Cube", 1, IconType::object);
-        MenuAdd->Agregar("Circle", 2, IconType::circle);
-        MenuAdd->Agregar("UV Sphere", 12, IconType::circle); // mismo icono que circle
-        MenuAdd->Agregar("Cone", 13, IconType::cono);
-        MenuAdd->Agregar("Cylinder", 14, IconType::cilindro);
-        MenuAdd->Agregar("Vertex", 3, IconType::mesh);
-        MenuAdd->Agregar("Empty", 4, IconType::empty);
-        MenuAdd->Agregar("Armature", 16, IconType::armature);
-        MenuAdd->Agregar("Camera", 5, IconType::camera);
-        MenuAdd->Agregar("Light", 6, IconType::light);
-        MenuAdd->Agregar("Collection", 8, IconType::archive);
+        MenuAdd->Agregar(T("Plane"), 0, IconType::plane);
+        // Reference: un plano PARADO con su material y el selector de textura ya abierto = imagen de referencia
+        // en un paso (antes: crear plano, rotarlo, crear material, buscar la textura).
+        MenuAdd->Agregar(T("Reference"), 20, IconType::textura);
+        MenuAdd->Agregar(T("Cube"), 1, IconType::object);
+        MenuAdd->Agregar(T("Circle"), 2, IconType::circle);
+        MenuAdd->Agregar(T("UV Sphere"), 12, IconType::circle); // mismo icono que circle
+        MenuAdd->Agregar(T("Cone"), 13, IconType::cono);
+        MenuAdd->Agregar(T("Cylinder"), 14, IconType::cilindro);
+        MenuAdd->Agregar(T("Vertex"), 3, IconType::mesh);
+        MenuAdd->Agregar(T("Empty"), 4, IconType::empty);
+        MenuAdd->Agregar(T("Armature"), 16, IconType::armature);
+        MenuAdd->Agregar(T("Camera"), 5, IconType::camera);
+        MenuAdd->Agregar(T("Light"), 6, IconType::light);
+        MenuAdd->Agregar(T("Collection"), 8, IconType::archive);
         // submenu Imports (ya son varios): OBJ / FBX / glTF / GLB. Los items despachan por LayoutAccionAdd (ids 7/15/17/18).
         MenuImports = new PopupMenu();
         MenuImports->Agregar("OBJ", 7, IconType::mesh);
         MenuImports->Agregar("FBX", 15, IconType::mesh);
         MenuImports->Agregar("glTF", 17, IconType::mesh);
         MenuImports->Agregar("GLB", 18, IconType::mesh);
-        MenuAdd->Agregar("Imports", 19, IconType::mesh, MenuImports);
+        MenuAdd->Agregar(T("Imports"), 19, IconType::mesh, MenuImports);
         // objetos especiales linkeados a un objeto (target): renderizan a otro
-        MenuAdd->Agregar("Duplicate Linked", 9, IconType::instance);
+        MenuAdd->Agregar(T("Duplicate Linked"), 9, IconType::instance);
         MenuAdd->Agregar("Array", 10, IconType::array);
-        MenuAdd->Agregar("Mirror", 11, IconType::mirror);
+        MenuAdd->Agregar(T("Mirror"), 11, IconType::mirror);
     }
     if (!MenuSelect){
         MenuSelect = new PopupMenu();
-        MenuSelect->Agregar("All", 0)->atajo = "A";
-        MenuSelect->Agregar("None", 1)->atajo = "Alt A";
-        MenuSelect->Agregar("Invert", 2)->atajo = "Ctrl I";
+        MenuSelect->Agregar(T("All"), 0)->atajo = "A";
+        MenuSelect->Agregar(T("None"), 1)->atajo = "Alt A";
+        MenuSelect->Agregar(T("Invert"), 2)->atajo = "Ctrl I";
     }
     if (!MenuObject){
         // submenu Transform (Move/Rotate/Scale = G/R/S)
         MenuTransform = new PopupMenu();
-        MenuTransform->Agregar("Move", 100)->atajo = "G";
-        MenuTransform->Agregar("Rotate", 101)->atajo = "R";
-        MenuTransform->Agregar("Scale", 102)->atajo = "S";
+        MenuTransform->Agregar(T("Move"), 100)->atajo = "G";
+        MenuTransform->Agregar(T("Rotate"), 101)->atajo = "R";
+        MenuTransform->Agregar(T("Scale"), 102)->atajo = "S";
         // submenu Set Origin (mueve el origen y/o la geometria)
         MenuSetOrigin = new PopupMenu();
-        MenuSetOrigin->Agregar("Geometry to Origin", 200);
-        MenuSetOrigin->Agregar("Origin to Geometry", 201);
-        MenuSetOrigin->Agregar("Origin to 3D Cursor", 202);
+        MenuSetOrigin->Agregar(T("Geometry to Origin"), 200);
+        MenuSetOrigin->Agregar(T("Origin to Geometry"), 201);
+        MenuSetOrigin->Agregar(T("Origin to 3D Cursor"), 202);
         // submenu Apply (Ctrl A): hornea el transform en la malla (ids 220-223 -> LayoutAccionObject -> AplicarTransform)
         MenuApply = new PopupMenu();
-        MenuApply->titulo = "Apply"; // titulo visible tambien cuando se abre standalone con Ctrl+A
-        MenuApply->Agregar("Location", 220);
-        MenuApply->Agregar("Rotation", 221);
-        MenuApply->Agregar("Scale", 222);
-        MenuApply->Agregar("All Transforms", 223);
-        MenuObject = new PopupMenu();
-        MenuObject->Agregar("Transform", 0, -1, MenuTransform);    // abre submenu
-        MenuObject->Agregar("Set Origin", 4, -1, MenuSetOrigin);  // abre submenu
-        MenuObject->Agregar("Apply", 6, -1, MenuApply)->atajo = "Ctrl A"; // submenu Location/Rotation/Scale/All
-        MenuObject->Agregar("Duplicate Objects", 1)->atajo = "Shift D";
-        MenuObject->Agregar("Duplicate Linked", 2)->atajo = "Alt D";
-        MenuObject->Agregar("Join", 5)->atajo = "Ctrl J"; // une las mallas seleccionadas en el objeto activo
+        MenuApply->titulo = T("Apply"); // titulo visible tambien cuando se abre standalone con Ctrl+A
+        MenuApply->Agregar(T("Location"), 220);
+        MenuApply->Agregar(T("Rotation"), 221);
+        MenuApply->Agregar(T("Scale"), 222);
+        MenuApply->Agregar(T("All Transforms"), 223);
+        // REGLA DE DISENO de los titulos: un menu que se abre desde algo SIN TEXTO (un icono, o un atajo de
+        // teclado) lleva titulo -- es lo unico que te dice que estas mirando. Si lo abre un boton/item que YA
+        // decia el texto, NO lleva: repetirlo es ruido.
+        MenuObject = new PopupMenu(); MenuObject->titulo = T("Object");
+        MenuObject->Agregar(T("Transform"), 0, -1, MenuTransform);    // abre submenu
+        MenuObject->Agregar(T("Set Origin"), 4, -1, MenuSetOrigin);  // abre submenu
+        MenuObject->Agregar(T("Apply"), 6, -1, MenuApply)->atajo = "Ctrl A"; // submenu Location/Rotation/Scale/All
+        MenuObject->Agregar(T("Duplicate Objects"), 1)->atajo = "Shift D";
+        MenuObject->Agregar(T("Duplicate Linked"), 2)->atajo = "Alt D";
+        MenuObject->Agregar(T("Join"), 5)->atajo = "Ctrl J"; // une las mallas seleccionadas en el objeto activo
         // Set/Clear Parent (Ctrl P / Ctrl Alt P): submenus construidos en LayoutInput.cpp (reusan los mismos que
         // los atajos). Solo aparecen aca -> solo en Object Mode (MenuObject no se muestra en Edit).
-        MenuObject->Agregar("Set Parent",   0, -1, LayoutSubmenuSetParent())->atajo = "Ctrl P";
-        MenuObject->Agregar("Clear Parent", 0, -1, LayoutSubmenuClearParent())->atajo = "Ctrl Alt P";
-        MenuObject->Agregar("Delete", 3)->atajo = "X";
+        MenuObject->Agregar(T("Set Parent"),   0, -1, LayoutSubmenuSetParent())->atajo = "Ctrl P";
+        MenuObject->Agregar(T("Clear Parent"), 0, -1, LayoutSubmenuClearParent())->atajo = "Ctrl Alt P";
+        MenuObject->Agregar(T("Delete"), 3)->atajo = "X";
         // menu "Animation" (barra, Object Mode): keyframes del TRANSFORM del objeto + Motion Trail. Antes era un
         // SUBMENU de "Object"; es su propio menu de la barra (queda a un click, no a dos).
         MenuAnimation = new PopupMenu();
-        MenuAnimation->Agregar("Insert Keyframe", 510)->atajo = "I";
-        MenuAnimation->Agregar("Delete Keyframe", 511);
-        MenuAnimation->Agregar("Clear Keyframe",  512);
-        MenuAnimation->AgregarCheck("Motion Trail", 513, &MotionTrailOn);
+        MenuAnimation->Agregar(T("Insert Keyframe"), 510)->atajo = "I";
+        MenuAnimation->Agregar(T("Delete Keyframe"), 511);
+        MenuAnimation->Agregar(T("Clear Keyframe"),  512);
+        MenuAnimation->AgregarCheck(T("Motion Trail"), 513, &MotionTrailOn);
         // menu "Pose" (Pose Mode): Insert Keyframe + submenu Transform (Move/Rotate/Scale). Reusa MenuTransform.
         extern PopupMenu* MenuPose;
-        MenuPose = new PopupMenu();
+        // (regla de los titulos: el boton de contexto es un icono sin texto -> su menu lleva titulo)
+        MenuPose = new PopupMenu(); MenuPose->titulo = "Pose";
         MenuPose->titulo = "Pose";
-        MenuPose->Agregar("Insert Keyframe", 500, IconType::armature)->atajo = "I"; // guarda la pose en el frame actual
-        MenuPose->Agregar("Transform", 0, -1, MenuTransform); // Move(G)/Rotate(R)/Scale(S) -> ids 100/101/102
+        MenuPose->Agregar(T("Insert Keyframe"), 500, IconType::armature)->atajo = "I"; // guarda la pose en el frame actual
+        MenuPose->Agregar(T("Transform"), 0, -1, MenuTransform); // Move(G)/Rotate(R)/Scale(S) -> ids 100/101/102
         // Clear Transform: resetea la pose de los huesos SELECCIONADOS a rest. All (T+R+S) / Translation / Rotation / Scale.
         static PopupMenu* MenuClearPose = NULL;
         MenuClearPose = new PopupMenu();
-        MenuClearPose->Agregar("All", 520, IconType::armature);          // T+R+S -> PoseClearTransform(0)
-        MenuClearPose->Agregar("Translation", 521)->atajo = "Alt G";     // PoseClearTransform(1)
-        MenuClearPose->Agregar("Rotation", 522)->atajo = "Alt R";        // PoseClearTransform(2)
-        MenuClearPose->Agregar("Scale", 523)->atajo = "Alt S";           // PoseClearTransform(3)
-        MenuPose->Agregar("Clear Transform", 0, -1, MenuClearPose);
+        MenuClearPose->Agregar(T("All"), 520, IconType::armature);          // T+R+S -> PoseClearTransform(0)
+        MenuClearPose->Agregar(T("Translation"), 521)->atajo = "Alt G";     // PoseClearTransform(1)
+        MenuClearPose->Agregar(T("Rotation"), 522)->atajo = "Alt R";        // PoseClearTransform(2)
+        MenuClearPose->Agregar(T("Scale"), 523)->atajo = "Alt S";           // PoseClearTransform(3)
+        MenuPose->Agregar(T("Clear Transform"), 0, -1, MenuClearPose);
         // menu "Mesh" (Edit Mode): comun a vertice/borde/cara. Transform (arriba), Snap y Delete (abajo). Los
         // submenus Snap/Delete se reusan de LayoutInput.cpp. La accion (LayoutAccionMesh) se asigna al abrirlo.
         // submenu Transform de EDIT (como el de objeto pero + Shrink/Fatten, que solo tiene sentido en malla)
         static PopupMenu* MenuTransformEdit = NULL;
         MenuTransformEdit = new PopupMenu();
-        MenuTransformEdit->Agregar("Move", 100)->atajo = "G";
-        MenuTransformEdit->Agregar("Rotate", 101)->atajo = "R";
-        MenuTransformEdit->Agregar("Scale", 102)->atajo = "S";
-        MenuTransformEdit->Agregar("Shrink/Fatten", 103)->atajo = "Alt S"; // cada vert por su normal
+        MenuTransformEdit->Agregar(T("Move"), 100)->atajo = "G";
+        MenuTransformEdit->Agregar(T("Rotate"), 101)->atajo = "R";
+        MenuTransformEdit->Agregar(T("Scale"), 102)->atajo = "S";
+        MenuTransformEdit->Agregar(T("Shrink/Fatten"), 103)->atajo = "Alt S"; // cada vert por su normal
         MenuMesh = new PopupMenu();
-        MenuMesh->titulo = "Mesh";
-        MenuMesh->Agregar("Transform", 0, -1, MenuTransformEdit);        // arriba de todo (Move/Rotate/Scale/Shrink)
-        MenuMesh->Agregar("Duplicate", 314)->atajo = "Shift D";          // comun a vertice/borde/cara
-        MenuMesh->Agregar("Merge", 0, -1, LayoutSubmenuMerge())->atajo = "M"; // suelda verts (limpia duplicados)
+        MenuMesh->titulo = T("Mesh");
+        MenuMesh->Agregar(T("Transform"), 0, -1, MenuTransformEdit);        // arriba de todo (Move/Rotate/Scale/Shrink)
+        MenuMesh->Agregar(T("Duplicate"), 314)->atajo = "Shift D";          // comun a vertice/borde/cara
+        MenuMesh->Agregar(T("Merge"), 0, -1, LayoutSubmenuMerge())->atajo = "M"; // suelda verts (limpia duplicados)
         // Auto Merge (opt-in, OFF por defecto): al confirmar un move suelda los verts movidos con los que queden
         // a <= Threshold. Con el auto merge apagado, "Threshold" se ve en gris (->gris = &g_autoMerge).
         // ids 390/391: fuera del rango 0-7 (que LayoutAccionMesh rutea a Snap) y sin caso en LayoutAccionObject
         // (no-op). El toggle del check y el set del slider los hace el propio item; la accion no tiene que hacer nada.
-        MenuMesh->AgregarCheck("Auto Merge", 390, &g_autoMerge);
+        MenuMesh->AgregarCheck(T("Auto Merge"), 390, &g_autoMerge);
         MenuMesh->AgregarFloat("Threshold", 391, &g_autoMergeThreshold, 0.0f, 0.1f)->gris = &g_autoMerge;
-        MenuMesh->Agregar("Normals", 0, -1, LayoutSubmenuNormals()); // Recalculate Normals + Flip
+        MenuMesh->Agregar(T("Normals"), 0, -1, LayoutSubmenuNormals()); // Recalculate Normals + Flip
         MenuMesh->Agregar("Snap", 0, -1, LayoutSubmenuSnap())->atajo = "Shift S";
-        MenuMesh->Agregar("Delete", 360, -1, LayoutSubmenuDelete())->atajo = "X"; // abajo de todo
+        MenuMesh->Agregar(T("Delete"), 360, -1, LayoutSubmenuDelete())->atajo = "X"; // abajo de todo
     }
     if (!MenuView){
         // boton "View" (antes de Select): submenu Viewpoint con los 7 puntos de vista (mismos atajos del numpad).
         // ids 400-406 -> LayoutAccionView -> Viewport3DActive->SetViewpoint(...). Antes eran atajos "ocultos".
         MenuViewpoint = new PopupMenu();
-        MenuViewpoint->Agregar("Camera", 400)->atajo = "Num 0";
-        MenuViewpoint->Agregar("Top",    401)->atajo = "Num 7";
-        MenuViewpoint->Agregar("Bottom", 402)->atajo = "Ctrl Num 7";
-        MenuViewpoint->Agregar("Front",  403)->atajo = "Num 1";
-        MenuViewpoint->Agregar("Back",   404)->atajo = "Ctrl Num 1";
-        MenuViewpoint->Agregar("Right",  405)->atajo = "Num 3";
-        MenuViewpoint->Agregar("Left",   406)->atajo = "Ctrl Num 3";
+        MenuViewpoint->Agregar(T("Camera"), 400)->atajo = "Num 0";
+        MenuViewpoint->Agregar(T("Top"),    401)->atajo = "Num 7";
+        MenuViewpoint->Agregar(T("Bottom"), 402)->atajo = "Ctrl Num 7";
+        MenuViewpoint->Agregar(T("Front"),  403)->atajo = "Num 1";
+        MenuViewpoint->Agregar(T("Back"),   404)->atajo = "Ctrl Num 1";
+        MenuViewpoint->Agregar(T("Right"),  405)->atajo = "Num 3";
+        MenuViewpoint->Agregar(T("Left"),   406)->atajo = "Ctrl Num 3";
         // submenu Cameras: setear el objeto activo como camara / ver desde la camara activa
         MenuCameras = new PopupMenu();
-        MenuCameras->Agregar("Set Active Object as Camera", 410)->atajo = "Ctrl Num 0";
-        MenuCameras->Agregar("Active Camera",               411)->atajo = "Num 0";
-        MenuView = new PopupMenu();
-        MenuView->Agregar("Cameras",   0, -1, MenuCameras);   // abre submenu (antes de Viewpoint, como Blender)
-        MenuView->Agregar("Viewpoint", 0, -1, MenuViewpoint); // abre submenu
-        MenuView->Agregar("Frame Selected", 420)->atajo = "Numpad ."; // enfocar la seleccion (EnfocarObject)
-        MenuView->Agregar("Perspective/Ortho", 407)->atajo = "Num 5"; // alterna perspectiva/ortografica
+        MenuCameras->Agregar(T("Set Active Object as Camera"), 410)->atajo = "Ctrl Num 0";
+        MenuCameras->Agregar(T("Active Camera"),               411)->atajo = "Num 0";
+        // REGLA DE DISENO de los titulos: un menu que se abre desde algo SIN TEXTO (un icono, o un atajo de
+        // teclado) lleva titulo -- es lo unico que te dice que estas mirando. Si lo abre un boton/item que YA
+        // decia el texto, NO lleva: repetirlo es ruido. El boton View ahora es un icono -> titulo.
+        MenuView = new PopupMenu(); MenuView->titulo = T("View");
+        MenuView->Agregar(T("Cameras"),   0, -1, MenuCameras);   // abre submenu (antes de Viewpoint, como Blender)
+        MenuView->Agregar(T("Viewpoint"), 0, -1, MenuViewpoint); // abre submenu
+        MenuView->Agregar(T("Frame Selected"), 420)->atajo = "Numpad ."; // enfocar la seleccion (EnfocarObject)
+        MenuView->Agregar(T("Perspective/Ortho"), 407)->atajo = "Num 5"; // alterna perspectiva/ortografica
         // Lock Orbit: item REGULAR (no checkbox) -> al tocarlo togglea Y CIERRA el menu (pedido Dante). El
         // tilde (verde) se refresca al abrir el menu, con el estado del viewport activo (LayoutInput).
-        MenuItemLockOrbit = MenuView->Agregar("Lock Orbit", 421);
+        MenuItemLockOrbit = MenuView->Agregar(T("Lock Orbit"), 421);
     }
     if (!MenuRender){
-        MenuRender = new PopupMenu();
-        MenuRender->Agregar("Render Preview", 0);
-        MenuRender->Agregar("Material Preview", 1);
-        MenuRender->Agregar("Solid Preview", 2);
-        MenuRender->Agregar("Wireframe Preview", 3);
-        MenuRender->Agregar("ZBuffer Preview", 4);
-        MenuRender->Agregar("Normal View", 5); // simula normal map con 3 luces R/G/B
-        MenuRender->Agregar("Alpha Preview", 6); // matte blanco/negro por alpha (debug del pase alpha)
+        // REGLA DE DISENO de los titulos: un menu que se abre desde algo SIN TEXTO (un icono, o un atajo de
+        // teclado) lleva titulo -- es lo unico que te dice que estas mirando. Si lo abre un boton/item que YA
+        // decia el texto, NO lleva: repetirlo es ruido.
+        MenuRender = new PopupMenu(); MenuRender->titulo = "Render";
+        MenuRender->Agregar(T("Render Preview"), 0);
+        MenuRender->Agregar(T("Material Preview"), 1);
+        MenuRender->Agregar(T("Solid Preview"), 2);
+        MenuRender->Agregar(T("Wireframe Preview"), 3);
+        MenuRender->Agregar(T("ZBuffer Preview"), 4);
+        MenuRender->Agregar(T("Normal View"), 5); // simula normal map con 3 luces R/G/B
+        MenuRender->Agregar(T("Alpha Preview"), 6); // matte blanco/negro por alpha (debug del pase alpha)
     }
     if (!MenuOrient){
         // orientacion usada al constrenir a un eje (X/Y/Z) y por el extrude. Default Global.
         MenuOrient = new PopupMenu();
-        MenuOrient->titulo = "Transform Orientations";
+        MenuOrient->titulo = T("Transform Orientations");
         MenuOrient->Agregar("Global", 0);
         MenuOrient->Agregar("Local", 1);
         MenuOrient->Agregar("Normal", 3); // = la direccion de la normal (lo que hace el extrude)
-        MenuOrient->Agregar("View", 2);
+        MenuOrient->Agregar(T("View"), 2);
     }
     if (!MenuMode){
         // modo del objeto activo (solo malla). Edit y los Paint todavia no
         // hacen nada: dejamos la opcion para mas adelante.
         MenuMode = new PopupMenu();
-        MenuMode->Agregar("Object Mode", 0, IconType::object); // icono de objeto
-        MenuMode->Agregar("Edit Mode", 1, IconType::mesh);     // icono de malla 3d
-        MenuMode->Agregar("Vertex Paint", 2, IconType::mesh);
-        MenuMode->Agregar("Weight Paint", 3, IconType::mesh);
-        MenuMode->Agregar("Texture Paint", 4, IconType::mesh);
+        MenuMode->Agregar(T("Object Mode"), 0, IconType::object); // icono de objeto
+        MenuMode->Agregar(T("Edit Mode"), 1, IconType::mesh);     // icono de malla 3d
+        MenuMode->Agregar(T("Vertex Paint"), 2, IconType::mesh);
+        MenuMode->Agregar(T("Weight Paint"), 3, IconType::mesh);
+        MenuMode->Agregar(T("Texture Paint"), 4, IconType::mesh);
     }
     if (!MenuSelMode){
         // sub-elemento de Edit Mode (la seleccion -todo/nada/invertir- y el render
         // se refieren a esto). Vertex es el default.
         MenuSelMode = new PopupMenu();
-        MenuSelMode->Agregar("Vertex", SelVertex, IconType::selVertex);
-        MenuSelMode->Agregar("Edge",   SelEdge,   IconType::selEdge);
-        MenuSelMode->Agregar("Face",   SelFace,   IconType::selFace);
+        MenuSelMode->Agregar(T("Vertex"), SelVertex, IconType::selVertex);
+        MenuSelMode->Agregar(T("Edge"),   SelEdge,   IconType::selEdge);
+        MenuSelMode->Agregar(T("Face"),   SelFace,   IconType::selFace);
     }
     // (eran inicializadores de clase: C++03)
     orthographic = false;
@@ -355,56 +372,59 @@ Viewport3D::~Viewport3D() {};
 
 void Viewport3D::AbrirMenuOverlays(int x, int y){
     if (!MenuOverlays){
-        MenuOverlays = new PopupMenu();
+        // REGLA DE DISENO de los titulos: un menu que se abre desde algo SIN TEXTO (un icono, o un atajo de
+        // teclado) lleva titulo -- es lo unico que te dice que estas mirando. Si lo abre un boton/item que YA
+        // decia el texto, NO lleva: repetirlo es ruido.
+        MenuOverlays = new PopupMenu(); MenuOverlays->titulo = T("Overlays");
     }
     // se reconstruye en cada apertura apuntando a los flags de ESTE viewport
     // (cada instancia 3D tiene los suyos: split view = overlays independientes).
     // Sin titulo: el primer item ES el master "Show Overlays". Si esta off el
     // resto se ve en gris (->gris = &showOverlays) porque sin overlay no se ven.
     MenuOverlays->Limpiar();
-    MenuOverlays->AgregarCheck("Show Overlays", 0, &showOverlays);
-    MenuOverlays->AgregarCheck("Floor", 1, &showFloor)->gris = &showOverlays;
-    MenuOverlays->AgregarCheck("X Axis", 2, &showXaxis)->gris = &showOverlays;
-    MenuOverlays->AgregarCheck("Y Axis", 3, &showYaxis)->gris = &showOverlays;
-    MenuOverlays->AgregarCheck("Origins", 4, &showOrigins)->gris = &showOverlays;
+    MenuOverlays->AgregarCheck(T("Show Overlays"), 0, &showOverlays);
+    MenuOverlays->AgregarCheck(T("Floor"), 1, &showFloor)->gris = &showOverlays;
+    MenuOverlays->AgregarCheck(T("X Axis"), 2, &showXaxis)->gris = &showOverlays;
+    MenuOverlays->AgregarCheck(T("Y Axis"), 3, &showYaxis)->gris = &showOverlays;
+    MenuOverlays->AgregarCheck(T("Origins"), 4, &showOrigins)->gris = &showOverlays;
     // submenu "Objects": mostrar/ocultar el overlay de cada tipo de objeto (esqueleto / luces / camaras / empties)
     static PopupMenu* MenuOverlayObjects = NULL;
     if (!MenuOverlayObjects) MenuOverlayObjects = new PopupMenu(); // sin titulo (ya sabes que es al abrirlo)
     MenuOverlayObjects->Limpiar();
-    MenuOverlayObjects->AgregarCheck("Armature", 13, &showArmature, IconType::armature);
-    MenuOverlayObjects->AgregarCheck("Lights",   14, &showLights,   IconType::light);
-    MenuOverlayObjects->AgregarCheck("Camera",   15, &showCamera,   IconType::camera);
-    MenuOverlayObjects->AgregarCheck("Empty",    16, &showEmpty,    IconType::empty);
-    MenuOverlays->Agregar("Objects", 13, IconType::object, MenuOverlayObjects)->gris = &showOverlays;
-    MenuOverlays->AgregarCheck("3D Cursor", 5, &show3DCursor)->gris = &showOverlays;
-    MenuOverlays->AgregarCheck("Relationship Lines", 6, &ShowRelantionshipsLines)->gris = &showOverlays;
+    MenuOverlayObjects->AgregarCheck(T("Armature"), 13, &showArmature, IconType::armature);
+    MenuOverlayObjects->AgregarCheck(T("Lights"),   14, &showLights,   IconType::light);
+    MenuOverlayObjects->AgregarCheck(T("Camera"),   15, &showCamera,   IconType::camera);
+    MenuOverlayObjects->AgregarCheck(T("Empty"),    16, &showEmpty,    IconType::empty);
+    MenuOverlays->Agregar(T("Objects"), 13, IconType::object, MenuOverlayObjects)->gris = &showOverlays;
+    MenuOverlays->AgregarCheck(T("3D Cursor"), 5, &show3DCursor)->gris = &showOverlays;
+    MenuOverlays->AgregarCheck(T("Relationship Lines"), 6, &ShowRelantionshipsLines)->gris = &showOverlays;
     // submenu "Normals" (solo en meshes seleccionadas): 3 toggles + slider de tamano. Sin titulo (ya sabes que es al abrirlo).
     static PopupMenu* MenuOverlayNormals = NULL;
     if (!MenuOverlayNormals) MenuOverlayNormals = new PopupMenu();
     MenuOverlayNormals->Limpiar();
-    MenuOverlayNormals->AgregarCheck("Vertex Normal", 7, &OverlayVertexNormal, IconType::normalVertex);
-    MenuOverlayNormals->AgregarCheck("Custom Normal", 8, &OverlayCustomNormal, IconType::normalCustom);
-    MenuOverlayNormals->AgregarCheck("Face Normal",   9, &OverlayFaceNormal,   IconType::normalFace);
+    MenuOverlayNormals->AgregarCheck(T("Vertex Normal"), 7, &OverlayVertexNormal, IconType::normalVertex);
+    MenuOverlayNormals->AgregarCheck(T("Custom Normal"), 8, &OverlayCustomNormal, IconType::normalCustom);
+    MenuOverlayNormals->AgregarCheck(T("Face Normal"),   9, &OverlayFaceNormal,   IconType::normalFace);
     MenuOverlayNormals->AgregarFloat("Normal Size",  10, &OverlayNormalSize, 0.0f, 1.0f);
-    MenuOverlays->Agregar("Normals", 7, IconType::normalVertex, MenuOverlayNormals)->gris = &showOverlays;
+    MenuOverlays->Agregar(T("Normals"), 7, IconType::normalVertex, MenuOverlayNormals)->gris = &showOverlays;
     // submenu "Statistics": texto blanco arriba a la derecha del viewport. Cada linea es un toggle independiente. Sin titulo.
     static PopupMenu* MenuOverlayStats = NULL;
     if (!MenuOverlayStats) MenuOverlayStats = new PopupMenu();
     MenuOverlayStats->Limpiar();
     MenuOverlayStats->AgregarCheck("FPS",      12, &OverlayFps);
-    MenuOverlayStats->AgregarCheck("Vertices", 17, &OverlayStatVertices);
-    MenuOverlayStats->AgregarCheck("Faces",    18, &OverlayStatFaces);
+    MenuOverlayStats->AgregarCheck(T("Vertices"), 17, &OverlayStatVertices);
+    MenuOverlayStats->AgregarCheck(T("Faces"),    18, &OverlayStatFaces);
     MenuOverlayStats->AgregarCheck("Modgen",   19, &OverlayStatModgen);
-    MenuOverlayStats->AgregarCheck("Times",    20, &OverlayStatTimes);
-    MenuOverlays->Agregar("Statistics", 11, -1, MenuOverlayStats)->gris = &showOverlays;
+    MenuOverlayStats->AgregarCheck(T("Times"),    20, &OverlayStatTimes);
+    MenuOverlays->Agregar(T("Statistics"), 11, -1, MenuOverlayStats)->gris = &showOverlays;
     // Clear Screen: limpia el framebuffer (glClear) cada frame. NO es un overlay (no se grisa con
     // Show Overlays). Apagarlo gana rendimiento en juegos/renders donde la escena llena la pantalla.
     // ON por defecto (limpiarPantalla = true en el ctor).
-    MenuOverlays->AgregarCheck("Clear Screen", 13, &limpiarPantalla);
+    MenuOverlays->AgregarCheck(T("Clear Screen"), 13, &limpiarPantalla);
     // X-Ray (retopologia): la malla EN EDICION se dibuja semitransparente (30%) sin z-test y sus bordes/vertices
     // siempre encima -> se ven y se pueden SELECCIONAR los verts/aristas de atras (los tapados por las caras).
     // Modo propio, NO se grisa con Show Overlays. Global (una sola malla en edicion a la vez).
-    MenuOverlays->AgregarCheck("X-Ray", 14, &g_xray);
+    MenuOverlays->AgregarCheck(T("X-Ray"), 14, &g_xray);
     MenuOverlays->action = NULL; // el toggle lo hace el propio item (checkbox)
     MenuOverlays->Abrir(x, y, MenuPantallaW, MenuPantallaH);
     MenuAbierto = MenuOverlays;
@@ -415,13 +435,12 @@ void Viewport3D::SetLimpiarPantalla(bool value) {
 }
 
 #ifndef W3D_SYMBIAN
-void Viewport3D::event_mouse_wheel(SDL_Event &e) {
+void Viewport3D::event_mouse_wheel(float dy, int mx, int my) {
     // rueda sobre la BARRA superior = scroll horizontal (en PC no entran todos los botones); sino zoom.
     // Unificado con la barra de propiedades (BarScrollHorizontal).
-    int mx, my; SDL_GetMouseState(&mx, &my);
-    if (BarScrollHorizontal(mx, my, (int)(e.wheel.y * 40))) return;
-    if (OnToolbar(mx, my)) { ToolbarScrollBy((int)(e.wheel.y * 40)); return; } // barra de HERRAMIENTAS (abajo)
-    Zoom(e.wheel.y * 2.0f); // Zoom() ya distingue: viewport normal = distancia; vista de camara = inspeccion
+    if (BarScrollHorizontal(mx, my, (int)(dy * 40))) return;
+    if (OnToolbar(mx, my)) { ToolbarScrollBy((int)(dy * 40)); return; } // barra de HERRAMIENTAS (abajo)
+    Zoom(dy * 2.0f); // Zoom() ya distingue: viewport normal = distancia; vista de camara = inspeccion
 }
 #endif
 
@@ -776,6 +795,52 @@ void Viewport3D::RotarDesdeVista(int mx, int my){
     }
     AplicarPivotATransform(); // gira las posiciones alrededor del pivote
     { extern void SnapAjustarObjRot(); SnapAjustarObjRot(); } // imanta: el activo apunta al target (si snap ON)
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+//  VISTAS POR CUADRANTE (el telefono no tiene numpad: es su 1/3/7 de PC).
+//  Toda vista ortogonal es pitch * yaw, con yaw en {0,90,180,270} (front/right/back/left) y pitch en {-90,0,90}
+//  (top/lado/bottom). O sea: la vista es DOS ENTEROS, y moverse es sumarles.
+//    - Si estabas orbitando libre, la primera flecha SOLO ENCUADRA al cuadrante mas cercano (no te saltea uno).
+//    - izq/der: giran el yaw 90. Desde el top o el bottom tambien, que es "rotar la vista" desde arriba.
+//    - arriba/abajo: suben/bajan el pitch, con TOPE en top y en bottom (de arriba no se sigue girando).
+// ---------------------------------------------------------------------------------------------------------------
+static Quaternion W3dVistaQuat(int yaw90, int pitch){   // yaw90 en pasos de 90; pitch en {-1,0,1}
+    return Quaternion::FromAxisAngle(Vector3(1,0,0), (float)pitch * -90.0f)
+         * Quaternion::FromAxisAngle(Vector3(0,1,0), (float)(yaw90 * 90));
+}
+// El cuadrante mas parecido a la orientacion actual. 'exacta' = ya estabas EN el (no hace falta encuadrar).
+void Viewport3D::VistaCuadranteActual(int& yaw90, int& pitch, bool& exacta) const {
+    // las 12 combinaciones (4 yaw x 3 pitch) son 12 orientaciones DISTINTAS: top girado 90 no es lo mismo que right.
+    // Se prueban todas y gana la mas parecida.
+    float mejor = -1.0f; yaw90 = 0; pitch = 0;
+    for (int p = -1; p <= 1; p++){
+        for (int y = 0; y < 4; y++){
+            Quaternion q = W3dVistaQuat(y, p);
+            // |dot| entre unitarios: 1 = misma orientacion (q y -q son la misma rotacion, de ahi el abs)
+            float d = q.x*viewRot.x + q.y*viewRot.y + q.z*viewRot.z + q.w*viewRot.w;
+            if (d < 0.0f) d = -d;
+            if (d > mejor){ mejor = d; yaw90 = y; pitch = p; }
+        }
+    }
+    exacta = (mejor > 0.9999f);   // coseno del medio angulo: pegado al cuadrante
+}
+void Viewport3D::VistaCuadranteNav(int dx, int dy){
+    int yaw90, pitch; bool exacta;
+    VistaCuadranteActual(yaw90, pitch, exacta);
+    if (exacta){                       // ya encuadrado: la flecha MUEVE
+        if (dx > 0) yaw90 = (yaw90 + 1) & 3;
+        else if (dx < 0) yaw90 = (yaw90 + 3) & 3;
+        if (dy < 0 && pitch < 1) pitch++;    // arriba: hacia el top, y ahi se planta
+        else if (dy > 0 && pitch > -1) pitch--;
+    }
+    // si NO estabas encuadrado, la flecha solo te lleva al cuadrante mas cercano
+    ViewFromCameraActive = false; camFrameOn = false; CameraToView = false;
+    camViewZoom = 1.0f; camViewPanX = 0.0f; camViewPanY = 0.0f;
+    viewRot = W3dVistaQuat(yaw90, pitch);
+    viewRot.normalize();
+    RecalcOrbitPosition();
+    g_redraw = true;
 }
 
 void Viewport3D::SetViewpoint(Viewpoint value) {
@@ -1776,6 +1841,24 @@ void Viewport3D::Render3Dcursor() {
     w3dEngine::PopMatrix();
 }
 
+// El boton de CONTEXTO de la barra: es Object / Pose / Vertex / Edge / Face segun donde estes. Sin texto (comia
+// ancho de barra): lo dice el ICONO, y el titulo de su menu lo confirma al abrirlo.
+// FUERA del render a proposito: esto es ESTADO, no dibujo. Mientras vivio adentro de RenderUI -que es GL y no corre
+// headless- era intesteable, y de hecho el texto se seguia reescribiendo por frame pisando al que lo sacaba.
+void Viewport3D::SyncBotonContexto(){
+    Button* bObj = BarRolBtn(BarButtons, BR_Object);
+    if (!bObj) return;
+    bool esMesh = (ObjActivo && ObjActivo->getType() == ObjectType::mesh);
+    bool enEdit = (esMesh && InteractionMode == EditMode);
+    bool poseM  = (InteractionMode == PoseMode && ObjActivo && ObjActivo->getType() == ObjectType::armature);
+    bObj->visible = HayObjetosSeleccionados() || poseM;
+    bObj->text.clear();
+    bObj->icon = poseM ? (int)IconType::armature :
+        !enEdit ? (int)IconType::object :
+        (EditSelectMode == SelEdge) ? (int)IconType::selEdge :
+        (EditSelectMode == SelFace) ? (int)IconType::selFace : (int)IconType::selVertex;
+}
+
 void Viewport3D::RenderUI() {
     // barra de botones 2D del area: NO es un overlay, es chrome del area (como
     // los bordes). Se dibuja siempre que ShowUi este on, aunque "Show Overlays"
@@ -1831,11 +1914,11 @@ void Viewport3D::RenderUI() {
                 if (esArm && InteractionMode != EditMode && InteractionMode != PoseMode) InteractionMode = ObjectMode;
                 // una malla no tiene Pose: si venia de un armature en Pose, volver a Object
                 if (esMesh && InteractionMode == PoseMode) InteractionMode = ObjectMode;
-                bMode->text = (InteractionMode == EditMode)     ? "Edit Mode" :
-                              (InteractionMode == PoseMode)     ? "Pose Mode" :
-                              (InteractionMode == VertexPaint)  ? "Vertex Paint" :
-                              (InteractionMode == WeightPaint)  ? "Weight Paint" :
-                              (InteractionMode == TexturePaint) ? "Texture Paint" : "Object Mode";
+                bMode->text = (InteractionMode == EditMode)     ? T("Edit Mode") :
+                              (InteractionMode == PoseMode)     ? T("Pose Mode") :
+                              (InteractionMode == VertexPaint)  ? T("Vertex Paint") :
+                              (InteractionMode == WeightPaint)  ? T("Weight Paint") :
+                              (InteractionMode == TexturePaint) ? T("Texture Paint") : T("Object Mode");
                 bMode->icon = (InteractionMode == ObjectMode) ? (int)IconType::object :
                               esArm                            ? (int)IconType::armature : (int)IconType::mesh;
             }
@@ -1857,15 +1940,7 @@ void Viewport3D::RenderUI() {
                                    (g_transformPivot == PivotIndividual) ? (int)IconType::pivotIndividual :
                                    (g_transformPivot == PivotActive)     ? (int)IconType::pivotActive :
                                                                            (int)IconType::pivotMedian;
-            Button* bObj = BarRolBtn(BarButtons, BR_Object);  // "Object" / "Pose" / contexto Vertex/Edge/Face
-            if (bObj) {
-                bool poseM = (InteractionMode == PoseMode && ObjActivo && ObjActivo->getType() == ObjectType::armature);
-                bObj->visible = HayObjetosSeleccionados() || poseM;
-                bObj->text = poseM ? "Pose" :
-                    !enEdit ? "Object" :
-                    (EditSelectMode == SelEdge) ? "Edge" :
-                    (EditSelectMode == SelFace) ? "Face" : "Vertex";
-            }
+            SyncBotonContexto();
             // "Animation": keyframes del objeto + Motion Trail. Solo con algo seleccionado y en Object Mode
             // (en Pose Mode los keyframes van por el menu "Pose").
             Button* bAnim = BarRolBtn(BarButtons, BR_Animation);
@@ -1882,6 +1957,11 @@ void Viewport3D::RenderUI() {
                 bSnap->tinte = g_snap.enabled ? snapVerde : NULL;
                 bSnap->colorTexto = g_snap.enabled ? acc : NULL;
             }
+            // el OJO del overlay dice si estan prendidos: abierto = se ven, cerrado = apagados. Va aca (por
+            // frame) y no al construirlo, porque el estado cambia.
+            for (size_t i = 0; i < BarButtons.size(); i++)
+                if (BarButtons[i]->rol == BR_Overlays)
+                    BarButtons[i]->icon = showOverlays ? (int)IconType::visible : (int)IconType::hidden;
             RenderBar();
         }
         // barra de HERRAMIENTAS (abajo): historial + orientacion + ejes + aceptar/cancelar tactil.
@@ -1995,7 +2075,7 @@ static std::string W3dTextoTransform(){
     // "Move: [(2*3)+3] = 9  along global X"). Vale para objetos y malla.
     if (NumInputActivo()){
         float v = 0.0f; bool valido = NumInputValor(v);
-        const char* op = (estado==rotacion) ? "Rotate" : (estado==EditScale) ? (EditShrinkActivo() ? "Shrink/Fatten" : "Scale") : "Move";
+        const char* op = (estado==rotacion) ? T("Rotate") : (estado==EditScale) ? (EditShrinkActivo() ? T("Shrink/Fatten") : T("Scale")) : T("Move");
         const char* unit = (estado==rotacion) ? "\xC2\xB0" : "";
         std::string buf = NumInputBuffer();
         int car = NumInputCaret(); if (car<0) car=0; if (car>(int)buf.size()) car=(int)buf.size();
@@ -2017,7 +2097,7 @@ static std::string W3dTextoTransform(){
         if (estado == EditScale){
             if (EditShrinkActivo()) return std::string("Shrink/Fatten: ") + W3dFmtF(EditXformShrinkAmt(), 4);
             float f = EditXformScaleFactor();
-            return W3dLineaTransform("Scale", f, f, f);
+            return W3dLineaTransform(T("Scale"), f, f, f);
         }
         // rotacion: cae al bloque comun (gAnguloTransform + axisSelect/orientacion)
     }
@@ -2043,7 +2123,7 @@ static std::string W3dTextoTransform(){
         float fx = (s0.x != 0.0f) ? s.x / s0.x : s.x;
         float fy = (s0.y != 0.0f) ? s.y / s0.y : s.y;
         float fz = (s0.z != 0.0f) ? s.z / s0.z : s.z;
-        return W3dLineaTransform("Scale", fx, fz, fy); // Y=scale.z, Z=scale.y
+        return W3dLineaTransform(T("Scale"), fx, fz, fy); // Y=scale.z, Z=scale.y
     }
     if (estado == rotacion){
         std::string r = "Rotate  " + W3dFmtF(gAnguloTransform, 1) + "\xC2\xB0";
@@ -2338,7 +2418,7 @@ void Viewport3D::button_left(){
 #endif
 
 #ifndef W3D_SYMBIAN
-void Viewport3D::mouse_button_up(SDL_Event &e){
+void Viewport3D::mouse_button_up(int boton){
     ViewPortClickDown = false;
 }
 #endif
@@ -2733,12 +2813,12 @@ void ToolbarRegistrarAccion(int id){
 }
 static const char* ToolbarLabel(int id){
     switch (id){
-        case TBMove:    return "Move";
-        case TBRotate:  return "Rotate";
-        case TBScale:   return "Scale";
-        case TBExtrude: return "Extrude";
-        case TBLoopCut: return "Loop Cut";
-        case TBDelete:  return "Delete";
+        case TBMove:    return T("Move");
+        case TBRotate:  return T("Rotate");
+        case TBScale:   return T("Scale");
+        case TBExtrude: return T("Extrude");
+        case TBLoopCut: return T("Loop Cut");
+        case TBDelete:  return T("Delete");
     }
     return "?";
 }
@@ -3032,12 +3112,8 @@ void Viewport3D::SetViewFromCameraActive(bool value){
 }
 
 #ifndef W3D_SYMBIAN
-void Viewport3D::event_key_down(SDL_Event &e){
-    #if SDL_MAJOR_VERSION == 2
-        SDL_Keycode key = e.key.keysym.sym; //SDL2
-    #elif SDL_MAJOR_VERSION == 3
-        SDL_Keycode key = e.key.key; // SDL3
-    #endif
+void Viewport3D::event_key_down(int tecla, bool repeticion){
+    const int key = tecla;
     // Los menus que abren EN EL CURSOR (Shift+A, U, X, W, Ctrl+R...) usan lastMouseX/Y, que solo se
     // refrescaban en el CLICK -> el menu salia de la ULTIMA posicion clickeada, no del mouse. Aca
     // (con SDL_GetMouseState = posicion ACTUAL) se ponen donde esta el mouse. No durante un transform.
@@ -3046,39 +3122,39 @@ void Viewport3D::event_key_down(SDL_Event &e){
 #endif
     // las FLECHAS se repiten al mantenerlas (mover/orbitar continuo); el resto
     // de las teclas ignora el auto-repeat.
-    bool esFlecha = (key == SDLK_UP || key == SDLK_DOWN || key == SDLK_LEFT || key == SDLK_RIGHT);
-    if (esFlecha && e.key.repeat != 0) {
-        if (key == SDLK_RIGHT)     TeclaDerecha();
-        else if (key == SDLK_LEFT) TeclaIzquierda();
-        else if (key == SDLK_UP)   TeclaArriba();
+    bool esFlecha = (key == W3dK_UP || key == W3dK_DOWN || key == W3dK_LEFT || key == W3dK_RIGHT);
+    if (esFlecha && repeticion != 0) {
+        if (key == W3dK_RIGHT)     TeclaDerecha();
+        else if (key == W3dK_LEFT) TeclaIzquierda();
+        else if (key == W3dK_UP)   TeclaArriba();
         else                       TeclaAbajo();
         return;
     }
-    if (e.key.repeat == 0) {
+    if (repeticion == 0) {
         switch (key) {
-            case SDLK_LSHIFT:
+            case W3dK_LSHIFT:
                 ShiftCount = 0;
                 LShiftPressed = true;
                 break;
-            case SDLK_LALT:
+            case W3dK_LALT:
                 LAltPressed = true;
                 break;
-            case SDLK_RETURN:  // Enter
+            case W3dK_RETURN:  // Enter
                 key_down_return();
                 break;
-            case SDLK_RIGHT:   // Flecha derecha
+            case W3dK_RIGHT:   // Flecha derecha
                 TeclaDerecha();
                 break;
-            case SDLK_LEFT:    // Flecha izquierda
+            case W3dK_LEFT:    // Flecha izquierda
                 TeclaIzquierda();
                 break;
-            case SDLK_UP:
+            case W3dK_UP:
                 TeclaArriba();
                 break;
-            case SDLK_DOWN:
+            case W3dK_DOWN:
                 TeclaAbajo();
                 break;
-            case SDLK_A:
+            case W3dK_A:
                 // simple: las funciones ya saben si es object o edit mode
                 if (LCtrlPressed) {                     // Ctrl+A: menu Apply (Location/Rotation/Scale/All) en object
                     if (InteractionMode == ObjectMode) LayoutApplyMenu(lastMouseX, lastMouseY);
@@ -3089,13 +3165,13 @@ void Viewport3D::event_key_down(SDL_Event &e){
                 else if (LAltPressed) DeseleccionarTodo();   // Alt+A: deseleccionar todo
                 else SeleccionarTodoForzado();          // A: seleccionar todo
                 break;
-            case SDLK_I:
+            case W3dK_I:
                 // Pose Mode: I = Insert Keyframe (guarda la pose de los huesos seleccionados en el frame actual).
                 if (InteractionMode == PoseMode && !LCtrlPressed){ extern void PoseInsertKeyframe(); PoseInsertKeyframe(); }
                 else if (LCtrlPressed) InvertirSeleccion();  // Ctrl+I: invertir seleccion
                 else if (InteractionMode == ObjectMode){ extern void InsertarKeyframeObjeto(); InsertarKeyframeObjeto(); } // Object Mode: I = Insert Keyframe (transform)
                 break;
-            case SDLK_D: {
+            case W3dK_D: {
                 if (LAltPressed){
                     NewInstance();
                 }
@@ -3106,41 +3182,41 @@ void Viewport3D::event_key_down(SDL_Event &e){
                 }
                 break;
             }
-            case SDLK_F:
+            case W3dK_F:
                 // F: "New Edge/Face from Vertices" (solo Edit Mode con malla)
                 if (estado == editNavegacion && InteractionMode == EditMode && g_editMesh)
                     LayoutNewFaceEdit();
                 break;
-            case SDLK_N:
+            case W3dK_N:
                 // Shift+N: Recalculate Normals (Edit Mode), igual que el menu Face
                 if (LShiftPressed && estado == editNavegacion && InteractionMode == EditMode && g_editMesh)
                     LayoutRecalcNormales();
                 break;
-            case SDLK_L:
+            case W3dK_L:
                 // L: Select Linked (la isla conectada bajo el mouse)
                 if (estado == editNavegacion && InteractionMode == EditMode && g_editMesh)
                     LayoutSelectLinked(lastMouseX, lastMouseY);
                 break;
-            case SDLK_U:
+            case W3dK_U:
                 // Edit Mode: U abre el menu UV (Mark Seam + proyecciones).
                 // Object Mode: U NO hace nada (la "limpieza de pantalla" / Show Overlays se maneja
                 // SOLO desde el checkbox del menu Overlays, no por tecla).
                 if (InteractionMode == EditMode && g_editMesh && estado == editNavegacion)
                     LayoutMenuUV(lastMouseX, lastMouseY);
                 break;
-            case SDLK_J:
+            case W3dK_J:
                 // Ctrl+J: une las mallas seleccionadas en el objeto activo (Join). J sola: por ahora NADA
                 // (reservada para el futuro en el viewport 3D; antes cambiaba el render view, sacado a pedido).
                 if (LCtrlPressed && estado == editNavegacion && InteractionMode == ObjectMode)
                     JoinObjetos();
                 break;
-            case SDLK_H:
+            case W3dK_H:
                 ChangeVisibilityObj();
                 break;
-            case SDLK_K:
+            case W3dK_K:
                 SetShowOverlays(!showOverlays);
                 break;
-            case SDLK_X:
+            case W3dK_X:
                 // Pose Mode: X = eje X (Shift+X = plano YZ); cicla Global/Local/View al re-apretar
                 if (InteractionMode == PoseMode){ extern int g_poseModo; extern void PoseCiclarEje(int); extern void PoseCiclarPlano(int); if (g_poseModo){ if (LShiftPressed) PoseCiclarPlano(0); else PoseCiclarEje(0); break; } }
                 // durante un transform: X = eje X (re-apretar cicla
@@ -3153,12 +3229,12 @@ void Viewport3D::event_key_down(SDL_Event &e){
                 // Edit Mode: menu Delete cerca del cursor; Object Mode: POPUP de confirmar borrado
                 else if (!LayoutDeleteEdit(lastMouseX, lastMouseY)) AbrirConfirmarBorrado();
                 break;
-            case SDLK_BACKSPACE:
-            case SDLK_DELETE:
+            case W3dK_BACKSPACE:
+            case W3dK_DELETE:
                 if (estado == editNavegacion && !LayoutDeleteEdit(lastMouseX, lastMouseY))
                     AbrirConfirmarBorrado();
                 break;
-            case SDLK_Y:
+            case W3dK_Y:
                 if (InteractionMode == PoseMode){ extern int g_poseModo; extern void PoseCiclarEje(int); extern void PoseCiclarPlano(int); if (g_poseModo){ if (LShiftPressed) PoseCiclarPlano(1); else PoseCiclarEje(1); break; } }
                 if (estado != editNavegacion){
                     if (LShiftPressed) CiclarPlanoTransform(Y);
@@ -3166,7 +3242,7 @@ void Viewport3D::event_key_down(SDL_Event &e){
                     if (EditXformActivo()) EditXformReiniciar();
                 }
                 break;
-            case SDLK_Z:
+            case W3dK_Z:
                 if (InteractionMode == PoseMode){ extern int g_poseModo; extern void PoseCiclarEje(int); extern void PoseCiclarPlano(int); if (g_poseModo){ if (LShiftPressed) PoseCiclarPlano(2); else PoseCiclarEje(2); break; } }
                 if (estado != editNavegacion){
                     if (LShiftPressed) CiclarPlanoTransform(Z);
@@ -3174,7 +3250,7 @@ void Viewport3D::event_key_down(SDL_Event &e){
                     if (EditXformActivo()) EditXformReiniciar();
                 }
                 break;
-            case SDLK_R:
+            case W3dK_R:
                 // Ctrl+R: Loop Cut and Slide (Edit Mode con malla)
                 if (LCtrlPressed && estado == editNavegacion && InteractionMode == EditMode && g_editMesh){
                     LoopCutIniciar(lastMouseX, lastMouseY);
@@ -3193,64 +3269,64 @@ void Viewport3D::event_key_down(SDL_Event &e){
                     if (!EditXformStart(rotacion, ViewAxis)) SetRotacion();
                 }
                 break;
-            case SDLK_G:
+            case W3dK_G:
                 if (InteractionMode == PoseMode){ extern void PoseXformStart(int); extern void PoseClearTransform(int);
                     if (LAltPressed) PoseClearTransform(1); else PoseXformStart(1); break; } // POSE: Alt+G limpia translacion; G mueve
                 // EditXformStart (no EditXformIniciar directo) -> en Edit Mode CAPTURA el undo del move (Ctrl+Z)
                 if (!EditXformStart(translacion, ViewAxis)) SetPosicion();
                 break;
-            case SDLK_S:
+            case W3dK_S:
                 if (InteractionMode == PoseMode){ extern void PoseXformStart(int); extern void PoseClearTransform(int);
                     if (LAltPressed) PoseClearTransform(3); else PoseXformStart(3); break; } // POSE: Alt+S limpia escala; S escala
                 // Alt+S en Edit Mode = Shrink/Fatten (cada vert por su normal). Sin Alt = Scale.
                 if (LAltPressed && InteractionMode == EditMode && g_editMesh) LayoutShrinkFatten();
                 else if (!EditXformStart(EditScale, XYZ)) SetEscala();
                 break;
-            case SDLK_E:
+            case W3dK_E:
                 // Edit Mode: extrude de las caras seleccionadas (arranca el move por
                 // la normal). En Object Mode no hace nada.
                 if (estado == editNavegacion && InteractionMode == EditMode && g_editMesh)
                     LayoutExtrudeFaces();
                 break;
-            case SDLK_V:
+            case W3dK_V:
                 // Edit Mode: RIP -> separa la malla a lo largo de la seleccion (loop de bordes / verts / caras)
                 if (estado == editNavegacion && InteractionMode == EditMode && g_editMesh)
                     LayoutRipEdit();
                 break;
-            case SDLK_W:
+            case W3dK_W:
                 // Edit Mode: menu Mark/Clear Sharp en el cursor (bordes filosos)
                 if (estado == editNavegacion && InteractionMode == EditMode && g_editMesh)
                     LayoutMenuSharp(lastMouseX, lastMouseY);
                 break;
             // Numpad (Ctrl = la vista OPUESTA, como Blender)
-            case SDLK_KP_1: SetViewpoint(LCtrlPressed ? Viewpoint::back : Viewpoint::front); break;
-            //case SDLK_KP_2: numpad('2'); break;
-            case SDLK_KP_3: SetViewpoint(LCtrlPressed ? Viewpoint::left : Viewpoint::right); break;
-            case SDLK_KP_4: {
+            case W3dK_KP_1: SetViewpoint(LCtrlPressed ? Viewpoint::back : Viewpoint::front); break;
+            //case W3dK_KP_2: numpad('2'); break;
+            case W3dK_KP_3: SetViewpoint(LCtrlPressed ? Viewpoint::left : Viewpoint::right); break;
+            case W3dK_KP_4: {
                 RollOrbit(-15);
                 break;
             }
-            case SDLK_KP_5: {
+            case W3dK_KP_5: {
                 ChangePerspective();
                 break;
             };
-            case SDLK_KP_6: {
+            case W3dK_KP_6: {
                 RollOrbit(15);
                 break;
             }
-            case SDLK_KP_7: SetViewpoint(LCtrlPressed ? Viewpoint::bottom : Viewpoint::top); break;
-            case SDLK_KP_8: BuscarVertexAnimation(); break;
-            case SDLK_KP_9: abrir(); break;
-            case SDLK_KP_0:
+            case W3dK_KP_7: SetViewpoint(LCtrlPressed ? Viewpoint::bottom : Viewpoint::top); break;
+            case W3dK_KP_8: BuscarVertexAnimation(); break;
+            case W3dK_KP_9: abrir(); break;
+            case W3dK_KP_0:
                 if (LCtrlPressed) SetActiveObjectAsCamera();          // Ctrl+Num 0: activo -> camara activa (SIN cambiar la vista)
                 else SetViewFromCameraActive(!ViewFromCameraActive);  // Num 0: ver desde la camara (toggle)
                 break;
-            case SDLK_KP_PERIOD: {
+            case W3dK_KP_PERIOD: {
                 EnfocarObject();
                 break;
             }
             // si querés, agregá más teclas aquí
-            case SDLK_ESCAPE:  // Esc
+            case W3dK_ESCAPE:  // Esc
                 // loop cut en curso: lo descarta (restaura la geometria pre-corte)
                 if (LoopCutActivo()) LoopCutCancelar();
                 // Edit Mode con transform de malla en curso: descarta (restaura el
@@ -3264,48 +3340,48 @@ void Viewport3D::event_key_down(SDL_Event &e){
     else {
         // Evento repetido por mantener apretada
         switch (key) {
-            case SDLK_RETURN:  // Enter
+            case W3dK_RETURN:  // Enter
                 key_down_return();
                 break;
-            case SDLK_RIGHT:   // Flecha derecha
+            case W3dK_RIGHT:   // Flecha derecha
                 TeclaDerecha();
                 break;
-            case SDLK_LEFT:    // Flecha izquierda
+            case W3dK_LEFT:    // Flecha izquierda
                 TeclaIzquierda();
                 break;
-            case SDLK_UP:
+            case W3dK_UP:
                 TeclaArriba();
                 break;
-            case SDLK_DOWN:
+            case W3dK_DOWN:
                 TeclaAbajo();
                 break;
-            case SDLK_A:
+            case W3dK_A:
                 if (LAltPressed) DeseleccionarTodo();
                 else SeleccionarTodoForzado();
                 break;
             // Numpad (Ctrl = la vista OPUESTA, como Blender)
-            case SDLK_KP_1: {
+            case W3dK_KP_1: {
                 SetViewpoint(LCtrlPressed ? Viewpoint::back : Viewpoint::front);
                 break;
             }
-            //case SDLK_KP_2: numpad('2'); break;
-            case SDLK_KP_3: {
+            //case W3dK_KP_2: numpad('2'); break;
+            case W3dK_KP_3: {
                 SetViewpoint(LCtrlPressed ? Viewpoint::left : Viewpoint::right);
                 break;
             }
-            case SDLK_KP_7: {
+            case W3dK_KP_7: {
                 SetViewpoint(LCtrlPressed ? Viewpoint::bottom : Viewpoint::top);
                 break;
             }
-            case SDLK_KP_8: BuscarVertexAnimation(); break;
-            case SDLK_KP_9: abrir(); break;
-            //case SDLK_KP_0: numpad('0'); break;
-            case SDLK_KP_PERIOD: {
+            case W3dK_KP_8: BuscarVertexAnimation(); break;
+            case W3dK_KP_9: abrir(); break;
+            //case W3dK_KP_0: numpad('0'); break;
+            case W3dK_KP_PERIOD: {
                 EnfocarObject();
                 break;
             }
             // si querés, agregá más teclas aquí
-            case SDLK_ESCAPE:  // Esc
+            case W3dK_ESCAPE:  // Esc
                 // Edit Mode con transform de malla en curso: descarta (restaura el
                 // snapshot de vertices); si no, cancela el transform de objetos.
                 if (InteractionMode == EditMode && EditXformActivo()) EditXformCancelar();
@@ -3318,20 +3394,16 @@ void Viewport3D::event_key_down(SDL_Event &e){
 #endif
 
 #ifndef W3D_SYMBIAN
-void Viewport3D::event_key_up(SDL_Event &e){
-    #if SDL_MAJOR_VERSION == 2
-        SDL_Keycode key = e.key.keysym.sym; //SDL2
-    #elif SDL_MAJOR_VERSION == 3
-        SDL_Keycode key = e.key.key; // SDL3
-    #endif
+void Viewport3D::event_key_up(int tecla){
+    const int key = tecla;
     switch (key) {
-        case SDLK_LSHIFT:
+        case W3dK_LSHIFT:
             if (ShiftCount < 20){
                 changeSelect(SelectMode::NextSingle);
             }
             LShiftPressed = false;
             break;
-        case SDLK_LALT:
+        case W3dK_LALT:
             LAltPressed = false;
             break;
     }

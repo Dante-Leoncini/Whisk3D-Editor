@@ -1,4 +1,5 @@
 #include "ViewPorts/UVEditor.h"
+#include "W3dLang.h"   // T(): los textos salen en el idioma del sistema
 #include "objects/Mesh.h"          // Mesh, MaterialGroup, Material, Texture
 #include "objects/EditMesh.h"      // EditMesh (seleccion de caras para el Sync Selection)
 #include "objects/Textures.h"      // Textures[] (atlas de iconos = Textures[0])
@@ -28,14 +29,14 @@ UVEditor::UVEditor() {
     uvSelMode = SelVertex;              // modo de seleccion propio del UV (default vertices)
     BarCrear();
     // botones de barra (ademas del icono [0]); los rutea LayoutClickBarraUV:
-    BarButtons.push_back(new Button("View"));                         // [1] checkboxes (Sync/Repeat)
+    BarButtons.push_back(new Button("", IconType::monitor));          // [1] checkboxes (Sync/Repeat)
     BarButtons.push_back(new Button("", (int)IconType::selVertex));   // [2] SelMode UV (SOLO icono)
     BarButtons[2]->desplegable = true;
     BarButtons.push_back(new Button("", (int)IconType::pivotMedian)); // [3] Pivot (SOLO icono, = el 3D)
     BarButtons[3]->desplegable = true;
     BarButtons.push_back(new Button("Snap"));                        // [4] snap cursor<->seleccion
     BarButtons[4]->desplegable = true;
-    BarButtons.push_back(new Button("Texture"));                     // [5] dropdown: elegir que textura ver
+    BarButtons.push_back(new Button(T("Texture")));                     // [5] dropdown: elegir que textura ver
     BarButtons[5]->desplegable = true;
 }
 
@@ -463,32 +464,32 @@ void UVEditor::ZoomCentro(int dir) {
 
 #ifndef W3D_SYMBIAN
 // teclas del editor UV: flechas = paneo (cualquier modo); G/R/S inician mover/rotar/escalar; ESC/ENTER transform.
-void UVEditor::event_key_down(SDL_Event &e) {
+void UVEditor::event_key_down(int tecla, bool repeticion) {
     if (PopUpActive) return;                    // un popup modal abierto (file browser) tiene prioridad
-    SDL_Keycode k = e.key.keysym.sym;
+    const int k = tecla;
     // PANEO de la vista con las flechas (en cualquier modo): la flecha revela ese lado
     const float pp = (float)GlobalScale * 16.0f;
-    if (k == SDLK_LEFT)  { Panear(+pp, 0); return; }
-    if (k == SDLK_RIGHT) { Panear(-pp, 0); return; }
-    if (k == SDLK_UP)    { Panear(0, +pp); return; }
-    if (k == SDLK_DOWN)  { Panear(0, -pp); return; }
+    if (k == W3dK_LEFT)  { Panear(+pp, 0); return; }
+    if (k == W3dK_RIGHT) { Panear(-pp, 0); return; }
+    if (k == W3dK_UP)    { Panear(0, +pp); return; }
+    if (k == W3dK_DOWN)  { Panear(0, -pp); return; }
     Mesh* m = (ObjActivo && ObjActivo->getType() == ObjectType::mesh) ? (Mesh*)ObjActivo : NULL;
     if (!m || (Object*)m != g_editMesh) return; // el resto (G/R/S) solo en Edit Mode sobre esta malla
     if (uvXform) {                          // dentro de un transform: confirmar/cancelar
-        if (k == SDLK_ESCAPE) CancelarXform(m);
-        else if (k == SDLK_RETURN || k == SDLK_KP_ENTER) ConfirmarXform();
+        if (k == W3dK_ESCAPE) CancelarXform(m);
+        else if (k == W3dK_RETURN || k == W3dK_KP_ENTER) ConfirmarXform();
         return;
     }
-    if (k == SDLK_g) IniciarXform(m, 1);    // G = mover  (Symbian 1)
-    else if (k == SDLK_r) IniciarXform(m, 2); // R = rotar  (Symbian 2)
-    else if (k == SDLK_s) IniciarXform(m, 3); // S = escalar (Symbian 3)
+    if (k == W3dK_G) IniciarXform(m, 1);    // G = mover  (Symbian 1)
+    else if (k == W3dK_R) IniciarXform(m, 2); // R = rotar  (Symbian 2)
+    else if (k == W3dK_S) IniciarXform(m, 3); // S = escalar (Symbian 3)
 }
 
-void UVEditor::event_mouse_wheel(SDL_Event &e) {
+void UVEditor::event_mouse_wheel(float dy, int mx, int my) {
     if (PopUpActive) return;                    // dejar que el popup (file browser) maneje la rueda
-    { int mx, my; SDL_GetMouseState(&mx, &my);
-      if (BarScrollHorizontal(mx, my, (int)(e.wheel.y * 40))) return; } // sobre la barra -> scroll horizontal
-    float f = (e.wheel.y > 0) ? 1.1f : (1.0f / 1.1f);
+    {
+      if (BarScrollHorizontal(mx, my, (int)(dy * 40))) return; } // sobre la barra -> scroll horizontal
+    float f = (dy > 0) ? 1.1f : (1.0f / 1.1f);
     float nz = zoom * f;
     if (nz < 0.05f) nz = 0.05f;
     if (nz > 50.0f) nz = 50.0f;
@@ -508,8 +509,8 @@ void UVEditor::event_mouse_wheel(SDL_Event &e) {
 
 // al soltar el mouse: liberar el "click sostenido" para que viewPortActive vuelva a seguir
 // al mouse (sino el borde verde queda clavado aca y no se pueden mover los splitters).
-void UVEditor::mouse_button_up(SDL_Event &e) {
-    (void)e;
+void UVEditor::mouse_button_up(int boton) {
+    (void)boton;
     ViewPortClickDown = false;
     g_redraw = true;
 }

@@ -1,4 +1,5 @@
 #include "w3dGraphics.h" // abstraccion de graficos (independencia de OpenGL)
+#include "W3dLang.h"   // el nombre por defecto nace en el idioma del usuario
 #include "Camera.h"
 #include <math.h>
 #include <algorithm>
@@ -67,7 +68,7 @@ Camera* CameraActive = NULL;
 // ------------------- MÉTODOS -------------------
 
 Camera::Camera(Object* parent, Vector3 pos, Vector3 Rot)
-    : Object(parent, "Camera", pos, Rot), offsetRiel(0), Riel(NULL)
+    : Object(parent, T("Camera"), pos, Rot), offsetRiel(0), Riel(NULL)
 {
 
     if (!CameraActive){

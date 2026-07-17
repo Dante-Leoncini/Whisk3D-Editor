@@ -102,6 +102,8 @@ SOURCE          render.cpp OpcionesRender.cpp
 SOURCEPATH      ..\..\..\main
 SOURCE          variables.cpp
 SOURCE          W3dInitUI.cpp // init de UI compartido
+SOURCE          W3dLang.cpp   // idiomas del editor (T() + deteccion del idioma del telefono)
+SOURCE          W3dConfigGuardar.cpp // escribe el config.ini (la tarjeta "Ajustes" de Properties)
 SOURCE          Undo.cpp // Ctrl+Z (undo por comandos; lo llaman ObjectMode/LayoutInput/Properties)
 
 SOURCEPATH      ..\..\..\main\GeometriaUI

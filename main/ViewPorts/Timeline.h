@@ -81,12 +81,10 @@ class Timeline : public ViewportBase, public WithBorder, public Scrollable {
         void button_left() override;
         bool event_finger_scroll(int px, int py, int dx, int dy) override;             // 1 dedo: panear
         void event_finger_gesture(float zoomDelta, float panDx, float panDy) override; // 2 dedos: zoom + paneo
-#ifndef W3D_SYMBIAN
-        void event_key_down(SDL_Event &e) override;
-        void event_key_up(SDL_Event &e) override;   // soltar el CERO sin flechas = Frame Selected (Symbian)
-        void event_mouse_wheel(SDL_Event &e) override;
-        void mouse_button_up(SDL_Event &e) override;
-#endif
+        void event_key_down(int tecla, bool repeticion) override;
+        void event_key_up(int tecla) override;   // soltar el CERO sin flechas = Frame Selected (Symbian)
+        void event_mouse_wheel(float dy, int mx, int my) override;
+        void mouse_button_up(int boton) override;
 
         // click en la BARRA (transporte / campos): lo llama LayoutClickBarraTimeline. Devuelve true si consumio.
         bool ClickBarButton(int mx, int my);
@@ -96,6 +94,10 @@ class Timeline : public ViewportBase, public WithBorder, public Scrollable {
         void TogglePlay(int dir);       // dir=+1 adelante, -1 reversa; si ya juega en esa direccion -> pausa
         void GotoStart(); void GotoEnd();
         void StepFrame(int d);          // +1 / -1 frame
+        // Cuantos frames mover por pulsacion de flecha SEGUN EL ZOOM (Symbian: sin mouse, las flechas son la unica
+        // forma de recorrer el tiempo). Con mucho zoom cada frame ocupa mucho: paso de 1, preciso. Con poco zoom
+        // un frame es un pixel: pasos grandes o no llegas nunca. Devuelve >= 1.
+        void ScrubFlecha(int dir);      // flecha MANTENIDA: corre el frame ~3px de pantalla por tick, con cualquier zoom
         void StepKeyframe(int d);       // proximo (+1) / anterior (-1) keyframe del objeto activo
         void ZoomBy(float factor, int centerXlocal); // zoom HORIZONTAL manteniendo fijo el frame bajo centerX
         void ZoomVBy(float factor);     // zoom VERTICAL (solo curvas) desde el centro del strip
@@ -154,6 +156,15 @@ class Timeline : public ViewportBase, public WithBorder, public Scrollable {
         bool DopeClickStrip(int mx, int my); // click en el strip: selecciona keyframes (shift = agrega). true si consumio
         void DopeHover(int mx, int my);      // actualiza hoverRow
         void DopeSelectAll(); void DopeSelectNone(); void DopeSelectInvert(); // a / Alt+A / Ctrl+I
+        // ----- navegacion de keyframes por TECLADO (Symbian: lapiz + flechas; sin mouse) -----
+        // Recorre los frames del SUMMARY (uno por frame con algo): recorrer los de cada canal seria infinito.
+        // Si hay FILAS de curva seleccionadas, recorre los de ESAS (para eso esta el modo curva).
+        void DopeFilasNav(std::vector<int>& out) const;   // que filas se recorren
+        void DopeFramesNav(std::vector<int>& out) const;  // sus frames, ordenados
+        void DopeSelFrame(int f, bool on);                // elige/saca todos los keyframes de ese frame
+        bool DopeSelAvanzar(int paso, bool extender);     // lapiz+der/izq: avanza el activo
+        bool DopeSelTodoNav();                            // lapiz+arriba: todos
+        bool DopeSelNadaNav();                            // lapiz+abajo: ninguno
         void DopeBorrarSeleccion();          // 'x': borra los keyframes seleccionados, o la animacion de las filas seleccionadas
         void DopeDuplicarSeleccion();        // Shift+D: duplica los keyframes seleccionados y los agarra para moverlos
         // Transform de keyframes. En DOPE SHEET solo existe el eje TIEMPO (rotar no significa nada y no hay ejes
@@ -234,6 +245,13 @@ bool DopeNumInputChar(int c);
 void InvalidarAnimYRedraw();
 
 bool DopeXformActivo();
+bool TL_TogglePlay();   // barra de espacio: play/pausa sin tener el timeline enfocado. false = no hay timeline.
+// 1/2/3 de Symbian sobre el TIMELINE: arranca el transform de KEYFRAMES (1=mover 2=rotar 3=escalar) en vez del
+// transform del objeto. false = el timeline no esta activo (o no hay keyframes elegidos) -> seguir de largo.
+// Lapiz (+flechas) de Symbian sobre el TIMELINE: navega KEYFRAMES en vez de cambiar la seleccion de objetos.
+// dir: 0=lapiz solo (saca el actual y avanza) 1=derecha 2=izquierda 3=arriba(todos) 4=abajo(ninguno).
+// false = el timeline no esta activo -> que el llamador siga con lo suyo.
+bool DopeNavTecla(int dir);
 
 // ---- KEYFRAME ACTIVO (el ultimo clickeado): lo edita la tarjeta "Keyframe" del panel de propiedades ----
 // Devuelve la curva viva + el indice, o NULL si no hay ninguno elegido. El indice se resuelve cada vez: el vector

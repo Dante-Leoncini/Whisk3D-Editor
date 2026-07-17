@@ -1,4 +1,5 @@
 #include "w3dGraphics.h" // abstraccion de graficos (independencia de OpenGL)
+#include "W3dLang.h"   // T(): los textos salen en el idioma del sistema
 #include "Undo.h" // Ctrl+Z: capturar modo / seleccion
 #include "ViewPorts/PopUp/ConfirmarPopup.h" // AbrirConfirmarBorrado (popup de confirmar borrado)
 #include "ViewPorts/LayoutInput.h"
@@ -348,7 +349,7 @@ static void LayoutAccionTipo(int aId) {
 // opcion del menu Add: crea el objeto en el cursor 3D (codigo compartido)
 // ids: 0 Plane, 1 Cube, 2 Circle, 3 Vertex, 4 Empty, 5 Camera, 6 Light,
 //      7 import Wavefront (dialogo de cada plataforma)
-static void LayoutAccionAdd(int aId) {
+void LayoutAccionAdd(int aId) {
     Object* nuevo = NULL;
     switch (aId) {
         case 0: nuevo = NewMesh(MeshType::plane, NULL, false); break;
@@ -367,7 +368,9 @@ static void LayoutAccionAdd(int aId) {
         case 5: nuevo = new Camera(NULL, cursor3D.pos, Vector3(-35.0f, -45.0f, 0.0f)); break;
         case 6: {
             Light* l = Light::Create(NULL, 0, 0, 0);
-            if (l) { l->pos = cursor3D.pos; }
+            // el nombre se pone ACA y no en el constructor: la Light vive en el Core, y el Core no sabe -ni tiene
+            // por que saber- que existen los idiomas. El editor la crea, el editor la nombra.
+            if (l) { l->pos = cursor3D.pos; l->name = T("Light"); }
             nuevo = l;
             break;
         }
@@ -405,6 +408,15 @@ static void LayoutAccionAdd(int aId) {
             nuevo = inst;
             break;
         }
+        case 20: { // Reference: imagen de referencia. Un plano comun y corriente, pero PARADO (90 en X): asi
+                   // queda de frente en la vista, que es como se mira una referencia.
+            Mesh* m = (Mesh*)NewMesh(MeshType::plane, NULL, false);
+            if (!m) break;
+            m->name = "Reference";
+            m->SetRotEuler(Vector3(90.0f, 0.0f, 0.0f));
+            nuevo = m;
+            break;
+        }
         case 12: nuevo = NewMesh(MeshType::UVsphere, NULL, false); break;
         case 13: nuevo = NewMesh(MeshType::cone, NULL, false); break;
         case 14: nuevo = NewMesh(MeshType::cylinder, NULL, false); break;
@@ -412,6 +424,22 @@ static void LayoutAccionAdd(int aId) {
     if (nuevo) {
         DeseleccionarTodo();
         nuevo->Seleccionar();
+    }
+    // VERTEX: se crea y ya entras a EDITARLO, con el vertice elegido. Un vert suelto es lo unico que no se puede
+    // tocar desde Object Mode (ni se ve), asi que crearlo y tener que entrar a mano cada vez era un paso al pedo.
+    if (nuevo && aId == 3) {
+        if (InteractionMode != EditMode) LayoutToggleEditMode();
+        ((Mesh*)nuevo)->EditSeleccionarTodo(true);   // el unico vert que tiene
+    }
+    // REFERENCE: material propio + el selector de textura abierto. Elegis la imagen y ya tenes la referencia lista.
+    // No abre el panel "Add Plane": el selector ocupa la pantalla y son dos cosas peleando por el mismo lugar.
+    if (nuevo && aId == 20) {
+        Material* mat = NuevoMaterialEnMeshPart((Mesh*)nuevo, 0);
+        // sin LIGHTING: una referencia es una imagen, no una superficie. Si la sombrea la luz de la escena la ves
+        // mas oscura de un lado y no es fiel a lo que estas calcando.
+        if (mat) { mat->textureOn = true; mat->lighting = false; }
+        if (mat && DialogoCargarTextura) DialogoCargarTextura(mat);
+        return;
     }
     // cualquier primitiva regenerable (cube/plane/circle/UVsphere): ventanita "Add ..."
     if (nuevo && nuevo->getType() == ObjectType::mesh &&
@@ -446,23 +474,23 @@ static void LayoutAccionSelect(int aId) {
 static void LayoutRebuildMenuSelect() {
     if (!MenuSelect) return;
     MenuSelect->Limpiar();
-    MenuSelect->Agregar("All", 0)->atajo = "A";
-    MenuSelect->Agregar("None", 1)->atajo = "Alt A";
-    MenuSelect->Agregar("Invert", 2)->atajo = "Ctrl I";
+    MenuSelect->Agregar(T("All"), 0)->atajo = "A";
+    MenuSelect->Agregar(T("None"), 1)->atajo = "Alt A";
+    MenuSelect->Agregar(T("Invert"), 2)->atajo = "Ctrl I";
     if (InteractionMode == EditMode) {
         // Select Linked (L): selecciona la ISLA conexa. Desde el menu = guiado (pide click sobre el elemento).
-        MenuSelect->Agregar("Select Linked", 15)->atajo = "L";
+        MenuSelect->Agregar(T("Select Linked"), 15)->atajo = "L";
         if (EditSelectMode == SelEdge) {
-            MenuSelect->Agregar("Loop Select (Edge Loop)", 11)->atajo = "Shift Alt Click";
-            MenuSelect->Agregar("Loop Select (Edge Ring)", 12);
+            MenuSelect->Agregar(T("Loop Select (Edge Loop)"), 11)->atajo = "Shift Alt Click";
+            MenuSelect->Agregar(T("Loop Select (Edge Ring)"), 12);
         } else if (EditSelectMode == SelFace) {
-            MenuSelect->Agregar("Loop Select", 10)->atajo = "Shift Alt Click";
+            MenuSelect->Agregar(T("Loop Select"), 10)->atajo = "Shift Alt Click";
         } else { // VERTICE: el loop se define por un BORDE -> modo guiado (pedi click sobre un borde)
-            MenuSelect->Agregar("Loop Select (Edge Loop)", 16)->atajo = "Shift Alt Click";
+            MenuSelect->Agregar(T("Loop Select (Edge Loop)"), 16)->atajo = "Shift Alt Click";
         }
         // Pick Shortest Path: en los 3 sub-modos. Guiado por cartel (click 1ro -> click 2do).
-        MenuSelect->Agregar("Pick Shortest Path", 13)->atajo = "Ctrl Click";
-        MenuSelect->Agregar("Shortest Path (Fill Region)", 14)->atajo = "Ctrl Shift Click";
+        MenuSelect->Agregar(T("Pick Shortest Path"), 13)->atajo = "Ctrl Click";
+        MenuSelect->Agregar(T("Shortest Path (Fill Region)"), 14)->atajo = "Ctrl Shift Click";
     }
 }
 
@@ -641,8 +669,8 @@ void LayoutDuplicarEdit() {
 void LayoutRipEdit() {
     if (InteractionMode != EditMode || !g_editMesh) return;
     Mesh* m = (Mesh*)g_editMesh;
-    if (!m->RipSeleccionEdit()) { Notificar("Rip: the selection does not separate the mesh", true); g_redraw = true; return; }
-    Notificar("Rip: mesh separated", false);
+    if (!m->RipSeleccionEdit()) { Notificar(T("Rip: the selection does not separate the mesh"), true); g_redraw = true; return; }
+    Notificar(T("Rip: mesh separated"), false);
     g_redraw = true;
 }
 
@@ -701,7 +729,7 @@ void LayoutProyectarUVDesdeVista(bool bounds) {
     std::vector<unsigned char> sel3d(m->faces3d.size(), 0); bool hay = false;
     for (size_t f = 0; f < e->faceSel.size(); f++)
         if (e->faceSel[f] && f < e->faceSrc.size()) { int f3 = e->faceSrc[f]; if (f3>=0 && f3<(int)m->faces3d.size()) { sel3d[f3]=1; hay=true; } }
-    if (!hay) { Notificar("Project from View: select faces first", true); return; }
+    if (!hay) { Notificar(T("Project from View: select faces first"), true); return; }
     Matrix4 W; m->GetWorldMatrix(W);
     const int nC = m->ContarCorners();
     std::vector<float> uvL((size_t)nC*2, 0.0f);
@@ -737,21 +765,38 @@ void LayoutProyectarUVDesdeVista(bool bounds) {
 }
 // el menu UV (tecla U o el header "UV"): operaciones sobre las CARAS seleccionadas.
 static PopupMenu* gMenuUVops = NULL; // file-static: LayoutCambiarMenuBarra lo necesita (izq/der para salir del menu UV)
+// El menu de barra ABIERTO y el ROL del boton que lo abrio. Se registran juntos en RegistrarMenuBarra(), que llama
+// el UNICO lugar que abre estos menus. El rol sale del BOTON, asi que un menu nuevo NO SE PUEDE olvidar de
+// registrarse: viene con su boton puesto.
+//
+// Antes esto era una lista paralela de "if (MenuAbierto == MenuX) rol = BR_X" que habia que acordarse de ampliar a
+// mano con cada menu nuevo. Nadie se acordaba, y el sintoma era siempre el mismo: izq/der se clavaba en ese menu y
+// no se podia salir. Paso con View, con Snap, con UV y con Animation -- cuatro veces el mismo bug.
+static PopupMenu* gMenuBarraAbierto = NULL;
+static int        gMenuBarraRol = -1;
+
+// El par (menu, rol) va JUNTO: si despues se abre otro menu por otro camino, MenuAbierto ya no coincide con
+// gMenuBarraAbierto y el rol se descarta en vez de aplicarse al menu equivocado.
+static void RegistrarMenuBarra(PopupMenu* m, Button* b){
+    gMenuBarraAbierto = m;
+    gMenuBarraRol = b ? b->rol : -1;
+}
+
 static PopupMenu* gMenuSnapTool = NULL; // idem: LayoutCambiarMenuBarra lo necesita (izq/der para salir del menu Snap)
 void LayoutMenuUV(int mx, int my) {
     if (InteractionMode != EditMode || !g_editMesh) return;
     if (!gMenuUVops) {
         gMenuUVops = new PopupMenu(); gMenuUVops->titulo = "UV"; gMenuUVops->action = LayoutAccionObject;
-        gMenuUVops->Agregar("Unwrap", 350)->atajo = "soon";
-        gMenuUVops->Agregar("Smart UV Project", 351)->atajo = "soon";
-        gMenuUVops->Agregar("Follow Active Quads", 352)->atajo = "soon";
-        gMenuUVops->Agregar("Cube Projection", 353);
-        gMenuUVops->Agregar("Cylinder Projection", 354);
-        gMenuUVops->Agregar("Sphere Projection", 355);
-        gMenuUVops->Agregar("Project from View", 356);
-        gMenuUVops->Agregar("Project from View (Bounds)", 357);
-        gMenuUVops->Agregar("Mark Seam", 358);
-        gMenuUVops->Agregar("Clear Seam", 359);
+        gMenuUVops->Agregar(T("Unwrap"), 350)->atajo = "soon";
+        gMenuUVops->Agregar(T("Smart UV Project"), 351)->atajo = "soon";
+        gMenuUVops->Agregar(T("Follow Active Quads"), 352)->atajo = "soon";
+        gMenuUVops->Agregar(T("Cube Projection"), 353);
+        gMenuUVops->Agregar(T("Cylinder Projection"), 354);
+        gMenuUVops->Agregar(T("Sphere Projection"), 355);
+        gMenuUVops->Agregar(T("Project from View"), 356);
+        gMenuUVops->Agregar(T("Project from View (Bounds)"), 357);
+        gMenuUVops->Agregar(T("Mark Seam"), 358);
+        gMenuUVops->Agregar(T("Clear Seam"), 359);
     }
     if (MenuAbierto) MenuAbierto->Cerrar();
     gMenuUVops->Abrir(mx, my, MenuPantallaW, MenuPantallaH);
@@ -780,8 +825,8 @@ void LayoutFlipNormales() {
 void LayoutTriangulate() {
     if (InteractionMode != EditMode || !g_editMesh) return;
     Mesh* m = (Mesh*)g_editMesh;
-    if (m->TriangularSeleccionEdit()) { Notificar("Faces triangulated", false); g_redraw = true; } // false = exito (verde)
-    else Notificar("Select faces with more than 3 sides to triangulate", true);                    // true = error (rojo)
+    if (m->TriangularSeleccionEdit()) { Notificar(T("Faces triangulated"), false); g_redraw = true; } // false = exito (verde)
+    else Notificar(T("Select faces with more than 3 sides to triangulate"), true);                    // true = error (rojo)
 }
 
 static void AccionDelete(int aId); // ejecuta Delete Vertices/Edges/Faces/Edge Loops (ids 361-364); definida mas abajo
@@ -828,9 +873,9 @@ static void LayoutAccionObject(int aId) {
         case 330: LayoutMarkSharp(true);  break; // Edge > Mark Sharp
         case 331: LayoutMarkSharp(false); break; // Edge > Clear Sharp
         case 340: LayoutLoopCutDesdeActivo(); break; // Edge/Face > Loop Cut and Slide (elemento activo)
-        case 350: Notificar("Unwrap: not implemented yet", false); break;              // UV > Unwrap (pendiente: LSCM)
-        case 351: Notificar("Smart UV Project: not implemented yet", false); break;    // UV > Smart UV Project (pendiente)
-        case 352: Notificar("Follow Active Quads: not implemented yet", false); break; // UV > Follow Active Quads (pendiente)
+        case 350: Notificar(T("Unwrap: not implemented yet"), false); break;              // UV > Unwrap (pendiente: LSCM)
+        case 351: Notificar(T("Smart UV Project: not implemented yet"), false); break;    // UV > Smart UV Project (pendiente)
+        case 352: Notificar(T("Follow Active Quads: not implemented yet"), false); break; // UV > Follow Active Quads (pendiente)
         case 353: LayoutProyectarUV(0); break; // UV > Cube Projection
         case 354: LayoutProyectarUV(1); break; // UV > Cylinder Projection
         case 355: LayoutProyectarUV(2); break; // UV > Sphere Projection
@@ -906,7 +951,7 @@ static void LayoutAccionView(int aId) {
         case 410: SetActiveObjectAsCamera(); break; // Set Active Object as Camera (Ctrl Num 0): SOLO setea la camara activa, NO cambia la vista
         case 411: Viewport3DActive->SetViewFromCameraActive(!Viewport3DActive->ViewFromCameraActive);   break; // Active Camera (Num 0): ver desde la camara
         case 420: Viewport3DActive->EnfocarObject(); break; // Frame Selected (Numpad .): enfoca la seleccion
-        case 421: Viewport3DActive->lockOrbit = !Viewport3DActive->lockOrbit; break; // Lock Orbit: orbitar -> panear
+        case 421: LayoutLockOrbitToggle(); break; // Lock Orbit: orbitar -> panear
     }
 }
 
@@ -1297,14 +1342,14 @@ static void LayoutRebuildMenuMode() {
     if (!MenuMode) return;
     MenuMode->Limpiar();
     bool esArm = (ObjActivo && ObjActivo->getType() == ObjectType::armature);
-    MenuMode->Agregar("Object Mode", ObjectMode, IconType::object);
-    MenuMode->Agregar("Edit Mode",   EditMode,   esArm ? IconType::armature : IconType::mesh);
+    MenuMode->Agregar(T("Object Mode"), ObjectMode, IconType::object);
+    MenuMode->Agregar(T("Edit Mode"),   EditMode,   esArm ? IconType::armature : IconType::mesh);
     if (esArm) {
-        MenuMode->Agregar("Pose Mode", PoseMode, IconType::armature);
+        MenuMode->Agregar(T("Pose Mode"), PoseMode, IconType::armature);
     } else {
-        MenuMode->Agregar("Vertex Paint",  VertexPaint,  IconType::mesh);
-        MenuMode->Agregar("Weight Paint",  WeightPaint,  IconType::mesh);
-        MenuMode->Agregar("Texture Paint", TexturePaint, IconType::mesh);
+        MenuMode->Agregar(T("Vertex Paint"),  VertexPaint,  IconType::mesh);
+        MenuMode->Agregar(T("Weight Paint"),  WeightPaint,  IconType::mesh);
+        MenuMode->Agregar(T("Texture Paint"), TexturePaint, IconType::mesh);
     }
 }
 
@@ -1333,17 +1378,17 @@ void LayoutAbrirMenuTipo(ViewportBase* aVp) {
     gMenuTipo->Limpiar();
     if (LayoutEstaMaximizado()) {
         // en FULLSCREEN no se cambia tipo/split/expand: solo restaurar el layout
-        gMenuTipo->Agregar("Minimize", 23);
+        gMenuTipo->Agregar(T("Minimize"), 23);
     } else {
-        gMenuTipo->Agregar("3D Viewport", 0);
+        gMenuTipo->Agregar(T("3D Viewport"), 0);
         gMenuTipo->Agregar("Outliner", 1);
-        gMenuTipo->Agregar("Properties", 2);
-        gMenuTipo->Agregar("UV Editor", 3);
-        gMenuTipo->Agregar("Timeline", 4);
-        if (aVp != rootViewport) gMenuTipo->Agregar("Expand", 20);
-        gMenuTipo->Agregar("Split Row", 21);
-        gMenuTipo->Agregar("Split Column", 22);
-        if (aVp != rootViewport) gMenuTipo->Agregar("Maximize", 23); // fullscreen del viewport activo
+        gMenuTipo->Agregar(T("Properties"), 2);
+        gMenuTipo->Agregar(T("UV Editor"), 3);
+        gMenuTipo->Agregar(T("Timeline"), 4);
+        if (aVp != rootViewport) gMenuTipo->Agregar(T("Expand"), 20);
+        gMenuTipo->Agregar(T("Split Row"), 21);
+        gMenuTipo->Agregar(T("Split Column"), 22);
+        if (aVp != rootViewport) gMenuTipo->Agregar(T("Maximize"), 23); // fullscreen del viewport activo
     }
     gMenuTipoDe = aVp;
     if (MenuAbierto && MenuAbierto != gMenuTipo) MenuAbierto->Cerrar();
@@ -1367,12 +1412,15 @@ static bool LayoutClickBotonTipo(ViewportBase* aVp, int aX, int aY) {
 static PopupMenu* gMenuUV = NULL;
 static void LayoutAbrirMenuUV(UVEditor* uv, int x, int y) {
     if (!uv) return;
-    if (!gMenuUV) gMenuUV = new PopupMenu();
+    // REGLA DE DISENO de los titulos: un menu que se abre desde algo SIN TEXTO (un icono, o un atajo de
+    // teclado) lleva titulo -- es lo unico que te dice que estas mirando. Si lo abre un boton/item que YA
+    // decia el texto, NO lleva: repetirlo es ruido. El boton View ahora es un icono -> titulo.
+    if (!gMenuUV){ gMenuUV = new PopupMenu(); gMenuUV->titulo = T("View"); }
     gMenuUV->Limpiar();
     // los togglea el propio item (AgregarCheck sobre el bool* del UV editor)
-    gMenuUV->AgregarCheck("Sync Selection", 0, &uv->syncSelection);
-    gMenuUV->AgregarCheck("Repeat Texture", 1, &uv->repeatTexture);
-    gMenuUV->AgregarCheck("Show Chrome UV", 2, &uv->mostrarChromeUV); // overlay LIVE del reflejo equirect (demo)
+    gMenuUV->AgregarCheck(T("Sync Selection"), 0, &uv->syncSelection);
+    gMenuUV->AgregarCheck(T("Repeat Texture"), 1, &uv->repeatTexture);
+    gMenuUV->AgregarCheck(T("Show Chrome UV"), 2, &uv->mostrarChromeUV); // overlay LIVE del reflejo equirect (demo)
     gMenuUV->action = NULL;
     if (MenuAbierto && MenuAbierto != gMenuUV) MenuAbierto->Cerrar();
     gMenuUV->Abrir(x, y, MenuPantallaW, MenuPantallaH);
@@ -1393,9 +1441,9 @@ static void LayoutAbrirMenuUVSnap(UVEditor* uv, int x, int y) {
     if (!gMenuUVSnap) gMenuUVSnap = new PopupMenu();
     gMenuUVSnap->Limpiar();
     gMenuUVSnap->titulo = "Snap";
-    gMenuUVSnap->Agregar("Cursor to Selection", 0);
-    gMenuUVSnap->Agregar("Selection to Cursor", 1);
-    gMenuUVSnap->Agregar("Cursor to Center", 2);
+    gMenuUVSnap->Agregar(T("Cursor to Selection"), 0);
+    gMenuUVSnap->Agregar(T("Selection to Cursor"), 1);
+    gMenuUVSnap->Agregar(T("Cursor to Center"), 2);
     gMenuUVSnap->action = LayoutAccionUVSnap;
     if (MenuAbierto && MenuAbierto != gMenuUVSnap) MenuAbierto->Cerrar();
     gMenuUVSnap->Abrir(x, y, MenuPantallaW, MenuPantallaH);
@@ -1420,11 +1468,11 @@ static void LayoutAbrirMenuUVSelMode(UVEditor* uv, int x, int y) {
     gUVModeTarget = uv;
     if (!gMenuUVSelMode) gMenuUVSelMode = new PopupMenu();
     gMenuUVSelMode->Limpiar();
-    gMenuUVSelMode->titulo = "Select Mode";
+    gMenuUVSelMode->titulo = T("Select Mode");
     int cur = uv->ModoUV();
-    gMenuUVSelMode->Agregar("Vertex", SelVertex, (int)IconType::selVertex)->verde = (cur == SelVertex);
-    gMenuUVSelMode->Agregar("Edge",   SelEdge,   (int)IconType::selEdge)->verde   = (cur == SelEdge);
-    gMenuUVSelMode->Agregar("Face",   SelFace,   (int)IconType::selFace)->verde   = (cur == SelFace);
+    gMenuUVSelMode->Agregar(T("Vertex"), SelVertex, (int)IconType::selVertex)->verde = (cur == SelVertex);
+    gMenuUVSelMode->Agregar(T("Edge"),   SelEdge,   (int)IconType::selEdge)->verde   = (cur == SelEdge);
+    gMenuUVSelMode->Agregar(T("Face"),   SelFace,   (int)IconType::selFace)->verde   = (cur == SelFace);
     gMenuUVSelMode->action = LayoutAccionUVSelMode;
     if (MenuAbierto && MenuAbierto != gMenuUVSelMode) MenuAbierto->Cerrar();
     gMenuUVSelMode->Abrir(x, y, MenuPantallaW, MenuPantallaH);
@@ -1449,8 +1497,8 @@ static void LayoutAbrirMenuUVTex(UVEditor* uv, int x, int y) {
     gUVTexTarget = uv; gUVTexMesh = m;
     if (!gMenuUVTex) gMenuUVTex = new PopupMenu();
     gMenuUVTex->Limpiar();
-    gMenuUVTex->titulo = "Texture";
-    gMenuUVTex->Agregar("Auto (active part)", 9000);
+    gMenuUVTex->titulo = T("Texture");
+    gMenuUVTex->Agregar(T("Auto (active part)"), 9000);
     // lista las TEXTURAS DISTINTAS del modelo (dedup por puntero). El id de cada opcion = la parte que la usa, asi el
     // UV editor muestra esa textura + las UV de esa parte. (Dante: "el dropdown es de texturas, no de materiales".)
     std::vector<Texture*> vistas;
@@ -1549,11 +1597,13 @@ bool LayoutAbrirMenuDeBarra(ViewportBase* vp, int mx, int my) {
         // Pivot: el menu se REARMA cada vez (marca el activo) -> via LayoutMenuPivot
         if (MenuAbierto) MenuAbierto->Cerrar();
         LayoutMenuPivot(bPiv->sx, bPiv->sy + bPiv->height - GlobalScale);
+        RegistrarMenuBarra(MenuAbierto, bPiv);
         return true;
     } else if (bSnap && bSnap->visible && bSnap->Contains(mx, my)) {
         // Snap: el menu se REARMA cada vez (Base/Target marcan el activo + labels) -> via LayoutMenuSnapTool
         if (MenuAbierto) MenuAbierto->Cerrar();
         LayoutMenuSnapTool(bSnap->sx, bSnap->sy + bSnap->height - GlobalScale);
+        RegistrarMenuBarra(MenuAbierto, bSnap);
         return true;
     } else if (MenuView && bView && bView->visible && bView->Contains(mx, my)) {
         objetivo = MenuView; boton = bView;   // "View" (antes de Select): submenu Viewpoint
@@ -1583,6 +1633,7 @@ bool LayoutAbrirMenuDeBarra(ViewportBase* vp, int mx, int my) {
         if (InteractionMode == EditMode) {
             if (MenuAbierto) MenuAbierto->Cerrar();
             LayoutMenuEditContexto(bObj->sx, bObj->sy + bObj->height - GlobalScale);
+            RegistrarMenuBarra(MenuAbierto, bObj);
             return true;
         } else if (InteractionMode == PoseMode) {
             extern PopupMenu* MenuPose;
@@ -1616,12 +1667,14 @@ bool LayoutAbrirMenuDeBarra(ViewportBase* vp, int mx, int my) {
         if (MenuOverlays && MenuAbierto == MenuOverlays) return true; // ya abierto
         if (MenuAbierto) MenuAbierto->Cerrar();
         static_cast<Viewport3D*>(vp)->AbrirMenuOverlays(boton->sx, menuY);
+        RegistrarMenuBarra(MenuOverlays, boton);
         return true;
     }
     if (MenuAbierto == objetivo) return true; // ese menu ya esta abierto
     if (MenuAbierto) MenuAbierto->Cerrar();    // cerrar el otro (cambio de menu)
     objetivo->Abrir(boton->sx, menuY, MenuPantallaW, MenuPantallaH);
     MenuAbierto = objetivo;
+    RegistrarMenuBarra(objetivo, boton);
     return true;
 }
 
@@ -1673,21 +1726,9 @@ static void LayoutCambiarMenuBarra(int dir) {
     int idx = -1;
     if (MenuAbierto == gMenuTipo) idx = 0; // boton [0] = tipo/split del viewport (idx fijo)
     else {
-        int rol = -1;
-        if (MenuAbierto == MenuMode) rol = BR_Mode;
-        else if (MenuAbierto == MenuSelMode) rol = BR_SelMode;
-        else if (MenuAbierto == gMenuPivot) rol = BR_Pivot;
-        else if (MenuAbierto == MenuSelect) rol = BR_Select;
-        else if (MenuAbierto == MenuAdd) rol = BR_Add;
-        else if (MenuAbierto == MenuObject || MenuAbierto == gMenuVertex ||
-                 MenuAbierto == gMenuEdge  || MenuAbierto == gMenuFace) rol = BR_Object;
-        else if (MenuAbierto == MenuMesh) rol = BR_Mesh; // menu "Mesh" de Edit Mode
-        else if (MenuAbierto == MenuOverlays) rol = BR_Overlays;
-        else if (MenuAbierto == MenuView) rol = BR_View; // FIX: faltaba -> izq/der se clavaba en el menu View
-        else if (MenuAbierto == MenuRender) rol = BR_Render;
-        else if (MenuAbierto == MenuOrient) rol = BR_Orient;
-        else if (MenuAbierto == gMenuSnapTool) rol = BR_Snap; // FIX: faltaba -> izq/der se clavaba en el menu Snap
-        else if (MenuAbierto == gMenuUVops) rol = BR_UV; // FIX: faltaba -> izq/der no salia del menu UV
+        // El rol lo registro el que ABRIO el menu, sacandolo de su boton (RegistrarMenuBarra). Se exige que el
+        // menu abierto sea EL que se registro: si no, lo abrio otro camino y no es un menu de barra.
+        const int rol = (MenuAbierto == gMenuBarraAbierto) ? gMenuBarraRol : -1;
         if (rol >= 0) idx = BarRolIdx(B, rol);
     }
     if (idx < 0) return; // el abierto no es de la barra
@@ -1787,23 +1828,23 @@ static void AccionClearParent(int aId) {
 PopupMenu* LayoutSubmenuSetParent() {
     if (!gMenuSetParent) {
         gMenuSetParent = new PopupMenu();
-        gMenuSetParent->titulo = "Set Parent To";
+        gMenuSetParent->titulo = T("Set Parent To");
         gMenuSetParent->action = LayoutAccionObject;
-        gMenuSetParent->Agregar("Object", 230);
-        gMenuSetParent->Agregar("Object (Keep Transform)", 231);
-        gMenuSetParent->Agregar("Object (Without Inverse)", 232);
-        gMenuSetParent->Agregar("Object (Keep Transform Without Inverse)", 233);
+        gMenuSetParent->Agregar(T("Object"), 230);
+        gMenuSetParent->Agregar(T("Object (Keep Transform)"), 231);
+        gMenuSetParent->Agregar(T("Object (Without Inverse)"), 232);
+        gMenuSetParent->Agregar(T("Object (Keep Transform Without Inverse)"), 233);
     }
     return gMenuSetParent;
 }
 PopupMenu* LayoutSubmenuClearParent() {
     if (!gMenuClearParent) {
         gMenuClearParent = new PopupMenu();
-        gMenuClearParent->titulo = "Clear Parent";
+        gMenuClearParent->titulo = T("Clear Parent");
         gMenuClearParent->action = LayoutAccionObject;
-        gMenuClearParent->Agregar("Clear Parent", 240);
-        gMenuClearParent->Agregar("Clear and Keep Transformation", 241);
-        gMenuClearParent->Agregar("Clear Parent Inverse", 242);
+        gMenuClearParent->Agregar(T("Clear Parent"), 240);
+        gMenuClearParent->Agregar(T("Clear and Keep Transformation"), 241);
+        gMenuClearParent->Agregar(T("Clear Parent Inverse"), 242);
     }
     return gMenuClearParent;
 }
@@ -1833,7 +1874,7 @@ static void AccionDelete(int aId) {
     if (estado != editNavegacion) return;
     if (InteractionMode != EditMode || !g_editMesh) return;
     if (aId == 364) { // Edge Loops: disuelve el loop seleccionado (inverso del loop cut)
-        if (!((Mesh*)g_editMesh)->BorrarEdgeLoopEdit()) Notificar("Delete Edge Loops: select an edge loop first", true);
+        if (!((Mesh*)g_editMesh)->BorrarEdgeLoopEdit()) Notificar(T("Delete Edge Loops: select an edge loop first"), true);
         g_redraw = true; return;
     }
     int dt = (aId == 361) ? SelVertex : (aId == 362) ? SelEdge : SelFace;
@@ -1846,15 +1887,15 @@ static void AccionDelete(int aId) {
 static void EnsureMenuDelete() {
     if (gMenuDelete) return;
     gMenuDelete = new PopupMenu();
-    gMenuDelete->titulo = "Delete";
+    gMenuDelete->titulo = T("Delete");
     // OJO: action = LayoutAccionObject (NO AccionDelete). Como submenu, sus items se despachan por la accion del menu
     // TOP (el de contexto = LayoutAccionObject); usar la misma accion + ids unicos 361-364 hace que funcione IGUAL
     // sea como submenu (menu de contexto) o standalone (atajo X, donde este ES el menu top).
     gMenuDelete->action = LayoutAccionObject;
-    gMenuDelete->Agregar("Vertices", 361);
-    gMenuDelete->Agregar("Edges", 362);
-    gMenuDelete->Agregar("Faces", 363);
-    gMenuDelete->Agregar("Edge Loops", 364); // disuelve el loop (inverso del loop cut)
+    gMenuDelete->Agregar(T("Vertices"), 361);
+    gMenuDelete->Agregar(T("Edges"), 362);
+    gMenuDelete->Agregar(T("Faces"), 363);
+    gMenuDelete->Agregar(T("Edge Loops"), 364); // disuelve el loop (inverso del loop cut)
 }
 
 // abre el menu Delete EN EL CURSOR (atajo X) si estamos en Edit Mode. Devuelve true si lo abrio
@@ -1886,34 +1927,34 @@ void LayoutMenuEditContexto(int mx, int my) {
     PopupMenu* m = NULL;
     if (EditSelectMode == SelFace) {
         if (!gMenuFace) {
-            gMenuFace = new PopupMenu(); gMenuFace->titulo = "Face"; gMenuFace->action = LayoutAccionObject;
-            gMenuFace->Agregar("Extrude Faces", 300)->atajo = "E";
-            gMenuFace->Agregar("Loop Cut and Slide", 340)->atajo = "Ctrl R";
-            gMenuFace->Agregar("Rip", 341)->atajo = "V";
-            gMenuFace->Agregar("Shade Smooth", 320);
-            gMenuFace->Agregar("Shade Flat", 321);
-            gMenuFace->Agregar("Recalculate Normals", 322);
-            gMenuFace->Agregar("Triangulate Faces", 323)->atajo = "Ctrl T";
+            gMenuFace = new PopupMenu(); gMenuFace->titulo = T("Face"); gMenuFace->action = LayoutAccionObject;
+            gMenuFace->Agregar(T("Extrude Faces"), 300)->atajo = "E";
+            gMenuFace->Agregar(T("Loop Cut and Slide"), 340)->atajo = "Ctrl R";
+            gMenuFace->Agregar(T("Rip"), 341)->atajo = "V";
+            gMenuFace->Agregar(T("Shade Smooth"), 320);
+            gMenuFace->Agregar(T("Shade Flat"), 321);
+            gMenuFace->Agregar(T("Recalculate Normals"), 322);
+            gMenuFace->Agregar(T("Triangulate Faces"), 323)->atajo = "Ctrl T";
             // (Delete se movio al menu "Mesh": es comun a vertice/borde/cara)
         }
         m = gMenuFace;
     } else if (EditSelectMode == SelEdge) {
         if (!gMenuEdge) {
-            gMenuEdge = new PopupMenu(); gMenuEdge->titulo = "Edge"; gMenuEdge->action = LayoutAccionObject;
-            gMenuEdge->Agregar("Extrude Edges", 300)->atajo = "E";
-            gMenuEdge->Agregar("Loop Cut and Slide", 340)->atajo = "Ctrl R";
-            gMenuEdge->Agregar("Rip", 341)->atajo = "V";
-            gMenuEdge->Agregar("Mark Sharp", 330)->atajo = "W";
-            gMenuEdge->Agregar("Clear Sharp", 331);
+            gMenuEdge = new PopupMenu(); gMenuEdge->titulo = T("Edge"); gMenuEdge->action = LayoutAccionObject;
+            gMenuEdge->Agregar(T("Extrude Edges"), 300)->atajo = "E";
+            gMenuEdge->Agregar(T("Loop Cut and Slide"), 340)->atajo = "Ctrl R";
+            gMenuEdge->Agregar(T("Rip"), 341)->atajo = "V";
+            gMenuEdge->Agregar(T("Mark Sharp"), 330)->atajo = "W";
+            gMenuEdge->Agregar(T("Clear Sharp"), 331);
             // (Delete se movio al menu "Mesh": es comun a vertice/borde/cara)
         }
         m = gMenuEdge;
     } else {
         if (!gMenuVertex) {
-            gMenuVertex = new PopupMenu(); gMenuVertex->titulo = "Vertex"; gMenuVertex->action = LayoutAccionObject;
-            gMenuVertex->Agregar("New Edge/Face from Vertices", 310)->atajo = "F";
-            gMenuVertex->Agregar("Extrude Vertices", 300)->atajo = "E";
-            gMenuVertex->Agregar("Rip", 341)->atajo = "V";
+            gMenuVertex = new PopupMenu(); gMenuVertex->titulo = T("Vertex"); gMenuVertex->action = LayoutAccionObject;
+            gMenuVertex->Agregar(T("New Edge/Face from Vertices"), 310)->atajo = "F";
+            gMenuVertex->Agregar(T("Extrude Vertices"), 300)->atajo = "E";
+            gMenuVertex->Agregar(T("Rip"), 341)->atajo = "V";
             // (Delete se movio al menu "Mesh": es comun a vertice/borde/cara)
         }
         m = gMenuVertex;
@@ -1939,9 +1980,9 @@ static PopupMenu* gMenuSharp = NULL;
 void LayoutMenuSharp(int mx, int my) {
     if (InteractionMode != EditMode || !g_editMesh) return;
     if (!gMenuSharp) {
-        gMenuSharp = new PopupMenu(); gMenuSharp->titulo = "Edge"; gMenuSharp->action = LayoutAccionObject;
-        gMenuSharp->Agregar("Mark Sharp", 330);
-        gMenuSharp->Agregar("Clear Sharp", 331);
+        gMenuSharp = new PopupMenu(); gMenuSharp->titulo = T("Edge"); gMenuSharp->action = LayoutAccionObject;
+        gMenuSharp->Agregar(T("Mark Sharp"), 330);
+        gMenuSharp->Agregar(T("Clear Sharp"), 331);
     }
     if (MenuAbierto) MenuAbierto->Cerrar();
     gMenuSharp->Abrir(mx, my, MenuPantallaW, MenuPantallaH);
@@ -1972,16 +2013,19 @@ static void AccionSnapRouter(int id){
 static const char* SnapBaseNom(int b){ return b==SNAP_CLOSEST?"Closest":b==SNAP_CENTER?"Center":b==SNAP_MEDIAN?"Median":"Active"; }
 static const char* SnapTargetNom(int t){ return t==SNAP_VERTEX?"Vertex":t==SNAP_EDGE?"Edge":t==SNAP_FACE?"Face":t==SNAP_EDGECENTER?"Edge Center":"Face Center"; }
 void LayoutMenuSnapTool(int mx, int my){
-    if (!gMenuSnapBase){ gMenuSnapBase=new PopupMenu(); gMenuSnapBase->titulo="Snap Base"; }
+    if (!gMenuSnapBase){ gMenuSnapBase=new PopupMenu(); gMenuSnapBase->titulo=T("Snap Base"); }
     gMenuSnapBase->Limpiar();
     for (int b=SNAP_CLOSEST;b<=SNAP_ACTIVE;b++) gMenuSnapBase->Agregar(SnapBaseNom(b), 100+b)->verde=(g_snap.base==b);
-    if (!gMenuSnapTarget){ gMenuSnapTarget=new PopupMenu(); gMenuSnapTarget->titulo="Snap Target"; }
+    if (!gMenuSnapTarget){ gMenuSnapTarget=new PopupMenu(); gMenuSnapTarget->titulo=T("Snap Target"); }
     gMenuSnapTarget->Limpiar();
     for (int t=SNAP_VERTEX;t<=SNAP_FACECENTER;t++) gMenuSnapTarget->Agregar(SnapTargetNom(t), 200+t)->verde=(g_snap.target==t);
     // sin titulo: el boton "Snap" de la barra ya lo dice; una cabecera "Snap" gastaria una fila (240p Symbian)
-    if (!gMenuSnapTool){ gMenuSnapTool=new PopupMenu(); gMenuSnapTool->action=AccionSnapRouter; }
+    // REGLA DE DISENO de los titulos: un menu que se abre desde algo SIN TEXTO (un icono, o un atajo de teclado)
+    // lleva titulo -- es lo unico que te dice que estas mirando. Si lo abre un boton/item que YA decia el texto, NO
+    // lleva: repetirlo es ruido. El boton Snap ahora es un iman -> titulo.
+    if (!gMenuSnapTool){ gMenuSnapTool=new PopupMenu(); gMenuSnapTool->titulo="Snap"; gMenuSnapTool->action=AccionSnapRouter; }
     gMenuSnapTool->Limpiar();
-    gMenuSnapTool->AgregarCheck("Enable", 0, &g_snap.enabled)->atajo="Shift Tab";
+    gMenuSnapTool->AgregarCheck(T("Enable"), 0, &g_snap.enabled)->atajo="Shift Tab";
     // el resto se ve en GRIS cuando el snap esta apagado (->gris = &g_snap.enabled): sin snap
     // ninguna de estas opciones hace efecto, igual que "Show Overlays" grisa sus hijos.
     gMenuSnapTool->Agregar(std::string("Snap Base: ")+SnapBaseNom(g_snap.base), 0, -1, gMenuSnapBase)->gris = &g_snap.enabled;
@@ -1989,18 +2033,18 @@ void LayoutMenuSnapTool(int mx, int my){
     // SOLO en target FACE: proyeccion POR VERTICE (retopologia). Submenu con 2 tildes INDEPENDIENTES (no radio):
     // Face Project (a lo largo del rayo de la vista) y Face Nearest (al punto mas cercano de la superficie).
     if (g_snap.target == SNAP_FACE){
-        if (!gMenuSnapIndiv){ gMenuSnapIndiv=new PopupMenu(); gMenuSnapIndiv->titulo="Individual Elements"; }
+        if (!gMenuSnapIndiv){ gMenuSnapIndiv=new PopupMenu(); gMenuSnapIndiv->titulo=T("Individual Elements"); }
         gMenuSnapIndiv->Limpiar();
-        gMenuSnapIndiv->AgregarCheck("Face Project", 0, &g_snap.faceProject);
-        gMenuSnapIndiv->AgregarCheck("Face Nearest", 0, &g_snap.faceNearest);
-        gMenuSnapTool->Agregar("Snap Target for Individual Elements", 0, -1, gMenuSnapIndiv)->gris = &g_snap.enabled;
+        gMenuSnapIndiv->AgregarCheck(T("Face Project"), 0, &g_snap.faceProject);
+        gMenuSnapIndiv->AgregarCheck(T("Face Nearest"), 0, &g_snap.faceNearest);
+        gMenuSnapTool->Agregar(T("Snap Target for Individual Elements"), 0, -1, gMenuSnapIndiv)->gris = &g_snap.enabled;
     }
-    gMenuSnapTool->AgregarCheck("Affect Move",   0, &g_snap.afMove)->gris = &g_snap.enabled;
-    gMenuSnapTool->AgregarCheck("Affect Rotate", 0, &g_snap.afRot)->gris = &g_snap.enabled;
-    gMenuSnapTool->AgregarCheck("Affect Scale",  0, &g_snap.afScale)->gris = &g_snap.enabled;
-    gMenuSnapTool->AgregarCheck("Include Active",     0, &g_snap.tsActive)->gris = &g_snap.enabled;
-    gMenuSnapTool->AgregarCheck("Include Edited",     0, &g_snap.tsEdited)->gris = &g_snap.enabled;
-    gMenuSnapTool->AgregarCheck("Include Non-Edited", 0, &g_snap.tsNonEdited)->gris = &g_snap.enabled;
+    gMenuSnapTool->AgregarCheck(T("Affect Move"),   0, &g_snap.afMove)->gris = &g_snap.enabled;
+    gMenuSnapTool->AgregarCheck(T("Affect Rotate"), 0, &g_snap.afRot)->gris = &g_snap.enabled;
+    gMenuSnapTool->AgregarCheck(T("Affect Scale"),  0, &g_snap.afScale)->gris = &g_snap.enabled;
+    gMenuSnapTool->AgregarCheck(T("Include Active"),     0, &g_snap.tsActive)->gris = &g_snap.enabled;
+    gMenuSnapTool->AgregarCheck(T("Include Edited"),     0, &g_snap.tsEdited)->gris = &g_snap.enabled;
+    gMenuSnapTool->AgregarCheck(T("Include Non-Edited"), 0, &g_snap.tsNonEdited)->gris = &g_snap.enabled;
     if (MenuAbierto) MenuAbierto->Cerrar();
     gMenuSnapTool->Abrir(mx, my, MenuPantallaW, MenuPantallaH);
     MenuAbierto = gMenuSnapTool;
@@ -2009,16 +2053,16 @@ void LayoutMenuSnapTool(int mx, int my){
 void LayoutMenuPivot(int mx, int my) {
     if (!gMenuPivot) {
         gMenuPivot = new PopupMenu();
-        gMenuPivot->titulo = "Transform Pivot Point";
+        gMenuPivot->titulo = T("Transform Pivot Point");
         gMenuPivot->action = AccionPivot;
     }
     // se rearma cada vez: cada opcion con su ICONO y la ACTIVA en verde
     gMenuPivot->Limpiar();
-    gMenuPivot->Agregar("3D Cursor", PivotCursor3D, IconType::pivotCursor)->verde = (g_transformPivot==PivotCursor3D);
-    gMenuPivot->Agregar("Individual Origins", PivotIndividual, IconType::pivotIndividual)->verde = (g_transformPivot==PivotIndividual);
-    gMenuPivot->Agregar("Median Point", PivotMedian, IconType::pivotMedian)->verde = (g_transformPivot==PivotMedian);
-    gMenuPivot->Agregar("Active Element", PivotActive, IconType::pivotActive)->verde = (g_transformPivot==PivotActive);
-    gMenuPivot->AgregarCheck("Lock Normals", 9, &g_editLockNormales);
+    gMenuPivot->Agregar(T("3D Cursor"), PivotCursor3D, IconType::pivotCursor)->verde = (g_transformPivot==PivotCursor3D);
+    gMenuPivot->Agregar(T("Individual Origins"), PivotIndividual, IconType::pivotIndividual)->verde = (g_transformPivot==PivotIndividual);
+    gMenuPivot->Agregar(T("Median Point"), PivotMedian, IconType::pivotMedian)->verde = (g_transformPivot==PivotMedian);
+    gMenuPivot->Agregar(T("Active Element"), PivotActive, IconType::pivotActive)->verde = (g_transformPivot==PivotActive);
+    gMenuPivot->AgregarCheck(T("Lock Normals"), 9, &g_editLockNormales);
     gMenuPivot->Abrir(mx, my, MenuPantallaW, MenuPantallaH); // EN EL CURSOR
     MenuAbierto = gMenuPivot;
 }
@@ -2720,14 +2764,14 @@ PopupMenu* LayoutSubmenuSnap() {
         gMenuSnap = new PopupMenu();
         gMenuSnap->titulo = "Snap";
         gMenuSnap->action = AccionSnap;
-        gMenuSnap->Agregar("Selection to Grid", 0);
-        gMenuSnap->Agregar("Selection to Cursor", 1);
-        gMenuSnap->Agregar("Selection to Cursor (Keep Offset)", 2);
-        gMenuSnap->Agregar("Selection to Active", 3);
-        gMenuSnap->Agregar("Cursor to Selected", 4);
-        gMenuSnap->Agregar("Cursor to World Origin", 5);
-        gMenuSnap->Agregar("Cursor to Grid", 6);
-        gMenuSnap->Agregar("Cursor to Active", 7);
+        gMenuSnap->Agregar(T("Selection to Grid"), 0);
+        gMenuSnap->Agregar(T("Selection to Cursor"), 1);
+        gMenuSnap->Agregar(T("Selection to Cursor (Keep Offset)"), 2);
+        gMenuSnap->Agregar(T("Selection to Active"), 3);
+        gMenuSnap->Agregar(T("Cursor to Selected"), 4);
+        gMenuSnap->Agregar(T("Cursor to World Origin"), 5);
+        gMenuSnap->Agregar(T("Cursor to Grid"), 6);
+        gMenuSnap->Agregar(T("Cursor to Active"), 7);
     }
     return gMenuSnap;
 }
@@ -2764,12 +2808,12 @@ static void AccionMerge(int modo) {
 PopupMenu* LayoutSubmenuMerge() {
     if (!gMenuMerge) {
         gMenuMerge = new PopupMenu();
-        gMenuMerge->titulo = "Merge";
+        gMenuMerge->titulo = T("Merge");
         gMenuMerge->action = LayoutAccionObject;
-        gMenuMerge->Agregar("At Center", 380);
-        gMenuMerge->Agregar("At Cursor", 381);
-        gMenuMerge->Agregar("Collapse", 382);
-        gMenuMerge->Agregar("By Distance", 383);
+        gMenuMerge->Agregar(T("At Center"), 380);
+        gMenuMerge->Agregar(T("At Cursor"), 381);
+        gMenuMerge->Agregar(T("Collapse"), 382);
+        gMenuMerge->Agregar(T("By Distance"), 383);
     }
     return gMenuMerge;
 }
@@ -2779,10 +2823,10 @@ static PopupMenu* gMenuNormals = NULL;
 PopupMenu* LayoutSubmenuNormals() {
     if (!gMenuNormals) {
         gMenuNormals = new PopupMenu();
-        gMenuNormals->titulo = "Normals";
+        gMenuNormals->titulo = T("Normals");
         gMenuNormals->action = LayoutAccionObject;
-        gMenuNormals->Agregar("Recalculate Normals", 322)->atajo = "Shift N"; // orienta hacia afuera (cubo/esfera OK)
-        gMenuNormals->Agregar("Flip", 324);                                    // simplemente invierte las normales
+        gMenuNormals->Agregar(T("Recalculate Normals"), 322)->atajo = "Shift N"; // orienta hacia afuera (cubo/esfera OK)
+        gMenuNormals->Agregar(T("Flip"), 324);                                    // simplemente invierte las normales
     }
     return gMenuNormals;
 }
@@ -3349,17 +3393,88 @@ bool LayoutUVNavFrame(int dx, int dy, bool zoomMode) {
 // 0-mantenido + arriba/abajo = ZOOM centrado, * -mantenido + izq/der = PANEO de la vista. Devuelve true si el
 // viewport activo es el Timeline (asi AplicarFlechas3D corta y no orbita la camara 3D). Con dx=dy=0 no hace
 // nada pero igual devuelve true -> sirve de query "el activo es el Timeline?".
+// ---------------------------------------------------------------------------------------------------------------
+//  CLICK y TECLA al viewport que corresponde. Es el ruteo que PC ya tenia (main/controles.cpp) y que en el telefono
+//  NO EXISTIA: como las 4 firmas de input pedian un SDL_Event, esos metodos se compilaban afuera y cada tecla y cada
+//  click habia que reinventarlos como caso especial, casi siempre apuntando al viewport 3D. De ahi salia que una
+//  tecla apretada en el timeline terminara moviendo el modelo.
+// ---------------------------------------------------------------------------------------------------------------
+
+// El cursor virtual del telefono no tiene un mouse detras: manda el MISMO down que manda el mouse en PC, al mismo
+// viewport. El que esta bajo el cursor pasa a ACTIVO y recibe button_left(). Mantener el boton apretado sale gratis
+// como arrastre: el cursor ya emite event_mouse_motion mientras se mueve, que es de donde los viewports lo sacan.
+// false = no habia viewport abajo.
+// Lock Orbit: el arrastre pasa a PANEAR en vez de orbitar (modo tablero 2D). Lo comparten el menu del viewport3d
+// y el 9 del telefono. El cartel es la unica senal de que cambio: en el menu se ve la marca verde, pero por atajo
+// no hay nada que mirar y el mismo gesto pasa a hacer otra cosa.
+bool LayoutLockOrbitToggle(){
+    if (!Viewport3DActive) return false;
+    Viewport3DActive->lockOrbit = !Viewport3DActive->lockOrbit;
+    Notificar(Viewport3DActive->lockOrbit ? "Orbit locked" : "Orbit unlocked", false);
+    g_redraw = true;
+    return true;
+}
+
+bool LayoutClickViewport(int mx, int my){
+    ViewportBase* vp = FindViewportUnderMouse(rootViewport, mx, my);
+    if (!vp) return false;
+    viewPortActive = vp;
+    lastMouseX = mx; lastMouseY = my;   // button_left() los lee: son SU idea de donde ocurrio el click
+    vp->button_left();
+    return true;
+}
+bool LayoutSoltarViewport(int mx, int my){
+    if (!viewPortActive) return false;
+    lastMouseX = mx; lastMouseY = my;
+    viewPortActive->mouse_button_up(W3dMB_IZQ);
+    return true;
+}
+// La tecla va al viewport ACTIVO, como en PC. false = no hay activo (o la plataforma no supo traducirla).
+//
+// OJO con el valor de retorno: dice "se la mande", NO "el viewport hizo algo con ella". event_key_down devuelve
+// void, asi que un viewport no tiene forma de contestar "esta tecla no es mia" y quien llama no puede saberlo.
+// Mientras sea asi, el que llama tiene que estar seguro de que ESE viewport maneja ESA tecla antes de mandarsela:
+// si no, la tecla se pierde en el no-op de la base (paso: las flechas de Properties dejaron de navegar el panel
+// porque en el telefono Properties todavia no overridea event_key_down y la base se las comia en silencio).
+// El arreglo de fondo es que event_key_down devuelva bool.
+bool LayoutTeclaViewport(int tecla, bool repeticion){
+    if (!viewPortActive || tecla == W3dK_NADA) return false;
+    viewPortActive->event_key_down(tecla, repeticion);
+    return true;
+}
+bool LayoutTeclaViewportUp(int tecla){
+    if (!viewPortActive || tecla == W3dK_NADA) return false;
+    viewPortActive->event_key_up(tecla);
+    return true;
+}
+
 bool LayoutTimelineNavFrame(int dx, int dy, bool zoomMode, bool panMode) {
     if (!viewPortActive || !viewPortActive->isLeaf() || viewPortActive->ViewportKind() != 5) return false;
     Timeline* tl = (Timeline*)viewPortActive;
     if (tl->barFocusIndex >= 0) return false; // foco de barra activo (soft-izq): las flechas navegan la barra, no scrollean
-    if (panMode) {                                       // * + flechas = panear la vista (frames, horizontal)
-        if (dx) tl->PanFrames((float)dx * 1.5f);         // paso suave por frame de loop
-    } else if (zoomMode) {                               // 0 + flechas = zoom. arriba/derecha acerca; abajo/izquierda aleja
-        int z = (dy < 0 || dx > 0) ? 1 : ((dy > 0 || dx < 0) ? -1 : 0); // izq/der ADEMAS del arr/aba (instintivo en un timeline)
-        if (z != 0) tl->ZoomBy(z > 0 ? 1.06f : 0.94f, tl->width / 2);
-    } else {                                             // flechas solas = mover el frame actual (scrub)
-        if (dx) tl->StepFrame(dx > 0 ? 1 : -1);
+    if (panMode) {                                       // * + flechas = panear la vista
+        if (dx) tl->PanFrames((float)dx * 1.5f);         // horizontal: frames
+        // vertical: en CURVAS panea el VALOR; en dope sheet scrollea las filas. Antes arriba/abajo con * no
+        // hacia NADA (solo se miraba dx).
+        if (dy){
+            if (tl->modo == Timeline::TL_MODO_CURVAS)
+                tl->PanValor((float)dy * 8.0f / (tl->pxPerUnit > 1e-6f ? tl->pxPerUnit : 1e-6f));
+            else { tl->PosY += dy * 8; if (tl->PosY > 0) tl->PosY = 0; g_redraw = true; }
+        }
+    } else if (zoomMode) {                               // 0 + flechas = zoom
+        // los DOS ejes por separado: izq/der = tiempo, arriba/abajo = VALOR (solo en curvas, que es donde el eje
+        // vertical significa algo). Antes arriba/abajo tambien hacian zoom HORIZONTAL, que no tiene sentido.
+        if (dx) tl->ZoomBy(dx > 0 ? 1.06f : 0.94f, tl->CentroTimeline()); // centro del STRIP (excluye el panel)
+        if (dy){
+            if (tl->modo == Timeline::TL_MODO_CURVAS) tl->ZoomVBy(dy < 0 ? 1.06f : 0.94f);
+            else tl->ZoomBy(dy < 0 ? 1.06f : 0.94f, tl->CentroTimeline()); // dope sheet: no hay eje vertical propio
+        }
+    } else {                                             // flechas solas
+        // izq/der = mover el frame actual (scrub). El paso depende del ZOOM: siempre ~10px en pantalla, asi
+        // recorrer la animacion cuesta lo mismo con cualquier zoom.
+        if (dx) tl->ScrubFlecha(dx > 0 ? 1 : -1);
+        // arriba/abajo NO van aca: saltar de keyframe es UNO POR PULSACION y esta funcion la llama la repeticion de
+        // flecha mantenida (cada frame). Va como tecla al viewport activo, desde el key-down.
     }
     return true;
 }
@@ -4097,7 +4212,37 @@ static bool ObjSelToggleActual(){
 // queda). lapiz+flecha (extender=true): mantiene todo + agrega el siguiente/anterior. El
 // nuevo siempre queda ACTIVO. paso = +1 (siguiente) / -1 (anterior).
 // Mode-aware: en Object Mode delega a la version de objetos (mismo comportamiento exacto).
+// ---- POSE MODE: el lapiz/las flechas ciclan HUESOS, no objetos. (Estaba: "si es Edit Mode, sub-elementos; si
+//      no, OBJETOS" -> en Pose caia en objetos y el shift te deseleccionaba el armature y saltaba al siguiente
+//      objeto, que es lo ultimo que queres mientras posas.)
+static Armature* SelArmActiva(){
+    return (InteractionMode == PoseMode && ObjActivo && ObjActivo->getType() == ObjectType::armature)
+           ? (Armature*)ObjActivo : NULL;
+}
+static bool PoseSelAvanzar(Armature* a, int paso, bool extender){
+    int N = (int)a->bones.size(); if (N <= 0) return true;
+    int act = a->boneActivo;
+    if (act < 0 || act >= N){ act = 0; for (int i=0;i<N;i++) if (a->bones[i].select){ act=i; break; } }
+    if (!extender) a->bones[act].select = false;   // deselecciona el activo
+    int next = act + paso;
+    if (next < 0) next = N-1;
+    if (next >= N) next = 0;
+    a->bones[next].select = true;                  // selecciona el siguiente (si ya estaba, queda)
+    a->boneActivo = next;
+    g_redraw = true;
+    return true;
+}
+static bool PoseSelTodoToggle(Armature* a){
+    int N = (int)a->bones.size(); if (N <= 0) return true;
+    bool todo = true; for (int i=0;i<N;i++) if (!a->bones[i].select){ todo=false; break; }
+    for (int i=0;i<N;i++) a->bones[i].select = todo ? false : true;
+    a->boneActivo = todo ? -1 : 0;
+    g_redraw = true;
+    return true;
+}
+
 bool EditSelAvanzar(int paso, bool extender){
+    Armature* pa = SelArmActiva(); if (pa) return PoseSelAvanzar(pa, paso, extender);
     if (InteractionMode != EditMode) return ObjSelAvanzar(paso, extender);
     EditMesh* e = EditSelMesh(); if (!e) return false;
     int N=0; unsigned char* sel = EditSelArray(e, N);
@@ -4115,6 +4260,7 @@ bool EditSelAvanzar(int paso, bool extender){
 }
 // lapiz+arriba: si TODO esta seleccionado -> nada; sino -> todo.
 bool EditSelTodoToggle(){
+    Armature* pa = SelArmActiva(); if (pa) return PoseSelTodoToggle(pa);
     if (InteractionMode != EditMode) return ObjSelTodoToggle();
     EditMesh* e = EditSelMesh(); if (!e) return false;
     int N=0; unsigned char* sel = EditSelArray(e, N);
@@ -4392,7 +4538,7 @@ static void LoopCutHint(){
 }
 
 void LoopCutIniciar(int mx, int my){
-    if (InteractionMode!=EditMode || !g_editMesh){ Notificar("Loop Cut: enter Edit Mode first", true); return; }
+    if (InteractionMode!=EditMode || !g_editMesh){ Notificar(T("Loop Cut: enter Edit Mode first"), true); return; }
     gLoopCutOn=true; gLoopCutSlide=false; gLoopCutOrientando=false; gLoopCutCortes=1; gLoopCutFactor=0.0f; gLCSnap.tiene=false;
     LoopCutActualizarPreview(mx,my);
     g_redraw=true;
@@ -4447,17 +4593,17 @@ static void LoopCutIniciarQuad(Mesh* m, EditMesh* e, int faceIdx){
 //  - modo VERTICE: por la seleccion. 2 verts = un borde (direccion obvia); 4 verts = un quad
 //                  (elegir direccion). Cualquier otra cantidad (3, sueltos, etc.) = invalido.
 void LayoutLoopCutDesdeActivo(){
-    if (InteractionMode!=EditMode || !g_editMesh){ Notificar("Loop Cut: enter Edit Mode first", true); return; }
+    if (InteractionMode!=EditMode || !g_editMesh){ Notificar(T("Loop Cut: enter Edit Mode first"), true); return; }
     Mesh* m=(Mesh*)g_editMesh; m->EnsureEdit(); if (!m->edit) return;
     EditMesh* e = m->edit;
     int act = e->activeIdx;
     if (EditSelectMode == SelEdge){
-        if (act < 0 || act >= e->NumEdges()){ Notificar("Loop Cut: no active edge (click an edge first)", true); return; }
+        if (act < 0 || act >= e->NumEdges()){ Notificar(T("Loop Cut: no active edge (click an edge first)"), true); return; }
         LoopCutIniciarBorde(m, act);
     } else if (EditSelectMode == SelFace){
-        if (act < 0 || act >= (int)e->faces.size()){ Notificar("Loop Cut: no active face (click a face first)", true); return; }
-        if (e->faces[act].size() != 4){ Notificar("Loop Cut: the active face is not a quad", true); return; } // SOLO quads
-        if (act >= (int)e->faceEdges.size() || e->faceEdges[act].size() < 2){ Notificar("Loop Cut: the active face has no edges", true); return; }
+        if (act < 0 || act >= (int)e->faces.size()){ Notificar(T("Loop Cut: no active face (click a face first)"), true); return; }
+        if (e->faces[act].size() != 4){ Notificar(T("Loop Cut: the active face is not a quad"), true); return; } // SOLO quads
+        if (act >= (int)e->faceEdges.size() || e->faceEdges[act].size() < 2){ Notificar(T("Loop Cut: the active face has no edges"), true); return; }
         LoopCutIniciarQuad(m, e, act);
     } else { // SelVertex: decide por la SELECCION
         std::vector<int> sel;
@@ -4469,7 +4615,7 @@ void LayoutLoopCutDesdeActivo(){
                 int a=e->lineIdx[i*2], b=e->lineIdx[i*2+1];
                 if ((a==sel[0]&&b==sel[1]) || (a==sel[1]&&b==sel[0])){ eg=i; break; }
             }
-            if (eg<0){ Notificar("Loop Cut: the 2 selected vertices are not an edge", true); return; }
+            if (eg<0){ Notificar(T("Loop Cut: the 2 selected vertices are not an edge"), true); return; }
             LoopCutIniciarBorde(m, eg);
         } else if (sel.size() == 4){
             // 4 verts: la cara (quad) cuyos 4 vertices son EXACTAMENTE los seleccionados -> elegir direccion
@@ -4480,10 +4626,10 @@ void LayoutLoopCutDesdeActivo(){
                 for (int j=0;j<4;j++){ if (!e->vertSel[e->faces[i][j]]){ todos=false; break; } }
                 if (todos){ f=i; break; }
             }
-            if (f<0 || f>=(int)e->faceEdges.size() || e->faceEdges[f].size()<2){ Notificar("Loop Cut: select the 4 vertices of one quad", true); return; }
+            if (f<0 || f>=(int)e->faceEdges.size() || e->faceEdges[f].size()<2){ Notificar(T("Loop Cut: select the 4 vertices of one quad"), true); return; }
             LoopCutIniciarQuad(m, e, f);
         } else {
-            Notificar("Loop Cut: select an edge (2 verts) or a quad (4 verts)", true); // 3 o algo raro = invalido
+            Notificar(T("Loop Cut: select an edge (2 verts) or a quad (4 verts)"), true); // 3 o algo raro = invalido
         }
     }
 }

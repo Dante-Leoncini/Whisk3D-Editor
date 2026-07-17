@@ -68,6 +68,12 @@ bool LayoutPopupRepeat(int tecla); // flecha MANTENIDA al popup activo (solo aju
 bool LayoutTeclaPanelActivo(int tecla);
 bool LayoutUVNavFrame(int dx, int dy, bool zoomMode); // editor UV: paneo constante (o zoom si 0) por flecha mantenida
 bool LayoutTimelineNavFrame(int dx, int dy, bool zoomMode, bool panMode); // Timeline: scrub / zoom(0) / paneo(*) por flecha mantenida
+// ---- click / tecla al viewport que corresponde (el ruteo de PC, ahora tambien para el telefono) ----
+bool LayoutClickViewport(int mx, int my);        // down: el viewport bajo el cursor pasa a activo y recibe el click
+bool LayoutSoltarViewport(int mx, int my);       // up: lo suelta (cierra arrastres/undos)
+bool LayoutTeclaViewport(int tecla, bool repeticion); // tecla -> viewport ACTIVO (W3dInput.h)
+bool LayoutTeclaViewportUp(int tecla);
+
 // Timeline: navegacion de la barra de transporte por teclado (soft-izq entra/sale; flechas mueven el foco; OK activa)
 void LayoutTimelineBarToggle();
 void LayoutTimelineBarMover(int dir);
@@ -250,6 +256,11 @@ void LayoutTickFPS(unsigned long wallMs);
 
 // Tab: alterna Object<->Edit Mode si el activo es una malla (true si alterno)
 bool LayoutToggleEditMode();
+// La accion del menu Add del viewport3d (los mismos ids que arma ViewPort3D::MenuAdd). Publica: es POR DONDE se
+// crea todo objeto nuevo, asi que el que quiera crear uno (menu, atajo, test) entra por el mismo lado.
+void LayoutAccionAdd(int aId);
+// Lock Orbit: arrastrar PANEA en vez de orbitar. Togglea y avisa con un cartel. false = no hay viewport3d.
+bool LayoutLockOrbitToggle();
 
 // deriva g_editMesh del modo + objeto activo. Llamar al cambiar de modo/objeto.
 // COMPARTIDA PC+Symbian (antes solo la corria el render de PC -> Symbian quedaba sin edicion).

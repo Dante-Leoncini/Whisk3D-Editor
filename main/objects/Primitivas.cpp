@@ -1,4 +1,5 @@
 #include "Primitivas.h"
+#include "W3dLang.h"   // los nombres por defecto nacen en el idioma del usuario
 #include "objects/Mesh.h" // Mesh, MeshType, MaterialGroup, MaterialDefecto
 #include "variables.h"     // cursor3D (posicion del cursor 3D del editor)
 #include <math.h>          // sqrtf/sinf/cosf (generacion de esferas/conos en Regenerar)
@@ -117,11 +118,13 @@ Object* NewMesh(MeshType type, Object* parent, bool query){
             mesh->meshVerts = 8;
         }
         mesh->Regenerar(); // arma vertex/normals/uv/faces + el grupo de material
-        mesh->name = (type == MeshType::cube)     ? "Cube"
-                   : (type == MeshType::plane)    ? "Plane"
-                   : (type == MeshType::UVsphere) ? "UVSphere"
-                   : (type == MeshType::cone)     ? "Cone"
-                   : (type == MeshType::cylinder) ? "Cylinder" : "Circle";
+        // el nombre nace en el IDIOMA del usuario ("Cubo", "Plano"). De ahi en mas es DATO: se guarda en el .w3d y
+        // no vuelve a traducirse -- si no, abrir un archivo en otro idioma te renombraria los objetos.
+        mesh->name = (type == MeshType::cube)     ? T("Cube")
+                   : (type == MeshType::plane)    ? T("Plane")
+                   : (type == MeshType::UVsphere) ? T("UVSphere")
+                   : (type == MeshType::cone)     ? T("Cone")
+                   : (type == MeshType::cylinder) ? T("Cylinder") : T("Circle");
     } else if (type == MeshType::vertice) {
         // 1 VERT SUELTO en el origen local (la malla ya se ubica en el cursor 3D). looseVerts lo preserva en el
         // rebuild (sino, al no estar en ninguna cara/arista, GenerarRender lo descartaria). Se ve en Edit Mode.
@@ -134,7 +137,7 @@ Object* NewMesh(MeshType type, Object* parent, bool query){
         MaterialGroup g; g.startDrawn = 0; g.material = MaterialDefecto;
         mesh->materialsGroup.push_back(g);
         mesh->CalcularBordes();
-        mesh->name = "Vertex";
+        mesh->name = T("Vertex");
     } else {
         // otros: malla vacia con su grupo (como antes)
         MaterialGroup g; g.startDrawn = 0; g.material = MaterialDefecto;

@@ -1,4 +1,5 @@
 #include "w3dGraphics.h" // abstraccion de graficos (independencia de OpenGL)
+#include "W3dLang.h"   // el nombre por defecto nace en el idioma del usuario
 #include "Curve.h"
 #include <algorithm>
 #include "WhiskUI/colores.h"
@@ -12,7 +13,7 @@
 // Constructor
 // ===================================================
 Curve::Curve(Object* parent, Vector3 pos)
-    : Object(parent, "Curve", pos),
+    : Object(parent, T("Curve"), pos),
       vertexSize(0), vertex(NULL), indices(NULL), kdRoot(NULL)
 {
 }

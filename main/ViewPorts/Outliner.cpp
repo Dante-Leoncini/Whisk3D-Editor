@@ -418,13 +418,13 @@ void Outliner::button_left(){
 }
 
 #ifndef W3D_SYMBIAN
-void Outliner::mouse_button_up(SDL_Event &e){
+void Outliner::mouse_button_up(int boton){
     ViewPortClickDown = false;
-    if (e.button.button == SDL_BUTTON_LEFT) {
+    if (boton == W3dMB_IZQ) {
         mouseOverScrollYpress = false;
         mouseOverScrollXpress = false;
     }
-    //else if (e.button.button == SDL_BUTTON_MIDDLE) {
+    //else if (boton == W3dMB_MEDIO) {
     //    middleMouseDown = false;
     //}
     FindMouseOver(lastMouseX,lastMouseY);
@@ -432,11 +432,11 @@ void Outliner::mouse_button_up(SDL_Event &e){
 #endif
 
 #ifndef W3D_SYMBIAN
-void Outliner::event_mouse_wheel(SDL_Event &e){
-    { int mx, my; SDL_GetMouseState(&mx, &my);
-      if (BarScrollHorizontal(mx, my, (int)(e.wheel.y * 40))) return; } // sobre la barra -> horizontal
+void Outliner::event_mouse_wheel(float dy, int mx, int my){
+    {
+      if (BarScrollHorizontal(mx, my, (int)(dy * 40))) return; } // sobre la barra -> horizontal
     MouseWheel = true;
-    ScrollY(e.wheel.y*6*GlobalScale);
+    ScrollY(dy*6*GlobalScale);
     MouseWheel = false;
 }
 #endif
@@ -499,50 +499,46 @@ void Outliner::event_mouse_motion(int mx, int my) {
 }
 
 #ifndef W3D_SYMBIAN
-void Outliner::event_key_down(SDL_Event &e){
-    #if SDL_MAJOR_VERSION == 2
-        SDL_Keycode key = e.key.keysym.sym; //SDL2
-    #elif SDL_MAJOR_VERSION == 3
-        SDL_Keycode key = e.key.key; // SDL3
-    #endif
-    if (e.key.repeat == 0) {
+void Outliner::event_key_down(int tecla, bool repeticion){
+    const int key = tecla;
+    if (repeticion == 0) {
         // MODO MOVER: las flechas reordenan/reparentan en vez de navegar; OK confirma; C/backspace/Esc cancela.
         if (moviendo) {
             switch (key) {
-                case SDLK_UP:    MoverPaso(0); return;
-                case SDLK_DOWN:  MoverPaso(1); return;
-                case SDLK_LEFT:  MoverPaso(2); return; // izquierda = SACAR (unparent)
-                case SDLK_RIGHT: MoverPaso(3); return; // derecha = METER (parent bajo el hermano anterior)
-                case SDLK_RETURN: case SDLK_KP_ENTER: MoverConfirmar(); return;
-                case SDLK_ESCAPE: case SDLK_BACKSPACE: case SDLK_C: MoverCancelar(); return;
+                case W3dK_UP:    MoverPaso(0); return;
+                case W3dK_DOWN:  MoverPaso(1); return;
+                case W3dK_LEFT:  MoverPaso(2); return; // izquierda = SACAR (unparent)
+                case W3dK_RIGHT: MoverPaso(3); return; // derecha = METER (parent bajo el hermano anterior)
+                case W3dK_RETURN: case W3dK_KP_ENTER: MoverConfirmar(); return;
+                case W3dK_ESCAPE: case W3dK_BACKSPACE: case W3dK_C: MoverCancelar(); return;
                 default: return; // en modo mover se traga el resto
             }
         }
         switch (key) {
-            case SDLK_G: // g = entrar en modo MOVER (reordenar / reparentar el objeto activo)
+            case W3dK_G: // g = entrar en modo MOVER (reordenar / reparentar el objeto activo)
                 MoverIniciar();
                 break;
-            case SDLK_A:
+            case W3dK_A:
                 SeleccionarTodo(true);
                 break;
-            case SDLK_H:
+            case W3dK_H:
                 ChangeVisibilityObj();
                 break;
-            case SDLK_X:
+            case W3dK_X:
                 if (estado == editNavegacion){
                     AbrirConfirmarBorrado(true); // popup de confirmacion (incluye colecciones); Si -> borra con undo
                 }
                 break;
-            case SDLK_LEFT:
+            case W3dK_LEFT:
                 SetDesplegado(false);
                 break;
-            case SDLK_RIGHT:
+            case W3dK_RIGHT:
                 SetDesplegado(true);
                 break;
-            case SDLK_UP:
+            case W3dK_UP:
                 changeSelect(SelectMode::PrevSingle, true);
                 break;
-            case SDLK_DOWN:
+            case W3dK_DOWN:
                 changeSelect(SelectMode::NextSingle, true);
                 break;
         };
@@ -551,21 +547,17 @@ void Outliner::event_key_down(SDL_Event &e){
 #endif
 
 #ifndef W3D_SYMBIAN
-void Outliner::event_key_up(SDL_Event &e){
-    #if SDL_MAJOR_VERSION == 2
-        SDL_Keycode key = e.key.keysym.sym; //SDL2
-    #elif SDL_MAJOR_VERSION == 3
-        SDL_Keycode key = e.key.key; // SDL3
-    #endif
+void Outliner::event_key_up(int tecla){
+    const int key = tecla;
     switch (key) {
-        case SDLK_LSHIFT:
+        case W3dK_LSHIFT:
             if (ShiftCount < 20){
                 changeSelect(SelectMode::NextSingle, true);
             }
             ShiftCount = 0;
             LShiftPressed = false;
             break;
-        case SDLK_LALT:
+        case W3dK_LALT:
             LAltPressed = false;
             break;
     }

@@ -66,14 +66,16 @@ public:
 };
 
 // transform en OBJECT MODE: pos/rot/escala de los seleccionados al EMPEZAR
-struct TEst { Object* o; Vector3 pos; Quaternion rot; Vector3 scale; };
+// rotEuler va aparte del quaternion: el quaternion no distingue 0 de 360, asi que sin guardarlo el undo de un
+// giro de vuelta entera te devolvia la orientacion pero te comia las vueltas (y con ellas la animacion).
+struct TEst { Object* o; Vector3 pos; Quaternion rot; Vector3 rotEuler; Vector3 scale; };
 class TransformUndo : public UndoCmd {
     std::vector<TEst> e;
 public:
     TransformUndo() {
         for (size_t i = 0; i < ObjSelects.size(); i++) {
             Object* o = ObjSelects[i]; if (!o) continue;
-            TEst t; t.o = o; t.pos = o->pos; t.rot = o->rot; t.scale = o->scale;
+            TEst t; t.o = o; t.pos = o->pos; t.rot = o->rot; t.rotEuler = o->rotEuler; t.scale = o->scale;
             e.push_back(t);
         }
     }
@@ -81,10 +83,10 @@ public:
     void Aplicar() {
         for (size_t i = 0; i < e.size(); i++) {
             Object* o = e[i].o; if (!o) continue;
-            Vector3 cp = o->pos; Quaternion cr = o->rot; Vector3 cs = o->scale; // vivo
-            o->pos = e[i].pos; o->rot = e[i].rot; o->scale = e[i].scale;
-            e[i].pos = cp; e[i].rot = cr; e[i].scale = cs; // guarda lo vivo
-            o->ActualizarDisplayRot(); // sincroniza el euler del panel con el quaternion restaurado (sino queda stale)
+            Vector3 cp = o->pos; Quaternion cr = o->rot; Vector3 ce = o->rotEuler; Vector3 cs = o->scale; // vivo
+            o->pos = e[i].pos; o->rot = e[i].rot; o->rotEuler = e[i].rotEuler; o->scale = e[i].scale;
+            e[i].pos = cp; e[i].rot = cr; e[i].rotEuler = ce; e[i].scale = cs; // guarda lo vivo
+            o->ActualizarDisplayRot(); // rotAngle/rotAxis del panel (el euler ya quedo restaurado, con sus vueltas)
         }
     }
 };

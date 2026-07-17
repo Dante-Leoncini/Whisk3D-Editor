@@ -650,6 +650,8 @@ TBool W3dLayoutTimelineNav(TInt aDx, TInt aDy, TBool aZoom, TBool aPan) {
 // query: el viewport activo es el Timeline? (con 0,0 no hace nada, solo devuelve si es Timeline)
 TBool W3dLayoutTimelineActivo() { return LayoutTimelineNavFrame(0, 0, false, false) ? ETrue : EFalse; }
 
+
+
 // keypad SIN mouse: rutea la flecha/OK al viewport ACTIVO (propiedades/outliner)
 TBool W3dLayoutTeclaPanel(TInt aScan) {
     int k = -1;
@@ -778,3 +780,56 @@ void W3dLayoutDestroy() {
     gSplitterGrab = 0;
     gWhisk = 0;
 }
+
+// ---------------------------------------------------------------------------------------------------------------
+//  El teclado del telefono -> la tecla propia del editor (ViewPorts/W3dInput.h). Es la contraparte de lo que PC hace
+//  con SDL: de aca para adentro las dos plataformas corren EL MISMO codigo y la tecla va al viewport ACTIVO.
+//  El keypad del N95 ES el teclado: sus numeros entran como '0'..'9' y se mandan como teclas normales.
+// ---------------------------------------------------------------------------------------------------------------
+TInt W3dTeclaDesdeSymbian(TInt aScanCode) {
+    switch (aScanCode) {
+        case EStdKeyUpArrow:    return W3dK_UP;
+        case EStdKeyDownArrow:  return W3dK_DOWN;
+        case EStdKeyLeftArrow:  return W3dK_LEFT;
+        case EStdKeyRightArrow: return W3dK_RIGHT;
+        case EStdKeyDevice3:                        // el OK del telefono
+        case EStdKeyEnter:      return W3dK_RETURN;
+        case EStdKeyBackspace:  return W3dK_BACKSPACE;
+        case EStdKeyEscape:     return W3dK_ESCAPE;
+        default: break;
+    }
+    if (aScanCode >= '0' && aScanCode <= '9') return aScanCode;          // el keypad
+    if (aScanCode >= 'A' && aScanCode <= 'Z') return aScanCode - 'A' + 'a'; // el scan llega en MAYUSCULA
+    if (aScanCode >= 'a' && aScanCode <= 'z') return aScanCode;
+    return W3dK_NADA;
+}
+
+TBool W3dLayoutTeclaViewport(TInt aScanCode) {
+    return LayoutTeclaViewport(W3dTeclaDesdeSymbian(aScanCode), false) ? ETrue : EFalse;
+}
+// ...para las teclas que el telefono TIPEA distinto: su keypad no tiene letras, asi que el 1/2/3 se manda como la
+// g/r/s que serian en PC y del viewport para adentro es exactamente el mismo comando.
+TBool W3dLayoutTeclaViewportDirecta(TInt aTecla) {
+    return LayoutTeclaViewport(aTecla, false) ? ETrue : EFalse;
+}
+TBool W3dLayoutTeclaViewportUp(TInt aScanCode) {
+    return LayoutTeclaViewportUp(W3dTeclaDesdeSymbian(aScanCode)) ? ETrue : EFalse;
+}
+// El "ok" del cursor virtual: un click de VERDAD (down + up), no un caso especial. Mantenerlo apretado = arrastre.
+TBool W3dLayoutClickViewport(TInt aX, TInt aY) { return LayoutClickViewport(aX, aY) ? ETrue : EFalse; }
+TBool W3dLayoutSoltarViewport(TInt aX, TInt aY) { return LayoutSoltarViewport(aX, aY) ? ETrue : EFalse; }
+
+// # + flechas: vistas por cuadrante (el 1/3/7 del numpad, que el telefono no tiene). # solo: orto/perspectiva.
+// La logica vive en el Viewport3D (es matematica de camara, no del telefono); aca solo se elige a QUIEN.
+TBool W3dVistaCuadranteNav(TInt aDx, TInt aDy) {
+    if (!Viewport3DActive) return EFalse;
+    ((Viewport3D*)Viewport3DActive)->VistaCuadranteNav(aDx, aDy);
+    return ETrue;
+}
+TBool W3dVistaPerspectivaToggle() {
+    if (!Viewport3DActive) return EFalse;
+    ((Viewport3D*)Viewport3DActive)->ChangePerspective();
+    return ETrue;
+}
+
+TBool W3dLayoutLockOrbit() { return LayoutLockOrbitToggle() ? ETrue : EFalse; }

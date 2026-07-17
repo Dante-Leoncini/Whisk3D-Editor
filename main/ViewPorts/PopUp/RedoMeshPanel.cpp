@@ -1,4 +1,5 @@
 #include "w3dGraphics.h" // abstraccion de graficos (independencia de OpenGL)
+#include "W3dLang.h"   // T(): los textos salen en el idioma del sistema
 #include "RedoMeshPanel.h"
 #include "objects/Mesh.h"          // Mesh + Regenerar + MeshType
 #include "ViewPorts/LayoutInput.h" // LayoutKey
@@ -43,10 +44,10 @@ RedoMeshPanel::RedoMeshPanel(Mesh* m, int modo)
     gRedoMesh = m;
 
     if (modo == 1) { // Recalculate Normals: una tarjeta con la tilde "Inside"
-        grupo = new GroupPropertie("Recalculate Normals");
+        grupo = new GroupPropertie(T("Recalculate Normals"));
         grupo->anchoValores = 0.5f;
         gRedoInside = false;
-        PropBool* inside = new PropBool("Inside");
+        PropBool* inside = new PropBool(T("Inside"));
         inside->value = &gRedoInside; inside->onChange = RedoNormalesOnChange;
         grupo->properties.push_back(inside);
         grupo->selectIndex = 0;
@@ -57,17 +58,17 @@ RedoMeshPanel::RedoMeshPanel(Mesh* m, int modo)
     }
 
     if (modo == 2) { // Loop Cut and Slide: Number of Cuts + Factor
-        grupo = new GroupPropertie("Loop Cut and Slide");
+        grupo = new GroupPropertie(T("Loop Cut and Slide"));
         grupo->anchoValores = 0.5f;
         gRedoCortesF = (float)LoopCutGetCortes();
         gRedoFactorF = LoopCutGetFactor();
-        PropFloat* cuts = new PropFloat("Number of Cuts");
+        PropFloat* cuts = new PropFloat(T("Number of Cuts"));
         cuts->value = &gRedoCortesF;
         cuts->stepFino = 1.0f; cuts->stepGrueso = 1.0f; cuts->dragStep = 0.1f;
         cuts->SetRango(1.0f, 32.0f); cuts->onChange = RedoLoopCutOnChange;
         cuts->entero = true; cuts->centrado = true; cuts->flechas = true;
         grupo->properties.push_back(cuts);
-        PropFloat* fac = new PropFloat("Factor");
+        PropFloat* fac = new PropFloat(T("Factor"));
         fac->value = &gRedoFactorF;
         fac->stepFino = 0.05f; fac->stepGrueso = 0.05f; fac->dragStep = 0.01f;
         fac->SetRango(-1.0f, 1.0f); fac->onChange = RedoLoopCutOnChange;
@@ -93,7 +94,7 @@ RedoMeshPanel::RedoMeshPanel(Mesh* m, int modo)
     grupo->anchoValores = 0.5f;
 
     if (m->meshTipo == (int)MeshType::circle){
-        PropFloat* radio = new PropFloat("Radius");
+        PropFloat* radio = new PropFloat(T("Radius"));
         radio->value = &m->meshSize;
         radio->stepFino = 0.05f; radio->stepGrueso = 0.05f; // flechas: +-0.05 (fino)
         radio->dragStep = 0.02f;
@@ -101,7 +102,7 @@ RedoMeshPanel::RedoMeshPanel(Mesh* m, int modo)
         radio->centrado = true; // valor centrado (float: misma logica, se ve bien)
         grupo->properties.push_back(radio);
 
-        PropFloat* verts = new PropFloat("Vertices");
+        PropFloat* verts = new PropFloat(T("Vertices"));
         verts->value = &gRedoVertsF;
         verts->stepFino = 1.0f; verts->stepGrueso = 1.0f; // flechas/teclas: +-1
         verts->dragStep = 0.1f; // LENTO: ~10px por vertice (que no explote)
@@ -109,7 +110,7 @@ RedoMeshPanel::RedoMeshPanel(Mesh* m, int modo)
         verts->entero = true; verts->centrado = true; verts->flechas = true;
         grupo->properties.push_back(verts);
     } else if (m->meshTipo == (int)MeshType::UVsphere){
-        PropFloat* segs = new PropFloat("Segments");
+        PropFloat* segs = new PropFloat(T("Segments"));
         segs->value = &gRedoVertsF; // segments (longitud)
         segs->stepFino = 1.0f; segs->stepGrueso = 1.0f;
         segs->dragStep = 0.1f; // LENTO (que no explote)
@@ -117,7 +118,7 @@ RedoMeshPanel::RedoMeshPanel(Mesh* m, int modo)
         segs->entero = true; segs->centrado = true; segs->flechas = true;
         grupo->properties.push_back(segs);
 
-        PropFloat* rings = new PropFloat("Rings");
+        PropFloat* rings = new PropFloat(T("Rings"));
         rings->value = &gRedoVerts2F; // rings (latitud)
         rings->stepFino = 1.0f; rings->stepGrueso = 1.0f;
         rings->dragStep = 0.1f;
@@ -125,7 +126,7 @@ RedoMeshPanel::RedoMeshPanel(Mesh* m, int modo)
         rings->entero = true; rings->centrado = true; rings->flechas = true;
         grupo->properties.push_back(rings);
 
-        PropFloat* radio = new PropFloat("Radius");
+        PropFloat* radio = new PropFloat(T("Radius"));
         radio->value = &m->meshSize;
         radio->stepFino = 0.05f; radio->stepGrueso = 0.05f;
         radio->dragStep = 0.02f;
@@ -133,80 +134,80 @@ RedoMeshPanel::RedoMeshPanel(Mesh* m, int modo)
         radio->centrado = true;
         grupo->properties.push_back(radio);
 
-        PropBool* smooth = new PropBool("Shade Smooth");
+        PropBool* smooth = new PropBool(T("Shade Smooth"));
         smooth->value = &m->meshSmooth; smooth->onChange = RedoOnChange;
         grupo->properties.push_back(smooth);
     } else if (m->meshTipo == (int)MeshType::cone){
-        PropFloat* r1 = new PropFloat("Radius 1"); // base
+        PropFloat* r1 = new PropFloat(T("Radius 1")); // base
         r1->value = &m->meshSize;
         r1->stepFino = 0.05f; r1->stepGrueso = 0.05f; r1->dragStep = 0.02f;
         r1->SetRango(0.0f, 1000.0f); r1->onChange = RedoOnChange;
         r1->centrado = true;
         grupo->properties.push_back(r1);
 
-        PropFloat* r2 = new PropFloat("Radius 2"); // punta (0 = puntiagudo)
+        PropFloat* r2 = new PropFloat(T("Radius 2")); // punta (0 = puntiagudo)
         r2->value = &m->meshSize2;
         r2->stepFino = 0.05f; r2->stepGrueso = 0.05f; r2->dragStep = 0.02f;
         r2->SetRango(0.0f, 1000.0f); r2->onChange = RedoOnChange;
         r2->centrado = true;
         grupo->properties.push_back(r2);
 
-        PropFloat* depth = new PropFloat("Depth"); // altura
+        PropFloat* depth = new PropFloat(T("Depth")); // altura
         depth->value = &m->meshDepth;
         depth->stepFino = 0.05f; depth->stepGrueso = 0.05f; depth->dragStep = 0.02f;
         depth->SetRango(0.01f, 1000.0f); depth->onChange = RedoOnChange;
         depth->centrado = true;
         grupo->properties.push_back(depth);
 
-        PropFloat* verts = new PropFloat("Vertices");
+        PropFloat* verts = new PropFloat(T("Vertices"));
         verts->value = &gRedoVertsF;
         verts->stepFino = 1.0f; verts->stepGrueso = 1.0f; verts->dragStep = 0.1f;
         verts->SetRango(3.0f, 256.0f); verts->onChange = RedoOnChange;
         verts->entero = true; verts->centrado = true; verts->flechas = true;
         grupo->properties.push_back(verts);
 
-        PropBool* smooth = new PropBool("Shade Smooth");
+        PropBool* smooth = new PropBool(T("Shade Smooth"));
         smooth->value = &m->meshSmooth;
         smooth->onChange = RedoOnChange; // regenera con/sin normales compartidas
         grupo->properties.push_back(smooth);
     } else if (m->meshTipo == (int)MeshType::cylinder){
-        PropFloat* radio = new PropFloat("Radius"); // un solo radio
+        PropFloat* radio = new PropFloat(T("Radius")); // un solo radio
         radio->value = &m->meshSize;
         radio->stepFino = 0.05f; radio->stepGrueso = 0.05f; radio->dragStep = 0.02f;
         radio->SetRango(0.01f, 1000.0f); radio->onChange = RedoOnChange;
         radio->centrado = true;
         grupo->properties.push_back(radio);
 
-        PropFloat* depth = new PropFloat("Depth");
+        PropFloat* depth = new PropFloat(T("Depth"));
         depth->value = &m->meshDepth;
         depth->stepFino = 0.05f; depth->stepGrueso = 0.05f; depth->dragStep = 0.02f;
         depth->SetRango(0.01f, 1000.0f); depth->onChange = RedoOnChange;
         depth->centrado = true;
         grupo->properties.push_back(depth);
 
-        PropFloat* verts = new PropFloat("Vertices");
+        PropFloat* verts = new PropFloat(T("Vertices"));
         verts->value = &gRedoVertsF;
         verts->stepFino = 1.0f; verts->stepGrueso = 1.0f; verts->dragStep = 0.1f;
         verts->SetRango(3.0f, 256.0f); verts->onChange = RedoOnChange;
         verts->entero = true; verts->centrado = true; verts->flechas = true;
         grupo->properties.push_back(verts);
 
-        PropBool* smooth = new PropBool("Shade Smooth");
+        PropBool* smooth = new PropBool(T("Shade Smooth"));
         smooth->value = &m->meshSmooth; smooth->onChange = RedoOnChange;
         grupo->properties.push_back(smooth);
     } else if (m->meshTipo == (int)MeshType::cube){
-        PropFloat* size = new PropFloat("Size");
+        PropFloat* size = new PropFloat(T("Size"));
         size->value = &m->meshSize;
         size->stepFino = 0.05f; size->stepGrueso = 0.05f; size->dragStep = 0.02f;
         size->SetRango(0.01f, 1000.0f); size->onChange = RedoOnChange;
         size->centrado = true;
         grupo->properties.push_back(size);
 
-        PropBool* smooth = new PropBool("Shade Smooth");
+        PropBool* smooth = new PropBool(T("Shade Smooth"));
         smooth->value = &m->meshSmooth; smooth->onChange = RedoOnChange;
         grupo->properties.push_back(smooth);
     } else {
-        PropFloat* size = new PropFloat("Size");
+        PropFloat* size = new PropFloat(T("Size"));
         size->value = &m->meshSize;
         size->stepFino = 0.05f; size->stepGrueso = 0.05f; // flechas: +-0.05 (fino)
         size->dragStep = 0.02f;

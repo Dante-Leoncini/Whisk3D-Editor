@@ -7,6 +7,7 @@
 
 // INCLUDE FILES
 #include <eiklabel.h>
+#include "ViewPorts/Timeline.h"  // DopeNavTecla: el lapiz sobre el timeline navega keyframes
 #include <e32math.h>
 
 #include "Whisk3DContainer.h"
@@ -276,7 +277,7 @@ static TUint gLapizDownTick = 0;
 // 0 = ZOOM (arriba/abajo); tap 0 (sin flecha) = enfocar (como antes). * = PANEO. # = PRIMERA PERSONA (girar).
 static TBool g0Held = EFalse, g0ArrowUsed = EFalse;
 static TBool gStarHeld = EFalse;
-static TBool gHashHeld = EFalse;
+static TBool gHashHeld = EFalse, gHashArrowUsed = EFalse; // # + flecha = vista por cuadrante; tap sin flecha = orto/perspectiva
 // C/backspace como MODIFICADOR (mismo patron que el LAPIZ): tap = popup de confirmar borrado al soltar;
 // mantener + flecha IZQ = undo (Ctrl+Z); mantener + flecha DER = redo (Ctrl+Y).
 static TBool gCHeld = EFalse, gCArrowUsed = EFalse;
@@ -313,8 +314,10 @@ static void AplicarFlechas3D(){
 		return;
 	}
 	// MOUSE VIRTUAL visible: las flechas mueven el CURSOR como un mouse (no la camara).
-	// Durante un transform NO: ahi las flechas mueven la seleccion.
-	if (mouseVisible && !W3dNewTransformActive()){
+	// Durante un transform 3D/de malla NO: ahi las flechas mueven la seleccion. El de KEYFRAMES es al reves: lo
+	// maneja el CURSOR (event_mouse_motion -> DopeMoveApply, el mismo camino que arrastrar con el mouse en PC), asi
+	// que ahi las flechas tienen que seguir moviendolo o el transform no se puede manejar con nada.
+	if (mouseVisible && (!W3dNewTransformActive() || DopeXformActivo())){
 		// arranca LENTO (2px/frame) y acelera al mantener (hasta 9px) -> control fino al inicio, rapido al cruzar
 		int spd = (gMouseAccel < 6) ? 2 : (gMouseAccel < 14) ? 4 : (gMouseAccel < 24) ? 6 : 9;
 		gMouseAccel++;
@@ -329,7 +332,8 @@ static void AplicarFlechas3D(){
 	// MODIFICADORES de camara del keypad (mantener tecla + flechas), prioridad sobre orbit/transform:
 	if (g0Held){ if (dy != 0) W3dNewZoom(-dy); g0ArrowUsed = ETrue; return; }   // 0 + arriba/abajo = ZOOM
 	if (gStarHeld){ W3dNewPan(dx * 8, dy * 8); return; }                        // * + flechas = PANEO
-	if (gHashHeld){ W3dNewLook(dx * 8, dy * 8); return; }                       // # + flechas = PRIMERA PERSONA
+	// # + flechas = VISTAS POR CUADRANTE: lo aplica el KEY-DOWN (una por pulsacion). Aca no va nada: esto corre
+	// cada frame y te haria girar la vista sin control.
 	if (W3dNewTransformActive()){
 		// mover: paso fino; rotar/escalar: el DOBLE (se sentian lentos)
 		const TInt d = (W3dNewTransformModo() == 1) ? 4 : 8;
@@ -446,6 +450,12 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 				// mouse virtual, ahi si las flechas navegan la seleccion (todo/nada/siguiente/anterior).
 				if (gLapizHeld && !mouseVisible){
 					gLapizArrowUsed = ETrue;
+					// TIMELINE activo: el lapiz navega KEYFRAMES, no la seleccion de objetos (cambiar de objeto
+					// mientras trabajas la animacion es lo ultimo que queres). DopeNavTecla devuelve false si el
+					// timeline no esta activo -> sigue el camino de siempre.
+					int nav = (sc == EStdKeyRightArrow) ? 1 : (sc == EStdKeyLeftArrow) ? 2 :
+					          (sc == EStdKeyUpArrow) ? 3 : 4;
+					if (DopeNavTecla(nav)) return EKeyWasConsumed;
 					bool enEdit;
 					if (sc == EStdKeyRightArrow)      enEdit = EditSelAvanzar(1, true);   // mantiene + siguiente
 					else if (sc == EStdKeyLeftArrow)  enEdit = EditSelAvanzar(-1, true);  // mantiene + anterior
@@ -453,6 +463,25 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 					else                              enEdit = EditSelToggleActual();      // togglea el activo
 					if (!enEdit && (sc == EStdKeyRightArrow || sc == EStdKeyDownArrow) && !W3dNewTransformActive()) W3dNewCycleSelect();
 					return EKeyWasConsumed;
+				}
+				// # mantenido + flecha = VISTA POR CUADRANTE (el 1/3/7 del numpad que el telefono no tiene). Va en el
+				// key-down: es UNA por pulsacion.
+				if (gHashHeld){
+					gHashArrowUsed = ETrue;   // hubo flecha: soltar el # ya no togglea la perspectiva
+					const TInt vdx = (sc == EStdKeyRightArrow) ? 1 : (sc == EStdKeyLeftArrow) ? -1 : 0;
+					const TInt vdy = (sc == EStdKeyDownArrow)  ? 1 : (sc == EStdKeyUpArrow)   ? -1 : 0;
+					W3dVistaCuadranteNav(vdx, vdy);
+					return EKeyWasConsumed;
+				}
+				// TIMELINE + arriba/abajo (sin modificadores) = saltar al keyframe siguiente/anterior, igual que en
+				// PC. Aca y no en la repeticion de flecha mantenida: es uno por pulsacion. Con 0 (zoom), * (paneo) o
+				// VERDE (redimensionar) mantenidos, las flechas son de ellos.
+				// Se pregunta por el TIMELINE y no "no es el 3D": el resto de los viewports (Properties, outliner)
+				// todavia no overridea event_key_down en el telefono, asi que mandarles la tecla la perderia en el
+				// no-op de la base en vez de dejarla seguir a la navegacion del panel.
+				if (!g0Held && !gStarHeld && !gGreenHeld && !mouseVisible && W3dLayoutTimelineActivo() &&
+				    (sc == EStdKeyUpArrow || sc == EStdKeyDownArrow)){
+					if (W3dLayoutTeclaViewport(sc)) return EKeyWasConsumed;
 				}
 				if (gGreenHeld || W3dLayout3DActivo() || mouseVisible || W3dLayoutUVActivo() || W3dLayoutTimelineActivo()){ // 3D=orbita, UV/timeline=paneo/scrub, mouse=cursor
 					if (gGreenHeld) gGreenUsado = ETrue; // verde+flecha = resize (no ciclar)
@@ -478,6 +507,14 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 				return EKeyWasConsumed;
 			}
 			if (sc == '1' || sc == '2' || sc == '3'){
+				// El keypad del telefono no tiene letras: el 1/2/3 ES como se tipea g/r/s. Si el viewport activo no
+				// es el 3D, la tecla va a EL, como en PC (el timeline transforma sus keyframes con las MISMAS g/r/s,
+				// no con un camino propio). Solo el 3D sigue con W3dNewTransform*: su event_key_down todavia no
+				// compila en el telefono.
+				if (!W3dLayout3DActivo()){
+					const TInt t = (sc == '1') ? W3dK_G : (sc == '2') ? W3dK_R : W3dK_S;
+					if (W3dLayoutTeclaViewportDirecta(t)) return EKeyWasConsumed;
+				}
 				// solo con el mouse sobre el 3D (el hover decide, como PC)
 				extern TBool W3dHayMouseBT();
 				extern GLshort mouseX; extern GLshort mouseY;
@@ -509,7 +546,9 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 			// menu del viewport (que Dante confirmo que anda). Antes era LoopCutIniciar(mouseX,mouseY) = el path por
 			// HOVER de PC: en el N95 el cursor virtual no cae sobre una arista -> sin preview, sin orientacion, OK no hacia nada.
 			if (sc == '8'){ LayoutLoopCutDesdeActivo(); return EKeyWasConsumed; }
+			if (sc == '9'){ W3dLayoutLockOrbit(); return EKeyWasConsumed; } // 9 = bloquear/desbloquear el orbital
 			if (sc == '4'){ return EKeyWasConsumed; } // 4 = nada
+			if (sc == '5'){ return EKeyWasConsumed; } // 5 = nada
 			// con mouse BT activo el teclado navega como en PC: las
 			// flechas/OK van al panel bajo el cursor (no mueven el mouse)
 			{
@@ -521,7 +560,7 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 				}
 			}
 			// lapiz/shift del telefono: ciclar la seleccion entre objetos
-			if (sc == EStdKeyHash){ gHashHeld = ETrue; return EKeyWasConsumed; } // # = primera persona (mantener + flechas)
+			if (sc == EStdKeyHash){ gHashHeld = ETrue; gHashArrowUsed = EFalse; return EKeyWasConsumed; } // # = vistas (mantener + flechas); tap = orto/perspectiva
 			if (sc == EStdKeyLeftShift){ // LAPIZ (solo shift ahora; el # se separo para la camara)
 				// LAPIZ: solo REGISTRAR. La accion (ciclar) va al SOLTAR si fue una pulsacion
 				// corta SIN flecha. Larga = nada. Mantener + flecha = navegar (handler de flechas).
@@ -547,8 +586,15 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 					if (W3dLayoutClickUI(mouseX, mouseY)){ return EKeyWasConsumed; }
 					extern bool LShiftPressed;
 					LShiftPressed = (gLapizHeld || iWhisk3D->iShiftPressed) ? true : false; // lapiz mantenido = shift
-					iWhisk3D->ClickSelect();
 					if (gLapizHeld) gLapizArrowUsed = ETrue; // que soltar el lapiz NO cicle la seleccion
+					// El OK es un CLICK DE VERDAD al viewport bajo el cursor: el mismo down que manda el mouse en PC.
+					// Asi el timeline se entera (curvas, keyframes, handles) sin que nadie reimplemente el click
+					// afuera, y mantener el OK queda como arrastre solo (el cursor ya emite event_mouse_motion).
+					// El 3D es la excepcion: su button_left() todavia es stub en el telefono -> su pick va aparte.
+					if (!W3dLayoutMouseSobre3D(mouseX, mouseY) && W3dLayoutClickViewport(mouseX, mouseY)){
+						return EKeyWasConsumed;
+					}
+					iWhisk3D->ClickSelect();
 					return EKeyWasConsumed;
 				}
 				// OK al panel ACTIVO (propiedades/outliner) por teclado, sin mouse
@@ -597,16 +643,28 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 				return EKeyWasConsumed;
 			}
 			if (usc == EStdKeyNo){ return EKeyWasConsumed; } // tecla ROJA (end): consumida, no cierra la app
+			// soltar el OK = soltar el boton del mouse: cierra el arrastre (y su undo) del viewport que lo recibio
+			if (usc == EStdKeyDevice3 || usc == EStdKeyEnter){
+				if (mouseVisible) W3dLayoutSoltarViewport(mouseX, mouseY);
+				return EKeyWasConsumed;
+			}
 			if (usc == '0'){ // 0 soltada: tap SIN flecha = enfocar (como antes); con flecha ya hizo zoom
 				if (g0Held && !g0ArrowUsed) W3dNewEnfocar();
 				g0Held = EFalse;
 				return EKeyWasConsumed;
 			}
 			if (usc == '*'){ gStarHeld = EFalse; return EKeyWasConsumed; } // * soltada: fin del paneo
-			if (usc == EStdKeyHash){ gHashHeld = EFalse; return EKeyWasConsumed; } // # soltada: fin primera persona
+			if (usc == EStdKeyHash){ // soltada SIN haber tocado una flecha = TAP -> ortografica <-> perspectiva
+				if (gHashHeld && !gHashArrowUsed) W3dVistaPerspectivaToggle();
+				gHashHeld = EFalse;
+				return EKeyWasConsumed;
+			}
 			if (usc == EStdKeyLeftShift){ // LAPIZ (solo shift ahora)
 				TUint dt = User::NTickCount() - gLapizDownTick; // lapiz soltado: corto + sin flecha = ciclar
-				if (gLapizHeld && !gLapizArrowUsed && dt < 500 && !W3dNewTransformActive() && !mouseVisible){ W3dNewCycleSelect(); } // con mouse virtual el lapiz es shift (no cicla)
+				if (gLapizHeld && !gLapizArrowUsed && dt < 500 && !W3dNewTransformActive() && !mouseVisible){
+					// en el TIMELINE: saca el keyframe actual y pasa al siguiente. En el resto: cicla el activo.
+					if (!DopeNavTecla(0)) W3dNewCycleSelect();
+				} // con mouse virtual el lapiz es shift (no cicla)
 				gLapizHeld = EFalse;
 				return EKeyWasConsumed;
 			}
@@ -792,6 +850,11 @@ int CWhisk3DContainer::DrawCallBack( TAny* aInstance )
             ReloadAnimation();
         }
     }
+    // ANIMACION DE OBJETOS (pos/rot/escala): aplica los keyframes al frame actual. FALTABA en el N95 -> ni el play
+    // ni el scrub del timeline movian nada (el frame avanzaba y la escena quedaba quieta). Va FUERA del tick de
+    // AnimFPS, como en PC: al scrubear con las flechas se tiene que ver YA, no al ritmo del play. Guard interno:
+    // solo trabaja al CAMBIAR de frame.
+    { extern void AplicarAnimacionObjetos(); AplicarAnimacionObjetos(); }
 
     // Render EVENT-DRIVEN: solo dibujar+cursor+swap si algo CAMBIO (g_redraw, lo
     // prende cualquier tecla/cursor/flecha) o hay una animacion en play. Si la escena

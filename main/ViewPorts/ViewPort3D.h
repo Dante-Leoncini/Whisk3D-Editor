@@ -197,16 +197,24 @@ class Viewport3D : public ViewportBase, public WithBorder {
         void EncuadrarRadio(const Vector3& centro, float radio);
         bool RecalcViewPos();
         void SetViewpoint(Viewpoint value);
+        // Vistas por cuadrante: el 1/3/7 del numpad para el telefono (# + flechas). Si estabas orbitando libre, la
+        // primera flecha solo ENCUADRA al mas cercano; despues izq/der giran 90 y arriba/abajo van al top/bottom
+        // (con tope). Toda vista ortogonal es pitch*yaw -> moverse es sumarle a dos enteros.
+        // El boton de contexto de la barra (Object/Pose/Vertex/Edge/Face): decide su icono y si se ve. Es ESTADO,
+        // no dibujo -> vive afuera del render y se puede testear.
+        void SyncBotonContexto();
+        void VistaCuadranteNav(int dx, int dy);
+        void VistaCuadranteActual(int& yaw90, int& pitch, bool& exacta) const;
         void RestaurarViewport();
         void ChangePerspective();
         void SetCursor3D();
         void Aceptar();
         void button_left() override;
 #ifndef W3D_SYMBIAN
-        void mouse_button_up(SDL_Event &e) override;
+        void mouse_button_up(int boton) override;
 #endif
 #ifndef W3D_SYMBIAN
-        void event_mouse_wheel(SDL_Event &e) override;
+        void event_mouse_wheel(float dy, int mx, int my) override;
 #endif
         void event_mouse_motion(int mx, int my) override;
         void event_finger_gesture(float zoomDelta, float panDx, float panDy) override; // 2 dedos: zoom + paneo
@@ -235,10 +243,10 @@ class Viewport3D : public ViewportBase, public WithBorder {
         bool OnBar(int px, int py) override;      // barra de arriba O la de herramientas (setea toolGesto)
         void BarScrollBy(int delta) override;     // rutea el scroll a la barra donde arranco el gesto
 #ifndef W3D_SYMBIAN
-        void event_key_down(SDL_Event &e) override;
+        void event_key_down(int tecla, bool repeticion) override;
 #endif
 #ifndef W3D_SYMBIAN
-        void event_key_up(SDL_Event &e) override;
+        void event_key_up(int tecla) override;
 #endif
         void key_down_return();
         void SetLimpiarPantalla(bool value);

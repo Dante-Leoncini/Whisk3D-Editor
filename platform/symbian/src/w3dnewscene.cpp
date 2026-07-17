@@ -218,7 +218,6 @@ void W3dNewOrbit(TInt aDx, TInt aDy) {
 // modificadores del keypad (N95): 0+flechas=zoom, *+flechas=paneo, #+flechas=primera persona.
 void W3dNewZoom(TInt aDelta) { if (Viewport3DActive) Viewport3DActive->Zoom((float)aDelta); }
 void W3dNewPan(TInt aDx, TInt aDy)  { if (Viewport3DActive) Viewport3DActive->PanFlecha(-aDx, -aDy); } // invertido (Dante: las flechas iban al reves)
-void W3dNewLook(TInt aDx, TInt aDy) { if (Viewport3DActive) Viewport3DActive->MirarPrimeraPersona(aDx, aDy); }
 
 void W3dNewTransformEnd(TBool aCancel) {
     // TIMELINE: el transform de keyframes se acepta/cancela solo (no toca gTMode ni estado)
@@ -240,6 +239,10 @@ void W3dNewTransformEnd(TBool aCancel) {
     if (aCancel) {
         Cancelar(); // el REAL de PC: restaura desde estadoObjetos
     } else {
+        // AUTO KEY: va ANTES del clear, que es lo que borra el snapshot contra el que se mide QUE canal cambio.
+        // En PC esto lo hace Viewport3D::Aceptar(), pero ESA funcion arranca con "#ifdef W3D_SYMBIAN return;" ->
+        // en el N95 nunca corria y el auto key no guardaba nada, en silencio.
+        AutoKeyObjetos();
         // ACEPTAR: limpiar lo guardado SIN restaurar (ReestablecerEstado
         // restaura posiciones: es el mecanismo interno del cancel)
         estadoObjetos.clear();
@@ -295,6 +298,12 @@ void W3dNewDeseleccionarTodo() {
 
 // enfocar el objeto activo (el del Viewport3D REAL de PC)
 void W3dNewEnfocar() {
+    // "0" enfoca lo del viewport ACTIVO, no siempre el 3D. En el timeline enfocar el modelo no tiene ningun
+    // sentido: ahi el equivalente es encuadrar los keyframes elegidos (el numpad '.' de PC).
+    if (viewPortActive && viewPortActive->isLeaf() && viewPortActive->ViewportKind() == 5) {
+        ((Timeline*)viewPortActive)->DopeFrameSelected();
+        return;
+    }
     if (Viewport3DActive) {
         Viewport3DActive->EnfocarObject();
     }

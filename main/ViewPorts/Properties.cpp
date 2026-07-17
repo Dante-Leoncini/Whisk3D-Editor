@@ -1,4 +1,9 @@
 #include "w3dGraphics.h" // abstraccion de graficos (independencia de OpenGL)
+#include "variables.h"
+#ifndef W3D_SYMBIAN
+#include <filesystem>   // listar los skins de res/Skins (la tarjeta Ajustes)
+#endif
+#include "W3dLang.h"   // T(): los textos salen en el idioma del sistema
 #include "ViewPorts/Timeline.h"   // keyframe ACTIVO + InvalidarAnimYRedraw (tarjeta "Keyframe")
 #include "Properties.h"
 #include "Undo.h" // Ctrl+Z: capturar rename
@@ -66,6 +71,16 @@ static std::string NombreMaterialLibre(){
 static PopupMenu* MenuMateriales = NULL;
 
 // opcion elegida: 0 = New Material, 1 = Default Material, 2+ = existentes
+// Crea un material nuevo (nombre clasico: Material, Material.001, ...) y lo pone en el mesh part 'idx'. Vive aca
+// porque aca vive NombreMaterialLibre; lo usa el Add > Reference, que necesita el material hecho para poder abrirle
+// el selector de textura de una.
+Material* NuevoMaterialEnMeshPart(Mesh* mesh, int idx){
+    if (!mesh || idx < 0 || idx >= (int)mesh->materialsGroup.size()) return NULL;
+    Material* mat = new Material(NombreMaterialLibre());
+    mesh->materialsGroup[idx].material = mat;
+    return mat;
+}
+
 static void AccionMaterialElegido(int id){
     if (!PropsActivo) return;
     if (!ObjActivo || ObjActivo->getType() != ObjectType::mesh) return;
@@ -399,8 +414,8 @@ static void AccionMenuTexturas(){
         MenuTexturas->action = AccionTexturaElegida;
     }
     MenuTexturas->Limpiar(); // las texturas cargadas van cambiando
-    MenuTexturas->Agregar("No Texture", 0, IconType::notifError); // la "cruz" de error = sin textura
-    MenuTexturas->Agregar("Load Texture", 1, IconType::archive);
+    MenuTexturas->Agregar(T("No Texture"), 0, IconType::notifError); // la "cruz" de error = sin textura
+    MenuTexturas->Agregar(T("Load Texture"), 1, IconType::archive);
     for (size_t i = 5; i < Textures.size(); i++) {
         MenuTexturas->Agregar(NombreDeTextura(Textures[i]),
                               2 + (int)(i - 5), IconType::textura);
@@ -433,8 +448,8 @@ static void AccionMenuTexturasNormal(){
         MenuTexturasNormal->action = AccionNormalTexElegida;
     }
     MenuTexturasNormal->Limpiar();
-    MenuTexturasNormal->Agregar("No Normal Map", 0, IconType::notifError);
-    MenuTexturasNormal->Agregar("Load Texture", 1, IconType::archive);
+    MenuTexturasNormal->Agregar(T("No Normal Map"), 0, IconType::notifError);
+    MenuTexturasNormal->Agregar(T("Load Texture"), 1, IconType::archive);
     for (size_t i = 5; i < Textures.size(); i++) {
         MenuTexturasNormal->Agregar(NombreDeTextura(Textures[i]), 2 + (int)(i - 5), IconType::textura);
     }
@@ -482,6 +497,91 @@ static void OnLightGLChange(){
 }
 
 // click en el selector: abre el desplegable (new / default / existentes)
+// ====================================================================
+//  TARJETA "AJUSTES" (pestania Render, abajo de todo): lo que vive en el config.ini, editable desde adentro.
+//  Antes habia que salir del programa y abrir el .ini con un editor de texto.
+//  Casi todo esto SOLO se aplica al arrancar (el contexto GL, la fuente, el skin), asi que al cambiarlo se avisa
+//  que hay que reiniciar en vez de fingir que ya paso.
+// ====================================================================
+extern bool W3dConfigGuardar();
+static PopupMenu* MenuIdioma = NULL;
+
+static void AccionIdiomaElegido(int id){
+    W3dIdiomaSet((W3dIdioma)id);
+    extern bool g_idiomaForzado;
+    g_idiomaForzado = true;   // lo eligio el usuario: el idioma del SO ya no manda
+    Notificar(T("Restart Whisk3D for this change to take effect"), false);
+    g_redraw = true;
+}
+static void AccionMenuIdioma(){
+    if (!PropsActivo || !PropsActivo->propAjIdioma) return;
+    if (!MenuIdioma){ MenuIdioma = new PopupMenu(); MenuIdioma->action = AccionIdiomaElegido; }
+    MenuIdioma->Limpiar();
+    // los idiomas se listan en SU PROPIO nombre y no traducidos: el que abre esto capaz no entiende el idioma actual
+    MenuIdioma->Agregar("English",   (int)W3dLangEN);
+    MenuIdioma->Agregar("Español",   (int)W3dLangES);
+    MenuIdioma->Agregar("Portugues", (int)W3dLangPT);
+    AbrirMenuBajoBoton(MenuIdioma, PropsActivo->propAjIdioma->button);
+}
+
+static PopupMenu* MenuBackend = NULL;
+static void AccionBackendElegido(int id){
+    cfg.graphicsAPI = (id == 1) ? "opengles" : "opengl";
+    Notificar(T("Restart Whisk3D for this change to take effect"), false);
+    g_redraw = true;
+}
+static void AccionMenuBackend(){
+    if (!PropsActivo || !PropsActivo->propAjBackend) return;
+    if (!MenuBackend){ MenuBackend = new PopupMenu(); MenuBackend->action = AccionBackendElegido; }
+    MenuBackend->Limpiar();
+    MenuBackend->Agregar("OpenGL", 0);
+    MenuBackend->Agregar("OpenGL ES", 1);
+    AbrirMenuBajoBoton(MenuBackend, PropsActivo->propAjBackend->button);
+}
+
+// Los skins que hay: carpetas dentro de res/Skins. Vive ACA y no en w3dFileSystem porque eso es del Core, y el
+// Core no tiene por que saber que existe el concepto "skin del editor". Si no se puede listar (o no hay nada),
+// queda al menos el que esta puesto: el dropdown nunca sale vacio.
+static void W3dListarSkins(std::vector<std::string>& out){
+    out.clear();
+#ifndef W3D_SYMBIAN
+    try {
+        const std::string dir = w3dFileSystem::GetResDir() + "/Skins";
+        for (std::filesystem::directory_iterator it(dir), fin; it != fin; ++it)
+            if (it->is_directory()) out.push_back(it->path().filename().string());
+    } catch (...) { }
+#endif
+    if (out.empty()) out.push_back(cfg.SkinName);
+}
+
+static PopupMenu* MenuSkin = NULL;
+static void AccionSkinElegido(int id){
+    std::vector<std::string> skins; W3dListarSkins(skins);
+    if (id >= 0 && id < (int)skins.size()) cfg.SkinName = skins[id];
+    Notificar(T("Restart Whisk3D for this change to take effect"), false);
+    g_redraw = true;
+}
+static void AccionMenuSkin(){
+    if (!PropsActivo || !PropsActivo->propAjSkin) return;
+    if (!MenuSkin){ MenuSkin = new PopupMenu(); MenuSkin->action = AccionSkinElegido; }
+    MenuSkin->Limpiar();
+    std::vector<std::string> skins; W3dListarSkins(skins);
+    for (size_t i = 0; i < skins.size(); i++) MenuSkin->Agregar(skins[i], (int)i);
+    if (skins.empty()) MenuSkin->Agregar(cfg.SkinName, 0);
+    AbrirMenuBajoBoton(MenuSkin, PropsActivo->propAjSkin->button);
+}
+
+// el tilde ya toco cfg.enableAntialiasing (PropBool escribe el bool): aca solo se avisa
+static void AccionAntialias(){
+    Notificar(T("Restart Whisk3D for this change to take effect"), false);
+    g_redraw = true;
+}
+
+static void AccionGuardarConfig(){
+    if (W3dConfigGuardar()) Notificar(T("Settings saved"), false);
+    else                    Notificar(T("Could not write config.ini"), true);
+}
+
 static void AccionMenuMateriales(){
     if (!PropsActivo) return;
     if (!ObjActivo || ObjActivo->getType() != ObjectType::mesh) return;
@@ -490,8 +590,8 @@ static void AccionMenuMateriales(){
         MenuMateriales->action = AccionMaterialElegido;
     }
     MenuMateriales->Limpiar(); // la lista de materiales va cambiando
-    MenuMateriales->Agregar("New Material", 0, IconType::material);
-    MenuMateriales->Agregar("Default Material", 1, IconType::material);
+    MenuMateriales->Agregar(T("New Material"), 0, IconType::material);
+    MenuMateriales->Agregar(T("Default Material"), 1, IconType::material);
     for (size_t i = 0; i < Materials.size(); i++) {
         MenuMateriales->Agregar(Materials[i]->name, 2 + (int)i, IconType::material);
     }
@@ -516,11 +616,11 @@ static void AccionMenuAddModifier(){
         MenuAddModifier = new PopupMenu();
         MenuAddModifier->action = AccionAddModifierElegido;
         MenuAddModifier->Agregar("Screw",               ModifierType::Screw);
-        MenuAddModifier->Agregar("Mirror",              ModifierType::Mirror);
+        MenuAddModifier->Agregar(T("Mirror"),              ModifierType::Mirror);
         MenuAddModifier->Agregar("Array",               ModifierType::Array);
-        MenuAddModifier->Agregar("Subdivision Surface", ModifierType::SubdivisionSurface);
-        MenuAddModifier->Agregar("Boolean",             ModifierType::Boolean);
-        MenuAddModifier->Agregar("Armature",            ModifierType::Armature, (int)IconType::armature);
+        MenuAddModifier->Agregar(T("Subdivision Surface"), ModifierType::SubdivisionSurface);
+        MenuAddModifier->Agregar(T("Boolean"),             ModifierType::Boolean);
+        MenuAddModifier->Agregar(T("Armature"),            ModifierType::Armature, (int)IconType::armature);
     }
     if (PropsActivo->propRowMod && !PropsActivo->propRowMod->botones.empty()){
         AbrirMenuBajoBoton(MenuAddModifier, PropsActivo->propRowMod->botones[0]); // el boton "Add"
@@ -567,9 +667,9 @@ static void AccionMenuRotMode(){
         MenuRotMode->action = AccionRotModeElegido;
     }
     MenuRotMode->Limpiar();
-    MenuRotMode->Agregar("XYZ Euler", RotEulerXYZ);
-    MenuRotMode->Agregar("Quaternion (WXYZ)", RotQuaternion);
-    MenuRotMode->Agregar("Axis Angle", RotAxisAngle);
+    MenuRotMode->Agregar(T("XYZ Euler"), RotEulerXYZ);
+    MenuRotMode->Agregar(T("Quaternion (WXYZ)"), RotQuaternion);
+    MenuRotMode->Agregar(T("Axis Angle"), RotAxisAngle);
     AbrirMenuBajoBoton(MenuRotMode, PropsActivo->propRotMode->button);
 }
 
@@ -617,7 +717,7 @@ static void AccionMenuTarget(){
     if (!ObjComoTarget(ObjActivo)) return;
     if (!MenuTarget){ MenuTarget = new PopupMenu(); MenuTarget->action = AccionTargetElegido; }
     MenuTarget->Limpiar();
-    MenuTarget->Agregar("None", 0);
+    MenuTarget->Agregar(T("None"), 0);
     gTargetCandidatos.clear();
     RecolectarTargets(SceneCollection);
     for (size_t i = 0; i < gTargetCandidatos.size(); i++)
@@ -667,7 +767,7 @@ static void AccionMenuModTarget(){
     if (!PropsActivo || !PropsActivo->propMirTarget) return;
     if (!MenuModTarget){ MenuModTarget=new PopupMenu(); MenuModTarget->action=AccionModTargetElegido; }
     MenuModTarget->Limpiar();
-    MenuModTarget->Agregar("None", 0);
+    MenuModTarget->Agregar(T("None"), 0);
     gTargetCandidatos.clear(); RecolectarTargets(SceneCollection);
     for (size_t i=0;i<gTargetCandidatos.size();i++)
         MenuModTarget->Agregar(gTargetCandidatos[i]->name, 1+(int)i, (int)IconoDeObjeto(gTargetCandidatos[i]));
@@ -717,7 +817,7 @@ static void AccionMenuArmTarget(){
     if (!PropsActivo || !PropsActivo->propArmTarget) return;
     if (!MenuArmTarget){ MenuArmTarget = new PopupMenu(); MenuArmTarget->action = AccionArmTargetElegido; }
     MenuArmTarget->Limpiar();
-    MenuArmTarget->Agregar("None", 0);
+    MenuArmTarget->Agregar(T("None"), 0);
     gArmTargets.clear(); RecolectarArmatures(SceneCollection);
     for (size_t i = 0; i < gArmTargets.size(); i++)
         MenuArmTarget->Agregar(gArmTargets[i]->name, 1 + (int)i, (int)IconType::armature);
@@ -742,7 +842,7 @@ static void AccionAplicarModificador(){
     if (!ObjActivo || ObjActivo->getType()!=ObjectType::mesh) return;
     ((Mesh*)ObjActivo)->AplicarModificadorActivo();
     PropertiesLayoutDirty = true; g_redraw = true;
-    Notificar("Modifier applied", false);
+    Notificar(T("Modifier applied"), false);
 }
 
 // "Optimize Vertex Groups" (1 hueso por vertice): DESTRUCTIVO -> confirmar antes. ConfirmarPopup::onSi no lleva
@@ -754,7 +854,7 @@ static void HacerOptimizarVG(){
     OptimizarVertexGroups1Hueso(g_pendingOptVGMesh);
     g_pendingOptVGMesh = NULL;
     g_redraw = true;
-    Notificar("Vertex groups optimized (1 bone/vertex)", false);
+    Notificar(T("Vertex groups optimized (1 bone/vertex)"), false);
 }
 static void AccionOptimizarVertexGroups(){
     if (!ObjActivo || ObjActivo->getType() != ObjectType::mesh) return;
@@ -817,11 +917,11 @@ static void HacerExportActual(){
     if (!PropsActivo) return;
     std::string path = g_pendingExportPath;
     int f = PropsActivo->exportFormat;
-    if (f == 1) { Notificar("FBX export: not available yet", true); return; } // el exportador FBX binario todavia no esta
+    if (f == 1) { Notificar(T("FBX export: not available yet"), true); return; } // el exportador FBX binario todavia no esta
     bool ok = false;
     if (f == 0) {
         ok = ExportOBJ(path, PropsActivo->exportSelectedOnly, PropsActivo->exportApplyModifiers, PropsActivo->exportApplyTransforms);
-        if (ok) Notificar("OBJ saved successfully!", false); else Notificar("Error: could not save the OBJ", true);
+        if (ok) Notificar(T("OBJ saved successfully!"), false); else Notificar(T("Error: could not save the OBJ"), true);
 #ifdef __EMSCRIPTEN__
         if (ok) { std::string mtl = ExtractBaseName(path) + ".mtl"; // web: bajar .obj + .mtl (FS virtual de emscripten)
             WebDescargarArchivo(path.c_str(), SoloNombre(path).c_str()); WebDescargarArchivo(mtl.c_str(), SoloNombre(mtl).c_str()); }
@@ -988,7 +1088,7 @@ static int RenderPasesFrame(Viewport3D* vp, int w, int h, int progBase, int prog
 static void HacerRenderImage(){
     if (!PropsActivo) return;
     Viewport3D* vp = Viewport3DActive;
-    if (!vp) { Notificar("No active 3D viewport", true); return; }
+    if (!vp) { Notificar(T("No active 3D viewport"), true); return; }
     int w = (int)(PropsActivo->renderW + 0.5f); if (w < 1) w = 1;
     int h = (int)(PropsActivo->renderH + 0.5f); if (h < 1) h = 1;
     int total = PasesActivos() * vp->TilesNecesarios(w, h); // 1 frame: PASES x TILES
@@ -996,8 +1096,8 @@ static void HacerRenderImage(){
     int fallos = 0;
     RenderPasesFrame(vp, w, h, 0, total, fallos);
     ProgresoFin();
-    if (fallos == 0) Notificar("Render saved!", false);
-    else             Notificar("Error: could not save the render", true);
+    if (fallos == 0) Notificar(T("Render saved!"), false);
+    else             Notificar(T("Error: could not save the render"), true);
 }
 // boton "Render Image": arma Path + File name; si el PNG (pase beauty) ya existe, pide confirmacion.
 // Start / End / FPS de la animacion (tarjeta Animation): espejos float de los int globales StartFrame/EndFrame/AnimFPS
@@ -1017,7 +1117,7 @@ void SincronizarAnimFps(){
 }
 static void AccionRenderImage(){
     if (!PropsActivo) return;
-    if (!Viewport3DActive) { Notificar("No active 3D viewport", true); return; }
+    if (!Viewport3DActive) { Notificar(T("No active 3D viewport"), true); return; }
     CalcularRenderBase(); // setea g_pendingRenderBase desde los campos Path + File name
 #ifndef W3D_SYMBIAN
     std::string beauty = RenderFileNamePNG(""); // el pase principal
@@ -1058,13 +1158,13 @@ static void HacerRenderAnimation(){
     ProgresoFin();
     CurrentFrame = guardado;
     ReloadAnimation(); AplicarAnimacionObjetos(); // volver la escena al frame que estaba
-    if (fallos == 0) Notificar("Animation rendered!", false);
-    else             Notificar("Error rendering animation", true);
+    if (fallos == 0) Notificar(T("Animation rendered!"), false);
+    else             Notificar(T("Error rendering animation"), true);
     g_redraw = true;
 }
 static void AccionRenderAnimation(){
     if (!PropsActivo) return;
-    if (!Viewport3DActive) { Notificar("No active 3D viewport", true); return; }
+    if (!Viewport3DActive) { Notificar(T("No active 3D viewport"), true); return; }
     HacerRenderAnimation();
 }
 
@@ -1126,7 +1226,7 @@ void ConstruirMenuAnim(PopupMenu* menu){
     InitSceneAnimations();
     PopupMenu* subEsc = AnimSubmenuPool(0); subEsc->Limpiar(); subEsc->action = menu->action; // submenu "Scenes"
     for (size_t i=0;i<SceneAnimations.size();i++) subEsc->Agregar(SceneAnimations[i]->name, (int)i, IconType::camera);
-    menu->Agregar("Scenes", 0, IconType::camera, subEsc);
+    menu->Agregar(T("Scenes"), 0, IconType::camera, subEsc);
     g_animMenuArms.clear();                                                   // un submenu por armadura CON clips
     std::vector<Armature*> todas; RecolectarArmaduras(SceneCollection, todas);
     for (size_t t=0;t<todas.size();t++){
@@ -1329,10 +1429,10 @@ static void AccionMenuKfHandle(int id){
 static void AccionKfBtnInterp(){
     if (!gKfInterp) return;
     if (!g_menuKfInterp){ g_menuKfInterp = new PopupMenu(); g_menuKfInterp->action = AccionMenuKfInterp;
-                          g_menuKfInterp->titulo = "Interpolation"; }
+                          g_menuKfInterp->titulo = T("Interpolation"); }
     g_menuKfInterp->Limpiar();
-    g_menuKfInterp->Agregar("Constant", KfConstant);
-    g_menuKfInterp->Agregar("Linear", KfLinear);
+    g_menuKfInterp->Agregar(T("Constant"), KfConstant);
+    g_menuKfInterp->Agregar(T("Linear"), KfLinear);
     g_menuKfInterp->Agregar("Bezier", KfBezier);
     if (MenuAbierto && MenuAbierto != g_menuKfInterp) MenuAbierto->Cerrar();
     g_menuKfInterp->Abrir(gKfInterp->button->sx, gKfInterp->button->sy + gKfInterp->button->height,
@@ -1342,13 +1442,13 @@ static void AccionKfBtnInterp(){
 static void AccionKfBtnHandle(){
     if (!gKfHandle) return;
     if (!g_menuKfHandle){ g_menuKfHandle = new PopupMenu(); g_menuKfHandle->action = AccionMenuKfHandle;
-                          g_menuKfHandle->titulo = "Handle Type"; }
+                          g_menuKfHandle->titulo = T("Handle Type"); }
     g_menuKfHandle->Limpiar();
-    g_menuKfHandle->Agregar("Free", HFree);
-    g_menuKfHandle->Agregar("Aligned", HAligned);
-    g_menuKfHandle->Agregar("Vector", HVector);
-    g_menuKfHandle->Agregar("Automatic", HAuto);
-    g_menuKfHandle->Agregar("Auto Clamped", HAutoClamped);
+    g_menuKfHandle->Agregar(T("Free"), HFree);
+    g_menuKfHandle->Agregar(T("Aligned"), HAligned);
+    g_menuKfHandle->Agregar(T("Vector"), HVector);
+    g_menuKfHandle->Agregar(T("Automatic"), HAuto);
+    g_menuKfHandle->Agregar(T("Auto Clamped"), HAutoClamped);
     if (MenuAbierto && MenuAbierto != g_menuKfHandle) MenuAbierto->Cerrar();
     g_menuKfHandle->Abrir(gKfHandle->button->sx, gKfHandle->button->sy + gKfHandle->button->height,
                           MenuPantallaW, MenuPantallaH);
@@ -1356,9 +1456,9 @@ static void AccionKfBtnHandle(){
 }
 
 void Properties::ConstruirGrupos(){
-    propTransform = new GroupPropertie("Transform");
+    propTransform = new GroupPropertie(T("Transform"));
 
-    propTransform->properties.push_back(new PropFloat("Location X"));
+    propTransform->properties.push_back(new PropFloat(T("Location X")));
     propTransform->properties.push_back(new PropFloat("Y"));
     propTransform->properties.push_back(new PropFloat("Z"));
 
@@ -1366,12 +1466,12 @@ void Properties::ConstruirGrupos(){
 
     // selector de modo de rotacion (dropdown) + campos W/X/Y/Z. Que campos se
     // muestran (W solo en Quaternion/Axis) y a que apuntan lo hace RefreshTarget.
-    propRotMode = new PropButton("Mode");                            // [4]
+    propRotMode = new PropButton(T("Mode"));                            // [4]
     propRotMode->button->desplegable = true;
     propRotMode->action = AccionMenuRotMode;
     propTransform->properties.push_back(propRotMode);
-    propTransform->properties.push_back(new PropFloat("Rotation W")); // [5] (condicional)
-    propTransform->properties.push_back(new PropFloat("Rotation X")); // [6]
+    propTransform->properties.push_back(new PropFloat(T("Rotation W"))); // [5] (condicional)
+    propTransform->properties.push_back(new PropFloat(T("Rotation X"))); // [6]
     propTransform->properties.push_back(new PropFloat("Y"));          // [7]
     propTransform->properties.push_back(new PropFloat("Z"));          // [8]
     // editar W/X/Y/Z (flechas o arrastre) reconstruye el quaternion real
@@ -1380,7 +1480,7 @@ void Properties::ConstruirGrupos(){
 
     propTransform->properties.push_back(new PropGap(""));
 
-    propTransform->properties.push_back(new PropFloat("Scale X"));
+    propTransform->properties.push_back(new PropFloat(T("Scale X")));
     propTransform->properties.push_back(new PropFloat("Y"));
     propTransform->properties.push_back(new PropFloat("Z"));
 
@@ -1388,33 +1488,33 @@ void Properties::ConstruirGrupos(){
     // tactil). El commit -> ObjActivo->name (uniquificado) lo hace SincronizarNombreObjeto por frame. Antes era un boton
     // "Rename" que se volvia input pero no sacaba teclado en Android (inconsistente). El nombre del objeto no se ve en
     // otro lado, asi que aca SI conviene el campo (en material/uv/color el nombre ya se ve -> se dejaron como boton).
-    propNameObj = new PropText("Name", "");
+    propNameObj = new PropText(T("Name"), "");
     propTransform->properties.push_back(propNameObj);
 
     GroupProperties.push_back(propTransform);
 
     // ===== Tarjeta "Mesh Parts": selector (lista) + gestion de la PARTE (sin material) =====
-    propMeshParts = new GroupPropertie("Mesh Parts");
+    propMeshParts = new GroupPropertie(T("Mesh Parts"));
     propMeshParts->anchoValores = 0.30f;
     propMeshParts->properties.push_back(new PropListMeshParts("Mesh Parts")); // [0] selector (lo lee Rebind)
-    PropButton* pbNewPart = new PropButton("New Mesh Part", IconType::mesh);
+    PropButton* pbNewPart = new PropButton(T("New Mesh Part"), IconType::mesh);
     pbNewPart->action = AccionNuevoMeshPart;      propMeshParts->properties.push_back(pbNewPart);
     // fila: Assign | Select | Deselect (sin icono, 33% c/u, auto-ancho con gap)
     propRowPartOps = new PropButtonRow();
-    propRowPartOps->Agregar("Assign",   AccionAssignMeshPart);
-    propRowPartOps->Agregar("Select",   AccionSelectMeshPart);
-    propRowPartOps->Agregar("Deselect", AccionDeselectMeshPart);
+    propRowPartOps->Agregar(T("Assign"),   AccionAssignMeshPart);
+    propRowPartOps->Agregar(T("Select"),   AccionSelectMeshPart);
+    propRowPartOps->Agregar(T("Deselect"), AccionDeselectMeshPart);
     propMeshParts->properties.push_back(propRowPartOps);
     // fila: Delete | Rename (sin icono, 50% c/u). Delete se oculta si hay 1 sola parte (no borrable).
     propRowDelRen = new PropButtonRow();
-    propRowDelRen->Agregar("Delete", AccionBorrarMeshPart);
-    propRowDelRen->Agregar("Rename", AccionRenameMeshPart); // el boton Rename se vuelve input al apretarlo
+    propRowDelRen->Agregar(T("Delete"), AccionBorrarMeshPart);
+    propRowDelRen->Agregar(T("Rename"), AccionRenameMeshPart); // el boton Rename se vuelve input al apretarlo
     propMeshParts->properties.push_back(propRowDelRen);
     // fila: Move Up | Move Down (oculta si hay 1 sola parte). El ORDEN del mesh part = ORDEN DE DIBUJADO
     // (dibujar los solidos primero y los transparentes al final).
     propRowPartMove = new PropButtonRow();
-    propRowPartMove->Agregar("Move Up",   AccionMeshPartUp);
-    propRowPartMove->Agregar("Move Down", AccionMeshPartDown);
+    propRowPartMove->Agregar(T("Move Up"),   AccionMeshPartUp);
+    propRowPartMove->Agregar(T("Move Down"), AccionMeshPartDown);
     propMeshParts->properties.push_back(propRowPartMove);
     GroupProperties.push_back(propMeshParts);
 
@@ -1423,11 +1523,11 @@ void Properties::ConstruirGrupos(){
     // (propMatChk/propMatCol/propMatShin) -> Rebind los setea por nombre, NO por indice (reordenar = libre).
     propMaterial = new GroupPropertie("Material");
     propMaterial->anchoValores = 0.30f;
-    propBtnNewMaterial = new PropButton("New Material", IconType::material);
+    propBtnNewMaterial = new PropButton(T("New Material"), IconType::material);
     propBtnNewMaterial->button->desplegable = true;
     propBtnNewMaterial->action = AccionMenuMateriales;
     propMaterial->properties.push_back(propBtnNewMaterial);
-    propBtnRenameMat = new PropButton("Rename Material", -1); // ANTES de la textura, SIN icono (pedido Dante)
+    propBtnRenameMat = new PropButton(T("Rename Material"), -1); // ANTES de la textura, SIN icono (pedido Dante)
     propBtnRenameMat->action = AccionRenameMaterial; // se vuelve input al apretarlo; oculto si es el default
     propMaterial->properties.push_back(propBtnRenameMat);
     // aviso cuando el mesh part usa el material POR DEFECTO (oculto si tiene uno propio). 1 label WRAP: se
@@ -1438,7 +1538,7 @@ void Properties::ConstruirGrupos(){
     // material por defecto (sino queda una linea huerfana molesta debajo del aviso).
     propSepMat = new PropSeparator();
     propMaterial->properties.push_back(propSepMat);
-    propBtnTextura = new PropButton("No Texture", IconType::textura);
+    propBtnTextura = new PropButton(T("No Texture"), IconType::textura);
     propBtnTextura->button->desplegable = true;
     propBtnTextura->action = AccionMenuTexturas;
     propMaterial->properties.push_back(propBtnTextura);
@@ -1447,7 +1547,7 @@ void Properties::ConstruirGrupos(){
     // "pro" (Culling / Depth Test) abajo de todo.
     const char* nombresCol[3] = { "Base Color","Specular","Emission" };
     for (int i = 0; i < 3; i++) propMatCol[i] = new PropColor(nombresCol[i]);
-    propMatShin = new PropFloat("Shininess");
+    propMatShin = new PropFloat(T("Shininess"));
     propMatShin->SetRango(0.0f, 255.0f);
     propMatShin->stepFino = 1.0f; propMatShin->stepGrueso = 10.0f; propMatShin->dragStep = 1.0f;
     propMatShin->entero = true;   // es un entero (Dante: "que sea entero"), no float
@@ -1460,7 +1560,7 @@ void Properties::ConstruirGrupos(){
         // que dependen de otro (Base Color si Vertex Color; Shininess/Emission/Specular si Lighting; etc).
         propMatChk[i]->onChange = RebindMaterialMeshPart;
     }
-    propBtnNormalTex = new PropButton("No Normal Map", IconType::textura);
+    propBtnNormalTex = new PropButton(T("No Normal Map"), IconType::textura);
     propBtnNormalTex->button->desplegable = true;
     propBtnNormalTex->action = AccionMenuTexturasNormal;
     propBtnReflectMode = new PropButton("Matcap (hardware)", IconType::material);
@@ -1487,39 +1587,39 @@ void Properties::ConstruirGrupos(){
 
     // pestania de LUZ: TODAS las propiedades editables de la luz de OpenGL (pedido Dante). Se ve solo si el
     // objeto activo es una luz. OpenGL = UN tipo de luz configurable: Direccional / Puntual / Spot (ver Light.h).
-    propLight = new GroupPropertie("Light");
-    propLightDir = new PropBool("Directional");                 // w=0 (sol) vs puntual/spot
+    propLight = new GroupPropertie(T("Light"));
+    propLightDir = new PropBool(T("Directional"));                 // w=0 (sol) vs puntual/spot
     propLight->properties.push_back(propLightDir);
-    propLightGL = new PropFloat("GL Light");                    // numero de GL light (0..7), entero editable
+    propLightGL = new PropFloat(T("GL Light"));                    // numero de GL light (0..7), entero editable
     propLightGL->SetRango(0.0f, 7.0f); propLightGL->entero = true;
     propLightGL->stepFino = 1.0f; propLightGL->stepGrueso = 1.0f; propLightGL->dragStep = 1.0f;
     propLightGL->onChange = OnLightGLChange;
     propLight->properties.push_back(propLightGL);
-    propLightDiffuse = new PropColor("Diffuse");  propLight->properties.push_back(propLightDiffuse);
-    propLightAmbient = new PropColor("Ambient");  propLight->properties.push_back(propLightAmbient);
-    propLightSpecular = new PropColor("Specular"); propLight->properties.push_back(propLightSpecular);
+    propLightDiffuse = new PropColor(T("Diffuse"));  propLight->properties.push_back(propLightDiffuse);
+    propLightAmbient = new PropColor(T("Ambient"));  propLight->properties.push_back(propLightAmbient);
+    propLightSpecular = new PropColor(T("Specular")); propLight->properties.push_back(propLightSpecular);
     // atenuacion 1/(C + L*d + Q*d^2) (afecta a la puntual/spot)
-    propLightAttC = new PropFloat("Att Constant"); propLightAttC->SetRango(0.0f, 5.0f);
+    propLightAttC = new PropFloat(T("Att Constant")); propLightAttC->SetRango(0.0f, 5.0f);
     propLightAttC->stepFino = 0.02f; propLightAttC->stepGrueso = 0.1f; propLightAttC->dragStep = 0.01f;
     propLight->properties.push_back(propLightAttC);
-    propLightAttL = new PropFloat("Att Linear"); propLightAttL->SetRango(0.0f, 2.0f);
+    propLightAttL = new PropFloat(T("Att Linear")); propLightAttL->SetRango(0.0f, 2.0f);
     propLightAttL->stepFino = 0.01f; propLightAttL->stepGrueso = 0.05f; propLightAttL->dragStep = 0.005f;
     propLight->properties.push_back(propLightAttL);
-    propLightAttQ = new PropFloat("Att Quadratic"); propLightAttQ->SetRango(0.0f, 1.0f);
+    propLightAttQ = new PropFloat(T("Att Quadratic")); propLightAttQ->SetRango(0.0f, 1.0f);
     propLightAttQ->stepFino = 0.005f; propLightAttQ->stepGrueso = 0.02f; propLightAttQ->dragStep = 0.002f;
     propLight->properties.push_back(propLightAttQ);
     // spotlight: cono (grados) + concentracion del haz
-    propLightSpotCut = new PropFloat("Spot Cutoff"); propLightSpotCut->SetRango(1.0f, 180.0f); propLightSpotCut->entero = true;
+    propLightSpotCut = new PropFloat(T("Spot Cutoff")); propLightSpotCut->SetRango(1.0f, 180.0f); propLightSpotCut->entero = true;
     propLightSpotCut->stepFino = 1.0f; propLightSpotCut->stepGrueso = 5.0f; propLightSpotCut->dragStep = 1.0f;
     propLight->properties.push_back(propLightSpotCut);
-    propLightSpotExp = new PropFloat("Spot Exponent"); propLightSpotExp->SetRango(0.0f, 128.0f); propLightSpotExp->entero = true;
+    propLightSpotExp = new PropFloat(T("Spot Exponent")); propLightSpotExp->SetRango(0.0f, 128.0f); propLightSpotExp->entero = true;
     propLightSpotExp->stepFino = 1.0f; propLightSpotExp->stepGrueso = 8.0f; propLightSpotExp->dragStep = 1.0f;
     propLight->properties.push_back(propLightSpotExp);
     GroupProperties.push_back(propLight);
 
     // pestania de CAMARA: el target (look-at)
-    propCamera = new GroupPropertie("Camera");
-    propBtnCamTarget = new PropButton("Target", IconType::object);
+    propCamera = new GroupPropertie(T("Camera"));
+    propBtnCamTarget = new PropButton(T("Target"), IconType::object);
     propBtnCamTarget->button->desplegable = true;
     propBtnCamTarget->action = AccionMenuTarget;
     propCamera->properties.push_back(propBtnCamTarget);
@@ -1527,8 +1627,8 @@ void Properties::ConstruirGrupos(){
 
     // pestania de los objetos especiales (Duplicate Linked / Array / Mirror):
     // el objeto al que apuntan (target)
-    propInstance = new GroupPropertie("Linked");
-    propBtnInstTarget = new PropButton("Target", IconType::object);
+    propInstance = new GroupPropertie(T("Linked"));
+    propBtnInstTarget = new PropButton(T("Target"), IconType::object);
     propBtnInstTarget->button->desplegable = true;
     propBtnInstTarget->action = AccionMenuTarget;
     propInstance->properties.push_back(propBtnInstTarget);
@@ -1539,20 +1639,20 @@ void Properties::ConstruirGrupos(){
     propRender->anchoValores = 0.62f; // columna de valor ANCHA (paths)
     // salida partida en dos campos: Path (carpeta) + File name (nombre.png), como pidio Dante.
     // Default del path: carpeta de salida por defecto (Android = Descargas).
-    propRenderPath = new PropText("Path", w3dFileSystem::GetDefaultOutputDir());
+    propRenderPath = new PropText(T("Path"), w3dFileSystem::GetDefaultOutputDir());
     propRenderPath->onClick = AccionBrowseRender; // el campo Path ES el "Browse folder": al clickear abre el explorador
     propRender->properties.push_back(propRenderPath);
-    propRenderOutput = new PropText("File name", "render.png");
+    propRenderOutput = new PropText(T("File name"), "render.png");
     propRender->properties.push_back(propRenderOutput);
     // resolucion editable (default 640x480). Puede ser MAYOR que la ventana: se rinde por tiles.
     renderW = 640.0f; renderH = 480.0f;
     g_renderAspect = renderW / renderH; // arranca con el aspecto por defecto (4:3)
-    propRenderW = new PropFloat("Width");
+    propRenderW = new PropFloat(T("Width"));
     propRenderW->SetRango(1.0f, 8192.0f); propRenderW->entero = true;
     propRenderW->stepFino = 1.0f; propRenderW->stepGrueso = 16.0f; propRenderW->dragStep = 1.0f;
     propRenderW->value = &renderW; propRenderW->onChange = ActualizarAspectoRender; // geometria de camaras responsive
     propRender->properties.push_back(propRenderW);
-    propRenderH = new PropFloat("Height");
+    propRenderH = new PropFloat(T("Height"));
     propRenderH->SetRango(1.0f, 8192.0f); propRenderH->entero = true;
     propRenderH->stepFino = 1.0f; propRenderH->stepGrueso = 16.0f; propRenderH->dragStep = 1.0f;
     propRenderH->value = &renderH; propRenderH->onChange = ActualizarAspectoRender;
@@ -1567,11 +1667,11 @@ void Properties::ConstruirGrupos(){
     propRenderAlpha = new PropBool("Alpha"); propRenderAlpha->value = &renderAlpha;
     propRender->properties.push_back(propRenderAlpha);
     // color de FONDO del render (global g_renderBg, solo para el pase Rendered). Se edita con el color picker.
-    propRenderBg = new PropColor("Background");
+    propRenderBg = new PropColor(T("Background"));
     propRenderBg->value = g_renderBg; // el array global decae a puntero (igual que los colores de material/luz)
     propRender->properties.push_back(propRenderBg);
     // boton con action real (antes era no-op)
-    PropButton* pbRenderImg = new PropButton("Render Image", IconType::textura); // icono de textura (imagen)
+    PropButton* pbRenderImg = new PropButton(T("Render Image"), IconType::textura); // icono de textura (imagen)
     pbRenderImg->action = AccionRenderImage;
     propRender->properties.push_back(pbRenderImg);
     GroupProperties.push_back(propRender);
@@ -1579,19 +1679,19 @@ void Properties::ConstruirGrupos(){
     // tarjeta "Animation" (pestania Render): selector de la animacion ACTIVA (Scene(s) / clips del armature) + Start/End/
     // FPS + New|Delete + Rename + Render Animation (rendea la SECUENCIA StartFrame..EndFrame). Delete se oculta sin nada
     // que borrar y Render se grisa sin animaciones.
-    propAnimation = new GroupPropertie("Animation");
+    propAnimation = new GroupPropertie(T("Animation"));
     propAnimation->anchoValores = 0.55f; // Start/End/FPS son campos numericos: mas lugar al valor
-    propBtnAnimSel = new PropButton("Scene", IconType::camera); // dropdown: animacion activa (Scene por defecto)
+    propBtnAnimSel = new PropButton(T("Scene"), IconType::camera); // dropdown: animacion activa (Scene por defecto)
     propBtnAnimSel->button->desplegable = true;
     propBtnAnimSel->button->caretMenu = true; // aca SI conviene la flechita (no es obvio que es un selector)
     propBtnAnimSel->action = AccionMenuAnimSel;
     propAnimation->properties.push_back(propBtnAnimSel);
     // Start / End / FPS de la animacion (espejos float de los int StartFrame/EndFrame/AnimFPS)
-    { PropFloat* pS = new PropFloat("Start");
+    { PropFloat* pS = new PropFloat(T("Start"));
       pS->SetRango(0.0f, 100000.0f); pS->entero = true; pS->stepFino = 1.0f; pS->stepGrueso = 10.0f; pS->dragStep = 1.0f;
       g_animStartF = (float)StartFrame; pS->value = &g_animStartF; pS->onChange = AccionAnimStart; gPropAnimStart = pS;
       propAnimation->properties.push_back(pS); }
-    { PropFloat* pE = new PropFloat("End");
+    { PropFloat* pE = new PropFloat(T("End"));
       pE->SetRango(1.0f, 100000.0f); pE->entero = true; pE->stepFino = 1.0f; pE->stepGrueso = 10.0f; pE->dragStep = 1.0f;
       g_animEndF = (float)EndFrame; pE->value = &g_animEndF; pE->onChange = AccionAnimEnd; gPropAnimEnd = pE;
       propAnimation->properties.push_back(pE); }
@@ -1601,15 +1701,15 @@ void Properties::ConstruirGrupos(){
       propAnimation->properties.push_back(pF); }
     // New | Delete en UNA fila
     propRowAnimNewDel = new PropButtonRow();
-    propRowAnimNewDel->Agregar("New", AccionAnimNewCard, IconType::armature);
-    propRowAnimNewDel->Agregar("Duplicate", AccionAnimDupCard); // duplica el clip activo (se oculta sin clips)
-    propRowAnimNewDel->Agregar("Delete", AccionAnimDelCard);
+    propRowAnimNewDel->Agregar(T("New"), AccionAnimNewCard, IconType::armature);
+    propRowAnimNewDel->Agregar(T("Duplicate"), AccionAnimDupCard); // duplica el clip activo (se oculta sin clips)
+    propRowAnimNewDel->Agregar(T("Delete"), AccionAnimDelCard);
     propAnimation->properties.push_back(propRowAnimNewDel);
     // Rename de la animacion activa (escena o clip): el boton se vuelve input in-place
-    propBtnAnimRename = new PropButton("Rename", -1);
+    propBtnAnimRename = new PropButton(T("Rename"), -1);
     propBtnAnimRename->action = AccionAnimRenameCard;
     propAnimation->properties.push_back(propBtnAnimRename);
-    propBtnAnimRender = new PropButton("Render Animation", IconType::foto);
+    propBtnAnimRender = new PropButton(T("Render Animation"), IconType::foto);
     propBtnAnimRender->action = AccionRenderAnimation;
     propAnimation->properties.push_back(propBtnAnimRender);
     GroupProperties.push_back(propAnimation);
@@ -1624,26 +1724,26 @@ void Properties::ConstruirGrupos(){
       p1->entero = true; p1->stepFino = 1.0f; p1->stepGrueso = 10.0f; p1->dragStep = 1.0f;
       p1->value = &g_kfFrame; p1->onChange = AccionKfFrame; gKfFrame = p1;
       propKeyframe->properties.push_back(p1); }
-    { PropFloat* p1 = new PropFloat("Value Y");
+    { PropFloat* p1 = new PropFloat(T("Value Y"));
       p1->value = &g_kfValor; p1->onChange = AccionKfValor; gKfValor = p1;
       propKeyframe->properties.push_back(p1); }
     propKeyframe->properties.push_back(new PropGap(""));
-    gKfInterp = new PropButton("Interpolation");
+    gKfInterp = new PropButton(T("Interpolation"));
     gKfInterp->button->desplegable = true; gKfInterp->button->caretMenu = true;
     gKfInterp->action = AccionKfBtnInterp;
     propKeyframe->properties.push_back(gKfInterp);
-    gKfHandle = new PropButton("Handle Type");
+    gKfHandle = new PropButton(T("Handle Type"));
     gKfHandle->button->desplegable = true; gKfHandle->button->caretMenu = true;
     gKfHandle->action = AccionKfBtnHandle;
     propKeyframe->properties.push_back(gKfHandle);
     propKeyframe->properties.push_back(new PropGap(""));
-    { PropFloat* p1 = new PropFloat("Left Handle X");
+    { PropFloat* p1 = new PropFloat(T("Left Handle X"));
       p1->value = &g_kfInDF; p1->onChange = AccionKfHandles; gKfInDF = p1;
       propKeyframe->properties.push_back(p1); }
     { PropFloat* p1 = new PropFloat("Y");
       p1->value = &g_kfInDV; p1->onChange = AccionKfHandles; gKfInDV = p1;
       propKeyframe->properties.push_back(p1); }
-    { PropFloat* p1 = new PropFloat("Right Handle X");
+    { PropFloat* p1 = new PropFloat(T("Right Handle X"));
       p1->value = &g_kfOutDF; p1->onChange = AccionKfHandles; gKfOutDF = p1;
       propKeyframe->properties.push_back(p1); }
     { PropFloat* p1 = new PropFloat("Y");
@@ -1651,7 +1751,7 @@ void Properties::ConstruirGrupos(){
       propKeyframe->properties.push_back(p1); }
     GroupProperties.push_back(propKeyframe);
 
-    propExport = new GroupPropertie("Export");
+    propExport = new GroupPropertie(T("Export"));
     propExport->anchoValores = 0.62f;
     // dropdown de FORMATO (arriba de todo): OBJ / FBX / glTF / GLB. La etiqueta muestra el formato activo.
     propExportFormat = new PropButton(NombreFormato(exportFormat), IconType::mesh);
@@ -1659,29 +1759,62 @@ void Properties::ConstruirGrupos(){
     propExportFormat->button->caretMenu = true; // flechita: es un selector de formato
     propExportFormat->action = AccionMenuExportFormat;
     propExport->properties.push_back(propExportFormat);
-    PropBool* pbSel = new PropBool("Selected only");
+    PropBool* pbSel = new PropBool(T("Selected only"));
     pbSel->value = &exportSelectedOnly;
     propExport->properties.push_back(pbSel);
-    PropBool* pbMods = new PropBool("Apply Modifiers"); // OBJ: ON = exporta la malla generada por los modificadores
+    PropBool* pbMods = new PropBool(T("Apply Modifiers")); // OBJ: ON = exporta la malla generada por los modificadores
     pbMods->value = &exportApplyModifiers;
     propExport->properties.push_back(pbMods);
-    PropBool* pbXf = new PropBool("Apply Transforms"); // OBJ: ON = hornea el transform del objeto en el .obj (mundo)
+    PropBool* pbXf = new PropBool(T("Apply Transforms")); // OBJ: ON = hornea el transform del objeto en el .obj (mundo)
     pbXf->value = &exportApplyTransforms;
     propExport->properties.push_back(pbXf);
     // salida partida en dos: Path (carpeta) + File name (nombre + extension del formato). Default: Descargas en Android.
-    propExportPath = new PropText("Path", w3dFileSystem::GetDefaultOutputDir());
+    propExportPath = new PropText(T("Path"), w3dFileSystem::GetDefaultOutputDir());
     propExportPath->onClick = AccionBrowseExport; // el campo Path ES el "Browse folder": al clickear abre el explorador
     propExport->properties.push_back(propExportPath);
-    propExportName = new PropText("File name", std::string("model") + ExtDeFormato(exportFormat));
+    propExportName = new PropText(T("File name"), std::string("model") + ExtDeFormato(exportFormat));
     propExport->properties.push_back(propExportName);
-    PropButton* pbExp = new PropButton("Export", IconType::mesh);
+    PropButton* pbExp = new PropButton(T("Export"), IconType::mesh);
     pbExp->action = AccionExport;
     propExport->properties.push_back(pbExp);
     GroupProperties.push_back(propExport);
 
+    // ===== tarjeta "Ajustes" (ABAJO DE TODO en la pestania Render): el config.ini editable desde adentro =====
+    propAjustes = new GroupPropertie(T("Settings"));
+    propAjustes->anchoValores = 0.62f;
+
+    propAjIdioma = new PropButton(W3dIdiomaNombre(g_idioma), IconType::archive);
+    propAjIdioma->button->desplegable = true;
+    propAjIdioma->button->caretMenu = true;   // no es obvio que es un selector: la flechita lo dice
+    propAjIdioma->action = AccionMenuIdioma;
+    propAjustes->properties.push_back(propAjIdioma);
+
+    propAjAntialias = new PropBool(T("Antialiasing"));
+    propAjAntialias->value = &cfg.enableAntialiasing;
+    propAjAntialias->onChange = AccionAntialias;
+    propAjustes->properties.push_back(propAjAntialias);
+
+    propAjBackend = new PropButton(cfg.graphicsAPI, IconType::monitor);
+    propAjBackend->button->desplegable = true;
+    propAjBackend->button->caretMenu = true;
+    propAjBackend->action = AccionMenuBackend;
+    propAjustes->properties.push_back(propAjBackend);
+
+    propAjSkin = new PropButton(cfg.SkinName, IconType::material);
+    propAjSkin->button->desplegable = true;
+    propAjSkin->button->caretMenu = true;
+    propAjSkin->action = AccionMenuSkin;
+    propAjustes->properties.push_back(propAjSkin);
+
+    { PropButton* pbSave = new PropButton(T("Save Changes"), IconType::archive);
+      pbSave->action = AccionGuardarConfig;
+      propAjustes->properties.push_back(pbSave); }
+
+    GroupProperties.push_back(propAjustes);   // ULTIMA -> queda abajo de todo
+
     // pestaña VERTICES (icono mesh): card "Transform" (posicion X/Y/Z del centro de la seleccion, editable ->
     // traslada rigido) ARRIBA + 3 tarjetas (UV/Color/Anim). Solo en Edit Mode con algo seleccionado.
-    propEditItem = new GroupPropertie("Transform");
+    propEditItem = new GroupPropertie(T("Transform"));
     { PropFloat* px = new PropFloat("X"); px->value = &editPosX; px->onChange = AccionEditPos; propEditItem->properties.push_back(px);
       PropFloat* py = new PropFloat("Y"); py->value = &editPosY; py->onChange = AccionEditPos; propEditItem->properties.push_back(py);
       PropFloat* pz = new PropFloat("Z"); pz->value = &editPosZ; pz->onChange = AccionEditPos; propEditItem->properties.push_back(pz); }
@@ -1690,50 +1823,50 @@ void Properties::ConstruirGrupos(){
     // pestaña VERTICES (icono mesh): TARJETAS. Las listas REUSAN PropListMeshParts (con scroll, resize, etc., el
     // MISMO componente que el selector de mesh part) en modo 4 (vertex groups) / 1 (uvmaps) / 2 (colors).
     // "Vertex Groups" va PRIMERA: es la mas importante (huesos del rig, pesos para deformar la malla).
-    propVertexGroups = new GroupPropertie("Vertex Groups");
+    propVertexGroups = new GroupPropertie(T("Vertex Groups"));
     propListVertGroups = new PropListMeshParts("Vertex Groups"); propListVertGroups->modo = 4;
     propVertexGroups->properties.push_back(propListVertGroups);
-    PropButton* pbAddGrp = new PropButton("Add Vertex Group", IconType::mesh);
+    PropButton* pbAddGrp = new PropButton(T("Add Vertex Group"), IconType::mesh);
     pbAddGrp->action = AccionVertAddGroup;
     propVertexGroups->properties.push_back(pbAddGrp);
-    propBtnRenameGroup = new PropButton("Rename", -1); // renombra el grupo activo (nombre unico por malla)
+    propBtnRenameGroup = new PropButton(T("Rename"), -1); // renombra el grupo activo (nombre unico por malla)
     propBtnRenameGroup->action = AccionRenameGroup;
     propVertexGroups->properties.push_back(propBtnRenameGroup);
     // fila Delete | Move Up | Move Down (Delete si hay >=1; Move si hay >=2)
     propRowGroupOps = new PropButtonRow();
-    propRowGroupOps->Agregar("Delete",    AccionVertDelGroup);
-    propRowGroupOps->Agregar("Move Up",   AccionVertGroupUp);
-    propRowGroupOps->Agregar("Move Down", AccionVertGroupDown);
+    propRowGroupOps->Agregar(T("Delete"),    AccionVertDelGroup);
+    propRowGroupOps->Agregar(T("Move Up"),   AccionVertGroupUp);
+    propRowGroupOps->Agregar(T("Move Down"), AccionVertGroupDown);
     propVertexGroups->properties.push_back(propRowGroupOps);
     GroupProperties.push_back(propVertexGroups);
 
     // ===== pestania ARMATURE: tarjeta "Animation" (lista de clips del esqueleto + Add / Rename / Delete / Move) =====
     // MISMO componente que la lista de vertex groups (PropListMeshParts), pero en modo 5 (lee arm->animations).
-    propArmAnim = new GroupPropertie("Animation");
+    propArmAnim = new GroupPropertie(T("Animation"));
     propListAnims = new PropListMeshParts("Animation"); propListAnims->modo = 5;
     propArmAnim->properties.push_back(propListAnims);
-    PropButton* pbAddAnim = new PropButton("New Animation", IconType::armature); // crea un clip vacio en pose reset
+    PropButton* pbAddAnim = new PropButton(T("New Animation"), IconType::armature); // crea un clip vacio en pose reset
     pbAddAnim->action = AccionAnimAdd;
     propArmAnim->properties.push_back(pbAddAnim);
-    propBtnDupAnim = new PropButton("Duplicate", IconType::armature); // duplica el clip activo (se oculta sin clips)
+    propBtnDupAnim = new PropButton(T("Duplicate"), IconType::armature); // duplica el clip activo (se oculta sin clips)
     propBtnDupAnim->action = AccionAnimDup;
     propArmAnim->properties.push_back(propBtnDupAnim);
-    propBtnRenameAnim = new PropButton("Rename", -1); // renombra el clip activo (nombre unico por armature)
+    propBtnRenameAnim = new PropButton(T("Rename"), -1); // renombra el clip activo (nombre unico por armature)
     propBtnRenameAnim->action = AccionRenameAnim;
     propArmAnim->properties.push_back(propBtnRenameAnim);
     // fila Delete | Move Up | Move Down (Delete si hay >=1; Move si hay >=2)
     propRowAnimOps = new PropButtonRow();
-    propRowAnimOps->Agregar("Delete",    AccionAnimDel);
-    propRowAnimOps->Agregar("Move Up",   AccionAnimUp);
-    propRowAnimOps->Agregar("Move Down", AccionAnimDown);
+    propRowAnimOps->Agregar(T("Delete"),    AccionAnimDel);
+    propRowAnimOps->Agregar(T("Move Up"),   AccionAnimUp);
+    propRowAnimOps->Agregar(T("Move Down"), AccionAnimDown);
     propArmAnim->properties.push_back(propRowAnimOps);
     GroupProperties.push_back(propArmAnim);
 
     // ===== pestania ARMATURE: tarjeta "Bones" (Pose Mode): lista de huesos + parent + pos/rot/scale del hueso activo =====
-    propArmBones = new GroupPropertie("Bones");
+    propArmBones = new GroupPropertie(T("Bones"));
     propListBones = new PropListMeshParts("Bones"); propListBones->modo = 6; // lee arm->bones (mismo componente de lista)
     propArmBones->properties.push_back(propListBones);
-    propBoneParent = new PropText("Parent", ""); propBoneParent->onClick = BoneParentNoop; // solo lectura (onClick != NULL)
+    propBoneParent = new PropText(T("Parent"), ""); propBoneParent->onClick = BoneParentNoop; // solo lectura (onClick != NULL)
     propArmBones->properties.push_back(propBoneParent);
     { PropFloat* px=new PropFloat("Pos X"); px->value=&g_bonePosX; px->onChange=AccionBoneTransform; propArmBones->properties.push_back(px);
       PropFloat* py=new PropFloat("Pos Y"); py->value=&g_bonePosY; py->onChange=AccionBoneTransform; propArmBones->properties.push_back(py);
@@ -1741,138 +1874,138 @@ void Properties::ConstruirGrupos(){
     { PropFloat* rx=new PropFloat("Rot X"); rx->value=&g_boneRotX; rx->onChange=AccionBoneTransform; propArmBones->properties.push_back(rx);
       PropFloat* ry=new PropFloat("Rot Y"); ry->value=&g_boneRotY; ry->onChange=AccionBoneTransform; propArmBones->properties.push_back(ry);
       PropFloat* rz=new PropFloat("Rot Z"); rz->value=&g_boneRotZ; rz->onChange=AccionBoneTransform; propArmBones->properties.push_back(rz); }
-    { PropFloat* sx=new PropFloat("Scale X"); sx->value=&g_boneSclX; sx->onChange=AccionBoneTransform; propArmBones->properties.push_back(sx);
-      PropFloat* sy=new PropFloat("Scale Y"); sy->value=&g_boneSclY; sy->onChange=AccionBoneTransform; propArmBones->properties.push_back(sy);
-      PropFloat* sz=new PropFloat("Scale Z"); sz->value=&g_boneSclZ; sz->onChange=AccionBoneTransform; propArmBones->properties.push_back(sz); }
+    { PropFloat* sx=new PropFloat(T("Scale X")); sx->value=&g_boneSclX; sx->onChange=AccionBoneTransform; propArmBones->properties.push_back(sx);
+      PropFloat* sy=new PropFloat(T("Scale Y")); sy->value=&g_boneSclY; sy->onChange=AccionBoneTransform; propArmBones->properties.push_back(sy);
+      PropFloat* sz=new PropFloat(T("Scale Z")); sz->value=&g_boneSclZ; sz->onChange=AccionBoneTransform; propArmBones->properties.push_back(sz); }
     GroupProperties.push_back(propArmBones);
 
-    propUVMaps = new GroupPropertie("UV Maps");
+    propUVMaps = new GroupPropertie(T("UV Maps"));
     propListUV = new PropListMeshParts("UV Maps"); propListUV->modo = 1;
     propUVMaps->properties.push_back(propListUV);
-    PropButton* pbAddUV = new PropButton("Add UV Map", IconType::mesh);
+    PropButton* pbAddUV = new PropButton(T("Add UV Map"), IconType::mesh);
     pbAddUV->action = AccionVertAddUVMap;
     propUVMaps->properties.push_back(pbAddUV);
-    propBtnRenameUV = new PropButton("Rename", -1); // renombra la UV map activa (nombre unico por malla)
+    propBtnRenameUV = new PropButton(T("Rename"), -1); // renombra la UV map activa (nombre unico por malla)
     propBtnRenameUV->action = AccionRenameUVMap;
     propUVMaps->properties.push_back(propBtnRenameUV);
     // fila Delete | Move Up | Move Down (toda la fila oculta con 1 sola UV map)
     propRowUVOps = new PropButtonRow();
-    propRowUVOps->Agregar("Delete",    AccionVertDelUVMap);
-    propRowUVOps->Agregar("Move Up",   AccionVertUVMapUp);
-    propRowUVOps->Agregar("Move Down", AccionVertUVMapDown);
+    propRowUVOps->Agregar(T("Delete"),    AccionVertDelUVMap);
+    propRowUVOps->Agregar(T("Move Up"),   AccionVertUVMapUp);
+    propRowUVOps->Agregar(T("Move Down"), AccionVertUVMapDown);
     propUVMaps->properties.push_back(propRowUVOps);
     GroupProperties.push_back(propUVMaps);
 
-    propColorLayers = new GroupPropertie("Color");
+    propColorLayers = new GroupPropertie(T("Color"));
     propListColor = new PropListMeshParts("Color"); propListColor->modo = 2;
     propColorLayers->properties.push_back(propListColor);
-    PropButton* pbAddCol = new PropButton("Add Color Layer", IconType::mesh);
+    PropButton* pbAddCol = new PropButton(T("Add Color Layer"), IconType::mesh);
     pbAddCol->action = AccionVertAddColor;
     propColorLayers->properties.push_back(pbAddCol);
-    propBtnColorMode = new PropButton("Color Mode", IconType::mesh);
+    propBtnColorMode = new PropButton(T("Color Mode"), IconType::mesh);
     propBtnColorMode->action = AccionVertColorMode;
     propColorLayers->properties.push_back(propBtnColorMode);
-    propBtnRenameColor = new PropButton("Rename", -1); // renombra la capa de color activa (nombre unico)
+    propBtnRenameColor = new PropButton(T("Rename"), -1); // renombra la capa de color activa (nombre unico)
     propBtnRenameColor->action = AccionRenameColor;
     propColorLayers->properties.push_back(propBtnRenameColor);
     // fila Delete | Move Up | Move Down (toda la fila oculta con 1 sola capa de color)
     propRowColorOps = new PropButtonRow();
-    propRowColorOps->Agregar("Delete",    AccionVertDelColor);
-    propRowColorOps->Agregar("Move Up",   AccionVertColorUp);
-    propRowColorOps->Agregar("Move Down", AccionVertColorDown);
+    propRowColorOps->Agregar(T("Delete"),    AccionVertDelColor);
+    propRowColorOps->Agregar(T("Move Up"),   AccionVertColorUp);
+    propRowColorOps->Agregar(T("Move Down"), AccionVertColorDown);
     propColorLayers->properties.push_back(propRowColorOps);
     GroupProperties.push_back(propColorLayers);
 
-    propVertexAnim = new GroupPropertie("Vertex Animation");
+    propVertexAnim = new GroupPropertie(T("Vertex Animation"));
     propVertexAnim->properties.push_back(new PropLabel("(coming soon)")); // placeholder
     GroupProperties.push_back(propVertexAnim);
 
     // ===== pestania "Modifiers" (mesh): selector del stack + Add/Remove + Move Up/Down =====
-    propModifiers = new GroupPropertie("Modifiers");
+    propModifiers = new GroupPropertie(T("Modifiers"));
     propModifiers->anchoValores = 0.30f;
     propListModifiers = new PropListMeshParts("Modifiers");
     propListModifiers->modo = 3;                              // 3 = stack de modificadores (mesh->modificadores)
     propModifiers->properties.push_back(propListModifiers);   // [0] selector (el mismo componente de UV/parts)
     // fila: Add (desplegable: abre el menu de tipos) | Remove (oculto si no hay modificadores)
     propRowMod = new PropButtonRow();
-    Button* bAddMod = propRowMod->Agregar("Add", AccionMenuAddModifier);
+    Button* bAddMod = propRowMod->Agregar(T("Add"), AccionMenuAddModifier);
     bAddMod->desplegable = true;
-    propRowMod->Agregar("Remove", AccionRemoveModifier);
+    propRowMod->Agregar(T("Remove"), AccionRemoveModifier);
     propModifiers->properties.push_back(propRowMod);
     // fila: Move Up | Move Down (toda la fila oculta si hay < 2 -> el orden solo importa con 2+)
     propRowModMove = new PropButtonRow();
-    propRowModMove->Agregar("Move Up",   AccionModifierUp);
-    propRowModMove->Agregar("Move Down", AccionModifierDown);
+    propRowModMove->Agregar(T("Move Up"),   AccionModifierUp);
+    propRowModMove->Agregar(T("Move Down"), AccionModifierDown);
     propModifiers->properties.push_back(propRowModMove);
     GroupProperties.push_back(propModifiers);
 
     // ===== 2da tarjeta: props del modificador SELECCIONADO. Por ahora las del MIRROR (bindeadas al modificador
     // activo en ActualizarPestanias); otros tipos muestran "(no properties yet)". Solo visible con un modificador. =====
-    propModifierProps = new GroupPropertie("Modifier");
+    propModifierProps = new GroupPropertie(T("Modifier"));
     propModifierProps->anchoValores = 0.55f;
     // Visibilidad (TODOS los modificadores): en el viewport (OFF = nunca se calcula) y en Edit Mode (OFF = edicion
     // rapida en N95, se recalcula al salir). onChange regenera la malla.
-    propModVerViewport = new PropBool("Display in Viewport"); propModVerViewport->onChange = AccionModParamChanged;
+    propModVerViewport = new PropBool(T("Display in Viewport")); propModVerViewport->onChange = AccionModParamChanged;
     propModifierProps->properties.push_back(propModVerViewport);
-    propModVerEdit = new PropBool("Display in Edit Mode"); propModVerEdit->onChange = AccionModParamChanged;
+    propModVerEdit = new PropBool(T("Display in Edit Mode")); propModVerEdit->onChange = AccionModParamChanged;
     propModifierProps->properties.push_back(propModVerEdit);
     propModVacio = new PropLabel("(no properties yet)");
     propModifierProps->properties.push_back(propModVacio);
     // Mirror: ejes X/Y/Z
-    propMirX = new PropBool("Mirror X"); propMirX->onChange = AccionModParamChanged; propModifierProps->properties.push_back(propMirX);
-    propMirY = new PropBool("Mirror Y"); propMirY->onChange = AccionModParamChanged; propModifierProps->properties.push_back(propMirY);
-    propMirZ = new PropBool("Mirror Z"); propMirZ->onChange = AccionModParamChanged; propModifierProps->properties.push_back(propMirZ);
+    propMirX = new PropBool(T("Mirror X")); propMirX->onChange = AccionModParamChanged; propModifierProps->properties.push_back(propMirX);
+    propMirY = new PropBool(T("Mirror Y")); propMirY->onChange = AccionModParamChanged; propModifierProps->properties.push_back(propMirY);
+    propMirZ = new PropBool(T("Mirror Z")); propMirZ->onChange = AccionModParamChanged; propModifierProps->properties.push_back(propMirZ);
     // Mirror Object (target: cualquier objeto; su posicion+rotacion define el plano)
-    propMirTarget = new PropButton("Mirror Object", IconType::object);
+    propMirTarget = new PropButton(T("Mirror Object"), IconType::object);
     propMirTarget->button->desplegable = true; propMirTarget->action = AccionMenuModTarget;
     propModifierProps->properties.push_back(propMirTarget);
     // Armature: target (dropdown solo esqueletos). La malla se deforma (skinning) al rig elegido.
-    propArmTarget = new PropButton("Target", IconType::armature);
+    propArmTarget = new PropButton(T("Target"), IconType::armature);
     propArmTarget->button->desplegable = true; propArmTarget->action = AccionMenuArmTarget;
     propModifierProps->properties.push_back(propArmTarget);
     // Merge (soldar los verts del plano) + distancia
-    propMirMerge = new PropBool("Merge"); propMirMerge->onChange = AccionModParamChanged; propModifierProps->properties.push_back(propMirMerge);
-    propMirDist = new PropFloat("Merge Distance", "m"); propMirDist->onChange = AccionModParamChanged;
+    propMirMerge = new PropBool(T("Merge")); propMirMerge->onChange = AccionModParamChanged; propModifierProps->properties.push_back(propMirMerge);
+    propMirDist = new PropFloat(T("Merge Distance"), "m"); propMirDist->onChange = AccionModParamChanged;
     propMirDist->SetRango(0.0f, 1.0f); propMirDist->stepFino = 0.0001f; propMirDist->dragStep = 0.0005f;
     propModifierProps->properties.push_back(propMirDist);
     // Clipping (edit-time): clampea los verts al plano al moverlos y, una vez pegados, los deja pegados (arranca ON)
-    propMirClip = new PropBool("Clipping"); propMirClip->onChange = AccionModParamChanged; propModifierProps->properties.push_back(propMirClip);
+    propMirClip = new PropBool(T("Clipping")); propMirClip->onChange = AccionModParamChanged; propModifierProps->properties.push_back(propMirClip);
     // Subdivision Surface: modo Simple (OFF = Catmull-Clark, suaviza) + niveles viewport/render (enteros 0..6)
-    propSubSimple = new PropBool("Simple"); propSubSimple->onChange = AccionModParamChanged; propModifierProps->properties.push_back(propSubSimple);
-    propSubLevel = new PropFloat("Levels Viewport"); propSubLevel->onChange = AccionModParamChanged;
+    propSubSimple = new PropBool(T("Simple")); propSubSimple->onChange = AccionModParamChanged; propModifierProps->properties.push_back(propSubSimple);
+    propSubLevel = new PropFloat(T("Levels Viewport")); propSubLevel->onChange = AccionModParamChanged;
     propSubLevel->SetRango(0.0f, 6.0f); propSubLevel->entero = true; propModifierProps->properties.push_back(propSubLevel);
     propSubRender = new PropFloat("Render"); propSubRender->onChange = AccionModParamChanged;
     propSubRender->SetRango(0.0f, 6.0f); propSubRender->entero = true; propModifierProps->properties.push_back(propSubRender);
     // Screw: angle (grados), screw (subida por el eje), steps viewport/render, eje (dropdown), stretch U/V (UV)
-    propScrewAngle = new PropFloat("Angle", "\xc2\xb0"); propScrewAngle->onChange = AccionModParamChanged;
+    propScrewAngle = new PropFloat(T("Angle"), "\xc2\xb0"); propScrewAngle->onChange = AccionModParamChanged;
     propScrewAngle->SetRango(-3600.0f, 3600.0f); propModifierProps->properties.push_back(propScrewAngle);
     propScrewHeight = new PropFloat("Screw", "m"); propScrewHeight->onChange = AccionModParamChanged;
     propScrewHeight->SetRango(-1000.0f, 1000.0f); propModifierProps->properties.push_back(propScrewHeight);
-    propScrewAxis = new PropButton("Axis"); propScrewAxis->button->desplegable = true; propScrewAxis->action = AccionMenuScrewAxis;
+    propScrewAxis = new PropButton(T("Axis")); propScrewAxis->button->desplegable = true; propScrewAxis->action = AccionMenuScrewAxis;
     propModifierProps->properties.push_back(propScrewAxis);
-    propScrewSteps = new PropFloat("Steps Viewport"); propScrewSteps->onChange = AccionModParamChanged;
+    propScrewSteps = new PropFloat(T("Steps Viewport")); propScrewSteps->onChange = AccionModParamChanged;
     propScrewSteps->SetRango(2.0f, 512.0f); propScrewSteps->entero = true; propModifierProps->properties.push_back(propScrewSteps);
     propScrewRender = new PropFloat("Render"); propScrewRender->onChange = AccionModParamChanged;
     propScrewRender->SetRango(2.0f, 512.0f); propScrewRender->entero = true; propModifierProps->properties.push_back(propScrewRender);
-    propScrewStretchU = new PropBool("Stretch U"); propScrewStretchU->onChange = AccionModParamChanged; propModifierProps->properties.push_back(propScrewStretchU);
-    propScrewStretchV = new PropBool("Stretch V"); propScrewStretchV->onChange = AccionModParamChanged; propModifierProps->properties.push_back(propScrewStretchV);
-    propScrewSmooth = new PropBool("Smooth"); propScrewSmooth->onChange = AccionModParamChanged; propModifierProps->properties.push_back(propScrewSmooth);
-    propScrewMerge = new PropBool("Merge"); propScrewMerge->onChange = AccionModParamChanged; propModifierProps->properties.push_back(propScrewMerge);
-    propScrewFlip = new PropBool("Flip Normals"); propScrewFlip->onChange = AccionModParamChanged; propModifierProps->properties.push_back(propScrewFlip);
+    propScrewStretchU = new PropBool(T("Stretch U")); propScrewStretchU->onChange = AccionModParamChanged; propModifierProps->properties.push_back(propScrewStretchU);
+    propScrewStretchV = new PropBool(T("Stretch V")); propScrewStretchV->onChange = AccionModParamChanged; propModifierProps->properties.push_back(propScrewStretchV);
+    propScrewSmooth = new PropBool(T("Smooth")); propScrewSmooth->onChange = AccionModParamChanged; propModifierProps->properties.push_back(propScrewSmooth);
+    propScrewMerge = new PropBool(T("Merge")); propScrewMerge->onChange = AccionModParamChanged; propModifierProps->properties.push_back(propScrewMerge);
+    propScrewFlip = new PropBool(T("Flip Normals")); propScrewFlip->onChange = AccionModParamChanged; propModifierProps->properties.push_back(propScrewFlip);
     // "Optimize Vertex Groups" (SOLO modificador Armature): colapsa a 1 hueso por vertice -> skinning mucho mas
     // rapido en el N95 (destructivo -> pide confirmacion). Se oculta salvo en el Armature (ActualizarPropiedades).
-    propBtnOptVG = new PropButton("Optimize Vertex Groups");
+    propBtnOptVG = new PropButton(T("Optimize Vertex Groups"));
     propBtnOptVG->action = AccionOptimizarVertexGroups;
     propModifierProps->properties.push_back(propBtnOptVG);
     // "Cache Animation" (SOLO Armature): bakea el skinning por frame -> reproduccion sin recomputar (4fps -> techo de
     // render). "Frame Skip": 0 = todos los frames; N = guarda cada N+1 e interpola (menos memoria en el N95).
-    propArmCache = new PropBool("Cache Animation"); propArmCache->onChange = AccionModParamChanged;
+    propArmCache = new PropBool(T("Cache Animation")); propArmCache->onChange = AccionModParamChanged;
     propModifierProps->properties.push_back(propArmCache);
-    propArmCacheSkip = new PropFloat("Frame Skip"); propArmCacheSkip->SetRango(0.0f, 10.0f); propArmCacheSkip->entero = true;
+    propArmCacheSkip = new PropFloat(T("Frame Skip")); propArmCacheSkip->SetRango(0.0f, 10.0f); propArmCacheSkip->entero = true;
     propArmCacheSkip->onChange = AccionModParamChanged;
     propModifierProps->properties.push_back(propArmCacheSkip);
     // Apply Modifier (cualquier modificador): hornea la malla generada en la editable
-    propBtnApplyMod = new PropButton("Apply Modifier");
+    propBtnApplyMod = new PropButton(T("Apply Modifier"));
     propBtnApplyMod->action = AccionAplicarModificador;
     propModifierProps->properties.push_back(propBtnApplyMod);
     GroupProperties.push_back(propModifierProps);
@@ -2194,9 +2327,11 @@ Properties::Properties() : ViewportBase() {
     focoEnTabs = false;
     ConstruirGrupos(); // grupos PROPIOS: panel independiente
     BarCrear();
-    // pestania 0: "Render" (icono camara: export); 1: "Objeto" (transforms);
+    // pestania 0: "Render" (icono MONITOR: la salida); 1: "Objeto" (transforms);
     // 2: contextual (Mesh/Light/Camera/Instance, solo segun el objeto activo)
-    Tab* tRender = new Tab("", IconType::camera);
+    // El monitor y no una camara: la pestania 2 YA es una camara cuando el objeto activo es una Camera, y dos
+    // camaras juntas en la misma barra no se entienden.
+    Tab* tRender = new Tab("", IconType::monitor);
     BarTabs.push_back(tRender);
     Tab* tObj = new Tab("", IconType::object);
     tObj->activa = true;
@@ -2293,6 +2428,12 @@ void Properties::ActualizarPestanias(){
         }
     }
     if (propExport)    propExport->visible    = (pestaniaActiva == 0 && ObjActivo != NULL);
+    // Ajustes: pestania Render, SIN depender de que haya un objeto (es config del programa, no de la escena)
+    if (propAjustes)   propAjustes->visible   = (pestaniaActiva == 0);
+    // los selectores muestran lo que hay puesto AHORA (el idioma se puede cambiar desde aca mismo)
+    if (propAjIdioma)  propAjIdioma->button->text  = W3dIdiomaNombre(g_idioma);
+    if (propAjBackend) propAjBackend->button->text = cfg.graphicsAPI;
+    if (propAjSkin)    propAjSkin->button->text    = cfg.SkinName;
     // tarjeta Animation: el dropdown muestra la animacion activa (icono camara=escena / esqueleto=clip); Delete se
     // OCULTA cuando no hay nada que borrar; Render se GRISA sin animaciones. New y Rename siempre visibles.
     if (propAnimation && pestaniaActiva == 0){
@@ -2771,10 +2912,10 @@ void Properties::button_right(){
 }
 
 #ifndef W3D_SYMBIAN
-void Properties::mouse_button_up(SDL_Event &e){
+void Properties::mouse_button_up(int boton){
     // si se apreto sobre un PropFloat y NO se arrastro (click puro) -> abrir la edicion por TEXTO (todo seleccionado,
     // tipear reemplaza + enter). Si se arrastro, el valor ya cambio y no se edita.
-    if (gFloatDrag && !gFloatDragMoved && e.button.button == SDL_BUTTON_LEFT) {
+    if (gFloatDrag && !gFloatDragMoved && boton == W3dMB_IZQ) {
         PropsActivo = this;
         gFloatDrag->IniciarEdicionTexto(); // editor INLINE de Whisk3D (el texto entra por SDL_TEXTINPUT como siempre)
     }
@@ -2785,12 +2926,12 @@ void Properties::mouse_button_up(SDL_Event &e){
 #endif
 
 #ifndef W3D_SYMBIAN
-void Properties::event_mouse_wheel(SDL_Event &e){
+void Properties::event_mouse_wheel(float dy, int mx, int my){
     if (editando) return;
     // rueda sobre las PESTAÑAS (barra superior) = scroll horizontal (para llegar a Modifiers cuando el
     // panel es angosto). Mismo comportamiento que la barra del viewport 3D. Fuera de la barra -> vertical.
-    { int mx, my; SDL_GetMouseState(&mx, &my);
-      if (BarScrollHorizontal(mx, my, (int)(e.wheel.y * 40))) return; }
+    {
+      if (BarScrollHorizontal(mx, my, (int)(dy * 40))) return; }
     // si el mouse esta sobre una LISTA (mesh parts / selector), la rueda la scrollea A
     // ELLA (antes solo scrolleaba el panel entero -> el componente "obligaba" al estilo
     // Symbian de Enter+flechas). Reusa el hover ya trackeado (PropHoverGroup/Fila).
@@ -2801,7 +2942,7 @@ void Properties::event_mouse_wheel(SDL_Event &e){
             int n = lst->ListaCount(); // parts / uv maps / colors segun el modo
             int vis = n < lst->filasMax ? n : lst->filasMax;
             if (n > vis) {
-                lst->scrollFila -= (e.wheel.y > 0 ? 1 : -1); // rueda arriba = subir
+                lst->scrollFila -= (dy > 0 ? 1 : -1); // rueda arriba = subir
                 if (lst->scrollFila > n - vis) lst->scrollFila = n - vis;
                 if (lst->scrollFila < 0) lst->scrollFila = 0;
                 g_redraw = true;
@@ -2810,7 +2951,7 @@ void Properties::event_mouse_wheel(SDL_Event &e){
         }
     }
     MouseWheel = true;
-    ScrollY(e.wheel.y*12*GlobalScale);
+    ScrollY(dy*12*GlobalScale);
     MouseWheel = false;
 }
 #endif
@@ -2988,30 +3129,26 @@ void Properties::event_mouse_motion(int mx, int my) {
 }
 
 #ifndef W3D_SYMBIAN
-void Properties::event_key_down(SDL_Event &e){
-    #if SDL_MAJOR_VERSION == 2
-        SDL_Keycode key = e.key.keysym.sym; //SDL2
-    #elif SDL_MAJOR_VERSION == 3
-        SDL_Keycode key = e.key.key; // SDL3
-    #endif
-    if (e.key.repeat == 0) {
+void Properties::event_key_down(int tecla, bool repeticion){
+    const int key = tecla;
+    if (repeticion == 0) {
         switch (key) {
-            case SDLK_LEFT:
+            case W3dK_LEFT:
                 button_left();
                 break;
-            case SDLK_RIGHT:
+            case W3dK_RIGHT:
                 button_right();
                 break;
-            case SDLK_UP:
+            case W3dK_UP:
                 button_up();
                 break;
-            case SDLK_DOWN:
+            case W3dK_DOWN:
                 button_down();
                 break;
-            case SDLK_RETURN:
+            case W3dK_RETURN:
                 EnterPropertieSelect();
                 break;
-            case SDLK_ESCAPE:
+            case W3dK_ESCAPE:
                 Cancel();
                 break;
         };
@@ -3019,16 +3156,16 @@ void Properties::event_key_down(SDL_Event &e){
     else {
         // Evento repetido por mantener apretada
         switch (key) {
-            case SDLK_LEFT:
+            case W3dK_LEFT:
                 button_left();
                 break;
-            case SDLK_RIGHT:
+            case W3dK_RIGHT:
                 button_right();
                 break;
-            case SDLK_UP:
+            case W3dK_UP:
                 button_up();
                 break;
-            case SDLK_DOWN:
+            case W3dK_DOWN:
                 button_down();
                 break;
         }
@@ -3213,7 +3350,7 @@ void Properties::PrevSelect(){
 }
 
 #ifndef W3D_SYMBIAN
-void Properties::event_key_up(SDL_Event &e){
+void Properties::event_key_up(int tecla){
 }
 #endif
 

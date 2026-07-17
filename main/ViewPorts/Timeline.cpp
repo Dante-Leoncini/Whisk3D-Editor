@@ -1,4 +1,5 @@
 #include "ViewPorts/Timeline.h"
+#include "W3dLang.h"   // T(): los textos salen en el idioma del sistema
 #include "w3dGraphics.h"
 #include "WhiskUI/glesdraw.h"          // W3dPantallaAlto
 #include "WhiskUI/colores.h"           // ListaColores / ColorID
@@ -202,7 +203,11 @@ static bool DopeColapsado(const std::string& k){ return !k.empty() && g_dopeCola
 // AUTO FRAME (View > Auto frame, PRENDIDO por defecto): al clickear una fila del panel se elige toda su curva y
 // se la ENCUADRA sola, sin tener que apretar numpad '.'. Es lo que se quiere el 99% de las veces: si vas a mirar
 // una curva, la queres ver.
+// Panel del dope sheet a la vista, si/no. En el telefono se come media pantalla y muchas veces solo queres el
+// tiempo. Es lo MISMO que plegar el summary a mano (panelW=0), pero desde el menu y sin tener que buscar la flecha.
+static bool g_dopePanelOn = true;
 static bool g_dopeAutoFrame = true;
+static float g_scrubAcum = 0.0f;  // resto en frames del scrub por flecha (ver ScrubFlecha)
 static std::set<std::string> g_dopeOjoOff;
 static bool DopeOjoOff(const std::string& k){ return !k.empty() && g_dopeOjoOff.count(k) > 0; }
 
@@ -464,7 +469,7 @@ void Timeline::ConstruirDopeRows(){
     int piso = IconSizeGS*2; if (panelW < piso) panelW = piso;
     // SUMMARY PLEGADO -> se OCULTA el panel entero (panelW=0): el timeline pasa a ocupar TODO y el texto
     // "Summary" queda FLOTANDO encima (lo dibuja RenderDopePanel sin fondo).
-    if (DopeColapsado("summary")) panelW = 0;
+    if (DopeColapsado("summary") || !g_dopePanelOn) panelW = 0;
     // BARRA DE SCROLL: la del editor (Scrollable, la misma del Outliner) -> hover que la agranda, agarre verde,
     // arrastre y touch, todo por el ruteo generico. Solo en DOPE: en CURVAS el eje vertical es el VALOR, no una
     // lista de filas, asi que no hay nada que scrollear.
@@ -485,11 +490,12 @@ static void TL_menuSelAction(int id){
     g_redraw = true;
 }
 // menu View del dope sheet: encuadrar los keyframes seleccionados
-enum { TL_VIEW_FRAMESEL = 0, TL_VIEW_AUTOFRAME = 1 };
+enum { TL_VIEW_FRAMESEL = 0, TL_VIEW_AUTOFRAME = 1, TL_VIEW_PANEL = 2 };
 static void TL_menuViewAction(int id){
     // el CHECKBOX ya lo toggleo PopupMenu::Click, que a proposito NO cierra el menu (asi se prenden/apagan
     // varios de una). Cerrarlo aca romperia eso.
     if (id == TL_VIEW_AUTOFRAME){ g_redraw = true; return; }
+    if (id == TL_VIEW_PANEL){ g_redraw = true; return; }   // el checkbox ya toco el bool; el ancho se recalcula solo
     if (g_tlActivo && id == TL_VIEW_FRAMESEL) g_tlActivo->DopeFrameSelected();
     TL_CerrarMenu(g_tlMenuView);
     g_redraw = true;
@@ -541,8 +547,8 @@ Timeline::Timeline(){
     panelW = 0; panelWUser = 0; panelResize = false; rowH = RenglonHeightGS; hoverRow = -1; // dope sheet (panelW=0 -> timeline clasico)
     fStart=(float)StartFrame; fEnd=(float)EndFrame; fCur=(float)CurrentFrame;
 
-    pfStart = new PropFloat("Start"); pfStart->value=&fStart; pfStart->entero=true; pfStart->onChange=TL_onStart;
-    pfEnd   = new PropFloat("End");   pfEnd->value=&fEnd;     pfEnd->entero=true;   pfEnd->onChange=TL_onEnd;
+    pfStart = new PropFloat(T("Start")); pfStart->value=&fStart; pfStart->entero=true; pfStart->onChange=TL_onStart;
+    pfEnd   = new PropFloat(T("End"));   pfEnd->value=&fEnd;     pfEnd->entero=true;   pfEnd->onChange=TL_onEnd;
     pfCur   = new PropFloat("Frame"); pfCur->value=&fCur;     pfCur->entero=true;   pfCur->onChange=TL_onCur;
 
     BarCrear(); // [0] = icono/menu de tipo
@@ -552,9 +558,9 @@ Timeline::Timeline(){
         b->cuadrado = true;                  // ancho = alto (con el padding de UIBotonAltura)
         BarButtons.push_back(b); btnT[i] = b;
     }
-    btnStart = new Button("Start:1");   btnStart->rol = TL_ROL_START; BarButtons.push_back(btnStart);
-    btnEnd   = new Button("End:250");   btnEnd->rol   = TL_ROL_END;   BarButtons.push_back(btnEnd);
-    btnAnim  = new Button("Scene", (int)IconType::camera); btnAnim->rol = TL_ROL_ANIM; btnAnim->desplegable = true;
+    btnStart = new Button(std::string(T("Start")) + ":1");   btnStart->rol = TL_ROL_START; BarButtons.push_back(btnStart);
+    btnEnd   = new Button(std::string(T("End")) + ":250");   btnEnd->rol   = TL_ROL_END;   BarButtons.push_back(btnEnd);
+    btnAnim  = new Button(T("Scene"), (int)IconType::camera); btnAnim->rol = TL_ROL_ANIM; btnAnim->desplegable = true;
     btnAnim->caretMenu = true; // aca SI conviene la flechita (dropdown de animacion)
     // SIEMPRE visible (Scene por defecto); SyncFields actualiza texto/icono segun la animacion activa
     BarButtons.push_back(btnAnim);
@@ -563,10 +569,10 @@ Timeline::Timeline(){
     btnAutoKey = new Button("Auto Key"); btnAutoKey->rol = TL_ROL_AUTOKEY;
     BarButtons.push_back(btnAutoKey);
     // switch DOPE SHEET <-> CURVES: el texto dice a que modo se PASA (es un boton, no un dropdown)
-    btnModo = new Button("Curves"); btnModo->rol = TL_ROL_MODO;
+    btnModo = new Button(T("Curves")); btnModo->rol = TL_ROL_MODO;
     btnModo->visible = false;
     BarButtons.push_back(btnModo);
-    btnSelect = new Button("Select"); btnSelect->rol = TL_ROL_SELECT; btnSelect->desplegable = true;
+    btnSelect = new Button(T("Select")); btnSelect->rol = TL_ROL_SELECT; btnSelect->desplegable = true;
     btnSelect->visible = false;
     BarButtons.push_back(btnSelect);
     // menu Key: Transform (Move/Rotate/Scale) + Duplicate + Delete
@@ -574,11 +580,11 @@ Timeline::Timeline(){
     btnKey->visible = false;
     BarButtons.push_back(btnKey);
     // menu View del dope sheet: encuadrar el timeline en los keyframes seleccionados
-    btnView = new Button("View"); btnView->rol = TL_ROL_VIEW; btnView->desplegable = true;
+    btnView = new Button("", IconType::monitor); btnView->rol = TL_ROL_VIEW; btnView->desplegable = true;
     btnView->visible = false;
     BarButtons.push_back(btnView);
     // menu Pivot del dope sheet (desde donde escala 's'): mismo criterio que el Pivot Point del viewport 3D
-    btnPivot = new Button("Center"); btnPivot->rol = TL_ROL_PIVOT; btnPivot->desplegable = true; btnPivot->caretMenu = true;
+    btnPivot = new Button(T("Center")); btnPivot->rol = TL_ROL_PIVOT; btnPivot->desplegable = true; btnPivot->caretMenu = true;
     btnPivot->visible = false;
     BarButtons.push_back(btnPivot);
 #ifdef W3D_SYMBIAN
@@ -641,9 +647,9 @@ void Timeline::SyncFields(){
     // seleccionarla con AnimCargarRangoActivo). Aca solo se refleja en los campos.
     // Start / End: si NO se editan, mostrar el valor; si se editan, el boton es el input (editField)
     if (g_propFloatEditando == pfStart){ btnStart->editField = &pfStart->field; }
-    else { btnStart->editField = NULL; char b[24]; snprintf(b,sizeof b,"Start:%d",StartFrame); btnStart->text=b; fStart=(float)StartFrame; }
+    else { btnStart->editField = NULL; char b[24]; snprintf(b,sizeof b,"%s:%d",T("Start"),StartFrame); btnStart->text=b; fStart=(float)StartFrame; }
     if (g_propFloatEditando == pfEnd){ btnEnd->editField = &pfEnd->field; }
-    else { btnEnd->editField = NULL; char b[24]; snprintf(b,sizeof b,"End:%d",EndFrame); btnEnd->text=b; fEnd=(float)EndFrame; }
+    else { btnEnd->editField = NULL; char b[24]; snprintf(b,sizeof b,"%s:%d",T("End"),EndFrame); btnEnd->text=b; fEnd=(float)EndFrame; }
     if (g_propFloatEditando != pfCur) fCur=(float)CurrentFrame;
 
     // AUTO KEY prendido -> el boton queda ROJO (esta grabando)
@@ -1477,6 +1483,84 @@ void Timeline::DopeHover(int mx, int my){
     if (h != hoverRow){ hoverRow = h; g_redraw = true; }
 }
 
+// ============================================================================
+//  NAVEGACION DE KEYFRAMES POR TECLADO (Symbian: el lapiz + flechas). Sin mouse hay que poder elegir keyframes
+//  igual, pero recorrer los de CADA canal seria infinito (18 curvas x 35 keyframes). Por eso se recorren los del
+//  SUMMARY: un paso por FRAME que tenga algo. Para trabajar sobre una curva puntual esta el modo curva: si hay una
+//  FILA seleccionada, se recorren los de ESA curva.
+//  El "activo" es el mismo que marca el click (g_dopeAct*), asi teclado y mouse comparten estado.
+// ============================================================================
+
+// las filas cuyos keyframes se recorren: la del summary, o las SELECCIONADAS si hay alguna de canal
+void Timeline::DopeFilasNav(std::vector<int>& out) const {
+    out.clear();
+    for (size_t r=0;r<dopeRows.size();r++){
+        const DopeRow& d = dopeRows[r];
+        if (d.propId < 0 || d.oculto) continue;
+        if (g_dopeRowSel.count(d.claveFila)) out.push_back((int)r);
+    }
+    if (!out.empty()) return;              // hay curvas elegidas: se trabaja sobre ESAS
+    // si no, TODAS las de canal (sus frames son los del summary: la union)
+    for (size_t r=0;r<dopeRows.size();r++)
+        if (dopeRows[r].propId >= 0 && !dopeRows[r].oculto) out.push_back((int)r);
+}
+
+// los FRAMES que se recorren (la union de los de las filas de arriba), ordenados
+void Timeline::DopeFramesNav(std::vector<int>& out) const {
+    out.clear();
+    std::vector<int> filas; DopeFilasNav(filas);
+    for (size_t i=0;i<filas.size();i++){
+        const DopeRow& d = dopeRows[filas[i]];
+        for (size_t k=0;k<d.keys.size();k++){
+            bool ya=false; for (size_t j=0;j<out.size();j++) if (out[j]==d.keys[k]){ ya=true; break; }
+            if (!ya) out.push_back(d.keys[k]);
+        }
+    }
+    std::sort(out.begin(), out.end());
+}
+
+// selecciona (o saca) TODOS los keyframes del frame 'f' de las filas que se recorren
+void Timeline::DopeSelFrame(int f, bool on){
+    std::vector<int> filas; DopeFilasNav(filas);
+    for (size_t i=0;i<filas.size();i++){
+        const DopeRow& d = dopeRows[filas[i]];
+        for (size_t k=0;k<d.keys.size();k++){
+            if (d.keys[k] != f) continue;
+            std::string id = DopeKeyId(d.ownerKey, d.propId, d.compId, f);
+            if (on){ g_dopeKeySel.insert(id);
+                     g_dopeActOwner=d.ownerKey; g_dopeActProp=d.propId; g_dopeActComp=d.compId;
+                     g_dopeActFrame=f; g_dopeActHay=true; }
+            else g_dopeKeySel.erase(id);
+        }
+    }
+}
+
+// lapiz+flechas: avanza el keyframe ACTIVO. extender = mantiene lo que ya estaba elegido.
+bool Timeline::DopeSelAvanzar(int paso, bool extender){
+    std::vector<int> fr; DopeFramesNav(fr);
+    if (fr.empty()) return false;
+    // el frame de partida: el activo, o el primero elegido, o el mas cercano al frame actual
+    int act = g_dopeActHay ? g_dopeActFrame : CurrentFrame;
+    int idx = -1;
+    for (size_t i=0;i<fr.size();i++) if (fr[i]==act){ idx=(int)i; break; }
+    if (idx < 0){ // no esta en la lista: arrancar del mas cercano
+        int mejor=0; int md=0x7fffffff;
+        for (size_t i=0;i<fr.size();i++){ int d=fr[i]-act; if(d<0)d=-d; if(d<md){md=d;mejor=(int)i;} }
+        idx = mejor;
+        if (!extender) g_dopeKeySel.clear();
+        DopeSelFrame(fr[idx], true);
+        g_redraw = true; return true;
+    }
+    if (!extender) DopeSelFrame(fr[idx], false);   // deselecciona el actual y pasa al siguiente
+    int next = idx + paso;
+    if (next < 0) next = (int)fr.size()-1;
+    if (next >= (int)fr.size()) next = 0;
+    DopeSelFrame(fr[next], true);
+    g_redraw = true; return true;
+}
+bool Timeline::DopeSelTodoNav(){  DopeSelectAll(); return true; }
+bool Timeline::DopeSelNadaNav(){  DopeSelectNone(); g_dopeActHay = false; return true; }
+
 void Timeline::DopeSelectAll(){
     g_dopeKeySel.clear();
     // lo OCULTO no entra: ocultar una curva es justamente sacarla del laburo
@@ -1914,6 +1998,20 @@ bool DopeNumInputChar(int c){
 // Hay un transform de keyframes en curso? Lo pregunta controles.cpp para ENVOLVER el cursor dentro del timeline
 // (como al panear): sin eso, al llegar al borde de la pantalla te quedas sin recorrido y no podes seguir escalando.
 bool DopeXformActivo(){ return g_dopeMov; }
+// barra de espacio: play/pausa desde CUALQUIER viewport (no hace falta tener el timeline enfocado)
+bool TL_TogglePlay(){ if (!g_tlActivo) return false; g_tlActivo->TogglePlay(+1); return true; }
+// ---- lapiz (+flechas) de Symbian sobre el TIMELINE: navega KEYFRAMES. Devuelve false si el timeline no esta
+// activo, para que el llamador siga con lo suyo (ciclar objetos/huesos).
+bool DopeNavTecla(int dir){
+    if (!g_tlActivo || !viewPortActive || !viewPortActive->isLeaf() || viewPortActive->ViewportKind() != 5) return false;
+    switch (dir){
+        case 0: return g_tlActivo->DopeSelAvanzar(1, false);  // lapiz solo: saca el actual y pasa al siguiente
+        case 1: return g_tlActivo->DopeSelAvanzar(1, true);   // + derecha: mantiene y suma el siguiente
+        case 2: return g_tlActivo->DopeSelAvanzar(-1, true);  // + izquierda: mantiene y suma el anterior
+        case 3: return g_tlActivo->DopeSelTodoNav();          // + arriba: todos
+        default: return g_tlActivo->DopeSelNadaNav();         // + abajo: ninguno
+    }
+}
 
 // ---- KEYFRAME ACTIVO: lo lee/escribe la tarjeta "Keyframe" del panel de propiedades ----
 // Se devuelve la curva VIVA y el indice. El indice se resuelve por FRAME cada vez (no se cachea): el vector de
@@ -2029,7 +2127,7 @@ void Timeline::StepFrame(int d){
 }
 void Timeline::StepKeyframe(int d){
     std::vector<int> kfs; CollectKeyframes(kfs);
-    if (kfs.empty()){ StepFrame(d); return; }
+    if (kfs.empty()) return;   // no hay a donde saltar: quieto (mover el frame no es lo que se pidio)
     if (d>0){ for (size_t i=0;i<kfs.size();i++) if (kfs[i]>CurrentFrame){ CurrentFrame=kfs[i]; g_redraw=true; return; } }
     else    { for (int i=(int)kfs.size()-1;i>=0;i--) if (kfs[i]<CurrentFrame){ CurrentFrame=kfs[i]; g_redraw=true; return; } }
 }
@@ -2073,6 +2171,26 @@ void Timeline::EditarCampo(int i){
     if (i==0) btnStart->editField=&pfStart->field; else if (i==1) btnEnd->editField=&pfEnd->field;
     g_redraw = true;
 }
+// El paso de las flechas segun el ZOOM. La idea: que cada pulsacion avance SIEMPRE la misma distancia EN
+// PANTALLA (~10 px), con cualquier zoom. Alejado eso son muchos frames (sino no llegas nunca); con zoom son
+// menos, hasta el minimo de 1 frame (los frames son enteros: mas fino no se puede, y es lo que queres cuando
+// hiciste zoom para ser preciso).
+// OJO: redondeo al MAS CERCANO, no para arriba. Redondeando para arriba, al zoom por defecto (7 px/frame) un
+// paso "ideal" de 1.4 frames daba 2 -> el doble de rapido que antes, imposible de usar.
+// Flecha MANTENIDA sobre el timeline: corre el frame actual. Se aplica CADA frame de la UI, asi que el paso se
+// mide en PIXELES DE PANTALLA y no en frames: recorrer la animacion cuesta lo mismo con cualquier zoom. Los
+// sobrantes se ACUMULAN, que es lo que da el control fino: con mucho zoom un frame son varios ticks (antes el paso
+// se redondeaba a 1 frame minimo -> con zoom alto volaba a 1 frame por tick).
+void Timeline::ScrubFlecha(int dir){
+    const float pxPorTick = 3.3f;
+    float px = (pxPerFrame > 0.01f) ? pxPerFrame : 0.01f;
+    g_scrubAcum += (float)dir * pxPorTick / px;      // en frames (con fraccion)
+    int n = (int)g_scrubAcum;                        // trunca hacia el cero: la fraccion queda para el proximo tick
+    if (n == 0) return;
+    g_scrubAcum -= (float)n;
+    for (int k = 0, q = (n < 0 ? -n : n); k < q; k++) StepFrame(n > 0 ? 1 : -1);
+}
+
 void Timeline::TransportAction(int i){
     switch (i){
         case 0: GotoStart(); break;      case 1: StepKeyframe(-1); break;
@@ -2098,19 +2216,19 @@ void Timeline::AbrirMenuKey(int mx, int my){
     // se rearma en cada apertura: Rotate solo existe en CURVAS (en el dope sheet el unico eje es el tiempo, girar
     // no significa nada)
     g_tlMenuKeyXf->Limpiar();
-    g_tlMenuKeyXf->Agregar("Move", TL_KEY_MOVE)->atajo = "G";
-    if (modo == TL_MODO_CURVAS) g_tlMenuKeyXf->Agregar("Rotate", TL_KEY_ROT)->atajo = "R";
-    g_tlMenuKeyXf->Agregar("Scale", TL_KEY_SCALE)->atajo = "S";
+    g_tlMenuKeyXf->Agregar(T("Move"), TL_KEY_MOVE)->atajo = "G";
+    if (modo == TL_MODO_CURVAS) g_tlMenuKeyXf->Agregar(T("Rotate"), TL_KEY_ROT)->atajo = "R";
+    g_tlMenuKeyXf->Agregar(T("Scale"), TL_KEY_SCALE)->atajo = "S";
     ConstruirMenuInterp(g_tlMenuKeyIn);
     ConstruirMenuHandle(g_tlMenuHandle);
     g_tlMenuKey->Limpiar();
-    g_tlMenuKey->Agregar("Transform", -1, -1, g_tlMenuKeyXf);
-    g_tlMenuKey->Agregar("Interpolation Mode", -1, -1, g_tlMenuKeyIn)->atajo = "T";
+    g_tlMenuKey->Agregar(T("Transform"), -1, -1, g_tlMenuKeyXf);
+    g_tlMenuKey->Agregar(T("Interpolation Mode"), -1, -1, g_tlMenuKeyIn)->atajo = "T";
     // los handles solo existen en CURVAS: en el dope sheet no hay nada que ajustar
-    if (modo == TL_MODO_CURVAS) g_tlMenuKey->Agregar("Handle Type", -1, -1, g_tlMenuHandle)->atajo = "V";
-    g_tlMenuKey->Agregar("Smart Euler", TL_KEY_SMARTEULER);
-    g_tlMenuKey->Agregar("Duplicate", TL_KEY_DUP)->atajo = "Shift D";
-    g_tlMenuKey->Agregar("Delete", TL_KEY_DEL)->atajo = "X";
+    if (modo == TL_MODO_CURVAS) g_tlMenuKey->Agregar(T("Handle Type"), -1, -1, g_tlMenuHandle)->atajo = "V";
+    g_tlMenuKey->Agregar(T("Smart Euler"), TL_KEY_SMARTEULER);
+    g_tlMenuKey->Agregar(T("Duplicate"), TL_KEY_DUP)->atajo = "Shift D";
+    g_tlMenuKey->Agregar(T("Delete"), TL_KEY_DEL)->atajo = "X";
     if (MenuAbierto && MenuAbierto != g_tlMenuKey) MenuAbierto->Cerrar();
     g_tlMenuKey->Abrir(mx, my, MenuPantallaW, MenuPantallaH);
     MenuAbierto = g_tlMenuKey;
@@ -2119,17 +2237,17 @@ void Timeline::AbrirMenuKey(int mx, int my){
 // menu Key y la 't'.
 void Timeline::ConstruirMenuInterp(PopupMenu* m){
     m->Limpiar();
-    m->Agregar("Constant", TL_KEY_INTERP0 + KfConstant);
-    m->Agregar("Linear",   TL_KEY_INTERP0 + KfLinear);
+    m->Agregar(T("Constant"), TL_KEY_INTERP0 + KfConstant);
+    m->Agregar(T("Linear"),   TL_KEY_INTERP0 + KfLinear);
     m->Agregar("Bezier",   TL_KEY_INTERP0 + KfBezier);
 }
 // menu Select del dope sheet (All / None / Invert)
 void Timeline::AbrirMenuSelect(int mx, int my){
     if (!g_tlMenuSel){
         g_tlMenuSel = new PopupMenu(); g_tlMenuSel->action = TL_menuSelAction;
-        g_tlMenuSel->Agregar("All", 0)->atajo = "A";
-        g_tlMenuSel->Agregar("None", 1)->atajo = "Alt A";
-        g_tlMenuSel->Agregar("Invert", 2)->atajo = "Ctrl I";
+        g_tlMenuSel->Agregar(T("All"), 0)->atajo = "A";
+        g_tlMenuSel->Agregar(T("None"), 1)->atajo = "Alt A";
+        g_tlMenuSel->Agregar(T("Invert"), 2)->atajo = "Ctrl I";
     }
     if (MenuAbierto && MenuAbierto != g_tlMenuSel) MenuAbierto->Cerrar();
     g_tlMenuSel->Abrir(mx, my, MenuPantallaW, MenuPantallaH);
@@ -2139,8 +2257,8 @@ void Timeline::AbrirMenuSelect(int mx, int my){
 void Timeline::AbrirMenuPivot(int mx, int my){
     if (!g_tlMenuPivot){
         g_tlMenuPivot = new PopupMenu(); g_tlMenuPivot->action = TL_menuPivotAction;
-        g_tlMenuPivot->Agregar("Center", 0);
-        g_tlMenuPivot->Agregar("Current Frame", 1);
+        g_tlMenuPivot->Agregar(T("Center"), 0);
+        g_tlMenuPivot->Agregar(T("Current Frame"), 1);
     }
     if (MenuAbierto && MenuAbierto != g_tlMenuPivot) MenuAbierto->Cerrar();
     g_tlMenuPivot->Abrir(mx, my, MenuPantallaW, MenuPantallaH);
@@ -2158,18 +2276,22 @@ void Timeline::AbrirMenuAnim(int mx, int my){
 // bool VIVO.
 void Timeline::AbrirMenuView(int mx, int my){
     if (!g_tlMenuView){
-        g_tlMenuView = new PopupMenu(); g_tlMenuView->action = TL_menuViewAction; 
+        // REGLA DE DISENO de los titulos: un menu que se abre desde algo SIN TEXTO (un icono, o un atajo de
+        // teclado) lleva titulo -- es lo unico que te dice que estas mirando. Si lo abre un boton/item que YA
+        // decia el texto, NO lleva: repetirlo es ruido. El boton View ahora es un icono -> titulo.
+        g_tlMenuView = new PopupMenu(); g_tlMenuView->titulo = T("View"); g_tlMenuView->action = TL_menuViewAction; 
     }
     g_tlMenuView->Limpiar();
-    g_tlMenuView->Agregar("Frame Selected", TL_VIEW_FRAMESEL)->atajo = "Num .";
-    g_tlMenuView->AgregarCheck("Auto frame", TL_VIEW_AUTOFRAME, &g_dopeAutoFrame);
+    g_tlMenuView->Agregar(T("Frame Selected"), TL_VIEW_FRAMESEL)->atajo = "Num .";
+    g_tlMenuView->AgregarCheck("Show Panel", TL_VIEW_PANEL, &g_dopePanelOn);
+    g_tlMenuView->AgregarCheck(T("Auto frame"), TL_VIEW_AUTOFRAME, &g_dopeAutoFrame);
     if (MenuAbierto && MenuAbierto != g_tlMenuView) MenuAbierto->Cerrar();
     g_tlMenuView->Abrir(mx, my, MenuPantallaW, MenuPantallaH);
     MenuAbierto = g_tlMenuView;
 }
 void Timeline::AbrirMenuInterp(int mx, int my){
     if (!g_tlMenuKeyIn){ g_tlMenuKeyIn = new PopupMenu(); g_tlMenuKeyIn->action = TL_menuKeyAction;
-                         g_tlMenuKeyIn->titulo = "Interpolation Mode"; }
+                         g_tlMenuKeyIn->titulo = T("Interpolation Mode"); }
     ConstruirMenuInterp(g_tlMenuKeyIn);
     if (MenuAbierto && MenuAbierto != g_tlMenuKeyIn) MenuAbierto->Cerrar();
     g_tlMenuKeyIn->Abrir(mx, my, MenuPantallaW, MenuPantallaH);
@@ -2179,16 +2301,16 @@ void Timeline::AbrirMenuInterp(int mx, int my){
 // Handle Type: como se portan los dos lados del handle. Lo comparten el submenu del menu Key y la 'v'.
 void Timeline::ConstruirMenuHandle(PopupMenu* m){
     m->Limpiar();
-    m->Agregar("Free", TL_KEY_HANDLE0 + HFree);
-    m->Agregar("Aligned", TL_KEY_HANDLE0 + HAligned);
-    m->Agregar("Vector", TL_KEY_HANDLE0 + HVector);
-    m->Agregar("Automatic", TL_KEY_HANDLE0 + HAuto);
-    m->Agregar("Auto Clamped", TL_KEY_HANDLE0 + HAutoClamped);
+    m->Agregar(T("Free"), TL_KEY_HANDLE0 + HFree);
+    m->Agregar(T("Aligned"), TL_KEY_HANDLE0 + HAligned);
+    m->Agregar(T("Vector"), TL_KEY_HANDLE0 + HVector);
+    m->Agregar(T("Automatic"), TL_KEY_HANDLE0 + HAuto);
+    m->Agregar(T("Auto Clamped"), TL_KEY_HANDLE0 + HAutoClamped);
 }
 void Timeline::AbrirMenuHandle(int mx, int my){
     if (!g_tlMenuHandle){
         g_tlMenuHandle = new PopupMenu(); g_tlMenuHandle->action = TL_menuKeyAction;
-        g_tlMenuHandle->titulo = "Set Keyframe Handle Type";
+        g_tlMenuHandle->titulo = T("Set Keyframe Handle Type");
     }
     ConstruirMenuHandle(g_tlMenuHandle);
     if (MenuAbierto && MenuAbierto != g_tlMenuHandle) MenuAbierto->Cerrar();
@@ -2229,7 +2351,6 @@ bool Timeline::ClickBarButton(int mx, int my){
 }
 
 void Timeline::button_left(){
-#ifndef W3D_SYMBIAN
     if (PopUpActive) return;
     int lx = lastMx - x, ly = lastMy - y;
     // moviendo keyframes ('g' tipeada): el click ACEPTA. (El arrastre DIRECTO no pasa por aca: lo confirma el
@@ -2246,7 +2367,6 @@ void Timeline::button_left(){
     // arrastre. El PAN/scroll del timeline es con el boton del MEDIO (ver event_mouse_motion). Antes el cuerpo paneaba
     // con el izquierdo y el frame recien saltaba al SOLTAR -> molesto.
     if (ly >= numY - GlobalScale*2){ scrubbing = true; panning = false; SetFrameFromX(lx); }
-#endif
 }
 void Timeline::event_mouse_motion(int mx, int my){
     if (PopUpActive){ lastMx=mx; lastMy=my; return; }
@@ -2316,17 +2436,16 @@ void Timeline::event_finger_gesture(float zoomDelta, float panDx, float panDy){
     if (zoomDelta > 1.0f) ZoomBy(1.1f, CentroTimeline()); else if (zoomDelta < -1.0f) ZoomBy(1.0f/1.1f, CentroTimeline());
     if (panDx != 0.0f) PanFrames(-panDx / (pxPerFrame>0.01f?pxPerFrame:0.01f));
 }
-#ifndef W3D_SYMBIAN
-void Timeline::event_mouse_wheel(SDL_Event &e){
+void Timeline::event_mouse_wheel(float dy, int mx, int my){
     if (PopUpActive) return;
-    { int mx,my; SDL_GetMouseState(&mx,&my); if (BarScrollHorizontal(mx,my,(int)(e.wheel.y*40))) return; }
+    { if (BarScrollHorizontal(mx,my,(int)(dy*40))) return; }
     // La RUEDA SIEMPRE hace ZOOM en el timeline (desde el CENTRO exacto), NUNCA scrollea. Para scrollear/panear
     // se usa el BOTON DEL MEDIO: horizontal = frames, vertical = filas (dope) / valor (curvas).
     // En CURVAS el zoom tiene DOS EJES independientes -> no es un zoom parejo como en el resto del editor:
     //   rueda        = los dos ejes (mantiene la proporcion actual)
     //   Ctrl+rueda   = SOLO el tiempo (X)     Shift+rueda = SOLO el valor (Y)
     // Estirar un solo eje es lo que permite ver bien una curva chata o una de valores enormes.
-    float f = (e.wheel.y>0) ? 1.1f : 1.0f/1.1f;
+    float f = (dy>0) ? 1.1f : 1.0f/1.1f;
     if (modo == TL_MODO_CURVAS){
         if (LShiftPressed){ ZoomVBy(f); return; }
         if (LCtrlPressed) { ZoomBy(f, CentroTimeline()); return; }
@@ -2334,8 +2453,8 @@ void Timeline::event_mouse_wheel(SDL_Event &e){
     }
     ZoomBy(f, CentroTimeline());
 }
-void Timeline::mouse_button_up(SDL_Event &e){
-    (void)e;
+void Timeline::mouse_button_up(int boton){
+    (void)boton;
     // el frame YA se fijo en el DOWN + el arrastre (scrub); al soltar solo se limpia el estado.
     if (g_hOn) HandleSoltar();   // soltar el handle CIERRA su undo (curvar el tramo = 1 comando de Ctrl+Z)
     // ARRASTRE DIRECTO: soltar CONFIRMA (arrastrar y soltar es un gesto completo). Si nunca se movio, el
@@ -2348,60 +2467,59 @@ void Timeline::mouse_button_up(SDL_Event &e){
 // Si se suelta sin haber tocado ninguna flecha, fue un TOQUE: Frame Selected (el equivalente al numpad '.' de PC).
 static bool g_tlCeroDown = false, g_tlCeroUsado = false;
 
-void Timeline::event_key_up(SDL_Event &e){
-    SDL_Keycode k = e.key.keysym.sym;
-    if (k==SDLK_0 || k==SDLK_KP_0){
+void Timeline::event_key_up(int tecla){
+    const int k = tecla;
+    if (k==W3dK_0 || k==W3dK_KP_0){
         if (g_tlCeroDown && !g_tlCeroUsado) DopeFrameSelected(); // toque limpio: encuadra
         g_tlCeroDown = false; g_tlCeroUsado = false;
     }
 }
-void Timeline::event_key_down(SDL_Event &e){
+void Timeline::event_key_down(int tecla, bool repeticion){
     if (PopUpActive || g_textFieldActivo) return;
-    SDL_Keycode k = e.key.keysym.sym;
+    const int k = tecla;
     // ---- DOPE SHEET (solo si hay filas) ----
     if (g_dopeMov){ // transformando keyframes: Enter acepta, Esc cancela. El valor numerico lo alimenta
-        if (k==SDLK_RETURN || k==SDLK_KP_ENTER){ DopeMoveConfirm(); return; }  // DopeNumInputChar (SDL_TEXTINPUT en
-        if (k==SDLK_ESCAPE){ DopeMoveCancel(); return; }                       // PC, keypad en Symbian), igual que el 3D
+        if (k==W3dK_RETURN || k==W3dK_KP_ENTER){ DopeMoveConfirm(); return; }  // DopeNumInputChar (SDL_TEXTINPUT en
+        if (k==W3dK_ESCAPE){ DopeMoveCancel(); return; }                       // PC, keypad en Symbian), igual que el 3D
         // X / Y: limitan el transform a un eje (solo en curvas, que es donde hay dos)
-        if (k==SDLK_x){ DopeCiclarEje(DOPE_EJE_X); return; }
-        if (k==SDLK_y){ DopeCiclarEje(DOPE_EJE_Y); return; }
+        if (k==W3dK_X){ DopeCiclarEje(DOPE_EJE_X); return; }
+        if (k==W3dK_Y){ DopeCiclarEje(DOPE_EJE_Y); return; }
         return; // durante el transform no pasan los atajos de abajo
     }
     // ---- CERO MANTENIDO + FLECHAS = ZOOM (el camino de Symbian, que no tiene rueda ni boton del medio).
     //      Es el equivalente del Shift + arrastrar con el boton del medio de PC: izq/der estira el TIEMPO,
     //      arriba/abajo estira el VALOR. Un toque de cero SIN flechas = Frame Selected.
     if (g_tlCeroDown){
-        if (k==SDLK_LEFT) { ZoomBy(1.0f/1.15f, CentroTimeline()); g_tlCeroUsado = true; return; }
-        if (k==SDLK_RIGHT){ ZoomBy(1.15f, CentroTimeline());      g_tlCeroUsado = true; return; }
+        if (k==W3dK_LEFT) { ZoomBy(1.0f/1.15f, CentroTimeline()); g_tlCeroUsado = true; return; }
+        if (k==W3dK_RIGHT){ ZoomBy(1.15f, CentroTimeline());      g_tlCeroUsado = true; return; }
         if (modo == TL_MODO_CURVAS){
-            if (k==SDLK_UP)  { ZoomVBy(1.15f);      g_tlCeroUsado = true; return; }
-            if (k==SDLK_DOWN){ ZoomVBy(1.0f/1.15f); g_tlCeroUsado = true; return; }
+            if (k==W3dK_UP)  { ZoomVBy(1.15f);      g_tlCeroUsado = true; return; }
+            if (k==W3dK_DOWN){ ZoomVBy(1.0f/1.15f); g_tlCeroUsado = true; return; }
         }
     }
-    if (k==SDLK_0 || k==SDLK_KP_0){ g_tlCeroDown = true; g_tlCeroUsado = false; return; } // Symbian: se define al soltar
+    if (k==W3dK_0 || k==W3dK_KP_0){ g_tlCeroDown = true; g_tlCeroUsado = false; return; } // Symbian: se define al soltar
     // numpad '.' = Frame Selected, igual que en el viewport 3D (ahi enfoca el objeto; aca encuadra los keyframes)
-    if (k==SDLK_KP_PERIOD){ DopeFrameSelected(); return; }
+    if (k==W3dK_KP_PERIOD){ DopeFrameSelected(); return; }
     if (!dopeRows.empty()){
-        if (k==SDLK_a && LAltPressed){ DopeSelectNone(); return; }    // Alt+A: deseleccionar todo
-        if (k==SDLK_a)               { DopeSelectAll();  return; }    // A: seleccionar todos los keyframes
-        if (k==SDLK_i && LCtrlPressed){ DopeSelectInvert(); return; } // Ctrl+I: invertir
-        if (k==SDLK_d && LShiftPressed){ DopeDuplicarSeleccion(); return; } // Shift+D: DUPLICAR (y agarrar)
-        if (k==SDLK_x)               { DopeBorrarSeleccion(); return; } // X: borrar keyframes/filas seleccionadas
-        if (k==SDLK_g)               { DopeMoveStart(DOPE_MOV); return; } // G: MOVER
-        if (k==SDLK_s)               { DopeMoveStart(DOPE_ESC); return; } // S: ESCALAR desde el pivote
+        if (k==W3dK_A && LAltPressed){ DopeSelectNone(); return; }    // Alt+A: deseleccionar todo
+        if (k==W3dK_A)               { DopeSelectAll();  return; }    // A: seleccionar todos los keyframes
+        if (k==W3dK_I && LCtrlPressed){ DopeSelectInvert(); return; } // Ctrl+I: invertir
+        if (k==W3dK_D && LShiftPressed){ DopeDuplicarSeleccion(); return; } // Shift+D: DUPLICAR (y agarrar)
+        if (k==W3dK_X)               { DopeBorrarSeleccion(); return; } // X: borrar keyframes/filas seleccionadas
+        if (k==W3dK_G)               { DopeMoveStart(DOPE_MOV); return; } // G: MOVER
+        if (k==W3dK_S)               { DopeMoveStart(DOPE_ESC); return; } // S: ESCALAR desde el pivote
         // R: ROTAR. Solo en CURVAS: en el dope sheet hay un solo eje (el tiempo) y girar no significa nada.
-        if (k==SDLK_r && modo==TL_MODO_CURVAS){ DopeMoveStart(DOPE_ROT); return; }
+        if (k==W3dK_R && modo==TL_MODO_CURVAS){ DopeMoveStart(DOPE_ROT); return; }
         // T: Interpolation Mode (el mismo submenu del menu Key). Se abre EN EL CURSOR, como los menus del 3D.
-        if (k==SDLK_t){ AbrirMenuInterp(lastMx, lastMy); return; }
+        if (k==W3dK_T){ AbrirMenuInterp(lastMx, lastMy); return; }
         // V: Handle Type. Solo en CURVAS: los handles solo existen ahi.
-        if (k==SDLK_v && modo==TL_MODO_CURVAS){ AbrirMenuHandle(lastMx, lastMy); return; }
+        if (k==W3dK_V && modo==TL_MODO_CURVAS){ AbrirMenuHandle(lastMx, lastMy); return; }
     }
-    if (k==SDLK_SPACE) { TogglePlay(+1); return; }
-    if (k==SDLK_LEFT)  { StepFrame(-1); return; }
-    if (k==SDLK_RIGHT) { StepFrame(+1); return; }
-    if (k==SDLK_UP)    { StepKeyframe(+1); return; }
-    if (k==SDLK_DOWN)  { StepKeyframe(-1); return; }
-    if (k==SDLK_HOME)  { GotoStart(); return; }
-    if (k==SDLK_END)   { GotoEnd(); return; }
+    if (k==W3dK_SPACE) { TogglePlay(+1); return; }
+    if (k==W3dK_LEFT)  { StepFrame(-1); return; }
+    if (k==W3dK_RIGHT) { StepFrame(+1); return; }
+    if (k==W3dK_UP)    { StepKeyframe(+1); return; }
+    if (k==W3dK_DOWN)  { StepKeyframe(-1); return; }
+    if (k==W3dK_HOME)  { GotoStart(); return; }
+    if (k==W3dK_END)   { GotoEnd(); return; }
 }
-#endif

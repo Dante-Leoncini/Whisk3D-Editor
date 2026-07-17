@@ -68,6 +68,18 @@ TBool W3dLayoutUVNav(TInt aDx, TInt aDy, TBool aZoom);
 TBool W3dLayoutUVActivo(); // query: el viewport activo es el editor UV
 // Timeline activo: flecha MANTENIDA = scrub (izq/der); 0 + arriba/abajo = zoom; * + flechas = paneo. ETrue si lo manejo.
 TBool W3dLayoutTimelineNav(TInt aDx, TInt aDy, TBool aZoom, TBool aPan);
+
+// ---- ruteo por VIEWPORT ACTIVO (el mismo de PC; ver main/ViewPorts/W3dInput.h) ----
+TInt  W3dTeclaDesdeSymbian(TInt aScanCode);      // scan del telefono -> tecla propia del editor
+TBool W3dLayoutTeclaViewport(TInt aScanCode);    // tecla -> viewport ACTIVO
+TBool W3dLayoutTeclaViewportDirecta(TInt aTecla); // idem, con la tecla ya traducida (el keypad tipea g/r/s)
+TBool W3dLayoutTeclaViewportUp(TInt aScanCode);
+TBool W3dVistaCuadranteNav(TInt aDx, TInt aDy);  // # + flechas: encuadra/gira por cuadrante (el numpad que no hay)
+TBool W3dVistaPerspectivaToggle();               // # solo: ortografica <-> perspectiva
+TBool W3dLayoutLockOrbit();                      // 9: bloquear/desbloquear el orbital (arrastrar panea)
+
+TBool W3dLayoutClickViewport(TInt aX, TInt aY);  // "ok" del cursor virtual = click de verdad (down)
+TBool W3dLayoutSoltarViewport(TInt aX, TInt aY); // ...y su up (cierra arrastres)
 TBool W3dLayoutTimelineActivo(); // query: el viewport activo es el Timeline
 
 // keypad SIN mouse: rutea flecha/OK al viewport ACTIVO (propiedades/outliner).
