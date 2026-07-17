@@ -88,3 +88,17 @@ platform/windows/build/
 
 .vscode/
 .settings/
+
+# volcados de depuracion (posiciones de vertices / esqueleto por frame). Son salida de las herramientas de debug
+# del importador: no son parte del proyecto y no tienen que volver a entrar por un "git add ." distraido.
+die_f*.txt
+gw_f*.txt
+skel_f*.txt
+w_f*.txt
+wf*.txt
+wchk.txt
+tmp.txt
+g_tmp.txt
+n_tmp.txt
+u.txt
+whisk3d.log
