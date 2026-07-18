@@ -693,6 +693,13 @@ void LayoutRipEdit() {
     g_redraw = true;
 }
 
+// Separate (P en Edit Mode / menu Mesh > Separate): mueve las caras seleccionadas a un mesh NUEVO
+// (misma transform + materiales + vertex groups) y las borra del actual. Como Blender P > Selection.
+void LayoutSepararEdit() {
+    if (InteractionMode != EditMode || !g_editMesh) return;
+    if (SepararSeleccionEdit((Mesh*)g_editMesh)) g_redraw = true;
+}
+
 // F = "New Edge/Face from Vertices" (menu Vertex): conecta los verts seleccionados.
 void LayoutNewFaceEdit() {
     if (InteractionMode != EditMode || !g_editMesh) return;
@@ -876,6 +883,7 @@ void LayoutAccionObject(int aId) {
         case 300: LayoutExtrudeFaces(); break; // Extrude (segun el modo) (E)
         case 310: LayoutNewFaceEdit(); break;  // Vertex > New Edge/Face from Vertices (F)
         case 314: LayoutDuplicarEdit(); break; // Duplicate (Shift D)
+        case 316: LayoutSepararEdit();  break; // Separate (P): caras selec -> mesh nuevo
         case 341: LayoutRipEdit();      break; // Rip (V): separa la malla por la seleccion
         // Delete: los items del submenu/atajo-X despachan por ESTA accion (el menu top es el de contexto, no gMenuDelete)
         case 361: case 362: case 363: case 364: AccionDelete(aId); break; // Vertices/Edges/Faces/Edge Loops

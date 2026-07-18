@@ -150,6 +150,7 @@ void LayoutShrinkFatten(); // Alt+S: mueve cada vertice sel por SU normal (Shrin
 bool EditShrinkActivo();   // el transform en curso es un Shrink/Fatten (reusa EditScale)
 void LayoutDuplicarEdit(); // Shift+D en edit: duplica la seleccion + move libre
 void LayoutRipEdit();      // V en edit: separa la malla a lo largo de la seleccion
+void LayoutSepararEdit();  // P en edit: mueve las caras seleccionadas a un mesh NUEVO (Separate)
 void LayoutNewFaceEdit();  // F: crea arista/cara desde los verts seleccionados
 void LayoutShade(bool smooth); // Face > Shade Smooth/Flat (redondea/aplana)
 void LayoutRecalcNormales();   // Recalculate Normals (re-orienta hacia afuera + panel Inside)

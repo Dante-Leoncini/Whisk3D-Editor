@@ -7,7 +7,7 @@
 // ============================================================================
 #include "variables.h"
 #include "W3dLang.h"
-#include "w3dFileSystem.h"
+#include "w3dFilesystem.h"
 #include <stdio.h>
 #include <string>
 

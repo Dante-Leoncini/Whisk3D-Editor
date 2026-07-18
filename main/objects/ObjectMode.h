@@ -46,6 +46,9 @@ void guardarEstadoRec(Object* obj);
 bool guardarEstado();
 void SetPosicion();
 void DuplicatedObject();
+// Separate (Edit Mode: P / menu Mesh > Separate): mueve las caras SELECCIONADAS a un mesh NUEVO (misma
+// transform + materiales + vertex groups + modificadores) y las borra del actual. true si separo algo.
+bool SepararSeleccionEdit(Mesh* m);
 void NewInstance();
 // Join (Ctrl+J, menu Object): une las mallas seleccionadas dentro del objeto ACTIVO (conserva su transform).
 void JoinObjetos();

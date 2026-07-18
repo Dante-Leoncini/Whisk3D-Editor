@@ -573,9 +573,10 @@ bool ImportGLTF(const std::string& filepath) {
             std::vector<uint32_t> IDX; { int a = pr.getI("indices", -1); if (a >= 0) doc.readIndices(a, IDX); }
             if (IDX.empty()) { IDX.resize(pc); for (int i = 0; i < pc; i++) IDX[i] = i; } // sin indices: secuencial
 
-            // control-points de esta primitiva -> Wobj.vertex (Y-up; skinned = espacio escena)
+            // control-points de esta primitiva -> Wobj.vertex. Estatica: se dejan en LOCAL (el objeto lleva el
+            // transform del nodo, ver abajo) para que cada objeto tenga su ORIGEN propio -como en Blender- y se
+            // pueda rotar desde su centro. Skinned: espacio escena crudo (lo ubica el armature).
             for (int i = 0; i < pc; i++) { Vector3 v(POS[(size_t)i*pnc], POS[(size_t)i*pnc+1], POS[(size_t)i*pnc+2]);
-                if (!skinned) v = MatXform(globalM[nd], v); // malla estatica: aplicar el transform del nodo
                 Wobj.vertex.push_back(v.x); Wobj.vertex.push_back(v.y); Wobj.vertex.push_back(v.z); }
 
             // pesos por control-point (skinned): joint LOCAL de la primitiva -> hueso global
@@ -618,6 +619,22 @@ bool ImportGLTF(const std::string& filepath) {
         Object* parentMesh = arm ? (Object*)arm : collection;
         Mesh* mesh = new Mesh(parentMesh, Vector3(0, 0, 0));
         mesh->name = nom;
+        // malla estatica: el objeto se queda con su PROPIO origen = el transform del nodo (pos/rot/escala del
+        // mundo). Los vertices ya quedaron en LOCAL (relativos a ese origen). Descompongo globalM sin pasar por
+        // euler (FromMatrix es exacto y evita la duda grados/radianes). Skinned: origen en (0,0,0).
+        if (!skinned) {
+            const Matrix4& W = globalM[nd];
+            float sx = sqrtf(W.m[0]*W.m[0] + W.m[1]*W.m[1] + W.m[2]*W.m[2]);
+            float sy = sqrtf(W.m[4]*W.m[4] + W.m[5]*W.m[5] + W.m[6]*W.m[6]);
+            float sz = sqrtf(W.m[8]*W.m[8] + W.m[9]*W.m[9] + W.m[10]*W.m[10]);
+            Matrix4 Rot; Rot.Identity();
+            if (sx > 1e-8f) { Rot.m[0] = W.m[0]/sx; Rot.m[1] = W.m[1]/sx; Rot.m[2] = W.m[2]/sx; }
+            if (sy > 1e-8f) { Rot.m[4] = W.m[4]/sy; Rot.m[5] = W.m[5]/sy; Rot.m[6] = W.m[6]/sy; }
+            if (sz > 1e-8f) { Rot.m[8] = W.m[8]/sz; Rot.m[9] = W.m[9]/sz; Rot.m[10] = W.m[10]/sz; }
+            mesh->pos = Vector3(W.m[12], W.m[13], W.m[14]);
+            mesh->scale = Vector3(sx ? sx : 1.0f, sy ? sy : 1.0f, sz ? sz : 1.0f);
+            mesh->rot = Quaternion::FromMatrix(Rot); mesh->rot.normalize(); mesh->ActualizarDisplayRot();
+        }
         int a0 = 0, a1 = 0, a2 = 0;
         Wobj.ConvertToES1(mesh, &a0, &a1, &a2, &mesh->vertCtrlPoint);
         mesh->CalcularBordes();

@@ -3955,6 +3955,9 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
     if (cmd == "partassign") { Mesh* m = ScriptActiveMesh(); if(!m){err="no hay malla activa";return false;} int idx=-1; ss>>idx; m->AsignarFacesAMeshPart(idx); return true; }
     // ---- partmove <idx> <up|down> : reordena el mesh part idx (orden de dibujado) ----
     if (cmd == "partmove") { Mesh* m = ScriptActiveMesh(); if(!m){err="no hay malla activa";return false;} int idx=-1; std::string d; ss>>idx>>d; MoverMeshPart(m, idx, d=="up"?-1:1); return true; }
+    // ---- separate : Separate (P) -> mueve las caras SELECCIONADAS (edit) a un mesh NUEVO ----
+    if (cmd == "separate") { Mesh* m = ScriptActiveMesh(); if(!m){err="no hay malla activa";return false;}
+        extern bool SepararSeleccionEdit(Mesh*); if(!SepararSeleccionEdit(m)){err="separate: nada que separar (seleccion vacia o total)";return false;} return true; }
     // ---- partcount : imprime la cantidad de mesh parts + los rangos de dibujado (start/count por parte) ----
     if (cmd == "partcount") {
         Mesh* m = ScriptActiveMesh(); if(!m){err="no hay malla activa";return false;}

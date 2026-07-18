@@ -219,6 +219,7 @@ Viewport3D::Viewport3D(Vector3 pos){
         MenuMesh->titulo = T("Mesh");
         MenuMesh->Agregar(T("Transform"), 0, -1, MenuTransformEdit);        // arriba de todo (Move/Rotate/Scale/Shrink)
         MenuMesh->Agregar(T("Duplicate"), 314)->atajo = "Shift D";          // comun a vertice/borde/cara
+        MenuMesh->Agregar(T("Separate"), 316)->atajo = "P";                 // caras selec -> mesh NUEVO
         MenuMesh->Agregar(T("Merge"), 0, -1, LayoutSubmenuMerge())->atajo = "M"; // suelda verts (limpia duplicados)
         // Auto Merge (opt-in, OFF por defecto): al confirmar un move suelda los verts movidos con los que queden
         // a <= Threshold. Con el auto merge apagado, "Threshold" se ve en gris (->gris = &g_autoMerge).
@@ -2823,6 +2824,11 @@ void Viewport3D::event_key_down(int tecla, bool repeticion){
                 // Edit Mode: RIP -> separa la malla a lo largo de la seleccion (loop de bordes / verts / caras)
                 if (estado == editNavegacion && InteractionMode == EditMode && g_editMesh)
                     LayoutRipEdit();
+                break;
+            case W3dK_P:
+                // Edit Mode: SEPARATE -> mueve las caras seleccionadas a un mesh NUEVO (como Blender P > Selection)
+                if (estado == editNavegacion && InteractionMode == EditMode && g_editMesh)
+                    LayoutSepararEdit();
                 break;
             case W3dK_W:
                 // Edit Mode: menu Mark/Clear Sharp en el cursor (bordes filosos)

@@ -3446,4 +3446,8 @@ void Mesh::ReagruparMeshParts() {
     facesSize=(int)tris.size(); delete[] faces; faces=new MeshIndex[facesSize>0?facesSize:1];
     for (int i=0;i<facesSize;i++) faces[i]=tris[i];
     OptimizarCacheRender(); // reordena los triangulos de cada mesh part para el cache de vertices (no cambia la geometria)
+    // el index buffer (faces[]) cambio de agrupamiento -> invalidar el VBO de indices: sino en OBJECT MODE (que
+    // dibuja del vboIdx) queda el agrupamiento VIEJO y la reasignacion de mesh part "no se veia" (se veia en Edit,
+    // que no usa VBO). Bumpear skinGeomVersion fuerza el re-SubirVBO en el proximo draw.
+    skinGeomVersion++;
 }

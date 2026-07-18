@@ -6,6 +6,7 @@
 #include "Undo.h"      // Ctrl+Z: capturar transform / limpiar al borrar
 #include "ViewPorts/LayoutInput.h" // SNAP en modo objeto (SnapBuscarTarget, g_snap, enums)
 #include "edit/Modifier.h" // deep-copy de modificadores al duplicar
+#include "edit/MeshEdit.h" // Separate: CompactarCapas (cirugia del mesh nuevo)
 #include "objects/Armature.h" // Apply Transform sobre armature: hornear en los huesos
 #include "animation/SkeletalAnimation.h" // HornearTransformEnHuesos
 
@@ -641,6 +642,71 @@ void DuplicatedObject(){
 }
 
 void Notificar(const std::string& msg, bool error); // LayoutInput.cpp (toasts); forward-decl (no incluir el header)
+
+// ====================== SEPARATE (Edit Mode: P / menu Mesh > Separate) ======================
+// Mueve las caras SELECCIONADAS a un mesh NUEVO (misma pos/rot/escala, materiales, vertex groups, modificadores)
+// y las borra del mesh actual. Como Blender (P > Selection). Seguimos editando el original. true si separo algo.
+bool SepararSeleccionEdit(Mesh* m) {
+    if (!m) return false;
+    m->EnsureEdit();
+    if (!m->edit) return false;
+
+    // caras3d SELECCIONADAS (leidas del edit mesh, modo cara) ANTES de crear el clon: su ctor llama
+    // DeseleccionarTodo() y en Edit Mode eso limpia la seleccion de caras de 'm' -> hay que guardarla aca.
+    std::vector<char> sel3d(m->faces3d.size(), 0);
+    int nSel = 0;
+    { EditMesh* e = m->edit;
+      for (size_t f = 0; f < e->faceSel.size(); f++)
+        if (e->faceSel[f] && f < e->faceSrc.size()) {
+            int f3 = e->faceSrc[f];
+            if (f3 >= 0 && f3 < (int)m->faces3d.size() && !sel3d[f3]) { sel3d[f3] = 1; nSel++; }
+        } }
+    if (nSel == 0)                      { Notificar(T("Separate: no faces selected"), true);      return false; }
+    if (nSel == (int)m->faces3d.size()) { Notificar(T("Separate: select only some faces"), true); return false; }
+
+    // 1) clon COMPLETO (geometria + transform + materiales + vertex groups + modificadores; queda parented al
+    //    mismo padre). El ctor lo deja seleccionado a nivel objeto y limpia la sub-seleccion de 'm' (ver arriba).
+    Mesh* nuevo = (Mesh*)W3dDuplicarUno(m);
+    if (!nuevo) return false;
+
+    // 2) NUEVO: quedarse SOLO con las caras seleccionadas. NO se puede con BorrarSeleccionEdit (su seleccion es
+    //    por POSICION: borrar las NO-seleccionadas cubre todas las esquinas del cubo y se lleva tambien las
+    //    seleccionadas). Cirugia directa igual que las ops de MeshEdit: nf3d con las caras sel3d + survCorner
+    //    (corners viejos, para conservar UV/color/vertex-groups) -> CompactarCapas + GenerarRender (remapea y
+    //    DESCARTA los verts sin referencia).
+    nuevo->PoblarCapas();
+    { std::vector<MeshFace> nf3d; std::vector<int> survCorner; int L = 0;
+      for (size_t f = 0; f < nuevo->faces3d.size(); f++) {
+          int nc = (int)nuevo->faces3d[f].idx.size();
+          if (f < sel3d.size() && sel3d[f]) {
+              nf3d.push_back(nuevo->faces3d[f]);            // idx viejos; GenerarRender los remapea
+              for (int c = 0; c < nc; c++) survCorner.push_back(L + c);
+          }
+          L += nc;
+      }
+      nuevo->faces3d.swap(nf3d);
+      CompactarCapas(nuevo, survCorner);
+      nuevo->GenerarRender();
+    }
+
+    // 3) ORIGINAL: borrar las caras SELECCIONADAS (borrar el conjunto CHICO es seguro). Re-seleccionar desde
+    //    sel3d por si el ctor del clon limpio la sub-seleccion en Edit Mode.
+    int modoPrev = EditSelectMode; EditSelectMode = SelFace; // BorrarSeleccionEdit lee la seleccion del modo actual
+    m->EnsureEdit();
+    if (m->edit) {
+        EditMesh* e = m->edit;
+        e->faceSel.assign(e->faces.size(), 0);
+        for (size_t f = 0; f < e->faces.size(); f++)
+            if (f < e->faceSrc.size()) { int f3 = e->faceSrc[f];
+                if (f3 >= 0 && f3 < (int)m->faces3d.size() && sel3d[f3]) e->faceSel[f] = 1; }
+        m->BorrarSeleccionEdit(SelFace);
+    }
+    EditSelectMode = modoPrev;
+
+    ObjActivo = m; // seguimos editando el ORIGINAL (g_editMesh sigue siendo m)
+    Notificar(T("Separate: new mesh created"), false);
+    return true;
+}
 
 // invierte una matriz AFIN 4x4 (columna-major: m[col*4+fila]; m[12..14]=traslacion; fila inferior [0,0,0,1]).
 // Invierte la parte lineal 3x3 (adjugada/det) y la traslacion (-Ainv*t). false si es singular (escala 0).

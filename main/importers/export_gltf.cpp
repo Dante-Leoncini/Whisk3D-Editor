@@ -271,8 +271,9 @@ bool ExportGLTF(const std::string& filepath, bool selectedOnly, bool binary) {
         // POSITION (bind pose). Skinned: espacio escena crudo (matchea skinInvBind). Estatica: a mundo.
         std::vector<float> POS((size_t)nV * 3);
         for (int i = 0; i < nV; i++) {
+            // POSITION en LOCAL (estatica y skinned): la estatica lleva su transform en el NODO (abajo) -> se
+            // respeta el origen/posicion de cada objeto. Antes la estatica se horneaba a mundo con nodo identidad.
             Vector3 p(m->vertex[i*3], m->vertex[i*3+1], m->vertex[i*3+2]);
-            if (!skinned) p = m->LocalAMundo(p);
             POS[(size_t)i*3] = p.x; POS[(size_t)i*3+1] = p.y; POS[(size_t)i*3+2] = p.z;
         }
         int posAcc = buf.addFloats(POS, 3, "VEC3", 34962, true);
@@ -280,7 +281,7 @@ bool ExportGLTF(const std::string& filepath, bool selectedOnly, bool binary) {
         int nrmAcc = -1;
         if (m->normals) { std::vector<float> NRM((size_t)nV * 3);
             for (int i = 0; i < nV; i++) { Vector3 n(m->normals[i*3]/127.0f, m->normals[i*3+1]/127.0f, m->normals[i*3+2]/127.0f);
-                if (!skinned) n = RotGlobalDe(m) * n;
+                // normales en LOCAL (el nodo lleva la rotacion del objeto); antes la estatica las rotaba a mundo.
                 float L = sqrtf(n.x*n.x+n.y*n.y+n.z*n.z); if (L > 1e-6f) n = n * (1.0f/L);
                 NRM[(size_t)i*3] = n.x; NRM[(size_t)i*3+1] = n.y; NRM[(size_t)i*3+2] = n.z; }
             nrmAcc = buf.addFloats(NRM, 3, "VEC3", 34962, false); }
@@ -347,9 +348,17 @@ bool ExportGLTF(const std::string& filepath, bool selectedOnly, bool binary) {
         int meshId = (int)meshesJson.size();
         meshesJson.push_back("{\"name\":\"" + Jesc(m->name.empty() ? std::string("Mesh") : m->name) + "\",\"primitives\":[" + JoinArr(prims) + "]}");
 
-        // nodo de la malla (identidad; skinned -> ignora transform y usa el skin 0)
+        // nodo de la malla. Skinned: identidad + skin 0 (el armature deforma). Estatica: lleva el transform del
+        // objeto (translation/rotation/scale del MUNDO) para respetar su origen/posicion; la POSITION va en LOCAL.
         std::string node = "{\"name\":\"" + Jesc(m->name.empty() ? std::string("Mesh") : m->name) + "\",\"mesh\":" + Itos(meshId);
-        if (skinned && jntAcc >= 0) node += ",\"skin\":0";
+        if (skinned && jntAcc >= 0) { node += ",\"skin\":0"; }
+        else {
+            Matrix4 W; m->GetWorldMatrix(W);
+            Vector3 T, S; float qx, qy, qz, qw; DescomponerTRSQuat(W, T, qx, qy, qz, qw, S);
+            node += ",\"translation\":[" + Ftos(T.x) + "," + Ftos(T.y) + "," + Ftos(T.z) + "]";
+            node += ",\"rotation\":["    + Ftos(qx)  + "," + Ftos(qy)  + "," + Ftos(qz) + "," + Ftos(qw) + "]";
+            node += ",\"scale\":["       + Ftos(S.x) + "," + Ftos(S.y) + "," + Ftos(S.z) + "]";
+        }
         node += "}";
         sceneMeshNodes.push_back((int)nodesJson.size());
         nodesJson.push_back(node);
