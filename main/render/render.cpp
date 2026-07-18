@@ -167,14 +167,6 @@ static MeshOverlayHookReg g_meshOverlayHookReg;
 
 // Definiciones de funciones
 
-void DrawnLines(int LineWidth, int cantidad, GLshort* vertexlines, GLushort* lineasIndices){
-    W3dDrawLinesS(LineWidth, cantidad, vertexlines, lineasIndices);
-}
-
-void DrawnLines(int LineWidth, int cantidad, const GLshort* vertexlines, const GLushort* lineasIndices) {
-    W3dDrawLinesS(LineWidth, cantidad, vertexlines, lineasIndices);
-}
-
 void RenderLinkLines(Object* obj){
     // espacio MUNDO con GetGlobalPosition (el viejo trasladaba (x,z,y)
     // sin la rotacion del padre: la linea quedaba mal al emparentar)
@@ -422,8 +414,4 @@ void RenderIcons3D(){
     w3dEngine::PointSpriteCoordReplace(false);
     w3dEngine::Disable(w3dEngine::PointSprite);
     w3dEngine::DepthMask(true);
-}
-
-void RenderVK(){
-    // por implementar
 }

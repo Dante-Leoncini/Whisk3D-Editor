@@ -101,11 +101,9 @@ void WithBorder::DibujarBordes(ViewportBase* current) {
     if (!Textures.empty() && Textures[0]) w3dEngine::BindTexture(Textures[0]->iID);
 
     if (current == viewPortActive)
-        w3dEngine::Color4f(ListaColores[static_cast<int>(ColorID::accent)][0], ListaColores[static_cast<int>(ColorID::accent)][1],
-                  ListaColores[static_cast<int>(ColorID::accent)][2], ListaColores[static_cast<int>(ColorID::accent)][3]);
+        w3dEngine::Color4fv(ListaColores[static_cast<int>(ColorID::accent)]);
     else
-        w3dEngine::Color4f(ListaColores[static_cast<int>(ColorID::negro)][0], ListaColores[static_cast<int>(ColorID::negro)][1],
-                  ListaColores[static_cast<int>(ColorID::negro)][2], ListaColores[static_cast<int>(ColorID::negro)][3]);
+        w3dEngine::Color4fv(ListaColores[static_cast<int>(ColorID::negro)]);
 
     w3dEngine::TexCoordPointer2f(0, bourderUV);
     w3dEngine::VertexPointer2s(0, borderMesh);

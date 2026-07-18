@@ -237,19 +237,16 @@ void Scrollable::DibujarScrollbar(ViewportBase* current){
             uvSel = ScrollbarBigUV;
             meshSel = scrollVerticalBigMesh;
             if (ViewPortClickDown && mouseOverScrollYpress){
-                w3dEngine::Color4f(ListaColores[static_cast<int>(ColorID::accent)][0], ListaColores[static_cast<int>(ColorID::accent)][1],
-                        ListaColores[static_cast<int>(ColorID::accent)][2], ListaColores[static_cast<int>(ColorID::accent)][3]);
+                w3dEngine::Color4fv(ListaColores[static_cast<int>(ColorID::accent)]);
             }
             else {
-                w3dEngine::Color4f(ListaColores[static_cast<int>(ColorID::blanco)][0], ListaColores[static_cast<int>(ColorID::blanco)][1],
-                        ListaColores[static_cast<int>(ColorID::blanco)][2], ListaColores[static_cast<int>(ColorID::blanco)][3]);
+                w3dEngine::Color4fv(ListaColores[static_cast<int>(ColorID::blanco)]);
             }
         }
         else {
             uvSel = ScrollbarUV;
             meshSel = scrollVerticalMesh;
-            w3dEngine::Color4f(ListaColores[static_cast<int>(ColorID::grisUI)][0], ListaColores[static_cast<int>(ColorID::grisUI)][1],
-                    ListaColores[static_cast<int>(ColorID::grisUI)][2], ListaColores[static_cast<int>(ColorID::grisUI)][3]);
+            w3dEngine::Color4fv(ListaColores[static_cast<int>(ColorID::grisUI)]);
         }
 
         W3dDrawElemsB(meshSel, uvSel, indicesScrollbar, 18);
@@ -265,19 +262,16 @@ void Scrollable::DibujarScrollbar(ViewportBase* current){
             uvSel = ScrollbarBigUV;
             meshSel = scrollHorizontalBigMesh;
             if (ViewPortClickDown && mouseOverScrollXpress){
-                w3dEngine::Color4f(ListaColores[static_cast<int>(ColorID::accent)][0], ListaColores[static_cast<int>(ColorID::accent)][1],
-                        ListaColores[static_cast<int>(ColorID::accent)][2], ListaColores[static_cast<int>(ColorID::accent)][3]);
+                w3dEngine::Color4fv(ListaColores[static_cast<int>(ColorID::accent)]);
             }
             else {
-                w3dEngine::Color4f(ListaColores[static_cast<int>(ColorID::blanco)][0], ListaColores[static_cast<int>(ColorID::blanco)][1],
-                        ListaColores[static_cast<int>(ColorID::blanco)][2], ListaColores[static_cast<int>(ColorID::blanco)][3]);
+                w3dEngine::Color4fv(ListaColores[static_cast<int>(ColorID::blanco)]);
             }
         }
         else {
             uvSel = ScrollbarUV;
             meshSel = scrollHorizontalMesh;
-            w3dEngine::Color4f(ListaColores[static_cast<int>(ColorID::grisUI)][0], ListaColores[static_cast<int>(ColorID::grisUI)][1],
-                    ListaColores[static_cast<int>(ColorID::grisUI)][2], ListaColores[static_cast<int>(ColorID::grisUI)][3]);
+            w3dEngine::Color4fv(ListaColores[static_cast<int>(ColorID::grisUI)]);
         }
 
         W3dDrawElemsB(meshSel, uvSel, indicesScrollbar, 18);

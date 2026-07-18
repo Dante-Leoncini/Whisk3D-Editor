@@ -1,8 +1,8 @@
 /*
  * ==============================================================================
- *  w3dlayout.h — Fase 1 del plan de unificacion (ver PLAN-UNIFICACION.md)
+ *  w3dlayout.h — arma el arbol de viewports del editor para Symbian
  *
- *  Arma el arbol de viewports compartido (core/ui/W3dViewports) para Symbian:
+ *  Usa las clases REALES de PC (ViewportRow/Column, Viewport3D, Properties; ver main/ui/ViewPorts):
  *    - pantalla horizontal -> Row( Viewport3D | Properties )  70/30
  *    - pantalla vertical   -> Column( Viewport3D / Properties ) 70/30
  *  Reemplaza a la UI 2D vieja de Symbian (dibujarUI), que queda obsoleta.

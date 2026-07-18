@@ -54,9 +54,8 @@ SOURCE          w3dlog.cpp
 SOURCEPATH      ..\..\..\libs\Whisk3DCore\io
 SOURCE          w3dFilesystem.cpp // backend del File browser (POSIX en Symbian)
 
-// Fase C re-split: W3dColors/W3dViewports son del EDITOR -> main\ui (W3dFont es UI -> WhiskUI, abajo)
+// Fase C re-split: W3dColors es del EDITOR -> main\ui (W3dFont es UI -> WhiskUI, abajo)
 SOURCEPATH      ..\..\..\main\ui
-SOURCE          W3dViewports.cpp
 SOURCE          W3dColors.cpp
 
 // matematica del ENGINE (Vector3/Quaternion/Matrix4) — antes en core\math, es
@@ -157,7 +156,7 @@ END //RESOURCE
 
 USERINCLUDE     .
 USERINCLUDE     ..\inc
-// Fase C: W3dColors/W3dViewports en main\ui ("ui/W3dColors.h" resuelve por el USERINCLUDE de main)
+// Fase C: W3dColors en main\ui ("ui/W3dColors.h" resuelve por el USERINCLUDE de main)
 // core/ se unio a libs\Whisk3DCore/: los headers compartidos ("math/Vector3.h", "objects/Objects.h")
 // resuelven via libs\Whisk3DCore (mismo include path que usa PC)
 USERINCLUDE     ..\..\..\libs\Whisk3DCore

@@ -27,6 +27,15 @@ static void W3dContarMallas(Object* o, int& vAgr, int& vReal, int& fLog, int& fT
         W3dContarMallas(o->Childrens[i], vAgr, vReal, fLog, fTri);
 }
 
+// dibuja una linea del overlay alineada a la derecha, en la fila actual, y avanza a la siguiente
+static void StatLinea(const char* buf, int width, int margen, int& ly, int lineH){
+    w3dEngine::PushMatrix();
+    w3dEngine::Translatef((GLfloat)(width - margen), (GLfloat)ly, 0);
+    RenderBitmapText(buf, textAlign::right, width);
+    w3dEngine::PopMatrix();
+    ly += lineH;
+}
+
 // texto blanco arriba a la derecha: vertices agrupados/reales, caras logicas/
 // triangulos y fps. Se llama dentro del pase 2D de RenderUI (ortho + fuente ya
 // seteados). Los contadores por malla estan precalculados (no se cuenta por frame).
@@ -41,40 +50,22 @@ void Viewport3D::RenderEstadisticas(){
     if (OverlayStatVertices || OverlayStatFaces){
         int vAgr=0, vReal=0, fLog=0, fTri=0;
         W3dContarMallas(SceneCollection, vAgr, vReal, fLog, fTri);
-        if (OverlayStatVertices){
-            sprintf(buf, "vertex: %d/%d", vAgr, vReal);
-            w3dEngine::PushMatrix(); w3dEngine::Translatef((GLfloat)(width - margen), (GLfloat)ly, 0);
-            RenderBitmapText(buf, textAlign::right, width); w3dEngine::PopMatrix(); ly += lineH;
-        }
-        if (OverlayStatFaces){
-            sprintf(buf, "faces: %d/%d", fLog, fTri);
-            w3dEngine::PushMatrix(); w3dEngine::Translatef((GLfloat)(width - margen), (GLfloat)ly, 0);
-            RenderBitmapText(buf, textAlign::right, width); w3dEngine::PopMatrix(); ly += lineH;
-        }
+        if (OverlayStatVertices){ sprintf(buf, "vertex: %d/%d", vAgr, vReal); StatLinea(buf, width, margen, ly, lineH); }
+        if (OverlayStatFaces){    sprintf(buf, "faces: %d/%d", fLog, fTri);   StatLinea(buf, width, margen, ly, lineH); }
     }
     if (OverlayStatModgen){
         // DIAGNOSTICO de performance: regeneraciones de la malla de modificadores. Al ROTAR la camara NO debe subir
         // (la subdivision/screw se cachea en genValido). Si sube al rotar -> se esta recalculando de mas.
-        sprintf(buf, "modgen: %ld", g_genMallaCount);
-        w3dEngine::PushMatrix(); w3dEngine::Translatef((GLfloat)(width - margen), (GLfloat)ly, 0);
-        RenderBitmapText(buf, textAlign::right, width); w3dEngine::PopMatrix(); ly += lineH;
+        sprintf(buf, "modgen: %ld", g_genMallaCount); StatLinea(buf, width, margen, ly, lineH);
     }
     if (OverlayStatTimes){
         // PROFILER: ms por categoria del frame (para saber a que atacar). scene=modelo+skinning; 3d=overhead del
         // viewport (grilla/overlays/huesos); ui=paneles (outliner/props/timeline); log=input+anim; swap=espera vsync.
-        sprintf(buf, "ms scn:%.1f 3d:%.1f", g_profShow.scene, g_profShow.viewport3d - g_profShow.scene);
-        w3dEngine::PushMatrix(); w3dEngine::Translatef((GLfloat)(width - margen), (GLfloat)ly, 0);
-        RenderBitmapText(buf, textAlign::right, width); w3dEngine::PopMatrix(); ly += lineH;
-        sprintf(buf, "ms ui:%.1f log:%.1f", g_profShow.render - g_profShow.viewport3d, g_profShow.logic);
-        w3dEngine::PushMatrix(); w3dEngine::Translatef((GLfloat)(width - margen), (GLfloat)ly, 0);
-        RenderBitmapText(buf, textAlign::right, width); w3dEngine::PopMatrix(); ly += lineH;
-        sprintf(buf, "ms swap:%.1f tot:%.1f", g_profShow.swap, g_profShow.logic + g_profShow.render + g_profShow.swap);
-        w3dEngine::PushMatrix(); w3dEngine::Translatef((GLfloat)(width - margen), (GLfloat)ly, 0);
-        RenderBitmapText(buf, textAlign::right, width); w3dEngine::PopMatrix(); ly += lineH;
+        sprintf(buf, "ms scn:%.1f 3d:%.1f", g_profShow.scene, g_profShow.viewport3d - g_profShow.scene);                StatLinea(buf, width, margen, ly, lineH);
+        sprintf(buf, "ms ui:%.1f log:%.1f", g_profShow.render - g_profShow.viewport3d, g_profShow.logic);               StatLinea(buf, width, margen, ly, lineH);
+        sprintf(buf, "ms swap:%.1f tot:%.1f", g_profShow.swap, g_profShow.logic + g_profShow.render + g_profShow.swap); StatLinea(buf, width, margen, ly, lineH);
     }
     if (OverlayFps){
-        sprintf(buf, "fps: %d", (int)(g_fpsActual + 0.5f));
-        w3dEngine::PushMatrix(); w3dEngine::Translatef((GLfloat)(width - margen), (GLfloat)ly, 0);
-        RenderBitmapText(buf, textAlign::right, width); w3dEngine::PopMatrix(); ly += lineH;
+        sprintf(buf, "fps: %d", (int)(g_fpsActual + 0.5f)); StatLinea(buf, width, margen, ly, lineH);
     }
 }

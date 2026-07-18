@@ -21,24 +21,14 @@
 #include "W3dProfile.h"                  // profiler del frame (ms por categoria)
 #include "w3dVersion.h"                   // W3dVersion() para el titulo de ventana
 
-// accion del File browser al elegir un modelo: por EXTENSION (.fbx -> FBX; resto -> OBJ)
-static void ImportObjDesdeBrowser(const std::string& path) {
-    size_t d = path.find_last_of('.');
-    std::string ext = (d == std::string::npos) ? std::string() : path.substr(d);
-    for (size_t i = 0; i < ext.size(); i++) if (ext[i] >= 'A' && ext[i] <= 'Z') ext[i] += 32;
-    if (ext == ".fbx") ImportFBX(path);
-    else if (ext == ".gltf" || ext == ".glb") ImportGLTF(path);
-    else               ImportOBJ(path, false);
-}
-
 // el callback del menu "Add > Import OBJ": abre el explorador filtrado a .obj
 static void PCImportObj() {
-    AbrirFileBrowser("Import OBJ", "Import OBJ", ".obj", ImportObjDesdeBrowser);
+    AbrirFileBrowser("Import OBJ", "Import OBJ", ".obj", ImportModeloPorExtension);
 }
-// "Add > Imports > FBX/glTF/GLB": mismo explorador; ImportObjDesdeBrowser rutea por extension al importador correcto.
-static void PCImportFbx()  { AbrirFileBrowser("Import FBX",  "Import FBX",  ".fbx",  ImportObjDesdeBrowser); }
-static void PCImportGltf() { AbrirFileBrowser("Import glTF", "Import glTF", ".gltf", ImportObjDesdeBrowser); }
-static void PCImportGlb()  { AbrirFileBrowser("Import GLB",  "Import GLB",  ".glb",  ImportObjDesdeBrowser); }
+// "Add > Imports > FBX/glTF/GLB": mismo explorador; ImportModeloPorExtension rutea por extension al importador correcto.
+static void PCImportFbx()  { AbrirFileBrowser("Import FBX",  "Import FBX",  ".fbx",  ImportModeloPorExtension); }
+static void PCImportGltf() { AbrirFileBrowser("Import glTF", "Import glTF", ".gltf", ImportModeloPorExtension); }
+static void PCImportGlb()  { AbrirFileBrowser("Import GLB",  "Import GLB",  ".glb",  ImportModeloPorExtension); }
 
 // hook de swap para la barra de progreso (se redibuja DENTRO del export/import bloqueante)
 static SDL_Window* g_swapWindow = NULL;
@@ -892,13 +882,7 @@ int main(int argc, char* argv[]) {
     // file browser). Rutea por extension: .fbx -> ImportFBX; el resto -> ImportOBJ.
     for (int ai = 1; ai < argc; ai++) {
         if (std::string(argv[ai]) == "--open" && ai + 1 < argc) {
-            std::string path = argv[ai + 1];
-            size_t dot = path.find_last_of('.');
-            std::string ext = (dot != std::string::npos) ? path.substr(dot) : std::string();
-            for (size_t i = 0; i < ext.size(); i++) if (ext[i] >= 'A' && ext[i] <= 'Z') ext[i] += 32;
-            if (ext == ".fbx") ImportFBX(path);
-            else if (ext == ".gltf" || ext == ".glb") ImportGLTF(path);
-            else ImportOBJ(path, false);
+            ImportModeloPorExtension(argv[ai + 1]);
             g_redraw = true;
         }
     }

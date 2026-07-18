@@ -55,22 +55,13 @@ void Curve::RenderObject() {
     if (!showOverlayGlobal || ViewFromCameraActiveGlobal) return;
 
     if (ObjActivo == this && select){
-        w3dEngine::Color4f(ListaColores[static_cast<int>(ColorID::accent)][0],
-                  ListaColores[static_cast<int>(ColorID::accent)][1],
-                  ListaColores[static_cast<int>(ColorID::accent)][2],
-                  ListaColores[static_cast<int>(ColorID::accent)][3]);
+        w3dEngine::Color4fv(ListaColores[static_cast<int>(ColorID::accent)]);
     }
     else if (select){
-        w3dEngine::Color4f(ListaColores[static_cast<int>(ColorID::accentDark)][0],
-                  ListaColores[static_cast<int>(ColorID::accentDark)][1],
-                  ListaColores[static_cast<int>(ColorID::accentDark)][2],
-                  ListaColores[static_cast<int>(ColorID::accentDark)][3]);
+        w3dEngine::Color4fv(ListaColores[static_cast<int>(ColorID::accentDark)]);
     }
     else {
-        w3dEngine::Color4f(ListaColores[static_cast<int>(ColorID::grisUI)][0],
-                  ListaColores[static_cast<int>(ColorID::grisUI)][1],
-                  ListaColores[static_cast<int>(ColorID::grisUI)][2],
-                  ListaColores[static_cast<int>(ColorID::grisUI)][3]);
+        w3dEngine::Color4fv(ListaColores[static_cast<int>(ColorID::grisUI)]);
     }
 
     w3dEngine::Enable(w3dEngine::DepthTest);
