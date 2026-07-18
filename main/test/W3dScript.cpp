@@ -1269,6 +1269,29 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         if (what<0) { err = "apply desconocido: '"+w+"' (location|rotation|scale|all)"; return false; }
         AplicarTransform(what); return true;
     }
+    // ---- objkeyroty <deg> : keyframea rotY = 0 en frame 1 y <deg> en frame 20 (test round-trip de rotacion) ----
+    if (cmd == "objkeyroty") {
+        Object* o = ObjActivo; if (!o) { err="objkeyroty: sin objeto activo"; return false; }
+        float deg=90; ss>>deg;
+        DeseleccionarTodo(); ObjActivo=o; o->Seleccionar(); ObjSelects.clear(); ObjSelects.push_back(o);
+        CurrentFrame=1;  o->SetRotEuler(Vector3(0,0,0));   InsertarKeyframeObjeto();
+        CurrentFrame=20; o->SetRotEuler(Vector3(0,deg,0)); InsertarKeyframeObjeto();
+        CurrentFrame=1;  return true;
+    }
+    // ---- objanimdump : lista las animaciones de OBJETO (AnimationObjects): obj + curvas + #keyframes + valores ----
+    if (cmd == "objanimdump") {
+        printf("      [objanim] %d escena(s) activa='%s' | %d objeto(s) | frames %d..%d fps %d\n", (int)SceneAnimations.size(), NombreEscenaActiva(), (int)AnimationObjects.size(), StartFrame, EndFrame, AnimFPS);
+        for (size_t i=0;i<AnimationObjects.size();i++){ AnimationObject& ao=AnimationObjects[i];
+            printf("      [objanim] '%s':", ao.obj?ao.obj->name.c_str():"NULL");
+            for (size_t p=0;p<ao.Propertys.size();p++){ AnimProperty& ap=ao.Propertys[p];
+                const char* pn=(ap.Property==AnimPosition)?"pos":(ap.Property==AnimRotation)?"rot":"scl";
+                const char* cn=(ap.component==AnimX)?"X":(ap.component==AnimY)?"Y":"Z";
+                printf(" %s%s[%d:", pn, cn, (int)ap.keyframes.size());
+                for (size_t k=0;k<ap.keyframes.size();k++) printf("%s(f%d=%.2f)", k?",":"", ap.keyframes[k].frame, ap.keyframes[k].value);
+                printf("]"); }
+            printf("\n"); }
+        return true;
+    }
     // ---- objinfo : imprime pos/rot/scale del objeto activo + su bbox LOCAL (vertex[] sin transform) ----
     if (cmd == "objinfo") {
         if (!ObjActivo) { err = "no hay objeto activo"; return false; }

@@ -565,6 +565,7 @@ bool ImportGLTF(const std::string& filepath) {
     // ---- mallas: una por NODO con "mesh" (mezcla las primitivas del mesh en mesh-parts) ----
     const JVal* meshes = doc.arr("meshes");
     int importadas = 0;
+    std::map<int, Mesh*> nodeToMesh; // nodo glTF -> malla creada (para importar las animaciones de OBJETO)
     ProgresoActualizar(0.4f);
     int nMeshNodes = 0; if (meshes && nodes) for (int q = 0; q < nNodes; q++) if (nodes->arr[q].getI("mesh", -1) >= 0) nMeshNodes++;
     int meshNodeIdx = 0;
@@ -638,6 +639,7 @@ bool ImportGLTF(const std::string& filepath) {
         Object* parentMesh = arm ? (Object*)arm : collection;
         Mesh* mesh = new Mesh(parentMesh, Vector3(0, 0, 0));
         mesh->name = nom;
+        nodeToMesh[nd] = mesh; // para las animaciones de objeto (channels que apuntan a este nodo)
         // malla estatica: el objeto se queda con su PROPIO origen = el transform del nodo (pos/rot/escala del
         // mundo). Los vertices ya quedaron en LOCAL (relativos a ese origen). Descompongo globalM sin pasar por
         // euler (FromMatrix es exacto y evita la duda grados/radianes). Skinned: origen en (0,0,0).
@@ -680,6 +682,73 @@ bool ImportGLTF(const std::string& filepath) {
             }
         }
         importadas++;
+    }
+
+    // ---- animaciones de OBJETO: cada animacion glTF con channels a un NODO DE MALLA -> una ESCENA NUEVA (no se
+    //      fusiona con la escena existente; nombre unico ".NNN" si choca). Rango propio = ultimo keyframe. Simetrico
+    //      al export: times*fps -> frame; rotacion quat->euler (SkelMatrizAEulerFBX) con continuidad. fps de extras.
+    if (anims && !nodeToMesh.empty()) {
+        InitSceneAnimations();
+        for (size_t a = 0; a < anims->size(); a++) {
+            const JVal& an = anims->arr[a];
+            const JVal* chans = an.find("channels"); const JVal* samps = an.find("samplers");
+            if (!chans || !samps) continue;
+            // esta animacion toca alguna malla? (si es puro esqueleto -> ya lo hizo el skin, no crear escena)
+            bool hayObj = false;
+            for (size_t c = 0; c < chans->size() && !hayObj; c++) { const JVal* tgt = chans->arr[c].find("target");
+                if (tgt && nodeToMesh.count(tgt->getI("node", -1))) hayObj = true; }
+            if (!hayObj) continue;
+            int fps = 0; { const JVal* ex = an.find("extras"); if (ex) fps = ex->getI("frameRate", 0); } if (fps <= 0) fps = 30;
+
+            // ESCENA NUEVA para esta animacion (NuevaEscena guarda la activa y deja AnimationObjects vacio)
+            NuevaEscena();
+            std::string base = an.getS("name", "Scene"), nombre = base;
+            { int nn = 1; bool usado;
+              do { usado = false; for (size_t i=0;i<SceneAnimations.size();i++) if ((int)i!=SceneAnimActiva && SceneAnimations[i] && SceneAnimations[i]->name==nombre){ usado=true; break; }
+                   if (usado){ char b[16]; sprintf(b, ".%03d", nn++); nombre = base + b; } } while (usado); }
+            RenombrarEscenaActiva(nombre);
+            ActiveAnimKind = 0; // modo ESCENA (para que AnimSet* toquen esta escena, no un clip de armature)
+            int maxFrame = 1;
+
+            for (size_t c = 0; c < chans->size(); c++) {
+                const JVal& ch = chans->arr[c];
+                const JVal* tgt = ch.find("target"); if (!tgt) continue;
+                int nd = tgt->getI("node", -1);
+                std::map<int, Mesh*>::iterator mit = nodeToMesh.find(nd);
+                if (mit == nodeToMesh.end()) continue; // nodo de hueso -> ignorar aca
+                Mesh* mesh = mit->second;
+                std::string path = tgt->getS("path", "");
+                int prop = (path=="translation")?AnimPosition:(path=="rotation")?AnimRotation:(path=="scale")?AnimScale:-1;
+                if (prop < 0) continue;
+                int sampIdx = ch.getI("sampler", -1); if (sampIdx < 0 || sampIdx >= (int)samps->size()) continue;
+                const JVal& sm = samps->arr[sampIdx];
+                std::vector<float> times; int tc=0,tnc=0; if (!doc.readFloats(sm.getI("input",-1), times, tc, tnc)) continue;
+                std::vector<float> vals; int vc=0,vnc=0; if (!doc.readFloats(sm.getI("output",-1), vals, vc, vnc)) continue;
+                std::string interp = sm.getS("interpolation","LINEAR");
+                int stepV = (interp=="CUBICSPLINE")?3:1, voff = (interp=="CUBICSPLINE")?1:0;
+                AnimationObject* ao = NULL;
+                for (size_t i=0;i<AnimationObjects.size();i++) if (AnimationObjects[i].obj == (Object*)mesh){ ao=&AnimationObjects[i]; break; }
+                if (!ao){ AnimationObject nuevo; nuevo.obj=(Object*)mesh; AnimationObjects.push_back(nuevo); ao=&AnimationObjects.back(); }
+                std::vector<int> kfr((size_t)tc); std::vector<Vector3> kv((size_t)tc);
+                for (int k=0;k<tc;k++){
+                    kfr[(size_t)k] = (int)(times[(size_t)k]*fps + 0.5f) + 1;
+                    if (prop==AnimRotation){ size_t o=((size_t)k*stepV+voff)*4;
+                        kv[(size_t)k] = SkelMatrizAEulerFBX(QuatMat(vals[o],vals[o+1],vals[o+2],vals[o+3]), 0); }
+                    else { size_t o=((size_t)k*stepV+voff)*3; kv[(size_t)k]=Vector3(vals[o],vals[o+1],vals[o+2]); }
+                }
+                if (prop==AnimRotation) for (int k=1;k<tc;k++){
+                    float* cur[3]  = { &kv[(size_t)k].x,   &kv[(size_t)k].y,   &kv[(size_t)k].z };
+                    float  prev[3] = {  kv[(size_t)k-1].x,  kv[(size_t)k-1].y,  kv[(size_t)k-1].z };
+                    for (int comp=0;comp<3;comp++){ while (*cur[comp]-prev[comp] >  180.0f) *cur[comp]-=360.0f;
+                                                    while (*cur[comp]-prev[comp] < -180.0f) *cur[comp]+=360.0f; } }
+                for (int comp=0;comp<3;comp++){ AnimProperty& ap = PropertyDeLista(ao->Propertys, prop, comp);
+                    for (int k=0;k<tc;k++){ float v3[3]={kv[(size_t)k].x,kv[(size_t)k].y,kv[(size_t)k].z}; SetKeyCurva(ap, kfr[(size_t)k], v3[comp]); } }
+                ao->UpdateFirstLastFrame();
+                for (int k=0;k<tc;k++) if (kfr[(size_t)k] > maxFrame) maxFrame = kfr[(size_t)k];
+            }
+            // rango + fps PROPIOS de esta escena (no 250 default): asi el timeline muestra justo la animacion importada
+            AnimSetStart(1); AnimSetEnd(maxFrame > 1 ? maxFrame : 1); AnimSetFps(fps);
+        }
     }
 
     if (importadas == 0 && !arm) { w3dLogfE("ImportGLTF: sin mallas ni esqueleto"); ProgresoFin(); Notificar("glTF: nada que importar", true); return false; }

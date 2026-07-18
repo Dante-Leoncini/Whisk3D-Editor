@@ -279,6 +279,7 @@ bool ExportGLTF(const std::string& filepath, bool selectedOnly, bool binary) {
 
     // ---- mallas -> nodos + meshes (una primitiva por mesh-part/material) ----
     std::vector<int> sceneMeshNodes;
+    std::map<Object*, int> objNode; // Object* de cada malla exportada -> su indice de nodo (para animaciones de objeto)
     for (size_t mi = 0; mi < meshes.size(); mi++) {
         ProgresoActualizar((float)mi / (float)meshes.size());
         Mesh* m = meshes[mi];
@@ -378,7 +379,9 @@ bool ExportGLTF(const std::string& filepath, bool selectedOnly, bool binary) {
             node += ",\"scale\":["       + Ftos(S.x) + "," + Ftos(S.y) + "," + Ftos(S.z) + "]";
         }
         node += "}";
-        sceneMeshNodes.push_back((int)nodesJson.size());
+        int nodeIdx = (int)nodesJson.size();
+        objNode[(Object*)m] = nodeIdx; // para exportar las animaciones de OBJETO (curvas TRS -> este nodo)
+        sceneMeshNodes.push_back(nodeIdx);
         nodesJson.push_back(node);
     }
 
@@ -501,6 +504,56 @@ bool ExportGLTF(const std::string& filepath, bool selectedOnly, bool binary) {
         // restaurar el estado de animacion del editor
         arm->animActiva = savActiva; ActiveAnimKind = savKind; ActiveAnimArm = savArm; g_skelAnimPreview = savPrev;
         arm->poseDirty = false; arm->lastPoseFrame = -999999; EvaluarPoseEsqueleto(arm, savFrame);
+    }
+
+    // ---- animaciones de OBJETO (transform pos/rot/escala de mallas): cada SceneAnimation = una animacion glTF.
+    //      Mismo patron que el rig: por objeto y propiedad se UNEN los frames de las curvas X/Y/Z, se evalua cada
+    //      componente (rot euler->quat via FromEulerXYZ, IGUAL que SetRotEuler -> round-trip exacto) y se escribe
+    //      sampler+channel apuntando al NODO de la malla. El fps de la escena va en extras (glTF estandar).
+    InitSceneAnimations(); // garantiza que exista la escena "Scene" (idempotente) -> sus curvas viven en AnimationObjects
+    for (size_t si = 0; si < SceneAnimations.size(); si++) {
+        SceneAnimation* esc = SceneAnimations[si]; if (!esc) continue;
+        // las curvas de la escena ACTIVA viven en el global AnimationObjects; las de las demas en esc->objetos
+        std::vector<AnimationObject>& objs = ((int)si == SceneAnimActiva) ? AnimationObjects : esc->objetos;
+        float fps = (float)(esc->fps > 0 ? esc->fps : 30);
+        std::vector<std::string> channels, samplers;
+        for (size_t oi = 0; oi < objs.size(); oi++) {
+            AnimationObject& ao = objs[oi]; if (!ao.obj) continue;
+            std::map<Object*, int>::iterator it = objNode.find(ao.obj);
+            if (it == objNode.end()) continue; // el objeto no se exporto (no seleccionado / no es malla) -> no hay nodo
+            int node = it->second;
+            const int propsExp[3] = { AnimPosition, AnimRotation, AnimScale };
+            for (int pe = 0; pe < 3; pe++) {
+                int prop = propsExp[pe];
+                const char* path = (prop==AnimPosition)?"translation":(prop==AnimRotation)?"rotation":"scale";
+                std::vector<int> frames;
+                for (size_t pi = 0; pi < ao.Propertys.size(); pi++){
+                    if (ao.Propertys[pi].Property != prop) continue;
+                    for (size_t k = 0; k < ao.Propertys[pi].keyframes.size(); k++) frames.push_back(ao.Propertys[pi].keyframes[k].frame);
+                }
+                if (frames.empty()) continue;
+                std::sort(frames.begin(), frames.end());
+                frames.erase(std::unique(frames.begin(), frames.end()), frames.end());
+                Vector3 def = (prop==AnimPosition)?ao.obj->pos : (prop==AnimRotation)?ao.obj->rotEuler : ao.obj->scale;
+                std::vector<float> times(frames.size()), vals;
+                for (size_t k = 0; k < frames.size(); k++) {
+                    times[k] = (float)(frames[k]-1)/fps;
+                    Vector3 v = EvalPropVec(ao.Propertys, prop, frames[k], def);
+                    if (prop==AnimRotation){ Quaternion q = Quaternion::FromEulerXYZ(v.x, v.y, v.z);
+                        vals.push_back(q.x); vals.push_back(q.y); vals.push_back(q.z); vals.push_back(q.w); }
+                    else { vals.push_back(v.x); vals.push_back(v.y); vals.push_back(v.z); }
+                }
+                if (prop==AnimRotation) for (size_t k=1;k<frames.size();k++){ float* c=&vals[k*4]; float* p=&vals[(k-1)*4];
+                    if (c[0]*p[0]+c[1]*p[1]+c[2]*p[2]+c[3]*p[3]<0){ c[0]=-c[0];c[1]=-c[1];c[2]=-c[2];c[3]=-c[3]; } } // hemisferio
+                int inAcc = buf.addFloats(times, 1, "SCALAR", 0, true);
+                int outAcc = buf.addFloats(vals, prop==AnimRotation?4:3, prop==AnimRotation?"VEC4":"VEC3", 0, false);
+                int sIdx = (int)samplers.size();
+                samplers.push_back("{\"input\":"+Itos(inAcc)+",\"output\":"+Itos(outAcc)+",\"interpolation\":\"LINEAR\"}");
+                channels.push_back("{\"sampler\":"+Itos(sIdx)+",\"target\":{\"node\":"+Itos(node)+",\"path\":\""+std::string(path)+"\"}}");
+            }
+        }
+        if (channels.empty()) continue;
+        animsJson.push_back("{\"name\":\""+Jesc(esc->name)+"\",\"extras\":{\"frameRate\":"+Itos((long)fps)+"},\"channels\":["+JoinArr(channels)+"],\"samplers\":["+JoinArr(samplers)+"]}");
     }
 
     // ---- nodos raiz de la escena: el hueso raiz del skin + los nodos de malla ----
