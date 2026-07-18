@@ -51,6 +51,7 @@ SOURCE          w3dTexture.cpp
 SOURCE          w3dGraphics.cpp
 SOURCEPATH      ..\..\..\libs\Whisk3DCore\base
 SOURCE          w3dlog.cpp
+SOURCE          W3dInteractionState.cpp // estado de interaccion (InteractionMode/estado): ahora en el motor
 SOURCEPATH      ..\..\..\libs\Whisk3DCore\io
 SOURCE          w3dFilesystem.cpp // backend del File browser (POSIX en Symbian)
 

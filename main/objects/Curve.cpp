@@ -3,6 +3,7 @@
 #include "Curve.h"
 #include <algorithm>
 #include "WhiskUI/theme/colores.h"
+#include "variables.h" // showOverlayGlobal / ViewFromCameraActiveGlobal (estado del editor)
 #ifndef W3D_SYMBIAN
     #include <functional>
     #include <limits>

@@ -27,11 +27,10 @@ float fovDeg = 45.0f;
 int nextLightId = GL_LIGHT1;
 
 float angle = 55.0f;
-int estado;
+// estado + InteractionMode se DEFINEN en el motor: libs/Whisk3DCore/base/W3dInteractionState.cpp
 bool g_xformPrimerMov = false;
 bool gEVuseCustom = false;             // transform constrenido a la NORMAL (extrude / orientacion Normal)
 Vector3 gTransformNormal(0, 1, 0);     // esa normal, en MUNDO
-int InteractionMode;
 int navegacionMode;
 
 

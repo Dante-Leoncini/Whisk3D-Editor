@@ -15,6 +15,7 @@
 #endif
 #include <string>
 #include "math/Quaternion.h"
+#include "base/W3dInteractionState.h" // InteractionMode/estado + sus enums: viven en el MOTOR (capa correcta)
 
 #ifndef W3D_SYMBIAN
 extern SDL_Window* window;
@@ -66,12 +67,9 @@ struct Viewpoint {
 };
 
 enum { Constant, Linear, EaseInOut, EaseIn, EaseOut };
-// modos del viewport (selector estilo Blender; solo con una MALLA activa). Edit
-// y los Paint todavia no estan implementados: por ahora el selector solo cambia
-// InteractionMode (la edicion/pintura de malla viene despues).
-enum { ObjectMode, EditMode, VertexPaint, WeightPaint, TexturePaint, PoseMode };
+// InteractionMode (ObjectMode/EditMode/PoseMode...) y estado (editNavegacion/rotacion...) se
+// declaran en el MOTOR: base/W3dInteractionState.h (incluido arriba).
 enum { pointLight, sunLight };
-enum { editNavegacion, EdgeMove, FaceMove, timelineMove, rotacion, EditScale, translacion };
 enum { Orbit, Fly, Apuntar };
 enum { vertexSelect, edgeSelect, faceSelect };
 // X/Y/Z = constreñido a un eje; XYZ/ViewAxis = libre (3 ejes); PlaneX/Y/Z =
@@ -101,11 +99,9 @@ extern Vector3 TransformPivotPoint;
 extern float fovDeg;
 extern int nextLightId;
 extern float angle;
-extern int estado;
 // true = recien arranco un transform (G/R/S/extrude): el primer motion debe IGNORAR el
 // delta dx/dy (que todavia es del frame anterior) para que el transform arranque en CERO
 extern bool g_xformPrimerMov;
-extern int InteractionMode;
 extern int navegacionMode;
 extern std::string w3dPath;
 extern std::string exeDir;
