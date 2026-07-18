@@ -651,16 +651,12 @@ bool SepararSeleccionEdit(Mesh* m) {
     m->EnsureEdit();
     if (!m->edit) return false;
 
-    // caras3d SELECCIONADAS (leidas del edit mesh, modo cara) ANTES de crear el clon: su ctor llama
-    // DeseleccionarTodo() y en Edit Mode eso limpia la seleccion de caras de 'm' -> hay que guardarla aca.
-    std::vector<char> sel3d(m->faces3d.size(), 0);
-    int nSel = 0;
-    { EditMesh* e = m->edit;
-      for (size_t f = 0; f < e->faceSel.size(); f++)
-        if (e->faceSel[f] && f < e->faceSrc.size()) {
-            int f3 = e->faceSrc[f];
-            if (f3 >= 0 && f3 < (int)m->faces3d.size() && !sel3d[f3]) { sel3d[f3] = 1; nSel++; }
-        } }
+    // caras3d SELECCIONADAS segun el modo ACTUAL (vertice/borde/cara) ANTES de crear el clon: su ctor llama
+    // DeseleccionarTodo() y en Edit Mode eso limpia la seleccion -> hay que guardarla aca. CarasSelPorModo
+    // deriva las caras aunque estes en modo VERTICE (una cara cuenta si todos sus verts estan seleccionados).
+    std::vector<char> sel3d;
+    m->CarasSelPorModo(sel3d);
+    int nSel = 0; for (size_t f = 0; f < sel3d.size(); f++) if (sel3d[f]) nSel++;
     if (nSel == 0)                      { Notificar(T("Separate: no faces selected"), true);      return false; }
     if (nSel == (int)m->faces3d.size()) { Notificar(T("Separate: select only some faces"), true); return false; }
 

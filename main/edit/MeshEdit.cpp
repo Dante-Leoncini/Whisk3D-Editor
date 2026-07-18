@@ -918,6 +918,51 @@ void Mesh::SeleccionarMeshPart(int idx, bool sel) {
     e->Recolorear();
 }
 
+// llena sel3d[f] (por faces3d) segun el EditSelectMode ACTUAL: una cara cuenta si TODOS sus corners estan
+// seleccionados. Mismo criterio que BorrarSeleccionEdit(SelFace) -> anda en modo vertice/borde/cara. Lo usa
+// Separate para no depender de que estes en modo cara (si seleccionas todo en modo vertice, igual detecta las caras).
+void Mesh::CarasSelPorModo(std::vector<char>& sel3d) {
+    sel3d.assign(faces3d.size(), 0);
+    EnsureEdit();
+    if (!edit || !vertex || vertexSize <= 0) return;
+    EditMesh* e = edit;
+    const int nV = vertexSize;
+    const bool hayRep = ((int)posRep.size() == nV);
+    std::vector<char> selRep(nV, 0);
+    if (EditSelectMode == SelVertex) {
+        for (size_t k = 0; k < e->editVerts.size(); k++)
+            if (k < e->vertSel.size() && e->vertSel[k] && e->editVerts[k] >= 0 && e->editVerts[k] < nV)
+                selRep[e->editVerts[k]] = 1;
+    } else if (EditSelectMode == SelEdge) {
+        for (size_t eg = 0; eg < e->edgeSel.size(); eg++) {
+            if (!e->edgeSel[eg]) continue;
+            int ea = e->lineIdx[eg*2], eb = e->lineIdx[eg*2+1];
+            if (ea >= 0 && ea < (int)e->editVerts.size() && e->editVerts[ea] < nV) selRep[e->editVerts[ea]] = 1;
+            if (eb >= 0 && eb < (int)e->editVerts.size() && e->editVerts[eb] < nV) selRep[e->editVerts[eb]] = 1;
+        }
+    } else { // SelFace
+        for (size_t fe = 0; fe < e->faces.size(); fe++) {
+            if (fe >= e->faceSel.size() || !e->faceSel[fe]) continue;
+            const std::vector<int>& poly = e->faces[fe];
+            for (size_t c = 0; c < poly.size(); c++) {
+                int ev = poly[c];
+                if (ev >= 0 && ev < (int)e->editVerts.size() && e->editVerts[ev] < nV) selRep[e->editVerts[ev]] = 1;
+            }
+        }
+    }
+    for (size_t f = 0; f < faces3d.size(); f++) {
+        const std::vector<int>& idx = faces3d[f].idx;
+        if (idx.empty()) continue;
+        bool todos = true;
+        for (size_t c = 0; c < idx.size(); c++) {
+            int gi = idx[c];
+            int rep = (gi >= 0 && gi < nV) ? (hayRep ? posRep[gi] : gi) : -1;
+            if (rep < 0 || rep >= nV || !selRep[rep]) { todos = false; break; }
+        }
+        if (todos) sel3d[f] = 1;
+    }
+}
+
 // proyecciones object-space sobre las caras seleccionadas. tipo: 0=Cube, 1=Cylinder, 2=Sphere.
 void Mesh::ProyectarUVCaras(int tipo) {
     EnsureEdit(); if (!edit || !vertex || vertexSize <= 0) return;
@@ -1996,8 +2041,28 @@ void Mesh::AplicarMatriz(const Matrix4& B) {
         Vector3 w = B * Vector3(vertex[i*3], vertex[i*3+1], vertex[i*3+2]);
         vertex[i*3]=w.x; vertex[i*3+1]=w.y; vertex[i*3+2]=w.z;
     }
-    PoblarCapas();   // asegura las capas UV/color desde el render (por si no estaban) antes de regenerar
-    GenerarRender(); // recompone normales de la geo horneada + preserva UV/color + CalcularBordes
+    // NORMALES: transformarlas por la INVERSA-TRASPUESTA de la 3x3 de B y CONSERVARLAS (GenerarRender(false)).
+    // Asi el sombreado queda IGUAL: una rotacion las rota; una escala las ajusta sin deformarlas. Antes se llamaba
+    // GenerarRender() que las RECALCULABA (promedio por cara) -> se perdian las normales autoradas del glTF/FBX
+    // (bordes filosos, flat shading, splits) y Apply Scale cambiaba el sombreado.
+    bool normTransformadas = false;
+    if (normals) {
+        Matrix4 Binv = B.Inverse();
+        for (int i=0;i<vertexSize;i++){
+            float nx = normals[i*3]/127.0f, ny = normals[i*3+1]/127.0f, nz = normals[i*3+2]/127.0f;
+            // n' = (B^-1)^T * n  (Binv es col-major: m[col*4+fila])
+            Vector3 tn( Binv.m[0]*nx + Binv.m[1]*ny + Binv.m[2]*nz,
+                        Binv.m[4]*nx + Binv.m[5]*ny + Binv.m[6]*nz,
+                        Binv.m[8]*nx + Binv.m[9]*ny + Binv.m[10]*nz );
+            tn = tn.Normalized();
+            int bx=(int)(tn.x*127.0f), by=(int)(tn.y*127.0f), bz=(int)(tn.z*127.0f);
+            if(bx>127)bx=127; if(bx<-127)bx=-127; if(by>127)by=127; if(by<-127)by=-127; if(bz>127)bz=127; if(bz<-127)bz=-127;
+            normals[i*3]=(GLbyte)bx; normals[i*3+1]=(GLbyte)by; normals[i*3+2]=(GLbyte)bz;
+        }
+        normTransformadas = true;
+    }
+    PoblarCapas();                        // asegura las capas UV/color desde el render antes de regenerar
+    GenerarRender(!normTransformadas);    // si transformamos las normales -> CONSERVARLAS (false); sino recalcular
 }
 
 // ============================================================================

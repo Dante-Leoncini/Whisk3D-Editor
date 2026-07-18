@@ -660,6 +660,15 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         printf("      [%s] %s -> %s\n", cmd.c_str(), ruta.c_str(), ok?"OK":"FALLO");
         return ok;
     }
+    // ---- exportglbsel <ruta> : export GLB SOLO de los objetos SELECCIONADOS (test de issue: 2 selec -> 1) ----
+    if (cmd == "exportglbsel") {
+        std::string ruta; std::getline(ss, ruta); size_t p = ruta.find_first_not_of(" \t"); if (p!=std::string::npos) ruta = ruta.substr(p);
+        if (ruta.empty()) { err = "exportglbsel: falta la ruta"; return false; }
+        extern bool ExportGLTF(const std::string&, bool, bool);
+        bool ok = ExportGLTF(ruta, true, true); // selectedOnly=true, binary=true
+        printf("      [exportglbsel] %s -> %s\n", ruta.c_str(), ok?"OK":"FALLO");
+        return ok;
+    }
     // ---- armdeltest : borra el armature con una malla skinneada -> verifica que skinArmature queda NULL (no cuelga),
     //      que skinnear no crashea, y que el undo lo restaura. (bug: borrar esqueleto y la malla sigue animando/crash). ----
     if (cmd == "armdeltest") {
