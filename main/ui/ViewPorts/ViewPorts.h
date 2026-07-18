@@ -30,7 +30,6 @@ size_t IconoDeObjeto(Object* o);
     #include <GL/gl.h>
     #include <SDL2/SDL.h>
     #include <iostream>
-    #include "WhiskUI/core/UI.h"
     #include "WhiskUI/text/font.h"
 #endif
 

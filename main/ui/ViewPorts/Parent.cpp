@@ -31,7 +31,6 @@
 #include "objects/ObjectMode.h"
 #include "edit/Modifier.h" // ModifierType::Mirror + target (regen de mirrors al mover objetos)
 #include "objects/Primitivas.h"
-#include "objects/Textures.h"
 #include "variables.h"
 #include "render/OpcionesRender.h" // g_fpsActual
 #include "ViewPorts/PopUp/PopUpBase.h"

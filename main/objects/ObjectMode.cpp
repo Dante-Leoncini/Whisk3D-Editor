@@ -515,7 +515,6 @@ void SetPosicion(){
 
 // duplica los objetos seleccionados (deep copy). Implementacion NUEVA y
 // compartida: reemplaza al cuerpo viejo comentado (era del modelo viejo).
-#include "objects/Mesh.h"
 #include "Instance.h"
 #include "objects/Light.h"
 #include "Camera.h"
