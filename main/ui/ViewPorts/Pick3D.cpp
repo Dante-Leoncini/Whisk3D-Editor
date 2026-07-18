@@ -13,9 +13,6 @@
 #include "ViewPorts/Parent.h" // emparentar/desemparentar (extraido a su propio archivo)
 #include "ViewPorts/ViewPort3D.h"
 #include "ViewPorts/Outliner.h"
-#include "ViewPorts/Properties.h"
-#include "ViewPorts/UVEditor.h"
-#include "ViewPorts/Timeline.h"
 #include "WhiskUI/draw/glesdraw.h"
 #include "WhiskUI/draw/rectangle.h" // el velo del modo foco
 #include "objects/Objects.h"
@@ -28,7 +25,6 @@
 #include "objects/Empty.h"
 #include "objects/Armature.h"
 #include "animation/SkeletalAnimation.h" // InsertarKeyframeEsqueleto (Pose Mode: Insert Keyframe)
-#include "objects/Instance.h"
 #include "objects/Collection.h"
 #include "objects/ObjectMode.h"
 #include "edit/Modifier.h" // ModifierType::Mirror + target (regen de mirrors al mover objetos)

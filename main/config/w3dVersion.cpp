@@ -1,6 +1,5 @@
 #include "w3dVersion.h"
 #include <cstdio>
-#include <cstring>
 
 const char* W3dVersion() {
     static char ver[16] = {0};

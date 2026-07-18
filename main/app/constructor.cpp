@@ -1,5 +1,4 @@
 #include "constructor.h"
-#include "ViewPorts/UVEditor.h" // el UV editor (ya no en el layout default de PC; accesible por el selector de tipo)
 #include "ViewPorts/Timeline.h" // el layout PC parte el 3D en columna [3D / Timeline]
 
 #define STB_IMAGE_IMPLEMENTATION

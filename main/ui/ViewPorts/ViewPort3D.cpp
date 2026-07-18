@@ -2187,67 +2187,8 @@ void Viewport3D::ChangePerspective(){
 }
 
 //coloca el cursor 3d desde la vista 3d
-void Viewport3D::SetCursor3D(){// 1) Calcular base de la cámara (forward/right/up)
-    /*float pitch = rotX * DEG2RAD;
-    float yaw = rotY * DEG2RAD;
-
-    Vec3 forward(cosf(pitch) * sinf(yaw), sinf(pitch), cosf(pitch) * cosf(yaw));
-    forward = Normalize(forward);
-
-    Vec3 worldUp(0, 1, 0);
-    Vec3 right = Cross(forward, worldUp);
-    float rlen = Len(right);
-    if (rlen < 1e-8f) {
-        right = Vec3(1, 0, 0); // Evitar degeneración en pitch ±90°
-    } else {
-        right = right * (1.0f / rlen);
-    }
-
-    Vec3 up = Cross(right, forward); // Unitario por construcción
-
-    // 2) Posición de la cámara
-    Vec3 pivotPos(PivotX + posX, PivotY + posY, PivotZ + posZ);
-    Vec3 camPos = pivotPos - forward * zoom;
-
-    // 3) Mouse a NDC
-    float ndcX = (2.0f * (float)lastMouseX / (float)winW) - 1.0f;
-    float ndcY = 1.0f - (2.0f * (float)lastMouseY / (float)winH);
-
-    // 4) Calcular dirección del rayo en el espacio de la cámara
-    float halfFovRad = fovDeg * DEG2RAD * 0.5f;
-    float halfH = tanf(halfFovRad);
-    float halfW = aspect * halfH;
-
-    // Rayo en el espacio de la cámara (sin normalizar)
-    Vec3 rayDir = forward + right * (ndcX * halfW) + up * (ndcY * halfH);
-
-    // 5) Intersección con un plano perpendicular al forward, pasando por el pivot
-    // Plano: punto = pivotPos, normal = forward
-    // Rayo: origen = camPos, dirección = rayDir
-    // Ecuación: dot((camPos + t * rayDir - pivotPos), forward) = 0
-    float denom = Dot(rayDir, forward);
-    if (fabs(denom) < 1e-8f) {
-        // Rayo paralelo al plano, usar posición por defecto
-        Cursor3DposX = pivotPos.x;
-        Cursor3DposY = pivotPos.y;
-        Cursor3DposZ = pivotPos.z;
-        return;
-    }
-
-    float t = Dot(pivotPos - camPos, forward) / denom;
-    if (t < 0) {
-        // Intersección detrás de la cámara, usar posición por defecto
-        Cursor3DposX = pivotPos.x;
-        Cursor3DposY = pivotPos.y;
-        Cursor3DposZ = pivotPos.z;
-        return;
-    }
-
-    Vec3 cursorPos = camPos + rayDir * t;
-
-    Cursor3DposX = cursorPos.x;
-    Cursor3DposY = cursorPos.y;
-    Cursor3DposZ = cursorPos.z;*/
+void Viewport3D::SetCursor3D(){
+    // sin cuerpo por ahora: el calculo viejo (raycast desde la vista al plano) quedo desactivado.
 }
 
 void Viewport3D::Aceptar() {

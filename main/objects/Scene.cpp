@@ -13,8 +13,6 @@ Scene::Scene(Vector3 pos)
     backgroundColor[2] = 0.0f;
     backgroundColor[3] = 0.0f;
 
-#ifndef W3D_SYMBIAN
-#endif
     scene = this;
 }
 

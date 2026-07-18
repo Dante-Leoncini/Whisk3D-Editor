@@ -5,7 +5,6 @@
 #include "animation/SkeletalAnimation.h" // animaciones (clips) importadas del FBX
 #include "animation/Animation.h"         // AnimProperty/keyFrame + enum AnimPosition/Rotation/Scale
 #include "edit/Modifier.h"                // modificador Armature (auto-add al importar)
-#include <algorithm>                      // sort/unique (resampleo de curvas)
 #include "objects/Materials.h"   // Material / Materials / MaterialDefecto
 #include "objects/Objects.h"     // CollectionActive
 #include "w3dFilesystem.h"       // ReadFileBytes / FileExists / DirOf(inline abajo)

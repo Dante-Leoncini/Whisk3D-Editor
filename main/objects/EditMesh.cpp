@@ -7,8 +7,6 @@
 #include "ui/W3dColors.h"     // W3dColoresUbyte: colores del editor (piso, normales)
 #include <map>
 #include <utility>
-#include <string>
-#include <cstring>
 
 EditMesh::EditMesh() { src = NULL; activeIdx = -1; }
 

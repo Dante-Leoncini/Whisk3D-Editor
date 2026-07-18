@@ -3,8 +3,7 @@
 #include "Curve.h"
 #include <algorithm>
 #include "WhiskUI/theme/colores.h"
-#ifdef W3D_SYMBIAN
-    #else
+#ifndef W3D_SYMBIAN
     #include <functional>
     #include <limits>
 #endif
