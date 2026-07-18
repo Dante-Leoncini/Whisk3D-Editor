@@ -2,7 +2,7 @@
 #include "W3dLang.h"   // el nombre por defecto nace en el idioma del usuario
 #include "Curve.h"
 #include <algorithm>
-#include "WhiskUI/colores.h"
+#include "WhiskUI/theme/colores.h"
 #ifdef W3D_SYMBIAN
     #else
     #include <functional>

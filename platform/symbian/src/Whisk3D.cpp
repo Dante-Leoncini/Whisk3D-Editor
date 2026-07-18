@@ -8,7 +8,7 @@
 #include "w3dmouse.h" // cursor virtual de Symbian (el telefono no tiene mouse)
 #include "w3dTexture.h" // motor: cargador de texturas universal
 #include "w3dGraphics.h" // motor: abstraccion del estado de graficos
-#include "WhiskUI/colores.h" // paleta del editor (ListaColores/ColorID) — compartida
+#include "WhiskUI/theme/colores.h" // paleta del editor (ListaColores/ColorID) — compartida
 #include "w3dnewscene.h"
 #include "math/w3dmath.h" // w3dClamp compartido (4 OS)
 #include "W3dInitUI.h" // init de UI compartido (texturas+fuente+iconos)

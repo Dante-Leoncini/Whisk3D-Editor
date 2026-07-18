@@ -12,7 +12,7 @@
 #include <cmath>
 #include <GL/gl.h>
 
-#include "WhiskUI/icons.h"
+#include "WhiskUI/draw/icons.h"
 #include "objects/Objects.h"
 #include "objects/Mesh.h"
 #include "Target.h"

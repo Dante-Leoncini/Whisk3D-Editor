@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../libs/Whisk3DCore/w3dBase.h"
+#include "../../libs/Whisk3DCore/base/w3dBase.h"
 
 #include <vector>
 #include <cmath>
@@ -9,7 +9,7 @@
 #include "variables.h"
 #endif
 #include "GeometriaUI/GeometriaUI.h"
-#include "WhiskUI/colores.h"
+#include "WhiskUI/theme/colores.h"
 #include "GeometriaUI/Floor.h"
 #include "objects/Objects.h"
 #include "objects/Textures.h"

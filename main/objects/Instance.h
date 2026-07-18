@@ -8,7 +8,7 @@
 #endif
 #endif
 
-#include "WhiskUI/icons.h"
+#include "WhiskUI/draw/icons.h"
 #include "objects/Objects.h"
 #include "Target.h"
 #ifdef W3D_SYMBIAN

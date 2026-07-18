@@ -26,19 +26,19 @@
 #include "ViewPorts/ViewPort3D.h" // Viewport3D REAL de PC
 #include "ViewPorts/Properties.h" // Properties REAL de PC
 #include "W3dProfile.h"           // profiler del frame (ms por categoria) tambien en el N95
-#include "WhiskUI/card.h"
+#include "WhiskUI/widgets/card.h"
 #include "ViewPorts/ScrollBar.h"
 #include "objects/Textures.h"
 #include "objects/Materials.h"            // Material (cargar textura)
 #include "ViewPorts/PopUp/FileBrowser.h"  // AbrirFileBrowser (explorador compartido)
 #include "w3dnewscene.h"                   // W3dNewImportObj
-#include "WhiskUI/icons.h"
+#include "WhiskUI/draw/icons.h"
 extern int W3dPantallaAlto;
 extern bool MouseWheel;
-#include "WhiskUI/font.h"      // Font/WhiskFont REALES de PC
-#include "WhiskUI/bitmapText.h"
-#include "WhiskUI/colores.h"
-#include "WhiskUI/W3dFont.h"
+#include "WhiskUI/text/font.h"      // Font/WhiskFont REALES de PC
+#include "WhiskUI/text/bitmapText.h"
+#include "WhiskUI/theme/colores.h"
+#include "WhiskUI/text/W3dFont.h"
 #include "w3dlog.h"
 #include "w3dnewscene.h" // mundo nuevo (Fase 3c-2)
 #include "ViewPorts/LayoutInput.h" // ruteo COMPARTIDO (menus/barras/paneles)

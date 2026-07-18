@@ -12,7 +12,7 @@
     #include <GLES/gl.h>  // GLfloat
 #else
     #include <GL/gl.h>
-    #include "WhiskUI/icons.h"
+    #include "WhiskUI/draw/icons.h"
 #endif
 
 // Forward declaration

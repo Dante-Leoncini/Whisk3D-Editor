@@ -1,5 +1,5 @@
 #include "W3dColors.h"
-#include "WhiskUI/colores.h"       // ListaColores (colores genericos de la UI)
+#include "WhiskUI/theme/colores.h"       // ListaColores (colores genericos de la UI)
 #include "objects/RenderColors.h"  // gRenderColors del core
 
 #include <fstream>

@@ -11,12 +11,12 @@
 #include "Target.h"
 #include "Curve.h"
 #include "objects/Objects.h"
-#include "WhiskUI/icons.h" // portable: iconos compartidos
+#include "WhiskUI/draw/icons.h" // portable: iconos compartidos
 #ifdef W3D_SYMBIAN
     #include <GLES/gl.h>
 #else
     #include "variables.h"
-    #include "WhiskUI/colores.h"
+    #include "WhiskUI/theme/colores.h"
     #include <GL/gl.h>
 #endif
 

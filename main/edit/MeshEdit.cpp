@@ -6,7 +6,7 @@
 #include "animation/Animation.h"         // CurrentFrame
 #include "Undo.h"               // Ctrl+Z: snapshot de geometria antes de los ops
 #include "w3dGraphics.h"
-#include "WhiskUI/colores.h"
+#include "WhiskUI/theme/colores.h"
 #include "render/OpcionesRender.h"
 #include <iostream>
 #include <math.h>

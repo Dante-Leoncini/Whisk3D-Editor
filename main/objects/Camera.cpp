@@ -3,7 +3,7 @@
 #include "Camera.h"
 #include <math.h>
 #include <algorithm>
-#include "WhiskUI/colores.h"
+#include "WhiskUI/theme/colores.h"
 #include "render/OpcionesRender.h" // g_renderAspect (la geometria de la camara sigue el aspecto del render)
 #ifdef W3D_SYMBIAN
     #endif

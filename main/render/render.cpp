@@ -1,8 +1,8 @@
 #include "w3dGraphics.h" // abstraccion de graficos (independencia de OpenGL)
 #include "render.h"
 #include "objects/Light.h"
-#include "WhiskUI/glesdraw.h"
-#include "WhiskUI/UI.h" // GlobalScale (point sprites relativos)
+#include "WhiskUI/draw/glesdraw.h"
+#include "WhiskUI/core/UI.h" // GlobalScale (point sprites relativos)
 #include "ui/W3dColors.h" // W3dColores: colores del editor (ejes de transformacion)
 #include "objects/Mesh.h"          // Mesh + g_meshOverlayHook (hook de overlays)
 #include "objects/RenderColors.h"  // gRenderColors / RC_selActive (color del contorno)
@@ -362,9 +362,7 @@ void RenderLightLines(){
         else if (Lights[l]->select)
             w3dEngine::Color4fv(ListaColores[static_cast<int>(ColorID::accentDark)]);
         else
-            w3dEngine::Color4f(ListaColores[static_cast<int>(ColorID::grisUI)][0],
-                      ListaColores[static_cast<int>(ColorID::grisUI)][1],
-                      ListaColores[static_cast<int>(ColorID::grisUI)][2], 0.7f);
+            SetColorID(ColorID::grisUI, 0.7f);
         Vector3 p = Lights[l]->GetGlobalPosition();
         GLfloat* v = pool[slot];
         slot = (slot + 1) % 16;

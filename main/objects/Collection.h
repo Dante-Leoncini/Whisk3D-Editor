@@ -4,7 +4,7 @@
 
 #include "objects/Objects.h"
 #ifndef W3D_SYMBIAN
-    #include "WhiskUI/icons.h"
+    #include "WhiskUI/draw/icons.h"
 #endif
 
 class Collection : public Object {

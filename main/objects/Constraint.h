@@ -6,7 +6,7 @@
 
 #include "objects/Objects.h"
 #include "Target.h"
-#include "WhiskUI/icons.h"
+#include "WhiskUI/draw/icons.h"
 #include "variables.h" 
 
 class Constraint: public Object, public Target {

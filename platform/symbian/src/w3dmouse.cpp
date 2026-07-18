@@ -14,7 +14,7 @@
 #include "w3dGraphics.h"       // motor: abstraccion del ESTADO de graficos
 #include "w3dlayout.h"         // W3dLayoutArrastrePopup / W3dLayoutOcupado
 #include "w3dnewscene.h"   // W3dNew* (transform/orbit/zoom) + DuplicatedObject
-#include "WhiskUI/colores.h"        // ListaColores / ColorID (paleta del editor)
+#include "WhiskUI/theme/colores.h"        // ListaColores / ColorID (paleta del editor)
 #include "w3dlog.h"
 #include "render/OpcionesRender.h" // g_redraw (render event-driven)
 #include "ViewPorts/LayoutInput.h" // LayoutDeleteEdit (menu Delete de edit mode)

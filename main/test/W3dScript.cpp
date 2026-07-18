@@ -1,4 +1,5 @@
 #include "test/W3dScript.h"
+#include <filesystem>   // W3dDebugFile: los dumps de debug van a la carpeta debug, no a la raiz
 #include "w3dFilesystem.h"   // el test de Ajustes lee el config.ini de vuelta del disco
 #include "W3dLang.h"
 #include "W3dLangTabla.h"
@@ -85,6 +86,20 @@ static bool MeshTypeFromName(const std::string& s, MeshType::Enum& out) {
 // ============================================================================
 //  Un comando
 // ============================================================================
+// ---------------------------------------------------------------------------------------------------------------
+//  Los dumps de depuracion (skelexport/skinexport/matexport) escriben donde se los mande. Con un nombre PELADO
+//  ("w_f13.txt") eso es el CWD = la raiz del repo, y la ensucia. Un nombre sin separador se redirige a la carpeta
+//  debug FUERA del repo (workspace/Whisk3Decosystem/debug); una ruta explicita se respeta. Solo-PC.
+// ---------------------------------------------------------------------------------------------------------------
+static std::string W3dDebugFile(const std::string& name){
+    if (name.find('/') != std::string::npos || name.find('\\') != std::string::npos) return name;
+    try {
+        std::filesystem::path dir = std::filesystem::path("..") / "debug";
+        std::filesystem::create_directories(dir);
+        return (dir / name).string();
+    } catch (...) { return name; }
+}
+
 bool W3dRunCommand(const std::string& linea, std::string& err) {
     std::istringstream ss(linea);
     std::string cmd; ss >> cmd;
@@ -281,7 +296,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         if (clip<0){ err="skelexport: clip no encontrado"; return false; }
         ActiveAnimKind=1; ActiveAnimArm=a; a->animActiva=clip;
         CurrentFrame=frame; a->lastPoseFrame=-999999; EvaluarPoseEsqueleto(a, frame);
-        FILE* fp=fopen(path.c_str(),"w"); if(!fp){ err="skelexport: no pude abrir "+path; return false; }
+        std::string dbg=W3dDebugFile(path); FILE* fp=fopen(dbg.c_str(),"w"); if(!fp){ err="skelexport: no pude abrir "+dbg; return false; }
         int nT=0;
         for (size_t i=0;i<a->bones.size();i++){ W3dBone& b=a->bones[i];
             float dt=(b.poseT-b.restT).Length(); if (dt>0.5f) nT++;
@@ -791,7 +806,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         int nCtrl=0; for (int i=0;i<nv && i<(int)found->vertCtrlPoint.size(); i++) if (found->vertCtrlPoint[i]+1>nCtrl) nCtrl=found->vertCtrlPoint[i]+1;
         std::vector<int> rep(nCtrl,-1);
         for (int i=0;i<nv && i<(int)found->vertCtrlPoint.size(); i++){ int c=found->vertCtrlPoint[i]; if (c>=0 && c<nCtrl && rep[c]<0) rep[c]=i; }
-        FILE* fp=fopen(path.c_str(),"w"); if(!fp){ err="skinexport: no pude abrir "+path; return false; }
+        std::string dbg=W3dDebugFile(path); FILE* fp=fopen(dbg.c_str(),"w"); if(!fp){ err="skinexport: no pude abrir "+dbg; return false; }
         bool bind = (f==-999); // frame sentinela -999 = exportar el BIND (m->vertex) en vez del skinneado
         for (int c=0;c<nCtrl;c++){ int i=rep[c]; if (i<0){ fprintf(fp,"nan nan nan\n"); continue; }
             const float* src = bind ? found->vertex : found->skinVertex;
@@ -811,7 +826,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
             for (size_t i=0;i<o->Childrens.size();i++) stack.push_back(o->Childrens[i]); } }
         if (!a) { err="matexport: no hay armature"; return false; }
         CurrentFrame=f; a->lastPoseFrame=-999999; EvaluarPoseEsqueleto(a, f);
-        FILE* fp=fopen(path.c_str(),"w"); if(!fp){ err="matexport: no pude abrir "+path; return false; }
+        std::string dbg=W3dDebugFile(path); FILE* fp=fopen(dbg.c_str(),"w"); if(!fp){ err="matexport: no pude abrir "+dbg; return false; }
         for (size_t i=0;i<a->bones.size();i++){ W3dBone& b=a->bones[i];
             fprintf(fp,"BONE %s\n", b.name.c_str());
             #define ROWMAJ(M) do{ for(int r=0;r<4;r++)for(int c=0;c<4;c++) fprintf(fp,"%.6f ", (M).m[c*4+r]); fprintf(fp,"\n"); }while(0)
@@ -3224,7 +3239,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
 
         // ---- Reference ----
         int antes = (int)AnimationObjects.size(); (void)antes;
-        LayoutAccionAdd(20);
+        AddReference();
         Object* r = ObjActivo;
         bool esMalla = (r && r->getType() == ObjectType::mesh);
         printf("      [addref] Reference creada: nombre='%s' | tipo malla=%s\n",
@@ -3246,7 +3261,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
 
         // ---- Vertex ----
         InteractionMode = ObjectMode;
-        LayoutAccionAdd(3);
+        AddVertex();
         Object* v = ObjActivo;
         bool okEdit = (InteractionMode == EditMode);
         int nv = (v && v->getType() == ObjectType::mesh) ? ((Mesh*)v)->vertexSize : 0;
@@ -3555,6 +3570,62 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
 
         delete pr;
         if (!ok){ err = "ajustes: la tarjeta no quedo como se pidio"; return false; }
+        return true;
+    }
+    // ---- animhuerfana : animar un cubo, BORRARLO y crear otro -> el nuevo NO tiene que heredar su animacion.
+    //      (AnimationObjects referencia por PUNTERO; al morir el comando de undo se hace delete del objeto y el
+    //      cubo nuevo puede caer en la MISMA direccion -> heredaba la animacion del muerto.) ----
+    if (cmd == "animhuerfana") {
+        bool ok = true;
+        // 1) un cubo animado
+        AddCube();
+        Object* c1 = ObjActivo;
+        if (!c1){ err="animhuerfana: no se creo el cubo"; return false; }
+        for (int f = 1; f <= 20; f += 10){ CurrentFrame = f; c1->pos.x = (float)f; InsertarKeyframeObjeto(); }
+        int nAnim0 = 0;
+        for (size_t i=0;i<AnimationObjects.size();i++) if (AnimationObjects[i].obj == c1) nAnim0++;
+        printf("      [animhuerfana] cubo 1 animado: entradas suyas en AnimationObjects=%d\n", nAnim0);
+        if (nAnim0 != 1) ok = false;
+
+        // 2) borrarlo por el camino REAL (con su undo)
+        DeseleccionarTodo(); ObjActivo = c1; c1->Seleccionar();
+        ObjSelects.clear(); ObjSelects.push_back(c1);
+        InteractionMode = ObjectMode;
+        Eliminar(false);
+        int tras = (int)AnimationObjects.size();
+        printf("      [animhuerfana] tras borrar: AnimationObjects=%d -> %s\n", tras,
+               (tras == 0) ? "la animacion se fue con el objeto OK" : "QUEDO HUERFANA");
+        if (tras != 0) ok = false;
+
+        // 3) el undo la devuelve (no se pierde: el comando es su dueño mientras vive)
+        UndoDeshacer();
+        int vuelta = 0;
+        for (size_t i=0;i<AnimationObjects.size();i++) if (AnimationObjects[i].obj == c1) vuelta++;
+        printf("      [animhuerfana] undo: la animacion volvio con el objeto: %s\n",
+               (vuelta == 1) ? "OK" : "MAL (undo pierde la animacion)");
+        if (vuelta != 1) ok = false;
+
+        // 4) rehacer el borrado y VACIAR el undo -> ahora el objeto se libera de verdad
+        UndoRehacer();
+        UndoLimpiar();
+        printf("      [animhuerfana] tras vaciar el undo (el objeto se libera): AnimationObjects=%d\n",
+               (int)AnimationObjects.size());
+        if (!AnimationObjects.empty()) ok = false;
+
+        // 5) el cubo NUEVO: puede caer en la direccion del muerto. No tiene que traer nada.
+        AddCube();
+        Object* c2 = ObjActivo;
+        int nAnim2 = 0;
+        for (size_t i=0;i<AnimationObjects.size();i++) if (AnimationObjects[i].obj == c2) nAnim2++;
+        printf("      [animhuerfana] cubo 2 (dir %s que el borrado): entradas=%d -> %s\n",
+               (c2 == c1) ? "REUSADA, el caso jodido" : "distinta", nAnim2,
+               (nAnim2 == 0) ? "nace SIN animacion OK" : "HEREDO LA DEL MUERTO!");
+        if (nAnim2 != 0) ok = false;
+
+        if (c2){ DeseleccionarTodo(); ObjActivo=c2; c2->Seleccionar();
+                 ObjSelects.clear(); ObjSelects.push_back(c2); Eliminar(false); UndoLimpiar(); }
+        CurrentFrame = 1;
+        if (!ok){ err = "animhuerfana: la animacion sobrevive al objeto"; return false; }
         return true;
     }
     // ---- normstats <name> : normales de la malla -> #verts, normales DISTINTAS y posiciones con MAS DE UNA normal

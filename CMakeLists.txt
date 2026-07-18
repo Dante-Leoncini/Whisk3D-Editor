@@ -53,11 +53,11 @@ file(GLOB_RECURSE SRC_FILES
 )
 
 list(APPEND SRC_FILES
-    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/w3dFilesystem.cpp
-    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/w3dTexture.cpp
-    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/w3dCompress.cpp
-    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/w3dGraphics.cpp
-    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/w3dlog.cpp
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/io/w3dFilesystem.cpp
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/gfx/w3dTexture.cpp
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/io/w3dCompress.cpp
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/gfx/w3dGraphics.cpp
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/base/w3dlog.cpp
     # matematica del engine (antes en core/math): Vector3/Quaternion/Matrix4.
     # Se incluyen como "math/X.h" (engine es include dir). No los globea core/.
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/math/Vector3.cpp
@@ -96,10 +96,32 @@ endif()
 target_include_directories(whisk3d PRIVATE
     ${CMAKE_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/main
+    # main/ reorganizado por tema (app/config/io/undo): cada carpeta es include dir para que los includes
+    # "variables.h" / "Undo.h" / "W3dLang.h" resuelvan sin reescribir cada #include ni tocar los submodulos.
+    ${CMAKE_SOURCE_DIR}/main/app
+    ${CMAKE_SOURCE_DIR}/main/config
+    ${CMAKE_SOURCE_DIR}/main/io
+    ${CMAKE_SOURCE_DIR}/main/undo
+    # la UI del editor se consolido bajo main/ui/ (ViewPorts, GeometriaUI): main/ui como include dir para que
+    # "ViewPorts/ViewPort3D.h" resuelva como main/ui/ViewPorts/...; y las subcarpetas para los includes pelados.
+    ${CMAKE_SOURCE_DIR}/main/ui
+    ${CMAKE_SOURCE_DIR}/main/ui/ViewPorts
+    ${CMAKE_SOURCE_DIR}/main/ui/GeometriaUI
     # capas reutilizables en libs/: "objects/Mesh.h" (Whisk3DCore) y "WhiskUI/icons.h"
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore
+    # Core reorganizado: base/gfx/io como include dir para los includes pelados ("w3dTexture.h", "w3dlog.h")
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/base
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/gfx
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/io
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/thirdparty # stb: dep del engine, vive CON el core ("stb/stb_image.h")
     ${CMAKE_SOURCE_DIR}/libs
+    # WhiskUI reorganizado por tema: sus subcarpetas son include dirs para que los includes INTERNOS pelados
+    # ("icons.h", "card.h") resuelvan entre subcarpetas (los externos usan "WhiskUI/draw/icons.h").
+    ${CMAKE_SOURCE_DIR}/libs/WhiskUI/widgets
+    ${CMAKE_SOURCE_DIR}/libs/WhiskUI/text
+    ${CMAKE_SOURCE_DIR}/libs/WhiskUI/draw
+    ${CMAKE_SOURCE_DIR}/libs/WhiskUI/theme
+    ${CMAKE_SOURCE_DIR}/libs/WhiskUI/core
     ${CMAKE_SOURCE_DIR}/thirdparty
 )
 

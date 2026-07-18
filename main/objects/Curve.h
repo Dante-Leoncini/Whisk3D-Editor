@@ -11,7 +11,7 @@
 #include <vector>
 #include <string>
 #include "objects/Objects.h"
-#include "WhiskUI/icons.h" // portable: iconos compartidos
+#include "WhiskUI/draw/icons.h" // portable: iconos compartidos
 #ifdef W3D_SYMBIAN
     #include <GLES/gl.h>
 #else
@@ -19,7 +19,7 @@
     #ifndef _WIN32
     #include <GL/glext.h>
     #endif
-    #include "WhiskUI/colores.h"
+    #include "WhiskUI/theme/colores.h"
     //para leer el archivo de texto
     #include <fstream>
     #include <sstream>

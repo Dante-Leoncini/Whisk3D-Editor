@@ -1,7 +1,7 @@
 #ifndef EMPTY_H
 #define EMPTY_H
 #include "objects/Objects.h"
-#include "WhiskUI/icons.h" // el icono compartido del outliner
+#include "WhiskUI/draw/icons.h" // el icono compartido del outliner
 
 // objeto vacio (eje/pivote), compartido PC/Symbian
 class Empty : public Object {

@@ -46,10 +46,12 @@ SOURCE          w3dmouse.cpp // cursor virtual de Symbian
 SOURCE          w3dinput.cpp // input propio del telefono (teclado/keypad)
 
 // motor compartido (Whisk3DCore / libs\Whisk3DCore): texturas + estado de graficos + log
-SOURCEPATH      ..\..\..\libs\Whisk3DCore
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\gfx
 SOURCE          w3dTexture.cpp
 SOURCE          w3dGraphics.cpp
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\base
 SOURCE          w3dlog.cpp
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\io
 SOURCE          w3dFilesystem.cpp // backend del File browser (POSIX en Symbian)
 
 // Fase C re-split: W3dColors/W3dViewports son del EDITOR -> main\ui (W3dFont es UI -> WhiskUI, abajo)
@@ -88,8 +90,15 @@ SOURCEPATH      ..\..\..\main\importers
 SOURCE          import_obj.cpp
 
 // ViewportBase REAL de PC (fase outliner)
-SOURCEPATH      ..\..\..\main\ViewPorts
+SOURCEPATH      ..\..\..\main\ui\ViewPorts
 SOURCE          ViewPorts.cpp WithBorder.cpp ScrollBar.cpp Outliner.cpp Properties.cpp ViewPort3D.cpp UVEditor.cpp LayoutInput.cpp
+SOURCE          PoseTransform.cpp // Pose Mode: transform de huesos (extraido de LayoutInput, Fase 2)
+SOURCE          Notificaciones.cpp // toasts (extraido de LayoutInput, Fase 2)
+SOURCE          NumInput.cpp // entrada numerica/formulas (extraido de LayoutInput, Fase 2)
+SOURCE          Parent.cpp // emparentar/desemparentar (extraido de LayoutInput, Fase 2)
+SOURCE          Pick3D.cpp // pick/seleccion 3D + loop cut (extraido de LayoutInput, Fase 2)
+SOURCE          ViewPort3D_Toolbar.cpp // barra de herramientas tactil (extraido de ViewPort3D, Fase 2)
+SOURCE          ViewPort3D_Stats.cpp   // overlay de estadisticas arriba-derecha (extraido de ViewPort3D, Fase 2)
 
 // Fase A re-split core/editor: la logica de EDICION de la malla (deref EditMesh) se movio
 // de Mesh.cpp a main/edit/ para que el core (Mesh) no dependa del editor (EditMesh)
@@ -99,14 +108,17 @@ SOURCE          MeshEdit.cpp
 SOURCEPATH      ..\..\..\main\render
 SOURCE          render.cpp OpcionesRender.cpp
 
-SOURCEPATH      ..\..\..\main
+SOURCEPATH      ..\..\..\main\app
 SOURCE          variables.cpp
 SOURCE          W3dInitUI.cpp // init de UI compartido
+SOURCEPATH      ..\..\..\main\config
 SOURCE          W3dLang.cpp   // idiomas del editor (T() + deteccion del idioma del telefono)
 SOURCE          W3dConfigGuardar.cpp // escribe el config.ini (la tarjeta "Ajustes" de Properties)
+SOURCE          W3dProfile.cpp // reloj de pared + tiempos por categoria del frame (overlay Statistics)
+SOURCEPATH      ..\..\..\main\undo
 SOURCE          Undo.cpp // Ctrl+Z (undo por comandos; lo llaman ObjectMode/LayoutInput/Properties)
 
-SOURCEPATH      ..\..\..\main\GeometriaUI
+SOURCEPATH      ..\..\..\main\ui\GeometriaUI
 SOURCE          GeometriaUI.cpp Floor.cpp
 
 SOURCEPATH      ..\..\..\libs\WhiskUI\Propieties
@@ -115,13 +127,20 @@ SOURCE          propGap.cpp PropBool.cpp PropList.cpp PropColor.cpp
 SOURCE          PropSelectText.cpp PropButton.cpp PropLabel.cpp
 
 // pila de UI de PC (fase outliner real)
-SOURCEPATH      ..\..\..\main\ViewPorts\PopUp
+SOURCEPATH      ..\..\..\main\ui\ViewPorts\PopUp
 SOURCE          PopUpBase.cpp ColorPicker.cpp FileBrowser.cpp RedoMeshPanel.cpp ConfirmarPopup.cpp ProgressPopup.cpp
 
 // La UI (WhiskUI) es su propia capa reutilizable en libs/. Ver documentacion/ui.html
-SOURCEPATH      ..\..\..\libs\WhiskUI
-SOURCE          UI.cpp colores.cpp object2D.cpp rectangle.cpp font.cpp bitmapText.cpp icons.cpp glesdraw.cpp card.cpp Button.cpp PopupMenu.cpp Tab.cpp
-SOURCE          W3dFont.cpp // datos de glifos (Fase C: era libs\Whisk3DCore\ui, ahora UI)
+SOURCEPATH      ..\..\..\libs\WhiskUI\core
+SOURCE          UI.cpp
+SOURCEPATH      ..\..\..\libs\WhiskUI\theme
+SOURCE          colores.cpp
+SOURCEPATH      ..\..\..\libs\WhiskUI\draw
+SOURCE          object2D.cpp rectangle.cpp icons.cpp glesdraw.cpp
+SOURCEPATH      ..\..\..\libs\WhiskUI\text
+SOURCE          font.cpp bitmapText.cpp W3dFont.cpp
+SOURCEPATH      ..\..\..\libs\WhiskUI\widgets
+SOURCE          card.cpp Button.cpp PopupMenu.cpp Tab.cpp
 
 // OJO: volver al SOURCEPATH local (las rutas de recursos de abajo se
 // resuelven contra el ultimo SOURCEPATH)
@@ -142,10 +161,28 @@ USERINCLUDE     ..\inc
 // core/ se unio a libs\Whisk3DCore/: los headers compartidos ("math/Vector3.h", "objects/Objects.h")
 // resuelven via libs\Whisk3DCore (mismo include path que usa PC)
 USERINCLUDE     ..\..\..\libs\Whisk3DCore
+// Core reorganizado: base/gfx/io como include dir para los includes pelados ("w3dTexture.h", "w3dlog.h")
+USERINCLUDE     ..\..\..\libs\Whisk3DCore\base
+USERINCLUDE     ..\..\..\libs\Whisk3DCore\gfx
+USERINCLUDE     ..\..\..\libs\Whisk3DCore\io
 USERINCLUDE     ..\..\..\main
-// capas reutilizables en libs/: la UI se incluye como "WhiskUI/icons.h" (libs/WhiskUI)
+USERINCLUDE     ..\..\..\main\ui
+USERINCLUDE     ..\..\..\main\ui\ViewPorts
+USERINCLUDE     ..\..\..\main\ui\GeometriaUI
+// main/ reorganizado por tema: cada carpeta es include dir para que "variables.h" / "Undo.h" / "W3dLang.h"
+// resuelvan sin reescribir cada #include (mismo criterio que el CMake de PC)
+USERINCLUDE     ..\..\..\main\app
+USERINCLUDE     ..\..\..\main\config
+USERINCLUDE     ..\..\..\main\undo
+// capas reutilizables en libs/: la UI externa se incluye como "WhiskUI/draw/icons.h" (libs/WhiskUI)
 // (igual que en PC, que tiene libs/ en su include path).
 USERINCLUDE     ..\..\..\libs
+// WhiskUI reorganizado por tema: sus subcarpetas son include dir para los includes INTERNOS pelados ("icons.h")
+USERINCLUDE     ..\..\..\libs\WhiskUI\widgets
+USERINCLUDE     ..\..\..\libs\WhiskUI\text
+USERINCLUDE     ..\..\..\libs\WhiskUI\draw
+USERINCLUDE     ..\..\..\libs\WhiskUI\theme
+USERINCLUDE     ..\..\..\libs\WhiskUI\core
 
 SYSTEMINCLUDE   .
 SYSTEMINCLUDE   \epoc32\include\stdapis
@@ -197,12 +234,12 @@ END
 // comentado); si algun dia hacen falta, hay que firmarse con Open Signed.
 CAPABILITY ReadUserData WriteUserData
 
-SOURCEPATH ..\..\..\main\ViewPorts\PopUp
+SOURCEPATH ..\..\..\main\ui\ViewPorts\PopUp
 SOURCE NumPad.cpp
 
 // --- subsistema de ANIMACION (pull FBX/skinning): las piezas C++03 se compilan de verdad;
 //     el ESQUELETO/SKINNING (C++11) va como stubs no-op (ver w3dskelstubs.cpp). ---
-SOURCEPATH ..\..\..\main
+SOURCEPATH ..\..\..\main\config
 SOURCE w3dVersion.cpp              // W3dVersion() (header del .obj exportado)
 
 SOURCEPATH ..\..\..\libs\Whisk3DCore\animation
@@ -212,7 +249,7 @@ SOURCE SkeletalAnimation.cpp      // ESQUELETO/SKINNING real (C++03): FK + linea
 SOURCEPATH ..\..\..\libs\Whisk3DCore\objects
 SOURCE Armature.cpp              // clase Armature (PuntoFoco/RadioFoco/RenderObject) — C++03, render de esqueleto
 
-SOURCEPATH ..\..\..\main\ViewPorts
+SOURCEPATH ..\..\..\main\ui\ViewPorts
 SOURCE Timeline.cpp              // viewport Timeline (los metodos SDL van #ifndef W3D_SYMBIAN; el resto compila)
 
 SOURCEPATH ..\src
@@ -221,7 +258,7 @@ SOURCE w3dskelstubs.cpp          // solo w3dGetTicks (reloj de ms del core); los
 // --- IMPORT FBX en el N95 (usa el subsistema de animacion de arriba + comparte el file browser con el OBJ).
 //     El descompresor zlib (w3dCompress) es self-contained/multiplataforma -> compila aca sin stb ni libs
 //     externas; sera tambien la base del formato propio .w3d (archivo comprimido). ---
-SOURCEPATH ..\..\..\libs\Whisk3DCore
+SOURCEPATH ..\..\..\libs\Whisk3DCore\io
 SOURCE w3dCompress.cpp           // inflate DEFLATE/zlib self-contained (arrays comprimidos del FBX + futuro .w3d)
 
 SOURCEPATH ..\..\..\main\importers

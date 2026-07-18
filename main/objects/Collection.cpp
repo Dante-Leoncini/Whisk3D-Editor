@@ -1,6 +1,6 @@
 #include "Collection.h"
 #include "W3dLang.h"   // el nombre por defecto nace en el idioma del usuario
-#include "WhiskUI/icons.h" // el icono compartido del outliner
+#include "WhiskUI/draw/icons.h" // el icono compartido del outliner
 
 // Constructor
 Collection::Collection(Object* parent, Vector3 pos)

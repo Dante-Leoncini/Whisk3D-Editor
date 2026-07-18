@@ -3,7 +3,7 @@
 #include "objects/Mesh.h"        // lee la geometria de la malla de render (vertex/edges/faces3d)
 #include "objects/Objects.h"     // EditSelectMode + SelVertex/SelEdge/SelFace
 #include "w3dGraphics.h" // abstraccion de graficos (sin GL directo)
-#include "WhiskUI/colores.h"  // ListaColores(Ubyte) + ColorID
+#include "WhiskUI/theme/colores.h"  // ListaColores(Ubyte) + ColorID
 #include "ui/W3dColors.h"     // W3dColoresUbyte: colores del editor (piso, normales)
 #include <map>
 #include <utility>
