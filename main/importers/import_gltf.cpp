@@ -55,6 +55,7 @@ struct JVal {
     int    getI(const char* k, int d) const { const JVal* v = find(k); return v ? v->intOr(d) : d; }
     double getN(const char* k, double d) const { const JVal* v = find(k); return v ? v->numOr(d) : d; }
     std::string getS(const char* k, const char* d) const { const JVal* v = find(k); return v && v->t == STR ? v->str : std::string(d); }
+    bool   getB(const char* k, bool d) const { const JVal* v = find(k); return (v && v->t == BOOL) ? v->b : d; }
 };
 
 struct JParser {
@@ -539,6 +540,24 @@ bool ImportGLTF(const std::string& filepath) {
                 if (ti >= 0 && ti < (int)jtex->size()) { int im = jtex->arr[ti].getI("source", -1);
                     if (im >= 0 && im < (int)jimg->size()) { std::string uri = jimg->arr[im].getS("uri", "");
                         if (!uri.empty() && uri.compare(0, 5, "data:") != 0) EncolarTextura(mat, doc.dir + UrlDecode(uri)); } } }
+        }
+        // doubleSided (estandar) -> culling. Default glTF: doubleSided=false -> culling ON.
+        mat->culling = !jm.getB("doubleSided", false);
+        // extras: los flags de Whisk3D (round-trip exacto). Si no estan (glTF de otro programa), quedan los defaults.
+        const JVal* ex = jm.find("extras");
+        if (ex) {
+            mat->lighting    = ex->getB("w3d_lighting",    mat->lighting);
+            mat->culling     = ex->getB("w3d_culling",     mat->culling);
+            mat->textureOn   = ex->getB("w3d_textureOn",   mat->textureOn);
+            mat->filtrado    = ex->getB("w3d_filtrado",    mat->filtrado);
+            mat->repeat      = ex->getB("w3d_repeat",      mat->repeat);
+            mat->transparent = ex->getB("w3d_transparent", mat->transparent);
+            mat->depth_test  = ex->getB("w3d_depthTest",   mat->depth_test);
+            mat->vertexColor = ex->getB("w3d_vertexColor", mat->vertexColor);
+            mat->chrome      = ex->getB("w3d_chrome",      mat->chrome);
+            mat->normalMap   = ex->getB("w3d_normalMap",   mat->normalMap);
+            mat->reflectMode = ex->getI("w3d_reflectMode", mat->reflectMode);
+            mat->shininess   = (float)ex->getN("w3d_shininess", mat->shininess);
         }
         mats.push_back(mat);
     }

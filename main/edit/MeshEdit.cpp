@@ -891,13 +891,12 @@ void Mesh::AsignarFacesAMeshPart(int idx) {
     EnsureEdit();
     if (!edit || idx < 0 || idx >= (int)materialsGroup.size()) return;
     UndoCapturarMallaGeo(this); // Ctrl+Z: snapshot pre-assign (faces3d.mat + materialsGroup)
-    EditMesh* e = edit;
+    // caras seleccionadas segun el modo ACTUAL (vertice/borde/cara) -> antes solo leia faceSel (modo cara),
+    // asi que "asignar" no andaba desde seleccion de vertices/bordes.
+    std::vector<char> sel3d; CarasSelPorModo(sel3d);
     int n = 0;
-    for (size_t f = 0; f < e->faceSel.size(); f++)
-        if (e->faceSel[f] && f < e->faceSrc.size()) {
-            int f3 = e->faceSrc[f];
-            if (f3 >= 0 && f3 < (int)faces3d.size()) { faces3d[f3].mat = idx; n++; }
-        }
+    for (size_t f = 0; f < sel3d.size() && f < faces3d.size(); f++)
+        if (sel3d[f]) { faces3d[f].mat = idx; n++; }
     if (n > 0) ReagruparMeshParts();
 }
 

@@ -664,6 +664,7 @@ bool SepararSeleccionEdit(Mesh* m) {
     //    mismo padre). El ctor lo deja seleccionado a nivel objeto y limpia la sub-seleccion de 'm' (ver arriba).
     Mesh* nuevo = (Mesh*)W3dDuplicarUno(m);
     if (!nuevo) return false;
+    nuevo->name = nuevo->SetName(m->name); // nombre UNICO (W3dDuplicarUno pone ".001" y podria chocar con otro mesh)
 
     // 2) NUEVO: quedarse SOLO con las caras seleccionadas. NO se puede con BorrarSeleccionEdit (su seleccion es
     //    por POSICION: borrar las NO-seleccionadas cubre todas las esquinas del cubo y se lleva tambien las

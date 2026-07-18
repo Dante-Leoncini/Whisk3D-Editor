@@ -218,7 +218,25 @@ bool ExportGLTF(const std::string& filepath, bool selectedOnly, bool binary) {
             + Ftos(mat->diffuse[0]) + "," + Ftos(mat->diffuse[1]) + "," + Ftos(mat->diffuse[2]) + "," + Ftos(mat->diffuse[3]) + "]";
         if (mat->textureOn && mat->texture && texIdx.count(mat->texture))
             j += ",\"baseColorTexture\":{\"index\":" + Itos((long)texIdx[mat->texture]) + "}";
-        j += ",\"metallicFactor\":0,\"roughnessFactor\":1}}";
+        j += ",\"metallicFactor\":0,\"roughnessFactor\":1}";
+        // doubleSided: propiedad ESTANDAR de glTF -> culling off = doubleSided true (lo entienden otros viewers).
+        j += std::string(",\"doubleSided\":") + (mat->culling ? "false" : "true");
+        j += mat->transparent ? ",\"alphaMode\":\"BLEND\"" : "";
+        // el RESTO de los flags de Whisk3D (lighting/reflejo/etc) van en "extras": el mecanismo ESTANDAR de glTF
+        // para datos de aplicacion (otros viewers los ignoran; nuestro importer los lee de vuelta -> round-trip exacto).
+        j += std::string(",\"extras\":{\"w3d_lighting\":") + (mat->lighting?"true":"false")
+           + ",\"w3d_culling\":"     + (mat->culling?"true":"false")
+           + ",\"w3d_textureOn\":"   + (mat->textureOn?"true":"false")
+           + ",\"w3d_filtrado\":"    + (mat->filtrado?"true":"false")
+           + ",\"w3d_repeat\":"      + (mat->repeat?"true":"false")
+           + ",\"w3d_transparent\":" + (mat->transparent?"true":"false")
+           + ",\"w3d_depthTest\":"   + (mat->depth_test?"true":"false")
+           + ",\"w3d_vertexColor\":" + (mat->vertexColor?"true":"false")
+           + ",\"w3d_chrome\":"      + (mat->chrome?"true":"false")
+           + ",\"w3d_normalMap\":"   + (mat->normalMap?"true":"false")
+           + ",\"w3d_reflectMode\":" + Itos((long)mat->reflectMode)
+           + ",\"w3d_shininess\":"   + Ftos(mat->shininess) + "}";
+        j += "}";
         matsJson.push_back(j);
     }
 
