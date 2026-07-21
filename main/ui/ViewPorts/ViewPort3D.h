@@ -8,11 +8,10 @@
 #endif
 
 #include <vector>
+#include "render/OpcionesRender.h"   // RenderType: se usa en las dos plataformas
 #ifdef W3D_SYMBIAN
     #include <GLES/gl.h>
     // (variables.h REAL llega via ViewPorts.h)
-    #include "render/OpcionesRender.h"
-
 #else
     #include <GL/gl.h>
     #include <GL/glu.h>

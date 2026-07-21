@@ -20,12 +20,17 @@ mkdir -p "$OUT"
 
 # --- fuentes: mismo set que el CMakeLists, pero con el backend ES2 en vez del de desktop ---
 SRC=$(find main "$CORE/objects" "$CORE/animation" libs/WhiskUI -name '*.cpp')
-SRC="$SRC $CORE/w3dFilesystem.cpp $CORE/w3dTexture.cpp $CORE/w3dCompress.cpp $CORE/w3dlog.cpp"
+SRC="$SRC $CORE/io/w3dFilesystem.cpp $CORE/gfx/w3dTexture.cpp $CORE/io/w3dCompress.cpp"
+SRC="$SRC $CORE/base/w3dlog.cpp $CORE/base/W3dInteractionState.cpp"
 SRC="$SRC $CORE/math/Vector3.cpp $CORE/math/Quaternion.cpp $CORE/math/Matrix4.cpp"
 SRC="$SRC $CORE/gles2/w3dGraphicsGLES2.cpp"
 
 # --- includes: los mismos del CMakeLists + platform/web (shim de <GL/gl.h> -> ES2) ---
-INC="-Iplatform/web -I. -Imain -I$CORE -I$CORE/thirdparty -Ilibs -Ithirdparty"
+INC="-Iplatform/web -I. -Imain -Imain/app -Imain/config -Imain/io -Imain/undo"
+INC="$INC -Imain/ui -Imain/ui/ViewPorts -Imain/ui/GeometriaUI"
+INC="$INC -I$CORE -I$CORE/base -I$CORE/gfx -I$CORE/io -I$CORE/thirdparty"
+INC="$INC -Ilibs -Ilibs/WhiskUI/widgets -Ilibs/WhiskUI/text -Ilibs/WhiskUI/draw"
+INC="$INC -Ilibs/WhiskUI/theme -Ilibs/WhiskUI/core -Ithirdparty"
 
 # --- defines: solo el backend WebGL. OJO: NO va -DW3D_STB_IMPL: en el editor la
 #     implementacion de stb_image ya la instancia constructor.cpp (una sola vez). Con

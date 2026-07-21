@@ -1,4 +1,5 @@
 #include "ViewPorts/LayoutInput.h" // ruteo compartido (menus/barras/paneles)
+#include "render/OpcionesRender.h"   // RenderType / g_redraw: son del editor
 #include "ViewPorts/Properties.h" // PropertiesTouchScrollFin (fin del scroll tactil de listas)
 #include "ViewPorts/ViewPort3D.h" // Viewport3DActive->Aceptar() en el transform
 #include "ViewPorts/PopUp/PopUpBase.h" // PopUpActive (la X cancela)

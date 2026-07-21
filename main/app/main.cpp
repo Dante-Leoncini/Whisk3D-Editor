@@ -1,4 +1,5 @@
 #include "w3dGraphics.h" // abstraccion de graficos (independencia de OpenGL)
+#include "render/OpcionesRender.h"   // RenderType / g_redraw: son del editor
 #include "W3dLang.h"   // config.ini: "idioma = es" fuerza el idioma por encima del SO
 #include "test/W3dScript.h" // modo test: whisk3d --script <ruta>
 

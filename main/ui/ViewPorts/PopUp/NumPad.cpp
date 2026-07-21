@@ -1,4 +1,5 @@
 #include "w3dGraphics.h" // abstraccion de graficos (independencia de OpenGL)
+#include "render/OpcionesRender.h"   // RenderType / g_redraw: son del editor
 #include "NumPad.h"
 #include "ViewPorts/LayoutInput.h"          // LayoutKey + NumInput* (modo transform)
 #include "ViewPorts/Timeline.h"             // DopeNumInputChar (transform de keyframes del dope sheet)

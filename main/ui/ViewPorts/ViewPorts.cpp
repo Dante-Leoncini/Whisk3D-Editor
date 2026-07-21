@@ -1,4 +1,5 @@
 #include "w3dGraphics.h" // abstraccion de graficos (independencia de OpenGL)
+#include "render/OpcionesRender.h"   // RenderType / g_redraw: son del editor
 #include "ViewPorts/ViewPorts.h"
 #include <math.h>
 

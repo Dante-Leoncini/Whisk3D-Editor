@@ -2,6 +2,7 @@
 #define PROPERTIES_H
 
 #include <vector>
+#include "render/OpcionesRender.h"   // RenderType / g_redraw: son del editor
 #ifndef W3D_SYMBIAN
 #include <SDL2/SDL.h>
 #endif

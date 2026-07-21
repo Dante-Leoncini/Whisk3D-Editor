@@ -1,4 +1,5 @@
 #include "import_obj.h"
+#include "render/OpcionesRender.h"   // RenderType / g_redraw: son del editor
 #include "w3dVersion.h" // W3dVersion() para el header del .obj exportado
 #include <sstream>
 #include <stdlib.h>

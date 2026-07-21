@@ -30,10 +30,11 @@ CORE := Whisk3DCore
 SRC_FILES := $(shell find $(PROJECT_ROOT)/main $(PROJECT_ROOT)/libs/$(CORE)/objects \
 $(PROJECT_ROOT)/libs/$(CORE)/animation $(PROJECT_ROOT)/libs/WhiskUI \
 -name '*.cpp')
-SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/w3dFilesystem.cpp
-SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/w3dTexture.cpp
-SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/w3dCompress.cpp
-SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/w3dlog.cpp
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/io/w3dFilesystem.cpp
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/gfx/w3dTexture.cpp
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/io/w3dCompress.cpp
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/base/w3dlog.cpp
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/base/W3dInteractionState.cpp
 # SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/w3dGraphics.cpp #1.1
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/gles2/w3dGraphicsGLES2.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/math/Vector3.cpp
@@ -47,9 +48,24 @@ LOCAL_C_INCLUDES := \
 $(MY_PATH)/shim \
 $(PROJECT_ROOT) \
 $(PROJECT_ROOT)/main \
+$(PROJECT_ROOT)/main/app \
+$(PROJECT_ROOT)/main/config \
+$(PROJECT_ROOT)/main/io \
+$(PROJECT_ROOT)/main/undo \
+$(PROJECT_ROOT)/main/ui \
+$(PROJECT_ROOT)/main/ui/ViewPorts \
+$(PROJECT_ROOT)/main/ui/GeometriaUI \
 $(PROJECT_ROOT)/libs/$(CORE) \
+$(PROJECT_ROOT)/libs/$(CORE)/base \
+$(PROJECT_ROOT)/libs/$(CORE)/gfx \
+$(PROJECT_ROOT)/libs/$(CORE)/io \
 $(PROJECT_ROOT)/libs/$(CORE)/thirdparty \
 $(PROJECT_ROOT)/libs \
+$(PROJECT_ROOT)/libs/WhiskUI/widgets \
+$(PROJECT_ROOT)/libs/WhiskUI/text \
+$(PROJECT_ROOT)/libs/WhiskUI/draw \
+$(PROJECT_ROOT)/libs/WhiskUI/theme \
+$(PROJECT_ROOT)/libs/WhiskUI/core \
 $(PROJECT_ROOT)/thirdparty \
 $(PROJECT_ROOT)/thirdparty/SDL2/include
 
