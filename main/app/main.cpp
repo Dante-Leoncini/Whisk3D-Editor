@@ -284,9 +284,9 @@ EM_JS(void, WebDescargarArchivo, (const char* pathPtr, const char* namePtr), {
 #include "controles.h"
 #include "constructor.h"
 
-// Reloj de ms para el core (Animation declara w3dGetTicks en Animation.h y NO incluye
-// SDL). Aca el EDITOR/plataforma PC lo implementa con SDL. Symbian pondria el suyo.
-unsigned int w3dGetTicks() { return SDL_GetTicks(); }
+// Reloj de ms: el Core ya trae uno portable; aca le damos el de SDL, que mide tiempo de PARED
+// (el respaldo del Core usa clock(), que mide CPU). Se registra en el arranque, ver W3dSetReloj.
+static unsigned int RelojSDL() { return SDL_GetTicks(); }
 
 // Función simple para leer el ini
 Config loadConfig(const std::string& filename) {
@@ -675,6 +675,7 @@ int main(int argc, char* argv[]) {
         return -1;
     }
 
+    W3dSetReloj(RelojSDL);   // el motor usa el reloj de PARED de SDL en vez de su respaldo
     w3dFileSystem::Init();
 
     // Carpeta ESCRIBIBLE por-app para config/bookmarks. SDL_GetPrefPath la crea si no

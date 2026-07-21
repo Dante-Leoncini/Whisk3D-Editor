@@ -31,16 +31,16 @@ ObjectType Scene::getType() {
 Scene::~Scene() {
 }
 
-#ifdef W3D_SYMBIAN
-// en Symbian la raiz se crea explicitamente (W3dModelInit, llamado desde el
-// container): el orden de inicializacion estatica entre TUs no esta
-// garantizado y el ctor de Scene usa globals de Objects.cpp (ObjSelects)
-Object* SceneCollection = NULL;
+// SceneCollection lo DEFINE el Core (objects/Objects.cpp) y arranca en 0; aca solo se llena con
+// la raiz del editor. En Symbian eso ya se hacia asi, por el orden de inicializacion estatica
+// entre unidades: el ctor de Scene usa globals de Objects.cpp (ObjSelects).
 void W3dModelInit() {
     if (!SceneCollection) {
         SceneCollection = new Scene();
     }
 }
-#else
-Object* SceneCollection = new Scene();
+
+#ifndef W3D_SYMBIAN
+// en PC se arma sola en el arranque estatico, como antes (el editor no llama a W3dModelInit)
+namespace { struct CrearRaiz { CrearRaiz() { W3dModelInit(); } } g_crearRaiz; }
 #endif
