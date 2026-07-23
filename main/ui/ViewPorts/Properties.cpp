@@ -3,7 +3,9 @@
 #ifndef W3D_SYMBIAN
 #include <filesystem>   // listar los skins de res/Skins (la tarjeta Ajustes)
 #endif
-#include "W3dLang.h"   // T(): los textos salen en el idioma del sistema
+#include "W3dLang.h"
+#include "objects/Texto2D.h"   // panel del elemento de texto del Editor 2D
+#include "io/Fuente2D.h"   // T(): los textos salen en el idioma del sistema
 #include "ViewPorts/Timeline.h"   // keyframe ACTIVO + InvalidarAnimYRedraw (tarjeta "Keyframe")
 #include "Properties.h"
 #include "Undo.h" // Ctrl+Z: capturar rename
@@ -348,6 +350,23 @@ static void SincronizarNombreObjeto(Properties* p){
     if (!foco && ObjActivo && pt->field.text != ObjActivo->name){ pt->field.SetText(ObjActivo->name); g_redraw = true; }
 }
 
+// TEXTO del elemento 2D: el campo propT2dTexto muestra t->texto y, al perder el foco, escribe lo
+// tipeado. Mismo patron que SincronizarNombreObjeto (commit al desenfocar + sync de display).
+static std::string* g_t2dEditTarget = NULL;
+static void SincronizarTexto2D(Properties* p){
+    if (!p || !p->propT2dTexto) return;
+    Texto2D* t = (ObjActivo && ObjActivo->getType() == ObjectType::texto2d) ? (Texto2D*)ObjActivo : NULL;
+    PropText* pt = p->propT2dTexto;
+    bool foco = (g_textFieldActivo == &pt->field);
+    if (foco && !g_t2dEditTarget && t) g_t2dEditTarget = &t->texto;
+    if (!foco && g_t2dEditTarget){
+        *g_t2dEditTarget = pt->field.text;
+        g_t2dEditTarget = NULL;
+        g_redraw = true;
+    }
+    if (!foco && t && pt->field.text != t->texto){ pt->field.SetText(t->texto); g_redraw = true; }
+}
+
 // nombre corto de una textura (el archivo, sin la ruta)
 static std::string NombreDeTextura(Texture* t){
     if (!t) return std::string("No Texture");
@@ -647,6 +666,65 @@ static void AccionModifierDown(){
 
 // ====================================================================
 // selector de MODO de rotacion (XYZ Euler / Quaternion / Axis Angle)
+// ==================== TEXTO 2D (Editor 2D) ====================
+static Texto2D* T2dActivo(){
+    return (ObjActivo && ObjActivo->getType() == ObjectType::texto2d) ? (Texto2D*)ObjActivo : NULL;
+}
+static const char* T2dNombreAlign(int v, bool horizontal){
+    if (horizontal) return v==0 ? "Izquierda" : (v==1 ? "Centro" : "Derecha");
+    return v==0 ? "Arriba" : (v==1 ? "Centro" : "Abajo");
+}
+static PopupMenu* MenuT2dAlignH = NULL;
+static PopupMenu* MenuT2dAlignV = NULL;
+static PopupMenu* MenuT2dFuente = NULL;
+
+static void AccionT2dAlignHElegido(int id){
+    Texto2D* t = T2dActivo(); if (!t) return;
+    t->alignH = id;
+    if (PropsActivo && PropsActivo->propT2dAlignH) PropsActivo->propT2dAlignH->button->text = T2dNombreAlign(id, true);
+    g_redraw = true;
+}
+static void AccionT2dAlignVElegido(int id){
+    Texto2D* t = T2dActivo(); if (!t) return;
+    t->alignV = id;
+    if (PropsActivo && PropsActivo->propT2dAlignV) PropsActivo->propT2dAlignV->button->text = T2dNombreAlign(id, false);
+    g_redraw = true;
+}
+static void AccionMenuT2dAlignH(){
+    if (!PropsActivo || !T2dActivo()) return;
+    if (!MenuT2dAlignH){ MenuT2dAlignH = new PopupMenu(); MenuT2dAlignH->action = AccionT2dAlignHElegido; }
+    MenuT2dAlignH->Limpiar();
+    MenuT2dAlignH->Agregar("Izquierda", 0); MenuT2dAlignH->Agregar("Centro", 1); MenuT2dAlignH->Agregar("Derecha", 2);
+    AbrirMenuBajoBoton(MenuT2dAlignH, PropsActivo->propT2dAlignH->button);
+}
+static void AccionMenuT2dAlignV(){
+    if (!PropsActivo || !T2dActivo()) return;
+    if (!MenuT2dAlignV){ MenuT2dAlignV = new PopupMenu(); MenuT2dAlignV->action = AccionT2dAlignVElegido; }
+    MenuT2dAlignV->Limpiar();
+    MenuT2dAlignV->Agregar("Arriba", 0); MenuT2dAlignV->Agregar("Centro", 1); MenuT2dAlignV->Agregar("Abajo", 2);
+    AbrirMenuBajoBoton(MenuT2dAlignV, PropsActivo->propT2dAlignV->button);
+}
+// FUENTE: la de Whisk3D o un .ttf elegido con el file browser (se hornea al vuelo, ver Fuente2D)
+static void T2dFuenteElegida(const std::string& ruta){
+    Texto2D* t = T2dActivo(); if (!t) return;
+    t->fuente = ruta;
+    if (PropsActivo && PropsActivo->propT2dFuente) PropsActivo->propT2dFuente->button->text = Fuente2DNombre(ruta);
+    g_redraw = true;
+}
+static void AccionT2dFuenteElegida(int id){
+    Texto2D* t = T2dActivo(); if (!t) return;
+    if (id == 0) { T2dFuenteElegida(""); }                                    // la fuente de Whisk3D
+    else AbrirFileBrowser(T("Load font"), T("Open"), ".ttf .otf", T2dFuenteElegida);
+}
+static void AccionMenuT2dFuente(){
+    if (!PropsActivo || !T2dActivo()) return;
+    if (!MenuT2dFuente){ MenuT2dFuente = new PopupMenu(); MenuT2dFuente->action = AccionT2dFuenteElegida; }
+    MenuT2dFuente->Limpiar();
+    MenuT2dFuente->Agregar("Whisk3D", 0);
+    MenuT2dFuente->Agregar(T("Load font") + std::string("..."), 1);
+    AbrirMenuBajoBoton(MenuT2dFuente, PropsActivo->propT2dFuente->button);
+}
+
 // ====================================================================
 static PopupMenu* MenuRotMode = NULL;
 
@@ -1491,6 +1569,30 @@ void Properties::ConstruirGrupos(){
 
     GroupProperties.push_back(propTransform);
 
+    // ===== Tarjeta "Texto" (elemento Texto2D del Editor 2D) =====
+    propTexto2D = new GroupPropertie(T("Text"));
+    propTexto2D->icono = (int)IconType::lista;
+    propT2dTexto = new PropText(T("Text"), "");
+    propTexto2D->properties.push_back(propT2dTexto);
+    propT2dTam = new PropFloat(T("Size"), "px");
+    propT2dTam->SetRango(1.0f, 2000.0f);
+    propTexto2D->properties.push_back(propT2dTam);
+    propT2dAlignH = new PropButton(T("Align X"));
+    propT2dAlignH->button->desplegable = true;
+    propT2dAlignH->action = AccionMenuT2dAlignH;
+    propTexto2D->properties.push_back(propT2dAlignH);
+    propT2dAlignV = new PropButton(T("Align Y"));
+    propT2dAlignV->button->desplegable = true;
+    propT2dAlignV->action = AccionMenuT2dAlignV;
+    propTexto2D->properties.push_back(propT2dAlignV);
+    propT2dColor = new PropColor(T("Color"));
+    propTexto2D->properties.push_back(propT2dColor);
+    propT2dFuente = new PropButton(T("Font"));
+    propT2dFuente->button->desplegable = true;
+    propT2dFuente->action = AccionMenuT2dFuente;
+    propTexto2D->properties.push_back(propT2dFuente);
+    GroupProperties.push_back(propTexto2D);
+
     // ===== Tarjeta "Mesh Parts": selector (lista) + gestion de la PARTE (sin material) =====
     propMeshParts = new GroupPropertie(T("Mesh Parts"));
     propMeshParts->anchoValores = 0.30f;
@@ -2195,6 +2297,7 @@ void Properties::RefreshTargetProperties(){
         Resize(width, height); // tambien recalcula la scrollbar
     }
     SincronizarNombreObjeto(this); // el campo "Name": muestra el nombre del objeto y commitea lo editado al perder foco
+    SincronizarTexto2D(this);      // idem para el campo "Text" del elemento de texto 2D
     if (!ObjActivo) {
         if (target) {
             target = NULL;
@@ -2251,6 +2354,19 @@ void Properties::RefreshTargetProperties(){
     //Mesh Parts
     RefreshPropMeshParts();
 
+    // TEXTO 2D: bindea la tarjeta (NULL/labels segun el activo sea o no un Texto2D)
+    if (propTexto2D && propT2dTam){
+        Texto2D* t = (ObjActivo && ObjActivo->getType() == ObjectType::texto2d) ? (Texto2D*)ObjActivo : NULL;
+        propT2dTam->value   = t ? &t->tam   : NULL;
+        propT2dColor->value = t ? t->color  : NULL;
+        if (t){
+            propT2dTexto->field.SetText(t->texto);
+            propT2dAlignH->button->text = T2dNombreAlign(t->alignH, true);
+            propT2dAlignV->button->text = T2dNombreAlign(t->alignV, false);
+            propT2dFuente->button->text = Fuente2DNombre(t->fuente);
+        }
+    }
+
     // LUZ: bindea TODAS las propiedades por member (NULL si el activo no es luz -> no editable). Guard contra
     // punteros sin construir (propLightDir == el primero de los nuevos) -> nunca deref de basura.
     if (propLight && propLightDir){
@@ -2282,6 +2398,8 @@ Properties::Properties() : ViewportBase() {
     propTransform = NULL;
     propMeshParts = NULL;
     propLight = NULL;
+    propTexto2D = NULL; propT2dTexto = NULL; propT2dTam = NULL;
+    propT2dAlignH = NULL; propT2dAlignV = NULL; propT2dColor = NULL; propT2dFuente = NULL;
     propCamera = NULL;
     propInstance = NULL;
     propBtnCamTarget = NULL;
@@ -2357,7 +2475,9 @@ void Properties::ActualizarPestanias(){
     bool esCam  = (tipo == (int)ObjectType::camera);
     bool esInst = (tipo == (int)ObjectType::instance);
     bool esArm  = (tipo == (int)ObjectType::armature);
-    bool hayTab3 = esMesh || esLuz || esCam || esInst || esArm; // 3ra pestania (contextual)
+    bool esT2d  = (tipo == (int)ObjectType::texto2d);
+    bool esUI   = (tipo == (int)ObjectType::ui);
+    bool hayTab3 = esMesh || esLuz || esCam || esInst || esArm || esT2d; // 3ra pestania (contextual)
 
     if (BarTabs.size() >= 3){
         BarTabs[2]->visible = hayTab3;
@@ -2366,6 +2486,7 @@ void Properties::ActualizarPestanias(){
         else if (esCam)  icono = (int)IconType::camera;
         else if (esArm)  icono = (int)IconType::armature;      // esqueleto: pestania Animation
         else if (esInst) icono = (int)IconoDeObjeto(ObjActivo); // instance/array/mirror
+        else if (esT2d)  icono = (int)IconType::lista;           // elemento de texto 2D
         BarTabs[2]->icon = icono;
     }
     if (BarTabs.size() >= 4) BarTabs[3]->visible = esMesh; // pestaña Vertices: SOLO meshes
@@ -2455,7 +2576,10 @@ void Properties::ActualizarPestanias(){
         // aunque no tenga keyframes: secuencia estatica) -> nunca se desactiva.
         if (propBtnAnimRender) propBtnAnimRender->gris = (SceneAnimations.empty() && nClips == 0);
     }
-    if (propTransform) propTransform->visible = (pestaniaActiva == 1);
+    // el objeto UI NO tiene transformacion: es el ORDEN DE DIBUJO (la interfaz se dibuja al
+    // final, sobre la escena). No se mueve, ni rota, ni escala: su tarjeta no aplica.
+    if (propTransform) propTransform->visible = (pestaniaActiva == 1 && !esUI);
+    if (propTexto2D)   propTexto2D->visible   = (pestaniaActiva == 2 && esT2d);
     if (propMeshParts) propMeshParts->visible = (pestaniaActiva == 2 && esMesh);
     if (propMaterial)  propMaterial->visible  = (pestaniaActiva == 2 && esMesh);
     if (propLight)     propLight->visible     = (pestaniaActiva == 2 && esLuz);

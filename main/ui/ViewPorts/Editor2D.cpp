@@ -5,6 +5,11 @@
 #include "WhiskUI/theme/colores.h"   // ListaColores / ColorID
 #include "render/OpcionesRender.h"   // g_redraw (render event-driven)
 #include "PopUp/PopUpBase.h"         // PopUpActive (los popups modales tienen prioridad)
+#include "objects/Objects.h"         // SceneCollection / ObjActivo (los UI viven en la escena)
+#include "objects/Texto2D.h"         // el elemento de texto
+#include "io/Fuente2D.h"             // fuentes del editor 2D (atlas)
+#include "WhiskUI/text/W3dTextAtlas.h"
+#include "W3dLang.h"                 // T()
 #include <vector>
 
 namespace gfx = w3dEngine;
@@ -19,6 +24,9 @@ Editor2D::Editor2D() {
     panX = 0.0f; panY = 0.0f;
     lastMx = 0; lastMy = 0;
     BarCrear();   // el boton [0] de la barra (menu de tipo/split), como todos los viewports
+    // [1] Add: el menu para crear elementos 2D (texto, y lo que venga)
+    BarButtons.push_back(new Button(T("Add")));
+    BarButtons[1]->desplegable = true;
 }
 
 Editor2D::~Editor2D() {}
@@ -112,6 +120,9 @@ void Editor2D::Render() {
     gfx::VertexPointer2f(0, mitad);
     gfx::DrawLines(4);
 
+    // ---- TEXTOS de las interfaces (objetos UI y sus hijos), sobre el lienzo ----
+    DibujarTextosUI(fx, fy, s);
+
     gfx::Disable(gfx::ScissorTest);
     // RenderBar/DibujarBordes dibujan quads texturizados (iconos del atlas): dejarles el estado
     // prendido y RE-BINDEAR el atlas (mismo cuidado que el UV editor, bug reportado por Dante).
@@ -124,6 +135,57 @@ void Editor2D::Render() {
     if (!Textures.empty() && Textures[0]) gfx::BindTexture(Textures[0]->iID);
     RenderBar();
     DibujarBordes(this); // borde del viewport (verde si es el activo)
+}
+
+// recorre un arbol de la UI dibujando cada Texto2D. La posicion de un hijo se ACUMULA sobre la
+// del padre (heredan la transformacion: asi se arman jerarquias tipo la rotacion de portadas).
+static void DibujarTextosRec(Object* o, float baseX, float baseY,
+                             float fx, float fy, float esc, bool* alguno) {
+    if (!o) return;
+    float ox = baseX, oy = baseY;
+    if (o->getType() == ObjectType::texto2d) {
+        Texto2D* t = (Texto2D*)o;
+        ox += t->pos.x; oy += t->pos.y;
+        w3dui::W3dTextAtlas* at = Fuente2DObtener(t->fuente);
+        if (at) {
+            float px = t->tam * esc;
+            float w  = at->TextWidth(t->texto.c_str(), px);
+            float sx = fx + ox * esc, sy = fy + oy * esc;
+            if (t->alignH == 1) sx -= w * 0.5f; else if (t->alignH == 2) sx -= w;
+            if (t->alignV == 1) sy -= px * 0.5f; else if (t->alignV == 2) sy -= px;
+            at->Begin();
+            at->DrawText(t->texto.c_str(), sx, sy, px,
+                         t->color[0], t->color[1], t->color[2], t->color[3]);
+            at->End();
+            if (t->select) {   // marco de seleccion alrededor del texto
+                gfx::Disable(gfx::Texture2D);
+                gfx::DisableArray(gfx::TexCoordArray);
+                gfx::EnableArray(gfx::VertexArray);
+                float m = 4.0f;
+                float x0 = sx - m, y0 = sy - m, x1 = sx + w + m, y1 = sy + px + m;
+                float V[16] = { x0,y0, x1,y0,  x1,y0, x1,y1,  x1,y1, x0,y1,  x0,y1, x0,y0 };
+                gfx::LineWidth(1.0f);
+                gfx::Color4f(0.30f, 0.95f, 0.45f, 1.0f);   // verde de seleccion
+                gfx::VertexPointer2f(0, V);
+                gfx::DrawLines(8);
+            }
+            *alguno = true;
+        }
+    } else if (o->getType() != ObjectType::ui) {
+        return;   // dentro de un UI solo se dibujan elementos 2D
+    }
+    for (size_t i = 0; i < o->Childrens.size(); i++)
+        DibujarTextosRec(o->Childrens[i], ox, oy, fx, fy, esc, alguno);
+}
+
+void Editor2D::DibujarTextosUI(float fx, float fy, float s) {
+    if (!SceneCollection) return;
+    bool alguno = false;
+    for (size_t i = 0; i < SceneCollection->Childrens.size(); i++) {
+        Object* o = SceneCollection->Childrens[i];
+        if (o && o->getType() == ObjectType::ui)
+            DibujarTextosRec(o, 0.0f, 0.0f, fx, fy, s, &alguno);
+    }
 }
 
 // ---- PANEO / ZOOM (mismo manejo que el UV editor) -------------------------------------------

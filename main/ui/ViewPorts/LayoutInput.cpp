@@ -25,6 +25,7 @@
 #include "objects/Camera.h"
 #include "objects/Empty.h"
 #include "objects/UI.h"
+#include "objects/Texto2D.h"
 #include "objects/Armature.h"
 #include "animation/SkeletalAnimation.h" // InsertarKeyframeEsqueleto (Pose Mode: Insert Keyframe)
 #include "objects/Instance.h"
@@ -1247,6 +1248,54 @@ static void LayoutAbrirMenuUVTex(UVEditor* uv, int x, int y) {
     if (MenuAbierto && MenuAbierto != gMenuUVTex) MenuAbierto->Cerrar();
     gMenuUVTex->Abrir(x, y, MenuPantallaW, MenuPantallaH);
     MenuAbierto = gMenuUVTex;
+}
+
+// ---- barra del EDITOR 2D: boton [1] "Add" -> menu de elementos 2D --------------------------
+static PopupMenu* gMenu2DAdd = NULL;
+
+// el UI donde va a caer el elemento nuevo: el del objeto activo (si estas parado en un texto o
+// en un UI) o el primero de la escena. Si no hay ninguno se CREA: los elementos 2D viven si o
+// si dentro de un UI.
+static UI* UIRaizParaAgregar() {
+    for (Object* o = ObjActivo; o; o = o->Parent)
+        if (o->getType() == ObjectType::ui) return (UI*)o;
+    if (SceneCollection)
+        for (size_t i = 0; i < SceneCollection->Childrens.size(); i++)
+            if (SceneCollection->Childrens[i]->getType() == ObjectType::ui)
+                return (UI*)SceneCollection->Childrens[i];
+    return new UI(NULL);
+}
+
+static void LayoutAccion2DAdd(int id) {
+    if (id == 0) {   // Texto
+        UI* raiz = UIRaizParaAgregar();
+        Texto2D* t = new Texto2D(raiz, Vector3(540.0f, 960.0f, 0.0f));   // centro del lienzo
+        DeseleccionarTodo();
+        t->Seleccionar();
+        g_redraw = true;
+    }
+}
+
+static void LayoutAbrirMenu2DAdd(int x, int y) {
+    if (!gMenu2DAdd) gMenu2DAdd = new PopupMenu();
+    gMenu2DAdd->Limpiar();
+    gMenu2DAdd->titulo = T("Add");
+    gMenu2DAdd->Agregar(T("Text"), 0, (int)IconType::lista);
+    gMenu2DAdd->action = LayoutAccion2DAdd;
+    if (MenuAbierto && MenuAbierto != gMenu2DAdd) MenuAbierto->Cerrar();
+    gMenu2DAdd->Abrir(x, y, MenuPantallaW, MenuPantallaH);
+    MenuAbierto = gMenu2DAdd;
+}
+
+static bool LayoutClickBarra2D(Editor2D* ed, int mx, int my) {
+    if (!ed) return false;
+    std::vector<Button*>& B = ed->BarButtons;
+    if (B.size() > 1 && B[1]->visible && B[1]->Contains(mx, my)) {   // [1] Add
+        ed->ActualizarBarra();
+        LayoutAbrirMenu2DAdd(B[1]->sx, B[1]->sy + B[1]->height - GlobalScale);
+        return true;
+    }
+    return false;
 }
 
 static bool LayoutClickBarraUV(UVEditor* uv, int mx, int my) {
@@ -2595,6 +2644,8 @@ bool LayoutClickUI(int mx, int my) {
             LayoutClickBarraUV((UVEditor*)under, mx, my); // boton "View" -> checkboxes
         } else if (under->ViewportKind() == 5) {
             ((Timeline*)under)->ClickBarButton(mx, my); // transporte + campos Start/End
+        } else if (under->ViewportKind() == 6) {
+            LayoutClickBarra2D((Editor2D*)under, mx, my); // boton "Add" del editor 2D
         } else {
             LayoutAbrirMenuDeBarra(under, mx, my); // Select/Add/Object/Overlays
         }

@@ -6,7 +6,8 @@
 #include "WhiskUI/draw/icons.h"
 #include "WhiskUI/draw/glesdraw.h" // W3dDrawStrip4 / W3dPantallaAlto
 #include "objects/Textures.h"
-#include "w3dTexture.h"  // miniaturas: DecodeThumbnail / UploadRGBA / DeleteTexture / FreeImage
+#include "w3dTexture.h"
+#include "io/Fuente2D.h"   // vista previa de .ttf (rasteriza con la fuente misma)  // miniaturas: DecodeThumbnail / UploadRGBA / DeleteTexture / FreeImage
 #include "variables.h"
 #include <cstring>
 #include <map>
@@ -42,11 +43,17 @@ static bool EsImagen(const std::string& name) {
     return TerminaEn(name, ".png") || TerminaEn(name, ".jpg") || TerminaEn(name, ".jpeg") ||
            TerminaEn(name, ".bmp") || TerminaEn(name, ".tga") || TerminaEn(name, ".gif");
 }
+// es una FUENTE tipografica? (vista previa: el nombre de la letra dibujado con la letra misma,
+// como hace el gestor de archivos de Linux)
+static bool EsFuente(const std::string& name) {
+    return TerminaEn(name, ".ttf") || TerminaEn(name, ".otf");
+}
 // icono segun el tipo de archivo
 static int IconoEntrada(const w3dFileSystem::DirEntry& e) {
     if (e.isDir) return (int)IconType::carpeta;
     if (TerminaEn(e.name, ".obj") || TerminaEn(e.name, ".fbx") || TerminaEn(e.name, ".gltf") || TerminaEn(e.name, ".glb")) return (int)IconType::mesh;
     if (EsImagen(e.name)) return (int)IconType::foto;
+    if (EsFuente(e.name)) return (int)IconType::lista;   // fuente (mientras carga su preview)
     return (int)IconType::archive;
 }
 
@@ -88,9 +95,16 @@ static const FBThumb* FBObtenerThumb(const std::string& path) {
     }
 #else
     // PC/Android/Web: si hay _PAlbTN (copiado del N95) se decodifica ESE (mas rapido); si no, la imagen entera reducida.
-    const std::string& src = pal.empty() ? path : pal;
-    if (w3dEngine::DecodeThumbnail(src.c_str(), kFBThumbMax, &rgba, &tw, &th) && rgba) {
-        t.tex = w3dEngine::UploadRGBA(rgba, tw, th, true); t.w = tw; t.h = th; w3dEngine::FreeImage(rgba);
+    if (EsFuente(path)) {
+        // vista previa de la TIPOGRAFIA: "AaBb" rasterizado con la fuente misma (stb_truetype)
+        if (Fuente2DThumb(path, kFBThumbMax, &rgba, &tw, &th) && rgba) {
+            t.tex = w3dEngine::UploadRGBA(rgba, tw, th, true); t.w = tw; t.h = th; delete[] rgba; rgba = 0;
+        }
+    } else {
+        const std::string& src = pal.empty() ? path : pal;
+        if (w3dEngine::DecodeThumbnail(src.c_str(), kFBThumbMax, &rgba, &tw, &th) && rgba) {
+            t.tex = w3dEngine::UploadRGBA(rgba, tw, th, true); t.w = tw; t.h = th; w3dEngine::FreeImage(rgba);
+        }
     }
 #endif
     gFBThumbs[path] = t;
@@ -445,7 +459,7 @@ void FileBrowser::Render() {
         int iconIdx = IconoEntrada(entries[i]);
         if (gridView) {
             int isz = 26 * GlobalScale, ix = cx + (cw - isz) / 2, iy = cy + gapGS * 2;
-            const FBThumb* thmb = (!entries[i].isDir && EsImagen(entries[i].name))
+            const FBThumb* thmb = (!entries[i].isDir && (EsImagen(entries[i].name) || EsFuente(entries[i].name)))
                 ? FBObtenerThumb(w3dFileSystem::JoinPath(currentPath, entries[i].name)) : 0;
             if (thmb) FBDibujarThumb(thmb, ix, iy, isz);
             else
@@ -468,7 +482,7 @@ void FileBrowser::Render() {
             }
         } else {
             int isz = IconSizeGS, iy = cy + (ch - isz) / 2, ix = ex + gapGS;
-            const FBThumb* thmb = (!entries[i].isDir && EsImagen(entries[i].name))
+            const FBThumb* thmb = (!entries[i].isDir && (EsImagen(entries[i].name) || EsFuente(entries[i].name)))
                 ? FBObtenerThumb(w3dFileSystem::JoinPath(currentPath, entries[i].name)) : 0;
             if (thmb) FBDibujarThumb(thmb, ix, iy, isz);
             else

@@ -43,6 +43,10 @@ class Editor2D : public ViewportBase, public WithBorder {
 #endif
         // mapeo lienzo->pantalla (centro cx,cy del marco y escala s), igual que usa Render.
         void ParamsLienzo(float& cx, float& cy, float& s) const;
+    private:
+        // dibuja los TEXTOS de todos los objetos UI de la escena sobre el lienzo.
+        // (fx,fy) = esquina superior izquierda del marco en pantalla; s = escala.
+        void DibujarTextosUI(float fx, float fy, float s);
 };
 
 #endif // EDITOR2D_H

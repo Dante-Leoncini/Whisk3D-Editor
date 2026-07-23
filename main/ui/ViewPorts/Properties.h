@@ -90,6 +90,14 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropColor* propMatCol[3];  // Base Color, Specular, Emission
         PropFloat* propMatShin;    // Shininess
         GroupPropertie* propLight;   // pestania de luz: TODAS las propiedades editables de la luz GL
+        // tarjeta del elemento TEXTO 2D (se edita en el Editor 2D)
+        GroupPropertie* propTexto2D;
+        PropText*   propT2dTexto;    // que dice ("Texto" por defecto)
+        PropFloat*  propT2dTam;      // alto de fuente, en px del lienzo
+        PropButton* propT2dAlignH;   // desplegable: izquierda / centro / derecha
+        PropButton* propT2dAlignV;   // desplegable: arriba / centro / abajo
+        PropColor*  propT2dColor;    // swatch -> ColorPicker
+        PropButton* propT2dFuente;   // desplegable: Whisk3D / cargar un .ttf
         PropBool*   propLightDir;     // Directional (w=0) vs puntual/spot
         PropFloat*  propLightGL;      // numero de GL light (0..7, entero)
         PropColor*  propLightDiffuse; // color difuso
