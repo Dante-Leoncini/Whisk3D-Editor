@@ -43,6 +43,7 @@ struct View {
         UVeditor,
         Timeline,
         GraphEditor,
+        Editor2D,   // editor 2D (interfaces/juegos 2D); ViewportKind() = 6
         Row,
         Column
     };

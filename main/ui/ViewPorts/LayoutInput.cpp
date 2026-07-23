@@ -12,6 +12,7 @@
 #include "ViewPorts/Outliner.h"
 #include "ViewPorts/Properties.h"
 #include "ViewPorts/UVEditor.h"
+#include "ViewPorts/Editor2D.h"
 #include "ViewPorts/Timeline.h"
 #include "WhiskUI/draw/glesdraw.h"
 #include "WhiskUI/draw/rectangle.h" // el velo del modo foco
@@ -23,6 +24,7 @@
 #include "objects/Light.h"
 #include "objects/Camera.h"
 #include "objects/Empty.h"
+#include "objects/UI.h"
 #include "objects/Armature.h"
 #include "animation/SkeletalAnimation.h" // InsertarKeyframeEsqueleto (Pose Mode: Insert Keyframe)
 #include "objects/Instance.h"
@@ -59,6 +61,7 @@ static ViewportBase* LayoutCrearViewport(int aId) {
         case 2: return new Properties();
         case 3: return new UVEditor();
         case 4: return new Timeline();
+        case 5: return new Editor2D();
     }
     return NULL;
 }
@@ -376,6 +379,7 @@ void AddUVSphere(){ TrasCrearAdd(NewMesh(MeshType::UVsphere, NULL, false)); }
 void AddCone(){     TrasCrearAdd(NewMesh(MeshType::cone, NULL, false)); }
 void AddCylinder(){ TrasCrearAdd(NewMesh(MeshType::cylinder, NULL, false)); }
 void AddEmpty(){    TrasCrearAdd(new Empty(NULL, cursor3D.pos)); }
+void AddUI(){       TrasCrearAdd(new UI(NULL, cursor3D.pos)); }   // interfaz 2D (se edita en el Editor 2D)
 void AddCamera(){   TrasCrearAdd(new Camera(NULL, cursor3D.pos, Vector3(-35.0f, -45.0f, 0.0f))); }
 
 void AddLight(){
@@ -458,6 +462,7 @@ static const MenuDef ADD[] = {
     { "Camera",     AddCamera,          NULL, ICONO(IconType::camera) },
     { "Light",      AddLight,           NULL, ICONO(IconType::light) },
     { "Collection", AddCollection,      NULL, ICONO(IconType::archive) },
+    { "UI",         AddUI,              NULL, ICONO(IconType::textura) },
     { "Imports",    NULL,               NULL, ICONO(IconType::mesh), &MenuImports },
 };
 
@@ -1108,6 +1113,7 @@ void LayoutAbrirMenuTipo(ViewportBase* aVp) {
         gMenuTipo->Agregar(T("Properties"), 2);
         gMenuTipo->Agregar(T("UV Editor"), 3);
         gMenuTipo->Agregar(T("Timeline"), 4);
+        gMenuTipo->Agregar(T("2D Editor"), 5);
         if (aVp != rootViewport) gMenuTipo->Agregar(T("Expand"), 20);
         gMenuTipo->Agregar(T("Split Row"), 21);
         gMenuTipo->Agregar(T("Split Column"), 22);

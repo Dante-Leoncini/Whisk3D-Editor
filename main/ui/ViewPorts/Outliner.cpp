@@ -38,6 +38,7 @@ size_t IconoDeObjeto(Object* o) {
             return (size_t)IconType::instance;
         }
         case ObjectType::constraint: return (size_t)IconType::constraint;
+        case ObjectType::ui:         return (size_t)IconType::textura;   // interfaz 2D
         default:                     return (size_t)IconType::archive;
     }
 }
