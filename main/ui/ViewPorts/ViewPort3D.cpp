@@ -2422,7 +2422,6 @@ void Viewport3D::TeclaDerecha(){
     else if (estado == timelineMove){
         CurrentFrame++;
         if (!PlayAnimation){
-            ReloadAnimation();
         }
     }
 }
@@ -2488,7 +2487,6 @@ void Viewport3D::TeclaIzquierda(){
             StartFrame = EndFrame;
         }
         if (!PlayAnimation){
-            ReloadAnimation();
         }
     }
 }

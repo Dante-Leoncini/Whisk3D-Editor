@@ -19,7 +19,7 @@
 #include <GLES/gl.h> // modelo compartido de PC (Fase 3c): init+render
 #include "render/OpcionesRender.h"     // g_redraw (render event-driven)
 #include "objects/Materials.h"         // HayAnimacionActiva / UpdateAnimatedMaterials
-#include "animation/Animation.h"       // PlayAnimation / AnimFPS / AnimTick / ReloadAnimation (avance del play)
+#include "animation/Animation.h"       // PlayAnimation / AnimFPS / AnimTick (avance del play)
 
 // BARRA DE PROGRESO (export/import OBJ): el hook de swap que faltaba en Symbian. ProgresoIniciar/Actualizar lo
 // llaman para mostrar la barra DURANTE la operacion bloqueante (sin esto, ProgresoIniciar hacia return y la
@@ -847,7 +847,6 @@ int CWhisk3DContainer::DrawCallBack( TAny* aInstance )
         if (nowA - gLastAnimTick >= animTicks) {
             gLastAnimTick = nowA;
             if (PlayAnimation) { AnimTick(); g_redraw = true; } // avanza CurrentFrame (loop Start..End del clip)
-            ReloadAnimation();
         }
     }
     // ANIMACION DE OBJETOS (pos/rot/escala): aplica los keyframes al frame actual. FALTABA en el N95 -> ni el play

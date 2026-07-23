@@ -585,7 +585,6 @@ static void MainLoopFrame() {
         // Timeline: si esta en PLAY, avanzar CurrentFrame (loop Start..End) y forzar redibujo
         if (PlayAnimation) { AnimTick(); g_redraw = true; }
         // Actualizar frame
-        ReloadAnimation();
     }
     // ANIMACION DE OBJETOS (transform pos/rot/escala): aplica los keyframes al frame actual (play o scrub del timeline).
     // Guard interno: solo trabaja al CAMBIAR de frame -> editar/keyframear un objeto en un frame fijo no lo resnapea.

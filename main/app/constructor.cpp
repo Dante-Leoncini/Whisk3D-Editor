@@ -16,7 +16,6 @@ void ConstructUniversal(int argc, char* argv[]) {
     // Siempre un material por defecto
     MaterialDefecto = new Material("Default", true);
 
-    CalculateMillisecondsPerFrame(60);
 
     // Tamaño de las texturas
     InitCursors();

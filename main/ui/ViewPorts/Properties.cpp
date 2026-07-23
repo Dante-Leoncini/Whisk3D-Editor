@@ -1136,7 +1136,7 @@ static void HacerRenderAnimation(){
     if (!PropsActivo || !Viewport3DActive) return;
     Viewport3D* vp = Viewport3DActive;
     extern int CurrentFrame, StartFrame, EndFrame;
-    extern void ReloadAnimation(); extern void AplicarAnimacionObjetos();
+    extern void AplicarAnimacionObjetos();
     int w = (int)(PropsActivo->renderW + 0.5f); if (w < 1) w = 1;
     int h = (int)(PropsActivo->renderH + 0.5f); if (h < 1) h = 1;
     int f0 = StartFrame, f1 = EndFrame; if (f1 < f0){ int t=f0; f0=f1; f1=t; }
@@ -1150,13 +1150,12 @@ static void HacerRenderAnimation(){
     int fallos = 0, base = 0;
     for (int f = f0; f <= f1; f++){
         CurrentFrame = f;
-        ReloadAnimation();         // vertex/skeleton al frame f
         AplicarAnimacionObjetos(); // transform de objetos al frame f
         base += RenderPasesFrame(vp, w, h, base, total, fallos); // rendea el frame; avanza la barra GLOBAL
     }
     ProgresoFin();
     CurrentFrame = guardado;
-    ReloadAnimation(); AplicarAnimacionObjetos(); // volver la escena al frame que estaba
+    AplicarAnimacionObjetos(); // volver la escena al frame que estaba
     if (fallos == 0) Notificar(T("Animation rendered!"), false);
     else             Notificar(T("Error rendering animation"), true);
     g_redraw = true;
