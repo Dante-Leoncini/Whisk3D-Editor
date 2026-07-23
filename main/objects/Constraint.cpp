@@ -50,7 +50,7 @@ void Constraint::RenderObject() {
         }
 
         // Construir quaternion final (roll siempre 0)
-        target->rot = Quaternion::FromEuler(-pitchAngle, horizAngle, 0.0f);
+        target->rot = Quaternion::FromEulerYXZ(-pitchAngle, horizAngle, 0.0f);
     }
 }
 

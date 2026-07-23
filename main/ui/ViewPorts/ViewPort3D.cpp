@@ -323,7 +323,7 @@ Viewport3D::Viewport3D(Vector3 pos){
     farClip = 1000.0f;
     aspect = 1.0f;
     bgSolido[0] = bgSolido[1] = bgSolido[2] = bgSolido[3] = -1.0f; // sentinel: usar el color del tema
-    viewRot = Quaternion::FromEuler(-30.0f, -23.0f, 0.0f);
+    viewRot = Quaternion::FromEulerYXZ(-30.0f, -23.0f, 0.0f);
     orbitDistance = 10.0f;
 
     RecalcOrbitPosition();

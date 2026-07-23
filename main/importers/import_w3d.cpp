@@ -189,7 +189,7 @@ void ApplyViewport3DProps(Viewport3D* v, const std::map<std::string,std::string>
 
     if(p.count("orbitDistance")) v->orbitDistance = F("orbitDistance", 10.0f);
 
-    v->viewRot = Quaternion::FromEuler(
+    v->viewRot = Quaternion::FromEulerYXZ(
         GetFloatOrDefault(p, "rotY", -30.0f),
         GetFloatOrDefault(p, "rotX", -30.0f),
         GetFloatOrDefault(p, "rotZ", 0.0f)
