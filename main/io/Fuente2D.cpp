@@ -3,6 +3,9 @@
 // ============================================================================
 #include "io/Fuente2D.h"
 #include "WhiskUI/text/W3dTextAtlas.h"
+#include "WhiskUI/text/W3dFont.h"   // la fuente PIXEL de Whisk3D (font.png del skin)
+#include "w3dTexture.h"             // DecodeImage/UploadRGBA (premultiplicar el alpha)
+#include "variables.h"              // cfg.SkinName (de que skin sale font.png)
 #include "w3dFilesystem.h"
 #include "w3dlog.h"
 
@@ -24,17 +27,50 @@ static const unsigned kExtras[] = {
 };
 static const int kNumExtras = (int)(sizeof(kExtras)/sizeof(kExtras[0]));
 
-// ---- default: la fuente de Whisk3D (Inter), ya horneada en res/ ----------------------------
+// ---- default: la fuente PIXEL de Whisk3D (font.png del skin, la MISMA del editor) ----------
+// Grilla de 5x11 en un atlas de 128: se arma un W3dTextAtlas con las UVs de W3dFontGetGlyph.
+// Nitida a multiplos enteros (pixel-perfect, como en el N95); NEAREST para no emborronarla.
 static w3dui::W3dTextAtlas* CargarDefault() {
-    std::vector<unsigned char> fnt, png;
-    const std::string base = w3dFileSystem::GetResDir();
-    if (!w3dFileSystem::ReadFileBytes(base + "/inter_atlas.w3dfnt", fnt) ||
-        !w3dFileSystem::ReadFileBytes(base + "/inter_atlas.png", png)) {
-        w3dLogE("Fuente2D: falta res/inter_atlas.* (la fuente de Whisk3D)");
+    std::string ruta = w3dFileSystem::GetResDir() + "/Skins/" + cfg.SkinName + "/font.png";
+    unsigned char* rgba = NULL; int w = 0, h = 0;
+    if (!gfx::DecodeImage(ruta.c_str(), &rgba, &w, &h) || !rgba) {
+        w3dLogfE("Fuente2D: no pude leer %s", ruta.c_str());
         return NULL;
     }
+    for (int i = 0; i < w * h; i++) {   // premultiplicar (el atlas mezcla premultiplicado)
+        unsigned char a = rgba[i*4+3];
+        rgba[i*4+0] = (unsigned char)(rgba[i*4+0] * a / 255);
+        rgba[i*4+1] = (unsigned char)(rgba[i*4+1] * a / 255);
+        rgba[i*4+2] = (unsigned char)(rgba[i*4+2] * a / 255);
+    }
     w3dui::W3dTextAtlas* at = new w3dui::W3dTextAtlas();
-    if (!at->Load(&fnt[0], fnt.size(), &png[0], png.size())) { delete at; return NULL; }
+    at->fontPx = W3dFont_GlyphH; at->atlasW = w; at->atlasH = h;
+    at->pixelPerfect = true;   // grilla pixel: solo multiplos enteros (nitida como el editor)
+    at->ascent = W3dFont_GlyphH; at->lineH = W3dFont_LineH;
+    for (unsigned cp = 32; cp < 256; cp++) {
+        int gx = 0, gy = 0;   // posicion en PIXELES dentro del archivo (las UVs salen de
+        // aca contra w,h del png leido: la textura del EDITOR puede tener otro tamano)
+        if (!W3dFontGetGlyphPx((unsigned short)cp, &gx, &gy) && cp != '?') continue;
+        w3dui::W3dAtlasGlyph g;
+        g.u0 = (float)gx / w;                       g.v0 = (float)gy / h;
+        g.u1 = (float)(gx + W3dFont_GlyphW) / w;    g.v1 = (float)(gy + W3dFont_GlyphH) / h;
+        g.w = W3dFont_GlyphW; g.h = W3dFont_GlyphH;
+        g.xoff = 0; g.yoff = 0;
+        g.advance = W3dFont_Advance;
+        at->glyphs[cp] = g;
+    }
+    // el ESPACIO: el atlas de la grilla no lo trae; sin este glifo las palabras quedan pegadas
+    if (at->glyphs.find(32) == at->glyphs.end()) {
+        w3dui::W3dAtlasGlyph esp;
+        esp.u0 = esp.v0 = esp.u1 = esp.v1 = 0.0f;
+        esp.w = 0; esp.h = 0; esp.xoff = 0; esp.yoff = 0;
+        esp.advance = W3dFont_Advance;
+        at->glyphs[32] = esp;
+    }
+    at->tex = gfx::UploadRGBA(rgba, w, h, false);   // NEAREST: pixel-perfect al escalar
+    gfx::FreeImage(rgba);
+    if (!at->tex) { delete at; return NULL; }
+    gfx::BindTexture(at->tex); gfx::TexFilter(false); gfx::TexWrap(false);
     return at;
 }
 

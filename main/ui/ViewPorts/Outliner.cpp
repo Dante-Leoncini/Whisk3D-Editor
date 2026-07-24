@@ -39,6 +39,12 @@ size_t IconoDeObjeto(Object* o) {
         }
         case ObjectType::constraint: return (size_t)IconType::constraint;
         case ObjectType::ui:         return (size_t)IconType::textura;   // interfaz 2D
+        case ObjectType::imagen2d:   return (size_t)IconType::foto;      // elemento imagen 2D
+        case ObjectType::rect2d:     return (size_t)IconType::plane;     // elemento rectangulo 2D
+        case ObjectType::cont2d:     return (size_t)IconType::carpeta;   // contenedor 2D (ordena hijos)
+        case ObjectType::slice9:     return (size_t)IconType::cuadricula; // imagen con bordes fijos
+        case ObjectType::boton2d:    return (size_t)IconType::object;     // boton de interfaz
+        case ObjectType::expandir2d: return (size_t)IconType::arrowRight; // resorte de layout
         default:                     return (size_t)IconType::archive;
     }
 }

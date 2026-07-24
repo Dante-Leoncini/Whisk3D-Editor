@@ -13,6 +13,8 @@
 #include "WhiskUI/core/UI.h"                     // GlobalScale
 #include "ViewPorts/WithBorder.h"      // CalcBorderUV
 #include "ViewPorts/ScrollBar.h"       // CalcScrollUV
+#include "WhiskUI/text/W3dFont.h"      // W3dFontSetTexSize (atlas dinamico)
+#include "io/SkinAtlas.h"              // el atlas armado al arrancar (font.png + iconos)
 
 void W3dInitUI(const std::string& skinDir) {
     // El IDIOMA va primero: la UI que se arma abajo ya pide sus textos con T(), asi que tiene que estar resuelto
@@ -42,12 +44,25 @@ void W3dInitUI(const std::string& skinDir) {
         Textures.push_back(t);
     }
 
-    // UI armada sobre el atlas (font.png): UVs del 9-patch, scrollbar, tarjetas,
-    // iconos y la fuente real
+    // ATLAS DINAMICO: si el skin trae iconos individuales (atlas/iconos/*.png) se arma
+    // UNA textura al vuelo: font.png entero en el (0,0) -que deja validas las coords de
+    // siempre de borde/cards/scroll/glifos- y cada icono empaquetado en el espacio libre.
+    // Agregar un icono = tirar el png y listo. Sin la carpeta: el camino clasico intacto.
+    IconRect rectsAtlas[ICON_TOTAL];
+    unsigned texAtlas = 0; int aw = 0, ah = 0;
+    bool atlasDinamico = SkinAtlasArmar(skinDir, &texAtlas, &aw, &ah, rectsAtlas);
+    if (atlasDinamico) {
+        Textures[0]->iID = texAtlas;
+        atlasW = aw; atlasH = ah;
+    }
+
+    // UI armada sobre el atlas: UVs del 9-patch, scrollbar, tarjetas, iconos y la fuente
     CalcBorderUV(atlasW, atlasH);
     CalcScrollUV(atlasW, atlasH);
     CalcCardUV(atlasW, atlasH);
-    CrearIconos(atlasW, atlasH);
+    if (atlasDinamico) CrearIconosDesde(rectsAtlas, atlasW, atlasH);
+    else               CrearIconos(atlasW, atlasH);
+    W3dFontSetTexSize(atlasW, atlasH);
     SetIconScale(GlobalScale);
 
     WhiskFont = new Font(atlasW, atlasH, Textures[0]->iID);

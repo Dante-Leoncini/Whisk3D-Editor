@@ -5,7 +5,17 @@
 #endif
 #include "W3dLang.h"
 #include "objects/Texto2D.h"   // panel del elemento de texto del Editor 2D
-#include "io/Fuente2D.h"   // T(): los textos salen en el idioma del sistema
+#include "objects/Imagen2D.h"  // panel del elemento de imagen
+#include "objects/Rect2D.h"    // panel del elemento rectangulo
+#include "objects/Contenedor2D.h" // panel del contenedor (rect invisible)
+#include "objects/Slice9.h"       // panel del slice 9 (imagen con bordes fijos)
+#include "objects/Boton2D.h"      // panel del boton
+#include "objects/Expandir2D.h"   // panel del expandir (resorte de layout)
+#include "io/Fuente2D.h"
+#include "io/Textura2D.h"      // tamano natural del archivo al elegir la textura
+#include "io/UI2DFormato.h"    // guardar/cargar interfaces (.w3dui)
+#include "objects/UI.h"
+#include "render/UIOverlay.h"   // UI2D_PuntoAncla (rebase del ancla)   // T(): los textos salen en el idioma del sistema
 #include "ViewPorts/Timeline.h"   // keyframe ACTIVO + InvalidarAnimYRedraw (tarjeta "Keyframe")
 #include "Properties.h"
 #include "Undo.h" // Ctrl+Z: capturar rename
@@ -331,23 +341,48 @@ static void AccionRenameAnim(){
 // NOMBRE del objeto: el campo propNameObj muestra ObjActivo->name (cuando NO se edita) y, al perder el foco,
 // escribe lo tipeado (uniquificado) en ObjActivo->name. Se llama por frame desde RefreshTargetProperties.
 static std::string* g_nameEditTarget = NULL; // != NULL mientras se edita el nombre (captura el destino al enfocar)
-static void SincronizarNombreObjeto(Properties* p){
-    // usa el panel que se esta renderizando (this), NO el global PropsActivo: al arrancar PropsActivo es NULL hasta
-    // el 1er click, y el campo Name quedaba vacio hasta el 1er hover. Como esto corre ANTES de dibujar los campos
-    // (RefreshTargetProperties al inicio de Render), el nombre ya se ve en el primer frame.
-    if (!p || !p->propNameObj) return;
-    PropText* pt = p->propNameObj;
+static PropText*    g_nameEditCampo  = NULL; // CUAL campo Name esta editando (hay uno por tarjeta contextual)
+// sincroniza UN campo Name contra ObjActivo->name: muestra el nombre (cuando no se edita) y al
+// perder el foco commitea lo tipeado (uniquificado). Corre ANTES de dibujar los campos
+// (RefreshTargetProperties al inicio de Render) -> el nombre ya se ve en el primer frame.
+static void SincronizarNombreCampo(PropText* pt){
+    if (!pt) return;
     bool foco = (g_textFieldActivo == &pt->field);
-    if (foco && !g_nameEditTarget && ObjActivo) g_nameEditTarget = &ObjActivo->name; // empezo a editar este nombre
-    if (!foco && g_nameEditTarget){                                                  // termino -> commit uniquificado
+    if (foco && !g_nameEditTarget && ObjActivo){ g_nameEditTarget = &ObjActivo->name; g_nameEditCampo = pt; }
+    if (!foco && g_nameEditTarget && g_nameEditCampo == pt){   // termino -> commit uniquificado
         UndoCapturarRename(g_nameEditTarget);
         *g_nameEditTarget = UniqObjeto(pt->field.text, g_nameEditTarget);
-        g_nameEditTarget = NULL;
+        g_nameEditTarget = NULL; g_nameEditCampo = NULL;
     }
-    // sync display cuando NO se edita. Solo si CAMBIO (sino redibuja infinito) + pide un redraw: el loop es
-    // event-driven, sin esto el campo quedaba vacio al arrancar (se seteaba para el frame siguiente que no llegaba
-    // hasta el 1er hover). Con el g_redraw se muestra el nombre apenas arranca.
+    // sync display cuando NO se edita. Solo si CAMBIO (sino redibuja infinito) + pide un redraw.
     if (!foco && ObjActivo && pt->field.text != ObjActivo->name){ pt->field.SetText(ObjActivo->name); g_redraw = true; }
+}
+static std::string* g_btnEditTarget = NULL;
+static void SincronizarTextoBoton(Properties* p){
+    if (!p || !p->propBtnTexto) return;
+    Boton2D* b = (ObjActivo && ObjActivo->getType() == ObjectType::boton2d) ? (Boton2D*)ObjActivo : NULL;
+    PropText* pt = p->propBtnTexto;
+    bool foco = (g_textFieldActivo == &pt->field);
+    if (foco && !g_btnEditTarget && b) g_btnEditTarget = &b->texto;
+    if (foco && g_btnEditTarget && *g_btnEditTarget != pt->field.text){
+        *g_btnEditTarget = pt->field.text;   // vista previa EN VIVO
+        g_redraw = true;
+    }
+    if (!foco && g_btnEditTarget) g_btnEditTarget = NULL;
+    if (!foco && b && pt->field.text != b->texto){ pt->field.SetText(b->texto); g_redraw = true; }
+}
+
+static void SincronizarNombreObjeto(Properties* p){
+    if (!p) return;
+    SincronizarNombreCampo(p->propNameObj);
+    SincronizarNombreCampo(p->propT2dNombre);   // los elementos 2D no muestran el tab Objeto:
+    SincronizarNombreCampo(p->propImgNombre);   // su Name vive arriba de su tarjeta contextual
+    SincronizarNombreCampo(p->propRectNombre);
+    SincronizarNombreCampo(p->propContNombre);
+    SincronizarNombreCampo(p->propS9Nombre);
+    SincronizarNombreCampo(p->propBtnNombre);
+    SincronizarNombreCampo(p->propExpNombre);
+    SincronizarNombreCampo(p->propUInombre);
 }
 
 // TEXTO del elemento 2D: el campo propT2dTexto muestra t->texto y, al perder el foco, escribe lo
@@ -359,10 +394,12 @@ static void SincronizarTexto2D(Properties* p){
     PropText* pt = p->propT2dTexto;
     bool foco = (g_textFieldActivo == &pt->field);
     if (foco && !g_t2dEditTarget && t) g_t2dEditTarget = &t->texto;
-    if (!foco && g_t2dEditTarget){
-        *g_t2dEditTarget = pt->field.text;
-        g_t2dEditTarget = NULL;
+    if (foco && g_t2dEditTarget && *g_t2dEditTarget != pt->field.text){
+        *g_t2dEditTarget = pt->field.text;   // VISTA PREVIA EN VIVO: cada tecla se ve en el lienzo
         g_redraw = true;
+    }
+    if (!foco && g_t2dEditTarget){
+        g_t2dEditTarget = NULL;
     }
     if (!foco && t && pt->field.text != t->texto){ pt->field.SetText(t->texto); g_redraw = true; }
 }
@@ -420,7 +457,11 @@ static void AccionTexturaElegida(int id){
 // todos los dropdowns quedan iguales y bien pegados (antes cada accion lo calculaba a mano con un gap de mas).
 static void AbrirMenuBajoBoton(PopupMenu* menu, Button* boton){
     if (!menu || !boton) return;
-    menu->Abrir(boton->sx, boton->sy + boton->height - GlobalScale, MenuPantallaW, MenuPantallaH);
+    // el menu se engancha al borde DERECHO del boton (nunca al izquierdo): los items quedan
+    // alineados con la columna de valores, que es donde esta el desplegable.
+    menu->Resize();   // para conocer su ancho antes de posicionarlo
+    menu->Abrir(boton->sx + boton->width - menu->width,
+                boton->sy + boton->height - GlobalScale, MenuPantallaW, MenuPantallaH);
     MenuAbierto = menu;
 }
 
@@ -595,6 +636,20 @@ static void AccionAntialias(){
     g_redraw = true;
 }
 
+// ESCALA GLOBAL del editor (cfg.scale), cambiada EN VIVO desde Ajustes: re-deriva todas
+// las metricas *GS y re-lay-outea el arbol de viewports. x1 = como se ve en el N95.
+static float g_ajEscala = 3.0f;
+static void AccionEscalaEditor(){
+    int v = (int)(g_ajEscala + 0.5f);
+    if (v < 1) v = 1;
+    if (v > 6) v = 6;
+    g_ajEscala = (float)v;
+    cfg.scale = v;
+    SetGlobalScale(v);
+    if (rootViewport) rootViewport->Resize(winW, winH);
+    g_redraw = true;
+}
+
 static void AccionGuardarConfig(){
     if (W3dConfigGuardar()) Notificar(T("Settings saved"), false);
     else                    Notificar(T("Could not write config.ini"), true);
@@ -677,6 +732,33 @@ static const char* T2dNombreAlign(int v, bool horizontal){
 static PopupMenu* MenuT2dAlignH = NULL;
 static PopupMenu* MenuT2dAlignV = NULL;
 static PopupMenu* MenuT2dFuente = NULL;
+static PopupMenu* MenuT2dAncla  = NULL;
+
+static const char* T2dNombreAncla(int v){
+    switch (v){
+        case 1: return "Izquierda";        case 2: return "Derecha";
+        case 3: return "Arriba";           case 4: return "Abajo";
+        case 5: return "Arriba-Izquierda"; case 6: return "Arriba-Derecha";
+        case 7: return "Abajo-Izquierda";  case 8: return "Abajo-Derecha";
+        default: return "Centro";
+    }
+}
+static void AccionT2dAnclaElegida(int id){
+    Texto2D* t = T2dActivo(); if (!t) return;
+    // el ancla cambia SOLO el punto de referencia: X, Y y Z quedan como estan
+    // (pedido de Dante: el elemento salta al nuevo punto, sin tocarle los valores)
+    t->ancla = id;
+    if (PropsActivo && PropsActivo->propT2dAncla) PropsActivo->propT2dAncla->button->text = T2dNombreAncla(id);
+    g_redraw = true;
+}
+static void AccionMenuT2dAncla(){
+    if (!PropsActivo || !T2dActivo()) return;
+    if (!MenuT2dAncla){ MenuT2dAncla = new PopupMenu(); MenuT2dAncla->action = AccionT2dAnclaElegida; }
+    MenuT2dAncla->Limpiar();
+    MenuT2dAncla->titulo = T("Anchor");
+    for (int i = 0; i <= 8; i++) MenuT2dAncla->Agregar(T2dNombreAncla(i), i);
+    AbrirMenuBajoBoton(MenuT2dAncla, PropsActivo->propT2dAncla->button);
+}
 
 static void AccionT2dAlignHElegido(int id){
     Texto2D* t = T2dActivo(); if (!t) return;
@@ -723,6 +805,570 @@ static void AccionMenuT2dFuente(){
     MenuT2dFuente->Agregar("Whisk3D", 0);
     MenuT2dFuente->Agregar(T("Load font") + std::string("..."), 1);
     AbrirMenuBajoBoton(MenuT2dFuente, PropsActivo->propT2dFuente->button);
+}
+
+// ============================ IMAGEN 2D ============================
+static Imagen2D* Img2dActiva(){
+    return (ObjActivo && ObjActivo->getType() == ObjectType::imagen2d) ? (Imagen2D*)ObjActivo : NULL;
+}
+static const char* ImgNombreModo(int m){
+    return m == 1 ? "Ajustar" : (m == 2 ? "Cover" : "Estirar");
+}
+// nombre de archivo pelado (para el boton de la textura)
+static std::string NombreDeArchivo(const std::string& ruta){
+    size_t b = ruta.find_last_of("/\\");
+    return (b == std::string::npos) ? ruta : ruta.substr(b + 1);
+}
+static PopupMenu* MenuImgModo = NULL;
+static void AccionImgModoElegido(int id){
+    Imagen2D* im = Img2dActiva(); if (!im) return;
+    im->modo = id;
+    if (PropsActivo && PropsActivo->propImgModo) PropsActivo->propImgModo->button->text = ImgNombreModo(id);
+    g_redraw = true;
+}
+static void AccionMenuImgModo(){
+    if (!PropsActivo || !Img2dActiva()) return;
+    if (!MenuImgModo){ MenuImgModo = new PopupMenu(); MenuImgModo->action = AccionImgModoElegido; }
+    MenuImgModo->Limpiar();
+    MenuImgModo->titulo = T("Mode");
+    MenuImgModo->Agregar("Estirar", 0);   // deforma para llenar el rect
+    MenuImgModo->Agregar("Ajustar", 1);   // entera, con bandas
+    MenuImgModo->Agregar("Cover", 2);     // llena recortando
+    AbrirMenuBajoBoton(MenuImgModo, PropsActivo->propImgModo->button);
+}
+static PopupMenu* MenuImgAncla = NULL;
+static void AccionImgAnclaElegida(int id){
+    Imagen2D* im = Img2dActiva(); if (!im) return;
+    im->ancla = id;   // igual que el texto: el ancla NO toca X/Y/Z
+    if (PropsActivo && PropsActivo->propImgAncla) PropsActivo->propImgAncla->button->text = T2dNombreAncla(id);
+    g_redraw = true;
+}
+static void AccionMenuImgAncla(){
+    if (!PropsActivo || !Img2dActiva()) return;
+    if (!MenuImgAncla){ MenuImgAncla = new PopupMenu(); MenuImgAncla->action = AccionImgAnclaElegida; }
+    MenuImgAncla->Limpiar();
+    MenuImgAncla->titulo = T("Anchor");
+    for (int i = 0; i <= 8; i++) MenuImgAncla->Agregar(T2dNombreAncla(i), i);
+    AbrirMenuBajoBoton(MenuImgAncla, PropsActivo->propImgAncla->button);
+}
+// TEXTURA: elegir el archivo con el file browser; una imagen recien creada toma su tamano natural
+static void ImgTexturaElegida(const std::string& ruta){
+    Imagen2D* im = Img2dActiva(); if (!im) return;
+    im->textura = ruta;
+    int w = 0, h = 0;
+    if (Textura2DObtener(ruta, &w, &h) && w > 0 && h > 0) { im->ancho = (float)w; im->alto = (float)h; }
+    if (PropsActivo && PropsActivo->propImgTextura)
+        PropsActivo->propImgTextura->button->text = NombreDeArchivo(ruta);
+    g_redraw = true;
+}
+static void AccionImgTextura(){
+    if (!Img2dActiva()) return;
+    AbrirFileBrowser(T("Load image"), T("Open"), ".png .jpg .jpeg .bmp .tga .gif", ImgTexturaElegida);
+}
+
+// ============================ UI RESPONSIVE ============================
+static UI* UIActivaProps(){
+    return (ObjActivo && ObjActivo->getType() == ObjectType::ui) ? (UI*)ObjActivo : NULL;
+}
+static const char* UINombreRes(int p){
+    return p == 2160 ? "4k" : p == 1080 ? "1080p" : p == 720 ? "720p" : p == 480 ? "480p" : "240p";
+}
+static const char* UINombreAspecto(int a){
+    return a == 0 ? "16:9" : (a == 1 ? "4:3" : "1:1");
+}
+static void AccionUIigualRender(){   // onChange del checkbox "como el render"
+    UI* u = UIActivaProps(); if (!u) return;
+    // recien pasado a RESPONSIVE: arranca del tamano actual del render (continuidad visual)
+    if (!u->igualQueRender) UI2D_TamanoVentana(&u->ancho, &u->alto);
+    if (PropsActivo) PropsActivo->target = NULL;   // re-bind: muestra/oculta las filas responsive
+    g_redraw = true;
+}
+static PopupMenu* MenuUIres = NULL;
+static void AccionUIresElegida(int id){
+    UI* u = UIActivaProps(); if (!u) return;
+    u->resPreset = id;
+    u->AplicarPreset();
+    if (PropsActivo && PropsActivo->propUIres) PropsActivo->propUIres->button->text = UINombreRes(id);
+    g_redraw = true;
+}
+static void AccionMenuUIres(){
+    if (!PropsActivo || !UIActivaProps()) return;
+    if (!MenuUIres){ MenuUIres = new PopupMenu(); MenuUIres->action = AccionUIresElegida; }
+    MenuUIres->Limpiar();
+    MenuUIres->titulo = T("Resolution");
+    MenuUIres->Agregar("4k", 2160);
+    MenuUIres->Agregar("1080p", 1080);
+    MenuUIres->Agregar("720p", 720);
+    MenuUIres->Agregar("480p", 480);
+    MenuUIres->Agregar("240p", 240);    // para simular el Nokia (con 4:3 y Rotar: 240x320)
+    AbrirMenuBajoBoton(MenuUIres, PropsActivo->propUIres->button);
+}
+static PopupMenu* MenuUIaspecto = NULL;
+static void AccionUIaspectoElegido(int id){
+    UI* u = UIActivaProps(); if (!u) return;
+    u->aspectoPreset = id;
+    u->AplicarPreset();
+    if (PropsActivo && PropsActivo->propUIaspecto) PropsActivo->propUIaspecto->button->text = UINombreAspecto(id);
+    g_redraw = true;
+}
+static void AccionMenuUIaspecto(){
+    if (!PropsActivo || !UIActivaProps()) return;
+    if (!MenuUIaspecto){ MenuUIaspecto = new PopupMenu(); MenuUIaspecto->action = AccionUIaspectoElegido; }
+    MenuUIaspecto->Limpiar();
+    MenuUIaspecto->titulo = T("Aspect");
+    MenuUIaspecto->Agregar("16:9", 0);
+    MenuUIaspecto->Agregar("4:3", 1);
+    MenuUIaspecto->Agregar("1:1", 2);
+    AbrirMenuBajoBoton(MenuUIaspecto, PropsActivo->propUIaspecto->button);
+}
+// EXPORTAR el UI activo como .w3dui: elegis la carpeta y se escribe <nombre>.w3dui
+static void UIExportCarpetaElegida(const std::string& carpeta){
+    UI* u = UIActivaProps(); if (!u) return;
+    std::string ruta = carpeta + "/" + u->name + ".w3dui";
+    if (UI2DGuardar(u, ruta)) Notificar(std::string(T("Saved: ")) + ruta, false);
+    else                      Notificar(T("Could not write the file"), true);
+}
+static void AccionUIexportar(){
+    if (!UIActivaProps()) return;
+    AbrirFileBrowser(T("Export UI to..."), T("Select Folder"), ".w3dui", UIExportCarpetaElegida, true);
+}
+
+static void AccionUIrotar(){   // el ancho se vuelve el alto y viceversa
+    UI* u = UIActivaProps(); if (!u) return;
+    u->Rotar();
+    g_redraw = true;
+}
+
+// ============================ POSICION RELATIVA / ABSOLUTA ============================
+// por defecto la posicion X/Y se muestra RELATIVA al tamano de la UI (1.0 = todo el ancho,
+// 0.5 = la mitad); el checkbox "Pixels" la pasa a pixeles absolutos. Los campos editan un
+// PROXY que se sincroniza por frame y el onChange escribe de vuelta en pos.
+static bool  g_pos2dAbs = false;
+static float g_pos2dX = 0.0f, g_pos2dY = 0.0f;
+static Object* ElemActivo2D(){
+    return (ObjActivo && UI2D_EsElemento2D(ObjActivo)) ? ObjActivo : NULL;
+}
+static void AccionPos2DEditada(){
+    Object* o = ElemActivo2D(); if (!o) return;
+    // la posicion GUARDADA es RELATIVA (el numero que no se toca); el modo px es la
+    // vista "final": lo tipeado en px se convierte de vuelta a relativo
+    float vw, vh; UI2D_TamanoLienzo(&vw, &vh);
+    o->pos.x = g_pos2dAbs ? (vw > 0.0f ? g_pos2dX / vw : 0.0f) : g_pos2dX;
+    o->pos.y = g_pos2dAbs ? (vh > 0.0f ? g_pos2dY / vh : 0.0f) : g_pos2dY;
+    g_redraw = true;
+}
+static void AccionPos2DAbsToggle(){ g_redraw = true; }   // el sync por frame rehace el proxy
+
+// ============================ TIPO DEL TEXTO ============================
+static const char* T2dNombreTipo(int t){
+    return t == 1 ? "Number" : (t == 2 ? "Float" : "String");
+}
+static PopupMenu* MenuT2dTipo = NULL;
+static void AccionT2dTipoElegido(int id){
+    Texto2D* t = T2dActivo(); if (!t) return;
+    t->tipo = id;
+    if (PropsActivo && PropsActivo->propT2dTipo) PropsActivo->propT2dTipo->button->text = T2dNombreTipo(id);
+    if (PropsActivo) PropsActivo->target = NULL;   // re-bind: Decimales aparece solo en float
+    g_redraw = true;
+}
+static void AccionMenuT2dTipo(){
+    if (!PropsActivo || !T2dActivo()) return;
+    if (!MenuT2dTipo){ MenuT2dTipo = new PopupMenu(); MenuT2dTipo->action = AccionT2dTipoElegido; }
+    MenuT2dTipo->Limpiar();
+    MenuT2dTipo->titulo = T("Type");
+    MenuT2dTipo->Agregar("String", 0);   // tal cual se escribe
+    MenuT2dTipo->Agregar("Number", 1);   // entero
+    MenuT2dTipo->Agregar("Float", 2);    // con decimales configurables
+    AbrirMenuBajoBoton(MenuT2dTipo, PropsActivo->propT2dTipo->button);
+}
+
+// ============================ LINEAS DEL TEXTO ============================
+static const char* T2dNombreLineas(int l){
+    return l == 1 ? "Por palabras" : (l == 2 ? "En cualquier parte" : "Una linea");
+}
+static PopupMenu* MenuT2dLineas = NULL;
+static void AccionT2dLineasElegido(int id){
+    Texto2D* t = T2dActivo(); if (!t) return;
+    t->lineas = id;
+    if (PropsActivo && PropsActivo->propT2dLineas) PropsActivo->propT2dLineas->button->text = T2dNombreLineas(id);
+    g_redraw = true;
+}
+static void AccionMenuT2dLineas(){
+    if (!PropsActivo || !T2dActivo()) return;
+    if (!MenuT2dLineas){ MenuT2dLineas = new PopupMenu(); MenuT2dLineas->action = AccionT2dLineasElegido; }
+    MenuT2dLineas->Limpiar();
+    MenuT2dLineas->titulo = T("Lines");
+    MenuT2dLineas->Agregar("Una linea", 0);            // todo junto, sin saltos
+    MenuT2dLineas->Agregar("Por palabras", 1);         // salta en los espacios (como css)
+    MenuT2dLineas->Agregar("En cualquier parte", 2);   // salta donde haga falta
+    AbrirMenuBajoBoton(MenuT2dLineas, PropsActivo->propT2dLineas->button);
+}
+
+// ============================ RECTANGULO 2D ============================
+static Rect2D* Rect2dActivo(){
+    return (ObjActivo && ObjActivo->getType() == ObjectType::rect2d) ? (Rect2D*)ObjActivo : NULL;
+}
+// ============================ LAYOUT DE LOS HIJOS ============================
+static const char* HijosNombreLayout(int l){
+    return l == 1 ? "Filas" : (l == 2 ? "Columnas" : "Libremente");
+}
+static int* HijosLayoutDe(Object* o){
+    if (!o) return NULL;
+    if (o->getType() == ObjectType::ui) return &((UI*)o)->layoutHijos;
+    if (UI2D_EsElemento2D(o))           return &((Elemento2D*)o)->layoutHijos;
+    return NULL;
+}
+static float* HijosGapDe(Object* o){
+    if (!o) return NULL;
+    if (o->getType() == ObjectType::ui) return &((UI*)o)->gap;
+    if (UI2D_EsElemento2D(o))           return &((Elemento2D*)o)->gap;
+    return NULL;
+}
+static bool* HijosClipXDe(Object* o){
+    if (!o) return NULL;
+    if (o->getType() == ObjectType::ui) return &((UI*)o)->recortaX;
+    if (UI2D_EsElemento2D(o))           return &((Elemento2D*)o)->recortaX;
+    return NULL;
+}
+static bool* HijosClipYDe(Object* o){
+    if (!o) return NULL;
+    if (o->getType() == ObjectType::ui) return &((UI*)o)->recortaY;
+    if (UI2D_EsElemento2D(o))           return &((Elemento2D*)o)->recortaY;
+    return NULL;
+}
+static bool* HijosScrollDe(Object* o){
+    if (!o) return NULL;
+    if (o->getType() == ObjectType::ui) return &((UI*)o)->conScroll;
+    if (UI2D_EsElemento2D(o))           return &((Elemento2D*)o)->conScroll;
+    return NULL;
+}
+static float* HijosScrollXDe(Object* o){
+    if (!o) return NULL;
+    if (o->getType() == ObjectType::ui) return &((UI*)o)->scrollX;
+    if (UI2D_EsElemento2D(o))           return &((Elemento2D*)o)->scrollX;
+    return NULL;
+}
+static float* HijosScrollYDe(Object* o){
+    if (!o) return NULL;
+    if (o->getType() == ObjectType::ui) return &((UI*)o)->scrollY;
+    if (UI2D_EsElemento2D(o))           return &((Elemento2D*)o)->scrollY;
+    return NULL;
+}
+static bool* HijosPadGapPxDe(Object* o){
+    if (!o) return NULL;
+    if (o->getType() == ObjectType::ui) return &((UI*)o)->padGapPx;
+    if (UI2D_EsElemento2D(o))           return &((Elemento2D*)o)->padGapPx;
+    return NULL;
+}
+static void AccionHijosRefrescar(){
+    if (PropsActivo) PropsActivo->target = NULL;   // re-bind: filas visibles cambian
+    g_redraw = true;
+}
+static void AccionTamPxToggle(){
+    if (PropsActivo) PropsActivo->target = NULL;   // re-bind: unidades y rangos cambian
+    g_redraw = true;
+}
+// ajusta unidad/rango/pasos de una fila Width/Height segun el modo (px o relativo)
+static void AjustarFilaTam(PropFloat* f, bool px){
+    if (!f) return;
+    f->unit = px ? "px" : "";
+    f->SetRango(px ? 1.0f : 0.005f, px ? 8192.0f : 8.0f);
+    f->stepFino   = px ? 1.0f  : 0.005f;
+    f->stepGrueso = px ? 10.0f : 0.05f;
+    f->dragStep   = px ? 1.0f  : 0.002f;
+}
+static void AccionHijosPxToggle(){
+    if (PropsActivo) PropsActivo->target = NULL;   // re-bind: unidades y rangos cambian
+    g_redraw = true;
+}
+static const char* HijosNombreAjuste(int a){ return a == 1 ? "Minimo" : "Estirar"; }
+static const char* HijosNombreAlign(int a){
+    return a == 1 ? "Centro" : (a == 2 ? "Fin" : "Inicio");
+}
+static int* HijosAjusteDe(Object* o){
+    if (!o) return NULL;
+    if (o->getType() == ObjectType::ui) return &((UI*)o)->layoutAjuste;
+    if (UI2D_EsElemento2D(o))           return &((Elemento2D*)o)->layoutAjuste;
+    return NULL;
+}
+static int* HijosAlignDe(Object* o){
+    if (!o) return NULL;
+    if (o->getType() == ObjectType::ui) return &((UI*)o)->layoutAlign;
+    if (UI2D_EsElemento2D(o))           return &((Elemento2D*)o)->layoutAlign;
+    return NULL;
+}
+static PopupMenu* MenuHijosAjuste = NULL;
+static void AccionHijosAjusteElegido(int id){
+    int* a = HijosAjusteDe(ObjActivo); if (!a) return;
+    *a = id;
+    if (PropsActivo && PropsActivo->propHijosAjuste)
+        PropsActivo->propHijosAjuste->button->text = HijosNombreAjuste(id);
+    if (PropsActivo) PropsActivo->target = NULL;
+    g_redraw = true;
+}
+static void AccionMenuHijosAjuste(){
+    if (!PropsActivo || !HijosAjusteDe(ObjActivo)) return;
+    if (!MenuHijosAjuste){ MenuHijosAjuste = new PopupMenu(); MenuHijosAjuste->action = AccionHijosAjusteElegido; }
+    MenuHijosAjuste->Limpiar();
+    MenuHijosAjuste->titulo = T("Fit");
+    MenuHijosAjuste->Agregar("Estirar", 0);   // se reparten el 100% por peso
+    MenuHijosAjuste->Agregar("Minimo", 1);    // cada uno su tamano; Expandir absorbe el resto
+    AbrirMenuBajoBoton(MenuHijosAjuste, PropsActivo->propHijosAjuste->button);
+}
+static PopupMenu* MenuHijosAlign = NULL;
+static void AccionHijosAlignElegido(int id){
+    int* a = HijosAlignDe(ObjActivo); if (!a) return;
+    *a = id;
+    if (PropsActivo && PropsActivo->propHijosAlign)
+        PropsActivo->propHijosAlign->button->text = HijosNombreAlign(id);
+    g_redraw = true;
+}
+static void AccionMenuHijosAlign(){
+    if (!PropsActivo || !HijosAlignDe(ObjActivo)) return;
+    if (!MenuHijosAlign){ MenuHijosAlign = new PopupMenu(); MenuHijosAlign->action = AccionHijosAlignElegido; }
+    MenuHijosAlign->Limpiar();
+    MenuHijosAlign->titulo = T("Align");
+    MenuHijosAlign->Agregar("Inicio", 0);
+    MenuHijosAlign->Agregar("Centro", 1);
+    MenuHijosAlign->Agregar("Fin", 2);
+    AbrirMenuBajoBoton(MenuHijosAlign, PropsActivo->propHijosAlign->button);
+}
+
+// fila COMPACTA de la paleta: nombre a la IZQUIERDA (label) + swatch a la DERECHA
+// (lo de siempre de PropColor) + un cuadradito con CRUZ para borrar la entrada.
+class PropColorPal : public PropColor {
+public:
+    int idx;
+    PropColorPal(const std::string& nom, int i) : PropColor(nom), idx(i) {}
+    int PaletaIdx() const override { return idx; }
+    void RenderPropertiValue(Card* propertiBox) override {
+        // la CRUZ: un cuadradito a la IZQUIERDA del swatch (que esta pegado a la derecha)
+        int cw = RenglonHeightGS + GlobalScale * 2;
+        float xCruz = (float)(width - PropColEtiqueta - cw * 2 - gapGS - bordersGS);
+        w3dEngine::PushMatrix();
+        w3dEngine::Translatef(xCruz, 0, 0);
+        RenderBitmapText("x", textAlign::center, cw);
+        w3dEngine::PopMatrix();
+        PropColor::RenderPropertiValue(propertiBox);
+    }
+};
+
+// ============================ PALETA DE COLORES ============================
+static Imagen2D* Img2dActiva();      // (definidos mas abajo; las acciones de paleta los usan)
+static Rect2D* Rect2dActivo();
+static Slice9* S9Activo();
+static Boton2D* Btn2dActivo();
+static UI* UIActivaProps();
+// el UI cuya paleta manda para el elemento activo (su raiz, o el mismo si es un UI)
+static UI* PaletaUIDe(Object* o){
+    for (Object* p = o; p; p = p->Parent)
+        if (p->getType() == ObjectType::ui) return (UI*)p;
+    return NULL;
+}
+static const char* PalNombre(UI* u, int idx){
+    if (!u || idx < 0) return "Propio";
+    std::vector<PaletaColor>& cs = u->Colores();
+    if (idx >= (int)cs.size()) return "Propio";
+    return cs[idx].nombre.c_str();
+}
+// que indice esta editando el menu de paleta abierto (apunta al campo int del elemento)
+static int* g_palTarget = NULL;
+static PropButton* g_palBoton = NULL;
+static PopupMenu* MenuPal = NULL;
+static void AccionPalElegida(int id){
+    if (!g_palTarget) return;
+    *g_palTarget = id;   // -1 = color propio
+    if (g_palBoton) g_palBoton->button->text = PalNombre(PaletaUIDe(ObjActivo), id);
+    if (PropsActivo) PropsActivo->target = NULL;   // re-bind: el swatch aparece/desaparece
+    g_redraw = true;
+}
+static void AbrirMenuPal(int* target, PropButton* boton){
+    UI* u = PaletaUIDe(ObjActivo);
+    if (!u || !boton) return;
+    g_palTarget = target; g_palBoton = boton;
+    if (!MenuPal){ MenuPal = new PopupMenu(); MenuPal->action = AccionPalElegida; }
+    MenuPal->Limpiar();
+    MenuPal->titulo = T("Palette");
+    MenuPal->Agregar("Propio", -1);
+    std::vector<PaletaColor>& cs = u->Colores();
+    for (size_t i = 0; i < cs.size(); i++)
+        MenuPal->Agregar(cs[i].nombre, (int)i);
+    AbrirMenuBajoBoton(MenuPal, boton->button);
+}
+static void AccionPalT2d(){  Texto2D* t = T2dActivo();   if (t && PropsActivo) AbrirMenuPal(&t->palColor, PropsActivo->propT2dPal); }
+static void AccionPalImg(){  Imagen2D* i = Img2dActiva();if (i && PropsActivo) AbrirMenuPal(&i->palTinte, PropsActivo->propImgPal); }
+static void AccionPalRect(){ Rect2D* r = Rect2dActivo(); if (r && PropsActivo) AbrirMenuPal(&r->palColor, PropsActivo->propRectPal); }
+static void AccionPalS9(){   Slice9* s = S9Activo();     if (s && PropsActivo) AbrirMenuPal(&s->palTinte, PropsActivo->propS9Pal); }
+static void AccionPalBtnFondo(){ Boton2D* b = Btn2dActivo(); if (b && PropsActivo) AbrirMenuPal(&b->palFondo, PropsActivo->propBtnPalFondo); }
+static void AccionPalBtnTexto(){ Boton2D* b = Btn2dActivo(); if (b && PropsActivo) AbrirMenuPal(&b->palTexto, PropsActivo->propBtnPalTexto); }
+static void AccionPalBtnBorde(){ Boton2D* b = Btn2dActivo(); if (b && PropsActivo) AbrirMenuPal(&b->palBorde, PropsActivo->propBtnPalBorde); }
+// agregar un color a la paleta del UI activo
+static void AccionPaletaAgregar(){
+    UI* u = UIActivaProps(); if (!u) return;
+    char nom[24];
+    snprintf(nom, sizeof(nom), "Color %d", (int)u->Colores().size() + 1);
+    float blanco[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+    u->AgregarPaleta(nom, blanco);
+    if (PropsActivo) PropsActivo->target = NULL;   // re-bind: la tarjeta se reconstruye
+    g_redraw = true;
+}
+// los nombres de la paleta se editan EN VIVO (los PropText dinamicos de la tarjeta)
+// desplegable de PALETAS: elegir la activa (recolorea todo) o crear una nueva (copia)
+static PopupMenu* MenuPaletas = NULL;
+static void AccionPaletasElegida(int id){
+    UI* u = UIActivaProps(); if (!u) return;
+    if (id >= (int)u->paletas.size()) {          // "Nueva paleta": copia de la activa
+        char nom[24];
+        snprintf(nom, sizeof(nom), "Paleta %d", (int)u->paletas.size() + 1);
+        u->NuevaPaleta(nom);
+    } else u->paletaActiva = id;
+    if (PropsActivo) PropsActivo->target = NULL;
+    g_redraw = true;
+}
+static void AccionMenuPaletas(){
+    UI* u = UIActivaProps(); if (!u || !PropsActivo || !PropsActivo->propPaletaSel) return;
+    if (!MenuPaletas){ MenuPaletas = new PopupMenu(); MenuPaletas->action = AccionPaletasElegida; }
+    MenuPaletas->Limpiar();
+    MenuPaletas->titulo = T("Palette");
+    for (size_t i = 0; i < u->paletas.size(); i++)
+        MenuPaletas->Agregar(u->paletas[i].nombre, (int)i);
+    MenuPaletas->Agregar(T("New Palette"), (int)u->paletas.size());
+    AbrirMenuBajoBoton(MenuPaletas, PropsActivo->propPaletaSel->button);
+}
+
+// ============================ BOTON 2D ============================
+static Boton2D* Btn2dActivo(){
+    return (ObjActivo && ObjActivo->getType() == ObjectType::boton2d) ? (Boton2D*)ObjActivo : NULL;
+}
+static PopupMenu* MenuBtnAncla = NULL;
+static void AccionBtnAnclaElegida(int id){
+    Boton2D* b = Btn2dActivo(); if (!b) return;
+    b->ancla = id;
+    if (PropsActivo && PropsActivo->propBtnAncla) PropsActivo->propBtnAncla->button->text = T2dNombreAncla(id);
+    g_redraw = true;
+}
+static void AccionMenuBtnAncla(){
+    if (!PropsActivo || !Btn2dActivo()) return;
+    if (!MenuBtnAncla){ MenuBtnAncla = new PopupMenu(); MenuBtnAncla->action = AccionBtnAnclaElegida; }
+    MenuBtnAncla->Limpiar();
+    MenuBtnAncla->titulo = T("Anchor");
+    for (int i = 0; i <= 8; i++) MenuBtnAncla->Agregar(T2dNombreAncla(i), i);
+    AbrirMenuBajoBoton(MenuBtnAncla, PropsActivo->propBtnAncla->button);
+}
+static void BtnTexElegida(const std::string& ruta){
+    Boton2D* b = Btn2dActivo(); if (!b) return;
+    b->texturaFondo = ruta;
+    if (PropsActivo && PropsActivo->propBtnTex)
+        PropsActivo->propBtnTex->button->text = ruta.empty() ? std::string(T("Choose..."))
+                                                             : NombreDeArchivo(ruta);
+    if (PropsActivo) PropsActivo->target = NULL;
+    g_redraw = true;
+}
+static void AccionBtnTex(){
+    if (!Btn2dActivo()) return;
+    AbrirFileBrowser(T("Load image"), T("Open"), ".png .jpg .jpeg .bmp .tga .gif", BtnTexElegida);
+}
+static void BtnIconoElegido(const std::string& ruta){
+    Boton2D* b = Btn2dActivo(); if (!b) return;
+    b->icono = ruta;
+    if (PropsActivo && PropsActivo->propBtnIcono)
+        PropsActivo->propBtnIcono->button->text = ruta.empty() ? std::string(T("Choose..."))
+                                                               : NombreDeArchivo(ruta);
+    g_redraw = true;
+}
+static void AccionBtnIcono(){
+    if (!Btn2dActivo()) return;
+    AbrirFileBrowser(T("Load image"), T("Open"), ".png .jpg .jpeg .bmp .tga .gif", BtnIconoElegido);
+}
+
+static PopupMenu* MenuHijosLayout = NULL;
+static void AccionHijosLayoutElegido(int id){
+    int* l = HijosLayoutDe(ObjActivo); if (!l) return;
+    *l = id;
+    if (PropsActivo && PropsActivo->propHijosLayout)
+        PropsActivo->propHijosLayout->button->text = HijosNombreLayout(id);
+    if (PropsActivo) PropsActivo->target = NULL;   // re-bind: Gap aparece/desaparece
+    g_redraw = true;
+}
+static void AccionMenuHijosLayout(){
+    if (!PropsActivo || !HijosLayoutDe(ObjActivo)) return;
+    if (!MenuHijosLayout){ MenuHijosLayout = new PopupMenu(); MenuHijosLayout->action = AccionHijosLayoutElegido; }
+    MenuHijosLayout->Limpiar();
+    MenuHijosLayout->titulo = T("Layout");
+    MenuHijosLayout->Agregar("Libremente", 0);   // cada hijo con su ancla y su posicion
+    MenuHijosLayout->Agregar("Filas", 1);        // se reparten el alto (100% del area)
+    MenuHijosLayout->Agregar("Columnas", 2);     // se reparten el ancho
+    AbrirMenuBajoBoton(MenuHijosLayout, PropsActivo->propHijosLayout->button);
+}
+
+static Contenedor2D* Cont2dActivo(){
+    return (ObjActivo && ObjActivo->getType() == ObjectType::cont2d) ? (Contenedor2D*)ObjActivo : NULL;
+}
+static PopupMenu* MenuContAncla = NULL;
+static void AccionContAnclaElegida(int id){
+    Contenedor2D* c = Cont2dActivo(); if (!c) return;
+    c->ancla = id;
+    if (PropsActivo && PropsActivo->propContAncla) PropsActivo->propContAncla->button->text = T2dNombreAncla(id);
+    g_redraw = true;
+}
+static void AccionMenuContAncla(){
+    if (!PropsActivo || !Cont2dActivo()) return;
+    if (!MenuContAncla){ MenuContAncla = new PopupMenu(); MenuContAncla->action = AccionContAnclaElegida; }
+    MenuContAncla->Limpiar();
+    MenuContAncla->titulo = T("Anchor");
+    for (int i = 0; i <= 8; i++) MenuContAncla->Agregar(T2dNombreAncla(i), i);
+    AbrirMenuBajoBoton(MenuContAncla, PropsActivo->propContAncla->button);
+}
+
+// ============================ SLICE 9 ============================
+static Slice9* S9Activo(){
+    return (ObjActivo && ObjActivo->getType() == ObjectType::slice9) ? (Slice9*)ObjActivo : NULL;
+}
+static PopupMenu* MenuS9Ancla = NULL;
+static void AccionS9AnclaElegida(int id){
+    Slice9* s9 = S9Activo(); if (!s9) return;
+    s9->ancla = id;
+    if (PropsActivo && PropsActivo->propS9Ancla) PropsActivo->propS9Ancla->button->text = T2dNombreAncla(id);
+    g_redraw = true;
+}
+static void AccionMenuS9Ancla(){
+    if (!PropsActivo || !S9Activo()) return;
+    if (!MenuS9Ancla){ MenuS9Ancla = new PopupMenu(); MenuS9Ancla->action = AccionS9AnclaElegida; }
+    MenuS9Ancla->Limpiar();
+    MenuS9Ancla->titulo = T("Anchor");
+    for (int i = 0; i <= 8; i++) MenuS9Ancla->Agregar(T2dNombreAncla(i), i);
+    AbrirMenuBajoBoton(MenuS9Ancla, PropsActivo->propS9Ancla->button);
+}
+static void S9TexturaElegida(const std::string& ruta){
+    Slice9* s9 = S9Activo(); if (!s9) return;
+    s9->textura = ruta;
+    int w = 0, h = 0;
+    if (Textura2DObtener(ruta, &w, &h) && w > 0 && h > 0 && s9->tamPx) {
+        s9->ancho = (float)w; s9->alto = (float)h;
+    }
+    if (PropsActivo && PropsActivo->propS9Textura)
+        PropsActivo->propS9Textura->button->text = NombreDeArchivo(ruta);
+    g_redraw = true;
+}
+static void AccionS9Textura(){
+    if (!S9Activo()) return;
+    AbrirFileBrowser(T("Load image"), T("Open"), ".png .jpg .jpeg .bmp .tga .gif", S9TexturaElegida);
+}
+
+static PopupMenu* MenuRectAncla = NULL;
+static void AccionRectAnclaElegida(int id){
+    Rect2D* r = Rect2dActivo(); if (!r) return;
+    r->ancla = id;   // igual que el resto: el ancla NO toca X/Y/Z
+    if (PropsActivo && PropsActivo->propRectAncla) PropsActivo->propRectAncla->button->text = T2dNombreAncla(id);
+    g_redraw = true;
+}
+static void AccionMenuRectAncla(){
+    if (!PropsActivo || !Rect2dActivo()) return;
+    if (!MenuRectAncla){ MenuRectAncla = new PopupMenu(); MenuRectAncla->action = AccionRectAnclaElegida; }
+    MenuRectAncla->Limpiar();
+    MenuRectAncla->titulo = T("Anchor");
+    for (int i = 0; i <= 8; i++) MenuRectAncla->Agregar(T2dNombreAncla(i), i);
+    AbrirMenuBajoBoton(MenuRectAncla, PropsActivo->propRectAncla->button);
 }
 
 // ====================================================================
@@ -1543,6 +2189,7 @@ void Properties::ConstruirGrupos(){
     // selector de modo de rotacion (dropdown) + campos W/X/Y/Z. Que campos se
     // muestran (W solo en Quaternion/Axis) y a que apuntan lo hace RefreshTarget.
     propRotMode = new PropButton(T("Mode"));                            // [4]
+    propRotMode->conLabel = true;   // label a la izquierda, el desplegable a la derecha
     propRotMode->button->desplegable = true;
     propRotMode->action = AccionMenuRotMode;
     propTransform->properties.push_back(propRotMode);
@@ -1570,28 +2217,488 @@ void Properties::ConstruirGrupos(){
     GroupProperties.push_back(propTransform);
 
     // ===== Tarjeta "Texto" (elemento Texto2D del Editor 2D) =====
+    // ARRIBA de todo: Nombre y Posicion (los elementos 2D no muestran el tab Objeto; esto
+    // era lo unico que se usaba de ahi)
     propTexto2D = new GroupPropertie(T("Text"));
     propTexto2D->icono = (int)IconType::lista;
+    propT2dNombre = new PropText(T("Name"), "");
+    propTexto2D->properties.push_back(propT2dNombre);
+    propT2dPosX = new PropFloat(T("Location X"));
+    propTexto2D->properties.push_back(propT2dPosX);
+    propT2dPosY = new PropFloat("Y");
+    propTexto2D->properties.push_back(propT2dPosY);
+    propT2dPosZ = new PropFloat("Z");
+    propTexto2D->properties.push_back(propT2dPosZ);
+    propT2dPosAbs = new PropBool(T("Pixels"));   // off = relativa al tamano de la UI
+    propT2dPosAbs->onChange = AccionPos2DAbsToggle;
+    propTexto2D->properties.push_back(propT2dPosAbs);
+    propT2dPeso = new PropFloat(T("Weight"));    // reparto en filas/columnas del padre
+    propT2dPeso->SetRango(0.01f, 100.0f);
+    propTexto2D->properties.push_back(propT2dPeso);
     propT2dTexto = new PropText(T("Text"), "");
     propTexto2D->properties.push_back(propT2dTexto);
+    // TIPO del contenido (string / number / float) + decimales del float
+    propT2dTipo = new PropButton(T("Type"));
+    propT2dTipo->conLabel = true;
+    propT2dTipo->button->desplegable = true;
+    propT2dTipo->action = AccionMenuT2dTipo;
+    propTexto2D->properties.push_back(propT2dTipo);
+    propT2dDec = new PropFloat(T("Decimals"));
+    propT2dDec->SetRango(0.0f, 8.0f); propT2dDec->entero = true;
+    propTexto2D->properties.push_back(propT2dDec);
     propT2dTam = new PropFloat(T("Size"), "px");
     propT2dTam->SetRango(1.0f, 2000.0f);
     propTexto2D->properties.push_back(propT2dTam);
+    propT2dRot = new PropFloat(T("Rotation"), "o");   // debajo de Tamano (pedido Dante)
+    propTexto2D->properties.push_back(propT2dRot);
+    // desplegables: label a la IZQUIERDA, el boton del menu a la DERECHA (conLabel)
+    // la FUENTE va entre Rotacion y Align X (pedido Dante: molestaba entre ancla y alineacion)
+    propT2dFuente = new PropButton(T("Font"));
+    propT2dFuente->conLabel = true;
+    propT2dFuente->button->desplegable = true;
+    propT2dFuente->action = AccionMenuT2dFuente;
+    propTexto2D->properties.push_back(propT2dFuente);
+    // LINEAS (una / por palabras / donde sea) + ajustar el tamano al area disponible
+    propT2dLineas = new PropButton(T("Lines"));
+    propT2dLineas->conLabel = true;
+    propT2dLineas->button->desplegable = true;
+    propT2dLineas->action = AccionMenuT2dLineas;
+    propTexto2D->properties.push_back(propT2dLineas);
+    propT2dAutoTam = new PropBool(T("Auto Fit"));
+    propTexto2D->properties.push_back(propT2dAutoTam);
     propT2dAlignH = new PropButton(T("Align X"));
+    propT2dAlignH->conLabel = true;
     propT2dAlignH->button->desplegable = true;
     propT2dAlignH->action = AccionMenuT2dAlignH;
     propTexto2D->properties.push_back(propT2dAlignH);
     propT2dAlignV = new PropButton(T("Align Y"));
+    propT2dAlignV->conLabel = true;
     propT2dAlignV->button->desplegable = true;
     propT2dAlignV->action = AccionMenuT2dAlignV;
     propTexto2D->properties.push_back(propT2dAlignV);
-    propT2dColor = new PropColor(T("Color"));
+    // ANCLA: desde donde se mide la posicion (el centro del padre por defecto, o bordes/esquinas).
+    // Es lo que hace que la interfaz se ADAPTE al tamano de la ventana.
+    propT2dAncla = new PropButton(T("Anchor"));
+    propT2dAncla->conLabel = true;
+    propT2dAncla->button->desplegable = true;
+    propT2dAncla->action = AccionMenuT2dAncla;
+    propTexto2D->properties.push_back(propT2dAncla);
+    propT2dOpac = new PropFloat(T("Opacity"));
+    propT2dOpac->SetRango(0.0f, 1.0f);
+    propT2dOpac->stepFino = 0.01f; propT2dOpac->stepGrueso = 0.1f; propT2dOpac->dragStep = 0.005f;
+    propTexto2D->properties.push_back(propT2dOpac);
+    propT2dPal = new PropButton(T("Palette"));   // color de la paleta del UI (o propio)
+    propT2dPal->conLabel = true;
+    propT2dPal->button->desplegable = true;
+    propT2dPal->action = AccionPalT2d;
+    propTexto2D->properties.push_back(propT2dPal);
+    propT2dColor = new PropColor(T("Color"));   // el color al FINAL de la lista (pedido Dante)
     propTexto2D->properties.push_back(propT2dColor);
-    propT2dFuente = new PropButton(T("Font"));
-    propT2dFuente->button->desplegable = true;
-    propT2dFuente->action = AccionMenuT2dFuente;
-    propTexto2D->properties.push_back(propT2dFuente);
     GroupProperties.push_back(propTexto2D);
+
+    // ===== Tarjeta "Imagen" (elemento Imagen2D del Editor 2D) =====
+    propImagen2D = new GroupPropertie(T("Image"));
+    propImagen2D->icono = (int)IconType::foto;
+    propImgNombre = new PropText(T("Name"), "");
+    propImagen2D->properties.push_back(propImgNombre);
+    propImgPosX = new PropFloat(T("Location X"));
+    propImagen2D->properties.push_back(propImgPosX);
+    propImgPosY = new PropFloat("Y");
+    propImagen2D->properties.push_back(propImgPosY);
+    propImgPosZ = new PropFloat("Z");
+    propImagen2D->properties.push_back(propImgPosZ);
+    propImgPosAbs = new PropBool(T("Pixels"));
+    propImgPosAbs->onChange = AccionPos2DAbsToggle;
+    propImagen2D->properties.push_back(propImgPosAbs);
+    propImgPeso = new PropFloat(T("Weight"));
+    propImgPeso->SetRango(0.01f, 100.0f);
+    propImagen2D->properties.push_back(propImgPeso);
+    propImgTextura = new PropButton(T("Texture"));   // abre el file browser (con vista previa)
+    propImgTextura->conLabel = true;
+    propImgTextura->action = AccionImgTextura;
+    propImagen2D->properties.push_back(propImgTextura);
+    propImgAncho = new PropFloat(T("Width"), "px");
+    propImgAncho->SetRango(1.0f, 8192.0f);
+    propImagen2D->properties.push_back(propImgAncho);
+    propImgAlto = new PropFloat(T("Height"), "px");
+    propImgAlto->SetRango(1.0f, 8192.0f);
+    propImagen2D->properties.push_back(propImgAlto);
+    propImgTamPx = new PropBool(T("Pixels"));   // tamano en px o relativo al padre
+    propImgTamPx->onChange = AccionTamPxToggle;
+    propImagen2D->properties.push_back(propImgTamPx);
+    propImgRot = new PropFloat(T("Rotation"), "o");
+    propImagen2D->properties.push_back(propImgRot);
+    // como se acomoda la textura en el rect: estirar / ajustar (bandas) / cover (recorta)
+    propImgModo = new PropButton(T("Mode"));
+    propImgModo->conLabel = true;
+    propImgModo->button->desplegable = true;
+    propImgModo->action = AccionMenuImgModo;
+    propImagen2D->properties.push_back(propImgModo);
+    propImgAncla = new PropButton(T("Anchor"));
+    propImgAncla->conLabel = true;
+    propImgAncla->button->desplegable = true;
+    propImgAncla->action = AccionMenuImgAncla;
+    propImagen2D->properties.push_back(propImgAncla);
+    propImgOpac = new PropFloat(T("Opacity"));
+    propImgOpac->SetRango(0.0f, 1.0f);
+    propImgOpac->stepFino = 0.01f; propImgOpac->stepGrueso = 0.1f; propImgOpac->dragStep = 0.005f;
+    propImagen2D->properties.push_back(propImgOpac);
+    propImgAlpha = new PropBool("Alpha");   // usar el canal alpha de la textura
+    propImagen2D->properties.push_back(propImgAlpha);
+    propImgFiltro = new PropBool(T("Filtering"));   // off = NEAREST (pixel-perfect)
+    propImagen2D->properties.push_back(propImgFiltro);
+    propImgPal = new PropButton(T("Palette"));
+    propImgPal->conLabel = true;
+    propImgPal->button->desplegable = true;
+    propImgPal->action = AccionPalImg;
+    propImagen2D->properties.push_back(propImgPal);
+    propImgColor = new PropColor(T("Color"));   // tinte (blanco = tal cual)
+    propImagen2D->properties.push_back(propImgColor);
+    GroupProperties.push_back(propImagen2D);
+
+    // ===== Tarjeta "Rectangulo" (color solido o transparente: acomoda hijos) =====
+    propRect2D = new GroupPropertie(T("Rectangle"));
+    propRect2D->icono = (int)IconType::plane;
+    propRectNombre = new PropText(T("Name"), "");
+    propRect2D->properties.push_back(propRectNombre);
+    propRectPosX = new PropFloat(T("Location X"));
+    propRect2D->properties.push_back(propRectPosX);
+    propRectPosY = new PropFloat("Y");
+    propRect2D->properties.push_back(propRectPosY);
+    propRectPosZ = new PropFloat("Z");
+    propRect2D->properties.push_back(propRectPosZ);
+    propRectPosAbs = new PropBool(T("Pixels"));
+    propRectPosAbs->onChange = AccionPos2DAbsToggle;
+    propRect2D->properties.push_back(propRectPosAbs);
+    propRectPeso = new PropFloat(T("Weight"));
+    propRectPeso->SetRango(0.01f, 100.0f);
+    propRect2D->properties.push_back(propRectPeso);
+    propRectAncho = new PropFloat(T("Width"), "px");
+    propRectAncho->SetRango(1.0f, 8192.0f);
+    propRect2D->properties.push_back(propRectAncho);
+    propRectAlto = new PropFloat(T("Height"), "px");
+    propRectAlto->SetRango(1.0f, 8192.0f);
+    propRect2D->properties.push_back(propRectAlto);
+    propRectTamPx = new PropBool(T("Pixels"));
+    propRectTamPx->onChange = AccionTamPxToggle;
+    propRect2D->properties.push_back(propRectTamPx);
+    propRectRot = new PropFloat(T("Rotation"), "o");
+    propRect2D->properties.push_back(propRectRot);
+    propRectAncla = new PropButton(T("Anchor"));
+    propRectAncla->conLabel = true;
+    propRectAncla->button->desplegable = true;
+    propRectAncla->action = AccionMenuRectAncla;
+    propRect2D->properties.push_back(propRectAncla);
+    propRectOpac = new PropFloat(T("Opacity"));
+    propRectOpac->SetRango(0.0f, 1.0f);
+    propRectOpac->stepFino = 0.01f; propRectOpac->stepGrueso = 0.1f; propRectOpac->dragStep = 0.005f;
+    propRect2D->properties.push_back(propRectOpac);
+    propRectPal = new PropButton(T("Palette"));
+    propRectPal->conLabel = true;
+    propRectPal->button->desplegable = true;
+    propRectPal->action = AccionPalRect;
+    propRect2D->properties.push_back(propRectPal);
+    propRectColor = new PropColor(T("Color"));   // alpha 0 = 100% transparente (solo acomoda)
+    propRect2D->properties.push_back(propRectColor);
+    GroupProperties.push_back(propRect2D);
+
+    // ===== Tarjeta "Contenedor" (rectangulo invisible: solo ordena a sus hijos) =====
+    propCont2D = new GroupPropertie(T("Container"));
+    propCont2D->icono = (int)IconType::carpeta;
+    propContNombre = new PropText(T("Name"), "");
+    propCont2D->properties.push_back(propContNombre);
+    propContPosX = new PropFloat(T("Location X"));
+    propCont2D->properties.push_back(propContPosX);
+    propContPosY = new PropFloat("Y");
+    propCont2D->properties.push_back(propContPosY);
+    propContPosZ = new PropFloat("Z");
+    propCont2D->properties.push_back(propContPosZ);
+    propContPosAbs = new PropBool(T("Pixels"));
+    propContPosAbs->onChange = AccionPos2DAbsToggle;
+    propCont2D->properties.push_back(propContPosAbs);
+    propContPeso = new PropFloat(T("Weight"));
+    propContPeso->SetRango(0.01f, 100.0f);
+    propCont2D->properties.push_back(propContPeso);
+    propContAncho = new PropFloat(T("Width"), "px");
+    propContAncho->SetRango(1.0f, 8192.0f);
+    propCont2D->properties.push_back(propContAncho);
+    propContAlto = new PropFloat(T("Height"), "px");
+    propContAlto->SetRango(1.0f, 8192.0f);
+    propCont2D->properties.push_back(propContAlto);
+    propContTamPx = new PropBool(T("Pixels"));
+    propContTamPx->onChange = AccionTamPxToggle;
+    propCont2D->properties.push_back(propContTamPx);
+    propContRot = new PropFloat(T("Rotation"), "o");
+    propCont2D->properties.push_back(propContRot);
+    propContAncla = new PropButton(T("Anchor"));
+    propContAncla->conLabel = true;
+    propContAncla->button->desplegable = true;
+    propContAncla->action = AccionMenuContAncla;
+    propCont2D->properties.push_back(propContAncla);
+    propContOpac = new PropFloat(T("Opacity"));
+    propContOpac->SetRango(0.0f, 1.0f);
+    propContOpac->stepFino = 0.01f; propContOpac->stepGrueso = 0.1f; propContOpac->dragStep = 0.005f;
+    propCont2D->properties.push_back(propContOpac);
+    GroupProperties.push_back(propCont2D);
+
+    // ===== Tarjeta "Slice 9" (imagen con bordes fijos) =====
+    propS9card = new GroupPropertie("Slice 9");
+    propS9card->icono = (int)IconType::cuadricula;
+    propS9Nombre = new PropText(T("Name"), "");
+    propS9card->properties.push_back(propS9Nombre);
+    propS9PosX = new PropFloat(T("Location X"));
+    propS9card->properties.push_back(propS9PosX);
+    propS9PosY = new PropFloat("Y");
+    propS9card->properties.push_back(propS9PosY);
+    propS9PosZ = new PropFloat("Z");
+    propS9card->properties.push_back(propS9PosZ);
+    propS9PosAbs = new PropBool(T("Pixels"));
+    propS9PosAbs->onChange = AccionPos2DAbsToggle;
+    propS9card->properties.push_back(propS9PosAbs);
+    propS9Peso = new PropFloat(T("Weight"));
+    propS9Peso->SetRango(0.01f, 100.0f);
+    propS9card->properties.push_back(propS9Peso);
+    propS9Textura = new PropButton(T("Texture"));
+    propS9Textura->conLabel = true;
+    propS9Textura->action = AccionS9Textura;
+    propS9card->properties.push_back(propS9Textura);
+    propS9Ancho = new PropFloat(T("Width"), "px");
+    propS9Ancho->SetRango(1.0f, 8192.0f);
+    propS9card->properties.push_back(propS9Ancho);
+    propS9Alto = new PropFloat(T("Height"), "px");
+    propS9Alto->SetRango(1.0f, 8192.0f);
+    propS9card->properties.push_back(propS9Alto);
+    propS9TamPx = new PropBool(T("Pixels"));
+    propS9TamPx->onChange = AccionTamPxToggle;
+    propS9card->properties.push_back(propS9TamPx);
+    // el borde: cuanto mide en el ARCHIVO (por eje: esquinas rectangulares si difieren;
+    // minimo 1, maximo la mitad de la imagen menos 1) y a que escala se dibuja
+    propS9BordeX = new PropFloat(T("Border X"), "px");
+    propS9BordeX->SetRango(1.0f, 512.0f); propS9BordeX->entero = true;
+    propS9card->properties.push_back(propS9BordeX);
+    propS9BordeY = new PropFloat(T("Border Y"), "px");
+    propS9BordeY->SetRango(1.0f, 512.0f); propS9BordeY->entero = true;
+    propS9card->properties.push_back(propS9BordeY);
+    propS9EscBorde = new PropFloat(T("Border Scale"));
+    propS9EscBorde->SetRango(0.05f, 16.0f);
+    propS9EscBorde->stepFino = 0.05f; propS9EscBorde->stepGrueso = 0.5f; propS9EscBorde->dragStep = 0.01f;
+    propS9card->properties.push_back(propS9EscBorde);
+    propS9Rot = new PropFloat(T("Rotation"), "o");
+    propS9card->properties.push_back(propS9Rot);
+    propS9Ancla = new PropButton(T("Anchor"));
+    propS9Ancla->conLabel = true;
+    propS9Ancla->button->desplegable = true;
+    propS9Ancla->action = AccionMenuS9Ancla;
+    propS9card->properties.push_back(propS9Ancla);
+    propS9Opac = new PropFloat(T("Opacity"));
+    propS9Opac->SetRango(0.0f, 1.0f);
+    propS9Opac->stepFino = 0.01f; propS9Opac->stepGrueso = 0.1f; propS9Opac->dragStep = 0.005f;
+    propS9card->properties.push_back(propS9Opac);
+    propS9Filtro = new PropBool(T("Filtering"));
+    propS9card->properties.push_back(propS9Filtro);
+    propS9Pal = new PropButton(T("Palette"));
+    propS9Pal->conLabel = true;
+    propS9Pal->button->desplegable = true;
+    propS9Pal->action = AccionPalS9;
+    propS9card->properties.push_back(propS9Pal);
+    propS9Color = new PropColor(T("Color"));   // tinte (el arte del editor es blanco)
+    propS9card->properties.push_back(propS9Color);
+    GroupProperties.push_back(propS9card);
+
+    // ===== Tarjeta "Boton" (card con texto y/o icono, estilo Whisk3D) =====
+    propBtn2D = new GroupPropertie(T("Button"));
+    propBtn2D->icono = (int)IconType::object;
+    propBtnNombre = new PropText(T("Name"), "");
+    propBtn2D->properties.push_back(propBtnNombre);
+    propBtnPosX = new PropFloat(T("Location X"));
+    propBtn2D->properties.push_back(propBtnPosX);
+    propBtnPosY = new PropFloat("Y");
+    propBtn2D->properties.push_back(propBtnPosY);
+    propBtnPosZ = new PropFloat("Z");
+    propBtn2D->properties.push_back(propBtnPosZ);
+    propBtnPosAbs = new PropBool(T("Pixels"));
+    propBtnPosAbs->onChange = AccionPos2DAbsToggle;
+    propBtn2D->properties.push_back(propBtnPosAbs);
+    propBtnPeso = new PropFloat(T("Weight"));
+    propBtnPeso->SetRango(0.01f, 100.0f);
+    propBtn2D->properties.push_back(propBtnPeso);
+    propBtnTexto = new PropText(T("Text"), "");
+    propBtn2D->properties.push_back(propBtnTexto);
+    propBtnIcono = new PropButton(T("Icon"));   // un png (10x10 estilo Whisk3D, o el que sea)
+    propBtnIcono->conLabel = true;
+    propBtnIcono->action = AccionBtnIcono;
+    propBtn2D->properties.push_back(propBtnIcono);
+    propBtnTam = new PropFloat(T("Size"), "px");
+    propBtnTam->SetRango(1.0f, 512.0f);
+    propBtn2D->properties.push_back(propBtnTam);
+    propBtnPad = new PropFloat(T("Padding"), "px");
+    propBtnPad->SetRango(0.0f, 256.0f);
+    propBtn2D->properties.push_back(propBtnPad);
+    propBtnAncla = new PropButton(T("Anchor"));
+    propBtnAncla->conLabel = true;
+    propBtnAncla->button->desplegable = true;
+    propBtnAncla->action = AccionMenuBtnAncla;
+    propBtn2D->properties.push_back(propBtnAncla);
+    propBtnOpac = new PropFloat(T("Opacity"));
+    propBtnOpac->SetRango(0.0f, 1.0f);
+    propBtnOpac->stepFino = 0.01f; propBtnOpac->stepGrueso = 0.1f; propBtnOpac->dragStep = 0.005f;
+    propBtn2D->properties.push_back(propBtnOpac);
+    // cada color puede ser PROPIO o apuntar a la PALETA del UI (un puntero, no una copia)
+    propBtnPalFondo = new PropButton(T("Background"));
+    propBtnPalFondo->conLabel = true;
+    propBtnPalFondo->button->desplegable = true;
+    propBtnPalFondo->action = AccionPalBtnFondo;
+    propBtn2D->properties.push_back(propBtnPalFondo);
+    propBtnColFondo = new PropColor("");
+    propBtn2D->properties.push_back(propBtnColFondo);
+    propBtnPalTexto = new PropButton(T("Text Color"));
+    propBtnPalTexto->conLabel = true;
+    propBtnPalTexto->button->desplegable = true;
+    propBtnPalTexto->action = AccionPalBtnTexto;
+    propBtn2D->properties.push_back(propBtnPalTexto);
+    propBtnColTexto = new PropColor("");
+    propBtn2D->properties.push_back(propBtnColTexto);
+    propBtnPalBorde = new PropButton(T("Border Color"));
+    propBtnPalBorde->conLabel = true;
+    propBtnPalBorde->button->desplegable = true;
+    propBtnPalBorde->action = AccionPalBtnBorde;
+    propBtn2D->properties.push_back(propBtnPalBorde);
+    propBtnColBorde = new PropColor("");
+    propBtn2D->properties.push_back(propBtnColBorde);
+    // FONDO con textura (9 pedazos, como el slice9): opcional
+    propBtnTex = new PropButton(T("Texture"));
+    propBtnTex->conLabel = true;
+    propBtnTex->action = AccionBtnTex;
+    propBtn2D->properties.push_back(propBtnTex);
+    propBtnTexBX = new PropFloat(T("Border X"), "px");
+    propBtnTexBX->SetRango(1.0f, 512.0f); propBtnTexBX->entero = true;
+    propBtn2D->properties.push_back(propBtnTexBX);
+    propBtnTexBY = new PropFloat(T("Border Y"), "px");
+    propBtnTexBY->SetRango(1.0f, 512.0f); propBtnTexBY->entero = true;
+    propBtn2D->properties.push_back(propBtnTexBY);
+    propBtnTexEsc = new PropFloat(T("Border Scale"));
+    propBtnTexEsc->SetRango(0.05f, 16.0f);
+    propBtnTexEsc->stepFino = 0.05f; propBtnTexEsc->stepGrueso = 0.5f; propBtnTexEsc->dragStep = 0.01f;
+    propBtn2D->properties.push_back(propBtnTexEsc);
+    GroupProperties.push_back(propBtn2D);
+
+    // ===== Tarjeta "Expandir" (resorte de layout: absorbe el espacio libre) =====
+    propExp2D = new GroupPropertie(T("Expand"));
+    propExp2D->icono = (int)IconType::arrowRight;
+    propExpNombre = new PropText(T("Name"), "");
+    propExp2D->properties.push_back(propExpNombre);
+    propExpPeso = new PropFloat(T("Weight"));   // reparte el espacio libre entre expandirs
+    propExpPeso->SetRango(0.01f, 100.0f);
+    propExp2D->properties.push_back(propExpPeso);
+    GroupProperties.push_back(propExp2D);
+
+    // ===== Tarjeta "UI" (la raiz de la interfaz) =====
+    propUIcard = new GroupPropertie("UI");
+    propUIcard->icono = (int)IconType::textura;
+    propUInombre = new PropText(T("Name"), "");
+    propUIcard->properties.push_back(propUInombre);
+    propUIver3D = new PropBool(T("View in 3D"));
+    propUIcard->properties.push_back(propUIver3D);
+    // la ESCALA GLOBAL del contenido: x1 = N95, x2/x3/x4 = pantallas mas grandes
+    propUIescala = new PropFloat("Escala", "x");
+    propUIescala->SetRango(1.0f, 8.0f); propUIescala->entero = true;
+    propUIcard->properties.push_back(propUIescala);
+    // el lienzo: "como el render" (default, en vivo) o RESPONSIVE con tamano propio
+    propUIigualRender = new PropBool(T("Match render"));
+    propUIigualRender->onChange = AccionUIigualRender;
+    propUIcard->properties.push_back(propUIigualRender);
+    propUIancho = new PropFloat(T("Width"), "px");    // solo en responsive (value NULL los oculta)
+    propUIancho->SetRango(16.0f, 8192.0f); propUIancho->entero = true;
+    propUIcard->properties.push_back(propUIancho);
+    propUIalto = new PropFloat(T("Height"), "px");
+    propUIalto->SetRango(16.0f, 8192.0f); propUIalto->entero = true;
+    propUIcard->properties.push_back(propUIalto);
+    propUIres = new PropButton(T("Resolution"));      // presets 4k .. 240p (el Nokia)
+    propUIres->conLabel = true;
+    propUIres->button->desplegable = true;
+    propUIres->action = AccionMenuUIres;
+    propUIcard->properties.push_back(propUIres);
+    propUIaspecto = new PropButton(T("Aspect"));      // 16:9 / 4:3 / 1:1
+    propUIaspecto->conLabel = true;
+    propUIaspecto->button->desplegable = true;
+    propUIaspecto->action = AccionMenuUIaspecto;
+    propUIcard->properties.push_back(propUIaspecto);
+    propUIrotar = new PropButton(T("Rotate"));        // horizontal <-> vertical
+    propUIrotar->action = AccionUIrotar;
+    propUIcard->properties.push_back(propUIrotar);
+    propUIopac = new PropFloat(T("Opacity"));         // atenua la interfaz entera
+    propUIopac->SetRango(0.0f, 1.0f);
+    propUIopac->stepFino = 0.01f; propUIopac->stepGrueso = 0.1f; propUIopac->dragStep = 0.005f;
+    propUIcard->properties.push_back(propUIopac);
+    propUIcolor = new PropColor(T("Color"));          // fondo (transparente por defecto)
+    propUIcard->properties.push_back(propUIcolor);
+    // GUARDAR la interfaz: un .w3dui (JSON) que despues carga el editor o compila el juego
+    propUIexport = new PropButton(T("Export UI"), IconType::archive);
+    propUIexport->action = AccionUIexportar;
+    propUIcard->properties.push_back(propUIexport);
+    GroupProperties.push_back(propUIcard);
+
+    // ===== Tarjeta "Paleta" (del UI): colores con NOMBRE que los componentes referencian.
+    // Las filas se reconstruyen en el rebind cuando cambia la cantidad (RefreshPaleta).
+    propPaleta = new GroupPropertie(T("Palette"));
+    GroupProperties.push_back(propPaleta);
+
+    // ===== Tarjeta "Children": afecta a los HIJOS del seleccionado. El padding encoge el
+    // area donde se enganchan las anclas de bordes/esquinas (la linea transparente se ve en
+    // el Editor 2D cuando el UI esta seleccionado). =====
+    propHijos = new GroupPropertie(T("Children"));
+    propHijosPadIzq = new PropFloat("Pad izq", "px");
+    propHijosPadIzq->SetRango(0.0f, 2048.0f);
+    propHijos->properties.push_back(propHijosPadIzq);
+    propHijosPadDer = new PropFloat("Pad der", "px");
+    propHijosPadDer->SetRango(0.0f, 2048.0f);
+    propHijos->properties.push_back(propHijosPadDer);
+    propHijosPadArr = new PropFloat("Pad arriba", "px");
+    propHijosPadArr->SetRango(0.0f, 2048.0f);
+    propHijos->properties.push_back(propHijosPadArr);
+    propHijosPadAba = new PropFloat("Pad abajo", "px");
+    propHijosPadAba->SetRango(0.0f, 2048.0f);
+    propHijos->properties.push_back(propHijosPadAba);
+    // como se ACOMODAN los hijos: libremente (default) o en filas/columnas (se reparten
+    // el 100% del area interior y su posicion deja de editarse)
+    propHijosLayout = new PropButton(T("Layout"));
+    propHijosLayout->conLabel = true;
+    propHijosLayout->button->desplegable = true;
+    propHijosLayout->action = AccionMenuHijosLayout;
+    propHijos->properties.push_back(propHijosLayout);
+    // como se REPARTEN: estirar (100% por peso) o minimo (tamano natural + Expandir)
+    propHijosAjuste = new PropButton(T("Fit"));
+    propHijosAjuste->conLabel = true;
+    propHijosAjuste->button->desplegable = true;
+    propHijosAjuste->action = AccionMenuHijosAjuste;
+    propHijos->properties.push_back(propHijosAjuste);
+    propHijosAlign = new PropButton(T("Align"));
+    propHijosAlign->conLabel = true;
+    propHijosAlign->button->desplegable = true;
+    propHijosAlign->action = AccionMenuHijosAlign;
+    propHijos->properties.push_back(propHijosAlign);
+    propHijosGap = new PropFloat(T("Gap"), "px");
+    propHijosGap->SetRango(0.0f, 1024.0f);
+    propHijos->properties.push_back(propHijosGap);
+    // unidad del padding y el gap: pixeles (default) o proporcional al lado menor
+    propHijosPx = new PropBool(T("Pixels"));
+    propHijosPx->onChange = AccionHijosPxToggle;
+    propHijos->properties.push_back(propHijosPx);
+    // OVERFLOW (como css): recortar lo que se sale del area, por eje; y scroll opcional
+    propHijosClipX = new PropBool(T("Overflow X"));
+    propHijosClipX->onChange = AccionHijosRefrescar;
+    propHijos->properties.push_back(propHijosClipX);
+    propHijosClipY = new PropBool(T("Overflow Y"));
+    propHijosClipY->onChange = AccionHijosRefrescar;
+    propHijos->properties.push_back(propHijosClipY);
+    propHijosScroll = new PropBool(T("Scroll"));
+    propHijosScroll->onChange = AccionHijosRefrescar;
+    propHijos->properties.push_back(propHijosScroll);
+    propHijosScrollX = new PropFloat(T("Scroll X"), "px");
+    propHijos->properties.push_back(propHijosScrollX);
+    propHijosScrollY = new PropFloat(T("Scroll Y"), "px");
+    propHijos->properties.push_back(propHijosScrollY);
+    GroupProperties.push_back(propHijos);
 
     // ===== Tarjeta "Mesh Parts": selector (lista) + gestion de la PARTE (sin material) =====
     propMeshParts = new GroupPropertie(T("Mesh Parts"));
@@ -1883,9 +2990,10 @@ void Properties::ConstruirGrupos(){
     propAjustes = new GroupPropertie(T("Settings"));
     propAjustes->anchoValores = 0.62f;
 
-    propAjIdioma = new PropButton(W3dIdiomaNombre(g_idioma), IconType::archive);
+    propAjIdioma = new PropButton(T("Language"));   // label a la izquierda, el valor a la derecha
+    propAjIdioma->conLabel = true;
+    propAjIdioma->button->text = W3dIdiomaNombre(g_idioma);
     propAjIdioma->button->desplegable = true;
-    propAjIdioma->button->caretMenu = true;   // no es obvio que es un selector: la flechita lo dice
     propAjIdioma->action = AccionMenuIdioma;
     propAjustes->properties.push_back(propAjIdioma);
 
@@ -1894,17 +3002,27 @@ void Properties::ConstruirGrupos(){
     propAjAntialias->onChange = AccionAntialias;
     propAjustes->properties.push_back(propAjAntialias);
 
-    propAjBackend = new PropButton(cfg.graphicsAPI, IconType::monitor);
+    propAjBackend = new PropButton(T("Graphics"));
+    propAjBackend->conLabel = true;
+    propAjBackend->button->text = cfg.graphicsAPI;
     propAjBackend->button->desplegable = true;
-    propAjBackend->button->caretMenu = true;
     propAjBackend->action = AccionMenuBackend;
     propAjustes->properties.push_back(propAjBackend);
 
-    propAjSkin = new PropButton(cfg.SkinName, IconType::material);
+    propAjSkin = new PropButton("Skin");
+    propAjSkin->conLabel = true;
+    propAjSkin->button->text = cfg.SkinName;
     propAjSkin->button->desplegable = true;
-    propAjSkin->button->caretMenu = true;
     propAjSkin->action = AccionMenuSkin;
     propAjustes->properties.push_back(propAjSkin);
+
+    // la ESCALA del editor, en vivo (x1 = N95, x3 = default PC)
+    { PropFloat* pe = new PropFloat("Escala", "x");
+      g_ajEscala = (float)(cfg.scale > 0 ? cfg.scale : 3);
+      pe->SetRango(1.0f, 6.0f); pe->entero = true;
+      pe->value = &g_ajEscala;
+      pe->onChange = AccionEscalaEditor;
+      propAjustes->properties.push_back(pe); }
 
     { PropButton* pbSave = new PropButton(T("Save Changes"), IconType::archive);
       pbSave->action = AccionGuardarConfig;
@@ -2297,7 +3415,25 @@ void Properties::RefreshTargetProperties(){
         Resize(width, height); // tambien recalcula la scrollbar
     }
     SincronizarNombreObjeto(this); // el campo "Name": muestra el nombre del objeto y commitea lo editado al perder foco
+    // proxy de POSICION 2D: muestra pos.x/y relativa al tamano de la UI (o en px con el checkbox)
+    {
+        Object* e2d = (ObjActivo && UI2D_EsElemento2D(ObjActivo)) ? ObjActivo : NULL;
+        if (e2d){
+            float vw, vh; UI2D_TamanoLienzo(&vw, &vh);
+            g_pos2dX = g_pos2dAbs ? e2d->pos.x * vw : e2d->pos.x;
+            g_pos2dY = g_pos2dAbs ? e2d->pos.y * vh : e2d->pos.y;
+            PropFloat* xs[6] = { propT2dPosX, propT2dPosY, propImgPosX, propImgPosY,
+                                 propRectPosX, propRectPosY };
+            for (int i = 0; i < 6; i++) if (xs[i]){
+                xs[i]->unit = g_pos2dAbs ? "px" : "";
+                xs[i]->stepFino   = g_pos2dAbs ? 1.0f  : 0.01f;
+                xs[i]->stepGrueso = g_pos2dAbs ? 10.0f : 0.1f;
+                xs[i]->dragStep   = g_pos2dAbs ? 1.0f  : 0.002f;
+            }
+        }
+    }
     SincronizarTexto2D(this);      // idem para el campo "Text" del elemento de texto 2D
+    SincronizarTextoBoton(this);   // y el del boton 2D
     if (!ObjActivo) {
         if (target) {
             target = NULL;
@@ -2358,12 +3494,286 @@ void Properties::RefreshTargetProperties(){
     if (propTexto2D && propT2dTam){
         Texto2D* t = (ObjActivo && ObjActivo->getType() == ObjectType::texto2d) ? (Texto2D*)ObjActivo : NULL;
         propT2dTam->value   = t ? &t->tam   : NULL;
-        propT2dColor->value = t ? t->color  : NULL;
+        propT2dColor->value = (t && t->palColor < 0) ? t->color : NULL;
+        if (propT2dPal && t) propT2dPal->button->text = PalNombre(PaletaUIDe(t), t->palColor);
+        if (propT2dRot)  propT2dRot->value  = t ? &t->rot2d : NULL;
+        if (propT2dPosX){ propT2dPosX->value = t ? &g_pos2dX : NULL; propT2dPosX->onChange = AccionPos2DEditada; }
+        if (propT2dPosY){ propT2dPosY->value = t ? &g_pos2dY : NULL; propT2dPosY->onChange = AccionPos2DEditada; }
+        if (propT2dPosZ) propT2dPosZ->value = t ? &t->pos.z : NULL;
+        if (propT2dPosAbs) propT2dPosAbs->value = t ? &g_pos2dAbs : NULL;
+        if (propT2dOpac) propT2dOpac->value = t ? &t->opacidad : NULL;
+        if (propT2dDec)  propT2dDec->value  = (t && t->tipo == 2) ? &t->decimales : NULL;
+        if (propT2dAutoTam) propT2dAutoTam->value = t ? &t->autoTam : NULL;
+        if (propT2dLineas && t) propT2dLineas->button->text = T2dNombreLineas(t->lineas);
         if (t){
             propT2dTexto->field.SetText(t->texto);
             propT2dAlignH->button->text = T2dNombreAlign(t->alignH, true);
             propT2dAlignV->button->text = T2dNombreAlign(t->alignV, false);
             propT2dFuente->button->text = Fuente2DNombre(t->fuente);
+            propT2dAncla->button->text  = T2dNombreAncla(t->ancla);
+            if (propT2dTipo) propT2dTipo->button->text = T2dNombreTipo(t->tipo);
+        }
+    }
+    // IMAGEN 2D: bindea la tarjeta (NULL/labels segun el activo sea o no una Imagen2D)
+    if (propImagen2D && propImgAncho){
+        Imagen2D* im = (ObjActivo && ObjActivo->getType() == ObjectType::imagen2d) ? (Imagen2D*)ObjActivo : NULL;
+        propImgAncho->value = im ? &im->ancho : NULL;
+        propImgAlto->value  = im ? &im->alto  : NULL;
+        propImgRot->value   = im ? &im->rot2d : NULL;
+        if (propImgPosX){ propImgPosX->value = im ? &g_pos2dX : NULL; propImgPosX->onChange = AccionPos2DEditada; }
+        if (propImgPosY){ propImgPosY->value = im ? &g_pos2dY : NULL; propImgPosY->onChange = AccionPos2DEditada; }
+        if (propImgPosZ) propImgPosZ->value = im ? &im->pos.z : NULL;
+        if (propImgPosAbs) propImgPosAbs->value = im ? &g_pos2dAbs : NULL;
+        if (propImgOpac) propImgOpac->value = im ? &im->opacidad : NULL;
+        if (propImgTamPx) propImgTamPx->value = im ? &im->tamPx : NULL;
+        if (propImgColor) propImgColor->value = (im && im->palTinte < 0) ? im->color : NULL;
+        if (propImgPal && im) propImgPal->button->text = PalNombre(PaletaUIDe(im), im->palTinte);
+        if (propImgAlpha) propImgAlpha->value = im ? &im->usarAlpha : NULL;
+        if (propImgFiltro) propImgFiltro->value = im ? &im->filtrado : NULL;
+        AjustarFilaTam(propImgAncho, !im || im->tamPx);
+        AjustarFilaTam(propImgAlto,  !im || im->tamPx);
+        if (im){
+            propImgTextura->button->text = im->textura.empty() ? std::string(T("Choose..."))
+                                                               : NombreDeArchivo(im->textura);
+            propImgModo->button->text  = ImgNombreModo(im->modo);
+            propImgAncla->button->text = T2dNombreAncla(im->ancla);
+        }
+    }
+    // RECTANGULO 2D
+    if (propRect2D && propRectAncho){
+        Rect2D* r = (ObjActivo && ObjActivo->getType() == ObjectType::rect2d) ? (Rect2D*)ObjActivo : NULL;
+        propRectAncho->value = r ? &r->ancho : NULL;
+        propRectAlto->value  = r ? &r->alto  : NULL;
+        propRectRot->value   = r ? &r->rot2d : NULL;
+        if (propRectPosX){ propRectPosX->value = r ? &g_pos2dX : NULL; propRectPosX->onChange = AccionPos2DEditada; }
+        if (propRectPosY){ propRectPosY->value = r ? &g_pos2dY : NULL; propRectPosY->onChange = AccionPos2DEditada; }
+        if (propRectPosZ) propRectPosZ->value = r ? &r->pos.z : NULL;
+        if (propRectPosAbs) propRectPosAbs->value = r ? &g_pos2dAbs : NULL;
+        if (propRectOpac)  propRectOpac->value  = r ? &r->opacidad : NULL;
+        if (propRectColor) propRectColor->value = (r && r->palColor < 0) ? r->color : NULL;
+        if (propRectPal && r) propRectPal->button->text = PalNombre(PaletaUIDe(r), r->palColor);
+        if (propRectTamPx) propRectTamPx->value = r ? &r->tamPx : NULL;
+        AjustarFilaTam(propRectAncho, !r || r->tamPx);
+        AjustarFilaTam(propRectAlto,  !r || r->tamPx);
+        if (r && propRectAncla) propRectAncla->button->text = T2dNombreAncla(r->ancla);
+    }
+    // CONTENEDOR 2D
+    if (propCont2D && propContAncho){
+        Contenedor2D* c = (ObjActivo && ObjActivo->getType() == ObjectType::cont2d) ? (Contenedor2D*)ObjActivo : NULL;
+        propContAncho->value = c ? &c->ancho : NULL;
+        propContAlto->value  = c ? &c->alto  : NULL;
+        propContRot->value   = c ? &c->rot2d : NULL;
+        if (propContPosX){ propContPosX->value = c ? &g_pos2dX : NULL; propContPosX->onChange = AccionPos2DEditada; }
+        if (propContPosY){ propContPosY->value = c ? &g_pos2dY : NULL; propContPosY->onChange = AccionPos2DEditada; }
+        if (propContPosZ) propContPosZ->value = c ? &c->pos.z : NULL;
+        if (propContPosAbs) propContPosAbs->value = c ? &g_pos2dAbs : NULL;
+        if (propContOpac) propContOpac->value = c ? &c->opacidad : NULL;
+        if (propContTamPx) propContTamPx->value = c ? &c->tamPx : NULL;
+        AjustarFilaTam(propContAncho, !c || c->tamPx);
+        AjustarFilaTam(propContAlto,  !c || c->tamPx);
+        if (c && propContAncla) propContAncla->button->text = T2dNombreAncla(c->ancla);
+    }
+    // SLICE 9
+    if (propS9card && propS9Ancho){
+        Slice9* s9 = (ObjActivo && ObjActivo->getType() == ObjectType::slice9) ? (Slice9*)ObjActivo : NULL;
+        propS9Ancho->value = s9 ? &s9->ancho : NULL;
+        propS9Alto->value  = s9 ? &s9->alto  : NULL;
+        propS9Rot->value   = s9 ? &s9->rot2d : NULL;
+        if (propS9PosX){ propS9PosX->value = s9 ? &g_pos2dX : NULL; propS9PosX->onChange = AccionPos2DEditada; }
+        if (propS9PosY){ propS9PosY->value = s9 ? &g_pos2dY : NULL; propS9PosY->onChange = AccionPos2DEditada; }
+        if (propS9PosZ) propS9PosZ->value = s9 ? &s9->pos.z : NULL;
+        if (propS9PosAbs) propS9PosAbs->value = s9 ? &g_pos2dAbs : NULL;
+        if (propS9TamPx) propS9TamPx->value = s9 ? &s9->tamPx : NULL;
+        if (propS9BordeX) propS9BordeX->value = s9 ? &s9->bordeX : NULL;
+        if (propS9BordeY) propS9BordeY->value = s9 ? &s9->bordeY : NULL;
+        if (propS9EscBorde) propS9EscBorde->value = s9 ? &s9->escalaBorde : NULL;
+        if (propS9Opac) propS9Opac->value = s9 ? &s9->opacidad : NULL;
+        if (propS9Color) propS9Color->value = (s9 && s9->palTinte < 0) ? s9->color : NULL;
+        if (propS9Pal && s9) propS9Pal->button->text = PalNombre(PaletaUIDe(s9), s9->palTinte);
+        if (propS9Filtro) propS9Filtro->value = s9 ? &s9->filtrado : NULL;
+        AjustarFilaTam(propS9Ancho, !s9 || s9->tamPx);
+        AjustarFilaTam(propS9Alto,  !s9 || s9->tamPx);
+        if (s9){
+            propS9Textura->button->text = s9->textura.empty() ? std::string(T("Choose..."))
+                                                              : NombreDeArchivo(s9->textura);
+            if (propS9Ancla) propS9Ancla->button->text = T2dNombreAncla(s9->ancla);
+        }
+    }
+    // BOTON 2D
+    if (propBtn2D && propBtnTam){
+        Boton2D* b = (ObjActivo && ObjActivo->getType() == ObjectType::boton2d) ? (Boton2D*)ObjActivo : NULL;
+        propBtnTam->value = b ? &b->tam : NULL;
+        if (propBtnPad)  propBtnPad->value  = b ? &b->pad : NULL;
+        if (propBtnPosX){ propBtnPosX->value = b ? &g_pos2dX : NULL; propBtnPosX->onChange = AccionPos2DEditada; }
+        if (propBtnPosY){ propBtnPosY->value = b ? &g_pos2dY : NULL; propBtnPosY->onChange = AccionPos2DEditada; }
+        if (propBtnPosZ) propBtnPosZ->value = b ? &b->pos.z : NULL;
+        if (propBtnPosAbs) propBtnPosAbs->value = b ? &g_pos2dAbs : NULL;
+        if (propBtnOpac) propBtnOpac->value = b ? &b->opacidad : NULL;
+        if (propBtnColFondo) propBtnColFondo->value = (b && b->palFondo < 0) ? b->colorFondo : NULL;
+        if (propBtnColTexto) propBtnColTexto->value = (b && b->palTexto < 0) ? b->colorTexto : NULL;
+        if (propBtnColBorde) propBtnColBorde->value = (b && b->palBorde < 0) ? b->colorBorde : NULL;
+        if (b){
+            if (propBtnPalFondo) propBtnPalFondo->button->text = PalNombre(PaletaUIDe(b), b->palFondo);
+            if (propBtnPalTexto) propBtnPalTexto->button->text = PalNombre(PaletaUIDe(b), b->palTexto);
+            if (propBtnPalBorde) propBtnPalBorde->button->text = PalNombre(PaletaUIDe(b), b->palBorde);
+        }
+        if (propBtnTexBX) propBtnTexBX->value = (b && !b->texturaFondo.empty()) ? &b->bordeTexX : NULL;
+        if (propBtnTexBY) propBtnTexBY->value = (b && !b->texturaFondo.empty()) ? &b->bordeTexY : NULL;
+        if (propBtnTexEsc) propBtnTexEsc->value = (b && !b->texturaFondo.empty()) ? &b->escalaBordeTex : NULL;
+        if (b){
+            if (propBtnIcono) propBtnIcono->button->text = b->icono.empty() ? std::string(T("Choose..."))
+                                                                            : NombreDeArchivo(b->icono);
+            if (propBtnTex) propBtnTex->button->text = b->texturaFondo.empty() ? std::string(T("Choose..."))
+                                                                               : NombreDeArchivo(b->texturaFondo);
+            if (propBtnAncla) propBtnAncla->button->text = T2dNombreAncla(b->ancla);
+        }
+    }
+    // EXPANDIR
+    if (propExp2D && propExpPeso){
+        Expandir2D* ex = (ObjActivo && ObjActivo->getType() == ObjectType::expandir2d) ? (Expandir2D*)ObjActivo : NULL;
+        propExpPeso->value = ex ? &ex->peso : NULL;
+    }
+    // PALETA: reconstruir las filas si cambio la cantidad (o la paleta activa)
+    if (propPaleta){
+        UI* u = (ObjActivo && ObjActivo->getType() == ObjectType::ui) ? (UI*)ObjActivo : NULL;
+        int n = u ? (int)u->Colores().size() : 0;
+        int firma = u ? (n + u->paletaActiva * 1000 + (int)u->paletas.size() * 100000) : 0;
+        if (firma != paletaFilas){
+            for (size_t i = 0; i < propPaleta->properties.size(); i++)
+                delete propPaleta->properties[i];
+            propPaleta->properties.clear();
+            propPaletaSel = NULL;
+            if (u){
+                // [0] el desplegable de paletas (elegir la activa o crear una nueva)
+                propPaletaSel = new PropButton(T("Palette"));
+                propPaletaSel->conLabel = true;
+                propPaletaSel->button->desplegable = true;
+                propPaletaSel->button->text = u->paletas.empty() ? "" : u->paletas[u->paletaActiva].nombre;
+                propPaletaSel->action = AccionMenuPaletas;
+                propPaleta->properties.push_back(propPaletaSel);
+                // una fila COMPACTA por color: nombre + swatch + cruz de borrar
+                std::vector<PaletaColor>& cs = u->Colores();
+                for (int i = 0; i < n; i++){
+                    PropColorPal* col = new PropColorPal(cs[i].nombre, i);
+                    col->value = cs[i].rgba;   // puntero ESTABLE (colores con reserve)
+                    propPaleta->properties.push_back(col);
+                }
+                PropButton* mas = new PropButton(T("Add Color"), IconType::material);
+                mas->action = AccionPaletaAgregar;
+                propPaleta->properties.push_back(mas);
+            }
+            paletaFilas = firma;
+        }
+    }
+    // UI: la tarjeta de la raiz de la interfaz. Las filas responsive solo aparecen con
+    // "como el render" apagado (value NULL / oculto: no ocupan fila).
+    if (propUIver3D){
+        UI* u = (ObjActivo && ObjActivo->getType() == ObjectType::ui) ? (UI*)ObjActivo : NULL;
+        propUIver3D->value = u ? &u->verEn3D : NULL;
+        bool resp = (u && !u->igualQueRender);
+        if (propUIigualRender) propUIigualRender->value = u ? &u->igualQueRender : NULL;
+        if (propUIancho) propUIancho->value = resp ? &u->ancho : NULL;
+        if (propUIalto)  propUIalto->value  = resp ? &u->alto  : NULL;
+        if (propUIres){     propUIres->oculto = !resp;
+                            if (u) propUIres->button->text = UINombreRes(u->resPreset); }
+        if (propUIaspecto){ propUIaspecto->oculto = !resp;
+                            if (u) propUIaspecto->button->text = UINombreAspecto(u->aspectoPreset); }
+        if (propUIrotar)    propUIrotar->oculto = !resp;
+        if (propUIopac)     propUIopac->value = u ? &u->opacidad : NULL;
+        if (propUIcolor)    propUIcolor->value = u ? u->color : NULL;
+        if (propUIescala)   propUIescala->value = u ? &u->escalaGlobal : NULL;
+    }
+    // Children (padding por lado + layout + gap): del elemento 2D o UI activo
+    if (propHijosPadIzq){
+        float *pi = NULL, *pd = NULL, *pa = NULL, *pb = NULL;
+        if (ObjActivo){
+            if (ObjActivo->getType() == ObjectType::ui){
+                UI* u2 = (UI*)ObjActivo;
+                pi = &u2->padIzq; pd = &u2->padDer; pa = &u2->padArr; pb = &u2->padAba;
+            } else if (UI2D_EsElemento2D(ObjActivo)){
+                Elemento2D* e2 = (Elemento2D*)ObjActivo;
+                pi = &e2->padIzq; pd = &e2->padDer; pa = &e2->padArr; pb = &e2->padAba;
+            }
+        }
+        propHijosPadIzq->value = pi;
+        propHijosPadDer->value = pd;
+        propHijosPadArr->value = pa;
+        propHijosPadAba->value = pb;
+        int* lay = HijosLayoutDe(ObjActivo);
+        if (propHijosGap) propHijosGap->value = (lay && *lay != 0) ? HijosGapDe(ObjActivo) : NULL;
+        if (propHijosLayout && lay) propHijosLayout->button->text = HijosNombreLayout(*lay);
+        // Fit y Align: solo con layout activo (Align ademas solo con ajuste MINIMO)
+        int* aj = HijosAjusteDe(ObjActivo);
+        int* al = HijosAlignDe(ObjActivo);
+        if (propHijosAjuste){
+            propHijosAjuste->oculto = !(lay && *lay != 0);
+            if (aj) propHijosAjuste->button->text = HijosNombreAjuste(*aj);
+        }
+        if (propHijosAlign){
+            propHijosAlign->oculto = !(lay && *lay != 0 && aj && *aj == 1);
+            if (al) propHijosAlign->button->text = HijosNombreAlign(*al);
+        }
+        bool* pgpx = HijosPadGapPxDe(ObjActivo);
+        if (propHijosPx) propHijosPx->value = pgpx;
+        // overflow + scroll (los Scroll X/Y solo aparecen con el scroll permitido)
+        if (propHijosClipX)  propHijosClipX->value  = HijosClipXDe(ObjActivo);
+        if (propHijosClipY)  propHijosClipY->value  = HijosClipYDe(ObjActivo);
+        if (propHijosScroll) propHijosScroll->value = HijosScrollDe(ObjActivo);
+        bool* scr = HijosScrollDe(ObjActivo);
+        if (propHijosScrollX) propHijosScrollX->value = (scr && *scr) ? HijosScrollXDe(ObjActivo) : NULL;
+        if (propHijosScrollY) propHijosScrollY->value = (scr && *scr) ? HijosScrollYDe(ObjActivo) : NULL;
+        // unidades y rangos segun el modo (px o proporcion)
+        bool enPx = !pgpx || *pgpx;
+        PropFloat* pads[4] = { propHijosPadIzq, propHijosPadDer, propHijosPadArr, propHijosPadAba };
+        for (int k = 0; k < 4; k++) if (pads[k]){
+            pads[k]->unit = enPx ? "px" : "";
+            pads[k]->SetRango(0.0f, enPx ? 2048.0f : 0.49f);
+            pads[k]->stepFino = enPx ? 1.0f : 0.005f;
+            pads[k]->stepGrueso = enPx ? 10.0f : 0.05f;
+            pads[k]->dragStep = enPx ? 1.0f : 0.002f;
+        }
+        if (propHijosGap){
+            propHijosGap->unit = enPx ? "px" : "";
+            propHijosGap->SetRango(0.0f, enPx ? 1024.0f : 1.0f);
+            propHijosGap->stepFino = enPx ? 1.0f : 0.005f;
+            propHijosGap->stepGrueso = enPx ? 10.0f : 0.05f;
+            propHijosGap->dragStep = enPx ? 1.0f : 0.002f;
+        }
+    }
+    // si el PADRE esta en filas/columnas, la posicion del hijo no se edita (se acomoda sola)
+    {
+        Object* e2d = (ObjActivo && UI2D_EsElemento2D(ObjActivo)) ? ObjActivo : NULL;
+        int* layPadre = e2d ? HijosLayoutDe(e2d->Parent) : NULL;
+        bool enLayout = (layPadre && *layPadre != 0);
+        if (enLayout){
+            if (propT2dPosX)  propT2dPosX->value  = NULL;
+            if (propT2dPosY)  propT2dPosY->value  = NULL;
+            if (propT2dPosAbs)  propT2dPosAbs->value  = NULL;
+            if (propImgPosX)  propImgPosX->value  = NULL;
+            if (propImgPosY)  propImgPosY->value  = NULL;
+            if (propImgPosAbs)  propImgPosAbs->value  = NULL;
+            if (propRectPosX) propRectPosX->value = NULL;
+            if (propRectPosY) propRectPosY->value = NULL;
+            if (propRectPosAbs) propRectPosAbs->value = NULL;
+            if (propContPosX) propContPosX->value = NULL;
+            if (propContPosY) propContPosY->value = NULL;
+            if (propContPosAbs) propContPosAbs->value = NULL;
+            if (propS9PosX) propS9PosX->value = NULL;
+            if (propS9PosY) propS9PosY->value = NULL;
+            if (propS9PosAbs) propS9PosAbs->value = NULL;
+        }
+        // el PESO solo cuenta (y se muestra) cuando el padre esta en filas/columnas
+        float* peso = (e2d && enLayout) ? &((Elemento2D*)e2d)->peso : NULL;
+        if (propT2dPeso)  propT2dPeso->value  = (e2d && e2d->getType() == ObjectType::texto2d)  ? peso : NULL;
+        if (propImgPeso)  propImgPeso->value  = (e2d && e2d->getType() == ObjectType::imagen2d) ? peso : NULL;
+        if (propRectPeso) propRectPeso->value = (e2d && e2d->getType() == ObjectType::rect2d)   ? peso : NULL;
+        if (propContPeso) propContPeso->value = (e2d && e2d->getType() == ObjectType::cont2d)   ? peso : NULL;
+        if (propS9Peso)   propS9Peso->value   = (e2d && e2d->getType() == ObjectType::slice9)   ? peso : NULL;
+        if (propBtnPeso)  propBtnPeso->value  = (e2d && e2d->getType() == ObjectType::boton2d)  ? peso : NULL;
+        if (propBtnPosX && e2d && e2d->getType() == ObjectType::boton2d && enLayout){
+            propBtnPosX->value = NULL;
+            if (propBtnPosY) propBtnPosY->value = NULL;
+            if (propBtnPosAbs) propBtnPosAbs->value = NULL;
         }
     }
 
@@ -2400,6 +3810,47 @@ Properties::Properties() : ViewportBase() {
     propLight = NULL;
     propTexto2D = NULL; propT2dTexto = NULL; propT2dTam = NULL;
     propT2dAlignH = NULL; propT2dAlignV = NULL; propT2dColor = NULL; propT2dFuente = NULL;
+    propT2dAncla = NULL; propT2dRot = NULL; propUIcard = NULL; propUIver3D = NULL;
+    propImagen2D = NULL; propImgTextura = NULL; propImgAncho = NULL; propImgAlto = NULL;
+    propImgRot = NULL; propImgModo = NULL; propImgAncla = NULL;
+    propUIigualRender = NULL; propUIancho = NULL; propUIalto = NULL;
+    propUIres = NULL; propUIaspecto = NULL; propUIrotar = NULL;
+    propT2dNombre = NULL; propT2dPosX = NULL; propT2dPosY = NULL; propT2dPosZ = NULL;
+    propT2dOpac = NULL; propImgNombre = NULL; propImgPosX = NULL; propImgPosY = NULL;
+    propImgPosZ = NULL; propImgOpac = NULL; propUInombre = NULL; propUIopac = NULL;
+    propHijos = NULL; propHijosLayout = NULL; propHijosGap = NULL;
+    propHijosPadIzq = NULL; propHijosPadDer = NULL; propHijosPadArr = NULL; propHijosPadAba = NULL;
+    propHijosPx = NULL;
+    propT2dPosAbs = NULL; propT2dTipo = NULL; propT2dDec = NULL; propImgPosAbs = NULL;
+    propUIescala = NULL; propUIexport = NULL;
+    propRect2D = NULL; propRectNombre = NULL; propRectPosX = NULL; propRectPosY = NULL;
+    propRectPosZ = NULL; propRectPosAbs = NULL; propRectAncho = NULL; propRectAlto = NULL;
+    propRectRot = NULL; propRectAncla = NULL; propRectOpac = NULL; propRectColor = NULL;
+    propT2dPeso = NULL; propT2dLineas = NULL; propT2dAutoTam = NULL;
+    propImgPeso = NULL; propRectPeso = NULL;
+    propCont2D = NULL; propContNombre = NULL; propContPosX = NULL; propContPosY = NULL;
+    propContPosZ = NULL; propContPosAbs = NULL; propContPeso = NULL; propContAncho = NULL;
+    propContAlto = NULL; propContRot = NULL; propContAncla = NULL; propContOpac = NULL;
+    propHijosAjuste = NULL; propHijosAlign = NULL;
+    propBtn2D = NULL; propBtnNombre = NULL; propBtnPosX = NULL; propBtnPosY = NULL;
+    propBtnPosZ = NULL; propBtnPosAbs = NULL; propBtnPeso = NULL; propBtnTexto = NULL;
+    propBtnIcono = NULL; propBtnTam = NULL; propBtnPad = NULL; propBtnAncla = NULL;
+    propBtnOpac = NULL; propBtnColFondo = NULL; propBtnColTexto = NULL; propBtnColBorde = NULL;
+    propExp2D = NULL; propExpNombre = NULL; propExpPeso = NULL;
+    propPaleta = NULL; paletaFilas = -1; propPaletaSel = NULL;
+    propBtnPalFondo = NULL; propBtnPalTexto = NULL; propBtnPalBorde = NULL;
+    propBtnTex = NULL; propBtnTexBX = NULL; propBtnTexBY = NULL; propBtnTexEsc = NULL;
+    propT2dPal = NULL; propImgPal = NULL; propRectPal = NULL; propS9Pal = NULL;
+    propHijosClipX = NULL; propHijosClipY = NULL; propHijosScroll = NULL;
+    propHijosScrollX = NULL; propHijosScrollY = NULL;
+    propImgTamPx = NULL; propImgColor = NULL; propImgAlpha = NULL;
+    propRectTamPx = NULL; propContTamPx = NULL; propUIcolor = NULL;
+    propS9card = NULL; propS9Nombre = NULL; propS9PosX = NULL; propS9PosY = NULL;
+    propS9PosZ = NULL; propS9PosAbs = NULL; propS9Peso = NULL; propS9Textura = NULL;
+    propS9Ancho = NULL; propS9Alto = NULL; propS9TamPx = NULL;
+    propS9BordeX = NULL; propS9BordeY = NULL;
+    propS9EscBorde = NULL; propS9Rot = NULL; propS9Ancla = NULL; propS9Opac = NULL;
+    propS9Color = NULL; propImgFiltro = NULL; propS9Filtro = NULL;
     propCamera = NULL;
     propInstance = NULL;
     propBtnCamTarget = NULL;
@@ -2476,8 +3927,14 @@ void Properties::ActualizarPestanias(){
     bool esInst = (tipo == (int)ObjectType::instance);
     bool esArm  = (tipo == (int)ObjectType::armature);
     bool esT2d  = (tipo == (int)ObjectType::texto2d);
+    bool esImg  = (tipo == (int)ObjectType::imagen2d);
+    bool esRect = (tipo == (int)ObjectType::rect2d);
+    bool esCont = (tipo == (int)ObjectType::cont2d);
+    bool esS9   = (tipo == (int)ObjectType::slice9);
+    bool esBtn  = (tipo == (int)ObjectType::boton2d);
+    bool esExp  = (tipo == (int)ObjectType::expandir2d);
     bool esUI   = (tipo == (int)ObjectType::ui);
-    bool hayTab3 = esMesh || esLuz || esCam || esInst || esArm || esT2d; // 3ra pestania (contextual)
+    bool hayTab3 = esMesh || esLuz || esCam || esInst || esArm || esT2d || esImg || esRect || esCont || esS9 || esBtn || esExp || esUI;
 
     if (BarTabs.size() >= 3){
         BarTabs[2]->visible = hayTab3;
@@ -2487,8 +3944,20 @@ void Properties::ActualizarPestanias(){
         else if (esArm)  icono = (int)IconType::armature;      // esqueleto: pestania Animation
         else if (esInst) icono = (int)IconoDeObjeto(ObjActivo); // instance/array/mirror
         else if (esT2d)  icono = (int)IconType::lista;           // elemento de texto 2D
+        else if (esImg)  icono = (int)IconType::foto;            // elemento de imagen 2D
+        else if (esRect) icono = (int)IconType::plane;           // elemento rectangulo 2D
+        else if (esCont) icono = (int)IconType::carpeta;         // contenedor 2D
+        else if (esS9)   icono = (int)IconType::cuadricula;      // slice 9
+        else if (esBtn)  icono = (int)IconType::object;          // boton
+        else if (esExp)  icono = (int)IconType::arrowRight;      // expandir
+        else if (esUI)   icono = (int)IconType::textura;         // la raiz de la interfaz
         BarTabs[2]->icon = icono;
     }
+    // los objetos 2D no muestran el tab Objeto (su Nombre y Posicion viven arriba de su
+    // tarjeta contextual, que era lo unico que se usaba de ahi)
+    bool es2D = esT2d || esImg || esRect || esCont || esS9 || esBtn || esExp || esUI;
+    if (BarTabs.size() >= 2) BarTabs[1]->visible = !es2D;
+    if (pestaniaActiva == 1 && es2D) pestaniaActiva = 2;
     if (BarTabs.size() >= 4) BarTabs[3]->visible = esMesh; // pestaña Vertices: SOLO meshes
     if (BarTabs.size() >= 5) BarTabs[4]->visible = esMesh; // pestaña Modifiers: SOLO meshes
     if (pestaniaActiva == 2 && !hayTab3) pestaniaActiva = 1;
@@ -2578,8 +4047,17 @@ void Properties::ActualizarPestanias(){
     }
     // el objeto UI NO tiene transformacion: es el ORDEN DE DIBUJO (la interfaz se dibuja al
     // final, sobre la escena). No se mueve, ni rota, ni escala: su tarjeta no aplica.
-    if (propTransform) propTransform->visible = (pestaniaActiva == 1 && !esUI);
+    if (propTransform) propTransform->visible = (pestaniaActiva == 1 && !es2D);
     if (propTexto2D)   propTexto2D->visible   = (pestaniaActiva == 2 && esT2d);
+    if (propImagen2D)  propImagen2D->visible  = (pestaniaActiva == 2 && esImg);
+    if (propRect2D)    propRect2D->visible    = (pestaniaActiva == 2 && esRect);
+    if (propCont2D)    propCont2D->visible    = (pestaniaActiva == 2 && esCont);
+    if (propS9card)    propS9card->visible    = (pestaniaActiva == 2 && esS9);
+    if (propBtn2D)     propBtn2D->visible     = (pestaniaActiva == 2 && esBtn);
+    if (propExp2D)     propExp2D->visible     = (pestaniaActiva == 2 && esExp);
+    if (propUIcard)    propUIcard->visible    = (pestaniaActiva == 2 && esUI);
+    if (propPaleta)    propPaleta->visible    = (pestaniaActiva == 2 && esUI);
+    if (propHijos)     propHijos->visible     = (pestaniaActiva == 2 && es2D);
     if (propMeshParts) propMeshParts->visible = (pestaniaActiva == 2 && esMesh);
     if (propMaterial)  propMaterial->visible  = (pestaniaActiva == 2 && esMesh);
     if (propLight)     propLight->visible     = (pestaniaActiva == 2 && esLuz);
@@ -3250,7 +4728,7 @@ void Properties::SetRectFilaSeleccionada(){
     int syFila = y + BarTopOffset() + PosY + yFila;
     if (prop->GetType() == PropertyType::Button) {
         PropButton* pb = (PropButton*)prop;
-        pb->button->sx = sxFila;
+        pb->button->sx = sxFila + (pb->conLabel ? gsel->colEtiqueta : 0);
         pb->button->sy = syFila;
     } else { // Color: guardo la posicion para abrir el ColorPicker desde EnterPropertieSelect
         gColorSelSx = sxFila; gColorSelSy = syFila;
@@ -3481,6 +4959,22 @@ void Properties::ClickEn(int mx, int my) {
                     }
                     else if (prop->GetType() == PropertyType::Color) {
                         PropColor* pc = (PropColor*)prop;
+                        // fila de PALETA: la crucecita a la izquierda del swatch BORRA la entrada
+                        int pidx = pc->PaletaIdx();
+                        if (pidx >= 0) {
+                            int cw = RenglonHeightGS + GlobalScale * 2;
+                            int xCruz = x + PosX + borderGS * 2 + g->width - bordersGS
+                                        - cw * 2 - gapGS;
+                            if (mx >= xCruz && mx < xCruz + cw) {
+                                UI* u2 = (ObjActivo && ObjActivo->getType() == ObjectType::ui) ? (UI*)ObjActivo : NULL;
+                                if (u2 && pidx < (int)u2->Colores().size()) {
+                                    u2->Colores().erase(u2->Colores().begin() + pidx);
+                                    target = NULL;   // re-bind: la tarjeta se reconstruye
+                                    g_redraw = true;
+                                }
+                                return;
+                            }
+                        }
                         if (pc->value) {
                             // selector de color (popup); la fila queda
                             // con BORDE VERDE mientras se edita
@@ -3493,9 +4987,12 @@ void Properties::ClickEn(int mx, int my) {
                         }
                     }
                     else if (prop->GetType() == PropertyType::Button) {
-                        // rect absoluto (los desplegables abren debajo)
+                        // rect absoluto (los desplegables abren debajo). Con label el boton
+                        // vive en la COLUMNA DE VALORES: sin el corrimiento el menu abria
+                        // enganchado al borde izquierdo de la fila, no al del boton.
                         PropButton* pb = (PropButton*)prop;
-                        pb->button->sx = x + PosX + borderGS + borderGS;
+                        pb->button->sx = x + PosX + borderGS + borderGS +
+                                         (pb->conLabel ? g->colEtiqueta : 0);
                         pb->button->sy = yFila;
                         prop->EditPropertie(); // accion del boton
                     }

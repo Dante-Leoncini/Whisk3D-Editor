@@ -26,6 +26,14 @@
 #include "objects/Empty.h"
 #include "objects/UI.h"
 #include "objects/Texto2D.h"
+#include "objects/Imagen2D.h"
+#include "objects/Rect2D.h"
+#include "objects/Contenedor2D.h"
+#include "objects/Slice9.h"
+#include "objects/Boton2D.h"
+#include "objects/Expandir2D.h"
+#include "io/UI2DFormato.h"     // cargar interfaces .w3dui
+#include "PopUp/FileBrowser.h"  // AbrirFileBrowser (elegir el archivo)
 #include "objects/Armature.h"
 #include "animation/SkeletalAnimation.h" // InsertarKeyframeEsqueleto (Pose Mode: Insert Keyframe)
 #include "objects/Instance.h"
@@ -439,12 +447,25 @@ void AddImportFbx(){  if (LayoutImportFbx)  LayoutImportFbx(); }
 void AddImportGltf(){ if (LayoutImportGltf) LayoutImportGltf(); }
 void AddImportGlb(){  if (LayoutImportGlb)  LayoutImportGlb(); }
 
+// importar una INTERFAZ 2D (.w3dui): el arbol entero aparece en la escena, seleccionado
+static void UIImportElegido(const std::string& ruta){
+    UI* u = UI2DCargar(ruta);
+    if (!u) { Notificar(T("Could not read the file"), true); return; }
+    DeseleccionarTodo();
+    u->Seleccionar();
+    g_redraw = true;
+}
+void AddImportUI(){
+    AbrirFileBrowser(T("Load UI"), T("Open"), ".w3dui .json", UIImportElegido);
+}
+
 // submenu Imports (OBJ/FBX/glTF/GLB). Nombres de formato: NO se traducen (son marcas).
 static const MenuDef ADD_IMPORTS[] = {
     { "OBJ",  AddImportObj,  NULL, ICONO(IconType::mesh) },
     { "FBX",  AddImportFbx,  NULL, ICONO(IconType::mesh) },
     { "glTF", AddImportGltf, NULL, ICONO(IconType::mesh) },
     { "GLB",  AddImportGlb,  NULL, ICONO(IconType::mesh) },
+    { "Whisk3D UI", AddImportUI, NULL, ICONO(IconType::textura) },
 };
 
 // EL MENU ADD, de una mirada: texto + accion + icono por fila. Agregar una primitiva = una linea aca, y ya queda
@@ -1267,13 +1288,21 @@ static UI* UIRaizParaAgregar() {
 }
 
 static void LayoutAccion2DAdd(int id) {
-    if (id == 0) {   // Texto
-        UI* raiz = UIRaizParaAgregar();
-        Texto2D* t = new Texto2D(raiz, Vector3(540.0f, 960.0f, 0.0f));   // centro del lienzo
-        DeseleccionarTodo();
-        t->Seleccionar();
-        g_redraw = true;
-    }
+    UI* raiz = UIRaizParaAgregar();
+    // posicion CERO: con el ancla en el centro (default) cero = centrado en la ventana
+    Object* nuevo = NULL;
+    if (id == 0) nuevo = new Texto2D(raiz, Vector3(0.0f, 0.0f, 0.0f));
+    if (id == 1) nuevo = new Imagen2D(raiz, Vector3(0.0f, 0.0f, 0.0f));
+    if (id == 2) nuevo = new Rect2D(raiz, Vector3(0.0f, 0.0f, 0.0f));
+    if (id == 3) nuevo = new Contenedor2D(raiz, Vector3(0.0f, 0.0f, 0.0f));
+    if (id == 4) nuevo = new Slice9(raiz, Vector3(0.0f, 0.0f, 0.0f));
+    if (id == 5) nuevo = new Boton2D(raiz, Vector3(0.0f, 0.0f, 0.0f));
+    if (id == 6) nuevo = new Expandir2D(raiz, Vector3(0.0f, 0.0f, 0.0f));
+    if (id == 7) { AddImportUI(); return; }   // importar un .w3dui (mismo flujo que Imports)
+    if (!nuevo) return;
+    DeseleccionarTodo();
+    nuevo->Seleccionar();
+    g_redraw = true;
 }
 
 static void LayoutAbrirMenu2DAdd(int x, int y) {
@@ -1281,18 +1310,160 @@ static void LayoutAbrirMenu2DAdd(int x, int y) {
     gMenu2DAdd->Limpiar();
     gMenu2DAdd->titulo = T("Add");
     gMenu2DAdd->Agregar(T("Text"), 0, (int)IconType::lista);
+    gMenu2DAdd->Agregar(T("Image"), 1, (int)IconType::foto);
+    gMenu2DAdd->Agregar(T("Rectangle"), 2, (int)IconType::plane);
+    gMenu2DAdd->Agregar(T("Container"), 3, (int)IconType::carpeta);
+    gMenu2DAdd->Agregar("Slice 9", 4, (int)IconType::cuadricula);
+    gMenu2DAdd->Agregar(T("Button"), 5, (int)IconType::object);
+    gMenu2DAdd->Agregar(T("Expand"), 6, (int)IconType::arrowRight);
+    gMenu2DAdd->Agregar("Importar w3dui", 7, (int)IconType::archive);
     gMenu2DAdd->action = LayoutAccion2DAdd;
     if (MenuAbierto && MenuAbierto != gMenu2DAdd) MenuAbierto->Cerrar();
     gMenu2DAdd->Abrir(x, y, MenuPantallaW, MenuPantallaH);
     MenuAbierto = gMenu2DAdd;
 }
 
+static PopupMenu* gMenu2DPivot = NULL;
+static Editor2D*  gMenu2DPivotDe = NULL;   // el editor cuyo boton abrio el menu
+
+static void LayoutAccion2DPivot(int id) {
+    if (gMenu2DPivotDe) { gMenu2DPivotDe->pivotModo = id; g_redraw = true; }
+}
+static void LayoutAbrirMenu2DPivot(Editor2D* ed, int x, int y) {
+    if (!gMenu2DPivot) { gMenu2DPivot = new PopupMenu(); gMenu2DPivot->action = LayoutAccion2DPivot; }
+    gMenu2DPivotDe = ed;
+    gMenu2DPivot->Limpiar();
+    gMenu2DPivot->titulo = T("Pivot");
+    gMenu2DPivot->Agregar(T("Median Point"),   0, (int)IconType::pivotMedian);
+    gMenu2DPivot->Agregar(T("Active Element"), 1, (int)IconType::pivotActive);
+    gMenu2DPivot->Agregar(T("2D Cursor"),      2, (int)IconType::pivotCursor);
+    if (MenuAbierto && MenuAbierto != gMenu2DPivot) MenuAbierto->Cerrar();
+    gMenu2DPivot->Abrir(x, y, MenuPantallaW, MenuPantallaH);
+    MenuAbierto = gMenu2DPivot;
+}
+
+// ---- menu Seleccionar del Editor 2D (solo elementos 2D) ----
+static PopupMenu* gMenu2DSelect = NULL;
+static void LayoutAccion2DSelect(int id) { Editor2DSeleccionar(id); }
+static void LayoutAbrirMenu2DSelect(int x, int y) {
+    if (!gMenu2DSelect) {
+        gMenu2DSelect = new PopupMenu();
+        gMenu2DSelect->titulo = T("Select");
+        gMenu2DSelect->action = LayoutAccion2DSelect;
+        gMenu2DSelect->Agregar(T("All"), 0)->atajo = "A";
+        gMenu2DSelect->Agregar(T("None"), 1)->atajo = "Alt A";
+        gMenu2DSelect->Agregar(T("Invert"), 2)->atajo = "Ctrl I";
+    }
+    if (MenuAbierto && MenuAbierto != gMenu2DSelect) MenuAbierto->Cerrar();
+    gMenu2DSelect->Abrir(x, y, MenuPantallaW, MenuPantallaH);
+    MenuAbierto = gMenu2DSelect;
+}
+
+// ---- menu Objeto del Editor 2D: Transformar (G/R/S) + duplicar/emparentar/borrar ----
+static PopupMenu* gMenu2DObj = NULL;
+static PopupMenu* gMenu2DXform = NULL;
+static Editor2D* gEditor2DMenu = NULL;   // el editor que abrio el menu (para G/R/S)
+static void LayoutAccion2DObject(int id) {
+    Editor2D* ed = gEditor2DMenu;
+    switch (id) {
+        case 100: if (ed) ed->IniciarXform2D(1); break;   // Move (G)
+        case 101: if (ed) ed->IniciarXform2D(2); break;   // Rotate (R)
+        case 102: if (ed) ed->IniciarXform2D(3); break;   // Scale (S)
+        case 1:   Editor2DDuplicarSeleccion(ed); break;   // Duplicate (Shift D)
+        case 40: {   // EMPARENTAR la seleccion 2D al elemento ACTIVO (o al UI activo)
+            if (!ObjActivo) break;
+            if (!UI2D_EsElemento2D(ObjActivo) && ObjActivo->getType() != ObjectType::ui) break;
+            std::vector<Object*> sel = ObjSelects;   // copia: ReparentSimple no toca la seleccion
+            for (size_t i = 0; i < sel.size(); i++)
+                if (sel[i] != ObjActivo && UI2D_EsElemento2D(sel[i]))
+                    ReparentSimple(sel[i], ObjActivo);
+            g_redraw = true;
+        } break;
+        case 41: {   // DESEMPARENTAR: cada elemento vuelve a colgar de su UI raiz
+            std::vector<Object*> sel = ObjSelects;
+            for (size_t i = 0; i < sel.size(); i++) {
+                if (!UI2D_EsElemento2D(sel[i])) continue;
+                Object* r = sel[i]->Parent;
+                while (r && r->getType() != ObjectType::ui) r = r->Parent;
+                if (r && sel[i]->Parent != r) ReparentSimple(sel[i], r);
+            }
+            g_redraw = true;
+        } break;
+        case 3: Editor2DBorrarSeleccion(); break;         // Delete (X)
+    }
+}
+static void LayoutAbrirMenu2DObj(Editor2D* ed, int x, int y) {
+    gEditor2DMenu = ed;
+    if (!gMenu2DObj) {
+        gMenu2DXform = new PopupMenu();
+        gMenu2DXform->action = LayoutAccion2DObject;
+        gMenu2DXform->Agregar(T("Move"), 100)->atajo = "G";
+        gMenu2DXform->Agregar(T("Rotate"), 101)->atajo = "R";
+        gMenu2DXform->Agregar(T("Scale"), 102)->atajo = "S";
+        gMenu2DObj = new PopupMenu();
+        gMenu2DObj->titulo = T("Object");
+        gMenu2DObj->action = LayoutAccion2DObject;
+        gMenu2DObj->Agregar(T("Transform"), 0, -1, gMenu2DXform);
+        gMenu2DObj->Agregar(T("Duplicate Objects"), 1)->atajo = "Shift D";
+        gMenu2DObj->Agregar(T("Set Parent"), 40);
+        gMenu2DObj->Agregar(T("Clear Parent"), 41);
+        gMenu2DObj->Agregar(T("Delete"), 3)->atajo = "X";
+    }
+    if (MenuAbierto && MenuAbierto != gMenu2DObj) MenuAbierto->Cerrar();
+    gMenu2DObj->Abrir(x, y, MenuPantallaW, MenuPantallaH);
+    MenuAbierto = gMenu2DObj;
+}
+
+// ---- menu View del Editor 2D: la vista (zoom) ----
+static PopupMenu* gMenu2DView = NULL;
+static Editor2D* gEditor2DView = NULL;
+static void LayoutAccion2DView(int id) {
+    if (id >= 1 && id <= 4) Editor2DZoomExacto(gEditor2DView, id);
+    else if (id == 10) Editor2DEncuadrarSeleccion(gEditor2DView);
+}
+static void LayoutAbrirMenu2DView(Editor2D* ed, int x, int y) {
+    gEditor2DView = ed;
+    if (!gMenu2DView) {
+        gMenu2DView = new PopupMenu();
+        gMenu2DView->titulo = T("View");
+        gMenu2DView->action = LayoutAccion2DView;
+        gMenu2DView->Agregar(T("Frame Selected"), 10)->atajo = "Num .";
+        gMenu2DView->Agregar("Zoom 1:1", 1);   // pixel-perfect: un px del lienzo = uno real
+        gMenu2DView->Agregar("Zoom 2:1", 2);
+        gMenu2DView->Agregar("Zoom 3:1", 3);
+        gMenu2DView->Agregar("Zoom 4:1", 4);
+    }
+    if (MenuAbierto && MenuAbierto != gMenu2DView) MenuAbierto->Cerrar();
+    gMenu2DView->Abrir(x, y, MenuPantallaW, MenuPantallaH);
+    MenuAbierto = gMenu2DView;
+}
+
 static bool LayoutClickBarra2D(Editor2D* ed, int mx, int my) {
     if (!ed) return false;
     std::vector<Button*>& B = ed->BarButtons;
-    if (B.size() > 1 && B[1]->visible && B[1]->Contains(mx, my)) {   // [1] Add
+    if (B.size() > 1 && B[1]->visible && B[1]->Contains(mx, my)) {   // [1] Seleccionar
         ed->ActualizarBarra();
-        LayoutAbrirMenu2DAdd(B[1]->sx, B[1]->sy + B[1]->height - GlobalScale);
+        LayoutAbrirMenu2DSelect(B[1]->sx, B[1]->sy + B[1]->height - GlobalScale);
+        return true;
+    }
+    if (B.size() > 2 && B[2]->visible && B[2]->Contains(mx, my)) {   // [2] Add
+        ed->ActualizarBarra();
+        LayoutAbrirMenu2DAdd(B[2]->sx, B[2]->sy + B[2]->height - GlobalScale);
+        return true;
+    }
+    if (B.size() > 3 && B[3]->visible && B[3]->Contains(mx, my)) {   // [3] Objeto
+        ed->ActualizarBarra();
+        LayoutAbrirMenu2DObj(ed, B[3]->sx, B[3]->sy + B[3]->height - GlobalScale);
+        return true;
+    }
+    if (B.size() > 4 && B[4]->visible && B[4]->Contains(mx, my)) {   // [4] View
+        ed->ActualizarBarra();
+        LayoutAbrirMenu2DView(ed, B[4]->sx, B[4]->sy + B[4]->height - GlobalScale);
+        return true;
+    }
+    if (B.size() > 5 && B[5]->visible && B[5]->Contains(mx, my)) {   // [5] Pivote
+        ed->ActualizarBarra();
+        LayoutAbrirMenu2DPivot(ed, B[5]->sx, B[5]->sy + B[5]->height - GlobalScale);
         return true;
     }
     return false;

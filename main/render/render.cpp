@@ -175,6 +175,13 @@ void RenderLinkLines(Object* obj){
     for (size_t c = 0; c < obj->Childrens.size(); c++) {
         Object* objChild = obj->Childrens[c];
         if (!objChild->visible || !objChild->showRelantionshipsLines ) continue;
+        if (objChild->getType() == ObjectType::ui || objChild->getType() == ObjectType::texto2d ||
+            objChild->getType() == ObjectType::imagen2d ||
+            objChild->getType() == ObjectType::rect2d ||
+            objChild->getType() == ObjectType::cont2d ||
+            objChild->getType() == ObjectType::slice9 ||
+            objChild->getType() == ObjectType::boton2d ||
+            objChild->getType() == ObjectType::expandir2d) continue; // sin linea de parent para la UI 2D
         if (obj->getType()!= ObjectType::collection && obj->getType() != ObjectType::baseObject){
             Vector3 a = obj->GetGlobalPosition();
             Vector3 b = objChild->GetGlobalPosition();
@@ -281,6 +288,7 @@ bool RenderAxisTransform(Object* obj) {
 
 void DibujarOrigen(Object* obj){
     if (!obj->visible) return;
+    if (obj->getType() == ObjectType::ui) return;   // la UI no vive en el 3D: ni ella ni sus hijos 2D
 
     w3dEngine::PushMatrix();
 

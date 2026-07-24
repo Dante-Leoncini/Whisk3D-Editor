@@ -4,6 +4,7 @@
 #include "ViewPorts/ViewPort3D.h" // Viewport3DActive->Aceptar() en el transform
 #include "ViewPorts/PopUp/PopUpBase.h" // PopUpActive (la X cancela)
 #include "ViewPorts/Timeline.h"    // DopeNumInputChar (valor numerico del transform de keyframes)
+#include "ViewPorts/Editor2D.h"    // Editor2DXformActivo (envolver el cursor en G/R/S 2D)
 #include "WhiskUI/draw/glesdraw.h"        // W3dPantallaAlto
 #include "controles.h"
 #include "Undo.h" // Ctrl+Z
@@ -378,6 +379,12 @@ void InputUsuarioSDL3(SDL_Event &e){
         // pone en 0 justo en el salto), no la posicion real. ViewPortClickDown congela el foco en el timeline: sin
         // eso, al envolverse el cursor podria caer en otro viewport y el warp pasaria a usar EL RECT EQUIVOCADO.
         else if (DopeXformActivo() && viewPortActive && viewPortActive->ViewportKind() == 5){
+            ViewPortClickDown = true;
+            CheckWarpMouseInViewport(mx, my, viewPortActive);
+        }
+        // TRANSFORM 2D del Editor 2D (G/R/S, sin boton apretado): mismo envolver del cursor que
+        // el 3D. El editor acumula deltas y SALTEA el salto del warp -> la accion sigue fluida.
+        else if (Editor2DXformActivo(viewPortActive)){
             ViewPortClickDown = true;
             CheckWarpMouseInViewport(mx, my, viewPortActive);
         }

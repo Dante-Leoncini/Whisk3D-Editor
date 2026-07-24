@@ -1,5 +1,6 @@
 #include "w3dGraphics.h" // abstraccion de graficos (independencia de OpenGL)
-#include "W3dLang.h"   // T(): los textos salen en el idioma del sistema
+#include "W3dLang.h"
+#include "render/UIOverlay.h"   // la UI 2D dibujada sobre el viewport (simula la ventana)   // T(): los textos salen en el idioma del sistema
 #include "ViewPorts/ViewPort3D.h"
 #include "Undo.h" // Ctrl+Z: confirmar transform
 #include "objects/CameraBase.h" // camara base del core (la vista)
@@ -1712,6 +1713,14 @@ void Viewport3D::RenderOverlay() {
 
         if (ShowRelantionshipsLines) RenderRelantionshipsLines();
         RenderIcons3D();
+        // "Ver en 3D" de la UI: los elementos 2D metidos EN la escena, con su profundidad Z
+        if (UI2D_HayVerEn3D()) {
+            UI2D_DibujarEnMundo();
+            w3dEngine::BlendAlpha();
+            w3dEngine::Disable(w3dEngine::Texture2D);
+            w3dEngine::EnableArray(w3dEngine::VertexArray);
+            w3dEngine::DisableArray(w3dEngine::TexCoordArray);
+        }
 
         w3dEngine::Disable(w3dEngine::DepthTest);
 
@@ -1844,6 +1853,18 @@ void Viewport3D::RenderUI() {
         w3dEngine::EnableArray(w3dEngine::VertexArray);
         w3dEngine::EnableArray(w3dEngine::TexCoordArray);
         w3dEngine::DisableArray(w3dEngine::NormalArray);
+        w3dEngine::DisableArray(w3dEngine::ColorArray);
+        // la INTERFAZ 2D del juego/programa: el viewport ES la ventana, pero la parte VISIBLE
+        // (sin la barra de menu ni la barra de herramientas de abajo, que son chrome del
+        // editor; en el render final no existen). Las anclas se recalculan al cambiar.
+        { int arri = barAbajo ? 0 : BarTopOffset();
+          int abaj = ToolbarHeight() + (barAbajo ? BarTopOffset() : 0);
+          UI2D_BaseRecorte(x, y, width, height);   // el overflow recorta con scissor absoluto
+          UI2D_DibujarOverlay(0.0f, (float)arri, (float)width,
+                              (float)(height - arri - abaj), 1.0f, 0, true); }
+        w3dEngine::BlendAlpha();               // el texto deja mezcla premultiplicada
+        w3dEngine::Enable(w3dEngine::Texture2D);
+        w3dEngine::EnableArray(w3dEngine::TexCoordArray);
         w3dEngine::DisableArray(w3dEngine::ColorArray);
         w3dEngine::BindTexture(Textures[0]->iID);
         w3dEngine::TexFilter(false);

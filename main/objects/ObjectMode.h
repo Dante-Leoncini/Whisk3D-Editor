@@ -46,6 +46,9 @@ void guardarEstadoRec(Object* obj);
 bool guardarEstado();
 void SetPosicion();
 void DuplicatedObject();
+// copia REAL de UN objeto (mesh deep-copy; luz/camara/empty/texto2d/imagen2d sus propiedades).
+// La usan DuplicatedObject y el duplicado del Editor 2D.
+Object* W3dDuplicarUno(Object* src);
 // Separate (Edit Mode: P / menu Mesh > Separate): mueve las caras SELECCIONADAS a un mesh NUEVO (misma
 // transform + materiales + vertex groups + modificadores) y las borra del actual. true si separo algo.
 bool SepararSeleccionEdit(Mesh* m);

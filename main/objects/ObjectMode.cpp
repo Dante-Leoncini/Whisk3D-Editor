@@ -2,6 +2,13 @@
 #include "W3dLang.h"   // T(): los textos salen en el idioma del sistema
 #include "render/OpcionesRender.h" // g_transformPivot + enum TransformPivot (editor)
 #include "objects/Mesh.h"      // snap del cursor al centro de la malla en Edit Mode
+#include "objects/Texto2D.h"   // W3dDuplicarUno: copiar elementos 2D
+#include "objects/Imagen2D.h"
+#include "objects/Rect2D.h"
+#include "objects/Contenedor2D.h"
+#include "objects/Slice9.h"
+#include "objects/Boton2D.h"
+#include "objects/Expandir2D.h"
 #include "EditMesh.h"  // CentroSeleccion
 #include "Undo.h"      // Ctrl+Z: capturar transform / limpiar al borrar
 #include "ViewPorts/LayoutInput.h" // SNAP en modo objeto (SnapBuscarTarget, g_snap, enums)
@@ -506,6 +513,15 @@ bool guardarEstado(){
 }
 
 void SetPosicion(){
+	// la UI y sus elementos 2D NO se transforman desde el 3D (la UI es orden de dibujo;
+	// los textos se mueven en el Editor 2D). Borrarlos si esta permitido.
+	if (ObjActivo && (ObjActivo->getType() == ObjectType::ui || ObjActivo->getType() == ObjectType::texto2d ||
+	                  ObjActivo->getType() == ObjectType::imagen2d ||
+	                  ObjActivo->getType() == ObjectType::rect2d ||
+	                  ObjActivo->getType() == ObjectType::cont2d ||
+	                  ObjActivo->getType() == ObjectType::slice9 ||
+	                  ObjActivo->getType() == ObjectType::boton2d ||
+	                  ObjActivo->getType() == ObjectType::expandir2d)) return;
 	if (ObjActivo && InteractionMode == ObjectMode && ObjActivo->select && estado == editNavegacion){
 		if (!guardarEstado()) return;
 		estado = translacion; g_xformPrimerMov = true; // primer motion en cero (no salta)
@@ -522,7 +538,21 @@ void SetPosicion(){
 #include "Empty.h"
 #include <string.h>
 
-static Object* W3dDuplicarUno(Object* src) {
+// copia la parte COMUN de un elemento 2D (Elemento2D: rect, ancla, layout, overflow...)
+static void CopiarBase2D(Elemento2D* d, Elemento2D* s) {
+    d->ancho = s->ancho; d->alto = s->alto;
+    d->ancla = s->ancla; d->rot2d = s->rot2d;
+    d->opacidad = s->opacidad; d->peso = s->peso;
+    d->padIzq = s->padIzq; d->padDer = s->padDer;
+    d->padArr = s->padArr; d->padAba = s->padAba;
+    d->layoutHijos = s->layoutHijos;
+    d->gap = s->gap; d->padGapPx = s->padGapPx;
+    d->tamPx = s->tamPx;
+    d->recortaX = s->recortaX; d->recortaY = s->recortaY;
+    d->conScroll = s->conScroll; d->scrollX = s->scrollX; d->scrollY = s->scrollY;
+}
+
+Object* W3dDuplicarUno(Object* src) {
     Object* nuevo = NULL;
     if (src->getType() == ObjectType::mesh) {
         Mesh* m = (Mesh*)src;
@@ -600,6 +630,74 @@ static Object* W3dDuplicarUno(Object* src) {
     }
     else if (src->getType() == ObjectType::empty) {
         nuevo = new Empty(src->Parent, src->pos);
+    }
+    else if (src->getType() == ObjectType::texto2d) {
+        Texto2D* st = (Texto2D*)src;
+        Texto2D* d = new Texto2D(src->Parent, src->pos);
+        CopiarBase2D(d, st);
+        d->texto = st->texto; d->tam = st->tam;
+        d->alignH = st->alignH; d->alignV = st->alignV;
+        d->fuente = st->fuente;
+        d->tipo = st->tipo; d->decimales = st->decimales;
+        d->lineas = st->lineas; d->autoTam = st->autoTam;
+        d->palColor = st->palColor;
+        for (int i = 0; i < 4; i++) d->color[i] = st->color[i];
+        nuevo = d;
+    }
+    else if (src->getType() == ObjectType::imagen2d) {
+        Imagen2D* si = (Imagen2D*)src;
+        Imagen2D* d = new Imagen2D(src->Parent, src->pos);
+        CopiarBase2D(d, si);
+        d->textura = si->textura; d->modo = si->modo;
+        d->usarAlpha = si->usarAlpha; d->filtrado = si->filtrado;
+        d->palTinte = si->palTinte;
+        for (int i = 0; i < 4; i++) d->color[i] = si->color[i];
+        nuevo = d;
+    }
+    else if (src->getType() == ObjectType::rect2d) {
+        Rect2D* sr = (Rect2D*)src;
+        Rect2D* d = new Rect2D(src->Parent, src->pos);
+        CopiarBase2D(d, sr);
+        d->palColor = sr->palColor;
+        for (int i = 0; i < 4; i++) d->color[i] = sr->color[i];
+        nuevo = d;
+    }
+    else if (src->getType() == ObjectType::cont2d) {
+        Contenedor2D* d = new Contenedor2D(src->Parent, src->pos);
+        CopiarBase2D(d, (Contenedor2D*)src);
+        nuevo = d;
+    }
+    else if (src->getType() == ObjectType::boton2d) {
+        Boton2D* sb = (Boton2D*)src;
+        Boton2D* d = new Boton2D(src->Parent, src->pos);
+        CopiarBase2D(d, sb);
+        d->texto = sb->texto; d->icono = sb->icono; d->fuente = sb->fuente;
+        d->tam = sb->tam; d->pad = sb->pad;
+        d->palFondo = sb->palFondo; d->palTexto = sb->palTexto; d->palBorde = sb->palBorde;
+        d->texturaFondo = sb->texturaFondo;
+        d->bordeTexX = sb->bordeTexX; d->bordeTexY = sb->bordeTexY;
+        d->escalaBordeTex = sb->escalaBordeTex;
+        for (int i = 0; i < 4; i++) {
+            d->colorFondo[i] = sb->colorFondo[i];
+            d->colorTexto[i] = sb->colorTexto[i];
+            d->colorBorde[i] = sb->colorBorde[i];
+        }
+        nuevo = d;
+    }
+    else if (src->getType() == ObjectType::expandir2d) {
+        Expandir2D* d = new Expandir2D(src->Parent, src->pos);
+        CopiarBase2D(d, (Expandir2D*)src);
+        nuevo = d;
+    }
+    else if (src->getType() == ObjectType::slice9) {
+        Slice9* ss = (Slice9*)src;
+        Slice9* d = new Slice9(src->Parent, src->pos);
+        CopiarBase2D(d, ss);
+        d->textura = ss->textura; d->escalaBorde = ss->escalaBorde;
+        d->bordeX = ss->bordeX; d->bordeY = ss->bordeY;
+        d->filtrado = ss->filtrado; d->palTinte = ss->palTinte;
+        for (int i = 0; i < 4; i++) d->color[i] = ss->color[i];
+        nuevo = d;
     }
     if (nuevo) {
         nuevo->pos = src->pos;
@@ -1103,6 +1201,15 @@ void ToggleRotacionOrbital(){
 }
 
 void SetRotacion(){
+	// la UI y sus elementos 2D NO se transforman desde el 3D (la UI es orden de dibujo;
+	// los textos se mueven en el Editor 2D). Borrarlos si esta permitido.
+	if (ObjActivo && (ObjActivo->getType() == ObjectType::ui || ObjActivo->getType() == ObjectType::texto2d ||
+	                  ObjActivo->getType() == ObjectType::imagen2d ||
+	                  ObjActivo->getType() == ObjectType::rect2d ||
+	                  ObjActivo->getType() == ObjectType::cont2d ||
+	                  ObjActivo->getType() == ObjectType::slice9 ||
+	                  ObjActivo->getType() == ObjectType::boton2d ||
+	                  ObjActivo->getType() == ObjectType::expandir2d)) return;
 	//si no hay objetos. En Edit Mode NO se transforma el objeto (es para editar la malla)
 	if (ObjActivo && InteractionMode == ObjectMode && ObjActivo->select && estado == editNavegacion){
 		if (!guardarEstado()) return;
@@ -1139,6 +1246,14 @@ void SetScale(int dx, int dy, float factor){
 }
 
 void SetEscala(){
+	// la UI y sus elementos 2D NO se transforman desde el 3D (ver SetPosicion)
+	if (ObjActivo && (ObjActivo->getType() == ObjectType::ui || ObjActivo->getType() == ObjectType::texto2d ||
+	                  ObjActivo->getType() == ObjectType::imagen2d ||
+	                  ObjActivo->getType() == ObjectType::rect2d ||
+	                  ObjActivo->getType() == ObjectType::cont2d ||
+	                  ObjActivo->getType() == ObjectType::slice9 ||
+	                  ObjActivo->getType() == ObjectType::boton2d ||
+	                  ObjActivo->getType() == ObjectType::expandir2d)) return;
 	//XYZ tiene escala. En Edit Mode NO se transforma el objeto (es para editar la malla)
 	if (ObjActivo && InteractionMode == ObjectMode && ObjActivo->select && estado == editNavegacion){
 		if (!guardarEstado()) return;

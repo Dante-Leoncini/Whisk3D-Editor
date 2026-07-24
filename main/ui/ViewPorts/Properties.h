@@ -92,12 +92,160 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         GroupPropertie* propLight;   // pestania de luz: TODAS las propiedades editables de la luz GL
         // tarjeta del elemento TEXTO 2D (se edita en el Editor 2D)
         GroupPropertie* propTexto2D;
+        PropText*   propT2dNombre;   // nombre del objeto (arriba de todo; el tab Objeto no se muestra)
+        PropFloat*  propT2dPosX;     // posicion (X/Y en el lienzo, Z = profundidad)
+        PropFloat*  propT2dPosY;
+        PropFloat*  propT2dPosZ;
+        PropFloat*  propT2dOpac;     // opacidad 0..1 (multiplica a la de los padres)
+        PropBool*   propT2dPosAbs;   // posicion en PIXELES (off = relativa al tamano de la UI)
+        PropFloat*  propT2dPeso;     // peso en el reparto de filas/columnas del padre
+        PropButton* propT2dLineas;   // desplegable: una linea / por palabras / cualquier parte
+        PropBool*   propT2dAutoTam;  // ajustar el tamano de fuente al area disponible
         PropText*   propT2dTexto;    // que dice ("Texto" por defecto)
+        PropButton* propT2dTipo;     // desplegable: string / number / float
+        PropFloat*  propT2dDec;      // decimales del float (0 = no se ven)
         PropFloat*  propT2dTam;      // alto de fuente, en px del lienzo
         PropButton* propT2dAlignH;   // desplegable: izquierda / centro / derecha
         PropButton* propT2dAlignV;   // desplegable: arriba / centro / abajo
         PropColor*  propT2dColor;    // swatch -> ColorPicker
+        PropButton* propT2dPal;      // desplegable: color propio o de la paleta
         PropButton* propT2dFuente;   // desplegable: Whisk3D / cargar un .ttf
+        PropButton* propT2dAncla;    // desplegable: desde donde se mide la posicion (ancla)
+        PropFloat*  propT2dRot;      // rotacion en grados
+        // tarjeta del elemento IMAGEN 2D (una textura con modo de ajuste)
+        GroupPropertie* propImagen2D;
+        PropButton* propImgTextura;  // elegir el archivo de imagen (file browser)
+        PropFloat*  propImgAncho;    // el rectangulo del elemento, en px de lienzo
+        PropFloat*  propImgAlto;
+        PropFloat*  propImgRot;      // rotacion en grados
+        PropButton* propImgModo;     // desplegable: estirar / ajustar / cover
+        PropButton* propImgAncla;    // desplegable de ancla (mismo esquema que el texto)
+        PropText*   propImgNombre;   // nombre del objeto (arriba de todo)
+        PropFloat*  propImgPosX;
+        PropFloat*  propImgPosY;
+        PropFloat*  propImgPosZ;
+        PropFloat*  propImgOpac;     // opacidad 0..1
+        PropBool*   propImgPosAbs;   // posicion en pixeles (off = relativa)
+        PropFloat*  propImgPeso;
+        PropBool*   propImgTamPx;    // ancho/alto en px (default) o relativos al padre
+        PropColor*  propImgColor;    // tinte de la textura
+        PropButton* propImgPal;
+        PropBool*   propImgAlpha;    // usar el canal alpha de la textura
+        PropBool*   propImgFiltro;   // filtrado de textura (off = pixel-perfect)
+        // tarjeta del elemento RECTANGULO 2D (color solido o transparente: acomoda hijos)
+        GroupPropertie* propRect2D;
+        PropText*   propRectNombre;
+        PropFloat*  propRectPosX;
+        PropFloat*  propRectPosY;
+        PropFloat*  propRectPosZ;
+        PropBool*   propRectPosAbs;
+        PropFloat*  propRectAncho;
+        PropFloat*  propRectAlto;
+        PropFloat*  propRectRot;
+        PropButton* propRectAncla;
+        PropFloat*  propRectOpac;
+        PropColor*  propRectColor;
+        PropButton* propRectPal;
+        PropFloat*  propRectPeso;
+        PropBool*   propRectTamPx;
+        // tarjeta del elemento CONTENEDOR (rectangulo invisible: solo ordena a sus hijos)
+        GroupPropertie* propCont2D;
+        PropText*   propContNombre;
+        PropFloat*  propContPosX;
+        PropFloat*  propContPosY;
+        PropFloat*  propContPosZ;
+        PropBool*   propContPosAbs;
+        PropFloat*  propContPeso;
+        PropFloat*  propContAncho;
+        PropFloat*  propContAlto;
+        PropFloat*  propContRot;
+        PropButton* propContAncla;
+        PropFloat*  propContOpac;
+        PropBool*   propContTamPx;
+        // tarjeta del elemento SLICE 9 (imagen con bordes fijos)
+        GroupPropertie* propS9card;
+        PropText*   propS9Nombre;
+        PropFloat*  propS9PosX;
+        PropFloat*  propS9PosY;
+        PropFloat*  propS9PosZ;
+        PropBool*   propS9PosAbs;
+        PropFloat*  propS9Peso;
+        PropButton* propS9Textura;
+        PropFloat*  propS9Ancho;
+        PropFloat*  propS9Alto;
+        PropBool*   propS9TamPx;
+        PropFloat*  propS9BordeX;    // grosor del borde EN la textura (px del archivo), por eje
+        PropFloat*  propS9BordeY;
+        PropFloat*  propS9EscBorde;  // grosor dibujado = borde * esto
+        PropFloat*  propS9Rot;
+        PropButton* propS9Ancla;
+        PropFloat*  propS9Opac;
+        // tarjeta del BOTON 2D
+        GroupPropertie* propBtn2D;
+        PropText*   propBtnNombre;
+        PropFloat*  propBtnPosX;
+        PropFloat*  propBtnPosY;
+        PropFloat*  propBtnPosZ;
+        PropBool*   propBtnPosAbs;
+        PropFloat*  propBtnPeso;
+        PropText*   propBtnTexto;
+        PropButton* propBtnIcono;    // elegir el png del icono
+        PropFloat*  propBtnTam;
+        PropFloat*  propBtnPad;
+        PropButton* propBtnAncla;
+        PropFloat*  propBtnOpac;
+        PropColor*  propBtnColFondo;
+        PropColor*  propBtnColTexto;
+        PropColor*  propBtnColBorde;
+        PropButton* propBtnPalFondo; // desplegable: color propio o uno de la paleta
+        PropButton* propBtnPalTexto;
+        PropButton* propBtnPalBorde;
+        PropButton* propBtnTex;      // textura de fondo (9 pedazos) opcional
+        PropFloat*  propBtnTexBX;
+        PropFloat*  propBtnTexBY;
+        PropFloat*  propBtnTexEsc;
+        // tarjeta del EXPANDIR
+        GroupPropertie* propExp2D;
+        PropText*   propExpNombre;
+        PropFloat*  propExpPeso;
+        PropColor*  propS9Color;     // tinte del arte (blanco = tal cual)
+        PropButton* propS9Pal;
+        PropBool*   propS9Filtro;    // filtrado de textura (off = pixel-perfect)
+        // tarjeta del objeto UI (la raiz de la interfaz)
+        GroupPropertie* propUIcard;
+        PropBool*   propUIver3D;     // ver los elementos con su profundidad en la escena 3D
+        PropBool*   propUIigualRender; // lienzo = tamano del render (default); apagado = responsive
+        PropFloat*  propUIancho;     // el lienzo propio (solo en responsive)
+        PropFloat*  propUIalto;
+        PropButton* propUIres;       // desplegable de resoluciones (4k .. 240p)
+        PropButton* propUIaspecto;   // desplegable de aspecto (16:9 / 4:3 / 1:1)
+        PropButton* propUIrotar;     // boton: intercambia ancho y alto
+        PropColor*  propUIcolor;     // fondo de la ventana (transparente por defecto)
+        PropFloat*  propUIescala;    // escala global del contenido (x1 N95 ... x4 pantallas grandes)
+        PropButton* propUIexport;    // guardar el arbol como .w3dui (JSON)
+        // tarjeta PALETA (del UI): filas dinamicas nombre+color por entrada
+        GroupPropertie* propPaleta;
+        int paletaFilas;             // firma de lo construido (rebuild al cambiar)
+        PropButton* propPaletaSel;   // desplegable: la paleta activa / crear nueva
+        PropText*   propUInombre;    // nombre del objeto UI
+        PropFloat*  propUIopac;      // opacidad de la interfaz ENTERA
+        // tarjeta "Children": lo que afecta a los HIJOS del seleccionado (padding = encoge el
+        // area donde se enganchan sus anclas; la linea se ve en el Editor 2D con el UI elegido)
+        GroupPropertie* propHijos;
+        PropFloat*  propHijosPadIzq;   // el padding, POR LADO
+        PropFloat*  propHijosPadDer;
+        PropFloat*  propHijosPadArr;
+        PropFloat*  propHijosPadAba;
+        PropButton* propHijosLayout; // desplegable: libremente / filas / columnas
+        PropFloat*  propHijosGap;    // espacio entre hijos (solo con filas/columnas)
+        PropBool*   propHijosPx;     // padding y gap en px (default) o proporcionales
+        PropButton* propHijosAjuste; // desplegable: estirar (100%) / minimo (tamano natural)
+        PropButton* propHijosAlign;  // desplegable: inicio / centro / fin (con ajuste minimo)
+        PropBool*   propHijosClipX;  // overflow: recortar lo que se sale, por eje
+        PropBool*   propHijosClipY;
+        PropBool*   propHijosScroll; // permitir scrollear el contenido recortado
+        PropFloat*  propHijosScrollX;
+        PropFloat*  propHijosScrollY;
         PropBool*   propLightDir;     // Directional (w=0) vs puntual/spot
         PropFloat*  propLightGL;      // numero de GL light (0..7, entero)
         PropColor*  propLightDiffuse; // color difuso
