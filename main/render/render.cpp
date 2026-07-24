@@ -181,7 +181,8 @@ void RenderLinkLines(Object* obj){
             objChild->getType() == ObjectType::cont2d ||
             objChild->getType() == ObjectType::slice9 ||
             objChild->getType() == ObjectType::boton2d ||
-            objChild->getType() == ObjectType::expandir2d) continue; // sin linea de parent para la UI 2D
+            objChild->getType() == ObjectType::expandir2d ||
+            objChild->getType() == ObjectType::video2d) continue; // sin linea de parent para la UI 2D
         if (obj->getType()!= ObjectType::collection && obj->getType() != ObjectType::baseObject){
             Vector3 a = obj->GetGlobalPosition();
             Vector3 b = objChild->GetGlobalPosition();

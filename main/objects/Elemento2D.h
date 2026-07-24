@@ -21,6 +21,14 @@ public:
     float rot2d;          // rotacion en grados (los hijos la heredan)
     float opacidad;       // 0..1; multiplica a la de los padres
     float peso;           // reparto del espacio cuando el PADRE esta en filas/columnas
+    // MARGEN exterior (como CSS): aire alrededor del elemento cuando esta en una
+    // fila/columna del padre. En px si el padre usa padGapPx; si no, proporcional
+    // (fraccion del lado menor del area del padre). En layout libre no aplica.
+    float margIzq, margDer, margArr, margAba;
+    bool  margUni;        // el panel edita los 4 margenes con UN solo valor
+    bool  padUni;         // idem para el padding (tarjeta Hijos)
+    bool  expandir;       // en una fila/columna ABSORBE el espacio sobrante (ademas de su
+                          // tamano natural), como el elemento Expandir: aprovecha el hueco
 
     // ---- los HIJOS ----
     float padIzq, padDer; // el padding POR LADO: encoge el rect donde se anclan los hijos
@@ -40,6 +48,8 @@ public:
         : Object(parent, nombre, pos) {
         ancho = 200.0f; alto = 150.0f; tamPx = true;
         ancla = 0; rot2d = 0.0f; opacidad = 1.0f; peso = 1.0f;
+        margIzq = margDer = margArr = margAba = 0.0f;
+        margUni = true; padUni = true; expandir = false;
         padIzq = padDer = padArr = padAba = 0.0f;
         layoutHijos = 0; layoutAjuste = 0; layoutAlign = 0;
         gap = 0.0f; padGapPx = true;

@@ -540,8 +540,17 @@ static void MainLoopFrame() {
     // frame SIGUIENTE (toasts/import fluidos) y en reposo REAL (nada prende g_redraw) bloquea en eventos (0% CPU).
     bool _needRender = g_redraw; g_redraw = false;
 
-    UpdateAnimations();
-    UpdateAnimatedMaterials();
+    // dt REAL del frame (el gameplay y las animaciones son proporcionales al
+    // tiempo, NO a los fps: a 10 fps en el Nokia se recorre lo mismo por segundo)
+    static double g_dtPrevMs = W3dNowMs();
+    double g_dtAhoraMs = W3dNowMs();
+    float dtFrame = (float)((g_dtAhoraMs - g_dtPrevMs) / 1000.0);
+    g_dtPrevMs = g_dtAhoraMs;
+    if (dtFrame < 0.0f) dtFrame = 0.0f;
+    if (dtFrame > 0.1f) dtFrame = 0.1f;   // pico (debugger/carga): no dar saltos gigantes
+
+    UpdateAnimations(dtFrame);
+    UpdateAnimatedMaterials(dtFrame);
 
 #ifdef __EMSCRIPTEN__
     // el canvas puede cambiar de tamano (ventana del browser). SDL2/Emscripten no siempre emite el
@@ -580,10 +589,43 @@ static void MainLoopFrame() {
     // el avance de frames va al ritmo de AnimFPS (default 30), independiente de los fps de la UI (que puede ir a 60).
     // Asi la animacion NO va "muy rapido": un frame de animacion dura 1000/AnimFPS ms aunque se dibuje 2 veces.
     unsigned int animMs = (AnimFPS > 0) ? (unsigned int)(1000 / AnimFPS) : 33;
+    // el MODO JUEGO va a 60 fps fijo (la fisica de los scripts se siente fluida);
+    // el timeline de animacion normal conserva su AnimFPS
+    if (AnimEsJuego && PlayAnimation) animMs = 1000 / 60;
     if (now - lastAnimTime >= animMs) {
         lastAnimTime = now;
         // Timeline: si esta en PLAY, avanzar CurrentFrame (loop Start..End) y forzar redibujo
-        if (PlayAnimation) { AnimTick(); g_redraw = true; }
+        if (PlayAnimation) {
+            extern void SimTickPlay(float); extern bool SimHayScripts(); extern bool SimActiva();
+            extern bool SimStep(int); extern int SimFrameActual(); extern int SimPrimerFrame();
+            bool juego = AnimEsJuego && (SimActiva() || SimHayScripts());
+            // el dt de la SIMULACION tambien es TIEMPO REAL entre ticks (el fisico
+            // del juego rinde lo mismo a 30, 60 o 10 fps)
+            static Uint32 lastSimMs = 0;
+            float dtSim;
+            if (lastSimMs == 0 || now < lastSimMs) dtSim = juego ? (1.0f / 60.0f)
+                                : 1.0f / (AnimFPS > 0 ? (float)AnimFPS : 30.0f);
+            else {
+                dtSim = (float)(now - lastSimMs) / 1000.0f;
+                if (dtSim > 0.1f) dtSim = 0.1f;
+                if (dtSim < 0.001f) dtSim = 0.001f;
+            }
+            lastSimMs = now;
+            if (juego && AnimPlayDir < 0) {
+                // PLAY EN REVERSA (modo juego): reproduce lo grabado HACIA ATRAS;
+                // al llegar al inicio se PAUSA (el final es infinito, no hay loop)
+                if (!SimActiva() || SimFrameActual() <= SimPrimerFrame()) PlayAnimation = false;
+                else SimStep(-1);
+            } else if (juego) {
+                // MODO JUEGO hacia adelante: el playhead lo lleva la simulacion
+                // (sin AnimTick: no hay Fin ni loop)
+                SimTickPlay(dtSim);
+            } else {
+                // animacion NORMAL: reproduce con su loop de siempre, sin tocar el juego
+                AnimTick();
+            }
+            g_redraw = true;
+        }
         // Actualizar frame
     }
     // ANIMACION DE OBJETOS (transform pos/rot/escala): aplica los keyframes al frame actual (play o scrub del timeline).
@@ -647,9 +689,9 @@ static void MainLoopFrame() {
 #endif
     }
 
-#ifndef __EMSCRIPTEN__
-    SDL_Delay(8); // liberar CPU (en web el timing lo maneja el browser via requestAnimationFrame)
-#endif
+    // (el Delay(8) fijo que vivia aca era un vestigio del busy-spin viejo: sumado al
+    // vsync del swap clavaba el editor en ~30 fps. El paceo real lo hace el loop de
+    // escritorio: duerme hasta el proximo frame de 60 y en reposo bloquea en eventos.)
 }
 
 int main(int argc, char* argv[]) {
@@ -905,6 +947,13 @@ int main(int argc, char* argv[]) {
     for (int ai = 1; ai < argc; ai++) {
         if (std::string(argv[ai]) == "--stats") { extern bool OverlayStatVertices, OverlayStatFaces, OverlayStatModgen, OverlayStatTimes, OverlayFps; OverlayStatVertices = OverlayStatFaces = OverlayStatModgen = OverlayStatTimes = OverlayFps = true; g_redraw = true; }
         if (std::string(argv[ai]) == "--play")  { extern bool PlayAnimation;     PlayAnimation = true;     g_redraw = true; }
+        // "whisk3d proyecto.w3d --juego": abre DIRECTO jugando (el selector del
+        // timeline en "Juego" + play): para probar un juego sin tocar nada
+        if (std::string(argv[ai]) == "--juego") {
+            extern int ActiveAnimKind; extern bool AnimEsJuego; extern bool PlayAnimation;
+            ActiveAnimKind = 2; AnimEsJuego = true; StartFrame = 1;
+            PlayAnimation = true; g_redraw = true;
+        }
     }
 
 #ifdef __EMSCRIPTEN__

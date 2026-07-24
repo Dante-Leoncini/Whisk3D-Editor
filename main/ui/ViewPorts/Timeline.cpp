@@ -650,6 +650,7 @@ void Timeline::SyncFields(){
     else { btnStart->editField = NULL; char b[24]; snprintf(b,sizeof b,"%s:%d",T("Start"),StartFrame); btnStart->text=b; fStart=(float)StartFrame; }
     if (g_propFloatEditando == pfEnd){ btnEnd->editField = &pfEnd->field; }
     else { btnEnd->editField = NULL; char b[24]; snprintf(b,sizeof b,"%s:%d",T("End"),EndFrame); btnEnd->text=b; fEnd=(float)EndFrame; }
+    btnEnd->visible = !AnimEsJuego;   // MODO JUEGO: la animacion es infinita, sin Fin
     if (g_propFloatEditando != pfCur) fCur=(float)CurrentFrame;
 
     // AUTO KEY prendido -> el boton queda ROJO (esta grabando)
@@ -663,7 +664,8 @@ void Timeline::SyncFields(){
     // icono esqueleto = clip de armature. No depende del objeto seleccionado.
     btnAnim->visible = true;
     SkeletalAnimation* c = ClipActivo();
-    if (c){ btnAnim->text = c->name; btnAnim->icon = (int)IconType::armature; }
+    if (ActiveAnimKind == 2){ btnAnim->text = "Juego"; btnAnim->icon = (int)IconType::gamepad; }
+    else if (c){ btnAnim->text = c->name; btnAnim->icon = (int)IconType::armature; }
     else  { btnAnim->text = NombreEscenaActiva(); btnAnim->icon = (int)IconType::camera; }
     bool hayFilas = !dopeRows.empty();
     btnModo->visible   = hayFilas;          // sin nada animado/seleccionado no hay curvas que mostrar
@@ -713,9 +715,21 @@ void Timeline::Render(){
     int fN = (int)ceilf(fRight) + step;
 
     // ---------------- AREA REPRODUCIBLE [Start..End]: gris tarjeta (el resto queda NEGRO) ----------------
-    { float xa = FrameToX((float)StartFrame), xb = FrameToX((float)EndFrame + 1);
+    { float xa = FrameToX((float)StartFrame);
+      // MODO JUEGO: sin Fin -> el area reproducible sigue hasta el borde derecho
+      float xb = AnimEsJuego ? (float)width : FrameToX((float)EndFrame + 1);
       int ia = (int)(xa<panelW?panelW:xa), ib = (int)(xb>width?width:xb); // nunca invade el panel del dope sheet
       if (ib > ia){ SetCol(ColorID::gris, 1.0f); FillRect(ia, stripY, ib-ia, height-stripY); } }
+    // LINEA ROJA: los frames con ESTADO DE JUEGO grabado (la simulacion guarda un
+    // snapshot por frame; sirve para ver hasta donde se puede viajar en el tiempo)
+    { extern int SimFramesGrabados(); extern int SimPrimerFrame();
+      int ng = SimFramesGrabados();
+      if (ng > 0){
+        float xa = FrameToX((float)(StartFrame + SimPrimerFrame()));
+        float xb = FrameToX((float)(StartFrame + SimPrimerFrame() + ng));
+        int ia = (int)(xa<panelW?panelW:xa), ib = (int)(xb>width?width:xb);
+        if (ib > ia){ gfx::Color4f(0.85f, 0.15f, 0.15f, 1.0f);
+                      FillRect(ia, height - GlobalScale*2, ib-ia, GlobalScale*2); } } }
 
     // ---------------- LINEAS verticales (van del piso hasta tocar la barra de numeros) ----------------
     // ALTERNAN color: las "oscuras" (mas oscuras que la tarjeta) llevan numero; las "claras" (color del texto) no.
@@ -2118,11 +2132,22 @@ void Timeline::TogglePlay(int dir){
     g_redraw = true;
 }
 void Timeline::GotoStart(){ CurrentFrame = StartFrame; g_redraw=true; }
-void Timeline::GotoEnd(){   CurrentFrame = EndFrame;   g_redraw=true; }
+void Timeline::GotoEnd(){
+    // MODO JUEGO: "ir al final" = el ultimo frame del cache de estados grabados
+    { extern bool SimActiva(); extern int SimFramesGrabados(); extern void SimIrA(int);
+      if (AnimEsJuego && SimActiva() && SimFramesGrabados() > 0){
+          SimIrA(SimFramesGrabados() - 1); g_redraw = true; return; } }
+    if (!AnimEsJuego) CurrentFrame = EndFrame;
+    g_redraw=true;
+}
 void Timeline::StepFrame(int d){
+    // simulacion en PAUSA: < > van FRAME A FRAME por el juego. Adelante simula (o
+    // re-ve lo grabado); atras VIAJA EN EL TIEMPO al snapshot anterior (solo editor)
+    { extern bool SimActiva(); extern bool SimStep(int);
+      if (SimActiva() && !PlayAnimation && SimStep(d)) { g_redraw = true; return; } }
     CurrentFrame += d;
     if (CurrentFrame < StartFrame) CurrentFrame = StartFrame;
-    if (CurrentFrame > EndFrame)   CurrentFrame = EndFrame;
+    if (CurrentFrame > EndFrame && !AnimEsJuego) CurrentFrame = EndFrame;
     g_redraw=true;
 }
 void Timeline::StepKeyframe(int d){
@@ -2153,8 +2178,11 @@ void Timeline::ZoomBy(float factor, int cxLocal){
 void Timeline::SetFrameFromX(int lx){
     int f = (int)(XToFrame((float)lx) + 0.5f);
     if (f < StartFrame) f = StartFrame;
-    if (f > EndFrame)   f = EndFrame;
+    if (f > EndFrame && !AnimEsJuego) f = EndFrame;   // en modo juego no hay Fin
     CurrentFrame = f; g_redraw = true;
+    // simulacion en pausa: mover el playhead VIAJA al estado grabado de ese frame
+    { extern bool SimActiva(); extern void SimIrA(int);
+      if (SimActiva() && !PlayAnimation) SimIrA(f - StartFrame); }
 }
 void Timeline::ApplyStart(){ int v=(int)(fStart+0.5f); if(v<0)v=0;
     AnimSetStart(v);   // editar Start = editar el Start PROPIO de la animacion activa (escena o clip)
@@ -2192,6 +2220,10 @@ void Timeline::ScrubFlecha(int dir){
 }
 
 void Timeline::TransportAction(int i){
+    // con una SIMULACION cargada (scripts lua), el boton "inicio" es el STOP del
+    // juego: restaura el estado inicial y descarga los scripts
+    { extern bool SimActiva(); extern void SimStop();
+      if (i == 0 && SimActiva()) { SimStop(); PlayAnimation = false; g_redraw = true; return; } }
     switch (i){
         case 0: GotoStart(); break;      case 1: StepKeyframe(-1); break;
         case 2: StepFrame(-1); break;    case 3: TogglePlay(-1); break;

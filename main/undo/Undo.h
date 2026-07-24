@@ -49,7 +49,10 @@ void UndoPoseIniciar(Armature* a);
 void UndoPoseConfirmar();
 
 // transform (object mode): pendiente hasta confirmar, asi un transform CANCELADO no deja un undo no-op.
+// Los elementos 2D capturan ademas rot2d/ancho/alto (o el tam del texto y el lienzo del UI).
+class Object;
 void UndoTransformIniciar();   // captura pos/rot/escala de los seleccionados (al empezar)
+void UndoTransformIniciarObj(Object* o); // variante: captura SOLO este objeto (ej: resize del lienzo)
 void UndoTransformConfirmar(); // al aceptar el transform: pushea el pendiente al stack
 void UndoTransformCancelar();  // al cancelar: descarta el pendiente
 

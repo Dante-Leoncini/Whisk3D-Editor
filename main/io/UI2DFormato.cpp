@@ -6,6 +6,7 @@
 //  numero, bool) que alcanza y sobra para estos archivos.
 // ============================================================================
 #include "io/UI2DFormato.h"
+#include "script/W3dScript.h"    // script lua + refs expuestas (se guardan con el arbol)
 #include "objects/Objects.h"
 #include "objects/UI.h"
 #include "objects/Elemento2D.h"
@@ -16,6 +17,7 @@
 #include "objects/Slice9.h"
 #include "objects/Boton2D.h"
 #include "objects/Expandir2D.h"
+#include "objects/Video2D.h"
 #include "w3dFilesystem.h"
 #include "w3dlog.h"
 #include <stdio.h>
@@ -78,6 +80,26 @@ static void CampoColor(FILE* f, int ind, const char* k, const float* c, bool com
 static void EscribirElemento(FILE* f, Object* o, int ind, const std::string& base);
 
 // los campos que COMPARTEN los elementos y el UI (layout de hijos + overflow)
+// los SCRIPTS lua del objeto (puede tener varios) + lo asignado en el editor
+static void EscribirScript(FILE* f, int ind, Object* o, const std::string& base) {
+    if (!o->scriptDatos || o->scriptDatos->scripts.empty()) return;
+    Sangria(f, ind); fputs("\"scripts\": [\n", f);
+    for (size_t e = 0; e < o->scriptDatos->scripts.size(); e++) {
+        const W3dScriptEntrada& ent = o->scriptDatos->scripts[e];
+        Sangria(f, ind + 1); fputs("{ \"ruta\": ", f);
+        JsonEscapar(f, RutaParaGuardar(ent.ruta, base));
+        fputs(", \"refs\": {", f);
+        for (size_t i = 0; i < ent.refs.size(); i++) {
+            fprintf(f, "%s ", i ? "," : "");
+            JsonEscapar(f, ent.refs[i].first);
+            fputs(": ", f);
+            JsonEscapar(f, ent.refs[i].second);
+        }
+        fprintf(f, " } }%s\n", (e + 1 < o->scriptDatos->scripts.size()) ? "," : "");
+    }
+    Sangria(f, ind); fputs("],\n", f);
+}
+
 static void EscribirCamposHijos(FILE* f, int ind, float padIzq, float padDer,
                                 float padArr, float padAba, int layoutHijos,
                                 int layoutAjuste, int layoutAlign, float gap,
@@ -108,7 +130,7 @@ static void EscribirHijos(FILE* f, Object* o, int ind, const std::string& base) 
         if (t != ObjectType::texto2d && t != ObjectType::imagen2d &&
             t != ObjectType::rect2d && t != ObjectType::cont2d &&
             t != ObjectType::slice9 && t != ObjectType::boton2d &&
-            t != ObjectType::expandir2d)
+            t != ObjectType::expandir2d && t != ObjectType::video2d)
             continue;
         if (!primero) fputs(",\n", f);
         primero = false;
@@ -129,6 +151,7 @@ static void EscribirElemento(FILE* f, Object* o, int ind, const std::string& bas
     if (o->getType() == ObjectType::slice9)   tipo = "slice9";
     if (o->getType() == ObjectType::boton2d)  tipo = "boton";
     if (o->getType() == ObjectType::expandir2d) tipo = "expandir";
+    if (o->getType() == ObjectType::video2d)  tipo = "video";
     CampoS(f, i2, "tipo", tipo);
     CampoS(f, i2, "nombre", o->name);
     CampoB(f, i2, "visible", o->visible);
@@ -140,6 +163,14 @@ static void EscribirElemento(FILE* f, Object* o, int ind, const std::string& bas
     CampoF(f, i2, "ancho", e->ancho);
     CampoF(f, i2, "alto", e->alto);
     CampoB(f, i2, "tamPx", e->tamPx);                // false: relativo al rect del padre
+    CampoB(f, i2, "expandir", e->expandir);          // absorbe el sobrante en la fila/columna
+    // margen exterior (unidad: la del padre, px o proporcional como su gap)
+    CampoF(f, i2, "margIzq", e->margIzq);
+    CampoF(f, i2, "margDer", e->margDer);
+    CampoF(f, i2, "margArr", e->margArr);
+    CampoF(f, i2, "margAba", e->margAba);
+    CampoB(f, i2, "margUni", e->margUni);            // el panel: un valor o por lado
+    CampoB(f, i2, "padUni", e->padUni);
 
     if (o->getType() == ObjectType::texto2d) {
         Texto2D* t = (Texto2D*)o;
@@ -174,6 +205,13 @@ static void EscribirElemento(FILE* f, Object* o, int ind, const std::string& bas
         CampoColor(f, i2, "tinte", s9->color);
         CampoB(f, i2, "filtrado", s9->filtrado);
         CampoI(f, i2, "palTinte", s9->palTinte);
+    } else if (o->getType() == ObjectType::video2d) {
+        Video2D* vd = (Video2D*)o;
+        CampoS(f, i2, "video", RutaParaGuardar(vd->video, base));
+        CampoI(f, i2, "modo", vd->modo);             // 0 estirar, 1 ajustar, 2 cover
+        CampoB(f, i2, "loop", vd->loop);
+        CampoB(f, i2, "usarAlpha", vd->usarAlpha);
+        CampoB(f, i2, "filtrado", vd->filtrado);
     } else if (o->getType() == ObjectType::boton2d) {
         Boton2D* b = (Boton2D*)o;
         CampoS(f, i2, "texto", b->texto);
@@ -193,6 +231,7 @@ static void EscribirElemento(FILE* f, Object* o, int ind, const std::string& bas
         CampoF(f, i2, "escalaBordeTex", b->escalaBordeTex);
     }
 
+    EscribirScript(f, i2, o, base);
     EscribirCamposHijos(f, i2, e->padIzq, e->padDer, e->padArr, e->padAba,
                         e->layoutHijos, e->layoutAjuste, e->layoutAlign,
                         e->gap, e->padGapPx,
@@ -238,6 +277,8 @@ bool UI2DGuardar(UI* u, const std::string& ruta) {
         fprintf(f, "] }%s\n", (pIdx + 1 < u->paletas.size()) ? "," : "");
     }
     Sangria(f, 1); fputs("],\n", f);
+    CampoB(f, 1, "padUni", u->padUni);
+    EscribirScript(f, 1, u, base);
     EscribirCamposHijos(f, 1, u->padIzq, u->padDer, u->padArr, u->padAba,
                         u->layoutHijos, u->layoutAjuste, u->layoutAlign,
                         u->gap, u->padGapPx,
@@ -361,6 +402,42 @@ static JVal* JHijo(JVal* o, const char* k, int tipo) {
     return (it != o->obj.end() && it->second->tipo == tipo) ? it->second : NULL;
 }
 
+// los refs {prop: valor} de un objeto json -> una entrada
+static void LeerRefsDe(JVal* jrefs, W3dScriptEntrada* ent) {
+    if (!jrefs || jrefs->tipo != 4) return;
+    for (std::map<std::string, JVal*>::iterator r = jrefs->obj.begin();
+         r != jrefs->obj.end(); ++r)
+        if (r->second->tipo == 2)
+            ent->refs.push_back(std::make_pair(r->first, r->second->str));
+}
+// los scripts + lo asignado; tolerante: sin campos = sin scripts. Retrocompat: los
+// archivos viejos con "script"/"scriptRefs" (uno solo) se leen como una entrada.
+static void LeerScript(JVal* j, Object* o, const std::string& base) {
+    std::map<std::string, JVal*>::iterator it = j->obj.find("scripts");
+    if (it != j->obj.end() && it->second->tipo == 5) {
+        for (size_t i = 0; i < it->second->lista.size(); i++) {
+            JVal* je = it->second->lista[i];
+            if (!je || je->tipo != 4) continue;
+            W3dScriptEntrada ent;
+            ent.ruta = RutaAlCargar(JS(je, "ruta", ""), base);
+            if (ent.ruta.empty()) continue;
+            std::map<std::string, JVal*>::iterator jr = je->obj.find("refs");
+            if (jr != je->obj.end()) LeerRefsDe(jr->second, &ent);
+            if (!o->scriptDatos) o->scriptDatos = new W3dScriptDatos();
+            o->scriptDatos->scripts.push_back(ent);
+        }
+        return;
+    }
+    std::string ruta = JS(j, "script", "");   // formato VIEJO (un solo script)
+    if (ruta.empty()) return;
+    W3dScriptEntrada ent;
+    ent.ruta = RutaAlCargar(ruta, base);
+    std::map<std::string, JVal*>::iterator jr = j->obj.find("scriptRefs");
+    if (jr != j->obj.end()) LeerRefsDe(jr->second, &ent);
+    if (!o->scriptDatos) o->scriptDatos = new W3dScriptDatos();
+    o->scriptDatos->scripts.push_back(ent);
+}
+
 static void LeerCamposHijos(JVal* j, float* padIzq, float* padDer, float* padArr,
                             float* padAba, int* layoutHijos, int* layoutAjuste,
                             int* layoutAlign, float* gap,
@@ -456,6 +533,15 @@ static void CargarElemento(JVal* j, Object* padre, const std::string& base) {
         b->bordeTexY = JF(j, "bordeTexY", b->bordeTexY);
         b->escalaBordeTex = JF(j, "escalaBordeTex", b->escalaBordeTex);
         e = b;
+    } else if (tipo == "video") {
+        Video2D* vd = new Video2D(padre, pos);
+        vd->video = RutaAlCargar(JS(j, "video", ""), base);
+        if (JS(j, "video", "").empty()) vd->video = "";
+        vd->modo = JI(j, "modo", vd->modo);
+        vd->loop = JB(j, "loop", vd->loop);
+        vd->usarAlpha = JB(j, "usarAlpha", vd->usarAlpha);
+        vd->filtrado = JB(j, "filtrado", vd->filtrado);
+        e = vd;
     } else if (tipo == "expandir") {
         e = new Expandir2D(padre, pos);
     } else if (tipo == "slice9") {
@@ -481,10 +567,21 @@ static void CargarElemento(JVal* j, Object* padre, const std::string& base) {
     e->ancho = JF(j, "ancho", e->ancho);
     e->alto = JF(j, "alto", e->alto);
     e->tamPx = JB(j, "tamPx", e->tamPx);
+    e->expandir = JB(j, "expandir", e->expandir);
+    e->margIzq = JF(j, "margIzq", e->margIzq);
+    e->margDer = JF(j, "margDer", e->margDer);
+    e->margArr = JF(j, "margArr", e->margArr);
+    e->margAba = JF(j, "margAba", e->margAba);
+    e->margUni = JB(j, "margUni", e->margUni);
     LeerCamposHijos(j, &e->padIzq, &e->padDer, &e->padArr, &e->padAba,
                     &e->layoutHijos, &e->layoutAjuste, &e->layoutAlign,
                     &e->gap, &e->padGapPx,
                     &e->recortaX, &e->recortaY, &e->conScroll, &e->scrollX, &e->scrollY);
+    // archivos sin "padUni": si el padding por lado difiere, NO editar con un solo
+    // valor (el sincronizador del panel pisaria los lados con el izquierdo)
+    e->padUni = JB(j, "padUni", e->padIzq == e->padDer && e->padIzq == e->padArr &&
+                                e->padIzq == e->padAba);
+    LeerScript(j, e, base);
     CargarHijos(j, e, base);
 }
 
@@ -555,6 +652,10 @@ UI* UI2DCargar(const std::string& ruta) {
                     &u->layoutHijos, &u->layoutAjuste, &u->layoutAlign,
                     &u->gap, &u->padGapPx,
                     &u->recortaX, &u->recortaY, &u->conScroll, &u->scrollX, &u->scrollY);
+    // archivos sin "padUni": no pisar un padding por-lado con el sincronizador del panel
+    u->padUni = JB(raiz, "padUni", u->padIzq == u->padDer && u->padIzq == u->padArr &&
+                                   u->padIzq == u->padAba);
+    LeerScript(raiz, u, base);
     CargarHijos(raiz, u, base);
     delete raiz;
     w3dLogf("UI2D: cargado %s", ruta.c_str());

@@ -45,6 +45,7 @@ size_t IconoDeObjeto(Object* o) {
         case ObjectType::slice9:     return (size_t)IconType::cuadricula; // imagen con bordes fijos
         case ObjectType::boton2d:    return (size_t)IconType::object;     // boton de interfaz
         case ObjectType::expandir2d: return (size_t)IconType::arrowRight; // resorte de layout
+        case ObjectType::video2d:    return (size_t)IconType::camera;     // video (sin sonido)
         default:                     return (size_t)IconType::archive;
     }
 }
@@ -519,6 +520,7 @@ void Outliner::event_key_down(int tecla, bool repeticion){
                 ChangeVisibilityObj();
                 break;
             case W3dK_X:
+            case W3dK_DELETE:   // Supr borra igual que X (pedido de Dante)
                 if (estado == editNavegacion){
                     AbrirConfirmarBorrado(true); // popup de confirmacion (incluye colecciones); Si -> borra con undo
                 }

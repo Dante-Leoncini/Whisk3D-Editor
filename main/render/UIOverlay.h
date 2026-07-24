@@ -21,7 +21,10 @@ class Slice9;
 // posicion RESUELTA en pantalla de un elemento 2D (para el origen, el pivote y el grab)
 // + el rectangulo que ocupa (para seleccion y puntos de agarre; sin la rotacion aplicada)
 // + el tamano del rect de REFERENCIA de su ancla (la posicion se guarda RELATIVA a el)
-struct UI2DPos { Object* obj; float sx, sy; float bx0, by0, bx1, by1; float refW, refH; };
+// cx0..cy1 = el RECORTE vigente cuando se dibujo (overflow de los ancestros): el editor
+// solo hit-testea dentro (un simbolo recortado por su rodillo no se clickea donde no se ve)
+struct UI2DPos { Object* obj; float sx, sy; float bx0, by0, bx1, by1; float refW, refH;
+                 float cx0, cy0, cx1, cy1; };
 
 // punto de anclaje 'ancla' (0..8) dentro del rect (x0,y0,w,h)
 void UI2D_PuntoAncla(int ancla, float x0, float y0, float w, float h, float* ax, float* ay);

@@ -12,6 +12,7 @@
 #include "objects/Contenedor2D.h"    // el contenedor (rect invisible)
 #include "objects/Slice9.h"          // imagen con bordes fijos (guias de sus cortes)
 #include "io/Fuente2D.h"             // fuentes del editor 2D (atlas)
+#include "Undo.h"                    // Ctrl+Z de los transforms/drags del editor 2D
 #include "WhiskUI/text/W3dTextAtlas.h"
 #include "W3dLang.h"                 // T()
 #include "objects/ObjectMode.h"      // W3dDuplicarUno (duplicar la seleccion 2D)
@@ -446,6 +447,7 @@ void Editor2D::IniciarXform2D(int modo) {
         xformResueltas.push_back(posiciones[i]);
     }
     if (xformObjs.empty()) return;                 // nada 2D seleccionado
+    UndoTransformIniciar();   // Ctrl+Z: snapshot previo (se pushea al confirmar)
     xform = modo; xformEje = 0;
     xformMx = lastMx; xformMy = lastMy;
     acumX = acumY = acumAng = 0.0f; acumFactor = 1.0f;
@@ -509,9 +511,13 @@ void Editor2D::AplicarXform2D(int mx, int my) {
     g_redraw = true;
 }
 
-void Editor2D::ConfirmarXform2D() { xform = 0; xformEje = 0; g_redraw = true; }
+void Editor2D::ConfirmarXform2D() {
+    UndoTransformConfirmar();   // pushea el paso de undo (si hubo cambio real)
+    xform = 0; xformEje = 0; g_redraw = true;
+}
 
 void Editor2D::CancelarXform2D() {
+    UndoTransformCancelar();    // cancelado: el snapshot pendiente se descarta
     for (size_t i = 0; i < xformObjs.size(); i++) {
         Object* o = xformObjs[i];
         o->pos = xformOrig[i];
@@ -539,6 +545,8 @@ void Editor2D::button_left() {
         for (int i = (int)posiciones.size() - 1; i >= 0; i--) {
             const UI2DPos& P = posiciones[i];
             if (mx < P.bx0 - m || mx > P.bx1 + m || my < P.by0 - m || my > P.by1 + m) continue;
+            // recortado por el overflow de un ancestro: donde no se VE no se clickea
+            if (mx < P.cx0 || mx > P.cx1 || my < P.cy0 || my > P.cy1) continue;
             if (P.obj->select) Deseleccionar2D(P.obj);
             else               P.obj->Seleccionar();
             g_redraw = true;
@@ -560,6 +568,7 @@ void Editor2D::button_left() {
             int h = HandleBajoMouse(P.bx0, P.by0, P.bx1, P.by1, mx, my,
                                     *UI2D_Rot2dDe(ObjActivo), P.sx, P.sy);
             if (h >= 0) {
+                UndoTransformIniciar();   // Ctrl+Z del resize (confirma al soltar)
                 drag = 2; dragHandle = h; dragObj = ObjActivo;
                 dragOrigPos = ObjActivo->pos;
                 dragOrigW = *ew; dragOrigH = *eh;
@@ -580,6 +589,7 @@ void Editor2D::button_left() {
           int h = HandleBajoMouse(lastFx, lastFy, lastFx + lw * lastEsc,
                                   lastFy + lh * lastEsc, mx, my);
           if (h >= 0) {
+              UndoTransformIniciarObj(ued);   // Ctrl+Z del lienzo (el UI puede no estar seleccionado)
               drag = 3; dragHandle = h; dragObj = NULL;
               dragOrigW = ued->ancho; dragOrigH = ued->alto;
               dragMx = lastMx; dragMy = lastMy;
@@ -595,6 +605,9 @@ void Editor2D::button_left() {
     for (int i = (int)posiciones.size() - 1; i >= 0; i--) {
         const UI2DPos& P = posiciones[i];
         if (mx < P.bx0 - m || mx > P.bx1 + m || my < P.by0 - m || my > P.by1 + m) continue;
+        // recortado por el overflow de un ancestro: donde no se VE no se clickea (asi
+        // tocar fuera de la pantalla deselecciona en vez de agarrar algo invisible)
+        if (mx < P.cx0 || mx > P.cx1 || my < P.cy0 || my > P.cy1) continue;
         if (!P.obj->select) DeseleccionarTodo();
         P.obj->Seleccionar();
         drag = 1; dragObj = P.obj;
@@ -611,6 +624,7 @@ void Editor2D::button_left() {
         dragMx = lastMx; dragMy = lastMy;
         dragPaso = false;                       // umbral anti movimiento accidental
         acumX = acumY = 0.0f; accionPrimerMov = true;
+        UndoTransformIniciar();   // Ctrl+Z del mover (un click sin arrastre no pushea)
         g_redraw = true;
         return;
     }
@@ -644,19 +658,51 @@ void Editor2D::AplicarDrag(int mx, int my) {
         bool der = (dragHandle == 2 || dragHandle == 3 || dragHandle == 4);
         bool arr = (dragHandle == 0 || dragHandle == 1 || dragHandle == 2);
         bool aba = (dragHandle == 4 || dragHandle == 5 || dragHandle == 6);
+        // MODIFICADORES (pedido de Dante): Ctrl mantiene las PROPORCIONES (un cuadrado
+        // sigue cuadrado); Shift escala DESDE EL CENTRO (el objeto no se mueve);
+        // Ctrl+Shift = las dos cosas. Se leen EN VIVO: cambiar de idea a mitad del
+        // arrastre recalcula todo desde el estado original.
+        bool ctrl = LCtrlPressed, shift = LShiftPressed;
         // con el tamano RELATIVO el delta se guarda como fraccion del rect del padre
         bool tamPx = ((Elemento2D*)dragObj)->tamPx;
         float dW = tamPx ? dx : acumX / dragObjRefW;
         float dH = tamPx ? dy : acumY / dragObjRefH;
         float minimo = tamPx ? 1.0f : 0.005f;
-        float nw = dragOrigW + (der ? dW : 0.0f) - (izq ? dW : 0.0f);
-        float nh = dragOrigH + (aba ? dH : 0.0f) - (arr ? dH : 0.0f);
+        float dm = shift ? 2.0f : 1.0f;          // desde el centro: el borde sigue al mouse
+        float nw = dragOrigW + (der ? dm * dW : 0.0f) - (izq ? dm * dW : 0.0f);
+        float nh = dragOrigH + (aba ? dm * dH : 0.0f) - (arr ? dm * dH : 0.0f);
+        if (ctrl && dragOrigW > 0.0001f && dragOrigH > 0.0001f) {
+            bool enX = (izq || der), enY = (arr || aba);
+            if (enX && !enY)      nh = dragOrigH * (nw / dragOrigW);   // borde lateral
+            else if (enY && !enX) nw = dragOrigW * (nh / dragOrigH);   // borde arriba/abajo
+            else {
+                // esquina: manda el eje con MAYOR cambio relativo (escala pareja)
+                float fw = nw / dragOrigW, fh = nh / dragOrigH;
+                float fac = (fabsf(fw - 1.0f) > fabsf(fh - 1.0f)) ? fw : fh;
+                if (fac < 0.01f) fac = 0.01f;
+                nw = dragOrigW * fac; nh = dragOrigH * fac;
+            }
+        }
         if (nw < minimo) nw = minimo;
         if (nh < minimo) nh = minimo;
         *ew = nw; *eh = nh;
-        // el lado OPUESTO queda quieto: el centro (pos) se corre la mitad del delta
-        if (izq || der) dragObj->pos.x = dragOrigPos.x + acumX * 0.5f / dragObjRefW;
-        if (arr || aba) dragObj->pos.y = dragOrigPos.y + acumY * 0.5f / dragObjRefH;
+        if (shift) {
+            // desde el CENTRO: la posicion no se toca
+            dragObj->pos.x = dragOrigPos.x;
+            dragObj->pos.y = dragOrigPos.y;
+        } else {
+            // el lado OPUESTO queda quieto: el centro se corre la mitad del cambio
+            // EFECTIVO (con Ctrl el tamano real difiere del delta crudo del mouse)
+            float kx = tamPx ? lastEsc / dragObjRefW : 1.0f;
+            float ky = tamPx ? lastEsc / dragObjRefH : 1.0f;
+            float dwEf = nw - dragOrigW, dhEf = nh - dragOrigH;
+            dragObj->pos.x = dragOrigPos.x;
+            dragObj->pos.y = dragOrigPos.y;
+            if (der)      dragObj->pos.x += dwEf * 0.5f * kx;
+            else if (izq) dragObj->pos.x -= dwEf * 0.5f * kx;
+            if (aba)      dragObj->pos.y += dhEf * 0.5f * ky;
+            else if (arr) dragObj->pos.y -= dhEf * 0.5f * ky;
+        }
     } else if (drag == 3) {                      // RESIZE del lienzo (responsive)
         UI* ued = UI2D_UIDelEditor();
         if (!ued || ued->igualQueRender) { drag = 0; return; }
@@ -676,6 +722,7 @@ void Editor2D::AplicarDrag(int mx, int my) {
 
 void Editor2D::button_right() {
     if (xform) { CancelarXform2D(); return; }      // click derecho = cancelar G/R/S
+    if (drag) UndoTransformCancelar();             // drag cancelado: sin paso de undo
     if (drag == 1) {                               // mover arrastrando: todo vuelve a su lugar
         for (size_t i = 0; i < dragObjs.size(); i++) dragObjs[i]->pos = dragOrigs[i];
         drag = 0; dragObj = NULL; g_redraw = true;
@@ -776,7 +823,7 @@ void Editor2D::event_key_down(int tecla, bool repeticion) {
     if (tecla == W3dK_R) { IniciarXform2D(2); return; }   // rotar alrededor del pivote
     if (tecla == W3dK_S) { IniciarXform2D(3); return; }   // escalar desde el pivote
     if (tecla == W3dK_D && LShiftPressed) { Editor2DDuplicarSeleccion(this); return; }  // Shift+D
-    if (tecla == W3dK_X) { Editor2DBorrarSeleccion(); return; }   // X = borrar (con confirmacion)
+    if (tecla == W3dK_X || tecla == W3dK_DELETE) { Editor2DBorrarSeleccion(); return; }  // X / Supr = borrar
     if (tecla == W3dK_KP_PERIOD) { Editor2DEncuadrarSeleccion(this); return; }  // encuadrar
     if (tecla == W3dK_A && LAltPressed)  { Editor2DSeleccionar(1); return; }  // Alt+A = nada
     if (tecla == W3dK_A)                 { Editor2DSeleccionar(0); return; }  // A = todo (2D)
@@ -924,6 +971,7 @@ void Editor2DBorrarSeleccion() {
 
 void Editor2D::mouse_button_up(int boton) {
     (void)boton;
+    if (drag) UndoTransformConfirmar();   // Ctrl+Z: cierra el paso (no-op si no se movio)
     drag = 0; dragHandle = -1; dragObj = NULL;   // fin del arrastre
     ViewPortClickDown = false;
     g_redraw = true;

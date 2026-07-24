@@ -13,4 +13,9 @@
 // La ruta "" devuelve 0 sin intentar cargar.
 unsigned Textura2DObtener(const std::string& ruta, int* w = 0, int* h = 0);
 
+// ruta que stb PUEDE decodificar: un .webp se convierte (ffmpeg, editor de PC) a un png
+// cacheado en /tmp una vez por sesion; cualquier otra ruta vuelve tal cual. La usan el
+// cache de texturas y las miniaturas del explorador.
+std::string Textura2DRutaDecodificable(const std::string& ruta);
+
 #endif // TEXTURA2D_H

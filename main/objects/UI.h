@@ -59,6 +59,7 @@ public:
     float scrollX, scrollY;   // desplazamiento del contenido (px de lienzo)
     float padIzq, padDer;   // margen interior POR LADO: encoge el area de anclaje
     float padArr, padAba;
+    bool  padUni;           // el panel edita los 4 lados con UN solo valor
 
     UI(Object* parent = NULL, Vector3 pos = Vector3(0,0,0))
         : Object(parent, "UI", pos) {
@@ -68,6 +69,7 @@ public:
         resPreset = 480; aspectoPreset = 1;
         opacidad = 1.0f;
         padIzq = padDer = padArr = padAba = 0.0f;
+        padUni = true;
         color[0] = color[1] = color[2] = 0.0f; color[3] = 0.0f;
         // arranca con la PALETA DE WHISK3D (los colores reales del skin cargado)
         paletas.reserve(8);

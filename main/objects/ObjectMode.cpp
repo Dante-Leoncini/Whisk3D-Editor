@@ -9,6 +9,7 @@
 #include "objects/Slice9.h"
 #include "objects/Boton2D.h"
 #include "objects/Expandir2D.h"
+#include "objects/Video2D.h"
 #include "EditMesh.h"  // CentroSeleccion
 #include "Undo.h"      // Ctrl+Z: capturar transform / limpiar al borrar
 #include "ViewPorts/LayoutInput.h" // SNAP en modo objeto (SnapBuscarTarget, g_snap, enums)
@@ -521,7 +522,8 @@ void SetPosicion(){
 	                  ObjActivo->getType() == ObjectType::cont2d ||
 	                  ObjActivo->getType() == ObjectType::slice9 ||
 	                  ObjActivo->getType() == ObjectType::boton2d ||
-	                  ObjActivo->getType() == ObjectType::expandir2d)) return;
+	                  ObjActivo->getType() == ObjectType::expandir2d ||
+	                  ObjActivo->getType() == ObjectType::video2d)) return;
 	if (ObjActivo && InteractionMode == ObjectMode && ObjActivo->select && estado == editNavegacion){
 		if (!guardarEstado()) return;
 		estado = translacion; g_xformPrimerMov = true; // primer motion en cero (no salta)
@@ -546,10 +548,15 @@ static void CopiarBase2D(Elemento2D* d, Elemento2D* s) {
     d->padIzq = s->padIzq; d->padDer = s->padDer;
     d->padArr = s->padArr; d->padAba = s->padAba;
     d->layoutHijos = s->layoutHijos;
+    d->layoutAjuste = s->layoutAjuste; d->layoutAlign = s->layoutAlign;
     d->gap = s->gap; d->padGapPx = s->padGapPx;
     d->tamPx = s->tamPx;
     d->recortaX = s->recortaX; d->recortaY = s->recortaY;
     d->conScroll = s->conScroll; d->scrollX = s->scrollX; d->scrollY = s->scrollY;
+    d->margIzq = s->margIzq; d->margDer = s->margDer;
+    d->margArr = s->margArr; d->margAba = s->margAba;
+    d->margUni = s->margUni; d->padUni = s->padUni;
+    d->expandir = s->expandir;
 }
 
 Object* W3dDuplicarUno(Object* src) {
@@ -682,6 +689,15 @@ Object* W3dDuplicarUno(Object* src) {
             d->colorTexto[i] = sb->colorTexto[i];
             d->colorBorde[i] = sb->colorBorde[i];
         }
+        nuevo = d;
+    }
+    else if (src->getType() == ObjectType::video2d) {
+        Video2D* sv = (Video2D*)src;
+        Video2D* d = new Video2D(src->Parent, src->pos);
+        CopiarBase2D(d, sv);
+        d->video = sv->video; d->modo = sv->modo;
+        d->loop = sv->loop; d->usarAlpha = sv->usarAlpha;
+        d->reproducir = sv->reproducir; d->filtrado = sv->filtrado;
         nuevo = d;
     }
     else if (src->getType() == ObjectType::expandir2d) {
@@ -1209,7 +1225,8 @@ void SetRotacion(){
 	                  ObjActivo->getType() == ObjectType::cont2d ||
 	                  ObjActivo->getType() == ObjectType::slice9 ||
 	                  ObjActivo->getType() == ObjectType::boton2d ||
-	                  ObjActivo->getType() == ObjectType::expandir2d)) return;
+	                  ObjActivo->getType() == ObjectType::expandir2d ||
+	                  ObjActivo->getType() == ObjectType::video2d)) return;
 	//si no hay objetos. En Edit Mode NO se transforma el objeto (es para editar la malla)
 	if (ObjActivo && InteractionMode == ObjectMode && ObjActivo->select && estado == editNavegacion){
 		if (!guardarEstado()) return;
@@ -1253,7 +1270,8 @@ void SetEscala(){
 	                  ObjActivo->getType() == ObjectType::cont2d ||
 	                  ObjActivo->getType() == ObjectType::slice9 ||
 	                  ObjActivo->getType() == ObjectType::boton2d ||
-	                  ObjActivo->getType() == ObjectType::expandir2d)) return;
+	                  ObjActivo->getType() == ObjectType::expandir2d ||
+	                  ObjActivo->getType() == ObjectType::video2d)) return;
 	//XYZ tiene escala. En Edit Mode NO se transforma el objeto (es para editar la malla)
 	if (ObjActivo && InteractionMode == ObjectMode && ObjActivo->select && estado == editNavegacion){
 		if (!guardarEstado()) return;

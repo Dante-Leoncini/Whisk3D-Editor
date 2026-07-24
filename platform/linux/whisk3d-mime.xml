@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- define el tipo MIME de los proyectos .w3d: con esto el doble click en un
+     proyecto abre Whisk3D (el .desktop ya declara application/x-whisk3d) -->
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="application/x-whisk3d">
+    <comment>Proyecto Whisk3D</comment>
+    <comment xml:lang="es">Proyecto Whisk3D</comment>
+    <glob pattern="*.w3d"/>
+    <icon name="whisk3d"/>
+  </mime-type>
+</mime-info>

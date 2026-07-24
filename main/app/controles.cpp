@@ -401,6 +401,19 @@ void InputUsuarioSDL3(SDL_Event &e){
             case SDLK_RCTRL:  LCtrlPressed = down; break;
             case SDLK_LALT:   LAltPressed = down; break;
         }
+        // JUEGO EN PLAY: con el mouse SOBRE el viewport (3D o 2D), el teclado es del
+        // juego: el script lo captura y NO dispara atajos del editor (que no rote ni
+        // haga nada raro). Fuera del viewport todo se comporta como siempre. La barra
+        // espaciadora sigue pasando: hay que poder pausar.
+        { extern bool SimActiva(); extern void SimTeclaSDL(int, bool);
+          if (SimActiva() && PlayAnimation) {
+            int smx, smy; SDL_GetMouseState(&smx, &smy);
+            ViewportBase* vj = FindViewportUnderMouse(rootViewport, smx, smy);
+            if (vj && (vj->ViewportKind() == 1 || vj->ViewportKind() == 6)) {
+                SimTeclaSDL(e.key.keysym.sym, down);
+                if (e.key.keysym.sym != SDLK_SPACE) return;
+            }
+          } }
     }
 
     // ANTI-TRABA (red de seguridad): si por cualquier camino viewPortActive quedo NULL, un BOTON del mouse/
@@ -660,6 +673,13 @@ void InputUsuarioSDL3(SDL_Event &e){
 
         // Ctrl+Z = DESHACER (undo). Global, antes del campo de texto y de los atajos del viewport.
         // Ctrl+Shift+Z tambien REHACE (convencion comun ademas de Ctrl+Y).
+        // Ctrl+S = GUARDAR el proyecto (.w3d): al archivo abierto, o pide nombre
+        if ((e.key.keysym.mod & KMOD_CTRL) && e.key.keysym.sym == SDLK_s && !RenameActivo() &&
+            e.type == SDL_EVENT_KEY_DOWN) {
+            extern void GuardarProyecto();
+            GuardarProyecto();
+            return;
+        }
         if ((e.key.keysym.mod & KMOD_CTRL) && e.key.keysym.sym == SDLK_z && !RenameActivo()) {
             if (e.key.keysym.mod & KMOD_SHIFT) UndoRehacer(); else UndoDeshacer();
             RebindMaterialMeshPart(); // refresca el panel (ej: asignacion de material deshecha)

@@ -9,6 +9,9 @@
 #include "objects/Armature.h"    // Armature (cast correcto Object*<->Armature* al limpiar/restaurar skinArmature)
 #include "animation/SkeletalAnimation.h" // KeyframesUndo: recorrer las curvas del clip activo (tracks/Propertys)
 #include "animation/Animation.h"         // AnimationObjects / keyFrame / ActiveAnimKind
+#include "render/UIOverlay.h"    // UI2D_EsElemento2D / Rot2dDe / TamanoElem (campos 2D del transform)
+#include "objects/Texto2D.h"     // el texto 2D escala por su 'tam'
+#include "objects/UI.h"          // resize del lienzo (UI::ancho/alto)
 // CameraActive: NO incluyo Camera.h (header pesado del editor, arrastra Target/Curve/icons -> riesgo en el
 // build de Symbian). Forward-declaro: solo necesito el puntero (Object es la 1ra base -> el cast a Object* es offset 0).
 class Camera; extern Camera* CameraActive;
@@ -68,24 +71,76 @@ public:
 // transform en OBJECT MODE: pos/rot/escala de los seleccionados al EMPEZAR
 // rotEuler va aparte del quaternion: el quaternion no distingue 0 de 360, asi que sin guardarlo el undo de un
 // giro de vuelta entera te devolvia la orientacion pero te comia las vueltas (y con ellas la animacion).
-struct TEst { Object* o; Vector3 pos; Quaternion rot; Vector3 rotEuler; Vector3 scale; };
+// Los ELEMENTOS 2D guardan ADEMAS sus campos propios (rot2d / ancho / alto o el tam del
+// texto, y el ancho/alto del UI): los G/R/S y handles del Editor 2D tocan ESO, no scale.
+struct TEst { Object* o; Vector3 pos; Quaternion rot; Vector3 rotEuler; Vector3 scale;
+              bool es2d; float rot2d, w2, h2; };
 class TransformUndo : public UndoCmd {
     std::vector<TEst> e;
-public:
-    TransformUndo() {
-        for (size_t i = 0; i < ObjSelects.size(); i++) {
-            Object* o = ObjSelects[i]; if (!o) continue;
-            TEst t; t.o = o; t.pos = o->pos; t.rot = o->rot; t.rotEuler = o->rotEuler; t.scale = o->scale;
-            e.push_back(t);
+    // que campos 2D tiene 'o' y sus valores actuales (rot2d solo en Elemento2D)
+    static bool Leer2D(Object* o, float* r, float* w, float* h) {
+        *r = 0.0f; *w = 0.0f; *h = 0.0f;
+        if (UI2D_EsElemento2D(o)) {
+            *r = *UI2D_Rot2dDe(o);
+            float *ew, *eh;
+            if (UI2D_TamanoElem(o, &ew, &eh)) { *w = *ew; *h = *eh; }
+            else *w = ((Texto2D*)o)->tam;
+            return true;
+        }
+        if (o->getType() == ObjectType::ui) {
+            *w = ((UI*)o)->ancho; *h = ((UI*)o)->alto;
+            return true;
+        }
+        return false;
+    }
+    static void Escribir2D(Object* o, float r, float w, float h) {
+        if (UI2D_EsElemento2D(o)) {
+            *UI2D_Rot2dDe(o) = r;
+            float *ew, *eh;
+            if (UI2D_TamanoElem(o, &ew, &eh)) { *ew = w; *eh = h; }
+            else ((Texto2D*)o)->tam = w;
+        } else if (o->getType() == ObjectType::ui) {
+            ((UI*)o)->ancho = w; ((UI*)o)->alto = h;
         }
     }
+public:
+    TransformUndo() {
+        for (size_t i = 0; i < ObjSelects.size(); i++) Capturar(ObjSelects[i]);
+    }
+    TransformUndo(Object* solo) { Capturar(solo); }   // un objeto puntual (resize del lienzo)
+    void Capturar(Object* o) {
+        if (!o) return;
+        TEst t; t.o = o; t.pos = o->pos; t.rot = o->rot; t.rotEuler = o->rotEuler; t.scale = o->scale;
+        t.es2d = Leer2D(o, &t.rot2d, &t.w2, &t.h2);
+        e.push_back(t);
+    }
     bool Vacio() const { return e.empty(); }
+    // hubo cambio real? Un drag que no se movio (un click) no merece un paso de undo.
+    bool Difiere() const {
+        for (size_t i = 0; i < e.size(); i++) {
+            Object* o = e[i].o; if (!o) continue;
+            if (o->pos.x != e[i].pos.x || o->pos.y != e[i].pos.y || o->pos.z != e[i].pos.z) return true;
+            if (o->rotEuler.x != e[i].rotEuler.x || o->rotEuler.y != e[i].rotEuler.y ||
+                o->rotEuler.z != e[i].rotEuler.z) return true;
+            if (o->scale.x != e[i].scale.x || o->scale.y != e[i].scale.y || o->scale.z != e[i].scale.z) return true;
+            if (e[i].es2d) {
+                float r, w, h; Leer2D(o, &r, &w, &h);
+                if (r != e[i].rot2d || w != e[i].w2 || h != e[i].h2) return true;
+            }
+        }
+        return false;
+    }
     void Aplicar() {
         for (size_t i = 0; i < e.size(); i++) {
             Object* o = e[i].o; if (!o) continue;
             Vector3 cp = o->pos; Quaternion cr = o->rot; Vector3 ce = o->rotEuler; Vector3 cs = o->scale; // vivo
             o->pos = e[i].pos; o->rot = e[i].rot; o->rotEuler = e[i].rotEuler; o->scale = e[i].scale;
             e[i].pos = cp; e[i].rot = cr; e[i].rotEuler = ce; e[i].scale = cs; // guarda lo vivo
+            if (e[i].es2d) {
+                float r, w, h; Leer2D(o, &r, &w, &h);           // vivo 2D
+                Escribir2D(o, e[i].rot2d, e[i].w2, e[i].h2);
+                e[i].rot2d = r; e[i].w2 = w; e[i].h2 = h;
+            }
             o->ActualizarDisplayRot(); // rotAngle/rotAxis del panel (el euler ya quedo restaurado, con sus vueltas)
         }
     }
@@ -393,6 +448,10 @@ class DeleteUndo : public UndoCmd {
         //    TAMBIEN se borra (esta en ents) se va con su root -> no se reparenta.
         if (!repsListos) {
             for (size_t i = 0; i < ents.size(); i++) { DelEntry& e = ents[i];
+                // borrar un UI se lleva TODA su interfaz: sus elementos 2D son PARTE del UI
+                // (no tiene sentido dejarlos huerfanos en la escena). El subarbol entero viaja
+                // detachado con el comando y vuelve completo al deshacer.
+                if (e.obj->getType() == ObjectType::ui) continue;
                 Vector3 gAbuelo = e.parent->GetGlobalPosition();
                 // recorre el SUBARBOL del borrado: los descendientes NO seleccionados se PRESERVAN (reparent al abuelo);
                 // los SELECCIONADOS se borran con el (se baja a sus hijos). Antes reparentaba TODO hijo directo -> los
@@ -725,9 +784,16 @@ void UndoTransformIniciar() {
     if (g_pendingT) delete g_pendingT;
     g_pendingT = new TransformUndo();
 }
+void UndoTransformIniciarObj(Object* o) {
+    if (!o) return;
+    if (g_pendingT) delete g_pendingT;
+    g_pendingT = new TransformUndo(o);
+}
 void UndoTransformConfirmar() {
     if (!g_pendingT) return;
-    if (!g_pendingT->Vacio()) Push(g_pendingT); else delete g_pendingT;
+    // sin cambio real (un click que armo el drag y solto) no se pushea: si no, cada
+    // click sobre un elemento del Editor 2D dejaba un paso de undo que "no hacia nada"
+    if (!g_pendingT->Vacio() && g_pendingT->Difiere()) Push(g_pendingT); else delete g_pendingT;
     g_pendingT = NULL;
 }
 void UndoTransformCancelar() {

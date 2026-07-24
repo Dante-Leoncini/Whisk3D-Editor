@@ -53,6 +53,8 @@ file(GLOB_RECURSE SRC_FILES
 )
 
 list(APPEND SRC_FILES
+    # scripts LUA del Core (estilo Unity: un .lua por objeto)
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/script/W3dScript.cpp
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/io/w3dFilesystem.cpp
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/gfx/w3dTexture.cpp
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/io/w3dCompress.cpp
@@ -192,6 +194,13 @@ if(UNIX AND NOT APPLE AND NOT ANDROID)
 
     install(FILES ${CMAKE_SOURCE_DIR}/platform/linux/whisk3d.desktop
         DESTINATION share/applications
+    )
+
+    # el tipo MIME de los .w3d: doble click en un proyecto -> abre Whisk3D
+    # (el trigger de dpkg sobre share/mime actualiza la base al instalar)
+    install(FILES ${CMAKE_SOURCE_DIR}/platform/linux/whisk3d-mime.xml
+        DESTINATION share/mime/packages
+        RENAME whisk3d.xml
     )
 
     install(FILES ${CMAKE_SOURCE_DIR}/res/Whisk3D.svg

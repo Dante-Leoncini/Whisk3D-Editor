@@ -32,8 +32,12 @@
 #include "objects/Slice9.h"
 #include "objects/Boton2D.h"
 #include "objects/Expandir2D.h"
+#include "objects/Video2D.h"
+#include "objects/Gamepad.h"   // el objeto Control (scripts del juego)
 #include "io/UI2DFormato.h"     // cargar interfaces .w3dui
 #include "PopUp/FileBrowser.h"  // AbrirFileBrowser (elegir el archivo)
+#include "io/Textura2D.h"       // tamano real de la imagen elegida al crearla
+#include "io/Video2DCache.h"    // tamano real del video elegido al crearlo
 #include "objects/Armature.h"
 #include "animation/SkeletalAnimation.h" // InsertarKeyframeEsqueleto (Pose Mode: Insert Keyframe)
 #include "objects/Instance.h"
@@ -389,6 +393,9 @@ void AddCone(){     TrasCrearAdd(NewMesh(MeshType::cone, NULL, false)); }
 void AddCylinder(){ TrasCrearAdd(NewMesh(MeshType::cylinder, NULL, false)); }
 void AddEmpty(){    TrasCrearAdd(new Empty(NULL, cursor3D.pos)); }
 void AddUI(){       TrasCrearAdd(new UI(NULL, cursor3D.pos)); }   // interfaz 2D (se edita en el Editor 2D)
+// el objeto SCRIPT (icono de control): donde van los SCRIPTS del juego (controles y
+// logica; se recomienda ponerlo ANTES que la UI en el arbol: corre primero)
+void AddControl(){  Gamepad* g = new Gamepad(NULL); g->name = "Script"; g->pos = cursor3D.pos; TrasCrearAdd(g); }
 void AddCamera(){   TrasCrearAdd(new Camera(NULL, cursor3D.pos, Vector3(-35.0f, -45.0f, 0.0f))); }
 
 void AddLight(){
@@ -484,6 +491,7 @@ static const MenuDef ADD[] = {
     { "Camera",     AddCamera,          NULL, ICONO(IconType::camera) },
     { "Light",      AddLight,           NULL, ICONO(IconType::light) },
     { "Collection", AddCollection,      NULL, ICONO(IconType::archive) },
+    { "Script",     AddControl,         NULL, ICONO(IconType::gamepad) },
     { "UI",         AddUI,              NULL, ICONO(IconType::textura) },
     { "Imports",    NULL,               NULL, ICONO(IconType::mesh), &MenuImports },
 };
@@ -1287,12 +1295,39 @@ static UI* UIRaizParaAgregar() {
     return new UI(NULL);
 }
 
+// crear la IMAGEN recien cuando se eligio el archivo (cancelar el explorador = no crear);
+// nace con la textura puesta y su tamano real
+static void Add2DImagenElegida(const std::string& ruta) {
+    UI* raiz = UIRaizParaAgregar();
+    Imagen2D* img = new Imagen2D(raiz, Vector3(0.0f, 0.0f, 0.0f));
+    img->textura = ruta;
+    int w = 0, h = 0;
+    Textura2DObtener(ruta, &w, &h);
+    if (w > 0 && h > 0) { img->ancho = (float)w; img->alto = (float)h; }
+    DeseleccionarTodo();
+    img->Seleccionar();
+    g_redraw = true;
+}
+// idem para el VIDEO (la preview ademas trae el tamano real via ffprobe)
+static void Add2DVideoElegido(const std::string& ruta) {
+    UI* raiz = UIRaizParaAgregar();
+    Video2D* v = new Video2D(raiz, Vector3(0.0f, 0.0f, 0.0f));
+    v->video = ruta;
+    const VideoPreview* pv = Video2DPreview(ruta);
+    if (pv && pv->anchoReal > 0) { v->ancho = (float)pv->anchoReal; v->alto = (float)pv->altoReal; }
+    DeseleccionarTodo();
+    v->Seleccionar();
+    g_redraw = true;
+}
+
 static void LayoutAccion2DAdd(int id) {
+    // imagen y video piden PRIMERO el archivo (con vista previa); cancelar no crea nada
+    if (id == 1) { AbrirFileBrowser("Cargar imagen", T("Open"), ".png .jpg .jpeg .webp .bmp .tga .gif", Add2DImagenElegida); return; }
+    if (id == 8) { AbrirFileBrowser("Cargar video", T("Open"), ".mp4 .webm .gif .mov .avi", Add2DVideoElegido); return; }
     UI* raiz = UIRaizParaAgregar();
     // posicion CERO: con el ancla en el centro (default) cero = centrado en la ventana
     Object* nuevo = NULL;
     if (id == 0) nuevo = new Texto2D(raiz, Vector3(0.0f, 0.0f, 0.0f));
-    if (id == 1) nuevo = new Imagen2D(raiz, Vector3(0.0f, 0.0f, 0.0f));
     if (id == 2) nuevo = new Rect2D(raiz, Vector3(0.0f, 0.0f, 0.0f));
     if (id == 3) nuevo = new Contenedor2D(raiz, Vector3(0.0f, 0.0f, 0.0f));
     if (id == 4) nuevo = new Slice9(raiz, Vector3(0.0f, 0.0f, 0.0f));
@@ -1316,6 +1351,7 @@ static void LayoutAbrirMenu2DAdd(int x, int y) {
     gMenu2DAdd->Agregar("Slice 9", 4, (int)IconType::cuadricula);
     gMenu2DAdd->Agregar(T("Button"), 5, (int)IconType::object);
     gMenu2DAdd->Agregar(T("Expand"), 6, (int)IconType::arrowRight);
+    gMenu2DAdd->Agregar("Video", 8, (int)IconType::camera);
     gMenu2DAdd->Agregar("Importar w3dui", 7, (int)IconType::archive);
     gMenu2DAdd->action = LayoutAccion2DAdd;
     if (MenuAbierto && MenuAbierto != gMenu2DAdd) MenuAbierto->Cerrar();

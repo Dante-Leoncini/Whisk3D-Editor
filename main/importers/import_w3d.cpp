@@ -1,6 +1,13 @@
 #include "importers/import_w3d.h"
 #include "render/OpcionesRender.h"   // RenderType / g_redraw: son del editor
 #include "stb/stb_image.h" // stb ahora vive en libs/Whisk3DCore/thirdparty
+#include "script/W3dScript.h"   // colgar el <proyecto>.lua al objeto Script/gamepad
+#include "animation/Animation.h" // auto modo-juego al abrir un proyecto con scripts
+#include "ViewPorts/Editor2D.h"  // layouts con Editor2D/Timeline (proyectos de juego)
+#include "ViewPorts/Timeline.h"
+#include "objects/UI.h"          // la UI del proyecto (rama UI { archivo: ... })
+#include "io/UI2DFormato.h"
+#include "w3dFilesystem.h"
 
 //ESTO DESPUES TIENE QUE IR A UN ARCHIVO SEPARADOOOOO
 SDL_Surface* LoadSurfaceSTB(const std::string& path) {
@@ -217,6 +224,8 @@ ViewportBase* BuildLayout(Node* n){
     }
     if(n->type == "Outliner")  return new Outliner();
     if(n->type == "Properties")  return new Properties();
+    if(n->type == "Editor2D")  return new Editor2D();
+    if(n->type == "Timeline")  return new Timeline();
 
     if(n->type == "ViewportRow" || n->type == "ViewportColumn"){
         bool isRow = (n->type == "ViewportRow");
@@ -368,6 +377,16 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
         return mesh;
     }
 
+    if (n->type=="UI"){
+        // la INTERFAZ del proyecto: el .w3d referencia un .w3dui (el arbol 2D
+        // completo, con sus scripts). Se cuelga de la escena como cualquier UI.
+        if (n->props.count("archivo")) {
+            UI* u = UI2DCargar(GetFilePath(n->props.at("archivo")));
+            return (Object*)u;   // (ya quedo colgado de la escena)
+        }
+        return nullptr;
+    }
+
     if (n->type=="Mirror"){
         Mirror* mirror = new Mirror(parent);
         if(p.count("target")) mirror->SetTarget(p.at("target"));
@@ -395,6 +414,36 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
         gamepad->limiteFrente = GetFloatOrDefault(p, "limiteFrente", 2.0f);
         gamepad->velocidadMaximaCaida = GetFloatOrDefault(p, "velocidadMaximaCaida", 2.0f);
         gamepad->potenciaSalto = GetFloatOrDefault(p, "potenciaSalto", 2.0f);
+
+        // el SCRIPT declarado en el archivo: `script: pong.lua` + sus referencias
+        // `ref_<propiedad>: "objeto"` (lo que escribe Ctrl+S)
+        if (p.count("script")) {
+            if (!gamepad->scriptDatos) gamepad->scriptDatos = new W3dScriptDatos();
+            W3dScriptEntrada e;
+            e.ruta = GetFilePath(p.at("script"));
+            for (std::map<std::string,std::string>::const_iterator it = p.begin(); it != p.end(); ++it)
+                if (it->first.compare(0, 4, "ref_") == 0)
+                    e.refs.push_back(std::make_pair(it->first.substr(4), Unquote(it->second)));
+            gamepad->scriptDatos->scripts.push_back(e);
+        }
+        // convencion ALTERNATIVA: si no declara script pero junto al .w3d hay un
+        // "<nombre del proyecto>.lua" (CrashMadero.w3d -> CrashMadero.lua), se
+        // cuelga solo. La fisica que antes vivia hardcodeada en el editor ahora
+        // es un script lua del proyecto.
+        if (!p.count("script")) {
+            extern std::string w3dPath;
+            size_t sl = w3dPath.find_last_of("/\\");
+            std::string dir  = (sl == std::string::npos) ? std::string(".") : w3dPath.substr(0, sl);
+            std::string base = (sl == std::string::npos) ? w3dPath : w3dPath.substr(sl + 1);
+            size_t pt = base.find_last_of('.');
+            if (pt != std::string::npos) base = base.substr(0, pt);
+            std::string lua = dir + "/" + base + ".lua";
+            if (w3dFileSystem::FileExists(lua)) {
+                if (!gamepad->scriptDatos) gamepad->scriptDatos = new W3dScriptDatos();
+                W3dScriptEntrada e; e.ruta = lua;
+                gamepad->scriptDatos->scripts.push_back(e);
+            }
+        }   // (fin de la convencion sin "script:")
 
         return gamepad;
     }
@@ -505,10 +554,19 @@ void BuildScene(Node* root){
         SDL_FreeSurface(icon);
     }
 
+    // el "fullscreen" del archivo se lee pero NO se aplica al abrir en el editor
+    // (pedido de Dante: un proyecto no tiene que arrancar a pantalla completa;
+    // el flag queda para el juego final)
     if(root->props.count("fullscreen")){
         std::string v = root->props.at("fullscreen");
         cfg.fullscreen = (v == "true" || v == "1");
-        SetFullScreen(cfg.fullscreen);
+    }
+
+    // el FPS del proyecto (timeline/animaciones): "fps: 60" en la Escena
+    if(root->props.count("fps")){
+        int f = GetIntOrDefault(root->props, "fps", 30);
+        if (f < 1) f = 1; if (f > 120) f = 120;
+        AnimFPS = f;
     }
 
     if(root->props.count("Antialiasing")){
@@ -568,6 +626,25 @@ void OpenW3D(){
 			if(!rootViewport) {
 				std::cerr << "AVISO: rootViewport no creado, usando por defecto\n";
 				rootViewport = new ViewportColumn(new Outliner(), new Viewport3D(), 0.2f);
+			}
+
+			// nada seleccionado al abrir (los constructores van seleccionando lo
+			// ultimo creado; un proyecto recien abierto arranca LIMPIO)
+			DeseleccionarTodo();
+			ObjActivo = NULL;
+
+			// un proyecto CON SCRIPTS es un JUEGO: arranca con el selector del
+			// timeline en "Juego" y en PLAY (asi el doble click abre jugando y
+			// las vertex animations corren de una)
+			{
+				extern bool SimHayScripts();
+				if (SimHayScripts()) {
+					extern int ActiveAnimKind;
+					ActiveAnimKind = 2; AnimEsJuego = true;
+					StartFrame = 1;
+					PlayAnimation = true;
+					g_redraw = true;
+				}
 			}
 		}
 	}

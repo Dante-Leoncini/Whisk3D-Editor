@@ -11,6 +11,8 @@
 #include "objects/Slice9.h"       // panel del slice 9 (imagen con bordes fijos)
 #include "objects/Boton2D.h"      // panel del boton
 #include "objects/Expandir2D.h"   // panel del expandir (resorte de layout)
+#include "objects/Video2D.h"      // panel del video
+#include "io/Video2DCache.h"      // tamano real del video al elegirlo
 #include "io/Fuente2D.h"
 #include "io/Textura2D.h"      // tamano natural del archivo al elegir la textura
 #include "io/UI2DFormato.h"    // guardar/cargar interfaces (.w3dui)
@@ -382,7 +384,9 @@ static void SincronizarNombreObjeto(Properties* p){
     SincronizarNombreCampo(p->propS9Nombre);
     SincronizarNombreCampo(p->propBtnNombre);
     SincronizarNombreCampo(p->propExpNombre);
+    SincronizarNombreCampo(p->propVidNombre);
     SincronizarNombreCampo(p->propUInombre);
+    SincronizarNombreCampo(p->propScriptNombre);  // el objeto Script/Control
 }
 
 // TEXTO del elemento 2D: el campo propT2dTexto muestra t->texto y, al perder el foco, escribe lo
@@ -928,6 +932,25 @@ static void UIExportCarpetaElegida(const std::string& carpeta){
     if (UI2DGuardar(u, ruta)) Notificar(std::string(T("Saved: ")) + ruta, false);
     else                      Notificar(T("Could not write the file"), true);
 }
+// el techo del cache de estados (espejo float del int de SimJuego)
+extern int gSimCacheMax;   // SimJuego.cpp
+static float g_simCacheF = 250.0f;
+static void AccionSimCache(){
+    gSimCacheMax = (int)(g_simCacheF + 0.5f);
+    if (gSimCacheMax < 10) gSimCacheMax = 10;
+}
+// Compilar juego: exporta + luac + empaqueta, con el progreso en notificaciones.
+// Usa el UI activo o el primero de la escena (el boton vive en la tarjeta Juego).
+static void AccionCompilarJuego(){
+    extern bool CompilarJuego(UI*);
+    UI* u = (ObjActivo && ObjActivo->getType() == ObjectType::ui) ? (UI*)ObjActivo : NULL;
+    if (!u && SceneCollection)
+        for (size_t i = 0; i < SceneCollection->Childrens.size(); i++)
+            if (SceneCollection->Childrens[i]->getType() == ObjectType::ui)
+                { u = (UI*)SceneCollection->Childrens[i]; break; }
+    if (u) CompilarJuego(u);
+    else Notificar("Compilar: no hay ninguna UI en la escena", true);
+}
 static void AccionUIexportar(){
     if (!UIActivaProps()) return;
     AbrirFileBrowser(T("Export UI to..."), T("Select Folder"), ".w3dui", UIExportCarpetaElegida, true);
@@ -1134,24 +1157,241 @@ static void AccionMenuHijosAlign(){
     AbrirMenuBajoBoton(MenuHijosAlign, PropsActivo->propHijosAlign->button);
 }
 
-// fila COMPACTA de la paleta: nombre a la IZQUIERDA (label) + swatch a la DERECHA
-// (lo de siempre de PropColor) + un cuadradito con CRUZ para borrar la entrada.
+// fila COMPACTA de la paleta: NOMBRE EDITABLE a la izquierda (se clickea y se tipea,
+// como el campo Name), el swatch de color, y un BOTON cuadrado con la X para borrar
+// pegado al borde DERECHO. Las zonas las resuelve el click handler de Color.
 class PropColorPal : public PropColor {
 public:
     int idx;
-    PropColorPal(const std::string& nom, int i) : PropColor(nom), idx(i) {}
+    TextField field;    // el nombre se edita inline (g_textFieldActivo al clickear)
+    std::string* nom;   // apunta al nombre en la paleta (estable: colores con reserve)
+    PropColorPal(const std::string& nomIni, int i) : PropColor(nomIni), idx(i) {
+        nom = NULL; field.SetText(nomIni);
+    }
     int PaletaIdx() const override { return idx; }
+    void RenderPropertiBox(Card* box) override {
+        if (!value) return;
+        int cb = box->width;
+        float dxS = (float)(width - PropColEtiqueta - cb * 2 - gapGS - bordersGS);
+        float dxX = (float)(width - PropColEtiqueta - cb - bordersGS);
+        w3dEngine::Translatef(dxS, 0, 0);
+        box->Render(false);                 // el swatch (el group ya seteo su color)
+        w3dEngine::Translatef(dxX - dxS, 0, 0);
+        SetColorID(ColorID::gris);          // el boton X: card gris como los botones...
+        box->Render(false);
+        SetColorID(ColorID::grisLinea);     // ...con borde propio SIEMPRE visible
+        box->RenderBorder(false);
+        w3dEngine::Translatef(-dxX, RenglonHeightGS + gapGS, 0);
+    }
+    void RenderPropertiBoxBorder(Card* box) override {
+        if (!value) return;
+        int cb = box->width;
+        float dxS = (float)(width - PropColEtiqueta - cb * 2 - gapGS - bordersGS);
+        float dxX = (float)(width - PropColEtiqueta - cb - bordersGS);
+        w3dEngine::Translatef(dxS, -RenglonHeightGS - gapGS, 0);
+        box->RenderBorder(false);
+        w3dEngine::Translatef(dxX - dxS, 0, 0);
+        box->RenderBorder(false);
+        w3dEngine::Translatef(-dxX, RenglonHeightGS + gapGS, 0);
+    }
     void RenderPropertiValue(Card* propertiBox) override {
-        // la CRUZ: un cuadradito a la IZQUIERDA del swatch (que esta pegado a la derecha)
-        int cw = RenglonHeightGS + GlobalScale * 2;
-        float xCruz = (float)(width - PropColEtiqueta - cw * 2 - gapGS - bordersGS);
+        if (!value) return;
+        int cb = RenglonHeightGS + GlobalScale * 2;
+        bool foco = (g_textFieldActivo == &field);
+        if (foco && nom) *nom = field.text;   // lo tipeado pisa el nombre EN VIVO
+        // el nombre arranca en el borde IZQUIERDO de la fila (no en la col de valores)
         w3dEngine::PushMatrix();
-        w3dEngine::Translatef(xCruz, 0, 0);
-        RenderBitmapText("x", textAlign::center, cw);
+        w3dEngine::Translatef((float)(bordersGS - PropColEtiqueta), 0, 0);
+        int wNombre = width - cb * 2 - gapGS * 2 - bordersGS * 2;
+        if (foco && field.selectAll) {
+            w3dEngine::Color4fv(ListaColores[static_cast<int>(ColorID::accent)]);
+            RenderBitmapText(field.text, textAlign::left, wNombre);
+            w3dEngine::Color4fv(ListaColores[static_cast<int>(ColorID::blanco)]);
+        } else {
+            std::string s = foco ? field.text.substr(0, field.caret) + "|" + field.text.substr(field.caret)
+                                 : (nom ? *nom : field.text);
+            RenderBitmapText(s, textAlign::left, wNombre);
+        }
         w3dEngine::PopMatrix();
-        PropColor::RenderPropertiValue(propertiBox);
+        // la X centrada sobre su boton
+        float dxX = (float)(width - PropColEtiqueta - cb - bordersGS);
+        w3dEngine::PushMatrix();
+        w3dEngine::Translatef(dxX, 0, 0);
+        RenderBitmapText("x", textAlign::center, cb);
+        w3dEngine::PopMatrix();
+        w3dEngine::Translatef(0, RenglonHeightGS + gapGS, 0);
+    }
+    void RenderPropertiLabel(Card* propertiBox) override {
+        if (value) w3dEngine::Translatef(0, RenglonHeightGS + gapGS, 0);
     }
 };
+
+// ============================ VIDEO 2D ============================
+static Video2D* Vid2dActivo(){
+    return (ObjActivo && ObjActivo->getType() == ObjectType::video2d) ? (Video2D*)ObjActivo : NULL;
+}
+static PopupMenu* MenuVidModo = NULL;
+static void AccionVidModoElegido(int id){
+    Video2D* v = Vid2dActivo(); if (!v) return;
+    v->modo = id;
+    if (PropsActivo && PropsActivo->propVidModo) PropsActivo->propVidModo->button->text = ImgNombreModo(id);
+    g_redraw = true;
+}
+static void AccionMenuVidModo(){
+    if (!PropsActivo || !Vid2dActivo()) return;
+    if (!MenuVidModo){ MenuVidModo = new PopupMenu(); MenuVidModo->action = AccionVidModoElegido; }
+    MenuVidModo->Limpiar();
+    MenuVidModo->titulo = T("Mode");
+    MenuVidModo->Agregar("Estirar", 0);
+    MenuVidModo->Agregar("Ajustar", 1);
+    MenuVidModo->Agregar("Cover", 2);
+    AbrirMenuBajoBoton(MenuVidModo, PropsActivo->propVidModo->button);
+}
+static PopupMenu* MenuVidAncla = NULL;
+static void AccionVidAnclaElegida(int id){
+    Video2D* v = Vid2dActivo(); if (!v) return;
+    v->ancla = id;
+    if (PropsActivo && PropsActivo->propVidAncla) PropsActivo->propVidAncla->button->text = T2dNombreAncla(id);
+    g_redraw = true;
+}
+static void AccionMenuVidAncla(){
+    if (!PropsActivo || !Vid2dActivo()) return;
+    if (!MenuVidAncla){ MenuVidAncla = new PopupMenu(); MenuVidAncla->action = AccionVidAnclaElegida; }
+    MenuVidAncla->Limpiar();
+    MenuVidAncla->titulo = T("Anchor");
+    for (int i = 0; i <= 8; i++) MenuVidAncla->Agregar(T2dNombreAncla(i), i);
+    AbrirMenuBajoBoton(MenuVidAncla, PropsActivo->propVidAncla->button);
+}
+static void VidArchivoElegido(const std::string& ruta){
+    Video2D* v = Vid2dActivo(); if (!v) return;
+    v->video = ruta;
+    const VideoPreview* pv = Video2DPreview(ruta);   // extrae la preview + tamano real
+    if (pv && pv->anchoReal > 0 && v->tamPx) {
+        v->ancho = (float)pv->anchoReal; v->alto = (float)pv->altoReal;
+    }
+    if (PropsActivo && PropsActivo->propVidArchivo)
+        PropsActivo->propVidArchivo->button->text = NombreDeArchivo(ruta);
+    g_redraw = true;
+}
+static void AccionVidArchivo(){
+    if (!Vid2dActivo()) return;
+    AbrirFileBrowser("Cargar video", T("Open"), ".mp4 .webm .gif .mov .avi", VidArchivoElegido);
+}
+
+// ============================ SCRIPT (estilo Unity) ============================
+#include "script/W3dScript.h"
+#include "ViewPorts/Notificaciones.h"   // el progreso de Compilar juego
+// las propiedades expuestas por CADA script del objeto activo (una tarjeta por script)
+static std::vector<std::vector<W3dScriptProp> > gScriptPropsMulti;
+static int g_scriptCardSel = -1;     // la tarjeta cuyo menu esta abierto
+static int g_scriptPropSel = -1;     // la propiedad elegida en esa tarjeta
+static int g_scriptCambiarIdx = -1;  // el file browser cambia ESTE script (-1 = agrega)
+static std::vector<std::string> gScriptObjNombres;
+static PopupMenu* MenuScriptRef = NULL;
+
+static void ScriptRefrescar(){
+    if (PropsActivo) { PropsActivo->target = NULL; PropsActivo->scriptFirma = -1; }
+    g_redraw = true;
+}
+// el file browser eligio un .lua: agregarlo o cambiar el del script elegido
+static void ScriptElegido(const std::string& ruta) {
+    if (!ObjActivo) return;
+    if (!ObjActivo->scriptDatos) ObjActivo->scriptDatos = new W3dScriptDatos();
+    if (g_scriptCambiarIdx >= 0 && g_scriptCambiarIdx < (int)ObjActivo->scriptDatos->scripts.size()) {
+        ObjActivo->scriptDatos->scripts[g_scriptCambiarIdx].ruta = ruta;
+    } else {
+        W3dScriptEntrada e; e.ruta = ruta;
+        ObjActivo->scriptDatos->scripts.push_back(e);
+    }
+    g_scriptCambiarIdx = -1;
+    { extern void SimScriptsCambiados(Object*); SimScriptsCambiados(ObjActivo); }
+    ScriptRefrescar();
+}
+static void AccionScriptAgregar() {
+    if (!ObjActivo) return;
+    g_scriptCambiarIdx = -1;
+    AbrirFileBrowser("Elegir script", T("Open"), ".lua .luac", ScriptElegido);
+}
+// guarda el valor elegido para una propiedad de UN script
+static void ScriptAsignar(int si, const std::string& prop, const std::string& valor) {
+    if (!ObjActivo || !ObjActivo->scriptDatos) return;
+    if (si < 0 || si >= (int)ObjActivo->scriptDatos->scripts.size()) return;
+    W3dScriptEntrada& e = ObjActivo->scriptDatos->scripts[si];
+    for (size_t i = 0; i < e.refs.size(); i++)
+        if (e.refs[i].first == prop) { e.refs[i].second = valor; return; }
+    e.refs.push_back(std::make_pair(prop, valor));
+}
+static const char* ScriptValorDe(Object* o, int si, const std::string& prop) {
+    if (!o || !o->scriptDatos || si < 0 || si >= (int)o->scriptDatos->scripts.size()) return "";
+    W3dScriptEntrada& e = o->scriptDatos->scripts[si];
+    for (size_t i = 0; i < e.refs.size(); i++)
+        if (e.refs[i].first == prop) return e.refs[i].second.c_str();
+    return "";
+}
+static void RecolectarNombres(Object* o, std::vector<std::string>* v) {
+    if (!o) return;
+    if (o != SceneCollection) v->push_back(o->name);
+    for (size_t i = 0; i < o->Childrens.size(); i++) RecolectarNombres(o->Childrens[i], v);
+}
+static void AccionScriptRefElegida(int id) {
+    if (g_scriptCardSel < 0 || g_scriptCardSel >= (int)gScriptPropsMulti.size()) return;
+    std::vector<W3dScriptProp>& props = gScriptPropsMulti[g_scriptCardSel];
+    if (g_scriptPropSel < 0 || g_scriptPropSel >= (int)props.size()) return;
+    W3dScriptProp& p = props[g_scriptPropSel];
+    std::string valor;
+    if (p.tipo == 1) { if (id >= 0 && id < (int)p.opciones.size()) valor = p.opciones[id]; }
+    else             { if (id >= 0 && id < (int)gScriptObjNombres.size()) valor = gScriptObjNombres[id]; }
+    if (!valor.empty()) ScriptAsignar(g_scriptCardSel, p.nombre, valor);
+    // con el juego ANDANDO el cambio se ve al instante (se re-resuelven las refs)
+    { extern bool SimActiva(); extern void SimReresolver(Object*);
+      if (SimActiva()) SimReresolver(ObjActivo); }
+    ScriptRefrescar();
+}
+// el click en cualquier fila de una tarjeta de script: se localiza QUE tarjeta fue
+// (el handler del panel deja su selectIndex >= 0) y que fila
+static void AccionScriptCardFila() {
+    if (!PropsActivo) return;
+    int card = -1, fila = -1;
+    for (int i = 0; i < Properties::kMaxScriptCards; i++) {
+        GroupPropertie* g = PropsActivo->propScriptCards[i];
+        if (g && g->visible && g->selectIndex >= 0) { card = i; fila = g->selectIndex; break; }
+    }
+    if (card < 0 || !ObjActivo || !ObjActivo->scriptDatos) return;
+    if (card >= (int)ObjActivo->scriptDatos->scripts.size()) return;
+    GroupPropertie* g = PropsActivo->propScriptCards[card];
+    int ultima = (int)g->properties.size() - 1;
+    if (fila == 0) {                 // [0] el archivo: elegir otro .lua
+        g_scriptCambiarIdx = card;
+        AbrirFileBrowser("Elegir script", T("Open"), ".lua .luac", ScriptElegido);
+        return;
+    }
+    if (fila == ultima) {            // ultima fila: QUITAR el script
+        ObjActivo->scriptDatos->scripts.erase(
+            ObjActivo->scriptDatos->scripts.begin() + card);
+        { extern void SimScriptsCambiados(Object*); SimScriptsCambiados(ObjActivo); }
+        ScriptRefrescar();
+        return;
+    }
+    // filas del medio: una PROPIEDAD expuesta (desplegable de objetos u opciones)
+    int pi = fila - 1;
+    g_scriptCardSel = card; g_scriptPropSel = pi;
+    if (card >= (int)gScriptPropsMulti.size() || pi < 0 || pi >= (int)gScriptPropsMulti[card].size()) return;
+    W3dScriptProp& p = gScriptPropsMulti[card][pi];
+    if (!MenuScriptRef) { MenuScriptRef = new PopupMenu(); MenuScriptRef->action = AccionScriptRefElegida; }
+    MenuScriptRef->Limpiar();
+    MenuScriptRef->titulo = p.nombre;
+    if (p.tipo == 1) {
+        for (size_t i = 0; i < p.opciones.size(); i++)
+            MenuScriptRef->Agregar(p.opciones[i], (int)i);
+    } else {
+        gScriptObjNombres.clear();
+        RecolectarNombres(SceneCollection, &gScriptObjNombres);
+        for (size_t i = 0; i < gScriptObjNombres.size(); i++)
+            MenuScriptRef->Agregar(gScriptObjNombres[i], (int)i);
+    }
+    PropButton* pb = (PropButton*)g->properties[fila];
+    AbrirMenuBajoBoton(MenuScriptRef, pb->button);
+}
 
 // ============================ PALETA DE COLORES ============================
 static Imagen2D* Img2dActiva();      // (definidos mas abajo; las acciones de paleta los usan)
@@ -1928,6 +2168,7 @@ static const int ANIM_CLIP_STRIDE = 1000; // hasta 1000 clips por armadura
 static std::vector<PopupMenu*> g_animSubmenus; // pool reutilizable (0 = Scenes, 1.. = por armadura); persiste entre aperturas
 static std::vector<Armature*>  g_animMenuArms; // armaduras (con clips) en el orden del menu, para decodificar el id
 static std::string NombreAnimActiva(){
+    if (ActiveAnimKind == 2) return "Juego";
     if (ActiveAnimKind == 1 && ActiveAnimArm &&
         ActiveAnimArm->animActiva >= 0 && ActiveAnimArm->animActiva < (int)ActiveAnimArm->animations.size() &&
         ActiveAnimArm->animations[ActiveAnimArm->animActiva])
@@ -1943,9 +2184,16 @@ static void RecolectarArmaduras(Object* nodo, std::vector<Armature*>& out){
 static PopupMenu* AnimSubmenuPool(size_t i){ while (g_animSubmenus.size() <= i) g_animSubmenus.push_back(new PopupMenu()); return g_animSubmenus[i]; }
 // construye el menu jerarquico en 'menu' (lo comparten la tarjeta y el timeline). El id de los items bubbles hasta
 // menu->action (ver PopupMenu::Click), asi que los submenus heredan la misma action.
+// id reservado del selector: la "animacion" JUEGO (tiempo infinito, corre los
+// scripts). POSITIVO y debajo de ANIM_CLIP_BASE: el dispatch del menu ignora los
+// ids negativos (por eso el "Juego" original no entraba) y este valor no puede
+// colisionar con una escena real (se chequea PRIMERO en AnimSelPorId).
+#define ANIM_ID_JUEGO 99999
+
 void ConstruirMenuAnim(PopupMenu* menu){
     menu->Limpiar();
     InitSceneAnimations();
+    menu->Agregar("Juego", ANIM_ID_JUEGO, IconType::gamepad);
     PopupMenu* subEsc = AnimSubmenuPool(0); subEsc->Limpiar(); subEsc->action = menu->action; // submenu "Scenes"
     for (size_t i=0;i<SceneAnimations.size();i++) subEsc->Agregar(SceneAnimations[i]->name, (int)i, IconType::camera);
     menu->Agregar(T("Scenes"), 0, IconType::camera, subEsc);
@@ -1974,6 +2222,17 @@ static void InvalidarSkinEscena(){
     g_redraw = true;
 }
 void AnimSelPorId(int id){
+    if (id == ANIM_ID_JUEGO){
+        // el JUEGO: tiempo INFINITO (sin Fin, sin loop); el PLAY corre la simulacion
+        // de scripts y el cache rojo del viaje en el tiempo vive aca. Las animaciones
+        // normales se siguen editando eligiendo una escena o un clip.
+        ActiveAnimKind = 2; AnimEsJuego = true;
+        StartFrame = 1;
+        if (CurrentFrame < StartFrame) CurrentFrame = StartFrame;
+        InvalidarSkinEscena();
+        return;
+    }
+    AnimEsJuego = false;
     if (id >= ANIM_CLIP_BASE){
         int k = id - ANIM_CLIP_BASE, armIdx = k / ANIM_CLIP_STRIDE, clipIdx = k % ANIM_CLIP_STRIDE;
         if (armIdx >= 0 && armIdx < (int)g_animMenuArms.size()){
@@ -2539,31 +2798,35 @@ void Properties::ConstruirGrupos(){
     propBtnAncla->button->desplegable = true;
     propBtnAncla->action = AccionMenuBtnAncla;
     propBtn2D->properties.push_back(propBtnAncla);
+    propBtnRot = new PropFloat(T("Rotation"), "o");
+    propBtn2D->properties.push_back(propBtnRot);
     propBtnOpac = new PropFloat(T("Opacity"));
     propBtnOpac->SetRango(0.0f, 1.0f);
     propBtnOpac->stepFino = 0.01f; propBtnOpac->stepGrueso = 0.1f; propBtnOpac->dragStep = 0.005f;
     propBtn2D->properties.push_back(propBtnOpac);
-    // cada color puede ser PROPIO o apuntar a la PALETA del UI (un puntero, no una copia)
+    // cada color puede ser PROPIO o apuntar a la PALETA del UI (un puntero, no una copia).
+    // El swatch de abajo lleva el MISMO label que su desplegable (sin nombre no se sabia
+    // cual era cual, pedido de Dante).
     propBtnPalFondo = new PropButton(T("Background"));
     propBtnPalFondo->conLabel = true;
     propBtnPalFondo->button->desplegable = true;
     propBtnPalFondo->action = AccionPalBtnFondo;
     propBtn2D->properties.push_back(propBtnPalFondo);
-    propBtnColFondo = new PropColor("");
+    propBtnColFondo = new PropColor(T("Background"));
     propBtn2D->properties.push_back(propBtnColFondo);
     propBtnPalTexto = new PropButton(T("Text Color"));
     propBtnPalTexto->conLabel = true;
     propBtnPalTexto->button->desplegable = true;
     propBtnPalTexto->action = AccionPalBtnTexto;
     propBtn2D->properties.push_back(propBtnPalTexto);
-    propBtnColTexto = new PropColor("");
+    propBtnColTexto = new PropColor(T("Text Color"));
     propBtn2D->properties.push_back(propBtnColTexto);
     propBtnPalBorde = new PropButton(T("Border Color"));
     propBtnPalBorde->conLabel = true;
     propBtnPalBorde->button->desplegable = true;
     propBtnPalBorde->action = AccionPalBtnBorde;
     propBtn2D->properties.push_back(propBtnPalBorde);
-    propBtnColBorde = new PropColor("");
+    propBtnColBorde = new PropColor(T("Border Color"));
     propBtn2D->properties.push_back(propBtnColBorde);
     // FONDO con textura (9 pedazos, como el slice9): opcional
     propBtnTex = new PropButton(T("Texture"));
@@ -2581,6 +2844,62 @@ void Properties::ConstruirGrupos(){
     propBtnTexEsc->stepFino = 0.05f; propBtnTexEsc->stepGrueso = 0.5f; propBtnTexEsc->dragStep = 0.01f;
     propBtn2D->properties.push_back(propBtnTexEsc);
     GroupProperties.push_back(propBtn2D);
+
+    // ===== Tarjeta "Video" (fondos animados y festejos; sin sonido) =====
+    propVid2D = new GroupPropertie("Video");
+    propVid2D->icono = (int)IconType::camera;
+    propVidNombre = new PropText(T("Name"), "");
+    propVid2D->properties.push_back(propVidNombre);
+    propVidPosX = new PropFloat(T("Location X"));
+    propVid2D->properties.push_back(propVidPosX);
+    propVidPosY = new PropFloat("Y");
+    propVid2D->properties.push_back(propVidPosY);
+    propVidPosZ = new PropFloat("Z");
+    propVid2D->properties.push_back(propVidPosZ);
+    propVidPosAbs = new PropBool(T("Pixels"));
+    propVidPosAbs->onChange = AccionPos2DAbsToggle;
+    propVid2D->properties.push_back(propVidPosAbs);
+    propVidPeso = new PropFloat(T("Weight"));
+    propVidPeso->SetRango(0.01f, 100.0f);
+    propVid2D->properties.push_back(propVidPeso);
+    propVidArchivo = new PropButton("Video");
+    propVidArchivo->conLabel = true;
+    propVidArchivo->action = AccionVidArchivo;
+    propVid2D->properties.push_back(propVidArchivo);
+    propVidAncho = new PropFloat(T("Width"), "px");
+    propVidAncho->SetRango(1.0f, 8192.0f);
+    propVid2D->properties.push_back(propVidAncho);
+    propVidAlto = new PropFloat(T("Height"), "px");
+    propVidAlto->SetRango(1.0f, 8192.0f);
+    propVid2D->properties.push_back(propVidAlto);
+    propVidTamPx = new PropBool(T("Pixels"));
+    propVidTamPx->onChange = AccionTamPxToggle;
+    propVid2D->properties.push_back(propVidTamPx);
+    propVidModo = new PropButton(T("Mode"));
+    propVidModo->conLabel = true;
+    propVidModo->button->desplegable = true;
+    propVidModo->action = AccionMenuVidModo;
+    propVid2D->properties.push_back(propVidModo);
+    propVidLoop = new PropBool("Loop");
+    propVid2D->properties.push_back(propVidLoop);
+    propVidAlpha = new PropBool("Alpha");        // usar la transparencia del video
+    propVid2D->properties.push_back(propVidAlpha);
+    propVidPlay = new PropBool("Ver animacion"); // reproducir la preview en el editor
+    propVid2D->properties.push_back(propVidPlay);
+    propVidFiltro = new PropBool(T("Filtering"));
+    propVid2D->properties.push_back(propVidFiltro);
+    propVidRot = new PropFloat(T("Rotation"), "o");
+    propVid2D->properties.push_back(propVidRot);
+    propVidAncla = new PropButton(T("Anchor"));
+    propVidAncla->conLabel = true;
+    propVidAncla->button->desplegable = true;
+    propVidAncla->action = AccionMenuVidAncla;
+    propVid2D->properties.push_back(propVidAncla);
+    propVidOpac = new PropFloat(T("Opacity"));
+    propVidOpac->SetRango(0.0f, 1.0f);
+    propVidOpac->stepFino = 0.01f; propVidOpac->stepGrueso = 0.1f; propVidOpac->dragStep = 0.005f;
+    propVid2D->properties.push_back(propVidOpac);
+    GroupProperties.push_back(propVid2D);
 
     // ===== Tarjeta "Expandir" (resorte de layout: absorbe el espacio libre) =====
     propExp2D = new GroupPropertie(T("Expand"));
@@ -2638,15 +2957,36 @@ void Properties::ConstruirGrupos(){
     propUIcard->properties.push_back(propUIexport);
     GroupProperties.push_back(propUIcard);
 
+    // ===== El objeto SCRIPT/CONTROL: la tarjeta "Control" (nombre + visible +
+    // agregar) y una TARJETA POR SCRIPT (se pueblan en el rebind con la firma).
+    // Si el objeto esta INVISIBLE sus scripts no se ejecutan.
+    propControl = new GroupPropertie("Control");
+    propScriptNombre = new PropText(T("Name"), "");
+    propControl->properties.push_back(propScriptNombre);
+    propScriptVisible = new PropBool(T("Visible"));
+    propControl->properties.push_back(propScriptVisible);
+    propScriptAgregar = new PropButton("Agregar script", IconType::archive);
+    propScriptAgregar->action = AccionScriptAgregar;
+    propControl->properties.push_back(propScriptAgregar);
+    for (int i = 0; i < kMaxScriptCards; i++)
+        propScriptCards[i] = new GroupPropertie("Script");
+
     // ===== Tarjeta "Paleta" (del UI): colores con NOMBRE que los componentes referencian.
     // Las filas se reconstruyen en el rebind cuando cambia la cantidad (RefreshPaleta).
+    // Se agrega a GroupProperties DESPUES de la tarjeta Hijos (asi aparece debajo).
     propPaleta = new GroupPropertie(T("Palette"));
-    GroupProperties.push_back(propPaleta);
 
     // ===== Tarjeta "Children": afecta a los HIJOS del seleccionado. El padding encoge el
     // area donde se enganchan las anclas de bordes/esquinas (la linea transparente se ve en
     // el Editor 2D cuando el UI esta seleccionado). =====
     propHijos = new GroupPropertie(T("Children"));
+    // el padding se maneja con UN valor (uniforme, default) o POR LADO (checkbox)
+    propHijosPadUni = new PropBool(T("Uniform"));
+    propHijosPadUni->onChange = AccionHijosRefrescar;
+    propHijos->properties.push_back(propHijosPadUni);
+    propHijosPadTodos = new PropFloat("Padding", "px");
+    propHijosPadTodos->SetRango(0.0f, 2048.0f);
+    propHijos->properties.push_back(propHijosPadTodos);
     propHijosPadIzq = new PropFloat("Pad izq", "px");
     propHijosPadIzq->SetRango(0.0f, 2048.0f);
     propHijos->properties.push_back(propHijosPadIzq);
@@ -2698,7 +3038,37 @@ void Properties::ConstruirGrupos(){
     propHijos->properties.push_back(propHijosScrollX);
     propHijosScrollY = new PropFloat(T("Scroll Y"), "px");
     propHijos->properties.push_back(propHijosScrollY);
+    // ===== Tarjeta "Margen" (del elemento 2D): su aire ALREDEDOR cuando esta en una
+    // fila/columna del padre, y el checkbox "Expandir" (absorbe el espacio sobrante,
+    // como el elemento Expandir: aprovecha el hueco muerto). Uniforme = un solo valor.
+    propMargen = new GroupPropertie(T("Margin"));
+    propMargExp = new PropBool(T("Expand"));
+    propMargen->properties.push_back(propMargExp);
+    propMargUni = new PropBool(T("Uniform"));
+    propMargUni->onChange = AccionHijosRefrescar;
+    propMargen->properties.push_back(propMargUni);
+    propMargTodos = new PropFloat(T("Margin"), "px");
+    propMargTodos->SetRango(0.0f, 2048.0f);
+    propMargen->properties.push_back(propMargTodos);
+    propMargIzq = new PropFloat("Marg izq", "px");
+    propMargIzq->SetRango(0.0f, 2048.0f);
+    propMargen->properties.push_back(propMargIzq);
+    propMargDer = new PropFloat("Marg der", "px");
+    propMargDer->SetRango(0.0f, 2048.0f);
+    propMargen->properties.push_back(propMargDer);
+    propMargArr = new PropFloat("Marg arriba", "px");
+    propMargArr->SetRango(0.0f, 2048.0f);
+    propMargen->properties.push_back(propMargArr);
+    propMargAba = new PropFloat("Marg abajo", "px");
+    propMargAba->SetRango(0.0f, 2048.0f);
+    propMargen->properties.push_back(propMargAba);
+
+    GroupProperties.push_back(propMargen);   // Margen arriba de Hijos (es del elemento)
     GroupProperties.push_back(propHijos);
+    GroupProperties.push_back(propPaleta);   // la Paleta va DEBAJO de Hijos
+    GroupProperties.push_back(propControl);  // el Control y sus scripts, al final
+    for (int i = 0; i < kMaxScriptCards; i++)
+        GroupProperties.push_back(propScriptCards[i]);
 
     // ===== Tarjeta "Mesh Parts": selector (lista) + gestion de la PARTE (sin material) =====
     propMeshParts = new GroupPropertie(T("Mesh Parts"));
@@ -2902,6 +3272,7 @@ void Properties::ConstruirGrupos(){
       pE->SetRango(1.0f, 100000.0f); pE->entero = true; pE->stepFino = 1.0f; pE->stepGrueso = 10.0f; pE->dragStep = 1.0f;
       g_animEndF = (float)EndFrame; pE->value = &g_animEndF; pE->onChange = AccionAnimEnd; gPropAnimEnd = pE;
       propAnimation->properties.push_back(pE); }
+
     { PropFloat* pF = new PropFloat("FPS");
       pF->SetRango(1.0f, 120.0f); pF->entero = true; pF->stepFino = 1.0f; pF->stepGrueso = 5.0f; pF->dragStep = 1.0f;
       g_animFpsF = (float)AnimFPS; pF->value = &g_animFpsF; pF->onChange = AccionAnimFps; gPropAnimFps = pF;
@@ -2920,6 +3291,25 @@ void Properties::ConstruirGrupos(){
     propBtnAnimRender->action = AccionRenderAnimation;
     propAnimation->properties.push_back(propBtnAnimRender);
     GroupProperties.push_back(propAnimation);
+
+    // ===== Tarjeta "Juego" (debajo de Animacion): compilar + el cache del viaje en
+    // el tiempo. El juego NO se mezcla con la UI ni con las animaciones normales.
+    propJuego = new GroupPropertie("Juego");
+    propJuegoCompilar = new PropButton("Compilar juego", IconType::gamepad);
+    propJuegoCompilar->action = AccionCompilarJuego;
+    propJuego->properties.push_back(propJuegoCompilar);
+    { PropFloat* pC = new PropFloat("Cache", "frames");
+      pC->SetRango(10.0f, 100000.0f); pC->entero = true;
+      pC->stepFino = 10.0f; pC->stepGrueso = 50.0f; pC->dragStep = 1.0f;
+      g_simCacheF = (float)gSimCacheMax; pC->value = &g_simCacheF; pC->onChange = AccionSimCache;
+      propJuego->properties.push_back(pC); }
+    propAnimConservar = new PropBool("No reemplazar estados");
+    propAnimConservar->value = &AnimConservarEstados;
+    propJuego->properties.push_back(propAnimConservar);
+    propAnimConservarNota = new PropLabel(
+        "Play desde un frame anterior REPRODUCE lo grabado en vez de borrarlo.", true /*wrap*/);
+    propJuego->properties.push_back(propAnimConservarNota);
+    GroupProperties.push_back(propJuego);
 
     // ===== Tarjeta "Keyframe": el keyframe elegido en el editor de curvas, con numeros exactos =====
     // Aparece SOLO cuando hay uno elegido. X = frame (entero), Y = valor. Los handles son puntos (offset desde el
@@ -3434,6 +3824,18 @@ void Properties::RefreshTargetProperties(){
     }
     SincronizarTexto2D(this);      // idem para el campo "Text" del elemento de texto 2D
     SincronizarTextoBoton(this);   // y el del boton 2D
+    // UNIFORME de padding/margen: mientras el checkbox esta prendido los 4 lados siguen
+    // al primero (el valor unico del panel bindea a Izq y aca se replica en vivo)
+    if (ObjActivo){
+        if (UI2D_EsElemento2D(ObjActivo)){
+            Elemento2D* eU = (Elemento2D*)ObjActivo;
+            if (eU->padUni)  { eU->padDer = eU->padArr = eU->padAba = eU->padIzq; }
+            if (eU->margUni) { eU->margDer = eU->margArr = eU->margAba = eU->margIzq; }
+        } else if (ObjActivo->getType() == ObjectType::ui){
+            UI* uU = (UI*)ObjActivo;
+            if (uU->padUni) { uU->padDer = uU->padArr = uU->padAba = uU->padIzq; }
+        }
+    }
     if (!ObjActivo) {
         if (target) {
             target = NULL;
@@ -3608,6 +4010,7 @@ void Properties::RefreshTargetProperties(){
         if (propBtnPosY){ propBtnPosY->value = b ? &g_pos2dY : NULL; propBtnPosY->onChange = AccionPos2DEditada; }
         if (propBtnPosZ) propBtnPosZ->value = b ? &b->pos.z : NULL;
         if (propBtnPosAbs) propBtnPosAbs->value = b ? &g_pos2dAbs : NULL;
+        if (propBtnRot) propBtnRot->value = b ? &b->rot2d : NULL;
         if (propBtnOpac) propBtnOpac->value = b ? &b->opacidad : NULL;
         if (propBtnColFondo) propBtnColFondo->value = (b && b->palFondo < 0) ? b->colorFondo : NULL;
         if (propBtnColTexto) propBtnColTexto->value = (b && b->palTexto < 0) ? b->colorTexto : NULL;
@@ -3628,10 +4031,81 @@ void Properties::RefreshTargetProperties(){
             if (propBtnAncla) propBtnAncla->button->text = T2dNombreAncla(b->ancla);
         }
     }
+    // VIDEO 2D
+    if (propVid2D && propVidAncho){
+        Video2D* v = (ObjActivo && ObjActivo->getType() == ObjectType::video2d) ? (Video2D*)ObjActivo : NULL;
+        propVidAncho->value = v ? &v->ancho : NULL;
+        propVidAlto->value  = v ? &v->alto  : NULL;
+        if (propVidPosX){ propVidPosX->value = v ? &g_pos2dX : NULL; propVidPosX->onChange = AccionPos2DEditada; }
+        if (propVidPosY){ propVidPosY->value = v ? &g_pos2dY : NULL; propVidPosY->onChange = AccionPos2DEditada; }
+        if (propVidPosZ) propVidPosZ->value = v ? &v->pos.z : NULL;
+        if (propVidPosAbs) propVidPosAbs->value = v ? &g_pos2dAbs : NULL;
+        if (propVidTamPx) propVidTamPx->value = v ? &v->tamPx : NULL;
+        if (propVidLoop) propVidLoop->value = v ? &v->loop : NULL;
+        if (propVidAlpha) propVidAlpha->value = v ? &v->usarAlpha : NULL;
+        if (propVidPlay) propVidPlay->value = v ? &v->reproducir : NULL;
+        if (propVidFiltro) propVidFiltro->value = v ? &v->filtrado : NULL;
+        if (propVidRot) propVidRot->value = v ? &v->rot2d : NULL;
+        if (propVidOpac) propVidOpac->value = v ? &v->opacidad : NULL;
+        AjustarFilaTam(propVidAncho, !v || v->tamPx);
+        AjustarFilaTam(propVidAlto,  !v || v->tamPx);
+        if (v){
+            if (propVidArchivo) propVidArchivo->button->text = v->video.empty() ? std::string(T("Choose..."))
+                                                                                : NombreDeArchivo(v->video);
+            if (propVidModo) propVidModo->button->text = ImgNombreModo(v->modo);
+            if (propVidAncla) propVidAncla->button->text = T2dNombreAncla(v->ancla);
+        }
+    }
     // EXPANDIR
     if (propExp2D && propExpPeso){
         Expandir2D* ex = (ObjActivo && ObjActivo->getType() == ObjectType::expandir2d) ? (Expandir2D*)ObjActivo : NULL;
         propExpPeso->value = ex ? &ex->peso : NULL;
+    }
+    // SCRIPT: reconstruir LAS TARJETAS (una por script) si cambio algo
+    if (propControl){
+        W3dScriptDatos* d = (ObjActivo && ObjActivo->scriptDatos) ? ObjActivo->scriptDatos : NULL;
+        int firma = (int)(((size_t)ObjActivo) & 0xffff) * 31;
+        if (d) for (size_t i = 0; i < d->scripts.size(); i++)
+            firma += (int)d->scripts[i].ruta.size() + (int)d->scripts[i].refs.size() * 1000 + (int)i * 7;
+        if (firma != scriptFirma){
+            gScriptPropsMulti.clear();
+            for (int c = 0; c < kMaxScriptCards; c++){
+                GroupPropertie* g = propScriptCards[c];
+                for (size_t i = 0; i < g->properties.size(); i++) delete g->properties[i];
+                g->properties.clear();
+                if (!ObjActivo || !d || c >= (int)d->scripts.size()) continue;
+                // [0] el ARCHIVO del script (click: elegir otro)
+                g->name = NombreDeArchivo(d->scripts[c].ruta);
+                PropButton* pa = new PropButton("Archivo");
+                pa->conLabel = true;
+                pa->button->text = NombreDeArchivo(d->scripts[c].ruta);
+                pa->action = AccionScriptCardFila;
+                g->properties.push_back(pa);
+                // [1..n] sus propiedades expuestas (estilo Unity)
+                std::vector<W3dScriptProp> props;
+                W3dScriptLeerPropiedades(d->scripts[c].ruta, &props);
+                gScriptPropsMulti.push_back(props);
+                for (size_t pi = 0; pi < props.size(); pi++){
+                    PropButton* pb = new PropButton(props[pi].nombre);
+                    pb->conLabel = true;
+                    pb->button->desplegable = true;
+                    const char* v = ScriptValorDe(ObjActivo, c, props[pi].nombre);
+                    pb->button->text = *v ? std::string(v)
+                        : (props[pi].tipo == 1 && !props[pi].opciones.empty()
+                           ? props[pi].opciones[0] : std::string("-"));
+                    pb->action = AccionScriptCardFila;
+                    g->properties.push_back(pb);
+                }
+                // ultima fila: QUITAR este script
+                PropButton* pq = new PropButton("Quitar script", -1);
+                pq->action = AccionScriptCardFila;
+                g->properties.push_back(pq);
+            }
+            scriptFirma = firma;
+            PropertiesLayoutDirty = true;   // cambio la cantidad de tarjetas visibles
+        }
+        // bind de la tarjeta Control (nombre lo sincroniza SincronizarNombreObjeto)
+        if (propScriptVisible) propScriptVisible->value = ObjActivo ? &ObjActivo->visible : NULL;
     }
     // PALETA: reconstruir las filas si cambio la cantidad (o la paleta activa)
     if (propPaleta){
@@ -3639,8 +4113,17 @@ void Properties::RefreshTargetProperties(){
         int n = u ? (int)u->Colores().size() : 0;
         int firma = u ? (n + u->paletaActiva * 1000 + (int)u->paletas.size() * 100000) : 0;
         if (firma != paletaFilas){
-            for (size_t i = 0; i < propPaleta->properties.size(); i++)
-                delete propPaleta->properties[i];
+            for (size_t i = 0; i < propPaleta->properties.size(); i++){
+                PropertieBase* p = propPaleta->properties[i];
+                // si el foco de texto estaba en el nombre de una fila que se destruye,
+                // soltarlo (si no, g_textFieldActivo queda apuntando a memoria borrada)
+                if (p->GetType() == PropertyType::Color){
+                    PropColorPal* pp = (PropColorPal*)p;
+                    if (pp->PaletaIdx() >= 0 && g_textFieldActivo == &pp->field)
+                        g_textFieldActivo = NULL;
+                }
+                delete p;
+            }
             propPaleta->properties.clear();
             propPaletaSel = NULL;
             if (u){
@@ -3651,11 +4134,12 @@ void Properties::RefreshTargetProperties(){
                 propPaletaSel->button->text = u->paletas.empty() ? "" : u->paletas[u->paletaActiva].nombre;
                 propPaletaSel->action = AccionMenuPaletas;
                 propPaleta->properties.push_back(propPaletaSel);
-                // una fila COMPACTA por color: nombre + swatch + cruz de borrar
+                // una fila COMPACTA por color: nombre editable + swatch + boton X
                 std::vector<PaletaColor>& cs = u->Colores();
                 for (int i = 0; i < n; i++){
                     PropColorPal* col = new PropColorPal(cs[i].nombre, i);
-                    col->value = cs[i].rgba;   // puntero ESTABLE (colores con reserve)
+                    col->value = cs[i].rgba;    // punteros ESTABLES (colores con reserve)
+                    col->nom = &cs[i].nombre;
                     propPaleta->properties.push_back(col);
                 }
                 PropButton* mas = new PropButton(T("Add Color"), IconType::material);
@@ -3695,10 +4179,20 @@ void Properties::RefreshTargetProperties(){
                 pi = &e2->padIzq; pd = &e2->padDer; pa = &e2->padArr; pb = &e2->padAba;
             }
         }
-        propHijosPadIzq->value = pi;
-        propHijosPadDer->value = pd;
-        propHijosPadArr->value = pa;
-        propHijosPadAba->value = pb;
+        // el padding puede editarse con UN solo valor (uniforme; el valor unico ES padIzq
+        // y el sincronizador per-frame replica a los otros 3) o POR LADO
+        bool* pu = NULL;
+        if (ObjActivo){
+            if (ObjActivo->getType() == ObjectType::ui) pu = &((UI*)ObjActivo)->padUni;
+            else if (UI2D_EsElemento2D(ObjActivo)) pu = &((Elemento2D*)ObjActivo)->padUni;
+        }
+        bool uni = (pu && *pu);
+        if (propHijosPadUni)   propHijosPadUni->value   = pu;
+        if (propHijosPadTodos) propHijosPadTodos->value = (pi && uni) ? pi : NULL;
+        propHijosPadIzq->value = uni ? NULL : pi;
+        propHijosPadDer->value = uni ? NULL : pd;
+        propHijosPadArr->value = uni ? NULL : pa;
+        propHijosPadAba->value = uni ? NULL : pb;
         int* lay = HijosLayoutDe(ObjActivo);
         if (propHijosGap) propHijosGap->value = (lay && *lay != 0) ? HijosGapDe(ObjActivo) : NULL;
         if (propHijosLayout && lay) propHijosLayout->button->text = HijosNombreLayout(*lay);
@@ -3724,8 +4218,9 @@ void Properties::RefreshTargetProperties(){
         if (propHijosScrollY) propHijosScrollY->value = (scr && *scr) ? HijosScrollYDe(ObjActivo) : NULL;
         // unidades y rangos segun el modo (px o proporcion)
         bool enPx = !pgpx || *pgpx;
-        PropFloat* pads[4] = { propHijosPadIzq, propHijosPadDer, propHijosPadArr, propHijosPadAba };
-        for (int k = 0; k < 4; k++) if (pads[k]){
+        PropFloat* pads[5] = { propHijosPadIzq, propHijosPadDer, propHijosPadArr, propHijosPadAba,
+                               propHijosPadTodos };
+        for (int k = 0; k < 5; k++) if (pads[k]){
             pads[k]->unit = enPx ? "px" : "";
             pads[k]->SetRango(0.0f, enPx ? 2048.0f : 0.49f);
             pads[k]->stepFino = enPx ? 1.0f : 0.005f;
@@ -3738,6 +4233,35 @@ void Properties::RefreshTargetProperties(){
             propHijosGap->stepFino = enPx ? 1.0f : 0.005f;
             propHijosGap->stepGrueso = enPx ? 10.0f : 0.05f;
             propHijosGap->dragStep = enPx ? 1.0f : 0.002f;
+        }
+    }
+    // MARGEN + EXPANDIR del elemento activo (solo aplican con el padre en filas/columnas;
+    // la visibilidad de la tarjeta se decide aparte). Uniforme: mismo criterio que padding.
+    if (propMargExp){
+        Elemento2D* em = NULL;
+        if (ObjActivo && UI2D_EsElemento2D(ObjActivo) &&
+            ObjActivo->getType() != ObjectType::expandir2d){
+            int* layP = HijosLayoutDe(ObjActivo->Parent);
+            if (layP && *layP != 0) em = (Elemento2D*)ObjActivo;
+        }
+        bool mu = (em && em->margUni);
+        propMargExp->value = em ? &em->expandir : NULL;
+        if (propMargUni)   propMargUni->value   = em ? &em->margUni : NULL;
+        if (propMargTodos) propMargTodos->value = (em && mu)  ? &em->margIzq : NULL;
+        if (propMargIzq)   propMargIzq->value   = (em && !mu) ? &em->margIzq : NULL;
+        if (propMargDer)   propMargDer->value   = (em && !mu) ? &em->margDer : NULL;
+        if (propMargArr)   propMargArr->value   = (em && !mu) ? &em->margArr : NULL;
+        if (propMargAba)   propMargAba->value   = (em && !mu) ? &em->margAba : NULL;
+        // la unidad del margen la decide el PADRE (px o proporcional, como su gap)
+        bool* pgP = em ? HijosPadGapPxDe(ObjActivo->Parent) : NULL;
+        bool mPx = !pgP || *pgP;
+        PropFloat* ms[5] = { propMargTodos, propMargIzq, propMargDer, propMargArr, propMargAba };
+        for (int k = 0; k < 5; k++) if (ms[k]){
+            ms[k]->unit = mPx ? "px" : "";
+            ms[k]->SetRango(0.0f, mPx ? 2048.0f : 0.49f);
+            ms[k]->stepFino = mPx ? 1.0f : 0.005f;
+            ms[k]->stepGrueso = mPx ? 10.0f : 0.05f;
+            ms[k]->dragStep = mPx ? 1.0f : 0.002f;
         }
     }
     // si el PADRE esta en filas/columnas, la posicion del hijo no se edita (se acomoda sola)
@@ -3769,6 +4293,7 @@ void Properties::RefreshTargetProperties(){
         if (propRectPeso) propRectPeso->value = (e2d && e2d->getType() == ObjectType::rect2d)   ? peso : NULL;
         if (propContPeso) propContPeso->value = (e2d && e2d->getType() == ObjectType::cont2d)   ? peso : NULL;
         if (propS9Peso)   propS9Peso->value   = (e2d && e2d->getType() == ObjectType::slice9)   ? peso : NULL;
+        if (propVidPeso)  propVidPeso->value  = (e2d && e2d->getType() == ObjectType::video2d)  ? peso : NULL;
         if (propBtnPeso)  propBtnPeso->value  = (e2d && e2d->getType() == ObjectType::boton2d)  ? peso : NULL;
         if (propBtnPosX && e2d && e2d->getType() == ObjectType::boton2d && enLayout){
             propBtnPosX->value = NULL;
@@ -3837,7 +4362,21 @@ Properties::Properties() : ViewportBase() {
     propBtnIcono = NULL; propBtnTam = NULL; propBtnPad = NULL; propBtnAncla = NULL;
     propBtnOpac = NULL; propBtnColFondo = NULL; propBtnColTexto = NULL; propBtnColBorde = NULL;
     propExp2D = NULL; propExpNombre = NULL; propExpPeso = NULL;
+    propVid2D = NULL; propVidNombre = NULL; propVidPosX = NULL; propVidPosY = NULL;
+    propVidPosZ = NULL; propVidPosAbs = NULL; propVidPeso = NULL; propVidArchivo = NULL;
+    propVidAncho = NULL; propVidAlto = NULL; propVidTamPx = NULL; propVidModo = NULL;
+    propVidLoop = NULL; propVidAlpha = NULL; propVidPlay = NULL; propVidFiltro = NULL;
+    propVidAncla = NULL; propVidRot = NULL; propVidOpac = NULL;
+    propBtnRot = NULL;
+    propMargen = NULL; propMargExp = NULL; propMargUni = NULL; propMargTodos = NULL;
+    propMargIzq = NULL; propMargDer = NULL; propMargArr = NULL; propMargAba = NULL;
+    propHijosPadUni = NULL; propHijosPadTodos = NULL;
     propPaleta = NULL; paletaFilas = -1; propPaletaSel = NULL;
+    propControl = NULL; propScriptNombre = NULL; propScriptVisible = NULL;
+    propScriptAgregar = NULL; scriptFirma = -1;
+    for (int i = 0; i < kMaxScriptCards; i++) propScriptCards[i] = NULL;
+    propJuego = NULL; propJuegoCompilar = NULL;
+    propAnimConservar = NULL; propAnimConservarNota = NULL;
     propBtnPalFondo = NULL; propBtnPalTexto = NULL; propBtnPalBorde = NULL;
     propBtnTex = NULL; propBtnTexBX = NULL; propBtnTexBY = NULL; propBtnTexEsc = NULL;
     propT2dPal = NULL; propImgPal = NULL; propRectPal = NULL; propS9Pal = NULL;
@@ -3933,8 +4472,12 @@ void Properties::ActualizarPestanias(){
     bool esS9   = (tipo == (int)ObjectType::slice9);
     bool esBtn  = (tipo == (int)ObjectType::boton2d);
     bool esExp  = (tipo == (int)ObjectType::expandir2d);
+    bool esVid  = (tipo == (int)ObjectType::video2d);
     bool esUI   = (tipo == (int)ObjectType::ui);
-    bool hayTab3 = esMesh || esLuz || esCam || esInst || esArm || esT2d || esImg || esRect || esCont || esS9 || esBtn || esExp || esUI;
+    // el objeto SCRIPT (gamepad) NO vive en el espacio 3D: sin transformacion; solo
+    // su nombre y sus scripts (el lugar en el outliner es el orden de ejecucion)
+    bool esScript = (tipo == (int)ObjectType::gamepad);
+    bool hayTab3 = esMesh || esLuz || esCam || esInst || esArm || esT2d || esImg || esRect || esCont || esS9 || esBtn || esExp || esVid || esUI || esScript;
 
     if (BarTabs.size() >= 3){
         BarTabs[2]->visible = hayTab3;
@@ -3950,14 +4493,16 @@ void Properties::ActualizarPestanias(){
         else if (esS9)   icono = (int)IconType::cuadricula;      // slice 9
         else if (esBtn)  icono = (int)IconType::object;          // boton
         else if (esExp)  icono = (int)IconType::arrowRight;      // expandir
+        else if (esVid)  icono = (int)IconType::camera;          // video
         else if (esUI)   icono = (int)IconType::textura;         // la raiz de la interfaz
+        else if (esScript) icono = (int)IconType::gamepad;       // el objeto Script
         BarTabs[2]->icon = icono;
     }
     // los objetos 2D no muestran el tab Objeto (su Nombre y Posicion viven arriba de su
     // tarjeta contextual, que era lo unico que se usaba de ahi)
-    bool es2D = esT2d || esImg || esRect || esCont || esS9 || esBtn || esExp || esUI;
-    if (BarTabs.size() >= 2) BarTabs[1]->visible = !es2D;
-    if (pestaniaActiva == 1 && es2D) pestaniaActiva = 2;
+    bool es2D = esT2d || esImg || esRect || esCont || esS9 || esBtn || esExp || esVid || esUI;
+    if (BarTabs.size() >= 2) BarTabs[1]->visible = !es2D && !esScript;
+    if (pestaniaActiva == 1 && (es2D || esScript)) pestaniaActiva = 2;
     if (BarTabs.size() >= 4) BarTabs[3]->visible = esMesh; // pestaña Vertices: SOLO meshes
     if (BarTabs.size() >= 5) BarTabs[4]->visible = esMesh; // pestaña Modifiers: SOLO meshes
     if (pestaniaActiva == 2 && !hayTab3) pestaniaActiva = 1;
@@ -3986,6 +4531,7 @@ void Properties::ActualizarPestanias(){
     // no hay nada que exportar).
     if (propRender)    propRender->visible    = (pestaniaActiva == 0);
     if (propAnimation) propAnimation->visible = (pestaniaActiva == 0); // tarjeta Animation: global, como Render
+    if (propJuego)     propJuego->visible     = (pestaniaActiva == 0); // Juego: debajo de Animation
     // tarjeta Keyframe: SOLO si hay un keyframe elegido en el editor de curvas. Los campos se refrescan desde la
     // curva viva (que la puede haber movido el propio timeline), salvo el que se este editando a mano.
     if (propKeyframe){
@@ -4031,7 +4577,8 @@ void Properties::ActualizarPestanias(){
         bool clipActivo = (ActiveAnimKind == 1 && ActiveAnimArm);
         if (propBtnAnimSel && propBtnAnimSel->button){
             propBtnAnimSel->button->text = NombreAnimActiva();
-            propBtnAnimSel->button->icon = clipActivo ? (int)IconType::armature : (int)IconType::camera;
+            propBtnAnimSel->button->icon = (ActiveAnimKind == 2) ? (int)IconType::gamepad
+                                          : clipActivo ? (int)IconType::armature : (int)IconType::camera;
         }
         // dropdown de formato del export: la etiqueta refleja el formato activo
         if (propExportFormat && propExportFormat->button)
@@ -4044,6 +4591,12 @@ void Properties::ActualizarPestanias(){
         // Render Animation: se grisa solo si hay CERO animaciones. Siempre existe la escena "Scene" (rendea su rango
         // aunque no tenga keyframes: secuencia estatica) -> nunca se desactiva.
         if (propBtnAnimRender) propBtnAnimRender->gris = (SceneAnimations.empty() && nClips == 0);
+        // MODO JUEGO: el Fin y Render Animation desaparecen (la animacion es infinita);
+        // "No reemplazar estados" y su nota solo aparecen siendo un juego
+        if (gPropAnimEnd) gPropAnimEnd->value = AnimEsJuego ? NULL : &g_animEndF;
+        if (propBtnAnimRender) propBtnAnimRender->oculto = AnimEsJuego;
+        if (propAnimConservar) propAnimConservar->value = AnimEsJuego ? &AnimConservarEstados : NULL;
+        if (propAnimConservarNota) propAnimConservarNota->oculto = !AnimEsJuego;
     }
     // el objeto UI NO tiene transformacion: es el ORDEN DE DIBUJO (la interfaz se dibuja al
     // final, sobre la escena). No se mueve, ni rota, ni escala: su tarjeta no aplica.
@@ -4055,9 +4608,27 @@ void Properties::ActualizarPestanias(){
     if (propS9card)    propS9card->visible    = (pestaniaActiva == 2 && esS9);
     if (propBtn2D)     propBtn2D->visible     = (pestaniaActiva == 2 && esBtn);
     if (propExp2D)     propExp2D->visible     = (pestaniaActiva == 2 && esExp);
+    if (propVid2D)     propVid2D->visible     = (pestaniaActiva == 2 && esVid);
     if (propUIcard)    propUIcard->visible    = (pestaniaActiva == 2 && esUI);
     if (propPaleta)    propPaleta->visible    = (pestaniaActiva == 2 && esUI);
+    if (propControl)   propControl->visible   = (pestaniaActiva == 2 && esScript);
+    {
+        int nScripts = (ObjActivo && ObjActivo->scriptDatos) ? (int)ObjActivo->scriptDatos->scripts.size() : 0;
+        for (int i = 0; i < kMaxScriptCards; i++)
+            if (propScriptCards[i])
+                propScriptCards[i]->visible = (pestaniaActiva == 2 && !esUI && i < nScripts);
+    }
     if (propHijos)     propHijos->visible     = (pestaniaActiva == 2 && es2D);
+    // la tarjeta Margen solo aplica a un ELEMENTO cuyo padre lo acomoda en filas/columnas
+    if (propMargen){
+        bool enFila = false;
+        if (pestaniaActiva == 2 && ObjActivo && UI2D_EsElemento2D(ObjActivo) &&
+            ObjActivo->getType() != ObjectType::expandir2d){
+            int* layP = HijosLayoutDe(ObjActivo->Parent);
+            enFila = (layP && *layP != 0);
+        }
+        propMargen->visible = enFila;
+    }
     if (propMeshParts) propMeshParts->visible = (pestaniaActiva == 2 && esMesh);
     if (propMaterial)  propMaterial->visible  = (pestaniaActiva == 2 && esMesh);
     if (propLight)     propLight->visible     = (pestaniaActiva == 2 && esLuz);
@@ -4959,19 +5530,31 @@ void Properties::ClickEn(int mx, int my) {
                     }
                     else if (prop->GetType() == PropertyType::Color) {
                         PropColor* pc = (PropColor*)prop;
-                        // fila de PALETA: la crucecita a la izquierda del swatch BORRA la entrada
+                        // fila de PALETA: [nombre editable][swatch][boton X], cada zona lo suyo
                         int pidx = pc->PaletaIdx();
                         if (pidx >= 0) {
                             int cw = RenglonHeightGS + GlobalScale * 2;
-                            int xCruz = x + PosX + borderGS * 2 + g->width - bordersGS
-                                        - cw * 2 - gapGS;
-                            if (mx >= xCruz && mx < xCruz + cw) {
+                            int xBtn = x + PosX + borderGS * 2 + g->width - bordersGS - cw;
+                            int xSw  = xBtn - cw - gapGS;
+                            if (mx >= xBtn) {           // el boton X: borra la entrada
                                 UI* u2 = (ObjActivo && ObjActivo->getType() == ObjectType::ui) ? (UI*)ObjActivo : NULL;
                                 if (u2 && pidx < (int)u2->Colores().size()) {
                                     u2->Colores().erase(u2->Colores().begin() + pidx);
                                     target = NULL;   // re-bind: la tarjeta se reconstruye
                                     g_redraw = true;
                                 }
+                                return;
+                            }
+                            if (mx < xSw) {             // el nombre: se edita inline (como Name)
+                                PropColorPal* pp = (PropColorPal*)pc;
+                                if (pp->nom) pp->field.SetText(*pp->nom);
+                                g_textFieldActivo = &pp->field;
+#ifdef __EMSCRIPTEN__
+                                if (g_uiTapEnCurso) SDL_StartTextInput();
+#else
+                                if (g_uiTapEnCurso) QwertyAbrir();
+#endif
+                                g_redraw = true;
                                 return;
                             }
                         }

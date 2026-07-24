@@ -8,6 +8,10 @@
 #include "objects/Textures.h"
 #include "w3dTexture.h"
 #include "io/Fuente2D.h"   // vista previa de .ttf (rasteriza con la fuente misma)  // miniaturas: DecodeThumbnail / UploadRGBA / DeleteTexture / FreeImage
+#ifndef W3D_SYMBIAN
+#include "io/Textura2D.h"     // Textura2DRutaDecodificable (webp -> png para el thumb)
+#include "io/Video2DCache.h"  // Video2DFramePng (un frame del video para el thumb)
+#endif
 #include "variables.h"
 #include <cstring>
 #include <map>
@@ -41,18 +45,25 @@ static bool TerminaEn(const std::string& s, const char* ext) {
 // es una imagen que podemos previsualizar? (los formatos que stb decodifica)
 static bool EsImagen(const std::string& name) {
     return TerminaEn(name, ".png") || TerminaEn(name, ".jpg") || TerminaEn(name, ".jpeg") ||
-           TerminaEn(name, ".bmp") || TerminaEn(name, ".tga") || TerminaEn(name, ".gif");
+           TerminaEn(name, ".bmp") || TerminaEn(name, ".tga") || TerminaEn(name, ".gif") ||
+           TerminaEn(name, ".webp");
 }
 // es una FUENTE tipografica? (vista previa: el nombre de la letra dibujado con la letra misma,
 // como hace el gestor de archivos de Linux)
 static bool EsFuente(const std::string& name) {
     return TerminaEn(name, ".ttf") || TerminaEn(name, ".otf");
 }
+// es un VIDEO? (vista previa: un frame extraido con ffmpeg, como hace nautilus)
+static bool EsVideo(const std::string& name) {
+    return TerminaEn(name, ".mp4") || TerminaEn(name, ".webm") || TerminaEn(name, ".mov") ||
+           TerminaEn(name, ".avi") || TerminaEn(name, ".mkv");
+}
 // icono segun el tipo de archivo
 static int IconoEntrada(const w3dFileSystem::DirEntry& e) {
     if (e.isDir) return (int)IconType::carpeta;
     if (TerminaEn(e.name, ".obj") || TerminaEn(e.name, ".fbx") || TerminaEn(e.name, ".gltf") || TerminaEn(e.name, ".glb")) return (int)IconType::mesh;
     if (EsImagen(e.name)) return (int)IconType::foto;
+    if (EsVideo(e.name))  return (int)IconType::camera;  // video (mientras carga su preview)
     if (EsFuente(e.name)) return (int)IconType::lista;   // fuente (mientras carga su preview)
     return (int)IconType::archive;
 }
@@ -101,8 +112,12 @@ static const FBThumb* FBObtenerThumb(const std::string& path) {
             t.tex = w3dEngine::UploadRGBA(rgba, tw, th, true); t.w = tw; t.h = th; delete[] rgba; rgba = 0;
         }
     } else {
-        const std::string& src = pal.empty() ? path : pal;
-        if (w3dEngine::DecodeThumbnail(src.c_str(), kFBThumbMax, &rgba, &tw, &th) && rgba) {
+        // stb no decodifica webp ni videos: se normaliza a un png cacheado (ffmpeg).
+        // Un video muestra un frame del medio, como hace nautilus.
+        std::string src = pal.empty() ? path : pal;
+        if (EsVideo(path)) src = Video2DFramePng(path);
+        else src = Textura2DRutaDecodificable(src);
+        if (!src.empty() && w3dEngine::DecodeThumbnail(src.c_str(), kFBThumbMax, &rgba, &tw, &th) && rgba) {
             t.tex = w3dEngine::UploadRGBA(rgba, tw, th, true); t.w = tw; t.h = th; w3dEngine::FreeImage(rgba);
         }
     }
@@ -459,7 +474,7 @@ void FileBrowser::Render() {
         int iconIdx = IconoEntrada(entries[i]);
         if (gridView) {
             int isz = 26 * GlobalScale, ix = cx + (cw - isz) / 2, iy = cy + gapGS * 2;
-            const FBThumb* thmb = (!entries[i].isDir && (EsImagen(entries[i].name) || EsFuente(entries[i].name)))
+            const FBThumb* thmb = (!entries[i].isDir && (EsImagen(entries[i].name) || EsVideo(entries[i].name) || EsFuente(entries[i].name)))
                 ? FBObtenerThumb(w3dFileSystem::JoinPath(currentPath, entries[i].name)) : 0;
             if (thmb) FBDibujarThumb(thmb, ix, iy, isz);
             else
@@ -482,7 +497,7 @@ void FileBrowser::Render() {
             }
         } else {
             int isz = IconSizeGS, iy = cy + (ch - isz) / 2, ix = ex + gapGS;
-            const FBThumb* thmb = (!entries[i].isDir && (EsImagen(entries[i].name) || EsFuente(entries[i].name)))
+            const FBThumb* thmb = (!entries[i].isDir && (EsImagen(entries[i].name) || EsVideo(entries[i].name) || EsFuente(entries[i].name)))
                 ? FBObtenerThumb(w3dFileSystem::JoinPath(currentPath, entries[i].name)) : 0;
             if (thmb) FBDibujarThumb(thmb, ix, iy, isz);
             else

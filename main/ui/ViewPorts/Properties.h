@@ -193,6 +193,7 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropFloat*  propBtnTam;
         PropFloat*  propBtnPad;
         PropButton* propBtnAncla;
+        PropFloat*  propBtnRot;
         PropFloat*  propBtnOpac;
         PropColor*  propBtnColFondo;
         PropColor*  propBtnColTexto;
@@ -204,6 +205,36 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropFloat*  propBtnTexBX;
         PropFloat*  propBtnTexBY;
         PropFloat*  propBtnTexEsc;
+        // tarjeta del VIDEO 2D
+        GroupPropertie* propVid2D;
+        PropText*   propVidNombre;
+        PropFloat*  propVidPosX;
+        PropFloat*  propVidPosY;
+        PropFloat*  propVidPosZ;
+        PropBool*   propVidPosAbs;
+        PropFloat*  propVidPeso;
+        PropButton* propVidArchivo;  // elegir el .mp4/.webm/.gif
+        PropFloat*  propVidAncho;
+        PropFloat*  propVidAlto;
+        PropBool*   propVidTamPx;
+        PropButton* propVidModo;     // estirar / ajustar / cover
+        PropBool*   propVidLoop;
+        PropBool*   propVidAlpha;    // usar la transparencia del video
+        PropBool*   propVidPlay;     // ver la animacion en el editor
+        PropBool*   propVidFiltro;
+        PropButton* propVidAncla;
+        PropFloat*  propVidRot;
+        PropFloat*  propVidOpac;
+        // tarjeta MARGEN (del elemento 2D activo): aire alrededor en filas/columnas +
+        // el checkbox "expandir" (absorbe el sobrante como el elemento Expandir)
+        GroupPropertie* propMargen;
+        PropBool*   propMargExp;     // expandirse en la fila/columna
+        PropBool*   propMargUni;     // un solo valor para los 4 lados
+        PropFloat*  propMargTodos;   // el valor unico (con uniforme prendido)
+        PropFloat*  propMargIzq;     // por lado (con uniforme apagado)
+        PropFloat*  propMargDer;
+        PropFloat*  propMargArr;
+        PropFloat*  propMargAba;
         // tarjeta del EXPANDIR
         GroupPropertie* propExp2D;
         PropText*   propExpNombre;
@@ -223,6 +254,16 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropColor*  propUIcolor;     // fondo de la ventana (transparente por defecto)
         PropFloat*  propUIescala;    // escala global del contenido (x1 N95 ... x4 pantallas grandes)
         PropButton* propUIexport;    // guardar el arbol como .w3dui (JSON)
+        // el objeto SCRIPT/CONTROL: una tarjeta "Control" (nombre + visible + agregar)
+        // y UNA TARJETA POR SCRIPT (archivo + propiedades expuestas + quitar).
+        // Invisible = sus scripts no se ejecutan.
+        GroupPropertie* propControl;
+        PropText*   propScriptNombre;
+        PropBool*   propScriptVisible;
+        PropButton* propScriptAgregar;
+        enum { kMaxScriptCards = 8 };
+        GroupPropertie* propScriptCards[kMaxScriptCards];
+        int scriptFirma;             // rebuild de las tarjetas al cambiar de script/objeto
         // tarjeta PALETA (del UI): filas dinamicas nombre+color por entrada
         GroupPropertie* propPaleta;
         int paletaFilas;             // firma de lo construido (rebuild al cambiar)
@@ -232,6 +273,8 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         // tarjeta "Children": lo que afecta a los HIJOS del seleccionado (padding = encoge el
         // area donde se enganchan sus anclas; la linea se ve en el Editor 2D con el UI elegido)
         GroupPropertie* propHijos;
+        PropBool*   propHijosPadUni;   // un solo valor de padding para los 4 lados
+        PropFloat*  propHijosPadTodos; // el valor unico (con uniforme prendido)
         PropFloat*  propHijosPadIzq;   // el padding, POR LADO
         PropFloat*  propHijosPadDer;
         PropFloat*  propHijosPadArr;
@@ -265,6 +308,11 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropButtonRow* propRowAnimNewDel; // fila: New | Delete (Delete oculto si no hay nada que borrar)
         PropButton* propBtnAnimRename; // "Rename" de la animacion activa (escena o clip)
         PropButton* propBtnAnimRender; // "Render Animation" (gris si no hay animaciones)
+        // tarjeta "Juego" (debajo de Animacion): compilar + cache del viaje en el tiempo
+        GroupPropertie* propJuego;
+        PropButton* propJuegoCompilar;
+        PropBool*   propAnimConservar; // play no pisa lo grabado: lo reproduce
+        PropLabel*  propAnimConservarNota;
         GroupPropertie* propExport;  // pestania RENDER: tarjeta "Export" (.obj)
         // pestania VERTICES (icono mesh): 3 tarjetas. Las listas REUSAN PropListMeshParts (modo 1/2).
         GroupPropertie* propEditItem;   // EDIT MODE: tarjeta "Transform" con X/Y/Z del centro (pivote) de la seleccion
