@@ -91,9 +91,9 @@ class Camera : public Object, public Target {
 
         Camera(Object* parent = NULL, Vector3 pos = Vector3(0,0,0), Vector3 Rot = Vector3(0,0,0));
 
-        ObjectType getType() override;
+        ObjectType getType() W3D_OVERRIDE;
 
-        void Reload() override;
+        void Reload() W3D_OVERRIDE;
         
         void UpdateLookAt();
 
@@ -112,7 +112,7 @@ class Camera : public Object, public Target {
         // apagado o si el riel no trae rotacion.
         void AplicarMiradaDelRiel();
 
-        void RenderObject() override;
+        void RenderObject() W3D_OVERRIDE;
 
         void UpdatePosition();
 
@@ -136,17 +136,17 @@ class Camera : public Object, public Target {
         // DOS refs por puntero (ver Objects.h): 0 = el target al que mira, 1 = el RIEL
         // (una Curve). El riel se guarda como Curve*, asi que el cast vive aca -donde
         // el tipo se conoce- y no en el que maneja los borrados.
-        int     RefsPropias() const override { return 2; }
-        Object* RefPropia(int i) const override {
+        int     RefsPropias() const W3D_OVERRIDE { return 2; }
+        Object* RefPropia(int i) const W3D_OVERRIDE {
             if (i == 0) return target;
             if (i == 1) return (Object*)Riel;
             return NULL;
         }
-        void SetRefPropia(int i, Object* o) override {
+        void SetRefPropia(int i, Object* o) W3D_OVERRIDE {
             if (i == 0) target = o;
             else if (i == 1) Riel = (o && o->getType() == ObjectType::curve) ? (Curve*)o : NULL;
         }
-        std::string* RefPropiaNombre(int i) override {
+        std::string* RefPropiaNombre(int i) W3D_OVERRIDE {
             if (i == 0) return &targetName;
             if (i == 1) return &RielName;
             return NULL;

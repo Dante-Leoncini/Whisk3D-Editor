@@ -75,7 +75,7 @@ public:
         anclaObj = NULL;
         rielBindHay = false; fueraDeRiel = false;
     }
-    ObjectType getType() override { return ObjectType::viszona; }
+    ObjectType getType() W3D_OVERRIDE { return ObjectType::viszona; }
 
     // un paso de simulacion (lo llama W3dVisZonasTick una vez por tick del juego):
     // evalua el modo y, si la celda cambio, se la aplica al objetivo.

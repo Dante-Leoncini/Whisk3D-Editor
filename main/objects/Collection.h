@@ -52,8 +52,8 @@ public:
     int  lote;
 
     // Métodos
-    ObjectType getType() override;
-    void RenderHijos() override;   // dibuja los hijos ordenados si corresponde
+    ObjectType getType() W3D_OVERRIDE;
+    void RenderHijos() W3D_OVERRIDE;   // dibuja los hijos ordenados si corresponde
 
     // Destructor
     ~Collection();

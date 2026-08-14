@@ -41,15 +41,15 @@ class Console : public ViewportBase, public WithBorder, public Scrollable {
         Console();
         virtual ~Console();
 
-        void Render() override;
-        void Resize(int newW, int newH) override;
-        void button_left() override;
-        void event_mouse_motion(int mx, int my) override; // drag con boton = scroll del contenido
+        void Render() W3D_OVERRIDE;
+        void Resize(int newW, int newH) W3D_OVERRIDE;
+        void button_left() W3D_OVERRIDE;
+        void event_mouse_motion(int mx, int my) W3D_OVERRIDE; // drag con boton = scroll del contenido
 #ifndef W3D_SYMBIAN
-        void mouse_button_up(int boton) override;         // libera ViewPortClickDown (foco por hover)
-        void event_mouse_wheel(float dy, int mx, int my) override;
+        void mouse_button_up(int boton) W3D_OVERRIDE;         // libera ViewPortClickDown (foco por hover)
+        void event_mouse_wheel(float dy, int mx, int my) W3D_OVERRIDE;
 #endif
-        bool event_finger_scroll(int px, int py, int dx, int dy) override; // touch: arrastrar = scroll v/h
+        bool event_finger_scroll(int px, int py, int dx, int dy) W3D_OVERRIDE; // touch: arrastrar = scroll v/h
 
     private:
         // recalcula el scrollbar con las metricas guardadas, manteniendo el

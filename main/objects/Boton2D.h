@@ -43,6 +43,6 @@ public:
         bordeTexX = bordeTexY = 4.0f;
         escalaBordeTex = 1.0f;
     }
-    ObjectType getType() override { return ObjectType::boton2d; }
+    ObjectType getType() W3D_OVERRIDE { return ObjectType::boton2d; }
 };
 #endif

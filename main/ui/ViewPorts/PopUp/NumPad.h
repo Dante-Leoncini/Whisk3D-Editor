@@ -15,10 +15,10 @@ class NumPad : public PopUpBase {
     public:
         NumPad(bool transform = false); // transform=true: edita el transform de la barra (sin display propio)
 
-        void Render() override;
-        bool Click(int mx, int my) override;
-        bool Tecla(int tecla) override; // Enter fisico = Aceptar, Esc = Cancelar
-        void Cerrar() override;         // click AFUERA = commit (float) / deja el transform (transform)
+        void Render() W3D_OVERRIDE;
+        bool Click(int mx, int my) W3D_OVERRIDE;
+        bool Tecla(int tecla) W3D_OVERRIDE; // Enter fisico = Aceptar, Esc = Cancelar
+        void Cerrar() W3D_OVERRIDE;         // click AFUERA = commit (float) / deja el transform (transform)
 
         PopUpBase* prevPopup;        // popup a restaurar al cerrar (ej: el panel redo del loop cut). NULL = ninguno
 
@@ -48,10 +48,10 @@ void NumPadAbrirTransform();
 class QwertyPad : public PopUpBase {
     public:
         QwertyPad();
-        void Render() override;
-        bool Click(int mx, int my) override;
-        bool Tecla(int tecla) override; // Enter = Aceptar, Esc = Cancelar
-        void Cerrar() override;         // click AFUERA = commitea el texto
+        void Render() W3D_OVERRIDE;
+        bool Click(int mx, int my) W3D_OVERRIDE;
+        bool Tecla(int tecla) W3D_OVERRIDE; // Enter = Aceptar, Esc = Cancelar
+        void Cerrar() W3D_OVERRIDE;         // click AFUERA = commitea el texto
         PopUpBase* prevPopup;           // popup a restaurar al cerrar (NULL = ninguno)
     private:
         Card* keyCard;

@@ -103,16 +103,16 @@ class Timeline : public ViewportBase, public WithBorder, public Scrollable {
         Timeline();
         virtual ~Timeline();
 
-        void Render() override;
-        void Resize(int newW, int newH) override;
-        void event_mouse_motion(int mx, int my) override;
-        void button_left() override;
-        bool event_finger_scroll(int px, int py, int dx, int dy) override;             // 1 dedo: panear
-        void event_finger_gesture(float zoomDelta, float panDx, float panDy) override; // 2 dedos: zoom + paneo
-        void event_key_down(int tecla, bool repeticion) override;
-        void event_key_up(int tecla) override;   // soltar el CERO sin flechas = Frame Selected (Symbian)
-        void event_mouse_wheel(float dy, int mx, int my) override;
-        void mouse_button_up(int boton) override;
+        void Render() W3D_OVERRIDE;
+        void Resize(int newW, int newH) W3D_OVERRIDE;
+        void event_mouse_motion(int mx, int my) W3D_OVERRIDE;
+        void button_left() W3D_OVERRIDE;
+        bool event_finger_scroll(int px, int py, int dx, int dy) W3D_OVERRIDE;             // 1 dedo: panear
+        void event_finger_gesture(float zoomDelta, float panDx, float panDy) W3D_OVERRIDE; // 2 dedos: zoom + paneo
+        void event_key_down(int tecla, bool repeticion) W3D_OVERRIDE;
+        void event_key_up(int tecla) W3D_OVERRIDE;   // soltar el CERO sin flechas = Frame Selected (Symbian)
+        void event_mouse_wheel(float dy, int mx, int my) W3D_OVERRIDE;
+        void mouse_button_up(int boton) W3D_OVERRIDE;
 
         // click en la BARRA (transporte / campos): lo llama LayoutClickBarraTimeline. Devuelve true si consumio.
         bool ClickBarButton(int mx, int my);
@@ -255,7 +255,7 @@ class Timeline : public ViewportBase, public WithBorder, public Scrollable {
         // aperturas de menu COMPARTIDAS por el boton de la barra y el atajo de teclado (no pueden divergir)
         // el ruteo compartido llama a esta al PASAR el mouse (sin click) -> deslizarse de un menu de la barra a
         // otro, igual que en el viewport 3D. Por eso los menus van SEPARADOS de las acciones de la barra.
-        bool AbrirMenuDeBarra(int mx, int my) override;
+        bool AbrirMenuDeBarra(int mx, int my) W3D_OVERRIDE;
         void AbrirMenuSelect(int mx, int my);   // menu Select (All / None / Invert)
         void AbrirMenuPivot(int mx, int my);    // menu Pivot (Center / Current Frame)
         void AbrirMenuAnim(int mx, int my);     // dropdown de animacion

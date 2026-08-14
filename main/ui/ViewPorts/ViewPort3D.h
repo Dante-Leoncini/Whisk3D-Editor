@@ -175,12 +175,12 @@ class Viewport3D : public ViewportBase, public WithBorder {
 
         void ReloadLights();
         void ChangeViewType();
-        void Resize(int newW, int newH) override;
+        void Resize(int newW, int newH) W3D_OVERRIDE;
         void SetShowOverlays(bool valor);
         // abre el menu de overlays (checkboxes) apuntando a los flags de ESTA
         // instancia; lo llama el click del boton "Overlays" de la barra
         void AbrirMenuOverlays(int x, int y);
-        void Render() override;
+        void Render() W3D_OVERRIDE;
 
         // render de la escena a un PNG de outW x outH (puede ser mayor que la ventana; por tiles,
         // anda hasta en el N95). Sin overlay. pass = Rendered / ZBuffer / NormalView / Alpha. true si guardo.
@@ -249,16 +249,16 @@ class Viewport3D : public ViewportBase, public WithBorder {
         void RestaurarViewport();
         void ChangePerspective();
         void Aceptar();
-        void button_left() override;
+        void button_left() W3D_OVERRIDE;
 #ifndef W3D_SYMBIAN
-        void mouse_button_up(int boton) override;
+        void mouse_button_up(int boton) W3D_OVERRIDE;
 #endif
 #ifndef W3D_SYMBIAN
-        void event_mouse_wheel(float dy, int mx, int my) override;
+        void event_mouse_wheel(float dy, int mx, int my) W3D_OVERRIDE;
 #endif
-        void event_mouse_motion(int mx, int my) override;
-        void event_finger_gesture(float zoomDelta, float panDx, float panDy) override; // 2 dedos: zoom + paneo
-        bool event_finger_scroll(int px, int py, int dx, int dy) override; // 1 dedo sobre el TOOLBAR = scroll horiz
+        void event_mouse_motion(int mx, int my) W3D_OVERRIDE;
+        void event_finger_gesture(float zoomDelta, float panDx, float panDy) W3D_OVERRIDE; // 2 dedos: zoom + paneo
+        bool event_finger_scroll(int px, int py, int dx, int dy) W3D_OVERRIDE; // 1 dedo sobre el TOOLBAR = scroll horiz
         void TeclaDerecha();
         void TeclaIzquierda();
         void TeclaArriba();
@@ -270,16 +270,16 @@ class Viewport3D : public ViewportBase, public WithBorder {
         // ViewportBase (ToolbarBase.cpp, compartido con UV/2D). Aca queda SOLO lo contextual del 3D:
         // sin transform = historial de acciones; durante un transform = orientacion + ejes X/Y/Z
         // (+ aceptar/cancelar si es tactil). Solo si cfg.nuevoUsuario (Symbian default: off). ----
-        bool ToolbarVisible() const override;   // cfg.nuevoUsuario
-        void ToolbarSincronizar() override;     // visibilidad contextual + colores (estado puro)
-        void ToolbarAccionRol(int rol) override; // que hace cada boton (roles TBR_*)
+        bool ToolbarVisible() const W3D_OVERRIDE;   // cfg.nuevoUsuario
+        void ToolbarSincronizar() W3D_OVERRIDE;     // visibilidad contextual + colores (estado puro)
+        void ToolbarAccionRol(int rol) W3D_OVERRIDE; // que hace cada boton (roles TBR_*)
         bool ClickBarraTransform(int mx, int my); // tap TACTIL en la barra de estado del transform -> abre el teclado numerico
-        void RenderToolbar() override;            // + ocultarla en MODO JUEGO (el juego se mira limpio)
+        void RenderToolbar() W3D_OVERRIDE;            // + ocultarla en MODO JUEGO (el juego se mira limpio)
 #ifndef W3D_SYMBIAN
-        void event_key_down(int tecla, bool repeticion) override;
+        void event_key_down(int tecla, bool repeticion) W3D_OVERRIDE;
 #endif
 #ifndef W3D_SYMBIAN
-        void event_key_up(int tecla) override;
+        void event_key_up(int tecla) W3D_OVERRIDE;
 #endif
         void key_down_return();
 };

@@ -30,6 +30,6 @@ public:
         t0ms = 0;
         ancho = 320.0f; alto = 240.0f;   // al elegir el archivo toma su tamano real
     }
-    ObjectType getType() override { return ObjectType::video2d; }
+    ObjectType getType() W3D_OVERRIDE { return ObjectType::video2d; }
 };
 #endif

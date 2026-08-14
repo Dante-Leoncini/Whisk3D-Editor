@@ -11,6 +11,14 @@ Mirror::Mirror(Object* parent, Vector3 pos, bool x, bool y, bool z)
     mirrorX = x;
     mirrorY = y;
     mirrorZ = z;
+    // defaults que antes eran inicializadores in-class (C++11): en C++03/RVCT van aca.
+    RenderChildrens = true;
+    sinProfundidad = false;
+    usaLimites = false;
+    limU0 = limU1 = limV0 = limV1 = 0.0f;
+    recorte = false;
+    recorteDeclarado = false;
+    hundimientoMaximo = 0.0f;
 }
 
 // Devuelve el tipo de objeto

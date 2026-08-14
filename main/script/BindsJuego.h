@@ -38,7 +38,7 @@
 //  C++03 puro (mismo codigo compila para Symbian/Android). Comentarios sin acentos.
 // ============================================================================
 
-struct UI2DPos;   // definido en render/UIOverlay.h
+#include "render/UIOverlay.h"   // UI2DPos, tipo COMPLETO: el STLport de RVCT no acepta vector<incompleto>
 class Object;
 
 // emitir(obj, n): rafaga de n particulas del objeto Particulas (el polvo de las

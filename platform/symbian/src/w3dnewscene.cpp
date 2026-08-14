@@ -61,7 +61,9 @@ static void RotDesdeEuler(Object* aObj) {
     Quaternion qX = Quaternion::FromAxisAngle(Vector3(1,0,0), aObj->rotEuler.x);
     Quaternion qY = Quaternion::FromAxisAngle(Vector3(0,1,0), aObj->rotEuler.y);
     Quaternion qZ = Quaternion::FromAxisAngle(Vector3(0,0,1), aObj->rotEuler.z);
-    aObj->rot = qY * qX * qZ;
+    // 'rot' ahora es privado en Object: se escribe por accesor. Snapshot = setea rot Y
+    // deja el rotEuler tal cual (identico al viejo 'aObj->rot = ...' que no tocaba el euler).
+    aObj->SetRotSnapshot(qY * qX * qZ, aObj->rotEuler);
 }
 
 unsigned int W3dNewWhiteTex() {

@@ -9,7 +9,7 @@ public:
     Empty(Object* parent = NULL, Vector3 pos = Vector3(0,0,0))
         : Object(parent, "Empty", pos) {
     }
-    ObjectType getType() override { return ObjectType::empty; }
-    void RenderObject() override;
+    ObjectType getType() W3D_OVERRIDE { return ObjectType::empty; }
+    void RenderObject() W3D_OVERRIDE;
 };
 #endif

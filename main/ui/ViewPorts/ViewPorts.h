@@ -246,14 +246,14 @@ class ViewportRow : public ViewportBase {
         ~ViewportRow();
 
         // ------------------ Funciones override ------------------
-        bool isLeaf() const override;
-        int ContainerKind() const override { return 1; }
+        bool isLeaf() const W3D_OVERRIDE;
+        int ContainerKind() const W3D_OVERRIDE { return 1; }
 
-        void Resize(int newW, int newH) override;
-        void Render() override;
-        void button_left() override;
-        void mouse_button_up(int boton) override;
-        void event_mouse_motion(int mx, int my) override;
+        void Resize(int newW, int newH) W3D_OVERRIDE;
+        void Render() W3D_OVERRIDE;
+        void button_left() W3D_OVERRIDE;
+        void mouse_button_up(int boton) W3D_OVERRIDE;
+        void event_mouse_motion(int mx, int my) W3D_OVERRIDE;
 
         // ------------------ Funciones propias ------------------
         void SetSizeChildrens(int move);
@@ -271,16 +271,16 @@ class ViewportColumn : public ViewportBase {
         ViewportColumn(ViewportBase* a = NULL, ViewportBase* b = NULL, float frac = 0.5f);
         ~ViewportColumn();
 
-        bool isLeaf() const override;
-        int ContainerKind() const override { return 2; }
+        bool isLeaf() const W3D_OVERRIDE;
+        int ContainerKind() const W3D_OVERRIDE { return 2; }
 
-        void Resize(int newW, int newH) override;
+        void Resize(int newW, int newH) W3D_OVERRIDE;
         void SetSizeChildrens(int move);
-        void Render() override;
+        void Render() W3D_OVERRIDE;
 
-        void button_left() override;
-        void mouse_button_up(int boton) override;
-        void event_mouse_motion(int mx, int my) override;
+        void button_left() W3D_OVERRIDE;
+        void mouse_button_up(int boton) W3D_OVERRIDE;
+        void event_mouse_motion(int mx, int my) W3D_OVERRIDE;
 };
 
 #endif

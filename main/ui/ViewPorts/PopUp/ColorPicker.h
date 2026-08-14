@@ -68,7 +68,7 @@ class ColorPicker : public PopUpBase {
         // indice del elemento; obj = el elemento (paleta efectiva/seleccion)
         void SetPaleta(int* ref, Object* obj, void (*onCambio)());
         void Reflow();          // recalcula el layout (el alto depende de la pestania)
-        void Cerrar() override; // Ctrl+Z: al cerrar captura el cambio de color (push solo si cambio; cancelar restaura -> no) Y SUELTA target/palRef/palObj
+        void Cerrar() W3D_OVERRIDE; // Ctrl+Z: al cerrar captura el cambio de color (push solo si cambio; cancelar restaura -> no) Y SUELTA target/palRef/palObj
         // el elemento dueno se esta DESTRUYENDO: soltar target/palRef/palObj (todos apuntan
         // adentro de el) y cerrar, sin desreferenciar nada. Ver el bloque en ColorPicker.cpp.
         void OlvidarDueno();

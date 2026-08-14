@@ -92,9 +92,9 @@ class Curve : public Object {
 
         ~Curve();
 
-        ObjectType getType() override;
+        ObjectType getType() W3D_OVERRIDE;
 
-        void RenderObject() override;
+        void RenderObject() W3D_OVERRIDE;
 
         bool LoadFromFile(const std::string& filepath);
 

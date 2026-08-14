@@ -41,6 +41,6 @@ public:
         palColor = -1;
         lineas = 0; autoTam = false;
     }
-    ObjectType getType() override { return ObjectType::texto2d; }
+    ObjectType getType() W3D_OVERRIDE { return ObjectType::texto2d; }
 };
 #endif

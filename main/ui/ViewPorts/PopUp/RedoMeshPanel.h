@@ -18,12 +18,12 @@ class RedoMeshPanel : public PopUpBase {
         RedoMeshPanel(Mesh* m, int modo = 0); // 0 = primitiva (Add); 1 = Recalculate Normals
         ~RedoMeshPanel();
 
-        void Render() override;
-        bool Click(int mx, int my) override;
-        bool Motion(int mx, int my) override;
-        bool Tecla(int tecla) override;
-        void Soltar() override;
-        bool CierraConViewport() override { return true; } // se cierra al tocar el viewport
+        void Render() W3D_OVERRIDE;
+        bool Click(int mx, int my) W3D_OVERRIDE;
+        bool Motion(int mx, int my) W3D_OVERRIDE;
+        bool Tecla(int tecla) W3D_OVERRIDE;
+        void Soltar() W3D_OVERRIDE;
+        bool CierraConViewport() W3D_OVERRIDE { return true; } // se cierra al tocar el viewport
 
     private:
         GroupPropertie* grupo;

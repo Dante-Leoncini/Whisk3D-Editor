@@ -20,7 +20,9 @@
 #include "animation/VertexAnimation.h" // FindTargetAnim / EvalVertexAnim / UpdateAnimations
 #include "ViewPorts/Editor2D.h"        // SimToquePantalla: mapeo pantalla->lienzo real
 #include "ViewPorts/ViewPort3D.h"      // idem para el 3D: el rect real del HUD (hudX0/hudEsc)
-#include <SDL.h>
+#ifndef W3D_SYMBIAN
+#include <SDL.h>   // SDL_CONTROLLER_* / SDLK_*: solo el input del Play de escritorio
+#endif
 #include <vector>
 #include <string>
 
@@ -308,7 +310,9 @@ static void TickReal(float dt) {
     // el mismo valor que dejaria un frame dibujado entre tick y tick (UpdatePosition
     // es deterministica e idempotente: el dibujo posterior recalcula lo mismo).
     { extern void W3dCamarasRielTick(); W3dCamarasRielTick(); }
-    // el GAMEPAD analogico entra a los scripts (los ejes ya vienen con deadzone)
+    // el GAMEPAD analogico entra a los scripts (los ejes ya vienen con deadzone).
+    // En Symbian el pad SDL no existe (el input del juego entra por otra via).
+#ifndef W3D_SYMBIAN
     float lx = axisState[SDL_CONTROLLER_AXIS_LEFTX], ly = axisState[SDL_CONTROLLER_AXIS_LEFTY];
     // ---- EL D-PAD (LA CRUCETA) ENTRA COMO EL STICK IZQUIERDO --------------------
     // Reporte del dueno, textual: "dejame jugar con las flechas del control y no
@@ -342,6 +346,7 @@ static void TickReal(float dt) {
     W3dScriptBotonPad("abajo",      buttonState[SDL_CONTROLLER_BUTTON_DPAD_DOWN]);
     W3dScriptBotonPad("izquierda",  buttonState[SDL_CONTROLLER_BUTTON_DPAD_LEFT]);
     W3dScriptBotonPad("derecha",    buttonState[SDL_CONTROLLER_BUTTON_DPAD_RIGHT]);
+#endif
     for (size_t i = 0; i < gScripted.size(); i++) {
         // solo corren los scripts de la escena ACTIVA (y visibles): un objeto invisible o
         // de una escena inactiva no ejecuta su logica. Sin multi-escena EsDeActiva cae a
@@ -516,6 +521,9 @@ void SimStop() {
 
 // ---- teclado del juego -----------------------------------------------------
 void SimTeclaSDL(int sdlk, bool down) {
+#ifdef W3D_SYMBIAN
+    (void)sdlk; (void)down;   // en Symbian el teclado del juego entra por otra via (keypad propio)
+#else
     const char* n = NULL;
     char letra[2] = { 0, 0 };
     // LAS FLECHAS DEL TECLADO tambien mueven el stick izquierdo (ver gFlecha arriba):
@@ -534,4 +542,5 @@ void SimTeclaSDL(int sdlk, bool down) {
     else if (sdlk == SDLK_RETURN || sdlk == SDLK_KP_ENTER) n = "enter";
     else if (sdlk >= SDLK_0 && sdlk <= SDLK_9) { letra[0] = (char)('0' + (sdlk - SDLK_0)); n = letra; }
     if (n) W3dScriptTecla(n, down);
+#endif
 }

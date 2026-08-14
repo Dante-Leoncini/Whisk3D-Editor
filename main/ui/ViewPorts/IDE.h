@@ -114,16 +114,16 @@ class IDE : public ViewportBase, public WithBorder, public Scrollable {
                              std::vector<unsigned char>* tipos);
 
         // ================= viewport =================
-        void Render() override;
-        void Resize(int newW, int newH) override;
-        void button_left() override;
-        void event_mouse_motion(int mx, int my) override; // drag izq = seleccion; medio = scroll
-        void event_key_down(int tecla, bool repeticion) override; // Symbian / ruta normal
+        void Render() W3D_OVERRIDE;
+        void Resize(int newW, int newH) W3D_OVERRIDE;
+        void button_left() W3D_OVERRIDE;
+        void event_mouse_motion(int mx, int my) W3D_OVERRIDE; // drag izq = seleccion; medio = scroll
+        void event_key_down(int tecla, bool repeticion) W3D_OVERRIDE; // Symbian / ruta normal
 #ifndef W3D_SYMBIAN
-        void mouse_button_up(int boton) override; // IMPRESCINDIBLE: libera ViewPortClickDown
-        void event_mouse_wheel(float dy, int mx, int my) override;
+        void mouse_button_up(int boton) W3D_OVERRIDE; // IMPRESCINDIBLE: libera ViewPortClickDown
+        void event_mouse_wheel(float dy, int mx, int my) W3D_OVERRIDE;
 #endif
-        bool event_finger_scroll(int px, int py, int dx, int dy) override; // touch: arrastrar = scroll
+        bool event_finger_scroll(int px, int py, int dx, int dy) W3D_OVERRIDE; // touch: arrastrar = scroll
 
         // sincroniza la barra (texto del selector = script abierto + '*' si esta sucio).
         // Puro (sin GL): lo llaman Render y el click de barra.

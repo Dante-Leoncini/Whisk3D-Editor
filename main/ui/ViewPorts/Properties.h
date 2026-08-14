@@ -83,7 +83,7 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
     public:
         Scrollable* ComoScrollable() { return this; }
         Properties();
-        ~Properties() override;
+        ~Properties() W3D_OVERRIDE;
 
         // grupos PROPIOS del panel: cada viewport de propiedades es
         // INDEPENDIENTE (seleccion, scroll de la lista, tamanos). Los
@@ -594,21 +594,21 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         void ResetButtonHovers(); // apaga el hover de TODOS los botones (filas)
         void EnterPropertieSelect();
 
-        void Resize(int newW, int newH) override;
-        void Render() override;
+        void Resize(int newW, int newH) W3D_OVERRIDE;
+        void Render() W3D_OVERRIDE;
 
         void RefreshTargetProperties();
         void RefreshPropMeshParts();
         void CentrarSeleccion(); // centrar la opcion al navegar
 
-        void button_left() override;
-        void button_right() override;
-        void button_up() override;
-        void button_down() override;
+        void button_left() W3D_OVERRIDE;
+        void button_right() W3D_OVERRIDE;
+        void button_up() W3D_OVERRIDE;
+        void button_down() W3D_OVERRIDE;
         void Cancel();
         void FindMouseOver(int mx, int my);
-        void event_mouse_motion(int mx, int my) override;
-        bool event_finger_scroll(int px, int py, int dx, int dy) override; // touch: arrastrar = scroll vertical
+        void event_mouse_motion(int mx, int my) W3D_OVERRIDE;
+        bool event_finger_scroll(int px, int py, int dx, int dy) W3D_OVERRIDE; // touch: arrastrar = scroll vertical
         // tarjeta "Ajustes" (pestania Render): el config.ini editable desde adentro del programa.
         // FUERA del #ifndef: son DATOS de la tarjeta, no metodos de SDL. La tarjeta se arma igual en el telefono
         // -- de hecho ahi es donde mas sirve, que es donde no hay un editor de texto para tocar el .ini a mano.
@@ -619,10 +619,10 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropButton* propAjSkin;     // dropdown del skin
 
 #ifndef W3D_SYMBIAN
-        void mouse_button_up(int boton) override;
-        void event_mouse_wheel(float dy, int mx, int my) override;
-        void event_key_down(int tecla, bool repeticion) override;
-        void event_key_up(int tecla) override;
+        void mouse_button_up(int boton) W3D_OVERRIDE;
+        void event_mouse_wheel(float dy, int mx, int my) W3D_OVERRIDE;
+        void event_key_down(int tecla, bool repeticion) W3D_OVERRIDE;
+        void event_key_up(int tecla) W3D_OVERRIDE;
 #endif
         // click: plegar/desplegar el grupo cuyo titulo este bajo el mouse
         // (compartido; en PC se cablea a mouse_button_up)
@@ -630,10 +630,10 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
 
         // touch: (mx,my) cae sobre el VALUE BOX de un PropFloat? -> ahi el arrastre horizontal EDITA (slider);
         // en el label / otras filas el arrastre SCROLLEA. Lo usa el ruteo tactil en controles.cpp.
-        bool PuntoEnCampoNumerico(int mx, int my) override;
-        bool TouchSliderArmar(int mx, int my) override;
-        void TouchSliderMover(int dx) override;
-        void TouchSliderSoltar() override;
+        bool PuntoEnCampoNumerico(int mx, int my) W3D_OVERRIDE;
+        bool TouchSliderArmar(int mx, int my) W3D_OVERRIDE;
+        void TouchSliderMover(int dx) W3D_OVERRIDE;
+        void TouchSliderSoltar() W3D_OVERRIDE;
         // PropFloat cuyo value box cae bajo (mx,my), o NULL (recorrido de filas comun a lo de arriba)
         PropFloat* PropFloatEnValueBox(int mx, int my);
         // mini-listado (PropListMeshParts) bajo la coordenada py, o NULL (para el scroll tactil de la lista)

@@ -4,7 +4,9 @@
 #include "animation/SkeletalAnimation.h"  // pose del esqueleto
 #include "animation/VertexAnimation.h"    // FindTargetAnim (el tipo completo)
 
-// ---- (1) ENTRADA CRUDA DEL MANDO -------------------------------------------
+// ---- (1) ENTRADA CRUDA DEL MANDO (SDL): solo desktop; en Symbian el input del
+//         gamepad viene por otra via y W3dScript recibe los sticks ya alimentados
+#ifndef W3D_SYMBIAN
 float axisState[SDL_CONTROLLER_AXIS_MAX] = {0.0f};
 bool buttonState[SDL_CONTROLLER_BUTTON_MAX] = {false};
 GLfloat deadzone = 0.20f;
@@ -22,6 +24,7 @@ void RefreshInputControllerSDL(SDL_Event &e) {
         buttonState[e.cbutton.button] = false;
     }
 }
+#endif
 
 // ---- (2) EL OBJETO DE ESCENA -----------------------------------------------
 // Aca vivia un character controller plataformero completo: stick + gravedad +

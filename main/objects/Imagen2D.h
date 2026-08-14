@@ -27,6 +27,6 @@ public:
         palTinte = -1;
         filtrado = true;
     }
-    ObjectType getType() override { return ObjectType::imagen2d; }
+    ObjectType getType() W3D_OVERRIDE { return ObjectType::imagen2d; }
 };
 #endif

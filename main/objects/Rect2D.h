@@ -17,6 +17,6 @@ public:
         color[0] = color[1] = color[2] = 1.0f; color[3] = 1.0f;
         palColor = -1;
     }
-    ObjectType getType() override { return ObjectType::rect2d; }
+    ObjectType getType() W3D_OVERRIDE { return ObjectType::rect2d; }
 };
 #endif

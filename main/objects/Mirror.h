@@ -10,16 +10,20 @@
 #include "WhiskUI/draw/icons.h"
 #include "objects/Objects.h"
 #include "Target.h"
-#include <GL/gl.h>
+#ifdef W3D_SYMBIAN
+    #include <GLES/gl.h>
+#else
+    #include <GL/gl.h>
+#endif
 #include <string>
 #include <vector>
 
 class Mirror : public Object, public Target {
     public:
-        bool mirrorX = false;
-        bool mirrorY = false;
-        bool mirrorZ = true;
-        bool RenderChildrens = true;
+        bool mirrorX;
+        bool mirrorY;
+        bool mirrorZ;
+        bool RenderChildrens;
 
         // TARGETS EXTRA (varios objetos sobre el MISMO cuerpo de agua: el personaje + los
         // ranas + la caja...). El primero sigue siendo Target::target/targetName
@@ -34,7 +38,7 @@ class Mirror : public Object, public Target {
         // test de profundidad el reflejo (que queda mas hondo) no se ve nunca.
         // sinProfundidad dibuja el reflejo SIN test NI escritura de z (como el
         // painter's del PSX).
-        bool  sinProfundidad = false;
+        bool  sinProfundidad;
         // RECTANGULO AL QUE SE RECORTA EL REFLEJO, expresado EN EL PLANO DEL
         // ESPEJO: limU sobre EjeU() y limV sobre EjeV(), los dos ejes
         // perpendiculares a la normal. NO son un switch de "dibujar si / dibujar
@@ -51,8 +55,8 @@ class Mirror : public Object, public Target {
         // Para el espejo horizontal sin rotar (mirrorY) EjeU() = X y EjeV() = Z,
         // asi que los numeros son los mismos de siempre y el formato no cambia
         // un solo byte: "limites": [u0, u1, v0, v1].
-        bool  usaLimites = false;
-        float limU0 = 0, limU1 = 0, limV0 = 0, limV1 = 0;
+        bool  usaLimites;
+        float limU0, limU1, limV0, limV1;
         // recortar el reflejo. Con estencil disponible son DOS recortes: la
         // SILUETA del agua en pantalla (mascara) + UN PLANO DE USUARIO sobre la
         // superficie, que tira todo lo que caiga del lado de ARRIBA (es el unico
@@ -62,8 +66,8 @@ class Mirror : public Object, public Target {
         // Default = usaLimites: un espejo comun declarado sin limites se dibuja
         // como siempre, y el del agua se recorta.
         // Se puede forzar con la propiedad "recorte".
-        bool  recorte = false;
-        bool  recorteDeclarado = false;   // true si el archivo trae "recorte"
+        bool  recorte;
+        bool  recorteDeclarado;   // true si el archivo trae "recorte"
         bool  Recorta() const { return recorteDeclarado ? recorte : usaLimites; }
 
         // ---- hundimientoMaximo: DEPRECADO (se acepta, se avisa por log, SIN efecto) ----
@@ -76,7 +80,7 @@ class Mirror : public Object, public Target {
         // de estencil del pase A), y con eso el reflejo profundo se ve adentro
         // del agua hasta donde la silueta llega -- como en un espejo de verdad.
         // El campo queda solo para que los .w3d que lo declaren sigan abriendo.
-        float hundimientoMaximo = 0.0f;
+        float hundimientoMaximo;
 
         Mirror(Object* parent, Vector3 pos = Vector3(0,0,0), bool x = false, bool y = false, bool z = true);
 
@@ -118,25 +122,25 @@ class Mirror : public Object, public Target {
         // (espejopx <espejo> info lista la decision por target).
         bool TargetSeRefleja(Object* tg) const;
 
-        ObjectType getType() override;
+        ObjectType getType() W3D_OVERRIDE;
 
-        void Reload() override;
+        void Reload() W3D_OVERRIDE;
 
-        void RenderObject() override;
+        void RenderObject() W3D_OVERRIDE;
 
         // sus refs por puntero: el target principal (ver Objects.h) + un slot por
         // target extra. Sin esto el espejo seguia dibujando un objeto
         // detachado/borrado (puntero colgado).
-        int     RefsPropias() const override { return 1 + (int)targetsExtra.size(); }
-        Object* RefPropia(int i) const override {
+        int     RefsPropias() const W3D_OVERRIDE { return 1 + (int)targetsExtra.size(); }
+        Object* RefPropia(int i) const W3D_OVERRIDE {
             if (i == 0) return target;
             i--; return (i >= 0 && i < (int)targetsExtra.size()) ? targetsExtra[i] : NULL;
         }
-        void    SetRefPropia(int i, Object* o) override {
+        void    SetRefPropia(int i, Object* o) W3D_OVERRIDE {
             if (i == 0) { target = o; return; }
             i--; if (i >= 0 && i < (int)targetsExtra.size()) targetsExtra[i] = o;
         }
-        std::string* RefPropiaNombre(int i) override {
+        std::string* RefPropiaNombre(int i) W3D_OVERRIDE {
             if (i == 0) return &targetName;
             i--; return (i >= 0 && i < (int)targetsExtraNombre.size()) ? &targetsExtraNombre[i] : NULL;
         }

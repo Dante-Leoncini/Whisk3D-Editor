@@ -12,6 +12,6 @@ class Contenedor2D : public Elemento2D {
 public:
     Contenedor2D(Object* parent = NULL, Vector3 pos = Vector3(0,0,0))
         : Elemento2D(parent, "Contenedor", pos) {}
-    ObjectType getType() override { return ObjectType::cont2d; }
+    ObjectType getType() W3D_OVERRIDE { return ObjectType::cont2d; }
 };
 #endif

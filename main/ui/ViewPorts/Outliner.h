@@ -34,11 +34,11 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable {
         unsigned filaDFS;
 
         Outliner();
-        ~Outliner() override;
+        ~Outliner() W3D_OVERRIDE;
 
         void CalcularRenglon(Object* obj, int* MaxPosXtemp, int* MaxPosYtemp);
-        void Resize(int newW, int newH) override;
-        void Render() override;
+        void Resize(int newW, int newH) W3D_OVERRIDE;
+        void Render() W3D_OVERRIDE;
         void DibujarRenglon(Object* obj, bool hidden);
         // fila VIRTUAL "Armature 2D" de una malla: UNA sola fila informativa, en AZUL y colgando de
         // la malla, que avisa que el rig 2D es PARTE del mesh y no un objeto de escena. Inerte: no
@@ -48,15 +48,15 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable {
         void DibujarLineaDesplegada(Object* obj);
         void DibujarOjos(Object* obj, bool hidden, bool noRender);
 
-        void button_left() override;
+        void button_left() W3D_OVERRIDE;
         void FindMouseOver(int mx, int my);
-        void event_mouse_motion(int mx, int my) override;
-        bool event_finger_scroll(int px, int py, int dx, int dy) override; // touch: arrastrar = scroll v/h
+        void event_mouse_motion(int mx, int my) W3D_OVERRIDE;
+        bool event_finger_scroll(int px, int py, int dx, int dy) W3D_OVERRIDE; // touch: arrastrar = scroll v/h
 #ifndef W3D_SYMBIAN
-        void mouse_button_up(int boton) override;
-        void event_mouse_wheel(float dy, int mx, int my) override;
-        void event_key_down(int tecla, bool repeticion) override;
-        void event_key_up(int tecla) override;
+        void mouse_button_up(int boton) W3D_OVERRIDE;
+        void event_mouse_wheel(float dy, int mx, int my) W3D_OVERRIDE;
+        void event_key_down(int tecla, bool repeticion) W3D_OVERRIDE;
+        void event_key_up(int tecla) W3D_OVERRIDE;
 #endif
         // click para seleccionar la fila (compartido; en el N95 lo llama el
         // router del mouse HID, en PC se puede cablear a mouse_button_up)

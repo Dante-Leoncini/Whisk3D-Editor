@@ -28,6 +28,6 @@ public:
         filtrado = true;
         palTinte = -1;
     }
-    ObjectType getType() override { return ObjectType::slice9; }
+    ObjectType getType() W3D_OVERRIDE { return ObjectType::slice9; }
 };
 #endif

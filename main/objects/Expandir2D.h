@@ -12,6 +12,6 @@ class Expandir2D : public Elemento2D {
 public:
     Expandir2D(Object* parent = NULL, Vector3 pos = Vector3(0,0,0))
         : Elemento2D(parent, "Expandir", pos) {}
-    ObjectType getType() override { return ObjectType::expandir2d; }
+    ObjectType getType() W3D_OVERRIDE { return ObjectType::expandir2d; }
 };
 #endif

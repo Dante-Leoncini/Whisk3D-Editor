@@ -5,6 +5,9 @@
 #include <algorithm>
 #include "WhiskUI/theme/colores.h"
 #include "render/OpcionesRender.h" // g_renderAspect (la geometria de la camara sigue el aspecto del render)
+#ifdef W3D_SYMBIAN
+#include "variables.h" // showOverlayGlobal / ViewFromCameraActiveGlobal: gate del gizmo (bloque Symbian de abajo)
+#endif
 
 // Geometría de la cámara
 GLfloat CameraVertices[CameraVertexSize] = {    

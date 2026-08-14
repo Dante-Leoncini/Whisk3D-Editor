@@ -46,8 +46,8 @@ public:
         : Object(parent, "LOD", pos), soloCamaraActiva(false), cacheVal(false), ultimoElegido(-1) {
         for (int i = 0; i < 16; i++) cacheW[i] = 0.0f;
     }
-    ObjectType getType() override { return ObjectType::lod; }
-    void RenderHijos() override;
+    ObjectType getType() W3D_OVERRIDE { return ObjectType::lod; }
+    void RenderHijos() W3D_OVERRIDE;
 
     int HijoElegido() const; // indice del hijo a dibujar con la vista bindeada (-1 = sin hijos)
     // el hijo que quedo DIBUJADO en el ultimo render (sin re-medir nada): es lo

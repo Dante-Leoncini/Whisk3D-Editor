@@ -17,6 +17,17 @@ EPOCHEAPSIZE    0x10000 0x4000000  // Tama�o del heap: 64 KB m�nimo y 64 MB 
 // define (activa el dialecto Symbian: GLES/gl.h, shims de app-state, etc.)
 MACRO           W3D_SYMBIAN
 
+// Lua 5.4 en RVCT/C89: sin esto luaconf.h corta con "Compiler does not support
+// 'long long'". LUA_USE_C89 usa numeros C89 (long + double) y evita las
+// funciones de C99. Solo aplica a los .c de lua (nadie mas incluye luaconf.h).
+MACRO           LUA_USE_C89
+// lstate.h usa l_signalT = sig_atomic_t (de <signal.h>), que el Open C del N95 no
+// define. l_signalT es un override sancionado por Lua (flags volatiles de trap/hook).
+MACRO           l_signalT=int
+// os.clock() de Lua (loslib.c) usa CLOCKS_PER_SEC de <time.h>, que Open C no define
+// (clock() si existe). Valor POSIX estandar; os.clock no es critico para el juego.
+MACRO           CLOCKS_PER_SEC=1000000
+
 // Compilador RVCT 2.2 (ARMV6 en bld.inf): forzar ARM, ARMv6 y FPU por hardware.
 // Es lo que aprovecha la VFP del N95/N8.
 ALWAYS_BUILD_AS_ARM
@@ -150,6 +161,59 @@ SOURCE          font.cpp bitmapText.cpp W3dFont.cpp
 SOURCEPATH      ..\..\..\libs\WhiskUI\widgets
 SOURCE          card.cpp Button.cpp PopupMenu.cpp Tab.cpp
 
+// --- subsistemas nuevos que faltaban en el build de Symbian (link): vertex animation,
+//     paletas/2D, contenedor .w3d, visibilidad/PVS, particulas, texturas/fuentes/atlas ---
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\animation
+SOURCE          VertexAnimation.cpp
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\objects
+SOURCE          TexturaCache.cpp
+SOURCEPATH      ..\..\..\main
+SOURCE          W3dEscena.cpp
+SOURCEPATH      ..\..\..\main\io
+SOURCE          GuardarW3D.cpp W3dContenedor.cpp UI2DFormato.cpp Textura2D.cpp Fuente2D.cpp SkinAtlas.cpp Video2DCache.cpp
+SOURCEPATH      ..\..\..\main\objects
+SOURCE          Culling.cpp Particulas.cpp VisZona.cpp Gamepad.cpp
+SOURCEPATH      ..\..\..\main\render
+SOURCE          UIOverlay.cpp
+// audio del Core: el dispatcher compila SIEMPRE. Sin W3D_ENABLE_AUDIO son stubs
+// no-op (sonido() no hace nada), asi BindsJuego linkea sin backend. El backend real
+// de Symbian (W3dAudioSymbian.cpp + CMdaAudioOutputStream) se prende despues.
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\audio
+SOURCE          W3dAudio.cpp
+// subsistemas del Core que el link pedia (todos C++03, portables): sistema de
+// recursos, zip (.w3d/.w3dpack), almacen, config, visibilidad/PVS, atlas de skin.
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\io
+SOURCE          W3dRecursos.cpp W3dZip.cpp W3dAlmacen.cpp
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\objects
+SOURCE          VisSet.cpp
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\base
+SOURCE          W3dConfig.cpp
+SOURCEPATH      ..\..\..\libs\WhiskUI\draw
+SOURCE          W3dAtlasPacker.cpp
+// objetos del editor que faltaban: LOD (niveles de detalle) y el espejo/agua
+SOURCEPATH      ..\..\..\main\objects
+SOURCE          LOD.cpp Mirror.cpp
+// import_w3d.cpp (cargador del proyecto .w3d) DIFERIDO: son 3800 lineas en C++11
+// (auto/lambdas/range-for/unordered_map) que hay que portar a C++03. Hoy no lo llama
+// nadie en el build de Symbian (constructor.cpp/main.cpp de PC no entran aca), asi que
+// se saca hasta hacer el port. El editor Symbian ya importa OBJ/FBX/glTF (esos si C++03).
+//SOURCEPATH      ..\..\..\main\importers
+//SOURCE          import_w3d.cpp
+
+// --- LUA 5.4 EMBEBIDO (C89 portable: corre hasta en el N95) + los binds del juego,
+//     la fisica y la simulacion. Sin lua.c/luac.c (son los programas standalone). ---
+SOURCEPATH      ..\..\..\thirdparty\lua\src
+SOURCE          lapi.c lauxlib.c lbaselib.c lcode.c lcorolib.c lctype.c ldblib.c ldebug.c ldo.c ldump.c
+SOURCE          lfunc.c lgc.c linit.c liolib.c llex.c lmathlib.c lmem.c loadlib.c lobject.c lopcodes.c
+SOURCE          loslib.c lparser.c lstate.c lstring.c lstrlib.c ltable.c ltablib.c ltm.c lundump.c lutf8lib.c
+SOURCE          lvm.c lzio.c
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\script
+SOURCE          W3dScript.cpp
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\physics
+SOURCE          W3dFisica.cpp
+SOURCEPATH      ..\..\..\main\script
+SOURCE          BindsJuego.cpp SimJuego.cpp
+
 // OJO: volver al SOURCEPATH local (las rutas de recursos de abajo se
 // resuelven contra el ultimo SOURCEPATH)
 
@@ -173,6 +237,9 @@ USERINCLUDE     ..\..\..\libs\Whisk3DCore
 USERINCLUDE     ..\..\..\libs\Whisk3DCore\base
 USERINCLUDE     ..\..\..\libs\Whisk3DCore\gfx
 USERINCLUDE     ..\..\..\libs\Whisk3DCore\io
+// thirdparty del Core (stb) + lua src (lua.h/lauxlib.h/lualib.h del interprete embebido)
+USERINCLUDE     ..\..\..\libs\Whisk3DCore\thirdparty
+USERINCLUDE     ..\..\..\thirdparty\lua\src
 USERINCLUDE     ..\..\..\main
 USERINCLUDE     ..\..\..\main\ui
 USERINCLUDE     ..\..\..\main\ui\ViewPorts
@@ -263,6 +330,8 @@ SOURCE Timeline.cpp              // viewport Timeline (los metodos SDL van #ifnd
 
 SOURCEPATH ..\src
 SOURCE w3dskelstubs.cpp          // solo w3dGetTicks (reloj de ms del core); los stubs del esqueleto ya no van (SkeletalAnimation.cpp compila)
+// stubs de simbolos desktop-only que el link pedia (abrir/compilar proyecto, multi-touch SDL, g_w3dUINoCargo)
+SOURCE w3ddesktopstubs.cpp
 
 // --- IMPORT FBX en el N95 (usa el subsistema de animacion de arriba + comparte el file browser con el OBJ).
 //     El descompresor zlib (w3dCompress) es self-contained/multiplataforma -> compila aca sin stb ni libs

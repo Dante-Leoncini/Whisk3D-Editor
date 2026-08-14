@@ -174,17 +174,17 @@ class UVEditor : public ViewportBase, public WithBorder {
         void SyncBarra();
         // toolbar inferior compartida (ToolbarBase): G/R/S (MRU) en modo edicion; en PINTURA los
         // controles del PINCEL (roles TBR_Pincel*/TBR_Grupo). Oculta si el UV no esta operativo.
-        bool ToolbarVisible() const override;
-        void ToolbarSincronizar() override;
-        void ToolbarAccionRol(int rol) override;
+        bool ToolbarVisible() const W3D_OVERRIDE;
+        void ToolbarSincronizar() W3D_OVERRIDE;
+        void ToolbarAccionRol(int rol) W3D_OVERRIDE;
 
-        void Render() override;
-        void Resize(int newW, int newH) override;
-        void event_mouse_motion(int mx, int my) override;
-        bool event_finger_scroll(int px, int py, int dx, int dy) override;             // 1 dedo: panear la vista UV
-        void event_finger_gesture(float zoomDelta, float panDx, float panDy) override; // 2 dedos: zoom + paneo
-        void button_left() override; // click izquierdo = seleccionar UV (o confirmar transform)
-        void button_right() override; // click derecho = cancelar transform
+        void Render() W3D_OVERRIDE;
+        void Resize(int newW, int newH) W3D_OVERRIDE;
+        void event_mouse_motion(int mx, int my) W3D_OVERRIDE;
+        bool event_finger_scroll(int px, int py, int dx, int dy) W3D_OVERRIDE;             // 1 dedo: panear la vista UV
+        void event_finger_gesture(float zoomDelta, float panDx, float panDy) W3D_OVERRIDE; // 2 dedos: zoom + paneo
+        void button_left() W3D_OVERRIDE; // click izquierdo = seleccionar UV (o confirmar transform)
+        void button_right() W3D_OVERRIDE; // click derecho = cancelar transform
         // pick en coords LOCALES del viewport (lx,ly); add=true -> toggle/sumar (shift), false -> reemplazar.
         // Escribe Mesh::uvSelVert. Compartido (PC lo llama desde button_left; Symbian desde OK).
         // FUERA de sync el pick es POR RENDER-VERT: toca EXACTAMENTE el vert/borde/cara UV que
@@ -219,12 +219,12 @@ class UVEditor : public ViewportBase, public WithBorder {
         // ---- hooks del TRANSFORM UI COMPARTIDO (TransformUI.cpp): barra de info, entrada
         // numerica, warp del cursor y tilde/cruz/X/Y de la toolbar. Cubren el G/R/S de UVs
         // (uvXform) y el transform modal de huesos 2D de ESTE editor. ----
-        bool XformEnCurso() const override;
-        void XformNumValor(float v) override;           // valor exacto tipeado (1.0 = un tile UV)
-        void XformConfirmar() override;                 // gate: expresion invalida NO confirma
-        void XformCancelar() override;
-        void XformToggleEje(int eje) override;          // teclas X/Y y botones de la toolbar
-        std::string XformTextoBarra() override;         // texto de la barra de info (unidades UV)
+        bool XformEnCurso() const W3D_OVERRIDE;
+        void XformNumValor(float v) W3D_OVERRIDE;           // valor exacto tipeado (1.0 = un tile UV)
+        void XformConfirmar() W3D_OVERRIDE;                 // gate: expresion invalida NO confirma
+        void XformCancelar() W3D_OVERRIDE;
+        void XformToggleEje(int eje) W3D_OVERRIDE;          // teclas X/Y y botones de la toolbar
+        std::string XformTextoBarra() W3D_OVERRIDE;         // texto de la barra de info (unidades UV)
         // SNAP (menu del UV editor): cursor<->seleccion.
         void SnapCursorToSel();  // el cursor 2D va al centro de la seleccion
         void SnapSelToCursor();  // la seleccion se mueve para que su centro quede en el cursor
@@ -340,11 +340,11 @@ class UVEditor : public ViewportBase, public WithBorder {
         void Panear(float dx, float dy); // paneo de la vista UV (flechas; COMPARTIDO PC/Symbian -> FUERA del #ifndef SDL)
         void ZoomCentro(int dir);        // zoom centrado en el viewport (sin cursor): teclado 0+arriba/abajo (Symbian)
 #ifndef W3D_SYMBIAN
-        void event_key_down(int tecla, bool repeticion) override; // G/R/S + ESC/ENTER (transform)
-        void event_mouse_wheel(float dy, int mx, int my) override;
+        void event_key_down(int tecla, bool repeticion) W3D_OVERRIDE; // G/R/S + ESC/ENTER (transform)
+        void event_mouse_wheel(float dy, int mx, int my) W3D_OVERRIDE;
         // IMPRESCINDIBLE: resetear ViewPortClickDown al soltar (sino queda en true y
         // viewPortActive se CONGELA -> el borde verde no cambia + no se puede resize).
-        void mouse_button_up(int boton) override;
+        void mouse_button_up(int boton) W3D_OVERRIDE;
 #endif
 };
 

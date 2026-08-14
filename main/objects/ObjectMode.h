@@ -3,10 +3,10 @@
 
 #include "objects/Objects.h"
 #include "variables.h" // REAL, portable
+#include "animation/Animation.h" // AnimProperty/curvas: Symbian-safe (GLES propio, sin SDL)
 #ifndef W3D_SYMBIAN
-// (Instance/Animation arrastran SDL/GL de PC)
+// Instance arrastra SDL/GL de escritorio
 #include "Instance.h"
-#include "animation/Animation.h"
 #endif
 
 class Mesh; // MoverSeleccionEditLocal opera sobre una malla en Edit Mode
@@ -32,13 +32,11 @@ extern bool MotionTrailOn;   // el checkbox del menu Animation del viewport 3D
 void BorrarKeyframeObjeto();   // Delete Keyframe: saca el keyframe del frame actual
 void LimpiarKeyframeObjeto();  // Clear Keyframe: borra toda la animacion del objeto
 void AplicarAnimacionObjetos();// PLAYBACK: aplica los keyframes al transform en el frame actual (al cambiar de frame)
-#ifndef W3D_SYMBIAN
 // aplica las curvas de UN objeto en EL FRAME QUE SE LE PIDA (transform + visible + render + fov/clip de
 // camara + color/atenuacion/spot de luz). Es lo mismo que hace el playback, pero sin depender de donde
 // este el playhead: lo usa el GUARDADO para escribir el objeto en su CUADRO BASE y no en la pose del
 // scrub (ver ReposoAnimObjetos en io/GuardarW3D.cpp).
 void W3dAplicarCurvasEnFrame(Object* o, std::vector<AnimProperty>& props, int frame);
-#endif
 // estado del keyframe de un CANAL del objeto en 'frame': 0 sin animacion / 1 animado
 // pero sin key en este frame / 2 hay key en este frame. Lo usa el rombo del panel.
 int  AnimCanalEstado(class Object* o, int prop, int comp, int frame);

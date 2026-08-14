@@ -90,7 +90,7 @@ public:
         soloCamaraActiva = false;
         distanciaMax = 0.0f;
     }
-    ObjectType getType() override { return ObjectType::culling; }
-    void RenderHijos() override;
+    ObjectType getType() W3D_OVERRIDE { return ObjectType::culling; }
+    void RenderHijos() W3D_OVERRIDE;
 };
 #endif

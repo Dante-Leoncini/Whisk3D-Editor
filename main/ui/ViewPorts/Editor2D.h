@@ -99,16 +99,16 @@ class Editor2D : public ViewportBase, public WithBorder {
         Editor2D();
         virtual ~Editor2D();
 
-        void Render() override;
-        void Resize(int newW, int newH) override;
-        void event_mouse_motion(int mx, int my) override;
-        bool event_finger_scroll(int px, int py, int dx, int dy) override;             // touch: 1 dedo panea
-        void event_finger_gesture(float zoomDelta, float panDx, float panDy) override; // touch: 2 dedos zoom+paneo
+        void Render() W3D_OVERRIDE;
+        void Resize(int newW, int newH) W3D_OVERRIDE;
+        void event_mouse_motion(int mx, int my) W3D_OVERRIDE;
+        bool event_finger_scroll(int px, int py, int dx, int dy) W3D_OVERRIDE;             // touch: 1 dedo panea
+        void event_finger_gesture(float zoomDelta, float panDx, float panDy) W3D_OVERRIDE; // touch: 2 dedos zoom+paneo
 
         void Panear(float dx, float dy); // compartido PC/Symbian (flechas / touch)
         void ZoomCentro(int dir);        // zoom centrado (teclado / pinch)
-        void button_left() override;     // confirmar transform / Shift+click = colocar el cursor 2D
-        void button_right() override;    // cancelar transform
+        void button_left() W3D_OVERRIDE;     // confirmar transform / Shift+click = colocar el cursor 2D
+        void button_right() W3D_OVERRIDE;    // cancelar transform
         // transform 2D
         void IniciarXform2D(int modo);   // 1=mover 2=rotar (captura seleccion + pivote)
         void AplicarXform2D(int mx, int my);
@@ -117,24 +117,24 @@ class Editor2D : public ViewportBase, public WithBorder {
         // ---- hooks del TRANSFORM UI COMPARTIDO (TransformUI.cpp): barra de info, entrada
         // numerica exacta (en px de LIENZO), warp del cursor y tilde/cruz/X/Y de la toolbar.
         // Mismo mecanismo que el 3D y el UV editor, sin duplicar codigo. ----
-        bool XformEnCurso() const override { return xform != 0; }
-        void XformNumValor(float v) override;   // v en px de lienzo (mover) / grados / factor
-        void XformConfirmar() override;         // gate: expresion invalida NO confirma
-        void XformCancelar() override;
-        void XformToggleEje(int eje) override;  // teclas X/Y y botones de la toolbar
-        std::string XformTextoBarra() override; // texto de la barra de info (px)
+        bool XformEnCurso() const W3D_OVERRIDE { return xform != 0; }
+        void XformNumValor(float v) W3D_OVERRIDE;   // v en px de lienzo (mover) / grados / factor
+        void XformConfirmar() W3D_OVERRIDE;         // gate: expresion invalida NO confirma
+        void XformCancelar() W3D_OVERRIDE;
+        void XformToggleEje(int eje) W3D_OVERRIDE;  // teclas X/Y y botones de la toolbar
+        std::string XformTextoBarra() W3D_OVERRIDE; // texto de la barra de info (px)
 #ifndef W3D_SYMBIAN
-        void event_key_down(int tecla, bool repeticion) override; // flechas = paneo
-        void event_mouse_wheel(float dy, int mx, int my) override;
+        void event_key_down(int tecla, bool repeticion) W3D_OVERRIDE; // flechas = paneo
+        void event_mouse_wheel(float dy, int mx, int my) W3D_OVERRIDE;
         // IMPRESCINDIBLE: resetear ViewPortClickDown al soltar (sino viewPortActive se congela
         // y el borde verde/resize dejan de andar; mismo gotcha documentado en UVEditor).
-        void mouse_button_up(int boton) override;
+        void mouse_button_up(int boton) W3D_OVERRIDE;
 #endif
         // toolbar inferior compartida (ToolbarBase): Mover/Rotar/Escalar de elementos (MRU).
         // Oculta en vista de juego y durante el Play (el juego se mira limpio, como el 3D).
-        bool ToolbarVisible() const override;
-        void ToolbarSincronizar() override;
-        void ToolbarAccionRol(int rol) override;
+        bool ToolbarVisible() const W3D_OVERRIDE;
+        void ToolbarSincronizar() W3D_OVERRIDE;
+        void ToolbarAccionRol(int rol) W3D_OVERRIDE;
         // mapeo lienzo->pantalla (centro cx,cy del marco y escala s), igual que usa Render.
         void ParamsLienzo(float& cx, float& cy, float& s) const;
         // rect UTIL del viewport (todo MENOS la barra de menu), en coords LOCALES del viewport

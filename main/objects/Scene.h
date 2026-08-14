@@ -34,7 +34,7 @@ public:
 
     void SetBackground(GLfloat R, GLfloat G, GLfloat B, GLfloat A);
 
-    ObjectType getType() override;
+    ObjectType getType() W3D_OVERRIDE;
 
     ~Scene();
 };

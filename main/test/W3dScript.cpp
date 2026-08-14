@@ -17628,7 +17628,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
     //       apuntan adentro del elemento -> se sueltan al cerrar Y cuando destruyen al dueno.
     //   (b) RedoMeshPanel: sus campos apuntan a MIEMBROS de la malla (&m->meshSize...) y el
     //       arrastre los escribe -> el panel se CIERRA cuando destruyen su malla.
-    //   (c) override de textura del editor UV: nunca se desreferencia, es IDENTIDAD -> pasa a
+    //   (c) W3D_OVERRIDE de textura del editor UV: nunca se desreferencia, es IDENTIDAD -> pasa a
     //       ir por Object::serial, que no se recicla.
     //  El borrado es el REAL (Eliminar -> DeleteUndo) MAS el desalojo del historial, que es lo
     //  que hace el free de verdad: sin desalojar no se libera nada y el test no probaria nada.
@@ -17681,7 +17681,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
             if (!(abrio && cerro)) ok = false;
         }
 
-        // ---- (c) override de textura del editor UV (identidad, no puntero) ----
+        // ---- (c) W3D_OVERRIDE de textura del editor UV (identidad, no puntero) ----
         UndoLimpiar();
         {
             Mesh* a = (Mesh*)NewMesh(MeshType(MeshType::cube), NULL, false); a->SetNameObj("UVa");

@@ -1935,8 +1935,8 @@ public:
     PropColorPal(const std::string& nomIni, int i) : PropColor(nomIni), idx(i) {
         nom = NULL; field.SetText(nomIni);
     }
-    int PaletaIdx() const override { return idx; }
-    void RenderPropertiBox(Card* box) override {
+    int PaletaIdx() const W3D_OVERRIDE { return idx; }
+    void RenderPropertiBox(Card* box) W3D_OVERRIDE {
         if (!value) return;
         int cb = box->width;
         float dxS = (float)(width - PropColEtiqueta - cb * 2 - gapGS - bordersGS);
@@ -1950,7 +1950,7 @@ public:
         box->RenderBorder(false);
         w3dEngine::Translatef(-dxX, RenglonHeightGS + gapGS, 0);
     }
-    void RenderPropertiBoxBorder(Card* box) override {
+    void RenderPropertiBoxBorder(Card* box) W3D_OVERRIDE {
         if (!value) return;
         int cb = box->width;
         float dxS = (float)(width - PropColEtiqueta - cb * 2 - gapGS - bordersGS);
@@ -1961,7 +1961,7 @@ public:
         box->RenderBorder(false);
         w3dEngine::Translatef(-dxX, RenglonHeightGS + gapGS, 0);
     }
-    void RenderPropertiValue(Card* propertiBox) override {
+    void RenderPropertiValue(Card* propertiBox) W3D_OVERRIDE {
         if (!value) return;
         int cb = RenglonHeightGS + GlobalScale * 2;
         bool foco = (g_textFieldActivo == &field);
@@ -1988,7 +1988,7 @@ public:
         w3dEngine::PopMatrix();
         w3dEngine::Translatef(0, RenglonHeightGS + gapGS, 0);
     }
-    void RenderPropertiLabel(Card* propertiBox) override {
+    void RenderPropertiLabel(Card* propertiBox) W3D_OVERRIDE {
         if (value) w3dEngine::Translatef(0, RenglonHeightGS + gapGS, 0);
     }
 };

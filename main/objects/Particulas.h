@@ -120,9 +120,9 @@ public:
         sys.spinMin = 0.0f; sys.spinMax = 0.0f; // sin giro azaroso: predecible (y testeable)
         sys.swayAmp = 0.0f;
     }
-    ObjectType getType() override { return ObjectType::particulas; }
+    ObjectType getType() W3D_OVERRIDE { return ObjectType::particulas; }
 
-    void RenderObject() override;  // NO dibuja: anota el emisor para el pase de translucidas
+    void RenderObject() W3D_OVERRIDE;  // NO dibuja: anota el emisor para el pase de translucidas
     void Tick(float dt);           // sincroniza config, emite el rate y corre la sim (mundo)
     void Emitir(int n);            // rafaga de n particulas YA (lua emitir / harness)
 

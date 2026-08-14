@@ -133,7 +133,7 @@ public:
         cs.push_back(pc);
     }
 
-    ObjectType getType() override { return ObjectType::ui; }
-    void RenderObject() override {}   // nada en el 3D: vive en el Editor 2D
+    ObjectType getType() W3D_OVERRIDE { return ObjectType::ui; }
+    void RenderObject() W3D_OVERRIDE {}   // nada en el 3D: vive en el Editor 2D
 };
 #endif

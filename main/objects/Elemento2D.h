@@ -77,6 +77,6 @@ public:
         recortaX = false; recortaY = false;
         conScroll = false; scrollX = 0.0f; scrollY = 0.0f;
     }
-    void RenderObject() override {}   // nada en el 3D: se dibujan en el Editor 2D
+    void RenderObject() W3D_OVERRIDE {}   // nada en el 3D: se dibujan en el Editor 2D
 };
 #endif
