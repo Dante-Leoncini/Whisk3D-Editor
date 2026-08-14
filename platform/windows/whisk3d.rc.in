@@ -1,0 +1,5 @@
+// Recurso de icono embebido en el exe (lo genera CMake via configure_file -> @W3D_ICON_ABS@ = ruta
+// absoluta de res/Whisk3D.ico). El ICON con el ID mas bajo (1) es el que el Explorador, el menu
+// inicio, la barra de tareas y Alt+Tab usan como icono del programa. Sin esto el exe queda con el
+// icono generico de Windows (SDL_SetWindowIcon en runtime NO afecta al acceso directo del menu inicio).
+1 ICON "@W3D_ICON_ABS@"

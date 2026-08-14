@@ -1,0 +1,16 @@
+# Prueba del BATCHEO de particulas (camino de render eficiente, P2) + de la
+# AUDITORIA del cache de estado GL (P1).
+#   - Antes: un draw call POR particula (~46 vivas en esta escena = ~46 draws).
+#   - Ahora: las consecutivas del orden global back-to-front que comparten
+#     (textura, mezcla) salen en UN draw. Esta escena tiene DOS emisores con
+#     mezclas distintas (alfa y aditiva) cuyas particulas se INTERCALAN en
+#     profundidad: quedan unas pocas corridas (medido: 7). El gate exige <=10
+#     via la clave dcParticulas del presupuesto (el desglose por categoria).
+#   - glaudit verifica que NADA del pase de escena toca GL crudo: el cache de
+#     estado (que ahora vive el frame entero, sin Invalidate por malla) tiene
+#     que coincidir con el estado REAL de GL al cerrar cada pase.
+abrirw3d prueba_particulas.w3d
+simplay 30
+presupuesto presupuesto-particulas.json lote 3
+simstop
+glaudit 3

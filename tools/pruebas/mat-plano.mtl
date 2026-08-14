@@ -1,0 +1,9 @@
+# Material de prueba_materiales.w3s. SIN textura a proposito: con NoLight el color
+# del pixel es EXACTAMENTE Kd*255, asi los asserts de pixel son numeros cerrados.
+
+newmtl mat-plano
+Kd 0.100000 0.900000 0.100000
+d 1.0
+NoLight
+BackfaceCullingOff
+

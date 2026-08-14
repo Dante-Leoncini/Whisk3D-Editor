@@ -1,0 +1,6 @@
+# NoLight: el pixel es Kd*255 exacto (no hace falta textura para esta prueba)
+newmtl costura-quad
+Kd 0.800000 0.300000 0.100000
+d 1.0
+NoLight
+BackfaceCullingOff

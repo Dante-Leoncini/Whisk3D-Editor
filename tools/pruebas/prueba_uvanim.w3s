@@ -1,0 +1,11 @@
+# Prueba de la ANIMACION UV "tira de atlas": texto -> v4 -> reabrir.
+# Correr DESDE ESTA CARPETA:
+#   cd <motor>/tools/pruebas
+#   ../../platform/linux/build/whisk3d --script prueba_uvanim.w3s
+# meshinfo imprime "uvanim frames=4 fps=12 eje=u desfase=1" para QuadAnimado
+# (y NADA para QuadQuieto) las dos veces.
+abrirw3d prueba_uvanim.w3d
+meshinfo
+guardarw3d prueba_uvanim_v4.w3d
+abrirw3d prueba_uvanim_v4.w3d
+meshinfo

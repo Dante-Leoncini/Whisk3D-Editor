@@ -1,0 +1,26 @@
+/*
+ * ==============================================================================
+ *  Name        : Whisk3D_reg.rss
+ *  Part of     : OpenGLEx / Whisk3D
+ * ==============================================================================
+ */
+
+#include <appinfo.rh>
+#include <whisk3D.rsg>
+
+UID2 KUidAppRegistrationResourceFile
+
+// Application UID
+UID3 0xA00D021D
+
+RESOURCE APP_REGISTRATION_INFO {
+    app_file                  = "Whisk3D";
+    localisable_resource_file = "\\resource\\apps\\whisk3D";
+    localisable_resource_id   = R_WHISK3D_LOCALISABLE_APP_INFO;
+    embeddability             = KAppNotEmbeddable;
+    newfile                   = KAppDoesNotSupportNewFile;
+
+//    group_name                = "OpenGLEx";
+}
+
+// End of File

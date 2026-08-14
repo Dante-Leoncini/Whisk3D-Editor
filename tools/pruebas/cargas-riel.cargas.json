@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "adelante": [
+    { "nodo": 0, "ids": ["otro:espejo-poste.obj", "otro:espejo-puente.obj"] },
+    { "nodo": 1, "ids": ["otro:espejo-cubo-rojo.obj"] },
+    { "nodo": 2, "ids": ["otro:espejo-poste.obj"] },
+    { "nodo": 3, "ids": ["otro:espejo-orilla.obj"] }
+  ],
+  "atras": [
+    { "nodo": 0, "ids": ["otro:espejo-poste.obj"] },
+    { "nodo": 1, "ids": ["otro:espejo-puente.obj"] },
+    { "nodo": 2, "ids": ["otro:espejo-cubo-rojo.obj"] },
+    { "nodo": 3, "ids": ["otro:espejo-poste.obj", "otro:espejo-puente.obj", "otro:espejo-cubo-rojo.obj"] }
+  ]
+}

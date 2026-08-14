@@ -1,0 +1,68 @@
+// ==========================================================================
+//  PRUEBA sintetica del objeto Particulas (formato texto). La usa
+//  prueba_particulas.w3s: carga -> partinfo -> simplay -> partinfo (vivas) ->
+//  guardarw3d (v4) -> reabrir -> lo mismo (la config sobrevive el round-trip).
+//    - "EmisorContinuo": cantidad 30/s con vida 2 s -> tras 30 ticks de 1/30 s
+//      tiene ~30 particulas vivas (1 por tick, ninguna murio todavia).
+//    - "EmisorRafaga": cantidad 0 (SOLO rafagas) + script que llama
+//      emitir(objeto("emisor"), 8) en inicio() -> exactamente 8 vivas.
+//    - "EmisorApagado": activo false -> ni el rate ni emitir() sacan nada.
+// ==========================================================================
+Whisk3D {
+    version: 20251127
+    Escena {
+        background: "0.2, 0.2, 0.25, 1.0"
+
+        Camera {
+            name: "Camara"
+            y: -8.0
+            z: 2.0
+        }
+
+        Particulas {
+            name: "EmisorContinuo"
+            textura: "texturas/particula.png"
+            cantidad: 30.0
+            vida: 2.0
+            tam: 0.4
+            vel: 2.0
+            dispersion: 45.0
+            gravedad: 4.0
+            aditivo: false
+            color: "1, 0.9, 0.8, 1"
+            desvanecer: true
+            activo: true
+        }
+
+        Particulas {
+            name: "EmisorRafaga"
+            x: 3.0
+            textura: "texturas/particula.png"
+            cantidad: 0.0
+            vida: 3.0
+            tam: 0.25
+            vel: 3.0
+            dispersion: 360.0
+            gravedad: -1.0
+            aditivo: true
+            color: "0.4, 0.8, 1, 0.9"
+            desvanecer: false
+            activo: true
+            // azar: jitter +-40% (vida minima 1.8 s > el segundo simulado: las 8
+            // siguen vivas al assert) + deriva suave. Round-trip por partinfo.
+            variacion: 0.4
+            turbulencia: 1.5
+            script: "particulas_rafaga.lua"
+            ref_emisor: "EmisorRafaga"
+        }
+
+        Particulas {
+            name: "EmisorApagado"
+            x: -3.0
+            textura: "texturas/particula.png"
+            cantidad: 60.0
+            vida: 2.0
+            activo: false
+        }
+    }
+}

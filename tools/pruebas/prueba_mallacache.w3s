@@ -1,0 +1,68 @@
+# ===========================================================================
+#  GEOMETRIA COMPARTIDA POR RUTA (MallaDatos.h) + COPY-ON-WRITE
+#
+#  El .w3d declara `Wavefront { filePath }` por objeto y cada objeto re-importa
+#  su OBJ: N cajas del mismo modelo eran N copias identicas del heap. Ahora la
+#  primera importacion registra sus arrays en el almacen de recursos
+#  (io/W3dRecursos.h, tipo MALLA) y las siguientes REAPUNTAN (+1 ref).
+#
+#  La escena: 4 imports, 2 archivos distintos (3x cubo rojo + 1 amarillo).
+#    -> con cache:  2 juegos de arrays vivos, refs 3 + 1 = 4
+#    -> sin cache:  0 registrados (cada malla posee su copia, como antes)
+#
+#  COW: el componente lua mueve UN vertice de Caja1 (setVerticePos) -> se
+#  desinstancia SOLO la capa de posiciones de Caja1; Caja2 y Caja3 no se
+#  mueven. La ref no se suelta (las otras capas siguen compartidas).
+#
+#  ROUND-TRIP: guardar el proyecto v4 con el cache prendido y apagado tiene
+#  que producir EL MISMO archivo byte a byte (la geometria compartida es un
+#  detalle de memoria, no de contenido).
+#
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_mallacache.w3s
+# ===========================================================================
+
+# --- A) CON CACHE: mismas rutas = mismos datos ------------------------------
+abrirw3d prueba_mallacache.w3d
+meminfo
+meminfo mallas 2
+meminfo mallasrefs 4
+meminfo desinst 0
+# la escena se VE igual que siempre (color por vertice + NoLight = pixel exacto).
+# Los puntos van SOBRE caras, corridos de la grilla/cursor (overlays sin depth).
+escenapx 0.4 1.5 0.4 es 255 0 0 8
+escenapx -3.6 1.5 0.4 es 255 0 0 8
+escenapx 0.4 2.7 -1.5 es 255 255 0 8
+
+# --- B) COW: editar UNA caja no mueve las otras -----------------------------
+simplay 3
+scriptinfo compartido mc_iguales 1
+scriptinfo compartido mc_movida 1
+scriptinfo compartido mc_intacta 1
+simstop
+# UNA desinstancia (solo la capa de posiciones de Caja1); la ref sigue viva
+# porque uv/normales/color/faces siguen compartidas -> refs no cambia
+meminfo desinst 1
+meminfo mallas 2
+meminfo mallasrefs 4
+# la caja testigo sigue dibujandose donde estaba
+escenapx 0.4 1.5 0.4 es 255 0 0 8
+
+# --- C) ROUND-TRIP v4: cache on == cache off, byte a byte -------------------
+abrirw3d prueba_mallacache.w3d
+guardarw3d prueba_mallacache_v4on.w3d
+mallacache off
+abrirw3d prueba_mallacache.w3d
+# sin cache no se registra nada (el motor de antes) y la escena se ve IGUAL
+meminfo mallas 0
+meminfo mallasrefs 0
+escenapx 0.4 1.5 0.4 es 255 0 0 8
+guardarw3d prueba_mallacache_v4off.w3d
+comparar prueba_mallacache_v4on.w3d prueba_mallacache_v4off.w3d
+mallacache on
+
+# --- D) el v4 reabierto carga del .w3dm horneado (sin Wavefront no hay
+#        dedup por ruta: eso lo cubre Prefab/Clon). Documentado, no bug. ------
+abrirw3d prueba_mallacache_v4on.w3d
+meminfo mallas 0
+escenapx 0.4 1.5 0.4 es 255 0 0 8

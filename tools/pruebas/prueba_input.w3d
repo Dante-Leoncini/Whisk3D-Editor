@@ -1,0 +1,26 @@
+// ==========================================================================
+//  PRUEBA sintetica del INPUT QUE LLEGA AL SCRIPT (formato texto).
+//  La corre prueba_input.w3s; el script es input_volcado.lua.
+//
+//  Un solo objeto con script alcanza: lo que se verifica es que la cruceta, el
+//  stick analogico y las flechas del teclado lleguen HASTA LUA por los binds
+//  stick("izq") y boton("nombre"), y con que prioridad entre ellos.
+// ==========================================================================
+Whisk3D {
+    version: 20251127
+    Escena {
+        background: "0.05, 0.05, 0.08, 1.0"
+
+        Camera {
+            name: "Camara"
+            y: -8.0
+            z: 2.0
+        }
+
+        Wavefront {
+            name: "Jugador"
+            filePath: uvanim-quad.obj
+            script: "input_volcado.lua"
+        }
+    }
+}

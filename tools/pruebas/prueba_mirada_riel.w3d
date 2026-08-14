@@ -1,0 +1,41 @@
+// ==========================================================================
+//  PRUEBA del MODO DE MIRADA de la camara (formato texto). La corre
+//  prueba_mirada_riel.w3s. Ver mirada-riel.cap.
+//
+//  `miradaRiel: true` es la palabra nueva: la camara toma el yaw/pitch/roll
+//  AUTORAL grabado en el nodo del riel en vez de mirar al target. Sin esa
+//  linea (o con false) se comporta como siempre: look-at al target.
+// ==========================================================================
+Whisk3D {
+    version: 20251127
+    Escena {
+        background: "0.02, 0.02, 0.03, 1.0"
+
+        Curve {
+            name: "Riel de Mirada"
+            filePath: mirada-riel.cap
+        }
+
+        // el TARGET: en el modo look-at la camara lo mira; con la mirada del
+        // riel solo decide DONDE se para (y aca ni eso: el .w3s usa nodo manual)
+        Collection {
+            name: "Mira"
+            x: 4.0
+            y: 0.0    // profundidad (en el .w3d de texto la vertical es `z`)
+            z: 5.0
+            // el script prueba los binds de lua (setMiradaRiel / rielDe) contra
+            // la camara de al lado; deja lo que lee en el mapa compartido
+            script: "mirada_riel.lua"
+            ref_cam: "Camara"
+        }
+
+        Camera {
+            name: "Camara"
+            fov: 45.0
+            target: "Mira"
+            riel: "Riel de Mirada"
+            offsetRiel: 0
+            miradaRiel: true
+        }
+    }
+}

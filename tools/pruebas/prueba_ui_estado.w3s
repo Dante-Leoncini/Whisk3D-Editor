@@ -1,0 +1,41 @@
+# ==========================================================================
+#  ESTADO GL DE LA UI DEL VIEWPORT DESPUES DEL OVERLAY DEL JUEGO.
+#  Correr DESDE ESTA CARPETA:
+#    cd <motor>/tools/pruebas
+#    ../../platform/linux/build/whisk3d --script prueba_ui_estado.w3s
+#
+#  Reporte del dueno (con captura): jugando, los botones de Play/Pausa de la
+#  barra del viewport salian con BORDES NEGROS en vez de transparentes.
+#  Causa: el HUD del juego termina dibujando una imagen SIN canal alpha
+#  (UIOverlay::DibujarImagenRect APAGA Blend para las opacas) y el bloque que
+#  re-armaba el estado 2D despues del overlay solo reponia la FUNCION de mezcla
+#  (BlendAlpha), nunca el Enable(Blend): la barra translucida salia opaca y las
+#  esquinas redondeadas de los botones, NEGRAS. La UI ahora AFIRMA su estado
+#  completo (mismo criterio que W3dDecalesDibujarPendientes); con el cache fino
+#  de estado GL, re-afirmar lo ya puesto cuesta cero llamadas de driver.
+#
+#  Los numeros (tema oscuro por defecto, fondo de escena 13,13,13):
+#    barra translucida (gris 0.5 sobre 13)  = 22,22,22   [con el bug: 31 opaco]
+#    tarjeta del boton sobre la barra        = 27,27,27   [con el bug: 0,0,0]
+# ==========================================================================
+abrirw3d prueba_ui_estado.w3d
+loadtex
+juego on
+simplay 2
+
+# el cache fino sigue coherente durante el pase de escena (0 desyncs): el bug
+# NO era un desync del cache -- el cache sabia que Blend quedo apagado --, era
+# la UI asumiendo un estado que nadie le garantizaba.
+glaudit 2
+
+# la BARRA (abajo en este layout) sigue TRANSLUCIDA aunque el HUD haya apagado
+# Blend: gris 0.5 sobre el fondo de escena = 22. Con el bug daba 31 (opaca).
+vppx 600 -15 es 22 22 22 5
+vppx 600 -25 es 22 22 22 5
+# ...y la TARJETA del primer boton no tiene los bordes negros: 27 (tarjeta
+# sobre barra). Con el bug este pixel daba 0,0,0 (el negro de la captura).
+vppx 30 -20 es 27 27 27 5
+vppx 60 -20 es 27 27 27 5
+
+simstop
+juego off

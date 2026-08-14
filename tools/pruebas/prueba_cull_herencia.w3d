@@ -1,0 +1,60 @@
+// ==========================================================================
+//  PRUEBA de la HERENCIA de soloCamaraActiva con DOS viewports 3D.
+//  La corre prueba_cull_herencia.w3s.
+//
+//  Reporte del dueno: con soloCamaraActiva puesto en el Culling padre, "el
+//  culling de cada viewport3d es parcialmente independiente en vez de ser
+//  exclusivo de la camara activa" — los LOD anidados adentro seguian eligiendo
+//  hijo con la camara del viewport que dibujaba. La designacion ahora SE HEREDA
+//  al subarbol mientras se dibuja (W3dHerenciaMedida, Culling.h).
+//
+//  Layout: DOS viewports. El primero mira POR la camara activa; el segundo es
+//  una orbita plantada a 250 unidades. Sin herencia, el ultimo viewport en
+//  dibujar (la orbita) dejaba a LodAdentro en el hijo GRUESO (dist 245 > 8);
+//  con herencia elige SIEMPRE con la camara del juego (dist 5 <= 8*0.9).
+// ==========================================================================
+Whisk3D {
+    version: 20251127
+    Escena {
+        background: "0.02, 0.02, 0.03, 1.0"
+        Camera {
+            name: "Camara"
+            fov: 60.0
+            x: 14.0
+            y: -3.0
+            z: 0.0
+            target: "CullZona"
+        }
+        Culling {
+            name: "CullZona"
+            activo: true
+            soloCamaraActiva: true
+            Wavefront { name: "Cull0" filePath: lod-barra-fina.obj x: 0.0 y: 0.0 scale: 0.05 }
+            Wavefront { name: "CullLejos" filePath: lod-barra-fina.obj x: 0.0 y: 0.0 z: 300.0 scale: 0.05 }
+            // LOD SIN flag propio, ADENTRO del Culling designado: HEREDA la
+            // camara de medida en todos los viewports
+            LOD {
+                name: "LodAdentro"
+                distancias: "8"
+                Wavefront { name: "AdFina"   filePath: lod-barra-fina.obj }
+                Wavefront { name: "AdGruesa" filePath: lod-barra-gruesa.obj }
+            }
+        }
+        // CONTROL: el mismo LOD sin flag pero AFUERA del Culling designado: la
+        // herencia NO se escapa del subarbol -> sigue midiendo por viewport (el
+        // ultimo en dibujar es la orbita a 250 -> hijo GRUESO).
+        LOD {
+            name: "LodFuera"
+            distancias: "8"
+            Wavefront { name: "FuFina"   filePath: lod-barra-fina.obj   z: 3.0 }
+            Wavefront { name: "FuGruesa" filePath: lod-barra-gruesa.obj z: 3.0 }
+        }
+    }
+    Layout {
+        ViewportRow {
+            Split: 0.5
+            Viewport3D { ViewFromCameraActive: true }
+            Viewport3D { posX: 0.0 posY: 0.0 posZ: 0.0 orbitDistance: 250.0 }
+        }
+    }
+}

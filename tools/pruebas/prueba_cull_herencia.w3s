@@ -1,0 +1,31 @@
+# Prueba de la HERENCIA de soloCamaraActiva (dos viewports 3D). Correr DESDE
+# ESTA CARPETA:
+#   cd <motor>/tools/pruebas
+#   ../../platform/linux/build/whisk3d --script prueba_cull_herencia.w3s
+#
+# El layout del .w3d abre DOS viewports: el primero mira POR la camara activa y
+# el segundo es una orbita plantada a 250 unidades, que ademas DIBUJA ULTIMO.
+# `lodelegido <lod> <n> dibujado` renderiza el frame entero y assertea el hijo
+# que QUEDO DIBUJADO (la decision del ultimo viewport en dibujar ese LOD), sin
+# re-medir nada: la herencia solo existe durante el render.
+abrirw3d prueba_cull_herencia.w3d
+loadtex
+
+# 1) HERENCIA: el LOD sin flag ADENTRO del Culling designado elige con la
+#    camara del JUEGO (dist 5.0 <= 8*0.9 -> hijo FINO) aunque el ultimo
+#    viewport en dibujar sea la orbita a 250. Sin herencia salia el GRUESO.
+lodelegido LodAdentro 0 dibujado
+
+# 2) NO-FUGA: el mismo LOD sin flag pero AFUERA del Culling designado sigue
+#    midiendo por viewport: la orbita (ultima en dibujar) esta a ~245 -> hijo
+#    GRUESO. La herencia rige el subarbol del Culling y NADA mas.
+lodelegido LodFuera 1 dibujado
+
+# 3) estabilidad: repetir el frame no cambia ninguna de las dos decisiones
+#    (la herencia se prende y APAGA por frame; no queda colgada entre frames)
+lodelegido LodAdentro 0 dibujado
+lodelegido LodFuera 1 dibujado
+
+# 4) render real de los dos viewports con la herencia activa (no crashea)
+bench 2 noswap
+lodinfo

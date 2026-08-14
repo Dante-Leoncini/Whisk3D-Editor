@@ -1,0 +1,43 @@
+# Prueba del CULLING POR TRIANGULO (modificador "Culling" / PVS estilo PS1).
+# Correr DESDE ESTA CARPETA:
+#   cd <motor>/tools/pruebas
+#   ../../platform/linux/build/whisk3d --script prueba_pvs.w3s
+#
+# pvsinfo <malla> [sectores [activo [trisDibujando]]] -> los args opcionales son
+# ASSERTS. La malla tiene 4 tris; el sidecar pvs-tris.pvs.json trae 2 sectores de
+# 2 tris. El .w3d declara sector 1 (dibuja 2 tris); el componente lua salta al
+# sector 2 con setSector() en inicio() (simplay). Con simstop la escena vuelve
+# al estado guardable y el round-trip v4 tiene que conservar modificador+sector.
+abrirw3d prueba_pvs.w3d
+pvsinfo MallaPVS 2 1 2
+guardarw3d prueba_pvs_v4.w3d
+# EL SIDECAR VIAJA ADENTRO DEL PAQUETE. Antes no entraba a ninguna entrada: el
+# .obj se guardaba como referencia EXTERNA y `sinExt + ".pvs.json"` daba un
+# nombre que no existe en el contenedor, asi que al mandar el .w3d a otra
+# maquina el PVS desaparecia SIN AVISO (ni siquiera figuraba en EXTERNOS.txt).
+# Ahora se ingiere como cualquier asset y el nodo guarda su nombre REAL.
+zipentrada prueba_pvs_v4.w3d extra/pvs-tris.pvs.json
+# y el .obj de origen sigue siendo EXTERNO (es del usuario, lo edita otro programa)
+zipentrada prueba_pvs_v4.w3d modelos/pvs-tris.obj no
+simplay 2
+scriptinfo compartido pvs_listo 1
+pvsinfo MallaPVS 2 2 2
+simstop
+# round-trip v4: el modificador (metodo/sector) viaja en el .w3d; los sectores
+# se releen del sidecar por la ruta del .obj de origen
+abrirw3d prueba_pvs_v4.w3d
+pvsinfo MallaPVS 2 1 2
+simplay 2
+pvsinfo MallaPVS 2 2 2
+simstop
+# fallback: sector 0 / fuera de rango = malla completa (4 tris)
+simplay 1
+setsector MallaPVS 0
+pvsinfo MallaPVS 2 0 4
+setsector MallaPVS 9
+pvsinfo MallaPVS 2 9 4
+setsector MallaPVS 1
+pvsinfo MallaPVS 2 1 2
+simstop
+# render real con el sector activo (ejercita el swap del IBO en el path VBO)
+bench 2 noswap

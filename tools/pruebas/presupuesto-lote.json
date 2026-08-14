@@ -1,0 +1,10 @@
+{
+  "editor": {
+    "mallasMin": 4,
+    "trisOpacosMin": 48
+  },
+  "lote": {
+    "mallas": 1,
+    "trisOpacosMin": 48
+  }
+}

@@ -1,0 +1,39 @@
+Whisk3D {
+    version: 20251127
+    Escena {
+        iconApp: Whisk3D_experiment.png
+        limpiarPantalla: true
+        background: "0.2, 0.2, 0.2, 1.0"
+
+        Mesh {
+            name: "Cube"
+            x: 0.0
+            y: 0.0
+            z: 0.0
+            scale: 1.0
+        }  
+
+        Instance {
+            name: "Instance"
+            target: "Cube"
+            count: 10
+            x: -3.0
+            y: 0.0
+            z: 0.0
+            rz: 10.0
+        }  
+    }
+
+    Layout {
+        ViewportRow {
+            Viewport3D {
+                posY: 5
+                posX: -5
+                rotX: 100.0
+                orbitDistance: 30.0
+            }
+            Outliner
+            Split: 0.7
+        }
+    }
+}

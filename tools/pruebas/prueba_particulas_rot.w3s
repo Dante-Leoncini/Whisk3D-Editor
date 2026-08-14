@@ -1,0 +1,73 @@
+# ==========================================================================
+#  ROTACION DE PARTICULAS: rotacion (angulo azaroso fijo al nacer) y
+#  velRotacion (giro continuo, signo azaroso por particula).
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_particulas_rot.w3s
+#
+#  Feedback del dueno: "me parece que a las particulas le falta rotaciones".
+#  El original nace cada sprite con un rotz azaroso FIJO ("rotz al nacer").
+#  Contrato:
+#    - default (rotacion off, velRotacion 0): billboard DERECHO y quieto,
+#      deterministico (rot 0, spin 0);
+#    - rotacion: true  -> nace con angulo azaroso 0..360 y LO MANTIENE;
+#    - velRotacion: N  -> gira N grados/s, signo azaroso POR particula.
+#  El azar sale del LCG deterministico del sistema: los valores asertados son
+#  reproducibles por construccion (mismo seed -> misma secuencia).
+# ==========================================================================
+abrirw3d prueba_particulas_rot.w3d
+loadtex
+
+# --- 1) PIXELES con la textura ASIMETRICA de cuadrantes (una particula por
+#        emisor: sin solapes). Vista reproducible mirando el plano de los
+#        billboards; el quad tiene medio-lado 1.0 (tam 2.0).
+simplay 1
+partinfo EmisorDerecho 1 1
+partinfo EmisorRotado 1 1
+vpvista material
+vporbita 0 0 0 20 0 0
+
+# EmisorDerecho (rot 0): el cuadrante ROJO queda abajo-izquierda, clavado.
+escenapx -6.5 -0.5 0 es 255 0 0 40
+# punto a 20 grados del eje +X del quad DERECHO: cae en el cuadrante
+# TRANSPARENTE (se ve el fondo, no un color pleno)
+escenapx -5.34 0.24 0 noes 0 255 0 60
+# EL MISMO punto relativo sobre el quad ROTADO (rot azaroso 36.2 del LCG):
+# ahi la textura girada muestra VERDE -> dos particulas con rotacion distinta
+# muestran orientacion distinta en pantalla.
+escenapx 0.66 0.24 0 es 0 255 0 60
+# y el par (abajo-izquierda) del rotado difiere del transparente del derecho
+escenapx 0.66 0.24 0 distintode -5.34 0.24 0 60
+
+# --- 2) NUMEROS deterministas del contrato -------------------------------
+simplay 2
+# default: SIEMPRE derecho y quieto (la regresion de "predecible y testeable")
+partrot EmisorDerecho 0 0 0.01
+partrot EmisorDerecho 1 0 0.01
+partrot EmisorDerecho 2 0 0.01
+# rotacion true: angulo azaroso FIJO por particula (valores del LCG del Core;
+# la 3ra ya sortea su textura -tras el primer draw nTex pasa a 1- y por eso su
+# valor difiere del de una corrida sin renders: deterministico igual)
+partrot EmisorRotado 0 36.20 0.5
+partrot EmisorRotado 1 121.02 0.5
+partrot EmisorRotado 2 306.05 0.5
+# ...y dos particulas del MISMO emisor tienen rotaciones distintas
+partrot EmisorRotado 0 distinto EmisorRotado 1
+partrot EmisorRotado 1 distinto EmisorRotado 2
+# velRotacion: nace derecho y gira 360 grados/s (el signo lo sortea el LCG
+# por particula; en esta secuencia ambos salen -). part 0 lleva 3 ticks de
+# giro (-36), part 1 lleva 2 (-24): el giro es POR PARTICULA y con el reloj.
+partrot EmisorGiro 0 -36 1.0
+partrot EmisorGiro 1 -24 1.0
+# 15 ticks (0.5 s) despues: el que gira avanzo +-180 y el derecho sigue en 0
+simplay 15
+partrot EmisorGiro 0 -216 1.0
+partrot EmisorGiro 0 distinto EmisorDerecho 0
+partrot EmisorDerecho 0 0 0.01
+
+# --- 3) ROUND-TRIP: guardar y reabrir conserva rotacion/velRotacion ------
+guardarw3d prueba_particulas_rot_rt.w3d
+abrirw3d prueba_particulas_rot_rt.w3d
+simplay 1
+partrot EmisorRotado 0 36.20 0.5
+partrot EmisorGiro 0 -12 1.0
+partrot EmisorDerecho 0 0 0.01

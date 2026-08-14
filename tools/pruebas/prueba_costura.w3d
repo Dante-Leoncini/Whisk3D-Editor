@@ -1,0 +1,26 @@
+// ==========================================================================
+//  PRUEBA sintetica de los PESOS DE UN GRUPO DE VERTICES A TRAVES DE UNA
+//  COSTURA (formato texto). La corre prueba_costura.w3s.
+//
+//  costura-quad.obj son dos triangulos que se tocan en la diagonal con COLOR
+//  POR VERTICE distinto a cada lado: las esquinas (-1,0,-1) y (1,0,1) tienen
+//  DOS control-points cada una (un vertice es unico por posicion + color + UV,
+//  y fusionarlos rompería el sombreado). El sidecar mete en el grupo los dos
+//  control-points del lado rojo.
+//
+//  El .w3dm guarda los pesos POR POSICION, asi que al recargar el peso de una
+//  posicion tiene que llegar a TODOS sus control-points. Antes llegaba a UNO
+//  solo y el grupo volvia incompleto.
+// ==========================================================================
+Whisk3D {
+    version: 20251127
+    Escena {
+        Camera { name: "Camara" y: -8.0 z: 2.0 }
+        Wavefront {
+            name: "QuadCostura"
+            filePath: costura-quad.obj
+            script: "costura_grupo.lua"
+            ref_malla: "QuadCostura"
+        }
+    }
+}

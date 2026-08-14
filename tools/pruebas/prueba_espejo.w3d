@@ -1,0 +1,92 @@
+// ==========================================================================
+//  PRUEBA sintetica del objeto Mirror (reflejo en agua). La usa
+//  prueba_espejo.w3s, que mide el reflejo con glReadPixels (comando espejopx).
+//
+//  ESCENA (mundo del motor, Y arriba; en el TEXTO 'y' es la Z del motor y
+//  'z' es la Y/vertical):
+//    - Orilla verde  (0, 179, 0)  en Y=10, marco alrededor del estanque.
+//    - Fondo marron  (102, 51, 0) en Y=8.8: OPACO y apenas bajo la lamina,
+//      igual que el estanque de Toad Village (por eso el reflejo, que queda
+//      mas hondo, no pasaria el z-test contra el fondo).
+//    - Puente cian   (0, 255, 255) en Y=11.5 sobre z=[6,10]: geometria OPACA
+//      ENTRE la camara y el agua. El reflejo NO tiene que pintarse encima.
+//    - Agua azul     (0, 0, 255) con d=0.5 en Y=10, el plano del espejo.
+//    - CuboRojo      (255, 0, 0) y CuboAmarillo (255, 255, 0) arriba del agua.
+//  Los materiales llevan 'NoLight': el pixel sale con el Kd exacto y el test
+//  compara colores absolutos sin depender de la luz.
+//
+//  ORDEN DE DIBUJO (= orden de los hijos): orilla -> fondo -> puente ->
+//  espejo -> agua -> cubos. El agua semitransparente va DESPUES del reflejo
+//  para que lo tina, y los cubos al final.
+// ==========================================================================
+Whisk3D {
+    version: 20251127
+    Escena {
+        background: "0.0, 0.0, 0.0, 1.0"
+
+        Wavefront {
+            name: "Orilla"
+            filePath: espejo-orilla.obj
+        }
+
+        Wavefront {
+            name: "Fondo"
+            filePath: espejo-fondo.obj
+        }
+
+        Wavefront {
+            name: "Puente"
+            filePath: espejo-puente.obj
+        }
+
+        // El espejo del agua: plano horizontal (mirrorY) a Y = 10 (declarado
+        // como 2*h = 20, la convencion historica del formato), acotado al
+        // rectangulo del estanque.
+        Mirror {
+            name: "EspejoAgua"
+            targets: "CuboRojo, CuboAmarillo"
+            mirrorX: false
+            mirrorY: true
+            mirrorZ: false
+            sinProfundidad: true
+            limiteIzquierdo: -6.0
+            limiteDerecho: 6.0
+            limiteFondo: -6.0
+            limiteFrente: 6.0
+            z: 20.0
+        }
+
+        Wavefront {
+            name: "Agua"
+            filePath: espejo-agua.obj
+        }
+
+        Wavefront {
+            name: "CuboRojo"
+            filePath: espejo-cubo-rojo.obj
+            x: 0.0
+            y: -4.0
+            z: 13.0
+        }
+
+        // ESPEJO VIEJO (compatibilidad del formato): declarado con la propiedad
+        // 'target' de siempre y SIN limites. visible:false -> no dibuja nada; esta
+        // para probar que un .w3d que no conoce 'targets' sigue abriendo igual y
+        // que el round-trip a v4 no le inventa la lista.
+        Mirror {
+            name: "EspejoViejo"
+            target: "CuboAmarillo"
+            mirrorZ: true
+            visible: false
+            z: 20.0
+        }
+
+        Wavefront {
+            name: "CuboAmarillo"
+            filePath: espejo-cubo-amarillo.obj
+            x: -4.5
+            y: -4.5
+            z: 13.0
+        }
+    }
+}

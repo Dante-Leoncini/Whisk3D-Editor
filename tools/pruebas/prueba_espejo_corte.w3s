@@ -1,0 +1,84 @@
+# ===========================================================================
+#  EL REFLEJO NO SALE A TRAVES DEL AGUA (recorte por PLANO DE MUNDO)
+#
+#  Reporte del dueno: "el recorte del reflejo esta mal y sale a traves del
+#  agua. cuando la rana besa a [el personaje] y el queda acostado en el agua,
+#  la espalda del reflejo se ve por encima del [personaje] original en vez de
+#  ser recortado."
+#
+#  LA CAUSA: un cuerpo MEDIO SUMERGIDO. La reflexion manda Y -> 2*plano - Y, o
+#  sea que la mitad que esta BAJO el agua se refleja HACIA ARRIBA y sale al
+#  aire, por encima del cuerpo real. El recorte que habia era SOLO el estencil,
+#  que recorta por la SILUETA DEL AGUA EN PANTALLA -- y esa imagen cae justo
+#  adentro de la silueta, asi que el estencil no la ve. El gate TargetSeRefleja
+#  tampoco: ese solo apaga el cuerpo ENTERO hundido.
+#
+#  EL ARREGLO: UN PLANO DE RECORTE DE USUARIO (glClipPlane / GL_CLIP_PLANE0,
+#  pipeline fijo, GL 1.1 y GL ES 1.1) en la superficie, prendido SOLO durante el
+#  pase del reflejo, que descarta todo lo que quede del lado de arriba. Los dos
+#  recortes se reparten el trabajo: el ESTENCIL en pantalla, el PLANO en el
+#  mundo. Sin planos de recorte en el driver (PlanosRecorteMax() == 0)
+#  PlanosRecorte es un no-op y el espejo sigue andando con el estencil solo.
+#
+#  MEDIDO ANTES DEL ARREGLO en esta misma escena: los pixeles de Y = 0.8 hasta
+#  Y = 1.4 (o sea HASTA UNA UNIDAD POR ENCIMA de la superficie, que esta en
+#  Y = 0.5) daban 115,121,121 = el reflejo rojo visto a traves del agua. Ahora
+#  dan 6,127,127 = agua sola.
+#
+#  Colores de la escena:
+#     agua sola sobre el fondo hondo ......... 6,127,127
+#     reflejo ROJO     bajo el agua .......... 115,121,121
+#     reflejo AMARILLO bajo el agua .......... 115,225,121
+#     el poste rojo REAL, fuera del agua ..... 255,0,0
+#
+#  Los puntos van con X = 0.35 (no 0) a proposito: sobre el eje X = 0 pasa la
+#  linea del eje Z de la grilla del editor y ese pixel mide la grilla.
+#
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_espejo_corte.w3s
+# ===========================================================================
+abrirw3d prueba_espejo_corte.w3d
+loadtex
+vpvista material
+# el contorno del objeto activo pintaria los pixeles que se miden
+deselectall
+activename Camara
+espejopx CorteEspejo info
+
+# --- EL BUG: la mitad SUMERGIDA no puede reflejarse hacia el AIRE ------------
+# PosteCruza va de Y=-0.5 a Y=0.7 con el agua en Y=0.5. El reflejo del punto
+# hundido Y=-0.1 cae en Y=+1.1: EN EL AIRE, y encima del cuerpo real (que
+# termina en Y=0.7). Ahi tiene que haber agua sola.
+espejopx CorteEspejo reflejo 0.35 -0.1 0 es 6 127 127 12
+espejopx CorteEspejo reflejo 0.35 -0.1 0 noes 115 121 121 24
+# y es EXACTAMENTE lo mismo que un punto de agua limpia lejos del poste
+espejopx CorteEspejo reflejo 0.35 -0.1 0 comoen 1.6 0.5 -0.6 12
+# lo mismo mas arriba todavia (reflejo de Y=-0.4 -> Y=+1.4)
+espejopx CorteEspejo reflejo 0.35 -0.4 0 es 6 127 127 12
+
+# --- Y LA MITAD DE ABAJO SIGUE DIBUJANDOSE ----------------------------------
+# el reflejo del punto EMERGIDO Y=0.62 cae en Y=0.38, bajo el agua: se ve.
+espejopx CorteEspejo reflejo 0.35 0.62 0 es 115 121 121 12
+# control: PosteSeco esta ENTERO fuera del agua (Y 1.0..2.0); su reflejo cae
+# entero bajo el plano y no lo toca el recorte nuevo.
+espejopx CorteEspejo reflejo -2.2 1.5 0 es 115 225 121 12
+espejopx CorteEspejo mundo -2.2 1.5 0 es 255 230 0 8
+
+# --- EL OBJETO REAL SE VE ENTERO --------------------------------------------
+# arriba del agua, color crudo
+espejopx CorteEspejo mundo 0.35 0.6 0 es 255 0 0 8
+# y abajo del agua, tenido por la lamina (el pase del espejo no le abre agujeros)
+espejopx CorteEspejo mundo 0.35 -0.3 0 es 115 121 121 12
+
+# --- ROUND-TRIP v4 ----------------------------------------------------------
+guardarw3d prueba_espejo_corte_v4.w3d
+abrirw3d prueba_espejo_corte_v4.w3d
+loadtex
+vpvista material
+deselectall
+activename Camara
+espejopx CorteEspejo info
+espejopx CorteEspejo reflejo 0.35 -0.1 0 es 6 127 127 12
+espejopx CorteEspejo reflejo 0.35 0.62 0 es 115 121 121 12
+espejopx CorteEspejo reflejo -2.2 1.5 0 es 115 225 121 12
+espejopx CorteEspejo mundo 0.35 0.6 0 es 255 0 0 8

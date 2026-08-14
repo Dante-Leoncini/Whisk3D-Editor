@@ -1,0 +1,10 @@
+count 6
+# Riel A de juguete para prueba_riel_camara.w3s: 6 nodos en linea sobre X, a 5
+# de altura y 3 de profundidad. Es el riel "normal": la camara se proyecta
+# sobre el nodo mas cercano a la mira y la sigue a lo largo del recorrido.
+p 0.0 5.0 3.0
+p 2.0 5.0 3.0
+p 4.0 5.0 3.0
+p 6.0 5.0 3.0
+p 8.0 5.0 3.0
+p 10.0 5.0 3.0

@@ -1,0 +1,41 @@
+// ==========================================================================
+//  PRUEBA de la GEOMETRIA COMPARTIDA por ruta (MallaDatos.h, formato texto).
+//  La corre prueba_mallacache.w3s.
+//
+//  TRES Wavefront con el MISMO filePath (espejo-cubo-rojo.obj) y uno con otro
+//  (espejo-cubo-amarillo.obj): 4 imports, 2 archivos distintos. Con el cache,
+//  el heap guarda DOS juegos de arrays (refs 3 y 1); sin cache, CUATRO.
+//  Los cubos son de color por vertice + NoLight: el pixel sale exacto.
+//
+//  Caja1 lleva el componente de COW: mueve un vertice SUYO y verifica que
+//  Caja2 (mismo .obj) no se mueve.
+//
+//  OJO: en el .w3d de TEXTO la vertical se llama `z` y la profundidad `y`.
+// ==========================================================================
+Whisk3D {
+    version: 20251127
+    Escena {
+        background: "0.05, 0.05, 0.05, 1.0"
+
+        Camera {
+            name: "Camara"
+            fov: 60.0
+            y: -8.0
+            z: 0.0
+        }
+
+        Wavefront {
+            name: "Caja1"
+            filePath: espejo-cubo-rojo.obj
+            x: -3.2 y: 0.0 z: 0.0
+            script: "mallacache_componente.lua"
+            ref_caja1: "Caja1"
+            ref_caja2: "Caja2"
+        }
+        Wavefront { name: "Caja2" filePath: espejo-cubo-rojo.obj x: 0.0 y: 0.0 z: 0.0 }
+        Wavefront { name: "Caja3" filePath: espejo-cubo-rojo.obj x: 3.2 y: 0.0 z: 0.0 }
+
+        // un archivo DISTINTO: el almacen tiene que contar dos datos, no uno
+        Wavefront { name: "Otra"  filePath: espejo-cubo-amarillo.obj x: 0.0 y: 0.0 z: 4.0 }
+    }
+}

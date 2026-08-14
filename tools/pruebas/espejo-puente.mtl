@@ -1,0 +1,6 @@
+# 'NoLight' (extension de Whisk3D) apaga la iluminacion del material:
+# el pixel sale con el color del vertice, sin depender de la luz.
+newmtl PuenteCian
+Kd 0.0 1.0 1.0
+d 1.00
+NoLight

@@ -1,0 +1,58 @@
+// ==========================================================================
+//  PRUEBA sintetica de un ESPEJO DE PARED ACOTADO (formato texto).
+//  La corre prueba_espejo_pared.w3s.
+//
+//  El recorte del reflejo se expresa en el PLANO DEL ESPEJO (limU sobre EjeU(),
+//  limV sobre EjeV()). Para un espejo de pared -- mirrorZ, que es ademas el
+//  default de la clase -- U es X y V es la ALTURA: un rectangulo vertical.
+//  Antes los limites se comparaban contra .x/.z de mundo y el semiespacio de
+//  "detras del espejo" estaba clavado en -Y, asi que ESTA escena no se podia
+//  acotar de ninguna manera.
+//
+//  OJO con las coordenadas: en el .w3d de TEXTO la vertical se llama `z` y la
+//  profundidad `y`. El espejo se planta a `y: 2*d` para que su plano quede en
+//  profundidad d (el punto fijo de la matriz de reflexion es el punto medio).
+// ==========================================================================
+Whisk3D {
+    version: 20251127
+    Escena {
+        background: "0.05, 0.05, 0.05, 1.0"
+
+        Camera {
+            name: "Camara"
+            fov: 60.0
+            y: -9.0
+            z: 1.5
+        }
+
+        // los tres postes, DELANTE de la pared (profundidad y > -2)
+        // rojo, centrado: cae entero adentro del rectangulo
+        Wavefront { name: "PosteCentro" filePath: espejo-poste.obj  x:  0.0 y: 1.0 z: 1.5 }
+        // amarillo, medio afuera por la derecha (x 1.7..2.7 contra el borde 2.0)
+        Wavefront { name: "PosteBorde"  filePath: espejo-poste2.obj x:  2.2 y: 1.0 z: 1.5 }
+        // rojo, MUY afuera: no proyecta nada adentro -> el gate lo apaga
+        Wavefront { name: "PosteLejos"  filePath: espejo-poste.obj  x:  7.0 y: 1.0 z: 1.5 }
+        // amarillo, BAJO: ocupa altura 0.1..1.1 contra un borde V que empieza en
+        // 0.5, o sea que su reflejo queda CORTADO POR ABAJO. Ese es el eje que
+        // antes no existia: el semiespacio de recorte estaba clavado en -Y y los
+        // limites solo hablaban de X/Z de mundo, asi que la altura no se podia
+        // acotar de ninguna manera.
+        Wavefront { name: "PosteBajo"   filePath: espejo-poste2.obj x: -1.0 y: 1.0 z: 0.6 }
+
+        // LA PARED: reflejo en profundidad (mirrorZ), acotado a un rectangulo
+        // VERTICAL. limU = X en [-2, 2]; limV = ALTURA en [0.5, 3.0].
+        Mirror {
+            name: "EspejoPared"
+            targets: "PosteCentro, PosteBorde, PosteLejos, PosteBajo"
+            mirrorX: false
+            mirrorY: false
+            mirrorZ: true
+            recorte: true
+            limiteU0: -2.0
+            limiteU1: 2.0
+            limiteV0: 0.5
+            limiteV1: 3.0
+            y: -4.0
+        }
+    }
+}

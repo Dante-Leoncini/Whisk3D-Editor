@@ -1,0 +1,69 @@
+// ==========================================================================
+//  PRUEBA de los DOS agujeros del espejo horizontal que se veian en un nivel
+//  real y NO en prueba_espejo_z (formato texto). La corre
+//  prueba_espejo_lamina.w3s.
+//
+//  Todo el estanque vive LEJOS DEL ORIGEN (X ~ 120, Z ~ 1000), como en un nivel
+//  de verdad. No es decorado: la precision de la profundidad interpolada
+//  empeora con la magnitud de las coordenadas, y ES la variable que hacia que
+//  el bug (1) se viera en el juego y no en una escena sintetica centrada en el
+//  origen.
+//
+//   (1) LA LAMINA ES TESELADA (128 triangulos) y NO HAY FONDO DE ESTANQUE.
+//       La lamina de agua de un nivel real son decenas de triangulos sobre EL
+//       MISMO plano del espejo y se dibuja DESPUES de el. El pase D del espejo
+//       (que devuelve la profundidad de la silueta al plano) estampa UN SOLO
+//       quad grande: dos teselados del mismo plano no interpolan la misma z,
+//       asi que con un sesgo constante de pocos ULPs la lamina PERDIA el z-test
+//       triangulo por triangulo y no se dibujaba. Sin fondo debajo, el pixel se
+//       quedaba con el color de borrado: EL AGUA NEGRA A PARCHES.
+//
+//   (2) EL ESPEJO DECLARA hundimientoMaximo. El poste esta 2.5 unidades sobre
+//       la lamina ("saltando"); con el espejo EXACTO su reflejo cae 2.5 por
+//       debajo y en pantalla se corre FUERA de la silueta del agua, donde el
+//       recorte -- bien -- lo borra: es el "salto sobre el agua y no hay
+//       reflejos". Con el tope el reflejo no baja de 0.6 y se sigue viendo.
+//
+//  OJO: en el .w3d de TEXTO la vertical se llama `z` y la profundidad `y`.
+//     superficie del agua (translucida, TESELADA) en Y = 0.5, rect 3x3 centrado
+//     en (120, 1000); el poste en (120, 3.0, 1000).
+// ==========================================================================
+Whisk3D {
+    version: 20251127
+    Escena {
+        background: "0.05, 0.05, 0.08, 1.0"
+
+        Camera {
+            name: "Camara"
+            fov: 60.0
+            x: 120.0
+            y: 993.0
+            z: 3.2
+            rotX: -18.0
+        }
+
+        Wavefront { name: "PosteAlto" filePath: espejo-poste.obj x: 120.0 y: 1000.0 z: 3.0 }
+
+        Mirror {
+            name: "ReflejoLamina"
+            target: "PosteAlto"
+            mirrorX: false
+            mirrorY: true
+            mirrorZ: false
+            limiteIzquierdo: 118.5
+            limiteDerecho: 121.5
+            limiteFondo: 998.5
+            limiteFrente: 1001.5
+            hundimientoMaximo: 0.6
+            // el Mirror va en el ORIGEN salvo por la vertical: su matriz de
+            // mundo se aplica a puntos de MUNDO, asi que cualquier X/Z distinta
+            // de 0 duplicaria esas coordenadas del reflejo. Los limites, en
+            // cambio, SI son coordenadas de mundo.
+            z: 1.0
+        }
+
+        // la lamina TESELADA, en el plano EXACTO del espejo y DESPUES de el en
+        // el arbol (que es el orden de dibujo).
+        Wavefront { name: "Agua" filePath: espejo-lamina-teselada.obj x: 120.0 y: 1000.0 z: 0.5 scale: 3.0 }
+    }
+}

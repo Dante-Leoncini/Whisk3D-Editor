@@ -1,0 +1,38 @@
+# ==========================================================================
+#  ESTADISTICAS EN VIVO del viewport (overlay "faces: dibujadas/total" + "gl")
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_stats_vivo.w3s
+#
+#  Pedido del dueno: "las caras tiene que mostrar exactamente cuantos poligonos
+#  con el culling se estan dibujando y cuantas hay en total" + "un contador de
+#  llamadas de opengl". El overlay ahora muestra lo EMITIDO de verdad por el
+#  pase de escena (indices/3, la misma fuente que el bench: g_stat* del Core),
+#  no el total de la escena dos veces. `statsvivo` lee esos mismos contadores
+#  por script y ASSERTA el rango de triangulos dibujados.
+#
+#  Escena: prueba_pvs.w3d = UNA malla de 4 triangulos con el modificador
+#  Culling por triangulo (2 sectores de 2 tris, arranca en el sector 1).
+#  Al cambiar de celda/sector el numero BAJA/SUBE exactamente como el culling.
+# ==========================================================================
+abrirw3d prueba_pvs.w3d
+loadtex
+
+# sector 1 activo: de los 4 tris de la malla se EMITEN solo 2 (el tercero es
+# el triangulo SOLIDO del gizmo de la camara activa: overlay del editor, se va
+# solo al dar Play)
+statsvivo 3 3
+
+# malla COMPLETA (sector 0): se emiten los 4 (+1 del gizmo)
+setsector MallaPVS 0
+statsvivo 5 5
+
+# sector 2: baja de nuevo (el numero refleja el culling, no el total)
+setsector MallaPVS 2
+statsvivo 3 3
+
+# CON EL JUEGO CORRIENDO el contador sigue vivo (el overlay se puede dejar
+# prendido jugando): el componente lua salta al sector 2 en inicio()
+juego on
+simplay 2
+statsvivo 2 2
+juego off

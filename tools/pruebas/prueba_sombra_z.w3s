@@ -1,0 +1,83 @@
+# ===========================================================================
+#  LA SOMBRA (material `decal`) CONTRA EL Z-FIGHTING
+#
+#  Reporte del dueno (2026-08): "sombra de crash que se pierde por z-fighting
+#  pese al material decal [...] probalo con la sombra sobre terreno inclinado y
+#  sobre los troncos".
+#
+#  prueba_sombras.w3s ya cubre las sombras REALES de Toad Village sobre piso
+#  llano. Esta cubre los dos casos que se pierden:
+#
+#   A) RAMPA a 30 grados, blob EXACTAMENTE COPLANAR (mismo rotX, mismo origen).
+#   B) RAMPA a 55 grados: cuanto mas inclinada la superficie, mas grande es la
+#      pendiente de profundidad por pixel y peor el redondeo del z-test.
+#      -> Arreglo: la calcomania dibuja con DepthLEqual (antes DepthLess, y el
+#         empate exacto NO pasaba: la sombra salia comida a lunares).
+#   C) EL TRONCO / EL ORDEN: el blob se declara ANTES de la superficie que lo
+#      recibe. Es el caso REAL de Toad Village: CrashSombra y las sombras de las
+#      ranas son objetos SUELTOS, y los troncos y la malla EscenarioAlpha se
+#      declaran DESPUES. Como una calcomania NO escribe z a proposito, esos
+#      opacos posteriores la borraban entera. Medido antes del arreglo: el pixel
+#      del blob daba 70,70,70 (la superficie ganaba) en vez de 26,26,26.
+#      -> Arreglo: las mallas que son SOLO calcomania se DIFIEREN y se dibujan
+#         cuando la escena opaca ya esta completa (Mesh.cpp:
+#         W3dDecalesDibujarPendientes, el mismo mecanismo de las particulas).
+#   D) PISO LLANO de control (el caso que ya andaba).
+#   E) EL CUERPO QUE LA PROYECTA, opaco y por delante: la calcomania no escribe
+#      z pero SI hace z-test, asi que no puede pintarse encima de el.
+#
+#  Colores (NoLight -> el pixel es Kd*255 exacto):
+#     superficie ... 204,204,204     sombra ... 26,26,26
+#
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_sombra_z.w3s
+# ===========================================================================
+abrirw3d prueba_sombra_z.w3d
+loadtex
+
+# los flags del material: transparente + NO escribe z + sesgo negativo + orden 1
+matflags sombra-blob decal
+matflags sombra-piso normal
+
+# vista FIJA (el assert de pixel tiene que ser reproducible)
+vporbita 0 0 0 16 -30 0
+
+# --- A) rampa 30 grados, blob coplanar --------------------------------------
+escenapx -6 0 0    es 26 26 26 6
+escenapx -6 0 0.4  es 26 26 26 6
+escenapx -6 0 0    masoscuroque -6 0 1.2 60
+
+# --- B) rampa 55 grados (el peor caso de pendiente) -------------------------
+escenapx -2 0 0    es 26 26 26 6
+escenapx -2 0 0.4  es 26 26 26 6
+
+# --- C) EL ORDEN: el blob declarado ANTES de la superficie que lo recibe -----
+# (el caso de la sombra de Crash sobre los troncos). Sin el pase diferido este
+# es el assert que fallaba: la superficie, dibujada despues, borraba la sombra.
+escenapx 2 0 0     es 26 26 26 6
+escenapx 2 0 0.4   es 26 26 26 6
+
+# --- D) piso llano (control) ------------------------------------------------
+escenapx 6 0 0     es 26 26 26 6
+escenapx 6 0 0.4   es 26 26 26 6
+
+# --- la superficie SIGUE ahi (la sombra no la borro) ------------------------
+escenapx -6 0 1.2  masclaroque -6 0 0 60
+
+# --- E) LA CALCOMANIA NO TAPA LO QUE ESTA DELANTE ---------------------------
+# El cuerpo que proyecta la sombra es opaco y esta MAS CERCA de la camara. Una
+# calcomania no escribe z, pero SI hace z-test: el cuerpo tiene que ganar. Si
+# el pase diferido dibujara las calcomanias sin z-test, este pixel daria 26.
+escenapx 6 1.6 -1.2  es 204 204 204 6
+escenapx 6 1.6 -1.2  masclaroque 6 0 0 60
+
+# --- ROUND-TRIP v4 ----------------------------------------------------------
+guardarw3d prueba_sombra_z_v4.w3d
+abrirw3d prueba_sombra_z_v4.w3d
+loadtex
+matflags sombra-blob decal
+vporbita 0 0 0 16 -30 0
+escenapx -6 0 0    es 26 26 26 6
+escenapx -2 0 0    es 26 26 26 6
+escenapx 2 0 0     es 26 26 26 6
+escenapx 6 0 0     es 26 26 26 6

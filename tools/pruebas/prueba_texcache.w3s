@@ -1,0 +1,91 @@
+# ===========================================================================
+#  CACHE DE TEXTURAS POR RUTA + PIXELADO GLOBAL
+#
+#  Reporte del dueno (2026-08): "las texturas las estas cargando multiples
+#  veces. ese es un error de whisk3d editor. tenes que guardar el path de una
+#  textura y si esa textura ya se cargo, ya se cargo! no la cargues en memoria
+#  multiples veces".
+#
+#  La escena tiene 6 objetos con 6 MATERIALES DISTINTOS que declaran el MISMO
+#  `map_Kd texturas/cuadrantes.png` (64x64), mas uno con texturas/rojo.png
+#  (8x8). O sea: 7 pedidos de textura, 2 imagenes distintas.
+#
+#  Cuentas exactas (RGBA8):
+#    cuadrantes 64x64 = 16 384 B; con la piramide de mipmaps = 21 845 B
+#    rojo        8x8  =    256 B; con mipmaps                =    341 B
+#    -> con cache y mipmaps: 21 845 + 341 = 22 186 B
+#    -> SIN cache          : 6*21 845 + 341 = 131 411 B  (5,9x mas)
+#    -> con cache y PIXELADO (sin mipmaps): 16 384 + 256 = 16 640 B
+#
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_texcache.w3s
+# ===========================================================================
+
+# --- 1) EL BUG: sin cache, la misma imagen se sube una vez por material -----
+texcache off
+abrirw3d prueba_texcache.w3d
+loadtex
+texinfo
+# 7 pedidos = 7 cargas de disco (cero reusos). Es lo que hacia el motor antes.
+texinfo cargas 7
+texinfo reusos 0
+texinfo subidos 131411
+
+# --- 2) EL ARREGLO: con cache, 7 pedidos = 2 cargas -------------------------
+texcache on
+abrirw3d prueba_texcache.w3d
+loadtex
+texinfo
+texinfo cargas 2
+texinfo reusos 5
+texinfo subidos 22186
+# y el ASSERT duro: la escena entera no puede pasar de 22 186 B de texturas.
+# Si alguien vuelve a subir la misma imagen N veces, este numero explota.
+texinfo max 22186
+
+# --- 3) SE LIBERA DE VERDAD al cerrar la escena -----------------------------
+# (abrirw3d hace ReiniciarEscena, que ahora libera las texturas del proyecto
+#  anterior: si no liberara, el contador de vivas iria creciendo corrida a
+#  corrida en vez de quedarse en 2 de contenido)
+abrirw3d prueba_texcache.w3d
+loadtex
+texinfo contenido 2
+
+# --- 3bis) NO SE DA PLAY CON TEXTURAS A MEDIO CARGAR ------------------------
+# ("no se puede dar play hasta que carguen todas las texturas"). Recien abierto,
+# el proyecto tiene los 7 pedidos en la cola DIFERIDA (1 por frame). `juegotex`
+# corre LA MISMA funcion que el boton Play del editor: si queda algo, lo carga
+# entero antes de arrancar.
+abrirw3d prueba_texcache.w3d
+texpend 7
+juegotex
+texpend 0
+
+# --- 4) PIXELADO GLOBAL: sin mipmaps -> ~1/4 menos de GPU -------------------
+# ("pixela todas las texturas y no uses filtros de textura"). Se declara en la
+# cabecera del .w3d con `pixelado: true`; aca se prende a mano para medir el
+# mismo contenido con y sin.
+abrirw3d prueba_texcache.w3d
+pixelado on
+loadtex
+texinfo
+pixelado es true
+texinfo subidos 16640
+texinfo max 16640
+
+# --- 4ter) el .w3d de TEXTO tambien lo declara ------------------------------
+# Es EXACTAMENTE la linea que hay que agregarle a CrashToadVillage.w3d, adentro
+# de `Escena { }` y al lado de `background`:   pixelado: true
+abrirw3d prueba_texcache_pix.w3d
+pixelado es true
+loadtex
+texinfo subidos 16640
+
+# --- 5) ROUND-TRIP v4: `pixelado` tiene que sobrevivir al guardado ----------
+guardarw3d prueba_texcache_v4.w3d
+abrirw3d prueba_texcache_v4.w3d
+loadtex
+pixelado es true
+# y un .w3d que NO lo declara vuelve a false (no se hereda entre proyectos)
+abrirw3d prueba_texcache.w3d
+pixelado es false

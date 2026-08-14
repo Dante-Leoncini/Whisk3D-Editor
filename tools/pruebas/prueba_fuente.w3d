@@ -1,0 +1,23 @@
+// ==========================================================================
+//  PRUEBA sintetica de la FUENTE BITMAP en WhiskUI (Texto2D.fuenteBitmap).
+//  La usa prueba_fuente.w3s: el .w3dui declara un texto con
+//  fuenteBitmap: "texturas/ui/fuente-bitmap-npot.png" (el .json de glifos
+//  hermano lo deriva el motor) y otro sin fuenteBitmap (fuente comun).
+//  El round-trip a v4 tiene que conservar el campo (comando uifuente).
+// ==========================================================================
+Whisk3D {
+    version: 20251127
+    Escena {
+        background: "0.2, 0.2, 0.25, 1.0"
+
+        Camera {
+            name: "Camara"
+            y: -8.0
+            z: 2.0
+        }
+
+        UI {
+            archivo: "prueba_fuente.w3dui"
+        }
+    }
+}

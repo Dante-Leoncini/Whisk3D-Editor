@@ -1,0 +1,64 @@
+// ==========================================================================
+//  PRUEBA del ORDEN DE PASADAS del espejo con Z-BUFFER (formato texto).
+//  La corre prueba_espejo_z.w3s.
+//
+//  Los tres reclamos del dueno, en una escena:
+//   (a) el reflejo aparece SOLO adentro del agua;
+//   (b) una geometria OPACA entre la camara y el agua TAPA el reflejo (antes,
+//       con `sinProfundidad`, el reflejo se pintaba encima de ella);
+//   (c) el fondo OPACO del estanque, que esta apenas debajo de la superficie y
+//       por lo tanto MAS ARRIBA que el reflejo, ya no lo mata.
+//  Y el gate del punto 4: saltando alto y parado en la orilla se sigue viendo.
+//
+//  OJO: en el .w3d de TEXTO la vertical se llama `z` y la profundidad `y`.
+//  Coordenadas de MUNDO (X, Y arriba, Z profundidad):
+//     superficie del agua (translucida) en Y = 0.5, rect X[-3,3] Z[-3,3]
+//     fondo del estanque (OPACO, azul)  en Y = 0.4   <- por ENCIMA del reflejo
+//     PosteAlto   rojo     en (0, 4.0, 0)   "saltando": su reflejo cae en Y=-3.0
+//     PosteOrilla amarillo en (3.3, 1.5, 0) a caballo del borde X=3
+//     PosteLejos  rojo     en (8, 1.5, 0)   ya no cae nada adentro del agua
+//     Tapa        verde    OPACA, entre la camara y el agua
+//
+//  ESTE espejo NO declara `sinProfundidad`: con la mascara de estencil ya no
+//  hace falta apagar el z-test para que el reflejo le gane al fondo del estanque.
+// ==========================================================================
+Whisk3D {
+    version: 20251127
+    Escena {
+        background: "0.05, 0.05, 0.08, 1.0"
+
+        Camera {
+            name: "Camara"
+            fov: 60.0
+            y: -7.0
+            z: 3.2
+            rotX: -18.0
+        }
+
+        Wavefront { name: "FondoEstanque" filePath: espejo-piso.obj  z: 0.4 scale: 6.0 }
+
+        Wavefront { name: "PosteAlto"   filePath: espejo-poste.obj  x: -2.0 z: 2.6 }
+        Wavefront { name: "PosteOrilla" filePath: espejo-poste2.obj x: 3.3 z: 1.5 }
+        Wavefront { name: "PosteLejos"  filePath: espejo-poste.obj  x: 8.0 z: 1.5 }
+        Wavefront { name: "PosteTapado" filePath: espejo-poste.obj x: 1.4 y: -2.6 z: 1.5 }
+
+        // la TAPA opaca: se dibuja ANTES del espejo, asi su profundidad ya esta
+        // en el buffer cuando la mascara del agua se marca CON z-test.
+        Wavefront { name: "Puente" filePath: espejo-tapa.obj y: -0.5 z: -0.4 scale: 3.0 }
+
+        Mirror {
+            name: "ReflejoZ"
+            targets: "PosteAlto, PosteOrilla, PosteLejos, PosteTapado"
+            mirrorX: false
+            mirrorY: true
+            mirrorZ: false
+            limiteIzquierdo: -3.0
+            limiteDerecho: 3.0
+            limiteFondo: -3.0
+            limiteFrente: 3.0
+            z: 1.0
+        }
+
+        Wavefront { name: "Agua" filePath: espejo-lamina.obj z: 0.5 scale: 6.0 }
+    }
+}

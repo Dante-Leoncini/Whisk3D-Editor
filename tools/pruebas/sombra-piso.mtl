@@ -1,0 +1,6 @@
+# SIN textura y con NoLight: el pixel es EXACTAMENTE Kd*255 = 204,204,204.
+newmtl sombra-piso
+Kd 0.800000 0.800000 0.800000
+d 1.0
+NoLight
+BackfaceCullingOff

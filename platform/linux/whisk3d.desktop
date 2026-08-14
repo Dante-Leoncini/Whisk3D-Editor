@@ -1,0 +1,14 @@
+[Desktop Entry]
+#Version=1.5 # Version is for spec version, not app version
+X-AppVersion=25.12.06
+Type=Application
+Name=Whisk3D pre-alpha
+GenericName=Game Engine
+Comment=Creación de juegos 3D, Animación y Modelado con estilo retro
+Exec=whisk3d %f
+Icon=whisk3d
+Terminal=false
+StartupNotify=true
+Categories=3DGraphics;Graphics;
+MimeType=application/vnd.whisk3d.proyecto+zip;application/x-whisk3d;
+Keywords=3d;modeling;animation;painting;sculpting;texturing;rendering;render engine;cycles;game engine;

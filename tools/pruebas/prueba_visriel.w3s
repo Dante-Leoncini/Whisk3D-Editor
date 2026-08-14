@@ -1,0 +1,84 @@
+# ==========================================================================
+#  VISIBILIDAD POR NODO DEL RIEL, punta a punta y POR PIXELES.
+#  Correr DESDE ESTA CARPETA:
+#    cd <motor>/tools/pruebas
+#    ../../platform/linux/build/whisk3d --script prueba_visriel.w3s
+#
+#  El cable completo (visriel_componente.lua):
+#    camara sobre el riel (visriel.cap, 4 nodos) -> rielDe(cam) publica el
+#    INDICE FRACCIONARIO del nodo -> setVisCurvaT(zona, t) -> VisZona modo
+#    curva -> la playlist del `.w3dvis` decide QUE TRIANGULOS se dibujan.
+#  Celdas de vis-tris.w3dvis (1-based): 1=[t0,t1] 2=[t2,t0,t1] 3=[t2,t3]
+#  4=[t3,t2]. celda = 1 + floor(indice).
+#
+#  El indice lo hornea la camara AL DIBUJAR (UpdatePosition corre con el
+#  frame): por eso cada paso hace `bench 1 noswap` (un frame real) antes del
+#  simplay que se lo entrega a la zona. En el juego hay un frame por tick, asi
+#  que ahi el indice esta siempre fresco.
+#
+#  Los pixeles se miran desde ARRIBA (vporbita pitch 90): triangulo dibujado =
+#  mas claro que el fondo; triangulo recortado = identico al fondo vacio
+#  (-3.5, 0, 3). Las fotos de 3 nodos quedan en /tmp para mirar a ojo.
+# ==========================================================================
+abrirw3d prueba_visriel.w3d
+loadtex
+vporbita 0 0 0 12 90 0
+
+# celda declarada en el .w3d: 1 -> dibuja t0 y t1 (el estado de arranque)
+visinfo MallaVis 4 1 2
+
+activename Jugador
+
+# --- NODO 0: el jugador arranca al pie del primer nodo -> indice 0.00, celda 1
+objpos 0 0 5
+bench 1 noswap
+simplay 6
+scriptinfo compartido vr_indice 0.00
+visinfo MallaVis 4 1 2
+escenapx foto /tmp/w3d_visriel-nodo0.ppm
+escenapx -3.5 0 -0.3 masclaroque -3.5 0 3 40
+escenapx -1.5 0 -0.3 masclaroque -3.5 0 3 40
+escenapx  1.5 0 -0.3 comoen -3.5 0 3
+escenapx  3.5 0 -0.3 comoen -3.5 0 3
+
+# --- NODO 1: camina hasta el segundo nodo -> indice 1.00, celda 2 (APARECE t2,
+#     siguen t0 y t1: el registro DELTA de la playlist, no la malla entera)
+objpos 2 0 5
+bench 1 noswap
+simplay 6
+scriptinfo compartido vr_indice 1.00
+visinfo MallaVis 4 2 3
+escenapx foto /tmp/w3d_visriel-nodo1.ppm
+escenapx -3.5 0 -0.3 masclaroque -3.5 0 3 40
+escenapx -1.5 0 -0.3 masclaroque -3.5 0 3 40
+escenapx  1.5 0 -0.3 masclaroque -3.5 0 3 40
+escenapx  3.5 0 -0.3 comoen -3.5 0 3
+
+# --- ENTRE NODOS: mitad de camino entre el nodo 2 y el 3 -> indice 2.50 (la
+#     prueba de que lo publicado es FRACCIONARIO), celda 3 (DESAPARECEN t0 y
+#     t1, aparece t3; el stepper avanza de a una celda por tick)
+objpos 5 0 5
+bench 1 noswap
+simplay 6
+scriptinfo compartido vr_indice 2.50
+visinfo MallaVis 4 3 2
+escenapx foto /tmp/w3d_visriel-nodo2.ppm
+escenapx -3.5 0 -0.3 comoen -3.5 0 3
+escenapx -1.5 0 -0.3 comoen -3.5 0 3
+escenapx  1.5 0 -0.3 masclaroque -3.5 0 3 40
+escenapx  3.5 0 -0.3 masclaroque -3.5 0 3 40
+
+# --- NODO 3 (el ultimo): indice 3.00, celda 4 (mismos triangulos que la 3
+#     pero con OTRO orden: el registro MOVE de la playlist)
+objpos 6 0 5
+bench 1 noswap
+simplay 6
+scriptinfo compartido vr_indice 3.00
+visinfo MallaVis 4 4 2
+escenapx  1.5 0 -0.3 masclaroque -3.5 0 3 40
+escenapx  3.5 0 -0.3 masclaroque -3.5 0 3 40
+
+simstop
+# render real con la ultima celda activa (el mismo camino de indices de cliente
+# sobre VBO que el PVS clasico)
+bench 2 noswap

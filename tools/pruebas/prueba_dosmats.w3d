@@ -1,0 +1,19 @@
+// ==========================================================================
+//  PRUEBA del .mtl con VARIOS materiales y texturas RELATIVAS (formato texto).
+//  La corre prueba_dosmats.w3s. Ver dosmats.mtl para el porque.
+// ==========================================================================
+Whisk3D {
+    version: 20251127
+    Escena {
+        background: "0.02, 0.02, 0.03, 1.0"
+
+        Camera {
+            name: "Camara"
+            fov: 60.0
+            y: -6.0   // profundidad (en el .w3d de texto la vertical es `z`)
+            z: 0.0
+        }
+
+        Wavefront { name: "DosMats" filePath: dosmats.obj }
+    }
+}

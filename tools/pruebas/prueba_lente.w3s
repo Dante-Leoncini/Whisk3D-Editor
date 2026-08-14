@@ -1,0 +1,75 @@
+# ==========================================================================
+#  EL LENTE DE LA CAMARA DESDE LUA: fov + planos de recorte
+#  Correr DESDE ESTA CARPETA:
+#    cd <motor>/tools/pruebas
+#    ../../platform/linux/build/whisk3d --script prueba_lente.w3s
+#
+#    lenteDe(camara) -> fov, cerca, lejos
+#    setLente(camara [, fov] [, cerca] [, lejos])    nil = no tocar ese
+#
+#  Los tres ya vivian en el .w3d; lo que faltaba era poder moverlos EN JUEGO.
+#  El caso de uso del plano LEJANO es acortar el alcance del dibujado al entrar
+#  a un espacio cerrado, para que no asome geometria lejana que ahi no
+#  corresponde (y de paso no pagarla).
+#
+#  La escena tiene dos carteles: uno CERCA (a 10 de profundidad) y uno LEJOS (a
+#  300, escalado x60 para que ocupe pixeles medibles). lente_camara.lua mueve el
+#  plano lejano segun el tick: largo -> corto -> los tres a la vez.
+#  Se verifica por PIXELES, que es lo unico que prueba que el recorte ocurrio.
+# ==========================================================================
+abrirw3d prueba_lente.w3d
+loadtex
+# el viewport dibuja POR la camara de la escena: si no, el recorte que se mide
+# seria el de la orbita del editor y el assert no probaria nada
+vpcamara on
+
+# --- 1) ALCANCE LARGO: se ve hasta el fondo --------------------------------
+# el script NO toca nada en inicio(): estos tres son los que declaro el .w3d de
+# TEXTO, o sea que de paso prueban que near/far se leen del formato (antes solo
+# se leia el fov y los planos quedaban en los defaults 0.01 / 1000)
+simplay 1
+scriptinfo compartido fov 60.0
+scriptinfo compartido cerca 0.10
+scriptinfo compartido lejos 1000.0
+escenapx 60 0 -300 es 134 142 6 10
+escenapx -2 0 -10  es 134 27 6 10
+
+# --- 2) ALCANCE CORTO: el fondo deja de dibujarse ---------------------------
+# al tick 3 el script hace setLente(cam, nil, nil, 60): el cartel de atras cae
+# fuera del plano lejano. ESTE es el assert de la feature: sin poder mover el
+# `far` desde el script, el pixel seguiria siendo el cartel.
+simplay 3
+scriptinfo compartido lejos 60.0
+escenapx 60 0 -300 noes 134 142 6 10
+# y lo que esta adentro del alcance sigue igual: el recorte no se comio la escena
+escenapx -2 0 -10 es 134 27 6 10
+# los otros dos no se tocaron (nil = no tocar ese)
+scriptinfo compartido fov 60.0
+scriptinfo compartido cerca 0.10
+
+# --- 3) LOS TRES A LA VEZ ---------------------------------------------------
+# al tick 6: setLente(cam, 30, 0.5, 1000)
+simplay 3
+scriptinfo compartido fov 30.0
+scriptinfo compartido cerca 0.50
+scriptinfo compartido lejos 1000.0
+simstop
+
+# --- 4) EL LENTE VIAJA EN EL .w3d ------------------------------------------
+# fov ya se leia en el formato de texto; near/far solo en la rama JSON, asi que
+# una camara con planos propios quedaba clavada en los defaults al abrir un .w3d
+# de texto. Los tres sobreviven el round-trip a v4.
+# (el lente NO es estado de partida: es una propiedad de la camara que se
+#  guarda, asi que despues del bloque 3 la escena queda con fov 30 / cerca 0.5)
+guardarw3d prueba_lente_v4.w3d
+abrirw3d prueba_lente_v4.w3d
+loadtex
+# el fov guardado, leido por el harness antes de correr ningun script
+camriel fov 30.0
+vpcamara on
+simplay 1
+# y el plano cercano, que es un valor NO default (el default es 0.01): si el
+# round-trip lo perdiera, aca saldria 0.01
+scriptinfo compartido cerca 0.50
+scriptinfo compartido fov 30.0
+simstop

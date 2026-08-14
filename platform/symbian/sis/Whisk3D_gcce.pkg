@@ -1,0 +1,35 @@
+;Languages
+&EN
+
+;Header
+#{"Whisk3D"}, (0xA00D021D), 1, 0, 0,TYPE=SA
+
+;Localised Vendor name
+%{"Dante Leoncini"}
+
+;Unique Vendor name
+:"Vendor"
+
+;Supports Series 60 v 3.0
+;[0x101F7961], 0, 0, 0, {"Series60ProductID"}
+[0x101F7961], 0, 0, 0, {"S60v5-compatible App"}
+
+;Files to install
+"$(EPOCROOT)epoc32\release\gcce\urel\Whisk3D.exe"                       -"!:\sys\bin\Whisk3D.exe"
+"$(EPOCROOT)epoc32\data\z\resource\apps\Whisk3D.RSC"                    -"!:\resource\apps\Whisk3D.RSC"
+"$(EPOCROOT)epoc32\data\Z\private\10003a3f\import\apps\whisk3D_reg.RSC" -"!:\private\10003a3f\import\apps\whisk3D_reg.RSC"
+"$(EPOCROOT)epoc32\data\z\resource\apps\whisk3D_icon.mif"  			        -"!:\resource\apps\whisk3D_icon.mif"
+
+; texturas de UI: el MISMO skin compartido que usa PC (res/Skins/Whisk3D)
+"..\..\..\res\Skins\Whisk3D\origen.png"   -"!:\private\A00D021D\origen.png"
+"..\..\..\res\Skins\Whisk3D\lamp.png"   -"!:\private\A00D021D\lamp.png"
+"..\..\..\res\Skins\Whisk3D\cursor3d.png"   -"!:\private\A00D021D\cursor3d.png"
+"..\..\..\res\Skins\Whisk3D\relationshipLine.png"   -"!:\private\A00D021D\relationshipLine.png"
+"..\..\..\res\Skins\Whisk3D\font.png"   -"!:\private\A00D021D\font.png"
+"..\..\..\res\Skins\Whisk3D\skin.ini"   -"!:\private\A00D021D\skin.ini"
+; cursor del mouse BT: asset propio de Symbian (PC usa el cursor del sistema)
+"..\inc\texturas\mouse.png"   -"!:\private\A00D021D\mouse.png"
+
+;required for application to be covered by backup/restore facility 
+"backup_registration.xml"						                                    -"!:\private\A00D021D\backup_registration.xml"
+

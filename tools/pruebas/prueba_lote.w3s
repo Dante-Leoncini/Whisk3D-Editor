@@ -1,0 +1,16 @@
+# Prueba del LOTE ESTATICO (camino de render eficiente, P4):
+#   Collection { lote: "estatico" } con 3 cubos adentro + 1 cubo suelto AFUERA.
+#   - EDITOR (sin jugar): el lote no corre; las 4 mallas se dibujan solas
+#     (mallasMin=4) y los 48 triangulos estan (trisOpacosMin, piso del gate).
+#   - JUGANDO: los 3 cubos de la coleccion se hornean en buffers estaticos con
+#     un rango por material: sus RenderObject no dibujan (mallas<=1, solo el
+#     cubo suelto) y los MISMOS 48 triangulos siguen en pantalla
+#     (trisOpacosMin=48: dibujar de menos tambien falla).
+#   - round-trip v4: el flag lote viaja y el comportamiento se repite.
+abrirw3d prueba_lote.w3d
+presupuesto presupuesto-lote.json editor 3
+presupuesto presupuesto-lote.json lote 3 jugando
+guardarw3d prueba_lote_v4.w3d
+abrirw3d prueba_lote_v4.w3d
+presupuesto presupuesto-lote.json editor 3
+presupuesto presupuesto-lote.json lote 3 jugando

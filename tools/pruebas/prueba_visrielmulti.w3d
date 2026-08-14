@@ -1,0 +1,82 @@
+// ==========================================================================
+//  PRUEBA sintetica de la VISIBILIDAD POR NODO con VARIOS RIELES (multi-riel).
+//  La corre prueba_visrielmulti.w3s; el cable vive en visrielmulti_componente.lua.
+//
+//  Mismo armado que prueba_visriel (camara por visriel.cap, 4 nodos; playlist
+//  vis-tris.w3dvis: c1=[t0,t1] c2=[t2,t0,t1] c3=[t2,t3] c4=[t3,t2]) MAS un
+//  segundo riel ("RielOtro"). Las dos zonas declaran `riel: "RielVis"`: sus
+//  celdas son los NODOS DE ESE riel y de ningun otro. Cuando la camara se va
+//  al otro riel (setRiel del juego / camriel set del harness), un indice de
+//  ESE riel no indexa estas celdas -> cada zona cae a su fallback declarado:
+//    Zona    -> fallback "completa" (la malla entera, sin recorte)
+//    ZonaSec -> fallback 1          (la lista de la celda 1)
+//  Al volver al riel propio, la zona salta DIRECTO a la celda del nodo.
+//  El componente pasa el identificador a Zona (setVisCurvaT(z, t, riel)) y NO
+//  a ZonaSec: ahi decide el riel de la Camera ACTIVA (los dos caminos).
+// ==========================================================================
+Whisk3D {
+    version: 20251127
+    Escena {
+        background: "0.2, 0.2, 0.25, 1.0"
+
+        Curve { name: "RielVis" filePath: visriel.cap }
+        Curve { name: "RielOtro" filePath: riel-b.cap }
+
+        Collection {
+            name: "Jugador"
+            x: 0.0
+            y: 0.0
+            z: 0.0
+        }
+
+        Camera {
+            name: "Camara"
+            fov: 45.0
+            target: "Jugador"
+            riel: "RielVis"
+            offsetRiel: 0
+        }
+
+        VisZona {
+            name: "Zona"
+            modo: "curva"
+            objetivo: "MallaVis"
+            riel: "RielVis"
+            fallback: "completa"
+        }
+        VisZona {
+            name: "ZonaSec"
+            modo: "curva"
+            objetivo: "MallaSec"
+            riel: "RielVis"
+            fallback: 1
+        }
+
+        Wavefront {
+            name: "MallaVis"
+            filePath: vis-tris.obj
+            script: "visrielmulti_componente.lua"
+            ref_cam: "Camara"
+            ref_zona: "Zona"
+            ref_zonaSec: "ZonaSec"
+            CullingTri {
+                metodo: "celdas"
+                celda: 1
+            }
+        }
+        Wavefront {
+            name: "MallaSec"
+            filePath: vis-tris.obj
+            y: 4.0
+            CullingTri {
+                metodo: "celdas"
+                celda: 1
+                vis: "vis-tris.w3dvis"
+            }
+        }
+    }
+    // un solo viewport, sin piso/ejes (mismo criterio que prueba_visriel)
+    Layout {
+        Viewport3D { showFloor: false showXaxis: false showYaxis: false }
+    }
+}

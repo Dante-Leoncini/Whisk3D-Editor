@@ -1,0 +1,30 @@
+// ==========================================================================
+//  PRUEBA del material con LINEAS (Material::lineas + grosorLinea).
+//  La corre prueba_mat_lineas.w3s.
+//
+//  "Cuerda" importa lineas-cuerda.obj: una POLILINEA declarada como tira
+//  degenerada (triangulos de area cero) cuyo material (lineas-cuerda.mtl)
+//  declara `lineas 6`: el relleno no pinta nada y las aristas dibujan el
+//  CAMINO con glLineWidth = 6, del color ABSOLUTO del material (NoLight).
+// ==========================================================================
+Whisk3D {
+    version: 20251127
+    Escena {
+        background: "0.05, 0.05, 0.08, 1.0"
+
+        Camera {
+            name: "Camara"
+            y: -8.0
+            z: 2.0
+        }
+
+        Wavefront {
+            name: "Cuerda"
+            filePath: lineas-cuerda.obj
+        }
+    }
+    // un solo viewport, sin piso/ejes: los pixeles se comparan contra el fondo
+    Layout {
+        Viewport3D { showFloor: false showXaxis: false showYaxis: false }
+    }
+}

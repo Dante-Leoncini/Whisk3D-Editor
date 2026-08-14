@@ -1,0 +1,20 @@
+// ==========================================================================
+//  PRUEBA del STREAMING por listas de carga (formato/cargas-json.md).
+//  La corre prueba_cargas.w3s. Un riel de 4 nodos con su sidecar
+//  `.cargas.json`: los "recursos" son archivos crudos del disco (tipo otro,
+//  registrado por el comando `cargastest` del harness).
+// ==========================================================================
+Whisk3D {
+    version: 20251127
+    Escena {
+        background: "0.05, 0.05, 0.05, 1.0"
+
+        Camera { name: "Camara" fov: 60.0 y: -8.0 z: 0.0 }
+
+        Curve {
+            name: "Riel"
+            filePath: cargas-riel.txt
+            ListaCarga { filePath: cargas-riel.cargas.json }
+        }
+    }
+}

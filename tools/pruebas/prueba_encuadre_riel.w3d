@@ -1,0 +1,44 @@
+// ==========================================================================
+//  PRUEBA del ENCUADRE HEREDADO DEL RIEL (formato texto). La corre
+//  prueba_encuadre.w3s (parte B).
+//
+//  La camara NO declara `aspecto:`: lo hereda de la cabecera `aspecto` del
+//  .cap del riel por el que viaja (encuadre-riel.cap trae `aspecto 1.481481`).
+//  Es el caso del riel exportado de un juego original: el encuadre autoral
+//  viaja CON el recorrido y todas las camaras que lo usen lo respetan.
+//
+//  OJO: en el .w3d de TEXTO la vertical se llama `z` y la profundidad `y`.
+// ==========================================================================
+Whisk3D {
+    version: 20251127
+    Escena {
+        background: "0.05, 0.05, 0.05, 1.0"
+
+        Curve {
+            name: "Riel 4027"
+            filePath: encuadre-riel.cap
+        }
+
+        // el target: decide donde se para la camara sobre el riel (y la mirada)
+        Collection {
+            name: "Mira"
+            x: 0.0
+            y: -10.0
+            z: 0.0
+        }
+
+        Camera {
+            name: "Camara"
+            fov: 60.0
+            near: 0.10
+            far: 1000.0
+            target: "Mira"
+            riel: "Riel 4027"
+            offsetRiel: 0
+        }
+
+        // misma geometria que prueba_encuadre.w3d (ver ahi las cuentas)
+        Wavefront { name: "Centro"  filePath: espejo-poste.obj  x: 0.0 y: -10.0 z: 0.0 scale: 2.0 }
+        Wavefront { name: "Costado" filePath: espejo-poste2.obj x: 9.5 y: -10.0 z: 0.0 scale: 1.0 }
+    }
+}

@@ -1,0 +1,22 @@
+// ==========================================================================
+//  PRUEBA sintetica del bind lua sonido(ruta [, vol [, pitch]]).
+//  La usa prueba_sonido.w3s: al abrir este .w3d, g_w3dDirProyecto queda
+//  apuntando a ESTA carpeta -> "sonidos/bip.wav" (tono sintetico generado por el propio repo: sin material de terceros)
+//  resuelve relativo al proyecto, igual que en el juego real.
+// ==========================================================================
+Whisk3D {
+    version: 20251127
+    Escena {
+        background: "0.2, 0.2, 0.25, 1.0"
+
+        Camera {
+            name: "Camara"
+            y: -8.0
+            z: 2.0
+        }
+
+        Mesh {
+            name: "Cubo"
+        }
+    }
+}

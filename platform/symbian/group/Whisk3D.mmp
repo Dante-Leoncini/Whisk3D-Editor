@@ -1,0 +1,285 @@
+/*
+ * ==============================================================================
+ *  Name        : Whisk3D.mmp
+ *  Part of     : OpenGLEx / Whisk3D
+ * ==============================================================================
+ */
+
+//New style application exe
+TARGET          whisk3D.exe
+TARGETTYPE      exe
+UID             0x100039CE 0xA00D021D
+
+EPOCSTACKSIZE   30000 //originalmente estaba en 30000 67108864
+EPOCHEAPSIZE    0x10000 0x4000000  // Tama�o del heap: 64 KB m�nimo y 64 MB m�ximo
+
+// Fase 3 unificacion: el codigo compartido del core se compila con este
+// define (activa el dialecto Symbian: GLES/gl.h, shims de app-state, etc.)
+MACRO           W3D_SYMBIAN
+
+// Compilador RVCT 2.2 (ARMV6 en bld.inf): forzar ARM, ARMv6 y FPU por hardware.
+// Es lo que aprovecha la VFP del N95/N8.
+ALWAYS_BUILD_AS_ARM
+OPTION_REPLACE  ARMCC --cpu 6
+OPTION_REPLACE  ARMCC --fpu vfpv2 --fpmode fast
+OPTION_REPLACE  ARMCC -O2 -Otime
+
+VENDORID        0
+
+SOURCEPATH      ..\src
+SOURCE          Whisk3D.cpp
+SOURCE          Whisk3Dapp.cpp
+SOURCE          Whisk3Dappui.cpp
+SOURCE          Whisk3Ddocument.cpp
+SOURCE          Whisk3Dcontainer.cpp 
+SOURCE          Whisk3Dinput.cpp 
+// new/delete propios para no importar scppnwdl.dll (no existe en el N95)
+SOURCE          newdel_compat.cpp
+// mouse/teclado bluetooth via hidsrv.dll (cargada en runtime, no se linkea)
+SOURCE          hidmonitor.cpp
+// Fase 1 unificacion: hojas/armado del layout para Symbian
+SOURCE          w3dlayout.cpp
+// Fase 3c: puente al modelo nuevo (unico TU de symbian que ve el core)
+SOURCE          w3dnewscene.cpp
+SOURCE          w3dtexload.cpp
+SOURCE          w3dmouse.cpp // cursor virtual de Symbian
+SOURCE          w3dinput.cpp // input propio del telefono (teclado/keypad)
+
+// motor compartido (Whisk3DCore / libs\Whisk3DCore): texturas + estado de graficos + log
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\gfx
+SOURCE          w3dTexture.cpp
+SOURCE          w3dGraphics.cpp
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\base
+SOURCE          w3dlog.cpp
+SOURCE          W3dInteractionState.cpp // estado de interaccion (InteractionMode/estado): ahora en el motor
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\io
+SOURCE          w3dFilesystem.cpp // backend del File browser (POSIX en Symbian)
+
+// Fase C re-split: W3dColors es del EDITOR -> main\ui (W3dFont es UI -> WhiskUI, abajo)
+SOURCEPATH      ..\..\..\main\ui
+SOURCE          W3dColors.cpp
+
+// matematica del ENGINE (Vector3/Quaternion/Matrix4) — antes en core\math, es
+// del motor (Whisk3DCore), no exclusiva de Whisk3D. Se incluye como "math/X.h"
+// (la USERINCLUDE de libs\Whisk3DCore la resuelve).
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\math
+SOURCE          Vector3.cpp
+SOURCE          Quaternion.cpp
+SOURCE          Matrix4.cpp
+
+// Fase C re-split: SOLO el modelo de datos del CORE queda en libs\Whisk3DCore\objects
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\objects
+SOURCE          Objects.cpp
+SOURCE          Materials.cpp
+SOURCE          Mesh.cpp
+SOURCE          CameraBase.cpp // camara BASE del core (la vista que usa el render)
+SOURCE          RenderColors.cpp // paleta de render del core (Fase D, sin depender de la UI)
+SOURCE          Light.cpp
+
+// Fase C re-split: los objetos del EDITOR se movieron a main\objects (no son del core)
+SOURCEPATH      ..\..\..\main\objects
+SOURCE          Scene.cpp
+SOURCE          Collection.cpp
+SOURCE          EditMesh.cpp
+SOURCE          Primitivas.cpp
+SOURCE          Empty.cpp
+SOURCE          Camera.cpp Target.cpp Curve.cpp ObjectMode.cpp Instance.cpp
+
+// Fase 4: importador OBJ compartido con PC
+SOURCEPATH      ..\..\..\main\importers
+SOURCE          import_obj.cpp
+
+// ViewportBase REAL de PC (fase outliner)
+SOURCEPATH      ..\..\..\main\ui\ViewPorts
+SOURCE          ViewPorts.cpp WithBorder.cpp ScrollBar.cpp Outliner.cpp Properties.cpp ViewPort3D.cpp UVEditor.cpp LayoutInput.cpp
+SOURCE          PoseTransform.cpp // Pose Mode: transform de huesos (extraido de LayoutInput, Fase 2)
+SOURCE          Notificaciones.cpp // toasts (extraido de LayoutInput, Fase 2)
+SOURCE          NumInput.cpp // entrada numerica/formulas (extraido de LayoutInput, Fase 2)
+SOURCE          Parent.cpp // emparentar/desemparentar (extraido de LayoutInput, Fase 2)
+SOURCE          Pick3D.cpp // pick/seleccion 3D + loop cut (extraido de LayoutInput, Fase 2)
+SOURCE          ViewPort3D_Toolbar.cpp // barra de herramientas tactil (extraido de ViewPort3D, Fase 2)
+SOURCE          ToolbarBase.cpp // mecanismo COMPARTIDO de la toolbar (ViewportBase): lo usan el 3D y el UV editor
+SOURCE          TransformUI.cpp // UI COMPARTIDA del transform (barra de info / numerico / tilde-cruz-ejes): 3D + UV + 2D
+SOURCE          ViewPort3D_Stats.cpp   // overlay de estadisticas arriba-derecha (extraido de ViewPort3D, Fase 2)
+SOURCE          IDE.cpp // editor de TEXTO de scripts lua (viewport IDE); las partes SDL van #ifndef W3D_SYMBIAN
+SOURCE          Editor2D.cpp // viewport Editor 2D (UI de juegos); las partes SDL van #ifndef W3D_SYMBIAN
+SOURCE          Console.cpp // viewport Consola (log del editor); las partes SDL van #ifndef W3D_SYMBIAN
+
+// Fase A re-split core/editor: la logica de EDICION de la malla (deref EditMesh) se movio
+// de Mesh.cpp a main/edit/ para que el core (Mesh) no dependa del editor (EditMesh)
+SOURCEPATH      ..\..\..\main\edit
+SOURCE          MeshEdit.cpp
+SOURCE          WeightPaint.cpp // Fase 2 weight paint: pincel + escritura de pesos (undo por trazo)
+SOURCE          BoneEdit.cpp // Fase 3: Edit Mode de huesos (extrude/duplicar/borrar/grab + rename con vgroup)
+
+SOURCEPATH      ..\..\..\main\render
+SOURCE          render.cpp OpcionesRender.cpp
+SOURCE          EscenaRender.cpp // el pase 3D compartido con el runtime de los juegos
+
+SOURCEPATH      ..\..\..\main\app
+SOURCE          variables.cpp
+SOURCE          W3dInitUI.cpp // init de UI compartido
+SOURCEPATH      ..\..\..\main\config
+SOURCE          W3dLang.cpp   // idiomas del editor (T() + deteccion del idioma del telefono)
+SOURCE          W3dConfigGuardar.cpp // escribe el config.ini (la tarjeta "Ajustes" de Properties)
+SOURCE          W3dProfile.cpp // reloj de pared + tiempos por categoria del frame (overlay Statistics)
+SOURCEPATH      ..\..\..\main\undo
+SOURCE          Undo.cpp // Ctrl+Z (undo por comandos; lo llaman ObjectMode/LayoutInput/Properties)
+
+SOURCEPATH      ..\..\..\main\ui\GeometriaUI
+SOURCE          GeometriaUI.cpp Floor.cpp
+
+SOURCEPATH      ..\..\..\libs\WhiskUI\Propieties
+SOURCE          PropertieBase.cpp GroupPropertie.cpp PropFloat.cpp
+SOURCE          propGap.cpp PropBool.cpp PropList.cpp PropColor.cpp
+SOURCE          PropSelectText.cpp PropButton.cpp PropLabel.cpp
+
+// pila de UI de PC (fase outliner real)
+SOURCEPATH      ..\..\..\main\ui\ViewPorts\PopUp
+SOURCE          PopUpBase.cpp ColorPicker.cpp FileBrowser.cpp RedoMeshPanel.cpp ConfirmarPopup.cpp ProgressPopup.cpp
+
+// La UI (WhiskUI) es su propia capa reutilizable en libs/. Ver documentacion/ui.html
+SOURCEPATH      ..\..\..\libs\WhiskUI\core
+SOURCE          UI.cpp
+SOURCEPATH      ..\..\..\libs\WhiskUI\theme
+SOURCE          colores.cpp
+SOURCEPATH      ..\..\..\libs\WhiskUI\draw
+SOURCE          object2D.cpp rectangle.cpp icons.cpp glesdraw.cpp
+SOURCEPATH      ..\..\..\libs\WhiskUI\text
+SOURCE          font.cpp bitmapText.cpp W3dFont.cpp
+SOURCEPATH      ..\..\..\libs\WhiskUI\widgets
+SOURCE          card.cpp Button.cpp PopupMenu.cpp Tab.cpp
+
+// OJO: volver al SOURCEPATH local (las rutas de recursos de abajo se
+// resuelven contra el ultimo SOURCEPATH)
+
+// OJO: volver al SOURCEPATH local ANTES de los START RESOURCE de abajo
+// (las rutas de recursos se resuelven contra el ultimo SOURCEPATH)
+SOURCEPATH      ..\src
+
+START RESOURCE  ..\data\whisk3D.rss
+HEADER
+TARGETPATH      \\resource\\apps
+LANG            SC
+END //RESOURCE
+
+USERINCLUDE     .
+USERINCLUDE     ..\inc
+// Fase C: W3dColors en main\ui ("ui/W3dColors.h" resuelve por el USERINCLUDE de main)
+// core/ se unio a libs\Whisk3DCore/: los headers compartidos ("math/Vector3.h", "objects/Objects.h")
+// resuelven via libs\Whisk3DCore (mismo include path que usa PC)
+USERINCLUDE     ..\..\..\libs\Whisk3DCore
+// Core reorganizado: base/gfx/io como include dir para los includes pelados ("w3dTexture.h", "w3dlog.h")
+USERINCLUDE     ..\..\..\libs\Whisk3DCore\base
+USERINCLUDE     ..\..\..\libs\Whisk3DCore\gfx
+USERINCLUDE     ..\..\..\libs\Whisk3DCore\io
+USERINCLUDE     ..\..\..\main
+USERINCLUDE     ..\..\..\main\ui
+USERINCLUDE     ..\..\..\main\ui\ViewPorts
+USERINCLUDE     ..\..\..\main\ui\GeometriaUI
+// main/ reorganizado por tema: cada carpeta es include dir para que "variables.h" / "Undo.h" / "W3dLang.h"
+// resuelvan sin reescribir cada #include (mismo criterio que el CMake de PC)
+USERINCLUDE     ..\..\..\main\app
+USERINCLUDE     ..\..\..\main\config
+USERINCLUDE     ..\..\..\main\undo
+// capas reutilizables en libs/: la UI externa se incluye como "WhiskUI/draw/icons.h" (libs/WhiskUI)
+// (igual que en PC, que tiene libs/ en su include path).
+USERINCLUDE     ..\..\..\libs
+// WhiskUI reorganizado por tema: sus subcarpetas son include dir para los includes INTERNOS pelados ("icons.h")
+USERINCLUDE     ..\..\..\libs\WhiskUI\widgets
+USERINCLUDE     ..\..\..\libs\WhiskUI\text
+USERINCLUDE     ..\..\..\libs\WhiskUI\draw
+USERINCLUDE     ..\..\..\libs\WhiskUI\theme
+USERINCLUDE     ..\..\..\libs\WhiskUI\core
+
+SYSTEMINCLUDE   .
+SYSTEMINCLUDE   \epoc32\include\stdapis
+// STL para el modelo compartido de PC (Fase 3: std::vector/string en
+// core/objects). (probada en este
+// telefono): STLport v4 + libstdcpp v1, SIN el keyword STDCPP. La variante
+// v5 referencia backend_free de libstdcppv5.dll, que no esta en el firmware.
+SYSTEMINCLUDE   \epoc32\include\stdapis\stlport
+SYSTEMINCLUDE   \epoc32\include\stdapis\stlport\stl
+
+SYSTEMINCLUDE   \epoc32\include
+// El SDK de Symbian^3 reorganizo las cabeceras en subcarpetas (antes estaban
+// planas en \epoc32\include en el SDK de S60v5). Sin estas rutas faltan
+// eikon.rh/avkon.rh/CommonDialogs.rh (-> mw) y e32svr.h (-> platform).
+SYSTEMINCLUDE   \epoc32\include\mw
+SYSTEMINCLUDE   \epoc32\include\app
+SYSTEMINCLUDE   \epoc32\include\platform
+SYSTEMINCLUDE   \epoc32\include\platform\mw
+
+LIBRARY         avkon.lib euser.lib apparc.lib cone.lib eikcore.lib
+LIBRARY         eikcoctl.lib estlib.lib fbscli.lib
+LIBRARY         efsrv.lib
+LIBRARY         ImageConversion.lib
+LIBRARY         libgles_cm.lib
+LIBRARY         ws32.lib commondialogs.lib
+LIBRARY         estor.lib eikctl.lib aknnotify.lib apgrfx.lib eikdlg.lib charconv.lib 
+
+LIBRARY         libc.lib
+// variantes float de math (sinf/cosf/acosf...) usadas por libs\Whisk3DCore/math de PC
+LIBRARY         libm.lib
+// runtime C++ de Open C++: STL del modelo compartido
+LIBRARY         libstdcpp.lib
+
+//acelerometro
+//LIBRARY         NokiaAccSensor.lib
+
+
+START RESOURCE ..\data\whisk3D_reg.rss
+#ifdef WINSCW
+TARGETPATH 	  \private\10003a3f\apps
+#else
+TARGETPATH 	  \private\10003a3f\import\apps
+#endif
+END
+// Solo capabilities auto-firmables. ReadDeviceData
+// necesita DevCert de Symbian y Location no es auto-firmable en el 9.2 del
+// N95: con cualquiera de las dos el telefono rechaza el binario self-signed
+// ("funcion no admitida"). La app no las usaba (el acelerometro esta
+// comentado); si algun dia hacen falta, hay que firmarse con Open Signed.
+CAPABILITY ReadUserData WriteUserData
+
+SOURCEPATH ..\..\..\main\ui\ViewPorts\PopUp
+SOURCE NumPad.cpp
+
+// --- subsistema de ANIMACION (pull FBX/skinning): las piezas C++03 se compilan de verdad;
+//     el ESQUELETO/SKINNING (C++11) va como stubs no-op (ver w3dskelstubs.cpp). ---
+SOURCEPATH ..\..\..\main\config
+SOURCE w3dVersion.cpp              // W3dVersion() (header del .obj exportado)
+
+SOURCEPATH ..\..\..\libs\Whisk3DCore\animation
+SOURCE Animation.cpp              // globales de playback: CurrentFrame / AnimFPS / Start-EndFrame / PlayAnimation + keyframes
+SOURCE SkeletalAnimation.cpp      // ESQUELETO/SKINNING real (C++03): FK + linear blend skinning. Antes stubbeado; ya deforma en el N95.
+SOURCE Armature2DAnimation.cpp    // clips del armature 2D (C++03). Animation.cpp lo llama SIN ifdef -> si falta, no linkea.
+
+SOURCEPATH ..\..\..\libs\Whisk3DCore\objects
+SOURCE Armature.cpp              // clase Armature (PuntoFoco/RadioFoco/RenderObject) — C++03, render de esqueleto
+
+SOURCEPATH ..\..\..\main\ui\ViewPorts
+SOURCE Timeline.cpp              // viewport Timeline (los metodos SDL van #ifndef W3D_SYMBIAN; el resto compila)
+
+SOURCEPATH ..\src
+SOURCE w3dskelstubs.cpp          // solo w3dGetTicks (reloj de ms del core); los stubs del esqueleto ya no van (SkeletalAnimation.cpp compila)
+
+// --- IMPORT FBX en el N95 (usa el subsistema de animacion de arriba + comparte el file browser con el OBJ).
+//     El descompresor zlib (w3dCompress) es self-contained/multiplataforma -> compila aca sin stb ni libs
+//     externas; sera tambien la base del formato propio .w3d (archivo comprimido). ---
+SOURCEPATH ..\..\..\libs\Whisk3DCore\io
+SOURCE w3dCompress.cpp           // inflate DEFLATE/zlib self-contained (arrays comprimidos del FBX + futuro .w3d)
+SOURCE W3dTexto.cpp              // escaner de texto del .w3dm (numeros exactos, cero allocs por token)
+SOURCE W3dMalla.cpp              // lector/escritor del .w3dm (la geometria propia, en texto por lineas)
+
+SOURCEPATH ..\..\..\main\importers
+SOURCE import_fbx.cpp            // importador FBX binario (parseo + descompresion + malla/esqueleto/materiales)
+SOURCE import_gltf.cpp           // importador glTF 2.0 / GLB (JSON propio + accessors + malla/esqueleto/animaciones)
+SOURCE export_gltf.cpp           // exportador glTF 2.0 / GLB (inverso: bind pose + skin + huesos + clips, sin hornear)
+
+// --- guardado por versiones del proyecto (.w3d): en Symbian queda como STUB no-op
+//     (GuardarW3D/W3dZip no estan en este build; el #ifdef W3D_SYMBIAN del .cpp
+//     compila solo los stubs). Regla del repo: todo .cpp nuevo de main\ entra aca. ---
+SOURCEPATH ..\..\..\main\io
+SOURCE GuardarVersion.cpp
+SOURCE LuaCompilar.cpp           // compilar .lua a bytecode (Compilar juego): stub no-op en Symbian (sin lua en este build)

@@ -1,0 +1,14 @@
+{
+  "pc": {
+    "dc": 500,
+    "trisOpacos": 200000,
+    "trisBlend": 50000,
+    "texbinds": 200,
+    "bytesSubidos": 4194304,
+    "stateChanges": 20000,
+    "cpuRenderMs": 50
+  },
+  "imposible": {
+    "dc": 0
+  }
+}

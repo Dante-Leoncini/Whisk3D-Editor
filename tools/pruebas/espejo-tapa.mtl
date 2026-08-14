@@ -1,0 +1,6 @@
+# SIN textura y con NoLight: el pixel es EXACTAMENTE Kd*255 = 26,230,26.
+newmtl espejo-tapa
+Kd 0.100000 0.900000 0.100000
+d 1.0
+NoLight
+BackfaceCullingOff

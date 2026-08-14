@@ -1,0 +1,25 @@
+# ==========================================================================
+#  LA FRUTA DEL HUD QUE PARPADEA A NEGRO (mezcla sustractiva que leakea).
+#  Correr DESDE ESTA CARPETA:
+#    cd <motor>/tools/pruebas
+#    ../../platform/linux/build/whisk3d --script prueba_hud_sustractivo.w3s
+#
+#  El bug (tercera vez reportado en el juego real): el icono animado del HUD
+#  salia NEGRO con el alpha bien, a veces. La causa era la BLEND EQUATION: un
+#  pase SUSTRACTIVO (SetMezcla(MezclaSubtract) -> GL_FUNC_REVERSE_SUBTRACT,
+#  el humo de chimenea) dibujaba ultimo en el 3D, y BlendAlpha() -- lo unico
+#  que el HUD re-afirmaba -- solo reponia la FUNCION de mezcla, nunca la
+#  ecuacion. Todo lo alpha-blended que siguiera RESTABA del framebuffer:
+#  dst*(1-a) - src*a = silueta negra. Ahora BlendAlpha()/BlendMode() reponen
+#  TAMBIEN la ecuacion (cacheada: re-poner ADD ya puesto no llama al driver).
+#
+#  hudanimpx corre ticks REALES (sim + particulas + frame completo 3D + HUD)
+#  y lee el pixel del CENTRO del icono en CADA uno: si un solo frame da negro
+#  (r,g,b <= 20), FALLA. 84 ticks = 28 ciclos completos de los 3 frames.
+# ==========================================================================
+abrirw3d prueba_hud_sustractivo.w3d
+loadtex
+juego on
+simplay 2
+hudanimpx IconoAnim 84
+juego off

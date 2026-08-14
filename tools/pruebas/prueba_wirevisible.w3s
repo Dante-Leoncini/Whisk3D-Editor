@@ -1,0 +1,54 @@
+# ==========================================================================
+#  WIREFRAME "SOLO LO QUE SE DIBUJA", POR PIXELES.
+#  Correr DESDE ESTA CARPETA:
+#    cd <motor>/tools/pruebas
+#    ../../platform/linux/build/whisk3d --script prueba_wirevisible.w3s
+#
+#  Pedido textual del dueno: "en la vista de alambre me gustaria ver las
+#  lineas solo de los triangulos que se van a dibujar y no de todos".
+#  Con visibilidad por triangulo activa (modificador Culling, Mesh::pvsFaces)
+#  el alambre ahora se arma DE LA LISTA ACTIVA (default). El toggle del menu
+#  Render ("Wireframe: Only Visible") -aca `vpvista wire todo|visible`- vuelve
+#  al alambre clasico con todas las aristas.
+#
+#  vis-tris.obj: 4 triangulos independientes en fila; la BASE de cada uno es
+#  horizontal en z=-1 (mismo truco que prueba_mat_lineas: el punto medio del
+#  tramo horizontal es un pixel confiable de la linea). Centros de base:
+#  t0=-3.5  t1=-1.5  t2=1.5  t3=3.5. Celdas: c1=[t0,t1]  c3=[t2,t3].
+#  La malla se SELECCIONA (grosor 2 px) para que el trazo no dependa del
+#  redondeo de 1 px. Vista desde arriba; (0, 0, 2.5) es fondo vacio.
+# ==========================================================================
+abrirw3d prueba_wirevisible.w3d
+loadtex
+selname MallaVis
+vpvista wire
+vporbita 0 0 0 12 90 0
+
+# --- celda 1 = [t0, t1]: SOLO sus aristas (la mitad de la malla) -----------
+visinfo MallaVis 4 1 2
+escenapx -3.5 0 -1 masclaroque 0 0 2.5 20
+escenapx -1.5 0 -1 masclaroque 0 0 2.5 20
+escenapx  1.5 0 -1 comoen 0 0 2.5
+escenapx  3.5 0 -1 comoen 0 0 2.5
+# el alambre no rellena: el centroide de t0 sigue siendo fondo
+escenapx -3.5 0 -0.33 comoen 0 0 2.5
+
+# --- el toggle "todo": el alambre clasico (todas las aristas) --------------
+vpvista wire todo
+escenapx -3.5 0 -1 masclaroque 0 0 2.5 20
+escenapx  1.5 0 -1 masclaroque 0 0 2.5 20
+escenapx  3.5 0 -1 masclaroque 0 0 2.5 20
+
+# --- de vuelta al default y a OTRA celda: el alambre sigue a la lista ------
+vpvista wire visible
+setsector MallaVis 3
+visinfo MallaVis 4 3 2
+escenapx  1.5 0 -1 masclaroque 0 0 2.5 20
+escenapx  3.5 0 -1 masclaroque 0 0 2.5 20
+escenapx -3.5 0 -1 comoen 0 0 2.5
+escenapx -1.5 0 -1 comoen 0 0 2.5
+
+# --- celda 0 (malla completa): sin recorte, el alambre entero --------------
+setsector MallaVis 0
+escenapx -3.5 0 -1 masclaroque 0 0 2.5 20
+escenapx  3.5 0 -1 masclaroque 0 0 2.5 20

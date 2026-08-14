@@ -1,0 +1,41 @@
+// ==========================================================================
+//  PRUEBA del INDICE DEL RIEL CLAMPEADO (la corre prueba_riel_indice.w3s).
+//
+//  La camara viaja por un riel de 6 nodos con offsetRiel 4. Con el target al
+//  PRINCIPIO del riel, el indice crudo (proyeccion - offset) daria NEGATIVO
+//  con la camara parada en el nodo 0: rielIndice tiene que reportar 0 (el
+//  nodo donde la camara REALMENTE esta), no -4. Es la causa raiz del "la
+//  camara gira de mas a la izquierda" del nivel real: rielDe() devolvia el
+//  indice negativo y el lua del juego apagaba su formula de mirada.
+//
+//  OJO: en el .w3d de TEXTO la vertical se llama `z` y la profundidad `y`.
+// ==========================================================================
+Whisk3D {
+    version: 20251127
+    Escena {
+        background: "0.05, 0.05, 0.05, 1.0"
+
+        Curve {
+            name: "RielIndice"
+            filePath: riel-indice.cap
+        }
+
+        // el target: proyectado sobre el riel decide donde se para la camara
+        Collection {
+            name: "Mira"
+            x: -3.0
+            y: 0.0
+            z: 0.0
+        }
+
+        Camera {
+            name: "Camara"
+            fov: 60.0
+            near: 0.10
+            far: 1000.0
+            target: "Mira"
+            riel: "RielIndice"
+            offsetRiel: 4
+        }
+    }
+}

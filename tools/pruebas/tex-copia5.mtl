@@ -1,0 +1,7 @@
+# MATERIAL DISTINTO, MISMO map_Kd que las otras 5 copias: esto es exactamente lo
+# que pasa en el proyecto Crash (28 trozos de escenario con el mismo atlas).
+newmtl tex-copia5
+Kd 1.000000 1.000000 1.000000
+map_Kd texturas/cuadrantes.png
+NoLight
+BackfaceCullingOff

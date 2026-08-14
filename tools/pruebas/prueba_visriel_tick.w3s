@@ -1,0 +1,67 @@
+# ==========================================================================
+#  EL INDICE DEL RIEL SE HORNEA EN EL TICK DE JUEGO (sin dibujar NI UN frame).
+#  Correr DESDE ESTA CARPETA:
+#    cd <motor>/tools/pruebas
+#    ../../platform/linux/build/whisk3d --script prueba_visriel_tick.w3s
+#
+#  La hermana prueba_visriel.w3s valida el cable entero pero mete un
+#  `bench 1 noswap` (un frame real) antes de cada simplay, porque el indice
+#  fraccionario del riel (rielIndice, el 5to valor de rielDe) lo horneaba
+#  SOLO el camino de dibujo (Viewport3D::UpdateViewOrbit -> UpdatePosition).
+#  Ese era EL BUG del material de referencia: en ticks sin render (harness,
+#  o el primer tick antes del primer frame) los scripts leian el indice
+#  VIEJO, setVisCurvaT alimentaba la celda de OTRO nodo y la malla se
+#  recortaba mal (triangulos faltantes = cunas negras con la camara de
+#  juego). El fix: TickReal (SimJuego.cpp) llama W3dCamarasRielTick() y el
+#  indice queda fresco EN el tick.
+#
+#  Esta prueba es la MISMA escena y los MISMOS asserts que prueba_visriel,
+#  pero sin ningun bench/render antes de los simplay: si alguien vuelve a
+#  dejar el horneado solo en el dibujo, el indice queda clavado en el valor
+#  inicial y los visinfo/scriptinfo de aca revientan.
+#  Celdas de vis-tris.w3dvis (1-based): 1=[t0,t1] 2=[t2,t0,t1] 3=[t2,t3]
+#  4=[t3,t2]. celda = 1 + floor(indice).
+# ==========================================================================
+abrirw3d prueba_visriel.w3d
+loadtex
+
+# celda declarada en el .w3d: 1 -> dibuja t0 y t1 (el estado de arranque)
+visinfo MallaVis 4 1 2
+
+activename Jugador
+
+# --- NODO 0: el jugador arranca al pie del primer nodo -> indice 0.00, celda 1
+objpos 0 0 5
+simplay 6
+scriptinfo compartido vr_indice 0.00
+visinfo MallaVis 4 1 2
+
+# --- NODO 1: sin frames en el medio, el indice tiene que avanzar igual ->
+#     indice 1.00, celda 2 (el registro DELTA de la playlist)
+objpos 2 0 5
+simplay 6
+scriptinfo compartido vr_indice 1.00
+visinfo MallaVis 4 2 3
+
+# --- ENTRE NODOS: indice 2.50 (fraccionario, horneado por el TICK), celda 3
+objpos 5 0 5
+simplay 6
+scriptinfo compartido vr_indice 2.50
+visinfo MallaVis 4 3 2
+
+# --- NODO 3 (el ultimo): indice 3.00, celda 4
+objpos 6 0 5
+simplay 6
+scriptinfo compartido vr_indice 3.00
+visinfo MallaVis 4 4 2
+
+simstop
+
+# el PRIMER render de toda la prueba, con la ultima celda ya activa: los
+# pixeles tienen que salir recortados como manda la celda 4 (t2 y t3
+# dibujados, t0 y t1 fuera), mirando desde arriba como en prueba_visriel
+vporbita 0 0 0 12 90 0
+escenapx -3.5 0 -0.3 comoen -3.5 0 3
+escenapx -1.5 0 -0.3 comoen -3.5 0 3
+escenapx  1.5 0 -0.3 masclaroque -3.5 0 3 40
+escenapx  3.5 0 -0.3 masclaroque -3.5 0 3 40

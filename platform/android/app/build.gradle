@@ -1,0 +1,47 @@
+apply plugin: 'com.android.application'
+
+// Version = fecha de compilacion YY.MM.DD (mismo criterio que el .deb / .exe).
+def buildDate = new Date().format('yy.MM.dd')
+
+// Las mismas ABIs que compila jni/Application.mk (no 'x86': no se genera .so).
+// Una sola fuente de verdad: se usan para abiFilters Y para el nombre del APK, asi
+// el nombre siempre lista las arquitecturas que este APK universal (fat) trae dentro.
+def supportedAbis = ['arm64-v8a', 'armeabi-v7a', 'x86_64']
+
+android {
+    compileSdkVersion 34
+    defaultConfig {
+        applicationId "com.whisk3d"
+        minSdkVersion 21
+        targetSdkVersion 34
+        versionCode 1
+        versionName buildDate
+        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+        ndk {
+            abiFilters(*supportedAbis)
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            // firmar con el keystore de debug (~/.android/debug.keystore, AGP lo crea/usa
+            // solo): no subimos el keystore real y el APK queda instalable directo.
+            signingConfig signingConfigs.debug
+        }
+    }
+    namespace 'com.whisk3d'
+
+    // UN solo APK universal (fat), ya firmado y con nombre que lista las 3 ABIs que
+    // trae adentro: whisk3d-editor-<fecha>-arm64-v8a_armeabi-v7a_x86_64.apk
+    // (antes salian dos: el -unsigned de gradle + el firmado a mano).
+    applicationVariants.all { variant ->
+        variant.outputs.all { output ->
+            output.outputFileName = "whisk3d-editor-${buildDate}-${supportedAbis.join('_')}.apk"
+        }
+    }
+}
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation 'androidx.appcompat:appcompat:1.1.0'
+}

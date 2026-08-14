@@ -1,0 +1,49 @@
+# ==========================================================================
+#  UN GRUPO DE VERTICES QUE CRUZA UNA COSTURA
+#  Correr DESDE ESTA CARPETA:
+#    cd <motor>/tools/pruebas
+#    ../../platform/linux/build/whisk3d --script prueba_costura.w3s
+#
+#  QUE ES UNA COSTURA
+#  Un vertice de render es unico por posicion + color + UV. Donde la textura o
+#  el sombreado cambian de golpe, la MISMA posicion tiene que existir dos veces
+#  -- fusionarlas rompería las UV o el sombreado --, asi que quedan varios
+#  control-points parados en el mismo punto del espacio. Le pasa a cualquier
+#  modelo texturado de verdad.
+#
+#  EL PROBLEMA
+#  El .w3dm guarda los pesos de los grupos de vertices POR POSICION (los indices
+#  no sobreviven a un re-split). Al cargar, el peso de una posicion se le daba a
+#  UNO solo de sus control-points -- el representante -- y los demas volvian sin
+#  peso: en una malla grande con costuras se perdian cientos de pesos y el grupo
+#  volvia incompleto. Una animacion por grupos abria la malla en dos justo por
+#  la costura, porque la mitad de los vertices no se movia.
+#  Arreglo: al cargar, el peso de una posicion se reparte a TODOS sus
+#  control-points.
+#
+#  LA ESCENA: costura-quad.obj son dos triangulos que se tocan en la diagonal
+#  con color por vertice distinto a cada lado, o sea DOS control-points en
+#  (-1,0,-1) y DOS en (1,0,1). El sidecar mete en el grupo los del lado rojo.
+# ==========================================================================
+abrirw3d prueba_costura.w3d
+
+# --- RECIEN IMPORTADO: el grupo es el que declara el sidecar ---------------
+# 2 control-points (los rojos), 2 render-verts.
+vertinfo QuadCostura costura 2 2
+simplay 1
+scriptinfo compartido nverts 2
+scriptinfo compartido fuera 0
+simstop
+
+# --- TRAS EL ROUND-TRIP: el grupo vuelve COMPLETO --------------------------
+# El archivo guardo DOS POSICIONES; al cargar, cada una reparte su peso a sus
+# DOS control-points -> 4. Antes volvian 2 y los otros dos quedaban sin peso.
+guardarw3d prueba_costura_v4.w3d
+abrirw3d prueba_costura_v4.w3d
+vertinfo QuadCostura costura 4 4
+# y lo que ve LUA por grupoVertices() (la via por la que un juego mueve o tine
+# un subconjunto de la malla) son los 4, todos en las dos posiciones del grupo
+simplay 1
+scriptinfo compartido nverts 4
+scriptinfo compartido fuera 0
+simstop

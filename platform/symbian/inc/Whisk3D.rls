@@ -1,0 +1,16 @@
+/*
+ * ==============================================================================
+ *  Name        : whisk3D.rls
+ *  Part of     : OpenGLEx / Whisk3D
+ *
+ *  UI de S60 minima: solo los textos que sobreviven (nombre de la app + Exit).
+ *  El resto de los strings (menus/notes/dialogos viejos de S60) se borraron.
+ * ==============================================================================
+ */
+
+// LOCALISATION STRINGS
+
+rls_string STRING_r_app_caption_string       "Whisk3D"
+rls_string STRING_r_app_short_caption_string "Whisk3D"
+
+rls_string STRING_r_whisk3D_exit         "Quit"

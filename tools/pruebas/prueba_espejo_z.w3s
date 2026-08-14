@@ -1,0 +1,112 @@
+# ===========================================================================
+#  ESPEJO CON Z-BUFFER: orden de pasadas + el gate del reflejo
+#
+#  Reportes del dueno (2026-08):
+#   (3) "algo me dice que estas ignorando el test de profundidad [...] el
+#       zbuffer lo tenes que hacer si o si pero dibujas primero los reflejos.
+#       luego el mapa solido. luego el agua y luego el crash real..."
+#   (4) "el reflejo de crash y la rana en el agua tiene que estar no solo al
+#       tocar el agua. si salta tambien y si esta al borde del agua tambien.
+#       solo cuando ya no se llega a reflejar deja de verse realmente."
+#
+#  ORDEN DE PASADAS que verifica esta escena (es orden de ARBOL del .w3d):
+#     fondo opaco del estanque -> los objetos -> la geometria opaca que cruza
+#     -> ESPEJO (A marcar estencil con z-test, B mandar la z de esa silueta al
+#        fondo, C reflejo CON z-test y z-write, D restaurar la z al plano)
+#     -> la lamina de agua translucida.
+#  El espejo de esta escena NO declara `sinProfundidad`: con la mascara ya no
+#  hace falta apagar el z-test.
+#
+#  Colores medidos (agua 0,220,220 con alpha 140 sobre lo de abajo):
+#     agua sola sobre el fondo azul .......... 9,139,211
+#     reflejo ROJO bajo el agua .............. 115,121,121
+#     reflejo AMARILLO bajo el agua .......... 115,225,121
+#     la pared opaca verde ................... 25,229,25
+#     fondo de la escena (nada dibujado) ..... 13,13,13
+#
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_espejo_z.w3s
+# ===========================================================================
+abrirw3d prueba_espejo_z.w3d
+loadtex
+espejopx ReflejoZ info
+
+# --- (c) EL FONDO OPACO DEL ESTANQUE YA NO MATA EL REFLEJO ------------------
+# PosteAlto esta a Y=2.6 ("saltando"): su reflejo cae en Y=-1.6, o sea DOS
+# unidades por debajo del fondo OPACO del estanque (Y=0.4), que ya escribio z.
+# Con el z-test crudo no se veria un pixel; por eso el motor terminaba apagando
+# el z-test entero. Ahora el pase B manda la z de la silueta del agua al fondo y
+# el reflejo se dibuja CON z-test normal.
+espejopx ReflejoZ reflejo -2 2.6 0 es 115 121 121 12
+espejopx ReflejoZ reflejo -2 2.6 0 distintode 0 0.5 2.5 24
+
+# --- (4) SALTANDO: el reflejo sigue estando ---------------------------------
+# (el mismo punto de arriba: el poste esta 2.1 unidades POR ENCIMA del agua y
+#  su reflejo se ve igual. El gate mira la PROYECCION en planta, no la altura.)
+
+# --- (4) EN LA ORILLA: se ve, y el recorte es la SILUETA ---------------------
+# PosteOrilla ocupa x 2.8..3.8 contra un rectangulo que termina en x=3.0: el
+# ORIGEN del objeto (3.3) esta AFUERA. El reflejo se ve igual...
+espejopx ReflejoZ reflejo 2.9 1.5 0 es 115 225 121 12
+# ...incluida la parte del cuerpo MAS ALLA del borde x=3.0: un espejo refleja
+# tambien lo que esta al lado suyo (la imagen virtual en x=3.4 se ve porque el
+# rayo del ojo CRUZA la silueta del agua). Con los planos de mundo viejos este
+# pixel se cortaba en el borde: eso era el bug del "reflejo que desaparece".
+espejopx ReflejoZ reflejo 3.4 1.5 0 es 115 225 121 12
+
+# --- (4) FUERA DE LA SILUETA: recien ahi se apaga ----------------------------
+# PosteLejos (x=8): la imagen virtual proyecta en pantalla FUERA de la silueta
+# del agua -> ni un pixel (ahi no hay ni agua: se ve el fondo de la escena).
+espejopx ReflejoZ reflejo 8 1.5 0 es 13 13 13 8
+
+# --- ESPEJO DE VERDAD: el target SUBE y su reflejo BAJA ----------------------
+# PosteAlto sube 0.6: el punto de arriba del poste pasa de y=2.6 a y=3.2 y su
+# imagen virtual baja de y=-1.6 a y=-2.2 (reflexion geometrica pura, nada de
+# "pegarse a la superficie"). La imagen mas honda SIGUE VISIBLE dentro del agua.
+activename PosteAlto
+objpos -2 3.2 0
+espejopx ReflejoZ reflejo -2 3.2 0 es 115 121 121 12
+# y en el pixel del reflejo VIEJO (la imagen de y=2.6, que ahora es aire porque
+# el poste entero esta mas arriba) quedo agua sola: el reflejo NO se quedo
+# enganchado en la base del agua.
+espejopx ReflejoZ reflejo -2 2.55 0 es 9 139 211 12
+objpos -2 2.6 0
+espejopx ReflejoZ reflejo -2 2.6 0 es 115 121 121 12
+# soltar la seleccion Y el objeto activo: el contorno verde del activo pintaria
+# el pixel del assert `mundo` de mas abajo (la Camara no se dibuja, asi que
+# dejarla de activa es "ninguno")
+deselectall
+activename Camara
+
+# --- (b) UNA GEOMETRIA OPACA ENTRE LA CAMARA Y EL AGUA TAPA EL REFLEJO -------
+# "Puente" es una pared OPACA que se cruza delante del estanque y se dibuja
+# ANTES del espejo. El reflejo de PosteTapado cae justo detras de ella.
+# ESTE es el assert que fallaba con `sinProfundidad`: sin z-test ni estencil, el
+# reflejo se pintaba ENCIMA de la pared. Ahora la mascara de estencil se marca
+# CON z-test, asi que ahi no hay marca y no se dibuja nada.
+espejopx ReflejoZ reflejo 1.1 1.5 -2.6 es 25 229 25 10
+espejopx ReflejoZ reflejo 1.1 1.5 -2.6 noes 115 121 121 24
+
+# --- (a) EL REFLEJO SOLO ADENTRO DEL AGUA -----------------------------------
+# un punto del agua donde no cae ningun reflejo tiene que ser agua sola
+escenapx -2 0.5 2.0 es 9 139 211 12
+# y el pixel de la pared opaca sigue siendo la pared (el pase del espejo no la
+# ensucia ni le pisa la profundidad)
+escenapx 0 -0.5 -2.6 es 25 229 25 10
+
+# --- los objetos REALES siguen con su color crudo ---------------------------
+# (el pase del espejo restaura todo el estado: z-func, z-write, color mask,
+#  estencil y planos de recorte)
+espejopx ReflejoZ mundo -2 2.6 0 es 255 0 0 8
+espejopx ReflejoZ mundo 3.3 1.5 0 es 255 230 0 8
+
+# --- ROUND-TRIP v4 ----------------------------------------------------------
+guardarw3d prueba_espejo_z_v4.w3d
+abrirw3d prueba_espejo_z_v4.w3d
+loadtex
+espejopx ReflejoZ info
+espejopx ReflejoZ reflejo -2 2.6 0 es 115 121 121 12
+espejopx ReflejoZ reflejo 2.9 1.5 0 es 115 225 121 12
+espejopx ReflejoZ reflejo 3.4 1.5 0 es 115 225 121 12
+espejopx ReflejoZ reflejo 8 1.5 0 es 13 13 13 8
+espejopx ReflejoZ reflejo 1.1 1.5 -2.6 es 25 229 25 10

@@ -1,0 +1,16 @@
+# Copia 4 de un quad que usa LA MISMA imagen que las otras cinco, pero con su
+# PROPIO material (newmtl tex-copia4) -> el motor no puede compartirla "por
+# nombre de material": la unica forma de subirla una sola vez es el CACHE POR RUTA.
+o tex-copia4
+v -0.8 -0.8 0.0
+v  0.8 -0.8 0.0
+v  0.8  0.8 0.0
+v -0.8  0.8 0.0
+vt 0.0 0.0
+vt 1.0 0.0
+vt 1.0 1.0
+vt 0.0 1.0
+vn 0.0 0.0 -1.0
+usemtl tex-copia4
+f 1/1/1 2/2/1 3/3/1
+f 1/1/1 3/3/1 4/4/1

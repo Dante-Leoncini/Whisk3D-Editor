@@ -1,0 +1,97 @@
+# ==========================================================================
+#  EL MANDO Y EL TECLADO LLEGAN AL SCRIPT
+#  Correr DESDE ESTA CARPETA:
+#    cd <motor>/tools/pruebas
+#    ../../platform/linux/build/whisk3d --script prueba_input.w3s
+#
+#  Tres fuentes de direccion entran POR EL MISMO CAMINO a stick("izq") y a
+#  boton("arriba"/"abajo"/"izquierda"/"derecha"):
+#     * el stick analogico (valores continuos, con deadzone)
+#     * la CRUCETA del mando (ejes de exactamente 0 / +-1)
+#     * las FLECHAS DEL TECLADO (idem)
+#  y hay una prioridad: si el analogico esta fuera de la deadzone, MANDA el
+#  analogico y la cruceta no pisa nada. Un juego que quiera 8 direcciones con
+#  modulo de diagonal lo hace en SU script a partir de estos 0/+-1; el motor no
+#  aplica ninguna tabla.
+#
+#  `pad ejes` lee lo que ve el motor; `scriptinfo compartido` lee lo que vio
+#  LUA. Se asertan los dos: es la diferencia entre "el estado esta" y "el estado
+#  llego al juego".
+#  El eje Y de SDL crece HACIA ABAJO: "arriba" es -1.
+# ==========================================================================
+abrirw3d prueba_input.w3d
+
+# --- 0) EN REPOSO ----------------------------------------------------------
+pad soltar
+simplay 1
+pad ejes 0 0
+scriptinfo compartido ejeX 0
+scriptinfo compartido ejeY 0
+scriptinfo compartido bDerecha no
+
+# --- 1) LA CRUCETA SOLA ----------------------------------------------------
+pad dpad derecha on
+simplay 1
+pad ejes 1 0
+scriptinfo compartido ejeX 1
+scriptinfo compartido ejeY 0
+scriptinfo compartido bDerecha si
+scriptinfo compartido bIzquierda no
+
+# diagonal arriba-derecha: (+1, -1), exactamente, sin normalizar
+pad dpad arriba on
+simplay 1
+pad ejes 1 -1
+scriptinfo compartido ejeX 1
+scriptinfo compartido ejeY -1
+scriptinfo compartido bArriba si
+
+pad soltar
+simplay 1
+pad ejes 0 0
+scriptinfo compartido bArriba no
+
+# --- 2) EL ANALOGICO MANDA -------------------------------------------------
+# con el stick fuera de la deadzone, la cruceta NO pisa el valor continuo
+pad stick -0.5 0.25
+pad dpad derecha on
+simplay 1
+pad ejes -0.5 0.25
+scriptinfo compartido ejeX -0.500
+scriptinfo compartido ejeY 0.250
+# ...pero el boton por NOMBRE sigue estando apretado: son dos lecturas distintas
+scriptinfo compartido bDerecha si
+pad soltar
+simplay 1
+
+# --- 3) LAS FLECHAS DEL TECLADO --------------------------------------------
+# entran al EJE por el mismo camino que la cruceta...
+pad flecha izquierda on
+simplay 1
+pad ejes -1 0
+scriptinfo compartido ejeX -1
+pad flecha abajo on
+simplay 1
+pad ejes -1 1
+scriptinfo compartido ejeY 1
+# ...pero HOY NO entran a los botones por nombre: SimJuego::TickReal alimenta
+# W3dScriptBotonPad("izquierda"/...) SOLO desde buttonState[] del d-pad, aunque
+# el comentario de al lado diga "mismos nombres que las flechas del teclado".
+# Este assert fija la conducta REAL para que se vea si algun dia cambia; si se
+# decide unificarlo (gFlecha[] tambien a los nombres), este renglon pasa a "si"
+# y es un cambio de contrato deliberado, no un accidente.
+scriptinfo compartido bIzquierda no
+scriptinfo compartido bAbajo no
+pad soltar
+simplay 1
+pad ejes 0 0
+scriptinfo compartido ejeX 0
+
+# --- 4) UN BOTON DE ACCION -------------------------------------------------
+pad boton a on
+simplay 1
+scriptinfo compartido bA si
+pad soltar
+simplay 1
+scriptinfo compartido bA no
+simstop

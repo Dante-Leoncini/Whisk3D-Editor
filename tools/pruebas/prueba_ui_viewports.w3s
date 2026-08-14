@@ -1,0 +1,42 @@
+# ==========================================================================
+#  EL LIENZO DEL JUEGO CON DOS VIEWPORTS 3D (estado del overlay POR viewport).
+#  Correr DESDE ESTA CARPETA:
+#    cd <motor>/tools/pruebas
+#    ../../platform/linux/build/whisk3d --script prueba_ui_viewports.w3s
+#
+#  Reporte del dueno: "si hay mas de un viewport3d la UI se agranda y achica
+#  como loca. es independiente por cada viewport3d". Causa: el override global
+#  de la ventana simulada era "el ultimo que escribe gana" -- cada viewport lo
+#  pisaba al dibujar su HUD y el que dibujaba ULTIMO dejaba SU pantalla puesta
+#  para los binds del juego (pantalla()). Ahora cada viewport dibuja con un
+#  override CON ALCANCE (se repone al salir) y el PERSISTENTE lo publica solo
+#  el viewport ACTIVO.
+#
+#  El layout parte 0.25/0.75: el activo (primero) es ANGOSTO (w < h) y el
+#  segundo ANCHO (w > h) -- discrimina sin depender del tamano de la ventana.
+#  `vpestado` renderiza el frame entero UNA vez (vp1 y despues vp2): el ULTIMO
+#  en dibujar es el ANCHO, que es justo el que antes pisaba el override.
+# ==========================================================================
+abrirw3d prueba_ui_viewports.w3d
+loadtex
+juego on
+# arrancar la sim ANTES de medir: al arrancar se esconde la toolbar y la
+# pantalla util del viewport cambia UNA vez (el unico cambio legitimo)
+simplay 1
+
+# un frame entero: los DOS viewports; el SEGUNDO (ancho) dibuja ultimo
+vpestado
+simplay 3
+# la pantalla que ve el juego es la del viewport ACTIVO (angosto), no la del
+# ultimo en dibujar (con el bug daba "ancho")
+scriptinfo compartido pv_lado angosto
+
+# otro frame entero intercalado con ticks: la pantalla NO baila (el unico
+# cambio fue el del arranque, del lienzo por defecto a la del viewport activo)
+vpestado
+simplay 3
+scriptinfo compartido pv_lado angosto
+scriptinfo compartido pv_cambios 1
+
+simstop
+juego off

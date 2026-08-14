@@ -1,0 +1,32 @@
+// ==========================================================================
+//  PRUEBA del ESTADO GL de la UI del viewport DESPUES del overlay del juego.
+//  La corre prueba_ui_estado.w3s.
+//
+//  El .w3dui declara UNA imagen SIN canal alpha (usarAlpha: false): al
+//  dibujarla, el overlay APAGA Blend (UIOverlay::DibujarImagenRect) y ese es
+//  exactamente el estado con el que despues se dibuja la barra del viewport si
+//  la UI no lo re-afirma. El sintoma real: jugando, la barra translucida y los
+//  botones de Play/Pausa salian con bordes NEGROS (opacos).
+// ==========================================================================
+Whisk3D {
+    version: 20251127
+    Escena {
+        background: "0.2, 0.2, 0.25, 1.0"
+
+        Camera {
+            name: "Camara"
+            y: -8.0
+            z: 2.0
+        }
+
+        Wavefront {
+            name: "Piso"
+            filePath: espejo-piso.obj
+            scale: 6.0
+        }
+
+        UI {
+            archivo: "prueba_ui_estado.w3dui"
+        }
+    }
+}

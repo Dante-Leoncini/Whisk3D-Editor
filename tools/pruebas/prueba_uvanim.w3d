@@ -1,0 +1,36 @@
+// ==========================================================================
+//  PRUEBA sintetica de la ANIMACION UV "tira de atlas" (Core, autoplay).
+//  La usa prueba_uvanim.w3s: carga -> meshinfo (uvanim frames/fps/eje/desfase)
+//  -> guardarw3d (v4, props "animUV") -> reabrir -> meshinfo igual.
+//  El quad tiene la UV en la primera celda de una tira de 4; el motor recorre
+//  la tira solo (UpdateUVAnims), sin lua ni timeline.
+// ==========================================================================
+Whisk3D {
+    version: 20251127
+    Escena {
+        background: "0.2, 0.2, 0.25, 1.0"
+
+        Camera {
+            name: "Camara"
+            y: -8.0
+            z: 2.0
+        }
+
+        Wavefront {
+            name: "QuadAnimado"
+            filePath: uvanim-quad.obj
+            AnimacionUV {
+                frames: 4
+                fps: 12
+                eje: u
+                desfase: 1
+            }
+        }
+
+        Wavefront {
+            name: "QuadQuieto"
+            filePath: uvanim-quad.obj
+            x: 3.0
+        }
+    }
+}

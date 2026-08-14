@@ -1,0 +1,7 @@
+# barra GRUESA (hijo 1 del LOD): roja
+
+newmtl lod-barra-gruesa
+Kd 0.900000 0.150000 0.150000
+d 1.0
+NoLight
+BackfaceCullingOff

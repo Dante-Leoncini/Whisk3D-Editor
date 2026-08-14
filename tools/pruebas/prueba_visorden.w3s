@@ -1,0 +1,30 @@
+# Prueba del ORDEN DE TRANSPARENTES del override de visibilidad (E3):
+# con un `.w3dvis` ORDENADO (flag ordenLejosCerca), los mesh parts OPACOS se
+# agrupan por material (como siempre) y los TRANSPARENTES salen al final EN EL
+# ORDEN EXACTO de la lista (pvsRuns): la lista del dato precalculado ES el
+# orden del pintor, sin sort en runtime.
+#
+# vis-dos.obj: 4 tris, 2 materiales (tris 0-1 opacos "solido", 2-3 "vidrio"
+# transparente d 0.5). vis-dos.w3dvis (K=1, 3 celdas ordenadas):
+#   celda 1 = [2,0,3,1] -> opacos {0,1} + 1 run transparente [2,3]
+#   celda 2 = [3,2]     -> solo transparentes: 1 run [3,2] (orden invertido)
+#   celda 3 = [0,1]     -> solo opacos: 0 runs
+# visinfo asserts: celdas, celdaActiva, trisDibujando, runsTransparentes.
+abrirw3d prueba_visorden.w3d
+visinfo MallaOrden 3 1 4 1
+setsector MallaOrden 2
+visinfo MallaOrden 3 2 2 1
+setsector MallaOrden 3
+visinfo MallaOrden 3 3 2 0
+# fuera de rango = malla completa, sin runs
+setsector MallaOrden 9
+visinfo MallaOrden 3 9 4 0
+setsector MallaOrden 1
+visinfo MallaOrden 3 1 4 1
+# round-trip v4: el `.w3dvis` viaja y el orden sobrevive la recarga
+guardarw3d prueba_visorden_v4.w3d
+zipentrada prueba_visorden_v4.w3d extra/vis-dos.w3dvis
+abrirw3d prueba_visorden_v4.w3d
+visinfo MallaOrden 3 1 4 1
+# render real: los runs salen por el camino de indices client sobre el VBO
+bench 2 noswap

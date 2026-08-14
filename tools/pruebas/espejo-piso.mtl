@@ -1,0 +1,6 @@
+newmtl espejo-piso
+Kd 1.000000 1.000000 1.000000
+map_Kd texturas/azul.png
+NoLight
+PIXELATED
+BackfaceCullingOff

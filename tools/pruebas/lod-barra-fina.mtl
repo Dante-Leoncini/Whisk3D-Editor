@@ -1,0 +1,7 @@
+# barra FINA (hijo 0 del LOD): verde
+
+newmtl lod-barra-fina
+Kd 0.100000 0.900000 0.100000
+d 1.0
+NoLight
+BackfaceCullingOff

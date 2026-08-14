@@ -1,0 +1,59 @@
+// ==========================================================================
+//  PRUEBA sintetica del FALLBACK DE CELDA VACIA (CullingTri sectorFallback).
+//  La corre prueba_visfallback.w3s.
+//
+//  Tres mallas IGUALES (vis-tris.obj: 4 triangulos en fila sobre XZ) con el
+//  mismo `.w3dvis` (vis-hueco.w3dvis: 4 celdas, c1=[t0,t1] c2=VACIA c3=[t2,t3]
+//  c4=VACIA), cada una con un fallback distinto:
+//    MallaSin      sin fallback           -> celda vacia = NADA (el contrato de
+//                                            siempre: "desde aca no se ve")
+//    MallaCompleta sectorFallback completa-> celda vacia = la malla ENTERA
+//    MallaCelda    sectorFallback 3       -> celda vacia = la lista de la celda 3
+//  Es el paracaidas del "agujero negro" LOD x CullingTri: un LOD elige por
+//  DISTANCIA sobre listas horneadas POR NODO, y el hijo elegido podia caer en
+//  una celda que para SU variante estaba vacia -> ninguna de las dos se dibujaba.
+// ==========================================================================
+Whisk3D {
+    version: 20251127
+    Escena {
+        background: "0.2, 0.2, 0.25, 1.0"
+
+        Wavefront {
+            name: "MallaSin"
+            filePath: vis-tris.obj
+            y: -3.0
+            CullingTri {
+                metodo: "celdas"
+                celda: 1
+                vis: "vis-hueco.w3dvis"
+            }
+        }
+        Wavefront {
+            name: "MallaCompleta"
+            filePath: vis-tris.obj
+            y: 1.5
+            CullingTri {
+                metodo: "celdas"
+                celda: 1
+                vis: "vis-hueco.w3dvis"
+                sectorFallback: "completa"
+            }
+        }
+        Wavefront {
+            name: "MallaCelda"
+            filePath: vis-tris.obj
+            y: 6.0
+            CullingTri {
+                metodo: "celdas"
+                celda: 1
+                vis: "vis-hueco.w3dvis"
+                sectorFallback: 3
+            }
+        }
+    }
+    // un solo viewport, sin piso/ejes: los asserts por pixel comparan contra el
+    // FONDO vacio y una linea de la grilla justo ahi los ensuciaria
+    Layout {
+        Viewport3D { showFloor: false showXaxis: false showYaxis: false }
+    }
+}

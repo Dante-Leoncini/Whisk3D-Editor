@@ -1,0 +1,5 @@
+# salidas de las corridas (entradas: los .w3d/.w3dui sin sufijo)
+*_v4.w3d
+*_rt*.w3d
+*.ppm
+whisk3d.log

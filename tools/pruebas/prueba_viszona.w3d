@@ -1,0 +1,43 @@
+// ==========================================================================
+//  PRUEBA sintetica del metodo CELDAS del Culling por triangulo (VisSet /
+//  `.w3dvis`, formato/w3dvis.md) + el objeto VisZona en modo curva.
+//  La usa prueba_viszona.w3s:
+//   - MallaVis importa vis-tris.obj (4 triangulos, los mismos de pvs-tris) con
+//     su dato vis-tris.w3dvis: playlist K=2, 4 celdas CON ORDEN
+//     (c1=[0,1], c2=[2,0,1], c3=[2,3], c4=[3,2]), escrito por un generador
+//     Python INDEPENDIENTE contra el spec congelado (si el motor lo lee, el
+//     spec alcanza para un conversor externo).
+//   - El CullingTri declara metodo "celdas" y celda inicial 1.
+//   - La VisZona en modo curva recibe setVisCurvaT() desde el componente lua
+//     (el stepper avanza de a una celda por tick).
+// ==========================================================================
+Whisk3D {
+    version: 20251127
+    Escena {
+        background: "0.2, 0.2, 0.25, 1.0"
+
+        Camera {
+            name: "Camara"
+            y: -8.0
+            z: 2.0
+        }
+
+        VisZona {
+            name: "Zona"
+            modo: "curva"
+            objetivo: "MallaVis"
+        }
+
+        Wavefront {
+            name: "MallaVis"
+            filePath: vis-tris.obj
+            script: "viszona_componente.lua"
+            ref_malla: "MallaVis"
+            ref_zona: "Zona"
+            CullingTri {
+                metodo: "celdas"
+                celda: 1
+            }
+        }
+    }
+}

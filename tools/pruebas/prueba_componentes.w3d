@@ -1,0 +1,37 @@
+// ==========================================================================
+//  PRUEBA sintetica de los SCRIPTS estilo Unity en CUALQUIER objeto (texto):
+//  dos Wavefront comparten componente.lua y cada uno declara sus valores por
+//  instancia con val_* (id = 1 y 3, una "agarrada"). La usa
+//  prueba_componentes.w3s: carga -> simplay (inicio() suma los ids en el mapa
+//  compartido) -> scriptinfo verifica suma=4 y agarradas=1 -> guardarw3d (v4)
+//  -> reabrir -> lo mismo (los scripts y los val_ sobreviven el round-trip).
+// ==========================================================================
+Whisk3D {
+    version: 20251127
+    Escena {
+        background: "0.2, 0.2, 0.25, 1.0"
+
+        Camera {
+            name: "Camara"
+            y: -8.0
+            z: 2.0
+        }
+
+        Wavefront {
+            name: "Fruta1"
+            filePath: uvanim-quad.obj
+            script: "componente.lua"
+            val_id: "1"
+            val_agarrada: "true"
+            val_etiqueta: "manzana"
+        }
+
+        Wavefront {
+            name: "Fruta2"
+            filePath: uvanim-quad.obj
+            x: 3.0
+            script: "componente.lua"
+            val_id: "3"
+        }
+    }
+}

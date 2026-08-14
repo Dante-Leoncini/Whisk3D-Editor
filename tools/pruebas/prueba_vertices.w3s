@@ -1,0 +1,19 @@
+# Prueba de los VERTICES POR GRUPO desde lua (sidecar <obj>.grupos.json).
+# Correr DESDE ESTA CARPETA:
+#   cd <motor>/tools/pruebas
+#   ../../platform/linux/build/whisk3d --script prueba_vertices.w3s
+# Antes de la sim: vertinfo muestra el grupo "punta" (cps=2 render=2) en los dos
+# quads (QuadAgua con merge via vertCtrlPoint, QuadCrudo con noMerge 1:1) y el
+# primer vert del grupo en pos=(1,0,1) color=(255,255,255,255).
+# Tras simplay: el lua movio la punta con setVertices (x = 1 + dx = 3) y la tino
+# de rojo -> vertinfo muestra pos=(3,0,1) color=(255,0,0,255); los asserts duros
+# son los compartido (nverts=2 verts en el grupo, xpunta=3 releido del mesh).
+abrirw3d prueba_vertices.w3d
+vertinfo QuadAgua
+vertinfo QuadCrudo
+simplay 3
+scriptinfo compartido nverts 2
+scriptinfo compartido xpunta 3
+scriptinfo compartido pantallaok 1
+vertinfo QuadAgua
+simstop

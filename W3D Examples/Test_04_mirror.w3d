@@ -1,0 +1,67 @@
+Whisk3D {
+    version: 20251127
+    Escena {
+        iconApp: Whisk3D_experiment.png
+        limpiarPantalla: true
+        background: "0.2, 0.2, 0.2, 1.0"
+
+        Collection {
+            name: "Collection"
+            x: 0.0
+            y: 0.0
+            z: 0.0
+
+            Light {
+                name: "Light"
+                x: 1.0
+                y: 2.25
+                z: 2
+                r: 1.0
+                g: 0.0
+                b: 0.0
+            } 
+
+            Wavefront {
+                name: "Monkey"
+                filePath: assets/monkey.obj
+                x: 0.0
+                y: 0.0
+                z: 0.53
+                scale: 1
+            } 
+        }
+
+        Mirror {
+            name: "Espejo"
+            target: "Collection"
+            x: 0.0
+            y: 0.0
+            z: 0.0
+        }  
+    }
+
+    Layout {
+        ViewportRow {
+            Viewport3D {
+                orthographic: false
+                ViewFromCameraActive: false
+                showOverlays: true
+                ShowUi: true
+                showFloor: true
+                showYaxis: true
+                showXaxis: true
+                CameraToView: false
+                showOrigins: true
+                show3DCursor: true
+                ShowRelantionshipsLines: true
+                view: Rendered
+            }
+            ViewportColumn {
+                Properties
+                Outliner
+                Split: 0.7
+            }
+            Split: 0.7
+        }
+    }
+}

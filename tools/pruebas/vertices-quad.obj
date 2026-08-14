@@ -1,0 +1,13 @@
+# quad de prueba para los GRUPOS DE VERTICES (sidecar vertices-quad.grupos.json):
+# 4 lineas 'v'; el grupo "punta" son las lineas v 2 y 3 (0-based), o sea los dos
+# vertices con z = 1. Caras v/vt/vn (Whisk3D exige los tres indices).
+v -1 0 -1
+v 1 0 -1
+v 1 0 1
+v -1 0 1
+vt 0 0
+vt 1 0
+vt 1 1
+vt 0 1
+vn 0 1 0
+f 1/1/1 2/2/1 3/3/1 4/4/1

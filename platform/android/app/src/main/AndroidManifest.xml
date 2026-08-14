@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Leer texturas/modelos del almacenamiento (Descargas, etc.). READ_EXTERNAL_STORAGE
+         vale hasta API 32; en API 33+ para imagenes se usa READ_MEDIA_IMAGES. El pedido en
+         runtime lo hace la app (SDL_AndroidRequestPermission). -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <!-- Escribir el OBJ/MTL exportado y el render PNG. WRITE_EXTERNAL_STORAGE es no-op
+         en API 30+ (scoped storage); con requestLegacyExternalStorage vale en API<=29,
+         que es donde el file browser escribe a /sdcard por fopen. -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+                     android:maxSdkVersion="29" />
+    <!-- API 30+ (Android 11): para leer/escribir ARCHIVOS arbitrarios (modelos .obj/.w3d, texturas) con el file
+         browser interno (opendir/fopen). Los permisos de media solo dan imagenes/videos -> no se cargaban modelos.
+         "All files access": se pide en runtime (el Activity abre la pantalla de Settings). Mantiene nuestro browser. -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+
+    <application
+        android:requestLegacyExternalStorage="true"
+        android:allowBackup="true"
+        android:label="@string/app_name"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/AppTheme">
+        <!-- launchMode=singleTask: reabrir desde el launcher/recientes TRAE la instancia existente (onResume), NO crea
+             otra Activity. Sin esto, con los globals C++ estaticos vivos, main() se relanzaba y ConstructUniversal
+             DUPLICABA la escena (aparecia otro cubo + camara + luz encima de lo que ya habia).
+             configChanges: rotar / mostrar teclado / cambiar densidad NO destruye ni recrea la Activity (sino tambien
+             se relanzaba main -> misma duplicacion + perdida del contexto GL = texturas negras). SDL maneja el resize. -->
+        <activity
+            android:name=".Whisk3DActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden|keyboard|navigation|uiMode|density|touchscreen|locale|fontScale"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- abrir un proyecto .w3d desde el gestor de archivos (equivale al
+                 doble click de PC). Se filtra por EXTENSION porque .w3d no tiene
+                 MIME registrado en Android (llega como octet-stream o texto). -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="file" android:host="*" android:pathPattern=".*\\.w3d" android:mimeType="*/*" />
+                <data android:scheme="content" android:host="*" android:pathPattern=".*\\.w3d" android:mimeType="*/*" />
+            </intent-filter>
+        </activity>
+
+    </application>
+
+</manifest>

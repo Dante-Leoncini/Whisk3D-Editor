@@ -1,0 +1,26 @@
+# ==========================================================================
+#  LAS LISTAS CON BOTON DE REORDENAR Y SU UNDO POR INDICE
+#  Correr DESDE ESTA CARPETA:
+#    cd <motor>/tools/pruebas
+#    ../../platform/linux/build/whisk3d --script prueba_capas.w3s
+#
+#  El editor tiene siete listas con botones de subir/bajar/borrar: vertex
+#  groups, UV groups, UV maps, capas de color, los clips 3D del esqueleto
+#  (borrar y reordenar), las vertex anims y los clips 2D del armature 2D.
+#  TODAS guardan el destino de un rename POR INDICE, asi que mover o borrar un
+#  elemento corre los indices y deja los pasos de undo anteriores apuntando al
+#  elemento equivocado: el Ctrl+Z de un rename no lo deshacia Y ADEMAS escribia
+#  el nombre viejo ENCIMA del vecino.
+#
+#  Los dos comandos arman su propia escena (ReiniciarEscena + una malla nueva),
+#  asi que esta prueba no necesita ningun fixture en disco. Hasta hoy ningun
+#  .w3s los corria: el motor tenia el detector escrito y apagado.
+# ==========================================================================
+
+# reordenar una capa (UV group) NO puede romper el undo de un rename anterior,
+# ni de ida (undo x2) ni de vuelta (redo x2)
+capaorden
+
+# lo mismo en las OTRAS cinco listas, incluido el caso que rompe de verdad:
+# BORRAR uno de abajo, que desplaza a los de arriba
+capaindices

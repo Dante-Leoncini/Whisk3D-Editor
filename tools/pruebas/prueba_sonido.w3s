@@ -1,0 +1,16 @@
+# Prueba del bind lua sonido(ruta[,vol[,pitch]]) (BindsJuego.cpp).
+# Correr DESDE ESTA CARPETA:
+#   cd <motor>/tools/pruebas
+#   ../../platform/linux/build/whisk3d --script prueba_sonido.w3s
+#
+# `sonidotest <ruta.wav> [<rutaInexistente.wav>]` carga el wav (relativo al
+# proyecto), lo re-dispara cacheado, lo toca con pitch fraccional, y pide uno
+# inexistente: nada puede romper (headless el mixer puede no abrir: cargar da
+# NULL y sonido() es no-op). El archivo lo pone ESTE script, no el comando.
+abrirw3d prueba_sonido.w3d
+
+# con las dos rutas explicitas
+sonidotest sonidos/bip.wav sonidos/no-existe.wav
+
+# y sin argumentos: el default retrocompatible tiene que dar lo mismo
+sonidotest

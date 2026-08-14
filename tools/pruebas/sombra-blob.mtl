@@ -1,0 +1,8 @@
+# LA SOMBRA: material `decal` (transparente + NO escribe z + sesgo -4 +
+# ordenPasada 1). Kd oscuro y NoLight -> el pixel es 26,26,26 exacto.
+newmtl sombra-blob
+Kd 0.100000 0.100000 0.100000
+d 1.0
+NoLight
+BackfaceCullingOff
+decal

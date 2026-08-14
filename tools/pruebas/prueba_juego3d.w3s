@@ -1,0 +1,52 @@
+# ==========================================================================
+#  UN JUEGO 3D COMPILADO SE VE (no abre en negro)
+#  Correr DESDE ESTA CARPETA:
+#    cd <motor>/tools/pruebas
+#    ../../platform/linux/build/whisk3d --script prueba_juego3d.w3s
+#
+#  EL PROBLEMA QUE ESTA PRUEBA CIERRA. El runtime de los juegos compilados
+#  dibujaba UNICAMENTE el pase 2D: el .deb del juego abria con la escena 3D en
+#  negro y solo el HUD encima. Nada lo detectaba, porque las 52 pruebas del motor
+#  corren adentro del EDITOR, donde el viewport 3D si dibuja. O sea que lo unico
+#  que se puede probar de verdad es el BINARIO: compilarlo, correrlo y mirarle
+#  los pixeles.
+#
+#  Eso hace esta prueba, de punta a punta y sin ningun proyecto externo:
+#    1. arma en memoria el juego 3D MINIMO (juego3dmin): un cubo, una camara que
+#       lo mira DECLARANDO aspecto 1:1, y un HUD con una franja verde y un script
+#       colgado (Compilar juego exige que el proyecto tenga scripts);
+#    2. lo guarda, lo abre y lo COMPILA con el mismo "Compilar juego" del editor;
+#    3. corre el binario resultante pidiendole una captura y verifica por pixeles
+#       (juego3dpx) las tres cosas que tienen que pasar a la vez:
+#         - el CENTRO no es negro          -> la escena 3D se dibuja;
+#         - la BANDA del encuadre es negro OPACO -> el letterbox del aparato
+#           (en el editor las bandas van atenuadas: es la unica diferencia
+#            deliberada entre el Play y el juego);
+#         - la franja del HUD se ve VERDE  -> el 2D queda ENCIMA del 3D **y** los
+#           binds COMPARTIDOS existen en el binario: la franja nace OCULTA y la
+#           prende el .lua del juego DESPUES de llamar a camaraXZ(), pantalla(),
+#           parametro(), objetivo() y sonido(). Si al runtime le falta uno, lua
+#           corta ahi ("attempt to call a nil value"), la franja no aparece y esto
+#           se pone rojo. Es la regresion del bug del .deb del demo: el runtime
+#           registraba los binds solo en los caminos 2D, y un juego 3D compilado
+#           corria sus scripts sin la mitad de la API (sin sonido, sin riel, sin
+#           visibilidad por celda) cayendose todos los frames.
+#
+#  Si alguna de las tres falla, la captura queda en <carpeta>/captura.png para
+#  mirarla.
+#
+#  Compila un juego de verdad (cmake + g++), asi que tarda mas que las demas.
+# ==========================================================================
+
+ventana 640 480
+
+# --- 1) el juego 3D minimo, guardado y abierto como proyecto -----------------
+juego3dmin /tmp/w3d_juego3d
+guardarw3d /tmp/w3d_juego3d/juego3dmin.w3d
+abrirw3d /tmp/w3d_juego3d/juego3dmin.w3d
+
+# --- 2) compilarlo para Linux, con los assets sueltos ------------------------
+compilarjuego 0 0
+
+# --- 3) correr el BINARIO y mirarle los pixeles ------------------------------
+juego3dpx /tmp/w3d_juego3d juego3dmin

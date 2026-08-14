@@ -1,0 +1,88 @@
+{
+  "version": 1,
+  "nombre": "PruebaFuente",
+  "ventana": {
+    "igualQueRender": true,
+    "ancho": 640,
+    "alto": 480,
+    "escalaGlobal": 1,
+    "color": [
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  "paleta": "",
+  "paletas": [],
+  "hijos": [
+    {
+      "tipo": "texto",
+      "nombre": "TxtBitmap",
+      "pos": [
+        0,
+        -0.2,
+        0
+      ],
+      "ancla": 5,
+      "texto": "CHECKPOINT 0123456789",
+      "tam": 32,
+      "alignX": 1,
+      "alignY": 1,
+      "color": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "fuente": "",
+      "fuenteBitmap": "texturas/ui/fuente-bitmap-npot.png",
+      "hijos": []
+    },
+    {
+      "tipo": "texto",
+      "nombre": "TxtNormal",
+      "pos": [
+        0,
+        0.2,
+        0
+      ],
+      "ancla": 5,
+      "texto": "fallback a la fuente comun",
+      "tam": 24,
+      "alignX": 1,
+      "alignY": 1,
+      "color": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "fuente": "",
+      "hijos": []
+    },
+    {
+      "tipo": "texto",
+      "nombre": "TxtMinima",
+      "pos": [
+        0,
+        0.4,
+        0
+      ],
+      "ancla": 5,
+      "texto": "defaults abc",
+      "tam": 16,
+      "alignX": 1,
+      "alignY": 1,
+      "color": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "fuente": "",
+      "fuenteBitmap": "texturas/ui/fuente-bitmap-minima.png",
+      "hijos": []
+    }
+  ]
+}

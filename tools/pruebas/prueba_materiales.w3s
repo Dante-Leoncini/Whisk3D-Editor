@@ -1,0 +1,145 @@
+# Prueba de los materiales DECAL y ADITIVO, con evidencia por PIXELES del render
+# real (escenapx lee con glReadPixels el pixel donde cae un punto de mundo).
+# Correr DESDE ESTA CARPETA:
+#   cd <motor>/tools/pruebas
+#   ../../platform/linux/build/whisk3d --script prueba_materiales.w3s
+#
+# LAS DOS PALABRAS NUEVAS DEL .mtl:
+#   decal [unidades]   calcomania. transparente + NO escribe z + glPolygonOffset
+#                      hacia el ojo (default -4 unidades; en el N95, con z de 16
+#                      bits, el motor lo multiplica x4 solo) + orden de pasada 1
+#                      (se dibuja despues de los opacos de la misma malla).
+#                      Implica NoLight. Es lo que arregla el z-fighting de las
+#                      sombras, los blobs horneados y la caja de checkpoint.
+#   ADITIVO            transparente con mezcla GL_ONE/GL_ONE: SUMA al fondo, el
+#                      negro queda invisible. Es el torbellino del giro, los
+#                      rayos, el halo, las chispas y los sprites de agua.
+#
+# La escena son 6 estaciones, todas con la MISMA baldosa roja (204,38,38) y la
+# MISMA geometria, para que la z de dos piezas coplanares salga bit a bit igual
+# y el z-test sea determinista (sino el z-fighting seria ruido, no una prueba).
+abrirw3d prueba_materiales.w3d
+loadtex
+# vista REPRODUCIBLE: una prueba de pixeles no puede depender del layout guardado
+vporbita 0 0 0 12 0 0
+
+# 0) lo que el .mtl dejo en el material
+matflags mat-piso    normal
+matflags mat-plano   normal
+matflags mat-decal   decal
+matflags mat-decalalto decal
+matflags mat-alfa    normal
+matflags mat-aditivo aditivo
+
+# 1) CONTROL (A, x=-3): un quad verde COPLANAR con la baldosa y SIN decal. Los dos
+#    tienen exactamente la misma z, asi que el segundo pierde el z-test (DepthLess)
+#    y no se ve ni un pixel: ESE es el sintoma que se viene arrastrando.
+escenapx -3 2 0 es 204 38 38 6
+
+# 2) EL DECAL (B, x=0): mismo caso, mismo quad, misma z... pero con `decal`. El
+#    glPolygonOffset lo corre hacia el ojo lo justo y gana. Verde limpio.
+escenapx 0 2 0 es 26 230 26 6
+escenapx 0 2 0 distintode -3 2 0 40
+
+# 3) EL DECAL NO ESCRIBE Z, Y VA AL FINAL (C, x=3): el decal magenta esta
+#    DELANTE y la tapa azul opaca DETRAS, y en el ARBOL la tapa va DESPUES.
+#    ANTES aca se veia AZUL, y eso NO era lo correcto: era el bug que reporto el
+#    dueno ("sombra de crash que se pierde pese al material decal"). Como la
+#    calcomania no escribe z a proposito, cualquier opaco dibujado despues la
+#    borraba -- en Toad Village, los troncos y la malla EscenarioAlpha (que van
+#    al final del .w3d) se comian la sombra de Crash.
+#    Ahora las mallas que son SOLO calcomania se DIFIEREN al final del frame
+#    (Mesh.cpp: W3dDecalesDibujarPendientes, igual que las particulas), asi que
+#    la calcomania cae encima de la escena opaca ya terminada y, como esta
+#    genuinamente delante de la tapa, se ve MAGENTA. Sigue sin escribir z: eso
+#    lo aserta `matflags mat-decalalto decal` del bloque 7.
+escenapx 3 2 0.2 es 229 25 229 6
+#    (la calcomania y la tapa son el MISMO quad de 1.6x1.6, asi que no queda
+#     tapa a la vista: el 'no escribe z' se aserta arriba con matflags.)
+
+# 4) ALPHA COMUN (D, x=-3 abajo): gris 0.5 opaco por alpha sobre el rojo -> 128 pelado.
+escenapx -3 -2 0.2 es 128 128 128 6
+
+# 5) ADITIVO (E, x=0 abajo): el MISMO gris 0.5, la MISMA baldosa roja debajo, pero
+#    sumando: 128+204 (satura a 255), 128+38, 128+38.
+escenapx 0 -2 0.2 es 255 166 166 6
+#    y la prueba que de verdad importa: contra el alpha, el aditivo ACLARA.
+escenapx 0 -2 0.2 masclaroque -3 -2 0.2 150
+
+# 6) ORDEN DE PASADA dentro de UNA malla (F, x=3 abajo): mat-combo.obj lista el
+#    decal PRIMERO y el piso opaco SEGUNDO. En orden de archivo el decal perderia
+#    (dibuja antes que el piso, no escribe z, y el opaco lo tapa). Con el orden de
+#    pasada del material (0 opaco -> 1 decal -> 2 transparente) se ve el verde.
+escenapx 3 -2 0 es 26 230 26 6
+
+# 7) el estado GL vuelve a su lugar: la estacion F se dibuja DESPUES de los decals
+#    y del aditivo. Que su piso opaco escriba z (y que su decal mezcle con ALPHA y
+#    no sumando) prueba que DepthMask y BlendAlpha se restauraron. Con el aditivo
+#    pegado, verde sobre rojo daria 230,255,64.
+escenapx 3 -2 0 noes 230 255 64 30
+
+# 8) ROUND-TRIP v4: sesgo, orden de pasada, escritura de z y mezcla tienen que
+#    sobrevivir al guardado y a la reapertura.
+guardarw3d prueba_materiales_v4.w3d
+abrirw3d prueba_materiales_v4.w3d
+loadtex
+vporbita 0 0 0 12 0 0
+matflags mat-decal   decal
+matflags mat-aditivo aditivo
+matflags mat-piso    normal
+escenapx -3 2 0 es 204 38 38 6
+escenapx 0 2 0 es 26 230 26 6
+escenapx 3 2 0.2 es 229 25 229 6
+escenapx -3 -2 0.2 es 128 128 128 6
+escenapx 0 -2 0.2 es 255 166 166 6
+escenapx 3 -2 0 es 26 230 26 6
+
+# 9) LOS MISMOS CAMPOS, DESDE EL PANEL DE MATERIALES DEL EDITOR.
+#    Hasta hoy `decal`, `ADITIVO`, `sesgoProfundidad` y `ordenPasada` SOLO se
+#    podian poner desde el .mtl o el .w3d: en el editor no habia forma de ver
+#    como se porta una sombra pegada al piso sin editar un archivo de texto.
+#    Ahora la tarjeta Material tiene el tilde "Decal", dos desplegables (modo de
+#    mezcla y test de profundidad) y los campos Depth Bias / Pass Order.
+#    `matflags <mat> set ...` corre LA MISMA logica que esos controles (la receta
+#    de calcomania vive en Materials.cpp y la comparten el .mtl, el panel y el
+#    assert `matflags <mat> decal`), asi que esto prueba el camino del editor.
+#
+#    9a) un material NORMAL se vuelve calcomania con un tilde...
+matflags mat-piso    normal
+matflags mat-piso    set decal
+matflags mat-piso    decal
+#    ...y vuelve a ser normal destildandolo (se deshace la receta, nada mas)
+matflags mat-piso    set nodecal
+matflags mat-piso    normal
+
+#    9b) el desplegable de MEZCLA: 2 = MezclaAdd = la palabra ADITIVO del .mtl.
+#        En el panel ese desplegable SOLO aparece con Transparent tildado (sin
+#        blend habilitado el modo no se aplica), asi que se prende primero.
+matflags mat-plano   set transparente 1
+matflags mat-plano   set mezcla 2
+matflags mat-plano   aditivo
+matflags mat-plano   set mezcla 0
+matflags mat-plano   set transparente 0
+
+#    9c) el desplegable de TEST DE PROFUNDIDAD son los DOS bools juntos:
+#        "Test, no Write" (1 0) es lo que usan transparentes y calcomanias.
+matflags mat-tapa    set transparente 1
+matflags mat-tapa    set profundidad 1 0
+matflags mat-tapa    set sesgo -4
+matflags mat-tapa    set pasada 1
+matflags mat-tapa    decal
+#        y "Test + Write" (1 1) lo devuelve a opaco
+matflags mat-tapa    set profundidad 1 1
+matflags mat-tapa    set sesgo 0
+matflags mat-tapa    set pasada 0
+matflags mat-tapa    set transparente 0
+matflags mat-tapa    normal
+
+#    9d) lo puesto desde el panel SOBREVIVE al guardado v4
+matflags mat-piso    set decal
+matflags mat-plano   set transparente 1
+matflags mat-plano   set mezcla 2
+guardarw3d prueba_materiales_panel_v4.w3d
+abrirw3d prueba_materiales_panel_v4.w3d
+matflags mat-piso    decal
+matflags mat-plano   aditivo

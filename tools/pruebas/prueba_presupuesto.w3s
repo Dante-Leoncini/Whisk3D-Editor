@@ -1,0 +1,12 @@
+# Prueba del GATE de presupuesto de render (C-P0):
+#   presupuesto <json> [bloque] [frames] [jugando]
+# renderiza N frames, toma el MAXIMO por frame de los contadores del render
+# (drawcalls, tris opacos/blend, texbinds, bytes subidos a buffers, cambios de
+# estado reales) y FALLA el harness si algun tope del json se supera. Aca se
+# corre contra una escena chica con topes holgados: lo que se prueba es que el
+# comando mida, compare y pase. El bloque "imposible" del json (dc=0) existe
+# para probar el camino de FALLA a mano:
+#   ../../platform/linux/build/whisk3d --script <(echo "abrirw3d prueba_pvs.w3d"; echo "presupuesto presupuesto-prueba.json imposible 2")
+# (debe salir con error "presupuesto EXCEDIDO").
+abrirw3d prueba_pvs.w3d
+presupuesto presupuesto-prueba.json pc 5

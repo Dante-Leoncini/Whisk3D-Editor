@@ -1,0 +1,35 @@
+// ==========================================================================
+//  PRUEBA sintetica del LENTE DE LA CAMARA desde lua (formato texto).
+//  La corre prueba_lente.w3s; el script es lente_camara.lua.
+//
+//  Dos carteles a distinta profundidad. Moviendo el PLANO LEJANO con setLente()
+//  el de atras deja de dibujarse: es lo que hace un juego al pasar de un area
+//  abierta a un pasillo cerrado.
+//
+//  OJO: en el .w3d de TEXTO la vertical se llama `z` y la profundidad `y`.
+// ==========================================================================
+Whisk3D {
+    version: 20251127
+    Escena {
+        background: "0.05, 0.05, 0.05, 1.0"
+
+        Camera {
+            name: "Camara"
+            fov: 60.0
+            near: 0.10
+            far: 1000.0
+        }
+
+        // CERCA (rojo): a 10 de profundidad, siempre adentro del alcance
+        Wavefront { name: "Cerca" filePath: espejo-poste.obj  x: -2.0 y: -10.0 z: 0.0 scale: 2.0 }
+        // LEJOS (amarillo): a 300 de profundidad y bien grande, para que ocupe
+        // pixeles medibles. Con `far` 1000 se dibuja; con 60, no.
+        Wavefront { name: "Lejos" filePath: espejo-poste2.obj x: 60.0 y: -300.0 z: 0.0 scale: 60.0 }
+
+        Collection {
+            name: "Control"
+            script: "lente_camara.lua"
+            ref_cam: "Camara"
+        }
+    }
+}

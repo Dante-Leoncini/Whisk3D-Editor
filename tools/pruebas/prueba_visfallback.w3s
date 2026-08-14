@@ -1,0 +1,69 @@
+# ==========================================================================
+#  FALLBACK DE CELDA VACIA (CullingTri `sectorFallback:`), POR PIXELES.
+#  Correr DESDE ESTA CARPETA:
+#    cd <motor>/tools/pruebas
+#    ../../platform/linux/build/whisk3d --script prueba_visfallback.w3s
+#
+#  EL BUG QUE TAPA (reproducido en un nivel real): un LOD elige el hijo por
+#  DISTANCIA, pero las listas de visibilidad de cada hijo estan horneadas POR
+#  NODO del riel (la eleccion del juego original). En la banda donde los dos
+#  criterios no coinciden, el hijo ELEGIDO caia en una celda VACIA para su
+#  variante -> no se dibujaba NINGUNA de las dos ("me acerco... se ve negro").
+#  Una celda vacia sigue siendo legitima ("desde aca no se ve": oclusion real),
+#  asi que el paracaidas es OPT-IN del archivo:
+#    sectorFallback: "completa"  -> celda vacia = malla entera
+#    sectorFallback: N           -> celda vacia = la lista de la celda N
+#    (ausente)                   -> celda vacia = nada (como siempre)
+#
+#  vis-hueco.w3dvis: 4 celdas, c1=[t0,t1]  c2=VACIA  c3=[t2,t3]  c4=VACIA.
+#  Vista desde arriba; t0 vive en x=-3.5 y t3 en x=3.5 de cada banda.
+# ==========================================================================
+abrirw3d prueba_visfallback.w3d
+loadtex
+vpvista material
+vporbita 0 0 0 20 90 0
+
+# --- estado inicial: celda 1 = [t0, t1] en las tres bandas -----------------
+visinfo MallaSin      4 1 2
+visinfo MallaCompleta 4 1 2
+visinfo MallaCelda    4 1 2
+# pixeles: t0 dibujado, t3 no (banda del medio, la de MallaCompleta)
+escenapx -3.5 0 1.17 masclaroque 0 0 -6.5 20
+escenapx  3.5 0 1.17 comoen 0 0 -6.5
+
+# --- LA CELDA VACIA (2): cada malla hace lo que declaro --------------------
+setsector MallaSin 2
+setsector MallaCompleta 2
+setsector MallaCelda 2
+# sin fallback: NADA (el contrato de siempre; la celda vacia es dato valido)
+visinfo MallaSin 4 2 0
+escenapx -3.5 0 -3.33 comoen 0 0 -6.5
+escenapx  3.5 0 -3.33 comoen 0 0 -6.5
+# fallback "completa": la malla ENTERA (4 tris) y los pixeles lo muestran
+visinfo MallaCompleta 4 2 4
+escenapx -3.5 0 1.17 masclaroque 0 0 -6.5 20
+escenapx  3.5 0 1.17 masclaroque 0 0 -6.5 20
+# fallback celda 3: la lista de la celda 3 = [t2, t3] (t0 apagado, t3 prendido)
+visinfo MallaCelda 4 2 2
+escenapx -3.5 0 5.67 comoen 0 0 -6.5
+escenapx  3.5 0 5.67 masclaroque 0 0 -6.5 20
+
+# --- al volver a una celda CON triangulos el fallback se va solo -----------
+setsector MallaCompleta 3
+visinfo MallaCompleta 4 3 2
+escenapx -3.5 0 1.17 comoen 0 0 -6.5
+escenapx  3.5 0 1.17 masclaroque 0 0 -6.5 20
+
+# --- la otra celda vacia (4) tambien cae al paracaidas ---------------------
+setsector MallaCompleta 4
+visinfo MallaCompleta 4 4 4
+
+# --- ROUND-TRIP v4: sectorFallback viaja en el proyecto ---------------------
+guardarw3d prueba_visfallback_v4.w3d
+abrirw3d prueba_visfallback_v4.w3d
+setsector MallaSin 2
+setsector MallaCompleta 2
+setsector MallaCelda 2
+visinfo MallaSin      4 2 0
+visinfo MallaCompleta 4 2 4
+visinfo MallaCelda    4 2 2

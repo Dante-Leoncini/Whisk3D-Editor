@@ -1,0 +1,35 @@
+// ==========================================================================
+//  PRUEBA sintetica del CULLING POR TRIANGULO (modificador "Culling" / PVS
+//  estilo PS1). La usa prueba_pvs.w3s:
+//   - MallaPVS importa pvs-tris.obj (4 triangulos, 1 material) con su sidecar
+//     pvs-tris.pvs.json = 2 sectores de 2 tris ([0,1] y [2,3]).
+//   - El nodo hijo CullingTri declara el modificador: metodo "triangulos" y
+//     sector inicial 1 (se dibujan SOLO los tris 0 y 1).
+//   - pvs_componente.lua salta al sector 2 con setSector() en inicio() (el
+//     patron del juego real al cambiar de nodo del riel).
+//   - El .w3s verifica con pvsinfo (asserts), hace round-trip v4 y bencha.
+// ==========================================================================
+Whisk3D {
+    version: 20251127
+    Escena {
+        background: "0.2, 0.2, 0.25, 1.0"
+
+        Camera {
+            name: "Camara"
+            y: -8.0
+            z: 2.0
+        }
+
+        Wavefront {
+            name: "MallaPVS"
+            filePath: pvs-tris.obj
+            script: "pvs_componente.lua"
+            ref_malla: "MallaPVS"
+            val_sector: "2"
+            CullingTri {
+                metodo: "triangulos"
+                sector: 1
+            }
+        }
+    }
+}

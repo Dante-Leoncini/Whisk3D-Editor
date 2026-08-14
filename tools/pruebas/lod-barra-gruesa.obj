@@ -1,0 +1,17 @@
+# BARRA larga en el plano XY: x de -10 a 10, y de -0.4 a 0.4, z = 0.
+# Su ORIGEN esta en el centro (0,0,0) pero su geometria llega hasta x = +-10:
+# esa diferencia es justamente lo que separa "distancia al origen" de
+# "distancia al AABB". Caras v/vt/vn (sin vn el importador descarta las UV).
+o lod-barra-gruesa
+v -10.0 -0.4 0.0
+v  10.0 -0.4 0.0
+v  10.0  0.4 0.0
+v -10.0  0.4 0.0
+vt 0.0 0.0
+vt 1.0 0.0
+vt 1.0 1.0
+vt 0.0 1.0
+vn 0.0 0.0 -1.0
+usemtl lod-barra-gruesa
+f 1/1/1 2/2/1 3/3/1
+f 1/1/1 3/3/1 4/4/1

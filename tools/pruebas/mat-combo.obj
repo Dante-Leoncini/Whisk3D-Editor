@@ -1,0 +1,32 @@
+# DOS piezas COPLANARES en el MISMO archivo, con el DECAL LISTADO PRIMERO y el
+# piso opaco SEGUNDO. En orden de archivo el decal perderia: dibuja antes que el
+# piso, no escribe z, y el piso opaco lo tapa. Con el ORDEN DE PASADA del material
+# (0 opaco -> 1 decal -> 2 transparente) el piso va primero y el decal queda
+# encima. Es la prueba de `orden_pasada` DENTRO de una misma malla.
+o combo-decal
+v -0.6 -0.6 0.0
+v  0.6 -0.6 0.0
+v  0.6  0.6 0.0
+v -0.6  0.6 0.0
+vt 0.0 0.0
+vt 1.0 0.0
+vt 1.0 1.0
+vt 0.0 1.0
+vn 0.0 0.0 -1.0
+usemtl mat-decal
+f 1/1/1 2/2/1 3/3/1
+f 1/1/1 3/3/1 4/4/1
+
+o combo-piso
+v -0.8 -0.8 0.0
+v  0.8 -0.8 0.0
+v  0.8  0.8 0.0
+v -0.8  0.8 0.0
+vt 0.0 0.0
+vt 1.0 0.0
+vt 1.0 1.0
+vt 0.0 1.0
+vn 0.0 0.0 -1.0
+usemtl mat-piso
+f 5/5/2 6/6/2 7/7/2
+f 5/5/2 7/7/2 8/8/2

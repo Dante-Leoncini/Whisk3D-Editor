@@ -1,0 +1,73 @@
+// ==========================================================================
+//  PRUEBA de la ROTACION de particulas (formato texto). La usa
+//  prueba_particulas_rot.w3s. Tres emisores quietos con la textura ASIMETRICA
+//  de 4 cuadrantes (rojo TL, verde TR, azul BL, transparente BR):
+//    - EmisorDerecho: rotacion off (default) -> el billboard nace DERECHO
+//      (angulo 0, deterministico) y quieto.
+//    - EmisorRotado: rotacion: true -> cada particula nace con un angulo
+//      azaroso 0..360 FIJO (el "rotz al nacer" del original).
+//    - EmisorGiro: velRotacion: 360 -> nace derecho y gira 360 grados/s con
+//      signo azaroso por particula.
+// ==========================================================================
+Whisk3D {
+    version: 20251127
+    Escena {
+        background: "0.2, 0.2, 0.25, 1.0"
+
+        Camera {
+            name: "Camara"
+            y: -8.0
+            z: 2.0
+        }
+
+        Particulas {
+            name: "EmisorDerecho"
+            x: -6.0
+            textura: "texturas/cuadrantes.png"
+            cantidad: 30.0
+            vida: 600.0
+            tam: 2.0
+            vel: 0.0
+            dispersion: 0.0
+            gravedad: 0.0
+            aditivo: false
+            color: "1, 1, 1, 1"
+            desvanecer: false
+            activo: true
+        }
+
+        Particulas {
+            name: "EmisorRotado"
+            x: 0.0
+            textura: "texturas/cuadrantes.png"
+            cantidad: 30.0
+            vida: 600.0
+            tam: 2.0
+            vel: 0.0
+            dispersion: 0.0
+            gravedad: 0.0
+            aditivo: false
+            color: "1, 1, 1, 1"
+            desvanecer: false
+            activo: true
+            rotacion: true
+        }
+
+        Particulas {
+            name: "EmisorGiro"
+            x: 6.0
+            textura: "texturas/cuadrantes.png"
+            cantidad: 30.0
+            vida: 600.0
+            tam: 2.0
+            vel: 0.0
+            dispersion: 0.0
+            gravedad: 0.0
+            aditivo: false
+            color: "1, 1, 1, 1"
+            desvanecer: false
+            activo: true
+            velRotacion: 360.0
+        }
+    }
+}

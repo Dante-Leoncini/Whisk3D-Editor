@@ -1,0 +1,17 @@
+# Generado para prueba_espejo.w3d (reflejo en agua). Caras v/vt/vn: el
+# importador de Whisk3D descarta las UV si falta la normal. El COLOR va
+# por vertice (v x y z r g b a) y el .mtl aporta NoLight/d: asi el pixel
+# sale exacto y el test compara colores absolutos.
+o espejo-puente
+v -4.0000 11.5000 10.0000 0.0 1.0 1.0 1.0
+v 4.0000 11.5000 10.0000 0.0 1.0 1.0 1.0
+v 4.0000 11.5000 6.0000 0.0 1.0 1.0 1.0
+v -4.0000 11.5000 6.0000 0.0 1.0 1.0 1.0
+vt 0.0 0.0
+vt 1.0 0.0
+vt 1.0 1.0
+vt 0.0 1.0
+vn 0.0 1.0 0.0
+usemtl PuenteCian
+f 1/1/1 2/2/1 3/3/1
+f 1/1/1 3/3/1 4/4/1

@@ -1,0 +1,32 @@
+# Prueba de los arreglos de UX del EDITOR (los que se pueden medir sin pantalla).
+# Correr DESDE ESTA CARPETA:
+#   cd <motor>/tools/pruebas
+#   ../../platform/linux/build/whisk3d --script prueba_editor.w3s
+#
+# uxeditor  : navegacion del outliner + menu Add
+#   0) el VINCULO al arbol: un objeto creado desde el menu Add nace con Parent = NULL y
+#      se cuelga igual de SceneCollection->Childrens. GetPrevDFS no lo encontraba y
+#      devolvia NULL -> desde un objeto recien creado la flecha ARRIBA no se movia nunca.
+#   A) DIRECCION: la flecha arriba va para ATRAS (el salteo de no-seleccionables solo
+#      contemplaba PrevAdd y con PrevSingle -que es el que dispara la flecha- caminaba
+#      para adelante).
+#   A2) WRAP: en el tope, la flecha arriba envuelve al ULTIMO, no al primero.
+#   B) PLEGADO: un objeto adentro de una rama plegada NO tiene fila en el outliner, asi
+#      que no es navegable (antes el highlight se iba a filas que no se dibujan).
+#   C) la RAIZ (SceneCollection) nunca queda seleccionada, ni con colecciones incluidas.
+#   D) el menu Add: primera fila = submenu de MALLAS con las 8 primitivas, y el objeto
+#      "Script"/Control ya no esta (cualquier objeto acepta scripts).
+uxeditor
+
+# luaquitar / luamover : la tarjeta "Control" es ahora la LISTA DE SCRIPTS del objeto
+# (lista + Add/Remove + Move Up/Move Down, igual que el stack de modificadores) y el orden
+# de la lista ES el orden de ejecucion. Quitar Y MOVER corren los indices, y los destinos
+# de rename de las refs de lua van por (objeto, indice de script, indice de ref): sin el
+# aviso al undo, un Ctrl+Z de un rename escribe el nombre viejo encima de la ref de OTRO
+# script (corrupcion silenciosa).
+luaquitar
+luamover
+
+# layoutdump : el layout por defecto (outliner ARRIBA al 40 % / propiedades debajo, y el
+# timeline bien chico bajo el viewport 3D) respeta los minimos de viewport.
+layoutdump

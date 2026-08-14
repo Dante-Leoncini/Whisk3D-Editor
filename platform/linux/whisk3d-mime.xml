@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tipos MIME de Whisk3D (shared-mime-info). Con esto Nautilus le pone NOMBRE e
+     ICONO propios a los archivos y el doble click en un proyecto abre el editor.
+
+     POR QUE HAY FIRMA (magic) Y NO SOLO EL GLOB:
+     desde el formato v2 el .w3d es un contenedor ZIP, asi que TODO .w3d empieza
+     con "PK\3\4" y cualquier deteccion por CONTENIDO lo resolvia como zip comun
+     (el comando "file" sigue diciendo application/zip: usa la base de libmagic,
+     que es otra). El escritor del contenedor (main/io/W3dContenedor.cpp) guarda
+     la entrada "mimetype" PRIMERA y SIN COMPRIMIR -estilo OpenDocument-, asi que
+     la cadena del tipo cae siempre en el offset 38; ahi es exactamente donde
+     shared-mime-info busca la firma de un ODF/EPUB. Se declara igual que ellos y
+     con la misma prioridad (70), que es MAYOR que la del zip generico (60).
+
+     NOMBRES: el tipo del contenedor es el que el ARCHIVO declara adentro
+     (application/vnd.whisk3d.proyecto+zip). El viejo application/x-whisk3d queda
+     como <alias> para no romper las asociaciones ya hechas (mimeapps.list de los
+     usuarios que ya tenian el .deb instalado). -->
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="application/vnd.whisk3d.proyecto+zip">
+    <comment>Whisk3D project</comment>
+    <comment xml:lang="es">Proyecto Whisk3D</comment>
+    <!-- nombre anterior del tipo: sigue resolviendo al mismo -->
+    <alias type="application/x-whisk3d"/>
+    <!-- es un zip especializado: los gestores de archivos lo pueden abrir como
+         archivo comprimido y la deteccion sabe que "zip" es su padre -->
+    <sub-class-of type="application/zip"/>
+    <magic priority="70">
+      <match type="string" value="PK\003\004" offset="0">
+        <match type="string" value="mimetype" offset="30">
+          <match type="string" value="application/vnd.whisk3d.proyecto+zip" offset="38"/>
+        </match>
+      </match>
+    </magic>
+    <!-- el glob se queda: cubre los .w3d VIEJOS (texto/JSON sueltos, sin zip) -->
+    <glob pattern="*.w3d"/>
+    <!-- icono del tipo: se instala en hicolor/.../mimetypes/ con el nombre del
+         tipo con '/' cambiado por '-' (ver INSTALACION LINUX en el CMakeLists) -->
+    <icon name="application-vnd.whisk3d.proyecto+zip"/>
+    <generic-icon name="package-x-generic"/>
+  </mime-type>
+  <!-- la interfaz 2D (.w3dui) es JSON SUELTO, no un zip: su firma es la de un
+       JSON cualquiera, asi que aca no hay magic propio y se declara subclase de
+       application/json (con eso la deteccion por contenido cae en json y el glob
+       -mas especifico- gana igual). OJO: NO va en el MimeType del .desktop
+       porque el editor no abre un .w3dui suelto por argv (solo proyectos .w3d);
+       el tipo existe para que Nautilus le ponga nombre e icono -->
+  <mime-type type="application/x-whisk3d-ui">
+    <comment>Whisk3D interface</comment>
+    <comment xml:lang="es">Interfaz Whisk3D</comment>
+    <sub-class-of type="application/json"/>
+    <glob pattern="*.w3dui"/>
+    <icon name="application-x-whisk3d-ui"/>
+    <generic-icon name="text-x-generic"/>
+  </mime-type>
+</mime-info>

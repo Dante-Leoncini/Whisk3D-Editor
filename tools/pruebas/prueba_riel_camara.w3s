@@ -1,0 +1,136 @@
+# ==========================================================================
+#  EL RIEL DE LA CAMARA, CAMBIABLE EN JUEGO
+#  Correr DESDE ESTA CARPETA:
+#    cd <motor>/tools/pruebas
+#    ../../platform/linux/build/whisk3d --script prueba_riel_camara.w3s
+#
+#  Un riel de camara es una Curve: la camara se PROYECTA sobre el punto del
+#  riel mas cercano a su target y viaja por ahi. Un juego con varias "salas"
+#  no tiene UNA curva que las una, asi que el motor expone el riel a lua
+#  (setRiel / setRielNodo / rielDe) y cada riel se declara como Curve.
+#
+#  Cuatro rieles de juguete (ver riel-a/b/c/motor.cap):
+#     A  6 nodos en linea sobre X  -> el seguimiento normal
+#     B  4 nodos a 100 unidades    -> cambiar de riel MUEVE la camara en el acto
+#     C  5 nodos con espaciado DESIGUAL -> el muestreo POR INDICE
+#     Motor  los 3 primeros nodos del A pero con cabecera `ejes x y z`
+#
+#  OJO con la Z: un .cap SIN la cabecera `ejes` se lee con la Z NEGADA (default
+#  legacy, ver Curve::signoZ), asi que un nodo escrito `p 0 5 3` cae en
+#  (0, 5, -3). Todos los asserts de abajo estan en ESPACIO DEL MOTOR.
+# ==========================================================================
+abrirw3d prueba_riel_camara.w3d
+
+# --- 1) EL RIEL DE ARRANQUE, Y QUE SIGUE AL TARGET -------------------------
+camriel riel "Riel A"
+activename Mira
+objpos 0 0 0
+camriel pos 0.0 5.0 -3.0 0.01
+# el target camina y la camara lo sigue POR EL RIEL (misma altura, misma Z)
+objpos 4 0 0
+camriel pos 4.0 5.0 -3.0 0.01
+# y en la punta del riel se queda en la punta, no lo pasa
+objpos 10 0 0
+camriel pos 10.0 5.0 -3.0 0.01
+objpos 40 0 0
+camriel pos 10.0 5.0 -3.0 0.01
+
+# --- 2) EL OFFSET RETRASA LA PROYECCION N NODOS ----------------------------
+# offsetRiel = 2 con la mira en x=4 (nodo 2) deja la camara dos nodos atras
+activename Mira
+objpos 4 0 0
+camriel set "Riel A" 2
+camriel pos 0.0 5.0 -3.0 0.01
+# y no puede irse antes del primer nodo
+objpos 0 0 0
+camriel pos 0.0 5.0 -3.0 0.01
+camriel set "Riel A" 0
+
+# --- 3) CAMBIAR DE RIEL MUEVE LA CAMARA EN EL ACTO -------------------------
+# el riel B esta a 100 unidades: si el cambio dejara un frame de retraso, la
+# camara quedaria en el riel viejo y este assert lo veria de lejos.
+camriel set "Riel B" 0
+camriel riel "Riel B"
+camriel pos -100.0 2.0 0.0 0.01
+
+# --- 4) MUESTREO POR INDICE (setRielNodo) ----------------------------------
+# El riel C sube 0, 1, 3, 6, 10 en Y: los nodos NO estan igualmente espaciados.
+# Samplear por indice respeta ese espaciado (que es donde vive un ease horneado
+# por el autor); reparametrizar por longitud de arco lo borraria.
+camriel set "Riel C" 0
+camriel nodo 0
+camriel pos 20.0 0.0 0.0 0.01
+camriel nodo 2
+camriel pos 20.0 3.0 0.0 0.01
+camriel nodo 4
+camriel pos 20.0 10.0 0.0 0.01
+# un indice fraccionario INTERPOLA entre los dos nodos vecinos: 2.5 cae entre
+# y=3 y y=6 -> 4.5 (si reparametrizara por arco no daria el punto medio)
+camriel nodo 2.5
+camriel pos 20.0 4.5 0.0 0.01
+# -1 devuelve el seguimiento normal
+camriel nodo -1
+
+# --- 5) LA CONVENCION DE EJES DEL .cap -------------------------------------
+#  El cargador de .cap negaba la Z de TODO nodo, incondicionalmente y sin forma
+#  de apagarlo, porque el unico productor historico del formato autoreaba en un
+#  espacio de mano contraria. Cualquier otro proyecto veia su curva espejada.
+#  Ahora el archivo lo declara: `ejes x y z` (espacio del motor) o `ejes x y -z`
+#  (Z espejada, que es el default cuando no hay cabecera).
+#
+#  riel-motor.cap tiene los MISMOS numeros que riel-a.cap en sus 3 primeros
+#  nodos (z = 3) pero declara `ejes x y z`:
+#     riel-a      (sin cabecera) -> z = -3
+#     riel-motor  (ejes x y z)   -> z = +3
+activename Mira
+objpos 0 0 0
+camriel set "Riel A" 0
+camriel pos 0.0 5.0 -3.0 0.01
+camriel set "Riel Motor" 0
+camriel pos 0.0 5.0 3.0 0.01
+
+#  Y EL FORWARD SUFRE EL MISMO ESPEJO. Con la mirada del riel y un nodo de
+#  yaw 0 / pitch 0, el espacio del motor da la formula canonica: mirar a -Z.
+#  Si el forward no leyera el signo del ARCHIVO -- si siguiera siendo un acuerdo
+#  tacito con el cargador -- este assert daria (0, 0, +1): la camara al reves.
+camriel mirada riel
+camriel mira 0.0 0.0 -1.0 0.02
+camriel mirada target
+camriel set "Riel A" 0
+
+# --- 6) SOLTAR EL RIEL -----------------------------------------------------
+camriel suelto
+camriel riel
+camriel set "Riel A" 0
+camriel riel "Riel A"
+
+# --- 7) LOS BINDS DE LUA CORREN ADENTRO DEL MOTOR --------------------------
+# riel_camara.lua hace todo el recorrido en inicio(): lee el riel, cambia a B
+# con offset, planta el nodo 2, lo suelta y vuelve a A. El .w3s solo lee lo que
+# el script dejo en el mapa compartido -- si los binds fueran stubs mudos (como
+# lo son hoy bajo W3D_GAME_RUNTIME), estos seis asserts caerian.
+simplay 1
+scriptinfo compartido rielInicial RielA
+scriptinfo compartido rielCambiado RielB
+scriptinfo compartido offsetCambiado 1
+scriptinfo compartido nodoPlantado 2
+scriptinfo compartido rielFinal RielA
+scriptinfo compartido offsetFinal 0
+scriptinfo compartido nodoFinal suelto
+
+# --- 8) EL RIEL ES ESTADO DE PARTIDA: simstop lo restaura ------------------
+camriel set "Riel B" 0
+camriel riel "Riel B"
+simstop
+camriel riel "Riel A"
+
+# --- 9) ROUND-TRIP v4: los tres rieles y el riel de la camara sobreviven ---
+guardarw3d prueba_riel_camara_v4.w3d
+abrirw3d prueba_riel_camara_v4.w3d
+camriel riel "Riel A"
+activename Mira
+objpos 4 0 0
+camriel pos 4.0 5.0 -3.0 0.01
+camriel set "Riel C" 0
+camriel nodo 2
+camriel pos 20.0 3.0 0.0 0.01

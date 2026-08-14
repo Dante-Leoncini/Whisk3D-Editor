@@ -1,0 +1,12 @@
+# El importador saca el .mtl del NOMBRE DEL .OBJ (import_obj.cpp:1268), no de la
+# linea mtllib: por eso este archivo existe y es una copia de espejo-lamina.mtl.
+# El material se llama IGUAL para que las dos laminas (la de 2 triangulos y la
+# de 128) se vean exactamente igual y la unica variable de la prueba sea el
+# teselado.
+newmtl espejo-lamina
+Kd 1.000000 1.000000 1.000000
+map_Kd texturas/agua.png
+NoLight
+PIXELATED
+BackfaceCullingOff
+alpha

@@ -1,0 +1,61 @@
+// ==========================================================================
+//  PRUEBA sintetica de los objetos LOD, Culling y Collection (formato texto).
+//  La usa prueba_lod.w3s: carga -> lodinfo -> guardarw3d (v4) -> reabrir.
+//    - LOD con 2 hijos: cubo "LodCerca" hasta 10 unidades, "LodLejos" mas alla
+//      de 25 (umbral i = hasta donde llega el hijo i; despues, el ultimo hijo).
+//    - Culling con soloCamaraActiva: el frustum sale de la Camera activa
+//      aunque el viewport mire desde otro lado.
+//    - Collection con ordenarPorCamara + ordenarUnaVez (orden de dibujo
+//      lejos->cerca para transparentes): las dos flags tienen que sobrevivir
+//      el round-trip a v4 (lodinfo las imprime las dos veces).
+// ==========================================================================
+Whisk3D {
+    version: 20251127
+    Escena {
+        background: "0.2, 0.2, 0.25, 1.0"
+
+        Camera {
+            name: "Camara"
+            x: 0.0
+            y: -8.0
+            z: 2.0
+        }
+
+        LOD {
+            name: "LodPrueba"
+            distancias: "10, 25"
+            Mesh {
+                name: "LodCerca"
+            }
+            Mesh {
+                name: "LodLejos"
+            }
+        }
+
+        Culling {
+            name: "CullPrueba"
+            soloCamaraActiva: true
+            Mesh {
+                name: "CajaAdentro"
+            }
+            Mesh {
+                name: "CajaAfuera"
+                x: 500.0
+            }
+        }
+
+        Collection {
+            name: "FrutasTransparentes"
+            ordenarPorCamara: true
+            ordenarUnaVez: true
+            Mesh {
+                name: "FrutaCerca"
+                y: 2.0
+            }
+            Mesh {
+                name: "FrutaLejos"
+                y: 20.0
+            }
+        }
+    }
+}

@@ -1,0 +1,9 @@
+count 4
+# Riel B de juguete: LEJOS del A (100 unidades en X) y corriendo sobre Z en vez
+# de sobre X. Sirve para dos cosas: que cambiar de riel MUEVA la camara en el
+# acto (no puede quedar un frame en el riel viejo, que esta a 100 unidades), y
+# que el encuadre resultante sea lateral respecto del A.
+p -100.0 2.0 0.0
+p -100.0 2.0 4.0
+p -100.0 2.0 8.0
+p -100.0 2.0 12.0

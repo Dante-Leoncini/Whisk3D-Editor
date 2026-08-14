@@ -1,0 +1,10 @@
+# Material de prueba_particulas_z.w3s. SIN textura a proposito: con NoLight el
+# color del pixel es EXACTAMENTE Kd*255, asi los asserts son numeros cerrados.
+# Es el FONDO OPACO de la escena: lo que se ve por el "agujero" cuando algo
+# translucido escribe profundidad de mas.
+
+newmtl partz-fondo
+Kd 0.100000 0.100000 0.800000
+d 1.0
+NoLight
+BackfaceCullingOff

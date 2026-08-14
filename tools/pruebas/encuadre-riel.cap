@@ -1,0 +1,8 @@
+count 2
+ejes x y z
+aspecto 1.481481
+# Riel de juguete para prueba_encuadre.w3s (parte B): dos nodos casi juntos
+# sobre X, a la altura de la camara. Lo importante es la cabecera `aspecto`:
+# el encuadre autoral 40:27 que la camara hereda si no declara uno propio.
+p 0.0 0.0 0.0
+p 0.001 0.0 0.0

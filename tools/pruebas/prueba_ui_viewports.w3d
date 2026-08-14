@@ -1,0 +1,45 @@
+// ==========================================================================
+//  PRUEBA del LIENZO del juego con DOS viewports 3D de tamanos distintos.
+//  La corre prueba_ui_viewports.w3s (componente: pantalla_componente.lua).
+//
+//  El layout parte la ventana en 0.25/0.75: el primer viewport (el ACTIVO en
+//  una corrida sin input) queda ANGOSTO (mas alto que ancho) y el segundo,
+//  ANCHO. El .w3dui es "igual que el render" (UI dinamica): en modo juego cada
+//  viewport dibuja el HUD con SU pantalla, y la pantalla que ven los BINDS del
+//  juego (pantalla()) tiene que ser la del viewport ACTIVO, estable, sin que
+//  el ultimo viewport en dibujar la pise.
+// ==========================================================================
+Whisk3D {
+    version: 20251127
+    Escena {
+        background: "0.2, 0.2, 0.25, 1.0"
+
+        Camera {
+            name: "Camara"
+            y: -8.0
+            z: 2.0
+        }
+
+        Wavefront {
+            name: "Piso"
+            filePath: espejo-piso.obj
+            scale: 6.0
+        }
+
+        Collection {
+            name: "Vigia"
+            script: "pantalla_componente.lua"
+        }
+
+        UI {
+            archivo: "prueba_ui_estado.w3dui"
+        }
+    }
+    Layout {
+        ViewportRow {
+            Split: 0.25
+            Viewport3D { }
+            Viewport3D { }
+        }
+    }
+}

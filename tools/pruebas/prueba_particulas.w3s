@@ -1,0 +1,28 @@
+# Prueba del objeto Particulas: carga del texto, emision continua (cantidad),
+# la rafaga de lua (emitir(obj, n)), el emisor apagado, y el round-trip v4.
+# Correr DESDE ESTA CARPETA:
+#   cd <motor>/tools/pruebas
+#   ../../platform/linux/build/whisk3d --script prueba_particulas.w3s
+# partinfo <obj> <vivasMin> [vivasMax] ASSERTEA las particulas vivas del emisor.
+abrirw3d prueba_particulas.w3d
+partinfo
+# antes de simular no hay nada vivo
+partinfo EmisorContinuo 0 0
+partinfo EmisorRafaga 0 0
+# 30 ticks de 1/30 s = 1 segundo de juego: el continuo emitio 30 (vida 2 s, ninguna
+# murio), la rafaga son las 8 del emitir() del inicio() de lua, el apagado nada
+simplay 30
+partinfo EmisorContinuo 28 32
+partinfo EmisorRafaga 8 8
+partinfo EmisorApagado 0 0
+simstop
+# round-trip: el v4 tiene que llevar y traer la config completa del emisor
+# (la textura entra al contenedor como texturas/particula.png)
+guardarw3d prueba_particulas_v4.w3d
+abrirw3d prueba_particulas_v4.w3d
+partinfo
+simplay 30
+partinfo EmisorContinuo 28 32
+partinfo EmisorRafaga 8 8
+partinfo EmisorApagado 0 0
+simstop

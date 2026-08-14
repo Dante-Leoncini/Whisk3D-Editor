@@ -1,0 +1,57 @@
+#include "OpcionesRender.h"
+
+// Definición de variables
+RenderType view = RenderType::MaterialPreview;
+
+// fondo del RENDER (pase Rendered): NEGRO por defecto, editable desde el menu Render (color picker).
+float g_renderBg[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+float g_renderAspect = 640.0f / 480.0f; // 4:3 por defecto (igual que el default del render 640x480)
+
+GLfloat MaterialPreviewAmbient[4]  = { 0.3f, 0.3f, 0.3f, 1.0f };
+GLfloat MaterialPreviewDiffuse[4]  = { 1.0f, 1.0f, 1.0f, 1.0f };
+GLfloat MaterialPreviewSpecular[4] = { 0.2f, 0.2f, 0.2f, 1.0f };
+GLfloat MaterialPreviewPosition[4] = { -0.45f, 0.55f, 1.0f, 0.0f };
+
+bool g_mostrarOverlays = true; // master de overlays (false = limpieza de pantalla, oculta TODO)
+// overlay de normales (solo en meshes seleccionadas); apagados por defecto
+bool OverlayVertexNormal = false;
+bool OverlayCustomNormal = false;
+bool OverlayFaceNormal   = false;
+float OverlayNormalSize  = 0.10f;
+
+// overlay de estadisticas / fps (apagados por defecto). Cada linea del submenu Statistics es independiente.
+bool OverlayStatVertices = false;
+bool OverlayStatFaces    = false;
+bool OverlayStatModgen   = false;
+bool OverlayStatTimes    = false;
+bool OverlayStatGL       = false;
+bool OverlayFps          = false;
+float g_fpsActual      = 0.0f;
+long g_genMallaCount   = 0; // diagnostico de regeneracion de modificadores (ver OpcionesRender.h)
+bool g_objetosMovidos  = false; // un objeto se movio -> regenerar los Mirror con target (ver OpcionesRender.h)
+
+// arranca en true para dibujar el primer frame
+bool g_redraw = true;
+
+// ajustes de transformacion del EDITOR (pivot + normales). Default Blender.
+int g_transformPivot = PivotMedian;   // pivote por defecto = punto medio
+bool g_editLockNormales = false;      // por defecto SI recalcula normales (al confirmar)
+float g_mergeDist = 0.0002f;          // Merge > By Distance: suelda verts a <= 0.0002 m. El editor cuantiza los
+                                      // verts a una grilla de 1e-4, asi que 0.0002 es el minimo util (justo por
+                                      // encima) y alcanza para soldar la tapa de un extrude "dejado en su lugar"
+bool g_modRenderMode = false;         // true SOLO durante el render final (Subdivision usa subRenderLevel)
+bool g_autoMerge = false;             // Auto Merge (menu Mesh): OFF por defecto. Al confirmar un move, suelda los verts
+float g_autoMergeThreshold = 0.001f;  // movidos con cualquier vert a <= threshold (opt-in; sin esto el snap NO funde)
+
+// Implementación de función
+RenderType StringToRenderType(const std::string& s){
+    if(s == "Solid")            return RenderType::Solid;
+    if(s == "MaterialPreview")  return RenderType::MaterialPreview;
+    if(s == "Rendered")         return RenderType::Rendered;
+    if(s == "ZBuffer")          return RenderType::ZBuffer;
+    if(s == "Alpha")            return RenderType::Alpha;
+
+    std::cerr << "[StringToRenderType] WARNING: valor desconocido '" << s
+              << "' → usando RenderType::Solid" << std::endl;
+    return RenderType::Solid; // fallback seguro
+}

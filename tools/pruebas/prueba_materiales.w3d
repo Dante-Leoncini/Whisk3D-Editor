@@ -1,0 +1,61 @@
+// ==========================================================================
+//  PRUEBA de los materiales DECAL y ADITIVO (formato texto).
+//  La corre prueba_materiales.w3s, que lee PIXELES del render real (escenapx).
+//
+//  OJO con las coordenadas: en el .w3d de TEXTO la vertical se llama `z` y la
+//  profundidad `y` (mismo criterio que prueba_espejo.w3d). En el .w3s, en cambio,
+//  los puntos son de MUNDO: (X, Y arriba, Z profundidad).
+//
+//  Los quads son VERTICALES (plano XY) y la camara mira de frente desde Z = -8,
+//  asi que "coplanar" = misma Z y "mas cerca" = Z menor. Todas las estaciones
+//  usan la MISMA baldosa roja, con la MISMA geometria: cuando una pieza es
+//  coplanar con su baldosa, la z sale bit a bit igual y el resultado del z-test
+//  es determinista (sin eso el z-fighting seria ruido y no una prueba).
+//
+//   A  x=-3  verde coplanar SIN decal   -> gana la baldosa: se ve ROJO 204,38,38
+//   B  x= 0  verde coplanar CON decal   -> se ve VERDE 26,230,26 (offset al ojo)
+//   C  x= 3  decal delante + tapa atras -> se ve AZUL 26,51,230 (el decal NO escribio z)
+//   D  x=-3  gris con `alpha`           -> 128,128,128 (tapa el rojo)
+//   E  x= 0  gris con `ADITIVO`         -> 255,166,166 (SUMA sobre el rojo)
+//   F  x= 3  un .obj con el decal LISTADO PRIMERO -> VERDE (orden de pasada)
+// ==========================================================================
+Whisk3D {
+    version: 20251127
+    Escena {
+        background: "0.02, 0.02, 0.03, 1.0"
+
+        Camera {
+            name: "Camara"
+            fov: 60.0
+            y: -8.0   // profundidad: 8 unidades hacia atras, mirando de frente
+            z: 0.0
+        }
+
+        // ---------- A: coplanar SIN decal (control) ----------
+        Wavefront { name: "PisoA"    filePath: mat-piso.obj  x: -3.0 y: 0.0 z: 2.0 }
+        Wavefront { name: "PlanoA"   filePath: mat-plano.obj x: -3.0 y: 0.0 z: 2.0 }
+
+        // ---------- B: coplanar CON decal ----------
+        Wavefront { name: "PisoB"    filePath: mat-piso.obj  x: 0.0 y: 0.0 z: 2.0 }
+        Wavefront { name: "DecalB"   filePath: mat-decal.obj x: 0.0 y: 0.0 z: 2.0 }
+
+        // ---------- C: el decal NO escribe z ----------
+        // el decal va DELANTE (y = -0.4, mas cerca de la camara) y la tapa opaca
+        // DETRAS (y = -0.2), y la tapa se dibuja DESPUES. Si el decal escribiera z,
+        // la tapa perderia el z-test y se veria el magenta del decal.
+        Wavefront { name: "PisoC"      filePath: mat-piso.obj      x: 3.0 y:  0.0 z: 2.0 }
+        Wavefront { name: "DecalAltoC" filePath: mat-decalalto.obj x: 3.0 y:  0.4 z: 2.0 }
+        Wavefront { name: "TapaC"      filePath: mat-tapa.obj      x: 3.0 y:  0.2 z: 2.0 }
+
+        // ---------- D: alpha comun ----------
+        Wavefront { name: "PisoD"    filePath: mat-piso.obj x: -3.0 y:  0.0 z: -2.0 }
+        Wavefront { name: "AlfaD"    filePath: mat-alfa.obj x: -3.0 y:  0.2 z: -2.0 }
+
+        // ---------- E: ADITIVO ----------
+        Wavefront { name: "PisoE"    filePath: mat-piso.obj    x: 0.0 y:  0.0 z: -2.0 }
+        Wavefront { name: "AditivoE" filePath: mat-aditivo.obj x: 0.0 y:  0.2 z: -2.0 }
+
+        // ---------- F: orden de pasada dentro de UN archivo ----------
+        Wavefront { name: "ComboF"   filePath: mat-combo.obj x: 3.0 y: 0.0 z: -2.0 }
+    }
+}

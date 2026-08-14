@@ -1,0 +1,47 @@
+// ==========================================================================
+//  PRUEBA del LOTE ESTATICO (camino de render eficiente, P4).
+//  La usa prueba_lote.w3s: una Collection con lote: "estatico" y TRES cubos
+//  estaticos adentro (mas un cuarto AFUERA de la coleccion, que sigue
+//  dibujandose solo). JUGANDO, los tres cubos se hornean en un juego de
+//  buffers con un rango por material: sus RenderObject no dibujan (el
+//  contador 'mallas' del presupuesto lo verifica) y el dc del escenario baja.
+//  En el editor (sin jugar) todo se dibuja normal.
+// ==========================================================================
+Whisk3D {
+    version: 20251127
+    Escena {
+        background: "0.2, 0.2, 0.25, 1.0"
+
+        Camera {
+            name: "Camara"
+            y: -10.0
+            z: 3.0
+        }
+
+        Collection {
+            name: "Escenario"
+            lote: "estatico"
+
+            Wavefront {
+                name: "Cubo1"
+                filePath: espejo-cubo-rojo.obj
+                x: -3.0
+            }
+            Wavefront {
+                name: "Cubo2"
+                filePath: espejo-cubo-rojo.obj
+            }
+            Wavefront {
+                name: "Cubo3"
+                filePath: espejo-cubo-amarillo.obj
+                x: 3.0
+            }
+        }
+
+        Wavefront {
+            name: "CuboSuelto"
+            filePath: espejo-cubo-amarillo.obj
+            x: 6.0
+        }
+    }
+}

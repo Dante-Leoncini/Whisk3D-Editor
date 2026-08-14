@@ -1,0 +1,62 @@
+/*
+ * ==============================================================================
+ *  Name        : Whisk3D.rss
+ *  Part of     : OpenGLEx / Whisk3D
+ *
+ *  UI de S60 en su MINIMA expresion: solo la barra de menu con Exit. Toda la
+ *  interfaz real (viewports, menus desplegables, propiedades, cursor) es la
+ *  COMPARTIDA con PC, dibujada en el viewport GL. Los dialogos/notes nativos de
+ *  S60 (wait / progress / error / file picker / queries) se borraron.
+ * ==============================================================================
+ */
+
+//  RESOURCE IDENTIFIER
+NAME    AWIZ // 4 letter ID
+
+//  INCLUDES
+#include <eikon.rh>
+#include <avkon.rh>
+#include "whisk3D.hrh"
+#include "whisk3D.rls"
+#include <avkon.rsg>
+#include <avkon.mbg>
+#include <appinfo.rh>
+
+//  RESOURCE DEFINITIONS
+RESOURCE RSS_SIGNATURE { }
+RESOURCE TBUF { buf="Whisk3D"; }
+
+RESOURCE EIK_APP_INFO {
+    menubar = r_whisk3D_menubar;
+    // softkeys VACIAS: asi la IZQ no abre el menu "Options" y
+    // ambas llegan como teclas crudas (164 IZQ / 165 DER) a OfferKeyEventL,
+    // donde el File browser las usa para Cancelar / Import.
+    cba = R_AVKON_SOFTKEYS_EMPTY;
+}
+
+RESOURCE MENU_BAR r_whisk3D_menubar {
+    titles = {
+        MENU_TITLE { menu_pane = r_whisk3D_exit; }
+    };
+}
+
+RESOURCE MENU_PANE r_whisk3D_exit {
+    items = {
+        MENU_ITEM {
+            command = EAknCmdExit;
+            txt = STRING_r_whisk3D_exit;
+        }
+    };
+}
+
+RESOURCE LOCALISABLE_APP_INFO r_whisk3D_localisable_app_info {
+    short_caption = STRING_r_app_short_caption_string;
+    caption_and_icon =
+    CAPTION_AND_ICON_INFO {
+        caption         = STRING_r_app_caption_string;
+        number_of_icons = 1;
+        icon_file       = "\\resource\\apps\\whisk3D_icon.mif";
+    };
+}
+
+// End of File

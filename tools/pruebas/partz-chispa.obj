@@ -1,0 +1,16 @@
+# Quad VERTICAL de 0.6x0.6 en el plano XY (Z=0), mirando a la camara: mas chico
+# que la mascara, asi el "agujero" que abre es un RECTANGULO ADENTRO de ella
+# (exactamente lo que se ve en la captura del dueno).
+o partz-chispa
+v -0.3 -0.3 0.0
+v  0.3 -0.3 0.0
+v  0.3  0.3 0.0
+v -0.3  0.3 0.0
+vt 0.0 0.0
+vt 1.0 0.0
+vt 1.0 1.0
+vt 0.0 1.0
+vn 0.0 0.0 -1.0
+usemtl partz-chispa
+f 1/1/1 2/2/1 3/3/1
+f 1/1/1 3/3/1 4/4/1

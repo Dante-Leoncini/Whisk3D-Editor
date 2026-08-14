@@ -1,0 +1,78 @@
+// ==========================================================================
+//  PRUEBA: LO TRANSLUCIDO NO ABRE AGUJEROS EN LO QUE SE DIBUJA DESPUES.
+//  La corre prueba_particulas_z.w3s (evidencia por PIXELES del render real).
+//
+//  Reporte del dueno (juego demo): "primero dibuja las particulas con alpha
+//  (bien) pero luego dibuja [la mascara] atras y entonces queda un agujero".
+//  En la captura, la mascara tiene un RECORTE RECTANGULAR vacio con la forma
+//  exacta del quad de una chispa: no es un problema de mezcla, es que la
+//  chispa ESCRIBIO PROFUNDIDAD y la mascara, dibujada despues y mas lejos,
+//  perdio el z-test.
+//
+//  OJO con las coordenadas: en el .w3d de TEXTO la vertical se llama `z` y la
+//  profundidad `y` (mismo criterio que prueba_materiales.w3d). En el .w3s los
+//  puntos son de MUNDO: (X, Y arriba, Z profundidad).
+//
+//  DOS ESTACIONES, las dos con el MISMO reparto: fondo opaco LEJOS, efecto
+//  translucido CERCA y dibujado PRIMERO, y la mascara translucida EN EL MEDIO
+//  y dibujada AL FINAL del arbol (igual que en el juego demo).
+//
+//   A  x = -3   la chispa es una MALLA con material ADITIVO  (el caso reportado)
+//   B  x = +3   la chispa es el objeto Particulas del motor  (pase diferido)
+//
+//  Colores: fondo 26,26,204 · mascara 0,153,0 · la chispa aditiva suma 26.
+// ==========================================================================
+Whisk3D {
+    version: 20251127
+    Escena {
+        background: "0.02, 0.02, 0.03, 1.0"
+
+        Camera {
+            name: "Camara"
+            fov: 60.0
+            y: -8.0   // profundidad: 8 unidades hacia atras, mirando de frente
+            z: 0.0
+        }
+
+        // ---------- el fondo OPACO de las dos estaciones (lo que se ve por el
+        //            agujero cuando algo translucido escribe z de mas) ----------
+        Wavefront { name: "Fondo" filePath: partz-fondo.obj y: -4.0 z: 2.0 }
+
+        // ---------- A: la chispa es una MALLA aditiva, y va PRIMERA ----------
+        // (en el juego demo la nube de estrellas del efecto esta arriba en el
+        //  arbol y la mascara varios miles de lineas mas abajo)
+        Wavefront { name: "ChispaMalla" filePath: partz-chispa.obj x: -3.0 y: 2.0 z: 2.0 }
+
+        // ---------- B: la chispa es el EMISOR del motor, tambien primero ------
+        // vida enorme + cantidad alta: con un solo tick ya hay una particula
+        // viva, quieta y grande en el origen del emisor.
+        Particulas {
+            name: "ChispaEmisor"
+            x: 3.0
+            y: 2.0
+            z: 2.0
+            textura: "texturas/cuadrantes.png"
+            cantidad: 30.0
+            vida: 600.0
+            tam: 0.6
+            vel: 0.0
+            dispersion: 0.0
+            gravedad: 0.0
+            aditivo: false
+            color: "1, 1, 1, 1"
+            desvanecer: false
+            activo: true
+        }
+
+        // ---------- C: la chispa esta DETRAS de la mascara ------------------
+        // El control de que "diferir" no es "dibujar encima de todo": la luz se
+        // difiere pero sigue con Z-TEST, asi que aca no tiene que verse nada.
+        Wavefront { name: "ChispaDetras" filePath: partz-chispa.obj x: 0.0 y: -2.0 z: 2.0 }
+
+        // ---------- las mascaras: TRANSLUCIDAS, DETRAS de las chispas y
+        //            ULTIMAS en el arbol ----------
+        Wavefront { name: "MascaraA" filePath: partz-mascara.obj x: -3.0 y: 0.0 z: 2.0 }
+        Wavefront { name: "MascaraB" filePath: partz-mascara.obj x:  3.0 y: 0.0 z: 2.0 }
+        Wavefront { name: "MascaraC" filePath: partz-mascara.obj x:  0.0 y: 0.0 z: 2.0 }
+    }
+}

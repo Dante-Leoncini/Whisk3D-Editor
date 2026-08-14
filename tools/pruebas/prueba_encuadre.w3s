@@ -1,0 +1,55 @@
+# ==========================================================================
+#  EL ENCUADRE DECLARADO SE RESPETA EN PLAY (letterbox/pillarbox por pixeles)
+#  Correr DESDE ESTA CARPETA:
+#    cd <motor>/tools/pruebas
+#    ../../platform/linux/build/whisk3d --script prueba_encuadre.w3s
+#
+#  Una camara puede declarar su ASPECTO DE IMAGEN (`aspecto:` en el .w3d, o la
+#  cabecera `aspecto` del .cap de su riel). Con el juego corriendo, el viewport
+#  dibuja EXACTAMENTE ese frustum encajado en el marco.
+#
+#  LAS BANDAS de afuera del marco, EN EL EDITOR, son ATENUADAS (reporte del
+#  dueno: "ahora alrededor de la camara se ve completamente negro y ya no tengo
+#  forma de saber si el culling se esta haciendo bien"): lo de afuera del
+#  encuadre SE VE, oscurecido, para poder auditar el culling. El NEGRO OPACO
+#  del dispositivo queda detras del toggle "Letterbox Negro" (menu Overlays /
+#  comando letterboxnegro), que es lo que asserta `encuadrepx`:
+#    1) las bandas del pillarbox son negro puro;
+#    2) un cartel FUERA del encuadre 40:27 pero DENTRO de la ventana ancha
+#       cae en la banda y su pixel es negro (no se dibuja).
+# ==========================================================================
+
+# ventana ANCHA (mas que 40:27): el caso que rompia las listas por nodo
+ventana 900 300
+
+# --- parte A: `aspecto:` declarado EN LA CAMARA -----------------------------
+abrirw3d prueba_encuadre.w3d
+loadtex
+vpcamara on
+juego on
+
+# A.1) DEFAULT del editor (bandas atenuadas): el cartel del costado, fuera del
+#      40:27 pero dentro de la ventana, SE VE (atenuado): su pixel NO es negro.
+escenapx 9.5 0 -10 noes 0 0 0 10
+# el del centro (dentro del encuadre) se dibuja pleno, como siempre
+escenapx 0 0 -10 noes 0 0 0 10
+
+# A.2) PREVIEW DEL DISPOSITIVO (toggle): bandas negro opaco + el cartel del
+#      costado desaparece bajo la banda (lo que ve el jugador en el aparato).
+letterboxnegro on
+encuadrepx 9.5 0 -10
+escenapx 0 0 -10 noes 0 0 0 10
+# vuelta al default y el costado se ve de nuevo: el toggle no deja nada pegado
+letterboxnegro off
+escenapx 9.5 0 -10 noes 0 0 0 10
+juego off
+
+# --- parte B: el encuadre HEREDADO de la cabecera `aspecto` del .cap --------
+abrirw3d prueba_encuadre_riel.w3d
+loadtex
+vpcamara on
+juego on
+letterboxnegro on
+encuadrepx 9.5 0 -10
+escenapx 0 0 -10 noes 0 0 0 10
+juego off

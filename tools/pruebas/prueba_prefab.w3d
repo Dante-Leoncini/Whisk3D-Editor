@@ -1,0 +1,40 @@
+// ==========================================================================
+//  PRUEBA de Biblioteca/Prefab/Clon (formato texto). La corre prueba_prefab.w3s.
+//
+//  La Biblioteca declara UNA vez el subarbol "caja" (Wavefront + script) y la
+//  escena lo instancia con TRES Clones de una linea: posicion, nombre y val_
+//  como overrides. La Biblioteca NO agrega objetos por si misma.
+//
+//  El spawner prueba el bind runtime instanciar("caja", x, y, z).
+//
+//  OJO: en el .w3d de TEXTO la vertical se llama `z` y la profundidad `y`.
+// ==========================================================================
+Whisk3D {
+    version: 20251127
+    Escena {
+        background: "0.05, 0.05, 0.05, 1.0"
+
+        Camera {
+            name: "Camara"
+            fov: 60.0
+            y: -8.0
+            z: 0.0
+            script: "prefab_spawner.lua"
+        }
+
+        Biblioteca {
+            Prefab {
+                name: "caja"
+                Wavefront {
+                    name: "Caja"
+                    filePath: espejo-cubo-rojo.obj
+                    script: "prefab_componente.lua"
+                }
+            }
+        }
+
+        Clon { prefab: "caja" x: -3.2 y: 0.0 z: 0.0 }
+        Clon { prefab: "caja" x:  0.0 y: 0.0 z: 0.0 }
+        Clon { prefab: "caja" name: "CajaEspecial" x: 3.2 y: 0.0 z: 0.0 val_etiqueta: "especial" }
+    }
+}

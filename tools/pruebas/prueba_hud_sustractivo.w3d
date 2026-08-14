@@ -1,0 +1,57 @@
+// ==========================================================================
+//  PRUEBA sintetica de "la fruta del HUD parpadea a NEGRO" (formato texto).
+//  La corre prueba_hud_sustractivo.w3s; el script es hud_anim_frames.lua.
+//
+//  La receta minima del bug real: un emisor de particulas SUSTRACTIVO
+//  (mezcla dst - src, la del humo de chimenea de un juego PSX) dibujando en
+//  el pase 3D + un icono 2D animado por frames (setTextura por tick) en el
+//  HUD. El pase de particulas dejaba la BLEND EQUATION en REVERSE_SUBTRACT
+//  y el HUD (que solo reponia la FUNCION de mezcla, no la ecuacion) restaba
+//  del framebuffer: el icono salia como una silueta NEGRA con el alpha bien.
+// ==========================================================================
+Whisk3D {
+    version: 20251127
+    Escena {
+        background: "0.2, 0.2, 0.25, 1.0"
+
+        Camera {
+            name: "Camara"
+            y: -8.0
+            z: 2.0
+        }
+
+        Wavefront {
+            name: "Piso"
+            filePath: espejo-piso.obj
+            scale: 6.0
+        }
+
+        // el humo SUSTRACTIVO delante de la camara: su lote se dibuja TODOS
+        // los frames y deja la blend equation en dst - src si nadie la repone
+        Particulas {
+            name: "HumoResta"
+            y: -4.0
+            z: 2.0
+            textura: "texturas/particula.png"
+            cantidad: 20
+            vida: 2.0
+            tam: 1.0
+            vel: 0.3
+            dispersion: 20
+            gravedad: 0
+            sustractivo: true
+            color: "0.3, 0.3, 0.3, 1.0"
+            activo: true
+        }
+
+        UI {
+            archivo: "prueba_hud_sustractivo.w3dui"
+        }
+
+        Collection {
+            name: "Control"
+            script: "hud_anim_frames.lua"
+            ref_icono: "IconoAnim"
+        }
+    }
+}

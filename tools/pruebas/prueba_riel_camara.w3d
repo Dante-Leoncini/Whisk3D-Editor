@@ -1,0 +1,40 @@
+// ==========================================================================
+//  PRUEBA sintetica del RIEL DE CAMARA CAMBIABLE EN JUEGO (formato texto).
+//  La corre prueba_riel_camara.w3s; el script es riel_camara.lua.
+//
+//  Tres Curve cortas y una Camera. Un juego con varias "salas" no tiene UNA
+//  curva que las una: el motor expone el riel a lua (setRiel / setRielNodo /
+//  setMiradaRiel / rielDe) para que el juego elija el riel que toca.
+// ==========================================================================
+Whisk3D {
+    version: 20251127
+    Escena {
+        background: "0.02, 0.02, 0.03, 1.0"
+
+        Curve { name: "Riel A" filePath: riel-a.cap }
+        Curve { name: "Riel B" filePath: riel-b.cap }
+        Curve { name: "Riel C" filePath: riel-c.cap }
+        // el MISMO trazado que el Riel A pero declarado en el espacio del
+        // motor (cabecera `ejes x y z`): se lee sin espejar
+        Curve { name: "Riel Motor" filePath: riel-motor.cap }
+
+        // el objetivo que la camara sigue: moviendolo con `objpos` se simula al
+        // jugador recorriendo el nivel
+        Collection {
+            name: "Mira"
+            x: 0.0
+            y: 0.0
+            z: 0.0
+            script: "riel_camara.lua"
+            ref_cam: "Camara"
+        }
+
+        Camera {
+            name: "Camara"
+            fov: 45.0
+            target: "Mira"
+            riel: "Riel A"
+            offsetRiel: 0
+        }
+    }
+}

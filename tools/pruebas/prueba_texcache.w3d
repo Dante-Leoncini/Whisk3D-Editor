@@ -1,0 +1,41 @@
+// ==========================================================================
+//  PRUEBA del CACHE DE TEXTURAS POR RUTA (formato texto).
+//  La corre prueba_texcache.w3s.
+//
+//  SEIS objetos, cada uno con su PROPIO material (tex-copia1..6), y los seis
+//  .mtl declaran el MISMO `map_Kd texturas/cuadrantes.png`. El motor comparte
+//  materiales por NOMBRE, asi que aca no puede ahorrar por ese lado: la unica
+//  forma de no subir la imagen seis veces a la GPU es el cache POR RUTA.
+//
+//  Es la reduccion minima del bug real del proyecto Crash (28 trozos de
+//  escenario con el mismo atlas de 1 MB), que hasta hoy se esquivaba con el
+//  truco del "ancla" (un solo .mtl con map_Kd y los otros 27 sin textura).
+//
+//  Ademas hay un septimo objeto con OTRA imagen (rojo.png) para que el conteo
+//  de texturas distintas no sea trivialmente 1.
+//
+//  OJO: en el .w3d de TEXTO la vertical se llama `z` y la profundidad `y`.
+// ==========================================================================
+Whisk3D {
+    version: 20251127
+    Escena {
+        background: "0.05, 0.05, 0.05, 1.0"
+
+        Camera {
+            name: "Camara"
+            fov: 60.0
+            y: -8.0
+            z: 0.0
+        }
+
+        Wavefront { name: "Copia1" filePath: tex-copia1.obj x: -3.0 y: 0.0 z:  1.0 }
+        Wavefront { name: "Copia2" filePath: tex-copia2.obj x:  0.0 y: 0.0 z:  1.0 }
+        Wavefront { name: "Copia3" filePath: tex-copia3.obj x:  3.0 y: 0.0 z:  1.0 }
+        Wavefront { name: "Copia4" filePath: tex-copia4.obj x: -3.0 y: 0.0 z: -1.0 }
+        Wavefront { name: "Copia5" filePath: tex-copia5.obj x:  0.0 y: 0.0 z: -1.0 }
+        Wavefront { name: "Copia6" filePath: tex-copia6.obj x:  3.0 y: 0.0 z: -1.0 }
+
+        // una imagen DISTINTA (8x8): el cache tiene que contar dos rutas, no una
+        Wavefront { name: "Otra"   filePath: espejo-poste.obj x: 0.0 y: 0.0 z: 3.0 }
+    }
+}

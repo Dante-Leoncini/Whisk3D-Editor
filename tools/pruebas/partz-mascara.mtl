@@ -1,0 +1,10 @@
+# Material de prueba_particulas_z.w3s: el objeto TRANSLUCIDO que va DETRAS del
+# efecto y que se dibuja DESPUES en el arbol (el caso de la mascara del juego
+# demo que reporto el dueno). `alpha` con d 1.0 = tapa entero, color exacto.
+
+newmtl partz-mascara
+Kd 0.000000 0.600000 0.000000
+d 1.0
+NoLight
+BackfaceCullingOff
+alpha

@@ -1,0 +1,47 @@
+# ===========================================================================
+#  FRAMES COMPARTIDOS DE LAS VERTEX ANIMS (AnimDatos) + POSE POR INSTANCIA
+#
+#  Cada frame de una vertex anim es la malla ENTERA: N objetos que declaraban
+#  la misma Animation { basePath } cargaban N juegos completos de frames (el
+#  dato mas pesado despues de las texturas). Ahora la primera carga registra
+#  sus frames en el almacen de recursos (tipo ANIM) y las siguientes ADOPTAN
+#  los mismos punteros sin tocar el disco.
+#
+#  La POSE queda por instancia: animar() escribe mesh->vertex (con COW de la
+#  geometria compartida), asi que posar una instancia NO mueve a la otra.
+#
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_animcache.w3s
+# ===========================================================================
+
+# --- A) CON CACHE: misma Animation = un solo juego de frames ----------------
+abrirw3d prueba_animcache.w3d
+meminfo
+meminfo anims 2
+meminfo animsrefs 4
+# la geometria base tambien comparte (mismo .obj + noMerge)
+meminfo mallas 1
+meminfo mallasrefs 2
+
+# --- B) POSE POR INSTANCIA: posar AniA no mueve a AniB ----------------------
+simplay 3
+scriptinfo compartido ac_iguales 1
+scriptinfo compartido ac_movida 1
+scriptinfo compartido ac_intacta 1
+simstop
+# el playback NO desinstancia frames (solo escribe la pose por instancia)
+meminfo anims 2
+meminfo animsrefs 4
+meminfo animsdesinst 0
+
+# --- C) ROUND-TRIP v4: animcache on == animcache off, byte a byte -----------
+abrirw3d prueba_animcache.w3d
+guardarw3d prueba_animcache_v4on.w3d
+animcache off
+abrirw3d prueba_animcache.w3d
+# sin cache cada instancia carga su juego de frames (el motor de antes)
+meminfo anims 0
+meminfo animsrefs 0
+guardarw3d prueba_animcache_v4off.w3d
+comparar prueba_animcache_v4on.w3d prueba_animcache_v4off.w3d
+animcache on

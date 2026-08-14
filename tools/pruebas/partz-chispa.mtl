@@ -1,0 +1,11 @@
+# Material de prueba_particulas_z.w3s: la CHISPA. Una particula hecha con una
+# MALLA (el patron de los sprites de efecto: un pool de quads que mueve el
+# script), con mezcla ADITIVA. Kd bajo a proposito: suma 26 por canal y ningun
+# assert satura.
+
+newmtl partz-chispa
+Kd 0.100000 0.100000 0.100000
+d 1.0
+NoLight
+BackfaceCullingOff
+ADITIVO

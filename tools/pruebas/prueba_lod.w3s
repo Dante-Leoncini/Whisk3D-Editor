@@ -1,0 +1,16 @@
+# Prueba de los objetos LOD y Culling: carga del texto, guardado v4 y reapertura.
+# Correr DESDE ESTA CARPETA:
+#   cd <motor>/tools/pruebas
+#   ../../platform/linux/build/whisk3d --script prueba_lod.w3s
+# lodinfo lista los LOD (umbrales + hijo elegido), los Culling (soloCamaraActiva)
+# y las Collection (ordenarPorCamara/ordenarUnaVez): iguales antes y despues del v4.
+abrirw3d prueba_lod.w3d
+lodinfo
+meshinfo
+guardarw3d prueba_lod_v4.w3d
+abrirw3d prueba_lod_v4.w3d
+lodinfo
+meshinfo
+# render real: ejercita el orden lejos->cerca de la Collection (ordenarUnaVez
+# congela con la Camera activa) ademas del LOD y el Culling
+bench 2 noswap

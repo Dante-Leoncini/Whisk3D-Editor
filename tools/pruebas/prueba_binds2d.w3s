@@ -1,0 +1,19 @@
+# ==========================================================================
+#  LOS BINDS 2D DE JUEGO CONTRA EL LAYOUT REAL
+#  Correr DESDE ESTA CARPETA:
+#    cd <motor>/tools/pruebas
+#    ../../platform/linux/build/whisk3d --script prueba_binds2d.w3s
+#
+#  `chocantest` arma su propia escena UI (un contenedor con layout en filas, un
+#  elemento anclado a un borde y dos objetos moviles) y corre los binds REALES
+#  -- cajaUI, chocan, rebotar y limitar -- contra ella. Lo que verifica es la
+#  regla crudo-vs-resuelto: un objeto puesto por el LAYOUT choca donde se
+#  DIBUJA, y uno movido a mano este frame choca en su posicion NUEVA, sin lag.
+#
+#  Incluye el eje de limitar(): recortaba solo en Y (era el clamp vertical de la
+#  pala de un pong con nombre generico) y ahora acepta "xy" | "x" | "y".
+#
+#  El comando trae su escena adentro a proposito: no hay fixture que se pueda
+#  desincronizar de lo que mide. Hasta hoy ningun .w3s lo corria.
+# ==========================================================================
+chocantest

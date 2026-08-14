@@ -1,0 +1,40 @@
+# ===========================================================================
+#  UN .mtl con VARIOS materiales y map_Kd RELATIVO (la regresion del v4)
+#
+#  Los dos primeros materiales declaran EL MISMO `map_Kd dosmats.png`, relativo
+#  al directorio de ESTE .mtl (que NO es "texturas/"). El cache de texturas por
+#  ruta les da UN solo Texture*, asi que al guardar el contenedor la MISMA
+#  cadena llega dos veces al escritor: la primera vuelve reescrita como
+#  "texturas/dosmats.png" y la segunda ENTRA con ese valor. Es exactamente lo
+#  que pasa con modelos/enemigos/caballero.mtl (caballero + caballero-sombra).
+#
+#  El tercero apunta a OTRA imagen del mismo directorio y el cuarto no declara
+#  ninguna (blob de sombra por color de vertice): sin map_Kd NO es una falla.
+# ===========================================================================
+
+newmtl dosmats
+Kd 1.000000 1.000000 1.000000
+d 1.0
+NoLight
+map_Kd dosmats.png
+
+newmtl dosmats-sombra
+Kd 1.000000 1.000000 1.000000
+d 1.0
+NoLight
+BackfaceCullingOff
+decal
+map_Kd dosmats.png
+
+newmtl dosmats-otra
+Kd 1.000000 1.000000 1.000000
+d 1.0
+NoLight
+map_Kd dosmats-b.png
+
+newmtl dosmats-sintex
+Kd 0.500000 0.500000 0.500000
+d 1.0
+NoLight
+BackfaceCullingOff
+decal

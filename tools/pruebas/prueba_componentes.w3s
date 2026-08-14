@@ -1,0 +1,37 @@
+# Prueba de los scripts estilo Unity en CUALQUIER objeto: val_* por instancia,
+# propiedad() en lua, y el estado compartido entre scripts (setCompartido).
+# Correr DESDE ESTA CARPETA:
+#   cd <motor>/tools/pruebas
+#   ../../platform/linux/build/whisk3d --script prueba_componentes.w3s
+# Los asserts: suma = 1 + 3 (los val_id de las dos frutas llegaron a lua),
+# agarradas = 1 (el val_agarrada bool), ultima = "caja" (el default de texto
+# del script: Fruta2 no declara val_etiqueta y corre ultima en orden de arbol).
+abrirw3d prueba_componentes.w3d
+scriptinfo
+simplay 3
+scriptinfo compartido suma 4
+scriptinfo compartido agarradas 1
+scriptinfo compartido ultima caja
+simstop
+# round-trip: el v4 tiene que llevar y traer los scripts con sus val_ intactos
+guardarw3d prueba_componentes_v4.w3d
+abrirw3d prueba_componentes_v4.w3d
+scriptinfo
+simplay 3
+scriptinfo compartido suma 4
+scriptinfo compartido agarradas 1
+scriptinfo compartido ultima caja
+# --- parametro() es un alias NUMERICO de propiedad() ------------------------
+# Antes resolvia contra un if/else cerrado de nueve nombres de gameplay que
+# vivian como campos C++ del objeto Script: el motor definia el vocabulario de
+# un genero de juego. Ahora lo declara el proyecto y estos cuatro asserts
+# cubren las tres precedencias.
+#   paramId    = 3 -> Fruta2 corre ultima y su val_id es 3 (valor por instancia)
+#   paramEmpuje= 2.50 -> nadie lo configura: el default de la tabla `propiedades`
+#   paramNadie = 7.25 -> clave que nadie declaro: el default del call site
+#   paramCero  = 0.00 -> idem sin default: 0, no nil
+scriptinfo compartido paramId 3
+scriptinfo compartido paramEmpuje 2.50
+scriptinfo compartido paramNadie 7.25
+scriptinfo compartido paramCero 0.00
+simstop

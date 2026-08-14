@@ -1,0 +1,6 @@
+newmtl espejo-poste2
+Kd 1.000000 1.000000 1.000000
+map_Kd texturas/amarillo.png
+NoLight
+PIXELATED
+BackfaceCullingOff

@@ -1,0 +1,45 @@
+# ==========================================================================
+#  EL INDICE DEL RIEL (rielIndice) QUEDA CLAMPEADO AL RIEL
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_riel_indice.w3s
+#
+#  Camera.h documenta rielIndice como "el indice del riel donde SE PARO la
+#  camara". PuntoDelRiel siempre clampeo la POSICION a [0, ultimo], pero el
+#  indice reportado NO sufria el mismo clamp: con offsetRiel 4 y el target al
+#  principio del riel quedaba en -4 (camara parada en el nodo 0). rielDe() de
+#  lua devolvia ese -4, el juego lo trataba como "sin indice" y apagaba su
+#  formula de mirada: es el "la camara gira de mas a la izquierda / crash se
+#  va MUY afuera del mapa" medido en el nivel real (yaw 87 grados contra un
+#  clamp autoral de +-12.9). Aca se prueba el contrato en las cuatro puntas.
+# ==========================================================================
+abrirw3d prueba_riel_indice.w3d
+
+# 1) target ANTES del nodo 0 (proyecta al nodo 0) + offset 4: indice crudo -4
+#    -> clampeado a 0, y la camara parada en el nodo 0 (0,0,0).
+camriel indice 0
+camriel pos 0 0 0
+
+# 2) target DESPUES del final (proyecta al ultimo nodo, 5) + offset 4:
+#    indice 5-4=1 (en rango: el offset sigue funcionando como siempre).
+selname Mira
+objpos 20 0 0
+camriel indice 1
+camriel pos 1 0 0
+
+# 3) target en el medio (proyecta al nodo 5? no: x=2.5 -> entre nodo 2 y 3):
+#    indice fraccionario 2.5-4 = -1.5 -> clampeado a 0 de nuevo.
+selname Mira
+objpos 2.5 0 0
+camriel indice 0
+camriel pos 0 0 0
+
+# 4) NODO MANUAL fuera de rango: setRielNodo(100) planta la camara en el
+#    ultimo nodo y el indice reportado es ESE nodo (5), no 100.
+camriel nodo 100
+camriel indice 5
+camriel pos 5 0 0
+
+# 5) nodo manual valido: indice = el nodo pedido, sin sorpresas.
+camriel nodo 2.5
+camriel indice 2.5
+camriel pos 2.5 0 0

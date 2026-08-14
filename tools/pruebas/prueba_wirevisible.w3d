@@ -1,0 +1,30 @@
+// ==========================================================================
+//  PRUEBA sintetica del WIREFRAME "SOLO LO VISIBLE" (w3dRenderWireframeSoloVisible).
+//  La corre prueba_wirevisible.w3s.
+//
+//  Una malla (vis-tris.obj: 4 triangulos en fila sobre XZ) con Culling por
+//  triangulo en metodo celdas (vis-tris.w3dvis, derivado del origen:
+//  c1=[t0,t1] c2=[t2,t0,t1] c3=[t2,t3] c4=[t3,t2]). En la vista de alambre,
+//  el default nuevo dibuja SOLO las aristas de la lista activa; el toggle
+//  "Wireframe: Only Visible" (menu Render) vuelve al alambre clasico.
+// ==========================================================================
+Whisk3D {
+    version: 20251127
+    Escena {
+        background: "0.2, 0.2, 0.25, 1.0"
+
+        Wavefront {
+            name: "MallaVis"
+            filePath: vis-tris.obj
+            CullingTri {
+                metodo: "celdas"
+                celda: 1
+            }
+        }
+    }
+    // un solo viewport, sin piso/ejes: los asserts por pixel comparan contra el
+    // FONDO vacio y una linea de la grilla justo ahi los ensuciaria
+    Layout {
+        Viewport3D { showFloor: false showXaxis: false showYaxis: false }
+    }
+}

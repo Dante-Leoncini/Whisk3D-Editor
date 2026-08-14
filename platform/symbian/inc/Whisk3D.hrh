@@ -1,0 +1,18 @@
+/*
+ * ==============================================================================
+ *  Name        : whisk3D.hrh
+ *  Part of     : OpenGLEx / Whisk3D
+ *
+ *  El enum de comandos del menu S60 (TWhisk3DMenuCommands, ~120 IDs) se borro:
+ *  la UI nativa quedo solo con Exit (EAknCmdExit, de avkon). Toda la interfaz
+ *  real (viewports / menus desplegables / propiedades / cursor) es la COMPARTIDA
+ *  con PC, dibujada en el viewport GL.
+ * ==============================================================================
+ */
+
+#ifndef WHISK3D_HRH
+#define WHISK3D_HRH
+
+// (sin comandos propios: el unico menu nativo es Exit -> EAknCmdExit de avkon)
+
+#endif      // WHISK3D_HRH

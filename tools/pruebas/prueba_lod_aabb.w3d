@@ -1,0 +1,75 @@
+// ==========================================================================
+//  PRUEBA del criterio NUEVO del objeto LOD: distancia al AABB EN MUNDO del hijo
+//  candidato (no al origen del LOD), histeresis del 10 % y soloCamaraActiva.
+//  La corre prueba_lod_aabb.w3s.
+//
+//  Los dos hijos son la MISMA barra: x de -10 a +10, y de -0.4 a 0.4, z = 0, con
+//  el ORIGEN en (0,0,0). Esa es toda la escena: la barra es larga a proposito,
+//  porque su origen esta a 14 unidades de la camara de prueba mientras que su
+//  geometria llega a 4. Con el criterio viejo (al origen) el LOD conmutaba a
+//  "lejos" con la camara pegada al borde de la barra; con el nuevo, no.
+//
+//  OJO con las coordenadas: en el .w3d de TEXTO la vertical se llama `z` y la
+//  profundidad `y` (mismo criterio que prueba_espejo.w3d).
+// ==========================================================================
+Whisk3D {
+    version: 20251127
+    Escena {
+        background: "0.02, 0.02, 0.03, 1.0"
+
+        // la camara de la ESCENA queda parada al lado de la punta de la barra:
+        // a 5 unidades de su AABB (dx = 4, dz = 3) y a 14.32 de su origen.
+        Camera {
+            name: "Camara"
+            fov: 60.0
+            x: 14.0
+            y: -3.0
+            z: 0.0
+            // mira al origen: asi se sabe DONDE cae su marco y el Culling de
+            // abajo puede tener hijos adentro y afuera a proposito
+            target: "LodBarra"
+        }
+
+        // LOD normal: mide desde la VISTA QUE DIBUJA (la orbita del viewport)
+        LOD {
+            name: "LodBarra"
+            distancias: "8"
+            Wavefront { name: "BarraFina"   filePath: lod-barra-fina.obj }
+            Wavefront { name: "BarraGruesa" filePath: lod-barra-gruesa.obj }
+        }
+
+        // LOD con soloCamaraActiva: mide SIEMPRE desde la Camera activa, se mire
+        // el viewport desde donde se mire (el mismo flag que ya tiene el Culling).
+        LOD {
+            name: "LodBarraCam"
+            distancias: "8"
+            soloCamaraActiva: true
+            Wavefront { name: "BarraFinaCam"   filePath: lod-barra-fina.obj   z: 3.0 }
+            Wavefront { name: "BarraGruesaCam" filePath: lod-barra-gruesa.obj z: 3.0 }
+        }
+
+        // CULLING con soloCamaraActiva: 8 hijos repartidos a lo largo de X. La
+        // Camera de la escena esta en x = 14 mirando al frente con fov 60, asi
+        // que solo unos pocos caen dentro de su marco; los demas quedan MUY
+        // afuera (x negativos). Con `activo: false` se dibujan los 8; con
+        // `activo: true` se recorta contra el frustum de la camara del juego,
+        // se mire el viewport desde donde se mire.
+        Culling {
+            name: "CullBarras"
+            activo: true
+            soloCamaraActiva: true
+            Wavefront { name: "Cull0" filePath: lod-barra-fina.obj x:    0.0 y:   0.0 scale: 0.05 }
+            Wavefront { name: "Cull1" filePath: lod-barra-fina.obj x:    2.0 y:   0.0 scale: 0.05 }
+            Wavefront { name: "Cull2" filePath: lod-barra-fina.obj x: 0.0 y: 0.0 z: 200.0 scale: 0.05 }
+            Wavefront { name: "Cull3" filePath: lod-barra-fina.obj x: 0.0 y: 0.0 z: 220.0 scale: 0.05 }
+            Wavefront { name: "Cull4" filePath: lod-barra-fina.obj x: 0.0 y: 0.0 z: 240.0 scale: 0.05 }
+            Wavefront { name: "Cull5" filePath: lod-barra-fina.obj x: 0.0 y: 0.0 z: 260.0 scale: 0.05 }
+            Wavefront { name: "Cull6" filePath: lod-barra-fina.obj x: 0.0 y: 0.0 z: 280.0 scale: 0.05 }
+            Wavefront { name: "Cull7" filePath: lod-barra-fina.obj x: 0.0 y: 0.0 z: 300.0 scale: 0.05 }
+            // este esta DETRAS de la Camera de la escena pero DENTRO del marco
+            // de la orbita del viewport: separa "recortar con la camara del
+            // juego" de "recortar con la vista que dibuja".
+            Wavefront { name: "CullDetras" filePath: lod-barra-fina.obj x: 60.0 y: -60.0 z: 0.0 scale: 0.05 }
+        }
+    }
+}

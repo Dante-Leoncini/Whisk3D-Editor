@@ -1,0 +1,8 @@
+# dos materiales para la prueba del ORDEN de transparentes (pvsRuns):
+# "solido" opaco y "vidrio" transparente (d < 1 -> mat->transparent)
+newmtl solido
+Kd 0.8 0.8 0.8
+d 1.0
+newmtl vidrio
+Kd 0.4 0.6 1.0
+d 0.5

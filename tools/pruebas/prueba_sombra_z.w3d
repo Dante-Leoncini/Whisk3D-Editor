@@ -1,0 +1,50 @@
+// ==========================================================================
+//  PRUEBA del material `decal` (LAS SOMBRAS) contra el z-fighting, en los dos
+//  casos que reporta el dueno: TERRENO INCLINADO y TRONCOS.
+//  La corre prueba_sombra_z.w3s.
+//
+//  OJO: en el .w3d de TEXTO la vertical se llama `z` y la profundidad `y`.
+//
+//  A) RAMPA a 30 grados con su blob EXACTAMENTE COPLANAR (mismo rotX, mismo
+//     origen): sin sesgo ni DepthLEqual el blob pierde el z-test y desaparece.
+//  B) RAMPA a 55 grados: cuanto mas inclinada, mas grande es la pendiente de
+//     profundidad por pixel y peor el redondeo.
+//  C) TRONCO: una caja; el blob se apoya en su cara superior, coplanar.
+//  D) PISO LLANO de control (el caso facil, que ya andaba).
+// ==========================================================================
+Whisk3D {
+    version: 20251127
+    Escena {
+        background: "0.05, 0.05, 0.08, 1.0"
+
+        Camera {
+            name: "Camara"
+            fov: 60.0
+            y: -9.0
+            z: 5.0
+            rotX: -28.0
+        }
+
+        // A) rampa 30 grados
+        Wavefront { name: "RampaA" filePath: sombra-piso.obj x: -6.0 rotX: 30.0 scale: 3.0 }
+        Wavefront { name: "BlobA"  filePath: sombra-blob.obj x: -6.0 rotX: 30.0 scale: 1.2 }
+
+        // B) rampa 55 grados
+        Wavefront { name: "RampaB" filePath: sombra-piso.obj x: -2.0 rotX: 55.0 scale: 3.0 }
+        Wavefront { name: "BlobB"  filePath: sombra-blob.obj x: -2.0 rotX: 55.0 scale: 1.2 }
+
+        // C) EL ORDEN: el blob se declara ANTES de la superficie que lo recibe
+        //    (es lo que pasa con la sombra SUELTA de Crash y los troncos: son
+        //    objetos distintos y el arbol decide quien va primero)
+        Wavefront { name: "BlobC"   filePath: sombra-blob.obj x: 2.0 rotX: 30.0 scale: 1.2 }
+        Wavefront { name: "TroncoC" filePath: sombra-piso.obj x: 2.0 rotX: 30.0 scale: 3.0 }
+
+        // D) piso llano (control)
+        Wavefront { name: "PisoD"  filePath: sombra-piso.obj x: 6.0 scale: 3.0 }
+        Wavefront { name: "BlobD"  filePath: sombra-blob.obj x: 6.0 scale: 1.2 }
+        // E) el CUERPO que proyecta la sombra: opaco, POR ENCIMA del blob. Una
+        // calcomania no escribe z pero SI hace z-test, asi que lo que esta mas
+        // cerca de la camara le gana: la sombra no puede pintarse sobre el.
+        Wavefront { name: "CuerpoD" filePath: sombra-piso.obj x: 6.0 y: -1.2 z: 1.6 scale: 0.9 }
+    }
+}

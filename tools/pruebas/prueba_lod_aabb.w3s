@@ -1,0 +1,149 @@
+# Prueba del criterio NUEVO del objeto LOD. Correr DESDE ESTA CARPETA:
+#   cd <motor>/tools/pruebas
+#   ../../platform/linux/build/whisk3d --script prueba_lod_aabb.w3s
+#
+# Tres cosas, las tres medidas:
+#  1. la distancia se mide al AABB EN MUNDO del hijo candidato, no al ORIGEN del
+#     LOD. La barra va de x=-10 a x=+10 con su origen en (0,0,0): parado al lado
+#     de su punta, el origen queda a 14.3 y la geometria a 5.0. Con el criterio
+#     viejo el trozo conmutaba a "lejos" con la camara pegada a su borde.
+#  2. HISTERESIS del 10 %: a la MISMA distancia (8.0, justo el umbral) el LOD
+#     contesta distinto segun de donde venga. Sin esto la pareja parpadea.
+#  3. soloCamaraActiva: el LOD mide desde la Camera ACTIVA aunque el viewport
+#     este a 200 unidades — el mismo flag que ya tenia el Culling, para que los
+#     dos previsualicen con LA MISMA camara.
+#
+# `vporbita <x> <y> <z> <dist> <pitch> <yaw>` deja la camara en (x, y, z+dist):
+# con el pivot en (14, 0, 0), la distancia al AABB de la barra es sqrt(16 + dist^2).
+abrirw3d prueba_lod_aabb.w3d
+loadtex
+lodinfo
+
+# --- 1) LEJOS: AABB a 12.65 > 8 -> el hijo GRUESO (1)
+vporbita 14 0 0 12 0 0
+lodelegido LodBarra 1
+
+# --- 2) HISTERESIS, ida: AABB a 8.000 (el umbral exacto) VINIENDO DE LEJOS.
+#        Para subir de detalle hace falta 8*0.9 = 7.2 -> sigue el GRUESO.
+vporbita 14 0 0 6.9282 0 0
+lodelegido LodBarra 1
+
+# --- 3) AABB a 7.000 <= 7.2 -> ahora si, el hijo FINO (0)
+vporbita 14 0 0 5.7446 0 0
+lodelegido LodBarra 0
+
+# --- 4) HISTERESIS, vuelta: la MISMA distancia 8.000 del paso 2, pero viniendo
+#        de cerca. Para bajar de detalle hace falta 8*1.1 = 8.8 -> sigue el FINO.
+#        Este renglon y el paso 2 son el mismo numero con dos respuestas: eso ES
+#        la histeresis, y es lo que evita el parpadeo justo en el umbral.
+vporbita 14 0 0 6.9282 0 0
+lodelegido LodBarra 0
+
+# --- 5) EL CAMBIO DE CRITERIO: camara a 3 del plano de la barra.
+#        distancia al AABB   = sqrt(16 + 9)   =  5.00  <= 8   -> FINO
+#        distancia al ORIGEN = sqrt(196 + 9)  = 14.32  >  8   -> hubiera dado GRUESO
+vporbita 14 0 0 3 0 0
+lodelegido LodBarra 0
+
+# --- 6) soloCamaraActiva: el viewport se va a 200 unidades y el LOD normal pasa a
+#        grueso; el que mide por la Camera activa NO se mueve de fino.
+vporbita 14 0 0 200 0 0
+lodelegido LodBarra 1
+lodelegido LodBarraCam 0
+
+# --- 7) ROUND-TRIP v4: distancias y soloCamaraActiva tienen que sobrevivir
+guardarw3d prueba_lod_aabb_v4.w3d
+abrirw3d prueba_lod_aabb_v4.w3d
+loadtex
+lodinfo
+vporbita 14 0 0 3 0 0
+lodelegido LodBarra 0
+lodelegido LodBarraCam 0
+vporbita 14 0 0 200 0 0
+lodelegido LodBarra 1
+lodelegido LodBarraCam 0
+
+# --- 8) JUGANDO, EL LOD MIDE DESDE LA CAMARA DEL JUEGO ----------------------
+#  LOD::OjoDeMedida usaba la vista QUE DIBUJA. Dar Play no cambia la vista del
+#  viewport, asi que con el juego corriendo el LOD seguia midiendo desde la
+#  orbita del editor, que no se mueve: el personaje camina y las distancias no
+#  cambian NUNCA -> el LOD no conmuta. Arreglo: jugando (timeline en Juego +
+#  reproduciendo) se mide siempre desde CameraActive; en pausa vuelve a la vista
+#  que dibuja, para poder inspeccionarlo orbitando.
+abrirw3d prueba_lod_aabb.w3d
+loadtex
+vporbita 14 0 0 200 0 0
+# EN PAUSA manda la orbita (200 u) -> GRUESO; el que declara soloCamaraActiva
+# siempre midio bien y sirve de control.
+lodelegido LodBarra 1
+lodelegido LodBarraCam 0
+# JUGANDO manda la Camera de la escena (a 5 u del AABB) -> FINO. Este es el
+# assert que fallaba: antes seguia dando 1.
+juego on
+lodelegido LodBarra 0
+lodelegido LodBarraCam 0
+# y al salir vuelve a medir desde la orbita: el caso de la pausa no se rompe
+juego off
+lodelegido LodBarra 1
+
+# --- 9) DAR PLAY NO TOCA EL PANEO/ZOOM DEL VIEWPORT -------------------------
+#  Regresion: la puerta del boton Play reseteaba camViewZoom / camViewPanX /
+#  camViewPanY del viewport en vista de camara. Play no escribe NADA de la
+#  vista; el LOD y el Culling piden la camara del juego por W3dCamaraDeMedida
+#  (solo lectura).
+vporbita 14 3 -2 200 25 -40
+vpcamara on
+vpestado inspeccion 2.5 0.3 -0.15
+vpestado guardar
+juego on
+simplay 5
+juego off
+# IDENTICO, no "parecido"
+vpestado comparar
+# y tambien sin vista de camara (orbita pura)
+vpcamara off
+vporbita 14 0 0 200 0 0
+vpestado guardar
+juego on
+simplay 5
+juego off
+vpestado comparar
+
+# --- 10) EL CHECKBOX `activo` DEL CULLING -----------------------------------
+#  El Culling recorta sus hijos contra el frustum. Con `soloCamaraActiva` mide
+#  desde la camara del JUEGO aunque el viewport este a 200 unidades, igual que
+#  el LOD de arriba: asi lo que se previsualiza es lo que se va a dibujar.
+#  `activo: false` es el interruptor para mostrar la escena entera sin recortar.
+#  De los 9 hijos, 2 caen adentro del marco de la Camera, 6 estan 200..300
+#  unidades por encima y el noveno (CullDetras) esta DETRAS de la Camera pero
+#  DENTRO del marco de la orbita del viewport: si el Culling midiera con la
+#  vista que dibuja en vez de con la camara del juego, pasarian 3 y no 2. Ese
+#  hijo es lo que hace que `soloCamaraActiva` se pueda distinguir de no tenerlo.
+vporbita 14 0 0 200 0 0
+cullactivo CullBarras on
+cullvisibles 2 2
+cullactivo CullBarras off
+cullvisibles 9 9
+cullactivo CullBarras on
+cullvisibles 2 2
+
+# jugando da lo MISMO: el recorte no depende de que el viewport este orbitando
+juego on
+simplay 2
+cullactivo CullBarras on
+cullvisibles 2 2
+cullactivo CullBarras off
+cullvisibles 9 9
+juego off
+
+# --- 11) `activo` SOBREVIVE AL GUARDADO v4 ----------------------------------
+cullactivo CullBarras off
+guardarw3d prueba_lod_aabb_cull_v4.w3d
+abrirw3d prueba_lod_aabb_cull_v4.w3d
+loadtex
+vporbita 14 0 0 200 0 0
+# apagado en el archivo -> apagado al reabrir: los 8 sin tocar nada
+cullactivo CullBarras
+cullvisibles 9 9
+cullactivo CullBarras on
+cullvisibles 2 2

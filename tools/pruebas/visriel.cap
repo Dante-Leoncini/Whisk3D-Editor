@@ -1,0 +1,9 @@
+count 4
+# RIEL de la prueba visriel: 4 nodos en linea sobre X, en ESPACIO DEL MOTOR
+# (cabecera `ejes x y z`). Cada nodo del riel corresponde a una CELDA del
+# `.w3dvis` (celda = 1 + floor(indice fraccionario)).
+ejes x y z
+p 0.0 2.0 8.0
+p 2.0 2.0 8.0
+p 4.0 2.0 8.0
+p 6.0 2.0 8.0

@@ -1,0 +1,15 @@
+count 3
+# EL MISMO riel, declarado en el ESPACIO DEL MOTOR. La cabecera `ejes` dice en
+# que mano viene autoreado el archivo:
+#     ejes x y z    -> tal cual (lo que escribe cualquier autor del motor)
+#     ejes x y -z   -> con la Z espejada (el default legacy, sin cabecera)
+# Los tres nodos son los del riel-a en x = 0, 2, 4, con la MISMA z = 3: aca se
+# leen en z = +3 y en riel-a.cap (sin cabecera) en z = -3. El canal 'r' de
+# mirada sufre el mismo espejo, asi que un yaw 0 mira a -Z en los dos casos.
+ejes x y z
+p 0.0 5.0 3.0
+r 0.0 0.0 0.0
+p 2.0 5.0 3.0
+r 0.0 0.0 0.0
+p 4.0 5.0 3.0
+r 0.0 0.0 0.0

@@ -1,0 +1,27 @@
+# Prueba de COLOR y ALPHA de las particulas: una particula grande y quieta con la
+# textura de 4 cuadrantes, renderizada de verdad y leida con glReadPixels (partpx).
+# Correr DESDE ESTA CARPETA:
+#   cd <motor>/tools/pruebas
+#   ../../platform/linux/build/whisk3d --script prueba_particulas_color.w3s
+# MEZCLA ALPHA (aditivo:false): cada cuadrante opaco sale con SU color exacto y el
+# cuadrante transparente deja ver el FONDO. MEZCLA ADITIVA (aditivo:true): el rojo
+# suma sobre el fondo (fondomas) y el transparente no suma nada (fondo).
+abrirw3d prueba_particulas_color.w3d
+simplay 1
+partinfo EmisorAlpha 1 1
+partinfo EmisorAditivo 1 1
+# uv v=0 es la PRIMERA fila del PNG (arriba): (0.25, 0.25) = cuadrante rojo
+partpx EmisorAlpha 0.25 0.25 255 0 0
+partpx EmisorAlpha 0.75 0.25 0 255 0
+partpx EmisorAlpha 0.25 0.75 0 0 255
+partpx EmisorAlpha 0.75 0.75 fondo
+partpx EmisorAditivo 0.25 0.25 fondomas 255 0 0
+partpx EmisorAditivo 0.75 0.25 fondomas 0 255 0
+partpx EmisorAditivo 0.75 0.75 fondo
+# ORDEN GLOBAL back-to-front ENTRE emisores: el cuadrante azul del emisor de
+# adelante (alpha 0.5) tiene que MEZCLAR sobre el rojo opaco del de atras
+# (127, 0, 127). Si el orden fuera por emisor (o al reves), el rojo opaco
+# pisaria y daria (255, 0, 0). El transparente de adelante deja ver el rojo.
+vporbita 30 0 0 8
+partpx EmisorAdelante 0.25 0.75 127 0 127 16
+partpx EmisorAdelante 0.75 0.75 255 0 0 16

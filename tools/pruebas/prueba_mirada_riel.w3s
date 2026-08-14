@@ -1,0 +1,84 @@
+# ===========================================================================
+#  MODO DE MIRADA DE LA CAMARA: la rotacion AUTORAL del nodo del riel
+#
+#  EL PROBLEMA. `Camera::UpdateLookAt` siempre apuntaba al target. El juego
+#  original, en cambio, grababa la mirada NODO POR NODO del riel (yaw/pitch/roll
+#  + fov, docs/04 6): el port la re-calculaba con look-at, asi que el yaw se
+#  apartaba ~6.5 grados del original y ademas OSCILABA con el desplazamiento
+#  lateral del personaje -- algo que el original no hace, porque su mirada no
+#  depende de donde este Crash dentro del corredor.
+#
+#  LO NUEVO. Un .cap puede intercalar, despues de cada "p x y z":
+#      r <pitch> <yaw> <roll>    grados
+#      f <fov>                   grados, vertical
+#  y la camara toma esa rotacion (interpolada entre nodo y nodo POR ARCO CORTO)
+#  en vez de mirar al target. Se prende con `miradaRiel: true` en el .w3d, con
+#  `setMiradaRiel(camara, true)` en lua, o con `camriel mirada riel` aca.
+#  POR DEFAULT ESTA APAGADO: sin la palabra, todo se comporta como siempre.
+#
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_mirada_riel.w3s
+# ===========================================================================
+
+abrirw3d prueba_mirada_riel.w3d
+
+# --- 1) el .w3d de TEXTO trae el modo prendido y el riel trae rotacion -------
+camriel mirada riel es riel
+
+# --- 2) LA MIRADA SALE DEL NODO, no del target ------------------------------
+# forward = (-sin yaw * cos pitch, sin pitch, cos yaw * cos pitch)
+# nodo 0: pitch -30, yaw 0 -> mira de frente (+Z) y 30 grados hacia abajo.
+# El target ("Mira") esta en (4, 5, 0) y la camara en (0, 5, 0): un look-at
+# apuntaria a +X, o sea (1,0,0). Que de (0,-0.5,0.866) es la prueba de que
+# manda el riel.
+camriel nodo 0
+camriel pos 0 5 0 0.001
+camriel mira 0.0 -0.5 0.86603 0.002
+# y el LENTE tambien es del nodo (linea 'f'), no el 45 que declara la camara
+camriel fov 60.0 0.01
+
+# nodo 1: pitch 0, yaw 90 -> mira al horizonte, hacia -X
+camriel nodo 1
+camriel mira -1.0 0.0 0.0 0.002
+camriel fov 90.0 0.01
+
+# --- 3) INTERPOLACION entre nodos, y por ARCO CORTO --------------------------
+# nodo 0.5: pitch -15, yaw 45 -> (-0.683, -0.259, 0.683). Si no interpolara,
+# daria el valor de alguno de los dos extremos.
+camriel nodo 0.5
+camriel mira -0.68301 -0.25882 0.68301 0.002
+camriel fov 75.0 0.01
+# nodo 2.5: yaw 179 -> -179. POR ARCO CORTO el medio es 180 (giro de 2 grados);
+# un lerp lineal del crudo daria yaw 0 y la camara pegaria media vuelta -> el
+# forward saldria (0,0,+1) en vez de (0,0,-1). Este es EL assert del arco corto.
+camriel nodo 2.5
+camriel mira 0.0 0.0 -1.0 0.002
+
+# --- 4) EL DEFAULT NO CAMBIO: en modo target manda el look-at ---------------
+# mismo nodo 0, misma escena: apagando el modo, la camara vuelve a mirar al
+# target (4,5,0) desde (0,5,0), o sea +X.
+camriel mirada target es target
+camriel nodo 0
+camriel mira 1.0 0.0 0.0 0.002
+# el fov ya no lo pisa el riel: se queda en el ultimo que quedo puesto
+camriel mirada riel es riel
+camriel nodo 0
+camriel fov 60.0 0.01
+
+# --- 5) SOBREVIVE AL GUARDADO (contenedor v4) -------------------------------
+guardarw3d prueba_mirada_riel_v4.w3d
+abrirw3d prueba_mirada_riel_v4.w3d
+camriel nodo 0
+camriel mira 0.0 -0.5 0.86603 0.002
+# (sin tocar nada: el modo vino del archivo)
+camriel mirada riel es riel
+
+# --- 6) DESDE LUA: setMiradaRiel / rielDe ------------------------------------
+# mirada_riel.lua lee el modo con rielDe(), lo apaga con setMiradaRiel(cam,false),
+# lo vuelve a leer y lo deja prendido. Las tres lecturas van al mapa compartido.
+abrirw3d prueba_mirada_riel.w3d
+simplay 1
+scriptinfo compartido rielNodos hay
+scriptinfo compartido miradaAntes si
+scriptinfo compartido miradaDespues no
+scriptinfo compartido miradaFinal si

@@ -1,0 +1,62 @@
+// ==========================================================================
+//  PRUEBA del RECORTE DEL REFLEJO POR EL PLANO DEL ESPEJO (formato texto).
+//  La corre prueba_espejo_corte.w3s.
+//
+//  Reporte del dueno: "el recorte del reflejo esta mal y sale a traves del
+//  agua. cuando [el personaje] queda acostado en el agua, la espalda del
+//  reflejo se ve por encima del [personaje] original en vez de ser recortado."
+//
+//  EL CASO: un cuerpo MEDIO SUMERGIDO. La reflexion manda Y -> 2*plano - Y, o
+//  sea que la parte que esta BAJO el agua se refleja HACIA ARRIBA y sale al
+//  aire. El estencil no puede cortar eso: el estencil recorta por la SILUETA
+//  DEL AGUA EN PANTALLA, y esa imagen cae justo adentro de la silueta.
+//
+//  OJO: en el .w3d de TEXTO la vertical se llama `z` y la profundidad `y`.
+//  Coordenadas de MUNDO (X, Y arriba, Z profundidad):
+//     superficie del agua (translucida) en Y = 0.5, rect X[-3,3] Z[-3,3]
+//     fondo del estanque (OPACO, azul)  en Y = 0.4
+//     PosteCruza  rojo     de Y=-0.5 a Y=0.7  <- A CABALLO del plano del agua
+//        su mitad SUMERGIDA (Y -0.5..0.5) se refleja a Y 0.5..1.5, o sea EN EL
+//        AIRE y por encima del cuerpo real: eso es lo que hay que recortar.
+//     PosteSeco   amarillo de Y=1.0 a Y=2.0   <- control: entero fuera del agua,
+//        su reflejo cae entero BAJO el plano y tiene que seguir viendose.
+// ==========================================================================
+Whisk3D {
+    version: 20251127
+    Escena {
+        background: "0.05, 0.05, 0.08, 1.0"
+
+        Camera {
+            name: "Camara"
+            fov: 60.0
+            y: -7.0
+            z: 3.2
+            rotX: -18.0
+        }
+
+        // el fondo del estanque va HONDO (Y = -1.5) a proposito: con el fondo
+        // pegado a la superficie (como en prueba_espejo_z) taparia la mitad
+        // sumergida del poste y no habria nada que medir.
+        Wavefront { name: "FondoEstanque" filePath: espejo-piso.obj z: -1.5 scale: 6.0 }
+
+        // a caballo del plano: 1x1 escalado 1.2 -> +-0.6 alrededor de Y = 0.1
+        Wavefront { name: "PosteCruza" filePath: espejo-poste.obj  x: 0.0  z: 0.1 scale: 1.2 }
+        // control: entero por encima del agua
+        Wavefront { name: "PosteSeco"  filePath: espejo-poste2.obj x: -2.2 z: 1.5 }
+
+        Mirror {
+            name: "CorteEspejo"
+            targets: "PosteCruza, PosteSeco"
+            mirrorX: false
+            mirrorY: true
+            mirrorZ: false
+            limiteIzquierdo: -3.0
+            limiteDerecho: 3.0
+            limiteFondo: -3.0
+            limiteFrente: 3.0
+            z: 1.0
+        }
+
+        Wavefront { name: "Agua" filePath: espejo-lamina.obj z: 0.5 scale: 6.0 }
+    }
+}

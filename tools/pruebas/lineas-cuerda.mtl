@@ -1,0 +1,7 @@
+# material de la cuerda: color ABSOLUTO (NoLight) + LINEAS con grosor 6 px.
+# `lineas [grosor]` es la palabra nueva del .mtl: dibuja las aristas de la
+# malla con glLineWidth ademas del relleno (aca no hay relleno: tira degenerada).
+newmtl cuerda
+Kd 1.0 0.2 0.1
+NoLight
+lineas 6

@@ -1,0 +1,59 @@
+// ==========================================================================
+//  PRUEBA sintetica de la VISIBILIDAD POR NODO DEL RIEL, punta a punta.
+//  La corre prueba_visriel.w3s; el cable vive en visriel_componente.lua.
+//
+//  La camara viaja por un riel de 4 nodos (visriel.cap). El motor publica el
+//  INDICE FRACCIONARIO del nodo donde la camara quedo parada (5to valor de
+//  rielDe); el componente se lo entrega a la VisZona modo curva con
+//  setVisCurvaT y la playlist del `.w3dvis` (vis-tris.w3dvis: 4 celdas,
+//  c1=[0,1] c2=[2,0,1] c3=[2,3] c4=[3,2]) decide QUE TRIANGULOS se dibujan.
+//  "Jugador" es el target de la camara: moverlo con objpos simula recorrer el
+//  nivel, y los triangulos aparecen/desaparecen NODO A NODO como manda la
+//  lista.
+// ==========================================================================
+Whisk3D {
+    version: 20251127
+    Escena {
+        background: "0.2, 0.2, 0.25, 1.0"
+
+        Curve { name: "RielVis" filePath: visriel.cap }
+
+        Collection {
+            name: "Jugador"
+            x: 0.0
+            y: 0.0
+            z: 0.0
+        }
+
+        Camera {
+            name: "Camara"
+            fov: 45.0
+            target: "Jugador"
+            riel: "RielVis"
+            offsetRiel: 0
+        }
+
+        VisZona {
+            name: "Zona"
+            modo: "curva"
+            objetivo: "MallaVis"
+        }
+
+        Wavefront {
+            name: "MallaVis"
+            filePath: vis-tris.obj
+            script: "visriel_componente.lua"
+            ref_cam: "Camara"
+            ref_zona: "Zona"
+            CullingTri {
+                metodo: "celdas"
+                celda: 1
+            }
+        }
+    }
+    // un solo viewport, sin piso/ejes: los asserts por pixel comparan contra el
+    // FONDO vacio y una linea de la grilla justo ahi los ensuciaria
+    Layout {
+        Viewport3D { showFloor: false showXaxis: false showYaxis: false }
+    }
+}

@@ -1,0 +1,29 @@
+// ==========================================================================
+//  PRUEBA del ORDEN DE TRANSPARENTES del override de visibilidad (E3).
+//  La usa prueba_visorden.w3s: MallaOrden importa vis-dos.obj (4 tris, 2
+//  materiales: 0-1 opacos, 2-3 transparentes) con su dato vis-dos.w3dvis
+//  (playlist K=1 ORDENADA, 3 celdas). El CullingTri en metodo "celdas" arma
+//  los opacos agrupados + los transparentes como pvsRuns en el orden de la
+//  lista (el orden del pintor precalculado).
+// ==========================================================================
+Whisk3D {
+    version: 20251127
+    Escena {
+        background: "0.2, 0.2, 0.25, 1.0"
+
+        Camera {
+            name: "Camara"
+            y: -8.0
+            z: 2.0
+        }
+
+        Wavefront {
+            name: "MallaOrden"
+            filePath: vis-dos.obj
+            CullingTri {
+                metodo: "celdas"
+                celda: 1
+            }
+        }
+    }
+}

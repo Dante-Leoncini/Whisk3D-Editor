@@ -1,0 +1,24 @@
+count 5
+# Riel de juguete para prueba_mirada_riel.w3s: 5 nodos en linea sobre X, a 5 de
+# altura, con el canal de MIRADA AUTORAL ("r pitch yaw roll", grados) y el de
+# LENTE ("f fov"). Los valores estan elegidos para que cada assert distinga UNA
+# cosa; ver el .w3s.
+#   0: mira 30 grados HACIA ABAJO, de frente (+Z)
+#   1: mira al horizonte, girada 90 grados (hacia -X)
+#   2 y 3: yaw 179 y -179 -> el punto medio es 180 (cruce del wrap), no 0
+#   4: igual que el 3, para que el ultimo tramo no interpole
+p 0.0 5.0 0.0
+r -30.0 0.0 0.0
+f 60.0
+p 2.0 5.0 0.0
+r 0.0 90.0 0.0
+f 90.0
+p 4.0 5.0 0.0
+r 0.0 179.0 0.0
+f 90.0
+p 6.0 5.0 0.0
+r 0.0 -179.0 0.0
+f 90.0
+p 8.0 5.0 0.0
+r 0.0 -179.0 0.0
+f 90.0

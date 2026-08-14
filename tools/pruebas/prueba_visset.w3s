@@ -1,0 +1,19 @@
+# Prueba de VisSet: el DATO de visibilidad por triangulo del Core
+# (libs/Whisk3DCore/objects/VisSet.*, spec congelado en formato/w3dvis.md).
+# Correr DESDE ESTA CARPETA:
+#   cd <motor>/tools/pruebas
+#   ../../platform/linux/build/whisk3d --script prueba_visset.w3s
+#
+# vissettest hace la regresion completa en C++:
+#   1. playlist sintetica CON ORDEN (23 celdas, K=5, celda vacia incluida)
+#      -> Guardar -> archivo prueba_visset_rt.w3dvis -> CargarW3dvis
+#      -> Decodificar de TODAS las celdas == las listas de origen;
+#   2. Delta ida (0..22) y vuelta (22..0) == Decodificar en cada paso: la
+#      reversibilidad (REMOVE re-insertable / ADD invertible) que garantiza el
+#      formato con sus ops con payload;
+#   3. round-trip byte a byte (lo que escribe el motor re-carga identico);
+#   4. las mismas listas como BITSET (RLE de palabras): mismos sets, orden
+#      ascendente;
+#   5. el sidecar legacy pvs-tris.pvs.json -> DesdeListas == sus sectores
+#      (la entrada vieja no muere nunca).
+vissettest pvs-tris.pvs.json

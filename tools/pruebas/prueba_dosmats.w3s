@@ -1,0 +1,84 @@
+# ===========================================================================
+#  REGRESION DEL CONTENEDOR v4: un .mtl con VARIOS materiales y map_Kd RELATIVO
+#
+#  El sintoma (Toad Village, 2026-08): al guardar el contenedor se perdian las
+#  texturas de 7 materiales. Sus rutas quedaban anotadas en EXTERNOS.txt como
+#  "ext:texturas/caballero.png ... FALTA" cuando el png vive en
+#  modelos/enemigos/. loadtex bajaba de 47/48 a 40/48 al reabrir.
+#
+#  La causa NO era la ruta relativa del .mtl (LeerMTL siempre resuelve contra
+#  el directorio del .mtl, para todos los materiales). Era el ESCRITOR v4:
+#  Ingerir() deja la ruta que le pasan con el NOMBRE DE ENTRADA, y ese
+#  std::string esta COMPARTIDO -- el cache de texturas por ruta le da UN solo
+#  Texture* a todos los materiales que nombran la misma imagen. Asi que el
+#  segundo material del .mtl entraba con "texturas/dosmats.png" ya reescrito:
+#  no matcheaba el cache 'yaResueltas' (indexado por la ruta ORIGINAL), no
+#  habia contenedor viejo donde mirar (primer guardado desde el .w3d de texto)
+#  y ReadFileBytes no encuentra "texturas/..." en disco -> referencia externa
+#  que FALTA. Del SEGUNDO material en adelante, textura perdida.
+#
+#  Los assets: dosmats.mtl declara CUATRO materiales; los dos primeros con el
+#  MISMO `map_Kd dosmats.png` (relativo a esta carpeta, que no es texturas/),
+#  el tercero con otra imagen y el cuarto SIN map_Kd a proposito.
+#
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_dosmats.w3s
+# ===========================================================================
+
+# --- 1) EN EL ORIGEN: los 3 primeros cargan, el cuarto no nombra ninguna ----
+abrirw3d prueba_dosmats.w3d
+loadtex contex 3
+loadtex sintex 1
+loadtex rotas 0
+mattex dosmats        dosmats.png
+mattex dosmats-sombra dosmats.png
+mattex dosmats-otra   dosmats-b.png
+mattex dosmats-sintex NADA
+
+# --- 2) GUARDAR EL CONTENEDOR v4 -------------------------------------------
+# Al guardar, cada imagen entra al zip y la ruta en memoria pasa a ser el
+# NOMBRE DE ENTRADA. Los dos materiales que comparten imagen tienen que quedar
+# los dos apuntando a la MISMA entrada (dedup por contenido), no uno adentro y
+# el otro colgado afuera.
+guardarw3d prueba_dosmats_v4.w3d
+mattex dosmats        texturas/dosmats.png
+mattex dosmats-sombra texturas/dosmats.png
+mattex dosmats-otra   texturas/dosmats-b.png
+mattex dosmats-sintex NADA
+
+# --- 3) REABRIR EL v4: NINGUNA textura se perdio ----------------------------
+# Con el bug, 'dosmats-sombra' volvia SIN textura: su ref decia
+# "ext:texturas/dosmats.png", ese archivo no existe, y el material quedaba
+# PIDIENDO una imagen que no carga -> `rotas` > 0. Ese es el assert clave.
+# (los materiales del proyecto anterior siguen vivos en la lista global -- por
+#  eso aca se cuenta 'rotas', que no depende de cuantos haya, y no 'contex')
+abrirw3d prueba_dosmats_v4.w3d
+loadtex rotas 0
+# el decal sin map_Kd sigue siendo un decal de verdad (no se lo comio nada)
+matflags dosmats-sombra decal
+matflags dosmats-sintex decal
+
+# --- 4) ROUND-TRIP: re-guardar da LOS MISMOS BYTES --------------------------
+# Se comparan las entradas que este bug rompia: las TEXTURAS (las dos imagenes
+# adentro, ni una de menos) y EXTERNOS.txt (con el bug, el primer guardado lo
+# llenaba de "ext:texturas/dosmats.png ... FALTA" y el segundo ya no, asi que
+# los dos archivos diferian). El resto del zip no se compara EN ESTE PROCESO:
+# ReiniciarEscena no poda `Materials` (limitacion conocida, documentada en
+# import_w3d.cpp), asi que reabrir un proyecto en la MISMA corrida renombra sus
+# materiales a ".001" y el proyecto.json cambia por eso, no por el contenedor.
+# El round-trip byte a byte del proyecto ENTERO lo cubre tools/empaquetar_w3d.py,
+# que reabre en un proceso FRESCO.
+guardarw3d prueba_dosmats_rt.w3d
+w3diguales prueba_dosmats_v4.w3d prueba_dosmats_rt.w3d texturas/
+w3diguales prueba_dosmats_v4.w3d prueba_dosmats_rt.w3d EXTERNOS.txt
+
+# --- 5) y una vuelta mas: el resultado se estabiliza ------------------------
+abrirw3d prueba_dosmats_rt.w3d
+loadtex rotas 0
+guardarw3d prueba_dosmats_rt2.w3d
+w3diguales prueba_dosmats_v4.w3d prueba_dosmats_rt2.w3d texturas/
+w3diguales prueba_dosmats_v4.w3d prueba_dosmats_rt2.w3d EXTERNOS.txt
+# y dos guardados seguidos del MISMO estado son identicos ENTEROS (el escritor
+# es deterministico: es lo que hace posible el round-trip)
+guardarw3d prueba_dosmats_rt3.w3d
+w3diguales prueba_dosmats_rt2.w3d prueba_dosmats_rt3.w3d

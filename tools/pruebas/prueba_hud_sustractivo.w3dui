@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "nombre": "PruebaHudSustractivo",
+  "ventana": {
+    "igualQueRender": true,
+    "ancho": 640,
+    "alto": 480,
+    "escalaGlobal": 1,
+    "color": [0, 0, 0, 0]
+  },
+  "paleta": "",
+  "paletas": [],
+  "hijos": [
+    {
+      "tipo": "imagen",
+      "nombre": "IconoAnim",
+      "pos": [0.15, 0.15, 0],
+      "ancla": 5,
+      "textura": "texturas/rojo.png",
+      "modo": 0,
+      "usarAlpha": true,
+      "ancho": 48,
+      "alto": 48,
+      "tamModo": 1,
+      "hijos": []
+    }
+  ]
+}

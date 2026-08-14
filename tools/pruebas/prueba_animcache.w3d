@@ -1,0 +1,44 @@
+// ==========================================================================
+//  PRUEBA de los FRAMES COMPARTIDOS de las vertex anims (AnimDatos).
+//  La corre prueba_animcache.w3s.
+//
+//  DOS Wavefront del mismo .obj (noMerge: el render-vert es la linea 'v', asi
+//  los cuadros anim-cubo-f1/f2.obj de 8 verts aplican 1:1) que declaran la
+//  MISMA Animation { basePath }: antes eran DOS juegos completos de frames en
+//  el heap; ahora el primero registra y el segundo adopta (+1 ref).
+//
+//  OJO: en el .w3d de TEXTO la vertical se llama `z` y la profundidad `y`.
+// ==========================================================================
+Whisk3D {
+    version: 20251127
+    Escena {
+        background: "0.05, 0.05, 0.05, 1.0"
+
+        Camera {
+            name: "Camara"
+            fov: 60.0
+            y: -8.0
+            z: 0.0
+        }
+
+        Wavefront {
+            name: "AniA"
+            filePath: espejo-cubo-rojo.obj
+            noMerge: true
+            x: -3.2 y: 0.0 z: 0.0
+            script: "animcache_componente.lua"
+            ref_a: "AniA"
+            ref_b: "AniB"
+            Animation { name: "base" basePath: anim-cubo-f frames: 1 padding: 0 }
+            Animation { name: "mov"  basePath: anim-cubo-m frames: 1 padding: 0 }
+        }
+        Wavefront {
+            name: "AniB"
+            filePath: espejo-cubo-rojo.obj
+            noMerge: true
+            x: 3.2 y: 0.0 z: 0.0
+            Animation { name: "base" basePath: anim-cubo-f frames: 1 padding: 0 }
+            Animation { name: "mov"  basePath: anim-cubo-m frames: 1 padding: 0 }
+        }
+    }
+}

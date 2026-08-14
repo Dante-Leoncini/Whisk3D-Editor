@@ -1,0 +1,28 @@
+# DOS TRIANGULOS QUE SE TOCAN EN LA DIAGONAL, con COLOR POR VERTICE distinto a
+# cada lado. Los vertices 1 y 4 estan en la MISMA posicion, y los 3 y 5 tambien:
+# son control-points DISTINTOS parados en el mismo punto del espacio, porque un
+# vertice es unico por posicion + color + UV y fusionarlos rompería el sombreado.
+# Eso es una costura, y es lo normal en cualquier modelo texturado de verdad.
+#
+# El sidecar costura-quad.grupos.json mete en el grupo los control-points 0 y 2,
+# o sea el lado ROJO de la costura. Los pesos se guardan POR POSICION en el
+# .w3dm, asi que al recargar tienen que llegar a los CUATRO render-verts de esas
+# dos posiciones -- los rojos y los azules -- no solo a uno de cada par.
+mtllib costura-quad.mtl
+o CosturaQuad
+v -1 0 -1 1.0 0.0 0.0
+v  1 0 -1 1.0 0.0 0.0
+v  1 0  1 1.0 0.0 0.0
+v -1 0 -1 0.0 0.0 1.0
+v  1 0  1 0.0 0.0 1.0
+v -1 0  1 0.0 0.0 1.0
+vt 0.0 0.0
+vt 1.0 0.0
+vt 1.0 1.0
+vt 0.0 0.0
+vt 1.0 1.0
+vt 0.0 1.0
+vn 0 1 0
+usemtl costura-quad
+f 1/1/1 2/2/1 3/3/1
+f 4/4/1 5/5/1 6/6/1

@@ -1,0 +1,58 @@
+# ==========================================================================
+#  MATERIAL CON LINEAS (Material::lineas + grosorLinea), POR PIXELES.
+#  Correr DESDE ESTA CARPETA:
+#    cd <motor>/tools/pruebas
+#    ../../platform/linux/build/whisk3d --script prueba_mat_lineas.w3s
+#
+#  La "Cuerda" es una POLILINEA declarada como tira degenerada (triangulos de
+#  area cero): el relleno no pinta nada y `lineas 6` del .mtl hace que las
+#  aristas dibujen el CAMINO con glLineWidth = 6, del color ABSOLUTO del
+#  material (NoLight -> el pixel es el Kd exacto: 255,51,25).
+#  Camino: (-3,-2) -> (-1,2) -> (1,2) -> (3,-2); el tramo del medio es
+#  HORIZONTAL (z = 2): sirve para medir el GROSOR con un punto a 0.02 u del
+#  eje de la linea (~2 px: adentro con grosor 6, afuera con grosor 1).
+#  Vista de arriba (vporbita pitch 90), fondo de escena = 13,13,13.
+# ==========================================================================
+abrirw3d prueba_mat_lineas.w3d
+loadtex
+vpvista material
+vporbita 0 0 0 12 90 0
+
+# el .mtl (formato de texto) dejo el material con lineas + grosor 6
+matflags cuerda
+
+# --- 1) EL CAMINO SE DIBUJA: el punto medio de cada tramo es la linea roja
+escenapx -2 0 0 es 255 51 25 10
+escenapx  0 0 2 es 255 51 25 10
+escenapx  2 0 0 es 255 51 25 10
+# ...y el "interior" del triangulo degenerado NO pinta nada (no hay relleno)
+escenapx -2 0 1.5 es 13 13 13 8
+
+# --- 2) EL GROSOR ES REAL: a 0.02 u (~2 px) del eje del tramo horizontal,
+#     con grosor 6 (mitad ~3 px) el pixel sigue siendo linea...
+escenapx 0 0 2.02 es 255 51 25 10
+# ...con grosor 1 ya es fondo (la linea quedo de 1 px), y el eje sigue pintado
+# (con 1 px de grosor el multisample reparte la cobertura: se pide "no fondo",
+#  no el color pleno)
+matflags cuerda set lineas 1
+escenapx 0 0 2.02 es 13 13 13 8
+escenapx 0 0 2 noes 13 13 13 30
+# apagar el checkbox apaga el trazo entero
+matflags cuerda set nolineas
+escenapx 0 0 2 es 13 13 13 8
+# y volver a prenderlo con grosor 6 lo trae de vuelta (los setters del harness
+# son la misma logica que el checkbox Lines + Line Width del panel)
+matflags cuerda set lineas 6
+escenapx 0 0 2 es 255 51 25 10
+
+# --- 3) ROUND-TRIP v4: lineas + grosorLinea viajan en el proyecto.json
+guardarw3d prueba_mat_lineas_v4.w3d
+abrirw3d prueba_mat_lineas_v4.w3d
+loadtex
+vpvista material
+vporbita 0 0 0 12 90 0
+matflags cuerda
+escenapx  0 0 2 es 255 51 25 10
+escenapx  0 0 2.02 es 255 51 25 10
+# (el layout reabierto trae la grilla del piso: el punto vacio esquiva sus lineas)
+escenapx -1.8 0 1.2 es 13 13 13 8

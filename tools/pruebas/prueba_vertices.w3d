@@ -1,0 +1,38 @@
+// ==========================================================================
+//  PRUEBA sintetica de los VERTICES POR GRUPO desde lua (sidecar .grupos.json
+//  + binds grupoVertices/verticePos/setVertices/setVerticeColor + vertinfo).
+//  La usa prueba_vertices.w3s:
+//   - QuadAgua importa vertices-quad.obj (CON merge): el sidecar
+//     vertices-quad.grupos.json crea el VertexGroup "punta" (lineas v 2 y 3)
+//     y el mapeo render->control-point queda en vertCtrlPoint.
+//   - QuadCrudo importa el MISMO obj con noMerge (mapeo 1:1).
+//   - prueba_vertices.lua mueve el grupo con setVertices (batch) y lo tine de
+//     rojo; el .w3s verifica con vertinfo + scriptinfo compartido.
+// ==========================================================================
+Whisk3D {
+    version: 20251127
+    Escena {
+        background: "0.2, 0.2, 0.25, 1.0"
+
+        Camera {
+            name: "Camara"
+            y: -8.0
+            z: 2.0
+        }
+
+        Wavefront {
+            name: "QuadAgua"
+            filePath: vertices-quad.obj
+            script: "prueba_vertices.lua"
+            ref_malla: "QuadAgua"
+            val_dx: "2"
+        }
+
+        Wavefront {
+            name: "QuadCrudo"
+            filePath: vertices-quad.obj
+            noMerge: true
+            x: 3.0
+        }
+    }
+}

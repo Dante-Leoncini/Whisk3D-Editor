@@ -1,0 +1,11 @@
+# Cuadro de vertex anim para prueba_animcache (8 lineas 'v', paralelo al
+# espejo-cubo-rojo.obj importado con noMerge: render-vert == linea 'v').
+o anim-cubo-f1
+v -1.5000 -1.5000 -1.5000
+v 1.5000 -1.5000 -1.5000
+v 1.5000 -1.5000 1.5000
+v -1.5000 -1.5000 1.5000
+v -1.5000 1.5000 -1.5000
+v 1.5000 1.5000 -1.5000
+v 1.5000 1.5000 1.5000
+v -1.5000 1.5000 1.5000

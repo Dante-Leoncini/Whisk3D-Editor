@@ -1,0 +1,83 @@
+# ==========================================================================
+#  VISIBILIDAD POR NODO CON VARIOS RIELES (multi-riel de la VisZona).
+#  Correr DESDE ESTA CARPETA:
+#    cd <motor>/tools/pruebas
+#    ../../platform/linux/build/whisk3d --script prueba_visrielmulti.w3s
+#
+#  EL BUG QUE TAPA (reportado en un juego real): el juego cambia la camara de
+#  riel (pueblo <-> elevador <-> bonus) con setRiel, pero la playlist de celdas
+#  de cada malla esta indexada por los nodos de UN solo riel. Aplicarle el
+#  indice de OTRO riel recorta cualquier cosa ("el culling del escenario
+#  parece fallar desde el riel de la plataforma de bonus"), y congelar la
+#  ultima celda deja el recorte del punto de partida pegado media pantalla.
+#  Ahora la zona declara `riel:` y, con la camara en otro riel, cae a su
+#  `fallback:` declarado; al volver salta DIRECTO a la celda del nodo.
+#
+#  Celdas de vis-tris.w3dvis (1-based): 1=[t0,t1] 2=[t2,t0,t1] 3=[t2,t3]
+#  4=[t3,t2]. celda = 1 + floor(indice). Zona -> MallaVis (fallback completa,
+#  identificador por bind); ZonaSec -> MallaSec (fallback celda 1, decide el
+#  riel de la Camera activa).
+# ==========================================================================
+abrirw3d prueba_visrielmulti.w3d
+loadtex
+vporbita 0 0 0 12 90 0
+
+# estado de arranque: celda declarada 1 -> [t0, t1]
+visinfo MallaVis 4 1 2
+visinfo MallaSec 4 1 2
+
+activename Jugador
+
+# --- EN EL RIEL PROPIO la playlist manda, como siempre ---------------------
+# (el indice lo hornea la camara al dibujar: bench 1 antes del simplay)
+objpos 0 0 5
+bench 1 noswap
+simplay 6
+scriptinfo compartido vrm_riel RielVis
+visinfo MallaVis 4 1 2
+visinfo MallaSec 4 1 2
+
+# mitad de camino entre el nodo 2 y el 3 -> indice 2.50, celda 3 = [t2, t3]
+objpos 5 0 5
+bench 1 noswap
+simplay 6
+scriptinfo compartido vrm_indice 2.50
+visinfo MallaVis 4 3 2
+visinfo MallaSec 4 3 2
+
+# --- LA CAMARA SE VA A OTRO RIEL: el indice de ese riel NO indexa estas ----
+#     celdas. Zona (identificador del bind) cae a "completa"; ZonaSec (riel de
+#     la Camera activa) cae a su celda 1. NUNCA la playlist con indice ajeno.
+camriel set RielOtro
+camriel riel RielOtro
+bench 1 noswap
+simplay 4
+scriptinfo compartido vrm_riel RielOtro
+visinfo MallaVis 4 0 4
+visinfo MallaSec 4 1 2
+
+# --- VUELVE AL RIEL PROPIO: salto DIRECTO a la celda del nodo (un solo tick,
+#     sin pasear el stepper por celdas que nunca estuvieron activas) ---------
+camriel set RielVis
+camriel riel RielVis
+bench 1 noswap
+simplay 1
+scriptinfo compartido vrm_riel RielVis
+visinfo MallaVis 4 3 2
+visinfo MallaSec 4 3 2
+
+# --- ROUND-TRIP v4: riel y fallback de la VisZona viajan en el proyecto ----
+guardarw3d prueba_visrielmulti_v4.w3d
+abrirw3d prueba_visrielmulti_v4.w3d
+loadtex
+vporbita 0 0 0 12 90 0
+activename Jugador
+objpos 5 0 5
+bench 1 noswap
+simplay 6
+visinfo MallaVis 4 3 2
+camriel set RielOtro
+bench 1 noswap
+simplay 4
+visinfo MallaVis 4 0 4
+visinfo MallaSec 4 1 2

@@ -1,0 +1,103 @@
+// ==========================================================================
+//  PRUEBA de COLOR/ALPHA de las particulas (formato texto). La usa
+//  prueba_particulas_color.w3s: emite UNA particula grande y quieta con la
+//  textura de 4 cuadrantes (texturas/cuadrantes.png: rojo TL, verde TR, azul
+//  BL, TRANSPARENTE BR) y lee con glReadPixels (partpx) el color exacto de
+//  cada cuadrante dibujado, en mezcla ALPHA y en mezcla ADITIVA.
+//  El cubo texturado con vertex colors "ensucia" el estado de GL como una
+//  escena real (era la RAIZ del bug del humo verde: el pase de particulas
+//  heredaba ColorArray/estado del ultimo mesh dibujado).
+// ==========================================================================
+Whisk3D {
+    version: 20251127
+    Escena {
+        background: "0.2, 0.2, 0.25, 1.0"
+
+        Camera {
+            name: "Camara"
+            y: -8.0
+            z: 2.0
+        }
+
+        Wavefront {
+            name: "QuadEstado"
+            filePath: uvanim-quad.obj
+            x: 0.0
+            y: 6.0
+            z: -6.0
+        }
+
+        Particulas {
+            name: "EmisorAlpha"
+            x: -2.5
+            textura: "texturas/cuadrantes.png"
+            cantidad: 30.0
+            vida: 600.0
+            tam: 3.0
+            vel: 0.0
+            dispersion: 0.0
+            gravedad: 0.0
+            aditivo: false
+            color: "1, 1, 1, 1"
+            desvanecer: false
+            activo: true
+        }
+
+        Particulas {
+            name: "EmisorAditivo"
+            x: 2.5
+            textura: "texturas/cuadrantes.png"
+            cantidad: 30.0
+            vida: 600.0
+            tam: 3.0
+            vel: 0.0
+            dispersion: 0.0
+            gravedad: 0.0
+            aditivo: true
+            color: "1, 1, 1, 1"
+            desvanecer: false
+            activo: true
+        }
+
+        // --- el par para el ORDEN GLOBAL por profundidad (lejos de los otros dos):
+        //     "Atras" (rojo solido opaco, quad grande) mas lejos de la camara que
+        //     "Adelante" (cuadrantes al 50% de alpha). Bien ordenado, el cuadrante
+        //     azul de Adelante mezcla sobre el rojo (127, 0, 127); mal ordenado, el
+        //     rojo opaco de Atras pisa todo (255, 0, 0). Son EMISORES DISTINTOS y
+        //     Adelante esta ANTES en el arbol A PROPOSITO: dibujando por lista (sin
+        //     el orden global) el rojo pisaria al azul y la prueba fallaria. ---
+        Particulas {
+            name: "EmisorAdelante"
+            x: 30.0
+            y: 1.5
+            textura: "texturas/cuadrantes.png"
+            cantidad: 30.0
+            vida: 600.0
+            tam: 3.0
+            vel: 0.0
+            dispersion: 0.0
+            gravedad: 0.0
+            aditivo: false
+            color: "1, 1, 1, 0.5"
+            desvanecer: false
+            activo: true
+        }
+
+        Particulas {
+            name: "EmisorAtras"
+            x: 30.0
+            y: -1.5
+            textura: "texturas/rojo.png"
+            cantidad: 30.0
+            vida: 600.0
+            tam: 8.0
+            vel: 0.0
+            dispersion: 0.0
+            gravedad: 0.0
+            aditivo: false
+            color: "1, 1, 1, 1"
+            desvanecer: false
+            activo: true
+        }
+    }
+}

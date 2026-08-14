@@ -1,0 +1,84 @@
+# ==========================================================================
+#  PRUEBA POR PIXELES del objeto Mirror (reflejo en agua). Correr DESDE ESTA
+#  CARPETA:
+#    cd <motor>/tools/pruebas
+#    ../../platform/linux/build/whisk3d --script prueba_espejo.w3s
+#
+#  La escena esta descripta en prueba_espejo.w3d. Todos los colores son
+#  ABSOLUTOS (materiales 'NoLight'), asi que cada assert dice exactamente que
+#  tiene que haber en ese pixel:
+#     (128,   0, 127)  reflejo del CUBO ROJO     visto a traves del agua (50% azul)
+#     (128, 128, 127)  reflejo del CUBO AMARILLO visto a traves del agua
+#     ( 51,  26, 127)  agua sola sobre el fondo del estanque = SIN reflejo
+#     (  0, 178,   0)  la orilla = el reflejo se salio del agua
+#     (  0, 255, 255)  el puente = el reflejo se pinto sobre lo que esta delante
+#
+#  vporbita fija tambien los angulos: una prueba de pixeles no puede depender
+#  del layout guardado del usuario. vpvista material: si el viewport quedo en
+#  "Solid" sale todo gris plano y no se puede medir ningun color.
+# ==========================================================================
+abrirw3d prueba_espejo.w3d
+vpvista material
+vporbita 0 10 0 34 -30 0
+espejopx EspejoAgua info
+
+# --- 1) EL REFLEJO SE VE, aunque el fondo del estanque sea OPACO y este por
+#     encima de el. Es la raiz que 'sinProfundidad' no arreglaba: el material de
+#     la malla volvia a prender el z-test durante el pase del espejo y el
+#     reflejo, mas hondo que el fondo, no pasaba el test NUNCA (daba 51,26,127,
+#     o sea agua sobre fondo). ---
+espejopx EspejoAgua reflejo 0 13 -4 es 128 0 127 12
+
+# --- 2) EL AGUA VA ENCIMA: el reflejo esta TENIDO por la lamina semitransparente
+#     (128,0,127 = rojo al 50% + azul al 50%). Si el reflejo se dibujara despues
+#     del agua daria rojo puro (255,0,0). ---
+espejopx EspejoAgua reflejo 0 13 -4 noes 255 0 0 40
+
+# --- 3) MULTI-TARGET: el segundo objeto de la propiedad 'targets' tambien se
+#     refleja, con UN solo espejo. ---
+espejopx EspejoAgua reflejo -4.5 13 -4.5 es 128 128 127 12
+
+# --- 4) EL BORDE DEL RECTANGULO NO CORTA LA IMAGEN: el cubo se corre hasta el
+#     borde (x 3.7..6.7 con el limite en 6) y su reflejo se ve ENTERO, tambien
+#     la parte del cuerpo mas alla del borde -- un espejo refleja lo que esta al
+#     lado suyo: la imagen virtual en x=6.5 se ve porque el rayo del ojo cruza
+#     la SILUETA del agua. (Los planos de mundo que cortaban aca eran el bug del
+#     "reflejo que desaparece al saltar/en la orilla".) ---
+activename CuboRojo
+objpos 5.2 13 -4
+espejopx EspejoAgua reflejo 5.0 13 -4 es 128 0 127 12
+espejopx EspejoAgua reflejo 6.5 13 -4 es 128 0 127 12
+
+# --- 5) RECORTE A LA LAMINA VISIBLE (mascara de estencil): un punto del reflejo
+#     que caeria en pantalla MAS ALLA del borde cercano del agua se corta. Sin
+#     esto el reflejo se derrama sobre la orilla (se ve el "acuario de costado").
+objpos 5 13 5
+espejopx EspejoAgua reflejo 5 13 5 es 0 178 0 12
+#     ...y en el agua, a 10 cm del mismo borde, SI se ve.
+espejopx EspejoAgua mundo 5 10 5.9 es 128 0 127 12
+
+# --- 6) NADA DE PINTAR SOBRE LO QUE ESTA DELANTE: el puente cruza por encima
+#     del estanque; ahi el pixel tiene que seguir siendo el puente. Con el
+#     reflejo dibujado sin z-test y sin mascara, el reflejo lo tapaba. ---
+objpos 0 13 3
+espejopx EspejoAgua reflejo 0 13 3 es 0 255 255 12
+
+# --- 7) POR DEBAJO DE LA SUPERFICIE: con el cubo HUNDIDO (todo bajo el agua) su
+#     reflejo caeria ARRIBA del plano, flotando en el aire sobre el estanque. El
+#     plano de recorte lo corta: ahi se ve la orilla, no el reflejo. ---
+objpos 0 8 -4
+espejopx EspejoAgua reflejo 0 8 -4 es 0 178 0 12
+
+# --- 8) ROUND-TRIP v4: 'targets' y el espejo viejo de una sola 'target' tienen
+#     que sobrevivir guardar + reabrir (info imprime los targets vivos). ---
+guardarw3d prueba_espejo_v4.w3d
+abrirw3d prueba_espejo_v4.w3d
+espejopx EspejoAgua info
+espejopx EspejoViejo info
+vpvista material
+vporbita 0 10 0 34 -30 0
+# el guardado se llevo la ultima posicion del cubo (la del test 7): devolverlo
+activename CuboRojo
+objpos 0 13 -4
+espejopx EspejoAgua reflejo 0 13 -4 es 128 0 127 12
+espejopx EspejoAgua reflejo -4.5 13 -4.5 es 128 128 127 12
