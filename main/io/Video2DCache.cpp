@@ -12,6 +12,13 @@
 #include <vector>
 #include <string>
 
+#ifdef _WIN32
+// MSVC: popen/pclose se llaman _popen/_pclose (misma firma). Asi el cache de previews
+// por ffmpeg/ffprobe compila en Windows; si ffmpeg no esta, popen falla y se usan defaults.
+#define popen  _popen
+#define pclose _pclose
+#endif
+
 #ifndef _WIN32
 #include <time.h>
 unsigned W3dMsAhora() {
