@@ -8003,6 +8003,7 @@ void Properties::CambiarTab(int dir){
 // pestañas a las propiedades). Sin esto el foco quedaba en un grupo invisible
 // (ej: transforms cuando estas en Materiales) y la navegacion se rompia.
 void Properties::EntrarPrimerGrupoVisible(){
+    focoEnTabs = false;   // entrar a las filas: dejamos las pestanias
     for (size_t i = 0; i < GroupProperties.size(); i++){
         if (GroupProperties[i]->visible){
             selectIndex = (int)i;

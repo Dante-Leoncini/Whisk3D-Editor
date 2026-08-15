@@ -232,6 +232,11 @@ void LayoutCiclarViewportActivo(int dir) {
     viewPortActive = hojas[next];
     if (viewPortActive->isLeaf() && viewPortActive->ViewportKind() == 1)
         Viewport3DActive = (Viewport3D*)viewPortActive;
+    // al ENTRAR (verde) a un panel de Propiedades sin mouse: resetear al primer grupo visible + recentrar el
+    // scroll. Sin esto retoma en una fila vieja fuera de vista y las flechas parecen "no hacer nada" hasta
+    // llegar a las pestanias. EntrarPrimerGrupoVisible fija selectIndex, limpia focoEnTabs y recentra.
+    if (viewPortActive->isLeaf() && viewPortActive->ViewportKind() == 3)
+        ((Properties*)viewPortActive)->EntrarPrimerGrupoVisible();
 }
 
 // redimensiona el viewport ACTIVO en UN eje (dx!=0 izq/der; dy!=0 arr/ab).
