@@ -407,6 +407,7 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropButton* propJuegoOrient;    // desplegable: Todas / Solo vertical / Solo horizontal
         PropButton* propJuegoIcono;     // elegir el PNG (maxima definicion) del icono del juego
         PropButton* propJuegoAssets;    // desplegable: Sueltos (editables) / Empaquetados (protegidos)
+        PropButton* propJuegoUID;       // genera/muestra el UID3 de Symbian del juego (app propia)
         PropBool*   propJuegoFisica;    // checkbox: compilar CON el motor de fisica (default si)
         PropBool*   propJuegoSonido;    // checkbox: compilar CON el audio (default si)
         PropBool*   propJuegoDebug;     // checkbox: modo debug W3D_DEV_LOG=1 (default NO = produccion)
@@ -617,6 +618,7 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropBool*   propAjAntialias;
         PropButton* propAjBackend;  // dropdown del backend grafico
         PropButton* propAjSkin;     // dropdown del skin
+        PropText*   propAjRepo;     // raiz del repo para Compilar (editor instalado)
 
 #ifndef W3D_SYMBIAN
         void mouse_button_up(int boton) W3D_OVERRIDE;

@@ -250,62 +250,43 @@ void W3dLayoutBuild(CWhisk3D* aWhisk, TInt aWidth, TInt aHeight) {
     MenuPantallaH = aHeight;
 
 
-    TBool horizontal = (aWidth >= aHeight);
-
-    // LAYOUT FIJO: la orientacion (horizontal/vertical) elige el layout UNA SOLA VEZ, la PRIMERA
-    // (cuando gRoot todavia no existe). Despues, al ROTAR la pantalla o redimensionar, NO se rebuildea otro
-    // arbol distinto: se resize SIEMPRE el MISMO -> el viewport3D y los paneles no "saltan" de lugar al girar.
+    // el layout NO se rebuildea al rotar/redimensionar: se resize SIEMPRE el MISMO (asi los viewports no
+    // "saltan" de lugar). El tamano de pantalla elige el arbol UNA sola vez (la primera, sin gRoot todavia).
     if (gRoot) {
         gRoot->Resize(aWidth, aHeight);
         return;
     }
 
-    delete gRoot;
     gSplitterGrab = 0;
     viewPortActive = 0;
 
-    gView3D = new Viewport3D();
-    Viewport3DActive = gView3D;
-    gProps = new Properties();
-    // SIN outliner por defecto (Dante casi no lo usa y lo sacaba en cada arranque). El arbol arranca con SOLO
-    // 3D + Propiedades. gOutliner queda en 0 (todos sus usos lo chequean); si se quiere el outliner se agrega
-    // desde el menu del viewport (Split + cambiar tipo) y W3dLayoutRecolectar lo recupera.
-    gOutliner = 0;
-
-    if (horizontal) {
-        // pantalla horizontal: 3D a la izquierda | Propiedades a la derecha
-        gRoot = new ViewportRow(gView3D, gProps, 0.7f);
-        gRaizEsRow = ETrue;
-    } else {
-        // pantalla vertical (default N95): COLUMNA -> 3D arriba / Propiedades abajo
-        gRoot = new ViewportColumn(gView3D, gProps, 0.7f);
-        gRaizEsRow = EFalse;
-    }
-    gContHijo = 0; // arbol de 2 hojas: UN solo divisor (gContRaiz=gRoot). gContHijo se recalcula si se hace Split.
-    gContRaiz = gRoot;
-    gHorizontal = horizontal;
-
-    // el ruteo COMPARTIDO (LayoutInput) opera sobre rootViewport
-    rootViewport = gRoot;
-    // sin mouse, SIEMPRE hay un viewport activo (borde verde) por defecto:
-    // el 3D. La tecla verde de llamada lo cicla (W3dLayoutCiclarViewport).
-    if (!viewPortActive) viewPortActive = gView3D;
+    // hooks COMPARTIDOS del ruteo (LayoutInput opera sobre rootViewport)
     LayoutWarpMouse = W3dMouseWarp;
     LayoutArbolCambiado = W3dArbolCambiadoHook;
     LayoutImportObj = W3dImportObjMenu;        // Add > Import OBJ: el browser compartido
-    LayoutImportFbx = W3dImportFbxMenu;        // Add > Import FBX: idem (antes NULL -> el item no hacia nada)
-    LayoutImportGltf = W3dImportGltfMenu;      // Add > Imports > glTF: idem (antes NULL -> el item no abria el browser)
-    LayoutImportGlb = W3dImportGlbMenu;        // Add > Imports > GLB: idem
-    DialogoCargarTextura = W3dCargarTexturaEn; // cargar textura: idem
+    LayoutImportFbx = W3dImportFbxMenu;        // Add > Import FBX
+    LayoutImportGltf = W3dImportGltfMenu;      // Add > Imports > glTF
+    LayoutImportGlb = W3dImportGlbMenu;        // Add > Imports > GLB
+    DialogoCargarTextura = W3dCargarTexturaEn; // cargar textura
 
+    // EL layout por defecto COMPARTIDO (LayoutPorDefecto, por TAMANO DE PANTALLA): la MISMA logica que PC,
+    // no una propia de Symbian. En el N95 (240x320, lado < 320) da 2 viewports (3D + Propiedades). El
+    // bookkeeping (gRoot/gView3D/gProps/gContRaiz/...) lo arma W3dArbolCambiadoHook recorriendo el arbol.
+    { extern ViewportBase* LayoutPorDefecto(int, int, Viewport3D**);
+      rootViewport = LayoutPorDefecto(aWidth, aHeight, &gView3D); }
+    W3dArbolCambiadoHook();
+    Viewport3DActive = gView3D;
+    // sin mouse SIEMPRE hay un viewport activo (borde verde): el 3D. La tecla verde lo cicla.
+    if (!viewPortActive) viewPortActive = gView3D;
 
     gRoot->x = 0;
     gRoot->y = 0;
     gRoot->Resize(aWidth, aHeight);
 
-    w3dLogf("layout: %dx%d horizontal=%d (3D %dx%d, props %dx%d)",
-        aWidth, aHeight, (TInt)horizontal,
-        gView3D->width, gView3D->height, gProps->width, gProps->height);
+    w3dLogf("layout: %dx%d (3D %dx%d, props %dx%d)",
+        aWidth, aHeight,
+        gView3D ? gView3D->width : 0, gView3D ? gView3D->height : 0,
+        gProps ? gProps->width : 0, gProps ? gProps->height : 0);
 }
 
 void W3dLayoutRender() {
@@ -513,6 +494,15 @@ void W3dLayoutRedimensionarViewport(TInt aDx, TInt aDy) {
 TBool W3dLayout3DActivo() {
     return (viewPortActive && viewPortActive->isLeaf() &&
             viewPortActive->ViewportKind() == 1) ? ETrue : EFalse;
+}
+
+// el viewport ACTIVO es donde se JUEGA (3D o 2D/Editor2D)? -> ahi el D-pad va al JUEGO; en
+// cualquier otro (outliner/props/timeline) el D-pad maneja la UI del editor, asi con la tecla
+// verde se cambia de viewport y se puede salir del juego (menu/stop) sin quedar atrapado.
+TBool W3dLayoutJuegoViewportActivo() {
+    if (!viewPortActive || !viewPortActive->isLeaf()) return EFalse;
+    const TInt k = viewPortActive->ViewportKind();
+    return (k == 1 || k == 6) ? ETrue : EFalse;   // 1 = ViewPort3D, 6 = Editor2D
 }
 
 // ctrl+P / alt+P: menus de emparentar (compartidos)

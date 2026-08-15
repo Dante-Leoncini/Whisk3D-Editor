@@ -34,6 +34,7 @@
 #include "w3dlog.h"              // avisos de layout tambien al log (los ve la Console)
 #include "objects/UI.h"          // la UI del proyecto (rama UI { archivo: ... })
 #include "objects/Empty.h"       // el nodo generico ("tipo": "objeto") vuelve como Empty
+#include "objects/Instance.h"    // Instance ("tipo": "Instance"): usado antes del include de mas abajo
 #include "objects/LOD.h"         // objeto LOD (un hijo por distancia a la camara)
 #include "objects/Culling.h"     // objeto Culling (frustum culling de sus hijos)
 #include "objects/Particulas.h"  // objeto Particulas (emisor de billboards del Core)
@@ -54,6 +55,7 @@
 #include "W3dNombres.h"          // W3dNombreUnico: el nombre del constraint migrado, en el espacio del objeto
 
 //ESTO DESPUES TIENE QUE IR A UN ARCHIVO SEPARADOOOOO
+#ifndef W3D_SYMBIAN  // icono de la ventana via SDL: solo desktop (en Symbian no hay ventana SDL)
 SDL_Surface* LoadSurfaceSTB(const std::string& path) {
 
     int width, height, channels;
@@ -63,12 +65,12 @@ SDL_Surface* LoadSurfaceSTB(const std::string& path) {
     // archivo suelto. stbi_load abre con fopen y no ve el montaje.
     std::vector<unsigned char> datos;
     if (!w3dFileSystem::ReadFileBytes(path, datos) || datos.empty())
-        return nullptr;
+        return NULL;
     stbi_uc* pixels = stbi_load_from_memory(&datos[0], (int)datos.size(),
                                             &width, &height, &channels, 4);
 
     if (!pixels)
-        return nullptr;
+        return NULL;
 
     // superficie DUENIA de su memoria: CreateRGBSurfaceFrom NO adopta 'pixels'
     // (el buffer de stb quedaba fugado en cada apertura de proyecto). Se copia
@@ -84,24 +86,39 @@ SDL_Surface* LoadSurfaceSTB(const std::string& path) {
     stbi_image_free(pixels);
     return surface;
 }
+#endif // W3D_SYMBIAN (LoadSurfaceSTB via SDL)
 
 // ============================================
 // Helpers
 // ============================================
+// std::map::at() es C++11 y el STLport de RVCT (Symbian) no lo tiene. Este es el
+// equivalente C++03: como los call sites ya chequean count() antes, la clave existe;
+// si faltara devuelve "" en vez de tirar excepcion (mas robusto: el .w3d es editable
+// a mano y un archivo corrupto NO puede colgar el editor).
+static const std::string& w3dMapAt(const std::map<std::string,std::string>& m, const std::string& k){
+    static const std::string empty;
+    std::map<std::string,std::string>::const_iterator it = m.find(k);
+    return it != m.end() ? it->second : empty;
+}
+
 float GetFloatOrDefault(const std::map<std::string,std::string>& props, const std::string& k, float def){
-    auto it = props.find(k);
+    std::map<std::string,std::string>::const_iterator it = props.find(k);
     if(it==props.end() || it->second.empty()) return def;
-    try{ return std::stof(it->second); } catch(...){ return def; }
+    const char* s = it->second.c_str(); char* end = 0;
+    double v = strtod(s, &end);
+    return (end == s) ? def : (float)v;   // nada parseable -> el default del caller (no 0)
 }
 
 int GetIntOrDefault(const std::map<std::string,std::string>& props, const std::string& k, int def){
-    auto it = props.find(k);
-    if(it == props.end()) return def;
-    try{ return std::stoi(it->second); } catch(...){ return def; }
+    std::map<std::string,std::string>::const_iterator it = props.find(k);
+    if(it == props.end() || it->second.empty()) return def;
+    const char* s = it->second.c_str(); char* end = 0;
+    long v = strtol(s, &end, 10);
+    return (end == s) ? def : (int)v;
 }
 
 bool GetBoolOrDefault(const std::map<std::string,std::string>& props, const std::string& key, bool def=false){
-    auto it = props.find(key);
+    std::map<std::string,std::string>::const_iterator it = props.find(key);
     if(it == props.end()) return def;
 
     std::string val = it->second;
@@ -109,23 +126,16 @@ bool GetBoolOrDefault(const std::map<std::string,std::string>& props, const std:
 }
 
 GLenum GetLightIDOrDefault(std::string name, GLenum defaultLight){
-    static std::unordered_map<std::string, GLenum> lightMap = {
-        {"GL_LIGHT0", GL_LIGHT0},
-        {"GL_LIGHT1", GL_LIGHT1},
-        {"GL_LIGHT2", GL_LIGHT2},
-        {"GL_LIGHT3", GL_LIGHT3},
-        {"GL_LIGHT4", GL_LIGHT4},
-        {"GL_LIGHT5", GL_LIGHT5},
-        {"GL_LIGHT6", GL_LIGHT6},
-        {"GL_LIGHT7", GL_LIGHT7},
-    };
-
-    auto it = lightMap.find(name);
-    return (it != lightMap.end()) ? it->second : defaultLight;
+    // "GL_LIGHT0".."GL_LIGHT7" -> GL_LIGHT0 + n: los enum GL de luz son consecutivos (spec GL)
+    if (name.size() == 9 && name.compare(0, 8, "GL_LIGHT") == 0) {
+        char d = name[8];
+        if (d >= '0' && d <= '7') return (GLenum)(GL_LIGHT0 + (d - '0'));
+    }
+    return defaultLight;
 }
 
 std::string Unquote(const std::string& s){
-    if(s.size()>=2 && ((s.front()=='"' && s.back()=='"') || (s.front()=='\'' && s.back()=='\'')))
+    if(s.size()>=2 && ((s[0]=='"' && s[s.size()-1]=='"') || (s[0]=='\'' && s[s.size()-1]=='\'')))
         return s.substr(1,s.size()-2);
     return s;
 }
@@ -188,16 +198,17 @@ std::vector<std::string> Tokenize(const std::string& src){
 // Node & Find
 // ============================================
 Node* Find(Node* root, const std::string& type){
-    if(!root) return nullptr;
+    if(!root) return NULL;
     if(root->type == type) return root;
-    for(Node* c : root->children){
+    for(size_t _i=0;_i<root->children.size();_i++){
+        Node* c = root->children[_i];
         if(Node* f = Find(c,type)) return f;
     }
-    return nullptr;
+    return NULL;
 }
 
 Node* ParseNode(std::vector<std::string>& tk, size_t& i){
-    if(i >= tk.size()) return nullptr;
+    if(i >= tk.size()) return NULL;
     Node* n = new Node();
     n->type = tk[i++];
     if(i>=tk.size() || tk[i]!="{") return n;
@@ -227,13 +238,13 @@ void ApplyViewport3DProps(Viewport3D* v, const std::map<std::string,std::string>
     // excepcion que NADIE atrapa -> el editor se cerraba al abrir el proyecto.
     // GetFloatOrDefault ya hace el try/catch y cae al default. El .w3d se vende
     // como editable a mano: el archivo NO puede ser una fuente de crash.
-    auto F = [&](const std::string& k, float def=0.0f){
-        return GetFloatOrDefault(p, k, def);
-    };
-
-    auto B = [&](const std::string& k, bool def=false){
-        return p.count(k) ? (p.at(k)=="true" || p.at(k)=="1") : def;
-    };
+    // C++03 (RVCT/Symbian): sin lambdas -> functors locales con la MISMA sintaxis de llamada
+    struct FGet { const std::map<std::string,std::string>& p; FGet(const std::map<std::string,std::string>& m):p(m){}
+        float operator()(const std::string& k, float def=0.0f) const { return GetFloatOrDefault(p, k, def); } } F(p);
+    struct BGet { const std::map<std::string,std::string>& p; BGet(const std::map<std::string,std::string>& m):p(m){}
+        bool operator()(const std::string& k, bool def=false) const {
+            std::map<std::string,std::string>::const_iterator it = p.find(k);
+            return it != p.end() ? (it->second=="true" || it->second=="1") : def; } } B(p);
 
     /// --- bools ---
     if(p.count("orthographic"))           v->orthographic = B("orthographic");
@@ -285,7 +296,7 @@ void ApplyViewport3DProps(Viewport3D* v, const std::map<std::string,std::string>
     v->RecalcOrbitPosition();
 
     if(p.count("view"))  // string → enum
-         v->view = StringToRenderType(p.at("view"));
+         v->view = StringToRenderType(w3dMapAt(p, "view"));
 }
 
 // MODO + VISTA del timeline guardados en su hoja del layout (ver el comentario grande de
@@ -300,7 +311,7 @@ void ApplyViewport3DProps(Viewport3D* v, const std::map<std::string,std::string>
 void ApplyTimelineProps(Timeline* t, const std::map<std::string,std::string>& p){
     if(!t) return;
     if(p.count("modo"))
-        t->modo = (p.at("modo") == "curvas") ? Timeline::TL_MODO_CURVAS : Timeline::TL_MODO_DOPE;
+        t->modo = (w3dMapAt(p, "modo") == "curvas") ? Timeline::TL_MODO_CURVAS : Timeline::TL_MODO_DOPE;
     t->VistaAplicar(GetFloatOrDefault(p, "zoomFrame",   t->pxPerFrame),
                     GetFloatOrDefault(p, "frameIzq",    t->viewStartF),
                     GetFloatOrDefault(p, "zoomValor",   t->pxPerUnit),
@@ -309,11 +320,11 @@ void ApplyTimelineProps(Timeline* t, const std::map<std::string,std::string>& p)
 
 // ----------------------------- Builders -----------------------------
 ViewportBase* BuildLayout(Node* n){
-    if(!n) return nullptr;
+    if(!n) return NULL;
     std::cout << "[BuildLayout] node=" << n->type << std::endl;
 
     if(n->type == "Viewport3D"){
-        auto* v = new Viewport3D();
+        Viewport3D* v = new Viewport3D();
         ApplyViewport3DProps(v, n->props);
         return v;
     }
@@ -321,7 +332,7 @@ ViewportBase* BuildLayout(Node* n){
     if(n->type == "Properties")  return new Properties();
     if(n->type == "Editor2D")  return new Editor2D();
     if(n->type == "Timeline"){
-        auto* t = new Timeline();
+        Timeline* t = new Timeline();
         ApplyTimelineProps(t, n->props);
         return t;
     }
@@ -358,8 +369,8 @@ ViewportBase* BuildLayout(Node* n){
 			}
 		}
 
-        ViewportBase* A = nullptr;
-        ViewportBase* B = nullptr;
+        ViewportBase* A = NULL;
+        ViewportBase* B = NULL;
 
         if(n->children.size() > 0) A = BuildLayout(n->children[0]);
         if(n->children.size() > 1) B = BuildLayout(n->children[1]);
@@ -509,7 +520,7 @@ static void AplicarModoEscenas(bool v) { W3dEscenaSetModo(v); }
 // ("proyecto/icono.png"), en v3 la ruta de disco. g_proyIcono guarda ESO, que es
 // lo que sabe leer ReadFileBytes y lo que el guardado vuelve a meter adentro.
 static void AplicarIcono(const std::string& resuelta) {
-#ifdef W3D_SIN_EDITOR
+#if defined(W3D_SIN_EDITOR) || defined(W3D_SYMBIAN)
     // el juego compilado ya lleva SU icono (lo genera "Compilar juego" y lo pone
     // el main.cpp generado con SDL_SetWindowIcon): el del proyecto no aplica.
     (void)resuelta;
@@ -612,16 +623,18 @@ static void AplicarLayoutTexto(const std::string& cual) {
 void ApplyCommonProps(Object* obj, const std::map<std::string,std::string>& p){
     if(!obj) return;
 
-    auto B = [&](const std::string& k, bool def=false){
-        return p.count(k) ? (p.at(k)=="true" || p.at(k)=="1") : def;
-    };
+    // C++03 (RVCT/Symbian): sin lambdas -> functor local, misma sintaxis de llamada
+    struct BGet { const std::map<std::string,std::string>& p; BGet(const std::map<std::string,std::string>& m):p(m){}
+        bool operator()(const std::string& k, bool def=false) const {
+            std::map<std::string,std::string>::const_iterator it = p.find(k);
+            return it != p.end() ? (it->second=="true" || it->second=="1") : def; } } B(p);
 
     // Nombre
     if(p.count("name")){
 		// CARGA: el nombre entra CRUDO (el archivo puede traer duplicados de versiones
 		// viejas). Los duplicados los repara de una sola vez W3dNombresRepararEscena al
 		// final de AbrirW3D, que ademas arrastra las refs de scripts y los targets.
-		obj->SetNameCrudo(p.at("name"));
+		obj->SetNameCrudo(w3dMapAt(p, "name"));
 	}
 
     // Posición
@@ -776,14 +789,14 @@ static Object* InstanciarPrefabNodo(const std::string& nombre,
     std::map<std::string, Node*>::iterator it = gPrefabs.find(nombre);
     if (it == gPrefabs.end() || !it->second) {
         std::cerr << "[Clon] no hay un Prefab '" << nombre << "' en la Biblioteca\n";
-        return nullptr;
+        return NULL;
     }
-    Node* raiz = nullptr;
+    Node* raiz = NULL;
     for (size_t i = 0; i < it->second->children.size() && !raiz; i++)
         raiz = it->second->children[i];
     if (!raiz) {
         std::cerr << "[Clon] el Prefab '" << nombre << "' esta vacio\n";
-        return nullptr;
+        return NULL;
     }
     Node tmp;
     tmp.type  = raiz->type;
@@ -798,7 +811,7 @@ static Object* InstanciarPrefabNodo(const std::string& nombre,
             if ((*hijosExtra)[i]) tmp.children.push_back((*hijosExtra)[i]);
     // el MISMO camino que BuildObjectRecursive, pero devolviendo la raiz creada
     Object* obj = CreateObjectFromNode(&tmp, parent);
-    if (!obj) return nullptr;
+    if (!obj) return NULL;
     ApplyCommonProps(obj, tmp.props);
     LeerScriptsDeProps(obj, tmp.props);
     for (size_t i = 0; i < tmp.children.size(); i++)
@@ -809,7 +822,7 @@ static Object* InstanciarPrefabNodo(const std::string& nombre,
 // el hook del bind lua instanciar() (Core). Coordenadas del MOTOR -> props del
 // formato de texto (la vertical del texto es z y la profundidad y).
 static Object* HookInstanciarPrefab(const char* nombre, const float* posMotor) {
-    if (!nombre || !*nombre) return nullptr;
+    if (!nombre || !*nombre) return NULL;
     std::map<std::string,std::string> ov;
     if (posMotor) {
         char b[48];
@@ -817,33 +830,33 @@ static Object* HookInstanciarPrefab(const char* nombre, const float* posMotor) {
         snprintf(b, sizeof(b), "%g", posMotor[2]); ov["y"] = b;   // profundidad
         snprintf(b, sizeof(b), "%g", posMotor[1]); ov["z"] = b;   // vertical
     }
-    return InstanciarPrefabNodo(nombre, ov, nullptr, SceneCollection);
+    return InstanciarPrefabNodo(nombre, ov, NULL, SceneCollection);
 }
 
 Object* CreateObjectFromNode(Node* n, Object* parent){
-    if(!n) return nullptr;
+    if(!n) return NULL;
 
-    const auto& p = n->props;
+    const std::map<std::string,std::string>& p = n->props;
 
     // --- Biblioteca de PREFABS: declara subarboles SIN instanciarlos ---
     if (n->type == "Biblioteca") {
         for (size_t i = 0; i < n->children.size(); i++) {
             Node* c = n->children[i];
             if (!c || c->type != "Prefab") continue;
-            std::string nombre = c->props.count("name") ? Unquote(c->props.at("name")) : std::string();
+            std::string nombre = c->props.count("name") ? Unquote(w3dMapAt(c->props, "name")) : std::string();
             if (nombre.empty()) { std::cerr << "[Biblioteca] Prefab sin name (ignorado)\n"; continue; }
             std::map<std::string, Node*>::iterator viejo = gPrefabs.find(nombre);
             if (viejo != gPrefabs.end()) { PrefabBorrarNodo(viejo->second); gPrefabs.erase(viejo); }
             gPrefabs[nombre] = PrefabCopiarNodo(c);
         }
         W3dInstanciarPrefabHook = HookInstanciarPrefab;   // habilita instanciar() en lua
-        return nullptr;   // la Biblioteca no agrega objetos a la escena
+        return NULL;   // la Biblioteca no agrega objetos a la escena
     }
     // --- Clon: instancia un Prefab de la Biblioteca con overrides ---
     if (n->type == "Clon") {
-        if (!n->props.count("prefab")) { std::cerr << "[Clon] falta prefab:\n"; return nullptr; }
-        InstanciarPrefabNodo(Unquote(n->props.at("prefab")), n->props, &n->children, parent);
-        return nullptr;   // todo construido adentro (props + scripts + hijos)
+        if (!n->props.count("prefab")) { std::cerr << "[Clon] falta prefab:\n"; return NULL; }
+        InstanciarPrefabNodo(Unquote(w3dMapAt(n->props, "prefab")), n->props, &n->children, parent);
+        return NULL;   // todo construido adentro (props + scripts + hijos)
     }
 
     // ‼ Se crea el objeto por tipo (mínimo switch posible)
@@ -856,10 +869,10 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
 
         // Si el archivo viene con comillas --> Unquote
         if(n->props.count("filePath"))
-            path = GetFilePath(n->props.at("filePath"));
+            path = GetFilePath(w3dMapAt(n->props, "filePath"));
         else {
             std::cerr << "[Wavefront] Falta filePath\n";
-            return nullptr;
+            return NULL;
         }
 
         bool NoMerge = GetBoolOrDefault(n->props, "noMerge", false);        
@@ -869,12 +882,13 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
 
         if (!mesh){
             std::cerr << "[Wobj] Se importo mal el wobj!\n";
-            return nullptr;
+            return NULL;
         }
 
-        for (auto* child : n->children) {
+        for (size_t _ci=0; _ci<n->children.size(); _ci++) {
+            Node* child = n->children[_ci];
             if (child->type == "Animation") {
-                auto& ap = child->props;
+                std::map<std::string,std::string>& ap = child->props;
 
                 bool UseNormals = GetBoolOrDefault(ap, "UseNormals", false);
 
@@ -887,10 +901,10 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
                 // tolerante como el resto del lector: un archivo viejo sin estos
                 // campos NO tira excepcion (at()/stoi lanzan y mataban el editor)
                 VertexAnimation* anim =
-                    new VertexAnimation(nullptr, ap.count("name") ? ap.at("name") : std::string("anim"),
+                    new VertexAnimation(NULL, ap.count("name") ? w3dMapAt(ap, "name") : std::string("anim"),
                                         UseNormals, (float)speed, repeat, proximaAnimacion);
 
-                anim->basePath   = ap.count("basePath") ? GetFilePath(ap.at("basePath")) : std::string();
+                anim->basePath   = ap.count("basePath") ? GetFilePath(w3dMapAt(ap, "basePath")) : std::string();
                 anim->frameCount = GetIntOrDefault(ap, "frames", 0);
                 anim->padding    = GetIntOrDefault(ap, "padding", 0);
 
@@ -900,8 +914,8 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
             //   AnimacionUV { frames: 14  fps: 30  eje: u  desfase: 0 }
             // La textura es una TIRA de 'frames' celdas sobre 'eje'; el motor la recorre solo.
             if (child->type == "AnimacionUV") {
-                auto& up = child->props;
-                std::string eje = up.count("eje") ? Unquote(up.at("eje")) : std::string("u");
+                std::map<std::string,std::string>& up = child->props;
+                std::string eje = up.count("eje") ? Unquote(w3dMapAt(up, "eje")) : std::string("u");
                 mesh->SetUVAnimTira(GetIntOrDefault(up, "frames", 1),
                                     GetFloatOrDefault(up, "fps", 30.0f),
                                     (eje == "v") ? 1 : 0,
@@ -920,15 +934,15 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
             // SIN triangulos: "completa" = la malla entera, N = la lista de la celda N;
             // ausente = nada (el comportamiento de siempre). Ver Modifier.h.
             if (child->type == "CullingTri") {
-                auto& cp = child->props;
+                std::map<std::string,std::string>& cp = child->props;
                 extern void W3dModPVSAgregar(Mesh*, const std::string&, int, const std::string&, int); // edit/MeshEdit.cpp
-                std::string metodo = cp.count("metodo") ? Unquote(cp.at("metodo")) : std::string("triangulos");
+                std::string metodo = cp.count("metodo") ? Unquote(w3dMapAt(cp, "metodo")) : std::string("triangulos");
                 int sector = GetIntOrDefault(cp, "sector", GetIntOrDefault(cp, "celda", 0));
-                std::string archivo = cp.count("vis") ? Unquote(cp.at("vis"))
-                                    : (cp.count("pvs") ? Unquote(cp.at("pvs")) : std::string());
+                std::string archivo = cp.count("vis") ? Unquote(w3dMapAt(cp, "vis"))
+                                    : (cp.count("pvs") ? Unquote(w3dMapAt(cp, "pvs")) : std::string());
                 int fallback = 0;
                 if (cp.count("sectorFallback")) {
-                    std::string fs = Unquote(cp.at("sectorFallback"));
+                    std::string fs = Unquote(w3dMapAt(cp, "sectorFallback"));
                     fallback = (fs == "completa") ? -1 : GetIntOrDefault(cp, "sectorFallback", 0);
                 }
                 W3dModPVSAgregar(mesh, metodo, sector, archivo, fallback);
@@ -947,10 +961,10 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
         // arbol 2D completo, con sus scripts). Mismo camino que el JSON nuevo.
         if (!n->props.count("archivo")) {
             w3dLogfW("[W3D] nodo UI sin 'archivo': escena omitida");
-            return nullptr;
+            return NULL;
         }
-        return (Object*)CargarUIProyecto(GetFilePath(n->props.at("archivo")),
-                                         Unquote(n->props.at("archivo")));
+        return (Object*)CargarUIProyecto(GetFilePath(w3dMapAt(n->props, "archivo")),
+                                         Unquote(w3dMapAt(n->props, "archivo")));
         // (si cargo, ya quedo colgado de la escena)
     }
 
@@ -960,12 +974,12 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
         // traia via "ejes"): sin esto el reflejo del agua (mirrorY, plano
         // horizontal) no se podia declarar y el default quedaba en mirrorZ.
         Mirror* mirror = new Mirror(parent);
-        if(p.count("target")) mirror->SetTarget(p.at("target"));
+        if(p.count("target")) mirror->SetTarget(w3dMapAt(p, "target"));
         // MULTI-TARGET (opcional): targets: "Jugador, Enemigo1, Enemigo2". El primero
         // ocupa el slot historico, o sea que 'target' y 'targets' conviven y un
         // archivo viejo abre igual. Va DESPUES de 'target' a proposito: si estan
         // los dos, manda la lista.
-        if(p.count("targets")) mirror->SetTargetsTexto(Unquote(p.at("targets")));
+        if(p.count("targets")) mirror->SetTargetsTexto(Unquote(w3dMapAt(p, "targets")));
         mirror->mirrorX = GetBoolOrDefault(p, "mirrorX", mirror->mirrorX);
         mirror->mirrorY = GetBoolOrDefault(p, "mirrorY", mirror->mirrorY);
         mirror->mirrorZ = GetBoolOrDefault(p, "mirrorZ", mirror->mirrorZ);
@@ -1011,7 +1025,7 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
         // LOD { distancias: "20, 45, 90" <hijos en orden de detalle> }
         // umbral i = hasta donde llega el hijo i; mas alla del ultimo, el ultimo hijo.
         LOD* lod = new LOD(parent);
-        if (p.count("distancias")) lod->SetDistanciasTexto(Unquote(p.at("distancias")));
+        if (p.count("distancias")) lod->SetDistanciasTexto(Unquote(w3dMapAt(p, "distancias")));
         lod->soloCamaraActiva = GetBoolOrDefault(p, "soloCamaraActiva", false);
         return lod; // los hijos los cuelga BuildObjectRecursive
     }
@@ -1032,7 +1046,7 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
         //              desvanecer: true activo: true }   (ver Particulas.h)
         Particulas* pt = new Particulas(parent);
         // la textura se resuelve contra la carpeta del .w3d (como filePath del Wavefront)
-        if (p.count("textura")) pt->textura = GetFilePath(p.at("textura"));
+        if (p.count("textura")) pt->textura = GetFilePath(w3dMapAt(p, "textura"));
         pt->cantidad   = GetFloatOrDefault(p, "cantidad",   pt->cantidad);
         pt->vida       = GetFloatOrDefault(p, "vida",       pt->vida);
         pt->tam        = GetFloatOrDefault(p, "tam",        pt->tam);
@@ -1041,7 +1055,7 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
         pt->gravedad   = GetFloatOrDefault(p, "gravedad",   pt->gravedad);
         pt->aditivo    = GetBoolOrDefault(p, "aditivo",     pt->aditivo);
         pt->sustractivo= GetBoolOrDefault(p, "sustractivo", pt->sustractivo);
-        if (p.count("color")) pt->SetColorTexto(Unquote(p.at("color")));
+        if (p.count("color")) pt->SetColorTexto(Unquote(w3dMapAt(p, "color")));
         pt->desvanecer = GetBoolOrDefault(p, "desvanecer",  pt->desvanecer);
         pt->activo     = GetBoolOrDefault(p, "activo",      pt->activo);
         // azar (defaults 0 = sin jitter ni deriva: los archivos viejos no cambian)
@@ -1063,21 +1077,21 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
         // celdas: con la camara en OTRO riel la zona cae a `fallback:` ("completa"
         // = malla entera, N = celda N). Sin `riel:` nada cambia (legacy).
         VisZona* vz = new VisZona(parent);
-        std::string modo = p.count("modo") ? Unquote(p.at("modo")) : std::string("manual");
+        std::string modo = p.count("modo") ? Unquote(w3dMapAt(p, "modo")) : std::string("manual");
         vz->modo = (modo == "grilla") ? VisZona::ModoGrilla
                  : (modo == "volumenes") ? VisZona::ModoVolumenes
                  : (modo == "curva") ? VisZona::ModoCurva : VisZona::ModoManual;
-        if (p.count("objetivo")) vz->objetivoNombre = Unquote(p.at("objetivo"));
-        if (p.count("ancla"))    vz->anclaNombre    = Unquote(p.at("ancla"));
+        if (p.count("objetivo")) vz->objetivoNombre = Unquote(w3dMapAt(p, "objetivo"));
+        if (p.count("ancla"))    vz->anclaNombre    = Unquote(w3dMapAt(p, "ancla"));
         vz->nx       = GetIntOrDefault(p, "nx", 1);
         vz->ny       = GetIntOrDefault(p, "ny", 1);
         vz->nz       = GetIntOrDefault(p, "nz", 1);
         vz->tamCelda = GetFloatOrDefault(p, "tamCelda", 1.0f);
         vz->pasoMax  = GetIntOrDefault(p, "pasoMax", 32);
-        if (p.count("riel"))       vz->rielNombre = Unquote(p.at("riel"));
-        else if (p.count("curva")) vz->rielNombre = Unquote(p.at("curva"));
+        if (p.count("riel"))       vz->rielNombre = Unquote(w3dMapAt(p, "riel"));
+        else if (p.count("curva")) vz->rielNombre = Unquote(w3dMapAt(p, "curva"));
         if (p.count("fallback")) {
-            std::string fb = Unquote(p.at("fallback"));
+            std::string fb = Unquote(w3dMapAt(p, "fallback"));
             vz->celdaFallback = (fb == "completa") ? 0 : GetIntOrDefault(p, "fallback", 0);
         }
         return vz;
@@ -1085,7 +1099,7 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
 
     if (n->type=="Instance"){
         Instance* instance = new Instance(parent);
-        if(p.count("target")) instance->SetTarget(p.at("target"));
+        if(p.count("target")) instance->SetTarget(w3dMapAt(p, "target"));
         if(p.count("count")){   // misma cota que el camino JSON: 'count' manda un for del render
             int c = GetIntOrDefault(p, "count", 1);
             if (c < 0) c = 0; else if (c > 4096) c = 4096;
@@ -1106,7 +1120,7 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
         Empty* gamepad = new Empty(parent);
         W3dAvisof(false, "El objeto Script '%s' ya no existe: se migro a un objeto vacio con sus "
                          "scripts. Su fisica hardcodeada (velocidad/gravedad/limites) NO se migra.",
-                  p.count("name") ? Unquote(p.at("name")).c_str() : "(sin nombre)");
+                  p.count("name") ? Unquote(w3dMapAt(p, "name")).c_str() : "(sin nombre)");
 
         // el SCRIPT declarado con `script:` lo levanta LeerScriptsDeProps (en
         // BuildObjectRecursive, para CUALQUIER objeto). Aca queda solo la
@@ -1138,20 +1152,21 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
 
         // Si el archivo viene con comillas --> Unquote
         if(n->props.count("filePath"))
-            path = GetFilePath(n->props.at("filePath"));
+            path = GetFilePath(w3dMapAt(n->props, "filePath"));
         else {
             std::cerr << "[Curve] Falta filePath\n";
-            return nullptr;
+            return NULL;
         }
 
         Curve* curve = new Curve(parent);
         if (curve->LoadFromFile(path)){
             // LISTA DE CARGA (streaming por riel): sidecar declarado como hijo
             //     Curve { filePath: "riel.cap"  ListaCarga { filePath: "riel.cargas.json" } }
-            for (Node* c : n->children) {
+            for (size_t _i=0; _i<n->children.size(); _i++) {
+                Node* c = n->children[_i];
                 if (!c || c->type != "ListaCarga") continue;
                 if (!c->props.count("filePath")) { std::cerr << "[ListaCarga] falta filePath\n"; continue; }
-                curve->CargarListaCarga(GetFilePath(c->props.at("filePath")));
+                curve->CargarListaCarga(GetFilePath(w3dMapAt(c->props, "filePath")));
             }
             return curve;
         }
@@ -1163,7 +1178,7 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
                 if (hs[i] == curve) { hs.erase(hs.begin() + i); break; }
         }
         delete curve;
-        return nullptr;
+        return NULL;
     }
 
     if (n->type=="Constraint"){
@@ -1171,7 +1186,7 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
         // al objeto APUNTADO al final de la carga (ver PendConsViejo, arriba).
         // OJO: en el formato de TEXTO 'usePitch' tiene default TRUE (en el JSON es false).
         return NodoConstraintViejo(parent,
-                                   p.count("target") ? p.at("target") : std::string(),
+                                   p.count("target") ? w3dMapAt(p, "target") : std::string(),
                                    GetBoolOrDefault(p, "useHorizontal", true),
                                    GetBoolOrDefault(p, "usePitch", true),
                                    GetBoolOrDefault(p, "copyPosX", false),
@@ -1181,8 +1196,8 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
 
     if(n->type=="Camera"){
         Camera* camera = new Camera(parent, Vector3(0,0,0), Vector3(0, 0, 0));
-        if(p.count("target")) camera->SetTarget(p.at("target"));
-        if(p.count("riel")) camera->SetRiel(p.at("riel"));
+        if(p.count("target")) camera->SetTarget(w3dMapAt(p, "target"));
+        if(p.count("riel")) camera->SetRiel(w3dMapAt(p, "riel"));
         if(p.count("offsetRiel")) camera->offsetRiel = GetIntOrDefault(p, "offsetRiel", 0);
         // MIRADA DEL RIEL: la orientacion sale del yaw/pitch AUTORAL del nodo en vez del
         // look-at al target (ver Camera.h). Ausente = false = comportamiento de siempre.
@@ -1208,7 +1223,7 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
             GetFloatOrDefault(n->props,"g",1),
             GetFloatOrDefault(n->props,"b",1)
         );
-        L->LightID = GetLightIDOrDefault(p.count("LightID") ? p.at("LightID") : "GL_LIGHT0");
+        L->LightID = GetLightIDOrDefault(p.count("LightID") ? w3dMapAt(p, "LightID") : "GL_LIGHT0");
 
         return L;
     }
@@ -1217,15 +1232,15 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
         // Collection { ordenarPorCamara: true|false ordenarUnaVez: true|false
         //              lote: "estatico" <hijos> }
         // (orden lejos->cerca para transparentes + lote estatico; ver Collection.h)
-        auto* C = new Collection(parent);
+        Collection* C = new Collection(parent);
         if(!CollectionActive) CollectionActive = C;
         C->ordenarPorCamara = GetBoolOrDefault(p, "ordenarPorCamara", false);
         C->ordenarUnaVez    = GetBoolOrDefault(p, "ordenarUnaVez", false);
-        C->lote = (p.count("lote") && Unquote(p.at("lote")) == "estatico") ? 1 : 0;
+        C->lote = (p.count("lote") && Unquote(w3dMapAt(p, "lote")) == "estatico") ? 1 : 0;
         return C;
     }
 
-    return nullptr; // objeto desconocido → ignorado
+    return NULL; // objeto desconocido → ignorado
 }
 
 // ===========================================================================
@@ -1243,7 +1258,7 @@ static void LeerScriptsDeProps(Object* obj, const std::map<std::string,std::stri
     if (!obj || !p.count("script")) return;
     if (!obj->scriptDatos) obj->scriptDatos = new W3dScriptDatos();
     W3dScriptEntrada e;
-    e.ruta = GetFilePath(p.at("script"));
+    e.ruta = GetFilePath(w3dMapAt(p, "script"));
     for (std::map<std::string,std::string>::const_iterator it = p.begin(); it != p.end(); ++it)
         if (it->first.compare(0, 4, "ref_") == 0 ||
             it->first.compare(0, 4, "opt_") == 0 ||
@@ -1259,8 +1274,8 @@ void BuildObjectRecursive(Node* n, Object* parent){
     ApplyCommonProps(obj, n->props);
     LeerScriptsDeProps(obj, n->props);   // `script:` + ref_/opt_/val_ (cualquier objeto)
 
-    for(Node* c : n->children)
-        BuildObjectRecursive(c, obj);
+    for(size_t _i=0;_i<n->children.size();_i++)
+        BuildObjectRecursive(n->children[_i], obj);
 }
 
 void BuildScene(Node* root){
@@ -1269,11 +1284,11 @@ void BuildScene(Node* root){
     // TODOS los campos del proyecto van por los MISMOS aplicadores que el JSON
     // (una sola fuente de verdad por campo). "iconApp" es el alias del formato
     // de texto viejo para "icono" (solo existe en este lector).
-    AplicarIcono(root->props.count("iconApp") ? Unquote(root->props.at("iconApp"))
+    AplicarIcono(root->props.count("iconApp") ? Unquote(w3dMapAt(root->props, "iconApp"))
                                               : std::string());
 
     if(root->props.count("fullscreen")){
-        std::string v = root->props.at("fullscreen");
+        std::string v = w3dMapAt(root->props, "fullscreen");
         AplicarFullscreen(v == "true" || v == "1");
     }
 
@@ -1282,15 +1297,15 @@ void BuildScene(Node* root){
 
     // MULTI-ESCENA: la escena que ARRANCA + el modo (lo lee Compilar juego)
     if(root->props.count("escenaInicial"))
-        AplicarEscenaInicial(Unquote(root->props.at("escenaInicial")));
+        AplicarEscenaInicial(Unquote(w3dMapAt(root->props, "escenaInicial")));
     if(root->props.count("modoEscenas")){
-        std::string v = root->props.at("modoEscenas");
+        std::string v = w3dMapAt(root->props, "modoEscenas");
         AplicarModoEscenas(v == "true" || v == "1");
     }
 
 #ifndef W3D_SIN_EDITOR
     if(root->props.count("Antialiasing")){
-        std::string v = root->props.at("Antialiasing");
+        std::string v = w3dMapAt(root->props, "Antialiasing");
         cfg.enableAntialiasing = (v == "true" || v == "1");   // opcion del EDITOR (cfg)
     }
 #endif
@@ -1302,12 +1317,12 @@ void BuildScene(Node* root){
     // y a partir de ahi todo el 3D va NEAREST y sin mipmaps. Default false: los
     // ejemplos que ya andan no cambian de aspecto.
     if(root->props.count("pixelado")){
-        std::string v = root->props.at("pixelado");
+        std::string v = w3dMapAt(root->props, "pixelado");
         w3dEngine::SetPixeladoGlobal(v == "true" || v == "1");
     }
 
     if(root->props.count("background")){
-        std::string bg = Unquote(root->props.at("background")); // <- quita comillas si las hay
+        std::string bg = Unquote(w3dMapAt(root->props, "background")); // <- quita comillas si las hay
         std::replace(bg.begin(), bg.end(), ',', ' '); // reemplaza comas por espacios
         std::stringstream ss(bg);
         float r,g,b,a;
@@ -1320,8 +1335,8 @@ void BuildScene(Node* root){
         }
     }
 
-    for(Node* n : root->children)
-        BuildObjectRecursive(n, SceneCollection);  // 👈 el parent puede ser la escena global
+    for(size_t _i=0;_i<root->children.size();_i++)
+        BuildObjectRecursive(root->children[_i], SceneCollection);  // el parent puede ser la escena global
 
     if(!CollectionActive) 
         CollectionActive = SceneCollection;        // seguridad
@@ -2770,6 +2785,7 @@ static void AplicarCompilar(JVal* jc) {
     g_proyCompilar.modoDebug   = JB(jc, "debug", false);
     g_proyCompilar.assetsModo  = W3dCompilarAssetsInt(JS(jc, "assets", ""));
     g_proyCompilar.plataforma  = W3dCompilarPlataformaInt(JS(jc, "plataforma", ""));
+    g_proyCompilar.uid         = (unsigned)strtoul(JS(jc, "uid", "0").c_str(), 0, 16);  // UID3 Symbian (hex string)
 #endif
 }
 
@@ -3119,9 +3135,15 @@ static bool AbrirEscenaJson(const char* datos, size_t n, const std::string& base
     if (esc) {
         AplicarFps(JI(esc, "fps", 0));
         JVal* objs = JHijo(esc, "objetos", 5);
-        if (objs)
-            for (size_t i = 0; i < objs->lista.size(); i++)
+        if (objs) {
+            extern void ProgresoActualizar(float);
+            for (size_t i = 0; i < objs->lista.size(); i++) {
+                // construir los objetos = 30%->95% de la barra (los imports de modelo de
+                // adentro muestran ademas su propia barra). Throttle interno a ~1.5%.
+                ProgresoActualizar(0.30f + 0.65f * (float)i / (float)objs->lista.size());
                 JsonObjeto(objs->lista[i], SceneCollection, base);
+            }
+        }
     } else {
         w3dLogfW("[W3D] el proyecto no trae \"escena\": abre sin objetos");
     }
@@ -3548,6 +3570,12 @@ void ReiniciarEscena() {
 // la apertura REAL (destruye la escena y arma el layout nuevo). Solo debe correr
 // con el stack limpio: desde el inicio del frame (main) o desde el modo --script.
 void AbrirProyectoAhora(const std::string& ruta) {
+    // BARRA DE PROGRESO: abrir un .w3d bloquea el frame (montar el contenedor, descomprimir,
+    // parsear el JSON y construir los objetos). En el N95 eso tarda MUCHO y la pantalla queda
+    // congelada -> parece trabado. La barra bombea el render (swap) desde adentro, como el
+    // import de modelos: el usuario ve que avanza (y si se traba, en que % quedo).
+    extern void ProgresoIniciar(const std::string&); extern void ProgresoFin();
+    ProgresoIniciar("Abriendo proyecto...");
     ReiniciarEscena();
     // OJO: rootViewport se reemplaza por el layout del proyecto; el viejo queda
     // (los viewports globales del editor se reusan). El layout nuevo pisa el puntero.
@@ -3560,6 +3588,11 @@ void AbrirProyectoAhora(const std::string& ruta) {
         rootViewport->Resize(MenuPantallaW, MenuPantallaH);
     extern void ProyectoSincronizarCampos();
     ProyectoSincronizarCampos();
+    // MODO JUEGO (.sisx bundleado): full-screen del 3D -> el juego se ve solo, sin el chrome
+    // del editor. El auto-play (game mode + Play) ya lo hizo AbrirW3D si el proyecto tiene scripts.
+    { extern bool g_modoJuego;   // definido mas abajo en este archivo
+      if (g_modoJuego) { extern void LayoutMaximizar3DParaJuego(); LayoutMaximizar3DParaJuego(); } }
+    ProgresoFin();
     g_redraw = true;
 }
 
@@ -3567,6 +3600,9 @@ void AbrirProyectoAhora(const std::string& ruta) {
 // disparo esto vive en el layout que vamos a destruir; destruirlo con su stack
 // activo TRABABA el editor). Se anota y el main lo abre al inicio del proximo frame.
 std::string g_proyAbrirPendiente;
+// MODO JUEGO: lo prende el arranque (Whisk3D.cpp) cuando el .sisx trae un proyecto bundleado.
+// Hace que al abrir el proyecto se full-screene el viewport 3D (el juego se ve solo).
+bool g_modoJuego = false;
 void AbrirProyectoDesde(const std::string& ruta) {
     g_proyAbrirPendiente = ruta;
     g_redraw = true;
@@ -3605,15 +3641,18 @@ static std::string NombreSinExt(const std::string& r) {
 //  guardado ANTES del mimetype abre igual y se migra en el primer guardado.
 // ---------------------------------------------------------------------------
 static bool AbrirW3DContenedor(const std::string& ruta) {
+    extern void ProgresoActualizar(float);
     if (!W3dContenedorMontar(ruta)) {
         w3dLogfE("[W3D] no pude montar el contenedor %s (se abre vacio)", ruta.c_str());
         return false;
     }
+    ProgresoActualizar(0.12f);   // contenedor montado (indice del zip descomprimido)
     std::vector<unsigned char> datos;
     if (!w3dFileSystem::ReadFileBytes("proyecto.json", datos) || datos.empty()) {
         w3dLogfE("[W3D] el contenedor %s no trae proyecto.json legible (se abre vacio)", ruta.c_str());
         return false;
     }
+    ProgresoActualizar(0.22f);   // proyecto.json leido y descomprimido
     gProyectoV4 = true;
     g_w3dRefsEntradas = true;          // los .w3dui tambien traen nombres de entrada
     g_w3dRefExtMarcar = W3dRefExternaMarcar;
@@ -3742,10 +3781,12 @@ void AbrirW3D(const std::string& ruta) {
     // ---- pie COMUN a los tres formatos (tambien si algo fallo: el editor sigue) ----
     if (!CollectionActive) CollectionActive = SceneCollection;
     bool layoutDelProyecto = (rootViewport != NULL);
-    if (!rootViewport)
-        rootViewport = LayoutPorDefecto(NULL);   // el MISMO que el arranque sin archivo
-                                                 // (antes: un outliner flaco sobre un 3D,
-                                                 //  sin propiedades ni timeline)
+    if (!rootViewport) {
+        // fallback: el .w3d no trae bloque Layout -> EL layout por defecto (por tamano de pantalla,
+        // el MISMO que el arranque sin archivo). MenuPantallaW/H estan seteados en PC y en Symbian.
+        extern int MenuPantallaW, MenuPantallaH;
+        rootViewport = LayoutPorDefecto(MenuPantallaW, MenuPantallaH, NULL);
+    }
 
     // nada seleccionado al abrir (los constructores van seleccionando lo
     // ultimo creado; un proyecto recien abierto arranca LIMPIO)

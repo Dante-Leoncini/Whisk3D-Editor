@@ -10,8 +10,11 @@
 #include <vector>
 #include <map>
 #include <string>
-#include <GL/gl.h>
-#include <unordered_map>
+#ifdef W3D_SYMBIAN
+    #include <GLES/gl.h>
+#else
+    #include <GL/gl.h>
+#endif
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -22,7 +25,9 @@
 #include "objects/Curve.h"
 #include "animation/VertexAnimation.h"
 #include "objects/Collection.h"
-#include "controles.h"
+#ifndef W3D_SYMBIAN
+#include "controles.h"   // input SDL de escritorio; import_w3d no usa sus simbolos (en el telefono se guarda)
+#endif
 
 #include "ViewPorts/ViewPorts.h"
 #include "ViewPorts/ViewPort3D.h"

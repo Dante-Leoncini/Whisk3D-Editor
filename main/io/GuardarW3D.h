@@ -118,6 +118,7 @@ struct W3dCompilarCfg {
     bool usarFisica;    // false = W3D_SIN_FISICA (binds stub no-op)
     bool usarSonido;    // false = sin W3D_ENABLE_AUDIO (beep() mudo)
     bool modoDebug;     // true = W3D_DEV_LOG=1 (log + ring + depurar())
+    unsigned uid;       // UID3 de Symbian del juego (app propia). 0 = sin asignar. Rango self-signed: 0xE0000000-0xEFFFFFFF
 };
 extern W3dCompilarCfg g_proyCompilar;
 

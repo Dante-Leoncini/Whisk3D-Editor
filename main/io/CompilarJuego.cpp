@@ -17,6 +17,7 @@
 #include "ViewPorts/Notificaciones.h"
 #include "render/OpcionesRender.h"    // g_redraw: mantener vivo el render mientras compila
 #include "W3dDock.h"                  // apagar la barra del icono del dock al terminar el build
+#include "variables.h"                // cfg.repoPath: raiz del repo fijada a mano (editor instalado)
 #include "w3dFilesystem.h"
 #include "w3dTexture.h"               // DecodeImage/FreeImage: leer el PNG del icono
 #include "w3dlog.h"
@@ -438,10 +439,16 @@ static void RecolectarEscenas(std::vector<UI*>* out) {
     }
 }
 
-// la raiz del repo Whisk3D (Core + UI 2D + game runtime). El editor puede correr
-// desde build/ (res/ copiado al lado del binario), asi que se SUBE de carpeta hasta
-// encontrar libs/Whisk3DCore (la marca del repo). "" si no se encuentra.
+// la raiz del repo Whisk3D (Core + UI 2D + game runtime). Dos formas de encontrarla:
+//   1) la que el usuario fijo a mano en Ajustes (cfg.repoPath): es lo que hace que el editor
+//      INSTALADO -- que no tiene el repo al lado -- pueda compilar juegos igual;
+//   2) subiendo de carpeta desde res/ hasta dar con libs/Whisk3DCore, para el editor corriendo
+//      desde el arbol de codigo (build/ con res/ copiado al lado del binario).
+// En ambos casos se valida que exista la marca del repo (Objects.cpp). "" si no se encuentra.
 static std::string RepoRoot() {
+    if (!cfg.repoPath.empty() &&
+        w3dFileSystem::FileExists(cfg.repoPath + "/libs/Whisk3DCore/objects/Objects.cpp"))
+        return cfg.repoPath;
     std::string dir = Carpeta(w3dFileSystem::GetResDir());   // sube de res/
     for (int i = 0; i < 8; i++) {
         if (w3dFileSystem::FileExists(dir + "/libs/Whisk3DCore/objects/Objects.cpp")) return dir;
@@ -1891,6 +1898,17 @@ bool CompilarJuego(UI* u, int plataforma, int modoVentana, int orientacion,
         Notificar("Compilar: ya hay una compilacion en curso", true);
         return false;
     }
+    // Windows (4) y Symbian (5): el pipeline de build de estos targets todavia NO esta
+    // cableado a este boton (el flujo de abajo genera el runtime SDL/cmake de Linux/web/
+    // android). Se hace aparte para no romper este camino. Mensaje claro en vez de fallar raro.
+    if (plataforma == 5) {
+        Notificar("Symbian .sisx: el target todavia no esta cableado a este boton (viene).", true);
+        return false;
+    }
+    if (plataforma == 4) {
+        Notificar("Windows .exe: todavia no se genera desde el boton (viene). El EDITOR se compila con platform/windows/build_windows.bat.", true);
+        return false;
+    }
     std::vector<ObjScript> objs;
     std::vector<std::string> rutasLua;
     if (SceneCollection) RecolectarScripts(SceneCollection, &objs, &rutasLua);
@@ -1901,7 +1919,7 @@ bool CompilarJuego(UI* u, int plataforma, int modoVentana, int orientacion,
     std::string repo = RepoRoot();
     if (repo.empty()) {
         Notificar("Compilar: no encuentro el repo Whisk3D (fuentes del runtime). "
-                  "Compila desde el arbol de codigo, no desde un binario instalado.", true);
+                  "Fija la raiz del repo en Ajustes (o compila desde el arbol de codigo).", true);
         return false;
     }
     // la carpeta del JUEGO: la del .w3d abierto. Sin proyecto guardado queda la
@@ -1944,8 +1962,7 @@ bool CompilarJuego(UI* u, int plataforma, int modoVentana, int orientacion,
     //  pero los artefactos con el NOMBRE DEL JUEGO adentro no se pueden reusar:
     //  al compilar OTRO proyecto -- o el mismo con otro nombre de archivo, que es
     //  lo que pasa cuando la carpeta tiene el .w3d de texto Y su contenedor v4
-    //  empaquetado al lado (CrashToadVillage.w3d + CrashToadVillage_v4.w3d) --
-    //  quedaban conviviendo los dos:
+    //  empaquetado al lado -- quedaban conviviendo los dos:
     //    * out/<juego>-linux-<arch>.deb  de cpack, y el paso [4/4] copia
     //      out/*.deb ENTERO -> build/linux salia con DOS .deb, uno de ellos de
     //      una compilacion vieja de otro proyecto (es el bug reportado);

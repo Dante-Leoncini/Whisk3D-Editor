@@ -12,6 +12,8 @@
 #include "w3dnewscene.h"
 #include "math/w3dmath.h" // w3dClamp compartido (4 OS)
 #include "W3dInitUI.h" // init de UI compartido (texturas+fuente+iconos)
+#include "w3dFilesystem.h" // FileExists: detectar el proyecto bundleado (modo juego)
+#include <string>
 
 #include "Whisk3D.h"
 
@@ -107,6 +109,27 @@ void CWhisk3D::AppInit( void ){
 			w3dLog("skin.ini cargado: paleta de Whisk3D activa");
 		} else {
 			w3dLog("skin.ini NO se pudo abrir (paleta default)");
+		}
+	}
+
+	// ---- MODO JUEGO ----------------------------------------------------------
+	// Si el .sisx trae un proyecto bundleado en <privado>\game\juego.w3d, se AUTO-ABRE
+	// en el arranque (encolando en g_proyAbrirPendiente, que drena el DrawCallBack en el
+	// primer frame -> AbrirProyectoAhora). Un .sisx de EDITOR no trae ese archivo, asi que
+	// arranca como editor normal. Mismo binario, dos comportamientos segun el bundle.
+	{
+		char rutaJuego[260];
+		TInt lj = fullFilePath.Length() > 230 ? 230 : fullFilePath.Length();
+		for (TInt i = 0; i < lj; i++) { rutaJuego[i] = (char)fullFilePath[i]; }
+		const char* finJ = "game\\juego.w3d";
+		for (TInt k = 0; finJ[k] && lj < 250; k++) { rutaJuego[lj++] = finJ[k]; }
+		rutaJuego[lj] = 0;
+		if (w3dFileSystem::FileExists(rutaJuego)) {
+			extern std::string g_proyAbrirPendiente;
+			extern bool g_modoJuego;
+			g_proyAbrirPendiente = rutaJuego;
+			g_modoJuego = true;   // -> full-screen del 3D al abrir (el juego se ve solo)
+			w3dLog("modo juego: proyecto bundleado detectado, auto-abriendo full-screen");
 		}
 	}
 

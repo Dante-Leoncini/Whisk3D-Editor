@@ -360,6 +360,7 @@ Config loadConfig(const std::string& filename) {
             else if (key == "autoKey") cfg.autoKey = (value == "true" || value == "1");           // boton AUTO KEY del timeline
             else if (key == "SkinName") cfg.SkinName = value;
             else if (key == "graphicsAPI") cfg.graphicsAPI = value;
+            else if (key == "repoPath") cfg.repoPath = value;   // raiz del repo para Compilar (editor instalado)
             else if (key == "idioma") {
                 // "auto" (o ausente) = seguir al sistema. Cualquier otra cosa FUERZA ese idioma.
                 if (value != "auto" && !value.empty()) { g_idioma = W3dIdiomaDe(value.c_str()); g_idiomaForzado = true; }

@@ -9,6 +9,8 @@
 #include "Whisk3DAppUi.h"
 #include "w3dnewscene.h"
 void DuplicatedObject(); // ObjectMode.cpp compartido
+// motor de audio del Core (fwd-decl: evita arrastrar el header del subsistema)
+namespace w3dEngine { bool W3dAudioInit(int); void W3dAudioShutdown(); }
 #include "Whisk3DContainer.h"
 #include <Whisk3D.rsg>
 #include "whisk3D.hrh"
@@ -31,10 +33,15 @@ void CWhisk3DAppUi::ConstructL(){
     iAppContainer->SetMopParent(this);
     iAppContainer->ConstructL( ClientRect() );
     AddToStackL( iAppContainer );
+    // motor de audio del Core: mixer por software + salida CMdaAudioOutputStream (22050 Hz,
+    // el mismo rate que la demo de q3rev). Si el device no abre el stream, W3dAudioInit
+    // devuelve false y todo queda mudo (no rompe la app).
+    w3dEngine::W3dAudioInit(22050);
 }
 
 // Destructor
 CWhisk3DAppUi::~CWhisk3DAppUi(){
+	w3dEngine::W3dAudioShutdown();   // parar el hilo de audio antes de soltar el resto
 	if ( iAppContainer ){
 		RemoveFromStack( iAppContainer );
 		delete iAppContainer;

@@ -269,7 +269,7 @@ void LayoutConstruirMenuAdd();
 // arranque sin archivo y el fallback de un .w3d sin bloque Layout. 'vp3dOut' (opcional)
 // devuelve el Viewport3D creado, para dejarlo como viewport activo.
 class Viewport3D;
-ViewportBase* LayoutPorDefecto(Viewport3D** vp3dOut);
+ViewportBase* LayoutPorDefecto(int w, int h, Viewport3D** vp3dOut);
 void AddCube(); void AddPlane(); void AddVertex(); void AddReference();
 // Lock Orbit: arrastrar PANEA en vez de orbitar. Togglea y avisa con un cartel. false = no hay viewport3d.
 bool LayoutLockOrbitToggle();

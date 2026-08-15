@@ -74,7 +74,7 @@ texinfo subidos 16640
 texinfo max 16640
 
 # --- 4ter) el .w3d de TEXTO tambien lo declara ------------------------------
-# Es EXACTAMENTE la linea que hay que agregarle a CrashToadVillage.w3d, adentro
+# Es la linea que hay que agregarle al .w3d de texto, adentro
 # de `Escena { }` y al lado de `background`:   pixelado: true
 abrirw3d prueba_texcache_pix.w3d
 pixelado es true

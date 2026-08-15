@@ -3,6 +3,21 @@
 #include "objects/MallaDatos.h" // geometria compartida por ruta (dedup del re-import)
 #include "io/w3dFilesystem.h"   // leer por el Core: sirve igual en disco, en el pak y en el APK
 #include <sstream>
+#include <iostream>   // std::cerr (avisos de parseo)
+
+// C++03 (RVCT/Symbian): las dos lambdas del parser pasan a funciones de archivo
+static unsigned char WobjSaturar(double v){
+    double n = v * 255.0;
+    if (n < 0) n = 0;
+    if (n > 255.0) n = 255.0;
+    return (unsigned char)n;
+}
+static signed char WobjConvNormal(double v){
+    v = ((v + 1.0) / 2.0) * 255.0 - 128.0;
+    if (v > 127) v = 127;
+    if (v < -128) v = -128;
+    return (signed char)v;
+}
 
 Mesh* LeerWOBJ(std::istream& file, const std::string& filename, Object* parent, bool NoMerge,
                std::vector<int>* vertToCP){
@@ -43,17 +58,10 @@ Mesh* LeerWOBJ(std::istream& file, const std::string& filename, Object* parent, 
             Wobj.vertex.push_back((GLfloat)y);
             Wobj.vertex.push_back((GLfloat)z);
 
-            auto saturar = [](double v) { 
-                double n = v * 255.0; 
-                if (n < 0) n = 0; 
-                if (n > 255.0) n = 255.0; 
-                return (unsigned char)n; 
-            };
-
-            Wobj.vertexColor.push_back(saturar(r));
-            Wobj.vertexColor.push_back(saturar(g));
-            Wobj.vertexColor.push_back(saturar(b));
-            Wobj.vertexColor.push_back(saturar(a));
+            Wobj.vertexColor.push_back(WobjSaturar(r));
+            Wobj.vertexColor.push_back(WobjSaturar(g));
+            Wobj.vertexColor.push_back(WobjSaturar(b));
+            Wobj.vertexColor.push_back(WobjSaturar(a));
 
             acumuladoVertices++;
         }
@@ -62,16 +70,9 @@ Mesh* LeerWOBJ(std::istream& file, const std::string& filename, Object* parent, 
             double nx, ny, nz;
             ss >> nx >> ny >> nz;
 
-            auto conv = [](double v) -> signed char {
-                v = ((v + 1.0) / 2.0) * 255.0 - 128.0;
-                if (v > 127) v = 127;
-                if (v < -128) v = -128;
-                return (signed char)v;
-            };
-
-            Wobj.normals.push_back(conv(nx));
-            Wobj.normals.push_back(conv(ny));
-            Wobj.normals.push_back(conv(nz));
+            Wobj.normals.push_back(WobjConvNormal(nx));
+            Wobj.normals.push_back(WobjConvNormal(ny));
+            Wobj.normals.push_back(WobjConvNormal(nz));
             acumuladoNormales++;
         }
         else if (line.rfind("vt ", 0) == 0) {
@@ -207,7 +208,7 @@ Mesh* ImportWOBJ(const std::string& filepath, Object* parent, bool NoMerge) {
     (filepath.substr(filepath.size() - 5) != ".wobj" &&
      filepath.substr(filepath.size() - 4) != ".obj")) {
         std::cerr << "Error: El archivo no es ni .obj ni .wobj: "<< filepath <<"\n";
-        return nullptr;
+        return NULL;
     }
 
     // POR LA ABSTRACCION DEL CORE (ReadTextFile) y no con ifstream: un .obj puede
@@ -219,7 +220,7 @@ Mesh* ImportWOBJ(const std::string& filepath, Object* parent, bool NoMerge) {
     const std::string datosObj = w3dFileSystem::ReadTextFile(filepath, &okObj);
     if (!okObj) {
         std::cerr << "No se pudo abrir: " << filepath << "\n";
-        return nullptr;
+        return NULL;
     }
     std::istringstream file(datosObj);
 
@@ -234,11 +235,11 @@ Mesh* ImportWOBJ(const std::string& filepath, Object* parent, bool NoMerge) {
     bool hayGrupos = w3dFileSystem::FileExists(rutaGrupos);
     std::vector<int> vertToCP;
 
-    Mesh* mesh = LeerWOBJ(file, filepath, parent, NoMerge, hayGrupos ? &vertToCP : nullptr);
+    Mesh* mesh = LeerWOBJ(file, filepath, parent, NoMerge, hayGrupos ? &vertToCP : NULL);
 
     if (!mesh) {
         std::cerr << "No se pudo cargar el objeto WOBJ\n";
-        return nullptr;
+        return NULL;
     }
 
     std::string mtl = sinExt + ".mtl";

@@ -107,7 +107,7 @@ extern std::string g_w3dUINoCargo;
 
 // CONFIG de la tarjeta Juego (Compilar juego): viaja con el proyecto como
 // objeto raiz "compilar" del .w3d (ver GuardarW3D.h). Arranca en los defaults.
-W3dCompilarCfg g_proyCompilar = { 1, 0, 0, 0, true, true, false };
+W3dCompilarCfg g_proyCompilar = { 1, 0, 0, 0, true, true, false, 0 };
 
 void W3dCompilarReset() {
     g_proyCompilar.modoVentana = 1;      // Pantalla completa (el default de siempre)
@@ -117,6 +117,7 @@ void W3dCompilarReset() {
     g_proyCompilar.usarFisica  = true;
     g_proyCompilar.usarSonido  = true;
     g_proyCompilar.modoDebug   = false;  // produccion
+    g_proyCompilar.uid         = 0;       // sin UID: un proyecto sin "uid" no hereda el del anterior. El save/load lo persiste.
 }
 
 // int <-> string legible del bloque "compilar" (el JSON se edita a mano: nada
@@ -140,12 +141,15 @@ int W3dCompilarOrientacionInt(const std::string& s) {
 const char* W3dCompilarAssetsStr(int a) { return (a == 1) ? "empaquetados" : "sueltos"; }
 int W3dCompilarAssetsInt(const std::string& s) { return (s == "empaquetados") ? 1 : 0; }
 const char* W3dCompilarPlataformaStr(int p) {
-    return (p == 3) ? "android" : (p == 2) ? "web" : (p == 1) ? "appimage" : "linux-deb";
+    return (p == 5) ? "symbian" : (p == 4) ? "windows" :
+           (p == 3) ? "android" : (p == 2) ? "web" : (p == 1) ? "appimage" : "linux-deb";
 }
 int W3dCompilarPlataformaInt(const std::string& s) {
     if (s == "appimage") return 1;
     if (s == "web")      return 2;
     if (s == "android")  return 3;
+    if (s == "windows")  return 4;
+    if (s == "symbian")  return 5;
     return 0;
 }
 
@@ -2096,7 +2100,9 @@ bool GuardarW3D(const std::string& ruta) {
     s += "    \"sonido\": ";  s += g_proyCompilar.usarSonido ? "true" : "false"; s += ",\n";
     s += "    \"debug\": ";   s += g_proyCompilar.modoDebug  ? "true" : "false"; s += ",\n";
     s += "    \"assets\": ";  JEsc(s, W3dCompilarAssetsStr(g_proyCompilar.assetsModo)); s += ",\n";
-    s += "    \"plataforma\": "; JEsc(s, W3dCompilarPlataformaStr(g_proyCompilar.plataforma)); s += "\n";
+    s += "    \"plataforma\": "; JEsc(s, W3dCompilarPlataformaStr(g_proyCompilar.plataforma)); s += ",\n";
+    { char uidhex[16]; snprintf(uidhex, sizeof(uidhex), "0x%08X", g_proyCompilar.uid);
+      s += "    \"uid\": "; JEsc(s, uidhex); s += "\n"; }   // UID3 de Symbian del juego (0 = sin asignar)
     s += "  },\n";
     // PALETAS del proyecto (v3): la fuente de verdad. Ademas se BAKEAN dentro
     // de cada .w3dui (UI2DGuardar) para el runtime standalone.

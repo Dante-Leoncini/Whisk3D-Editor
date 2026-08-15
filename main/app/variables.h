@@ -45,16 +45,20 @@ struct Config {
     bool autoKey;
     std::string SkinName;
     std::string graphicsAPI;
+    // Raiz del repo Whisk3D (con libs/Whisk3DCore) que Compilar necesita para el runtime. Cuando el editor
+    // corre desde el arbol de codigo se encuentra sola subiendo carpetas; cuando corre INSTALADO (junto al
+    // binario no hay repo) el que compila juegos la fija a mano en Ajustes y queda guardada aca.
+    std::string repoPath;
     Config()
         : fullscreen(false), enableAntialiasing(false),
-          width(800), height(600), displayIndex(0), scale(3),
+          width(800), height(600), displayIndex(0),
 #ifdef W3D_SYMBIAN
-          nuevoUsuario(false),
+          scale(1), nuevoUsuario(false),   // N95: UI a escala 1 (240x320) + usuario experimentado (va a teclas)
 #else
-          nuevoUsuario(true),
+          scale(3), nuevoUsuario(true),
 #endif
           autoKey(false),
-          SkinName("Whisk3D"), graphicsAPI("opengl") {}
+          SkinName("Whisk3D"), graphicsAPI("opengl"), repoPath("") {}
 };
 extern Config cfg;
 

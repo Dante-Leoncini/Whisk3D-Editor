@@ -57,6 +57,7 @@
 #include "ViewPorts/ViewPort3D.h"  // Viewport3D::RenderAPNG + Viewport3DActive (render a PNG)
 #include <cstdio>
 #include <cstdlib> // atof: el valor configurado (string) -> buffer del PropFloat (tarjetas de script)
+#include <ctime>   // time(): semilla del UID random del juego
 #include <string>
 #include <set> // centro UV de la seleccion (posiciones UV unicas, tarjeta "Transform UV")
 #ifdef W3D_SYMBIAN
@@ -1060,6 +1061,19 @@ static void AccionGuardarConfig(){
     else                    Notificar(T("Could not write config.ini"), true);
 }
 
+// Campo "Repo" de Ajustes <-> cfg.repoPath. Commit EN VIVO mientras se tipea (para que "Save Changes"
+// escriba lo que hay en el campo) y sync del display desde cfg cuando no tiene el foco. Mismo patron
+// que el campo Name. La ruta se valida recien al Compilar (RepoRoot chequea que exista Objects.cpp).
+static void SincronizarRepoCampo(PropText* pt){
+    if (!pt) return;
+    bool foco = (g_textFieldActivo == &pt->field);
+    if (foco){
+        if (cfg.repoPath != pt->field.text){ cfg.repoPath = pt->field.text; g_redraw = true; }
+    } else if (pt->field.text != cfg.repoPath){
+        pt->field.SetText(cfg.repoPath); g_redraw = true;
+    }
+}
+
 static void AccionMenuMateriales(){
     if (!PropsActivo) return;
     if (!ObjActivo || ObjActivo->getType() != ObjectType::mesh) return;
@@ -1531,13 +1545,20 @@ static void AccionSimCache(){
 // y se escribe al guardar con los valores vigentes. Antes eran statics de aca y
 // se reseteaban en cada arranque (el modo ventana elegido se perdia).
 // nombres VISIBLES de cada valor (los del JSON son otros: ver W3dCompilar*Str)
-static const char* NombrePlat(int p){ return (p==3)?"Android":(p==2)?"WebGL":(p==1)?"Linux AppImage":"Linux .deb"; }
+static const char* NombrePlat(int p){ return (p==5)?"Symbian .sisx":(p==4)?"Windows .exe":(p==3)?"Android":(p==2)?"WebGL":(p==1)?"Linux AppImage":"Linux .deb"; }
 static const char* NombreModoVent(int m){ return (m==2)?"Sin bordes":(m==0)?"Ventana":"Pantalla completa"; }
 // la ORIENTACION solo afecta a Android (manifest + hint SDL); en desktop/web no aplica.
 static const char* NombreOrientacion(int o){ return (o==2)?"Solo horizontal":(o==1)?"Solo vertical":"Todas"; }
 // ASSETS: Sueltos = archivos visibles y editables al lado del binario (modding
 // facil). Empaquetados = protegidos, DENTRO del binario, ofuscados (pak.cpp).
 static const char* NombreAssetsModo(int m){ return (m==1)?"Empaquetados (protegidos)":"Sueltos (editables)"; }
+// UID3 de Symbian del juego: 0 = sin asignar (el boton lo genera). Se muestra en hex.
+static const char* NombreUID(){
+    static char buf[16];
+    if (g_proyCompilar.uid == 0) return "Generar";
+    snprintf(buf, sizeof(buf), "0x%08X", g_proyCompilar.uid);
+    return buf;
+}
 static UI* UIParaCompilar(){
     UI* u = (ObjActivo && ObjActivo->getType() == ObjectType::ui) ? (UI*)ObjActivo : NULL;
     if (!u && SceneCollection)
@@ -1559,6 +1580,7 @@ static PopupMenu* MenuPlat = NULL;
 static void AccionPlatElegida(int id){
     g_proyCompilar.plataforma = id;   // queda en el .w3d al guardar el proyecto
     if (PropsActivo && PropsActivo->propJuegoPlat) PropsActivo->propJuegoPlat->button->text = NombrePlat(id);
+    if (PropsActivo && PropsActivo->propJuegoUID) PropsActivo->propJuegoUID->oculto = (id != 5); // UID: solo cuando Symbian esta elegido
     g_redraw = true;
 }
 static void AccionMenuPlat(){
@@ -1566,11 +1588,24 @@ static void AccionMenuPlat(){
     if (!MenuPlat){ MenuPlat = new PopupMenu(); MenuPlat->action = AccionPlatElegida; }
     MenuPlat->Limpiar();
     MenuPlat->titulo = "Plataforma";
+    MenuPlat->Agregar("Windows .exe", 4);
+    MenuPlat->Agregar("Symbian .sisx", 5);
     MenuPlat->Agregar("Linux .deb", 0);
     MenuPlat->Agregar("Linux AppImage", 1);
     MenuPlat->Agregar("WebGL", 2);
     MenuPlat->Agregar("Android", 3);
     AbrirMenuBajoBoton(MenuPlat, PropsActivo->propJuegoPlat->button);
+}
+// GENERAR un UID3 random para el JUEGO (app propia de Symbian: no pisa el editor). Rango
+// self-signed 0xE0000000-0xEFFFFFFF. Queda en el .w3d (bloque "compilar") al guardar.
+static void AccionGenerarUID(){
+    static bool seeded = false;
+    if (!seeded){ srand((unsigned)time(NULL)); seeded = true; }
+    unsigned r = ((unsigned)rand() << 17) ^ ((unsigned)rand() << 6) ^ (unsigned)rand();
+    g_proyCompilar.uid = 0xE0000000u | (r & 0x0FFFFFFFu);
+    if (PropsActivo && PropsActivo->propJuegoUID) PropsActivo->propJuegoUID->button->text = NombreUID();
+    Notificar("UID del juego generado (se guarda con el proyecto)", false);
+    g_redraw = true;
 }
 // desplegable "Modo ventana": como arranca la ventana del juego COMPILADO
 static PopupMenu* MenuModoVent = NULL;
@@ -2345,17 +2380,23 @@ static void AccionPaletaAgregar(){
 // crear una nueva (copia de la editada) o borrar la editada
 static PopupMenu* MenuPaletas = NULL;
 static void AccionPaletasElegida(int id){
+    // FUSIONADA: el dropdown elige la paleta DEL OBJETO (o hereda), y ademas gestiona.
+    // gPalEdit sigue a ObjActivo->paleta (se recalcula en el rebind), no se fija aca.
     int n = (int)W3dPaletas().size();
-    if (id == n) {                       // "Nueva paleta": copia de la editada
-        // el nombre unico lo pone W3dPaletaNueva (LA regla comun): antes habia OTRO
-        // bucle propio aca ("Paleta N", con tope 99)
+    if (id == -1) {                      // "Igual que el padre": el objeto hereda
+        if (ObjActivo) ObjActivo->paleta.clear();
+    } else if (id == n) {                // "Nueva paleta": una nueva por defecto, asignada al objeto
+        int idx = W3dPaletaNueva("Paleta", -1);
+        if (idx >= 0 && ObjActivo) ObjActivo->paleta = W3dPaletas()[idx].nombre;
+    } else if (id == n + 2) {            // "Duplicar": copia de la actual, asignada al objeto
         int idx = W3dPaletaNueva("Paleta", gPalEdit);
-        if (idx >= 0) gPalEdit = idx;
-    } else if (id == n + 1) {            // "Borrar paleta": la editada; sus
-        W3dPaletaBorrarPaleta(gPalEdit); // seleccionados vuelven a heredar
-        if (gPalEdit >= (int)W3dPaletas().size()) gPalEdit = (int)W3dPaletas().size() - 1;
-        if (gPalEdit < 0) gPalEdit = 0;
-    } else gPalEdit = id;
+        if (idx >= 0 && ObjActivo) ObjActivo->paleta = W3dPaletas()[idx].nombre;
+    } else if (id == n + 1) {            // "Borrar paleta": la actual; el objeto vuelve a heredar
+        W3dPaletaBorrarPaleta(gPalEdit);
+        if (ObjActivo) ObjActivo->paleta.clear();
+    } else {                             // elegir una paleta existente -> asignar al objeto
+        if (ObjActivo && id >= 0 && id < n) ObjActivo->paleta = W3dPaletas()[id].nombre;
+    }
     if (PropsActivo) PropsActivo->target = NULL;
     g_redraw = true;
 }
@@ -2365,10 +2406,15 @@ static void AccionMenuPaletas(){
     MenuPaletas->Limpiar();
     MenuPaletas->titulo = T("Palette");
     std::vector<Paleta>& ps = W3dPaletas();
-    for (size_t i = 0; i < ps.size(); i++)
-        MenuPaletas->Agregar(ps[i].nombre, (int)i);
-    MenuPaletas->Agregar(T("New Palette"), (int)ps.size());
-    if (!ps.empty()) MenuPaletas->Agregar("Borrar paleta", (int)ps.size() + 1);
+    int n = (int)ps.size();
+    MenuPaletas->Agregar("Igual que el padre", -1);       // heredar del padre (default)
+    for (int i = 0; i < n; i++)
+        MenuPaletas->Agregar(ps[i].nombre, i);
+    MenuPaletas->Agregar(T("New Palette"), n);             // nueva por defecto, asignada al objeto
+    if (gPalEdit >= 0 && gPalEdit < n){                    // hay una paleta asignada: gestionarla
+        MenuPaletas->Agregar("Duplicar", n + 2);          // copia de la actual
+        MenuPaletas->Agregar("Borrar paleta", n + 1);     // borrar la actual (vuelve a heredar)
+    }
     AbrirMenuBajoBoton(MenuPaletas, PropsActivo->propPaletaSel->button);
 }
 // el desplegable "Paleta" del OBJETO: "Igual que el padre" (default, hereda)
@@ -4247,6 +4293,8 @@ void ProyectoSincronizarCampos() {
     if (PropsActivo->propJuegoModoVent) PropsActivo->propJuegoModoVent->button->text = NombreModoVent(g_proyCompilar.modoVentana);
     if (PropsActivo->propJuegoOrient)   PropsActivo->propJuegoOrient->button->text   = NombreOrientacion(g_proyCompilar.orientacion);
     if (PropsActivo->propJuegoAssets)   PropsActivo->propJuegoAssets->button->text   = NombreAssetsModo(g_proyCompilar.assetsModo);
+    if (PropsActivo->propJuegoUID)    { PropsActivo->propJuegoUID->button->text      = NombreUID();
+                                        PropsActivo->propJuegoUID->oculto = (g_proyCompilar.plataforma != 5); }
     g_redraw = true;
 }
 
@@ -4257,9 +4305,23 @@ static void AccionProyAbrirElegido(const std::string& ruta) {
 static void AccionProyAbrir() {
     AbrirFileBrowser("Abrir proyecto", "Abrir", ".w3d", AccionProyAbrirElegido);
 }
+// valida que el proyecto tenga NOMBRE antes de guardar. Si falta, marca el campo en rojo
+// (PropText::error) + avisa por toast, y devuelve false: el caller NO guarda (antes, sin
+// nombre, caia silenciosamente en el explorador de "Guardar como" -> parecia que no pasaba nada).
+static bool ProyValidarNombre() {
+    if (!PropsActivo || !PropsActivo->propProyNombre) return false;
+    bool falta = PropsActivo->propProyNombre->field.text.find_first_not_of(" \t") == std::string::npos;
+    PropsActivo->propProyNombre->error = falta;
+    if (falta) {
+        extern void Notificar(const std::string&, bool);
+        Notificar("Ponele un nombre al proyecto para poder guardar", true);
+        g_redraw = true;
+    }
+    return !falta;
+}
 static void AccionProyGuardar() {
+    if (!ProyValidarNombre()) return;
     std::string r = ProyRutaCompleta();
-    if (r.empty() || r == ".w3d") { GuardarProyectoComo(); return; }
     if (GuardarW3D(r)) { w3dPath = r; ProyectoSincronizarCampos(); }
 }
 static void AccionProyComo() {
@@ -4269,6 +4331,7 @@ static void AccionProyComo() {
 // lado, como <proyecto>_vNN.w3d (ver GuardarVersion.h): el .w3d es un contenedor,
 // asi que copiarlo es copiar la version entera. Despues se refresca el label.
 static void AccionProyVersion() {
+    if (!ProyValidarNombre()) return;
     GuardarVersionEjecutar();
     ProyectoSincronizarCampos();   // el boton pasa a "Guardar version v(N+1)"
 }
@@ -5519,6 +5582,14 @@ void Properties::ConstruirGrupos(){
     propJuegoAssets->button->text = NombreAssetsModo(g_proyCompilar.assetsModo);
     propJuegoAssets->action = AccionMenuAssets;
     propJuego->properties.push_back(propJuegoAssets);
+    // UID de Symbian del juego: cada juego es su PROPIA app (no pisa el editor). El boton
+    // GENERA un UID random (rango self-signed) que se guarda en el .w3d. Solo lo usa el target Symbian.
+    propJuegoUID = new PropButton("UID Symbian");
+    propJuegoUID->conLabel = true;
+    propJuegoUID->button->text = NombreUID();
+    propJuegoUID->action = AccionGenerarUID;
+    propJuegoUID->oculto = (g_proyCompilar.plataforma != 5);  // visible solo con Symbian
+    propJuego->properties.push_back(propJuegoUID);
     // subsistemas opcionales: destildado = el juego compilado sale SIN ese modulo
     propJuegoFisica = new PropBool("Usar motor de fisica");
     propJuegoFisica->value = &g_proyCompilar.usarFisica;
@@ -5638,6 +5709,12 @@ void Properties::ConstruirGrupos(){
     propAjSkin->button->desplegable = true;
     propAjSkin->action = AccionMenuSkin;
     propAjustes->properties.push_back(propAjSkin);
+
+    // RAIZ DEL REPO para Compilar: solo hace falta cuando el editor corre INSTALADO (sin el repo al lado).
+    // El que compila juegos pega aca la ruta a la carpeta del repo (la que tiene libs/Whisk3DCore) y con
+    // "Save Changes" queda guardada en el config. Vacio = el editor la busca sola subiendo de carpetas.
+    propAjRepo = new PropText("Repo", cfg.repoPath.c_str());
+    propAjustes->properties.push_back(propAjRepo);
 
     // la ESCALA del editor, en vivo (x1 = N95, x3 = default PC)
     { PropFloat* pe = new PropFloat("Escala", "x");
@@ -6622,10 +6699,15 @@ void Properties::RefreshTargetProperties(){
     // la pestania 0 (proyecto): no depende del objeto activo.
     if (propPaleta){
         std::vector<Paleta>& ps = W3dPaletas();
-        if (gPalEdit >= (int)ps.size()) gPalEdit = ps.empty() ? 0 : (int)ps.size() - 1;
-        if (gPalEdit < 0) gPalEdit = 0;
-        int n = ps.empty() ? 0 : (int)ps[gPalEdit].colores.size();
-        int firma = 1 + n + gPalEdit * 1000 + (int)ps.size() * 100000;
+        // gPalEdit = la paleta ASIGNADA al objeto activo (-1 = "Igual que el padre", hereda).
+        // La tarjeta FUSIONA la seleccion del objeto con la gestion: se edita la paleta que usa
+        // el objeto. Sin objeto o heredando (gPalEdit<0) solo se muestra el desplegable.
+        gPalEdit = -1;
+        if (ObjActivo && !ObjActivo->paleta.empty())
+            for (size_t i = 0; i < ps.size(); i++)
+                if (ps[i].nombre == ObjActivo->paleta) { gPalEdit = (int)i; break; }
+        int n = (gPalEdit >= 0 && gPalEdit < (int)ps.size()) ? (int)ps[gPalEdit].colores.size() : 0;
+        int firma = 1 + n + (gPalEdit + 2) * 1000 + (int)ps.size() * 100000;
         if (firma != paletaFilas){
             for (size_t i = 0; i < propPaleta->properties.size(); i++){
                 PropertieBase* p = propPaleta->properties[i];
@@ -6648,10 +6730,11 @@ void Properties::RefreshTargetProperties(){
             propPaletaSel = new PropButton(T("Palette"));
             propPaletaSel->conLabel = true;
             propPaletaSel->button->desplegable = true;
-            propPaletaSel->button->text = ps.empty() ? "-" : ps[gPalEdit].nombre;
+            propPaletaSel->button->text = (gPalEdit >= 0 && gPalEdit < (int)ps.size())
+                                              ? ps[gPalEdit].nombre : std::string("Igual que el padre");
             propPaletaSel->action = AccionMenuPaletas;
             propPaleta->properties.push_back(propPaletaSel);
-            if (!ps.empty()){
+            if (gPalEdit >= 0 && gPalEdit < (int)ps.size()){
                 // [1] el NOMBRE de la paleta en edicion (renombra en vivo,
                 // propagando a las selecciones: SincronizarNombrePaleta)
                 propPaletaNombre = new PropText(T("Name"), ps[gPalEdit].nombre);
@@ -6680,7 +6763,7 @@ void Properties::RefreshTargetProperties(){
         // renombra en todas; la fuente es la paleta en edicion)
         // ...y ademas son UNICOS entre si (el rename in-place de la fila PropColorPal no
         // chequeaba nada: dos colores homonimos eran triviales)
-        if (!ps.empty())
+        if (gPalEdit >= 0 && gPalEdit < (int)ps.size())
             for (size_t i = 0; i < ps[gPalEdit].colores.size(); i++){
                 const std::string libre = W3dPaletaColorNombreLibre(ps[gPalEdit].colores[i].nombre, (int)i);
                 if (libre != ps[gPalEdit].colores[i].nombre) ps[gPalEdit].colores[i].nombre = libre;
@@ -7287,6 +7370,7 @@ void Properties::ActualizarPestanias(){
     if (propAjIdioma)  propAjIdioma->button->text  = W3dIdiomaNombre(g_idioma);
     if (propAjBackend) propAjBackend->button->text = cfg.graphicsAPI;
     if (propAjSkin)    propAjSkin->button->text    = cfg.SkinName;
+    if (propAjRepo)    SincronizarRepoCampo(propAjRepo);
     // tarjeta Animation: el dropdown muestra la animacion activa (icono camara=escena / esqueleto=clip); Delete se
     // OCULTA cuando no hay nada que borrar; Render se GRISA sin animaciones. New y Rename siempre visibles.
     if (propAnimation && pestaniaActiva == 0){
@@ -7346,9 +7430,11 @@ void Properties::ActualizarPestanias(){
     // su nombre/posicion viven en la contextual) esa pestania es la 2. NUNCA en la
     // 0 ni en la de data de un mesh, y SOLO con un objeto activo: sin seleccion
     // la tarjeta por-objeto no se muestra (la del proyecto si, que es global).
-    if (propPaleta)    propPaleta->visible    = (pestaniaActiva == 0);
-    if (propPaletaObj) propPaletaObj->visible = ObjActivo != NULL &&
+    // la Paleta (seleccion del objeto + gestion + colores, FUSIONADAS en propPaleta) vive en la
+    // pestania del OBJETO (Objeto para 3D, contextual para 2D/script), no en Render.
+    if (propPaleta)    propPaleta->visible    = ObjActivo != NULL &&
         ((pestaniaActiva == 1 && !es2D) || (pestaniaActiva == 2 && (es2D || esScript)));
+    if (propPaletaObj) propPaletaObj->visible = false;   // su dropdown se fusiono en propPaleta
     // la tarjeta Control (nombre + visible + "Agregar script") y las tarjetas de scripts:
     // en la contextual (2) para el objeto Script, y en la pestania Scripts (8) para
     // CUALQUIER otro objeto (si no tiene scripts, la 8 ofrece "Agregar script" igual).

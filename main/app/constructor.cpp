@@ -98,29 +98,12 @@ void ConstructUniversal(int argc, char* argv[]) {
 
     NewMesh(MeshType::cube, CollectionActive);
 
-    Viewport3D* vp3dInicial = new Viewport3D();
-    // el layout se adapta a la orientacion (igual que Symbian, ver w3dlayout.cpp):
-    if (winH > winW) {
-#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
-        // WEB / ANDROID VERTICAL: viewport ARRIBA, solo PROPIEDADES abajo. Outliner +
-        // propiedades juntos quedan muy apretados en un celular; el outliner se ve rotando
-        // a horizontal.
-        rootViewport = new ViewportColumn(vp3dInicial, new Properties(), 0.70f);
-#else
-        // PORTRAIT (ej. N95 240x320): viewport ARRIBA, fila [outliner | propiedades] ABAJO
-        rootViewport = new ViewportColumn(
-            vp3dInicial,
-            new ViewportRow(new Outliner(), new Properties(), 0.40f),
-            0.70f
-        );
-#endif
-    } else {
-        // LANDSCAPE (PC): EL layout por defecto, que vive en UN solo lugar (LayoutPorDefecto,
-        // LayoutInput.cpp) para que el arranque sin archivo y el fallback de un .w3d sin
-        // bloque Layout armen exactamente lo mismo.
-        delete vp3dInicial;                      // el builder crea el suyo
-        rootViewport = LayoutPorDefecto(&vp3dInicial);
-    }
+    // EL layout por defecto, UNA sola logica por TAMANO DE PANTALLA (LayoutPorDefecto, LayoutInput.cpp):
+    // un lado < 320px -> 2 viewports (3D + Propiedades, segun orientacion); mas grande -> 4 viewports
+    // (3D + Timeline + Outliner + Props). La MISMA en todos los sistemas (antes habia una rama aca y otra
+    // distinta en Symbian). El arranque sin archivo y el fallback de un .w3d sin bloque Layout arman lo mismo.
+    Viewport3D* vp3dInicial = NULL;
+    rootViewport = LayoutPorDefecto(winW, winH, &vp3dInicial);
     // siempre hay un viewport activo (borde verde) por defecto: sin mouse
     // (Symbian) es la unica referencia; con mouse el hover lo pisa enseguida.
     viewPortActive = vp3dInicial;

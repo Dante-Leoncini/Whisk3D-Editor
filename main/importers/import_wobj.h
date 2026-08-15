@@ -2,7 +2,9 @@
 #define IMPORTWOBJ_H
 
 #include "importers/import_obj.h"
-#include <filesystem>
+#ifndef W3D_SYMBIAN
+#include <filesystem>   // (no se usa hoy; RVCT/Symbian no tiene C++17 filesystem)
+#endif
 
 // vertToCP (opcional): por cada vertice de RENDER creado, el indice de la linea 'v'
 // del OBJ de la que salio (dominio CONTROL-POINT). Lo pide ImportWOBJ cuando hay un

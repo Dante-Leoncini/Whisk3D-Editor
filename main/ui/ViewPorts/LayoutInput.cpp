@@ -109,9 +109,19 @@ static ViewportBase* LayoutCrearViewport(int aId) {
 //  hacia abajo y lo que se elige ahi es lo que muestra el panel de abajo.
 //  El timeline no necesita alto: 12 % alcanza para la barra y el dope.
 // ====================================================================
-ViewportBase* LayoutPorDefecto(Viewport3D** vp3dOut) {
+ViewportBase* LayoutPorDefecto(int w, int h, Viewport3D** vp3dOut) {
     Viewport3D* vp3d = new Viewport3D();
     if (vp3dOut) *vp3dOut = vp3d;
+    // UNA sola logica de layout por defecto, por TAMANO DE PANTALLA (identica en todos los sistemas):
+    //   lado menor < 320px  -> 2 viewports: 3D + Propiedades, segun orientacion.
+    //   lado menor >= 320px -> 4 viewports: 3D + Timeline + Outliner + Propiedades (el de arriba).
+    int lado = (w < h) ? w : h;
+    if (lado < 320) {
+        if (w >= h)  // horizontal: 3D a la izquierda | Propiedades a la derecha
+            return new ViewportRow(vp3d, new Properties(), 0.7f);
+        // vertical (N95 240x320): 3D arriba / Propiedades abajo
+        return new ViewportColumn(vp3d, new Properties(), 0.7f);
+    }
     return new ViewportRow(
         new ViewportColumn(vp3d, new Timeline(), 0.88f),          // 3D grande / timeline chico
         new ViewportColumn(new Outliner(), new Properties(), 0.40f), // outliner 40 % arriba
@@ -384,6 +394,17 @@ void LayoutMaximizar() {
         rootViewport->x = 0; rootViewport->y = 0; rootViewport->Resize(w, h);
     }
     g_redraw = true;
+}
+
+// MODO JUEGO (.sisx bundleado): full-screen del viewport 3D -> el juego se ve SOLO, sin el
+// chrome del editor (los demas viewports). Idempotente: si ya esta maximizado, no hace nada.
+void LayoutMaximizar3DParaJuego() {
+    if (!rootViewport || g_rootGuardado) return;   // sin layout o ya maximizado
+    std::vector<ViewportBase*> hojas;
+    LayoutRecolectarHojas(rootViewport, hojas);
+    for (size_t i = 0; i < hojas.size(); i++)
+        if (hojas[i]->ViewportKind() == 1) { viewPortActive = hojas[i]; break; } // 1 = ViewPort3D
+    if (viewPortActive && viewPortActive != rootViewport) LayoutMaximizar();
 }
 
 // opcion del menu de tipo: cambiar / expand / split / maximizar
@@ -2165,6 +2186,39 @@ static PopupMenu* gMenuFace   = NULL;
 // [3] Object, [4] Overlays. Si ya hay OTRO menu abierto lo cierra y abre el
 // nuevo (cambio por hover / click); si el de ese boton ya esta abierto, nada.
 // Devuelve true si quedo abierto un menu de la barra.
+// TRANSPORTE del juego (Stop / Play-Pausa) de la barra del viewport 3D: es ACCION DIRECTA, asi que
+// SOLO se dispara con un CLICK real. Estaba DENTRO de LayoutAbrirMenuDeBarra -- que la llaman tambien el
+// hover del mouse y las flechas de navegacion del menu -> pasar POR ENCIMA de Stop reseteaba el juego
+// (SimStop). Separado aca: la llama unicamente el path del click. Devuelve true si el punto cae sobre un
+// boton de transporte (y ya hizo la accion): el click no sigue al menu. Mismo patron que el Timeline
+// (Mover=resalta / Activar=dispara), que ya lo hacia bien.
+static bool LayoutTransporteBarra3D(ViewportBase* vp, int mx, int my) {
+    if (!vp || !vp->isLeaf() || vp->ViewportKind() != 1) return false;
+    std::vector<Button*>& B = vp->BarButtons;
+    Button* bs = BarRolBtn(B, BR_JuegoStop);
+    Button* bl = BarRolBtn(B, BR_JuegoPlay);
+    extern bool SimActiva(); extern void SimStop();
+    if (bs && bs->visible && bs->Contains(mx, my)) {
+        Viewport3DActive = (Viewport3D*)vp;
+        if (SimActiva()) SimStop();       // restaura el estado inicial + descarga scripts
+        PlayAnimation = false; g_redraw = true; return true;
+    }
+    if (bl && bl->visible && bl->Contains(mx, my)) {
+        Viewport3DActive = (Viewport3D*)vp;
+        if (PlayAnimation) { PlayAnimation = false; }   // pausa
+        else {
+            // MISMA PUERTA que el Play del timeline: no arrancar con texturas en la cola diferida
+            // (el juego salia gris el primer segundo).
+            extern bool JuegoEsperarTexturas();
+            if (!JuegoEsperarTexturas()) { g_redraw = true; return true; }
+            JuegoPrepararViewports(!SimActiva());   // overlays off solo si el juego ARRANCA
+            AnimPlayDir = 1; PlayAnimation = true;
+        }
+        g_redraw = true; return true;
+    }
+    return false;
+}
+
 bool LayoutAbrirMenuDeBarra(ViewportBase* vp, int mx, int my) {
     if (!vp || !vp->isLeaf()) return false;
     // el viewport 3D tiene su cadena propia (abajo); los demas se abren solos por el virtual compartido, asi no
@@ -2175,29 +2229,8 @@ bool LayoutAbrirMenuDeBarra(ViewportBase* vp, int mx, int my) {
     // tras abrir un proyecto en caliente Viewport3DActive podia quedar apuntando
     // al 3D del layout ANTERIOR y View > Viewpoint "no hacia nada"
     Viewport3DActive = (Viewport3D*)vp;
-
-    // MODO JUEGO: los botones de transporte son ACCION directa (no abren menu)
-    { Button* bs = BarRolBtn(B, BR_JuegoStop);
-      Button* bl = BarRolBtn(B, BR_JuegoPlay);
-      extern bool SimActiva(); extern void SimStop();
-      if (bs && bs->visible && bs->Contains(mx, my)) {
-          if (SimActiva()) SimStop();       // restaura el estado inicial + descarga scripts
-          PlayAnimation = false; g_redraw = true; return true;
-      }
-      if (bl && bl->visible && bl->Contains(mx, my)) {
-          if (PlayAnimation) { PlayAnimation = false; }   // pausa
-          else {
-              // MISMA PUERTA que el Play del timeline: no se arranca con texturas
-              // en la cola diferida (el juego salia gris el primer segundo).
-              extern bool JuegoEsperarTexturas();
-              if (!JuegoEsperarTexturas()) { g_redraw = true; return true; }
-              // dar PLAY: overlays off SOLO si el juego ARRANCA (sim aun no cargada);
-              // reanudar desde pausa respeta lo que el usuario haya prendido
-              JuegoPrepararViewports(!SimActiva());
-              AnimPlayDir = 1; PlayAnimation = true;
-          }
-          g_redraw = true; return true;
-      } }
+    // (el transporte Stop/Play NO va aca: es accion directa y solo se dispara por click real ->
+    //  LayoutTransporteBarra3D, llamada desde el path del click. Ver el comentario de esa funcion.)
 
     PopupMenu* objetivo = NULL;     // menu desplegable a abrir
     Button* boton = NULL;           // su boton en la barra
@@ -3678,7 +3711,8 @@ bool LayoutClickUI(int mx, int my) {
         } else if (under->ViewportKind() == 8) {
             LayoutClickBarraIDE((IDE*)under, mx, my); // selector de script / Save / Refresh
         } else {
-            LayoutAbrirMenuDeBarra(under, mx, my); // Select/Add/Object/Overlays
+            // transporte (Stop/Play) SOLO por click real; si no fue transporte, abrir el menu
+            if (!LayoutTransporteBarra3D(under, mx, my)) LayoutAbrirMenuDeBarra(under, mx, my); // Select/Add/Object/Overlays
         }
         return true;
     }

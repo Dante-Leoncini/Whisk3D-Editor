@@ -11,7 +11,7 @@ TARGETTYPE      exe
 UID             0x100039CE 0xA00D021D
 
 EPOCSTACKSIZE   30000 //originalmente estaba en 30000 67108864
-EPOCHEAPSIZE    0x10000 0x4000000  // Tama�o del heap: 64 KB m�nimo y 64 MB m�ximo
+EPOCHEAPSIZE    0x10000 0x6000000  // heap: 64 KB min, 96 MB max (subido de 64 MB para proyectos grandes; el N95 8GB tiene 128 MB RAM)
 
 // Fase 3 unificacion: el codigo compartido del core se compila con este
 // define (activa el dialecto Symbian: GLES/gl.h, shims de app-state, etc.)
@@ -27,6 +27,9 @@ MACRO           l_signalT=int
 // os.clock() de Lua (loslib.c) usa CLOCKS_PER_SEC de <time.h>, que Open C no define
 // (clock() si existe). Valor POSIX estandar; os.clock no es critico para el juego.
 MACRO           CLOCKS_PER_SEC=1000000
+// AUDIO: prende el mixer real del Core (efectos + musica) y su backend Symbian
+// (CMdaAudioOutputStream). Sin esto W3dAudio.cpp compila solo los stubs no-op.
+MACRO           W3D_ENABLE_AUDIO
 
 // Compilador RVCT 2.2 (ARMV6 en bld.inf): forzar ARM, ARMv6 y FPU por hardware.
 // Es lo que aprovecha la VFP del N95/N8.
@@ -175,17 +178,17 @@ SOURCEPATH      ..\..\..\main\objects
 SOURCE          Culling.cpp Particulas.cpp VisZona.cpp Gamepad.cpp
 SOURCEPATH      ..\..\..\main\render
 SOURCE          UIOverlay.cpp
-// audio del Core: el dispatcher compila SIEMPRE. Sin W3D_ENABLE_AUDIO son stubs
-// no-op (sonido() no hace nada), asi BindsJuego linkea sin backend. El backend real
-// de Symbian (W3dAudioSymbian.cpp + CMdaAudioOutputStream) se prende despues.
+// audio del Core: el dispatcher (mixer por software) + el backend de salida de Symbian
+// (CMdaAudioOutputStream en su propio hilo, doble-buffer). Con W3D_ENABLE_AUDIO arriba
+// compilan el camino REAL; sin el, W3dAudio.cpp cae a stubs no-op.
 SOURCEPATH      ..\..\..\libs\Whisk3DCore\audio
-SOURCE          W3dAudio.cpp
+SOURCE          W3dAudio.cpp W3dAudioSymbian.cpp
 // subsistemas del Core que el link pedia (todos C++03, portables): sistema de
 // recursos, zip (.w3d/.w3dpack), almacen, config, visibilidad/PVS, atlas de skin.
 SOURCEPATH      ..\..\..\libs\Whisk3DCore\io
 SOURCE          W3dRecursos.cpp W3dZip.cpp W3dAlmacen.cpp
 SOURCEPATH      ..\..\..\libs\Whisk3DCore\objects
-SOURCE          VisSet.cpp
+SOURCE          VisSet.cpp MallaDatos.cpp
 SOURCEPATH      ..\..\..\libs\Whisk3DCore\base
 SOURCE          W3dConfig.cpp
 SOURCEPATH      ..\..\..\libs\WhiskUI\draw
@@ -193,12 +196,14 @@ SOURCE          W3dAtlasPacker.cpp
 // objetos del editor que faltaban: LOD (niveles de detalle) y el espejo/agua
 SOURCEPATH      ..\..\..\main\objects
 SOURCE          LOD.cpp Mirror.cpp
-// import_w3d.cpp (cargador del proyecto .w3d) DIFERIDO: son 3800 lineas en C++11
-// (auto/lambdas/range-for/unordered_map) que hay que portar a C++03. Hoy no lo llama
-// nadie en el build de Symbian (constructor.cpp/main.cpp de PC no entran aca), asi que
-// se saca hasta hacer el port. El editor Symbian ya importa OBJ/FBX/glTF (esos si C++03).
-//SOURCEPATH      ..\..\..\main\importers
-//SOURCE          import_w3d.cpp
+// import_w3d.cpp (cargador del proyecto .w3d): portado a C++03 (functors en vez de
+// lambdas, loops por indice, tipos explicitos, w3dMapAt en vez de map::at de C++11).
+// import_wobj.cpp (.wobj + normales/color de vertice) tambien portado a C++03.
+SOURCEPATH      ..\..\..\main\importers
+SOURCE          import_w3d.cpp import_wobj.cpp
+// dispatcher de import por extension (.fbx/.gltf/.obj): lo llama import_w3d
+SOURCEPATH      ..\..\..\main\io
+SOURCE          lectura-escritura.cpp
 
 // --- LUA 5.4 EMBEBIDO (C89 portable: corre hasta en el N95) + los binds del juego,
 //     la fisica y la simulacion. Sin lua.c/luac.c (son los programas standalone). ---
@@ -212,7 +217,9 @@ SOURCE          W3dScript.cpp
 SOURCEPATH      ..\..\..\libs\Whisk3DCore\physics
 SOURCE          W3dFisica.cpp
 SOURCEPATH      ..\..\..\main\script
-SOURCE          BindsJuego.cpp SimJuego.cpp
+// ScriptUI.cpp: engancha gBindExtra (constructor estatico) -> registra los binds de JUEGO
+// (sonido/setTexto/posPx/pantalla/...). Sin esto, un .lua que llama sonido() da "nil value".
+SOURCE          BindsJuego.cpp SimJuego.cpp ScriptUI.cpp
 
 // OJO: volver al SOURCEPATH local (las rutas de recursos de abajo se
 // resuelven contra el ultimo SOURCEPATH)
@@ -281,6 +288,7 @@ LIBRARY         avkon.lib euser.lib apparc.lib cone.lib eikcore.lib
 LIBRARY         eikcoctl.lib estlib.lib fbscli.lib
 LIBRARY         efsrv.lib
 LIBRARY         ImageConversion.lib
+LIBRARY         mediaclientaudiostream.lib // CMdaAudioOutputStream: salida de audio del Core
 LIBRARY         libgles_cm.lib
 LIBRARY         ws32.lib commondialogs.lib
 LIBRARY         estor.lib eikctl.lib aknnotify.lib apgrfx.lib eikdlg.lib charconv.lib 

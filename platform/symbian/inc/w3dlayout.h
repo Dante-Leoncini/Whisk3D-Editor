@@ -41,6 +41,7 @@ void  W3dLayoutCiclarViewport(TInt aDir); // tecla verde: cambia viewport activo
 void  W3dLayoutToggleBarra();             // soft-izq: abre/cierra barra de menu
 void  W3dLayoutRedimensionarViewport(TInt aDx, TInt aDy); // verde+flechas: redimensiona en un eje
 TBool W3dLayout3DActivo();                // el viewport activo es un 3D?
+TBool W3dLayoutJuegoViewportActivo();     // el viewport activo es donde se juega (3D o 2D)
 TBool W3dLayoutOcupado();   // scroll/divisor agarrado (cursor verde)
 TBool W3dLayoutArrastrePopup(); // el picker arrastrando (cursor violeta)
 void W3dLayoutMenuParent(TBool aClear, TInt aX, TInt aY); // ctrl+P/alt+P

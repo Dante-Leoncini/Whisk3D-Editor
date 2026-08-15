@@ -344,6 +344,21 @@ static void AplicarFlechas3D(){
 	}
 }
 
+// MODO JUEGO: mapea el scancode del keypad del N95 al nombre de tecla que leen los scripts lua
+// (tecla/teclaApretada/stick). El D-pad navega el menu y mueve la pala (1 jugador usa arriba/abajo);
+// el centro (select) se trata aparte como enter+espacio. 0 = no es tecla de juego (sigue al editor).
+static const char* W3dJuegoNombreTecla(TInt sc){
+	switch (sc){
+		case EStdKeyUpArrow:    return "arriba";
+		case EStdKeyDownArrow:  return "abajo";
+		case EStdKeyLeftArrow:  return "izquierda";
+		case EStdKeyRightArrow: return "derecha";
+		case EStdKeyDevice3:    // centro del D-pad (select)
+		case EStdKeyEnter:      return "enter";
+		default:                return 0;
+	}
+}
+
 TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEventCode aType ){
 	// EEventKey (auto-repeat) se ignora: las flechas mantenidas las aplica el
 	// loop de frame (gHeld* + AplicarFlechas3D), no el repeat lento del telefono.
@@ -357,6 +372,18 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 			// NO pasa por aca: 1/2/3 del BT quedan libres, como pidio Dante)
 			// 1/2/3 = mover/rotar/escalar (G/R/S de PC) - 0 = modo de vista
 			TInt sc = aKeyEvent.iScanCode;
+			// MODO JUEGO: el D-pad + select van DIRECTO a los scripts (tecla/teclaApretada), con prioridad
+			// sobre el ruteo del editor (que se come las flechas para orbita/cursor). Sin esto el juego cargaba
+			// pero no respondia a nada en el N95. Cede a popup/menu abiertos (escotilla: softkeys siguen libres).
+			if (AnimEsJuego && PlayAnimation && W3dLayoutJuegoViewportActivo() && !W3dLayoutPopupActivo() && !W3dLayoutMenuAbierto()){
+				const char* jn = W3dJuegoNombreTecla(sc);
+				if (jn){
+					extern void W3dScriptTecla(const char*, bool);
+					W3dScriptTecla(jn, true);
+					if (sc == EStdKeyDevice3 || sc == EStdKeyEnter) W3dScriptTecla("espacio", true); // select cuenta como enter Y espacio
+					return EKeyWasConsumed;
+				}
+			}
 			// popup modal (File browser) o barra de menu abierta: se quedan con
 			// TODO el keypad (flechas mueven el foco/menu, OK selecciona, soft
 			// IZQ=164=Cancelar/cerrar). Asi se navegan SIN mouse BT y los
@@ -637,8 +664,23 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 			{
 			// soltar una flecha: deja de aplicarse en el loop de frame
 			TInt usc = aKeyEvent.iScanCode;
+			// MODO JUEGO: soltar el D-pad + select -> los scripts (fin del "mantenido" que lee tecla()).
+			if (AnimEsJuego && PlayAnimation && W3dLayoutJuegoViewportActivo() && !W3dLayoutPopupActivo() && !W3dLayoutMenuAbierto()){
+				const char* jn = W3dJuegoNombreTecla(usc);
+				if (jn){
+					extern void W3dScriptTecla(const char*, bool);
+					W3dScriptTecla(jn, false);
+					if (usc == EStdKeyDevice3 || usc == EStdKeyEnter) W3dScriptTecla("espacio", false);
+					return EKeyWasConsumed;
+				}
+			}
 			if (usc == EStdKeyYes){
-				if (!gGreenUsado) W3dLayoutCiclarViewport(1); // tap = ciclar viewport
+				if (!gGreenUsado){
+					W3dLayoutCiclarViewport(1); // tap = ciclar viewport
+					// al cambiar de viewport durante el juego, soltar las teclas del juego: si se ciclo con
+					// una flecha mantenida, que no quede la pala "trabada" moviendose sola.
+					if (AnimEsJuego && PlayAnimation){ extern void W3dScriptSoltarTeclas(); W3dScriptSoltarTeclas(); }
+				}
 				gGreenHeld = EFalse;
 				return EKeyWasConsumed;
 			}
@@ -780,6 +822,21 @@ int CWhisk3DContainer::DrawCallBack( TAny* aInstance )
     CWhisk3DContainer* instance = (CWhisk3DContainer*) aInstance;
     instance->iFrame++;
 
+    // APERTURA DE PROYECTO DIFERIDA (tarjeta Archivo / abrir un .w3d en el explorador ->
+    // AbrirProyectoDesde solo encola g_proyAbrirPendiente). Se procesa ACA, con el stack
+    // limpio, igual que MainLoopFrame en PC. Sin esto el .w3d elegido quedaba en la cola y
+    // NO se abria en el N95 (el boton que la pidio vive en el layout que AbrirProyectoAhora
+    // destruye, por eso el open es diferido y no directo).
+    {
+        extern std::string g_proyAbrirPendiente;
+        extern void AbrirProyectoAhora(const std::string&);
+        if (!g_proyAbrirPendiente.empty()) {
+            std::string r = g_proyAbrirPendiente;
+            g_proyAbrirPendiente.clear();
+            AbrirProyectoAhora(r);
+        }
+    }
+
     // Heartbeat de diagnostico: una linea cada 300 frames. Si despues de un
     // cuelgue el log sigue creciendo, el loop de render esta vivo y el
     // problema es el ESTADO (clavado en ELoadingTextures); si no crece mas,
@@ -848,10 +905,28 @@ int CWhisk3DContainer::DrawCallBack( TAny* aInstance )
     #endif
         static TUint gLastAnimTick = 0;
         TUint nowA = User::NTickCount();
-        TUint animTicks = (AnimFPS > 0) ? (TUint)(tickHz / AnimFPS) : (tickHz / 30);
-        if (nowA - gLastAnimTick >= animTicks) {
-            gLastAnimTick = nowA;
-            if (PlayAnimation) { AnimTick(); g_redraw = true; } // avanza CurrentFrame (loop Start..End del clip)
+        // MODO JUEGO (.w3d con scripts): la simulacion la maneja SimTickPlay -> corre los .lua
+        // (inicio/actualizar) y dispara sonido/UI, con dt en TIEMPO REAL a 60 nominal. En PC vive en
+        // main.cpp; en el N95 FALTABA -> el juego quedaba clavado en el frame 1 (nada de logica ni sonido).
+        // Si NO es juego, el play de animacion normal sigue como antes (AnimTick al ritmo de AnimFPS).
+        extern bool SimHayScripts(); extern bool SimActiva(); extern void SimTickPlay(float);
+        bool juego = AnimEsJuego && PlayAnimation && (SimActiva() || SimHayScripts());
+        if (juego) {
+            TUint gameTicks = tickHz / 60;   // objetivo 60 fps nominal
+            if (nowA - gLastAnimTick >= gameTicks) {
+                float dtSim = (float)(nowA - gLastAnimTick) / (float)tickHz;  // segundos reales entre ticks
+                if (dtSim > 0.1f)   dtSim = 0.1f;    // clamp (igual que PC): no dar pasos gigantes
+                if (dtSim < 0.001f) dtSim = 0.001f;
+                gLastAnimTick = nowA;
+                SimTickPlay(dtSim);
+                g_redraw = true;
+            }
+        } else {
+            TUint animTicks = (AnimFPS > 0) ? (TUint)(tickHz / AnimFPS) : (tickHz / 30);
+            if (nowA - gLastAnimTick >= animTicks) {
+                gLastAnimTick = nowA;
+                if (PlayAnimation) { AnimTick(); g_redraw = true; } // avanza CurrentFrame (loop Start..End del clip)
+            }
         }
     }
     // ANIMACION DE OBJETOS (pos/rot/escala): aplica los keyframes al frame actual. FALTABA en el N95 -> ni el play
