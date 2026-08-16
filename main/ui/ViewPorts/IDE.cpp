@@ -3,6 +3,7 @@
 #include "WhiskUI/draw/glesdraw.h"       // W3dPantallaAlto
 #include "WhiskUI/theme/colores.h"       // ListaColores / ColorID
 #include "WhiskUI/text/bitmapText.h"     // RenderBitmapText
+#include "W3dClipboard.h"                // portapapeles del sistema (Core): copiar/pegar con navegador/notas
 #include "WhiskUI/core/UI.h"             // marginGS / RenglonHeightGS / LetterWidthGS / GlobalScale / borderGS
 #include "objects/Textures.h"            // Textures[0] = atlas de la fuente
 #include "render/OpcionesRender.h"       // g_redraw (render event-driven)
@@ -352,8 +353,9 @@ bool IDE::Guardar() {
         Notificar("IDE: fallo el guardado de " + IDENombreScript(archivo), true);
         return false;
     }
-#ifdef _WIN32
-    remove(archivo.c_str()); // en Windows rename no pisa un destino existente
+#if defined(_WIN32) || defined(W3D_SYMBIAN)
+    remove(archivo.c_str()); // Windows Y Symbian: rename()/RFs::Rename NO reemplaza un destino que ya existe
+                             // (KErrAlreadyExists) -> sin este remove, guardar un .lua que ya existe fallaba SIEMPRE
 #endif
     if (rename(tmp.c_str(), archivo.c_str()) != 0) {
         remove(tmp.c_str());
@@ -377,7 +379,8 @@ bool IDE::Guardar() {
 void IDE::Refresh() {
     if (archivo.empty()) return;
     if (!Guardar()) return;
-#ifndef W3D_SYMBIAN
+    // (antes esto estaba bajo #ifndef W3D_SYMBIAN sin razon: SimJuego.cpp -SimActiva/SimScriptsCambiados- SI
+    //  compila en el .mmp del N95 -ya se usa desde Whisk3DContainer.cpp-, asi que la recarga en vivo linkea igual.)
     extern bool SimActiva();
     extern void SimScriptsCambiados(Object*);
     if (!SimActiva()) return;
@@ -398,7 +401,6 @@ void IDE::Refresh() {
     for (size_t i = 0; i < usan.size(); i++) SimScriptsCambiados(usan[i]);
     Notificar("Refresh: " + IdeNum((int)usan.size()) + " objeto(s) recargados en vivo", false);
     g_redraw = true;
-#endif
 }
 
 // ---------------------------------------------------------------------------
@@ -623,14 +625,14 @@ void IDE::DelForward() {
 }
 
 // ---------------------------------------------------------------------------
-//  clipboard (el REAL de SDL en PC; interno como respaldo/Symbian)
+//  clipboard: el del SISTEMA via W3dClipboard (Core) -> compartido con navegador/notas
+//  en TODAS las plataformas (SDL en PC/web, CClipboard en Symbian). gIDEClipInterno es
+//  respaldo local (headless / si el sistema no responde).
 // ---------------------------------------------------------------------------
 void IDE::Copiar() {
     if (!haySel) return;
     gIDEClipInterno = TextoSeleccionado();
-#ifndef W3D_SYMBIAN
-    SDL_SetClipboardText(gIDEClipInterno.c_str());
-#endif
+    w3dEngine::W3dClipboardSet(gIDEClipInterno);   // portapapeles del sistema (cualquier app lo puede pegar)
 }
 
 void IDE::Cortar() {
@@ -640,12 +642,8 @@ void IDE::Cortar() {
 }
 
 void IDE::Pegar() {
-    std::string t;
-#ifndef W3D_SYMBIAN
-    char* c = SDL_GetClipboardText(); // el clipboard REAL (de cualquier programa)
-    if (c) { t = c; SDL_free(c); }
-#endif
-    if (t.empty()) t = gIDEClipInterno; // headless / sin clipboard de sistema
+    std::string t = w3dEngine::W3dClipboardGet(); // el clipboard del SISTEMA (de cualquier programa: navegador, notas)
+    if (t.empty()) t = gIDEClipInterno; // headless / si el sistema no dio nada
     if (t.empty()) return;
     // solo ASCII imprimible + saltos (la fuente pixel del editor es ASCII)
     std::string filtrado;
@@ -953,7 +951,8 @@ void IDE::Render() {
     for (int l = primera; l < ultima; l++) {
         std::string num = IdeNum(l + 1);
         int nx = gutterW - marginGS - (int)num.size() * LW; // alineado a la derecha
-        IdeTexto(nx, py0 + l * lh, num, ListaColores[static_cast<int>(ColorID::grisUI)]);
+        // la linea del CURSOR se resalta en BLANCO (el resto en gris); asi se ve en que renglon estamos
+        IdeTexto(nx, py0 + l * lh, num, ListaColores[static_cast<int>(l == curLin ? ColorID::blanco : ColorID::grisUI)]);
     }
 
     // el codigo, por tramos de color del lexer

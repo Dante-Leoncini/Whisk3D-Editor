@@ -19,13 +19,9 @@ bool OverlayCustomNormal = false;
 bool OverlayFaceNormal   = false;
 float OverlayNormalSize  = 0.10f;
 
-// overlay de estadisticas / fps (apagados por defecto). Cada linea del submenu Statistics es independiente.
-bool OverlayStatVertices = false;
-bool OverlayStatFaces    = false;
-bool OverlayStatModgen   = false;
-bool OverlayStatTimes    = false;
-bool OverlayStatGL       = false;
-bool OverlayFps          = false;
+// overlay de estadisticas / fps: los 6 flags (OverlayStat*/OverlayFps) son AHORA miembros PER-VIEWPORT de
+// Viewport3D (mismo nombre, ver ViewPort3D.h) -> cada viewport prende sus stats por separado. Aca solo quedan
+// los datos GLOBALES que alimentan el overlay (los actualiza cada plataforma / el Core).
 float g_fpsActual      = 0.0f;
 long g_genMallaCount   = 0; // diagnostico de regeneracion de modificadores (ver OpcionesRender.h)
 bool g_objetosMovidos  = false; // un objeto se movio -> regenerar los Mirror con target (ver OpcionesRender.h)

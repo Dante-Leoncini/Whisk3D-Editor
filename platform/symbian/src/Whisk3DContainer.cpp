@@ -273,6 +273,8 @@ bool EditSelAvanzar(int, bool); bool EditSelTodoToggle(); bool EditSelToggleActu
 // LAPIZ del N95 (= "shift" del usuario): pulsacion CORTA sin flecha = ciclar al soltar;
 // pulsacion larga = nada; mantener + flecha = navegar la seleccion.
 static TBool gLapizHeld = EFalse, gLapizArrowUsed = EFalse;
+// accesor del lapiz (shift) para el codigo compartido: la barra del viewport muestra "copiar"/"pegar" al mantenerlo.
+bool W3dLapizHeld(){ return gLapizHeld ? true : false; }
 static TUint gLapizDownTick = 0;
 // MODIFICADORES de camara del keypad (mismo patron que el lapiz): mantener + flecha = accion de camara.
 // 0 = ZOOM (arriba/abajo); tap 0 (sin flecha) = enfocar (como antes). * = PANEO. # = PRIMERA PERSONA (girar).
@@ -292,12 +294,13 @@ extern void LoopCutIniciar(int aMx, int aMy); // 8 = Loop Cut (idem; arranca el 
 extern void LayoutLoopCutDesdeActivo();       // 8 = Loop Cut sobre el elemento ACTIVO (mismo path que el menu del viewport3d)
 static void AplicarFlechas3D(){
 	static TInt gMouseAccel = 0; // rampa del mouse virtual (arranca lento, acelera al mantener)
+	static TInt gIDEAccel = 0;   // rampa del cursor del IDE (idem: delay inicial + aceleracion)
 	TInt dx = 0, dy = 0;
 	if (gHeldLeft) dx -= 1;
 	if (gHeldRight) dx += 1;
 	if (gHeldUp) dy -= 1;
 	if (gHeldDown) dy += 1;
-	if (dx == 0 && dy == 0) { gMouseAccel = 0; return; } // soltaron: la proxima vez arranca lento de nuevo
+	if (dx == 0 && dy == 0) { gMouseAccel = 0; gIDEAccel = 0; return; } // soltaron: la proxima vez arranca lento de nuevo
 	g_redraw = true; // hay flecha mantenida moviendo camara/transform/valor -> redibujar
 	// POPUP activo (color picker): la flecha MANTENIDA ajusta el valor CADA frame (R/G/B/A o circulo/value).
 	// El auto-repeat del N95 es lentisimo (1fps) -> antes habia que tap-tap-tap ~255 veces. TeclaRepeat NO
@@ -313,6 +316,45 @@ static void AplicarFlechas3D(){
 	if (gGreenHeld){
 		W3dLayoutRedimensionarViewport(dx, dy); // un eje (der/abajo agranda childA)
 		return;
+	}
+	// IDE editando: las flechas MANTENIDAS mueven el cursor con aceleracion (delay inicial, despues rapido).
+	// shift(lapiz)+flecha extiende la seleccion. Sin esto el cursor era 1-por-pulsacion (inusable para el codigo).
+	{ extern void W3dLayoutIDEFlecha(int, bool);
+	  if (W3dLayoutIDEEditando()){
+		gIDEAccel++;
+		bool mover;
+		if      (gIDEAccel == 1)   mover = true;                    // primer paso inmediato
+		else if (gIDEAccel < 10)   mover = false;                   // delay inicial (como un teclado)
+		else if (gIDEAccel < 25)   mover = (gIDEAccel % 3 == 0);    // repeticion lenta
+		else                       mover = true;                    // rapido (cada frame)
+		if (mover){
+			TInt pasos = (gIDEAccel > 45) ? 2 : 1;                 // muy rapido: 2 pasos por frame
+			bool shift = gLapizHeld ? true : false;
+			for (TInt p = 0; p < pasos; p++){
+				if (gHeldLeft)  W3dLayoutIDEFlecha(EStdKeyLeftArrow, shift);
+				if (gHeldRight) W3dLayoutIDEFlecha(EStdKeyRightArrow, shift);
+				if (gHeldUp)    W3dLayoutIDEFlecha(EStdKeyUpArrow, shift);
+				if (gHeldDown)  W3dLayoutIDEFlecha(EStdKeyDownArrow, shift);
+			}
+		}
+		return;
+	  }
+	}
+	// CONSOLA: las flechas MANTENIDAS scrollean con aceleracion (comparte la rampa gIDEAccel: solo una activa a la vez)
+	{ extern bool W3dLayoutConsolaActivo(); extern void W3dLayoutConsolaScroll(int, int);
+	  if (W3dLayoutConsolaActivo()){
+		gIDEAccel++;
+		bool mover;
+		if      (gIDEAccel == 1)   mover = true;
+		else if (gIDEAccel < 10)   mover = false;
+		else if (gIDEAccel < 25)   mover = (gIDEAccel % 3 == 0);
+		else                       mover = true;
+		if (mover){
+			TInt pasos = (gIDEAccel > 45) ? 2 : 1;
+			for (TInt p = 0; p < pasos; p++) W3dLayoutConsolaScroll(dx, dy);
+		}
+		return;
+	  }
 	}
 	// MOUSE VIRTUAL visible: las flechas mueven el CURSOR como un mouse (no la camara).
 	// Durante un transform 3D/de malla NO: ahi las flechas mueven la seleccion. El de KEYFRAMES es al reves: lo
@@ -356,6 +398,10 @@ static const char* W3dJuegoNombreTecla(TInt sc){
 		case EStdKeyRightArrow: return "derecha";
 		case EStdKeyDevice3:    // centro del D-pad (select)
 		case EStdKeyEnter:      return "enter";
+		case 164:               return "softizq"; // softkey IZQUIERDO: reservado para juegos (solo dentro de un viewport de juego)
+		case '1':               return "1";       // digitos del keypad: van al juego durante el play (tecla("1")/("2")/("3"))
+		case '2':               return "2";
+		case '3':               return "3";
 		default:                return 0;
 	}
 }
@@ -376,7 +422,7 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 			// MODO JUEGO: el D-pad + select van DIRECTO a los scripts (tecla/teclaApretada), con prioridad
 			// sobre el ruteo del editor (que se come las flechas para orbita/cursor). Sin esto el juego cargaba
 			// pero no respondia a nada en el N95. Cede a popup/menu abiertos (escotilla: softkeys siguen libres).
-			if (AnimEsJuego && PlayAnimation && W3dLayoutJuegoViewportActivo() && !W3dLayoutPopupActivo() && !W3dLayoutMenuAbierto()){
+			if (AnimEsJuego && PlayAnimation && !gGreenHeld && W3dLayoutJuegoViewportActivo() && !W3dLayoutPopupActivo() && !W3dLayoutMenuAbierto()){
 				const char* jn = W3dJuegoNombreTecla(sc);
 				if (jn){
 					extern void W3dScriptTecla(const char*, bool);
@@ -405,6 +451,8 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 					else if (sc == EStdKeyUpArrow)    gHeldUp = ETrue;
 					else if (sc == EStdKeyDownArrow)  gHeldDown = ETrue;
 				}
+				// '*' cierra el selector de simbolos (otra forma de salir sin elegir nada)
+				if (sc == '*'){ extern bool SimbolosActivo(); extern void SimbolosCerrar(); if (SimbolosActivo()){ SimbolosCerrar(); return EKeyWasConsumed; } }
 				W3dLayoutTecla(sc, mouseX, mouseY);
 				return EKeyWasConsumed; // modal: traga el resto tambien
 			}
@@ -416,25 +464,56 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 			// (nombres/paths) no se podian editar en el N95. '#' cambia el modo (Abc/abc/ABC, mantenido=123);
 			// '*' = punto decimal en numerico (los simbolos en texto vienen en la etapa 2). izq/der mueven el
 			// caret, C borra, OK confirma y sale, soft-IZQ(164) cancela.
-			if (W3dT9Activo()){
+			// VERDE (resize/ciclar viewport) y LAPIZ (shift para seleccionar/copiar/pegar) NO los toma el T9: se dejan
+			// pasar a sus handlers de abajo (gGreenHeld/gLapizHeld) asi andan mientras se edita texto. El bug era que
+			// el T9 se los comia -> ni resize, ni copiar/pegar, ni seleccion (gLapizHeld nunca se seteaba).
+			if (W3dT9Activo() && sc != EStdKeyYes && sc != EStdKeyLeftShift && sc != EStdKeyRightShift){
+				// IDE editando codigo: el T9 escribe en el editor de scripts (no en un TextField). Flechas = cursor,
+				// OK = nueva linea, C = backspace, soft-izq = salir a la barra (script/save/refresh).
+				if (W3dLayoutIDEEditando()){
+					if ((sc >= '0' && sc <= '9') || sc == EStdKeyHash){ W3dT9Tecla(sc, ETrue); return EKeyWasConsumed; }
+					if (sc == EStdKeyBackspace){ W3dT9Reset(); W3dLayoutIDEBorrar(); return EKeyWasConsumed; }
+					// las flechas se MANTIENEN (gHeld*) y AplicarFlechas3D mueve el cursor cada frame con aceleracion
+					// (arranca lento, acelera). shift(lapiz)+flecha selecciona. Single-tap = 1 movimiento.
+					if (sc == EStdKeyLeftArrow){  W3dT9Reset(); gHeldLeft = ETrue;  return EKeyWasConsumed; }
+					if (sc == EStdKeyRightArrow){ W3dT9Reset(); gHeldRight = ETrue; return EKeyWasConsumed; }
+					if (sc == EStdKeyUpArrow){    W3dT9Reset(); gHeldUp = ETrue;    return EKeyWasConsumed; }
+					if (sc == EStdKeyDownArrow){  W3dT9Reset(); gHeldDown = ETrue;  return EKeyWasConsumed; }
+					if (sc == EStdKeyDevice3 || sc == EStdKeyEnter){ W3dT9Reset(); W3dLayoutIDEEnter(); return EKeyWasConsumed; }
+					// shift(lapiz) + softkey: izquierda = COPIAR la seleccion, derecha = PEGAR (portapapeles del sistema)
+					if (gLapizHeld && sc == 164){ W3dT9Reset(); W3dLayoutIDECopiar(); return EKeyWasConsumed; }
+					if (gLapizHeld && sc == 165){ W3dT9Reset(); W3dLayoutIDEPegar();  return EKeyWasConsumed; }
+					if (sc == 164){ W3dT9Reset(); W3dLayoutIDESalirEdicion(); return EKeyWasConsumed; }
+					if (sc == '*'){ W3dT9Reset(); { extern void SimbolosAbrir(); SimbolosAbrir(); } return EKeyWasConsumed; } // selector de simbolos
+					return EKeyWasConsumed; // el resto se consume: no toca la escena
+				}
 				if ((sc >= '0' && sc <= '9') || sc == EStdKeyHash){ W3dT9Tecla(sc, ETrue); return EKeyWasConsumed; }
 				if (sc == EStdKeyBackspace){ W3dT9Reset(); W3dTextFieldChar(8); return EKeyWasConsumed; }
 				if (sc == EStdKeyLeftArrow || sc == EStdKeyRightArrow){ W3dT9Reset(); W3dLayoutTeclaPanel(sc); return EKeyWasConsumed; }
 				if (sc == EStdKeyDevice3 || sc == EStdKeyEnter){ W3dT9Reset(); W3dLayoutTeclaPanel(EStdKeyDevice3); return EKeyWasConsumed; }
 				if (sc == 164){ W3dT9Reset(); W3dLayoutTeclaPanel(EStdKeyEscape); return EKeyWasConsumed; } // soft-IZQ = cancelar
-				if (sc == '*'){ if (W3dNumEditActivo()){ W3dT9Reset(); W3dTextFieldChar('.'); } return EKeyWasConsumed; }
+				if (sc == '*'){ if (W3dNumEditActivo()){ W3dT9Reset(); W3dTextFieldChar('.'); } else { W3dT9Reset(); { extern void SimbolosAbrir(); SimbolosAbrir(); } } return EKeyWasConsumed; } // '.' en numerico; selector de simbolos en texto
 				return EKeyWasConsumed; // mientras se edita, ninguna otra tecla toca la escena
 			}
-			// soft IZQ: si el JUEGO esta corriendo, PAUSA y devuelve el control a la app (suelta las teclas del
-			// juego para que la paleta no quede pegada). Sino, abre/cierra la barra de menu del viewport activo.
+			// soft IZQ: VERDE + izquierda = PAUSA el juego (combo DELIBERADO). El softkey SOLO no pausa: seria un
+			// desastre por inercia (salis de un menu en el timeline y pausas sin querer). En un viewport de juego la
+			// izquierda va al juego (W3dJuegoNombreTecla, se captura arriba); en el resto abre/cierra la barra de menu.
 			if (sc == 164){
-				if (AnimEsJuego && PlayAnimation){
-					extern void W3dScriptSoltarTeclas();
-					PlayAnimation = false;      // pausa el sim: el gate de input se cierra y la UI vuelve a responder
-					W3dScriptSoltarTeclas();    // suelta teclas/pad/sticks/touch (sino la paleta queda pegada)
-				} else {
-					W3dLayoutToggleBarra();
+				if (gGreenHeld){
+					gGreenUsado = ETrue;   // que soltar el verde NO cicle el viewport
+					// verde + izquierda = PLAY/PAUSA toggle (pausar Y reanudar con el mismo combo). En JUEGO y tambien
+					// en ANIMACION normal (pedido del usuario): togglea PlayAnimation en los dos; solo suelta las
+					// teclas del juego si es juego (en animacion no hay input de juego que soltar).
+					if (PlayAnimation){
+						if (AnimEsJuego){ extern void W3dScriptSoltarTeclas(); W3dScriptSoltarTeclas(); }
+						PlayAnimation = false;
+					} else PlayAnimation = true;   // reanudar
+					return EKeyWasConsumed;
 				}
+				// IDE en modo barra: el soft-izq VUELVE a editar texto (toggle con el soft-izq que en edicion abre la
+				// barra). Sin esto quedabas atascado en la barra (izquierda navegaba/abria el menu de tipo).
+				if (W3dLayoutIDEEnBarra()){ W3dLayoutIDEVolverEdicion(); return EKeyWasConsumed; }
+				W3dLayoutToggleBarra();
 				return EKeyWasConsumed;
 			}
 			// soft DER fuera de un popup: alterna el cursor virtual (lo que
@@ -528,7 +607,9 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 				    (sc == EStdKeyUpArrow || sc == EStdKeyDownArrow)){
 					if (W3dLayoutTeclaViewport(sc)) return EKeyWasConsumed;
 				}
-				if (gGreenHeld || W3dLayout3DActivo() || mouseVisible || W3dLayoutUVActivo() || W3dLayoutTimelineActivo()){ // 3D=orbita, UV/timeline=paneo/scrub, mouse=cursor
+				// 3D con FOCO DE TRANSPORTE (Stop/Play): la flecha NO orbita, cae al dispatch del panel (linea 618)
+				// para navegar Stop<->Play, igual que el Timeline con foco suelta las flechas. De ahi el && !W3dLayoutFocoTransporte().
+				if (gGreenHeld || (W3dLayout3DActivo() && !W3dLayoutFocoTransporte()) || mouseVisible || W3dLayoutUVActivo() || W3dLayoutTimelineActivo() || W3dLayoutConsolaActivo()){ // 3D=orbita, UV/timeline=paneo/scrub, mouse=cursor, consola=scroll
 					if (gGreenHeld) gGreenUsado = ETrue; // verde+flecha = resize (no ciclar)
 					if (sc == EStdKeyLeftArrow)       gHeldLeft = ETrue;
 					else if (sc == EStdKeyRightArrow) gHeldRight = ETrue;
@@ -587,10 +668,10 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 			// EDIT MODE: 7 = Extrude, 8 = Loop Cut, 4 = nada. Las funciones se protegen
 			// solas fuera de Edit Mode (chequean InteractionMode), asi que en object mode no hacen nada.
 			if (sc == '7'){ LayoutExtrudeFaces(); return EKeyWasConsumed; }
-			// 8 = Loop Cut desde el ELEMENTO ACTIVO (cara -> pregunta orientacion; arista -> directo), IGUAL que el
-			// menu del viewport (que Dante confirmo que anda). Antes era LoopCutIniciar(mouseX,mouseY) = el path por
-			// HOVER de PC: en el N95 el cursor virtual no cae sobre una arista -> sin preview, sin orientacion, OK no hacia nada.
-			if (sc == '8'){ LayoutLoopCutDesdeActivo(); return EKeyWasConsumed; }
+			// 8 = Loop Cut SOLO en Edit Mode de malla; FUERA de edicion = entra/sale de la vista desde la CAMARA
+			// ACTIVA (toggle, como el numpad 0 en PC). Antes "8" disparaba Loop Cut siempre -> daba error de loop
+			// cut aun sin estar editando una malla. El gate (Edit Mode vs camara) vive en W3dLayoutTecla8.
+			if (sc == '8'){ W3dLayoutTecla8(); return EKeyWasConsumed; }
 			if (sc == '9'){ W3dLayoutLockOrbit(); return EKeyWasConsumed; } // 9 = bloquear/desbloquear el orbital
 			if (sc == '4'){ return EKeyWasConsumed; } // 4 = nada
 			if (sc == '5'){ return EKeyWasConsumed; } // 5 = nada
@@ -682,8 +763,10 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 			{
 			// soltar una flecha: deja de aplicarse en el loop de frame
 			TInt usc = aKeyEvent.iScanCode;
-			// T9: soltar '#' mientras se edita texto resuelve el cambio de modo (tap=Abc/abc/ABC, mantenido=123)
-			if (W3dT9Activo() && usc == EStdKeyHash){ W3dT9Tecla(usc, EFalse); return EKeyWasConsumed; }
+			// T9: soltar '#' mientras se edita texto resuelve el cambio de modo (tap=Abc/abc/ABC, mantenido=123).
+			// TAMBIEN soltar las teclas NUMERICAS: el T9 usa el key-UP para distinguir MANTENER (auto-repeat, sin
+			// release) de un re-tap deliberado -> sin esto el "mantener->digito" no anda y el multi-tap se rompe.
+			if (W3dT9Activo() && (usc == EStdKeyHash || (usc >= '0' && usc <= '9'))){ W3dT9Tecla(usc, EFalse); return EKeyWasConsumed; }
 			// MODO JUEGO: soltar el D-pad + select -> los scripts (fin del "mantenido" que lee tecla()).
 			if (AnimEsJuego && PlayAnimation && W3dLayoutJuegoViewportActivo() && !W3dLayoutPopupActivo() && !W3dLayoutMenuAbierto()){
 				const char* jn = W3dJuegoNombreTecla(usc);
@@ -902,8 +985,8 @@ int CWhisk3DContainer::DrawCallBack( TAny* aInstance )
 
     // ANIMACION: materiales/UV animados cada frame + avance del frame en PLAY al ritmo de AnimFPS (independiente de
     // los fps de la UI). En PC vive en MainLoopFrame; en el N95 FALTABA -> el play quedaba "clavado" en el frame 1 y
-    // los materiales animados no corrian. (UpdateAnimations -vertex anim, VertexAnimation.cpp- NO se compila en el
-    // .mmp -> se saltea; el skinning/pose de esqueleto siguen stub -> el frame avanza pero la malla no deforma.)
+    // los materiales animados no corrian. (El avance de las VERTEX-anims -VertexAnimation.cpp, SI en el .mmp- se hace
+    // abajo, en la rama de juego, con UpdateAnimations(dtSim); el skinning/pose de esqueleto siguen stub.)
     UpdateAnimatedMaterials();
     // ANIMACIONES UV "tira de atlas" (Core, Mesh.cpp: SI esta en el .mmp): autoplay
     // tambien en el N95, mismo tick nominal que los materiales animados. El redraw
@@ -932,6 +1015,9 @@ int CWhisk3DContainer::DrawCallBack( TAny* aInstance )
                 if (dtSim < 0.001f) dtSim = 0.001f;
                 gLastAnimTick = nowA;
                 SimTickPlay(dtSim);
+                // AVANCE de las vertex-anims (Crash y demas mallas animadas): en PC vive en main.cpp; en el N95
+                // FALTABA -> la malla quedaba clavada en el frame 1 (CambiarYa posa un cuadro, pero nada lo avanzaba).
+                { extern void UpdateAnimations(float); UpdateAnimations(dtSim); }
                 g_redraw = true;
             }
         } else {
@@ -947,6 +1033,10 @@ int CWhisk3DContainer::DrawCallBack( TAny* aInstance )
     // AnimFPS, como en PC: al scrubear con las flechas se tiene que ver YA, no al ritmo del play. Guard interno:
     // solo trabaja al CAMBIAR de frame.
     { extern void AplicarAnimacionObjetos(); AplicarAnimacionObjetos(); }
+    // VERTEX ANIM ACTIVA EN EL TIMELINE (kind 3): posa la malla al frame del playhead. En PC vive en main.cpp; en
+    // el N95 FALTABA -> al seleccionar un clip (ej "correr") y dar Play, la timeline avanzaba pero la vertex-anim
+    // NO cambiaba. UpdateAnimations la saltea a proposito (kind 3): manda el playhead, no el auto-avance.
+    { extern void AplicarVertexAnimTimeline(); AplicarVertexAnimTimeline(); }
 
     // Render EVENT-DRIVEN: solo dibujar+cursor+swap si algo CAMBIO (g_redraw, lo
     // prende cualquier tecla/cursor/flecha) o hay una animacion en play. Si la escena

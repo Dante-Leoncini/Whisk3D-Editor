@@ -1536,10 +1536,17 @@ static void UIExportCarpetaElegida(const std::string& carpeta){
 }
 // el techo del cache de estados (espejo float del int de SimJuego)
 extern int gSimCacheMax;   // SimJuego.cpp
+extern bool gSimCacheOn;   // SimJuego.cpp: cache de juego ON/OFF (checkbox)
 static float g_simCacheF = 250.0f;
 static void AccionSimCache(){
     gSimCacheMax = (int)(g_simCacheF + 0.5f);
     if (gSimCacheMax < 10) gSimCacheMax = 10;
+}
+// al DES/TILDAR "Cache de juego": cortar/reiniciar el buffer LIMPIO desde el tick actual, asi destildarlo a mitad
+// de partida no deja frames "fantasma" (banda de cache / rewind sobre frames viejos) hasta el proximo Stop.
+static void AccionSimCacheOn(){
+    extern void SimCacheReset();
+    SimCacheReset();
 }
 // Volumen del gameplay (0..100): escribe g_proyCompilar.volumen (viaja en el .w3d) y aplica YA la ganancia al
 // mixer del Core (0..100 -> 0..1), asi baja/sube en vivo mientras jugas. Ver W3dAudioJuegoVolume.
@@ -5633,11 +5640,17 @@ void Properties::ConstruirGrupos(){
     propJuegoCompilar = new PropButton("Compilar juego", IconType::gamepad);
     propJuegoCompilar->action = AccionCompilarJuego;
     propJuego->properties.push_back(propJuegoCompilar);
-    { PropFloat* pC = new PropFloat("Cache", "frames");
-      pC->SetRango(10.0f, 100000.0f); pC->entero = true;
-      pC->stepFino = 10.0f; pC->stepGrueso = 50.0f; pC->dragStep = 1.0f;
-      g_simCacheF = (float)gSimCacheMax; pC->value = &g_simCacheF; pC->onChange = AccionSimCache;
-      propJuego->properties.push_back(pC); }
+    // checkbox: cache de juego (rewind) ON/OFF. Destildado -> el sim NO snapshotea la escena cada tick = juego
+    // FLUIDO (ver SimJuego.cpp). Con el cache OFF, el campo "Cache" y "No reemplazar estados" se ocultan (refresh).
+    propJuegoCacheOn = new PropBool("Cache de juego");
+    propJuegoCacheOn->value = &gSimCacheOn;
+    propJuegoCacheOn->onChange = AccionSimCacheOn;   // al togglear: corta el cache limpio (sin frames fantasma)
+    propJuego->properties.push_back(propJuegoCacheOn);
+    propJuegoCacheMax = new PropFloat("Cache", "frames");
+    propJuegoCacheMax->SetRango(10.0f, 100000.0f); propJuegoCacheMax->entero = true;
+    propJuegoCacheMax->stepFino = 10.0f; propJuegoCacheMax->stepGrueso = 50.0f; propJuegoCacheMax->dragStep = 1.0f;
+    g_simCacheF = (float)gSimCacheMax; propJuegoCacheMax->value = &g_simCacheF; propJuegoCacheMax->onChange = AccionSimCache;
+    propJuego->properties.push_back(propJuegoCacheMax);
     propAnimConservar = new PropBool("No reemplazar estados");
     propAnimConservar->value = &AnimConservarEstados;
     propJuego->properties.push_back(propAnimConservar);
@@ -7429,7 +7442,10 @@ void Properties::ActualizarPestanias(){
         // "No reemplazar estados" y su nota solo aparecen siendo un juego
         if (gPropAnimEnd) gPropAnimEnd->value = AnimEsJuego ? NULL : &g_animEndF;
         if (propBtnAnimRender) propBtnAnimRender->oculto = AnimEsJuego;
-        if (propAnimConservar) propAnimConservar->value = AnimEsJuego ? &AnimConservarEstados : NULL;
+        // con el cache de juego DESTILDADO, el limite "Cache" y "No reemplazar estados" (opciones del rewind)
+        // no tienen sentido -> se ocultan (value=NULL). "No reemplazar estados" ademas solo aplica en modo juego.
+        if (propJuegoCacheMax) propJuegoCacheMax->value = gSimCacheOn ? &g_simCacheF : NULL;
+        if (propAnimConservar) propAnimConservar->value = (AnimEsJuego && gSimCacheOn) ? &AnimConservarEstados : NULL;
     }
     // el objeto UI NO tiene transformacion: es el ORDEN DE DIBUJO (la interfaz se dibuja al
     // final, sobre la escena). No se mueve, ni rota, ni escala: su tarjeta no aplica.

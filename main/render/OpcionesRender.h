@@ -53,16 +53,8 @@ extern bool OverlayFaceNormal;   // cian: normal de cada cara (triangulo)
 extern float OverlayNormalSize;  // largo de la linea (default 0.10)
 
 // overlay de estadisticas (texto blanco arriba a la derecha del viewport 3D). Submenu "Statistics": cada linea
-// se prende/apaga por separado (como el submenu "Objects"), sin master.
-extern bool OverlayStatVertices; // "vertex: agrupados/reales"
-extern bool OverlayStatFaces;    // "faces: logicas/triangulos"
-extern bool OverlayStatModgen;   // "modgen: N" (regeneraciones de malla de modificadores)
-extern bool OverlayStatTimes;    // "ms scn/3d/ui/log/swap/tot" (profiler por categoria)
-extern bool OverlayStatGL;       // "gl: N (dw/tx/st)": llamadas GL del pase de escena por frame
-                                 // (draws + binds reales + cambios de estado; fuente = g_stat* del Core,
-                                 // los mismos contadores del bench). Pedido del dueno: "cuantas llamadas
-                                 // gl se estan haciendo y cuanto logramos reducir".
-extern bool OverlayFps;          // "fps: N"
+// se prende/apaga por separado. Los 6 flags (OverlayStatVertices/Faces/Modgen/Times/GL, OverlayFps) son AHORA
+// miembros PER-VIEWPORT de Viewport3D (ver ViewPort3D.h), NO globales -> stats independientes por viewport.
 extern float g_fpsActual;        // FPS actual (lo actualiza cada plataforma 1x/frame)
 extern long g_genMallaCount;     // DIAGNOSTICO: veces que se regenero la malla de un modificador (subsurf/screw).
                                  // Se muestra en Statistics; al ROTAR NO debe subir (la malla se cachea en genValido).

@@ -25,11 +25,15 @@
 #include "ViewPorts/Outliner.h" // Outliner REAL de PC
 #include "ViewPorts/ViewPort3D.h" // Viewport3D REAL de PC
 #include "ViewPorts/Properties.h" // Properties REAL de PC
+#include "ViewPorts/IDE.h"        // editor de scripts (engancha el T9 del keypad en el N95)
+#include "ViewPorts/Console.h"    // consola: scroll con flechas mantenidas
+#include "w3dt9.h"                // hooks del T9 -> IDE
 #include "W3dProfile.h"           // profiler del frame (ms por categoria) tambien en el N95
 #include "WhiskUI/widgets/card.h"
 #include "ViewPorts/ScrollBar.h"
 #include "objects/Textures.h"
 #include "objects/Materials.h"            // Material (cargar textura)
+#include "base/W3dInteractionState.h"     // InteractionMode/EditMode (gate de la tecla "8": loop cut vs camara)
 #include "ViewPorts/PopUp/FileBrowser.h"  // AbrirFileBrowser (explorador compartido)
 #include "w3dnewscene.h"                   // W3dNewImportObj
 #include "WhiskUI/draw/icons.h"
@@ -239,6 +243,59 @@ static void W3dCargarTexturaEn(Material* aMat) {
                      ".png .jpg .jpeg .bmp .tga", W3dTexturaElegida);
 }
 
+// ============================ IDE (editor de scripts) por keypad en el N95 ============================
+// Dos modos segun barFocusIndex: < 0 = EDITAR TEXTO (el T9 escribe, flechas mueven el cursor, OK = nueva linea,
+// soft-izq = pasar a la barra); >= 0 = BARRA (script/save/refresh, ver LayoutBarraFoco*). Estas funciones son el
+// puente que usa el container (bloque T9 de OfferKeyEventL) y los hooks del T9 (W3dT9IDE*).
+static IDE* IDEActivoPtr() {
+    if (viewPortActive && viewPortActive->isLeaf() && viewPortActive->ViewportKind() == 8) return (IDE*)viewPortActive;
+    return 0;
+}
+bool W3dLayoutIDEEditando() {
+    IDE* i = IDEActivoPtr();
+    return (i && i->barFocusIndex < 0) ? true : false;
+}
+void W3dLayoutIDEInsertar(int c) { IDE* i = IDEActivoPtr(); if (i) { i->InsertarChar((char)c); g_redraw = true; } }
+void W3dLayoutIDEBorrar()        { IDE* i = IDEActivoPtr(); if (i) { i->Backspace(); g_redraw = true; } }
+void W3dLayoutIDEEnter()         { IDE* i = IDEActivoPtr(); if (i) { i->Enter(); g_redraw = true; } }
+void W3dLayoutIDEFlecha(int aScan, bool shift) {
+    IDE* i = IDEActivoPtr(); if (!i) return;
+    if      (aScan == EStdKeyLeftArrow)  i->MoverCursor(0, -1, shift);  // shift extiende la seleccion
+    else if (aScan == EStdKeyRightArrow) i->MoverCursor(0, +1, shift);
+    else if (aScan == EStdKeyUpArrow)    i->MoverCursor(-1, 0, shift);
+    else if (aScan == EStdKeyDownArrow)  i->MoverCursor(+1, 0, shift);
+    g_redraw = true;
+}
+void W3dLayoutIDESalirEdicion() { IDE* i = IDEActivoPtr(); if (i) i->barFocusIndex = 0; g_redraw = true; } // -> modo barra
+bool W3dLayoutIDEEnBarra()      { IDE* i = IDEActivoPtr(); return (i && i->barFocusIndex >= 0) ? true : false; }
+void W3dLayoutIDEVolverEdicion(){ IDE* i = IDEActivoPtr(); if (i) i->barFocusIndex = -1; g_redraw = true; } // barra -> editar
+bool W3dLayoutIDEInicioPalabra() {
+    IDE* i = IDEActivoPtr(); if (!i) return true;
+    if (i->curCol <= 0) return true;
+    const std::string& l = i->lineas[i->curLin];
+    return (i->curCol - 1 < (int)l.size() && l[i->curCol - 1] == ' ') ? true : false;
+}
+void W3dLayoutIDECopiar() {   // shift + softkey-izq: copiar la seleccion al portapapeles del sistema + toast
+    IDE* i = IDEActivoPtr(); if (!i || !i->haySel) return;
+    i->Copiar();
+    { extern void Notificar(const std::string&, bool); Notificar("texto copiado", false); }
+    g_redraw = true;
+}
+void W3dLayoutIDEPegar() { IDE* i = IDEActivoPtr(); if (i) { i->Pegar(); g_redraw = true; } } // shift + softkey-der: pegar
+
+// CONSOLA (kind 7): scroll con flechas MANTENIDAS (el container las setea en gHeld* y AplicarFlechas3D las repite
+// con aceleracion). ScrollByTouch no depende del mouse (a diferencia de ScrollY/X), asi sirve para el keypad.
+bool W3dLayoutConsolaActivo() {
+    return (viewPortActive && viewPortActive->isLeaf() && viewPortActive->ViewportKind() == 7) ? true : false;
+}
+void W3dLayoutConsolaScroll(int dx, int dy) {
+    if (!W3dLayoutConsolaActivo()) return;
+    Console* c = (Console*)viewPortActive;
+    int paso = RenglonHeightGS * 2;
+    c->ScrollByTouch(-dx * paso, -dy * paso);   // Up (dy=-1) -> PosY hacia 0 (muestra arriba); igual que el single-press
+    g_redraw = true;
+}
+
 void W3dLayoutBuild(CWhisk3D* aWhisk, TInt aWidth, TInt aHeight) {
     gWhisk = aWhisk;
     gScreenW = aWidth;
@@ -273,6 +330,15 @@ void W3dLayoutBuild(CWhisk3D* aWhisk, TInt aWidth, TInt aHeight) {
     // campo. El render vive en ViewportBase::RenderBar (compartido); aca solo apuntamos el hook a la funcion Symbian.
     { extern const char* (*g_ViewportBarModoHook)(); extern const char* W3dT9ModoTexto();
       g_ViewportBarModoHook = W3dT9ModoTexto; }
+    // shift (lapiz): la barra muestra "copiar"/"pegar" mientras se edita texto (W3dLapizHeld vive en el container).
+    { extern bool (*g_ViewportBarShiftHook)(); extern bool W3dLapizHeld();
+      g_ViewportBarShiftHook = W3dLapizHeld; }
+
+    // IDE por keypad: enganchar el T9 al editor de scripts (escribir codigo con multi-tap en el N95).
+    W3dT9IDEEditando     = W3dLayoutIDEEditando;
+    W3dT9IDEInsertar     = W3dLayoutIDEInsertar;
+    W3dT9IDEBorrar       = W3dLayoutIDEBorrar;
+    W3dT9IDEInicioPalabra = W3dLayoutIDEInicioPalabra;
 
     // EL layout por defecto COMPARTIDO (LayoutPorDefecto, por TAMANO DE PANTALLA): la MISMA logica que PC,
     // no una propia de Symbian. En el N95 (240x320, lado < 320) da 2 viewports (3D + Propiedades). El
@@ -463,6 +529,11 @@ static void W3dArbolCambiadoHook() {
     gOutliner = 0;
     gProps = 0;
     W3dRecolectarPaneles(gRoot);
+    // re-anclar el viewport ACTIVO al arbol NUEVO: al abrir un .w3d el arbol se reconstruye y viewPortActive
+    // podia quedar apuntando a un viewport del arbol VIEJO (huerfano/liberado) -> hover/maximize/ruteo de teclas
+    // rotos, y con el fix de 1-viewport el 3D es el que hay que enfocar. Preferir el 3D; si no hay, la raiz.
+    viewPortActive = gView3D ? (ViewportBase*)gView3D : gRoot;
+    if (gView3D) Viewport3DActive = gView3D;
     gContRaiz = gRoot->isLeaf() ? 0 : gRoot;
     gContHijo = W3dPrimerContenedor(gRoot);
     if (gContRaiz) gRaizEsRow = (gRoot->ContainerKind() == 1);
@@ -499,6 +570,26 @@ void W3dLayoutRedimensionarViewport(TInt aDx, TInt aDy) {
 TBool W3dLayout3DActivo() {
     return (viewPortActive && viewPortActive->isLeaf() &&
             viewPortActive->ViewportKind() == 1) ? ETrue : EFalse;
+}
+
+// el 3D activo tiene el FOCO DE BARRA en el transporte Stop/Play? -> ahi las flechas NO orbitan la camara:
+// van al dispatch del panel (LayoutTeclaPanelActivo) para navegar Stop<->Play con el keypad. Espejo de como
+// el Timeline con foco de barra suelta las flechas (W3dLayoutTimelineActivo devuelve false). El container lo
+// consulta en el branch de orbita (OfferKeyEventL) para dejar caer la flecha cuando hay foco de transporte.
+TBool W3dLayoutFocoTransporte() {
+    extern bool LayoutFocoEnTransporte(ViewportBase*);
+    return LayoutFocoEnTransporte(viewPortActive) ? ETrue : EFalse;
+}
+
+// "8" en el N95: EN Edit Mode de malla = Loop Cut (path del menu del viewport3d, como antes); FUERA de edicion
+// = entra/sale de la vista desde la CAMARA ACTIVA (toggle, como el numpad 0 en PC: SetViewFromCameraActive).
+// Antes "8" disparaba Loop Cut SIEMPRE -> daba un error de loop cut aun sin estar editando una malla.
+void W3dLayoutTecla8() {
+    if (InteractionMode == EditMode) { extern void LayoutLoopCutDesdeActivo(); LayoutLoopCutDesdeActivo(); return; }
+    if (Viewport3DActive) {
+        Viewport3DActive->SetViewFromCameraActive(!Viewport3DActive->ViewFromCameraActive);
+        g_redraw = true;
+    }
 }
 
 // el viewport ACTIVO es donde se JUEGA (3D o 2D/Editor2D)? -> ahi el D-pad va al JUEGO; en

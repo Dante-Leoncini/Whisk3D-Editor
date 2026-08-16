@@ -813,8 +813,10 @@ bool LeerMTL(const std::string& filepath, int objetosCargados) {
                 std::string texfile;
                 iss >> texfile;
                 //std::string absPath = getParentPath(filepath) + "/" + texfile;
-                std::string absPath = DirOf(filepath) + texfile;
-                std::replace(absPath.begin(), absPath.end(), '\\', '/');
+                // JoinPath NORMALIZA la ruta: '\'->'/' y COLAPSA el '..' (ej: modelos/frutas/../../texturas/
+                // frutas.png -> texturas/frutas.png). En PC el fopen resuelve los '..' al abrir; en SYMBIAN RFs
+                // los rechaza (KErrBadName) -> sin esto la textura de la fruta/cajas no cargaba en el N95.
+                std::string absPath = w3dFileSystem::JoinPath(DirOf(filepath), texfile);
 
                 // CARGA DIFERIDA: no decodificar aca (bloquea el import ~17s con los PNG grandes). Encolar -> el loop
                 // principal la carga en los frames siguientes (el modelo aparece gris y las texturas entran solas).

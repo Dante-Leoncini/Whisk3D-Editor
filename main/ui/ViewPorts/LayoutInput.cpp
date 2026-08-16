@@ -222,6 +222,17 @@ static void LayoutRecolectarHojas(ViewportBase* aNodo, std::vector<ViewportBase*
     LayoutRecolectarHojas(b, out);
 }
 
+// vuelca a disco/overlay los IDE con cambios SIN guardar (sucio). Lo llama SimPlay ANTES de arrancar la partida:
+// sin esto, editar un valor DENTRO del .lua desde el IDE y dar Play corria el .lua VIEJO (el buffer del IDE no
+// se habia persistido, y el '*' de sucio lo delataba). Recorre las hojas y guarda cada IDE (kind 8) sucio.
+void IDEGuardarSucios() {
+    if (!rootViewport) return;
+    std::vector<ViewportBase*> hojas;
+    LayoutRecolectarHojas(rootViewport, hojas);
+    for (size_t i = 0; i < hojas.size(); i++)
+        if (hojas[i]->ViewportKind() == 8) { IDE* ide = (IDE*)hojas[i]; if (ide->sucio) ide->Guardar(); }
+}
+
 // cambia el viewport ACTIVO (borde verde) a la siguiente hoja (dir=+1) o la
 // anterior (dir=-1), dando la vuelta. Sin mouse (Symbian) es la unica forma de
 // elegir viewport: la tecla verde de llamada lo cicla. Con mouse, el hover lo
@@ -445,6 +456,10 @@ static void LayoutAccionTipo(int aId) {
     }
     delete vp;
     LayoutRescan(nuevo, w, h);
+    // el viewport RECIEN cambiado queda ACTIVO y sin foco de barra (barFocusIndex = -1). Asi un IDE nuevo arranca
+    // editando texto (no en la barra: sino en el N95 quedabas atascado, la izquierda abria el menu de tipo).
+    viewPortActive = nuevo;
+    nuevo->barFocusIndex = -1;
 }
 
 // opcion del menu Add: crea el objeto en el cursor 3D (codigo compartido)
@@ -2241,6 +2256,23 @@ static PopupMenu* gMenuFace   = NULL;
 // (SimStop). Separado aca: la llama unicamente el path del click. Devuelve true si el punto cae sobre un
 // boton de transporte (y ya hizo la accion): el click no sigue al menu. Mismo patron que el Timeline
 // (Mover=resalta / Activar=dispara), que ya lo hacia bien.
+// true si el boton es del TRANSPORTE del modo juego (Stop/Play): accion DIRECTA, sin desplegable.
+static inline bool EsBotonTransporte(const Button* b) {
+    return b && (b->rol == BR_JuegoStop || b->rol == BR_JuegoPlay);
+}
+
+// true si 'vp' es un viewport 3D cuyo FOCO DE BARRA (barFocusIndex) apunta a un boton de transporte
+// Stop/Play VISIBLE. Lo consultan: RenderBar (para NO apagar el foco por-frame, como ya hace con el
+// Timeline), el container Symbian via W3dLayoutFocoTransporte (para SOLTAR las flechas al dispatch del
+// panel en vez de orbitar la camara) y el bloque kind==1 de LayoutTeclaPanelActivo. Sin esto el foco de
+// Stop/Play se borraba cada frame y las flechas se las comia la orbita -> no se llegaba de Stop a Play.
+bool LayoutFocoEnTransporte(ViewportBase* vp) {
+    if (!vp || !vp->isLeaf() || vp->ViewportKind() != 1) return false;
+    int fi = vp->barFocusIndex;
+    std::vector<Button*>& B = vp->BarButtons;
+    return (fi >= 0 && fi < (int)B.size() && B[fi]->visible && EsBotonTransporte(B[fi]));
+}
+
 static bool LayoutTransporteBarra3D(ViewportBase* vp, int mx, int my) {
     if (!vp || !vp->isLeaf() || vp->ViewportKind() != 1) return false;
     std::vector<Button*>& B = vp->BarButtons;
@@ -2425,8 +2457,9 @@ void LayoutToggleBarraViewportActivo() {
 // (Select/Add/Object/Overlays) salteando los ocultos, y abre su desplegable
 static void LayoutCambiarMenuBarra(int dir) {
     // el menu de tipo/split de un panel NO-3D (outliner/propiedades) no tiene
-    // menus hermanos para ciclar: izq/der no hacen nada ahi.
-    if (MenuAbierto == gMenuTipo && gMenuTipoDe != (ViewportBase*)Viewport3DActive) return;
+    // menus hermanos para ciclar: izq/der no hacen nada ahi. (Solo si ese menu esta REALMENTE abierto: con
+    // foco de transporte MenuAbierto puede quedar apuntando a un gMenuTipo ya cerrado -> no cortar la nav.)
+    if (LayoutMenuAbierto() && MenuAbierto == gMenuTipo && gMenuTipoDe != (ViewportBase*)Viewport3DActive) return;
     Viewport3D* vp = Viewport3DActive;
     if (!vp || vp->BarButtons.size() < 2) return;
     std::vector<Button*>& B = vp->BarButtons;
@@ -2434,14 +2467,18 @@ static void LayoutCambiarMenuBarra(int dir) {
                                           // boton -Orient/etc.- quedaba afuera y se salteaba)
     // mapeo MENU->ROL (estable) y rol->INDICE via BarRolIdx (dinamico) -> reordenar no rompe la nav.
     int idx = -1;
-    if (MenuAbierto == gMenuTipo) idx = 0; // boton [0] = tipo/split del viewport (idx fijo)
-    else {
-        // El rol lo registro el que ABRIO el menu, sacandolo de su boton (RegistrarMenuBarra). Se exige que el
-        // menu abierto sea EL que se registro: si no, lo abrio otro camino y no es un menu de barra.
-        const int rol = (MenuAbierto == gMenuBarraAbierto) ? gMenuBarraRol : -1;
-        if (rol >= 0) idx = BarRolIdx(B, rol);
-    }
-    if (idx < 0) return; // el abierto no es de la barra
+    // idx del boton "actual": SOLO si hay un menu de barra REALMENTE abierto. MenuAbierto puede seguir apuntando
+    // a un menu YA cerrado (Cerrar() baja ->abierto pero NO NULea el puntero), asi que sin el LayoutMenuAbierto()
+    // de guarda, tras cerrar sobre Stop la nav recalculaba idx desde el menu viejo (Render) y oscilaba
+    // Render<->Stop sin llegar a Play. El rol lo registro el que ABRIO el menu (RegistrarMenuBarra).
+    if (LayoutMenuAbierto() && MenuAbierto == gMenuTipo) idx = 0; // boton [0] = tipo/split del viewport
+    else if (LayoutMenuAbierto() && MenuAbierto == gMenuBarraAbierto && gMenuBarraRol >= 0) idx = BarRolIdx(B, gMenuBarraRol);
+    // SIN menu de barra abierto pero CON foco (transporte Stop/Play, ver abajo): ciclar DESDE el foco actual.
+    // Solo si el 3D activo (vp==Viewport3DActive) ES el viewport enfocado: esta funcion tambien corre para
+    // menus de barra de paneles NO-3D, y ahi no hay que desviar la nav al barFocusIndex del 3D (cross-viewport).
+    if (idx < 0 && (ViewportBase*)vp == viewPortActive
+        && vp->barFocusIndex >= 0 && vp->barFocusIndex <= maxIdx) idx = vp->barFocusIndex;
+    if (idx < 0) return; // ni menu ni foco -> nada que ciclar
     // el [0] (tipo/split) SIEMPRE es navegable; el resto salta los ocultos
     for (int k = 0; k <= maxIdx; k++) {
         idx += dir;
@@ -2453,6 +2490,11 @@ static void LayoutCambiarMenuBarra(int dir) {
     Button* b = B[idx];
     vp->barFocusIndex = idx;   // la barra se auto-scrollea para centrar el nuevo
     vp->ActualizarBarra();     // recalcula sx/sy YA con el scroll antes del hit-test
+    // Stop/Play son ACCION DIRECTA (sin desplegable): al aterrizar en ellos cerramos el menu que estuviera
+    // abierto (Render, etc.) y dejamos SOLO el foco -> el bloque kind 1 de LayoutTeclaPanelActivo rutea OK a
+    // LayoutTransporteBarra3D. Antes LayoutAbrirMenuDeBarra no tenia rama de transporte -> devolvia false, el
+    // menu de Render quedaba abierto y de Stop no se llegaba a Play.
+    if (EsBotonTransporte(b)) { if (MenuAbierto) MenuAbierto->Cerrar(); g_redraw = true; return; }
     LayoutAbrirMenuDeBarra(vp, b->sx + b->width / 2, b->sy + b->height / 2);
 }
 
@@ -4035,6 +4077,27 @@ bool LayoutTeclaPanelActivo(int tecla) {
             case LayoutKey::Right: SetDesplegado(true);  return true;
         }
         return false;
+    }
+    if (viewPortActive->ViewportKind() == 1 && (ViewportBase*)Viewport3DActive == viewPortActive) {
+        // 3D en FOCO DE BARRA sobre el transporte Stop/Play (sin menu abierto -garantizado por el return de
+        // arriba-): flechas ciclan por la barra, OK dispara el transporte, C sale del foco. Solo engancha si el
+        // foco esta REALMENTE en Stop/Play -> si quedo un foco viejo en un menu-boton, cae al 'return false' de
+        // abajo y el 3D orbita/edita como siempre (sin regresion).
+        Viewport3D* v3 = Viewport3DActive;
+        std::vector<Button*>& B = v3->BarButtons;
+        int fi = v3->barFocusIndex;
+        // exige VISIBLE: si quedo un foco viejo sobre un Stop/Play ya oculto (al salir del modo juego se ponen
+        // visible=false), NO enganchar -> cae al 'return false' y el 3D orbita/edita normal (sin tragar teclas).
+        if (fi >= 0 && fi < (int)B.size() && B[fi]->visible && EsBotonTransporte(B[fi])) {
+            switch (tecla) {
+                case LayoutKey::Left:   LayoutCambiarMenuBarra(-1); return true;
+                case LayoutKey::Right:  LayoutCambiarMenuBarra(+1); return true;
+                case LayoutKey::Enter:  LayoutTransporteBarra3D(v3, B[fi]->sx + B[fi]->width / 2, B[fi]->sy + B[fi]->height / 2); return true;
+                case LayoutKey::Cancel: v3->barFocusIndex = -1; g_redraw = true; return true;
+            }
+            return true;
+        }
+        return false; // sin foco de transporte: el 3D sigue como antes (orbita / edit mode)
     }
     if (viewPortActive->ViewportKind() == 4) { // UV editor: las flechas PANEAN la vista
         UVEditor* uv = (UVEditor*)viewPortActive;

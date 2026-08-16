@@ -191,7 +191,7 @@ SOURCE          W3dRecursos.cpp W3dZip.cpp W3dAlmacen.cpp
 SOURCEPATH      ..\..\..\libs\Whisk3DCore\objects
 SOURCE          VisSet.cpp MallaDatos.cpp
 SOURCEPATH      ..\..\..\libs\Whisk3DCore\base
-SOURCE          W3dConfig.cpp
+SOURCE          W3dConfig.cpp W3dClipboardSymbian.cpp
 SOURCEPATH      ..\..\..\libs\WhiskUI\draw
 SOURCE          W3dAtlasPacker.cpp
 // objetos del editor que faltaban: LOD (niveles de detalle) y el espejo/agua
@@ -292,7 +292,8 @@ LIBRARY         ImageConversion.lib
 LIBRARY         mediaclientaudiostream.lib // CMdaAudioOutputStream: salida de audio del Core
 LIBRARY         libgles_cm.lib
 LIBRARY         ws32.lib commondialogs.lib
-LIBRARY         estor.lib eikctl.lib aknnotify.lib apgrfx.lib eikdlg.lib charconv.lib 
+LIBRARY         estor.lib eikctl.lib aknnotify.lib apgrfx.lib eikdlg.lib charconv.lib
+LIBRARY         bafl.lib etext.lib // portapapeles del sistema: CClipboard (bafl) + CPlainText (etext)
 
 LIBRARY         libc.lib
 // variantes float de math (sinf/cosf/acosf...) usadas por libs\Whisk3DCore/math de PC

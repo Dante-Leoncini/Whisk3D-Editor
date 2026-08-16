@@ -379,6 +379,9 @@ Viewport3D::Viewport3D(Vector3 pos){
     hudX0 = 0.0f; hudY0 = 0.0f; hudW = 0.0f; hudH = 0.0f; hudEsc = 1.0f; // aun sin HUD dibujado
     hudOverride = false;
     showOverlays = true;
+    // stats por-viewport apagados por defecto (igual que los globales viejos; --stats o el menu los prende)
+    OverlayFps = false; OverlayStatVertices = false; OverlayStatFaces = false;
+    OverlayStatGL = false; OverlayStatModgen = false; OverlayStatTimes = false;
     showFloor = true;
     showYaxis = true;
     showXaxis = true;
@@ -456,7 +459,9 @@ void Viewport3D::AbrirMenuOverlays(int x, int y){
     MenuOverlayStats->AgregarCheck("GL Calls", 21, &OverlayStatGL); // llamadas GL por frame (draw/bind/estado)
     MenuOverlayStats->AgregarCheck("Modgen",   19, &OverlayStatModgen);
     MenuOverlayStats->AgregarCheck(T("Times"),    20, &OverlayStatTimes);
-    MenuOverlays->Agregar(T("Statistics"), 11, -1, MenuOverlayStats)->gris = &showOverlays;
+    // "Statistics" NO se grisa con "Show Overlays": el overlay de stats es un debug independiente de la grilla
+    // (RenderEstadisticas ya no gatea por showOverlays) -> se puede prender aunque la grilla/gizmos esten off.
+    MenuOverlays->Agregar(T("Statistics"), 11, -1, MenuOverlayStats);
     // Clear Screen: limpia el framebuffer (glClear) cada frame. NO es un overlay (no se grisa con
     // Show Overlays). Apagarlo gana rendimiento en juegos/renders donde la escena llena la pantalla.
     // ON por defecto (limpiarPantalla = true en el ctor).
@@ -3432,7 +3437,9 @@ static void JuegoPrepararViewportsRec(ViewportBase* v, bool apagarOverlays) {
     if (!v) return;
     if (v->ViewportKind() == 1) {
         Viewport3D* v3 = (Viewport3D*)v;
-        if (apagarOverlays) v3->showOverlays = false;   // sin gizmos/grilla por defecto
+        // DAR PLAY YA NO APAGA LOS OVERLAYS: reporte del dueno "al darle play me quitas los overlays, eso no va".
+        // Se respeta el showOverlays que el usuario tenga (grilla/gizmos + gate del overlay de stats fps/gl/faces).
+        (void)apagarOverlays; // (vestigial: antes forzaba v3->showOverlays=false)
         // DAR PLAY NO TOCA LA VISTA DEL USUARIO. Reporte del dueno, textual:
         // "cuando aprieto play no quiero que me modifiques el paneo/zoom de la
         // camara activa". Aca se reseteaba camViewZoom/camViewPanX/camViewPanY

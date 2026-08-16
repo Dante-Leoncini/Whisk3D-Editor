@@ -15,6 +15,7 @@
 #include "objects/Elemento2D.h"
 #include "render/UIOverlay.h"          // UI2D_TamanoLienzo, UI2D_EsElemento2D, UI2DPos
 #include "render/OpcionesRender.h"     // g_redraw (+ g_renderAspect para pantallaDe)
+#include "base/w3dlog.h"               // w3dLogf: log PROPIO (nunca printf/stdout -> abria la consola blanca)
 // (Camera.h NO se incluye aca: arrastra variables.h, que es solo del editor. Todo
 //  lo que necesita una camara pasa por los hooks de BindsJuego.h, que instala quien
 //  linkee el objeto Camera. Asi el bind existe y funciona en cualquier build que
@@ -1065,9 +1066,8 @@ bool W3dControlAlta(void* handle, int id, const char* nombre, const char* tipo) 
     r.nombre = (nombre && *nombre) ? nombre : "Control";
     r.tipo   = (tipo && *tipo) ? tipo : "generico";
     gControles.push_back(r);
-    printf("[control] se detecto un nuevo control: %s (%s), %d conectado(s)\n",
-           r.nombre.c_str(), r.tipo.c_str(), (int)gControles.size());
-    fflush(stdout);
+    w3dLogf("[control] se detecto un nuevo control: %s (%s), %d conectado(s)",
+            r.nombre.c_str(), r.tipo.c_str(), (int)gControles.size());
     W3dAvisof(false, "Se detecto un nuevo control: %s", W3dNombreCorto(r.nombre).c_str());
     return true;
 }
@@ -1079,9 +1079,8 @@ bool W3dControlBaja(int id, void** handle) {
         std::string nom = gControles[i].nombre;
         if (handle) *handle = gControles[i].handle;
         gControles.erase(gControles.begin() + (long)i);
-        printf("[control] se desconecto un control: %s, quedan %d\n",
-               nom.c_str(), (int)gControles.size());
-        fflush(stdout);
+        w3dLogf("[control] se desconecto un control: %s, quedan %d",
+                nom.c_str(), (int)gControles.size());
         W3dAvisof(true, "Se desconecto un control: %s", W3dNombreCorto(nom).c_str());
         return true;
     }

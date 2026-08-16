@@ -523,7 +523,7 @@ void ViewportBase::ActualizarBarra(){
         Button* btn = BarButtons[b];
         if (!btn->visible) continue;
         btn->Resize(width - gapGS * 2);
-        if ((int)b == barFocusIndex){ focoX = total; focoW = btn->width; }
+        if (this == viewPortActive && (int)b == barFocusIndex){ focoX = total; focoW = btn->width; }
         total += btn->width + btnGap;
     }
     // las PESTAÑAS tambien cuentan para el ancho total (sino el scroll maximo salia mal: en propiedades hay
@@ -553,7 +553,7 @@ void ViewportBase::ActualizarBarra(){
                           : (UIBarPadding() + GlobalScale);
         if (by < 0) by = 0;
         // con un menu abierto, el ENFOCADO se resalta verde y los demas no
-        btn->focoMenu = (barFocusIndex >= 0 && (int)b == barFocusIndex);
+        btn->focoMenu = (this == viewPortActive && barFocusIndex >= 0 && (int)b == barFocusIndex); // solo el viewport ACTIVO resalta su barra
         btn->sx = x + bx;
         btn->sy = y + yBar + by;
         bx += btn->width + btnGap;
@@ -572,6 +572,8 @@ void ViewportBase::ActualizarBarra(){
 // hook opcional (lo setea la plataforma): texto del modo de entrada de texto a mostrar en la barra del viewport
 // ACTIVO mientras se edita un campo (Symbian lo apunta a W3dT9ModoTexto: "Abc"/"abc"/"ABC"/"123"). NULL en PC.
 const char* (*g_ViewportBarModoHook)() = 0;
+// shift (lapiz) mantenido durante la edicion de texto: la barra muestra "copiar" (izq) y "pegar" (der). NULL en PC.
+bool (*g_ViewportBarShiftHook)() = 0;
 
 void ViewportBase::RenderBar(){
     // se llama al final del Render del viewport (con su ortho 2D activo)
@@ -580,7 +582,14 @@ void ViewportBase::RenderBar(){
     // navega sus botones de transporte SIN abrir menu -> su foco lo maneja el ruteo de teclado (LayoutTimelineBar*),
     // no se apaga aca (sino se perderia cada frame).
     extern bool LayoutMenuAbierto();
-    if (!LayoutMenuAbierto() && ViewportKind() != 5 && ViewportKind() != 6 && ViewportKind() != 8) barFocusIndex = -1;
+    extern bool LayoutFocoEnTransporte(ViewportBase*);
+    // el 3D (kind 1) retiene su foco de barra SOLO si esta en el transporte Stop/Play Y es el viewport ACTIVO
+    // (como el Timeline kind 5, que no se apaga cada frame). El 'this==viewPortActive' hace que al ciclar de
+    // viewport (verde) el 3D SUELTE el foco -> al volver las flechas orbitan de nuevo (no quedan pegadas en
+    // Stop/Play) y un 3D no-activo (multi-vista PC) no retiene un indice stale.
+    bool retieneTransporte = (this == viewPortActive) && LayoutFocoEnTransporte(this);
+    if (!LayoutMenuAbierto() && ViewportKind() != 5 && ViewportKind() != 6 && ViewportKind() != 8
+        && !retieneTransporte) barFocusIndex = -1;
     ActualizarBarra(); // layout + auto-scroll + sx/sy frescos
     int barH = BarHeight();
     int yBar = barAbajo ? height - barH : 0;
@@ -629,11 +638,25 @@ void ViewportBase::RenderBar(){
     if (this == viewPortActive && g_ViewportBarModoHook){
         const char* modo = g_ViewportBarModoHook();
         if (modo && modo[0]){
-            SetColorID(ColorID::accent);
-            w3dEngine::PushMatrix();
-            w3dEngine::Translatef(0, (GLfloat)((barH - LetterHeightGS) / 2), 0);
-            RenderBitmapText(std::string(modo), textAlign::right, width - gapGS * 2);
-            w3dEngine::PopMatrix();
+            int ty = (barH - LetterHeightGS) / 2;
+            bool shift = (g_ViewportBarShiftHook && g_ViewportBarShiftHook());
+            if (shift){
+                // con SHIFT: "copiar" a la IZQUIERDA + "pegar" a la DERECHA (asi se sabe que shift+softkey copia/pega);
+                // el modo (Abc/abc/ABC/123) queda CENTRADO para no pisar "pegar".
+                SetColorID(ColorID::blanco);
+                w3dEngine::PushMatrix(); w3dEngine::Translatef((GLfloat)gapGS, (GLfloat)ty, 0);
+                RenderBitmapText(std::string("copiar"), textAlign::left, width / 2); w3dEngine::PopMatrix();
+                w3dEngine::PushMatrix(); w3dEngine::Translatef((GLfloat)(width - gapGS), (GLfloat)ty, 0);
+                RenderBitmapText(std::string("pegar"), textAlign::right, width / 2); w3dEngine::PopMatrix();
+                SetColorID(ColorID::accent);
+                w3dEngine::PushMatrix(); w3dEngine::Translatef(0, (GLfloat)ty, 0);
+                RenderBitmapText(std::string(modo), textAlign::center, width); w3dEngine::PopMatrix();
+            } else {
+                // sin shift: el modo a la DERECHA (borde derecho anclado en width - gapGS; antes quedaba en x=0 = fuera)
+                SetColorID(ColorID::accent);
+                w3dEngine::PushMatrix(); w3dEngine::Translatef((GLfloat)(width - gapGS), (GLfloat)ty, 0);
+                RenderBitmapText(std::string(modo), textAlign::right, width - gapGS * 2); w3dEngine::PopMatrix();
+            }
         }
     }
     w3dEngine::PopMatrix();

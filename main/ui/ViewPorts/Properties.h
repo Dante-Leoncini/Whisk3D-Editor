@@ -414,6 +414,8 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropBool*   propJuegoDebug;     // checkbox: modo debug W3D_DEV_LOG=1 (default NO = produccion)
         PropButton* propJuegoCompilar;
         PropBool*   propAnimConservar; // play no pisa lo grabado: lo reproduce
+        PropBool*   propJuegoCacheOn;  // cache de juego (rewind) ON/OFF: OFF = sin snapshot por tick = fluido
+        PropFloat*  propJuegoCacheMax; // limite del cache (frames); se oculta cuando el cache esta OFF
         GroupPropertie* propExport;  // pestania RENDER: tarjeta "Export" (.obj)
         // pestania TRANSFORMAR (tab 5, icono del modo de seleccion; SOLO Edit Mode con malla activa):
         // 2 tarjetas. "Transform Mesh" = X/Y/Z del centro de la seleccion (antes en la pestania

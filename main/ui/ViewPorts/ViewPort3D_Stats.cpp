@@ -40,7 +40,8 @@ static void StatLinea(const char* buf, int width, int margen, int& ly, int lineH
 // triangulos y fps. Se llama dentro del pase 2D de RenderUI (ortho + fuente ya
 // seteados). Los contadores por malla estan precalculados (no se cuenta por frame).
 void Viewport3D::RenderEstadisticas(){
-    if (!showOverlays) return;
+    // NO se gatea por showOverlays: el overlay de stats (fps/gl/faces/...) es un debug INDEPENDIENTE de la grilla/
+    // gizmos (showOverlays) -> se pueden ver los fps en un JUEGO sin la grilla del editor. Lo prenden SOLO sus 6 flags.
     if (!OverlayStatVertices && !OverlayStatFaces && !OverlayStatModgen && !OverlayStatTimes && !OverlayFps && !OverlayStatGL) return;
     SetColorID(ColorID::blanco);
     const int margen = gapGS * 2;

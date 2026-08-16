@@ -40,6 +40,8 @@ SRC="$SRC $CORE/physics/W3dFisica.cpp"
 # audio: el beep() de los juegos (efectos estilo WhiskPaddle). SDL2 audio anda en emscripten (-sUSE_SDL=2).
 # Sin estas fuentes el link falla: W3dScript/main referencian W3dSoundBeep/W3dSoundPlay/W3dAudioInit.
 SRC="$SRC $CORE/audio/W3dAudio.cpp $CORE/audio/W3dAudioSDL.cpp"
+# portapapeles del sistema (Core): backend SDL (mapea al del navegador en emscripten)
+SRC="$SRC $CORE/base/W3dClipboardSDL.cpp"
 LUA_A="$OUT/libw3dlua.a"
 if [[ ! -f "$LUA_A" || thirdparty/lua/src -nt "$LUA_A" ]]; then
     echo "compilando lua (C) -> libw3dlua.a"

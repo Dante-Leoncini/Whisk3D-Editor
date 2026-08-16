@@ -3,6 +3,7 @@
 #include "NumPad.h"
 #include "ViewPorts/LayoutInput.h"          // LayoutKey + NumInput* (modo transform)
 #include "ViewPorts/Timeline.h"             // DopeNumInputChar (transform de keyframes del dope sheet)
+#include "ViewPorts/IDE.h"                  // IDE + viewPortActive: destino del simbolo elegido
 #include "WhiskUI/widgets/PopupMenu.h"              // MenuPantallaW / MenuPantallaH
 #include "WhiskUI/Propieties/PropFloat.h"   // g_propFloatEditando + NumEditCommit/Cancel
 #include "WhiskUI/widgets/TextField.h"              // TextFieldInputChar (mismo camino que el teclado fisico)
@@ -508,3 +509,177 @@ void QwertyAbrir(){
     PopUpActive = gQwerty;
     g_redraw = true;
 }
+
+// ============================================================================
+//  SELECTOR DE SIMBOLOS
+// ============================================================================
+#define NS_COLS 7
+#define NS_FILAS 6
+static const char* kSimbolos[NS_FILAS][NS_COLS] = {
+    { ".", ",", ";", ":", "!", "?", "'"  },
+    { "\"","`", "~", "^", "|", "\\","/"  },
+    { "(", ")", "[", "]", "{", "}", "="  },
+    { "<", ">", "-", "_", "+", "*", "&"  },
+    { "%", "$", "#", "@", "0", "1", "2"  },
+    { "3", "4", "5", "6", "7", "esp", "ent" },   // esp = espacio, ent = ENTER (nueva linea en el IDE)
+};
+static std::string gRecientes[7] = { ".", ",", "(", ")", "=", "_", "\"" };
+static SimbolosPopup* gSimbolos = NULL;
+
+static void RecientePush(const char* s){
+    // MRU real (SIN dedup): cada uso empuja al frente y corre el resto -> el mismo simbolo puede aparecer VARIAS
+    // veces en la fila (ej "= ( = )"). Solo se evita duplicarlo si YA esta al frente (no repetir el primero al
+    // apretarlo seguido). Antes se deduplicaba y perdia la gracia de "los ultimos usados".
+    if (gRecientes[0] == s) return;
+    for (int j = 6; j > 0; j--) gRecientes[j] = gRecientes[j - 1];
+    gRecientes[0] = s;
+}
+
+// destino de texto activo: el IDE editando (kind 8, barFocusIndex<0) o el TextField enfocado
+static IDE* SimbIDEDestino(){
+    if (viewPortActive && viewPortActive->isLeaf() && viewPortActive->ViewportKind() == 8 &&
+        ((IDE*)viewPortActive)->barFocusIndex < 0) return (IDE*)viewPortActive;
+    return NULL;
+}
+static void SimbInsertar(const char* s){
+    IDE* ide = SimbIDEDestino();
+    if (!strcmp(s, "ent")){ if (ide) ide->Enter(); return; }   // nueva linea (solo IDE; el TextField es de una linea)
+    char c = !strcmp(s, "esp") ? ' ' : s[0];
+    if (ide) ide->InsertarChar(c);
+    else if (g_textFieldActivo) TextFieldInputChar((int)c);
+}
+
+SimbolosPopup::SimbolosPopup() : PopUpBase("seleccionar simbolo") {
+    celda = new Card(NULL, 10, 10);
+    celW = celH = recentY = gridY = 0;
+    focoFila = 0; focoCol = 0;
+    Reubicar();
+}
+
+void SimbolosPopup::Reubicar(){
+    int w = MenuPantallaW;
+    celH = RenglonHeightGS + gapGS;
+    celW = (w - borderGS * 2 - gapGS * (NS_COLS - 1)) / NS_COLS;
+    int tituloH = RenglonHeightGS + gapGS;
+    recentY = borderGS + tituloH;
+    gridY   = recentY + celH + gapGS * 2;
+    barraY  = gridY + (celH + gapGS) * NS_FILAS + gapGS;   // barra "aceptar"/"cancelar" abajo de la cuadricula
+    int h = barraY + celH + borderGS;
+    x = 0;
+    y = MenuPantallaH - h;
+    popUpWindow->Resize(w, h);
+}
+
+// dibuja una celda (fondo header o accent si enfocada) + su etiqueta centrada
+static void SimbCelda(Card* celda, int kx, int ky, int celW, int celH, int textoY, const char* txt, bool foco){
+    const float* accent = ListaColores[static_cast<int>(ColorID::accent)];
+    const float* blanco = ListaColores[static_cast<int>(ColorID::blanco)];
+    const float* header = ListaColores[static_cast<int>(ColorID::headerColor)];
+    w3dEngine::PushMatrix();
+    w3dEngine::Translatef((GLfloat)kx, (GLfloat)ky, 0);
+    if (foco) w3dEngine::Color4f(accent[0] * 0.55f, accent[1] * 0.55f, accent[2] * 0.55f, 1.0f);
+    else      w3dEngine::Color4f(header[0], header[1], header[2], 1.0f);
+    celda->Resize(celW, celH); celda->RenderObject(false);
+    w3dEngine::Color4f(blanco[0], blanco[1], blanco[2], 1.0f);
+    w3dEngine::Translatef(0, (GLfloat)textoY, 0);
+    RenderBitmapText(txt, textAlign::center, celW);
+    w3dEngine::PopMatrix();
+}
+
+void SimbolosPopup::Render(){
+    // si ya no hay destino de texto (Enter fisico, cambio de viewport), el popup se cierra solo
+    if (!g_textFieldActivo && !SimbIDEDestino()){ Cerrar(); return; }
+    Reubicar();
+    const float* gris   = ListaColores[static_cast<int>(ColorID::gris)];
+    const float* accent = ListaColores[static_cast<int>(ColorID::accent)];
+    const float* grisUI = ListaColores[static_cast<int>(ColorID::grisUI)];
+
+    initView();
+    w3dEngine::Color4f(gris[0], gris[1], gris[2], 0.98f); popUpWindow->RenderObject(false);
+    w3dEngine::Color4f(accent[0], accent[1], accent[2], 1.0f); popUpWindow->RenderBorder(false);
+
+    // titulo
+    w3dEngine::PushMatrix();
+    w3dEngine::Translatef((GLfloat)(borderGS + gapGS), (GLfloat)borderGS, 0);
+    w3dEngine::Color4f(grisUI[0], grisUI[1], grisUI[2], 1.0f);
+    RenderBitmapText(name, textAlign::left, popUpWindow->width - borderGS * 2);
+    w3dEngine::PopMatrix();
+
+    int textoY = (celH - RenglonHeightGS) / 2;
+    // fila de RECIENTES (focoFila == -1)
+    for (int col = 0; col < NS_COLS; col++)
+        SimbCelda(celda, borderGS + col * (celW + gapGS), recentY, celW, celH, textoY,
+                  gRecientes[col].c_str(), focoFila == -1 && focoCol == col);
+    // cuadricula 7x6
+    for (int fila = 0; fila < NS_FILAS; fila++)
+        for (int col = 0; col < NS_COLS; col++)
+            SimbCelda(celda, borderGS + col * (celW + gapGS), gridY + fila * (celH + gapGS), celW, celH, textoY,
+                      kSimbolos[fila][col], focoFila == fila && focoCol == col);
+    // barra de abajo: "aceptar" (softkey IZQUIERDO) a la izq, "cancelar" (softkey DERECHO) a la der. '*' tambien cierra.
+    { const float* acc = ListaColores[static_cast<int>(ColorID::accent)];
+      int barTY = barraY + (celH - RenglonHeightGS) / 2;
+      w3dEngine::Color4f(acc[0], acc[1], acc[2], 1.0f);
+      w3dEngine::PushMatrix(); w3dEngine::Translatef((GLfloat)(borderGS + gapGS), (GLfloat)barTY, 0);
+      RenderBitmapText(std::string("aceptar"), textAlign::left, popUpWindow->width / 2); w3dEngine::PopMatrix();
+      w3dEngine::PushMatrix(); w3dEngine::Translatef((GLfloat)(popUpWindow->width - borderGS - gapGS), (GLfloat)barTY, 0);
+      RenderBitmapText(std::string("cancelar"), textAlign::right, popUpWindow->width / 2); w3dEngine::PopMatrix(); }
+    endView();
+}
+
+void SimbolosPopup::Elegir(const char* s){
+    SimbInsertar(s);
+    RecientePush(s);
+    g_redraw = true;   // queda ABIERTO para elegir mas simbolos; C/soft-izq cierra
+}
+
+bool SimbolosPopup::Tecla(int tecla){
+    // Convencion Symbian: soft-IZQ (Cancel, 164) = ACEPTAR (inserta el enfocado y CIERRA); soft-DER (Accept, 165) =
+    // CANCELAR (cierra sin insertar). OK del centro (Enter) = inserta y QUEDA abierto (para elegir varios).
+    if (tecla == LayoutKey::Cancel){
+        if (focoFila < 0) Elegir(gRecientes[focoCol].c_str()); else Elegir(kSimbolos[focoFila][focoCol]);
+        Cerrar(); return true;
+    }
+    if (tecla == LayoutKey::Accept){ Cerrar(); return true; }
+    if (tecla == LayoutKey::Enter){
+        if (focoFila < 0) Elegir(gRecientes[focoCol].c_str());
+        else              Elegir(kSimbolos[focoFila][focoCol]);
+        return true;
+    }
+    if (tecla == LayoutKey::Up)   { focoFila--; if (focoFila < -1) focoFila = NS_FILAS - 1; g_redraw = true; return true; }
+    if (tecla == LayoutKey::Down) { focoFila++; if (focoFila > NS_FILAS - 1) focoFila = -1; g_redraw = true; return true; }
+    if (tecla == LayoutKey::Left) { focoCol--;  if (focoCol < 0) focoCol = NS_COLS - 1;     g_redraw = true; return true; }
+    if (tecla == LayoutKey::Right){ focoCol++;  if (focoCol > NS_COLS - 1) focoCol = 0;     g_redraw = true; return true; }
+    return true;
+}
+
+bool SimbolosPopup::Click(int mx, int my){
+    if (!Contains(mx, my)) return false;   // afuera: LayoutClickUI nos cierra
+    int lx = mx - x, ly = my - y;
+    if (ly >= barraY){   // barra de abajo: mitad izq = aceptar (insertar enfocado + cerrar), mitad der = cancelar (cerrar)
+        if (lx < popUpWindow->width / 2){
+            if (focoFila < 0) Elegir(gRecientes[focoCol].c_str()); else Elegir(kSimbolos[focoFila][focoCol]);
+        }
+        Cerrar(); return true;
+    }
+    if (ly >= recentY && ly < recentY + celH){
+        int col = (lx - borderGS) / (celW + gapGS);
+        if (col >= 0 && col < NS_COLS){ focoFila = -1; focoCol = col; Elegir(gRecientes[col].c_str()); }
+        return true;
+    }
+    if (ly >= gridY){
+        int fila = (ly - gridY) / (celH + gapGS);
+        int col  = (lx - borderGS) / (celW + gapGS);
+        if (fila >= 0 && fila < NS_FILAS && col >= 0 && col < NS_COLS){ focoFila = fila; focoCol = col; Elegir(kSimbolos[fila][col]); }
+        return true;
+    }
+    return true;
+}
+
+void SimbolosAbrir(){
+    if (!gSimbolos) gSimbolos = new SimbolosPopup();
+    gSimbolos->focoFila = 0; gSimbolos->focoCol = 0;
+    PopUpActive = gSimbolos;
+    g_redraw = true;
+}
+bool SimbolosActivo(){ return (gSimbolos && PopUpActive == gSimbolos); }
+void SimbolosCerrar(){ if (SimbolosActivo()) gSimbolos->Cerrar(); }

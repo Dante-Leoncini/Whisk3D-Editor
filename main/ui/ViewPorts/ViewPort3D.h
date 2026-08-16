@@ -125,6 +125,15 @@ class Viewport3D : public ViewportBase, public WithBorder {
         // Editor2D en vista de juego (coherencia con varios viewports).
         bool hudOverride;
         bool showOverlays;
+        // los 6 flags del overlay "Statistics" -> PER-VIEWPORT (antes globales en OpcionesRender). MISMO nombre que
+        // los globales viejos a proposito: RenderEstadisticas y el menu Overlays>Statistics (metodos de Viewport3D)
+        // los referencian sin calificar -> pasan a bindear this->flag sin tocar esos sitios. Stats por viewport.
+        bool OverlayFps;
+        bool OverlayStatVertices;
+        bool OverlayStatFaces;
+        bool OverlayStatGL;
+        bool OverlayStatModgen;
+        bool OverlayStatTimes;
         // ESTADISTICAS DEL FRAME de ESTE viewport: lo que el pase de ESCENA que acaba
         // de dibujar Render() EMITIO de verdad (con frustum culling, LOD, Culling y
         // celdas por triangulo ya aplicados). Render() las mide como DELTA de los

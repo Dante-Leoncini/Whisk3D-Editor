@@ -46,5 +46,8 @@ void SimScriptsCambiados(class Object* o);
 void SimToquePantalla(class ViewportBase* v, int mx, int my, bool activo);
 // techo del cache de estados (frames): configurable desde la tarjeta Juego
 extern int gSimCacheMax;
+extern bool gSimCacheOn;   // cache de juego (rewind) ON/OFF: OFF = sin snapshot por tick -> juego fluido
+bool SimHayCache();        // hay frames grabados para rebobinar? (OFF/juego compilado -> false)
+void SimCacheReset();      // limpia el cache y lo re-ancla al tick actual (al des/tildar "Cache de juego")
 
 #endif // SIMJUEGO_H

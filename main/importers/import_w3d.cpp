@@ -250,6 +250,14 @@ void ApplyViewport3DProps(Viewport3D* v, const std::map<std::string,std::string>
     if(p.count("orthographic"))           v->orthographic = B("orthographic");
     if(p.count("ViewFromCameraActive"))   v->ViewFromCameraActive = B("ViewFromCameraActive");
     if(p.count("showOverlays"))           v->showOverlays = B("showOverlays");
+    // overlay de STATS (fps/gl/faces/...) PER-VIEWPORT: se leen para que un .w3d pueda abrir con el overlay YA
+    // prendido (ej un juego que quiere ver los fps). Independientes de showOverlays (RenderEstadisticas no gatea).
+    if(p.count("OverlayFps"))             v->OverlayFps = B("OverlayFps");
+    if(p.count("OverlayStatVertices"))    v->OverlayStatVertices = B("OverlayStatVertices");
+    if(p.count("OverlayStatFaces"))       v->OverlayStatFaces = B("OverlayStatFaces");
+    if(p.count("OverlayStatGL"))          v->OverlayStatGL = B("OverlayStatGL");
+    if(p.count("OverlayStatModgen"))      v->OverlayStatModgen = B("OverlayStatModgen");
+    if(p.count("OverlayStatTimes"))       v->OverlayStatTimes = B("OverlayStatTimes");
     // ("ShowUi" se dio de baja: los .w3d viejos que la traigan caen aca como cualquier
     //  clave desconocida -se ignora- y el chrome del viewport se dibuja SIEMPRE)
     if(p.count("showFloor"))              v->showFloor = B("showFloor");
@@ -321,7 +329,7 @@ void ApplyTimelineProps(Timeline* t, const std::map<std::string,std::string>& p)
 // ----------------------------- Builders -----------------------------
 ViewportBase* BuildLayout(Node* n){
     if(!n) return NULL;
-    std::cout << "[BuildLayout] node=" << n->type << std::endl;
+    w3dLogf("[BuildLayout] node=%s", n->type.c_str());  // log PROPIO, nunca stdout (abria la consola en CADA carga)
 
     if(n->type == "Viewport3D"){
         Viewport3D* v = new Viewport3D();
@@ -365,7 +373,7 @@ ViewportBase* BuildLayout(Node* n){
 			}
 			// si hicimos algo, seguimos adelante y BuildLayout procesará estos nodos
 			if(made){
-				std::cerr << "[BuildLayout] Notice: creado children temporales desde props A/B para " << n->type << std::endl;
+				w3dLogfW("[BuildLayout] children temporales desde props A/B para %s", n->type.c_str());
 			}
 		}
 
@@ -394,8 +402,12 @@ ViewportBase* BuildLayout(Node* n){
                      "se anidaron en su propio contenedor en vez de perderse",
                      n->type.c_str(), (int)n->children.size());
 
-        if(!A) A = new Viewport3D();
-        if(!B) B = new Viewport3D();
+        // contenedor de UN SOLO hijo (ej 'ViewportRow { Viewport3D {} }'): COLAPSAR al hijo, NO inventar un
+        // segundo Viewport3D fantasma. Antes 'if(!B) B=new Viewport3D()' devolvia un split 50/50 con un 3D de mas
+        // -> por eso un .w3d que pedia 1 viewport (minimal.w3d) mostraba 2 (en PC y en el N95, codigo compartido).
+        if(A && !B) return A;
+        if(B && !A) return B;
+        if(!A && !B) return new Viewport3D();
 
         if(isRow)  return new ViewportRow(A,B,split);
         else       return new ViewportColumn(A,B,split);
@@ -404,8 +416,6 @@ ViewportBase* BuildLayout(Node* n){
     // tipo DESCONOCIDO (ej: archivo guardado por una version mas nueva del
     // editor): NO se aborta el layout entero, va un viewport 3D en su lugar
     // y queda el aviso en consola y en el log (visible en la Console del editor)
-    std::cerr << "[BuildLayout] AVISO: viewport desconocido '" << n->type
-              << "', usando Viewport3D en su lugar" << std::endl;
     w3dLogfW("[W3D] layout: viewport desconocido '%s', va un Viewport3D en su lugar", n->type.c_str());
     return new Viewport3D();
 }
@@ -1319,6 +1329,14 @@ void BuildScene(Node* root){
     if(root->props.count("pixelado")){
         std::string v = w3dMapAt(root->props, "pixelado");
         w3dEngine::SetPixeladoGlobal(v == "true" || v == "1");
+    }
+
+    // CACHE DE JUEGO (rewind) del proyecto: un .w3d puede abrir con el cache YA destildado -> un JUEGO se juega
+    // FLUIDO (no rebobina). Si el .w3d no declara "cacheJuego", gSimCacheOn queda como estaba (pref de sesion).
+    if(root->props.count("cacheJuego")){
+        extern bool gSimCacheOn;
+        std::string cj = w3dMapAt(root->props, "cacheJuego");
+        gSimCacheOn = (cj == "true" || cj == "1");
     }
 
     if(root->props.count("background")){

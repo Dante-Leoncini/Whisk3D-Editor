@@ -18,4 +18,11 @@ const char* W3dT9ModoTexto();               // "Abc"/"abc"/"ABC"/"123" (o "" si 
 void        W3dT9Reset();                   // confirmar/soltar el char pendiente (cambio de campo, OK, cancel)
 TBool       W3dT9HayPendiente();            // hay un char a medio elegir? (para el guioncito bajo el cursor)
 
+// El editor de scripts (IDE) tambien recibe el T9: la plataforma (w3dlayout) apunta estos hooks al IDE ACTIVO.
+// Con W3dT9IDEEditando()==true el T9 escribe en el IDE en vez de en g_textFieldActivo. NULL = no hay IDE.
+extern bool (*W3dT9IDEEditando)();
+extern void (*W3dT9IDEInsertar)(int c);
+extern void (*W3dT9IDEBorrar)();
+extern bool (*W3dT9IDEInicioPalabra)();
+
 #endif // W3DT9_H

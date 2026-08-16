@@ -84,6 +84,7 @@ static int gTick = 0;
 static std::vector<Object*> gScripted;
 static int gGrabOffset = 0;   // tick ABSOLUTO del primer snapshot (el cache rueda)
 int gSimCacheMax = 250;       // techo del cache (frames), configurable (tarjeta Juego)
+bool gSimCacheOn = true;      // cache de juego (rewind) ON/OFF (checkbox tarjeta Juego). OFF = sin snapshot -> fluido
 // FLECHAS DEL TECLADO apretadas AHORA [arriba, abajo, izquierda, derecha]. Las
 // mantiene SimTeclaSDL y las mezcla TickReal en el stick izquierdo, igual que el
 // d-pad. Se sueltan al parar la partida (SimStop) para que una flecha que quedo
@@ -240,6 +241,9 @@ static void EditorInitSubtree(Object* o, bool reiniciar) {
 static void EditorInitEscena(UI* u, bool reiniciar) { EditorInitSubtree((Object*)u, reiniciar); }
 
 static void SimPlay() {
+    // volcar a disco/overlay los .lua editados en el IDE (sucios) ANTES de leerlos: sino Play corre el .lua VIEJO
+    // (el cambio vivia solo en el buffer del IDE). Asi cambiar un valor en el script y dar Play YA se ve.
+    { extern void IDEGuardarSucios(); IDEGuardarSucios(); }
     gScripted.clear();
     Recorrer(SceneCollection, NULL, &gScripted);   // en el orden del arbol (outliner)
     if (gScripted.empty()) return;
@@ -267,8 +271,11 @@ static void SimPlay() {
     if (hayEscenas) W3dEscenaArrancar();   // muestra + inicia SOLO la escena inicial
     gGrab.clear();
     gGrabOffset = 0;
-    Snapshot(&gBase);          // el inicio() pudo acomodar cosas: ESE es el frame 0
-    gGrab.push_back(gBase);
+    // frame 0 del cache (post-inicio): SOLO si el cache esta ON y NO es un juego compilado. Con el cache OFF (o
+    // g_modoJuego) gGrab queda VACIO -> juego fluido y SIN rewind. Es CLAVE dejarlo vacio: si gGrab tuviera este
+    // unico frame 0, SimStep back accederia gGrab[gTick] (gTick avanza pero gGrab no crece) fuera de rango = crash.
+    { extern bool g_modoJuego;
+      if (gSimCacheOn && !g_modoJuego) { Snapshot(&gBase); gGrab.push_back(gBase); } }
     gTick = 0;
     gActiva = true;
     CurrentFrame = StartFrame;
@@ -369,10 +376,18 @@ static void TickReal(float dt) {
     // pausa, asi que jugando nunca se avanza dos veces.
     if (!PlayAnimation) UpdateAnimations(dt);
     gTick++;
-    { SimSnap s; Snapshot(&s); gGrab.push_back(s); }
-    // el cache RUEDA: al llenarse se descartan los frames mas viejos (limite de memoria)
-    int techo = (gSimCacheMax > 10) ? gSimCacheMax : 10;
-    while ((int)gGrab.size() > techo) { gGrab.erase(gGrab.begin()); gGrabOffset++; }
+    // CACHE DE JUEGO (rewind): un snapshot de TODA la escena por tick. Es lo que DEGRADA el fps (arranca fluido y
+    // cae a ~15 al llenarse el buffer -> clonar la escena + memmove del vector cada frame). Se saltea si el usuario
+    // destildo "Cache de juego" (gSimCacheOn=false) o si corre un JUEGO COMPILADO (g_modoJuego: un juego no rebobina,
+    // nunca debe cachear). Sin cache, SimTickPlay va directo a TickReal (gGrab vacio -> el branch de futuro grabado
+    // de :382 no entra) y SimStep/SimSeek hacen early-return con el buffer vacio.
+    { extern bool g_modoJuego;
+      if (gSimCacheOn && !g_modoJuego) {
+          SimSnap s; Snapshot(&s); gGrab.push_back(s);
+          // el cache RUEDA: al llenarse se descartan los frames mas viejos (limite de memoria)
+          int techo = (gSimCacheMax > 10) ? gSimCacheMax : 10;
+          while ((int)gGrab.size() > techo) { gGrab.erase(gGrab.begin()); gGrabOffset++; }
+      } }
     if (AnimEsJuego || StartFrame + gTick <= EndFrame) CurrentFrame = StartFrame + gTick;
     g_redraw = true;
 }
@@ -485,6 +500,8 @@ void SimIrA(int tick) {
 
 bool SimStep(int dir) {
     if (!gActiva) return false;
+    if (gGrab.empty()) return true;   // sin cache (destildado o juego compilado): no hay rewind -> no-op
+                                      // (evita gGrab[gTick] fuera de rango: gTick avanza pero gGrab no crece)
     if (dir < 0) {
         if (gTick <= gGrabOffset) return true;   // el cache rodo: mas atras no hay
         gTick--;
@@ -517,6 +534,16 @@ void SimStop() {
     gActiva = false;
     CurrentFrame = StartFrame;
     g_redraw = true;
+}
+
+// hay frames grabados para rebobinar? (con el cache de juego OFF gGrab queda vacio: no hay rewind)
+bool SimHayCache() { return !gGrab.empty(); }
+
+// corta/reinicia el cache LIMPIO desde el tick actual. Lo llama el checkbox "Cache de juego": al destildarlo a
+// mitad de partida no quedan frames "fantasma" (banda de cache / rewind sobre frames viejos) hasta el proximo Stop.
+void SimCacheReset() {
+    gGrab.clear();
+    gGrabOffset = gTick;
 }
 
 // ---- teclado del juego -----------------------------------------------------

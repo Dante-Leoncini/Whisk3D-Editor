@@ -66,4 +66,28 @@ class QwertyPad : public PopUpBase {
 // abre el teclado QWERTY para el campo de texto enfocado (g_textFieldActivo)
 void QwertyAbrir();
 
+// ============================================================================
+//  SELECTOR DE SIMBOLOS (keypad N95, sin teclado): popup con titulo, una fila con los
+//  ULTIMOS 7 simbolos usados y una cuadricula 7x6 de simbolos + espacio + ENTER (nueva
+//  linea, para el IDE). Se abre con '*' mientras se edita texto (T9). Flechas navegan,
+//  OK inserta (queda abierto para elegir mas), C/soft-izq cierra.
+// ============================================================================
+class SimbolosPopup : public PopUpBase {
+    public:
+        SimbolosPopup();
+        void Render() W3D_OVERRIDE;
+        bool Click(int mx, int my) W3D_OVERRIDE;
+        bool Tecla(int tecla) W3D_OVERRIDE;
+        int  focoFila, focoCol;   // -1 = fila de recientes; 0..5 = grid. Publico: SimbolosAbrir lo resetea.
+    private:
+        Card* celda;
+        int celW, celH, recentY, gridY, barraY;   // barraY = fila de "aceptar"/"cancelar" abajo
+        void Reubicar();
+        void Elegir(const char* s);
+};
+// abre el selector de simbolos (lo llama el container con '*' durante la edicion de texto)
+void SimbolosAbrir();
+bool SimbolosActivo();   // el selector de simbolos esta abierto? ('*' lo cierra desde el container)
+void SimbolosCerrar();
+
 #endif // NUMPAD_H

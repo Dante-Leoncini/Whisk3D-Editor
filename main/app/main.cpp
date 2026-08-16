@@ -700,8 +700,10 @@ static void MainLoopFrame() {
             lastSimMs = now;
             if (juego && AnimPlayDir < 0) {
                 // PLAY EN REVERSA (modo juego): reproduce lo grabado HACIA ATRAS;
-                // al llegar al inicio se PAUSA (el final es infinito, no hay loop)
-                if (!SimActiva() || SimFrameActual() <= SimPrimerFrame()) PlayAnimation = false;
+                // al llegar al inicio se PAUSA (el final es infinito, no hay loop). Con el CACHE OFF (gGrab vacio)
+                // no hay nada que rebobinar -> SimHayCache() pausa YA (sino SimStep(-1) era no-op y el boton de
+                // reversa quedaba trabado con PlayAnimation=true para siempre).
+                if (!SimActiva() || !SimHayCache() || SimFrameActual() <= SimPrimerFrame()) PlayAnimation = false;
                 else SimStep(-1);
             } else if (juego) {
                 // MODO JUEGO hacia adelante: el playhead lo lleva la simulacion
@@ -1083,7 +1085,15 @@ int main(int argc, char* argv[]) {
     }
     // "whisk3d --stats" prende el overlay Statistics (con el profiler de ms); "--play" arranca la animacion en PLAY
     for (int ai = 1; ai < argc; ai++) {
-        if (std::string(argv[ai]) == "--stats") { extern bool OverlayStatVertices, OverlayStatFaces, OverlayStatModgen, OverlayStatTimes, OverlayFps, OverlayStatGL; OverlayStatVertices = OverlayStatFaces = OverlayStatModgen = OverlayStatTimes = OverlayFps = OverlayStatGL = true; g_redraw = true; }
+        if (std::string(argv[ai]) == "--stats") { // los 6 flags de stats son AHORA miembros per-viewport: prende los del 3D activo
+            extern Viewport3D* Viewport3DActive;
+            if (Viewport3DActive) {
+                Viewport3DActive->OverlayStatVertices = Viewport3DActive->OverlayStatFaces =
+                Viewport3DActive->OverlayStatModgen  = Viewport3DActive->OverlayStatTimes =
+                Viewport3DActive->OverlayFps         = Viewport3DActive->OverlayStatGL = true;
+            }
+            g_redraw = true;
+        }
         if (std::string(argv[ai]) == "--play")  { extern bool PlayAnimation;     PlayAnimation = true;     g_redraw = true; }
         // "whisk3d proyecto.w3d --juego": abre DIRECTO jugando (el selector del
         // timeline en "Juego" + play): para probar un juego sin tocar nada

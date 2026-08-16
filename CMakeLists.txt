@@ -99,6 +99,8 @@ list(APPEND SRC_FILES
     # todo es stub no-op, asi que agregarlos no cambia nada hasta habilitar el flag (abajo).
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/audio/W3dAudio.cpp
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/audio/W3dAudioSDL.cpp
+    # PORTAPAPELES del sistema (Core): backend SDL (en Symbian se usa W3dClipboardSymbian.cpp via .mmp)
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/base/W3dClipboardSDL.cpp
 )
 
 if(ANDROID)

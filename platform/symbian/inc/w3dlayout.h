@@ -41,7 +41,27 @@ void  W3dLayoutCiclarViewport(TInt aDir); // tecla verde: cambia viewport activo
 void  W3dLayoutToggleBarra();             // soft-izq: abre/cierra barra de menu
 void  W3dLayoutRedimensionarViewport(TInt aDx, TInt aDy); // verde+flechas: redimensiona en un eje
 TBool W3dLayout3DActivo();                // el viewport activo es un 3D?
+TBool W3dLayoutFocoTransporte();          // el 3D activo tiene el foco de barra en Stop/Play? (flechas al panel, no orbita)
+void  W3dLayoutTecla8();                   // "8": loop cut en Edit Mode, o toggle vista-desde-camara-activa fuera (como numpad 0 PC)
 TBool W3dLayoutJuegoViewportActivo();     // el viewport activo es donde se juega (3D o 2D)
+
+// IDE (editor de scripts) por keypad: el container los usa en el bloque T9 de OfferKeyEventL. barFocusIndex < 0 =
+// EDITAR TEXTO (T9 escribe, flechas = cursor, OK = nueva linea, soft-izq = salir a la barra); >= 0 = navegar la barra.
+bool W3dLayoutIDEEditando();              // el IDE activo esta editando texto?
+void W3dLayoutIDEInsertar(int c);
+void W3dLayoutIDEBorrar();
+void W3dLayoutIDEEnter();
+void W3dLayoutIDEFlecha(int aScan, bool shift); // EStdKey* de flecha -> mover el cursor del IDE (shift = seleccionar)
+void W3dLayoutIDESalirEdicion();          // pasar a modo barra (barFocusIndex = 0)
+bool W3dLayoutIDEEnBarra();               // el IDE activo esta en modo barra (barFocusIndex >= 0)?
+void W3dLayoutIDEVolverEdicion();         // volver a editar texto (barFocusIndex = -1)
+bool W3dLayoutIDEInicioPalabra();         // cursor al inicio de palabra (modo Abc del T9)
+void W3dLayoutIDECopiar();                // shift + softkey-izq: copiar la seleccion al portapapeles del sistema
+void W3dLayoutIDEPegar();                 // shift + softkey-der: pegar del portapapeles del sistema
+
+// Consola (kind 7): scroll con flechas mantenidas (el container las repite via AplicarFlechas3D con aceleracion)
+bool W3dLayoutConsolaActivo();
+void W3dLayoutConsolaScroll(int dx, int dy);  // dx/dy = -1/0/1 (una flecha); aplica el paso + signo internamente
 TBool W3dLayoutOcupado();   // scroll/divisor agarrado (cursor verde)
 TBool W3dLayoutArrastrePopup(); // el picker arrastrando (cursor violeta)
 void W3dLayoutMenuParent(TBool aClear, TInt aX, TInt aY); // ctrl+P/alt+P
