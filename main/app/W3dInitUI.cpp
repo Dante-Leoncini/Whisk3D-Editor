@@ -18,7 +18,12 @@
 #include "WhiskUI/text/W3dFont.h"      // W3dFontSetTexSize (atlas dinamico)
 #include "io/SkinAtlas.h"              // el atlas armado al arrancar (font.png + iconos)
 
+// skinDir de la plataforma (PC: res/Skins/<skin>/ ; Symbian: la carpeta privada, flat). Se guarda para
+// que otros modulos (Fuente2D) carguen font.png del MISMO lugar que el editor, no de una ruta armada a
+// mano con GetResDir() (que en Symbian es "" -> daba "/Skins/Whisk3D/font.png" y la UI2D quedaba SIN texto).
+std::string g_skinDir;
 void W3dInitUI(const std::string& skinDir) {
+    g_skinDir = skinDir;
     // El IDIOMA va primero: la UI que se arma abajo ya pide sus textos con T(), asi que tiene que estar resuelto
     // antes. Aca y no en cada plataforma: este init lo comparten las cinco, y el detector ya sabe preguntarle a
     // cada SO por su lado.

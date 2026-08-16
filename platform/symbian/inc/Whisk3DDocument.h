@@ -13,6 +13,8 @@
 
 // FORWARD DECLARATIONS
 class  CEikAppUi;
+class  CFileStore;
+class  RFile;
 
 // CLASS DECLARATION
 
@@ -52,6 +54,14 @@ class CWhisk3DDocument : public CAknDocument
          * From CEikDocument, creates and returns CWhisk3DAppUi application UI object.
          */
         CEikAppUi* CreateAppUiL();
+
+        /**
+         * Abrir un .w3d desde un file manager (X-plore, "abrir con"). Recibe el archivo y solo
+         * ENCOLA su ruta (g_proyAbrirPendiente): el editor lo abre en el primer frame (diferido),
+         * porque abrir aca -durante la construccion de la app- puede reventar. NO registramos
+         * datatype (eso rompio X-plore antes): el file manager elige la app por su cuenta.
+         */
+        void OpenFileL(CFileStore*& aFileStore, RFile& aFile);
     };
 
 #endif

@@ -569,6 +569,10 @@ void ViewportBase::ActualizarBarra(){
     }
 }
 
+// hook opcional (lo setea la plataforma): texto del modo de entrada de texto a mostrar en la barra del viewport
+// ACTIVO mientras se edita un campo (Symbian lo apunta a W3dT9ModoTexto: "Abc"/"abc"/"ABC"/"123"). NULL en PC.
+const char* (*g_ViewportBarModoHook)() = 0;
+
 void ViewportBase::RenderBar(){
     // se llama al final del Render del viewport (con su ortho 2D activo)
     if (!barCard || BarButtons.empty()) return;
@@ -576,7 +580,7 @@ void ViewportBase::RenderBar(){
     // navega sus botones de transporte SIN abrir menu -> su foco lo maneja el ruteo de teclado (LayoutTimelineBar*),
     // no se apaga aca (sino se perderia cada frame).
     extern bool LayoutMenuAbierto();
-    if (!LayoutMenuAbierto() && ViewportKind() != 5) barFocusIndex = -1;
+    if (!LayoutMenuAbierto() && ViewportKind() != 5 && ViewportKind() != 6 && ViewportKind() != 8) barFocusIndex = -1;
     ActualizarBarra(); // layout + auto-scroll + sx/sy frescos
     int barH = BarHeight();
     int yBar = barAbajo ? height - barH : 0;
@@ -618,6 +622,19 @@ void ViewportBase::RenderBar(){
         w3dEngine::Translatef((GLfloat)(tab->sx - x), (GLfloat)(tab->sy - y - yBar), 0);
         tab->Render();
         w3dEngine::PopMatrix();
+    }
+
+    // indicador del modo de entrada de texto (T9 del keypad Symbian) a la DERECHA de la barra del viewport ACTIVO,
+    // mientras se edita un campo: "Abc"/"abc"/"ABC"/"123". En PC el hook es NULL y no dibuja nada.
+    if (this == viewPortActive && g_ViewportBarModoHook){
+        const char* modo = g_ViewportBarModoHook();
+        if (modo && modo[0]){
+            SetColorID(ColorID::accent);
+            w3dEngine::PushMatrix();
+            w3dEngine::Translatef(0, (GLfloat)((barH - LetterHeightGS) / 2), 0);
+            RenderBitmapText(std::string(modo), textAlign::right, width - gapGS * 2);
+            w3dEngine::PopMatrix();
+        }
     }
     w3dEngine::PopMatrix();
 }

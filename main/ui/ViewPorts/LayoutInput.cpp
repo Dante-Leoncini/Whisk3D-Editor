@@ -66,6 +66,11 @@
 #include "w3dlog.h"         // las notificaciones tambien van al log
 // (los tipos GL + el dibujo vienen del engine: w3dGraphics.h / w3dEngine, ya incluido arriba)
 
+// rename en curso (mesh part / material / hueso): Properties.cpp. Enter escribe el nombre uniquificado, Esc descarta.
+extern bool RenameActivo();
+extern void RenameCommit();
+extern void RenameCancel();
+
 void (*LayoutImportObj)() = NULL;
 void (*LayoutImportFbx)() = NULL; // "Add > Imports > FBX": abre el explorador filtrado a .fbx (lo cablea la plataforma)
 void (*LayoutImportGltf)() = NULL; // "Add > Imports > glTF": explorador filtrado a .gltf
@@ -385,6 +390,10 @@ static ViewportBase* gMenuTipoDe = NULL; // de que viewport se abrio
 // fullscreen no se puede split/expand/cambiar tipo (el menu solo ofrece Minimize).
 static ViewportBase* g_rootGuardado = NULL; // != NULL => hay un viewport MAXIMIZADO
 bool LayoutEstaMaximizado() { return g_rootGuardado != NULL; }
+// limpiar el estado "maximizado" SIN restaurar nada: al abrir un proyecto el arbol es NUEVO y el g_rootGuardado
+// viejo apunta a un arbol huerfano; si no se limpia, el menu ofrece solo "Minimizar" y minimizar instalaria ese
+// arbol muerto (layout roto). Lo llama el camino de apertura de proyecto.
+void LayoutResetMaximizado() { g_rootGuardado = NULL; }
 void LayoutMaximizar() {
     if (!rootViewport) return;
     if (g_rootGuardado) { // ya maximizado -> RESTAURAR el arbol guardado
@@ -1943,6 +1952,41 @@ bool LayoutClickBarraIDE(IDE* ide, int mx, int my) {
             case BRIDE_Refresh: ide->Refresh(); return true;
         }
     }
+    return false;
+}
+
+// ---- navegacion GENERICA de la barra de un viewport por teclado (Symbian, sin mouse), modelada en la del Timeline:
+// mueve barFocusIndex entre los botones VISIBLES (el [0] tipo/split SIEMPRE navegable) y activa el enfocado
+// simulando el click en su centro. La usan Editor2D (kind 6) e IDE (kind 8). El foco se DIBUJA solo (RenderBar lee
+// barFocusIndex); para que no se resetee por frame hay que exceptuar estos kinds en ViewPorts.cpp (como el Timeline). ----
+static void LayoutBarraFocoMover(ViewportBase* vp, int dir) {
+    if (!vp) return;
+    std::vector<Button*>& B = vp->BarButtons;
+    int maxIdx = (int)B.size() - 1;
+    if (maxIdx < 0) return;
+    int idx = vp->barFocusIndex;
+    if (idx < 0) idx = 0;                          // primera vez: arrancar en el [0]
+    for (int k = 0; k <= maxIdx; k++) {
+        idx += dir;
+        if (idx > maxIdx) idx = 0;                 // wrap
+        if (idx < 0) idx = maxIdx;
+        if (idx == 0 || B[idx]->visible) break;    // el [0] SIEMPRE es navegable (cambia el tipo de viewport)
+    }
+    vp->barFocusIndex = idx;
+    vp->ActualizarBarra();                         // auto-scroll para mostrar el enfocado
+    g_redraw = true;
+}
+static bool LayoutBarraFocoActivar(ViewportBase* vp) {
+    if (!vp) return false;
+    int idx = vp->barFocusIndex;
+    if (idx < 0 || idx > (int)vp->BarButtons.size() - 1) return false;
+    vp->ActualizarBarra();                         // sx/sy frescos antes del hit-test
+    if (idx == 0) { LayoutAbrirMenuTipo(vp); return true; } // [0] = menu tipo/split (cambiar el viewport a 3D/outliner/etc.)
+    Button* b = vp->BarButtons[idx];
+    if (!b->visible) return false;
+    int mx = b->sx + b->width / 2, my = b->sy + b->height / 2;
+    if (vp->ViewportKind() == 6) return LayoutClickBarra2D((Editor2D*)vp, mx, my);
+    if (vp->ViewportKind() == 8) return LayoutClickBarraIDE((IDE*)vp, mx, my);
     return false;
 }
 
@@ -3858,16 +3902,22 @@ bool LayoutTeclaUI(int tecla, int mx, int my) {
         return true; // mientras este abierto no le roban teclas
     }
 
-    // EDICION NUMERICA por texto en curso (un PropFloat): el teclado va al campo. Enter APLICA, Cancel DESCARTA,
-    // izq/der mueven el caret. Los digitos 0-9 / '*'(punto) los inyecta el contenedor Symbian o SDL_TEXTINPUT (PC).
-    if (NumEditActivo()) {
+    // CUALQUIER campo de texto enfocado (PropFloat numerico O PropText de nombre/save/path): el teclado va al
+    // campo. Enter CONFIRMA y sale, Cancel descarta, izq/der = caret. Los caracteres los inyecta el contenedor
+    // Symbian (T9) o SDL_TEXTINPUT (PC). Antes solo miraba NumEditActivo(): un PropText no marcaba edicion y las
+    // flechas colapsaban la tarjeta / OK no salia -> quedabas atorado.
+    if (g_textFieldActivo) {
         switch (tecla) {
-            // aceptar/cancelar tiene que SALIR del editando del panel, sino te clava en la propiedad (button_up/down
-            // seguirian ajustando el valor en vez de navegar).
-            case LayoutKey::Enter:  NumEditCommit(); if (PropsActivo) PropsActivo->editando = false; return true;
-            case LayoutKey::Cancel: NumEditCancel(); if (PropsActivo) PropsActivo->editando = false; return true;
-            case LayoutKey::Left:   if (g_textFieldActivo) g_textFieldActivo->CaretIzq(); g_redraw = true; return true;
-            case LayoutKey::Right:  if (g_textFieldActivo) g_textFieldActivo->CaretDer(); g_redraw = true; return true;
+            // al aceptar/cancelar hay que SALIR de la edicion del panel (editando=false): sino button_up/down
+            // seguirian navegando/ajustando y te clavaban en la propiedad.
+            case LayoutKey::Enter:
+                if (RenameActivo()) RenameCommit(); else if (NumEditActivo()) NumEditCommit(); else g_textFieldActivo = NULL;
+                if (PropsActivo) PropsActivo->editando = false; g_redraw = true; return true;
+            case LayoutKey::Cancel:
+                if (RenameActivo()) RenameCancel(); else if (NumEditActivo()) NumEditCancel(); else g_textFieldActivo = NULL;
+                if (PropsActivo) PropsActivo->editando = false; g_redraw = true; return true;
+            case LayoutKey::Left:   g_textFieldActivo->CaretIzq(); g_redraw = true; return true;
+            case LayoutKey::Right:  g_textFieldActivo->CaretDer(); g_redraw = true; return true;
         }
         return true; // mientras edita, consume el resto (no navega ni ajusta la escena)
     }
@@ -3926,20 +3976,28 @@ bool LayoutTeclaUI(int tecla, int mx, int my) {
 // (kind 3) y outliner (kind 2). El 3D (kind 1) devuelve false: lo maneja la
 // orbita/transform. Es lo que usa Symbian con el keypad cuando no hay mouse BT.
 bool LayoutTeclaPanelActivo(int tecla) {
-    // edicion numerica por texto en curso: Enter aplica, Cancel descarta, izq/der = caret (los digitos los mete
-    // el contenedor). Va ANTES de todo asi el keypad no navega la escena mientras se tipea un valor.
-    if (NumEditActivo()) {
+    // CUALQUIER campo de texto enfocado (PropFloat numerico O PropText de nombre/save/path): Enter CONFIRMA y sale,
+    // Cancel descarta, izq/der = caret (los caracteres los mete el contenedor / T9). Va ANTES de todo asi el keypad
+    // no navega la escena mientras se tipea. Antes solo NumEditActivo() -> un PropText quedaba atorado.
+    if (g_textFieldActivo) {
         switch (tecla) {
             // al aceptar/cancelar hay que SALIR de la edicion del panel (editando=false): sino button_up/down siguen
-            // ajustando el valor en vez de navegar -> te quedabas CLAVADO en la propiedad. (Bug reportado en Symbian.)
-            case LayoutKey::Enter:  NumEditCommit(); if (PropsActivo) PropsActivo->editando = false; return true;
-            case LayoutKey::Cancel: NumEditCancel(); if (PropsActivo) PropsActivo->editando = false; return true;
-            case LayoutKey::Left:   if (g_textFieldActivo) g_textFieldActivo->CaretIzq(); g_redraw = true; return true;
-            case LayoutKey::Right:  if (g_textFieldActivo) g_textFieldActivo->CaretDer(); g_redraw = true; return true;
+            // navegando/ajustando -> te quedabas CLAVADO en la propiedad. (Bug reportado en Symbian.)
+            case LayoutKey::Enter:
+                if (RenameActivo()) RenameCommit(); else if (NumEditActivo()) NumEditCommit(); else g_textFieldActivo = NULL;
+                if (PropsActivo) PropsActivo->editando = false; g_redraw = true; return true;
+            case LayoutKey::Cancel:
+                if (RenameActivo()) RenameCancel(); else if (NumEditActivo()) NumEditCancel(); else g_textFieldActivo = NULL;
+                if (PropsActivo) PropsActivo->editando = false; g_redraw = true; return true;
+            case LayoutKey::Left:   g_textFieldActivo->CaretIzq(); g_redraw = true; return true;
+            case LayoutKey::Right:  g_textFieldActivo->CaretDer(); g_redraw = true; return true;
         }
         return true;
     }
     if (!viewPortActive || !viewPortActive->isLeaf()) return false;
+    // MENU/desplegable abierto: el panel NO maneja teclas (las navega el menu via LayoutTeclaUI). Sin esto, con un
+    // menu abierto el OK caeria a la accion del panel (o al caso 6/8 nuevo) en vez de activar el item del menu.
+    if (LayoutMenuAbierto()) return false;
     if (viewPortActive->ViewportKind() == 3) {
         Properties* p = (Properties*)viewPortActive;
         switch (tecla) {
@@ -4002,6 +4060,32 @@ bool LayoutTeclaPanelActivo(int tecla) {
         }
         if (tecla == LayoutKey::Enter) { tl->TogglePlay(+1); return true; } // sin foco: OK = play (flechas -> NavFrame)
         return false;
+    }
+    // Editor2D (6) e IDE (8): las flechas navegan los botones de la BARRA (foco tipo Timeline), OK activa el enfocado
+    // (abre su menu / Save / Refresh / cambia el tipo de viewport), C sale del foco. Consumen SIEMPRE asi el OK NUNCA
+    // cae al toggle de Edit Mode del cubo 3D (bug: apretar OK en el IDE metia el cubo seleccionado en Edit Mode).
+    if (viewPortActive->ViewportKind() == 6 || viewPortActive->ViewportKind() == 8) {
+        switch (tecla) {
+            case LayoutKey::Left:
+            case LayoutKey::Up:     LayoutBarraFocoMover(viewPortActive, -1); return true;
+            case LayoutKey::Right:
+            case LayoutKey::Down:   LayoutBarraFocoMover(viewPortActive, +1); return true;
+            case LayoutKey::Enter:  LayoutBarraFocoActivar(viewPortActive);   return true;
+            case LayoutKey::Cancel: viewPortActive->barFocusIndex = -1; g_redraw = true; return true;
+        }
+        return true;
+    }
+    // Consola (7): las flechas SCROLLEAN el contenido (vertical y horizontal). El resto se consume (no toca la escena).
+    if (viewPortActive->ViewportKind() == 7) {
+        Console* c = (Console*)viewPortActive;
+        int paso = RenglonHeightGS * 2;
+        switch (tecla) {
+            case LayoutKey::Up:    c->ScrollByTouch(0, +paso); g_redraw = true; return true;
+            case LayoutKey::Down:  c->ScrollByTouch(0, -paso); g_redraw = true; return true;
+            case LayoutKey::Left:  c->ScrollByTouch(+paso, 0); g_redraw = true; return true;
+            case LayoutKey::Right: c->ScrollByTouch(-paso, 0); g_redraw = true; return true;
+        }
+        return true;
     }
     return false;
 }

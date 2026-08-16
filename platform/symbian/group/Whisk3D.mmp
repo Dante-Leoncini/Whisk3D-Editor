@@ -53,6 +53,7 @@ SOURCE          newdel_compat.cpp
 SOURCE          hidmonitor.cpp
 // Fase 1 unificacion: hojas/armado del layout para Symbian
 SOURCE          w3dlayout.cpp
+SOURCE          w3dt9.cpp // entrada de texto multi-tap (T9) del keypad
 // Fase 3c: puente al modelo nuevo (unico TU de symbian que ve el core)
 SOURCE          w3dnewscene.cpp
 SOURCE          w3dtexload.cpp

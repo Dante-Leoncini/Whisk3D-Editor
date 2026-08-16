@@ -1422,37 +1422,27 @@ void Timeline::Render(){
     // ---------------- PANEL del dope sheet: TAPA el playhead/recuadro (van detras) ----------------
     RenderDopePanel();
 
-    // ---------------- readout del transform de keyframes ('g'/'s'): cuanto se movio/escalo ----------------
-    // Igual que la barra del modo objeto: muestra el valor y, si se esta tipeando, la expresion tal cual.
-    { std::string tt = DopeTextoTransform();
-      if (!tt.empty()){
-        int tw = (int)tt.size()*CharacterWidthGS, pad = GlobalScale*4;
-        int tx = panelW + pad*2, ty = height - LetterHeightGS - pad*2;
-        gfx::Disable(gfx::Texture2D); gfx::DisableArray(gfx::TexCoordArray);
-        gfx::Color4f(0.06f, 0.06f, 0.06f, 1.0f);            // fondo OPACO: legible sobre los keyframes
-        FillRect(tx - pad, ty - pad, tw + pad*2, LetterHeightGS + pad*2);
-        gfx::Enable(gfx::Texture2D); gfx::EnableArray(gfx::TexCoordArray);
-        if (!Textures.empty() && Textures[0]) gfx::BindTexture(Textures[0]->iID);
-        SetCol(ColorID::blanco, 1.0f);
-        gfx::PushMatrix(); gfx::Translatef((float)tx, (float)ty, 0);
-        RenderBitmapText(tt, textAlign::left, tw + GlobalScale*2);
-        gfx::PopMatrix();
-      } }
-
-    // ---------------- barra del viewport (menu con transporte + campos) ----------------
+    // ---------------- barra del viewport ----------------
+    // Durante un transform de keyframes ('g'/'s'/'r') la barra de menu se reemplaza por el readout (Move/Scale/
+    // Rotate + eje) con RenderBarraInfo, IGUAL que el 3D y el 2D. Sin transform: barra normal (transporte + campos).
     gfx::EnableArray(gfx::TexCoordArray);
     if (!Textures.empty() && Textures[0]) gfx::BindTexture(Textures[0]->iID);
-    RenderBar();
+    std::string ttBarra = DopeTextoTransform();
+    if (!ttBarra.empty()) {
+        RenderBarraInfo(ttBarra);
+    } else {
+        RenderBar();
 
-    // glyphs vectoriales ENCIMA de los botones de transporte (sin textura, centrados en el boton cuadrado)
-    gfx::Disable(gfx::Texture2D); gfx::DisableArray(gfx::TexCoordArray);
-    bool pfwd = (PlayAnimation && AnimPlayDir>0), prev = (PlayAnimation && AnimPlayDir<0);
-    SetCol(ColorID::blanco, 1.0f);
-    for (int i=0;i<8;i++){
-        Button* b = btnT[i]; if (!b->visible || b->sx < -9000) continue;
-        int gx = b->sx - x, gy = b->sy - y;
-        bool pausa = (i==3 && prev) || (i==4 && pfwd);
-        DrawGlyph(gx, gy, b->width, b->height, i, pausa);
+        // glyphs vectoriales ENCIMA de los botones de transporte (sin textura, centrados en el boton cuadrado)
+        gfx::Disable(gfx::Texture2D); gfx::DisableArray(gfx::TexCoordArray);
+        bool pfwd = (PlayAnimation && AnimPlayDir>0), prev = (PlayAnimation && AnimPlayDir<0);
+        SetCol(ColorID::blanco, 1.0f);
+        for (int i=0;i<8;i++){
+            Button* b = btnT[i]; if (!b->visible || b->sx < -9000) continue;
+            int gx = b->sx - x, gy = b->sy - y;
+            bool pausa = (i==3 && prev) || (i==4 && pfwd);
+            DrawGlyph(gx, gy, b->width, b->height, i, pausa);
+        }
     }
 
     // borde del viewport (verde si activo)

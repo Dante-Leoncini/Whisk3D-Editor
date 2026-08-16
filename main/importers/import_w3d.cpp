@@ -2771,6 +2771,8 @@ static void JsonObjeto(JVal* j, Object* parent, const std::string& base) {
 // "pantallaCompleta", ...); un valor desconocido o ausente deja el default del
 // campo (W3dCompilar*Int). Solo existe en el camino JSON: los formatos viejos
 // (zip v2 sin el campo, texto Whisk3D{}) quedan con los defaults.
+namespace w3dEngine { void W3dAudioJuegoVolume(float v); }  // aplicar el volumen del juego (0..1) al mixer del Core
+
 static void AplicarCompilar(JVal* jc) {
     if (!jc) return;
 #ifdef W3D_SIN_EDITOR
@@ -2786,6 +2788,9 @@ static void AplicarCompilar(JVal* jc) {
     g_proyCompilar.assetsModo  = W3dCompilarAssetsInt(JS(jc, "assets", ""));
     g_proyCompilar.plataforma  = W3dCompilarPlataformaInt(JS(jc, "plataforma", ""));
     g_proyCompilar.uid         = (unsigned)strtoul(JS(jc, "uid", "0").c_str(), 0, 16);  // UID3 Symbian (hex string)
+    g_proyCompilar.volumen     = JIRango(jc, "volumen", 100, 0, 100, "compilar");        // 0..100 volumen del gameplay
+    w3dEngine::W3dAudioJuegoVolume(g_proyCompilar.volumen / 100.0f);                      // aplicar YA la ganancia al mixer
+    { extern void W3dJuegoVolRefUI(); W3dJuegoVolRefUI(); }                               // refrescar el numero de la tarjeta Juego
 #endif
 }
 
@@ -3586,6 +3591,11 @@ void AbrirProyectoAhora(const std::string& ruta) {
     extern int MenuPantallaW, MenuPantallaH;
     if (rootViewport && MenuPantallaW > 0 && MenuPantallaH > 0)
         rootViewport->Resize(MenuPantallaW, MenuPantallaH);
+    // el arbol es NUEVO: (1) limpiar el estado "maximizado" (el g_rootGuardado viejo apunta a un arbol huerfano;
+    // sino el menu pide Minimizar y minimizar instala el arbol muerto) y (2) reenganchar gRoot/paneles del layout
+    // (sino en Symbian la rotacion redimensiona el arbol viejo huerfano y no re-acomoda nada).
+    { extern void LayoutResetMaximizado(); LayoutResetMaximizado();
+      extern void (*LayoutArbolCambiado)(); if (LayoutArbolCambiado) LayoutArbolCambiado(); }
     extern void ProyectoSincronizarCampos();
     ProyectoSincronizarCampos();
     // MODO JUEGO (.sisx bundleado): full-screen del 3D -> el juego se ve solo, sin el chrome

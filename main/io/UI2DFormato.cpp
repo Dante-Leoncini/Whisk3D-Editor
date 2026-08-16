@@ -363,6 +363,7 @@ bool UI2DGuardar(UI* u, const std::string& ruta, const std::string& baseRel) {
     CampoF(f, 2, "ancho", u->ancho);
     CampoF(f, 2, "alto", u->alto);
     CampoF(f, 2, "escalaGlobal", u->escalaGlobal);
+    CampoB(f, 2, "escalaIgualEditor", u->escalaIgualEditor);
     CampoColor(f, 2, "color", u->color, false);
     Sangria(f, 1); fputs("},\n", f);
     // las PALETAS: la fuente de verdad es el PROYECTO (W3dPaletas); se BAKEAN
@@ -717,6 +718,7 @@ UI* UI2DCargar(const std::string& ruta) {
         u->ancho = JF(v, "ancho", u->ancho);
         u->alto = JF(v, "alto", u->alto);
         u->escalaGlobal = JF(v, "escalaGlobal", u->escalaGlobal);
+        u->escalaIgualEditor = JB(v, "escalaIgualEditor", u->escalaIgualEditor);
         JColor(v, "color", u->color);
     }
     LeerCamposHijos(raiz, &u->padIzq, &u->padDer, &u->padArr, &u->padAba,

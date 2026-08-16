@@ -286,6 +286,7 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropButton* propUIrotar;     // boton: intercambia ancho y alto
         PropColor*  propUIcolor;     // fondo de la ventana (transparente por defecto)
         PropFloat*  propUIescala;    // escala global del contenido (x1 N95 ... x4 pantallas grandes)
+        PropBool*   propUIescalaIgual; // escala = GlobalScale del editor (por plataforma); tildado oculta el valor manual
         PropButton* propUIexport;    // guardar el arbol como .w3dui (JSON)
         // el objeto SCRIPT/CONTROL: una tarjeta "Control" (nombre + visible + agregar)
         // y UNA TARJETA POR SCRIPT (archivo + propiedades expuestas + quitar).

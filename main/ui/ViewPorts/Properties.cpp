@@ -1481,6 +1481,12 @@ static void AccionUIigualRender(){   // onChange del checkbox "como el render"
     if (PropsActivo) PropsActivo->target = NULL;   // re-bind: muestra/oculta las filas responsive
     g_redraw = true;
 }
+static void AccionUIescalaIgual(){   // onChange del checkbox "Escala igual que el editor"
+    // tildado = la escala la da el GlobalScale del editor (por plataforma); se oculta el valor manual (el re-bind
+    // lo aplica). Destildado = escala manual, como antes.
+    if (PropsActivo) PropsActivo->target = NULL;   // re-bind: muestra/oculta la fila del valor manual
+    g_redraw = true;
+}
 static PopupMenu* MenuUIres = NULL;
 static void AccionUIresElegida(int id){
     UI* u = UIActivaProps(); if (!u) return;
@@ -1535,6 +1541,18 @@ static void AccionSimCache(){
     gSimCacheMax = (int)(g_simCacheF + 0.5f);
     if (gSimCacheMax < 10) gSimCacheMax = 10;
 }
+// Volumen del gameplay (0..100): escribe g_proyCompilar.volumen (viaja en el .w3d) y aplica YA la ganancia al
+// mixer del Core (0..100 -> 0..1), asi baja/sube en vivo mientras jugas. Ver W3dAudioJuegoVolume.
+namespace w3dEngine { void W3dAudioJuegoVolume(float v); }
+static float g_juegoVolF = 100.0f;
+static void AccionJuegoVolumen(){
+    int v = (int)(g_juegoVolF + 0.5f);
+    if (v < 0) v = 0; else if (v > 100) v = 100;
+    g_proyCompilar.volumen = v;
+    w3dEngine::W3dAudioJuegoVolume(v / 100.0f);
+}
+// refresca el numero mostrado desde g_proyCompilar (lo llama import_w3d al abrir un .w3d con volumen guardado)
+void W3dJuegoVolRefUI(){ g_juegoVolF = (float)g_proyCompilar.volumen; }
 // Compilar juego: exporta + genera + compila EN SEGUNDO PLANO (worker): el editor no
 // se congela; el progreso (etapa + %) lo muestra la barra overlay de abajo y el
 // resultado llega por notificacion. Si ya hay un build corriendo, CompilarJuego avisa
@@ -4951,7 +4969,11 @@ void Properties::ConstruirGrupos(){
     propUIcard->properties.push_back(propUInombre);
     propUIver3D = new PropBool(T("View in 3D"));
     propUIcard->properties.push_back(propUIver3D);
-    // la ESCALA GLOBAL del contenido: x1 = N95, x2/x3/x4 = pantallas mas grandes
+    // la ESCALA GLOBAL del contenido: x1 = N95, x2/x3/x4 = pantallas mas grandes. El checkbox "igual que el editor"
+    // la ata al GlobalScale por plataforma (y oculta el valor manual); destildado = manual, como antes.
+    propUIescalaIgual = new PropBool("Escala igual que el editor");
+    propUIescalaIgual->onChange = AccionUIescalaIgual;
+    propUIcard->properties.push_back(propUIescalaIgual);
     propUIescala = new PropFloat("Escala", "x");
     propUIescala->SetRango(1.0f, 8.0f); propUIescala->entero = true;
     propUIcard->properties.push_back(propUIescala);
@@ -5597,6 +5619,12 @@ void Properties::ConstruirGrupos(){
     propJuegoSonido = new PropBool("Usar sonido");
     propJuegoSonido->value = &g_proyCompilar.usarSonido;
     propJuego->properties.push_back(propJuegoSonido);
+    // volumen del gameplay 0..100 (audio del juego): baja/sube en vivo (onChange aplica la ganancia al mixer).
+    { PropFloat* pV = new PropFloat("Volumen", "%");
+      pV->SetRango(0.0f, 100.0f); pV->entero = true;
+      pV->stepFino = 1.0f; pV->stepGrueso = 10.0f; pV->dragStep = 1.0f;
+      g_juegoVolF = (float)g_proyCompilar.volumen; pV->value = &g_juegoVolF; pV->onChange = AccionJuegoVolumen;
+      propJuego->properties.push_back(pV); }
     // modo debug: tildado = W3D_DEV_LOG=1 (log + ring + depurar()); destildado
     // (default) = produccion, W3D_DEV_LOG=0 (sin mensajes de debug ni ring)
     propJuegoDebug = new PropBool("Modo debug");
@@ -6795,7 +6823,10 @@ void Properties::RefreshTargetProperties(){
         if (propUIrotar)    propUIrotar->oculto = !resp;
         if (propUIopac)     propUIopac->value = u ? &u->opacidad : NULL;
         if (propUIcolor)    propUIcolor->value = u ? u->color : NULL;
-        if (propUIescala)   propUIescala->value = u ? &u->escalaGlobal : NULL;
+        if (propUIescalaIgual) propUIescalaIgual->value = u ? &u->escalaIgualEditor : NULL;
+        // tildado "igual que el editor": ocultar el valor manual (PropFloat con value NULL no se muestra, igual que
+        // ancho/alto en no-responsive); destildado: editable como antes.
+        if (propUIescala)   propUIescala->value = (u && !u->escalaIgualEditor) ? &u->escalaGlobal : NULL;
     }
     // Children (padding por lado + layout + gap): del elemento 2D o UI activo
     if (propHijosPadIzq){
@@ -7039,7 +7070,7 @@ Properties::Properties() : ViewportBase() {
     propHijosPadIzq = NULL; propHijosPadDer = NULL; propHijosPadArr = NULL; propHijosPadAba = NULL;
     propHijosPx = NULL;
     propT2dPosAbs = NULL; propT2dTipo = NULL; propT2dDec = NULL; propImgPosAbs = NULL;
-    propUIescala = NULL; propUIexport = NULL;
+    propUIescala = NULL; propUIescalaIgual = NULL; propUIexport = NULL;
     propRect2D = NULL; propRectNombre = NULL; propRectPosX = NULL; propRectPosY = NULL;
     propRectPosZ = NULL; propRectPosAbs = NULL; propRectAncho = NULL; propRectAlto = NULL;
     propRectRot = NULL; propRectAncla = NULL; propRectOpac = NULL; propRectColor = NULL;

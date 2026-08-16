@@ -40,6 +40,8 @@ public:
     float color[4];      // fondo de la ventana (TRANSPARENTE por defecto)
     float escalaGlobal;  // multiplica TODO lo que este en px (como el GlobalScale del editor):
                          // x1 = N95, x2/x3/x4 = como se ve en PC y pantallas mas grandes
+    bool escalaIgualEditor; // true = la escala la da el GlobalScale del editor (por plataforma: x1 N95, x2/x3 PC/
+                            // Android), no el valor manual de arriba. Igual que reusamos GlobalScale al exportar.
     // las PALETAS ("temas"): los componentes referencian colores POR INDICE contra la
     // paleta ACTIVA; cambiar de paleta recolorea todo. OJO con los reserve: el panel
     // guarda punteros adentro (max 8 paletas de 32 colores).
@@ -92,6 +94,7 @@ public:
         AgregarPaleta("Gris UI",       ListaColores[ColorID::grisUI]);
         AgregarPaleta("Gris linea",    ListaColores[ColorID::grisLinea]);
         escalaGlobal = 1.0f;
+        escalaIgualEditor = false;
         layoutHijos = 0; layoutAjuste = 0; layoutAlign = 0; distribucion = 0;
         gap = 0.0f; padGapPx = true;
         recortaX = false; recortaY = false;

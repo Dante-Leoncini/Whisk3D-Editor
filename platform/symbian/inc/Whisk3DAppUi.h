@@ -17,6 +17,7 @@
 
 // FORWARD DECLARATIONS
 class CWhisk3DContainer;
+class CApaCommandLine;
 
 
 // CLASS DECLARATION
@@ -66,6 +67,13 @@ class CWhisk3DAppUi : public CAknAppUi
          */
         virtual TKeyResponse HandleKeyEventL(
             const TKeyEvent& aKeyEvent,TEventCode aType);
+
+        /**
+         * Recibe el documento cuando la app se lanza desde un file manager ("abrir con", X-plore):
+         * si es un .w3d lo encola en g_proyAbrirPendiente para abrirlo en el primer frame.
+         * @param aCommandLine linea de comando del lanzamiento (incluye el nombre del documento).
+         */
+        TBool ProcessCommandParametersL(CApaCommandLine& aCommandLine);
 
     private: //Data
         /** GUI container that resides in this application UI. */

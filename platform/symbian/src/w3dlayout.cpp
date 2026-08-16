@@ -269,6 +269,11 @@ void W3dLayoutBuild(CWhisk3D* aWhisk, TInt aWidth, TInt aHeight) {
     LayoutImportGlb = W3dImportGlbMenu;        // Add > Imports > GLB
     DialogoCargarTextura = W3dCargarTexturaEn; // cargar textura
 
+    // barra del viewport activo: mostrar el modo de entrada de texto (Abc/abc/ABC/123) del T9 mientras se edita un
+    // campo. El render vive en ViewportBase::RenderBar (compartido); aca solo apuntamos el hook a la funcion Symbian.
+    { extern const char* (*g_ViewportBarModoHook)(); extern const char* W3dT9ModoTexto();
+      g_ViewportBarModoHook = W3dT9ModoTexto; }
+
     // EL layout por defecto COMPARTIDO (LayoutPorDefecto, por TAMANO DE PANTALLA): la MISMA logica que PC,
     // no una propia de Symbian. En el N95 (240x320, lado < 320) da 2 viewports (3D + Propiedades). El
     // bookkeeping (gRoot/gView3D/gProps/gContRaiz/...) lo arma W3dArbolCambiadoHook recorriendo el arbol.

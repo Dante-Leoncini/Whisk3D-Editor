@@ -107,7 +107,7 @@ extern std::string g_w3dUINoCargo;
 
 // CONFIG de la tarjeta Juego (Compilar juego): viaja con el proyecto como
 // objeto raiz "compilar" del .w3d (ver GuardarW3D.h). Arranca en los defaults.
-W3dCompilarCfg g_proyCompilar = { 1, 0, 0, 0, true, true, false, 0 };
+W3dCompilarCfg g_proyCompilar = { 1, 0, 0, 0, true, true, false, 0, 100 };
 
 void W3dCompilarReset() {
     g_proyCompilar.modoVentana = 1;      // Pantalla completa (el default de siempre)
@@ -118,6 +118,7 @@ void W3dCompilarReset() {
     g_proyCompilar.usarSonido  = true;
     g_proyCompilar.modoDebug   = false;  // produccion
     g_proyCompilar.uid         = 0;       // sin UID: un proyecto sin "uid" no hereda el del anterior. El save/load lo persiste.
+    g_proyCompilar.volumen     = 100;     // volumen del gameplay al maximo por defecto
 }
 
 // int <-> string legible del bloque "compilar" (el JSON se edita a mano: nada
@@ -2098,6 +2099,8 @@ bool GuardarW3D(const std::string& ruta) {
     s += "    \"orientacion\": "; JEsc(s, W3dCompilarOrientacionStr(g_proyCompilar.orientacion)); s += ",\n";
     s += "    \"fisica\": ";  s += g_proyCompilar.usarFisica ? "true" : "false"; s += ",\n";
     s += "    \"sonido\": ";  s += g_proyCompilar.usarSonido ? "true" : "false"; s += ",\n";
+    { char volbuf[16]; snprintf(volbuf, sizeof(volbuf), "%d", g_proyCompilar.volumen);
+      s += "    \"volumen\": "; s += volbuf; s += ",\n"; }   // 0..100 volumen del gameplay
     s += "    \"debug\": ";   s += g_proyCompilar.modoDebug  ? "true" : "false"; s += ",\n";
     s += "    \"assets\": ";  JEsc(s, W3dCompilarAssetsStr(g_proyCompilar.assetsModo)); s += ",\n";
     s += "    \"plataforma\": "; JEsc(s, W3dCompilarPlataformaStr(g_proyCompilar.plataforma)); s += ",\n";

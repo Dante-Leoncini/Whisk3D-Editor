@@ -442,12 +442,18 @@ void UI2D_CortesSlice9(Slice9* s9, float x0, float y0, float x1, float y1,
     if (*dY > maxDY) *dY = maxDY;
 }
 
+extern int GlobalScale;
+// escala efectiva de un UI raiz: si "igual que el editor" esta tildado, sigue el GlobalScale del editor (por
+// plataforma: x1 N95, x2/x3 PC/Android); sino, el valor manual. Clamp a >= 0.25 para no colapsar a 0.
+static float UI_EscalaEfectiva(const UI* u) {
+    float gs = u->escalaIgualEditor ? (float)GlobalScale : u->escalaGlobal;
+    return gs >= 0.25f ? gs : 1.0f;
+}
+
 float UI2D_EscalaGlobalDe(Object* o) {
     for (Object* p = o; p; p = p->Parent)
-        if (p->getType() == ObjectType::ui) {
-            float gs = ((UI*)p)->escalaGlobal;
-            return gs >= 0.25f ? gs : 1.0f;
-        }
+        if (p->getType() == ObjectType::ui)
+            return UI_EscalaEfectiva((UI*)p);
     return 1.0f;
 }
 
@@ -1019,7 +1025,7 @@ void UI2D_DibujarOverlay(float x0, float y0, float w, float h, float escala,
         }
         // la ESCALA GLOBAL del UI multiplica todo lo que este en px (texto, tamanos,
         // padding, gap, bordes): x1 = N95, x3 = como se ve en PC. La ventana no cambia.
-        float esc2 = escala * (u->escalaGlobal >= 0.25f ? u->escalaGlobal : 1.0f);
+        float esc2 = escala * UI_EscalaEfectiva(u);
         float pi, pd, pa, pb;
         PaddingLados(o, esc2, w, h, &pi, &pd, &pa, &pb);
         DibujarHijosRecortados(o, x0, y0, x0 + w, y0 + h,

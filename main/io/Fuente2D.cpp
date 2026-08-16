@@ -63,7 +63,11 @@ static const int kNumExtras = (int)(sizeof(kExtras)/sizeof(kExtras[0]));
 // Nitida a multiplos enteros (pixel-perfect, como en el N95); NEAREST para no emborronarla.
 static w3dui::W3dTextAtlas* CargarDefault() {
 #ifndef W3D_GAME_RUNTIME
-    std::string ruta = w3dFileSystem::GetResDir() + "/Skins/" + cfg.SkinName + "/font.png";
+    // el MISMO font.png que carga el editor (W3dInitUI): en Symbian esta en la carpeta privada (flat),
+    // no en GetResDir()+"/Skins/..." (que ahi es "" -> la UI2D quedaba sin texto). g_skinDir trae el
+    // separador final que puso cada plataforma.
+    extern std::string g_skinDir;
+    std::string ruta = g_skinDir + "font.png";
 #else
     std::string ruta = W3dGameFontPng();
 #endif

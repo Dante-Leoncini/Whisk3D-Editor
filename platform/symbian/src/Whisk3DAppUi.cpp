@@ -19,6 +19,8 @@ namespace w3dEngine { bool W3dAudioInit(int); void W3dAudioShutdown(); }
 #include <avkon.hrh>
 
 #include <aknconsts.h>
+#include <apacmdln.h>   // CApaCommandLine: recibir el .w3d al lanzar la app desde un file manager
+#include <string>
 
 // ================= MEMBER FUNCTIONS =======================
 //
@@ -65,6 +67,35 @@ void CWhisk3DAppUi::DynInitMenuPaneL(TInt /*aResourceId*/, CEikMenuPane* /*aMenu
     // (sin dimming dinamico: los menus quedaron minimos tras la limpieza S60;
     //  el modelo de objetos viejo que decidia que items mostrar ya no existe)
 }
+
+// ----------------------------------------------------
+// CWhisk3DAppUi::ProcessCommandParametersL
+// abrir un .w3d cuando el file manager (X-plore "abrir con") lanza la app: el framework pasa el nombre del
+// documento aca. Lo encolamos en g_proyAbrirPendiente (el drain del DrawCallBack lo abre en el primer frame,
+// con el stack limpio). Es la via robusta: no todos los lanzamientos pasan por Document::OpenFileL.
+// ----------------------------------------------------
+//
+TBool CWhisk3DAppUi::ProcessCommandParametersL(CApaCommandLine& aCommandLine)
+    {
+    TPtrC nombre = aCommandLine.DocumentName();
+    if (nombre.Length() > 0)
+        {
+        char buf[260];
+        TInt n = nombre.Length() > 259 ? 259 : nombre.Length();
+        for (TInt i = 0; i < n; i++) buf[i] = (char)nombre[i];
+        buf[n] = 0;
+        std::string s = buf;
+        std::string low = s;
+        for (std::string::size_type i = 0; i < low.size(); i++)
+            if (low[i] >= 'A' && low[i] <= 'Z') low[i] = (char)(low[i] + 32);
+        if (low.size() >= 4 && low.compare(low.size() - 4, 4, ".w3d") == 0)
+            {
+            extern std::string g_proyAbrirPendiente;
+            g_proyAbrirPendiente = s;
+            }
+        }
+    return CAknAppUi::ProcessCommandParametersL(aCommandLine);
+    }
 
 // ----------------------------------------------------
 // CWhisk3DAppUi::HandleKeyEventL

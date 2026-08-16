@@ -15,6 +15,7 @@
 #include "whisk3D.hrh"
 #include "w3dlog.h" // log de diagnostico E:\whisk3d.log (modo dev)
 #include "w3dlayout.h" // layout compartido (Fase 1 unificacion)
+#include "w3dt9.h"     // entrada de texto multi-tap (T9) del keypad
 #include "w3dnewscene.h"
 #include <GLES/gl.h> // modelo compartido de PC (Fase 3c): init+render
 #include "render/OpcionesRender.h"     // g_redraw (render event-driven)
@@ -410,19 +411,30 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 			// EDICION NUMERICA por texto en curso (un PropFloat en Propiedades): el keypad ESCRIBE el valor.
 			// 0-9 = digitos, '*' = punto decimal, C(backspace) borra un digito, OK aplica, soft-IZQ(164) cancela,
 			// izq/der mueven el caret. Todo lo demas se consume (no toca la escena). Va ANTES de softkeys/1-2-3/etc.
-			if (W3dNumEditActivo()){
-				if (sc >= '0' && sc <= '9'){ W3dTextFieldChar(sc); return EKeyWasConsumed; }
-				if (sc == '*'){ W3dTextFieldChar('.'); return EKeyWasConsumed; }
-				if (sc == EStdKeyBackspace){ W3dTextFieldChar(8); return EKeyWasConsumed; }
-				if (sc == EStdKeyLeftArrow || sc == EStdKeyRightArrow){ W3dLayoutTeclaPanel(sc); return EKeyWasConsumed; }
-				if (sc == EStdKeyDevice3 || sc == EStdKeyEnter){ W3dLayoutTeclaPanel(EStdKeyDevice3); return EKeyWasConsumed; }
-				if (sc == 164){ W3dLayoutTeclaPanel(EStdKeyEscape); return EKeyWasConsumed; } // soft-IZQ = cancelar
-				return EKeyWasConsumed; // mientras se tipea, ninguna otra tecla toca la escena
+			// EDICION DE TEXTO (CUALQUIER campo enfocado: nombre, path, formula numerica, script del IDE): el
+			// keypad escribe con T9/multi-tap. Antes solo los campos NUMERICOS recibian teclas -> los PropText
+			// (nombres/paths) no se podian editar en el N95. '#' cambia el modo (Abc/abc/ABC, mantenido=123);
+			// '*' = punto decimal en numerico (los simbolos en texto vienen en la etapa 2). izq/der mueven el
+			// caret, C borra, OK confirma y sale, soft-IZQ(164) cancela.
+			if (W3dT9Activo()){
+				if ((sc >= '0' && sc <= '9') || sc == EStdKeyHash){ W3dT9Tecla(sc, ETrue); return EKeyWasConsumed; }
+				if (sc == EStdKeyBackspace){ W3dT9Reset(); W3dTextFieldChar(8); return EKeyWasConsumed; }
+				if (sc == EStdKeyLeftArrow || sc == EStdKeyRightArrow){ W3dT9Reset(); W3dLayoutTeclaPanel(sc); return EKeyWasConsumed; }
+				if (sc == EStdKeyDevice3 || sc == EStdKeyEnter){ W3dT9Reset(); W3dLayoutTeclaPanel(EStdKeyDevice3); return EKeyWasConsumed; }
+				if (sc == 164){ W3dT9Reset(); W3dLayoutTeclaPanel(EStdKeyEscape); return EKeyWasConsumed; } // soft-IZQ = cancelar
+				if (sc == '*'){ if (W3dNumEditActivo()){ W3dT9Reset(); W3dTextFieldChar('.'); } return EKeyWasConsumed; }
+				return EKeyWasConsumed; // mientras se edita, ninguna otra tecla toca la escena
 			}
-			// soft IZQ sin nada abierto: abre la barra de menu del viewport
-			// activo (el primer desplegable, sin preseleccionar item).
+			// soft IZQ: si el JUEGO esta corriendo, PAUSA y devuelve el control a la app (suelta las teclas del
+			// juego para que la paleta no quede pegada). Sino, abre/cierra la barra de menu del viewport activo.
 			if (sc == 164){
-				W3dLayoutToggleBarra();
+				if (AnimEsJuego && PlayAnimation){
+					extern void W3dScriptSoltarTeclas();
+					PlayAnimation = false;      // pausa el sim: el gate de input se cierra y la UI vuelve a responder
+					W3dScriptSoltarTeclas();    // suelta teclas/pad/sticks/touch (sino la paleta queda pegada)
+				} else {
+					W3dLayoutToggleBarra();
+				}
 				return EKeyWasConsumed;
 			}
 			// soft DER fuera de un popup: alterna el cursor virtual (lo que
@@ -452,6 +464,12 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 			// ruteo de paneles de abajo (mouse BT).
 			if (sc == EStdKeyUpArrow || sc == EStdKeyDownArrow ||
 			    sc == EStdKeyLeftArrow || sc == EStdKeyRightArrow){
+				// MENU/desplegable abierto: las flechas NAVEGAN el menu (no orbitan el 3D ni scrollean). Sin esto, con
+				// el 3D activo las flechas se "mantenian" para la orbita y la seleccion del menu no se movia -> el menu
+				// (ej: el de render) quedaba pegado y no llegabas al item (Stop/Play).
+				if (W3dLayoutMenuAbierto()){
+					if (W3dLayoutTecla(sc, 0, 0)) return EKeyWasConsumed;
+				}
 				// LOOP CUT activo: las flechas eligen orientacion / cortes / slide (single-press)
 				if (LoopCutActivo()){
 					int d = (sc == EStdKeyLeftArrow) ? 0 : (sc == EStdKeyRightArrow) ? 1 : (sc == EStdKeyUpArrow) ? 2 : 3;
@@ -664,6 +682,8 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 			{
 			// soltar una flecha: deja de aplicarse en el loop de frame
 			TInt usc = aKeyEvent.iScanCode;
+			// T9: soltar '#' mientras se edita texto resuelve el cambio de modo (tap=Abc/abc/ABC, mantenido=123)
+			if (W3dT9Activo() && usc == EStdKeyHash){ W3dT9Tecla(usc, EFalse); return EKeyWasConsumed; }
 			// MODO JUEGO: soltar el D-pad + select -> los scripts (fin del "mantenido" que lee tecla()).
 			if (AnimEsJuego && PlayAnimation && W3dLayoutJuegoViewportActivo() && !W3dLayoutPopupActivo() && !W3dLayoutMenuAbierto()){
 				const char* jn = W3dJuegoNombreTecla(usc);
@@ -837,15 +857,6 @@ int CWhisk3DContainer::DrawCallBack( TAny* aInstance )
         }
     }
 
-    // Heartbeat de diagnostico: una linea cada 300 frames. Si despues de un
-    // cuelgue el log sigue creciendo, el loop de render esta vivo y el
-    // problema es el ESTADO (clavado en ELoadingTextures); si no crece mas,
-    // el thread principal esta bloqueado de verdad.
-    if ( (instance->iFrame % 300) == 0 )
-        {
-        w3dLogf("heartbeat: frame=%d", instance->iFrame);
-        }
-
     // NOTA: aca NO va ningun User::After ni salteo de frames durante la
     // carga de texturas. User::After dentro de este callback hace
     // WaitForRequest y se COME las señales de completado del decoder de
@@ -878,6 +889,8 @@ int CWhisk3DContainer::DrawCallBack( TAny* aInstance )
         W3dNewTransformEnd(ETrue);
     }
 
+    // T9: confirmar el caracter multi-tap a medio elegir cuando vence el timeout (1 seg sin apretar)
+    W3dT9Tick();
     // flechas MANTENIDAS: aplicar CADA frame (orbitar/mover/rotar/escalar
     // fluido con el teclado, sin depender del auto-repeat lento del telefono)
     AplicarFlechas3D();
