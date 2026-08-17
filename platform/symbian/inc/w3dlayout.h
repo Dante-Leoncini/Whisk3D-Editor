@@ -117,6 +117,8 @@ void  W3dTextFieldChar(TInt c);
 TBool W3dOutlinerActivo();
 // "1" sobre el outliner: entra al modo MOVER (o confirma si ya esta moviendo)
 void W3dOutlinerMoverToggle();
+void W3dOutlinerToggleVisible();  // outliner N95: 2 = ocultar/mostrar (visible) el activo
+void W3dOutlinerToggleRender();   // outliner N95: 3 = visibilidad de RENDER del activo
 
 // rueda sobre el outliner: scroll (consume el evento)
 TBool W3dLayoutWheelOutliner(TInt aX, TInt aY, TInt aDelta);

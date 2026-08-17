@@ -54,6 +54,8 @@ bool showOverlayGlobal = false;
 bool g_showLights = true;   // overlays por tipo (submenu "Objects"); sincronizados por el viewport
 bool g_showCamera = true;
 bool g_showEmpty  = true;
+bool g_showParticulas = false;  // default OFF: no mostrar las flechas de los emisores de particulas
+bool g_showCurvas     = true;   // default ON: las curvas/rieles se ven salvo que se destilde
 bool ViewFromCameraActiveGlobal = false;
 
 Vector3 camRight;

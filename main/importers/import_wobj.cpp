@@ -2,8 +2,18 @@
 #include "io/JsonW3d.h"   // parser del sidecar <modelo>.grupos.json (grupos de vertices)
 #include "objects/MallaDatos.h" // geometria compartida por ruta (dedup del re-import)
 #include "io/w3dFilesystem.h"   // leer por el Core: sirve igual en disco, en el pak y en el APK
+#include "base/w3dlog.h"        // w3dTickMs (instrumentar la carga) + w3dLogf
 #include <sstream>
 #include <iostream>   // std::cerr (avisos de parseo)
+
+// INSTRUMENTACION de carga: la lee AbrirW3D (import_w3d.cpp) para el resumen "[CARGA]". Tiempos
+// ACUMULADOS por fase sobre TODAS las mallas del proyecto -> con esto el N95 dice donde se van los
+// minutos y CONFIRMA que binario corre (una build vieja NO imprime estas lineas). Se resetean en AbrirW3D.
+//   parse  = LeerWOBJ (leer el texto + construir la malla)
+//   bordes = CalcularBordes (estructura de EDICION: contorno de seleccion / wireframe; inutil en un juego)
+unsigned long g_wobjParseMs  = 0;
+unsigned long g_wobjBordesMs = 0;
+unsigned long g_wobjCount    = 0;
 
 // C++03 (RVCT/Symbian): las dos lambdas del parser pasan a funciones de archivo
 static unsigned char WobjSaturar(double v){
@@ -20,7 +30,7 @@ static signed char WobjConvNormal(double v){
 }
 
 Mesh* LeerWOBJ(std::istream& file, const std::string& filename, Object* parent, bool NoMerge,
-               std::vector<int>* vertToCP){
+               std::vector<int>* vertToCP, size_t totalBytes){
     Mesh* mesh = new Mesh(parent, Vector3(0, 0, 0));
 
     Wavefront Wobj;
@@ -36,81 +46,92 @@ Mesh* LeerWOBJ(std::istream& file, const std::string& filename, Object* parent, 
     int acumuladoVertices = 0;
     int acumuladoUVs = 0;
     int acumuladoNormales = 0;
+    size_t _lineas = 0;   // pump de la barra DENTRO de una malla grande (ver g_progObjIni/Fin en import_w3d)
 
     while (std::getline(file, line)) {
         startPos = file.tellg();
 
-        if (line.rfind("v ", 0) == 0) {
-            std::istringstream ss(line.substr(2));
-            double x, y, z, r, g, b, a;
-
-            ss >> x >> y >> z;
-
-            if (ss >> r >> g >> b) {
-                TieneVertexColor = true;
-                if (!(ss >> a)) a = 1.0;
-            } else {
-                r = g = b = 1.0;
-                a = 1.0;
+        // BARRA: interpola el tramo de ESTA malla ([g_progObjIni,g_progObjFin]) por bytes leidos, cada
+        // 4096 lineas. Sin esto una malla grande congelaba la barra en un solo frac. El throttle del popup
+        // (ProgressPopup ~1.5%) acota los clear+swap reales, asi que llamar seguido no cuesta.
+        if (totalBytes && (++_lineas & 4095) == 0) {
+            std::streamoff _off = (std::streamoff)startPos;
+            if (_off > 0) {
+                extern void ProgresoActualizar(float);
+                extern float g_progObjIni, g_progObjFin;
+                float _f = (float)_off / (float)totalBytes;
+                if (_f > 1.0f) _f = 1.0f;
+                ProgresoActualizar(g_progObjIni + (g_progObjFin - g_progObjIni) * _f);
             }
+        }
 
-            Wobj.vertex.push_back((GLfloat)x);
-            Wobj.vertex.push_back((GLfloat)y);
-            Wobj.vertex.push_back((GLfloat)z);
-
-            Wobj.vertexColor.push_back(WobjSaturar(r));
-            Wobj.vertexColor.push_back(WobjSaturar(g));
-            Wobj.vertexColor.push_back(WobjSaturar(b));
-            Wobj.vertexColor.push_back(WobjSaturar(a));
-
-            acumuladoVertices++;
+        if (line.rfind("v ", 0) == 0) {
+            // PARSEO MANUAL con strtod (NO istringstream: construir uno por linea reinicializa el locale ~cientos de
+            // miles de veces -> era EL cuello de la carga en el N95). Mismo formato/logica que LeerOBJ (import_obj.cpp).
+            const char* p = line.c_str() + 2; char* e;
+            double val[7]; int n = 0;
+            while (n < 7) { double d = strtod(p, &e); if (e == p) break; val[n++] = d; p = e; }
+            if (n >= 3) {
+                Wobj.vertex.push_back((GLfloat)val[0]);
+                Wobj.vertex.push_back((GLfloat)val[1]);
+                Wobj.vertex.push_back((GLfloat)val[2]);
+                if (n >= 6) {   // v x y z r g b [a] -> vertex color
+                    TieneVertexColor = true;
+                    Wobj.vertexColor.push_back(WobjSaturar(val[3]));
+                    Wobj.vertexColor.push_back(WobjSaturar(val[4]));
+                    Wobj.vertexColor.push_back(WobjSaturar(val[5]));
+                    Wobj.vertexColor.push_back(WobjSaturar(n >= 7 ? val[6] : 1.0));
+                } else {        // sin color -> blanco
+                    Wobj.vertexColor.push_back(WobjSaturar(1.0));
+                    Wobj.vertexColor.push_back(WobjSaturar(1.0));
+                    Wobj.vertexColor.push_back(WobjSaturar(1.0));
+                    Wobj.vertexColor.push_back(WobjSaturar(1.0));
+                }
+                acumuladoVertices++;
+            }
         }
         else if (line.rfind("vn ", 0) == 0) {
-            std::istringstream ss(line.substr(3));
-            double nx, ny, nz;
-            ss >> nx >> ny >> nz;
-
+            const char* p = line.c_str() + 3; char* e;
+            double nx = strtod(p, &e); p = e;
+            double ny = strtod(p, &e); p = e;
+            double nz = strtod(p, &e);
             Wobj.normals.push_back(WobjConvNormal(nx));
             Wobj.normals.push_back(WobjConvNormal(ny));
             Wobj.normals.push_back(WobjConvNormal(nz));
             acumuladoNormales++;
         }
         else if (line.rfind("vt ", 0) == 0) {
-            std::istringstream ss(line.substr(3));
-            double u, v;
-            ss >> u >> v;
-
+            const char* p = line.c_str() + 3; char* e;
+            double u = strtod(p, &e); p = e;
+            double v = strtod(p, &e);
             Wobj.uv.push_back((float)u);
             Wobj.uv.push_back(1.0f - (float)v);
             acumuladoUVs++;
         }
         else if (line.rfind("f ", 0) == 0) {
-            std::istringstream ss(line.substr(2));
-            std::string token;
+            // tokenizar los corners A MANO (sin istringstream): cada token es "v[/vt][/vn]". La logica de indices
+            // por corner (strtol + primera/ultima '/') es EXACTAMENTE la de antes; solo se cambia el split.
             Face newFace;
-
-            while (ss >> token) {
-                FaceCorner fc;
-                size_t pos1 = token.find('/');
-                size_t pos2 = token.rfind('/');
-
-                // strtol en vez de stoi: un token malformado (o la forma comun
-                // "v//vn", con el campo uv VACIO) hacia tirar una excepcion sin catch
-                const char* tokC = token.c_str();
+            const char* p = line.c_str() + 2;
+            while (*p) {
+                while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n') p++;   // saltear separadores
+                if (!*p) break;
+                const char* tok = p;
+                while (*p && *p != ' ' && *p != '\t' && *p != '\r' && *p != '\n') p++;   // fin del token [tok,p)
                 char* fin = NULL;
-                long v = strtol(tokC, &fin, 10);
-                if (fin == tokC) continue;   // ni siquiera hay indice de vertice: saltear
-                fc.vertex = (int)v - 1;
-                fc.uv = -1; fc.normal = -1;
-                if (pos1 != std::string::npos && pos2 > pos1) {
-                    long u = strtol(tokC + pos1 + 1, &fin, 10);
-                    if (fin != tokC + pos1 + 1) fc.uv = (int)u - 1;
+                long vidx = strtol(tok, &fin, 10);
+                if (fin == tok) continue;    // ni indice de vertice: saltear
+                FaceCorner fc; fc.vertex = (int)vidx - 1; fc.uv = -1; fc.normal = -1;
+                const char* b1 = NULL; const char* b2 = NULL;   // primera y ultima '/' (como find/rfind)
+                for (const char* q = tok; q < p; q++) if (*q == '/') { if (!b1) b1 = q; b2 = q; }
+                if (b1 && b2 > b1) {         // uv entre las dos barras (v/vt/vn); "v//vn" da uv vacio -> queda -1
+                    long u = strtol(b1 + 1, &fin, 10);
+                    if (fin != b1 + 1) fc.uv = (int)u - 1;
                 }
-                if (pos2 != std::string::npos) {
-                    long n = strtol(tokC + pos2 + 1, &fin, 10);
-                    if (fin != tokC + pos2 + 1) fc.normal = (int)n - 1;
+                if (b2) {
+                    long nrm = strtol(b2 + 1, &fin, 10);
+                    if (fin != b2 + 1) fc.normal = (int)nrm - 1;
                 }
-
                 newFace.corners.push_back(fc);
             }
 
@@ -235,12 +256,15 @@ Mesh* ImportWOBJ(const std::string& filepath, Object* parent, bool NoMerge) {
     bool hayGrupos = w3dFileSystem::FileExists(rutaGrupos);
     std::vector<int> vertToCP;
 
-    Mesh* mesh = LeerWOBJ(file, filepath, parent, NoMerge, hayGrupos ? &vertToCP : NULL);
+    unsigned long _tParse = w3dTickMs();
+    Mesh* mesh = LeerWOBJ(file, filepath, parent, NoMerge, hayGrupos ? &vertToCP : NULL, datosObj.size());
+    g_wobjParseMs += (w3dTickMs() - _tParse);
 
     if (!mesh) {
         std::cerr << "No se pudo cargar el objeto WOBJ\n";
         return NULL;
     }
+    g_wobjCount++;
 
     std::string mtl = sinExt + ".mtl";
     if (w3dFileSystem::FileExists(mtl))
@@ -257,7 +281,11 @@ Mesh* ImportWOBJ(const std::string& filepath, Object* parent, bool NoMerge) {
     // bordes unicos desde las caras: sin esto el CONTORNO de seleccion (y el
     // wireframe) no existen y la malla "parece no seleccionada" (import_obj ya
     // lo hacia; esta via -los Wavefront de los proyectos .w3d- no)
-    if (mesh) mesh->CalcularBordes();
+    if (mesh) {
+        unsigned long _tB = w3dTickMs();
+        mesh->CalcularBordes();
+        g_wobjBordesMs += (w3dTickMs() - _tB);
+    }
 
     // GEOMETRIA COMPARTIDA (MallaDatos.h): mismos filePath = mismos datos. La
     // primera importacion de esta ruta registra sus arrays en el almacen; las

@@ -632,6 +632,16 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 				W3dOutlinerMoverToggle();
 				return EKeyWasConsumed;
 			}
+			// "2"/"3" sobre el outliner (sin transform 3D en curso): 2 = ocultar/mostrar, 3 = visibilidad de
+			// RENDER del objeto activo. Van ANTES del 1/2/3 del transform 3D (que en el outliner no aplica).
+			if (sc == '2' && W3dOutlinerActivo() && !W3dNewTransformActive()){
+				W3dOutlinerToggleVisible();
+				return EKeyWasConsumed;
+			}
+			if (sc == '3' && W3dOutlinerActivo() && !W3dNewTransformActive()){
+				W3dOutlinerToggleRender();
+				return EKeyWasConsumed;
+			}
 			if (sc == '1' || sc == '2' || sc == '3'){
 				// El keypad del telefono no tiene letras: el 1/2/3 ES como se tipea g/r/s. Si el viewport activo no
 				// es el 3D, la tecla va a EL, como en PC (el timeline transforma sus keyframes con las MISMAS g/r/s,
@@ -672,7 +682,7 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 			// ACTIVA (toggle, como el numpad 0 en PC). Antes "8" disparaba Loop Cut siempre -> daba error de loop
 			// cut aun sin estar editando una malla. El gate (Edit Mode vs camara) vive en W3dLayoutTecla8.
 			if (sc == '8'){ W3dLayoutTecla8(); return EKeyWasConsumed; }
-			if (sc == '9'){ W3dLayoutLockOrbit(); return EKeyWasConsumed; } // 9 = bloquear/desbloquear el orbital
+			if (sc == '9'){ if (!W3dOutlinerActivo()) W3dLayoutLockOrbit(); return EKeyWasConsumed; } // 9 = bloquear orbital (NO en el outliner)
 			if (sc == '4'){ return EKeyWasConsumed; } // 4 = nada
 			if (sc == '5'){ return EKeyWasConsumed; } // 5 = nada
 			// con mouse BT activo el teclado navega como en PC: las
@@ -987,12 +997,17 @@ int CWhisk3DContainer::DrawCallBack( TAny* aInstance )
     // los fps de la UI). En PC vive en MainLoopFrame; en el N95 FALTABA -> el play quedaba "clavado" en el frame 1 y
     // los materiales animados no corrian. (El avance de las VERTEX-anims -VertexAnimation.cpp, SI en el .mmp- se hace
     // abajo, en la rama de juego, con UpdateAnimations(dtSim); el skinning/pose de esqueleto siguen stub.)
-    UpdateAnimatedMaterials();
-    // ANIMACIONES UV "tira de atlas" (Core, Mesh.cpp: SI esta en el .mmp): autoplay
-    // tambien en el N95, mismo tick nominal que los materiales animados. El redraw
-    // ya lo cubre HayAnimacionActiva() (cuenta las UV anims), pero marcarlo aca no
-    // depende del orden de esa consulta.
-    { extern bool UpdateUVAnims(float); if (UpdateUVAnims(1.0f / 60.0f)) g_redraw = true; }
+    // PAUSA: las FRUTAS y los BANDERINES son billboards de tira UV (AnimacionUV). En PAUSA del juego
+    // (AnimEsJuego && !PlayAnimation) NO se avanzan los materiales animados ni las tiras UV -> quedan quietos,
+    // igual que en PC (main.cpp:609). En PLAY (PlayAnimation) y en el editor normal (AnimEsJuego==false) el
+    // gate da true y todo anima como antes. ActiveAnimKind!=3 = no pisar la edicion de vertex-anim del timeline.
+    // (Las particulas ya estan gateadas por PlayAnimation dentro del bloque 'juego' de abajo: no van aca.)
+    { extern int ActiveAnimKind;
+      if (!(AnimEsJuego && !PlayAnimation) && ActiveAnimKind != 3) {
+          UpdateAnimatedMaterials();
+          extern bool UpdateUVAnims(float); if (UpdateUVAnims(1.0f / 60.0f)) g_redraw = true;
+      }
+    }
     {
     #ifdef __WINS__
         const TUint tickHz = 200;  // el emulador corre NTickCount a 200Hz
@@ -1018,6 +1033,10 @@ int CWhisk3DContainer::DrawCallBack( TAny* aInstance )
                 // AVANCE de las vertex-anims (Crash y demas mallas animadas): en PC vive en main.cpp; en el N95
                 // FALTABA -> la malla quedaba clavada en el frame 1 (CambiarYa posa un cuadro, pero nada lo avanzaba).
                 { extern void UpdateAnimations(float); UpdateAnimations(dtSim); }
+                // PARTICULAS: simula + MATA las vivas (polvo de los pies, humo, etc.). En PC vive en main.cpp; en el
+                // N95 FALTABA -> cada rafaga de emitir() se creaba y dibujaba pero NUNCA se simulaba -> el polvo se
+                // acumulaba infinito (nunca moria).
+                { extern void W3dParticulasTick(float); W3dParticulasTick(dtSim); }
                 g_redraw = true;
             }
         } else {

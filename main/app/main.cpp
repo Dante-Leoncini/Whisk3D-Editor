@@ -266,6 +266,7 @@ EM_JS(void, WebDescargarArchivo, (const char* pathPtr, const char* namePtr), {
 #include <string>
 #include <sstream>
 #include <iostream>
+#include "base/w3dlog.h"   // w3dLogf: para redirigir cout/cerr al log propio (no la consola blanca de Windows)
 #include <iomanip>
 
 
@@ -611,12 +612,15 @@ static void MainLoopFrame() {
         // ANIMACIONES UV "tira de atlas" (Core, autoplay): mismas reglas de pausa
         // que las texturas animadas. true = alguna malla cambio su uv -> redibujar.
         if (UpdateUVAnims(dtFrame)) g_redraw = true;
-        // PARTICULAS (objeto Particulas): emision + simulacion, mismas reglas de
-        // pausa que las texturas animadas (el mundo no respira con el juego en pausa)
-        { extern void W3dParticulasTick(float); W3dParticulasTick(dtFrame); }
         // VISIBILIDAD POR CELDA (VisZona): evalua el modo (grilla/volumenes/curva)
         // y aplica la celda a su malla objetivo. Un paso por frame, como las particulas.
         { extern void W3dVisZonasTick(); W3dVisZonasTick(); }
+    }
+    // PARTICULAS: la SIMULACION de lo vivo (avanzar + MATAR por vida) corre SIEMPRE que el mundo respira, TAMBIEN
+    // con una vertex anim activa en el timeline (kind 3) -> sino, seleccionar/editar una vertex-anim CONGELABA las
+    // particulas ya emitidas y no morian. La EMISION la controla el flag 'visible' por objeto (W3dParticulasTick).
+    if (!(AnimEsJuego && !PlayAnimation)) {
+        extern void W3dParticulasTick(float); W3dParticulasTick(dtFrame);
     }
 
     // CLIP DEL ARMATURE 2D en el timeline (kind 4): el rig 2D de la malla sigue al PLAYHEAD. Se evalua
@@ -811,6 +815,9 @@ static void MainLoopFrame() {
 namespace w3dEngine { bool W3dAudioInit(int); }  // audio/W3dAudio.h (evita meter el dir al include path)
 
 int main(int argc, char* argv[]) {
+#ifndef __EMSCRIPTEN__
+    w3dRedirigirCoutAlLog();   // cout/cerr -> whisk3d.log (no la consola blanca de Windows). Impl comun en w3dlog.cpp.
+#endif
 #ifdef __EMSCRIPTEN__
     SDL_SetMainReady(); // web: no arrancamos por el main de SDL
     // touch -> mouse SIEMPRE sintetizado por SDL (which = SDL_TOUCH_MOUSEID): el ruteo tactil de

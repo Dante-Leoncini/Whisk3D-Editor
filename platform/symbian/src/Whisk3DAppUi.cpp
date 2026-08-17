@@ -31,6 +31,9 @@ namespace w3dEngine { bool W3dAudioInit(int); void W3dAudioShutdown(); }
 //
 void CWhisk3DAppUi::ConstructL(){
     BaseConstructL();
+    // cout/cerr -> el log PROPIO (no la terminal/consola). Va ANTES de cargar el proyecto para atrapar cualquier
+    // cout de los importadores. En Symbian el std::cout iba a una terminal en pantalla; ahora cae en whisk3d.log.
+    { extern void w3dRedirigirCoutAlLog(); w3dRedirigirCoutAlLog(); }
     iAppContainer = new (ELeave) CWhisk3DContainer;
     iAppContainer->SetMopParent(this);
     iAppContainer->ConstructL( ClientRect() );

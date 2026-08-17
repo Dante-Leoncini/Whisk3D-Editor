@@ -134,6 +134,8 @@ extern bool showOverlayGlobal;
 extern bool g_showLights;
 extern bool g_showCamera;
 extern bool g_showEmpty;
+extern bool g_showParticulas; // gizmo (flecha) de los emisores de particulas (overlay "Objects")
+extern bool g_showCurvas;     // linea de las curvas/rieles (overlay "Objects")
 extern bool ViewFromCameraActiveGlobal;
 extern Vector3 camRight;
 extern Vector3 camUp;

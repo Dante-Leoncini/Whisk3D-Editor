@@ -183,7 +183,10 @@ SOURCE          UIOverlay.cpp
 // (CMdaAudioOutputStream en su propio hilo, doble-buffer). Con W3D_ENABLE_AUDIO arriba
 // compilan el camino REAL; sin el, W3dAudio.cpp cae a stubs no-op.
 SOURCEPATH      ..\..\..\libs\Whisk3DCore\audio
-SOURCE          W3dAudio.cpp W3dAudioSymbian.cpp
+// W3dVolumen.cpp = volumen maestro + el volumen inicial por-proyecto del .w3d (VolumenAplicarProyecto,
+// lo llama import_w3d.cpp). W3dMusic.cpp entra por el dispatcher (W3dMusicRefrescarVolumenes SIEMPRE
+// compila, fuera de W3D_ENABLE_MUSIC): sin el flag son stubs no-op, no arrastra backend de musica.
+SOURCE          W3dAudio.cpp W3dAudioSymbian.cpp W3dVolumen.cpp W3dMusic.cpp
 // subsistemas del Core que el link pedia (todos C++03, portables): sistema de
 // recursos, zip (.w3d/.w3dpack), almacen, config, visibilidad/PVS, atlas de skin.
 SOURCEPATH      ..\..\..\libs\Whisk3DCore\io

@@ -769,6 +769,19 @@ void W3dOutlinerMoverToggle() {
     else                  out->MoverIniciar();
 }
 
+// "2"/"3" sobre el outliner: 2 = ocultar/mostrar (visible), 3 = visibilidad de RENDER (renderizable) del
+// objeto activo. El estado vive en el Core (ObjActivo); el redibujo ya lo puso el container en cualquier tecla.
+void W3dOutlinerToggleVisible() {
+    if (!W3dOutlinerActivo()) return;
+    extern void ChangeVisibilityObj();
+    ChangeVisibilityObj();
+}
+void W3dOutlinerToggleRender() {
+    if (!W3dOutlinerActivo()) return;
+    extern void ChangeRenderizableObj();
+    ChangeRenderizableObj();
+}
+
 // rueda sobre el outliner: scroll REAL de PC
 TBool W3dLayoutWheelOutliner(TInt aX, TInt aY, TInt aDelta) {
     if (!gOutliner || !gOutliner->Contains(aX, aY)) return EFalse;

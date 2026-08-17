@@ -4,6 +4,9 @@
 #include "io/w3dFilesystem.h"   // leer el .cap por el Core (disco / pak / APK)
 #include <sstream>
 #include <algorithm>
+#include <cstdlib>   // strtod/strtol: parsear el .cap sin stringstream (rompe el locale en Symbian)
+#include <cstring>   // strncmp
+#include "base/w3dlog.h"   // w3dLogf: el .cap ahora carga en Symbian; sus mensajes van al log
 #include "WhiskUI/theme/colores.h"
 #include "variables.h" // showOverlayGlobal / ViewFromCameraActiveGlobal (estado del editor)
 #ifndef W3D_SYMBIAN
@@ -76,6 +79,7 @@ bool Curve::RotacionEnNodo(float indice, Vector3* pitchYawRoll, float* fovOut) c
 }
 
 void Curve::RenderObject() {
+    { extern bool g_showCurvas; if (!g_showCurvas) return; } // toggle "Curves" del overlay: ocultar la linea del riel
 #ifdef W3D_SYMBIAN
     if (!vertex || vertexSize < 2) return;
     const float* c;
@@ -123,11 +127,23 @@ void Curve::RenderObject() {
 }
 
 #ifdef W3D_SYMBIAN
-// los rieles de camara usan lambdas/std::function (C++11): stubs por ahora.
-// Cuando hagan falta en el telefono se reescriben con functors C++03.
+// KD-tree deshabilitado en Symbian (la version real usa lambdas/std::function C++11). En su lugar
+// FindNearest hace una busqueda LINEAL sobre los nodos del riel: son ~1000 y se corre unas pocas veces
+// por frame -> trivial en el N95, y da el MISMO nodo que el arbol (nearest global por LengthSq).
+// BuildKDTree queda no-op (kdRoot=NULL, no se usa). Antes FindNearest devolvia -1 (stub): con eso la
+// camara con riel NUNCA se ubicaba en el telefono (Camera::UpdatePosition corta en 'if idx < 0 return').
 KDNode* Curve::BuildKDTreeRecursive(std::vector<int>&, int) { return NULL; }
 void Curve::BuildKDTree() { kdRoot = NULL; }
-int Curve::FindNearest(const Vector3&) const { return -1; }
+int Curve::FindNearest(const Vector3& target) const {
+    int bestIndex = -1;
+    float bestDist = 3.4e38f;   // ~FLT_MAX, sin <limits> (excluido en Symbian)
+    for (int i = 0; i < vertexSize; i++) {
+        Vector3 p(vertex[i*3+0], vertex[i*3+1], vertex[i*3+2]);
+        float d = (p - target).LengthSq();
+        if (d < bestDist) { bestDist = d; bestIndex = i; }
+    }
+    return bestIndex;
+}
 #else
 KDNode* Curve::BuildKDTreeRecursive(std::vector<int>& idx, int depth){
     if (idx.empty()) return NULL;
@@ -209,11 +225,11 @@ Vector3 Curve::GetPoint(int i) const {
     );
 }
 
-#ifdef W3D_SYMBIAN
-bool Curve::LoadFromFile(const std::string&) {
-    return false; // carga de curvas: pendiente en Symbian (usa ifstream)
-}
-#else
+// Carga el .cap del riel. Corre en TODAS las plataformas (antes era un stub `return false` en
+// Symbian por un ifstream que ya no existe: hoy lee por w3dFileSystem, que anda en el N95). Sin esto,
+// en el telefono el .cap NUNCA se abria -> la Curve se borraba -> la camara con riel quedaba en el
+// origen (y el culling, que usa esa camara, fallaba con ella). El parseo es MANUAL con strtod/strtol:
+// operator>> de float reinicializa el locale por linea y en Symbian (STLport/RVCT) lee BASURA.
 bool Curve::LoadFromFile(const std::string& filepath){
     // POR LA ABSTRACCION DEL CORE, no con ifstream: el riel (.cap) puede venir del
     // pak embebido o de ADENTRO DEL APK. Con ifstream, en Android la camara se
@@ -222,7 +238,7 @@ bool Curve::LoadFromFile(const std::string& filepath){
     bool okCap = false;
     const std::string datosCap = w3dFileSystem::ReadTextFile(filepath, &okCap);
     if (!okCap) {
-        std::cerr << "ERROR: No se pudo abrir el archivo: " << filepath << std::endl;
+        w3dLogfW("[Curve] no se pudo abrir %s", filepath.c_str());
         return false;
     }
     std::istringstream file(datosCap);
@@ -233,23 +249,22 @@ bool Curve::LoadFromFile(const std::string& filepath){
     // 1) Leer la línea "count X"
     // ============================
     if (!std::getline(file, line)) {
-        std::cerr << "ERROR: Archivo vacío." << std::endl;
+        w3dLogfW("[Curve] archivo vacio: %s", filepath.c_str());
         return false;
     }
 
-    std::stringstream ss(line);
-    std::string word;
-    ss >> word;   // "count"
-
-    if (word != "count") {
-        std::cerr << "ERROR: Formato inválido. Se esperaba 'count'." << std::endl;
-        return false;
+    {
+        const char* p = line.c_str();
+        while (*p == ' ' || *p == '\t') p++;
+        if (strncmp(p, "count", 5) != 0) {
+            w3dLogfW("[Curve] formato invalido: se esperaba 'count' en %s", filepath.c_str());
+            return false;
+        }
+        vertexSize = (int)strtol(p + 5, NULL, 10);   // cantidad de vertices
     }
-
-    ss >> vertexSize;  // cantidad de vértices
 
     if (vertexSize <= 0) {
-        std::cerr << "ERROR: Cantidad de vértices inválida." << std::endl;
+        w3dLogfW("[Curve] cantidad de vertices invalida en %s", filepath.c_str());
         return false;
     }
 
@@ -287,10 +302,8 @@ bool Curve::LoadFromFile(const std::string& filepath){
         // Se compara la palabra entera para no confundirla con un punto 'e...'.
         if (line.compare(0, 4, "ejes") == 0 &&
             (line.size() == 4 || line[4] == ' ' || line[4] == '\t')) {
-            std::stringstream es(line);
-            std::string pal, ex, ey, ez;
-            es >> pal >> ex >> ey >> ez;
-            signoZ = (ez == "-z" || ez == "-Z") ? -1.0f : 1.0f;
+            signoZ = (line.find("-z") != std::string::npos ||
+                      line.find("-Z") != std::string::npos) ? -1.0f : 1.0f;
             continue;
         }
 
@@ -299,41 +312,39 @@ bool Curve::LoadFromFile(const std::string& filepath){
         // como `ejes`, para no confundirla con un punto 'a...'.
         if (line.compare(0, 7, "aspecto") == 0 &&
             (line.size() == 7 || line[7] == ' ' || line[7] == '\t')) {
-            std::stringstream as(line);
-            std::string pal; float v = 0.0f;
-            as >> pal >> v;
+            float v = (float)strtod(line.c_str() + 7, NULL);
             aspecto = (v > 0.01f && v < 100.0f) ? v : 0.0f;
             continue;
         }
 
-        std::stringstream ls(line);
-        char type;
-        float x, y, z;
-
-        ls >> type;
+        // PARSEO MANUAL con strtod (NO stringstream/operator>>: reinicializa el locale por linea y
+        // en Symbian lee basura -> el riel quedaba deformado). Mismo criterio que import_wobj.cpp.
+        const char* p = line.c_str();
+        while (*p == ' ' || *p == '\t') p++;
+        char type = *p;
+        char* e; const char* q = p + 1;
 
         if (type == 'r') {                       // rotacion AUTORAL del nodo anterior
             if (loaded <= 0) continue;           // una 'r' antes del primer punto no es de nadie
-            y = z = 0.0f; x = 0.0f;
-            ls >> x >> y >> z;
+            double rx = strtod(q, &e); double ry = strtod(e, &e); double rz = strtod(e, &e);
             if (!rotNodo) {                          // primera 'r': recien ahi se paga la memoria
                 rotNodo = new GLfloat[vertexSize * 3];
                 for (int i = 0; i < vertexSize * 3; i++) rotNodo[i] = 0.0f;
             }
-            rotNodo[(loaded - 1) * 3 + 0] = x;
-            rotNodo[(loaded - 1) * 3 + 1] = y;
-            rotNodo[(loaded - 1) * 3 + 2] = z;
+            rotNodo[(loaded - 1) * 3 + 0] = (GLfloat)rx;
+            rotNodo[(loaded - 1) * 3 + 1] = (GLfloat)ry;
+            rotNodo[(loaded - 1) * 3 + 2] = (GLfloat)rz;
             conRot++;
             continue;
         }
         if (type == 'f') {                       // fov del nodo anterior
             if (loaded <= 0) continue;
-            x = 0.0f; ls >> x;
+            double fv = strtod(q, &e);
             if (!fovNodo) {
                 fovNodo = new GLfloat[vertexSize];
                 for (int i = 0; i < vertexSize; i++) fovNodo[i] = 0.0f;
             }
-            fovNodo[loaded - 1] = x;
+            fovNodo[loaded - 1] = (GLfloat)fv;
             conFov++;
             continue;
         }
@@ -343,11 +354,10 @@ bool Curve::LoadFromFile(const std::string& filepath){
         if (loaded >= vertexSize)
             continue; // el 'count' de la cabecera manda: los puntos de mas se descartan
 
-        ls >> x >> y >> z;
-
-        vertex[loaded * 3 + 0] = x;
-        vertex[loaded * 3 + 1] = y;
-        vertex[loaded * 3 + 2] = signoZ * z;   // ver Curve::signoZ
+        double px = strtod(q, &e); double py = strtod(e, &e); double pz = strtod(e, &e);
+        vertex[loaded * 3 + 0] = (GLfloat)px;
+        vertex[loaded * 3 + 1] = (GLfloat)py;
+        vertex[loaded * 3 + 2] = signoZ * (GLfloat)pz;   // ver Curve::signoZ
 
         loaded++;
     }
@@ -357,15 +367,12 @@ bool Curve::LoadFromFile(const std::string& filepath){
     // canales incompletos: no se adivina nada. Si el .cap trae rotacion para
     // algunos nodos y para otros no, los que falten quedan en 0 (y se avisa).
     if (rotNodo && conRot != loaded)
-        std::cerr << "ADVERTENCIA: el riel trae rotacion en " << conRot << " de "
-                  << loaded << " nodos" << std::endl;
+        w3dLogfW("[Curve] rotacion en %d de %d nodos (los que falten quedan en 0)", conRot, loaded);
     if (fovNodo && conFov != loaded)
-        std::cerr << "ADVERTENCIA: el riel trae fov en " << conFov << " de "
-                  << loaded << " nodos" << std::endl;
+        w3dLogfW("[Curve] fov en %d de %d nodos", conFov, loaded);
 
     if (loaded != vertexSize) {
-        std::cerr << "ADVERTENCIA: Se esperaban " << vertexSize
-                  << " vértices pero solo se leyeron " << loaded << std::endl;
+        w3dLogfW("[Curve] se esperaban %d nodos pero se leyeron %d", vertexSize, loaded);
         vertexSize = loaded;
     }
 
@@ -373,7 +380,7 @@ bool Curve::LoadFromFile(const std::string& filepath){
     for (int i=0; i < vertexSize; i++)
         indices[i] = i;
 
-    std::cout << "Curva cargada: " << vertexSize << " vértices." << std::endl;
+    w3dLogf("[Curve] cargada: %d nodos (%s)", vertexSize, filepath.c_str());
 
     origen = filepath;   // el .w3d guarda esta ruta para recargar la curva al abrir
 
@@ -381,7 +388,6 @@ bool Curve::LoadFromFile(const std::string& filepath){
 
     return true;
 }
-#endif // !W3D_SYMBIAN
 
 
 

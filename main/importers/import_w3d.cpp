@@ -41,6 +41,7 @@
 #include "objects/VisZona.h"     // objeto VisZona (celda de visibilidad: grilla/volumenes/curva)
 #include "io/UI2DFormato.h"
 #include "W3dEscena.h"           // escenaInicial / modoEscenas (multi-escena)
+#include "audio/W3dVolumen.h"    // VolumenAplicarProyecto (volumen inicial por-proyecto del .w3d)
 #include "W3dPaletas.h"          // paletas del PROYECTO (raiz "paletas" del .w3d v3)
 #include "io/GuardarW3D.h"       // g_proyIcono: el icono del juego (ruta externa)
 #include "io/W3dContenedor.h"    // FORMATO v4: el .w3d es un zip que se MONTA (no se extrae)
@@ -258,6 +259,14 @@ void ApplyViewport3DProps(Viewport3D* v, const std::map<std::string,std::string>
     if(p.count("OverlayStatGL"))          v->OverlayStatGL = B("OverlayStatGL");
     if(p.count("OverlayStatModgen"))      v->OverlayStatModgen = B("OverlayStatModgen");
     if(p.count("OverlayStatTimes"))       v->OverlayStatTimes = B("OverlayStatTimes");
+    // submenu Overlays>"Objects": mostrar/ocultar el overlay de cada TIPO (esqueleto/luces/camaras/EMPTIES).
+    // Se guardan por-viewport (ej: un juego que no quiere ver los gizmos de los Empty/Gamepad abre con showEmpty:false).
+    if(p.count("showArmature"))           v->showArmature = B("showArmature");
+    if(p.count("showLights"))             v->showLights = B("showLights");
+    if(p.count("showCamera"))             v->showCamera = B("showCamera");
+    if(p.count("showEmpty"))              v->showEmpty = B("showEmpty");
+    if(p.count("showParticulas"))         v->showParticulas = B("showParticulas");
+    if(p.count("showCurvas"))             v->showCurvas = B("showCurvas");
     // ("ShowUi" se dio de baja: los .w3d viejos que la traigan caen aca como cualquier
     //  clave desconocida -se ignora- y el chrome del viewport se dibuja SIEMPRE)
     if(p.count("showFloor"))              v->showFloor = B("showFloor");
@@ -1181,7 +1190,9 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
             return curve;
         }
         // fallo la carga: el ctor ya lo colgo del padre -> sacarlo del arbol y
-        // liberarlo (antes quedaba una Curve vacia fantasma en la escena)
+        // liberarlo (antes quedaba una Curve vacia fantasma en la escena). LOG del fallo: sin esto la Curve del
+        // riel desaparecia en SILENCIO -> la camara con riel se quedaba en el origen sin ninguna pista del por que.
+        w3dLogfW("[W3D] no pude cargar la curva/riel '%s' (queda sin riel: la camara que dependa de el no se posiciona)", path.c_str());
         if (parent) {
             std::vector<Object*>& hs = parent->Childrens;
             for (size_t i = 0; i < hs.size(); i++)
@@ -1277,7 +1288,27 @@ static void LeerScriptsDeProps(Object* obj, const std::map<std::string,std::stri
     obj->scriptDatos->scripts.push_back(e);
 }
 
+// PROGRESO de la carga de TEXTO (Crash): el camino de texto NO bombeaba la barra -> saltaba 0->100 y en
+// el N95 (carga de minutos) parecia colgada. Se cuenta el total de nodos y cada BuildObjectRecursive avanza
+// su fraccion; ademas exporta [g_progObjIni,g_progObjFin] para que LeerWOBJ bombee DENTRO de una malla
+// grande. El throttle del popup (ProgressPopup ~1.5%) acota los clear+swap por mas llamadas que se hagan.
+size_t g_bsTotal = 0, g_bsHecho = 0;
+float  g_progObjIni = 0.30f, g_progObjFin = 0.95f;
+static size_t ContarNodos(Node* n){
+    size_t c = 0;
+    for(size_t i=0;i<n->children.size();i++) c += 1 + ContarNodos(n->children[i]);
+    return c;
+}
+
 void BuildObjectRecursive(Node* n, Object* parent){
+    extern void ProgresoActualizar(float);
+    float t0 = g_bsTotal ? (float)g_bsHecho / (float)g_bsTotal : 0.0f;
+    g_bsHecho++;
+    float t1 = g_bsTotal ? (float)g_bsHecho / (float)g_bsTotal : 1.0f;
+    g_progObjIni = 0.30f + 0.65f * t0;
+    g_progObjFin = 0.30f + 0.65f * t1;
+    ProgresoActualizar(g_progObjIni);
+
     Object* obj = CreateObjectFromNode(n, parent);
     if(!obj) return;
 
@@ -1339,6 +1370,14 @@ void BuildScene(Node* root){
         gSimCacheOn = (cj == "true" || cj == "1");
     }
 
+    // VOLUMEN INICIAL del proyecto (0..1). Vive en el .w3d ("volumen: 0.5") y se aplica SOLO a esta
+    // sesion: no pisa el volumen global del usuario ni vale para otros proyectos. Ausente = no se toca.
+    if(root->props.count("volumen")){
+        std::stringstream ss(w3dMapAt(root->props, "volumen"));
+        float vv = 0.5f; ss >> vv;
+        w3dEngine::VolumenAplicarProyecto(vv);
+    }
+
     if(root->props.count("background")){
         std::string bg = Unquote(w3dMapAt(root->props, "background")); // <- quita comillas si las hay
         std::replace(bg.begin(), bg.end(), ',', ' '); // reemplaza comas por espacios
@@ -1353,6 +1392,8 @@ void BuildScene(Node* root){
         }
     }
 
+    g_bsTotal = ContarNodos(root);
+    g_bsHecho = 0;
     for(size_t _i=0;_i<root->children.size();_i++)
         BuildObjectRecursive(root->children[_i], SceneCollection);  // el parent puede ser la escena global
 
@@ -3738,6 +3779,19 @@ void AbrirW3D(const std::string& ruta) {
     w3dPath = ruta;
     gDirProyecto = DirDelProyecto();
     g_w3dDirProyecto = gDirProyecto;   // base de las rutas "ext:" relativas (UI2DFormato)
+
+    // REDIRECCION de cout/cerr AL LOG, tambien aca (no solo en el ConstructL de Symbian): si Carbide no
+    // recompilo Whisk3DAppUi.cpp, el redirect del arranque no quedo instalado y los cout de la carga caian
+    // a la TERMINAL blanca del N95. Abrir un proyecto SIEMPRE pasa por este archivo -> el redirect queda
+    // puesto ANTES de leer nada, y persiste toda la sesion (juego incluido). Idempotente (solo el rdbuf).
+    w3dRedirigirCoutAlLog();
+
+    // INSTRUMENTACION de carga: resetear los acumuladores por fase y dejar un MARCADOR de build.
+    // Si en el log NO aparece esta linea ni el resumen "[CARGA]" del pie, la build que corre es VIEJA
+    // (Carbide no recompilo import_wobj.cpp/import_w3d.cpp) -> hay que forzar el recompilado.
+    { extern unsigned long g_wobjParseMs, g_wobjBordesMs, g_wobjCount;
+      g_wobjParseMs = g_wobjBordesMs = g_wobjCount = 0; }
+    w3dLogf("[BUILD] parser .obj = strtod (rapido), carga instrumentada");
     gPendModArm.clear(); // referencias modArmature de una carga anterior (por si quedo algo)
     gPendModTgt.clear(); // idem targets de modificadores y mallas a regenerar
     gPendModGen.clear();
@@ -3883,6 +3937,12 @@ void AbrirW3D(const std::string& ruta) {
                 ruta.c_str(), formato, objs, uis, W3dEscenaInicial().c_str(),
                 layoutDelProyecto ? "del proyecto" : "default", g_proyIcono.c_str());
     }
+
+    // REPARTO del tiempo de carga por fase (para saber que optimizar en el N95): parse+build de mallas
+    // vs CalcularBordes (estructura de EDICION). La PRESENCIA de esta linea prueba que corre la build nueva.
+    { extern unsigned long g_wobjParseMs, g_wobjBordesMs, g_wobjCount;
+      w3dLogf("[CARGA] mallas .obj=%lu  parse+build=%lu ms  bordes(edicion)=%lu ms",
+              g_wobjCount, g_wobjParseMs, g_wobjBordesMs); }
 }
 
 // compat: los llamadores viejos (constructor con w3dPath ya seteado) siguen andando

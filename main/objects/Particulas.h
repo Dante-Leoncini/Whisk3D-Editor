@@ -123,7 +123,7 @@ public:
     ObjectType getType() W3D_OVERRIDE { return ObjectType::particulas; }
 
     void RenderObject() W3D_OVERRIDE;  // NO dibuja: anota el emisor para el pase de translucidas
-    void Tick(float dt);           // sincroniza config, emite el rate y corre la sim (mundo)
+    void Tick(float dt, bool puedeEmitir = true); // sincroniza config; emite el rate SOLO si puedeEmitir (visible); la sim (mundo) corre SIEMPRE
     void Emitir(int n);            // rafaga de n particulas YA (lua emitir / harness)
 
     // "r, g, b, a" <-> color[4] (el idioma del panel y del .w3d de texto)

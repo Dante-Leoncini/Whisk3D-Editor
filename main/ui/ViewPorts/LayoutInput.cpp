@@ -4002,7 +4002,7 @@ bool LayoutTeclaUI(int tecla, int mx, int my) {
                 changeSelect(SelectMode::NextSingle, true);
                 return true;
             case LayoutKey::Left:
-                SetDesplegado(false);
+                OutlinerColapsarIzquierda();   // plegar; si ya plegado, subir al padre
                 return true;
             case LayoutKey::Right:
                 SetDesplegado(true);
@@ -4073,7 +4073,7 @@ bool LayoutTeclaPanelActivo(int tecla) {
         switch (tecla) {
             case LayoutKey::Up:    changeSelect(SelectMode::PrevSingle, true); out->AsegurarVisible(); return true;
             case LayoutKey::Down:  changeSelect(SelectMode::NextSingle, true); out->AsegurarVisible(); return true;
-            case LayoutKey::Left:  SetDesplegado(false); return true;
+            case LayoutKey::Left:  OutlinerColapsarIzquierda(); return true; // plegar / subir al padre
             case LayoutKey::Right: SetDesplegado(true);  return true;
         }
         return false;

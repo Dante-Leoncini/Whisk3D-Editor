@@ -156,6 +156,8 @@ class Viewport3D : public ViewportBase, public WithBorder {
         bool showLights;
         bool showCamera;
         bool showEmpty;
+        bool showParticulas;   // overlay "Objects": gizmo (flecha) de los emisores de particulas. Default OFF.
+        bool showCurvas;       // overlay "Objects": la LINEA de las curvas/rieles. Default ON (se puede ocultar).
         bool show3DCursor;
         bool ShowRelantionshipsLines; 
         bool limpiarPantalla;

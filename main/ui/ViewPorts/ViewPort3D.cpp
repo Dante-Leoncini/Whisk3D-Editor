@@ -391,6 +391,8 @@ Viewport3D::Viewport3D(Vector3 pos){
     showLights = true;
     showCamera = true;
     showEmpty = true;
+    showParticulas = false;  // DEFAULT DESTILDADO: no ver las flechas de los emisores en el juego del editor
+    showCurvas = true;       // las curvas/rieles se ven por defecto; el checkbox permite ocultarlas
     show3DCursor = true;
     ShowRelantionshipsLines = true;
     limpiarPantalla = true;
@@ -437,6 +439,8 @@ void Viewport3D::AbrirMenuOverlays(int x, int y){
     MenuOverlayObjects->AgregarCheck(T("Lights"),   14, &showLights,   IconType::light);
     MenuOverlayObjects->AgregarCheck(T("Camera"),   15, &showCamera,   IconType::camera);
     MenuOverlayObjects->AgregarCheck(T("Empty"),    16, &showEmpty,    IconType::empty);
+    MenuOverlayObjects->AgregarCheck(T("Particles"),17, &showParticulas, IconType::arrow);
+    MenuOverlayObjects->AgregarCheck(T("Curves"),   18, &showCurvas,   IconType::curve);
     MenuOverlays->Agregar(T("Objects"), 13, IconType::object, MenuOverlayObjects)->gris = &showOverlays;
     MenuOverlays->AgregarCheck(T("3D Cursor"), 5, &show3DCursor)->gris = &showOverlays;
     MenuOverlays->AgregarCheck(T("Relationship Lines"), 6, &ShowRelantionshipsLines)->gris = &showOverlays;
@@ -459,9 +463,7 @@ void Viewport3D::AbrirMenuOverlays(int x, int y){
     MenuOverlayStats->AgregarCheck("GL Calls", 21, &OverlayStatGL); // llamadas GL por frame (draw/bind/estado)
     MenuOverlayStats->AgregarCheck("Modgen",   19, &OverlayStatModgen);
     MenuOverlayStats->AgregarCheck(T("Times"),    20, &OverlayStatTimes);
-    // "Statistics" NO se grisa con "Show Overlays": el overlay de stats es un debug independiente de la grilla
-    // (RenderEstadisticas ya no gatea por showOverlays) -> se puede prender aunque la grilla/gizmos esten off.
-    MenuOverlays->Agregar(T("Statistics"), 11, -1, MenuOverlayStats);
+    MenuOverlays->Agregar(T("Statistics"), 11, -1, MenuOverlayStats)->gris = &showOverlays;
     // Clear Screen: limpia el framebuffer (glClear) cada frame. NO es un overlay (no se grisa con
     // Show Overlays). Apagarlo gana rendimiento en juegos/renders donde la escena llena la pantalla.
     // ON por defecto (limpiarPantalla = true en el ctor).
@@ -1287,6 +1289,7 @@ void Viewport3D::Render() {
     w3dRenderOverlays = ovl; // el Core lo lee (Mesh::RenderObject); g_mostrarOverlays sigue siendo del editor
     // overlays por tipo (submenu "Objects"): del viewport -> globales que lee el traversal del Core (Empty/Camera/luz)
     g_showLights = showLights && ovl; g_showCamera = showCamera && ovl; g_showEmpty = showEmpty && ovl;
+    g_showParticulas = showParticulas && ovl; g_showCurvas = showCurvas && ovl;
 
     // (los flags de dibujo del Core los dejo W3dEscena3DModo mas arriba, junto con la
     //  posicion de la luz: tienen que quedar puestos con la modelview en identidad.)

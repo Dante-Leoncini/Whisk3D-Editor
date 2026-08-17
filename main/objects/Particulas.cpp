@@ -127,10 +127,13 @@ void Particulas::Emitir(int n) {
     g_redraw = true;
 }
 
-void Particulas::Tick(float dt) {
+void Particulas::Tick(float dt, bool puedeEmitir) {
     if (dt <= 0.0f) return;
     SincronizarConfig(this);
-    if (activo && cantidad > 0.0f) {
+    // la EMISION respeta 'puedeEmitir' (visible); la SIMULACION (sys.Update, abajo) corre SIEMPRE -> las
+    // particulas VIVAS (mundo) avanzan y MUEREN aunque el emisor se oculte. Antes, si el objeto era !visible,
+    // W3dParticulasTick lo salteaba entero -> las ya emitidas se congelaban y NUNCA morian (acumulacion infinita).
+    if (puedeEmitir && activo && cantidad > 0.0f) {
         // emision continua con CONO: el acumulador vive aca (sys.rate queda en 0
         // a proposito, el Emit() del Core no sabe de conos ni del transform)
         emAcc += cantidad * dt;
@@ -183,6 +186,7 @@ void Particulas::RenderObject() {
     // gizmo del EMISOR (overlay del editor, jamas en el render final): una flechita
     // +Y local (la boca del cono), con el color de seleccion de siempre
     if (!g_mostrarOverlays) return;
+    { extern bool g_showParticulas; if (!g_showParticulas) return; } // toggle "Particles": oculta SOLO el gizmo (la flecha), no las particulas
     static const GLfloat flecha[] = {
         0,0,0,       0,0.6f,0,                 // el tallo (+Y local)
         0,0.6f,0,    0.12f,0.42f,0,            // punta
@@ -317,15 +321,16 @@ void W3dParticulasDibujarPendientes() {
 // ---------------------------------------------------------------------------
 //  El TICK global (una vez por frame) + "hay algo animando?"
 // ---------------------------------------------------------------------------
+// recorre TODO el arbol (NO corta por !visible): las particulas VIVAS se simulan y mueren aunque su emisor o un
+// ancestro esten ocultos (son world-space, ya emitidas). La EMISION si respeta la cadena de visibilidad (vis).
+static void ParticulasRec(Object* o, bool cadenaVisible, float dt) {
+    bool vis = cadenaVisible && o->visible;
+    if (o->getType() == ObjectType::particulas) ((Particulas*)o)->Tick(dt, vis);  // vis=false -> NO emite, SI simula
+    for (size_t i = 0; i < o->Childrens.size(); i++) ParticulasRec(o->Childrens[i], vis, dt);
+}
 void W3dParticulasTick(float dt) {
     if (!SceneCollection || dt <= 0.0f) return;
-    std::vector<Object*> st; st.push_back(SceneCollection);
-    while (!st.empty()) {
-        Object* o = st.back(); st.pop_back();
-        if (!o->visible) continue;   // oculto (con su subarbol): ni emite ni simula
-        if (o->getType() == ObjectType::particulas) ((Particulas*)o)->Tick(dt);
-        for (size_t i = 0; i < o->Childrens.size(); i++) st.push_back(o->Childrens[i]);
-    }
+    ParticulasRec(SceneCollection, true, dt);
 }
 
 bool W3dParticulasAnimando() {
