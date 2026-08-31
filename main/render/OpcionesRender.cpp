@@ -13,6 +13,7 @@ GLfloat MaterialPreviewSpecular[4] = { 0.2f, 0.2f, 0.2f, 1.0f };
 GLfloat MaterialPreviewPosition[4] = { -0.45f, 0.55f, 1.0f, 0.0f };
 
 bool g_mostrarOverlays = true; // master de overlays (false = limpieza de pantalla, oculta TODO)
+int g_juegoPuro = 0;           // MODO JUEGO PURO (VERDE+0): 0 editor / 1 bandas / 2 cover
 // overlay de normales (solo en meshes seleccionadas); apagados por defecto
 bool OverlayVertexNormal = false;
 bool OverlayCustomNormal = false;
@@ -23,6 +24,10 @@ float OverlayNormalSize  = 0.10f;
 // Viewport3D (mismo nombre, ver ViewPort3D.h) -> cada viewport prende sus stats por separado. Aca solo quedan
 // los datos GLOBALES que alimentan el overlay (los actualiza cada plataforma / el Core).
 float g_fpsActual      = 0.0f;
+// caras (triangulos) y draw calls del ultimo pase de escena del viewport ACTIVO (planos, para el [PERF] sin
+// arrastrar ViewPort3D.h). Los setea ViewPort3D::Render; los lee el loop del juego (Whisk3DContainer / [PERF]).
+int  g_renderCaras     = 0;
+int  g_renderDraws     = 0;
 long g_genMallaCount   = 0; // diagnostico de regeneracion de modificadores (ver OpcionesRender.h)
 bool g_objetosMovidos  = false; // un objeto se movio -> regenerar los Mirror con target (ver OpcionesRender.h)
 

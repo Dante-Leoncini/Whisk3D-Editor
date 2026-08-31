@@ -24,6 +24,7 @@
 #include "w3dlog.h"
 #include "objects/Textures.h"
 #include "w3dTexture.h" // engine: UploadRGBA (subida comun a los 4 OS)
+#include "io/w3dFilesystem.h" // ReadFileBytes: resuelve el contenedor v4 (VFS) y disco
 
 // global compartido del modelo de PC (Textures.cpp es PC-only)
 std::vector<Texture*> Textures;
@@ -75,7 +76,22 @@ static void DecodeImageSymbianL(const char* aFilename,
     User::LeaveIfError(fs.Connect());
     CleanupCloseFsPushL(fs);
 
-    CImageDecoder* dec = CImageDecoder::FileNewL(fs, nombre);
+    // CONTENEDOR v4: una entrada del zip NO es un archivo del filesystem, asi
+    // que FileNewL fallaba y el juego empaquetado quedaba SIN TEXTURAS en el
+    // N95 (las mallas si cargaban: van por ReadFileBytes). Se leen los bytes
+    // por la abstraccion del Core (resuelve el montaje del contenedor Y los
+    // archivos comunes) y se decodifica DE MEMORIA con DataNewL; si la ruta
+    // no aparece por ahi, el camino viejo por archivo queda de fallback.
+    HBufC8* datos = NULL;
+    {
+        std::vector<unsigned char> bytes;
+        if (w3dFileSystem::ReadFileBytes(aFilename ? aFilename : "", bytes) && !bytes.empty()) {
+            datos = HBufC8::NewLC((TInt)bytes.size());
+            datos->Des().Copy(&bytes[0], (TInt)bytes.size());
+        }
+    }
+    CImageDecoder* dec = datos ? CImageDecoder::DataNewL(fs, *datos)
+                               : CImageDecoder::FileNewL(fs, nombre);
     CleanupStack::PushL(dec);
 
     const TFrameInfo& info = dec->FrameInfo();
@@ -152,6 +168,7 @@ static void DecodeImageSymbianL(const char* aFilename,
     }
     CleanupStack::PopAndDestroy(bmp);
     CleanupStack::PopAndDestroy(dec);
+    if (datos) CleanupStack::PopAndDestroy(datos);
     CleanupStack::PopAndDestroy(); // fs
 }
 

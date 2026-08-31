@@ -36,6 +36,8 @@ struct KDNode {
     KDNode() : index(0), left(NULL), right(NULL) {}
 };
 
+class Mesh;   // la malla de edicion interna (miembro 'edicion', ver abajo)
+
 class Curve : public Object {
     public:
         int vertexSize;   // (inicializados en el constructor: C++03)
@@ -95,6 +97,32 @@ class Curve : public Object {
         ObjectType getType() W3D_OVERRIDE;
 
         void RenderObject() W3D_OVERRIDE;
+
+        // FOCO/ENCUADRE ('.' / Frame Selected): centro y radio del bounding de los NODOS.
+        // Sin esto el encuadre usaba el origen del objeto (radio 0) y un riel de 1000
+        // unidades "se encuadraba" a la nada (queja del dueno: "funciona muy mal").
+        Vector3 PuntoFoco() const W3D_OVERRIDE;
+        float   RadioFoco() const W3D_OVERRIDE;
+
+        // ---- GRAFO DE RAMAS (pedido del dueno: "el riel puede tener ramificaciones... todos
+        // los path de crash en un solo objeto") -------------------------------------------
+        // aristas: pares de indices de nodo. VACIO = polilinea implicita 0-1-2-... (los .cap
+        // de siempre). Con aristas, el path es un GRAFO: extrudir varias veces desde un nodo
+        // crea ramas, borrar un nodo separa sub-paths. Una RAMA = componente conexa; el
+        // modificador Oclusion puede filtrar que ramas participan del nodo-mas-cercano (la
+        // rama del bonus no sirve al nivel principal y viceversa).
+        std::vector<GLushort> aristas;
+        std::vector<int> ramaDeNodo;   // (derivado, no se serializa) componente conexa de cada nodo
+        int nRamas;                    // cantidad de ramas (componentes)
+        // MALLA DE EDICION INTERNA (parte de la curva, NO un objeto de escena: no se puede
+        // seleccionar, ni borrar, ni aparece en el outliner -- muere con la curva). Al entrar
+        // a Edit Mode sobre la curva, g_editMesh apunta ACA y toda la maquinaria de edicion
+        // de mallas (G/E, vertices/aristas) opera sobre ella; al salir, los nodos vuelven.
+        Mesh* edicion;                 // NULL hasta la primera edicion; delete en ~Curve
+        void RecalcularRamas();        // rehace ramaDeNodo/nRamas (llamar tras cargar/editar)
+        // nodo mas cercano CONSIDERANDO solo las ramas habilitadas (ramasOn[rama] != 0);
+        // NULL o vacio = todas. Lineal (~1000 nodos = trivial, tambien en el N95).
+        int FindNearestFiltrado(const Vector3& target, const std::vector<char>* ramasOn) const;
 
         bool LoadFromFile(const std::string& filepath);
 

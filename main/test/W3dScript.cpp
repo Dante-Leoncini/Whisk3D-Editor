@@ -35,6 +35,7 @@
 #include "ViewPorts/PopUp/ProgressPopup.h" // dockprog: ProgresoFin/ProgresoActivo (la barra compartida)
 #include "W3dDock.h"                // dockprog: barra de progreso en el icono del dock (Linux)
 bool LayoutAbrirMenuDeBarra(ViewportBase* vp, int mx, int my); // LayoutInput.cpp (animmenu: el camino real del click)           // icontest: crear el panel arma las tarjetas    // dopedump: arma las filas del dope sheet
+bool UpdateFlipbooks(float dtSeg); // Flipbook.cpp: flipbooks unificados (Imagen2D/particulas), junto a UpdateUVAnims
 #include "importers/import_obj.h"   // ExportOBJ
 #include "importers/import_fbx.h"  // ImportFBX
 #include "objects/UI.h"        // compilarjuego: la UI raiz que compila la tarjeta Juego
@@ -4292,7 +4293,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         SDL_GL_SetSwapInterval(0);
         for (int i = 0; i < 5; i++) {   // warmup (VBOs/caches/inicio() de scripts)
             if (jugando) {
-                SimTickPlay(dt); UpdateAnimations(dt); UpdateAnimatedMaterials(dt); UpdateUVAnims(dt);
+                SimTickPlay(dt); UpdateAnimations(dt); UpdateAnimatedMaterials(dt); UpdateUVAnims(dt); UpdateFlipbooks(dt);
                 W3dParticulasTick(dt); { extern void W3dVisZonasTick(); W3dVisZonasTick(); } AplicarAnimacionObjetos();
             }
             vp->Render(); gfx::Finish();
@@ -4303,7 +4304,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         for (int i = 0; i < n; i++) {
             gfx::StatsReset();
             if (jugando) {
-                SimTickPlay(dt); UpdateAnimations(dt); UpdateAnimatedMaterials(dt); UpdateUVAnims(dt);
+                SimTickPlay(dt); UpdateAnimations(dt); UpdateAnimatedMaterials(dt); UpdateUVAnims(dt); UpdateFlipbooks(dt);
                 W3dParticulasTick(dt); { extern void W3dVisZonasTick(); W3dVisZonasTick(); } AplicarAnimacionObjetos();
             }
             double t0 = W3dNowMs();
@@ -4458,7 +4459,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         if (!teclaHold.empty()) W3dScriptTecla(teclaHold.c_str(), true); // jugar de verdad
         const float dt = 1.0f / 60.0f;
         for (int i = 0; i < 5; i++) { // warmup (inicio() de los scripts + VBOs/caches)
-            SimTickPlay(dt); UpdateAnimations(dt); UpdateAnimatedMaterials(dt); UpdateUVAnims(dt);
+            SimTickPlay(dt); UpdateAnimations(dt); UpdateAnimatedMaterials(dt); UpdateUVAnims(dt); UpdateFlipbooks(dt);
             W3dParticulasTick(dt);   // el mismo tick del main loop (emisores del juego)
             { extern void W3dVisZonasTick(); W3dVisZonasTick(); }
             AplicarAnimacionObjetos(); vp->Render(); gfx::Finish();
@@ -4475,6 +4476,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
             UpdateAnimations(dt);                  // vertex/skel anims (skinning va en el render)
             UpdateAnimatedMaterials(dt);
             UpdateUVAnims(dt);
+            UpdateFlipbooks(dt);                   // flipbooks unificados (junto a UpdateUVAnims)
             W3dParticulasTick(dt);                 // emisores de particulas (como el main loop)
             { extern void W3dVisZonasTick(); W3dVisZonasTick(); }
             AplicarAnimacionObjetos();             // keyframes de transform
@@ -4884,10 +4886,10 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
             if (o->getType() == ObjectType::particulas && (!elegido || o == elegido)) {
                 Particulas* pt = (Particulas*)o; np++;
                 printf("      [particulas] '%s' textura=\"%s\" cantidad=%g vida=%g tam=%g vel=%g "
-                       "dispersion=%g gravedad=%g aditivo=%s color=\"%s\" desvanecer=%s activo=%s "
+                       "dispersion=%g gravedad=%g mezcla=%d color=\"%s\" desvanecer=%s activo=%s "
                        "variacion=%g turbulencia=%g rotacion=%s velRotacion=%g\n",
                        pt->name.c_str(), pt->textura.c_str(), pt->cantidad, pt->vida, pt->tam,
-                       pt->vel, pt->dispersion, pt->gravedad, pt->aditivo ? "true" : "false",
+                       pt->vel, pt->dispersion, pt->gravedad, pt->mezcla,
                        pt->ColorTexto().c_str(), pt->desvanecer ? "true" : "false",
                        pt->activo ? "true" : "false", pt->variacion, pt->turbulencia,
                        pt->rotacion ? "true" : "false", pt->velRotacion);
@@ -5793,7 +5795,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         if (!mod) { err = "pvsinfo: '" + nombre + "' no tiene modificador Culling"; return false; }
         int nsec = (int)mod->pvsSectores.size();
         printf("      [pvsinfo] '%s' metodo=%s sectores=%d sectorActivo=%d trisMalla=%d dibujando=%d\n",
-               m->name.c_str(), mod->metodoPVS == 1 ? "bsp" : "triangulos",
+               m->name.c_str(), mod->metodoPVS == 1 ? "celdas" : "triangulos",
                nsec, mod->sectorPVS, m->facesSize / 3,
                m->pvsFaces ? m->pvsFacesSize / 3 : m->facesSize / 3);
         for (int sct = 0; sct < nsec; sct++)
@@ -5899,8 +5901,8 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         while(!st.empty()){ Object* o=st.back(); st.pop_back();
             if (o->getType()==ObjectType::mesh){ Mesh* m=(Mesh*)o; nm++;
                 printf("      [mesh] '%s' verts=%d faces3d=%d tris(idx/3)=%d edges=%d meshParts=%d\n", m->name.c_str(), m->vertexSize, (int)m->faces3d.size(), m->facesSize/3, (int)(m->edges.size()/2), (int)m->materialsGroup.size());
-                if (m->uvAnim)   // animacion UV "tira de atlas" (para verificar texto/v4 en los tests)
-                    printf("         uvanim frames=%d fps=%g eje=%s desfase=%d\n", m->uvAnim->frames, (double)m->uvAnim->fps, m->uvAnim->eje ? "v" : "u", m->uvAnim->desfase);
+                if (m->flipbook)   // animacion UV = flipbook del Core (para verificar texto/v4 en los tests)
+                    printf("         uvanim frames=%d fps=%g eje=%s desfase=%d\n", m->flipbook->cuadros, (double)m->flipbook->fps, m->flipbook->filas > 1 ? "v" : "u", m->flipPlay.desfase);
                 for (size_t g=0; g<m->materialsGroup.size(); g++){ MaterialGroup& mg=m->materialsGroup[g];
                     printf("         part[%d] mat='%s' tris=%d\n", (int)g, mg.material?mg.material->name.c_str():"(none)", mg.indicesDrawnCount/3); }
             }
@@ -6888,6 +6890,54 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         CurrentFrame=1;  o->SetRotEuler(Vector3(0,0,0));   InsertarKeyframeObjeto();
         CurrentFrame=20; o->SetRotEuler(Vector3(0,deg,0)); InsertarKeyframeObjeto();
         CurrentFrame=1;  return true;
+    }
+    // ---- teclajuego <nombre> <on|off> : setea una TECLA DE JUEGO como la ve lua
+    //      (tecla("espacio"), tecla("2")...) via W3dScriptTecla, el MISMO camino del
+    //      telefono. Complementa a `pad flecha` (que solo cubre las 4 flechas):
+    //      con esto se prueban headless salto/disparo/entrar-al-auto. ----
+    if (cmd == "teclajuego") {
+        std::string n, e; ss >> n >> e;
+        if (n.empty()) { err = "teclajuego: falta el nombre de la tecla"; return false; }
+        W3dScriptTecla(n.c_str(), e != "off");
+        printf("      [teclajuego] '%s' %s\n", n.c_str(), e != "off" ? "on" : "off");
+        return true;
+    }
+    // ---- tlciclo : CICLO RAPIDO del selector de animacion del timeline (pedido N95).
+    //      Con el foco de barra sobre el boton de animacion, ABAJO = siguiente
+    //      animacion y ARRIBA = anterior, SIN abrir el menu (LayoutTeclaPanelActivo,
+    //      el mismo ruteo del keypad del telefono). Auto-contenido: si el proyecto
+    //      tiene una sola escena crea otra para poder ciclar. ----
+    if (cmd == "tlciclo") {
+        InitSceneAnimations();
+        if (SceneAnimations.size() < 2) { NuevaEscena(); SetEscenaActiva(0); ActiveAnimKind = 0; }
+        Timeline* tl = new Timeline();
+        ViewportBase* vpAntes = viewPortActive;
+        viewPortActive = tl;
+        tl->SyncFields();                       // visibilidad REAL de los botones (btnAnim visible)
+        LayoutTimelineBarToggle();              // soft-izquierda: entra al foco de barra
+        int guard = 0;                          // navegar el foco hasta el selector de animacion
+        while (guard++ < 64 && !(tl->barFocusIndex >= 0 &&
+               tl->barFocusIndex < (int)tl->BarButtons.size() &&
+               tl->BarButtons[tl->barFocusIndex] == tl->btnAnim))
+            LayoutTimelineBarMover(+1);
+        const bool enAnim = (tl->barFocusIndex >= 0 &&
+                             tl->BarButtons[tl->barFocusIndex] == tl->btnAnim);
+        const std::string a0 = NombreEscenaActiva();
+        const bool tomoAbajo  = LayoutTeclaPanelActivo(LayoutKey::Down);
+        const std::string a1 = NombreEscenaActiva();
+        const bool tomoArriba = LayoutTeclaPanelActivo(LayoutKey::Up);
+        const std::string a2 = NombreEscenaActiva();
+        printf("      [tlciclo] foco=%d abajo(%d): '%s' -> '%s' | arriba(%d): -> '%s' | escenas=%d kind=%d\n",
+               enAnim ? 1 : 0, tomoAbajo ? 1 : 0, a0.c_str(), a1.c_str(),
+               tomoArriba ? 1 : 0, a2.c_str(), (int)SceneAnimations.size(), ActiveAnimKind);
+        viewPortActive = vpAntes;
+        delete tl;
+        if (!enAnim)              { err = "tlciclo: el foco de barra no llego al selector de animacion"; return false; }
+        if (!tomoAbajo)           { err = "tlciclo: ABAJO no fue consumido por el selector"; return false; }
+        if (a1 == a0)             { err = "tlciclo: ABAJO no cambio de animacion"; return false; }
+        if (a2 != a0)             { err = "tlciclo: ARRIBA no volvio a la animacion anterior"; return false; }
+        if (ActiveAnimKind != 0)  { err = "tlciclo: el ciclo salio del kind 0 (escenas)"; return false; }
+        return true;
     }
     // ---- objanimdump : lista las animaciones de OBJETO (AnimationObjects): obj + curvas + #keyframes + valores ----
     if (cmd == "objanimdump") {

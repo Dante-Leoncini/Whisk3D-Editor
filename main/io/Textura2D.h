@@ -1,6 +1,7 @@
 #ifndef TEXTURA2D_H
 #define TEXTURA2D_H
 #include <string>
+#include <vector>
 
 // ============================================================================
 //  Textura2D — cache de texturas para los elementos IMAGEN de las interfaces
@@ -12,6 +13,10 @@
 // GL id de la textura (0 si no se pudo cargar) + tamano del archivo en px.
 // La ruta "" devuelve 0 sin intentar cargar.
 unsigned Textura2DObtener(const std::string& ruta, int* w = 0, int* h = 0);
+
+// enumera las rutas CACHEADAS (las imagenes 2D del PROYECTO: HUD, Imagen2D...).
+// Lo usa el dropdown Texture del editor UV para listar la UI del juego.
+void Textura2DListar(std::vector<std::string>& rutas);
 
 // ruta que stb PUEDE decodificar: un .webp se convierte (ffmpeg, editor de PC) a un png
 // cacheado en /tmp una vez por sesion; cualquier otra ruta vuelve tal cual. La usan el

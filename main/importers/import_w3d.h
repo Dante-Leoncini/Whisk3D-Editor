@@ -79,4 +79,11 @@ void OpenW3D();
 // verificar que el juego lee exactamente lo mismo que el Play.
 bool W3dProyectoCargarEscena3D(const void* datos, size_t n);
 
+// ----------------------------- Anexar en RUNTIME -----------------------------
+// ANEXA un .w3d (JSON v3 plano) a la escena EN CALIENTE: objetos + materiales +
+// sus animaciones de escena, sin limpiar nada del proyecto abierto. Lo usa el
+// bind lua importarW3D() (streaming del modo juego). Devuelve el primer objeto
+// raiz creado, o NULL. Ver el comentario largo en import_w3d.cpp.
+Object* W3dImportarW3DAnexo(const std::string& ruta);
+
 #endif

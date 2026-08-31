@@ -142,7 +142,7 @@ static void MeshOverlayHook(Mesh* m) {
     if (!g_mostrarOverlays) return;
     if ((Object*)m == g_editMesh) {
         m->RenderEditOverlay();
-    } else if (m->select) {
+    } else if (m->select && w3dVerSeleccion) {   // "Ver seleccion" OFF (menu Select): sin contorno
         int cid = ((Object*)m == ObjActivo) ? RC_selActive : RC_selInactive;
         const float* col = gRenderColors[cid];
         m->RenderBordes(col, 3.0f, true); // pushBack=true: el contorno se empuja ATRAS (DepthRange), sin adelantar las caras
@@ -183,7 +183,10 @@ void RenderLinkLines(Object* obj){
             objChild->getType() == ObjectType::boton2d ||
             objChild->getType() == ObjectType::expandir2d ||
             objChild->getType() == ObjectType::video2d) continue; // sin linea de parent para la UI 2D
-        if (obj->getType()!= ObjectType::collection && obj->getType() != ObjectType::baseObject){
+        // Culling se comporta como Collection: es un contenedor ESTRUCTURAL (agrupa 100s de props para
+        // cullear), no una relacion padre-hijo real -> no dibuja lineas a sus hijos (sino satura el editor).
+        if (obj->getType()!= ObjectType::collection && obj->getType() != ObjectType::baseObject &&
+            obj->getType() != ObjectType::culling){
             Vector3 a = obj->GetGlobalPosition();
             Vector3 b = objChild->GetGlobalPosition();
             GLfloat* v = pool[slot];

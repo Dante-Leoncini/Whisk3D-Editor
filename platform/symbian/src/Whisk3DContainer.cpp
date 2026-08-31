@@ -399,9 +399,12 @@ static const char* W3dJuegoNombreTecla(TInt sc){
 		case EStdKeyDevice3:    // centro del D-pad (select)
 		case EStdKeyEnter:      return "enter";
 		case 164:               return "softizq"; // softkey IZQUIERDO: reservado para juegos (solo dentro de un viewport de juego)
-		case '1':               return "1";       // digitos del keypad: van al juego durante el play (tecla("1")/("2")/("3"))
+		case '1':               return "1";       // digitos del keypad: van al juego durante el play (tecla("1").."tecla("6"))
 		case '2':               return "2";
 		case '3':               return "3";
+		case '4':               return "4";       // 4/5/6 tambien son del juego (armas del demo GTA:
+		case '5':               return "5";       // 4 = arma anterior, 5 = arma siguiente); en pausa
+		case '6':               return "6";       // siguen siendo los atajos del editor
 		default:                return 0;
 	}
 }
@@ -419,6 +422,17 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 			// NO pasa por aca: 1/2/3 del BT quedan libres, como pidio Dante)
 			// 1/2/3 = mover/rotar/escalar (G/R/S de PC) - 0 = modo de vista
 			TInt sc = aKeyEvent.iScanCode;
+			// VERDE + '0' = MODO JUEGO PURO (pedido del dueno): el 3D del juego a
+			// pantalla completa y CERO editor (menu/headers/overlays/estadisticas),
+			// para medir el rendimiento REAL. Re-apretar restaura todo. gGreenUsado
+			// evita que al soltar la VERDE se cicle el viewport (mismo patron que
+			// VERDE+OK y VERDE+flecha).
+			if (gGreenHeld && sc == '0'){
+				gGreenUsado = ETrue;
+				extern void LayoutJuegoPuroToggle();
+				LayoutJuegoPuroToggle();
+				return EKeyWasConsumed;
+			}
 			// MODO JUEGO: el D-pad + select van DIRECTO a los scripts (tecla/teclaApretada), con prioridad
 			// sobre el ruteo del editor (que se come las flechas para orbita/cursor). Sin esto el juego cargaba
 			// pero no respondia a nada en el N95. Cede a popup/menu abiertos (escotilla: softkeys siguen libres).
@@ -428,6 +442,17 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 					extern void W3dScriptTecla(const char*, bool);
 					W3dScriptTecla(jn, true);
 					if (sc == EStdKeyDevice3 || sc == EStdKeyEnter) W3dScriptTecla("espacio", true); // select cuenta como enter Y espacio
+					return EKeyWasConsumed;
+				}
+				// 7/8/9/0/*/# SON DEL JUEGO mientras corre (pedido del dueno: el 8
+				// cambiaba camara<->viewport en pleno gameplay). Van a los scripts
+				// por nombre y el editor NO los ve; en PAUSA vuelven a ser los
+				// atajos de siempre (extrude/tecla8/orbital/zoom/paneo/vistas).
+				if (sc == '7' || sc == '8' || sc == '9' || sc == '0' ||
+				    sc == '*' || sc == EStdKeyHash){
+					char jnom[2]; jnom[0] = (char)(sc == EStdKeyHash ? '#' : sc); jnom[1] = 0;
+					extern void W3dScriptTecla(const char*, bool);
+					W3dScriptTecla(jnom, true);
 					return EKeyWasConsumed;
 				}
 			}
@@ -786,6 +811,14 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 					if (usc == EStdKeyDevice3 || usc == EStdKeyEnter) W3dScriptTecla("espacio", false);
 					return EKeyWasConsumed;
 				}
+				// el par del key-down: 7/8/9/0/*/# reservadas al juego mientras corre
+				if (usc == '7' || usc == '8' || usc == '9' || usc == '0' ||
+				    usc == '*' || usc == EStdKeyHash){
+					char jnom[2]; jnom[0] = (char)(usc == EStdKeyHash ? '#' : usc); jnom[1] = 0;
+					extern void W3dScriptTecla(const char*, bool);
+					W3dScriptTecla(jnom, false);
+					return EKeyWasConsumed;
+				}
 			}
 			if (usc == EStdKeyYes){
 				if (!gGreenUsado){
@@ -1006,6 +1039,8 @@ int CWhisk3DContainer::DrawCallBack( TAny* aInstance )
       if (!(AnimEsJuego && !PlayAnimation) && ActiveAnimKind != 3) {
           UpdateAnimatedMaterials();
           extern bool UpdateUVAnims(float); if (UpdateUVAnims(1.0f / 60.0f)) g_redraw = true;
+          extern bool UpdateFlipbooks(float); if (UpdateFlipbooks(1.0f / 60.0f)) g_redraw = true;
+          extern bool W3dOclusionTick(); if (W3dOclusionTick()) g_redraw = true;   // oclusion por nodos (.w3dnodos)
       }
     }
     {
@@ -1029,14 +1064,36 @@ int CWhisk3DContainer::DrawCallBack( TAny* aInstance )
                 if (dtSim > 0.1f)   dtSim = 0.1f;    // clamp (igual que PC): no dar pasos gigantes
                 if (dtSim < 0.001f) dtSim = 0.001f;
                 gLastAnimTick = nowA;
-                SimTickPlay(dtSim);
-                // AVANCE de las vertex-anims (Crash y demas mallas animadas): en PC vive en main.cpp; en el N95
-                // FALTABA -> la malla quedaba clavada en el frame 1 (CambiarYa posa un cuadro, pero nada lo avanzaba).
-                { extern void UpdateAnimations(float); UpdateAnimations(dtSim); }
-                // PARTICULAS: simula + MATA las vivas (polvo de los pies, humo, etc.). En PC vive en main.cpp; en el
-                // N95 FALTABA -> cada rafaga de emitir() se creaba y dibujaba pero NUNCA se simulaba -> el polvo se
-                // acumulaba infinito (nunca moria).
-                { extern void W3dParticulasTick(float); W3dParticulasTick(dtSim); }
+                // PERF (DIAGNOSTICO): cronometrar cada fase de la LOGICA del juego. El profiler del render NO las ve
+                // (corren fuera de su ventana). El bonus con 437 draws a 8fps ya prueba que el cuello es un COSTO FIJO
+                // por frame (CPU), no los draws. Esto dice cual: lua (SimTickPlay), vertex-anim, PVS o particulas.
+                // Loguea el acumulado + promedio cada 30 ticks a e:\whisk3d.log. NTickCount = ms en el N95 (1000 Hz).
+                static TUint gPfSim=0, gPfAnim=0, gPfPvs=0, gPfPart=0, gPfN=0; TUint _pf;
+                _pf=User::NTickCount(); SimTickPlay(dtSim);                                              gPfSim  += User::NTickCount()-_pf;
+                // AVANCE de las vertex-anims (Crash y demas mallas animadas): en PC vive en main.cpp; en el N95 FALTABA.
+                _pf=User::NTickCount(); { extern void UpdateAnimations(float); UpdateAnimations(dtSim); }  gPfAnim += User::NTickCount()-_pf;
+                // PVS DEL ESCENARIO (oclusion del MAPA como el Crash original): el stepper que lee el nodo del riel y
+                // APLICA el sector (override del index buffer por triangulo). En PC vive en main.cpp:617; en el N95 FALTABA.
+                _pf=User::NTickCount(); { extern void W3dVisZonasTick(); W3dVisZonasTick(); }              gPfPvs  += User::NTickCount()-_pf;
+                // PARTICULAS: simula + MATA las vivas (polvo, humo). En PC vive en main.cpp; en el N95 FALTABA.
+                _pf=User::NTickCount(); { extern void W3dParticulasTick(float); W3dParticulasTick(dtSim); } gPfPart += User::NTickCount()-_pf;
+                if (++gPfN >= 30) {
+                    extern void w3dLogf(const char*, ...);
+                    // CULLING: g_cullHijos* se acumulan por Culling::RenderHijos cada frame. El RATIO visibles/total dice
+                    // si el frustum descarta mallas en el N95 (visibles<<total = anda; visibles~=total = dibuja TODO ->
+                    // el frustum cull no corta y hay que ver por que). El profiler del render mide aparte (overlay stats).
+                    extern int g_cullHijosTotal, g_cullHijosVisibles;
+                    extern int g_luaScriptsActivos, g_luaScriptsTotal, g_renderCaras, g_renderDraws;
+                    // TOP de scripts por ms (promedio del bloque de 30): dice CUAL lua se come el sim=
+                    extern void SimLuaPerfTop(char*, int, int);
+                    char topLua[96]; SimLuaPerfTop(topLua, sizeof(topLua), 30);
+                    w3dLogf("[PERF] /30f logica: sim=%u anim=%u pvs=%u part=%u ms | lua %d/%d scripts [%s] | RENDER: %d caras %d draws | CULLING: %d de %d hijos",
+                            gPfSim/30, gPfAnim/30, gPfPvs/30, gPfPart/30,
+                            g_luaScriptsActivos, g_luaScriptsTotal, topLua, g_renderCaras, g_renderDraws,
+                            g_cullHijosVisibles/30, g_cullHijosTotal/30);
+                    gPfSim=gPfAnim=gPfPvs=gPfPart=gPfN=0;
+                    g_cullHijosTotal=0; g_cullHijosVisibles=0;
+                }
                 g_redraw = true;
             }
         } else {

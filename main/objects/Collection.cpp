@@ -84,7 +84,7 @@ static const size_t kLoteMaxVerts = 65500;
 static bool LoteElegible(Mesh* m) {
     if (!m || !m->visible || !m->renderizable) return false;
     if (m->skinArmature || !m->modificadores.empty() || m->genValido) return false;
-    if (m->uvAnim || m->pvsFaces) return false;
+    if (m->flipbook || m->pvsFaces) return false;
     if (!m->vertex || m->vertexSize <= 0 || !m->faces || m->facesSize < 3) return false;
     for (size_t g = 0; g < m->materialsGroup.size(); g++) {
         Material* mt = m->materialsGroup[g].material;

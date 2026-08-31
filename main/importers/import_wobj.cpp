@@ -146,6 +146,8 @@ Mesh* LeerWOBJ(std::istream& file, const std::string& filename, Object* parent, 
         }
         else if (line.rfind("usemtl ", 0) == 0) {
             std::string matName = line.substr(7);
+            W3dTrimNombre(matName);   // saca \r/\n/espacios del final: un .obj con CRLF (Windows) daba un
+                                      // material NUEVO por archivo ("crash_escenario_alpha\r" nunca matcheaba)
             Material* materialPuntero = BuscarMaterialPorNombre(matName);
             if (!materialPuntero) materialPuntero = new Material(matName, false, TieneVertexColor);
 
@@ -223,7 +225,7 @@ static void CargarGruposWOBJ(Mesh* mesh, const std::string& ruta) {
     if (creados > 0 && mesh->grupoActivo < 0) mesh->grupoActivo = 0;
 }
 
-Mesh* ImportWOBJ(const std::string& filepath, Object* parent, bool NoMerge) {
+Mesh* ImportWOBJ(const std::string& filepath, Object* parent, bool NoMerge, bool noEditable) {
 
     if (filepath.size() < 5 || 
     (filepath.substr(filepath.size() - 5) != ".wobj" &&
@@ -280,10 +282,13 @@ Mesh* ImportWOBJ(const std::string& filepath, Object* parent, bool NoMerge) {
 
     // bordes unicos desde las caras: sin esto el CONTORNO de seleccion (y el
     // wireframe) no existen y la malla "parece no seleccionada" (import_obj ya
-    // lo hacia; esta via -los Wavefront de los proyectos .w3d- no)
+    // lo hacia; esta via -los Wavefront de los proyectos .w3d- no).
+    // noEditable (escenarios cerrados a edicion): SOLO el AABB (el Culling y el
+    // encuadre lo necesitan); posRep/edges/bordesBuf no se calculan nunca.
     if (mesh) {
         unsigned long _tB = w3dTickMs();
-        mesh->CalcularBordes();
+        if (noEditable) { mesh->noEditable = true; mesh->CalcularAABBSolo(); }
+        else            mesh->CalcularBordes();
         g_wobjBordesMs += (w3dTickMs() - _tB);
     }
 

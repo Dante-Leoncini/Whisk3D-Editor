@@ -66,6 +66,7 @@ PopupMenu* MenuSetOrigin = NULL; // submenu de Object: Geometry/Origin/Cursor
 PopupMenu* MenuApply = NULL;     // submenu de Object: Apply Location/Rotation/Scale/All (Ctrl A)
 PopupMenu* MenuView = NULL;      // boton "View" (antes de Select): submenus Cameras + Viewpoint
 MenuItem* MenuItemLockOrbit = NULL; // el item "Lock Orbit" del menu View (para refrescar su tilde al abrir)
+MenuItem* MenuItemLocalView = NULL; // el item "Local View" del menu View (tilde = local view activo en el viewport)
 PopupMenu* MenuViewpoint = NULL; // submenu de View: Camera/Top/Bottom/Front/Back/Right/Left (numpad)
 PopupMenu* MenuCameras = NULL;   // submenu de View: Set Active Object as Camera / Active Camera
 PopupMenu* MenuOverlays = NULL;  // overlays del viewport (checkboxes)
@@ -319,6 +320,8 @@ Viewport3D::Viewport3D(Vector3 pos){
         MenuView->Agregar(T("Cameras"),   0, -1, MenuCameras);   // abre submenu (antes de Viewpoint, como Blender)
         MenuView->Agregar(T("Viewpoint"), 0, -1, MenuViewpoint); // abre submenu
         MenuView->Agregar(T("Frame Selected"), 420)->atajo = "Numpad ."; // enfocar la seleccion (EnfocarObject)
+        MenuItemLocalView = MenuView->Agregar(T("Local View"), 422); // aisla la seleccion en ESTE viewport (tilde = activo)
+        MenuItemLocalView->atajo = "/";
         MenuView->Agregar(T("Perspective/Ortho"), 407)->atajo = "Num 5"; // alterna perspectiva/ortografica
         // Lock Orbit: item REGULAR (no checkbox) -> al tocarlo togglea Y CIERRA el menu. El
         // tilde (verde) se refresca al abrir el menu, con el estado del viewport activo (LayoutInput).
@@ -367,7 +370,9 @@ Viewport3D::Viewport3D(Vector3 pos){
         MenuSelMode = new PopupMenu();
         MenuSelMode->Agregar(T("Vertex"), SelVertex, IconType::selVertex);
         MenuSelMode->Agregar(T("Edge"),   SelEdge,   IconType::selEdge);
-        MenuSelMode->Agregar(T("Face"),   SelFace,   IconType::selFace);
+        // Face se DESHABILITA (gris) editando una malla sin caras (un path/riel)
+        { extern bool g_selFaceDisponible;
+          MenuSelMode->Agregar(T("Face"), SelFace, IconType::selFace)->gris = &g_selFaceDisponible; }
     }
     // (eran inicializadores de clase: C++03)
     orthographic = false;
@@ -397,6 +402,7 @@ Viewport3D::Viewport3D(Vector3 pos){
     ShowRelantionshipsLines = true;
     limpiarPantalla = true;
     lockOrbit = false; // por defecto se orbita normal; el usuario lo activa para modo tablero 2D
+    localViewActivo = false;   // local view ("/") apagado
     view = RenderType::MaterialPreview;
     nearClip = 0.01f;
     farClip = 1000.0f;
@@ -545,6 +551,45 @@ void Viewport3D::EncuadrarRadio(const Vector3& centro, float radio){
     if (orbitDistance < 0.02f)     orbitDistance = 0.02f;
     if (orbitDistance > farClip)   orbitDistance = farClip;
     RecalcOrbitPosition();
+}
+
+// ---- LOCAL VIEW ("/"): aisla la seleccion en este viewport (solo dibuja los seleccionados + sus hijos),
+// encuadra, y al re-tocar restaura vista + visibilidad. Estilo Blender. ----
+static void LV_AgregarSubarbol(Object* o, std::set<Object*>& s){
+    if (!o) return;
+    s.insert(o);
+    for (size_t i = 0; i < o->Childrens.size(); i++) LV_AgregarSubarbol(o->Childrens[i], s);
+}
+static void LV_AgregarAncestros(Object* o, std::set<Object*>& s){
+    for (Object* p = o->Parent; p; p = p->Parent) s.insert(p);   // padres: para que la recursion ALCANCE al hijo
+}
+void Viewport3D::LocalViewEntrar(){
+    localViewSet.clear();
+    for (size_t i = 0; i < ObjSelects.size(); i++){
+        LV_AgregarSubarbol(ObjSelects[i], localViewSet);   // el seleccionado + su descendencia
+        LV_AgregarAncestros(ObjSelects[i], localViewSet);  // + su cadena de padres
+    }
+    if (SceneCollection) localViewSet.insert(SceneCollection); // la raiz siempre traversable
+    // snapshot de la camara para restaurarla al salir
+    lvViewRot = viewRot; lvPivot = pivot; lvOrbitDistance = orbitDistance;
+    lvOrtho = orthographic; lvFromCam = ViewFromCameraActive;
+    lvZoom = camViewZoom; lvPanX = camViewPanX; lvPanY = camViewPanY;
+    localViewActivo = true;
+    EnfocarObject();   // Frame Selected: encuadra la seleccion aislada
+    g_redraw = true;
+}
+void Viewport3D::LocalViewSalir(){
+    localViewActivo = false;
+    localViewSet.clear();
+    viewRot = lvViewRot; pivot = lvPivot; orbitDistance = lvOrbitDistance;
+    orthographic = lvOrtho; ViewFromCameraActive = lvFromCam;
+    camViewZoom = lvZoom; camViewPanX = lvPanX; camViewPanY = lvPanY;
+    RecalcOrbitPosition();   // rederiva viewPos desde viewRot/pivot/orbitDistance
+    g_redraw = true;
+}
+void Viewport3D::LocalViewToggle(){
+    if (localViewActivo) LocalViewSalir();
+    else if (!ObjSelects.empty()) LocalViewEntrar();   // sin seleccion no hace nada (como Blender)
 }
 
 void Viewport3D::Zoom(float delta){
@@ -843,7 +888,9 @@ void Viewport3D::RotarDesdeVista(int mx, int my){
         Object& ob = *estadoObjetos[o].obj;
         // por la puerta: antes se derivaba el euler a mano con ToEulerYXZ mientras el resto del editor
         // usa XYZ -> lo que se guardaba NO era lo que se veia. SetRot lo deriva bien y conserva las vueltas.
-        ob.SetRot(Quaternion::FromAxisAngle(cf, -delta) * estadoObjetos[o].rot);
+        // W3dRotarMundoSobre: el eje de la vista es DE MUNDO y el snapshot es LOCAL -> se conjuga por el
+        // padre (sin eso, rotar desde la vista un objeto emparentado y rotado giraba por cualquier lado).
+        ob.SetRot(W3dRotarMundoSobre(ob, Quaternion::FromAxisAngle(cf, -delta), estadoObjetos[o].rot));
     }
     AplicarPivotATransform(); // gira las posiciones alrededor del pivote
     { extern void SnapAjustarObjRot(); SnapAjustarObjRot(); } // imanta: el activo apunta al target (si snap ON)
@@ -1120,9 +1167,15 @@ void Viewport3D::Render() {
         float va = (aspect > 1e-4f) ? aspect : 1.0f; // aspecto del viewport
         float ra = W3dAspectoJuego(); // declarado por la camara, o el del render (ver Camera.h)
         extern bool AnimEsJuego; extern bool PlayAnimation;
-        camFrameLetterbox = (CameraActive->AspectoDeclarado() > 0.01f) &&
+        // MODO JUEGO PURO "COVER" (VERDE+0 dos veces, g_juegoPuro == 2): el marco
+        // ES el viewport (ra = va -> NX = NY = 1): sin bandas, el frustum llena la
+        // pantalla (vertical u horizontal) y el culling publicado es EXACTAMENTE lo
+        // que se ve -- nada se esfuma en los bordes. La UI del juego se encaja al
+        // marco, asi que se adapta sola al viewport y los contadores quedan visibles.
+        if (g_juegoPuro == 2) ra = va;
+        camFrameLetterbox = (CameraActive->AspectoDeclarado() > 0.01f) && g_juegoPuro != 2 &&
                             AnimEsJuego && (PlayAnimation || JuegoSimActiva());
-        const float margin = camFrameLetterbox ? 1.0f : 0.92f; // jugando encuadrado: sin aire
+        const float margin = (camFrameLetterbox || g_juegoPuro == 2) ? 1.0f : 0.92f; // jugando encuadrado: sin aire
         // LA cuenta del encuadre vive en main/render/EscenaRender.cpp: el runtime del
         // juego compilado llama a la MISMA, asi el .deb/APK encuadra igual que el Play.
         W3dEncuadreMarco(va, ra, margin, &camNX, &camNY);
@@ -1158,7 +1211,8 @@ void Viewport3D::Render() {
     vst.ortoSize      = orbitDistance * tanf(projFov * 0.5f * 3.14159265f / 180.0f);
     if (vst.ortoSize < 0.001f) vst.ortoSize = 0.001f;
     vst.aspectoVista  = (aspect > 1e-4f) ? aspect : 1.0f;
-    vst.aspectoImagen = camFrame ? W3dAspectoJuego() : vst.aspectoVista;
+    // en COVER (juego puro 2) la imagen es la del VIEWPORT: sin encuadre declarado
+    vst.aspectoImagen = (camFrame && g_juegoPuro != 2) ? W3dAspectoJuego() : vst.aspectoVista;
     vst.marcoNX       = camNX;
     vst.marcoNY       = camNY;
     if (camFrame) { vst.zoom = camViewZoom; vst.panX = camViewPanX; vst.panY = camViewPanY; }
@@ -1241,8 +1295,8 @@ void Viewport3D::Render() {
 
     w3dEngine::Enable(w3dEngine::DepthTest);
 
-    // Dibujar overlays
-    if (showOverlays) {
+    // Dibujar overlays (en MODO JUEGO PURO ni la grilla/piso: cero editor)
+    if (showOverlays && !g_juegoPuro) {
             w3dEngine::Material(w3dEngine::MatDiffuse,  ListaColores[static_cast<int>(ColorID::negro)]);
             w3dEngine::Material(w3dEngine::MatAmbient,  ListaColores[static_cast<int>(ColorID::negro)]);
             w3dEngine::Material(w3dEngine::MatSpecular, ListaColores[static_cast<int>(ColorID::negro)]);
@@ -1284,12 +1338,17 @@ void Viewport3D::Render() {
     // SIN cortarlo por el modo juego: "Show Overlays" significa lo mismo jugando que editando (ver el
     // comentario de ReloadLights). Al dar Play, JuegoPrepararViewports(true) ya lo deja apagado; si el
     // usuario lo prende, ve las curvas, los empties, los huesos, los gizmos y los contornos.
-    const bool ovl = showOverlays;
+    // EXCEPCION: el MODO JUEGO PURO (VERDE+0) apaga TODO lo del editor a la fuerza.
+    const bool ovl = showOverlays && !g_juegoPuro;
     g_mostrarOverlays = ovl;
     w3dRenderOverlays = ovl; // el Core lo lee (Mesh::RenderObject); g_mostrarOverlays sigue siendo del editor
     // overlays por tipo (submenu "Objects"): del viewport -> globales que lee el traversal del Core (Empty/Camera/luz)
     g_showLights = showLights && ovl; g_showCamera = showCamera && ovl; g_showEmpty = showEmpty && ovl;
     g_showParticulas = showParticulas && ovl; g_showCurvas = showCurvas && ovl;
+    // LOCAL VIEW de ESTE viewport -> globals que lee Object::Render (mismo patron que g_mostrarOverlays). El set
+    // vive en el viewport; otro viewport sin local view lo deja en false/NULL al publicar SU estado.
+    { extern bool g_localViewActivo; extern const std::set<Object*>* g_localViewVisibles;
+      g_localViewActivo = localViewActivo; g_localViewVisibles = localViewActivo ? &localViewSet : 0; }
 
     // (los flags de dibujo del Core los dejo W3dEscena3DModo mas arriba, junto con la
     //  posicion de la luz: tienen que quedar puestos con la modelview en identidad.)
@@ -1339,6 +1398,9 @@ void Viewport3D::Render() {
       statDrawsFrame   =  w3dEngine::g_statDrawTris     - _stDraw0;
       statBindsFrame   =  w3dEngine::g_statTexBinds     - _stBind0;
       statEstadosFrame =  w3dEngine::g_statStateChanges - _stEst0;
+      // exponer caras/draws del viewport ACTIVO como globals planos (para el [PERF] del juego).
+      { extern int g_renderCaras, g_renderDraws;
+        if (Viewport3DActive == this) { g_renderCaras = statTrisFrame; g_renderDraws = statDrawsFrame; } }
       g_prof.scene += W3dNowMs() - _tScn0; } // profiler: escena (skinning + modelos)
 
     // huesos encima de todo (ignoran z-buffer). Es OVERLAY del editor: se apaga con "Show Overlays",
@@ -1643,7 +1705,7 @@ void Viewport3D::RenderCamPassepartout(){
     // compilado dibuja siempre- solo con el toggle 'letterboxNegro' prendido
     // (preview del dispositivo; lo usan las pruebas encuadrepx).
     W3dEscena3DBandas(W, H, camFrameNX, camFrameNY, camViewZoom, camViewPanX, camViewPanY,
-                      camFrameLetterbox && letterboxNegro);
+                      camFrameLetterbox && (letterboxNegro || g_juegoPuro));
     // el marco sigue el zoom/pan de INSPECCION (misma transform que la proyeccion). NDC->pixeles (y hacia abajo).
     float cx = (camViewPanX * 0.5f + 0.5f) * W;
     float cy = (0.5f - camViewPanY * 0.5f) * H;
@@ -1785,6 +1847,11 @@ bool Viewport3D::RenderAPNG(int outW, int outH, RenderType::Enum pass, const cha
             w3dEngine::Invalidate(); // (P1) resync una vez por pase, como en el viewport
             w3dLoteStamp++;          // (P4) sello del pase (lote estatico)
             SceneCollection->Render();
+            // PROXY de edicion de Curve (riel/path): vive FUERA del arbol de escena a proposito
+            // (no aparece en el outliner, no se guarda, no lo toca nada) y se dibuja explicito
+            // aca, solo mientras se edita. Ver CurveEntrarEdicion (LayoutInput.cpp).
+            { extern Object* W3dCurveProxyActivo();
+              Object* px = W3dCurveProxyActivo(); if (px) px->Render(); }
             // CALCOMANIAS SUELTAS (sombras): recien ahora, con toda la escena opaca ya
     // dibujada. Antes se dibujaban en su lugar del arbol y cualquier opaco
     // posterior (troncos, EscenarioAlpha) las borraba: no escriben z a proposito.
@@ -2191,6 +2258,10 @@ void Viewport3D::RenderUI() {
               hudX0 = dx0; hudY0 = dy0; hudW = dw; hudH = dh; hudEsc = esc; hudOverride = false;
               UI2D_DibujarOverlay(dx0, dy0, dw, dh, esc, g_hudCapturaPos, true);
           } }
+        // MODO JUEGO PURO (VERDE+0): el HUD del juego ya se dibujo; todo lo que
+        // sigue es CHROME del editor (barras, botones, toolbar, estadisticas).
+        // Un corte temprano = cero draws y cero texto del editor por frame.
+        if (g_juegoPuro) { w3dEngine::Invalidate(); return; }
         // el OVERLAY DEL JUEGO pudo dejar CUALQUIER estado 2D: una imagen/video
         // sin canal alpha APAGA Blend (UIOverlay::DibujarImagenRect), el texto
         // deja mezcla premultiplicada, un elemento con profundidad prende el
@@ -3153,6 +3224,7 @@ void Viewport3D::event_key_down(int tecla, bool repeticion){
                     JoinObjetos();
                 break;
             case W3dK_H:
+                UndoCapturarVisibilidad();   // Ctrl+Z: guarda el 'visible' PREVIO antes de togglear
                 ChangeVisibilityObj();
                 break;
             case W3dK_K:
@@ -3320,6 +3392,9 @@ void Viewport3D::event_key_down(int tecla, bool repeticion){
                 EnfocarObject();
                 break;
             }
+            case W3dK_SLASH:   // Local View: aisla la seleccion (frame + oculta el resto); re-tocar restaura todo
+                LocalViewToggle();
+                break;
             // si querés, agregá más teclas aquí
             case W3dK_ESCAPE:  // Esc
                 // grab de huesos en curso: lo cancela (restaura head/tail del snapshot)
@@ -3399,9 +3474,10 @@ void Viewport3D::event_key_up(int tecla){
     const int key = tecla;
     switch (key) {
         case W3dK_LSHIFT:
-            if (ShiftCount < 20){
-                changeSelect(SelectMode::NextSingle);
-            }
+            // (el TAP de Shift que ciclaba la seleccion era un idioma del TELEFONO -sin mouse,
+            //  la tecla cicla- que se filtro a PC: "aprieto shift y me cambia la seleccion, eso
+            //  no va" -el dueno-. En PC/Android/WebGL Shift es SOLO modificador; el ciclado del
+            //  N95 vive en su propio handler de Symbian.)
             ShiftCount = 0;      // el gesto termino: el proximo arranca limpio (el outliner
                                  // ya lo hacia, Outliner.cpp; aca faltaba y el estado quedaba
                                  // sucio entre gestos)

@@ -46,6 +46,13 @@ extern GLfloat MaterialPreviewPosition[4];
 // ni overlay de edit -verts/bordes/caras-). El render del core (Mesh::Render) lo lee para no dibujar
 // el contorno/edit. El viewport lo setea = showOverlays por frame antes de renderizar la escena.
 extern bool g_mostrarOverlays;
+// MODO JUEGO PURO (N95 VERDE+0, LayoutJuegoPuroToggle): el 3D del juego a pantalla
+// completa y NADA del editor (menu, headers, overlays, gizmos, passepartout gris).
+// TRES estados que cicla la tecla: 0 = editor normal; 1 = juego con BANDAS
+// (letterbox del aspecto declarado, lo que ve el jugador del aparato);
+// 2 = COVER (el frustum llena el viewport, sin bandas ni culling de borde, y la
+// UI del juego se adapta al viewport). Lo leen w3dlayout y ViewPort3D.
+extern int g_juegoPuro;
 // overlay de normales (toggles + tamano de la linea). Solo en meshes seleccionadas.
 extern bool OverlayVertexNormal; // amarillo: promedio de caras por POSICION
 extern bool OverlayCustomNormal; // magenta: normal guardada por vertice
@@ -56,6 +63,8 @@ extern float OverlayNormalSize;  // largo de la linea (default 0.10)
 // se prende/apaga por separado. Los 6 flags (OverlayStatVertices/Faces/Modgen/Times/GL, OverlayFps) son AHORA
 // miembros PER-VIEWPORT de Viewport3D (ver ViewPort3D.h), NO globales -> stats independientes por viewport.
 extern float g_fpsActual;        // FPS actual (lo actualiza cada plataforma 1x/frame)
+extern int   g_renderCaras;      // caras dibujadas por el ultimo pase de escena del viewport activo ([PERF])
+extern int   g_renderDraws;      // draw calls idem
 extern long g_genMallaCount;     // DIAGNOSTICO: veces que se regenero la malla de un modificador (subsurf/screw).
                                  // Se muestra en Statistics; al ROTAR NO debe subir (la malla se cachea en genValido).
 extern bool g_objetosMovidos;    // lo prenden los transforms de OBJETO (mover/rotar/escalar/snap). El unico modificador

@@ -257,28 +257,64 @@ static w3dui::W3dTextAtlas* CargarBitmapJson(const std::string& ruta) {
         const std::string& t = itT->second->str;
         rutaPng = (t[0] == '/' || (t.size() > 1 && t[1] == ':')) ? t : dir + t;
     }
-    unsigned char* rgba = NULL; int w = 0, h = 0;
-    if (!gfx::DecodeImage(rutaPng.c_str(), &rgba, &w, &h) || !rgba || w < 1 || h < 1) {
+    // ATLAS UNICO: el json remapeado por build_atlas declara "atlas_unico": true
+    // y su "textura" es el atlas del juego (ya subido por el 3D). En este caso
+    // el campo "textura" del json GANA siempre (los glifos estan en coordenadas
+    // ABSOLUTAS del atlas: contra el png chico de fuenteBitmap saldrian fuera
+    // de rango y el texto desaparecia). Se usa el id compartido (Textura2DObtener
+    // puentea al cache 3D): ni decode, ni premultiplicar, ni copia en VRAM --
+    // y la mezcla pasa a alpha recto (el atlas no va premultiplicado).
+    bool atlasUnico = JBool(root, "atlas_unico", false);
+    unsigned texCompartida = 0; int w = 0, h = 0;
+    if (atlasUnico) {
+        if (itT != root->obj.end() && itT->second->tipo == 2 && !itT->second->str.empty()) {
+            size_t b2 = rutaJson.find_last_of("/\\");
+            std::string dir2 = (b2 == std::string::npos) ? "" : rutaJson.substr(0, b2 + 1);
+            const std::string& t2 = itT->second->str;
+            rutaPng = (t2[0] == '/' || (t2.size() > 1 && t2[1] == ':')) ? t2 : dir2 + t2;
+            // colapsar "dir/../" ("texturas/ui/../atlas.png" -> "texturas/atlas.png"):
+            // el VFS del contenedor v4 no resuelve ".." y el puente compara por sufijo
+            for (size_t i = 0; i < rutaPng.size(); i++)
+                if (rutaPng[i] == '\\') rutaPng[i] = '/';
+            size_t pp;
+            while ((pp = rutaPng.find("/../")) != std::string::npos) {
+                size_t s2 = rutaPng.rfind('/', pp ? pp - 1 : 0);
+                if (s2 == std::string::npos) break;
+                rutaPng.erase(s2, pp + 3 - s2);
+            }
+        }
+        extern unsigned Textura2DObtener(const std::string&, int*, int*);
+        texCompartida = Textura2DObtener(rutaPng, &w, &h);
+        if (!texCompartida || w < 1 || h < 1) {
+            w3dLogfW("Fuente2D: %s declara atlas_unico pero el atlas no se pudo "
+                     "obtener: el texto va a salir sin glifos", rutaPng.c_str());
+            delete root; return NULL;
+        }
+    }
+    unsigned char* rgba = NULL;
+    if (!atlasUnico &&
+        (!gfx::DecodeImage(rutaPng.c_str(), &rgba, &w, &h) || !rgba || w < 1 || h < 1)) {
         w3dLogfE("Fuente2D: no pude leer %s", rutaPng.c_str());
         delete root; return NULL;
     }
     // GUARDIA "RGB sin alpha": DecodeImage fuerza 4 canales, asi que un PNG que no
     // trae canal alpha llega con a=255 en TODOS los pixels -> el fondo del glifo
     // saldria OPACO (caja del color del fondo) y nadie diria por que. Se avisa.
-    {
+    if (rgba) {
         bool todoOpaco = true;
         for (int i = 0; i < w * h && todoOpaco; i++) todoOpaco = (rgba[i*4+3] == 255);
         if (todoOpaco)
             w3dLogfW("Fuente2D: %s no trae canal alpha (o esta todo opaco): el fondo de los glifos va a salir OPACO", rutaPng.c_str());
     }
-    for (int i = 0; i < w * h; i++) {   // premultiplicar (el atlas mezcla premultiplicado)
+    if (rgba) for (int i = 0; i < w * h; i++) {   // premultiplicar (el atlas mezcla premultiplicado)
         unsigned char a = rgba[i*4+3];
         rgba[i*4+0] = (unsigned char)(rgba[i*4+0] * a / 255);
         rgba[i*4+1] = (unsigned char)(rgba[i*4+1] * a / 255);
         rgba[i*4+2] = (unsigned char)(rgba[i*4+2] * a / 255);
     }
     // el atlas SIEMPRE se sube POT (ver SubirAtlasPOT): las UV se calculan contra
-    // el tamano ACOLCHADO (tw/th), no contra el del PNG.
+    // el tamano ACOLCHADO (tw/th), no contra el del PNG. Con el atlas unico el
+    // PNG ya ES POT (1024): tw/th quedan iguales y las UV absolutas del json valen.
     int tw = PotSiguiente(w), th = PotSiguiente(h);
     w3dui::W3dTextAtlas* at = new w3dui::W3dTextAtlas();
     at->atlasW = tw; at->atlasH = th;
@@ -332,9 +368,14 @@ static w3dui::W3dTextAtlas* CargarBitmapJson(const std::string& ruta) {
                      rutaJson.c_str(), faltan, (char)primera);
     }
     delete root;
-    if (at->glyphs.empty()) { gfx::FreeImage(rgba); delete at; return NULL; }
-    at->tex = SubirAtlasPOT(rgba, w, h, false, &tw, &th);   // NEAREST: pixel-perfect al escalar
-    gfx::FreeImage(rgba);
+    if (at->glyphs.empty()) { if (rgba) gfx::FreeImage(rgba); delete at; return NULL; }
+    if (atlasUnico) {
+        at->tex = texCompartida;               // el MISMO id del atlas del juego
+        at->mezcla = gfx::MezclaAlpha;         // RGBA recto (no premultiplicado)
+    } else {
+        at->tex = SubirAtlasPOT(rgba, w, h, false, &tw, &th);   // NEAREST: pixel-perfect al escalar
+    }
+    if (rgba) gfx::FreeImage(rgba);
     if (!at->tex) { delete at; return NULL; }
     gfx::BindTexture(at->tex); gfx::TexFilter(false); gfx::TexWrap(false);
     w3dLogf("Fuente2D: bitmap %s (%d glifos, linea %d px)",

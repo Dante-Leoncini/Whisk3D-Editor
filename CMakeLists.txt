@@ -67,6 +67,8 @@ list(APPEND SRC_FILES
     # fisica minima del Core (velocidad + rebotes AABB) que usan los scripts lua. Va SIEMPRE
     # junto a W3dScript.cpp: es el que registra sus binds (sin este .cpp el link falla).
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/physics/W3dFisica.cpp
+    # cuerpos rigidos del Core (cajas + impulsos + raycast + eventos a lua)
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/physics/W3dRigido.cpp
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/io/w3dFilesystem.cpp
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/gfx/w3dTexture.cpp
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/io/w3dCompress.cpp
@@ -99,6 +101,10 @@ list(APPEND SRC_FILES
     # todo es stub no-op, asi que agregarlos no cambia nada hasta habilitar el flag (abajo).
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/audio/W3dAudio.cpp
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/audio/W3dAudioSDL.cpp
+    # VOLUMEN maestro + volumen inicial por-proyecto (VolumenAplicarProyecto, lo llama import_w3d.cpp) y el
+    # dispatcher de musica (W3dMusicRefrescarVolumenes, que W3dVolumen usa). Sin W3D_ENABLE_MUSIC = stubs no-op.
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/audio/W3dVolumen.cpp
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/audio/W3dMusic.cpp
     # PORTAPAPELES del sistema (Core): backend SDL (en Symbian se usa W3dClipboardSymbian.cpp via .mmp)
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/base/W3dClipboardSDL.cpp
 )

@@ -445,6 +445,26 @@ public:
     W3D_UNDO_SIN_INDICES // sel/activo: (a) punteros a Object (el arbol de escena no se indexa)
 };
 
+// VISIBILIDAD de un objeto en el EDITOR (tecla 'h'): guarda el estado PREVIO de 'visible' y hace SWAP al
+// aplicar (el mismo Aplicar() sirve para deshacer Y rehacer). Mismo criterio de lifetime que SelectUndo
+// (puntero a Object; el arbol de escena no se indexa). Antes 'h' toggleaba sin registrar undo -> Ctrl+Z no lo
+// revertia (reporte del dueno). Espeja ChangeVisibilityObj (Objects.cpp): si queda oculto y es/contiene luz, la apaga.
+class VisibilityUndo : public UndoCmd {
+    Object* obj;
+    bool    visible;   // estado GUARDADO (para el swap)
+public:
+    VisibilityUndo(Object* o) : obj(o), visible(o ? o->visible : true) {}
+    void Aplicar() {
+        if (!obj) return;
+        bool cur = obj->visible;
+        obj->visible = visible;
+        visible = cur;                       // guarda lo vivo (para rehacer)
+        extern bool w3dRenderLuces;          // fwd-decl: evita el header pesado de gfx en el build de Symbian
+        if (!obj->visible && w3dRenderLuces) ApagarLucesHijas(obj);
+    }
+    W3D_UNDO_SIN_INDICES // obj: puntero a Object; visible: valor propio -> no indexa ninguna lista
+};
+
 // transform en OBJECT MODE: pos/rot/escala de los seleccionados al EMPEZAR
 // rotEuler va aparte del quaternion: el quaternion no distingue 0 de 360, asi que sin guardarlo el undo de un
 // giro de vuelta entera te devolvia la orientacion pero te comia las vueltas (y con ellas la animacion).
@@ -3040,6 +3060,12 @@ bool UndoHayAlgo() { return !g_undo.empty(); }
 bool UndoHayRedo() { return !g_redo.empty(); }
 
 void UndoCapturarModo()                       { Push(new ModeUndo(InteractionMode)); }
+// tecla 'h': captura el 'visible' PREVIO ANTES de togglearlo. MISMO gate que ChangeVisibilityObj (Objects.cpp):
+// si el Core no va a togglear nada, no ensuciamos el stack con un paso no-op.
+void UndoCapturarVisibilidad() {
+    if (InteractionMode == ObjectMode && estado == editNavegacion && SceneCollection && ObjActivo)
+        Push(new VisibilityUndo(ObjActivo));
+}
 void UndoCapturarRename(const W3dRenameDest& destino) { if (W3dDestResolver(destino)) Push(new RenameUndo(destino)); }
 // N nombres en UN SOLO paso de undo: un rename que arrastra su contraparte por
 // nombre (vertex group <-> hueso, UV group <-> hueso 2D, refs de scripts, riel de

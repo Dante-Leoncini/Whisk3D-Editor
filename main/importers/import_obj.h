@@ -78,6 +78,7 @@ bool LeerOBJ(const std::vector<const char*>& lines, // punteros a un buffer del 
 
 // Función para leer archivos MTL y cargar materiales
 bool LeerMTL(const std::string& filepath, int objetosCargados);
+void W3dTrimNombre(std::string& s);   // saca \r/\n/espacios del final de un nombre (CRLF de Windows en usemtl/newmtl)
 
 // Función principal para importar un OBJ
 bool ImportOBJ(const std::string& filepath, bool NoMerge);

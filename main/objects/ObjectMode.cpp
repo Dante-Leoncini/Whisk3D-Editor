@@ -65,12 +65,59 @@ static Vector3 EjeMundo(int a){
 	if (a == Y) return Vector3(0, 0, 1);
 	return Vector3(0, 1, 0); // Z = arriba
 }
+// ---------------------------------------------------------------------------
+//  EMPARENTADO: los deltas del transform interactivo se calculan en MUNDO
+//  (plano de camara, ejes globales), pero pos/rot del objeto viven en el
+//  espacio de SU PADRE. Con un padre rotado, sumar el delta de mundo directo a
+//  obj.pos aplicaba el movimiento en ejes equivocados (reporte: "aprieto g,
+//  muevo el mouse a la izquierda y se mueve a la derecha"). Estos helpers
+//  hacen la conversion una sola vez y en un solo lugar; con el padre sin rotar
+//  ni escalar son la identidad y todo queda como siempre.
+// ---------------------------------------------------------------------------
+
+// rotacion global del PADRE (identidad si cuelga de la raiz)
+static Quaternion RotPadreDe(Object& o){
+	return o.Parent ? RotGlobalDe(o.Parent) : Quaternion();
+}
+
+// delta de POSICION en MUNDO -> espacio del padre de 'o'. La misma matematica
+// que ReparentKeepTransform/PonerEnGlobal: inversa de la rotacion global del
+// padre + division por su escala global, componente a componente.
+static Vector3 DeltaMundoAPadre(Object& o, const Vector3& d){
+	if (!o.Parent) return d;
+	Quaternion pr = RotGlobalDe(o.Parent);
+	Vector3 ps = ScaleGlobalDe(o.Parent);
+	Vector3 l = pr.Inverted() * d;
+	return Vector3(ps.x != 0.0f ? l.x / ps.x : l.x,
+	               ps.y != 0.0f ? l.y / ps.y : l.y,
+	               ps.z != 0.0f ? l.z / ps.z : l.z);
+}
+
+// aplica una rotacion DE MUNDO sobre una rotacion LOCAL base: conjugar por el
+// padre (local' = P^-1 * R * P * base). PUBLICA (ObjectMode.h): el trackball
+// de la vista (ViewPort3D::RotarDesdeVista) y el snap de rotacion rotan desde
+// el SNAPSHOT y necesitan la misma cuenta con otra base.
+Quaternion W3dRotarMundoSobre(Object& o, const Quaternion& Rmundo, const Quaternion& localBase){
+	Quaternion p = RotPadreDe(o);
+	Quaternion q = p.Inverted() * Rmundo * p * localBase;
+	q.normalize();
+	return q;
+}
+
+// idem, incremental sobre la rotacion ACTUAL del objeto
+static Quaternion RotarEnMundo(Object& o, const Quaternion& Rmundo){
+	return W3dRotarMundoSobre(o, Rmundo, o.Rot());
+}
+
 // el eje constrenido EN WORLD segun la orientacion actual. La ESCALA es un caso
 // especial: siempre local (no existe escala global/desde-la-vista), sin importar
 // la orientacion elegida en el menu.
 Vector3 EjeOrientado(Object& obj, int a){
 	if (estado == EditScale || transformOrientation == LocalOrient){
-		Vector3 v = obj.Rot() * EjeMundo(a);
+		// GLOBAL del objeto, no obj.Rot() pelado: el eje "local" de un objeto
+		// emparentado incluye la rotacion de sus padres (si no, la guia y el
+		// movimiento no coinciden con lo que se ve)
+		Vector3 v = RotGlobalDe(&obj) * EjeMundo(a);
 		return v.Normalized();
 	}
 	if (transformOrientation == ViewOrient){
@@ -855,13 +902,17 @@ Object* W3dDuplicarUno(Object* src) {
         nuevo = d;
     }
     else if (src->getType() == ObjectType::culling) {
+        Culling* s = (Culling*)src;
         Culling* d = new Culling(src->Parent, src->pos);
-        // TODOS los campos: 'activo' (el checkbox nuevo) y distanciaMax se olvidaban
-        // -> la copia recortaba distinto que el original.
-        d->activo           = ((Culling*)src)->activo;
-        d->soloCamaraActiva = ((Culling*)src)->soloCamaraActiva;
-        d->distanciaMax     = ((Culling*)src)->distanciaMax;
-        nuevo = d;
+        // TODOS los campos (incluido metodo + los de grilla): sin esto la copia recortaba distinto.
+        d->metodo           = s->metodo;
+        d->activo           = s->activo;
+        d->soloCamaraActiva = s->soloCamaraActiva;
+        d->distanciaMax     = s->distanciaMax;
+        d->ordenAlpha       = s->ordenAlpha;
+        d->cellSize         = s->cellSize;
+        d->modo3D           = s->modo3D;
+        nuevo = d;   // la grilla (metodo Grid) se rearma sola al primer render (gridSucia = true en el ctor)
     }
     else if (src->getType() == ObjectType::particulas) {
         Particulas* sp = (Particulas*)src;
@@ -869,8 +920,7 @@ Object* W3dDuplicarUno(Object* src) {
         d->textura = sp->textura;       d->cantidad = sp->cantidad;
         d->vida = sp->vida;             d->tam = sp->tam;
         d->vel = sp->vel;               d->dispersion = sp->dispersion;
-        d->gravedad = sp->gravedad;     d->aditivo = sp->aditivo;
-        d->sustractivo = sp->sustractivo;
+        d->gravedad = sp->gravedad;     d->mezcla = sp->mezcla;
         for (int i = 0; i < 4; i++) d->color[i] = sp->color[i];
         d->desvanecer = sp->desvanecer; d->activo = sp->activo;
         d->variacion = sp->variacion;   d->turbulencia = sp->turbulencia;
@@ -1606,13 +1656,14 @@ void SetRotacion(int dx, int dy){
 
 	for (size_t o = 0; o < estadoObjetos.size(); o++) {
 		Object& obj = *estadoObjetos[o].obj;
-		// rotar alrededor del eje constrenido EN WORLD (la identidad de
-		// conjugacion hace que pre-multiplicar funcione para global/local/view:
-		// local = el propio eje rotado por obj.rot).
+		// rotar alrededor del eje constrenido EN WORLD. El pre-multiply pelado
+		// solo vale con padre identidad: para un hijo de un padre rotado hay
+		// que conjugar por el padre (RotarEnMundo), o el eje visible y el eje
+		// aplicado no coinciden.
 		Vector3 axis;
 		if (axisSelect == ViewAxis || axisSelect == XYZ) axis = camForward; // libre = eje de vista
 		else axis = EjeOrientado(obj, axisSelect);
-		obj.SetRot(Quaternion::FromAxisAngle(axis, ang) * obj.Rot());
+		obj.SetRot(RotarEnMundo(obj, Quaternion::FromAxisAngle(axis, ang)));
 	}
 	AplicarPivotATransform(); // gira las posiciones alrededor del pivote
 	SnapAjustarObjRot(); // imanta: el activo apunta al target (si snap ON)
@@ -1631,7 +1682,7 @@ void RotarOrbital(int dx, int dy){
 	             * Quaternion::FromAxisAngle(camRight, pitch);
 	for (size_t o = 0; o < estadoObjetos.size(); o++) {
 		Object& obj = *estadoObjetos[o].obj;
-		obj.SetRot(q * obj.Rot()); // pre-multiplica: gira en los ejes de la vista
+		obj.SetRot(RotarEnMundo(obj, q)); // gira en los ejes de la vista (conjugado por el padre)
 	}
 	AplicarPivotATransform(); // gira las posiciones alrededor del pivote
 	{ extern bool g_objetosMovidos; g_objetosMovidos = true; } // Mirror con target depende de la rotacion/posicion
@@ -1726,12 +1777,16 @@ void SetTransformNumerico(float v){
 		SaveState& st = estadoObjetos[o];
 		Object& obj = *st.obj;
 		if (estado == translacion){
-			obj.pos = st.pos + EjesActivosObj(obj) * v;
+			// EjesActivosObj es MUNDO; pos vive en el espacio del padre
+			obj.pos = st.pos + DeltaMundoAPadre(obj, EjesActivosObj(obj) * v);
 		} else if (estado == rotacion){
 			Vector3 ax;
 			if (axisSelect==ViewAxis||axisSelect==XYZ||axisSelect==OrbitalAxis) ax = camForward;
 			else ax = EjeOrientado(obj, axisSelect);
-			Quaternion q = Quaternion::FromAxisAngle(ax, v) * st.rot;
+			// rotacion DE MUNDO sobre el snapshot: conjugada por el padre
+			// (con padre identidad es el pre-multiply de siempre)
+			Quaternion pq = RotPadreDe(obj);
+			Quaternion q = pq.Inverted() * Quaternion::FromAxisAngle(ax, v) * pq * st.rot;
 			q.normalize();
 			// El euler NO se puede re-derivar acá: este camino aplica el angulo de UNA sola vez desde el snapshot
 			// (tipeaste "360"), y conservar vueltas eligiendo "la forma mas parecida a la anterior" solo funciona
@@ -1739,8 +1794,11 @@ void SetTransformNumerico(float v){
 			// El angulo pedido (v) ES el dato: se le suma al euler del snapshot sobre el eje en el que se roto.
 			// Con un eje X/Y/Z global el euler es exactamente el del snapshot + v en ese componente; en cualquier
 			// otro eje (vista, local, plano) el euler no se descompone asi -> ahi se re-deriva como siempre.
+			// ...y solo si el PADRE no esta rotado: con padre rotado el euler
+			// local no se descompone eje a eje (el conjugado de arriba manda)
 			bool ejeSimple = (transformOrientation == GlobalOrient &&
-			                  (axisSelect == X || axisSelect == Y || axisSelect == Z));
+			                  (axisSelect == X || axisSelect == Y || axisSelect == Z) &&
+			                  fabsf(pq.w) > 0.999999f);
 			if (ejeSimple){
 				Vector3 e = st.rotEuler;
 				// EjeMundo: user X->x, Y->z (profundidad), Z->y (arriba)
@@ -1774,20 +1832,23 @@ void SetTranslacionObjetos(int dx, int dy, float speed){
 	for (size_t o = 0; o < estadoObjetos.size(); o++) {
 		Object& obj = *estadoObjetos[o].obj;
 		Vector3 libre = camRight * (dx * speed) + camUp * (-dy * speed); // plano camara
+		// el delta se ARMA en mundo y se APLICA en el espacio del padre
+		// (DeltaMundoAPadre): sin eso, mover un hijo de un padre rotado iba
+		// para cualquier lado (hasta al reves del mouse)
 		if (axisSelect == X || axisSelect == Y || axisSelect == Z) {
 			// un eje: proyectar el movimiento de PANTALLA sobre la direccion en
 			// que se ve el eje (relativo a la vista). Asi arrastrar "hacia donde
 			// apunta el eje en pantalla" mueve en +eje (no se invierte).
 			Vector3 axis = EjeOrientado(obj, axisSelect);
 			float amount = (dx * axis.Dot(camRight) - dy * axis.Dot(camUp)) * speed;
-			obj.pos += axis * amount;
+			obj.pos += DeltaMundoAPadre(obj, axis * amount);
 		} else if (axisSelect == PlaneX || axisSelect == PlaneY || axisSelect == PlaneZ) {
 			// plano: movimiento libre MENOS la componente del eje excluido
 			int ex = (axisSelect == PlaneX) ? X : (axisSelect == PlaneY) ? Y : Z;
 			Vector3 axis = EjeOrientado(obj, ex);
-			obj.pos += libre - axis * libre.Dot(axis);
+			obj.pos += DeltaMundoAPadre(obj, libre - axis * libre.Dot(axis));
 		} else {
-			obj.pos += libre; // libre (3 ejes)
+			obj.pos += DeltaMundoAPadre(obj, libre); // libre (3 ejes)
 		}
 	}
 	SnapAjustarObjMove(); // imanta la base de la seleccion al target (si snap ON)
@@ -1832,8 +1893,11 @@ void AplicarPivotATransform(){
         Vector3 off = st.worldPos - pivot; // offset inicial respecto al pivote
         Vector3 nw;
         if (estado == rotacion){
-            // rotacion acumulada desde el inicio (en mundo p/ objetos top-level)
-            Quaternion delta = obj.Rot() * st.rot.Inverted();
+            // rotacion acumulada desde el inicio, EN MUNDO: el delta local se
+            // conjuga por el padre (antes solo era mundo para objetos top-level
+            // y la orbita alrededor del pivote salia torcida en los emparentados)
+            Quaternion pq = RotPadreDe(obj);
+            Quaternion delta = pq * (obj.Rot() * st.rot.Inverted()) * pq.Inverted();
             nw = pivot + delta * off;
         } else { // EditScale: la distancia al pivote escala con el factor (por eje)
             float fx = st.scale.x != 0.0f ? obj.scale.x / st.scale.x : 1.0f;
@@ -1933,7 +1997,8 @@ void SnapAjustarObjRot(){
     Vector3 cross(vN.y*vT.z-vN.z*vT.y, vN.z*vT.x-vN.x*vT.z, vN.x*vT.y-vN.y*vT.x);
     float angDeg = atan2f(cross.Dot(axis), cosA)*180.0f/3.14159265f; // absoluto -> obj.rot desde el snapshot
     for (size_t o=0;o<estadoObjetos.size();o++){ SaveState& st=estadoObjetos[o]; Object& ob=*st.obj;
-        ob.SetRot(Quaternion::FromAxisAngle(axis, angDeg) * st.rot); }
+        // rotacion DE MUNDO sobre el snapshot: conjugada por el padre (emparentados)
+        ob.SetRot(W3dRotarMundoSobre(ob, Quaternion::FromAxisAngle(axis, angDeg), st.rot)); }
     AplicarPivotATransform();
     gAnguloTransform = angDeg;
     g_snapHit=true; g_snapSx=sx; g_snapSy=sy;

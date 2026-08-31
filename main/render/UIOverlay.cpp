@@ -104,6 +104,31 @@ bool UI2D_EsElemento2D(Object* o) {
 // cast comodo: valido despues de chequear UI2D_EsElemento2D (comparten la base Elemento2D)
 static Elemento2D* E2(Object* o) { return (Elemento2D*)o; }
 
+// PRECARGA de las imagenes 2D del juego: la wumpa-tira del contador (y todo
+// icono de HUD que arranca oculto) se decodificaba en el PRIMER pickup, en
+// pleno gameplay -- un tiron visible en el N95. Al abrir el proyecto se tocan
+// todas las rutas: el costo va a la CARGA, no al juego.
+void UI2D_PrecargarTexturas(Object* raiz) {
+    if (!raiz) return;
+    std::vector<Object*> st; st.push_back(raiz);
+    while (!st.empty()) {
+        Object* o = st.back(); st.pop_back();
+        ObjectType t = o->getType();
+        if (t == ObjectType::imagen2d) {
+            Imagen2D* im = (Imagen2D*)o;
+            if (!im->textura.empty()) Textura2DObtener(im->textura);
+        } else if (t == ObjectType::slice9) {
+            Slice9* s9 = (Slice9*)o;
+            if (!s9->textura.empty()) Textura2DObtener(s9->textura);
+        } else if (t == ObjectType::boton2d) {
+            Boton2D* b = (Boton2D*)o;
+            if (!b->icono.empty()) Textura2DObtener(b->icono);
+            if (!b->texturaFondo.empty()) Textura2DObtener(b->texturaFondo);
+        }
+        for (size_t i = 0; i < o->Childrens.size(); i++) st.push_back(o->Childrens[i]);
+    }
+}
+
 float* UI2D_Rot2dDe(Object* o) {
     return UI2D_EsElemento2D(o) ? &E2(o)->rot2d : NULL;
 }
@@ -349,26 +374,46 @@ static void QuadUV(float x0, float y0, float x1, float y1,
     gfx::DrawTrianglesArray(6);
 }
 
+// como QuadUV pero remapea los UV 0..1 a un SUB-RECT del atlas (celda de un flipbook):
+// u' = uOff + u*uSc, v' = vOff + v*vSc. Con (0,0,1,1) es identico a QuadUV.
+static void QuadUVCelda(float x0, float y0, float x1, float y1,
+                        float u0, float v0, float u1, float v1,
+                        float uOff, float vOff, float uSc, float vSc) {
+    QuadUV(x0, y0, x1, y1,
+           uOff + u0 * uSc, vOff + v0 * vSc,
+           uOff + u1 * uSc, vOff + v1 * vSc);
+}
+
 // una TEXTURA dentro de un rect segun el modo (el nucleo que comparten imagen y video):
-// 0 = estirar, 1 = ajustar (entera, con bandas), 2 = cover (llena recortando)
+// 0 = estirar, 1 = ajustar (entera, con bandas), 2 = cover (llena recortando).
+// (uOff,vOff,uSc,vSc) selecciona una CELDA del atlas (default = textura entera): el modo
+// se resuelve DENTRO de la celda (iw/ih ya vienen en pixeles de celda para el aspecto).
 static void DibujarTexturaModo(unsigned tex, int iw, int ih, int modo,
-                               float x0, float y0, float x1, float y1) {
+                               float x0, float y0, float x1, float y1,
+                               float uOff = 0.0f, float vOff = 0.0f,
+                               float uSc = 1.0f, float vSc = 1.0f) {
     float rw = x1 - x0, rh = y1 - y0;
     if (rw < 1e-6f || rh < 1e-6f) return;
     if (modo == 1) {
         float e = rw / iw; if (rh / ih < e) e = rh / ih;
         float w = iw * e, h = ih * e;
         float cx = (x0 + x1) * 0.5f, cy = (y0 + y1) * 0.5f;
-        QuadUV(cx - w * 0.5f, cy - h * 0.5f, cx + w * 0.5f, cy + h * 0.5f, 0, 0, 1, 1);
+        QuadUVCelda(cx - w * 0.5f, cy - h * 0.5f, cx + w * 0.5f, cy + h * 0.5f,
+                    0, 0, 1, 1, uOff, vOff, uSc, vSc);
     } else if (modo == 2) {
         float e = rw / iw; if (rh / ih > e) e = rh / ih;
         float du = (rw / e) / iw * 0.5f;   // mitad del ancho visible, en UV
         float dv = (rh / e) / ih * 0.5f;
-        QuadUV(x0, y0, x1, y1, 0.5f - du, 0.5f - dv, 0.5f + du, 0.5f + dv);
+        QuadUVCelda(x0, y0, x1, y1, 0.5f - du, 0.5f - dv, 0.5f + du, 0.5f + dv,
+                    uOff, vOff, uSc, vSc);
     } else {
-        QuadUV(x0, y0, x1, y1, 0, 0, 1, 1);
+        QuadUVCelda(x0, y0, x1, y1, 0, 0, 1, 1, uOff, vOff, uSc, vSc);
     }
 }
+
+// (El flipbook 2D ya NO tiene subsistema propio aca: usa el Flipbook UNIFICADO del Core
+//  -- Imagen2D::flipPlay se registra solo en el registro global de Flipbook.cpp y lo tickea
+//  UpdateFlipbooks. El render lee flipPlay.uvActual. Ver Flipbook.h.)
 
 // dibuja la textura de una Imagen2D dentro del rect (x0,y0)-(x1,y1) segun su modo.
 // Sin textura: un gris translucido para que el rect se vea igual.
@@ -386,7 +431,27 @@ static void DibujarImagenRect(Imagen2D* im, float x0, float y0, float x1, float 
     if (!im->usarAlpha) gfx::Disable(gfx::Blend);   // sin canal alpha: se dibuja opaca
     const float* c = ColorResuelto(im, im->palTinte, im->color);   // TINTE (propio o de paleta)
     gfx::Color4f(c[0], c[1], c[2], c[3] * op);
-    DibujarTexturaModo(tex, iw, ih, im->modo, x0, y0, x1, y1);
+    // FLIPBOOK: si anima, dibujar la VENTANA UV actual (el motor la avanzo en flipPlay.uvActual).
+    // Se toma la ventana rectangular de las esquinas 0 (u0,v0) y 2 (u1,v1): cubre el flipbook por
+    // celdas y el scroll/zoom eje-alineado; el skew/rotacion (esquinas 1 y 3) es un caso futuro.
+    // IMAGEN FIJA: manda su uvRect (default 0,0,1,1 = entera; atlas unico = su recorte).
+    float uOff = im->uvRect[0], vOff = im->uvRect[1];
+    float uSc = im->uvRect[2] - im->uvRect[0], vSc = im->uvRect[3] - im->uvRect[1];
+    if (uSc <= 0.0f) { uOff = 0.0f; uSc = 1.0f; }
+    if (vSc <= 0.0f) { vOff = 0.0f; vSc = 1.0f; }
+    int cw = (int)(iw * uSc + 0.5f); if (cw < 1) cw = 1;   // px del recorte (aspecto de modo 1/2)
+    int ch = (int)(ih * vSc + 0.5f); if (ch < 1) ch = 1;
+    if (im->EsFlipbook()) {
+        const float* uvp = im->flipPlay.uvActual;   // (0,0)(1,0)(1,1)(0,1)
+        uOff = uvp[0]; vOff = uvp[1];
+        uSc = uvp[4] - uvp[0];   // ancho de la ventana (esq2.u - esq0.u)
+        vSc = uvp[5] - uvp[1];   // alto  de la ventana (esq2.v - esq0.v)
+        if (uSc <= 0.0f) uSc = 1.0f;
+        if (vSc <= 0.0f) vSc = 1.0f;
+        cw = (int)(iw * uSc + 0.5f); if (cw < 1) cw = 1;   // px de la celda (aspecto de modo 1/2)
+        ch = (int)(ih * vSc + 0.5f); if (ch < 1) ch = 1;
+    }
+    DibujarTexturaModo(tex, cw, ch, im->modo, x0, y0, x1, y1, uOff, vOff, uSc, vSc);
 }
 
 // el FRAME actual del video dentro del rect. Con 'reproducir' avanza solo (y pide

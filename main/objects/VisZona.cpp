@@ -97,8 +97,13 @@ void VisZona::Tick() {
         if (fueraDeRiel) { fueraDeRiel = false; Aplicar(objetivo); return; }
         if (celdaActual <= 0) { Aplicar(objetivo); return; }
         int d = objetivo - celdaActual;
+        // FPS BAJO (N95: 4-8 fps): la camara avanza MUCHAS celdas por tick. El stepper de +-1 del original
+        // (pensado para 60 fps) quedaba ATRAS -> se aplicaba un sector PASADO -> AGUJEROS y partes oscuras en
+        // el mapa (en PC a 60 fps no se nota: d~=0/+-1). Si la camara se movio MAS de 1 celda desde el ultimo
+        // tick, saltar DIRECTO al objetivo (el re-decode desde la celda-clave es barato: no cuesta mas rebinds
+        // de IBO que el paso). El paso incremental de +-1 queda solo para 60 fps (d==+-1).
         if (d == 0) return;
-        if (d > pasoMax || d < -pasoMax) { Aplicar(objetivo); return; }
+        if (d > 1 || d < -1) { Aplicar(objetivo); return; }   // (antes: > pasoMax; a fps bajo eso quedaba atras)
         Aplicar(celdaActual + (d > 0 ? 1 : -1));
         return;
     }

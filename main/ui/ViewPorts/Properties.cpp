@@ -18,6 +18,8 @@
 #include "io/Video2DCache.h"      // tamano real del video al elegirlo
 #include "io/Fuente2D.h"
 #include "io/Textura2D.h"      // tamano natural del archivo al elegir la textura
+#include "io/W3dNodos.h"       // modificador Oclusion: sincronizar el nodo elegido
+#include "objects/Curve.h"     // ramas del path (dropdown Ramas del modificador Oclusion)
 #include "io/UI2DFormato.h"    // guardar/cargar interfaces (.w3dui)
 #include "io/W3dContenedor.h"  // importar un asset = COPIARLO adentro del .w3d (ver el header)
 #include "objects/UI.h"
@@ -39,11 +41,13 @@
 #include "PopUp/ProgressPopup.h" // barra "Rendering..." durante el render (clave en N95)
 #include "ViewPorts/LayoutInput.h" // Notificar (toasts de exito/error)
 #include "objects/Camera.h"   // selector de target de la camara
+#include "objects/Mirror.h"   // pestania del Mirror (target + ejes + rect)
 #include "objects/Instance.h" // selector de target de instance/array/mirror
 #include "objects/LOD.h"      // tarjeta del objeto LOD (umbrales de distancia)
 #include "objects/Culling.h"  // tarjeta del objeto Culling (soloCamaraActiva)
 #include "objects/Collection.h" // tarjeta de la Collection (ordenarPorCamara/ordenarUnaVez)
 #include "objects/Particulas.h" // tarjeta del objeto Particulas (emisor: textura + cono)
+#include "physics/W3dRigido.h"  // tarjeta Fisica (cuerpo rigido): W3dRigidoDef + Olvidar
 #include "edit/Modifier.h"    // ModifierType (ids del menu Add del stack de modificadores)
 #include "objects/Armature.h" // pestania Animation: clips del esqueleto
 #include "animation/SkeletalAnimation.h" // CrearAnimacion/BorrarAnimacionActiva/MoverAnimacionActiva
@@ -635,51 +639,121 @@ static void SincronizarLodDist(Properties* p){
     }
 }
 
-// TEXTURA del objeto Particulas: campo de texto con la ruta del PNG, aplicado EN VIVO
-// (el decode fallido se cachea por ruta -> tipear a medias no reintenta por frame).
-// Mismo patron que SincronizarLodDist: sync de display al no tener foco.
-static std::string g_partTexUlt; // ultimo texto APLICADO (no re-aplicar el mismo por frame)
-static void SincronizarPartTextura(Properties* p){
-    if (!p || !p->propPartTextura) return;
-    Particulas* pt = (ObjActivo && ObjActivo->getType() == ObjectType::particulas)
-                   ? (Particulas*)ObjActivo : NULL;
-    PropText* f = p->propPartTextura;
-    bool foco = (g_textFieldActivo == &f->field);
-    if (foco && pt && f->field.text != g_partTexUlt){
-        pt->textura = f->field.text;   // vista previa EN VIVO en el viewport
-        g_partTexUlt = f->field.text;
+// TARGET del Mirror: el campo muestra el NOMBRE del objeto espejado y lo tipeado
+// se aplica EN VIVO (se resuelve por nombre contra la escena; un nombre a medio
+// tipear deja el target en NULL y el espejo simplemente no dibuja hasta acertar).
+// Mismo patron que SincronizarLodDist.
+static std::string g_mirrorTgtUlt;
+static void SincronizarMirrorTarget(Properties* p){
+    if (!p || !p->propMirrorTarget) return;
+    Mirror* m = (ObjActivo && ObjActivo->getType() == ObjectType::mirror) ? (Mirror*)ObjActivo : NULL;
+    PropText* pt = p->propMirrorTarget;
+    bool foco = (g_textFieldActivo == &pt->field);
+    if (foco && m && pt->field.text != g_mirrorTgtUlt){
+        std::string* nom = m->RefPropiaNombre(0);
+        if (nom) *nom = pt->field.text;
+        m->SetRefPropia(0, SceneCollection ? FindObjectByName(SceneCollection, pt->field.text) : NULL);
+        g_mirrorTgtUlt = pt->field.text;
         g_redraw = true;
     }
     if (!foco){
-        g_partTexUlt.clear();
-        if (pt && f->field.text != pt->textura){
-            f->field.SetText(pt->textura); // display fresco (cambio de objeto / undo)
-            g_redraw = true;
+        g_mirrorTgtUlt.clear();
+        if (m){
+            std::string* nom = m->RefPropiaNombre(0);
+            Object* tg = m->RefPropia(0);
+            std::string mostrar = tg ? tg->name : (nom ? *nom : std::string());
+            if (pt->field.text != mostrar){ pt->field.SetText(mostrar); g_redraw = true; }
         }
     }
 }
 
-// COLOR del objeto Particulas: "r, g, b, a" (parseo tolerante de SetColorTexto)
-static std::string g_partColUlt;
-static void SincronizarPartColor(Properties* p){
-    if (!p || !p->propPartColor) return;
-    Particulas* pt = (ObjActivo && ObjActivo->getType() == ObjectType::particulas)
-                   ? (Particulas*)ObjActivo : NULL;
-    PropText* f = p->propPartColor;
-    bool foco = (g_textFieldActivo == &f->field);
-    if (foco && pt && f->field.text != g_partColUlt){
-        pt->SetColorTexto(f->field.text);
-        g_partColUlt = f->field.text;
-        g_redraw = true;
-    }
-    if (!foco){
-        g_partColUlt.clear();
-        if (pt && f->field.text != pt->ColorTexto()){
-            f->field.SetText(pt->ColorTexto());
-            g_redraw = true;
-        }
-    }
+// ---- tarjeta FISICA (cuerpo rigido): acciones de sus botones ---------------
+// el boton de tipo CICLA (Dynamic -> Static -> Character): en el telefono un
+// dropdown de 3 opciones es mas lento que tres taps
+static void AccionFisTipoCiclar(){
+    if (!ObjActivo || !ObjActivo->fisica) return;
+    ObjActivo->fisica->tipo = (ObjActivo->fisica->tipo + 1) % 3;
+    g_redraw = true;
 }
+static void AccionFisQuitar(){
+    if (!ObjActivo || !ObjActivo->fisica) return;
+    W3dRigidosOlvidar(ObjActivo);
+    delete ObjActivo->fisica;
+    ObjActivo->fisica = NULL;
+    g_redraw = true;
+}
+
+// (definidas mas abajo en este archivo; el selector de particula las usa antes)
+static std::string NombreDeTextura(Texture* t);
+static std::string NombreDeArchivo(const std::string& ruta);
+static void AbrirMenuBajoBoton(PopupMenu* menu, Button* boton);
+static const char* NombreMezcla(int m);   // nombre del modo de mezcla (reusa el del material, definido mas abajo)
+
+// TEXTURA del objeto Particulas: dropdown de texturas ya cargadas + "Load Texture" (file browser), IGUAL que
+// el material/Imagen2D. La particula guarda su textura como std::string (ruta) y la resuelve en render con
+// Textura2DObtener, asi que -como Imagen2D- el dropdown escribe la RUTA (no un Texture*): save/load/render/lua
+// no se tocan. Patron: menu lazy con action registrado una vez; Limpiar()+repoblar Textures[5..] al abrir.
+static PopupMenu* MenuPartTextura = NULL;
+static Particulas* PartActiva(){
+    return (ObjActivo && ObjActivo->getType() == ObjectType::particulas) ? (Particulas*)ObjActivo : NULL;
+}
+// callback del file browser: importa (copia al .w3d) y aplica la ruta a la particula
+static void PartTexturaElegida(const std::string& rutaElegida){
+    Particulas* pt = PartActiva(); if (!pt) return;
+    const std::string ruta = W3dImportarAsset(rutaElegida);   // COPIA adentro del proyecto
+    pt->textura = ruta;
+    TexturaTomar(ruta);   // la registra en Textures[] para que aparezca en el dropdown la proxima vez
+    if (PropsActivo && PropsActivo->propPartTextura)
+        PropsActivo->propPartTextura->button->text = NombreDeArchivo(ruta);
+    g_redraw = true;
+}
+// 0 = No Texture; 1 = Load Texture (browser); 2+ = Textures[5 + id - 2] (las 5 primeras son de la UI)
+static void AccionPartTexturaElegida(int id){
+    Particulas* pt = PartActiva(); if (!pt) return;
+    if (id == 0) { pt->textura = ""; }
+    else if (id == 1) {
+        AbrirFileBrowser(T("Load Texture"), T("Open"), ".png .jpg .jpeg .bmp .tga .gif", PartTexturaElegida);
+        return;
+    } else if (5 + id - 2 < (int)Textures.size()) {
+        pt->textura = Textures[5 + id - 2]->path;   // guarda la RUTA (no el Texture*)
+    }
+    if (PropsActivo && PropsActivo->propPartTextura)
+        PropsActivo->propPartTextura->button->text = NombreDeArchivo(pt->textura);
+    g_redraw = true;
+}
+static void AccionMenuPartTextura(){
+    if (!PropsActivo || !PartActiva()) return;
+    if (!MenuPartTextura) { MenuPartTextura = new PopupMenu(); MenuPartTextura->action = AccionPartTexturaElegida; }
+    MenuPartTextura->Limpiar();
+    MenuPartTextura->Agregar(T("No Texture"), 0, IconType::notifError);
+    MenuPartTextura->Agregar(T("Load Texture"), 1, IconType::archive);
+    for (size_t i = 5; i < Textures.size(); i++)
+        MenuPartTextura->Agregar(NombreDeTextura(Textures[i]), 2 + (int)(i - 5), IconType::textura);
+    AbrirMenuBajoBoton(MenuPartTextura, PropsActivo->propPartTextura->button);
+}
+
+// MEZCLA del objeto Particulas: dropdown con TODOS los modos del motor (w3dEngine::Mezcla), mismo patron que
+// el "Blend Mode" del material. Reemplaza a los dos checkbox aditivo/sustractivo.
+static PopupMenu* MenuPartMezcla = NULL;
+static void AccionPartMezclaElegida(int id){
+    Particulas* pt = PartActiva(); if (!pt) return;
+    if (id < 0 || id >= (int)w3dEngine::MezclaCount_) return;
+    pt->mezcla = id;
+    if (PropsActivo && PropsActivo->propPartMezcla)
+        PropsActivo->propPartMezcla->button->text = NombreMezcla(id);
+    g_redraw = true;
+}
+static void AccionMenuPartMezcla(){
+    if (!PropsActivo || !PartActiva()) return;
+    if (!MenuPartMezcla){ MenuPartMezcla = new PopupMenu(); MenuPartMezcla->action = AccionPartMezclaElegida; }
+    MenuPartMezcla->Limpiar();
+    for (int i = 0; i < (int)w3dEngine::MezclaCount_; i++)
+        MenuPartMezcla->Agregar(NombreMezcla(i), i, IconType::material);
+    AbrirMenuBajoBoton(MenuPartMezcla, PropsActivo->propPartMezcla->button);
+}
+
+// (el COLOR del objeto Particulas ya no es campo de texto: es un PropColor -> ColorPicker de Whisk3D, bindeado
+//  directo a Particulas::color[4] como el material. Ver el bind en el bloque PARTICULAS de Rebind.)
 
 // nombre corto de una textura (el archivo, sin la ruta)
 static std::string NombreDeTextura(Texture* t){
@@ -1039,6 +1113,27 @@ static void AccionMenuSkin(){
 // el tilde ya toco cfg.enableAntialiasing (PropBool escribe el bool): aca solo se avisa
 static void AccionAntialias(){
     Notificar(T("Restart Whisk3D for this change to take effect"), false);
+    g_redraw = true;
+}
+
+// MIPMAPPING global del editor (Ajustes; cfg.mipmaps ya lo escribio el PropBool). Se
+// aplica a las CARGAS nuevas; las texturas ya subidas con piramide dejan de usarla al
+// instante (TexFilter consulta MipmapsGlobal), pero prenderlo recien genera piramides
+// al recargar el proyecto.
+static void AccionMipmapsEditor(){
+    w3dEngine::SetMipmapsGlobal(cfg.mipmaps);
+    if (cfg.mipmaps)
+        Notificar(T("Reload the project to generate mipmaps"), false);
+    g_redraw = true;
+}
+
+// MIPMAPPING del PROYECTO (tarjeta Render): pisa el global SOLO en esta sesion y se
+// guarda en la cabecera del .w3d (`mipmaps: false` cuando esta apagado).
+static bool g_renderMipmaps = true;
+static void AccionMipmapsProyecto(){
+    w3dEngine::SetMipmapsGlobal(g_renderMipmaps);
+    if (g_renderMipmaps)
+        Notificar(T("Reload the project to generate mipmaps"), false);
     g_redraw = true;
 }
 
@@ -2896,6 +2991,96 @@ static void AccionPvsRecalcular(){
     if (n > 0) Notificar(T("PVS recalculado"), false);
     else       Notificar(T("PVS: falta <modelo>.pvs.json junto al .obj de origen"), true);
 }
+// --- PATH del modificador Oclusion: dropdown con las Curve de la escena (el riel) y las
+// mallas de SOLO ARISTAS (Add > Path). El nodo activo lo elige el motor siguiendo el path. ---
+static PopupMenu* MenuPvsPath = NULL;
+static std::vector<std::string> g_pvsPathNombres;   // id-2 -> nombre (0=None, 1..: candidatos)
+static void PvsPathCandidatos(Object* o){
+    if (!o) return;
+    // SOLO Curves: el path ES el riel (Add > Path crea una Curve; "vi que creo un riel...
+    // y no es un riel! es un mesh!" -el dueno-, asi que aca no se listan mallas).
+    if (o->getType() == ObjectType::curve) g_pvsPathNombres.push_back(o->name);
+    for (size_t i = 0; i < o->Childrens.size(); i++) PvsPathCandidatos(o->Childrens[i]);
+}
+static void AccionPvsPathElegido(int id){
+    Modifier* mod = ModActivoUI(); if (!mod) return;
+    if (id == 0) mod->pathNombre.clear();
+    else if (id - 1 < (int)g_pvsPathNombres.size()) mod->pathNombre = g_pvsPathNombres[id - 1];
+    if (PropsActivo && PropsActivo->propPvsPath)
+        PropsActivo->propPvsPath->button->text = mod->pathNombre.empty() ? std::string("None") : mod->pathNombre;
+    g_redraw = true;
+}
+static void AccionMenuPvsPath(){
+    if (!PropsActivo || !PropsActivo->propPvsPath) return;
+    if (!MenuPvsPath){ MenuPvsPath = new PopupMenu(); MenuPvsPath->action = AccionPvsPathElegido; }
+    MenuPvsPath->Limpiar();
+    MenuPvsPath->Agregar(T("None"), 0, IconType::notifError);
+    g_pvsPathNombres.clear();
+    PvsPathCandidatos(SceneCollection);
+    for (size_t i = 0; i < g_pvsPathNombres.size(); i++)
+        MenuPvsPath->Agregar(g_pvsPathNombres[i], 1 + (int)i, IconType::curve);
+    AbrirMenuBajoBoton(MenuPvsPath, PropsActivo->propPvsPath->button);
+}
+// --- RAMAS del path (dropdown con toggles): que componentes del path participan del
+// nodo-mas-cercano (la rama del bonus no sirve al nivel principal y viceversa). ---
+static PopupMenu* MenuPvsRamas = NULL;
+static Curve* PvsCurveDelMod(Modifier* mod){
+    if (!mod || mod->pathNombre.empty()) return NULL;
+    Object* o = FindObjectByName(SceneCollection, mod->pathNombre);
+    return (o && o->getType() == ObjectType::curve) ? (Curve*)o : NULL;
+}
+static void AccionPvsRamaToggle(int id){
+    Modifier* mod = ModActivoUI(); if (!mod) return;
+    Curve* cv = PvsCurveDelMod(mod); if (!cv) return;
+    if ((int)mod->ramasOn.size() < cv->nRamas) mod->ramasOn.resize(cv->nRamas, 1);  // default: todas ON
+    if (id >= 0 && id < (int)mod->ramasOn.size()) mod->ramasOn[id] = !mod->ramasOn[id];
+    g_redraw = true;
+}
+static void AccionMenuPvsRamas(){
+    Modifier* mod = ModActivoUI(); if (!mod || !PropsActivo || !PropsActivo->propPvsRamas) return;
+    Curve* cv = PvsCurveDelMod(mod); if (!cv) return;
+    if ((int)mod->ramasOn.size() < cv->nRamas) mod->ramasOn.resize(cv->nRamas, 1);
+    if (!MenuPvsRamas){ MenuPvsRamas = new PopupMenu(); MenuPvsRamas->action = AccionPvsRamaToggle; }
+    MenuPvsRamas->Limpiar();
+    char lbl[32];
+    for (int r = 0; r < cv->nRamas; r++) {
+        snprintf(lbl, sizeof(lbl), "Rama %d", r + 1);
+        MenuPvsRamas->Agregar(lbl, r, IconType::curve)->verde = (mod->ramasOn[r] != 0);
+    }
+    AbrirMenuBajoBoton(MenuPvsRamas, PropsActivo->propPvsRamas->button);
+}
+
+// "Nodo actual" del modificador Oclusion (0 = malla completa). En PLAY (o volando con
+// "solo camara activa" apagado) lo pisa el motor; editarlo a mano sirve en pausa.
+static float g_pvsNodoF = 0.0f;
+static void AccionPvsNodoChanged(){
+    Modifier* mod = ModActivoUI(); if (!mod) return;
+    if (!ObjActivo || ObjActivo->getType() != ObjectType::mesh) return;
+    mod->sectorPVS = (int)(g_pvsNodoF + 0.5f);
+    extern void W3dPVSSincronizar(Mesh*);
+    W3dPVSSincronizar((Mesh*)ObjActivo);
+    g_redraw = true;
+}
+
+// interruptor de EDICION de la malla (card "Edicion", pestania Mesh). Borrar = libera el
+// cage + posRep/edges/bordesBuf (queda solo el AABB: mismo estado que un import noEditable);
+// Convertir = recalcula los bordes y reabre el Tab. Ahorra memoria en mallas de escenario.
+static void AccionMeshEditableToggle(){
+    if (!ObjActivo || ObjActivo->getType() != ObjectType::mesh) return;
+    Mesh* m = (Mesh*)ObjActivo;
+    if (m->noEditable) {
+        m->noEditable = false;
+        m->CalcularBordes();                       // reconstruye posRep/edges/bordesBuf
+        Notificar(T("Malla editable de nuevo"), false);
+    } else {
+        if (g_editMesh == (Object*)m) { extern bool LayoutToggleEditMode(); LayoutToggleEditMode(); } // salir de Edit primero
+        m->InvalidarEdit();                        // borra el cage
+        m->CalcularAABBSolo();                     // limpia edges/bordes/posRep, deja AABB+radio
+        m->noEditable = true;
+        Notificar(T("Datos de edicion borrados (malla no editable)"), false);
+    }
+    g_redraw = true;
+}
 
 // "Apply Modifier": hornea la malla generada en la editable + saca el modificador del stack
 static void AccionAplicarModificador(){
@@ -3331,8 +3516,47 @@ static std::vector<Mesh*> g_animMenu2D;     // mallas (con clips de armature 2D)
 static std::vector<int>   g_animMenu2DArm;  // paralelo: QUE armature 2D de esa malla es cada entrada
 static std::vector<PopupMenu*> g_animSubmenus; // pool reutilizable (0 = Scenes, 1.. = por armadura); persiste entre aperturas
 static std::vector<Armature*>  g_animMenuArms; // armaduras (con clips) en el orden del menu, para decodificar el id
+Flipbook* g_flipActivo = NULL;   // flipbook activo del editor (cuando ActiveAnimKind == 5)
+// --- CONFIG del flipbook activo: mirrors float + handlers de la card Animation (kind 5) ---
+static float g_flipCuadrosF = 1.0f, g_flipColsF = 1.0f, g_flipFilasF = 1.0f, g_flipFpsF = 30.0f;
+static void AccionFlipConfig(){   // onChange de Frames/Columns/Rows/Speed: re-arma el flipbook
+    if (!g_flipActivo) return;
+    int cuad = (int)(g_flipCuadrosF + 0.5f), cols = (int)(g_flipColsF + 0.5f), filas = (int)(g_flipFilasF + 0.5f);
+    if (cuad < 1) cuad = 1; if (cols < 1) cols = 1; if (filas < 1) filas = 1;
+    float fps = g_flipFpsF < 0.0f ? 0.0f : g_flipFpsF;
+    g_flipActivo->ConfigurarTira(g_flipActivo->atlas, cols, filas, cuad, fps);   // grilla + regenera curvas
+    g_redraw = true;
+}
+static PopupMenu* MenuFlipAtlas = NULL;
+static void FlipAtlasElegida(const std::string& ruta);   // fwd (callback del file browser)
+static void AccionFlipAtlasElegida(int id){
+    if (!g_flipActivo) return;
+    if (id == 0) g_flipActivo->atlas = "";
+    else if (id == 1){ AbrirFileBrowser(T("Load Texture"), T("Open"), ".png .jpg .jpeg .bmp .tga .gif", FlipAtlasElegida); return; }
+    else if (5 + id - 2 < (int)Textures.size()) g_flipActivo->atlas = Textures[5 + id - 2]->path;
+    g_flipActivo->ConfigurarTira(g_flipActivo->atlas, g_flipActivo->cols, g_flipActivo->filas, g_flipActivo->cuadros, g_flipActivo->fps);
+    if (PropsActivo && PropsActivo->propFlipAtlas) PropsActivo->propFlipAtlas->button->text = NombreDeArchivo(g_flipActivo->atlas);
+    g_redraw = true;
+}
+static void FlipAtlasElegida(const std::string& ruta){
+    if (!g_flipActivo || ruta.empty()) return;
+    g_flipActivo->atlas = ruta;
+    g_flipActivo->ConfigurarTira(ruta, g_flipActivo->cols, g_flipActivo->filas, g_flipActivo->cuadros, g_flipActivo->fps);
+    if (PropsActivo && PropsActivo->propFlipAtlas) PropsActivo->propFlipAtlas->button->text = NombreDeArchivo(ruta);
+    g_redraw = true;
+}
+static void AccionMenuFlipAtlas(){
+    if (!g_flipActivo || !PropsActivo || !PropsActivo->propFlipAtlas) return;
+    if (!MenuFlipAtlas){ MenuFlipAtlas = new PopupMenu(); MenuFlipAtlas->action = AccionFlipAtlasElegida; }
+    MenuFlipAtlas->Limpiar();
+    MenuFlipAtlas->Agregar(T("No Texture"), 0, IconType::notifError);
+    MenuFlipAtlas->Agregar(T("Load Texture"), 1, IconType::archive);
+    for (size_t i = 5; i < Textures.size(); i++) MenuFlipAtlas->Agregar(NombreDeTextura(Textures[i]), 2 + (int)(i - 5), IconType::textura);
+    AbrirMenuBajoBoton(MenuFlipAtlas, PropsActivo->propFlipAtlas->button);
+}
 static std::string NombreAnimActiva(){
     if (ActiveAnimKind == 2) return "Juego";
+    if (ActiveAnimKind == 5) return g_flipActivo ? g_flipActivo->nombre : std::string("Flipbook");
     if (ActiveAnimKind == 4 && ActiveAnimMesh) {   // clip del ARMATURE 2D de la malla
         Armature2DAnimation* c2 = Arm2DClipActivo(ActiveAnimMesh);
         return c2 ? c2->name : ActiveAnimMesh->name;
@@ -3389,6 +3613,8 @@ static PopupMenu* AnimSubmenuPool(size_t i){ while (g_animSubmenus.size() <= i) 
 #define ANIM_ID_NEW_OBJETO 99991
 #define ANIM_ID_NEW_ARM    99992
 #define ANIM_ID_NEW_ARM2D  99993
+#define ANIM_ID_NEW_FLIP   99994
+static const int ANIM_FLIP_BASE = 400000;  // seleccionar un FLIPBOOK con nombre: [BASE + idx en SceneFlipbooks]
 
 void ConstruirMenuAnim(PopupMenu* menu){
     menu->Limpiar();
@@ -3439,13 +3665,24 @@ void ConstruirMenuAnim(PopupMenu* menu){
         // el nombre dice la malla Y el rig 2D: una malla puede tener varios (curvas independientes)
         menu->Agregar(mm->name + " (" + arm->nombre + ")", 0, IconType::armature, sub);
     }
+    // categoria FLIPBOOKS: los assets de flipbook CON NOMBRE de la escena (compartidos: varios
+    // objetos usan el mismo). Elegir uno lo pone activo (kind 5) para editarlo; hay "New Flipbook" abajo.
+    if (!SceneFlipbooks.empty()) {
+        PopupMenu* subF = AnimSubmenuPool(1 + g_animMenuArms.size() + g_animMenuMeshes.size() + g_animMenu2D.size() + 1);
+        subF->Limpiar(); subF->action = menu->action;
+        for (size_t i = 0; i < SceneFlipbooks.size(); i++)
+            subF->Agregar(SceneFlipbooks[i] ? SceneFlipbooks[i]->nombre : std::string("Flipbook"),
+                          ANIM_FLIP_BASE + (int)i, IconType::textura);
+        menu->Agregar(T("Flipbooks"), 0, IconType::textura, subF);
+    }
     // ---- "Nueva animacion": CREAR desde el selector (antes solo se podia desde el panel, y una
     // malla sin animaciones ni siquiera aparecia aca -> no habia camino desde el timeline).
     // Cada item es EXPLICITO (no adivina por contexto como hacia el boton New de la tarjeta).
     {
-        PopupMenu* subN = AnimSubmenuPool(1 + g_animMenuArms.size() + g_animMenuMeshes.size() + g_animMenu2D.size());
+        PopupMenu* subN = AnimSubmenuPool(2 + g_animMenuArms.size() + g_animMenuMeshes.size() + g_animMenu2D.size());
         subN->Limpiar(); subN->action = menu->action;
         subN->Agregar(T("Scene Animation"), ANIM_ID_NEW_ESCENA, IconType::camera);
+        subN->Agregar(T("New Flipbook"), ANIM_ID_NEW_FLIP, IconType::textura);
         Mesh* mAct = (ObjActivo && ObjActivo->getType()==ObjectType::mesh) ? (Mesh*)ObjActivo : NULL;
         if (mAct) subN->Agregar(T("Object Animation"), ANIM_ID_NEW_OBJETO, IconType::mesh);
         if (ObjActivo && ObjActivo->getType()==ObjectType::armature)
@@ -3551,7 +3788,14 @@ void AnimSelPorId(int id){
         if (m && !m->Arm2DHuesos().empty()){ Arm2DCrearAnimacion(m); AnimSelArm2D(m, m->Arm2DAnimActiva()); }
         else Notificar(T("2D armature animation: the mesh has no 2D armature"), true);
         return; }
+    if (id == ANIM_ID_NEW_FLIP){ AnimEsJuego = false;   // CREAR un flipbook con nombre y ponerlo activo
+        g_flipActivo = FlipbookNuevo("Flipbook"); ActiveAnimKind = 5; return; }
     AnimEsJuego = false;
+    if (id >= ANIM_FLIP_BASE){   // seleccionar un flipbook (base MAS ALTA: va ANTES que las otras)
+        int idx = id - ANIM_FLIP_BASE;
+        if (idx >= 0 && idx < (int)SceneFlipbooks.size()){ ActiveAnimKind = 5; g_flipActivo = SceneFlipbooks[idx]; }
+        return;
+    }
     if (id >= ANIM_ARM2D_BASE){
         int k = id - ANIM_ARM2D_BASE, mIdx = k / ANIM_CLIP_STRIDE, aIdx = k % ANIM_CLIP_STRIDE;
         if (mIdx >= 0 && mIdx < (int)g_animMenu2D.size()) AnimSelArm2DEn(g_animMenu2D[mIdx], g_animMenu2DArm[mIdx], aIdx);
@@ -3573,6 +3817,100 @@ void AnimSelPorId(int id){
     AnimCargarRangoActivo(); // Start/End/FPS propios de la animacion elegida
     InvalidarSkinEscena();   // deformar la malla YA a la pose del frame actual (sin esperar al play)
 }
+// ----------------------------------------------------------------------------------
+//  CICLO RAPIDO DEL SELECTOR (arriba/abajo con el foco sobre el boton de animacion del
+//  timeline; pedido para el N95: cambiar de animacion SIN abrir el menu, para irlas
+//  viendo una atras de otra -- abrir el menu, entrar a Escenas y buscar la siguiente
+//  por CADA una era un dolor de cabeza).
+//  La lista PLANA de ids reproduce el ORDEN del menu (escenas -> clips por armadura ->
+//  anims de objeto por malla -> clips 2D -> flipbooks) y refresca los MISMOS registros
+//  g_animMenu* que AnimSelPorId usa para resolver los ids (sin eso, ciclar sin haber
+//  abierto nunca el menu dereferenciaria registros viejos o vacios).
+//  "Juego" y "New Animation" quedan AFUERA a proposito: ciclar es para VER
+//  animaciones, no para cambiar de modo ni crear cosas sin querer.
+// ----------------------------------------------------------------------------------
+static void AnimSelIdsPlanos(std::vector<int>& out){
+    out.clear();
+    InitSceneAnimations();
+    for (size_t i=0;i<SceneAnimations.size();i++) out.push_back((int)i);
+    g_animMenuArms.clear();
+    std::vector<Armature*> todas; RecolectarArmaduras(SceneCollection, todas);
+    for (size_t t=0;t<todas.size();t++){
+        Armature* arm = todas[t]; if (arm->animations.empty()) continue;
+        int a = (int)g_animMenuArms.size(); g_animMenuArms.push_back(arm);
+        for (size_t c=0;c<arm->animations.size();c++)
+            out.push_back(ANIM_CLIP_BASE + a*ANIM_CLIP_STRIDE + (int)c);
+    }
+    g_animMenuMeshes.clear();
+    std::vector<Mesh*> mallas; RecolectarMeshesAnim(SceneCollection, mallas);
+    for (size_t t=0;t<mallas.size();t++){
+        Mesh* mm = mallas[t];
+        int a = (int)g_animMenuMeshes.size(); g_animMenuMeshes.push_back(mm);
+        for (size_t c=0;c<mm->animations.size();c++)
+            out.push_back(ANIM_VERT_BASE + a*ANIM_CLIP_STRIDE + (int)c);
+    }
+    g_animMenu2D.clear(); g_animMenu2DArm.clear();
+    std::vector<Mesh*> m2d; std::vector<int> m2dArm; RecolectarMeshes2D(SceneCollection, m2d, m2dArm);
+    for (size_t t=0;t<m2d.size();t++){
+        Mesh* mm = m2d[t];
+        const Armature2D* arm = mm->armatures2d[m2dArm[t]];
+        int a = (int)g_animMenu2D.size(); g_animMenu2D.push_back(mm); g_animMenu2DArm.push_back(m2dArm[t]);
+        for (size_t c=0;c<arm->anims.size();c++)
+            out.push_back(ANIM_ARM2D_BASE + a*ANIM_CLIP_STRIDE + (int)c);
+    }
+    for (size_t i=0;i<SceneFlipbooks.size();i++) out.push_back(ANIM_FLIP_BASE + (int)i);
+}
+
+// el id del selector que corresponde a la seleccion ACTIVA (-1 = Juego / nada
+// reconocible). Llamar DESPUES de AnimSelIdsPlanos: lee los registros recien
+// refrescados (los punteros de la seleccion se buscan ahi por identidad).
+static int AnimSelIdActual(){
+    if (ActiveAnimKind == 1 && ActiveAnimArm){
+        for (size_t a=0;a<g_animMenuArms.size();a++)
+            if (g_animMenuArms[a] == ActiveAnimArm)
+                return ANIM_CLIP_BASE + (int)a*ANIM_CLIP_STRIDE + ActiveAnimArm->animActiva;
+        return -1;
+    }
+    if (ActiveAnimKind == 3 && ActiveAnimMesh){
+        VertexAnimationActive* va = FindTargetAnim(ActiveAnimMesh);
+        if (!va || va->currentAnim < 0) return -1;
+        for (size_t a=0;a<g_animMenuMeshes.size();a++)
+            if (g_animMenuMeshes[a] == ActiveAnimMesh)
+                return ANIM_VERT_BASE + (int)a*ANIM_CLIP_STRIDE + va->currentAnim;
+        return -1;
+    }
+    if (ActiveAnimKind == 4 && ActiveAnimMesh){
+        for (size_t a=0;a<g_animMenu2D.size();a++)
+            if (g_animMenu2D[a] == ActiveAnimMesh &&
+                g_animMenu2DArm[a] == ActiveAnimMesh->armature2dActivo)
+                return ANIM_ARM2D_BASE + (int)a*ANIM_CLIP_STRIDE + ActiveAnimMesh->Arm2DAnimActiva();
+        return -1;
+    }
+    if (ActiveAnimKind == 5){
+        for (size_t i=0;i<SceneFlipbooks.size();i++)
+            if (SceneFlipbooks[i] == g_flipActivo) return ANIM_FLIP_BASE + (int)i;
+        return -1;
+    }
+    if (ActiveAnimKind == 0) return SceneAnimActiva;
+    return -1;
+}
+
+// salta a la animacion siguiente (dir>0) o anterior (dir<0) del selector, con wrap.
+// Va por AnimSelPorId: exactamente lo mismo que elegirla en el menu (rango, playhead,
+// invalidacion de skin). Desde "Juego" (sin id) arranca por la primera/ultima.
+void AnimSelCiclar(int dir){
+    std::vector<int> ids; AnimSelIdsPlanos(ids);
+    if (ids.empty()) return;
+    const int n = (int)ids.size();
+    int idx = -1;
+    { const int cur = AnimSelIdActual();
+      if (cur >= 0) for (int i=0;i<n;i++) if (ids[i] == cur){ idx = i; break; } }
+    idx = (idx < 0) ? (dir >= 0 ? 0 : n-1) : (idx + (dir >= 0 ? 1 : -1) + n) % n;
+    AnimSelPorId(ids[idx]);
+    PropertiesLayoutDirty = true;
+    g_redraw = true;
+}
+
 static void AccionAnimSelElegida(int id){ AnimSelPorId(id); PropertiesLayoutDirty = true; g_redraw = true; }
 // hook de la LISTA de animaciones (PropList modo 5, tab Armature): al elegir un clip ahi, sincroniza la seleccion
 // APP-WIDE (igual que el selector del timeline) + carga Start/End/FPS. Antes la lista solo cambiaba animActiva y el
@@ -3802,6 +4140,10 @@ static void AccionObjAnimDel(){
     BorrarVertexAnimDe((Mesh*)ObjActivo);
 }
 static void AccionAnimNewCard(){
+    if (ActiveAnimKind == 5){   // FLIPBOOK activo: New crea OTRO flipbook con nombre
+        g_flipActivo = FlipbookNuevo("Flipbook");
+        PropertiesLayoutDirty = true; g_redraw = true; return;
+    }
     // clip del ARMATURE 2D activo: New crea OTRO clip del mismo rig 2D (no una vertex anim)
     if (ActiveAnimKind == 4 && ActiveAnimMesh && !ActiveAnimMesh->Arm2DHuesos().empty()){
         Mesh* m = ActiveAnimMesh;
@@ -3833,6 +4175,12 @@ static void AccionAnimDupCard(){ // Duplicate: copia el clip activo del armature
     PropertiesLayoutDirty = true; g_redraw = true;
 }
 static void AccionAnimDelCard(){
+    if (ActiveAnimKind == 5){   // FLIPBOOK activo: Delete lo borra de la escena
+        if (g_flipActivo){ FlipbookBorrar(g_flipActivo);
+            g_flipActivo = SceneFlipbooks.empty() ? NULL : SceneFlipbooks[0];
+            if (!g_flipActivo) ActiveAnimKind = 0; }   // sin flipbooks -> volver a escena
+        PropertiesLayoutDirty = true; g_redraw = true; return;
+    }
     // vertex anim activa (kind 3): Delete borra ESA anim, como ya hacen New y
     // Rename con su rama kind 3. Antes caia a BorrarEscenaActiva y volaba una
     // animacion de ESCENA que no tenia nada que ver.
@@ -3857,6 +4205,9 @@ static void AccionAnimDelCard(){
 void _AnimDelCardFwd(){ AccionAnimDelCard(); }
 static void AccionAnimRenameCard(){                                          // renombra la animacion activa in-place
     if (!PropsActivo || !PropsActivo->propBtnAnimRename) return;
+    if (ActiveAnimKind == 5 && g_flipActivo){   // FLIPBOOK activo: renombrar el asset in-place
+        RenameIniciar(PropsActivo->propBtnAnimRename->button, &g_flipActivo->nombre, NULL, NULL, NULL); return;
+    }
     // TODOS los clips viven en un vector<T*> y se BORRAN con el "-" de esta misma tarjeta
     // (AccionAnimDelCard, aca arriba): el destino del undo va por (dueno, indice), nunca por
     // puntero, o el Ctrl+Z siguiente escribia en el clip liberado. Ver W3dRenameDest en Undo.h.
@@ -4423,6 +4774,44 @@ static void AccionObjAnimStart(){ int v=(int)(g_objAnimStartF+0.5f); if(v<0)v=0;
 static void AccionObjAnimEnd(){ int v=(int)(g_objAnimEndF+0.5f); if(v<1)v=1; AnimSetEnd(v); if(CurrentFrame>EndFrame)CurrentFrame=EndFrame; g_redraw=true; }
 static void AccionObjAnimFps(){ int v=(int)(g_objAnimFpsF+0.5f); if(v<1)v=1; if(v>120)v=120; AnimSetFps(v); g_objAnimFpsF=(float)v; g_redraw=true; }
 
+// BOTON "Recalcular" del Culling: rearma el reparto de hijos en celdas (metodo Grid; RebuildGrid via MarcarSucio).
+// Se toca despues de mover/agregar hijos ESTATICOS; en runtime el grid se arma solo al primer frame y se cachea.
+static void AccionCullRecalcular(){
+    if (ObjActivo && ObjActivo->getType() == ObjectType::culling)
+        static_cast<Culling*>(ObjActivo)->MarcarSucio();
+    g_redraw = true;
+}
+
+// DROPDOWN del METODO de culling (Frustum / Grid / Triangulo / BSP): patron de propPvsMetodo/propBtnMezcla.
+static PopupMenu* MenuCullMetodo = NULL;
+static void AccionCullMetodoElegido(int id){
+    if (!ObjActivo || ObjActivo->getType() != ObjectType::culling) return;
+    Culling* cu = static_cast<Culling*>(ObjActivo);
+    cu->metodo = id;
+    cu->MarcarSucio();                 // al cambiar de metodo, rearma la grilla si aplica
+    if (id == Culling::Bsp) Notificar(T("BSP pendiente: se usa frustum por ahora"), false);
+    g_redraw = true;
+}
+static void AccionMenuCullMetodo(){
+    if (!PropsActivo || !PropsActivo->propCullMetodo) return;
+    if (!MenuCullMetodo){ MenuCullMetodo = new PopupMenu(); MenuCullMetodo->action = AccionCullMetodoElegido; }
+    MenuCullMetodo->Limpiar();
+    MenuCullMetodo->Agregar(T("Frustum (AABB)"),  Culling::Frustum,  IconType::visible);
+    MenuCullMetodo->Agregar(T("Grid (cells)"),    Culling::Grid,     IconType::cuadricula);
+    MenuCullMetodo->Agregar(T("Riel (nodos)"),    Culling::Riel,     IconType::curve); // hijos por nodo, estilo NSD
+    MenuCullMetodo->Agregar("BSP (pending)",      Culling::Bsp,      IconType::empty);
+    AbrirMenuBajoBoton(MenuCullMetodo, PropsActivo->propCullMetodo->button);
+}
+// nombre visible del metodo para el texto del boton
+static const char* CullMetodoLabel(int m){
+    switch (m) {
+        case Culling::Grid:      return "Grid (cells)";
+        case Culling::Riel:      return "Riel (nodos)";
+        case Culling::Bsp:       return "BSP (pending)";
+        default:                 return "Frustum (AABB)";
+    }
+}
+
 void Properties::ConstruirGrupos(){
     propTransform = new GroupPropertie(T("Transform"));
     propTransform->reservaKeyBtn = true;   // columna del boton de keyframe a la derecha
@@ -4489,6 +4878,11 @@ void Properties::ConstruirGrupos(){
     // molestan a la vista y se calculan por frame) sin perder las de los demas.
     propObjRelLines = new PropBool(T("Relationship Lines"));
     propTransform->properties.push_back(propObjRelLines);
+    // ESTATICO vs DINAMICO: flag universal del objeto que usa el Culling metodo=Grid (estatico=cacheado en su
+    // celda, dinamico=re-medido por frame). Va en la tarjeta generica (bindea a ObjActivo sin mirar getType);
+    // el gate de propTransform (pestaniaActiva==1 && !es2D) la deja 3D-only. Solo importa dentro de un Culling.
+    propObjEstatico = new PropBool(T("Static"));
+    propTransform->properties.push_back(propObjEstatico);
     GroupProperties.push_back(propTransform);
 
     // ===== pestania OBJETO: tarjeta "Animacion" — las animaciones DEL objeto
@@ -5160,6 +5554,16 @@ void Properties::ConstruirGrupos(){
     for (int i = 0; i < kMaxScriptCards; i++)
         GroupProperties.push_back(propScriptCards[i]);
 
+    // ===== card "Edicion" (ARRIBA de Mesh Parts, pedido del dueno): el interruptor de
+    // EDICION de la malla. Una malla "no editable" (escenario) no tiene posRep/edges/
+    // bordesBuf ni entra a Edit Mode -> ahorra memoria y carga. El boton alterna:
+    // borra los datos de edicion o los recalcula (CalcularBordes).
+    propMeshEdicion = new GroupPropertie(T("Edicion"));
+    propBtnMeshEditable = new PropButton(T("Borrar datos para edicion"), IconType::borrar);
+    propBtnMeshEditable->action = AccionMeshEditableToggle;
+    propMeshEdicion->properties.push_back(propBtnMeshEditable);
+    GroupProperties.push_back(propMeshEdicion);
+
     // ===== Tarjeta "Mesh Parts": selector (lista) + gestion de la PARTE (sin material) =====
     propMeshParts = new GroupPropertie(T("Mesh Parts"));
     propMeshParts->anchoValores = 0.30f;
@@ -5378,28 +5782,114 @@ void Properties::ConstruirGrupos(){
     propLOD->properties.push_back(propLodSoloCam);
     GroupProperties.push_back(propLOD);
 
-    // pestania del objeto Culling: el checkbox bindea DIRECTO al campo del activo
+    // pestania del objeto Culling UNIFICADO: un solo objeto con SELECTOR de metodo (Frustum/Grid/Triangulo/BSP)
+    // + boton "Recalcular". Los campos de grilla (Cell size / 3D grid) solo aparecen con metodo=Grid.
     propCulling = new GroupPropertie("Culling");
-    // INTERRUPTOR del recorte: primero de la lista porque es el que se toca en vivo
-    // (demo A/B: apagar y ver TODO el escenario, prender y ver desaparecer lo que
-    // queda fuera del marco 4:3 de la camara del juego).
+    // SELECTOR de metodo (dropdown), primero de la lista.
+    propCullMetodo = new PropButton("Frustum (AABB)", IconType::visible);
+    propCullMetodo->button->desplegable = true;
+    propCullMetodo->action = AccionMenuCullMetodo;
+    propCulling->properties.push_back(propCullMetodo);
+    // INTERRUPTOR del recorte (demo A/B: apagar y ver TODO el escenario, prender y ver desaparecer lo de afuera).
     propCullActivo = new PropBool(T("Active"));
     propCulling->properties.push_back(propCullActivo);
+    // "solo camara activa": calcula UNA vez desde la camara del juego (para TODAS las vistas); OFF = cada
+    // vista/camara recalcula por su cuenta.
     propCullSoloCam = new PropBool(T("Only active camera"));
     propCulling->properties.push_back(propCullSoloCam);
-    // culling por DISTANCIA (0 = sin limite): el corte que el frustum no puede
-    // hacer en un nivel "pasillo" (ver Culling.h)
+    // culling por DISTANCIA (0 = sin limite): el corte que el frustum no hace en un nivel "pasillo".
     propCullDistMax = new PropFloat(T("Max distance"), "m");
     propCullDistMax->SetRango(0.0f, 100000.0f);
     propCulling->properties.push_back(propCullDistMax);
+    // translucido: ordena atras->adelante (alpha) en vez de por material.
+    propCullOrdenAlpha = new PropBool(T("Alpha order"));
+    propCulling->properties.push_back(propCullOrdenAlpha);
+    // --- campos del metodo Grid (se ocultan con value=NULL cuando el metodo no es Grid) ---
+    propCullCellSize = new PropFloat(T("Cell size"), "m");
+    propCullCellSize->SetRango(0.5f, 100000.0f);
+    propCullCellSize->onChange = AccionCullRecalcular;   // cambiar la celda rearma el reparto
+    propCulling->properties.push_back(propCullCellSize);
+    propCullModo3D = new PropBool(T("3D grid"));
+    propCullModo3D->onChange = AccionCullRecalcular;     // 2D<->3D cambia la particion -> rearmar
+    propCulling->properties.push_back(propCullModo3D);
+    propCullRecalc = new PropButton(T("Recalculate"), IconType::cuadricula);
+    propCullRecalc->action = AccionCullRecalcular;
+    propCulling->properties.push_back(propCullRecalc);
     GroupProperties.push_back(propCulling);
+
+    // pestania del objeto MIRROR (pedido del dueno: "el mirror no tiene propiedades"):
+    // a quien espeja (por nombre, commit en vivo) + en que ejes + el rectangulo del
+    // plano (los limites que ademas usa el autocull del espejo).
+    propMirror = new GroupPropertie("Mirror");
+    propMirrorTarget = new PropText(T("Target"), "");
+    propMirror->properties.push_back(propMirrorTarget);
+    propMirrorX = new PropBool("Mirror X");
+    propMirror->properties.push_back(propMirrorX);
+    propMirrorY = new PropBool("Mirror Y");
+    propMirror->properties.push_back(propMirrorY);
+    propMirrorZ = new PropBool("Mirror Z");
+    propMirror->properties.push_back(propMirrorZ);
+    propMirrorHijos = new PropBool(T("Reflect children"));
+    propMirror->properties.push_back(propMirrorHijos);
+    propMirrorLimites = new PropBool(T("Clip to rect"));
+    propMirror->properties.push_back(propMirrorLimites);
+    propMirrorU0 = new PropFloat(T("Left"));   propMirrorU0->SetRango(-100000.0f, 100000.0f);
+    propMirror->properties.push_back(propMirrorU0);
+    propMirrorU1 = new PropFloat(T("Right"));  propMirrorU1->SetRango(-100000.0f, 100000.0f);
+    propMirror->properties.push_back(propMirrorU1);
+    propMirrorV0 = new PropFloat(T("Back"));   propMirrorV0->SetRango(-100000.0f, 100000.0f);
+    propMirror->properties.push_back(propMirrorV0);
+    propMirrorV1 = new PropFloat(T("Front"));  propMirrorV1->SetRango(-100000.0f, 100000.0f);
+    propMirror->properties.push_back(propMirrorV1);
+    GroupProperties.push_back(propMirror);
+
+    // tarjeta FISICA (cuerpo rigido): para cualquier objeto con definicion
+    // (Add > Physics). Los PropFloat se re-apuntan por frame a la definicion
+    // del activo (o NULL, que oculta la fila) en el bloque de visibilidad.
+    propFisica = new GroupPropertie(T("Physics"));
+    propFisTipo = new PropButton(T("Dynamic"), IconType::object);
+    propFisTipo->action = AccionFisTipoCiclar;
+    propFisica->properties.push_back(propFisTipo);
+    propFisMasa = new PropFloat(T("Mass"), "kg");
+    propFisMasa->SetRango(0.001f, 1000000.0f);
+    propFisMasa->stepFino = 1.0f; propFisMasa->stepGrueso = 50.0f;
+    propFisica->properties.push_back(propFisMasa);
+    propFisCajaX = new PropFloat(T("Box X"), "m");
+    propFisCajaY = new PropFloat(T("Box Y"), "m");
+    propFisCajaZ = new PropFloat(T("Box Z"), "m");
+    propFisCenX  = new PropFloat(T("Center X"), "m");
+    propFisCenY  = new PropFloat(T("Center Y"), "m");
+    propFisCenZ  = new PropFloat(T("Center Z"), "m");
+    {
+        PropFloat* fs[6] = { propFisCajaX, propFisCajaY, propFisCajaZ,
+                             propFisCenX, propFisCenY, propFisCenZ };
+        for (int i = 0; i < 6; i++) {
+            if (i < 3) fs[i]->SetRango(0.01f, 100000.0f);
+            else       fs[i]->SetRango(-100000.0f, 100000.0f);
+            fs[i]->stepFino = 0.05f; fs[i]->stepGrueso = 0.5f;
+            propFisica->properties.push_back(fs[i]);
+        }
+    }
+    propFisFriccion = new PropFloat(T("Friction"));
+    propFisFriccion->SetRango(0.0f, 1.0f); propFisFriccion->stepFino = 0.05f;
+    propFisica->properties.push_back(propFisFriccion);
+    propFisRebote = new PropFloat(T("Bounce"));
+    propFisRebote->SetRango(0.0f, 1.0f); propFisRebote->stepFino = 0.05f;
+    propFisica->properties.push_back(propFisRebote);
+    propFisQuitar = new PropButton(T("Remove physics"), IconType::borrar);
+    propFisQuitar->action = AccionFisQuitar;
+    propFisica->properties.push_back(propFisQuitar);
+    GroupProperties.push_back(propFisica);
 
     // pestania del objeto Particulas: la config del emisor. Los numeros/checks
     // bindean directo a los campos del activo; textura y color son de TEXTO
     // (commit en vivo, ver SincronizarPartTextura/SincronizarPartColor)
     propParticulas = new GroupPropertie("Particles");
-    propParticulas->anchoValores = 0.62f;   // columna ancha (la ruta de la textura)
-    propPartTextura = new PropText(T("Texture"), "");
+    // TEXTURA: dropdown de texturas cargadas + "Load Texture" (file browser), IGUAL que el material (ya no es
+    // un campo de texto donde tipear el path).
+    propPartTextura = new PropButton(T("Texture"), IconType::textura);
+    propPartTextura->button->desplegable = true;
+    propPartTextura->action = AccionMenuPartTextura;
     propParticulas->properties.push_back(propPartTextura);
     propPartCantidad = new PropFloat(T("Rate"), "p/s");     // 0 = solo rafagas emitir()
     propPartCantidad->SetRango(0.0f, 4096.0f);
@@ -5430,15 +5920,14 @@ void Properties::ConstruirGrupos(){
     propPartVelRot = new PropFloat(T("Spin"), "deg/s");       // giro continuo, signo azaroso
     propPartVelRot->SetRango(-3600.0f, 3600.0f);
     propParticulas->properties.push_back(propPartVelRot);
-    propPartColor = new PropText(T("Color"), "");           // "r, g, b, a"
+    propPartColor = new PropColor(T("Color"));              // swatch -> ColorPicker (bindea a pt->color[4])
     propParticulas->properties.push_back(propPartColor);
-    propPartAditivo = new PropBool(T("Additive"));
-    propParticulas->properties.push_back(propPartAditivo);
-    // SUSTRACTIVA (dst - src): oscurece. Es la mezcla del humo y el polvo del
-    // originales de PS1, que con alpha o aditiva no se pueden hacer. Gana sobre
-    // "Additive" si las dos estan marcadas (ver Particulas.h).
-    propPartSustractivo = new PropBool(T("Subtractive"));
-    propParticulas->properties.push_back(propPartSustractivo);
+    // MODO DE MEZCLA: dropdown (Normal/Aditiva/Substractiva/Multiply/Screen/... segun el motor), en vez de dos
+    // checkbox que no podian estar los dos a la vez. Mismo patron que el "Blend Mode" del material.
+    propPartMezcla = new PropButton(T("Blend"), IconType::material);
+    propPartMezcla->button->desplegable = true;
+    propPartMezcla->action = AccionMenuPartMezcla;
+    propParticulas->properties.push_back(propPartMezcla);
     propPartDesvanecer = new PropBool(T("Fade out"));
     propParticulas->properties.push_back(propPartDesvanecer);
     propPartActivo = new PropBool(T("Active"));
@@ -5525,6 +6014,14 @@ void Properties::ConstruirGrupos(){
     propRenderBg = new PropColor(T("Background"));
     propRenderBg->value = g_renderBg; // el array global decae a puntero (igual que los colores de material/luz)
     propRender->properties.push_back(propRenderBg);
+    // MIPMAPPING del PROYECTO: el estado vigente (el .w3d lo declara en su cabecera y
+    // GuardarW3D escribe `mipmaps: false` si esta apagado). ActualizarPropiedades lo
+    // sincroniza con MipmapsGlobal al cambiar de proyecto.
+    { PropBool* pm = new PropBool("Mipmaps");
+      g_renderMipmaps = w3dEngine::MipmapsGlobal();
+      pm->value = &g_renderMipmaps;
+      pm->onChange = AccionMipmapsProyecto;
+      propRender->properties.push_back(pm); }
     // boton con action real (antes era no-op)
     PropButton* pbRenderImg = new PropButton(T("Render Image"), IconType::foto); // foto: renderiza una imagen
     pbRenderImg->action = AccionRenderImage;
@@ -5535,6 +6032,35 @@ void Properties::ConstruirGrupos(){
     // FPS + New|Delete + Rename + Render Animation (rendea la SECUENCIA StartFrame..EndFrame). Delete se oculta sin nada
     // que borrar y Render se grisa sin animaciones.
     propAnimation = new GroupPropertie(T("Animation"));
+    // CONFIG del flipbook activo (kind 5): estos props se agregan a la card Animation y se OCULTAN
+    // salvo cuando hay un flipbook activo (ver el bloque de sync). Atlas + grilla + velocidad.
+    {
+        propFlipAtlas = new PropButton(T("Atlas"), IconType::textura);
+        propFlipAtlas->button->desplegable = true;
+        propFlipAtlas->action = AccionMenuFlipAtlas;
+        propFlipAtlas->oculto = true;
+        propAnimation->properties.push_back(propFlipAtlas);
+        // los PropFloat se OCULTAN con value=NULL (no tienen 'oculto'); el sync los bindea con flipbook activo
+        propFlipCuadros = new PropFloat(T("Frames"));
+        propFlipCuadros->SetRango(1.0f, 4096.0f); propFlipCuadros->entero = true;
+        propFlipCuadros->stepFino = 1.0f; propFlipCuadros->dragStep = 1.0f;
+        propFlipCuadros->value = NULL; propFlipCuadros->onChange = AccionFlipConfig;
+        propAnimation->properties.push_back(propFlipCuadros);
+        propFlipCols = new PropFloat(T("Columns"));
+        propFlipCols->SetRango(1.0f, 256.0f); propFlipCols->entero = true;
+        propFlipCols->stepFino = 1.0f; propFlipCols->dragStep = 1.0f;
+        propFlipCols->value = NULL; propFlipCols->onChange = AccionFlipConfig;
+        propAnimation->properties.push_back(propFlipCols);
+        propFlipFilas = new PropFloat(T("Rows"));
+        propFlipFilas->SetRango(1.0f, 256.0f); propFlipFilas->entero = true;
+        propFlipFilas->stepFino = 1.0f; propFlipFilas->dragStep = 1.0f;
+        propFlipFilas->value = NULL; propFlipFilas->onChange = AccionFlipConfig;
+        propAnimation->properties.push_back(propFlipFilas);
+        propFlipFps = new PropFloat(T("Speed"), "fps");
+        propFlipFps->SetRango(0.0f, 120.0f);
+        propFlipFps->value = NULL; propFlipFps->onChange = AccionFlipConfig;
+        propAnimation->properties.push_back(propFlipFps);
+    }
     propAnimation->anchoValores = 0.55f; // Start/End/FPS son campos numericos: mas lugar al valor
     propBtnAnimSel = new PropButton(T("Scene"), IconType::camera); // dropdown: animacion activa (Scene por defecto)
     propBtnAnimSel->button->desplegable = true;
@@ -5736,6 +6262,11 @@ void Properties::ConstruirGrupos(){
     propAjAntialias->value = &cfg.enableAntialiasing;
     propAjAntialias->onChange = AccionAntialias;
     propAjustes->properties.push_back(propAjAntialias);
+
+    { PropBool* pm = new PropBool("Mipmaps");   // global del EDITOR (el proyecto puede pisarlo)
+      pm->value = &cfg.mipmaps;
+      pm->onChange = AccionMipmapsEditor;
+      propAjustes->properties.push_back(pm); }
 
     propAjBackend = new PropButton(T("Graphics"));
     propAjBackend->conLabel = true;
@@ -6074,6 +6605,22 @@ void Properties::ConstruirGrupos(){
     propModifierProps->properties.push_back(propPvsRecalc);
     propPvsInfo = new PropLabel("");   // "N sectores, sector activo S" / "sin .pvs.json"
     propModifierProps->properties.push_back(propPvsInfo);
+    // PATH del recorrido (el motor elige el nodo solo) + desde que ojo + nodo actual
+    propPvsPath = new PropButton(T("Path"), IconType::curve);
+    propPvsPath->button->desplegable = true;
+    propPvsPath->action = AccionMenuPvsPath;
+    propModifierProps->properties.push_back(propPvsPath);
+    propPvsSoloCam = new PropBool(T("Only active camera"));   // OFF = la vista libre manda (demo A/B volando)
+    propModifierProps->properties.push_back(propPvsSoloCam);
+    propPvsRamas = new PropButton(T("Ramas"), IconType::curve);   // toggles: que ramas del path participan
+    propPvsRamas->button->desplegable = true;
+    propPvsRamas->action = AccionMenuPvsRamas;
+    propModifierProps->properties.push_back(propPvsRamas);
+    propPvsNodo = new PropFloat(T("Nodo actual"));
+    propPvsNodo->entero = true; propPvsNodo->stepFino = 1.0f; propPvsNodo->dragStep = 1.0f;
+    propPvsNodo->onChange = AccionPvsNodoChanged;
+    propPvsNodo->value = NULL;   // se bindea con un Oclusion seleccionado
+    propModifierProps->properties.push_back(propPvsNodo);
     // Apply Modifier (cualquier modificador): hornea la malla generada en la editable
     propBtnApplyMod = new PropButton(T("Apply Modifier"));
     propBtnApplyMod->action = AccionAplicarModificador;
@@ -6382,8 +6929,8 @@ void Properties::RefreshTargetProperties(){
     }
     SincronizarTexto2D(this);      // idem para el campo "Text" del elemento de texto 2D
     SincronizarLodDist(this);      // y el campo "Distances" del objeto LOD
-    SincronizarPartTextura(this);  // y los dos campos de texto del objeto Particulas
-    SincronizarPartColor(this);
+    SincronizarMirrorTarget(this); // y el campo "Target" del objeto Mirror
+    // (color y textura de particula ya no son campos de texto: color = PropColor/picker, textura = dropdown)
     SincronizarTextoBoton(this);   // y el del boton 2D
     SincronizarNombreBone(this);   // fila "Name" de la tarjeta Bones: renombra hueso + vertex group al commitear
     SincronizarNombreBone2D(this); // idem para la tarjeta Armature 2D (huesos 2D del mesh)
@@ -6455,6 +7002,7 @@ void Properties::RefreshTargetProperties(){
     if (propObjVisible) propObjVisible->value = &ObjActivo->visible;       // checkboxes visible/render
     if (propObjRender)  propObjRender->value  = &ObjActivo->renderizable;
     if (propObjRelLines) propObjRelLines->value = &ObjActivo->showRelantionshipsLines;
+    if (propObjEstatico) propObjEstatico->value = &ObjActivo->estatico;
 
     //Mesh Parts
     RefreshPropMeshParts();
@@ -7017,19 +7565,48 @@ void Properties::RefreshTargetProperties(){
         propLodSoloCam->value = lo ? &lo->soloCamaraActiva : NULL;
     }
 
-    // CULLING: el checkbox bindea directo al campo del objeto activo (NULL = no editable)
-    if (propCullSoloCam){
-        Culling* cu = (ObjActivo->getType() == ObjectType::culling) ? static_cast<Culling*>(ObjActivo) : NULL;
-        if (propCullActivo)  propCullActivo->value  = cu ? &cu->activo : NULL;
-        propCullSoloCam->value = cu ? &cu->soloCamaraActiva : NULL;
-        if (propCullDistMax) propCullDistMax->value = cu ? &cu->distanciaMax : NULL;
+    // MIRROR: checkboxes y limites bindean directo (NULL = no editable); el target
+    // por nombre va con SincronizarMirrorTarget (patron LOD, sync por frame)
+    if (propMirror && propMirrorX){
+        Mirror* mi = (ObjActivo->getType() == ObjectType::mirror) ? static_cast<Mirror*>(ObjActivo) : NULL;
+        propMirrorX->value       = mi ? &mi->mirrorX         : NULL;
+        propMirrorY->value       = mi ? &mi->mirrorY         : NULL;
+        propMirrorZ->value       = mi ? &mi->mirrorZ         : NULL;
+        propMirrorHijos->value   = mi ? &mi->RenderChildrens : NULL;
+        propMirrorLimites->value = mi ? &mi->usaLimites      : NULL;
+        propMirrorU0->value      = (mi && mi->usaLimites) ? &mi->limU0 : NULL;
+        propMirrorU1->value      = (mi && mi->usaLimites) ? &mi->limU1 : NULL;
+        propMirrorV0->value      = (mi && mi->usaLimites) ? &mi->limV0 : NULL;
+        propMirrorV1->value      = (mi && mi->usaLimites) ? &mi->limV1 : NULL;
     }
 
-    // PARTICULAS: numeros y checks directo a los campos del activo (textura y
-    // color van por Sincronizar*, son de texto)
+    // CULLING UNIFICADO: bind directo a los campos del activo (NULL = no editable/oculto). Los campos de grilla
+    // (cellSize/modo3D) solo se bindean con metodo=Grid; el texto del boton de metodo se refresca aca.
+    if (propCullSoloCam){
+        Culling* cu = (ObjActivo->getType() == ObjectType::culling) ? static_cast<Culling*>(ObjActivo) : NULL;
+        bool grid = cu && cu->metodo == Culling::Grid;
+        if (propCullActivo)     propCullActivo->value     = cu ? &cu->activo : NULL;
+        propCullSoloCam->value  = cu ? &cu->soloCamaraActiva : NULL;
+        if (propCullDistMax)    propCullDistMax->value    = cu ? &cu->distanciaMax : NULL;
+        if (propCullOrdenAlpha) propCullOrdenAlpha->value = cu ? &cu->ordenAlpha : NULL;
+        if (propCullCellSize)   propCullCellSize->value   = grid ? &cu->cellSize : NULL;
+        if (propCullModo3D)     propCullModo3D->value      = grid ? &cu->modo3D : NULL;
+        if (propCullMetodo){
+            propCullMetodo->button->text = cu ? CullMetodoLabel(cu->metodo) : "";
+            propCullMetodo->oculto       = !cu;
+        }
+        if (propCullRecalc) propCullRecalc->oculto = !grid; // Recalcular solo tiene sentido con grilla
+    }
+
+
+    // PARTICULAS: numeros y checks directo a los campos del activo (el color va por Sincronizar*, es de texto;
+    // la textura es un dropdown -> solo se refresca el texto del boton).
     if (propPartCantidad){
         Particulas* pt = (ObjActivo->getType() == ObjectType::particulas)
                        ? static_cast<Particulas*>(ObjActivo) : NULL;
+        if (propPartTextura)
+            propPartTextura->button->text = (pt && !pt->textura.empty())
+                                          ? NombreDeArchivo(pt->textura) : std::string(T("No Texture"));
         propPartCantidad->value   = pt ? &pt->cantidad   : NULL;
         propPartVida->value       = pt ? &pt->vida       : NULL;
         propPartTam->value        = pt ? &pt->tam        : NULL;
@@ -7040,8 +7617,8 @@ void Properties::RefreshTargetProperties(){
         propPartTurbulencia->value = pt ? &pt->turbulencia : NULL;
         if (propPartRotacion) propPartRotacion->value = pt ? &pt->rotacion    : NULL;
         if (propPartVelRot)   propPartVelRot->value   = pt ? &pt->velRotacion : NULL;
-        propPartAditivo->value    = pt ? &pt->aditivo    : NULL;
-        if (propPartSustractivo) propPartSustractivo->value = pt ? &pt->sustractivo : NULL;
+        if (propPartColor)    propPartColor->value    = pt ? pt->color        : NULL; // float[4] -> ColorPicker
+        if (propPartMezcla)   propPartMezcla->button->text = pt ? NombreMezcla(pt->mezcla) : std::string(T("Blend"));
         propPartDesvanecer->value = pt ? &pt->desvanecer : NULL;
         propPartActivo->value     = pt ? &pt->activo     : NULL;
     }
@@ -7135,17 +7712,28 @@ Properties::Properties() : ViewportBase() {
     propInstance = NULL;
     propLOD = NULL; propLodDist = NULL;           // objeto LOD (umbrales de distancia)
     propObjRelLines = NULL;                                            // lineas parentales (tarjeta generica)
+    propObjEstatico = NULL;                                            // estatico/dinamico (tarjeta generica, culling grid)
     propLodSoloCam = NULL;                                             // objeto LOD (camara de medida)
-    propCulling = NULL; propCullSoloCam = NULL; propCullDistMax = NULL; // objeto Culling
+    propCulling = NULL; propCullMetodo = NULL; propCullActivo = NULL; propCullSoloCam = NULL; // objeto Culling unificado
+    propCullDistMax = NULL; propCullOrdenAlpha = NULL; propCullCellSize = NULL; propCullModo3D = NULL; propCullRecalc = NULL;
     propCollection = NULL; propCollOrdenCam = NULL; propCollOrdenUnaVez = NULL; // Collection (orden transparentes)
+    propMirror = NULL; propMirrorTarget = NULL;                                 // objeto Mirror (target + ejes + rect)
+    propMirrorX = NULL; propMirrorY = NULL; propMirrorZ = NULL; propMirrorHijos = NULL;
+    propMirrorLimites = NULL; propMirrorU0 = NULL; propMirrorU1 = NULL; propMirrorV0 = NULL; propMirrorV1 = NULL;
     propParticulas = NULL; propPartTextura = NULL; propPartCantidad = NULL;     // objeto Particulas
     propPartVida = NULL; propPartTam = NULL; propPartVel = NULL; propPartDispersion = NULL;
-    propPartGravedad = NULL; propPartAditivo = NULL; propPartSustractivo = NULL; propPartColor = NULL;
+    propPartGravedad = NULL; propPartMezcla = NULL; propPartColor = NULL;
     propPartDesvanecer = NULL; propPartActivo = NULL;
     propPartVariacion = NULL; propPartTurbulencia = NULL;
     propPartRotacion = NULL; propPartVelRot = NULL;
+    propFlipAtlas = NULL; propFlipCuadros = NULL; propFlipCols = NULL; propFlipFilas = NULL; propFlipFps = NULL;
     propBtnCamTarget = NULL;
     propBtnInstTarget = NULL;
+    // tarjeta Fisica (cuerpo rigido)
+    propFisica = NULL; propFisTipo = NULL; propFisMasa = NULL;
+    propFisCajaX = NULL; propFisCajaY = NULL; propFisCajaZ = NULL;
+    propFisCenX = NULL; propFisCenY = NULL; propFisCenZ = NULL;
+    propFisFriccion = NULL; propFisRebote = NULL; propFisQuitar = NULL;
     propBtnNewMaterial = NULL;
     propBtnTextura = NULL;
     propBtnNormalTex = NULL; // (faltaba: normal map UI)
@@ -7160,7 +7748,9 @@ Properties::Properties() : ViewportBase() {
     propModVerViewport = NULL; propModVerEdit = NULL;
     propModVacio = NULL; propMirX = NULL; propMirY = NULL; propMirZ = NULL; propMirTarget = NULL; propArmTarget = NULL;
     propMirMerge = NULL; propMirDist = NULL; propMirClip = NULL; propBtnApplyMod = NULL;
-    propPvsMetodo = NULL; propPvsRecalc = NULL; propPvsInfo = NULL; // modificador Culling (PVS)
+    propPvsMetodo = NULL; propPvsRecalc = NULL; propPvsInfo = NULL; // modificador Oclusion (PVS por triangulo)
+    propPvsPath = NULL; propPvsSoloCam = NULL; propPvsNodo = NULL; propPvsRamas = NULL;
+    propMeshEdicion = NULL; propBtnMeshEditable = NULL; // card "Edicion" (editable/no-editable)
     propSubSimple = NULL; propSubLevel = NULL; propSubRender = NULL;
     propScrewAngle = NULL; propScrewHeight = NULL; propScrewSteps = NULL; propScrewRender = NULL;
     propScrewAxis = NULL; propScrewStretchU = NULL; propScrewStretchV = NULL;
@@ -7245,6 +7835,9 @@ Properties::Properties() : ViewportBase() {
 // segun el objeto activo y la pestania elegida: que tab se ve, cual esta
 // activa, y que grupo de propiedades se muestra
 void Properties::ActualizarPestanias(){
+    // espejo del checkbox Mipmaps de la tarjeta Render: el proyecto abierto pudo
+    // cambiar el global (cabecera `mipmaps:` del .w3d)
+    g_renderMipmaps = w3dEngine::MipmapsGlobal();
     // la 1ra pestania ("Objeto") siempre esta (transforms). La 2da depende del
     // tipo del objeto activo: Mesh -> mesh parts (icono material); Light ->
     // color (icono luz). (Camara / objetos especiales: a futuro.)
@@ -7270,9 +7863,10 @@ void Properties::ActualizarPestanias(){
     bool esLOD  = (tipo == (int)ObjectType::lod);
     bool esCull = (tipo == (int)ObjectType::culling);
     bool esPart = (tipo == (int)ObjectType::particulas);
+    bool esMirror = (tipo == (int)ObjectType::mirror);
     // Collection REAL (no la raiz Scene, que comparte el tipo pero no tiene Parent)
     bool esColl = (tipo == (int)ObjectType::collection && ObjActivo && ObjActivo->Parent);
-    bool hayTab3 = esMesh || esLuz || esCam || esInst || esArm || esT2d || esImg || esRect || esCont || esS9 || esBtn || esExp || esVid || esUI || esScript || esLOD || esCull || esColl || esPart;
+    bool hayTab3 = esMesh || esLuz || esCam || esInst || esArm || esT2d || esImg || esRect || esCont || esS9 || esBtn || esExp || esVid || esUI || esScript || esLOD || esCull || esColl || esPart || esMirror;
 
     if (BarTabs.size() >= 3){
         BarTabs[2]->visible = hayTab3;
@@ -7295,6 +7889,7 @@ void Properties::ActualizarPestanias(){
         else if (esCull) icono = (int)IconType::visible;         // objeto Culling (que se ve)
         else if (esColl) icono = (int)IconType::archive;         // Collection (orden transparentes)
         else if (esPart) icono = (int)IconType::circle;          // objeto Particulas (emisor)
+        else if (esMirror) icono = (int)IconType::mirror;        // objeto Mirror (target + ejes)
         BarTabs[2]->icon = icono;
     }
     // los objetos 2D no muestran el tab Objeto (su Nombre y Posicion viven arriba de su
@@ -7427,6 +8022,15 @@ void Properties::ActualizarPestanias(){
             propBtnAnimSel->button->icon = (ActiveAnimKind == 2) ? (int)IconType::gamepad
                                           : clipActivo ? (int)IconType::armature : (int)IconType::camera;
         }
+        // CONFIG del flipbook: visible SOLO con un flipbook activo (kind 5); carga sus valores en los mirrors
+        { bool flip = (ActiveAnimKind == 5 && g_flipActivo != NULL);
+          if (propFlipAtlas)   { propFlipAtlas->oculto = !flip;   // PropButton: oculto
+              if (flip) propFlipAtlas->button->text = NombreDeArchivo(g_flipActivo->atlas); }
+          // PropFloat: se ocultan con value=NULL; con flipbook activo cargan su valor y se bindean
+          if (propFlipCuadros) { if (flip) g_flipCuadrosF = (float)g_flipActivo->cuadros; propFlipCuadros->value = flip ? &g_flipCuadrosF : NULL; }
+          if (propFlipCols)    { if (flip) g_flipColsF = (float)g_flipActivo->cols;    propFlipCols->value = flip ? &g_flipColsF : NULL; }
+          if (propFlipFilas)   { if (flip) g_flipFilasF = (float)g_flipActivo->filas;  propFlipFilas->value = flip ? &g_flipFilasF : NULL; }
+          if (propFlipFps)     { if (flip) g_flipFpsF = g_flipActivo->fps;             propFlipFps->value = flip ? &g_flipFpsF : NULL; } }
         // dropdown de formato del export: la etiqueta refleja el formato activo
         if (propExportFormat && propExportFormat->button)
             propExportFormat->button->text = NombreFormato(exportFormat);
@@ -7526,6 +8130,16 @@ void Properties::ActualizarPestanias(){
         propMargen->visible = enFila;
     }
     if (propMeshParts) propMeshParts->visible = (pestaniaActiva == 2 && esMesh);
+    // card "Edicion" (pestania MESH = 3, la de UV Maps/Vertex Groups; la 2 es Materiales):
+    // el boton alterna el texto segun el estado
+    if (propMeshEdicion) {
+        propMeshEdicion->visible = (pestaniaActiva == 3 && esMesh);
+        if (esMesh && propBtnMeshEditable && ObjActivo->getType() == ObjectType::mesh) {
+            bool noEd = ((Mesh*)ObjActivo)->noEditable;
+            propBtnMeshEditable->button->text = noEd ? T("Convertir en mesh editable") : T("Borrar datos para edicion");
+            propBtnMeshEditable->button->icon = (int)(noEd ? IconType::mesh : IconType::borrar); // mesh al convertir, tacho al borrar
+        }
+    }
     if (propMaterial)  propMaterial->visible  = (pestaniaActiva == 2 && esMesh);
     if (propLight)     propLight->visible     = (pestaniaActiva == 2 && esLuz);
     if (propCamera)    propCamera->visible    = (pestaniaActiva == 2 && esCam);
@@ -7534,6 +8148,27 @@ void Properties::ActualizarPestanias(){
     if (propCulling)   propCulling->visible   = (pestaniaActiva == 2 && esCull);
     if (propCollection) propCollection->visible = (pestaniaActiva == 2 && esColl);
     if (propParticulas) propParticulas->visible = (pestaniaActiva == 2 && esPart);
+    if (propMirror)     propMirror->visible     = (pestaniaActiva == 2 && esMirror);
+    // tarjeta FISICA: para CUALQUIER objeto que tenga definicion (Add > Physics).
+    // Los PropFloat se re-apuntan al activo (value=NULL oculta la fila).
+    if (propFisica) {
+        W3dRigidoDef* fd = (pestaniaActiva == 2 && ObjActivo) ? ObjActivo->fisica : NULL;
+        propFisica->visible = (fd != NULL);
+        if (propFisTipo && fd) {
+            const char* tn = (fd->tipo == 0) ? "Static"
+                           : (fd->tipo == 2) ? "Character" : "Dynamic";
+            if (propFisTipo->button->text != T(tn)) { propFisTipo->button->text = T(tn); g_redraw = true; }
+        }
+        if (propFisMasa)     propFisMasa->value     = fd ? &fd->masa : NULL;
+        if (propFisCajaX)    propFisCajaX->value    = fd ? &fd->caja[0] : NULL;
+        if (propFisCajaY)    propFisCajaY->value    = fd ? &fd->caja[1] : NULL;
+        if (propFisCajaZ)    propFisCajaZ->value    = fd ? &fd->caja[2] : NULL;
+        if (propFisCenX)     propFisCenX->value     = fd ? &fd->centro[0] : NULL;
+        if (propFisCenY)     propFisCenY->value     = fd ? &fd->centro[1] : NULL;
+        if (propFisCenZ)     propFisCenZ->value     = fd ? &fd->centro[2] : NULL;
+        if (propFisFriccion) propFisFriccion->value = fd ? &fd->friccion : NULL;
+        if (propFisRebote)   propFisRebote->value   = fd ? &fd->rebote : NULL;
+    }
     // pestania ARMATURE: tarjeta "Animation" (clips del esqueleto). Bindeo + visibilidad de Delete/Move mas abajo.
     bool armTab = (pestaniaActiva == 2 && esArm);
     if (propArmAnim) propArmAnim->visible = armTab;
@@ -7728,12 +8363,39 @@ void Properties::ActualizarPestanias(){
         if (propPvsInfo) { propPvsInfo->oculto = !esPvs;
             if (esPvs) {
                 char inf[96];
-                if (!mod->pvsSectores.empty())
-                    snprintf(inf, sizeof(inf), "%d sectores | sector activo: %d", (int)mod->pvsSectores.size(), mod->sectorPVS);
+                int nCel = !mod->pvsSectores.empty() ? (int)mod->pvsSectores.size()
+                         : (mod->visSet.Valido() ? (int)mod->visSet.nCeldas : 0);
+                if (nCel > 0)
+                    snprintf(inf, sizeof(inf), "%d nodos | nodo activo: %d", nCel, mod->sectorPVS);
                 else
-                    snprintf(inf, sizeof(inf), "%s", mod->pvsCargado ? "sin <modelo>.pvs.json (malla completa)" : "sidecar sin cargar (Recalcular)");
+                    snprintf(inf, sizeof(inf), "%s", mod->pvsCargado ? "sin dato (malla completa)" : "sidecar sin cargar (Recalcular)");
                 propPvsInfo->name = inf;
             } }
+        // Oclusion: path (el motor elige el nodo) + ojo de medida + nodo actual editable
+        if (propPvsPath) { propPvsPath->oculto = !esPvs;
+            if (esPvs) propPvsPath->button->text = mod->pathNombre.empty() ? std::string("None") : mod->pathNombre; }
+        if (propPvsSoloCam) propPvsSoloCam->value = esPvs ? &mod->soloCamaraActiva : NULL;
+        if (propPvsRamas) {   // solo con path resuelto y MAS de una rama
+            Curve* cvR = esPvs ? PvsCurveDelMod(mod) : NULL;
+            propPvsRamas->oculto = !(cvR && cvR->nRamas > 1);
+            if (cvR && cvR->nRamas > 1) {
+                int off = 0;
+                for (size_t r = 0; r < mod->ramasOn.size(); r++) if (!mod->ramasOn[r]) off++;
+                char t[40];
+                if (off) snprintf(t, sizeof(t), "Ramas: %d/%d", cvR->nRamas - off, cvR->nRamas);
+                else     snprintf(t, sizeof(t), "Ramas: %d (todas)", cvR->nRamas);
+                propPvsRamas->button->text = t;
+            }
+        }
+        if (propPvsNodo) {
+            if (esPvs) {
+                int nCel = !mod->pvsSectores.empty() ? (int)mod->pvsSectores.size()
+                         : (mod->visSet.Valido() ? (int)mod->visSet.nCeldas : 0);
+                g_pvsNodoF = (float)mod->sectorPVS;
+                propPvsNodo->SetRango(0.0f, nCel > 0 ? (float)nCel : 100000.0f);
+                propPvsNodo->value = &g_pvsNodoF;
+            } else propPvsNodo->value = NULL;
+        }
         // Apply: con cualquier modificador seleccionado, SALVO el Culling (no hornea nada: la malla ya esta intacta)
         if (propBtnApplyMod) propBtnApplyMod->oculto = !haySel || esPvs;
     } else if (propModifierProps) propModifierProps->visible = false;

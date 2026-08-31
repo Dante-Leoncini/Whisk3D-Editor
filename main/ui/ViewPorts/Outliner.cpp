@@ -27,7 +27,8 @@
 // Mapeo tipo de objeto -> IconType (el catalogo de iconos vive en la UI, que el editor SI ve).
 size_t IconoDeObjeto(Object* o) {
     switch (o->getType().v) {
-        case ObjectType::mesh:       return (size_t)IconType::mesh;
+        case ObjectType::mesh:       // no editable (escenario) = CUBO/objeto; editable = el de mesh de siempre
+            return (size_t)(((Mesh*)o)->noEditable ? IconType::object : IconType::mesh);
         case ObjectType::light:      return (size_t)IconType::light;
         case ObjectType::camera:     return (size_t)IconType::camera;
         case ObjectType::collection: return (size_t)IconType::archive;
@@ -612,6 +613,7 @@ void Outliner::event_key_down(int tecla, bool repeticion){
                 SeleccionarTodo(true);
                 break;
             case W3dK_H:
+                UndoCapturarVisibilidad();   // Ctrl+Z: guarda el 'visible' PREVIO antes de togglear
                 ChangeVisibilityObj();
                 break;
             case W3dK_X:

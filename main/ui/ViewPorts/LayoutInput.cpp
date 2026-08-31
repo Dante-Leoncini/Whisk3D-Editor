@@ -20,7 +20,13 @@
 #include "WhiskUI/draw/rectangle.h" // el velo del modo foco
 #include "objects/Objects.h"
 #include "objects/Mesh.h"
+#include "physics/W3dRigido.h" // Add > Physics: W3dRigidoDef del objeto activo
+#include "objects/Curve.h"   // edicion de riel/path via proxy de malla (CurveEntrarEdicion)
+#include "w3dLog.h"          // aviso al pasar una curva de .cap a autorada
 #include "objects/Materials.h" // Material (mat->texture) para el dropdown "Texture" del UV editor
+#include "importers/import_obj.h" // TexturaPendienteDe: texturas encoladas y aun sin subir (dropdown Texture)
+#include "w3dTexture.h"        // w3dEngine::TextureSize (los niveles del menu Mipmap)
+#include "io/Textura2D.h"      // Textura2DListar: la UI del JUEGO en el dropdown Texture
 #include "objects/Textures.h"  // Texture (path) para las etiquetas del dropdown
 #include "objects/EditMesh.h"
 #include "objects/Light.h"
@@ -432,6 +438,45 @@ void LayoutMaximizar3DParaJuego() {
     if (viewPortActive && viewPortActive != rootViewport) LayoutMaximizar();
 }
 
+// MODO JUEGO PURO (pedido del dueno, N95: VERDE + '0'): "para ver esto al
+// MAXIMO rendimiento" -- pantalla completa el viewport 3D con la vista de la
+// camara del juego y NADA del editor (ni barra de menu, ni headers, ni
+// overlays/gizmos, ni texto). Re-apretar restaura todo tal cual estaba.
+static bool gPuroMaximizo = false;   // este toggle maximizo (o ya estaba)
+static bool gPuroVistaCam = false;   // ViewFromCameraActive previo del 3D
+void LayoutJuegoPuroToggle() {
+    extern int g_juegoPuro;
+    if (!rootViewport) return;
+    if (g_juegoPuro == 0) {
+        // ENTRAR (estado 1, juego con BANDAS): si hay OTRO panel maximizado
+        // (no el 3D), des-maximizar primero
+        if (g_rootGuardado && rootViewport->ViewportKind() != 1) LayoutMaximizar();
+        bool yaMax = LayoutEstaMaximizado();
+        LayoutMaximizar3DParaJuego();
+        gPuroMaximizo = !yaMax && LayoutEstaMaximizado();
+        // la vista del JUEGO: mirar por la camara activa (aspect de la camara)
+        gPuroVistaCam = false;
+        if (viewPortActive && viewPortActive->ViewportKind() == 1 && CameraActive) {
+            Viewport3D* v3 = (Viewport3D*)viewPortActive;
+            gPuroVistaCam = v3->ViewFromCameraActive;
+            v3->SetViewFromCameraActive(true);
+        }
+        g_juegoPuro = 1;
+    } else if (g_juegoPuro == 1) {
+        // estado 2, COVER: solo cambia la proyeccion/encuadre (ViewPort3D lo
+        // lee); el layout maximizado y la vista de camara quedan como estan
+        g_juegoPuro = 2;
+    } else {
+        // SALIR: restaurar vista y layout como estaban
+        g_juegoPuro = 0;
+        if (viewPortActive && viewPortActive->ViewportKind() == 1 && !gPuroVistaCam)
+            ((Viewport3D*)viewPortActive)->SetViewFromCameraActive(false);
+        if (gPuroMaximizo && LayoutEstaMaximizado()) LayoutMaximizar();
+        gPuroMaximizo = false;
+    }
+    g_redraw = true;
+}
+
 // opcion del menu de tipo: cambiar / expand / split / maximizar
 static void LayoutAccionTipo(int aId) {
     if (!gMenuTipoDe || !rootViewport) return;
@@ -481,6 +526,138 @@ static void TrasCrearAdd(Object* nuevo){
         AbrirRedoMeshPanel((Mesh*)nuevo);
 }
 
+// ============================================================================
+//  EDICION DE CURVE (riel/path) VIA PROXY DE MALLA (pedido del dueno: "si
+//  selecciono un riel tendria que poder entrar en modo edicion... misma edicion
+//  que cualquier mesh normal. solo moves puntos... el riel no tiene caras").
+//
+//  Tab sobre una Curve arma una malla "<nombre> (edit)" con sus nodos + la
+//  CADENA de aristas y la pone en Edit Mode: G mueve, E extruye el proximo
+//  nodo -- toda la maquinaria de mesh, gratis. Al salir de Edit los nodos
+//  vuelven a la curva RECORRIENDO la cadena de aristas desde una punta (el
+//  orden interno de los vertices del proxy no importa). Si la cantidad de
+//  nodos cambio, los canales por-nodo del .cap (rotacion/fov) ya no mapean y
+//  se sueltan; la curva pasa a AUTORADA (origen vacio -> se guarda inline).
+// ============================================================================
+void ActualizarEditMeshActivo();   // (definida mas abajo; la edicion de curve la usa al entrar)
+bool g_selFaceDisponible = true;   // false = editando una malla sin caras (path): Face gris
+static Curve* gCurveEnEdicion = NULL;   // la curva cuya malla INTERNA se esta editando
+
+// la malla de edicion es PARTE de la curva (Curve::edicion): no hay ningun objeto de
+// escena de por medio -- no se puede seleccionar, ni borrar, ni aparece en el outliner
+// ("adivina que pasa si ese objeto despues se borra" -el dueno-; ya no existe ese caso).
+// El viewport la dibuja explicito tras la escena para que el overlay de edit se vea.
+Object* W3dCurveProxyActivo() {
+    return (gCurveEnEdicion && gCurveEnEdicion->edicion) ? (Object*)gCurveEnEdicion->edicion : NULL;
+}
+
+// true si 'o' sigue vivo en la escena (la curva pudo morir con un cierre de proyecto)
+static bool ObjetoEnEscena(Object* raiz, Object* o){
+    if (!raiz || !o) return false;
+    if (raiz == o) return true;
+    for (size_t i = 0; i < raiz->Childrens.size(); i++)
+        if (ObjetoEnEscena(raiz->Childrens[i], o)) return true;
+    return false;
+}
+
+static void CurveEntrarEdicion(Curve* cv){
+    if (!cv || gCurveEnEdicion) return;
+    if (!cv->edicion) {
+        cv->edicion = new Mesh(NULL, Vector3(0,0,0));
+        // el ctor lo colgo de SceneCollection: DESCOLGARLO ya (es un MIEMBRO de la curva,
+        // no un objeto de escena; muere con la curva en ~Curve)
+        if (cv->edicion->Parent) {
+            std::vector<Object*>& ch = cv->edicion->Parent->Childrens;
+            for (size_t i = 0; i < ch.size(); i++) if (ch[i] == cv->edicion) { ch.erase(ch.begin() + i); break; }
+            cv->edicion->Parent = NULL;
+        }
+    }
+    Mesh* m = cv->edicion;
+    // REUSO del holder: limpiar lo del uso anterior y cargar los nodos de ESTA curva
+    m->InvalidarEdit();
+    delete[] m->vertex; delete[] m->normals; delete[] m->uv; delete[] m->vertexColor;
+    m->looseVerts.clear(); m->looseEdges.clear(); m->materialsGroup.clear();
+    int n = cv->vertexSize > 0 ? cv->vertexSize : 1;
+    m->vertexSize  = n;
+    m->vertex      = new GLfloat[n * 3];
+    m->normals     = new GLbyte [n * 3];
+    m->uv          = new GLfloat[n * 2];
+    m->vertexColor = new GLubyte[n * 4];
+    for (int i = 0; i < n; i++) {
+        if (cv->vertex && i < cv->vertexSize) {
+            m->vertex[i*3] = cv->vertex[i*3]; m->vertex[i*3+1] = cv->vertex[i*3+1]; m->vertex[i*3+2] = cv->vertex[i*3+2];
+        } else { m->vertex[i*3] = m->vertex[i*3+1] = m->vertex[i*3+2] = 0.0f; }
+        m->normals[i*3] = 0; m->normals[i*3+1] = 127; m->normals[i*3+2] = 0;
+        m->uv[i*2] = m->uv[i*2+1] = 0.0f;
+        m->vertexColor[i*4] = m->vertexColor[i*4+1] = m->vertexColor[i*4+2] = m->vertexColor[i*4+3] = 255;
+    }
+    // aristas: el grafo explicito de la curva, o la cadena implicita de la polilinea
+    if (!cv->aristas.empty())
+        for (size_t k = 0; k < cv->aristas.size(); k++) m->looseEdges.push_back((int)cv->aristas[k]);
+    else
+        for (int i = 0; i + 1 < n; i++) { m->looseEdges.push_back(i); m->looseEdges.push_back(i + 1); }
+    if (n == 1) m->looseVerts.push_back(0);
+    MaterialGroup g; g.startDrawn = 0; g.material = MaterialDefecto;
+    m->materialsGroup.push_back(g);
+    m->name = cv->name;                    // (interno: solo para logs/overlays)
+    m->pos  = cv->GetGlobalPosition();     // suelto: su pos ES su global
+    m->noEditable = false; m->visible = true;
+    m->CalcularBordes();
+    gCurveEnEdicion = cv;
+    // NO se toca la seleccion (la curva sigue siendo el objeto activo) ni su visibilidad:
+    // la linea del riel queda abajo y encima se dibujan los nodos editables.
+    if (EditSelectMode == SelFace) EditSelectMode = SelVertex;   // un path no tiene caras
+    InteractionMode = EditMode;
+    ActualizarEditMeshActivo();
+    m->EditSeleccionarTodo(true);
+    g_redraw = true;
+}
+
+static void CurveFinalizarEdicion(){
+    Curve* cv = gCurveEnEdicion;
+    gCurveEnEdicion = NULL;
+    if (!cv) return;
+    // la curva pudo BORRARSE mientras se editaba (X): el camino real de borrado la deja viva
+    // en el undo (y su malla interna con ella), asi que aca solo hay que no volcar nada.
+    bool curvaViva = ObjetoEnEscena(SceneCollection, cv);
+    Mesh* m = cv->edicion;
+    if (!m) return;
+    if (curvaViva && m->vertex && m->vertexSize > 0) {
+        // WRITE-BACK EN ORDEN DE VERTICES (1:1 con el proxy): los nodos existentes CONSERVAN su
+        // indice (el mapeo con las celdas del .w3dvis no se rompe con un move) y los extruidos
+        // se agregan al final. Las ARISTAS son el grafo tal cual (ramas incluidas).
+        const int nn = m->vertexSize;
+        GLfloat* nv = new GLfloat[nn * 3];
+        for (int i = 0; i < nn * 3; i++) nv[i] = m->vertex[i];
+        bool cambioN = (nn != cv->vertexSize);
+        delete[] cv->vertex;  cv->vertex = nv; cv->vertexSize = nn;
+        delete[] cv->indices; cv->indices = new GLushort[nn];
+        for (int i = 0; i < nn; i++) cv->indices[i] = (GLushort)i;
+        cv->aristas.clear();
+        for (size_t k = 0; k < m->looseEdges.size(); k++) cv->aristas.push_back((GLushort)m->looseEdges[k]);
+        if (cambioN) {   // los canales por-nodo del .cap ya no mapean nodo a nodo
+            delete[] cv->rotNodo; cv->rotNodo = NULL;
+            delete[] cv->fovNodo; cv->fovNodo = NULL;
+        }
+        if (!cv->origen.empty()) {
+            w3dLogf("[Curve] '%s' editada en el editor: pasa a AUTORADA (se guarda inline, ya no sigue al .cap)",
+                    cv->name.c_str());
+            cv->origen.clear();
+        }
+        cv->BuildKDTree();
+        cv->RecalcularRamas();
+    }
+    // la malla interna queda en la curva (se reusa en la proxima edicion); solo soltar el cage
+    m->InvalidarEdit();
+    g_redraw = true;
+}
+
+// cierre EXTERNO de la edicion de curve (lo llama el guardado del proyecto: los nodos
+// editados tienen que estar volcados en la curva ANTES de serializarla)
+void W3dCurveEdicionCerrar() {
+    if (gCurveEnEdicion) { InteractionMode = ObjectMode; CurveFinalizarEdicion(); }
+}
+
 void AddPlane(){    TrasCrearAdd(NewMesh(MeshType::plane, NULL, false)); }
 void AddCube(){     TrasCrearAdd(NewMesh(MeshType::cube, NULL, false)); }
 void AddCircle(){   TrasCrearAdd(NewMesh(MeshType::circle, NULL, false)); }
@@ -491,9 +668,62 @@ void AddEmpty(){    TrasCrearAdd(new Empty(NULL, cursor3D.pos)); }
 // LOD: nace sin umbrales (dibuja el ultimo hijo siempre); se cargan en el panel
 void AddLOD(){      TrasCrearAdd(new LOD(NULL, cursor3D.pos)); }
 void AddCulling(){  TrasCrearAdd(new Culling(NULL, cursor3D.pos)); }
+// GridCull: atajo que crea un Culling con metodo=Grid (celda 16, grilla 2D XZ); se le cuelgan los objetos
+// y se toca "Recalcular". El objeto es el mismo Culling: el metodo se puede cambiar despues en el panel.
+void AddGridCull(){ Culling* c = new Culling(NULL, cursor3D.pos); c->metodo = Culling::Grid; TrasCrearAdd(c); }
 // Particulas: nace emitiendo (cantidad 10/s) pero SIN textura -> no dibuja nada
 // hasta que el usuario le carga un PNG en el panel
 void AddParticulas(){ TrasCrearAdd(new Particulas(NULL, cursor3D.pos)); }
+
+// ---- Add > Physics: cuerpo rigido para el objeto ACTIVO --------------------
+// No crea un objeto: le cuelga la DEFINICION de fisica (physics/W3dRigido.h)
+// al activo. La caja default ENVUELVE el subarbol (mallas incluidas), medida
+// en el espacio LOCAL del objeto; un Empty pelado queda con el cubo unitario.
+// Tipo/masa/caja/centro/friccion/rebote se afinan en el panel (seccion Physics).
+static void BoundsLocalRec(Object* o, const Matrix4& aRaiz, bool esRaiz,
+                           float mn[3], float mx[3], bool* hay) {
+    Matrix4 m = aRaiz;
+    if (!esRaiz) {
+        Matrix4 loc;
+        o->GetMatrixBase(loc);
+        m = aRaiz * loc;
+    }
+    if (o->getType() == ObjectType::mesh) {
+        Mesh* me = (Mesh*)o;
+        if (me->vertex && me->vertexSize > 0) {
+            for (int i = 0; i < me->vertexSize; i++) {
+                Vector3 p = m * Vector3(me->vertex[i * 3], me->vertex[i * 3 + 1],
+                                        me->vertex[i * 3 + 2]);
+                for (int k = 0; k < 3; k++) {
+                    if (!*hay || p[k] < mn[k]) mn[k] = p[k];
+                    if (!*hay || p[k] > mx[k]) mx[k] = p[k];
+                }
+                *hay = true;
+            }
+        }
+    }
+    for (size_t i = 0; i < o->Childrens.size(); i++)
+        BoundsLocalRec(o->Childrens[i], m, false, mn, mx, hay);
+}
+void AddFisica(){
+    Object* o = ObjActivo;
+    if (!o) { Notificar(T("No active object"), true); return; }
+    if (o->fisica) { Notificar(T("It already has physics"), true); return; }
+    W3dRigidoDef* d = new W3dRigidoDef();
+    float mn[3] = {0, 0, 0}, mx[3] = {0, 0, 0};
+    bool hay = false;
+    Matrix4 ident; ident.Identity();
+    BoundsLocalRec(o, ident, true, mn, mx, &hay);
+    if (hay) {
+        for (int k = 0; k < 3; k++) {
+            d->caja[k] = mx[k] - mn[k];
+            if (d->caja[k] < 0.02f) d->caja[k] = 0.02f;
+            d->centro[k] = 0.5f * (mx[k] + mn[k]);
+        }
+    }
+    o->fisica = d;
+    g_redraw = true;
+}
 // interfaz 2D (se edita en el Editor 2D). Si el proyecto aun no tiene
 // PALETAS, la default del UI ("Whisk3D") pasa a ser la del proyecto y queda
 // seleccionada en la raiz nueva; con paletas ya cargadas no se mezclan
@@ -550,6 +780,22 @@ void AddVertex(){
     Mesh* m = (Mesh*)NewMesh(MeshType::vertice, NULL, false);
     TrasCrearAdd(m);
     if (m){ if (InteractionMode != EditMode) LayoutToggleEditMode(); m->EditSeleccionarTodo(true); }
+}
+void AddPath(){
+    // un PATH = una CURVE de verdad (el mismo objeto que hace de riel de la camara y del
+    // modificador Oclusion -- "vi que creo un riel... y no es un riel! es un mesh!" -el
+    // dueno-). Nace AUTORADA (sin .cap, se guarda inline) con 2 nodos en el cursor, y
+    // entra DIRECTO a edicion via el proxy de malla: G mueve, E extruye el proximo nodo.
+    Curve* cv = new Curve(NULL, cursor3D.pos);
+    cv->SetNameObj("Path");
+    cv->vertexSize = 2;
+    cv->vertex = new GLfloat[6];
+    cv->vertex[0] = 0.0f; cv->vertex[1] = 0.0f; cv->vertex[2] = 0.0f;
+    cv->vertex[3] = 1.0f; cv->vertex[4] = 0.0f; cv->vertex[5] = 0.0f;
+    cv->indices = new GLushort[2]; cv->indices[0] = 0; cv->indices[1] = 1;
+    cv->signoZ = 1.0f;               // autorada en el espacio del motor (sin espejo de .cap)
+    TrasCrearAdd(cv);
+    CurveEntrarEdicion(cv);
 }
 void AddReference(){
     // un plano PARADO (90 en X) = de frente en la vista, con su material y el selector de textura ya abierto:
@@ -649,7 +895,10 @@ static const MenuDef ADD[] = {
     { "Empty",      AddEmpty,           NULL, ICONO(IconType::empty) },
     { "LOD",        AddLOD,             NULL, ICONO(IconType::array) },
     { "Culling",    AddCulling,         NULL, ICONO(IconType::visible) },
+    { "Grid Cull",  AddGridCull,        NULL, ICONO(IconType::cuadricula) },
     { "Particles",  AddParticulas,      NULL, ICONO(IconType::circle) },
+    { "Physics",    AddFisica,          NULL, ICONO(IconType::object) },
+    { "Path",       AddPath,            NULL, ICONO(IconType::curve) },
     { "Armature",   AddArmature,        NULL, ICONO(IconType::armature) },
     { "Camera",     AddCamera,          NULL, ICONO(IconType::camera) },
     { "Light",      AddLight,           NULL, ICONO(IconType::light) },
@@ -685,6 +934,7 @@ static void LayoutAccionSelect(int aId) {
         case 14: LayoutPickPathIniciar(true);  break; // + Fill Region (rellena)
         case 15: LayoutSelectLinkedGuiado();   break; // Select Linked (isla conexa) en modo guiado: pide click
         case 16: LayoutLoopSelectGuiado();     break; // Loop Select en modo VERTICE: guiado (click sobre un borde)
+        case 20: w3dVerSeleccion = !w3dVerSeleccion; g_redraw = true; break; // Ver seleccion (contorno + tinte)
     }
 }
 
@@ -696,6 +946,9 @@ static void LayoutRebuildMenuSelect() {
     MenuSelect->Agregar(T("All"), 0)->atajo = "A";
     MenuSelect->Agregar(T("None"), 1)->atajo = "Alt A";
     MenuSelect->Agregar(T("Invert"), 2)->atajo = "Ctrl I";
+    // "Ver seleccion" (pedido del dueno): OFF = ni contorno verde ni tinte de malla no
+    // editable -- para mirar el escenario seleccionado tal como se ve de verdad.
+    MenuSelect->Agregar(T("Ver seleccion"), 20)->verde = w3dVerSeleccion;
     if (InteractionMode == EditMode) {
         // Select Linked (L): selecciona la ISLA conexa. Desde el menu = guiado (pide click sobre el elemento).
         MenuSelect->Agregar(T("Select Linked"), 15)->atajo = "L";
@@ -1294,6 +1547,7 @@ static void LayoutAccionView(int aId) {
         case 411: Viewport3DActive->SetViewFromCameraActive(!Viewport3DActive->ViewFromCameraActive);   break; // Active Camera (Num 0): ver desde la camara
         case 420: Viewport3DActive->EnfocarObject(); break; // Frame Selected (Numpad .): enfoca la seleccion
         case 421: LayoutLockOrbitToggle(); break; // Lock Orbit: orbitar -> panear
+        case 422: Viewport3DActive->LocalViewToggle(); break; // Local View (/): aisla la seleccion en el viewport activo
     }
 }
 
@@ -1318,8 +1572,19 @@ static void RegenerarMirrorsConTargetRec(Object* nodo){
 }
 
 void ActualizarEditMeshActivo() {
+    // EDICION DE CURVE: si la curva dejo de ser el objeto activo en Edit (Tab afuera,
+    // click en otro objeto, cambio de modo), volcar los nodos y cerrar la sesion.
+    if (gCurveEnEdicion && (InteractionMode != EditMode || ObjActivo != (Object*)gCurveEnEdicion))
+        CurveFinalizarEdicion();
+    // (noEditable: red de seguridad app-wide; los gates de Tab/menu ya avisaron)
     g_editMesh = (InteractionMode == EditMode && ObjActivo &&
-                  ObjActivo->getType() == ObjectType::mesh) ? ObjActivo : NULL;
+                  ObjActivo->getType() == ObjectType::mesh &&
+                  !((Mesh*)ObjActivo)->noEditable) ? ObjActivo : NULL;
+    // curva en edicion: la MALLA INTERNA de la curva es la editable (el activo sigue siendo la curva)
+    if (gCurveEnEdicion && InteractionMode == EditMode && ObjActivo == (Object*)gCurveEnEdicion)
+        g_editMesh = (Object*)gCurveEnEdicion->edicion;
+    // el modo Face del menu SelMode se grisa editando una malla sin caras (path/riel)
+    g_selFaceDisponible = !(g_editMesh && ((Mesh*)g_editMesh)->facesSize == 0);
     // CONSTRAINTS + EDIT MODE: el evaluador del Core necesita saber CUAL objeto se esta editando
     // para poder saltear los constraints que tienen apagado "ver en modo edicion" (W3dConstraint.h).
     // Va por la misma puerta que g_editMesh -que es la unica- para que no puedan quedar desfasados.
@@ -1373,10 +1638,19 @@ void ActualizarEditMeshActivo() {
 //  - ARMATURE:  Object / Edit (placeholder) / Pose (posa el esqueleto).
 static void LayoutAccionMode(int aId) {
     int modoPrevio = InteractionMode;
-    if (ObjActivo && ObjActivo->getType() == ObjectType::mesh)
+    if (ObjActivo && ObjActivo->getType() == ObjectType::mesh) {
+        if (aId == EditMode && ((Mesh*)ObjActivo)->noEditable) {   // escenario cerrado a edicion
+            Notificar(T("Malla no editable (Convertir en mesh editable, card Mesh)"), true);
+            return;
+        }
         InteractionMode = aId;
+    }
     else if (ObjActivo && ObjActivo->getType() == ObjectType::armature)
         InteractionMode = (aId == PoseMode || aId == EditMode) ? aId : ObjectMode; // Object/Edit/Pose
+    else if (ObjActivo && ObjActivo->getType() == ObjectType::curve && aId == EditMode) {
+        CurveEntrarEdicion((Curve*)ObjActivo);   // riel/path: editar sus nodos via el proxy
+        return;
+    }
     else
         InteractionMode = ObjectMode;
     // al SALIR del Edit de huesos: cerrar un grab a medio hacer + preparar el skin autorado
@@ -1411,6 +1685,8 @@ static void LayoutRebuildMenuMode() {
 // modo hay que RECOLOREAR (sino quedan los colores del modo anterior, ej: el
 // degradado de vertex en edge) y se resetea el activo (no hay activo del modo nuevo).
 static void LayoutAccionSelMode(int aId) {
+    // malla SIN caras (un path/riel en edicion): el modo Face no existe
+    if (aId == SelFace && g_editMesh && ((Mesh*)g_editMesh)->facesSize == 0) return;
     EditSelectMode = aId; // SelVertex/SelEdge/SelFace
     if (g_editMesh) {
         Mesh* m = (Mesh*)g_editMesh;
@@ -1626,11 +1902,21 @@ static void LayoutAbrirMenuUVSelMode(UVEditor* uv, int x, int y) {
 }
 
 // click en la barra del UV editor: [1]=View, [2]=SelMode (propio), [3]=Pivot (= menu del 3D), [4]=Snap
-// dropdown "Texture" del UV editor (boton [5] de la barra): elegir a mano que textura/parte del modelo ver.
+// dropdown "Texture" del UV editor (boton [5] de la barra): elegir que textura ver -- una parte del
+// modelo (auto-cae al cambiar de seleccion) o CUALQUIER textura del proyecto (persiste; sirve para
+// auditar cuantas texturas hay cargadas y probar como calzan las UV en otro aspecto).
 static UVEditor*  gUVTexTarget = NULL;
 static Mesh*      gUVTexMesh   = NULL;
 static PopupMenu* gMenuUVTex   = NULL;
+static std::vector<std::string> gUVTexRutas;   // rutas de las opciones de proyecto (id 9001+k)
 static void LayoutAccionUVTex(int id) {
+    if (id >= 9001) {                                   // textura del PROYECTO (por ruta)
+        size_t k = (size_t)(id - 9001);
+        if (k < gUVTexRutas.size()) UVSetTexProyecto(gUVTexRutas[k]);
+        g_redraw = true;
+        return;
+    }
+    UVSetTexProyecto(std::string());                    // parte del modelo: apaga el de proyecto
     if (!gUVTexMesh) return;
     if (id >= 9000) UVSetTexOverride(gUVTexMesh, -1);   // "Auto": vuelve a seguir la parte activa
     else            UVSetTexOverride(gUVTexMesh, id);   // ver a mano la parte (material) 'id'
@@ -1639,16 +1925,15 @@ static void LayoutAccionUVTex(int id) {
 static void LayoutAbrirMenuUVTex(UVEditor* uv, int x, int y) {
     if (!uv) return;
     Mesh* m = (ObjActivo && ObjActivo->getType() == ObjectType::mesh) ? (Mesh*)ObjActivo : NULL;
-    if (!m || m->materialsGroup.empty()) return;
-    gUVTexTarget = uv; gUVTexMesh = m;
+    gUVTexTarget = uv; gUVTexMesh = m;   // sin malla el menu sale igual (solo el proyecto)
     if (!gMenuUVTex) gMenuUVTex = new PopupMenu();
     gMenuUVTex->Limpiar();
-    gMenuUVTex->titulo = T("Texture");
-    gMenuUVTex->Agregar(T("Auto (active part)"), 9000);
-    // lista las TEXTURAS DISTINTAS del modelo (dedup por puntero). El id de cada opcion = la parte que la usa, asi el
-    // UV editor muestra esa textura + las UV de esa parte. (el dropdown es de texturas, no de materiales).
+    const bool sinProyecto = UVTexProyectoRuta().empty();
+    gMenuUVTex->Agregar(T("Auto (active part)"), 9000)->verde = sinProyecto && UVTexOverrideParte() < 0;
+    // las TEXTURAS DISTINTAS del modelo (dedup por puntero). El id de cada opcion = la parte que la
+    // usa, asi el UV editor muestra esa textura + las UV de esa parte.
     std::vector<Texture*> vistas;
-    for (size_t i = 0; i < m->materialsGroup.size(); i++) {
+    for (size_t i = 0; m && i < m->materialsGroup.size(); i++) {
         Material* mm = m->materialsGroup[i].material;
         Texture* t = mm ? mm->texture : NULL;
         if (!t) continue;
@@ -1658,12 +1943,83 @@ static void LayoutAbrirMenuUVTex(UVEditor* uv, int x, int y) {
         std::string lbl; char buf[24]; sprintf(buf, "Texture %d", (int)vistas.size());
         if (!t->path.empty()){ size_t sl = t->path.find_last_of("/\\"); lbl = (sl==std::string::npos) ? t->path : t->path.substr(sl+1); }
         else lbl = buf;
-        gMenuUVTex->Agregar(lbl, (int)i); // id = parte que usa esta textura
+        gMenuUVTex->Agregar(lbl, (int)i)->verde = (sinProyecto && UVTexOverrideParte() == (int)i);
     }
+    // ...y TODAS las del PROYECTO: las texturas de los MATERIALES de la escena
+    // MAS la UI del JUEGO (el cache 2D: HUD/Imagen2D). La UI del propio editor
+    // (skin/iconos/fuente) NO es del proyecto y queda afuera (pedido del dueno).
+    // Dedup por NOMBRE DE ARCHIVO: la misma textura aparece con ruta absoluta
+    // (ya subida) o relativa (encolada) segun el momento, y con esto el contador
+    // del titulo es SIEMPRE el mismo, haya lo que haya seleccionado.
+    gUVTexRutas.clear();
+    std::vector<std::string> candidatas;
+    for (size_t i = 0; i < Materials.size(); i++) {
+        Material* mm = Materials[i];
+        if (!mm) continue;
+        std::string ruta = (mm->texture && !mm->texture->path.empty())
+                               ? mm->texture->path
+                               : TexturaPendienteDe(mm);   // encolada, aun sin subir
+        if (!ruta.empty()) candidatas.push_back(ruta);
+    }
+    Textura2DListar(candidatas);                            // la UI del juego
+    std::vector<std::string> nombresVistos;
+    for (size_t i = 0; i < candidatas.size(); i++) {
+        const std::string& ruta = candidatas[i];
+        size_t sl = ruta.find_last_of("/\\");
+        std::string lbl = (sl == std::string::npos) ? ruta : ruta.substr(sl + 1);
+        bool dup = false;
+        for (size_t k = 0; k < nombresVistos.size(); k++) if (nombresVistos[k] == lbl) { dup = true; break; }
+        if (dup) continue;
+        nombresVistos.push_back(lbl);
+        MenuItem* it = gMenuUVTex->Agregar(lbl, (int)(9001 + gUVTexRutas.size()));
+        it->verde = (!sinProyecto && ruta == UVTexProyectoRuta());
+        gUVTexRutas.push_back(ruta);
+    }
+    { char tit[48]; sprintf(tit, "%s (%d)", T("Texture"), (int)gUVTexRutas.size());
+      gMenuUVTex->titulo = tit; }
     gMenuUVTex->action = LayoutAccionUVTex;
     if (MenuAbierto && MenuAbierto != gMenuUVTex) MenuAbierto->Cerrar();
     gMenuUVTex->Abrir(x, y, MenuPantallaW, MenuPantallaH);
     MenuAbierto = gMenuUVTex;
+}
+
+// menu "Mipmap" del UV editor: inspector de la piramide de la textura MOSTRADA.
+// "Auto" = el filtro elige el nivel por zoom (comportamiento normal del render);
+// elegir un tamano lo clava para inspeccionarlo (GL_TEXTURE_BASE_LEVEL, solo PC).
+static PopupMenu* gMenuUVMip = NULL;
+static void LayoutAccionUVMip(int id) {
+    UVSetMipNivel(id >= 9000 ? -1 : id);
+    g_redraw = true;
+}
+static void LayoutAbrirMenuUVMip(UVEditor* uv, int x, int y) {
+    if (!uv) return;
+    Mesh* m = (ObjActivo && ObjActivo->getType() == ObjectType::mesh) ? (Mesh*)ObjActivo : NULL;
+    unsigned int tid = UVTexturaMostradaId(m);
+    if (!tid) return;
+    if (!gMenuUVMip) gMenuUVMip = new PopupMenu();
+    gMenuUVMip->Limpiar();
+    gMenuUVMip->titulo = "Mipmap";
+    gMenuUVMip->Agregar("Auto", 9000)->verde = (UVMipNivel() < 0);
+    if (w3dEngine::TexTieneMips(tid) && w3dEngine::MipmapsGlobal()) {
+        int tw = 0, th = 0;
+        w3dEngine::TextureSize(tid, tw, th);
+        int niv = 0;
+        while (tw >= 1 && th >= 1) {
+            char b[24]; sprintf(b, "%dx%d", tw, th);
+            gMenuUVMip->Agregar(b, niv)->verde = (UVMipNivel() == niv);
+            if (tw == 1 && th == 1) break;
+            if (tw > 1) tw /= 2;
+            if (th > 1) th /= 2;
+            niv++;
+        }
+    } else {
+        // sin piramide: mipmaps apagados (Ajustes/proyecto) o textura NPOT
+        gMenuUVMip->Agregar(T("No mipmaps (off or NPOT texture)"), 9001);
+    }
+    gMenuUVMip->action = LayoutAccionUVMip;
+    if (MenuAbierto && MenuAbierto != gMenuUVMip) MenuAbierto->Cerrar();
+    gMenuUVMip->Abrir(x, y, MenuPantallaW, MenuPantallaH);
+    MenuAbierto = gMenuUVMip;
 }
 
 // ---- barra del EDITOR 2D: boton [1] "Add" -> menu de elementos 2D --------------------------
@@ -2228,6 +2584,7 @@ bool LayoutClickBarraUV(UVEditor* uv, int mx, int my) {
             case BRUV_Pivot:     LayoutMenuPivotUV(bx, by);            return true; // variante 2D (sin Active Element)
             case BRUV_Snap:      LayoutAbrirMenuUVSnap(uv, bx, by);    return true;
             case BRUV_Texture:   LayoutAbrirMenuUVTex(uv, bx, by);     return true; // dropdown de texturas
+            case BRUV_Mipmap:    LayoutAbrirMenuUVMip(uv, bx, by);     return true; // inspector de la piramide
             case BRUV_Animation: LayoutAbrirMenuUVAnim(uv, bx, by);    return true; // keyframes de la vertex anim
         }
     }
@@ -2350,6 +2707,8 @@ bool LayoutAbrirMenuDeBarra(ViewportBase* vp, int mx, int my) {
         // refrescar el tilde de "Lock Orbit" con el estado del viewport activo (el menu se arma 1 sola vez)
         extern MenuItem* MenuItemLockOrbit;
         if (MenuItemLockOrbit && Viewport3DActive) MenuItemLockOrbit->verde = Viewport3DActive->lockOrbit;
+        extern MenuItem* MenuItemLocalView;
+        if (MenuItemLocalView && Viewport3DActive) MenuItemLocalView->verde = Viewport3DActive->localViewActivo;
     } else if (MenuSelect && bSel && bSel->visible && bSel->Contains(mx, my)) {
         objetivo = MenuSelect; boton = bSel;
         LayoutRebuildMenuSelect();   // mode-aware: agrega Loop Select en Edit (cara/borde)
@@ -2523,6 +2882,7 @@ static void LayoutCambiarMenuBarraUV(int dir) {
         else if (MenuAbierto == gMenuPivot)     rol = BRUV_Pivot;
         else if (MenuAbierto == gMenuUVSnap)    rol = BRUV_Snap;
         else if (MenuAbierto == gMenuUVTex)     rol = BRUV_Texture;
+        else if (MenuAbierto == gMenuUVMip)     rol = BRUV_Mipmap;
         else if (MenuAbierto == gMenuUVAnim)    rol = BRUV_Animation;
         if (rol >= 0) idx = BarRolIdx(B, rol);
     }
@@ -2548,6 +2908,7 @@ static void LayoutCambiarMenuBarraUV(int dir) {
         case BRUV_Pivot:     LayoutMenuPivot(mx, my);              break;
         case BRUV_Snap:      LayoutAbrirMenuUVSnap(uv, mx, my);    break;
         case BRUV_Texture:   LayoutAbrirMenuUVTex(uv, mx, my);     break;
+        case BRUV_Mipmap:    LayoutAbrirMenuUVMip(uv, mx, my);     break;
         case BRUV_Animation: LayoutAbrirMenuUVAnim(uv, mx, my);    break;
     }
 }
@@ -4113,6 +4474,19 @@ bool LayoutTeclaPanelActivo(int tecla) {
     if (viewPortActive->ViewportKind() == 5) { // Timeline
         Timeline* tl = (Timeline*)viewPortActive;
         if (tl->barFocusIndex >= 0) { // foco de barra (soft-izq): flechas mueven el foco, OK activa, C sale
+            // FOCO SOBRE EL SELECTOR DE ANIMACION: arriba/abajo CAMBIAN de animacion
+            // directamente, sin abrir el menu (pedido N95: ciclar rapido para irlas
+            // viendo; abrir el menu, entrar a Escenas y buscar la siguiente por CADA
+            // animacion era un dolor de cabeza). Abajo = siguiente (como bajar en la
+            // lista del menu), arriba = anterior. En los demas botones las flechas
+            // verticales siguen sin hacer nada (como antes).
+            if ((tecla == LayoutKey::Up || tecla == LayoutKey::Down) &&
+                tl->barFocusIndex < (int)tl->BarButtons.size() &&
+                tl->BarButtons[tl->barFocusIndex] == tl->btnAnim && tl->btnAnim->visible) {
+                extern void AnimSelCiclar(int dir);   // Properties.cpp (selector compartido)
+                AnimSelCiclar(tecla == LayoutKey::Down ? +1 : -1);
+                return true;
+            }
             switch (tecla) {
                 case LayoutKey::Left:   LayoutTimelineBarMover(-1); return true;
                 case LayoutKey::Right:  LayoutTimelineBarMover(+1); return true;
@@ -4340,7 +4714,19 @@ bool LayoutToggleEditMode() {
         ActualizarEditMeshActivo();
         return true;
     }
+    if (ObjActivo->getType() == ObjectType::curve) {
+        // CURVE (riel/path): Tab alterna la edicion de su malla INTERNA de nodos.
+        if (InteractionMode != EditMode) CurveEntrarEdicion((Curve*)ObjActivo);
+        else { InteractionMode = ObjectMode; ActualizarEditMeshActivo(); }   // el watchdog vuelca y cierra
+        return true;
+    }
     if (ObjActivo->getType() != ObjectType::mesh) return false;
+    // malla NO EDITABLE (escenario): sin datos de edicion, el Tab no entra. El boton
+    // "Convertir en mesh editable" de la card Mesh la reabre (recalcula bordes/edges).
+    if (InteractionMode != EditMode && ((Mesh*)ObjActivo)->noEditable) {
+        Notificar(T("Malla no editable (Convertir en mesh editable, card Mesh)"), true);
+        return false;
+    }
     UndoCapturarModo(); // Ctrl+Z: guarda el modo PREVIO antes de togglear
     InteractionMode = (InteractionMode == EditMode) ? ObjectMode : EditMode; // MALLA: Object <-> Edit
     ActualizarEditMeshActivo(); // refresca g_editMesh (PC + Symbian)

@@ -382,8 +382,12 @@ void W3dLayoutRender() {
     if (rootViewport) rootViewport->Render();
     else gRoot->Render();
 
-    LayoutRenderMenu(gScreenW, gScreenH); // desplegable abierto (compartido)
-    { extern void NotificacionesRender(int, int); NotificacionesRender(gScreenW, gScreenH); } // toasts encima (export/import)
+    // MODO JUEGO PURO (VERDE+0): ni menu ni toasts -- SOLO el juego en pantalla
+    { extern int g_juegoPuro;
+      if (!g_juegoPuro) {
+          LayoutRenderMenu(gScreenW, gScreenH); // desplegable abierto (compartido)
+          extern void NotificacionesRender(int, int); NotificacionesRender(gScreenW, gScreenH); // toasts encima (export/import)
+      } }
     g_prof.render = W3dNowMs() - _profR0; // profiler: TODO el render (viewports 3D + paneles + menus). En Symbian el
     W3dProfEnd();                          // swap/logic van en el event loop (no aca) -> quedan en 0; scene/3d/ui reales.
     LayoutTickFPS(User::NTickCount());     // overlay de fps (reloj de Symbian, ~ms)

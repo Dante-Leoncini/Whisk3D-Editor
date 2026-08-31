@@ -22,6 +22,7 @@ enum W3dTecla {
 
     // --- imprimibles: su propio ASCII ---
     W3dK_SPACE = ' ',
+    W3dK_SLASH = '/',   // Local View (toggle)
     W3dK_0 = '0', W3dK_1 = '1', W3dK_2 = '2', W3dK_3 = '3', W3dK_4 = '4',
     W3dK_5 = '5', W3dK_6 = '6', W3dK_7 = '7', W3dK_8 = '8', W3dK_9 = '9',
     W3dK_A = 'a', W3dK_B = 'b', W3dK_C = 'c', W3dK_D = 'd', W3dK_E = 'e', W3dK_F = 'f',

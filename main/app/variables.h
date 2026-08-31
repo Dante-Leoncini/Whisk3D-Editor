@@ -29,6 +29,10 @@ extern int winH;
 struct Config {
     bool fullscreen;
     bool enableAntialiasing;
+    // MIPMAPPING global del EDITOR (default true). El proyecto puede pisarlo con
+    // `mipmaps:` en la cabecera del .w3d (el editor lo tiene y el proyecto no, o
+    // al reves). Se aplica al SUBIR texturas: cambiarlo pide recargar el proyecto.
+    bool mipmaps;
     int width;
     int height;
     int displayIndex;
@@ -50,7 +54,7 @@ struct Config {
     // binario no hay repo) el que compila juegos la fija a mano en Ajustes y queda guardada aca.
     std::string repoPath;
     Config()
-        : fullscreen(false), enableAntialiasing(false),
+        : fullscreen(false), enableAntialiasing(false), mipmaps(true),
           width(800), height(600), displayIndex(0),
 #ifdef W3D_SYMBIAN
           scale(1), nuevoUsuario(false),   // N95: UI a escala 1 (240x320) + usuario experimentado (va a teclas)

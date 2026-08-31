@@ -80,14 +80,12 @@ public:
     float vel;             // velocidad inicial (unidades/seg)
     float dispersion;      // apertura TOTAL del cono (grados)
     float gravedad;        // aceleracion -Y de mundo (+ cae, - sube)
-    bool  aditivo;         // mezcla aditiva vs alpha
-    // MEZCLA SUSTRACTIVA (dst = dst - src): OSCURECE en vez de aclarar. La usa la
-    // mitad de las particulas de un emisor tipico (el humo de una chimenea, el
-    // polvo del aterrizaje): un humo gris sobre un cielo claro no se puede hacer
-    // ni con alpha ni con aditiva. El Core ya la tenia (w3dEngine::MezclaSubtract,
-    // REVERSE_SUBTRACT en PC/WebGL y una aproximacion documentada en GL ES 1.1 del
-    // N95); lo que faltaba era poder pedirla desde el emisor. Gana sobre `aditivo`.
-    bool  sustractivo;     // true = dst - src (humo, polvo)
+    // MODO DE MEZCLA (dropdown en el panel): un solo campo con el enum del Core w3dEngine::Mezcla
+    // (Off/Alpha/Add/AddAlpha/Multiply/Screen/Premult/Subtract). Reemplaza a los viejos bool aditivo +
+    // bool sustractivo (que no podian ser dos a la vez ni expresar Multiply/Screen). Default MezclaAlpha.
+    // Subtract (dst - src) OSCURECE: sirve para humo gris sobre cielo claro (chimeneas), que ni alpha ni
+    // aditiva logran. El Core ya soporta todos (REVERSE_SUBTRACT en PC/WebGL, aproximacion en GL ES 1.1 del N95).
+    int   mezcla;          // w3dEngine::Mezcla
     float color[4];        // tinte r,g,b + alpha inicial
     bool  desvanecer;      // alpha -> 0 con la vida
     bool  activo;          // false = no emite nada (las vivas terminan su vida)
@@ -103,6 +101,18 @@ public:
     bool  rotacion;        // true = nace con angulo azaroso 0..360 FIJO (rotz del original);
                            // false (default) = nace derecha (angulo 0, deterministico)
     float velRotacion;     // grados/seg de giro continuo, SIGNO azaroso por particula (0 = sin giro)
+    // FLIPBOOK por EDAD (sin Lua): la textura es un atlas de flipCols x flipFilas; cada particula
+    // recorre flipCuadros celdas segun su edad. flipCuadros=0 = sin flipbook (textura entera). Lo
+    // maneja el Core (ParticleSystem::CeldaUV); es el mismo concepto de flipbook que UI/Mesh.
+    int   flipCols, flipFilas, flipCuadros;
+    // RADIO DE EMISION (perf del N95, [PERF] part=8ms con emisores del otro lado del
+    // mapa): mas lejos que esto de la camara el emisor NO emite (las vivas terminan
+    // su vida y la sim queda vacia = gratis). 0 = sin limite. Default 45 u.
+    float radioEmision;
+    // SUB-RECT del ATLAS UNICO (u0, v0, u1, v1; default 0,0,1,1 = la textura
+    // entera): el sprite (y su flipbook) viven en ese rect. Con todos los
+    // emisores sobre el mismo atlas el pase de particulas usa UN solo bind.
+    float uvRect[4];
 
     // ---- runtime (no se guarda) ----
     w3dEngine::ParticleSystem sys; // el sistema del Core: simula y dibuja
@@ -111,9 +121,12 @@ public:
     Particulas(Object* parent = NULL, Vector3 pos = Vector3(0,0,0))
         : Object(parent, "Particulas", pos) {
         cantidad = 10.0f; vida = 1.0f; tam = 0.3f; vel = 1.5f;
-        dispersion = 30.0f; gravedad = 0.0f; aditivo = false; sustractivo = false;
+        dispersion = 30.0f; gravedad = 0.0f; mezcla = w3dEngine::MezclaAlpha;
         variacion = 0.0f; turbulencia = 0.0f;
         rotacion = false; velRotacion = 0.0f;   // billboards derechos y quietos (deterministico)
+        flipCols = 1; flipFilas = 1; flipCuadros = 0;   // sin flipbook por defecto (textura entera)
+        radioEmision = 45.0f;                   // no emitir lejos de la camara (0 = sin limite)
+        uvRect[0] = 0.0f; uvRect[1] = 0.0f; uvRect[2] = 1.0f; uvRect[3] = 1.0f;
         color[0] = 1.0f; color[1] = 1.0f; color[2] = 1.0f; color[3] = 1.0f;
         desvanecer = true; activo = true; emAcc = 0.0f;
         sys.rate = 0.0f;      // la emision continua la lleva Tick (con cono), no el Core

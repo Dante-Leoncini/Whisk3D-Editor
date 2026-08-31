@@ -96,6 +96,13 @@ Vector3 CentroFocoSeleccion();
 // el transform de sub-elementos de malla (editor) sin re-implementar la cadena.
 // (RotGlobalDe se declara en el Core, objects/Objects.h)
 Vector3 ScaleGlobalDe(Object* o);
+// aplica una rotacion DE MUNDO sobre una rotacion LOCAL base de 'o', conjugando
+// por el padre (local' = P^-1 * R * P * base). Con padre sin rotar es el
+// pre-multiply de siempre. La usan TODOS los caminos que rotan objetos desde un
+// eje de mundo (SetRotacion, el trackball de la vista, el snap de rotacion...):
+// sin la conjugacion, rotar un objeto emparentado bajo un padre rotado giraba
+// alrededor del eje equivocado.
+Quaternion W3dRotarMundoSobre(Object& o, const Quaternion& Rmundo, const Quaternion& localBase);
 // reposiciona los seleccionados alrededor del pivote tras rotar/escalar (objetos)
 void AplicarPivotATransform();
 void GuardarMousePos();

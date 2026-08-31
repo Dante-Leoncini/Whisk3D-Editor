@@ -35,6 +35,7 @@ bool UndoHayAlgo();  // hay algo para deshacer?
 bool UndoHayRedo();  // hay algo para rehacer?
 
 void UndoCapturarModo();                        // antes de cambiar Edit/Object
+void UndoCapturarVisibilidad();                 // antes de togglear Object::visible con 'h' (guarda el estado previo)
 
 // ============================================================================
 //  DESTINO de un rename (W3dRenameDest) - IDENTIDAD ESTABLE, no un puntero crudo.

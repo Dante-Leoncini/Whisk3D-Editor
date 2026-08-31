@@ -135,6 +135,21 @@ class Modifier {
         // NOMBRE REAL del `.w3dvis` (metodo "celdas"), mismo contrato que pvsArchivo:
         // vacio = derivar de <origen sin extension>.w3dvis / extra/<base>.w3dvis.
         std::string visArchivo;
+        // PATH del recorrido (idea del dueno: "el modificador apunta a un path"): nombre de un
+        // objeto de la escena -una Curve (el riel de la camara) o una malla de aristas creada
+        // con Add > Path- cuyos NODOS son las celdas. Con path, el motor elige la celda SOLO:
+        // el nodo mas cercano al ojo (W3dOclusionTick, main/io/W3dNodos.cpp). Vacio = la celda
+        // la maneja lua/VisZona/el panel, como siempre. Se resuelve POR NOMBRE en cada tick
+        // (sin puntero guardado: borrar/rehacer el path nunca deja nada colgando).
+        std::string pathNombre;
+        // "solo camara activa" (default ON): el nodo se elige desde la CAMARA ACTIVA (jugando
+        // sigue el riel solo). OFF = desde la vista del viewport activo: volas libre por el
+        // escenario y ves aparecer/desaparecer lo que el dato dice (demo A/B en vivo).
+        bool soloCamaraActiva;
+        // RAMAS del path habilitadas para el nodo-mas-cercano (pedido del dueno: un path puede
+        // tener ramificaciones -nivel principal, bonus- y "la rama principal no sirve con el
+        // objeto de bonus"). Indice = rama (componente conexa del path); VACIO = todas.
+        std::vector<char> ramasOn;
         // -- runtime (NO se serializa) --
         std::vector< std::vector<int> > pvsSectores; // tris por sector, del sidecar
         VisSet visSet;     // metodo "celdas": el `.w3dvis` cargado (por VALOR: copiar el
@@ -155,7 +170,7 @@ class Modifier {
               screwAxis(1), screwStretchU(true), screwStretchV(true),
               screwSmooth(true), screwMerge(true), screwFlip(false),
               cacheAnim(false), cacheSkip(0.0f),
-              metodoPVS(0), sectorPVS(0), sectorFallback(0),
+              metodoPVS(0), sectorPVS(0), sectorFallback(0), soloCamaraActiva(true),
               pvsCargado(false), pvsAplicado(-1), pvsFacesBase(0) {}
         virtual ~Modifier() {}
 };
@@ -169,7 +184,7 @@ inline const char* NombreTipoModificador(int t) {
         case ModifierType::SubdivisionSurface: return "Subdivision Surface";
         case ModifierType::Boolean:            return "Boolean";
         case ModifierType::Armature:           return "Armature";
-        case ModifierType::CullingTri:         return "Culling";
+        case ModifierType::CullingTri:         return "Oclusion";   // culling POR TRIANGULO con dato precalculado (el buen nombre, pedido del dueno)
     }
     return "Modifier";
 }

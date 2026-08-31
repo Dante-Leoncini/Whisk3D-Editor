@@ -11,6 +11,9 @@
 // sidecar de grupos <modelo>.grupos.json (con noMerge el mapeo es la identidad).
 Mesh* LeerWOBJ(std::istream& file, const std::string& filename, Object* parent, bool NoMerge,
                std::vector<int>* vertToCP = NULL, size_t totalBytes = 0);
-Mesh* ImportWOBJ(const std::string& filepath, Object* parent, bool NoMerge);
+// noEditable: malla de escenario CERRADA a edicion -> se saltea CalcularBordes
+// (posRep/edges/bordesBuf) y solo se calcula el AABB (CalcularAABBSolo). Carga
+// mas rapido y no gasta memoria de edicion; el Tab a Edit Mode la ignora.
+Mesh* ImportWOBJ(const std::string& filepath, Object* parent, bool NoMerge, bool noEditable = false);
 
 #endif

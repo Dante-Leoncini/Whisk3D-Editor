@@ -93,6 +93,7 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         GroupPropertie* propTransform;
         PropBool* propObjVisible;   // visible en el viewport (animable)
         PropBool* propObjRender;    // sale en el render final (animable)
+        PropBool* propObjEstatico;  // ESTATICO vs DINAMICO (culling por grilla): true=celda cacheada / false=por-frame
         PropBool* propObjRelLines;  // dibujar la linea al padre. Va en la tarjeta GENERICA:
                                     // es una opcion UNIVERSAL de todos los objetos.
         // tarjeta "Animacion" del OBJETO (pestania Objeto): animaciones del objeto
@@ -353,33 +354,66 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         GroupPropertie* propLOD;
         PropText*   propLodDist;
         PropBool*   propLodSoloCam;   // medir desde la camara ACTIVA (igual que el Culling)
-        // pestania del objeto Culling: desde que camara se corta + distancia maxima
+        // pestania del objeto Culling UNIFICADO: selector de metodo + campos comunes + campos del metodo Grid
         GroupPropertie* propCulling;
+        PropButton* propCullMetodo;    // dropdown: Frustum / Grid / Triangulo / BSP
         PropBool*   propCullActivo;    // interruptor del recorte (demo A/B en vivo)
-        PropBool*   propCullSoloCam;
+        PropBool*   propCullSoloCam;   // medir desde la camara ACTIVA (calc una vez para todas las vistas)
         PropFloat*  propCullDistMax;   // culling por distancia (0 = sin limite)
+        PropBool*   propCullOrdenAlpha;// translucido: ordena atras->adelante (alpha)
+        PropFloat*  propCullCellSize;  // metodo Grid: lado de la celda (unidades de mundo)
+        PropBool*   propCullModo3D;    // metodo Grid: grilla 3D (default 2D en XZ)
+        PropButton* propCullRecalc;    // BOTON "Recalcular": rearma la grilla del metodo Grid
         // pestania de la Collection: orden de dibujo para transparentes
         GroupPropertie* propCollection;
         PropBool*   propCollOrdenCam;
         PropBool*   propCollOrdenUnaVez;
+        // pestania del objeto Mirror (pedido del dueno: "el mirror no tiene
+        // propiedades"): target por NOMBRE + ejes espejados + limites del rect
+        GroupPropertie* propMirror;
+        PropText*   propMirrorTarget;   // nombre del objeto a espejar (patron LOD: sync por frame)
+        PropBool*   propMirrorX;        // ejes que se niegan (X/Y/Z)
+        PropBool*   propMirrorY;
+        PropBool*   propMirrorZ;
+        PropBool*   propMirrorHijos;    // reflejar tambien los hijos del target
+        PropBool*   propMirrorLimites;  // recortar al rectangulo del plano (limU/V)
+        PropFloat*  propMirrorU0;
+        PropFloat*  propMirrorU1;
+        PropFloat*  propMirrorV0;
+        PropFloat*  propMirrorV1;
+        // tarjeta FISICA (cuerpo rigido, physics/W3dRigido.h): aparece para
+        // CUALQUIER objeto con definicion (Add > Physics). Los numeros bindean
+        // DIRECTO a la definicion; el tipo es un boton que CICLA
+        // (Dynamic -> Static -> Character) y hay boton para quitarla.
+        GroupPropertie* propFisica;
+        PropButton* propFisTipo;
+        PropFloat*  propFisMasa;
+        PropFloat*  propFisCajaX;
+        PropFloat*  propFisCajaY;
+        PropFloat*  propFisCajaZ;
+        PropFloat*  propFisCenX;
+        PropFloat*  propFisCenY;
+        PropFloat*  propFisCenZ;
+        PropFloat*  propFisFriccion;
+        PropFloat*  propFisRebote;
+        PropButton* propFisQuitar;
         // pestania del objeto Particulas: el emisor (textura + config del cono).
         // Los numeros/checks bindean DIRECTO a los campos del activo; los dos de
         // TEXTO (textura y color "r, g, b, a") van con el patron del LOD (sync por frame).
         GroupPropertie* propParticulas;
-        PropText*   propPartTextura;    // ruta del PNG (con alpha)
+        PropButton* propPartTextura;    // dropdown de texturas cargadas + "Load Texture" (file browser), como el material
         PropFloat*  propPartCantidad;   // particulas/seg (0 = solo rafagas emitir())
         PropFloat*  propPartVida;       // segundos
         PropFloat*  propPartTam;        // lado del billboard (unidades de mundo)
         PropFloat*  propPartVel;        // velocidad inicial (unidades/seg)
         PropFloat*  propPartDispersion; // apertura del cono (grados)
         PropFloat*  propPartGravedad;   // + cae / - sube
-        PropBool*   propPartAditivo;    // mezcla aditiva vs alpha
-        PropBool*   propPartSustractivo;// mezcla sustractiva dst-src (humo/polvo); gana sobre aditiva
+        PropButton* propPartMezcla;     // dropdown del modo de mezcla (Normal/Aditiva/Substractiva/... del motor)
         PropFloat*  propPartVariacion;  // 0..1: jitter por particula sobre vel/vida/tam
         PropFloat*  propPartTurbulencia;// deriva azarosa suave por particula (unid/s^2)
         PropBool*   propPartRotacion;   // nace con angulo azaroso 0..360 fijo (rotz del original)
         PropFloat*  propPartVelRot;     // giro continuo (grados/s), signo azaroso por particula
-        PropText*   propPartColor;      // tinte + alpha inicial ("r, g, b, a")
+        PropColor*  propPartColor;      // tinte + alpha: swatch -> ColorPicker de Whisk3D (bindea a Particulas::color[4])
         PropBool*   propPartDesvanecer; // alpha -> 0 con la vida
         PropBool*   propPartActivo;     // false = no emite
         // tarjeta ARCHIVO (pestania Render, arriba de todo): abrir/guardar el
@@ -401,6 +435,12 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropButtonRow* propRowAnimNewDel; // fila: New | Delete (Delete oculto si no hay nada que borrar)
         PropButton* propBtnAnimRename; // "Rename" de la animacion activa (escena o clip)
         PropButton* propBtnAnimRender; // "Render Animation" (gris si no hay animaciones)
+        // CONFIG del flipbook activo (kind 5): en la card Animation, ocultos salvo con flipbook activo
+        PropButton* propFlipAtlas;     // dropdown del atlas (textura) del flipbook
+        PropFloat*  propFlipCuadros;   // cantidad de celdas del ciclo
+        PropFloat*  propFlipCols;      // columnas de la grilla del atlas
+        PropFloat*  propFlipFilas;     // filas de la grilla
+        PropFloat*  propFlipFps;       // velocidad (cuadros/seg)
         // tarjeta "Juego" (debajo de Animacion): compilar + cache del viaje en el tiempo
         GroupPropertie* propJuego;
         PropButton* propJuegoPlat;      // desplegable: Linux .deb / AppImage / WebGL
@@ -456,6 +496,12 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropButton* propPvsMetodo;
         PropButton* propPvsRecalc;
         PropLabel*  propPvsInfo;
+        GroupPropertie* propMeshEdicion;   // card "Edicion" (pestania Mesh): interruptor editable/no-editable
+        PropButton* propBtnMeshEditable;   // "Borrar datos para edicion" / "Convertir en mesh editable"
+        PropButton* propPvsPath;      // dropdown: el PATH del recorrido (Curve / malla de aristas)
+        PropBool*   propPvsSoloCam;   // OFF = el nodo sigue la vista libre del viewport (demo A/B)
+        PropButton* propPvsRamas;     // dropdown-toggles: que RAMAS del path participan del nearest
+        PropFloat*  propPvsNodo;      // "Nodo actual" (0 = malla completa; jugando lo pisa el motor)
         PropButton* propBtnApplyMod; // "Apply Modifier": hornea la malla generada en malla real editable
         // ===== pestania "Constraints" (tab 7, la ULTIMA): 2 tarjetas, calcadas de Modifiers =====
         // El stack NO es de la malla: lo tiene cualquier objeto 3D (una luz, una camara, una

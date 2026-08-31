@@ -7,6 +7,8 @@
 #include "w3dGraphics.h"           // abstraccion de graficos (independencia de OpenGL)
 #include "Particulas.h"
 #include "objects/CameraBase.h"    // g_renderCamRight/Up: la vista bindeada (billboards)
+#include "objects/Culling.h"       // W3dCamaraDeMedida: el ojo del radioEmision
+#include "objects/Camera.h"        // Camera (la activa del juego)
 #include "objects/RenderColors.h"  // gRenderColors / RC_selActive (gizmo del emisor)
 #include "render/OpcionesRender.h" // g_mostrarOverlays / g_redraw
 #include "io/Textura2D.h"          // cache de texturas por ruta (PNG con alpha)
@@ -38,6 +40,23 @@ static std::string RutaTextura(const std::string& t) {
     return t;
 }
 
+// PRECARGA de las texturas de los emisores: el PNG de un emisor se decodificaba
+// en su PRIMERA rafaga (humo/gota/estrella), en pleno gameplay -- un tiron
+// visible en el N95. Al abrir el proyecto se tocan todas las rutas: el decode
+// (y su cacheo, exitoso o fallido) queda pagado en la CARGA.
+void W3dParticulasPrecargarTexturas(Object* raiz) {
+    if (!raiz) return;
+    std::vector<Object*> st; st.push_back(raiz);
+    while (!st.empty()) {
+        Object* o = st.back(); st.pop_back();
+        if (o->getType() == ObjectType::particulas) {
+            Particulas* p = (Particulas*)o;
+            if (!p->textura.empty()) Textura2DObtener(RutaTextura(p->textura));
+        }
+        for (size_t i = 0; i < o->Childrens.size(); i++) st.push_back(o->Childrens[i]);
+    }
+}
+
 // ---------------------------------------------------------------------------
 //  config del objeto -> config del Core. Se re-aplica en cada Tick/Emitir:
 //  es barato (asignaciones) y el panel edita los campos del OBJETO sin tener
@@ -56,16 +75,12 @@ static void SincronizarConfig(Particulas* p) {
     s.sizeMin = half * (1.0f - var); s.sizeMax = half * (1.0f + var); s.sizeEndMul = 1.0f;
     s.gravY = -p->gravedad;                // gravedad + = cae (aceleracion -Y de mundo)
     s.turbAmp = (p->turbulencia > 0.0f) ? p->turbulencia : 0.0f; // deriva suave por particula (Core)
-    // SUSTRACTIVA gana sobre aditiva (ver Particulas.h): dst - src, para el humo
-    // y el polvo, que tienen que OSCURECER el fondo en vez de aclararlo.
-    s.blend = p->sustractivo ? w3dEngine::MezclaSubtract
-            : (p->aditivo    ? w3dEngine::MezclaAdd : w3dEngine::MezclaAlpha);
-    // con mezcla ALFA el color se deja quieto y solo baja el alfa (ver w3dParticles.h);
-    // con ADITIVA el color x alfa es lo que hace "desaparecer" a la particula
-    // con SUSTRACTIVA vale lo mismo que con aditiva: el color tiene que caer con el
-    // alfa, si no la particula sigue restando lo mismo hasta el ultimo frame y
-    // "desaparece" de golpe dejando un agujero oscuro.
-    s.colorPlano = !(p->aditivo || p->sustractivo);
+    // MODO DE MEZCLA: el enum del Core va directo (ver Particulas.h). El humo/polvo usan Subtract (dst-src),
+    // que OSCURECE el fondo en vez de aclararlo.
+    s.blend = p->mezcla;
+    // con mezcla ALFA el color se deja quieto y solo baja el alfa (ver w3dParticles.h); con cualquier otra
+    // (aditiva/sustractiva/etc) el color x alfa es lo que hace "desaparecer" la particula sin dejar un agujero.
+    s.colorPlano = (p->mezcla == w3dEngine::MezclaAlpha);
     s.tintR = p->color[0]; s.tintG = p->color[1]; s.tintB = p->color[2];
     float a = p->color[3]; if (a < 0.0f) a = 0.0f; if (a > 1.0f) a = 1.0f;
     s.alphaMin = a; s.alphaMax = a;
@@ -75,6 +90,13 @@ static void SincronizarConfig(Particulas* p) {
     int tope = (int)(p->cantidad * v) + 64;
     if (tope < 64) tope = 64; if (tope > 4096) tope = 4096;
     s.maxParts = tope;
+    // FLIPBOOK por edad: el Core recorre la grilla del atlas segun la edad de cada particula
+    s.flipCols = p->flipCols > 0 ? p->flipCols : 1;
+    s.flipFilas = p->flipFilas > 0 ? p->flipFilas : 1;
+    s.flipCuadros = p->flipCuadros > 0 ? p->flipCuadros : 0;
+    // SUB-RECT del atlas unico: el sprite (y su grilla) viven en este rect
+    s.uvU0 = p->uvRect[0]; s.uvV0 = p->uvRect[1];
+    s.uvU1 = p->uvRect[2]; s.uvV1 = p->uvRect[3];
 }
 
 // origen (mundo) + eje +Y local llevado a mundo (la direccion del cono). La matriz
@@ -322,15 +344,31 @@ void W3dParticulasDibujarPendientes() {
 //  El TICK global (una vez por frame) + "hay algo animando?"
 // ---------------------------------------------------------------------------
 // recorre TODO el arbol (NO corta por !visible): las particulas VIVAS se simulan y mueren aunque su emisor o un
-// ancestro esten ocultos (son world-space, ya emitidas). La EMISION si respeta la cadena de visibilidad (vis).
-static void ParticulasRec(Object* o, bool cadenaVisible, float dt) {
+// ancestro esten ocultos (son world-space, ya emitidas). La EMISION si respeta la cadena de visibilidad (vis)
+// Y el radioEmision contra la camara (perf del N95: emisores del otro lado del mapa no emiten; las vivas
+// terminan su vida y la sim queda vacia = gratis).
+static void ParticulasRec(Object* o, bool cadenaVisible, float dt, const Vector3& ojo, bool hayOjo) {
     bool vis = cadenaVisible && o->visible;
-    if (o->getType() == ObjectType::particulas) ((Particulas*)o)->Tick(dt, vis);  // vis=false -> NO emite, SI simula
-    for (size_t i = 0; i < o->Childrens.size(); i++) ParticulasRec(o->Childrens[i], vis, dt);
+    if (o->getType() == ObjectType::particulas) {
+        Particulas* p = (Particulas*)o;
+        bool cerca = true;
+        if (hayOjo && p->radioEmision > 0.0f) {
+            Vector3 d = p->GetGlobalPosition() - ojo;
+            cerca = d.LengthSq() <= p->radioEmision * p->radioEmision;
+        }
+        p->Tick(dt, vis && cerca);  // sin emitir: NO emite, SI simula lo vivo
+    }
+    for (size_t i = 0; i < o->Childrens.size(); i++)
+        ParticulasRec(o->Childrens[i], vis, dt, ojo, hayOjo);
 }
 void W3dParticulasTick(float dt) {
     if (!SceneCollection || dt <= 0.0f) return;
-    ParticulasRec(SceneCollection, true, dt);
+    // el "ojo" de la medida: la camara del juego jugando, o la vista que dibuja
+    Vector3 ojo; bool hayOjo = false;
+    Camera* cam = W3dCamaraDeMedida(false);
+    if (cam) { ojo = cam->GetGlobalPosition(); hayOjo = true; }
+    else if (g_vistaBindeada) { ojo = g_renderCamPos; hayOjo = true; }
+    ParticulasRec(SceneCollection, true, dt, ojo, hayOjo);
 }
 
 bool W3dParticulasAnimando() {

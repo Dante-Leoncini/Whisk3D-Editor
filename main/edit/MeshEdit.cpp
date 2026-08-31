@@ -50,7 +50,10 @@ void Mesh::RefrescarRender() {
 
 // construye la malla de EDICION (EditMesh) si no existe. La geometria ya tiene que
 // estar lista (CalcularBordes corrio: posRep + edges). Se llama al entrar a Edit.
+// noEditable: escenario cerrado a edicion (sin posRep/edges) -> NUNCA construir el
+// cage (cubre todos los llamadores: render, undo, weight paint, tests).
 void Mesh::EnsureEdit() {
+    if (noEditable) return;
     if (!edit) { edit = new EditMesh(); edit->Construir(this); }
 }
 
@@ -2880,6 +2883,33 @@ static void PVSArmarOverride(Mesh* m, const unsigned* tris, size_t nLista, bool 
     g_redraw = true;
 }
 
+// AABB + radio + centro SIN el resto de CalcularBordes (posRep/edges/bordesBuf): lo
+// usa el import con noEditable (escenarios cerrados a edicion). Mismos campos que
+// llena CalcularBordes, asi el Culling por frustum y el encuadre siguen andando.
+void Mesh::CalcularAABBSolo() {
+    edges.clear(); bordesBuf.clear(); posRep.clear(); vertsAgrupados = 0;
+    if (!vertex || vertexSize <= 0) { aabbOk = false; return; }
+    const int nV = vertexSize;
+    float cgx = 0, cgy = 0, cgz = 0;
+    aabbMin = Vector3(vertex[0], vertex[1], vertex[2]);
+    aabbMax = aabbMin;
+    for (int i = 0; i < nV; i++) {
+        float vx = vertex[i*3], vy = vertex[i*3+1], vz = vertex[i*3+2];
+        cgx += vx; cgy += vy; cgz += vz;
+        if (vx < aabbMin.x) aabbMin.x = vx; if (vx > aabbMax.x) aabbMax.x = vx;
+        if (vy < aabbMin.y) aabbMin.y = vy; if (vy > aabbMax.y) aabbMax.y = vy;
+        if (vz < aabbMin.z) aabbMin.z = vz; if (vz > aabbMax.z) aabbMax.z = vz;
+    }
+    centroGeom = Vector3(cgx / nV, cgy / nV, cgz / nV);
+    float rg2 = 0.0f;
+    for (int i = 0; i < nV; i++) {
+        float dx = vertex[i*3] - centroGeom.x, dy = vertex[i*3+1] - centroGeom.y, dz = vertex[i*3+2] - centroGeom.z;
+        float d2 = dx*dx + dy*dy + dz*dz; if (d2 > rg2) rg2 = d2;
+    }
+    radioGeom = sqrtf(rg2);
+    aabbOk = true;
+}
+
 // lee el sidecar -> mod->pvsSectores. Tolerante: sin archivo / JSON roto = sin sectores
 // (la malla se dibuja completa y el panel lo muestra). Marca pvsCargado para no reintentar
 // por frame; "Recalcular" (o setSector) lo re-lee bajando la marca.
@@ -3103,7 +3133,7 @@ void W3dPVSInvalidar(Mesh* m) {
 // 'fallback' = sectorFallback (ver Modifier.h): 0 = sin (celda vacia dibuja nada),
 // -1 = "completa", N>=1 = la lista de la celda N.
 void W3dModPVSAgregar(Mesh* m, const std::string& metodo, int sector, const std::string& archivo,
-                      int fallback) {
+                      int fallback, const std::string& pathNombre, bool soloCamaraActiva) {
     if (!m) return;
     m->AgregarModificador(ModifierType::CullingTri);
     Modifier* mod = m->modificadores.empty() ? NULL : m->modificadores.back();
@@ -3116,6 +3146,20 @@ void W3dModPVSAgregar(Mesh* m, const std::string& metodo, int sector, const std:
     mod->sectorFallback = fallback;
     if (mod->metodoPVS == 1) mod->visArchivo = archivo;
     else                     mod->pvsArchivo = archivo;
+    // path del recorrido (Curve o malla de aristas): con esto el nodo lo elige el motor
+    // (W3dOclusionTick, main/io/W3dNodos.cpp), no lua/VisZona.
+    mod->pathNombre       = pathNombre;
+    mod->soloCamaraActiva = soloCamaraActiva;
+}
+
+// mascara de ramas del ULTIMO modificador Oclusion agregado ("1101" = rama 2 apagada).
+// Va aparte de W3dModPVSAgregar para no tocar a todos sus llamadores.
+void W3dModPVSRamas(Mesh* m, const std::string& mask) {
+    if (!m || m->modificadores.empty()) return;
+    Modifier* mod = m->modificadores.back();
+    if (!mod || mod->tipo != ModifierType::CullingTri) return;
+    mod->ramasOn.clear();
+    for (size_t r = 0; r < mask.size(); r++) mod->ramasOn.push_back(mask[r] != '0');
 }
 
 // boton "Recalcular" del panel: RE-LEE el sidecar del .obj de origen y re-arma el sector

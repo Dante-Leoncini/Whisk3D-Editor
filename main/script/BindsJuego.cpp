@@ -32,6 +32,7 @@ extern "C" {
 
 #include <math.h>   // fabsf() para chocan()
 #include <map>      // cache de sonidos cargados por sonido()
+#include "io/w3dFilesystem.h"   // ListDir: la precarga de WAVs recorre sonidos/ y musica/
 #include <string>
 
 // audio del Core, forward-decl (evita el include del dir de audio, como en W3dScript.cpp).
@@ -330,13 +331,95 @@ static int LSetTextura(lua_State* L) {
     }
     return 0;
 }
+// setFlipbook(objeto, cuadros, fps [, cols [, filas [, desfase [, ancho, alto, u0, v0]]]]):
+// convierte una Imagen2D en un FLIPBOOK animado por el MOTOR sobre su textura-atlas. El motor
+// avanza la celda cada frame (UpdateFlipbooks); Lua llama esto UNA vez y no toca mas la textura.
+// cuadros<=0 lo apaga (vuelve a imagen fija). cols/filas = grilla del atlas (tira horizontal =
+// cols=cuadros, filas=1). ancho/alto/u0/v0 opcionales: la SUB-TIRA dentro del atlas unico
+// (fraccion + origen; defaults = la textura entera, como siempre).
+static int LSetFlipbook(lua_State* L) {
+    Object* o = W3dScriptParamObjeto(L, 1);
+    if (o && o->getType() == ObjectType::imagen2d) {
+        Imagen2D* im = (Imagen2D*)o;
+        // los enteros van por optNUMBER + truncado: un float por error de un
+        // script NO tiene que abortar el tick del juego con "no integer
+        // representation" (paso en el N95: el vuelo de la fruta reintentaba
+        // cada tick y el spam de errores al log clavaba el aparato)
+        int   cuadros = (int)luaL_optnumber(L, 2, 0.0);
+        float fps     = (float)luaL_optnumber(L, 3, 0.0);
+        int   cols    = (int)luaL_optnumber(L, 4, (lua_Number)(cuadros > 0 ? cuadros : 1));
+        int   filas   = (int)luaL_optnumber(L, 5, 1.0);
+        int   desfase = (int)luaL_optnumber(L, 6, 0.0);
+        float ancho   = (float)luaL_optnumber(L, 7, 1.0);
+        float alto    = (float)luaL_optnumber(L, 8, 1.0);
+        float u0      = (float)luaL_optnumber(L, 9, 0.0);
+        float v0      = (float)luaL_optnumber(L, 10, 0.0);
+        im->FlipbookConfig(cuadros, fps, cols, filas, desfase, ancho, alto, u0, v0);
+        g_redraw = true;
+    }
+    return 0;
+}
+// setUVRect(objeto, u0, v0, u1, v1): el RECORTE del atlas unico que muestra una
+// Imagen2D FIJA (sin flipbook). (0,0,1,1) = la textura entera, como siempre.
+static int LSetUVRect(lua_State* L) {
+    Object* o = W3dScriptParamObjeto(L, 1);
+    if (o && o->getType() == ObjectType::imagen2d) {
+        Imagen2D* im = (Imagen2D*)o;
+        im->uvRect[0] = (float)luaL_optnumber(L, 2, 0.0);
+        im->uvRect[1] = (float)luaL_optnumber(L, 3, 0.0);
+        im->uvRect[2] = (float)luaL_optnumber(L, 4, 1.0);
+        im->uvRect[3] = (float)luaL_optnumber(L, 5, 1.0);
+        g_redraw = true;
+    }
+    return 0;
+}
 // sonido("sonidos/bip.wav" [, vol [, pitch]]): reproduce un WAV one-shot. La ruta relativa
 // cuelga de la carpeta del PROYECTO (g_w3dDirProyecto, la del .w3d abierto); vol 0..1 (default 1);
 // pitch 1 = normal (paso fraccional en la voz, W3dSoundPlayPitch). El WAV se carga UNA vez y se
 // cachea por ruta resuelta (NULL tambien: un archivo que falta no reintenta cada frame). No
 // bloquea: si el mixer no abrio (headless / sin -DW3D_ENABLE_AUDIO) la carga da NULL y no suena.
+// cache de WAVs por ruta resuelta (NULL tambien se cachea: un archivo que
+// falta no reintenta cada frame). A nivel archivo para que W3dSonidosPrecargar
+// lo pueda llenar ANTES de jugar.
+static std::map<std::string, w3dEngine::W3dSound*> gSonidos;
+
+// PRECARGA de los WAV del proyecto (sonidos/ + musica/): el PRIMER disparo de
+// cada sample lo cargaba y decodificaba EN PLENO GAMEPLAY -- los picos de
+// "Musica:10ms" del [PERF] del N95 eran eso, no el secuenciador. Con el
+// contenedor v4 montado se precargan sus entradas .wav; con proyecto de texto,
+// los .wav de sonidos/ y musica/. Se llama al ABRIR el proyecto.
+void W3dSonidosPrecargar() {
+    std::vector<std::string> rutas;
+    W3dAlmacen* alm = W3dAlmacenMontado();
+    if (alm) {
+        std::vector<std::string> ent;
+        alm->Listar(ent);
+        for (size_t i = 0; i < ent.size(); i++)
+            if (ent[i].size() > 4 && ent[i].compare(ent[i].size() - 4, 4, ".wav") == 0)
+                rutas.push_back(ent[i]);
+    } else if (!g_w3dDirProyecto.empty()) {
+        static const char* DIRS[] = { "sonidos", "musica" };
+        for (int d = 0; d < 2; d++) {
+            std::string dir = g_w3dDirProyecto + "/" + DIRS[d];
+            std::vector<w3dFileSystem::DirEntry> ents;
+            if (!w3dFileSystem::ListDir(dir, ents)) continue;
+            for (size_t i = 0; i < ents.size(); i++) {
+                const std::string& n = ents[i].name;
+                if (!ents[i].isDir && n.size() > 4 && n.compare(n.size() - 4, 4, ".wav") == 0)
+                    rutas.push_back(dir + "/" + n);
+            }
+        }
+    }
+    int nuevos = 0;
+    for (size_t i = 0; i < rutas.size(); i++)
+        if (gSonidos.find(rutas[i]) == gSonidos.end()) {
+            gSonidos[rutas[i]] = w3dEngine::W3dSoundLoad(rutas[i].c_str());
+            nuevos++;
+        }
+    if (nuevos) w3dLogf("[CARGA] sonidos precargados: %d wav", nuevos);
+}
+
 static int LSonido(lua_State* L) {
-    static std::map<std::string, w3dEngine::W3dSound*> gSonidos;   // cache por ruta resuelta (NULL tambien se cachea)
     const char* ruta = luaL_checkstring(L, 1);
     float vol   = (float)luaL_optnumber(L, 2, 1.0);
     float pitch = (float)luaL_optnumber(L, 3, 1.0);
@@ -936,6 +1019,24 @@ static int LControl(lua_State* L) {
     return 2;
 }
 
+// importarW3D("assets/pj/pj.w3d") -> ANEXA un .w3d (JSON v3 plano) a la escena
+// EN RUNTIME: objetos + materiales + sus animaciones de escena (el streaming
+// del modo juego; pedido del demo GTA). Devuelve el objeto RAIZ del archivo
+// (light userdata, como objeto()), o nil. La ruta relativa cuelga del proyecto,
+// mismo criterio que sonido(). Los hijos del arbol anexado se agarran con
+// buscar("nombre") del Core (objeto() solo resuelve refs pre-cableadas).
+static int LImportarW3D(lua_State* L) {
+    const char* r = luaL_checkstring(L, 1);
+    extern Object* W3dImportarW3DAnexo(const std::string&);   // main/importers/import_w3d.h
+    std::string ruta = r ? r : "";
+    if (ruta.empty()) { lua_pushnil(L); return 1; }
+    const bool absoluta = (ruta[0] == '/') || (ruta.size() > 2 && ruta[1] == ':');
+    if (!absoluta && !g_w3dDirProyecto.empty()) ruta = g_w3dDirProyecto + "/" + ruta;
+    Object* o = W3dImportarW3DAnexo(ruta);
+    if (o) lua_pushlightuserdata(L, o); else lua_pushnil(L);
+    return 1;
+}
+
 // ---------------------------------------------------------------------------
 //  REGISTRO + ALIMENTACION.
 // ---------------------------------------------------------------------------
@@ -950,6 +1051,8 @@ void BindsJuegoRegistrar(void* Lv) {
     lua_pushcfunction(L, LSetTamPx);    lua_setglobal(L, "setTamPx");
     lua_pushcfunction(L, LSetTexto);    lua_setglobal(L, "setTexto");
     lua_pushcfunction(L, LSetTextura);  lua_setglobal(L, "setTextura");
+    lua_pushcfunction(L, LSetFlipbook); lua_setglobal(L, "setFlipbook");
+    lua_pushcfunction(L, LSetUVRect);   lua_setglobal(L, "setUVRect");
     lua_pushcfunction(L, LSonido);      lua_setglobal(L, "sonido");
     lua_pushcfunction(L, LPararSonido); lua_setglobal(L, "pararSonido");
     lua_pushcfunction(L, LSetSector);   lua_setglobal(L, "setSector");
@@ -986,6 +1089,8 @@ void BindsJuegoRegistrar(void* Lv) {
     lua_pushcfunction(L, LCamaraXZ);    lua_setglobal(L, "camaraXZ");
     lua_pushcfunction(L, LObjetivo);    lua_setglobal(L, "objetivo");
     lua_pushcfunction(L, LParametro);   lua_setglobal(L, "parametro");
+    // streaming del modo juego: anexar un .w3d externo en caliente
+    lua_pushcfunction(L, LImportarW3D); lua_setglobal(L, "importarW3D");
     // multi-escena: cambiarEscena(nombre[,reiniciar]) — mismo bind en editor y runtime
     W3dEscenaRegistrarBind(Lv);
 }

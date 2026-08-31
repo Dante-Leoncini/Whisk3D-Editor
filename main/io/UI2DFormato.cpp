@@ -292,6 +292,26 @@ static void EscribirElemento(FILE* f, Object* o, int ind, const std::string& bas
         CampoB(f, i2, "usarAlpha", im->usarAlpha);
         CampoB(f, i2, "filtrado", im->filtrado);
         CampoI(f, i2, "palTinte", im->palTinte);
+        if (im->EsFlipbook()) {   // flipbook: solo si anima (el resto de las imagenes queda igual)
+            CampoI(f, i2, "flipCuadros", im->flip.cuadros);
+            CampoF(f, i2, "flipFps", im->flip.fps);
+            CampoI(f, i2, "flipCols", im->flip.cols);
+            CampoI(f, i2, "flipFilas", im->flip.filas);
+            CampoI(f, i2, "flipDesfase", im->flipPlay.desfase);
+            // sub-tira en el atlas unico: solo si difiere de la textura entera
+            if (im->flip.tiraAncho != 1.0f) CampoF(f, i2, "flipAncho", im->flip.tiraAncho);
+            if (im->flip.tiraAlto  != 1.0f) CampoF(f, i2, "flipAlto",  im->flip.tiraAlto);
+            if (im->flip.tiraU0 != 0.0f)    CampoF(f, i2, "flipU0",    im->flip.tiraU0);
+            if (im->flip.tiraV0 != 0.0f)    CampoF(f, i2, "flipV0",    im->flip.tiraV0);
+        }
+        // imagen FIJA en el atlas unico: su recorte (solo si difiere de entera)
+        if (im->uvRect[0] != 0.0f || im->uvRect[1] != 0.0f ||
+            im->uvRect[2] != 1.0f || im->uvRect[3] != 1.0f) {
+            CampoF(f, i2, "uvU0", im->uvRect[0]);
+            CampoF(f, i2, "uvV0", im->uvRect[1]);
+            CampoF(f, i2, "uvU1", im->uvRect[2]);
+            CampoF(f, i2, "uvV1", im->uvRect[3]);
+        }
     } else if (o->getType() == ObjectType::rect2d) {
         CampoColor(f, i2, "color", ((Rect2D*)o)->color);
         CampoI(f, i2, "palColor", ((Rect2D*)o)->palColor);
@@ -544,6 +564,18 @@ static void CargarElemento(JVal* j, Object* padre, const std::string& base) {
         im->usarAlpha = JB(j, "usarAlpha", im->usarAlpha);
         im->filtrado = JB(j, "filtrado", im->filtrado);
         im->palTinte = JI(j, "palTinte", im->palTinte);
+        int _fc = JI(j, "flipCuadros", 0);
+        if (_fc > 0)   // engancha el flipbook (configura el asset + registra el player en el motor)
+            im->FlipbookConfig(_fc, JF(j, "flipFps", 30.0f),
+                               JI(j, "flipCols", 1), JI(j, "flipFilas", 1),
+                               JI(j, "flipDesfase", 0),
+                               JF(j, "flipAncho", 1.0f), JF(j, "flipAlto", 1.0f),
+                               JF(j, "flipU0", 0.0f), JF(j, "flipV0", 0.0f));
+        // imagen FIJA en el atlas unico: su recorte (ausente = textura entera)
+        im->uvRect[0] = JF(j, "uvU0", im->uvRect[0]);
+        im->uvRect[1] = JF(j, "uvV0", im->uvRect[1]);
+        im->uvRect[2] = JF(j, "uvU1", im->uvRect[2]);
+        im->uvRect[3] = JF(j, "uvV1", im->uvRect[3]);
         e = im;
     } else if (tipo == "rect") {
         Rect2D* r = new Rect2D(padre, pos);

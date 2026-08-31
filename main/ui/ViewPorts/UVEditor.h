@@ -28,6 +28,7 @@ enum BarRolUV {
                     // botones con el mismo nombre y distinto significado era la trampa de consistencia
                     // que reporto la auditoria; el UV todavia no tiene iman (ver AplicarXformValores).
     BRUV_Texture,   // dropdown: que textura/parte ver
+    BRUV_Mipmap,    // dropdown: inspector de la piramide de la textura mostrada (Auto / un nivel)
     BRUV_Animation, // menu Animation: keyframes de la VERTEX ANIM activa (icono keyframe, como BR_Animation)
     BRUV_Add,       // menu Add: crear el ARMATURE 2D del mesh / agregar huesos (icono +, como BR_Add)
     BRUV_Armature,  // menu Armature (solo en UVModoHuesos): Extrude/Duplicate/Delete/Set Parent/Clear Parent
@@ -355,6 +356,17 @@ void UVSetTexOverride(Mesh* m, int part);
 // La usa el nombre del boton de la barra y el test 'uipunteros' (el override va por SERIAL de
 // la malla, no por puntero: la direccion se recicla y se quedaba pegado a OTRA malla).
 int  UVParteMostrada(Mesh* m);
+int  UVTexOverrideParte();   // el override de parte crudo (-1 = auto); para el tilde del menu
+// override de PROYECTO del mismo dropdown: ver CUALQUIER textura cargada en la escena con
+// las UV de la malla activa encima ("" = ninguna, vuelve al auto/parte). Va por RUTA.
+void UVSetTexProyecto(const std::string& ruta);
+const std::string& UVTexProyectoRuta();
+class Texture* UVTexProyectoActiva();   // NULL si no hay override o la textura se descargo
+unsigned int UVTexProyectoId();         // id GL del override (3D o cache 2D del juego); 0 = sin override
+// inspector de MIPMAPS (menu "Mipmap" de la barra): -1 = Auto (por zoom), N = ver el nivel N.
+int  UVMipNivel();
+void UVSetMipNivel(int nivel);
+unsigned int UVTexturaMostradaId(Mesh* m);   // id GL de la textura que el editor esta mostrando (0 = ninguna)
 
 // SELECCION EFECTIVA de UVs para los consumidores de AFUERA del editor (la tarjeta "Transform UV"
 // del panel Properties). DECISION (modelo de seleccion nuevo): si hay un editor UV VIVO con

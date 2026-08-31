@@ -353,6 +353,8 @@ Config loadConfig(const std::string& filename) {
         if (lineStream >> key >> eq >> value && eq == "=") {
             if (key == "fullscreen") cfg.fullscreen = (value == "true");
             else if (key == "enableAntialiasing") cfg.enableAntialiasing = (value == "true");
+            else if (key == "mipmaps") { cfg.mipmaps = (value == "true" || value == "1");
+                                         w3dEngine::SetMipmapsGlobal(cfg.mipmaps); }
             else if (key == "width") cfg.width = std::stoi(value);
             else if (key == "height") cfg.height = std::stoi(value);
             else if (key == "displayIndex") cfg.displayIndex = std::stoi(value);
@@ -612,9 +614,13 @@ static void MainLoopFrame() {
         // ANIMACIONES UV "tira de atlas" (Core, autoplay): mismas reglas de pausa
         // que las texturas animadas. true = alguna malla cambio su uv -> redibujar.
         if (UpdateUVAnims(dtFrame)) g_redraw = true;
+        // FLIPBOOKS (Imagen2D/particulas, registro unificado del Core): el motor avanza la UV.
+        { extern bool UpdateFlipbooks(float); if (UpdateFlipbooks(dtFrame)) g_redraw = true; }
         // VISIBILIDAD POR CELDA (VisZona): evalua el modo (grilla/volumenes/curva)
         // y aplica la celda a su malla objetivo. Un paso por frame, como las particulas.
         { extern void W3dVisZonasTick(); W3dVisZonasTick(); }
+        // OCLUSION POR NODOS DE RIEL (.w3dnodos): en PLAY el nodo sigue a la camara activa.
+        { extern bool W3dOclusionTick(); if (W3dOclusionTick()) g_redraw = true; }
     }
     // PARTICULAS: la SIMULACION de lo vivo (avanzar + MATAR por vida) corre SIEMPRE que el mundo respira, TAMBIEN
     // con una vertex anim activa en el timeline (kind 3) -> sino, seleccionar/editar una vertex-anim CONGELABA las
@@ -689,6 +695,7 @@ static void MainLoopFrame() {
         if (PlayAnimation) {
             extern void SimTickPlay(float); extern bool SimHayScripts(); extern bool SimActiva();
             extern bool SimStep(int); extern int SimFrameActual(); extern int SimPrimerFrame();
+            extern bool SimHayCache();
             bool juego = AnimEsJuego && (SimActiva() || SimHayScripts());
             // el dt de la SIMULACION tambien es TIEMPO REAL entre ticks (el fisico
             // del juego rinde lo mismo a 30, 60 o 10 fps)
@@ -1098,6 +1105,7 @@ int main(int argc, char* argv[]) {
                 Viewport3DActive->OverlayStatVertices = Viewport3DActive->OverlayStatFaces =
                 Viewport3DActive->OverlayStatModgen  = Viewport3DActive->OverlayStatTimes =
                 Viewport3DActive->OverlayFps         = Viewport3DActive->OverlayStatGL = true;
+                Viewport3DActive->showOverlays = true;   // el overlay de stats esta gateado por "Show Overlays"
             }
             g_redraw = true;
         }
@@ -1121,11 +1129,19 @@ int main(int argc, char* argv[]) {
     emscripten_set_main_loop(MainLoopFrame, 0, 1);
 #else
     // Loop de escritorio PACEADO (reemplaza el busy-spin viejo): MainLoopFrame ya bloquea en REPOSO (0% CPU). Cuando
-    // SI dibuja (animando/interactuando), dormimos hasta el proximo frame -> 60fps parejos y CPU baja. Acumulador
+    // SI dibuja (animando/interactuando), dormimos hasta el proximo frame -> fps parejos y CPU baja. Acumulador
     // (nextFrame) para no driftear; si nos atrasamos mucho no acumulamos deuda.
-    const double frameMs = 1000.0 / 60.0;
+    // TOPE DE FRAMERATE por proyecto: g_fpsCap (import_w3d) -> default 60, el .w3d puede subirlo hasta 120 en PC.
+    // Se recomputa por iteracion para reaccionar a un .w3d abierto en caliente. VSYNC adaptativo: con cap>60 hay
+    // que apagar el vsync (SwapInterval 0) para pasar de la tasa del monitor; con cap<=60 se deja (sin tearing).
+    extern int g_fpsCap;
+    int capVsync = -1;   // ultimo estado de vsync aplicado (para no re-llamar SwapInterval cada frame)
     double nextFrame = W3dNowMs();
     while (running) {
+        int cap = (g_fpsCap > 0) ? g_fpsCap : 60;
+        const double frameMs = 1000.0 / (double)cap;
+        int quiereVsync = (cap > 60) ? 0 : 1;
+        if (quiereVsync != capVsync) { SDL_GL_SetSwapInterval(quiereVsync); capVsync = quiereVsync; }
         MainLoopFrame();
         if (g_didRender) {
             nextFrame += frameMs;

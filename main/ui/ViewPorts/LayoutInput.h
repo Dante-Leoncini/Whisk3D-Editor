@@ -142,6 +142,7 @@ class PopupMenu; void LayoutSyncInsertKeySubmenu(PopupMenu* menu, int idxItem, b
 void LayoutMaximizar();      // maximiza/restaura el viewport activo a pantalla completa (toggle, no destructivo)
 bool LayoutEstaMaximizado(); // hay un viewport en fullscreen?
 void LayoutResetMaximizado(); // limpiar el flag de maximizado (al abrir proyecto: el arbol es nuevo)
+void LayoutJuegoPuroToggle(); // MODO JUEGO PURO (N95 VERDE+0): 3D fullscreen con vista de camara y CERO editor
 
 // menu TRANSFORM PIVOT POINT (objeto + edit): sale cerca de (mx,my). Setea el
 // pivote (g_transformPivot) que usan rotar/escalar + el checkbox Lock Normals.

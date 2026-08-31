@@ -1255,6 +1255,11 @@ void Timeline::SyncFields(){
         if (a2 && ActiveAnimMesh->armatures2d.size() > 1) btnAnim->text += " (" + a2->nombre + ")";
         btnAnim->icon = (int)IconType::armature;
     }
+    else if (ActiveAnimKind == 5){   // FLIPBOOK activo: su nombre
+        extern Flipbook* g_flipActivo;
+        btnAnim->text = g_flipActivo ? g_flipActivo->nombre : std::string("Flipbook");
+        btnAnim->icon = (int)IconType::textura;
+    }
     else if (c){ btnAnim->text = c->name; btnAnim->icon = (int)IconType::armature; }
     else  { btnAnim->text = NombreEscenaActiva(); btnAnim->icon = (int)IconType::camera; }
     bool hayFilas = !dopeRows.empty();

@@ -175,6 +175,7 @@ SOURCEPATH      ..\..\..\main
 SOURCE          W3dEscena.cpp
 SOURCEPATH      ..\..\..\main\io
 SOURCE          GuardarW3D.cpp W3dContenedor.cpp UI2DFormato.cpp Textura2D.cpp Fuente2D.cpp SkinAtlas.cpp Video2DCache.cpp
+SOURCE          W3dNodos.cpp   // oclusion por nodos de riel (.w3dnodos, estilo SLST de PS1)
 SOURCEPATH      ..\..\..\main\objects
 SOURCE          Culling.cpp Particulas.cpp VisZona.cpp Gamepad.cpp
 SOURCEPATH      ..\..\..\main\render
@@ -220,6 +221,8 @@ SOURCEPATH      ..\..\..\libs\Whisk3DCore\script
 SOURCE          W3dScript.cpp
 SOURCEPATH      ..\..\..\libs\Whisk3DCore\physics
 SOURCE          W3dFisica.cpp
+// cuerpos rigidos del Core (cajas + impulsos + raycast + contactos para lua)
+SOURCE          W3dRigido.cpp
 SOURCEPATH      ..\..\..\main\script
 // ScriptUI.cpp: engancha gBindExtra (constructor estatico) -> registra los binds de JUEGO
 // (sonido/setTexto/posPx/pantalla/...). Sin esto, un .lua que llama sonido() da "nil value".
@@ -332,6 +335,7 @@ SOURCE w3dVersion.cpp              // W3dVersion() (header del .obj exportado)
 
 SOURCEPATH ..\..\..\libs\Whisk3DCore\animation
 SOURCE Animation.cpp              // globales de playback: CurrentFrame / AnimFPS / Start-EndFrame / PlayAnimation + keyframes
+SOURCE Flipbook.cpp               // flipbook unificado (asset + player): UV de un quad por curvas; lo usan Imagen2D/Mesh/particulas
 SOURCE SkeletalAnimation.cpp      // ESQUELETO/SKINNING real (C++03): FK + linear blend skinning. Antes stubbeado; ya deforma en el N95.
 SOURCE Armature2DAnimation.cpp    // clips del armature 2D (C++03). Animation.cpp lo llama SIN ifdef -> si falta, no linkea.
 

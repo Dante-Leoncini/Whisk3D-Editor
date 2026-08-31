@@ -5,6 +5,7 @@
 #include "script/W3dScript.h"
 #include "script/BindsJuego.h"        // alimentar el estado de los binds de juego (apretado/etc) en el Play
 #include "physics/W3dFisica.h"        // paso de fisica del Core (el MISMO que corre el juego compilado)
+#include "physics/W3dRigido.h"        // cuerpos rigidos del Core (cajas + impulsos + contactos)
 #include "W3dEscena.h"                // motor multi-escena COMPARTIDO (activa / init perezoso / cambio pendiente)
 #include "objects/Objects.h"
 #include "objects/Light.h"            // el snapshot guarda/restaura el color difuso (setColor/setEnergia)
@@ -82,6 +83,36 @@ static SimSnap gBaseEditor;  // la escena DEL USUARIO antes de tocar nada (la re
 static std::vector<SimSnap> gGrab;    // un snapshot por frame simulado (editor)
 static int gTick = 0;
 static std::vector<Object*> gScripted;
+// INSTRUMENTACION de scripts (para el [PERF] y el overlay de stats): cuantos corrieron este tick, cuantos hay,
+// y ms del loop. Los conteos son ints puros (sirven en PC y Symbian); el ms usa W3dNowMs (real en las dos:
+// SDL de alta resolucion en PC, NTickCount ~1ms en Symbian).
+int    g_luaScriptsActivos = 0;
+int    g_luaScriptsTotal   = 0;
+double g_luaTickMs         = 0.0;
+// ms ACUMULADOS por objeto-con-script (paralelo a gScripted): dice CUAL script
+// se come el tiempo, no solo el total. SimLuaPerfTop lo vuelca y lo resetea.
+static std::vector<double> gLuaMsAcum;
+
+// Vuelca los 3 scripts que MAS ms acumularon desde el ultimo volcado, como
+// "Juego:41 agua:12 camara:2" (promedio POR TICK si frames > 1), y resetea el
+// acumulador. Lo consume el [PERF] de Symbian; en PC sirve igual desde el log.
+void SimLuaPerfTop(char* buf, int bufLen, int frames) {
+    if (!buf || bufLen < 24) return;
+    buf[0] = 0;
+    if (frames < 1) frames = 1;
+    char* p = buf; char* fin = buf + bufLen - 24;   // margen para "nombre:9999 "
+    for (int k = 0; k < 3 && p < fin; k++) {
+        size_t mejor = gLuaMsAcum.size(); double mms = 0.0;
+        for (size_t i = 0; i < gLuaMsAcum.size() && i < gScripted.size(); i++)
+            if (gLuaMsAcum[i] > mms) { mms = gLuaMsAcum[i]; mejor = i; }
+        if (mejor >= gLuaMsAcum.size() || mms <= 0.0) break;
+        char nom[13]; size_t nl = gScripted[mejor]->name.size(); if (nl > 12) nl = 12;
+        memcpy(nom, gScripted[mejor]->name.c_str(), nl); nom[nl] = 0;
+        p += sprintf(p, "%s%s:%d", k ? " " : "", nom, (int)(mms / frames + 0.5));
+        gLuaMsAcum[mejor] = 0.0;
+    }
+    for (size_t i = 0; i < gLuaMsAcum.size(); i++) gLuaMsAcum[i] = 0.0;
+}
 static int gGrabOffset = 0;   // tick ABSOLUTO del primer snapshot (el cache rueda)
 int gSimCacheMax = 250;       // techo del cache (frames), configurable (tarjeta Juego)
 bool gSimCacheOn = true;      // cache de juego (rewind) ON/OFF (checkbox tarjeta Juego). OFF = sin snapshot -> fluido
@@ -251,6 +282,10 @@ static void SimPlay() {
     // que Stop restaura. (Antes se pisaba con el snapshot post-inicio de abajo y
     // Stop dejaba pegado lo que los scripts movieron en inicio().)
     Snapshot(&gBaseEditor);
+    // CUERPOS RIGIDOS: crear los de la escena ANTES de inicio() (lo que los
+    // scripts importen en runtime lo agrega W3dImportarW3DAnexo por su cuenta)
+    W3dRigidosLimpiar();
+    W3dRigidosAsegurar(SceneCollection);
     // MULTI-ESCENA: registrar las escenas UI. La INICIAL arranca ya; las demas quedan
     // cargadas pero sin inicir (init perezoso al hacer cambiarEscena()).
     W3dEscenaSetInit(EditorInitEscena);
@@ -269,6 +304,10 @@ static void SimPlay() {
         W3dScriptInicio(s);
     }
     if (hayEscenas) W3dEscenaArrancar();   // muestra + inicia SOLO la escena inicial
+    // SEGUNDA pasada de cuerpos rigidos: lo que los inicio() importaron con
+    // importarW3D() entro ANTES de gActiva=true, asi que el hook del anexo
+    // no lo dio de alta (Asegurar es idempotente: los ya creados no se tocan).
+    W3dRigidosAsegurar(SceneCollection);
     gGrab.clear();
     gGrabOffset = 0;
     // frame 0 del cache (post-inicio): SOLO si el cache esta ON y NO es un juego compilado. Con el cache OFF (o
@@ -308,6 +347,9 @@ static void TickReal(float dt) {
     // en el MISMO frame. Es el mismo orden y el mismo dt que el runtime compilado
     // (W3dGameActualizar en game/w3drun.cpp) -> el juego se comporta igual en los dos lados.
     W3dFisicaPaso(dt);
+    // CUERPOS RIGIDOS (cajas con masa): mismo orden que la fisica minima, y los
+    // scripts leen contactos() de ESTE paso en el mismo frame.
+    W3dRigidosPaso(dt);
     // CAMARAS CON RIEL: el indice fraccionario (rielIndice, el 5to valor de rielDe)
     // lo horneaba SOLO el dibujo (Viewport3D::UpdateViewOrbit -> UpdatePosition), asi
     // que en ticks sin render -- harness `simplay`, o el primer tick antes del primer
@@ -354,13 +396,28 @@ static void TickReal(float dt) {
     W3dScriptBotonPad("izquierda",  buttonState[SDL_CONTROLLER_BUTTON_DPAD_LEFT]);
     W3dScriptBotonPad("derecha",    buttonState[SDL_CONTROLLER_BUTTON_DPAD_RIGHT]);
 #endif
+    extern double W3dNowMs();
+    double _lua0 = W3dNowMs();
+    int _act = 0;
+    if (gLuaMsAcum.size() != gScripted.size()) gLuaMsAcum.assign(gScripted.size(), 0.0);
     for (size_t i = 0; i < gScripted.size(); i++) {
         // solo corren los scripts de la escena ACTIVA (y visibles): un objeto invisible o
         // de una escena inactiva no ejecuta su logica. Sin multi-escena EsDeActiva cae a
         // la regla vieja (solo visible), asi que el 3D/una-sola-UI se comporta igual.
         if (!W3dEscenaEsDeActiva(gScripted[i])) continue;
+        double _s0 = W3dNowMs();
         W3dScriptActualizar(gScripted[i], dt);
+        gLuaMsAcum[i] += W3dNowMs() - _s0;   // a quien se le va el tiempo (SimLuaPerfTop)
+        _act++;                              // objeto con script que EFECTIVAMENTE corrio (visible/escena activa)
     }
+    g_luaScriptsActivos = _act;              // el "solo calcular las cosas cercanas": los no-visibles no cuentan
+    g_luaScriptsTotal   = (int)gScripted.size();
+    g_luaTickMs         = W3dNowMs() - _lua0;
+    // ANIMACION DE ESCENA pedida por los scripts (animEscena de lua): avanzar el
+    // reloj y APLICAR las curvas. Va DESPUES del bucle de scripts para que un
+    // animEscena() recien pedido pose los objetos en ESTE mismo frame (el editor
+    // solo evalua estas curvas con kind 0; en el juego el dueno es este tick).
+    W3dAnimEscenaTick(dt);
     // SNAPSHOT del estado apretado para el flanco de apretado() del PROXIMO frame (DESPUES de los scripts,
     // igual que el runtime en W3dGameActualizar): asi apretado() funciona identico en el Play y compilado.
     BindsJuegoSnapshotPunteros();
@@ -524,6 +581,8 @@ void SimStop() {
     Aplicar(gBaseEditor);   // la escena del usuario, NO el frame 0 post-inicio()
     W3dScriptDescargarTodo();
     W3dScriptSoltarTeclas();
+    W3dAnimEscenaReset();   // que no quede una animEscena() sonando para la proxima partida
+    W3dRigidosLimpiar();    // los cuerpos rigidos runtime mueren con la partida
     gFlecha[0] = gFlecha[1] = gFlecha[2] = gFlecha[3] = false;  // flechas del teclado
     BindsJuegoResetPunteros();   // soltar el dedo/mouse: que no quede un toque viejo para la proxima partida
     W3dEscenaLimpiar();          // soltar el mapa de escenas / activa (el editor vuelve a elegir UI por ObjActivo)

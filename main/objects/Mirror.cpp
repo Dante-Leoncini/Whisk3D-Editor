@@ -299,6 +299,26 @@ void Mirror::RenderObject() {
     // mide el rectangulo de recorte (ver Mirror.h)
     const Vector3 N = Normal(), U = EjeU(), V = EjeV(), P0 = PuntoDelPlano();
 
+    // AUTOCULL por el RECTANGULO del espejo (feedback del dueno: "los reflejos
+    // consumen llamadas innecesarias"): el reflejo solo se VE a traves del rect
+    // del agua; si ese rect esta fuera del frustum, re-dibujar el target es caras
+    // y draws tirados (el grueso del sobre-dibujo medido en el N95). Espejos sin
+    // limites no se cortan (no hay rect que medir).
+    if (usaLimites) {
+        const Vector3 esq[4] = { P0 + U*limU0 + V*limV0, P0 + U*limU1 + V*limV0,
+                                 P0 + U*limU0 + V*limV1, P0 + U*limU1 + V*limV1 };
+        Vector3 mn = esq[0], mx = esq[0];
+        for (int i = 1; i < 4; i++) {
+            if (esq[i].x < mn.x) mn.x = esq[i].x;  if (esq[i].x > mx.x) mx.x = esq[i].x;
+            if (esq[i].y < mn.y) mn.y = esq[i].y;  if (esq[i].y > mx.y) mx.y = esq[i].y;
+            if (esq[i].z < mn.z) mn.z = esq[i].z;  if (esq[i].z > mx.z) mx.z = esq[i].z;
+        }
+        // medio metro de margen: el rect es una lamina sin espesor
+        mn.x -= 0.5f; mn.y -= 0.5f; mn.z -= 0.5f;
+        mx.x += 0.5f; mx.y += 0.5f; mx.z += 0.5f;
+        if (!W3dAabbVisible(mn, mx)) return;
+    }
+
     // ---- 1) el RECORTE. Son DOS recortes, y hacen falta LOS DOS:
     //
     //   * EN PANTALLA lo recorta el ESTENCIL: la silueta del agua, marcada con

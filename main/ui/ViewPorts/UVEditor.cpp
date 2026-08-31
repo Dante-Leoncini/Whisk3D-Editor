@@ -4,6 +4,7 @@
 #include "objects/Mesh.h"          // Mesh, MaterialGroup, Material, Texture
 #include "objects/EditMesh.h"      // EditMesh (seleccion de caras para el Sync Selection)
 #include "objects/Textures.h"      // Textures[] (atlas de iconos = Textures[0])
+#include "io/Textura2D.h"          // Textura2DObtener: la UI del JUEGO en el dropdown Texture
 #include "w3dGraphics.h"           // w3dEngine (abstraccion grafica)
 #include "WhiskUI/draw/glesdraw.h"      // W3dPantallaAlto + helpers de dibujo
 #include "WhiskUI/theme/colores.h"       // ListaColores / ColorID
@@ -135,6 +136,8 @@ UVEditor::UVEditor() {
         b->desplegable = true; b->visible = false; BarButtons.push_back(b); // solo en UVModoHuesos
     b = new Button(T("Texture")); b->rol = BRUV_Texture;              // dropdown: elegir que textura ver
         b->desplegable = true; BarButtons.push_back(b);
+    b = new Button("Mipmap"); b->rol = BRUV_Mipmap;                   // inspector de la piramide (Auto / nivel)
+        b->desplegable = true; b->visible = false; BarButtons.push_back(b); // visible con textura mostrada (SyncBarra)
     b = new Button("", IconType::keyframe); b->rol = BRUV_Animation;  // menu Animation (icono rombo, = el 3D)
         b->desplegable = true; b->visible = false; BarButtons.push_back(b); // solo operativo (Edit Mode)
     // TOOLBAR inferior (mecanismo compartido de ViewportBase): DESHACER/REHACER primero (siempre,
@@ -383,6 +386,47 @@ void UVSetTexOverride(Mesh* m, int part){
     }
 }
 int  UVParteMostrada(Mesh* m){ return UVParteEfectiva(m); } // para la barra (nombre del boton)
+int  UVTexOverrideParte(){ return g_uvTexOverride; }        // -1 = auto (para el tilde del menu)
+
+// --- override de PROYECTO: ver CUALQUIER textura cargada en la escena (auditar cuantas
+// hay y como calzan estas UV sobre otra textura/aspecto). A diferencia del override de
+// parte NO cae al cambiar de seleccion: comparar contra otra textura es justamente
+// pasearse por mallas. Va por RUTA (el puntero muere al cerrar/recargar el proyecto);
+// si la textura ya no esta cargada, cae solo al auto.
+static std::string g_uvTexProyecto;
+Texture* UVTexProyectoActiva(){
+    if (g_uvTexProyecto.empty()) return NULL;
+    for (size_t i = 0; i < Textures.size(); i++)
+        if (Textures[i] && Textures[i]->iID && Textures[i]->path == g_uvTexProyecto)
+            return Textures[i];
+    return NULL;
+}
+// el ID GL de la textura de proyecto elegida: la del registro 3D (Textures) o, si
+// no esta ahi, la del cache 2D del juego (HUD/Imagen2D via Textura2DObtener, que
+// la carga si hace falta). 0 = sin override.
+unsigned int UVTexProyectoId(){
+    if (g_uvTexProyecto.empty()) return 0;
+    Texture* t = UVTexProyectoActiva();
+    if (t) return t->iID;
+    return Textura2DObtener(g_uvTexProyecto);
+}
+void UVSetTexProyecto(const std::string& ruta){ g_uvTexProyecto = ruta; }
+const std::string& UVTexProyectoRuta(){ return g_uvTexProyecto; }
+
+// --- inspector de MIPMAPS (menu "Mipmap" de la barra): ver UN nivel puntual de la
+// piramide de la textura mostrada. -1 = Auto (el filtro elige por zoom, el
+// comportamiento normal del render). Solo visualizacion, no toca la textura.
+static int g_uvMipNivel = -1;
+int  UVMipNivel(){ return g_uvMipNivel; }
+void UVSetMipNivel(int nivel){ g_uvMipNivel = nivel; }
+unsigned int UVTexturaMostradaId(Mesh* m){
+    unsigned int idp = UVTexProyectoId();
+    if (idp) return idp;
+    if (!m) return 0;
+    int p = UVParteEfectiva(m);
+    Material* mm = (p >= 0 && p < (int)m->materialsGroup.size()) ? m->materialsGroup[p].material : NULL;
+    return (mm && mm->texture) ? mm->texture->iID : 0;
+}
 
 // un punto (u,v) del espacio UV -> pixel del viewport. V=0 va ARRIBA: la convencion del engine
 // es V=0 = arriba de la imagen (stb top-first + el importador OBJ hace 1-v), asi la textura
@@ -395,12 +439,19 @@ static inline void UVtoScreen(float u, float v, float cx, float cy, float s,
     sx = cx + (u - 0.5f) * s * g_uvAspU;
     sy = cy + (v - 0.5f) * s * g_uvAspV;
 }
-// calcula el aspecto (g_uvAspU/V) de la textura de la mesh part activa de m. mayor lado = 1.0.
+// calcula el aspecto (g_uvAspU/V) de la textura MOSTRADA: la del override de proyecto si
+// hay, o la de la mesh part activa de m. mayor lado = 1.0.
 static void CalcAspectoUV(class Mesh* m, int part) {
     g_uvAspU = g_uvAspV = 1.0f;
+    int tw = 0, th = 0;
+    unsigned int idp = UVTexProyectoId();
+    if (idp && w3dEngine::TextureSize(idp, tw, th) && tw > 0 && th > 0) {
+        if (tw >= th) g_uvAspV = (float)th / (float)tw;
+        else          g_uvAspU = (float)tw / (float)th;
+        return;
+    }
     if (!m) return;
     Material* mat = (part >= 0 && part < (int)m->materialsGroup.size()) ? m->materialsGroup[part].material : NULL;
-    int tw = 0, th = 0;
     if (mat && mat->texture && mat->texture->iID && w3dEngine::TextureSize(mat->texture->iID, tw, th) && tw > 0 && th > 0) {
         if (tw >= th) g_uvAspV = (float)th / (float)tw; // ancha -> achica el alto
         else          g_uvAspU = (float)tw / (float)th; // alta  -> achica el ancho
@@ -864,22 +915,43 @@ void UVEditor::SyncBarra() {
     }
     if (bSnap) bSnap->visible = conXform; // ops del cursor 2D (pivote alternativo del transform)
     if (bAnim) bAnim->visible = conKeys;  // menu Animation: keyframes de la vertex anim / de la pose 2D
-    // Texture: visible si la malla tiene >=2 partes; el texto = nombre de archivo de la TEXTURA mostrada.
+    // Texture: SIEMPRE visible, independiente de la seleccion (pedido del dueno): el
+    // dropdown lista TODAS las texturas del proyecto ademas de las partes de la malla
+    // activa. El texto = nombre de archivo de la MOSTRADA.
     if (bTex) {
-        bool hayTex = (m && m->materialsGroup.size() >= 2);
-        bTex->visible = hayTex;
-        if (hayTex) {
+        bTex->visible = true;
+        std::string lbl = T("Texture");
+        const std::string* ruta = NULL;
+        if (!UVTexProyectoRuta().empty()) ruta = &UVTexProyectoRuta();
+        else if (m) {
             int p = UVParteEfectiva(m);
             Material* mm = (p >= 0 && p < (int)m->materialsGroup.size()) ? m->materialsGroup[p].material : NULL;
-            std::string lbl = "Texture";
-            if (mm && mm->texture && !mm->texture->path.empty()) {
-                const std::string& pt = mm->texture->path;
-                size_t sl = pt.find_last_of("/\\");
-                lbl = (sl == std::string::npos) ? pt : pt.substr(sl + 1);
-            }
-            bTex->text = lbl;
+            if (mm && mm->texture && !mm->texture->path.empty()) ruta = &mm->texture->path;
         }
+        if (ruta) {
+            size_t sl = ruta->find_last_of("/\\");
+            lbl = (sl == std::string::npos) ? *ruta : ruta->substr(sl + 1);
+        }
+        bTex->text = lbl;
     }
+    // Mipmap: inspector de la piramide de la textura mostrada. Visible cuando hay
+    // textura; el texto dice que se esta viendo (Auto o el tamano del nivel).
+    { Button* bMip = BarRolBtn(BarButtons, BRUV_Mipmap);
+      if (bMip) {
+          unsigned int tid = UVTexturaMostradaId(m);
+          bMip->visible = (tid != 0);
+          if (tid) {
+              int niv = UVMipNivel();
+              if (niv < 0 || !w3dEngine::TexTieneMips(tid)) bMip->text = "Mip: Auto";
+              else {
+                  int tw = 0, th = 0;
+                  w3dEngine::TextureSize(tid, tw, th);
+                  for (int k = 0; k < niv; k++) { if (tw > 1) tw /= 2; if (th > 1) th /= 2; }
+                  char buf[32]; sprintf(buf, "Mip: %dx%d", tw, th);
+                  bMip->text = buf;
+              }
+          }
+      } }
 }
 
 // distancia^2 de un punto al segmento ab (en pixeles) — para el pick de arista.
@@ -976,18 +1048,18 @@ void UVEditor::Render() {
         gfx::DrawLines(8);
     }
 
-    if (m) {
-        const int part = UVParteEfectiva(m); // auto (parte activa) o la elegida a mano en el dropdown "Texture"
-        Material* mat = (part < (int)m->materialsGroup.size())
-                            ? m->materialsGroup[part].material : NULL;
-
-        // --- la textura de la parte activa, centrada ---
-        if (mat && mat->texture && mat->texture->iID) {
+    // sin malla activa el override de PROYECTO se muestra igual (el dropdown es
+    // independiente de la seleccion): la textura sola, sin wireframe encima
+    if (!m) {
+        unsigned int idProy = UVTexProyectoId();
+        if (idProy) {
             gfx::Enable(gfx::Texture2D);
             gfx::EnableArray(gfx::TexCoordArray);
-            gfx::BindTexture(mat->texture->iID);
+            gfx::BindTexture(idProy);
             gfx::TexWrap(repeatTexture);
-            gfx::TexFilter(mat->filtrado);
+            gfx::TexFilter(true);
+            const bool mipVer = (g_uvMipNivel >= 0 && gfx::TexTieneMips(idProy));
+            if (mipVer) gfx::TexBaseLevel(g_uvMipNivel);
             gfx::Color4f(1.0f, 1.0f, 1.0f, 1.0f);
             const float lo = repeatTexture ? -3.0f : 0.0f;
             const float hi = repeatTexture ?  4.0f : 1.0f;
@@ -999,6 +1071,42 @@ void UVEditor::Render() {
             gfx::VertexPointer2f(0, P);
             gfx::TexCoordPointer2f(0, T);
             gfx::DrawTrianglesArray(6);
+            if (mipVer) gfx::TexBaseLevel(0);
+            gfx::Disable(gfx::Texture2D);
+            gfx::DisableArray(gfx::TexCoordArray);
+        }
+    }
+
+    if (m) {
+        const int part = UVParteEfectiva(m); // auto (parte activa) o la elegida a mano en el dropdown "Texture"
+        Material* mat = (part < (int)m->materialsGroup.size())
+                            ? m->materialsGroup[part].material : NULL;
+
+        // --- la textura MOSTRADA, centrada: la del proyecto elegida en el dropdown
+        // (3D o UI del juego via el cache 2D), o la de la parte activa ---
+        unsigned int idProy = UVTexProyectoId();
+        unsigned int texId = idProy ? idProy
+                                    : ((mat && mat->texture) ? mat->texture->iID : 0);
+        if (texId) {
+            gfx::Enable(gfx::Texture2D);
+            gfx::EnableArray(gfx::TexCoordArray);
+            gfx::BindTexture(texId);
+            gfx::TexWrap(repeatTexture);
+            gfx::TexFilter(mat ? mat->filtrado : true);
+            const bool mipVer = (g_uvMipNivel >= 0 && gfx::TexTieneMips(texId));
+            if (mipVer) gfx::TexBaseLevel(g_uvMipNivel);
+            gfx::Color4f(1.0f, 1.0f, 1.0f, 1.0f);
+            const float lo = repeatTexture ? -3.0f : 0.0f;
+            const float hi = repeatTexture ?  4.0f : 1.0f;
+            float aX,aY,bX,bY,cX,cY,dX,dY;
+            UVtoScreen(lo,lo, cx,cy,s, aX,aY); UVtoScreen(hi,lo, cx,cy,s, bX,bY);
+            UVtoScreen(hi,hi, cx,cy,s, cX,cY); UVtoScreen(lo,hi, cx,cy,s, dX,dY);
+            float P[12] = { aX,aY, bX,bY, cX,cY,  aX,aY, cX,cY, dX,dY };
+            float T[12] = { lo,lo, hi,lo, hi,hi,  lo,lo, hi,hi, lo,hi };
+            gfx::VertexPointer2f(0, P);
+            gfx::TexCoordPointer2f(0, T);
+            gfx::DrawTrianglesArray(6);
+            if (mipVer) gfx::TexBaseLevel(0);
             gfx::Disable(gfx::Texture2D);
             gfx::DisableArray(gfx::TexCoordArray);
         }

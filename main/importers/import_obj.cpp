@@ -700,6 +700,7 @@ bool LeerOBJ(const std::vector<const char*>& lines,
         }
         else if (LineaEmpieza(line, "usemtl ")) {
             std::string matName(line + 7);
+            W3dTrimNombre(matName);   // CRLF de Windows: sin esto el material no matchea el del newmtl del .mtl
             Material* materialPuntero = BuscarMaterialPorNombre(matName);
             if (!materialPuntero) materialPuntero = new Material(matName, false, TieneVertexColor);
             MaterialGroup mg;
@@ -757,6 +758,18 @@ bool LeerOBJ(const std::vector<const char*>& lines,
     return hayMasObjetos;
 }
 
+// saca \r, \n, espacios y tabs del FINAL de un nombre. CLAVE: un .obj/.mtl escrito en Windows (Python en modo
+// texto, o cualquier editor con CRLF) deja el nombre de material con un '\r' INVISIBLE ("crash_escenario_alpha\r"),
+// que no matchea "crash_escenario_alpha" en BuscarMaterialPorNombre -> se creaba un MATERIAL NUEVO por cada .obj
+// (el "millon de materiales" + malla sin textura porque el usemtl y el newmtl caian en materiales distintos).
+void W3dTrimNombre(std::string& s) {
+    while (!s.empty()) {
+        char c = s[s.size() - 1];
+        if (c == '\r' || c == '\n' || c == ' ' || c == '\t') s.erase(s.size() - 1);
+        else break;
+    }
+}
+
 bool LeerMTL(const std::string& filepath, int objetosCargados) {
     // POR LA ABSTRACCION DEL CORE (ReadTextFile), no con ifstream: un .mtl puede
     // venir del pak embebido o de ADENTRO DEL APK, donde no es un archivo real y
@@ -779,8 +792,8 @@ bool LeerMTL(const std::string& filepath, int objetosCargados) {
     while (std::getline(file, line)) {
         if (line.rfind("newmtl ", 0) == 0) {
             std::string matName = line.substr(7);
+            W3dTrimNombre(matName);   // CRLF de Windows: sin esto "X\r" del newmtl no matcheaba el "X" del usemtl
             mat = BuscarMaterialPorNombre(matName);
-            //std::cout << "Cargando MTL: " << matName << " encontrado=" << (mat?"si":"no") << std::endl;
 
             if (!mat) {
                 // (el ctor de Material YA se registra en Materials: un push_back
@@ -879,9 +892,9 @@ bool LeerMTL(const std::string& filepath, int objetosCargados) {
 
                     std::string filename = baseURL + num.str() + "." + extension;
 
-                    std::string absPath = DirOf(filepath) + filename;
-
-                    std::replace(absPath.begin(), absPath.end(), '\\', '/');
+                    // MISMA normalizacion que map_Kd (linea ~819): JoinPath colapsa '..' y separadores, asi la
+                    // clave del cache de texturas coincide con la de un map_Kd al mismo PNG -> 1 solo upload.
+                    std::string absPath = w3dFileSystem::JoinPath(DirOf(filepath), filename);
 
                     // por el CACHE por ruta: dos tiras animadas que compartan
                     // frames (o el mismo .mtl leido dos veces) suben la imagen
@@ -911,6 +924,9 @@ bool LeerMTL(const std::string& filepath, int objetosCargados) {
             }
             else if (prefix == "GL_DEPTH_TEST_OFF") {
                 mat->depth_test = false;
+            }
+            else if (prefix == "FONDO") {
+                mat->fondo = true;   // cielo: ultimo de los opacos, clavado al plano lejano
             }
             else if (prefix == "NoLight") {
                 mat->lighting = false;
@@ -1027,6 +1043,7 @@ static void EscribirMaterialMTL(std::ofstream& mtl, Material* mat, const std::st
     // extras propios de Whisk3D (los lee LeerMTL)
     if (!mat->culling)    mtl << "BackfaceCullingOff\n";
     if (!mat->depth_test) mtl << "GL_DEPTH_TEST_OFF\n";
+    if (mat->fondo) mtl << "FONDO\n";
     if (!mat->lighting)   mtl << "NoLight\n";
     if (!mat->repeat)     mtl << "CLAMP_TO_EDGE\n";
     // DECAL / ADITIVO (round-trip del import de arriba). El 'decal' ya implica NoLight,

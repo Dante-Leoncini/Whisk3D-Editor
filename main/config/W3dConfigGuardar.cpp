@@ -25,6 +25,7 @@ bool W3dConfigGuardar(){
 
     fprintf(f, "fullscreen = %s\n",         cfg.fullscreen ? "true" : "false");
     fprintf(f, "enableAntialiasing = %s\n", cfg.enableAntialiasing ? "true" : "false");
+    fprintf(f, "mipmaps = %s\n",            cfg.mipmaps ? "true" : "false");
     fprintf(f, "scale = %d\n",              cfg.scale);
     fprintf(f, "width = %d\n",              cfg.width);
     fprintf(f, "height = %d\n",             cfg.height);

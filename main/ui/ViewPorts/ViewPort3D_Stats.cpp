@@ -40,7 +40,9 @@ static void StatLinea(const char* buf, int width, int margen, int& ly, int lineH
 // triangulos y fps. Se llama dentro del pase 2D de RenderUI (ortho + fuente ya
 // seteados). Los contadores por malla estan precalculados (no se cuenta por frame).
 void Viewport3D::RenderEstadisticas(){
-    if (!showOverlays) return;   // las stats son un overlay: si "Show Overlays" esta apagado, no se ven
+    // Las stats (faces/gl/lua/times/fps) son DEBUG y se controlan por SUS PROPIOS flags (View menu / --stats),
+    // NO por "Show Overlays" (que es para los gizmos del editor: grilla, ejes...). Sin esto no se veian jugando,
+    // porque el pase de camara del juego apaga showOverlays (ViewPort3D.cpp) y arrastraba a las stats con el.
     if (!OverlayStatVertices && !OverlayStatFaces && !OverlayStatModgen && !OverlayStatTimes && !OverlayFps && !OverlayStatGL) return;
     SetColorID(ColorID::blanco);
     const int margen = gapGS * 2;
@@ -85,6 +87,12 @@ void Viewport3D::RenderEstadisticas(){
         sprintf(buf, "ms scn:%ld.%ld 3d:%ld.%ld",  ms[0]/10, ms[0]%10, ms[1]/10, ms[1]%10); StatLinea(buf, width, margen, ly, lineH);
         sprintf(buf, "ms ui:%ld.%ld log:%ld.%ld",  ms[2]/10, ms[2]%10, ms[3]/10, ms[3]%10); StatLinea(buf, width, margen, ly, lineH);
         sprintf(buf, "ms swap:%ld.%ld tot:%ld.%ld", ms[4]/10, ms[4]%10, ms[5]/10, ms[5]%10); StatLinea(buf, width, margen, ly, lineH);
+        // SCRIPTS lua: ms del loop + activos/total. "activos" = los que corrieron (visibles/escena activa); los
+        // que estan fuera de camara NO cuentan (el "solo calcular lo cercano"). caras/draws ya salen arriba (faces:/gl:).
+        { extern int g_luaScriptsActivos, g_luaScriptsTotal; extern double g_luaTickMs;
+          long lm = (long)(g_luaTickMs * 10.0 + 0.5); if (lm < 0) lm = 0;
+          sprintf(buf, "lua:%ld.%ld ms scr:%d/%d", lm/10, lm%10, g_luaScriptsActivos, g_luaScriptsTotal);
+          StatLinea(buf, width, margen, ly, lineH); }
     }
     if (OverlayFps){
         sprintf(buf, "fps: %d", (int)(g_fpsActual + 0.5f)); StatLinea(buf, width, margen, ly, lineH);

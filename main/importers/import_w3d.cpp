@@ -4,6 +4,7 @@
 #include "render/OpcionesRender.h"   // RenderType / g_redraw: son del editor
 #include "stb/stb_image.h" // stb ahora vive en libs/Whisk3DCore/thirdparty
 #include "script/W3dScript.h"   // colgar el <proyecto>.lua al objeto Script/gamepad
+#include "physics/W3dRigido.h"  // W3dRigidoDef (bloque "fisica") + W3dRigidosAsegurar (anexo en runtime)
 #include "io/W3dRecursos.h"   // listas de carga (cierre de proyecto) — Core
 #include "animation/Animation.h" // auto modo-juego al abrir un proyecto con scripts
 // ============================================================================
@@ -47,6 +48,7 @@
 #include "io/W3dContenedor.h"    // FORMATO v4: el .w3d es un zip que se MONTA (no se extrae)
 #include "io/W3dZip.h"           // W3dZipEs: detectar el zip sin levantar el archivo entero
 #include "io/W3dMalla.h"         // .w3dm: la geometria propia (reemplaza al GLB como formato de guardado)
+#include "io/W3dNodos.h"         // .w3dnodos: oclusion por nodos de riel (estilo SLST de PS1)
 #include "objects/Materials.h"   // bloque raiz "materiales" (antes viajaban dentro del GLB)
 #include "gfx/w3dGraphics.h"     // gfx::Mezcla: acotar el modo de mezcla que venga del archivo
 #include "objects/Textures.h"
@@ -457,6 +459,21 @@ static void AplicarFps(int f) {
     AnimFPS = f;
 }
 
+// TOPE DE RENDER del proyecto (`fpsCap` en la Escena), DISTINTO de `fps` (que es AnimFPS, el ritmo de
+// animacion): cuantos frames/seg dibuja el motor. Lo lee el loop de escritorio (main.cpp) para pacear;
+// en Symbian el vblank ya topa a <=60 y nadie lo lee (solo se clampea). Default 60.
+int g_fpsCap = 60;
+static void AplicarFpsCap(int f) {
+    if (f < 1) return;   // ausente/roto: queda el default (reseteado a 60 al cargar cada proyecto)
+#if defined(W3D_SYMBIAN)
+    if (f > 60) f = 60;  // Symbian: nunca supera 60 (el N95 no llega igual)
+#else
+    if (f > 120) f = 120; // PC/Android: tope 120
+    if (f < 30)  f = 30;
+#endif
+    g_fpsCap = f;
+}
+
 // el "fullscreen" del archivo NO cambia la ventana al abrir (
 // un proyecto no tiene que arrancar a pantalla completa). Solo actualiza cfg
 // para que GuardarW3D lo re-escriba con el proyecto (y lo lea el juego final).
@@ -675,6 +692,7 @@ void ApplyCommonProps(Object* obj, const std::map<std::string,std::string>& p){
     // el "ojito" del outliner: el formato de texto no lo escribia nunca, pero un .w3d
     // a mano tiene que poder ocultar un objeto (mismo idioma que el JSON v4)
     if(p.count("visible")) obj->visible = B("visible");
+    if(p.count("estatico")) obj->estatico = B("estatico"); // GridCull: false = dinamico (se re-evalua su celda por frame)
     if(p.count("showRelantionshipsLines")) obj->showRelantionshipsLines = B("showRelantionshipsLines");
 
     // Escala
@@ -894,15 +912,18 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
             return NULL;
         }
 
-        bool NoMerge = GetBoolOrDefault(n->props, "noMerge", false);        
+        bool NoMerge = GetBoolOrDefault(n->props, "noMerge", false);
+        // escenario CERRADO a edicion (sin bordes/edges al importar; Tab lo ignora)
+        bool noEditable = GetBoolOrDefault(n->props, "noEditable", false);
 
         // --- IMPORTACIÓN ---
-        Mesh* mesh = ImportWOBJ(path, parent, NoMerge);
+        Mesh* mesh = ImportWOBJ(path, parent, NoMerge, noEditable);
 
         if (!mesh){
             std::cerr << "[Wobj] Se importo mal el wobj!\n";
             return NULL;
         }
+
 
         for (size_t _ci=0; _ci<n->children.size(); _ci++) {
             Node* child = n->children[_ci];
@@ -930,15 +951,19 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
                 NewActiveVertexAnimation(mesh, anim);
             }
             // ANIMACION UV "tira de atlas" (Core, autoplay: ver struct UVAnimTira en Mesh.h).
-            //   AnimacionUV { frames: 14  fps: 30  eje: u  desfase: 0 }
+            //   AnimacionUV { frames: 14  fps: 30  eje: u  desfase: 0  ancho: 0.5 }
             // La textura es una TIRA de 'frames' celdas sobre 'eje'; el motor la recorre solo.
+            // `ancho`/`alto` (default 1): fraccion de la textura que ocupa la tira -- con la
+            // tira metida en el ATLAS UNICO el paso por celda es ancho/frames, no 1/frames.
             if (child->type == "AnimacionUV") {
                 std::map<std::string,std::string>& up = child->props;
                 std::string eje = up.count("eje") ? Unquote(w3dMapAt(up, "eje")) : std::string("u");
                 mesh->SetUVAnimTira(GetIntOrDefault(up, "frames", 1),
                                     GetFloatOrDefault(up, "fps", 30.0f),
                                     (eje == "v") ? 1 : 0,
-                                    GetIntOrDefault(up, "desfase", 0));
+                                    GetIntOrDefault(up, "desfase", 0),
+                                    GetFloatOrDefault(up, "ancho", 1.0f),
+                                    GetFloatOrDefault(up, "alto", 1.0f));
             }
             // MODIFICADOR "Culling" POR TRIANGULO (ver edit/Modifier.h). Dos metodos:
             //   CullingTri { metodo: "triangulos"  sector: 0  pvs: "extra/x.pvs.json" }
@@ -952,9 +977,10 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
             // `sectorFallback:` (opcional) = que dibujar cuando la celda ACTIVA quedo
             // SIN triangulos: "completa" = la malla entera, N = la lista de la celda N;
             // ausente = nada (el comportamiento de siempre). Ver Modifier.h.
-            if (child->type == "CullingTri") {
+            if (child->type == "CullingTri" || child->type == "Oclusion") {   // "Oclusion" = el buen nombre; CullingTri sigue por retrocompat
                 std::map<std::string,std::string>& cp = child->props;
-                extern void W3dModPVSAgregar(Mesh*, const std::string&, int, const std::string&, int); // edit/MeshEdit.cpp
+                extern void W3dModPVSAgregar(Mesh*, const std::string&, int, const std::string&, int,
+                                             const std::string&, bool); // edit/MeshEdit.cpp
                 std::string metodo = cp.count("metodo") ? Unquote(w3dMapAt(cp, "metodo")) : std::string("triangulos");
                 int sector = GetIntOrDefault(cp, "sector", GetIntOrDefault(cp, "celda", 0));
                 std::string archivo = cp.count("vis") ? Unquote(w3dMapAt(cp, "vis"))
@@ -964,7 +990,14 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
                     std::string fs = Unquote(w3dMapAt(cp, "sectorFallback"));
                     fallback = (fs == "completa") ? -1 : GetIntOrDefault(cp, "sectorFallback", 0);
                 }
-                W3dModPVSAgregar(mesh, metodo, sector, archivo, fallback);
+                // path: objeto del recorrido (Curve o malla de aristas) -> el motor elige la celda solo
+                std::string path = cp.count("path") ? Unquote(w3dMapAt(cp, "path")) : std::string();
+                bool soloCam = GetBoolOrDefault(cp, "soloCamaraActiva", true);
+                W3dModPVSAgregar(mesh, metodo, sector, archivo, fallback, path, soloCam);
+                if (cp.count("ramas")) {   // "1101" = rama 2 apagada (filtro del nodo-mas-cercano)
+                    extern void W3dModPVSRamas(Mesh*, const std::string&);
+                    W3dModPVSRamas(mesh, Unquote(w3dMapAt(cp, "ramas")));
+                }
             }
         }
 
@@ -1053,10 +1086,31 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
         // Culling { activo: true|false soloCamaraActiva: true|false distanciaMax: 0 <hijos> }
         // (frustum culling por AABB + culling por distancia opcional; ver Culling.h)
         Culling* cu = new Culling(parent);
+        // metodo de culling (frustum/grid/triangulo/bsp): ausente = frustum (retrocompat .w3d viejos)
+        cu->metodo           = p.count("metodo") ? CullingMetodoDesde(w3dMapAt(p, "metodo")) : (int)Culling::Frustum;
         cu->activo           = GetBoolOrDefault(p, "activo", true);   // ausente = prendido
         cu->soloCamaraActiva = GetBoolOrDefault(p, "soloCamaraActiva", false);
         cu->distanciaMax     = GetFloatOrDefault(p, "distanciaMax", 0.0f);
+        cu->ordenAlpha       = GetBoolOrDefault(p, "ordenAlpha", false); // translucido: cullea + ordena atras->adelante
+        cu->cellSize         = GetFloatOrDefault(p, "cellSize", 16.0f);  // metodo grid: lado de celda
+        cu->modo3D           = GetBoolOrDefault(p, "modo3D", false);     // metodo grid: 2D XZ vs 3D
+        // metodo riel: la Curve del recorrido + el .w3dvis de HIJOS visibles por nodo
+        if (p.count("riel"))     cu->rielNombre      = Unquote(w3dMapAt(p, "riel"));
+        if (p.count("visHijos")) cu->visHijosArchivo = Unquote(w3dMapAt(p, "visHijos"));
         return cu;
+    }
+
+    if (n->type=="GridCull"){
+        // COMPAT: el nodo GridCull viejo ahora es un Culling con metodo=Grid (el objeto se unifico).
+        Culling* g = new Culling(parent);
+        g->metodo           = Culling::Grid;
+        g->activo           = GetBoolOrDefault(p, "activo", true);
+        g->cellSize         = GetFloatOrDefault(p, "cellSize", 16.0f);
+        g->modo3D           = GetBoolOrDefault(p, "modo3D", false);
+        g->distanciaMax     = GetFloatOrDefault(p, "distanciaMax", 0.0f);
+        g->soloCamaraActiva = GetBoolOrDefault(p, "soloCamaraActiva", false);
+        g->ordenAlpha       = GetBoolOrDefault(p, "ordenAlpha", false); // celdas de lejos a cerca (transparencias)
+        return g;
     }
 
     if (n->type=="Particulas"){
@@ -1072,17 +1126,30 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
         pt->vel        = GetFloatOrDefault(p, "vel",        pt->vel);
         pt->dispersion = GetFloatOrDefault(p, "dispersion", pt->dispersion);
         pt->gravedad   = GetFloatOrDefault(p, "gravedad",   pt->gravedad);
-        pt->aditivo    = GetBoolOrDefault(p, "aditivo",     pt->aditivo);
-        pt->sustractivo= GetBoolOrDefault(p, "sustractivo", pt->sustractivo);
+        // MEZCLA: el .w3d nuevo trae "mezcla" (int, w3dEngine::Mezcla); los viejos, aditivo/sustractivo (bool)
+        if (p.count("mezcla"))                              pt->mezcla = GetIntOrDefault(p, "mezcla", pt->mezcla);
+        else if (GetBoolOrDefault(p, "sustractivo", false)) pt->mezcla = w3dEngine::MezclaSubtract;
+        else if (GetBoolOrDefault(p, "aditivo", false))     pt->mezcla = w3dEngine::MezclaAdd;
         if (p.count("color")) pt->SetColorTexto(Unquote(w3dMapAt(p, "color")));
         pt->desvanecer = GetBoolOrDefault(p, "desvanecer",  pt->desvanecer);
         pt->activo     = GetBoolOrDefault(p, "activo",      pt->activo);
         // azar (defaults 0 = sin jitter ni deriva: los archivos viejos no cambian)
         pt->variacion   = GetFloatOrDefault(p, "variacion",   pt->variacion);
         pt->turbulencia = GetFloatOrDefault(p, "turbulencia", pt->turbulencia);
+        pt->radioEmision = GetFloatOrDefault(p, "radioEmision", pt->radioEmision);
         // rotacion del billboard (defaults false/0 = derecho y quieto, como antes)
         pt->rotacion    = GetBoolOrDefault (p, "rotacion",    pt->rotacion);
         pt->velRotacion = GetFloatOrDefault(p, "velRotacion", pt->velRotacion);
+        pt->flipCuadros = GetIntOrDefault(p, "flipCuadros", pt->flipCuadros);   // flipbook por edad
+        pt->flipCols    = GetIntOrDefault(p, "flipCols",    pt->flipCols);
+        pt->flipFilas   = GetIntOrDefault(p, "flipFilas",   pt->flipFilas);
+        // SUB-RECT del atlas unico: "u0, v0, u1, v1" (ausente = textura entera)
+        if (p.count("uvRect")) {
+            std::string s = Unquote(w3dMapAt(p, "uvRect"));
+            float r[4] = { 0, 0, 1, 1 };
+            if (sscanf(s.c_str(), "%f , %f , %f , %f", &r[0], &r[1], &r[2], &r[3]) == 4)
+                for (int k = 0; k < 4; k++) pt->uvRect[k] = r[k];
+        }
         return pt;
     }
 
@@ -1179,6 +1246,7 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
 
         Curve* curve = new Curve(parent);
         if (curve->LoadFromFile(path)){
+            curve->RecalcularRamas();   // ramas (componentes) para el filtro del modificador Oclusion
             // LISTA DE CARGA (streaming por riel): sidecar declarado como hijo
             //     Curve { filePath: "riel.cap"  ListaCarga { filePath: "riel.cargas.json" } }
             for (size_t _i=0; _i<n->children.size(); _i++) {
@@ -1335,6 +1403,8 @@ void BuildScene(Node* root){
 
     // el FPS del proyecto (timeline/animaciones): "fps: 60" en la Escena
     AplicarFps(GetIntOrDefault(root->props, "fps", 0));
+    // TOPE DE RENDER del proyecto: "fpsCap: 120" en la Escena (distinto de fps=AnimFPS). Symbian lo clampea a 60.
+    AplicarFpsCap(GetIntOrDefault(root->props, "fpsCap", 0));
 
     // MULTI-ESCENA: la escena que ARRANCA + el modo (lo lee Compilar juego)
     if(root->props.count("escenaInicial"))
@@ -1360,6 +1430,16 @@ void BuildScene(Node* root){
     if(root->props.count("pixelado")){
         std::string v = w3dMapAt(root->props, "pixelado");
         w3dEngine::SetPixeladoGlobal(v == "true" || v == "1");
+    }
+
+    // MIPMAPPING del proyecto: sin la prop manda el default del EDITOR (cfg.mipmaps,
+    // Ajustes); con `mipmaps:` en la cabecera manda el proyecto ("capaz el editor las
+    // tiene pero el proyecto no"). Se aplica ANTES de que la cola diferida suba las
+    // texturas, asi que gobierna esta carga.
+    w3dEngine::SetMipmapsGlobal(cfg.mipmaps);
+    if(root->props.count("mipmaps")){
+        std::string v = w3dMapAt(root->props, "mipmaps");
+        w3dEngine::SetMipmapsGlobal(v == "true" || v == "1");
     }
 
     // CACHE DE JUEGO (rewind) del proyecto: un .w3d puede abrir con el cache YA destildado -> un JUEGO se juega
@@ -1501,6 +1581,7 @@ static int SanearPadres(std::vector<int>& padre, const char* quien) {
 static void JsonComunes(JVal* j, Object* o) {
     o->name = JS(j, "nombre", o->name);
     o->visible = JB(j, "visible", true);
+    o->estatico = JB(j, "estatico", true); // GridCull: false = dinamico (se re-evalua su celda por frame)
     o->showRelantionshipsLines = JB(j, "lineasParentales", true); // ausente = true (archivos viejos)
     o->paleta = JS(j, "paleta", "");   // seleccion de paleta ("" = hereda del padre)
     JVal* v;
@@ -1515,6 +1596,22 @@ static void JsonComunes(JVal* j, Object* o) {
     }
     if ((v = JHijo(j, "escala", 5)) && v->lista.size() >= 3) {
         o->scale.x = (float)v->lista[0]->num; o->scale.y = (float)v->lista[1]->num; o->scale.z = (float)v->lista[2]->num;
+    }
+    // FISICA de cuerpo rigido (opcional; espejo exacto de EscribirFisica del
+    // guardado). Ver physics/W3dRigido.h.
+    JVal* jf = JHijo(j, "fisica", 4);
+    if (jf) {
+        W3dRigidoDef* d = o->fisica ? o->fisica : new W3dRigidoDef();
+        const std::string t = JS(jf, "tipo", "dinamico");
+        d->tipo = (t == "estatico") ? 0 : ((t == "personaje") ? 2 : 1);
+        d->masa     = JF(jf, "masa", d->masa);
+        d->friccion = JF(jf, "friccion", d->friccion);
+        d->rebote   = JF(jf, "rebote", d->rebote);
+        if ((v = JHijo(jf, "caja", 5)) && v->lista.size() >= 3)
+            for (int k = 0; k < 3; k++) d->caja[k] = (float)v->lista[k]->num;
+        if ((v = JHijo(jf, "centro", 5)) && v->lista.size() >= 3)
+            for (int k = 0; k < 3; k++) d->centro[k] = (float)v->lista[k]->num;
+        o->fisica = d;
     }
 }
 
@@ -1583,12 +1680,14 @@ static void CargarCurvasAnim(JVal* aj, VertexAnimation* anim) {
 int g_w3dVaRemapeos = 0;
 
 // ANIMACION UV "tira de atlas" del JSON v4: { "frames": N, "fps": F, "eje": "u"|"v",
-// "desfase": D } bajo la clave "animUV" del objeto malla (la escribe GuardarW3D).
+// "desfase": D, "ancho": A, "alto": A } bajo la clave "animUV" del objeto malla (la
+// escribe GuardarW3D; ancho/alto default 1 = tira sobre la textura entera).
 static void CargarAnimUV(JVal* j, Mesh* mesh) {
     JVal* a = JHijo(j, "animUV", 4);
     if (!a || !mesh) return;
     mesh->SetUVAnimTira(JI(a, "frames", 1), JF(a, "fps", 30.0f),
-                        JS(a, "eje", "u") == "v" ? 1 : 0, JI(a, "desfase", 0));
+                        JS(a, "eje", "u") == "v" ? 1 : 0, JI(a, "desfase", 0),
+                        JF(a, "ancho", 1.0f), JF(a, "alto", 1.0f));
 }
 
 static void CargarAnimsVertex(JVal* j, Mesh* mesh, const std::string& base) {
@@ -1741,6 +1840,10 @@ static void CargarModificadores(JVal* j, Mesh* mesh) {
             md->sectorFallback = JI(e, "sectorFallback", 0);
             md->pvsArchivo = JS(e, "pvs", "");
             md->visArchivo = JS(e, "vis", "");
+            md->pathNombre = JS(e, "path", "");                       // recorrido: el motor elige la celda solo
+            md->soloCamaraActiva = JB(e, "soloCamaraActiva", true);
+            { std::string mask = JS(e, "ramas", "");                  // "1101" = rama 2 apagada
+              for (size_t r = 0; r < mask.size(); r++) md->ramasOn.push_back(mask[r] != '0'); }
         }
         mesh->modificadores.push_back(md);
     }
@@ -2411,12 +2514,30 @@ static Object* JsonObjetoCrear(JVal* j, Object* parent, const std::string& base)
         std::string rel = JS(j, "archivo", "");
         Curve* cv = new Curve(parent);
         JsonComunes(j, cv);
-        // "archivo" vacio = curva sin archivo de origen (el guardado avisa y no
-        // serializa su geometria): vuelve VACIA, pero el nodo y sus hijos vuelven
-        if (rel.empty())
+        // curva AUTORADA (Add > Path / riel editado): los nodos vienen INLINE en "puntos"
+        JVal* pts = JHijo(j, "puntos", 5);
+        if (pts && pts->lista.size() >= 3) {
+            int n = (int)pts->lista.size() / 3;
+            cv->vertexSize = n;
+            cv->vertex = new GLfloat[n * 3];
+            for (int i = 0; i < n * 3; i++)
+                cv->vertex[i] = pts->lista[i] ? (GLfloat)pts->lista[i]->num : 0.0f;
+            cv->indices = new GLushort[n];
+            for (int i = 0; i < n; i++) cv->indices[i] = (GLushort)i;
+            cv->signoZ = 1.0f;   // autorada en el espacio del motor (sin espejo de .cap)
+            JVal* ar = JHijo(j, "aristas", 5);   // GRAFO con ramas (pares); ausente = polilinea
+            if (ar) for (size_t i = 0; i + 1 < ar->lista.size(); i += 2) {
+                cv->aristas.push_back((GLushort)(ar->lista[i]   ? (int)ar->lista[i]->num   : 0));
+                cv->aristas.push_back((GLushort)(ar->lista[i+1] ? (int)ar->lista[i+1]->num : 0));
+            }
+            cv->BuildKDTree();
+        }
+        // "archivo" vacio y sin puntos = curva sin origen (queda vacia, el nodo vuelve)
+        else if (rel.empty())
             w3dLogfW("[W3D] la curva '%s' no tiene archivo de origen (queda vacia)", cv->name.c_str());
         else if (!cv->LoadFromFile(RutaJson(rel, base)))
             w3dLogfW("[W3D] no pude cargar la curva %s (queda vacia)", rel.c_str());
+        cv->RecalcularRamas();   // ramas (componentes) para el filtro del modificador Oclusion
         // LISTA DE CARGA (streaming): el sidecar .cargas.json (opcional)
         { std::string cg = JS(j, "cargas", "");
           if (!cg.empty()) cv->CargarListaCarga(RutaJson(cg, base)); }
@@ -2507,7 +2628,11 @@ static Object* JsonObjetoCrear(JVal* j, Object* parent, const std::string& base)
             // el cierre que el lector NO hace (es del Core y no puede llamar al editor):
             // index buffer + rangos por mesh part, bordes/posRep, y las capas activas al render.
             mesh->ReagruparMeshParts();
-            mesh->CalcularBordes();
+            // ESCENARIO CERRADO A EDICION: mismo trato que ImportWOBJ con noEditable
+            // (solo el AABB; sin posRep/edges la malla queda identica a la guardada)
+            mesh->noEditable = JB(j, "noEditable", false);
+            if (mesh->noEditable) mesh->CalcularAABBSolo();
+            else mesh->CalcularBordes();
             mesh->AplicarCapasAlRender();
             // el mapeo render-vert -> control-point (vertCtrlPoint = posRep). SIN ESTO el skinning
             // 3D se corta en seco (SkinearMesh sale si el mapa no cubre los verts) y la malla
@@ -2527,7 +2652,10 @@ static Object* JsonObjetoCrear(JVal* j, Object* parent, const std::string& base)
         CargarAnimsVertex(j, mesh, base);   // vertex anims (blob binario + curvas + rango)
         CargarRigMesh(j, mesh);             // modArmature + armatures 2D (los grupos vienen del .w3dm)
         CargarModificadores(j, mesh);       // el resto del stack (Mirror/Screw/SubSurf/...)
-        CargarAnimUV(j, mesh);              // animacion UV "tira de atlas" (autoplay)
+        CargarAnimUV(j, mesh);              // animacion UV "tira de atlas" (autoplay, propia de la malla)
+        { std::string fbn = JS(j, "flipbook", "");   // o un flipbook CON NOMBRE compartido (SceneFlipbooks)
+          if (!fbn.empty()) { Flipbook* fb = FlipbookPorNombre(fbn);
+              if (fb) mesh->UsarFlipbook(fb, JI(j, "flipDesfase", 0)); } }
         return mesh;
     }
     if (tipo == "modelo") {   // wavefront referenciado + sus vertex anims
@@ -2538,7 +2666,10 @@ static Object* JsonObjetoCrear(JVal* j, Object* parent, const std::string& base)
         CargarAnimsVertex(j, mesh, base);   // vertex anims (blob binario + curvas + rango)
         CargarRigMesh(j, mesh);             // vgroups por posicion + referencia modArmature (Fase 3)
         CargarModificadores(j, mesh);       // el resto del stack (Mirror/Screw/SubSurf/...)
-        CargarAnimUV(j, mesh);              // animacion UV "tira de atlas" (autoplay)
+        CargarAnimUV(j, mesh);              // animacion UV "tira de atlas" (autoplay, propia de la malla)
+        { std::string fbn = JS(j, "flipbook", "");   // o un flipbook CON NOMBRE compartido (SceneFlipbooks)
+          if (!fbn.empty()) { Flipbook* fb = FlipbookPorNombre(fbn);
+              if (fb) mesh->UsarFlipbook(fb, JI(j, "flipDesfase", 0)); } }
         return mesh;
     }
     if (tipo == "glb") {      // malla modelada, exportada a GLB dentro del zip
@@ -2644,13 +2775,31 @@ static Object* JsonObjetoCrear(JVal* j, Object* parent, const std::string& base)
         l->soloCamaraActiva = JB(j, "soloCamaraActiva", false); // ausente en los .w3d viejos
         return l;
     }
-    if (tipo == "culling") {   // Culling: frustum culling por AABB de los hijos
+    if (tipo == "culling") {   // Culling: contenedor de culling (frustum/grid/triangulo/bsp)
         Culling* cu = new Culling(parent);
         JsonComunes(j, cu);
+        cu->metodo           = CullingMetodoDesde(JS(j, "metodo", "frustum")); // ausente = frustum (retrocompat)
         cu->activo           = JB(j, "activo", true);         // ausente = prendido
         cu->soloCamaraActiva = JB(j, "soloCamaraActiva", false);
         cu->distanciaMax     = JF(j, "distanciaMax", 0.0f);   // 0 = sin limite (archivos viejos)
+        cu->ordenAlpha       = JB(j, "ordenAlpha", false);    // translucido: cullea + ordena atras->adelante
+        cu->cellSize         = JF(j, "cellSize", 16.0f);      // metodo grid
+        cu->modo3D           = JB(j, "modo3D", false);        // metodo grid
+        cu->rielNombre       = JS(j, "riel", "");             // metodo riel: la Curve del recorrido
+        cu->visHijosArchivo  = JS(j, "visHijos", "");         // metodo riel: hijos visibles por nodo
         return cu;
+    }
+    if (tipo == "gridcull") {   // COMPAT: gridcull viejo -> Culling con metodo=Grid (objeto unificado)
+        Culling* g = new Culling(parent);
+        g->metodo           = Culling::Grid;
+        JsonComunes(j, g);
+        g->activo           = JB(j, "activo", true);          // ausente = prendido
+        g->cellSize         = JF(j, "cellSize", 16.0f);
+        g->modo3D           = JB(j, "modo3D", false);
+        g->distanciaMax     = JF(j, "distanciaMax", 0.0f);    // 0 = sin limite
+        g->soloCamaraActiva = JB(j, "soloCamaraActiva", false);
+        g->ordenAlpha       = JB(j, "ordenAlpha", false);     // celdas de lejos a cerca (transparencias)
+        return g;
     }
     if (tipo == "viszona") {   // VisZona: celda de visibilidad (ver VisZona.h)
         VisZona* vz = new VisZona(parent);
@@ -2681,8 +2830,11 @@ static Object* JsonObjetoCrear(JVal* j, Object* parent, const std::string& base)
         pt->vel        = JF(j, "vel",        pt->vel);
         pt->dispersion = JF(j, "dispersion", pt->dispersion);
         pt->gravedad   = JF(j, "gravedad",   pt->gravedad);
-        pt->aditivo    = JB(j, "aditivo",    pt->aditivo);
-        pt->sustractivo= JB(j, "sustractivo", pt->sustractivo);   // ausente = false (archivos viejos)
+        // MEZCLA: v4 nuevo trae "mezcla" (int); archivos viejos, aditivo/sustractivo (bool)
+        int mz = JI(j, "mezcla", -1);
+        if (mz >= 0)                          pt->mezcla = mz;
+        else if (JB(j, "sustractivo", false)) pt->mezcla = w3dEngine::MezclaSubtract;
+        else if (JB(j, "aditivo",     false)) pt->mezcla = w3dEngine::MezclaAdd;
         JVal* c = JHijo(j, "color", 5);   // [r, g, b, a] (mismo idioma que "ejes")
         if (c) for (size_t i = 0; i < c->lista.size() && i < 4; i++)
             if (c->lista[i]) pt->color[i] = (float)c->lista[i]->num;
@@ -2691,9 +2843,20 @@ static Object* JsonObjetoCrear(JVal* j, Object* parent, const std::string& base)
         // azar (ausente en archivos v4 viejos -> 0: mismo comportamiento de antes)
         pt->variacion   = JF(j, "variacion",   pt->variacion);
         pt->turbulencia = JF(j, "turbulencia", pt->turbulencia);
+        pt->radioEmision = JF(j, "radioEmision", pt->radioEmision);
         // rotacion del billboard (ausente -> false/0: derecho y quieto, como antes)
         pt->rotacion    = JB(j, "rotacion",    pt->rotacion);
         pt->velRotacion = JF(j, "velRotacion", pt->velRotacion);
+        pt->flipCuadros = JI(j, "flipCuadros", pt->flipCuadros);   // flipbook por edad
+        pt->flipCols    = JI(j, "flipCols",    pt->flipCols);
+        pt->flipFilas   = JI(j, "flipFilas",   pt->flipFilas);
+        // SUB-RECT del atlas unico: [u0, v0, u1, v1] (ausente = textura entera)
+        {
+            JVal* r = JHijo(j, "uvRect", 5);
+            if (r && r->lista.size() >= 4)
+                for (int k = 0; k < 4; k++)
+                    if (r->lista[k]->tipo == 1) pt->uvRect[k] = (float)r->lista[k]->num;
+        }
         return pt;
     }
     if (tipo == "objeto") {
@@ -3044,6 +3207,24 @@ static Object* AnimBuscarScopeUI(Object* nodo, const std::string& n) {
     return NULL;
 }
 
+// FLIPBOOKS CON NOMBRE de la escena (contraparte de EscribirFlipbooks). Solo la config;
+// las 8 curvas de UV se regeneran con ConfigurarTira->GenerarCeldas.
+static void CargarFlipbooksEscena(JVal* raiz) {
+    SceneFlipbooksLimpiar();                        // reemplaza la lista entera (escena nueva)
+    JVal* jf = JHijo(raiz, "flipbooks", 5);         // array (.w3d viejo: sin bloque, no pasa nada)
+    if (!jf) return;
+    for (size_t i = 0; i < jf->lista.size(); i++) {
+        JVal* je = jf->lista[i];
+        if (!je || je->tipo != 4) continue;
+        Flipbook* f = new Flipbook();
+        f->nombre = JS(je, "nombre", "Flipbook");
+        f->ConfigurarTira(JS(je, "atlas", ""), JI(je, "cols", 1), JI(je, "filas", 1),
+                          JI(je, "cuadros", 1), JF(je, "fps", 30.0f));   // grilla + regenera curvas
+        f->crossfade = JB(je, "crossfade", false);
+        SceneFlipbooks.push_back(f);
+    }
+}
+
 static void CargarAnimacionesEscena(JVal* raiz) {
     JVal* ja = JHijo(raiz, "animaciones", 4);
     if (!ja) { InitSceneAnimations(); return; }   // .w3d viejo: sin bloque, abre igual
@@ -3163,6 +3344,7 @@ static bool AbrirEscenaJson(const char* datos, size_t n, const std::string& base
     }
     // fps: canonico en la raiz (v3); el zip v2 lo traia dentro de "escena"
     AplicarFps(JI(raiz, "fps", 0));
+    AplicarFpsCap(JI(raiz, "fpsCap", 0));
     // PALETAS del proyecto (v3), ANTES de los objetos: asi las paletas del
     // .w3d ganan el merge contra las bakeadas en los .w3dui (primera gana).
     // Un .w3d viejo sin el campo: se adoptan las de las UIs al cargarlas.
@@ -3195,9 +3377,11 @@ static bool AbrirEscenaJson(const char* datos, size_t n, const std::string& base
     // Un .w3d viejo (mallas en GLB) no trae el bloque y sus materiales siguen viniendo de
     // adentro del .glb, como siempre.
     CargarMateriales(raiz, base);
+    CargarFlipbooksEscena(raiz);   // ANTES de los objetos: un objeto puede referenciar un flipbook por nombre
     JVal* esc = JHijo(raiz, "escena", 4);
     if (esc) {
         AplicarFps(JI(esc, "fps", 0));
+        AplicarFpsCap(JI(esc, "fpsCap", 0));
         JVal* objs = JHijo(esc, "objetos", 5);
         if (objs) {
             extern void ProgresoActualizar(float);
@@ -3229,6 +3413,10 @@ static bool AbrirEscenaJson(const char* datos, size_t n, const std::string& base
     // PIXELADO GLOBAL (ver la rama de texto arriba y w3dGraphics.h). Ausente =
     // false: nada de lo que ya andaba cambia de aspecto.
     w3dEngine::SetPixeladoGlobal(JB(raiz, "pixelado", false));
+    // MIPMAPPING (ver la rama de texto): ausente = default del EDITOR (cfg.mipmaps),
+    // presente = manda el proyecto. Antes de la cola diferida, asi gobierna la subida.
+    w3dEngine::SetMipmapsGlobal(cfg.mipmaps);
+    { JVal* jm = JHijo(raiz, "mipmaps", 3); if (jm) w3dEngine::SetMipmapsGlobal(jm->b); }
     // icono del juego (opcional): ruta EXTERNA relativa al .w3d. La usa la tarjeta
     // Juego y Compilar juego (genera los tamanos chicos al compilar).
     AplicarIcono(RutaJson(JS(raiz, "icono", ""), base));
@@ -3258,6 +3446,152 @@ static bool AbrirEscenaJson(const char* datos, size_t n, const std::string& base
     AplicarLayoutTexto(JS(raiz, "layout", "2d"));
     delete raiz;
     return true;
+}
+
+// ============================================================================
+//  ANEXAR UN .w3d EN RUNTIME (el streaming del modo juego)
+//
+//  Pedido del demo GTA: importarW3D("assets/claude/claude.w3d") desde Lua trae
+//  un personaje/vehiculo ADENTRO de la escena que ya esta corriendo: objetos
+//  (con jerarquia), materiales y SUS animaciones de escena. A diferencia de
+//  AbrirEscenaJson NO limpia nada ni toca el estado del proyecto (fps, layout,
+//  sesion, escena inicial, animacion activa): solo AGREGA.
+//
+//  Limites, a proposito y documentados:
+//   - SOLO acepta JSON v3 plano (el contenedor v4/zip habria que montarlo
+//     ademas del proyecto ya montado: pendiente).
+//   - los nombres del archivo se conservan TAL CUAL (W3dNombresCargando):
+//     importar dos veces el mismo archivo duplica nombres y `buscar()` de lua
+//     devuelve el primero. Evitarlo es responsabilidad del que importa.
+//   - no corre los post-pasos de targets/constraints del abrir completo (los
+//     assets de juego tipo personaje/vehiculo no los usan).
+// ============================================================================
+
+// las animaciones de escena del archivo anexado: mismo parseo que
+// CargarAnimacionesEscena pero SIN limpiar las existentes y SIN tocar la
+// activa (en el juego se reproducen por nombre con animEscena() de lua).
+static void AnexarAnimacionesEscena(JVal* raiz) {
+    JVal* ja = JHijo(raiz, "animaciones", 4);
+    if (!ja) return;
+    JVal* jes = JHijo(ja, "escenas", 5);
+    if (!jes || jes->lista.empty()) return;
+    InitSceneAnimations();
+    size_t nEsc = jes->lista.size();
+    if (nEsc > (size_t)kAnimMaxEscenas) nEsc = (size_t)kAnimMaxEscenas;
+    for (size_t i = 0; i < nEsc; i++) {
+        JVal* je = jes->lista[i];
+        if (!je || je->tipo != 4) continue;
+        SceneAnimation* esc = new SceneAnimation(JS(je, "nombre", "Scene"));
+        esc->startFrame = JI(je, "inicio", 1);
+        esc->endFrame   = JI(je, "fin", 250);
+        esc->fps        = JI(je, "fps", 30);
+        if (esc->startFrame < 0) esc->startFrame = 0;
+        if (esc->endFrame < esc->startFrame) esc->endFrame = esc->startFrame;
+        if (esc->fps < 1) esc->fps = 1;
+        if (esc->fps > 120) esc->fps = 120;
+        SceneAnimations.push_back(esc);
+        JVal* jobjs = JHijo(je, "objetos", 5);
+        if (!jobjs) continue;
+        size_t nObj = jobjs->lista.size();
+        if (nObj > (size_t)kAnimMaxObjetos) nObj = (size_t)kAnimMaxObjetos;
+        for (size_t o = 0; o < nObj; o++) {
+            JVal* jo = jobjs->lista[o];
+            if (!jo || jo->tipo != 4) continue;
+            const std::string nombre = JS(jo, "objeto", "");
+            if (nombre.empty()) continue;
+            // los objetos recien anexados ya cuelgan del arbol: scope global
+            Object* obj = AnimBuscarScopeGlobal(SceneCollection, nombre, false);
+            if (!obj) {
+                w3dLogfW("[W3D] anexo: la animacion '%s' referencia a '%s', que no aparecio: se descarta",
+                         esc->name.c_str(), nombre.c_str());
+                continue;
+            }
+            AnimationObject ao;
+            ao.obj = obj; ao.FirstKeyFrame = 0; ao.LastKeyFrame = 0;
+            JVal* jcur = JHijo(jo, "curvas", 5);
+            if (jcur) {
+                size_t nCur = jcur->lista.size();
+                if (nCur > (size_t)kAnimMaxCurvas) nCur = (size_t)kAnimMaxCurvas;
+                for (size_t c = 0; c < nCur; c++) {
+                    AnimProperty ap;
+                    if (!CargarCurvaJson(jcur->lista[c], ap)) continue;
+                    if (ap.keyframes.empty()) continue;
+                    ap.SortKeyFrames();
+                    ao.Propertys.push_back(ap);
+                }
+            }
+            if (ao.Propertys.empty()) continue;
+            ao.UpdateFirstLastFrame();
+            SceneAnimations.back()->objetos.push_back(ao);
+        }
+    }
+}
+
+// Los ctores de Object/Mesh dejan seleccionado lo que crean (comportamiento de
+// editor). AbrirW3D lo limpia con DeseleccionarTodo(); el anexo NO puede hacer
+// eso (pisaria la seleccion del usuario en plena sesion), asi que deselecciona
+// SOLO el subarbol recien importado.
+static void DeseleccionarSubarbol(Object* o) {
+    if (!o) return;
+    if (o->select) o->Deseleccionar();
+    if (ObjActivo == o) ObjActivo = NULL;
+    for (size_t i = 0; i < o->Childrens.size(); i++)
+        DeseleccionarSubarbol(o->Childrens[i]);
+}
+
+Object* W3dImportarW3DAnexo(const std::string& ruta) {
+    std::vector<unsigned char> datos;
+    if (!w3dFileSystem::ReadFileBytes(ruta, datos) || datos.empty()) {
+        w3dLogfE("[W3D] importarW3D: no pude leer %s", ruta.c_str());
+        return NULL;
+    }
+    size_t i = 0;
+    while (i < datos.size() && (datos[i] == ' ' || datos[i] == '\t' ||
+                                datos[i] == '\r' || datos[i] == '\n')) i++;
+    if (i >= datos.size() || datos[i] != '{') {
+        w3dLogfE("[W3D] importarW3D: %s no es un .w3d JSON v3 plano (unico formato anexable por ahora)",
+                 ruta.c_str());
+        return NULL;
+    }
+    JParser parser((const char*)&datos[0] + i, datos.size() - i);
+    JVal* raiz = parser.Valor();
+    if (parser.error || raiz->tipo != 4) {
+        w3dLogfE("[W3D] importarW3D: el JSON de %s no parsea", ruta.c_str());
+        delete raiz;
+        return NULL;
+    }
+    // las rutas internas (mallas/, texturas/) cuelgan de la carpeta DEL ARCHIVO
+    size_t barra = ruta.find_last_of("/\\");
+    const std::string base = (barra == std::string::npos) ? std::string(".") : ruta.substr(0, barra);
+    CargarMateriales(raiz, base);
+    Object* primero = NULL;
+    JVal* esc = JHijo(raiz, "escena", 4);
+    JVal* objs = esc ? JHijo(esc, "objetos", 5) : NULL;
+    if (objs && SceneCollection) {
+        const bool antes = W3dNombresCargando;
+        W3dNombresCargando = true;    // conservar los nombres tal como vienen
+        const size_t nAntes = SceneCollection->Childrens.size();
+        for (size_t k = 0; k < objs->lista.size(); k++)
+            JsonObjeto(objs->lista[k], SceneCollection, base);
+        W3dNombresCargando = antes;
+        if (SceneCollection->Childrens.size() > nAntes)
+            primero = SceneCollection->Childrens[nAntes];
+        for (size_t k = nAntes; k < SceneCollection->Childrens.size(); k++)
+            DeseleccionarSubarbol(SceneCollection->Childrens[k]);
+        // si la partida esta andando (importarW3D lo llamo un script), dar de
+        // alta los cuerpos rigidos de lo que acaba de entrar
+        { extern bool SimActiva();
+          if (SimActiva())
+              for (size_t k = nAntes; k < SceneCollection->Childrens.size(); k++)
+                  W3dRigidosAsegurar(SceneCollection->Childrens[k]); }
+    }
+    ResolverModArmaturePendientes();
+    AnexarAnimacionesEscena(raiz);
+    delete raiz;
+    w3dLogf("[W3D] importarW3D: %s anexado (raiz '%s', %d animaciones de escena en total)",
+            ruta.c_str(), primero ? primero->name.c_str() : "sin objetos",
+            (int)SceneAnimations.size());
+    return primero;
 }
 
 // ---------------------------------------------------------------------------
@@ -3792,6 +4126,10 @@ void AbrirW3D(const std::string& ruta) {
     { extern unsigned long g_wobjParseMs, g_wobjBordesMs, g_wobjCount;
       g_wobjParseMs = g_wobjBordesMs = g_wobjCount = 0; }
     w3dLogf("[BUILD] parser .obj = strtod (rapido), carga instrumentada");
+    // el cache 2D pudo PRESTAR ids del cache 3D del proyecto anterior (atlas
+    // unico): al abrir otro proyecto esos ids pueden liberarse -> purgarlas
+    // ANTES de cargar (se re-prestan solas al primer uso).
+    { extern void Textura2DPurgarPrestadas(); Textura2DPurgarPrestadas(); }
     gPendModArm.clear(); // referencias modArmature de una carga anterior (por si quedo algo)
     gPendModTgt.clear(); // idem targets de modificadores y mallas a regenerar
     gPendModGen.clear();
@@ -3815,6 +4153,7 @@ void AbrirW3D(const std::string& ruta) {
     // idem el FPS: AplicarFps ignora un "fps" ausente/0, asi que sin este reset
     // un proyecto sin el campo HEREDABA el fps del proyecto anterior
     AnimFPS = 30;
+    g_fpsCap = 60;   // idem el tope de render: sin el campo fpsCap se vuelve al default de plataforma
 
     // el proyecto ANTERIOR deja de estar montado (su FILE* se suelta) y sus refs
     // externas dejan de valer: las del que abre las trae SU archivo
@@ -3943,6 +4282,29 @@ void AbrirW3D(const std::string& ruta) {
     { extern unsigned long g_wobjParseMs, g_wobjBordesMs, g_wobjCount;
       w3dLogf("[CARGA] mallas .obj=%lu  parse+build=%lu ms  bordes(edicion)=%lu ms",
               g_wobjCount, g_wobjParseMs, g_wobjBordesMs); }
+
+    // PRECARGA de texturas 2D (emisores de particulas + imagenes del HUD): sin
+    // esto cada PNG se decodificaba en su PRIMER uso, EN PLENO GAMEPLAY (la
+    // primera salpicadura, el primer pickup). Ahora el decode va aca, a la
+    // carga del proyecto (queja del dueno: "horrible que se ponga a decodificar
+    // imagenes durante el gameplay").
+    if (SceneCollection) {
+        extern void W3dParticulasPrecargarTexturas(Object*);
+        extern void UI2D_PrecargarTexturas(Object*);
+        extern void W3dSonidosPrecargar();
+        extern void CargarTexturasPendientes();
+        extern double W3dNowMs();
+        double _pre0 = W3dNowMs();
+        // PRIMERO el 3D (la cola diferida sube el atlas unico): asi el puente
+        // 2D->3D de Textura2DObtener encuentra el id y el HUD/particulas/fuente
+        // COMPARTEN esa textura en vez de decodificar una copia propia.
+        CargarTexturasPendientes();
+        W3dParticulasPrecargarTexturas(SceneCollection);
+        UI2D_PrecargarTexturas(SceneCollection);
+        W3dSonidosPrecargar();
+        w3dLogf("[CARGA] precarga de texturas (3D + 2D) + WAVs: %d ms",
+                (int)(W3dNowMs() - _pre0));
+    }
 }
 
 // compat: los llamadores viejos (constructor con w3dPath ya seteado) siguen andando

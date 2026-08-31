@@ -1,6 +1,7 @@
 #include "w3dGraphics.h" // abstraccion de graficos (independencia de OpenGL)
 #include "W3dLang.h"   // el nombre por defecto nace en el idioma del usuario
 #include "Curve.h"
+#include "objects/Mesh.h"       // ~Curve: liberar la malla de edicion interna ('edicion')
 #include "io/w3dFilesystem.h"   // leer el .cap por el Core (disco / pak / APK)
 #include <sstream>
 #include <algorithm>
@@ -20,10 +21,77 @@
 Curve::Curve(Object* parent, Vector3 pos)
     : Object(parent, T("Curve"), pos),
       vertexSize(0), vertex(NULL), indices(NULL), rotNodo(NULL), fovNodo(NULL),
-      signoZ(-1.0f), aspecto(0.0f), kdRoot(NULL)
+      signoZ(-1.0f), aspecto(0.0f), nRamas(0), edicion(NULL), kdRoot(NULL)
 {
     cargasHandle = -1;   // sin lista de carga hasta CargarListaCarga
 
+}
+
+// RAMAS = componentes conexas del grafo (aristas explicitas, o la cadena implicita de la
+// polilinea). BFS iterativo simple: ~1000 nodos, corre solo al cargar/terminar de editar.
+void Curve::RecalcularRamas() {
+    ramaDeNodo.assign(vertexSize > 0 ? vertexSize : 0, -1);
+    nRamas = 0;
+    if (vertexSize <= 0) return;
+    std::vector< std::vector<int> > ady(vertexSize);
+    if (!aristas.empty()) {
+        for (size_t k = 0; k + 1 < aristas.size(); k += 2) {
+            int a = aristas[k], b = aristas[k+1];
+            if (a >= 0 && a < vertexSize && b >= 0 && b < vertexSize) { ady[a].push_back(b); ady[b].push_back(a); }
+        }
+    } else {
+        for (int i = 0; i + 1 < vertexSize; i++) { ady[i].push_back(i+1); ady[i+1].push_back(i); }
+    }
+    std::vector<int> cola;
+    for (int s = 0; s < vertexSize; s++) {
+        if (ramaDeNodo[s] >= 0) continue;
+        int r = nRamas++;
+        cola.clear(); cola.push_back(s); ramaDeNodo[s] = r;
+        while (!cola.empty()) {
+            int c = cola.back(); cola.pop_back();
+            for (size_t k = 0; k < ady[c].size(); k++)
+                if (ramaDeNodo[ady[c][k]] < 0) { ramaDeNodo[ady[c][k]] = r; cola.push_back(ady[c][k]); }
+        }
+    }
+}
+
+// nearest con FILTRO de ramas (el modificador Oclusion elige que ramas participan:
+// la del bonus no sirve al nivel principal). Lineal, comun a PC y N95.
+int Curve::FindNearestFiltrado(const Vector3& target, const std::vector<char>* ramasOn) const {
+    bool filtrar = ramasOn && !ramasOn->empty() && (int)ramaDeNodo.size() == vertexSize;
+    int best = -1; float bd = 3.4e38f;
+    for (int i = 0; i < vertexSize; i++) {
+        if (filtrar) {
+            int r = ramaDeNodo[i];
+            if (r >= 0 && r < (int)ramasOn->size() && !(*ramasOn)[r]) continue;
+        }
+        float dx = vertex[i*3] - target.x, dy = vertex[i*3+1] - target.y, dz = vertex[i*3+2] - target.z;
+        float d = dx*dx + dy*dy + dz*dz;
+        if (d < bd) { bd = d; best = i; }
+    }
+    return best;
+}
+
+// FOCO/ENCUADRE: bounding de los nodos en MUNDO (centro del AABB + radio que lo envuelve).
+Vector3 Curve::PuntoFoco() const {
+    if (!vertex || vertexSize < 1) return GetGlobalPosition();
+    Vector3 mn(vertex[0], vertex[1], vertex[2]), mx = mn;
+    for (int i = 1; i < vertexSize; i++) {
+        if (vertex[i*3]   < mn.x) mn.x = vertex[i*3];   if (vertex[i*3]   > mx.x) mx.x = vertex[i*3];
+        if (vertex[i*3+1] < mn.y) mn.y = vertex[i*3+1]; if (vertex[i*3+1] > mx.y) mx.y = vertex[i*3+1];
+        if (vertex[i*3+2] < mn.z) mn.z = vertex[i*3+2]; if (vertex[i*3+2] > mx.z) mx.z = vertex[i*3+2];
+    }
+    return GetGlobalPosition() + (mn + mx) * 0.5f;   // nodos locales + posicion del objeto
+}
+float Curve::RadioFoco() const {
+    if (!vertex || vertexSize < 1) return 0.0f;
+    Vector3 c = PuntoFoco() - GetGlobalPosition();
+    float r2 = 0.0f;
+    for (int i = 0; i < vertexSize; i++) {
+        float dx = vertex[i*3] - c.x, dy = vertex[i*3+1] - c.y, dz = vertex[i*3+2] - c.z;
+        float d2 = dx*dx + dy*dy + dz*dz; if (d2 > r2) r2 = d2;
+    }
+    return sqrtf(r2);
 }
 
 // ===================================================
@@ -47,6 +115,7 @@ Curve::~Curve() {
     delete[] indices;          // (antes se fugaban indices y el arbol KD)
     delete[] rotNodo;           // canales opcionales del riel (pueden ser NULL)
     delete[] fovNodo;
+    delete edicion;             // la malla de edicion interna es de esta curva
     CurveBorrarKD(kdRoot);
 }
 
@@ -93,7 +162,11 @@ void Curve::RenderObject() {
     w3dEngine::LineWidth(2);
     w3dEngine::VertexPointer3f(0, vertex);
     w3dEngine::TexCoordPointer2f(12, vertex); // dummy valido
-    w3dEngine::DrawLineStrip(vertexSize);
+    if (!aristas.empty())                      // GRAFO con ramas: un segmento por arista
+        for (size_t k = 0; k + 1 < aristas.size(); k += 2)
+            w3dEngine::DrawLineStripIndexed(2, &aristas[k]);
+    else
+        w3dEngine::DrawLineStrip(vertexSize);
     w3dEngine::LineWidth(1);
     w3dEngine::EnableArray(w3dEngine::NormalArray);
     if (luzEstaba) w3dEngine::Enable(w3dEngine::Lighting);
@@ -122,7 +195,11 @@ void Curve::RenderObject() {
     w3dEngine::LineWidth(2);
 
     w3dEngine::VertexPointer3f(0, vertex);
-    w3dEngine::DrawLineStripIndexed(vertexSize, indices);
+    if (!aristas.empty())                      // GRAFO con ramas: un segmento por arista
+        for (size_t k = 0; k + 1 < aristas.size(); k += 2)
+            w3dEngine::DrawLineStripIndexed(2, &aristas[k]);
+    else
+        w3dEngine::DrawLineStripIndexed(vertexSize, indices);
 #endif // !W3D_SYMBIAN
 }
 

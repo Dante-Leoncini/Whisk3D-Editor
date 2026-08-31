@@ -180,6 +180,15 @@ class Viewport3D : public ViewportBase, public WithBorder {
         Vector3    pivot;                    // punto de interés a orbitar
         float      orbitDistance; // distancia al pivote (zoom)
 
+        // --- LOCAL VIEW (aislar la seleccion en ESTE viewport, tecla "/" / menu View) ---
+        bool localViewActivo;
+        std::set<Object*> localViewSet;   // objetos visibles mientras dura el aislamiento
+        Quaternion lvViewRot; Vector3 lvPivot; float lvOrbitDistance;   // camara guardada al entrar (se restaura al salir)
+        bool lvOrtho; bool lvFromCam; float lvZoom, lvPanX, lvPanY;
+        void LocalViewToggle();
+        void LocalViewEntrar();
+        void LocalViewSalir();
+
         Viewport3D(Vector3 pos = Vector3(0,0,0));
 
         virtual ~Viewport3D();

@@ -43,6 +43,7 @@
 #include "W3dPaletas.h"               // las paletas del PROYECTO (raiz "paletas" del .w3d)
 #include "objects/Objects.h"
 #include "objects/ObjectMode.h"        // W3dAplicarCurvasEnFrame: el objeto se guarda EN REPOSO
+#include "physics/W3dRigido.h"         // W3dRigidoDef: el bloque "fisica" del objeto
 #include "objects/UI.h"
 #include "objects/Camera.h"
 #include "objects/Light.h"
@@ -289,11 +290,27 @@ static std::string Asset(CtxGuardar* cx, std::string& rutaDisco) {
 static void CamposComunes(std::string& s, int ind, Object* o) {
     JSang(s, ind); s += "\"nombre\": "; JEsc(s, o->name); s += ",\n";
     if (!o->visible) { JSang(s, ind); s += "\"visible\": false,\n"; }
+    // ESTATICO: solo se escribe cuando es DINAMICO (default true = estatico), asi los proyectos que no lo
+    // tocan quedan igual. Lo usa W3dGridCull (celda cacheada vs re-evaluada por frame).
+    if (!o->estatico) { JSang(s, ind); s += "\"estatico\": false,\n"; }
     // LINEAS PARENTALES: solo se escribe cuando se APAGO (el default es true), asi los
     // proyectos que no la tocan quedan byte a byte como antes.
     if (!o->showRelantionshipsLines) { JSang(s, ind); s += "\"lineasParentales\": false,\n"; }
     // PALETA elegida por el objeto, POR NOMBRE (ausente = hereda del padre)
     if (!o->paleta.empty()) { JSang(s, ind); s += "\"paleta\": "; JEsc(s, o->paleta); s += ",\n"; }
+    // FISICA de cuerpo rigido (opcional): espejo exacto de la lectura en
+    // JsonComunes de import_w3d (ver physics/W3dRigido.h)
+    if (o->fisica) {
+        const W3dRigidoDef* d = o->fisica;
+        JSang(s, ind); s += "\"fisica\": { \"tipo\": ";
+        s += (d->tipo == 0) ? "\"estatico\"" : (d->tipo == 2 ? "\"personaje\"" : "\"dinamico\"");
+        s += ", \"masa\": "; JNum(s, d->masa);
+        s += ", \"caja\": ["; JNum(s, d->caja[0]); s += ", "; JNum(s, d->caja[1]); s += ", "; JNum(s, d->caja[2]);
+        s += "], \"centro\": ["; JNum(s, d->centro[0]); s += ", "; JNum(s, d->centro[1]); s += ", "; JNum(s, d->centro[2]);
+        s += "], \"friccion\": "; JNum(s, d->friccion);
+        s += ", \"rebote\": "; JNum(s, d->rebote);
+        s += " },\n";
+    }
     JSang(s, ind); s += "\"pos\": ["; JNum(s, o->pos.x); s += ", "; JNum(s, o->pos.y); s += ", "; JNum(s, o->pos.z); s += "],\n";
     JSang(s, ind); s += "\"rot\": ["; JNum(s, o->rotEuler.x); s += ", "; JNum(s, o->rotEuler.y); s += ", "; JNum(s, o->rotEuler.z); s += "],\n";
     JSang(s, ind); s += "\"escala\": ["; JNum(s, o->scale.x); s += ", "; JNum(s, o->scale.y); s += ", "; JNum(s, o->scale.z); s += "]";
@@ -1169,6 +1186,16 @@ static void EscribirModificadores(std::string& s, Mesh* m, int ind) {
             if (md->sectorFallback != 0) { s += ", \"sectorFallback\": "; JNum(s, (float)md->sectorFallback); }
             if (!md->pvsArchivo.empty()) { s += ", \"pvs\": "; JEsc(s, md->pvsArchivo); }
             if (!md->visArchivo.empty()) { s += ", \"vis\": "; JEsc(s, md->visArchivo); }
+            // path del recorrido (el motor elige la celda solo) + desde que ojo se mide
+            if (!md->pathNombre.empty()) { s += ", \"path\": "; JEsc(s, md->pathNombre); }
+            if (!md->soloCamaraActiva)   { s += ", \"soloCamaraActiva\": false"; }
+            // ramas habilitadas del path ("1101" = rama 2 apagada); solo si alguna esta OFF
+            { bool hayOff = false;
+              for (size_t r = 0; r < md->ramasOn.size(); r++) if (!md->ramasOn[r]) { hayOff = true; break; }
+              if (hayOff) {
+                  std::string mask; for (size_t r = 0; r < md->ramasOn.size(); r++) mask += md->ramasOn[r] ? '1' : '0';
+                  s += ", \"ramas\": "; JEsc(s, mask);
+              } }
         }
         // Array y Boolean: todavia sin params ni generacion (se guarda tipo/nombre
         // para no perder el stack que armo el usuario)
@@ -1536,10 +1563,15 @@ static void EscribirObjeto(std::string& s, Object* o, int ind, CtxGuardar* cx, b
         if (l->soloCamaraActiva) { s += ",\n"; JSang(s, ind + 1); s += "\"soloCamaraActiva\": true"; }
     }
     else if (t == ObjectType::culling) {
-        // Culling (frustum culling por AABB de los hijos)
+        // Culling: contenedor de culling unificado (metodo frustum/grid/triangulo/bsp)
         Culling* cu = (Culling*)o;
         JSang(s, ind + 1); s += "\"tipo\": \"culling\",\n";
         CamposComunes(s, ind + 1, o);
+        // metodo: solo se escribe si NO es frustum, asi los Culling clasicos quedan byte a byte como antes
+        if (cu->metodo != Culling::Frustum) {
+            s += ",\n"; JSang(s, ind + 1); s += "\"metodo\": ";
+            JEsc(s, std::string(CullingMetodoNombre(cu->metodo)));
+        }
         // interruptor del recorte: solo se escribe si esta APAGADO, asi los .w3d que
         // no lo tocan quedan byte a byte como antes (el default al leer es true)
         if (!cu->activo) { s += ",\n"; JSang(s, ind + 1); s += "\"activo\": false"; }
@@ -1549,6 +1581,17 @@ static void EscribirObjeto(std::string& s, Object* o, int ind, CtxGuardar* cx, b
         // que los proyectos que no lo tocan queden byte a byte como antes
         if (cu->distanciaMax > 0.0f) {
             s += ",\n"; JSang(s, ind + 1); s += "\"distanciaMax\": "; JNum(s, cu->distanciaMax);
+        }
+        if (cu->ordenAlpha) { s += ",\n"; JSang(s, ind + 1); s += "\"ordenAlpha\": true"; }
+        // campos del metodo Grid: solo se escriben con metodo=Grid (los demas metodos no los usan)
+        if (cu->metodo == Culling::Grid) {
+            s += ",\n"; JSang(s, ind + 1); s += "\"cellSize\": "; JNum(s, cu->cellSize);
+            if (cu->modo3D) { s += ",\n"; JSang(s, ind + 1); s += "\"modo3D\": true"; }
+        }
+        // campos del metodo Riel: la Curve del recorrido + el .w3dvis de hijos por nodo
+        if (cu->metodo == Culling::Riel) {
+            if (!cu->rielNombre.empty())      { s += ",\n"; JSang(s, ind + 1); s += "\"riel\": ";     JEsc(s, cu->rielNombre); }
+            if (!cu->visHijosArchivo.empty()) { s += ",\n"; JSang(s, ind + 1); s += "\"visHijos\": "; JEsc(s, cu->visHijosArchivo); }
         }
     }
     else if (t == ObjectType::viszona) {
@@ -1592,9 +1635,11 @@ static void EscribirObjeto(std::string& s, Object* o, int ind, CtxGuardar* cx, b
         s += ",\n"; JSang(s, ind + 1); s += "\"vel\": ";        JNum(s, pt->vel);
         s += ",\n"; JSang(s, ind + 1); s += "\"dispersion\": "; JNum(s, pt->dispersion);
         s += ",\n"; JSang(s, ind + 1); s += "\"gravedad\": ";   JNum(s, pt->gravedad);
-        s += ",\n"; JSang(s, ind + 1); s += "\"aditivo\": ";    s += pt->aditivo ? "true" : "false";
-        // solo se escribe si se usa: los proyectos que no la tocan quedan igual que antes
-        if (pt->sustractivo) { s += ",\n"; JSang(s, ind + 1); s += "\"sustractivo\": true"; }
+        // MODO DE MEZCLA (w3dEngine::Mezcla): reemplaza a aditivo/sustractivo. Solo se escribe si NO es el
+        // default MezclaAlpha, asi los emisores comunes quedan igual que antes.
+        if (pt->mezcla != w3dEngine::MezclaAlpha) {
+            s += ",\n"; JSang(s, ind + 1); s += "\"mezcla\": "; JNum(s, (float)pt->mezcla);
+        }
         s += ",\n"; JSang(s, ind + 1); s += "\"color\": [";
         JNum(s, pt->color[0]); s += ", "; JNum(s, pt->color[1]); s += ", ";
         JNum(s, pt->color[2]); s += ", "; JNum(s, pt->color[3]); s += "]";
@@ -1602,10 +1647,24 @@ static void EscribirObjeto(std::string& s, Object* o, int ind, CtxGuardar* cx, b
         s += ",\n"; JSang(s, ind + 1); s += "\"activo\": ";     s += pt->activo ? "true" : "false";
         s += ",\n"; JSang(s, ind + 1); s += "\"variacion\": ";   JNum(s, pt->variacion);
         s += ",\n"; JSang(s, ind + 1); s += "\"turbulencia\": "; JNum(s, pt->turbulencia);
+        // radioEmision: solo si difiere del default (round-trip byte a byte)
+        if (pt->radioEmision != 45.0f) { s += ",\n"; JSang(s, ind + 1); s += "\"radioEmision\": "; JNum(s, pt->radioEmision); }
         // rotacion del billboard: solo si se usa (los proyectos que no la tocan
         // quedan byte a byte como antes, mismo criterio que "sustractivo")
         if (pt->rotacion)            { s += ",\n"; JSang(s, ind + 1); s += "\"rotacion\": true"; }
         if (pt->velRotacion != 0.0f) { s += ",\n"; JSang(s, ind + 1); s += "\"velRotacion\": "; JNum(s, pt->velRotacion); }
+        if (pt->flipCuadros > 0) {   // FLIPBOOK por edad (solo si anima)
+            s += ",\n"; JSang(s, ind + 1); s += "\"flipCuadros\": "; JNum(s, (float)pt->flipCuadros);
+            s += ", \"flipCols\": ";  JNum(s, (float)pt->flipCols);
+            s += ", \"flipFilas\": "; JNum(s, (float)pt->flipFilas);
+        }
+        // SUB-RECT del atlas unico: solo si difiere de la textura entera
+        if (pt->uvRect[0] != 0.0f || pt->uvRect[1] != 0.0f ||
+            pt->uvRect[2] != 1.0f || pt->uvRect[3] != 1.0f) {
+            s += ",\n"; JSang(s, ind + 1); s += "\"uvRect\": [";
+            for (int k = 0; k < 4; k++) { if (k) s += ", "; JNum(s, pt->uvRect[k]); }
+            s += "]";
+        }
     }
     // (aca vivia la rama del objeto Constraint VIEJO. Se dio de baja: un constraint es
     //  una propiedad del objeto y lo escribe EscribirConstraints, que corre para TODOS
@@ -1619,16 +1678,27 @@ static void EscribirObjeto(std::string& s, Object* o, int ind, CtxGuardar* cx, b
         CamposComunes(s, ind + 1, o);
         // sin origen: "archivo" vacio (la curva vuelve VACIA, pero el nodo y su
         // subarbol vuelven). Asset() no se llama con "" (no hay nada que copiar).
-        // v4: Curve::LoadFromFile usa std::ifstream (no pasa por el VFS), asi que su
-        // .txt de origen NO puede vivir adentro del contenedor: queda EXTERNO
-        if (!cv->origen.empty()) W3dRefExternaMarcar(cv->origen);
+        // v4: el .cap SE INGIERE al contenedor -- Curve::LoadFromFile lee por
+        // w3dFileSystem (VFS incluido); el comentario viejo sobre std::ifstream
+        // estaba stale y dejaba el riel AFUERA del zip (el juego no viajaba solo).
         s += ",\n"; JSang(s, ind + 1); s += "\"archivo\": ";
         JEsc(s, cv->origen.empty() ? std::string() : Asset(cx, cv->origen));
+        // curva AUTORADA (Add > Path o riel editado en el editor): sin .cap de origen,
+        // los nodos van INLINE (x y z por nodo, ya en el espacio del motor)
+        if (cv->origen.empty() && cv->vertex && cv->vertexSize > 0) {
+            s += ",\n"; JSang(s, ind + 1); s += "\"puntos\": [";
+            for (int i = 0; i < cv->vertexSize * 3; i++) { if (i) s += ", "; JNum(s, cv->vertex[i]); }
+            s += "]";
+            if (!cv->aristas.empty()) {   // GRAFO con ramas (pares de indices); sin esto = polilinea
+                s += ",\n"; JSang(s, ind + 1); s += "\"aristas\": [";
+                for (size_t i = 0; i < cv->aristas.size(); i++) { if (i) s += ", "; JNum(s, (float)cv->aristas[i]); }
+                s += "]";
+            }
+        }
         // LISTA DE CARGA (streaming): el sidecar .cargas.json declarado. Solo
         // si hay (los .w3d sin streaming quedan byte a byte como siempre).
-        // Externo por la misma razon que el .cap (se lee junto a el).
+        // Se INGIERE como el .cap (CargarListaCarga lee por ReadFileBytes = VFS).
         if (!cv->cargasArchivo.empty()) {
-            W3dRefExternaMarcar(cv->cargasArchivo);
             s += ",\n"; JSang(s, ind + 1); s += "\"cargas\": ";
             JEsc(s, Asset(cx, cv->cargasArchivo));
         }
@@ -1663,6 +1733,9 @@ static void EscribirObjeto(std::string& s, Object* o, int ind, CtxGuardar* cx, b
         JSang(s, ind + 1); s += "\"tipo\": \"malla\",\n";
         CamposComunes(s, ind + 1, o);
         s += ",\n"; JSang(s, ind + 1); s += "\"geometria\": "; JEsc(s, nomGeo);
+        // ESCENARIO CERRADO A EDICION: sin esto el reabrir recalculaba bordes
+        // (edges 0 -> N) y la malla dejaba de ser identica a la original.
+        if (m->noEditable) { s += ",\n"; JSang(s, ind + 1); s += "\"noEditable\": true"; }
         if (!m->origen.empty()) {
             // el .obj/.fbx del usuario lo edita OTRO programa: es suyo y queda EXTERNO
             // (listado en EXTERNOS.txt). Ya no es de donde carga la malla.
@@ -1676,12 +1749,18 @@ static void EscribirObjeto(std::string& s, Object* o, int ind, CtxGuardar* cx, b
         }
         // ANIMACION UV "tira de atlas" (autoplay del Core, ver Mesh.h): 4 parametros
         // planos. El estado de reproduccion (cuadro/acum/base) NO se guarda a proposito.
-        if (m->uvAnim) {
+        if (m->flipbook && !m->flipbookPropio) {   // flipbook CON NOMBRE compartido: se guarda la REFERENCIA
+            s += ",\n"; JSang(s, ind + 1); s += "\"flipbook\": "; JEsc(s, m->flipbook->nombre);
+            if (m->flipPlay.desfase) { s += ", \"flipDesfase\": "; JNum(s, (float)m->flipPlay.desfase); }
+        } else if (m->flipbook) {   // flipbook PROPIO de la malla: la tira inline (animUV)
             s += ",\n"; JSang(s, ind + 1); s += "\"animUV\": { \"frames\": ";
-            JNum(s, (float)m->uvAnim->frames);
-            s += ", \"fps\": "; JNum(s, m->uvAnim->fps);
-            s += ", \"eje\": "; JEsc(s, std::string(m->uvAnim->eje ? "v" : "u"));
-            s += ", \"desfase\": "; JNum(s, (float)m->uvAnim->desfase);
+            JNum(s, (float)m->flipbook->cuadros);
+            s += ", \"fps\": "; JNum(s, m->flipbook->fps);
+            s += ", \"eje\": "; JEsc(s, std::string(m->flipbook->filas > 1 ? "v" : "u"));
+            s += ", \"desfase\": "; JNum(s, (float)m->flipPlay.desfase);
+            // sub-tira en el atlas unico (default 1 = textura entera): solo si difiere
+            if (m->flipbook->tiraAncho != 1.0f) { s += ", \"ancho\": "; JNum(s, m->flipbook->tiraAncho); }
+            if (m->flipbook->tiraAlto  != 1.0f) { s += ", \"alto\": ";  JNum(s, m->flipbook->tiraAlto); }
             s += " }";
         }
         EscribirAnimsVertex(s, m, ind + 1, cx);   // vertex anims (frames binarios + curvas)
@@ -1832,6 +1911,28 @@ static void EscribirAnimacionesEscena(std::string& s) {
     }
     s += "    ]\n";
     s += "  },\n";
+}
+
+// FLIPBOOKS CON NOMBRE de la escena (assets compartidos). Bloque raiz "flipbooks": solo la
+// config (nombre/atlas/grilla/fps); las 8 curvas de UV se regeneran al cargar (GenerarCeldas).
+// Sin flipbooks no se escribe nada (proyecto viejo sale igual).
+static void EscribirFlipbooks(std::string& s) {
+    if (SceneFlipbooks.empty()) return;
+    s += "  \"flipbooks\": [\n";
+    for (size_t i = 0; i < SceneFlipbooks.size(); i++) {
+        const Flipbook* f = SceneFlipbooks[i]; if (!f) continue;
+        s += "    { \"nombre\": "; JEsc(s, f->nombre);
+        s += ", \"atlas\": ";     JEsc(s, f->atlas);
+        s += ", \"cols\": ";      JInt(s, f->cols);
+        s += ", \"filas\": ";     JInt(s, f->filas);
+        s += ", \"cuadros\": ";   JInt(s, f->cuadros);
+        s += ", \"fps\": ";       JNum(s, f->fps);
+        if (f->crossfade) s += ", \"crossfade\": true";
+        s += " }";
+        if (i + 1 < SceneFlipbooks.size()) s += ",";
+        s += "\n";
+    }
+    s += "  ],\n";
 }
 
 // ===========================================================================
@@ -2007,6 +2108,8 @@ class ReposoAnimObjetos {
 // ---------------------------------------------------------------------------
 bool GuardarW3D(const std::string& ruta) {
     if (!SceneCollection) return false;
+    // una CURVE a medio editar (proxy de nodos abierto): volcar los nodos ANTES de serializar
+    { extern void W3dCurveEdicionCerrar(); W3dCurveEdicionCerrar(); }
     // ---- FRENO: UNA ESCENA UI DEL PROYECTO NO CARGO --------------------------------------
     //  El .w3dui faltaba o no parseaba, asi que su nodo NO se creo. Guardar escribe un
     //  proyecto.json SIN esa escena: los bytes del .w3dui sobreviven (PreservarPasajeras) pero
@@ -2091,6 +2194,7 @@ bool GuardarW3D(const std::string& ruta) {
     // PIXELADO GLOBAL: solo se escribe si esta PRENDIDO (los .w3d que ya existen
     // no cambian ni un byte al re-guardarlos).
     if (w3dEngine::PixeladoGlobal()) s += "  \"pixelado\": true,\n";
+    if (!w3dEngine::MipmapsGlobal()) s += "  \"mipmaps\": false,\n";   // default true: solo se guarda el apagado
     // CONFIG de la tarjeta Juego (Compilar juego): los valores VIGENTES del
     // editor, con strings legibles para editarlos a mano. Un .w3d viejo sin el
     // bloque abre con los defaults (W3dCompilarReset, ver import_w3d).
@@ -2134,6 +2238,9 @@ bool GuardarW3D(const std::string& ruta) {
         }
     }
     s += "  \"fps\": "; JNum(s, (float)AnimFPS); s += ",\n";
+    // TOPE DE RENDER (distinto de fps=AnimFPS): solo se escribe si NO es el default 60, asi los proyectos que
+    // no lo tocan quedan igual. Lo lee el loop de escritorio (Symbian lo clampea a 60).
+    { extern int g_fpsCap; if (g_fpsCap != 60) { s += "  \"fpsCap\": "; JNum(s, (float)g_fpsCap); s += ",\n"; } }
     s += "  \"fullscreen\": "; s += cfg.fullscreen ? "true" : "false"; s += ",\n";
     // estado de REPRODUCCION al guardar (v3): reabrir el proyecto respeta si estaba
     // en PLAY o en PAUSA (guardado en pausa -> abre en pausa). En archivos viejos el
@@ -2155,6 +2262,7 @@ bool GuardarW3D(const std::string& ruta) {
     // ANIMACIONES DE ESCENA (las curvas de transform de los objetos): van DESPUES de
     // la escena porque referencian a los objetos por nombre y asi se leen en orden.
     EscribirAnimacionesEscena(s);
+    EscribirFlipbooks(s);   // assets de flipbook con nombre (config; las curvas se regeneran al cargar)
     // MATERIALES: van DESPUES de la escena porque la lista se arma recorriendola (orden de
     // primera aparicion = deterministico). En el JSON el orden de las claves no significa nada:
     // el lector los resuelve por nombre, y los carga ANTES de armar los objetos.

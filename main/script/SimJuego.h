@@ -27,6 +27,11 @@ bool SimActiva();                 // hay una partida cargada (jugando o en pausa
 bool W3dJuegoCorriendo();
 bool SimHayScripts();             // hay algo con script en la escena?
 void SimTickPlay(float dt);       // lo llama el main loop con el timeline en PLAY
+// instrumentacion de scripts (para [PERF]/overlay): activos este tick / total cargados / ms del loop
+extern int    g_luaScriptsActivos;
+extern int    g_luaScriptsTotal;
+extern double g_luaTickMs;
+void SimLuaPerfTop(char* buf, int bufLen, int frames);   // top-3 scripts por ms ("Juego:41 agua:12"), resetea
 void SimStop();                   // restaurar el estado inicial + descargar
 bool SimStep(int dir);            // en pausa: +1 re-simula / -1 vuelve un frame
 void SimIrA(int tick);            // saltar a un frame GRABADO (scrub / ir al final)
