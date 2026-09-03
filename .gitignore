@@ -111,6 +111,8 @@ whisk3d.log
 /curvchk
 /contenido/
 platform/linux/debug/
+# round-trip de .w3d que guardan wptest/uvgroup (el harness redirige a "../debug/<nombre>")
+/tools/debug/
 
 # proyectos sueltos en la RAIZ del repo: son basura de pruebas manuales (guardarw3d con
 # ruta relativa deja el .w3d y su carpeta de contenido al lado del ejecutable/cwd).

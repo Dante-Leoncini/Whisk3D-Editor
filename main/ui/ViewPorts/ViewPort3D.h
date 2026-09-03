@@ -291,6 +291,7 @@ class Viewport3D : public ViewportBase, public WithBorder {
         // sin transform = historial de acciones; durante un transform = orientacion + ejes X/Y/Z
         // (+ aceptar/cancelar si es tactil). Solo si cfg.nuevoUsuario (Symbian default: off). ----
         bool ToolbarVisible() const W3D_OVERRIDE;   // cfg.nuevoUsuario
+        bool BrushBarVisible() const W3D_OVERRIDE;  // fila radio/valor: solo en Weight Paint
         void ToolbarSincronizar() W3D_OVERRIDE;     // visibilidad contextual + colores (estado puro)
         void ToolbarAccionRol(int rol) W3D_OVERRIDE; // que hace cada boton (roles TBR_*)
         bool ClickBarraTransform(int mx, int my); // tap TACTIL en la barra de estado del transform -> abre el teclado numerico

@@ -161,13 +161,22 @@ Viewport3D::Viewport3D(Vector3 pos){
     b = new Button("X"); b->rol = TBR_EjeX; b->centrado = true; b->cuadrado = true; ToolButtons.push_back(b);
     b = new Button("Y"); b->rol = TBR_EjeY; b->centrado = true; b->cuadrado = true; ToolButtons.push_back(b);
     b = new Button("Z"); b->rol = TBR_EjeZ; b->centrado = true; b->cuadrado = true; ToolButtons.push_back(b);
-    // PINCEL (modo Weight Paint): tam / fuerza / sumar-restar / grupo activo. Los ROLES son los
-    // reservados en UVEditor.h (TBR_Pincel*/TBR_Grupo): la MISMA toolbar contextual que el UV en
-    // modo pintura. Textos por frame en ToolbarSincronizar (labels de WeightPaintLabels).
-    b = new Button("40px");  b->rol = TBR_PincelTam;    b->desplegable = true; b->visible = false; ToolButtons.push_back(b);
-    b = new Button("100%");  b->rol = TBR_PincelFuerza; b->desplegable = true; b->visible = false; ToolButtons.push_back(b);
+    // PINCEL (modo Weight Paint): modo (+/-/=) y grupo activo. Los ROLES son los reservados en
+    // UVEditor.h (TBR_Pincel*/TBR_Grupo): la MISMA toolbar contextual que el UV en modo pintura.
+    // Textos por frame en ToolbarSincronizar (labels de WeightPaintLabels).
+    // El RADIO y el VALOR no tienen boton: son la fila de barras deslizables de arriba de la
+    // toolbar (ViewportBase::RenderBrushBar), que se arrastran sin abrir ningun desplegable.
     b = new Button("+");     b->rol = TBR_PincelModo;   b->centrado = true; b->cuadrado = true; b->visible = false; ToolButtons.push_back(b);
     b = new Button("Group"); b->rol = TBR_Grupo;        b->desplegable = true; b->visible = false; ToolButtons.push_back(b);
+    // MARCAS: icono de malla. Prendido = se ven los cuadraditos pintables y el pincel trabaja
+    // sobre ELLOS (al valor de la barra, sin falloff), no sobre la superficie.
+    b = new Button("", (int)IconType::mesh); b->rol = TBR_Marcas; b->centrado = true; b->cuadrado = true; b->visible = false; ToolButtons.push_back(b);
+    // FALLOFF: abre el editor (lista de presets + curva custom). El texto/icono del boton
+    // muestran el falloff ACTIVO, asi se ve cual esta puesto sin abrir nada.
+    b = new Button("Smooth"); b->rol = TBR_Falloff; b->desplegable = true; b->visible = false; ToolButtons.push_back(b);
+    // VERTEX PAINT: el color del pincel, como cuadradito relleno (el boton se tinta con el color
+    // vivo). Lo abre el ColorPicker de siempre -> color libre o color de PALETA por indice.
+    b = new Button(""); b->rol = TBR_ColorPincel; b->centrado = true; b->cuadrado = true; b->visible = false; ToolButtons.push_back(b);
     // "editar solo lo seleccionado" (mascara de pintura): toggle GLOBAL compartido con la
     // toolbar del UV editor (WeightPaintSoloSel); icono de seleccion, tinte accent = ON
     b = new Button("", (int)IconType::seleccion); b->rol = TBR_SoloSel; b->centrado = true; b->cuadrado = true; b->visible = false; ToolButtons.push_back(b);
@@ -1047,15 +1056,29 @@ void Viewport3D::SetShowOverlays(bool valor) {
 // pintar). Recalcula el color cada frame (barato y refleja el cambio de grupo activo al instante). Fuera del modo,
 // apaga el ultimo. Se llama antes de renderizar la escena.
 static Mesh* g_wpMesh = NULL;
+static int WP3DCapaColor(Mesh* m);   // (definida mas abajo, con el pincel de color)
 static void WeightPaintActualizar() {
     Mesh* target = NULL;
-    if (InteractionMode == WeightPaint && ObjActivo && ObjActivo->getType() == ObjectType::mesh)
+    const bool esPeso  = (InteractionMode == WeightPaint);
+    const bool esColor = (InteractionMode == VertexPaint);
+    if ((esPeso || esColor) && ObjActivo && ObjActivo->getType() == ObjectType::mesh)
         target = (Mesh*)ObjActivo;
-    if (g_wpMesh && g_wpMesh != target) g_wpMesh->weightPaintOn = false; // apaga el anterior
+    if (g_wpMesh && g_wpMesh != target) {       // apaga el anterior (los DOS pases)
+        g_wpMesh->weightPaintOn = false;
+        g_wpMesh->vertexPaintOn = false;
+    }
     g_wpMesh = target;
-    if (target) {
+    if (!target) return;
+    target->weightPaintOn = esPeso;
+    target->vertexPaintOn = esColor;
+    if (esPeso) {
         WeightPaintAsegurarMapa(target); // malla del editor recien creada: mapa render-vert -> control-point
-        target->weightPaintOn = true; target->ConstruirColorPeso(target->grupoActivo);
+        target->ConstruirColorPeso(target->grupoActivo);
+    } else if (esColor) {
+        // preparar la capa AL ENTRAR al modo, no al primer trazo: es lo que hace que la malla
+        // se vea con su vertex color (blanco si nunca tuvo) desde el momento en que entras.
+        // Sin esto la malla seguia con su material y luces, y no se entendia que ibas a pintar.
+        if (WP3DCapaColor(target) < 0) target->vertexPaintOn = false;
     }
 }
 
@@ -1077,7 +1100,10 @@ static int g_wpCursorX = -1, g_wpCursorY = -1;
 // guarda la posicion y redibuja. Extensible: sumar aca vertex/texture paint cuando pinten
 // con el mismo pincel. (El UV editor en UVModoPesos lleva su propio cursor lastMx/lastMy.)
 static bool WP3DModoPintura() {
-    return InteractionMode == WeightPaint;
+    // los DOS pinceles: el de pesos y el de vertex color. Comparten TODO (circulo, radio,
+    // valor, falloff, marcas, mascara "solo lo seleccionado") y se diferencian solo en QUE
+    // escriben, asi que todo el andamiaje del viewport es el mismo.
+    return InteractionMode == WeightPaint || InteractionMode == VertexPaint;
 }
 
 struct WP3DCtx { Viewport3D* vp; Mesh* m; Matrix4 W; const GLfloat* pos; };
@@ -1119,26 +1145,145 @@ static void WP3DPintar(Viewport3D* vp, int mx, int my) {
     c.pos = (m->skinArmature && m->skinVertex) ? m->skinVertex : m->vertex; // pintar sobre la pose visible
     BrushEstado& br = BrushGet();
     PincelAplicar(m, m->grupoActivo, (float)(mx - vp->x), (float)(my - vp->y),
-                  br.radioPx, br.fuerza, br.modo == 0, WP3DProyectar, &c);
+                  br.radioPx, br.fuerza, (WPModo)br.modo, WP3DProyectar, &c,
+                  NULL, &BrushFalloffEfectivo());
     g_redraw = true; // WeightPaintActualizar recalcula el color por frame -> feedback inmediato
+}
+
+// asegura una capa de color USABLE y devuelve su indice (-1 si la malla no da). Es el
+// equivalente del "grupo automatico al primer trazo" del pincel de pesos: pintar tiene que
+// funcionar sin obligar a preparar nada a mano. Una malla que nunca tuvo vertex color
+// arranca en BLANCO (que es como se ve hoy: sin color = sin tinte).
+static int WP3DCapaColor(Mesh* m) {
+    if (!m || m->vertexSize <= 0) return -1;
+    const int nC = m->ContarCorners();
+    if (nC <= 0) return -1;
+    if (!m->vertexColor) {
+        // COW: los buffers de render pueden estar COMPARTIDOS entre instancias (MallaDatos.h).
+        // Escribir sin desinstanciar pintaria tambien a las otras copias.
+        m->DesinstanciarDatos(W3DMD_COL);
+        m->vertexColor = new GLubyte[(size_t)m->vertexSize * 4];
+        for (int i = 0; i < m->vertexSize * 4; i++) m->vertexColor[i] = 255;
+    }
+    if (m->colorLayers.empty()) m->PoblarCapas();
+    if (m->colorLayers.empty()) return -1;
+    if (m->colorActivo < 0 || m->colorActivo >= (int)m->colorLayers.size()) m->colorActivo = 0;
+    ColorLayer* cl = m->colorLayers[m->colorActivo];
+    if ((int)cl->color.size() != nC * 4) cl->color.assign((size_t)nC * 4, 255);
+    return m->colorActivo;
+}
+
+static bool g_wpColorCambio = false;  // el trazo de color cambio algo (decide si va al undo)
+
+// una pasada del pincel de COLOR (misma cuenta de contexto que WP3DPintar)
+static void WP3DPintarColor(Viewport3D* vp, int mx, int my) {
+    Mesh* m = (ObjActivo && ObjActivo->getType() == ObjectType::mesh) ? (Mesh*)ObjActivo : NULL;
+    if (!m) return;
+    const int capa = WP3DCapaColor(m);
+    if (capa < 0) return;
+    WP3DCtx c; c.vp = vp; c.m = m;
+    vp->BindVista();                 // idem pesos: la matriz EFECTIVA depende de ESTA vista
+    m->GetWorldMatrix(c.W);
+    c.pos = (m->skinArmature && m->skinVertex) ? m->skinVertex : m->vertex;
+    BrushEstado& br = BrushGet();
+    unsigned char rgba[4];
+    for (int q = 0; q < 4; q++) {
+        float v = br.color[q];
+        if (v < 0.0f) v = 0.0f;
+        if (v > 1.0f) v = 1.0f;
+        rgba[q] = (unsigned char)(v * 255.0f + 0.5f);
+    }
+    if (PincelAplicarColor(m, capa, (float)(mx - vp->x), (float)(my - vp->y),
+                           br.radioPx, br.fuerza, rgba, br.palIdx,
+                           WP3DProyectar, &c, NULL, &BrushFalloffEfectivo()))
+        g_wpColorCambio = true;
+    g_redraw = true;
+}
+
+// UNA pasada, la que corresponda al modo. El drag y el commit no tienen que saber cual es.
+static void WP3DPasada(Viewport3D* vp, int mx, int my) {
+    if (InteractionMode == VertexPaint) WP3DPintarColor(vp, mx, my);
+    else                                WP3DPintar(vp, mx, my);
+}
+// arranca el trazo (snapshot de undo). false = no hay nada que pintar en esta malla.
+static bool WP3DTrazoIniciar(Mesh* m) {
+    if (InteractionMode == VertexPaint) {
+        const int capa = WP3DCapaColor(m);
+        if (capa < 0) return false;
+        g_wpColorCambio = false;
+        BrushTrazoResetear();          // el tope por trazo arranca limpio (ver WeightPaint.h)
+        UndoColorIniciar(m, capa);
+        return true;
+    }
+    return WeightPaintTrazoIniciar(m) >= 0;
+}
+// cierra el trazo: un paso de undo por trazo, como en pesos (se descarta si no cambio nada)
+static void WP3DTrazoFin() {
+    if (InteractionMode == VertexPaint) { UndoColorConfirmar(g_wpColorCambio); g_wpColorCambio = false; }
+    else                                  WeightPaintTrazoFin();
 }
 
 // circulo del pincel siguiendo al mouse, SOLO en modo pintura y con el cursor sobre el
 // CONTENIDO del viewport (no sobre la barra/toolbar ni con un menu/popup abierto).
 static void WP3DRenderPincel(Viewport3D* vp) {
     if (!WP3DModoPintura()) return;
-    if (PopUpActive || LayoutMenuAbierto()) return;
-    // cursor VIVO (actualizado en cada motion); si todavia no se movio, el ultimo click
-    int mx = (g_wpCursorX >= 0) ? g_wpCursorX : (int)lastMouseX;
-    int my = (g_wpCursorY >= 0) ? g_wpCursorY : (int)lastMouseY;
-    if (mx < vp->x || mx >= vp->x + vp->width || my < vp->y || my >= vp->y + vp->height) return;
-    if (vp->OnBar(mx, my) || vp->OnToolbar(mx, my)) return;
     namespace gfx = w3dEngine;
+    // DOS COSAS DISTINTAS, con reglas distintas:
+    //  - el CIRCULO es el cursor del pincel: sigue al mouse y solo se ve con el mouse sobre el
+    //    CONTENIDO de este viewport (no sobre las barras) y sin un menu/popup abierto.
+    //  - las MARCAS son un DISPLAY: muestran donde se puede pintar. No dependen del mouse (si
+    //    dependieran, desaparecerian al ir a la barra a cambiar el radio, que es justo cuando
+    //    se las quiere ver) ni de que haya un popup abierto (el de falloff, sin ir mas lejos).
+    int mx = (g_wpCursorX >= 0) ? g_wpCursorX : (int)lastMouseX;   // cursor VIVO (o el ultimo click)
+    int my = (g_wpCursorY >= 0) ? g_wpCursorY : (int)lastMouseY;
+    const bool cursorAdentro =
+        !PopUpActive && !LayoutMenuAbierto() &&
+        mx >= vp->x && mx < vp->x + vp->width && my >= vp->y && my < vp->y + vp->height &&
+        !vp->OnBar(mx, my) && !vp->OnToolbar(mx, my) && !vp->OnBrushBar(mx, my);
+    if (!cursorAdentro && BrushGet().marcas == MarcasOff && !WeightPaintSoloSel()) return; // nada que dibujar
+    // el contexto del proyector se arma ANTES del ortho 2D: GetWorldMatrix es la matriz
+    // EFECTIVA (billboards/constraints miran a la camara), asi que necesita ESTA vista
+    // bindeada -- y bindearla despues pisaria el ortho con el que se dibuja.
+    Mesh* mm = (ObjActivo && ObjActivo->getType() == ObjectType::mesh) ? (Mesh*)ObjActivo : NULL;
+    WP3DCtx c; bool hayCtx = false;
+    const bool hayMarcas = (mm && BrushGet().marcas != MarcasOff && mm->vertexSize > 0);
+    if (mm && mm->vertexSize > 0 && (hayMarcas || WeightPaintSoloSel())) {
+        c.vp = vp; c.m = mm;
+        vp->BindVista();
+        mm->GetWorldMatrix(c.W);
+        c.pos = (mm->skinArmature && mm->skinVertex) ? mm->skinVertex : mm->vertex; // la pose visible
+        hayCtx = true;
+    }
     gfx::MatrixMode(gfx::Projection); gfx::LoadIdentity();
     gfx::Ortho(0, vp->width, vp->height, 0, -1, 1);
     gfx::MatrixMode(gfx::ModelView); gfx::LoadIdentity();
     gfx::Disable(gfx::DepthTest); gfx::Disable(gfx::Lighting); gfx::Disable(gfx::Blend);
-    BrushDibujarCirculo((float)(mx - vp->x), (float)(my - vp->y), BrushGet().radioPx);
+    // VELO sobre lo no pintable (mascara "solo lo seleccionado"): antes de las marcas, para que
+    // los cuadraditos queden ARRIBA del velo y se sigan viendo.
+    if (hayCtx && WeightPaintSoloSel())
+        BrushDibujarCarasBloqueadas(mm, WP3DProyectar, &c);
+    if (hayCtx && hayMarcas) {
+        // relleno = el color del PESO que ya tiene el punto (la misma rampa que tinta la malla):
+        // el cuadradito muestra lo que vale, no solo donde esta. Si el color todavia no se armo
+        // para esta malla, van en gris (NULL) y no se dibuja nada de mas.
+        const unsigned char* colorRV =
+            (InteractionMode == VertexPaint)
+                ? mm->vertexColor                                   // vertex color: el color real del punto
+                : (((int)mm->weightPaintColor.size() >= mm->vertexSize * 4)
+                       ? &mm->weightPaintColor[0] : NULL);          // pesos: la rampa azul->rojo
+        // el MODO sale del pincel, pero en VERTEX COLOR manda la capa: una capa por corner
+        // muestra un cuadrado por corner (corridos hacia el centro de su cara) y una capa
+        // Per-Vertex los muestra sobre el vertice. Son ubicaciones distintas a proposito:
+        // es lo unico que distingue a simple vista en que unidad estas pintando.
+        int modoMarcas = BrushGet().marcas;
+        if (InteractionMode == VertexPaint && modoMarcas != MarcasOff) {
+            const ColorLayer* cl = (mm->colorActivo >= 0 && mm->colorActivo < (int)mm->colorLayers.size())
+                                 ? mm->colorLayers[mm->colorActivo] : NULL;
+            modoMarcas = (cl && cl->porVertice) ? MarcasVertice : MarcasCorner;
+        }
+        BrushDibujarMarcas(mm, modoMarcas, 7.0f * (float)GlobalScale, colorRV, WP3DProyectar, &c);
+    }
+    if (cursorAdentro) BrushDibujarCirculo((float)(mx - vp->x), (float)(my - vp->y), BrushGet().radioPx);
     gfx::Enable(gfx::Texture2D); gfx::EnableArray(gfx::TexCoordArray); // restaurar para la UI que sigue
     gfx::Invalidate();
 }
@@ -2685,12 +2830,12 @@ void Viewport3D::button_left(){
     }
     // WEIGHT PAINT: el click sobre el contenido PINTA (arranca el TRAZO: snapshot de undo +
     // primera pasada del pincel). El drag sigue en event_mouse_motion; el commit al soltar.
-    else if (InteractionMode == WeightPaint && !PopUpActive){
+    else if (WP3DModoPintura() && !PopUpActive){
         Mesh* m = (ObjActivo && ObjActivo->getType() == ObjectType::mesh) ? (Mesh*)ObjActivo : NULL;
         GuardarMousePos();
-        if (m && WeightPaintTrazoIniciar(m) >= 0){
+        if (m && WP3DTrazoIniciar(m)){
             g_wp3dPintando = true;
-            WP3DPintar(this, lastMouseX, lastMouseY);
+            WP3DPasada(this, lastMouseX, lastMouseY);
         }
     }
     else {
@@ -2701,7 +2846,7 @@ void Viewport3D::button_left(){
 
 #ifndef W3D_SYMBIAN
 void Viewport3D::mouse_button_up(int boton){
-    if (g_wp3dPintando){ g_wp3dPintando = false; WeightPaintTrazoFin(); } // fin del trazo -> commit del undo
+    if (g_wp3dPintando){ g_wp3dPintando = false; WP3DTrazoFin(); } // fin del trazo -> commit del undo
     // EDIT de ARMATURE: el drag de head/tail arrancado por el click termina al SOLTAR (commit del undo)
     if (BoneGrabActivo() && BoneGrabPorClick()) BoneGrabConfirmar();
     ViewPortClickDown = false;
@@ -2728,8 +2873,8 @@ void Viewport3D::event_mouse_motion(int mx, int my){
     // Android/web mientras se pinta).
     if (WP3DModoPintura()) { g_wpCursorX = mx; g_wpCursorY = my; g_redraw = true; }
     if (g_wp3dPintando){
-        if (leftMouseDown){ WP3DPintar(this, mx, my); return; }
-        g_wp3dPintando = false; WeightPaintTrazoFin(); // up perdido (solto fuera del viewport): commit igual
+        if (leftMouseDown){ WP3DPasada(this, mx, my); return; }
+        g_wp3dPintando = false; WP3DTrazoFin(); // up perdido (solto fuera del viewport): commit igual
     }
     // EDIT de ARMATURE: drag de head/tail (o grab modal de E/G) en curso -> el arrastre mueve los extremos
     if (BoneGrabActivo()){

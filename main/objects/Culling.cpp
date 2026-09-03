@@ -4,7 +4,7 @@
 #include "objects/Mesh.h"        // Mesh::aabbMin/aabbMax (AABB local cacheado)
 #include "render/OpcionesRender.h" // g_renderAspect (el aspecto con el que dibuja el juego)
 #include "w3dFilesystem.h"       // metodo Riel: leer el .w3dvis de hijos por nodo
-#include "w3dLog.h"              // aviso si el dato no carga
+#include "w3dlog.h"              // aviso si el dato no carga
 #include <math.h>
 #include <algorithm> // std::sort (orden adelante -> atras)
 

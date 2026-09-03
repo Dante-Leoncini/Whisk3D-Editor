@@ -2499,10 +2499,12 @@ static void AccionPaletaAgregar(){
 // desplegable de PALETAS de la tarjeta del proyecto: elegir cual se EDITA,
 // crear una nueva (copia de la editada) o borrar la editada
 static PopupMenu* MenuPaletas = NULL;
+static PopupMenu* MenuBorrarPaleta = NULL;   // submenu "Borrar paleta > <cual>"
 static void AccionPaletasElegida(int id){
     // FUSIONADA: el dropdown elige la paleta DEL OBJETO (o hereda), y ademas gestiona.
     // gPalEdit sigue a ObjActivo->paleta (se recalcula en el rebind), no se fija aca.
-    int n = (int)W3dPaletas().size();
+    std::vector<Paleta>& ps = W3dPaletas();
+    int n = (int)ps.size();
     if (id == -1) {                      // "Igual que el padre": el objeto hereda
         if (ObjActivo) ObjActivo->paleta.clear();
     } else if (id == n) {                // "Nueva paleta": una nueva por defecto, asignada al objeto
@@ -2511,9 +2513,17 @@ static void AccionPaletasElegida(int id){
     } else if (id == n + 2) {            // "Duplicar": copia de la actual, asignada al objeto
         int idx = W3dPaletaNueva("Paleta", gPalEdit);
         if (idx >= 0 && ObjActivo) ObjActivo->paleta = W3dPaletas()[idx].nombre;
-    } else if (id == n + 1) {            // "Borrar paleta": la actual; el objeto vuelve a heredar
-        W3dPaletaBorrarPaleta(gPalEdit);
-        if (ObjActivo) ObjActivo->paleta.clear();
+    } else if (id >= 2000) {             // "Borrar paleta > <cual>": del SUBMENU, cualquiera del proyecto
+        // Se puede borrar CUALQUIER paleta, no solo la asignada a este objeto: antes el item
+        // aparecia unicamente con una paleta propia asignada, asi que heredando (que es el
+        // default) no habia forma de borrar ninguna.
+        const int victima = id - 2000;
+        if (victima >= 0 && victima < n) {
+            const std::string nombre = ps[victima].nombre;
+            W3dPaletaBorrarPaleta(victima);
+            // el objeto solo pierde su seleccion si borro JUSTO la que tenia elegida
+            if (ObjActivo && ObjActivo->paleta == nombre) ObjActivo->paleta.clear();
+        }
     } else {                             // elegir una paleta existente -> asignar al objeto
         if (ObjActivo && id >= 0 && id < n) ObjActivo->paleta = W3dPaletas()[id].nombre;
     }
@@ -2531,9 +2541,18 @@ static void AccionMenuPaletas(){
     for (int i = 0; i < n; i++)
         MenuPaletas->Agregar(ps[i].nombre, i);
     MenuPaletas->Agregar(T("New Palette"), n);             // nueva por defecto, asignada al objeto
-    if (gPalEdit >= 0 && gPalEdit < n){                    // hay una paleta asignada: gestionarla
-        MenuPaletas->Agregar("Duplicar", n + 2);          // copia de la actual
-        MenuPaletas->Agregar("Borrar paleta", n + 1);     // borrar la actual (vuelve a heredar)
+    if (gPalEdit >= 0 && gPalEdit < n)
+        MenuPaletas->Agregar(T("Duplicate"), n + 2);      // copia de la actual (necesita una asignada)
+    if (n > 0) {
+        // BORRAR: submenu con TODAS las paletas del proyecto. Antes borraba "la actual" y solo
+        // aparecia con una asignada al objeto -> heredando no se podia borrar ninguna, que es
+        // el caso normal. Ademas asi se ve CUAL se esta por borrar.
+        if (!MenuBorrarPaleta) MenuBorrarPaleta = new PopupMenu();
+        MenuBorrarPaleta->Limpiar();
+        MenuBorrarPaleta->titulo = T("Delete Palette");
+        MenuBorrarPaleta->action = AccionPaletasElegida;   // los ids 2000+i los maneja la misma accion
+        for (int i = 0; i < n; i++) MenuBorrarPaleta->Agregar(ps[i].nombre, 2000 + i);
+        MenuPaletas->Agregar(T("Delete Palette"), -2, -1, MenuBorrarPaleta);
     }
     AbrirMenuBajoBoton(MenuPaletas, PropsActivo->propPaletaSel->button);
 }
@@ -4496,13 +4515,45 @@ static void AccionRenameArm2D() {
                   &m->armatures2d[m->armature2dActivo]->nombre, UniqArm2D, NULL, &dest);
 }
 
-static void AccionVertColorMode() {   // toggle Per-Vertex / Per-Corner de la capa de color activa
-    Mesh* m = VerticesMesh(); if (!m) return;
+// el toggle en si (lo llama el boton, o el "Si" del popup de confirmacion)
+static Mesh* gVertColorModeMesh = NULL;
+static void VertColorModeAplicar() {
+    Mesh* m = gVertColorModeMesh; gVertColorModeMesh = NULL;
+    if (!m) return;
     if (m->colorActivo >= 0 && m->colorActivo < (int)m->colorLayers.size()) {
         ColorLayer* cl = m->colorLayers[m->colorActivo];
-        cl->porVertice = !cl->porVertice;
+        const bool aPorVertice = !cl->porVertice;
+        cl->porVertice = aPorVertice;
+        if (aPorVertice) {
+            // FUSIONA de verdad: los 3, 4 o los que sean corners de cada vertice quedan con el
+            // PROMEDIO de sus colores. Antes el flag solo cambiaba el horneado (se mostraba el
+            // color del primer corner y los demas quedaban guardados intactos), asi que volver
+            // atras devolvia todo: no perdia nada, pero tampoco mezclaba nada. Va con su paso de
+            // undo porque ahora SI se pierden los colores originales de los otros corners.
+            UndoColorIniciar(m, m->colorActivo);
+            const bool cambio = VertexColorFusionarPorVertice(m, m->colorActivo);
+            UndoColorConfirmar(cambio);
+        }
         m->AplicarCapasAlRender(); g_redraw = true;
     }
+}
+static void AccionVertColorMode() {   // toggle Per-Vertex / Per-Corner de la capa de color activa
+    Mesh* m = VerticesMesh(); if (!m) return;
+    if (m->colorActivo < 0 || m->colorActivo >= (int)m->colorLayers.size()) return;
+    gVertColorModeMesh = m;
+    // PASAR A PER-VERTEX ACHICA LA INFORMACION: un vertice puede tener varios face corner con
+    // colores distintos (una arista dura pintada de dos colores), y en Per-Vertex todos esos
+    // corners pasan a mostrar UNO SOLO -- y en cuanto se pinta encima, los otros se pierden de
+    // verdad. Por eso se pregunta al ENTRAR y no al volver (volver a Per-Corner no pierde nada:
+    // la capa siempre guarda por corner).
+    if (!m->colorLayers[m->colorActivo]->porVertice) {
+        if (!confirmarPopup) confirmarPopup = new ConfirmarPopup();
+        confirmarPopup->Abrir(T("Per-Vertex uses one color per vertex: the colors of the other "
+                                "face corners are lost when painting. Continue?"),
+                              VertColorModeAplicar);
+        return;
+    }
+    VertColorModeAplicar();   // volver a Per-Corner: sin perdida, sin preguntar
 }
 
 

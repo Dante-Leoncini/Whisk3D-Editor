@@ -7,7 +7,7 @@
 #include "objects/Culling.h"       // metodo Riel: hijos-objetos por nodo (listaRender cacheada)
 #include "edit/Modifier.h"         // pathNombre / soloCamaraActiva / sectorPVS
 #include "edit/MeshEdit.h"         // W3dPVSSincronizar (materializa el sector, idempotente)
-#include "UI/ViewPorts/ViewPort3D.h" // Viewport3DActive->VistaCam(): la vista libre del editor
+#include "ViewPorts/ViewPort3D.h" // Viewport3DActive->VistaCam(): la vista libre del editor
 
 // nodo (0-based) mas cercano al ojo sobre el path. Curve: FindNearest (lineal, ~1000 nodos
 // = trivial). Malla de aristas (Add > Path): lineal sobre sus vertices, mismo criterio.

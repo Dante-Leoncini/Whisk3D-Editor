@@ -76,6 +76,21 @@ void ToolbarMRU(std::vector<int>& hist, int id);
 // texto de una accion TB* del historial (TBMove/TBRotate/... de variables.h), ya traducido.
 const char* ToolbarAccionLabel(int id);
 
+// ---- FILA DE BARRAS DEL PINCEL: estado GLOBAL del gesto y del foco (def en ToolbarBase.cpp).
+// Global y no por viewport a proposito: el pincel es UNO solo (BrushGet) y solo se puede
+// arrastrar una barra a la vez, igual que el drag del item-slider de los menus (MenuSliderDrag*).
+bool BrushBarDragActivo();          // hay un arrastre de barra armado (el down cayo en una)
+void BrushBarDragMover(int mx, int my); // el mouse se movio con el boton apretado -> valor en vivo
+void BrushBarDragSoltar();          // se solto: si NO hubo arrastre fue un TAP -> edicion numerica
+// TECLADO (Symbian/keypad): arriba/abajo turnan entre las dos barras, OK entra a editarlas
+// (y ahi izquierda/derecha mueven el valor), C/Cancel suelta el foco. true = la tecla se consumio.
+bool BrushBarTecla(ViewportBase* vp, int tecla);
+int  BrushBarFoco();                // barra enfocada por teclado: -1 ninguna, 0 radio, 1 valor
+bool BrushBarEditando();            // el foco esta en modo ajuste (OK apretado): izq/der mueven
+void BrushBarSoltarFoco();          // saca el foco (al salir del modo pintura)
+class ViewportBase;
+void BrushBarOlvidarViewport(ViewportBase* vp); // el viewport murio en medio del gesto: olvidarlo
+
 // Variables UV/indices
 extern GLubyte indicesBorder[];
 extern GLfloat bourderUV[32];
@@ -212,6 +227,20 @@ class ViewportBase {
         bool ToolbarClick(int mx, int my);     // hit tolerante + despacho por rol (true = consumido)
         virtual void ToolbarAccionRol(int rol) { (void)rol; } // accion del boton con ese rol
         virtual void RenderToolbar();          // fondo + botones (al final del Render, en ortho 2D)
+
+        // ---- FILA DE BARRAS DEL PINCEL (arriba de la toolbar), COMPARTIDA (ToolbarBase.cpp).
+        // Dos barras deslizables al 50% del ancho cada una: "radio: 40px" y "valor: 100%".
+        // Se arrastran con el dedo o el mouse (el valor cambia en vivo, sin abrir nada) y un
+        // TAP/click sin arrastre abre la edicion numerica por teclado (fisico en PC, el NumPad
+        // tactil en Android). El radio NO se dibuja lleno: no tiene tope (minimo 0px), asi que
+        // se arrastra RELATIVO; el valor va de 0 a 100% y si se llena, y se mapea ABSOLUTO
+        // (donde tocas, ese valor) como el item-slider de los menus.
+        // Solo la muestran los editores que pintan pesos, via el virtual de abajo. ----
+        virtual bool BrushBarVisible() const { return false; } // 3D: Weight Paint; UV: modo pesos
+        int  BrushBarHeight() const;             // alto de la fila (0 si no se ve)
+        bool OnBrushBar(int px, int py) const;   // (px,py) cae en la fila de barras?
+        void RenderBrushBar();                   // dibujo (lo llama RenderToolbar, arriba de la barra)
+        bool BrushBarClick(int mx, int my);      // arma el arrastre + mueve el valor (true = consumido)
 
         // ---- TRANSFORM UI COMPARTIDO (TransformUI.cpp): barra de info + entrada numerica +
         // envolver el cursor + tilde/cruz/ejes de la toolbar. Un editor con G/R/S MODAL propio

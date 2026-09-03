@@ -2548,6 +2548,47 @@ public:
 static UVMapUndo*   g_pendingUV    = NULL; // transform de UV liviano en curso
 static MeshGeoUndo* g_pendingUVGeo = NULL; // transform de cara CON split en curso (snapshot total)
 
+// ============================================================================
+//  VERTEX COLOR (pincel de color): un paso por TRAZO, igual que los pesos. Pintar solo cambia
+//  VALORES de la capa activa (color + indices de paleta), no la topologia -> alcanza el patron
+//  LIVIANO de UVMapUndo: snapshot de la capa al empezar el trazo y swap al deshacer.
+// ============================================================================
+class ColorLayerUndo : public UndoCmd {
+    Mesh* m;
+    int capa;
+    std::vector<GLubyte> color;   // la capa entera (4 por corner)
+    std::vector<int> indice;      // los indices de paleta (vacio si la capa no es porIndice)
+public:
+    ColorLayerUndo(Mesh* M, int c) : m(M), capa(c) {
+        if (!m || capa < 0 || capa >= (int)m->colorLayers.size()) { m = NULL; return; }
+        ColorLayer* cl = m->colorLayers[capa];
+        if (!cl) { m = NULL; return; }
+        color = cl->color;
+        indice = cl->indice;
+    }
+    bool Vacio() const { return !m || color.empty(); }
+    void Aplicar() {
+        if (!m || capa < 0 || capa >= (int)m->colorLayers.size()) return;
+        ColorLayer* cl = m->colorLayers[capa];
+        if (!cl || cl->color.size() != color.size()) return; // la topologia cambio: no tocar
+        cl->color.swap(color);
+        cl->indice.swap(indice);
+        m->AplicarCapasAlRender();   // la capa -> vertexColor[] (lo que dibuja el core)
+    }
+    W3D_UNDO_SIN_INDICES // color/indice: (b) snapshot completo con guard de tamano; m: (a)
+};
+static ColorLayerUndo* g_pendingColor = NULL;
+
+void UndoColorIniciar(Mesh* m, int capa) {
+    delete g_pendingColor; g_pendingColor = NULL;
+    if (m) g_pendingColor = new ColorLayerUndo(m, capa);
+}
+void UndoColorCancelar() { delete g_pendingColor; g_pendingColor = NULL; }
+void UndoColorConfirmar(bool cambio) {
+    if (cambio && g_pendingColor && !g_pendingColor->Vacio()) { Push(g_pendingColor); g_pendingColor = NULL; }
+    UndoColorCancelar();
+}
+
 void UndoUVIniciar(Mesh* m) {
     delete g_pendingUV;    g_pendingUV = NULL;
     delete g_pendingUVGeo; g_pendingUVGeo = NULL;

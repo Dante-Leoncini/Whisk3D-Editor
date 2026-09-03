@@ -22,7 +22,7 @@
 #include "objects/Mesh.h"
 #include "physics/W3dRigido.h" // Add > Physics: W3dRigidoDef del objeto activo
 #include "objects/Curve.h"   // edicion de riel/path via proxy de malla (CurveEntrarEdicion)
-#include "w3dLog.h"          // aviso al pasar una curva de .cap a autorada
+#include "w3dlog.h"          // aviso al pasar una curva de .cap a autorada
 #include "objects/Materials.h" // Material (mat->texture) para el dropdown "Texture" del UV editor
 #include "importers/import_obj.h" // TexturaPendienteDe: texturas encoladas y aun sin subir (dropdown Texture)
 #include "w3dTexture.h"        // w3dEngine::TextureSize (los niveles del menu Mipmap)
@@ -1662,6 +1662,10 @@ static void LayoutAccionMode(int aId) {
     }
     ActualizarEditMeshActivo(); // refresca g_editMesh (PC + Symbian)
 }
+
+// el MISMO camino que elegir la opcion en el menu Mode, publico para el harness de tests
+// (asi 'mode weight' ejercita lo que ejercita el click y no una asignacion propia).
+void LayoutModoElegir(int modo) { LayoutAccionMode(modo); }
 
 // REARMA el menu Mode segun el objeto activo (como LayoutRebuildMenuSelect):
 //   malla -> Object/Edit/Vertex/Weight/Texture ; armature -> Object/Edit/Pose.
@@ -3936,6 +3940,7 @@ static void SoltarDragOutliners(ViewportBase* aNodo, int mx, int my) {
 
 void LayoutSoltar(int mx, int my) {
     MenuSliderDragSoltar(); // fin del drag del item-slider de un menu (si habia)
+    BrushBarDragSoltar();   // fin del gesto en la fila de barras del pincel; sin arrastre = tap -> editar
     // Symbian (tap-agarra / tap-suelta): el up del MISMO tap que agarro (down+up
     // en ~8ms) no suelta, solo si hubo movimiento. En PC (hold-drag) el up SIEMPRE
     // suelta: sino un click sin movimiento dejaba la barra AGARRADA y el panel
@@ -4014,6 +4019,12 @@ bool LayoutMenuDragSoltar(int mx, int my){
 
 bool LayoutMotionUI(int mx, int my) {
     if (!rootViewport) return false;
+    // ARRASTRE de una barra del pincel: el gesto ya quedo lockeado a esa barra en el down, asi que
+    // manda sobre todo lo demas (mismo criterio que el drag del item-slider de los menus).
+    if (BrushBarDragActivo()) {
+        if (leftMouseDown) { BrushBarDragMover(mx, my); return true; }
+        BrushBarDragSoltar(); // up perdido (se solto fuera de la ventana): cerrar el gesto
+    }
     if (PopUpActive) {
         // popup modal (selector de color): se queda con el mouse
         PopUpActive->Motion(mx, my);
@@ -4148,6 +4159,11 @@ bool LayoutClickUI(int mx, int my) {
     // UV editor y Editor 2D (G/R/S). El hit + despacho por rol viven en ViewportBase (ToolbarBase.cpp);
     // un viewport sin toolbar devuelve false y el click sigue su camino normal.
     if (under->ToolbarClick(mx, my)) return true;
+
+    // 0b) FILA DE BARRAS DEL PINCEL (radio | valor), justo arriba de la toolbar. El down solo ARMA el
+    // gesto: si despues hay arrastre mueve el valor en vivo (LayoutMotionUI) y si no lo hubo, al soltar
+    // abre la edicion numerica (LayoutSoltar). Consumir aca es lo que evita que el click PINTE.
+    if (under->BrushBarClick(mx, my)) return true;
 
     // 1) la barra de botones del viewport
     if (under->BarClick(mx, my)) {
@@ -4445,6 +4461,10 @@ bool LayoutTeclaPanelActivo(int tecla) {
         // foco esta REALMENTE en Stop/Play -> si quedo un foco viejo en un menu-boton, cae al 'return false' de
         // abajo y el 3D orbita/edita como siempre (sin regresion).
         Viewport3D* v3 = Viewport3DActive;
+        // WEIGHT PAINT: la FILA DE BARRAS (radio | valor) se navega con el keypad. Arriba/abajo turnan
+        // entre las dos, OK entra a ajustarlas y ahi izquierda/derecha mueven el valor, C suelta el foco.
+        // Se queda SOLO con las teclas que usa: sin foco, izq/der/C siguen su camino de siempre.
+        if (v3->BrushBarVisible() && BrushBarTecla(v3, tecla)) return true;
         std::vector<Button*>& B = v3->BarButtons;
         int fi = v3->barFocusIndex;
         // exige VISIBLE: si quedo un foco viejo sobre un Stop/Play ya oculto (al salir del modo juego se ponen

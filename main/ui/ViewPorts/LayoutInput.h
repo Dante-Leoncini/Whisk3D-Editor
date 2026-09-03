@@ -59,6 +59,10 @@ struct LayoutKey {
     enum Enum { Up, Down, Left, Right, Enter, Cancel, Accept };
 };
 
+// cambia el modo de interaccion del objeto ACTIVO por el mismo camino que el menu Mode
+// (InteractionMode + las consecuencias: g_editMesh, skin autorado al salir de Edit de huesos).
+void LayoutModoElegir(int modo);
+
 // true = la UI (menu/barra/panel) consumio el click; false = es de la
 // escena 3D (cada plataforma decide: pick, transform, etc.)
 bool LayoutClickUI(int mx, int my);

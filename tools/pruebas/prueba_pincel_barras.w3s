@@ -1,0 +1,36 @@
+# ==========================================================================
+#  PINCEL DE PESOS: la fila de BARRAS (radio | valor) y el modo "="
+#  Correr DESDE ESTA CARPETA:
+#    cd <motor>/tools/pruebas
+#    ../../platform/linux/build/whisk3d --script prueba_pincel_barras.w3s
+#
+#  'brushbar' ejercita la fila que vive arriba de la toolbar en modo pintura:
+#    * geometria: esta ARRIBA de la toolbar y no se pisa con ella
+#    * VALOR: arrastre ABSOLUTO (donde tocas, ese valor; 0..100% y se llena)
+#    * RADIO: arrastre RELATIVO (no tiene tope, minimo 0px, no se llena)
+#    * el DOWN no mueve el valor -> un tap sin arrastre abre la edicion
+#      numerica por teclado en vez de pegar un salto
+#    * keypad (Symbian): arriba/abajo turnan entre las dos barras, OK entra a
+#      ajustar, izquierda/derecha mueven, C suelta. Sin OK NO roba las flechas.
+#    * el boton de modo cicla + -> - -> =
+#
+#  'wptest' es la regresion del pincel en si (pesos, undo por trazo, mascara,
+#  uv groups) e incluye el modo "=": lo pintado queda EXACTO en el valor, sin
+#  falloff, y con valor 0 borra a cero (los otros modos con delta 0 no hacen nada).
+#
+#  'falloff' cubre la curva de caida (los 10 presets + la custom editable), las MARCAS
+#  (los cuadraditos por punto pintable, que hacen que el pincel trabaje sobre ELLOS al
+#  valor de la barra y sin falloff) y el POPUP reutilizable que edita la curva -- abierto
+#  sobre un W3dFalloff que NO es el del pincel, que es justamente lo que prueba que sirve
+#  para cualquier otra herramienta.
+#
+#  'vcolor' cubre el pincel de VERTEX COLOR: mezcla segun intensidad*falloff, capa
+#  Per-Vertex (todos los corners de una posicion quedan del mismo color), color por
+#  INDICE de paleta (que no se mezcla: el falloff decide QUIEN se pinta) y su undo.
+# ==========================================================================
+add cube
+mode weight
+brushbar
+falloff
+wptest
+vcolor

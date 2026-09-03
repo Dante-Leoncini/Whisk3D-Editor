@@ -19,6 +19,7 @@
 #include "render/OpcionesRender.h" // bonetest: g_transformPivot (pivote de los R/S de huesos)
 #include "objects/EditMesh.h"  // EditMesh
 #include "ViewPorts/LayoutInput.h" // LayoutToggleEditMode/ExtrudeFaces, EditXform*
+#include "ViewPorts/PopUp/FalloffEditor.h" // test 'falloff': el popup reutilizable de la curva
 #include "ViewPorts/Timeline.h"
 #include "WhiskUI/Propieties/GroupPropertie.h" // icontest: la tarjeta "Keyframe" y su icono
 #include "WhiskUI/Propieties/PropList.h"       // arm2drango: la LISTA de armatures 2D del panel (modo 10)
@@ -6383,7 +6384,37 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         } else if (md == "object") {
             if (InteractionMode == EditMode) LayoutToggleEditMode();
             if (InteractionMode == EditMode) { err = "no se pudo salir de Edit Mode"; return false; }
-        } else { err = "modo desconocido: '" + md + "' (object|edit)"; return false; }
+        } else if (md == "weight" || md == "pesos") {
+            // WEIGHT PAINT por el MISMO camino que el menu Mode (necesita una malla activa)
+            LayoutModoElegir(WeightPaint);
+            if (InteractionMode != WeightPaint) { err = "no se pudo entrar a Weight Paint (hay una malla activa?)"; return false; }
+        } else if (md == "vertex" || md == "color") {
+            LayoutModoElegir(VertexPaint);   // vertex color, por el mismo camino que el menu Mode
+            if (InteractionMode != VertexPaint) { err = "no se pudo entrar a Vertex Paint (hay una malla activa?)"; return false; }
+        } else { err = "modo desconocido: '" + md + "' (object|edit|weight|vertex)"; return false; }
+        return true;
+    }
+
+    // ---- uishot <archivo.png> : guarda la PANTALLA ENTERA (la UI dibujada, no la escena) a PNG.
+    //      Es el companiero visual de vppx: vppx asierta UN pixel, esto deja mirar el resultado.
+    //      Sirve para revisar trabajo de UI sin tener que manejar la ventana a mano. ----
+    if (cmd == "uishot") {
+        std::string ruta; ss >> ruta;
+        if (ruta.empty()) { err = "uishot: falta la ruta del .png"; return false; }
+        if (!rootViewport) { err = "uishot: no hay layout de viewports"; return false; }
+        { extern void CargarTexturasPendientes(); CargarTexturasPendientes(); }
+        extern int W3dPantallaAlto;
+        const int w = MenuPantallaW, h = W3dPantallaAlto;
+        rootViewport->Render();
+        // los popups y los desplegables se dibujan APARTE del arbol de viewports (van encima de
+        // todo): sin esta llamada la captura no mostraba el popup que se queria mirar.
+        LayoutRenderMenu(w, h);
+        w3dEngine::Finish();
+        if (w < 1 || h < 1) { err = "uishot: pantalla sin tamano"; return false; }
+        std::vector<unsigned char> px((size_t)w * h * 4, 0);
+        w3dEngine::ReadPixelsRGBA(0, 0, w, h, &px[0]);
+        if (!w3dEngine::SavePNG(ruta.c_str(), &px[0], w, h, true)) { err = "uishot: no se pudo escribir " + ruta; return false; }
+        printf("      [uishot] %dx%d -> %s\n", w, h, ruta.c_str());
         return true;
     }
 
@@ -24028,11 +24059,485 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         if (!ok) { err = "uvundo: fallo (ver arriba)"; return false; }
         return true;
     }
+    // ---- vcolor : el pincel de VERTEX COLOR. Misma pasada que el de pesos (circulo, falloff,
+    //      mascara, marcas) pero escribiendo color en la capa activa. Cubre: mezcla segun
+    //      intensidad*falloff, capa Per-Vertex (todos los corners de una posicion quedan del
+    //      MISMO color), color POR INDICE de paleta (no se mezcla: el falloff decide quien) y
+    //      el undo por trazo. ----
+    if (cmd == "vcolor") {
+        bool ok = true;
+        struct VP {   // proyector sintetico: cada render-vert en su columna
+            Mesh* m;
+            static bool Proy(void* ctx, int i, float& sx, float& sy) {
+                VP* c = (VP*)ctx;
+                if (i < 0 || i >= c->m->vertexSize) return false;
+                sx = (float)i * 3.0f; sy = 0.0f;   // todos cerca: el pincel los agarra a todos
+                return true;
+            }
+        };
+        Object* o = NewMesh(MeshType(MeshType::cube), NULL, false);
+        if (!o) { err = "vcolor: NewMesh fallo"; return false; }
+        Mesh* m = (Mesh*)o;
+        DeseleccionarTodo(); o->Seleccionar(); ObjActivo = m;
+        m->GenerarRender();
+        if (!m->vertexColor) {   // el pincel la crea sola al primer trazo; aca se prepara igual
+            m->vertexColor = new GLubyte[(size_t)m->vertexSize * 4];
+            for (int i = 0; i < m->vertexSize * 4; i++) m->vertexColor[i] = 255;
+        }
+        m->PoblarCapas();
+        const int capa = m->colorActivo;
+        if (capa < 0 || capa >= (int)m->colorLayers.size()) { err = "vcolor: la malla no tiene capa de color"; return false; }
+        ColorLayer* cl = m->colorLayers[capa];
+        const int nC = m->ContarCorners();
+        VP ctx; ctx.m = m;
+        unsigned char rojo[4] = { 255, 0, 0, 255 };
+
+        // 1) MEZCLA: intensidad 0.5 sobre blanco -> gris rojizo (no llega a rojo pleno)
+        W3dFalloff plano; plano.tipo = FoConstant;   // sin caida: la cuenta es exacta y clara
+        BrushTrazoResetear();
+        bool pinto = PincelAplicarColor(m, capa, 0.0f, 0.0f, 10000.0f, 0.5f, rojo, -1, VP::Proy, &ctx, NULL, &plano);
+        const int r0 = cl->color[0], g0 = cl->color[1];
+        const bool mezcla = pinto && r0 == 255 && g0 > 100 && g0 < 155;  // 255 -> ~127 en verde
+        printf("      [vcolor] mezcla al 50%%: rgba(%d,%d,%d) sobre blanco (esp verde ~127) -> %s\n",
+               r0, g0, (int)cl->color[2], mezcla?"OK":"MAL");
+        if (!mezcla) ok = false;
+
+        // 2) al 100% queda el color EXACTO
+        BrushTrazoResetear();
+        PincelAplicarColor(m, capa, 0.0f, 0.0f, 10000.0f, 1.0f, rojo, -1, VP::Proy, &ctx, NULL, &plano);
+        const bool pleno = cl->color[0] == 255 && cl->color[1] == 0 && cl->color[2] == 0;
+        printf("      [vcolor] al 100%%: rgba(%d,%d,%d) (esp 255,0,0) -> %s\n",
+               (int)cl->color[0], (int)cl->color[1], (int)cl->color[2], pleno?"OK":"MAL");
+        if (!pleno) ok = false;
+
+        // 3) PER-VERTICE: todos los corners de una MISMA posicion quedan del mismo color, aunque
+        //    el pincel toque uno solo. Es la diferencia con Per-Corner y lo que lo hace destructivo.
+        for (size_t i = 0; i < cl->color.size(); i++) cl->color[i] = 255;   // blanco de nuevo
+        cl->porVertice = true;
+        unsigned char azul[4] = { 0, 0, 255, 255 };
+        struct VP1 {  // ahora SOLO el render-vert 0 cae adentro del circulo
+            Mesh* m;
+            static bool Proy(void* ctx, int i, float& sx, float& sy) {
+                VP1* c = (VP1*)ctx;
+                if (i < 0 || i >= c->m->vertexSize) return false;
+                sx = (i == 0) ? 0.0f : 10000.0f; sy = 0.0f;
+                return true;
+            }
+        };
+        VP1 ctx1; ctx1.m = m;
+        BrushTrazoResetear();
+        PincelAplicarColor(m, capa, 0.0f, 0.0f, 50.0f, 1.0f, azul, -1, VP1::Proy, &ctx1, NULL, &plano);
+        int azules = 0;
+        for (int i = 0; i < nC; i++) if (cl->color[(size_t)i*4+2] == 255 && cl->color[(size_t)i*4] == 0) azules++;
+        // el vertice del corner 0 lo comparten 3 caras del cubo -> 3 corners azules
+        const bool porVert = (azules == 3);
+        printf("      [vcolor] Per-Vertex: corners pintados por tocar UNO = %d (cubo: 3 caras comparten el vertice) -> %s\n",
+               azules, porVert?"OK":"MAL");
+        if (!porVert) ok = false;
+
+        // 4) POR INDICE de paleta: el indice no se mezcla (el falloff decide QUIEN, no cuanto)
+        cl->porVertice = false;
+        cl->porIndice = true;
+        cl->indice.assign((size_t)nC, -1);
+        BrushTrazoResetear();
+        PincelAplicarColor(m, capa, 0.0f, 0.0f, 10000.0f, 1.0f, rojo, 3, VP::Proy, &ctx, NULL, &plano);
+        int conIdx = 0;
+        for (int i = 0; i < nC; i++) if (cl->indice[(size_t)i] == 3) conIdx++;
+        const bool idxOk = (conIdx == nC);
+        printf("      [vcolor] por indice: corners con indice 3 = %d de %d -> %s\n", conIdx, nC, idxOk?"OK":"MAL");
+        if (!idxOk) ok = false;
+
+        // 5) UNDO por trazo: el snapshot devuelve colores E indices
+        cl->porIndice = false;
+        for (size_t i = 0; i < cl->color.size(); i++) cl->color[i] = 255;
+        UndoColorIniciar(m, capa);
+        BrushTrazoResetear();
+        PincelAplicarColor(m, capa, 0.0f, 0.0f, 10000.0f, 1.0f, rojo, -1, VP::Proy, &ctx, NULL, &plano);
+        const bool antesUndo = (cl->color[0] == 255 && cl->color[1] == 0);
+        UndoColorConfirmar(true);
+        UndoDeshacer();
+        const bool volvio = (cl->color[0] == 255 && cl->color[1] == 255 && cl->color[2] == 255);
+        printf("      [vcolor] undo del trazo: pinto=%s | deshacer restaura el blanco=%s\n",
+               antesUndo?"OK":"MAL", volvio?"OK":"MAL");
+        if (!antesUndo || !volvio) ok = false;
+
+        // 6) CORNERS INDIVIDUALES: el caso real. Los 2-3 corners que comparten una esquina caen
+        //    en el MISMO punto del vertice, asi que si el pincel testeara ahi seria imposible
+        //    pintar uno solo (agarraba los 3 juntos, que es el bug que se reporto). El pincel
+        //    tiene que testear la posicion del CUADRADITO: corrida hacia el centro de su cara.
+        {
+            cl->porVertice = false;
+            for (size_t i = 0; i < cl->color.size(); i++) cl->color[i] = 255;
+            // proyector REALISTA: cada render-vert en la posicion de SU VERTICE -> los corners
+            // que comparten esquina se superponen, igual que en pantalla.
+            struct VPV {
+                Mesh* m;
+                static bool Proy(void* ctx, int i, float& sx, float& sy) {
+                    VPV* c = (VPV*)ctx;
+                    if (i < 0 || i >= (int)c->m->vertCtrlPoint.size()) return false;
+                    const int cp = c->m->vertCtrlPoint[i];
+                    if (cp < 0) return false;
+                    sx = (float)((cp % 4) * 200); sy = (float)((cp / 4) * 200);
+                    return true;
+                }
+            };
+            WeightPaintAsegurarMapa(m);
+            VPV ctxv; ctxv.m = m;
+            // la posicion del cuadradito del corner 0 (MISMA cuenta que el editor: el centro de
+            // la cara en pantalla y un 25% hacia el). Si el editor cambia el corrimiento, este
+            // test lo tiene que ver.
+            const std::vector<int>& cara0 = m->faces3d[0].idx;
+            float cx0 = 0.0f, cy0 = 0.0f, sumX = 0.0f, sumY = 0.0f;
+            for (size_t k = 0; k < cara0.size(); k++) {
+                float sx, sy; VPV::Proy(&ctxv, cara0[k], sx, sy);
+                sumX += sx; sumY += sy;
+                if (k == 0) { cx0 = sx; cy0 = sy; }
+            }
+            const float ccx = sumX / (float)cara0.size(), ccy = sumY / (float)cara0.size();
+            const float objX = cx0 + (ccx - cx0) * 0.25f, objY = cy0 + (ccy - cy0) * 0.25f;
+
+            unsigned char verde[4] = { 0, 255, 0, 255 };
+            BrushTrazoResetear();
+        PincelAplicarColor(m, capa, objX, objY, 20.0f, 1.0f, verde, -1, VPV::Proy, &ctxv, NULL, &plano);
+            int pintados = 0;
+            for (int i = 0; i < nC; i++) if (cl->color[(size_t)i*4+1] == 255 && cl->color[(size_t)i*4] == 0) pintados++;
+            // cuantos corners comparten ese vertice (en un cubo, 3): con el bug se pintaban TODOS
+            int comparten = 0;
+            { const int cp0 = m->vertCtrlPoint[cara0[0]];
+              for (size_t f = 0; f < m->faces3d.size(); f++)
+                for (size_t k = 0; k < m->faces3d[f].idx.size(); k++)
+                    if (m->vertCtrlPoint[m->faces3d[f].idx[k]] == cp0) comparten++; }
+            const bool individual = (pintados == 1);
+            printf("      [vcolor] corner individual: pintados=%d de %d que comparten esa esquina -> %s\n",
+                   pintados, comparten, individual?"OK":"MAL");
+            if (!individual) ok = false;
+        }
+
+        // 7) FUSION Per-Corner -> Per-Vertex: los corners que comparten posicion quedan con el
+        //    PROMEDIO de sus colores. Antes el flag solo cambiaba el horneado y los colores de
+        //    los otros corners seguian guardados intactos (volver atras devolvia todo): no
+        //    perdia nada, pero tampoco mezclaba, que es lo que uno espera al unificar.
+        {
+            cl->porVertice = false; cl->porIndice = false;
+            for (size_t i = 0; i < cl->color.size(); i++) cl->color[i] = 0;
+            WeightPaintAsegurarMapa(m);
+            // los corners de UN vertice: al primero se le pone 255 en rojo, a los otros 0
+            const int cpX = m->vertCtrlPoint[m->faces3d[0].idx[0]];
+            std::vector<int> suyos;
+            { int L = 0;
+              for (size_t f = 0; f < m->faces3d.size(); f++)
+                for (size_t c = 0; c < m->faces3d[f].idx.size(); c++, L++)
+                    if (m->vertCtrlPoint[m->faces3d[f].idx[c]] == cpX) suyos.push_back(L); }
+            if (suyos.empty()) { err = "vcolor: el cubo no dio corners para el vertice"; return false; }
+            cl->color[(size_t)suyos[0] * 4] = 255;                 // uno rojo, el resto en 0
+            const int esperado = (int)(255.0f / (float)suyos.size() + 0.5f);   // el promedio
+            const bool huboCambio = VertexColorFusionarPorVertice(m, capa);
+            bool todosIguales = true;
+            for (size_t k = 0; k < suyos.size(); k++)
+                if ((int)cl->color[(size_t)suyos[k] * 4] != esperado) todosIguales = false;
+            printf("      [vcolor] fusion Per-Vertex: %d corners de esa esquina -> todos en %d (promedio de 255 y ceros)=%s cambio=%s\n",
+                   (int)suyos.size(), esperado, todosIguales?"OK":"MAL", huboCambio?"OK":"MAL");
+            if (!todosIguales || !huboCambio) ok = false;
+        }
+
+        UndoLimpiar();
+        if (!ok) { err = "vcolor: ver los MAL de arriba"; return false; }
+        return true;
+    }
+
+    // ---- brushset <marcas|falloff|valor|radio|popup> <v> : deja el PINCEL en un estado
+    //      conocido desde un script. Es el companiero de 'uishot'/'vppx': sin esto no hay
+    //      forma de fijar el estado del pincel antes de mirar/asertar pixeles. ----
+    if (cmd == "brushset") {
+        std::string sub; ss >> sub;
+        if (sub == "marcas")       { int v = 0; ss >> v;   // 0 = off, 1 = vertice, 2 = face corner
+                                     if (v < MarcasOff || v > MarcasCorner) { err = "brushset marcas: 0|1|2"; return false; }
+                                     BrushGet().marcas = v; }
+        else if (sub == "falloff") { int v = 0; ss >> v;
+                                     if (v < 0 || v >= FoTotal) { err = "brushset falloff: tipo fuera de rango"; return false; }
+                                     BrushGet().falloff.tipo = v; }
+        else if (sub == "valor")   { float v = 1.0f; ss >> v; BrushGet().fuerza = v; }
+        else if (sub == "radio")   { float v = 40.0f; ss >> v; BrushGet().radioPx = v; }
+        else if (sub == "popup")   { FalloffEditorAbrir(&BrushGet().falloff, 40, 40); }
+        else if (sub == "color")   { float r=1,g=1,b=1; ss >> r >> g >> b;   // color del pincel (0..1)
+                                     BrushGet().color[0]=r; BrushGet().color[1]=g; BrushGet().color[2]=b; BrushGet().color[3]=1.0f; }
+        else if (sub == "solosel") { int v = 0; ss >> v; WeightPaintSoloSel() = (v != 0); }
+        else { err = "brushset: uso: brushset <marcas|falloff|valor|radio|popup|color|solosel> [v]"; return false; }
+        g_redraw = true;
+        return true;
+    }
+
+    // ---- falloff : la CURVA DE CAIDA (W3dFalloff), las MARCAS (los cuadraditos por punto
+    //      pintable) y el POPUP reutilizable que edita la curva. Cubre:
+    //        * cada preset en el centro / la mitad / el borde, y que SMOOTH siga siendo
+    //          exactamente el smoothstep que el pincel tenia clavado (cero regresion)
+    //        * la curva custom: evaluar, agregar/mover/borrar puntos y sus reglas
+    //        * MARCAS: el falloff efectivo pasa a CONSTANTE y el pincel deja todo lo que toca
+    //          en el valor de la barra, sin importar la distancia al centro
+    //        * el popup: se abre sobre CUALQUIER W3dFalloff (no solo el del pincel), lo edita
+    //          en vivo y Cancel lo deja como estaba
+    if (cmd == "falloff") {
+        bool ok = true;
+
+        // 1) PRESETS: 1 en el centro y 0 en el borde (salvo Constant, que no cae nunca)
+        {
+            bool bordes = true;
+            for (int t = FoSmooth; t < FoTotal; t++) {
+                W3dFalloff f; f.tipo = t;
+                const float c = f.Eval(0.0f), b = f.Eval(1.0f);
+                const float espB = (t == FoConstant) ? 1.0f : 0.0f;
+                if (fabsf(c - 1.0f) > 1e-5f || fabsf(b - espB) > 1e-5f) {
+                    printf("      [falloff] preset %-14s centro=%.4f borde=%.4f <-- MAL\n", W3dFalloffNombre(t), c, b);
+                    bordes = false;
+                }
+            }
+            printf("      [falloff] presets: centro=1 y borde=%s -> %s\n",
+                   "0 (Constant: 1)", bordes?"OK":"MAL");
+            if (!bordes) ok = false;
+        }
+        // SMOOTH tiene que seguir dando el smoothstep EXACTO: es la formula que el pincel
+        // tenia adentro, y todo lo pintado hasta hoy depende de que no cambie.
+        {
+            W3dFalloff f; f.tipo = FoSmooth;
+            bool igual = true;
+            for (int k = 0; k <= 10; k++) {
+                const float t = (float)k / 10.0f, sm = 1.0f - t;
+                const float esp = sm * sm * (3.0f - 2.0f * sm);
+                if (fabsf(f.Eval(t) - esp) > 1e-6f) igual = false;
+            }
+            printf("      [falloff] Smooth == el smoothstep viejo del pincel: %s\n", igual?"OK":"MAL");
+            if (!igual) ok = false;
+        }
+        // 2) CURVA CUSTOM: default, agregar, mover (con sus topes) y borrar
+        {
+            W3dFalloff f; f.tipo = FoCustom;
+            const bool def = (f.puntos.size() == 2) && fabsf(f.Eval(0.0f) - 1.0f) < 1e-5f
+                                                    && fabsf(f.Eval(1.0f) - 0.0f) < 1e-5f;
+            const int i = f.CurvaAgregar(0.5f, 0.8f);          // un punto en el medio, alto
+            const bool subio = (f.puntos.size() == 3) && (i == 1) && (f.Eval(0.5f) > 0.75f);
+            f.CurvaMover(1, 5.0f, 5.0f);                        // se clampea al cuadrado y entre vecinos
+            const bool clamp = (f.puntos[1].x <= 1.0f) && (f.puntos[1].y <= 1.0f) &&
+                               (f.puntos[1].x < f.puntos[2].x);
+            f.CurvaBorrar(0);                                   // un EXTREMO no se borra
+            const bool extremo = (f.puntos.size() == 3);
+            f.CurvaBorrar(1);                                   // el del medio si
+            const bool borro = (f.puntos.size() == 2);
+            printf("      [falloff] custom: default=%s | agregar=%s | mover clampea=%s | extremo no se borra=%s | borrar=%s\n",
+                   def?"OK":"MAL", subio?"OK":"MAL", clamp?"OK":"MAL", extremo?"OK":"MAL", borro?"OK":"MAL");
+            if (!def || !subio || !clamp || !extremo || !borro) ok = false;
+        }
+        // 3) MARCAS -> el falloff EFECTIVO es constante (no importa cual este elegido)
+        {
+            BrushGet().falloff.tipo = FoSharp;
+            BrushGet().marcas = false;
+            const bool off = (BrushFalloffEfectivo().tipo == FoSharp);
+            BrushGet().marcas = true;
+            const bool on = (BrushFalloffEfectivo().tipo == FoConstant);
+            printf("      [falloff] marcas OFF -> usa el elegido=%s | ON -> constante=%s\n",
+                   off?"OK":"MAL", on?"OK":"MAL");
+            if (!off || !on) ok = false;
+        }
+        // 4) PINTAR con las marcas prendidas: TODO lo que cae adentro del radio queda en el
+        //    valor de la barra (sin degradar con la distancia); lo de afuera no se toca.
+        {
+            struct FP {   // proyector sintetico: cada control-point en su columna (50px de paso)
+                Mesh* m; std::map<int,int> rank;
+                static bool Proy(void* ctx, int i, float& sx, float& sy) {
+                    FP* c = (FP*)ctx;
+                    const int cp = (i < (int)c->m->vertCtrlPoint.size()) ? c->m->vertCtrlPoint[i] : -1;
+                    std::map<int,int>::iterator it = c->rank.find(cp);
+                    if (it == c->rank.end()) return false;
+                    sx = (float)it->second * 50.0f; sy = 0.0f;
+                    return true;
+                }
+            };
+            Object* o = NewMesh(MeshType(MeshType::cube), NULL, false);
+            if (!o) { err = "falloff: NewMesh fallo"; return false; }
+            Mesh* m = (Mesh*)o;
+            DeseleccionarTodo(); o->Seleccionar(); ObjActivo = m;
+            m->GenerarRender();
+            FP ctx; ctx.m = m;
+            { std::set<int> cps;
+              for (size_t i = 0; i < m->vertCtrlPoint.size(); i++) cps.insert(m->vertCtrlPoint[i]);
+              int r = 0; for (std::set<int>::iterator it = cps.begin(); it != cps.end(); ++it) ctx.rank[*it] = r++; }
+            int cp0 = -1, cp1 = -1, cp3 = -1;
+            for (std::map<int,int>::iterator it = ctx.rank.begin(); it != ctx.rank.end(); ++it) {
+                if (it->second == 0) cp0 = it->first;   // d = 0   (centro)
+                if (it->second == 1) cp1 = it->first;   // d = 50  (adentro, pero lejos del centro)
+                if (it->second == 3) cp3 = it->first;   // d = 150 (AFUERA del radio 120)
+            }
+            const int g = WeightPaintTrazoIniciar(m);
+            BrushGet().marcas = true;
+            // En modo SUMAR el peso queda = valor * falloff, asi que es el modo donde se VE si
+            // el falloff entro o no. (Con "=" no serviria: ese modo ignora el falloff a
+            // proposito -- deja el valor exacto en todo el circulo, por diseno.)
+            PincelAplicar(m, g, 0.0f, 0.0f, 120.0f, 0.40f, WPSumar, FP::Proy, &ctx,
+                          NULL, &BrushFalloffEfectivo());
+            const float w0 = PesoDe(m, g, cp0), w1 = PesoDe(m, g, cp1), w3 = PesoDe(m, g, cp3);
+            const bool marcasOk = fabsf(w0 - 0.40f) < 1e-5f && fabsf(w1 - 0.40f) < 1e-5f && w3 == 0.0f;
+            printf("      [falloff] marcas pintando: centro=%.4f lejos=%.4f (los DOS esp 0.40) afuera=%.4f (esp 0) -> %s\n",
+                   w0, w1, w3, marcasOk?"OK":"MAL");
+            if (!marcasOk) ok = false;
+            // el MISMO trazo sin marcas y con Smooth: ahi si tiene que degradar con la distancia
+            BrushGet().marcas = false;
+            BrushGet().falloff.tipo = FoSmooth;
+            PincelAplicar(m, g, 0.0f, 0.0f, 120.0f, 0.0f, WPIgualar, FP::Proy, &ctx, NULL); // borra lo pintado
+            PincelAplicar(m, g, 0.0f, 0.0f, 120.0f, 1.0f, WPSumar, FP::Proy, &ctx,
+                          NULL, &BrushFalloffEfectivo());
+            const float d0 = PesoDe(m, g, cp0), d1 = PesoDe(m, g, cp1);
+            const bool degrada = (d0 > d1 + 0.05f);
+            printf("      [falloff] sin marcas (Smooth): centro=%.4f > lejos=%.4f -> %s\n",
+                   d0, d1, degrada?"OK":"MAL");
+            if (!degrada) ok = false;
+            WeightPaintTrazoFin();
+            UndoDeshacer();          // no dejar el trazo en el stack
+            BrushGet().falloff.tipo = FoSmooth;
+        }
+        // 5) EL POPUP es REUTILIZABLE: se abre sobre un W3dFalloff CUALQUIERA (aca uno local,
+        //    que no es el del pincel), lo edita en vivo y Cancel lo deja como estaba.
+        {
+            W3dFalloff mio; mio.tipo = FoLinear;
+            FalloffEditorAbrir(&mio, 10, 10);
+            const bool abrio = FalloffEditorActivo(&mio) && (PopUpActive == (PopUpBase*)falloffEditor);
+            const bool noEsElPincel = !FalloffEditorActivo(&BrushGet().falloff);
+            falloffEditor->foco = FoSharp;
+            falloffEditor->Tecla(LayoutKey::Enter);          // OK sobre la fila enfocada = elegir
+            const bool eligio = (mio.tipo == FoSharp);
+            falloffEditor->Tecla(LayoutKey::Cancel);         // C = cancelar: vuelve a como estaba
+            const bool cancelo = (mio.tipo == FoLinear) && (PopUpActive == NULL);
+            printf("      [falloff] popup: abre sobre un falloff ajeno=%s (no es el del pincel=%s) | elige=%s | cancel restaura=%s\n",
+                   abrio?"OK":"MAL", noEsElPincel?"OK":"MAL", eligio?"OK":"MAL", cancelo?"OK":"MAL");
+            if (!abrio || !noEsElPincel || !eligio || !cancelo) ok = false;
+        }
+
+        if (!ok) { err = "falloff: ver los MAL de arriba"; return false; }
+        return true;
+    }
+
     // ---- wptest : WEIGHT PAINT (fase 2). Cubo del editor -> vertCtrlPoint identidad-por-posicion;
     //      trazo del pincel con proyector SINTETICO (cada control-point en una posicion de pantalla
     //      conocida) -> asserts de pesos EXACTOS (falloff smoothstep, clamp 0..1, entrada sparse
     //      creada/borrada, splits que comparten CP sin acumular doble); ConstruirColorPeso refleja
     //      los pesos; y el UNDO de cada trazo restaura (incluido el grupo creado automaticamente). ----
+    // ---- brushbar : la FILA DE BARRAS del pincel (radio | valor) arriba de la toolbar.
+    //      Ejercita su API publica -- la misma que llaman el ruteo de clicks (LayoutClickUI ->
+    //      BrushBarClick), el de motion (BrushBarDragMover) y el del keypad (BrushBarTecla) --,
+    //      que es como se testean las otras barras del editor (uvbar / idetest).
+    //      Cubre: geometria, arrastre ABSOLUTO del valor, arrastre RELATIVO del radio, tap ->
+    //      edicion numerica, nav con el keypad y el ciclo +/-/= del boton de modo.
+    if (cmd == "brushbar") {
+        extern Viewport3D* Viewport3DActive;
+        if (!rootViewport) { err = "brushbar: no hay layout de viewports"; return false; }
+        rootViewport->Render();   // deja el layout con sus x/y/width reales (y elige Viewport3DActive), como vppx
+        Viewport3D* vp = Viewport3DActive;
+        if (!vp) { err = "brushbar: no hay viewport 3D"; return false; }
+        if (InteractionMode != WeightPaint) { err = "brushbar: hay que estar en Weight Paint (mode weight)"; return false; }
+        bool ok = true;
+
+        // 1) GEOMETRIA: la fila existe y esta ARRIBA de la toolbar. Se la busca con OnBrushBar
+        //    (en vez de recalcular el layout aca, que se desincronizaria del real).
+        if (!vp->BrushBarVisible()) { err = "brushbar: la fila no esta visible en Weight Paint"; return false; }
+        int yTop = -1, yBot = -1;
+        for (int yy = vp->y; yy < vp->y + vp->height; yy++) {
+            if (!vp->OnBrushBar(vp->x + 5, yy)) continue;
+            if (yTop < 0) yTop = yy;
+            yBot = yy;
+        }
+        int alto = (yTop >= 0) ? (yBot - yTop + 1) : 0;
+        bool geoOk = (alto == vp->BrushBarHeight()) && (yTop > vp->y) &&
+                     !vp->OnBrushBar(vp->x + 5, yTop - 1) &&        // arriba de la fila = contenido
+                     !vp->OnToolbar(vp->x + 5, yTop);               // no se pisa con la toolbar
+        printf("      [brushbar] fila: y=%d..%d alto=%d (esp %d) sobre la toolbar=%s\n",
+               yTop, yBot, alto, vp->BrushBarHeight(), geoOk?"OK":"MAL");
+        if (!geoOk) ok = false;
+        const int yMid = (yTop + yBot) / 2;
+
+        // 2) VALOR: arrastre ABSOLUTO (donde tocas, ese valor). El DOWN no cambia nada -- si lo
+        //    hiciera, un tap (que es "editar exacto") pegaria un salto antes de abrir el teclado.
+        BrushGet().fuerza = 0.5f;
+        int xVal = vp->x + vp->width * 3 / 4;   // mitad derecha = celda del valor
+        vp->BrushBarClick(xVal, yMid);
+        bool downQuieto = (BrushGet().fuerza == 0.5f);
+        BrushBarDragMover(vp->x + vp->width - 1, yMid); float vDer = BrushGet().fuerza; // tope derecho
+        BrushBarDragMover(vp->x, yMid);                  float vIzq = BrushGet().fuerza; // tope izquierdo
+        BrushBarDragMover(xVal, yMid);                   float vMed = BrushGet().fuerza; // ~la mitad
+        BrushBarDragSoltar();
+        bool valOk = downQuieto && vDer == 1.0f && vIzq == 0.0f && fabsf(vMed - 0.5f) < 0.06f;
+        printf("      [brushbar] valor: down no mueve=%s | arrastre der=%.2f (esp 1) izq=%.2f (esp 0) medio=%.2f (esp ~0.5) -> %s\n",
+               downQuieto?"OK":"MAL", vDer, vIzq, vMed, valOk?"OK":"MAL");
+        if (!valOk) ok = false;
+
+        // 3) RADIO: arrastre RELATIVO (no tiene tope al que mapear: el minimo es 0px y no hay maximo)
+        BrushGet().radioPx = 40.0f;
+        int xRad = vp->x + vp->width / 4;       // mitad izquierda = celda del radio
+        vp->BrushBarClick(xRad, yMid);
+        BrushBarDragMover(xRad + 40, yMid); float rMas = BrushGet().radioPx;  // +40 px de dedo = +40 px de radio
+        BrushBarDragMover(xRad - 500, yMid); float rMin = BrushGet().radioPx; // clampea en 0, no en negativo
+        BrushBarDragSoltar();
+        bool radOk = fabsf(rMas - 80.0f) < 0.01f && rMin == 0.0f;
+        printf("      [brushbar] radio: +40px arrastrados -> %.1f (esp 80, relativo) | tope inferior=%.1f (esp 0) -> %s\n",
+               rMas, rMin, radOk?"OK":"MAL");
+        if (!radOk) ok = false;
+
+        // 4) TAP (click sin arrastrar) -> edicion numerica por teclado, sin tocar el valor
+        BrushGet().fuerza = 0.5f;
+        vp->BrushBarClick(xVal, yMid);
+        BrushBarDragSoltar();               // soltar SIN mover = tap
+        bool tapOk = NumEditActivo() && BrushGet().fuerza == 0.5f;
+        printf("      [brushbar] tap: abre edicion numerica=%s | el valor no salto=%s\n",
+               NumEditActivo()?"OK":"MAL", BrushGet().fuerza == 0.5f ? "OK":"MAL");
+        if (!tapOk) ok = false;
+        NumEditCancel();                    // no dejar el campo abierto para el resto del script
+
+        // 5) KEYPAD (Symbian): arriba/abajo turnan, OK entra a ajustar, izq/der mueven, C suelta
+        BrushBarSoltarFoco();
+        bool k1 = BrushBarTecla(vp, LayoutKey::Down) && BrushBarFoco() == 0;   // primera vez: la de la izquierda
+        bool k2 = BrushBarTecla(vp, LayoutKey::Down) && BrushBarFoco() == 1;   // turna a la otra
+        // sin OK, las flechas NO son de la barra (el viewport las sigue usando)
+        bool k3 = !BrushBarTecla(vp, LayoutKey::Right);
+        BrushBarTecla(vp, LayoutKey::Enter);                                   // OK: entra a ajustar
+        BrushGet().fuerza = 0.50f;
+        BrushBarTecla(vp, LayoutKey::Right);
+        float vK = BrushGet().fuerza;                                          // un paso = 5% (rango/20)
+        bool k4 = BrushBarEditando() && fabsf(vK - 0.55f) < 1e-5f;
+        bool k5 = BrushBarTecla(vp, LayoutKey::Cancel) && BrushBarFoco() < 0;   // C suelta el foco
+        bool k6 = !BrushBarTecla(vp, LayoutKey::Right);                         // ya sin foco: no roba teclas
+        bool keyOk = k1 && k2 && k3 && k4 && k5 && k6;
+        printf("      [brushbar] keypad: abajo turna=%s/%s | sin OK no toma izq-der=%s | OK+derecha 0.50->%.2f (esp 0.55)=%s | C suelta=%s/%s\n",
+               k1?"OK":"MAL", k2?"OK":"MAL", k3?"OK":"MAL", vK, k4?"OK":"MAL", k5?"OK":"MAL", k6?"OK":"MAL");
+        if (!keyOk) ok = false;
+
+        // 6) BOTON DE MODO: cicla sumar -> restar -> igualar -> sumar, con su label
+        std::string l1, l2, l3, l4, dummy;
+        BrushGet().modo = WPSumar;
+        WeightPaintLabels(NULL, dummy, dummy, l1, dummy);
+        vp->ToolbarAccionRol(TBR_PincelModo); WeightPaintLabels(NULL, dummy, dummy, l2, dummy);
+        vp->ToolbarAccionRol(TBR_PincelModo); WeightPaintLabels(NULL, dummy, dummy, l3, dummy);
+        vp->ToolbarAccionRol(TBR_PincelModo); WeightPaintLabels(NULL, dummy, dummy, l4, dummy);
+        bool modoOk = (l1 == "+") && (l2 == "-") && (l3 == "=") && (l4 == "+") && (BrushGet().modo == WPSumar);
+        printf("      [brushbar] boton de modo: %s -> %s -> %s -> %s (esp + - = +) -> %s\n",
+               l1.c_str(), l2.c_str(), l3.c_str(), l4.c_str(), modoOk?"OK":"MAL");
+        if (!modoOk) ok = false;
+
+        // 7) los DOS BOTONES nuevos de la barra, por su ROL (el mismo camino que el click):
+        //    el de MALLA prende las marcas (en pesos, sobre el VERTICE) y el de FALLOFF abre
+        //    el popup sobre el falloff DEL PINCEL.
+        BrushGet().marcas = MarcasOff;
+        vp->ToolbarAccionRol(TBR_Marcas);
+        const bool mOn = (BrushGet().marcas == MarcasVertice);
+        vp->ToolbarAccionRol(TBR_Marcas);
+        const bool mOff = (BrushGet().marcas == MarcasOff);
+        vp->ToolbarAccionRol(TBR_Falloff);
+        const bool foAbrio = FalloffEditorActivo(&BrushGet().falloff);
+        if (PopUpActive) PopUpActive->Cerrar();
+        printf("      [brushbar] boton malla: prende sobre el VERTICE=%s apaga=%s | boton falloff abre el popup=%s\n",
+               mOn?"OK":"MAL", mOff?"OK":"MAL", foAbrio?"OK":"MAL");
+        if (!mOn || !mOff || !foAbrio) ok = false;
+
+        if (!ok) { err = "brushbar: ver los MAL de arriba"; return false; }
+        return true;
+    }
+
     if (cmd == "wptest") {
         // contexto del proyector sintetico: cada CONTROL-POINT va a x = rango(cp)*100, y = 0.
         // (a nivel de archivo no se puede declarar un struct local con funcion en C++03 -> lambdaless)
@@ -24090,7 +24595,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         // (d=100) -> s=1-100/150, f=s*s*(3-2s); columna 2 (d=200) -> fuera del circulo
         float s1 = 1.0f - 100.0f / 150.0f;
         float f1 = s1 * s1 * (3.0f - 2.0f * s1); // = 0.259259...
-        bool aplico = PincelAplicar(m, g, 0.0f, 0.0f, 150.0f, 1.0f, true, WPT::Proy, &ctx);
+        bool aplico = PincelAplicar(m, g, 0.0f, 0.0f, 150.0f, 1.0f, WPSumar, WPT::Proy, &ctx);
         float w0 = PesoDe(m, g, cp0), w1 = PesoDe(m, g, cp1), w2 = PesoDe(m, g, cp2);
         printf("      [wptest] F1 sumar: w(cp0)=%.6f (esp 1) w(cp1)=%.6f (esp %.6f) w(cp2)=%.6f (esp 0)\n",
                w0, w1, f1, w2);
@@ -24103,11 +24608,16 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
                  (int)vg->verts.size(), tiene2?"MAL":"OK");
           if (!sparseOk || tiene2) ok = false; }
 
-        // fuerza 0.5 SUMAR de nuevo: cp0 clampea en 1; cp1 = f1 + 0.5*f1 = 1.5*f1
-        PincelAplicar(m, g, 0.0f, 0.0f, 150.0f, 0.5f, true, WPT::Proy, &ctx);
+        // SEGUNDA pasada DEL MISMO TRAZO, mas floja (0.5): NO suma nada. Es el TOPE POR TRAZO
+        // (ver BrushTrazoResetear): dentro de un trazo un vertice no recibe mas de lo que le da
+        // UNA pasada, y esta pide 0.5*f1, menos que el f1 que ya recibio. Sin este tope, mover
+        // el mouse despacio aplicaba decenas de pasadas y todo saturaba a 1 (el falloff no se
+        // veia y la fuerza no significaba nada).
+        PincelAplicar(m, g, 0.0f, 0.0f, 150.0f, 0.5f, WPSumar, WPT::Proy, &ctx);
         w0 = PesoDe(m, g, cp0); w1 = PesoDe(m, g, cp1);
-        float esp1 = f1 + 0.5f * f1;
-        printf("      [wptest] F0.5 sumar: w(cp0)=%.6f (clamp 1) w(cp1)=%.6f (esp %.6f)\n", w0, w1, esp1);
+        float esp1 = f1;   // se queda en lo de la primera pasada
+        printf("      [wptest] F0.5 sumar en el MISMO trazo: w(cp0)=%.6f (clamp 1) w(cp1)=%.6f (esp %.6f: el tope por trazo no deja sumar)\n",
+               w0, w1, esp1);
         if (fabsf(w0 - 1.0f) > 1e-5f || fabsf(w1 - esp1) > 1e-5f) ok = false;
         WeightPaintTrazoFin(); // commit del trazo 1 (un solo paso de undo con las DOS pasadas)
 
@@ -24135,17 +24645,44 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
             if (!c0ok || !c1ok) ok = false;
         } else { printf("      [wptest] ConstruirColorPeso: tamano MAL\n"); ok = false; }
 
-        // 4) TRAZO 2: RESTAR fuerza 1 -> cp0: 1-1=0 (entrada sparse BORRADA); cp1: esp1 - f1
+        // 4) TRAZO 2: RESTAR fuerza 1 -> cp0: 1-1=0 (entrada sparse BORRADA); cp1: esp1 - f1.
+        //    Es OTRO trazo, asi que el tope arranca limpio y la pasada entra entera.
         WeightPaintTrazoIniciar(m);
-        PincelAplicar(m, g, 0.0f, 0.0f, 150.0f, 1.0f, false, WPT::Proy, &ctx);
+        PincelAplicar(m, g, 0.0f, 0.0f, 150.0f, 1.0f, WPRestar, WPT::Proy, &ctx);
         WeightPaintTrazoFin();
         w0 = PesoDe(m, g, cp0); w1 = PesoDe(m, g, cp1);
         float esp1b = esp1 - f1;
+        if (esp1b < 0.0f) esp1b = 0.0f;
         bool cero0 = true; { VertexGroup* vg = m->vertexGroups[g];
             for (size_t j = 0; j < vg->verts.size(); j++) if (vg->verts[j] == cp0) cero0 = false; }
         printf("      [wptest] F1 restar: w(cp0)=%.6f (esp 0, entrada borrada=%s) w(cp1)=%.6f (esp %.6f)\n",
                w0, cero0?"OK":"MAL", w1, esp1b);
         if (w0 != 0.0f || !cero0 || fabsf(w1 - esp1b) > 1e-5f) ok = false;
+
+        // 4b) MODO "=" (WPIgualar): lo pintado queda EXACTO en el valor, sin falloff. Es la
+        //     diferencia con +/-: cp1 esta a 100px del centro (falloff 0.259) y IGUAL tiene que
+        //     quedar en 0.32, no en 0.32*0.259. cp2 sigue afuera del circulo: no se toca.
+        //     El bloque NO toca el stack de undo (guarda y restaura los pesos a mano): el punto 5
+        //     de abajo asierta la cadena de trazos y meter uno en el medio la corre.
+        const float bkp0 = PesoDe(m, g, cp0), bkp1 = PesoDe(m, g, cp1);
+        PincelAplicar(m, g, 0.0f, 0.0f, 150.0f, 0.32f, WPIgualar, WPT::Proy, &ctx);
+        w0 = PesoDe(m, g, cp0); w1 = PesoDe(m, g, cp1);
+        float w2ig = PesoDe(m, g, cp2);
+        bool igOk = fabsf(w0 - 0.32f) < 1e-5f && fabsf(w1 - 0.32f) < 1e-5f && w2ig == 0.0f;
+        printf("      [wptest] \"=\" 32%%: w(cp0)=%.6f w(cp1)=%.6f (los DOS esp 0.32, el falloff no escala) w(cp2)=%.6f (esp 0) -> %s\n",
+               w0, w1, w2ig, igOk?"OK":"MAL");
+        if (!igOk) ok = false;
+        //     "=" con valor 0 SI hace algo (a diferencia de +/-, que con delta 0 se cortan): deja
+        //     los pesos en cero EXACTO, o sea borra sus entradas sparse.
+        PincelAplicar(m, g, 0.0f, 0.0f, 150.0f, 0.0f, WPIgualar, WPT::Proy, &ctx);
+        bool ceroIg = (PesoDe(m, g, cp0) == 0.0f) && (PesoDe(m, g, cp1) == 0.0f);
+        { VertexGroup* vg = m->vertexGroups[g];
+          for (size_t j = 0; j < vg->verts.size(); j++)
+              if (vg->verts[j] == cp0 || vg->verts[j] == cp1) ceroIg = false; } // entradas borradas
+        printf("      [wptest] \"=\" 0%%: pesos en cero y entradas sparse borradas=%s\n", ceroIg?"OK":"MAL");
+        if (!ceroIg) ok = false;
+        PesoAsignar(m, g, cp0, bkp0);   // deja todo como estaba, sin pasar por el undo
+        PesoAsignar(m, g, cp1, bkp1);
 
         // 5) UNDO por TRAZO: deshacer el trazo 2 -> vuelve el estado post-trazo-1; deshacer el
         //    trazo 1 -> ni pesos NI grupo (el grupo automatico tambien se va); rehacer -> vuelve
@@ -24198,7 +24735,8 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
                 m->vertexGroups.push_back(new VertexGroup("Mask"));
                 int gm = (int)m->vertexGroups.size() - 1;
                 WeightPaintSoloSel() = true;
-                PincelAplicar(m, gm, 0.0f, 0.0f, 100000.0f, 1.0f, true, WPT::Proy, &ctx);
+                BrushTrazoResetear();   // pasada suelta = trazo nuevo (sino arrastra el tope del anterior)
+                PincelAplicar(m, gm, 0.0f, 0.0f, 100000.0f, 1.0f, WPSumar, WPT::Proy, &ctx);
                 bool soloSel = true; int pintados = 0;
                 for (std::map<int,int>::iterator it = ctx.rank.begin(); it != ctx.rank.end(); ++it) {
                     float w = PesoDe(m, gm, it->first);
@@ -24208,7 +24746,8 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
                 }
                 // OFF (default): la misma pasada pinta TODO
                 WeightPaintSoloSel() = false;
-                PincelAplicar(m, gm, 0.0f, 0.0f, 100000.0f, 1.0f, true, WPT::Proy, &ctx);
+                BrushTrazoResetear();
+                PincelAplicar(m, gm, 0.0f, 0.0f, 100000.0f, 1.0f, WPSumar, WPT::Proy, &ctx);
                 bool todos = true;
                 for (std::map<int,int>::iterator it = ctx.rank.begin(); it != ctx.rank.end(); ++it)
                     if (PesoDe(m, gm, it->first) <= 0.0f) todos = false;
@@ -24272,7 +24811,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
             for (std::set<int>::iterator it = cpCara.begin(); it != cpCara.end(); ++it)
                 PesoAsignar(m, vgHom, *it, 1.0f);
             std::vector<int> vgVertsAntes = m->vertexGroups[vgHom]->verts;
-            bool pinto = PincelAplicarUV(m, gc, 0.0f, 0.0f, 10.0f, 1.0f, true, WPC::Proy, &cc, NULL);
+            bool pinto = PincelAplicarUV(m, gc, 0.0f, 0.0f, 10.0f, 1.0f, WPSumar, WPC::Proy, &cc, NULL);
             // (a) SOLO los 4 corners de la cara, con peso 1
             int conPeso = 0, malCero = 0;
             for (int i = 0; i < m->vertexSize; i++) {
@@ -24307,7 +24846,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
 
             // (d) pintar en 3D (PincelAplicar, por control-point) NO toca el UV group
             std::vector<int> capaAntes = ugc->verts;
-            PincelAplicar(m, vgHom, 0.0f, 0.0f, 10.0f, 1.0f, true, WPC::Proy, &cc, NULL);
+            PincelAplicar(m, vgHom, 0.0f, 0.0f, 10.0f, 1.0f, WPSumar, WPC::Proy, &cc, NULL);
             bool uvQuieto = (ugc->verts == capaAntes) && ((int)ugc->pesos.size() == 4);
             printf("      [wptest] uvgroup: pincel 3D -> %d CPs escritos | el UV group queda intacto=%s\n",
                    (int)m->vertexGroups[vgHom]->verts.size(), uvQuieto?"OK":"MAL");
@@ -24345,7 +24884,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
             //     al stack igual, y el UV group creado automaticamente se deshace con el.
             UVGroupLimpiarPesos(m, gc);
             int gTrazo = WeightPaintTrazoIniciarUV(m);
-            PincelAplicarUV(m, gc, 0.0f, 0.0f, 10.0f, 1.0f, true, WPC::Proy, &cc, NULL);
+            PincelAplicarUV(m, gc, 0.0f, 0.0f, 10.0f, 1.0f, WPSumar, WPC::Proy, &cc, NULL);
             WeightPaintTrazoFin();
             bool trazoEnStack = ((int)ugc->pesos.size() == 4);
             UndoDeshacer();
@@ -24641,9 +25180,11 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
             };
             WPR pr; pr.en = &enCara;
             // (a) POSE EN IDENTIDAD: pintar (agregar) y despintar (quitar) NO puede mover un solo uv
-            bool pintoA = PincelAplicarUV(mr, gr, 0.0f, 0.0f, 10.0f, 1.0f, true, WPR::Proy, &pr, NULL);
+            BrushTrazoResetear();
+            bool pintoA = PincelAplicarUV(mr, gr, 0.0f, 0.0f, 10.0f, 1.0f, WPSumar, WPR::Proy, &pr, NULL);
             if (!mr->Arm2DHuesos().empty() && !mr->Armature2DPoseIdentidad()) mr->Armature2DAplicar();
-            bool quitoA = PincelAplicarUV(mr, gr, 0.0f, 0.0f, 10.0f, 0.5f, false, WPR::Proy, &pr, NULL);
+            BrushTrazoResetear();
+            bool quitoA = PincelAplicarUV(mr, gr, 0.0f, 0.0f, 10.0f, 0.5f, WPRestar, WPR::Proy, &pr, NULL);
             if (!mr->Arm2DHuesos().empty() && !mr->Armature2DPoseIdentidad()) mr->Armature2DAplicar();
             int movidos = 0;
             for (int i = 0; i < mr->vertexSize * 2; i++) if (mr->uv[i] != uvEsperado[i]) movidos++;
@@ -24657,7 +25198,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
             //     regla vieja ("solo redefinir el rest si la pose esta en identidad") el rest
             //     quedaba VIEJO y el Armature2DAplicar del pintado devolvia el mapeo al rest: la
             //     cara volvia arriba de las otras 5 ("todo en el mismo lugar").
-            PincelAplicarUV(mr, gr, 0.0f, 0.0f, 10.0f, 1.0f, true, WPR::Proy, &pr, NULL);
+            BrushTrazoResetear(), PincelAplicarUV(mr, gr, 0.0f, 0.0f, 10.0f, 1.0f, WPSumar, WPR::Proy, &pr, NULL);
             mr->Arm2DHuesos()[0].poseTU = 0.3f; mr->Arm2DHuesos()[0].poseTV = -0.15f;
             mr->Armature2DRestCapturar();   // (lo hace Bone2DXformStart al empezar a posar)
             mr->Armature2DAplicar();
@@ -24670,9 +25211,9 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
             mr->Armature2DRestDesdeUV();    // el cierre del transform (ConfirmarXform)
             std::vector<GLfloat> uvTrasEdit(mr->uv, mr->uv + mr->vertexSize * 2);
             // ...y AHORA se pinta (agregar y quitar), que es lo que disparaba el reset
-            PincelAplicarUV(mr, gr, 0.0f, 0.0f, 10.0f, 0.25f, true, WPR::Proy, &pr, NULL);
+            BrushTrazoResetear(), PincelAplicarUV(mr, gr, 0.0f, 0.0f, 10.0f, 0.25f, WPSumar, WPR::Proy, &pr, NULL);
             if (!mr->Arm2DHuesos().empty() && !mr->Armature2DPoseIdentidad()) mr->Armature2DAplicar();
-            PincelAplicarUV(mr, gr, 0.0f, 0.0f, 10.0f, 0.25f, false, WPR::Proy, &pr, NULL);
+            BrushTrazoResetear(), PincelAplicarUV(mr, gr, 0.0f, 0.0f, 10.0f, 0.25f, WPRestar, WPR::Proy, &pr, NULL);
             if (!mr->Arm2DHuesos().empty() && !mr->Armature2DPoseIdentidad()) mr->Armature2DAplicar();
             // pintar CON la pose puesta SI puede mover un poco los uv (cambiar el peso cambia
             // cuanto sigue el corner al hueso: eso es el efecto buscado), pero acotado por la

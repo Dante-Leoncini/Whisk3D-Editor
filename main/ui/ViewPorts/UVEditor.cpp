@@ -14,7 +14,9 @@
 #include "render/OpcionesRender.h" // g_redraw (render event-driven)
 #include "w3dTexture.h"             // w3dEngine::TextureSize (aspect ratio de la textura del UV editor)
 #include "PopUp/PopUpBase.h"       // PopUpActive (file browser / popups modales tienen prioridad)
-#include "edit/WeightPaint.h"      // pincel + escritura de pesos (modo UVModoPesos)
+#include "edit/WeightPaint.h"
+#include "ViewPorts/PopUp/FalloffEditor.h" // editor de falloff (el mismo popup que el 3D)
+#include "WhiskUI/draw/icons.h"            // IconoIndice      // pincel + escritura de pesos (modo UVModoPesos)
 #include "ViewPorts/ViewPort3D.h"  // roles TBR_Undo/TBR_Redo de la toolbar (mismos que el 3D)
 #include "ViewPorts/TransformUI.h" // UI compartida del transform (barra de info / numerico / tilde-cruz-ejes)
 #include "ViewPorts/NumInput.h"    // entrada numerica compartida (NumInputActivo/Reset)
@@ -151,10 +153,14 @@ UVEditor::UVEditor() {
     for (int i = 0; i < 3; i++){
         b = new Button(""); b->rol = TBR_UVHist + i; b->visible = false; ToolButtons.push_back(b);
     }
-    b = new Button("40px");  b->rol = TBR_PincelTam;    b->desplegable = true; b->visible = false; ToolButtons.push_back(b);
-    b = new Button("100%");  b->rol = TBR_PincelFuerza; b->desplegable = true; b->visible = false; ToolButtons.push_back(b);
+    // (radio y valor no tienen boton: son la fila de barras deslizables de arriba de la toolbar,
+    //  ViewportBase::RenderBrushBar -- la misma que el viewport 3D, con el mismo pincel detras)
     b = new Button("+");     b->rol = TBR_PincelModo;   b->centrado = true; b->cuadrado = true; b->visible = false; ToolButtons.push_back(b);
     b = new Button("Group"); b->rol = TBR_Grupo;        b->desplegable = true; b->visible = false; ToolButtons.push_back(b);
+    // marcas + falloff: los MISMOS del 3D (el pincel es uno solo). En el UV las marcas van por
+    // CORNER, que es la unidad que pinta este editor (los uv groups son por render-vert).
+    b = new Button("", (int)IconType::mesh); b->rol = TBR_Marcas; b->centrado = true; b->cuadrado = true; b->visible = false; ToolButtons.push_back(b);
+    b = new Button("Smooth"); b->rol = TBR_Falloff; b->desplegable = true; b->visible = false; ToolButtons.push_back(b);
     // "editar solo lo seleccionado" (mascara de pintura): toggle GLOBAL compartido con la
     // toolbar del 3D (WeightPaintSoloSel); icono de seleccion, tinte accent cuando esta ON
     b = new Button("", (int)IconType::seleccion); b->rol = TBR_SoloSel; b->centrado = true; b->cuadrado = true; b->visible = false; ToolButtons.push_back(b);
@@ -180,6 +186,10 @@ UVEditor::~UVEditor() {
     for (size_t i = 0; i < gUVEditores.size(); i++)
         if (gUVEditores[i] == this) { gUVEditores.erase(gUVEditores.begin() + i); break; }
 }
+
+// FILA DE BARRAS del pincel (radio | valor): el UV la muestra en modo PESOS, con el mismo
+// BrushEstado que el viewport 3D (mover una barra aca mueve el pincel alla: es UN pincel).
+bool UVEditor::BrushBarVisible() const { return uvModo == UVModoPesos && EnEdicionUV(); }
 
 // ---- TOOLBAR inferior (compartida): historial G/R/S por editor ----
 // MRU PROPIO del UV editor (compartido entre todos los viewports UV, como el del 3D por modo).
@@ -243,10 +253,26 @@ void UVEditor::ToolbarSincronizar(){
             if (btn->visible) btn->text = ToolbarAccionLabel(h[hi]);
         } else if (rol >= TBR_PincelTam && rol <= TBR_Grupo){
             btn->visible = pintura;
-            if (rol == TBR_PincelTam)         btn->text = lTam;
-            else if (rol == TBR_PincelFuerza) btn->text = lFuerza;
-            else if (rol == TBR_PincelModo)   btn->text = lModo;
+            btn->tinte = NULL; btn->colorTexto = NULL;
+            if (rol == TBR_PincelModo){
+                btn->text = lModo;                          // "+" / "-" / "=" (mismo pincel que el 3D)
+                int md = BrushGet().modo;
+                btn->tinte      = (md == WPRestar) ? TbRojoBg() : (md == WPIgualar) ? TbVerdeBg() : NULL;
+                btn->colorTexto = (md == WPRestar) ? TbRojo()
+                                : (md == WPIgualar) ? ListaColores[static_cast<int>(ColorID::accent)] : NULL;
+            }
             else                              btn->text = lGrupo;
+        } else if (rol == TBR_Marcas){
+            btn->visible = pintura;
+            const bool onM = (BrushGet().marcas != MarcasOff);
+            btn->tinte = onM ? TbVerdeBg() : NULL;
+            btn->colorTexto = onM ? ListaColores[static_cast<int>(ColorID::accent)] : blanco;
+        } else if (rol == TBR_Falloff){
+            btn->visible = pintura;
+            const int tipoF = BrushGet().falloff.tipo;
+            btn->icon = IconoIndice(W3dFalloffIcono(tipoF));
+            btn->text = T(W3dFalloffNombre(tipoF));
+            btn->tinte = NULL; btn->colorTexto = NULL;
         } else if (rol == TBR_SoloSel){
             // "editar solo lo seleccionado": toggle global compartido con el 3D; accent = ON
             btn->visible = pintura;
@@ -277,14 +303,21 @@ void UVEditor::ToolbarAccionRol(int rol){
     if (uvModo == UVModoPesos){
         // "editar solo lo seleccionado": toggle global (compartido con la toolbar del 3D)
         if (rol == TBR_SoloSel){ WeightPaintSoloSel() = !WeightPaintSoloSel(); g_redraw = true; return; }
+        if (rol == TBR_Marcas){ // el UV pinta POR CORNER (uv groups) -> sus marcas son las de corner
+            BrushGet().marcas = (BrushGet().marcas != MarcasOff) ? MarcasOff : MarcasCorner;
+            g_redraw = true; return;
+        }
+        if (rol == TBR_Falloff){ // el MISMO popup reutilizable que abre el 3D, sobre el MISMO falloff
+            Button* bf = BarRolBtn(ToolButtons, TBR_Falloff);
+            FalloffEditorAbrir(&BrushGet().falloff, bf ? bf->sx : x, y + height - ToolbarHeight());
+            return;
+        }
         // PINTURA: controles del pincel (mismo dispatch que la toolbar del 3D en Weight Paint)
         if (rol < TBR_PincelTam || rol > TBR_Grupo) return;
         Button* b = BarRolBtn(ToolButtons, rol);
         int bx = b ? b->sx : x, byTop = y + height - ToolbarHeight();
-        if (rol == TBR_PincelModo)        { BrushGet().modo = BrushGet().modo ? 0 : 1; g_redraw = true; }
-        else if (rol == TBR_PincelTam)    WeightPaintMenuTam(bx, byTop);
-        else if (rol == TBR_PincelFuerza) WeightPaintMenuFuerza(bx, byTop);
-        else if (m)                       WeightPaintMenuUVGroup(m, bx, byTop); // TBR_Grupo: UV groups
+        if (rol == TBR_PincelModo)   { BrushGet().modo = (BrushGet().modo + 1) % 3; g_redraw = true; } // + -> - -> =
+        else if (rol == TBR_Grupo && m) WeightPaintMenuUVGroup(m, bx, byTop); // UV groups
         return;
     }
     if (!m || (Object*)m != g_editMesh) return;
@@ -490,7 +523,8 @@ void UVPintarPesos(UVEditor* uv, Mesh* m) {
     // 4 corners de UNA cara del cubo no toca las otras caras que comparten esos vertices 3D (que
     // es lo que se ve como islas UV separadas) ni los vertex groups del 3D.
     if (PincelAplicarUV(m, m->uvGrupoActivo, (float)(uv->lastMx - uv->x), (float)(uv->lastMy - uv->y),
-                        br.radioPx, br.fuerza, br.modo == 0, WPUVProyectar, &c, NULL)) {
+                        br.radioPx, br.fuerza, (WPModo)br.modo, WPUVProyectar, &c, NULL,
+                        &BrushFalloffEfectivo())) {
         // PINTAR NO MUEVE UVs. Solo se re-evalua el skinning 2D si hay una POSE REAL que dependa
         // de los pesos que se acaban de cambiar; con la pose en identidad (o sin armature 2D) no
         // hay nada que re-deformar y llamar al skinning seria pisar uv[] al pedo.
@@ -1306,6 +1340,16 @@ void UVEditor::Render() {
         gfx::LineWidth(1.0f); gfx::Color4f(1,1,1,1); gfx::DrawLines(8);
     }
 
+    // MARCAS del pincel: un cuadradito por punto pintable. En el UV el punto es el CORNER
+    // (render-vert), que es la unidad que escribe su pincel (uv groups). No dependen del mouse
+    // -- son un display, igual que en el viewport 3D.
+    if (enEditUV && uvModo == UVModoPesos && BrushGet().marcas != MarcasOff && m && m->uv) {
+        WPUVCtx cm; cm.m = m;
+        ParamsUV(cm.cx, cm.cy, cm.s);   // el MISMO mapeo UV->pantalla que usa el pincel
+        const unsigned char* colorRV =
+            ((int)m->weightPaintColor.size() >= m->vertexSize * 4) ? &m->weightPaintColor[0] : NULL;
+        BrushDibujarMarcas(m, BrushGet().marcas, 7.0f * (float)GlobalScale, colorRV, WPUVProyectar, &cm);
+    }
     // circulo del PINCEL (solo en modo pintura), siguiendo al mouse sobre el CONTENIDO
     // (no sobre la barra/toolbar ni con un popup modal abierto)
     if (enEditUV && uvModo == UVModoPesos && !PopUpActive &&

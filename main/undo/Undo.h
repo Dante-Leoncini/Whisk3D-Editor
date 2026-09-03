@@ -261,6 +261,12 @@ void UndoBonesCancelar();
 void UndoPesosIniciar(Mesh* m);
 void UndoPesosConfirmar();
 
+// VERTEX COLOR (pincel de color): mismo trato que los pesos -- un paso de undo POR TRAZO.
+// Snapshot de la capa 'capa' (colores + indices de paleta) al apoyar, commit al soltar.
+void UndoColorIniciar(Mesh* m, int capa);
+void UndoColorConfirmar(bool cambio);
+void UndoColorCancelar();
+
 // TRANSFORM DE UVs (G/R/S del editor UV + tarjeta "Transform UV" del panel): pendiente hasta
 // confirmar, un paso por operacion. DOS variantes (decision documentada en Undo.cpp):
 //  - LIVIANO (UVMapUndo): un G/R/S de verts/bordes (o de caras SIN split) solo cambia VALORES

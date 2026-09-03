@@ -42,7 +42,9 @@ ViewportBase::ViewportBase()
     toolScroll = 0;    // toolbar compartida (ToolbarBase.cpp): sin scroll ni gesto al nacer
     toolGesto = false;
 }
-ViewportBase::~ViewportBase(){}
+ViewportBase::~ViewportBase(){
+    BrushBarOlvidarViewport(this); // no dejar el gesto de la fila del pincel apuntando a un viewport muerto
+}
 void ViewportBase::event_mouse_motion(int mx, int my) {}
 void ViewportBase::button_left() {}
 void ViewportBase::button_right(){};

@@ -11,6 +11,7 @@
 #include "w3dGraphics.h"        // dibujo del circulo (DrawLines)
 #include "w3dlog.h"             // aviso al crear el grupo automatico
 #include "W3dLang.h"            // T(): titulos de los menus en el idioma del sistema
+#include "W3dPaletas.h"         // vertex color por INDICE: la paleta efectiva del objeto
 #include "WhiskUI/widgets/PopupMenu.h" // menus deslizables (AgregarFloat) de la toolbar
 #include <math.h>               // sqrtf / cosf / sinf
 #include <cstdio>               // sprintf (labels de la toolbar)
@@ -23,6 +24,33 @@ extern bool g_redraw;
 // ---------------------------------------------------------------------------
 static BrushEstado g_brush;
 BrushEstado& BrushGet() { return g_brush; }
+
+// TOPE POR TRAZO (ver WeightPaint.h): cuanto recibio YA cada elemento en este trazo. El indice
+// es el del pincel que este corriendo (control-point, render-vert o corner): un trazo es de UN
+// pincel solo, asi que un vector alcanza. Se vacia al arrancar cada trazo.
+static std::vector<float> g_trazoAplic;
+void BrushTrazoResetear() { g_trazoAplic.clear(); }
+
+// cuanto FALTA aplicarle al elemento i para llegar a 'a' en este trazo (0 = ya recibio eso o
+// mas). Deja anotado el nuevo maximo. 'n' es el tamano del dominio (para dimensionar el vector).
+static float TrazoPendiente(size_t i, size_t n, float a) {
+    if (g_trazoAplic.size() != n) g_trazoAplic.assign(n, 0.0f);
+    if (i >= n) return a;
+    const float ya = g_trazoAplic[i];
+    if (a <= ya) return 0.0f;      // ya se paso por aca con igual o mas fuerza: no suma
+    g_trazoAplic[i] = a;
+    return a - ya;
+}
+
+// Con las MARCAS prendidas el pincel no degrada con la distancia: el cuadradito se toca o
+// no se toca. Eso es exactamente un falloff CONSTANTE, asi que en vez de meter un "if
+// marcas" adentro del pincel (y tener que acordarse de repetirlo en cada llamador) se
+// cambia la curva y el pincel sigue siendo uno solo.
+const W3dFalloff& BrushFalloffEfectivo() {
+    static W3dFalloff constante;          // se arma una vez
+    constante.tipo = FoConstant;
+    return (g_brush.marcas != MarcasOff) ? constante : g_brush.falloff;
+}
 
 // circulo por SEGMENTOS DE LINEA (no habia helper de circulo en el motor): 48 segmentos,
 // dos pasadas -> halo NEGRO grueso abajo + linea BLANCA fina arriba (se lee sobre
@@ -45,6 +73,140 @@ void BrushDibujarCirculo(float cx, float cy, float radioPx) {
     gfx::VertexPointer2f(0, buf);
     gfx::LineWidth(3.0f); gfx::Color4f(0.0f, 0.0f, 0.0f, 1.0f); gfx::DrawLines(N * 2); // halo oscuro
     gfx::LineWidth(1.0f); gfx::Color4f(1.0f, 1.0f, 1.0f, 1.0f); gfx::DrawLines(N * 2); // circulo blanco
+}
+
+// ---------------------------------------------------------------------------
+//  MARCAS: un cuadradito por punto pintable (relleno + borde negro).
+//  Dos modos con el MISMO dibujo y distinta posicion (ver W3dMarcasModo):
+//    MarcasVertice -> uno por control-point, EXACTO sobre el vertice   (pesos)
+//    MarcasCorner  -> uno por face corner, corrido hacia el centro de SU cara
+//                     para que los corners que comparten esquina no se tapen (vertex color)
+//  Todo en 2D de PANTALLA: las posiciones salen del proyector (el mismo que usa el
+//  pincel para decidir a quien pinta), asi lo que se VE y lo que se PINTA no pueden
+//  desalinearse -- y el mismo codigo sirve en el viewport 3D y en el editor UV.
+// ---------------------------------------------------------------------------
+// CUANTO se corre un face corner hacia el centro de su cara, como fraccion. Es lo que despega
+// los 2-3 corners que comparten una esquina para que se vean -- y se puedan APUNTAR -- por
+// separado. Vive en UN solo lugar porque lo usan el DIBUJO de los cuadraditos y el HIT-TEST del
+// pincel: si divergieran, apuntarias a un cuadrado y pintarias otro (que es exactamente el bug
+// que habia: se dibujaba corrido y se testeaba sobre el vertice crudo, donde los 3 corners caen
+// en el MISMO punto -> el pincel agarraba los 3 juntos).
+static const float kCornerInset = 0.25f;
+
+// posicion EN PANTALLA de cada corner, en el orden de faces3d (el mismo que indexa las capas).
+// ok[L] = 0 si ese corner no se ve (detras de camara / back-facing): no se dibuja ni se pinta.
+// Una cara entra ENTERA o no entra: si un corner no proyecta, la cara se saltea (sino se
+// dibujarian esquinas sueltas de una cara que no se ve).
+static void WPCornersEnPantalla(Mesh* m, WPProyector proy, void* ctx,
+                                std::vector<float>& cx, std::vector<float>& cy,
+                                std::vector<char>& ok) {
+    const int nC = m->ContarCorners();
+    const size_t n0 = (size_t)(nC > 0 ? nC : 0);
+    cx.assign(n0, 0.0f); cy.assign(n0, 0.0f); ok.assign(n0, 0);
+    if (nC <= 0) return;
+    int L = 0;
+    for (size_t f = 0; f < m->faces3d.size(); f++) {
+        const std::vector<int>& idx = m->faces3d[f].idx;
+        const size_t n = idx.size();
+        if (L + (int)n > nC) break;
+        if (n < 3) { L += (int)n; continue; }
+        static std::vector<float> px, py;
+        px.clear(); py.clear();
+        float sumX = 0.0f, sumY = 0.0f;
+        bool todos = true;
+        for (size_t k = 0; k < n; k++) {
+            float sx = 0.0f, sy = 0.0f;
+            const int rv = idx[k];
+            if (rv < 0 || rv >= m->vertexSize || !proy(ctx, rv, sx, sy)) { todos = false; break; }
+            px.push_back(sx); py.push_back(sy);
+            sumX += sx; sumY += sy;
+        }
+        if (todos) {
+            const float ccx = sumX / (float)n, ccy = sumY / (float)n;  // centro de la cara EN PANTALLA
+            for (size_t k = 0; k < n; k++) {
+                cx[(size_t)(L + (int)k)] = px[k] + (ccx - px[k]) * kCornerInset;
+                cy[(size_t)(L + (int)k)] = py[k] + (ccy - py[k]) * kCornerInset;
+                ok[(size_t)(L + (int)k)] = 1;
+            }
+        }
+        L += (int)n;
+    }
+}
+
+static void MarcaEmpujar(std::vector<float>& tri, float cx, float cy, float mitad) {
+    const float x0 = cx - mitad, x1 = cx + mitad;
+    const float y0 = cy - mitad, y1 = cy + mitad;
+    // 2 triangulos (sin index buffer: son pocos y se dibujan con DrawTrianglesArray)
+    tri.push_back(x0); tri.push_back(y0);  tri.push_back(x1); tri.push_back(y0);  tri.push_back(x1); tri.push_back(y1);
+    tri.push_back(x0); tri.push_back(y0);  tri.push_back(x1); tri.push_back(y1);  tri.push_back(x0); tri.push_back(y1);
+}
+static void MarcaColor(std::vector<unsigned char>& col, const unsigned char* c) {
+    for (int k = 0; k < 6; k++) {          // los 6 vertices del cuadrado, mismo color
+        if (c) { col.push_back(c[0]); col.push_back(c[1]); col.push_back(c[2]); col.push_back(255); }
+        else   { col.push_back(170); col.push_back(170); col.push_back(170); col.push_back(255); }
+    }
+}
+
+void BrushDibujarMarcas(Mesh* m, int modo, float ladoPx, const unsigned char* colorRV,
+                        WPProyector proy, void* ctx) {
+    if (!m || !proy || modo == MarcasOff || m->vertexSize <= 0 || ladoPx <= 1.0f) return;
+    const float mitad = ladoPx * 0.5f;
+    const float mitadBorde = mitad + 1.0f * (float)GlobalScale; // el borde negro asoma alrededor
+
+    static std::vector<float> triFondo, triRelleno;
+    static std::vector<unsigned char> colRelleno;
+    triFondo.clear(); triRelleno.clear(); colRelleno.clear();
+
+    if (modo == MarcasVertice) {
+        // UNO POR CONTROL-POINT: el peso es del vertice, no del corner, asi que dos corners
+        // del mismo vertice no pueden mostrar cosas distintas -> se dibuja uno solo.
+        WeightPaintAsegurarMapa(m);
+        int maxCP = -1;
+        for (size_t i = 0; i < m->vertCtrlPoint.size(); i++)
+            if (m->vertCtrlPoint[i] > maxCP) maxCP = m->vertCtrlPoint[i];
+        if (maxCP < 0) return;
+        std::vector<char> visto((size_t)maxCP + 1, 0);
+        for (int i = 0; i < m->vertexSize && i < (int)m->vertCtrlPoint.size(); i++) {
+            const int cp = m->vertCtrlPoint[i];
+            if (cp < 0 || cp > maxCP || visto[(size_t)cp]) continue;
+            float sx = 0.0f, sy = 0.0f;
+            if (!proy(ctx, i, sx, sy)) continue;   // detras de camara / back-facing: no se ve
+            visto[(size_t)cp] = 1;
+            MarcaEmpujar(triFondo, sx, sy, mitadBorde);
+            MarcaEmpujar(triRelleno, sx, sy, mitad);
+            MarcaColor(colRelleno, colorRV ? &colorRV[(size_t)i * 4] : NULL);
+        }
+    } else {
+        // UNO POR FACE CORNER: la posicion sale del helper COMPARTIDO con el pincel, asi el
+        // cuadradito que ves es exactamente el punto que el pincel testea.
+        std::vector<float> cx, cy; std::vector<char> ok;
+        WPCornersEnPantalla(m, proy, ctx, cx, cy, ok);
+        int L = 0;
+        for (size_t f = 0; f < m->faces3d.size(); f++)
+            for (size_t k = 0; k < m->faces3d[f].idx.size(); k++, L++) {
+                if (L >= (int)ok.size() || !ok[(size_t)L]) continue;
+                MarcaEmpujar(triFondo,   cx[(size_t)L], cy[(size_t)L], mitadBorde);
+                MarcaEmpujar(triRelleno, cx[(size_t)L], cy[(size_t)L], mitad);
+                MarcaColor(colRelleno, colorRV ? &colorRV[(size_t)m->faces3d[f].idx[k] * 4] : NULL);
+            }
+    }
+    if (triRelleno.empty()) return;
+
+    gfx::Disable(gfx::Texture2D);
+    gfx::DisableArray(gfx::TexCoordArray);
+    gfx::DisableArray(gfx::NormalArray);
+    gfx::EnableArray(gfx::VertexArray);
+    // 1) el BORDE: los mismos cuadrados un poquito mas grandes, en negro, abajo de todo
+    gfx::DisableArray(gfx::ColorArray);
+    gfx::Color4f(0.0f, 0.0f, 0.0f, 1.0f);
+    gfx::VertexPointer2f(0, &triFondo[0]);
+    gfx::DrawTrianglesArray((int)(triFondo.size() / 2));
+    // 2) el RELLENO: el color de cada punto (el peso pintado, o el vertex color)
+    gfx::EnableArray(gfx::ColorArray);
+    gfx::ColorPointer4ub(&colRelleno[0]);
+    gfx::VertexPointer2f(0, &triRelleno[0]);
+    gfx::DrawTrianglesArray((int)(triRelleno.size() / 2));
+    gfx::DisableArray(gfx::ColorArray);
 }
 
 // ---------------------------------------------------------------------------
@@ -126,6 +288,67 @@ bool& WeightPaintSoloSel() { return g_wpSoloSel; }
 // control-points PERMITIDOS por la mascara: los de las caras logicas (faces3d) marcadas en
 // 'fsel'. Si fsel es NULL se deriva de la EDIT MESH (faceSel via faceSrc = la seleccion de
 // caras de edit mode, que persiste al cambiar a Weight Paint).
+// caras seleccionadas en EDIT MODE (por indice de faces3d). Es la fuente unica de la que
+// salen las dos mascaras del pincel Y el velo de caras bloqueadas: si divergieran, se veria
+// bloqueada una cara que si se puede pintar (o al reves).
+static void WPCarasSel(Mesh* m, const std::vector<char>* fsel, std::vector<char>& out) {
+    if (fsel) { out = *fsel; return; }
+    out.assign(m->faces3d.size(), 0);
+    m->EnsureEdit();
+    if (!m->edit) return;
+    for (size_t f = 0; f < m->edit->faceSel.size(); f++)
+        if (m->edit->faceSel[f] && f < m->edit->faceSrc.size()) {
+            const int f3 = m->edit->faceSrc[f];
+            if (f3 >= 0 && f3 < (int)m->faces3d.size()) out[(size_t)f3] = 1;
+        }
+}
+
+// velo negro sobre lo que NO se puede pintar (ver WeightPaint.h). En PANTALLA, via proyector.
+void BrushDibujarCarasBloqueadas(Mesh* m, WPProyector proy, void* ctx,
+                                 const std::vector<char>* soloCaras) {
+    if (!m || !proy || !g_wpSoloSel || m->vertexSize <= 0) return;
+    std::vector<char> sel;
+    WPCarasSel(m, soloCaras, sel);
+
+    static std::vector<float> tri;
+    tri.clear();
+    for (size_t f = 0; f < m->faces3d.size(); f++) {
+        if (f < sel.size() && sel[f]) continue;          // esta cara SI se puede pintar
+        const std::vector<int>& id = m->faces3d[f].idx;
+        const size_t n = id.size();
+        if (n < 3) continue;
+        static std::vector<float> px, py;
+        px.clear(); py.clear();
+        bool todos = true;
+        for (size_t k = 0; k < n; k++) {
+            float sx = 0.0f, sy = 0.0f;
+            // el proyector descarta lo que mira para el otro lado: una cara de atras no se
+            // oscurece (tampoco se pinta, asi que no hay nada que avisar ahi)
+            if (id[k] < 0 || id[k] >= m->vertexSize || !proy(ctx, id[k], sx, sy)) { todos = false; break; }
+            px.push_back(sx); py.push_back(sy);
+        }
+        if (!todos) continue;
+        for (size_t k = 2; k < n; k++) {                  // abanico: ngon -> triangulos
+            tri.push_back(px[0]);   tri.push_back(py[0]);
+            tri.push_back(px[k-1]); tri.push_back(py[k-1]);
+            tri.push_back(px[k]);   tri.push_back(py[k]);
+        }
+    }
+    if (tri.empty()) return;
+
+    gfx::Disable(gfx::Texture2D);
+    gfx::DisableArray(gfx::TexCoordArray);
+    gfx::DisableArray(gfx::ColorArray);
+    gfx::DisableArray(gfx::NormalArray);
+    gfx::EnableArray(gfx::VertexArray);
+    gfx::Enable(gfx::Blend);
+    gfx::BlendAlpha();
+    gfx::Color4f(0.0f, 0.0f, 0.0f, 0.40f);   // 40% mas oscuro, como se pidio
+    gfx::VertexPointer2f(0, &tri[0]);
+    gfx::DrawTrianglesArray((int)(tri.size() / 2));
+    gfx::Disable(gfx::Blend);
+}
+
 static void WPMaskCPs(Mesh* m, const std::vector<char>* fsel, int maxCP, std::vector<char>& cpOk) {
     cpOk.assign((size_t)maxCP + 1, 0);
     std::vector<char> propia;
@@ -183,15 +406,24 @@ static void WPMaskRVs(Mesh* m, const std::vector<char>* fsel, std::vector<char>&
 // ---------------------------------------------------------------------------
 //  PINCEL sobre la malla (agnostico del viewport via el proyector)
 // ---------------------------------------------------------------------------
+// el falloff a usar: el que pidio el llamador, o SMOOTH (la formula que estaba clavada
+// antes de que el falloff fuera elegible) para que un llamador viejo no cambie de conducta.
+static const W3dFalloff& FalloffODefault(const W3dFalloff* f) {
+    static const W3dFalloff smooth;   // el constructor deja tipo = FoSmooth
+    return f ? *f : smooth;
+}
+
 bool PincelAplicar(Mesh* m, int grupo, float centroX, float centroY, float radioPx,
-                   float fuerza01, bool sumar, WPProyector proy, void* ctx,
-                   const std::vector<char>* soloCaras) {
+                   float fuerza01, WPModo modo, WPProyector proy, void* ctx,
+                   const std::vector<char>* soloCaras, const W3dFalloff* falloff) {
     if (!m || !proy || m->vertexSize <= 0 || radioPx <= 0.0f) return false;
     WeightPaintAsegurarMapa(m);
     if (grupo < 0 || grupo >= (int)m->vertexGroups.size()) return false;
     if (fuerza01 < 0.0f) fuerza01 = 0.0f;
     if (fuerza01 > 1.0f) fuerza01 = 1.0f;
-    if (fuerza01 <= 0.0f) return false;
+    // valor 0: en +/- el delta seria 0 y no hay nada que hacer; en "=" SI hay (deja los
+    // pesos en cero exacto, o sea BORRA lo pintado), asi que ese modo no se corta aca.
+    if (modo != WPIgualar && fuerza01 <= 0.0f) return false;
 
     int maxCP = -1;
     for (size_t i = 0; i < m->vertCtrlPoint.size(); i++)
@@ -204,6 +436,7 @@ bool PincelAplicar(Mesh* m, int grupo, float centroX, float centroY, float radio
     if (g_wpSoloSel) WPMaskCPs(m, soloCaras, maxCP, cpOk);
 
     // 1) falloff MAXIMO por control-point: los splits de un mismo CP no acumulan doble
+    const W3dFalloff& fo = FalloffODefault(falloff);
     std::vector<float> fall((size_t)maxCP + 1, 0.0f);
     const float r2 = radioPx * radioPx;
     bool alguno = false;
@@ -216,20 +449,31 @@ bool PincelAplicar(Mesh* m, int grupo, float centroX, float centroY, float radio
         float dx = sx - centroX, dy = sy - centroY;
         float d2 = dx * dx + dy * dy;
         if (d2 > r2) continue;
-        // falloff SMOOTHSTEP del centro (1) al borde (0): suave, sin escalones
-        float s = 1.0f - sqrtf(d2) / radioPx;
-        float f = s * s * (3.0f - 2.0f * s);
+        // la CURVA elegida decide cuanto entra este vert: t = 0 en el centro, 1 en el borde
+        float f = fo.Eval(sqrtf(d2) / radioPx);
         if (f > fall[(size_t)cp]) { fall[(size_t)cp] = f; alguno = true; }
     }
     if (!alguno) return false;
 
     // 2) aplicar UNA vez por control-point (clamp 0..1; entrada sparse creada/borrada)
     bool cambio = false;
+    const size_t dom = (size_t)maxCP + 1;
     for (int cp = 0; cp <= maxCP; cp++) {
         float f = fall[(size_t)cp];
         if (f <= 0.0f) continue;
         float w0 = PesoDe(m, grupo, cp);
-        float w = sumar ? (w0 + fuerza01 * f) : (w0 - fuerza01 * f);
+        // TOPE POR TRAZO: de este control-point ya puede haberse ocupado una pasada anterior
+        // del mismo trazo (el mouse pasa decenas de veces por el mismo lugar). Solo se aplica
+        // lo que FALTA para llegar a valor*falloff. "=" no necesita tope: deja el valor exacto,
+        // aplicarlo dos veces da lo mismo.
+        float paso = fuerza01 * f;
+        if (modo != WPIgualar) {
+            paso = TrazoPendiente((size_t)cp, dom, paso);
+            if (paso <= 0.0f) continue;
+        }
+        float w = (modo == WPIgualar) ? fuerza01
+                : (modo == WPSumar)   ? (w0 + paso)
+                                      : (w0 - paso);
         if (w < 0.0f) w = 0.0f;
         if (w > 1.0f) w = 1.0f;
         if (w != w0) { PesoAsignar(m, grupo, cp, w); cambio = true; }
@@ -245,20 +489,221 @@ bool PincelAplicar(Mesh* m, int grupo, float centroX, float centroY, float radio
 }
 
 // ---------------------------------------------------------------------------
+//  PINCEL DE VERTEX COLOR (por CORNER, sobre una ColorLayer). Ver WeightPaint.h.
+// ---------------------------------------------------------------------------
+bool PincelAplicarColor(Mesh* m, int capa, float centroX, float centroY, float radioPx,
+                        float valor01, const unsigned char* rgba, int palIdx,
+                        WPProyector proy, void* ctx,
+                        const std::vector<char>* soloCaras, const W3dFalloff* falloff) {
+    if (!m || !proy || !rgba || m->vertexSize <= 0 || radioPx <= 0.0f) return false;
+    if (capa < 0 || capa >= (int)m->colorLayers.size()) return false;
+    ColorLayer* cl = m->colorLayers[capa];
+    if (!cl) return false;
+    const int nC = m->ContarCorners();
+    if (nC <= 0 || (int)cl->color.size() != nC * 4) return false;   // capa stale: no tocar
+    if (valor01 < 0.0f) valor01 = 0.0f;
+    if (valor01 > 1.0f) valor01 = 1.0f;
+    if (valor01 <= 0.0f) return false;
+    if (cl->porIndice && (int)cl->indice.size() != nC) cl->indice.assign((size_t)nC, -1);
+
+    const W3dFalloff& fo = FalloffODefault(falloff);
+    std::vector<char> rvOk;
+    if (g_wpSoloSel) WPMaskRVs(m, soloCaras, rvOk);   // "solo lo seleccionado": por render-vert
+
+    // 1) cuanto le toca a cada CORNER (en el orden de faces3d, que es como indexa la capa).
+    //    LA POSICION DEL CORNER ES LA DEL CUADRADITO, no la del vertice: los 2-3 corners que
+    //    comparten una esquina caen en el MISMO punto del vertice, asi que testear ahi hacia
+    //    imposible pintar uno solo (agarraba los 3 juntos aunque apuntaras a un cuadrado).
+    //    Con capa Per-Vertex es al reves: ahi el punto ES el vertice (un vertice = un color) y
+    //    el bloque 2) de abajo reparte lo pintado a todos sus corners.
+    std::vector<float> peso((size_t)nC, 0.0f);
+    const float r2 = radioPx * radioPx;
+    bool alguno = false;
+    std::vector<float> cx, cy; std::vector<char> vis;
+    if (!cl->porVertice) WPCornersEnPantalla(m, proy, ctx, cx, cy, vis);
+    int L = 0;
+    for (size_t f = 0; f < m->faces3d.size(); f++) {
+        const std::vector<int>& id = m->faces3d[f].idx;
+        for (size_t c = 0; c < id.size(); c++, L++) {
+            if (L >= nC) break;
+            const int rv = id[c];
+            if (rv < 0 || rv >= m->vertexSize) continue;
+            if (!rvOk.empty() && !rvOk[(size_t)rv]) continue;   // mascara: cara no seleccionada
+            float sx = 0.0f, sy = 0.0f;
+            if (!cl->porVertice) {
+                if (L >= (int)vis.size() || !vis[(size_t)L]) continue;  // corner no visible
+                sx = cx[(size_t)L]; sy = cy[(size_t)L];                 // el punto del cuadradito
+            } else if (!proy(ctx, rv, sx, sy)) continue;                // Per-Vertex: el vertice
+            const float dx = sx - centroX, dy = sy - centroY;
+            const float d2 = dx * dx + dy * dy;
+            if (d2 > r2) continue;
+            const float a = valor01 * fo.Eval(sqrtf(d2) / radioPx);
+            if (a > peso[(size_t)L]) { peso[(size_t)L] = a; alguno = true; }
+        }
+    }
+    if (!alguno) return false;
+
+    // 2) POR VERTICE: la capa igual guarda por corner, pero al hornear se colapsa por posicion
+    //    (todos los corners de una posicion toman el color del primero). Si se pintara solo el
+    //    corner tocado, el resultado dependeria de cual corner es el primero -> se propaga el
+    //    maximo a TODOS los corners que comparten posicion. Es "un vertice = un color".
+    if (cl->porVertice) {
+        WeightPaintAsegurarMapa(m);
+        int maxCP = -1;
+        for (size_t i = 0; i < m->vertCtrlPoint.size(); i++)
+            if (m->vertCtrlPoint[i] > maxCP) maxCP = m->vertCtrlPoint[i];
+        if (maxCP >= 0) {
+            std::vector<float> porCP((size_t)maxCP + 1, 0.0f);
+            L = 0;
+            for (size_t f = 0; f < m->faces3d.size(); f++)
+                for (size_t c = 0; c < m->faces3d[f].idx.size(); c++, L++) {
+                    if (L >= nC) break;
+                    const int rv = m->faces3d[f].idx[c];
+                    if (rv < 0 || rv >= (int)m->vertCtrlPoint.size()) continue;
+                    const int cp = m->vertCtrlPoint[rv];
+                    if (cp >= 0 && cp <= maxCP && peso[(size_t)L] > porCP[(size_t)cp])
+                        porCP[(size_t)cp] = peso[(size_t)L];
+                }
+            L = 0;
+            for (size_t f = 0; f < m->faces3d.size(); f++)
+                for (size_t c = 0; c < m->faces3d[f].idx.size(); c++, L++) {
+                    if (L >= nC) break;
+                    const int rv = m->faces3d[f].idx[c];
+                    if (rv < 0 || rv >= (int)m->vertCtrlPoint.size()) continue;
+                    const int cp = m->vertCtrlPoint[rv];
+                    if (cp >= 0 && cp <= maxCP) peso[(size_t)L] = porCP[(size_t)cp];
+                }
+        }
+    }
+
+    // 3) escribir: mezcla del color (o el indice entero, que no se puede mezclar)
+    bool cambio = false;
+    for (int i = 0; i < nC; i++) {
+        const float a = peso[(size_t)i];
+        if (a <= 0.0f) continue;
+        if (cl->porIndice) {
+            if (a < 0.5f) continue;                 // el falloff decide QUIEN, no cuanto
+            if (cl->indice[(size_t)i] != palIdx) { cl->indice[(size_t)i] = palIdx; cambio = true; }
+            for (int q = 0; q < 4; q++) {
+                if (cl->color[(size_t)i * 4 + q] == rgba[q]) continue;
+                cl->color[(size_t)i * 4 + q] = rgba[q]; cambio = true;
+            }
+            continue;
+        }
+        // TOPE POR TRAZO en una MEZCLA: no se puede sumar el pendiente y listo (mezclar dos
+        // veces al 50% no da 100%). Se aplica t = (a - ya) / (1 - ya), que es exactamente el
+        // factor que hace que la mezcla ACUMULADA del trazo termine valiendo 'a'.
+        const float ya = (i < (int)g_trazoAplic.size() && g_trazoAplic.size() == (size_t)nC)
+                         ? g_trazoAplic[(size_t)i] : 0.0f;
+        const float pend = TrazoPendiente((size_t)i, (size_t)nC, a);
+        if (pend <= 0.0f) continue;
+        const float t = (ya >= 0.999f) ? 1.0f : (pend / (1.0f - ya));
+        for (int q = 0; q < 4; q++) {
+            const float viejo = (float)cl->color[(size_t)i * 4 + q];
+            const float nuevo = viejo + ((float)rgba[q] - viejo) * t;
+            const unsigned char b = (unsigned char)(nuevo + 0.5f);
+            if (b != cl->color[(size_t)i * 4 + q]) { cl->color[(size_t)i * 4 + q] = b; cambio = true; }
+        }
+    }
+    if (cambio) {
+        m->AplicarCapasAlRender();   // la capa -> vertexColor[] (lo unico que el core dibuja)
+        g_redraw = true;
+    }
+    return cambio;
+}
+
+// FUSION Per-Corner -> Per-Vertex: promedia los colores de los corners que comparten posicion
+// y se los escribe a TODOS. Ver WeightPaint.h: esto es lo que hace destructivo al cambio.
+bool VertexColorFusionarPorVertice(Mesh* m, int capa) {
+    if (!m || capa < 0 || capa >= (int)m->colorLayers.size()) return false;
+    ColorLayer* cl = m->colorLayers[capa];
+    if (!cl) return false;
+    const int nC = m->ContarCorners();
+    if (nC <= 0 || (int)cl->color.size() != nC * 4) return false;
+    WeightPaintAsegurarMapa(m);
+    int maxCP = -1;
+    for (size_t i = 0; i < m->vertCtrlPoint.size(); i++)
+        if (m->vertCtrlPoint[i] > maxCP) maxCP = m->vertCtrlPoint[i];
+    if (maxCP < 0) return false;
+
+    // suma por control-point (4 canales) + cuantos corners aporto cada uno
+    std::vector<float> suma((size_t)(maxCP + 1) * 4, 0.0f);
+    std::vector<int>   n((size_t)maxCP + 1, 0);
+    int L = 0;
+    for (size_t f = 0; f < m->faces3d.size(); f++)
+        for (size_t c = 0; c < m->faces3d[f].idx.size(); c++, L++) {
+            if (L >= nC) break;
+            const int rv = m->faces3d[f].idx[c];
+            if (rv < 0 || rv >= (int)m->vertCtrlPoint.size()) continue;
+            const int cp = m->vertCtrlPoint[rv];
+            if (cp < 0 || cp > maxCP) continue;
+            for (int q = 0; q < 4; q++) suma[(size_t)cp * 4 + q] += (float)cl->color[(size_t)L * 4 + q];
+            n[(size_t)cp]++;
+        }
+    bool cambio = false;
+    L = 0;
+    for (size_t f = 0; f < m->faces3d.size(); f++)
+        for (size_t c = 0; c < m->faces3d[f].idx.size(); c++, L++) {
+            if (L >= nC) break;
+            const int rv = m->faces3d[f].idx[c];
+            if (rv < 0 || rv >= (int)m->vertCtrlPoint.size()) continue;
+            const int cp = m->vertCtrlPoint[rv];
+            if (cp < 0 || cp > maxCP || n[(size_t)cp] <= 0) continue;
+            for (int q = 0; q < 4; q++) {
+                const unsigned char prom =
+                    (unsigned char)(suma[(size_t)cp * 4 + q] / (float)n[(size_t)cp] + 0.5f);
+                if (prom != cl->color[(size_t)L * 4 + q]) { cl->color[(size_t)L * 4 + q] = prom; cambio = true; }
+            }
+        }
+    // el INDICE de paleta no se puede promediar (no existe "el promedio de dos indices"): al
+    // fusionar, esos corners pasan a color libre con el promedio ya horneado.
+    if (cl->porIndice && (int)cl->indice.size() == nC)
+        for (int i = 0; i < nC; i++) cl->indice[(size_t)i] = -1;
+    if (cambio) { m->AplicarCapasAlRender(); g_redraw = true; }
+    return cambio;
+}
+
+// re-hornea los colores desde los INDICES contra la paleta efectiva del objeto: ESTO es el
+// palette-swap (cambiar la paleta de un padre re-pinta a todos sus herederos).
+bool VertexColorResolverIndices(Mesh* m, int capa, Object* dueno) {
+    if (!m || capa < 0 || capa >= (int)m->colorLayers.size()) return false;
+    ColorLayer* cl = m->colorLayers[capa];
+    if (!cl || !cl->porIndice) return false;
+    const int nC = m->ContarCorners();
+    if (nC <= 0 || (int)cl->color.size() != nC * 4) return false;
+    if ((int)cl->indice.size() != nC) return false;
+    std::vector<PaletaColor>* cols = W3dColoresEfectivos(dueno ? dueno : (Object*)m);
+    bool cambio = false;
+    for (int i = 0; i < nC; i++) {
+        const int idx = cl->indice[(size_t)i];
+        if (idx < 0 || !cols || idx >= (int)cols->size()) continue;  // sin indice: color libre, no se toca
+        const float* c = (*cols)[(size_t)idx].rgba;
+        for (int q = 0; q < 4; q++) {
+            float v = c[q]; if (v < 0.0f) v = 0.0f; if (v > 1.0f) v = 1.0f;
+            const unsigned char b = (unsigned char)(v * 255.0f + 0.5f);
+            if (b != cl->color[(size_t)i * 4 + q]) { cl->color[(size_t)i * 4 + q] = b; cambio = true; }
+        }
+    }
+    if (cambio) { m->AplicarCapasAlRender(); g_redraw = true; }
+    return cambio;
+}
+
+// ---------------------------------------------------------------------------
 //  PINCEL DEL EDITOR UV (por CORNER, sobre un UV GROUP). Misma pasada/falloff que el de arriba,
 //  pero la unidad es el RENDER-VERT: los 4 corners de UNA cara se pesan sin tocar las caras
 //  vecinas que comparten esos vertices 3D. No mira ni toca los vertex groups.
 // ---------------------------------------------------------------------------
 bool PincelAplicarUV(Mesh* m, int uvGrupo, float centroX, float centroY, float radioPx,
-                     float fuerza01, bool sumar, WPProyector proy, void* ctx,
-                     const std::vector<char>* soloCaras) {
+                     float fuerza01, WPModo modo, WPProyector proy, void* ctx,
+                     const std::vector<char>* soloCaras, const W3dFalloff* falloff) {
     if (!m || !proy || m->vertexSize <= 0 || radioPx <= 0.0f) return false;
     if (uvGrupo < 0 || uvGrupo >= (int)m->uvGroups.size()) return false;
     if (fuerza01 < 0.0f) fuerza01 = 0.0f;
     if (fuerza01 > 1.0f) fuerza01 = 1.0f;
-    if (fuerza01 <= 0.0f) return false;
+    if (modo != WPIgualar && fuerza01 <= 0.0f) return false; // "=" con 0 SI hace algo (borra)
 
     std::vector<char> rvOk;
+    const W3dFalloff& fo = FalloffODefault(falloff);
     if (g_wpSoloSel) WPMaskRVs(m, soloCaras, rvOk);
     // falloff por render-vert (cada uno se proyecta a SU posicion en pantalla; no hay
     // "maximo entre splits" que valga: los splits son justamente lo que se separa)
@@ -272,8 +717,7 @@ bool PincelAplicarUV(Mesh* m, int uvGrupo, float centroX, float centroY, float r
         float dx = sx - centroX, dy = sy - centroY;
         float d2 = dx * dx + dy * dy;
         if (d2 > r2) continue;
-        float s = 1.0f - sqrtf(d2) / radioPx;   // falloff SMOOTHSTEP del centro (1) al borde (0)
-        fall[(size_t)i] = s * s * (3.0f - 2.0f * s);
+        fall[(size_t)i] = fo.Eval(sqrtf(d2) / radioPx); // la CURVA elegida (0 centro .. 1 borde)
         alguno = true;
     }
     if (!alguno) return false;
@@ -289,7 +733,14 @@ bool PincelAplicarUV(Mesh* m, int uvGrupo, float centroX, float centroY, float r
         float f = fall[(size_t)i];
         if (f <= 0.0f) continue;
         float w0 = wIni[(size_t)i];
-        float w = sumar ? (w0 + fuerza01 * f) : (w0 - fuerza01 * f);
+        float paso = fuerza01 * f;                                // idem 3D: tope por trazo
+        if (modo != WPIgualar) {
+            paso = TrazoPendiente((size_t)i, (size_t)m->vertexSize, paso);
+            if (paso <= 0.0f) continue;
+        }
+        float w = (modo == WPIgualar) ? fuerza01                 // "=": exacto, sin falloff
+                : (modo == WPSumar)   ? (w0 + paso)
+                                      : (w0 - paso);
         if (w < 0.0f) w = 0.0f;
         if (w > 1.0f) w = 1.0f;
         if (w != w0) { PesoUVAsignar(m, uvGrupo, i, w); cambio = true; }
@@ -307,6 +758,7 @@ bool PincelAplicarUV(Mesh* m, int uvGrupo, float centroX, float centroY, float r
 static Mesh* g_wpTrazoMesh = NULL;
 
 int WeightPaintTrazoIniciar(Mesh* m) {
+    BrushTrazoResetear();
     if (!m || m->vertexSize <= 0) return -1;
     WeightPaintAsegurarMapa(m);
     UndoPesosIniciar(m); // snapshot ANTES de crear el grupo -> el undo del trazo tambien lo saca
@@ -324,6 +776,7 @@ int WeightPaintTrazoIniciar(Mesh* m) {
 // NOMBRE DEL HUESO 2D ACTIVO si la malla tiene armature 2D (asi el binding por nombre queda
 // hecho y pintar deforma al toque); sin armature 2D se llama "UV Group".
 int WeightPaintTrazoIniciarUV(Mesh* m) {
+    BrushTrazoResetear();
     if (!m || m->vertexSize <= 0) return -1;
     UndoPesosIniciar(m); // snapshot ANTES de crear el grupo -> el undo del trazo tambien lo saca
     if (m->uvGroups.empty()) {
@@ -451,8 +904,6 @@ int UVGroupSeleccionar(Mesh* m, bool sel) {
 // ---------------------------------------------------------------------------
 //  MENUS del pincel (compartidos por la toolbar del 3D y la del UV editor)
 // ---------------------------------------------------------------------------
-static PopupMenu* gMenuBrushTam    = NULL;
-static PopupMenu* gMenuBrushFuerza = NULL;
 static PopupMenu* gMenuBrushGrupo  = NULL; // 3D: vertex groups
 static PopupMenu* gMenuBrushUVGrp  = NULL; // UV: uv groups
 static Mesh*      gMenuGrupoMesh   = NULL; // la malla cuyo dropdown de grupos esta abierto
@@ -468,25 +919,6 @@ static void AbrirMenuToolbar(PopupMenu* menu, int sx, int syTop) {
     menu->Abrir(sx, my, MenuPantallaW, MenuPantallaH);
     MenuAbierto = menu;
     g_redraw = true;
-}
-
-void WeightPaintMenuTam(int sx, int syTop) {
-    if (!gMenuBrushTam) {
-        gMenuBrushTam = new PopupMenu();
-        gMenuBrushTam->titulo = T("Radius");
-        // "menu deslizable": el mismo item-slider de los menus (AgregarFloat)
-        gMenuBrushTam->AgregarFloat(T("Radius"), 0, &BrushGet().radioPx, 4.0f, 200.0f);
-    }
-    AbrirMenuToolbar(gMenuBrushTam, sx, syTop);
-}
-
-void WeightPaintMenuFuerza(int sx, int syTop) {
-    if (!gMenuBrushFuerza) {
-        gMenuBrushFuerza = new PopupMenu();
-        gMenuBrushFuerza->titulo = T("Strength");
-        gMenuBrushFuerza->AgregarFloat(T("Strength"), 0, &BrushGet().fuerza, 0.0f, 1.0f);
-    }
-    AbrirMenuToolbar(gMenuBrushFuerza, sx, syTop);
 }
 
 static void AccionMenuGrupo(int id) {
@@ -513,6 +945,34 @@ void WeightPaintMenuGrupo(Mesh* m, int sx, int syTop) {
     gMenuBrushGrupo->Agregar(T("Add Vertex Group"), 1000, (int)IconType::mas);
     gMenuBrushGrupo->action = AccionMenuGrupo;
     AbrirMenuToolbar(gMenuBrushGrupo, sx, syTop);
+}
+
+// ---- CAPAS DE COLOR (vertex paint): elegir a cual se pinta, o crear una ----
+static PopupMenu* gMenuCapaColor = NULL;
+static void AccionMenuCapaColor(int id) {
+    Mesh* m = gMenuGrupoMesh;
+    if (!m) return;
+    if (id == 1000) {                       // capa nueva: copia de la activa (misma regla que UV/color del panel)
+        DuplicarColorLayerActivo(m);        // declarada en edit/MeshEdit.h (ya incluido)
+    } else if (id >= 0 && id < (int)m->colorLayers.size()) {
+        m->colorActivo = id;
+        m->AplicarCapasAlRender();          // la capa elegida es la que se ve (y la que se pinta)
+    }
+    g_redraw = true;
+}
+
+void WeightPaintMenuCapaColor(Mesh* m, int sx, int syTop) {
+    if (!m) return;
+    gMenuGrupoMesh = m;
+    if (!gMenuCapaColor) gMenuCapaColor = new PopupMenu();
+    gMenuCapaColor->Limpiar();
+    gMenuCapaColor->titulo = T("Color Layers");
+    for (size_t i = 0; i < m->colorLayers.size(); i++)
+        gMenuCapaColor->Agregar(m->colorLayers[i]->nombre, (int)i)->verde = ((int)i == m->colorActivo);
+    if (!m->colorLayers.empty())
+        gMenuCapaColor->Agregar(T("New Color Layer"), 1000, (int)IconType::mas);
+    gMenuCapaColor->action = AccionMenuCapaColor;
+    AbrirMenuToolbar(gMenuCapaColor, sx, syTop);
 }
 
 static void AccionMenuUVGrupo(int id) {
@@ -553,7 +1013,7 @@ static void BrushLabels(std::string& tam, std::string& fuerza, std::string& modo
     char b[32];
     sprintf(b, "%dpx", (int)(g_brush.radioPx + 0.5f));          tam = b;
     sprintf(b, "%d%%", (int)(g_brush.fuerza * 100.0f + 0.5f));  fuerza = b;
-    modo = g_brush.modo ? "-" : "+";
+    modo = (g_brush.modo == WPIgualar) ? "=" : (g_brush.modo == WPRestar) ? "-" : "+";
 }
 
 void WeightPaintLabels(Mesh* m, std::string& tam, std::string& fuerza,

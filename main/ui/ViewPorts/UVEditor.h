@@ -67,6 +67,12 @@ enum ToolbarRolUV {
     TBR_SoloSel,         // "editar solo lo seleccionado": el pincel SOLO pinta verts de caras
                          // seleccionadas en edit mode. Toggle GLOBAL compartido 3D/UV
                          // (WeightPaintSoloSel), tinte accent cuando esta ON
+    TBR_Marcas,          // icono de MALLA: muestra un cuadradito en cada punto pintable y hace que
+                         // el pincel trabaje SOBRE ESOS PUNTOS (al valor de la barra, sin falloff)
+    TBR_Falloff,         // como cae la intensidad del centro al borde: abre el editor de falloff
+                         // (lista de presets + curva custom), el popup reutilizable
+    TBR_ColorPincel,     // VERTEX PAINT: cuadradito con el color del pincel; abre el ColorPicker
+                         // (sus pestanias dan color libre, y la de Paleta el color POR INDICE)
     // acciones de HUESO 2D (solo visibles en UVModoHuesos), pensadas para pantallas tactiles
     TBR_BoneExtrude = 30, // E: hueso nuevo desde el tail del activo
     TBR_BoneDup,          // Shift+D: duplicar los seleccionados (sueltos)
@@ -176,6 +182,8 @@ class UVEditor : public ViewportBase, public WithBorder {
         // toolbar inferior compartida (ToolbarBase): G/R/S (MRU) en modo edicion; en PINTURA los
         // controles del PINCEL (roles TBR_Pincel*/TBR_Grupo). Oculta si el UV no esta operativo.
         bool ToolbarVisible() const W3D_OVERRIDE;
+        // fila de barras del pincel (radio | valor): solo en modo PESOS y con el UV operativo
+        bool BrushBarVisible() const W3D_OVERRIDE;
         void ToolbarSincronizar() W3D_OVERRIDE;
         void ToolbarAccionRol(int rol) W3D_OVERRIDE;
 

@@ -26,6 +26,9 @@
 #include "ViewPorts/LayoutInput.h" // LayoutDeleteEdit (menu Delete en edit mode)
 #include "ViewPorts/UVEditor.h"    // roles TBR_Pincel*/TBR_Grupo (pincel de Weight Paint, compartidos con el UV)
 #include "edit/WeightPaint.h"      // estado del pincel + menus deslizables + labels de la toolbar
+#include "ViewPorts/PopUp/FalloffEditor.h" // el editor de falloff (popup reutilizable)
+#include "ViewPorts/PopUp/ColorPicker.h"   // el color del pincel de vertex paint
+#include "WhiskUI/draw/icons.h"    // IconoIndice: el icono del falloff activo
 #include "edit/BoneEdit.h"         // Edit Mode de ARMATURE: toolbar contextual Extrude/Move/Delete (Fase 3)
 #include "ViewPorts/PopUp/NumPad.h" // NumPadAbrirTransform (teclado tactil sobre la barra de estado)
 #include "ViewPorts/TransformUI.h"  // compartidos: ToolbarUsaTactil + colores Tb* (los usan los 3 editores)
@@ -146,6 +149,14 @@ bool Viewport3D::ToolbarVisible() const {
     return true; // PC/Android/Web: SIEMPRE (Undo/Redo tienen que estar; el experimentado ve solo esos)
 #endif
 }
+// FILA DE BARRAS del pincel (radio | valor, arriba de la toolbar): solo pintando pesos. A
+// diferencia de la toolbar NO depende de cfg.nuevoUsuario: sin estas dos barras no hay forma de
+// cambiar el radio ni el valor (misma excepcion que ya tenian los controles del pincel).
+bool Viewport3D::BrushBarVisible() const {
+    { extern bool SimActiva(); if (AnimEsJuego && SimActiva()) return false; } // modo juego: pantalla limpia
+    return InteractionMode == WeightPaint || InteractionMode == VertexPaint;
+}
+
 // (ToolbarHeight / OnToolbar / ToolbarScrollBy: compartidos en ViewportBase, ToolbarBase.cpp)
 
 // colores de los ejes (X/Y/Z), rojos del cancelar y verde del aceptar: COMPARTIDOS en
@@ -168,11 +179,19 @@ void Viewport3D::ToolbarSincronizar(){
     std::vector<int>& h = ToolbarHist();
     // modo WEIGHT PAINT: la toolbar muestra los CONTROLES DEL PINCEL (tam/fuerza/modo/grupo)
     // en vez del historial de acciones. Labels con el estado actual del pincel.
-    const bool pincel = (InteractionMode == WeightPaint);
+    const bool pincel = (InteractionMode == WeightPaint || InteractionMode == VertexPaint);
+    const bool color  = (InteractionMode == VertexPaint);   // pintando COLOR, no pesos
     std::string lTam, lFuerza, lModo, lGrupo;
+    Mesh* wpm = (ObjActivo && ObjActivo->getType() == ObjectType::mesh) ? (Mesh*)ObjActivo : NULL;
     if (pincel){
-        Mesh* wpm = (ObjActivo && ObjActivo->getType() == ObjectType::mesh) ? (Mesh*)ObjActivo : NULL;
         WeightPaintLabels(wpm, lTam, lFuerza, lModo, lGrupo);
+        if (color){
+            // en vertex paint el desplegable elige la CAPA DE COLOR (la unidad que se pinta),
+            // no el vertex group
+            lGrupo = T("Color");
+            if (wpm && wpm->colorActivo >= 0 && wpm->colorActivo < (int)wpm->colorLayers.size())
+                lGrupo = wpm->colorLayers[wpm->colorActivo]->nombre;
+        }
     }
 
     // visibilidad + contenido + colores
@@ -220,19 +239,39 @@ void Viewport3D::ToolbarSincronizar(){
             btn->tinte = g_viewEditMode ? TbVerdeBg() : NULL;
             btn->colorTexto = g_viewEditMode ? accent : blanco;
         } else if (rol >= TBR_PincelTam && rol <= TBR_Grupo){
-            // PINCEL (Weight Paint): tam / fuerza / sumar-restar / grupo activo. El modo restar
-            // se marca en verde (esta "activado" respecto del sumar por defecto).
+            // PINCEL (Weight Paint): modo (+/-/=) y grupo activo. El RADIO y el VALOR ya no son
+            // botones: viven en la fila de barras deslizables de arriba (RenderBrushBar).
             btn->visible = pincel && !transformando;
             btn->tinte = NULL; btn->colorTexto = NULL;
-            if (rol == TBR_PincelTam)         btn->text = lTam;
-            else if (rol == TBR_PincelFuerza) btn->text = lFuerza;
-            else if (rol == TBR_PincelModo){
-                btn->text = lModo;
-                bool restar = (BrushGet().modo != 0);
-                btn->tinte = restar ? TbRojoBg() : NULL;    // restar: fondo rojizo (como Cancelar)
-                btn->colorTexto = restar ? TbRojo() : NULL;
+            if (rol == TBR_PincelModo){
+                // sumar/restar/igualar es de PESOS: a un color no se le suma ni se le resta.
+                // En vertex paint el boton no va (la intensidad la da la barra "valor").
+                btn->visible = pincel && !transformando && !color;
+                btn->text = lModo;                          // "+" / "-" / "="
+                int md = BrushGet().modo;
+                // restar: rojizo (SACA peso, como el cancelar). igualar: accent, porque no acumula
+                // nada -- PISA el peso con el valor exacto, y conviene que se note de un vistazo.
+                btn->tinte      = (md == WPRestar) ? TbRojoBg() : (md == WPIgualar) ? TbVerdeBg() : NULL;
+                btn->colorTexto = (md == WPRestar) ? TbRojo()   : (md == WPIgualar) ? accent      : NULL;
             }
             else btn->text = lGrupo;
+        } else if (rol == TBR_ColorPincel){
+            btn->visible = color && !transformando;
+            btn->tinte = BrushGet().color;   // el boton ES la muestra de color (se tinta en vivo)
+            btn->colorTexto = NULL;
+        } else if (rol == TBR_Marcas){
+            // los cuadraditos por punto pintable: toggle, accent cuando esta ON
+            btn->visible = pincel && !transformando;
+            const bool on = (BrushGet().marcas != MarcasOff);
+            btn->tinte = on ? TbVerdeBg() : NULL;
+            btn->colorTexto = on ? accent : blanco;
+        } else if (rol == TBR_Falloff){
+            // muestra el falloff ACTIVO (icono si ya tiene arte + nombre traducido)
+            btn->visible = pincel && !transformando;
+            const int tipo = BrushGet().falloff.tipo;
+            btn->icon = IconoIndice(W3dFalloffIcono(tipo));
+            btn->text = T(W3dFalloffNombre(tipo));
+            btn->tinte = NULL; btn->colorTexto = NULL;
         } else if (rol == TBR_SoloSel){
             // "editar solo lo seleccionado" (mascara de pintura): solo en Weight Paint.
             // Toggle GLOBAL compartido con el UV editor; tinte accent cuando esta ON.
@@ -254,7 +293,7 @@ void Viewport3D::ToolbarSincronizar(){
         // tilde/cruz/ejes) y EXCEPTO los controles del pincel en Weight Paint (sin ellos no se
         // puede ajustar el pincel: no hay atajos de teclado todavia).
         if (!cfg.nuevoUsuario && !transformando && rol != TBR_Undo && rol != TBR_Redo &&
-            !(pincel && rol >= TBR_PincelTam && rol <= TBR_SoloSel)) btn->visible = false;
+            !(pincel && rol >= TBR_PincelTam && rol <= TBR_ColorPincel)) btn->visible = false;
     }
 }
 
@@ -280,19 +319,37 @@ void Viewport3D::ToolbarAccionRol(int rol){
     }
     else if (rol >= TBR_EjeX && rol <= TBR_EjeZ) ToolbarToggleEje(1 << (rol - TBR_EjeX)); // combinables
     else if (rol >= TBR_PincelTam && rol <= TBR_Grupo){
-        // PINCEL (Weight Paint): +- togglea; tam/fuerza abren su menu deslizable; grupo el dropdown
+        // PINCEL (Weight Paint): el boton de modo CICLA sumar -> restar -> igualar -> sumar;
+        // grupo abre su dropdown. (radio y valor son la fila de barras, no pasan por aca)
         Button* b = BarRolBtn(ToolButtons, rol);
         int bx = b ? b->sx : x, byTop = y + height - ToolbarHeight();
-        if (rol == TBR_PincelModo) BrushGet().modo = BrushGet().modo ? 0 : 1;
-        else if (rol == TBR_PincelTam)    WeightPaintMenuTam(bx, byTop);
-        else if (rol == TBR_PincelFuerza) WeightPaintMenuFuerza(bx, byTop);
-        else { // TBR_Grupo: vertex group activo del mesh activo
+        if (rol == TBR_PincelModo) BrushGet().modo = (BrushGet().modo + 1) % 3;
+        else if (rol == TBR_Grupo){ // la UNIDAD que se pinta: vertex group (pesos) o capa (color)
             Mesh* m = (ObjActivo && ObjActivo->getType() == ObjectType::mesh) ? (Mesh*)ObjActivo : NULL;
-            if (m) WeightPaintMenuGrupo(m, bx, byTop);
+            if (!m) return;
+            if (InteractionMode == VertexPaint) WeightPaintMenuCapaColor(m, bx, byTop);
+            else                                WeightPaintMenuGrupo(m, bx, byTop);
         }
     }
     else if (rol == TBR_SoloSel){ // "editar solo lo seleccionado": toggle global (compartido con el UV)
         WeightPaintSoloSel() = !WeightPaintSoloSel(); g_redraw = true;
+    }
+    else if (rol == TBR_Marcas){ // cuadraditos por punto pintable (y el pincel pasa a trabajar sobre ellos)
+        // en PESOS el punto pintable es el VERTICE (el skinning lee un peso por vertice)
+        BrushGet().marcas = (BrushGet().marcas != MarcasOff) ? MarcasOff : MarcasVertice;
+        g_redraw = true;
+    }
+    else if (rol == TBR_Falloff){ // el editor de falloff, que es el popup REUTILIZABLE
+        Button* b = BarRolBtn(ToolButtons, TBR_Falloff);
+        FalloffEditorAbrir(&BrushGet().falloff, b ? b->sx : x, y + height - ToolbarHeight());
+    }
+    else if (rol == TBR_ColorPincel){ // el color del pincel: el ColorPicker de siempre
+        Button* b = BarRolBtn(ToolButtons, TBR_ColorPincel);
+        if (!colorPicker) colorPicker = new ColorPicker();
+        colorPicker->Abrir(BrushGet().color, b ? b->sx : x, y + height - ToolbarHeight());
+        // pestania "Pal": elegir un color de la paleta EFECTIVA del objeto (o "Propio" para
+        // color libre). Lo pintado con indice sigue a la paleta -> palette-swap en el modelo.
+        colorPicker->SetPaleta(&BrushGet().palIdx, ObjActivo, NULL);
     }
     else if (rol == TBR_Shift) LShiftPressed = !LShiftPressed; // modificador tactil: queda encendido (verde)
     else if (rol == TBR_Ctrl)  LCtrlPressed  = !LCtrlPressed;
