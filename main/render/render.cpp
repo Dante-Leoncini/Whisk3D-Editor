@@ -141,7 +141,7 @@ static void RenderNormales(Mesh* m) {
 static void MeshOverlayHook(Mesh* m) {
     if (!g_mostrarOverlays) return;
     if ((Object*)m == g_editMesh) {
-        m->RenderEditOverlay();
+        m->RenderEditOverlay();   // (el X-Ray de la jaula ya lo maneja EditMesh::Render)
     } else if (m->select && w3dVerSeleccion) {   // "Ver seleccion" OFF (menu Select): sin contorno
         int cid = ((Object*)m == ObjActivo) ? RC_selActive : RC_selInactive;
         const float* col = gRenderColors[cid];

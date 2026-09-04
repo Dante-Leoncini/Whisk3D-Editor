@@ -25,6 +25,11 @@ void LayoutPickPathCancelar();
 bool GuiadoUnClickActivo();
 void LayoutGuiadoCancelar();
 void LayoutSelectLinkedGuiado();
+
+// BOX SELECT del viewport 3D: aplica la caja (en coords de PANTALLA) sobre los objetos
+// (Object Mode) o los sub-elementos (Edit Mode). 'tocar' = regla azul (alcanza con rozar);
+// false = regla verde (tiene que entrar entero). 'sumar' = suma a la seleccion (Shift).
+void BoxSelectAplicar3D(int x0, int y0, int x1, int y1, bool tocar, bool sumar);
 bool LoopCutOrientando();
 bool LoopCutActivo();
 void LoopCutIniciar(int mx, int my);

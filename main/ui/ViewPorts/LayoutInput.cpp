@@ -7,7 +7,8 @@
 #include "ViewPorts/Notificaciones.h" // toasts (extraido a su propio archivo)
 #include "ViewPorts/NumInput.h" // entrada numerica/formulas (extraido a su propio archivo)
 #include "ViewPorts/Parent.h" // emparentar/desemparentar (extraido a su propio archivo)
-#include "ViewPorts/Pick3D.h" // pick/seleccion 3D + loop cut (extraido a su propio archivo)
+#include "ViewPorts/Pick3D.h"  // pick/seleccion 3D + loop cut (extraido a su propio archivo)
+#include "edit/BoxSelect.h"    // Box Select (tecla B / menu Select)
 #include "ViewPorts/ViewPort3D.h"
 #include "ViewPorts/Outliner.h"
 #include "ViewPorts/Console.h"
@@ -935,6 +936,8 @@ static void LayoutAccionSelect(int aId) {
         case 15: LayoutSelectLinkedGuiado();   break; // Select Linked (isla conexa) en modo guiado: pide click
         case 16: LayoutLoopSelectGuiado();     break; // Loop Select en modo VERTICE: guiado (click sobre un borde)
         case 20: w3dVerSeleccion = !w3dVerSeleccion; g_redraw = true; break; // Ver seleccion (contorno + tinte)
+        case 30: // Box Select: arma la cruz guia y espera el arrastre (idem tecla B)
+            BoxSelectArmar(); BoxSelectMover(lastMouseX, lastMouseY); break;
     }
 }
 
@@ -946,6 +949,9 @@ static void LayoutRebuildMenuSelect() {
     MenuSelect->Agregar(T("All"), 0)->atajo = "A";
     MenuSelect->Agregar(T("None"), 1)->atajo = "Alt A";
     MenuSelect->Agregar(T("Invert"), 2)->atajo = "Ctrl I";
+    // BOX SELECT: arma la caja (igual que la tecla). El atajo va en el item para que se
+    // aprenda solo -- desde el menu hace exactamente lo mismo que apretar B.
+    MenuSelect->Agregar(T("Box Select"), 30)->atajo = "B";
     // "Ver seleccion" (pedido del dueno): OFF = ni contorno verde ni tinte de malla no
     // editable -- para mirar el escenario seleccionado tal como se ve de verdad.
     MenuSelect->Agregar(T("Ver seleccion"), 20)->verde = w3dVerSeleccion;
@@ -2999,6 +3005,36 @@ void LayoutMenuArmEdit(int mx, int my) {
     BoneAltPContexto3D(); // el submenu Clear Parent opera sobre los huesos 3D en edicion
     gMenuArmEdit->Abrir(mx, my, MenuPantallaW, MenuPantallaH);
     MenuAbierto = gMenuArmEdit;
+}
+
+// MENU CONTEXTUAL del viewport 3D (click DERECHO en el contenido). Abre EN EL MOUSE el menu
+// que corresponda al modo -- exactamente el mismo que abre el boton de la barra, no una copia:
+//   Object Mode -> "Object"  (solo con algo seleccionado: sin seleccion no hay nada que hacerle)
+//   Edit Mode   -> el contexto de la MALLA segun el sub-modo (Vertex / Edge / Face), o el de
+//                  huesos si se esta editando un armature
+//   Pose Mode   -> "Pose"
+void LayoutMenuContexto3D(int mx, int my) {
+    if (MenuAbierto) MenuAbierto->Cerrar();
+    if (InteractionMode == EditMode) {
+        if (BoneEditActivo()) LayoutMenuArmEdit(mx, my);
+        else                  LayoutMenuEditContexto(mx, my);
+        return;
+    }
+    PopupMenu* m = NULL;
+    if (InteractionMode == PoseMode) {
+        extern PopupMenu* MenuPose;
+        m = MenuPose;
+        if (m) { if (!m->action) m->action = LayoutAccionObject; LayoutSyncInsertKeySubmenu(m, 0); }
+    } else {
+        if (!ObjActivo) return;      // Object Mode sin seleccion: no se abre nada
+        m = MenuObject;
+        if (m && !m->action) m->action = LayoutAccionObject;
+    }
+    if (!m) return;
+    m->Resize();
+    m->Abrir(mx, my, MenuPantallaW, MenuPantallaH);
+    MenuAbierto = m;
+    g_redraw = true;
 }
 
 // menus de CONTEXTO de Edit Mode (Vertex / Edge / Face), separados (no submenus de

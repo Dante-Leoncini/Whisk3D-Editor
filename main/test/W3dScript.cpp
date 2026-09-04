@@ -20,6 +20,8 @@
 #include "objects/EditMesh.h"  // EditMesh
 #include "ViewPorts/LayoutInput.h" // LayoutToggleEditMode/ExtrudeFaces, EditXform*
 #include "ViewPorts/PopUp/FalloffEditor.h" // test 'falloff': el popup reutilizable de la curva
+#include "ViewPorts/Pick3D.h"              // test 'boxtest': BoxSelectAplicar3D
+#include "edit/BoxSelect.h"                // test 'boxtest': la caja de seleccion
 #include "ViewPorts/Timeline.h"
 #include "WhiskUI/Propieties/GroupPropertie.h" // icontest: la tarjeta "Keyframe" y su icono
 #include "WhiskUI/Propieties/PropList.h"       // arm2drango: la LISTA de armatures 2D del panel (modo 10)
@@ -24242,6 +24244,199 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
 
         UndoLimpiar();
         if (!ok) { err = "vcolor: ver los MAL de arriba"; return false; }
+        return true;
+    }
+
+    // ---- xray <0|1> : el toggle X-Ray del menu Overlays, para pruebas y capturas ----
+    if (cmd == "xray") { int v = 0; ss >> v; g_xray = (v != 0); g_redraw = true; return true; }
+
+    // ---- boxsel cruz <x> <y> | caja <x0> <y0> <x1> <y1> : deja el box select EN CURSO (sin
+    //      soltar) para poder mirarlo con uishot. Es la unica forma de capturar un overlay que
+    //      solo existe mientras el mouse esta apretado. ----
+    if (cmd == "boxsel") {
+        std::string sub; ss >> sub;
+        if (sub == "cruz") { int x = 0, y = 0; ss >> x >> y; BoxSelectArmar(); BoxSelectMover(x, y); }
+        else if (sub == "caja") {
+            int x0 = 0, y0 = 0, x1 = 0, y1 = 0; ss >> x0 >> y0 >> x1 >> y1;
+            BoxSelectArmar(); BoxSelectDown(x0, y0); BoxSelectMover(x1, y1);
+        } else { err = "boxsel: uso: boxsel cruz <x> <y> | boxsel caja <x0> <y0> <x1> <y1>"; return false; }
+        g_redraw = true;
+        return true;
+    }
+
+    // ---- boxtest : BOX SELECT. Verifica las DOS reglas sobre geometria real (el cubo de la
+    //      escena, proyectado con la camara del viewport):
+    //        VERDE (izq->der): entra solo lo que esta ENTERO adentro
+    //        AZUL  (der->izq): alcanza con rozar
+    //      ...en los tres tipos de elemento: objeto, vertice y arista. Todo por el MISMO camino
+    //      que el mouse (BoxSelectArmar/Down/Mover/Soltar + BoxSelectAplicar3D).
+    if (cmd == "boxtest") {
+        extern Viewport3D* Viewport3DActive;
+        if (!rootViewport) { err = "boxtest: no hay layout"; return false; }
+        rootViewport->Render();
+        Viewport3D* vp = Viewport3DActive;
+        if (!vp) { err = "boxtest: no hay viewport 3D"; return false; }
+        Mesh* m = (ObjActivo && ObjActivo->getType() == ObjectType::mesh) ? (Mesh*)ObjActivo : NULL;
+        if (!m || m->vertexSize <= 0) { err = "boxtest: hace falta una malla activa"; return false; }
+        bool ok = true;
+
+        // caja en PANTALLA de la malla (proyectando sus vertices con la vista real)
+        vp->BindVista();
+        Matrix4 W; m->GetWorldMatrix(W);
+        float minX = 1e9f, minY = 1e9f, maxX = -1e9f, maxY = -1e9f;
+        for (int i = 0; i < m->vertexSize; i++) {
+            float sx, sy;
+            Vector3 w = W * Vector3(m->vertex[i*3], m->vertex[i*3+1], m->vertex[i*3+2]);
+            if (!vp->ProyectarPunto(w, sx, sy)) continue;
+            if (sx < minX) minX = sx; if (sx > maxX) maxX = sx;
+            if (sy < minY) minY = sy; if (sy > maxY) maxY = sy;
+        }
+        if (maxX <= minX || maxY <= minY) { err = "boxtest: la malla no proyecta"; return false; }
+        // el helper: arma, arrastra y suelta como lo haria el mouse. El SENTIDO del arrastre
+        // (x0 > x1 = derecha a izquierda) es lo que elige la regla azul.
+        struct BX { static void Correr(int x0, int y0, int x1, int y1) {
+            BoxSelectArmar(); BoxSelectDown(x0, y0); BoxSelectMover(x1, y1);
+            int rx0, ry0, rx1, ry1; bool tocar = false;
+            if (BoxSelectSoltar(rx0, ry0, rx1, ry1, tocar))
+                BoxSelectAplicar3D(rx0, ry0, rx1, ry1, tocar, false);
+        } };
+
+        // ---- 1) OBJETO: caja que lo envuelve entero (verde) -> entra ----
+        InteractionMode = ObjectMode;
+        DeseleccionarTodo();
+        BX::Correr((int)minX - 20, (int)minY - 20, (int)maxX + 20, (int)maxY + 20);
+        const bool entero = m->select;
+        // ---- 2) OBJETO: caja que lo corta al medio (verde) -> NO entra (un pixel afuera basta) ----
+        DeseleccionarTodo();
+        const int medioX = (int)((minX + maxX) * 0.5f);
+        BX::Correr((int)minX - 20, (int)minY - 20, medioX, (int)maxY + 20);
+        const bool cortadoVerde = m->select;
+        // ---- 3) el MISMO corte pero de DERECHA a IZQUIERDA (azul) -> entra por rozarlo ----
+        DeseleccionarTodo();
+        BX::Correr(medioX, (int)maxY + 20, (int)minX - 20, (int)minY - 20);
+        const bool cortadoAzul = m->select;
+        printf("      [boxtest] objeto: entero+verde=%s | cortado+verde=%s (esp NO) | cortado+azul=%s\n",
+               entero?"OK":"MAL", cortadoVerde?"MAL":"OK", cortadoAzul?"OK":"MAL");
+        if (!entero || cortadoVerde || !cortadoAzul) ok = false;
+
+        // ---- 4) EDIT MODE ----
+        DeseleccionarTodo(); ObjActivo = m; m->Seleccionar();
+        LayoutModoElegir(EditMode);
+        if (InteractionMode != EditMode) { err = "boxtest: no se pudo entrar a Edit Mode"; return false; }
+        m->EnsureEdit();
+        EditMesh* e = m->edit;
+        if (!e || e->pos.empty()) { err = "boxtest: sin edit mesh"; return false; }
+        // proyectar los verts editables (para poner las cajas donde se quiere)
+        const int nV = e->NumVerts();
+        std::vector<float> px((size_t)nV, 0.0f), py((size_t)nV, 0.0f);
+        std::vector<char> vis((size_t)nV, 0);
+        for (int k = 0; k < nV; k++) {
+            float sx, sy;
+            Vector3 w = W * Vector3(e->pos[k*3], e->pos[k*3+1], e->pos[k*3+2]);
+            if (vp->ProyectarPunto(w, sx, sy)) { px[(size_t)k] = sx; py[(size_t)k] = sy; vis[(size_t)k] = 1; }
+        }
+        // VERTICE: una caja chica alrededor de UNO -> ese y solo ese
+        EditSelectMode = SelVertex;
+        int v0 = -1; for (int k = 0; k < nV && v0 < 0; k++) if (vis[(size_t)k]) v0 = k;
+        BX::Correr((int)px[(size_t)v0] - 6, (int)py[(size_t)v0] - 6,
+                   (int)px[(size_t)v0] + 6, (int)py[(size_t)v0] + 6);
+        int selV = 0; for (int k = 0; k < nV; k++) if (e->vertSel[(size_t)k]) selV++;
+        printf("      [boxtest] vertice: caja chica sobre uno -> %d seleccionado(s) (esp 1)\n", selV);
+        if (selV != 1) ok = false;
+
+        // ARISTA: una caja sobre el MEDIO de una arista, SIN tocar sus puntas.
+        //   verde -> no entra (las puntas quedan afuera) | azul -> entra (la caja la cruza)
+        EditSelectMode = SelEdge;
+        int eIdx = -1;
+        for (int i = 0; i < e->NumEdges() && eIdx < 0; i++) {
+            const int a = e->lineIdx[(size_t)i*2], b = e->lineIdx[(size_t)i*2+1];
+            if (a < nV && b < nV && vis[(size_t)a] && vis[(size_t)b]) {
+                const float d = fabsf(px[(size_t)a]-px[(size_t)b]) + fabsf(py[(size_t)a]-py[(size_t)b]);
+                if (d > 40.0f) eIdx = i;   // una arista larga: entra una caja en el medio
+            }
+        }
+        if (eIdx < 0) { err = "boxtest: no encontre una arista larga para el caso del medio"; return false; }
+        { const int a = e->lineIdx[(size_t)eIdx*2], b = e->lineIdx[(size_t)eIdx*2+1];
+          const int cx = (int)((px[(size_t)a] + px[(size_t)b]) * 0.5f);
+          const int cy = (int)((py[(size_t)a] + py[(size_t)b]) * 0.5f);
+          e->SeleccionarTodo(false);
+          BX::Correr(cx - 8, cy - 8, cx + 8, cy + 8);            // verde
+          int selVerde = 0; for (size_t i = 0; i < e->edgeSel.size(); i++) if (e->edgeSel[i]) selVerde++;
+          e->SeleccionarTodo(false);
+          BX::Correr(cx + 8, cy + 8, cx - 8, cy - 8);            // azul (der -> izq)
+          int selAzul = 0; for (size_t i = 0; i < e->edgeSel.size(); i++) if (e->edgeSel[i]) selAzul++;
+          printf("      [boxtest] arista por el MEDIO: verde=%d (esp 0: las puntas quedan afuera) | azul=%d (esp >=1: la roza)\n",
+                 selVerde, selAzul);
+          if (selVerde != 0 || selAzul < 1) ok = false; }
+
+        // ---- 5) LO QUE ESTA ATRAS: sin X-Ray la caja NO lo agarra; con X-Ray si ----
+        //    Una caja que cubre todo el cubo: de frente se ven 7 de sus 8 vertices (el de atras
+        //    de todo queda tapado). Con X-Ray prendido entran los 8.
+        {
+            EditSelectMode = SelVertex;
+            const bool xrayAntes = g_xray;
+            g_xray = false;
+            e->SeleccionarTodo(false);
+            BX::Correr((int)minX - 20, (int)minY - 20, (int)maxX + 20, (int)maxY + 20);
+            int sinXray = 0; for (int k = 0; k < nV; k++) if (e->vertSel[(size_t)k]) sinXray++;
+            g_xray = true;
+            e->SeleccionarTodo(false);
+            BX::Correr((int)minX - 20, (int)minY - 20, (int)maxX + 20, (int)maxY + 20);
+            int conXray = 0; for (int k = 0; k < nV; k++) if (e->vertSel[(size_t)k]) conXray++;
+            g_xray = xrayAntes;
+            e->SeleccionarTodo(false);
+            const bool okXray = (sinXray < conXray) && (conXray == nV);
+            printf("      [boxtest] X-Ray: sin=%d de %d (esp MENOS: lo de atras no se ve) | con=%d (esp %d: todos) -> %s\n",
+                   sinXray, nV, conXray, nV, okXray?"OK":"MAL");
+            if (!okXray) ok = false;
+        }
+
+        // ---- 6) X-RAY + CARAS: se agarran por el PUNTITO (su centro), no por la superficie ----
+        //    Con X-Ray lo que se ve y se apunta son los puntitos: una caja que pasa por encima de
+        //    la cara pero NO por su centro no la tiene que agarrar.
+        if (!e->faceCenter.empty()) {
+            EditSelectMode = SelFace;
+            const bool xrayAntes2 = g_xray;
+            g_xray = true;
+            // centro de la cara 0 en pantalla
+            int fc = -1; float fx = 0.0f, fy = 0.0f;
+            for (int f = 0; f < e->NumFaces() && fc < 0; f++) {
+                float sx, sy;
+                Vector3 w = W * Vector3(e->faceCenter[f*3], e->faceCenter[f*3+1], e->faceCenter[f*3+2]);
+                if (vp->ProyectarPunto(w, sx, sy)) { fc = f; fx = sx; fy = sy; }
+            }
+            if (fc >= 0) {
+                e->SeleccionarTodo(false);
+                BX::Correr((int)fx - 8, (int)fy - 8, (int)fx + 8, (int)fy + 8);   // sobre el puntito
+                int conPunto = 0; for (size_t i = 0; i < e->faceSel.size(); i++) if (e->faceSel[i]) conPunto++;
+                // ...y una caja LEJOS de todos los puntitos, pero encima de la malla
+                e->SeleccionarTodo(false);
+                int lejosX = (int)fx, lejosY = (int)fy;
+                { // buscar un punto de la malla que este a mas de 25px de TODOS los centros
+                  for (int k = 0; k < nV; k++) {
+                      if (!vis[(size_t)k]) continue;
+                      float mejor = 1e9f;
+                      for (int f = 0; f < e->NumFaces(); f++) {
+                          float sx, sy;
+                          Vector3 w = W * Vector3(e->faceCenter[f*3], e->faceCenter[f*3+1], e->faceCenter[f*3+2]);
+                          if (!vp->ProyectarPunto(w, sx, sy)) continue;
+                          const float d = fabsf(sx - px[(size_t)k]) + fabsf(sy - py[(size_t)k]);
+                          if (d < mejor) mejor = d;
+                      }
+                      if (mejor > 25.0f) { lejosX = (int)px[(size_t)k]; lejosY = (int)py[(size_t)k]; break; }
+                  } }
+                BX::Correr(lejosX - 5, lejosY - 5, lejosX + 5, lejosY + 5);
+                int sinPunto = 0; for (size_t i = 0; i < e->faceSel.size(); i++) if (e->faceSel[i]) sinPunto++;
+                printf("      [boxtest] X-Ray + caras: caja sobre el puntito -> %d (esp 1) | caja sin puntito -> %d (esp 0)\n",
+                       conPunto, sinPunto);
+                if (conPunto != 1 || sinPunto != 0) ok = false;
+            }
+            g_xray = xrayAntes2;
+            e->SeleccionarTodo(false);
+        }
+
+        LayoutModoElegir(ObjectMode);
+        if (!ok) { err = "boxtest: ver los MAL de arriba"; return false; }
         return true;
     }
 

@@ -41,6 +41,7 @@
 #include "WhiskUI/theme/colores.h"     // ColorID
 #include "w3dlog.h"         // las notificaciones tambien van al log
 #include "ViewPorts/Pick3D.h"
+#include "edit/BoxSelect.h"   // la caja compartida + sus predicados
 
 // ====================================================================
 // pick 3D por color (antes vivia en w3dnewscene.cpp, solo Symbian)
@@ -157,12 +158,36 @@ static bool PickEsTactil(){ return false; }
 // Pickea por color-ID el sub-elemento bajo (mx,my) en el MODO dado (SelVertex/Edge/
 // Face, NO necesariamente el modo activo: el loop-select pickea un BORDE en modo cara).
 // Devuelve el indice 0-based o -1. NO modifica la seleccion.
+// X-RAY + CARAS: el pick por color-ID no sirve. Con X-Ray las caras de atras se ven, pero el
+// id-buffer sigue teniendo el z-test: clickeabas una cara del fondo y agarrabas la de adelante.
+// La regla que corresponde es la que se VE: gana el PUNTITO (el centro de cara que dibuja la
+// jaula) MAS CERCA del mouse, sin importar la profundidad -- que es exactamente lo que el ojo
+// esta apuntando. Sin X-Ray no cambia nada: ahi el id-buffer es lo correcto (tapa lo de atras).
+static int EditPickFaceXRay(Mesh* m, EditMesh* e, int mx, int my) {
+    if (!Viewport3DActive || !e || e->faceCenter.empty()) return -1;
+    Viewport3DActive->BindVista();
+    Matrix4 W; m->GetWorldMatrix(W);
+    const int nF = e->NumFaces();
+    const float radio = 40.0f * (float)GlobalScale;   // hasta donde se considera "apuntado"
+    int mejor = -1; float mejorD2 = radio * radio;
+    for (int f = 0; f < nF && (size_t)(f*3+2) < e->faceCenter.size(); f++) {
+        float sx, sy;
+        Vector3 w = W * Vector3(e->faceCenter[f*3], e->faceCenter[f*3+1], e->faceCenter[f*3+2]);
+        if (!Viewport3DActive->ProyectarPunto(w, sx, sy)) continue;
+        const float dx = sx - (float)mx, dy = sy - (float)my;
+        const float d2 = dx*dx + dy*dy;
+        if (d2 < mejorD2) { mejorD2 = d2; mejor = f; }
+    }
+    return mejor;
+}
+
 static int EditPickIndex(int modo, int mx, int my, int vx, int vy, int vw, int vh, int screenH) {
     Mesh* m = (Mesh*)g_editMesh;
     if (!m) return -1;
     m->EnsureEdit();
     EditMesh* e = m->edit;
     if (!e || e->pos.empty()) return -1;
+    if (g_xray && modo == SelFace) return EditPickFaceXRay(m, e, mx, my);
     const bool edgeMode = (modo == SelEdge);
     const bool faceMode = (modo == SelFace);
     const int N = faceMode ? e->NumFaces() : edgeMode ? e->NumEdges() : e->NumVerts();
@@ -630,6 +655,226 @@ static bool PickPathClick(int mx,int my,int vx,int vy,int vw,int vh,int screenH)
     }
     g_redraw = true;
     return true;
+}
+
+// ============================================================================
+//  BOX SELECT aplicado al viewport 3D. La caja y sus predicados son compartidos
+//  (edit/BoxSelect.h); aca se decide QUE entra, que es lo unico propio del 3D.
+//
+//  LA REGLA, por tipo de elemento (pedido del dueno):
+//    VERDE (izq->der): entra lo que esta ENTERO adentro. Un pixel afuera y no entra.
+//    AZUL  (der->izq): alcanza con ROZAR.
+//  Un VERTICE es un punto: esta o no esta, y ahi los dos colores dan lo mismo.
+//  Una ARISTA o una CARA tienen extension: en azul basta que la caja cruce la
+//  arista (aunque las dos puntas queden afuera), en verde tienen que entrar todas
+//  sus puntas. Un OBJETO entra en verde solo si TODOS sus vertices proyectados
+//  caen adentro -- y como el rect es convexo, eso es exactamente "ni un pixel
+//  afuera": si las puntas de cada triangulo estan adentro, el triangulo tambien.
+// ============================================================================
+static bool BoxObjetoEntra(Viewport3D* vp, Object* o, int x0, int y0, int x1, int y1, bool tocar) {
+    if (o->getType() != ObjectType::mesh) {
+        // sin geometria (camara, luz, empty, hueso): su origen es todo lo que hay
+        float sx, sy;
+        if (!vp->ProyectarPunto(o->GetGlobalPosition(), sx, sy)) return false;
+        return BoxPunto(x0, y0, x1, y1, sx - vp->x, sy - vp->y);
+    }
+    Mesh* m = (Mesh*)o;
+    if (m->vertexSize <= 0 || !m->vertex) {
+        float sx, sy;
+        if (!vp->ProyectarPunto(o->GetGlobalPosition(), sx, sy)) return false;
+        return BoxPunto(x0, y0, x1, y1, sx - vp->x, sy - vp->y);
+    }
+    Matrix4 W; m->GetWorldMatrix(W);
+    const GLfloat* pos = (m->skinArmature && m->skinVertex) ? m->skinVertex : m->vertex; // la pose visible
+    static std::vector<float> px, py; static std::vector<char> vis;
+    px.assign((size_t)m->vertexSize, 0.0f); py.assign((size_t)m->vertexSize, 0.0f);
+    vis.assign((size_t)m->vertexSize, 0);
+    bool algunoAdentro = false, todosAdentro = true;
+    for (int i = 0; i < m->vertexSize; i++) {
+        float sx, sy;
+        Vector3 w = W * Vector3(pos[i*3], pos[i*3+1], pos[i*3+2]);
+        if (!vp->ProyectarPunto(w, sx, sy)) { todosAdentro = false; continue; } // detras de camara
+        px[(size_t)i] = sx - vp->x; py[(size_t)i] = sy - vp->y; vis[(size_t)i] = 1;
+        if (BoxPunto(x0, y0, x1, y1, px[(size_t)i], py[(size_t)i])) algunoAdentro = true;
+        else todosAdentro = false;
+    }
+    if (!tocar) return todosAdentro;      // VERDE: entero adentro
+    if (algunoAdentro) return true;       // AZUL: con una punta adentro ya esta
+    // ...o que la caja CRUCE alguna arista, o que haya quedado ENTERA adentro de una cara
+    // (ahi no toca ningun vertice ni cruza nada, pero esta encima del objeto igual)
+    const float cxCaja = (float)(x0 + x1) * 0.5f, cyCaja = (float)(y0 + y1) * 0.5f;
+    static std::vector<float> polX, polY;
+    for (size_t f = 0; f < m->faces3d.size(); f++) {
+        const std::vector<int>& id = m->faces3d[f].idx;
+        polX.clear(); polY.clear();
+        bool caraVisible = true;
+        for (size_t k = 0; k < id.size(); k++) {
+            const int a = id[k], b = id[(k + 1) % id.size()];
+            if (a < 0 || b < 0 || a >= m->vertexSize || b >= m->vertexSize) { caraVisible = false; continue; }
+            if (!vis[(size_t)a] || !vis[(size_t)b]) { caraVisible = false; continue; }
+            if (BoxSegmento(x0, y0, x1, y1, px[(size_t)a], py[(size_t)a], px[(size_t)b], py[(size_t)b]))
+                return true;
+            polX.push_back(px[(size_t)a]); polY.push_back(py[(size_t)a]);
+        }
+        if (caraVisible && BoxPuntoEnPoligono(&polX[0], &polY[0], (int)polX.size(), cxCaja, cyCaja))
+            return true;
+    }
+    return false;
+}
+
+static void BoxRecolectar(Object* o, std::vector<Object*>& out) {
+    if (!o) return;
+    for (size_t i = 0; i < o->Childrens.size(); i++) {
+        Object* c = o->Childrens[i];
+        if (!c) continue;
+        if (c->getType() != ObjectType::collection && c->visible) out.push_back(c);
+        BoxRecolectar(c, out);   // las colecciones no se seleccionan, pero sus hijos si
+    }
+}
+
+void BoxSelectAplicar3D(int x0, int y0, int x1, int y1, bool tocar, bool sumar) {
+    Viewport3D* vp = Viewport3DActive;
+    if (!vp) return;
+    vp->BindVista();                 // proyectar con ESTA vista (multi-viewport)
+    // el rect llega en pantalla; ProyectarPunto devuelve pantalla tambien, pero los
+    // predicados trabajan en LOCALES del viewport (como el resto de los overlays)
+    const int lx0 = x0 - vp->x, ly0 = y0 - vp->y, lx1 = x1 - vp->x, ly1 = y1 - vp->y;
+
+    if (InteractionMode == EditMode && g_editMesh) {
+        Mesh* m = (Mesh*)g_editMesh;
+        m->EnsureEdit();
+        EditMesh* e = m->edit;
+        if (!e || e->pos.empty()) return;
+        UndoCapturarSeleccionEdit(m);            // Ctrl+Z, igual que All/None/Invert
+        Matrix4 W; m->GetWorldMatrix(W);
+        const int nV = e->NumVerts();
+        static std::vector<float> px, py; static std::vector<char> vis;
+        px.assign((size_t)nV, 0.0f); py.assign((size_t)nV, 0.0f); vis.assign((size_t)nV, 0);
+        for (int k = 0; k < nV; k++) {
+            float sx, sy;
+            Vector3 w = W * Vector3(e->pos[k*3], e->pos[k*3+1], e->pos[k*3+2]);
+            if (!vp->ProyectarPunto(w, sx, sy)) continue;
+            px[(size_t)k] = sx - vp->x; py[(size_t)k] = sy - vp->y; vis[(size_t)k] = 1;
+        }
+        // ---- QUE SE VE: sin X-Ray la caja agarra SOLO lo que esta de cara a la camara ----
+        // El criterio es el AREA CON SIGNO del poligono proyectado: si da vuelta al otro lado,
+        // esa cara mira para atras y lo que hay ahi no se ve. De ahi sale la visibilidad de sus
+        // aristas y vertices (un vertice se ve si alguna de sus caras se ve). Con X-Ray prendido
+        // no se filtra nada: justamente el modo esta para agarrar lo de atras.
+        const bool filtrarOcultos = !g_xray;   // el X-Ray del menu Overlays (global, ya existia)
+        std::vector<char> vertVis, edgeVis, faceVis;
+        if (filtrarOcultos) {
+            vertVis.assign((size_t)nV, 0);
+            edgeVis.assign((size_t)e->NumEdges(), 0);
+            faceVis.assign((size_t)e->NumFaces(), 0);
+            for (int f = 0; f < e->NumFaces(); f++) {
+                const std::vector<int>& id = e->faces[(size_t)f];
+                if (id.size() < 3) continue;
+                float area = 0.0f;
+                bool todosVis = true;
+                for (size_t k = 0; k < id.size(); k++) {
+                    const int a = id[k], b = id[(k + 1) % id.size()];
+                    if (a < 0 || b < 0 || a >= nV || b >= nV || !vis[(size_t)a] || !vis[(size_t)b]) { todosVis = false; break; }
+                    area += px[(size_t)a] * py[(size_t)b] - px[(size_t)b] * py[(size_t)a];
+                }
+                if (!todosVis || area >= 0.0f) continue;   // mira para el otro lado (o no proyecta)
+                faceVis[(size_t)f] = 1;
+                for (size_t k = 0; k < id.size(); k++)
+                    if (id[k] >= 0 && id[k] < nV) vertVis[(size_t)id[k]] = 1;
+                if (f < (int)e->faceEdges.size())
+                    for (size_t k = 0; k < e->faceEdges[(size_t)f].size(); k++) {
+                        const int ei = e->faceEdges[(size_t)f][k];
+                        if (ei >= 0 && ei < (int)edgeVis.size()) edgeVis[(size_t)ei] = 1;
+                    }
+            }
+        }
+        if (!sumar) e->SeleccionarTodo(false);   // sin Shift la caja REEMPLAZA la seleccion
+        if (EditSelectMode == SelVertex) {
+            // un punto esta o no esta: verde y azul dan lo mismo
+            for (int k = 0; k < nV; k++) {
+                if (!vis[(size_t)k]) continue;
+                if (filtrarOcultos && !vertVis[(size_t)k]) continue;   // esta atras: no se ve
+                if (BoxPunto(lx0, ly0, lx1, ly1, px[(size_t)k], py[(size_t)k]))
+                    e->vertSel[(size_t)k] = 1;
+            }
+        } else if (EditSelectMode == SelEdge) {
+            const int nE = e->NumEdges();
+            for (int i = 0; i < nE; i++) {
+                const int a = e->lineIdx[(size_t)i*2], b = e->lineIdx[(size_t)i*2+1];
+                if (a < 0 || b < 0 || a >= nV || b >= nV) continue;
+                const bool va = vis[(size_t)a] != 0, vb = vis[(size_t)b] != 0;
+                bool entra;
+                if (!tocar) {   // VERDE: las DOS puntas adentro
+                    entra = va && vb &&
+                            BoxPunto(lx0, ly0, lx1, ly1, px[(size_t)a], py[(size_t)a]) &&
+                            BoxPunto(lx0, ly0, lx1, ly1, px[(size_t)b], py[(size_t)b]);
+                } else {        // AZUL: que la caja toque la arista en cualquier punto
+                    entra = va && vb &&
+                            BoxSegmento(lx0, ly0, lx1, ly1, px[(size_t)a], py[(size_t)a],
+                                        px[(size_t)b], py[(size_t)b]);
+                }
+                if (entra && (!filtrarOcultos || edgeVis[(size_t)i])) e->edgeSel[(size_t)i] = 1;
+            }
+        } else { // SelFace
+            const int nF = e->NumFaces();
+            // X-RAY: la cara se agarra por su PUNTITO (el centro), no por su superficie. Es lo
+            // mismo que el click: con X-Ray lo que se ve y se apunta son los puntitos, asi que
+            // una caja que pasa por encima de la cara pero no de su centro NO la agarra.
+            if (g_xray && !e->faceCenter.empty()) {
+                for (int f = 0; f < nF && (size_t)(f*3+2) < e->faceCenter.size(); f++) {
+                    float sx, sy;
+                    Vector3 w = W * Vector3(e->faceCenter[f*3], e->faceCenter[f*3+1], e->faceCenter[f*3+2]);
+                    if (!vp->ProyectarPunto(w, sx, sy)) continue;
+                    if (BoxPunto(lx0, ly0, lx1, ly1, sx - vp->x, sy - vp->y)) e->faceSel[(size_t)f] = 1;
+                }
+                e->Recolorear();
+                g_redraw = true;
+                return;
+            }
+            for (int f = 0; f < nF; f++) {
+                const std::vector<int>& id = e->faces[(size_t)f];
+                if (id.empty()) continue;
+                bool todos = true, alguno = false, cruza = false;
+                for (size_t k = 0; k < id.size(); k++) {
+                    const int a = id[k];
+                    if (a < 0 || a >= nV || !vis[(size_t)a]) { todos = false; continue; }
+                    if (BoxPunto(lx0, ly0, lx1, ly1, px[(size_t)a], py[(size_t)a])) alguno = true;
+                    else todos = false;
+                    const int b = id[(k + 1) % id.size()];
+                    if (b >= 0 && b < nV && vis[(size_t)b] &&
+                        BoxSegmento(lx0, ly0, lx1, ly1, px[(size_t)a], py[(size_t)a],
+                                    px[(size_t)b], py[(size_t)b])) cruza = true;
+                }
+                bool adentro = false;   // la caja ENTERA adentro de esta cara
+                if (tocar && !alguno && !cruza) {
+                    static std::vector<float> polX, polY;
+                    polX.clear(); polY.clear();
+                    bool okPol = true;
+                    for (size_t k = 0; k < id.size(); k++) {
+                        const int a = id[k];
+                        if (a < 0 || a >= nV || !vis[(size_t)a]) { okPol = false; break; }
+                        polX.push_back(px[(size_t)a]); polY.push_back(py[(size_t)a]);
+                    }
+                    if (okPol && polX.size() >= 3)
+                        adentro = BoxPuntoEnPoligono(&polX[0], &polY[0], (int)polX.size(),
+                                                     (float)(lx0 + lx1) * 0.5f, (float)(ly0 + ly1) * 0.5f);
+                }
+                const bool entra = tocar ? (alguno || cruza || adentro) : todos;
+                if (entra && (!filtrarOcultos || faceVis[(size_t)f])) e->faceSel[(size_t)f] = 1;
+            }
+        }
+        e->Recolorear();
+        g_redraw = true;
+        return;
+    }
+
+    // ---- OBJECT MODE ----
+    std::vector<Object*> objs;
+    BoxRecolectar(SceneCollection, objs);
+    if (!sumar) DeseleccionarTodo();
+    for (size_t i = 0; i < objs.size(); i++)
+        if (BoxObjetoEntra(vp, objs[i], lx0, ly0, lx1, ly1, tocar)) objs[i]->Seleccionar();
+    g_redraw = true;
 }
 
 // ===== modo guiado de 1 CLICK (Select Linked desde el menu; Loop Select sin elemento activo) =====

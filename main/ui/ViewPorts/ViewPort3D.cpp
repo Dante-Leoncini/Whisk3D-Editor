@@ -28,6 +28,7 @@ static bool JuegoSimActiva() { extern bool SimActiva(); return SimActiva(); }
 #include "ViewPorts/LayoutInput.h" // LayoutDeleteEdit (menu Delete en edit mode)
 #include "ViewPorts/UVEditor.h"    // roles TBR_Pincel*/TBR_Grupo (toolbar del modo Weight Paint, compartidos con el UV)
 #include "edit/WeightPaint.h"      // pincel + escritura de pesos (modo Weight Paint)
+#include "edit/BoxSelect.h"        // B: caja de seleccion (compartida con los otros editores)
 #include "edit/BoneEdit.h"         // Edit Mode de ARMATURE: ops de huesos + grab de head/tail (Fase 3)
 #include "ViewPorts/PopUp/NumPad.h" // NumPadAbrirTransform (teclado tactil sobre la barra de estado)
 #include "ViewPorts/TransformUI.h"  // UI compartida del transform (W3dFmtFloat / TextoNum / barra de info)
@@ -1223,6 +1224,21 @@ static void WP3DTrazoFin() {
     else                                  WeightPaintTrazoFin();
 }
 
+// CRUZ GUIA / CAJA del box select. Mismo ortho 2D local que el circulo del pincel: es un
+// overlay de pantalla, no geometria de la escena.
+static void BoxSelectRender3D(Viewport3D* vp) {
+    if (!BoxSelectActivo()) return;
+    if (Viewport3DActive != vp) return;   // la caja es de UN viewport (el activo)
+    namespace gfx = w3dEngine;
+    gfx::MatrixMode(gfx::Projection); gfx::LoadIdentity();
+    gfx::Ortho(0, vp->width, vp->height, 0, -1, 1);
+    gfx::MatrixMode(gfx::ModelView); gfx::LoadIdentity();
+    gfx::Disable(gfx::DepthTest); gfx::Disable(gfx::Lighting);
+    BoxSelectDibujar(vp->x, vp->y, vp->width, vp->height);
+    gfx::Enable(gfx::Texture2D); gfx::EnableArray(gfx::TexCoordArray); // restaurar para la UI
+    gfx::Invalidate();
+}
+
 // circulo del pincel siguiendo al mouse, SOLO en modo pintura y con el cursor sobre el
 // CONTENIDO del viewport (no sobre la barra/toolbar ni con un menu/popup abierto).
 static void WP3DRenderPincel(Viewport3D* vp) {
@@ -1565,6 +1581,7 @@ void Viewport3D::Render() {
     RenderUI();
     RenderSnapIndicador(); // recuadro verde en el target de snap (encima de todo)
     WP3DRenderPincel(this); // circulo del pincel (modo Weight Paint), siguiendo al mouse
+    BoxSelectRender3D(this); // cruz guia / caja de seleccion (tecla B)
     g_prof.viewport3d += W3dNowMs() - _tVp0; // profiler: cierra el tiempo de este viewport 3D
 }
 
@@ -3350,6 +3367,11 @@ void Viewport3D::event_key_down(int tecla, bool repeticion){
                 if (LShiftPressed && estado == editNavegacion && InteractionMode == EditMode && g_editMesh)
                     LayoutRecalcNormales();
                 break;
+            case W3dK_B:
+                // B: BOX SELECT. Anda en Object Mode y en Edit Mode. Arma la cruz guia y
+                // espera el arrastre (el paso 2). Ver edit/BoxSelect.h.
+                if (estado == editNavegacion) { BoxSelectArmar(); BoxSelectMover(lastMouseX, lastMouseY); }
+                break;
             case W3dK_L:
                 // L: Select Linked (la isla conectada bajo el mouse)
                 if (estado == editNavegacion && InteractionMode == EditMode && g_editMesh)
@@ -3542,6 +3564,8 @@ void Viewport3D::event_key_down(int tecla, bool repeticion){
                 break;
             // si querés, agregá más teclas aquí
             case W3dK_ESCAPE:  // Esc
+                // box select armado o en curso: lo cancela sin tocar la seleccion
+                if (BoxSelectActivo()){ BoxSelectCancelar(); break; }
                 // grab de huesos en curso: lo cancela (restaura head/tail del snapshot)
                 if (BoneGrabActivo()){ BoneGrabCancelar(); NumInputReset(); break; }
                 // loop cut en curso: lo descarta (restaura la geometria pre-corte)

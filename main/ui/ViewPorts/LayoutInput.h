@@ -65,6 +65,10 @@ void LayoutModoElegir(int modo);
 
 // true = la UI (menu/barra/panel) consumio el click; false = es de la
 // escena 3D (cada plataforma decide: pick, transform, etc.)
+// menu CONTEXTUAL del viewport 3D (click derecho): abre en (mx,my) el menu del modo actual
+// (Object / contexto de malla en Edit / Pose). Es el MISMO menu que el boton de la barra.
+void LayoutMenuContexto3D(int mx, int my);
+
 bool LayoutClickUI(int mx, int my);
 
 // click en la barra del UV editor, por ROL (BarRolUV). Publica para que el comando de test

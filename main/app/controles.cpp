@@ -1,4 +1,6 @@
 #include "ViewPorts/LayoutInput.h" // ruteo compartido (menus/barras/paneles)
+#include "edit/BoxSelect.h"
+#include "ViewPorts/Pick3D.h"
 #include "render/OpcionesRender.h"   // RenderType / g_redraw: son del editor
 #include "ViewPorts/Properties.h" // PropertiesTouchScrollFin (fin del scroll tactil de listas)
 #include "ViewPorts/ViewPort3D.h" // Viewport3DActive->Aceptar() en el transform
@@ -381,6 +383,11 @@ void InputUsuarioSDL3(SDL_Event &e){
         // loop cut en curso: el motion maneja el preview (sigue la arista) o el slide
         if (LoopCutActivo()) { LoopCutMotion(mx, my); return; }
 
+        // BOX SELECT: mientras esta armado la cruz sigue al cursor, y mientras se arrastra la
+        // caja se estira. En los dos casos se queda con el motion: si siguiera de largo, el
+        // viewport orbitaria abajo de la caja.
+        if (BoxSelectActivo()) { BoxSelectMover(mx, my); GuardarMousePos(); return; }
+
         // GESTO TACTIL DE SCROLL (1 dedo arrastrado). VA ANTES de LayoutMotionUI: sino el hover de la
         // barra consume el motion sobre un boton y el scroll SOLO andaba tocando el gap entre botones.
         // Queda LOCKEADO al viewport del down (g_barTapView) hasta levantar el dedo: NO orbita ni abre
@@ -395,7 +402,19 @@ void InputUsuarioSDL3(SDL_Event &e){
             if (g_view3dTapPending) {
                 int vdx = mx - g_tapStartX; if (vdx < 0) vdx = -vdx;
                 int vdy = my - g_tapStartY; if (vdy < 0) vdy = -vdy;
-                if (vdx + vdy > 8 * GlobalScale) g_view3dTapPending = false;
+                if (vdx + vdy > 8 * GlobalScale) {
+                    g_view3dTapPending = false;
+                    // PC: arrastrar sobre el contenido del 3D es un BOX SELECT (con el mouse ese
+                    // arrastre no hacia nada: la orbita es el boton del medio). En TACTIL no, que
+                    // ahi el arrastre de 1 dedo ES la orbita.
+                    if (e.motion.which != SDL_TOUCH_MOUSEID && !BoxSelectActivo()) {
+                        BoxSelectArmar();
+                        BoxSelectDown(g_tapStartX, g_tapStartY);
+                        BoxSelectMover(mx, my);
+                        GuardarMousePos();
+                        return;
+                    }
+                }
             }
             // ESQUINA (boton de menu): si se ARRASTRA, redimensiona el viewport (borde izq + sup). Un TAP
             // (sin pasar el umbral) NO entra aca -> al soltar abre el menu como siempre.
@@ -739,6 +758,10 @@ void InputUsuarioSDL3(SDL_Event &e){
                 g_contentTapPending = true;
                 g_barTapView = vpDown; g_tapStartX = (int)e.button.x; g_tapStartY = (int)e.button.y;
             }
+            // BOX SELECT armado (tecla B / menu Select): el click NO pickea, empieza la caja.
+            else if (BoxSelectArmado()) {
+                BoxSelectDown((int)e.button.x, (int)e.button.y);
+            }
             // la UI compartida (menu/barras/paneles) consume primero
             else if (!LayoutClickUI((int)e.button.x, (int)e.button.y)) {
                 // click sobre un viewport 3D: seleccion compartida por color picking
@@ -754,11 +777,13 @@ void InputUsuarioSDL3(SDL_Event &e){
                     g_barTapView = hoja3d; g_tapStartX = (int)e.button.x; g_tapStartY = (int)e.button.y;
                 } else {
                     viewPortActive->button_left();
+                    // PC sobre el viewport 3D: el pick tambien se DIFIERE al soltar, con el mismo
+                    // mecanismo que el tactil. Es lo que permite distinguir CLICK (pickea) de
+                    // ARRASTRE (box select): si se pickeara en el down, arrastrar deseleccionaba
+                    // todo antes de empezar la caja -- que es justo lo que pasaba.
                     if (es3Dnav) {
-                        ScenePick3D((int)e.button.x, (int)e.button.y,
-                                    hoja3d->x, hoja3d->y,
-                                    hoja3d->width, hoja3d->height,
-                                    W3dPantallaAlto);
+                        g_view3dTapPending = true;
+                        g_barTapView = hoja3d; g_tapStartX = (int)e.button.x; g_tapStartY = (int)e.button.y;
                     }
                 }
             }
@@ -777,6 +802,8 @@ void InputUsuarioSDL3(SDL_Event &e){
             GuardarMousePos();
         }
         else if (e.button.button == SDL_BUTTON_RIGHT) {
+            // el derecho CANCELA la caja de seleccion, como cancela cualquier operacion modal
+            if (BoxSelectActivo()) { BoxSelectCancelar(); GuardarMousePos(); return; }
             // transform de KEYFRAMES (timeline): mismo trato que el del 3D -> derecho CANCELA. No usa 'estado'
             // (ese es el del viewport 3D), asi que necesita su propio chequeo.
             if (DopeXformActivo()){ DopeXformCancelar(); GuardarMousePos(); return; }
@@ -816,6 +843,16 @@ void InputUsuarioSDL3(SDL_Event &e){
                     uvDer->lastMx = (int)e.button.x; uvDer->lastMy = (int)e.button.y;
                     uvDer->button_right(); g_redraw = true; GuardarMousePos(); return;
                 }
+                // VIEWPORT 3D: el derecho abre el MENU CONTEXTUAL en el mouse (Object / el de la
+                // malla en Edit / Pose). Solo sobre el contenido y sin transform en curso (con
+                // transform el derecho ya cancelo, mas arriba).
+                if (vpDer && vpDer->isLeaf() && vpDer->ViewportKind() == 1 &&
+                    !vpDer->OnBar((int)e.button.x, (int)e.button.y) &&
+                    !vpDer->OnToolbar((int)e.button.x, (int)e.button.y) &&
+                    !vpDer->OnBrushBar((int)e.button.x, (int)e.button.y)) {
+                    LayoutMenuContexto3D((int)e.button.x, (int)e.button.y);
+                    GuardarMousePos(); return;
+                }
             }
         }
     }
@@ -831,6 +868,16 @@ void InputUsuarioSDL3(SDL_Event &e){
         }
         if (e.button.button == SDL_BUTTON_LEFT) {
             leftMouseDown = false;
+            // BOX SELECT: soltar cierra la caja y selecciona. Shift SUMA a lo que ya estaba
+            // (misma regla que el pick de siempre). Consume el up: no hay pick ni orbita.
+            if (BoxSelectArrastrando()) {
+                int bx0, by0, bx1, by1; bool tocar = false;
+                if (BoxSelectSoltar(bx0, by0, bx1, by1, tocar))
+                    BoxSelectAplicar3D(bx0, by0, bx1, by1, tocar, LShiftPressed);
+                ViewPortClickDown = false;
+                GuardarMousePos();
+                return;
+            }
             g_cornerVp = NULL; g_cornerResizing = false; // fin del gesto de esquina
             // DRAG-SCROLL de menu largo: el soltar resuelve (drag=solo scrolleo; tap=selecciona el item). Consume el up.
             // OJO: consume el up SIN pasar por mouse_button_up del viewport (quien normalmente apaga

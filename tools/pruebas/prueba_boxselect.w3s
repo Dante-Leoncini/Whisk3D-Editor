@@ -1,0 +1,27 @@
+# ==========================================================================
+#  BOX SELECT (tecla B / menu Select > Box Select)
+#  Correr DESDE ESTA CARPETA:
+#    cd <motor>/tools/pruebas
+#    ../../platform/linux/build/whisk3d --script prueba_boxselect.w3s
+#
+#  Verifica las DOS reglas sobre geometria REAL (el cubo de la escena, proyectado
+#  con la camara del viewport), en los tres tipos de elemento:
+#
+#    VERDE (se arrastra de IZQUIERDA a DERECHA): entra solo lo que queda ENTERO
+#      adentro. Un pixel afuera y no entra.
+#    AZUL  (de DERECHA a IZQUIERDA): alcanza con ROZAR.
+#
+#  Casos:
+#    * objeto envuelto entero + verde  -> entra
+#    * objeto cortado al medio + verde -> NO entra
+#    * el mismo corte + azul           -> entra (lo roza)
+#    * vertice: una caja chica sobre uno -> ese y solo ese (ahi verde y azul dan
+#      lo mismo: un punto esta o no esta)
+#    * arista por el MEDIO, sin tocar sus puntas: verde 0 / azul 1. Es el caso
+#      que pidio el dueno: "la esquina del box toca el centro de un borde y ya
+#      alcanza para seleccionarlo".
+#
+#  Todo por el MISMO camino que el mouse (BoxSelectArmar/Down/Mover/Soltar +
+#  BoxSelectAplicar3D), no por una via de test aparte.
+# ==========================================================================
+boxtest
