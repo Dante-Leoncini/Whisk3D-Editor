@@ -722,7 +722,7 @@ static int W3dFilaDe(Object* objetivo) {
     return -1;
 }
 
-// NUMPAD "." = centrar la SELECCION en la vista (el analogo del Frame Selected de Blender,
+// NUMPAD "." = centrar la SELECCION en la vista,
 // por diseno). Scrollea PosY para que la fila objetivo quede en el MEDIO del area de
 // contenido. Con varios seleccionados se centra el PROMEDIO de sus filas VISIBLES (un objeto
 // dentro de un padre plegado no tiene fila: no aporta); sin seleccion visible cae al objeto

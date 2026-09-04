@@ -663,8 +663,8 @@ static void MainLoopFrame() {
 
     SDL_Event e;
 #ifndef __EMSCRIPTEN__
-    // REPOSO: si no hay animacion NI nada pendiente para redibujar, BLOQUEAR esperando el 1er evento (0% CPU, como
-    // Blender). Esto reemplaza el busy-spin (que corria todo esto en loop cerrado). En emscripten NO se bloquea (el
+    // REPOSO: si no hay animacion NI nada pendiente para redibujar, BLOQUEAR esperando el 1er evento
+    // Esto reemplaza el busy-spin (que corria todo esto en loop cerrado). En emscripten NO se bloquea (el
     // requestAnimationFrame del browser no se puede frenar). El paceo cuando SI animamos lo hace el while de abajo.
     { extern bool W3dParticulasAnimando();
       // las particulas solo mantienen vivo el loop si su tick CORRE (mismas reglas de

@@ -1346,7 +1346,7 @@ void Timeline::Render(){
             int ry0 = stripY + (int)r*rowH + PosY;   // las filas arrancan DEBAJO de los numeros
             if (ry0 + rowH < stripY || ry0 > height) continue;      // fuera de vista
             float ry = (float)ry0 + rowH*0.5f;
-            // fondo de la fila del SUMMARY (mas oscuro, como Blender) para separarlo
+            // fondo de la fila del SUMMARY (mas oscuro) para separarlo
             if (dopeRows[r].tipo == 0){ gfx::Color4f(0.10f,0.10f,0.10f,1.0f); FillRect(panelW, ry0, width-panelW, rowH); }
             // fila SELECCIONADA: el renglon se extiende por TODO el timeline (asi se ve que keyframes abarca)
             if (g_dopeRowSel.count(dopeRows[r].claveFila)){

@@ -22,6 +22,7 @@
 #include "ViewPorts/PopUp/FalloffEditor.h" // test 'falloff': el popup reutilizable de la curva
 #include "ViewPorts/Pick3D.h"              // test 'boxtest': BoxSelectAplicar3D
 #include "edit/BoxSelect.h"                // test 'boxtest': la caja de seleccion
+#include "edit/PolyMesh.h"                 // test 'booltest': contar los poligonos del stack
 #include "ViewPorts/Timeline.h"
 #include "WhiskUI/Propieties/GroupPropertie.h" // icontest: la tarjeta "Keyframe" y su icono
 #include "WhiskUI/Propieties/PropList.h"       // arm2drango: la LISTA de armatures 2D del panel (modo 10)
@@ -6376,6 +6377,12 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         if (!ObjActivo) { err = "no hay objeto activo"; return false; }
         float x=0,y=0,z=0; ss>>x>>y>>z; ObjActivo->pos = Vector3(x,y,z); return true;
     }
+    // ---- objscale <x> <y> <z> : escala del objeto activo (los Mirror/Boolean con target se enteran) ----
+    if (cmd == "objscale") {
+        if (!ObjActivo) { err = "no hay objeto activo"; return false; }
+        float x=1,y=1,z=1; ss>>x>>y>>z; ObjActivo->scale = Vector3(x,y,z);
+        { extern bool g_objetosMovidos; g_objetosMovidos = true; } return true;
+    }
 
     // ---- mode <object|edit> ----
     if (cmd == "mode") {
@@ -6384,6 +6391,8 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
             if (InteractionMode != EditMode) LayoutToggleEditMode();
             if (InteractionMode != EditMode) { err = "no se pudo entrar a Edit Mode (hay una malla activa?)"; return false; }
         } else if (md == "object") {
+            // desde un modo de pintura se vuelve por la MISMA puerta que el menu Mode
+            if (InteractionMode == WeightPaint || InteractionMode == VertexPaint || InteractionMode == TexturePaint) LayoutModoElegir(ObjectMode);
             if (InteractionMode == EditMode) LayoutToggleEditMode();
             if (InteractionMode == EditMode) { err = "no se pudo salir de Edit Mode"; return false; }
         } else if (md == "weight" || md == "pesos") {
@@ -6574,6 +6583,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         Mesh* m = ScriptActiveMesh(); if(!m){err="no hay malla activa";return false;}
         m->EnsureEdit(); if(!m->edit){err="sin edit mesh";return false;}
         int eg=0, cuts=1; float factor=0.0f; ss>>eg>>cuts>>factor;
+        UndoCapturarMallaGeo(m);   // como el modal real: un paso de undo PRE-corte
         bool ok = m->LoopCutEdit(eg, cuts, factor);
         printf("      [loopcut] edge=%d cuts=%d factor=%.2f -> %s\n", eg, cuts, factor, ok?"ok":"no-op");
         return true;
@@ -24068,6 +24078,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
     //      el undo por trazo. ----
     if (cmd == "vcolor") {
         bool ok = true;
+        const bool pvPrev = BrushGet().porVertice; BrushGet().porVertice = false;   // este test mide el pincel POR CORNER
         struct VP {   // proyector sintetico: cada render-vert en su columna
             Mesh* m;
             static bool Proy(void* ctx, int i, float& sx, float& sy) {
@@ -24242,11 +24253,1149 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
             if (!todosIguales || !huboCambio) ok = false;
         }
 
+        BrushGet().porVertice = pvPrev;
         UndoLimpiar();
         if (!ok) { err = "vcolor: ver los MAL de arriba"; return false; }
         return true;
     }
 
+    // ---- booltest : el modificador BOOLEAN (no destructivo). Dos cubos que se solapan a medias;
+    //      se asierta sobre la MALLA GENERADA (la que se ve), para las 3 operaciones:
+    //        * la caja envolvente: union = la de los dos; difference = la de A menos el pedazo
+    //          comido; intersect = solo el solape
+    //        * CERRADA: cada arista compartida por exactamente 2 caras (sino hay agujeros)
+    //        * poligonos: hay quads que sobrevivieron (no se triangulo todo)
+    //      y el CACHE: sin tocar nada no se regenera; mover el target si; editar el target si. ----
+    if (cmd == "booltest") {
+        bool ok = true;
+        Object* oa = NewMesh(MeshType(MeshType::cube), NULL, false);
+        Object* ob = NewMesh(MeshType(MeshType::cube), NULL, false);
+        if (!oa || !ob) { err = "booltest: NewMesh fallo"; return false; }
+        Mesh* A = (Mesh*)oa; Mesh* B = (Mesh*)ob;
+        A->GenerarRender(); B->GenerarRender();
+        // B corrido +1 en X: se solapa con la mitad derecha de A (cubo de 2 de lado centrado)
+        B->pos.x = 1.0f; { extern bool g_objetosMovidos; g_objetosMovidos = true; }
+        DeseleccionarTodo(); oa->Seleccionar(); ObjActivo = A;
+        UndoModAgregar(A, ModifierType::Boolean);
+        Modifier* md = A->modificadores.back();
+        md->target = B;
+
+        struct BT {
+            // caja envolvente + cerrada + cuantos quads, de la malla GENERADA
+            static void Medir(Mesh* m, float& x0, float& x1, int& quads, int& abiertas) {
+                x0 = 1e9f; x1 = -1e9f; quads = 0; abiertas = 0;
+                if (!m->genValido || !m->genVertex) return;
+                for (int i = 0; i < m->genVertexSize; i++) { float x = m->genVertex[i*3]; if (x < x0) x0 = x; if (x > x1) x1 = x; }
+                // las caras se hornean como poligonos en el Apply, pero la GEN es triangulos de render:
+                // los quads se cuentan con el mismo pipeline que el Apply (PolyMesh del stack)
+                std::map<std::pair<int,int>, int> aristas;   // por POSICION cuantizada: cuantas caras la usan
+                std::map<std::string,int> pos;
+                std::vector<int> rv((size_t)m->genVertexSize, 0);
+                for (int i = 0; i < m->genVertexSize; i++) {
+                    int q[3] = { (int)floorf(m->genVertex[i*3]*1000.0f+0.5f), (int)floorf(m->genVertex[i*3+1]*1000.0f+0.5f), (int)floorf(m->genVertex[i*3+2]*1000.0f+0.5f) };
+                    std::string k((const char*)q, sizeof(q));
+                    std::map<std::string,int>::iterator it = pos.find(k);
+                    if (it == pos.end()) { rv[(size_t)i] = (int)pos.size(); pos[k] = rv[(size_t)i]; } else rv[(size_t)i] = it->second;
+                }
+                for (int t = 0; t + 2 < m->genFacesSize; t += 3) {
+                    int a = rv[(size_t)m->genFaces[t]], b = rv[(size_t)m->genFaces[t+1]], c = rv[(size_t)m->genFaces[t+2]];
+                    int e[3][2] = { {a,b}, {b,c}, {c,a} };
+                    for (int k = 0; k < 3; k++) { int p = e[k][0], q = e[k][1]; if (p == q) continue;
+                        std::pair<int,int> key = (p < q) ? std::make_pair(p,q) : std::make_pair(q,p);
+                        aristas[key]++; }
+                }
+                // en una malla de triangulos cerrada, las aristas del BORDE de los triangulos internas a un
+                // quad aparecen 2 veces (las diagonales tambien): solo una arista con 1 uso es un agujero
+                std::vector<Vector3> P((size_t)pos.size());
+                for (int i = 0; i < m->genVertexSize; i++) P[(size_t)rv[(size_t)i]] = Vector3(m->genVertex[i*3], m->genVertex[i*3+1], m->genVertex[i*3+2]);
+                // aristas con UN solo uso: candidatas a agujero...
+                std::vector<std::pair<Vector3,Vector3> > sueltas;
+                for (std::map<std::pair<int,int>,int>::iterator it = aristas.begin(); it != aristas.end(); ++it)
+                    if (it->second == 1) sueltas.push_back(std::make_pair(P[(size_t)it->first.first], P[(size_t)it->first.second]));
+                // ...salvo que sean una T-JUNCTION: el BSP parte la arista de la costura coplanar de UN
+                // lado (-1..0 y 0..1) y no del otro (-1..1). Es la misma linea cubierta dos veces, no un
+                // agujero. Una suelta cuya punto medio cae SOBRE otra suelta colineal esta tapada.
+                struct TJ { static bool SobreSegmento(const Vector3& q, const Vector3& a, const Vector3& b) {
+                    Vector3 ab = b - a; const float L2 = ab.LengthSq(); if (L2 < 1e-12f) return false;
+                    const float t = (q - a).Dot(ab) / L2; if (t < -1e-3f || t > 1.0f + 1e-3f) return false;
+                    return ((a + ab * t) - q).Length() < 1e-3f; } };
+                for (size_t i = 0; i < sueltas.size(); i++) {
+                    const Vector3 mid = (sueltas[i].first + sueltas[i].second) * 0.5f;
+                    bool tapada = false;
+                    for (size_t j = 0; j < sueltas.size() && !tapada; j++) {
+                        if (i == j) continue;
+                        // la otra cubre a esta (esta es la mitad) o esta cubre a la otra (esta es la larga)
+                        const Vector3 midJ = (sueltas[j].first + sueltas[j].second) * 0.5f;
+                        if (TJ::SobreSegmento(mid, sueltas[j].first, sueltas[j].second) ||
+                            TJ::SobreSegmento(midJ, sueltas[i].first, sueltas[i].second)) tapada = true;
+                    }
+                    if (!tapada) {
+                        if (abiertas < 4) printf("         AGUJERO: (%.2f,%.2f,%.2f)-(%.2f,%.2f,%.2f)\n",
+                            sueltas[i].first.x, sueltas[i].first.y, sueltas[i].first.z, sueltas[i].second.x, sueltas[i].second.y, sueltas[i].second.z);
+                        abiertas++;
+                    }
+                }
+                (void)quads;
+            }
+        };
+        const char* nombres[3] = { "intersect", "union", "difference" };
+        // caja esperada en X: A = [-1,1], B = [0,2]
+        const float espX0[3] = { 0.0f, -1.0f, -1.0f };
+        const float espX1[3] = { 1.0f,  2.0f,  0.0f };
+        for (int op = 0; op < 3; op++) {
+            md->boolOp = op;
+            A->GenerarMallaModificada();
+            float x0, x1; int quads, abiertas;
+            BT::Medir(A, x0, x1, quads, abiertas);
+            const bool caja = A->genValido && fabsf(x0 - espX0[op]) < 1e-3f && fabsf(x1 - espX1[op]) < 1e-3f;
+            const bool cerrada = (abiertas == 0);
+            printf("      [booltest] %-10s caja X=[%.2f, %.2f] (esp [%.0f, %.0f]) %s | sin agujeros (%d) %s | caras=%d\n",
+                   nombres[op], x0, x1, espX0[op], espX1[op], caja?"OK":"MAL", abiertas, cerrada?"OK":"MAL", A->genFacesSize/3);
+            if (!caja || !cerrada) ok = false;
+        }
+        // POLIGONOS: el Apply baja el stack a faces3d. Se mide con el mismo pipeline (sin aplicar):
+        // en la DIFERENCIA la cara izquierda de A (x=-1) no la toca ningun plano de B -> sigue quad.
+        {
+            md->boolOp = 2;
+            PolyMesh W; bool sm = false;
+            extern bool Mesh_AplicarStackPublico(Mesh*, PolyMesh&, bool&);
+            int quads = 0, ngons = 0, tris = 0;
+            if (Mesh_AplicarStackPublico(A, W, sm))
+                for (size_t f = 0; f < W.F.size(); f++) { size_t n = W.F[f].size(); if (n == 3) tris++; else if (n == 4) quads++; else ngons++; }
+            printf("      [booltest] poligonos de la diferencia: quads=%d ngons=%d tris=%d (esp quads>=1: la cara que ningun plano corta sigue quad) -> %s\n",
+                   quads, ngons, tris, (quads >= 1)?"OK":"MAL");
+            if (quads < 1) ok = false;
+        }
+        // EL CASO DEL DUENO: un prisma angosto y alto atraviesa el cubo -> la tapa y el fondo quedan
+        // con agujero (si o si hay que cortarlas), pero las 4 PAREDES no las toca nada y tienen que
+        // salir INTACTAS: quads, sin un solo vertice de mas. Es lo que rompia el BSP con planos
+        // infinitos (el lado del prisma partia las paredes que ni tocaba).
+        {
+            B->pos = Vector3(0.0f, 0.0f, 0.0f); B->scale = Vector3(0.5f, 2.0f, 0.5f);
+            { extern bool g_objetosMovidos; g_objetosMovidos = true; }
+            md->boolOp = 2;
+            PolyMesh W; bool sm = false;
+            extern bool Mesh_AplicarStackPublico(Mesh*, PolyMesh&, bool&);
+            int paredesIntactas = 0, total = 0;
+            if (Mesh_AplicarStackPublico(A, W, sm)) {
+                total = (int)W.F.size();
+                // una pared intacta = un quad cuyos 4 vertices son ESQUINAS del cubo (|x|=|y|=|z|=1)
+                for (size_t f = 0; f < W.F.size(); f++) {
+                    if (W.F[f].size() != 4) continue;
+                    bool esquinas = true;
+                    for (size_t k = 0; k < 4; k++) { const Vector3& q = W.P[(size_t)W.F[f][k]];
+                        if (fabsf(fabsf(q.x) - 1.0f) > 1e-4f || fabsf(fabsf(q.y) - 1.0f) > 1e-4f || fabsf(fabsf(q.z) - 1.0f) > 1e-4f) esquinas = false; }
+                    if (esquinas) paredesIntactas++;
+                }
+            }
+            // ...y la TAPA (y=1) tiene que ser UN solo ngon con ojo de cerradura: los 4 vertices
+            // originales en el borde + los 4 del prisma adentro, unidos por un corte de ancho cero
+            // (el puente aparece dos veces). Ni vertices nuevos sobre el borde, ni abanico.
+            // la tapa (y=1) queda en DOS poligonos simples: la "U" (4 esquinas + 4 del prisma = 8) y el
+            // "cuadrado" (2 esquinas + 2 del prisma); ninguna cara repite un vertice
+            int tapas = 0, tapaU = 0, tapaQuad = 0, repetidos = 0;
+            for (size_t f = 0; f < W.F.size(); f++) {
+                bool enTapa = true;
+                for (size_t k = 0; k < W.F[f].size() && enTapa; k++) if (fabsf(W.P[(size_t)W.F[f][k]].y - 1.0f) > 1e-4f) enTapa = false;
+                if (!enTapa) continue;
+                tapas++;
+                if (W.F[f].size() == 8) tapaU++; else if (W.F[f].size() == 4) tapaQuad++;
+                for (size_t k = 0; k < W.F[f].size(); k++) for (size_t k2 = k + 1; k2 < W.F[f].size(); k2++) if (W.F[f][k] == W.F[f][k2]) repetidos++;
+            }
+            // triangulacion: cada cara triangulada tiene que cubrir EXACTAMENTE su area, con todos los
+            // triangulos del mismo lado (un abanico cruzado o una oreja mal recortada se nota aca)
+            int trisMal = 0;
+            { std::vector<float> pos; for (size_t i = 0; i < W.P.size(); i++) { pos.push_back(W.P[i].x); pos.push_back(W.P[i].y); pos.push_back(W.P[i].z); }
+              for (size_t f = 0; f < W.F.size(); f++) {
+                const std::vector<int>& id = W.F[f]; const int nn = (int)id.size(); if (nn < 3) continue;
+                Vector3 nrm(0, 0, 0), av(0, 0, 0);
+                for (int i = 0; i < nn; i++) { const Vector3& p0 = W.P[(size_t)id[i]]; const Vector3& p1 = W.P[(size_t)id[(i + 1) % nn]];
+                    nrm.x += (p0.y - p1.y) * (p0.z + p1.z); nrm.y += (p0.z - p1.z) * (p0.x + p1.x); nrm.z += (p0.x - p1.x) * (p0.y + p1.y);
+                    av += Vector3::Cross(p0, p1); }
+                if (nrm.Length() < 1e-9f) continue;
+                nrm = nrm.Normalized();
+                const float areaPoly = 0.5f * av.Dot(nrm);
+                std::vector<MeshIndex> tri; W3dTriangularCara(&pos[0], id, tri);
+                float areaTris = 0.0f; bool negativo = false;
+                for (size_t t = 0; t + 2 < tri.size(); t += 3) {
+                    const Vector3& p0 = W.P[tri[t]]; const Vector3& p1 = W.P[tri[t + 1]]; const Vector3& p2 = W.P[tri[t + 2]];
+                    const float at = 0.5f * Vector3::Cross(p1 - p0, p2 - p0).Dot(nrm);
+                    if (at < -1e-5f) negativo = true;
+                    areaTris += at; }
+                if (negativo || fabsf(areaTris - areaPoly) > 1e-3f * (areaPoly > 1.0f ? areaPoly : 1.0f)) {
+                    trisMal++; printf("         TRIANGULACION MAL: cara %d (%d corners) area poly %.4f tris %.4f%s\n", (int)f, nn, areaPoly, areaTris, negativo ? " (triangulo dado vuelta)" : ""); }
+              } }
+            const bool ojoOk = (tapas == 2) && (tapaU == 1) && (tapaQuad == 1) && (repetidos == 0) && (trisMal == 0);
+            printf("      [booltest] prisma a traves de la tapa: quads intactos=%d (esp 4: las paredes) de %d caras -> %s | tapa: %d caras (U de 8: %d, quad: %d, vertices repetidos: %d; esp 2/1/1/0) | triangulacion mal: %d -> %s\n",
+                   paredesIntactas, total, (paredesIntactas >= 4) ? "OK" : "MAL", tapas, tapaU, tapaQuad, repetidos, trisMal, ojoOk ? "OK" : "MAL");
+            if (paredesIntactas < 4 || !ojoOk) ok = false;
+            B->scale = Vector3(1.0f, 1.0f, 1.0f); B->pos = Vector3(1.0f, 0.0f, 0.0f);
+            { extern bool g_objetosMovidos; g_objetosMovidos = true; }
+        }
+
+        // CACHE: regenerar cuesta; sin cambios NO tiene que pasar. Se mide con el contador de diagnostico.
+        {
+            extern long g_genMallaCount;
+            A->GenerarMallaModificada();
+            // un frame de descarga: el setup dejo prendidos g_objetosMovidos/g_mallasEditadas (y el
+            // primer frame inicializa el cambio de modo). Lo que se mide es el REPOSO de despues.
+            ActualizarEditMeshActivo();
+            const long antes = g_genMallaCount;
+            ActualizarEditMeshActivo(); ActualizarEditMeshActivo();      // dos "frames" sin tocar nada
+            const bool quieto = (g_genMallaCount == antes);
+            B->pos.x = 1.5f; { extern bool g_objetosMovidos; g_objetosMovidos = true; }
+            ActualizarEditMeshActivo();                                   // el target se movio
+            const bool porMover = (g_genMallaCount > antes);
+            const long antes2 = g_genMallaCount;
+            B->vertex[0] += 0.01f; B->RefrescarRender();                  // el target se EDITO (sube geoVersion)
+            ActualizarEditMeshActivo();
+            const bool porEditar = (g_genMallaCount > antes2);
+            printf("      [booltest] cache: sin cambios no regenera=%s | mover el target regenera=%s | editar el target regenera=%s\n",
+                   quieto?"OK":"MAL", porMover?"OK":"MAL", porEditar?"OK":"MAL");
+            if (!quieto || !porMover || !porEditar) ok = false;
+        }
+        // EDIT MODE y APPLY (lo que vio el dueno: "la boolean no se veia en modo edicion" y "al aplicar
+        // quedo mal"). Escena fresca por comandos del harness: cubo menos prisma (0.5, 2, 0.5).
+        {
+            const int n0 = SceneCollection ? (int)SceneCollection->Childrens.size() : 0;
+            std::string e2; char cmdb[64]; bool armado = true;
+            if (!W3dRunCommand("add cube", e2)) armado = false;
+            if (!W3dRunCommand("add cube", e2)) armado = false;
+            sprintf(cmdb, "active %d", n0 + 1);      if (armado && !W3dRunCommand(cmdb, e2)) armado = false;
+            if (armado && !W3dRunCommand("objscale 0.5 2 0.5", e2)) armado = false;
+            sprintf(cmdb, "active %d", n0);          if (armado && !W3dRunCommand(cmdb, e2)) armado = false;
+            if (armado && !W3dRunCommand("modadd boolean", e2)) armado = false;
+            sprintf(cmdb, "modtarget %d", n0 + 1);   if (armado && !W3dRunCommand(cmdb, e2)) armado = false;
+            Mesh* A2 = armado ? ScriptActiveMesh() : NULL;
+            if (!A2) { printf("      [booltest] edit/apply: no se pudo armar la escena (%s) -> MAL\n", e2.c_str()); ok = false; }
+            else {
+                // 32 triangulos: 4 paredes (8) + tapa U(8 corners)=6 + quad=2, fondo idem (8), 4 paredes del agujero (8)
+                const int espTris = 32;
+                const int trisObj = A2->genValido ? A2->genFacesSize / 3 : -1;
+                bool editOk = false; int trisEdit = -1;
+                if (W3dRunCommand("mode edit", e2)) { trisEdit = A2->genValido ? A2->genFacesSize / 3 : -1; editOk = (trisEdit == espTris); W3dRunCommand("mode object", e2); }
+                printf("      [booltest] preview: objeto=%d tris, edit mode=%d tris (esp %d los dos) -> %s\n", trisObj, trisEdit, espTris, (trisObj == espTris && editOk) ? "OK" : "MAL");
+                if (trisObj != espTris || !editOk) ok = false;
+                // APPLY: faces3d tiene que quedar con la tapa en U + quad, sin tapa del agujero, sin vertices
+                // repetidos, y el index buffer del render con 32 triangulos que cubren exactamente cada cara
+                if (!W3dRunCommand("modapply", e2)) { printf("      [booltest] apply fallo: %s -> MAL\n", e2.c_str()); ok = false; }
+                else {
+                    int tapas = 0, U = 0, quads = 0, lids = 0, rep = 0, triMal = 0;
+                    for (size_t f = 0; f < A2->faces3d.size(); f++) {
+                        const std::vector<int>& id = A2->faces3d[f].idx; const int nn = (int)id.size(); if (nn < 3) continue;
+                        bool enTapa = true, chica = true;
+                        for (int k = 0; k < nn; k++) { const float* q = A2->vertex + id[k] * 3;
+                            if (fabsf(q[1] - 1.0f) > 1e-4f) enTapa = false;
+                            if (fabsf(q[0]) > 0.6f || fabsf(q[2]) > 0.6f) chica = false; }
+                        for (int k = 0; k < nn; k++) for (int k2 = k + 1; k2 < nn; k2++) if (id[k] == id[k2]) rep++;
+                        if (enTapa) { tapas++; if (nn == 8) U++; else if (nn == 4 && chica) lids++; else if (nn == 4) quads++; }
+                        // triangulacion de ESTA cara (la misma que arma el index buffer)
+                        Vector3 nrm(0, 0, 0), av(0, 0, 0);
+                        for (int i = 0; i < nn; i++) { const float* a = A2->vertex + id[i] * 3; const float* b = A2->vertex + id[(i + 1) % nn] * 3;
+                            Vector3 p0(a[0], a[1], a[2]), p1(b[0], b[1], b[2]);
+                            nrm.x += (p0.y - p1.y) * (p0.z + p1.z); nrm.y += (p0.z - p1.z) * (p0.x + p1.x); nrm.z += (p0.x - p1.x) * (p0.y + p1.y);
+                            av += Vector3::Cross(p0, p1); }
+                        if (nrm.Length() < 1e-9f) continue;
+                        nrm = nrm.Normalized();
+                        const float areaPoly = 0.5f * av.Dot(nrm);
+                        std::vector<MeshIndex> tri; W3dTriangularCara(A2->vertex, id, tri);
+                        float areaTris = 0.0f; bool neg = false;
+                        for (size_t t = 0; t + 2 < tri.size(); t += 3) {
+                            const float* a = A2->vertex + tri[t] * 3; const float* b = A2->vertex + tri[t + 1] * 3; const float* c = A2->vertex + tri[t + 2] * 3;
+                            Vector3 p0(a[0], a[1], a[2]), p1(b[0], b[1], b[2]), p2(c[0], c[1], c[2]);
+                            const float at = 0.5f * Vector3::Cross(p1 - p0, p2 - p0).Dot(nrm);
+                            if (at < -1e-5f) neg = true; areaTris += at; }
+                        if (neg || fabsf(areaTris - areaPoly) > 1e-3f * (areaPoly > 1.0f ? areaPoly : 1.0f)) {
+                            triMal++; printf("         APPLY TRIANGULACION MAL: cara %d (%d corners) area poly %.4f tris %.4f%s\n", (int)f, nn, areaPoly, areaTris, neg ? " (dado vuelta)" : ""); }
+                    }
+                    const int trisBuf = A2->facesSize / 3;
+                    const bool applyOk = (tapas == 2) && (U == 1) && (quads == 1) && (lids == 0) && (rep == 0) && (triMal == 0) && (trisBuf == espTris);
+                    printf("      [booltest] apply: caras=%d | tapa: %d caras (U de 8: %d, quad: %d, tapa del agujero: %d, repetidos: %d; esp 2/1/1/0/0) | triangulacion mal: %d | index buffer %d tris (esp %d) -> %s\n",
+                           (int)A2->faces3d.size(), tapas, U, quads, lids, rep, triMal, trisBuf, espTris, applyOk ? "OK" : "MAL");
+                    if (!applyOk) ok = false;
+                }
+            }
+        }
+        UndoLimpiar();
+        if (!ok) { err = "booltest: ver los MAL de arriba"; return false; }
+        return true;
+    }
+
+    // ---- connectpath : Connect Vertex Path (J) sobre los 2 vertices seleccionados de la malla activa ----
+    if (cmd == "connectpath") {
+        Mesh* m = ScriptActiveMesh(); if (!m) { err = "no hay malla activa"; return false; }
+        std::string msg; const bool okc = ConectarVerticesEdit(m, NULL, NULL, msg);   // vista frontal (x,y)
+        printf("      [connectpath] %s -> %s\n", msg.c_str(), okc ? "OK" : "nada");
+        if (!okc) { err = "connectpath: " + msg; return false; }
+        return true;
+    }
+    // ---- connecttest : Connect Vertex Path (J) de punta a punta ----
+    if (cmd == "connecttest") {
+        bool ok = true; std::string e2, msg;
+        // helper local: vertice editable mas cercano a (x,y,z)
+        struct CT { static int Cercano(EditMesh* e, float x, float y, float z) { int mejor = -1; float md = 1e30f;
+            for (int k = 0; k < e->NumVerts(); k++) { float dx = e->pos[(size_t)k*3]-x, dy = e->pos[(size_t)k*3+1]-y, dz = e->pos[(size_t)k*3+2]-z; float d = dx*dx+dy*dy+dz*dz; if (d < md) { md = d; mejor = k; } }
+            return mejor; }
+            static int Lados(Mesh* m, int n) { int c = 0; for (size_t f = 0; f < m->faces3d.size(); f++) if ((int)m->faces3d[f].idx.size() == n) c++; return c; }
+            static bool Sana(Mesh* m) { for (size_t f = 0; f < m->faces3d.size(); f++) { const std::vector<int>& id = m->faces3d[f].idx; if (id.size() < 3) return false;
+                for (size_t i = 0; i < id.size(); i++) for (size_t j = i + 1; j < id.size(); j++) if (id[i] == id[j]) return false; } return true; } };
+        // (1) CUBO: diagonal de la tapa -> el quad queda en 2 triangulos; 7 caras
+        if (!W3dRunCommand("add cube", e2)) { err = "connecttest: " + e2; return false; }
+        // el cubo nuevo se llama Cubo.001 si la escena ya trae un Cubo, o Cubo si no
+        if (!W3dRunCommand("selobj Cubo.001", e2) && !W3dRunCommand("selobj Cubo", e2)) { err = "connecttest: no encuentro el cubo"; return false; }
+        if (!W3dRunCommand("mode edit", e2)) { err = "connecttest: " + e2; return false; }
+        W3dRunCommand("selmode vert", e2);
+        Mesh* m = ScriptActiveMesh(); if (m) m->EnsureEdit();
+        if (!m || !m->edit) { err = "connecttest: sin malla en edit"; return false; }
+        EditMesh* e = m->edit;
+        { int a = CT::Cercano(e, -1, 1, -1), b = CT::Cercano(e, 1, 1, 1);
+          e->TogglearVert(a, true); e->TogglearVert(b, false);
+          const bool r = ConectarVerticesEdit(m, NULL, NULL, msg); e = m->edit;
+          const bool bien = r && m->faces3d.size() == 7 && CT::Lados(m, 3) == 2 && CT::Lados(m, 4) == 5 && CT::Sana(m);
+          printf("      [connecttest] quad en diagonal: %s -> caras=%d (tris=%d quads=%d; esp 7: 2 tris + 5 quads) -> %s\n", msg.c_str(), (int)m->faces3d.size(), CT::Lados(m, 3), CT::Lados(m, 4), bien ? "OK" : "MAL");
+          if (!bien) ok = false; }
+        // (2) ya unidos por una arista -> no hace nada
+        { int a = CT::Cercano(e, -1, 1, -1), b = CT::Cercano(e, 1, 1, -1);
+          e->TogglearVert(a, true); e->TogglearVert(b, false);
+          const size_t antes = m->faces3d.size();
+          const bool r = ConectarVerticesEdit(m, NULL, NULL, msg); e = m->edit;
+          const bool bien = !r && m->faces3d.size() == antes;
+          printf("      [connecttest] ya conectados: '%s' (esp no hace nada) -> %s\n", msg.c_str(), bien ? "OK" : "MAL");
+          if (!bien) ok = false; }
+        // (3) esquinas OPUESTAS del cubo: camino por la superficie = una diagonal + una arista -> 1 corte mas
+        { int a = CT::Cercano(e, -1, -1, 1), b = CT::Cercano(e, 1, 1, -1);
+          e->TogglearVert(a, true); e->TogglearVert(b, false);
+          const size_t antes = m->faces3d.size();
+          const bool r = ConectarVerticesEdit(m, NULL, NULL, msg); e = m->edit;
+          const bool bien = r && m->faces3d.size() == antes + 1 && CT::Sana(m);
+          printf("      [connecttest] esquinas opuestas del cubo: %s -> caras %d -> %d (esp +1) -> %s\n", msg.c_str(), (int)antes, (int)m->faces3d.size(), bien ? "OK" : "MAL");
+          if (!bien) ok = false; }
+        W3dRunCommand("mode object", e2);
+        // (4) CILINDRO: dos vertices opuestos de la tapa -> el 8-gon queda en 2 pentagonos
+        if (!W3dRunCommand("add cylinder", e2)) { err = "connecttest: " + e2; return false; }
+        if (!W3dRunCommand("selobj Cilindro.001", e2) && !W3dRunCommand("selobj Cilindro", e2)) { err = "connecttest: no encuentro el cilindro"; return false; }
+        if (!W3dRunCommand("mode edit", e2)) { err = "connecttest: " + e2; return false; }
+        W3dRunCommand("selmode vert", e2);
+        m = ScriptActiveMesh(); if (m) m->EnsureEdit();
+        if (!m || !m->edit) { err = "connecttest: sin cilindro en edit"; return false; }
+        e = m->edit;
+        float ymax = -1e30f, ymin = 1e30f, rmax = 0.0f;
+        for (int k = 0; k < e->NumVerts(); k++) { const float y = e->pos[(size_t)k*3+1]; if (y > ymax) ymax = y; if (y < ymin) ymin = y;
+            const float r2 = e->pos[(size_t)k*3]*e->pos[(size_t)k*3] + e->pos[(size_t)k*3+2]*e->pos[(size_t)k*3+2]; if (r2 > rmax) rmax = r2; }
+        const float R = sqrtf(rmax);
+        { int a = CT::Cercano(e, R, ymax, 0), b = CT::Cercano(e, -R, ymax, 0);
+          const int ngonAntes = CT::Lados(m, 8), carasAntes = (int)m->faces3d.size();
+          e->TogglearVert(a, true); e->TogglearVert(b, false);
+          const bool r = ConectarVerticesEdit(m, NULL, NULL, msg); e = m->edit;
+          const bool bien = r && (int)m->faces3d.size() == carasAntes + 1 && CT::Lados(m, 5) == 2 && CT::Lados(m, 8) == ngonAntes - 1 && CT::Sana(m);
+          printf("      [connecttest] tapa del cilindro: %s -> caras %d -> %d, pentagonos=%d, 8-gons %d -> %d (esp +1 / 2 / -1) -> %s\n", msg.c_str(), carasAntes, (int)m->faces3d.size(), CT::Lados(m, 5), ngonAntes, CT::Lados(m, 8), bien ? "OK" : "MAL");
+          if (!bien) ok = false; }
+        // (5) corte RECTO por el lateral (vista frontal x,y): de un vertice de la tapa de arriba (90 grados,
+        // x=0) a uno de la tapa de abajo dos columnas mas alla (180 grados, x=-R). La linea cruza la arista
+        // vertical de 135 grados: ahi nace UN vertice nuevo y los dos quads que atraviesa se parten en
+        // dos (triangulo + quad cada uno): +1 vertice editable, +2 caras, y quedan seleccionados a, b y el nuevo
+        { int a = CT::Cercano(e, 0, ymax, R), b = CT::Cercano(e, -R, ymin, 0);
+          const int carasAntes = (int)m->faces3d.size(), vertsAntes = e->NumVerts();
+          e->TogglearVert(a, true); e->TogglearVert(b, false);
+          const bool r = ConectarVerticesEdit(m, NULL, NULL, msg); e = m->edit;
+          int sel = 0; for (size_t k = 0; k < e->vertSel.size(); k++) if (e->vertSel[k]) sel++;
+          const bool bien = r && (int)m->faces3d.size() == carasAntes + 2 && e->NumVerts() == vertsAntes + 1 && CT::Sana(m) && sel == 3;
+          printf("      [connecttest] corte recto por el lateral: %s -> caras %d -> %d, verts %d -> %d, seleccionados=%d (esp +2 / +1 / 3) -> %s\n", msg.c_str(), carasAntes, (int)m->faces3d.size(), vertsAntes, e->NumVerts(), sel, bien ? "OK" : "MAL");
+          if (!bien) ok = false; }
+        W3dRunCommand("mode object", e2);
+        // (6) ARRANQUE EN LA SILUETA: de frente, el quad de adelante y el de atras se proyectan IGUAL,
+        // asi que cual tomar no se puede decidir con el dibujo 2D. De theta=0 (el contorno) a theta=135
+        // (el frente): por adelante son 3 tramos y por atras 5, o sea que el corto va por adelante y todo
+        // lo que quede seleccionado tiene z>=0.
+        { Object* o6 = NewMesh(MeshType(MeshType::cylinder), NULL, false);
+          if (!o6) { err = "connecttest: NewMesh del cilindro (6) fallo"; return false; }
+          DeseleccionarTodo(); o6->Seleccionar(); ObjActivo = o6;
+          if (!W3dRunCommand("mode edit", e2)) { err = "connecttest: " + e2; return false; }
+          W3dRunCommand("selmode vert", e2);
+          m = ScriptActiveMesh(); if (m) m->EnsureEdit();
+          if (!m || !m->edit) { err = "connecttest: sin cilindro (6) en edit"; return false; }
+          e = m->edit;
+          float ymax6 = -1e30f, ymin6 = 1e30f, rmax6 = 0.0f;
+          for (int k = 0; k < e->NumVerts(); k++) { const float y = e->pos[(size_t)k*3+1]; if (y > ymax6) ymax6 = y; if (y < ymin6) ymin6 = y;
+              const float rr = e->pos[(size_t)k*3]*e->pos[(size_t)k*3] + e->pos[(size_t)k*3+2]*e->pos[(size_t)k*3+2]; if (rr > rmax6) rmax6 = rr; }
+          const float R6 = sqrtf(rmax6), D6 = R6 * 0.70710678f;
+          const int a6 = CT::Cercano(e, R6, ymax6, 0), b6 = CT::Cercano(e, -D6, ymin6, D6);
+          e->TogglearVert(a6, true); e->TogglearVert(b6, false);
+          const bool r = ConectarVerticesEdit(m, NULL, NULL, msg); e = m->edit;
+          int sel = 0; float zmin = 1e30f;
+          for (size_t k = 0; k < e->vertSel.size(); k++) if (e->vertSel[k]) { sel++; const float z = e->pos[k*3+2]; if (z < zmin) zmin = z; }
+          const bool bien = r && sel == 4 && zmin > -1e-3f && CT::Sana(m);
+          printf("      [connecttest] arranque en la silueta: %s -> seleccionados=%d z minimo=%.3f (esp 4 / z>=0: el camino corto va por adelante) -> %s\n", msg.c_str(), sel, zmin, bien ? "OK" : "MAL");
+          if (!bien) ok = false;
+          W3dRunCommand("mode object", e2); }
+        UndoLimpiar();
+        if (!ok) { err = "connecttest: ver los MAL de arriba"; return false; }
+        return true;
+    }
+    // ---- boolpaint : el Boolean y los modos de PINTURA. Reproduce el reporte "en vertex/weight
+    //      paint desaparecen face corners y vertices de mas, y sacar el Boolean no lo arregla". ----
+    if (cmd == "boolpaint") {
+        bool ok = true;
+        Object* oa = NewMesh(MeshType(MeshType::cube), NULL, false);
+        Object* ob = NewMesh(MeshType(MeshType::cube), NULL, false);
+        if (!oa || !ob) { err = "boolpaint: NewMesh fallo"; return false; }
+        Mesh* A = (Mesh*)oa; Mesh* B = (Mesh*)ob;
+        A->GenerarRender(); B->GenerarRender();
+        B->pos.x = 1.0f; { extern bool g_objetosMovidos; g_objetosMovidos = true; }   // se solapa con la mitad de A
+        DeseleccionarTodo(); oa->Seleccionar(); ObjActivo = A;
+        struct BP {
+            static int Corners(Mesh* m) { int c = 0; for (size_t f = 0; f < m->faces3d.size(); f++) c += (int)m->faces3d[f].idx.size(); return c; }
+            static void Log(const char* etapa, Mesh* m) {
+                printf("      [boolpaint] %-20s verts=%3d corners=%3d caras=%2d mapaCP=%3d gen=%s(%d)\n", etapa,
+                       m->vertexSize, Corners(m), (int)m->faces3d.size(), (int)m->vertCtrlPoint.size(),
+                       m->genValido ? "si" : "no", m->genValido ? m->genVertexSize : 0); } };
+        BP::Log("cubo solo", A);
+        // VERTEX PAINT: un render-vert POR CORNER, igual que ViewPort3D al entrar al modo
+        W3dRenderCornersSeparados(true); A->GenerarRender(); A->vertexPaintOn = true;
+        BP::Log("vertex paint ON", A);
+        const int vertsPaint = A->vertexSize, cornersPaint = BP::Corners(A);
+        const bool separo = (A->vertexSize == cornersPaint);
+        printf("      [boolpaint] un vert por corner al entrar (%d/%d): %s\n", A->vertexSize, cornersPaint, separo ? "OK" : "MAL");
+        if (!separo) ok = false;
+        // el Boolean, con el modo de pintura PRENDIDO
+        UndoModAgregar(A, ModifierType::Boolean);
+        A->modificadorActivo = (int)A->modificadores.size() - 1;
+        A->modificadores.back()->target = B;
+        A->GenerarMallaModificada();
+        BP::Log("con boolean", A);
+        // y sacarlo: tiene que volver todo a como estaba
+        A->QuitarModificadorActivo(); A->GenerarMallaModificada();
+        BP::Log("boolean quitado", A);
+        { const bool vuelve = (A->vertexSize == vertsPaint) && (BP::Corners(A) == cornersPaint) && (A->vertexSize == BP::Corners(A));
+          printf("      [boolpaint] al sacar el Boolean vuelve a %d verts / %d corners: %s\n", vertsPaint, cornersPaint, vuelve ? "OK" : "MAL");
+          if (!vuelve) ok = false; }
+        // WEIGHT PAINT sobre la misma malla: el mapa render-vert -> control-point tiene que ser del tamano de la malla
+        W3dRenderCornersSeparados(false); A->GenerarRender(); A->vertexPaintOn = false;
+        WeightPaintAsegurarMapa(A); A->weightPaintOn = true;
+        BP::Log("weight paint ON", A);
+        { const bool mapaSano = ((int)A->vertCtrlPoint.size() == A->vertexSize) && A->vertexSize > 0;
+          printf("      [boolpaint] mapa render->control-point del tamano de la malla (%d/%d): %s\n", (int)A->vertCtrlPoint.size(), A->vertexSize, mapaSano ? "OK" : "MAL");
+          if (!mapaSano) ok = false; }
+        A->weightPaintOn = false;
+        // Con el Boolean vivo: la malla GENERADA es la que se dibuja en los modos de pintura, asi que su
+        // color (genColor) tiene que seguir al pincel. Si queda congelado, pintar no se veria.
+        { W3dRenderCornersSeparados(true); A->GenerarRender(); A->vertexPaintOn = true;   // el modo importa: el rehacer va guardado tras el
+          UndoModAgregar(A, ModifierType::Boolean);
+          A->modificadorActivo = (int)A->modificadores.size() - 1;
+          A->modificadores.back()->target = B;
+          A->GenerarMallaModificada();
+          if (!A->vertexColor) { A->vertexColor = new GLubyte[(size_t)A->vertexSize * 4]; for (int i = 0; i < A->vertexSize*4; i++) A->vertexColor[i] = 255; }
+          A->PoblarCapas();
+          const bool hayGenCol = A->genValido && A->genColor && A->genVertexSize > 0;
+          int rojosAntes = 0; if (hayGenCol) for (int i = 0; i < A->genVertexSize; i++) if (A->genColor[i*4] > 200 && A->genColor[i*4+1] < 60) rojosAntes++;
+          // pintar la CAPA de rojo (es la fuente: AplicarCapasAlRender copia capa -> render, no al reves)
+          if (A->colorActivo >= 0 && A->colorActivo < (int)A->colorLayers.size()) {
+              std::vector<GLubyte>& cap = A->colorLayers[A->colorActivo]->color;
+              for (size_t i = 0; i + 3 < cap.size(); i += 4) { cap[i] = 255; cap[i+1] = 0; cap[i+2] = 0; cap[i+3] = 255; } }
+          A->AplicarCapasAlRender();
+          int rojosDespues = 0; if (A->genValido && A->genColor) for (int i = 0; i < A->genVertexSize; i++) if (A->genColor[i*4] > 200 && A->genColor[i*4+1] < 60) rojosDespues++;
+          // los que NO quedan rojos son las caras que aporta el TARGET del Boolean: llevan su color, no el de A
+          const bool sigue = hayGenCol && rojosAntes == 0 && rojosDespues > 0;
+          printf("      [boolpaint] genColor sigue al pincel: rojos %d -> %d de %d (el resto son caras del target) -> %s\n", rojosAntes, rojosDespues, A->genVertexSize, sigue ? "OK" : "MAL");
+          if (!sigue) ok = false;
+          A->QuitarModificadorActivo(); A->GenerarMallaModificada();
+          A->vertexPaintOn = false; W3dRenderCornersSeparados(false); A->GenerarRender(); }
+        UndoLimpiar();
+        if (!ok) { err = "boolpaint: ver los MAL de arriba"; return false; }
+        return true;
+    }
+    // ---- slidetest : Vertex Slide (Shift+V / G-G). Desliza el vertice por una de sus aristas de 0 a
+    //      100% y, con Auto Merge, al confirmar lo suelda con el vecino y simplifica la topologia:
+    //      es el paso que sigue al J (cortar con J, juntar con G-G). ----
+    if (cmd == "slidetest") {
+        bool ok = true; std::string e2;
+        if (!viewPortActive || viewPortActive->ViewportKind() != 1) { err = "slidetest: el viewport activo no es 3D"; return false; }
+        Viewport3D* vp = (Viewport3D*)viewPortActive; vp->BindVista();
+        struct SL {
+            static int Cercano(EditMesh* e, float x, float y, float z) { int mejor = -1; float md = 1e30f;
+                for (int k = 0; k < e->NumVerts(); k++) { float dx=e->pos[(size_t)k*3]-x, dy=e->pos[(size_t)k*3+1]-y, dz=e->pos[(size_t)k*3+2]-z;
+                    float d = dx*dx+dy*dy+dz*dz; if (d < md) { md = d; mejor = k; } } return mejor; }
+            static int Posiciones(Mesh* m) { std::set<std::string> s;
+                for (int i = 0; i < m->vertexSize; i++) { int q[3] = { (int)floorf(m->vertex[i*3]*1000.0f+0.5f), (int)floorf(m->vertex[i*3+1]*1000.0f+0.5f), (int)floorf(m->vertex[i*3+2]*1000.0f+0.5f) };
+                    s.insert(std::string((const char*)q, sizeof(q))); } return (int)s.size(); }
+            static bool Sana(Mesh* m) { for (size_t f = 0; f < m->faces3d.size(); f++) { const std::vector<int>& id = m->faces3d[f].idx;
+                if (id.size() < 3) return false;
+                for (size_t i = 0; i < id.size(); i++) for (size_t j = i+1; j < id.size(); j++) if (id[i] == id[j]) return false; } return true; } };
+        Object* o = NewMesh(MeshType(MeshType::cube), NULL, false);
+        if (!o) { err = "slidetest: NewMesh fallo"; return false; }
+        Mesh* m = (Mesh*)o; DeseleccionarTodo(); o->Seleccionar(); ObjActivo = m; m->GenerarRender();
+        if (!W3dRunCommand("mode edit", e2)) { err = "slidetest: " + e2; return false; }
+        W3dRunCommand("selmode vert", e2);
+        m->EnsureEdit(); EditMesh* e = m->edit;
+        if (!e) { err = "slidetest: sin edit"; return false; }
+        const int a = SL::Cercano(e, -1, 1, -1), b = SL::Cercano(e, 1, 1, -1);   // vecinos por una arista de la tapa
+        e->SeleccionarTodo(false); e->TogglearVert(a, true);
+        Matrix4 Wm; m->GetWorldMatrix(Wm);
+        const Vector3 pa = Wm * Vector3(e->pos[(size_t)a*3], e->pos[(size_t)a*3+1], e->pos[(size_t)a*3+2]);
+        const Vector3 pb = Wm * Vector3(e->pos[(size_t)b*3], e->pos[(size_t)b*3+1], e->pos[(size_t)b*3+2]);
+        float ax, ay, bx, by;
+        if (!vp->ProyectarPunto(pa, ax, ay) || !vp->ProyectarPunto(pb, bx, by)) { err = "slidetest: los vertices no proyectan"; return false; }
+        const int posAntes = SL::Posiciones(m);      // ANTES de deslizar: si se mide despues ya estan encimadas
+        LayoutSlideVerticesEdit();
+        { const bool arranco = EditSlideActivo() && EditXformActivo();
+          printf("      [slidetest] Shift+V arranca el slide: activo=%d (esp 1) -> %s\n", arranco ? 1 : 0, arranco ? "OK" : "MAL");
+          if (!arranco) ok = false; }
+        // arrastrar HACIA el vecino, pasandose: el factor tiene que clampear en 1
+        EditSlideRaton((int)((bx - ax) * 1.5f), (int)((by - ay) * 1.5f));
+        { e = m->edit;
+          const float t = EditSlideFactor();
+          const float dx = e->pos[(size_t)a*3] - 1.0f, dy = e->pos[(size_t)a*3+1] - 1.0f, dz = e->pos[(size_t)a*3+2] + 1.0f;
+          const bool encima = (dx*dx + dy*dy + dz*dz) < 1e-4f;
+          printf("      [slidetest] al 100%% queda encima del vecino: t=%.2f pos=(%.2f,%.2f,%.2f) esp (1,1,-1) -> %s\n",
+                 t, e->pos[(size_t)a*3], e->pos[(size_t)a*3+1], e->pos[(size_t)a*3+2], (t > 0.99f && encima) ? "OK" : "MAL");
+          if (!(t > 0.99f && encima)) ok = false; }
+        // confirmar CON Auto Merge: se sueldan y la topologia se simplifica
+        extern bool g_autoMerge; const bool amPrev = g_autoMerge; g_autoMerge = true;
+        EditXformConfirmar();
+        g_autoMerge = amPrev;
+        { const int posDespues = SL::Posiciones(m);
+          int tris = 0, quads = 0;
+          for (size_t f = 0; f < m->faces3d.size(); f++) { const int n = (int)m->faces3d[f].idx.size(); if (n == 3) tris++; else if (n == 4) quads++; }
+          // las dos caras que tenian los DOS vertices pierden un corner: quedan triangulos, y ninguna cara
+          // repite un vertice (la arista que colapso se fue). Las otras cuatro siguen siendo quads.
+          const bool bien = posDespues == posAntes - 1 && tris == 2 && quads == 4 && SL::Sana(m) && !EditSlideActivo();
+          printf("      [slidetest] Auto Merge al confirmar: posiciones %d -> %d (esp -1), caras %d tris + %d quads (esp 2+4), sana=%d, slide apagado=%d -> %s\n",
+                 posAntes, posDespues, tris, quads, SL::Sana(m) ? 1 : 0, EditSlideActivo() ? 0 : 1, bien ? "OK" : "MAL");
+          if (!bien) ok = false; }
+        // Ctrl+Z: la geometria vuelve Y la malla EDITABLE tiene que volver con ella (el reporte era que
+        // el mesh editable quedaba viejo hasta mover un vertice).
+        { int pasos = 0;
+          while (pasos < 4 && SL::Posiciones(m) != 8) { UndoDeshacer(); pasos++; }
+          m->EnsureEdit(); EditMesh* eu = m->edit;
+          const int posU = SL::Posiciones(m);
+          int quadsU = 0; for (size_t f = 0; f < m->faces3d.size(); f++) if (m->faces3d[f].idx.size() == 4) quadsU++;
+          // la editable tiene que tener un vertice por posicion de la malla restaurada, y sus pos deben coincidir
+          bool editSano = (eu != NULL) && (eu->NumVerts() == posU);
+          if (editSano) { int fuera = 0;
+              for (int k = 0; k < eu->NumVerts(); k++) { bool hay = false;
+                  for (int i = 0; i < m->vertexSize && !hay; i++) {
+                      const float dx = eu->pos[(size_t)k*3] - m->vertex[i*3], dy = eu->pos[(size_t)k*3+1] - m->vertex[i*3+1], dz = eu->pos[(size_t)k*3+2] - m->vertex[i*3+2];
+                      if (dx*dx + dy*dy + dz*dz < 1e-6f) hay = true; }
+                  if (!hay) fuera++; }
+              if (fuera > 0) editSano = false; }
+          const bool bien = posU == 8 && quadsU == 6 && editSano;
+          printf("      [slidetest] Ctrl+Z (%d pasos): posiciones=%d quads=%d, editable con %d verts sincronizada=%d (esp 8 / 6 / si) -> %s\n",
+                 pasos, posU, quadsU, eu ? eu->NumVerts() : -1, editSano ? 1 : 0, bien ? "OK" : "MAL");
+          if (!bien) ok = false; }
+        // G-G-G: sobre un move YA en curso, la segunda G entra al slide y la tercera vuelve a trasladar,
+        // sin confirmar nada en el medio (es el mismo modal cambiando de recorrido).
+        { m->EnsureEdit(); EditMesh* e3 = m->edit; e3->SeleccionarTodo(false);
+          e3->TogglearVert(SL::Cercano(e3, -1, -1, -1), true);
+          const bool g1 = EditXformStart(translacion, ViewAxis) && !EditSlideActivo();
+          EditSlideToggle(); const bool g2 = EditSlideActivo() && EditXformActivo();
+          EditSlideToggle(); const bool g3 = !EditSlideActivo() && EditXformActivo();
+          EditXformCancelar();
+          const bool bien = g1 && g2 && g3 && !EditXformActivo();
+          printf("      [slidetest] G=mover G-G=slide G-G-G=mover otra vez: %d/%d/%d, Esc cierra=%d -> %s\n",
+                 g1?1:0, g2?1:0, g3?1:0, EditXformActivo()?0:1, bien ? "OK" : "MAL");
+          if (!bien) ok = false; }
+        W3dRunCommand("mode object", e2);
+        UndoLimpiar();
+        if (!ok) { err = "slidetest: ver los MAL de arriba"; return false; }
+        return true;
+    }
+    // ---- barinfo : roles y visibilidad de los botones de la barra del viewport 3D activo ----
+    if (cmd == "barinfo") {
+        ViewportBase* v = viewPortActive;
+        if (!v || v->ViewportKind() != 1) { err = "barinfo: el viewport activo no es 3D"; return false; }
+        printf("      [barinfo] barCard=%d botones=%d:", v->barCard ? 1 : 0, (int)v->BarButtons.size());
+        for (size_t i = 0; i < v->BarButtons.size(); i++) printf(" %d%s", v->BarButtons[i]->rol, v->BarButtons[i]->visible ? "" : "(oculto)");
+        printf("\n"); return true;
+    }
+    // ---- vcollayer : la cadena capa de color -> vertexColor[] (render) -> VBO. Pintar tiene que
+    //      llegar al render Y invalidar el VBO (skinGeomVersion), y cambiar la capa activa tambien.
+    //      Era el bug del "cubo blanco con vertex color": se pintaba la capa pero el VBO de Object
+    //      Mode seguia con el blanco inicial. ----
+    if (cmd == "vcollayer") {
+        bool ok = true;
+        struct VP { Mesh* m;
+            static bool Proy(void* ctx, int i, float& sx, float& sy) { VP* c = (VP*)ctx; if (i < 0 || i >= c->m->vertexSize) return false; sx = (float)i * 3.0f; sy = 0.0f; return true; } };
+        Object* o = NewMesh(MeshType(MeshType::cube), NULL, false);
+        if (!o) { err = "vcollayer: NewMesh fallo"; return false; }
+        Mesh* m = (Mesh*)o;
+        DeseleccionarTodo(); o->Seleccionar(); ObjActivo = m;
+        m->GenerarRender();
+        if (!m->vertexColor) { m->vertexColor = new GLubyte[(size_t)m->vertexSize * 4]; for (int i = 0; i < m->vertexSize * 4; i++) m->vertexColor[i] = 255; }
+        m->PoblarCapas();
+        if (m->colorActivo < 0 || m->colorLayers.empty()) { err = "vcollayer: sin capa de color"; return false; }
+        VP ctx; ctx.m = m; W3dFalloff plano; plano.tipo = FoConstant;
+        unsigned char rojo[4] = { 255, 0, 0, 255 }, azul[4] = { 0, 0, 255, 255 };
+        struct C { static bool Es(const Mesh* m, unsigned char r, unsigned char g, unsigned char b) {
+            for (int i = 0; i < m->vertexSize; i++) if (m->vertexColor[i*4] != r || m->vertexColor[i*4+1] != g || m->vertexColor[i*4+2] != b) return false; return true; } };
+        // 1) pintar rojo la capa A: el render queda rojo y el VBO invalidado
+        m->vboGeomVer = 0;   // como si el draw ya hubiera subido el VBO con el blanco inicial
+        BrushTrazoResetear();
+        PincelAplicarColor(m, m->colorActivo, 0.0f, 0.0f, 10000.0f, 1.0f, rojo, -1, VP::Proy, &ctx, NULL, &plano);
+        { const bool inval = (m->vboGeomVer == 0xFFFFFFFFu);
+          const bool bien = C::Es(m, 255, 0, 0) && inval;
+          printf("      [vcollayer] pintar rojo: render rgb(%d,%d,%d) (esp rojo) | VBO invalidado=%s -> %s\n", m->vertexColor[0], m->vertexColor[1], m->vertexColor[2], inval ? "si" : "NO", bien ? "OK" : "MAL");
+          if (!bien) ok = false; }
+        // 2) capa B = copia de A, pintada de azul
+        const int capaA = m->colorActivo;
+        DuplicarColorLayerActivo(m);
+        const int capaB = m->colorActivo;
+        BrushTrazoResetear();
+        PincelAplicarColor(m, capaB, 0.0f, 0.0f, 10000.0f, 1.0f, azul, -1, VP::Proy, &ctx, NULL, &plano);
+        { const bool bien = capaB != capaA && (int)m->colorLayers.size() == 2 && C::Es(m, 0, 0, 255);
+          printf("      [vcollayer] capa B (copia) pintada azul: capas=%d activa=%d render rgb(%d,%d,%d) (esp azul) -> %s\n", (int)m->colorLayers.size(), capaB, m->vertexColor[0], m->vertexColor[1], m->vertexColor[2], bien ? "OK" : "MAL");
+          if (!bien) ok = false; }
+        // 3) volver a la capa A: el render vuelve a rojo y el VBO se invalida (la capa A sigue intacta)
+        m->vboGeomVer = 0;   // como si el draw hubiera subido el VBO: el cambio de capa lo tiene que volver a invalidar
+        m->colorActivo = capaA; m->AplicarCapasAlRender();
+        { const bool inval = (m->vboGeomVer == 0xFFFFFFFFu);
+          const bool bien = C::Es(m, 255, 0, 0) && inval;
+          printf("      [vcollayer] volver a la capa A: render rgb(%d,%d,%d) (esp rojo) | VBO invalidado=%s -> %s\n", m->vertexColor[0], m->vertexColor[1], m->vertexColor[2], inval ? "si" : "NO", bien ? "OK" : "MAL");
+          if (!bien) ok = false; }
+        // 4) el boton "por vertice" del pincel: pintar en la posicion de un vertice colorea TODOS sus corners
+        //    (3 en la esquina de un cubo); por corner, con el mismo proyector, solo los que caen en el circulo
+        {
+            struct PPV { Mesh* m; static bool Proy(void* ctx, int i, float& sx, float& sy) { PPV* c = (PPV*)ctx; if (i < 0 || i >= c->m->vertexSize) return false;
+                sx = c->m->vertex[i*3] * 100.0f; sy = c->m->vertex[i*3+2] * 100.0f + c->m->vertex[i*3+1] * 1000.0f; return true; } };
+            PPV pctx; pctx.m = m;
+            unsigned char verde[4] = { 0, 255, 0, 255 };
+            // capa nueva limpia (blanca) para medir
+            DuplicarColorLayerActivo(m); ColorLayer* cn = m->colorLayers[(size_t)m->colorActivo];
+            for (size_t i = 0; i < cn->color.size(); i++) cn->color[i] = 255; m->AplicarCapasAlRender();
+            int rv = -1; for (int i = 0; i < m->vertexSize && rv < 0; i++) if (m->vertex[i*3] > 0.99f && m->vertex[i*3+1] > 0.99f && m->vertex[i*3+2] > 0.99f) rv = i;
+            float sx = 0, sy = 0; PPV::Proy(&pctx, rv, sx, sy);
+            BrushGet().porVertice = true; BrushTrazoResetear();
+            PincelAplicarColor(m, m->colorActivo, sx, sy, 2.0f, 1.0f, verde, -1, PPV::Proy, &pctx, NULL, &plano);
+            int verdes = 0, copias = 0;
+            for (int i = 0; i < m->vertexSize; i++) { const bool misma = m->vertex[i*3] > 0.99f && m->vertex[i*3+1] > 0.99f && m->vertex[i*3+2] > 0.99f;
+                const bool v = m->vertexColor[i*4] == 0 && m->vertexColor[i*4+1] == 255 && m->vertexColor[i*4+2] == 0;
+                if (misma) { copias++; if (v) verdes++; } else if (v) verdes += 100; }
+            const bool bien = rv >= 0 && copias == 3 && verdes == 3;
+            printf("      [vcollayer] pincel por VERTICE en (1,1,1): corners del vertice=%d verdes=%d (esp 3 y 3, ningun otro) -> %s\n", copias, verdes, bien ? "OK" : "MAL");
+            if (!bien) ok = false;
+        }
+        UndoLimpiar();
+        if (!ok) { err = "vcollayer: ver los MAL de arriba"; return false; }
+        return true;
+    }
+    // ---- loopcutpaint : despues de un LOOP CUT, la pintura de pesos sigue siendo POR VERTICE (todas
+    //      las copias de una posicion comparten control-point) y la de color POR CORNER puede pintar
+    //      cualquier corner (un render-vert por corner mientras se pinta). Los dos bugs que vio el dueno. ----
+    if (cmd == "loopcutpaint") {
+        bool ok = true; std::string e2;
+        Object* o = NewMesh(MeshType(MeshType::cube), NULL, false);
+        if (!o) { err = "loopcutpaint: NewMesh fallo"; return false; }
+        Mesh* m = (Mesh*)o;
+        DeseleccionarTodo(); o->Seleccionar(); ObjActivo = m;
+        m->GenerarRender();
+        if (!W3dRunCommand("mode edit", e2) || !W3dRunCommand("loopcut 0 1 0.5", e2) || !W3dRunCommand("loopcut 3 1 0.5", e2)) { err = "loopcutpaint: " + e2; return false; }
+        extern void WP3DSincronizarModoPintura();
+        if (!W3dRunCommand("mode weight", e2)) { err = "loopcutpaint: " + e2; return false; }
+        WP3DSincronizarModoPintura();
+        const int nV = m->vertexSize;
+        // un vert NUEVO del loop cut (no es esquina del cubo: alguna coordenada no es +-1) con copias
+        struct LC { static int Corte(Mesh* m) { for (int i = 0; i < m->vertexSize; i++) { const float* q = m->vertex + i*3;
+            if (fabsf(fabsf(q[0]) - 1.0f) > 1e-3f || fabsf(fabsf(q[1]) - 1.0f) > 1e-3f || fabsf(fabsf(q[2]) - 1.0f) > 1e-3f) return i; } return -1; } };
+        // (1) PESOS: mapa completo y UN control-point por posicion
+        int sinCP = 0, mixtos = 0;
+        { const bool hayRep = ((int)m->posRep.size() == nV) && ((int)m->vertCtrlPoint.size() == nV);
+          std::map<int,int> cpDe;
+          for (int i = 0; i < nV; i++) {
+              if ((int)m->vertCtrlPoint.size() != nV || m->vertCtrlPoint[i] < 0) { sinCP++; continue; }
+              if (!hayRep) continue;
+              const int rep = m->posRep[i];
+              std::map<int,int>::iterator it = cpDe.find(rep);
+              if (it == cpDe.end()) cpDe[rep] = m->vertCtrlPoint[i]; else if (it->second != m->vertCtrlPoint[i]) mixtos++;
+          }
+          const bool bien = (sinCP == 0) && (mixtos == 0) && (int)m->vertCtrlPoint.size() == nV;
+          printf("      [loopcutpaint] pesos tras 2 loop cuts: verts=%d sin CP=%d posiciones con CP mezclado=%d (esp 0 / 0) -> %s\n", nV, sinCP, mixtos, bien ? "OK" : "MAL");
+          if (!bien) ok = false; }
+        // (2) pintar pesos en UNA posicion (proyector por posicion): todas sus copias reciben el peso
+        { struct PP { Mesh* m; static bool Proy(void* ctx, int i, float& sx, float& sy) { PP* c = (PP*)ctx; if (i < 0 || i >= c->m->vertexSize) return false;
+              sx = c->m->vertex[i*3] * 100.0f; sy = c->m->vertex[i*3+2] * 100.0f + c->m->vertex[i*3+1] * 1000.0f; return true; } };
+          PP ctx; ctx.m = m;
+          const int g = WeightPaintTrazoIniciar(m);
+          const int objetivo = LC::Corte(m);
+          if (objetivo < 0) { printf("      [loopcutpaint] no encontre un vert del corte -> MAL\n"); ok = false; }
+          else {
+              float sx, sy; PP::Proy(&ctx, objetivo, sx, sy);
+              BrushTrazoResetear();
+              PincelAplicar(m, g, sx, sy, 5.0f, 1.0f, WPSumar, PP::Proy, &ctx, NULL);
+              int copias = 0, conPeso = 0, otrosConPeso = 0;
+              for (int i = 0; i < nV; i++) {
+                  const bool misma = fabsf(m->vertex[i*3] - m->vertex[objetivo*3]) < 1e-4f && fabsf(m->vertex[i*3+1] - m->vertex[objetivo*3+1]) < 1e-4f && fabsf(m->vertex[i*3+2] - m->vertex[objetivo*3+2]) < 1e-4f;
+                  const float w = PesoDe(m, g, m->vertCtrlPoint[i]);
+                  if (misma) { copias++; if (w > 0.99f) conPeso++; } else if (w > 0.0f) otrosConPeso++;
+              }
+              const bool bien = copias >= 2 && conPeso == copias && otrosConPeso == 0;
+              printf("      [loopcutpaint] pintar pesos en un vert del corte (%.1f,%.1f,%.1f): copias=%d con peso=%d, otros con peso=%d (esp todas / 0) -> %s\n", m->vertex[objetivo*3], m->vertex[objetivo*3+1], m->vertex[objetivo*3+2], copias, conPeso, otrosConPeso, bien ? "OK" : "MAL");
+              if (!bien) ok = false; }
+          W3dRunCommand("mode object", e2); }
+        // (3) COLOR por corner: en Vertex Paint hay un render-vert POR CORNER y se pinta uno solo
+        if (!W3dRunCommand("mode vertex", e2)) { err = "loopcutpaint: " + e2; return false; }
+        WP3DSincronizarModoPintura();
+        { int corners = 0; for (size_t f = 0; f < m->faces3d.size(); f++) corners += (int)m->faces3d[f].idx.size();
+          const bool separados = (m->vertexSize == corners) && W3dRenderCornersSeparadosActivo();
+          printf("      [loopcutpaint] vertex paint: render verts=%d corners=%d flag=%d (esp iguales: un vert por corner) -> %s\n", m->vertexSize, corners, W3dRenderCornersSeparadosActivo() ? 1 : 0, separados ? "OK" : "MAL");
+          if (!separados) ok = false;
+          if (!m->vertexColor) { m->vertexColor = new GLubyte[(size_t)m->vertexSize * 4]; for (int i = 0; i < m->vertexSize * 4; i++) m->vertexColor[i] = 255; }
+          m->PoblarCapas();
+          const int objetivo = LC::Corte(m);   // un corner del corte (hay varios render-verts ahi: uno por cara)
+          // proyector por POSICION (x100): los corners de una misma posicion caen en el mismo punto, y el
+          // pincel por corner los separa metiendo cada uno hacia el centro de SU cara (WPCornersEnPantalla).
+          struct PP2 { Mesh* m; static bool Proy(void* ctx, int i, float& sx, float& sy) { PP2* c = (PP2*)ctx; if (i < 0 || i >= c->m->vertexSize) return false;
+              sx = c->m->vertex[i*3] * 100.0f; sy = c->m->vertex[i*3+2] * 100.0f + c->m->vertex[i*3+1] * 1000.0f; return true; } };
+          PP2 ctx; ctx.m = m;
+          std::vector<float> cxs, cys; std::vector<char> oks;
+          WPCornersEnPantalla(m, PP2::Proy, &ctx, cxs, cys, oks);
+          int cornerL = -1; { int L = 0; for (size_t f = 0; f < m->faces3d.size() && cornerL < 0; f++) for (size_t k = 0; k < m->faces3d[f].idx.size(); k++, L++) if (m->faces3d[f].idx[k] == objetivo) { cornerL = L; break; } }
+          unsigned char rojo[4] = { 255, 0, 0, 255 }; W3dFalloff plano; plano.tipo = FoConstant;
+          BrushTrazoResetear(); BrushGet().porVertice = false;   // por CORNER: se pinta uno solo
+          const bool pinto = objetivo >= 0 && cornerL >= 0 && cornerL < (int)cxs.size() &&
+                             PincelAplicarColor(m, m->colorActivo, cxs[(size_t)cornerL], cys[(size_t)cornerL], 2.0f, 1.0f, rojo, -1, PP2::Proy, &ctx, NULL, &plano);
+          int copiasRojas = 0, copias = 0;
+          for (int i = 0; i < m->vertexSize; i++) {
+              if (objetivo < 0) break;
+              const bool misma = fabsf(m->vertex[i*3] - m->vertex[objetivo*3]) < 1e-4f && fabsf(m->vertex[i*3+1] - m->vertex[objetivo*3+1]) < 1e-4f && fabsf(m->vertex[i*3+2] - m->vertex[objetivo*3+2]) < 1e-4f;
+              if (!misma) continue; copias++;
+              if (m->vertexColor[i*4] == 255 && m->vertexColor[i*4+1] == 0 && m->vertexColor[i*4+2] == 0) copiasRojas++;
+          }
+          const bool bien = pinto && copias >= 2 && copiasRojas == 1;
+          printf("      [loopcutpaint] pintar UN corner del corte: copias en esa posicion=%d, rojas=%d (esp >=2 / 1: solo el corner pintado) -> %s\n", copias, copiasRojas, bien ? "OK" : "MAL");
+          if (!bien) ok = false; }
+        W3dRunCommand("mode object", e2);
+        WP3DSincronizarModoPintura();
+        { const bool fusionado = !W3dRenderCornersSeparadosActivo();
+          printf("      [loopcutpaint] salir de vertex paint: corners separados=%s (esp no) -> %s\n", fusionado ? "no" : "si", fusionado ? "OK" : "MAL");
+          if (!fusionado) ok = false; }
+        UndoLimpiar();
+        if (!ok) { err = "loopcutpaint: ver los MAL de arriba"; return false; }
+        return true;
+    }
+    // ---- wpvisibles [esperado] : face corners visibles (marcas/pincel) de la malla activa en el
+    //      viewport 3D activo, con el mapa de oclusion del ULTIMO frame dibujado (uishot antes) ----
+    if (cmd == "wpvisibles") {
+        Mesh* m = ScriptActiveMesh(); if (!m) { err = "no hay malla activa"; return false; }
+        extern int WP3DCornersVisibles(Mesh*);
+        int esperado = -1; ss >> esperado;
+        const int n = WP3DCornersVisibles(m);
+        int corners = 0; for (size_t f = 0; f < m->faces3d.size(); f++) corners += (int)m->faces3d[f].idx.size();
+        printf("      [wpvisibles] %s: %d corners visibles de %d (oclusion=%s)%s\n", m->name.c_str(), n, corners, WPOclusionActiva(m) ? "si" : "no",
+               esperado >= 0 ? ((n == esperado) ? " -> OK" : " -> MAL") : "");
+        if (esperado >= 0 && n != esperado) { char b[96]; sprintf(b, "wpvisibles: esperaba %d, hay %d", esperado, n); err = b; return false; }
+        return true;
+    }
+    // ---- shadetest : el shading por cara (Face > Shade Smooth/Flat) SOBREVIVE a las operaciones que
+    //      rehacen la topologia: J (corte recto), loop cut, y el stack de modificadores (subsurf) con su Apply. ----
+    if (cmd == "shadetest") {
+        bool ok = true; std::string e2, msg;
+        struct SH {
+            static Vector3 CaraN(const Mesh* m, size_t f) { const std::vector<int>& id = m->faces3d[f].idx; Vector3 n(0,0,0); const int nn = (int)id.size();
+                for (int i = 0; i < nn; i++) { const float* a = m->vertex + id[i]*3; const float* b = m->vertex + id[(i+1)%nn]*3;
+                    n.x += (a[1]-b[1])*(a[2]+b[2]); n.y += (a[2]-b[2])*(a[0]+b[0]); n.z += (a[0]-b[0])*(a[1]+b[1]); }
+                return n.Normalized(); }
+            static Vector3 CornerN(const Mesh* m, int gv) { return Vector3(m->normals[gv*3]/127.0f, m->normals[gv*3+1]/127.0f, m->normals[gv*3+2]/127.0f).Normalized(); }
+            static float Grados(const Vector3& a, const Vector3& b) { float d = a.Dot(b); if (d > 1) d = 1; if (d < -1) d = -1; return acosf(d) * 57.2958f; }
+            // caras PLANAS (segun su flag y el global) cuyos corners no llevan la normal de la cara
+            static int PlanasMal(const Mesh* m) { int mal = 0; for (size_t f = 0; f < m->faces3d.size(); f++) { const int sm = m->faces3d[f].smooth; const bool plana = (sm == 0) || (sm < 0 && !m->meshSmooth); if (!plana) continue;
+                const Vector3 n = CaraN(m, f); for (size_t c = 0; c < m->faces3d[f].idx.size(); c++) if (Grados(CornerN(m, m->faces3d[f].idx[c]), n) > 2.0f) { mal++; break; } } return mal; }
+            // caras SUAVES cuyos corners no coinciden con la normal del corner vecino (misma posicion, otra cara suave)
+            static int SuavesMal(const Mesh* m) { int mal = 0; const int nV = m->vertexSize; const bool hayRep = ((int)m->posRep.size() == nV);
+                for (size_t f = 0; f < m->faces3d.size(); f++) { const int sm = m->faces3d[f].smooth; const bool suave = (sm == 1) || (sm < 0 && m->meshSmooth); if (!suave) continue;
+                    for (size_t c = 0; c < m->faces3d[f].idx.size(); c++) { const int gv = m->faces3d[f].idx[c]; const int rep = hayRep ? m->posRep[gv] : gv; const Vector3 n = CornerN(m, gv); bool bad = false;
+                        for (size_t g = 0; g < m->faces3d.size() && !bad; g++) { const int sg = m->faces3d[g].smooth; if (!((sg == 1) || (sg < 0 && m->meshSmooth))) continue;
+                            for (size_t d = 0; d < m->faces3d[g].idx.size(); d++) { const int gw = m->faces3d[g].idx[d]; if ((hayRep ? m->posRep[gw] : gw) != rep) continue; if (Grados(CornerN(m, gw), n) > 2.0f) { bad = true; break; } } }
+                        if (bad) { mal++; break; } } } return mal; }
+            static int Con(const Mesh* m, int v) { int c = 0; for (size_t f = 0; f < m->faces3d.size(); f++) if (m->faces3d[f].smooth == v) c++; return c; }
+            static int Cercano(EditMesh* e, float x, float y, float z) { int mejor = -1; float md = 1e30f; for (int k = 0; k < e->NumVerts(); k++) { float dx = e->pos[(size_t)k*3]-x, dy = e->pos[(size_t)k*3+1]-y, dz = e->pos[(size_t)k*3+2]-z; float d = dx*dx+dy*dy+dz*dz; if (d < md) { md = d; mejor = k; } } return mejor; }
+        };
+        // (a) cubo PLANO + J: sigue plano
+        { Object* o = NewMesh(MeshType(MeshType::cube), NULL, false); Mesh* m = (Mesh*)o; DeseleccionarTodo(); o->Seleccionar(); ObjActivo = m; m->GenerarRender();
+          W3dRunCommand("mode edit", e2); m->EnsureEdit(); EditMesh* e = m->edit; W3dRunCommand("selmode vert", e2);
+          e->TogglearVert(SH::Cercano(e, -1, -1, 1), true); e->TogglearVert(SH::Cercano(e, 1, 1, -1), false);
+          const bool r = ConectarVerticesEdit(m, NULL, NULL, msg);
+          const int mal = SH::PlanasMal(m);
+          const bool bien = r && mal == 0 && SH::Con(m, 1) == 0 && !m->meshSmooth;   // ninguna cara paso a suave
+          printf("      [shadetest] cubo plano + J: %s, caras=%d (suaves=%d), meshSmooth=%d, planas con normal torcida=%d (esp 0 suaves, flat global, 0) -> %s\n", msg.c_str(), (int)m->faces3d.size(), SH::Con(m, 1), m->meshSmooth ? 1 : 0, mal, bien ? "OK" : "MAL");
+          if (!bien) ok = false; W3dRunCommand("mode object", e2); }
+        // (b) cubo SUAVE (Shade Smooth sobre todas las caras) + loop cut: sigue suave, sin caras que vuelvan a flat
+        { Object* o = NewMesh(MeshType(MeshType::cube), NULL, false); Mesh* m = (Mesh*)o; DeseleccionarTodo(); o->Seleccionar(); ObjActivo = m; m->GenerarRender();
+          W3dRunCommand("mode edit", e2); m->EnsureEdit(); W3dRunCommand("selmode face", e2); m->edit->SeleccionarTodo(true);
+          const bool sh = m->ShadeEdit(true);
+          const int suavesAntes = SH::Con(m, 1);
+          W3dRunCommand("loopcut 0 1 0.5", e2);
+          const int suaves = SH::Con(m, 1), sinFlag = SH::Con(m, -1), mal = SH::SuavesMal(m);
+          const bool bien = sh && suavesAntes == 6 && suaves == (int)m->faces3d.size() && sinFlag == 0 && mal == 0;
+          printf("      [shadetest] cubo suave + loop cut: caras=%d con smooth=%d sin flag=%d, suaves con normal partida=%d (esp todas / 0 / 0) -> %s\n", (int)m->faces3d.size(), suaves, sinFlag, mal, bien ? "OK" : "MAL");
+          if (!bien) ok = false; W3dRunCommand("mode object", e2); }
+        // (c) MIXTO: todo suave salvo la tapa (flat) + subsurf: el preview y el Apply respetan el flag por cara
+        { Object* o = NewMesh(MeshType(MeshType::cube), NULL, false); Mesh* m = (Mesh*)o; DeseleccionarTodo(); o->Seleccionar(); ObjActivo = m; m->GenerarRender();
+          W3dRunCommand("mode edit", e2); m->EnsureEdit(); W3dRunCommand("selmode face", e2); m->edit->SeleccionarTodo(true); m->ShadeEdit(true);
+          m->EnsureEdit(); EditMesh* e = m->edit; e->SeleccionarTodo(false);
+          for (size_t f = 0; f < e->faces.size(); f++) { bool tapa = true; for (size_t c = 0; c < e->faces[f].size(); c++) if (fabsf(e->pos[(size_t)e->faces[f][c]*3+1] - 1.0f) > 1e-4f) tapa = false; if (tapa) e->TogglearFace((int)f, true); }
+          m->ShadeEdit(false);
+          W3dRunCommand("mode object", e2);
+          const int planasAntes = SH::Con(m, 0), suavesAntes = SH::Con(m, 1);
+          W3dRunCommand("modadd subsurf", e2);
+          PolyMesh W; bool sm = false; extern bool Mesh_AplicarStackPublico(Mesh*, PolyMesh&, bool&);
+          int wPlanas = 0, wSuaves = 0; if (Mesh_AplicarStackPublico(m, W, sm)) for (size_t f = 0; f < W.F.size(); f++) { const int fs = PolySmoothDe(W, f); if (fs == 0) wPlanas++; else if (fs == 1) wSuaves++; }
+          // Lo que se VE en la vista previa: las NORMALES de la malla generada. Lo de arriba mira el dato
+          // del stack; esto mira genNormals, que es lo que dibuja el render con el modificador VIVO.
+          m->GenerarMallaModificada();
+          int duros = 0, blandos = 0;
+          if (m->genValido && m->genNormals && m->genFaces)
+              for (int t = 0; t + 2 < m->genFacesSize; t += 3) {
+                  const int i0 = m->genFaces[t], i1 = m->genFaces[t+1], i2 = m->genFaces[t+2];
+                  bool igual = true;
+                  for (int q = 0; q < 3; q++) if (m->genNormals[i0*3+q] != m->genNormals[i1*3+q] || m->genNormals[i0*3+q] != m->genNormals[i2*3+q]) igual = false;
+                  if (igual) duros++; else blandos++; }
+          { const bool bienN = duros > 0 && blandos > 0;
+            printf("      [shadetest] normales de la GENERADA: tris duros=%d blandos=%d (esp los dos > 0: la tapa flat sigue dura) -> %s\n",
+                   duros, blandos, bienN ? "OK" : "MAL");
+            if (!bienN) ok = false; }
+          W3dRunCommand("modapply", e2);
+          const int planas = SH::Con(m, 0), suaves = SH::Con(m, 1), mal = SH::PlanasMal(m), malS = SH::SuavesMal(m);
+          const bool bien = planasAntes == 1 && suavesAntes == 5 && wPlanas == 4 && wSuaves == 20 && planas == 4 && suaves == 20 && mal == 0 && malS == 0;
+          printf("      [shadetest] mixto + subsurf: antes flat=%d smooth=%d | stack flat=%d smooth=%d | apply flat=%d smooth=%d, planas torcidas=%d suaves partidas=%d (esp 1/5 | 4/20 | 4/20, 0, 0) -> %s\n",
+                 planasAntes, suavesAntes, wPlanas, wSuaves, planas, suaves, mal, malS, bien ? "OK" : "MAL");
+          if (!bien) ok = false; }
+        // (e) caras que HEREDAN (-1) sobre una malla PLANA: ningun modificador puede suavizarlas por su
+        // cuenta. Era el bug: subsurf y screw prendian outSmooth y suavizaban la malla ENTERA, asi que el
+        // flat se perdia apenas ponias el modificador.
+        { struct SW { static void Contar(Mesh* m, int& duros, int& blandos) { duros = 0; blandos = 0;
+              if (!m->genValido || !m->genNormals || !m->genFaces) return;
+              for (int t = 0; t + 2 < m->genFacesSize; t += 3) { const int i0=m->genFaces[t], i1=m->genFaces[t+1], i2=m->genFaces[t+2];
+                  bool ig = true; for (int q=0;q<3;q++) if (m->genNormals[i0*3+q]!=m->genNormals[i1*3+q] || m->genNormals[i0*3+q]!=m->genNormals[i2*3+q]) ig=false;
+                  if (ig) duros++; else blandos++; } } };
+          // subsurf: subdividir NO es suavizar -> el cubo plano sigue entero facetado
+          { Object* o = NewMesh(MeshType(MeshType::cube), NULL, false); Mesh* m = (Mesh*)o;
+            DeseleccionarTodo(); o->Seleccionar(); ObjActivo = m; m->GenerarRender();
+            int conFlag = 0; for (size_t f = 0; f < m->faces3d.size(); f++) if (m->faces3d[f].smooth != -1) conFlag++;
+            W3dRunCommand("modadd subsurf", e2); m->GenerarMallaModificada();
+            int duros = 0, blandos = 0; SW::Contar(m, duros, blandos);
+            const bool bien = conFlag == 0 && !m->meshSmooth && duros > 0 && blandos == 0;
+            printf("      [shadetest] cubo plano (todo hereda) + subsurf: tris duros=%d blandos=%d (esp 0 blandos: no se suaviza solo) -> %s\n",
+                   duros, blandos, bien ? "OK" : "MAL");
+            if (!bien) ok = false; }
+          // screw: su opcion Smooth vale para las caras que BARRE, no para las que ya estaban
+          { Object* o = NewMesh(MeshType(MeshType::cube), NULL, false); Mesh* m = (Mesh*)o;
+            DeseleccionarTodo(); o->Seleccionar(); ObjActivo = m; m->GenerarRender();
+            W3dRunCommand("modadd screw", e2); m->GenerarMallaModificada();
+            int duros = 0, blandos = 0; SW::Contar(m, duros, blandos);
+            const bool bien = duros > 0 && blandos > 0;
+            printf("      [shadetest] cubo plano + screw (Smooth ON): tris duros=%d blandos=%d (esp los dos: barrido suave, resto duro) -> %s\n",
+                   duros, blandos, bien ? "OK" : "MAL");
+            if (!bien) ok = false; } }
+        UndoLimpiar();
+        if (!ok) { err = "shadetest: ver los MAL de arriba"; return false; }
+        return true;
+    }
+    // ---- loopcuttri : (1) un loop cut que termina en un TRIANGULO le mete el vert nuevo al triangulo
+    //      (queda quad, sin agujero); (2) el loop select (Alt+click) termina en una "T". ----
+    if (cmd == "loopcuttri") {
+        bool ok = true; std::string e2;
+        struct LT {
+            static int Vert(EditMesh* e, float x, float y, float z) { int mejor=-1; float md=1e30f; for (int k=0;k<e->NumVerts();k++){ float dx=e->pos[(size_t)k*3]-x, dy=e->pos[(size_t)k*3+1]-y, dz=e->pos[(size_t)k*3+2]-z; float d=dx*dx+dy*dy+dz*dz; if (d<md){ md=d; mejor=k; } } return mejor; }
+            static int Edge(EditMesh* e, int a, int b) { for (int eg=0; eg<e->NumEdges(); eg++){ int u=e->lineIdx[(size_t)eg*2], v=e->lineIdx[(size_t)eg*2+1]; if ((u==a&&v==b)||(u==b&&v==a)) return eg; } return -1; }
+            static int Lados(const Mesh* m, int n) { int c=0; for (size_t f=0;f<m->faces3d.size();f++) if ((int)m->faces3d[f].idx.size()==n) c++; return c; }
+            // aristas (por posicion) usadas por una sola cara = borde abierto = agujero en una malla cerrada
+            static int Abiertas(const Mesh* m) { const int nV=m->vertexSize; const bool hayRep=((int)m->posRep.size()==nV); std::map<std::pair<int,int>,int> cnt;
+                for (size_t f=0;f<m->faces3d.size();f++){ const std::vector<int>& id=m->faces3d[f].idx; const int n=(int)id.size();
+                    for (int i=0;i<n;i++){ int a=id[i], b=id[(i+1)%n]; a=hayRep?m->posRep[a]:a; b=hayRep?m->posRep[b]:b; if (a==b) continue; if (a>b){int t=a;a=b;b=t;} cnt[std::make_pair(a,b)]++; } }
+                int ab=0; for (std::map<std::pair<int,int>,int>::iterator it=cnt.begin(); it!=cnt.end(); ++it) if (it->second==1) ab++; return ab; }
+        };
+        Object* o = NewMesh(MeshType(MeshType::cube), NULL, false); if (!o) { err="loopcuttri: NewMesh fallo"; return false; }
+        Mesh* m = (Mesh*)o; DeseleccionarTodo(); o->Seleccionar(); ObjActivo = m; m->GenerarRender();
+        W3dRunCommand("mode edit", e2); m->EnsureEdit(); W3dRunCommand("selmode face", e2);
+        // la tapa (y=1) en 2 triangulos
+        { EditMesh* e = m->edit; e->SeleccionarTodo(false);
+          for (size_t f=0; f<e->faces.size(); f++){ bool tapa=true; for (size_t c=0;c<e->faces[f].size();c++) if (fabsf(e->pos[(size_t)e->faces[f][c]*3+1]-1.0f)>1e-4f) tapa=false; if (tapa) e->TogglearFace((int)f, true); }
+          m->TriangularSeleccionEdit(); }
+        m->EnsureEdit();
+        const int trisAntes = LT::Lados(m,3), carasAntes = (int)m->faces3d.size();
+        // loop cut sobre la arista de ABAJO del frente: el corte sube por el frente, baja por atras y pasa por
+        // el fondo; en la tapa termina contra los 2 triangulos (uno por lado)
+        { EditMesh* e = m->edit; const int a = LT::Vert(e, -1, -1, 1), b = LT::Vert(e, 1, -1, 1); const int eg = LT::Edge(e, a, b);
+          if (eg < 0) { err = "loopcuttri: no encuentro la arista"; return false; }
+          const bool r = m->LoopCutEdit(eg, 1, 0.5f);
+          const int tris = LT::Lados(m,3), abiertas = LT::Abiertas(m);
+          const bool bien = r && trisAntes == 2 && carasAntes == 7 && tris == 0 && (int)m->faces3d.size() == 10 && abiertas == 0;
+          printf("      [loopcuttri] corte que termina en triangulos: caras %d -> %d, tris %d -> %d, bordes abiertos=%d (esp 7->10, 2->0, 0) -> %s\n", carasAntes, (int)m->faces3d.size(), trisAntes, tris, abiertas, bien ? "OK" : "MAL");
+          if (!bien) ok = false; }
+        // loop select desde la arista del corte en el frente: sube hasta la "T" de la tapa y termina;
+        // por abajo recorre fondo y atras hasta la otra "T" -> 3 aristas, ni una mas
+        m->EnsureEdit();
+        { EditMesh* e = m->edit; W3dRunCommand("selmode edge", e2);
+          const int a = LT::Vert(e, 0, -1, 1), b = LT::Vert(e, 0, 1, 1); const int eg = LT::Edge(e, a, b);
+          if (eg < 0) { err = "loopcuttri: no encuentro la arista del corte"; return false; }
+          e->SeleccionarLoopEdge(eg, true);
+          int sel = 0; for (size_t k=0;k<e->edgeSel.size();k++) if (e->edgeSel[k]) sel++;
+          const bool bien = (sel == 3);
+          printf("      [loopcuttri] loop select desde el corte: %d aristas (esp 3: frente, fondo y atras; frena en las T de la tapa) -> %s\n", sel, bien ? "OK" : "MAL");
+          if (!bien) ok = false; }
+        W3dRunCommand("mode object", e2);
+        UndoLimpiar();
+        if (!ok) { err = "loopcuttri: ver los MAL de arriba"; return false; }
+        return true;
+    }
+    // ---- editcage : la JAULA editable (EditMesh) vs la malla real: para ver si quedo vieja tras un undo ----
+    if (cmd == "editcage") {
+        Mesh* m = ScriptActiveMesh(); if (!m) { err = "no hay malla activa"; return false; }
+        int sel = 0; if (m->edit) for (size_t k = 0; k < m->edit->vertSel.size(); k++) if (m->edit->vertSel[k]) sel++;
+        printf("      [editcage] %s: edit=%s verts=%d faces=%d sel=%d | malla: verts=%d faces3d=%d | undo=%s redo=%s\n", m->name.c_str(), m->edit ? "si" : "NO",
+               m->edit ? m->edit->NumVerts() : -1, m->edit ? m->edit->NumFaces() : -1, sel, m->vertexSize, (int)m->faces3d.size(), UndoHayAlgo() ? "si" : "no", UndoHayRedo() ? "si" : "no");
+        return true;
+    }
+    // ---- loopcutui <editEdge> : el loop cut por el MISMO camino que la UI de escritorio (menu Edge >
+    //      Loop Cut sobre la arista activa + clicks del modal), que deja el panel redo abierto ----
+    if (cmd == "loopcutui") {
+        Mesh* m = ScriptActiveMesh(); if (!m) { err = "no hay malla activa"; return false; }
+        if (InteractionMode != EditMode) { err = "loopcutui necesita Edit Mode"; return false; }
+        int eg = -1; ss >> eg; m->EnsureEdit(); if (!m->edit || eg < 0 || eg >= m->edit->NumEdges()) { err = "loopcutui: arista fuera de rango"; return false; }
+        EditSelectMode = SelEdge; m->edit->edgeSel.assign((size_t)m->edit->NumEdges(), 0); m->edit->edgeSel[(size_t)eg] = 1; m->edit->activeIdx = eg;
+        LayoutLoopCutDesdeActivo();
+        int clicks = 0; while (LoopCutActivo() && clicks < 3) { LoopCutClickIzq(0, 0); clicks++; }
+        printf("      [loopcutui] arista %d: clicks=%d, modal activo=%d, panel redo=%s\n", eg, clicks, LoopCutActivo() ? 1 : 0, RedoMeshPanelActivo() ? "si" : "no");
+        return true;
+    }
+    // ---- loopcutredo <cortes> <factor> <correctUV 0|1> <edge 1..N> : el panel redo del loop cut ----
+    if (cmd == "loopcutredo") {
+        int cortes = 1, cuv = 1, edge = 1; float factor = 0.0f; ss >> cortes >> factor >> cuv >> edge;
+        LoopCutRedoAplicar(cortes, factor, cuv != 0, edge - 1);
+        printf("      [loopcutredo] cortes=%d factor=%.2f correctUV=%d edge=%d/%d (arista %d; candidatas %d %d %d %d)\n", LoopCutGetCortes(), LoopCutGetFactor(), LoopCutGetCorrectUV() ? 1 : 0, LoopCutGetCandSel() + 1, LoopCutGetCandN(), LoopCutGetEdge(), LoopCutGetCand(0), LoopCutGetCand(1), LoopCutGetCand(2), LoopCutGetCand(3));
+        return true;
+    }
+    // ---- loopcutpanel : el panel redo del loop cut de punta a punta (arista, factor, correct UV) y el undo ----
+    if (cmd == "loopcutpanel") {
+        bool ok = true; std::string e2;
+        struct LP {
+            // posiciones de los verts que NO son esquinas del cubo (= los del corte), ordenadas para comparar
+            // (como claves de texto ordenadas: comparar coordenadas sueltas ordenadas confundia dos cortes distintos)
+            static std::vector<std::string> Corte(const Mesh* m) { std::vector<std::string> v; std::map<std::string,int> vistos;
+                for (int i = 0; i < m->vertexSize; i++) { const float* q = m->vertex + i*3;
+                    if (fabsf(fabsf(q[0])-1.0f) < 1e-3f && fabsf(fabsf(q[1])-1.0f) < 1e-3f && fabsf(fabsf(q[2])-1.0f) < 1e-3f) continue;
+                    char b[64]; sprintf(b, "%.2f,%.2f,%.2f", q[0], q[1], q[2]); if (vistos.insert(std::make_pair(std::string(b), 1)).second) v.push_back(b); }
+                std::sort(v.begin(), v.end()); return v; }
+            static bool Igual(const std::vector<std::string>& a, const std::vector<std::string>& b) { return a == b; }
+            static bool IgualF(const std::vector<float>& a, const std::vector<float>& b) { if (a.size() != b.size()) return false; for (size_t i = 0; i < a.size(); i++) if (fabsf(a[i]-b[i]) > 1e-3f) return false; return true; }
+            // uv de los corners de los verts del corte
+            static std::vector<float> UVCorte(const Mesh* m) { std::vector<float> v; const UVMap* um = (m->uvMapActivo >= 0 && m->uvMapActivo < (int)m->uvMaps.size()) ? m->uvMaps[m->uvMapActivo] : NULL; if (!um) return v;
+                int L = 0; for (size_t f = 0; f < m->faces3d.size(); f++) for (size_t c = 0; c < m->faces3d[f].idx.size(); c++, L++) { const float* q = m->vertex + m->faces3d[f].idx[c]*3;
+                    if (fabsf(fabsf(q[0])-1.0f) < 1e-3f && fabsf(fabsf(q[1])-1.0f) < 1e-3f && fabsf(fabsf(q[2])-1.0f) < 1e-3f) continue;
+                    if (L*2+1 < (int)um->uv.size()) { v.push_back(um->uv[L*2]); v.push_back(um->uv[L*2+1]); } }
+                std::sort(v.begin(), v.end()); return v; }
+        };
+        Object* o = NewMesh(MeshType(MeshType::cube), NULL, false); if (!o) { err = "loopcutpanel: NewMesh fallo"; return false; }
+        Mesh* m = (Mesh*)o; DeseleccionarTodo(); o->Seleccionar(); ObjActivo = m; m->GenerarRender();
+        // uv DISTINTAS por corner (el cubo primitivo puede traerlas iguales): asi se nota interpolar vs copiar
+        m->PoblarCapas();
+        if (m->uvMapActivo >= 0 && m->uvMapActivo < (int)m->uvMaps.size()) { UVMap* um = m->uvMaps[m->uvMapActivo];
+            for (size_t L = 0; L*2+1 < um->uv.size(); L++) { um->uv[L*2] = 0.01f * (float)L; um->uv[L*2+1] = 0.02f * (float)L; } m->AplicarCapasAlRender(); }
+        W3dRunCommand("mode edit", e2);
+        if (!W3dRunCommand("loopcutui 0", e2)) { err = "loopcutpanel: " + e2; return false; }
+        const bool panel = RedoMeshPanelActivo(); const int candN = LoopCutGetCandN(), sel = LoopCutGetCandSel();
+        const std::vector<std::string> A = LP::Corte(m); const std::vector<float> uvA = LP::UVCorte(m);
+        printf("      [loopcutpanel] tras el corte: panel=%s, aristas candidatas=%d (elegida %d), verts del corte=%d, caras=%d (esp panel, 4, 4, 10) -> %s\n", panel ? "si" : "no", candN, sel + 1, (int)A.size(), (int)m->faces3d.size(), (panel && candN == 4 && A.size() == 4 && m->faces3d.size() == 10) ? "OK" : "MAL");
+        if (!(panel && candN == 4 && A.size() == 4 && m->faces3d.size() == 10)) ok = false;
+        // otra arista (perpendicular): el loop cambia de direccion -> otros verts
+        const int aristaAntes = LoopCutGetEdge();
+        LoopCutRedoAplicar(1, 0.0f, true, (sel + 1) % candN);
+        const std::vector<std::string> B = LP::Corte(m);
+        printf("      [loopcutpanel]   (arista de entrada %d -> %d; candidatas %d %d %d %d)\n", aristaAntes, LoopCutGetEdge(), LoopCutGetCand(0), LoopCutGetCand(1), LoopCutGetCand(2), LoopCutGetCand(3));
+        { const bool bien = !LP::Igual(A, B) && B.size() == 4 && m->faces3d.size() == 10;
+          printf("      [loopcutpanel] arista %d: verts del corte distintos=%s, caras=%d (esp si, 10) -> %s\n", (sel + 1) % candN + 1, LP::Igual(A, B) ? "no" : "si", (int)m->faces3d.size(), bien ? "OK" : "MAL"); if (!bien) ok = false; }
+        // vuelta a la arista original con factor 0.5: mismos verts corridos
+        LoopCutRedoAplicar(1, 0.5f, true, sel);
+        const std::vector<std::string> C = LP::Corte(m);
+        { const bool bien = !LP::Igual(A, C) && C.size() == 4;
+          printf("      [loopcutpanel] factor 0.5: verts corridos=%s -> %s\n", LP::Igual(A, C) ? "no" : "si", bien ? "OK" : "MAL"); if (!bien) ok = false; }
+        // Correct UVs apagado: los corners del corte copian un extremo (uv distintas a las interpoladas)
+        LoopCutRedoAplicar(1, 0.0f, false, sel);
+        const std::vector<float> uvB = LP::UVCorte(m);
+        { const bool bien = LP::Igual(LP::Corte(m), A) && !uvA.empty() && !LP::IgualF(uvA, uvB);
+          printf("      [loopcutpanel] Correct UVs off: misma geometria=%s, uv distintas=%s -> %s\n", LP::Igual(LP::Corte(m), A) ? "si" : "no", LP::IgualF(uvA, uvB) ? "no" : "si", bien ? "OK" : "MAL"); if (!bien) ok = false; }
+        // Ctrl+Z: la malla vuelve al cubo, el panel se cierra, y la jaula se rehace en el proximo frame
+        W3dRunCommand("undo", e2);
+        const bool cerrado = !RedoMeshPanelActivo();
+        m->EnsureEdit();
+        { const bool bien = cerrado && m->vertexSize == 24 && m->faces3d.size() == 6 && m->edit && m->edit->NumVerts() == 8;
+          printf("      [loopcutpanel] undo: panel cerrado=%s, verts=%d caras=%d, jaula=%d verts (esp si, 24, 6, 8) -> %s\n", cerrado ? "si" : "no", m->vertexSize, (int)m->faces3d.size(), m->edit ? m->edit->NumVerts() : -1, bien ? "OK" : "MAL"); if (!bien) ok = false; }
+        W3dRunCommand("mode object", e2);
+        UndoLimpiar();
+        if (!ok) { err = "loopcutpanel: ver los MAL de arriba"; return false; }
+        return true;
+    }
+    // ---- cutverts : posiciones (unicas) de los verts que no son esquinas +-1 (los de un corte) + aristas del edit ----
+    if (cmd == "cutverts") {
+        Mesh* m = ScriptActiveMesh(); if (!m) { err = "no hay malla activa"; return false; }
+        std::map<std::string,int> vistos; printf("      [cutverts] %s:", m->name.c_str());
+        for (int i = 0; i < m->vertexSize; i++) { const float* q = m->vertex + i*3;
+            if (fabsf(fabsf(q[0])-1.0f) < 1e-3f && fabsf(fabsf(q[1])-1.0f) < 1e-3f && fabsf(fabsf(q[2])-1.0f) < 1e-3f) continue;
+            char b[64]; sprintf(b, "(%.2f,%.2f,%.2f)", q[0], q[1], q[2]); if (vistos.insert(std::make_pair(std::string(b), 1)).second) printf(" %s", b); }
+        printf("\n");
+        if (m->edit) { EditMesh* e = m->edit; printf("      [cutverts] aristas edit:"); for (int eg = 0; eg < e->NumEdges() && eg < 14; eg++) { int a = e->lineIdx[(size_t)eg*2], b = e->lineIdx[(size_t)eg*2+1];
+            printf(" %d=(%.0f,%.0f,%.0f)-(%.0f,%.0f,%.0f)", eg, e->pos[(size_t)a*3], e->pos[(size_t)a*3+1], e->pos[(size_t)a*3+2], e->pos[(size_t)b*3], e->pos[(size_t)b*3+1], e->pos[(size_t)b*3+2]); } printf("\n"); }
+        return true;
+    }
+    // ---- selectpos <x> <y> <z> : selecciona (solo ese) el vertice editable mas cercano a esa posicion ----
+    if (cmd == "selectpos") {
+        Mesh* m = ScriptActiveMesh(); if (!m) { err = "no hay malla activa"; return false; }
+        float x = 0, y = 0, z = 0; ss >> x >> y >> z; m->EnsureEdit(); EditMesh* e = m->edit; if (!e) { err = "sin edit mesh"; return false; }
+        int mejor = -1; float md = 1e30f;
+        for (int k = 0; k < e->NumVerts(); k++) { float dx = e->pos[(size_t)k*3]-x, dy = e->pos[(size_t)k*3+1]-y, dz = e->pos[(size_t)k*3+2]-z; float d = dx*dx+dy*dy+dz*dz; if (d < md) { md = d; mejor = k; } }
+        if (mejor < 0) { err = "selectpos: sin vertices"; return false; }
+        UndoCapturarSeleccionEdit(m); e->TogglearVert(mejor, true);
+        printf("      [selectpos] vert %d en (%.2f,%.2f,%.2f)\n", mejor, e->pos[(size_t)mejor*3], e->pos[(size_t)mejor*3+1], e->pos[(size_t)mejor*3+2]);
+        return true;
+    }
+    // ---- undoflow : loop cut (UI) + click en un vert del corte + mover hasta fusionar (auto merge) y
+    //      DESHACER paso a paso: unmerge, move, seleccion, loop cut; cada paso con SU seleccion ----
+    if (cmd == "undoflow") {
+        bool ok = true; std::string e2;
+        struct UF { static int Sel(Mesh* m) { m->EnsureEdit(); if (!m->edit) return -1; int n = 0; for (size_t k = 0; k < m->edit->vertSel.size(); k++) if (m->edit->vertSel[k]) n++; return n; }
+                    static bool Hay(Mesh* m, float x, float y, float z) { for (int i = 0; i < m->vertexSize; i++) if (fabsf(m->vertex[i*3]-x) < 1e-3f && fabsf(m->vertex[i*3+1]-y) < 1e-3f && fabsf(m->vertex[i*3+2]-z) < 1e-3f) return true; return false; } };
+        Object* o = NewMesh(MeshType(MeshType::cube), NULL, false); if (!o) { err = "undoflow: NewMesh fallo"; return false; }
+        Mesh* m = (Mesh*)o; DeseleccionarTodo(); o->Seleccionar(); ObjActivo = m; m->GenerarRender();
+        W3dRunCommand("mode edit", e2);
+        const bool amPrev = g_autoMerge; const float thPrev = g_autoMergeThreshold; g_autoMerge = true; g_autoMergeThreshold = 0.001f;
+        if (!W3dRunCommand("loopcutui 0", e2) || !W3dRunCommand("selmode vert", e2) || !W3dRunCommand("selectpos 0 -1 1", e2) || !W3dRunCommand("move 1", e2)) { g_autoMerge = amPrev; g_autoMergeThreshold = thPrev; err = "undoflow: " + e2; return false; }
+        g_autoMerge = amPrev; g_autoMergeThreshold = thPrev;
+        { const bool bien = m->vertexSize < 32 && UF::Sel(m) == 1;
+          printf("      [undoflow] tras mover y fusionar: verts=%d sel=%d (esp menos de 32: fusiono; 1) -> %s\n", m->vertexSize, UF::Sel(m), bien ? "OK" : "MAL"); if (!bien) ok = false; }
+        W3dRunCommand("undo", e2);
+        { const bool bien = m->vertexSize == 32 && UF::Sel(m) == 1 && UF::Hay(m, 1, -1, 1) && !UF::Hay(m, 0, -1, 1);
+          printf("      [undoflow] undo 1 (des-fusionar): verts=%d sel=%d, vert movido sigue en (1,-1,1)=%s (esp 32, 1, si) -> %s\n", m->vertexSize, UF::Sel(m), UF::Hay(m, 1, -1, 1) ? "si" : "no", bien ? "OK" : "MAL"); if (!bien) ok = false; }
+        W3dRunCommand("undo", e2);
+        { const bool bien = UF::Hay(m, 0, -1, 1) && UF::Sel(m) == 1;
+          printf("      [undoflow] undo 2 (mover): vert de vuelta en (0,-1,1)=%s sel=%d (esp si, 1) -> %s\n", UF::Hay(m, 0, -1, 1) ? "si" : "no", UF::Sel(m), bien ? "OK" : "MAL"); if (!bien) ok = false; }
+        W3dRunCommand("undo", e2);
+        { const bool bien = UF::Sel(m) == 4 && m->faces3d.size() == 10;
+          printf("      [undoflow] undo 3 (click): sel=%d caras=%d (esp 4 = los verts del corte, 10) -> %s\n", UF::Sel(m), (int)m->faces3d.size(), bien ? "OK" : "MAL"); if (!bien) ok = false; }
+        W3dRunCommand("undo", e2);
+        { const bool bien = m->vertexSize == 24 && m->faces3d.size() == 6;
+          printf("      [undoflow] undo 4 (loop cut): verts=%d caras=%d (esp 24, 6) -> %s\n", m->vertexSize, (int)m->faces3d.size(), bien ? "OK" : "MAL"); if (!bien) ok = false; }
+        W3dRunCommand("mode object", e2);
+        UndoLimpiar();
+        if (!ok) { err = "undoflow: ver los MAL de arriba"; return false; }
+        return true;
+    }
+    // ---- dissolvetest : Borrar > Loops de Aristas como disolucion general: la diagonal de dos triangulos
+    //      da un quad, el loop entero deshace el loop cut, y dos aristas del loop dan ngons ----
+    if (cmd == "dissolvetest") {
+        bool ok = true; std::string e2;
+        struct DT {
+            static bool Esquina(const float* q) { return fabsf(fabsf(q[0])-1.0f) < 1e-3f && fabsf(fabsf(q[1])-1.0f) < 1e-3f && fabsf(fabsf(q[2])-1.0f) < 1e-3f; }
+            static int Lados(const Mesh* m, int n) { int c=0; for (size_t f=0;f<m->faces3d.size();f++) if ((int)m->faces3d[f].idx.size()==n) c++; return c; }
+            static int Abiertas(const Mesh* m) { const int nV=m->vertexSize; const bool hayRep=((int)m->posRep.size()==nV); std::map<std::pair<int,int>,int> cnt;
+                for (size_t f=0;f<m->faces3d.size();f++){ const std::vector<int>& id=m->faces3d[f].idx; const int n=(int)id.size();
+                    for (int i=0;i<n;i++){ int a=id[i], b=id[(i+1)%n]; a=hayRep?m->posRep[a]:a; b=hayRep?m->posRep[b]:b; if (a==b) continue; if (a>b){int t=a;a=b;b=t;} cnt[std::make_pair(a,b)]++; } }
+                int ab=0; for (std::map<std::pair<int,int>,int>::iterator it=cnt.begin(); it!=cnt.end(); ++it) if (it->second==1) ab++; return ab; }
+            static int SelEdges(EditMesh* e, int modo) { int n=0; e->edgeSel.assign((size_t)e->NumEdges(), 0);
+                for (int eg=0; eg<e->NumEdges(); eg++){ const float* a=&e->pos[(size_t)e->lineIdx[(size_t)eg*2]*3]; const float* b=&e->pos[(size_t)e->lineIdx[(size_t)eg*2+1]*3]; bool sel=false;
+                    if (modo==0) sel = Esquina(a) && Esquina(b) && fabsf(a[1]-1.0f)<1e-3f && fabsf(b[1]-1.0f)<1e-3f && fabsf(a[0]-b[0])>1.5f && fabsf(a[2]-b[2])>1.5f;
+                    else if (modo==1) sel = !Esquina(a) && !Esquina(b);
+                    else if (modo==2) sel = !Esquina(a) && !Esquina(b) && ((fabsf(a[2]-1.0f)<1e-3f && fabsf(b[2]-1.0f)<1e-3f) || (fabsf(a[1]-1.0f)<1e-3f && fabsf(b[1]-1.0f)<1e-3f));   // la del frente (z=1) y la de la tapa (y=1): 2 seguidas
+                    if (sel){ e->edgeSel[(size_t)eg]=1; n++; } } return n; }
+        };
+        { Object* o = NewMesh(MeshType(MeshType::cube), NULL, false); Mesh* m = (Mesh*)o; DeseleccionarTodo(); o->Seleccionar(); ObjActivo = m; m->GenerarRender();
+          W3dRunCommand("mode edit", e2); m->EnsureEdit(); W3dRunCommand("selmode face", e2);
+          { EditMesh* e = m->edit; e->SeleccionarTodo(false); for (size_t f=0; f<e->faces.size(); f++){ bool tapa=true; for (size_t c=0;c<e->faces[f].size();c++) if (fabsf(e->pos[(size_t)e->faces[f][c]*3+1]-1.0f)>1e-4f) tapa=false; if (tapa) e->TogglearFace((int)f, true); } m->TriangularSeleccionEdit(); }
+          m->EnsureEdit(); W3dRunCommand("selmode edge", e2);
+          const int nsel = DT::SelEdges(m->edit, 0);
+          const bool r = m->BorrarEdgeLoopEdit();
+          const bool bien = nsel == 1 && r && m->faces3d.size() == 6 && DT::Lados(m,3) == 0 && DT::Lados(m,4) == 6 && DT::Abiertas(m) == 0;
+          printf("      [dissolvetest] diagonal de 2 triangulos: seleccionadas=%d, %s -> caras=%d tris=%d quads=%d abiertas=%d (esp 1, 6, 0, 6, 0) -> %s\n", nsel, r ? "disolvio" : "NO disolvio", (int)m->faces3d.size(), DT::Lados(m,3), DT::Lados(m,4), DT::Abiertas(m), bien ? "OK" : "MAL");
+          if (!bien) ok = false; W3dRunCommand("mode object", e2); }
+        { Object* o = NewMesh(MeshType(MeshType::cube), NULL, false); Mesh* m = (Mesh*)o; DeseleccionarTodo(); o->Seleccionar(); ObjActivo = m; m->GenerarRender();
+          W3dRunCommand("mode edit", e2); W3dRunCommand("loopcut 0 1 0.5", e2); m->EnsureEdit(); W3dRunCommand("selmode edge", e2);
+          const int nsel = DT::SelEdges(m->edit, 1);
+          const bool r = m->BorrarEdgeLoopEdit(); m->EnsureEdit();
+          const bool bien = nsel == 4 && r && m->faces3d.size() == 6 && DT::Lados(m,4) == 6 && m->edit->NumVerts() == 8 && DT::Abiertas(m) == 0;
+          printf("      [dissolvetest] loop entero del corte: seleccionadas=%d, %s -> caras=%d quads=%d verts=%d abiertas=%d (esp 4, 6, 6, 8, 0) -> %s\n", nsel, r ? "disolvio" : "NO disolvio", (int)m->faces3d.size(), DT::Lados(m,4), m->edit->NumVerts(), DT::Abiertas(m), bien ? "OK" : "MAL");
+          if (!bien) ok = false; W3dRunCommand("mode object", e2); }
+        { Object* o = NewMesh(MeshType(MeshType::cube), NULL, false); Mesh* m = (Mesh*)o; DeseleccionarTodo(); o->Seleccionar(); ObjActivo = m; m->GenerarRender();
+          W3dRunCommand("mode edit", e2); W3dRunCommand("loopcut 0 1 0.5", e2); m->EnsureEdit(); W3dRunCommand("selmode edge", e2);
+          const int nsel = DT::SelEdges(m->edit, 2);
+          const bool r = m->BorrarEdgeLoopEdit(); m->EnsureEdit();
+          const bool bien = nsel == 2 && r && m->faces3d.size() == 8 && m->edit->NumVerts() == 11 && DT::Abiertas(m) == 0;
+          printf("      [dissolvetest] 2 aristas del corte: seleccionadas=%d, %s -> caras=%d verts=%d abiertas=%d (esp 2, 8, 11, 0) -> %s\n", nsel, r ? "disolvio" : "NO disolvio", (int)m->faces3d.size(), m->edit->NumVerts(), DT::Abiertas(m), bien ? "OK" : "MAL");
+          if (!bien) ok = false; W3dRunCommand("mode object", e2); }
+        UndoLimpiar();
+        if (!ok) { err = "dissolvetest: ver los MAL de arriba"; return false; }
+        return true;
+    }
+    // ---- booldel : borrar el target de un Boolean lo deja en "none" y el cubo vuelve a verse normal; el undo
+    //      del borrado devuelve el target y el corte. (Vale para cualquier modificador con target.) ----
+    if (cmd == "booldel") {
+        bool ok = true; std::string e2;
+        extern void ActualizarEditMeshActivo();
+        if (!W3dRunCommand("add cube", e2) || !W3dRunCommand("add cylinder", e2)) { err = "booldel: " + e2; return false; }
+        if (!W3dRunCommand("selobj Cilindro.001", e2) && !W3dRunCommand("selobj Cilindro", e2)) { err = "booldel: no encuentro el cilindro"; return false; }
+        Object* cil = ObjActivo;
+        W3dRunCommand("objscale 0.5 2 0.5", e2);
+        if (!W3dRunCommand("selobj Cubo.001", e2) && !W3dRunCommand("selobj Cubo", e2)) { err = "booldel: no encuentro el cubo"; return false; }
+        Mesh* m = ScriptActiveMesh(); if (!m) { err = "booldel: sin cubo"; return false; }
+        W3dRunCommand("modadd boolean", e2);
+        if (m->modificadores.empty()) { err = "booldel: sin modificador"; return false; }
+        m->modificadores[0]->target = cil; m->GenerarMallaModificada();
+        const int trisCon = m->genValido ? m->genFacesSize / 3 : -1;
+        // borrar el cilindro (como el usuario: seleccionarlo y X)
+        DeseleccionarTodo(); cil->Seleccionar(); ObjActivo = cil;
+        if (!W3dRunCommand("delete", e2)) { err = "booldel: " + e2; return false; }
+        ActualizarEditMeshActivo();   // lo que hace el frame: regenera lo que quedo invalido
+        const bool none = (m->modificadores[0]->target == NULL);
+        const int trisSin = m->genValido ? m->genFacesSize / 3 : -1;
+        { const bool bien = trisCon == 48 && none && trisSin == 12;
+          printf("      [booldel] con target: %d tris | borrado el cilindro: target=%s, %d tris (esp 48, none, 12 = el cubo normal) -> %s\n", trisCon, none ? "none" : "SIGUE", trisSin, bien ? "OK" : "MAL"); if (!bien) ok = false; }
+        W3dRunCommand("undo", e2); ActualizarEditMeshActivo();
+        const bool vuelve = (m->modificadores[0]->target == cil);
+        const int trisUndo = m->genValido ? m->genFacesSize / 3 : -1;
+        { const bool bien = vuelve && trisUndo == 48;
+          printf("      [booldel] undo del borrado: target vuelve=%s, %d tris (esp si, 48) -> %s\n", vuelve ? "si" : "no", trisUndo, bien ? "OK" : "MAL"); if (!bien) ok = false; }
+        UndoLimpiar();
+        if (!ok) { err = "booldel: ver los MAL de arriba"; return false; }
+        return true;
+    }
+    // ---- geninfo : estado de la malla generada por modificadores de la malla activa ----
+    if (cmd == "geninfo") {
+        Mesh* m = ScriptActiveMesh(); if (!m) { err = "no hay malla activa"; return false; }
+        printf("      [geninfo] %s: genValido=%d genTris=%d | faces3d=%d tris propios=%d | modificadores=%d | edit=%d\n",
+               m->name.c_str(), m->genValido ? 1 : 0, m->genValido ? m->genFacesSize / 3 : 0, (int)m->faces3d.size(), m->facesSize / 3,
+               (int)m->modificadores.size(), ((Object*)m == g_editMesh) ? 1 : 0);
+        return true;
+    }
+    // ---- tricheck : cada cara de faces3d triangulada (W3dTriangularCara) cubre exactamente su area? ----
+    if (cmd == "tricheck") {
+        Mesh* m = ScriptActiveMesh(); if (!m) { err = "no hay malla activa"; return false; }
+        int mal = 0, ngons = 0;
+        for (size_t f = 0; f < m->faces3d.size(); f++) {
+            const std::vector<int>& id = m->faces3d[f].idx; const int nn = (int)id.size(); if (nn < 3) continue;
+            if (nn > 4) ngons++;
+            Vector3 nrm(0, 0, 0), av(0, 0, 0);
+            for (int i = 0; i < nn; i++) { const float* a = m->vertex + id[i] * 3; const float* b = m->vertex + id[(i + 1) % nn] * 3;
+                Vector3 p0(a[0], a[1], a[2]), p1(b[0], b[1], b[2]);
+                nrm.x += (p0.y - p1.y) * (p0.z + p1.z); nrm.y += (p0.z - p1.z) * (p0.x + p1.x); nrm.z += (p0.x - p1.x) * (p0.y + p1.y);
+                av += Vector3::Cross(p0, p1); }
+            if (nrm.Length() < 1e-9f) continue;
+            nrm = nrm.Normalized();
+            const float areaPoly = 0.5f * av.Dot(nrm);
+            std::vector<MeshIndex> tri; W3dTriangularCara(m->vertex, id, tri);
+            float areaTris = 0.0f; bool neg = false;
+            for (size_t t = 0; t + 2 < tri.size(); t += 3) {
+                const float* a = m->vertex + tri[t] * 3; const float* b = m->vertex + tri[t + 1] * 3; const float* c = m->vertex + tri[t + 2] * 3;
+                Vector3 p0(a[0], a[1], a[2]), p1(b[0], b[1], b[2]), p2(c[0], c[1], c[2]);
+                const float at = 0.5f * Vector3::Cross(p1 - p0, p2 - p0).Dot(nrm);
+                if (at < -1e-5f) neg = true; areaTris += at; }
+            if (neg || fabsf(areaTris - areaPoly) > 1e-3f * (areaPoly > 1.0f ? areaPoly : 1.0f)) {
+                mal++;
+                printf("      [tricheck] MAL cara %d (%d corners) area poly %.4f tris %.4f%s | corners:", (int)f, nn, areaPoly, areaTris, neg ? " (dado vuelta)" : "");
+                for (int k = 0; k < nn; k++) { const float* q = m->vertex + id[k] * 3; printf(" %d(%.2f,%.2f,%.2f)", id[k], q[0], q[1], q[2]); }
+                printf("\n");
+            }
+        }
+        printf("      [tricheck] %s: %d caras (%d ngons), %d con triangulacion mal\n", m->name.c_str(), (int)m->faces3d.size(), ngons, mal);
+        if (mal) { err = "tricheck: hay caras mal trianguladas"; return false; }
+        return true;
+    }
     // ---- xray <0|1> : el toggle X-Ray del menu Overlays, para pruebas y capturas ----
     if (cmd == "xray") { int v = 0; ss >> v; g_xray = (v != 0); g_redraw = true; return true; }
 
@@ -24457,6 +25606,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         else if (sub == "color")   { float r=1,g=1,b=1; ss >> r >> g >> b;   // color del pincel (0..1)
                                      BrushGet().color[0]=r; BrushGet().color[1]=g; BrushGet().color[2]=b; BrushGet().color[3]=1.0f; }
         else if (sub == "solosel") { int v = 0; ss >> v; WeightPaintSoloSel() = (v != 0); }
+        else if (sub == "porvertice") { int v = 1; ss >> v; BrushGet().porVertice = (v != 0); }   // vertex color: por vertice (1) / por corner (0)
         else { err = "brushset: uso: brushset <marcas|falloff|valor|radio|popup|color|solosel> [v]"; return false; }
         g_redraw = true;
         return true;
@@ -24521,16 +25671,20 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
                    def?"OK":"MAL", subio?"OK":"MAL", clamp?"OK":"MAL", extremo?"OK":"MAL", borro?"OK":"MAL");
             if (!def || !subio || !clamp || !extremo || !borro) ok = false;
         }
-        // 3) MARCAS -> el falloff EFECTIVO es constante (no importa cual este elegido)
+        // 3) el falloff EFECTIVO: las marcas NO lo cambian (con marcas prendidas sigue el elegido);
+        //    solo el modo "=" (valor exacto en todo el circulo) lo vuelve constante
         {
             BrushGet().falloff.tipo = FoSharp;
-            BrushGet().marcas = false;
+            BrushGet().marcas = false; BrushGet().modo = WPSumar;
             const bool off = (BrushFalloffEfectivo().tipo == FoSharp);
             BrushGet().marcas = true;
-            const bool on = (BrushFalloffEfectivo().tipo == FoConstant);
-            printf("      [falloff] marcas OFF -> usa el elegido=%s | ON -> constante=%s\n",
-                   off?"OK":"MAL", on?"OK":"MAL");
-            if (!off || !on) ok = false;
+            const bool on = (BrushFalloffEfectivo().tipo == FoSharp);
+            BrushGet().modo = WPIgualar;
+            const bool igual = (BrushFalloffEfectivo().tipo == FoConstant);
+            BrushGet().modo = WPSumar; BrushGet().marcas = false;
+            printf("      [falloff] marcas OFF -> usa el elegido=%s | marcas ON -> sigue el elegido=%s | modo = -> constante=%s\n",
+                   off?"OK":"MAL", on?"OK":"MAL", igual?"OK":"MAL");
+            if (!off || !on || !igual) ok = false;
         }
         // 4) PINTAR con las marcas prendidas: TODO lo que cae adentro del radio queda en el
         //    valor de la barra (sin degradar con la distancia); lo de afuera no se toca.
@@ -24569,8 +25723,10 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
             PincelAplicar(m, g, 0.0f, 0.0f, 120.0f, 0.40f, WPSumar, FP::Proy, &ctx,
                           NULL, &BrushFalloffEfectivo());
             const float w0 = PesoDe(m, g, cp0), w1 = PesoDe(m, g, cp1), w3 = PesoDe(m, g, cp3);
-            const bool marcasOk = fabsf(w0 - 0.40f) < 1e-5f && fabsf(w1 - 0.40f) < 1e-5f && w3 == 0.0f;
-            printf("      [falloff] marcas pintando: centro=%.4f lejos=%.4f (los DOS esp 0.40) afuera=%.4f (esp 0) -> %s\n",
+            // con marcas el falloff MANDA igual: el centro entra completo y el lejano degradado (antes las marcas
+            // forzaban constante y rozar un corner lo pintaba entero)
+            const bool marcasOk = fabsf(w0 - 0.40f) < 1e-5f && w1 > 0.0f && w1 < 0.40f - 1e-5f && w3 == 0.0f;
+            printf("      [falloff] marcas pintando: centro=%.4f (esp 0.40) lejos=%.4f (esp entre 0 y 0.40: degradado) afuera=%.4f (esp 0) -> %s\n",
                    w0, w1, w3, marcasOk?"OK":"MAL");
             if (!marcasOk) ok = false;
             // el MISMO trazo sin marcas y con Smooth: ahi si tiene que degradar con la distancia

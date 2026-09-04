@@ -109,7 +109,7 @@ class CWhisk3D : public MHidObserver
         // UI 2D vieja de Symbian.
         void DrawMouseCursor();
 
-        // --- seleccion con click izquierdo (color picking estilo Blender) ---
+        // --- seleccion con click izquierdo (color picking ) ---
         // render invisible con un color por objeto + lectura del pixel del
         // click; clicks repetidos en el mismo lugar ciclan entre solapados
         void ClickSelect();

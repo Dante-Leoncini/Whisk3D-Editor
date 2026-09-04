@@ -88,7 +88,7 @@ bool UVEditorTomaTab(ViewportBase* vp) {
 UVEditor::UVEditor() {
     zoom = 1.0f;
     panX = 0.0f; panY = 0.0f;
-    // SYNC SELECTION OFF por DEFAULT (semantica de Blender; ver el bloque grande del header):
+    // SYNC SELECTION OFF por DEFAULT (ver el bloque grande del header):
     // el 3D FILTRA que caras se ven en el UV y la seleccion del UV es PROPIA y POR RENDER-VERT.
     // Con sync ON un click en una copia UV agarraba TODAS las copias del mismo vertice 3D (las
     // costuras) porque el pick iba a la seleccion del 3D y volvia expandido por posRep: inusable
@@ -1954,7 +1954,7 @@ void UVEditor::event_key_down(int tecla, bool repeticion) {
     if (k == W3dK_DOWN)  { Panear(0, -pp); return; }
     Mesh* m = (ObjActivo && ObjActivo->getType() == ObjectType::mesh) ? (Mesh*)ObjActivo : NULL;
     if (!m || (Object*)m != g_editMesh) return; // el resto solo en Edit Mode sobre esta malla
-    // B = BOX SELECT (mismo atajo que Blender y que el resto de la app a futuro): ARMA el gesto y
+    // B = BOX SELECT: ARMA el gesto y
     // el proximo arrastre con el boton izquierdo dibuja el rectangulo. Solo en los modos con
     // seleccion (en pintura se pinta y en objeto el click elige la entidad, no hay caja que hacer).
     if (k == W3dK_B && !XformEnCurso() &&
@@ -2162,7 +2162,7 @@ void UVEditor::button_left() {
     // hay) y pinta la 1ra pasada. El drag sigue en event_mouse_motion; el commit al soltar.
     if (uvModo == UVModoPesos) {
         // CTRL+CLICK SOBRE UN HUESO 2D = ese hueso pasa a ser el GRUPO ACTIVO que se pinta.
-        // Es el gesto de Blender (en Weight Paint, Ctrl+click selecciona el hueso) y cierra el
+        // (en Weight Paint, Ctrl+click selecciona el hueso) y cierra el
         // flujo de rigging 2D: hasta ahora el UNICO camino para cambiar de grupo era el
         // desplegable "Group" de la toolbar, aunque los huesos SE DIBUJAN mientras se pinta.
         // Sale casi gratis porque el binding hueso <-> UV group es POR NOMBRE.
@@ -2316,7 +2316,7 @@ bool UVEditor::EncuadrarUV(bool todo) {
 }
 
 // =====================================================================================
-//  BOX SELECT (tecla B + arrastre con el izquierdo, como Blender)
+//  BOX SELECT (tecla B + arrastre con el izquierdo)
 //  Era LA ausencia mas cara del editor: media isla se seleccionaba vertice por vertice.
 //  El rectangulo es en PIXELES de pantalla y se prueba contra la MISMA proyeccion que usa
 //  el render/pick (UVtoScreen), asi que lo que se ve encerrado es exactamente lo que entra.
@@ -2475,7 +2475,7 @@ static unsigned UVFiltroFirma(const std::vector<char>& fsel) {
 // UN punto de entrada por frame para la relacion 3D <-> UV (ver el bloque SYNC SELECTION del
 // header). En SYNC espeja y listo. Fuera de sync la seleccion del UV es PROPIA: aca SOLO se la
 // inicializa cuando cambia el FILTRO (las caras seleccionadas en 3D), la malla o el toggle de
-// sync -> las esquinas que ACABAN de aparecer entran seleccionadas (como Blender: lo que se ve,
+// sync -> las esquinas que ACABAN de aparecer entran seleccionadas (lo que se ve,
 // se puede mover ya). De ahi en mas no se toca nada: manda el click del UV (PickUV), que es por
 // RENDER-VERT. Nunca corre con un transform en curso (no pisa lo que se esta moviendo).
 void UVEditor::SincronizarFiltro3D(Mesh* m, std::vector<char>* outFiltro) {
@@ -2617,7 +2617,7 @@ void UVEditor::PickUV(Mesh* m, int lx, int ly, bool add) {
 // ===================================================================================================
 
 // TAB sobre el UV editor = ENTRAR / SALIR de la edicion de huesos 2D. Ver el ciclo documentado en
-// UVEditor.h (Blender: Tab alterna Edit Bones con el modo del que venis). Requisitos para consumir
+// UVEditor.h (Tab alterna Edit Bones con el modo del que venis). Requisitos para consumir
 // la tecla: UV operativo (malla activa en Edit Mode) y la malla YA con armature 2D; si no, false y
 // el Tab GLOBAL hace lo de siempre. Un transform a medio hacer se CANCELA (como el Tab del 3D, que
 // no deja un grab colgado). No toca InteractionMode: el modo del UV es propio del viewport.
@@ -2637,8 +2637,8 @@ bool UVEditor::TabToggleHuesos() {
         if (alArmature) PropsIrAArmature2D();               // el panel se para en la pestania del rig 2D
     } else if (uvModo == UVModoHuesos) {                    // SALIR: vuelve al modo del que se entro
         uvModo = (uvModoPrevio == UVModoHuesos) ? UVModoObjeto : uvModoPrevio;
-    } else if (uvModo == UVModoEdicion) {                   // edicion de UVs -> Objeto (Tab de Blender)
-        uvModo = UVModoObjeto;
+    } else if (uvModo == UVModoEdicion) {                   // edicion de UVs -> Objeto
+    //         uvModo = UVModoObjeto;
         uvObjArm = false;                                   // se venia editando la GEOMETRIA
     } else {                                                // ENTRAR a Edit Bones (desde Pesos / Pose)
         uvModoPrevio = uvModo;
@@ -2680,7 +2680,7 @@ int UVEditor::Bone2DPickTodos(Mesh* m, float lx, float ly, int* outArm) const {
 
 // CTRL+CLICK EN WEIGHT PAINT: el hueso 2D bajo el cursor (de CUALQUIER armature, no solo el
 // activo) pasa a ser el hueso activo de SU rig, ese rig pasa a ser el ACTIVO de la malla y su UV
-// group homonimo el grupo que se pinta. Es el gesto de Blender (en Weight Paint, Ctrl+click
+// group homonimo el grupo que se pinta. (en Weight Paint, Ctrl+click
 // selecciona el hueso) y cierra el flujo de rigging 2D: sin el, el UNICO camino para cambiar de
 // grupo era el desplegable "Group" de la toolbar, aunque los huesos SE DIBUJAN mientras se pinta.
 // Sale casi gratis porque el binding hueso <-> UV group es POR NOMBRE. Se pide Ctrl a proposito:
@@ -2816,7 +2816,7 @@ int UVEditor::Bone2DExtruir(Mesh* m) {
     b.conectado = true;                            // extrude = CONECTADO (head soldado al tail del padre)
     b.headU = m->Arm2DHuesos()[act].tailU; b.headV = m->Arm2DHuesos()[act].tailV;
     b.tailU = b.headU; b.tailV = b.headV;
-    b.selTail = true;                              // el tip nuevo queda seleccionado (como Blender)
+    b.selTail = true;                              // el tip nuevo queda seleccionado
     Bone2DSelLimpiar(m);
     m->Arm2DHuesos().push_back(b);
     m->Arm2DBoneActivo() = (int)m->Arm2DHuesos().size() - 1;

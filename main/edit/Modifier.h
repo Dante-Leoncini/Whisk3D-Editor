@@ -86,6 +86,14 @@ class Modifier {
                                 // -> topologia limpia y sin costura. Default ON.
         bool  screwFlip;        // invierte el winding (normales para el otro lado) si la superficie quedo del reves.
 
+        // --- BOOLEAN --- la otra malla es 'target' (el mismo campo que el Mirror: CUALQUIER objeto de la
+        // escena, y solo cuenta si es una malla). Es NO destructivo: la malla original queda intacta y el
+        // resultado es la malla generada del stack; con Apply se hornea en poligonos (quads/ngons intactos).
+        int      boolOp;           // BoolOp::Enum (0 Intersect, 1 Union, 2 Difference). Default Difference.
+        // -- runtime (NO se serializa): con que version de la geometria del target se genero. Si el
+        //    target se EDITA, su geoVersion cambia y hay que regenerar; si no, no se toca nada (N95).
+        unsigned boolTargetGeoVer;
+
         // --- ARMATURE: cache de vertex-animation (bakea el skinning por frame -> reproduccion sin recomputar) ---
         bool  cacheAnim;        // Cache Animation: guarda las poses deformadas en memoria (default OFF)
         float cacheSkip;        // Frame Skip: 0=todos los frames; N=guarda cada N+1 e interpola (menos memoria). float para PropFloat entero.
@@ -169,6 +177,7 @@ class Modifier {
               screwAngle(360.0f), screwHeight(0.0f), screwSteps(16.0f), screwRenderSteps(32.0f),
               screwAxis(1), screwStretchU(true), screwStretchV(true),
               screwSmooth(true), screwMerge(true), screwFlip(false),
+              boolOp(2), boolTargetGeoVer(0),
               cacheAnim(false), cacheSkip(0.0f),
               metodoPVS(0), sectorPVS(0), sectorFallback(0), soloCamaraActiva(true),
               pvsCargado(false), pvsAplicado(-1), pvsFacesBase(0) {}

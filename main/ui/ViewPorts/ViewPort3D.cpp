@@ -1,5 +1,7 @@
 #include "w3dGraphics.h" // abstraccion de graficos (independencia de OpenGL)
 #include "W3dLang.h"
+#include "edit/MeshEdit.h"   // W3dRenderCornersSeparados
+#include <stdlib.h>   // getenv (debug de oclusion)
 #include "render/UIOverlay.h"   // la UI 2D dibujada sobre el viewport (simula la ventana)   // T(): los textos salen en el idioma del sistema
 #include "ViewPorts/ViewPort3D.h"
 #include "Undo.h" // Ctrl+Z: confirmar transform
@@ -172,6 +174,7 @@ Viewport3D::Viewport3D(Vector3 pos){
     // MARCAS: icono de malla. Prendido = se ven los cuadraditos pintables y el pincel trabaja
     // sobre ELLOS (al valor de la barra, sin falloff), no sobre la superficie.
     b = new Button("", (int)IconType::mesh); b->rol = TBR_Marcas; b->centrado = true; b->cuadrado = true; b->visible = false; ToolButtons.push_back(b);
+    b = new Button("", (int)IconType::selVertex); b->rol = TBR_PorVertice; b->centrado = true; b->cuadrado = true; b->visible = false; ToolButtons.push_back(b); // vertex color: por vertice / por corner
     // FALLOFF: abre el editor (lista de presets + curva custom). El texto/icono del boton
     // muestran el falloff ACTIVO, asi se ve cual esta puesto sin abrir nada.
     b = new Button("Smooth"); b->rol = TBR_Falloff; b->desplegable = true; b->visible = false; ToolButtons.push_back(b);
@@ -327,7 +330,7 @@ Viewport3D::Viewport3D(Vector3 pos){
         // teclado) lleva titulo -- es lo unico que te dice que estas mirando. Si lo abre un boton/item que YA
         // decia el texto, NO lleva: repetirlo es ruido. El boton View ahora es un icono -> titulo.
         MenuView = new PopupMenu(); MenuView->titulo = T("View");
-        MenuView->Agregar(T("Cameras"),   0, -1, MenuCameras);   // abre submenu (antes de Viewpoint, como Blender)
+        MenuView->Agregar(T("Cameras"),   0, -1, MenuCameras);   // abre submenu (antes de Viewpoint)
         MenuView->Agregar(T("Viewpoint"), 0, -1, MenuViewpoint); // abre submenu
         MenuView->Agregar(T("Frame Selected"), 420)->atajo = "Numpad ."; // enfocar la seleccion (EnfocarObject)
         MenuItemLocalView = MenuView->Agregar(T("Local View"), 422); // aisla la seleccion en ESTE viewport (tilde = activo)
@@ -564,7 +567,7 @@ void Viewport3D::EncuadrarRadio(const Vector3& centro, float radio){
 }
 
 // ---- LOCAL VIEW ("/"): aisla la seleccion en este viewport (solo dibuja los seleccionados + sus hijos),
-// encuadra, y al re-tocar restaura vista + visibilidad. Estilo Blender. ----
+// encuadra, y al re-tocar restaura vista + visibilidad. ----
 static void LV_AgregarSubarbol(Object* o, std::set<Object*>& s){
     if (!o) return;
     s.insert(o);
@@ -599,7 +602,7 @@ void Viewport3D::LocalViewSalir(){
 }
 void Viewport3D::LocalViewToggle(){
     if (localViewActivo) LocalViewSalir();
-    else if (!ObjSelects.empty()) LocalViewEntrar();   // sin seleccion no hace nada (como Blender)
+    else if (!ObjSelects.empty()) LocalViewEntrar();   // sin seleccion no hace nada
 }
 
 void Viewport3D::Zoom(float delta){
@@ -1058,12 +1061,41 @@ void Viewport3D::SetShowOverlays(bool valor) {
 // apaga el ultimo. Se llama antes de renderizar la escena.
 static Mesh* g_wpMesh = NULL;
 static int WP3DCapaColor(Mesh* m);   // (definida mas abajo, con el pincel de color)
+static void WeightPaintActualizar();
+void WP3DSincronizarModoPintura() { WeightPaintActualizar(); }   // harness: lo que hace el frame al cambiar de modo
 static void WeightPaintActualizar() {
     Mesh* target = NULL;
     const bool esPeso  = (InteractionMode == WeightPaint);
     const bool esColor = (InteractionMode == VertexPaint);
+    // las MARCAS del pincel se recuerdan POR MODO: pintando pesos arrancan apagadas (pincel
+    // clasico); pintando color arrancan con los cuadraditos de face corner prendidos, que es
+    // como se pinta un corner exacto. Al cambiar de modo cada uno recupera lo suyo.
+    {
+        static int marcasPeso = MarcasOff, marcasColor = MarcasCorner, modoPrev = -1;
+        const int modo = esPeso ? 1 : esColor ? 2 : 0;
+        if (modo != modoPrev) {
+            if (modoPrev == 1) marcasPeso  = BrushGet().marcas;
+            if (modoPrev == 2) marcasColor = BrushGet().marcas;
+            if (modo == 1) BrushGet().marcas = marcasPeso;
+            if (modo == 2) BrushGet().marcas = marcasColor;
+            modoPrev = modo;
+        }
+    }
     if ((esPeso || esColor) && ObjActivo && ObjActivo->getType() == ObjectType::mesh)
         target = (Mesh*)ObjActivo;
+    // VERTEX PAINT: la malla pintada se renderiza con un vert POR CORNER (sino dos corners fusionados
+    // no se pueden pintar por separado, ver W3dRenderCornersSeparados). Al salir, o al cambiar de
+    // malla, la anterior se vuelve a fusionar.
+    {
+        const bool separar = esColor && (target != NULL);
+        const bool cambio = (separar != W3dRenderCornersSeparadosActivo()) || (separar && target != g_wpMesh);
+        if (cambio) {
+            Mesh* anterior = g_wpMesh;
+            W3dRenderCornersSeparados(separar);
+            if (anterior && (anterior != target || !separar)) anterior->GenerarRender();   // vuelve a fusionar
+            if (separar) target->GenerarRender();                                        // separa
+        }
+    }
     if (g_wpMesh && g_wpMesh != target) {       // apaga el anterior (los DOS pases)
         g_wpMesh->weightPaintOn = false;
         g_wpMesh->vertexPaintOn = false;
@@ -1241,6 +1273,89 @@ static void BoxSelectRender3D(Viewport3D* vp) {
 
 // circulo del pincel siguiendo al mouse, SOLO en modo pintura y con el cursor sobre el
 // CONTENIDO del viewport (no sobre la barra/toolbar ni con un menu/popup abierto).
+// ============================================================================
+//  OCLUSION para pintar: al empezar el frame (modos de pintura, sin X-Ray) se dibuja la malla
+//  pintada con un COLOR POR CARA (ID) en el area del viewport, se lee el resultado y se le deja a
+//  WeightPaint (WPOclusionSet). Las marcas y los pinceles preguntan "que cara hay en este pixel":
+//  un corner de una cara que mira a camara pero esta tapada por otra ya no aparece ni se pinta.
+//  El render normal pisa este dibujo enseguida (viene el Clear de la escena). Costo: un draw de
+//  la malla + un ReadPixels del viewport por frame, solo mientras se pinta.
+// ============================================================================
+static std::vector<unsigned char> g_wpOclBuf;
+static void WP3DOclusionPass(Viewport3D* vp) {
+    Mesh* m = (WP3DModoPintura() && ObjActivo && ObjActivo->getType() == ObjectType::mesh) ? (Mesh*)ObjActivo : NULL;
+    if (!m || g_xray || m->vertexSize <= 0 || vp->width <= 0 || vp->height <= 0) { WPOclusionLimpiar(); return; }
+    namespace gfx = w3dEngine;
+    const int glY = W3dPantallaAlto - vp->y - vp->height;
+    // la PROYECCION ya la cargo el frame (W3dEscena3DProyeccion); la VISTA la aplica la escena mas
+    // adelante, asi que aca se carga a mano y al final se deja el modelview en identidad como estaba
+    vp->BindVista();
+    gfx::MatrixMode(gfx::ModelView);
+    gfx::LoadMatrix(vp->VistaCam().ViewMatrix().m);
+    gfx::Viewport(vp->x, glY, vp->width, vp->height);
+    gfx::Scissor(vp->x, glY, vp->width, vp->height);
+    gfx::Enable(gfx::ScissorTest);
+    gfx::Disable(gfx::Dither); gfx::Disable(gfx::Multisample);   // el ID tiene que llegar EXACTO al pixel
+    gfx::Disable(gfx::Lighting); gfx::Disable(gfx::Texture2D); gfx::Disable(gfx::Blend);
+    gfx::DisableArray(gfx::NormalArray); gfx::DisableArray(gfx::TexCoordArray);
+    gfx::EnableArray(gfx::VertexArray); gfx::EnableArray(gfx::ColorArray);
+    gfx::Enable(gfx::DepthTest); gfx::DepthMask(true);
+    gfx::ClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    gfx::Clear(gfx::ColorBuffer | gfx::DepthBuffer);
+    // triangulos de cada cara (la misma triangulacion que el render), en MUNDO, con el ID de la cara
+    const GLfloat* pos = (m->skinArmature && m->skinVertex) ? m->skinVertex : m->vertex;
+    Matrix4 W; m->GetWorldMatrix(W);
+    static std::vector<GLfloat> tp; static std::vector<GLubyte> tc; static std::vector<MeshIndex> tri;
+    tp.clear(); tc.clear();
+    for (size_t f = 0; f < m->faces3d.size(); f++) {
+        tri.clear(); W3dTriangularCara(pos, m->faces3d[f].idx, tri);
+        const int id = (int)f + 1;
+        const GLubyte r = (GLubyte)((id & 0x1F) << 3), g = (GLubyte)(((id >> 5) & 0x3F) << 2), b = (GLubyte)(((id >> 11) & 0x1F) << 3);
+        for (size_t t = 0; t < tri.size(); t++) {
+            const int v = (int)tri[t]; if (v < 0 || v >= m->vertexSize) continue;
+            const Vector3 wp = W * Vector3(pos[v*3], pos[v*3+1], pos[v*3+2]);
+            tp.push_back(wp.x); tp.push_back(wp.y); tp.push_back(wp.z);
+            tc.push_back(r); tc.push_back(g); tc.push_back(b); tc.push_back(255);
+        }
+    }
+    if (!tp.empty()) {
+        gfx::VertexPointer3f(0, &tp[0]);
+        gfx::ColorPointer4ub(&tc[0]);
+        gfx::DrawTrianglesArray((int)(tp.size() / 3));
+    }
+    g_wpOclBuf.resize((size_t)vp->width * (size_t)vp->height * 4);
+    gfx::ReadPixelsRGBA(vp->x, glY, vp->width, vp->height, &g_wpOclBuf[0]);
+    WPOclusionSet(&g_wpOclBuf[0], vp->x, glY, vp->width, vp->height, vp->x, vp->y, W3dPantallaAlto, m);
+    gfx::Enable(gfx::Dither); gfx::Enable(gfx::Multisample);
+    gfx::MatrixMode(gfx::ModelView); gfx::LoadIdentity();   // como lo dejo W3dEscena3DProyeccion
+    gfx::Invalidate();
+}
+
+// harness: cuantos face corners de la malla quedan visibles (marcas/pincel) en el viewport 3D activo
+int WP3DCornersVisibles(Mesh* m) {
+    if (!m || !viewPortActive || viewPortActive->ViewportKind() != 1) return -1;
+    Viewport3D* vp = (Viewport3D*)viewPortActive;
+    WP3DCtx c; c.vp = vp; c.m = m;
+    vp->BindVista();
+    m->GetWorldMatrix(c.W);
+    c.pos = (m->skinArmature && m->skinVertex) ? m->skinVertex : m->vertex;
+    std::vector<float> cx, cy; std::vector<char> ok;
+    WPCornersEnPantalla(m, WP3DProyectar, &c, cx, cy, ok);
+    int n = 0; for (size_t i = 0; i < ok.size(); i++) if (ok[i]) n++;
+    if (getenv("W3D_OCLDBG")) {
+        size_t noNegro = 0; int idMax = -1;
+        for (size_t i = 0; i + 3 < g_wpOclBuf.size(); i += 4) if (g_wpOclBuf[i] | g_wpOclBuf[i+1] | g_wpOclBuf[i+2]) { noNegro++;
+            const int id = (g_wpOclBuf[i] >> 3) | ((g_wpOclBuf[i+1] >> 2) << 5) | ((g_wpOclBuf[i+2] >> 3) << 11); if (id > idMax) idMax = id; }
+        printf("      [ocldbg] vp=(%d,%d %dx%d) pantallaAlto=%d buf=%d px no-negros=%d idMax=%d\n", vp->x, vp->y, vp->width, vp->height, W3dPantallaAlto, (int)(g_wpOclBuf.size()/4), (int)noNegro, idMax);
+        int L = 0;
+        for (size_t f = 0; f < m->faces3d.size() && L < 8; f++) for (size_t k = 0; k < m->faces3d[f].idx.size() && L < 8; k++, L++) {
+            float sx = 0, sy = 0; const bool p = WP3DProyectar(&c, m->faces3d[f].idx[k], sx, sy);
+            printf("      [ocldbg] corner %d cara %d: vert->(%.0f,%.0f) proy=%d cuadradito=(%.0f,%.0f) idEnPixel=%d ok=%d\n", L, (int)f, sx, sy, p ? 1 : 0, cx[(size_t)L], cy[(size_t)L], WPOclusionCaraEn(cx[(size_t)L], cy[(size_t)L]), ok[(size_t)L]);
+        }
+    }
+    return n;
+}
+
 static void WP3DRenderPincel(Viewport3D* vp) {
     if (!WP3DModoPintura()) return;
     namespace gfx = w3dEngine;
@@ -1295,7 +1410,7 @@ static void WP3DRenderPincel(Viewport3D* vp) {
         if (InteractionMode == VertexPaint && modoMarcas != MarcasOff) {
             const ColorLayer* cl = (mm->colorActivo >= 0 && mm->colorActivo < (int)mm->colorLayers.size())
                                  ? mm->colorLayers[mm->colorActivo] : NULL;
-            modoMarcas = (cl && cl->porVertice) ? MarcasVertice : MarcasCorner;
+            modoMarcas = ((cl && cl->porVertice) || BrushGet().porVertice) ? MarcasVertice : MarcasCorner;
         }
         BrushDibujarMarcas(mm, modoMarcas, 7.0f * (float)GlobalScale, colorRV, WP3DProyectar, &c);
     }
@@ -1383,6 +1498,7 @@ void Viewport3D::Render() {
     const int glY = W3dPantallaAlto - y - height; // arbol arriba-izq -> GL
     w3dEngine::Enable(w3dEngine::ScissorTest);
     w3dEngine::Scissor(x, glY, width, height);
+    WP3DOclusionPass(this);   // modos de pintura: mapa "que cara se ve en cada pixel" (lo pisa el Clear de abajo)
 
     // ZBuffer: fog de profundidad con rango FIJO en unidades de mundo (NO depende de la escena ni del
     // zoom). Es SOLO la distancia camara->objeto: en la camara = blanco, a fogFar o mas lejos = negro.
@@ -1697,7 +1813,7 @@ void Viewport3D::RenderArmaturasEncima(Object* node){
             gfx::DisableArray(gfx::TexCoordArray);
             // huesos: linea SOLIDA head->tail (azul). Ademas, para cada hueso cuyo head NO coincide con el tail de su
             // padre (hueso emparentado pero "separado"), una linea PUNTEADA padre.tail->head para que quede clara la
-            // conexion en la jerarquia (igual que Blender). El punteado se fabrica a mano (GLES no tiene line stipple).
+            // conexion en la jerarquia. El punteado se fabrica a mano (GLES no tiene line stipple).
             // POSE MODE: cada hueso se colorea segun seleccion -> sin seleccionar AZUL, seleccionado VERDE, activo BLANCO
             // (multi-seleccion). En Object Mode todos van a 'buf' con el color del armature (verde/azul de objeto).
             // EDIT MODE de armature (Fase 3): mismos colores por seleccion PERO sobre head/tail CRUDOS (el rest que
@@ -1719,7 +1835,7 @@ void Viewport3D::RenderArmaturasEncima(Object* node){
                 dst->push_back(H.x); dst->push_back(H.y); dst->push_back(H.z);
                 dst->push_back(T.x); dst->push_back(T.y); dst->push_back(T.z);
                 if (editArm){ // agarraderos: un punto por punta. Se resalta CADA punta seleccionada
-                    // (seleccion por puntas estilo Blender): hueso entero = las dos prendidas.
+                    // (seleccion por puntas ): hueso entero = las dos prendidas.
                     std::vector<GLfloat>& PH = b.selHead ? ptsSel : pts;
                     PH.push_back(H.x); PH.push_back(H.y); PH.push_back(H.z);
                     std::vector<GLfloat>& PT = b.selTail ? ptsSel : pts;
@@ -1939,7 +2055,7 @@ bool Viewport3D::RenderAPNG(int outW, int outH, RenderType::Enum pass, const cha
     // fijar el PASE (sin overlay): modo + luces + flags del Core, una sola vez
     RenderType viewPrev = view; bool overlaysPrev = showOverlays;
     bool camPrev = ViewFromCameraActive;
-    // el render se hace DESDE la camara activa (como F12 en Blender): si hay camara, forzamos su POV.
+    // el render se hace DESDE la camara activa: si hay camara, forzamos su POV.
     // Sin camara queda la vista del viewport (orbita). La proyeccion sigue con fovDeg (la Camera del editor
     // no tiene lente propio todavia). El gizmo de la camara no sale (showOverlays=false + este flag).
     if (CameraActive) ViewFromCameraActive = true;
@@ -2243,7 +2359,9 @@ void Viewport3D::RenderOverlay() {
             RenderAllAxisTransform();
     }
 
-    if (show3DCursor) Render3Dcursor();
+    // en los modos de pintura el cursor 3D no sirve para nada (no se agrega ni se transforma): se oculta
+    const bool pinturaCursor = (InteractionMode == WeightPaint || InteractionMode == VertexPaint || InteractionMode == TexturePaint);
+    if (show3DCursor && !pinturaCursor) Render3Dcursor();
 
     // (la barra de botones 2D NO se dibuja aca: es chrome del area, no un
     //  overlay. Va en RenderUI() junto con los bordes para que se vea aunque
@@ -2328,7 +2446,9 @@ void Viewport3D::SyncBotonContexto(){
     bool enEdit  = (esMesh && InteractionMode == EditMode);
     bool poseM   = (InteractionMode == PoseMode && esArm);
     bool editArm = (InteractionMode == EditMode && esArm); // Edit de huesos: el boton abre el menu "Armature"
-    bObj->visible = HayObjetosSeleccionados() || poseM;
+    // en los modos de PINTURA el menu Object no va (no se puede seleccionar ni transformar): oculto
+    const bool pintura = (InteractionMode == WeightPaint || InteractionMode == VertexPaint || InteractionMode == TexturePaint);
+    bObj->visible = (HayObjetosSeleccionados() || poseM) && !pintura;
     bObj->text.clear();
     bObj->icon = (poseM || editArm) ? (int)IconType::armature :
         !enEdit ? (int)IconType::object :
@@ -2527,7 +2647,15 @@ void Viewport3D::RenderUI() {
             if (bMesh) bMesh->visible = enEdit;
             Button* bAdd = BarRolBtn(BarButtons, BR_Add);     // Add: SOLO en Object Mode
             if (bAdd) bAdd->visible = (InteractionMode == ObjectMode);
+            // PINTURA (pesos / color / textura): no se puede cambiar la seleccion ni transformar nada, asi
+            // que los menus Select y Object, el snap, la orientacion (Global) y el pivot no tienen sentido
+            // en la barra: se ocultan (pedido del dueno).
+            const bool pintura = (InteractionMode == WeightPaint || InteractionMode == VertexPaint || InteractionMode == TexturePaint);
+            { Button* b;
+              if ((b = BarRolBtn(BarButtons, BR_Select))) b->visible = !pintura;
+              if ((b = BarRolBtn(BarButtons, BR_Object))) b->visible = !pintura; }
             Button* bPiv = BarRolBtn(BarButtons, BR_Pivot);   // Pivot: solo icono = el modo actual
+            if (bPiv) bPiv->visible = !pintura;
             if (bPiv) bPiv->icon = (g_transformPivot == PivotCursor3D)   ? (int)IconType::pivotCursor :
                                    (g_transformPivot == PivotIndividual) ? (int)IconType::pivotIndividual :
                                    (g_transformPivot == PivotActive)     ? (int)IconType::pivotActive :
@@ -2540,11 +2668,13 @@ void Viewport3D::RenderUI() {
                 ((InteractionMode == ObjectMode) ||
                  (InteractionMode == EditMode && ActiveAnimKind == 3)); // editando una vertex anim: Insert Keyframe a mano
             Button* bOri = BarRolBtn(BarButtons, BR_Orient);  // muestra la orientacion actual
+            if (bOri) bOri->visible = !pintura;
             if (bOri) bOri->text = (transformOrientation == LocalOrient)  ? "Local" :
                                    (transformOrientation == ViewOrient)   ? "View"  :
                                    (transformOrientation == NormalOrient) ? "Normal" : "Global";
             // SNAP: el boton se ilumina VERDE cuando esta ON (para saber que el imantado esta activo)
             Button* bSnap = BarRolBtn(BarButtons, BR_Snap);
+            if (bSnap) bSnap->visible = !pintura;
             if (bSnap){
                 static float snapVerde[3]; const float* acc = ListaColores[static_cast<int>(ColorID::accent)];
                 for (int i=0;i<3;i++) snapVerde[i]=acc[i]*0.4f;
@@ -2648,7 +2778,7 @@ static std::string W3dSufijoEjes(){
 }
 
 static std::string W3dTextoTransform(){
-    // ENTRADA NUMERICA: muestra la EXPRESION tipeada + su resultado (estilo Blender
+    // ENTRADA NUMERICA: muestra la EXPRESION tipeada + su resultado (
     // "Move: [(2*3)+3] = 9  along global X"). Vale para objetos y malla. El armado
     // "[expr|] = valor" es el compartido de TransformUI (mismo formato en UV / 2D).
     if (NumInputActivo()){
@@ -2968,7 +3098,9 @@ void Viewport3D::event_mouse_motion(int mx, int my){
         const bool edit = (InteractionMode == EditMode && EditXformActivo());
         switch (estado) {
             case translacion:
-                if (edit) EditXformTraslacion(dx, dy, VelocidadArrastreMundo());
+                // el slide (G-G / Shift+V) reusa el estado del move: mismo modal, otro recorrido
+                if (edit && EditSlideActivo()) EditSlideRaton(dx, dy);
+                else if (edit) EditXformTraslacion(dx, dy, VelocidadArrastreMundo());
                 else      SetTranslacionObjetos(dx, dy, VelocidadArrastreMundo());
                 break;
             case rotacion:
@@ -3385,10 +3517,12 @@ void Viewport3D::event_key_down(int tecla, bool repeticion){
                     LayoutMenuUV(lastMouseX, lastMouseY);
                 break;
             case W3dK_J:
-                // Ctrl+J: une las mallas seleccionadas en el objeto activo (Join). J sola: por ahora NADA
-                // (reservada para el futuro en el viewport 3D; antes cambiaba el render view, sacado a pedido).
+                // Ctrl+J: une las mallas seleccionadas en el objeto activo (Join).
+                // J sola en Edit Mode: Connect Vertex Path (corta las caras entre los 2 vertices).
                 if (LCtrlPressed && estado == editNavegacion && InteractionMode == ObjectMode)
                     JoinObjetos();
+                else if (!LCtrlPressed && estado == editNavegacion && InteractionMode == EditMode && g_editMesh)
+                    LayoutConectarVerticesEdit();
                 break;
             case W3dK_H:
                 UndoCapturarVisibilidad();   // Ctrl+Z: guarda el 'visible' PREVIO antes de togglear
@@ -3483,6 +3617,11 @@ void Viewport3D::event_key_down(int tecla, bool repeticion){
                 }
                 if (InteractionMode == PoseMode){ extern void PoseXformStart(int); extern void PoseClearTransform(int);
                     if (LAltPressed) PoseClearTransform(1); else PoseXformStart(1); break; } // POSE: Alt+G limpia translacion; G mueve
+                // G con un move YA en curso (Edit Mode): la segunda G pasa a SLIDE, la tercera vuelve a
+                // trasladar. No confirma nada: es el mismo modal cambiando de recorrido.
+                if (InteractionMode == EditMode && estado == translacion && EditXformActivo()){
+                    EditSlideToggle(); break;
+                }
                 // EditXformStart (no EditXformIniciar directo) -> en Edit Mode CAPTURA el undo del move (Ctrl+Z)
                 if (!EditXformStart(translacion, ViewAxis)) SetPosicion();
                 break;
@@ -3511,9 +3650,11 @@ void Viewport3D::event_key_down(int tecla, bool repeticion){
                     LayoutExtrudeFaces();
                 break;
             case W3dK_V:
-                // Edit Mode: RIP -> separa la malla a lo largo de la seleccion (loop de bordes / verts / caras)
-                if (estado == editNavegacion && InteractionMode == EditMode && g_editMesh)
-                    LayoutRipEdit();
+                // Edit Mode: Shift+V = SLIDE de los vertices seleccionados; V sola = RIP (separa la malla).
+                if (estado == editNavegacion && InteractionMode == EditMode && g_editMesh){
+                    if (LShiftPressed) LayoutSlideVerticesEdit();
+                    else               LayoutRipEdit();
+                }
                 break;
             case W3dK_P:
                 // EDIT de ARMATURE: Alt+P = menu Disconnect Bone / Clear Parent (punto 5). En PC
@@ -3523,7 +3664,7 @@ void Viewport3D::event_key_down(int tecla, bool repeticion){
                     LayoutParentHuesos(true, lastMouseX, lastMouseY);
                     break;
                 }
-                // Edit Mode: SEPARATE -> mueve las caras seleccionadas a un mesh NUEVO (como Blender P > Selection)
+                // Edit Mode: SEPARATE -> mueve las caras seleccionadas a un mesh NUEVO (P > Selection)
                 if (estado == editNavegacion && InteractionMode == EditMode && g_editMesh)
                     LayoutSepararEdit();
                 break;
@@ -3532,7 +3673,7 @@ void Viewport3D::event_key_down(int tecla, bool repeticion){
                 if (estado == editNavegacion && InteractionMode == EditMode && g_editMesh)
                     LayoutMenuSharp(lastMouseX, lastMouseY);
                 break;
-            // Numpad (Ctrl = la vista OPUESTA, como Blender)
+            // Numpad (Ctrl = la vista OPUESTA)
             case W3dK_KP_1: SetViewpoint(LCtrlPressed ? Viewpoint::back : Viewpoint::front); break;
             //case W3dK_KP_2: numpad('2'); break;
             case W3dK_KP_3: SetViewpoint(LCtrlPressed ? Viewpoint::left : Viewpoint::right); break;
@@ -3602,7 +3743,7 @@ void Viewport3D::event_key_down(int tecla, bool repeticion){
                 else if (LAltPressed) DeseleccionarTodo();
                 else SeleccionarTodoForzado();
                 break;
-            // Numpad (Ctrl = la vista OPUESTA, como Blender)
+            // Numpad (Ctrl = la vista OPUESTA)
             case W3dK_KP_1: {
                 SetViewpoint(LCtrlPressed ? Viewpoint::back : Viewpoint::front);
                 break;

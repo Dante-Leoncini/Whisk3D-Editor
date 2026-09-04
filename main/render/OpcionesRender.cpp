@@ -29,7 +29,8 @@ float g_fpsActual      = 0.0f;
 int  g_renderCaras     = 0;
 int  g_renderDraws     = 0;
 long g_genMallaCount   = 0; // diagnostico de regeneracion de modificadores (ver OpcionesRender.h)
-bool g_objetosMovidos  = false; // un objeto se movio -> regenerar los Mirror con target (ver OpcionesRender.h)
+bool g_objetosMovidos  = false; // un objeto se movio -> regenerar los Mirror/Boolean con target (ver OpcionesRender.h)
+bool g_mallasEditadas  = false; // alguna malla cambio su geometria -> regenerar los Boolean que la usan de target
 
 // arranca en true para dibujar el primer frame
 bool g_redraw = true;

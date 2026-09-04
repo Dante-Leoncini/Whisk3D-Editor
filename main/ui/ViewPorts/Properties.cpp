@@ -37,6 +37,7 @@
 #include "PopUp/ColorPicker.h"
 #include "PopUp/FileBrowser.h" // explorador para elegir la carpeta de export
 #include "PopUp/ConfirmarPopup.h" // confirmacion de sobrescritura (render / export)
+#include "ViewPorts/TransformUI.h" // TbVerdeBg: la operacion activa del Boolean se pinta como toggle
 #include "w3dFilesystem.h" // FileExists / GetDefaultOutputDir / JoinPath (rutas de salida)
 #include "PopUp/ProgressPopup.h" // barra "Rendering..." durante el render (clave en N95)
 #include "ViewPorts/LayoutInput.h" // Notificar (toasts de exito/error)
@@ -2903,15 +2904,26 @@ static void AccionModTargetElegido(int id){
     AccionModParamChanged();
 }
 static void AccionMenuModTarget(){
-    if (!PropsActivo || !PropsActivo->propMirTarget) return;
+    if (!PropsActivo) return;
+    // el MISMO menu para el target del Mirror y el objeto del Boolean: se ancla al boton del
+    // modificador que esta activo (los dos escriben mod->target)
+    Modifier* modA = ModActivoUI();
+    PropButton* ancla = (modA && modA->tipo == ModifierType::Boolean) ? PropsActivo->propBoolTarget
+                                                                       : PropsActivo->propMirTarget;
+    if (!ancla) return;
     if (!MenuModTarget){ MenuModTarget=new PopupMenu(); MenuModTarget->action=AccionModTargetElegido; }
     MenuModTarget->Limpiar();
     MenuModTarget->Agregar(T("None"), 0);
     gTargetCandidatos.clear(); RecolectarTargets(SceneCollection);
     for (size_t i=0;i<gTargetCandidatos.size();i++)
         MenuModTarget->Agregar(gTargetCandidatos[i]->name, 1+(int)i, (int)IconoDeObjeto(gTargetCandidatos[i]));
-    AbrirMenuBajoBoton(MenuModTarget, PropsActivo->propMirTarget->button);
+    AbrirMenuBajoBoton(MenuModTarget, ancla->button);
 }
+// Boolean: elegir la operacion (fila de 3 botones). Cambiarla regenera.
+static void AccionBoolOp(int op){ Modifier* mod = ModActivoUI(); if (!mod) return; mod->boolOp = op; AccionModParamChanged(); }
+static void AccionBoolIntersect(){ AccionBoolOp(0); }
+static void AccionBoolUnion(){ AccionBoolOp(1); }
+static void AccionBoolDifference(){ AccionBoolOp(2); }
 // ===== target del modificador ARMATURE: SOLO esqueletos. Al elegirlo, la malla se skinnea a ese rig =====
 static std::vector<Object*> gArmTargets;
 static void RecolectarArmatures(Object* nodo){
@@ -6602,6 +6614,15 @@ void Properties::ConstruirGrupos(){
     propMirTarget = new PropButton(T("Mirror Object"), IconType::object);
     propMirTarget->button->desplegable = true; propMirTarget->action = AccionMenuModTarget;
     propModifierProps->properties.push_back(propMirTarget);
+    // Boolean: la operacion como fila de 3 (la activa se pinta en verde, como un toggle) + el objeto
+    propBoolOp = new PropButtonRow();
+    propBoolOp->Agregar(T("Intersect"),  AccionBoolIntersect);
+    propBoolOp->Agregar(T("Union"),      AccionBoolUnion);
+    propBoolOp->Agregar(T("Difference"), AccionBoolDifference);
+    propModifierProps->properties.push_back(propBoolOp);
+    propBoolTarget = new PropButton(T("Object"), IconType::object);
+    propBoolTarget->button->desplegable = true; propBoolTarget->action = AccionMenuModTarget;
+    propModifierProps->properties.push_back(propBoolTarget);
     // Armature: target (dropdown solo esqueletos). La malla se deforma (skinning) al rig elegido.
     propArmTarget = new PropButton(T("Target"), IconType::armature);
     propArmTarget->button->desplegable = true; propArmTarget->action = AccionMenuArmTarget;
@@ -6785,7 +6806,7 @@ static int gListaScrollY0 = 0;   // my del press
 static int gListaScroll0 = 0;    // scrollFila al empezar el arrastre
 
 // arrastre de un PropFloat con el mouse: click + mover horizontal acumula el
-// delta 'dx' en el valor (como en Blender). NULL = no se esta arrastrando.
+// delta 'dx' en el valor. NULL = no se esta arrastrando.
 static PropFloat* gFloatDrag = NULL;
 static bool  gFloatDragMoved = false; // se paso el umbral de arrastre? (si NO al soltar -> fue un click -> editar texto)
 static float gFloatDragAccum = 0.0f;  // delta acumulado desde el mouse-down (zona muerta antes de arrastrar)
@@ -7769,6 +7790,7 @@ Properties::Properties() : ViewportBase() {
     propCullDistMax = NULL; propCullOrdenAlpha = NULL; propCullCellSize = NULL; propCullModo3D = NULL; propCullRecalc = NULL;
     propCollection = NULL; propCollOrdenCam = NULL; propCollOrdenUnaVez = NULL; // Collection (orden transparentes)
     propMirror = NULL; propMirrorTarget = NULL;                                 // objeto Mirror (target + ejes + rect)
+    propBoolOp = NULL; propBoolTarget = NULL;                                   // modificador Boolean
     propMirrorX = NULL; propMirrorY = NULL; propMirrorZ = NULL; propMirrorHijos = NULL;
     propMirrorLimites = NULL; propMirrorU0 = NULL; propMirrorU1 = NULL; propMirrorV0 = NULL; propMirrorV1 = NULL;
     propParticulas = NULL; propPartTextura = NULL; propPartCantidad = NULL;     // objeto Particulas
@@ -7837,7 +7859,7 @@ Properties::Properties() : ViewportBase() {
     W3dKeyframeEstado = PropKeyEstadoHook;   // el rombo de keyframe del panel
     W3dKeyframeToggle = PropKeyToggleHook;
     ActivaAnimVertexDe = ActivaAnimVertexDeMesh;               // la lista marca la activa
-    exportApplyModifiers = true;  // por defecto ON (como Blender)
+    exportApplyModifiers = true;  // por defecto ON
     exportApplyTransforms = true; // por defecto ON
     exportLastSerial = 0;
     focoEnTabs = false;
@@ -8375,7 +8397,18 @@ void Properties::ActualizarPestanias(){
         // display toggles: para CUALQUIER modificador seleccionado (no solo Mirror)
         if (propModVerViewport) propModVerViewport->value = haySel ? &mod->mostrarViewport : NULL;
         if (propModVerEdit)     propModVerEdit->value     = haySel ? &mod->mostrarEdit : NULL;
-        if (propModVacio) propModVacio->oculto = (esMirror || esSub || esScrew || esPvs || (mod && mod->tipo==ModifierType::Armature)); // "(no properties yet)" solo tipos sin params
+        bool esBool   = (mod && mod->tipo == ModifierType::Boolean);
+        if (propModVacio) propModVacio->oculto = (esMirror || esSub || esScrew || esPvs || esBool || (mod && mod->tipo==ModifierType::Armature)); // "(no properties yet)" solo tipos sin params
+        // Boolean: la fila de operacion (visible solo aca; la activa con tinte verde) + el objeto
+        if (propBoolOp) {   // una fila de botones se oculta ocultando sus botones (como propRowModMove)
+            for (size_t k = 0; k < propBoolOp->botones.size(); k++) {
+                propBoolOp->botones[k]->visible = esBool;
+                const bool on = esBool && ((int)k == mod->boolOp);
+                propBoolOp->botones[k]->tinte = on ? TbVerdeBg() : NULL;
+                propBoolOp->botones[k]->colorTexto = on ? ListaColores[static_cast<int>(ColorID::accent)] : NULL;
+            } }
+        if (propBoolTarget) { propBoolTarget->oculto = !esBool;
+            if (esBool) propBoolTarget->button->text = mod->target ? mod->target->name : std::string("None"); }
         if (propSubSimple) propSubSimple->value = esSub ? &mod->subSimple    : NULL;
         if (propSubLevel)  propSubLevel->value  = esSub ? &mod->subLevel      : NULL;
         if (propSubRender) propSubRender->value = esSub ? &mod->subRenderLevel: NULL;

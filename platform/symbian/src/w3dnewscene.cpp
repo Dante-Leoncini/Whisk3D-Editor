@@ -88,7 +88,7 @@ void W3dNewSceneInit() {
     if (SceneCollection && SceneCollection->Childrens.empty()) {
         // todo cuelga de una "Collection" (igual que el constructor de PC)
         CollectionActive = new Collection(SceneCollection);
-        // luz de escena default (como Blender): arriba-derecha-atras
+        // luz de escena default: arriba-derecha-atras
         Light* l = Light::Create(CollectionActive, 0, 0, 0);
         if (l) { l->pos = Vector3(3.0f, 4.0f, 2.0f); }
         // camara default, misma pose que el constructor de PC

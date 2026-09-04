@@ -3,6 +3,7 @@
 #include "Undo.h" // Ctrl+Z: capturar modo / seleccion
 #include "ViewPorts/PopUp/ConfirmarPopup.h" // AbrirConfirmarBorrado (popup de confirmar borrado)
 #include "ViewPorts/LayoutInput.h"
+#include "edit/MeshEdit.h"   // W3dTriangularCara
 #include "ViewPorts/PoseTransform.h" // Pose Mode transform (extraido a su propio archivo)
 #include "ViewPorts/Notificaciones.h" // toasts (extraido a su propio archivo)
 #include "ViewPorts/NumInput.h" // entrada numerica/formulas (extraido a su propio archivo)
@@ -1092,8 +1093,9 @@ bool SnapBuscarTarget(int mx, int my, Viewport3D* vp, Vector3& outWorld, float& 
                     float dx=sx-lmx,dy=sy-lmy,d=dx*dx+dy*dy;
                     if (d<bestD){ bestD=d; outWorld=c; outSx=sx; outSy=sy; found=true; }
                 } else { // FACE: proyecta el cursor sobre la cara (baricentrico en pantalla) -> retopologia
-                    for (int t=1; t+1<nc; t++){
-                        int i0=idx[0], i1=idx[t], i2=idx[t+1];
+                    std::vector<MeshIndex> triCara; W3dTriangularCara(m->vertex, idx, triCara);   // misma triangulacion que el render
+                    for (size_t t=0; t+2<triCara.size(); t+=3){
+                        int i0=triCara[t], i1=triCara[t+1], i2=triCara[t+2];
                         Vector3 w0=W*Vector3(m->vertex[i0*3],m->vertex[i0*3+1],m->vertex[i0*3+2]);
                         Vector3 w1=W*Vector3(m->vertex[i1*3],m->vertex[i1*3+1],m->vertex[i1*3+2]);
                         Vector3 w2=W*Vector3(m->vertex[i2*3],m->vertex[i2*3+1],m->vertex[i2*3+2]);
@@ -1158,6 +1160,22 @@ void LayoutRipEdit() {
     Mesh* m = (Mesh*)g_editMesh;
     if (!m->RipSeleccionEdit()) { Notificar(T("Rip: the selection does not separate the mesh"), true); g_redraw = true; return; }
     Notificar(T("Rip: mesh separated"), false);
+    g_redraw = true;
+}
+
+// Connect Vertex Path (J en Edit Mode / menu Vertex): corte RECTO en pantalla entre 2 vertices.
+// La "pantalla" es el viewport 3D activo: el corte sigue la linea que ves.
+namespace { struct ConnProyCtx { Viewport3D* vp; Matrix4 W; };
+static bool ConnProy(void* ctx, const Vector3& local, float& sx, float& sy) {
+    ConnProyCtx* c = (ConnProyCtx*)ctx; return c->vp->ProyectarPunto(c->W * local, sx, sy); } }
+void LayoutConectarVerticesEdit() {
+    if (InteractionMode != EditMode || !g_editMesh) return;
+    Mesh* m = (Mesh*)g_editMesh;
+    ConnProyCtx c; c.vp = NULL;
+    if (viewPortActive && viewPortActive->ViewportKind() == 1) { c.vp = (Viewport3D*)viewPortActive; c.vp->BindVista(); m->GetWorldMatrix(c.W); }
+    std::string msg;
+    const bool ok = ConectarVerticesEdit(m, c.vp ? ConnProy : NULL, c.vp ? (void*)&c : NULL, msg);
+    if (!msg.empty()) Notificar(T(msg.c_str()), !ok);   // rojo si no se pudo
     g_redraw = true;
 }
 
@@ -1451,6 +1469,8 @@ void LayoutAccionObject(int aId) {
         case 314: LayoutDuplicarEdit(); break; // Duplicate (Shift D)
         case 316: LayoutSepararEdit();  break; // Separate (P): caras selec -> mesh nuevo
         case 341: LayoutRipEdit();      break; // Rip (V): separa la malla por la seleccion
+        case 342: LayoutConectarVerticesEdit(); break; // Connect Vertex Path (J)
+        case 343: LayoutSlideVerticesEdit(); break;    // Slide Vertices (Shift+V, o G-G)
         // Delete: los items del submenu/atajo-X despachan por ESTA accion (el menu top es el de contexto, no gMenuDelete)
         case 361: case 362: case 363: case 364: AccionDelete(aId); break; // Vertices/Edges/Faces/Edge Loops
         case 315: break;                       // UV > Unwrap (pendiente)
@@ -1564,16 +1584,38 @@ static void LayoutAccionView(int aId) {
 // regenera el preview SOLO de las mallas que tienen un modificador MIRROR con TARGET (su plano de espejo sale del
 // mundo del target relativo al objeto -> si cualquiera de los dos se movio, cambia). El resto de modificadores es
 // local y no depende de la posicion. Recorre el arbol; barato: los que no tienen modificadores se saltean.
+// los modificadores que dependen de DONDE ESTA otro objeto: Mirror y Boolean con target. Si se
+// movio algo, su resultado cambio -> regenerar SOLO esos (el resto sigue cacheado en genValido).
 static void RegenerarMirrorsConTargetRec(Object* nodo){
     if (!nodo) return;
     for (size_t i=0;i<nodo->Childrens.size();i++){
         Object* o = nodo->Childrens[i];
         if (o->getType()==ObjectType::mesh){
             Mesh* m=(Mesh*)o;
-            for (size_t k=0;k<m->modificadores.size();k++)
-                if (m->modificadores[k]->tipo==ModifierType::Mirror && m->modificadores[k]->target){ m->GenerarMallaModificada(); break; }
+            for (size_t k=0;k<m->modificadores.size();k++){
+                const int t = m->modificadores[k]->tipo;
+                if ((t==ModifierType::Mirror || t==ModifierType::Boolean) && m->modificadores[k]->target){ m->GenerarMallaModificada(); break; }
+            }
         }
         RegenerarMirrorsConTargetRec(o);
+    }
+}
+// BOOLEAN cuyo TARGET fue editado: el target sube su geoVersion en cada cambio de geometria;
+// aca se compara con la version con la que se genero. UN entero por modificador, y solo se
+// recorre cuando g_mallasEditadas avisa que alguna malla cambio (no por frame).
+static void RegenerarBooleansConTargetEditadoRec(Object* nodo){
+    if (!nodo) return;
+    for (size_t i=0;i<nodo->Childrens.size();i++){
+        Object* o = nodo->Childrens[i];
+        if (o->getType()==ObjectType::mesh){
+            Mesh* m=(Mesh*)o;
+            for (size_t k=0;k<m->modificadores.size();k++){
+                Modifier* md = m->modificadores[k];
+                if (md->tipo!=ModifierType::Boolean || !md->target || md->target->getType()!=ObjectType::mesh) continue;
+                if (((Mesh*)md->target)->geoVersion != md->boolTargetGeoVer){ m->GenerarMallaModificada(); break; }
+            }
+        }
+        RegenerarBooleansConTargetEditadoRec(o);
     }
 }
 
@@ -1601,6 +1643,12 @@ void ActualizarEditMeshActivo() {
         g_objetosMovidos = false;
         if (SceneCollection) RegenerarMirrorsConTargetRec(SceneCollection);
         g_redraw = true;
+    }
+    // BOOLEAN con el target EDITADO (mover un vertice del cilindro tiene que rehacer el corte del
+    // cubo): mismo esquema, gateado por g_mallasEditadas para que en idle no se recorra nada.
+    if (g_mallasEditadas) {
+        g_mallasEditadas = false;
+        if (SceneCollection) RegenerarBooleansConTargetEditadoRec(SceneCollection);
     }
     // Esta funcion se llama CADA FRAME (ViewPort3D::Render). El UNICO motivo para regenerar aca es el CAMBIO DE MODO
     // (entrar/salir de Edit): el filtro mostrarEdit puede saltear un modificador en Edit, asi que el preview cambia.
@@ -2936,7 +2984,7 @@ static void AccionDelete(int aId) {
     if (estado != editNavegacion) return;
     if (InteractionMode != EditMode || !g_editMesh) return;
     if (aId == 364) { // Edge Loops: disuelve el loop seleccionado (inverso del loop cut)
-        if (!((Mesh*)g_editMesh)->BorrarEdgeLoopEdit()) Notificar(T("Delete Edge Loops: select an edge loop first"), true);
+        if (!((Mesh*)g_editMesh)->BorrarEdgeLoopEdit()) Notificar(T("Delete Edge Loops: select an edge shared by two faces"), true);
         g_redraw = true; return;
     }
     int dt = (aId == 361) ? SelVertex : (aId == 362) ? SelEdge : SelFace;
@@ -3071,7 +3119,9 @@ void LayoutMenuEditContexto(int mx, int my) {
         if (!gMenuVertex) {
             gMenuVertex = new PopupMenu(); gMenuVertex->titulo = T("Vertex"); gMenuVertex->action = LayoutAccionObject;
             gMenuVertex->Agregar(T("New Edge/Face from Vertices"), 310)->atajo = "F";
+            gMenuVertex->Agregar(T("Connect Vertex Path"), 342)->atajo = "J";
             gMenuVertex->Agregar(T("Extrude Vertices"), 300)->atajo = "E";
+            gMenuVertex->Agregar(T("Slide Vertices"), 343)->atajo = "Shift+V";
             gMenuVertex->Agregar(T("Rip"), 341)->atajo = "V";
             // (Delete se movio al menu "Mesh": es comun a vertice/borde/cara)
         }
@@ -3108,7 +3158,7 @@ void LayoutMenuSharp(int mx, int my) {
 
 // ====================================================================
 // menu TRANSFORM PIVOT POINT (objeto + edit): desde donde/como rotan-escalan.
-// 4 modos estilo Blender + checkbox "Lock Normals". Sale en el cursor.
+// 4 modos  + checkbox "Lock Normals". Sale en el cursor.
 // (gMenuPivot se declara mas arriba, junto al dispatch de la barra.)
 // ====================================================================
 static void AccionPivot(int aId) {
@@ -3244,6 +3294,19 @@ static Quaternion gEVrotTotal(1,0,0,0); // rotacion acumulada
 static float      gEVscaleAmt = 0;  // factor de escala acumulado (f = 1 + amt); en SHRINK = distancia por la normal
 static bool       gEVshrink = false; // SHRINK/FATTEN (Alt+S): reusa EditScale pero cada vert se mueve por SU normal
 bool EditShrinkActivo(){ return gEVshrink; }
+// VERTEX SLIDE (Shift+V, o G-G): el move deja de trasladar y DESLIZA cada vertice por UNA de sus
+// aristas. t=0 lo deja donde estaba, t=1 lo deja encima del vecino. El riel se elige con la direccion
+// del primer arrastre. Confirmar entra por EditXformConfirmar, o sea que el Auto Merge (si esta
+// prendido) suelda los verts encimados y MergeVertsEdit borra las caras que colapsan.
+static bool  gEVslide = false;
+static std::vector<std::vector<Vector3> > gEVslideCand; // vecinos por arista (posicion de MUNDO al empezar)
+static std::vector<Vector3> gEVslideDest;               // el vecino ELEGIDO, por entrada de gEVsnap
+static float gEVslideT = 0.0f;                          // 0..1
+static float gEVslideAccX = 0.0f, gEVslideAccY = 0.0f;  // arrastre acumulado, en pixeles de pantalla
+static int   gEVslideIdx = 0;                           // riel elegido con las flechas (Symbian / sin mouse)
+static bool  gEVslideTeclado = false;                   // manda el teclado: el mouse no re-elige hasta que se mueva
+bool EditSlideActivo(){ return gEVslide; }
+float EditSlideFactor(){ return gEVslideT; }
 // EXTRUDE / orientacion NORMAL: la translacion se constriñe a gTransformNormal (la normal en mundo).
 // gEVuseCustom + gTransformNormal son GLOBALES (variables.h) para que CiclarEje/EjeOrientado los vean.
 
@@ -3472,7 +3535,9 @@ static void EVEscribir(){
     for (size_t i=0;i<gEVsnap.size();i++){
         EditVtxSnap& s = gEVsnap[i];
         Vector3 wn;
-        if (estado == translacion){
+        if (gEVslide){   // deslizar por el riel: interpola entre donde estaba y el vecino elegido
+            wn = (i < gEVslideDest.size()) ? s.world0 + (gEVslideDest[i] - s.world0) * gEVslideT : s.world0;
+        } else if (estado == translacion){
             wn = s.world0 + gEVtrans;
             if (faceIndiv) wn = SnapFaceIndividualPunto(wn); // cada vert se pega a la superficie de atras (o queda igual)
         } else if (estado == rotacion){
@@ -3767,6 +3832,130 @@ void LayoutShrinkFatten() {
     ToolbarRegistrarAccion(TBScale);             // historial (reusa el de escala)
 }
 
+static bool EVSlidePorAngulo(const std::pair<float,Vector3>& a, const std::pair<float,Vector3>& b){ return a.first < b.first; }
+// Los rieles de cada vertice del snapshot: sus vecinos por arista, en MUNDO y CONGELADOS al empezar
+// (leerlos en vivo daria mal si el vecino tambien esta seleccionado y se esta moviendo).
+static void EVSlideRieles(){
+    gEVslideCand.clear(); gEVslideDest.clear();
+    gEVslideT = 0.0f; gEVslideAccX = gEVslideAccY = 0.0f; gEVslideIdx = 0; gEVslideTeclado = false;
+    if (!gEVmesh || !gEVmesh->edit) return;
+    EditMesh* e = gEVmesh->edit;
+    gEVslideCand.resize(gEVsnap.size()); gEVslideDest.resize(gEVsnap.size());
+    for (size_t i = 0; i < gEVsnap.size(); i++){
+        gEVslideDest[i] = gEVsnap[i].world0;      // sin riel elegido, el vertice se queda quieto
+        const int k = gEVsnap[i].editK;
+        for (int eg = 0; eg < e->NumEdges(); eg++){
+            if ((size_t)eg*2+1 >= e->lineIdx.size()) break;
+            const int u = e->lineIdx[(size_t)eg*2], v = e->lineIdx[(size_t)eg*2+1];
+            const int o = (u == k) ? v : (v == k) ? u : -1;
+            if (o < 0 || o*3+2 >= (int)e->pos.size()) continue;
+            gEVslideCand[i].push_back(EVLocalAMundo(Vector3(e->pos[(size_t)o*3], e->pos[(size_t)o*3+1], e->pos[(size_t)o*3+2])));
+        }
+    }
+    // Las direcciones POSIBLES dependen de la vista: una arista que apunta a la camara se proyecta casi a
+    // un punto y no se puede apuntar, asi que sale de la lista (de ahi que un vertice de cubo de 1, 2 o 3
+    // segun desde donde mires). El resto queda ORDENADO por angulo en pantalla, para que las flechas las
+    // recorran dando la vuelta y no a los saltos.
+    if (!viewPortActive || viewPortActive->ViewportKind() != 1) return;
+    Viewport3D* vp = (Viewport3D*)viewPortActive; vp->BindVista();
+    for (size_t i = 0; i < gEVsnap.size(); i++){
+        float sx0, sy0; if (!vp->ProyectarPunto(gEVsnap[i].world0, sx0, sy0)) continue;
+        std::vector<std::pair<float,Vector3> > utiles;
+        for (size_t c = 0; c < gEVslideCand[i].size(); c++){
+            float sx, sy; if (!vp->ProyectarPunto(gEVslideCand[i][c], sx, sy)) continue;
+            const float ex = sx - sx0, ey = sy - sy0;
+            if (ex*ex + ey*ey < 4.0f) continue;                       // de frente a la camara: no se puede apuntar
+            utiles.push_back(std::make_pair(atan2f(ey, ex), gEVslideCand[i][c]));
+        }
+        std::sort(utiles.begin(), utiles.end(), EVSlidePorAngulo);
+        gEVslideCand[i].clear();
+        for (size_t c = 0; c < utiles.size(); c++) gEVslideCand[i].push_back(utiles[c].second);
+    }
+}
+
+// el riel numero 'gEVslideIdx' de cada vertice (las flechas arriba/abajo lo van corriendo)
+static void EVSlidePorIndice(){
+    for (size_t i = 0; i < gEVsnap.size() && i < gEVslideCand.size(); i++){
+        const int n = (int)gEVslideCand[i].size();
+        if (n <= 0) continue;
+        int k = gEVslideIdx % n; if (k < 0) k += n;
+        gEVslideDest[i] = gEVslideCand[i][(size_t)k];
+    }
+}
+
+// Prende/apaga el slide sobre un transform YA EN CURSO (la segunda G). Al apagarlo el move sigue
+// desde donde estaba, porque gEVtrans nunca se toco.
+void EditSlideToggle(){
+    if (!gEVmesh) return;
+    gEVslide = !gEVslide;
+    if (gEVslide) EVSlideRieles();
+    EVEscribir();
+    Notificar(T(gEVslide ? "Slide Vertices" : "Move"), false);
+}
+
+// Menu Vertex / Shift+V: arranca el move y lo pone en slide de una.
+void LayoutSlideVerticesEdit(){
+    if (InteractionMode != EditMode || !g_editMesh) return;
+    if (!EditXformStart(translacion, ViewAxis)) return;
+    gEVslide = true; EVSlideRieles(); EVEscribir();
+}
+
+// El mouse durante el slide. Se trabaja con el DELTA acumulado (no con la posicion absoluta) porque
+// ProyectarPunto devuelve pixeles LOCALES del viewport y el delta es el mismo en los dos espacios.
+void EditSlideRaton(int dx, int dy){
+    if (!gEVslide || !gEVmesh || gEVsnap.empty() || gEVslideDest.empty()) return;
+    if (!viewPortActive || viewPortActive->ViewportKind() != 1) return;
+    Viewport3D* vp = (Viewport3D*)viewPortActive; vp->BindVista();
+    gEVslideAccX += (float)dx; gEVslideAccY += (float)dy;
+    const float largo = sqrtf(gEVslideAccX*gEVslideAccX + gEVslideAccY*gEVslideAccY);
+    if (largo < 4.0f) return;                           // hace falta arrastrar para saber hacia donde
+    gEVslideTeclado = false;                            // se movio el mouse: vuelve a mandar el
+    // El riel se re-elige EN CADA movimiento (no se congela con el primer arrastre): asi, sin soltar,
+    // pasas de una direccion posible a otra con solo apuntar para el otro lado.
+    { const float rx = gEVslideAccX/largo, ry = gEVslideAccY/largo;
+      for (size_t i = 0; i < gEVsnap.size() && i < gEVslideCand.size(); i++){
+        float sx0, sy0; if (!vp->ProyectarPunto(gEVsnap[i].world0, sx0, sy0)) continue;
+        float mejor = -2.0f; int elegido = -1;          // la arista mas parecida al arrastre, en pantalla
+        for (size_t c = 0; c < gEVslideCand[i].size(); c++){
+            float sx, sy; if (!vp->ProyectarPunto(gEVslideCand[i][c], sx, sy)) continue;
+            const float ex = sx - sx0, ey = sy - sy0, el = sqrtf(ex*ex + ey*ey);
+            if (el < 0.001f) continue;
+            const float d = (ex/el)*rx + (ey/el)*ry;
+            if (d > mejor){ mejor = d; elegido = (int)c; }
+        }
+        if (elegido >= 0){ gEVslideDest[i] = gEVslideCand[i][(size_t)elegido];
+            if (i == 0) gEVslideIdx = elegido; }        // las flechas siguen desde donde lo dejo el mouse
+      } }
+    // el factor lo manda el PRIMER vertice: todos deslizan lo mismo, cada uno por su riel (como Blender)
+    float ax, ay, bx, by;
+    if (vp->ProyectarPunto(gEVsnap[0].world0, ax, ay) && vp->ProyectarPunto(gEVslideDest[0], bx, by)){
+        const float ex = bx - ax, ey = by - ay, len2 = ex*ex + ey*ey;
+        if (len2 > 0.000001f){
+            float t = (gEVslideAccX*ex + gEVslideAccY*ey) / len2;
+            if (t < 0.0f) t = 0.0f; if (t > 1.0f) t = 1.0f;
+            gEVslideT = t;
+        }
+    }
+    EVEscribir();
+}
+
+// Teclado durante el slide (Symbian / sin mouse, mismo flujo que el Loop Cut): 0=izq 1=der 2=arriba
+// 3=abajo. Arriba/abajo van CAMBIANDO la direccion entre las posibles; izquierda/derecha van del 0% al
+// 100% por esa direccion. Devuelve false si no habia slide en curso.
+bool EditSlideTecla(int cual){
+    if (!gEVslide || !gEVmesh || gEVsnap.empty()) return false;
+    if (cual == 2 || cual == 3){
+        if (gEVslideTeclado) gEVslideIdx += (cual == 2) ? 1 : -1;  // la primera vez toma el riel 0
+        gEVslideTeclado = true;
+        EVSlidePorIndice();
+    } else {
+        const float paso = 0.05f;
+        gEVslideT += (cual == 1) ? paso : -paso;
+        if (gEVslideT < 0.0f) gEVslideT = 0.0f; if (gEVslideT > 1.0f) gEVslideT = 1.0f;
+    }
+    EVEscribir(); g_redraw = true; return true;
+}
+
 // fija el resultado: recalcula bordes/centro/posRep (sin invalidar el edit) y las
 // NORMALES (salvo Lock Normals). El overlay ya esta sincronizado (SincronizarPos).
 void EditXformConfirmar(){
@@ -3789,6 +3978,7 @@ void EditXformConfirmar(){
       if (AutoKeyOn && ActiveAnimKind == 3 && gEVmesh && (Mesh*)ActiveAnimMesh == gEVmesh)
           VertexAnimInsertarKeyframe(); }
     gEVsnap.clear(); gEVmesh = NULL;
+    gEVslide = false; gEVslideCand.clear(); gEVslideDest.clear();
     estado = editNavegacion;
     g_extrudeEnCurso = false; // termino el transform
     // el motion del transform (controles.cpp) dejo ViewPortClickDown en true para CONGELAR el foco
@@ -3816,6 +4006,7 @@ void EditXformCancelar(){
         if (!m->modificadores.empty()) m->GenerarMallaModificada(); // preview vuelve al estado previo al cancelar
     }
     gEVsnap.clear(); gEVmesh = NULL;
+    gEVslide = false; gEVslideCand.clear(); gEVslideDest.clear();
     estado = editNavegacion;
     g_extrudeEnCurso = false; // termino el transform
     // liberar el foco congelado: ver la nota en EditXformConfirmar (cancelar por ESC no genera
@@ -3825,7 +4016,7 @@ void EditXformCancelar(){
 
 
 // ====================================================================
-// menu de SNAP (shift+s, estilo Blender): mueve seleccion / cursor 3D
+// menu de SNAP (shift+s, ): mueve seleccion / cursor 3D
 // ====================================================================
 static PopupMenu* gMenuSnap = NULL;
 

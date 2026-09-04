@@ -3,9 +3,9 @@
 
 /**
  * @file Parent.h
- * @brief Emparentar / desemparentar objetos (Ctrl+P / Alt+P), estilo Blender. Extraido de LayoutInput.
+ * @brief Emparentar / desemparentar objetos (Ctrl+P / Alt+P), . Extraido de LayoutInput.
  *
- * Emparentar / desemparentar objetos (Ctrl+P / Alt+P), estilo Blender. Extraido de LayoutInput.
+ * Emparentar / desemparentar objetos (Ctrl+P / Alt+P), . Extraido de LayoutInput.
  */
 class PopupMenu; class Object; class Mesh;
 

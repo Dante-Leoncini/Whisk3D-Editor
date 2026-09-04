@@ -610,7 +610,7 @@ void W3dLayoutMenuParent(TBool aClear, TInt aX, TInt aY) {
     LayoutMenuParent(aClear ? true : false, aX, aY);
 }
 
-// shift+S: menu de snap (cursor/seleccion), compartido estilo Blender
+// shift+S: menu de snap (cursor/seleccion), compartido 
 void W3dLayoutMenuSnap(TInt aX, TInt aY) {
     LayoutMenuSnap(aX, aY);
 }

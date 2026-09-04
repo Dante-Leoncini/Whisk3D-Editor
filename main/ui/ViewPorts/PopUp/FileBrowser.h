@@ -10,7 +10,7 @@
 #include "w3dFilesystem.h"
 
 // ============================================================================
-//  File browser COMPARTIDO (4 OS) — modal a pantalla completa, estilo Blender.
+//  File browser COMPARTIDO (4 OS) — modal a pantalla completa, .
 //  Reusa los elementos que ya existen: Card (9-patch con borde), Button (con
 //  icono/tinte) y Scrollable (la barra de scroll real, con su textura).
 // ============================================================================

@@ -407,7 +407,10 @@ void InputUsuarioSDL3(SDL_Event &e){
                     // PC: arrastrar sobre el contenido del 3D es un BOX SELECT (con el mouse ese
                     // arrastre no hacia nada: la orbita es el boton del medio). En TACTIL no, que
                     // ahi el arrastre de 1 dedo ES la orbita.
-                    if (e.motion.which != SDL_TOUCH_MOUSEID && !BoxSelectActivo()) {
+                    // ...pero NO en los modos de pintura: ahi el arrastre ES el trazo del pincel
+                    // (y la seleccion no se puede cambiar). Este era el bug de "pinto y me arma la caja".
+                    const bool pintando = (InteractionMode == WeightPaint || InteractionMode == VertexPaint || InteractionMode == TexturePaint);
+                    if (e.motion.which != SDL_TOUCH_MOUSEID && !BoxSelectActivo() && !pintando) {
                         BoxSelectArmar();
                         BoxSelectDown(g_tapStartX, g_tapStartY);
                         BoxSelectMover(mx, my);
@@ -554,7 +557,7 @@ void InputUsuarioSDL3(SDL_Event &e){
           } }
     }
 
-    // FOCO DE TECLADO POR HOVER (estilo Blender, convencion del editor): el destino de las
+    // FOCO DE TECLADO POR HOVER (, convencion del editor): el destino de las
     // teclas es el viewport BAJO EL CURSOR, no el ultimo clickeado. Antes el foco solo se
     // actualizaba en el mouse-motion, y varios gestos (ej: el tap al boton Play de la barra
     // del Timeline) retornaban SIN pasar por mouse_button_up del viewport -> ViewPortClickDown
@@ -769,6 +772,10 @@ void InputUsuarioSDL3(SDL_Event &e){
                     rootViewport, (int)e.button.x, (int)e.button.y);
                 bool es3Dnav = hoja3d && hoja3d->isLeaf() &&
                                hoja3d->ViewportKind() == 1 && estado == editNavegacion;
+                // en los modos de PINTURA el down es el arranque del trazo y la seleccion no cambia:
+                // nada de diferir el pick ni de armar box select por arrastre (era el bug de "pinto y
+                // me arma la caja"). El trazo arranca en el down, en PC y en tactil por igual.
+                if (InteractionMode == WeightPaint || InteractionMode == VertexPaint || InteractionMode == TexturePaint) es3Dnav = false;
                 // TACTIL sobre el viewport 3D: NO seleccionar en el DOWN. Si el dedo se arrastra = orbita/
                 // panea (la seleccion NO cambia); si es un TAP simple, se pickea al SOLTAR. Antes cualquier
                 // orbit/paneo pisaba la seleccion (se deseleccionaba al tocar el fondo para orbitar).
@@ -1005,6 +1012,16 @@ void InputUsuarioSDL3(SDL_Event &e){
             if (k == SDLK_UP)    { LoopCutTecla(2); return; }
             if (k == SDLK_DOWN)  { LoopCutTecla(3); return; }
         }
+        // TECLADO durante un VERTEX SLIDE (Symbian / sin mouse, mismo flujo que el loop cut):
+        //  arriba/abajo = cambia de direccion entre las posibles; izquierda/derecha = del 0% al 100%.
+        //  Enter y Esc los maneja el modal del move (confirma / cancela), como cualquier transform.
+        if (EditSlideActivo()) {
+            SDL_Keycode k = e.key.keysym.sym;
+            if (k == SDLK_LEFT)  { EditSlideTecla(0); return; }
+            if (k == SDLK_RIGHT) { EditSlideTecla(1); return; }
+            if (k == SDLK_UP)    { EditSlideTecla(2); return; }
+            if (k == SDLK_DOWN)  { EditSlideTecla(3); return; }
+        }
         // loop select desde una cara: flechas eligen el sentido; enter/esc acepta la seleccion
         if (LoopSelOrientando()) {
             SDL_Keycode k = e.key.keysym.sym;
@@ -1074,7 +1091,7 @@ void InputUsuarioSDL3(SDL_Event &e){
         // normal hasta UVEditor::event_key_down, que decide si hace algo o no.
         const bool focoUV = (viewPortActive && viewPortActive->isLeaf() &&
                              viewPortActive->ViewportKind() == 4);
-        // shift+S: menu de snap (cursor/seleccion), estilo Blender
+        // shift+S: menu de snap (cursor/seleccion), 
         if (e.key.keysym.sym == SDLK_s && LShiftPressed && !focoUV) {
             LayoutMenuSnap(lastMouseX, lastMouseY);
             atajoMenu = true;
@@ -1112,7 +1129,7 @@ void InputUsuarioSDL3(SDL_Event &e){
                 atajoMenu = true;   // consumida aca: no se re-rutea al viewport
             }
         }
-        // 'm' en Edit Mode = menu MERGE (soldar verts, estilo Blender); en el resto abre/cierra la barra de
+        // 'm' en Edit Mode = menu MERGE (soldar verts, ); en el resto abre/cierra la barra de
         // menu del viewport activo (= soft-izq en Symbian). Teclado-solo: el primer menu se abre sin preseleccionar.
         if (e.key.keysym.sym == SDLK_m && !PopUpActive) {
             // Con el foco en el EDITOR UV el Merge NO corre (soldaria vertices de la MALLA estando

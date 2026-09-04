@@ -1117,7 +1117,7 @@ int CWhisk3DContainer::DrawCallBack( TAny* aInstance )
     // Render EVENT-DRIVEN: solo dibujar+cursor+swap si algo CAMBIO (g_redraw, lo
     // prende cualquier tecla/cursor/flecha) o hay una animacion en play. Si la escena
     // esta quieta, el frame se saltea ENTERO (sin GL ni swap/vsync) -> CPU y bateria
-    // casi 0, como Blender. El timer sigue tickeando, pero sin trabajo de GPU.
+    // casi 0. El timer sigue tickeando, pero sin trabajo de GPU.
     if (g_redraw || HayAnimacionActiva()) {
         // arbol de viewports (3D confinado a su rectangulo + props) y el cursor encima
         W3dLayoutRender();

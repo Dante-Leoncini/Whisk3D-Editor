@@ -2,6 +2,8 @@
 #include "edit/MeshEdit.h"      // funciones libres de edicion de malla (mesh parts, etc.)
 #include "objects/EditMesh.h"   // malla de EDICION (editor): este TU SI puede verla
 #include "edit/Modifier.h"      // stack de modificadores (clase del EDITOR; el core solo guarda Modifier*)
+#include "edit/PolyMesh.h"      // la malla de POLIGONOS sobre la que corre el stack (compartida con el Boolean)
+#include "edit/BooleanMod.h"    // el CSG del modificador Boolean (BSP sobre poligonos)
 #include "edit/WeightPaint.h"   // WeightPaintAsegurarMapa: vive aca (la usa la CARGA, no el pincel)
 #include "animation/SkeletalAnimation.h" // SkinearMesh (Apply del modificador Armature: hornear la pose)
 #include "animation/Animation.h"         // CurrentFrame
@@ -40,6 +42,8 @@ namespace gfx = w3dEngine;
 // la capa activa (uv/color) a los arrays de render SIN realloc ni re-merge ni re-triangular.
 // Para mover verts / pintar. NO sirve si cambia la TOPOLOGIA (ahi va GenerarRender).
 void Mesh::RefrescarRender() {
+    geoVersion++;                             // la geometria editable cambio (ver Mesh.h: lo lee el Boolean)
+    { extern bool g_mallasEditadas; g_mallasEditadas = true; }
     if (edit) DesinstanciarDatos(W3DMD_POS);  // COW: EmpujarPosiciones escribe vertex[] (MallaDatos.h)
     if (edit) { edit->EmpujarPosiciones();  // posiciones (autoritativas en el edit) -> render
                 edit->RefrescarOverlay(); } // lineas/puntos del overlay desde pos[]
@@ -438,8 +442,10 @@ bool Mesh::BorrarEdgeLoopEdit() {
     // GUARD: la seleccion tiene que ser edge LOOPS limpios (cada vert tocado por EXACTAMENTE 2 aristas del loop =
     // anillos disjuntos cerrados). Si no -ej. todo el cubo seleccionado (valencia 3) o un camino abierto (valencia 1)-
     // NO disolver: devolver false para que la GUI avise ("select an edge loop first") en vez de mangler la malla.
-    { std::map<int,int> val; for (std::set<std::pair<int,int> >::iterator it=loopE.begin();it!=loopE.end();++it){ val[it->first]++; val[it->second]++; }
-      for (std::map<int,int>::iterator it=val.begin();it!=val.end();++it) if (it->second != 2) return false; }
+    // NO hace falta que sea un loop cerrado: se disuelve CADA arista seleccionada que comparten dos caras
+    // (la diagonal de dos triangulos da un quad; dos o tres aristas seguidas dan un ngon). Los vertices de
+    // esas aristas se sacan solo si quedan con 2 aristas (alineados en el medio de una arista, como los de
+    // un loop cut): los demas (las esquinas del quad) se quedan.
 
     // 2) ring (gv) + corn (indice de corner VIEJO, para preservar las capas) por cara + edge->caras
     const int nF = (int)faces3d.size();
@@ -473,13 +479,16 @@ bool Mesh::BorrarEdgeLoopEdit() {
 
     UndoCapturarMallaGeo(this); // Ctrl+Z
 
-    // 4) sacar los verts del loop de los rings vivos (valencia-2 tras la fusion -> sus 2 aristas se unen). PROTECCION:
-    // si sacarlos degeneraria la cara (<3 verts; pasa cuando el loop atraviesa un POLO valencia-alta, ej. la longitud
-    // de una esfera) -> dejar la cara como esta. Asi nunca rompe la malla; en un loop limpio (cubo/cilindro/latitud)
-    // ninguna degenera y el dissolve es completo.
+    // valencia de cada vert DESPUES de fundir: un vert de una arista disuelta que queda con 2 aristas esta en
+    // el medio de una arista (loop cut deshecho) -> se saca; con 3 o mas (esquina, o toca una arista viva) se queda
+    std::set<int> sacar;
+    { std::set<std::pair<int,int> > vivas;
+      for (int f=0;f<nF;f++){ if (uf[f]!=f) continue; int m=(int)ring[f].size(); for (int c=0;c<m;c++){ int ra=LREP(ring[f][c]), rb=LREP(ring[f][(c+1)%m]); if (ra==rb) continue; vivas.insert(ra<rb?std::make_pair(ra,rb):std::make_pair(rb,ra)); } }
+      std::map<int,int> val; for (std::set<std::pair<int,int> >::iterator it=vivas.begin();it!=vivas.end();++it){ val[it->first]++; val[it->second]++; }
+      for (std::set<int>::iterator it=loopV.begin();it!=loopV.end();++it){ std::map<int,int>::iterator v=val.find(*it); if (v!=val.end() && v->second==2) sacar.insert(*it); } }
     for (int f=0;f<nF;f++){ if (uf[f]!=f) continue;
         std::vector<int> nr, nc;
-        for (size_t c=0;c<ring[f].size();c++){ if (loopV.count(LREP(ring[f][c]))) continue; nr.push_back(ring[f][c]); nc.push_back(corn[f][c]); }
+        for (size_t c=0;c<ring[f].size();c++){ if (sacar.count(LREP(ring[f][c]))) continue; nr.push_back(ring[f][c]); nc.push_back(corn[f][c]); }
         if (nr.size() >= 3) { ring[f].swap(nr); corn[f].swap(nc); }
     }
 
@@ -487,10 +496,10 @@ bool Mesh::BorrarEdgeLoopEdit() {
     PoblarCapas();
     std::vector<MeshFace> nf3d; std::vector<int> survCorner;
     for (int f=0;f<nF;f++){ if (uf[f]!=f || ring[f].size()<3) continue;
-        MeshFace mf; mf.idx=ring[f]; mf.mat=faces3d[f].mat; nf3d.push_back(mf);
+        MeshFace mf; mf.idx=ring[f]; mf.mat=faces3d[f].mat; mf.smooth=faces3d[f].smooth; nf3d.push_back(mf); // conserva mesh part + shading
         for (size_t c=0;c<corn[f].size();c++) survCorner.push_back(corn[f][c]); }
     std::vector<int> nLoose; // bordes sueltos: descartar los que toquen un vert del loop
-    for (size_t i=0;i+1<looseEdges.size();i+=2){ int a=looseEdges[i],b=looseEdges[i+1]; if (a<0||b<0||a>=nV||b>=nV) continue; if (loopV.count(LREP(a))||loopV.count(LREP(b))) continue; nLoose.push_back(a); nLoose.push_back(b); }
+    for (size_t i=0;i+1<looseEdges.size();i+=2){ int a=looseEdges[i],b=looseEdges[i+1]; if (a<0||b<0||a>=nV||b>=nV) continue; if (sacar.count(LREP(a))||sacar.count(LREP(b))) continue; nLoose.push_back(a); nLoose.push_back(b); }
     #undef LREP
     faces3d.swap(nf3d);
     looseEdges.swap(nLoose);
@@ -649,6 +658,7 @@ bool Mesh::ExtruirEdit(Vector3& outDirLocal, bool& outConstrain) {
     std::map<std::pair<int,int>,int> edgeCount;          // faces mode
     std::map<std::pair<int,int>,std::pair<int,int> > edgeDir;
     std::map<std::pair<int,int>,int> edgeMat;            // material (mesh part) de la cara sel duena de cada arista -> las paredes lo heredan
+    std::map<std::pair<int,int>,int> edgeSmooth;         // idem shading por cara (smooth): la pared sigue el de la cara del contorno
 
     // ELEMENTO EFECTIVO = el mas ALTO que forman los verts seleccionados (NO el modo
     // de la UI): en modo vertice, seleccionar los verts de una cara extruye la CARA; 2
@@ -669,7 +679,7 @@ bool Mesh::ExtruirEdit(Vector3& outDirLocal, bool& outConstrain) {
             for (int c = 0; c < m; c++) {
                 int ra=XREP(idx[c]), rb=XREP(idx[(c+1)%m]); if (ra==rb) continue;
                 int lo=ra<rb?ra:rb, hi=ra<rb?rb:ra; std::pair<int,int> key(lo,hi);
-                if (edgeCount.find(key)==edgeCount.end()){ edgeCount[key]=0; edgeDir[key]=std::make_pair(ra,rb); edgeMat[key]=faces3d[f].mat; }
+                if (edgeCount.find(key)==edgeCount.end()){ edgeCount[key]=0; edgeDir[key]=std::make_pair(ra,rb); edgeMat[key]=faces3d[f].mat; edgeSmooth[key]=faces3d[f].smooth; }
                 edgeCount[key]++;
             }
         }
@@ -690,7 +700,7 @@ bool Mesh::ExtruirEdit(Vector3& outDirLocal, bool& outConstrain) {
             for (int c = 0; c < m; c++) {
                 int ra=XREP(idx[c]), rb=XREP(idx[(c+1)%m]); if (ra==rb) continue;
                 int lo=ra<rb?ra:rb, hi=ra<rb?rb:ra; std::pair<int,int> key(lo,hi);
-                if (edgeMat.find(key)==edgeMat.end()) edgeMat[key]=faces3d[f].mat;
+                if (edgeMat.find(key)==edgeMat.end()) { edgeMat[key]=faces3d[f].mat; edgeSmooth[key]=faces3d[f].smooth; }
             }
         }
         // aristas de la malla (edges = pares de reps) con AMBOS extremos seleccionados
@@ -829,7 +839,7 @@ bool Mesh::ExtruirEdit(Vector3& outDirLocal, bool& outConstrain) {
             std::map<int,int>::iterator na=newOf.find(ra), nb=newOf.find(rb);
             if (na==newOf.end()||nb==newOf.end()) continue;
             std::vector<int> w; w.push_back(nb->second); w.push_back(na->second); w.push_back(ra); w.push_back(rb);
-            MeshFace mf; mf.idx=w; mf.mat=edgeMat[it->first]; nf3d.push_back(mf); // la pared hereda el mesh part de la cara del contorno
+            MeshFace mf; mf.idx=w; mf.mat=edgeMat[it->first]; mf.smooth=edgeSmooth[it->first]; nf3d.push_back(mf); // la pared hereda mesh part + shading de la cara del contorno
             // la pared hereda uv/color de los verts que conecta (b_new/b_old<-rb, a_new/a_old<-ra)
             AgregarCornerCapas(this,vertCorner[rb]); AgregarCornerCapas(this,vertCorner[ra]);
             AgregarCornerCapas(this,vertCorner[ra]); AgregarCornerCapas(this,vertCorner[rb]);
@@ -839,7 +849,9 @@ bool Mesh::ExtruirEdit(Vector3& outDirLocal, bool& outConstrain) {
             int ra=selEdgesDir[i].first, rb=selEdgesDir[i].second;
             std::vector<int> w; w.push_back(ra); w.push_back(rb); w.push_back(newOf[rb]); w.push_back(newOf[ra]);
             int lo=ra<rb?ra:rb, hi=ra<rb?rb:ra; std::map<std::pair<int,int>,int>::iterator em=edgeMat.find(std::make_pair(lo,hi));
-            MeshFace mf; mf.idx=w; if (em!=edgeMat.end()) mf.mat=em->second; nf3d.push_back(mf); // hereda el mesh part de la cara de la arista
+            MeshFace mf; mf.idx=w; if (em!=edgeMat.end()) mf.mat=em->second;
+            { std::map<std::pair<int,int>,int>::iterator es=edgeSmooth.find(std::make_pair(lo,hi)); if (es!=edgeSmooth.end()) mf.smooth=es->second; }
+            nf3d.push_back(mf); // hereda mesh part + shading de la cara de la arista
             AgregarCornerCapas(this,vertCorner[ra]); AgregarCornerCapas(this,vertCorner[rb]);
             AgregarCornerCapas(this,vertCorner[rb]); AgregarCornerCapas(this,vertCorner[ra]);
         }
@@ -1487,7 +1499,14 @@ bool Mesh::CrearCaraEdit() {
         std::vector<int> vertCorner(nV, -1); int Lc=0;
         for (size_t f=0;f<faces3d.size();f++){ const std::vector<int>& ix=faces3d[f].idx;
             for (size_t c=0;c<ix.size();c++){ if (ix[c]>=0&&ix[c]<nV&&vertCorner[ix[c]]<0) vertCorner[ix[c]]=Lc; Lc++; } }
-        MeshFace mf; mf.idx=ring; faces3d.push_back(mf);
+        MeshFace mf; mf.idx=ring;
+        // shading: hereda el de una cara VECINA (comparte 2 vertices con el anillo); sin vecina, el global (-1)
+        { const bool hr = ((int)posRep.size() == nV);
+          std::set<int> rs; for (size_t c=0;c<ring.size();c++){ int g=ring[c]; if (g>=0&&g<nV) rs.insert(hr?posRep[g]:g); }
+          for (size_t f=0; f<faces3d.size() && mf.smooth<0; f++){ int comp=0; const std::vector<int>& ix=faces3d[f].idx;
+              for (size_t c=0;c<ix.size();c++){ int g=ix[c]; if (g>=0&&g<nV && rs.count(hr?posRep[g]:g)) comp++; }
+              if (comp>=2) mf.smooth = faces3d[f].smooth; } }
+        faces3d.push_back(mf);
         for (size_t c=0;c<ring.size();c++){ int v=ring[c]; AgregarCornerCapas(this,(v>=0&&v<nV)?vertCorner[v]:-1); }
         RecalcularNormales(); // normales frescas (incluye la cara nueva)
         GenerarRender();      // re-merge + render (re-triangula + materialsGroup + CalcularBordes)
@@ -1696,7 +1715,7 @@ bool Mesh::LoopCutPreview(int startEditEdge, int numCuts, float factor, std::vec
 // interpolar por CP daria dos comportamientos distintos para la misma operacion, que es peor que
 // el 0 uniforme. Si algun dia se agrega, va para las DOS entidades juntas y en la misma pasada
 // del 'src' (LERP) que ya se usa para uv/color/normal.
-bool Mesh::LoopCutEdit(int startEditEdge, int numCuts, float factor) {
+bool Mesh::LoopCutEdit(int startEditEdge, int numCuts, float factor, bool correctUV) {
     DesinstanciarDatos(W3DMD_TODO);  // COW: la op de edicion muta la geometria (MallaDatos.h)
     EnsureEdit();
     if (!edit || !vertex || vertexSize <= 0) return false;
@@ -1743,9 +1762,43 @@ bool Mesh::LoopCutEdit(int startEditEdge, int numCuts, float factor) {
     vtxAnimRecipes.clear(); vtxAnimRecipeBase = nV;
     std::vector<char> esLoop(faces3d.size(), 0);
     for (int i=0;i<L;i++){ int fs = e->faceSrc[loopFaces[i]]; if (fs>=0 && fs<(int)faces3d.size()) esLoop[fs]=1; }
-    for (size_t f=0; f<faces3d.size(); f++) if (!esLoop[f]) { // caras intactas: copiar tal cual + sus capas
+    // caras VECINAS de un rung que NO son del loop (el triangulo/ngon donde termina un corte abierto, o un
+    // vecino no-manifold): la arista se les parte igual, con los mismos verts del corte, sino la cara de
+    // al lado seguia con la arista entera y quedaba un AGUJERO (3 bordes donde tenia que haber 2).
+    std::vector<std::vector<int> > rungsDeCara(faces3d.size());
+    for (size_t i=0;i<rungEg.size();i++){ const int eg=rungEg[i];
+        for (size_t ef=0; ef<e->faceEdges.size(); ef++){ const std::vector<int>& fe=e->faceEdges[ef]; bool tiene=false;
+            for (size_t k=0;k<fe.size();k++) if (fe[k]==eg){ tiene=true; break; }
+            if (!tiene) continue;
+            const int fs = (ef < e->faceSrc.size()) ? e->faceSrc[ef] : -1;
+            if (fs>=0 && fs<(int)faces3d.size() && !esLoop[fs]) rungsDeCara[fs].push_back((int)i); } }
+    for (size_t f=0; f<faces3d.size(); f++) if (!esLoop[f] && rungsDeCara[f].empty()) { // caras intactas: copiar tal cual + sus capas
         nf3d.push_back(faces3d[f]);
         for (size_t c=0;c<faces3d[f].idx.size();c++) src.push_back(CornerSrc(faceOff[f]+(int)c)); }
+    for (size_t f=0; f<faces3d.size(); f++) if (!esLoop[f] && !rungsDeCara[f].empty()) { // vecinas: se les insertan los verts del corte
+        const std::vector<int>& ring = faces3d[f].idx; const int n=(int)ring.size();
+        MeshFace mf; mf.mat=faces3d[f].mat; mf.smooth=faces3d[f].smooth;
+        for (int c=0;c<n;c++){
+            mf.idx.push_back(ring[c]); src.push_back(CornerSrc(faceOff[f]+c));
+            const int c2=(c+1)%n; const int g0=ring[c], g1=ring[c2];
+            const int r0 = hayRep?posRep[g0]:g0, r1 = hayRep?posRep[g1]:g1;
+            for (size_t k=0;k<rungsDeCara[f].size();k++){ const int i=rungsDeCara[f][k];
+                const int rA=e->editVerts[rungA[i]], rB=e->editVerts[rungB[i]];
+                int gA=-1,gB=-1,crA=-1,crB=-1; bool haciaB=false;
+                if (r0==rA && r1==rB){ gA=g0; gB=g1; crA=faceOff[f]+c; crB=faceOff[f]+c2; haciaB=true; }
+                else if (r0==rB && r1==rA){ gA=g1; gB=g0; crA=faceOff[f]+c2; crB=faceOff[f]+c; haciaB=false; }
+                if (gA<0) continue;
+                // del corner c al c2: si el anillo va de A a B, los cortes en orden de s creciente; si va de B a A, decreciente
+                for (int jj=0; jj<numCuts; jj++){ const int j = haciaB ? jj : (numCuts-1-jj); const float sv=sj[j];
+                    const int ni=(int)(vp.size()/3);
+                    for (int q=0;q<3;q++) vp.push_back(vertex[gA*3+q]*(1-sv)+vertex[gB*3+q]*sv);
+                    vtxAnimRecipes.push_back(VtxRecipe(gA, gB, sv));
+                    cutVerts.push_back(ni);
+                    mf.idx.push_back(ni); src.push_back(correctUV ? CornerSrc(crA, crB, sv) : CornerSrc(sv < 0.5f ? crA : crB)); }
+            }
+        }
+        nf3d.push_back(mf);
+    }
 
     for (int i=0;i<L;i++){
         int editF = loopFaces[i];
@@ -1790,15 +1843,17 @@ bool Mesh::LoopCutEdit(int startEditEdge, int numCuts, float factor) {
             // fuente de capa de cada corner del sub-quad (paralela a qi): los originales
             // COPIAN su corner viejo; los del corte LERPean entre los 2 corners de su arista
             CornerSrc qs[4];
-            qs[0] = (j==0)       ? CornerSrc(crA0) : CornerSrc(crA0,crB0,sj[j-1]);
-            qs[1] = (j==numCuts) ? CornerSrc(crB0) : CornerSrc(crA0,crB0,sj[j]);
-            qs[2] = (j==numCuts) ? CornerSrc(crB1) : CornerSrc(crA1,crB1,sj[j]);
-            qs[3] = (j==0)       ? CornerSrc(crA1) : CornerSrc(crA1,crB1,sj[j-1]);
+            // correctUV: los corners del corte interpolan la capa a lo largo de la arista; sino copian el extremo cercano
+            struct SrcDe { static CornerSrc De(int cA, int cB, float sv, bool lerp) { return lerp ? CornerSrc(cA, cB, sv) : CornerSrc(sv < 0.5f ? cA : cB); } };
+            qs[0] = (j==0)       ? CornerSrc(crA0) : SrcDe::De(crA0,crB0,sj[j-1],correctUV);
+            qs[1] = (j==numCuts) ? CornerSrc(crB0) : SrcDe::De(crA0,crB0,sj[j],correctUV);
+            qs[2] = (j==numCuts) ? CornerSrc(crB1) : SrcDe::De(crA1,crB1,sj[j],correctUV);
+            qs[3] = (j==0)       ? CornerSrc(crA1) : SrcDe::De(crA1,crB1,sj[j-1],correctUV);
             // normal del sub-quad; si va al reves de la cara original, lo doy vuelta (+ la capa)
             float qnx=0,qny=0,qnz=0;
             for (int c2=0;c2<4;c2++){ const float* pa=&vp[qi[c2]*3]; const float* pb=&vp[qi[(c2+1)%4]*3];
                 qnx+=(pa[1]-pb[1])*(pa[2]+pb[2]); qny+=(pa[2]-pb[2])*(pa[0]+pb[0]); qnz+=(pa[0]-pb[0])*(pa[1]+pb[1]); }
-            MeshFace q;
+            MeshFace q; q.mat = faces3d[fs].mat; q.smooth = faces3d[fs].smooth;   // los quads del corte heredan mesh part + shading
             if (qnx*onx+qny*ony+qnz*onz < 0.0f){ q.idx.push_back(d); q.idx.push_back(c); q.idx.push_back(b); q.idx.push_back(a);
                 src.push_back(qs[3]); src.push_back(qs[2]); src.push_back(qs[1]); src.push_back(qs[0]); }
             else                               { q.idx.push_back(a); q.idx.push_back(b); q.idx.push_back(c); q.idx.push_back(d);
@@ -2052,7 +2107,7 @@ static std::set<long long> gClipStuck;
 void ClipMirrorReset(){ gClipStuck.clear(); }
 
 // CLIPPING del modificador Mirror (edit-time): impide que los verts CRUCEN el plano del mirror mientras se mueven
-// (half-space, estilo Blender) y, una vez que un vert se PEGA al plano, lo deja pegado a esa pared por el resto del
+// (half-space, ) y, una vez que un vert se PEGA al plano, lo deja pegado a esa pared por el resto del
 // transform (solo desliza por el plano; el eje del espejo queda clavado en 0). Para cada vert mira el lado ACTUAL y
 // el lado al EMPEZAR (startLocal): se pega si entra a la banda, si cruza el plano, o si YA se habia pegado. Local space.
 void Mesh::ClipMirrorVerts(const std::vector<int>& editKs, const std::vector<Vector3>& startLocal) {
@@ -2426,19 +2481,10 @@ static bool AristaEnPlanoMirror(Mesh* m, int ra, int rb){
 //  TOPOLOGICOS (deduplicados por posicion). Se lleva la malla como poligonos con uv/color POR CORNER (preserva
 //  costuras) y material POR CARA; se triangula al final. Mirror se aplica tambien sobre poligonos.
 // ============================================================================
-struct PolyMesh {
-    std::vector<Vector3>                    P;    // posiciones topologicas (unicas por lugar)
-    std::vector<std::vector<int> >          F;    // caras: indices a P
-    std::vector<int>                        Fmat; // material (mesh part) por cara
-    std::vector<std::vector<float> >        Fuv;  // uv POR CORNER (2 por corner)
-    std::vector<std::vector<unsigned char> >Fcol; // color POR CORNER (4 por corner)
-    std::vector<std::pair<int,int> >        E;    // aristas topologicas (perfil) -> las usa el Screw para barrer
-    int                                     Emat; // material para las caras que genera el Screw desde las aristas
-    PolyMesh() : Emat(0) {}
-};
+// (PolyMesh vive en edit/PolyMesh.h: la comparte el Boolean, que tiene su propio archivo)
 
 // arma la PolyMesh desde faces3d: deduplica los verts de render por POSICION (posRep) -> verts topologicos.
-static void ConstruirPolyMesh(Mesh* m, PolyMesh& W) {
+void ConstruirPolyMesh(Mesh* m, PolyMesh& W) {
     const int nV = m->vertexSize;
     const bool hayRep = ((int)m->posRep.size() == nV);
     std::map<int,int> repToTopo; std::vector<int> gpuToTopo(nV, -1);
@@ -2456,7 +2502,7 @@ static void ConstruirPolyMesh(Mesh* m, PolyMesh& W) {
             for (int q=0;q<4;q++) col.push_back(m->vertexColor?m->vertexColor[gi*4+q]:(unsigned char)255);
         }
         if (face.size()<3) continue;
-        W.F.push_back(face); W.Fmat.push_back(m->faces3d[f].mat); W.Fuv.push_back(uv); W.Fcol.push_back(col);
+        W.F.push_back(face); W.Fmat.push_back(m->faces3d[f].mat); W.Fsmooth.push_back(m->faces3d[f].smooth); W.Fuv.push_back(uv); W.Fcol.push_back(col);
     }
     // aristas topologicas (perfil del Screw): de las caras + los bordes SUELTOS (un perfil de botella suele ser
     // una cadena de aristas sueltas sin caras). Deduplicadas por vert topologico.
@@ -2517,7 +2563,7 @@ static void SubdividirUnNivel(PolyMesh& W, bool simple) {
             int eN=eid[std::make_pair(vi<vnext?vi:vnext, vi<vnext?vnext:vi)];
             int eP=eid[std::make_pair(vprev<vi?vprev:vi, vprev<vi?vi:vprev)];
             std::vector<int> q; q.push_back(vi); q.push_back(baseE+eN); q.push_back(baseF+f); q.push_back(baseE+eP);
-            out.F.push_back(q); out.Fmat.push_back(W.Fmat[f]);
+            out.F.push_back(q); out.Fmat.push_back(W.Fmat[f]); out.Fsmooth.push_back(PolySmoothDe(W, f));
             std::vector<float> qu; std::vector<unsigned char> qc;
             // V (corner i)
             qu.push_back(W.Fuv[f][i*2]); qu.push_back(W.Fuv[f][i*2+1]); for(int z=0;z<4;z++) qc.push_back(W.Fcol[f][i*4+z]);
@@ -2532,7 +2578,7 @@ static void SubdividirUnNivel(PolyMesh& W, bool simple) {
             out.Fuv.push_back(qu); out.Fcol.push_back(qc);
         }
     }
-    W.P.swap(out.P); W.F.swap(out.F); W.Fmat.swap(out.Fmat); W.Fuv.swap(out.Fuv); W.Fcol.swap(out.Fcol);
+    W.P.swap(out.P); W.F.swap(out.F); W.Fmat.swap(out.Fmat); W.Fsmooth.swap(out.Fsmooth); W.Fuv.swap(out.Fuv); W.Fcol.swap(out.Fcol);
 }
 
 // MIRROR sobre poligonos: refleja los verts a traves del plano (c,n) y agrega las caras reflejadas con winding
@@ -2548,7 +2594,7 @@ static void MirrorPoly(PolyMesh& W, const Vector3& c, const Vector3& n, bool mer
         std::vector<int> nf; std::vector<float> nu; std::vector<unsigned char> nc;
         for (int i=m-1;i>=0;i--){ nf.push_back(mir[W.F[f][i]]); nu.push_back(W.Fuv[f][i*2]); nu.push_back(W.Fuv[f][i*2+1]);
             for(int z=0;z<4;z++) nc.push_back(W.Fcol[f][i*4+z]); }
-        W.F.push_back(nf); W.Fmat.push_back(W.Fmat[f]); W.Fuv.push_back(nu); W.Fcol.push_back(nc);
+        W.F.push_back(nf); W.Fmat.push_back(W.Fmat[f]); W.Fsmooth.push_back(PolySmoothDe(W, f)); W.Fuv.push_back(nu); W.Fcol.push_back(nc);
     }
 }
 
@@ -2569,7 +2615,7 @@ static void SoldarPolyPorPos(PolyMesh& W){
     for (int i=0;i<nP;i++){ int q[3]={ (int)floorf(W.P[i].x*10000.0f+0.5f),(int)floorf(W.P[i].y*10000.0f+0.5f),(int)floorf(W.P[i].z*10000.0f+0.5f) };
         std::string k((const char*)q,sizeof(q)); std::map<std::string,int>::iterator it=mp.find(k);
         if (it!=mp.end()) remap[i]=it->second; else { remap[i]=(int)np.size(); mp[k]=remap[i]; np.push_back(W.P[i]); } }
-    std::vector<std::vector<int> > nf; std::vector<int> nfm; std::vector<std::vector<float> > nfu; std::vector<std::vector<unsigned char> > nfc;
+    std::vector<std::vector<int> > nf; std::vector<int> nfm, nfs; std::vector<std::vector<float> > nfu; std::vector<std::vector<unsigned char> > nfc;
     for (size_t f=0;f<W.F.size();f++){ int m=(int)W.F[f].size();
         std::vector<int> r; std::vector<float> ru; std::vector<unsigned char> rc;
         for (int c=0;c<m;c++){ int v=remap[W.F[f][c]]; if(!r.empty() && r.back()==v) continue; // corner colapsado
@@ -2577,15 +2623,15 @@ static void SoldarPolyPorPos(PolyMesh& W){
             rc.push_back(W.Fcol[f][c*4]);rc.push_back(W.Fcol[f][c*4+1]);rc.push_back(W.Fcol[f][c*4+2]);rc.push_back(W.Fcol[f][c*4+3]); }
         if (r.size()>=2 && r.front()==r.back()){ r.pop_back(); ru.pop_back();ru.pop_back(); for(int k=0;k<4;k++) rc.pop_back(); }
         if (r.size()<3) continue;
-        nf.push_back(r); nfm.push_back(W.Fmat[f]); nfu.push_back(ru); nfc.push_back(rc); }
-    W.P.swap(np); W.F.swap(nf); W.Fmat.swap(nfm); W.Fuv.swap(nfu); W.Fcol.swap(nfc);
+        nf.push_back(r); nfm.push_back(W.Fmat[f]); nfs.push_back(PolySmoothDe(W, f)); nfu.push_back(ru); nfc.push_back(rc); }
+    W.P.swap(np); W.F.swap(nf); W.Fmat.swap(nfm); W.Fsmooth.swap(nfs); W.Fuv.swap(nfu); W.Fcol.swap(nfc);
 }
 
 // SCREW: barre el perfil (aristas W.E) alrededor del eje. Copia el perfil 'steps' veces girando 'angleDeg' del
 // primero al ultimo y subiendo 'height' por el eje; conecta cada arista entre copias consecutivas -> quad. Si es
 // vuelta completa (360) sin subida, cierra el anillo (torno). stretchU/V generan UV cilindrica (U=giro, V=perfil).
 // flip = invierte el winding (normales al otro lado). merge = suelda verts coincidentes (polos + costura) al final.
-static void ScrewPoly(PolyMesh& W, int axis, float angleDeg, float height, int steps, bool stretchU, bool stretchV, bool flip, bool merge) {
+static void ScrewPoly(PolyMesh& W, int axis, float angleDeg, float height, int steps, bool stretchU, bool stretchV, bool flip, bool merge, bool suave) {
     if (steps < 2) steps = 2;
     const int nP=(int)W.P.size(); if (nP==0) return;
     if (axis<0||axis>2) axis=2;
@@ -2624,21 +2670,25 @@ static void ScrewPoly(PolyMesh& W, int axis, float angleDeg, float height, int s
             std::vector<int> q; std::vector<float> qu;
             if (flip) { for (int i=0;i<4;i++){ q.push_back(qi[i]); qu.push_back(qU[i]); qu.push_back(qV[i]); } }
             else      { for (int i=3;i>=0;i--){ q.push_back(qi[i]); qu.push_back(qU[i]); qu.push_back(qV[i]); } }
-            out.F.push_back(q); out.Fmat.push_back(W.Emat); out.Fuv.push_back(qu);
+            // las caras que barre el Screw llevan SU shading (el lathe redondito): las que ya estaban
+            // conservan el suyo mas abajo. Antes esto suavizaba la malla ENTERA (outSmooth).
+            out.F.push_back(q); out.Fmat.push_back(W.Emat); out.Fsmooth.push_back(suave ? 1 : -1); out.Fuv.push_back(qu);
             std::vector<unsigned char> qc(16,255); out.Fcol.push_back(qc);
         }
     }
     // caras del perfil duplicadas en cada copia (si el perfil tiene caras)
     for (int s=0; s<copies; s++){ int base=s*nP;
         for (size_t f=0;f<W.F.size();f++){ std::vector<int> nf; for(size_t c=0;c<W.F[f].size();c++) nf.push_back(base+W.F[f][c]);
-            out.F.push_back(nf); out.Fmat.push_back(W.Fmat[f]); out.Fuv.push_back(W.Fuv[f]); out.Fcol.push_back(W.Fcol[f]); } }
-    W.P.swap(out.P); W.F.swap(out.F); W.Fmat.swap(out.Fmat); W.Fuv.swap(out.Fuv); W.Fcol.swap(out.Fcol); W.E.clear();
+            out.F.push_back(nf); out.Fmat.push_back(W.Fmat[f]); out.Fsmooth.push_back(PolySmoothDe(W, f)); out.Fuv.push_back(W.Fuv[f]); out.Fcol.push_back(W.Fcol[f]); } }
+    W.P.swap(out.P); W.F.swap(out.F); W.Fmat.swap(out.Fmat); W.Fsmooth.swap(out.Fsmooth); W.Fuv.swap(out.Fuv); W.Fcol.swap(out.Fcol); W.E.clear();
     if (merge) SoldarPolyPorPos(W); // suelda polos + costura del torno 360
 }
 
 // aplica el STACK de modificadores sobre poligonos. render=true usa los niveles/steps de RENDER (sino los de
 // viewport). Devuelve false si nada corrio. outSmooth -> normales smooth. (free function: miembros publicos del Mesh)
 static bool Mesh_AplicarStack(Mesh* m, bool render, PolyMesh& W, bool& outSmooth) {
+    // outSmooth = "este stack fuerza shading suave en TODA la malla". Hoy no lo prende nadie: cada
+    // modificador marca las caras que genera (W.Fsmooth) y las que ya estaban conservan su flag.
     outSmooth = false;
     const bool enEdit = ((Object*)m == g_editMesh); // en Edit Mode se saltean los mods con mostrarEdit=false
     { bool alguno=false; for (size_t i=0;i<m->modificadores.size();i++){ Modifier* md=m->modificadores[i];
@@ -2659,12 +2709,12 @@ static bool Mesh_AplicarStack(Mesh* m, bool render, PolyMesh& W, bool& outSmooth
             int lvl = (int)((render ? mod->subRenderLevel : mod->subLevel) + 0.5f);
             if (lvl < 0) lvl = 0; if (lvl > 6) lvl = 6; // tope (cada nivel x4 caras)
             for (int L=0; L<lvl; L++) SubdividirUnNivel(W, mod->subSimple);
-            if (!mod->subSimple && lvl>0) outSmooth = true;
+            // NO se toca el shading: subdividir no es suavizar. Cada cara hija hereda el flag de su madre
+            // (SubdividirUnNivel), asi que una malla plana sigue facetada y una suave sigue suave.
         } else if (mod->tipo == ModifierType::Screw){
             int st = (int)((render ? mod->screwRenderSteps : mod->screwSteps) + 0.5f);
             if (st < 2) st = 2; if (st > 512) st = 512;
-            ScrewPoly(W, mod->screwAxis, mod->screwAngle, mod->screwHeight, st, mod->screwStretchU, mod->screwStretchV, mod->screwFlip, mod->screwMerge);
-            if (mod->screwSmooth) outSmooth = true; // normales suaves -> lathe redondito
+            ScrewPoly(W, mod->screwAxis, mod->screwAngle, mod->screwHeight, st, mod->screwStretchU, mod->screwStretchV, mod->screwFlip, mod->screwMerge, mod->screwSmooth);
         } else if (mod->tipo == ModifierType::Mirror){
             Vector3 c(0,0,0), axX(1,0,0), axY(0,1,0), axZ(0,0,1);
             // BASE (igual que ClipMirrorVerts): esto GENERA la malla del modificador
@@ -2675,6 +2725,32 @@ static bool Mesh_AplicarStack(Mesh* m, bool render, PolyMesh& W, bool& outSmooth
             if (mod->ejeX) MirrorPoly(W, c, axX, mod->merge, mod->mergeDist);
             if (mod->ejeY) MirrorPoly(W, c, axY, mod->merge, mod->mergeDist);
             if (mod->ejeZ) MirrorPoly(W, c, axZ, mod->merge, mod->mergeDist);
+        } else if (mod->tipo == ModifierType::Boolean){
+            // BOOLEAN: la otra malla (target) se trae al espacio LOCAL de esta (base, sin constraints ni
+            // anim: misma regla que el Mirror) y se opera sobre poligonos. Sin target valido, no hace nada.
+            Object* t = mod->target;
+            if (t && t != (Object*)m && t->getType() == ObjectType::mesh){
+                Mesh* tm = (Mesh*)t;
+                PolyMesh B; ConstruirPolyMesh(tm, B);
+                if (!B.F.empty()){
+                    Matrix4 Wo, Wt; m->GetWorldMatrixBase(Wo); tm->GetWorldMatrixBase(Wt);
+                    Matrix4 iWo; InvAffineMod(Wo, iWo); Matrix4 M = iWo * Wt;
+                    for (size_t i = 0; i < B.P.size(); i++) B.P[i] = M * B.P[i];
+                    // una escala NEGATIVA (espejo) da vuelta el winding -> las normales de B mirarian
+                    // para adentro y el CSG clasificaria al reves. Se detecta por el determinante.
+                    const float det = M.m[0]*(M.m[5]*M.m[10]-M.m[9]*M.m[6]) - M.m[4]*(M.m[1]*M.m[10]-M.m[9]*M.m[2]) + M.m[8]*(M.m[1]*M.m[6]-M.m[5]*M.m[2]);
+                    if (det < 0.0f)
+                        for (size_t f = 0; f < B.F.size(); f++){
+                            std::vector<int>& fc = B.F[f]; std::vector<int> r(fc.rbegin(), fc.rend()); fc.swap(r);
+                            std::vector<float>& fu = B.Fuv[f]; std::vector<float> ru;
+                            for (int k = (int)fu.size()/2 - 1; k >= 0; k--){ ru.push_back(fu[k*2]); ru.push_back(fu[k*2+1]); } fu.swap(ru);
+                            std::vector<unsigned char>& fcol = B.Fcol[f]; std::vector<unsigned char> rc;
+                            for (int k = (int)fcol.size()/4 - 1; k >= 0; k--) for (int q = 0; q < 4; q++) rc.push_back(fcol[k*4+q]); fcol.swap(rc);
+                        }
+                    BooleanPoly(W, B, mod->boolOp, 0);   // las caras que vienen de B: mesh part 0 de esta malla
+                    mod->boolTargetGeoVer = tm->geoVersion; // con ESTA geometria del target se genero
+                }
+            }
         }
     }
     return (aplicados>0 && !W.F.empty());
@@ -2682,23 +2758,101 @@ static bool Mesh_AplicarStack(Mesh* m, bool render, PolyMesh& W, bool& outSmooth
 
 // del PolyMesh saca verts de RENDER deduplicados (pos+uv+normal+color) + los POLIGONOS (indices a esos verts, se
 // PRESERVAN los quads) + material por cara. smooth -> normal promediada por vert; sino plana por cara.
+// ---------------------------------------------------------------------------
+//  Triangulacion de una cara (ngon) para el index buffer. Un poligono CONVEXO sale en
+//  abanico desde el corner 0 (lo de siempre: quads y ngons de tapa). Uno CONCAVO -- la
+//  "U" que deja el Boolean alrededor de un agujero, o cualquier ngon que el usuario
+//  deforme -- va por EAR CLIPPING, porque el abanico le tapa el agujero. Una oreja de
+//  area cero (tres corners colineales) se recorta igual, asi nunca se cae al abanico
+//  con un resto torcido. Siempre salen m-2 triangulos, como antes. C++03, sin recursion.
+// ---------------------------------------------------------------------------
+void W3dTriangularCara(const float* pos, const std::vector<int>& idx, std::vector<MeshIndex>& tris) {
+    const int n = (int)idx.size();
+    if (n < 3) return;
+    if (n == 3) { tris.push_back((MeshIndex)idx[0]); tris.push_back((MeshIndex)idx[1]); tris.push_back((MeshIndex)idx[2]); return; }
+    // normal de Newell -> proyectar al plano dominante (2D)
+    float nx = 0, ny = 0, nz = 0;
+    for (int i = 0; i < n; i++) {
+        const float* a = pos + idx[i] * 3; const float* b = pos + idx[(i + 1) % n] * 3;
+        nx += (a[1] - b[1]) * (a[2] + b[2]); ny += (a[2] - b[2]) * (a[0] + b[0]); nz += (a[0] - b[0]) * (a[1] + b[1]);
+    }
+    const float ax = fabsf(nx), ay = fabsf(ny), az = fabsf(nz);
+    const int ejeU = (ax >= ay && ax >= az) ? 1 : (ay >= az) ? 2 : 0;    // se tira el eje dominante
+    const int ejeV = (ax >= ay && ax >= az) ? 2 : (ay >= az) ? 0 : 1;
+    std::vector<float> x((size_t)n), y((size_t)n);
+    for (int i = 0; i < n; i++) { x[(size_t)i] = pos[idx[i] * 3 + ejeU]; y[(size_t)i] = pos[idx[i] * 3 + ejeV]; }
+    float area = 0.0f;
+    for (int i = 0; i < n; i++) { const int j = (i + 1) % n; area += x[(size_t)i] * y[(size_t)j] - x[(size_t)j] * y[(size_t)i]; }
+    const float signo = (area < 0.0f) ? -1.0f : 1.0f;
+    const float eps = 1e-12f;
+    // convexo y sin vertice repetido -> abanico (el camino rapido y el resultado de siempre)
+    bool convexo = (ax + ay + az) > 1e-12f;
+    for (int i = 0; i < n && convexo; i++) {
+        const int a = (i + n - 1) % n, c = (i + 1) % n;
+        const float cr = ((x[(size_t)i] - x[(size_t)a]) * (y[(size_t)c] - y[(size_t)a]) - (y[(size_t)i] - y[(size_t)a]) * (x[(size_t)c] - x[(size_t)a])) * signo;
+        if (cr < -eps) convexo = false;
+        for (int k = i + 1; k < n && convexo; k++) if (idx[k] == idx[i]) convexo = false;
+    }
+    if (convexo) {
+        for (int t = 1; t + 1 < n; t++) { tris.push_back((MeshIndex)idx[0]); tris.push_back((MeshIndex)idx[t]); tris.push_back((MeshIndex)idx[t + 1]); }
+        return;
+    }
+    std::vector<int> r((size_t)n);
+    for (int i = 0; i < n; i++) r[(size_t)i] = i;
+    while (r.size() > 3) {
+        int oreja = -1;
+        const int m = (int)r.size();
+        for (int q = 0; q < m && oreja < 0; q++) {
+            const int a = r[(size_t)((q + m - 1) % m)], b = r[(size_t)q], c = r[(size_t)((q + 1) % m)];
+            const float bax = x[(size_t)b] - x[(size_t)a], bay = y[(size_t)b] - y[(size_t)a];
+            const float cax = x[(size_t)c] - x[(size_t)a], cay = y[(size_t)c] - y[(size_t)a];
+            const float cr = (bax * cay - bay * cax) * signo;
+            if (cr < -eps) continue;                                           // concavo: no es oreja
+            if (cr <= eps) { oreja = q; break; }                               // colineal (area cero): se saca sin mas
+            bool libre = true;
+            for (int k = 0; k < m && libre; k++) {
+                const int v = r[(size_t)k];
+                if (v == a || v == b || v == c) continue;
+                const float px = x[(size_t)v], py = y[(size_t)v];
+                if ((px == x[(size_t)a] && py == y[(size_t)a]) || (px == x[(size_t)b] && py == y[(size_t)b]) || (px == x[(size_t)c] && py == y[(size_t)c])) continue;  // otro corner en el mismo lugar
+                const float d1 = ((x[(size_t)b] - x[(size_t)a]) * (py - y[(size_t)a]) - (y[(size_t)b] - y[(size_t)a]) * (px - x[(size_t)a])) * signo;
+                const float d2 = ((x[(size_t)c] - x[(size_t)b]) * (py - y[(size_t)b]) - (y[(size_t)c] - y[(size_t)b]) * (px - x[(size_t)b])) * signo;
+                const float d3 = ((x[(size_t)a] - x[(size_t)c]) * (py - y[(size_t)c]) - (y[(size_t)a] - y[(size_t)c]) * (px - x[(size_t)c])) * signo;
+                if (d1 > 0.0f && d2 > 0.0f && d3 > 0.0f) libre = false;
+            }
+            if (libre) oreja = q;
+        }
+        if (oreja < 0) break;                                                  // no queda oreja limpia: abanico con el resto
+        const int a = r[(size_t)((oreja + m - 1) % m)], b = r[(size_t)oreja], c = r[(size_t)((oreja + 1) % m)];
+        tris.push_back((MeshIndex)idx[a]); tris.push_back((MeshIndex)idx[b]); tris.push_back((MeshIndex)idx[c]);
+        r.erase(r.begin() + oreja);
+    }
+    for (size_t t = 1; t + 1 < r.size(); t++) { tris.push_back((MeshIndex)idx[r[0]]); tris.push_back((MeshIndex)idx[r[t]]); tris.push_back((MeshIndex)idx[r[t + 1]]); }
+}
+
+// smooth = shading por defecto (global / del modificador) para las caras que HEREDAN (-1); una cara con
+// flag propio (Face > Shade Smooth/Flat) lo conserva a traves de todo el stack: las suaves promedian
+// solo con sus vecinas suaves, las planas usan su normal. polySmooth (opcional) devuelve el flag por
+// poligono para que el Apply lo baje a faces3d.
 static void PolyARenderVerts(const PolyMesh& W, bool smooth,
         std::vector<GLfloat>& gvp, std::vector<GLbyte>& gvn, std::vector<GLfloat>& gvu, std::vector<GLubyte>& gvc,
-        std::vector<std::vector<int> >& poly, std::vector<int>& polyMat) {
+        std::vector<std::vector<int> >& poly, std::vector<int>& polyMat, std::vector<int>* polySmooth = NULL) {
+    std::vector<char> suave(W.F.size(), 0);
+    for (size_t f=0; f<W.F.size(); f++){ const int fs = PolySmoothDe(W, f); suave[f] = (fs >= 0) ? (fs != 0) : smooth; }
     std::vector<Vector3> faceN(W.F.size());
     for (size_t f=0; f<W.F.size(); f++){ Vector3 nrm(0,0,0); int m=(int)W.F[f].size(); // Newell
         for (int i=0;i<m;i++){ const Vector3& a=W.P[W.F[f][i]]; const Vector3& b=W.P[W.F[f][(i+1)%m]];
             nrm.x+=(a.y-b.y)*(a.z+b.z); nrm.y+=(a.z-b.z)*(a.x+b.x); nrm.z+=(a.x-b.x)*(a.y+b.y); }
         float l=sqrtf(nrm.x*nrm.x+nrm.y*nrm.y+nrm.z*nrm.z); faceN[f] = (l>1e-6f) ? nrm*(1.0f/l) : Vector3(0,1,0); }
     std::vector<Vector3> vertN;
-    if (smooth){ vertN.assign(W.P.size(), Vector3(0,0,0));
-        for (size_t f=0; f<W.F.size(); f++) for (size_t c=0;c<W.F[f].size();c++) vertN[W.F[f][c]] = vertN[W.F[f][c]] + faceN[f];
+    { vertN.assign(W.P.size(), Vector3(0,0,0));
+        for (size_t f=0; f<W.F.size(); f++) if (suave[f]) for (size_t c=0;c<W.F[f].size();c++) vertN[W.F[f][c]] = vertN[W.F[f][c]] + faceN[f];
         for (size_t v=0; v<vertN.size(); v++){ float l=sqrtf(vertN[v].x*vertN[v].x+vertN[v].y*vertN[v].y+vertN[v].z*vertN[v].z);
             vertN[v] = (l>1e-6f) ? vertN[v]*(1.0f/l) : Vector3(0,1,0); } }
     std::map<std::string,int> mp;
     for (size_t f=0; f<W.F.size(); f++){ int m=(int)W.F[f].size(); if (m<3) continue;
         std::vector<int> ci(m);
-        for (int c=0;c<m;c++){ int v=W.F[f][c]; Vector3 nn = smooth ? vertN[v] : faceN[f];
+        for (int c=0;c<m;c++){ int v=W.F[f][c]; Vector3 nn = suave[f] ? vertN[v] : faceN[f];
             float px=W.P[v].x, py=W.P[v].y, pz=W.P[v].z, u0=W.Fuv[f][c*2], u1=W.Fuv[f][c*2+1];
             GLbyte nx=(GLbyte)(nn.x*127), ny=(GLbyte)(nn.y*127), nz=(GLbyte)(nn.z*127);
             GLubyte r=W.Fcol[f][c*4], g=W.Fcol[f][c*4+1], b=W.Fcol[f][c*4+2], a=W.Fcol[f][c*4+3];
@@ -2713,7 +2867,7 @@ static void PolyARenderVerts(const PolyMesh& W, bool smooth,
                 gvc.push_back(r);gvc.push_back(g);gvc.push_back(b);gvc.push_back(a); mp[key]=gi; }
             ci[c]=gi;
         }
-        poly.push_back(ci); polyMat.push_back(W.Fmat[f]);
+        poly.push_back(ci); polyMat.push_back(W.Fmat[f]); if (polySmooth) polySmooth->push_back(PolySmoothDe(W, f));
     }
 }
 
@@ -3192,6 +3346,9 @@ int W3dVisInfo(Mesh* m, int* celdaActiva, int* trisLista, bool* ordenado) {
     return mod->visSet.Valido() ? mod->visSet.nCeldas : 0;
 }
 
+// puerta PUBLICA al stack a nivel de viewport (la usa el harness para contar poligonos sin hornear)
+bool Mesh_AplicarStackPublico(Mesh* m, PolyMesh& W, bool& outSmooth) { return Mesh_AplicarStack(m, false, W, outSmooth); }
+
 void Mesh::GenerarMallaModificada() {
     { extern long g_genMallaCount; g_genMallaCount++; } // DIAGNOSTICO (Statistics): contar regeneraciones. Al ROTAR no debe subir.
     LiberarMallaModificada();
@@ -3206,12 +3363,14 @@ void Mesh::GenerarMallaModificada() {
     const bool smooth = meshSmooth || outSmooth;
 
     std::vector<GLfloat> gvp; std::vector<GLbyte> gvn; std::vector<GLfloat> gvu; std::vector<GLubyte> gvc;
-    std::vector<std::vector<int> > poly; std::vector<int> polyMat;
-    PolyARenderVerts(W, smooth, gvp,gvn,gvu,gvc, poly, polyMat);
+    std::vector<std::vector<int> > poly; std::vector<int> polyMat, polySmooth;
+    PolyARenderVerts(W, smooth, gvp,gvn,gvu,gvc, poly, polyMat, &polySmooth);
     // triangular los poligonos (fan) para el render GL
     std::vector<MeshIndex> tri; std::vector<int> triMat;
     for (size_t f=0; f<poly.size(); f++){ int m=(int)poly[f].size();
-        for (int t=1; t+1<m; t++){ tri.push_back((MeshIndex)poly[f][0]); tri.push_back((MeshIndex)poly[f][t]); tri.push_back((MeshIndex)poly[f][t+1]); triMat.push_back(polyMat[f]); } }
+        const size_t antes = tri.size();
+        W3dTriangularCara(&gvp[0], poly[f], tri);                                 // abanico si es convexo, ear clipping si no
+        for (size_t t = antes; t < tri.size(); t += 3) triMat.push_back(polyMat[f]); }
     genVertexSize=(int)(gvp.size()/3);
     if (genVertexSize<=0 || tri.empty()){ genValido=false; return; }
     genVertex=new GLfloat[gvp.size()]; for(size_t k=0;k<gvp.size();k++) genVertex[k]=gvp[k];
@@ -3391,8 +3550,8 @@ void Mesh::AplicarModificadorActivo() {
     if (!Mesh_AplicarStack(this, false, W, outSmooth)){ UndoModQuitar(this); UndoFundirUltimos(2); return; } // nivel de VIEWPORT
     const bool smooth = meshSmooth || outSmooth;
     std::vector<GLfloat> gvp; std::vector<GLbyte> gvn; std::vector<GLfloat> gvu; std::vector<GLubyte> gvc;
-    std::vector<std::vector<int> > poly; std::vector<int> polyMat;
-    PolyARenderVerts(W, smooth, gvp,gvn,gvu,gvc, poly, polyMat);
+    std::vector<std::vector<int> > poly; std::vector<int> polyMat, polySmooth;
+    PolyARenderVerts(W, smooth, gvp,gvn,gvu,gvc, poly, polyMat, &polySmooth);
     if (gvp.empty() || poly.empty()){ UndoModQuitar(this); UndoFundirUltimos(2); return; }
     int nv = (int)(gvp.size()/3);
     delete[] vertex;      vertex      = new GLfloat[nv*3]; for(int i=0;i<nv*3;i++) vertex[i]=gvp[i];
@@ -3401,7 +3560,7 @@ void Mesh::AplicarModificadorActivo() {
     delete[] vertexColor; vertexColor = new GLubyte[nv*4]; for(int i=0;i<nv*4;i++) vertexColor[i]=gvc[i];
     vertexSize = nv;
     faces3d.clear(); looseEdges.clear();
-    for (size_t f=0; f<poly.size(); f++){ MeshFace mf; mf.mat=polyMat[f]; // <- POLIGONO (quad), no triangulos
+    for (size_t f=0; f<poly.size(); f++){ MeshFace mf; mf.mat=polyMat[f]; mf.smooth = (f < polySmooth.size()) ? polySmooth[f] : -1; // <- POLIGONO (quad), no triangulos; conserva el shading por cara
         for (size_t c=0;c<poly[f].size();c++) mf.idx.push_back(poly[f][c]); faces3d.push_back(mf); }
     LiberarCapas(false);       // capas de otro tamano; false = PRESERVAR los vertex groups (el skinning), como el Join
     vertCtrlPoint.clear();     // la numeracion vieja no aplica a la malla rebuildeada: GenerarRender la re-deriva por posicion
@@ -3798,7 +3957,18 @@ float Mesh::RadioFoco() const {
 // del render ante cambios de TOPOLOGIA: las edit-ops construyen faces3d + las capas y llaman
 // aca (asi TODAS las capas sobreviven, sin meter interpolacion en cada op). LENTO -> usar
 // solo cuando cambia la topologia; para mover/pintar usar RefrescarRender (in-place).
+// Vertex Paint pinta POR CORNER, pero el render fusiona los corners que coinciden en posicion+uv+normal+
+// color (dos quads coplanares de un loop cut comparten el vert de la union). Pintar UNO de esos corners
+// no se podia ver: el vert fusionado sigue mostrando el color del otro. Mientras se pinta color, el render
+// se genera con un vert por corner (la clave de merge suma el indice del corner); al salir se vuelve a
+// fusionar. Lo prende/apaga el editor al entrar/salir del modo (WeightPaintActualizar).
+static bool g_cornersSeparados = false;
+void W3dRenderCornersSeparados(bool on) { g_cornersSeparados = on; }
+bool W3dRenderCornersSeparadosActivo() { return g_cornersSeparados; }
+
 void Mesh::GenerarRender(bool recomputarNormales) {
+    geoVersion++;                    // idem RefrescarRender: cualquier rebuild es un cambio de geometria
+    { extern bool g_mallasEditadas; g_mallasEditadas = true; }
     DesinstanciarDatos(W3DMD_TODO);  // COW: el rebuild lee y reemplaza las capas (MallaDatos.h)
     int nC = ContarCorners();
     // Sin caras (nC=0) igual seguimos si hay geometria SUELTA (loose edges/verts): para preservarla y, sobre todo,
@@ -3852,6 +4022,7 @@ void Mesh::GenerarRender(bool recomputarNormales) {
             memcpy(buf+p,&u0,4);p+=4; memcpy(buf+p,&v0,4);p+=4;
             buf[p++]=(char)nbx;buf[p++]=(char)nby;buf[p++]=(char)nbz;
             buf[p++]=(char)r;buf[p++]=(char)g;buf[p++]=(char)b;buf[p++]=(char)a;
+            if (g_cornersSeparados) { memcpy(buf+p,&L,4); p+=4; }   // Vertex Paint: un render-vert POR CORNER (ver W3dRenderCornersSeparados)
             std::string key(buf,p);
             std::map<std::string,int>::iterator it=mapa.find(key);
             int gi;
@@ -3933,9 +4104,17 @@ void Mesh::GenerarRender(bool recomputarNormales) {
     // los render verts, asi que el mapeo viejo queda invalido: sin esto, editar/joinear una malla skinneada rompia el
     // skin (los verts sin CP -> peso 0 -> la malla colapsaba). oldToNew mapea viejo->nuevo; verts nuevos (loose) = -1.
     if (!vertCtrlPoint.empty()){
+        // SPLIT-AWARE (newToOld, como los UV groups): un vert viejo que se parte en varios render-verts
+        // nuevos (por normal/uv/color) les deja el control-point a TODOS. Con oldToNew (que se queda con
+        // el primer split) los demas quedaban en -1 y abajo recibian un CP FRESCO -> dos CP en la misma
+        // posicion -> la pintura de pesos se veia "por corner" despues de un loop cut.
         std::vector<int> nCP(nuevoN, -1);
-        for (int i=0;i<(int)oldToNew.size() && i<(int)vertCtrlPoint.size();i++)
-            if (oldToNew[i]>=0 && oldToNew[i]<nuevoN) nCP[oldToNew[i]] = vertCtrlPoint[i];
+        for (int gi=0; gi<nuevoN && gi<(int)newToOld.size(); gi++){
+            const int o = newToOld[gi];
+            if (o>=0 && o<(int)vertCtrlPoint.size()) nCP[gi] = vertCtrlPoint[o];
+        }
+        for (int i=0;i<(int)oldToNew.size() && i<(int)vertCtrlPoint.size();i++)   // por si newToOld no cubrio alguno
+            if (oldToNew[i]>=0 && oldToNew[i]<nuevoN && nCP[oldToNew[i]]<0) nCP[oldToNew[i]] = vertCtrlPoint[i];
         vertCtrlPoint.swap(nCP);
     }
     // UV GROUPS (pesos por CORNER, indexados por RENDER-VERT): los indices son del render VIEJO ->
@@ -4001,17 +4180,21 @@ void Mesh::GenerarRender(bool recomputarNormales) {
         if ((int)vertCtrlPoint.size() < vertexSize) vertCtrlPoint.resize(vertexSize, -1);
         int maxCP = -1;
         for (size_t i = 0; i < vertCtrlPoint.size(); i++) if (vertCtrlPoint[i] > maxCP) maxCP = vertCtrlPoint[i];
-        std::map<int,int> cpNuevo; // representante (posRep) -> CP fresco ya asignado
+        // el CP del grupo de posicion: el de CUALQUIER miembro que ya tenga uno (no solo el representante,
+        // que puede ser justo un vert nuevo). Sin ninguno, uno fresco para todo el grupo.
+        std::map<int,int> cpGrupo; // representante (posRep) -> CP del grupo
+        for (int i = 0; i < vertexSize; i++) {
+            if (vertCtrlPoint[i] < 0) continue;
+            const int rep = ((int)posRep.size() == vertexSize) ? posRep[i] : i;
+            if (cpGrupo.find(rep) == cpGrupo.end()) cpGrupo[rep] = vertCtrlPoint[i];
+        }
         for (int i = 0; i < vertexSize; i++) {
             if (vertCtrlPoint[i] >= 0) continue;
-            int rep = ((int)posRep.size() == vertexSize) ? posRep[i] : i;
-            int cp = -1;
-            if (rep >= 0 && rep < (int)vertCtrlPoint.size() && vertCtrlPoint[rep] >= 0) cp = vertCtrlPoint[rep];
-            else {
-                std::map<int,int>::iterator itc = cpNuevo.find(rep);
-                if (itc != cpNuevo.end()) cp = itc->second;
-                else { cp = ++maxCP; cpNuevo[rep] = cp; }
-            }
+            const int rep = ((int)posRep.size() == vertexSize) ? posRep[i] : i;
+            std::map<int,int>::iterator itc = cpGrupo.find(rep);
+            int cp;
+            if (itc != cpGrupo.end()) cp = itc->second;
+            else { cp = ++maxCP; cpGrupo[rep] = cp; }
             vertCtrlPoint[i] = cp;
         }
     }
@@ -4572,6 +4755,16 @@ void Mesh::AplicarCapasAlRender() {
             else { int r = it->second; for (int q = 0; q < 4; q++) vertexColor[i*4+q] = vertexColor[r*4+q]; }
         }
     }
+    // los arrays de render cambiaron (uv/color/normales por corner): el VBO de Object Mode los tiene
+    // subidos de ANTES y hay que re-subirlos, sino se sigue viendo el color viejo (el cubo "blanco"
+    // con vertex color pintado, o la capa que no cambiaba al elegirla). Solo se invalida el VBO:
+    // no se toca skinGeomVersion porque la geometria no cambio (eso rehace el skinning al pedo).
+    vboGeomVer = 0xFFFFFFFFu;   // ninguna version real es esta -> el proximo draw re-sube todo
+    // En Vertex Paint la malla que se DIBUJA es la generada (ver el pase de vertexPaintOn en Mesh.cpp),
+    // y su color sale del stack: sin rehacerla, genColor queda con el color viejo y pintar no se ve.
+    // Solo en ese modo: rehacer el stack en cada AplicarCapasAlRender seria carisimo. Lo demuestra
+    // "genColor sigue al pincel" de la prueba boolpaint.
+    if (vertexPaintOn && genValido) GenerarMallaModificada();
 }
 
 // ===== Las DOS unicas puertas al render (abstraccion: las ops NO tocan vertex[]/faces3d a
@@ -4596,7 +4789,7 @@ void Mesh::ReagruparMeshParts() {
         materialsGroup[gi].startDrawn = (int)tris.size();
         for (size_t f=0;f<faces3d.size();f++){ if (faces3d[f].mat != gi) continue;
             const std::vector<int>& idx=faces3d[f].idx;
-            for (size_t k=1;k+1<idx.size();k++){ tris.push_back((MeshIndex)idx[0]);tris.push_back((MeshIndex)idx[k]);tris.push_back((MeshIndex)idx[k+1]); } }
+            W3dTriangularCara(vertex, idx, tris); }                                // abanico si es convexo, ear clipping si no
         materialsGroup[gi].indicesDrawnCount = (int)tris.size() - materialsGroup[gi].startDrawn;
     }
     facesSize=(int)tris.size(); delete[] faces; faces=new MeshIndex[facesSize>0?facesSize:1];
@@ -4624,4 +4817,232 @@ void WeightPaintAsegurarMapa(Mesh* m) {
     m->vertCtrlPoint.resize(m->vertexSize);
     for (int i = 0; i < m->vertexSize; i++)
         m->vertCtrlPoint[i] = ((int)m->posRep.size() == m->vertexSize) ? m->posRep[i] : i;
+}
+
+// ============================================================================
+//  CONNECT VERTEX PATH (J). Ver MeshEdit.h para el contrato.
+//  Corte RECTO en pantalla entre dos vertices: la linea que los une se proyecta sobre la
+//  superficie y va partiendo cada cara que atraviesa. Donde la linea cruza una arista se crea
+//  un vertice NUEVO (interpolado sobre la arista, con sus uv/color/normal como el loop cut) y la
+//  cara se parte en dos por el tramo que la cruza; la cara vecina recibe el vertice en esa
+//  arista (no se parte hasta que la linea la cruce a ella). Si la linea pasa justo por un
+//  vertice, se engancha en el. Termina cuando el destino esta en la cara actual.
+// ============================================================================
+namespace {
+struct ConnCorner { int gv; CornerSrc src; int ek; };            // render-vert, fuente de capa, vertice editable
+struct ConnAnillo { std::vector<ConnCorner> c; int mat; int smooth; };   // smooth es el flag por cara (-1/0/1): NO bool, que -1 se volvia "suave"
+// interseccion 2D del segmento p->q con el a->b: t en p->q, s en a->b
+static bool ConnCruce2D(float px, float py, float qx, float qy, float ax, float ay, float bx, float by, float& t, float& s) {
+    const float rx = qx - px, ry = qy - py, ex = bx - ax, ey = by - ay;
+    const float den = rx * ey - ry * ex;
+    if (fabsf(den) < 1e-12f) return false;                          // paralelos
+    const float wx = ax - px, wy = ay - py;
+    t = (wx * ey - wy * ex) / den;
+    s = (wx * ry - wy * rx) / den;
+    return true;
+}
+static int ConnBuscar(const ConnAnillo& A, int ek) { for (size_t i = 0; i < A.c.size(); i++) if (A.c[i].ek == ek) return (int)i; return -1; }
+// parte el anillo A por la cuerda entre los corners cu y cv (no vecinos): A queda con una mitad, B con la otra
+static void ConnPartir(ConnAnillo& A, int cu, int cv, ConnAnillo& B) {
+    const int n = (int)A.c.size();
+    ConnAnillo P, Q; P.mat = Q.mat = A.mat; P.smooth = Q.smooth = A.smooth;
+    for (int k = cu; ; k = (k + 1) % n) { P.c.push_back(A.c[(size_t)k]); if (k == cv) break; }
+    for (int k = cv; ; k = (k + 1) % n) { Q.c.push_back(A.c[(size_t)k]); if (k == cu) break; }
+    A = P; B = Q;
+}
+// distancia 3D entre dos vertices editables
+static float ConnDist(const std::vector<float>& P, int i, int j) {
+    const float dx = P[(size_t)i*3] - P[(size_t)j*3], dy = P[(size_t)i*3+1] - P[(size_t)j*3+1], dz = P[(size_t)i*3+2] - P[(size_t)j*3+2];
+    return sqrtf(dx * dx + dy * dy + dz * dz);
+}
+// costo de salir por el punto s de la arista (u,v): lo que se recorre hasta ahi MAS la recta que falta
+// hasta el destino. Nunca sobreestima el largo total (desigualdad triangular), asi que quedarse con el
+// candidato mas barato es quedarse con el camino mas corto sobre la superficie.
+static float ConnCosto(const std::vector<float>& P, int cur, int b, int u, int v, float s) {
+    float e[3], ida = 0.0f, resto = 0.0f;
+    for (int q = 0; q < 3; q++) e[q] = P[(size_t)u*3+q] + (P[(size_t)v*3+q] - P[(size_t)u*3+q]) * s;
+    for (int q = 0; q < 3; q++) { const float d = e[q] - P[(size_t)cur*3+q]; ida += d * d; }
+    for (int q = 0; q < 3; q++) { const float d = P[(size_t)b*3+q] - e[q]; resto += d * d; }
+    return sqrtf(ida) + sqrtf(resto);
+}
+} // namespace
+
+bool ConectarVerticesEdit(Mesh* m, W3dProy2D proy, void* ctx, std::string& msg) {
+    if (!m) return false;
+    m->EnsureEdit();
+    EditMesh* e = m->edit;
+    if (!e || !m->vertex || m->vertexSize <= 0) return false;
+    const int nV = m->vertexSize;
+    const int nE = e->NumVerts();
+    const bool hayRep = ((int)m->posRep.size() == nV);
+
+    // los 2 vertices: el ACTIVO (ultimo clickeado) es el destino, el otro el origen
+    std::vector<int> sel;
+    for (int k = 0; k < nE; k++) if (k < (int)e->vertSel.size() && e->vertSel[k]) sel.push_back(k);
+    if (sel.size() != 2) { msg = "Connect: select exactly 2 vertices"; return false; }
+    int a = sel[0], b = sel[1];
+    if (e->activeIdx == a) { a = sel[1]; b = sel[0]; }
+
+    // vertices editables en PANTALLA (los nuevos se agregan al final a medida que se crean)
+    std::vector<float> X, Y, P3;                       // 2D y 3D local de cada vertice editable
+    for (int k = 0; k < nE; k++) {
+        const Vector3 p(e->pos[(size_t)k*3], e->pos[(size_t)k*3+1], e->pos[(size_t)k*3+2]);
+        float sx = p.x, sy = p.y;
+        if (proy && !proy(ctx, p, sx, sy)) { sx = 1e30f; sy = 1e30f; }   // no proyectable: nunca cruza
+        X.push_back(sx); Y.push_back(sy); P3.push_back(p.x); P3.push_back(p.y); P3.push_back(p.z);
+    }
+    if (X[(size_t)a] > 1e29f || X[(size_t)b] > 1e29f) { msg = "Connect: the vertices are not visible"; return false; }
+
+    // aristas existentes (por vertice editable) y corner GPU -> vertice editable
+    std::map<std::pair<int,int>, int> aristas;
+    for (int eg = 0; eg < e->NumEdges(); eg++) { int u = e->lineIdx[(size_t)eg*2], v = e->lineIdx[(size_t)eg*2+1]; if (u > v) { int t = u; u = v; v = t; } aristas[std::make_pair(u, v)] = 1; }
+    std::vector<int> repToEdit((size_t)nV, -1);
+    for (int k = 0; k < nE; k++) { const int gi = e->editVerts[(size_t)k]; if (gi >= 0 && gi < nV) repToEdit[(size_t)gi] = k; }
+
+    // caras de trabajo (todavia sin tocar la malla) + posiciones de render (crecen con los verts nuevos)
+    std::vector<ConnAnillo> anillos; anillos.reserve(m->faces3d.size() + 8);
+    { int base = 0;
+      for (size_t f = 0; f < m->faces3d.size(); f++) { ConnAnillo A; A.mat = m->faces3d[f].mat; A.smooth = m->faces3d[f].smooth;
+          for (size_t c = 0; c < m->faces3d[f].idx.size(); c++) { ConnCorner cc; cc.gv = m->faces3d[f].idx[c]; cc.src = CornerSrc(base + (int)c);
+              const int gi = cc.gv; const int rep = (gi >= 0 && gi < nV) ? (hayRep ? m->posRep[(size_t)gi] : gi) : -1;
+              cc.ek = (rep >= 0 && rep < nV) ? repToEdit[(size_t)rep] : -1;
+              A.c.push_back(cc); }
+          base += (int)m->faces3d[f].idx.size(); anillos.push_back(A); } }
+    std::vector<GLfloat> vp(m->vertex, m->vertex + nV * 3);
+    std::vector<Mesh::VtxRecipe> recetas;                            // receta (lerp) de cada render-vert nuevo
+    std::vector<int> nuevosEk;                                       // vertices editables nuevos (para seleccionarlos)
+    int cortes = 0;
+
+    int cur = a, cara = -1, caraPrev = -1;
+    const float EPS = 1e-4f;
+    for (int iter = 0; iter < 4096 && cur != b; iter++) {
+        { const std::pair<int,int> key = (cur < b) ? std::make_pair(cur, b) : std::make_pair(b, cur);
+          if (aristas.find(key) != aristas.end()) { cur = b; break; } }   // ya hay arista hasta el destino: llegamos
+        const float px = X[(size_t)cur], py = Y[(size_t)cur], qx = X[(size_t)b], qy = Y[(size_t)b];
+        // Adentro de una cara el primer cruce en pantalla (t minimo) es el correcto. ELEGIR ENTRE CARAS es
+        // otra cosa: la de adelante y la de atras se proyectan igual, asi que en pantalla empatan y el
+        // desempate salia arbitrario (se iba por atras). Cuando no hay cara impuesta se elige por trayecto
+        // 3D (ConnCosto). Lo demuestra "arranque en la silueta" de connecttest.
+        const bool libre = (cara < 0);
+        int mejorR = -1, mejorE = -1; float mejorT = 2.0f, mejorS = 0.0f, mejorC = 1e30f; bool cuerda = false;
+        for (size_t r = 0; r < anillos.size(); r++) {
+            if (cara >= 0 && (int)r != cara) continue;
+            if ((int)r == caraPrev) continue;
+            const ConnAnillo& A = anillos[r]; const int n = (int)A.c.size(); if (n < 3) continue;
+            const int cu = ConnBuscar(A, cur); if (cu < 0) continue;
+            const int cb = ConnBuscar(A, b);
+            if (cb >= 0) {                                              // destino en esta cara: cuerda directa
+                if ((cu + 1) % n == cb || (cb + 1) % n == cu) { cur = b; mejorR = -1; cuerda = false; break; }   // ya vecinos
+                const float c = libre ? ConnDist(P3, cur, b) : 1.0f;    // la recta cur->b: ningun cruce cuesta menos
+                if (c < mejorC) { mejorC = c; mejorR = (int)r; mejorE = -1; mejorT = 1.0f; cuerda = true; }
+                continue;
+            }
+            int cE = -1; float cT = 2.0f, cS = 0.0f;                    // por donde sale la linea DE ESTA cara
+            for (int i = 0; i < n; i++) {
+                const int j = (i + 1) % n;
+                if (i == cu || j == cu) continue;                       // aristas que tocan el origen no cuentan
+                const int u = A.c[(size_t)i].ek, v = A.c[(size_t)j].ek; if (u < 0 || v < 0) continue;
+                float t, s;
+                if (!ConnCruce2D(px, py, qx, qy, X[(size_t)u], Y[(size_t)u], X[(size_t)v], Y[(size_t)v], t, s)) continue;
+                if (t <= EPS || t > 1.0f + EPS || s < -EPS || s > 1.0f + EPS) continue;
+                if (t < cT) { cT = t; cE = i; cS = s; }
+            }
+            if (cE < 0) continue;
+            const int u2 = A.c[(size_t)cE].ek, v2 = A.c[(size_t)(cE + 1) % n].ek;
+            const float c = libre ? ConnCosto(P3, cur, b, u2, v2, cS) : cT;
+            if (c < mejorC) { mejorC = c; mejorT = cT; mejorR = (int)r; mejorE = cE; mejorS = cS; cuerda = false; }
+        }
+        if (cur == b) break;
+        if (mejorR < 0) { msg = "Connect: the line leaves the surface"; return false; }
+        ConnAnillo& A = anillos[(size_t)mejorR];
+        const int n = (int)A.c.size();
+        const int cu = ConnBuscar(A, cur);
+        if (cuerda) {                                                   // cuerda hasta el destino y listo
+            const int cb = ConnBuscar(A, b);
+            ConnAnillo B; ConnPartir(A, cu, cb, B); anillos.push_back(B); cortes++;
+            { const std::pair<int,int> key = (cur < b) ? std::make_pair(cur, b) : std::make_pair(b, cur); aristas[key] = 1; }
+            cur = b; break;
+        }
+        const int i = mejorE, j = (i + 1) % n;
+        const int u = A.c[(size_t)i].ek, v = A.c[(size_t)j].ek;
+        if (mejorS < 1e-3f || mejorS > 1.0f - 1e-3f) {                  // pasa por un VERTICE: se engancha
+            const int w = (mejorS < 0.5f) ? u : v;
+            const int cw = (mejorS < 0.5f) ? i : j;
+            if (w == cur) { msg = "Connect: the line leaves the surface"; return false; }
+            if (!((cu + 1) % n == cw || (cw + 1) % n == cu)) {
+                ConnAnillo B; ConnPartir(A, cu, cw, B); anillos.push_back(B); cortes++;
+                { const std::pair<int,int> key = (cur < w) ? std::make_pair(cur, w) : std::make_pair(w, cur); aristas[key] = 1; }
+            }
+            caraPrev = -1; cara = -1; cur = w;
+            continue;
+        }
+        // vertice NUEVO sobre la arista (u,v) en s
+        const int ek = (int)X.size();
+        X.push_back(X[(size_t)u] + (X[(size_t)v] - X[(size_t)u]) * mejorS);
+        Y.push_back(Y[(size_t)u] + (Y[(size_t)v] - Y[(size_t)u]) * mejorS);
+        for (int q = 0; q < 3; q++) P3.push_back(P3[(size_t)u*3+q] + (P3[(size_t)v*3+q] - P3[(size_t)u*3+q]) * mejorS);
+        nuevosEk.push_back(ek);
+        aristas[std::make_pair(u < ek ? u : ek, u < ek ? ek : u)] = 1;   // la arista (u,v) queda partida en (u,N) y (N,v)
+        aristas[std::make_pair(v < ek ? v : ek, v < ek ? ek : v)] = 1;
+        // un render-vert nuevo por cara que toca la arista (GenerarRender los fusiona si coinciden)
+        struct Ins { static ConnCorner Nuevo(const ConnCorner& ci, const ConnCorner& cj, float s, std::vector<GLfloat>& vp, std::vector<Mesh::VtxRecipe>& rec, int ek) {
+            ConnCorner cc; cc.ek = ek; cc.gv = (int)(vp.size() / 3);
+            for (int q = 0; q < 3; q++) vp.push_back(vp[(size_t)ci.gv*3+q] + (vp[(size_t)cj.gv*3+q] - vp[(size_t)ci.gv*3+q]) * s);
+            rec.push_back(Mesh::VtxRecipe(ci.gv, cj.gv, s));
+            // fuente de capa: lerp entre los dos corners si los dos son corners ORIGINALES; si alguno ya es
+            // interpolado (dos cortes sobre la misma arista) se copia el mas cercano
+            if (ci.src.b < 0 && cj.src.b < 0) cc.src = CornerSrc(ci.src.a, cj.src.a, s);
+            else cc.src = (s < 0.5f) ? ci.src : cj.src;
+            return cc; } };
+        const int rIdx = mejorR;
+        // la cara vecina por la arista (u,v): recibe el vertice entre sus corners v..u (o u..v)
+        int vecina = -1, vi = -1;
+        for (size_t r = 0; r < anillos.size() && vecina < 0; r++) {
+            if ((int)r == rIdx) continue;
+            const ConnAnillo& G = anillos[r]; const int gn = (int)G.c.size();
+            for (int k = 0; k < gn; k++) { const int k2 = (k + 1) % gn;
+                if ((G.c[(size_t)k].ek == u && G.c[(size_t)k2].ek == v) || (G.c[(size_t)k].ek == v && G.c[(size_t)k2].ek == u)) { vecina = (int)r; vi = k; break; } }
+        }
+        if (vecina >= 0) {
+            ConnAnillo& G = anillos[(size_t)vecina]; const int gn = (int)G.c.size(); const int k2 = (vi + 1) % gn;
+            const float sG = (G.c[(size_t)vi].ek == u) ? mejorS : 1.0f - mejorS;
+            const ConnCorner nc = Ins::Nuevo(G.c[(size_t)vi], G.c[(size_t)k2], sG, vp, recetas, ek);
+            G.c.insert(G.c.begin() + vi + 1, nc);
+        }
+        // en la cara actual: insertar y partir por la cuerda (cur, N)
+        {
+            ConnAnillo& A2 = anillos[(size_t)rIdx];
+            const ConnCorner nc = Ins::Nuevo(A2.c[(size_t)i], A2.c[(size_t)j], mejorS, vp, recetas, ek);
+            A2.c.insert(A2.c.begin() + i + 1, nc);
+            const int cu2 = ConnBuscar(A2, cur);
+            ConnAnillo B; ConnPartir(A2, cu2, i + 1, B); anillos.push_back(B); cortes++;
+            aristas[std::make_pair(cur < ek ? cur : ek, cur < ek ? ek : cur)] = 1;
+        }
+        caraPrev = rIdx; cara = vecina; cur = ek;
+        if (vecina < 0) { msg = "Connect: the line leaves the surface"; return false; }   // borde abierto
+    }
+    if (cur != b) { msg = "Connect: the line leaves the surface"; return false; }
+    if (cortes == 0 && nuevosEk.empty()) { msg = "Connect: the vertices are already connected"; return false; }
+
+    UndoCapturarMallaGeo(m);   // Ctrl+Z: snapshot completo de la geometria ANTES del corte
+    m->PoblarCapas();          // asegura las capas por corner (ReconstruirCapasDesde las lee)
+    // seleccion final: origen, destino y los vertices nuevos, por posicion (GenerarRender renumera)
+    std::vector<Vector3> posSel;
+    posSel.push_back(Vector3(P3[(size_t)a*3], P3[(size_t)a*3+1], P3[(size_t)a*3+2]));
+    posSel.push_back(Vector3(P3[(size_t)b*3], P3[(size_t)b*3+1], P3[(size_t)b*3+2]));
+    for (size_t k = 0; k < nuevosEk.size(); k++) { const int ek = nuevosEk[k]; posSel.push_back(Vector3(P3[(size_t)ek*3], P3[(size_t)ek*3+1], P3[(size_t)ek*3+2])); }
+    std::vector<MeshFace> nf; nf.reserve(anillos.size()); std::vector<CornerSrc> src;
+    for (size_t r = 0; r < anillos.size(); r++) { MeshFace mf; mf.mat = anillos[r].mat; mf.smooth = anillos[r].smooth;
+        for (size_t c = 0; c < anillos[r].c.size(); c++) { mf.idx.push_back(anillos[r].c[c].gv); src.push_back(anillos[r].c[c].src); }
+        nf.push_back(mf); }
+    m->vtxAnimRecipes = recetas; m->vtxAnimRecipeBase = nV;   // los verts nuevos siguen la vertex anim (lerp de sus extremos)
+    const int nuevoN = (int)(vp.size() / 3);
+    delete[] m->vertex; m->vertex = new GLfloat[nuevoN * 3]; for (int i = 0; i < nuevoN * 3; i++) m->vertex[i] = vp[(size_t)i];
+    m->vertexSize = nuevoN;
+    m->faces3d.swap(nf);
+    ReconstruirCapasDesde(m, src);   // capas nuevas (copiar / lerp por corner, incluida la normal)
+    m->GenerarRender();               // re-merge + render + posRep + control-points de los verts nuevos
+    m->ReconstruirEditSelPorPos(posSel);
+    msg = "Vertices connected";
+    return true;
 }

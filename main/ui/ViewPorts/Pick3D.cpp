@@ -7,6 +7,7 @@
 #include "Undo.h" // Ctrl+Z: capturar modo / seleccion
 #include "ViewPorts/PopUp/ConfirmarPopup.h" // AbrirConfirmarBorrado (popup de confirmar borrado)
 #include "ViewPorts/LayoutInput.h"
+#include "edit/MeshEdit.h"   // W3dTriangularCara
 #include "ViewPorts/PoseTransform.h" // Pose Mode transform (extraido a su propio archivo)
 #include "ViewPorts/Notificaciones.h" // toasts (extraido a su propio archivo)
 #include "ViewPorts/NumInput.h" // entrada numerica/formulas (extraido a su propio archivo)
@@ -962,6 +963,29 @@ struct LCSnap { W3dPosVerts vp; std::vector<GLbyte> vn; std::vector<GLfloat> vu;
                 std::vector<MaterialGroup> mg; std::vector<int> le, lv; bool tiene; // le/lv = looseEdges/looseVerts
                 VtxAnimSnap vanims; }; // frames de las vertex anims PRE-corte (ver LCRestaurar)
 static LCSnap gLCSnap;
+// OPCIONES del panel redo: las 4 aristas del primer quad del loop (candidatas: por cual arista
+// entra el corte -> 2 direcciones), cual esta elegida, y si los uv/color se interpolan
+static int  gLoopCutCand[4] = {-1,-1,-1,-1};
+static int  gLoopCutCandN = 0, gLoopCutCandSel = 0;
+static bool gLoopCutCorrectUV = true;
+// Los indices de arista del edit mesh NO sobreviven a un rebuild (LCRestaurar -> CalcularBordes reagrupa
+// posRep y el edit se rearma): la arista de entrada y las candidatas se guardan por POSICION de sus dos
+// puntas y se vuelven a resolver contra el edit mesh vivo antes de cada re-corte (LCReanclar).
+static Vector3 gLoopCutEdgePos[2];
+static Vector3 gLoopCutCandPos[4][2];
+static int LCBuscarArista(EditMesh* e, const Vector3& a, const Vector3& b){
+    if (!e) return -1;
+    for (int eg=0; eg<e->NumEdges(); eg++){ const int u=e->lineIdx[(size_t)eg*2], v=e->lineIdx[(size_t)eg*2+1];
+        const Vector3 pu(e->pos[(size_t)u*3], e->pos[(size_t)u*3+1], e->pos[(size_t)u*3+2]), pv(e->pos[(size_t)v*3], e->pos[(size_t)v*3+1], e->pos[(size_t)v*3+2]);
+        if (((pu-a).LengthSq() < 1e-8f && (pv-b).LengthSq() < 1e-8f) || ((pu-b).LengthSq() < 1e-8f && (pv-a).LengthSq() < 1e-8f)) return eg; }
+    return -1;
+}
+static Vector3 LCPosVert(EditMesh* e, int k){ return Vector3(e->pos[(size_t)k*3], e->pos[(size_t)k*3+1], e->pos[(size_t)k*3+2]); }
+static void LCReanclar(Mesh* m){   // tras LCRestaurar: indices frescos para la arista de entrada y las candidatas
+    m->EnsureEdit(); EditMesh* e = m->edit; if (!e) return;
+    const int eg = LCBuscarArista(e, gLoopCutEdgePos[0], gLoopCutEdgePos[1]); if (eg >= 0) gLoopCutEdge = eg;
+    for (int i=0;i<gLoopCutCandN;i++){ const int c = LCBuscarArista(e, gLoopCutCandPos[i][0], gLoopCutCandPos[i][1]); if (c >= 0) gLoopCutCand[i] = c; }
+}
 
 static void LCGuardar(Mesh* m){
     gLCSnap.vsz = m->vertexSize;
@@ -977,6 +1001,16 @@ static void LCGuardar(Mesh* m){
     // se rompia por completo (vertex anim + loop cut).
     VertexAnimSnapshot(m, gLCSnap.vanims);
     gLCSnap.tiene = true;
+    // candidatas (sobre la malla PRE-corte, que es la que se re-corta): las aristas del primer quad del loop
+    gLoopCutCandN = 0; gLoopCutCandSel = 0;
+    { std::vector<int> rEg, rA, rB, lf; bool cerr = false;
+      m->EnsureEdit(); EditMesh* e = m->edit;
+      if (e && gLoopCutEdge >= 0 && gLoopCutEdge < e->NumEdges()) { gLoopCutEdgePos[0] = LCPosVert(e, e->lineIdx[(size_t)gLoopCutEdge*2]); gLoopCutEdgePos[1] = LCPosVert(e, e->lineIdx[(size_t)gLoopCutEdge*2+1]); }
+      if (e && gLoopCutEdge >= 0 && m->LoopCutRecorrido(gLoopCutEdge, rEg, rA, rB, lf, cerr) && !lf.empty() && lf[0] < (int)e->faceEdges.size()) {
+          const std::vector<int>& fe = e->faceEdges[lf[0]];
+          for (size_t k = 0; k < fe.size() && gLoopCutCandN < 4; k++) { const int c = fe[k]; if (c < 0 || c >= e->NumEdges()) continue;
+              gLoopCutCand[gLoopCutCandN] = c; gLoopCutCandPos[gLoopCutCandN][0] = LCPosVert(e, e->lineIdx[(size_t)c*2]); gLoopCutCandPos[gLoopCutCandN][1] = LCPosVert(e, e->lineIdx[(size_t)c*2+1]);
+              if (c == gLoopCutEdge) gLoopCutCandSel = gLoopCutCandN; gLoopCutCandN++; } } }
 }
 static void LCRestaurar(Mesh* m){
     if (!gLCSnap.tiene) return;
@@ -995,9 +1029,8 @@ static void LCRestaurar(Mesh* m){
     if (!gLCSnap.vc.empty()){ delete[] m->vertexColor; m->vertexColor=new GLubyte[gLCSnap.vsz*4]; for (int i=0;i<gLCSnap.vsz*4;i++) m->vertexColor[i]=gLCSnap.vc[i]; }
     m->faces3d = gLCSnap.f3d; m->materialsGroup = gLCSnap.mg;
     m->looseEdges = gLCSnap.le; m->looseVerts = gLCSnap.lv; // restaurar el perfil suelto (sino desaparece al re-cortar)
-    std::vector<GLushort> tris;
-    for (size_t f=0;f<m->faces3d.size();f++){ const std::vector<int>& idx=m->faces3d[f].idx;
-        for (size_t k=1;k+1<idx.size();k++){ tris.push_back((GLushort)idx[0]);tris.push_back((GLushort)idx[k]);tris.push_back((GLushort)idx[k+1]); } }
+    std::vector<MeshIndex> tris;
+    for (size_t f=0;f<m->faces3d.size();f++) W3dTriangularCara(m->vertex, m->faces3d[f].idx, tris);
     m->facesSize=(int)tris.size(); delete[] m->faces; m->faces=new MeshIndex[m->facesSize>0?m->facesSize:1];
     for (int i=0;i<m->facesSize;i++) m->faces[i]=tris[i];
     } // <- aca se re-ancla sharp/seam (recien despues se puede podar)
@@ -1160,7 +1193,7 @@ void LoopCutMotion(int mx, int my){
         float f = (float)(mx - gLoopCutSlideX0) / (float)(gLoopCutSlideW*0.4f);
         if (f>1.0f) f=1.0f; if (f<-1.0f) f=-1.0f;
         gLoopCutFactor=f;
-        Mesh* m=(Mesh*)g_editMesh; LCRestaurar(m); m->LoopCutEdit(gLoopCutEdge, gLoopCutCortes, f);
+        Mesh* m=(Mesh*)g_editMesh; LCRestaurar(m); LCReanclar(m); m->LoopCutEdit(gLoopCutEdge, gLoopCutCortes, f, gLoopCutCorrectUV);
         g_redraw=true;
     }
 }
@@ -1197,7 +1230,7 @@ void LoopCutTecla(int dir){
     else return;
     if (gLoopCutFactor>1.0f) gLoopCutFactor=1.0f;
     if (gLoopCutFactor<-1.0f) gLoopCutFactor=-1.0f;
-    LCRestaurar(m); m->LoopCutEdit(gLoopCutEdge, gLoopCutCortes, gLoopCutFactor);
+    LCRestaurar(m); LCReanclar(m); m->LoopCutEdit(gLoopCutEdge, gLoopCutCortes, gLoopCutFactor, gLoopCutCorrectUV);
     g_redraw=true;
 }
 
@@ -1252,7 +1285,7 @@ void LoopCutClickDer(){
     if (!gLoopCutOn) return;
     if (!gLoopCutSlide || !g_editMesh){ LoopCutCancelar(); return; } // sin Edit Mode no hay malla que cortar
     gLoopCutFactor=0.0f;
-    Mesh* m=(Mesh*)g_editMesh; LCRestaurar(m); m->LoopCutEdit(gLoopCutEdge, gLoopCutCortes, 0.0f);
+    Mesh* m=(Mesh*)g_editMesh; LCRestaurar(m); LCReanclar(m); m->LoopCutEdit(gLoopCutEdge, gLoopCutCortes, 0.0f, gLoopCutCorrectUV);
     LoopCutConfirmar();
 }
 
@@ -1268,15 +1301,23 @@ void LoopCutCancelar(){
 }
 
 // la usa el panel redo: re-corta desde el snapshot con nuevos parametros
-void LoopCutRedoAplicar(int cortes, float factor){
+void LoopCutRedoAplicar(int cortes, float factor, bool correctUV, int edgeSel){
     if (!gLCSnap.tiene || gLoopCutEdge<0 || !g_editMesh) return;
     if (cortes<1) cortes=1;
-    gLoopCutCortes=cortes; gLoopCutFactor=factor;
-    Mesh* m=(Mesh*)g_editMesh; LCRestaurar(m); m->LoopCutEdit(gLoopCutEdge, cortes, factor);
+    gLoopCutCortes=cortes; gLoopCutFactor=factor; gLoopCutCorrectUV=correctUV;
+    Mesh* m=(Mesh*)g_editMesh; LCRestaurar(m); LCReanclar(m);
+    if (edgeSel >= 0 && edgeSel < gLoopCutCandN) { gLoopCutCandSel = edgeSel; gLoopCutEdge = gLoopCutCand[edgeSel]; gLoopCutEdgePos[0] = gLoopCutCandPos[edgeSel][0]; gLoopCutEdgePos[1] = gLoopCutCandPos[edgeSel][1]; }
+    m->LoopCutEdit(gLoopCutEdge, cortes, factor, correctUV);
     g_redraw=true;
 }
+void LoopCutRedoAplicar(int cortes, float factor){ LoopCutRedoAplicar(cortes, factor, gLoopCutCorrectUV, gLoopCutCandSel); }
 int   LoopCutGetCortes(){ return gLoopCutCortes; }
 float LoopCutGetFactor(){ return gLoopCutFactor; }
+bool  LoopCutGetCorrectUV(){ return gLoopCutCorrectUV; }
+int   LoopCutGetCandN(){ return gLoopCutCandN; }
+int   LoopCutGetCandSel(){ return gLoopCutCandSel; }
+int   LoopCutGetEdge(){ return gLoopCutEdge; }
+int   LoopCutGetCand(int i){ return (i >= 0 && i < gLoopCutCandN) ? gLoopCutCand[i] : -1; }
 
 // dibuja el preview del corte (segmentos locales) con la matriz de mundo del objeto.
 // Lo llama el viewport 3D despues de renderizar la escena.
@@ -1305,7 +1346,7 @@ void LoopCutRenderPreview(){
             w3dEngine::PointSize(1.0f);
         }
     } else {
-        w3dEngine::Color4f(1.0f, 0.95f, 0.2f, 1.0f); // amarillo (como Blender)
+        w3dEngine::Color4f(1.0f, 0.95f, 0.2f, 1.0f); // amarillo
         w3dEngine::VertexPointer3f(0, &gLoopCutSegs[0]);
         if (gLoopCutEsPunto){ // corte de un BORDE SUELTO: el corte es un PUNTO en la arista, no una linea
             w3dEngine::PointSize(9.0f);

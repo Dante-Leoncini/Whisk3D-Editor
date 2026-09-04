@@ -1,0 +1,17 @@
+# ==========================================================================
+#  MODIFICADOR BOOLEAN (no destructivo, CSG por BSP sobre poligonos)
+#  Correr DESDE ESTA CARPETA:
+#    cd <motor>/tools/pruebas
+#    ../../platform/linux/build/whisk3d --script prueba_boolean.w3s
+#
+#  Dos cubos que se solapan a medias (B corrido +1 en X: caras COPLANARES con
+#  las de A, que es el caso dificil). Sobre la malla GENERADA se asierta:
+#    * la caja envolvente de cada operacion (intersect / union / difference)
+#    * que no haya AGUJEROS (una arista con un solo uso solo vale si otra
+#      colineal la cubre: la costura coplanar del BSP deja T-junctions, no huecos)
+#    * que la diferencia conserve sus QUADS (la cara que ningun plano corta
+#      sigue siendo un quad: nada se triangula porque si)
+#    * el CACHE: en reposo no se regenera; mover el target si; EDITAR el
+#      target si (sube su geoVersion). Es lo que lo hace viable en el N95.
+# ==========================================================================
+booltest

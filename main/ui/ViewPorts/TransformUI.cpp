@@ -42,7 +42,7 @@ std::string W3dFmtFloat(float v, int dec){
 }
 
 // ---------------------------------------------------------------------------------------------
-//  "[expr|] = valor" de la ENTRADA NUMERICA (estilo Blender "Move: [(2*3)+3] = 9"). El caret
+//  "[expr|] = valor" de la ENTRADA NUMERICA ( "Move: [(2*3)+3] = 9"). El caret
 //  se dibuja en el medio (editable con las flechas del teclado tactil). Era parte del
 //  W3dTextoTransform del 3D; ahora los 3 editores arman su texto con esto.
 // ---------------------------------------------------------------------------------------------

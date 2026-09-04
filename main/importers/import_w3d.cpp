@@ -1812,6 +1812,11 @@ static void CargarModificadores(JVal* j, Mesh* mesh) {
             md->clipping  = JB(e, "clipping", md->clipping);
             std::string tg = JS(e, "target", "");
             if (!tg.empty()) { PendModTgt p; p.md = md; p.nombre = tg; gPendModTgt.push_back(p); }
+        } else if (tipo == ModifierType::Boolean) {
+            const std::string op = JS(e, "op", "difference");
+            md->boolOp = (op == "intersect") ? 0 : (op == "union") ? 1 : 2;
+            std::string tg = JS(e, "target", "");
+            if (!tg.empty()) { PendModTgt p; p.md = md; p.nombre = tg; gPendModTgt.push_back(p); }
         } else if (tipo == ModifierType::SubdivisionSurface) {
             md->subLevel       = JF(e, "nivel", md->subLevel);
             md->subRenderLevel = JF(e, "nivelRender", md->subRenderLevel);

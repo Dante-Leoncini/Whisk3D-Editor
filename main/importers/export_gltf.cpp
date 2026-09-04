@@ -1,4 +1,5 @@
 #include "export_gltf.h"
+#include "edit/MeshEdit.h"   // W3dTriangularCara
 #include "import_obj.h"                  // ExtractBaseName
 #include "objects/Mesh.h"
 #include "objects/Armature.h"
@@ -375,7 +376,8 @@ bool ExportGLTF(const std::string& filepath, bool selectedOnly, bool binary) {
             while (oi < ordenF.size()) { const MeshFace& F = m->faces3d[ordenF[oi]];
                 int fm = (F.mat < 0 || F.mat >= (int)m->materialsGroup.size()) ? 0 : F.mat;
                 if (fm != g) break;   // ordenF esta agrupado: en cuanto cambia el grupo, se corta
-                for (size_t t = 1; t + 1 < F.idx.size(); t++) { idx.push_back((uint32_t)F.idx[0]); idx.push_back((uint32_t)F.idx[t]); idx.push_back((uint32_t)F.idx[t+1]); }
+                std::vector<MeshIndex> tri; W3dTriangularCara(m->vertex, F.idx, tri);   // misma triangulacion que el render
+                for (size_t t = 0; t < tri.size(); t++) idx.push_back((uint32_t)tri[t]);
                 oi++;
             }
             if (idx.empty()) continue;

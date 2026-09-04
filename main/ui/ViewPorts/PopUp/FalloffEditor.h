@@ -16,8 +16,7 @@
 //  porque se escriben SOBRE su W3dFalloff. Si el dueno se muere antes de que se
 //  cierre el popup, llamar OlvidarDueno() (mismo contrato que el color picker).
 //
-//  Contenido, de arriba a abajo (el mismo orden que el desplegable de Blender,
-//  que es de donde viene el vocabulario de los presets):
+//  Contenido, de arriba a abajo:
 //    * la LISTA de los 10 tipos (icono + nombre; el activo en verde)
 //    * el LIENZO de la curva: la curva dibujada + sus puntos. Solo se puede
 //      editar con tipo = Custom; con un preset se ve su forma (de solo lectura),

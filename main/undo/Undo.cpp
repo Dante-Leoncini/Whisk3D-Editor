@@ -1,4 +1,5 @@
 #include "Undo.h"
+extern bool g_redraw;   // el frame se redibuja cuando un undo/redo/borrado cambia algo visible
 #include "variables.h"           // InteractionMode, ObjActivo, ObjSelects
 #include "objects/Objects.h"     // Object (pos/rot/scale)
 #include "objects/Mesh.h"        // Mesh (edit move: vertex/normals/CalcularBordes)
@@ -657,6 +658,7 @@ class MeshGeoUndo : public UndoCmd {
     std::vector<GLfloat>     uv2dRest;
     std::vector<int>         vertCtrlPoint; int skinNCtrl; // SKINNING: mapeo render-vert -> control-point (sino el undo de una malla skinneada deja el mapeo viejo -> skin roto)
     std::set<std::string>    sharpEdges, seamEdges; // bordes sharp/seam (por POSICION). meshSmooth = shading
+    std::vector<int>         posRep;     // agrupamiento por posicion de la JAULA: dos verts coincidentes que estaban separados (pre-merge) siguen separados al deshacer
     bool                     meshSmooth;
     // FRAMES de las VERTEX ANIMS: el remap de topologia (RemapVertexAnims via GenerarRender)
     // los reescribe al layout nuevo. Sin snapshot, deshacer una op de topologia dejaba la
@@ -702,7 +704,7 @@ class MeshGeoUndo : public UndoCmd {
         vertexSize = s->vertexSize; facesSize = s->facesSize;
         VertexAnimSnapshot(s, vanims); // los frames de las vertex anims, parejos a ESTA geometria
         CapturarIdxVanims();           // recien capturado: cada slot esta en su lugar (identidad)
-        sharpEdges = s->sharpEdges; seamEdges = s->seamEdges; meshSmooth = s->meshSmooth;
+        sharpEdges = s->sharpEdges; seamEdges = s->seamEdges; meshSmooth = s->meshSmooth; posRep = s->posRep;
         normals.clear(); uv.clear(); color.clear(); faces.clear();
         uvMaps.clear(); colorLayers.clear(); vertexGroups.clear(); uvGroups.clear();
         uv2dRest = s->uv2dRest;
@@ -732,7 +734,7 @@ class MeshGeoUndo : public UndoCmd {
         if (!color.empty())   { s->vertexColor = new GLubyte[color.size()];    for (size_t i=0;i<color.size();i++)   s->vertexColor[i] = color[i]; }
         if (!faces.empty())   { s->faces = new MeshIndex[faces.size()];         for (size_t i=0;i<faces.size();i++)   s->faces[i]       = faces[i]; }
         s->faces3d = faces3d; s->looseEdges = looseEdges; s->looseVerts = looseVerts; s->materialsGroup = materialsGroup;
-        s->sharpEdges = sharpEdges; s->seamEdges = seamEdges; s->meshSmooth = meshSmooth;
+        s->sharpEdges = sharpEdges; s->seamEdges = seamEdges; s->meshSmooth = meshSmooth; s->posRep = posRep;
         s->LiberarCapas();
         for (size_t i = 0; i < uvMaps.size(); i++)       s->uvMaps.push_back(new UVMap(uvMaps[i]));
         for (size_t i = 0; i < colorLayers.size(); i++)  s->colorLayers.push_back(new ColorLayer(colorLayers[i]));
@@ -743,12 +745,36 @@ class MeshGeoUndo : public UndoCmd {
         s->vertCtrlPoint = vertCtrlPoint; s->skinNCtrl = skinNCtrl; // restaurar el mapeo render->control-point (skinning)
         RestaurarVanims(s); // los frames de las vertex anims vuelven JUNTO con su geometria (mismo layout), CADA UNO A SU ANIM
         s->lastSkinFrame = -999999; // forzar re-skin con la geo/mapeo restaurados (CalcularBordes ya bumpea skinGeomVersion)
-        s->CalcularBordes(); // recomputa edges/centroGeom + invalida el edit (se rearma de la geo restaurada)
+        // invalida el edit (se rearma de la geo restaurada) pero CONSERVA el posRep del snapshot: reagrupar por
+        // posicion soldaba en la jaula dos verts coincidentes (el des-merge de un auto merge) y la jaula quedaba con
+        // un vert de menos -> la seleccion guardada por indice ya no calzaba y el move siguiente la dejaba vieja
+        s->CalcularBordes(true, false);
     }
 public:
+    // SELECCION del edit mesh al momento del snapshot (posiciones de los verts seleccionados). Restaurar la
+    // geometria invalida la jaula y Construir la rearma con TODO seleccionado: sin esto cada Ctrl+Z de un
+    // merge/loop cut/extrude dejaba "todo seleccionado" y el usuario perdia el hilo de los pasos.
+    // Se guarda POR INDICE (exacto: distingue dos verts coincidentes, como el des-merge de un auto merge) y
+    // POR POSICION (respaldo si la jaula rearmada no tiene la misma cantidad de verts).
+    std::vector<Vector3> selPos; bool selCapturada;
+    std::vector<unsigned char> selV, selE, selF; int selActivo;
+    void CapturarSel(Mesh* s) {
+        selPos.clear(); selV.clear(); selE.clear(); selF.clear(); selActivo = -1; selCapturada = false;
+        if (!s || !s->edit) return;
+        const EditMesh* e = s->edit; selCapturada = true;
+        selV = e->vertSel; selE = e->edgeSel; selF = e->faceSel; selActivo = e->activeIdx;
+        for (size_t k = 0; k < e->vertSel.size() && k*3+2 < e->pos.size(); k++)
+            if (e->vertSel[k]) selPos.push_back(Vector3(e->pos[k*3], e->pos[k*3+1], e->pos[k*3+2]));
+    }
+    void RestaurarSel(Mesh* s) {
+        s->EnsureEdit(); EditMesh* e = s->edit; if (!e) return;
+        if (e->vertSel.size() == selV.size() && e->edgeSel.size() == selE.size() && e->faceSel.size() == selF.size()) {
+            e->vertSel = selV; e->edgeSel = selE; e->faceSel = selF; e->activeIdx = selActivo; e->Recolorear();
+        } else s->ReconstruirEditSelPorPos(selPos);
+    }
     MeshGeoUndo(Mesh* M) : m(M), vertexSize(0), facesSize(0), uvMapActivo(0), colorActivo(0), grupoActivo(0),
-                           uvGrupoActivo(-1), skinNCtrl(0) {
-        if (m) CapturarDe(m);
+                           uvGrupoActivo(-1), skinNCtrl(0), selCapturada(false), selActivo(-1) {
+        if (m) { CapturarDe(m); CapturarSel(m); }
     }
     void Aplicar() {
         if (!m) return;
@@ -765,9 +791,14 @@ public:
         vertCtrlPoint.swap(cur.vertCtrlPoint); skinNCtrl = cur.skinNCtrl; // (faltaban: el redo escribia el mapeo VIEJO -> skin roto)
         uvMapActivo = cur.uvMapActivo; colorActivo = cur.colorActivo; grupoActivo = cur.grupoActivo;
         uvGrupoActivo = cur.uvGrupoActivo;
-        sharpEdges.swap(cur.sharpEdges); seamEdges.swap(cur.seamEdges); meshSmooth = cur.meshSmooth;
+        sharpEdges.swap(cur.sharpEdges); seamEdges.swap(cur.seamEdges); meshSmooth = cur.meshSmooth; posRep.swap(cur.posRep);
         vanims.anims.swap(cur.vanims.anims); vanims.tiene = cur.vanims.tiene; // los frames de las anims (para rehacer)
         vanimIdx.swap(cur.vanimIdx);  // el snapshot nuevo salio de la lista VIVA -> sus indices son la identidad
+        // la seleccion que habia en ESE paso (en Edit Mode la jaula se rearma ya con ella)
+        if (selCapturada && InteractionMode == EditMode) RestaurarSel(m);
+        selPos.swap(cur.selPos); selV.swap(cur.selV); selE.swap(cur.selE); selF.swap(cur.selF);
+        { const int ta = selActivo; selActivo = cur.selActivo; cur.selActivo = ta; }
+        { const bool t = selCapturada; selCapturada = cur.selCapturada; cur.selCapturada = t; }
         // la geometria cambio -> refrescar el preview del modificador (subdivision/screw). Antes esto lo hacia el
         // regen POR FRAME de ActualizarEditMeshActivo; ahora que ese esta gateado, hay que pedirlo aca explicito.
         if (!m->modificadores.empty()) m->GenerarMallaModificada();
@@ -1022,7 +1053,15 @@ static void RefEscribir(RefEntry& r, bool restaurar){
         // si no es EL MISMO, no se escribe nada (ver ModVivoEn arriba, test 'modtargetuaf').
         if (r.mod) { if (ModVivoEn(m, r.mod, r.modSerial)) r.mod->target = restaurar ? r.target : NULL; }
         else if (m) m->skinArmature = restaurar ? (Armature*)r.target : NULL;
-        if (m) m->lastSkinFrame = -999999;
+        if (m) {
+            m->lastSkinFrame = -999999;
+            // el target cambio (se fue o volvio): la malla generada quedo VIEJA. Sin esto un Boolean seguia
+            // mostrando el corte de un cilindro ya borrado hasta que algo la regeneraba. Se regenera ACA (y no
+            // "en el proximo frame"): el frame solo regenera el objeto activo, y el dueno del modificador
+            // normalmente no lo es cuando borras su target.
+            m->GenerarMallaModificada();
+            g_redraw = true;
+        }
         return;
     }
     if (!r.dueno) return;
@@ -3067,14 +3106,17 @@ void UndoConMover(Object* o, int dir) {   // -1 = sube (hacia el principio), +1 
     ConPushSinc(c);
 }
 
+extern void RedoMeshPanelCerrar();   // RedoMeshPanel.cpp: el panel redo (Add/Normales/Loop Cut) trabaja sobre un snapshot que el undo deja viejo
 void UndoDeshacer() {
     if (g_undo.empty()) return;
+    RedoMeshPanelCerrar();
     UndoCmd* c = g_undo.back(); g_undo.pop_back();
     c->Aplicar();          // intercambia: el comando queda con el estado NUEVO
     g_redo.push_back(c);   // disponible para rehacer
 }
 void UndoRehacer() {
     if (g_redo.empty()) return;
+    RedoMeshPanelCerrar();
     UndoCmd* c = g_redo.back(); g_redo.pop_back();
     c->Aplicar();          // intercambia de nuevo: re-aplica el cambio
     g_undo.push_back(c);

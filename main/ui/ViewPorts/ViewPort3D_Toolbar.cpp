@@ -265,6 +265,12 @@ void Viewport3D::ToolbarSincronizar(){
             const bool on = (BrushGet().marcas != MarcasOff);
             btn->tinte = on ? TbVerdeBg() : NULL;
             btn->colorTexto = on ? accent : blanco;
+        } else if (rol == TBR_PorVertice){
+            // vertex color: por VERTICE (accent) o por face corner. Solo pintando color.
+            btn->visible = color && !transformando;
+            const bool on = BrushGet().porVertice;
+            btn->tinte = on ? TbVerdeBg() : NULL;
+            btn->colorTexto = on ? accent : blanco;
         } else if (rol == TBR_Falloff){
             // muestra el falloff ACTIVO (icono si ya tiene arte + nombre traducido)
             btn->visible = pincel && !transformando;
@@ -338,6 +344,9 @@ void Viewport3D::ToolbarAccionRol(int rol){
         // en PESOS el punto pintable es el VERTICE (el skinning lee un peso por vertice)
         BrushGet().marcas = (BrushGet().marcas != MarcasOff) ? MarcasOff : MarcasVertice;
         g_redraw = true;
+    }
+    else if (rol == TBR_PorVertice){ // vertex color: por vertice <-> por face corner
+        BrushGet().porVertice = !BrushGet().porVertice; g_redraw = true;
     }
     else if (rol == TBR_Falloff){ // el editor de falloff, que es el popup REUTILIZABLE
         Button* b = BarRolBtn(ToolButtons, TBR_Falloff);

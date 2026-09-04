@@ -8,7 +8,7 @@
 class Mesh;
 class Viewport3D;
 
-// Ventanita flotante "Add ..." (estilo redo-panel de Blender) que aparece al
+// Ventanita flotante "Add ..." que aparece al
 // crear una primitiva (cube/plane/circle). REUSA las tarjetas de Propiedades:
 // un GroupPropertie con campos PropFloat (Size / Radius+Vertices). Editar un
 // campo regenera la malla en vivo (Mesh::Regenerar). Se cierra al hacer otra
@@ -47,5 +47,6 @@ void AbrirRedoLoopCutPanel(Mesh* m);
 // el panel (o su malla) sigue vivo? Lo usa el test 'uipunteros': si borran la malla que edita,
 // el panel tiene que cerrarse, porque sus campos apuntan a MIEMBROS de ella y los ESCRIBEN.
 bool RedoMeshPanelActivo();
+void RedoMeshPanelCerrar();   // undo/redo lo cierran (su snapshot quedo viejo)
 
 #endif

@@ -6,7 +6,7 @@
 //     del FK: PrepararSkinAutorado deriva el rest de ahi).
 //   - "conectado" es IMPLICITO: head del hijo == tail del padre (el dibujo pone la linea punteada
 //     cuando hay gap). Extruir crea conectado; duplicar NO conecta; borrar re-parenta los hijos.
-//   - SELECCION estilo Blender: hueso ENTERO (select) o PUNTAS sueltas (selHead/selTail). La punta
+//   - SELECCION : hueso ENTERO (select) o PUNTAS sueltas (selHead/selTail). La punta
 //     COMPARTIDA de un par conectado se selecciona y se mueve como UNA sola (soldada): tocarla
 //     prende el tail del padre Y el head de cada hijo conectado a la vez.
 //   - cada operacion discreta empuja su paso de undo (UndoBonesCapturar, snapshot de bones+tracks).

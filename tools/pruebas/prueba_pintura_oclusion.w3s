@@ -1,0 +1,18 @@
+# Oclusion al pintar: un cubo chico ADENTRO de otro (joineados). Sus 3 caras que miran a camara
+# estan tapadas por el cubo grande: sin oclusion se veian sus 12 corners (solo back-facing);
+# con el mapa quedan los 12 del cubo grande. En X-Ray no hay oclusion: vuelven los 24.
+add cube
+add cube
+selobj Cubo.002
+objscale 0.5 0.5 0.5
+selobj Cubo.001
+selname Cubo.002
+join
+visible 0 Cubo
+mode vertex
+uishot /tmp/w3d_oclusion.png
+wpvisibles 12
+xray 1
+uishot /tmp/w3d_oclusion_xray.png
+wpvisibles 24
+xray 0

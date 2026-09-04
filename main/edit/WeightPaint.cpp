@@ -42,14 +42,15 @@ static float TrazoPendiente(size_t i, size_t n, float a) {
     return a - ya;
 }
 
-// Con las MARCAS prendidas el pincel no degrada con la distancia: el cuadradito se toca o
-// no se toca. Eso es exactamente un falloff CONSTANTE, asi que en vez de meter un "if
-// marcas" adentro del pincel (y tener que acordarse de repetirlo en cada llamador) se
-// cambia la curva y el pincel sigue siendo uno solo.
+// El modo "=" (valor exacto en todo el circulo) no degrada con la distancia: eso es un falloff
+// CONSTANTE, asi que en vez de meter un "if" adentro del pincel se cambia la curva y el pincel
+// sigue siendo uno solo. Las MARCAS no cambian el falloff: son solo donde se dibuja/testea cada
+// punto (antes las marcas forzaban constante, y con las marcas prendidas por defecto en Vertex
+// Paint el falloff "no andaba": rozar un corner lo pintaba entero).
 const W3dFalloff& BrushFalloffEfectivo() {
     static W3dFalloff constante;          // se arma una vez
     constante.tipo = FoConstant;
-    return (g_brush.marcas != MarcasOff) ? constante : g_brush.falloff;
+    return (g_brush.modo == WPIgualar) ? constante : g_brush.falloff;
 }
 
 // circulo por SEGMENTOS DE LINEA (no habia helper de circulo en el motor): 48 segmentos,
@@ -97,13 +98,57 @@ static const float kCornerInset = 0.25f;
 // ok[L] = 0 si ese corner no se ve (detras de camara / back-facing): no se dibuja ni se pinta.
 // Una cara entra ENTERA o no entra: si un corner no proyecta, la cara se saltea (sino se
 // dibujarian esquinas sueltas de una cara que no se ve).
-static void WPCornersEnPantalla(Mesh* m, WPProyector proy, void* ctx,
+// ---------------------------------------------------------------------------
+//  Oclusion (ver WeightPaint.h)
+// ---------------------------------------------------------------------------
+static const unsigned char* g_oclRGBA = NULL;
+static int g_oclX0 = 0, g_oclY0 = 0, g_oclW = 0, g_oclH = 0, g_oclVpX = 0, g_oclVpY = 0, g_oclAlto = 0;
+static const Mesh* g_oclMesh = NULL;
+
+void WPOclusionSet(const unsigned char* rgba, int x0, int y0, int w, int h, int vpX, int vpY, int pantallaAlto, Mesh* m) {
+    g_oclRGBA = rgba; g_oclX0 = x0; g_oclY0 = y0; g_oclW = w; g_oclH = h;
+    g_oclVpX = vpX; g_oclVpY = vpY; g_oclAlto = pantallaAlto; g_oclMesh = m;
+}
+void WPOclusionLimpiar() { g_oclRGBA = NULL; g_oclMesh = NULL; }
+bool WPOclusionActiva(const Mesh* m) { return g_oclRGBA != NULL && g_oclMesh == m && g_oclW > 0 && g_oclH > 0; }
+int WPOclusionCaraEn(float sx, float sy) {
+    if (!g_oclRGBA) return -1;
+    const int px = (int)floorf((float)g_oclVpX + sx + 0.5f) - g_oclX0;                 // columna de ventana
+    const int py = (g_oclAlto - 1 - (int)floorf((float)g_oclVpY + sy + 0.5f)) - g_oclY0; // fila GL (desde abajo)
+    if (px < 0 || py < 0 || px >= g_oclW || py >= g_oclH) return -1;
+    const unsigned char* q = g_oclRGBA + ((size_t)py * (size_t)g_oclW + (size_t)px) * 4;
+    // misma codificacion 5-6-5 que el picking por color (sobrevive a un framebuffer de 16 bits)
+    const int id = (q[0] >> 3) | ((q[1] >> 2) << 5) | ((q[2] >> 3) << 11);
+    return id - 1;
+}
+
+void WPRenderVertsVisibles(Mesh* m, WPProyector proy, void* ctx, std::vector<char>& vis) {
+    const int nV = m ? m->vertexSize : 0;
+    vis.assign((size_t)(nV > 0 ? nV : 0), 0);
+    if (nV <= 0) return;
+    for (int i = 0; i < nV; i++) { float sx, sy; vis[(size_t)i] = proy(ctx, i, sx, sy) ? 1 : 0; }
+    if (!WPOclusionActiva(m)) return;
+    // con mapa: ademas alguna esquina del vert tiene que verse de verdad
+    std::vector<float> cx, cy; std::vector<char> ok;
+    WPCornersEnPantalla(m, proy, ctx, cx, cy, ok);
+    std::vector<char> alguna((size_t)nV, 0);
+    int L = 0;
+    for (size_t f = 0; f < m->faces3d.size(); f++)
+        for (size_t k = 0; k < m->faces3d[f].idx.size(); k++, L++) {
+            const int rv = m->faces3d[f].idx[k];
+            if (rv >= 0 && rv < nV && L < (int)ok.size() && ok[(size_t)L]) alguna[(size_t)rv] = 1;
+        }
+    for (int i = 0; i < nV; i++) if (!alguna[(size_t)i]) vis[(size_t)i] = 0;
+}
+
+void WPCornersEnPantalla(Mesh* m, WPProyector proy, void* ctx,
                                 std::vector<float>& cx, std::vector<float>& cy,
                                 std::vector<char>& ok) {
     const int nC = m->ContarCorners();
     const size_t n0 = (size_t)(nC > 0 ? nC : 0);
     cx.assign(n0, 0.0f); cy.assign(n0, 0.0f); ok.assign(n0, 0);
     if (nC <= 0) return;
+    const bool oclusion = WPOclusionActiva(m);
     int L = 0;
     for (size_t f = 0; f < m->faces3d.size(); f++) {
         const std::vector<int>& idx = m->faces3d[f].idx;
@@ -124,9 +169,11 @@ static void WPCornersEnPantalla(Mesh* m, WPProyector proy, void* ctx,
         if (todos) {
             const float ccx = sumX / (float)n, ccy = sumY / (float)n;  // centro de la cara EN PANTALLA
             for (size_t k = 0; k < n; k++) {
-                cx[(size_t)(L + (int)k)] = px[k] + (ccx - px[k]) * kCornerInset;
-                cy[(size_t)(L + (int)k)] = py[k] + (ccy - py[k]) * kCornerInset;
-                ok[(size_t)(L + (int)k)] = 1;
+                const size_t Lk = (size_t)(L + (int)k);
+                cx[Lk] = px[k] + (ccx - px[k]) * kCornerInset;
+                cy[Lk] = py[k] + (ccy - py[k]) * kCornerInset;
+                // tapado por otra cara? el pixel del cuadradito tiene que mostrar ESTA cara
+                ok[Lk] = (!oclusion || WPOclusionCaraEn(cx[Lk], cy[Lk]) == (int)f) ? 1 : 0;
             }
         }
         L += (int)n;
@@ -165,10 +212,12 @@ void BrushDibujarMarcas(Mesh* m, int modo, float ladoPx, const unsigned char* co
         for (size_t i = 0; i < m->vertCtrlPoint.size(); i++)
             if (m->vertCtrlPoint[i] > maxCP) maxCP = m->vertCtrlPoint[i];
         if (maxCP < 0) return;
+        std::vector<char> vis; WPRenderVertsVisibles(m, proy, ctx, vis);   // back-facing + tapados
         std::vector<char> visto((size_t)maxCP + 1, 0);
         for (int i = 0; i < m->vertexSize && i < (int)m->vertCtrlPoint.size(); i++) {
             const int cp = m->vertCtrlPoint[i];
             if (cp < 0 || cp > maxCP || visto[(size_t)cp]) continue;
+            if (i >= (int)vis.size() || !vis[(size_t)i]) continue;
             float sx = 0.0f, sy = 0.0f;
             if (!proy(ctx, i, sx, sy)) continue;   // detras de camara / back-facing: no se ve
             visto[(size_t)cp] = 1;
@@ -440,11 +489,13 @@ bool PincelAplicar(Mesh* m, int grupo, float centroX, float centroY, float radio
     std::vector<float> fall((size_t)maxCP + 1, 0.0f);
     const float r2 = radioPx * radioPx;
     bool alguno = false;
+    std::vector<char> visRV; WPRenderVertsVisibles(m, proy, ctx, visRV);   // back-facing + tapados
     for (int i = 0; i < m->vertexSize && i < (int)m->vertCtrlPoint.size(); i++) {
         int cp = m->vertCtrlPoint[i];
         if (cp < 0 || cp > maxCP) continue;
         if (!cpOk.empty() && !cpOk[(size_t)cp]) continue; // mascara: cara no seleccionada
         float sx = 0.0f, sy = 0.0f;
+        if (i >= (int)visRV.size() || !visRV[(size_t)i]) continue;   // tapado por otra cara (mapa de oclusion)
         if (!proy(ctx, i, sx, sy)) continue;   // detras de camara / back-facing: no se pinta
         float dx = sx - centroX, dy = sy - centroY;
         float d2 = dx * dx + dy * dy;
@@ -505,6 +556,8 @@ bool PincelAplicarColor(Mesh* m, int capa, float centroX, float centroY, float r
     if (valor01 > 1.0f) valor01 = 1.0f;
     if (valor01 <= 0.0f) return false;
     if (cl->porIndice && (int)cl->indice.size() != nC) cl->indice.assign((size_t)nC, -1);
+    // por VERTICE si la capa es Per-Vertex o si el pincel esta en "por vertice" (el boton de la barra)
+    const bool porVert = cl->porVertice || BrushGet().porVertice;
 
     const W3dFalloff& fo = FalloffODefault(falloff);
     std::vector<char> rvOk;
@@ -520,7 +573,8 @@ bool PincelAplicarColor(Mesh* m, int capa, float centroX, float centroY, float r
     const float r2 = radioPx * radioPx;
     bool alguno = false;
     std::vector<float> cx, cy; std::vector<char> vis;
-    if (!cl->porVertice) WPCornersEnPantalla(m, proy, ctx, cx, cy, vis);
+    if (!porVert) WPCornersEnPantalla(m, proy, ctx, cx, cy, vis);
+    std::vector<char> visRV; if (porVert) WPRenderVertsVisibles(m, proy, ctx, visRV);   // back-facing + tapados
     int L = 0;
     for (size_t f = 0; f < m->faces3d.size(); f++) {
         const std::vector<int>& id = m->faces3d[f].idx;
@@ -530,10 +584,10 @@ bool PincelAplicarColor(Mesh* m, int capa, float centroX, float centroY, float r
             if (rv < 0 || rv >= m->vertexSize) continue;
             if (!rvOk.empty() && !rvOk[(size_t)rv]) continue;   // mascara: cara no seleccionada
             float sx = 0.0f, sy = 0.0f;
-            if (!cl->porVertice) {
+            if (!porVert) {
                 if (L >= (int)vis.size() || !vis[(size_t)L]) continue;  // corner no visible
                 sx = cx[(size_t)L]; sy = cy[(size_t)L];                 // el punto del cuadradito
-            } else if (!proy(ctx, rv, sx, sy)) continue;                // Per-Vertex: el vertice
+            } else if (rv >= (int)visRV.size() || !visRV[(size_t)rv] || !proy(ctx, rv, sx, sy)) continue;   // Per-Vertex: el vertice (visible)
             const float dx = sx - centroX, dy = sy - centroY;
             const float d2 = dx * dx + dy * dy;
             if (d2 > r2) continue;
@@ -547,7 +601,7 @@ bool PincelAplicarColor(Mesh* m, int capa, float centroX, float centroY, float r
     //    (todos los corners de una posicion toman el color del primero). Si se pintara solo el
     //    corner tocado, el resultado dependeria de cual corner es el primero -> se propaga el
     //    maximo a TODOS los corners que comparten posicion. Es "un vertice = un color".
-    if (cl->porVertice) {
+    if (porVert) {
         WeightPaintAsegurarMapa(m);
         int maxCP = -1;
         for (size_t i = 0; i < m->vertCtrlPoint.size(); i++)

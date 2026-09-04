@@ -13,7 +13,7 @@ class Viewport3D;
 //  transforms modales (G/R/S) de puntas y huesos. Compartido por el viewport 3D,
 //  el UV editor (armature 2D: mismos huesos con Z=0) y el harness de tests.
 //
-//  MODELO DE SELECCION (estilo Blender): se selecciona el hueso ENTERO
+//  MODELO DE SELECCION (): se selecciona el hueso ENTERO
 //  (b.select, con las dos puntas) o UNA PUNTA (b.selHead / b.selTail). Una punta
 //  COMPARTIDA (head del hijo CONECTADO == tail del padre) es UNA sola entidad:
 //  seleccionarla o moverla afecta las dos a la vez (siguen soldadas).

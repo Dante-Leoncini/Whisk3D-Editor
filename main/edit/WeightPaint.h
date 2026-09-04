@@ -33,9 +33,9 @@ enum WPModo {
 };
 
 // ---- MARCAS de pintura: los cuadraditos que muestran QUE se puede pintar. ----
-// Con las marcas prendidas el pincel deja de trabajar "sobre la malla" y pasa a trabajar
-// sobre ESOS puntos: pinta los que caen adentro del circulo, al valor de la barra y SIN
-// falloff (o lo tocaste o no), y tocar cualquier otro lado no hace nada.
+// Con las marcas prendidas el pincel trabaja sobre ESOS puntos: pinta los que caen adentro
+// del circulo (tocar cualquier otro lado no hace nada), cada uno con el falloff segun su
+// distancia al centro, igual que sin marcas. Solo el modo "=" pinta parejo (ver abajo).
 // Los dos modos dibujan el MISMO cuadrado; lo que cambia es DONDE cae:
 enum W3dMarcasModo {
     MarcasOff     = 0,
@@ -62,15 +62,20 @@ struct BrushEstado {
                     // la pestania "Pal" del mismo ColorPicker -> elegir paleta o "no usar paleta"
                     // sale gratis, y lo pintado con indice sigue a la paleta (palette-swap).
     W3dFalloff falloff; // como cae la intensidad del centro al borde (el menu Falloff de la barra)
-    BrushEstado() : radioPx(40.0f), fuerza(1.0f), modo(WPSumar), marcas(MarcasOff), palIdx(-1) {
+    // ---- VERTEX COLOR: pintar POR VERTICE (default) o POR FACE CORNER. Por vertice, todos los corners de
+    // un vertice se pintan como uno (y las marcas son una por vertice: menos puntos, menos cuentas); por
+    // corner, cada esquina de cada cara por separado. No toca la capa (su Per-Vertex/Per-Corner es el
+    // modelo de datos); es solo como trabaja el pincel. El boton de la barra al lado de las marcas.
+    bool  porVertice;
+    BrushEstado() : radioPx(40.0f), fuerza(1.0f), modo(WPSumar), marcas(MarcasOff), palIdx(-1), porVertice(true) {
         color[0] = 0.8f; color[1] = 0.15f; color[2] = 0.15f; color[3] = 1.0f; // un rojo, para que se vea
     }
 };
 
-// El falloff que el pincel USA REALMENTE en este momento. Con las marcas prendidas es
-// CONSTANTE (1 en todo el radio): el punto se toca o no se toca, no hay medias tintas.
-// Sale de aca -- y no de cada llamador -- para que el 3D y el editor UV no puedan
-// divergir en esa regla.
+// El falloff que el pincel USA REALMENTE en este momento: el elegido, salvo en el modo "="
+// (valor exacto en todo el circulo), que es CONSTANTE (1 en todo el radio). Las marcas no
+// lo cambian. Sale de aca -- y no de cada llamador -- para que el 3D y el editor UV no
+// puedan divergir en esa regla.
 const W3dFalloff& BrushFalloffEfectivo();
 BrushEstado& BrushGet(); // el estado global del pincel (unico)
 
@@ -100,6 +105,25 @@ void  UVGroupLimpiarPesos(Mesh* m, int uvGrupo);
 // viewport) del render-vert i. Devuelve false si el vert NO se pinta (detras de la
 // camara / back-facing). 'ctx' es el contexto del caller (viewport + malla).
 typedef bool (*WPProyector)(void* ctx, int i, float& sx, float& sy);
+// ---- OCLUSION: que cara se ve en cada pixel del viewport. El viewport 3D lo arma al empezar el
+// frame en los modos de pintura (pase de IDs de cara por color, leido con ReadPixels) y lo deja
+// aca. Con el mapa puesto, un corner cuenta como visible solo si el pixel de su cuadradito muestra
+// SU cara: los corners de caras que miran a camara pero estan TAPADAS por otra cara ya no se
+// dibujan ni se pintan. Sin mapa (X-Ray, otro modo) vale solo el test de back-facing de proy().
+// (x0,y0,w,h) = rectangulo leido en coords de ventana GL (y desde abajo); vpX/vpY = origen del
+// viewport en pantalla (y desde arriba), que es el espacio de (sx,sy) del proyector.
+void WPOclusionSet(const unsigned char* rgba, int x0, int y0, int w, int h, int vpX, int vpY, int pantallaAlto, Mesh* m);
+void WPOclusionLimpiar();
+bool WPOclusionActiva(const Mesh* m);
+int  WPOclusionCaraEn(float sx, float sy);    // indice de faces3d en ese punto, -1 = fondo / fuera / sin mapa
+// visibilidad POR RENDER-VERT: proy() (detras de camara / back-facing) y, si hay mapa, que alguna de
+// sus esquinas (corners) se vea de verdad. La usan las marcas por vertice y los dos pinceles.
+void WPRenderVertsVisibles(Mesh* m, WPProyector proy, void* ctx, std::vector<char>& vis);
+// posicion en pantalla de cada face corner (metida hacia el centro de su cara), la MISMA que
+// usan las marcas y el pincel por corner. ok[L] = el corner se ve. (la usa el harness)
+void WPCornersEnPantalla(Mesh* m, WPProyector proy, void* ctx,
+                                std::vector<float>& cx, std::vector<float>& cy,
+                                std::vector<char>& ok);
 
 // dibuja las MARCAS (los cuadraditos): un cuadrado relleno con el color del punto y un
 // BORDE NEGRO alrededor, en cada punto pintable. 'modo' es un W3dMarcasModo; 'colorRV' es
@@ -134,8 +158,8 @@ void BrushDibujarCarasBloqueadas(Mesh* m, WPProyector proy, void* ctx,
 //  varios face corner".
 //
 //  CUANTO entra: a = valor01 * falloff(d/radio), y el color se MEZCLA con el que habia
-//  (a=1 lo reemplaza). Con las marcas prendidas el falloff es constante -> el color
-//  entra al valor de la barra, parejo en todo el circulo.
+//  (a=1 lo reemplaza). Con las marcas prendidas cada corner entra segun SU distancia al
+//  centro (el falloff manda igual); en el modo "=" entra parejo en todo el circulo.
 //
 //  POR INDICE DE PALETA (capa porIndice): un indice NO se puede mezclar -- o el corner
 //  es del color 3 de la paleta o no lo es. Entonces el falloff decide QUIEN se pinta

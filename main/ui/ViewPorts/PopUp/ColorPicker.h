@@ -9,7 +9,7 @@
 
 class Object;   // el objeto dueno del color (contexto de la pestania Paleta)
 
-// Selector de color tipo Blender (4 OS): circulo cromatico (el arte de
+// Selector de color (4 OS): circulo cromatico (el arte de
 // 32x32 en (96,70) del atlas de la UI), barra de Valor, vista previa
 // (original | actual) y pestanias RGB / HSV / Hex con valores 0..255.
 // CUARTA pestania "Pal" (solo con contexto de paleta, ver SetPaleta): los

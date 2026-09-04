@@ -55,4 +55,25 @@ int  W3dPVSRecalcular(Mesh* m);             // re-lee el sidecar + re-arma; devu
 bool W3dVisSetCelda(Mesh* m, int celda);    // = W3dPVSAplicarSector con el nombre del contrato
 int  W3dVisInfo(Mesh* m, int* celdaActiva, int* trisLista, bool* ordenado); // nCeldas (-1 = sin metodo celdas)
 
+// CONNECT VERTEX PATH (tecla J / menu Vertex). Con 2 vertices seleccionados (el activo es el
+// destino) traza la linea RECTA entre los dos EN PANTALLA y la corta sobre la superficie: cada
+// cara que la linea atraviesa se parte en dos, y donde cruza una arista se crea un vertice nuevo
+// sobre esa arista (interpolado: uv, color, normal y vertex anim como el loop cut). Si la linea
+// pasa justo por un vertice se engancha en el. Si ya estan unidos por una arista, no hace nada.
+// proy: vertice (posicion LOCAL) -> pantalla; NULL = vista frontal ortografica (x, y), para tests.
+// msg = aviso para el usuario (clave de traduccion). Deja paso de undo y la seleccion en el corte.
+typedef bool (*W3dProy2D)(void* ctx, const Vector3& local, float& sx, float& sy);
+bool ConectarVerticesEdit(Mesh* m, W3dProy2D proy, void* ctx, std::string& msg);
+
+// render con un vert POR CORNER (sin fusionar corners iguales): lo prende el editor mientras se pinta
+// vertex color por corner, para que cada corner se pueda pintar y VER por separado. Vale para el
+// proximo GenerarRender de cualquier malla; apagarlo y regenerar vuelve a fusionar.
+void W3dRenderCornersSeparados(bool on);
+bool W3dRenderCornersSeparadosActivo();
+
+// cara (ngon) -> triangulos para un index buffer: abanico si es convexa, ear clipping si es concava
+// (la "U" que deja el Boolean alrededor de un agujero). pos = float[3] por indice. Siempre m-2 triangulos. Lo usan el
+// index buffer del render, el loop cut, el export glTF y el snap a cara: TODOS ven la misma cara.
+void W3dTriangularCara(const float* pos, const std::vector<int>& idx, std::vector<MeshIndex>& tris);
+
 #endif // MESHEDIT_H

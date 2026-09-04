@@ -126,7 +126,7 @@ bool LayoutEnArrastre();
 bool LayoutPopupArrastrando(); // el picker arrastrando (cursor violeta)
 void LayoutSoltar(int mx, int my);
 
-// menu de snap: shift+S (mueve seleccion / cursor 3D, estilo Blender)
+// menu de snap: shift+S (mueve seleccion / cursor 3D, )
 void LayoutMenuSnap(int mx, int my);
 
 // menu ADD en el cursor: shift+A (object mode). Mismo MenuAdd de la barra.
@@ -182,6 +182,15 @@ void LayoutShrinkFatten(); // Alt+S: mueve cada vertice sel por SU normal (Shrin
 bool EditShrinkActivo();   // el transform en curso es un Shrink/Fatten (reusa EditScale)
 void LayoutDuplicarEdit(); // Shift+D en edit: duplica la seleccion + move libre
 void LayoutRipEdit();      // V en edit: separa la malla a lo largo de la seleccion
+void LayoutConectarVerticesEdit(); // J en edit: Connect Vertex Path (corta las caras entre 2 vertices)
+// VERTEX SLIDE: desliza cada vertice seleccionado por una de sus aristas, de 0% (donde esta) a 100%
+// (encima del vecino). Shift+V lo arranca; la segunda G lo prende/apaga sobre un move en curso.
+void  LayoutSlideVerticesEdit();
+void  EditSlideToggle();
+void  EditSlideRaton(int dx, int dy);
+bool  EditSlideTecla(int cual);   // 0=izq 1=der (0%..100%), 2=arriba 3=abajo (cambia de direccion)
+bool  EditSlideActivo();
+float EditSlideFactor();
 void LayoutSepararEdit();  // P en edit: mueve las caras seleccionadas a un mesh NUEVO (Separate)
 void LayoutNewFaceEdit();  // F: crea arista/cara desde los verts seleccionados
 void LayoutShade(bool smooth); // Face > Shade Smooth/Flat (redondea/aplana)
@@ -205,9 +214,17 @@ void  LoopCutWheel(int dir);             // rueda: +/- cortes (solo en preview)
 void  LoopCutClickIzq(int mx, int my);   // click izq: aplica+slide / confirma
 void  LoopCutClickDer();                 // click der: factor 0 + confirma
 void  LoopCutCancelar();                 // Esc: descarta
-void  LoopCutRedoAplicar(int cortes, float factor); // panel redo: re-corta desde el snapshot
+void  LoopCutRedoAplicar(int cortes, float factor); // panel redo: re-corta desde el snapshot (misma arista y correct UV)
+// idem con TODAS las opciones del panel: correctUV (interpolar uv/color en el corte) y edgeSel = cual de las
+// aristas candidatas del primer quad (0..LoopCutGetCandN()-1) es la de entrada del corte (= la direccion)
+void  LoopCutRedoAplicar(int cortes, float factor, bool correctUV, int edgeSel);
 int   LoopCutGetCortes();
 float LoopCutGetFactor();
+bool  LoopCutGetCorrectUV();
+int   LoopCutGetCandN();
+int   LoopCutGetCandSel();
+int   LoopCutGetEdge();          // arista (edit mesh) de entrada del corte actual
+int   LoopCutGetCand(int i);     // arista candidata i
 void  LoopCutTecla(int dir);             // flechas en el modal (0=izq 1=der 2=arriba 3=abajo)
 void  LoopCutOrientConfirmarTeclado();   // Enter en orientacion (teclado): confirma la direccion -> preview clasico
 bool  LoopCutOrientando();               // true en la fase de elegir orientacion del quad

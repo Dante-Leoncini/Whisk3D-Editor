@@ -51,8 +51,7 @@ void BoxSelectMover(int mx, int my) {
 }
 
 // EL SENTIDO lo da el ANCLA, no el rect normalizado: arrastrar hacia la izquierda es
-// azul aunque despues vuelvas. Es la misma regla que espera cualquiera que venga de
-// un CAD o de Blender.
+// azul aunque despues vuelvas. Es la regla que espera cualquiera que haya usado un CAD.
 bool BoxSelectTocar() { return gX1 < gX0; }
 
 void BoxSelectRect(int& x0, int& y0, int& x1, int& y1) {

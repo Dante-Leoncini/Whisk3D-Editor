@@ -481,6 +481,9 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropLabel* propModVacio;   // "(no properties yet)" para tipos sin params todavia
         PropBool*  propMirX; PropBool* propMirY; PropBool* propMirZ; // ejes
         PropButton* propMirTarget; // "Mirror Object" (dropdown: cualquier objeto)
+        // Boolean: la operacion (fila Intersect | Union | Difference, la activa en verde) + el objeto
+        PropButtonRow* propBoolOp;
+        PropButton*    propBoolTarget;
         PropButton* propArmTarget; // "Target" del modificador Armature (dropdown: solo esqueletos)
         PropButton* propBtnOptVG;  // "Optimize Vertex Groups" (1 hueso/vertice) del modificador Armature (destructivo, con confirm)
         PropBool*   propArmCache;      // "Cache Animation" del modificador Armature (bakea el skinning por frame)

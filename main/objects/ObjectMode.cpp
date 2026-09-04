@@ -1856,7 +1856,7 @@ void SetTranslacionObjetos(int dx, int dy, float speed){
 }
 
 // ====================================================================
-// SNAP (menu shift+s, estilo Blender): mueve la seleccion o el cursor 3D
+// SNAP (menu shift+s, ): mueve la seleccion o el cursor 3D
 // ====================================================================
 
 // pone el origen de o en la posicion GLOBAL g (convierte a local segun el

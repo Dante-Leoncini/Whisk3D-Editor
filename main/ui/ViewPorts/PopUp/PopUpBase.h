@@ -45,7 +45,7 @@ class PopUpBase {
 
         // SEMI-MODAL: si es true, una accion del viewport (orbitar, r/g/s,
         // click) con el mouse AFUERA del popup lo cierra y deja pasar la accion
-        // (estilo redo-panel de Blender). Por defecto los popups son modales.
+        // Por defecto los popups son modales.
         virtual bool CierraConViewport() { return false; }
 };
 

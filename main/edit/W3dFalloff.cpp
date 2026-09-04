@@ -51,9 +51,10 @@ void W3dFalloff::CurvaDefault() {
 //  Evaluacion
 // ---------------------------------------------------------------------------
 // Todos los presets se escriben sobre s = 1 - t (s = 1 en el CENTRO), que es como
-// se leen de corrido: "s" es cuanto queda de pincel. Son las mismas formulas que
-// usa Blender para sus presets homonimos, asi que un artista que viene de ahi
-// encuentra lo que espera.
+// se leen de corrido: "s" es cuanto queda de pincel. Son las curvas de caida
+// clasicas (smoothstep, smootherstep, esfera, raiz, cuadratica, lineal, cuarta,
+// cuadrado inverso, constante), con los nombres con que las conoce cualquiera
+// que haya pintado pesos.
 static float EvalPreset(int tipo, float t) {
     const float s = 1.0f - t;
     switch (tipo) {

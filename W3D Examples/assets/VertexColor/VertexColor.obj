@@ -1,5 +1,5 @@
-# Blender 4.4.3
-# www.blender.org
+
+
 mtllib VertexColor.mtl
 o Cube
 v 1.000000 1.000000 -1.000000 0.0000 1.0000 0.0000

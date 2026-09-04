@@ -62,7 +62,7 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable {
         // router del mouse HID, en PC se puede cablear a mouse_button_up)
         void ClickSeleccionar(int mx, int my);
 
-        // numpad "." (como el Frame Selected de Blender): scrollea el outliner para CENTRAR
+        // numpad "."": scrollea el outliner para CENTRAR
         // la seleccion en la vista (promedio de las filas visibles de lo seleccionado)
         void CentrarSeleccion();
         // scroll MINIMO para que la fila del objeto ACTIVO se vea entera. A diferencia de

@@ -165,7 +165,7 @@ void SetTransformNumerico(float v);
 // de posicion del panel de Vertices.
 void MoverSeleccionEditLocal(Mesh* m, const Vector3& deltaLocal);
 
-// snap (menu shift+s): mueve la seleccion o el cursor 3D estilo Blender
+// snap (menu shift+s): mueve la seleccion o el cursor 3D 
 void SnapSeleccionAlCursor(bool mantenerOffset);
 void SnapSeleccionAlActivo();
 void SnapSeleccionAlGrid();

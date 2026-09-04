@@ -43,7 +43,7 @@ static ColorPickerEnganchar g_colorPickerEnganche;
 // que necesitaria leer 'target'.
 void ColorPicker::OlvidarDueno(){
     target = NULL; palRef = NULL; palObj = NULL; onPaletaCambio = NULL;
-    nTabs = 3; if (pestania == 3) pestania = 0;
+    nTabs = 3; if (pestania == 3) pestania = 1;   // sin paleta: vuelve a HSV
     if (PopUpActive == this) PopUpActive = NULL;
 }
 
@@ -109,7 +109,7 @@ ColorPicker::ColorPicker() : PopUpBase("Color") {
     h = 0.0f;
     s = 0.0f;
     v = 1.0f;
-    pestania = 0;
+    pestania = 1;                    // arranca en HSV (pedido del dueno): es como se piensa un color
     tabs[0] = new Tab("RGB");
     tabs[1] = new Tab("HSV");
     tabs[2] = new Tab("Hex");
@@ -246,7 +246,7 @@ void ColorPicker::Abrir(GLfloat* Target, int px, int py) {
     // SIN contexto de paleta hasta que el panel lo setee (SetPaleta despues de Abrir)
     palRef = NULL; palObj = NULL; onPaletaCambio = NULL;
     nTabs = 3; palScroll = 0;
-    if (pestania == 3) pestania = 0;   // la pestania Pal quedo de otra apertura
+    if (pestania == 3) pestania = 1;   // la pestania Pal quedo de otra apertura: vuelve a HSV
 
     x = px;
     y = py;
@@ -331,7 +331,7 @@ void ColorPicker::Cerrar() {
     // se puede borrar despues y la direccion se recicla (ver el bloque de arriba). Abrir() los
     // vuelve a poner; la pestania Pal se apaga porque ya no hay contexto de paleta.
     target = NULL; palRef = NULL; palObj = NULL; onPaletaCambio = NULL;
-    nTabs = 3; if (pestania == 3) pestania = 0;
+    nTabs = 3; if (pestania == 3) pestania = 1;   // sin paleta: vuelve a HSV
     PopUpBase::Cerrar();
 }
 

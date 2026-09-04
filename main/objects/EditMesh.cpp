@@ -525,24 +525,10 @@ void EditMesh::SeleccionarLoopEdge(int edgeK, bool soloEste) {
             // 2) FALLBACK GEOMETRICO (topologico ambiguo: 0 opuestos = rim/borde abierto, o >1 = polo/non-manifold):
             //    seguir el borde mas DERECHO (max alineacion con la entrada). Umbral permisivo (~120 grados) para que
             //    NO corte en el rim de un cilindro low-poly (donde cada borde gira 90 grados o mas).
-            if (nOpuestos != 1) {
-                int ca=lineIdx[cur*2], cb=lineIdx[cur*2+1];
-                int A = (ca==V) ? cb : ca;
-                float ix=pos[V*3]-pos[A*3], iy=pos[V*3+1]-pos[A*3+1], iz=pos[V*3+2]-pos[A*3+2];
-                float il=sqrtf(ix*ix+iy*iy+iz*iz); if (il<1e-9f) break; ix/=il; iy/=il; iz/=il;
-                // umbral ~72 grados: el rim de un cilindro (giro 45 a 60 grados) SIGUE, pero un giro de 90 grados
-                // (ej. el loop VERTICAL que quiere doblar hacia el rim) NO -> ahi corta, como debe.
-                next=-1; float best=0.3f;
-                for (size_t i=0;i<vertEdges[V].size();i++){
-                    int e2=vertEdges[V][i]; if (e2==cur) continue;
-                    int ea=lineIdx[e2*2], eb=lineIdx[e2*2+1];
-                    int B = (ea==V) ? eb : ea;                       // extremo de e2 opuesto a V
-                    float ox=pos[B*3]-pos[V*3], oy=pos[B*3+1]-pos[V*3+1], oz=pos[B*3+2]-pos[V*3+2];
-                    float ol=sqrtf(ox*ox+oy*oy+oz*oz); if (ol<1e-9f) continue; ox/=ol; oy/=ol; oz/=ol;
-                    float d = ix*ox+iy*oy+iz*oz;
-                    if (d>best){ best=d; next=e2; }
-                }
-            }
+            // en una "T" (valencia 3: no hay arista opuesta) o en un polo (mas de una opuesta) el loop
+            // NO sabe si seguir a la izquierda o a la derecha: termina ahi. Antes seguia por la arista mas
+            // alineada y se llevaba varios loops por delante.
+            if (nOpuestos != 1) break;
             if (next<0 || enLoop[next]) break;                       // sin continuacion / cerro el anillo
             enLoop[next] = 1;
             int na=lineIdx[next*2], nb=lineIdx[next*2+1];

@@ -1,6 +1,7 @@
 #include "w3dGraphics.h" // abstraccion de graficos (independencia de OpenGL)
 #include "W3dLang.h"   // T(): los textos salen en el idioma del sistema
 #include "RedoMeshPanel.h"
+#include "WhiskUI/Propieties/PropBool.h"
 #include "objects/Mesh.h"          // Mesh + Regenerar + MeshType
 #include "ViewPorts/LayoutInput.h" // LayoutKey
 #include "ViewPorts/ViewPort3D.h"  // Viewport3DActive (rect del viewport que crea)
@@ -58,9 +59,11 @@ static void RedoNormalesOnChange(){
 }
 
 // Loop Cut: cambiar cortes o factor -> re-corta desde el snapshot (en el modulo de loop cut)
+static bool  gRedoLCCorrectUV = true;   // Correct UVs (por defecto SI)
+static float gRedoLCEdgeF = 1.0f;       // arista de entrada elegida, 1..N (N = aristas del primer quad)
 static void RedoLoopCutOnChange(){
     int cortes = (int)(gRedoCortesF + 0.5f); if (cortes < 1) cortes = 1;
-    LoopCutRedoAplicar(cortes, gRedoFactorF);
+    LoopCutRedoAplicar(cortes, gRedoFactorF, gRedoLCCorrectUV, (int)(gRedoLCEdgeF + 0.5f) - 1);
 }
 
 RedoMeshPanel::RedoMeshPanel(Mesh* m, int modo)
@@ -98,6 +101,21 @@ RedoMeshPanel::RedoMeshPanel(Mesh* m, int modo)
         fac->SetRango(-1.0f, 1.0f); fac->onChange = RedoLoopCutOnChange;
         fac->centrado = true;
         grupo->properties.push_back(fac);
+        // Correct UVs: los corners nuevos interpolan uv/color a lo largo de la arista (tildado por defecto)
+        gRedoLCCorrectUV = LoopCutGetCorrectUV();
+        PropBool* cuv = new PropBool(T("Correct UVs"));
+        cuv->value = &gRedoLCCorrectUV; cuv->onChange = RedoLoopCutOnChange;
+        grupo->properties.push_back(cuv);
+        // Edge: por cual de las aristas del primer quad entra el corte (cambia la direccion del loop)
+        if (LoopCutGetCandN() > 1) {
+            gRedoLCEdgeF = (float)(LoopCutGetCandSel() + 1);
+            PropFloat* edge = new PropFloat(T("Edge"));
+            edge->value = &gRedoLCEdgeF;
+            edge->stepFino = 1.0f; edge->stepGrueso = 1.0f; edge->dragStep = 0.1f;
+            edge->SetRango(1.0f, (float)LoopCutGetCandN()); edge->onChange = RedoLoopCutOnChange;
+            edge->entero = true; edge->centrado = true; edge->flechas = true;
+            grupo->properties.push_back(edge);
+        }
         grupo->selectIndex = 0;
         vpCreador = Viewport3DActive;
         ResizeGrupo();
@@ -386,6 +404,13 @@ void RedoMeshPanel::Soltar(){
 
 // el panel sigue vivo? (para el test 'uipunteros': despues de borrar SU malla tiene que dar
 // false, sino quedan colgados gRedoMesh y los PropFloat::value que apuntan adentro de ella)
+// undo/redo: el panel trabaja sobre un snapshot PRE-operacion que ya no corresponde a la malla -> se cierra
+void RedoMeshPanelCerrar(){
+    if (!gRedoPanel) return;
+    if (PopUpActive == gRedoPanel) PopUpActive = NULL;
+    delete gRedoPanel; gRedoPanel = NULL;
+    gRedoMesh = NULL;
+}
 bool RedoMeshPanelActivo(){ return gRedoPanel != NULL || gRedoMesh != NULL; }
 
 void AbrirRedoMeshPanel(Mesh* m){

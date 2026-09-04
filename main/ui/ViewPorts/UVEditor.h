@@ -68,7 +68,9 @@ enum ToolbarRolUV {
                          // seleccionadas en edit mode. Toggle GLOBAL compartido 3D/UV
                          // (WeightPaintSoloSel), tinte accent cuando esta ON
     TBR_Marcas,          // icono de MALLA: muestra un cuadradito en cada punto pintable y hace que
-                         // el pincel trabaje SOBRE ESOS PUNTOS (al valor de la barra, sin falloff)
+                         // el pincel trabaje SOBRE ESOS PUNTOS
+    TBR_PorVertice,      // VERTEX PAINT (solo 3D): pintar por VERTICE (todos los corners de un vertice como
+                         // uno; marcas por vertice) o por FACE CORNER. Toggle, accent cuando esta por vertice
     TBR_Falloff,         // como cae la intensidad del centro al borde: abre el editor de falloff
                          // (lista de presets + curva custom), el popup reutilizable
     TBR_ColorPincel,     // VERTEX PAINT: cuadradito con el color del pincel; abre el ColorPicker
@@ -95,7 +97,7 @@ class UVEditor : public ViewportBase, public WithBorder {
 
         float zoom;          // 1 = la textura llena ~80% del viewport
         float panX, panY;    // desplazamiento en pixeles (paneo)
-        // ================= SYNC SELECTION (semantica de Blender) =================
+        // ================= SYNC SELECTION =================
         // El toggle vive en el menu "View" de la barra del UV (checkbox "Sync Selection").
         //
         //  OFF (DEFAULT, el modelo que se usa para editar UVs):
@@ -139,7 +141,7 @@ class UVEditor : public ViewportBase, public WithBorder {
         std::vector<float> uvXPivots; // pivote POR VERT (2 por vert; solo con Pivot=Individual en modo
                                       // cara: cada cara rota/escala alrededor de SU centro). Vacio = global
         float uvCursorU, uvCursorV; // CURSOR 2D (en UV): pivot opcional (modo "3D Cursor") + snap
-        // ---- BOX SELECT (tecla B, como el 3D de Blender) ----
+        // ---- BOX SELECT (tecla B) ----
         // B ARMA el gesto (uvBoxArmado) y el siguiente arrastre con el boton izquierdo define el
         // rectangulo (uvBoxSel + las 4 coords, en px LOCALES del viewport). Al soltar se aplica
         // sobre lo que el modo actual selecciona: los render-verts/bordes/caras UV en edicion, o
@@ -207,7 +209,7 @@ class UVEditor : public ViewportBase, public WithBorder {
         //  - en SYNC: espeja la seleccion del 3D (SincronizarSelDesde3D), como siempre.
         //  - fuera de sync: NO toca la seleccion propia salvo cuando CAMBIA el filtro (las caras
         //    seleccionadas en 3D), la malla o el propio toggle. Ahi la INICIALIZA con todas las
-        //    esquinas VISIBLES (lo que aparece, aparece seleccionado, como Blender). Nunca corre
+        //    esquinas VISIBLES (lo que aparece, aparece seleccionado). Nunca corre
         //    con un transform en curso (no pisa lo que se esta moviendo).
         // outFiltro (opcional) devuelve el FILTRO ya calculado (1 por cara de faces3d) para que
         // el Render no lo recalcule.
@@ -263,7 +265,7 @@ class UVEditor : public ViewportBase, public WithBorder {
         int  BoxSelectAplicar(Mesh* m, bool add);
 
         // ===== TAB DEL UV EDITOR (con el mouse sobre ESTE editor) =====
-        // Con el MODO OBJETO el Tab es el de Blender: alterna OBJETO con la EDICION del objeto
+        // Con el MODO OBJETO el Tab: alterna OBJETO con la EDICION del objeto
         // ACTIVO del UV (la geometria o el armature 2D seleccionado).
         // CICLO FINAL:
         //    Objeto (geometria activa) --Tab--> Edicion de UVs --Tab--> Objeto

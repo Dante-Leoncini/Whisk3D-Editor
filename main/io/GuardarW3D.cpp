@@ -1197,8 +1197,13 @@ static void EscribirModificadores(std::string& s, Mesh* m, int ind) {
                   s += ", \"ramas\": "; JEsc(s, mask);
               } }
         }
-        // Array y Boolean: todavia sin params ni generacion (se guarda tipo/nombre
-        // para no perder el stack que armo el usuario)
+        else if (md->tipo == ModifierType::Boolean) {
+            // la operacion viaja como STRING (misma regla que el tipo: el enum es orden de codigo);
+            // el target POR NOMBRE, como el del Mirror (se resuelve al final de la carga)
+            s += ", \"op\": "; JEsc(s, std::string(md->boolOp == 0 ? "intersect" : md->boolOp == 1 ? "union" : "difference"));
+            if (md->target) { s += ", \"target\": "; JEsc(s, md->target->name); }
+        }
+        // Array: todavia sin params ni generacion (se guarda tipo/nombre para no perder el stack)
         s += " }";
     }
     s += "\n"; JSang(s, ind); s += "]";

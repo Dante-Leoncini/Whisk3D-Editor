@@ -44,7 +44,7 @@
 #include "ViewPorts/Parent.h"
 
 // ====================================================================
-// menus de emparentar (ctrl+P / alt+P), como Blender
+// menus de emparentar (ctrl+P / alt+P)
 // ====================================================================
 
 static PopupMenu* gMenuSetParent = NULL;
@@ -132,7 +132,7 @@ void LayoutMenuParent(bool aClear, int mx, int my) {
 
 // ====================================================================
 // EMPARENTAR HUESOS (Ctrl+P / Alt+P en EDICION de huesos, 3D y armature 2D del UV editor).
-// Alt+P abre EL MISMO popup de 2 opciones en ambos editores (como Blender):
+// Alt+P abre EL MISMO popup de 2 opciones en ambos editores:
 //   - "Disconnect Bone": sigue emparentado pero SIN soldar (al separarlo queda la linea punteada)
 //   - "Clear Parent":    hueso libre (padre = -1)
 // Ctrl+P abre OTRO popup de 2 opciones (mismo patron):
@@ -175,7 +175,7 @@ static void AccionBoneCtrlP(int aId) {
 PopupMenu* LayoutSubmenuBoneCtrlP() {
     if (!gMenuBoneCtrlP) {
         gMenuBoneCtrlP = new PopupMenu();
-        gMenuBoneCtrlP->titulo = T("Set Parent To"); // el titulo del Ctrl+P de Blender
+        gMenuBoneCtrlP->titulo = T("Set Parent To"); // el titulo del Ctrl+P
         gMenuBoneCtrlP->action = AccionBoneCtrlP;
         gMenuBoneCtrlP->Agregar(T("Keep Offset"), 0);
         gMenuBoneCtrlP->Agregar(T("Connected"), 1);
@@ -197,7 +197,7 @@ void LayoutMenuBoneCtrlP2D(Mesh* m, int mx, int my) {
 PopupMenu* LayoutSubmenuBoneAltP() {
     if (!gMenuBoneAltP) {
         gMenuBoneAltP = new PopupMenu();
-        gMenuBoneAltP->titulo = T("Clear Parent"); // el titulo del Alt+P de Blender
+        gMenuBoneAltP->titulo = T("Clear Parent"); // el titulo del Alt+P
         gMenuBoneAltP->action = AccionBoneAltP;    // action PROPIA: funciona standalone Y como submenu
         gMenuBoneAltP->Agregar(T("Disconnect Bone"), 0);
         gMenuBoneAltP->Agregar(T("Clear Parent"), 1);

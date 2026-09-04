@@ -67,6 +67,9 @@ extern int   g_renderCaras;      // caras dibujadas por el ultimo pase de escena
 extern int   g_renderDraws;      // draw calls idem
 extern long g_genMallaCount;     // DIAGNOSTICO: veces que se regenero la malla de un modificador (subsurf/screw).
                                  // Se muestra en Statistics; al ROTAR NO debe subir (la malla se cachea en genValido).
+extern bool g_mallasEditadas;    // lo prenden las dos puertas al render de la malla (RefrescarRender/GenerarRender). Un
+                                 // BOOLEAN cuyo target se edito tiene que regenerarse; el flag evita recorrer la escena
+                                 // por frame: solo se chequea (y se limpia) cuando ALGUNA malla cambio.
 extern bool g_objetosMovidos;    // lo prenden los transforms de OBJETO (mover/rotar/escalar/snap). El unico modificador
                                  // que depende de la posicion en el mundo es el MIRROR con TARGET: si el objeto o su
                                  // target se movieron, hay que regenerar su preview. Se chequea/limpia 1x/frame.
