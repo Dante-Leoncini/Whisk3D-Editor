@@ -229,13 +229,16 @@ void Viewport3D::ToolbarSincronizar(){
         } else if (rol == TBR_Shift || rol == TBR_Ctrl){
             // modificadores tactiles: visibles con pantalla tactil, MENOS durante una edicion en curso
             // (transform/extrude/strip) -> ahi estorban. Encendidos (verde) = LShift/LCtrlPressed.
-            btn->visible = tactil && !transformando;
+            // ...y tampoco en PINTURA (pesos / vertex color): ahi Shift/Ctrl no sirven; en su lugar va el toggle "vista"
+            const bool pinturaTb = (InteractionMode == WeightPaint || InteractionMode == VertexPaint || InteractionMode == TexturePaint);
+            btn->visible = tactil && !transformando && !pinturaTb;
             bool on = (rol == TBR_Shift) ? LShiftPressed : LCtrlPressed;
             btn->tinte = on ? TbVerdeBg() : NULL;       // ON: fondo verde accent
             btn->colorTexto = on ? accent : blanco;    // ON: texto verde; OFF: blanco
         } else if (rol == TBR_View){
             // toggle VIEW: solo en Edit Mode y con pantalla tactil (en PC el mouse orbita distinto). Verde = ON.
-            btn->visible = tactil && (InteractionMode == EditMode);
+            // ...y en PINTURA tactil: ON = el dedo navega la camara; OFF = el dedo pinta (con la espera anti-gesto)
+            btn->visible = tactil && (InteractionMode == EditMode || InteractionMode == WeightPaint || InteractionMode == VertexPaint || InteractionMode == TexturePaint);
             btn->tinte = g_viewEditMode ? TbVerdeBg() : NULL;
             btn->colorTexto = g_viewEditMode ? accent : blanco;
         } else if (rol >= TBR_PincelTam && rol <= TBR_Grupo){

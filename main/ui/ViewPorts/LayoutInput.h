@@ -269,6 +269,7 @@ void LayoutMenuMerge(int mx, int my);  // tecla M en Edit Mode: abre el menu Mer
 #include "WhiskUI/widgets/TextField.h"
 // aplican un paso del transform (dx,dy de pantalla), igual que las de objetos
 void EditXformTraslacion(int dx, int dy, float speed);
+void EditXformTraslacionMundo(const Vector3& T);   // absoluta (mundo): la usa el gizmo
 void EditXformRotEje(int dx, int dy);
 void EditXformRotOrbital(int dx, int dy);
 void EditXformRotAbs(const Quaternion& qAbs); // trackball (delta absoluto desde el inicio)

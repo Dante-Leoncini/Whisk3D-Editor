@@ -233,6 +233,7 @@ static const W3dLangEntrada W3dLangTabla[] = {
     { "Game View", "Vista de juego", "Vista de jogo" },
     { "Gap", "Gap", "Gap" },
     { "Geometry to Origin", "Geometría al Origen", "Geometria para Origem" },
+    { "Gizmo", "Gizmo", "Gizmo" },
     { "Graphics", "Gráficos", "Gráficos" },
     { "Green", "Verde", "Verde" },
     { "Handle Type", "Tipo de Manija", "Tipo de Alça" },

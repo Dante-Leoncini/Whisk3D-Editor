@@ -1,5 +1,7 @@
 #include "ViewPorts/LayoutInput.h" // ruteo compartido (menus/barras/paneles)
 #include "edit/BoxSelect.h"
+#include "ui/ViewPorts/Gizmo.h"   // GizmoDown: click/tap sobre el gizmo de mover
+extern bool g_viewEditMode;   // toggle "vista" tactil (ViewPort3D_Toolbar): en pintura, el dedo navega en vez de pintar
 #include "ViewPorts/Pick3D.h"
 #include "render/OpcionesRender.h"   // RenderType / g_redraw: son del editor
 #include "ViewPorts/Properties.h" // PropertiesTouchScrollFin (fin del scroll tactil de listas)
@@ -85,6 +87,22 @@ extern void NumEditCancel();
 extern void NumEditSalirDelPanel(); // limpia el 'editando' del panel al terminar (sino te clava en la propiedad)
 
 std::map<SDL_FingerID, Finger> fingers;
+// DOBLE TAP DE 2 DEDOS (tactil): dos toques cortos con dos dedos, sin moverlos, sobre el viewport 3D = encuadrar la
+// seleccion (lo mismo que View > Frame Selected). El gesto se mide desde que apoya el 2do dedo hasta que se levantan
+// los dos; si alguno se corrio (pinch/paneo) o tardo mucho, no es un tap.
+static Uint32 g_dosDedosTicks = 0;                       // momento en que apoyo el 2do dedo (0 = sin gesto de 2 dedos)
+static bool   g_dosDedosMovio = false;                   // algun dedo se corrio: era pinch/paneo
+static int    g_dosDedosPx = 0, g_dosDedosPy = 0;        // centro (pixeles) al apoyar el 2do dedo
+static std::map<SDL_FingerID, Finger> g_dosDedosInicio;  // donde estaba cada dedo al apoyar el 2do
+static Uint32 g_ultimoTap2Ticks = 0;                     // ultimo tap de 2 dedos (para detectar el doble)
+// PINTURA TACTIL (pesos / vertex color): el viewport 3D necesita saber si el down que le llega vino de un
+// dedo (para ESPERAR antes de pintar: un 2do dedo en esa ventana es un gesto de camara, no un trazo) y
+// cuantos dedos hay apoyados. g_dedosSimulados (>= 0) lo pisa para los tests del harness.
+bool g_ultimoDownTactil = false;
+static int g_dedosSimulados = -1;
+int  W3dDedosActivos() { return (g_dedosSimulados >= 0) ? g_dedosSimulados : (int)fingers.size(); }
+void W3dSimularDedos(int n) { g_dedosSimulados = n; }
+extern void WP3DPinturaCancelarPendiente();   // ViewPort3D.cpp: un trazo que esperaba se descarta (2do dedo)
 float lastDistance = 0.0f;
 float PINCHposY = 0.0f;
 float lastCentroidX = 0.0f, lastCentroidY = 0.0f; // 2 dedos: punto medio anterior (para el paneo)
@@ -109,6 +127,13 @@ bool g_popupOpenedByMouseDown = false; // el popup lo abrio el mouse-down de EST
 ViewportBase* g_cornerVp = NULL;    // viewport cuyo boton-esquina se apreto; NULL = ninguno
 bool g_cornerResizing = false;      // ya se decidio que ESTE gesto redimensiona (paso el umbral)
 int g_tapStartX = 0, g_tapStartY = 0; // posicion del down (umbral: hasta que no se mueve N px sigue siendo TAP)
+// ESPERA ANTI-GESTO (tactil): un toque pendiente NO se convierte en arrastre (orbita, box select, gizmo, scrub del
+// timeline, scroll) hasta que pasen estos ms desde el down. Si en esa ventana cae un 2do dedo, era un pinch/paneo
+// y el 1er dedo no dispara nada. Sin esto, poner un dedo y despues el otro agarraba el gizmo o scrubeaba.
+static Uint32 g_tapStartTicks = 0;
+static const Uint32 kEsperaGestoMs = 180;
+static bool g_tlTapPending = false;          // toque sobre el CONTENIDO del timeline (kind 5) esperando: tap o arrastre
+static ViewportBase* g_tlTapView = NULL;
 bool g_uiTapEnCurso = false;        // el LayoutClickUI que corre es un TAP tactil diferido (no un click de mouse)
 Uint32 g_lastFingerTicks = 0;       // ultimo evento de DEDO: filtra los mouse FANTASMA que el browser sintetiza
                                     // tras el touch (llegan como mouse "real" y clickeaban/abrian al soltar)
@@ -256,9 +281,18 @@ void InputUsuarioSDL3(SDL_Event &e){
                 leftMouseDown = middleMouseDown = ViewPortClickDown = false;
                 g_barTapPending = g_contentTapPending = g_slideNum = false;
                 g_view3dTapPending = false; // 2do dedo (pan/zoom): NO seleccionar al soltar
+                WP3DPinturaCancelarPendiente(); // ...ni pintar: el trazo que esperaba era un gesto de camara
+                g_tlTapPending = false;         // ...ni scrubear el timeline
                 g_scrollView = NULL;
                 g_cornerVp = NULL; g_cornerResizing = false; // 2do dedo: cancela el gesto de esquina
                 lastDistance = 0.0f; // re-arma pinch/paneo desde este toque
+                if (fingers.size() == 2) {   // posible TAP de 2 dedos: arranca el reloj y se recuerda donde estan
+                    g_dosDedosTicks = SDL_GetTicks(); g_dosDedosMovio = false; g_dosDedosInicio = fingers;
+                    std::map<SDL_FingerID, Finger>::iterator it = fingers.begin();
+                    Finger f1 = it->second; ++it; Finger f2 = it->second;
+                    SDL_TouchFingerEvent tc = e.tfinger; tc.x = (f1.x + f2.x) * 0.5f; tc.y = (f1.y + f2.y) * 0.5f;
+                    FingerPix(tc, g_dosDedosPx, g_dosDedosPy);
+                } else g_dosDedosTicks = 0;  // 3 dedos: no es el gesto
             }
             break;
 
@@ -266,6 +300,17 @@ void InputUsuarioSDL3(SDL_Event &e){
             fingers.erase(e.tfinger.fingerId);
             g_lastFingerTicks = SDL_GetTicks();
             lastDistance = 0.0f; // reset
+            if (g_dosDedosTicks != 0 && fingers.empty()) {   // se levantaron los dos: ¿fue un TAP de 2 dedos?
+                const Uint32 ahora = SDL_GetTicks();
+                if (!g_dosDedosMovio && ahora - g_dosDedosTicks < 400) {
+                    if (g_ultimoTap2Ticks != 0 && ahora - g_ultimoTap2Ticks < 500) {   // DOBLE tap: encuadrar la seleccion
+                        ViewportBase* v = FindViewportUnderMouse(rootViewport, g_dosDedosPx, g_dosDedosPy);
+                        if (v && v->isLeaf() && v->ViewportKind() == 1) { ((Viewport3D*)v)->EnfocarObject(); g_redraw = true; }
+                        g_ultimoTap2Ticks = 0;
+                    } else g_ultimoTap2Ticks = ahora;
+                } else g_ultimoTap2Ticks = 0;
+                g_dosDedosTicks = 0;
+            }
             // POPUP manejado por el dedo: soltar (dispara tap/abre entrada/termina scroll) al levantar
             if (g_popupFinger) {
                 if (PopUpActive) PopUpActive->Soltar();
@@ -280,6 +325,14 @@ void InputUsuarioSDL3(SDL_Event &e){
 
         case SDL_FINGERMOTION:
             fingers[e.tfinger.fingerId] = {e.tfinger.x, e.tfinger.y};
+            if (g_dosDedosTicks != 0 && !g_dosDedosMovio) {   // tap de 2 dedos: si un dedo se corre, era pinch/paneo
+                std::map<SDL_FingerID, Finger>::iterator i0 = g_dosDedosInicio.find(e.tfinger.fingerId);
+                if (i0 != g_dosDedosInicio.end()) {
+                    int ax, ay, bx, by; FingerPix(e.tfinger, bx, by);
+                    SDL_TouchFingerEvent t0 = e.tfinger; t0.x = i0->second.x; t0.y = i0->second.y; FingerPix(t0, ax, ay);
+                    if (abs(bx - ax) + abs(by - ay) > 12 * GlobalScale) g_dosDedosMovio = true;
+                }
+            }
             // POPUP manejado por el dedo: arrastre = Motion del popup (scroll de la lista, etc)
             if (g_popupFinger && PopUpActive && fingers.size() == 1) {
                 g_lastFingerTicks = SDL_GetTicks();
@@ -400,10 +453,16 @@ void InputUsuarioSDL3(SDL_Event &e){
             // es un orbit/paneo -> se cancela el tap (la seleccion NO cambia) y se sigue de largo al
             // event_mouse_motion (que orbita). Un jitter chico sigue siendo TAP (selecciona al soltar).
             if (g_view3dTapPending) {
+                // TACTIL: dentro de la ventana anti-gesto el dedo no arrastra nada todavia (ver g_tapStartTicks)
+                if (e.motion.which == SDL_TOUCH_MOUSEID && SDL_GetTicks() - g_tapStartTicks < kEsperaGestoMs) { g_redraw = true; return; }
                 int vdx = mx - g_tapStartX; if (vdx < 0) vdx = -vdx;
                 int vdy = my - g_tapStartY; if (vdy < 0) vdy = -vdy;
                 if (vdx + vdy > 8 * GlobalScale) {
                     g_view3dTapPending = false;
+                    // DEDO sobre una manija del gizmo: recien ahora se agarra, desde el punto del down
+                    if (e.motion.which == SDL_TOUCH_MOUSEID && GizmoDown(g_barTapView, g_tapStartX, g_tapStartY)) {
+                        ViewPortClickDown = true; GuardarMousePos(); return;
+                    }
                     // PC: arrastrar sobre el contenido del 3D es un BOX SELECT (con el mouse ese
                     // arrastre no hacia nada: la orbita es el boton del medio). En TACTIL no, que
                     // ahi el arrastre de 1 dedo ES la orbita.
@@ -446,7 +505,18 @@ void InputUsuarioSDL3(SDL_Event &e){
             }
             // gesto SIN decidir (down sobre barra o contenido de panel): sigue siendo TAP hasta pasar el
             // umbral. Recien ahi decide barra/scroll/slider. Asi un tap con jitter chico igual togglea/abre.
+            if (g_tlTapPending) {                                    // TIMELINE (tactil): tap o scrub, pasada la espera
+                if (SDL_GetTicks() - g_tapStartTicks < kEsperaGestoMs) { g_redraw = true; return; }
+                int tdx = mx - g_tapStartX; if (tdx < 0) tdx = -tdx;
+                int tdy = my - g_tapStartY; if (tdy < 0) tdy = -tdy;
+                if (tdx + tdy < 8 * GlobalScale) { g_redraw = true; return; } // aun es tap
+                g_tlTapPending = false;
+                // el timeline mira SU ultima posicion de mouse: primero se le pasa la del toque (donde se apreto), despues el click
+                if (g_tlTapView) { viewPortActive = g_tlTapView; g_tlTapView->event_mouse_motion(g_tapStartX, g_tapStartY); g_tlTapView->button_left(); g_tlTapView->event_mouse_motion(mx, my); }
+                g_redraw = true; GuardarMousePos(); return;
+            }
             if (g_barTapPending || g_contentTapPending) {
+                if (e.motion.which == SDL_TOUCH_MOUSEID && SDL_GetTicks() - g_tapStartTicks < kEsperaGestoMs) { g_redraw = true; return; }   // espera anti-gesto
                 int ddx = mx - g_tapStartX; if (ddx < 0) ddx = -ddx;
                 int ddy = my - g_tapStartY; if (ddy < 0) ddy = -ddy;
                 if (ddx + ddy < 8 * GlobalScale) { g_redraw = true; return; } // aun es tap
@@ -502,7 +572,9 @@ void InputUsuarioSDL3(SDL_Event &e){
             viewPortActive->event_mouse_motion(mx, my);
         }
 
-        if ((leftMouseDown || middleMouseDown) && viewPortActive) {
+        // GIZMO: el punto agarrado sigue al puntero en ABSOLUTO (GizmoMotion): envolver el cursor lo haria saltar
+        if (GizmoArrastrando()) { ViewPortClickDown = true; }
+        else if ((leftMouseDown || middleMouseDown) && viewPortActive) {
             CheckWarpMouseInViewport(mx, my, viewPortActive);
         }
         // POSE Mode NO envuelve el cursor: el transform de huesos usa el delta REAL mx/my (PoseXformMotion). Si se
@@ -749,7 +821,7 @@ void InputUsuarioSDL3(SDL_Event &e){
             // viewport 3D la rueda hace ZOOM -> en PC la unica forma de scrollear esa barra es arrastrandola.
             else if (!LayoutMenuAbierto() && vpDown && vpDown->OnBar((int)e.button.x, (int)e.button.y)) {
                 g_barTapPending = true;
-                g_barTapView = vpDown; g_tapStartX = (int)e.button.x; g_tapStartY = (int)e.button.y;
+                g_barTapView = vpDown; g_tapStartX = (int)e.button.x; g_tapStartY = (int)e.button.y; g_tapStartTicks = SDL_GetTicks();
             }
             // CONTENIDO de un panel (properties=3 / outliner=2 / console=7), SOLO en TOUCH: no ejecutar el click
             // en el down (sino togglea/selecciona apenas apoyas). En PC el mouse usa scrollbar/rueda + el drag
@@ -759,9 +831,14 @@ void InputUsuarioSDL3(SDL_Event &e){
                      (vpDown->ViewportKind() == 2 || vpDown->ViewportKind() == 3 ||
                       vpDown->ViewportKind() == 7 || vpDown->ViewportKind() == 8)) {
                 g_contentTapPending = true;
-                g_barTapView = vpDown; g_tapStartX = (int)e.button.x; g_tapStartY = (int)e.button.y;
+                g_barTapView = vpDown; g_tapStartX = (int)e.button.x; g_tapStartY = (int)e.button.y; g_tapStartTicks = SDL_GetTicks();
             }
             // BOX SELECT armado (tecla B / menu Select): el click NO pickea, empieza la caja.
+            // TIMELINE en tactil: el toque tambien espera (tap = poner el frame ahi; arrastre = scrub; 2 dedos = zoom)
+            else if (esTouch && !LayoutMenuAbierto() && vpDown && vpDown->ViewportKind() == 5) {
+                g_tlTapPending = true;
+                g_tlTapView = vpDown; g_tapStartX = (int)e.button.x; g_tapStartY = (int)e.button.y; g_tapStartTicks = SDL_GetTicks();
+            }
             else if (BoxSelectArmado()) {
                 BoxSelectDown((int)e.button.x, (int)e.button.y);
             }
@@ -775,14 +852,25 @@ void InputUsuarioSDL3(SDL_Event &e){
                 // en los modos de PINTURA el down es el arranque del trazo y la seleccion no cambia:
                 // nada de diferir el pick ni de armar box select por arrastre (era el bug de "pinto y
                 // me arma la caja"). El trazo arranca en el down, en PC y en tactil por igual.
-                if (InteractionMode == WeightPaint || InteractionMode == VertexPaint || InteractionMode == TexturePaint) es3Dnav = false;
+                // ...salvo en TACTIL con el toggle "vista" (el monitor de la barra) prendido: ahi el dedo NO pinta,
+                // navega como en Object Mode (arrastrar = orbitar, dos dedos = zoom/paneo).
+                { const bool pinturaModo = (InteractionMode == WeightPaint || InteractionMode == VertexPaint || InteractionMode == TexturePaint);
+                  if (pinturaModo && !(esTouch && g_viewEditMode)) es3Dnav = false; }
                 // TACTIL sobre el viewport 3D: NO seleccionar en el DOWN. Si el dedo se arrastra = orbita/
                 // panea (la seleccion NO cambia); si es un TAP simple, se pickea al SOLTAR. Antes cualquier
                 // orbit/paneo pisaba la seleccion (se deseleccionaba al tocar el fondo para orbitar).
-                if (esTouch && es3Dnav) {
+                // GIZMO: un click/tap sobre una manija arranca la traslacion ahi mismo (mouse o dedo por igual);
+                // el up del viewport la confirma. Nada de diferir el pick ni de armar box select.
+                // GIZMO con MOUSE: agarra al instante (el up del viewport confirma). Con DEDO va por el toque
+                // pendiente de abajo: se decide recien pasada la espera anti-gesto (un 2do dedo = pinch, no gizmo).
+                if (es3Dnav && !esTouch && GizmoDown(hoja3d, (int)e.button.x, (int)e.button.y)) {
+                    ViewPortClickDown = true;
+                }
+                else if (esTouch && es3Dnav) {
                     g_view3dTapPending = true;
-                    g_barTapView = hoja3d; g_tapStartX = (int)e.button.x; g_tapStartY = (int)e.button.y;
+                    g_barTapView = hoja3d; g_tapStartX = (int)e.button.x; g_tapStartY = (int)e.button.y; g_tapStartTicks = SDL_GetTicks();
                 } else {
+                    g_ultimoDownTactil = esTouch;   // el viewport decide si ESPERA antes de pintar
                     viewPortActive->button_left();
                     // PC sobre el viewport 3D: el pick tambien se DIFIERE al soltar, con el mismo
                     // mecanismo que el tactil. Es lo que permite distinguir CLICK (pickea) de
@@ -790,7 +878,7 @@ void InputUsuarioSDL3(SDL_Event &e){
                     // todo antes de empezar la caja -- que es justo lo que pasaba.
                     if (es3Dnav) {
                         g_view3dTapPending = true;
-                        g_barTapView = hoja3d; g_tapStartX = (int)e.button.x; g_tapStartY = (int)e.button.y;
+                        g_barTapView = hoja3d; g_tapStartX = (int)e.button.x; g_tapStartY = (int)e.button.y; g_tapStartTicks = SDL_GetTicks();
                     }
                 }
             }
@@ -915,11 +1003,17 @@ void InputUsuarioSDL3(SDL_Event &e){
         if (g_fingerScrolling) { g_fingerScrolling = false; ViewPortClickDown = false; return; }
         // TAP simple sobre el viewport 3D (tactil): RECIEN AHORA se pickea la seleccion. Si hubo orbit/paneo,
         // g_view3dTapPending ya se limpio en el motion -> la seleccion NO cambia.
+        if (g_tlTapPending) {   // TAP en el timeline (sin arrastre): recien ahora se manda el click (poner el frame ahi)
+            g_tlTapPending = false; ViewPortClickDown = false;
+            if (g_tlTapView) { viewPortActive = g_tlTapView; g_tlTapView->event_mouse_motion(g_tapStartX, g_tapStartY); g_tlTapView->button_left(); g_tlTapView->mouse_button_up(W3dBotonDesdeSDL(e.button.button)); }
+            GuardarMousePos(); return;
+        }
         if (g_view3dTapPending) {
             g_view3dTapPending = false;
             ViewPortClickDown = false;
             ViewportBase* h = g_barTapView;
-            if (h && h->isLeaf() && h->ViewportKind() == 1 && estado == editNavegacion) {
+            const bool pinturaTap = (InteractionMode == WeightPaint || InteractionMode == VertexPaint || InteractionMode == TexturePaint);
+            if (h && h->isLeaf() && h->ViewportKind() == 1 && estado == editNavegacion && !pinturaTap) {   // pintando (vista ON) un tap no pickea ni pinta
                 if (viewPortActive) viewPortActive->button_left(); // GuardarMousePos + cursor 3D en el punto tocado
                 ScenePick3D((int)e.button.x, (int)e.button.y, h->x, h->y, h->width, h->height, W3dPantallaAlto);
             }

@@ -135,6 +135,20 @@ ViewportBase* LayoutPorDefecto(int w, int h, Viewport3D** vp3dOut) {
         // vertical (N95 240x320): 3D arriba / Propiedades abajo
         return new ViewportColumn(vp3d, new Properties(), 0.7f);
     }
+    if (h > w) {
+        // VERTICAL con pantalla grande (un telefono parado): el mismo reparto pero apilado. El layout
+        // apaisado (columna a la derecha) en vertical dejaba outliner y propiedades aplastados y sin texto.
+        //     +---------------------------+
+        //     |  3D                       |
+        //     |  Timeline (bien chico)    |
+        //     +-------------+-------------+
+        //     |  Outliner   | Propiedades |
+        //     +-------------+-------------+
+        return new ViewportColumn(
+            new ViewportColumn(vp3d, new Timeline(), 0.86f),        // 3D grande / timeline chico
+            new ViewportRow(new Outliner(), new Properties(), 0.40f), // outliner 40 % a la izquierda
+            0.62f);                                                   // arriba 62 % del alto
+    }
     return new ViewportRow(
         new ViewportColumn(vp3d, new Timeline(), 0.88f),          // 3D grande / timeline chico
         new ViewportColumn(new Outliner(), new Properties(), 0.40f), // outliner 40 % arriba
@@ -3758,6 +3772,13 @@ void EditXformTraslacion(int dx,int dy,float speed){
     gEVtrans += T;
     // con proyeccion POR VERTICE (Face Project/Nearest) NO se hace el snap de la seleccion entera: cada vert se
     // proyecta solo (en EVEscribir). Sino, el imantado normal de la seleccion al target bajo el cursor.
+    if (!SnapFaceIndividualActivo()) SnapAjustarEditTrans();
+    EVEscribir();
+}
+// traslacion ABSOLUTA de mundo (gizmo): el punto agarrado sigue al puntero, no se acumulan deltas por pixel
+void EditXformTraslacionMundo(const Vector3& T){
+    if (!gEVmesh) return;
+    gEVtrans = T;
     if (!SnapFaceIndividualActivo()) SnapAjustarEditTrans();
     EVEscribir();
 }

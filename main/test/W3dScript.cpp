@@ -73,6 +73,7 @@ bool UpdateFlipbooks(float dtSeg); // Flipbook.cpp: flipbooks unificados (Imagen
 #include "objects/Rect2D.h"
 #include "ViewPorts/PopUp/ColorPicker.h"     // uipunteros: target/palRef/palObj apuntan adentro del elemento
 #include "ViewPorts/PopUp/RedoMeshPanel.h"   // uipunteros: sus campos apuntan a miembros de la malla
+#include "ViewPorts/Gizmo.h"                // gizmotest: el gizmo de mover
 #include "objects/Empty.h"     // nombresmover/nombresscope: objetos sueltos del scope global
 #include "objects/Collection.h" // delarbol: 'delete col' (la coleccion es la raiz del borrado)
 #include "objects/Boton2D.h"
@@ -25353,6 +25354,169 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
           printf("      [booldel] undo del borrado: target vuelve=%s, %d tris (esp si, 48) -> %s\n", vuelve ? "si" : "no", trisUndo, bien ? "OK" : "MAL"); if (!bien) ok = false; }
         UndoLimpiar();
         if (!ok) { err = "booldel: ver los MAL de arriba"; return false; }
+        return true;
+    }
+    // ---- touchpaint : pintura TACTIL en el viewport 3D: al apoyar un dedo el trazo queda pendiente; un 2do dedo
+    //      lo cancela (gesto de camara), moverse o esperar lo arranca, soltar sin mover pinta una pasada; con
+    //      mouse se pinta al instante ----
+    if (cmd == "touchpaint") {
+        bool ok = true; std::string e2;
+        extern bool g_ultimoDownTactil; extern void W3dSimularDedos(int); extern int WP3DEstadoPintura(); extern void WP3DPinturaTick(Viewport3D*);
+        extern bool leftMouseDown; extern int lastMouseX, lastMouseY;
+        if (!W3dRunCommand("add cube", e2)) { err = "touchpaint: " + e2; return false; }
+        if (!W3dRunCommand("selobj Cubo.001", e2) && !W3dRunCommand("selobj Cubo", e2)) { err = "touchpaint: sin cubo"; return false; }
+        if (!W3dRunCommand("mode vertex", e2)) { err = "touchpaint: " + e2; return false; }
+        if (!viewPortActive || viewPortActive->ViewportKind() != 1) { err = "touchpaint: el viewport activo no es 3D"; return false; }
+        Viewport3D* vp = (Viewport3D*)viewPortActive;
+        const int x0 = vp->x + vp->width / 2, y0 = vp->y + vp->height / 2;
+        struct TP { static void Down(Viewport3D* vp, int x, int y, bool tactil) { extern bool g_ultimoDownTactil; extern bool leftMouseDown; extern int lastMouseX, lastMouseY;
+                lastMouseX = x; lastMouseY = y; leftMouseDown = true; g_ultimoDownTactil = tactil; vp->button_left(); }
+                    static void Up(Viewport3D* vp) { extern bool leftMouseDown; leftMouseDown = false; vp->mouse_button_up(1); } };
+        // (A) 2do dedo durante la espera: no se pinta nada
+        W3dSimularDedos(1); TP::Down(vp, x0, y0, true); const int eA1 = WP3DEstadoPintura();
+        W3dSimularDedos(2); vp->event_mouse_motion(x0 + 1, y0); const int eA2 = WP3DEstadoPintura();
+        TP::Up(vp); const int eA3 = WP3DEstadoPintura();
+        { const bool bien = eA1 == 1 && eA2 == 0 && eA3 == 0;
+          printf("      [touchpaint] dedo + 2do dedo: al apoyar=%d (esp 1 esperando), con 2 dedos=%d (esp 0), al soltar=%d (esp 0: no pinto) -> %s\n", eA1, eA2, eA3, bien ? "OK" : "MAL"); if (!bien) ok = false; }
+        // (B) el dedo se mueve: arranca el trazo
+        W3dSimularDedos(1); TP::Down(vp, x0, y0, true); const int eB1 = WP3DEstadoPintura();
+        vp->event_mouse_motion(x0 + 40, y0); const int eB2 = WP3DEstadoPintura();
+        TP::Up(vp); const int eB3 = WP3DEstadoPintura();
+        { const bool bien = eB1 == 1 && eB2 == 2 && eB3 == 0;
+          printf("      [touchpaint] dedo que se mueve: apoyar=%d, mover=%d (esp 2 pintando), soltar=%d -> %s\n", eB1, eB2, eB3, bien ? "OK" : "MAL"); if (!bien) ok = false; }
+        // (C) el dedo se queda quieto: pasada la espera arranca solo
+        TP::Down(vp, x0, y0, true); const int eC1 = WP3DEstadoPintura();
+        SDL_Delay(230); WP3DPinturaTick(vp); const int eC2 = WP3DEstadoPintura();
+        TP::Up(vp); const int eC3 = WP3DEstadoPintura();
+        { const bool bien = eC1 == 1 && eC2 == 2 && eC3 == 0;
+          printf("      [touchpaint] dedo quieto: apoyar=%d, tras la espera=%d (esp 2), soltar=%d -> %s\n", eC1, eC2, eC3, bien ? "OK" : "MAL"); if (!bien) ok = false; }
+        // (D) tap: soltar sin mover pinta una pasada y cierra
+        TP::Down(vp, x0, y0, true); const int eD1 = WP3DEstadoPintura(); TP::Up(vp); const int eD2 = WP3DEstadoPintura();
+        { const bool bien = eD1 == 1 && eD2 == 0;
+          printf("      [touchpaint] tap: apoyar=%d, soltar=%d (esp 1, 0) -> %s\n", eD1, eD2, bien ? "OK" : "MAL"); if (!bien) ok = false; }
+        // (E) mouse: pinta al instante
+        W3dSimularDedos(-1); TP::Down(vp, x0, y0, false); const int eE1 = WP3DEstadoPintura(); TP::Up(vp);
+        { const bool bien = eE1 == 2;
+          printf("      [touchpaint] mouse: al apretar=%d (esp 2: pinta al instante) -> %s\n", eE1, bien ? "OK" : "MAL"); if (!bien) ok = false; }
+        g_ultimoDownTactil = false; leftMouseDown = false; W3dSimularDedos(-1);
+        W3dRunCommand("mode object", e2);
+        UndoLimpiar();
+        if (!ok) { err = "touchpaint: ver los MAL de arriba"; return false; }
+        return true;
+    }
+    // ---- gizmotest : el gizmo de mover: agarrar una flecha mueve solo en ese eje, un cuadrado en su plano,
+    //      el circulo libre; soltar confirma (con undo); en Edit Mode mueve los verts seleccionados ----
+    if (cmd == "gizmotest") {
+        bool ok = true; std::string e2;
+        if (!W3dRunCommand("add cube", e2)) { err = "gizmotest: " + e2; return false; }
+        if (!W3dRunCommand("selobj Cubo.001", e2) && !W3dRunCommand("selobj Cubo", e2)) { err = "gizmotest: sin cubo"; return false; }
+        Object* cubo = ObjActivo; Mesh* m = ScriptActiveMesh(); if (!m) { err = "gizmotest: sin malla"; return false; }
+        if (!viewPortActive || viewPortActive->ViewportKind() != 1) { err = "gizmotest: el viewport activo no es 3D"; return false; }
+        Viewport3D* vp = (Viewport3D*)viewPortActive;
+        struct GZ { static bool Agarrar(Viewport3D* vp, int manija, int& mx, int& my) { float sx, sy; if (!GizmoManijaEnPantalla(vp, manija, sx, sy)) return false; mx = vp->x + (int)(sx + 0.5f); my = vp->y + (int)(sy + 0.5f); return GizmoDown(vp, mx, my); }
+                    // el transform lee las GLOBALES dx/dy (las carga controles desde el motion de SDL): aca se setean a mano.
+                    // La primera motion de un transform siempre arranca en cero (g_xformPrimerMov), por eso van dos.
+                    static void Mover(Viewport3D* vp, int mx, int my, int ddx, int ddy) { extern int dx, dy;
+                        dx = ddx / 2; dy = ddy / 2; vp->event_mouse_motion(mx + ddx / 2, my + ddy / 2);
+                        dx = ddx / 2; dy = ddy / 2; vp->event_mouse_motion(mx + ddx, my + ddy); dx = 0; dy = 0; } };
+        // (1) flecha X: solo x cambia; soltar confirma; undo vuelve
+        { int mx, my; const bool ag = GZ::Agarrar(vp, GizmoEjeX, mx, my);
+          const bool arranco = ag && estado == translacion && axisSelect == X && GizmoArrastrando();
+          GZ::Mover(vp, mx, my, 60, 25);
+          const Vector3 p = cubo->pos;
+          vp->mouse_button_up(1);
+          const bool fin = (estado == editNavegacion) && !GizmoArrastrando();
+          const bool solox = fabsf(p.x) > 1e-4f && fabsf(p.y) < 1e-5f && fabsf(p.z) < 1e-5f;
+          W3dRunCommand("undo", e2);
+          const bool volvio = fabsf(cubo->pos.x) < 1e-5f;
+          const bool bien = arranco && solox && fin && volvio;
+          printf("      [gizmotest] flecha X: agarro=%d arranco=%d, pos=(%.2f,%.2f,%.2f) solo x=%s, soltar confirma=%s, undo vuelve=%s -> %s\n", ag ? 1 : 0, arranco ? 1 : 0, p.x, p.y, p.z, solox ? "si" : "no", fin ? "si" : "no", volvio ? "si" : "no", bien ? "OK" : "MAL"); if (!bien) ok = false; }
+        // (2) cuadrado Z: mueve en X/Y, nunca en Z
+        { int mx, my; const bool ag = GZ::Agarrar(vp, GizmoPlanoZ, mx, my);
+          const bool arranco = ag && estado == translacion && axisSelect == PlaneZ;
+          GZ::Mover(vp, mx, my, 50, 40);
+          const Vector3 p = cubo->pos; vp->mouse_button_up(1);
+          // el cuadrado "Z" (azul, el eje de ARRIBA de la UI = y interno) mueve en X y en el "Y" de la UI (z interno), nunca en altura
+          const bool plano = (fabsf(p.x) > 1e-4f || fabsf(p.z) > 1e-4f) && fabsf(p.y) < 1e-5f;
+          W3dRunCommand("undo", e2);
+          const bool bien = arranco && plano && estado == editNavegacion;
+          printf("      [gizmotest] cuadrado Z (azul): arranco=%d (eje %d, esp PlaneZ=%d), pos=(%.2f,%.2f,%.2f) sin altura=%s -> %s\n", arranco ? 1 : 0, (int)axisSelect, (int)PlaneZ, p.x, p.y, p.z, plano ? "si" : "no", bien ? "OK" : "MAL"); if (!bien) ok = false; }
+        // (3) circulo: libre (vista)
+        { int mx, my; const bool ag = GZ::Agarrar(vp, GizmoCentro, mx, my);
+          const bool arranco = ag && estado == translacion && axisSelect == ViewAxis;
+          GZ::Mover(vp, mx, my, 30, 0); const Vector3 p = cubo->pos;
+          // 1:1: el pivote (agarrado justo en el centro) tiene que quedar BAJO el puntero, 30 px a la derecha
+          float px = 0, py = 0; const bool proy = vp->ProyectarPunto(p, px, py);
+          const bool sigue = proy && fabsf(px - (float)(mx - vp->x) - 30.0f) < 1.5f && fabsf(py - (float)(my - vp->y)) < 1.5f;
+          vp->mouse_button_up(1);
+          const bool movio = p.Length() > 1e-4f; W3dRunCommand("undo", e2);
+          const bool bien = arranco && movio && sigue && estado == editNavegacion;
+          printf("      [gizmotest] circulo 1:1: puntero en (%d,%d), pivote proyectado en (%.1f,%.1f) -> %s\n", mx - vp->x + 30, my - vp->y, px, py, sigue ? "OK" : "MAL");
+          printf("      [gizmotest] circulo: arranco=%d (eje %d, esp ViewAxis=%d), movio=%s -> %s\n", arranco ? 1 : 0, (int)axisSelect, (int)ViewAxis, movio ? "si" : "no", bien ? "OK" : "MAL"); if (!bien) ok = false; }
+        // (4) Edit Mode: la flecha Y mueve los verts seleccionados en y
+        { W3dRunCommand("mode edit", e2); m->EnsureEdit(); W3dRunCommand("selmode vert", e2); if (m->edit) m->edit->SeleccionarTodo(true);
+          const float y0 = m->vertex[2];   // la flecha "Y" (verde) es el z interno
+          int mx, my; const bool ag = GZ::Agarrar(vp, GizmoEjeY, mx, my);
+          const bool arranco = ag && estado == translacion && axisSelect == Y && EditXformActivo();
+          GZ::Mover(vp, mx, my, 0, -50);
+          vp->mouse_button_up(1);
+          const float y1 = m->vertex[2];
+          const bool movio = fabsf(y1 - y0) > 1e-4f && estado == editNavegacion && !EditXformActivo();
+          W3dRunCommand("undo", e2);
+          const bool bien = arranco && movio;
+          printf("      [gizmotest] edit, flecha Y (verde): arranco=%d, coord %.2f -> %.2f, movio y confirmo al soltar=%s -> %s\n", arranco ? 1 : 0, y0, y1, movio ? "si" : "no", bien ? "OK" : "MAL"); if (!bien) ok = false;
+          W3dRunCommand("mode object", e2); }
+        UndoLimpiar();
+        if (!ok) { err = "gizmotest: ver los MAL de arriba"; return false; }
+        return true;
+    }
+    // ---- tap2test : doble tap de 2 dedos sobre el viewport 3D = encuadrar la seleccion (eventos de dedo reales) ----
+    if (cmd == "tap2test") {
+        bool ok = true; std::string e2;
+        extern void InputUsuarioSDL3(SDL_Event&);
+        if (!W3dRunCommand("add cube", e2)) { err = "tap2test: " + e2; return false; }
+        if (!W3dRunCommand("selobj Cubo.001", e2) && !W3dRunCommand("selobj Cubo", e2)) { err = "tap2test: sin cubo"; return false; }
+        Object* cubo = ObjActivo;
+        if (!viewPortActive || viewPortActive->ViewportKind() != 1) { err = "tap2test: el viewport activo no es 3D"; return false; }
+        Viewport3D* vp = (Viewport3D*)viewPortActive;
+        int ww = 0, hh = 0; if (window) SDL_GetWindowSize(window, &ww, &hh);
+        if (ww <= 0 || hh <= 0) { err = "tap2test: sin ventana"; return false; }
+        struct T2 { static void Dedo(Uint32 tipo, SDL_FingerID id, float x, float y) { extern void InputUsuarioSDL3(SDL_Event&);
+                        SDL_Event ev; memset(&ev, 0, sizeof(ev)); ev.type = tipo; ev.tfinger.fingerId = id; ev.tfinger.x = x; ev.tfinger.y = y;
+                        ev.tfinger.timestamp = SDL_GetTicks(); InputUsuarioSDL3(ev); } };
+        const float fx = (float)(vp->x + vp->width / 2) / (float)ww, fy = (float)(vp->y + vp->height / 2) / (float)hh;
+        const Vector3 lejos(4.0f, 3.0f, 2.0f);
+        // (1) dos taps seguidos de 2 dedos quietos: encuadra (el pivote de la vista va al cubo). Con UNO solo, no.
+        vp->pivot = lejos; bool unoNo = false;
+        for (int rep = 0; rep < 2; rep++) {
+            T2::Dedo(SDL_FINGERDOWN, 1, fx, fy); T2::Dedo(SDL_FINGERDOWN, 2, fx + 0.05f, fy);
+            T2::Dedo(SDL_FINGERUP, 1, fx, fy);   T2::Dedo(SDL_FINGERUP, 2, fx + 0.05f, fy);
+            if (rep == 0) { unoNo = (vp->pivot - lejos).Length() < 1e-4f; SDL_Delay(80); }
+        }
+        { const bool encuadro = (vp->pivot - cubo->pos).Length() < 1e-3f;
+          const bool bien = unoNo && encuadro;
+          printf("      [tap2test] doble tap de 2 dedos: con uno solo no encuadra=%s, con el doble el pivote va al cubo=%s (pivote %.2f,%.2f,%.2f) -> %s\n", unoNo ? "si" : "no", encuadro ? "si" : "no", vp->pivot.x, vp->pivot.y, vp->pivot.z, bien ? "OK" : "MAL"); if (!bien) ok = false; }
+        // (2) dos gestos de 2 dedos que se MUEVEN (pinch): no encuadra
+        vp->pivot = lejos;
+        for (int rep = 0; rep < 2; rep++) {
+            T2::Dedo(SDL_FINGERDOWN, 1, fx, fy); T2::Dedo(SDL_FINGERDOWN, 2, fx + 0.05f, fy);
+            T2::Dedo(SDL_FINGERMOTION, 2, fx + 0.10f, fy); T2::Dedo(SDL_FINGERMOTION, 2, fx + 0.15f, fy);
+            T2::Dedo(SDL_FINGERUP, 1, fx, fy);   T2::Dedo(SDL_FINGERUP, 2, fx + 0.15f, fy);
+            SDL_Delay(80);
+        }
+        { // (el pinch panea/zoomea la vista, asi que el pivote se corre un poco: lo que NO tiene que pasar es que caiga en el cubo)
+          const bool quieto = (vp->pivot - cubo->pos).Length() > 1e-3f;
+          printf("      [tap2test] dos pinch seguidos: no encuadra=%s (pivote %.2f,%.2f,%.2f) -> %s\n", quieto ? "si" : "no", vp->pivot.x, vp->pivot.y, vp->pivot.z, quieto ? "OK" : "MAL"); if (!quieto) ok = false; }
+        // (3) dos taps de 2 dedos pero LEJOS en el tiempo: no es doble
+        vp->pivot = lejos;
+        for (int rep = 0; rep < 2; rep++) {
+            T2::Dedo(SDL_FINGERDOWN, 1, fx, fy); T2::Dedo(SDL_FINGERDOWN, 2, fx + 0.05f, fy);
+            T2::Dedo(SDL_FINGERUP, 1, fx, fy);   T2::Dedo(SDL_FINGERUP, 2, fx + 0.05f, fy);
+            if (rep == 0) SDL_Delay(650);
+        }
+        { const bool quieto = (vp->pivot - lejos).Length() < 1e-4f;
+          printf("      [tap2test] dos taps separados por 650 ms: no encuadra=%s -> %s\n", quieto ? "si" : "no", quieto ? "OK" : "MAL"); if (!quieto) ok = false; }
+        if (!ok) { err = "tap2test: ver los MAL de arriba"; return false; }
         return true;
     }
     // ---- geninfo : estado de la malla generada por modificadores de la malla activa ----

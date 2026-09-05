@@ -1855,6 +1855,18 @@ void SetTranslacionObjetos(int dx, int dy, float speed){
 	{ extern bool g_objetosMovidos; g_objetosMovidos = true; } // Mirror con target: su plano depende de la posicion
 }
 
+// traslacion ABSOLUTA de mundo desde el snapshot del transform (gizmo: el punto agarrado sigue al puntero, no se
+// acumulan deltas por pixel). Cada objeto vuelve a su pos capturada + el delta llevado al espacio de su padre; el
+// snap se re-aplica sobre eso.
+void SetTranslacionObjetosMundo(const Vector3& d){
+	for (size_t o = 0; o < estadoObjetos.size(); o++) {
+		Object& obj = *estadoObjetos[o].obj;
+		obj.pos = estadoObjetos[o].pos + DeltaMundoAPadre(obj, d);
+	}
+	SnapAjustarObjMove();
+	{ extern bool g_objetosMovidos; g_objetosMovidos = true; }
+}
+
 // ====================================================================
 // SNAP (menu shift+s, ): mueve la seleccion o el cursor 3D
 // ====================================================================

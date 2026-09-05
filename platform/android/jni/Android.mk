@@ -59,6 +59,10 @@ SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/physics/W3dFisica.cpp
 # AUDIO (efectos de los juegos: beep()). Mixer del Core + salida SDL2 (el celular tiene sonido)
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/audio/W3dAudio.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/audio/W3dAudioSDL.cpp
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/audio/W3dVolumen.cpp        # volumen del proyecto (VolumenAplicarProyecto)
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/base/W3dClipboardSDL.cpp     # portapapeles del IDE (SDL_SetClipboardText)
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/physics/W3dRigido.cpp        # cuerpos rigidos (W3dRigidos*)
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/audio/W3dMusic.cpp   # musica (W3dMusicRefrescarVolumenes)
 SRC_FILES += $(filter-out %/lua.c %/luac.c,$(wildcard $(PROJECT_ROOT)/thirdparty/lua/src/*.c))
 
 LOCAL_SRC_FILES := $(patsubst $(MY_PATH)/%,%,$(SRC_FILES))

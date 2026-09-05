@@ -1,6 +1,7 @@
 #include "w3dGraphics.h" // abstraccion de graficos (independencia de OpenGL)
 #include "W3dLang.h"
 #include "edit/MeshEdit.h"   // W3dRenderCornersSeparados
+#include "ui/ViewPorts/Gizmo.h"   // gizmo de mover
 #include <stdlib.h>   // getenv (debug de oclusion)
 #include "render/UIOverlay.h"   // la UI 2D dibujada sobre el viewport (simula la ventana)   // T(): los textos salen en el idioma del sistema
 #include "ViewPorts/ViewPort3D.h"
@@ -159,7 +160,7 @@ Viewport3D::Viewport3D(Vector3 pos){
     b = new Button("Shift"); b->rol = TBR_Shift; b->centrado = true; ToolButtons.push_back(b);
     b = new Button("Ctrl");  b->rol = TBR_Ctrl;  b->centrado = true; ToolButtons.push_back(b);
     // "View" (toggle): en Edit Mode, con 1 dedo orbitar/panear/zoom aunque haya una operacion en curso.
-    b = new Button(T("View"));  b->rol = TBR_View;  b->centrado = true; ToolButtons.push_back(b);
+    b = new Button("", (int)IconType::monitor); b->rol = TBR_View; b->centrado = true; b->cuadrado = true; ToolButtons.push_back(b); // "vista": el mismo monitor del menu View de arriba
     b = new Button("Global"); b->rol = TBR_Orient; b->desplegable = true; ToolButtons.push_back(b);
     b = new Button("X"); b->rol = TBR_EjeX; b->centrado = true; b->cuadrado = true; ToolButtons.push_back(b);
     b = new Button("Y"); b->rol = TBR_EjeY; b->centrado = true; b->cuadrado = true; ToolButtons.push_back(b);
@@ -450,6 +451,7 @@ void Viewport3D::AbrirMenuOverlays(int x, int y){
     MenuOverlays->AgregarCheck(T("X Axis"), 2, &showXaxis)->gris = &showOverlays;
     MenuOverlays->AgregarCheck(T("Y Axis"), 3, &showYaxis)->gris = &showOverlays;
     MenuOverlays->AgregarCheck(T("Origins"), 4, &showOrigins)->gris = &showOverlays;
+    MenuOverlays->AgregarCheck(T("Gizmo"), 45, &g_gizmoOn)->gris = &showOverlays;   // el gizmo de mover (Symbian: OFF por defecto)
     // submenu "Objects": mostrar/ocultar el overlay de cada tipo de objeto (esqueleto / luces / camaras / empties)
     static PopupMenu* MenuOverlayObjects = NULL;
     if (!MenuOverlayObjects) MenuOverlayObjects = new PopupMenu(); // sin titulo (ya sabes que es al abrirlo)
@@ -1122,6 +1124,18 @@ static void WeightPaintActualizar() {
 //  proyectan los vertices a pantalla (ProyectarPunto) y se rutean los eventos.
 // ============================================================================
 static bool g_wp3dPintando = false; // hay un trazo en curso en un viewport 3D (mouse apretado)
+// TRAZO PENDIENTE (pantalla tactil): al apoyar un dedo NO se pinta enseguida; se espera un ratito
+// (o que el dedo se mueva) por si viene un 2do dedo, que es un gesto de camara. Asi no se pintan
+// pesos/colores sin querer al querer orbitar o hacer zoom. Un tap solo (levantar sin mover) pinta
+// UNA pasada en ese punto al soltar.
+static bool   g_wpPend = false;
+static int    g_wpPendX = 0, g_wpPendY = 0;
+static Uint32 g_wpPendTicks = 0;
+static const Uint32 kWpEsperaMs = 180;   // ventana para que aparezca el 2do dedo
+extern bool g_ultimoDownTactil;          // controles.cpp: el ultimo mouse-down fue un dedo
+extern int  W3dDedosActivos();           // controles.cpp: dedos apoyados
+void WP3DPinturaCancelarPendiente() { g_wpPend = false; }
+int  WP3DEstadoPintura() { return g_wp3dPintando ? 2 : (g_wpPend ? 1 : 0); }   // harness: 0 nada, 1 esperando, 2 pintando
 
 // posicion VIVA del cursor en modo pintura (-1 = todavia no se movio). lastMouseX/Y
 // solo se refrescan al CLICKEAR (GuardarMousePos) o durante un drag (CheckWarpMouse):
@@ -1251,6 +1265,23 @@ static bool WP3DTrazoIniciar(Mesh* m) {
     return WeightPaintTrazoIniciar(m) >= 0;
 }
 // cierra el trazo: un paso de undo por trazo, como en pesos (se descarta si no cambio nada)
+static bool WP3DTrazoIniciar(Mesh* m);
+static void WP3DPasada(Viewport3D* vp, int mx, int my);
+// resuelve el trazo pendiente: 2 dedos -> se descarta; se movio / paso la espera / forzar (soltar) -> arranca
+static void WP3DPendienteResolver(Viewport3D* vp, int mx, int my, bool forzar) {
+    if (!g_wpPend) return;
+    if (W3dDedosActivos() >= 2) { g_wpPend = false; return; }
+    const int umbral = 6 * GlobalScale;
+    const bool movio = (mx - g_wpPendX > umbral) || (g_wpPendX - mx > umbral) || (my - g_wpPendY > umbral) || (g_wpPendY - my > umbral);
+    const bool paso  = (SDL_GetTicks() - g_wpPendTicks) >= kWpEsperaMs;
+    if (!forzar && !movio && !paso) return;
+    g_wpPend = false;
+    Mesh* m = (ObjActivo && ObjActivo->getType() == ObjectType::mesh) ? (Mesh*)ObjActivo : NULL;
+    if (!m || !WP3DTrazoIniciar(m)) return;
+    g_wp3dPintando = true;
+    WP3DPasada(vp, g_wpPendX, g_wpPendY);
+    if (movio) WP3DPasada(vp, mx, my);
+}
 static void WP3DTrazoFin() {
     if (InteractionMode == VertexPaint) { UndoColorConfirmar(g_wpColorCambio); g_wpColorCambio = false; }
     else                                  WeightPaintTrazoFin();
@@ -1356,7 +1387,14 @@ int WP3DCornersVisibles(Mesh* m) {
     return n;
 }
 
+void WP3DPinturaTick(Viewport3D* vp) {   // por frame (lo llama el render): la espera vence aunque el dedo no se mueva
+    if (!g_wpPend) return;
+    if (!leftMouseDown) { g_wpPend = false; return; }
+    WP3DPendienteResolver(vp, g_wpCursorX, g_wpCursorY, false);
+    g_redraw = true;   // seguir redibujando hasta resolver
+}
 static void WP3DRenderPincel(Viewport3D* vp) {
+    WP3DPinturaTick(vp);
     if (!WP3DModoPintura()) return;
     namespace gfx = w3dEngine;
     // DOS COSAS DISTINTAS, con reglas distintas:
@@ -2362,6 +2400,7 @@ void Viewport3D::RenderOverlay() {
     // en los modos de pintura el cursor 3D no sirve para nada (no se agrega ni se transforma): se oculta
     const bool pinturaCursor = (InteractionMode == WeightPaint || InteractionMode == VertexPaint || InteractionMode == TexturePaint);
     if (show3DCursor && !pinturaCursor) Render3Dcursor();
+    if (showOverlays && !pinturaCursor) GizmoRender(this);   // gizmo de mover (Overlays > Gizmo)
 
     // (la barra de botones 2D NO se dibuja aca: es chrome del area, no un
     //  overlay. Va en RenderUI() junto con los bordes para que se vea aunque
@@ -2980,7 +3019,11 @@ void Viewport3D::button_left(){
     else if (WP3DModoPintura() && !PopUpActive){
         Mesh* m = (ObjActivo && ObjActivo->getType() == ObjectType::mesh) ? (Mesh*)ObjActivo : NULL;
         GuardarMousePos();
-        if (m && WP3DTrazoIniciar(m)){
+        if (m && g_ultimoDownTactil) {
+            // dedo: el trazo queda PENDIENTE hasta que se mueva, pase la espera o se suelte (ver arriba)
+            g_wpPend = true; g_wpPendX = lastMouseX; g_wpPendY = lastMouseY; g_wpPendTicks = SDL_GetTicks();
+            g_redraw = true;
+        } else if (m && WP3DTrazoIniciar(m)){
             g_wp3dPintando = true;
             WP3DPasada(this, lastMouseX, lastMouseY);
         }
@@ -2993,6 +3036,8 @@ void Viewport3D::button_left(){
 
 #ifndef W3D_SYMBIAN
 void Viewport3D::mouse_button_up(int boton){
+    if (GizmoArrastrando()) { GizmoSoltar(this); ViewPortClickDown = false; return; }   // soltar la manija = confirmar
+    if (g_wpPend) WP3DPendienteResolver(this, g_wpPendX, g_wpPendY, true);   // tap sin mover: UNA pasada ahi
     if (g_wp3dPintando){ g_wp3dPintando = false; WP3DTrazoFin(); } // fin del trazo -> commit del undo
     // EDIT de ARMATURE: el drag de head/tail arrancado por el click termina al SOLTAR (commit del undo)
     if (BoneGrabActivo() && BoneGrabPorClick()) BoneGrabConfirmar();
@@ -3019,6 +3064,10 @@ void Viewport3D::event_mouse_motion(int mx, int my){
     // motion PINTA otra pasada y consume el evento (asi el izquierdo no orbita en
     // Android/web mientras se pinta).
     if (WP3DModoPintura()) { g_wpCursorX = mx; g_wpCursorY = my; g_redraw = true; }
+    if (g_wpPend){
+        if (!leftMouseDown) { g_wpPend = false; }                  // up perdido
+        else { WP3DPendienteResolver(this, mx, my, false); if (g_wpPend) return; }   // sigue esperando: ni pinta ni orbita
+    }
     if (g_wp3dPintando){
         if (leftMouseDown){ WP3DPasada(this, mx, my); return; }
         g_wp3dPintando = false; WP3DTrazoFin(); // up perdido (solto fuera del viewport): commit igual
@@ -3041,7 +3090,7 @@ void Viewport3D::event_mouse_motion(int mx, int my){
     // modo VIEW (toggle de Edit Mode): con 1 dedo se ORBITA aunque haya una operacion en curso (mover/rotar/
     // extrude/strip) -> se puede mirar desde otro angulo sin cancelar; se apaga View y sigue editando.
     #if defined(__ANDROID__) || defined(__EMSCRIPTEN__)
-        bool viewOrbita = (g_viewEditMode && InteractionMode == EditMode);
+        bool viewOrbita = (g_viewEditMode && (InteractionMode == EditMode || WP3DModoPintura()));   // pintura: vista ON = el dedo orbita
         if (middleMouseDown || (leftMouseDown && (estado == editNavegacion || viewOrbita))) {
     #else
         if (middleMouseDown) {
@@ -3098,6 +3147,8 @@ void Viewport3D::event_mouse_motion(int mx, int my){
         const bool edit = (InteractionMode == EditMode && EditXformActivo());
         switch (estado) {
             case translacion:
+                // GIZMO: el punto agarrado sigue al puntero (absoluto, por rayo), no el arrastre por velocidad
+                if (GizmoArrastrando() && GizmoMotion(this, mx, my)) break;
                 // el slide (G-G / Shift+V) reusa el estado del move: mismo modal, otro recorrido
                 if (edit && EditSlideActivo()) EditSlideRaton(dx, dy);
                 else if (edit) EditXformTraslacion(dx, dy, VelocidadArrastreMundo());

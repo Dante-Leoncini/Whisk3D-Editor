@@ -157,6 +157,7 @@ Vector3 EjeOrientado(Object& obj, int a);
 void SetScale(int dx, int dy, float factor = 0.01f);
 void SetEscala();
 void SetTranslacionObjetos(int dx, int dy, float factor = 1.0f);
+void SetTranslacionObjetosMundo(const Vector3& d); // absoluta (mundo) desde el snapshot: la usa el gizmo
 // entrada numerica: aplica un valor EXACTO al transform de objetos en curso
 void SetTransformNumerico(float v);
 
