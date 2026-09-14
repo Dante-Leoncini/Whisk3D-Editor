@@ -1,0 +1,86 @@
+# trazado de rayos por CPU (render/RayTracer): escena determinista (piso + cubo + lampara), render sincronico a
+# un buffer propio y lectura de pixeles: fondo, superficie iluminada, sombra dura, penumbra con radio, luz solar.
+add plane
+objscale 6 1 6
+add cube
+objmove 0 1 0
+addlight
+objmove 2 4 -2
+rtopt 1 1 16
+rtlight 0 0 0
+vpvista rendered
+vporbita 0 0.5 0 12 -35 -23
+rtrender 96 72 2
+rttris 14
+rtsave /tmp/claude-1000/-home-dante-Documentos-Whisk3decosystem-Whisk3D/66bd6498-7457-4f1d-941f-243ff1de6054/scratchpad/rt_duro.png
+# fondo (negro), piso iluminado (blanco), sombra dura (negro, sin ambiente)
+rtpixel 4 4 0 0 0 0
+rtpixel 80 56 255 255 255 40
+rtpixel 36 40 0 0 0 8
+# lampara con RADIO: la sombra se ablanda (el centro sigue oscuro, el borde queda gris)
+rtlight 1.5 16 0
+rtrender 96 72 4
+rtsave /tmp/claude-1000/-home-dante-Documentos-Whisk3decosystem-Whisk3D/66bd6498-7457-4f1d-941f-243ff1de6054/scratchpad/rt_suave.png
+rtpixel 36 40
+rtpixel 46 40
+rtpixel 30 44
+# luz SOLAR (direccional, desde arriba): el piso queda parejo (sin atenuacion) y las caras laterales del cubo oscuras
+rtlight 0 0 1
+rtrender 96 72 2
+rtsave /tmp/claude-1000/-home-dante-Documentos-Whisk3decosystem-Whisk3D/66bd6498-7457-4f1d-941f-243ff1de6054/scratchpad/rt_sol.png
+rtpixel 80 56 255 255 255 8
+rtpixel 8 56 255 255 255 8
+rtpixel 40 32
+# TRANSPARENCIA (material propio del cubo): alpha del color -> sombra a medias; alpha 0 -> ni se ve ni tapa la luz
+rtlight 0 0 0
+selobj Cubo.001
+matnew
+matalpha 0.5 1
+rtrender 96 72 2
+rtsave /tmp/claude-1000/-home-dante-Documentos-Whisk3decosystem-Whisk3D/66bd6498-7457-4f1d-941f-243ff1de6054/scratchpad/rt_a50.png
+rtpixel 44 46
+matalpha 0 1
+rtrender 96 72 2
+rtpixel 44 46 255 255 255 4
+rtpixel 48 32 255 255 255 4
+# recorte por textura: la mitad de arriba de la textura con alpha 0 -> esa parte del cubo no tapa ni sombrea
+matalpha 1 1
+newtex recorte 32 32 blank alpha
+texassign
+texalpha 0 0 1 0.5 0
+rtrender 96 72 2
+rtsave /tmp/claude-1000/-home-dante-Documentos-Whisk3decosystem-Whisk3D/66bd6498-7457-4f1d-941f-243ff1de6054/scratchpad/rt_cut.png
+rtpixel 20 36
+# ESPEJO: el piso metalico sin rugosidad refleja el cielo (negro) y el cubo; a medias con 0.5/0.5
+selobj Plano
+matnew
+matrt 0 1
+rtrender 96 72 2
+rtsave /tmp/claude-1000/-home-dante-Documentos-Whisk3decosystem-Whisk3D/66bd6498-7457-4f1d-941f-243ff1de6054/scratchpad/rt_esp0.png
+rtpixel 30 44 0 0 0 4
+rtpixel 44 46
+matrt 0.5 0.5
+rtrender 96 72 8
+rtpixel 30 44
+# NORMAL MAP: sol desde arriba; la mitad izquierda de la textura es plana (0.5,0.5,1) y la derecha inclina la
+# normal hasta la tangente (1,0.5,0.5) -> esa mitad del piso queda sin luz; con media inclinacion queda a medias
+selobj Plano
+matrt 0.5 0
+matalpha 1 0
+selobj Light.001
+rtlight 0 0 1
+selobj Plano
+newtex nm 64 64 blank
+texfill 0 0 0.5 1 0.5 0.5 1 1
+texfill 0.5 0 1 1 1 0.5 0.5 1
+matnormal 1
+rtrender 96 72 1
+rtsave /tmp/claude-1000/-home-dante-Documentos-Whisk3decosystem-Whisk3D/66bd6498-7457-4f1d-941f-243ff1de6054/scratchpad/rt_nm.png
+rtpixel 12 56 255 255 255 4
+rtpixel 84 56 0 0 0 6
+texfill 0.5 0 1 1 0.75 0.5 0.75 1
+rtrender 96 72 1
+rtpixel 84 56 217 217 217 12
+matnormal 0
+rtrender 96 72 1
+rtpixel 84 56 255 255 255 4

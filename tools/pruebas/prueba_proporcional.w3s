@@ -1,0 +1,78 @@
+# proportional editing (tecla O): lo seleccionado se transforma entero y lo de alrededor segun su distancia a lo
+# seleccionado (curva de caida + radio), en Edit Mode (vertices) y en Object Mode (objetos). Todo con undo.
+add cube
+selobj Cubo.001
+mode edit
+selmode vertex
+selectpos 1 1 1
+prop on
+prop type linear
+prop radius 3
+xform move 1
+vertat 2 1 1  2 1 1 0.001
+vertat -1 1 1  -0.6667 1 1 0.002
+vertat 1 -1 1  1.3333 -1 1 0.002
+vertat 1 1 -1  1.3333 1 -1 0.002
+vertat -1 -1 1  -0.9428 -1 1 0.002
+vertat -1 -1 -1  -1 -1 -1 0.001
+undo
+vertat 1 1 1  1 1 1 0.001
+vertat -1 1 1  -1 1 1 0.001
+# constante: todo lo que entra en el radio se mueve entero; lo de afuera no
+prop type constant
+xform move 1
+vertat 0 1 1  0 1 1 0.002
+vertat -1 -1 -1  -1 -1 -1 0.001
+undo
+# radio chico: nadie mas entra
+prop type linear
+prop radius 1
+xform move 1
+vertat 2 1 1  2 1 1 0.001
+vertat -1 1 1  -1 1 1 0.001
+undo
+# solo conectados: la distancia va por las aristas (el de la diagonal de la cara queda a 4 > 3 y no se mueve)
+prop connected 1
+prop radius 3
+xform move 1
+vertat -0.6667 1 1  -0.6667 1 1 0.002
+vertat -1 -1 1  -1 -1 1 0.001
+undo
+prop connected 0
+# escala desde el centro de la seleccion (el vertice mismo): el vecino a distancia 2 pesa 1/3
+xform scale 2
+vertat -1.6667 1 1  -1.6667 1 1 0.002
+undo
+# rotacion (90 grados sobre el eje Y de la UI) desde el vertice seleccionado: el vecino a distancia 2 gira 30
+xform rotate 90
+vertat 1 1 1  1 1 1 0.001
+vertat -0.7321 0 1  -0.7321 0 1 0.002
+vertat 2 -0.7321 1  2 -0.7321 1 0.002
+vertat 1 1 -1  1 1 -1 0.001
+vertat -1 -1 -1  -1 -1 -1 0.001
+undo
+# apagado: nada mas se mueve
+prop off
+xform move 1
+vertat -1 1 1  -1 1 1 0.001
+undo
+mode object
+# objetos: el otro cubo a distancia 3 con radio 5 lineal se mueve 0.4; el de la escena por defecto (a distancia 0) entero
+add cube
+objpos 3 0 0
+selobj Cubo.001
+prop on
+prop type linear
+prop radius 5
+objmove 1 0 0
+objat Cubo.001  1 0 0 0.001
+objat Cubo.002  3.4 0 0 0.002
+objat Cubo  1 0 0 0.002
+undo
+objat Cubo.001  0 0 0 0.001
+objat Cubo.002  3 0 0 0.001
+objat Cubo  0 0 0 0.001
+prop off
+objmove 1 0 0
+objat Cubo.002  3 0 0 0.001
+undo

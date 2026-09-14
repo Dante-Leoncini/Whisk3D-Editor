@@ -32,6 +32,8 @@ enum BarRolUV {
     BRUV_Animation, // menu Animation: keyframes de la VERTEX ANIM activa (icono keyframe, como BR_Animation)
     BRUV_Add,       // menu Add: crear el ARMATURE 2D del mesh / agregar huesos (icono +, como BR_Add)
     BRUV_Armature,  // menu Armature (solo en UVModoHuesos): Extrude/Duplicate/Delete/Set Parent/Clear Parent
+    BRUV_Editar,    // "Edit": entra/sale de la PINTURA DE TEXTURA (UVModoTextura)
+    BRUV_Guardar,   // icono diskette: Save Texture / Make External... / Make Internal (texturas en memoria: "*")
     BRUV_Select     // menu Select (icono seleccion, CALCADO del BR_Select del 3D): All / None /
                     // Invert / Select Linked. Contextual: en edicion opera los UVs, en Huesos/Pose
                     // los huesos 2D. Oculto en pintura de pesos (ahi no hay seleccion que operar).
@@ -48,10 +50,13 @@ enum UVEditorModo {
     UVModoPesos   = 1,  // pintura de pesos: relleno por peso + pincel (Fase 2, edit/WeightPaint.cpp)
     UVModoHuesos  = 2,  // ARMATURE 2D del mesh: EDITAR los huesos (mover puntas/extruir/borrar)
     UVModoPose    = 3,  // ARMATURE 2D del mesh: POSAR (G/R/S 2D -> los UV pesados siguen al hueso)
-    UVModoObjeto  = 4   // DEFAULT: elegir QUE se edita. Se dibujan la geometria (los UVs) y TODOS
+    UVModoObjeto  = 4,  // DEFAULT: elegir QUE se edita. Se dibujan la geometria (los UVs) y TODOS
                         // los armatures 2D de la malla; el click selecciona la entidad bajo el
                         // cursor (armature 2D si le pegas a un hueso, si no la geometria) y Tab
                         // entra a editar la seleccionada. Ver uvObjArm mas abajo.
+    UVModoTextura = 5   // PINTURA DE TEXTURA (boton "Edit" de la barra): el pincel pinta los pixeles de la
+                        // textura mostrada (io/TexturaEditada.h). El selector de textura y el mipmap se esconden;
+                        // abajo, la fila radio/valor + el color y la curva del pincel.
 };
 
 // ROLES de la TOOLBAR inferior del UV editor (mecanismo compartido de ViewportBase).
@@ -153,7 +158,8 @@ class UVEditor : public ViewportBase, public WithBorder {
         int   uvBoxX1, uvBoxY1;     // esquina actual  (px LOCALES)
         int   uvSelMode;            // modo de seleccion PROPIO del UV (SelVertex/Edge/Face), independiente
                                     // del 3D. En sync (syncSelection) se usa el del 3D. El efectivo = ModoUV().
-        int   uvModo;               // UVEditorModo: objeto (default) / edicion / pintura / huesos / pose.
+        int   uvModo;               // UVEditorModo: objeto (default) / edicion / pintura / huesos / pose / textura.
+        int   uvModoPrevTex;        // modo al que vuelve el boton "Edit" al salir de la pintura de textura
                                     // PROPIO del viewport (NO es el InteractionMode global: ver el enum arriba)
         int   uvModoPrevio;         // modo al que vuelve el TAB al salir de UVModoHuesos (ver TabToggleHuesos)
         // OBJETO ACTIVO del UV (lo elige el click en UVModoObjeto): false = la GEOMETRIA (los UVs),
@@ -366,6 +372,8 @@ void UVSetTexOverride(Mesh* m, int part);
 // La usa el nombre del boton de la barra y el test 'uipunteros' (el override va por SERIAL de
 // la malla, no por puntero: la direccion se recicla y se quedaba pegado a OTRA malla).
 int  UVParteMostrada(Mesh* m);
+class Texture* UVTexturaMostrada(Mesh* m);   // la textura que el editor esta MOSTRANDO (override de proyecto o la de la parte)
+void UVToggleEditarTextura(class UVEditor* uv); // boton "Edit": entra/sale de la pintura de textura
 int  UVTexOverrideParte();   // el override de parte crudo (-1 = auto); para el tilde del menu
 // override de PROYECTO del mismo dropdown: ver CUALQUIER textura cargada en la escena con
 // las UV de la malla activa encima ("" = ninguna, vuelve al auto/parte). Va por RUTA.

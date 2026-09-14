@@ -1,0 +1,40 @@
+# texturas en memoria + pintura de textura: la nueva no se asigna a nadie y esta sin guardar (*); pincel en
+# el espacio de la textura con undo; guardar (pendiente sin proyecto), hacer externa (PNG en disco) y volverla
+# interna; y la pintura por PROYECCION desde el viewport 3D (solo las caras de frente)
+add cube
+selobj Cubo.001
+newtex lienzo 64 64 blank
+texlabel lienzo.png*
+brushcolor 1 0 0 1 1
+texdab 0.5 0.5 6
+texpixel 0.5 0.5 255 0 0 10
+texpixel 0.1 0.1 128 128 128 1
+undo
+texpixel 0.5 0.5 128 128 128 1
+redo
+texpixel 0.5 0.5 255 0 0 10
+texsave
+texlabel lienzo.png
+texdab 0.2 0.2 4
+texlabel lienzo.png*
+texext /tmp/claude-1000/-home-dante-Documentos-Whisk3decosystem-Whisk3D/66bd6498-7457-4f1d-941f-243ff1de6054/scratchpad/lienzo_ext.png
+texlabel lienzo_ext.png
+texdab 0.8 0.8 4
+texlabel lienzo_ext.png*
+texint
+texlabel lienzo_ext.png
+# pintura desde el 3D: cada cara en su isla (smart uv), la textura al material de la parte activa, un toque
+# grande en el centro de la vista -> solo las caras DE FRENTE quedan pintadas (proyeccion con perspectiva)
+newtex lienzo3d 128 128 blank
+mode edit
+selmode face
+select all
+smartuv
+mode object
+texassign
+brushradius 150
+brushcolor 0 0 1 1 1
+mode texture
+texpaint3d 0 0
+texcaras
+mode object

@@ -237,6 +237,9 @@ class ViewportBase {
         // (donde tocas, ese valor) como el item-slider de los menus.
         // Solo la muestran los editores que pintan pesos, via el virtual de abajo. ----
         virtual bool BrushBarVisible() const { return false; } // 3D: Weight Paint; UV: modo pesos
+        // BARRA DE INFLUENCIA del proportional editing: la MISMA fila (alto y gesto) con el boton de apagar +
+        // el radio deslizable. Solo el 3D la muestra, con el proportional prendido y sin pincel.
+        virtual bool PropBarVisible() const { return false; }
         int  BrushBarHeight() const;             // alto de la fila (0 si no se ve)
         bool OnBrushBar(int px, int py) const;   // (px,py) cae en la fila de barras?
         void RenderBrushBar();                   // dibujo (lo llama RenderToolbar, arriba de la barra)

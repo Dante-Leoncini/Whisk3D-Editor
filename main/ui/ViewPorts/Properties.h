@@ -110,6 +110,8 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropBool*  propMatChk[11]; // Filtering, Transparent, VertexColor, Lighting, Repeat, Culling, DepthTest, Smooth, Chrome, Equirect360, NormalMapping
         PropColor* propMatCol[3];  // Base Color, Specular, Emission
         PropFloat* propMatShin;    // Shininess
+        PropFloat* propMatRough;   // trazado de rayos: Roughness 0..1 (solo con Ray Tracing tildado)
+        PropFloat* propMatMetal;   // trazado de rayos: Metallic 0..1 (solo con Ray Tracing tildado)
         // ---- CALCOMANIAS / MEZCLA / PROFUNDIDAD -----------------------------------
         // Hasta hoy `decal`, `mezcla`, `sesgoProfundidad` y `ordenPasada` solo se podian
         // poner desde el .mtl o el .w3d: en el editor no habia forma de ver como se porta
@@ -343,6 +345,8 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropFloat*  propLightAttQ;
         PropFloat*  propLightSpotCut; // spot: angulo del cono
         PropFloat*  propLightSpotExp; // spot: concentracion del haz
+        PropFloat*  propLightRTRadio; // trazado de rayos: tamano de la lampara (0 = puntual, sombra dura)
+        PropFloat*  propLightRTRayos; // trazado de rayos: rayos de sombra hacia esta lampara (0 = global)
         GroupPropertie* propCamera;  // pestania de camara: lente (fov/orto) + target (look-at)
         PropBool*   propCamOrtho;    // proyeccion ortografica vs perspectiva
         PropFloat*  propCamFov;      // campo de vision (grados), animable (AnimFov)
@@ -567,6 +571,9 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropColor* propRenderBg;     // color de fondo del render (global g_renderBg, solo pase Rendered)
         float renderW; float renderH;          // valores del render (default 640 x 480)
         bool  renderZbuffer; bool renderNormal; bool renderAlpha; // pases extra tildados (el beauty siempre)
+        PropBool*  propRT;           // "Ray Tracing": el pase Rendered se traza por CPU (render/RayTracer)
+        PropFloat* propRTRayos; PropFloat* propRTSamples; PropFloat* propRTPases; // solo visibles con Ray Tracing tildado
+        float rtRayos, rtSamples, rtPases;     // espejos float de g_rt (los PropFloat bindean float*)
         PropText* propExportPath;    // campo editable "Path" del export (carpeta de salida)
         PropText* propExportName;    // campo editable "File name" del export (solo el nombre + extension del formato)
         PropButton* propExportFormat;// dropdown de formato de export (OBJ / FBX / glTF / GLB)

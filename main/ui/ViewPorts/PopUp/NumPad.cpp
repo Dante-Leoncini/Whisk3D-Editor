@@ -119,6 +119,9 @@ void NumPad::Render(){
     } else {
         if (!g_propFloatEditando){ Cerrar(); return; } // Enter fisico / click que commiteo
     }
+    // el popup sobre el que se abrio (el formulario que se esta editando) sigue a la vista, DEBAJO del teclado:
+    // ese popup se corre hacia arriba solo (mira que PopUpActive es otro) y asi se ve todo junto
+    if (prevPopup) prevPopup->Render();
     Reubicar(); // por si roto la pantalla / cambio el tamano de la ventana
 
     const float* gris   = ListaColores[static_cast<int>(ColorID::gris)];

@@ -11,6 +11,7 @@ extern bool g_redraw;   // el frame se redibuja cuando un undo/redo/borrado camb
 #include "objects/Light.h"       // Lights (global): el borrado de luces lo des/re-registra
 #include "objects/Materials.h"    // Materials (lista global): destino de rename por INDICE (W3dDestGlobal)
 #include "edit/Modifier.h"       // Modifier (limpiar target de Armature/Mirror/Boolean al borrar el objeto apuntado)
+#include "io/TexturaEditada.h"   // TexturaPintadaUndo: los pixeles de una textura pintada
 #include "objects/Armature.h"    // Armature (cast correcto Object*<->Armature* al limpiar/restaurar skinArmature)
 #include "script/W3dScript.h"    // W3dScriptEntrada::refs (destino RefLua de un rename: vive en un vector por valor)
 #include "animation/SkeletalAnimation.h" // KeyframesUndo: recorrer las curvas del clip activo (tracks/Propertys)
@@ -504,6 +505,9 @@ class TransformUndo : public UndoCmd {
 public:
     TransformUndo() {
         for (size_t i = 0; i < ObjSelects.size(); i++) Capturar(ObjSelects[i]);
+        // proportional editing: los NO seleccionados que vienen arrastrados (ya estan en el snapshot del transform)
+        for (size_t i = 0; i < estadoObjetos.size(); i++)
+            if (estadoObjetos[i].distProp >= 0.0f && estadoObjetos[i].obj) Capturar(estadoObjetos[i].obj);
     }
     TransformUndo(Object* solo) { Capturar(solo); }   // un objeto puntual (resize del lienzo)
     void Capturar(Object* o) {
@@ -3321,4 +3325,32 @@ static void RemapEnPendientes(const W3dRenameDest& lista, int a, int b) {
     if (g_pendingUV)    g_pendingUV->RemapLista(lista, a, b);
     if (g_pendingUVGeo) g_pendingUVGeo->RemapLista(lista, a, b); // MeshGeoUndo: vanimIdx
     if (g_pendingB2D)   g_pendingB2D->RemapLista(lista, a, b);   // Bones2DUndo: tracks2d[].idx
+}
+
+// ============================================================================
+//  PINTURA DE TEXTURA: un trazo = un paso de undo con los pixeles enteros de antes (se intercambian)
+// ============================================================================
+class TexturaPintadaUndo : public UndoCmd {
+    TexturaEditable* te;
+    std::vector<unsigned char> px;
+public:
+    TexturaPintadaUndo(TexturaEditable* T) : te(T) { if (T) px = T->rgba; }
+    bool Vacio() const { return px.empty(); }
+    void Aplicar() {
+        if (!te || !TexEditBuscar(te->tex)) return;   // la textura se libero: no hay nada que deshacer
+        te->rgba.swap(px);
+        TexEditSubir(te, 0, 0, te->w, te->h);
+        te->modificada = true;
+        g_redraw = true;
+    }
+    W3D_UNDO_SIN_INDICES // te: puntero al editable (se revalida por su Texture* en Textures[]); px: propio
+};
+static TexturaPintadaUndo* g_pendingTex = NULL;
+void UndoTexturaIniciar(TexturaEditable* te) {
+    delete g_pendingTex; g_pendingTex = NULL;
+    if (te) g_pendingTex = new TexturaPintadaUndo(te);
+}
+void UndoTexturaConfirmar(bool cambio) {
+    if (cambio && g_pendingTex && !g_pendingTex->Vacio()) { Push(g_pendingTex); g_pendingTex = NULL; }
+    delete g_pendingTex; g_pendingTex = NULL;
 }

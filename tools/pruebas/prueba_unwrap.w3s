@@ -1,0 +1,84 @@
+# menu U: unwrap por costuras (angular / conforme / minimo estiramiento), smart uv project, lightmap pack,
+# reset y follow active quads. Cubo con 7 costuras = una cruz de 6 caras en una sola isla.
+add cube
+selobj Cubo.001
+mode edit
+selmode edge
+select none
+seledgepos 1 -1 1  1 1 1
+seledgepos -1 1 -1  1 1 -1 add
+seledgepos 1 1 -1  1 1 1 add
+seledgepos -1 1 1  -1 1 -1 add
+seledgepos -1 -1 -1  1 -1 -1 add
+seledgepos 1 -1 -1  1 -1 1 add
+seledgepos -1 -1 1  -1 -1 -1 add
+seam mark
+selmode face
+select all
+unwrap conformal
+uvcheck islas 1 enrango sinflips angmax 1
+unwrap angle
+uvcheck islas 1 enrango sinflips angmax 2
+unwrap stretch
+uvcheck islas 1 enrango sinflips angmax 2
+undo
+uvcheck islas 1 enrango sinflips angmax 2
+# sin costuras: smart project separa las 6 caras; lightmap una celda por cara; reset = toda la textura por cara
+seam clear
+smartuv
+uvcheck islas 6 enrango sinflips angmax 1
+lightmap
+uvcheck islas 6 enrango sinflips angmax 1 areamax 1
+uvreset
+uvcheck enrango sinflips angmax 1 area 6 0.01
+undo
+uvcheck islas 6 enrango areamax 1
+mode object
+# follow active quads: plano cortado en 2 quads, el activo con UV de reset -> el vecino sigue la grilla al lado
+add plane
+selobj Plano
+mode edit
+loopcut 0 1 0
+selmode face
+select all
+activeface 0
+uvreset
+followquads
+uvcheck islas 1 sinflips area 2 0.01 extension 2 0.01
+mode object
+# cilindro: costuras en los dos anillos de las tapas + una vertical -> 3 islas (lateral desenrollado + 2 tapas)
+add cylinder
+selobj Cilindro
+mode edit
+selmode face
+select ngons
+seam mark
+selmode edge
+select none
+seledgepos 1 -1 0  1 1 0
+seam mark
+selmode face
+select all
+unwrap conformal
+uvcheck islas 3 enrango sinflips angmax 2
+unwrap angle
+uvcheck islas 3 enrango sinflips angmax 3
+unwrap stretch
+uvcheck islas 3 enrango sinflips angmax 3
+smartuv
+uvcheck enrango sinflips
+mode object
+# esfera sin costuras: smart project y lightmap quedan en rango y sin triangulos dados vuelta; el unwrap de una
+# superficie cerrada no tiene por donde abrirse -> avisa y no toca los UV (los del lightmap siguen ahi)
+add uvsphere
+selobj EsferaUV
+mode edit
+selmode face
+select all
+smartuv
+uvcheck enrango sinflips
+lightmap
+uvcheck enrango sinflips
+fail unwrap conformal
+uvcheck enrango sinflips angmax 1
+mode object

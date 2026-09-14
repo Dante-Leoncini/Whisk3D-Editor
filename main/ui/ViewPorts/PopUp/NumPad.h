@@ -19,6 +19,7 @@ class NumPad : public PopUpBase {
         bool Click(int mx, int my) W3D_OVERRIDE;
         bool Tecla(int tecla) W3D_OVERRIDE; // Enter fisico = Aceptar, Esc = Cancelar
         void Cerrar() W3D_OVERRIDE;         // click AFUERA = commit (float) / deja el transform (transform)
+        bool EsTeclado() const W3D_OVERRIDE { return true; }
 
         PopUpBase* prevPopup;        // popup a restaurar al cerrar (ej: el panel redo del loop cut). NULL = ninguno
 
@@ -52,6 +53,7 @@ class QwertyPad : public PopUpBase {
         bool Click(int mx, int my) W3D_OVERRIDE;
         bool Tecla(int tecla) W3D_OVERRIDE; // Enter = Aceptar, Esc = Cancelar
         void Cerrar() W3D_OVERRIDE;         // click AFUERA = commitea el texto
+        bool EsTeclado() const W3D_OVERRIDE { return true; }
         PopUpBase* prevPopup;           // popup a restaurar al cerrar (NULL = ninguno)
     private:
         Card* keyCard;

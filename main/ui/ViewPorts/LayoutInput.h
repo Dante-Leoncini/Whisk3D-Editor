@@ -176,6 +176,10 @@ void EditXformConfirmar();          // fija: recalcula bordes + normales (salvo 
 void EditXformCancelar();           // descarta: restaura el snapshot
 void EditXformIniciarExtrude(const Vector3& normalLocal); // move de la tapa del extrude
 void EditXformNumValor(float v); // entrada numerica: aplica el valor exacto (malla)
+void EditXformProporcionalActualizar(); // proportional editing: cambio el radio en medio del transform -> pesos + reescritura
+void LayoutMenuProporcional(int mx, int my); // menu del proportional editing (icono de la curva de la barra)
+class ViewportBase;
+void LayoutCambiarTipoViewport(ViewportBase* v, int aId); // (harness) cambia el tipo de un viewport: 0=3D 1=outliner 2=props 3=UV 4=timeline...
 void LayoutExtrudeFaces(); // E: extruye la seleccion (vert/arista/cara) + arranca el move
 bool ExtrudeEnCurso();     // el transform en curso es un extrude (para el boton "Repeat" del toolbar)
 void LayoutShrinkFatten(); // Alt+S: mueve cada vertice sel por SU normal (Shrink/Fatten)

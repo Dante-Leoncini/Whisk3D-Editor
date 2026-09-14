@@ -709,7 +709,8 @@ void InputUsuarioSDL3(SDL_Event &e){
         bool clickEnPopup = PopUpActive && PopUpActive->Contains((int)e.button.x, (int)e.button.y);
         // edicion numerica por texto: un click en cualquier lado APLICA lo tipeado (no consume el click -> si fue
         // sobre otro campo, ese arranca su propia edicion en el mouse-up).
-        if (NumEditActivo() && !clickEnPopup) { NumEditCommit(); NumEditSalirDelPanel(); }
+        // (adentro de un popup que NO es el teclado -otro campo, un boton- tambien se aplica: lo tipeado no se pierde)
+        if (NumEditActivo() && !(clickEnPopup && PopUpActive->EsTeclado())) { NumEditCommit(); NumEditSalirDelPanel(); }
         // MODO JUEGO: el click IZQUIERDO sobre el visor (2D o 3D) es del JUEGO
         { extern bool SimActiva();
           // SOLO durante PLAY: el click sobre el visor es del JUEGO. En PAUSA el
@@ -781,7 +782,8 @@ void InputUsuarioSDL3(SDL_Event &e){
                     // barra de HERRAMIENTAS (tilde/cruz/ejes) maneja el tap.
                     else if (vpDown && vpDown->ViewportKind() == 1) {
                         Viewport3D* v3 = (Viewport3D*)vpDown;
-                        if (!v3->ClickBarraTransform((int)e.button.x, (int)e.button.y))
+                        if (!v3->ClickBarraTransform((int)e.button.x, (int)e.button.y) &&
+                            !v3->BrushBarClick((int)e.button.x, (int)e.button.y))   // barra de influencia (proportional)
                             v3->ToolbarClick((int)e.button.x, (int)e.button.y);
                     }
                     // fuera de la barra: nada en el down; el arrastre del dedo mueve el transform
@@ -789,6 +791,8 @@ void InputUsuarioSDL3(SDL_Event &e){
                 // durante un transform (mover/rotar/escalar, o ubicar un duplicado) el CLICK de mouse
                 // CONFIRMA, este donde este (incluso sobre la barra/menu): la UI no lo consume
                 else if (g_poseModo){ extern void PoseXformConfirm(); PoseXformConfirm(); }
+                // ...salvo sobre la BARRA DE INFLUENCIA del proportional editing: ahi el click arma el arrastre del radio
+                else if (vpDown && vpDown->ViewportKind() == 1 && vpDown->BrushBarClick((int)e.button.x, (int)e.button.y)) {}
                 else if (Viewport3DActive) Viewport3DActive->Aceptar();
             }
             // TRANSFORM MODAL del UV editor / Editor 2D en curso (no usa el 'estado' global):

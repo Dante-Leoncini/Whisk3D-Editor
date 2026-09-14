@@ -9,6 +9,9 @@
 #include "WhiskUI/draw/glesdraw.h"      // W3dPantallaAlto + helpers de dibujo
 #include "WhiskUI/theme/colores.h"       // ListaColores / ColorID
 #include "WhiskUI/draw/icons.h"         // IconType (botones-icono SelMode / Pivot)
+#include "io/TexturaEditada.h"          // pintura de TEXTURA (UVModoTextura): pixeles en memoria + guardado
+#include "Undo.h"                        // UndoTexturaIniciar/Confirmar (un trazo = un paso)
+#include "PopUp/ColorPicker.h"           // el color del pincel de textura
 #include "ViewPorts/Properties.h"  // PropsActivo (parte activa seleccionada)
 #include "WhiskUI/Propieties/PropList.h" // PropListMeshParts
 #include "render/OpcionesRender.h" // g_redraw (render event-driven)
@@ -104,6 +107,7 @@ UVEditor::UVEditor() {
     uvCursorU = 0.5f; uvCursorV = 0.5f; // cursor 2D al centro por defecto
     uvSelMode = SelVertex;              // modo de seleccion propio del UV (default vertices)
     uvModo = UVModoObjeto;              // DEFAULT: modo OBJETO (elegir geometria / armature 2D con el click)
+    uvModoPrevTex = UVModoObjeto;
     uvModoPrevio = UVModoObjeto;        // a donde vuelve el Tab al salir de Edit Bones
     uvObjArm = false;                   // objeto activo del UV: la GEOMETRIA (hasta que se clickee un hueso)
     uvBoxArmado = false; uvBoxSel = false; uvBoxAdd = false; // box select (B) sin gesto en curso
@@ -140,6 +144,9 @@ UVEditor::UVEditor() {
         b->desplegable = true; BarButtons.push_back(b);
     b = new Button("Mipmap"); b->rol = BRUV_Mipmap;                   // inspector de la piramide (Auto / nivel)
         b->desplegable = true; b->visible = false; BarButtons.push_back(b); // visible con textura mostrada (SyncBarra)
+    b = new Button(T("Edit")); b->rol = BRUV_Editar; b->visible = false; BarButtons.push_back(b);   // pintura de textura
+    b = new Button("", IconType::guardar); b->rol = BRUV_Guardar;    // Save Texture / Make External / Make Internal
+        b->desplegable = true; b->visible = false; BarButtons.push_back(b);
     b = new Button("", IconType::keyframe); b->rol = BRUV_Animation;  // menu Animation (icono rombo, = el 3D)
         b->desplegable = true; b->visible = false; BarButtons.push_back(b); // solo operativo (Edit Mode)
     // TOOLBAR inferior (mecanismo compartido de ViewportBase): DESHACER/REHACER primero (siempre,
@@ -161,6 +168,7 @@ UVEditor::UVEditor() {
     // CORNER, que es la unidad que pinta este editor (los uv groups son por render-vert).
     b = new Button("", (int)IconType::mesh); b->rol = TBR_Marcas; b->centrado = true; b->cuadrado = true; b->visible = false; ToolButtons.push_back(b);
     b = new Button("Smooth"); b->rol = TBR_Falloff; b->desplegable = true; b->visible = false; ToolButtons.push_back(b);
+    b = new Button(""); b->rol = TBR_ColorPincel; b->centrado = true; b->cuadrado = true; b->visible = false; ToolButtons.push_back(b); // color del pincel de textura
     // "editar solo lo seleccionado" (mascara de pintura): toggle GLOBAL compartido con la
     // toolbar del 3D (WeightPaintSoloSel); icono de seleccion, tinte accent cuando esta ON
     b = new Button("", (int)IconType::seleccion); b->rol = TBR_SoloSel; b->centrado = true; b->cuadrado = true; b->visible = false; ToolButtons.push_back(b);
@@ -189,7 +197,7 @@ UVEditor::~UVEditor() {
 
 // FILA DE BARRAS del pincel (radio | valor): el UV la muestra en modo PESOS, con el mismo
 // BrushEstado que el viewport 3D (mover una barra aca mueve el pincel alla: es UN pincel).
-bool UVEditor::BrushBarVisible() const { return uvModo == UVModoPesos && EnEdicionUV(); }
+bool UVEditor::BrushBarVisible() const { return (uvModo == UVModoPesos && EnEdicionUV()) || uvModo == UVModoTextura; }
 
 // ---- TOOLBAR inferior (compartida): historial G/R/S por editor ----
 // MRU PROPIO del UV editor (compartido entre todos los viewports UV, como el del 3D por modo).
@@ -226,6 +234,7 @@ void UVEditor::ToolbarSincronizar(){
     const bool operativo = EnEdicionUV();
     const bool edicion = (uvModo == UVModoEdicion) && operativo;
     const bool pintura = (uvModo == UVModoPesos) && operativo;
+    const bool texpaint = (uvModo == UVModoTextura);   // pintura de textura: color + curva del pincel
     const bool huesos  = (uvModo == UVModoHuesos) && operativo;
     const bool pose    = (uvModo == UVModoPose) && operativo;
     const bool transformando = XformEnCurso(); // G/R/S de UVs o transform de huesos 2D de ESTE editor
@@ -267,8 +276,12 @@ void UVEditor::ToolbarSincronizar(){
             const bool onM = (BrushGet().marcas != MarcasOff);
             btn->tinte = onM ? TbVerdeBg() : NULL;
             btn->colorTexto = onM ? ListaColores[static_cast<int>(ColorID::accent)] : blanco;
+        } else if (rol == TBR_ColorPincel){
+            btn->visible = texpaint;
+            btn->tinte = BrushGet().color;   // el boton ES la muestra del color
+            btn->colorTexto = NULL;
         } else if (rol == TBR_Falloff){
-            btn->visible = pintura;
+            btn->visible = pintura || texpaint;
             const int tipoF = BrushGet().falloff.tipo;
             btn->icon = IconoIndice(W3dFalloffIcono(tipoF));
             btn->text = T(W3dFalloffNombre(tipoF));
@@ -295,6 +308,19 @@ void UVEditor::ToolbarSincronizar(){
 }
 
 void UVEditor::ToolbarAccionRol(int rol){
+    if (uvModo == UVModoTextura){   // PINTURA DE TEXTURA: la curva y el color del pincel (el resto no aplica)
+        if (rol == TBR_Falloff){
+            Button* bf = BarRolBtn(ToolButtons, TBR_Falloff);
+            FalloffEditorAbrir(&BrushGet().falloff, bf ? bf->sx : x, y + height - ToolbarHeight());
+            return;
+        }
+        if (rol == TBR_ColorPincel){
+            Button* bc = BarRolBtn(ToolButtons, TBR_ColorPincel);
+            if (!colorPicker) colorPicker = new ColorPicker();
+            colorPicker->Abrir(BrushGet().color, bc ? bc->sx : x, y + height - ToolbarHeight());
+            return;
+        }
+    }
     Mesh* m = (ObjActivo && ObjActivo->getType() == ObjectType::mesh) ? (Mesh*)ObjActivo : NULL;
     if (rol == TBR_Undo){ UndoDeshacer(); RebindMaterialMeshPart(); g_redraw = true; return; }
     if (rol == TBR_Redo){ UndoRehacer(); RebindMaterialMeshPart(); g_redraw = true; return; }
@@ -509,6 +535,65 @@ static bool WPUVProyectar(void* ctx, int i, float& sx, float& sy) {
 // una pasada del pincel en la posicion actual del mouse (lastMx/lastMy, coords locales).
 // NO es static a proposito: la declara UVEditor.h para que los tests puedan dar una pasada de
 // pincel sin simular SDL (el click y el drag reales siguen siendo los unicos que la llaman).
+// la textura que el editor esta MOSTRANDO: el override de proyecto, o la del material de la parte mostrada
+Texture* UVTexturaMostrada(Mesh* m) {
+    Texture* t = UVTexProyectoActiva();
+    if (t) return t;
+    if (!m) return NULL;
+    const int p = UVParteEfectiva(m);
+    if (p < 0 || p >= (int)m->materialsGroup.size()) return NULL;
+    Material* mm = m->materialsGroup[(size_t)p].material;
+    return (mm && mm->texture && mm->texture->iID) ? mm->texture : NULL;
+}
+void UVToggleEditarTextura(UVEditor* uv) {
+    if (!uv) return;
+    if (uv->uvModo == UVModoTextura) uv->uvModo = uv->uvModoPrevTex;
+    else { uv->uvModoPrevTex = uv->uvModo; uv->uvModo = UVModoTextura; }
+    g_redraw = true;
+}
+// ---------------------------------------------------------------------------
+//  PINTURA DE TEXTURA en el editor UV: el toque va a los TEXELS bajo el cursor (el mismo mapeo UV->pantalla
+//  del Render, invertido). Los toques se interpolan desde el anterior para que un trazo rapido no deje huecos.
+// ---------------------------------------------------------------------------
+static UVEditor* gUVPintandoTex = NULL;
+static TexturaEditable* gUVTexEd = NULL;
+static bool  gUVTexCambio = false;
+static float gUVTexPrevX = -1e9f, gUVTexPrevY = 0.0f;
+static bool UVTexTrazoIniciar(UVEditor* uv) {
+    Mesh* m = (ObjActivo && ObjActivo->getType() == ObjectType::mesh) ? (Mesh*)ObjActivo : NULL;
+    Texture* t = UVTexturaMostrada(m);
+    if (!t) return false;
+    gUVTexEd = TexEditObtener(t);
+    if (!gUVTexEd) return false;
+    UndoTexturaIniciar(gUVTexEd);
+    gUVTexCambio = false; gUVTexPrevX = -1e9f;
+    (void)uv;
+    return true;
+}
+static void UVPintarTextura(UVEditor* uv) {
+    if (!uv || !gUVTexEd) return;
+    float cx, cy, s; uv->ParamsUV(cx, cy, s);
+    const float lx = (float)(uv->lastMx - uv->x), ly = (float)(uv->lastMy - uv->y);
+    const float u = 0.5f + (lx - cx) / (s * g_uvAspU), v = 0.5f + (ly - cy) / (s * g_uvAspV);
+    const float tx = u * gUVTexEd->w, ty = v * gUVTexEd->h;
+    BrushEstado& br = BrushGet();
+    const float rTex = br.radioPx / (s * g_uvAspU) * gUVTexEd->w;   // radio del pincel, en texels
+    unsigned char rgba[4];
+    for (int q = 0; q < 4; q++) { float c = br.color[q]; if (c < 0) c = 0; if (c > 1) c = 1; rgba[q] = (unsigned char)(c * 255.0f + 0.5f); }
+    const W3dFalloff& fo = BrushFalloffEfectivo();
+    int rect[4] = { -1, -1, -1, -1 };
+    if (gUVTexPrevX > -1e8f) {
+        const float dx = tx - gUVTexPrevX, dy = ty - gUVTexPrevY, dist = sqrtf(dx*dx + dy*dy);
+        float paso = rTex / 3.0f; if (paso < 1.0f) paso = 1.0f;
+        int n = (int)ceilf(dist / paso); if (n < 1) n = 1;
+        for (int i = 1; i <= n; i++) { const float f = (float)i / (float)n; TexEditDab(gUVTexEd, gUVTexPrevX + dx * f, gUVTexPrevY + dy * f, rTex, rgba, br.fuerza, fo, rect); }
+    } else TexEditDab(gUVTexEd, tx, ty, rTex, rgba, br.fuerza, fo, rect);
+    gUVTexPrevX = tx; gUVTexPrevY = ty;
+    if (rect[0] >= 0) { TexEditSubir(gUVTexEd, rect[0], rect[1], rect[2], rect[3]); gUVTexCambio = true; }
+    g_redraw = true;
+}
+static void UVTexTrazoFin() { UndoTexturaConfirmar(gUVTexCambio); gUVTexEd = NULL; gUVTexCambio = false; }
+
 void UVPintarPesos(UVEditor* uv, Mesh* m) {
     if (!uv || !m || !m->uv) return;
     WPUVCtx c; c.m = m;
@@ -909,6 +994,7 @@ void UVEditor::SyncBarra() {
     if (bModo) {
         bModo->visible = enEditUV;
         bModo->text = (uvModo == UVModoPesos)  ? T("Weight Paint") :
+                      (uvModo == UVModoTextura) ? T("Texture Paint") :
                       (uvModo == UVModoHuesos) ? T("Edit Bones") :
                       (uvModo == UVModoPose)   ? T("Pose Mode") :
                       (uvModo == UVModoObjeto) ? T("Object Mode") : T("Edit Mode");
@@ -953,7 +1039,7 @@ void UVEditor::SyncBarra() {
     // dropdown lista TODAS las texturas del proyecto ademas de las partes de la malla
     // activa. El texto = nombre de archivo de la MOSTRADA.
     if (bTex) {
-        bTex->visible = true;
+        bTex->visible = (uvModo != UVModoTextura);
         std::string lbl = T("Texture");
         const std::string* ruta = NULL;
         if (!UVTexProyectoRuta().empty()) ruta = &UVTexProyectoRuta();
@@ -965,15 +1051,30 @@ void UVEditor::SyncBarra() {
         if (ruta) {
             size_t sl = ruta->find_last_of("/\\");
             lbl = (sl == std::string::npos) ? *ruta : ruta->substr(sl + 1);
+            Texture* tm = UVTexturaMostrada(m);
+            if (tm && TexEditSinGuardar(tm)) lbl += "*";   // en memoria / con cambios sin guardar
         }
         bTex->text = lbl;
+    }
+    { Button* bEd = BarRolBtn(BarButtons, BRUV_Editar);
+      Button* bGu = BarRolBtn(BarButtons, BRUV_Guardar);
+      Texture* tm = UVTexturaMostrada(m);
+      const bool texpaint = (uvModo == UVModoTextura);
+      if (bEd) {
+          bEd->visible = (tm != NULL) || texpaint;
+          const float* acc = ListaColores[static_cast<int>(ColorID::accent)];
+          static float verdeEd[3]; for (int i = 0; i < 3; i++) verdeEd[i] = acc[i] * 0.4f;
+          bEd->tinte = texpaint ? verdeEd : NULL;
+          bEd->colorTexto = texpaint ? acc : NULL;
+      }
+      if (bGu) bGu->visible = (tm != NULL) && TexEditBuscar(tm) != NULL;   // solo las que estan en edicion (memoria) se guardan
     }
     // Mipmap: inspector de la piramide de la textura mostrada. Visible cuando hay
     // textura; el texto dice que se esta viendo (Auto o el tamano del nivel).
     { Button* bMip = BarRolBtn(BarButtons, BRUV_Mipmap);
       if (bMip) {
           unsigned int tid = UVTexturaMostradaId(m);
-          bMip->visible = (tid != 0);
+          bMip->visible = (tid != 0) && uvModo != UVModoTextura;
           if (tid) {
               int niv = UVMipNivel();
               if (niv < 0 || !w3dEngine::TexTieneMips(tid)) bMip->text = "Mip: Auto";
@@ -1352,7 +1453,7 @@ void UVEditor::Render() {
     }
     // circulo del PINCEL (solo en modo pintura), siguiendo al mouse sobre el CONTENIDO
     // (no sobre la barra/toolbar ni con un popup modal abierto)
-    if (enEditUV && uvModo == UVModoPesos && !PopUpActive &&
+    if (((enEditUV && uvModo == UVModoPesos) || uvModo == UVModoTextura) && !PopUpActive &&
         lastMx >= x && lastMx < x + width && lastMy >= y && lastMy < y + height &&
         !OnBar(lastMx, lastMy) && !OnToolbar(lastMx, lastMy))
         BrushDibujarCirculo((float)(lastMx - x), (float)(lastMy - y), BrushGet().radioPx);
@@ -1406,7 +1507,13 @@ void UVEditor::event_mouse_motion(int mx, int my) {
     }
     // PINTURA DE PESOS: el circulo del pincel sigue al mouse (redraw) y, con un trazo en
     // curso (mouse apretado), cada motion pinta otra pasada y consume el evento.
-    if (uvModo == UVModoPesos) g_redraw = true;
+    if (uvModo == UVModoPesos || uvModo == UVModoTextura) g_redraw = true;   // el circulo del pincel sigue al cursor
+    if (gUVPintandoTex == this) {   // trazo de PINTURA DE TEXTURA en curso
+        lastMx = mx; lastMy = my;
+        if (leftMouseDown) { UVPintarTextura(this); return; }
+        gUVPintandoTex = NULL; UVTexTrazoFin();   // up perdido: commit igual
+        return;
+    }
     if (gUVPintando == this) {
         lastMx = mx; lastMy = my;
         Mesh* mp = (ObjActivo && ObjActivo->getType() == ObjectType::mesh) ? (Mesh*)ObjActivo : NULL;
@@ -2095,6 +2202,7 @@ void UVEditor::mouse_button_up(int boton) {
         return;
     }
     if (gUVPintando == this) { gUVPintando = NULL; WeightPaintTrazoFin(); } // fin del trazo -> commit del undo
+    if (gUVPintandoTex == this) { gUVPintandoTex = NULL; UVTexTrazoFin(); } // fin del trazo de textura -> commit del undo
     // ARMATURE 2D del mesh: los drags arrancados por CLICK terminan al SOLTAR
     if (Bone2DXformActivo() && gB2D.porClick && gB2D.uv == this) {
         Mesh* mb = (ObjActivo && ObjActivo->getType() == ObjectType::mesh) ? (Mesh*)ObjActivo : NULL;
@@ -2160,6 +2268,10 @@ void UVEditor::button_left() {
     }
     // PINTURA DE PESOS: el click arranca el TRAZO (snapshot de undo + grupo automatico si no
     // hay) y pinta la 1ra pasada. El drag sigue en event_mouse_motion; el commit al soltar.
+    if (uvModo == UVModoTextura) {   // PINTURA DE TEXTURA: el click arranca el trazo (un toque ya pinta)
+        if (UVTexTrazoIniciar(this)) { gUVPintandoTex = this; UVPintarTextura(this); }
+        return;
+    }
     if (uvModo == UVModoPesos) {
         // CTRL+CLICK SOBRE UN HUESO 2D = ese hueso pasa a ser el GRUPO ACTIVO que se pinta.
         // (en Weight Paint, Ctrl+click selecciona el hueso) y cierra el

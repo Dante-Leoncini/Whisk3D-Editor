@@ -1,0 +1,10 @@
+# "Nueva textura" del UV editor: el generador (liso / grilla UV / grilla de colores) y la creacion en el proyecto
+# (PNG + carga + asignacion al material de la parte activa)
+texgentest
+add cube
+selobj Cubo.001
+newtex prueba_uv 256 256 uvgrid
+newtex prueba_colores 128 64 colorgrid alpha
+newtex prueba_lisa 16 16 blank alpha
+newtex prueba_uv 64 64 uvgrid
+newtexclean

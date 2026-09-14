@@ -2,6 +2,10 @@
 #include "W3dLang.h"
 #include "edit/MeshEdit.h"   // W3dRenderCornersSeparados
 #include "ui/ViewPorts/Gizmo.h"   // gizmo de mover
+#include "edit/Proporcional.h"   // proportional editing: tecla O, rueda = radio, circulo de influencia
+#include "io/TexturaEditada.h"    // TEXTURE PAINT: los pixeles de la textura de la parte activa
+#include "ui/ViewPorts/UVEditor.h"  // UVParteMostrada: que parte (material) se pinta
+#include "W3dAviso.h"
 #include <stdlib.h>   // getenv (debug de oclusion)
 #include "render/UIOverlay.h"   // la UI 2D dibujada sobre el viewport (simula la ventana)   // T(): los textos salen en el idioma del sistema
 #include "ViewPorts/ViewPort3D.h"
@@ -18,6 +22,7 @@
 #include "WhiskUI/draw/glesdraw.h"
 #include "ui/W3dColors.h" // W3dColores: colores del editor (piso, ejes de transformacion)
 #include "render/OpcionesRender.h" // flags del overlay de normales
+#include "render/RayTracer.h"      // vista Rendered + "Ray Tracing": la imagen trazada por CPU encima de la escena GL
 #include "render/EscenaRender.h"   // EL pase 3D COMPARTIDO con el runtime del juego compilado
 #include "objects/Mesh.h"          // overlay de estadisticas (vertsAgrupados, faces3d)
 #include "objects/EditMesh.h"      // foco al centro de la seleccion en edit mode
@@ -118,6 +123,8 @@ Viewport3D::Viewport3D(Vector3 pos){
         b->desplegable = true; BarButtons.push_back(b);                    // (movido ANTES de Select)
     b = new Button("", IconType::snap); b->rol = BR_Snap;                  // SNAP (imanta al mover): verde si esta ON
         b->desplegable = true; BarButtons.push_back(b);
+    b = new Button("", (int)IconType::curve); b->rol = BR_Proporcional;    // PROPORTIONAL EDITING (O): la curva, verde si ON
+        b->desplegable = true; BarButtons.push_back(b);
     // "View" es un ICONO (monitor): el texto ocupaba ancho de barra, que es lo que escasea (sobre todo en el N95).
     b = new Button("", IconType::monitor); b->rol = BR_View; b->desplegable = true; BarButtons.push_back(b);
     // "Select" y "Add" son ICONOS sin texto (el titulo va en el menu desplegable): el texto
@@ -161,6 +168,7 @@ Viewport3D::Viewport3D(Vector3 pos){
     b = new Button("Ctrl");  b->rol = TBR_Ctrl;  b->centrado = true; ToolButtons.push_back(b);
     // "View" (toggle): en Edit Mode, con 1 dedo orbitar/panear/zoom aunque haya una operacion en curso.
     b = new Button("", (int)IconType::monitor); b->rol = TBR_View; b->centrado = true; b->cuadrado = true; ToolButtons.push_back(b); // "vista": el mismo monitor del menu View de arriba
+    b = new Button("", (int)IconType::curve); b->rol = TBR_Proporcional; b->centrado = true; b->cuadrado = true; ToolButtons.push_back(b); // proportional editing: toggle de un click
     b = new Button("Global"); b->rol = TBR_Orient; b->desplegable = true; ToolButtons.push_back(b);
     b = new Button("X"); b->rol = TBR_EjeX; b->centrado = true; b->cuadrado = true; ToolButtons.push_back(b);
     b = new Button("Y"); b->rol = TBR_EjeY; b->centrado = true; b->cuadrado = true; ToolButtons.push_back(b);
@@ -509,6 +517,10 @@ void Viewport3D::event_mouse_wheel(float dy, int mx, int my) {
     // Unificado con la barra de propiedades (BarScrollHorizontal).
     if (BarScrollHorizontal(mx, my, (int)(dy * 40))) return;
     if (OnToolbar(mx, my)) { ToolbarScrollBy((int)(dy * 40)); return; } // barra de HERRAMIENTAS (abajo)
+    // PROPORTIONAL EDITING: con un transform en curso la rueda cambia el RADIO de influencia, no el zoom
+    if (ProporcionalAplicable() && estado != editNavegacion) {
+        ProporcionalRadioEscalar(dy > 0 ? 1.1f : 1.0f / 1.1f); ProporcionalReaplicar(); g_redraw = true; return;
+    }
     Zoom(dy * 2.0f); // Zoom() ya distingue: viewport normal = distancia; vista de camara = inspeccion
 }
 #endif
@@ -905,7 +917,7 @@ void Viewport3D::RotarDesdeVista(int mx, int my){
         // usa XYZ -> lo que se guardaba NO era lo que se veia. SetRot lo deriva bien y conserva las vueltas.
         // W3dRotarMundoSobre: el eje de la vista es DE MUNDO y el snapshot es LOCAL -> se conjuga por el
         // padre (sin eso, rotar desde la vista un objeto emparentado y rotado giraba por cualquier lado).
-        ob.SetRot(W3dRotarMundoSobre(ob, Quaternion::FromAxisAngle(cf, -delta), estadoObjetos[o].rot));
+        ob.SetRot(W3dRotarMundoSobre(ob, Quaternion::FromAxisAngle(cf, -delta * estadoObjetos[o].peso), estadoObjetos[o].rot)); // peso: proportional
     }
     AplicarPivotATransform(); // gira las posiciones alrededor del pivote
     { extern void SnapAjustarObjRot(); SnapAjustarObjRot(); } // imanta: el activo apunta al target (si snap ON)
@@ -1150,7 +1162,7 @@ static bool WP3DModoPintura() {
     // los DOS pinceles: el de pesos y el de vertex color. Comparten TODO (circulo, radio,
     // valor, falloff, marcas, mascara "solo lo seleccionado") y se diferencian solo en QUE
     // escriben, asi que todo el andamiaje del viewport es el mismo.
-    return InteractionMode == WeightPaint || InteractionMode == VertexPaint;
+    return InteractionMode == WeightPaint || InteractionMode == VertexPaint || InteractionMode == TexturePaint;
 }
 
 struct WP3DCtx { Viewport3D* vp; Mesh* m; Matrix4 W; const GLfloat* pos; };
@@ -1248,12 +1260,131 @@ static void WP3DPintarColor(Viewport3D* vp, int mx, int my) {
 }
 
 // UNA pasada, la que corresponda al modo. El drag y el commit no tienen que saber cual es.
+// ---------------------------------------------------------------------------
+//  TEXTURE PAINT desde el 3D (pintura por PROYECCION): para cada cara de la parte activa que mira a la camara
+//  y cae bajo el pincel, se recorren los TEXELS de sus triangulos (en el espacio UV de la textura), cada texel
+//  se lleva a su punto 3D por baricentricas y se PROYECTA a la pantalla con la perspectiva de la vista: si
+//  cae dentro del circulo del pincel y no lo tapa otra cara (el mapa de oclusion de los modos de pintura),
+//  se pinta con la caida del pincel segun su distancia en pantalla. Asi el trazo queda donde se ve, por
+//  mas que la cara este en escorzo.
+// ---------------------------------------------------------------------------
+static TexturaEditable* g_wpTexEd = NULL;
+static bool  g_wpTexCambio = false;
+static float g_wpTexPrevX = -1e9f, g_wpTexPrevY = 0.0f;
+static Texture* WP3DTexturaActiva(Mesh* m, int& parte) {
+    parte = UVParteMostrada(m);
+    if (parte < 0 || parte >= (int)m->materialsGroup.size()) return NULL;
+    Material* mt = m->materialsGroup[(size_t)parte].material;
+    return (mt && mt->texture && mt->texture->iID) ? mt->texture : NULL;
+}
+static bool WP3DTexTrazoIniciar(Mesh* m) {
+    int parte = -1;
+    Texture* t = WP3DTexturaActiva(m, parte);
+    if (!t || !m->uv) { Notificar(T("Texture Paint: the active part has no texture"), true); return false; }
+    g_wpTexEd = TexEditObtener(t);
+    if (!g_wpTexEd) return false;
+    UndoTexturaIniciar(g_wpTexEd);
+    g_wpTexCambio = false; g_wpTexPrevX = -1e9f;
+    return true;
+}
+static void WP3DDabTextura(Viewport3D* vp, Mesh* m, const Matrix4& W, const GLfloat* pos, int parte,
+                           float bx, float by, float radioPx, const unsigned char* rgba, float fuerza, const W3dFalloff& fo, int* rect) {
+    TexturaEditable* te = g_wpTexEd;
+    const int tw = te->w, th = te->h;
+    const float r2 = radioPx * radioPx;
+    const bool oclusion = WPOclusionActiva(m);
+    std::vector<Vector3> wp; std::vector<float> sx, sy;
+    for (size_t f = 0; f < m->faces3d.size(); f++) {
+        const MeshFace& F = m->faces3d[f];
+        const int n = (int)F.idx.size();
+        if (F.mat != parte || n < 3) continue;
+        wp.resize((size_t)n); sx.resize((size_t)n); sy.resize((size_t)n);
+        bool ok = true; float mnx = 1e30f, mny = 1e30f, mxx = -1e30f, mxy = -1e30f;
+        for (int c = 0; c < n && ok; c++) {
+            const int rv = F.idx[(size_t)c];
+            if (rv < 0 || rv >= m->vertexSize) { ok = false; break; }
+            wp[(size_t)c] = W * Vector3(pos[rv*3], pos[rv*3+1], pos[rv*3+2]);
+            if (!vp->ProyectarPunto(wp[(size_t)c], sx[(size_t)c], sy[(size_t)c])) { ok = false; break; }
+            if (sx[(size_t)c] < mnx) mnx = sx[(size_t)c]; if (sx[(size_t)c] > mxx) mxx = sx[(size_t)c];
+            if (sy[(size_t)c] < mny) mny = sy[(size_t)c]; if (sy[(size_t)c] > mxy) mxy = sy[(size_t)c];
+        }
+        if (!ok) continue;
+        if (mxx < bx - radioPx || mnx > bx + radioPx || mxy < by - radioPx || mny > by + radioPx) continue;   // lejos del pincel
+        Vector3 nrm(0, 0, 0);   // normal de mundo (Newell): las caras de espaldas no se pintan
+        for (int c = 0; c < n; c++) { const Vector3& a = wp[(size_t)c]; const Vector3& b = wp[(size_t)((c + 1) % n)];
+            nrm.x += (a.y - b.y) * (a.z + b.z); nrm.y += (a.z - b.z) * (a.x + b.x); nrm.z += (a.x - b.x) * (a.y + b.y); }
+        if (nrm.Dot(wp[0] - vp->viewPos) > 0.0f) continue;
+        for (int t = 1; t + 1 < n; t++) {   // abanico de triangulos en el espacio de la textura
+            const int i0 = F.idx[0], i1 = F.idx[(size_t)t], i2 = F.idx[(size_t)t + 1];
+            const float u0 = m->uv[i0*2] * tw, v0 = m->uv[i0*2+1] * th;
+            const float u1 = m->uv[i1*2] * tw, v1 = m->uv[i1*2+1] * th;
+            const float u2 = m->uv[i2*2] * tw, v2 = m->uv[i2*2+1] * th;
+            const float e1x = u1 - u0, e1y = v1 - v0, e2x = u2 - u0, e2y = v2 - v0;
+            const float det = e1x * e2y - e2x * e1y;
+            if (fabsf(det) < 1e-9f) continue;
+            const float inv = 1.0f / det;
+            int x0 = (int)floorf(u0 < u1 ? (u0 < u2 ? u0 : u2) : (u1 < u2 ? u1 : u2)), x1 = (int)ceilf(u0 > u1 ? (u0 > u2 ? u0 : u2) : (u1 > u2 ? u1 : u2));
+            int y0 = (int)floorf(v0 < v1 ? (v0 < v2 ? v0 : v2) : (v1 < v2 ? v1 : v2)), y1 = (int)ceilf(v0 > v1 ? (v0 > v2 ? v0 : v2) : (v1 > v2 ? v1 : v2));
+            if (x0 < 0) x0 = 0; if (y0 < 0) y0 = 0; if (x1 > tw - 1) x1 = tw - 1; if (y1 > th - 1) y1 = th - 1;
+            const Vector3& P0 = wp[0]; const Vector3& P1 = wp[(size_t)t]; const Vector3& P2 = wp[(size_t)t + 1];
+            for (int y = y0; y <= y1; y++) for (int x = x0; x <= x1; x++) {
+                const float dx = x + 0.5f - u0, dy = y + 0.5f - v0;
+                const float b1 = (dx * e2y - e2x * dy) * inv, b2 = (e1x * dy - dx * e1y) * inv, b0 = 1.0f - b1 - b2;
+                if (b0 < -0.02f || b1 < -0.02f || b2 < -0.02f) continue;   // (un poquito afuera tambien: sin huecos en los bordes)
+                const Vector3 p = P0 * b0 + P1 * b1 + P2 * b2;
+                float ssx, ssy; if (!vp->ProyectarPunto(p, ssx, ssy)) continue;
+                const float ddx = ssx - bx, ddy = ssy - by, d2 = ddx * ddx + ddy * ddy;
+                if (d2 > r2) continue;
+                if (oclusion) { const int fv = WPOclusionCaraEn(ssx, ssy); if (fv >= 0 && fv != (int)f) continue; }   // tapado
+                const float a = fuerza * fo.Eval(sqrtf(d2) / radioPx);
+                if (a <= 0.0f) continue;
+                TexEditMezclar(te, x, y, rgba, a);
+                TexEditRectUnir(rect, x, y);
+            }
+        }
+    }
+}
+static void WP3DPintarTextura(Viewport3D* vp, int mx, int my) {
+    Mesh* m = (ObjActivo && ObjActivo->getType() == ObjectType::mesh) ? (Mesh*)ObjActivo : NULL;
+    if (!m || !g_wpTexEd || !m->uv) return;
+    int parte = -1; Texture* t = WP3DTexturaActiva(m, parte);
+    if (!t || t != g_wpTexEd->tex) return;
+    vp->BindVista();
+    Matrix4 W; m->GetWorldMatrix(W);
+    const GLfloat* pos = (m->skinArmature && m->skinVertex) ? m->skinVertex : m->vertex;
+    BrushEstado& br = BrushGet();
+    unsigned char rgba[4];
+    for (int q = 0; q < 4; q++) { float c = br.color[q]; if (c < 0) c = 0; if (c > 1) c = 1; rgba[q] = (unsigned char)(c * 255.0f + 0.5f); }
+    const W3dFalloff& fo = BrushFalloffEfectivo();
+    const float bx = (float)(mx - vp->x), by = (float)(my - vp->y);
+    int rect[4] = { -1, -1, -1, -1 };
+    if (g_wpTexPrevX > -1e8f) {   // toques interpolados desde el anterior (sin huecos en un trazo rapido)
+        const float dx = bx - g_wpTexPrevX, dy = by - g_wpTexPrevY, dist = sqrtf(dx*dx + dy*dy);
+        float paso = br.radioPx / 3.0f; if (paso < 2.0f) paso = 2.0f;
+        int n = (int)ceilf(dist / paso); if (n < 1) n = 1; if (n > 64) n = 64;
+        for (int i = 1; i <= n; i++) { const float f = (float)i / (float)n; WP3DDabTextura(vp, m, W, pos, parte, g_wpTexPrevX + dx * f, g_wpTexPrevY + dy * f, br.radioPx, rgba, br.fuerza, fo, rect); }
+    } else WP3DDabTextura(vp, m, W, pos, parte, bx, by, br.radioPx, rgba, br.fuerza, fo, rect);
+    g_wpTexPrevX = bx; g_wpTexPrevY = by;
+    if (rect[0] >= 0) { TexEditSubir(g_wpTexEd, rect[0], rect[1], rect[2], rect[3]); g_wpTexCambio = true; }
+    g_redraw = true;
+}
+// (prueba del harness) un toque de pintura de textura en (mx,my) de pantalla, con su trazo completo
+bool W3dTexPaint3DHarness(Viewport3D* vp, int mx, int my) {
+    Mesh* m = (ObjActivo && ObjActivo->getType() == ObjectType::mesh) ? (Mesh*)ObjActivo : NULL;
+    if (!vp || !m || !WP3DTexTrazoIniciar(m)) return false;
+    WP3DPintarTextura(vp, mx, my);
+    const bool cambio = g_wpTexCambio;
+    UndoTexturaConfirmar(g_wpTexCambio); g_wpTexEd = NULL; g_wpTexCambio = false;
+    return cambio;
+}
 static void WP3DPasada(Viewport3D* vp, int mx, int my) {
-    if (InteractionMode == VertexPaint) WP3DPintarColor(vp, mx, my);
-    else                                WP3DPintar(vp, mx, my);
+    if (InteractionMode == VertexPaint)       WP3DPintarColor(vp, mx, my);
+    else if (InteractionMode == TexturePaint) WP3DPintarTextura(vp, mx, my);
+    else                                      WP3DPintar(vp, mx, my);
 }
 // arranca el trazo (snapshot de undo). false = no hay nada que pintar en esta malla.
 static bool WP3DTrazoIniciar(Mesh* m) {
+    if (InteractionMode == TexturePaint) return WP3DTexTrazoIniciar(m);
     if (InteractionMode == VertexPaint) {
         const int capa = WP3DCapaColor(m);
         if (capa < 0) return false;
@@ -1283,6 +1414,7 @@ static void WP3DPendienteResolver(Viewport3D* vp, int mx, int my, bool forzar) {
     if (movio) WP3DPasada(vp, mx, my);
 }
 static void WP3DTrazoFin() {
+    if (InteractionMode == TexturePaint) { UndoTexturaConfirmar(g_wpTexCambio); g_wpTexEd = NULL; g_wpTexCambio = false; return; }
     if (InteractionMode == VertexPaint) { UndoColorConfirmar(g_wpColorCambio); g_wpColorCambio = false; }
     else                                  WeightPaintTrazoFin();
 }
@@ -1717,6 +1849,10 @@ void Viewport3D::Render() {
       { extern int g_renderCaras, g_renderDraws;
         if (Viewport3DActive == this) { g_renderCaras = statTrisFrame; g_renderDraws = statDrawsFrame; } }
       g_prof.scene += W3dNowMs() - _tScn0; } // profiler: escena (skinning + modelos)
+
+    // TRAZADO DE RAYOS (vista Rendered con "Ray Tracing" tildado): avanza unos tiles y pega la imagen trazada
+    // sobre la escena GL (una textura del tamano del viewport). Los overlays del editor siguen encima con GL.
+    if (view == RenderType::Rendered && g_rt.on) RTViewportPaso(this);
 
     // huesos encima de todo (ignoran z-buffer). Es OVERLAY del editor: se apaga con "Show Overlays",
     // con su propio toggle "Armature" del menu de overlays, o jugando (ovl ya corta por modo juego).
@@ -2401,6 +2537,7 @@ void Viewport3D::RenderOverlay() {
     const bool pinturaCursor = (InteractionMode == WeightPaint || InteractionMode == VertexPaint || InteractionMode == TexturePaint);
     if (show3DCursor && !pinturaCursor) Render3Dcursor();
     if (showOverlays && !pinturaCursor) GizmoRender(this);   // gizmo de mover (Overlays > Gizmo)
+    if (showOverlays && !pinturaCursor) ProporcionalRender(this);   // circulo de influencia del proportional editing
 
     // (la barra de botones 2D NO se dibuja aca: es chrome del area, no un
     //  overlay. Va en RenderUI() junto con los bordes para que se vea aunque
@@ -2621,7 +2758,7 @@ void Viewport3D::RenderUI() {
             // ===== MODO JUEGO (sim corriendo): barra MINIMA. Se puede: parar/
             // pausar/reanudar, y los menus View (cambiar camara) / Overlays /
             // Render. Nada de editar. Con STOP la interfaz vuelve a la normal. =====
-            static const int kOcultar[] = { BR_Mode, BR_SelMode, BR_Pivot, BR_Orient, BR_Snap,
+            static const int kOcultar[] = { BR_Mode, BR_SelMode, BR_Pivot, BR_Orient, BR_Snap, BR_Proporcional,
                                             BR_Select, BR_Add, BR_Mesh, BR_Animation, BR_Object, BR_UV };
             for (size_t i = 0; i < sizeof(kOcultar) / sizeof(kOcultar[0]); i++) {
                 Button* bo = BarRolBtn(BarButtons, kOcultar[i]);
@@ -2720,6 +2857,16 @@ void Viewport3D::RenderUI() {
                 bSnap->tinte = g_snap.enabled ? snapVerde : NULL;
                 bSnap->colorTexto = g_snap.enabled ? acc : NULL;
             }
+            // PROPORTIONAL EDITING: el icono de la curva de caida elegida, VERDE cuando esta ON (tecla O)
+            Button* bProp = BarRolBtn(BarButtons, BR_Proporcional);
+            if (bProp){
+                bProp->visible = !pintura && (InteractionMode == EditMode || InteractionMode == ObjectMode);
+                bProp->icon = ProporcionalTipoIcono(g_prop.tipo);
+                static float propVerde[3]; const float* accP = ListaColores[static_cast<int>(ColorID::accent)];
+                for (int i=0;i<3;i++) propVerde[i]=accP[i]*0.4f;
+                bProp->tinte = g_prop.on ? propVerde : NULL;
+                bProp->colorTexto = g_prop.on ? accP : NULL;
+            }
             // el OJO del overlay dice si estan prendidos: abierto = se ven, cerrado = apagados. Va aca (por
             // frame) y no al construirlo, porque el estado cambia.
             for (size_t i = 0; i < BarButtons.size(); i++)
@@ -2732,6 +2879,8 @@ void Viewport3D::RenderUI() {
         RenderToolbar();
         // estadisticas/fps (texto blanco arriba a la derecha; misma ortho 2D)
         RenderEstadisticas();
+        // "Ray Tracing: 3/16" .. "done" (arriba a la izquierda, misma ortho 2D)
+        if (view == RenderType::Rendered) RTRenderEstado(this);
     }
 
     w3dEngine::MatrixMode(w3dEngine::Projection);
@@ -3559,6 +3708,22 @@ void Viewport3D::event_key_down(int tecla, bool repeticion){
                 // L: Select Linked (la isla conectada bajo el mouse)
                 if (estado == editNavegacion && InteractionMode == EditMode && g_editMesh)
                     LayoutSelectLinked(lastMouseX, lastMouseY);
+                break;
+            case W3dK_PGUP: case W3dK_PGDN:
+                // Re Pag / Av Pag: RADIO del proportional editing durante un transform (teclado sin rueda, N95)
+                if (ProporcionalAplicable() && estado != editNavegacion) {
+                    ProporcionalRadioEscalar(key == W3dK_PGUP ? 1.1f : 1.0f / 1.1f); ProporcionalReaplicar(); g_redraw = true;
+                }
+                break;
+            case W3dK_O:
+                // O: PROPORTIONAL EDITING on/off (Edit y Object Mode). En medio de un transform tambien
+                // vale: los vecinos vuelven a su lugar (off) o se arrastran desde el proximo transform (on).
+                if (InteractionMode == EditMode || InteractionMode == ObjectMode) {
+                    g_prop.on = !g_prop.on;
+                    Notificar(T(g_prop.on ? "Proportional Editing: on" : "Proportional Editing: off"), false);
+                    ProporcionalReaplicar();
+                    g_redraw = true;
+                }
                 break;
             case W3dK_U:
                 // Edit Mode: U abre el menu UV (Mark Seam + proyecciones).

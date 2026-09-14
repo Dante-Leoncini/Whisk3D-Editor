@@ -3,7 +3,13 @@
 #include "Undo.h" // Ctrl+Z: capturar modo / seleccion
 #include "ViewPorts/PopUp/ConfirmarPopup.h" // AbrirConfirmarBorrado (popup de confirmar borrado)
 #include "ViewPorts/LayoutInput.h"
-#include "edit/MeshEdit.h"   // W3dTriangularCara
+#include "edit/MeshEdit.h"
+#include "edit/UVUnwrap.h"
+#include "edit/Proporcional.h"
+#include "PopUp/NuevaTexturaPopup.h"
+#include "io/TexturaEditada.h"          // Save Texture / Make External / Make Internal + el "*" de las sin guardar // "New Texture..." del dropdown Texture del UV editor    // proportional editing: pesos de los vertices no seleccionados
+#include <queue>
+#include <functional>      // menu U: unwrap / smart project / lightmap / follow quads / reset   // W3dTriangularCara
 #include "ViewPorts/PoseTransform.h" // Pose Mode transform (extraido a su propio archivo)
 #include "ViewPorts/Notificaciones.h" // toasts (extraido a su propio archivo)
 #include "ViewPorts/NumInput.h" // entrada numerica/formulas (extraido a su propio archivo)
@@ -493,6 +499,9 @@ void LayoutJuegoPuroToggle() {
     g_redraw = true;
 }
 
+static void LayoutAccionTipo(int aId);
+// (harness) cambia el TIPO de un viewport por la misma puerta que el menu de tipo (ids de LayoutCrearViewport)
+void LayoutCambiarTipoViewport(ViewportBase* v, int aId) { gMenuTipoDe = v; LayoutAccionTipo(aId); }
 // opcion del menu de tipo: cambiar / expand / split / maximizar
 static void LayoutAccionTipo(int aId) {
     if (!gMenuTipoDe || !rootViewport) return;
@@ -1291,6 +1300,31 @@ void LayoutProyectarUVDesdeVista(bool bounds) {
     g_redraw = true;
     Notificar(bounds ? "UV: projected from view (bounds)" : "UV: projected from view", false);
 }
+// las operaciones del menu UV que DESPLIEGAN (edit/UVUnwrap): 0..2 unwrap (angular/conforme/estiramiento),
+// 3 smart project, 4 lightmap, 5 follow active quads, 6 reset. Avisan el resultado (islas) o el error.
+static void LayoutUVOperacion(int op) {
+    if (InteractionMode != EditMode || !g_editMesh) return;
+    Mesh* m = (Mesh*)g_editMesh; std::string msg; int n = 0; bool ok = false; char num[32]; num[0] = 0;
+    switch (op) {
+        case 0: case 1: case 2:
+            ok = W3dUnwrap(m, op, 0.02f, msg, &n);
+            if (ok) { sprintf(num, "%d", n); msg = std::string(T("Unwrap")) + ": " + num + " " + T("islands"); }
+            break;
+        case 3:
+            ok = W3dSmartUVProject(m, 66.0f, 0.02f, msg, &n);
+            if (ok) { sprintf(num, "%d", n); msg = std::string(T("Smart UV Project")) + ": " + num + " " + T("islands"); }
+            break;
+        case 4: ok = W3dLightmapPack(m, 0.02f, msg); if (ok) msg = T("Lightmap Pack"); break;
+        case 5:
+            ok = W3dFollowActiveQuads(m, msg, &n);
+            if (ok) { sprintf(num, "%d", n); msg = std::string(T("Follow Active Quads")) + ": " + num + " quads"; }
+            break;
+        case 6: ok = W3dUVReset(m, msg); if (ok) msg = std::string(T("Reset")) + " UV"; break;
+        default: return;
+    }
+    Notificar(ok ? msg : std::string(T(msg.c_str())), !ok);
+    g_redraw = true;
+}
 // el menu UV (tecla U o el header "UV"): operaciones sobre las CARAS seleccionadas.
 static PopupMenu* gMenuUVops = NULL; // file-static: LayoutCambiarMenuBarra lo necesita (izq/der para salir del menu UV)
 // El menu de barra ABIERTO y el ROL del boton que lo abrio. Se registran juntos en RegistrarMenuBarra(), que llama
@@ -1315,9 +1349,12 @@ void LayoutMenuUV(int mx, int my) {
     if (InteractionMode != EditMode || !g_editMesh) return;
     if (!gMenuUVops) {
         gMenuUVops = new PopupMenu(); gMenuUVops->titulo = "UV"; gMenuUVops->action = LayoutAccionObject;
-        gMenuUVops->Agregar(T("Unwrap"), 350)->atajo = "soon";
-        gMenuUVops->Agregar(T("Smart UV Project"), 351)->atajo = "soon";
-        gMenuUVops->Agregar(T("Follow Active Quads"), 352)->atajo = "soon";
+        gMenuUVops->Agregar(T("Unwrap Angle Based"), 350);
+        gMenuUVops->Agregar(T("Unwrap Conformal"), 365);
+        gMenuUVops->Agregar(T("Unwrap Minimum Stretch"), 366);
+        gMenuUVops->Agregar(T("Smart UV Project"), 351);
+        gMenuUVops->Agregar(T("Lightmap Pack"), 367);
+        gMenuUVops->Agregar(T("Follow Active Quads"), 352);
         gMenuUVops->Agregar(T("Cube Projection"), 353);
         gMenuUVops->Agregar(T("Cylinder Projection"), 354);
         gMenuUVops->Agregar(T("Sphere Projection"), 355);
@@ -1325,6 +1362,7 @@ void LayoutMenuUV(int mx, int my) {
         gMenuUVops->Agregar(T("Project from View (Bounds)"), 357);
         gMenuUVops->Agregar(T("Mark Seam"), 358);
         gMenuUVops->Agregar(T("Clear Seam"), 359);
+        gMenuUVops->Agregar(T("Reset"), 368);
     }
     if (MenuAbierto) MenuAbierto->Cerrar();
     gMenuUVops->Abrir(mx, my, MenuPantallaW, MenuPantallaH);
@@ -1496,9 +1534,13 @@ void LayoutAccionObject(int aId) {
         case 330: LayoutMarkSharp(true);  break; // Edge > Mark Sharp
         case 331: LayoutMarkSharp(false); break; // Edge > Clear Sharp
         case 340: LayoutLoopCutDesdeActivo(); break; // Edge/Face > Loop Cut and Slide (elemento activo)
-        case 350: Notificar(T("Unwrap: not implemented yet"), false); break;              // UV > Unwrap (pendiente: LSCM)
-        case 351: Notificar(T("Smart UV Project: not implemented yet"), false); break;    // UV > Smart UV Project (pendiente)
-        case 352: Notificar(T("Follow Active Quads: not implemented yet"), false); break; // UV > Follow Active Quads (pendiente)
+        case 350: LayoutUVOperacion(0); break; // UV > Unwrap Angle Based
+        case 365: LayoutUVOperacion(1); break; // UV > Unwrap Conformal
+        case 366: LayoutUVOperacion(2); break; // UV > Unwrap Minimum Stretch
+        case 351: LayoutUVOperacion(3); break; // UV > Smart UV Project
+        case 367: LayoutUVOperacion(4); break; // UV > Lightmap Pack
+        case 352: LayoutUVOperacion(5); break; // UV > Follow Active Quads
+        case 368: LayoutUVOperacion(6); break; // UV > Reset
         case 353: LayoutProyectarUV(0); break; // UV > Cube Projection
         case 354: LayoutProyectarUV(1); break; // UV > Cylinder Projection
         case 355: LayoutProyectarUV(2); break; // UV > Sphere Projection
@@ -1506,6 +1548,8 @@ void LayoutAccionObject(int aId) {
         case 357: LayoutProyectarUVDesdeVista(true);  break; // UV > Project from View (Bounds)
         case 358: LayoutMarkSeam(true);  break; // UV > Mark Seam
         case 359: LayoutMarkSeam(false); break; // UV > Clear Seam
+        case 430: case 431: case 432: case 433: case 434: case 435: case 436: case 437:
+            ProporcionalSetTipo(aId - 430); break;   // Proportional Editing > curva de caida
         case 200: SetOriginGeometryToOrigin(); break; // Set Origin > Geometry to Origin
         case 201: SetOriginOriginToGeometry(); break; // Set Origin > Origin to Geometry
         case 202: SetOriginToCursor();         break; // Set Origin > Origin to 3D Cursor
@@ -1982,6 +2026,7 @@ static Mesh*      gUVTexMesh   = NULL;
 static PopupMenu* gMenuUVTex   = NULL;
 static std::vector<std::string> gUVTexRutas;   // rutas de las opciones de proyecto (id 9001+k)
 static void LayoutAccionUVTex(int id) {
+    if (id == 8999) { AbrirNuevaTexturaPopup(); g_redraw = true; return; }   // "New Texture...": el formulario
     if (id >= 9001) {                                   // textura del PROYECTO (por ruta)
         size_t k = (size_t)(id - 9001);
         if (k < gUVTexRutas.size()) UVSetTexProyecto(gUVTexRutas[k]);
@@ -1994,12 +2039,54 @@ static void LayoutAccionUVTex(int id) {
     else            UVSetTexOverride(gUVTexMesh, id);   // ver a mano la parte (material) 'id'
     g_redraw = true;
 }
+// ---- menu GUARDAR del UV editor (icono diskette): la textura mostrada, que vive en memoria hasta guardarse ----
+static PopupMenu* gMenuUVGuardar = NULL;
+static Texture* UVGuardarTextura() {
+    Mesh* m = (ObjActivo && ObjActivo->getType() == ObjectType::mesh) ? (Mesh*)ObjActivo : NULL;
+    return UVTexturaMostrada(m);
+}
+static void UVGuardarExternaElegida(const std::string& elegido) {
+    Texture* t = UVGuardarTextura(); TexturaEditable* te = t ? TexEditObtener(t) : NULL;
+    if (!te) return;
+    std::string nombre = t->path;
+    const size_t sl = nombre.find_last_of("/\\"); if (sl != std::string::npos) nombre = nombre.substr(sl + 1);
+    const size_t pt = nombre.rfind('.'); if (pt != std::string::npos) nombre = nombre.substr(0, pt);
+    const std::string ruta = W3dRutaDeSalida(elegido, nombre, ".png");
+    std::string msg;
+    if (TexEditHacerExterna(te, ruta, msg)) Notificar(std::string(T("Texture saved")) + ": " + ruta, false);
+    else Notificar(T(msg.c_str()), true);
+    g_redraw = true;
+}
+static void LayoutAccionUVGuardar(int id) {
+    Texture* t = UVGuardarTextura(); TexturaEditable* te = t ? TexEditObtener(t) : NULL;
+    if (!te) { Notificar(T("Save Texture: no texture"), true); return; }
+    std::string msg;
+    if (id == 1) { if (TexEditGuardar(te, msg)) Notificar(std::string(T("Texture saved")) + ": " + TexEditEtiqueta(t), false); else Notificar(T(msg.c_str()), true); }
+    else if (id == 2) { AbrirFileBrowser(T("Make External..."), T("Save"), ".png", UVGuardarExternaElegida, true); return; }
+    else if (id == 3) { if (TexEditHacerInterna(te, msg)) Notificar(std::string(T("Texture saved")) + ": " + TexEditEtiqueta(t), false); else Notificar(T(msg.c_str()), true); }
+    g_redraw = true;
+}
+static void LayoutAbrirMenuUVGuardar(UVEditor* uv, int x, int y) {
+    (void)uv;
+    Texture* t = UVGuardarTextura();
+    if (!t) return;
+    if (!gMenuUVGuardar) { gMenuUVGuardar = new PopupMenu(); gMenuUVGuardar->action = LayoutAccionUVGuardar; }
+    gMenuUVGuardar->Limpiar();
+    gMenuUVGuardar->titulo = TexEditEtiqueta(t);
+    gMenuUVGuardar->Agregar(T("Save Texture"), 1);
+    if (TexEditEsExterna(t)) gMenuUVGuardar->Agregar(T("Make Internal"), 3);   // vuelve al .w3d
+    else                     gMenuUVGuardar->Agregar(T("Make External..."), 2); // un PNG afuera (se referencia por ruta)
+    if (MenuAbierto && MenuAbierto != gMenuUVGuardar) MenuAbierto->Cerrar();
+    gMenuUVGuardar->Abrir(x, y, MenuPantallaW, MenuPantallaH);
+    MenuAbierto = gMenuUVGuardar;
+}
 static void LayoutAbrirMenuUVTex(UVEditor* uv, int x, int y) {
     if (!uv) return;
     Mesh* m = (ObjActivo && ObjActivo->getType() == ObjectType::mesh) ? (Mesh*)ObjActivo : NULL;
     gUVTexTarget = uv; gUVTexMesh = m;   // sin malla el menu sale igual (solo el proyecto)
     if (!gMenuUVTex) gMenuUVTex = new PopupMenu();
     gMenuUVTex->Limpiar();
+    gMenuUVTex->Agregar(T("New Texture..."), 8999);   // generar una textura de prueba (liso / grilla UV / grilla de colores)
     const bool sinProyecto = UVTexProyectoRuta().empty();
     gMenuUVTex->Agregar(T("Auto (active part)"), 9000)->verde = sinProyecto && UVTexOverrideParte() < 0;
     // las TEXTURAS DISTINTAS del modelo (dedup por puntero). El id de cada opcion = la parte que la
@@ -2015,6 +2102,7 @@ static void LayoutAbrirMenuUVTex(UVEditor* uv, int x, int y) {
         std::string lbl; char buf[24]; sprintf(buf, "Texture %d", (int)vistas.size());
         if (!t->path.empty()){ size_t sl = t->path.find_last_of("/\\"); lbl = (sl==std::string::npos) ? t->path : t->path.substr(sl+1); }
         else lbl = buf;
+        if (TexEditSinGuardar(t)) lbl += "*";   // en memoria / con cambios sin guardar
         gMenuUVTex->Agregar(lbl, (int)i)->verde = (sinProyecto && UVTexOverrideParte() == (int)i);
     }
     // ...y TODAS las del PROYECTO: las texturas de los MATERIALES de la escena
@@ -2034,11 +2122,16 @@ static void LayoutAbrirMenuUVTex(UVEditor* uv, int x, int y) {
         if (!ruta.empty()) candidatas.push_back(ruta);
     }
     Textura2DListar(candidatas);                            // la UI del juego
+    // ...y las texturas CARGADAS del proyecto que ningun material tiene puesta (las generadas con "New Texture"
+    // que quedaron reemplazadas, las que se probaron y se sacaron): siguen en Textures[] despues de las de la UI
+    for (size_t i = (size_t)TexturasBase(); i < Textures.size(); i++)
+        if (Textures[i] && Textures[i]->iID && !Textures[i]->path.empty()) candidatas.push_back(Textures[i]->path);
     std::vector<std::string> nombresVistos;
     for (size_t i = 0; i < candidatas.size(); i++) {
         const std::string& ruta = candidatas[i];
         size_t sl = ruta.find_last_of("/\\");
         std::string lbl = (sl == std::string::npos) ? ruta : ruta.substr(sl + 1);
+        { Texture* tt = TexturaBuscar(ruta); if (tt && TexEditSinGuardar(tt)) lbl += "*"; }   // sin guardar
         bool dup = false;
         for (size_t k = 0; k < nombresVistos.size(); k++) if (nombresVistos[k] == lbl) { dup = true; break; }
         if (dup) continue;
@@ -2657,6 +2750,8 @@ bool LayoutClickBarraUV(UVEditor* uv, int mx, int my) {
             case BRUV_Snap:      LayoutAbrirMenuUVSnap(uv, bx, by);    return true;
             case BRUV_Texture:   LayoutAbrirMenuUVTex(uv, bx, by);     return true; // dropdown de texturas
             case BRUV_Mipmap:    LayoutAbrirMenuUVMip(uv, bx, by);     return true; // inspector de la piramide
+            case BRUV_Editar:    UVToggleEditarTextura(uv);            return true; // pintura de textura on/off
+            case BRUV_Guardar:   LayoutAbrirMenuUVGuardar(uv, bx, by); return true; // Save Texture / externa / interna
             case BRUV_Animation: LayoutAbrirMenuUVAnim(uv, bx, by);    return true; // keyframes de la vertex anim
         }
     }
@@ -2753,6 +2848,7 @@ bool LayoutAbrirMenuDeBarra(ViewportBase* vp, int mx, int my) {
     Button* bOri  = BarRolBtn(B, BR_Orient); Button* bUV   = BarRolBtn(B, BR_UV);
     Button* bView = BarRolBtn(B, BR_View);   Button* bMesh = BarRolBtn(B, BR_Mesh);
     Button* bSnap = BarRolBtn(B, BR_Snap);
+    Button* bProp = BarRolBtn(B, BR_Proporcional);
     Button* bAnim = BarRolBtn(B, BR_Animation);
     if (MenuMode && bMode && bMode->visible && bMode->Contains(mx, my)) {
         objetivo = MenuMode; boton = bMode;
@@ -2772,6 +2868,11 @@ bool LayoutAbrirMenuDeBarra(ViewportBase* vp, int mx, int my) {
         if (MenuAbierto) MenuAbierto->Cerrar();
         LayoutMenuSnapTool(bSnap->sx, bSnap->sy + bSnap->height - GlobalScale);
         RegistrarMenuBarra(MenuAbierto, bSnap);
+        return true;
+    } else if (bProp && bProp->visible && bProp->Contains(mx, my)) {
+        if (MenuAbierto) MenuAbierto->Cerrar();
+        LayoutMenuProporcional(bProp->sx, bProp->sy + bProp->height - GlobalScale);
+        RegistrarMenuBarra(MenuAbierto, bProp);
         return true;
     } else if (MenuView && bView && bView->visible && bView->Contains(mx, my)) {
         objetivo = MenuView; boton = bView;   // "View" (antes de Select): submenu Viewpoint
@@ -2955,6 +3056,7 @@ static void LayoutCambiarMenuBarraUV(int dir) {
         else if (MenuAbierto == gMenuUVSnap)    rol = BRUV_Snap;
         else if (MenuAbierto == gMenuUVTex)     rol = BRUV_Texture;
         else if (MenuAbierto == gMenuUVMip)     rol = BRUV_Mipmap;
+        else if (MenuAbierto == gMenuUVGuardar) rol = BRUV_Guardar;
         else if (MenuAbierto == gMenuUVAnim)    rol = BRUV_Animation;
         if (rol >= 0) idx = BarRolIdx(B, rol);
     }
@@ -3126,6 +3228,8 @@ void LayoutMenuEditContexto(int mx, int my) {
             gMenuEdge->Agregar(T("Rip"), 341)->atajo = "V";
             gMenuEdge->Agregar(T("Mark Sharp"), 330)->atajo = "W";
             gMenuEdge->Agregar(T("Clear Sharp"), 331);
+            gMenuEdge->Agregar(T("Mark Seam"), 358);   // costuras del unwrap (tambien en el menu U)
+            gMenuEdge->Agregar(T("Clear Seam"), 359);
             // (Delete se movio al menu "Mesh": es comun a vertice/borde/cara)
         }
         m = gMenuEdge;
@@ -3164,6 +3268,8 @@ void LayoutMenuSharp(int mx, int my) {
         gMenuSharp = new PopupMenu(); gMenuSharp->titulo = T("Edge"); gMenuSharp->action = LayoutAccionObject;
         gMenuSharp->Agregar(T("Mark Sharp"), 330);
         gMenuSharp->Agregar(T("Clear Sharp"), 331);
+        gMenuSharp->Agregar(T("Mark Seam"), 358);
+        gMenuSharp->Agregar(T("Clear Seam"), 359);
     }
     if (MenuAbierto) MenuAbierto->Cerrar();
     gMenuSharp->Abrir(mx, my, MenuPantallaW, MenuPantallaH);
@@ -3193,6 +3299,24 @@ static void AccionSnapRouter(int id){
 }
 static const char* SnapBaseNom(int b){ return b==SNAP_CLOSEST?"Closest":b==SNAP_CENTER?"Center":b==SNAP_MEDIAN?"Median":"Active"; }
 static const char* SnapTargetNom(int t){ return t==SNAP_VERTEX?"Vertex":t==SNAP_EDGE?"Edge":t==SNAP_FACE?"Face":t==SNAP_EDGECENTER?"Edge Center":"Face Center"; }
+// ===== menu PROPORTIONAL EDITING (el icono de la curva de la barra / tecla O) =====
+static PopupMenu* gMenuProp = NULL;
+void LayoutMenuProporcional(int mx, int my){
+    if (!gMenuProp){ gMenuProp = new PopupMenu(); gMenuProp->titulo = T("Proportional Editing"); gMenuProp->action = LayoutAccionObject; }
+    gMenuProp->Limpiar();
+    gMenuProp->AgregarCheck(T("Enable"), 0, &g_prop.on)->atajo = "O";
+    // el resto en GRIS con el proportional apagado (como el menu Snap)
+    gMenuProp->AgregarCheck(T("Connected Only"), 0, &g_prop.conectado)->gris = &g_prop.on;
+    for (int t = 0; t < PropTipos; t++){
+        MenuItem* it = gMenuProp->Agregar(T(ProporcionalTipoNombre(t)), 430 + t, ProporcionalTipoIcono(t));
+        it->verde = (g_prop.tipo == t); it->gris = &g_prop.on;
+    }
+    gMenuProp->AgregarFloat(T("Proportional Size"), 0, &g_prop.radio, 0.01f, 20.0f)->gris = &g_prop.on;
+    if (MenuAbierto) MenuAbierto->Cerrar();
+    gMenuProp->Abrir(mx, my, MenuPantallaW, MenuPantallaH);
+    MenuAbierto = gMenuProp;
+}
+
 void LayoutMenuSnapTool(int mx, int my){
     if (!gMenuSnapBase){ gMenuSnapBase=new PopupMenu(); gMenuSnapBase->titulo=T("Snap Base"); }
     gMenuSnapBase->Limpiar();
@@ -3293,6 +3417,12 @@ struct EditVtxSnap {
     Vector3 worldNormal; // normal del vertice en MUNDO (para Shrink/Fatten: cada vert se mueve por SU normal)
 };
 static std::vector<EditVtxSnap> gEVsnap;
+// PROPORTIONAL EDITING: los vertices NO seleccionados que vienen arrastrados, con su distancia a lo seleccionado
+// (medida UNA vez al arrancar el transform) y el peso que les toca con el radio actual (se re-evalua si el
+// radio cambia con la rueda o la barra). Escribirlos es reescribir desde world0, como con la seleccion.
+struct EditVtxProp { int editK; Vector3 world0; Vector3 worldNormal; float dist; float peso; };
+static std::vector<EditVtxProp> gEVprop;
+static void EVEscribir();
 static Mesh*      gEVmesh   = NULL;
 static Quaternion gEVrg;            // rotacion global de la malla (EFECTIVA, constante en el drag)
 static Vector3    gEVsg(1,1,1);     // escala global
@@ -3353,9 +3483,62 @@ Vector3 EditXformTransDelta(){ return gEVtrans; }       // translacion de MUNDO 
 float   EditXformScaleFactor(){ return 1.0f + gEVscaleAmt; }
 float   EditXformShrinkAmt(){ return gEVscaleAmt; }     // distancia por la normal (Shrink/Fatten)
 
+static void EVProporcionalPesos(){
+    for (size_t i = 0; i < gEVprop.size(); i++) gEVprop[i].peso = ProporcionalPeso(gEVprop[i].dist, gEVprop[i].editK);
+}
+// mide la distancia de cada vertice NO seleccionado a lo seleccionado: euclidea al mas cercano, o por las ARISTAS
+// (Connected Only: caminos mas cortos desde todos los seleccionados a la vez, con largos de mundo; una isla
+// suelta queda fuera). Se hace una sola vez por transform: en el N95 no hay tiempo de medir por frame.
+static void EVProporcionalCapturar(Mesh* m, EditMesh* e, const std::vector<char>& selEdit){
+    gEVprop.clear();
+    if (!g_prop.on) return;
+    const size_t N = e->editVerts.size();
+    std::vector<Vector3> W(N);
+    for (size_t k = 0; k < N; k++) W[k] = EVLocalAMundo(Vector3(e->pos[k*3], e->pos[k*3+1], e->pos[k*3+2]));
+    std::vector<float> dist(N, 1e30f);
+    if (g_prop.conectado){
+        std::vector<std::vector<int> > ady(N);
+        for (size_t eg = 0; eg + 1 < e->lineIdx.size(); eg += 2){
+            const int a = e->lineIdx[eg], b = e->lineIdx[eg+1];
+            if (a < 0 || b < 0 || (size_t)a >= N || (size_t)b >= N) continue;
+            ady[(size_t)a].push_back(b); ady[(size_t)b].push_back(a);
+        }
+        std::priority_queue<std::pair<float,int>, std::vector<std::pair<float,int> >, std::greater<std::pair<float,int> > > cola;
+        for (size_t k = 0; k < N; k++) if (selEdit[k]){ dist[k] = 0.0f; cola.push(std::make_pair(0.0f, (int)k)); }
+        while (!cola.empty()){
+            const float d = cola.top().first; const int k = cola.top().second; cola.pop();
+            if (d > dist[(size_t)k]) continue;
+            const std::vector<int>& v = ady[(size_t)k];
+            for (size_t j = 0; j < v.size(); j++){
+                const int nb = v[j]; const float nd = d + (W[(size_t)nb] - W[(size_t)k]).Length();
+                if (nd < dist[(size_t)nb]){ dist[(size_t)nb] = nd; cola.push(std::make_pair(nd, nb)); }
+            }
+        }
+    } else {
+        std::vector<int> sel; for (size_t k = 0; k < N; k++) if (selEdit[k]) sel.push_back((int)k);
+        for (size_t k = 0; k < N; k++){
+            if (selEdit[k]) continue;
+            float mejor = 1e30f;
+            for (size_t s = 0; s < sel.size(); s++){ const Vector3 d = W[k] - W[(size_t)sel[s]]; const float dd = d.x*d.x + d.y*d.y + d.z*d.z; if (dd < mejor) mejor = dd; }
+            dist[k] = sqrtf(mejor);
+        }
+    }
+    const int nV = m->vertexSize;
+    for (size_t k = 0; k < N; k++){
+        if (selEdit[k] || dist[k] >= 1e29f) continue;
+        EditVtxProp p; p.editK = (int)k; p.world0 = W[k]; p.dist = dist[k]; p.peso = 0.0f;
+        const int rep = e->editVerts[k];
+        Vector3 ln = (m->normals && rep >= 0 && rep < nV) ? Vector3(m->normals[rep*3]/127.0f, m->normals[rep*3+1]/127.0f, m->normals[rep*3+2]/127.0f) : Vector3(0,1,0);
+        p.worldNormal = (gEVrg * ln).Normalized();
+        gEVprop.push_back(p);
+    }
+    EVProporcionalPesos();
+}
+void EditXformProporcionalActualizar(){ if (!gEVmesh) return; EVProporcionalPesos(); EVEscribir(); }
+
 void EditXformIniciar(){
     g_xformPrimerMov = true; // el primer motion arranca en cero (no usa el delta viejo)
-    gEVsnap.clear(); gEVmesh = NULL;
+    gEVsnap.clear(); gEVprop.clear(); gEVmesh = NULL;
     gEVshrink = false; // por defecto es un transform comun; el starter de Shrink/Fatten lo prende despues
     ClipMirrorReset(); // nuevo transform: ningun vert esta "pegado" al plano del mirror todavia
     if (InteractionMode != EditMode || !g_editMesh) return;
@@ -3430,6 +3613,7 @@ void EditXformIniciar(){
         if (m->normals) nNormAcum = nNormAcum + ln;
     }
     if (gEVsnap.empty()){ gEVmesh = NULL; return; } // nada seleccionado
+    EVProporcionalCapturar(m, e, selEdit); // proportional editing: los no seleccionados que vienen arrastrados
 
     // pivote en MUNDO segun el modo (3D cursor o el centro de la seleccion)
     if (g_transformPivot == PivotCursor3D){
@@ -3463,7 +3647,7 @@ void EditXformIniciar(){
 // dejo asi); se mueve constreñida a la normal promedio (en MUNDO).
 void EditXformIniciarExtrude(const Vector3& normalLocal){
     estado = translacion;
-    EditXformIniciar(); // snapshot de la tapa seleccionada
+    EditXformIniciar(); gEVprop.clear(); // (sin proportional: la base coincide con la tapa recien extruida y se iria con ella) // snapshot de la tapa seleccionada
     if (!EditXformActivo()){ estado = editNavegacion; return; }
     Vector3 a = gEVrg * normalLocal;          // a mundo (la rotacion global de la malla)
     float ln = sqrtf(a.x*a.x + a.y*a.y + a.z*a.z);
@@ -3542,6 +3726,17 @@ static Vector3 SnapFaceIndividualPunto(const Vector3& wn){
 
 // recomputa cada vertice desde su world0 + el acumulado activo y lo escribe en la
 // malla (todos los GPU del grupo) + refresca el overlay.
+// escala DIRECCIONAL de un offset al pivote segun el eje/plano (orientacion); amt = factor - 1
+static Vector3 EVEscalarOff(Mesh* m, const Vector3& off, float amt){
+    if (axisSelect==X||axisSelect==Y||axisSelect==Z){ Vector3 a = EjeOrientado(*m, axisSelect); return off + a*(off.Dot(a)*amt); }
+    if (axisSelect==PlaneX||axisSelect==PlaneY||axisSelect==PlaneZ){
+        int ex=(axisSelect==PlaneX)?X:(axisSelect==PlaneY)?Y:Z;
+        Vector3 a=EjeOrientado(*m, ex); Vector3 inPlane = off - a*off.Dot(a);
+        return off + inPlane*amt;
+    }
+    return off*(1.0f + amt); // libre: uniforme
+}
+
 static void EVEscribir(){
     if (!gEVmesh) return;
     Mesh* m = gEVmesh;
@@ -3559,18 +3754,7 @@ static void EVEscribir(){
         } else if (gEVshrink){ // SHRINK/FATTEN: cada vert se mueve por SU normal (mundo) * distancia acumulada
             wn = s.world0 + s.worldNormal * gEVscaleAmt;
         } else { // EditScale: escala DIRECCIONAL segun el eje/plano (orientacion)
-            Vector3 off = s.world0 - gEVpivot;
-            if (axisSelect==X||axisSelect==Y||axisSelect==Z){
-                Vector3 a = EjeOrientado(*m, axisSelect);
-                wn = gEVpivot + off + a*(off.Dot(a)*gEVscaleAmt);
-            } else if (axisSelect==PlaneX||axisSelect==PlaneY||axisSelect==PlaneZ){
-                int ex=(axisSelect==PlaneX)?X:(axisSelect==PlaneY)?Y:Z;
-                Vector3 a = EjeOrientado(*m, ex);
-                Vector3 inPlane = off - a*off.Dot(a);
-                wn = gEVpivot + off + inPlane*gEVscaleAmt;
-            } else { // libre: uniforme
-                wn = gEVpivot + off*(1.0f + gEVscaleAmt);
-            }
+            wn = gEVpivot + EVEscalarOff(m, s.world0 - gEVpivot, gEVscaleAmt);
         }
         Vector3 ln = EVMundoALocal(wn);
         // escribe la posicion EDITABLE (autoritativa); NO toca vertex[] a mano
@@ -3579,12 +3763,34 @@ static void EVEscribir(){
             m->edit->pos[k*3]=ln.x; m->edit->pos[k*3+1]=ln.y; m->edit->pos[k*3+2]=ln.z;
         }
     }
+    // PROPORTIONAL EDITING: los no seleccionados reciben el MISMO transform a su peso (peso 0 o apagado = vuelven
+    // a su lugar). El deslizar por arista (slide) no arrastra a nadie.
+    if (!gEVprop.empty() && !gEVslide){
+        const bool prendido = g_prop.on;
+        for (size_t i = 0; i < gEVprop.size(); i++){
+            const EditVtxProp& p = gEVprop[i];
+            const float w = prendido ? p.peso : 0.0f;
+            Vector3 wn = p.world0;
+            if (w > 0.0f){
+                if (estado == translacion) wn = p.world0 + gEVtrans * w;
+                else if (estado == rotacion) wn = gEVpivot + Quaternion::Slerp(Quaternion(), gEVrotTotal, w) * (p.world0 - gEVpivot);
+                else if (gEVshrink) wn = p.world0 + p.worldNormal * (gEVscaleAmt * w);
+                else wn = gEVpivot + EVEscalarOff(m, p.world0 - gEVpivot, gEVscaleAmt * w);
+            }
+            Vector3 ln = EVMundoALocal(wn);
+            const int k = p.editK;
+            if (m->edit && k >= 0 && k*3+2 < (int)m->edit->pos.size()){
+                m->edit->pos[k*3]=ln.x; m->edit->pos[k*3+1]=ln.y; m->edit->pos[k*3+2]=ln.z;
+            }
+        }
+    }
     // CLIPPING (Mirror con clipping ON): impide que los verts CRUCEN el plano al moverlos (half-space). Pasa la
     // pos LOCAL inicial de cada vert (world0 -> local) para saber de que lado arranco. No-op si ningun Mirror clippea.
     if (m->edit && !m->modificadores.empty()){
         std::vector<int> editKs; editKs.reserve(gEVsnap.size());
         std::vector<Vector3> startLocal; startLocal.reserve(gEVsnap.size());
         for (size_t i=0;i<gEVsnap.size();i++){ editKs.push_back(gEVsnap[i].editK); startLocal.push_back(EVMundoALocal(gEVsnap[i].world0)); }
+        for (size_t i=0;i<gEVprop.size();i++){ editKs.push_back(gEVprop[i].editK); startLocal.push_back(EVMundoALocal(gEVprop[i].world0)); }
         m->ClipMirrorVerts(editKs, startLocal);
     }
     // edicion IN-PLACE solo de POSICIONES (rapido, tiempo real): pos[] -> render + overlay,
@@ -3998,7 +4204,7 @@ void EditXformConfirmar(){
     { extern bool AutoKeyOn; extern void VertexAnimInsertarKeyframe();
       if (AutoKeyOn && ActiveAnimKind == 3 && gEVmesh && (Mesh*)ActiveAnimMesh == gEVmesh)
           VertexAnimInsertarKeyframe(); }
-    gEVsnap.clear(); gEVmesh = NULL;
+    gEVsnap.clear(); gEVprop.clear(); gEVmesh = NULL;
     gEVslide = false; gEVslideCand.clear(); gEVslideDest.clear();
     estado = editNavegacion;
     g_extrudeEnCurso = false; // termino el transform
@@ -4023,10 +4229,17 @@ void EditXformCancelar(){
                 m->edit->pos[k*3]=ln.x; m->edit->pos[k*3+1]=ln.y; m->edit->pos[k*3+2]=ln.z;
             }
         }
+        for (size_t i=0;i<gEVprop.size();i++){ // proportional editing: los arrastrados vuelven a su lugar
+            Vector3 ln = EVMundoALocal(gEVprop[i].world0);
+            int k = gEVprop[i].editK;
+            if (m->edit && k>=0 && k*3+2 < (int)m->edit->pos.size()){
+                m->edit->pos[k*3]=ln.x; m->edit->pos[k*3+1]=ln.y; m->edit->pos[k*3+2]=ln.z;
+            }
+        }
         if (m->edit){ m->edit->EmpujarPosiciones(); m->edit->RefrescarOverlay(); }
         if (!m->modificadores.empty()) m->GenerarMallaModificada(); // preview vuelve al estado previo al cancelar
     }
-    gEVsnap.clear(); gEVmesh = NULL;
+    gEVsnap.clear(); gEVprop.clear(); gEVmesh = NULL;
     gEVslide = false; gEVslideCand.clear(); gEVslideDest.clear();
     estado = editNavegacion;
     g_extrudeEnCurso = false; // termino el transform

@@ -70,7 +70,8 @@ enum BarRol3D {
     BR_Object, BR_Overlays, BR_Render, BR_Orient, BR_UV, BR_View, BR_Snap,
     BR_JuegoStop, BR_JuegoPlay,   // transporte del MODO JUEGO (Play/Pausa es UN boton)
     BR_Mesh, // menu "Mesh" de Edit Mode (Transform/Snap/Delete), comun a vertice/borde/cara
-    BR_Animation // menu "Animation": keyframes del objeto + Motion Trail. Solo con algo seleccionado.
+    BR_Animation, // menu "Animation": keyframes del objeto + Motion Trail. Solo con algo seleccionado.
+    BR_Proporcional // PROPORTIONAL EDITING (tecla O): el icono de la curva, verde si esta ON; abre su menu
 };
 // roles de la barra de HERRAMIENTAS (abajo) del 3D. TBR_Hist+i = boton i del historial de acciones.
 enum ToolbarRol3D {
@@ -79,6 +80,7 @@ enum ToolbarRol3D {
     TBR_Undo, TBR_Redo,  // deshacer / rehacer: SIEMPRE visibles (PC y tactil), a la izquierda de la barra
     TBR_Repeat = 120,    // "Repeat" (solo en extrude): acepta el extrude y vuelve a extruir la seleccion
     TBR_View = 121,      // "View" (toggle, Edit Mode): 1 dedo orbita/panea/zoom aunque haya una operacion en curso
+    TBR_Proporcional = 122, // proportional editing: toggle de UN click (Edit/Object Mode); la barra de influencia sale arriba
     TBR_Hist = 110 // .. TBR_Hist+7
 };
 // (BarRolBtn / BarRolIdx se declaran en ViewPorts.h: los usan todas las barras, no solo la del 3D)
@@ -292,6 +294,7 @@ class Viewport3D : public ViewportBase, public WithBorder {
         // (+ aceptar/cancelar si es tactil). Solo si cfg.nuevoUsuario (Symbian default: off). ----
         bool ToolbarVisible() const W3D_OVERRIDE;   // cfg.nuevoUsuario
         bool BrushBarVisible() const W3D_OVERRIDE;  // fila radio/valor: solo en Weight Paint
+        bool PropBarVisible() const W3D_OVERRIDE;   // barra de influencia: proportional editing ON (Edit/Object)
         void ToolbarSincronizar() W3D_OVERRIDE;     // visibilidad contextual + colores (estado puro)
         void ToolbarAccionRol(int rol) W3D_OVERRIDE; // que hace cada boton (roles TBR_*)
         bool ClickBarraTransform(int mx, int my); // tap TACTIL en la barra de estado del transform -> abre el teclado numerico

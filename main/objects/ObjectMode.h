@@ -194,4 +194,8 @@ void SetOriginToCursor();         // origen -> cursor 3D (la geometria queda igu
 //  Devuelve cuantas mallas quedaron sin origen.
 int OlvidarOrigenSeleccionadas();
 
+// PROPORTIONAL EDITING en Object Mode: cambio el radio con un transform en curso -> re-evaluar el peso
+// de los objetos no seleccionados del snapshot (edit/Proporcional.h)
+void ProporcionalObjetosActualizar();
+
 #endif

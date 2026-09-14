@@ -47,6 +47,9 @@ class PopUpBase {
         // click) con el mouse AFUERA del popup lo cierra y deja pasar la accion
         // Por defecto los popups son modales.
         virtual bool CierraConViewport() { return false; }
+        // TECLADO en pantalla (numerico / qwerty): sus teclas EDITAN el campo activo, asi que un click adentro NO
+        // commitea la edicion. En cualquier otro popup, un click en otro control APLICA lo tipeado.
+        virtual bool EsTeclado() const { return false; }
 };
 
 extern PopUpBase* PopUpActive;

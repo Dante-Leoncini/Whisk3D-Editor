@@ -263,6 +263,9 @@ void UndoPesosConfirmar();
 
 // VERTEX COLOR (pincel de color): mismo trato que los pesos -- un paso de undo POR TRAZO.
 // Snapshot de la capa 'capa' (colores + indices de paleta) al apoyar, commit al soltar.
+struct TexturaEditable;
+void UndoTexturaIniciar(TexturaEditable* te);   // PINTURA DE TEXTURA: snapshot de los pixeles al empezar el trazo
+void UndoTexturaConfirmar(bool cambio);         // fin del trazo: pushea si pinto algo
 void UndoColorIniciar(Mesh* m, int capa);
 void UndoColorConfirmar(bool cambio);
 void UndoColorCancelar();

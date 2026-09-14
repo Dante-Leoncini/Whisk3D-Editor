@@ -26,6 +26,7 @@
 #include "ViewPorts/LayoutInput.h" // LayoutDeleteEdit (menu Delete en edit mode)
 #include "ViewPorts/UVEditor.h"    // roles TBR_Pincel*/TBR_Grupo (pincel de Weight Paint, compartidos con el UV)
 #include "edit/WeightPaint.h"      // estado del pincel + menus deslizables + labels de la toolbar
+#include "edit/Proporcional.h"           // proportional editing: boton de la toolbar + barra de influencia
 #include "ViewPorts/PopUp/FalloffEditor.h" // el editor de falloff (popup reutilizable)
 #include "ViewPorts/PopUp/ColorPicker.h"   // el color del pincel de vertex paint
 #include "WhiskUI/draw/icons.h"    // IconoIndice: el icono del falloff activo
@@ -154,7 +155,14 @@ bool Viewport3D::ToolbarVisible() const {
 // cambiar el radio ni el valor (misma excepcion que ya tenian los controles del pincel).
 bool Viewport3D::BrushBarVisible() const {
     { extern bool SimActiva(); if (AnimEsJuego && SimActiva()) return false; } // modo juego: pantalla limpia
-    return InteractionMode == WeightPaint || InteractionMode == VertexPaint;
+    return InteractionMode == WeightPaint || InteractionMode == VertexPaint || InteractionMode == TexturePaint;
+}
+bool Viewport3D::PropBarVisible() const {
+    { extern bool SimActiva(); if (AnimEsJuego && SimActiva()) return false; } // modo juego: pantalla limpia
+    // SOLO mientras se mueve/rota/escala (al confirmar o cancelar se va): fuera del transform el radio se ve en el
+    // menu de la curva y prender/apagar es el boton de la toolbar o la tecla O
+    return g_prop.on && (InteractionMode == EditMode || InteractionMode == ObjectMode) &&
+           Viewport3DActive == this && ToolbarTransformando();
 }
 
 // (ToolbarHeight / OnToolbar / ToolbarScrollBy: compartidos en ViewportBase, ToolbarBase.cpp)
@@ -179,8 +187,9 @@ void Viewport3D::ToolbarSincronizar(){
     std::vector<int>& h = ToolbarHist();
     // modo WEIGHT PAINT: la toolbar muestra los CONTROLES DEL PINCEL (tam/fuerza/modo/grupo)
     // en vez del historial de acciones. Labels con el estado actual del pincel.
-    const bool pincel = (InteractionMode == WeightPaint || InteractionMode == VertexPaint);
+    const bool pincel = (InteractionMode == WeightPaint || InteractionMode == VertexPaint || InteractionMode == TexturePaint);
     const bool color  = (InteractionMode == VertexPaint);   // pintando COLOR, no pesos
+    const bool textura = (InteractionMode == TexturePaint); // pintando la TEXTURA: color + curva, sin grupos ni marcas
     std::string lTam, lFuerza, lModo, lGrupo;
     Mesh* wpm = (ObjActivo && ObjActivo->getType() == ObjectType::mesh) ? (Mesh*)ObjActivo : NULL;
     if (pincel){
@@ -241,15 +250,21 @@ void Viewport3D::ToolbarSincronizar(){
             btn->visible = tactil && (InteractionMode == EditMode || InteractionMode == WeightPaint || InteractionMode == VertexPaint || InteractionMode == TexturePaint);
             btn->tinte = g_viewEditMode ? TbVerdeBg() : NULL;
             btn->colorTexto = g_viewEditMode ? accent : blanco;
+        } else if (rol == TBR_Proporcional){
+            // PROPORTIONAL EDITING: toggle de un click (Edit/Object Mode, fuera de un transform y del pincel)
+            btn->visible = !transformando && !pincel && (InteractionMode == EditMode || InteractionMode == ObjectMode);
+            btn->icon = ProporcionalTipoIcono(g_prop.tipo);
+            btn->tinte = g_prop.on ? TbVerdeBg() : NULL;
+            btn->colorTexto = g_prop.on ? accent : blanco;
         } else if (rol >= TBR_PincelTam && rol <= TBR_Grupo){
             // PINCEL (Weight Paint): modo (+/-/=) y grupo activo. El RADIO y el VALOR ya no son
             // botones: viven en la fila de barras deslizables de arriba (RenderBrushBar).
-            btn->visible = pincel && !transformando;
+            btn->visible = pincel && !transformando && !(textura && rol == TBR_Grupo);   // textura: sin grupos
             btn->tinte = NULL; btn->colorTexto = NULL;
             if (rol == TBR_PincelModo){
                 // sumar/restar/igualar es de PESOS: a un color no se le suma ni se le resta.
                 // En vertex paint el boton no va (la intensidad la da la barra "valor").
-                btn->visible = pincel && !transformando && !color;
+                btn->visible = pincel && !transformando && !color && !textura;
                 btn->text = lModo;                          // "+" / "-" / "="
                 int md = BrushGet().modo;
                 // restar: rojizo (SACA peso, como el cancelar). igualar: accent, porque no acumula
@@ -259,12 +274,12 @@ void Viewport3D::ToolbarSincronizar(){
             }
             else btn->text = lGrupo;
         } else if (rol == TBR_ColorPincel){
-            btn->visible = color && !transformando;
+            btn->visible = (color || textura) && !transformando;
             btn->tinte = BrushGet().color;   // el boton ES la muestra de color (se tinta en vivo)
             btn->colorTexto = NULL;
         } else if (rol == TBR_Marcas){
             // los cuadraditos por punto pintable: toggle, accent cuando esta ON
-            btn->visible = pincel && !transformando;
+            btn->visible = pincel && !transformando && !textura;
             const bool on = (BrushGet().marcas != MarcasOff);
             btn->tinte = on ? TbVerdeBg() : NULL;
             btn->colorTexto = on ? accent : blanco;
@@ -284,7 +299,7 @@ void Viewport3D::ToolbarSincronizar(){
         } else if (rol == TBR_SoloSel){
             // "editar solo lo seleccionado" (mascara de pintura): solo en Weight Paint.
             // Toggle GLOBAL compartido con el UV editor; tinte accent cuando esta ON.
-            btn->visible = pincel && !transformando;
+            btn->visible = pincel && !transformando && !textura;
             bool on = WeightPaintSoloSel();
             btn->tinte = on ? TbVerdeBg() : NULL;
             btn->colorTexto = on ? accent : blanco;
@@ -366,6 +381,7 @@ void Viewport3D::ToolbarAccionRol(int rol){
     else if (rol == TBR_Shift) LShiftPressed = !LShiftPressed; // modificador tactil: queda encendido (verde)
     else if (rol == TBR_Ctrl)  LCtrlPressed  = !LCtrlPressed;
     else if (rol == TBR_View)  g_viewEditMode = !g_viewEditMode; // toggle: orbitar/panear con el dedo durante una operacion
+    else if (rol == TBR_Proporcional) g_prop.on = !g_prop.on;     // proportional editing: un click (la barra de influencia sale arriba)
     else if (rol >= TBR_Hist && rol < TBR_Hist + 8){
         std::vector<int>& h = ToolbarHist();
         int hi = rol - TBR_Hist;

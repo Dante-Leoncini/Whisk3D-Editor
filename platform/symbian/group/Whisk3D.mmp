@@ -126,6 +126,8 @@ SOURCEPATH      ..\..\..\main\edit
 SOURCE          MeshEdit.cpp
 SOURCE          WeightPaint.cpp // Fase 2 weight paint: pincel + escritura de pesos (undo por trazo)
 SOURCE          BoneEdit.cpp // Fase 3: Edit Mode de huesos (extrude/duplicar/borrar/grab + rename con vgroup)
+SOURCE          UVUnwrap.cpp // menu U: unwrap (conforme + relajacion), smart project, lightmap, follow quads, reset
+SOURCE          Proporcional.cpp // proportional editing (tecla O): pesos por distancia + circulo de influencia
 
 SOURCEPATH      ..\..\..\main\render
 SOURCE          render.cpp OpcionesRender.cpp
@@ -151,7 +153,7 @@ SOURCE          PropSelectText.cpp PropButton.cpp PropLabel.cpp
 
 // pila de UI de PC (fase outliner real)
 SOURCEPATH      ..\..\..\main\ui\ViewPorts\PopUp
-SOURCE          PopUpBase.cpp ColorPicker.cpp FileBrowser.cpp RedoMeshPanel.cpp ConfirmarPopup.cpp ProgressPopup.cpp
+SOURCE          PopUpBase.cpp ColorPicker.cpp FileBrowser.cpp RedoMeshPanel.cpp ConfirmarPopup.cpp ProgressPopup.cpp NuevaTexturaPopup.cpp
 
 // La UI (WhiskUI) es su propia capa reutilizable en libs/. Ver documentacion/ui.html
 SOURCEPATH      ..\..\..\libs\WhiskUI\core
@@ -174,12 +176,12 @@ SOURCE          TexturaCache.cpp
 SOURCEPATH      ..\..\..\main
 SOURCE          W3dEscena.cpp
 SOURCEPATH      ..\..\..\main\io
-SOURCE          GuardarW3D.cpp W3dContenedor.cpp UI2DFormato.cpp Textura2D.cpp Fuente2D.cpp SkinAtlas.cpp Video2DCache.cpp
+SOURCE          GuardarW3D.cpp W3dContenedor.cpp UI2DFormato.cpp Textura2D.cpp Fuente2D.cpp SkinAtlas.cpp Video2DCache.cpp TexturaGenerada.cpp TexturaEditada.cpp
 SOURCE          W3dNodos.cpp   // oclusion por nodos de riel (.w3dnodos, estilo SLST de PS1)
 SOURCEPATH      ..\..\..\main\objects
 SOURCE          Culling.cpp Particulas.cpp VisZona.cpp Gamepad.cpp
 SOURCEPATH      ..\..\..\main\render
-SOURCE          UIOverlay.cpp
+SOURCE          UIOverlay.cpp RayTracer.cpp   // RayTracer: trazado de rayos por CPU (un hilo en el N95)
 // audio del Core: el dispatcher (mixer por software) + el backend de salida de Symbian
 // (CMdaAudioOutputStream en su propio hilo, doble-buffer). Con W3D_ENABLE_AUDIO arriba
 // compilan el camino REAL; sin el, W3dAudio.cpp cae a stubs no-op.

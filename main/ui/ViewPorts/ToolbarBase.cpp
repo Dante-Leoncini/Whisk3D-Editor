@@ -20,6 +20,8 @@
 #include "ViewPorts/PopUp/NumPad.h"      // teclado virtual (tactil/Android)
 #include "ViewPorts/TransformUI.h"       // ToolbarUsaTactil(): decide teclado fisico vs virtual
 #include "ViewPorts/LayoutInput.h"       // LayoutKey (nav con el keypad de Symbian)
+#include "edit/Proporcional.h"           // la fila tambien es la BARRA DE INFLUENCIA del proportional editing
+#include <stdio.h>
 #include <cstdlib>                       // abs (umbral tap/arrastre)
 
 namespace gfx = w3dEngine;
@@ -166,6 +168,14 @@ static float gBBvalorPct = 100.0f;
 static PropFloat* gBBpfRadio = NULL;
 static PropFloat* gBBpfValor = NULL;
 
+// ---- BARRA DE INFLUENCIA del proportional editing: la misma fila, cuando no hay pincel (PropBarVisible).
+// Una sola barra a todo el ancho con el radio, que se arrastra RELATIVO (no tiene tope). Solo esta
+// mientras se mueve/rota/escala; para prender/apagar estan la tecla O y el boton de la toolbar. ----
+static bool BBmodoProp(const ViewportBase* vp){ return vp && !vp->BrushBarVisible() && vp->PropBarVisible(); }
+static void BBceldaProp(const ViewportBase* vp, int& sx, int& sw){
+    sx = vp->x + gapGS; sw = vp->width - 2 * gapGS; if (sw < 1) sw = 1;
+}
+
 static const float kBBradioMax = 4000.0f; // "sin tope" en la practica (mas grande que cualquier pantalla)
 
 static void BBaplicarRadio(){ BrushGet().radioPx = gBBradioPx;         g_redraw = true; }
@@ -203,7 +213,7 @@ static int BBaltoToolbar(const ViewportBase* vp){
 }
 
 int ViewportBase::BrushBarHeight() const {
-    return BrushBarVisible() ? BarHeight() : 0;
+    return (BrushBarVisible() || PropBarVisible()) ? BarHeight() : 0;
 }
 
 // las dos celdas: mitad y mitad, con el mismo gap de la toolbar como margen y separacion
@@ -232,6 +242,12 @@ static void BBvalorDesdeX(const ViewportBase* vp, int mx){
 
 bool ViewportBase::BrushBarClick(int mx, int my){
     if (!OnBrushBar(mx, my)) return false;
+    if (BBmodoProp(this)){   // barra de influencia: el down arma el arrastre del radio (en cualquier punto de la fila)
+        if (NumEditActivo()) NumEditCommit();
+        gBBvp = this; gBBidx = 2; gBBdownX = mx; gBBdownY = my; gBBradio0 = g_prop.radio; gBBmovio = false;
+        g_redraw = true;
+        return true;
+    }
     // habia una edicion numerica abierta (esta barra u otro campo): tocar afuera la CONFIRMA,
     // igual que en el panel de propiedades. Sino quedaba un campo a medio tipear invisible.
     if (NumEditActivo()) NumEditCommit();
@@ -265,7 +281,10 @@ void BrushBarDragMover(int mx, int my){
         if (abs(mx - gBBdownX) < umbral && abs(my - gBBdownY) < umbral) return; // todavia puede ser un tap
         gBBmovio = true;
     }
-    if (gBBidx == 0){
+    if (gBBidx == 2){   // radio del proportional editing: RELATIVO (1% del radio por pixel), sin tope
+        ProporcionalRadioSet(gBBradio0 * (1.0f + (float)(mx - gBBdownX) / (100.0f * GlobalScale)));
+        ProporcionalReaplicar();
+    } else if (gBBidx == 0){
         float r = gBBradio0 + (float)(mx - gBBdownX); // RELATIVO: no hay tope al que mapear
         if (r < 0.0f) r = 0.0f;
         if (r > kBBradioMax) r = kBBradioMax;
@@ -278,7 +297,7 @@ void BrushBarDragMover(int mx, int my){
 
 void BrushBarDragSoltar(){
     if (!gBBvp) return;
-    if (!gBBmovio){
+    if (!gBBmovio && gBBidx != 2){   // (la barra de influencia solo se arrastra: el transform ya usa el teclado)
         // TAP / click simple: edicion numerica EXACTA. En PC alcanza el campo inline (el teclado
         // fisico entra por g_textFieldActivo); en tactil hace falta ademas el teclado en pantalla.
         PropFloat* pf = BBprop(gBBidx);
@@ -296,7 +315,7 @@ bool BrushBarEditando(){ return gBBedit; }
 void BrushBarSoltarFoco(){ gBBfoco = -1; gBBedit = false; }
 
 bool BrushBarTecla(ViewportBase* vp, int tecla){
-    if (!vp || !vp->BrushBarVisible()) return false;
+    if (!vp || !(vp->BrushBarVisible() || vp->PropBarVisible())) return false;
     switch (tecla){
         case LayoutKey::Up:
         case LayoutKey::Down:
@@ -314,6 +333,7 @@ bool BrushBarTecla(ViewportBase* vp, int tecla){
         case LayoutKey::Right: {
             if (gBBfoco < 0 || !gBBedit) return false; // sin OK previo las flechas son del viewport
             int dir = (tecla == LayoutKey::Right) ? +1 : -1;
+            if (BBmodoProp(vp)){ ProporcionalRadioEscalar(dir > 0 ? 1.1f : 1.0f / 1.1f); ProporcionalReaplicar(); g_redraw = true; return true; }
             if (gBBfoco == 0){
                 // el radio no tiene rango del que sacar el paso: px fijos, escalados como la UI
                 float r = BrushGet().radioPx + (float)(dir * 2 * GlobalScale);
@@ -382,6 +402,20 @@ void ViewportBase::RenderBrushBar(){
         return;
     }
     int yLocal = height - BBaltoToolbar(this) - h;   // local al viewport (la toolbar queda abajo)
+    if (BBmodoProp(this)){   // BARRA DE INFLUENCIA del proportional editing: una sola barra a todo el ancho
+        int sx, sw; BBceldaProp(this, sx, sw);
+        char num[48]; sprintf(num, "%.2f", g_prop.radio);
+        const std::string txt = std::string(T("Proportional Size")) + ": " + num + " m";
+        w3dEngine::PushMatrix();
+        w3dEngine::Translatef(0, (GLfloat)yLocal, 0);
+        const float* grisP = ListaColores[static_cast<int>(ColorID::gris)];
+        w3dEngine::Color4f(grisP[0], grisP[1], grisP[2], barAlpha);
+        barCard->Resize(width, h);
+        barCard->RenderObject(false);
+        BBrenderCelda(barCard, sx - x, sw, h, -1.0f, txt, false, false, std::string(), barAlpha);
+        w3dEngine::PopMatrix();
+        return;
+    }
 
     // textos: el MISMO formateo que usaban los botones ("40px" / "100%"), sin duplicar el sprintf
     std::string lTam, lFuerza, lModo, lGrupo;

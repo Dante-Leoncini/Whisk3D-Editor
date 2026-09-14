@@ -42,6 +42,10 @@
 #include "PopUp/ProgressPopup.h" // barra "Rendering..." durante el render (clave en N95)
 #include "ViewPorts/LayoutInput.h" // Notificar (toasts de exito/error)
 #include "objects/Camera.h"   // selector de target de la camara
+#include "render/RayTracer.h"  // g_rt: "Ray Tracing" de la tarjeta Render + render a PNG por trazado
+static void AccionRTToggle();   // tilde "Ray Tracing" (tarjeta Render)
+void RTFilasPanel(Properties* P); // muestra/oculta Rays/Samples/Passes segun g_rt.on
+static void AccionRTValores();  // Rays / Samples / Passes -> g_rt
 #include "objects/Mirror.h"   // pestania del Mirror (target + ejes + rect)
 #include "objects/Instance.h" // selector de target de instance/array/mirror
 #include "objects/LOD.h"      // tarjeta del objeto LOD (umbrales de distancia)
@@ -3356,7 +3360,11 @@ static int RenderPasesFrame(Viewport3D* vp, int w, int h, int progBase, int prog
     extern bool g_modRenderMode;
     g_modRenderMode = true; RegenerarModsEscena(SceneCollection);
     int base = progBase;
-    if (!vp->RenderAPNG(w, h, RenderType::Rendered, RenderFileNamePNG("").c_str(), base, progTotal)) fallos++;
+    if (g_rt.on) {
+        // TRAZADO DE RAYOS: el pase beauty lo hace la CPU (todos los pases, con la barra de progreso)
+        std::string msg;
+        if (!RTRenderizarAPNG(vp, w, h, RenderFileNamePNG(""), msg)) fallos++;
+    } else if (!vp->RenderAPNG(w, h, RenderType::Rendered, RenderFileNamePNG("").c_str(), base, progTotal)) fallos++;
     base += tpp;
     if (doZ){ if (!vp->RenderAPNG(w, h, RenderType::ZBuffer,    RenderFileNamePNG("zbuffer").c_str(), base, progTotal)) fallos++; base += tpp; }
     if (doN){ if (!vp->RenderAPNG(w, h, RenderType::NormalView, RenderFileNamePNG("normal").c_str(),  base, progTotal)) fallos++; base += tpp; }
@@ -3365,6 +3373,27 @@ static int RenderPasesFrame(Viewport3D* vp, int w, int h, int progBase, int prog
     return base - progBase; // tiles consumidos por este frame (nPases * tpp)
 }
 
+// "Ray Tracing" (tarjeta Render): con el tilde se muestran Rays/Samples/Passes; sin el, las filas no ocupan lugar.
+void RTFilasPanel(Properties* P){
+    if (!P || !P->propRT || !P->propRTRayos) return;
+    P->rtRayos = (float)g_rt.rayos; P->rtSamples = (float)g_rt.samples; P->rtPases = (float)g_rt.pases;
+    P->propRTRayos->value   = g_rt.on ? &P->rtRayos   : NULL;
+    P->propRTSamples->value = g_rt.on ? &P->rtSamples : NULL;
+    P->propRTPases->value   = g_rt.on ? &P->rtPases   : NULL;
+}
+static void AccionRTToggle(){
+    RTFilasPanel(PropsActivo);
+    RebindMaterialMeshPart(); // Roughness / Metallic de la tarjeta Material se ven solo con el tilde puesto
+    RTInvalidar(); // el viewport en modo Rendered arranca (o deja de) trazar
+}
+static void AccionRTValores(){
+    if (!PropsActivo) return;
+    Properties* P = PropsActivo;
+    g_rt.rayos = (int)(P->rtRayos + 0.5f); if (g_rt.rayos < 1) g_rt.rayos = 1;
+    g_rt.samples = (int)(P->rtSamples + 0.5f); if (g_rt.samples < 1) g_rt.samples = 1;
+    g_rt.pases = (int)(P->rtPases + 0.5f); if (g_rt.pases < 1) g_rt.pases = 1;
+    RTInvalidar();
+}
 // hace el render REAL de UNA imagen (llamado directo, o desde el "Si" de la confirmacion de sobrescritura).
 static void HacerRenderImage(){
     if (!PropsActivo) return;
@@ -3422,6 +3451,8 @@ void SincronizarAnimFps(){
         if (an) g_vertVelF = an->speed;
     }
 }
+// harness: el boton "Render Image" sin confirmacion de sobrescritura (prueba del trazado de rayos a PNG)
+void W3dHarnessRenderImage(){ if (PropsActivo && Viewport3DActive) { CalcularRenderBase(); HacerRenderImage(); } }
 static void AccionRenderImage(){
     if (!PropsActivo) return;
     if (!Viewport3DActive) { Notificar(T("No active 3D viewport"), true); return; }
@@ -5732,6 +5763,16 @@ void Properties::ConstruirGrupos(){
     propMaterial->properties.push_back(propMatCol[1]);  // Specular  (se oculta si Lighting OFF)
     propMaterial->properties.push_back(propMatCol[2]);  // Emission  (se oculta si Lighting OFF)
     propMaterial->properties.push_back(propMatShin);    // Shininess (se oculta si Lighting OFF)
+    // TRAZADO DE RAYOS: rugosidad (0 = espejo .. 1 = mate) y metalico (0 = difuso .. 1 = metal). Solo se ven con el
+    // tilde "Ray Tracing" de la pestania Render; el render GL no los usa.
+    propMatRough = new PropFloat(T("Roughness")); propMatRough->SetRango(0.0f, 1.0f);
+    propMatRough->stepFino = 0.05f; propMatRough->stepGrueso = 0.1f; propMatRough->dragStep = 0.01f;
+    propMatRough->onChange = AccionRTValores;
+    propMaterial->properties.push_back(propMatRough);
+    propMatMetal = new PropFloat(T("Metallic")); propMatMetal->SetRango(0.0f, 1.0f);
+    propMatMetal->stepFino = 0.05f; propMatMetal->stepGrueso = 0.1f; propMatMetal->dragStep = 0.01f;
+    propMatMetal->onChange = AccionRTValores;
+    propMaterial->properties.push_back(propMatMetal);
     propMaterial->properties.push_back(propMatChk[0]);  // Filtering
     propMaterial->properties.push_back(propMatChk[1]);  // Transparent
     propMaterial->properties.push_back(propMatChk[4]);  // Repeat
@@ -5796,6 +5837,15 @@ void Properties::ConstruirGrupos(){
     propLightSpotExp->stepFino = 1.0f; propLightSpotExp->stepGrueso = 8.0f; propLightSpotExp->dragStep = 1.0f;
     propLightSpotExp->animProp = AnimSpot; propLightSpotExp->animComp = AnimY;
     propLight->properties.push_back(propLightSpotExp);
+    // TRAZADO DE RAYOS: tamano de la lampara (0 = puntual -> sombra dura; mas = penumbra) y rayos de sombra (0 = global)
+    propLightRTRadio = new PropFloat(T("Radius")); propLightRTRadio->SetRango(0.0f, 100.0f);
+    propLightRTRadio->stepFino = 0.05f; propLightRTRadio->stepGrueso = 0.5f; propLightRTRadio->dragStep = 0.02f;
+    propLightRTRadio->onChange = AccionRTValores;
+    propLight->properties.push_back(propLightRTRadio);
+    propLightRTRayos = new PropFloat(T("Rays")); propLightRTRayos->SetRango(0.0f, 256.0f); propLightRTRayos->entero = true;
+    propLightRTRayos->stepFino = 1.0f; propLightRTRayos->stepGrueso = 4.0f; propLightRTRayos->dragStep = 1.0f;
+    propLightRTRayos->onChange = AccionRTValores;
+    propLight->properties.push_back(propLightRTRayos);
     GroupProperties.push_back(propLight);
 
     // pestania de CAMARA: lente (ortografica/perspectiva + fov) + target (look-at)
@@ -6073,6 +6123,20 @@ void Properties::ConstruirGrupos(){
     propRender->properties.push_back(propRenderNormal);
     propRenderAlpha = new PropBool("Alpha"); propRenderAlpha->value = &renderAlpha;
     propRender->properties.push_back(propRenderAlpha);
+    // TRAZADO DE RAYOS por CPU (render/RayTracer): apagado por defecto. Con el tilde aparecen los rayos de sombra por
+    // luz, las muestras por pixel (bajas) y los pases hasta "done" (16). Las filas se ocultan (value NULL) si esta apagado.
+    propRT = new PropBool(T("Ray Tracing")); propRT->value = &g_rt.on; propRT->onChange = AccionRTToggle;
+    propRender->properties.push_back(propRT);
+    propRTRayos = new PropFloat(T("Rays")); propRTRayos->SetRango(1.0f, 64.0f); propRTRayos->entero = true;
+    propRTRayos->stepFino = 1.0f; propRTRayos->stepGrueso = 4.0f; propRTRayos->dragStep = 1.0f; propRTRayos->onChange = AccionRTValores;
+    propRender->properties.push_back(propRTRayos);
+    propRTSamples = new PropFloat(T("Samples")); propRTSamples->SetRango(1.0f, 16.0f); propRTSamples->entero = true;
+    propRTSamples->stepFino = 1.0f; propRTSamples->stepGrueso = 2.0f; propRTSamples->dragStep = 1.0f; propRTSamples->onChange = AccionRTValores;
+    propRender->properties.push_back(propRTSamples);
+    propRTPases = new PropFloat(T("Passes")); propRTPases->SetRango(1.0f, 1024.0f); propRTPases->entero = true;
+    propRTPases->stepFino = 1.0f; propRTPases->stepGrueso = 8.0f; propRTPases->dragStep = 1.0f; propRTPases->onChange = AccionRTValores;
+    propRender->properties.push_back(propRTPases);
+    RTFilasPanel(this); // bindea (o esconde) las filas segun el estado inicial
     // color de FONDO del render (global g_renderBg, solo para el pase Rendered). Se edita con el color picker.
     propRenderBg = new PropColor(T("Background"));
     propRenderBg->value = g_renderBg; // el array global decae a puntero (igual que los colores de material/luz)
@@ -6919,6 +6983,8 @@ void Properties::Rebind(){
     propMatCol[1]->value = (esDefault || !material->lighting) ? NULL : material->specular;
     propMatCol[2]->value = (esDefault || !material->lighting) ? NULL : material->emission;
     propMatShin->value   = (esDefault || !material->lighting) ? NULL : &material->shininess;
+    if (propMatRough) propMatRough->value = (esDefault || !g_rt.on) ? NULL : &material->rtRugosidad;   // solo trazando
+    if (propMatMetal) propMatMetal->value = (esDefault || !g_rt.on) ? NULL : &material->rtMetalico;
 
     // el selector muestra el material actual del mesh part
     if (propBtnNewMaterial) {
@@ -7620,6 +7686,8 @@ void Properties::RefreshTargetProperties(){
         propLightAttQ->value     = l ? &l->attQuadratic  : NULL;
         propLightSpotCut->value  = l ? &l->spotCutoff    : NULL;
         propLightSpotExp->value  = l ? &l->spotExponent  : NULL;
+        if (propLightRTRadio) propLightRTRadio->value = l ? &l->rtRadio : NULL;
+        if (propLightRTRayos) propLightRTRayos->value = l ? &l->rtRayos : NULL;
     }
 
     // CAMARA: bindear el lente (fov + ortografica) a los campos del panel
@@ -7814,6 +7882,9 @@ Properties::Properties() : ViewportBase() {
     // luz: punteros nuevos a NULL (si no se inicializan quedan BASURA y el rebind crashea antes de ConstruirGrupos)
     propLightDir = NULL; propLightGL = NULL; propLightDiffuse = NULL; propLightAmbient = NULL; propLightSpecular = NULL;
     propLightAttC = NULL; propLightAttL = NULL; propLightAttQ = NULL; propLightSpotCut = NULL; propLightSpotExp = NULL;
+    propLightRTRadio = NULL; propLightRTRayos = NULL;
+    propRT = NULL; propRTRayos = NULL; propRTSamples = NULL; propRTPases = NULL;
+    rtRayos = (float)g_rt.rayos; rtSamples = (float)g_rt.samples; rtPases = (float)g_rt.pases;
     propEditItem = NULL; editPosX = editPosY = editPosZ = 0.0f;
     propUVTransform = NULL; uvPosU = uvPosV = 0.0f; // tarjeta "Transform UV" (pestania Transformar)
     propUVMaps = NULL; propColorLayers = NULL; propVertexGroups = NULL; propUVGroups = NULL; propModifiers = NULL;

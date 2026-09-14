@@ -13,7 +13,12 @@
 #include "objects/MallaDatos.h" // mallacache/meminfo: geometria compartida (A/B + medicion)
 #include "io/W3dRecursos.h"     // meminfo: el almacen de recursos (descriptores por tipo)
 #include "edit/Modifier.h"     // Modifier (params del Mirror en el harness)
-#include "edit/MeshEdit.h"     // Nuevo/MoverMeshPart (funciones libres del editor)
+#include "edit/MeshEdit.h"
+#include "edit/UVUnwrap.h"
+#include "edit/Proporcional.h"
+#include "io/TexturaGenerada.h"      // newtex / texgentest / newtexclean
+#include "render/RayTracer.h"        // rtrender / rtpixel / rtsave / rttris
+#include "io/TexturaEditada.h"       // texdab / texpixel / texsave / texext / texint / texlabel / texpaint3d     // prop / xform / vertat / objmove / objat       // unwrap / smartuv / lightmap / followquads / uvreset / unwraptest     // Nuevo/MoverMeshPart (funciones libres del editor)
 #include "edit/WeightPaint.h"  // wptest: pincel + escritura de pesos (fase 2 weight paint)
 #include "edit/BoneEdit.h"     // bonetest: Edit Mode de huesos (fase 3)
 #include "render/OpcionesRender.h" // bonetest: g_transformPivot (pivote de los R/S de huesos)
@@ -89,7 +94,8 @@ extern "C" {                      // chocantest: los binds se prueban sobre un l
 #include "lauxlib.h"
 #include "lualib.h"
 }
-#include <SDL2/SDL.h>          // compilarjuego: SDL_Delay mientras espera al worker
+#include <SDL2/SDL.h>
+#include <stdlib.h>          // compilarjuego: SDL_Delay mientras espera al worker
 #include "objects/ObjectMode.h" // Eliminar (test del borrado + su undo)
 #include "objects/Light.h"      // Light::Create + Lights (test del borrado de luces)
 #include "objects/Armature.h"   // test de la pestania Animation (clips del esqueleto)
@@ -1296,6 +1302,116 @@ static bool ZhFabricar(int id, const std::vector<unsigned char>& base, std::vect
     return false;
 }
 
+
+// ---------------------------------------------------------------------------
+//  UVAnalizar: mide los UV de las caras SELECCIONADAS de la malla (pruebas del menu U): cuantas islas
+//  (caras que comparten un corner con el MISMO vertice y el MISMO uv), si todo esta en [0,1], cuantos
+//  triangulos quedaron dados vuelta (orientacion en (u,-v) contra la del 3D), el desvio de angulos
+//  (max y medio, en grados) y el area UV total. bbox = umin, vmin, umax, vmax.
+// ---------------------------------------------------------------------------
+static bool UVAnalizar(Mesh* m, int& islas, bool& enrango, int& flips, double& angMax, double& angMed, double& area, double* bbox) {
+    m->EnsureEdit(); EditMesh* e = m->edit; if (!e) return false;
+    if (m->uvMaps.empty()) m->PoblarCapas();
+    const int nC = m->ContarCorners();
+    UVMap* um = (m->uvMapActivo >= 0 && m->uvMapActivo < (int)m->uvMaps.size()) ? m->uvMaps[(size_t)m->uvMapActivo] : NULL;
+    if (!um || (int)um->uv.size() != nC * 2) return false;
+    const GLfloat* P = m->PosicionesReposo(); if (!P) P = m->vertex;
+    const int nV = m->vertexSize; const bool hayRep = ((int)m->posRep.size() == nV);
+    std::vector<unsigned char> sel(m->faces3d.size(), 0);
+    for (size_t f = 0; f < e->faceSel.size() && f < e->faceSrc.size(); f++)
+        if (e->faceSel[f]) { const int f3 = e->faceSrc[f]; if (f3 >= 0 && f3 < (int)m->faces3d.size()) sel[(size_t)f3] = 1; }
+    struct UFc { std::vector<int> p; int Find(int a) { while (p[(size_t)a] != a) { p[(size_t)a] = p[(size_t)p[(size_t)a]]; a = p[(size_t)a]; } return a; } void Unir(int a, int b) { a = Find(a); b = Find(b); if (a != b) p[(size_t)a] = b; } } uf;
+    uf.p.resize((size_t)nC); for (int i = 0; i < nC; i++) uf.p[(size_t)i] = i;
+    std::map<std::pair<int, std::pair<long,long> >, int> visto;
+    islas = 0; enrango = true; flips = 0; angMax = 0.0; angMed = 0.0; area = 0.0; int nAng = 0;
+    bbox[0] = bbox[1] = 1e30; bbox[2] = bbox[3] = -1e30;
+    int L = 0;
+    for (size_t f = 0; f < m->faces3d.size(); f++) {
+        const std::vector<int>& idx = m->faces3d[f].idx; const int cnt = (int)idx.size();
+        if (sel[f]) {
+            for (int c = 0; c < cnt; c++) {
+                const int k = L + c; if (c > 0) uf.Unir(L, k);
+                const float u = um->uv[(size_t)k*2], v = um->uv[(size_t)k*2+1];
+                const int rep = hayRep ? m->posRep[(size_t)idx[(size_t)c]] : idx[(size_t)c];
+                std::pair<int, std::pair<long,long> > key(rep, std::make_pair((long)floor(u * 1e5 + 0.5), (long)floor(v * 1e5 + 0.5)));
+                std::map<std::pair<int, std::pair<long,long> >, int>::iterator it = visto.find(key);
+                if (it == visto.end()) visto[key] = k; else uf.Unir(k, it->second);
+                if (u < -1e-4f || u > 1.0f + 1e-4f || v < -1e-4f || v > 1.0f + 1e-4f) enrango = false;
+                if (u < bbox[0]) bbox[0] = u; if (v < bbox[1]) bbox[1] = v; if (u > bbox[2]) bbox[2] = u; if (v > bbox[3]) bbox[3] = v;
+            }
+            std::vector<MeshIndex> tris; W3dTriangularCara(P, idx, tris);
+            for (size_t t = 0; t + 2 < tris.size(); t += 3) {
+                int cs[3];
+                for (int i = 0; i < 3; i++) { cs[i] = -1; for (int c = 0; c < cnt; c++) if (idx[(size_t)c] == (int)tris[t + (size_t)i]) { cs[i] = L + c; break; } }
+                if (cs[0] < 0 || cs[1] < 0 || cs[2] < 0) continue;
+                double U[3], V[3]; const float* Q[3];
+                for (int i = 0; i < 3; i++) { U[i] = um->uv[(size_t)cs[i]*2]; V[i] = -um->uv[(size_t)cs[i]*2+1]; Q[i] = &P[(size_t)tris[t + (size_t)i]*3]; }
+                const double a2 = (U[1]-U[0])*(V[2]-V[0]) - (U[2]-U[0])*(V[1]-V[0]);
+                {   // un triangulo degenerado en 3D (dos esquinas en el mismo punto: polos) no cuenta ni como flip ni en los angulos
+                    const double ex = Q[1][0]-Q[0][0], ey = Q[1][1]-Q[0][1], ez = Q[1][2]-Q[0][2], fx = Q[2][0]-Q[0][0], fy = Q[2][1]-Q[0][1], fz = Q[2][2]-Q[0][2];
+                    const double nx = ey*fz - ez*fy, ny = ez*fx - ex*fz, nz = ex*fy - ey*fx;
+                    const double gx = Q[2][0]-Q[1][0], gy = Q[2][1]-Q[1][1], gz = Q[2][2]-Q[1][2];
+                    double lmax2 = ex*ex + ey*ey + ez*ez; const double lf = fx*fx + fy*fy + fz*fz, lg = gx*gx + gy*gy + gz*gz;
+                    if (lf > lmax2) lmax2 = lf; if (lg > lmax2) lmax2 = lg;
+                    if (sqrt(nx*nx + ny*ny + nz*nz) < 1e-4 * lmax2) continue;   // altura minima < 1e-4 del lado mas largo
+                }
+                if (a2 <= 1e-12) {
+                    flips++;
+                    if (getenv("W3D_UVDEBUG") && flips <= 6)
+                        printf("      [uvcheck] flip cara %d (%d lados) corners %d,%d,%d uv=(%.3f,%.3f)(%.3f,%.3f)(%.3f,%.3f) p=(%.2f,%.2f,%.2f)(%.2f,%.2f,%.2f)(%.2f,%.2f,%.2f)\n",
+                               (int)f, cnt, cs[0]-L, cs[1]-L, cs[2]-L, U[0], -V[0], U[1], -V[1], U[2], -V[2],
+                               Q[0][0], Q[0][1], Q[0][2], Q[1][0], Q[1][1], Q[1][2], Q[2][0], Q[2][1], Q[2][2]);
+                }
+                area += 0.5 * fabs(a2);
+                for (int i = 0; i < 3; i++) {
+                    const int j = (i + 1) % 3, k2 = (i + 2) % 3;
+                    const double ax = Q[j][0]-Q[i][0], ay = Q[j][1]-Q[i][1], az = Q[j][2]-Q[i][2], bx = Q[k2][0]-Q[i][0], by = Q[k2][1]-Q[i][1], bz = Q[k2][2]-Q[i][2];
+                    const double cx = ay*bz - az*by, cy = az*bx - ax*bz, cz = ax*by - ay*bx;
+                    const double a3 = atan2(sqrt(cx*cx + cy*cy + cz*cz), ax*bx + ay*by + az*bz);
+                    const double ux = U[j]-U[i], uy = V[j]-V[i], wx = U[k2]-U[i], wy = V[k2]-V[i];
+                    const double auv = atan2(fabs(ux*wy - uy*wx), ux*wx + uy*wy);
+                    const double dev = fabs(a3 - auv) * 180.0 / 3.14159265358979;
+                    if (dev > angMax) angMax = dev; angMed += dev; nAng++;
+                }
+            }
+        }
+        L += cnt;
+    }
+    if (nAng) angMed /= nAng;
+    std::set<int> raices; L = 0;
+    for (size_t f = 0; f < m->faces3d.size(); f++) { const int cnt = (int)m->faces3d[f].idx.size(); if (sel[f]) raices.insert(uf.Find(L)); L += cnt; }
+    islas = (int)raices.size();
+    return true;
+}
+// selecciona (en el edit mesh) la arista cuyos extremos son los vertices editables mas cercanos a a y b
+static bool UVSelEdgePos(EditMesh* e, float ax, float ay, float az, float bx, float by, float bz, bool sumar) {
+    int ka = -1, kb = -1; float da = 1e30f, db = 1e30f;
+    for (int k = 0; k < e->NumVerts(); k++) {
+        const float x = e->pos[(size_t)k*3], y = e->pos[(size_t)k*3+1], z = e->pos[(size_t)k*3+2];
+        const float d1 = (x-ax)*(x-ax) + (y-ay)*(y-ay) + (z-az)*(z-az), d2 = (x-bx)*(x-bx) + (y-by)*(y-by) + (z-bz)*(z-bz);
+        if (d1 < da) { da = d1; ka = k; } if (d2 < db) { db = d2; kb = k; }
+    }
+    if (ka < 0 || kb < 0 || ka == kb) return false;
+    for (int eg = 0; eg < e->NumEdges(); eg++) {
+        const int p = e->lineIdx[(size_t)eg*2], q = e->lineIdx[(size_t)eg*2+1];
+        if ((p == ka && q == kb) || (p == kb && q == ka)) {
+            if (!sumar) e->edgeSel.assign(e->edgeSel.size(), 0);
+            if ((size_t)eg < e->edgeSel.size()) e->edgeSel[(size_t)eg] = 1;
+            e->activeIdx = eg; e->Recolorear(); return true;
+        }
+    }
+    return false;
+}
+
+// el panel de propiedades del layout (PropsActivo se setea al INTERACTUAR; el harness lo busca en el arbol)
+static Properties* ScriptProps() {
+    if (PropsActivo) return PropsActivo;
+    struct VK { static ViewportBase* Buscar(ViewportBase* n, int k) { if (!n) return NULL; if (n->isLeaf()) return n->ViewportKind() == k ? n : NULL;
+                    ViewportBase* a = Buscar(((ViewportColumn*)n)->childA, k); if (a) return a; return Buscar(((ViewportColumn*)n)->childB, k); } };
+    ViewportBase* v = VK::Buscar(rootViewport, 3);
+    if (v) PropsActivo = (Properties*)v;
+    return PropsActivo;
+}
 bool W3dRunCommand(const std::string& linea, std::string& err) {
     std::istringstream ss(linea);
     std::string cmd; ss >> cmd;
@@ -6403,6 +6519,9 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         } else if (md == "vertex" || md == "color") {
             LayoutModoElegir(VertexPaint);   // vertex color, por el mismo camino que el menu Mode
             if (InteractionMode != VertexPaint) { err = "no se pudo entrar a Vertex Paint (hay una malla activa?)"; return false; }
+        } else if (md == "texture" || md == "textura") {
+            LayoutModoElegir(TexturePaint);  // pintura de textura (proyeccion desde el 3D)
+            if (InteractionMode != TexturePaint) { err = "no se pudo entrar a Texture Paint (hay una malla activa?)"; return false; }
         } else { err = "modo desconocido: '" + md + "' (object|edit|weight|vertex)"; return false; }
         return true;
     }
@@ -6451,6 +6570,11 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         UndoCapturarSeleccionEdit(m); // Ctrl+Z: guarda la seleccion previa (igual que el input real)
         if (what == "all")  { e->SeleccionarTodo(true);  return true; }
         if (what == "none") { e->SeleccionarTodo(false); return true; }
+        if (what == "ngons") {   // solo las caras de mas de 4 lados (las tapas de un cilindro, etc)
+            e->SeleccionarTodo(false); EditSelectMode = SelFace;
+            for (size_t f = 0; f < e->faces.size() && f < e->faceSel.size(); f++) if (e->faces[f].size() > 4) e->faceSel[f] = 1;
+            e->Recolorear(); return true;
+        }
         int idx = -1; ss >> idx;
         char b[96];
         if (what == "face") {
@@ -28994,6 +29118,563 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         return true;
     }
 
+    // ---- unwrap <angle|conformal|stretch> [margen] / smartuv [angulo] [margen] / lightmap [margen] / followquads / uvreset ----
+    if (cmd == "unwrap") {
+        std::string s; float mg = 0.02f; ss >> s >> mg;
+        Mesh* m = ScriptActiveMesh(); if (!m) { err = "no hay malla activa"; return false; }
+        const int metodo = (s == "angle") ? W3dUnwrapAngular : (s == "conformal") ? W3dUnwrapConforme : (s == "stretch") ? W3dUnwrapEstiramiento : -1;
+        if (metodo < 0) { err = "unwrap desconocido: '" + s + "' (angle|conformal|stretch)"; return false; }
+        std::string msg; int islas = 0;
+        if (!W3dUnwrap(m, metodo, mg, msg, &islas)) { err = msg; return false; }
+        printf("      [unwrap] %s: %d islas\n", s.c_str(), islas); return true;
+    }
+    if (cmd == "smartuv") {
+        float ang = 66.0f, mg = 0.02f; ss >> ang >> mg;
+        Mesh* m = ScriptActiveMesh(); if (!m) { err = "no hay malla activa"; return false; }
+        std::string msg; int islas = 0;
+        if (!W3dSmartUVProject(m, ang, mg, msg, &islas)) { err = msg; return false; }
+        printf("      [smartuv] %d islas\n", islas); return true;
+    }
+    if (cmd == "lightmap") {
+        float mg = 0.02f; ss >> mg;
+        Mesh* m = ScriptActiveMesh(); if (!m) { err = "no hay malla activa"; return false; }
+        std::string msg; if (!W3dLightmapPack(m, mg, msg)) { err = msg; return false; }
+        return true;
+    }
+    if (cmd == "followquads") {
+        Mesh* m = ScriptActiveMesh(); if (!m) { err = "no hay malla activa"; return false; }
+        std::string msg; int n = 0; if (!W3dFollowActiveQuads(m, msg, &n)) { err = msg; return false; }
+        printf("      [followquads] %d quads\n", n); return true;
+    }
+    if (cmd == "uvreset") {
+        Mesh* m = ScriptActiveMesh(); if (!m) { err = "no hay malla activa"; return false; }
+        std::string msg; if (!W3dUVReset(m, msg)) { err = msg; return false; }
+        return true;
+    }
+    // ---- seledgepos x1 y1 z1 x2 y2 z2 [add] : selecciona la arista con extremos mas cercanos a esas posiciones ----
+    if (cmd == "seledgepos") {
+        Mesh* m = ScriptActiveMesh(); if (!m) { err = "no hay malla activa"; return false; }
+        m->EnsureEdit(); if (!m->edit) { err = "sin edit mesh"; return false; }
+        float a[3] = {0,0,0}, b[3] = {0,0,0}; std::string add; ss >> a[0] >> a[1] >> a[2] >> b[0] >> b[1] >> b[2] >> add;
+        if (!UVSelEdgePos(m->edit, a[0], a[1], a[2], b[0], b[1], b[2], add == "add")) { err = "seledgepos: no hay arista entre esos vertices"; return false; }
+        return true;
+    }
+    // ---- activeface N : la cara N del edit mesh pasa a ser la ACTIVA (modo cara), sin tocar la seleccion ----
+    if (cmd == "activeface") {
+        int n = -1; ss >> n; Mesh* m = ScriptActiveMesh(); if (!m) { err = "no hay malla activa"; return false; }
+        m->EnsureEdit(); if (!m->edit || n < 0 || n >= m->edit->NumFaces()) { err = "activeface: cara fuera de rango"; return false; }
+        EditSelectMode = SelFace; m->edit->activeIdx = n; m->edit->Recolorear(); return true;
+    }
+    // ---- uvcheck [islas N] [enrango] [sinflips] [angmax X] [area X tol] [areamax X] [ancho X tol] : analiza los UV
+    //      [extension X tol] : analiza los UV de las caras seleccionadas (ver UVAnalizar) y falla si no cumple ----
+    if (cmd == "uvcheck") {
+        Mesh* m = ScriptActiveMesh(); if (!m) { err = "no hay malla activa"; return false; }
+        int islas = 0, flips = 0; bool enrango = false; double angMax = 0, angMed = 0, area = 0, bbox[4];
+        if (!UVAnalizar(m, islas, enrango, flips, angMax, angMed, area, bbox)) { err = "uvcheck: sin mapa UV"; return false; }
+        printf("      [uvcheck] islas=%d enrango=%s flips=%d angulo max=%.3f medio=%.3f area=%.4f bbox=[%.3f,%.3f]-[%.3f,%.3f]\n",
+               islas, enrango ? "si" : "no", flips, angMax, angMed, area, bbox[0], bbox[1], bbox[2], bbox[3]);
+        std::string tok; char b[160];
+        while (ss >> tok) {
+            if (tok == "islas") { int n = 0; ss >> n; if (islas != n) { sprintf(b, "uvcheck: islas=%d, se esperaban %d", islas, n); err = b; return false; } }
+            else if (tok == "enrango") { if (!enrango) { err = "uvcheck: hay UV fuera de [0,1]"; return false; } }
+            else if (tok == "sinflips") { if (flips) { sprintf(b, "uvcheck: %d triangulos dados vuelta", flips); err = b; return false; } }
+            else if (tok == "angmax") { double x = 0; ss >> x; if (angMax > x) { sprintf(b, "uvcheck: desvio de angulo %.3f > %.3f", angMax, x); err = b; return false; } }
+            else if (tok == "area") { double x = 0, tol = 0; ss >> x >> tol; if (fabs(area - x) > tol) { sprintf(b, "uvcheck: area %.4f, se esperaba %.4f (+-%.4f)", area, x, tol); err = b; return false; } }
+            else if (tok == "areamax") { double x = 0; ss >> x; if (area > x) { sprintf(b, "uvcheck: area %.4f > %.4f", area, x); err = b; return false; } }
+            else if (tok == "extension") { double x = 0, tol = 0; ss >> x >> tol; const double ext = (bbox[2] - bbox[0]) * (bbox[3] - bbox[1]); if (fabs(ext - x) > tol) { sprintf(b, "uvcheck: la caja ocupa %.4f, se esperaba %.4f", ext, x); err = b; return false; } }
+            else if (tok == "ancho") { double x = 0, tol = 0; ss >> x >> tol; const double w = bbox[2] - bbox[0]; if (fabs(w - x) > tol) { sprintf(b, "uvcheck: ancho %.4f, se esperaba %.4f", w, x); err = b; return false; } }
+            else { err = "uvcheck: opcion desconocida '" + tok + "'"; return false; }
+        }
+        return true;
+    }
+    // ---- fail <comando...> : corre el comando y pasa SOLO si ese comando falla (para probar los avisos) ----
+    if (cmd == "fail") {
+        std::string resto; std::getline(ss, resto);
+        size_t i0 = resto.find_first_not_of(" \t"); if (i0 == std::string::npos) { err = "fail: falta el comando"; return false; }
+        resto = resto.substr(i0);
+        std::string e2;
+        if (W3dRunCommand(resto, e2)) { err = "fail: '" + resto + "' anduvo y tenia que fallar"; return false; }
+        printf("      [fail] '%s' fallo como se esperaba: %s\n", resto.c_str(), e2.c_str());
+        return true;
+    }
+    // ---- prop on|off | connected 0/1 | type <smooth|sphere|root|invsquare|sharp|linear|constant|random> | radius X ----
+    if (cmd == "prop") {
+        std::string s; ss >> s;
+        if      (s == "on")  g_prop.on = true;
+        else if (s == "off") g_prop.on = false;
+        else if (s == "connected") { int v = 0; ss >> v; g_prop.conectado = (v != 0); }
+        else if (s == "radius") { float r = 1.0f; ss >> r; ProporcionalRadioSet(r); }
+        else if (s == "type") {
+            std::string tn; ss >> tn; int k = -1;
+            static const char* nombres[PropTipos] = { "smooth", "sphere", "root", "invsquare", "sharp", "linear", "constant", "random" };
+            for (int i = 0; i < PropTipos; i++) if (tn == nombres[i]) k = i;
+            if (k < 0) { err = "prop type desconocido: '" + tn + "'"; return false; }
+            ProporcionalSetTipo(k);
+        } else { err = "prop: on|off|connected 0/1|type <t>|radius X"; return false; }
+        return true;
+    }
+    // ---- xform <move|rotate|scale> <valor> : transform de Edit Mode con valor exacto (move en X, rotate en grados
+    //      sobre el eje Y de la UI, scale = factor) por la MISMA puerta que el teclado ----
+    if (cmd == "xform") {
+        std::string s; float v = 0.0f; ss >> s >> v;
+        Mesh* m = ScriptActiveMesh(); if (!m) { err = "no hay malla activa"; return false; }
+        if (InteractionMode != EditMode) { err = "xform necesita Edit Mode"; return false; }
+        const int est = (s == "move") ? translacion : (s == "rotate") ? rotacion : (s == "scale") ? EditScale : -1;
+        if (est < 0) { err = "xform: move|rotate|scale"; return false; }
+        if (!EditXformStart(est, (est == translacion) ? X : (est == rotacion) ? Y : XYZ) || !EditXformActivo()) { err = "xform: no arranco (sin seleccion)"; return false; }
+        EditXformNumValor(v); EditXformConfirmar();
+        return true;
+    }
+    // ---- vertat x y z [ex ey ez tol] : posicion del vertice editable mas cercano a (x,y,z); con esperado, falla si no coincide ----
+    if (cmd == "vertat") {
+        Mesh* m = ScriptActiveMesh(); if (!m) { err = "no hay malla activa"; return false; }
+        m->EnsureEdit(); EditMesh* e = m->edit; if (!e) { err = "sin edit mesh"; return false; }
+        float x = 0, y = 0, z = 0; ss >> x >> y >> z;
+        int mejor = -1; float md = 1e30f;
+        for (int k = 0; k < e->NumVerts(); k++) { const float dx = e->pos[(size_t)k*3]-x, dy = e->pos[(size_t)k*3+1]-y, dz = e->pos[(size_t)k*3+2]-z; const float d = dx*dx+dy*dy+dz*dz; if (d < md) { md = d; mejor = k; } }
+        if (mejor < 0) { err = "vertat: sin vertices"; return false; }
+        const float px = e->pos[(size_t)mejor*3], py = e->pos[(size_t)mejor*3+1], pz = e->pos[(size_t)mejor*3+2];
+        float ex, ey, ez, tol;
+        if (ss >> ex >> ey >> ez >> tol) {
+            if (fabsf(px-ex) > tol || fabsf(py-ey) > tol || fabsf(pz-ez) > tol) {
+                char b[160]; sprintf(b, "vertat: el vert cerca de (%.2f,%.2f,%.2f) esta en (%.4f,%.4f,%.4f), se esperaba (%.4f,%.4f,%.4f)", x, y, z, px, py, pz, ex, ey, ez); err = b; return false;
+            }
+        } else printf("      [vertat] vert %d en (%.4f,%.4f,%.4f)\n", mejor, px, py, pz);
+        return true;
+    }
+    // ---- objmove dx dy dz : mueve la seleccion de Object Mode por la puerta del transform (G + delta de mundo + aceptar) ----
+    if (cmd == "objmove") {
+        float dx = 0, dy = 0, dz = 0; ss >> dx >> dy >> dz;
+        if (InteractionMode != ObjectMode) { err = "objmove necesita Object Mode"; return false; }
+        SetPosicion();
+        if (estado != translacion) { err = "objmove: el transform no arranco (sin objeto activo seleccionado)"; return false; }
+        SetTranslacionObjetosMundo(Vector3(dx, dy, dz));
+        if (viewPortActive && viewPortActive->ViewportKind() == 1) ((Viewport3D*)viewPortActive)->Aceptar();
+        else { UndoTransformConfirmar(); ReestablecerEstado(true); }
+        return true;
+    }
+    // ---- objat <nombre> [ex ey ez tol] : posicion del objeto; con esperado, falla si no coincide ----
+    if (cmd == "objat") {
+        std::string nm; ss >> nm;
+        Object* o = SceneCollection ? FindObjectByName(SceneCollection, nm) : NULL;
+        if (!o) { err = "objat: objeto no encontrado: " + nm; return false; }
+        float ex, ey, ez, tol;
+        if (ss >> ex >> ey >> ez >> tol) {
+            if (fabsf(o->pos.x-ex) > tol || fabsf(o->pos.y-ey) > tol || fabsf(o->pos.z-ez) > tol) {
+                char b[160]; sprintf(b, "objat: %s esta en (%.4f,%.4f,%.4f), se esperaba (%.4f,%.4f,%.4f)", nm.c_str(), o->pos.x, o->pos.y, o->pos.z, ex, ey, ez); err = b; return false;
+            }
+        } else printf("      [objat] %s en (%.4f,%.4f,%.4f)\n", nm.c_str(), o->pos.x, o->pos.y, o->pos.z);
+        return true;
+    }
+    // ---- texgentest : genera los 3 tipos de textura de prueba y revisa los pixeles (damero, cruces, rotulos, alpha) ----
+    if (cmd == "texgentest") {
+        bool ok = true;
+        std::vector<unsigned char> px;
+        const float gris[4] = { 0.2f, 0.4f, 0.6f, 0.5f };
+        struct TG { static const unsigned char* P(const std::vector<unsigned char>& v, int w, int x, int y) { return &v[((size_t)y * w + x) * 4]; }
+                    static bool Igual(const unsigned char* a, const unsigned char* b) { return a[0]==b[0] && a[1]==b[1] && a[2]==b[2]; } };
+        // (1) liso con alpha: todos los pixeles = el color, alpha 128; sin alpha: 255
+        W3dGenerarTextura(TexGenBlank, 32, 16, gris, true, px);
+        { const unsigned char* p = TG::P(px, 32, 5, 7); const bool bien = px.size() == 32*16*4 && p[0]==51 && p[1]==102 && p[2]==153 && p[3]==128;
+          printf("      [texgentest] liso con alpha: (%d,%d,%d,%d) -> %s\n", p[0], p[1], p[2], p[3], bien ? "OK" : "MAL"); if (!bien) ok = false; }
+        W3dGenerarTextura(TexGenBlank, 32, 16, gris, false, px);
+        { const unsigned char* p = TG::P(px, 32, 31, 15); const bool bien = p[3] == 255;
+          printf("      [texgentest] liso sin alpha: a=%d -> %s\n", p[3], bien ? "OK" : "MAL"); if (!bien) ok = false; }
+        // (2) grilla UV 256x256: celdas de 64 (cuadradas, fijas); centros de celdas vecinas distintos, de la misma
+        //     paridad iguales, cruz de color en el centro (no gris), linea de borde mas clara
+        W3dGenerarTextura(TexGenUVGrid, 256, 256, gris, false, px);
+        { const unsigned char* a = TG::P(px, 256, 8, 8); const unsigned char* b = TG::P(px, 256, 72, 8); const unsigned char* c = TG::P(px, 256, 136, 8);
+          const unsigned char* cruz = TG::P(px, 256, 32, 32); const unsigned char* borde = TG::P(px, 256, 64, 8);
+          const bool damero = !TG::Igual(a, b) && TG::Igual(a, c) && a[0] == a[1] && a[1] == a[2];
+          const bool conCruz = !(cruz[0] == cruz[1] && cruz[1] == cruz[2]);
+          const bool conBorde = borde[0] > b[0];
+          const bool bien = damero && conCruz && conBorde;
+          printf("      [texgentest] grilla UV: damero=%s cruz de color=%s borde claro=%s -> %s\n", damero ? "si" : "no", conCruz ? "si" : "no", conBorde ? "si" : "no", bien ? "OK" : "MAL"); if (!bien) ok = false; }
+        // (3) grilla de colores 256x256: columnas de distinto tono, filas mas claras arriba, rotulo blanco en la celda
+        W3dGenerarTextura(TexGenColorGrid, 256, 256, gris, false, px);
+        { const unsigned char* c0 = TG::P(px, 256, 4, 250); const unsigned char* c1 = TG::P(px, 256, 68, 250);
+          const unsigned char* arriba = TG::P(px, 256, 4, 4);
+          const bool tonos = !TG::Igual(c0, c1);
+          const bool masClaro = (arriba[0] + arriba[1] + arriba[2]) > (c0[0] + c0[1] + c0[2]);
+          int blancos = 0; for (int y = 192; y < 256; y++) for (int x = 0; x < 64; x++) { const unsigned char* p = TG::P(px, 256, x, y); if (p[0] > 240 && p[1] > 240 && p[2] > 240) blancos++; }
+          const bool rotulo = blancos > 10;
+          const bool bien = tonos && masClaro && rotulo;
+          printf("      [texgentest] grilla de colores: tonos por columna=%s, fila H mas clara=%s, rotulo A1 (%d px blancos)=%s -> %s\n", tonos ? "si" : "no", masClaro ? "si" : "no", blancos, rotulo ? "si" : "no", bien ? "OK" : "MAL"); if (!bien) ok = false; }
+        // (3b) la grilla de colores NO se repite: 1024x64 (celdas de 16, 64 columnas): la columna 0, la 12 y la 32 difieren
+        W3dGenerarTextura(TexGenColorGrid, 1024, 64, gris, false, px);
+        { const unsigned char* a = TG::P(px, 1024, 8, 8); const unsigned char* b = TG::P(px, 1024, 200, 8); const unsigned char* c = TG::P(px, 1024, 520, 8);
+          const unsigned char* linea = TG::P(px, 1024, 16, 8);
+          const bool bien = !TG::Igual(a, b) && !TG::Igual(a, c) && !TG::Igual(b, c) && linea[0] < 40 && linea[1] < 40 && linea[2] < 40;
+          printf("      [texgentest] arcoiris sin repetir (col 0/12/32 distintas, linea negra)=%s -> %s\n", bien ? "si" : "no", bien ? "OK" : "MAL"); if (!bien) ok = false; }
+        // (4) rectangular 512x256: celdas de 64 CUADRADAS -> 8 x 4 celdas (el damero cambia cada 64 px en las dos direcciones)
+        W3dGenerarTextura(TexGenUVGrid, 512, 256, gris, false, px);
+        { const unsigned char* a = TG::P(px, 512, 8, 8); const unsigned char* bx = TG::P(px, 512, 72, 8); const unsigned char* by = TG::P(px, 512, 8, 72);
+          const bool bien = !TG::Igual(a, bx) && !TG::Igual(a, by) && W3dTexGenCelda(512, 256) == 64 && W3dTexGenCelda(4096, 4096) == 64 && W3dTexGenCelda(64, 64) == 16;
+          printf("      [texgentest] rectangular 512x256: celdas cuadradas de 64=%s -> %s\n", bien ? "si" : "no", bien ? "OK" : "MAL"); if (!bien) ok = false; }
+        // (5) tamanos raros: no revienta
+        W3dGenerarTextura(TexGenColorGrid, 64, 20, gris, true, px); W3dGenerarTextura(TexGenUVGrid, 5, 3, gris, false, px);
+        { const bool bien = px.size() == 5*3*4; printf("      [texgentest] tamanos chicos: %s\n", bien ? "OK" : "MAL"); if (!bien) ok = false; }
+        if (!ok) { err = "texgentest: ver los MAL de arriba"; return false; }
+        return true;
+    }
+    // ---- newtex <nombre> <w> <h> <blank|uvgrid|colorgrid> [alpha] : crea la textura en el proyecto y la asigna
+    //      al material de la parte activa (revisa tamano y asignacion) ----
+    if (cmd == "newtex") {
+        std::string nombre, tipoS, alphaS; int w = 0, h = 0; ss >> nombre >> w >> h >> tipoS >> alphaS;
+        const int tipo = (tipoS == "blank") ? TexGenBlank : (tipoS == "uvgrid") ? TexGenUVGrid : (tipoS == "colorgrid") ? TexGenColorGrid : -1;
+        if (tipo < 0) { err = "newtex: blank|uvgrid|colorgrid"; return false; }
+        const float col[4] = { 0.5f, 0.5f, 0.5f, 1.0f };
+        std::string msg;
+        const std::string ruta = W3dCrearTexturaProyecto(nombre, tipo, w, h, col, alphaS == "alpha", msg);
+        if (ruta.empty()) { err = "newtex: " + msg; return false; }
+        Texture* t = TexturaBuscar(ruta);
+        if (!t || !t->iID) { err = "newtex: la textura no quedo cargada: " + ruta; return false; }
+        if (t->ancho != w || t->alto != h) { char b[160]; sprintf(b, "newtex: tamano %dx%d, se esperaba %dx%d", t->ancho, t->alto, w, h); err = b; return false; }
+        // NO se asigna a ningun material (menos al de defecto): solo se muestra en el UV editor, en memoria ("*")
+        if (ObjActivo && ObjActivo->getType() == ObjectType::mesh) {
+            Mesh* m = (Mesh*)ObjActivo;
+            for (size_t i = 0; i < m->materialsGroup.size(); i++) if (m->materialsGroup[i].material && m->materialsGroup[i].material->texture == t) { err = "newtex: quedo asignada a un material (no debe)"; return false; }
+        }
+        if (UVTexProyectoRuta() != ruta) { err = "newtex: el UV editor no la muestra: " + UVTexProyectoRuta(); return false; }
+        if (!TexEditSinGuardar(t)) { err = "newtex: tendria que estar SIN guardar (*)"; return false; }
+        printf("      [newtex] '%s' -> %s (%dx%d, en memoria, etiqueta '%s')\n", nombre.c_str(), ruta.c_str(), t->ancho, t->alto, TexEditEtiqueta(t).c_str());
+        return true;
+    }
+    // ---- newtexpopup : abre el formulario de "Nueva textura" (para verlo con uishot) ----
+    if (cmd == "newtexpopup") { extern void AbrirNuevaTexturaPopup(); AbrirNuevaTexturaPopup(); return true; }
+    // ---- popupclick lx ly : click en el popup ACTIVO, en coordenadas locales a el (uishot despues para verlo) ----
+    if (cmd == "popupclick") {
+        int lx = 0, ly = 0; ss >> lx >> ly;
+        if (!PopUpActive) { err = "popupclick: no hay popup activo"; return false; }
+        PopUpBase* p = PopUpActive;
+        const bool dentro = p->Click(p->x + lx, p->y + ly);
+        if (!dentro) p->Cerrar();
+        p->Soltar();
+        printf("      [popupclick] (%d,%d) -> %s; popup activo=%s\n", lx, ly, dentro ? "adentro" : "afuera (cerrado)", PopUpActive ? "si" : "no");
+        return true;
+    }
+    // ---- popupinfo [activo|ninguno] : estado del popup activo; con argumento, falla si no coincide ----
+    if (cmd == "popupinfo") {
+        std::string esp; ss >> esp;
+        if (PopUpActive) printf("      [popupinfo] activo en (%d,%d) %dx%d\n", PopUpActive->x, PopUpActive->y, PopUpActive->popUpWindow->width, PopUpActive->popUpWindow->height);
+        else printf("      [popupinfo] ninguno\n");
+        if (esp == "activo" && !PopUpActive) { err = "popupinfo: no hay popup activo"; return false; }
+        if (esp == "ninguno" && PopUpActive) { err = "popupinfo: hay un popup activo"; return false; }
+        return true;
+    }
+    // ---- tactil 1|0 : simula que hubo (o no) pantalla tactil (ToolbarUsaTactil) para probar la UI tactil ----
+    if (cmd == "tactil") {
+        int v = 1; ss >> v; extern Uint32 g_lastFingerTicks; g_lastFingerTicks = v ? SDL_GetTicks() : 0;
+        return true;
+    }
+    // ---- texassign : le asigna la textura MOSTRADA en el UV editor al material de la parte activa de la malla activa ----
+    if (cmd == "texassign") {
+        Mesh* m = ScriptActiveMesh(); if (!m) { err = "no hay malla activa"; return false; }
+        Texture* t = UVTexturaMostrada(m); if (!t) { err = "texassign: el UV editor no muestra ninguna textura"; return false; }
+        const int p = UVParteMostrada(m);
+        if (p < 0 || p >= (int)m->materialsGroup.size() || !m->materialsGroup[(size_t)p].material) { err = "texassign: sin parte/material"; return false; }
+        m->materialsGroup[(size_t)p].material->texture = t; m->materialsGroup[(size_t)p].material->textureOn = true;
+        UVSetTexProyecto(std::string());   // el editor sigue a la parte (que ya la tiene)
+        return true;
+    }
+    // ---- brushradius px : radio del pincel en pixeles de pantalla ----
+    if (cmd == "brushradius") { float r = 40; ss >> r; BrushGet().radioPx = r; return true; }
+    // ---- brushcolor r g b [a] [fuerza] : color (0..1) y fuerza del pincel ----
+    if (cmd == "brushcolor") {
+        float r = 1, g = 1, b = 1, a = 1, f = -1; ss >> r >> g >> b >> a >> f;
+        BrushEstado& br = BrushGet(); br.color[0] = r; br.color[1] = g; br.color[2] = b; br.color[3] = a; br.palIdx = -1;
+        if (f >= 0) br.fuerza = f;
+        return true;
+    }
+    // ---- texdab u v radioTexels : un toque del pincel (color/fuerza/curva del pincel) sobre la textura mostrada, con undo ----
+    if (cmd == "texdab") {
+        float u = 0.5f, v = 0.5f, r = 8; ss >> u >> v >> r;
+        Mesh* m = ScriptActiveMesh(); Texture* t = UVTexturaMostrada(m);
+        TexturaEditable* te = t ? TexEditObtener(t) : NULL;
+        if (!te) { err = "texdab: no hay textura mostrada/editable"; return false; }
+        BrushEstado& br = BrushGet(); unsigned char rgba[4];
+        for (int q = 0; q < 4; q++) { float c = br.color[q]; if (c < 0) c = 0; if (c > 1) c = 1; rgba[q] = (unsigned char)(c * 255.0f + 0.5f); }
+        UndoTexturaIniciar(te);
+        int rect[4] = { -1, -1, -1, -1 };
+        const bool cambio = TexEditDab(te, u * te->w, v * te->h, r, rgba, br.fuerza, BrushFalloffEfectivo(), rect);
+        if (rect[0] >= 0) TexEditSubir(te, rect[0], rect[1], rect[2], rect[3]);
+        UndoTexturaConfirmar(cambio);
+        printf("      [texdab] (%.2f,%.2f) r=%.1f -> %s\n", u, v, r, cambio ? "pinto" : "nada");
+        return true;
+    }
+    // ---- rtrender w h [pases] : trazado de rayos sincronico del viewport 3D activo a un buffer propio ----
+    if (cmd == "rtrender") {
+        int w = 0, h = 0, pases = 0; ss >> w >> h >> pases;
+        Viewport3D* vp = Viewport3DActive;
+        if (!vp) { err = "rtrender: no hay viewport 3D activo"; return false; }
+        if (w < 1 || h < 1) { err = "rtrender: falta w h"; return false; }
+        if (!RTHarnessRender(vp, w, h, pases)) { err = "rtrender: fallo"; return false; }
+        return true;
+    }
+    // ---- rtpixel x y [er eg eb tol] : color del pixel del ultimo rtrender; con esperado, falla si no coincide ----
+    if (cmd == "rtpixel") {
+        int x = 0, y = 0; ss >> x >> y;
+        unsigned char p[3];
+        if (!RTHarnessPixel(x, y, p)) { err = "rtpixel: sin render o fuera de la imagen"; return false; }
+        int er, eg, eb, tol;
+        if (ss >> er >> eg >> eb >> tol) {
+            if (abs((int)p[0] - er) > tol || abs((int)p[1] - eg) > tol || abs((int)p[2] - eb) > tol) {
+                char b[160]; sprintf(b, "rtpixel (%d,%d): (%d,%d,%d), se esperaba (%d,%d,%d)", x, y, p[0], p[1], p[2], er, eg, eb); err = b; return false;
+            }
+        } else w3dLogf("[rtpixel] (%d,%d) = (%d,%d,%d)", x, y, p[0], p[1], p[2]);
+        return true;
+    }
+    // ---- rtopt rayos samples pases : opciones globales del trazado (g_rt) ----
+    if (cmd == "rtopt") {
+        int r = 1, sm = 1, ps = 16, on = -1; ss >> r >> sm >> ps >> on;
+        g_rt.rayos = r < 1 ? 1 : r; g_rt.samples = sm < 1 ? 1 : sm; g_rt.pases = ps < 1 ? 1 : ps;
+        if (on >= 0) g_rt.on = (on != 0);   // 4to parametro opcional: el tilde "Ray Tracing" de la tarjeta Render
+        { extern void RTFilasPanel(Properties*); RTFilasPanel(ScriptProps()); }
+        { extern void RebindMaterialMeshPart(); if (ScriptProps()) RebindMaterialMeshPart(); }
+        RTInvalidar();
+        return true;
+    }
+    // ---- rtlight radio rayos dir : tamano / rayos de sombra / direccional de la luz activa (o la primera) ----
+    if (cmd == "rtlight") {
+        float radio = 0, rayos = 0; int dir = 0; ss >> radio >> rayos >> dir;
+        Light* l = (ObjActivo && ObjActivo->getType() == ObjectType::light) ? (Light*)ObjActivo : NULL;
+        if (!l) for (size_t i = 0; i < Lights.size() && !l; i++) l = Lights[i];
+        if (!l) { err = "rtlight: sin luz en la escena"; return false; }
+        l->rtRadio = radio; l->rtRayos = rayos; l->direccional = (dir != 0);
+        RTInvalidar();
+        return true;
+    }
+    // ---- renderimage : el boton "Render Image" de la tarjeta Render (Path + Nombre del panel) ----
+    if (cmd == "renderimage") {
+        extern void W3dHarnessRenderImage();
+        if (!rootViewport) { err = "renderimage: no hay layout"; return false; }
+        rootViewport->Render();   // puebla Viewport3DActive
+        ScriptProps();            // y el panel de propiedades (Path / Nombre / Render Image)
+        std::string dir, nombre; ss >> dir >> nombre;   // opcionales: carpeta + nombre.png (los campos del panel)
+        if (PropsActivo && !dir.empty() && PropsActivo->propRenderPath) PropsActivo->propRenderPath->field.text = dir;
+        if (PropsActivo && !nombre.empty() && PropsActivo->propRenderOutput) PropsActivo->propRenderOutput->field.text = nombre;
+        W3dHarnessRenderImage();
+        return true;
+    }
+    // ---- propstab n : pestania del panel de propiedades (0 = Render/Archivo, 1 = Objeto, 2 = contextual) ----
+    if (cmd == "propstab") {
+        int n = 0; ss >> n;
+        if (!ScriptProps()) { err = "propstab: sin panel de propiedades"; return false; }
+        PropsActivo->pestaniaActiva = n; PropsActivo->ActualizarPestanias();
+        return true;
+    }
+    // ---- propcard archivo|render 0|1 : pliega/despliega una tarjeta del panel (para ver las de abajo en un uishot) ----
+    if (cmd == "propcard") {
+        std::string cual; int abierta = 1; ss >> cual >> abierta;
+        Properties* P = ScriptProps();
+        if (!P) { err = "propcard: sin panel de propiedades"; return false; }
+        GroupPropertie* g = (cual == "archivo") ? P->propArchivo : (cual == "render") ? P->propRender : NULL;
+        if (!g) { err = "propcard: tarjeta desconocida (archivo|render)"; return false; }
+        g->open = (abierta != 0);
+        return true;
+    }
+    // ---- matnew : material NUEVO (propio) para la parte 0 de la malla activa (como el boton New del panel) ----
+    if (cmd == "matnew") {
+        Mesh* m = ScriptActiveMesh(); if (!m || m->materialsGroup.empty()) { err = "matnew: no hay malla activa"; return false; }
+        extern Material* NuevoMaterialEnMeshPart(Mesh*, int);
+        if (!NuevoMaterialEnMeshPart(m, 0)) { err = "matnew: no se pudo crear"; return false; }
+        RTInvalidar();
+        return true;
+    }
+    // ---- matrt rugosidad metalico : los campos del trazado de rayos del material activo ----
+    if (cmd == "matrt") {
+        float rug = 0.5f, met = 0.0f; ss >> rug >> met;
+        Material* mat = ScriptActiveMaterial();
+        if (!mat) { err = "matrt: no hay material activo"; return false; }
+        mat->rtRugosidad = rug; mat->rtMetalico = met;
+        RTInvalidar();
+        return true;
+    }
+    // ---- matalpha a [transparente 0|1] : alpha del color difuso del material activo (+ el tilde Transparent) ----
+    if (cmd == "matalpha") {
+        float a = 1.0f; int tr = -1; ss >> a >> tr;
+        Material* mat = ScriptActiveMaterial();
+        if (!mat) { err = "matalpha: no hay material activo"; return false; }
+        mat->diffuse[3] = a; if (tr >= 0) mat->transparent = (tr != 0);
+        RTInvalidar();
+        return true;
+    }
+    // ---- texalpha u0 v0 u1 v1 a : alpha (0..1) de un rectangulo de la textura mostrada (recorte para probar sombras) ----
+    if (cmd == "texalpha") {
+        float u0 = 0, v0 = 0, u1 = 1, v1 = 1, a = 0; ss >> u0 >> v0 >> u1 >> v1 >> a;
+        Mesh* m = ScriptActiveMesh(); Texture* t = UVTexturaMostrada(m);
+        TexturaEditable* te = t ? TexEditObtener(t) : NULL;
+        if (!te) { err = "texalpha: no hay textura mostrada/editable"; return false; }
+        const unsigned char av = (unsigned char)(a * 255.0f + 0.5f);
+        int x0 = (int)(u0 * te->w), y0 = (int)(v0 * te->h), x1 = (int)(u1 * te->w), y1 = (int)(v1 * te->h);
+        if (x0 < 0) x0 = 0; if (y0 < 0) y0 = 0; if (x1 > te->w) x1 = te->w; if (y1 > te->h) y1 = te->h;
+        for (int y = y0; y < y1; y++) for (int x = x0; x < x1; x++) te->rgba[((size_t)y * te->w + x) * 4 + 3] = av;
+        te->alpha = true; te->modificada = true;
+        TexEditSubir(te, x0, y0, x1, y1);
+        RTInvalidar();
+        return true;
+    }
+    // ---- propscroll n : rueda del mouse sobre el panel de propiedades n veces (n<0 = hacia arriba) ----
+    if (cmd == "propscroll") {
+        int n = 1; ss >> n;
+        Properties* P = ScriptProps();
+        if (!P) { err = "propscroll: sin panel de propiedades"; return false; }
+        if (rootViewport) rootViewport->Render();   // el alto del contenido (tope del scroll) se mide al dibujar
+        const int mx = P->x + P->width / 2, my = P->y + P->height / 2;
+        for (int i = 0; i < (n < 0 ? -n : n); i++) P->event_mouse_wheel(n < 0 ? 1.0f : -1.0f, mx, my);
+        return true;
+    }
+    // ---- matnormal 0|1 : la textura mostrada en el UV editor pasa a ser el NORMAL MAP del material activo (1) o se apaga (0) ----
+    if (cmd == "matnormal") {
+        int on = 1; ss >> on;
+        Material* mat = ScriptActiveMaterial();
+        if (!mat) { err = "matnormal: no hay material activo"; return false; }
+        if (on) {
+            Mesh* m = ScriptActiveMesh(); Texture* t = UVTexturaMostrada(m);
+            if (!t) { err = "matnormal: el UV editor no muestra ninguna textura"; return false; }
+            mat->normalTexture = t; mat->normalMap = true;
+        } else mat->normalMap = false;
+        RTInvalidar();
+        return true;
+    }
+    // ---- texfill u0 v0 u1 v1 r g b [a] : pinta un rectangulo de la textura mostrada con ese color (0..1) ----
+    if (cmd == "texfill") {
+        float u0 = 0, v0 = 0, u1 = 1, v1 = 1, r = 0, g = 0, b = 0, a = 1; ss >> u0 >> v0 >> u1 >> v1 >> r >> g >> b >> a;
+        Mesh* m = ScriptActiveMesh(); Texture* t = UVTexturaMostrada(m);
+        TexturaEditable* te = t ? TexEditObtener(t) : NULL;
+        if (!te) { err = "texfill: no hay textura mostrada/editable"; return false; }
+        const float cc[4] = { r, g, b, a }; unsigned char px[4];
+        for (int k = 0; k < 4; k++) { float c = cc[k]; if (c < 0) c = 0; if (c > 1) c = 1; px[k] = (unsigned char)(c * 255.0f + 0.5f); }
+        int x0 = (int)(u0 * te->w), y0 = (int)(v0 * te->h), x1 = (int)(u1 * te->w), y1 = (int)(v1 * te->h);
+        if (x0 < 0) x0 = 0; if (y0 < 0) y0 = 0; if (x1 > te->w) x1 = te->w; if (y1 > te->h) y1 = te->h;
+        for (int y = y0; y < y1; y++) for (int x = x0; x < x1; x++) memcpy(&te->rgba[((size_t)y * te->w + x) * 4], px, 4);
+        te->modificada = true;
+        TexEditSubir(te, x0, y0, x1, y1);
+        RTInvalidar();
+        return true;
+    }
+    // ---- rtsave ruta.png : guarda el ultimo rtrender ----
+    if (cmd == "rtsave") {
+        std::string ruta; ss >> ruta;
+        if (ruta.empty() || !RTHarnessGuardar(ruta)) { err = "rtsave: no pude guardar"; return false; }
+        return true;
+    }
+    // ---- rttris [min] : triangulos de la escena trazada (con min, falla si hay menos) ----
+    if (cmd == "rttris") {
+        int mn = -1; ss >> mn;
+        const int n = RTHarnessTriangulos();
+        if (mn >= 0 && n < mn) { char b[96]; sprintf(b, "rttris: %d triangulos, se esperaban al menos %d", n, mn); err = b; return false; }
+        w3dLogf("[rttris] %d", n);
+        return true;
+    }
+    // ---- texpixel u v [er eg eb tol] : color del texel de la textura mostrada; con esperado, falla si no coincide ----
+    if (cmd == "texpixel") {
+        float u = 0, v = 0; ss >> u >> v;
+        Mesh* m = ScriptActiveMesh(); Texture* t = UVTexturaMostrada(m);
+        TexturaEditable* te = t ? TexEditObtener(t) : NULL;
+        if (!te) { err = "texpixel: no hay textura mostrada/editable"; return false; }
+        int x = (int)(u * te->w), y = (int)(v * te->h);
+        if (x < 0) x = 0; if (y < 0) y = 0; if (x >= te->w) x = te->w - 1; if (y >= te->h) y = te->h - 1;
+        const unsigned char* p = &te->rgba[((size_t)y * te->w + x) * 4];
+        int er, eg, eb, tol;
+        if (ss >> er >> eg >> eb >> tol) {
+            if (abs((int)p[0] - er) > tol || abs((int)p[1] - eg) > tol || abs((int)p[2] - eb) > tol) {
+                char b[160]; sprintf(b, "texpixel (%.2f,%.2f): (%d,%d,%d), se esperaba (%d,%d,%d)", u, v, p[0], p[1], p[2], er, eg, eb); err = b; return false;
+            }
+        } else printf("      [texpixel] (%.2f,%.2f) = (%d,%d,%d,%d)\n", u, v, p[0], p[1], p[2], p[3]);
+        return true;
+    }
+    // ---- texsave / texext <ruta.png> / texint : guardar la textura mostrada, hacerla externa (PNG de disco) o interna ----
+    if (cmd == "texsave" || cmd == "texext" || cmd == "texint") {
+        Mesh* m = ScriptActiveMesh(); Texture* t = UVTexturaMostrada(m);
+        TexturaEditable* te = t ? TexEditObtener(t) : NULL;
+        if (!te) { err = cmd + ": no hay textura mostrada/editable"; return false; }
+        std::string msg; bool ok;
+        if (cmd == "texsave") ok = TexEditGuardar(te, msg);
+        else if (cmd == "texext") { std::string ruta; ss >> ruta; ok = TexEditHacerExterna(te, ruta, msg); }
+        else ok = TexEditHacerInterna(te, msg);
+        if (!ok) { err = cmd + ": " + msg; return false; }
+        printf("      [%s] %s (externa=%s, etiqueta '%s')\n", cmd.c_str(), t->path.c_str(), TexEditEsExterna(t) ? "si" : "no", TexEditEtiqueta(t).c_str());
+        return true;
+    }
+    // ---- texlabel [esperado] : etiqueta de la textura mostrada (nombre + "*" si esta sin guardar) ----
+    if (cmd == "texlabel") {
+        std::string esp; ss >> esp;
+        Mesh* m = ScriptActiveMesh(); Texture* t = UVTexturaMostrada(m);
+        if (!t) { err = "texlabel: no hay textura mostrada"; return false; }
+        const std::string lbl = TexEditEtiqueta(t);
+        if (!esp.empty() && lbl != esp) { err = "texlabel: '" + lbl + "', se esperaba '" + esp + "'"; return false; }
+        printf("      [texlabel] '%s'\n", lbl.c_str());
+        return true;
+    }
+    // ---- texpaint3d dx dy : un toque del pincel de TEXTURE PAINT en el viewport 3D activo, en (centro + dx, dy) ----
+    if (cmd == "texpaint3d") {
+        int dx = 0, dy = 0; ss >> dx >> dy;
+        if (!viewPortActive || viewPortActive->ViewportKind() != 1) { err = "texpaint3d: el viewport activo no es 3D"; return false; }
+        if (InteractionMode != TexturePaint) { err = "texpaint3d: hay que estar en Texture Paint (mode texture)"; return false; }
+        Viewport3D* vp = (Viewport3D*)viewPortActive;
+        rootViewport->Render();   // arma el mapa de oclusion de los modos de pintura
+        extern bool W3dTexPaint3DHarness(Viewport3D*, int, int);
+        const bool cambio = W3dTexPaint3DHarness(vp, vp->x + vp->width / 2 + dx, vp->y + vp->height / 2 + dy);
+        printf("      [texpaint3d] (%+d,%+d) -> %s\n", dx, dy, cambio ? "pinto" : "nada");
+        if (!cambio) { err = "texpaint3d: no pinto nada"; return false; }
+        return true;
+    }
+    // ---- texcaras : para cada cara de la malla activa dice si mira a la camara y si su texel central esta pintado
+    //      (distinto del gris de fondo). Falla si alguna cara DE ESPALDAS quedo pintada o si ninguna de frente lo esta ----
+    if (cmd == "texcaras") {
+        Mesh* m = ScriptActiveMesh(); if (!m || !m->uv) { err = "texcaras: sin malla con UV"; return false; }
+        if (!viewPortActive || viewPortActive->ViewportKind() != 1) { err = "texcaras: el viewport activo no es 3D"; return false; }
+        Viewport3D* vp = (Viewport3D*)viewPortActive; vp->BindVista();
+        Texture* t = UVTexturaMostrada(m); TexturaEditable* te = t ? TexEditObtener(t) : NULL;
+        if (!te) { err = "texcaras: sin textura editable"; return false; }
+        Matrix4 W; m->GetWorldMatrix(W);
+        int frentePintadas = 0, frente = 0, espaldaPintadas = 0;
+        for (size_t f = 0; f < m->faces3d.size(); f++) {
+            const MeshFace& F = m->faces3d[f]; const int n = (int)F.idx.size(); if (n < 3) continue;
+            Vector3 c(0,0,0), nrm(0,0,0); float u = 0, v = 0;
+            std::vector<Vector3> wp((size_t)n);
+            for (int k = 0; k < n; k++) { const int rv = F.idx[(size_t)k]; wp[(size_t)k] = W * Vector3(m->vertex[rv*3], m->vertex[rv*3+1], m->vertex[rv*3+2]); c = c + wp[(size_t)k]; u += m->uv[rv*2]; v += m->uv[rv*2+1]; }
+            c = c * (1.0f / n); u /= n; v /= n;
+            for (int k = 0; k < n; k++) { const Vector3& a = wp[(size_t)k]; const Vector3& b = wp[(size_t)((k+1)%n)]; nrm.x += (a.y-b.y)*(a.z+b.z); nrm.y += (a.z-b.z)*(a.x+b.x); nrm.z += (a.x-b.x)*(a.y+b.y); }
+            const bool deFrente = nrm.Dot(c - vp->viewPos) < 0.0f;
+            int x = (int)(u * te->w), y = (int)(v * te->h); if (x < 0) x = 0; if (y < 0) y = 0; if (x >= te->w) x = te->w - 1; if (y >= te->h) y = te->h - 1;
+            const unsigned char* p = &te->rgba[((size_t)y * te->w + x) * 4];
+            const bool pintada = !(p[0] == 128 && p[1] == 128 && p[2] == 128);
+            printf("      [texcaras] cara %d: %s, texel central (%d,%d,%d) %s\n", (int)f, deFrente ? "de frente" : "de espaldas", p[0], p[1], p[2], pintada ? "PINTADO" : "sin pintar");
+            if (deFrente) { frente++; if (pintada) frentePintadas++; } else if (pintada) espaldaPintadas++;
+        }
+        if (espaldaPintadas) { err = "texcaras: se pintaron caras de espaldas"; return false; }
+        if (frente && !frentePintadas) { err = "texcaras: ninguna cara de frente quedo pintada"; return false; }
+        return true;
+    }
+    // ---- vpkind <kindActual> <nuevoId> : cambia el primer viewport de ese kind (1=3D 2=outliner 3=props 4=UV 5=timeline)
+    //      por uno nuevo del tipo nuevoId (0=3D 1=outliner 2=props 3=UV 4=timeline 5=2D 6=consola 7=IDE) ----
+    if (cmd == "vpkind") {
+        int kind = 0, nuevo = 3; ss >> kind >> nuevo;
+        struct VK { static ViewportBase* Buscar(ViewportBase* n, int k) { if (!n) return NULL; if (n->isLeaf()) return n->ViewportKind() == k ? n : NULL;
+                        ViewportBase* a = Buscar(((ViewportColumn*)n)->childA, k); if (a) return a; return Buscar(((ViewportColumn*)n)->childB, k); } };
+        ViewportBase* v = VK::Buscar(rootViewport, kind);
+        if (!v) { err = "vpkind: no hay un viewport de ese tipo"; return false; }
+        LayoutCambiarTipoViewport(v, nuevo);
+        return true;
+    }
+    // ---- uveditar : entra/sale de la pintura de textura en el primer UV editor del layout (el boton "Edit") ----
+    if (cmd == "uveditar") {
+        struct VK { static ViewportBase* Buscar(ViewportBase* n, int k) { if (!n) return NULL; if (n->isLeaf()) return n->ViewportKind() == k ? n : NULL;
+                        ViewportBase* a = Buscar(((ViewportColumn*)n)->childA, k); if (a) return a; return Buscar(((ViewportColumn*)n)->childB, k); } };
+        ViewportBase* v = VK::Buscar(rootViewport, 4);
+        if (!v) { err = "uveditar: no hay UV editor en el layout"; return false; }
+        UVToggleEditarTextura((UVEditor*)v);
+        printf("      [uveditar] modo textura=%s\n", ((UVEditor*)v)->uvModo == UVModoTextura ? "si" : "no");
+        return true;
+    }
+    // ---- newtexclean : borra del disco los PNG creados por newtex en esta sesion ----
+    if (cmd == "newtexclean") {
+        const int n = W3dTexturasGeneradasLimpiar();
+        printf("      [newtexclean] %d archivos borrados\n", n);
+        return true;
+    }
     // ---- print (loguea los contadores de la malla activa: diagnostico) ----
     if (cmd == "print") {
         Mesh* m = ScriptActiveMesh();

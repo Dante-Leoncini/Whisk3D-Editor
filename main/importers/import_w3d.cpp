@@ -1,4 +1,5 @@
 #include "importers/import_w3d.h"
+#include "io/TexturaEditada.h"   // TexEditLimpiarTodo al reiniciar la escena
 #include "objects/ObjectMode.h"   // W3dNombresRepararEscena (duplicados de archivos ya guardados)
 #include <math.h>                    // sqrtf: normal de la clave geometrica de los UV groups
 #include "render/OpcionesRender.h"   // RenderType / g_redraw: son del editor
@@ -2554,6 +2555,11 @@ static Object* JsonObjetoCrear(JVal* j, Object* parent, const std::string& base)
         JVal* col = JHijo(j, "color", 5);
         if (col && col->lista.size() >= 3)
             for (int i = 0; i < 3; i++) l->diffuse[i] = (float)col->lista[i]->num;
+        l->direccional = JB(j, "direccional", l->direccional);
+        JVal* at = JHijo(j, "atenuacion", 10);
+        if (at && at->lista.size() >= 3) { l->attConstant = (float)at->lista[0]->num; l->attLinear = (float)at->lista[1]->num; l->attQuadratic = (float)at->lista[2]->num; }
+        l->rtRadio = JF(j, "rtRadio", l->rtRadio);   // trazado de rayos: tamano de la lampara (penumbra)
+        l->rtRayos = JF(j, "rtRayos", l->rtRayos);   // rayos de sombra (0 = global)
         return l;
     }
     if (tipo == "script") {
@@ -3056,6 +3062,7 @@ static bool W3dMismoMaterial(const Material* v, const Material& n, const std::st
     if (!W3dMatCasi(v->shininess, n.shininess)) return false;
     if (v->interpolacion != n.interpolacion) return false;
     if (v->reflectMode   != n.reflectMode)   return false;
+    if (!W3dMatCasi(v->rtRugosidad, n.rtRugosidad) || !W3dMatCasi(v->rtMetalico, n.rtMetalico)) return false;
     if (v->textureOn != n.textureOn || v->filtrado != n.filtrado || v->repeat != n.repeat ||
         v->transparent != n.transparent || v->lighting != n.lighting || v->vertexColor != n.vertexColor ||
         v->culling != n.culling || v->depth_test != n.depth_test || v->chrome != n.chrome ||
@@ -3073,6 +3080,7 @@ static void W3dCopiarMaterial(const Material& src, Material* dst) {
     }
     dst->shininess = src.shininess; dst->interpolacion = src.interpolacion;
     dst->reflectMode = src.reflectMode;
+    dst->rtRugosidad = src.rtRugosidad; dst->rtMetalico = src.rtMetalico;
     dst->textureOn = src.textureOn; dst->filtrado = src.filtrado; dst->repeat = src.repeat;
     dst->transparent = src.transparent; dst->lighting = src.lighting; dst->vertexColor = src.vertexColor;
     dst->culling = src.culling; dst->depth_test = src.depth_test; dst->chrome = src.chrome;
@@ -3110,6 +3118,8 @@ static void CargarMateriales(JVal* raiz, const std::string& base) {
         tmp.shininess     = JF(e, "brillo", tmp.shininess);
         tmp.interpolacion = JI(e, "interpolacion", tmp.interpolacion);
         tmp.reflectMode   = JI(e, "reflejoModo", tmp.reflectMode);
+        tmp.rtRugosidad   = JF(e, "rugosidad", tmp.rtRugosidad);   // trazado de rayos (ausentes = default)
+        tmp.rtMetalico    = JF(e, "metalico",  tmp.rtMetalico);
         // DECAL / mezcla. Ausentes en TODO lo guardado hasta hoy -> el default deja el material igual.
         tmp.depth_bias    = JF(e, "sesgoProfundidad", tmp.depth_bias);
         tmp.orden_pasada  = JI(e, "ordenPasada",      tmp.orden_pasada);
@@ -3951,6 +3961,7 @@ void ReiniciarEscena() {
     W3dRecursosPurgarTransitorias();
     W3dCargasOlvidarTodas();
     { extern void OlvidarTexturasPendientes(); OlvidarTexturasPendientes(); }
+    TexEditLimpiarTodo();   // las texturas en edicion (pixeles en memoria) se van con la escena
     { const int n = TexturasLiberarEscena();
       if (n > 0) w3dLogf("[W3D] cierre de proyecto: %d textura(s) liberada(s)", n); }
 

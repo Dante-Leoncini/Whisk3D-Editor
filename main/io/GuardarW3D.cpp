@@ -39,6 +39,7 @@
 #include "io/JsonW3d.h"                // JsonNumTexto: floats con round-trip EXACTO
 #include "io/UI2DFormato.h"
 #include "io/W3dContenedor.h"          // FORMATO v4: el .w3d ES un zip y todo va adentro
+#include "io/TexturaEditada.h"   // texturas generadas/pintadas que solo viven en memoria: entran al zip
 #include "W3dEscena.h"                // escenaInicial / modoEscenas (se guardan con el proyecto)
 #include "W3dPaletas.h"               // las paletas del PROYECTO (raiz "paletas" del .w3d)
 #include "objects/Objects.h"
@@ -284,6 +285,8 @@ static std::string W3dRefEmitir(std::string& ruta) {
 // (el nombre de entrada para los internos), que es lo que resuelve ReadFileBytes.
 static std::string Asset(CtxGuardar* cx, std::string& rutaDisco) {
     if (rutaDisco.empty()) return rutaDisco;
+    { std::string png;   // textura interna que solo vive en memoria (generada / pintada sin guardar): sus bytes
+      if (TexEditBytesParaGuardar(rutaDisco, png)) { cx->esc->AgregarBytes(rutaDisco, png, true); return rutaDisco; } }
     return cx->esc->Ingerir(rutaDisco, NULL, gQuien);
 }
 
@@ -582,6 +585,9 @@ static void EscribirMateriales(std::string& s, CtxGuardar* cx) {
         s += ",\n      \"brillo\": "; JNum(s, mt->shininess);
         s += ", \"interpolacion\": "; JNum(s, (float)mt->interpolacion);
         s += ", \"reflejoModo\": "; JNum(s, (float)mt->reflectMode);
+        // TRAZADO DE RAYOS: solo si se apartan del default (0.5 / 0), mismo criterio que decal
+        if (mt->rtRugosidad != 0.5f) { s += ", \"rugosidad\": "; JNum(s, mt->rtRugosidad); }
+        if (mt->rtMetalico != 0.0f)  { s += ", \"metalico\": ";  JNum(s, mt->rtMetalico); }
         // DECAL / mezcla: se escriben SOLO si se apartan del default, asi un proyecto que no los
         // usa guarda exactamente el mismo texto de siempre (los diffs del .w3d siguen legibles).
         if (mt->depth_bias != 0.0f) { s += ", \"sesgoProfundidad\": "; JNum(s, mt->depth_bias); }
@@ -1481,6 +1487,14 @@ static void EscribirObjeto(std::string& s, Object* o, int ind, CtxGuardar* cx, b
         CamposComunes(s, ind + 1, o);
         s += ",\n"; JSang(s, ind + 1); s += "\"color\": [";
         JNum(s, l->diffuse[0]); s += ", "; JNum(s, l->diffuse[1]); s += ", "; JNum(s, l->diffuse[2]); s += "]";
+        // tipo/atenuacion/trazado de rayos: SOLO si no son los defaults (un proyecto que no los toca guarda igual)
+        if (l->direccional) { s += ",\n"; JSang(s, ind + 1); s += "\"direccional\": true"; }
+        if (l->attConstant != 0.5f || l->attLinear != 0.1f || l->attQuadratic != 0.0f) {
+            s += ",\n"; JSang(s, ind + 1); s += "\"atenuacion\": [";
+            JNum(s, l->attConstant); s += ", "; JNum(s, l->attLinear); s += ", "; JNum(s, l->attQuadratic); s += "]";
+        }
+        if (l->rtRadio > 0.0f) { s += ",\n"; JSang(s, ind + 1); s += "\"rtRadio\": "; JNum(s, l->rtRadio); }
+        if (l->rtRayos > 0.0f) { s += ",\n"; JSang(s, ind + 1); s += "\"rtRayos\": "; JNum(s, l->rtRayos); }
     }
     else if (t == ObjectType::collection) {
         JSang(s, ind + 1); s += "\"tipo\": \"coleccion\",\n";
@@ -2347,6 +2361,7 @@ bool GuardarW3D(const std::string& ruta) {
         // memoria son sus nombres de entrada y ReadFileBytes las resuelve
         if (!W3dContenedorMontar(ruta))
             w3dLogfE("[W3D] guarde %s pero no lo pude volver a montar", ruta.c_str());
+        TexEditProyectoGuardado();   // las texturas que vivian en memoria ya estan adentro del .w3d
         size_t nExt = esc.CantidadExternos(), nFaltan = esc.CantidadExternosQueFaltan();
         char b[256];
         if (nFaltan > 0) {

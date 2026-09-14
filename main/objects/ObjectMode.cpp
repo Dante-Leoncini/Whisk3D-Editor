@@ -1,4 +1,5 @@
 #include "ObjectMode.h"
+#include "edit/Proporcional.h" // proportional editing: peso de los objetos no seleccionados
 #include "w3dlog.h"    // w3dLogfW: los renames automaticos quedan registrados
 #include "W3dLang.h"   // T(): los textos salen en el idioma del sistema
 #include "render/OpcionesRender.h" // g_transformPivot + enum TransformPivot (editor)
@@ -678,8 +679,53 @@ void GuardarMousePos() {
 	#endif
 }
 
+// PROPORTIONAL EDITING: que objetos NO seleccionados pueden venir arrastrados. Nada 2D ni colecciones, y un hijo
+// de algo seleccionado no (su padre ya lo lleva).
+static bool ObjElegibleProporcional(Object* o){
+    if (!o || o->select || !o->visible) return false;
+    switch (o->getType()) {
+        case ObjectType::scene: case ObjectType::collection: case ObjectType::ui: case ObjectType::texto2d:
+        case ObjectType::imagen2d: case ObjectType::rect2d: case ObjectType::cont2d: case ObjectType::slice9:
+        case ObjectType::boton2d: case ObjectType::expandir2d: case ObjectType::video2d:
+            return false;
+        default: break;
+    }
+    for (Object* p = o->Parent; p; p = p->Parent) if (p->select) return false;
+    return true;
+}
+// mide la distancia de cada objeto proporcional a lo SELECCIONADO mas cercano y le pone su peso
+static void ProporcionalObjetosMedir(){
+    std::vector<Vector3> sel;
+    for (size_t o = 0; o < estadoObjetos.size(); o++) if (estadoObjetos[o].distProp < 0.0f) sel.push_back(estadoObjetos[o].worldPos);
+    if (sel.empty()) { estadoObjetos.clear(); return; }
+    for (size_t o = 0; o < estadoObjetos.size(); o++) {
+        SaveState& st = estadoObjetos[o];
+        if (st.distProp < 0.0f) continue;
+        float mejor = 1e30f;
+        for (size_t s = 0; s < sel.size(); s++) { const float d = (st.worldPos - sel[s]).Length(); if (d < mejor) mejor = d; }
+        st.distProp = mejor;
+        st.peso = ProporcionalPeso(mejor, (int)o);
+    }
+}
+void ProporcionalObjetosActualizar(){
+    for (size_t o = 0; o < estadoObjetos.size(); o++) {
+        SaveState& st = estadoObjetos[o];
+        if (st.distProp >= 0.0f) st.peso = ProporcionalPeso(st.distProp, (int)o);
+    }
+}
+
 void guardarEstadoRec(Object* obj){
     if (!obj) return;
+
+    // PROPORTIONAL EDITING: un NO seleccionado al alcance entra al snapshot con peso por distancia (se mide al
+    // terminar el recorrido, en ProporcionalObjetosMedir)
+    if (g_prop.on && InteractionMode == ObjectMode && ObjElegibleProporcional(obj)) {
+        SaveState st;
+        st.obj = obj; st.pos = obj->pos; st.rot = obj->Rot(); st.rotEuler = obj->rotEuler; st.scale = obj->scale;
+        st.worldPos = obj->GetGlobalPositionBase();
+        st.distProp = 0.0f; st.peso = 0.0f;
+        estadoObjetos.push_back(st);
+    }
 
     // Si está seleccionado, guardar estado
     if (obj->select && obj->visible) {
@@ -709,6 +755,7 @@ bool guardarEstado(){
 
     // Recorrer todo el árbol desde la raíz
     guardarEstadoRec(SceneCollection);
+    ProporcionalObjetosMedir(); // proportional editing: pesos de los no seleccionados (sin seleccion, vacia)
 
 	if (estadoObjetos.empty()) return false;
 	//std::cout << "moviendo "<< estadoObjetos.size() << " objetos" << std::endl;
@@ -1663,7 +1710,7 @@ void SetRotacion(int dx, int dy){
 		Vector3 axis;
 		if (axisSelect == ViewAxis || axisSelect == XYZ) axis = camForward; // libre = eje de vista
 		else axis = EjeOrientado(obj, axisSelect);
-		obj.SetRot(RotarEnMundo(obj, Quaternion::FromAxisAngle(axis, ang)));
+		obj.SetRot(RotarEnMundo(obj, Quaternion::FromAxisAngle(axis, ang * estadoObjetos[o].peso))); // peso: proportional
 	}
 	AplicarPivotATransform(); // gira las posiciones alrededor del pivote
 	SnapAjustarObjRot(); // imanta: el activo apunta al target (si snap ON)
@@ -1682,7 +1729,8 @@ void RotarOrbital(int dx, int dy){
 	             * Quaternion::FromAxisAngle(camRight, pitch);
 	for (size_t o = 0; o < estadoObjetos.size(); o++) {
 		Object& obj = *estadoObjetos[o].obj;
-		obj.SetRot(RotarEnMundo(obj, q)); // gira en los ejes de la vista (conjugado por el padre)
+		const float peso = estadoObjetos[o].peso; // proportional editing: parte del giro
+		obj.SetRot(RotarEnMundo(obj, (peso >= 1.0f) ? q : Quaternion::Slerp(Quaternion(), q, peso))); // gira en los ejes de la vista (conjugado por el padre)
 	}
 	AplicarPivotATransform(); // gira las posiciones alrededor del pivote
 	{ extern bool g_objetosMovidos; g_objetosMovidos = true; } // Mirror con target depende de la rotacion/posicion
@@ -1723,9 +1771,10 @@ void SetRotacion(){
 
 void SetScale(int dx, int dy, float factor){
 	//std::cout << "estadoObjetos size: " << estadoObjetos.size() << std::endl;
-	float d = (dx + dy) * factor;
+	float d0 = (dx + dy) * factor;
 	for (size_t o = 0; o < estadoObjetos.size(); o++) {
 		Object& obj = *estadoObjetos[o].obj;
+		const float d = d0 * estadoObjetos[o].peso; // proportional editing: parte de la escala
 		// enum: X->scale.x, Y->scale.z, Z->scale.y (mismo swap Y/Z del modelo)
 		switch (axisSelect) {
 			case X:      obj.scale.x += d; break;
@@ -1832,6 +1881,7 @@ void SetTranslacionObjetos(int dx, int dy, float speed){
 	for (size_t o = 0; o < estadoObjetos.size(); o++) {
 		Object& obj = *estadoObjetos[o].obj;
 		Vector3 libre = camRight * (dx * speed) + camUp * (-dy * speed); // plano camara
+		const float peso = estadoObjetos[o].peso; // proportional editing: 1 = seleccionado
 		// el delta se ARMA en mundo y se APLICA en el espacio del padre
 		// (DeltaMundoAPadre): sin eso, mover un hijo de un padre rotado iba
 		// para cualquier lado (hasta al reves del mouse)
@@ -1841,14 +1891,14 @@ void SetTranslacionObjetos(int dx, int dy, float speed){
 			// apunta el eje en pantalla" mueve en +eje (no se invierte).
 			Vector3 axis = EjeOrientado(obj, axisSelect);
 			float amount = (dx * axis.Dot(camRight) - dy * axis.Dot(camUp)) * speed;
-			obj.pos += DeltaMundoAPadre(obj, axis * amount);
+			obj.pos += DeltaMundoAPadre(obj, axis * (amount * peso));
 		} else if (axisSelect == PlaneX || axisSelect == PlaneY || axisSelect == PlaneZ) {
 			// plano: movimiento libre MENOS la componente del eje excluido
 			int ex = (axisSelect == PlaneX) ? X : (axisSelect == PlaneY) ? Y : Z;
 			Vector3 axis = EjeOrientado(obj, ex);
-			obj.pos += DeltaMundoAPadre(obj, libre - axis * libre.Dot(axis));
+			obj.pos += DeltaMundoAPadre(obj, (libre - axis * libre.Dot(axis)) * peso);
 		} else {
-			obj.pos += DeltaMundoAPadre(obj, libre); // libre (3 ejes)
+			obj.pos += DeltaMundoAPadre(obj, libre * peso); // libre (3 ejes)
 		}
 	}
 	SnapAjustarObjMove(); // imanta la base de la seleccion al target (si snap ON)
@@ -1861,7 +1911,7 @@ void SetTranslacionObjetos(int dx, int dy, float speed){
 void SetTranslacionObjetosMundo(const Vector3& d){
 	for (size_t o = 0; o < estadoObjetos.size(); o++) {
 		Object& obj = *estadoObjetos[o].obj;
-		obj.pos = estadoObjetos[o].pos + DeltaMundoAPadre(obj, d);
+		obj.pos = estadoObjetos[o].pos + DeltaMundoAPadre(obj, d * estadoObjetos[o].peso); // peso: proportional editing
 	}
 	SnapAjustarObjMove();
 	{ extern bool g_objetosMovidos; g_objetosMovidos = true; }
@@ -1938,6 +1988,7 @@ static void SnapObjCapturar(){
     g_objSnapPts.clear(); g_objSnapHayAct = false;
     for (size_t o=0;o<estadoObjetos.size();o++){
         Object* ob = estadoObjetos[o].obj; if (!ob) continue;
+        if (estadoObjetos[o].distProp >= 0.0f) continue; // proportional: no es de la seleccion, no imanta
         bool verts=false;
         if (ob->getType()==ObjectType::mesh){
             Mesh* m=(Mesh*)ob;

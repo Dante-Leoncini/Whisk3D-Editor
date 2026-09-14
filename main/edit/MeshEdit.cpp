@@ -970,6 +970,10 @@ void Mesh::EscribirUVProyeccion(const std::vector<float>& uvPorCorner) {
         if (e->faceSel[f] && f < e->faceSrc.size()) {
             int f3 = e->faceSrc[f]; if (f3 >= 0 && f3 < (int)faces3d.size()) sel3d[f3] = 1;
         }
+    // la cara ACTIVA sobrevive al rebuild (Reset y despues Follow Active Quads la necesita): se recuerda por
+    // su cara de faces3d, que el cambio de UV no reordena
+    int activa3 = -1;
+    if (EditSelectMode == SelFace && e->activeIdx >= 0 && e->activeIdx < (int)e->faceSrc.size()) activa3 = e->faceSrc[(size_t)e->activeIdx];
     int L = 0;
     for (size_t f = 0; f < faces3d.size(); f++) {
         int cnt = (int)faces3d[f].idx.size();
@@ -993,6 +997,7 @@ void Mesh::EscribirUVProyeccion(const std::vector<float>& uvPorCorner) {
                 edit->faceSel[f] = 1;
         }
         edit->activeIdx = -1;
+        if (activa3 >= 0) for (size_t f = 0; f < edit->faceSrc.size(); f++) if (edit->faceSrc[f] == activa3) { edit->activeIdx = (int)f; break; }
         edit->Recolorear();
     }
 }
