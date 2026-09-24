@@ -1762,6 +1762,7 @@ static void JVec3(JVal* j, const char* k, Vector3& v) {
     JVal* x = JHijo(j, k, 5);
     if (x && x->lista.size() >= 3) { v.x = (float)x->lista[0]->num; v.y = (float)x->lista[1]->num; v.z = (float)x->lista[2]->num; }
 }
+static void LeerCapas(JVal* jc, std::vector<W3dCapaAnim>& out); // capas del MIX (definida mas abajo)
 static void JMat16(JVal* j, const char* k, Matrix4& m) {
     JVal* x = JHijo(j, k, 5);
     if (x && x->lista.size() >= 16) for (int i = 0; i < 16; i++) m.m[i] = (float)x->lista[i]->num;
@@ -2723,6 +2724,7 @@ static Object* JsonObjetoCrear(JVal* j, Object* parent, const std::string& base)
         Armature* a = new Armature(parent);
         JsonComunes(j, a);
         bool autorado = JB(j, "autorado", false);
+        a->skinGltf = !autorado && JB(j, "gltf", false); // rig glTF: FK Y-up + skin = world * invBind
         JVal* jb = JHijo(j, "bones", 5);
         if (jb) for (size_t i = 0; i < jb->lista.size(); i++) {
             JVal* e = jb->lista[i]; if (!e || e->tipo != 4) continue;
@@ -2737,6 +2739,10 @@ static Object* JsonObjetoCrear(JVal* j, Object* parent, const std::string& base)
                 JVec3(e, "preRot", b.preRot); JVec3(e, "postRot", b.postRot);
                 b.rotOrder = JI(e, "rotOrder", 0);
                 JMat16(e, "bind", b.bind); JMat16(e, "cluster", b.clusterTransform);
+                if (a->skinGltf) { // la inverseBindMatrix; sin el campo (guardado viejo) = inversa del bind
+                    b.skinInvBind = b.bind.Inverse();
+                    JMat16(e, "invBind", b.skinInvBind);
+                }
             }
             b.poseT = b.restT; b.poseR = b.restR; b.poseS = b.restS;
             a->bones.push_back(b);
@@ -2769,6 +2775,8 @@ static Object* JsonObjetoCrear(JVal* j, Object* parent, const std::string& base)
             a->animations.push_back(an);
         }
         a->animActiva = JI(j, "animActiva", a->animations.empty() ? -1 : 0);
+        LeerCapas(JHijo(j, "capas", 5), a->capas);
+        a->capaActiva = a->capas.empty() ? -1 : 0;
         if (a->animActiva < -1 || a->animActiva >= (int)a->animations.size())
             a->animActiva = a->animations.empty() ? -1 : 0;
         if (autorado) PrepararSkinAutorado(a);          // rig del editor: rest/skin desde head/tail
@@ -2868,6 +2876,41 @@ static Object* JsonObjetoCrear(JVal* j, Object* parent, const std::string& base)
                 for (int k = 0; k < 4; k++)
                     if (r->lista[k]->tipo == 1) pt->uvRect[k] = (float)r->lista[k]->num;
         }
+        // LO AVANZADO (ausente = el default del ctor = el emisor de siempre)
+        {
+            const char* v3[4] = { "velAzar", "posAzar", "aceleracion", "velLocal" };
+            float* d3[4] = { pt->velAzar, pt->posAzar, pt->aceleracion, pt->velLocal };
+            for (int q = 0; q < 4; q++) {
+                JVal* r = JHijo(j, v3[q], 5);
+                if (r) for (size_t k = 0; k < r->lista.size() && k < 3; k++)
+                    if (r->lista[k] && r->lista[k]->tipo == 1) d3[q][k] = (float)r->lista[k]->num;
+            }
+            JVal* cf = JHijo(j, "colorFinal", 5);
+            if (cf) {
+                pt->usarColorFinal = true;
+                for (size_t k = 0; k < cf->lista.size() && k < 4; k++)
+                    if (cf->lista[k] && cf->lista[k]->tipo == 1) pt->colorFinal[k] = (float)cf->lista[k]->num;
+            }
+        }
+        pt->arrastre         = JF(j, "arrastre",         pt->arrastre);
+        pt->crecimiento      = JF(j, "crecimiento",      pt->crecimiento);
+        pt->frenoCrecimiento = JF(j, "frenoCrecimiento", pt->frenoCrecimiento);
+        pt->alphaDecae       = JF(j, "alphaDecae",       pt->alphaDecae);
+        pt->alphaMuerte      = JF(j, "alphaMuerte",      pt->alphaMuerte);
+        pt->rotInicial       = JF(j, "rotInicial",       pt->rotInicial);
+        pt->rotAzar          = JF(j, "rotAzar",          pt->rotAzar);
+        pt->velRotAzar       = JF(j, "velRotAzar",       pt->velRotAzar);
+        pt->giroSignoAzar    = JB(j, "giroSignoAzar",    pt->giroSignoAzar);
+        pt->flipFps          = JF(j, "flipFps",          pt->flipFps);
+        pt->flipUnaVez       = JB(j, "flipUnaVez",       pt->flipUnaVez);
+        {   // forma: "billboard" | "estirada" | "linea" (string: el enum no viaja como numero)
+            std::string f = JS(j, "forma", "billboard");
+            pt->forma = (f == "estirada") ? w3dEngine::FormaEstirada : (f == "linea") ? w3dEngine::FormaLinea : w3dEngine::FormaBillboard;
+        }
+        pt->estiramiento     = JF(j, "estiramiento",     pt->estiramiento);
+        pt->estelaPuntos     = JI(j, "estelaPuntos",     pt->estelaPuntos);
+        pt->estelaPaso       = JF(j, "estelaPaso",       pt->estelaPaso);
+        pt->grosorLinea      = JF(j, "grosorLinea",      pt->grosorLinea);
         return pt;
     }
     if (tipo == "objeto") {
@@ -2938,7 +2981,27 @@ static int TipoConsInt(const std::string& t) {
     if (t == "copyLocation") return W3dConstraintTipo::CopyLocation;
     if (t == "copyRotation") return W3dConstraintTipo::CopyRotation;
     if (t == "billboard")    return W3dConstraintTipo::Billboard;
+    if (t == "childOf")      return W3dConstraintTipo::ChildOf;
     return -1;   // desconocido (un .w3d de una version mas nueva)
+}
+
+// capas del MIX (ver EscribirCapas en GuardarW3D.cpp): la misma forma para armatures y escenas
+static void LeerCapas(JVal* jc, std::vector<W3dCapaAnim>& out) {
+    out.clear();
+    if (!jc) return;
+    for (size_t i = 0; i < jc->lista.size(); i++) {
+        JVal* e = jc->lista[i]; if (!e || e->tipo != 4) continue;
+        W3dCapaAnim c;
+        c.anim = JS(e, "anim", "");
+        c.influencia = JF(e, "influencia", c.influencia);
+        { std::string m = JS(e, "modo", "mezclar"); c.modo = (m == "sumar") ? 1 : (m == "restar") ? 2 : 0; }
+        c.visible = JB(e, "visible", true);
+        c.hueso = JS(e, "hueso", "");
+        c.desde = JF(e, "desde", 0.0f);
+        c.vel = JF(e, "vel", 1.0f);
+        c.loop = JB(e, "loop", true);
+        out.push_back(c);
+    }
 }
 
 static void LeerConstraints(JVal* j, Object* o) {
@@ -2969,6 +3032,11 @@ static void LeerConstraints(JVal* j, Object* o) {
             if (c->fuenteTipo == W3dConstraintFuente::Objeto)
                 c->fuenteNombre = JS(e, "objeto", "");
             JBools3(e, "ejes", &c->ejeX, &c->ejeY, &c->ejeZ);
+        }
+        if (tipo == W3dConstraintTipo::ChildOf) {
+            c->hueso = JS(e, "hueso", "");
+            JBools3(e, "hereda", &c->coLoc, &c->coRot, &c->coEsc);
+            JMat16(e, "inversa", c->inversa);   // ausente = identidad (el default del ctor)
         }
         // el archivo lo pudo editar cualquiera: clampea la influencia a [0,100] y arregla
         // el billboard que no gira en ningun eje (ver W3dConstraint::Normalizar)
@@ -3438,6 +3506,23 @@ static bool AbrirEscenaJson(const char* datos, size_t n, const std::string& base
     // config de la tarjeta Juego (opcional): modo ventana, orientacion, flags,
     // assets y plataforma del juego COMPILADO. Ausente = defaults del editor.
     AplicarCompilar(JHijo(raiz, "compilar", 4));
+    // RENDER (opcional): el rango propio de la secuencia (tarjeta Render). Ausente = el del timeline.
+    {
+        extern float g_renderIni, g_renderFin, g_renderFps;
+        JVal* rn = JHijo(raiz, "render", 4);
+        g_renderIni = rn ? JF(rn, "inicio", 0.0f) : 0.0f;
+        g_renderFin = rn ? JF(rn, "fin", 0.0f) : 0.0f;
+        g_renderFps = rn ? JF(rn, "fps", 0.0f) : 0.0f;
+    }
+    // MIX (opcional): el modo Mix del timeline + su rango + las capas de escena
+    {
+        JVal* mx = JHijo(raiz, "mix", 4);
+        g_animMix = mx ? JB(mx, "activo", false) : false;
+        g_mixInicio = mx ? JF(mx, "inicio", 1.0f) : 1.0f;
+        g_mixFin    = mx ? JF(mx, "fin", 250.0f) : 250.0f;
+        LeerCapas(mx ? JHijo(mx, "escenas", 5) : NULL, g_mixEscenas);
+        g_mixEscenaActiva = -1;
+    }
     // SESION (opcional): frame actual + seleccion. Solo se LEE aca; se aplica en el
     // pie de AbrirW3D, con los nombres ya definitivos (ver g_sesFrame arriba).
     {

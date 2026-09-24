@@ -6266,7 +6266,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
             return o + "'"; } };
         const std::string w = LocQ::Cita(wav), f = LocQ::Cita(falta);
         const std::string prog =
-            "sonido(" + w + ")\n"              // relativa al PROYECTO (carga y cachea)
+            "__h = sonido(" + w + ")\n"        // relativa al PROYECTO (carga y cachea); handle o nil
             "sonido(" + w + ", 0.5)\n"         // cacheada (no re-carga)
             "sonido(" + w + ", 0.3, 0.815)\n"  // pitch fraccional (paso en la voz)
             "sonido(" + f + ")\n"              // faltante: NULL cacheado, sin crash
@@ -6276,6 +6276,12 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         BindsJuegoRegistrar(L);
         bool ok = luaL_dostring(L, prog.c_str()) == 0;
         if (!ok) { err = std::string("sonidotest: ") + (lua_tostring(L, -1) ? lua_tostring(L, -1) : "?"); lua_close(L); return false; }
+        // la VOZ del primer disparo: handle > 0 = el WAV cargo y el mixer la arranco;
+        // nil = no sono (WAV no encontrado/ilegible, mixer cerrado o mute global)
+        lua_getglobal(L, "__h");
+        int voz = lua_isnumber(L, -1) ? (int)lua_tointeger(L, -1) : 0;
+        lua_pop(L, 1);
+        printf("      [sonidotest] voz del primer sonido(): %d (%s)\n", voz, voz > 0 ? "SONO" : "nil: no sono");
         lua_close(L);
         printf("      [sonidotest] sonido() x5 sobre '%s' (real/cache/pitch) y '%s' (faltante)"
                " sin romper; proyecto='%s'\n", wav.c_str(), falta.c_str(), g_w3dDirProyecto.c_str());
@@ -16053,12 +16059,12 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
             // 9 pestanias: la 7 es Constraints y la 8 (la ULTIMA) es Scripts, que se agrego
             // despues. Lo que este test cuida es que Constraints siga SIENDO la 7 y que las
             // que otros tests indexan por numero no se hayan corrido.
-            const bool alFinal = (pr->BarTabs.size() == 9);
+            const bool alFinal = (pr->BarTabs.size() >= 9);   // 9 = Scripts; despues vino la 10 (Animacion), tambien AL FINAL
             const bool icono   = alFinal && (pr->BarTabs[7]->icon == (int)IconType::constraint);
             // y las que los otros tests indexan por numero siguen donde estaban
             const bool viejas  = alFinal && (pr->BarTabs[1]->icon == (int)IconType::object) &&
                                  (pr->BarTabs[6]->icon == (int)IconType::armature);
-            printf("      [constab] A pestanias=%d (esperado 9) | icono de la 7 = constraint %s | 1 y 6 sin correrse %s\n",
+            printf("      [constab] A pestanias=%d (esperado >= 9) | icono de la 7 = constraint %s | 1 y 6 sin correrse %s\n",
                    (int)pr->BarTabs.size(), icono ? "OK" : "MAL", viejas ? "OK" : "MAL");
             if (!alFinal || !icono || !viejas) ok = false;
             // sin la pestania no tiene sentido seguir: todo lo de abajo indexa BarTabs[7] y el
@@ -28650,6 +28656,39 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
             err = buf; return false;
         }
         printf("      [texinfo] assert OK (%s = %ld)\n", sub.c_str(), real);
+        return true;
+    }
+    // ---- childof <objeto> [clip frame] : el objeto con Child Of a un HUESO, en el clip/frame dados. Verifica que su
+    //      mundo sea exactamente mundo(armature) * poseWorld(hueso) * inversa * local, e imprime su posicion de mundo
+    //      (para compararla con otro evaluador, ej. Blender). ----
+    // ---- frame N : pone el playhead en N (el editor evalua la pose / las curvas en ese frame al dibujar) ----
+    if (cmd == "frame") {
+        int f = 1; ss >> f; CurrentFrame = f; g_redraw = true;
+        { extern void AplicarAnimacionObjetos(); AplicarAnimacionObjetos(); }
+        printf("      [frame] %d\n", f);
+        return true;
+    }
+    if (cmd == "childof") {
+        std::string nm; int clip = -1, frame = 1; ss >> nm >> clip >> frame;
+        Object* o = SceneCollection ? FindObjectByName(SceneCollection, nm) : NULL;
+        if (!o) { err = "childof: objeto no encontrado: " + nm; return false; }
+        W3dConstraint* c = NULL;
+        for (size_t i = 0; i < o->constraints.size() && !c; i++)
+            if (o->constraints[i]->tipo == W3dConstraintTipo::ChildOf) c = o->constraints[i];
+        if (!c || !c->fuenteObj || c->fuenteObj->getType() != ObjectType::armature) { err = "childof: sin Child Of a un armature"; return false; }
+        Armature* a = (Armature*)c->fuenteObj;
+        extern int ActiveAnimKind; extern Armature* ActiveAnimArm;
+        if (clip >= 0 && clip < (int)a->animations.size()) { ActiveAnimKind = 1; ActiveAnimArm = a; a->animActiva = clip; }
+        CurrentFrame = frame;
+        Matrix4 Wo; o->GetWorldMatrix(Wo);
+        int h = -1; for (size_t i = 0; i < a->bones.size(); i++) if (a->bones[i].name == c->hueso) h = (int)i;
+        if (h < 0) { err = "childof: el hueso '" + c->hueso + "' no esta"; return false; }
+        Matrix4 Wa, L; a->GetWorldMatrix(Wa); o->GetMatrixBase(L);
+        Matrix4 esp = Wa * a->bones[h].poseWorld * c->inversa * L;
+        float dif = 0; for (int k = 0; k < 16; k++) { float d = fabsf(Wo.m[k] - esp.m[k]); if (d > dif) dif = d; }
+        printf("      [childof] %s clip=%d f=%d hueso=%s mundo=(%.4f,%.4f,%.4f) ejeX=(%.3f,%.3f,%.3f) dif=%.2e\n",
+               nm.c_str(), a->animActiva, frame, c->hueso.c_str(), Wo.m[12], Wo.m[13], Wo.m[14], Wo.m[0], Wo.m[1], Wo.m[2], dif);
+        if (dif > 1e-4f) { err = "childof: el mundo del objeto no es armature * hueso * inversa * local"; return false; }
         return true;
     }
     // ---- skinbbox [frame] : activa el clip 0 en 'frame' y dumpea el bbox de la malla DEFORMADA (skinVertex). Sirve

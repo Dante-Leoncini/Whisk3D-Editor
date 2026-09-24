@@ -114,6 +114,40 @@ public:
     // emisores sobre el mismo atlas el pase de particulas usa UN solo bind.
     float uvRect[4];
 
+    // ================================================================================
+    //  LO AVANZADO (todo opcional: con los defaults el emisor es exactamente el de antes).
+    //  Unidades por SEGUNDO (independiente del framerate). Para traducir un efecto de juego que
+    //  integra POR FRAME a 30 fps: un factor por frame k -> por segundo k^30.
+    // ================================================================================
+    // -- movimiento --
+    float velLocal[3];     // velocidad BASE fija en ejes LOCALES del emisor (m/s), se suma a la del cono
+    float velAzar[3];      // +- azar de velocidad POR EJE, en ejes LOCALES del emisor (m/s), ademas del cono
+    float posAzar[3];      // +- azar de la POSICION de nacimiento por eje local (m): caja de nacimiento
+    float aceleracion[3];  // aceleracion propia en ejes LOCALES del emisor (m/s^2), fijada al nacer (mundo)
+    float arrastre;        // la velocidad se multiplica por esto cada segundo (1 = sin arrastre; 0.08 = frena fuerte)
+    // -- tamanio --
+    float crecimiento;     // el tamanio gana esto x (tamanio inicial) por segundo al nacer (0 = no crece)
+    float frenoCrecimiento;// esa tasa se multiplica por esto cada segundo (1 = crece parejo; <1 = crece y se frena)
+    // -- color --
+    bool  usarColorFinal;  // el color va de 'color' a 'colorFinal' a lo largo de la vida
+    float colorFinal[4];   // rgb al morir + alpha al morir (multiplica al alpha inicial)
+    float alphaDecae;      // el alpha se multiplica por esto cada segundo (1 = apagado; 0.0001 = muere rapido)
+    float alphaMuerte;     // muere cuando su alpha baja de esto (0..1; 0 = nunca por alpha)
+    // -- rotacion (con 'rotacion' apagado) --
+    float rotInicial;      // angulo al nacer (grados)
+    float rotAzar;         // +- azar del angulo al nacer (grados)
+    float velRotAzar;      // +- azar del giro (grados/s)
+    bool  giroSignoAzar;   // true (default, como siempre) = el giro sale para un lado u otro al azar
+    // -- flipbook --
+    float flipFps;         // cuadros por segundo (0 = el flipbook se reparte en la vida)
+    bool  flipUnaVez;      // con flipFps: muere al terminar el ultimo cuadro
+    // -- forma --
+    int   forma;           // w3dEngine::ParticulaForma: 0 billboard, 1 estirada (por la velocidad), 2 linea (estela)
+    float estiramiento;    // estirada: largo = segundos de velocidad
+    int   estelaPuntos;    // linea: puntos de la estela (2..8)
+    float estelaPaso;      // linea: segundos entre puntos
+    float grosorLinea;     // linea: ancho en pixeles
+
     // ---- runtime (no se guarda) ----
     w3dEngine::ParticleSystem sys; // el sistema del Core: simula y dibuja
     float emAcc;                   // acumulador de la emision continua (cantidad/seg)
@@ -129,6 +163,13 @@ public:
         uvRect[0] = 0.0f; uvRect[1] = 0.0f; uvRect[2] = 1.0f; uvRect[3] = 1.0f;
         color[0] = 1.0f; color[1] = 1.0f; color[2] = 1.0f; color[3] = 1.0f;
         desvanecer = true; activo = true; emAcc = 0.0f;
+        for (int i = 0; i < 3; i++) { velLocal[i] = 0.0f; velAzar[i] = 0.0f; posAzar[i] = 0.0f; aceleracion[i] = 0.0f; }
+        arrastre = 1.0f; crecimiento = 0.0f; frenoCrecimiento = 1.0f;
+        usarColorFinal = false; colorFinal[0] = 1.0f; colorFinal[1] = 1.0f; colorFinal[2] = 1.0f; colorFinal[3] = 1.0f;
+        alphaDecae = 1.0f; alphaMuerte = 0.0f;
+        rotInicial = 0.0f; rotAzar = 0.0f; velRotAzar = 0.0f; giroSignoAzar = true;
+        flipFps = 0.0f; flipUnaVez = false;
+        forma = 0; estiramiento = 0.05f; estelaPuntos = 4; estelaPaso = 1.0f / 30.0f; grosorLinea = 1.0f;
         sys.rate = 0.0f;      // la emision continua la lleva Tick (con cono), no el Core
         sys.spinMin = 0.0f; sys.spinMax = 0.0f; // sin giro azaroso: predecible (y testeable)
         sys.swayAmp = 0.0f;

@@ -1,6 +1,7 @@
 // ============================================================================
 //  SimJuego.cpp — ver SimJuego.h.
 // ============================================================================
+#include "animation/SkeletalAnimation.h" // W3dArmaturesJuegoTick
 #include "script/SimJuego.h"
 #include "script/W3dScript.h"
 #include "script/BindsJuego.h"        // alimentar el estado de los binds de juego (apretado/etc) en el Play
@@ -418,6 +419,9 @@ static void TickReal(float dt) {
     // animEscena() recien pedido pose los objetos en ESTE mismo frame (el editor
     // solo evalua estas curvas con kind 0; en el juego el dueno es este tick).
     W3dAnimEscenaTick(dt);
+    // ESQUELETOS: cada armature avanza su clip con su propio reloj (animClip de lua). Despues de los scripts,
+    // igual que la animacion de escena: el clip recien pedido arranca en ESTE frame. (Mismo lugar en el runtime.)
+    W3dArmaturesJuegoTick(dt);
     // SNAPSHOT del estado apretado para el flanco de apretado() del PROXIMO frame (DESPUES de los scripts,
     // igual que el runtime en W3dGameActualizar): asi apretado() funciona identico en el Play y compilado.
     BindsJuegoSnapshotPunteros();
@@ -625,6 +629,8 @@ void SimTeclaSDL(int sdlk, bool down) {
     else if (sdlk == SDLK_LEFT)   n = "izquierda";
     else if (sdlk == SDLK_RIGHT)  n = "derecha";
     else if (sdlk == SDLK_SPACE)  n = "espacio";
+    else if (sdlk == SDLK_LSHIFT || sdlk == SDLK_RSHIFT) n = "shift";   // correr, agacharse...
+    else if (sdlk == SDLK_LCTRL  || sdlk == SDLK_RCTRL)  n = "ctrl";
     else if (sdlk == SDLK_RETURN || sdlk == SDLK_KP_ENTER) n = "enter";
     else if (sdlk >= SDLK_0 && sdlk <= SDLK_9) { letra[0] = (char)('0' + (sdlk - SDLK_0)); n = letra; }
     if (n) W3dScriptTecla(n, down);

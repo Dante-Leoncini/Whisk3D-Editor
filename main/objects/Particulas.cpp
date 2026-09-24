@@ -97,10 +97,58 @@ static void SincronizarConfig(Particulas* p) {
     // SUB-RECT del atlas unico: el sprite (y su grilla) viven en este rect
     s.uvU0 = p->uvRect[0]; s.uvV0 = p->uvRect[1];
     s.uvU1 = p->uvRect[2]; s.uvV1 = p->uvRect[3];
+    // lo AVANZADO (curvas por edad, forma): pasa tal cual al Core
+    s.crece = p->crecimiento; s.frenoCrece = p->frenoCrecimiento;
+    s.alphaDecae = p->alphaDecae; s.alphaMuerte = p->alphaMuerte;
+    s.arrastre = p->arrastre;
+    s.usarColorFinal = p->usarColorFinal;
+    s.colorFinR = p->colorFinal[0]; s.colorFinG = p->colorFinal[1]; s.colorFinB = p->colorFinal[2];
+    s.alphaFinMul = p->colorFinal[3];
+    s.flipFps = p->flipFps; s.flipUnaVez = p->flipUnaVez;
+    s.forma = p->forma; s.estiramiento = p->estiramiento;
+    s.estelaPuntos = p->estelaPuntos; s.estelaPaso = p->estelaPaso; s.grosorLinea = p->grosorLinea;
 }
 
 // origen (mundo) + eje +Y local llevado a mundo (la direccion del cono). La matriz
 // EFECTIVA: el chorro sale de donde se VE el emisor (mismo criterio que Culling).
+// los ejes LOCALES del emisor en mundo (normalizados): para las cajas de azar y la aceleracion propia
+static void EjesLocales(Particulas* p, Vector3& ex, Vector3& ey, Vector3& ez) {
+    Matrix4 W; p->GetWorldMatrix(W);
+    ex = Vector3(W.m[0], W.m[1], W.m[2]); ey = Vector3(W.m[4], W.m[5], W.m[6]); ez = Vector3(W.m[8], W.m[9], W.m[10]);
+    float l;
+    l = ex.Length(); if (l > 1e-6f) ex = ex * (1.0f / l);
+    l = ey.Length(); if (l > 1e-6f) ey = ey * (1.0f / l);
+    l = ez.Length(); if (l > 1e-6f) ez = ez * (1.0f / l);
+}
+// lo AVANZADO de una particula recien nacida: caja de posicion, azar de velocidad y aceleracion propia
+// (en ejes locales del emisor, llevados a mundo). Sin nada seteado no toca el LCG (secuencia intacta).
+static void AplicarAvanzado(Particulas* p, w3dEngine::Particle* q) {
+    if (!q) return;
+    bool hayPos = p->posAzar[0] != 0.0f || p->posAzar[1] != 0.0f || p->posAzar[2] != 0.0f;
+    bool hayVel = p->velAzar[0] != 0.0f || p->velAzar[1] != 0.0f || p->velAzar[2] != 0.0f;
+    bool hayBase = p->velLocal[0] != 0.0f || p->velLocal[1] != 0.0f || p->velLocal[2] != 0.0f;
+    bool hayAcc = p->aceleracion[0] != 0.0f || p->aceleracion[1] != 0.0f || p->aceleracion[2] != 0.0f;
+    if (!hayPos && !hayVel && !hayAcc && !hayBase) return;
+    Vector3 ex, ey, ez; EjesLocales(p, ex, ey, ez);
+    w3dEngine::ParticleSystem& s = p->sys;
+    if (hayPos) {
+        Vector3 d = ex * (p->posAzar[0] * s.rnd(-1.0f, 1.0f)) + ey * (p->posAzar[1] * s.rnd(-1.0f, 1.0f)) + ez * (p->posAzar[2] * s.rnd(-1.0f, 1.0f));
+        q->x += d.x; q->y += d.y; q->z += d.z;
+    }
+    if (hayBase) {
+        Vector3 d = ex * p->velLocal[0] + ey * p->velLocal[1] + ez * p->velLocal[2];
+        q->vx += d.x; q->vy += d.y; q->vz += d.z;
+    }
+    if (hayVel) {
+        Vector3 d = ex * (p->velAzar[0] * s.rnd(-1.0f, 1.0f)) + ey * (p->velAzar[1] * s.rnd(-1.0f, 1.0f)) + ez * (p->velAzar[2] * s.rnd(-1.0f, 1.0f));
+        q->vx += d.x; q->vy += d.y; q->vz += d.z;
+    }
+    if (hayAcc) {
+        Vector3 a = ex * p->aceleracion[0] + ey * p->aceleracion[1] + ez * p->aceleracion[2];
+        q->ax = a.x; q->ay = a.y; q->az = a.z;
+    }
+}
+
 static void OrigenYEje(Particulas* p, Vector3& pos, Vector3& eje) {
     Matrix4 W; p->GetWorldMatrix(W);
     pos = Vector3(W.m[12], W.m[13], W.m[14]);
@@ -128,10 +176,17 @@ static float VelConVariacion(Particulas* p) {
 // IDENTICA a la de antes (round-trip de escenas viejas intacto).
 static void AplicarRotacion(Particulas* p, w3dEngine::Particle* q) {
     if (!q) return;
-    if (!p->rotacion) q->rot = 0.0f;
-    if (p->velRotacion != 0.0f) {
-        float w = p->velRotacion * 0.0174532925f;   // grados/s -> rad/s
-        q->spin = (p->sys.frnd() < 0.5f) ? -w : w;  // signo azaroso POR particula
+    if (!p->rotacion) {
+        // angulo inicial +- azar (grados). Con los dos en 0 = billboard derecho, como siempre.
+        float r = p->rotInicial;
+        if (p->rotAzar != 0.0f) r += p->rotAzar * p->sys.rnd(-1.0f, 1.0f);
+        q->rot = r * 0.0174532925f;
+    }
+    if (p->velRotacion != 0.0f || p->velRotAzar != 0.0f) {
+        float w = p->velRotacion;
+        if (p->velRotAzar != 0.0f) w += p->velRotAzar * p->sys.rnd(-1.0f, 1.0f);
+        w *= 0.0174532925f;                          // grados/s -> rad/s
+        q->spin = (p->giroSignoAzar && p->sys.frnd() < 0.5f) ? -w : w;  // signo azaroso POR particula
     } else {
         q->spin = 0.0f;
     }
@@ -145,6 +200,7 @@ void Particulas::Emitir(int n) {
         w3dEngine::Particle* q = sys.EmitCono(o.x, o.y, o.z, e.x, e.y, e.z, VelConVariacion(this), dispersion);
         if (!q) break;
         AplicarRotacion(this, q);
+        AplicarAvanzado(this, q);
     }
     g_redraw = true;
 }
@@ -166,6 +222,7 @@ void Particulas::Tick(float dt, bool puedeEmitir) {
                 w3dEngine::Particle* q = sys.EmitCono(o.x, o.y, o.z, e.x, e.y, e.z, VelConVariacion(this), dispersion);
                 if (!q) { emAcc = 0.0f; break; }
                 AplicarRotacion(this, q);
+                AplicarAvanzado(this, q);
             }
         }
     } else {
@@ -246,6 +303,34 @@ struct PartOrdenada {
 // buffer REUSADO entre frames (clear no libera): sin mallocs por frame una vez
 // que alcanzo su pico (N total es chico, <500 en el juego).
 static std::vector<PartOrdenada> gOrdenadas;
+static std::vector<Particulas*> gLineas;   // emisores de FORMA LINEA de este frame (pase aparte, sin textura)
+
+// el pase de LINEAS (estelas): sin textura, color por vertice, GL_LINES; un draw por (mezcla, grosor).
+// Va despues de los quads con el mismo z-test/z-write. No se ordena por profundidad: las lineas son finas.
+static void DibujarLineas() {
+    if (gLineas.empty()) return;
+    static std::vector<float> lPos;
+    static std::vector<unsigned char> lCol;
+    gfx::Disable(gfx::Texture2D);
+    gfx::DisableArray(gfx::TexCoordArray);
+    gfx::EnableArray(gfx::ColorArray);
+    for (size_t i = 0; i < gLineas.size(); i++) {
+        Particulas* p = gLineas[i];
+        lPos.clear(); lCol.clear();
+        for (size_t k = 0; k < p->sys.parts.size(); k++) p->sys.AppendEstela(p->sys.parts[k], lPos, lCol);
+        if (lPos.empty()) continue;
+        gfx::SetMezcla(p->sys.blend);
+        gfx::LineWidth(p->grosorLinea > 0.5f ? p->grosorLinea : 1.0f);
+        gfx::VertexPointer3f(0, &lPos[0]);
+        gfx::ColorPointer4ub(&lCol[0]);
+        gfx::DrawLines((int)(lPos.size() / 3));
+    }
+    gfx::LineWidth(1.0f);
+    gfx::DisableArray(gfx::ColorArray);
+    gfx::Enable(gfx::Texture2D);
+    gfx::EnableArray(gfx::TexCoordArray);
+    gLineas.clear();
+}
 
 void W3dParticulasDibujarPendientes() {
     if (gPendientes.empty()) return;
@@ -257,6 +342,7 @@ void W3dParticulasDibujarPendientes() {
     for (size_t i = 0; i < gPendientes.size(); i++) {
         Particulas* p = gPendientes[i];
         if (p->sys.parts.empty()) continue;
+        if (p->forma == w3dEngine::FormaLinea) { gLineas.push_back(p); continue; }   // van en el pase de LINEAS
         unsigned tex = Textura2DObtener(RutaTextura(p->textura));
         if (!tex) continue;   // sin textura no hay nada que dibujar (el decode fallido se cachea)
         unsigned t[1] = { tex };
@@ -272,7 +358,7 @@ void W3dParticulasDibujarPendientes() {
         }
     }
     gPendientes.clear();
-    if (gOrdenadas.empty()) return;
+    if (gOrdenadas.empty() && gLineas.empty()) return;
     // 2) orden GLOBAL back-to-front (un sort por frame sobre <500 entradas)
     std::sort(gOrdenadas.begin(), gOrdenadas.end());
     // 3) dibujar BATCHEADO (P2): el orden global YA existe; lo que cambia es solo
@@ -334,6 +420,7 @@ void W3dParticulasDibujarPendientes() {
         gfx::DrawTrianglesArray((int)(bPos.size() / 3));
     }
     gfx::DisableArray(gfx::ColorArray);
+    DibujarLineas();
     w3dEngine::ParticleSystem::DrawBillboardFin();
     gfx::StatCategoria(gfx::StatCatEscena);
     gfx::DepthMask(true);

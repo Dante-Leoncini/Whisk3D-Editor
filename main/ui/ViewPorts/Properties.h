@@ -420,6 +420,40 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropColor*  propPartColor;      // tinte + alpha: swatch -> ColorPicker de Whisk3D (bindea a Particulas::color[4])
         PropBool*   propPartDesvanecer; // alpha -> 0 con la vida
         PropBool*   propPartActivo;     // false = no emite
+        // ---- particulas AVANZADAS: tarjetas aparte (Movimiento / Tamanio / Color / Rotacion / Forma) ----
+        GroupPropertie* propPartMovCard;   // Movimiento
+        GroupPropertie* propPartTamCard;   // Tamanio y crecimiento
+        GroupPropertie* propPartColCard;   // Color y alfa
+        GroupPropertie* propPartRotCard;   // Rotacion
+        GroupPropertie* propPartFormaCard; // Forma y flipbook
+        PropFloat* propPartArrastre;
+        PropFloat* propPartAcc[3];
+        PropFloat* propPartVelAzar[3];
+        PropFloat* propPartVelBase[3];
+        PropFloat* propPartPosAzar[3];
+        PropFloat* propPartCrec;
+        PropFloat* propPartFreno;
+        PropFloat* propPartAlphaDecae;
+        PropFloat* propPartAlphaMuerte;
+        PropBool*  propPartUsarColFin;
+        PropColor* propPartColorFin;
+        PropFloat* propPartRotIni;
+        PropFloat* propPartRotAzar;
+        PropFloat* propPartVelRotAzar;
+        PropBool*  propPartGiroSigno;
+        PropButton* propPartForma;       // dropdown Billboard / Estirada / Linea
+        PropFloat* propPartEstir;
+        PropFloat* propPartEstelaPts;
+        PropFloat* propPartEstelaPaso;
+        PropFloat* propPartGrosor;
+        PropFloat* propPartFlipC;
+        PropFloat* propPartFlipCols;
+        PropFloat* propPartFlipFilas;
+        PropFloat* propPartFlipFps;
+        PropBool*  propPartFlipUna;
+        // espejos float de los campos int (PropFloat bindea float*): se copian del objeto al rebind y
+        // vuelven al objeto (redondeados) en el onChange
+        float partFlipC, partFlipCols, partFlipFilas, partEstelaPts;
         // tarjeta ARCHIVO (pestania Render, arriba de todo): abrir/guardar el
         // proyecto .w3d (v3: JSON plano) con ruta/nombre. Los assets del proyecto son
         // SIEMPRE archivos externos en la carpeta (el checkbox "Empaquetar
@@ -433,7 +467,27 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropButton* propProyComo;
         PropButton* propProyExtraer; // "Extraer assets": saca lo de adentro del .w3d a una carpeta
         GroupPropertie* propRender;  // pestania RENDER: tarjeta "Render" (output)
-        GroupPropertie* propAnimation; // pestania RENDER: tarjeta "Animation" (selector + New/Delete + Render Animation)
+        GroupPropertie* propAnimation; // pestania ANIMACION (9): tarjeta "Animation" (selector + New/Delete)
+        // ===== pestania ANIMACION (9): el MIX de animaciones (capas estilo Maya) =====
+        GroupPropertie* propMix;          // tarjeta "Mix": rango + el arbol objetos/escenas -> capas + Add/Remove/Up/Down
+        PropListMeshParts* propListMix;   // el arbol (PropListMeshParts modo 13)
+        PropButtonRow* propRowMix;        // Agregar | Quitar
+        PropButtonRow* propRowMixMove;    // Subir | Bajar
+        PropFloat* propMixIni;            // el rango del mix (g_mixInicio / g_mixFin)
+        PropFloat* propMixFin;
+        GroupPropertie* propCapa;         // tarjeta "Capa": la capa ELEGIDA en el arbol
+        PropButton* propCapaAnim;         // que animacion suena en la capa
+        PropFloat*  propCapaInfl;         // influencia %
+        PropButton* propCapaModo;         // Mezclar / Sumar / Restar
+        PropButton* propCapaHueso;        // mascara (solo capas de armature)
+        PropFloat*  propCapaDesde;        // frame del mix en que arranca
+        PropFloat*  propCapaVel;          // velocidad
+        PropBool*   propCapaLoop;
+        PropBool*   propCapaVisible;      // el ojo
+        // tarjeta RENDER: el rango PROPIO de la secuencia (0 = el del timeline)
+        PropFloat* propRenderIni;
+        PropFloat* propRenderFin;
+        PropFloat* propRenderFps;
         GroupPropertie* propKeyframe;  // tarjeta "Keyframe": el keyframe elegido en el editor de curvas, con numeros exactos
         PropButton* propBtnAnimSel;    // dropdown: animacion ACTIVA (Scene(s) / clips del armature seleccionado)
         PropButtonRow* propRowAnimNewDel; // fila: New | Delete (Delete oculto si no hay nada que borrar)
@@ -529,6 +583,11 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropLabel*  propConAvisoEjes;   // aviso: sin ningun eje tildado el constraint no hace nada
         PropButton* propConBBModo;      // "Mode" del billboard (tipo arbol / mira a la camara)
         PropLabel*  propConAvisoBB;     // aviso: el giro de 180 con influencia intermedia
+        PropButton* propConHueso;       // Child Of: "Bone" (desplegable de huesos si la fuente es un armature)
+        PropBool*   propConCoLoc;       // Child Of: hereda Location / Rotation / Scale de la fuente
+        PropBool*   propConCoRot;
+        PropBool*   propConCoEsc;
+        PropButtonRow* propRowConInversa; // Child Of: Set Inverse | Clear Inverse
         PropListMeshParts* propListUV;    // lista de UV maps (modo=1)
         PropListMeshParts* propListColor; // lista de capas de color (modo=2)
         PropListMeshParts* propListVertGroups; // lista de grupos de vertices / huesos 3D (modo=4)
@@ -622,6 +681,7 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
                                 // 5 = Transformar (Edit Mode: Transform Mesh + Transform UV),
                                 // 6 = Armature 2D (solo editando/posando los huesos 2D del mesh),
                                 // 7 = Constraints (cualquier objeto 3D)
+                                // 8 = Scripts, 9 = Animacion (selector + MIX de capas)
                                 // *** ESTOS NUMEROS SON LITERALES EN ~40 LUGARES (y en los tests,
                                 //     que indexan BarTabs[1]/[5]/[6]/[7]): una pestania nueva va
                                 //     SIEMPRE AL FINAL, nunca intercalada. ***
@@ -638,6 +698,8 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         // en ClickEn). Mismo recorrido que CentrarSeleccion.
         void SetRectFilaSeleccionada();
         void ActualizarPestanias(); // visibilidad de tabs/grupos segun el objeto
+        // pestanias GLOBALES (no dependen del objeto seleccionado): 0 Render/Archivo y 9 Animacion
+        bool PestaniaGlobal() const { return pestaniaActiva == 0 || pestaniaActiva == 9; }
         void ClickTab(int mx, int my); // click en una pestania de la barra
 
         Object* target;

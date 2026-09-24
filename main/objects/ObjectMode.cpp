@@ -547,8 +547,18 @@ static void AplicarCurvasLista(Object* o, std::vector<AnimProperty>& props){
 	W3dAplicarCurvasEnFrame(o, props, CurrentFrame);
 }
 static void AplicarCurvasDe(AnimationObject& ao){ AplicarCurvasLista(ao.obj, ao.Propertys); }
+// MIX DE ESCENAS: vive en el Core (animation/Animation.cpp, W3dMixEscenasAplicar) para que el juego compilado
+// tambien lo tenga; el editor lo aplica aca con el frame del timeline.
+static bool AplicarMixEscenas(){
+	extern int ActiveAnimKind;
+	if (!g_animMix || ActiveAnimKind == 2) return false;   // fuera del Mix / jugando (ahi lo hace el tick del juego)
+	return W3dMixEscenasAplicar(CurrentFrame, false);
+}
+
 void AplicarAnimacionObjetos(){
 	extern int ActiveAnimKind; extern class Mesh* ActiveAnimMesh;
+	// MIX: las capas de escena mandan (sobre cualquier kind); se recalcula siempre (las capas se editan en vivo)
+	if (AplicarMixEscenas()) return;
 	// kind 3 (una VERTEX/OBJETO animation en el timeline): aplica SOLO las curvas
 	// de ESE objeto (el resto del mundo queda quieto -> "solo se ve ese objeto")
 	if (ActiveAnimKind == 3){

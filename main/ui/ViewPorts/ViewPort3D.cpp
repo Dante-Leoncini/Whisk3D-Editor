@@ -1,3 +1,4 @@
+#include "objects/Light.h" // W3dLucesPrepase
 #include "w3dGraphics.h" // abstraccion de graficos (independencia de OpenGL)
 #include "W3dLang.h"
 #include "edit/MeshEdit.h"   // W3dRenderCornersSeparados
@@ -2298,7 +2299,9 @@ bool Viewport3D::RenderAPNG(int outW, int outH, RenderType::Enum pass, const cha
     W3dLucesLimpiarPendientes();     // idem las chispas/halos aditivos
             w3dEngine::Invalidate(); // (P1) resync una vez por pase, como en el viewport
             w3dLoteStamp++;          // (P4) sello del pase (lote estatico)
+            W3dLucesPrepase(SceneCollection);   // las luces ANTES de la geometria (el fogonazo ilumina todo)
             SceneCollection->Render();
+            W3dLucesPrepaseFin();
             // PROXY de edicion de Curve (riel/path): vive FUERA del arbol de escena a proposito
             // (no aparece en el outliner, no se guarda, no lo toca nada) y se dibuja explicito
             // aca, solo mientras se edita. Ver CurveEntrarEdicion (LayoutInput.cpp).

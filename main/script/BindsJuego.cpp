@@ -426,10 +426,18 @@ static int LSonido(lua_State* L) {
     bool  loop  = lua_toboolean(L, 4) != 0;   // arg 4 opcional: true = sample en LOOP (nota sostenida)
     if (vol < 0.0f) vol = 0.0f; if (vol > 1.0f) vol = 1.0f;
     if (w3dEngine::ConfigMudo()) return 0;   // mute global del Core (mismo criterio que beep()); nil = no sono
-    // resolver la ruta: absoluta queda tal cual; relativa cuelga del proyecto (patron UI2DFormato)
+    // resolver la ruta: absoluta queda tal cual; una ENTRADA del contenedor v4 montado queda
+    // tal cual (ReadFileBytes la lee de adentro, y es la MISMA clave con la que
+    // W3dSonidosPrecargar la dejo en gSonidos); si no, cuelga del proyecto (archivo suelto).
+    // Mismo contrato que setTextura. Antes se colgaba SIEMPRE del proyecto: con los .wav
+    // adentro del .w3d esa ruta absoluta no existe en el disco ni es una entrada -> NULL
+    // cacheado y el juego quedaba MUDO aunque la precarga los hubiera leido bien.
     std::string res = ruta;
-    if (!(res.size() > 0 && (res[0] == '/' || (res.size() > 1 && res[1] == ':'))))
-        if (!g_w3dDirProyecto.empty()) res = g_w3dDirProyecto + "/" + res;
+    if (!(res.size() > 0 && (res[0] == '/' || (res.size() > 1 && res[1] == ':')))) {
+        W3dAlmacen* alm = W3dAlmacenMontado();
+        if (!(alm && alm->Existe(res)) && !g_w3dDirProyecto.empty())
+            res = g_w3dDirProyecto + "/" + res;
+    }
     w3dEngine::W3dSound* s;
     std::map<std::string, w3dEngine::W3dSound*>::iterator it = gSonidos.find(res);
     if (it != gSonidos.end()) s = it->second;

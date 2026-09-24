@@ -139,7 +139,9 @@ void W3dEscena3DPasada() {
     // dibujo antes (chrome del editor, HUD del frame anterior) pudo tocar GL crudo.
     gfx::Invalidate();
     w3dLoteStamp++;              // sello del pase: las Collection con lote marcan a sus horneadas
+    W3dLucesPrepase(SceneCollection);   // las luces ANTES de la geometria (el fogonazo ilumina todo)
     SceneCollection->Render();
+    W3dLucesPrepaseFin();
     // CALCOMANIAS (sombras) y LUCES ADITIVAS (chispas/halos): no escriben z, asi que
     // van DESPUES de toda la escena opaca o cualquier opaco posterior las borra.
     W3dDecalesDibujarPendientes();

@@ -757,6 +757,36 @@ static void AccionMenuPartMezcla(){
     AbrirMenuBajoBoton(MenuPartMezcla, PropsActivo->propPartMezcla->button);
 }
 
+// ---- PARTICULAS AVANZADAS: la FORMA (dropdown) y los int espejados en float ----
+static const char* NombreFormaPart(int f){
+    return f == w3dEngine::FormaEstirada ? T("Stretched") : f == w3dEngine::FormaLinea ? T("Line (trail)") : T("Billboard");
+}
+static PopupMenu* MenuPartForma = NULL;
+static void AccionPartFormaElegida(int id){
+    Particulas* pt = PartActiva(); if (!pt) return;
+    if (id < 0 || id > 2) return;
+    pt->forma = id;
+    if (PropsActivo && PropsActivo->propPartForma) PropsActivo->propPartForma->button->text = NombreFormaPart(id);
+    g_redraw = true;
+}
+static void AccionMenuPartForma(){
+    if (!PropsActivo || !PartActiva()) return;
+    if (!MenuPartForma){ MenuPartForma = new PopupMenu(); MenuPartForma->action = AccionPartFormaElegida; }
+    MenuPartForma->Limpiar();
+    MenuPartForma->titulo = T("Shape");
+    for (int i = 0; i < 3; i++) MenuPartForma->Agregar(NombreFormaPart(i), i, IconType::circle);
+    AbrirMenuBajoBoton(MenuPartForma, PropsActivo->propPartForma->button);
+}
+static int RedondeoPos(float v, int lo, int hi){ int n = (int)(v + 0.5f); if (n < lo) n = lo; if (n > hi) n = hi; return n; }
+static void AccionPartIntsCambio(){
+    Particulas* pt = PartActiva(); if (!pt || !PropsActivo) return;
+    pt->flipCuadros  = RedondeoPos(PropsActivo->partFlipC, 0, 256);
+    pt->flipCols     = RedondeoPos(PropsActivo->partFlipCols, 1, 64);
+    pt->flipFilas    = RedondeoPos(PropsActivo->partFlipFilas, 1, 64);
+    pt->estelaPuntos = RedondeoPos(PropsActivo->partEstelaPts, 2, w3dEngine::ParticulaMaxEstela);
+    g_redraw = true;
+}
+
 // (el COLOR del objeto Particulas ya no es campo de texto: es un PropColor -> ColorPicker de Whisk3D, bindeado
 //  directo a Particulas::color[4] como el material. Ver el bind en el bloque PARTICULAS de Rebind.)
 
@@ -1292,6 +1322,7 @@ static void AccionMenuAddConstraint(){
         MenuAddConstraint->Agregar(W3dNombreTipoConstraint(W3dConstraintTipo::CopyLocation), W3dConstraintTipo::CopyLocation, (int)IconType::constraint);
         MenuAddConstraint->Agregar(W3dNombreTipoConstraint(W3dConstraintTipo::CopyRotation), W3dConstraintTipo::CopyRotation, (int)IconType::constraint);
         MenuAddConstraint->Agregar(W3dNombreTipoConstraint(W3dConstraintTipo::Billboard),    W3dConstraintTipo::Billboard,    (int)IconType::constraint);
+        MenuAddConstraint->Agregar(W3dNombreTipoConstraint(W3dConstraintTipo::ChildOf),      W3dConstraintTipo::ChildOf,      (int)IconType::constraint);
     }
     if (PropsActivo->propRowCon && !PropsActivo->propRowCon->botones.empty())
         AbrirMenuBajoBoton(MenuAddConstraint, PropsActivo->propRowCon->botones[0]); // el boton "Add"
@@ -1380,7 +1411,8 @@ static void AccionMenuConFuente(){
     MenuConFuente->Limpiar();
     MenuConFuente->titulo = T("Source");
     MenuConFuente->Agregar(T("None"), 0);
-    MenuConFuente->Agregar(T("View"), 1, (int)IconType::camera); // la camara que esta dibujando
+    if (ConActivoUI()->tipo != W3dConstraintTipo::ChildOf)          // Child Of: la vista no es un padre posible
+        MenuConFuente->Agregar(T("View"), 1, (int)IconType::camera); // la camara que esta dibujando
     gConFuenteCand.clear(); RecolectarFuentesCon(SceneCollection, o);
     for (size_t i = 0; i < gConFuenteCand.size(); i++)
         MenuConFuente->Agregar(gConFuenteCand[i]->name, 2 + (int)i, (int)IconoDeObjeto(gConFuenteCand[i]));
@@ -1406,6 +1438,37 @@ static void AccionMenuConBBModo(){
     MenuConBBModo->Agregar(T("Upright (does not tilt)"), 0);
     MenuConBBModo->Agregar(T("Face the camera"), 1);
     AbrirMenuBajoBoton(MenuConBBModo, PropsActivo->propConBBModo->button);
+}
+// ---- CHILD OF: "Bone" (los huesos del armature fuente; "None" = el objeto entero) y la inversa ----
+static Armature* ConArmFuente(const W3dConstraint* c){
+    return (c && c->fuenteObj && c->fuenteObj->getType() == ObjectType::armature) ? (Armature*)c->fuenteObj : NULL;
+}
+static PopupMenu* MenuConHueso = NULL;
+static void AccionConHuesoElegido(int id){
+    W3dConstraint* c = ConActivoUI(); Armature* a = ConArmFuente(c); if (!c) return;
+    if (id <= 0 || !a) c->hueso.clear();
+    else if (id - 1 < (int)a->bones.size()) c->hueso = a->bones[id - 1].name;
+    c->huesoCache = -1;
+    AccionConParamChanged();
+}
+static void AccionMenuConHueso(){
+    if (!PropsActivo || !PropsActivo->propConHueso) return;
+    W3dConstraint* c = ConActivoUI(); Armature* a = ConArmFuente(c); if (!a) return;
+    if (!MenuConHueso){ MenuConHueso = new PopupMenu(); MenuConHueso->action = AccionConHuesoElegido; }
+    MenuConHueso->Limpiar();
+    MenuConHueso->titulo = T("Bone");
+    MenuConHueso->Agregar(T("None"), 0);
+    for (size_t i = 0; i < a->bones.size(); i++) MenuConHueso->Agregar(a->bones[i].name, 1 + (int)i);
+    AbrirMenuBajoBoton(MenuConHueso, PropsActivo->propConHueso->button);
+}
+static void AccionConSetInverse(){
+    W3dConstraint* c = ConActivoUI(); Object* o = ObjConstraintsUI();
+    if (c && o && W3dChildOfSetInverse(o, c)) AccionConParamChanged();
+}
+static void AccionConClearInverse(){
+    W3dConstraint* c = ConActivoUI(); if (!c) return;
+    c->inversa.Identity();
+    AccionConParamChanged();
 }
 
 
@@ -3471,6 +3534,9 @@ static void AccionRenderImage(){
 // "Render Animation": rendea la SECUENCIA de PNGs de StartFrame..EndFrame (loop del timeline). Cada frame evalua la
 // animacion (esqueleto + transform de objetos) y guarda base_0001.png, base_0002.png, ... (RenderFileNamePNG usa
 // CurrentFrame). Se restaura el frame al terminar.
+// RANGO DEL RENDER (tarjeta Render): propio, independiente del timeline. 0 = usar el del timeline.
+// Se guarda en el .w3d (raiz "render").
+float g_renderIni = 0.0f, g_renderFin = 0.0f, g_renderFps = 0.0f;
 static void HacerRenderAnimation(){
     if (!PropsActivo || !Viewport3DActive) return;
     Viewport3D* vp = Viewport3DActive;
@@ -3478,7 +3544,10 @@ static void HacerRenderAnimation(){
     extern void AplicarAnimacionObjetos();
     int w = (int)(PropsActivo->renderW + 0.5f); if (w < 1) w = 1;
     int h = (int)(PropsActivo->renderH + 0.5f); if (h < 1) h = 1;
-    int f0 = StartFrame, f1 = EndFrame; if (f1 < f0){ int t=f0; f0=f1; f1=t; }
+    // el rango PROPIO del render (tarjeta Render); 0 = el del timeline
+    int f0 = (g_renderIni > 0.0f) ? (int)g_renderIni : StartFrame;
+    int f1 = (g_renderFin > 0.0f) ? (int)g_renderFin : EndFrame;
+    if (f1 < f0){ int t=f0; f0=f1; f1=t; }
     int nFrames = f1 - f0 + 1;
     // barra de progreso UNICA para TODA la secuencia: total = FRAMES x PASES x TILES. Cada imagen (frame+pase)
     // es una fraccion del total -> 50 frames x 2 pases = 100 imagenes, cada una ~1%. (Antes iba 0..100 por frame.)
@@ -3617,6 +3686,7 @@ static void AccionMenuFlipAtlas(){
     AbrirMenuBajoBoton(MenuFlipAtlas, PropsActivo->propFlipAtlas->button);
 }
 static std::string NombreAnimActiva(){
+    if (g_animMix) return "Mix";
     if (ActiveAnimKind == 2) return "Juego";
     if (ActiveAnimKind == 5) return g_flipActivo ? g_flipActivo->nombre : std::string("Flipbook");
     if (ActiveAnimKind == 4 && ActiveAnimMesh) {   // clip del ARMATURE 2D de la malla
@@ -3669,6 +3739,7 @@ static PopupMenu* AnimSubmenuPool(size_t i){ while (g_animSubmenus.size() <= i) 
 // ids negativos (por eso el "Juego" original no entraba) y este valor no puede
 // colisionar con una escena real (se chequea PRIMERO en AnimSelPorId).
 #define ANIM_ID_JUEGO 99999
+#define ANIM_ID_MIX   99989   // el modo MIX (capas; ver g_animMix)
 // ids del submenu "Nueva animacion" (positivos y por DEBAJO de ANIM_ID_JUEGO -> se chequean primero
 // en AnimSelPorId, antes de que 99990.. se confunda con el indice de una escena).
 #define ANIM_ID_NEW_ESCENA 99990
@@ -3682,6 +3753,7 @@ void ConstruirMenuAnim(PopupMenu* menu){
     menu->Limpiar();
     InitSceneAnimations();
     menu->Agregar("Juego", ANIM_ID_JUEGO, IconType::gamepad);
+    menu->Agregar("Mix", ANIM_ID_MIX, IconType::falloff_smoother);   // capas mezcladas (pestania Animacion)
     PopupMenu* subEsc = AnimSubmenuPool(0); subEsc->Limpiar(); subEsc->action = menu->action; // submenu "Scenes"
     for (size_t i=0;i<SceneAnimations.size();i++) subEsc->Agregar(SceneAnimations[i]->name, (int)i, IconType::camera);
     menu->Agregar(T("Scenes"), 0, IconType::camera, subEsc);
@@ -3822,7 +3894,11 @@ static void InvalidarSkinEscena(){
     L::rec(SceneCollection);
     g_redraw = true;
 }
+void MixEntrar();   // mas abajo (el modo Mix)
 void AnimSelPorId(int id){
+    if (id == ANIM_ID_MIX){ MixEntrar(); return; }
+    // elegir cualquier otra cosa SALE del Mix: las escenas mezcladas vuelven a su base
+    if (g_animMix){ extern void W3dMixEscenasSoltar(); g_animMix = false; W3dMixEscenasSoltar(); }
     if (id == ANIM_ID_JUEGO){
         // el JUEGO: tiempo INFINITO (sin Fin, sin loop); el PLAY corre la simulacion
         // de scripts y el cache rojo del viaje en el tiempo vive aca. Las animaciones
@@ -3927,6 +4003,7 @@ static void AnimSelIdsPlanos(std::vector<int>& out){
 // reconocible). Llamar DESPUES de AnimSelIdsPlanos: lee los registros recien
 // refrescados (los punteros de la seleccion se buscan ahi por identidad).
 static int AnimSelIdActual(){
+    if (g_animMix) return ANIM_ID_MIX;
     if (ActiveAnimKind == 1 && ActiveAnimArm){
         for (size_t a=0;a<g_animMenuArms.size();a++)
             if (g_animMenuArms[a] == ActiveAnimArm)
@@ -3983,6 +4060,234 @@ static void SincronizarAnimClipDesdeLista(Armature* a, int clipIdx){
     AnimCargarRangoActivo(); InvalidarSkinEscena();
     PropertiesLayoutDirty = true; g_redraw = true;
 }
+// ============================================================================
+//  EL MIX DE ANIMACIONES (pestania Animacion). Modelo en el Core: Armature::capas (clips) y g_mixEscenas
+//  (animaciones de escena), g_animMix = el modo. La capa ELEGIDA es la que el timeline / dope sheet
+//  muestran y editan: elegirla deja su clip (o su escena) como la animacion activa de siempre.
+// ============================================================================
+struct MixFila { int tipo; Armature* arm; int capa; };   // 0 objeto, 1 capa de armature, 2 "Escenas", 3 capa de escena
+static std::vector<MixFila> gMixFilas;
+static std::vector<Object*> gMixPlegados;   // objetos plegados en el arbol
+static bool gMixEscenasPlegadas = false;
+static bool MixPlegado(Object* o){ for (size_t i=0;i<gMixPlegados.size();i++) if (gMixPlegados[i]==o) return true; return false; }
+static void RecolectarArmaduras(Object* nodo, std::vector<Armature*>& out); // definida abajo
+static void MixArmarFilas(){
+    gMixFilas.clear();
+    std::vector<Armature*> todas; RecolectarArmaduras(SceneCollection, todas);
+    for (size_t t=0;t<todas.size();t++){
+        Armature* a = todas[t]; if (a->capas.empty()) continue;
+        MixFila f; f.tipo = 0; f.arm = a; f.capa = -1; gMixFilas.push_back(f);
+        if (MixPlegado(a)) continue;
+        for (size_t k=0;k<a->capas.size();k++){ MixFila c; c.tipo = 1; c.arm = a; c.capa = (int)k; gMixFilas.push_back(c); }
+    }
+    if (!g_mixEscenas.empty()){
+        MixFila f; f.tipo = 2; f.arm = NULL; f.capa = -1; gMixFilas.push_back(f);
+        if (!gMixEscenasPlegadas)
+            for (size_t k=0;k<g_mixEscenas.size();k++){ MixFila c; c.tipo = 3; c.arm = NULL; c.capa = (int)k; gMixFilas.push_back(c); }
+    }
+}
+// la capa elegida (NULL = ninguna); 'arm' = su armature (NULL si es de escena)
+static W3dCapaAnim* MixCapaElegida(Armature** arm){
+    if (arm) *arm = NULL;
+    if (g_mixEscenaActiva >= 0 && g_mixEscenaActiva < (int)g_mixEscenas.size()) return &g_mixEscenas[g_mixEscenaActiva];
+    Armature* a = (ActiveAnimKind == 1) ? ActiveAnimArm : NULL;
+    if (a && a->capaActiva >= 0 && a->capaActiva < (int)a->capas.size()){ if (arm) *arm = a; return &a->capas[a->capaActiva]; }
+    return NULL;
+}
+static std::string MixModoTexto(int m){ return m == 1 ? T("Add") : m == 2 ? T("Subtract") : T("Mix"); }
+static int  HookMixCount(){ MixArmarFilas(); return (int)gMixFilas.size(); }
+static std::string HookMixTexto(int i){
+    if (i < 0 || i >= (int)gMixFilas.size()) return std::string();
+    const MixFila& f = gMixFilas[i];
+    if (f.tipo == 0) return f.arm->name;
+    if (f.tipo == 2) return T("Scenes");
+    const W3dCapaAnim& c = (f.tipo == 1) ? f.arm->capas[f.capa] : g_mixEscenas[f.capa];
+    char b[32]; snprintf(b, sizeof b, "  %d%%", (int)(c.influencia + 0.5f));
+    std::string t = c.anim + b;
+    if (c.modo == 1) t += " +"; else if (c.modo == 2) t += " -";
+    if (!c.hueso.empty()) t += " [" + c.hueso + "]";
+    return t;
+}
+static int  HookMixPlegada(int i){
+    if (i < 0 || i >= (int)gMixFilas.size()) return -1;
+    const MixFila& f = gMixFilas[i];
+    if (f.tipo == 0) return MixPlegado(f.arm) ? 1 : 0;
+    if (f.tipo == 2) return gMixEscenasPlegadas ? 1 : 0;
+    return -1;
+}
+static int  HookMixIcono(int i){
+    if (i < 0 || i >= (int)gMixFilas.size()) return (int)IconType::armature;
+    const MixFila& f = gMixFilas[i];
+    if (f.tipo == 0) return (int)IconType::armature;
+    if (f.tipo == 2) return (int)IconType::camera;
+    return (int)IconType::falloff_smoother;   // una capa: la curva (una animacion)
+}
+static int  HookMixNivel(int i){ return (i >= 0 && i < (int)gMixFilas.size() && (gMixFilas[i].tipo == 1 || gMixFilas[i].tipo == 3)) ? 1 : 0; }
+static int  HookMixOjo(int i){
+    if (i < 0 || i >= (int)gMixFilas.size()) return -1;
+    const MixFila& f = gMixFilas[i];
+    if (f.tipo == 1) return f.arm->capas[f.capa].visible ? 1 : 0;
+    if (f.tipo == 3) return g_mixEscenas[f.capa].visible ? 1 : 0;
+    return -1;
+}
+static void MixAplicarRango(){
+    StartFrame = (int)g_mixInicio; EndFrame = (int)g_mixFin;
+    if (CurrentFrame < StartFrame || CurrentFrame > EndFrame) CurrentFrame = StartFrame;
+}
+static void HookMixSeleccionar(int i){
+    if (i < 0 || i >= (int)gMixFilas.size()) return;
+    const MixFila& f = gMixFilas[i];
+    if (f.tipo == 0){ // plegar / desplegar el objeto
+        for (size_t k=0;k<gMixPlegados.size();k++) if (gMixPlegados[k]==f.arm){ gMixPlegados.erase(gMixPlegados.begin()+k); PropertiesLayoutDirty = true; g_redraw = true; return; }
+        gMixPlegados.push_back(f.arm); PropertiesLayoutDirty = true; g_redraw = true; return;
+    }
+    if (f.tipo == 2){ gMixEscenasPlegadas = !gMixEscenasPlegadas; PropertiesLayoutDirty = true; g_redraw = true; return; }
+    if (f.tipo == 1){
+        // la capa elegida es la animacion ACTIVA del timeline: sus keyframes se ven y se editan
+        Armature* a = f.arm; W3dCapaAnim& c = a->capas[f.capa];
+        a->capaActiva = f.capa; g_mixEscenaActiva = -1;
+        int ci = W3dCapaClip(a, c);
+        ActiveAnimKind = 1; ActiveAnimArm = a; if (ci >= 0) a->animActiva = ci;
+    } else {
+        g_mixEscenaActiva = f.capa;
+        int idx = W3dAnimEscenaIdx(g_mixEscenas[f.capa].anim.c_str());
+        if (idx >= 0) SetEscenaActiva(idx);
+        ActiveAnimKind = 0;
+    }
+    MixAplicarRango(); InvalidarSkinEscena();
+    PropertiesLayoutDirty = true; g_redraw = true;
+}
+static int  HookMixActiva(){
+    MixArmarFilas();
+    for (size_t i=0;i<gMixFilas.size();i++){ const MixFila& f = gMixFilas[i];
+        if (f.tipo == 3 && f.capa == g_mixEscenaActiva) return (int)i;
+        if (f.tipo == 1 && g_mixEscenaActiva < 0 && ActiveAnimKind == 1 && f.arm == ActiveAnimArm && f.capa == f.arm->capaActiva) return (int)i; }
+    return -1;
+}
+// el OJO: click en la columna del icono de una fila de capa
+static bool MixToggleOjo(int i){
+    if (i < 0 || i >= (int)gMixFilas.size()) return false;
+    const MixFila& f = gMixFilas[i];
+    if (f.tipo == 1){ f.arm->capas[f.capa].visible = !f.arm->capas[f.capa].visible; }
+    else if (f.tipo == 3){ g_mixEscenas[f.capa].visible = !g_mixEscenas[f.capa].visible; }
+    else return false;
+    InvalidarSkinEscena(); g_redraw = true; return true;
+}
+struct MixHooksReg { MixHooksReg(){ MixFilasCount = HookMixCount; MixFilaTexto = HookMixTexto; MixFilaNivel = HookMixNivel;
+                                   MixFilaOjo = HookMixOjo; MixFilaSeleccionar = HookMixSeleccionar; MixFilaActiva = HookMixActiva;
+                                   MixFilaPlegada = HookMixPlegada; MixFilaIcono = HookMixIcono; } };
+static MixHooksReg gMixHooksReg;
+
+// entrar al modo Mix (el selector de animacion / la pestania)
+void MixEntrar(){
+    g_animMix = true; AnimEsJuego = false;
+    if (ActiveAnimKind == 2 || ActiveAnimKind > 2) ActiveAnimKind = 0;
+    MixAplicarRango(); InvalidarSkinEscena();
+    PropertiesLayoutDirty = true; g_redraw = true;
+}
+// ---- Agregar: menu con los clips de cada armature y las animaciones de escena ----
+static std::vector<Armature*> gMixAddArms;
+static std::vector<PopupMenu*> gMixAddSubs;
+static PopupMenu* MenuMixAdd = NULL;
+static void AccionMixAddElegida(int id){
+    if (id >= 500000){ // escena
+        int e = id - 500000; if (e < 0 || e >= (int)SceneAnimations.size()) return;
+        W3dCapaAnim c; c.anim = SceneAnimations[e]->name; g_mixEscenas.push_back(c);
+        g_mixEscenaActiva = (int)g_mixEscenas.size() - 1;
+    } else {
+        int a = id / 1000, k = id % 1000;
+        if (a < 0 || a >= (int)gMixAddArms.size()) return;
+        Armature* arm = gMixAddArms[a]; if (k < 0 || k >= (int)arm->animations.size()) return;
+        W3dCapaAnim c; c.anim = arm->animations[k]->name; arm->capas.push_back(c);
+        arm->capaActiva = (int)arm->capas.size() - 1; g_mixEscenaActiva = -1;
+        ActiveAnimKind = 1; ActiveAnimArm = arm; arm->animActiva = k;
+    }
+    if (!g_animMix) MixEntrar();
+    InvalidarSkinEscena(); PropertiesLayoutDirty = true; g_redraw = true;
+}
+static void AccionMixAdd(){
+    if (!PropsActivo || !PropsActivo->propRowMix) return;
+    if (!MenuMixAdd){ MenuMixAdd = new PopupMenu(); MenuMixAdd->action = AccionMixAddElegida; }
+    MenuMixAdd->Limpiar();
+    MenuMixAdd->titulo = T("Add");
+    gMixAddArms.clear(); RecolectarArmaduras(SceneCollection, gMixAddArms);
+    size_t n = 0;
+    for (size_t a=0;a<gMixAddArms.size();a++){
+        Armature* arm = gMixAddArms[a]; if (arm->animations.empty()) continue;
+        if (gMixAddSubs.size() <= n) gMixAddSubs.push_back(new PopupMenu());
+        PopupMenu* sub = gMixAddSubs[n++]; sub->Limpiar(); sub->action = AccionMixAddElegida;
+        for (size_t k=0;k<arm->animations.size();k++) sub->Agregar(arm->animations[k]->name, (int)(a*1000 + k), IconType::armature);
+        MenuMixAdd->Agregar(arm->name, 0, IconType::armature, sub);
+    }
+    InitSceneAnimations();
+    if (gMixAddSubs.size() <= n) gMixAddSubs.push_back(new PopupMenu());
+    PopupMenu* subE = gMixAddSubs[n++]; subE->Limpiar(); subE->action = AccionMixAddElegida;
+    for (size_t e=0;e<SceneAnimations.size();e++) subE->Agregar(SceneAnimations[e]->name, 500000 + (int)e, IconType::camera);
+    MenuMixAdd->Agregar(T("Scenes"), 0, IconType::camera, subE);
+    AbrirMenuBajoBoton(MenuMixAdd, PropsActivo->propRowMix->botones[0]);
+}
+static void AccionMixQuitar(){
+    Armature* a = NULL; W3dCapaAnim* c = MixCapaElegida(&a); if (!c) return;
+    if (a){ a->capas.erase(a->capas.begin() + a->capaActiva); if (a->capaActiva >= (int)a->capas.size()) a->capaActiva = (int)a->capas.size() - 1; }
+    else { g_mixEscenas.erase(g_mixEscenas.begin() + g_mixEscenaActiva);
+           extern void W3dMixEscenasSoltar(); W3dMixEscenasSoltar();
+           if (g_mixEscenaActiva >= (int)g_mixEscenas.size()) g_mixEscenaActiva = (int)g_mixEscenas.size() - 1; }
+    InvalidarSkinEscena(); PropertiesLayoutDirty = true; g_redraw = true;
+}
+static void MixMover(int d){
+    Armature* a = NULL; W3dCapaAnim* c = MixCapaElegida(&a); if (!c) return;
+    std::vector<W3dCapaAnim>& v = a ? a->capas : g_mixEscenas;
+    int& i = a ? a->capaActiva : g_mixEscenaActiva;
+    int j = i + d; if (j < 0 || j >= (int)v.size()) return;
+    W3dCapaAnim t = v[i]; v[i] = v[j]; v[j] = t; i = j;
+    InvalidarSkinEscena(); PropertiesLayoutDirty = true; g_redraw = true;
+}
+static void AccionMixSubir(){ MixMover(-1); }
+static void AccionMixBajar(){ MixMover(+1); }
+static void AccionMixRango(){ MixAplicarRango(); InvalidarSkinEscena(); g_redraw = true; }
+static void AccionCapaCambio(){ InvalidarSkinEscena(); g_redraw = true; }
+// ---- la tarjeta Capa: animacion / modo / hueso (dropdowns) ----
+static PopupMenu* MenuCapaAnim = NULL;
+static void AccionCapaAnimElegida(int id){
+    Armature* a = NULL; W3dCapaAnim* c = MixCapaElegida(&a); if (!c) return;
+    if (a){ if (id < 0 || id >= (int)a->animations.size()) return; c->anim = a->animations[id]->name; c->clipCache = -1; a->animActiva = id; }
+    else { if (id < 0 || id >= (int)SceneAnimations.size()) return; c->anim = SceneAnimations[id]->name;
+           extern void W3dMixEscenasSoltar(); W3dMixEscenasSoltar(); SetEscenaActiva(id); }
+    AccionCapaCambio(); PropertiesLayoutDirty = true;
+}
+static void AccionMenuCapaAnim(){
+    Armature* a = NULL; W3dCapaAnim* c = MixCapaElegida(&a); if (!c || !PropsActivo) return;
+    if (!MenuCapaAnim){ MenuCapaAnim = new PopupMenu(); MenuCapaAnim->action = AccionCapaAnimElegida; }
+    MenuCapaAnim->Limpiar();
+    if (a) for (size_t k=0;k<a->animations.size();k++) MenuCapaAnim->Agregar(a->animations[k]->name, (int)k, IconType::armature);
+    else for (size_t e=0;e<SceneAnimations.size();e++) MenuCapaAnim->Agregar(SceneAnimations[e]->name, (int)e, IconType::camera);
+    AbrirMenuBajoBoton(MenuCapaAnim, PropsActivo->propCapaAnim->button);
+}
+static PopupMenu* MenuCapaModo = NULL;
+static void AccionCapaModoElegido(int id){ W3dCapaAnim* c = MixCapaElegida(NULL); if (c && id >= 0 && id <= 2){ c->modo = id; AccionCapaCambio(); } }
+static void AccionMenuCapaModo(){
+    if (!PropsActivo || !MixCapaElegida(NULL)) return;
+    if (!MenuCapaModo){ MenuCapaModo = new PopupMenu(); MenuCapaModo->action = AccionCapaModoElegido; }
+    MenuCapaModo->Limpiar();
+    for (int m = 0; m < 3; m++) MenuCapaModo->Agregar(MixModoTexto(m), m, IconType::falloff_smoother);
+    AbrirMenuBajoBoton(MenuCapaModo, PropsActivo->propCapaModo->button);
+}
+static PopupMenu* MenuCapaHueso = NULL;
+static void AccionCapaHuesoElegido(int id){
+    Armature* a = NULL; W3dCapaAnim* c = MixCapaElegida(&a); if (!c || !a) return;
+    c->hueso = (id <= 0 || id - 1 >= (int)a->bones.size()) ? std::string() : a->bones[id - 1].name;
+    AccionCapaCambio();
+}
+static void AccionMenuCapaHueso(){
+    Armature* a = NULL; W3dCapaAnim* c = MixCapaElegida(&a); if (!c || !a || !PropsActivo) return;
+    if (!MenuCapaHueso){ MenuCapaHueso = new PopupMenu(); MenuCapaHueso->action = AccionCapaHuesoElegido; }
+    MenuCapaHueso->Limpiar();
+    MenuCapaHueso->titulo = T("Bone");
+    MenuCapaHueso->Agregar(T("All"), 0, IconType::armature);
+    for (size_t b=0;b<a->bones.size();b++) MenuCapaHueso->Agregar(a->bones[b].name, 1 + (int)b);
+    AbrirMenuBajoBoton(MenuCapaHueso, PropsActivo->propCapaHueso->button);
+}
+
 static PopupMenu* MenuAnimSel = NULL;
 static void AccionMenuAnimSel(){
     if (!PropsActivo || !PropsActivo->propBtnAnimSel) return;
@@ -5997,7 +6302,7 @@ void Properties::ConstruirGrupos(){
     // pestania del objeto Particulas: la config del emisor. Los numeros/checks
     // bindean directo a los campos del activo; textura y color son de TEXTO
     // (commit en vivo, ver SincronizarPartTextura/SincronizarPartColor)
-    propParticulas = new GroupPropertie("Particles");
+    propParticulas = new GroupPropertie(T("Particles"));
     // TEXTURA: dropdown de texturas cargadas + "Load Texture" (file browser), IGUAL que el material (ya no es
     // un campo de texto donde tipear el path).
     propPartTextura = new PropButton(T("Texture"), IconType::textura);
@@ -6010,42 +6315,155 @@ void Properties::ConstruirGrupos(){
     propPartVida = new PropFloat(T("Lifetime"), "s");
     propPartVida->SetRango(0.01f, 600.0f);
     propParticulas->properties.push_back(propPartVida);
-    propPartTam = new PropFloat(T("Size"), "m");            // lado del billboard, en mundo
-    propPartTam->SetRango(0.0f, 1000.0f);
-    propParticulas->properties.push_back(propPartTam);
+    propPartActivo = new PropBool(T("Active"));
+    propParticulas->properties.push_back(propPartActivo);
+    GroupProperties.push_back(propParticulas);
+
+    // ---- MOVIMIENTO: velocidad (cono + azar por eje), fuerzas (gravedad, aceleracion propia, arrastre, turbulencia)
+    //      y la caja de nacimiento. Los ejes son los LOCALES del emisor (su +Y es el eje del cono). ----
+    propPartMovCard = new GroupPropertie(T("Particle Motion"));
+    propPartMovCard->anchoValores = 0.40f;   // etiquetas largas (ejes y unidades): mas lugar a la izquierda
     propPartVel = new PropFloat(T("Velocity"), "m/s");
     propPartVel->SetRango(0.0f, 10000.0f);
-    propParticulas->properties.push_back(propPartVel);
+    propPartMovCard->properties.push_back(propPartVel);
     propPartDispersion = new PropFloat(T("Spread"), "deg"); // apertura TOTAL del cono
     propPartDispersion->SetRango(0.0f, 360.0f);
-    propParticulas->properties.push_back(propPartDispersion);
-    propPartGravedad = new PropFloat(T("Gravity"), "");     // + cae / - sube
-    propPartGravedad->SetRango(-1000.0f, 1000.0f);
-    propParticulas->properties.push_back(propPartGravedad);
+    propPartMovCard->properties.push_back(propPartDispersion);
+    {
+        const char* ejes[3] = { "X", "Y", "Z" };
+        for (int k = 0; k < 3; k++) {
+            propPartVelBase[k] = new PropFloat(std::string(T("Base velocity")) + " " + ejes[k], "m/s");
+            propPartVelBase[k]->SetRango(-10000.0f, 10000.0f);
+            propPartMovCard->properties.push_back(propPartVelBase[k]);
+        }
+        for (int k = 0; k < 3; k++) {
+            propPartVelAzar[k] = new PropFloat(std::string(T("Random velocity")) + " " + ejes[k], "m/s");
+            propPartVelAzar[k]->SetRango(0.0f, 10000.0f);
+            propPartMovCard->properties.push_back(propPartVelAzar[k]);
+        }
+        propPartGravedad = new PropFloat(T("Gravity"), "m/s2");  // + cae / - sube
+        propPartGravedad->SetRango(-1000.0f, 1000.0f);
+        propPartMovCard->properties.push_back(propPartGravedad);
+        for (int k = 0; k < 3; k++) {
+            propPartAcc[k] = new PropFloat(std::string(T("Acceleration")) + " " + ejes[k], "m/s2");
+            propPartAcc[k]->SetRango(-10000.0f, 10000.0f);
+            propPartMovCard->properties.push_back(propPartAcc[k]);
+        }
+        propPartArrastre = new PropFloat(T("Drag (speed kept per second)"), "");
+        propPartArrastre->SetRango(0.0f, 1.0f);
+        propPartMovCard->properties.push_back(propPartArrastre);
+        propPartTurbulencia = new PropFloat(T("Turbulence"), ""); // deriva suave por particula (unid/s^2)
+        propPartTurbulencia->SetRango(0.0f, 1000.0f);
+        propPartMovCard->properties.push_back(propPartTurbulencia);
+        for (int k = 0; k < 3; k++) {
+            propPartPosAzar[k] = new PropFloat(std::string(T("Spawn box")) + " " + ejes[k], "m");
+            propPartPosAzar[k]->SetRango(0.0f, 10000.0f);
+            propPartMovCard->properties.push_back(propPartPosAzar[k]);
+        }
+    }
+    GroupProperties.push_back(propPartMovCard);
+
+    // ---- TAMANIO: lado + variacion + crecimiento con freno ----
+    propPartTamCard = new GroupPropertie(T("Particle Size"));
+    propPartTamCard->anchoValores = 0.40f;   // etiquetas largas (ejes y unidades): mas lugar a la izquierda
+    propPartTam = new PropFloat(T("Size"), "m");            // lado del billboard, en mundo
+    propPartTam->SetRango(0.0f, 1000.0f);
+    propPartTamCard->properties.push_back(propPartTam);
     propPartVariacion = new PropFloat(T("Variation"), "");  // 0..1: jitter por particula (vel/vida/tam)
     propPartVariacion->SetRango(0.0f, 1.0f);
-    propParticulas->properties.push_back(propPartVariacion);
-    propPartTurbulencia = new PropFloat(T("Turbulence"), ""); // deriva suave por particula (unid/s^2)
-    propPartTurbulencia->SetRango(0.0f, 1000.0f);
-    propParticulas->properties.push_back(propPartTurbulencia);
-    propPartRotacion = new PropBool(T("Rotation"));           // angulo azaroso fijo al nacer
-    propParticulas->properties.push_back(propPartRotacion);
-    propPartVelRot = new PropFloat(T("Spin"), "deg/s");       // giro continuo, signo azaroso
-    propPartVelRot->SetRango(-3600.0f, 3600.0f);
-    propParticulas->properties.push_back(propPartVelRot);
+    propPartTamCard->properties.push_back(propPartVariacion);
+    propPartCrec = new PropFloat(T("Growth (size per second)"), "x/s");
+    propPartCrec->SetRango(-100.0f, 1000.0f);
+    propPartTamCard->properties.push_back(propPartCrec);
+    propPartFreno = new PropFloat(T("Growth kept per second"), "");
+    propPartFreno->SetRango(0.0f, 1.0f);
+    propPartTamCard->properties.push_back(propPartFreno);
+    GroupProperties.push_back(propPartTamCard);
+
+    // ---- COLOR Y ALFA ----
+    propPartColCard = new GroupPropertie(T("Particle Color"));
+    propPartColCard->anchoValores = 0.40f;   // etiquetas largas (ejes y unidades): mas lugar a la izquierda
     propPartColor = new PropColor(T("Color"));              // swatch -> ColorPicker (bindea a pt->color[4])
-    propParticulas->properties.push_back(propPartColor);
+    propPartColCard->properties.push_back(propPartColor);
     // MODO DE MEZCLA: dropdown (Normal/Aditiva/Substractiva/Multiply/Screen/... segun el motor), en vez de dos
     // checkbox que no podian estar los dos a la vez. Mismo patron que el "Blend Mode" del material.
     propPartMezcla = new PropButton(T("Blend"), IconType::material);
     propPartMezcla->button->desplegable = true;
     propPartMezcla->action = AccionMenuPartMezcla;
-    propParticulas->properties.push_back(propPartMezcla);
+    propPartColCard->properties.push_back(propPartMezcla);
     propPartDesvanecer = new PropBool(T("Fade out"));
-    propParticulas->properties.push_back(propPartDesvanecer);
-    propPartActivo = new PropBool(T("Active"));
-    propParticulas->properties.push_back(propPartActivo);
-    GroupProperties.push_back(propParticulas);
+    propPartColCard->properties.push_back(propPartDesvanecer);
+    propPartAlphaDecae = new PropFloat(T("Alpha kept per second"), "");
+    propPartAlphaDecae->SetRango(0.0f, 1.0f);
+    propPartColCard->properties.push_back(propPartAlphaDecae);
+    propPartAlphaMuerte = new PropFloat(T("Dies below alpha"), "");
+    propPartAlphaMuerte->SetRango(0.0f, 1.0f);
+    propPartColCard->properties.push_back(propPartAlphaMuerte);
+    propPartUsarColFin = new PropBool(T("End color"));
+    propPartColCard->properties.push_back(propPartUsarColFin);
+    propPartColorFin = new PropColor(T("Color at death"));
+    propPartColCard->properties.push_back(propPartColorFin);
+    GroupProperties.push_back(propPartColCard);
+
+    // ---- ROTACION ----
+    propPartRotCard = new GroupPropertie(T("Particle Rotation"));
+    propPartRotCard->anchoValores = 0.40f;   // etiquetas largas (ejes y unidades): mas lugar a la izquierda
+    propPartRotacion = new PropBool(T("Random angle (0-360)"));   // angulo azaroso fijo al nacer
+    propPartRotCard->properties.push_back(propPartRotacion);
+    propPartRotIni = new PropFloat(T("Start angle"), "deg");
+    propPartRotIni->SetRango(-360.0f, 360.0f);
+    propPartRotCard->properties.push_back(propPartRotIni);
+    propPartRotAzar = new PropFloat(T("Angle random"), "deg");
+    propPartRotAzar->SetRango(0.0f, 180.0f);
+    propPartRotCard->properties.push_back(propPartRotAzar);
+    propPartVelRot = new PropFloat(T("Spin"), "deg/s");       // giro continuo
+    propPartVelRot->SetRango(-3600.0f, 3600.0f);
+    propPartRotCard->properties.push_back(propPartVelRot);
+    propPartVelRotAzar = new PropFloat(T("Spin random"), "deg/s");
+    propPartVelRotAzar->SetRango(0.0f, 3600.0f);
+    propPartRotCard->properties.push_back(propPartVelRotAzar);
+    propPartGiroSigno = new PropBool(T("Random spin direction"));
+    propPartRotCard->properties.push_back(propPartGiroSigno);
+    GroupProperties.push_back(propPartRotCard);
+
+    // ---- FORMA Y FLIPBOOK ----
+    propPartFormaCard = new GroupPropertie(T("Particle Shape"));
+    propPartFormaCard->anchoValores = 0.40f;   // etiquetas largas (ejes y unidades): mas lugar a la izquierda
+    propPartForma = new PropButton(T("Shape"), IconType::circle);
+    propPartForma->button->desplegable = true;
+    propPartForma->action = AccionMenuPartForma;
+    propPartFormaCard->properties.push_back(propPartForma);
+    propPartEstir = new PropFloat(T("Stretch (seconds of velocity)"), "s");
+    propPartEstir->SetRango(0.0f, 10.0f);
+    propPartFormaCard->properties.push_back(propPartEstir);
+    propPartEstelaPts = new PropFloat(T("Trail points"), "");
+    propPartEstelaPts->SetRango(2.0f, (float)w3dEngine::ParticulaMaxEstela);
+    propPartEstelaPts->onChange = AccionPartIntsCambio;
+    propPartFormaCard->properties.push_back(propPartEstelaPts);
+    propPartEstelaPaso = new PropFloat(T("Trail step"), "s");
+    propPartEstelaPaso->SetRango(0.001f, 10.0f);
+    propPartFormaCard->properties.push_back(propPartEstelaPaso);
+    propPartGrosor = new PropFloat(T("Line width"), "px");
+    propPartGrosor->SetRango(1.0f, 32.0f);
+    propPartFormaCard->properties.push_back(propPartGrosor);
+    propPartFlipC = new PropFloat(T("Flipbook frames"), "");
+    propPartFlipC->SetRango(0.0f, 256.0f);
+    propPartFlipC->onChange = AccionPartIntsCambio;
+    propPartFormaCard->properties.push_back(propPartFlipC);
+    propPartFlipCols = new PropFloat(T("Columns"), "");
+    propPartFlipCols->SetRango(1.0f, 64.0f);
+    propPartFlipCols->onChange = AccionPartIntsCambio;
+    propPartFormaCard->properties.push_back(propPartFlipCols);
+    propPartFlipFilas = new PropFloat(T("Rows"), "");
+    propPartFlipFilas->SetRango(1.0f, 64.0f);
+    propPartFlipFilas->onChange = AccionPartIntsCambio;
+    propPartFormaCard->properties.push_back(propPartFlipFilas);
+    propPartFlipFps = new PropFloat(T("Frame rate (0 = whole life)"), "fps");
+    propPartFlipFps->SetRango(0.0f, 240.0f);
+    propPartFormaCard->properties.push_back(propPartFlipFps);
+    propPartFlipUna = new PropBool(T("Play once (dies at the end)"));
+    propPartFormaCard->properties.push_back(propPartFlipUna);
+    GroupProperties.push_back(propPartFormaCard);
 
     // pestania de la Collection: orden de dibujo de los hijos para TRANSPARENTES
     // (lejos -> cerca respecto de la camara; ver Collection.h)
@@ -6153,6 +6571,17 @@ void Properties::ConstruirGrupos(){
     PropButton* pbRenderImg = new PropButton(T("Render Image"), IconType::foto); // foto: renderiza una imagen
     pbRenderImg->action = AccionRenderImage;
     propRender->properties.push_back(pbRenderImg);
+    // la SECUENCIA: rango y fps PROPIOS del render (0 = los del timeline). Antes el render usaba el rango de la
+    // animacion activa, que es de EDICION: ahora la tarjeta Animacion vive en su pestania y el render tiene el suyo.
+    propRenderIni = new PropFloat(T("Start"));
+    propRenderIni->SetRango(0.0f, 100000.0f); propRenderIni->entero = true; propRenderIni->value = &g_renderIni;
+    propRender->properties.push_back(propRenderIni);
+    propRenderFin = new PropFloat(T("End"));
+    propRenderFin->SetRango(0.0f, 100000.0f); propRenderFin->entero = true; propRenderFin->value = &g_renderFin;
+    propRender->properties.push_back(propRenderFin);
+    propRenderFps = new PropFloat("FPS");
+    propRenderFps->SetRango(0.0f, 240.0f); propRenderFps->entero = true; propRenderFps->value = &g_renderFps;
+    propRender->properties.push_back(propRenderFps);
     GroupProperties.push_back(propRender);
 
     // tarjeta "Animation" (pestania Render): selector de la animacion ACTIVA (Scene(s) / clips del armature) + Start/End/
@@ -6225,8 +6654,49 @@ void Properties::ConstruirGrupos(){
     propAnimation->properties.push_back(propBtnAnimRename);
     propBtnAnimRender = new PropButton(T("Render Animation"), IconType::camera);
     propBtnAnimRender->action = AccionRenderAnimation;
-    propAnimation->properties.push_back(propBtnAnimRender);
+    propRender->properties.push_back(propBtnAnimRender);   // la secuencia es del RENDER (tarjeta Render)
     GroupProperties.push_back(propAnimation);
+
+    // ===== MIX (pestania Animacion): el arbol de capas + la capa elegida =====
+    propMix = new GroupPropertie(T("Mix"));
+    propMix->anchoValores = 0.55f;
+    // (el RANGO del mix va arriba, en la tarjeta Animacion: Start/End son los del mix en este modo)
+    propListMix = new PropListMeshParts("Mix");
+    propListMix->modo = 13;       // el arbol (ganchos Mix*)
+    propListMix->filasMax = 8;
+    propMix->properties.push_back(propListMix);
+    propRowMix = new PropButtonRow();
+    propRowMix->Agregar(T("Add"), AccionMixAdd);
+    propRowMix->Agregar(T("Remove"), AccionMixQuitar, IconType::borrar);
+    propMix->properties.push_back(propRowMix);
+    propRowMixMove = new PropButtonRow();
+    propRowMixMove->Agregar(T("Move Up"), AccionMixSubir);
+    propRowMixMove->Agregar(T("Move Down"), AccionMixBajar);
+    propMix->properties.push_back(propRowMixMove);
+    GroupProperties.push_back(propMix);
+
+    propCapa = new GroupPropertie(T("Layer"));
+    propCapa->anchoValores = 0.55f;
+    propCapaAnim = new PropButton(T("Animation"), IconType::armature);
+    propCapaAnim->button->desplegable = true; propCapaAnim->action = AccionMenuCapaAnim;
+    propCapa->properties.push_back(propCapaAnim);
+    propCapaVisible = new PropBool(T("Visible")); propCapaVisible->onChange = AccionCapaCambio;
+    propCapa->properties.push_back(propCapaVisible);
+    propCapaInfl = new PropFloat(T("Influence"), "%"); propCapaInfl->SetRango(0.0f, 200.0f); propCapaInfl->onChange = AccionCapaCambio;
+    propCapa->properties.push_back(propCapaInfl);
+    propCapaModo = new PropButton(T("Blend"), IconType::falloff_smoother);
+    propCapaModo->button->desplegable = true; propCapaModo->action = AccionMenuCapaModo;
+    propCapa->properties.push_back(propCapaModo);
+    propCapaHueso = new PropButton(T("Bone"), IconType::armature);
+    propCapaHueso->button->desplegable = true; propCapaHueso->action = AccionMenuCapaHueso;
+    propCapa->properties.push_back(propCapaHueso);
+    propCapaDesde = new PropFloat(T("Starts at frame")); propCapaDesde->SetRango(-100000.0f, 100000.0f); propCapaDesde->onChange = AccionCapaCambio;
+    propCapa->properties.push_back(propCapaDesde);
+    propCapaVel = new PropFloat(T("Speed")); propCapaVel->SetRango(0.0f, 20.0f); propCapaVel->onChange = AccionCapaCambio;
+    propCapa->properties.push_back(propCapaVel);
+    propCapaLoop = new PropBool(T("Loop")); propCapaLoop->onChange = AccionCapaCambio;
+    propCapa->properties.push_back(propCapaLoop);
+    GroupProperties.push_back(propCapa);
 
     // ===== Tarjeta "Juego" (debajo de Animacion): compilar + el cache del viaje en
     // el tiempo. El juego NO se mezcla con la UI ni con las animaciones normales.
@@ -6852,6 +7322,20 @@ void Properties::ConstruirGrupos(){
     propConAvisoBB = new PropLabel(T("With influence between 0 and 100 the billboard can flip 180 degrees "
                                      "when it crosses the camera. Use 100% to avoid it."), true /*wrap*/);
     propConstraintProps->properties.push_back(propConAvisoBB);
+    // CHILD OF: el hueso de la fuente (solo si es un armature), que se hereda y la inversa
+    propConHueso = new PropButton(T("Bone"), IconType::armature);
+    propConHueso->button->desplegable = true; propConHueso->action = AccionMenuConHueso;
+    propConstraintProps->properties.push_back(propConHueso);
+    propConCoLoc = new PropBool(T("Location")); propConCoLoc->onChange = AccionConParamChanged;
+    propConstraintProps->properties.push_back(propConCoLoc);
+    propConCoRot = new PropBool(T("Rotation")); propConCoRot->onChange = AccionConParamChanged;
+    propConstraintProps->properties.push_back(propConCoRot);
+    propConCoEsc = new PropBool(T("Scale")); propConCoEsc->onChange = AccionConParamChanged;
+    propConstraintProps->properties.push_back(propConCoEsc);
+    propRowConInversa = new PropButtonRow();
+    propRowConInversa->Agregar(T("Set Inverse"),   AccionConSetInverse);
+    propRowConInversa->Agregar(T("Clear Inverse"), AccionConClearInverse);
+    propConstraintProps->properties.push_back(propRowConInversa);
     GroupProperties.push_back(propConstraintProps);
 }
 
@@ -7761,6 +8245,49 @@ void Properties::RefreshTargetProperties(){
         if (propPartMezcla)   propPartMezcla->button->text = pt ? NombreMezcla(pt->mezcla) : std::string(T("Blend"));
         propPartDesvanecer->value = pt ? &pt->desvanecer : NULL;
         propPartActivo->value     = pt ? &pt->activo     : NULL;
+        // ---- lo avanzado ----
+        for (int k = 0; k < 3; k++) {
+            if (propPartAcc[k])     propPartAcc[k]->value     = pt ? &pt->aceleracion[k] : NULL;
+            if (propPartVelAzar[k]) propPartVelAzar[k]->value = pt ? &pt->velAzar[k]     : NULL;
+            if (propPartVelBase[k]) propPartVelBase[k]->value = pt ? &pt->velLocal[k]    : NULL;
+            if (propPartPosAzar[k]) propPartPosAzar[k]->value = pt ? &pt->posAzar[k]     : NULL;
+        }
+        if (propPartArrastre)    propPartArrastre->value    = pt ? &pt->arrastre         : NULL;
+        if (propPartCrec)        propPartCrec->value        = pt ? &pt->crecimiento      : NULL;
+        // el freno solo tiene sentido si crece
+        if (propPartFreno)       propPartFreno->value       = (pt && pt->crecimiento != 0.0f) ? &pt->frenoCrecimiento : NULL;
+        if (propPartAlphaDecae)  propPartAlphaDecae->value  = pt ? &pt->alphaDecae       : NULL;
+        if (propPartAlphaMuerte) propPartAlphaMuerte->value = pt ? &pt->alphaMuerte      : NULL;
+        if (propPartUsarColFin)  propPartUsarColFin->value  = pt ? &pt->usarColorFinal   : NULL;
+        if (propPartColorFin)    propPartColorFin->value    = (pt && pt->usarColorFinal) ? pt->colorFinal : NULL;
+        // con "angulo al azar 0-360" prendido, el angulo inicial y su azar no se usan: se esconden
+        const bool rotFija = pt && !pt->rotacion;
+        if (propPartRotIni)      propPartRotIni->value      = rotFija ? &pt->rotInicial : NULL;
+        if (propPartRotAzar)     propPartRotAzar->value     = rotFija ? &pt->rotAzar    : NULL;
+        if (propPartVelRotAzar)  propPartVelRotAzar->value  = pt ? &pt->velRotAzar      : NULL;
+        if (propPartGiroSigno)   propPartGiroSigno->value   = pt ? &pt->giroSignoAzar   : NULL;
+        // FORMA: cada fila solo con la forma que la usa
+        const int forma = pt ? pt->forma : 0;
+        if (propPartForma) {
+            propPartForma->oculto = !pt;
+            if (pt) { const std::string txt = NombreFormaPart(forma);
+                      if (propPartForma->button->text != txt) { propPartForma->button->text = txt; g_redraw = true; } }
+        }
+        if (propPartEstir)      propPartEstir->value      = (pt && forma == w3dEngine::FormaEstirada) ? &pt->estiramiento : NULL;
+        if (pt) { partEstelaPts = (float)pt->estelaPuntos; partFlipC = (float)pt->flipCuadros;
+                  partFlipCols = (float)pt->flipCols; partFlipFilas = (float)pt->flipFilas; }
+        const bool esLinea = pt && forma == w3dEngine::FormaLinea;
+        if (propPartEstelaPts)  propPartEstelaPts->value  = esLinea ? &partEstelaPts : NULL;
+        if (propPartEstelaPaso) propPartEstelaPaso->value = esLinea ? &pt->estelaPaso : NULL;
+        if (propPartGrosor)     propPartGrosor->value     = esLinea ? &pt->grosorLinea : NULL;
+        // FLIPBOOK (no aplica a las lineas, que no llevan textura): grilla y fps solo con cuadros > 0
+        const bool conTex = pt && !esLinea;
+        const bool hayFlip = conTex && pt->flipCuadros > 0;
+        if (propPartFlipC)     propPartFlipC->value     = conTex ? &partFlipC : NULL;
+        if (propPartFlipCols)  propPartFlipCols->value  = hayFlip ? &partFlipCols : NULL;
+        if (propPartFlipFilas) propPartFlipFilas->value = hayFlip ? &partFlipFilas : NULL;
+        if (propPartFlipFps)   propPartFlipFps->value   = hayFlip ? &pt->flipFps : NULL;
+        if (propPartFlipUna)   propPartFlipUna->value   = (hayFlip && pt->flipFps > 0.0f) ? &pt->flipUnaVez : NULL;
     }
 
     // COLLECTION: idem. OJO: la raiz Scene tambien reporta tipo collection
@@ -7867,7 +8394,19 @@ Properties::Properties() : ViewportBase() {
     propPartDesvanecer = NULL; propPartActivo = NULL;
     propPartVariacion = NULL; propPartTurbulencia = NULL;
     propPartRotacion = NULL; propPartVelRot = NULL;
+    propPartMovCard = NULL; propPartTamCard = NULL; propPartColCard = NULL; propPartRotCard = NULL; propPartFormaCard = NULL;
+    propPartArrastre = NULL; propPartCrec = NULL; propPartFreno = NULL; propPartAlphaDecae = NULL; propPartAlphaMuerte = NULL;
+    propPartUsarColFin = NULL; propPartColorFin = NULL; propPartRotIni = NULL; propPartRotAzar = NULL; propPartVelRotAzar = NULL;
+    propPartGiroSigno = NULL; propPartForma = NULL; propPartEstir = NULL; propPartEstelaPts = NULL; propPartEstelaPaso = NULL;
+    propPartGrosor = NULL; propPartFlipC = NULL; propPartFlipCols = NULL; propPartFlipFilas = NULL; propPartFlipFps = NULL;
+    propPartFlipUna = NULL;
+    for (int k = 0; k < 3; k++) { propPartAcc[k] = NULL; propPartVelBase[k] = NULL; propPartVelAzar[k] = NULL; propPartPosAzar[k] = NULL; }
+    partFlipC = 0; partFlipCols = 1; partFlipFilas = 1; partEstelaPts = 4;
     propFlipAtlas = NULL; propFlipCuadros = NULL; propFlipCols = NULL; propFlipFilas = NULL; propFlipFps = NULL;
+    propMix = NULL; propListMix = NULL; propRowMix = NULL; propRowMixMove = NULL; propMixIni = NULL; propMixFin = NULL;
+    propCapa = NULL; propCapaAnim = NULL; propCapaInfl = NULL; propCapaModo = NULL; propCapaHueso = NULL;
+    propCapaDesde = NULL; propCapaVel = NULL; propCapaLoop = NULL; propCapaVisible = NULL;
+    propRenderIni = NULL; propRenderFin = NULL; propRenderFps = NULL;
     propBtnCamTarget = NULL;
     propBtnInstTarget = NULL;
     // tarjeta Fisica (cuerpo rigido)
@@ -7914,6 +8453,7 @@ Properties::Properties() : ViewportBase() {
     propConAvisoFuente = NULL; propConInfluencia = NULL;
     propConEjeX = NULL; propConEjeY = NULL; propConEjeZ = NULL; propConAvisoEjes = NULL;
     propConBBModo = NULL; propConAvisoBB = NULL;
+    propConHueso = NULL; propConCoLoc = NULL; propConCoRot = NULL; propConCoEsc = NULL; propRowConInversa = NULL;
     propRotMode = NULL;
     propMsgDefault = NULL; propSepMat = NULL;
     propMaterial = NULL; propBtnRenameMat = NULL;
@@ -7974,6 +8514,10 @@ Properties::Properties() : ViewportBase() {
     // viven en su pestania contextual (2). AL FINAL, como manda el comentario de arriba.
     Tab* tScripts = new Tab("", IconType::gamepad);
     BarTabs.push_back(tScripts);
+    // pestania 9: "ANIMACION" (icono de la curva de la edicion proporcional): la tarjeta Animacion (el selector,
+    // antes en Render) + el MIX de capas. Siempre visible, como Render. AL FINAL (ver el comentario de arriba).
+    Tab* tAnim = new Tab("", IconType::falloff_smoother);
+    BarTabs.push_back(tAnim);
 }
 
 // segun el objeto activo y la pestania elegida: que tab se ve, cual esta
@@ -8067,6 +8611,7 @@ void Properties::ActualizarPestanias(){
     // con su .lua). El objeto Script NO la necesita: sus scripts ya viven en su contextual (2).
     bool scriptsTabOk = (ObjActivo != NULL) && !esScript;
     if (BarTabs.size() >= 9) BarTabs[8]->visible = scriptsTabOk;
+    if (BarTabs.size() >= 10) BarTabs[9]->visible = true;   // Animacion: siempre (como Render)
     if (pestaniaActiva == 2 && !hayTab3) pestaniaActiva = 1;
     if (pestaniaActiva == 3 && !esMesh)  pestaniaActiva = 1;
     if (pestaniaActiva == 4 && !esMesh)  pestaniaActiva = 1;
@@ -8088,7 +8633,7 @@ void Properties::ActualizarPestanias(){
     // esto corria antes (y solo cubria la 1), deseleccionar parado en Material/
     // Vertices/Modifiers dejaba activa la pestania Objeto sin objeto: la pestania
     // fantasma con el panel entero VACIO que se reporto.
-    if (!ObjActivo && pestaniaActiva != 0) pestaniaActiva = 0;
+    if (!ObjActivo && !PestaniaGlobal()) pestaniaActiva = 0;
     for (size_t i = 0; i < BarTabs.size(); i++){
         BarTabs[i]->activa = ((int)i == pestaniaActiva);
         BarTabs[i]->foco   = (focoEnTabs && (int)i == pestaniaActiva);
@@ -8115,13 +8660,15 @@ void Properties::ActualizarPestanias(){
     // no hay nada que exportar).
     if (propArchivo) propArchivo->visible = (pestaniaActiva == 0);
     if (propRender)    propRender->visible    = (pestaniaActiva == 0);
-    if (propAnimation) propAnimation->visible = (pestaniaActiva == 0); // tarjeta Animation: global, como Render
+    if (propAnimation) propAnimation->visible = (pestaniaActiva == 9); // tarjeta Animation: su propia pestania
+    if (propMix)       propMix->visible  = (pestaniaActiva == 9 && g_animMix);
+    if (propCapa)      propCapa->visible = (pestaniaActiva == 9 && g_animMix && MixCapaElegida(NULL) != NULL);
     if (propJuego)     propJuego->visible     = (pestaniaActiva == 0); // Juego: debajo de Animation
     // tarjeta Keyframe: SOLO si hay un keyframe elegido en el editor de curvas. Los campos se refrescan desde la
     // curva viva (que la puede haber movido el propio timeline), salvo el que se este editando a mano.
     if (propKeyframe){
         int ki; AnimProperty* kap = DopeKeyframeActivo(&ki);
-        propKeyframe->visible = (pestaniaActiva == 0) && kap != NULL;
+        propKeyframe->visible = (pestaniaActiva == 9) && kap != NULL;   // keyframe elegido: pestania Animacion
         if (propKeyframe->visible){
             const keyFrame& k = kap->keyframes[ki];
             std::string canal = DopeKeyframeActivoCanal();
@@ -8156,14 +8703,33 @@ void Properties::ActualizarPestanias(){
     if (propAjRepo)    SincronizarRepoCampo(propAjRepo);
     // tarjeta Animation: el dropdown muestra la animacion activa (icono camara=escena / esqueleto=clip); Delete se
     // OCULTA cuando no hay nada que borrar; Render se GRISA sin animaciones. New y Rename siempre visibles.
-    if (propAnimation && pestaniaActiva == 0){
+    // tarjeta CAPA (Mix): bindea a la capa elegida
+    if (propCapa && pestaniaActiva == 9){
+        Armature* ca = NULL; W3dCapaAnim* c = MixCapaElegida(&ca);
+        if (propCapaInfl)    propCapaInfl->value    = c ? &c->influencia : NULL;
+        if (propCapaDesde)   propCapaDesde->value   = c ? &c->desde : NULL;
+        if (propCapaVel)     propCapaVel->value     = c ? &c->vel : NULL;
+        if (propCapaLoop)    propCapaLoop->value    = c ? &c->loop : NULL;
+        if (propCapaVisible) propCapaVisible->value = c ? &c->visible : NULL;
+        if (propCapaAnim && c){ if (propCapaAnim->button->text != c->anim){ propCapaAnim->button->text = c->anim; g_redraw = true; }
+                                propCapaAnim->button->icon = ca ? (int)IconType::armature : (int)IconType::camera; }
+        if (propCapaModo && c){ std::string t = MixModoTexto(c->modo); if (propCapaModo->button->text != t){ propCapaModo->button->text = t; g_redraw = true; } }
+        if (propCapaHueso){ propCapaHueso->oculto = !(c && ca);
+            if (c && ca){ std::string t = c->hueso.empty() ? std::string(T("All")) : c->hueso;
+                          if (propCapaHueso->button->text != t){ propCapaHueso->button->text = t; g_redraw = true; } } }
+        // en el Mix, Start/End de la tarjeta Animacion son los del MIX (ya estan en la tarjeta Mix)
+        if (propRowMix && propRowMix->botones.size() >= 2) propRowMix->botones[1]->visible = (c != NULL);
+        if (propRowMixMove && propRowMixMove->botones.size() >= 2){ propRowMixMove->botones[0]->visible = (c != NULL); propRowMixMove->botones[1]->visible = (c != NULL); }
+    }
+    if (propAnimation && pestaniaActiva == 9){
         InitSceneAnimations();
         Armature* aSel = ArmActiva();
         int nClips = aSel ? (int)aSel->animations.size() : 0;
         bool clipActivo = (ActiveAnimKind == 1 && ActiveAnimArm);
         if (propBtnAnimSel && propBtnAnimSel->button){
             propBtnAnimSel->button->text = NombreAnimActiva();
-            propBtnAnimSel->button->icon = (ActiveAnimKind == 2) ? (int)IconType::gamepad
+            propBtnAnimSel->button->icon = g_animMix ? (int)IconType::falloff_smoother
+                                          : (ActiveAnimKind == 2) ? (int)IconType::gamepad
                                           : clipActivo ? (int)IconType::armature : (int)IconType::camera;
         }
         // CONFIG del flipbook: visible SOLO con un flipbook activo (kind 5); carga sus valores en los mirrors
@@ -8188,7 +8754,15 @@ void Properties::ActualizarPestanias(){
         if (propBtnAnimRender) propBtnAnimRender->gris = (SceneAnimations.empty() && nClips == 0);
         // MODO JUEGO: el Fin y Render Animation desaparecen (la animacion es infinita);
         // "No reemplazar estados" y su nota solo aparecen siendo un juego
+        if (g_animMix && AnimEsJuego) AnimEsJuego = false;   // Mix y Juego son excluyentes (un .w3d viejo pudo traer los dos)
         if (gPropAnimEnd) gPropAnimEnd->value = AnimEsJuego ? NULL : &g_animEndF;
+        // MIX: Start/End de esta tarjeta SON el rango del mix (AnimSetStart/End los desvian a g_mixInicio/Fin)
+        if (g_animMix){ StartFrame = (int)g_mixInicio; EndFrame = (int)g_mixFin; }
+        // JUEGO y MIX no son una animacion: no se crean ni se renombran desde aca
+        if (propRowAnimNewDel && (AnimEsJuego || g_animMix))   // la fila entera se oculta (todos sus botones)
+            for (size_t k = 0; k < propRowAnimNewDel->botones.size(); k++) propRowAnimNewDel->botones[k]->visible = false;
+        else if (propRowAnimNewDel && !propRowAnimNewDel->botones.empty()) propRowAnimNewDel->botones[0]->visible = true;
+        if (propBtnAnimRename) propBtnAnimRename->oculto = (AnimEsJuego || g_animMix);
         if (propBtnAnimRender) propBtnAnimRender->oculto = AnimEsJuego;
         // con el cache de juego DESTILDADO, el limite "Cache" y "No reemplazar estados" (opciones del rewind)
         // no tienen sentido -> se ocultan (value=NULL). "No reemplazar estados" ademas solo aplica en modo juego.
@@ -8292,6 +8866,11 @@ void Properties::ActualizarPestanias(){
     if (propCulling)   propCulling->visible   = (pestaniaActiva == 2 && esCull);
     if (propCollection) propCollection->visible = (pestaniaActiva == 2 && esColl);
     if (propParticulas) propParticulas->visible = (pestaniaActiva == 2 && esPart);
+    if (propPartMovCard)   propPartMovCard->visible   = (pestaniaActiva == 2 && esPart);
+    if (propPartTamCard)   propPartTamCard->visible   = (pestaniaActiva == 2 && esPart);
+    if (propPartColCard)   propPartColCard->visible   = (pestaniaActiva == 2 && esPart);
+    if (propPartRotCard)   propPartRotCard->visible   = (pestaniaActiva == 2 && esPart);
+    if (propPartFormaCard) propPartFormaCard->visible = (pestaniaActiva == 2 && esPart);
     if (propMirror)     propMirror->visible     = (pestaniaActiva == 2 && esMirror);
     // tarjeta FISICA: para CUALQUIER objeto que tenga definicion (Add > Physics).
     // Los PropFloat se re-apuntan al activo (value=NULL oculta la fila).
@@ -8587,6 +9166,8 @@ void Properties::ActualizarPestanias(){
         const bool esCopia = (c && (c->tipo == W3dConstraintTipo::CopyLocation ||
                                     c->tipo == W3dConstraintTipo::CopyRotation));
         const bool esBB    = (c && c->tipo == W3dConstraintTipo::Billboard);
+        const bool esCO    = (c && c->tipo == W3dConstraintTipo::ChildOf);
+        const bool conFuente = esCopia || esCO;   // Source: Copy* y Child Of
         if (propConActivo)     propConActivo->value     = c ? &c->activo      : NULL;
         if (propConVerEdit)    propConVerEdit->value    = c ? &c->mostrarEdit : NULL;
         if (propConInfluencia) propConInfluencia->value = c ? &c->influencia : NULL;
@@ -8598,11 +9179,11 @@ void Properties::ActualizarPestanias(){
         if (propConEjeY) propConEjeY->value = esCopia ? (esLoc ? &c->ejeZ : &c->ejeY) : NULL;
         if (propConEjeZ) propConEjeZ->value = esCopia ? (esLoc ? &c->ejeY : &c->ejeZ) : NULL;
         if (propConFuente){
-            propConFuente->oculto = !esCopia;
+            propConFuente->oculto = !conFuente;
             // EL TEXTO SE REFRESCA POR FRAME, y ese es el punto: cuando borran el objeto fuente,
             // la puerta de refs (Object::SetRefObjeto) deja fuenteObj en NULL y el boton pasa a
             // decir "None" solo. Es donde se ve, sin abrir nada, que el vinculo se corto.
-            if (esCopia){
+            if (conFuente){
                 const std::string txt = (c->fuenteTipo == W3dConstraintFuente::Vista)
                                         ? std::string(T("View"))
                                         : (c->fuenteObj ? c->fuenteObj->name : std::string(T("None")));
@@ -8621,7 +9202,21 @@ void Properties::ActualizarPestanias(){
         // del billboard solo a influencia intermedia. Los dos primeros son los dos motivos por
         // los que W3dConEfectivo (Objects.cpp) deja un Copy* sin efecto, uno por motivo.
         if (propConAvisoFuente)
-            propConAvisoFuente->oculto = !(esCopia && c->fuenteTipo == W3dConstraintFuente::Objeto && !c->fuenteObj);
+            propConAvisoFuente->oculto = !(conFuente && c->fuenteTipo == W3dConstraintFuente::Objeto && !c->fuenteObj);
+        // CHILD OF: Bone solo con fuente armature; Location/Rotation/Scale e inversa siempre
+        if (propConHueso){
+            const bool esArm = esCO && ConArmFuente(c);
+            propConHueso->oculto = !esArm;
+            if (esArm){
+                const std::string txt = c->hueso.empty() ? std::string(T("None")) : c->hueso;
+                if (propConHueso->button->text != txt){ propConHueso->button->text = txt; g_redraw = true; }
+            }
+        }
+        if (propConCoLoc) propConCoLoc->value = esCO ? &c->coLoc : NULL;
+        if (propConCoRot) propConCoRot->value = esCO ? &c->coRot : NULL;
+        if (propConCoEsc) propConCoEsc->value = esCO ? &c->coEsc : NULL;
+        if (propRowConInversa)
+            for (size_t k = 0; k < propRowConInversa->botones.size(); k++) propRowConInversa->botones[k]->visible = esCO;
         if (propConAvisoEjes)
             propConAvisoEjes->oculto = !(esCopia && !c->ejeX && !c->ejeY && !c->ejeZ);
         if (propConAvisoBB)
@@ -8719,7 +9314,7 @@ void Properties::Resize(int newW, int newH){
     ResizeBorder(newW, newH);
     ActualizarPestanias(); // visibilidad de grupos antes de medir el contenido
 
-    if (!ObjActivo && pestaniaActiva != 0) {
+    if (!ObjActivo && !PestaniaGlobal()) {
         // sin objeto Y fuera de la pestania Render (global): sin contenido ni scrollbar (antes quedaba la
         // barra con el tamano viejo). En la pestania Render se mide su contenido global aunque no haya seleccion.
         PosY = 0;
@@ -8799,7 +9394,7 @@ void Properties::Render(){
 
     // la pestania Render (0) tiene ajustes GLOBALES (salida/pases): se dibuja SIEMPRE, con o sin seleccion.
     // Las demas pestanias son del objeto activo -> sin seleccion no hay contenido.
-    if (ObjActivo || pestaniaActiva == 0){
+    if (ObjActivo || PestaniaGlobal()){
         // los GRUPOS son globales y otro panel de propiedades pudo
         // haberlos acomodado con OTRO ancho: relayout con el propio
         // antes de dibujar (mitigacion hasta hacerlos por-instancia)
@@ -9004,7 +9599,7 @@ void Properties::FindMouseOver(int mx, int my){
     PropHoverGroup = NULL;
     PropHoverFila = -1;
     if (mouseOverScrollY) return; // el "scrollbar area" esta reservada
-    if ((!ObjActivo && pestaniaActiva != 0) || !Contains(mx, my)) return; // pestania Render (global): hover sin seleccion
+    if ((!ObjActivo && !PestaniaGlobal()) || !Contains(mx, my)) return; // pestania Render (global): hover sin seleccion
     int yCursor = y + BarTopOffset() + PosY + borderGS + RenglonHeightGS + gapGS;
     for (size_t i = 0; i < GroupProperties.size(); i++) {
         GroupPropertie* g = GroupProperties[i];
@@ -9397,7 +9992,7 @@ void Properties::event_key_up(int tecla){
 // devuelve el mini-listado (PropListMeshParts) cuyo BOX cae bajo la coordenada 'py' (o NULL). Mismo recorrido de
 // filas que ClickEn/PropFloatEnValueBox. Lo usa el scroll TACTIL para saber si el dedo empezo sobre una lista.
 PropListMeshParts* Properties::ListaBajoY(int py) {
-    if (!ObjActivo && pestaniaActiva != 0) return NULL;
+    if (!ObjActivo && !PestaniaGlobal()) return NULL;
     int yCursor = y + BarTopOffset() + PosY + borderGS + RenglonHeightGS + gapGS;
     for (size_t i = 0; i < GroupProperties.size(); i++) {
         GroupPropertie* g = GroupProperties[i];
@@ -9429,7 +10024,7 @@ void Properties::ClickEn(int mx, int my) {
         EnterPropertieSelect();
         return;
     }
-    if (!ObjActivo && pestaniaActiva != 0) return; // sin objeto no hay filas (salvo pestania Render, global)
+    if (!ObjActivo && !PestaniaGlobal()) return; // sin objeto no hay filas (salvo pestania Render, global)
     // mismo recorrido que el render: el titulo avanza RenglonHeightGS+gapGS
     // (no marginGS) y cada fila mide lo que devuelve su Resize (PropGap es
     // gapGS, checkbox sin valor es 0): antes el mapeo quedaba corrido y el
@@ -9568,6 +10163,11 @@ void Properties::ClickEn(int mx, int my) {
                                    (my - yFila - borderGS) / (RenglonHeightGS + gapGS);
                         int n = lista->ListaCount(); // parts / uv maps / colors segun el modo
                         if (item >= n) item = n - 1;
+                        // MIX: el click en la columna del OJO (a la derecha) oculta/muestra la capa sin elegirla
+                        if (lista->modo == 13 && item >= 0 && item < n &&
+                            mx >= x + PosX + g->width - (int)IconSizeGS - gapGS * 6 && MixToggleOjo(item)) {
+                            return;
+                        }
                         if (item >= 0 && n > 0) {
                             lista->ListaSeleccionar(item); // setea el activo + re-bind/re-bake
                             lista->AjustarVentana();
@@ -9630,7 +10230,7 @@ static PropFloat* gTouchSlide = NULL;
 
 // PropFloat cuyo VALUE BOX (columna de valores) esta bajo (mx,my), o NULL. Mismo recorrido de filas que ClickEn.
 PropFloat* Properties::PropFloatEnValueBox(int mx, int my){
-    if ((!ObjActivo && pestaniaActiva != 0) || !Contains(mx, my)) return NULL;
+    if ((!ObjActivo && !PestaniaGlobal()) || !Contains(mx, my)) return NULL;
     int yCursor = y + BarTopOffset() + PosY + borderGS + RenglonHeightGS + gapGS;
     for (size_t i = 0; i < GroupProperties.size(); i++) {
         GroupPropertie* g = GroupProperties[i];

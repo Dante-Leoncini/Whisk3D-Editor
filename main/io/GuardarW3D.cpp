@@ -804,6 +804,16 @@ static void LayoutEscribirNodo(std::string& s, ViewportBase* v, int ind) {
         JSang(s, ind + 1); s += "rotQY: "; JNum(s, v3->viewRot.y); s += "\n";
         JSang(s, ind + 1); s += "rotQZ: "; JNum(s, v3->viewRot.z); s += "\n";
         JSang(s, ind + 1); s += "rotQW: "; JNum(s, v3->viewRot.w); s += "\n";
+        // OVERLAYS POR TIPO (submenu Overlays > Objects): el lector ya los entendia pero no se escribian, asi
+        // que apagar el overlay del esqueleto (o de las luces...) se perdia al guardar. Solo si difieren del
+        // default del viewport: un layout comun sale igual que antes.
+        struct { const char* k; bool v, def; } ov[] = {
+            { "showArmature", v3->showArmature, true }, { "showLights", v3->showLights, true },
+            { "showCamera", v3->showCamera, true }, { "showEmpty", v3->showEmpty, true },
+            { "showParticulas", v3->showParticulas, false }, { "showCurvas", v3->showCurvas, true },
+            { "ShowRelantionshipsLines", v3->ShowRelantionshipsLines, true } };
+        for (size_t k = 0; k < sizeof(ov) / sizeof(ov[0]); k++)
+            if (ov[k].v != ov[k].def) { JSang(s, ind + 1); s += ov[k].k; s += ": "; s += ov[k].v ? "true" : "false"; s += "\n"; }
         JSang(s, ind); s += "}\n";
         return;
     }
@@ -938,8 +948,52 @@ static void EscribirSesion(std::string& s) {
 //  En un rig importado (FBX/glTF) se escriben rest + bind/cluster para reconstruir el FK/skinning
 //  (PrepararSkin al abrir) sin depender del archivo original.
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+//  CAPAS DEL MIX (W3dCapaAnim): la misma forma para las capas de un armature ("capas") y las de escena
+//  ("mix".escenas). Solo se escriben los campos que difieren del default; el orden de la lista es el de la mezcla.
+// ---------------------------------------------------------------------------
+static void EscribirCapas(std::string& s, const std::vector<W3dCapaAnim>& capas, int ind) {
+    s += "[\n";
+    for (size_t k = 0; k < capas.size(); k++) {
+        const W3dCapaAnim& c = capas[k];
+        JSang(s, ind + 1); s += "{ \"anim\": "; JEsc(s, c.anim);
+        if (c.influencia != 100.0f) { s += ", \"influencia\": "; JNum(s, c.influencia); }
+        if (c.modo != 0) { s += ", \"modo\": "; s += (c.modo == 1) ? "\"sumar\"" : "\"restar\""; }
+        if (!c.visible) s += ", \"visible\": false";
+        if (!c.hueso.empty()) { s += ", \"hueso\": "; JEsc(s, c.hueso); }
+        if (c.desde != 0.0f) { s += ", \"desde\": "; JNum(s, c.desde); }
+        if (c.vel != 1.0f)   { s += ", \"vel\": ";   JNum(s, c.vel); }
+        if (!c.loop) s += ", \"loop\": false";
+        s += " }";
+        if (k + 1 < capas.size()) s += ",";
+        s += "\n";
+    }
+    JSang(s, ind); s += "]";
+}
+
+// el bloque raiz "mix": el modo Mix del timeline, su rango y las capas de escena. Ausente = sin mix.
+// el rango PROPIO del render (tarjeta Render, Properties.cpp). Ausente = el del timeline.
+static void EscribirRender(std::string& s) {
+    extern float g_renderIni, g_renderFin, g_renderFps;
+    if (g_renderIni <= 0.0f && g_renderFin <= 0.0f && g_renderFps <= 0.0f) return;
+    s += "  \"render\": { \"inicio\": "; JNum(s, g_renderIni); s += ", \"fin\": "; JNum(s, g_renderFin);
+    s += ", \"fps\": "; JNum(s, g_renderFps); s += " },\n";
+}
+
+static void EscribirMix(std::string& s) {
+    if (!g_animMix && g_mixEscenas.empty() && g_mixInicio == 1.0f && g_mixFin == 250.0f) return;
+    s += "  \"mix\": {\n";
+    s += "    \"activo\": "; s += g_animMix ? "true" : "false"; s += ",\n";
+    s += "    \"inicio\": "; JNum(s, g_mixInicio); s += ", \"fin\": "; JNum(s, g_mixFin);
+    if (!g_mixEscenas.empty()) { s += ",\n    \"escenas\": "; EscribirCapas(s, g_mixEscenas, 2); }
+    s += "\n  },\n";
+}
+
 static void EscribirArmature(std::string& s, Armature* a, int ind) {
     if (a->skinAutorado) { s += ",\n"; JSang(s, ind); s += "\"autorado\": true"; }
+    // rig glTF (FK estandar Y-up, skinMatrix = world * inverseBindMatrix): sin este flag, al reabrir caia
+    // por el camino FBX (NodeToYup) -> huesos acostados 90 grados y skinning roto
+    if (a->skinGltf && !a->skinAutorado) { s += ",\n"; JSang(s, ind); s += "\"gltf\": true"; }
     if (a->animActiva >= 0) { s += ",\n"; JSang(s, ind); s += "\"animActiva\": "; JNum(s, (float)a->animActiva); }
     s += ",\n"; JSang(s, ind); s += "\"bones\": [\n";
     for (size_t i = 0; i < a->bones.size(); i++) {
@@ -961,12 +1015,14 @@ static void EscribirArmature(std::string& s, Armature* a, int ind) {
             s += ", \"rotOrder\": "; JNum(s, (float)b.rotOrder);
             s += ", \"bind\": "; JMat(s, b.bind);
             s += ", \"cluster\": "; JMat(s, b.clusterTransform);
+            if (a->skinGltf) { s += ", \"invBind\": "; JMat(s, b.skinInvBind); } // la inverseBindMatrix del glTF
         }
         s += " }";
         if (i + 1 < a->bones.size()) s += ",";
         s += "\n";
     }
     JSang(s, ind); s += "]";
+    if (!a->capas.empty()) { s += ",\n"; JSang(s, ind); s += "\"capas\": "; EscribirCapas(s, a->capas, ind); }
     if (!a->animations.empty()) {
         s += ",\n"; JSang(s, ind); s += "\"anims\": [\n";
         for (size_t i = 0; i < a->animations.size(); i++) {
@@ -1234,6 +1290,7 @@ static const char* TipoConsStr(int t) {
         case W3dConstraintTipo::CopyLocation: return "copyLocation";
         case W3dConstraintTipo::CopyRotation: return "copyRotation";
         case W3dConstraintTipo::Billboard:    return "billboard";
+        case W3dConstraintTipo::ChildOf:      return "childOf";
     }
     return NULL;   // un tipo nuevo se agrega aca y en el lector (TipoConsInt)
 }
@@ -1276,7 +1333,15 @@ static void EscribirConstraints(std::string& s, Object* o, int ind) {
             s += ", \"ejes\": [";
             s += c->ejeX ? "true" : "false"; s += ", ";
             s += c->ejeY ? "true" : "false"; s += ", ";
-            s += c->ejeZ ? "true" : "false"; s += "]";
+            s += c->ejeZ ? "true" : "false"; s += "]";}
+        if (c->tipo == W3dConstraintTipo::ChildOf) {
+            // el hueso (si la fuente es un armature), que se hereda (loc/rot/escala) y la inversa
+            if (!c->hueso.empty()) { s += ", \"hueso\": "; JEsc(s, c->hueso); }
+            s += ", \"hereda\": [";
+            s += c->coLoc ? "true" : "false"; s += ", ";
+            s += c->coRot ? "true" : "false"; s += ", ";
+            s += c->coEsc ? "true" : "false"; s += "]";
+            s += ", \"inversa\": "; JMat(s, c->inversa);
         }
         s += " }";
     }
@@ -1683,6 +1748,43 @@ static void EscribirObjeto(std::string& s, Object* o, int ind, CtxGuardar* cx, b
             s += ",\n"; JSang(s, ind + 1); s += "\"uvRect\": [";
             for (int k = 0; k < 4; k++) { if (k) s += ", "; JNum(s, pt->uvRect[k]); }
             s += "]";
+        }
+        // LO AVANZADO: cada campo solo si difiere del default (un emisor comun sale igual que antes)
+        {
+            const char* v3[4] = { "velLocal", "velAzar", "posAzar", "aceleracion" };
+            const float* d3[4] = { pt->velLocal, pt->velAzar, pt->posAzar, pt->aceleracion };
+            for (int q = 0; q < 4; q++) {
+                if (d3[q][0] == 0.0f && d3[q][1] == 0.0f && d3[q][2] == 0.0f) continue;
+                s += ",\n"; JSang(s, ind + 1); s += "\""; s += v3[q]; s += "\": [";
+                JNum(s, d3[q][0]); s += ", "; JNum(s, d3[q][1]); s += ", "; JNum(s, d3[q][2]); s += "]";
+            }
+            struct { const char* k; float v, def; } fl[] = {
+                { "arrastre", pt->arrastre, 1.0f }, { "crecimiento", pt->crecimiento, 0.0f },
+                { "frenoCrecimiento", pt->frenoCrecimiento, 1.0f }, { "alphaDecae", pt->alphaDecae, 1.0f },
+                { "alphaMuerte", pt->alphaMuerte, 0.0f }, { "rotInicial", pt->rotInicial, 0.0f },
+                { "rotAzar", pt->rotAzar, 0.0f }, { "velRotAzar", pt->velRotAzar, 0.0f },
+                { "flipFps", pt->flipFps, 0.0f } };
+            for (size_t q = 0; q < sizeof(fl) / sizeof(fl[0]); q++) {
+                if (fl[q].v == fl[q].def) continue;
+                s += ",\n"; JSang(s, ind + 1); s += "\""; s += fl[q].k; s += "\": "; JNum(s, fl[q].v);
+            }
+            if (!pt->giroSignoAzar) { s += ",\n"; JSang(s, ind + 1); s += "\"giroSignoAzar\": false"; }
+            if (pt->flipUnaVez)     { s += ",\n"; JSang(s, ind + 1); s += "\"flipUnaVez\": true"; }
+            if (pt->usarColorFinal) {
+                s += ",\n"; JSang(s, ind + 1); s += "\"colorFinal\": [";
+                for (int k = 0; k < 4; k++) { if (k) s += ", "; JNum(s, pt->colorFinal[k]); }
+                s += "]";
+            }
+            if (pt->forma != w3dEngine::FormaBillboard) {
+                s += ",\n"; JSang(s, ind + 1); s += "\"forma\": ";
+                s += (pt->forma == w3dEngine::FormaEstirada) ? "\"estirada\"" : "\"linea\"";
+                if (pt->forma == w3dEngine::FormaEstirada) { s += ", \"estiramiento\": "; JNum(s, pt->estiramiento); }
+                else {
+                    s += ", \"estelaPuntos\": "; JNum(s, (float)pt->estelaPuntos);
+                    s += ", \"estelaPaso\": ";   JNum(s, pt->estelaPaso);
+                    s += ", \"grosorLinea\": ";  JNum(s, pt->grosorLinea);
+                }
+            }
         }
     }
     // (aca vivia la rama del objeto Constraint VIEJO. Se dio de baja: un constraint es
@@ -2288,6 +2390,8 @@ bool GuardarW3D(const std::string& ruta) {
     EscribirMateriales(s, &cx);
     // SESION: donde estaba trabajando el usuario EN ESTE proyecto. Va DESPUES de la escena
     // porque nombra objetos (ver el comentario grande de EscribirSesion).
+    EscribirRender(s);
+    EscribirMix(s);
     EscribirSesion(s);
     // LAYOUT: el arbol VIVO (tipos + splits). Los .w3d guardados con el literal
     // "2d" siguen abriendo por el template estandar (ver AplicarLayoutTexto).

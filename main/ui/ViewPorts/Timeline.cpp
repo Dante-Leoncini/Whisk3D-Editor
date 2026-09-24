@@ -1213,6 +1213,8 @@ int Timeline::TickStep() const {
 }
 
 void Timeline::SyncFields(){
+    // MIX: el rango del timeline es SIEMPRE el del mix (tambien al abrir un .w3d que quedo en Mix)
+    if (g_animMix){ StartFrame = (int)g_mixInicio; EndFrame = (int)g_mixFin; }
     // el rango/fps de la animacion activa YA vive en los globales StartFrame/EndFrame/AnimFPS (se cargan al
     // seleccionarla con AnimCargarRangoActivo). Aca solo se refleja en los campos.
     // Start / End: si NO se editan, mostrar el valor; si se editan, el boton es el input (editField)
@@ -1236,7 +1238,8 @@ void Timeline::SyncFields(){
     // icono esqueleto = clip de armature. No depende del objeto seleccionado.
     btnAnim->visible = true;
     SkeletalAnimation* c = ClipActivo();
-    if (ActiveAnimKind == 2){ btnAnim->text = "Juego"; btnAnim->icon = (int)IconType::gamepad; }
+    if (g_animMix){ btnAnim->text = "Mix"; btnAnim->icon = (int)IconType::falloff_smoother; }   // capas mezcladas
+    else if (ActiveAnimKind == 2){ btnAnim->text = "Juego"; btnAnim->icon = (int)IconType::gamepad; }
     else if (ActiveAnimKind == 3 && ActiveAnimMesh){
         // vertex anim de una malla: el nombre de la anim activa (via el controlador)
         VertexAnimationActive* va = FindTargetAnim(ActiveAnimMesh);
@@ -3552,7 +3555,12 @@ void Timeline::event_key_down(int tecla, bool repeticion){
         // V: Handle Type. Solo en CURVAS: los handles solo existen ahi.
         if (k==W3dK_V && modo==TL_MODO_CURVAS){ AbrirMenuHandle(lastMx, lastMy); return; }
     }
-    if (k==W3dK_SPACE) { TogglePlay(+1); return; }
+    if (k==W3dK_SPACE) {
+        // jugando (modo Juego en play) el espacio es del juego: no pausa (la pausa es ESC)
+        extern bool SimActiva(); extern bool AnimEsJuego;
+        if (AnimEsJuego && PlayAnimation && SimActiva()) return;
+        TogglePlay(+1); return;
+    }
     if (k==W3dK_LEFT)  { StepFrame(-1); return; }
     if (k==W3dK_RIGHT) { StepFrame(+1); return; }
     if (k==W3dK_UP)    { StepKeyframe(+1); return; }

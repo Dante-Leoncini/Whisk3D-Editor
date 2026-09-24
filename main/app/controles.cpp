@@ -616,15 +616,15 @@ void InputUsuarioSDL3(SDL_Event &e){
         // JUEGO EN PLAY: con el mouse SOBRE el viewport (3D o 2D), el teclado es del
         // juego: el script lo captura y NO dispara atajos del editor (que no rote ni
         // haga nada raro). Fuera del viewport todo se comporta como siempre. La barra
-        // espaciadora sigue pasando: hay que poder pausar. ESC tambien sigue de largo:
-        // es la PAUSA global del juego (ver el bloque "ESC = PAUSA" en KEY_DOWN, abajo).
+        // espaciadora es DEL JUEGO (disparar, saltar...): no pausa. La pausa es ESC, que
+        // sigue de largo: es la PAUSA global del juego (ver el bloque "ESC = PAUSA" en KEY_DOWN).
         { extern bool SimActiva(); extern void SimTeclaSDL(int, bool);
           if (SimActiva() && PlayAnimation) {
             int smx, smy; SDL_GetMouseState(&smx, &smy);
             ViewportBase* vj = FindViewportUnderMouse(rootViewport, smx, smy);
             if (vj && (vj->ViewportKind() == 1 || vj->ViewportKind() == 6)) {
                 SimTeclaSDL(e.key.keysym.sym, down);
-                if (e.key.keysym.sym != SDLK_SPACE && e.key.keysym.sym != SDLK_ESCAPE) return;
+                if (e.key.keysym.sym != SDLK_ESCAPE) return;
             }
           } }
     }
@@ -1240,7 +1240,12 @@ void InputUsuarioSDL3(SDL_Event &e){
         // barra de espacio = play/pausa de la animacion, este donde este el foco (el timeline no tiene por que
         // estar activo para querer ver la animacion correr en el 3D). Si estas tipeando en un campo, el espacio
         // es un espacio.
-        if (e.key.keysym.sym == SDLK_SPACE && !g_textFieldActivo && !PopUpActive && TL_TogglePlay()) {
+        // JUGANDO (modo Juego en play) el espacio es del juego en TODO el editor, no solo sobre el
+        // viewport: pausar con la tecla de disparar cortaba el juego a cada tiro. La pausa es ESC.
+        bool espacioDelJuego = false;
+        { extern bool SimActiva(); extern bool AnimEsJuego;
+          espacioDelJuego = AnimEsJuego && PlayAnimation && SimActiva(); }
+        if (e.key.keysym.sym == SDLK_SPACE && !espacioDelJuego && !g_textFieldActivo && !PopUpActive && TL_TogglePlay()) {
             atajoMenu = true;
         }
         // backspace durante un transform: borra del valor numerico tipeado (los
