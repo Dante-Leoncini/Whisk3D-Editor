@@ -33,17 +33,10 @@
 // ============================================================================
 #include "io/GuardarVersion.h"
 
-#ifdef W3D_SYMBIAN
-// En el build Symbian el guardado de proyecto (GuardarW3D) y el W3dZip del Core
-// no estan en el .mmp todavia: el guardado por versiones queda como stub no-op
-// (el boton de la tarjeta Archivo no existe en esa UI). El .cpp igual se compila
-// (regla del repo: todo .cpp nuevo de main/ entra al Whisk3D.mmp).
-int GuardarVersionSiguienteN() { return 1; }
-std::string GuardarVersionLabel() { return "Guardar version v1"; }
-bool GuardarVersionEjecutar() { return false; }
-void GuardarVersionColectarDe(const std::string&, const std::string&,
-                              const std::string&, std::set<std::string>*) {}
-#else
+// (El stub W3D_SYMBIAN que vivia aca ya no hace falta: GuardarW3D.cpp y el W3dZip del
+//  Core SI estan en el Whisk3D.mmp, asi que el guardado por versiones compila entero
+//  tambien en el N95 -- el boton "Guardar version" de la tarjeta Archivo ahora hace
+//  lo mismo que en PC. Todo el camino es C++03 + fopen/mkdir de Open C.)
 
 #include "io/GuardarW3D.h"            // GuardarW3D (el guardado normal) + g_proyIcono
 #include "io/JsonW3d.h"               // parser JSON minimo (colectar referencias)
@@ -285,5 +278,3 @@ bool GuardarVersionEjecutar() {
     }
     return true;
 }
-
-#endif // !W3D_SYMBIAN

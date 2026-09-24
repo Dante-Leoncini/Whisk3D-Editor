@@ -634,7 +634,9 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 				}
 				// 3D con FOCO DE TRANSPORTE (Stop/Play): la flecha NO orbita, cae al dispatch del panel (linea 618)
 				// para navegar Stop<->Play, igual que el Timeline con foco suelta las flechas. De ahi el && !W3dLayoutFocoTransporte().
-				if (gGreenHeld || (W3dLayout3DActivo() && !W3dLayoutFocoTransporte()) || mouseVisible || W3dLayoutUVActivo() || W3dLayoutTimelineActivo() || W3dLayoutConsolaActivo()){ // 3D=orbita, UV/timeline=paneo/scrub, mouse=cursor, consola=scroll
+				// UV con foco en "Edit" (W3dLayoutFocoUVEditar): la flecha NO panea, cae al dispatch del panel
+				// para seguir navegando la barra (mismo esquema que el foco de transporte del 3D).
+				if (gGreenHeld || (W3dLayout3DActivo() && !W3dLayoutFocoTransporte()) || mouseVisible || (W3dLayoutUVActivo() && !W3dLayoutFocoUVEditar()) || W3dLayoutTimelineActivo() || W3dLayoutConsolaActivo()){ // 3D=orbita, UV/timeline=paneo/scrub, mouse=cursor, consola=scroll
 					if (gGreenHeld) gGreenUsado = ETrue; // verde+flecha = resize (no ciclar)
 					if (sc == EStdKeyLeftArrow)       gHeldLeft = ETrue;
 					else if (sc == EStdKeyRightArrow) gHeldRight = ETrue;
@@ -1119,13 +1121,17 @@ int CWhisk3DContainer::DrawCallBack( TAny* aInstance )
     // esta quieta, el frame se saltea ENTERO (sin GL ni swap/vsync) -> CPU y bateria
     // casi 0. El timer sigue tickeando, pero sin trabajo de GPU.
     if (g_redraw || HayAnimacionActiva()) {
+        // CAPTURAR y apagar g_redraw ANTES de dibujar (mismo orden que PC main.cpp): lo que se prenda
+        // DURANTE el render vale para el frame SIGUIENTE. Apagarlo despues PISABA esos pedidos: el ray
+        // tracer progresivo (RTViewportPaso prende g_redraw para seguir avanzando) quedaba congelado
+        // hasta la proxima tecla -> "solo renderiza cuando aprieto flechas".
+        g_redraw = false;
         // arbol de viewports (3D confinado a su rectangulo + props) y el cursor encima
         W3dLayoutRender();
         instance->iWhisk3D->DrawMouseCursor();
 
         // Call eglSwapBuffers, which blit the graphics to the window
         eglSwapBuffers( instance->iEglDisplay, instance->iEglSurface );
-        g_redraw = false; // ya dibujamos; esperar al proximo cambio
     }
 
     // To keep the background light on

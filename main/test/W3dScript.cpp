@@ -4341,9 +4341,9 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
                 if (tris) for (size_t i = 0; i < tris->lista.size(); i++) {
                     std::vector<int> l;
                     JVal* sec = tris->lista[i];
-                    if (sec && sec->tipo == 5)
-                        for (size_t k = 0; k < sec->lista.size(); k++)
-                            if (sec->lista[k] && sec->lista[k]->tipo == 1) { int t = (int)sec->lista[k]->num; l.push_back(t); if (t > maxTri) maxTri = t; }
+                    if (sec && sec->tipo == 5)   // filas compactas (JVal::nums)
+                        for (size_t k = 0; k < JFilaLen(sec); k++)
+                            if (JFilaEsNum(sec, k)) { int t = (int)JFilaNum(sec, k, 0); l.push_back(t); if (t > maxTri) maxTri = t; }
                     lj.push_back(l);
                 }
             }

@@ -697,6 +697,7 @@ static const W3dLangEntrada W3dLangTabla[] = {
     { "edge of a face", "arista de una cara", "aresta de uma face" },
     { "face", "cara", "face" },
     { "islands", "islas", "ilhas" },
+    { "preview", "vista previa", "prévia" },
     { "projection", "proyección", "projeção" },
     { "select a mesh object first", "elegí primero un objeto malla", "escolha primeiro um objeto malha" },
     { "soon", "pronto", "em breve" },

@@ -590,8 +590,12 @@ void ViewportBase::RenderBar(){
     // viewport (verde) el 3D SUELTE el foco -> al volver las flechas orbitan de nuevo (no quedan pegadas en
     // Stop/Play) y un 3D no-activo (multi-vista PC) no retiene un indice stale.
     bool retieneTransporte = (this == viewPortActive) && LayoutFocoEnTransporte(this);
+    // el UV retiene el foco sobre "Edit" (accion directa sin menu, como el transporte): sin esto el
+    // foco se borraba cada frame y el OK no encontraba a quien activar (keypad del N95)
+    extern bool LayoutFocoEnUVEditar(ViewportBase*);
+    bool retieneUVEditar = (this == viewPortActive) && LayoutFocoEnUVEditar(this);
     if (!LayoutMenuAbierto() && ViewportKind() != 5 && ViewportKind() != 6 && ViewportKind() != 8
-        && !retieneTransporte) barFocusIndex = -1;
+        && !retieneTransporte && !retieneUVEditar) barFocusIndex = -1;
     ActualizarBarra(); // layout + auto-scroll + sx/sy frescos
     int barH = BarHeight();
     int yBar = barAbajo ? height - barH : 0;

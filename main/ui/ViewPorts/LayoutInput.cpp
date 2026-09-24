@@ -2797,6 +2797,17 @@ bool LayoutFocoEnTransporte(ViewportBase* vp) {
     return (fi >= 0 && fi < (int)B.size() && B[fi]->visible && EsBotonTransporte(B[fi]));
 }
 
+// true si 'vp' es el editor UV con el foco de barra sobre "Edit" (BRUV_Editar): accion DIRECTA sin
+// desplegable, mismo esquema que el transporte Stop/Play del 3D. Lo consultan RenderBar (retener el
+// foco por-frame), el bloque kind 4 de LayoutTeclaPanelActivo (OK activa / izq-der siguen / C suelta)
+// y el container Symbian via W3dLayoutFocoUVEditar (soltar las flechas al panel en vez de panear).
+bool LayoutFocoEnUVEditar(ViewportBase* vp) {
+    if (!vp || !vp->isLeaf() || vp->ViewportKind() != 4) return false;
+    int fi = vp->barFocusIndex;
+    std::vector<Button*>& B = vp->BarButtons;
+    return (fi > 0 && fi < (int)B.size() && B[fi]->visible && B[fi]->rol == BRUV_Editar);
+}
+
 static bool LayoutTransporteBarra3D(ViewportBase* vp, int mx, int my) {
     if (!vp || !vp->isLeaf() || vp->ViewportKind() != 1) return false;
     std::vector<Button*>& B = vp->BarButtons;
@@ -3041,10 +3052,12 @@ static void LayoutCambiarMenuBarraUV(int dir) {
     std::vector<Button*>& B = uv->BarButtons;
     if (B.size() < 2) return;
     const int maxIdx = (int)B.size() - 1;
-    // menu abierto -> ROL del boton que lo abre -> indice ACTUAL de ese boton
+    // menu abierto -> ROL del boton que lo abre -> indice ACTUAL de ese boton. Guarda LayoutMenuAbierto():
+    // Cerrar() NO nulea MenuAbierto, y tras aterrizar en "Edit" (que cierra el menu) el puntero queda stale
+    // -> sin la guarda, la nav recalculaba idx desde el menu viejo y oscilaba (mismo bug que el Stop/Play del 3D).
     int idx = -1;
-    if      (MenuAbierto == gMenuTipo)      idx = 0;
-    else {
+    if      (LayoutMenuAbierto() && MenuAbierto == gMenuTipo) idx = 0;
+    else if (LayoutMenuAbierto()) {
         int rol = -1;
         if      (MenuAbierto == gMenuUVModo)    rol = BRUV_Modo;
         else if (MenuAbierto == gMenuUVAdd)     rol = BRUV_Add;
@@ -3060,6 +3073,8 @@ static void LayoutCambiarMenuBarraUV(int dir) {
         else if (MenuAbierto == gMenuUVAnim)    rol = BRUV_Animation;
         if (rol >= 0) idx = BarRolIdx(B, rol);
     }
+    // SIN menu abierto pero CON foco (el boton "Edit", accion directa): ciclar DESDE el foco actual
+    if (idx < 0 && LayoutFocoEnUVEditar(uv) && uv == viewPortActive) idx = uv->barFocusIndex;
     if (idx < 0) return;
     for (int k = 0; k <= maxIdx; k++) {       // avanza saltando los ocultos ([0] siempre navegable)
         idx += dir;
@@ -3083,6 +3098,12 @@ static void LayoutCambiarMenuBarraUV(int dir) {
         case BRUV_Snap:      LayoutAbrirMenuUVSnap(uv, mx, my);    break;
         case BRUV_Texture:   LayoutAbrirMenuUVTex(uv, mx, my);     break;
         case BRUV_Mipmap:    LayoutAbrirMenuUVMip(uv, mx, my);     break;
+        // "Edit" es ACCION DIRECTA (sin desplegable), como Stop/Play del 3D: al aterrizar se cierra el
+        // menu que estuviera abierto y queda SOLO el foco -> OK la dispara (bloque kind 4 del dispatch).
+        // Antes NO tenia case: la nav moria aca (nada se abria y el proximo izq/der arrancaba del menu
+        // stale) -> "editar" y "guardar" eran INALCANZABLES con el keypad del N95.
+        case BRUV_Editar:    if (MenuAbierto) MenuAbierto->Cerrar(); g_redraw = true; break;
+        case BRUV_Guardar:   LayoutAbrirMenuUVGuardar(uv, mx, my);  break;
         case BRUV_Animation: LayoutAbrirMenuUVAnim(uv, mx, my);    break;
     }
 }
@@ -4943,6 +4964,17 @@ bool LayoutTeclaPanelActivo(int tecla) {
     }
     if (viewPortActive->ViewportKind() == 4) { // UV editor: las flechas PANEAN la vista
         UVEditor* uv = (UVEditor*)viewPortActive;
+        // FOCO en el boton "Edit" de la barra (accion directa, sin menu; ver LayoutCambiarMenuBarraUV):
+        // OK entra/sale de la pintura de textura, izq/der siguen navegando la barra, C suelta el foco.
+        if (LayoutFocoEnUVEditar(uv) && !LayoutMenuAbierto()) {
+            switch (tecla) {
+                case LayoutKey::Enter:  UVToggleEditarTextura(uv); uv->barFocusIndex = -1; g_redraw = true; return true;
+                case LayoutKey::Cancel: uv->barFocusIndex = -1; g_redraw = true; return true;
+                case LayoutKey::Left:   LayoutCambiarMenuBarraUV(-1); return true;
+                case LayoutKey::Right:  LayoutCambiarMenuBarraUV(+1); return true;
+            }
+            return false;
+        }
         const float pp = (float)GlobalScale * 16.0f;
         switch (tecla) {
             case LayoutKey::Left:  uv->Panear(+pp, 0); return true;

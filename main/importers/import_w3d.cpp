@@ -1649,15 +1649,16 @@ static bool CargarCurvaJson(JVal* cj, AnimProperty& ap) {
         w3dLogfW("[W3D] una curva declara %d keyframes: se cargan los primeros 1000000", (int)nKeys);
         nKeys = 1000000;
     }
+    // las filas [frame,value,...] vienen COMPACTAS del parser (JVal::nums): se leen con JFila*
     if (ks) for (size_t i = 0; i < nKeys; i++) {
-        JVal* row = ks->lista[i]; if (!row || row->tipo != 5 || row->lista.size() < 3) continue;
+        JVal* row = ks->lista[i]; if (!row || row->tipo != 5 || JFilaLen(row) < 3) continue;
         keyFrame kf;
-        kf.frame = (int)row->lista[0]->num; kf.value = (float)row->lista[1]->num;
-        kf.Interpolation = (int)row->lista[2]->num;
-        if (row->lista.size() >= 8) {
-            kf.handleType = (int)row->lista[3]->num;
-            kf.inDF = (float)row->lista[4]->num; kf.inDV = (float)row->lista[5]->num;
-            kf.outDF = (float)row->lista[6]->num; kf.outDV = (float)row->lista[7]->num;
+        kf.frame = (int)JFilaNum(row, 0, 0); kf.value = JFilaNum(row, 1, 0);
+        kf.Interpolation = (int)JFilaNum(row, 2, 0);
+        if (JFilaLen(row) >= 8) {
+            kf.handleType = (int)JFilaNum(row, 3, 0);
+            kf.inDF = JFilaNum(row, 4, 0); kf.inDV = JFilaNum(row, 5, 0);
+            kf.outDF = JFilaNum(row, 6, 0); kf.outDV = JFilaNum(row, 7, 0);
         }
         ap.keyframes.push_back(kf);
     }
@@ -1923,14 +1924,14 @@ static void CargarCornersEnUVGroup(JVal* cor, Mesh* mesh, UVGroup* ug) {
     std::vector<char> yaPuesto((size_t)mesh->vertexSize, 0); // sin entradas duplicadas al mismo render-vert
     int sinMatch = 0, filasV1 = 0, repetidas = 0;
     for (size_t k = 0; k < cor->lista.size(); k++) {
-        JVal* row = cor->lista[k]; if (!row || row->tipo != 5 || row->lista.size() < 6) continue;
-        const bool conNormal = (row->lista.size() >= 9);
+        JVal* row = cor->lista[k]; if (!row || row->tipo != 5 || JFilaLen(row) < 6) continue;   // filas compactas (JVal::nums)
+        const bool conNormal = (JFilaLen(row) >= 9);
         if (!conNormal) filasV1++;
-        float x = (float)row->lista[0]->num, y = (float)row->lista[1]->num, z = (float)row->lista[2]->num;
-        float u = (float)row->lista[3]->num, v = (float)row->lista[4]->num;
+        float x = JFilaNum(row, 0, 0), y = JFilaNum(row, 1, 0), z = JFilaNum(row, 2, 0);
+        float u = JFilaNum(row, 3, 0), v = JFilaNum(row, 4, 0);
         float nx = 0.0f, ny = 0.0f, nz = 0.0f;
-        if (conNormal) { nx = (float)row->lista[5]->num; ny = (float)row->lista[6]->num; nz = (float)row->lista[7]->num; }
-        float w = (float)row->lista[conNormal ? 8 : 5]->num;
+        if (conNormal) { nx = JFilaNum(row, 5, 0); ny = JFilaNum(row, 6, 0); nz = JFilaNum(row, 7, 0); }
+        float w = JFilaNum(row, conNormal ? 8 : 5, 0);
         // pasada 1: la mejor distancia. pasada 2: todos los que empatan con ella.
         float mejorD = 1e-4f; bool hay = false;
         for (int pasada = 0; pasada < 2; pasada++) {
@@ -2012,9 +2013,9 @@ static void CargarRigMesh(JVal* j, Mesh* mesh) {
             VertexGroup* vg = new VertexGroup(JS(e, "nombre", "Group"));
             JVal* pts = JHijo(e, "puntos", 5);
             if (pts) for (size_t k = 0; k < pts->lista.size(); k++) {
-                JVal* row = pts->lista[k]; if (!row || row->tipo != 5 || row->lista.size() < 4) continue;
-                float x = (float)row->lista[0]->num, y = (float)row->lista[1]->num, z = (float)row->lista[2]->num;
-                float w = (float)row->lista[3]->num;
+                JVal* row = pts->lista[k]; if (!row || row->tipo != 5 || JFilaLen(row) < 4) continue;   // filas compactas
+                float x = JFilaNum(row, 0, 0), y = JFilaNum(row, 1, 0), z = JFilaNum(row, 2, 0);
+                float w = JFilaNum(row, 3, 0);
                 int mejor = -1; float mejorD = 1e-4f; // tolerancia (los GLB guardan float32 exacto)
                 for (int cp = 0; cp < nCP; cp++) {
                     if (!tiene[cp]) continue;
@@ -2272,17 +2273,18 @@ static bool RetopologizarDesdeTopologia(JVal* j, Mesh* m) {
     }
 
     // ---- pasada 0: validar las filas + contar triangulos + mayor indice ----
+    // (las caras vienen COMPACTAS del parser -- JVal::nums -- y se leen con JFila*)
     int maxIdx = -1; size_t totTri = 0;
     for (size_t i = 0; i < caras->lista.size(); i++) {
         JVal* c = caras->lista[i];
-        if (!c || c->tipo != 5 || c->lista.size() < 3) {
+        if (!c || c->tipo != 5 || JFilaLen(c) < 3) {
             w3dLogfW("[W3D] '%s': 'topologia' con una cara de menos de 3 corners -> se ignora el bloque (la malla queda triangulada)", nom);
             return false;
         }
-        totTri += c->lista.size() - 2;
-        for (size_t k = 0; k < c->lista.size(); k++) {
-            if (!c->lista[k] || c->lista[k]->tipo != 1) { w3dLogfW("[W3D] '%s': 'topologia' con un indice no numerico -> se ignora el bloque", nom); return false; }
-            int v = (int)c->lista[k]->num;
+        totTri += JFilaLen(c) - 2;
+        for (size_t k = 0; k < JFilaLen(c); k++) {
+            if (!JFilaEsNum(c, k)) { w3dLogfW("[W3D] '%s': 'topologia' con un indice no numerico -> se ignora el bloque", nom); return false; }
+            int v = (int)JFilaNum(c, k, -1);
             if (v < 0) { w3dLogfW("[W3D] '%s': 'topologia' con un indice negativo -> se ignora el bloque", nom); return false; }
             if (v > maxIdx) maxIdx = v;
         }
@@ -2315,7 +2317,7 @@ static bool RetopologizarDesdeTopologia(JVal* j, Mesh* m) {
     size_t t = 0;
     for (size_t i = 0; i < caras->lista.size(); i++) {
         JVal* c = caras->lista[i];
-        const int n = (int)c->lista.size(), nTri = n - 2;
+        const int n = (int)JFilaLen(c), nTri = n - 2;
         const MeshFace& T0 = m->faces3d[t];
         if (T0.idx.size() != 3) { w3dLogfW("[W3D] '%s': el GLB no vino triangulado -> se ignora 'topologia'", nom); return false; }
         std::vector<int> rv((size_t)n, -1);
@@ -2334,7 +2336,7 @@ static bool RetopologizarDesdeTopologia(JVal* j, Mesh* m) {
         MeshFace mf; mf.mat = T0.mat; mf.smooth = -1;
         mf.idx.resize((size_t)n);
         for (int q = 0; q < n; q++) {
-            int g = (int)c->lista[(size_t)q]->num;
+            int g = (int)JFilaNum(c, (size_t)q, 0);
             if (glbARender[(size_t)g] < 0) glbARender[(size_t)g] = rv[(size_t)q];
             else if (!MismoRenderVert(m, glbARender[(size_t)g], rv[(size_t)q])) {
                 w3dLogfW("[W3D] '%s': el vertice %d de 'topologia' cae en dos render-verts distintos -> la malla queda triangulada", nom, g);
@@ -2350,9 +2352,9 @@ static bool RetopologizarDesdeTopologia(JVal* j, Mesh* m) {
     // shading POR CARA (sparse): [indiceDeCara, 0=flat|1=smooth]
     JVal* shade = JHijo(topo, "shade", 5);
     if (shade) for (size_t k = 0; k < shade->lista.size(); k++) {
-        JVal* p = shade->lista[k]; if (!p || p->tipo != 5 || p->lista.size() < 2) continue;
-        int fi = (int)p->lista[0]->num;
-        if (fi >= 0 && fi < (int)nuevas.size()) nuevas[(size_t)fi].smooth = ((int)p->lista[1]->num) ? 1 : 0;
+        JVal* p = shade->lista[k]; if (!p || p->tipo != 5 || JFilaLen(p) < 2) continue;   // pares compactos
+        int fi = (int)JFilaNum(p, 0, -1);
+        if (fi >= 0 && fi < (int)nuevas.size()) nuevas[(size_t)fi].smooth = ((int)JFilaNum(p, 1, 0)) ? 1 : 0;
     }
 
     // ---- pasada 2: rehacer los arrays EN EL ORDEN DEL GLB (= el orden que tenian al guardar) ----

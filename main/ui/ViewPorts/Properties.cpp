@@ -6519,9 +6519,13 @@ void Properties::ConstruirGrupos(){
     propRender->properties.push_back(propRenderPath);
     propRenderOutput = new PropText("Nombre", "render.png");
     propRender->properties.push_back(propRenderOutput);
-    // resolucion editable (default 640x480). Puede ser MAYOR que la ventana: se rinde por tiles.
-    renderW = 640.0f; renderH = 480.0f;
-    g_renderAspect = renderW / renderH; // arranca con el aspecto por defecto (4:3)
+    // resolucion editable. Puede ser MAYOR que la ventana: se rinde por tiles.
+#ifdef W3D_SYMBIAN
+    renderW = 320.0f; renderH = 240.0f;   // el N95 rinde a 240p por defecto (su pantalla; el ray tracing a mas ya no es "esperable")
+#else
+    renderW = 1280.0f; renderH = 720.0f;  // 720p por defecto en PC/Android/Web
+#endif
+    g_renderAspect = renderW / renderH; // arranca con el aspecto por defecto
     propRenderW = new PropFloat(T("Width"));
     propRenderW->SetRango(1.0f, 8192.0f); propRenderW->entero = true;
     propRenderW->stepFino = 1.0f; propRenderW->stepGrueso = 16.0f; propRenderW->dragStep = 1.0f;

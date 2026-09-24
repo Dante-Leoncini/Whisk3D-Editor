@@ -422,6 +422,10 @@ static inline RTV DirAzarEsfera(RTRng& rng) {   // punto uniforme sobre la esfer
     const float r = sqrtf(rr), a = 6.2831853f * rng.F();
     return V3(r * cosf(a), r * sinf(a), z);
 }
+// en la VISTA PREVIA (escalera de resolucion) cada luz tira UN solo rayo de sombra: las penumbras
+// (rtRayos > 1) recien se muestrean en los pases a resolucion completa. En el N95 esto mantiene el
+// primer pantallazo en ~1 rayo por bloque aunque haya lamparas de area.
+static bool g_rtPreviewRapida = false;
 // luz directa en el impacto (difuso: color x (ambiente + suma de luces visibles) + emision). 'alb' ya trae la textura.
 static void LuzEn(const RTEscena& e, const RTV& p, const RTV& n, const RTV& haciaCam, const float* alb, const RTMaterial& m, RTRng& rng, float* out) {
     if (m.sinLuz) { out[0] = alb[0]; out[1] = alb[1]; out[2] = alb[2]; return; }   // "unlit": el color tal cual
@@ -438,7 +442,8 @@ static void LuzEn(const RTEscena& e, const RTV& p, const RTV& n, const RTV& haci
         const RTLuz& L = e.luces[i];
         luz[0] += L.ambiente[0]; luz[1] += L.ambiente[1]; luz[2] += L.ambiente[2];
         float lambert = 0.0f, spec = 0.0f, att = 1.0f;
-        for (int r = 0; r < L.rayos; r++) {
+        const int nRayos = g_rtPreviewRapida ? 1 : L.rayos;
+        for (int r = 0; r < nRayos; r++) {
             RTV ldir; float dist;
             if (L.direccional) {
                 ldir = L.dir;
@@ -461,7 +466,7 @@ static void LuzEn(const RTEscena& e, const RTV& p, const RTV& n, const RTV& haci
             }
         }
         if (lambert <= 0.0f && spec <= 0.0f) continue;
-        lambert /= (float)L.rayos; spec /= (float)L.rayos;
+        lambert /= (float)nRayos; spec /= (float)nRayos;
         if (!L.direccional) { const float dd = Largo(L.pos - po); att = 1.0f / (L.attC + L.attL * dd + L.attQ * dd * dd); if (att > 1.0f) att = 1.0f; }
         for (int c = 0; c < 3; c++) { luz[c] += L.color[c] * lambert * att; brillo[c] += L.color[c] * spec * att; }
     }
@@ -536,24 +541,53 @@ static void Radiancia(const RTEscena& e, const RTV& o0, const RTV& d, RTRng& rng
 //  el render progresivo: acumulador + tiles
 // ---------------------------------------------------------------------------
 static const int kTile = 32;
+// VISTA PREVIA progresiva por resolucion: antes del primer pase a resolucion completa se hacen
+// pasadas rapidas con 1 rayo por BLOQUE de s x s pixeles (s = 6, 4, 2). En un viewport de 240p
+// equivalen a ~40p, ~60p y ~120p: la imagen entera aparece enseguida (clave en el N95: ~1/36,
+// 1/16 y 1/4 del costo) y se va afinando; recien despues arranca la acumulacion real de samples.
+static const int kPrevPasos[3] = { 6, 4, 2 };
+static const int kPrevNiveles = 3;   // nivel 0..2 = preview; kPrevNiveles = resolucion completa
 struct RTRender {
     RTEscena esc; RTCamara cam;
     int w, h, tilesX, tilesY;
     std::vector<float> acum;             // 3 por pixel
     std::vector<unsigned char> img;      // RGBA 8 bits (lo que se muestra / guarda)
-    int paso;                            // pases completos
+    int paso;                            // pases completos (solo los de resolucion completa)
+    int nivel;                           // escalera de preview: 0..2 = bloques de 6/4/2 px; 3 = resolucion completa
     int tileSig;                         // proximo tile del pase en curso
     std::vector<unsigned char> tileSucio; // tiles con pixeles nuevos desde la ultima subida
-    RTRender() : w(0), h(0), tilesX(0), tilesY(0), paso(0), tileSig(0) {}
-    void Iniciar(Viewport3D* vp, int W, int H) {
+    RTRender() : w(0), h(0), tilesX(0), tilesY(0), paso(0), nivel(kPrevNiveles), tileSig(0) {}
+    void Iniciar(Viewport3D* vp, int W, int H, bool conPreview) {
         w = W; h = H; tilesX = (w + kTile - 1) / kTile; tilesY = (h + kTile - 1) / kTile;
         acum.assign((size_t)w * h * 3, 0.0f); img.assign((size_t)w * h * 4, 255);
         tileSucio.assign((size_t)tilesX * tilesY, 0);
         paso = 0; tileSig = 0;
+        nivel = conPreview ? 0 : kPrevNiveles;   // el render a archivo va directo a resolucion completa
         ArmarEscena(esc); CamaraDe(vp, w, h, cam);
     }
     bool Terminado() const { return paso >= g_rt.pases; }
+    // un tile de PREVIEW: 1 rayo por bloque de s x s (al centro del bloque), pinta el bloque entero.
+    // No toca el acumulador: es solo para que se vea algo enseguida; los pases reales lo pisan.
+    void TilePreview(int ti) {
+        const int tx = (ti % tilesX) * kTile, ty = (ti / tilesX) * kTile;
+        const int x1 = (tx + kTile < w) ? tx + kTile : w, y1 = (ty + kTile < h) ? ty + kTile : h;
+        const int s = kPrevPasos[nivel];
+        for (int y = ty; y < y1; y += s) for (int x = tx; x < x1; x += s) {
+            RTRng rng((unsigned int)(x * 1973 + y * 9277 + 1));
+            RTV o, d; RayoPixel(cam, x + s * 0.5f, y + s * 0.5f, w, h, o, d);
+            float m[3]; Sombrear(esc, o, d, rng, m);
+            unsigned char rgb[3];
+            for (int k = 0; k < 3; k++) { float v = m[k]; if (v < 0) v = 0; if (v > 1) v = 1; rgb[k] = (unsigned char)(v * 255.0f + 0.5f); }
+            const int bx1 = (x + s < x1) ? x + s : x1, by1 = (y + s < y1) ? y + s : y1;
+            for (int yy = y; yy < by1; yy++) {
+                unsigned char* p = &img[((size_t)yy * w + x) * 4];
+                for (int xx = x; xx < bx1; xx++, p += 4) { p[0] = rgb[0]; p[1] = rgb[1]; p[2] = rgb[2]; p[3] = 255; }
+            }
+        }
+        tileSucio[(size_t)ti] = 1;
+    }
     void Tile(int ti) {   // un tile del pase actual: 'samples' muestras por pixel
+        if (nivel < kPrevNiveles) { TilePreview(ti); return; }
         const int tx = (ti % tilesX) * kTile, ty = (ti / tilesX) * kTile;
         const int x1 = (tx + kTile < w) ? tx + kTile : w, y1 = (ty + kTile < h) ? ty + kTile : h;
         const int ns = (g_rt.samples < 1) ? 1 : g_rt.samples;
@@ -579,6 +613,7 @@ struct RTRender {
         if (Terminado()) return false;
         const int total = tilesX * tilesY;
         const double t0 = W3dNowMs();
+        g_rtPreviewRapida = (nivel < kPrevNiveles);   // preview: 1 rayo de sombra por luz (ver LuzEn)
         int hilos = (g_rt.hilos > 0) ? g_rt.hilos : 1;
 #ifdef RT_HILOS
         if (g_rt.hilos <= 0) { hilos = (int)std::thread::hardware_concurrency(); if (hilos < 1) hilos = 1; if (hilos > 16) hilos = 16; }
@@ -602,8 +637,8 @@ struct RTRender {
         } else
 #endif
         {
-            // sin reloj (Symbian: W3dNowMs devuelve 0) el presupuesto no corta -> tope de tiles por llamada, asi la UI
-            // del N95 sigue respondiendo (4 tiles de 32x32 por frame)
+            // en el N95 W3dNowMs es User::NTickCount (~ms): el presupuesto corta bien. El tope de tiles
+            // por llamada queda como red de seguridad por si el reloj no avanza (t0 en 0).
             const bool sinReloj = (t0 <= 0.0);
             int hechos = 0;
             while (tileSig < total) {
@@ -612,7 +647,7 @@ struct RTRender {
                 if (presupuestoMs > 0 && sinReloj && hechos >= 4) break;
             }
         }
-        if (tileSig >= total) { paso++; tileSig = 0; }
+        if (tileSig >= total) { tileSig = 0; if (nivel < kPrevNiveles) nivel++; else paso++; }
         return true;
     }
 };
@@ -662,7 +697,7 @@ void RTViewportPaso(Viewport3D* vp) {
     const double firma = FirmaVista(vp);
     if (!g_rtVp || g_rtVpDe != vp || g_rtVp->w != vp->width || g_rtVp->h != vp->height || firma != g_rtFirma || g_rtForzar) {
         if (!g_rtVp) g_rtVp = new RTRender();
-        g_rtVp->Iniciar(vp, vp->width, vp->height);
+        g_rtVp->Iniciar(vp, vp->width, vp->height, true);   // con la escalera de preview (40p/60p/120p en un viewport de 240p)
         g_rtVpDe = vp; g_rtFirma = firma; g_rtForzar = false;
         // textura de pantalla, potencia de 2 (GLES 1.1 del N95 no tiene NPOT), sin mips
         const int tw = Pot(vp->width), th = Pot(vp->height);
@@ -673,8 +708,16 @@ void RTViewportPaso(Viewport3D* vp) {
             g_rtTexW = tw; g_rtTexH = th;
         }
     }
-    // avanza con un presupuesto por frame: la UI sigue viva y la imagen se completa de a tiles
-    if (!g_rtVp->Terminado()) { g_rtVp->Avanzar(40.0); g_redraw = true; }
+    // avanza con un presupuesto por frame: la UI sigue viva y la imagen se completa de a tiles.
+    // En el N95 el presupuesto es mayor: cada frame ademas paga el render GL de la escena, asi que
+    // con 40ms la mitad del tiempo se iba en dibujar lo que la imagen trazada tapa; con 80ms el
+    // render termina antes y la UI sigue usable (~8 fps mientras traza).
+#ifdef W3D_SYMBIAN
+    const double kPresupuestoMs = 80.0;
+#else
+    const double kPresupuestoMs = 40.0;
+#endif
+    if (!g_rtVp->Terminado()) { g_rtVp->Avanzar(kPresupuestoMs); g_redraw = true; }
     SubirTiles(g_rtVp);
     // el blit: un quad del tamano del viewport, encima de la escena GL (sin z: los overlays 3D siguen usando el z de la escena)
     namespace gfx = w3dEngine;
@@ -700,6 +743,7 @@ void RTRenderEstado(Viewport3D* vp) {
     if (!g_rt.on || !g_rtVp || g_rtVpDe != vp) return;
     char b[96];
     if (g_rtVp->Terminado()) sprintf(b, "%s: %s (%d)", T("Ray Tracing"), T("done"), g_rtVp->paso);
+    else if (g_rtVp->nivel < kPrevNiveles) sprintf(b, "%s: %s %d/%d", T("Ray Tracing"), T("preview"), g_rtVp->nivel + 1, kPrevNiveles);
     else sprintf(b, "%s: %d/%d", T("Ray Tracing"), g_rtVp->paso, g_rt.pases);
     w3dEngine::PushMatrix();
     // una linea debajo del borde superior (la fila 0 del viewport queda tapada por el borde/menu)
@@ -717,7 +761,7 @@ static bool RenderCompleto(Viewport3D* vp, int w, int h, int pases, bool progres
     if (!vp || w <= 0 || h <= 0) return false;
     if (!g_rtOff) g_rtOff = new RTRender();
     const int pasesPrev = g_rt.pases; g_rt.pases = (pases > 0) ? pases : g_rt.pases;
-    g_rtOff->Iniciar(vp, w, h);
+    g_rtOff->Iniciar(vp, w, h, false);   // a archivo: sin preview, directo a resolucion completa
     while (!g_rtOff->Terminado()) {
         g_rtOff->Avanzar(0.0);
         if (progreso) ProgresoActualizar((float)g_rtOff->paso / (float)g_rt.pases);

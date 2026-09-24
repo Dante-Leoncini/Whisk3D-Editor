@@ -54,6 +54,13 @@ struct JVal {
     std::string str;
     std::map<std::string, JVal*> obj;
     std::vector<JVal*> lista;
+    // FILA COMPACTA: una lista de SOLO numeros que es elemento de OTRA lista (un keyframe
+    // [frame,v,i,...], una fila de pesos, una cara de 'topologia') guarda sus numeros ACA y
+    // deja 'lista' vacia: un JVal + un vector en vez de un JVal por numero. Sin esto el
+    // proyecto RE4 (2.5 MB de anims horneadas = ~800 mil nodos) NO ENTRABA en la RAM del
+    // N95. Se leen con JFilaLen/JFilaNum (abajo), que entienden los DOS formatos; las
+    // listas sueltas (pos/color/etc., hijas de un objeto) siguen como siempre.
+    std::vector<float> nums;
     JVal() : tipo(0), num(0), b(false) {}
     ~JVal() {
         for (std::map<std::string, JVal*>::iterator it = obj.begin(); it != obj.end(); ++it)
@@ -121,12 +128,28 @@ struct JParser {
         }
         return v;
     }
+    // una sub-lista de SOLO numeros se COMPACTA a 'nums' (ver JVal): el hijo recien
+    // parseado se convierte en el momento, asi los JVal por-numero viven un instante
+    // y el pico de memoria no crece con el archivo (clave en el N95).
+    static void CompactarSiEsFila(JVal* h) {
+        if (!h || h->tipo != 5 || h->lista.empty()) return;
+        for (size_t i = 0; i < h->lista.size(); i++)
+            if (!h->lista[i] || h->lista[i]->tipo != 1) return;
+        h->nums.reserve(h->lista.size());
+        for (size_t i = 0; i < h->lista.size(); i++) {
+            h->nums.push_back((float)h->lista[i]->num);
+            delete h->lista[i];
+        }
+        std::vector<JVal*>().swap(h->lista);   // clear() no suelta el buffer
+    }
     JVal* Lista() {
         JVal* v = new JVal(); v->tipo = 5;
         Comer('[');
         if (Es(']')) { p++; return v; }
         for (;;) {
-            v->lista.push_back(Valor());
+            JVal* h = Valor();
+            CompactarSiEsFila(h);
+            v->lista.push_back(h);
             if (error) break;
             if (Es(',')) { p++; continue; }
             Comer(']');
@@ -159,6 +182,20 @@ inline void JColor(JVal* o, const char* k, float* c) {
 inline JVal* JHijo(JVal* o, const char* k, int tipo) {
     std::map<std::string, JVal*>::iterator it = o->obj.find(k);
     return (it != o->obj.end() && it->second->tipo == tipo) ? it->second : NULL;
+}
+
+// --- FILAS (sub-listas de numeros, compactadas o no; ver JVal::nums) ---
+// largo de la fila (sirve tambien para una lista comun)
+inline size_t JFilaLen(JVal* v) { return v->nums.empty() ? v->lista.size() : v->nums.size(); }
+// el elemento i es un numero? (una fila compacta es toda numeros por construccion)
+inline bool JFilaEsNum(JVal* v, size_t i) {
+    if (!v->nums.empty()) return i < v->nums.size();
+    return i < v->lista.size() && v->lista[i] && v->lista[i]->tipo == 1;
+}
+// n-esimo numero de la fila ('def' si falta o no es numero)
+inline float JFilaNum(JVal* v, size_t i, float def) {
+    if (!v->nums.empty()) return (i < v->nums.size()) ? v->nums[i] : def;
+    return JFilaEsNum(v, i) ? (float)v->lista[i]->num : def;
 }
 
 #endif // JSONW3D_H

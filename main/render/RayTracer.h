@@ -26,9 +26,13 @@ struct W3dRTOpciones {
     bool on;        // "Ray Tracing" (pestania Render). Apagado por defecto.
     int  rayos;     // rayos de sombra por luz y por impacto (las lamparas con rtRayos = 0 usan este)
     int  samples;   // muestras por pixel y por pase (bajo: 1)
-    int  pases;     // pases hasta "done" (16 por defecto)
+    int  pases;     // pases hasta "done" (16 por defecto; 8 en el N95: a 333 MHz cada pase cuesta caro)
     int  hilos;     // 0 = automatico (nucleos de la maquina); 1 = un solo hilo
+#ifdef W3D_SYMBIAN
+    W3dRTOpciones() : on(false), rayos(1), samples(1), pases(8), hilos(1) {}
+#else
     W3dRTOpciones() : on(false), rayos(1), samples(1), pases(16), hilos(0) {}
+#endif
 };
 extern W3dRTOpciones g_rt;
 

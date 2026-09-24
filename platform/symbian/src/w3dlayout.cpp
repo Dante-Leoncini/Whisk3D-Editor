@@ -231,6 +231,10 @@ static void W3dTexturaElegida(const std::string& aPath) {
         if (gCargarTexturaComoNormal) { gSymTexMat->normalTexture = t; } // MISMO browser, destino segun el flag
         else { gSymTexMat->texture = t; gSymTexMat->textureOn = true; }
         RebindMaterialMeshPart();
+    } else {
+        // que el fallo se VEA: antes el browser se cerraba y la textura no aparecia, sin ninguna pista
+        extern void Notificar(const std::string&, bool);
+        Notificar("No se pudo cargar la textura", true);
     }
     gSymTexMat = NULL; gCargarTexturaComoNormal = false;
 }
@@ -583,6 +587,13 @@ TBool W3dLayout3DActivo() {
 TBool W3dLayoutFocoTransporte() {
     extern bool LayoutFocoEnTransporte(ViewportBase*);
     return LayoutFocoEnTransporte(viewPortActive) ? ETrue : EFalse;
+}
+
+// el editor UV activo tiene el foco de barra sobre "Edit" (pintura de textura)? -> las flechas NO panean:
+// van al dispatch del panel para seguir navegando la barra, y OK activa. Espejo de W3dLayoutFocoTransporte.
+TBool W3dLayoutFocoUVEditar() {
+    extern bool LayoutFocoEnUVEditar(ViewportBase*);
+    return LayoutFocoEnUVEditar(viewPortActive) ? ETrue : EFalse;
 }
 
 // "8" en el N95: EN Edit Mode de malla = Loop Cut (path del menu del viewport3d, como antes); FUERA de edicion

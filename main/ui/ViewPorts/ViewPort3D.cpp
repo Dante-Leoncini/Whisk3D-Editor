@@ -1143,10 +1143,17 @@ static bool g_wp3dPintando = false; // hay un trazo en curso en un viewport 3D (
 // UNA pasada en ese punto al soltar.
 static bool   g_wpPend = false;
 static int    g_wpPendX = 0, g_wpPendY = 0;
-static Uint32 g_wpPendTicks = 0;
-static const Uint32 kWpEsperaMs = 180;   // ventana para que aparezca el 2do dedo
+static unsigned int g_wpPendTicks = 0;
+static const unsigned int kWpEsperaMs = 180;   // ventana para que aparezca el 2do dedo
+#ifndef W3D_SYMBIAN
 extern bool g_ultimoDownTactil;          // controles.cpp: el ultimo mouse-down fue un dedo
 extern int  W3dDedosActivos();           // controles.cpp: dedos apoyados
+static unsigned int WP3DTicksMs() { return SDL_GetTicks(); }
+#else
+// N95: controles.cpp (input SDL) no se compila -> sin tactil, nunca hay 2do dedo
+static int  W3dDedosActivos() { return 0; }
+static unsigned int WP3DTicksMs() { return (unsigned int)User::NTickCount(); } // ~ms (mismo reloj que LayoutTickFPS)
+#endif
 void WP3DPinturaCancelarPendiente() { g_wpPend = false; }
 int  WP3DEstadoPintura() { return g_wp3dPintando ? 2 : (g_wpPend ? 1 : 0); }   // harness: 0 nada, 1 esperando, 2 pintando
 
@@ -1405,7 +1412,7 @@ static void WP3DPendienteResolver(Viewport3D* vp, int mx, int my, bool forzar) {
     if (W3dDedosActivos() >= 2) { g_wpPend = false; return; }
     const int umbral = 6 * GlobalScale;
     const bool movio = (mx - g_wpPendX > umbral) || (g_wpPendX - mx > umbral) || (my - g_wpPendY > umbral) || (g_wpPendY - my > umbral);
-    const bool paso  = (SDL_GetTicks() - g_wpPendTicks) >= kWpEsperaMs;
+    const bool paso  = (WP3DTicksMs() - g_wpPendTicks) >= kWpEsperaMs;
     if (!forzar && !movio && !paso) return;
     g_wpPend = false;
     Mesh* m = (ObjActivo && ObjActivo->getType() == ObjectType::mesh) ? (Mesh*)ObjActivo : NULL;

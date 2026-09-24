@@ -115,6 +115,7 @@ SOURCE          Pick3D.cpp // pick/seleccion 3D + loop cut (extraido de LayoutIn
 SOURCE          ViewPort3D_Toolbar.cpp // barra de herramientas tactil (extraido de ViewPort3D, Fase 2)
 SOURCE          ToolbarBase.cpp // mecanismo COMPARTIDO de la toolbar (ViewportBase): lo usan el 3D y el UV editor
 SOURCE          TransformUI.cpp // UI COMPARTIDA del transform (barra de info / numerico / tilde-cruz-ejes): 3D + UV + 2D
+SOURCE          Gizmo.cpp // gizmo de mover del viewport 3D (las partes SDL van #ifndef W3D_SYMBIAN)
 SOURCE          ViewPort3D_Stats.cpp   // overlay de estadisticas arriba-derecha (extraido de ViewPort3D, Fase 2)
 SOURCE          IDE.cpp // editor de TEXTO de scripts lua (viewport IDE); las partes SDL van #ifndef W3D_SYMBIAN
 SOURCE          Editor2D.cpp // viewport Editor 2D (UI de juegos); las partes SDL van #ifndef W3D_SYMBIAN
@@ -128,6 +129,9 @@ SOURCE          WeightPaint.cpp // Fase 2 weight paint: pincel + escritura de pe
 SOURCE          BoneEdit.cpp // Fase 3: Edit Mode de huesos (extrude/duplicar/borrar/grab + rename con vgroup)
 SOURCE          UVUnwrap.cpp // menu U: unwrap (conforme + relajacion), smart project, lightmap, follow quads, reset
 SOURCE          Proporcional.cpp // proportional editing (tecla O): pesos por distancia + circulo de influencia
+SOURCE          BoxSelect.cpp // B: caja de seleccion (compartida por 3D/UV/2D)
+SOURCE          W3dFalloff.cpp // curvas de falloff del pincel (pesos + vertex color)
+SOURCE          BooleanMod.cpp // modificador booleano (C++03, compila en Symbian)
 
 SOURCEPATH      ..\..\..\main\render
 SOURCE          render.cpp OpcionesRender.cpp
@@ -154,6 +158,7 @@ SOURCE          PropSelectText.cpp PropButton.cpp PropLabel.cpp
 // pila de UI de PC (fase outliner real)
 SOURCEPATH      ..\..\..\main\ui\ViewPorts\PopUp
 SOURCE          PopUpBase.cpp ColorPicker.cpp FileBrowser.cpp RedoMeshPanel.cpp ConfirmarPopup.cpp ProgressPopup.cpp NuevaTexturaPopup.cpp
+SOURCE          FalloffEditor.cpp // popup del editor de curva de falloff del pincel
 
 // La UI (WhiskUI) es su propia capa reutilizable en libs/. Ver documentacion/ui.html
 SOURCEPATH      ..\..\..\libs\WhiskUI\core

@@ -1003,10 +1003,10 @@ static void LCGuardar(Mesh* m){
     gLCSnap.tiene = true;
     // candidatas (sobre la malla PRE-corte, que es la que se re-corta): las aristas del primer quad del loop
     gLoopCutCandN = 0; gLoopCutCandSel = 0;
-    { std::vector<int> rEg, rA, rB, lf; bool cerr = false;
+    { std::vector<int> rEg, rA, rB, lf; bool cerrado = false;   // "cerrado", no "cerr": en Symbian cerr es un macro de STLport
       m->EnsureEdit(); EditMesh* e = m->edit;
       if (e && gLoopCutEdge >= 0 && gLoopCutEdge < e->NumEdges()) { gLoopCutEdgePos[0] = LCPosVert(e, e->lineIdx[(size_t)gLoopCutEdge*2]); gLoopCutEdgePos[1] = LCPosVert(e, e->lineIdx[(size_t)gLoopCutEdge*2+1]); }
-      if (e && gLoopCutEdge >= 0 && m->LoopCutRecorrido(gLoopCutEdge, rEg, rA, rB, lf, cerr) && !lf.empty() && lf[0] < (int)e->faceEdges.size()) {
+      if (e && gLoopCutEdge >= 0 && m->LoopCutRecorrido(gLoopCutEdge, rEg, rA, rB, lf, cerrado) && !lf.empty() && lf[0] < (int)e->faceEdges.size()) {
           const std::vector<int>& fe = e->faceEdges[lf[0]];
           for (size_t k = 0; k < fe.size() && gLoopCutCandN < 4; k++) { const int c = fe[k]; if (c < 0 || c >= e->NumEdges()) continue;
               gLoopCutCand[gLoopCutCandN] = c; gLoopCutCandPos[gLoopCutCandN][0] = LCPosVert(e, e->lineIdx[(size_t)c*2]); gLoopCutCandPos[gLoopCutCandN][1] = LCPosVert(e, e->lineIdx[(size_t)c*2+1]);

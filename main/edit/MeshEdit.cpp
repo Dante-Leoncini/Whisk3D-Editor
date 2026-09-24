@@ -3110,10 +3110,10 @@ bool W3dPVSCargar(Mesh* m, Modifier* mod) {
         if (tris) for (size_t i = 0; i < tris->lista.size(); i++) {
             JVal* sec = tris->lista[i];
             std::vector<int> lista;
-            if (sec && sec->tipo == 5)
-                for (size_t k = 0; k < sec->lista.size(); k++)
-                    if (sec->lista[k] && sec->lista[k]->tipo == 1)
-                        lista.push_back((int)sec->lista[k]->num);
+            if (sec && sec->tipo == 5)   // filas de numeros COMPACTAS (JVal::nums): se leen con JFila*
+                for (size_t k = 0; k < JFilaLen(sec); k++)
+                    if (JFilaEsNum(sec, k))
+                        lista.push_back((int)JFilaNum(sec, k, 0));
             mod->pvsSectores.push_back(lista);
         }
         // "sectores" declara M; si la lista trae menos, completar con sectores VACIOS

@@ -192,13 +192,46 @@ bool DecodeImage(const char* path, unsigned char** outRGBA, int* outW, int* outH
     return true;
 }
 
-// LOAD (firma del motor): decode + upload comun + free.
+// GLES 1.1 del N95: NPOT es zona gris (el driver puede aceptar la subida pero sin REPEAT ni
+// mips, o rechazarla con INVALID_VALUE). Las texturas de MATERIAL necesitan REPEAT (tiling),
+// asi que lo que no es potencia de dos se REMUESTREA (vecino mas cercano) al POT siguiente,
+// tope 1024 (una foto de 5MP del N95 baja a 1024x1024): los UV 0..1 no cambian.
+static unsigned char* ReescalarPOT(const unsigned char* rgba, int w, int h, int& outW, int& outH) {
+    int pw = 1; while (pw < w && pw < 1024) { pw <<= 1; }
+    int ph = 1; while (ph < h && ph < 1024) { ph <<= 1; }
+    outW = pw; outH = ph;
+    unsigned char* dst = new unsigned char[(TInt)pw * ph * 4];
+    if (!dst) { return NULL; }
+    for (int y = 0; y < ph; y++) {
+        const unsigned char* fila = rgba + (TInt)(y * h / ph) * w * 4;
+        unsigned char* out = dst + (TInt)y * pw * 4;
+        for (int x = 0; x < pw; x++) {
+            const unsigned char* p = fila + (x * w / pw) * 4;
+            out[x*4] = p[0]; out[x*4+1] = p[1]; out[x*4+2] = p[2]; out[x*4+3] = p[3];
+        }
+    }
+    return dst;
+}
+
+// LOAD (firma del motor): decode + POT + upload comun + free.
 bool LoadTexture(const char* path, unsigned int& outId, int* outW, int* outH) {
     unsigned char* rgba = NULL;
     int w = 0, h = 0;
     if (!DecodeImage(path, &rgba, &w, &h)) { return false; }
+    const bool pot = ((w & (w - 1)) == 0) && ((h & (h - 1)) == 0) && w <= 1024 && h <= 1024;
+    if (!pot) {
+        int pw = 0, ph = 0;
+        unsigned char* esc = ReescalarPOT(rgba, w, h, pw, ph);
+        FreeImage(rgba);
+        if (!esc) { return false; }
+        rgba = esc; w = pw; h = ph;
+    }
+    // limpiar errores GL VIEJOS encolados (p.ej. la miniatura NPOT del file browser): sin esto,
+    // el glGetError() de abajo los atribuia a ESTA subida y "Cargar textura" fallaba en SILENCIO
+    // (el browser se cerraba y la textura nunca aparecia) aunque el upload hubiera salido bien.
+    while (glGetError() != GL_NO_ERROR) {}
     outId = UploadRGBA(rgba, w, h, true);
-    GLenum e = glGetError(); // GLES1 del N95 exige potencia de dos
+    GLenum e = glGetError();
     w3dLogf("LoadTexture: subida %dx%d glErr=%x id=%d", w, h, e, (TInt)outId);
     FreeImage(rgba);
     if (outW) { *outW = w; }

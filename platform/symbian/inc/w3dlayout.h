@@ -42,6 +42,7 @@ void  W3dLayoutToggleBarra();             // soft-izq: abre/cierra barra de menu
 void  W3dLayoutRedimensionarViewport(TInt aDx, TInt aDy); // verde+flechas: redimensiona en un eje
 TBool W3dLayout3DActivo();                // el viewport activo es un 3D?
 TBool W3dLayoutFocoTransporte();          // el 3D activo tiene el foco de barra en Stop/Play? (flechas al panel, no orbita)
+TBool W3dLayoutFocoUVEditar();            // el UV activo tiene el foco de barra en "Edit"? (flechas al panel, no panean)
 void  W3dLayoutTecla8();                   // "8": loop cut en Edit Mode, o toggle vista-desde-camara-activa fuera (como numpad 0 PC)
 TBool W3dLayoutJuegoViewportActivo();     // el viewport activo es donde se juega (3D o 2D)
 

@@ -1,4 +1,4 @@
-﻿;Languages
+;Languages
 &EN
 
 ;Header
@@ -47,6 +47,13 @@
 "..\..\..\res\Skins\Whisk3D\atlas\iconos\cuadricula.png"   -"!:\private\A00D021D\atlas\iconos\cuadricula.png"
 "..\..\..\res\Skins\Whisk3D\atlas\iconos\curve.png"   -"!:\private\A00D021D\atlas\iconos\curve.png"
 "..\..\..\res\Skins\Whisk3D\atlas\iconos\empty.png"   -"!:\private\A00D021D\atlas\iconos\empty.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\falloff_constant.png"   -"!:\private\A00D021D\atlas\iconos\falloff_constant.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\falloff_custom.png"   -"!:\private\A00D021D\atlas\iconos\falloff_custom.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\falloff_linear.png"   -"!:\private\A00D021D\atlas\iconos\falloff_linear.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\falloff_root.png"   -"!:\private\A00D021D\atlas\iconos\falloff_root.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\falloff_sharp.png"   -"!:\private\A00D021D\atlas\iconos\falloff_sharp.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\falloff_smoother.png"   -"!:\private\A00D021D\atlas\iconos\falloff_smoother.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\falloff_sphere.png"   -"!:\private\A00D021D\atlas\iconos\falloff_sphere.png"
 "..\..\..\res\Skins\Whisk3D\atlas\iconos\foto.png"   -"!:\private\A00D021D\atlas\iconos\foto.png"
 "..\..\..\res\Skins\Whisk3D\atlas\iconos\gamepad.png"   -"!:\private\A00D021D\atlas\iconos\gamepad.png"
 "..\..\..\res\Skins\Whisk3D\atlas\iconos\guardar.png"   -"!:\private\A00D021D\atlas\iconos\guardar.png"
