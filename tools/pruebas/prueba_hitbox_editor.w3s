@@ -1,0 +1,36 @@
+# ==========================================================================
+#  HITBOX en el EDITOR: Add > Hitbox (hijo del activo con el tamano de su malla,
+#  o suelto), Shift+D (W3dDuplicarUno), la tarjeta del panel de propiedades, el
+#  icono del outliner y el guardado/carga de todos los campos.
+#  Correr DESDE ESTA CARPETA (ver prueba_hitbox.w3s):
+#    ../../platform/linux/build/whisk3d --script prueba_hitbox_editor.w3s
+# ==========================================================================
+
+ventana 1280 720
+escenadefecto
+
+# un cubo escalado: el hitbox HIJO toma el tamano de la malla en el espacio LOCAL
+# del cubo (la escala del padre la aplica el motor, no se hornea en 'tam')
+add cube
+nombreactivo Caja
+objscale 3 3 3
+hitboxadd Caja
+hitboxinfo Hitbox padre Caja duenio Caja tam 2 2 2 centro 0 0 0 activo 1 cuerpos 0
+# sin activo: suelto, con el cubo unitario (y es su propio dueno)
+hitboxadd -
+hitboxinfo Hitbox.001 padre - duenio Hitbox.001 tam 1 1 1
+
+# un hitbox con TODOS los campos distintos del default
+hitboxnuevo Sensor etiqueta jugador filtro enemigo cuerpos 1 activo 0 tam 1 2 3 centro 0.5 0 -0.5 pos 4 0 0
+hitboxdup Sensor
+hitboxinfo Sensor.001 etiqueta jugador filtro enemigo cuerpos 1 activo 0 tam 1 2 3 centro 0.5 0 -0.5
+hitboxprops Sensor
+
+# guardar + abrir: los campos viajan todos
+guardarw3d prueba_hitbox_editor_v4.w3d
+abrirw3d prueba_hitbox_editor_v4.w3d
+hitboxinfo Sensor etiqueta jugador filtro enemigo cuerpos 1 activo 0 tam 1 2 3 centro 0.5 0 -0.5
+hitboxinfo Sensor.001 etiqueta jugador filtro enemigo cuerpos 1 activo 0
+hitboxinfo Hitbox padre Caja duenio Caja tam 2 2 2
+hitboxinfo Hitbox.001 padre - tam 1 1 1
+hitboxprops Hitbox

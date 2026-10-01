@@ -1,0 +1,11 @@
+# ==========================================================================
+#  ICONOSPKG: un icono nuevo va en cuatro lugares: el enum (icons.h), KNombres
+#  (icons.cpp), su png de 10x10 en res/Skins/Whisk3D/atlas/iconos y los DOS
+#  .pkg de Symbian (platform/symbian/sis). Los .pkg se mantienen a mano y en PC
+#  nadie los usa: un icono que falta ahi no se instala en el celular y el atlas
+#  cae al arte legacy de OTRO icono, sin ningun error (asi quedaron afuera
+#  "limpiarz" y "recorte"). Este test cruza las cuatro listas.
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_iconospkg.w3s
+# ==========================================================================
+iconospkg

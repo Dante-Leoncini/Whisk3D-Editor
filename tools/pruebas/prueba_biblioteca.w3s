@@ -1,0 +1,236 @@
+# prueba_biblioteca.w3s — FASE 4b: el outliner es la BIBLIOTECA (el explorador del .w3d)
+#
+#  Criterios de aceptacion:
+#   - UN SOLO arbol de carpetas cosmeticas que MEZCLA todos los tipos (mallas, materiales, texturas,
+#     animaciones...) + el FILTRO por tipo (no esconde carpetas); LINEAS GUIA de la jerarquia; el color
+#     de una CARPETA elegida (activa / seleccionada) se ve como el de un recurso;
+#   - elegir un recurso o una carpeta DESELECCIONA los objetos de la escena, y elegir un objeto suelta el
+#     recurso;
+#   - RENOMBRAR EN LINEA con doble click / doble tap / F2, en las dos vistas: Enter confirma, Esc cancela,
+#     un click afuera confirma;
+#   - la barra: [1] la vista (el ojo), [2] Objeto (escena: Delete, Rename, Move, Hide/Show, Duplicate,
+#     Duplicate Linked; biblioteca: Delete, Rename, Move to Folder, Duplicate Resource, Select Users),
+#     [3] Seleccion (todo / nada / invertir), [4] el UNICO "+" (escena, juego, prefab, carpeta, material);
+#   - TACTIL: un toque elige (arrastrar con el dedo es scroll), la pulsacion larga AGARRA la fila (con
+#     su marca), soltarla sin mover abre el menu contextual y moverla la lleva a una carpeta (en la
+#     biblioteca) o la emparenta con otro objeto (en la escena);
+#   - la CUADRICULA: celdas con MINIATURAS perezosas (textura, material, malla); no van al .w3d;
+#   - los .w3d de la fase anterior (carpetas POR TIPO) se MIGRAN al arbol unico al abrir.
+ventana 1280 720
+
+# ---- 0) un proyecto con recursos de varios tipos ----
+escenadefecto
+selobj Cubo
+matnew
+matsuelto Piel
+texasignar Cubo dosmats.png
+animsetsintetica 1 agregar
+guardarw3d prueba_biblioteca_v4.w3d
+abrirw3d prueba_biblioteca_v4.w3d
+mallasrecurso n 1
+
+# ---- A) UN arbol que mezcla los tipos; el FILTRO; las LINEAS GUIA ----
+outvista biblioteca
+carpetanueva - Arte
+recmover materiales Piel Arte
+recmover mallas Cubo Arte
+recmover texturas texturas/dosmats.png Arte
+outfila Arte prof 0
+outfila Piel carpeta Arte prof 1 tipo materiales
+outfila Cubo carpeta Arte prof 1 tipo mallas
+outfila dosmats.png carpeta Arte prof 1 tipo texturas
+outfila Personaje prof 0 tipo animaciones
+outfila Material prof 0 tipo materiales
+# la linea guia de la carpeta Arte, a la izquierda de sus hijos (en la raiz no hay)
+outlinea Piel 0 si
+outlinea Material 0 no
+# el filtro: solo materiales (la carpeta sigue: el arbol es uno)
+outfiltro materiales
+outfila Arte
+outfila Piel carpeta Arte
+outnofila dosmats.png
+outnofila Personaje
+outfiltro todo
+outfila Personaje
+outfila dosmats.png
+
+# ---- B) el COLOR de lo elegido: una carpeta activa / seleccionada se ve igual que un recurso ----
+outclick Arte
+outcolor Arte activo
+outclick Piel ctrl
+outcolor Piel activo
+outcolor Arte seleccion
+outcolor Material normal
+outclick Material
+outcolor Arte normal
+
+# ---- C) o se eligen OBJETOS o se eligen RECURSOS ----
+selobj Cubo
+seleccion n 1 tiene Cubo
+outclick Personaje
+recactivo animaciones Personaje
+seleccion n 0
+selobj Cubo
+outclick Arte
+seleccion n 0
+recactivo ninguno
+outclick Piel
+recactivo materiales Piel
+outvista escena
+outclick Cubo
+seleccion n 1 tiene Cubo
+recactivo ninguno
+
+# ---- D) RENOMBRAR EN LINEA (doble click / doble tap / F2), en las dos vistas ----
+# la escena: doble click + Enter
+outdobleclick Cubo
+outescribir Caja
+seleccion n 1 tiene Caja
+undo
+seleccion n 1 tiene Cubo
+redo
+# Esc cancela
+outdobleclick Caja
+outtipear Otro
+outesc
+seleccion n 1 tiene Caja
+# el doble TAP del dedo
+outtap Caja doble
+outescribir Bloque
+seleccion n 1 tiene Bloque
+# F2
+outteclapc f2
+outescribir Caja
+seleccion n 1 tiene Caja
+# un click AFUERA (en otra fila) confirma lo tipeado
+outdobleclick Caja
+outtipear Caja2
+outclick Light
+outrender
+seleccion n 1 tiene Light
+outclick Caja2
+outteclapc f2
+outescribir Caja
+seleccion n 1 tiene Caja
+# la biblioteca: doble click / doble tap / F2
+outvista biblioteca
+outdobleclick Piel
+outescribir Cuero
+recurso materiales Cuero existe 1 carpeta Arte
+undo
+recurso materiales Piel existe 1
+redo
+outtap Cuero doble
+outtipear Nada
+outesc
+recurso materiales Cuero existe 1
+recurso materiales Nada existe 0
+# una CARPETA tambien
+outdobleclick Arte
+outescribir Arte2D
+carpetas n 1 tiene Arte2D
+recurso materiales Cuero carpeta Arte2D
+# un click AFUERA confirma
+outdobleclick Arte2D
+outtipear Arte
+outclick Material
+carpetas n 1 tiene Arte
+
+# ---- E) TACTIL: el toque elige sin armar arrastre; la pulsacion larga agarra ----
+outtap Material
+recactivo materiales Material
+outmantener Material soltar
+outmantener Material mover Arte
+recurso materiales Material carpeta Arte
+undo
+recurso materiales Material carpeta -
+outvista escena
+outtap Caja
+seleccion n 1 tiene Caja
+outmantener Caja soltar
+# en la ESCENA, llevar lo agarrado al medio de otra fila lo EMPARENTA (como el arrastre del mouse), con undo
+outmantener Caja mover Light
+objrel Caja padre Light
+objrel Light hijos 1
+undo
+objrel Light hijos 0
+fail objrel Caja padre Light
+
+# ---- F) los MENUS de la barra ----
+# la escena: Objeto
+outclick Caja
+outmenu Duplicate
+seleccion n 1 tiene Caja.001
+# (Shift+D: una malla 3D NUEVA, nombrada como la del original)
+mallainfo Caja.001 recurso Cubo.001 usuarios 1
+outmenu Duplicate Linked
+seleccion n 1 tiene Caja.002
+# (Alt+D: la MISMA malla 3D)
+mallainfo Caja.002 recurso Cubo.001 usuarios 2
+outmenu Hide/Show
+objvis Caja.002 0
+undo
+objvis Caja.002 1
+mallasrecurso n 2
+# Seleccion: todo / nada / invertir
+outmenu Deselect All
+seleccion n 0
+outmenu Select All
+outmenu Invert Selection
+seleccion n 0
+outclick Caja
+outmenu Invert Selection
+seleccion notiene Caja tiene Caja.001 tiene Caja.002
+# la biblioteca: Objeto, Seleccion y el "+"
+outvista biblioteca
+outclick Cuero
+outmenu Duplicate Resource
+recurso materiales Cuero.001 existe 1 carpeta Arte usuarios 0
+fail outmenu Select Users
+outmenu New Material
+recactivo materiales Material.001
+outmenu New Folder
+outescribir Nueva
+carpetas n 2 tiene Arte tiene Arte/Nueva
+outmenu Select All
+outsel n 11
+outmenu Invert Selection
+outsel n 0
+
+# ---- G) la CUADRICULA: miniaturas perezosas; la seleccion y el rename andan igual ----
+outcuadricula 1
+outmini dosmats.png si colorvivo
+outmini Cuero si colorvivo
+outmini Cubo si colorvivo
+outmini Personaje no
+outclick Cuero
+recactivo materiales Cuero
+outdobleclick Cuero
+outescribir Pelaje
+recurso materiales Pelaje existe 1
+outrender
+guardarw3d prueba_biblioteca_rt1.w3d
+zipentrada prueba_biblioteca_rt1.w3d miniaturas no
+outcuadricula 0
+abrirw3d prueba_biblioteca_rt1.w3d
+carpetas n 2 tiene Arte tiene Arte/Nueva
+recurso materiales Pelaje carpeta Arte
+recurso mallas Cubo carpeta Arte
+recurso texturas texturas/dosmats.png carpeta Arte
+guardarw3d prueba_biblioteca_rt2.w3d
+w3diguales prueba_biblioteca_rt1.w3d prueba_biblioteca_rt2.w3d
+
+# ---- H) MIGRACION: un .w3d de la fase anterior (un arbol de carpetas POR TIPO) ----
+abrirw3d prueba_biblioteca_carpetas_f4.w3d
+carpetas n 4 tiene Viejos tiene Rocas tiene Rocas/Grandes tiene Fondos
+recurso materiales Piel carpeta Viejos
+recurso mallas Cubo carpeta Rocas/Grandes
+recurso texturas texturas/dosmats.png carpeta Fondos
+guardarw3d prueba_biblioteca_rt3.w3d
+abrirw3d prueba_biblioteca_rt3.w3d
+carpetas n 4 tiene Viejos tiene Rocas/Grandes tiene Fondos
+recurso mallas Cubo carpeta Rocas/Grandes
+
+# ---- lo que no tiene que pasar ----
+fail outfiltro cualquiera
+fail outmini NoExiste

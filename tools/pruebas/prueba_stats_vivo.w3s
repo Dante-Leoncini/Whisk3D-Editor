@@ -18,8 +18,8 @@ abrirw3d prueba_pvs.w3d
 loadtex
 
 # sector 1 activo: de los 4 tris de la malla se EMITEN solo 2 (el tercero es
-# el triangulo SOLIDO del gizmo de la camara activa: overlay del editor, se va
-# solo al dar Play)
+# el triangulo SOLIDO del gizmo de la camara activa: overlay del editor, que
+# ya NO se va al dar Play: los overlays quedan prendidos jugando)
 statsvivo 3 3
 
 # malla COMPLETA (sector 0): se emiten los 4 (+1 del gizmo)
@@ -31,8 +31,9 @@ setsector MallaPVS 2
 statsvivo 3 3
 
 # CON EL JUEGO CORRIENDO el contador sigue vivo (el overlay se puede dejar
-# prendido jugando): el componente lua salta al sector 2 en inicio()
+# prendido jugando): el componente lua salta al sector 2 en inicio() -> 2 del
+# sector + 1 del gizmo de la camara (dar Play ya no apaga los overlays)
 juego on
 simplay 2
-statsvivo 2 2
+statsvivo 3 3
 juego off

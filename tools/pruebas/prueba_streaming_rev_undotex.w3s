@@ -1,0 +1,79 @@
+# ==========================================================================
+#  STREAMING (revision 2): el paso de undo de "poner una textura en un material" y las referencias que se lleva
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_streaming_rev_undotex.w3s
+#
+#  El paso guarda la textura de antes CON la referencia de la ranura (Textures.h: las ranuras son las duenas) y la
+#  suelta una vez al caerse del historial.
+#    A) la textura de antes se PURGA desde la biblioteca mientras el paso la tiene: la purgada es del cementerio y el
+#       paso no la vuelve a soltar (antes: doble delete al cerrar el proyecto);
+#    B) un MATERIAL ANIMADO: su ranura base es duena del cuadro que muestra (el material animado lo retiene al
+#       cambiarlo), asi que soltar otra textura encima y vaciar el historial suelta la referencia de la ranura y no
+#       la del material animado (antes: el cuadro se liberaba con el material animado todavia nombrandolo);
+#    C) la textura de antes se BORRA EN USO (forzado) y Ctrl+Z la revive: al revivir, el paso vuelve a ser dueno de
+#       su referencia (W3dUndoTexturaDuenos) y vaciar el historial no deja a la ranura sin la suya.
+# ==========================================================================
+
+ventana 1280 720
+
+# --- A) purgar la textura que un paso de undo se llevo ---
+escenadefecto
+selobj Cubo
+matnew
+texasignar Cubo dosmats.png
+guardarw3d /tmp/w3d_f9_rev2a.w3d
+abrirw3d /tmp/w3d_f9_rev2a.w3d
+texentrada dosmats-b.png
+outvista texturas
+outsoltar dosmats-b.png 3d 0 0
+# (la textura de antes la tiene el paso de undo: una referencia mas que las ranuras)
+streamtexrefs
+recborrar texturas texturas/dosmats.png
+escenadefecto
+streamtexrefs exacto
+
+# --- B) un material animado: soltar otra textura y vaciar el historial ---
+escenadefecto
+guardarw3d /tmp/w3d_f9_rev2b.w3d
+abrirw3d /tmp/w3d_f9_rev2b.w3d
+texentrada alfa_reja.png
+streamanimmat Cubo dosmats.png dosmats-b.png
+streamanimtick 1
+streamtexrefs exacto
+streamanimtick 1
+streamtexrefs exacto
+outvista texturas
+outsoltar alfa_reja.png 3d 0 0
+streamundolimpiar
+# (los usuarios de las texturas se recorren -los cuadros del material animado siguen vivos-)
+outvista escena
+outvista texturas
+streamanimtick 3
+streamtexrefs exacto
+selobj Cubo
+undo
+redo
+streamundolimpiar
+streamanimtick 2
+streamtexrefs exacto
+escenadefecto
+
+# --- C) borrar EN USO la textura que guarda un paso, Ctrl+Z (revive) y vaciar el historial ---
+escenadefecto
+selobj Cubo
+matnew
+texasignar Cubo dosmats.png
+guardarw3d /tmp/w3d_f9_rev2c.w3d
+abrirw3d /tmp/w3d_f9_rev2c.w3d
+texentrada dosmats-b.png
+outvista texturas
+outsoltar dosmats-b.png 3d 0 0
+outsoltar dosmats.png 3d 0 0
+# (dosmats.png: la ranura + el primer paso; dosmats-b.png: el segundo paso)
+streamtexrefs
+recborrarforzado texturas texturas/dosmats.png
+undo
+streamtexrefs
+streamundolimpiar
+streamtexrefs exacto
+escenadefecto

@@ -1,0 +1,241 @@
+# ==========================================================================
+#  LIBRERIAS EXTERNAS + PROXIES W3D (io/Librerias.h, objects/ProxyW3d.h)
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_librerias.w3s
+#
+#  La libreria "personajes" (libcrear): el prefab "Enemigo" (Esqueleto con dos clips + Cuerpo
+#  skinneado con el material "Piel" CON TEXTURA + Sensor + enemigo.lua), el prefab "Arbol" y la
+#  escena "Decorado" (dos cubos que comparten una malla). Un nivel en OTRA carpeta la vincula:
+#    A) montaje + 20 proxies del Enemigo: comparten UNA malla, UN animset, UN material y UNA
+#       textura (todos de la libreria, con su prefijo, fuera de la biblioteca del proyecto), cada
+#       uno con su pose y su scope; las rutas "lib:" se leen de la libreria; lo generado no se edita
+#       (el outliner le pone el CANDADO; Properties no muestra las filas que editan su malla -partes,
+#       grupos, mapas UV, capas, modificadores- y sus acciones no hacen nada);
+#    B) guardar: el proxy es un nodo ({"tipo": "proxy", libreria, elemento}) y NADA de la libreria
+#       entra al nivel (ni sus mallas, ni su material, ni su textura, ni su script); abrir lo
+#       regenera igual; re-guardar da los mismos bytes;
+#    C) la libreria CAMBIA en disco (su prefab gana un "Casco"): reabrir el nivel lo muestra;
+#    D) un proxy de una ESCENA de la libreria; Add > Proxy W3D y Add > Prefab con los de la libreria;
+#       cambiar el elemento (con Ctrl+Z) desde la tarjeta de Properties (soltar sobre su selector);
+#    E) arrastrar desde la vista de la libreria (outliner): prefab = proxy, malla / material /
+#       textura = una REFERENCIA al recurso de la libreria (no se copia al guardar);
+#    F) DOS librerias con las mismas entradas y los mismos nombres adentro no chocan;
+#    G) desvincular (con Ctrl+Z): sus proxies se regeneran VACIOS (como al reabrir sin ella) y Ctrl+Z / Ctrl+Y
+#       los devuelve;
+#    H) un script DE LA LIBRERIA (el del prefab "Lanzador") hace instanciar("Arbol"): es el Arbol de SU
+#       libreria (un proxy), aunque el proyecto no tenga ningun prefab con ese nombre.
+# ==========================================================================
+
+ventana 1280 720
+libcrear /tmp/w3d_f8_lib/lib personajes.w3d dosmats.png
+libcrear /tmp/w3d_f8_lib/otra otros.w3d dosmats-b.png
+
+# --- A) el nivel vincula la libreria: 20 proxies que comparten todo ---
+escenadefecto
+libinfo personajes vinculada 0 montada 0
+libvincular /tmp/w3d_f8_lib/lib/personajes.w3d
+libinfo personajes vinculada 1 prefabs 3 escenas 2
+libinfo personajes montada 1
+libproxy personajes prefab Enemigo 0 0 -6 veces 20
+prefabvivos 20
+libproxyinfo Enemigo libreria personajes elemento Enemigo tipo prefab generados 4 vacio 0
+prefabnodo Enemigo.013 . nombre Enemigo generado 1
+prefabnodo Enemigo.013 Esqueleto/Cuerpo tipo mesh
+libcompartido personajes prefab Enemigo proxies 20 mallas 1 animsets 1 materiales 1 texturas 1
+prefabcompartido lib:personajes/prefab/Enemigo instancias 20 mallas 1 animsets 1
+prefabskin Enemigo.007
+prefabscope Enemigo.003 Esqueleto Cuerpo Enemigo.003
+prefabclip Enemigo.001 Esqueleto Quieto
+prefabclip Enemigo.002 Esqueleto Saludo
+prefabpose Enemigo.001 Enemigo.002 10 distinta
+librecurso malla personajes/Cuerpo existe 1 libreria personajes biblioteca 0
+librecurso material personajes/Piel existe 1 libreria personajes biblioteca 0
+librecurso animset personajes/Esqueleto existe 1 libreria personajes biblioteca 0
+librecurso textura lib:personajes/texturas/piel.png existe 1 libreria personajes biblioteca 0
+libruta lib:personajes/proyecto.json lee 1 existe 1
+libruta lib:personajes/texturas/piel.png lee 1 existe 1
+libruta lib:personajes/noexiste.png lee 0 existe 0
+libruta lib:noesta/texturas/piel.png lee 0 existe 0
+libeditar Enemigo.004 Esqueleto/Cuerpo
+# (Properties: el material de lo generado es de SOLO LECTURA; el proxy muestra su tarjeta con libreria y elemento)
+prefabsel Enemigo.006 Esqueleto/Cuerpo
+libpropsmat lectura 1
+selobj Enemigo.006
+libpropsmat tarjeta proxy
+# (el outliner: lo generado por un proxy lleva el CANDADO; el proxy no)
+libmarca Enemigo.006 Esqueleto/Cuerpo candado
+libmarca Enemigo.006 . candado
+libmarca Enemigo.006 proxy -
+# (Properties: las filas que editan la malla generada no estan y sus acciones no hacen nada)
+prefabsel Enemigo.006 Esqueleto/Cuerpo
+libpropsmalla 2 lectura 1 intentar
+libpropsmalla 3 lectura 1 intentar
+libpropsmalla 4 lectura 1 intentar
+# (lo generado no se borra ni se duplica: es de solo lectura)
+prefabsel Enemigo.005 Esqueleto/Cuerpo
+delete
+prefabvivos 20
+libproxyinfo Enemigo.005 generados 4
+
+# --- B) guardar / abrir: el proxy es un nodo; la libreria no entra al nivel ---
+guardarw3d /tmp/w3d_f8_lib/nivel/nivel.w3d
+entradatiene /tmp/w3d_f8_lib/nivel/nivel.w3d proyecto.json "proxy", 1
+entradatiene /tmp/w3d_f8_lib/nivel/nivel.w3d proyecto.json "libreria": 1
+entradatiene /tmp/w3d_f8_lib/nivel/nivel.w3d proyecto.json "librerias": 1
+entradatiene /tmp/w3d_f8_lib/nivel/nivel.w3d proyecto.json ext:../lib/personajes.w3d 1
+entradatiene /tmp/w3d_f8_lib/nivel/nivel.w3d proyecto.json Esqueleto 0
+entradatiene /tmp/w3d_f8_lib/nivel/nivel.w3d proyecto.json Piel 0
+entradatiene /tmp/w3d_f8_lib/nivel/nivel.w3d proyecto.json personajes/Cuerpo 0
+entradaexiste /tmp/w3d_f8_lib/nivel/nivel.w3d texturas/piel.png 0
+entradaexiste /tmp/w3d_f8_lib/nivel/nivel.w3d mallas/cuerpo.w3db 0
+entradaexiste /tmp/w3d_f8_lib/nivel/nivel.w3d scripts/enemigo.lua 0
+entradaexiste /tmp/w3d_f8_lib/nivel/nivel.w3d animaciones/esqueleto.w3da 0
+abrirw3d /tmp/w3d_f8_lib/nivel/nivel.w3d
+libinfo personajes vinculada 1
+prefabvivos 20
+libcompartido personajes prefab Enemigo proxies 20 mallas 1 animsets 1 materiales 1 texturas 1
+prefabskin Enemigo.019
+guardarw3d /tmp/w3d_f8_lib/nivel/nivel2.w3d
+abrirw3d /tmp/w3d_f8_lib/nivel/nivel2.w3d
+guardarw3d /tmp/w3d_f8_lib/nivel/nivel3.w3d
+w3diguales /tmp/w3d_f8_lib/nivel/nivel2.w3d /tmp/w3d_f8_lib/nivel/nivel3.w3d
+
+# --- C) la LIBRERIA cambia en disco: reabrir el nivel lo muestra ---
+abrirw3d /tmp/w3d_f8_lib/lib/personajes.w3d
+raizabrir Enemigo prefab
+add cube
+objname Casco
+parent Casco Esqueleto
+raizabrir Scene
+guardarw3d /tmp/w3d_f8_lib/lib/personajes.w3d
+abrirw3d /tmp/w3d_f8_lib/nivel/nivel.w3d
+prefabvivos 20
+libproxyinfo Enemigo.011 generados 5
+prefabnodo Enemigo.011 Esqueleto/Casco tipo mesh generado 1
+libcompartido personajes prefab Enemigo proxies 20 mallas 2 animsets 1
+
+# --- D) una ESCENA de la libreria; Add > Proxy W3D / Add > Prefab; cambiar el elemento con Ctrl+Z ---
+escenadefecto
+libvincular /tmp/w3d_f8_lib/lib/personajes.w3d
+libproxy personajes escena Decorado 0 0 0
+libproxyinfo Decorado tipo escena elemento Decorado generados 3
+prefabnodo Decorado Roca tipo mesh generado 1
+prefabnodo Decorado Piedra tipo mesh generado 1
+libcompartido personajes escena Decorado proxies 1 mallas 1 materiales 1
+fail libproxy personajes escena NoExiste 0 0 0
+libproxy personajes escena NoExiste 0 0 0 falla
+undo
+prefabvivos 0
+redo
+prefabvivos 1
+prefabadd proxy
+libproxyinfo Enemigo libreria personajes elemento Enemigo generados 5
+prefabmenu tiene personajes/Enemigo tiene personajes/Arbol
+prefabmenuelegir personajes/Arbol
+libproxyinfo Arbol libreria personajes elemento Arbol generados 2
+prefabvivos 3
+libcambiar Arbol personajes prefab Enemigo
+libproxyinfo Arbol elemento Enemigo generados 5
+undo
+libproxyinfo Arbol elemento Arbol generados 2
+libcambiar Arbol personajes prefab NoExiste falla
+# (soltar un prefab de la libreria sobre el selector de la tarjeta del proxy: pasa a generar ese)
+selobj Arbol
+propstab 2
+outvista lib:personajes
+outsoltar Enemigo props prefab
+libproxyinfo Arbol elemento Enemigo
+undo
+libproxyinfo Arbol elemento Arbol
+
+# --- E) ARRASTRAR desde la vista de la libreria: prefab = proxy, recursos = referencias ---
+escenadefecto
+selobj Cubo
+matnew
+libvincular /tmp/w3d_f8_lib/lib/personajes.w3d
+outvista lib:personajes
+outsoltar Enemigo 3d 0 0
+prefabvivos 1
+libproxyinfo Enemigo libreria personajes elemento Enemigo
+undo
+prefabvivos 0
+outsoltar Cuerpo 3d 0 0
+mallainfo Cuerpo recurso personajes/Cuerpo
+undo
+fail selobj Cuerpo
+selobj Cubo
+libpropsmat lectura 0
+outsoltar Piel 3d 0 0
+mallainfo Cubo material 0 personajes/Piel
+libpropsmat lectura 1
+undo
+mallainfo Cubo material 0 Material
+libpropsmat lectura 0
+outsoltar piel.png 3d 0 0
+texrefde material Material lib:personajes/texturas/piel.png
+add cube
+selobj Cubo.001
+propstab 3
+outsoltar Tronco props malla
+mallainfo Cubo.001 recurso personajes/Tronco
+# (una malla del PROYECTO con una malla de la libreria: lo del recurso es de solo lectura -partes, grupos, mapas-;
+#  lo del OBJETO -sus modificadores- es del proyecto)
+libpropsmalla 3 lectura 1 intentar
+libpropsmalla 2 lectura 1
+libpropsmalla 4 lectura 0
+selobj Cubo
+libpropsmalla 2 lectura 0
+libpropsmalla 3 lectura 0
+libpropsmalla 4 lectura 0
+guardarw3d /tmp/w3d_f8_lib/nivel/refs.w3d
+entradatiene /tmp/w3d_f8_lib/nivel/refs.w3d proyecto.json lib:personajes/texturas/piel.png 1
+entradatiene /tmp/w3d_f8_lib/nivel/refs.w3d proyecto.json personajes/Tronco 1
+entradatiene /tmp/w3d_f8_lib/nivel/refs.w3d proyecto.json Corteza 0
+entradaexiste /tmp/w3d_f8_lib/nivel/refs.w3d texturas/piel.png 0
+entradaexiste /tmp/w3d_f8_lib/nivel/refs.w3d mallas/tronco.w3db 0
+abrirw3d /tmp/w3d_f8_lib/nivel/refs.w3d
+mallainfo Cubo.001 recurso personajes/Tronco
+mallainfo Cubo.001 material 0 personajes/Corteza
+texrefde material Material lib:personajes/texturas/piel.png
+librecurso malla personajes/Tronco existe 1 libreria personajes biblioteca 0
+# (New Copy de una malla de la libreria: la copia es del PROYECTO -sin su prefijo- y se edita; Ctrl+Z vuelve)
+mallanueva Cubo.001
+mallainfo Cubo.001 recurso Tronco
+selobj Cubo.001
+libpropsmalla 3 lectura 0
+undo
+mallainfo Cubo.001 recurso personajes/Tronco
+
+# --- F) DOS librerias con las mismas entradas y los mismos nombres adentro: no chocan ---
+escenadefecto
+libvincular /tmp/w3d_f8_lib/lib/personajes.w3d
+libvincular /tmp/w3d_f8_lib/otra/otros.w3d
+libinfo otros vinculada 1 prefabs 3 cantidad 2
+libproxy personajes prefab Enemigo 0 0 0
+libproxy otros prefab Enemigo 4 0 0
+libdistintos Enemigo Enemigo.001
+libcompartido otros prefab Enemigo proxies 1 mallas 1 animsets 1 materiales 1 texturas 1
+librecurso material otros/Piel existe 1 libreria otros biblioteca 0
+
+# --- G) desvincular (con Ctrl+Z): sus proxies se regeneran VACIOS; Ctrl+Z / Ctrl+Y ---
+libdesvincular otros
+libinfo otros vinculada 0 cantidad 1
+libproxyinfo Enemigo.001 libreria otros generados 0 vacio 1
+libproxyinfo Enemigo libreria personajes generados 5
+undo
+libinfo otros vinculada 1 cantidad 2
+libproxyinfo Enemigo.001 libreria otros generados 4 vacio 0
+redo
+libproxyinfo Enemigo.001 generados 0 vacio 1
+undo
+libproxyinfo Enemigo.001 generados 4 vacio 0
+
+# --- H) un script de la libreria instancia un prefab de SU libreria por su nombre pelado ---
+escenadefecto
+libvincular /tmp/w3d_f8_lib/lib/personajes.w3d
+libproxy personajes prefab Lanzador 0 0 0
+simplay 3
+scriptinfo compartido lanzado proxy
+prefabvivos 2
+simstop
+prefabvivos 1

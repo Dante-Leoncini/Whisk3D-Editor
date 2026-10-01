@@ -51,6 +51,7 @@ extern GLfloat LastPivotZ;
 extern PopupMenu* MenuAdd;      // el desplegable del boton "Add"
 extern PopupMenu* MenuImports;  // submenu "Add > Imports": OBJ / FBX / glTF / GLB
 extern PopupMenu* MenuMallas;   // submenu "Add > Mesh": las primitivas (plano, cubo, esfera...)
+extern PopupMenu* MenuPrefabsAdd; // submenu "Add > Prefab": los prefabs del proyecto (se rearma al abrir el Add)
 extern PopupMenu* MenuSelect;   // el desplegable del boton "Select"
 extern PopupMenu* MenuObject;
 extern PopupMenu* MenuAnimation; // el desplegable del boton "Animation"   // el desplegable del boton "Object"
@@ -71,7 +72,8 @@ enum BarRol3D {
     BR_JuegoStop, BR_JuegoPlay,   // transporte del MODO JUEGO (Play/Pausa es UN boton)
     BR_Mesh, // menu "Mesh" de Edit Mode (Transform/Snap/Delete), comun a vertice/borde/cara
     BR_Animation, // menu "Animation": keyframes del objeto + Motion Trail. Solo con algo seleccionado.
-    BR_Proporcional // PROPORTIONAL EDITING (tecla O): el icono de la curva, verde si esta ON; abre su menu
+    BR_Proporcional, // PROPORTIONAL EDITING (tecla O): el icono de la curva, verde si esta ON; abre su menu
+    BR_Raiz          // la ESCENA 3D o el PREFAB que se edita (W3dRaices.h): su menu cambia de raiz / crea otra
 };
 // roles de la barra de HERRAMIENTAS (abajo) del 3D. TBR_Hist+i = boton i del historial de acciones.
 enum ToolbarRol3D {
@@ -160,6 +162,7 @@ class Viewport3D : public ViewportBase, public WithBorder {
         bool showEmpty;
         bool showParticulas;   // overlay "Objects": gizmo (flecha) de los emisores de particulas. Default OFF.
         bool showCurvas;       // overlay "Objects": la LINEA de las curvas/rieles. Default ON (se puede ocultar).
+        bool showHitbox;       // overlay "Objects": el alambre de los hitbox. Default ON (oculto = tampoco se clickea).
         bool show3DCursor;
         bool ShowRelantionshipsLines; 
         bool limpiarPantalla;
@@ -237,6 +240,13 @@ class Viewport3D : public ViewportBase, public WithBorder {
         // outW (opcional): el divisor de perspectiva del punto (profundidad eye-space en perspectiva, 1.0 en
         // ortografica). Sirve para interpolar dentro de un triangulo de forma PERSPECTIVE-CORRECT (bary/outW).
         bool ProyectarPunto(const Vector3& p, float& sx, float& sy, float* outW = 0);
+        // LA LENTE con la que se dibuja este viewport, para las cuentas en CPU (proyectar, rayo desde un pixel,
+        // tamanio del gizmo). Mirando por la camara es la de la CAMARA: su pos/rot/fov/orto, el aspecto de la
+        // imagen, el marco del passepartout y el zoom/pan de inspeccion (ver W3dEscena3DProyeccion). Antes estas
+        // cuentas usaban SIEMPRE la orbita del visor, asi que desde la camara el gizmo cambiaba de tamanio mal.
+        // ndc = (e.xy / (sx,sy)) [/ ez en perspectiva] * zoom + pan
+        struct Lente { Vector3 pos, der, arr, fwd; bool orto; float sx, sy, zoom, panX, panY; };
+        Lente LenteActual() const;
         // mundo-por-pixel al arrastrar (mover/extrude): a la PROFUNDIDAD del pivot de transform, para
         // que lo agarrado se mueva 1:1 con el mouse/flechas en pantalla a cualquier zoom.
         float VelocidadArrastreMundo();

@@ -159,7 +159,7 @@ void Mirror::Reload() {
     ReloadTarget(this);
     for (size_t i = 0; i < targetsExtra.size() && i < targetsExtraNombre.size(); i++) {
         targetsExtra[i] = NULL;
-        Object* o = FindObjectByName(SceneCollection, targetsExtraNombre[i]);
+        Object* o = W3dBuscarNombreDesde(this, targetsExtraNombre[i]);   // (por scope, como el target)
         if (!o || o == this || IsMyAncestor(this, o)) continue;
         targetsExtra[i] = o;
     }

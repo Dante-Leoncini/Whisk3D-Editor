@@ -18,6 +18,7 @@
 #include "WhiskUI/draw/rectangle.h" // el velo del modo foco
 #include "objects/Objects.h"
 #include "objects/Mesh.h"
+#include "objects/MallaRecurso.h" // W3dMallaCarasVista: la seleccion por caja de una malla de un recurso
 #include "objects/Materials.h" // Material (mat->texture) para el dropdown "Texture" del UV editor
 #include "objects/Textures.h"  // Texture (path) para las etiquetas del dropdown
 #include "objects/EditMesh.h"
@@ -43,6 +44,7 @@
 #include "w3dlog.h"         // las notificaciones tambien van al log
 #include "ViewPorts/Pick3D.h"
 #include "edit/BoxSelect.h"   // la caja compartida + sus predicados
+#include "objects/Hitbox.h"   // el pick de un hitbox es su ALAMBRE (HitboxAristas)
 
 // ====================================================================
 // pick 3D por color (antes vivia en w3dnewscene.cpp, solo Symbian)
@@ -61,9 +63,11 @@ static bool PickSeleccionable(Object* obj) {
     if (t == ObjectType::light  && !g_showLights) return false;
     if (t == ObjectType::camera && !g_showCamera) return false;
     if (t == ObjectType::empty  && !g_showEmpty)  return false;
+    if (t == ObjectType::hitbox && !HitboxSeDibuja()) return false;   // la MISMA regla que su dibujo
     return t == ObjectType::mesh || t == ObjectType::camera ||
            t == ObjectType::light || t == ObjectType::empty ||
-           t == ObjectType::instance || t == ObjectType::armature;
+           t == ObjectType::instance || t == ObjectType::armature ||
+           t == ObjectType::hitbox;
 }
 // pick en 2 pasadas: primero NO-armatures (con z-buffer), despues armatures (XRAY, sin z, encima de todo)
 // para que el esqueleto se pickee EXACTAMENTE como se ve. 'armaturePass' filtra que se pinta/cuenta en cada pasada.
@@ -118,6 +122,15 @@ static void PickPaint(Object* obj, bool armaturePass) {
                 w3dEngine::DrawLines((int)(buf.size() / 3));
                 w3dEngine::LineWidth(1.0f);
             }
+        } else if (obj->getType() == ObjectType::hitbox) {
+            // las ARISTAS de la caja, gruesas: se clickea el alambre que se ve y no el volumen (un
+            // hitbox que envuelve una puerta no le tapa el click a la puerta)
+            float lineas[72];
+            HitboxAristas((W3dHitboxBase*)obj, lineas);
+            w3dEngine::LineWidth(5.0f * (float)GlobalScale);
+            w3dEngine::VertexPointer3f(0, lineas);
+            w3dEngine::DrawLines(24);
+            w3dEngine::LineWidth(1.0f);
         } else {
             // icono (camara/luz/empty/instancia): un punto clickeable en el
             // origen, del MISMO tamaño que el icono 3D (16 * GlobalScale)
@@ -705,8 +718,33 @@ static bool BoxObjetoEntra(Viewport3D* vp, Object* o, int x0, int y0, int x1, in
     // (ahi no toca ningun vertice ni cruza nada, pero esta encima del objeto igual)
     const float cxCaja = (float)(x0 + x1) * 0.5f, cyCaja = (float)(y0 + y1) * 0.5f;
     static std::vector<float> polX, polY;
-    for (size_t f = 0; f < m->faces3d.size(); f++) {
-        const std::vector<int>& id = m->faces3d[f].idx;
+    // las caras de la malla, o las COMPARTIDAS de su recurso si su edicion sigue pendiente
+    // (objects/MallaRecurso.h): la misma prueba que con la malla editada, sin cargar su edicion
+    const std::vector<MeshFace>* pF = W3dMallaCarasVista(m);
+    // sin caras (escenario cerrado a edicion, o una topologia que no se pudo leer): alcanzan los
+    // triangulos del render (mismo resultado: la caja cruza o cae en una cara)
+    if (!pF && m->faces && m->facesSize >= 3) {
+        for (int t = 0; t + 2 < m->facesSize; t += 3) {
+            const int tri[3] = { (int)m->faces[t], (int)m->faces[t + 1], (int)m->faces[t + 2] };
+            polX.clear(); polY.clear();
+            bool caraVisible = true;
+            for (int k = 0; k < 3; k++) {
+                const int a = tri[k], b = tri[(k + 1) % 3];
+                if (a < 0 || b < 0 || a >= m->vertexSize || b >= m->vertexSize) { caraVisible = false; continue; }
+                if (!vis[(size_t)a] || !vis[(size_t)b]) { caraVisible = false; continue; }
+                if (BoxSegmento(x0, y0, x1, y1, px[(size_t)a], py[(size_t)a], px[(size_t)b], py[(size_t)b]))
+                    return true;
+                polX.push_back(px[(size_t)a]); polY.push_back(py[(size_t)a]);
+            }
+            if (caraVisible && BoxPuntoEnPoligono(&polX[0], &polY[0], (int)polX.size(), cxCaja, cyCaja))
+                return true;
+        }
+        return false;
+    }
+    if (!pF) return false;
+    const std::vector<MeshFace>& F = *pF;
+    for (size_t f = 0; f < F.size(); f++) {
+        const std::vector<int>& id = F[f].idx;
         polX.clear(); polY.clear();
         bool caraVisible = true;
         for (size_t k = 0; k < id.size(); k++) {

@@ -15,6 +15,11 @@ namespace w3dui { struct W3dTextAtlas; }
 // la fuente lista para dibujar (cacheada). "" = la fuente de Whisk3D. NULL si fallo.
 w3dui::W3dTextAtlas* Fuente2DObtener(const std::string& ruta);
 
+// CIERRE DEL PROYECTO: suelta todas las fuentes cacheadas (sus texturas propias; el atlas
+// COMPARTIDO de una fuente "atlas_unico" es del cache 2D/3D y no se borra aca). Va junto con
+// Textura2DLiberarTodas: una fuente atlas_unico guarda un id de ESE cache.
+void Fuente2DLiberarTodas();
+
 // nombre corto para mostrar en la UI ("Whisk3D" o "Inter-VariableFont")
 std::string Fuente2DNombre(const std::string& ruta);
 

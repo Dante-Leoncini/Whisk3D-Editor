@@ -1,0 +1,54 @@
+# ==========================================================================
+#  STREAMING (revision 6): el editor corre siempre la FUENTE ACTUAL de un script de lo generado
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_streaming_rev_script.w3s
+#
+#  El Tronco del Poste lleva marca.lua (su inicio() suma su 'version' en compartido("version")). Jugando, la Cerca
+#  (diferida) se carga y corre la version 1; despues se REESCRIBE el .lua (como el IDE) y se carga la Lejos: corre la
+#  version 10. Las fuentes de los scripts solo se traen antes (W3DREC_SCRIPT) en el juego compilado, donde no
+#  cambian. Antes: el pedido de la Cerca retenia la fuente vieja y la Lejos corria la version 1 (version = 3).
+# ==========================================================================
+
+ventana 1280 720
+streamlua /tmp/w3d_f9_rev6 dosmats.png sincontrol
+abrirw3d /tmp/w3d_f9_rev6/streamlua.w3d
+streamscript /tmp/w3d_f9_rev6/marca.lua 1
+raizabrir Poste prefab
+raizscript Tronco marca.lua
+raizabrir Scene
+guardarw3d /tmp/w3d_f9_rev6/marca.w3d
+abrirw3d /tmp/w3d_f9_rev6/marca.w3d
+
+# --- Play: la Fija (siempre) y la Cerca corren la version 1 ---
+simcache 0
+streamobjetivo 0 0 3
+simplay 3
+streamestado Cerca cargada
+streamestado Lejos descargada
+scriptinfo compartido arranques 2
+scriptinfo compartido version 2
+# --- reescribir el script jugando y cargar la Lejos: corre la version nueva ---
+streamscript /tmp/w3d_f9_rev6/marca.lua 10
+streamobjetivo 0 0 -30
+simplay 10
+streamestado Lejos cargada
+scriptinfo compartido arranques 3
+scriptinfo compartido version 12
+simstop
+simcache 1
+
+# --- la vista previa del editor tampoco se queda con la fuente (Play de nuevo: todas la version 10) ---
+streamvista 1
+streamobjetivo 0 0 3
+streamtick 30
+streamestado Cerca cargada
+streamscript /tmp/w3d_f9_rev6/marca.lua 100
+simcache 0
+simplay 3
+streamestado Cerca cargada
+scriptinfo compartido arranques 2
+scriptinfo compartido version 200
+simstop
+simcache 1
+streamobjetivo off
+streamvista 0

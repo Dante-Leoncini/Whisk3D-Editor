@@ -12,13 +12,13 @@ extern bool (*W3dPVSSetSectorHook)(Object*, int);
 
 Object* VisZona::Objetivo() const {
     if (objetivoNombre.empty() || !SceneCollection) return NULL;
-    return FindObjectByName(SceneCollection, objetivoNombre);
+    return W3dBuscarNombreDesde(const_cast<VisZona*>(this), objetivoNombre, SceneCollection);   // (por scope)
 }
 
 Object* VisZona::Ancla() const {
     if (anclaObj) return anclaObj;
     if (anclaNombre.empty() || !SceneCollection) return NULL;
-    return FindObjectByName(SceneCollection, anclaNombre);
+    return W3dBuscarNombreDesde(const_cast<VisZona*>(this), anclaNombre, SceneCollection);
 }
 
 // posicion 'p' (mundo) -> celda 1-based de la grilla local de la zona.

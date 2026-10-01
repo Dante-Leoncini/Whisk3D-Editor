@@ -120,6 +120,8 @@ TBool W3dOutlinerActivo();
 void W3dOutlinerMoverToggle();
 void W3dOutlinerToggleVisible();  // outliner N95: 2 = ocultar/mostrar (visible) el activo
 void W3dOutlinerToggleRender();   // outliner N95: 3 = visibilidad de RENDER del activo
+TBool W3dOutlinerMarcarToggle();  // outliner N95 en una vista de RECURSOS: 5 = marca/desmarca el cursor (seleccion multiple)
+TBool W3dOutlinerRecursosBorrar(); // outliner N95 en una vista de RECURSOS: el toque de C borra la seleccion (no la escena)
 
 // rueda sobre el outliner: scroll (consume el evento)
 TBool W3dLayoutWheelOutliner(TInt aX, TInt aY, TInt aDelta);

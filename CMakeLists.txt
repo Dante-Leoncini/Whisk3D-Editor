@@ -69,6 +69,8 @@ list(APPEND SRC_FILES
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/physics/W3dFisica.cpp
     # cuerpos rigidos del Core (cajas + impulsos + raycast + eventos a lua)
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/physics/W3dRigido.cpp
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/physics/W3dColMalla.cpp
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/physics/W3dHitbox.cpp
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/io/w3dFilesystem.cpp
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/gfx/w3dTexture.cpp
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/io/w3dCompress.cpp
@@ -79,6 +81,9 @@ list(APPEND SRC_FILES
     # OJO: los .cpp del Core de io/ NO entran por GLOB, se listan a mano aca.
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/io/W3dTexto.cpp
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/io/W3dMalla.cpp
+    # .w3db: la MISMA geometria en binario lista para memoria (el formato por defecto al
+    # guardar). W3dMalla.cpp lo llama (el freno REQ), asi que van SIEMPRE juntos.
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/io/W3dMallaBin.cpp
     # almacen del proyecto (contenedor .w3d montado / carpeta): los backends del
     # formato v4. El REGISTRO del montaje vive en w3dFilesystem.cpp, asi que los
     # runtimes que no lo usan no necesitan este .cpp.

@@ -75,7 +75,9 @@ struct W3dRenameDest {
     // CapaMalla: CUAL de las listas con nombre de la malla (todas son vector<T*>, ver Mesh.h)
     enum Capa  { VGroup = 0, UVGroup, UVMap, ColorLayer, Arm2D, VertAnim };
     // Global: cual de las listas con nombre del PROYECTO
-    enum Lista { MaterialG = 0, SceneAnimG };
+    // MallaG / MallaCarpetaG: el NOMBRE / la CARPETA de una malla del registro (MallaRecurso.h);
+    // su 'i' es el SERIAL del recurso, no una posicion (el registro se purga y se corre)
+    enum Lista { MaterialG = 0, SceneAnimG, MallaG, MallaCarpetaG };
     int   tipo;
     void* dueno;      // Armature* (Hueso3D, ClipArm) / Mesh* (Hueso2D, MeshPart, CapaMalla, Clip2D) / Object* (RefLua)
     void* dueno2;     // Hueso2D / Clip2D: el Armature2D* CONCRETO (la lista de la malla puede cambiar)
@@ -132,6 +134,11 @@ void UndoFundirUltimos(int n);
 // ============================================================================
 void UndoGrupoIniciar();
 void UndoGrupoFin();
+// idem, pero las partes son SECUENCIALES: cada una se hizo sobre el resultado de la anterior
+// (hacer unica la malla compartida y DESPUES hornearle el transform / el Join / el origen).
+// Ctrl+Z las deshace AL REVES y Ctrl+Y las rehace AL DERECHO. UndoGrupoFin aplica en el mismo
+// orden los dos sentidos (lo que necesitan la mudanza del outliner y sus nombres).
+void UndoGrupoFinSecuencial();
 // ============================================================================
 //  REPARENT DESHACIBLE: Ctrl+Z deshace un Ctrl+P (ronda 14)
 //
@@ -183,11 +190,13 @@ bool UndoMoverClipArm(Armature* a, int i, int j);
 //           UndoArm2DBorrar y AccionMeshPartUp/Down. Esas NO se avisan: por LIFO el Ctrl+Z
 //           restaura la lista con sus indices ORIGINALES antes de que aplique el rename
 //           viejo, asi que desplazarlos aca los dejaria corridos justo al reves.
-//       (2) el "-" no empuja NADA (clips 3D, clips 2D, vertex anims, ANIMACIONES DE ESCENA y
-//           la lista de SCRIPTS lua de un objeto: borrarlos todavia no es deshacible). Ahi el
-//           indice stale pega de lleno -> hay que avisar.
+//           Las ANIMACIONES DE ESCENA tambien son de esta familia: UndoBorrarEscenaActiva y
+//           UndoNuevaEscena empujan el paso que la saca/devuelve a su posicion.
+//       (2) el "-" no empuja NADA (clips 3D, clips 2D, vertex anims y la lista de SCRIPTS lua de
+//           un objeto: borrarlos todavia no es deshacible). Ahi el indice stale pega de lleno ->
+//           hay que avisar.
 //      'lista' = el destino tipado CON el indice que se borra: W3dDestClipArm(a, i),
-//      W3dDestClip2D(m, arm, i), W3dDestCapaMalla(m, VertAnim, i), W3dDestGlobal(SceneAnimG, i),
+//      W3dDestClip2D(m, arm, i), W3dDestCapaMalla(m, VertAnim, i),
 //      W3dDestRefLua(obj, script, 0) -para la lista de SCRIPTS, donde el indice que corre es el
 //      del script (.i), no el de la ref-... Se puede llamar antes o despues del erase (solo mira
 //      los stacks del undo/redo). El destino del PROPIO elemento queda MUERTO (indice -1 = no-op
@@ -203,7 +212,33 @@ void UndoListaMovida(const W3dRenameDest& lista, int i, int j);
 // y olvidarse el aviso en uno de los llamadores es justo el bug que esto arregla.
 void UndoBorrarClipArm(Armature* a);   // "-" de la tarjeta Animation: clip 3D activo
 void UndoBorrarClip2D(Mesh* m);        // "-" de la tarjeta Animation: clip del armature 2D activo
-void UndoBorrarEscenaActiva();         // "-" de la tarjeta Animation: animacion de ESCENA activa
+// "-" de la tarjeta Animation con una animacion de ESCENA activa: la SACA de la lista y el paso de undo se la
+// queda (Ctrl+Z la devuelve a su lugar, activa). La unica se vacia (el paso guarda sus curvas). Con la VISTA
+// de un clip de jerarquia activa, su CLIP sale de la biblioteca en el mismo paso (vuelven juntos).
+void UndoBorrarEscenaActiva();
+// "New" de una animacion de ESCENA: NuevaEscena + el paso que la saca (Ctrl+Z) y la devuelve (Ctrl+Y)
+int  UndoNuevaEscena();
+// ============================================================================
+//  CLIPS DE JERARQUIA (animation/W3dAnimSet.h): la BIBLIOTECA de un objeto, sus clips y el RETARGET.
+//  Los pasos que guardan una biblioteca le toman una referencia (W3dAnimSet::refsUndo: no es un usuario),
+//  asi una biblioteca en memoria que un Ctrl+Z dejo sin usuarios sigue viva para el Ctrl+Y.
+// ============================================================================
+class W3dClipJer;
+struct W3dRecurso;
+// ANTES de cambiar la biblioteca de clips de 'o' (el desplegable "Clips", "New Library", un clip nuevo que
+// le crea la suya): el paso guarda la que tenia
+void UndoCapturarJerBiblioteca(Object* o);
+// ANTES de cambiar el RETARGET PROPIO de 'o' (armature: el de sus clips de esqueleto; si no, el de sus clips
+// de jerarquia, -1 = el de cada clip)
+void UndoCapturarRetarget(Object* o);
+// el clip 'c' YA se agrego a la biblioteca 'r' ("New Animation > Hierarchy Clip"): Ctrl+Z lo saca SIN
+// liberarlo (su vista queda huerfana: el timeline vuelve a una animacion de escena) y Ctrl+Y lo devuelve y
+// vuelve a elegir su vista sobre 'duenio' (la raiz que lo creo; NULL = solo lo devuelve)
+void UndoClipJerAgregado(W3dRecurso* r, W3dClipJer* c, Object* duenio);
+// SACA el clip de su biblioteca y deja el paso que lo devuelve (borrar desde el outliner). false = no estaba
+bool UndoClipJerBorrar(W3dRecurso* r, W3dClipJer* c);
+// ANTES de cambiar el NOMBRE o el RETARGET POR DEFECTO de un clip de jerarquia
+void UndoCapturarClipJer(W3dRecurso* r, W3dClipJer* c);
 // ============================================================================
 //  LOS PASOS DE UNDO QUE GUARDAN UN INDICE
 //
@@ -226,6 +261,24 @@ void UndoCapturarSeleccionEdit(Mesh* m);        // antes de cambiar la seleccion
 void UndoCapturarMaterial(Mesh* m, int idx);    // antes de cambiar el Material de un mesh part
 void UndoCapturarMallaGeo(Mesh* m);             // ANTES de un op de geometria (extrude/delete/loop/duplicate/assign)
 bool UndoCapturarBorrado(bool incCol);          // BORRA objetos: los DETACHA (sin liberar) + guarda para deshacer. true si borro algo
+// los objetos SELECCIONADOS se acaban de CREAR (Shift+D / Alt+D): Ctrl+Z los saca de la escena
+// (detachados, como un borrado) y Ctrl+Y los devuelve. true si habia algo que registrar.
+bool UndoCapturarCreacion();
+// ============================================================================
+//  PASO DE UNDO DE UN MODULO DE AFUERA: el que lo empuja conoce sus datos, Undo.cpp no.
+//  aplicar     = el toggle de siempre (undo Y redo intercambian lo vivo con lo guardado)
+//  desvincular = un objeto se LIBERA de verdad: soltar el puntero si es el suyo (NULL = nada)
+//  liberar     = el paso se cae del historial: liberar 'dato' (NULL = nada)
+//  Sus datos NO pueden ser posiciones en una lista (no los alcanza RemapLista): punteros que
+//  el propio modulo valida al aplicar, o valores.
+// ============================================================================
+struct UndoExterno {
+    void (*aplicar)(void* dato);
+    void (*desvincular)(void* dato, Object* borrado);
+    void (*liberar)(void* dato);
+    UndoExterno() : aplicar(0), desvincular(0), liberar(0) {}
+};
+void UndoPushExterno(const UndoExterno& f, void* dato);
 // JOIN (Ctrl+J): undo ATOMICO en 1 paso = geometria del activo + borrado de los mergeados.
 void UndoJoinIniciar(Mesh* activeMesh);         // ANTES de mergear: snapshot de la geo del objeto activo
 void UndoJoinConfirmar();                       // DESPUES: borra los seleccionados (los mergeados) + empaqueta todo

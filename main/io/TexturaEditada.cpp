@@ -36,6 +36,10 @@ TexturaEditable* TexEditObtener(Texture* t) {
     if (!w3dEngine::DecodeImage(t->path.c_str(), &px, &w, &h) || !px || w <= 0 || h <= 0) return NULL;
     te = new TexturaEditable();
     te->tex = t; te->w = w; te->h = h;
+    // la que se PINTA no se descarga en la sesion (sus pixeles editados viven aca hasta guardar): una referencia mas,
+    // aunque el streaming duerma el material que la usaba (Textures.h: las ranuras son las duenas). La suelta el
+    // cierre del proyecto, que libera todas
+    TexturaRetener(t);
     te->rgba.assign(px, px + (size_t)w * h * 4);
     w3dEngine::FreeImage(px);
     te->alpha = false;

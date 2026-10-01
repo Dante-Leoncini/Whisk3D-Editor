@@ -36,4 +36,8 @@ extern const GLfloat CuboVertices[CuboVertexSize];
 extern const GLushort CuboBordes[CuboEdgesSize];
 extern const GLbyte CuboUV[CuboUvSize];
 
+// una PRIMITIVA nueva (Add): el editor le da su malla 3D de la biblioteca en el acto (io/MallasProyecto.h pone el
+// gancho; en el juego compilado queda NULL)
+extern void (*W3dMallaNacioHook)();
+
 #endif

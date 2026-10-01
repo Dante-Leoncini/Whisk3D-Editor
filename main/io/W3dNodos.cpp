@@ -63,7 +63,7 @@ static bool OclusionPaso(Object* o) {
                 ojo = Viewport3DActive->VistaCam().pos; tengoOjo = true;
             }
             if (tengoOjo) {
-                Object* riel = FindObjectByName(SceneCollection, cu->rielNombre);
+                Object* riel = W3dBuscarNombreDesde(cu, cu->rielNombre, SceneCollection);   // (por scope)
                 if (riel && riel->getType() == ObjectType::curve) {
                     int nodo = porCamara ? NodoDeCamaraEnPath(riel) : -1;
                     if (nodo < 0)
@@ -90,7 +90,7 @@ static bool OclusionPaso(Object* o) {
                 ojo = Viewport3DActive->VistaCam().pos; tengoOjo = true;   // volar libre = demo en vivo
             }
             if (!tengoOjo) continue;
-            Object* path = FindObjectByName(SceneCollection, mod->pathNombre);
+            Object* path = W3dBuscarNombreDesde(m, mod->pathNombre, SceneCollection);   // (por scope)
             if (!path) continue;                                     // path borrado/renombrado: queda el sector manual
             int nodo = porCamara ? NodoDeCamaraEnPath(path) : -1;
             if (nodo < 0) nodo = NodoMasCercano(path, ojo, &mod->ramasOn);

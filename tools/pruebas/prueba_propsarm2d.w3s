@@ -1,0 +1,55 @@
+# ==========================================================================
+#  PROPSARM2D: las filas Pos / Rotation / Scale de la tarjeta Armature 2D son
+#  DE CADA PANEL de propiedades.
+#
+#  Eran punteros estaticos a las filas del ULTIMO panel construido. Desde que
+#  un panel libera sus tarjetas al destruirse, liberar ese panel (cambiarle el
+#  tipo, hacer Expand sobre el otro, o cualquier panel temporal) los dejaba
+#  colgando: la pestania Armature 2D de OTRO panel escribia sobre filas ya
+#  liberadas (corrupcion del heap en Release, heap-use-after-free en ASan) y
+#  sus propias filas nunca se refrescaban (posando, Rotation/Scale no
+#  aparecian). propsarm2d hace nacer y morir un panel temporal antes de mirar
+#  cada panel del layout.
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_propsarm2d.w3s
+# ==========================================================================
+ventana 1280 720
+
+# --- 1) dos paneles de propiedades: el outliner pasa a ser el 2do (el ULTIMO
+#        construido) y despues vuelve a ser 3D: ese panel se LIBERA ----------
+vpkind 2 2
+viewports hojas 4
+vpkind 3 0
+viewports hojas 4
+
+# --- 2) el rig 2D: el timeline pasa a ser editor UV y el cubo, en Edit Mode,
+#        recibe un armature 2D con un hueso -----------------------------------
+vpkind 5 3
+selobj Cubo
+mode edit
+bone2dnew Hueso
+
+# --- 3) el panel que sobrevive refresca SUS filas: editando huesos, Pos si y
+#        Rotation/Scale no; posando, todas --------------------------------------
+propsarm2d huesos paneles 1
+propsarm2d pose paneles 1
+propsarm2d huesos paneles 1
+
+# --- 4) dividir el panel y hacer Expand del original (borra el NUEVO, que era
+#        el ultimo construido): el que queda sigue refrescando las suyas -------
+vpkind 3 21
+viewports hojas 5
+vpkind 3 20
+viewports hojas 4
+propsarm2d pose paneles 1
+
+# --- 5) con DOS paneles vivos, los dos refrescan (no solo el ultimo) --------
+vpkind 3 21
+viewports hojas 5
+propsarm2d pose paneles 2
+propsarm2d huesos paneles 2
+
+# --- 6) lo que no tiene que pasar ---------------------------------------------
+fail propsarm2d otro
+fail propsarm2d pose paneles 3
+fail propsarm2d pose ramas 2

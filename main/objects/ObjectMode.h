@@ -111,8 +111,10 @@ bool guardarEstado();
 void SetPosicion();
 void DuplicatedObject();
 // copia REAL de UN objeto (mesh deep-copy; luz/camara/empty/texto2d/imagen2d sus propiedades).
-// La usan DuplicatedObject y el duplicado del Editor 2D.
-Object* W3dDuplicarUno(Object* src);
+// La usan DuplicatedObject y el duplicado del Editor 2D. 'vinculado' (Alt+D) solo cambia lo
+// que se puede compartir sin dejar de ser una copia: un armature usa los MISMOS clips que el
+// original (W3dArmatureAnimsVincular) en vez de una copia propia.
+Object* W3dDuplicarUno(Object* src, bool vinculado = false);
 // Separate (Edit Mode: P / menu Mesh > Separate): mueve las caras SELECCIONADAS a un mesh NUEVO (misma
 // transform + materiales + vertex groups + modificadores) y las borra del actual. true si separo algo.
 bool SepararSeleccionEdit(Mesh* m);

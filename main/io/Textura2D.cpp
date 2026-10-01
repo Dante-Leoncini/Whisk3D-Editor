@@ -27,6 +27,14 @@ void Textura2DPurgarPrestadas() {
     }
 }
 
+// Cierre del proyecto (ver Textura2D.h). Lo llama ReiniciarEscena, con el arbol ya
+// destruido: ninguna Imagen2D/Slice9/particula queda para pedir un id viejo.
+void Textura2DLiberarTodas() {
+    for (std::map<std::string, Tex2DEntrada>::iterator it = gTexturas.begin(); it != gTexturas.end(); ++it)
+        if (!it->second.prestada && it->second.id) gfx::DeleteTexture(it->second.id);
+    gTexturas.clear();
+}
+
 // PUENTE AL CACHE 3D (atlas unico): si la MISMA imagen ya la subio un material
 // 3D (Textures[] / TexturaCache por ruta), la UI usa ESE id de GL en vez de
 // subir una copia. Con el HUD y el 3D compartiendo texturas/atlas.png, el

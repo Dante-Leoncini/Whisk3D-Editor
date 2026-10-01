@@ -53,16 +53,22 @@ abrirw3d prueba_mallacache.w3d
 guardarw3d prueba_mallacache_v4on.w3d
 mallacache off
 abrirw3d prueba_mallacache.w3d
-# sin cache no se registra nada (el motor de antes) y la escena se ve IGUAL
-meminfo mallas 0
-meminfo mallasrefs 0
+# sin el cache de los OBJ las 4 cajas leen cada una su copia... pero TODA malla es un recurso de la biblioteca
+# (se les crea al abrir) y las iguales comparten UNO: 2 mallas 3D con 4 usuarios, igual que con el cache. La
+# escena se ve IGUAL
+meminfo mallas 2
+meminfo mallasrefs 4
 escenapx 0.4 1.5 0.4 es 255 0 0 8
 guardarw3d prueba_mallacache_v4off.w3d
 comparar prueba_mallacache_v4on.w3d prueba_mallacache_v4off.w3d
 mallacache on
 
-# --- D) el v4 reabierto carga del .w3dm horneado (sin Wavefront no hay
-#        dedup por ruta: eso lo cubre Prefab/Clon). Documentado, no bug. ------
+# --- D) el v4 reabierto ya no carga una malla por objeto: el guardado agrupo las
+#        mallas IGUALES por contenido en las mallas del proyecto (registro "mallas",
+#        objects/MallaRecurso.h) y al abrir cada una se lee UNA vez para todos sus
+#        objetos: las 4 cajas de 2 modelos son 2 mallas con 4 usuarios. ----------
 abrirw3d prueba_mallacache_v4on.w3d
-meminfo mallas 0
+meminfo mallas 2
+meminfo mallasrefs 4
+mallasregistro n 2 cargados 2
 escenapx 0.4 1.5 0.4 es 255 0 0 8

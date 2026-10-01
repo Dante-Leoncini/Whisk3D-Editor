@@ -28,6 +28,8 @@ SRC="$SRC $CORE/io/w3dFilesystem.cpp $CORE/gfx/w3dTexture.cpp $CORE/io/w3dCompre
 # "W3dEscribirFloat", y como el .wasm viejo queda en su lugar es facil creer que compilo.
 # Si se agrega otro .cpp al Core, comparar contra el CMakeLists antes de dar por bueno el build.
 SRC="$SRC $CORE/io/W3dTexto.cpp $CORE/io/W3dMalla.cpp $CORE/io/W3dAlmacen.cpp"
+# W3dMallaBin = el .w3db (la misma geometria en binario, el formato por defecto). Va siempre con W3dMalla.
+SRC="$SRC $CORE/io/W3dMallaBin.cpp"
 SRC="$SRC $CORE/io/W3dRecursos.cpp"
 SRC="$SRC $CORE/base/w3dlog.cpp $CORE/base/W3dInteractionState.cpp $CORE/base/W3dConfig.cpp"
 SRC="$SRC $CORE/math/Vector3.cpp $CORE/math/Quaternion.cpp $CORE/math/Matrix4.cpp"
@@ -37,6 +39,13 @@ SRC="$SRC $CORE/gles2/w3dGraphicsGLES2.cpp"
 SRC="$SRC $CORE/script/W3dScript.cpp"
 # fisica minima del Core (velocidad + rebotes AABB): va SIEMPRE junto a W3dScript.cpp (registra sus binds)
 SRC="$SRC $CORE/physics/W3dFisica.cpp"
+# cuerpos rigidos + colision contra mallas: W3dScript.cpp registra SIEMPRE sus binds (fisicaVel,
+# colSuelo...). Faltaban aca (el CMakeLists y el Android.mk ya los tenian).
+SRC="$SRC $CORE/physics/W3dRigido.cpp $CORE/physics/W3dColMalla.cpp"
+SRC="$SRC $CORE/physics/W3dHitbox.cpp"   # hitbox + eventos alEntrar/alSalir/alTocar
+# volumen del proyecto (VolumenAplicarProyecto, lo llama el lector) + el dispatcher de musica que
+# W3dVolumen usa (sin W3D_ENABLE_MUSIC son stubs mudos). Mismo par que el CMakeLists.
+SRC="$SRC $CORE/audio/W3dVolumen.cpp $CORE/audio/W3dMusic.cpp"
 # audio: el beep() de los juegos (efectos estilo WhiskPaddle). SDL2 audio anda en emscripten (-sUSE_SDL=2).
 # Sin estas fuentes el link falla: W3dScript/main referencian W3dSoundBeep/W3dSoundPlay/W3dAudioInit.
 SRC="$SRC $CORE/audio/W3dAudio.cpp $CORE/audio/W3dAudioSDL.cpp"

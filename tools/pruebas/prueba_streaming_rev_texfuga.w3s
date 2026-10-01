@@ -1,0 +1,49 @@
+# ==========================================================================
+#  STREAMING (revision 7): poner una textura NUEVA en un material no deja una referencia de mas
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_streaming_rev_texfuga.w3s
+#
+#  Soltar una textura de la biblioteca (en la vista 3D o en la tarjeta de Properties) que todavia no estaba cargada:
+#  el gesto la carga con una referencia TEMPORAL, la ranura toma la suya (W3dMaterialPonerTextura) y el gesto suelta
+#  la temporal. Deshacer y seguir editando (el paso de rehacer se cae) la deja sin referencias. Antes: quedaba una
+#  referencia de mas (la textura no se liberaba nunca: streamtexrefs exacto fallaba).
+# ==========================================================================
+
+ventana 1280 720
+escenadefecto
+selobj Cubo
+matnew
+guardarw3d /tmp/w3d_f9_rev7.w3d
+abrirw3d /tmp/w3d_f9_rev7.w3d
+texentrada dosmats-b.png
+texentrada alfa_reja.png
+
+# --- A) soltar en la vista 3D, deshacer y editar otra cosa ---
+outvista texturas
+outsoltar dosmats-b.png 3d 0 0
+streamtexrefs exacto
+selobj Cubo
+undo
+objmove 1 0 0
+streamtexrefs exacto
+# (y otra vez, ahora vaciando el historial con la textura puesta)
+outvista texturas
+outsoltar dosmats-b.png 3d 0 0
+streamundolimpiar
+streamtexrefs exacto
+
+# --- B) soltar en la tarjeta del material (Properties) ---
+selobj Cubo
+propstab 2
+outsoltar alfa_reja.png props textura
+# (la de antes -dosmats-b.png- la tiene el paso de undo: una referencia mas que las ranuras)
+streamtexrefs
+selobj Cubo
+undo
+objmove 1 0 0
+streamtexrefs exacto
+propstab 2
+outsoltar alfa_reja.png props textura
+streamundolimpiar
+streamtexrefs exacto
+escenadefecto

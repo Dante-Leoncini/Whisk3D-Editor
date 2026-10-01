@@ -1,0 +1,184 @@
+# ==========================================================================
+#  RAICES de tipo ESCENA y de tipo JUEGO (W3dRaices.h / io/RaicesEditor.h).
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_escenas_juego.w3s
+#
+#  ESCENA = cine: animacion, keyframes, timeline y rango de render a mano.
+#  JUEGO  = simulacion: su estado editable es el "frame 1"; el timeline en "Juego" NO
+#           muestra ni deja insertar keyframes (sin Auto Key); lo que tiene es el CACHE de
+#           la simulacion, y eso es lo que se renderiza (el rango se adapta solo al cache y
+#           se puede ajustar a mano, siempre adentro; sin cache no hay render de animacion).
+#           Sus animaciones de escena son CLIPS (los dispara Lua): se editan eligiendolos en
+#           el timeline y al volver a "Juego" todo vuelve a su frame 1.
+#  Se prueba tambien: "New Game" en el selector de la barra, "Convert to Game/Scene" con
+#  undo, el "+" desplegable del outliner (UN boton con New Scene / New Game / New Prefab), la
+#  vista Scenes con los dos tipos, los ICONOS (escena = la camara, juego = el control de
+#  juego: los que ya existian), el tipo DEDUCIDO de un proyecto de una sola raiz (tiene
+#  scripts = juego) y que los tipos sobreviven a guardar/abrir.
+# ==========================================================================
+
+ventana 1280 720
+escenadefecto
+
+# ---- el proyecto de arranque es una ESCENA (no tiene scripts): su timeline es su animacion ----
+raizinfo n 1 activa Scene tipo escena
+raizmodo kind 0 juego 0 autokey 1 menujuego 0
+# "Juego" no existe en una escena (el selector no lo ofrece y elegirlo no cambia nada)
+raizanim juego
+raizmodo kind 0 juego 0
+
+# ---- "New Game" por el selector de la barra del 3D ----
+raizmenu 3d New Game
+raizinfo n 2 activa Game tipo juego juegos 1 escenas 1
+raizmodo kind 2 juego 1 autokey 0 menujuego 1
+raizbarra 3d Game icono gamepad
+raizbarra outliner Game icono gamepad
+add cube
+objname Jugador
+selobj Jugador
+
+# ---- en "Juego" NO hay keyframes: la I no inserta y el dope sheet no arma filas ----
+raizkey n 0
+raizdope 0
+
+# ---- un CLIP de escena del juego (lo dispararia Lua con animEscena): se edita eligiendolo ----
+raizclip Salto Jugador 1 0 11 10
+raizanim Salto
+raizmodo kind 0 juego 0 autokey 1 menujuego 1
+frame 6
+objat Jugador 5 0 0 0.01
+raizdope 4
+# en el clip SI se insertan keyframes (son del clip, no del juego)
+raizkey n 9
+# ---- volver a "Juego": el juego vuelve a su frame 1 (el Jugador donde lo dejo el usuario) ----
+raizanim juego
+raizmodo kind 2 juego 1 autokey 0
+objat Jugador 0 0 0 0.001
+raizdope 0
+raizkey n 0
+# el clip sigue ahi (con el keyframe nuevo), elegirlo lo vuelve a mostrar
+raizanim Salto
+frame 11
+objat Jugador 10 0 0 0.01
+# guardar editando un clip escribe el ESTADO BASE del juego (se verifica al final) y no toca la pantalla
+guardarw3d /tmp/w3d_f6_juego_clip.w3d
+objat Jugador 10 0 0 0.01
+# dejar la raiz editando un clip: se deja en su estado base (al volver, "Juego" en su frame 1)
+raizabrir Scene
+raizabrir Game
+raizmodo kind 2 juego 1
+objat Jugador 0 0 0 0.001
+
+# ---- el "+" de la barra del outliner: New Game ----
+raizboton juego
+raizinfo n 3 activa Game.001 tipo juego juegos 2
+raizabrir Game
+
+# ---- convertir: la escena de arranque pasa a ser un juego (y vuelve, con undo) ----
+raizabrir Scene
+raiztipo juego
+raizinfo tipo juego juegos 3 escenas 0
+raizmodo kind 2 juego 1 menujuego 1
+undo
+raizinfo tipo escena escenas 1
+raizmodo kind 0 juego 0 menujuego 0
+redo
+raizinfo tipo juego
+undo
+raizinfo tipo escena
+
+# ---- la vista "Scenes" lista escenas Y juegos (cada uno con su icono) ----
+outvista escenas
+outfilas n 3
+outfila Game usuarios 0 icono gamepad
+outfila Scene usuarios 0 icono camera
+outvista escena
+
+# ---- el RENDER de un juego = su CACHE de simulacion ----
+raizabrir Game
+raizscript Jugador prueba_escenas_juego.lua
+# sin partida no hay cache: no hay rango ni render de animacion (solo el frame actual)
+rendercache /tmp/w3d_f6_render sin
+simplay 10
+objat Jugador 10 0 0 0.001
+# el rango se ADAPTA SOLO al cache: frames 1..11 (el tick 0 + 10 simulados)
+rendercache /tmp/w3d_f6_render n 11 ini 1 fin 11
+# a mano, adentro del cache
+rendercache /tmp/w3d_f6_render rango 3 5 n 3 ini 3 fin 5
+# a mano, pero pedido de mas: se acota a lo cacheado
+rendercache /tmp/w3d_f6_render rango 0 99 n 11 ini 1 fin 11
+# el cache crece jugando y el rango (a mano) sigue acotado; en automatico lo sigue entero
+simplay 4
+rendercache /tmp/w3d_f6_render auto n 15 ini 1 fin 15
+# renderizar no movio el cabezal; arrastrarlo recorre los ticks CACHEADOS (acotado a lo que hay)
+objat Jugador 14 0 0 0.001
+raizscrub 4 cur 4
+objat Jugador 3 0 0 0.001
+raizscrub 90 cur 15
+objat Jugador 14 0 0 0.001
+simstop
+objat Jugador 0 0 0 0.001
+# sin partida no hay cache que recorrer: el cabezal se queda en el estado base (frame 1)
+raizscrub 7 cur 1
+rendercache /tmp/w3d_f6_render sin
+# un JUEGO sin scripts igual simula (su fisica, sus particulas, sus hitbox): hay partida y cache
+raizabrir Game.001
+simplay 2
+rendercache /tmp/w3d_f6_render n 3 ini 1 fin 3
+simstop
+
+# ---- guardar / abrir: el tipo de cada raiz sobrevive ----
+raizabrir Scene
+guardarw3d /tmp/w3d_f6_juego.w3d
+entradaexiste /tmp/w3d_f6_juego.w3d escenas/game.w3de 1
+entradatiene /tmp/w3d_f6_juego.w3d proyecto.json escenas3d 1
+abrirw3d /tmp/w3d_f6_juego.w3d
+raizinfo n 3 activa Scene tipo escena cargada Game 0 tipode Game juego tipode Game.001 juego
+raizmodo kind 0 juego 0
+raizabrir Game
+raizmodo kind 2 juego 1
+raizinfo tipo juego
+raizabrir Scene
+guardarw3d /tmp/w3d_f6_juego_2.w3d
+w3diguales /tmp/w3d_f6_juego.w3d /tmp/w3d_f6_juego_2.w3d
+
+# ---- un proyecto de UNA raiz: su tipo sale de su contenido (proyecto viejo) ----
+escenadefecto
+raizinfo n 1 tipo escena
+raizscript Cubo prueba_escenas_juego.lua
+raizinfo tipo juego
+guardarw3d /tmp/w3d_f6_juego_viejo.w3d
+entradatiene /tmp/w3d_f6_juego_viejo.w3d proyecto.json escenas3d 0
+abrirw3d /tmp/w3d_f6_juego_viejo.w3d
+raizinfo n 1 tipo juego
+raizmodo kind 2 juego 1
+# ...y si se lo declara ESCENA a mano, el registro lo dice (aunque tenga scripts)
+raiztipo escena
+guardarw3d /tmp/w3d_f6_juego_escena.w3d
+entradatiene /tmp/w3d_f6_juego_escena.w3d proyecto.json escenas3d 1
+abrirw3d /tmp/w3d_f6_juego_escena.w3d
+raizinfo n 1 tipo escena
+raizmodo kind 0 juego 0
+
+# ---- el guardado de arriba (hecho editando el clip "Salto") tiene al juego en su frame 1 ----
+abrirw3d /tmp/w3d_f6_juego_clip.w3d
+raizinfo activa Game tipo juego
+raizmodo kind 2 juego 1
+objat Jugador 0 0 0 0.001
+raizanim Salto
+frame 11
+objat Jugador 10 0 0 0.01
+raizanim juego
+objat Jugador 0 0 0 0.001
+
+# ---- el "+" del outliner crea los TRES tipos; cada raiz con su icono (los que ya existian) ----
+raizboton escena
+raizinfo activa Scene.001 tipo escena
+raizbarra 3d Scene.001 icono camera
+raizbarra outliner Scene.001 icono camera
+raizboton prefab
+raizinfo activa Prefab tipo prefab
+raizbarra 3d Prefab icono prefab
+raizboton juego
+raizinfo activa Game.001 tipo juego
+raizbarra outliner Game.001 icono gamepad

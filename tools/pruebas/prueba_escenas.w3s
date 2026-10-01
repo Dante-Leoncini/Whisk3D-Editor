@@ -1,0 +1,161 @@
+# ==========================================================================
+#  ESCENAS 3D MULTIPLES (W3dRaices.h / io/RaicesEditor.h) en el editor.
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_escenas.w3s
+#
+#  Cada escena 3D es una RAIZ propia; una sola es SceneCollection. Se prueba:
+#    - crear escenas por el SELECTOR de la barra del viewport 3D y el "+" del outliner;
+#    - el CONTEXTO por raiz: seleccion, objeto activo, camara activa, coleccion activa,
+#      animaciones de escena y LUCES (el tope de 8 de GL es por escena);
+#    - Parent normalizado (un objeto de primer nivel tiene a su raiz de padre);
+#    - el undo LIMPIO al cambiar (el historial era de la otra escena);
+#    - la vista "Scenes" del outliner: renombrar (con undo), carpetas, no borrar la
+#      abierta, "Purge Orphans" no toca escenas;
+#    - guardar/abrir: registro "escenas3d" + entradas .w3de, carga PEREZOSA, la sesion
+#      reabre la escena que se editaba, re-guardar da los mismos bytes, la escena
+#      inicial del juego, y borrar una escena saca su entrada;
+#    - una escena SIN ABRIR no se rompe cuando se renombra o se purga un recurso que
+#      solo ella usa (se cargan todas antes).
+# ==========================================================================
+
+ventana 1280 720
+escenadefecto
+raizinfo n 1 activa Scene bloque Scene inicial -
+selobj Cubo
+raizcontexto activo Cubo sel 1 camara Cámara luces 1 anims 1 coleccion Colección
+raizbarra 3d Scene
+raizbarra outliner Scene
+
+# ---- una escena nueva por el SELECTOR de la barra del 3D ----
+raizmenu 3d New Scene
+raizinfo n 2 activa Scene.001 escenas 2
+raizcontexto activo - sel 0 camara - luces 0 coleccion -
+raizinfo objetos 0
+raizbarra 3d Scene.001
+raizbarra outliner Scene.001
+add cube
+objname CajaB
+raizparent CajaB
+raizcamara CamB
+addlight
+selobj CajaB
+raizcontexto activo CajaB sel 1 camara CamB luces 1
+
+# ---- volver: cada escena conserva lo suyo ----
+raizabrir Scene
+raizcontexto activo Cubo sel 1 camara Cámara luces 1 coleccion Colección
+raizinfo objetos 4
+# las LUCES son por escena: la del bloque llena sus 8 y la otra sigue pudiendo crear
+raizluces 9 creadas 7
+raizcontexto luces 8
+selobj Cubo
+raizmenu outliner Scene.001
+raizinfo activa Scene.001
+raizcontexto activo CajaB camara CamB luces 1
+raizluces 2 creadas 2
+raizcontexto luces 3
+
+# ---- el undo es de la escena que se deja (se limpia al cambiar) ----
+add cube
+objname Temporal
+raizinfo objetos 6
+raizabrir Scene
+undo
+raizinfo objetos 11
+raizabrir Scene.001
+raizinfo objetos 6
+undo
+raizinfo objetos 6
+
+# ---- la vista "Scenes" del outliner ----
+outvista escenas
+outfilas n 2
+outfila Scene.001 usuarios 0
+recrenombrar escenas Scene.001 Nivel2
+raizinfo activa Nivel2
+raizbarra 3d Nivel2
+undo
+raizinfo activa Scene.001
+redo
+raizinfo activa Nivel2
+carpetanueva escenas - Niveles
+recmover escenas Nivel2 Niveles
+outfila Nivel2 carpeta Niveles prof 1
+recborrar escenas Nivel2 falla
+recpurgar escenas n 0
+outfilas n 3
+outvista escena
+
+# ---- un PREFAB por el "+" de la barra del outliner (su raiz aislada, con su objeto raiz) ----
+raizboton prefab
+raizinfo n 3 activa Prefab tipo prefab prefabs 1 objetos 1
+raizcontexto coleccion Prefab
+raizbarra 3d Prefab icono prefab
+
+# ---- la escena con la que arranca el juego ----
+raizabrir Nivel2
+raizmenu 3d Set as Start Scene
+raizinfo inicial Nivel2
+
+# ---- guardar: registro + una entrada por escena/prefab ----
+raizabrir Scene
+guardarw3d /tmp/w3d_f6_escenas.w3d
+entradaexiste /tmp/w3d_f6_escenas.w3d escenas/nivel2.w3de 1
+entradaexiste /tmp/w3d_f6_escenas.w3d prefabs/prefab.w3dp 1
+entradatiene /tmp/w3d_f6_escenas.w3d proyecto.json escenas3d 1
+entradatiene /tmp/w3d_f6_escenas.w3d proyecto.json escena3dInicial 1
+entradatiene /tmp/w3d_f6_escenas.w3d proyecto.json Niveles 1
+entradatiene /tmp/w3d_f6_escenas.w3d escenas/nivel2.w3de CajaB 1
+entradatiene /tmp/w3d_f6_escenas.w3d proyecto.json CamB 0
+entradatiene /tmp/w3d_f6_escenas.w3d escenas/nivel2.w3de CamB 1
+
+# ---- abrir: la del bloque cargada, el resto PEREZOSO ----
+abrirw3d /tmp/w3d_f6_escenas.w3d
+raizinfo n 3 activa Scene cargada Nivel2 0 cargada Prefab 0 inicial Nivel2
+raizcontexto activo Cubo sel 1
+raizabrir Nivel2
+raizinfo cargada Nivel2 1 objetos 6
+raizcontexto camara CamB luces 3
+outvista escenas
+outfila Nivel2 carpeta Niveles
+outvista escena
+raizabrir Scene
+guardarw3d /tmp/w3d_f6_escenas_2.w3d
+w3diguales /tmp/w3d_f6_escenas.w3d /tmp/w3d_f6_escenas_2.w3d
+
+# ---- la sesion reabre la escena que se estaba editando ----
+raizabrir Nivel2
+selobj CajaB
+guardarw3d /tmp/w3d_f6_escenas_3.w3d
+abrirw3d /tmp/w3d_f6_escenas_3.w3d
+raizinfo activa Nivel2 cargada Scene 1 cargada Prefab 0
+raizcontexto activo CajaB sel 1
+
+# ---- un recurso que SOLO usa una escena sin abrir no se purga ni queda nombrado viejo ----
+abrirw3d /tmp/w3d_f6_escenas.w3d
+raizinfo cargada Nivel2 0
+recpurgar mallas n 0
+raizinfo cargada Nivel2 1
+recurso mallas CajaB usuarios 1
+abrirw3d /tmp/w3d_f6_escenas.w3d
+raizinfo cargada Nivel2 0
+recrenombrar mallas CajaB CajaX
+raizinfo cargada Nivel2 1
+guardarw3d /tmp/w3d_f6_escenas_4.w3d
+entradatiene /tmp/w3d_f6_escenas_4.w3d escenas/nivel2.w3de CajaX 1
+abrirw3d /tmp/w3d_f6_escenas_4.w3d
+raizabrir Nivel2
+recurso mallas CajaX usuarios 1
+raizinfo objetos 6
+
+# ---- borrar una escena (no la abierta): su entrada se va del contenedor ----
+raizabrir Scene
+outvista escenas
+recborrar escenas Nivel2
+outvista escena
+raizinfo n 2 escenas 1 inicial -
+guardarw3d /tmp/w3d_f6_escenas_5.w3d
+entradaexiste /tmp/w3d_f6_escenas_5.w3d escenas/nivel2.w3de 0
+entradaexiste /tmp/w3d_f6_escenas_5.w3d prefabs/prefab.w3dp 1
+# la ultima escena no se borra
+raizborrar Scene falla

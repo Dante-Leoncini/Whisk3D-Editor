@@ -1,0 +1,40 @@
+# ==========================================================================
+#  HITBOX en el VIEWPORT: lo que se ve y lo que se clickea siguen la MISMA
+#  regla, y el overlay de debug de lua (verHitboxes) muere con la partida.
+#  Correr DESDE ESTA CARPETA (ver prueba_hitbox.w3s):
+#    ../../platform/linux/build/whisk3d --script prueba_hitbox_ver.w3s
+#
+#  prueba_hitbox_ver.w3d: una Zona 4x4x4 cuyo script llama verHitboxes(true).
+#  hitboxvista cuenta los pixeles del alambre verde en el viewport 3D y hace un
+#  click en el medio de una arista:
+#    - con overlays: se ve y se clickea;
+#    - Show Overlays apagado, o solo Overlays > Objects > Hitbox apagado: ni se
+#      ve ni se clickea (antes se seguia eligiendo con un click "en el aire");
+#    - en el Play el script prende el overlay de debug: se ve sin overlays;
+#    - Stop: el overlay de debug se apaga (antes quedaba prendido para siempre:
+#      las cajas salian en el Render Image y en el proximo archivo que se abra);
+#    - el toggle por tipo se guarda con el layout.
+# ==========================================================================
+
+ventana 1280 720
+abrirw3d prueba_hitbox_ver.w3d
+hitboxvista Zona dibuja 1 pick 1 ver 0
+hitboxvista Zona overlays 0 dibuja 0 pick 0
+hitboxvista Zona tipo 0 dibuja 0 pick 0
+hitboxvista Zona dibuja 1 pick 1
+
+# --- Play: verHitboxes(true) -> se ve aun sin overlays (es el overlay de DEBUG) ---
+simplay 2
+hitboxvista Zona overlays 0 dibuja 1 pick 1 ver 1
+simstop
+
+# --- Stop: muere con la partida ---
+hitboxvista Zona overlays 0 dibuja 0 pick 0 ver 0
+hitboxvista Zona dibuja 1 pick 1
+
+# --- el toggle Overlays > Objects > Hitbox se guarda con el layout ---
+hitboxvista Zona tipo 0 queda 1 dibuja 0
+guardarw3d prueba_hitbox_ver_v4.w3d
+abrirw3d prueba_hitbox_ver_v4.w3d
+hitboxvista Zona dibuja 0 pick 0
+hitboxvista Zona tipo 1 queda 1 dibuja 1 pick 1

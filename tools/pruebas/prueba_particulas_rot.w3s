@@ -26,16 +26,17 @@ partinfo EmisorRotado 1 1
 vpvista material
 vporbita 0 0 0 20 0 0
 
-# EmisorDerecho (rot 0): el cuadrante ROJO queda abajo-izquierda, clavado.
-escenapx -6.5 -0.5 0 es 255 0 0 40
-# punto a 20 grados del eje +X del quad DERECHO: cae en el cuadrante
-# TRANSPARENTE (se ve el fondo, no un color pleno)
-escenapx -5.34 0.24 0 noes 0 255 0 60
-# EL MISMO punto relativo sobre el quad ROTADO (rot azaroso 36.2 del LCG):
-# ahi la textura girada muestra VERDE -> dos particulas con rotacion distinta
+# La textura va DERECHA en el quad (fila 0 del PNG arriba): rojo arriba-izq, verde arriba-der, azul abajo-izq,
+# transparente abajo-der. (Antes esta prueba afirmaba la textura CABEZA ABAJO: el bug de las UV del Core.)
+# EmisorDerecho (rot 0): el cuadrante AZUL queda abajo-izquierda, clavado.
+escenapx -6.5 -0.5 0 es 0 0 255 40
+# punto a 20 grados del eje +X del quad DERECHO: cae en el cuadrante VERDE (arriba-derecha)
+escenapx -5.34 0.24 0 es 0 255 0 60
+# EL MISMO punto relativo sobre el quad ROTADO (rot azaroso 36.2 del LCG): en el espacio del quad queda a
+# 20 - 36.2 = -16 grados -> cuadrante TRANSPARENTE (abajo-derecha): dos particulas con rotacion distinta
 # muestran orientacion distinta en pantalla.
-escenapx 0.66 0.24 0 es 0 255 0 60
-# y el par (abajo-izquierda) del rotado difiere del transparente del derecho
+escenapx 0.66 0.24 0 noes 0 255 0 60
+# y el mismo punto relativo difiere entre el derecho y el rotado
 escenapx 0.66 0.24 0 distintode -5.34 0.24 0 60
 
 # --- 2) NUMEROS deterministas del contrato -------------------------------

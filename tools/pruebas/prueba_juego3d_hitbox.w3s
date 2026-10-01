@@ -1,0 +1,36 @@
+# ==========================================================================
+#  HITBOX + CUERPOS RIGIDOS + ANIMACION DE ESCENA en el JUEGO COMPILADO.
+#  Correr DESDE ESTA CARPETA (ver prueba_juego3d.w3s):
+#    ../../platform/linux/build/whisk3d --script prueba_juego3d_hitbox.w3s
+#
+#  Los eventos tienen que andar IGUAL en el Play del editor y en el binario. Antes
+#  de esta prueba el runtime ni siquiera simulaba los cuerpos rigidos ni avanzaba
+#  animEscena(). La escena (juegohitboxmin, sobre el juego 3D minimo):
+#    - una Puerta con un hitbox hijo y un Movil que la atraviesa a paso fijo;
+#    - una Caja que cae (cuerpo rigido) a traves de una Zona (detectarCuerpos) y
+#      aterriza en un Piso estatico (alTocar);
+#    - un Ascensor que sube con animEscena("Subir") (animacion de escena);
+#    - un JUEZ que mira todo y deja el veredicto en compartido("juez") y en el log
+#      ("[juegohitbox] OK ..."), y pide salir(). Los contadores tienen que dar
+#      EXACTO (un alTocar por lado) y, cumplidos, se sigue mirando 1 s mas: un
+#      segundo golpe falso con el dt variable del binario es FALTA.
+#  El mismo veredicto en el Play (simplay) y en el binario (su whisk3d.log).
+#  Compila un juego de verdad (cmake + g++), asi que tarda mas que las demas.
+# ==========================================================================
+
+ventana 640 480
+juegohitboxmin /tmp/w3d_f5_hitbox
+guardarw3d /tmp/w3d_f5_hitbox/juegohitbox.w3d
+abrirw3d /tmp/w3d_f5_hitbox/juegohitbox.w3d
+
+# --- el Play del editor (el juez exige UN alTocar por lado y sigue mirando 1 s mas) ---
+simplay 120
+scriptinfo compartido juez OK
+scriptinfo compartido puerta_quedarse 7
+compartidonum piso_tocar 1
+compartidonum caja_tocar 1
+simstop
+
+# --- el binario (modo debug: deja su whisk3d.log) ---
+compilarjuego 0 0 1
+juegohitboxlog /tmp/w3d_f5_hitbox juegohitbox

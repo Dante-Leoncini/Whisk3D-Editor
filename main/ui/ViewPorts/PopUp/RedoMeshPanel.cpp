@@ -5,6 +5,7 @@
 #include "objects/Mesh.h"          // Mesh + Regenerar + MeshType
 #include "ViewPorts/LayoutInput.h" // LayoutKey
 #include "ViewPorts/ViewPort3D.h"  // Viewport3DActive (rect del viewport que crea)
+#include "ViewPorts/LayoutArbol.h" // aviso de destruccion de viewports (vpCreador)
 #include "WhiskUI/widgets/PopupMenu.h"          // MenuPantallaW / MenuPantallaH (tamano ventana)
 #include "NumPad.h"                     // teclado numerico (editar el valor por texto/formula)
 
@@ -41,6 +42,17 @@ static void RedoMeshDesvincular(Object* borrado){
 }
 struct RedoMeshEnganchar { RedoMeshEnganchar(){ W3dDesvincularRegistrar(RedoMeshDesvincular); } };
 static RedoMeshEnganchar g_redoMeshEnganche;
+// idem el VIEWPORT 3D que creo la forma: de el se lee el rect para ubicar el panel (vpCreador) y
+// si muere (cambiar el tipo del viewport, abrir un proyecto: LayoutArbol.h) el panel se cierra,
+// igual que con su malla. g_redoVpCreador es el mismo puntero que el vpCreador del panel abierto.
+static Viewport3D* g_redoVpCreador = NULL;
+static void RedoMeshOlvidarViewport(ViewportBase* vp){
+    if (!gRedoPanel || !g_redoVpCreador || (ViewportBase*)g_redoVpCreador != vp) return;
+    g_redoVpCreador = NULL;
+    RedoMeshPanelCerrar();   // el mismo cierre que el undo: panel + su malla
+}
+struct RedoMeshEngancharVp { RedoMeshEngancharVp(){ ViewportOlvidarRegistrar(RedoMeshOlvidarViewport); } };
+static RedoMeshEngancharVp g_redoMeshEngancheVp;
 
 static void RedoOnChange(){
     if (!gRedoMesh) return;
@@ -78,7 +90,7 @@ RedoMeshPanel::RedoMeshPanel(Mesh* m, int modo)
         inside->value = &gRedoInside; inside->onChange = RedoNormalesOnChange;
         grupo->properties.push_back(inside);
         grupo->selectIndex = 0;
-        vpCreador = Viewport3DActive;
+        vpCreador = Viewport3DActive; g_redoVpCreador = vpCreador;
         ResizeGrupo();
         Reubicar();
         return;
@@ -117,7 +129,7 @@ RedoMeshPanel::RedoMeshPanel(Mesh* m, int modo)
             grupo->properties.push_back(edge);
         }
         grupo->selectIndex = 0;
-        vpCreador = Viewport3DActive;
+        vpCreador = Viewport3DActive; g_redoVpCreador = vpCreador;
         ResizeGrupo();
         Reubicar();
         return;
@@ -262,7 +274,7 @@ RedoMeshPanel::RedoMeshPanel(Mesh* m, int modo)
 
     // recordar el viewport3D que creo la forma; sus bounds se leen en cada
     // Render (en el constructor todavia valen 0, antes del primer layout)
-    vpCreador = Viewport3DActive;
+    vpCreador = Viewport3DActive; g_redoVpCreador = vpCreador;
     ResizeGrupo();
     Reubicar();
 }

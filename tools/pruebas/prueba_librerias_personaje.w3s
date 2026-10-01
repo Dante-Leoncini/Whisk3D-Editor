@@ -1,0 +1,167 @@
+# ==========================================================================
+#  LIBRERIAS EXTERNAS: la ACEPTACION de la fase con un PERSONAJE (io/Librerias.h, objects/ProxyW3d.h)
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_librerias_personaje.w3s
+#
+#  La libreria "personajes" (libcrear ... prefab Personaje) trae el prefab "Personaje": un Esqueleto con dos
+#  clips (su animset), un Cuerpo skinneado con el material "Piel" CON TEXTURA, un Sensor (hitbox) y enemigo.lua
+#  (cada personaje cuenta en compartido() y mira SU cuerpo por scope). La libreria "otros" tiene las MISMAS
+#  entradas y los mismos nombres adentro (otra textura).
+#    A) un nivel con 20 proxies del Personaje: UNA malla, UN animset, UN material, UNA textura y UN script, todos
+#       de la libreria con su prefijo (nada en la biblioteca del proyecto); 20 hitbox (uno por proxy); en el Play
+#       cada proxy corre SU script (su scope, su override de vida) y sus hitbox entran al motor;
+#    B) guardar el nivel no ingiere NADA de la libreria (ni sus entradas ni sus nombres); abrirlo lo regenera igual
+#       y re-guardar da los mismos bytes;
+#    C) la libreria CAMBIA en disco (el Personaje gana un "Casco" y su Piel otro color): reabrir el nivel lo
+#       muestra en los 20 (y el nivel guardado sigue dando los mismos bytes); si FALTA, los proxies abren vacios
+#       sin perder nada al guardar, y vuelven cuando vuelve;
+#    D) dos librerias con entradas y nombres iguales no chocan (cada proxy usa lo de SU libreria);
+#    E) instanciar("personajes/Personaje") en el Play del editor y en un JUEGO COMPILADO de prueba (la libreria
+#       viaja empaquetada en librerias/personajes/ y el runtime la lee igual).
+#  Compila un juego de verdad (cmake + g++), asi que tarda mas que las demas.
+# ==========================================================================
+
+ventana 1280 720
+libcrear /tmp/w3d_f8_pj/lib personajes.w3d dosmats.png prefab Personaje
+libcrear /tmp/w3d_f8_pj/otra otros.w3d dosmats-b.png prefab Personaje
+# (todo lo del Personaje vive ADENTRO del .w3d de la libreria)
+entradaexiste /tmp/w3d_f8_pj/lib/personajes.w3d prefabs/personaje.w3dp 1
+entradaexiste /tmp/w3d_f8_pj/lib/personajes.w3d mallas/cuerpo.w3db 1
+entradaexiste /tmp/w3d_f8_pj/lib/personajes.w3d animaciones/esqueleto.w3da 1
+entradaexiste /tmp/w3d_f8_pj/lib/personajes.w3d texturas/piel.png 1
+entradaexiste /tmp/w3d_f8_pj/lib/personajes.w3d scripts/enemigo.lua 1
+entradatiene /tmp/w3d_f8_pj/lib/personajes.w3d prefabs/personaje.w3dp "hitbox" 1
+entradatiene /tmp/w3d_f8_pj/lib/personajes.w3d proyecto.json "Piel" 1
+
+# --- A) 20 proxies del Personaje: comparten todo, cada uno con su estado ---
+escenadefecto
+libvincular /tmp/w3d_f8_pj/lib/personajes.w3d
+libinfo personajes vinculada 1 prefabs 3
+libproxy personajes prefab Personaje 0 0 -6 veces 20
+prefabvivos 20
+libproxyinfo Personaje libreria personajes elemento Personaje tipo prefab generados 4 vacio 0
+prefabnodo Personaje.007 . nombre Personaje generado 1
+prefabnodo Personaje.007 Esqueleto tipo esqueleto generado 1
+prefabnodo Personaje.007 Esqueleto/Cuerpo tipo mesh generado 1
+prefabnodo Personaje.007 Esqueleto/Sensor tipo hitbox generado 1
+libcompartido personajes prefab Personaje proxies 20 mallas 1 animsets 1 materiales 1 texturas 1 scripts 1 hitboxes 20
+librecurso malla personajes/Cuerpo existe 1 libreria personajes biblioteca 0
+librecurso material personajes/Piel existe 1 libreria personajes biblioteca 0 color 0.9 0.7 0.6
+librecurso animset personajes/Esqueleto existe 1 libreria personajes biblioteca 0
+librecurso textura lib:personajes/texturas/piel.png existe 1 libreria personajes biblioteca 0
+# (la pose y el scope son de CADA proxy)
+prefabskin Personaje.012
+prefabscope Personaje.003 Esqueleto Cuerpo Personaje.003
+prefabclip Personaje.001 Esqueleto Quieto
+prefabclip Personaje.002 Esqueleto Saludo
+prefabpose Personaje.001 Personaje.002 10 distinta
+# (un override de su script en UNO: como en una instancia de prefab)
+prefaboverride Personaje.004 prop Esqueleto vida 25
+# (el Play: 20 scripts, uno por proxy, cada uno con su scope y su vida; 20 hitbox en el motor)
+simcache 0
+simplay 3
+scriptinfo compartido enemigos 20
+scriptinfo compartido scope_ok 20
+scriptinfo compartido vida_total 215
+hitboxstats hitboxes 20
+simstop
+simcache 1
+prefabvivos 20
+
+# --- B) guardar el nivel: NADA de la libreria entra; abrir lo regenera igual ---
+guardarw3d /tmp/w3d_f8_pj/nivel/nivel.w3d
+entradatiene /tmp/w3d_f8_pj/nivel/nivel.w3d proyecto.json "proxy", 1
+entradatiene /tmp/w3d_f8_pj/nivel/nivel.w3d proyecto.json ext:../lib/personajes.w3d 1
+entradatiene /tmp/w3d_f8_pj/nivel/nivel.w3d proyecto.json "vida": 1
+entradatiene /tmp/w3d_f8_pj/nivel/nivel.w3d proyecto.json Esqueleto 0
+entradatiene /tmp/w3d_f8_pj/nivel/nivel.w3d proyecto.json Sensor 0
+entradatiene /tmp/w3d_f8_pj/nivel/nivel.w3d proyecto.json Piel 0
+entradatiene /tmp/w3d_f8_pj/nivel/nivel.w3d proyecto.json enemigo.lua 0
+entradatiene /tmp/w3d_f8_pj/nivel/nivel.w3d proyecto.json personajes/Cuerpo 0
+entradaexiste /tmp/w3d_f8_pj/nivel/nivel.w3d prefabs/personaje.w3dp 0
+entradaexiste /tmp/w3d_f8_pj/nivel/nivel.w3d mallas/cuerpo.w3db 0
+entradaexiste /tmp/w3d_f8_pj/nivel/nivel.w3d animaciones/esqueleto.w3da 0
+entradaexiste /tmp/w3d_f8_pj/nivel/nivel.w3d texturas/piel.png 0
+entradaexiste /tmp/w3d_f8_pj/nivel/nivel.w3d scripts/enemigo.lua 0
+abrirw3d /tmp/w3d_f8_pj/nivel/nivel.w3d
+libinfo personajes vinculada 1
+prefabvivos 20
+libcompartido personajes prefab Personaje proxies 20 mallas 1 animsets 1 materiales 1 texturas 1 scripts 1 hitboxes 20
+prefabinfo Personaje.004 overrides 1
+guardarw3d /tmp/w3d_f8_pj/nivel/nivel2.w3d
+abrirw3d /tmp/w3d_f8_pj/nivel/nivel2.w3d
+guardarw3d /tmp/w3d_f8_pj/nivel/nivel3.w3d
+w3diguales /tmp/w3d_f8_pj/nivel/nivel2.w3d /tmp/w3d_f8_pj/nivel/nivel3.w3d
+
+# --- C) la LIBRERIA cambia en disco: reabrir el nivel lo muestra ---
+abrirw3d /tmp/w3d_f8_pj/lib/personajes.w3d
+raizabrir Personaje prefab
+add cube
+objname Casco
+parent Casco Esqueleto
+selobj Cuerpo
+matcolor 0.2 0.8 0.3
+raizabrir Scene
+guardarw3d /tmp/w3d_f8_pj/lib/personajes.w3d
+abrirw3d /tmp/w3d_f8_pj/nivel/nivel.w3d
+prefabvivos 20
+libproxyinfo Personaje.015 generados 5
+prefabnodo Personaje.015 Esqueleto/Casco tipo mesh generado 1
+libcompartido personajes prefab Personaje proxies 20 mallas 2 animsets 1 materiales 2 texturas 1 scripts 1 hitboxes 20
+librecurso material personajes/Piel existe 1 libreria personajes biblioteca 0 color 0.2 0.8 0.3
+# (el nivel sigue sin tener nada de la libreria: guardado ahora da los MISMOS bytes que antes del cambio)
+guardarw3d /tmp/w3d_f8_pj/nivel/nivel4.w3d
+entradatiene /tmp/w3d_f8_pj/nivel/nivel4.w3d proyecto.json Casco 0
+entradatiene /tmp/w3d_f8_pj/nivel/nivel4.w3d proyecto.json personajes/Cubo 0
+w3diguales /tmp/w3d_f8_pj/nivel/nivel3.w3d /tmp/w3d_f8_pj/nivel/nivel4.w3d
+# (la libreria FALTA en disco: sus proxies abren VACIOS, el Play anda y guardar no pierde nada; cuando vuelve, vuelven)
+libmover /tmp/w3d_f8_pj/lib/personajes.w3d /tmp/w3d_f8_pj/lib/personajes.aparte
+abrirw3d /tmp/w3d_f8_pj/nivel/nivel.w3d
+prefabvivos 20
+libproxyinfo Personaje libreria personajes elemento Personaje generados 0 vacio 1
+libinfo personajes vinculada 1
+simplay 3
+simstop
+guardarw3d /tmp/w3d_f8_pj/nivel/nivel5.w3d
+w3diguales /tmp/w3d_f8_pj/nivel/nivel4.w3d /tmp/w3d_f8_pj/nivel/nivel5.w3d
+libmover /tmp/w3d_f8_pj/lib/personajes.aparte /tmp/w3d_f8_pj/lib/personajes.w3d
+abrirw3d /tmp/w3d_f8_pj/nivel/nivel5.w3d
+libproxyinfo Personaje.015 generados 5 vacio 0
+prefabinfo Personaje.004 overrides 1
+
+# --- D) DOS librerias con las mismas entradas y los mismos nombres adentro: no chocan ---
+escenadefecto
+libvincular /tmp/w3d_f8_pj/lib/personajes.w3d
+libvincular /tmp/w3d_f8_pj/otra/otros.w3d
+libinfo otros vinculada 1 prefabs 3 cantidad 2
+libproxy personajes prefab Personaje 0 0 0
+libproxy otros prefab Personaje 4 0 0
+libdistintos Personaje Personaje.001
+libcompartido personajes prefab Personaje proxies 1 mallas 2 animsets 1 materiales 2 texturas 1 scripts 1
+libcompartido otros prefab Personaje proxies 1 mallas 1 animsets 1 materiales 1 texturas 1 scripts 1
+librecurso material personajes/Piel existe 1 libreria personajes biblioteca 0
+librecurso material otros/Piel existe 1 libreria otros biblioteca 0
+librecurso malla otros/Cuerpo existe 1 libreria otros biblioteca 0
+librecurso textura lib:otros/texturas/piel.png existe 1 libreria otros biblioteca 0
+
+# --- E) instanciar("personajes/Personaje") en el Play y en el juego compilado ---
+libjuegomin /tmp/w3d_f8_pj/juego /tmp/w3d_f8_pj/lib/personajes.w3d prefab Personaje
+guardarw3d /tmp/w3d_f8_pj/juego/libpersonaje.w3d
+entradaexiste /tmp/w3d_f8_pj/juego/libpersonaje.w3d scripts/enemigo.lua 0
+entradaexiste /tmp/w3d_f8_pj/juego/libpersonaje.w3d prefabs/personaje.w3dp 0
+abrirw3d /tmp/w3d_f8_pj/juego/libpersonaje.w3d
+prefabvivos 3
+libcompartido personajes prefab Personaje proxies 3 mallas 2 animsets 1 materiales 2 texturas 1 scripts 1 hitboxes 3
+simcache 0
+simplay 30
+scriptinfo compartido juez OK
+scriptinfo compartido enemigos 8
+scriptinfo compartido scope_ok 8
+scriptinfo compartido vida_total 95
+prefabvivos 8
+libcompartido personajes prefab Personaje proxies 8 mallas 2 animsets 1 materiales 2 texturas 1 scripts 1 hitboxes 8
+simstop
+simcache 1
+prefabvivos 3
+compilarjuego 0 1 1
+libjuegolog /tmp/w3d_f8_pj/juego libpersonaje creados=5 enemigos=8 scope=8 vida=95

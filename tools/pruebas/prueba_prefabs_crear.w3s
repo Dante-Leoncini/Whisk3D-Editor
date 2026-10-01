@@ -1,0 +1,124 @@
+# ==========================================================================
+#  "CREATE PREFAB" CON Ctrl+Z / Ctrl+Y (io/PrefabsEditor.h: W3dPrefabCrearDesdeSeleccion)
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_prefabs_crear.w3s
+#
+#  "Create Prefab" es UN paso de undo: la MUDANZA de lo elegido a la raiz de un prefab nuevo + la
+#  INSTANCIA que queda en su lugar. Ctrl+Z saca la instancia, devuelve lo elegido TAL CUAL (mismo padre,
+#  mismo lugar entre sus hermanos, misma transform, sus curvas de las animaciones de escena, sus luces,
+#  la camara activa) y el prefab sale del registro; Ctrl+Y lo rehace. El historial de ANTES sigue
+#  valiendo (se deshace despues, por LIFO).
+#    A) un objeto (es el objeto raiz del prefab; la instancia toma su transform)
+#    B) varios (una camara activa, una luz y un cubo con un hijo) colgados de un vacio
+#    C) guardar/abrir despues del Ctrl+Y; y un Ctrl+Z seguido de otra accion (el prefab que habia
+#       salido se libera con el paso)
+#    D) adentro de un prefab que se edita (el nuevo queda anidado): Ctrl+Z lo devuelve adentro
+# ==========================================================================
+
+ventana 1280 720
+prefabenemigo /tmp/w3d_f7_cr
+raizinfo prefabs 1
+
+# --- A) UN objeto. Antes, un paso cualquiera del historial (una instancia de Enemigo) ---
+prefabinstanciar Enemigo 0 0 -6 nombre Enemigo
+selobj CuboAfuera
+objrot 30
+objscale 1.5 1.5 1.5
+animcurva Scene CuboAfuera x 1 4.5 20 6
+prefabobj CuboAfuera pos 4.5 0 0 euler 0 30 0 escala 1.5 1.5 1.5 indice 1 padre - curvas 1
+prefabcrear nombre CuboAfuera
+raizinfo prefabs 2
+prefabinfo CuboAfuera prefab CuboAfuera generados 1 raiz CuboAfuera
+# (su curva de la animacion de escena pasa a la INSTANCIA, que ocupa su lugar con su transform: la animacion
+#  la sigue moviendo. Lo generado no tiene curvas: no se guardarian)
+prefabobj CuboAfuera tipo prefab pos 4.5 0 0 euler 0 30 0 escala 1.5 1.5 1.5 indice 1 padre - curvas 1
+prefabnodo CuboAfuera . tipo mesh
+raizobjat CuboAfuera CuboAfuera 0 0 0 0.001
+prefabvivos 2
+undo
+raizinfo prefabs 1
+prefabvivos 1
+prefabobj CuboAfuera tipo mesh
+prefabobj CuboAfuera pos 4.5 0 0 euler 0 30 0 escala 1.5 1.5 1.5 indice 1 padre - curvas 1
+redo
+raizinfo prefabs 2
+prefabvivos 2
+prefabinfo CuboAfuera prefab CuboAfuera generados 1 raiz CuboAfuera
+prefabobj CuboAfuera tipo prefab indice 1 curvas 1
+# (dos Ctrl+Z: el Create Prefab y despues la instancia de antes; dos Ctrl+Y: todo de vuelta)
+undo
+undo
+prefabvivos 0
+objrel Enemigo nada
+prefabobj CuboAfuera tipo mesh indice 1 curvas 1
+redo
+redo
+prefabvivos 2
+raizinfo prefabs 2
+prefabinfo CuboAfuera generados 1
+
+# --- B) VARIOS: la camara ACTIVA, una luz y el Cubo (con un hijo) quedan colgados de un vacio ---
+addlight
+objname Luz
+add cube
+objname Hijo
+parent Hijo Cubo
+prefabobj Camara camara 1 indice 2
+prefabobj Luz luz 1 indice 5
+prefabobj Cubo pos 0 0 0 escala 2 2 2 indice 0
+prefabelegir Cubo Camara Luz
+prefabcrear nombre Prefab
+raizinfo prefabs 3
+prefabinfo Prefab prefab Prefab generados 5 raiz Prefab
+prefabobj Prefab tipo prefab indice 0 escala 1 1 1
+prefabnodo Prefab Camara tipo camara generado 1
+prefabnodo Prefab Luz tipo luz generado 1
+prefabnodo Prefab Cubo/Hijo tipo mesh generado 1
+undo
+raizinfo prefabs 2
+prefabobj Cubo pos 0 0 0 escala 2 2 2 indice 0 padre -
+prefabobj Camara camara 1 indice 2 padre -
+prefabobj Luz luz 1 indice 5 padre -
+objrel Hijo padre Cubo
+prefabobj Hijo tipo mesh padre Cubo
+fail prefabinfo Prefab
+redo
+raizinfo prefabs 3
+prefabinfo Prefab prefab Prefab generados 5
+prefabnodo Prefab Hijo nada
+prefabnodo Prefab Cubo/Hijo tipo mesh generado 1
+
+# --- C) guardar/abrir: los dos prefabs creados son del proyecto ---
+guardarw3d /tmp/w3d_f7_cr/crear.w3d
+abrirw3d /tmp/w3d_f7_cr/crear.w3d
+raizinfo prefabs 3
+prefabinfo CuboAfuera prefab CuboAfuera generados 1
+prefabinfo Prefab prefab Prefab generados 5
+prefabvivos 3
+# un Ctrl+Z y despues OTRA accion: el Ctrl+Y ya no existe y el prefab que salio se libera con su paso
+prefabdesempaquetar CuboAfuera
+prefabvivos 2
+selobj CuboAfuera
+prefabcrear nombre CuboAfuera.001
+raizinfo prefabs 4
+undo
+raizinfo prefabs 3
+prefabinstanciar Enemigo 3 0 -6
+redo
+raizinfo prefabs 3
+prefabvivos 3
+
+# --- D) adentro de un prefab que se EDITA: el nuevo queda anidado; Ctrl+Z lo devuelve adentro ---
+raizabrir Enemigo prefab
+selobj Sensor
+prefabcrear nombre Sensor
+raizinfo prefabs 4
+prefabobj Sensor tipo prefab padre Esqueleto
+undo
+raizinfo prefabs 3
+prefabobj Sensor tipo hitbox padre Esqueleto
+redo
+raizinfo prefabs 4
+raizabrir Scene
+prefabinfo Enemigo generados 5
+prefabnodo Enemigo Esqueleto/Sensor tipo prefab

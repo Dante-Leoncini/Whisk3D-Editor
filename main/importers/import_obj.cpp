@@ -15,6 +15,8 @@
 #include <cerrno>  // errno del ofstream fallido (diagnostico del export en Android)
 #include <cstring> // strerror
 #include "gfx/w3dGraphics.h" // gfx::MezclaAdd: la palabra ADITIVO del .mtl
+#include "io/W3dMallaBin.h"       // W3dMallaBinMaterializarEdicion: las caras pendientes de una malla de un recurso
+#include "objects/MallaRecurso.h" // W3dMallaSoltarEdicion: y vuelven a quedar pendientes al terminar
 
 // formateo de float SIN operator<< ni %f: ambos ROTOS en STLport/Symbian (el export escribia basura tipo
 // 2.31e-307 Y era lentisimo -> el N95 se "colgaba"). Replica de RenderBitmapFloat: entero.fraccion con %d.
@@ -60,20 +62,21 @@ static void AppendFloat(std::string& out, float v) {
 
 bool VertexKey::operator==(const VertexKey &other) const {
     return pos == other.pos && normal == other.normal
-           && uv == other.uv && color == other.color;
+           && uv == other.uv && color == other.color && uv2 == other.uv2;
 }
 
 bool VertexKey::operator<(const VertexKey &other) const {
     if (pos != other.pos) return pos < other.pos;
     if (normal != other.normal) return normal < other.normal;
     if (uv != other.uv) return uv < other.uv;
-    return color < other.color;
+    if (color != other.color) return color < other.color;
+    return uv2 < other.uv2;
 }
 
 #ifndef W3D_SYMBIAN
 size_t std::hash<VertexKey>::operator()(const VertexKey &k) const {
     return ((size_t)k.pos * 73856093) ^ ((size_t)k.normal * 19349663)
-           ^ ((size_t)k.uv * 83492791) ^ ((size_t)k.color * 49979693);
+           ^ ((size_t)k.uv * 83492791) ^ ((size_t)k.color * 49979693) ^ ((size_t)(k.uv2 + 1) * 15485863);
 }
 #endif
 
@@ -122,10 +125,16 @@ void EncolarTextura(Material* mat, const std::string& path) { // (la usa tambien
 // la textura que 'mat' tiene ENCOLADA y todavia no se decodifico ("" si no hay). La necesita el
 // importador glTF para comparar dos materiales homonimos: recien importado, mat->texture sigue
 // NULL (la carga es diferida) y sin esto dos materiales con texturas DISTINTAS parecian iguales.
+// TEXTURAS DORMIDAS (ver import_obj.h): las de un material que al abrir no usaba ninguna malla. Su
+// textura BASE cuenta como "encolada" (TexturaPendienteDe / RefDe la devuelven): para el guardado, el
+// outliner y el rename es la misma ruta que espera su turno, solo que no se carga hasta despertar.
+static std::vector<TexDormida> g_texDormidas;
+
 std::string TexturaPendienteDe(const Material* mat) {
     for (size_t i = g_texPendIdx; i < g_texPendientes.size(); i++)
         if (g_texPendientes[i].mat == mat) return g_texPendientes[i].path;
-    return std::string();
+    const TexDormida* d = TexturasDormidasDe(mat);
+    return (d && !d->base.empty()) ? d->base : std::string();
 }
 
 // LA MISMA ENTRADA, PERO ESCRIBIBLE. El guardado no solo LEE la ruta: la INGIERE al
@@ -138,10 +147,147 @@ std::string TexturaPendienteDe(const Material* mat) {
 std::string* TexturaPendienteRefDe(const Material* mat) {
     for (size_t i = g_texPendIdx; i < g_texPendientes.size(); i++)
         if (g_texPendientes[i].mat == mat) return &g_texPendientes[i].path;
-    return NULL;
+    TexDormida* d = TexturasDormidasDe(mat);
+    return (d && !d->base.empty()) ? &d->base : NULL;
 }
 
-void CargarTexturasPendientes() {
+void TexturasDormir(const TexDormida& d) {
+    if (!d.mat || (d.base.empty() && d.normal.empty() && d.capas.empty())) return;
+    TexDormida* ya = TexturasDormidasDe(d.mat);
+    if (ya) *ya = d; else g_texDormidas.push_back(d);
+}
+TexDormida* TexturasDormidasDe(const Material* mat) {
+    if (!mat) return NULL;
+    for (size_t i = 0; i < g_texDormidas.size(); i++) if (g_texDormidas[i].mat == mat) return &g_texDormidas[i];
+    return NULL;
+}
+int TexturasDormidasCantidad() { return (int)g_texDormidas.size(); }
+
+// DESPIERTA una: la base a la cola diferida (1 por cuadro, como al abrir) y el normal map y las capas
+// ya. Lo que el material haya recibido mientras dormia (una textura asignada a mano) MANDA: la dormida
+// no la pisa. Las capas dormidas eran las primeras del material: van adelante.
+static void DespertarUna(const TexDormida& d) {
+    Material* m = d.mat;
+    if (!d.base.empty() && !m->texture && TexturaPendienteRefDe(m) == NULL) {
+        // YA EN MEMORIA (el streaming la trajo antes de generar, u otro material la usa): se pone ahora, sin esperar
+        // su turno en la cola (no toca el disco ni la GPU: es la referencia de la ranura). Como la cola, la prende
+        if (TexturaBuscar(d.base)) { TexturaPonerEn(m->texture, TexturaBuscar(d.base)); m->textureOn = true; }
+        else EncolarTextura(m, d.base);
+    }
+    if (!d.normal.empty() && !m->normalTexture) {
+        m->normalTexture = TexturaTomar(d.normal);
+        if (!m->normalTexture) w3dLogfW("[W3D] no pude cargar la textura '%s'", d.normal.c_str());
+    }
+    std::vector<TexLayer> capas;
+    for (size_t c = 0; c < d.capas.size(); c++) {
+        Texture* t = TexturaTomar(d.capas[c].textura);
+        if (!t) { w3dLogfW("[W3D] no pude cargar la textura '%s'", d.capas[c].textura.c_str()); continue; }
+        TexLayer tl; tl.tex = t; tl.blend = d.capas[c].mezcla; tl.uvMapa = d.capas[c].uv; tl.on = d.capas[c].on;
+        capas.push_back(tl);
+    }
+    if (!capas.empty()) m->capas.insert(m->capas.begin(), capas.begin(), capas.end());
+    w3dLogf("[W3D] material '%s': una malla lo usa, sus texturas se cargan", m->name.c_str());
+}
+// los materiales que dibuja alguna malla de la escena (partes y lo generado por los modificadores)
+static void JuntarMaterialesUsados(Object* o, std::set<const Material*>& out) {
+    if (!o) return;
+    for (size_t i = 0; i < o->Childrens.size(); i++) {
+        Object* h = o->Childrens[i];
+        if (!h) continue;
+        if (h->getType() == ObjectType::mesh) {
+            const Mesh* m = (const Mesh*)h;
+            for (size_t g = 0; g < m->materialsGroup.size(); g++) out.insert(m->materialsGroup[g].material);
+            for (size_t g = 0; g < m->genMaterialsGroup.size(); g++) out.insert(m->genMaterialsGroup[g].material);
+        }
+        JuntarMaterialesUsados(h, out);
+    }
+}
+bool TexturasAdormecer(Material* m) {
+    if (!m || m == MaterialDefecto || TexturasDormidasDe(m)) return false;
+    // un material ANIMADO: sus cuadros pasan por la ranura base sin referencia propia (son del material animado)
+    for (size_t i = 0; i < AnimatedMaterials.size(); i++)
+        if (AnimatedMaterials[i])
+            for (size_t t = 0; t < AnimatedMaterials[i]->targets.size(); t++)
+                if (AnimatedMaterials[i]->targets[t] == m) return false;
+    TexDormida d;
+    d.mat = m;
+    if (m->texture) d.base = m->texture->path;
+    // (la base que esperaba en la cola diferida tambien duerme: su entrada se anula -sin material no se carga ni la
+    //  nombra el guardado- y su ruta queda con las dormidas)
+    for (size_t i = g_texPendIdx; i < g_texPendientes.size(); i++)
+        if (g_texPendientes[i].mat == m) {
+            if (d.base.empty()) d.base = g_texPendientes[i].path;
+            g_texPendientes[i].mat = NULL;
+        }
+    if (m->normalTexture) d.normal = m->normalTexture->path;
+    // las capas duermen TODAS o ninguna (despiertan adelante de las que tenga: el orden se conserva)
+    bool capasTodas = !m->capas.empty();
+    for (size_t c = 0; c < m->capas.size(); c++) if (!m->capas[c].tex) capasTodas = false;
+    std::vector<Texture*> sueltas;
+    if (capasTodas) {
+        for (size_t c = 0; c < m->capas.size(); c++) {
+            TexCapaDormida cd;
+            cd.textura = m->capas[c].tex->path; cd.mezcla = m->capas[c].blend; cd.uv = m->capas[c].uvMapa; cd.on = m->capas[c].on;
+            d.capas.push_back(cd);
+            sueltas.push_back(m->capas[c].tex);
+        }
+        m->capas.clear();
+    }
+    if (d.base.empty() && d.normal.empty() && d.capas.empty()) return false;
+    sueltas.push_back(m->texture);
+    sueltas.push_back(m->normalTexture);
+    m->texture = NULL;
+    m->normalTexture = NULL;
+    TexturasDormir(d);
+    // las ranuras sueltan su referencia (la textura que ningun otro material retiene se libera YA)
+    for (size_t i = 0; i < sueltas.size(); i++) TexturaSoltar(sueltas[i]);
+    return true;
+}
+int TexturasDespertarUsadas() {
+    if (g_texDormidas.empty() || !SceneCollection) return 0;
+    std::set<const Material*> usados;
+    JuntarMaterialesUsados(SceneCollection, usados);
+    std::vector<TexDormida> despertar;
+    for (size_t i = 0; i < g_texDormidas.size(); ) {
+        if (usados.count(g_texDormidas[i].mat)) {
+            despertar.push_back(g_texDormidas[i]);
+            g_texDormidas.erase(g_texDormidas.begin() + (long)i);
+        } else i++;
+    }
+    for (size_t i = 0; i < despertar.size(); i++) DespertarUna(despertar[i]);
+    return (int)despertar.size();
+}
+bool TexturasDespertar(Material* mat) {
+    for (size_t i = 0; i < g_texDormidas.size(); i++) {
+        if (g_texDormidas[i].mat != mat) continue;
+        const TexDormida d = g_texDormidas[i];
+        g_texDormidas.erase(g_texDormidas.begin() + (long)i);
+        DespertarUna(d);
+        return true;
+    }
+    return false;
+}
+// una malla que PASA a usar un material dormido: se revisa la escena cuando nacieron objetos (un
+// duplicado, un anexo del streaming) y, en el editor, cada tanto (asignarle un material a una malla que
+// ya existe no crea objetos). Sin dormidas no cuesta nada; con, un recorrido cada 16 cuadros.
+static void RevisarDormidas() {
+    if (g_texDormidas.empty()) return;
+    static unsigned int visto = 0;
+    static int cuadros = 0;
+    cuadros++;
+    const unsigned int nacidos = W3dObjetosNacidos();
+    bool revisar = (nacidos != visto && cuadros >= 4);
+#ifndef W3D_SIN_EDITOR
+    if (cuadros >= 16) revisar = true;
+#endif
+    if (!revisar) return;
+    visto = nacidos;
+    cuadros = 0;
+    TexturasDespertarUsadas();
+}
+
+// una textura de la cola (sin la revision de las dormidas: CargarTodas la hace una vez antes)
+static void CargarUnaPendiente() {
     if (g_texPendIdx >= g_texPendientes.size()) {
         if (!g_texPendientes.empty()) { g_texPendientes.clear(); g_texPendIdx = 0; } // termino -> liberar la cola
         return;
@@ -169,24 +315,33 @@ void CargarTexturasPendientes() {
     g_redraw = true; // redibujar con la textura recien cargada (las texturas "aparecen")
 }
 
+void CargarTexturasPendientes() {
+    RevisarDormidas();
+    CargarUnaPendiente();
+}
+
 // cuantas quedan en la cola sin decodificar. Lo mira el PLAY: no se puede
 // arrancar el juego con la mitad de las texturas en gris (reporte del dueno).
+// Las DORMIDAS no cuentan: son de materiales que nadie dibuja.
 int TexturasPendientes() {
     return (g_texPendIdx < g_texPendientes.size())
          ? (int)(g_texPendientes.size() - g_texPendIdx) : 0;
 }
 
 // tira la cola entera SIN cargar nada (cierre de proyecto): las entradas
-// apuntan a materiales del proyecto que se esta cerrando.
+// apuntan a materiales del proyecto que se esta cerrando. Las dormidas tambien.
 void OlvidarTexturasPendientes() {
     g_texPendientes.clear();
     g_texPendIdx = 0;
+    g_texDormidas.clear();
 }
 
 // vacia la cola ENTERA de una (la usa el export: la textura tiene que estar
-// cargada YA para poder escribirla; antes se simulaba con 100000 llamadas)
+// cargada YA para poder escribirla; antes se simulaba con 100000 llamadas).
+// Antes despierta las dormidas que alguna malla ya usa (esas tambien se dibujan).
 void CargarTodasTexturasPendientes() {
-    while (g_texPendIdx < g_texPendientes.size()) CargarTexturasPendientes();
+    TexturasDespertarUsadas();
+    while (g_texPendIdx < g_texPendientes.size()) CargarUnaPendiente();
 }
 
 void Wavefront::Reset() {
@@ -195,6 +350,7 @@ void Wavefront::Reset() {
     cornerColors.clear();
     normals.clear();
     uv.clear();
+    uv2.clear();
     faces.clear();
     looseEdges.clear();
     materialsGroup.clear();
@@ -210,7 +366,9 @@ void Wavefront::ConvertToES1(Mesh* TempMesh, int* acumuladoVertices, int* acumul
     std::vector<GLubyte> newColors;
     std::vector<GLbyte> newNormals;
     std::vector<GLfloat> newUVs;
+    std::vector<GLfloat> newUVs2;   // 2da capa UV por render-vert -> TempMesh->uvExtra[1]
     std::vector<MeshIndex> newFaces;
+    const bool hayUV2 = !uv2.empty();
 
     TVertexMap vertexMap;
     std::vector<int> posToMesh((size_t)(vertex.size()/3), -1); // posicion OBJ -> primer vertice de malla (para 'l')
@@ -256,7 +414,7 @@ void Wavefront::ConvertToES1(Mesh* TempMesh, int* acumuladoVertices, int* acumul
             // color: por ESQUINA (fc.color>=0 -> cornerColors) o por VERTICE (vertexColor[fc.vertex]).
             // el key del color usa un indice NEGATIVO para el por-esquina (no colisiona con el por-vertice).
             int colorKey = (fc.color >= 0) ? -(fc.color + 1) : fc.vertex;
-            VertexKey key = {fc.vertex, fc.normal, fc.uv, colorKey};
+            VertexKey key = {fc.vertex, fc.normal, fc.uv, colorKey, hayUV2 ? fc.uv2 : -1};
             TVertexMap::iterator it = vertexMap.find(key);
             MeshIndex idx;
             if (it != vertexMap.end()) {
@@ -283,6 +441,12 @@ void Wavefront::ConvertToES1(Mesh* TempMesh, int* acumuladoVertices, int* acumul
                     for (int u = 0; u < 2; u++) {
                         size_t ui = (size_t)(fc.uv < 0 ? 0 : fc.uv) * 2 + u;
                         newUVs.push_back(ui < uv.size() ? uv[ui] : 0.0f);
+                    }
+                }
+                if (hayUV2) {
+                    for (int u = 0; u < 2; u++) {
+                        size_t ui = (size_t)fc.uv2 * 2 + u;
+                        newUVs2.push_back((fc.uv2 >= 0 && ui < uv2.size()) ? uv2[ui] : 0.0f);
                     }
                 }
             }
@@ -328,6 +492,7 @@ void Wavefront::ConvertToES1(Mesh* TempMesh, int* acumuladoVertices, int* acumul
                 if (hayNormales) { newNormals.push_back(0); newNormals.push_back(127); newNormals.push_back(0); }
                 for (int v = 0; v < 4; v++) { size_t ci=(size_t)pos*4+v; newColors.push_back(ci<vertexColor.size()?vertexColor[ci]:(GLubyte)255); }
                 if (hayUVs) { newUVs.push_back(0.0f); newUVs.push_back(0.0f); }
+                if (hayUV2) { newUVs2.push_back(0.0f); newUVs2.push_back(0.0f); }
                 posToMesh[pos] = nuevo; mm[s] = nuevo;
             }
             if (mm[0]>=0 && mm[1]>=0 && mm[0]!=mm[1]) { TempMesh->looseEdges.push_back(mm[0]); TempMesh->looseEdges.push_back(mm[1]); }
@@ -356,6 +521,9 @@ void Wavefront::ConvertToES1(Mesh* TempMesh, int* acumuladoVertices, int* acumul
         TempMesh->uv = new GLfloat[newUVs.size()];
         std::copy(newUVs.begin(), newUVs.end(), TempMesh->uv);
     }
+    // 2da capa UV (TEXCOORD_1): al render como uvExtra[1]; PoblarCapas la vuelve una capa editable "UV2"
+    TempMesh->uvExtra.clear();
+    if (hayUV2 && !newUVs2.empty()) { TempMesh->uvExtra.resize(2); TempMesh->uvExtra[1] = newUVs2; }
 
     TempMesh->facesSize = (int)newFaces.size();
     TempMesh->faces = new MeshIndex[newFaces.size() ? newFaces.size() : 1];
@@ -1058,10 +1226,46 @@ static void EscribirMaterialMTL(std::ofstream& mtl, Material* mat, const std::st
     mtl << "\n";
 }
 
+// LA EDICION PRESTADA para exportar: las mallas de un RECURSO compartido tienen sus caras
+// PENDIENTES (objects/MallaRecurso.h) y el OBJ se escribe por caras (faces3d). Se leen antes de
+// escribir y, al terminar, las que se leyeron solo para esto vuelven a quedar pendientes (el
+// export no deja la memoria de mil arboles cargada). false = alguna no se pudo leer: exportarla
+// sin caras seria perder su geometria sin avisar.
+static bool EdicionParaExportar(const std::vector<Mesh*>& meshes, std::vector<Mesh*>& prestadas) {
+    prestadas.clear();
+    for (size_t i = 0; i < meshes.size(); i++) {
+        Mesh* m = meshes[i];
+        if (m->edicionPendiente.empty()) continue;
+        const bool delRecurso = m->malla != NULL;
+        if (!W3dMallaBinMaterializarEdicion(m)) {
+            // (el que llama avisa que el OBJ no se guardo; el motivo queda en el log)
+            w3dLogfE("ExportOBJ: no pude leer las caras de '%s': no exporto", m->name.c_str());
+            return false;
+        }
+        if (delRecurso) prestadas.push_back(m);
+    }
+    return true;
+}
+static void SoltarPrestadas(std::vector<Mesh*>& prestadas) {
+    for (size_t i = 0; i < prestadas.size(); i++) W3dMallaSoltarEdicion(prestadas[i]);
+    prestadas.clear();
+}
+namespace {
+struct SoltarPrestadasAlSalir {   // (cualquier return de ExportOBJ las devuelve a pendientes)
+    std::vector<Mesh*>& v;
+    SoltarPrestadasAlSalir(std::vector<Mesh*>& p) : v(p) {}
+    ~SoltarPrestadasAlSalir() { SoltarPrestadas(v); }
+};
+}
+
 bool ExportOBJ(const std::string& filepath, bool selectedOnly, bool applyModifiers, bool applyTransforms) {
     std::vector<Mesh*> meshes;
     RecolectarMeshesExport(SceneCollection, selectedOnly, meshes);
     if (meshes.empty()) { w3dLogfE("ExportOBJ: NO hay meshes para exportar"); return false; }
+    // las caras de las mallas de un recurso (pendientes) se leen ANTES de escribir nada
+    std::vector<Mesh*> prestadas;
+    SoltarPrestadasAlSalir soltar(prestadas);
+    if (!EdicionParaExportar(meshes, prestadas)) return false;
 
     errno = 0;
     std::ofstream obj(filepath.c_str());

@@ -1,0 +1,57 @@
+# ==========================================================================
+#  STREAMING (revision 4): una instancia DIFERIDA ANIDADA y los overrides de la de AFUERA
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_streaming_rev_anidada.w3s
+#
+#  La Casa (un prefab) tiene adentro un Poste DIFERIDO; la instancia de la Casa oculta el Tronco del Poste de adentro
+#  (un override de la CASA: "Poste/Poste/Tronco"). Cuando el streaming genera el Poste por su cuenta (el Play, la
+#  vista previa), lo nuevo entra a la base de la Casa y se le aplican sus overrides (W3dPrefabAnidadaGenerada); con
+#  el Poste descargado el override se conserva (guardar no lo pierde). Antes: el Tronco volvia visible y editar lo
+#  anidado y dar Play/Stop dejaba la Casa sin overrides.
+# ==========================================================================
+
+ventana 1280 720
+streamanidada /tmp/w3d_f9_rev4 dosmats.png
+abrirw3d /tmp/w3d_f9_rev4/anidada.w3d
+prefabnodo Casa Poste/Poste/Tronco visible 1
+prefabh Casa Poste/Poste/Tronco
+prefabinfo Casa overrides 1
+guardarw3d /tmp/w3d_f9_rev4/anidada2.w3d
+entradatiene /tmp/w3d_f9_rev4/anidada2.w3d proyecto.json Poste/Poste/Tronco 1
+abrirw3d /tmp/w3d_f9_rev4/anidada2.w3d
+prefabinfo Casa overrides 1
+prefabnodo Casa Poste/Poste/Tronco visible 0
+
+# --- el Play: el Poste se suelta al arrancar y el streaming lo genera de nuevo (con el override de la Casa) ---
+simcache 0
+streamobjetivo 0 0 3
+simplay 3
+streamestado Poste cargada
+prefabnodo Casa Poste/Poste/Tronco visible 0
+streamobjetivo 1000 0 1000
+simplay 10
+streamestado Poste descargada
+streamobjetivo 0 0 3
+simplay 10
+streamestado Poste cargada
+prefabnodo Casa Poste/Poste/Tronco visible 0
+simstop
+simcache 1
+prefabinfo Casa overrides 1
+prefabnodo Casa Poste/Poste/Tronco visible 0
+
+# --- la vista previa: con el Poste descargado el override se guarda igual ---
+streamvista 1
+streamobjetivo 1000 0 1000
+streamtick 20
+streamestado Poste descargada
+prefabinfo Casa overrides 1
+guardarw3d /tmp/w3d_f9_rev4/anidada3.w3d
+entradatiene /tmp/w3d_f9_rev4/anidada3.w3d proyecto.json Poste/Poste/Tronco 1
+streamobjetivo 0 0 3
+streamtick 20
+streamestado Poste cargada
+prefabnodo Casa Poste/Poste/Tronco visible 0
+prefabinfo Casa overrides 1
+streamobjetivo off
+streamvista 0

@@ -1,0 +1,50 @@
+# ==========================================================================
+#  LAS ANIMACIONES DE ESQUELETO (animsets .w3da) EN EL JUEGO COMPILADO
+#  Correr DESDE ESTA CARPETA:
+#    cd <motor>/tools/pruebas
+#    ../../platform/linux/build/whisk3d --script prueba_juego3d_anims.w3s
+#
+#  EL CASO. Desde los animsets los clips de esqueleto ya NO viajan adentro de
+#  proyecto.json: van en entradas aparte (animaciones/<slug>.w3da) que el juego
+#  lee al abrir la escena. Si esa carpeta no llega a los assets del juego (la
+#  lista de carpetas de CompilarJuego, que usan el staging suelto, el pak, el APK
+#  y emcc) o el runtime no resuelve la entrada, el juego queda SIN CLIPS y en
+#  silencio: los personajes quedan quietos. Las pruebas de animsets corren en el
+#  EDITOR (prueba_animsets*.w3s); aca se compila el juego y se mira el binario.
+#
+#    1. el juego 3D minimo (juego3dmin) + tres armatures del mismo rig con sus
+#       clips (animsetsintetica ... agregar), guardado con los clips en UN
+#       animset .w3da (ninguno inline);
+#    2. el .lua del juego prende la franja verde del HUD SOLO si animClip /
+#       animLargo ven los clips de los armatures (animsetluajuego), y se compila;
+#    3. juego3dpx: la franja tiene que verse;
+#    4. la prueba se prueba a si misma: sin la carpeta animaciones/ en los assets
+#       del juego, el MISMO binario no la prende (juego3dpx falla); con la
+#       carpeta de vuelta, pasa otra vez.
+#
+#  Si falla, la captura queda en <carpeta>/captura.png para mirarla.
+#  Compila un juego de verdad (cmake + g++), asi que tarda mas que las demas.
+# ==========================================================================
+
+ventana 640 480
+
+# --- 1) el juego 3D minimo con personajes animados, guardado y abierto ---------
+juego3dmin /tmp/w3d_juego3danims
+animsetsintetica 3 agregar
+animsetluajuego /tmp/w3d_juego3danims
+guardarw3d /tmp/w3d_juego3danims/juego3dmin.w3d
+animsetsw3d /tmp/w3d_juego3danims/juego3dmin.w3d animsets 1 clips 5 armatures 3 inline 0
+abrirw3d /tmp/w3d_juego3danims/juego3dmin.w3d
+animsetinfo vivos 1 registro 1
+
+# --- 2) compilarlo para Linux, con los assets sueltos ---------------------------
+compilarjuego 0 0
+
+# --- 3) correr el BINARIO: la franja se prende solo si los clips cargaron -------
+juego3dpx /tmp/w3d_juego3danims juego3dmin
+
+# --- 4) sin los .w3da en los assets, el mismo binario NO la prende -------------
+animsetjuegoquitar /tmp/w3d_juego3danims quitar
+fail juego3dpx /tmp/w3d_juego3danims juego3dmin
+animsetjuegoquitar /tmp/w3d_juego3danims volver
+juego3dpx /tmp/w3d_juego3danims juego3dmin

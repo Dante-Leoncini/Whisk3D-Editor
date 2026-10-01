@@ -1,0 +1,238 @@
+# ==========================================================================
+#  LA MALLA BINARIA (.w3db, libs/Whisk3DCore/io/W3dMallaBin.h): el formato por
+#  defecto de las mallas al guardar. Abrir = leer la entrada + copiar: CERO
+#  merge, triangulacion, Forsyth, CalcularBordes o capas al render al cargar.
+#  Correr DESDE ESTA CARPETA:
+#    cd <motor>/tools/pruebas
+#    ../../platform/linux/build/whisk3d --script prueba_w3db.w3s
+#
+#  Lo que se exige (la aceptacion de la malla binaria):
+#   A) EQUIVALENCIA: una malla cargada de su .w3dm y la misma cargada de su .w3db
+#      quedan IDENTICAS en memoria (arrays de render, index buffer, parts, puntos,
+#      grupos, formas, AABB, malla generada, y los datos de edicion) y dan el
+#      mismo skinning, las mismas vertex anims y las mismas shape keys en varios
+#      cuadros (mallafoto / mallafotoigual).
+#   B) ROUND-TRIP: abrir -> guardar -> abrir -> guardar da los MISMOS bytes, el
+#      contenedor entero (.w3db y proyecto.json).
+#   C) ABRIR NO DERIVA NADA: cargabench cuenta 0 mallas derivadas; y reabrir no
+#      deja memoria (fugakb). La linea "[CARGA] mallas" del log dice lo mismo
+#      (logcargamallas): es lo que se puede mirar en el telefono.
+#   D) los TRES lectores coinciden: el del editor, el del juego compilado (solo
+#      render + materializar la edicion por ConstruirPolyMesh) y el de la malla de
+#      render sin Mesh (la base del recurso compartido). El modo noEditable al
+#      reves de como se guardo da lo mismo que la carga clasica.
+#   E) ROBUSTEZ: archivos cortados y bytes al azar no crashean ni dejan la malla
+#      a medio llenar; version mas nueva se rechaza; un bloque desconocido se
+#      preserva; uno desconocido y REQUERIDO frena el guardado.
+#   F) la OPCION DEL PROYECTO "formatoMallas": "texto" se guarda y se respeta, y
+#      un proyecto en .w3dm migra a .w3db al guardarlo en binario (y al reves).
+#   G) los tests de guardar/abrir que no miran el texto, corridos en binario.
+#   H) el tilde de la UI (tarjeta Archivo, "Meshes as text") ES la opcion del
+#      proyecto; el codigo, el registro de nombres (formato/bloques.tsv) y la spec
+#      (formato/w3db.md) dicen lo mismo; y el CRC32 del contenedor es el del zip.
+#   I) INDICES DE 16 BITS (el N95): una malla de mas de 65535 render-verts no entra
+#      en el .w3db (su index buffer se trunca en memoria): se guarda en TEXTO.
+#   J) el JUEGO COMPILADO solo lee la edicion de la malla cuyo stack GENERA malla
+#      (el PVS/Oclusion o un modificador apagado no la cargan); lo pendiente se
+#      materializa al pedirlo y al guardar.
+#   K) la PRESERVACION del .w3dm (bloques de una version mas nueva + "requiere")
+#      a traves del binario (AJEN): texto -> binario -> texto da el mismo .w3dm.
+#  (E incluye las claves SHRP/SEAM: little-endian, la mitad menor primero, y el
+#  lector no depende del orden de las mitades: w3dbmarcas.)
+#  (Los tests que MIDEN el .w3dm de texto fijan "formatomallas texto": ver
+#  prueba_formatos.w3s.) Escribe en tools/debug.
+# ==========================================================================
+ventana 1280 720
+
+# --- A/B/C/D/E: una malla de cada caso del formato (capas UV y de color con una
+#     por vertice, dos parts con material, shading por cara, sharp/seam, vertex
+#     groups, shape key, UV group + reposo 2D, geometria suelta, noEditable, rig
+#     con clip, vertex anim, Mirror, flipbook) y una de mas de 65535 render-verts
+#     (indices de 32 bits) --------------------------------------------------------
+mallarica grande
+formatomallas texto
+guardarw3d ../debug/w3db_rica_t.w3d
+w3dbinfo ../debug/w3db_rica_t.w3d w3db 0 w3dm 7
+abrirw3d ../debug/w3db_rica_t.w3d
+# la linea "[CARGA] mallas" del log (en el telefono, e:\whisk3d.log): .w3db listas / .w3dm
+# derivadas al abrir / .w3db rechazadas. Se escribe siempre, sin reloj de medicion.
+logcargamallas 0 7 0
+mallafoto T frame 1 frame 7 frame 15
+formatomallas binario
+guardarw3d ../debug/w3db_rica_b.w3d
+w3dbinfo ../debug/w3db_rica_b.w3d w3db 7 w3dm 0 tiene REQ tiene INFO tiene RPOS tiene RIDX tiene PART tiene RCTL tiene FACE
+abrirw3d ../debug/w3db_rica_b.w3d
+logcargamallas 7 0 0
+mallafoto B frame 1 frame 7 frame 15
+mallafotoigual T B
+cargabench ../debug/w3db_rica_b.w3d 1 mallas 7 mallasbin 7 derivadas 0
+guardarw3d ../debug/w3db_rica_b2.w3d
+w3diguales ../debug/w3db_rica_b.w3d ../debug/w3db_rica_b2.w3d
+abrirw3d ../debug/w3db_rica_b2.w3d
+guardarw3d ../debug/w3db_rica_b3.w3d
+w3diguales ../debug/w3db_rica_b2.w3d ../debug/w3db_rica_b3.w3d
+w3dbrender ../debug/w3db_rica_b2.w3d
+w3dbcorrupto ../debug/w3db_rica_b2.w3d
+w3dbmarcas ../debug/w3db_rica_b2.w3d
+# el guardia del reparto: el texto SI deriva (y lo cuenta)
+cargabench ../debug/w3db_rica_t.w3d 1 mallas 7 mallasbin 0 derivadas 7
+# una .w3db ROTA adentro del proyecto (cortada, o de una version mas nueva): esa
+# malla no carga, las demas si, y guardar encima se FRENA (no se hornea la nada)
+w3dbromper ../debug/w3db_rica_b2.w3d ../debug/w3db_rota.w3d corte
+cargabench ../debug/w3db_rota.w3d 1 mallas 7 mallasbin 6 derivadas 0
+logcargamallas 6 0 1
+fail guardarw3d ../debug/w3db_rota2.w3d
+w3dbromper ../debug/w3db_rica_b2.w3d ../debug/w3db_futura.w3d version
+abrirw3d ../debug/w3db_futura.w3d
+logcargamallas 6 0 1
+fail guardarw3d ../debug/w3db_futura2.w3d
+
+# --- I: INDICES DE 16 BITS (el N95). Ahi una malla de mas de 65535 render-verts tiene
+#     el index buffer TRUNCADO en memoria: no entra en el .w3db (saldria un RIDX con los
+#     triangulos equivocados). El guardado la manda en TEXTO (las caras van con int) y
+#     el resto sigue en binario; reabierta es la MISMA malla (la foto T es la del texto) --
+formatomallas binario
+abrirw3d ../debug/w3db_rica_b.w3d
+indices16 1
+guardarw3d ../debug/w3db_rica_i16.w3d
+indices16 0
+w3dbinfo ../debug/w3db_rica_i16.w3d w3db 6 w3dm 1
+abrirw3d ../debug/w3db_rica_i16.w3d
+mallafoto I frame 1 frame 7 frame 15
+mallafotoigual T I
+
+# --- A sobre proyectos de prueba reales (formato de texto viejo con .obj + sus
+#     sidecars): el PVS indexa los triangulos de faces[] y el .w3db tiene que
+#     traer EXACTAMENTE ese orden ---------------------------------------------------
+formatomallas texto
+abrirw3d prueba_pvs.w3d
+guardarw3d ../debug/w3db_pvs_t.w3d
+abrirw3d ../debug/w3db_pvs_t.w3d
+mallafoto PT
+formatomallas binario
+guardarw3d ../debug/w3db_pvs_b.w3d
+abrirw3d ../debug/w3db_pvs_b.w3d
+mallafoto PB
+mallafotoigual PT PB
+formatomallas texto
+abrirw3d prueba_costura.w3d
+guardarw3d ../debug/w3db_cos_t.w3d
+abrirw3d ../debug/w3db_cos_t.w3d
+mallafoto CT frame 1 frame 5
+formatomallas binario
+guardarw3d ../debug/w3db_cos_b.w3d
+abrirw3d ../debug/w3db_cos_b.w3d
+mallafoto CB frame 1 frame 5
+mallafotoigual CT CB
+formatomallas texto
+abrirw3d prueba_uvanim.w3d
+guardarw3d ../debug/w3db_uva_t.w3d
+abrirw3d ../debug/w3db_uva_t.w3d
+mallafoto UT frame 1 frame 3
+formatomallas binario
+guardarw3d ../debug/w3db_uva_b.w3d
+abrirw3d ../debug/w3db_uva_b.w3d
+mallafoto UB frame 1 frame 3
+mallafotoigual UT UB
+formatomallas texto
+abrirw3d prueba_dosmats.w3d
+guardarw3d ../debug/w3db_dos_t.w3d
+abrirw3d ../debug/w3db_dos_t.w3d
+mallafoto DT
+formatomallas binario
+guardarw3d ../debug/w3db_dos_b.w3d
+abrirw3d ../debug/w3db_dos_b.w3d
+mallafoto DB
+mallafotoigual DT DB
+
+# --- C: mallas iguales en cantidad, y reabrir el binario no deja memoria viva. Las 40
+#     mallas iguales se guardan como UNA malla del proyecto (un .w3db que usan los 40
+#     objetos: registro "mallas", objects/MallaRecurso.h); los 40 abren sin derivar nada ---
+escenasintetica 40 ../debug/w3db_sint.w3d
+w3dbinfo ../debug/w3db_sint.w3d w3db 1 w3dm 0
+cargabench ../debug/w3db_sint.w3d 3 mallas 40 mallasbin 40 derivadas 0 fugakb 32
+
+# --- F: la opcion del PROYECTO. Sin el forzado del harness manda el proyecto:
+#     un .w3d sin la clave es binario; "texto" se guarda en proyecto.json, se lee
+#     al abrir, y el guardado migra las entradas (las del otro formato se van) ---
+formatomallas proyecto
+abrirw3d ../debug/w3db_rica_b.w3d
+formatomallas es binario
+formatomallas proyecto texto
+guardarw3d ../debug/w3db_rica_opt.w3d
+w3dbinfo ../debug/w3db_rica_opt.w3d w3db 0 w3dm 7
+abrirw3d ../debug/w3db_rica_opt.w3d
+formatomallas es texto
+guardarw3d ../debug/w3db_rica_opt2.w3d
+w3diguales ../debug/w3db_rica_opt.w3d ../debug/w3db_rica_opt2.w3d
+formatomallas proyecto binario
+guardarw3d ../debug/w3db_rica_opt3.w3d
+w3dbinfo ../debug/w3db_rica_opt3.w3d w3db 7 w3dm 0
+abrirw3d ../debug/w3db_rica_opt3.w3d
+formatomallas es binario
+mallafoto O frame 1 frame 7 frame 15
+mallafotoigual T O
+# un proyecto nuevo arranca en binario aunque el anterior fuera de texto
+abrirw3d ../debug/w3db_rica_opt.w3d
+formatomallas es texto
+escenadefecto
+formatomallas es binario
+
+# --- G: los tests de guardar/abrir que no miran el texto, ahora por el binario --
+formatomallas binario
+escenadefecto
+contenedor
+zipidx
+montaje
+w3dcotas
+escenadefecto
+w3dmf10
+escenadefecto
+vaguardado
+escenadefecto
+vanocargo
+escenadefecto
+uinocarga
+escenadefecto
+animsave
+escenadefecto
+modsave
+escenadefecto
+vistasave
+escenadefecto
+arm2dsave
+formatomallas proyecto
+
+# --- J: la EDICION de las .w3db en el JUEGO COMPILADO (abierto COMO el juego): solo la
+#     carga la malla cuyo stack GENERA malla; la de solo Oclusion (PVS), la de un Mirror
+#     apagado y la comun quedan pendientes. Lo pendiente se materializa al pedirlo
+#     (ConstruirPolyMesh) y al guardar (las mallas salen identicas) --------------------
+w3dbjuego ../debug/w3db_juego.w3d
+
+# --- K: la PRESERVACION del .w3dm a traves del binario (bloque AJEN): un .w3dm con
+#     bloques de una version mas nueva (uno de cara, uno global) y un "requiere" que no
+#     es el default: texto -> binario -> texto da el MISMO .w3dm; y si la topologia
+#     cambia, el bloque de cara se descarta avisando y el global sigue --------------
+w3dbajenos ../debug/w3db_ajen
+
+# --- H: el control de la UI, el registro de nombres y el CRC del contenedor ------
+#     el tilde "Meshes as text" de la tarjeta Archivo refleja el proyecto que se
+#     abre, un click cambia el formato del proximo guardado, y un proyecto nuevo
+#     arranca destildado (binario)
+abrirw3d ../debug/w3db_rica_opt.w3d
+formatomallasui tilde 1
+formatomallasui clic tilde 0
+formatomallas es binario
+guardarw3d ../debug/w3db_rica_ui.w3d
+w3dbinfo ../debug/w3db_rica_ui.w3d w3db 7 w3dm 0
+formatomallasui clic tilde 1
+formatomallas es texto
+escenadefecto
+formatomallasui tilde 0
+abrirw3d ../debug/w3db_rica_ui.w3d
+formatomallasui tilde 0
+# el codigo, formato/bloques.tsv (filas w3db:) y formato/w3db.md dicen lo mismo, y
+# todo bloque que el motor escribe esta registrado (sin formato/: SIN CORPUS)
+w3dbregistro ../debug/w3db_rica_b2.w3d
+# el CRC32 del contenedor (de a 8 bytes) contra los vectores de control del zip
+zipcrc

@@ -1,0 +1,220 @@
+# ==========================================================================
+#  LIBRERIAS EXTERNAS: los arreglos de la REVISION (io/Librerias.h, objects/ProxyW3d.h)
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_librerias_revision.w3s
+#
+#    A) BORRAR un proxy (o una instancia de prefab) se lleva lo que genero: nada queda suelto en el nivel (editable,
+#       guardado con recursos de la libreria, con sus scripts corriendo en el Play) y Ctrl+Z lo devuelve entero;
+#       borrar SOLO el padre de un proxy conserva el proxy con lo suyo;
+#    B) el juego compilado lleva una libreria que el nivel usa SOLO desde lua (instanciar("personajes/Enemigo") sin
+#       ningun proxy);
+#    C) un nivel cuyo unico objeto 3D es un proxy se compila como juego 3D;
+#    D) los FLIPBOOKS de una libreria no se filtran al nivel (ni a un proyecto nuevo los del anterior);
+#    E) DESVINCULAR con mallas de la libreria usadas por el proyecto: cada una pasa a su copia propia (Ctrl+Z la
+#       devuelve) y el nivel se sigue guardando; una referencia a una libreria que NO ESTA (su archivo falta) se
+#       conserva al guardar sin frenarlo y vuelve a resolverse al vincularla (malla y animset).
+#  Compila juegos de verdad (cmake + g++), asi que tarda mas que las demas.
+# ==========================================================================
+
+ventana 1280 720
+libcrear /tmp/w3d_f8_rev/lib personajes.w3d dosmats.png
+
+# --- A) BORRAR un proxy se lleva lo que genero (y Ctrl+Z lo devuelve) ---
+escenadefecto
+libvincular /tmp/w3d_f8_rev/lib/personajes.w3d
+libproxy personajes prefab Arbol 3 0 -6
+libproxy personajes prefab Enemigo 0 0 -6 veces 2
+prefabvivos 3
+selobj Tronco
+selobj Arbol
+delete
+prefabvivos 2
+fail selobj Tronco
+fail selobj Arbol
+undo
+prefabvivos 3
+libproxyinfo Arbol libreria personajes elemento Arbol generados 2
+prefabnodo Arbol . nombre Arbol generado 1
+libmarca Arbol Tronco candado
+redo
+prefabvivos 2
+fail selobj Tronco
+# (un Enemigo borrado no deja su Cuerpo / Sensor / script sueltos: en el Play corre UN solo enemigo)
+selobj Enemigo.001
+delete
+prefabvivos 1
+guardarw3d /tmp/w3d_f8_rev/nivel/borrado.w3d
+entradatiene /tmp/w3d_f8_rev/nivel/borrado.w3d proyecto.json Tronco 0
+entradatiene /tmp/w3d_f8_rev/nivel/borrado.w3d proyecto.json Sensor 0
+entradatiene /tmp/w3d_f8_rev/nivel/borrado.w3d proyecto.json personajes/Cuerpo 0
+entradatiene /tmp/w3d_f8_rev/nivel/borrado.w3d proyecto.json lib:personajes/ 0
+simcache 0
+simplay 3
+scriptinfo compartido enemigos 1
+simstop
+simcache 1
+# (borrar el PADRE de un proxy, sin el proxy: el proxy sube con lo suyo; borrar los dos: no queda nada)
+prefabadd empty
+objname Grupo
+libproxy personajes prefab Arbol 6 0 -6
+parent Arbol Grupo
+selobj Grupo
+delete
+libproxyinfo Arbol generados 2
+prefabnodo Arbol Tronco tipo mesh generado 1
+undo
+prefabelegir Grupo Arbol
+delete
+fail selobj Tronco
+fail selobj Grupo
+undo
+libproxyinfo Arbol generados 2
+# (una INSTANCIA de un prefab del PROYECTO, igual)
+prefabenemigo /tmp/w3d_f8_rev/pf
+prefabinstanciar Enemigo 0 0 -6 veces 2
+prefabvivos 2
+selobj Enemigo
+delete
+prefabvivos 1
+undo
+prefabvivos 2
+prefabinfo Enemigo generados 4
+redo
+prefabvivos 1
+guardarw3d /tmp/w3d_f8_rev/pf/inst.w3d
+entradatiene /tmp/w3d_f8_rev/pf/inst.w3d proyecto.json Sensor 0
+abrirw3d /tmp/w3d_f8_rev/pf/inst.w3d
+prefabvivos 1
+simcache 0
+simplay 3
+scriptinfo compartido enemigos 1
+simstop
+simcache 1
+
+# --- B) una libreria usada SOLO desde lua viaja con el juego compilado ---
+libjuegomin /tmp/w3d_f8_rev/sololua /tmp/w3d_f8_rev/lib/personajes.w3d proxies 0
+prefabvivos 0
+guardarw3d /tmp/w3d_f8_rev/sololua/sololua.w3d
+entradatiene /tmp/w3d_f8_rev/sololua/sololua.w3d proyecto.json "proxy", 0
+abrirw3d /tmp/w3d_f8_rev/sololua/sololua.w3d
+simcache 0
+simplay 30
+scriptinfo compartido juez OK
+scriptinfo compartido enemigos 5
+simstop
+simcache 1
+compilarjuego 0 0 1
+libruta /tmp/w3d_f8_rev/sololua/platform-build/linux/librerias/personajes/proyecto.json lee 1
+libruta /tmp/w3d_f8_rev/sololua/platform-build/linux/librerias/personajes/scripts/enemigo.lua lee 1
+libjuegolog /tmp/w3d_f8_rev/sololua sololua creados=5 enemigos=5 scope=5 vida=50
+
+# --- C) un nivel cuyo UNICO objeto 3D es un proxy es un juego 3D ---
+juego3dmin /tmp/w3d_f8_rev/soloproxy
+selobj Cubo
+delete
+selobj CuboAfuera
+delete
+selobj Camara
+delete
+libvincular /tmp/w3d_f8_rev/lib/personajes.w3d
+libproxy personajes prefab Lanzador 0 0 0
+guardarw3d /tmp/w3d_f8_rev/soloproxy/soloproxy.w3d
+abrirw3d /tmp/w3d_f8_rev/soloproxy/soloproxy.w3d
+prefabvivos 1
+compilarjuego 0 0 1
+libruta /tmp/w3d_f8_rev/soloproxy/platform-build/linux/proyecto.json lee 1
+libruta /tmp/w3d_f8_rev/soloproxy/platform-build/linux/librerias/personajes/proyecto.json lee 1
+
+# --- D) los FLIPBOOKS de una libreria no se filtran al nivel ---
+escenadefecto
+fliptex Chispa /tmp/w3d_f8_rev/lib/piel.png
+raiznueva prefab Cosa
+add cube
+raizabrir Scene
+guardarw3d /tmp/w3d_f8_rev/fx/fx.w3d
+entradatiene /tmp/w3d_f8_rev/fx/fx.w3d proyecto.json Chispa 1
+# (un proyecto NUEVO no hereda los flipbooks del anterior)
+escenadefecto
+fail texrefde flipbook Chispa -
+guardarw3d /tmp/w3d_f8_rev/fx/vacio.w3d
+entradatiene /tmp/w3d_f8_rev/fx/vacio.w3d proyecto.json Chispa 0
+libvincular /tmp/w3d_f8_rev/fx/fx.w3d
+libproxy fx prefab Cosa 0 0 0
+texrefde flipbook fx/Chispa /tmp/w3d_f8_rev/lib/piel.png
+guardarw3d /tmp/w3d_f8_rev/fx/nivel.w3d
+entradatiene /tmp/w3d_f8_rev/fx/nivel.w3d proyecto.json fx/Chispa 0
+entradatiene /tmp/w3d_f8_rev/fx/nivel.w3d proyecto.json "flipbooks" 0
+abrirw3d /tmp/w3d_f8_rev/fx/nivel.w3d
+texrefde flipbook fx/Chispa /tmp/w3d_f8_rev/lib/piel.png
+guardarw3d /tmp/w3d_f8_rev/fx/nivel2.w3d
+entradatiene /tmp/w3d_f8_rev/fx/nivel2.w3d proyecto.json fx/Chispa 0
+
+# --- E) DESVINCULAR con mallas de la libreria en el proyecto: cada una pasa a su copia (Ctrl+Z la devuelve) ---
+escenadefecto
+libvincular /tmp/w3d_f8_rev/lib/personajes.w3d
+outvista lib:personajes
+add cube
+selobj Cubo.001
+propstab 3
+outsoltar Tronco props malla
+mallainfo Cubo.001 recurso personajes/Tronco
+libdesvincular personajes
+libinfo personajes vinculada 0
+mallainfo Cubo.001 recurso Tronco
+undo
+libinfo personajes vinculada 1
+mallainfo Cubo.001 recurso personajes/Tronco
+redo
+mallainfo Cubo.001 recurso Tronco
+guardarw3d /tmp/w3d_f8_rev/nivel/n1.w3d
+entradaexiste /tmp/w3d_f8_rev/nivel/n1.w3d mallas/tronco.w3db 1
+abrirw3d /tmp/w3d_f8_rev/nivel/n1.w3d
+mallainfo Cubo.001 recurso Tronco
+guardarw3d /tmp/w3d_f8_rev/nivel/n2.w3d
+# (una referencia a una libreria que NO ESTA: su archivo falta. El objeto queda vacio pero se guarda sin frenar y con
+#  su referencia; vuelve cuando la libreria vuelve: al reabrir, y en la sesion al vincularla otra vez)
+escenadefecto
+libvincular /tmp/w3d_f8_rev/lib/personajes.w3d
+outvista lib:personajes
+add cube
+selobj Cubo.001
+propstab 3
+outsoltar Tronco props malla
+outvista escena
+guardarw3d /tmp/w3d_f8_rev/nivel/ref.w3d
+entradatiene /tmp/w3d_f8_rev/nivel/ref.w3d proyecto.json personajes/Tronco 1
+libmover /tmp/w3d_f8_rev/lib/personajes.w3d /tmp/w3d_f8_rev/lib/personajes.aparte
+abrirw3d /tmp/w3d_f8_rev/nivel/ref.w3d
+libinfo personajes vinculada 1
+guardarw3d /tmp/w3d_f8_rev/nivel/ref2.w3d
+entradatiene /tmp/w3d_f8_rev/nivel/ref2.w3d proyecto.json personajes/Tronco 1
+entradaexiste /tmp/w3d_f8_rev/nivel/ref2.w3d mallas/tronco.w3db 0
+w3diguales /tmp/w3d_f8_rev/nivel/ref.w3d /tmp/w3d_f8_rev/nivel/ref2.w3d
+libmover /tmp/w3d_f8_rev/lib/personajes.aparte /tmp/w3d_f8_rev/lib/personajes.w3d
+abrirw3d /tmp/w3d_f8_rev/nivel/ref2.w3d
+mallainfo Cubo.001 recurso personajes/Tronco
+# (en la sesion: falta al abrir, vuelve el archivo, desvincular + vincular la resuelve)
+libmover /tmp/w3d_f8_rev/lib/personajes.w3d /tmp/w3d_f8_rev/lib/personajes.aparte
+abrirw3d /tmp/w3d_f8_rev/nivel/ref2.w3d
+libmover /tmp/w3d_f8_rev/lib/personajes.aparte /tmp/w3d_f8_rev/lib/personajes.w3d
+libdesvincular personajes
+libvincular /tmp/w3d_f8_rev/lib/personajes.w3d
+mallainfo Cubo.001 recurso personajes/Tronco
+# (el ANIMSET de una libreria que no esta, en un esqueleto del PROYECTO: sin clips, se guarda sin frenar con su
+#  referencia, y vuelve con la libreria)
+prefabenemigo /tmp/w3d_f8_rev/anim
+libvincular /tmp/w3d_f8_rev/lib/personajes.w3d
+prefabinstanciar Enemigo 0 0 0
+prefabdesempaquetar Enemigo
+guardarw3d /tmp/w3d_f8_rev/anim/a.w3d
+animsetapuntar /tmp/w3d_f8_rev/anim/a.w3d /tmp/w3d_f8_rev/anim/b.w3d Esqueleto personajes/Esqueleto
+abrirw3d /tmp/w3d_f8_rev/anim/b.w3d
+animsetarm Esqueleto animset personajes/Esqueleto clips 2 nocargo 0
+libmover /tmp/w3d_f8_rev/lib/personajes.w3d /tmp/w3d_f8_rev/lib/personajes.aparte
+abrirw3d /tmp/w3d_f8_rev/anim/b.w3d
+animsetarm Esqueleto clips 0 nocargo 0
+guardarw3d /tmp/w3d_f8_rev/anim/b2.w3d
+entradatiene /tmp/w3d_f8_rev/anim/b2.w3d proyecto.json personajes/Esqueleto 1
+libmover /tmp/w3d_f8_rev/lib/personajes.aparte /tmp/w3d_f8_rev/lib/personajes.w3d
+abrirw3d /tmp/w3d_f8_rev/anim/b2.w3d
+animsetarm Esqueleto animset personajes/Esqueleto clips 2 nocargo 0

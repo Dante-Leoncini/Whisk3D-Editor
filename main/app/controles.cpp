@@ -1,4 +1,5 @@
 #include "ViewPorts/LayoutInput.h" // ruteo compartido (menus/barras/paneles)
+#include "ViewPorts/LayoutArbol.h"  // aviso de destruccion de viewports (los gestos en curso los sueltan)
 #include "edit/BoxSelect.h"
 #include "ui/ViewPorts/Gizmo.h"   // GizmoDown: click/tap sobre el gizmo de mover
 extern bool g_viewEditMode;   // toggle "vista" tactil (ViewPort3D_Toolbar): en pintura, el dedo navega en vez de pintar
@@ -12,6 +13,7 @@ extern bool g_viewEditMode;   // toggle "vista" tactil (ViewPort3D_Toolbar): en 
 #include "ViewPorts/TransformUI.h" // TransformUIClickBarra (tap en la barra de info -> teclado numerico)
 #include "ViewPorts/IDE.h"         // IDETecladoCaptura/IDETextoTexto (el IDE captura el teclado)
 #include "ViewPorts/UVEditor.h"    // UVEditorTomaTab (Tab sobre el UV = entrar/salir de huesos 2D)
+#include "ViewPorts/Outliner.h"    // el menu contextual de las vistas de recursos (click derecho)
 #include "WhiskUI/draw/glesdraw.h"        // W3dPantallaAlto
 #include "controles.h"
 #include "Undo.h" // Ctrl+Z
@@ -43,6 +45,7 @@ static int W3dTeclaDesdeSDL(SDL_Keycode k){
         case SDLK_END:       return W3dK_END;
         case SDLK_PAGEUP:    return W3dK_PGUP;
         case SDLK_PAGEDOWN:  return W3dK_PGDN;
+        case SDLK_F2:        return W3dK_F2;
         case SDLK_LEFT:      return W3dK_LEFT;
         case SDLK_RIGHT:     return W3dK_RIGHT;
         case SDLK_UP:        return W3dK_UP;
@@ -138,6 +141,27 @@ bool g_uiTapEnCurso = false;        // el LayoutClickUI que corre es un TAP tact
 Uint32 g_lastFingerTicks = 0;       // ultimo evento de DEDO: filtra los mouse FANTASMA que el browser sintetiza
                                     // tras el touch (llegan como mouse "real" y clickeaban/abrian al soltar)
 
+// PULSACION LARGA (tactil) sobre el OUTLINER: el dedo quieto ~0,5 s AGARRA la fila (arrastrar = moverla; soltar sin
+// mover = el menu contextual). Mientras tanto, arrastrar el dedo sigue siendo SCROLL (lo normal). El agarre queda en
+// g_outAgarre hasta levantar el dedo: el motion va derecho al outliner (no scrollea) y el up lo suelta ahi.
+static const Uint32 kPulsacionLargaMs = 500;
+static bool g_outAgarre = false;
+static bool g_contentTapTactil = false;   // el toque de contenido pendiente es de un DEDO (el mouse no agarra asi)
+// DOBLE TAP (tactil): dos toques cortos seguidos en el mismo lugar = el doble click (renombrar en el outliner)
+static Uint32 g_ultimoTapTicks = 0;
+static int g_ultimoTapX = -1000, g_ultimoTapY = -1000;
+void ControlesTick() {
+    if (!g_contentTapPending || !g_contentTapTactil || g_outAgarre || fingers.size() > 1) return;
+    if (!g_barTapView || !g_barTapView->isLeaf() || g_barTapView->ViewportKind() != 2) return;
+    if (SDL_GetTicks() - g_tapStartTicks < kPulsacionLargaMs) { g_redraw = true; return; }   // (sigue esperando)
+    if (LayoutPulsacionLargaUI(g_tapStartX, g_tapStartY)) {
+        g_contentTapPending = false;   // ya no es ni tap ni scroll: es un agarre
+        g_outAgarre = true;
+        ViewPortClickDown = true;
+        g_redraw = true;
+    }
+}
+
 void Contadores(){
     if (LShiftPressed){
         ShiftCount++;
@@ -164,6 +188,19 @@ static void FingerPix(const SDL_TouchFingerEvent& tf, int& mx, int& my){
 // viewport del juego bajo el dedo/mouse en PLAY (antes era static LOCAL de InputUsuarioSDL3; se subio
 // a file-scope para poder alimentar TODOS los dedos al juego por frame, ver AlimentarDedosJuego).
 static ViewportBase* g_toqueJuegoVp = NULL;
+
+// los gestos en curso de este archivo apuntan a viewports del layout: si uno muere (abrir un
+// proyecto libera el layout anterior, cambiar el tipo de un viewport lo reemplaza) se sueltan
+// (LayoutArbol.h). El gesto se pierde; el puntero colgado seria un crash al levantar el dedo.
+static void ControlesOlvidarViewport(ViewportBase* vp) {
+    if (g_scrollView == vp)    g_scrollView = NULL;
+    if (g_barTapView == vp)    g_barTapView = NULL;
+    if (g_cornerVp == vp)    { g_cornerVp = NULL; g_cornerResizing = false; }
+    if (g_tlTapView == vp)   { g_tlTapView = NULL; g_tlTapPending = false; }
+    if (g_toqueJuegoVp == vp)  g_toqueJuegoVp = NULL;
+}
+struct ControlesEngancharOlvido { ControlesEngancharOlvido() { ViewportOlvidarRegistrar(ControlesOlvidarViewport); } };
+static ControlesEngancharOlvido g_controlesEngancheOlvido;
 
 // MULTI-TOUCH del juego: alimenta cada dedo tactil activo al script (dedo(1), dedo(2), ...) durante el
 // play. Aditivo: si NO hay dedos (mouse/desktop) no hace nada -> el dedo 0 lo sigue manejando
@@ -448,6 +485,13 @@ void InputUsuarioSDL3(SDL_Event &e){
         // gesto de scroll con 1 dedo O con el mouse (fingers<=1). El scroll de BARRA (g_barTapPending) vale para
         // ambos; el de CONTENIDO de panel y el slider numerico son solo touch (en PC el mouse usa scrollbar/rueda
         // + el drag numerico clasico). Lockeado al viewport del down hasta soltar.
+        // una fila del OUTLINER AGARRADA con la pulsacion larga: el dedo la arrastra (no scrollea)
+        if (g_outAgarre && g_barTapView) {
+            g_barTapView->event_mouse_motion(mx, my);
+            GuardarMousePos();
+            g_redraw = true;
+            return;
+        }
         if (leftMouseDown && fingers.size() <= 1) {
             // VIEWPORT 3D en tactil: el down NO selecciono (g_view3dTapPending). Si el dedo paso el umbral,
             // es un orbit/paneo -> se cancela el tap (la seleccion NO cambia) y se sigue de largo al
@@ -835,6 +879,7 @@ void InputUsuarioSDL3(SDL_Event &e){
                      (vpDown->ViewportKind() == 2 || vpDown->ViewportKind() == 3 ||
                       vpDown->ViewportKind() == 7 || vpDown->ViewportKind() == 8)) {
                 g_contentTapPending = true;
+                g_contentTapTactil = true;
                 g_barTapView = vpDown; g_tapStartX = (int)e.button.x; g_tapStartY = (int)e.button.y; g_tapStartTicks = SDL_GetTicks();
             }
             // BOX SELECT armado (tecla B / menu Select): el click NO pickea, empieza la caja.
@@ -846,8 +891,12 @@ void InputUsuarioSDL3(SDL_Event &e){
             else if (BoxSelectArmado()) {
                 BoxSelectDown((int)e.button.x, (int)e.button.y);
             }
-            // la UI compartida (menu/barras/paneles) consume primero
-            else if (!LayoutClickUI((int)e.button.x, (int)e.button.y)) {
+            // la UI compartida (menu/barras/paneles) consume primero. Un DOBLE CLICK del mouse (el clicks == 2 de
+            // SDL) ademas renombra en linea la fila del outliner que esta bajo el puntero
+            else if (LayoutClickUI((int)e.button.x, (int)e.button.y)) {
+                if (!esTouch && e.button.clicks >= 2) LayoutDobleClickUI((int)e.button.x, (int)e.button.y);
+            }
+            else {
                 // click sobre un viewport 3D: seleccion compartida por color picking
                 ViewportBase* hoja3d = FindViewportUnderMouse(
                     rootViewport, (int)e.button.x, (int)e.button.y);
@@ -952,6 +1001,13 @@ void InputUsuarioSDL3(SDL_Event &e){
                     LayoutMenuContexto3D((int)e.button.x, (int)e.button.y);
                     GuardarMousePos(); return;
                 }
+                // OUTLINER en una vista de RECURSOS: el derecho elige la fila y abre el menu de
+                // acciones (carpetas, renombrar, mover, borrar huerfanos) en el mouse
+                if (vpDer && vpDer->isLeaf() && vpDer->ViewportKind() == 2 &&
+                    !vpDer->OnBar((int)e.button.x, (int)e.button.y) &&
+                    ((Outliner*)vpDer)->MenuContexto((int)e.button.x, (int)e.button.y)) {
+                    g_redraw = true; GuardarMousePos(); return;
+                }
             }
         }
     }
@@ -963,6 +1019,18 @@ void InputUsuarioSDL3(SDL_Event &e){
             leftMouseDown = false;
             ViewPortClickDown = false; // este up no pasa por mouse_button_up: liberar el foco aca
             GuardarMousePos();
+            return;
+        }
+        if (e.button.button == SDL_BUTTON_LEFT && g_outAgarre) {
+            // se levanto el dedo con una fila AGARRADA: se suelta ahi (a una carpeta, al 3D, a Properties; sin
+            // haberla movido = el menu contextual)
+            g_outAgarre = false;
+            g_contentTapPending = false; g_contentTapTactil = false;
+            leftMouseDown = false;
+            ViewPortClickDown = false;
+            LayoutSoltar((int)e.button.x, (int)e.button.y);
+            GuardarMousePos();
+            g_redraw = true;
             return;
         }
         if (e.button.button == SDL_BUTTON_LEFT) {
@@ -1033,7 +1101,18 @@ void InputUsuarioSDL3(SDL_Event &e){
             ViewPortClickDown = false;
             g_uiTapEnCurso = wasContentTap;
             LayoutClickUI((int)e.button.x, (int)e.button.y);
+            // DOBLE TAP: un segundo toque de contenido, rapido y en el mismo lugar, es el doble click
+            if (wasContentTap && g_contentTapTactil) {
+                const Uint32 ahora = SDL_GetTicks();
+                int ddx = (int)e.button.x - g_ultimoTapX; if (ddx < 0) ddx = -ddx;
+                int ddy = (int)e.button.y - g_ultimoTapY; if (ddy < 0) ddy = -ddy;
+                if (ahora - g_ultimoTapTicks < 400 && ddx + ddy < 12 * GlobalScale) {
+                    LayoutDobleClickUI((int)e.button.x, (int)e.button.y);
+                    g_ultimoTapTicks = 0;
+                } else { g_ultimoTapTicks = ahora; g_ultimoTapX = (int)e.button.x; g_ultimoTapY = (int)e.button.y; }
+            }
             g_uiTapEnCurso = false;
+            g_contentTapTactil = false;
             return;
         }
 
@@ -1086,9 +1165,12 @@ void InputUsuarioSDL3(SDL_Event &e){
         if (g_textFieldActivo) {
             SDL_Keycode k = e.key.keysym.sym;
             // si es un RENAME (mesh part / material): Enter ACEPTA, ESC CANCELA (escribe / descarta el
-            // nombre). En un campo normal (export/output) ambos solo desenfocan (edicion en vivo).
+            // nombre). En un campo normal (Name, rename en linea del outliner, export/output) Enter
+            // desenfoca (el dueno confirma al perder el foco) y ESC lo devuelve al texto de ANTES y
+            // desenfoca: el dueno ve su valor de siempre y no confirma nada (TextFieldCancelar).
+            TextFieldSeguirFoco();   // el texto de antes, si el foco se puso a mano y no hubo teclas
             if (k == SDLK_RETURN || k == SDLK_KP_ENTER) { if (RenameActivo()) RenameCommit(); else if (NumEditActivo()) { NumEditCommit(); NumEditSalirDelPanel(); } else g_textFieldActivo = NULL; }
-            else if (k == SDLK_ESCAPE) { if (RenameActivo()) RenameCancel(); else if (NumEditActivo()) { NumEditCancel(); NumEditSalirDelPanel(); } else g_textFieldActivo = NULL; }
+            else if (k == SDLK_ESCAPE) { if (RenameActivo()) RenameCancel(); else if (NumEditActivo()) { NumEditCancel(); NumEditSalirDelPanel(); } else TextFieldCancelar(); }
             else if (k == SDLK_LEFT)  { g_textFieldActivo->CaretIzq();  g_redraw = true; }
             else if (k == SDLK_RIGHT) { g_textFieldActivo->CaretDer();  g_redraw = true; }
             else if (k == SDLK_BACKSPACE) { g_textFieldActivo->Backspace();  g_redraw = true; }

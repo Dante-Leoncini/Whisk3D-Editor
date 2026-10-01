@@ -87,6 +87,16 @@ void NotificarHintClear() {
     if (habia) g_redraw = true;
 }
 
+bool NotificacionVisible(const std::string& texto) {
+    for (size_t i = 0; i < gNotifs.size(); i++)
+        if (!gNotifs[i].hint && gNotifs[i].msg.find(texto) != std::string::npos) return true;
+    return false;
+}
+void NotificacionesLimpiar() {
+    if (!gNotifs.empty()) g_redraw = true;
+    gNotifs.clear();
+}
+
 void NotificacionesTick(float dt) {
     bool hayTimer = false;
     for (size_t i = 0; i < gNotifs.size(); ) {

@@ -3,6 +3,7 @@
 #include "objects/MallaDatos.h" // geometria compartida por ruta (dedup del re-import)
 #include "io/w3dFilesystem.h"   // leer por el Core: sirve igual en disco, en el pak y en el APK
 #include "base/w3dlog.h"        // w3dTickMs (instrumentar la carga) + w3dLogf
+#include "importers/import_w3d.h" // g_w3dCargaFases / g_w3dCargaReloj: el reparto de cargabench
 #include <sstream>
 #include <iostream>   // std::cerr (avisos de parseo)
 
@@ -239,8 +240,12 @@ Mesh* ImportWOBJ(const std::string& filepath, Object* parent, bool NoMerge, bool
     // real. Con ifstream, en Android NINGUN `Wavefront { filePath: ... }` del .w3d
     // llegaba a crearse -- la app abria con la escena vacia (negro) y con los
     // constraints "sin target", porque el objeto apuntado nunca habia nacido.
+    // medicion por sub-fase de cargabench (NULL = nadie mide): leer / parsear / derivados,
+    // los MISMOS acumuladores que la malla .w3dm del contenedor (import_w3d.cpp)
+    double tMed = g_w3dCargaReloj ? g_w3dCargaReloj() : 0.0;
     bool okObj = false;
     const std::string datosObj = w3dFileSystem::ReadTextFile(filepath, &okObj);
+    if (g_w3dCargaReloj) { const double t = g_w3dCargaReloj(); g_w3dCargaFases.mallaLeerMs += t - tMed; tMed = t; }
     if (!okObj) {
         std::cerr << "No se pudo abrir: " << filepath << "\n";
         return NULL;
@@ -276,6 +281,7 @@ Mesh* ImportWOBJ(const std::string& filepath, Object* parent, bool NoMerge, bool
         mesh->vertCtrlPoint.swap(vertToCP);   // render -> linea 'v' (control-point)
         CargarGruposWOBJ(mesh, rutaGrupos);
     }
+    if (g_w3dCargaReloj) { const double t = g_w3dCargaReloj(); g_w3dCargaFases.mallaParseMs += t - tMed; tMed = t; }
 
     // recordar de que ARCHIVO salio: el guardado del proyecto lo referencia
     if (mesh) mesh->origen = filepath;
@@ -291,6 +297,7 @@ Mesh* ImportWOBJ(const std::string& filepath, Object* parent, bool NoMerge, bool
         else            mesh->CalcularBordes();
         g_wobjBordesMs += (w3dTickMs() - _tB);
     }
+    if (g_w3dCargaReloj) g_w3dCargaFases.mallaDerivadosMs += g_w3dCargaReloj() - tMed;
 
     // GEOMETRIA COMPARTIDA (MallaDatos.h): mismos filePath = mismos datos. La
     // primera importacion de esta ruta registra sus arrays en el almacen; las

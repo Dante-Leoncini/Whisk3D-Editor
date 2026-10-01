@@ -1,8 +1,10 @@
+#include "io/RaicesEditor.h"   // el selector de escena/prefab de las barras (3D y outliner)
 #include "w3dGraphics.h" // abstraccion de graficos (independencia de OpenGL)
 #include "W3dLang.h"   // T(): los textos salen en el idioma del sistema
 #include "Undo.h" // Ctrl+Z: capturar modo / seleccion
 #include "ViewPorts/PopUp/ConfirmarPopup.h" // AbrirConfirmarBorrado (popup de confirmar borrado)
 #include "ViewPorts/LayoutInput.h"
+#include "ViewPorts/LayoutArbol.h" // aviso de destruccion de viewports + borrar un arbol entero
 #include "edit/MeshEdit.h"
 #include "edit/UVUnwrap.h"
 #include "edit/Proporcional.h"
@@ -28,6 +30,7 @@
 #include "WhiskUI/draw/rectangle.h" // el velo del modo foco
 #include "objects/Objects.h"
 #include "objects/Mesh.h"
+#include "objects/MallaRecurso.h"   // W3dMallaAristasVista / W3dMallaCarasVista: el snap a una malla de un recurso
 #include "physics/W3dRigido.h" // Add > Physics: W3dRigidoDef del objeto activo
 #include "objects/Curve.h"   // edicion de riel/path via proxy de malla (CurveEntrarEdicion)
 #include "w3dlog.h"          // aviso al pasar una curva de .cap a autorada
@@ -42,6 +45,13 @@
 #include "objects/Empty.h"
 #include "objects/LOD.h"     // Add > LOD (un hijo por distancia a la camara)
 #include "objects/Culling.h" // Add > Culling (frustum culling de sus hijos)
+#include "objects/Niebla.h"  // Add > Fog (niebla en el arbol)
+#include "objects/Recorte.h" // Add > Clear Depth / Screen Rect
+#include "objects/Hitbox.h"  // Add > Hitbox (caja de deteccion con eventos lua)
+#include "io/PrefabsEditor.h"   // Add > Prefab (una instancia en el cursor 3D) + "Create Prefab" / "Unpack"
+#include "objects/InstanciaPrefab.h"
+#include "objects/ProxyW3d.h"   // Add > Proxy W3D (un prefab o una escena de una libreria externa)
+#include "io/Librerias.h"
 #include "objects/Particulas.h" // Add > Particles (emisor de particulas del Core)
 #include "objects/UI.h"
 #include "objects/Texto2D.h"
@@ -199,25 +209,10 @@ static ViewportBase* LayoutPadreDe(ViewportBase* aNodo, ViewportBase* aHijo) {
     return LayoutPadreDe(b, aHijo);
 }
 
-// borra un subarbol completo (los dtors de Row/Column no borran childA)
+// borra un subarbol completo (los dtors de Row/Column no borran childA): es el MISMO
+// borrado que usa abrir un proyecto para soltar el layout anterior (LayoutArbol.h)
 static void LayoutBorrarSubarbol(ViewportBase* aNodo) {
-    if (!aNodo) return;
-    if (!aNodo->isLeaf()) {
-        if (aNodo->ContainerKind() == 1) {
-            ViewportRow* r = (ViewportRow*)aNodo;
-            LayoutBorrarSubarbol(r->childA);
-            LayoutBorrarSubarbol(r->childB);
-            r->childA = NULL;
-            r->childB = NULL;
-        } else {
-            ViewportColumn* c = (ViewportColumn*)aNodo;
-            LayoutBorrarSubarbol(c->childA);
-            LayoutBorrarSubarbol(c->childB);
-            c->childA = NULL;
-            c->childB = NULL;
-        }
-    }
-    delete aNodo;
+    ViewportBorrarArbol(aNodo);
 }
 
 static Viewport3D* LayoutPrimer3D(ViewportBase* aNodo) {
@@ -545,6 +540,10 @@ static void LayoutAccionTipo(int aId) {
 // despues hacen lo suyo, o no lo llaman.
 static void TrasCrearAdd(Object* nuevo){
     if (!nuevo) return;
+    // TODA malla es un recurso de la biblioteca desde que nace ("Cubo", el siguiente "Cubo.001")
+    if (nuevo->getType() == ObjectType::mesh && W3dMallaNacioHook) W3dMallaNacioHook();
+    // editando un PREFAB lo nuevo va adentro de su objeto raiz: suelto al lado no lo generaria ninguna instancia
+    W3dPrefabAdoptarNuevo(nuevo);
     DeseleccionarTodo();
     nuevo->Seleccionar();
     if (nuevo->getType() == ObjectType::mesh && ((Mesh*)nuevo)->meshTipo >= 0)
@@ -693,6 +692,9 @@ void AddEmpty(){    TrasCrearAdd(new Empty(NULL, cursor3D.pos)); }
 // LOD: nace sin umbrales (dibuja el ultimo hijo siempre); se cargan en el panel
 void AddLOD(){      TrasCrearAdd(new LOD(NULL, cursor3D.pos)); }
 void AddCulling(){  TrasCrearAdd(new Culling(NULL, cursor3D.pos)); }
+void AddNiebla(){   TrasCrearAdd(new Niebla(NULL, cursor3D.pos)); }
+void AddLimpiarZ(){ TrasCrearAdd(new LimpiarZ(NULL, cursor3D.pos)); }
+void AddRecorte(){  TrasCrearAdd(new Recorte(NULL, cursor3D.pos)); }
 // GridCull: atajo que crea un Culling con metodo=Grid (celda 16, grilla 2D XZ); se le cuelgan los objetos
 // y se toca "Recalcular". El objeto es el mismo Culling: el metodo se puede cambiar despues en el panel.
 void AddGridCull(){ Culling* c = new Culling(NULL, cursor3D.pos); c->metodo = Culling::Grid; TrasCrearAdd(c); }
@@ -749,6 +751,13 @@ void AddFisica(){
     o->fisica = d;
     g_redraw = true;
 }
+// ---- Add > Hitbox: caja de deteccion (objects/Hitbox.h) ----------------------
+// Con un objeto 3D ACTIVO nace como su HIJO y del tamano de sus mallas (el trigger de una
+// puerta, el sensor de un enemigo); sin activo, suelta en el cursor 3D con el cubo unitario.
+void AddHitbox(){
+    Object* padre = (ObjActivo && ObjActivo->select && HitboxPadreValido(ObjActivo)) ? ObjActivo : NULL;
+    TrasCrearAdd(padre ? (Object*)HitboxCrearAjustado(padre) : (Object*)new Hitbox(NULL, cursor3D.pos));
+}
 // interfaz 2D (se edita en el Editor 2D). Si el proyecto aun no tiene
 // PALETAS, la default del UI ("Whisk3D") pasa a ser la del proyecto y queda
 // seleccionada en la raiz nueva; con paletas ya cargadas no se mezclan
@@ -786,6 +795,19 @@ void AddArmature(){
 }
 void AddCollection(){
     TrasCrearAdd(new Collection(CollectionActive ? CollectionActive : SceneCollection));
+}
+// ---- Add > Proxy W3D: un PROXY de una libreria externa en el cursor 3D (objects/ProxyW3d.h) -------------
+// Con librerias vinculadas nace generando el primer prefab de la primera que tenga (la libreria y el elemento se
+// cambian en su tarjeta, Properties); sin ninguna nace vacio (la tarjeta tiene "Add Library...")
+void AddProxyW3d(){
+    std::string lib, elem;
+    for (int i = 0; i < W3dLibsCantidad() && elem.empty(); i++) {
+        std::vector<std::string> ps;
+        W3dLibsElementos(W3dLibsFila(i).nombre, W3D_LIB_PREFAB, ps);
+        if (!ps.empty()) { lib = W3dLibsFila(i).nombre; elem = ps[0]; }
+    }
+    std::string motivo;
+    if (!W3dProxyAgregar(lib, W3D_LIB_PREFAB, elem, cursor3D.pos, &motivo)) Notificar(std::string(T(motivo.c_str())), true);
 }
 // objetos LINKEADOS a un target (el activo, o NULL): renderizan a ese target una vez / N veces / espejado.
 void AddDuplicateLinked(){
@@ -923,12 +945,18 @@ static const MenuDef ADD[] = {
     { "Grid Cull",  AddGridCull,        NULL, ICONO(IconType::cuadricula) },
     { "Particles",  AddParticulas,      NULL, ICONO(IconType::circle) },
     { "Physics",    AddFisica,          NULL, ICONO(IconType::object) },
+    { "Hitbox",     AddHitbox,          NULL, ICONO(IconType::hitbox) },
     { "Path",       AddPath,            NULL, ICONO(IconType::curve) },
     { "Armature",   AddArmature,        NULL, ICONO(IconType::armature) },
     { "Camera",     AddCamera,          NULL, ICONO(IconType::camera) },
     { "Light",      AddLight,           NULL, ICONO(IconType::light) },
+    { "Fog",        AddNiebla,          NULL, ICONO(IconType::niebla) },
+    { "Clear Depth", AddLimpiarZ,       NULL, ICONO(IconType::limpiarz) },
+    { "Screen Rect", AddRecorte,        NULL, ICONO(IconType::recorte) },
     { "Collection", AddCollection,      NULL, ICONO(IconType::archive) },
     { "UI",         AddUI,              NULL, ICONO(IconType::textura) },
+    { "Prefab",     NULL,               NULL, ICONO(IconType::prefab), &MenuPrefabsAdd },   // los del proyecto
+    { "Proxy W3D",  AddProxyW3d,        NULL, ICONO(IconType::libreria) },   // un prefab/escena de una libreria
     { "Imports",    NULL,               NULL, ICONO(IconType::mesh),   &MenuImports },
 };
 // (aca estaba la fila "Script", que creaba el objeto Script. Se dio de baja: cualquier
@@ -937,6 +965,8 @@ static const MenuDef ADD[] = {
 // arma MenuAdd + sus submenus (Mesh e Imports) desde las tablas. Lo llama ViewPort3D al crear la barra.
 void LayoutConstruirMenuAdd(){
     if (!MenuAdd || !MenuImports || !MenuMallas) return;
+    // "Add > Prefab": su contenido es DEL PROYECTO (se rearma cada vez que se abre el Add: LayoutSyncMenuPrefabs)
+    if (MenuPrefabsAdd) { MenuPrefabsAdd->action = W3dPrefabMenuAddAccion; W3dPrefabMenuAddArmar(MenuPrefabsAdd); }
     MenuImports->Construir(ADD_IMPORTS, (int)(sizeof(ADD_IMPORTS)/sizeof(ADD_IMPORTS[0])));
     MenuMallas->Construir(ADD_MESHES, (int)(sizeof(ADD_MESHES)/sizeof(ADD_MESHES[0])));
     MenuAdd->Construir(ADD, (int)(sizeof(ADD)/sizeof(ADD[0])));
@@ -1085,8 +1115,13 @@ bool SnapBuscarTarget(int mx, int my, Viewport3D* vp, Vector3& outWorld, float& 
                 if (d<bestD){ bestD=d; outWorld=wp; outSx=sx; outSy=sy; found=true; }
             }
         } else if (g_snap.target==SNAP_EDGECENTER || g_snap.target==SNAP_EDGE){
-            for (size_t e=0; e+1<m->edges.size(); e+=2){
-                int a=m->edges[e], b=m->edges[e+1];
+            // las aristas de la malla, o las COMPARTIDAS de su recurso si su edicion sigue pendiente
+            // (objects/MallaRecurso.h): snapear a mil arboles no carga la edicion de ninguno
+            const std::vector<int>* pE = W3dMallaAristasVista(m);
+            if (!pE) continue;
+            const std::vector<int>& E = *pE;
+            for (size_t e=0; e+1<E.size(); e+=2){
+                int a=E[e], b=E[e+1];
                 if (a<0||b<0||a>=m->vertexSize||b>=m->vertexSize) continue;
                 Vector3 wa = W * Vector3(m->vertex[a*3],m->vertex[a*3+1],m->vertex[a*3+2]);
                 Vector3 wb = W * Vector3(m->vertex[b*3],m->vertex[b*3+1],m->vertex[b*3+2]);
@@ -1105,8 +1140,12 @@ bool SnapBuscarTarget(int mx, int my, Viewport3D* vp, Vector3& outWorld, float& 
                 }
             }
         } else { // SNAP_FACE / SNAP_FACECENTER: recorre las caras (trianguladas por abanico)
-            for (size_t f=0; f<m->faces3d.size(); f++){
-                const std::vector<int>& idx = m->faces3d[f].idx; int nc=(int)idx.size(); if (nc<3) continue;
+            // (las de la malla, o las COMPARTIDAS de su recurso: ver la rama de aristas)
+            const std::vector<MeshFace>* pF = W3dMallaCarasVista(m);
+            if (!pF) continue;
+            const std::vector<MeshFace>& F = *pF;
+            for (size_t f=0; f<F.size(); f++){
+                const std::vector<int>& idx = F[f].idx; int nc=(int)idx.size(); if (nc<3) continue;
                 { bool rango=true; for (int k=0;k<nc;k++) if (idx[k]<0||idx[k]>=m->vertexSize){rango=false;break;}
                   if (!rango) continue; }   // faces3d desincronizado con vertex[] (defensivo, como la rama EDGE)
                 if (g_snap.target==SNAP_FACECENTER){
@@ -1431,9 +1470,17 @@ static int InsertKeyframeContextoActual(Mesh** m2d, bool desdeUV) {
     if (InteractionMode == EditMode && g_editMesh) return 3;
     return 0;
 }
+// "JUEGO" (el estado base de un juego, ver W3dRaices.h) no tiene keyframes: se animan sus CLIPS
+// (eligiendolos en el timeline). true = se freno (y se aviso).
+static bool KeyframeEnJuego() {
+    if (ActiveAnimKind != 2) return false;
+    Notificar(T("A game has no keyframes: choose one of its clips in the timeline to animate"), true);
+    return true;
+}
 void InsertarKeyframeContexto(int canales, bool desdeUV) {
     extern void VertexAnimInsertarKeyframe();
     extern void VertexAnimInsertarKeyframeUV();
+    if (KeyframeEnJuego()) return;
     Mesh* m2d = NULL;
     switch (InsertKeyframeContextoActual(&m2d, desdeUV)) {
         case 1: PoseInsertKeyframe(canales); break;
@@ -1465,6 +1512,7 @@ void LayoutSyncInsertKeySubmenu(PopupMenu* menu, int idxItem, bool desdeUV) {
     menu->items[idxItem]->submenu = (ctx == 3 || ctx == 4) ? NULL : MenuInsertKey;
 }
 void LayoutMenuInsertKeyframe(int mx, int my, bool desdeUV) {
+    if (KeyframeEnJuego()) return;
     int ctx = InsertKeyframeContextoActual(NULL, desdeUV);
     if (ctx == 3 || ctx == 4) { InsertarKeyframeContexto(KfCanalTodos, desdeUV); return; } // vertices/UV: sin menu
     if (!MenuInsertKey) return;
@@ -1481,6 +1529,16 @@ void LayoutAccionObject(int aId) {
         case 2: NewInstance();      break; // Duplicate Linked  (Alt D)
         case 3: AbrirConfirmarBorrado(); break; // Delete (X): popup de confirmacion -> Si borra (con undo)
         case 5: JoinObjetos(); break;           // Join (Ctrl J): une las mallas seleccionadas en el objeto activo
+        // PREFABS: "Create Prefab" (lo elegido pasa a un prefab nuevo) / "Unpack Prefab" (la instancia activa)
+        case 700: { std::string nom, motivo;
+                    if (!W3dPrefabCrearDesdeSeleccion(&nom, &motivo)) Notificar(std::string(T(motivo.c_str())), true);
+                    else Notificar(std::string(T("Prefab created")) + ": " + nom, false);
+                    break; }
+        case 701: { std::string motivo;
+                    InstanciaPrefab* ip = (ObjActivo && ObjActivo->getType() == ObjectType::prefab) ? (InstanciaPrefab*)ObjActivo : NULL;
+                    if (!ip) Notificar(std::string(T("Select a prefab instance")), true);
+                    else if (!W3dPrefabDesempaquetar(ip, &motivo)) Notificar(std::string(T(motivo.c_str())), true);
+                    break; }
         // Insert Keyframe: el dispatch por CONTEXTO vive en InsertarKeyframeContexto (arriba).
         // 510 se conserva como ALIAS de "todos los canales" (era el id plano del menu Animation y
         // lo puede seguir mandando cualquier caller viejo); 530-533 son los items del desplegable.
@@ -1695,6 +1753,10 @@ void ActualizarEditMeshActivo() {
     // para poder saltear los constraints que tienen apagado "ver en modo edicion" (W3dConstraint.h).
     // Va por la misma puerta que g_editMesh -que es la unica- para que no puedan quedar desfasados.
     W3dConSetObjEditando(g_editMesh);
+    // LAS MALLAS COMO RECURSO (io/MallasProyecto.h): la malla que sale de Edit/Weight/Vertex
+    // Paint se publica en su recurso (la ven todos sus objetos) y lo seleccionado tiene su edicion
+    // en memoria. Por la misma puerta que g_editMesh: cada frame y en cada cambio de modo.
+    { extern void W3dMallasTickEditor(); W3dMallasTickEditor(); }
     // MIRROR con TARGET: si se movio algun objeto (flag que prenden los transforms de objeto), su plano cambio ->
     // regenerar SOLO esos previews. Chequeo barato (1 bool/frame); no corre nada al orbitar/idle.
     if (g_objetosMovidos) {
@@ -1745,11 +1807,23 @@ void ActualizarEditMeshActivo() {
 }
 
 
+// lo que es de una LIBRERIA externa no se edita (es de su .w3d, de solo lectura: se edita abriendo la libreria):
+// lo que genera un PROXY y una malla que usa una malla de una libreria. true = no se puede (con aviso)
+static bool EsDeLibreriaAviso(Object* o) {
+    if (!o) return false;
+    bool lib = (o->getType() == ObjectType::mesh && ((Mesh*)o)->malla && !((Mesh*)o)->malla->libreria.empty());
+    for (Object* p = W3dInstanciaDe(o); p && !lib; p = W3dInstanciaDe(p)) if (p->getType() == ObjectType::proxy) lib = true;
+    if (lib) Notificar(T("It belongs to a library (read-only): open the library to edit it"), true);
+    return lib;
+}
+
 // opcion del menu Mode: cambia el modo del objeto ACTIVO.
 //  - MALLA:     Object/Edit/Paint (Edit y Paint todavia son placeholders).
 //  - ARMATURE:  Object / Edit (placeholder) / Pose (posa el esqueleto).
 static void LayoutAccionMode(int aId) {
     int modoPrevio = InteractionMode;
+    // (lo de una libreria: solo Object, y Pose para posar un esqueleto de un proxy)
+    if (aId != ObjectMode && aId != PoseMode && InteractionMode == ObjectMode && EsDeLibreriaAviso(ObjActivo)) return;
     if (ObjActivo && ObjActivo->getType() == ObjectType::mesh) {
         if (aId == EditMode && ((Mesh*)ObjActivo)->noEditable) {   // escenario cerrado a edicion
             Notificar(T("Malla no editable (Convertir en mesh editable, card Mesh)"), true);
@@ -2861,7 +2935,15 @@ bool LayoutAbrirMenuDeBarra(ViewportBase* vp, int mx, int my) {
     Button* bSnap = BarRolBtn(B, BR_Snap);
     Button* bProp = BarRolBtn(B, BR_Proporcional);
     Button* bAnim = BarRolBtn(B, BR_Animation);
-    if (MenuMode && bMode && bMode->visible && bMode->Contains(mx, my)) {
+    Button* bRaiz = BarRolBtn(B, BR_Raiz);
+    if (bRaiz && bRaiz->visible && bRaiz->Contains(mx, my)) {
+        // la ESCENA / el PREFAB que se edita: el menu se REARMA cada vez (la lista cambia)
+        static PopupMenu* menuRaiz = NULL;
+        if (!menuRaiz) { menuRaiz = new PopupMenu(); menuRaiz->action = W3dRaicesMenuAccion; }
+        if (MenuAbierto == menuRaiz && menuRaiz->abierto) return true;   // ya abierto (el hover que se desliza)
+        W3dRaicesMenuArmar(menuRaiz);
+        objetivo = menuRaiz; boton = bRaiz;
+    } else if (MenuMode && bMode && bMode->visible && bMode->Contains(mx, my)) {
         objetivo = MenuMode; boton = bMode;
         LayoutRebuildMenuMode();   // mode-aware: malla -> Paints ; armature -> Pose
         if (!MenuMode->action) MenuMode->action = LayoutAccionMode;
@@ -2899,6 +2981,7 @@ bool LayoutAbrirMenuDeBarra(ViewportBase* vp, int mx, int my) {
         if (!MenuSelect->action) MenuSelect->action = LayoutAccionSelect;
     } else if (MenuAdd && bAdd && bAdd->visible && bAdd->Contains(mx, my)) {
         objetivo = MenuAdd; boton = bAdd;
+        W3dPrefabMenuAddArmar(MenuPrefabsAdd);   // "Add > Prefab": los prefabs del proyecto de AHORA
     } else if (MenuMesh && bMesh && bMesh->visible && bMesh->Contains(mx, my)) {
         // Edit Mode: menu "Mesh" (Transform/Snap/Delete), comun a vertice/borde/cara.
         objetivo = MenuMesh; boton = bMesh;
@@ -2990,15 +3073,44 @@ void LayoutToggleBarraViewportActivo() {
         // Timeline: entra/sale del foco de la barra de TRANSPORTE (play/inicio/fin/Start/End/anim). Antes caia en
         // el else -> abria el menu de tipo/split, que no es lo que se quiere navegar.
         LayoutTimelineBarToggle();
+    } else if (vp->ViewportKind() == 2) {
+        // Outliner: abre el SELECTOR DE VISTA ([1]: escena / mallas / materiales...). Izq/der recorren
+        // la barra ([0] tipo de viewport, [2] acciones de la vista de recursos).
+        if (!((Outliner*)vp)->AbrirMenuBoton(1)) LayoutAbrirMenuTipo(vp);
     } else {
         // outliner (u otros sin menus de barra): abre el menu de tipo/split ([0])
         LayoutAbrirMenuTipo(vp);
     }
 }
 
+// OUTLINER: izq/der con un menu de SU barra abierto ([0] tipo, [1] vista, [2] acciones) salta al
+// boton vecino visible y abre su desplegable (el N95 recorre la barra sin mouse). false = el menu
+// abierto no es de la barra del outliner activo.
+static bool LayoutCambiarMenuBarraOutliner(int dir) {
+    if (!viewPortActive || !viewPortActive->isLeaf() || viewPortActive->ViewportKind() != 2) return false;
+    if (!LayoutMenuAbierto()) return false;
+    Outliner* out = (Outliner*)viewPortActive;
+    int idx = out->BotonDelMenuAbierto();
+    if (idx < 0 && MenuAbierto == gMenuTipo && gMenuTipoDe == viewPortActive) idx = 0;
+    if (idx < 0) return false;
+    std::vector<Button*>& B = out->BarButtons;
+    const int maxIdx = (int)B.size() - 1;
+    for (int k = 0; k <= maxIdx; k++) {
+        idx += dir;
+        if (idx > maxIdx) idx = 0;
+        if (idx < 0) idx = maxIdx;
+        // (el interruptor lista/cuadricula no tiene menu: se saltea; sin mouse se alterna desde el menu de la vista)
+        if (idx == 0 || (B[(size_t)idx] && B[(size_t)idx]->visible && B[(size_t)idx] != out->btnCuadricula)) break;
+    }
+    if (idx == 0) { LayoutAbrirMenuTipo(out); return true; }
+    out->AbrirMenuBoton(idx);
+    return true;
+}
+
 // flechas izq/der con un menu de barra abierto: salta al boton de menu vecino
 // (Select/Add/Object/Overlays) salteando los ocultos, y abre su desplegable
 static void LayoutCambiarMenuBarra(int dir) {
+    if (LayoutCambiarMenuBarraOutliner(dir)) return;   // la barra del outliner (vista / acciones)
     // el menu de tipo/split de un panel NO-3D (outliner/propiedades) no tiene
     // menus hermanos para ciclar: izq/der no hacen nada ahi. (Solo si ese menu esta REALMENTE abierto: con
     // foco de transporte MenuAbierto puede quedar apuntando a un gMenuTipo ya cerrado -> no cortar la nav.)
@@ -3276,6 +3388,7 @@ void LayoutMenuEditContexto(int mx, int my) {
 void LayoutMenuAdd(int mx, int my) {
     if (!MenuAdd) return; // se crea en el setup de menus (1er frame)
     if (MenuAbierto) MenuAbierto->Cerrar();
+    W3dPrefabMenuAddArmar(MenuPrefabsAdd);   // (los prefabs del proyecto de AHORA)
     MenuAdd->Abrir(mx, my, MenuPantallaW, MenuPantallaH); // EN EL CURSOR
     MenuAbierto = MenuAdd;
 }
@@ -3714,8 +3827,12 @@ static bool SnapFaceProyectarPunto(const Vector3& p, int modo, Vector3& out){
         Mesh* m=meshes[mi]; if (m==em) continue; // no proyectar sobre la propia malla en edicion (retopo -> otra geometria)
         if (!m->vertex || m->vertexSize<=0) continue;
         Matrix4 W; m->GetWorldMatrix(W);
-        for (size_t f=0; f<m->faces3d.size(); f++){
-            const std::vector<int>& idx=m->faces3d[f].idx; int nc=(int)idx.size(); if (nc<3) continue;
+        // las caras de la malla, o las COMPARTIDAS de su recurso (edicion pendiente, MallaRecurso.h)
+        const std::vector<MeshFace>* pF = W3dMallaCarasVista(m);
+        if (!pF) continue;
+        const std::vector<MeshFace>& F = *pF;
+        for (size_t f=0; f<F.size(); f++){
+            const std::vector<int>& idx=F[f].idx; int nc=(int)idx.size(); if (nc<3) continue;
             { bool rango=true; for (int k=0;k<nc;k++) if (idx[k]<0||idx[k]>=m->vertexSize){rango=false;break;}
               if (!rango) continue; }   // faces3d desincronizado con vertex[] (defensivo)
             Vector3 w0=W*Vector3(m->vertex[idx[0]*3],m->vertex[idx[0]*3+1],m->vertex[idx[0]*3+2]);
@@ -4660,6 +4777,8 @@ bool LayoutClickUI(int mx, int my) {
             LayoutClickBarra2D((Editor2D*)under, mx, my); // boton "Add" del editor 2D
         } else if (under->ViewportKind() == 8) {
             LayoutClickBarraIDE((IDE*)under, mx, my); // selector de script / Save / Refresh
+        } else if (under->ViewportKind() == 2 && ((Outliner*)under)->ClickBarra(mx, my)) {
+            // outliner: lo directo de su barra (el interruptor lista / cuadricula de la biblioteca)
         } else {
             // transporte (Stop/Play) SOLO por click real; si no fue transporte, abrir el menu
             if (!LayoutTransporteBarra3D(under, mx, my)) LayoutAbrirMenuDeBarra(under, mx, my); // Select/Add/Object/Overlays
@@ -4707,6 +4826,29 @@ bool LayoutClickUI(int mx, int my) {
         return true;
     }
     return false; // 3D: la seleccion/transform la maneja la plataforma
+}
+
+// DOBLE CLICK / DOBLE TAP (controles.cpp: el clicks == 2 de SDL, o dos toques seguidos): el outliner renombra
+// en linea la fila bajo el puntero (las dos vistas). true = lo uso alguien.
+bool LayoutDobleClickUI(int mx, int my) {
+    if (PopUpActive || LayoutMenuAbierto()) return false;
+    ViewportBase* under = FindViewportUnderMouse(rootViewport, mx, my);
+    if (!under || !under->isLeaf()) return false;
+    if (under->ViewportKind() == 2) return ((Outliner*)under)->DobleClick(mx, my);
+    return false;
+}
+// PULSACION LARGA (tactil: el dedo quieto ~0,5 s sobre un panel): el outliner AGARRA la fila (despues se
+// arrastra, o al soltar sin mover abre el menu contextual). true = lo uso alguien (el gesto deja de ser scroll).
+bool LayoutPulsacionLargaUI(int mx, int my) {
+    if (PopUpActive || LayoutMenuAbierto()) return false;
+    ViewportBase* under = FindViewportUnderMouse(rootViewport, mx, my);
+    if (!under || !under->isLeaf()) return false;
+    if (under->ViewportKind() == 2) {
+        if (!((Outliner*)under)->PulsacionLarga(mx, my)) return false;
+        viewPortActive = under;
+        return true;
+    }
+    return false;
 }
 
 // algun panel de propiedades esta editando? (tiene el foco del teclado)
@@ -4814,8 +4956,8 @@ bool LayoutTeclaUI(int tecla, int mx, int my) {
             case LayoutKey::Enter:
                 if (RenameActivo()) RenameCommit(); else if (NumEditActivo()) NumEditCommit(); else g_textFieldActivo = NULL;
                 if (PropsActivo) PropsActivo->editando = false; g_redraw = true; return true;
-            case LayoutKey::Cancel:
-                if (RenameActivo()) RenameCancel(); else if (NumEditActivo()) NumEditCancel(); else g_textFieldActivo = NULL;
+            case LayoutKey::Cancel:   // descarta: un campo comun vuelve al texto de antes (TextFieldCancelar)
+                if (RenameActivo()) RenameCancel(); else if (NumEditActivo()) NumEditCancel(); else TextFieldCancelar();
                 if (PropsActivo) PropsActivo->editando = false; g_redraw = true; return true;
             case LayoutKey::Left:   g_textFieldActivo->CaretIzq(); g_redraw = true; return true;
             case LayoutKey::Right:  g_textFieldActivo->CaretDer(); g_redraw = true; return true;
@@ -4853,6 +4995,14 @@ bool LayoutTeclaUI(int tecla, int mx, int my) {
         return false;
     }
     if (under->ViewportKind() == 2) {
+        // vista de RECURSOS: flechas/OK recorren y eligen su lista (no la seleccion de la escena). En PC
+        // esta es LA puerta de las flechas (controles.cpp las manda aca antes que a event_key_down): el
+        // modo de PC (Shift+flechas suma, sin Shift la fila queda sola); en el N95, el del keypad.
+#ifndef W3D_SYMBIAN
+        if (((Outliner*)under)->vista != W3D_VISTA_ESCENA) return ((Outliner*)under)->TeclaRecursosPC(tecla);
+#else
+        if (((Outliner*)under)->vista != W3D_VISTA_ESCENA) return ((Outliner*)under)->TeclaRecursos(tecla);
+#endif
         switch (tecla) {
             case LayoutKey::Up:
                 changeSelect(SelectMode::PrevSingle, true);
@@ -4887,8 +5037,8 @@ bool LayoutTeclaPanelActivo(int tecla) {
             case LayoutKey::Enter:
                 if (RenameActivo()) RenameCommit(); else if (NumEditActivo()) NumEditCommit(); else g_textFieldActivo = NULL;
                 if (PropsActivo) PropsActivo->editando = false; g_redraw = true; return true;
-            case LayoutKey::Cancel:
-                if (RenameActivo()) RenameCancel(); else if (NumEditActivo()) NumEditCancel(); else g_textFieldActivo = NULL;
+            case LayoutKey::Cancel:   // descarta: un campo comun vuelve al texto de antes (TextFieldCancelar)
+                if (RenameActivo()) RenameCancel(); else if (NumEditActivo()) NumEditCancel(); else TextFieldCancelar();
                 if (PropsActivo) PropsActivo->editando = false; g_redraw = true; return true;
             case LayoutKey::Left:   g_textFieldActivo->CaretIzq(); g_redraw = true; return true;
             case LayoutKey::Right:  g_textFieldActivo->CaretDer(); g_redraw = true; return true;
@@ -4928,6 +5078,13 @@ bool LayoutTeclaPanelActivo(int tecla) {
                 case LayoutKey::Cancel: out->MoverCancelar();   return true;
             }
             return true; // en modo mover se traga todo (que nada mas se cuele)
+        }
+        // VISTA DE RECURSOS (sin mouse, N95): flechas = recorrer la lista / plegar carpetas, OK = elegir
+        // (Properties lo muestra) o plegar. Se come todo menos C, asi el OK nunca cae al Edit Mode del 3D.
+        if (out->vista != W3D_VISTA_ESCENA) {
+            // (C solo se come si solto una seleccion de varias; si no, sigue su camino)
+            const bool usada = out->TeclaRecursos(tecla);
+            return usada || tecla != LayoutKey::Cancel;
         }
         switch (tecla) {
             case LayoutKey::Up:    changeSelect(SelectMode::PrevSingle, true); out->AsegurarVisible(); return true;
@@ -5234,6 +5391,8 @@ bool LayoutToggleEditMode() {
         return true;
     }
     if (ObjActivo->getType() != ObjectType::mesh) return false;
+    // una malla de una LIBRERIA (la genera un proxy o usa una malla de una libreria): de solo lectura
+    if (InteractionMode != EditMode && EsDeLibreriaAviso(ObjActivo)) return false;
     // malla NO EDITABLE (escenario): sin datos de edicion, el Tab no entra. El boton
     // "Convertir en mesh editable" de la card Mesh la reabre (recalcula bordes/edges).
     if (InteractionMode != EditMode && ((Mesh*)ObjActivo)->noEditable) {
@@ -5248,6 +5407,13 @@ bool LayoutToggleEditMode() {
 
 
 void LayoutRenderMenu(int screenW, int screenH) {
+    // (lo ultimo de CADA cuadro de la UI, PC y Symbian) el foco de texto que se puso a mano en este
+    // cuadro anota su texto de antes, asi un Esc posterior lo descarta; y el campo que un Esc
+    // descarto ya lo re-escribieron sus duenos en vivo (ver TextFieldCancelar)
+    TextFieldFinDeCuadro();
+    // el recurso de la BIBLIOTECA que se arrastra afuera del outliner (al 3D, a Properties): junto al puntero,
+    // con los destinos resaltados (Outliner.h, g_outArrastre). Encima de todo, menos de los menus y popups.
+    OutlinerArrastreRender(screenW, screenH);
     bool hayMenu = LayoutMenuAbierto();
     if (!hayMenu && !PopUpActive) return;
 
@@ -5272,3 +5438,46 @@ void LayoutRenderMenu(int screenW, int screenH) {
     if (!Textures.empty() && Textures[0]) w3dEngine::BindTexture(Textures[0]->iID);
     MenuAbierto->Render();
 }
+
+// ====================================================================
+//  VIDA DEL ARBOL (LayoutArbol.h): la raiz completa, re-anclar los activos y el gancho
+//  que suelta los punteros de ESTE archivo a un viewport que muere
+// ====================================================================
+ViewportBase* LayoutRaizCompleta() {
+    return g_rootGuardado ? g_rootGuardado : rootViewport;
+}
+
+void LayoutAnclarActivos() {
+    if (!rootViewport) return;
+    std::vector<ViewportBase*> hojas;
+    LayoutRecolectarHojas(rootViewport, hojas);
+    if (!viewPortActive) {
+        // como el arranque sin archivo (constructor.cpp) y el shell de Symbian: el 3D si hay
+        Viewport3D* v3 = LayoutPrimer3D(rootViewport);
+        viewPortActive = v3 ? (ViewportBase*)v3 : (hojas.empty() ? rootViewport : hojas[0]);
+    }
+    if (!PropsActivo) {
+        for (size_t i = 0; i < hojas.size(); i++)
+            if (hojas[i]->ViewportKind() == 3) { PropsActivo = (Properties*)hojas[i]; break; }
+    }
+}
+
+// el viewport que muere puede ser el que abrio un menu (los "...De"), el objetivo de un
+// menu del UV/2D/IDE, el de la barra de scroll agarrada o el arbol guardado al maximizar.
+// Se compara SUBIENDO a ViewportBase*: aca los tipos estan completos.
+static void LayoutOlvidarViewport(ViewportBase* vp) {
+    if (!vp) return;
+    if (gMenuTipoDe == vp)    gMenuTipoDe = NULL;
+    if (g_rootGuardado == vp) g_rootGuardado = NULL;
+    if (gScrollBarDrag == vp) gScrollBarDrag = NULL;
+    UVEditor** uvs[] = { &gMenuUVDe, &gUVSnapTarget, &gUVSelectDe, &gUVModeTarget, &gUVTexTarget,
+                         &gUVModoDe, &gUVAddDe, &gUVArmDe };
+    for (size_t i = 0; i < sizeof(uvs) / sizeof(uvs[0]); i++)
+        if (*uvs[i] && (ViewportBase*)*uvs[i] == vp) *uvs[i] = NULL;
+    Editor2D** e2d[] = { &gMenu2DPivotDe, &gEditor2DMenu, &gEditor2DView };
+    for (size_t i = 0; i < sizeof(e2d) / sizeof(e2d[0]); i++)
+        if (*e2d[i] && (ViewportBase*)*e2d[i] == vp) *e2d[i] = NULL;
+    if (gIDEMenuDe && (ViewportBase*)gIDEMenuDe == vp) gIDEMenuDe = NULL;
+}
+struct LayoutEngancharOlvido { LayoutEngancharOlvido() { ViewportOlvidarRegistrar(LayoutOlvidarViewport); } };
+static LayoutEngancharOlvido g_layoutEngancheOlvido;

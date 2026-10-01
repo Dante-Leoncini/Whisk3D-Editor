@@ -1,0 +1,44 @@
+{
+  "version": 3,
+  "escena": {
+    "objetos": [
+      {
+        "tipo": "objeto", "nombre": "Puerta", "pos": [0, 0, 0], "rot": [0, 0, 0], "escala": [1, 1, 1],
+        "scripts": [ { "archivo": "hitbox_contador.lua", "refs": { "prefijo": "puerta" } } ],
+        "hijos": [
+          {
+            "tipo": "hitbox", "nombre": "ZonaPuerta", "pos": [0, 0, 0], "rot": [0, 0, 0], "escala": [1, 1, 1],
+            "activo": true, "tam": [2, 2, 2], "centro": [0, 0, 0], "etiqueta": "", "filtro": "jugador",
+            "detectarCuerpos": false,
+            "scripts": [ { "archivo": "hitbox_contador.lua", "refs": { "prefijo": "zona" } } ]
+          }
+        ]
+      },
+      {
+        "tipo": "objeto", "nombre": "Trampa", "pos": [0, 0, 0], "rot": [0, 0, 0], "escala": [1, 1, 1],
+        "scripts": [ { "archivo": "hitbox_contador.lua", "refs": { "prefijo": "trampa" } } ],
+        "hijos": [
+          { "tipo": "hitbox", "nombre": "SoloEnemigos", "pos": [0, 0, 0], "tam": [2, 2, 2], "filtro": "enemigo" }
+        ]
+      },
+      {
+        "tipo": "hitbox", "nombre": "Apagada", "pos": [0, 0, 0], "activo": false, "tam": [2, 2, 2],
+        "scripts": [ { "archivo": "hitbox_contador.lua", "refs": { "prefijo": "apagada" } } ]
+      },
+      {
+        "tipo": "hitbox", "nombre": "Oculta", "pos": [0, 0, 0], "visible": false, "tam": [2, 2, 2],
+        "scripts": [ { "archivo": "hitbox_contador.lua", "refs": { "prefijo": "oculta" } } ]
+      },
+      {
+        "tipo": "objeto", "nombre": "Movil", "pos": [-5.05, 0, 0], "rot": [0, 0, 0], "escala": [1, 1, 1],
+        "scripts": [
+          { "archivo": "hitbox_mover.lua", "refs": { "x0": "-5.05" } },
+          { "archivo": "hitbox_contador.lua", "refs": { "prefijo": "movil" } }
+        ],
+        "hijos": [
+          { "tipo": "hitbox", "nombre": "CajaMovil", "pos": [0, 0, 0], "tam": [1, 1, 1], "etiqueta": "jugador" }
+        ]
+      }
+    ]
+  }
+}

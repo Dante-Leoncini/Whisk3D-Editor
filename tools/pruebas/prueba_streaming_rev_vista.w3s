@@ -1,0 +1,34 @@
+# ==========================================================================
+#  STREAMING (revision 5): la VISTA PREVIA del editor no pierde lo que el usuario cambio en lo generado
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_streaming_rev_vista.w3s
+#
+#  Sin partida, descargar una instancia anota antes sus overrides (en la de afuera de todo), como al regenerar: el ojo
+#  de un hijo generado sobrevive a alejarse y volver. Antes: se soltaba lo generado sin sincronizar y volvia visible.
+# ==========================================================================
+
+ventana 1280 720
+streamlua /tmp/w3d_f9_rev5 dosmats.png
+abrirw3d /tmp/w3d_f9_rev5/streamlua.w3d
+streamvista 1
+streamobjetivo 0 0 3
+streamtick 30
+streamestado Cerca cargada
+prefabh Cerca Tronco
+prefabnodo Cerca Tronco visible 0
+# alejarse: se descarga (y el ojo queda anotado como override de la Cerca)
+streamobjetivo 1000 0 1000
+streamtick 30
+streamestado Cerca descargada
+prefabinfo Cerca overrides 1
+# volver: se genera con su override
+streamobjetivo 0 0 3
+streamtick 30
+streamestado Cerca cargada
+prefabnodo Cerca Tronco visible 0
+prefabinfo Cerca overrides 1
+# y se guarda
+guardarw3d /tmp/w3d_f9_rev5/vista.w3d
+entradatiene /tmp/w3d_f9_rev5/vista.w3d proyecto.json "visible": 1
+streamobjetivo off
+streamvista 0

@@ -18,7 +18,7 @@ class W3dZipLector;
 //     escenas/           los .w3dui
 //     scripts/           los .lua internos
 //     texturas/  fuentes/  sonidos/  videos/
-//     mallas/            la geometria (.w3dm propio; .glb de los archivos viejos)
+//     mallas/            la geometria (.w3db binario / .w3dm texto; .glb de los archivos viejos)
 //     animaciones/       los blobs de vertex anim (.w3danim / .bin)
 //     modelos/           .obj/.wobj/.fbx traidos por el usuario
 //     proyecto/          el icono del juego y su arte fuente
@@ -86,6 +86,12 @@ bool W3dContenedorEntradaEditada(const std::string& entrada);
 bool W3dContenedorLeerEditada(const std::string& entrada, std::vector<unsigned char>& out);
 // cuantas entradas hay editadas sin guardar (el aviso de "tenes cambios sin guardar")
 size_t W3dContenedorEditadasCantidad();
+// MUDA una entrada del overlay a otro nombre SIN copiar sus bytes (renombrar una textura importada
+// en la sesion: el N95 no tiene memoria para dos copias). Pisa lo que hubiera editado con el nombre
+// nuevo. false = no hay contenedor, 'vieja' no esta editada o 'nueva' no es un nombre de entrada.
+bool W3dContenedorMudarEditada(const std::string& vieja, const std::string& nueva);
+// true si la entrada existe en el contenedor montado (editada o en el zip del disco)
+bool W3dContenedorExiste(const std::string& entrada);
 
 // ---------------------------------------------------------------------------
 //  CONSULTAS SOBRE EL CONTENEDOR MONTADO (las usa la UI: IDE, tarjetas)
@@ -129,6 +135,8 @@ std::string W3dImportarAsset(const std::string& rutaDisco, const char* categoria
 //  que en el ARCHIVO llevaba el prefijo, para volver a escribirla como externa.
 // ---------------------------------------------------------------------------
 void W3dRefExternaMarcar(const std::string& rutaResuelta);
+// la ref vuelve a ser comun (la biblioteca la paso ADENTRO del .w3d)
+void W3dRefExternaDesmarcar(const std::string& rutaResuelta);
 bool W3dRefEsExterna(const std::string& rutaResuelta);
 void W3dRefExternasLimpiar();
 // TODAS las refs externas del proyecto abierto (rutas de disco resueltas). La
@@ -164,6 +172,13 @@ const char* W3dCategoriaPorExtension(const std::string& ruta);
 // true si 'r' arranca con una de las carpetas reservadas del layout: o sea, si
 // parece un NOMBRE DE ENTRADA y no una ruta de disco.
 bool W3dEsNombreDeEntrada(const std::string& r);
+// una RUTA COSMETICA (la carpeta de un recurso del outliner: "texturas/UI") tal como se escribe
+// en el JSON: si parece un nombre de entrada se le antepone '/' para que la verificacion del
+// guardado no la tome por una referencia a una entrada que no existe (y aborte). Al leerla, la
+// normalizacion de carpetas (W3dMallaCarpetaNormalizar) descarta la barra inicial.
+inline std::string W3dRutaCosmeticaJson(const std::string& r) {
+    return W3dEsNombreDeEntrada(r) ? std::string("/") + r : r;
+}
 
 // TEST del harness (comando 'contenedor'): hace que el escritor SE OLVIDE de la
 // primera entrada que ingiere, o sea que el JSON la nombra y el zip no la tiene.
@@ -243,6 +258,17 @@ public:
     // ¿ya hay una entrada con ese nombre?
     bool Tiene(const std::string& nombre) const;
 
+    // lo que la INGESTA hizo hasta ahora con cada ruta ORIGINAL que le llego (la de disco de una
+    // particula, un elemento 2D, un material...): pares (original, entrada con la que quedo ADENTRO).
+    // Las que quedaron afuera ("ext:") no van. La usa la carpeta cosmetica de una textura de disco,
+    // que tiene que seguir a su entrada aunque ningun material la cargue.
+    void Ingeridas(std::vector<std::pair<std::string, std::string> >& out) const;
+
+    // la entrada 'nombre' del contenedor VIEJO pasa TAL CUAL al nuevo, con el mismo nombre
+    // (sin leerla a memoria ni recomprimirla): una malla del proyecto que no cambio.
+    // false = no hay contenedor viejo, no la trae, o ya hay una entrada con ese nombre.
+    bool CopiarDelViejo(const std::string& nombre);
+
     // VERIFICACION (spec seccion 9.1, punto 2): toda referencia interna del JSON y
     // de cada .w3dui tiene su entrada escrita. Sin esto el proyecto abre "sin la
     // textura" y no falla nada: es el fallo mas caro del diseno. false + el nombre
@@ -253,6 +279,11 @@ public:
     // VERBATIM (spec seccion 10), salvo lo que cuelgue de mallas/ o animaciones/
     // (carpetas exclusivas del editor: ahi lo no referenciado se descarta).
     void PreservarPasajeras();
+    // una entrada del contenedor VIEJO que el usuario PURGO (un huerfano del outliner por
+    // recursos: una textura que nadie usa): PreservarPasajeras ya no la conserva. Si algo del
+    // guardado la vuelve a referenciar, la ingesta la escribe igual (esto solo afecta a lo que
+    // se conservaria sin referencia).
+    void Descartar(const std::string& nombre) { olvidadas.insert(nombre); }
 
     // las dos entradas de servicio del estilo OpenDocument: "mimetype" (que
     // Escribir() manda PRIMERA) y "LEEME.txt". Se llama en cada guardado: las dos
@@ -299,7 +330,7 @@ private:
     std::map<std::string, std::vector<size_t> > porHuella;
     std::map<std::string, std::string> yaResueltas;  // ruta original -> lo que se escribio
     std::vector<W3dExterno>       externos;
-    std::set<std::string>         olvidadas;   // solo el hook de test las llena
+    std::set<std::string>         olvidadas;   // el hook de test y Descartar (huerfanos purgados)
 };
 
 #endif // W3DCONTENEDOR_H

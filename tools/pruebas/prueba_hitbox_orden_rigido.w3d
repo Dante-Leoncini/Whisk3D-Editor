@@ -1,0 +1,22 @@
+{
+  "version": 3,
+  "escena": {
+    "objetos": [
+      {
+        "tipo": "objeto", "nombre": "Piso", "pos": [0, -0.5, 0],
+        "fisica": { "tipo": "estatico", "masa": 1, "caja": [20, 1, 10], "centro": [0, 0, 0], "friccion": 0.5, "rebote": 0 },
+        "scripts": [ { "archivo": "hitbox_orden.lua", "refs": { "prefijo": "piso" } } ]
+      },
+      {
+        "tipo": "objeto", "nombre": "CajaA", "pos": [-3, 4, 0],
+        "fisica": { "tipo": "dinamico", "masa": 1, "caja": [1, 1, 1], "centro": [0, 0, 0], "friccion": 0.5, "rebote": 0 },
+        "scripts": [ { "archivo": "hitbox_despertar.lua" } ]
+      },
+      {
+        "tipo": "objeto", "nombre": "CajaB", "pos": [3, 4, 0],
+        "fisica": { "tipo": "dinamico", "masa": 1, "caja": [1, 1, 1], "centro": [0, 0, 0], "friccion": 0.5, "rebote": 0 },
+        "scripts": [ { "archivo": "hitbox_despertar.lua" } ]
+      }
+    ]
+  }
+}

@@ -39,8 +39,11 @@
 #include "io/JsonW3d.h"                // JsonNumTexto: floats con round-trip EXACTO
 #include "io/UI2DFormato.h"
 #include "io/W3dContenedor.h"          // FORMATO v4: el .w3d ES un zip y todo va adentro
+#include "io/W3dZip.h"                 // el contenedor VIEJO (las entradas de escenas/prefabs que ya no son de nadie)
 #include "io/TexturaEditada.h"   // texturas generadas/pintadas que solo viven en memoria: entran al zip
 #include "W3dEscena.h"                // escenaInicial / modoEscenas (se guardan con el proyecto)
+#include "W3dRaices.h"                // las ESCENAS 3D, los JUEGOS y los PREFABS: una entrada por raiz (.w3de / .w3dp)
+#include "io/RaicesEditor.h"          // el estado base de un juego que se guarda editando uno de sus clips
 #include "W3dPaletas.h"               // las paletas del PROYECTO (raiz "paletas" del .w3d)
 #include "objects/Objects.h"
 #include "objects/ObjectMode.h"        // W3dAplicarCurvasEnFrame: el objeto se guarda EN REPOSO
@@ -54,17 +57,29 @@
 #include "objects/Instance.h"          // idem Instance (duplicado enlazado / array de copias)
 #include "objects/LOD.h"               // objeto LOD (un hijo por distancia): distancias
 #include "objects/Culling.h"           // objeto Culling (frustum culling): soloCamaraActiva
+#include "objects/Niebla.h"            // objeto Niebla (glFog en el arbol)
+#include "objects/Recorte.h"           // LimpiarZ / Recorte
+#include "objects/Hitbox.h"            // HITBOX (sus campos los escribe objects/Hitbox.cpp)
+#include "objects/InstanciaPrefab.h"   // INSTANCIA DE PREFAB: se escribe el nodo (prefab + overrides), NO lo que genera
+#include "objects/ProxyW3d.h"         // PROXY W3D: el nodo (libreria + elemento + overrides); lo que genera es de la libreria
+#include "io/Librerias.h"             // las referencias a una LIBRERIA que no esta (se escriben tal cual)
+#include "io/Prefabs.h"                // la definicion EN MEMORIA de un prefab (W3dPrefabSerializarHook)
 #include "objects/Particulas.h"        // objeto Particulas (emisor): textura + config del cono
 #include "objects/VisZona.h"           // objeto VisZona (celda de visibilidad): modo + grilla + refs
 #include "objects/Collection.h"        // Collection: ordenarPorCamara/ordenarUnaVez (transparentes)
 #include "objects/Curve.h"             // idem Curve (riel de camara; se guarda su archivo de origen)
 #include "objects/Armature.h"          // los ARMATURES ahora SI se guardan (Fase 3)
 #include "animation/SkeletalAnimation.h" // clips del esqueleto (tracks/curvas por hueso)
+#include "animation/W3dAnimSet.h"        // la raiz de clips de jerarquia de un objeto: su retarget y sus capas
+#include "io/GuardarAnimSets.h"       // los clips van a ANIMSETS binarios (.w3da), deduplicados por clip
 #include "animation/Armature2DAnimation.h" // clips del armature 2D (tracks/curvas por hueso 2D)
 #include "edit/Modifier.h"             // modificador Armature del mesh (referencia por nombre)
 #include "animation/VertexAnimation.h"
 #include "script/W3dScript.h"
 #include "io/W3dMalla.h"               // .w3dm: el formato de geometria propio (reemplaza al GLB)
+#include "io/W3dMallaBin.h"            // .w3db: la misma geometria en BINARIO, lista para memoria (el default)
+#include "importers/import_w3d.h"      // W3dFormatoMallas: binario o texto (opcion del proyecto)
+#include "edit/MeshEdit.h"             // W3dMallaIndicesCanonicos: el index buffer que hornea el .w3db
 #include "importers/import_obj.h"     // TexturaPendienteDe: la carga de texturas es DIFERIDA
 #include "objects/Materials.h"         // los MATERIALES viajaban dentro del GLB: ahora van al JSON
 #include "objects/Textures.h"
@@ -74,6 +89,9 @@
 #include "ViewPorts/ViewPorts.h"      // rootViewport: el arbol VIVO de viewports (layout)
 #include "ViewPorts/ViewPort3D.h"     // la VISTA (pivot/orbit/rotacion) viaja con el layout
 #include "ViewPorts/Timeline.h"       // el MODO del timeline (dope/curvas) tambien viaja con el layout
+#include "ViewPorts/Outliner.h"       // la VISTA del outliner (escena / mallas / materiales...) tambien
+#include "io/RecursosProyecto.h"      // carpetas del outliner por recursos + texturas purgadas
+#include "io/BibliotecaExterna.h"   // "librerias": las vinculadas a la biblioteca
 #include "ViewPorts/PopUp/FileBrowser.h"
 #include "ViewPorts/PopUp/ConfirmarPopup.h"  // "Guardar como": confirmar antes de pisar un .w3d
 #include "render/OpcionesRender.h"
@@ -81,10 +99,13 @@
 #include "variables.h"   // w3dPath (el archivo abierto)
 #include "w3dFilesystem.h"
 #include "w3dlog.h"
+#include "io/MallasProyecto.h"   // las mallas 3D como RECURSO: plan de guardado + registro "mallas"
+#include "objects/MallaRecurso.h"
 #include <stdio.h>
 #include <string>
 #include <vector>
 #include <algorithm>   // std::sort: los refs de script se escriben en orden deterministico
+#include <set>
 #include <sstream>     // el nombre del PRIMER frame de una vertex anim (base + 001 + .obj)
 #include <iomanip>     // std::setw/std::setfill: el mismo padding que VertexAnimation::LoadFrames
 #ifdef _WIN32
@@ -102,6 +123,11 @@ std::string g_proyIcono;
 // TEST del harness (ver GuardarW3D.h): fallo de escritura inyectado. Siempre
 // false en el editor real.
 bool g_w3dFallarEscritura = false;
+// TEST del harness (ver GuardarW3D.h): guardar las mallas como una plataforma de indices
+// de 16 bits. Siempre false en el editor real.
+bool g_w3dIndices16Simulado = false;
+// TEST del harness (ver GuardarW3D.h): el esquema de mallas de antes. Siempre false en el editor real.
+bool g_w3dMallasLegado = false;
 
 // ESCENA UI QUE NO CARGO en la apertura actual (import_w3d.cpp). Vacio = ninguna.
 // Freno de guardado: ver el chequeo al entrar a GuardarW3D.
@@ -272,6 +298,12 @@ struct CtxGuardar {
 // ---------------------------------------------------------------------------
 static W3dContenedorEscritor* gEsc = NULL;
 static std::string gQuien;
+// SERIALIZACION EN SECO (io/Prefabs.h): el JSON de un subarbol SIN contenedor ni plan de guardado. La usa la
+// definicion en memoria de un prefab que se esta editando (lo que ven sus instancias antes de guardar). Nada se
+// ingiere ni se renombra: las rutas van como estan en memoria, las mallas por el nombre de su recurso, cada nodo
+// lleva su "_origen" (el serial del objeto) y lo que el JSON no puede llevar sin contenedor (los clips de un
+// armature, los frames de una vertex anim) lo copia la generacion de la plantilla (W3dPrefabArreglarHook).
+static bool gSeco = false;
 
 static std::string W3dRefEmitir(std::string& ruta) {
     if (!gEsc) return ruta;
@@ -285,6 +317,7 @@ static std::string W3dRefEmitir(std::string& ruta) {
 // (el nombre de entrada para los internos), que es lo que resuelve ReadFileBytes.
 static std::string Asset(CtxGuardar* cx, std::string& rutaDisco) {
     if (rutaDisco.empty()) return rutaDisco;
+    if (gSeco || !cx->esc) return rutaDisco;   // (en seco: la ruta tal cual esta en memoria)
     { std::string png;   // textura interna que solo vive en memoria (generada / pintada sin guardar): sus bytes
       if (TexEditBytesParaGuardar(rutaDisco, png)) { cx->esc->AgregarBytes(rutaDisco, png, true); return rutaDisco; } }
     return cx->esc->Ingerir(rutaDisco, NULL, gQuien);
@@ -385,7 +418,7 @@ static void EscribirCurva(std::string& s, const AnimProperty& ap) {
 //  pero se ingiere igual para poder re-importar el .obj desde el paquete.)
 // ---------------------------------------------------------------------------
 static void IngerirSidecars(CtxGuardar* cx, Mesh* m) {
-    if (!m) return;
+    if (!m || gSeco || !cx->esc) return;
     // 1) las declaraciones EXPLICITAS del modificador (`vis:` / `pvs:`) MANDAN:
     //    se ingiere ESE archivo y el nodo guarda su nombre real de entrada.
     //    Antes este paso no existia y el paso 2 PISABA la declaracion con el
@@ -424,12 +457,32 @@ static void IngerirSidecars(CtxGuardar* cx, Mesh* m) {
     }
 }
 
+// ---------------------------------------------------------------------------
+//  BINARIO (.w3db) o TEXTO (.w3dm): lo decide la opcion del proyecto "formatoMallas"
+//  (W3dFormatoMallas, default binario). Los DOS guardan la misma malla (ver W3dMallaBin.h):
+//  el binario ademas HORNEA lo que el texto obliga a derivar al abrir (index buffer por
+//  parte + Forsyth, aristas, AABB, capas activas en el render, identidad de los puntos),
+//  asi abrir el proyecto es leer la entrada y copiar. Los frenos de abajo valen igual.
+//  EXCEPCION: con indices de 16 bits (el N95) una malla de mas de 65535 render-verts no
+//  tiene index buffer correcto en memoria (se trunca modulo 65536) y el .w3db no se puede
+//  escribir (W3dMallaBinIndicesAlcanzan): esa sale en TEXTO, que guarda las caras con int.
+//  El PC la abre entera y el telefono la vuelve a abrir como antes. Se avisa.
+// ---------------------------------------------------------------------------
 static std::string EscribirMallaW3dm(CtxGuardar* cx, Mesh* m, const std::string& nombreObj) {
+    if (gSeco || !cx->esc) return std::string();   // (en seco no hay donde escribirla: va por su recurso)
+    const int nRV = m->vertex ? m->vertexSize : 0;
+    // una malla de un RECURSO con la edicion pendiente se materializa para escribirla y despues
+    // la suelta (no hay por que dejar en memoria las caras de mil arboles por un guardado)
+    const bool edicionPrestada = m->malla && !m->edicionPendiente.empty();
+    const bool pideBinario = (W3dFormatoMallas() == W3D_MALLAS_BINARIO);
+    const bool noEntra = !W3dMallaBinIndicesAlcanzan(nRV) || (g_w3dIndices16Simulado && nRV > 65535);
+    const bool binario = pideBinario && !noEntra;
+    const char* ext = binario ? ".w3db" : ".w3dm";
     std::string base = W3dSlugEntrada(nombreObj.empty() ? std::string("malla") : nombreObj);
-    std::string nom = "mallas/" + base + ".w3dm";
+    std::string nom = "mallas/" + base + ext;
     for (int k = 2; cx->esc->Tiene(nom); k++) {
         char sf[16]; snprintf(sf, sizeof(sf), "-%d", k);
-        nom = "mallas/" + base + sf + ".w3dm";
+        nom = "mallas/" + base + sf + ext;
     }
     // EL REST DEL SKINNING 2D ES DATO, NO CACHE: en memoria se captura LAZY (la primera vez que
     // se posa el rig o al reabrir el proyecto), asi que una malla con armature 2D todavia sin
@@ -466,6 +519,17 @@ static std::string EscribirMallaW3dm(CtxGuardar* cx, Mesh* m, const std::string&
         cx->error = true;   // no hay medio guardado posible: o sale entero o no sale
         return nom;
     }
+    // ---- EDICION PENDIENTE: UNA .w3db LEIDA COMO EL JUEGO (solo render) -------
+    //  Sus caras, capas y aristas siguen en la entrada (Mesh::edicionPendiente): se
+    //  materializan ANTES de escribir. Si no se puede, guardar hornearia una malla sin
+    //  caras: se frena igual que con "no cargo".
+    if (!m->edicionPendiente.empty() && !W3dMallaBinMaterializarEdicion(m)) {
+        w3dLogfE("[W3D] '%s': no pude leer las caras de su entrada .w3db: NO guardo encima", nombreObj.c_str());
+        W3dAvisof(true, "No guardo '%s': no pude leer sus caras y guardarla las borraria",
+                  W3dNombreCorto(nombreObj).c_str());
+        cx->error = true;
+        return nom;
+    }
     // ---- ABIERTA CON ERRORES (spec 19f) ---------------------------------------
     //  La malla vino de un .w3dm truncado: se cargo lo que habia y guardar encima
     //  HORNEA esa perdida. La spec pide CONFIRMACION; el guardado de hoy es
@@ -494,7 +558,23 @@ static std::string EscribirMallaW3dm(CtxGuardar* cx, Mesh* m, const std::string&
 
     std::string txt;
     std::vector<std::string> avisos;
-    if (!W3dMallaEscribir(m, txt, &avisos)) {
+    bool escrita;
+    if (binario) {
+        // el index buffer CANONICO (el que armaria ReagruparMeshParts al abrir el .w3dm): se
+        // hornea aca, una vez, y abrir no triangula ni reordena nada. No toca la malla viva.
+        W3dMallaBinIndices canon;
+        W3dMallaIndicesCanonicos(m, canon);
+        escrita = W3dMallaBinEscribir(m, &canon, txt, &avisos);
+    } else {
+        if (pideBinario) {   // el proyecto pedia binario y esta malla no entra (ver arriba)
+            w3dLogfW("[W3D] '%s': %d vertices de render y esta plataforma usa indices de 16 bits: la guardo en texto (.w3dm)",
+                     nombreObj.c_str(), nRV);
+            W3dAvisof(false, "'%s' tiene mas de 65535 vertices: la guardo en texto (.w3dm), no en binario",
+                      W3dNombreCorto(nombreObj).c_str());
+        }
+        escrita = W3dMallaEscribir(m, txt, &avisos);
+    }
+    if (!escrita) {
         w3dLogfE("GuardarW3D: no pude escribir la geometria de '%s'", nombreObj.c_str());
         for (size_t i = 0; i < avisos.size(); i++)
             w3dLogfE("[W3D] '%s': %s", nombreObj.c_str(), avisos[i].c_str());
@@ -515,6 +595,7 @@ static std::string EscribirMallaW3dm(CtxGuardar* cx, Mesh* m, const std::string&
         w3dLogfE("GuardarW3D: no pude meter %s adentro del .w3d", nom.c_str());
         cx->error = true;
     }
+    if (edicionPrestada) W3dMallaSoltarEdicion(m);
     return nom;
 }
 
@@ -536,6 +617,7 @@ static void MatRegistrar(Mesh* m) {
     for (size_t g = 0; g < m->materialsGroup.size(); g++) {
         Material* mat = m->materialsGroup[g].material;
         if (!mat) continue;
+        if (!mat->libreria.empty()) continue;   // (uno de una LIBRERIA: se nombra, no se escribe)
         bool ya = false;
         for (size_t i = 0; i < gMats.size() && !ya; i++) if (gMats[i] == mat) ya = true;
         if (!ya) gMats.push_back(mat);
@@ -574,6 +656,8 @@ static void EscribirMateriales(std::string& s, CtxGuardar* cx) {
         Material* mt = gMats[i];
         gQuien = "material \"" + mt->name + "\"";
         s += "    { \"nombre\": "; JEsc(s, mt->name);
+        // CARPETA cosmetica del outliner por recursos: solo si tiene (sin carpeta, el texto de siempre)
+        if (!mt->carpeta.empty()) { s += ", \"carpeta\": "; JEsc(s, W3dRutaCosmeticaJson(mt->carpeta)); }
         s += ",\n      \"difuso\": ["; JNum(s, mt->diffuse[0]); s += ", "; JNum(s, mt->diffuse[1]);
         s += ", "; JNum(s, mt->diffuse[2]); s += ", "; JNum(s, mt->diffuse[3]); s += "]";
         s += ",\n      \"especular\": ["; JNum(s, mt->specular[0]); s += ", "; JNum(s, mt->specular[1]);
@@ -591,6 +675,7 @@ static void EscribirMateriales(std::string& s, CtxGuardar* cx) {
         // DECAL / mezcla: se escriben SOLO si se apartan del default, asi un proyecto que no los
         // usa guarda exactamente el mismo texto de siempre (los diffs del .w3d siguen legibles).
         if (mt->depth_bias != 0.0f) { s += ", \"sesgoProfundidad\": "; JNum(s, mt->depth_bias); }
+        if (mt->alphaTest != 0.0f)  { s += ", \"alfaCorte\": ";        JNum(s, mt->alphaTest); }
         if (mt->orden_pasada != 0)  { s += ", \"ordenPasada\": ";      JNum(s, (float)mt->orden_pasada); }
         if (mt->mezcla != 0)        { s += ", \"mezcla\": ";           JNum(s, (float)mt->mezcla); }
         // LINEAS (aristas por material): solo si esta prendido (mismo criterio que decal)
@@ -614,20 +699,31 @@ static void EscribirMateriales(std::string& s, CtxGuardar* cx) {
         s += " }";
         std::string tex = MatTexturaBase(cx, mt);
         if (!tex.empty()) { s += ",\n      \"textura\": "; JEsc(s, tex); }
+        // un material HUERFANO recien abierto tiene sus texturas DORMIDAS (import_obj.h): sus rutas
+        // estan ahi, no en los Texture*. Se ingieren por referencia, como la base de la cola.
+        TexDormida* dz = TexturasDormidasDe(mt);
         std::string nrm = MatTextura(cx, mt->normalTexture);
+        if (nrm.empty() && dz && !dz->normal.empty()) nrm = Asset(cx, dz->normal);
         if (!nrm.empty()) { s += ",\n      \"normalTextura\": "; JEsc(s, nrm); }
-        // capas de textura EXTRA (multi-pass): su textura y como se mezcla con lo de abajo
-        if (!mt->capas.empty()) {
+        // capas de textura EXTRA (multi-pass): su textura y como se mezcla con lo de abajo (las
+        // dormidas eran las primeras del material: van adelante, como cuando despiertan)
+        if (!mt->capas.empty() || (dz && !dz->capas.empty())) {
             s += ",\n      \"capas\": [";
             bool primera = true;
-            for (size_t c = 0; c < mt->capas.size(); c++) {
-                std::string ct = MatTextura(cx, mt->capas[c].tex);
+            const size_t nDorm = dz ? dz->capas.size() : 0;
+            for (size_t c = 0; c < nDorm + mt->capas.size(); c++) {
+                const bool dormida = c < nDorm;
+                std::string ct = dormida ? Asset(cx, dz->capas[c].textura) : MatTextura(cx, mt->capas[c - nDorm].tex);
                 if (ct.empty()) continue;
+                const int mezcla = dormida ? dz->capas[c].mezcla : mt->capas[c - nDorm].blend;
+                const int uvCapa = dormida ? dz->capas[c].uv : mt->capas[c - nDorm].uvMapa;
+                const bool on = dormida ? dz->capas[c].on : mt->capas[c - nDorm].on;
                 if (!primera) s += ",";
                 primera = false;
                 s += " { \"textura\": "; JEsc(s, ct);
-                s += ", \"mezcla\": "; JNum(s, (float)mt->capas[c].blend);
-                s += ", \"on\": "; s += mt->capas[c].on ? "true" : "false"; s += " }";
+                s += ", \"mezcla\": "; JNum(s, (float)mezcla);
+                if (uvCapa != 0) { s += ", \"uv\": "; JNum(s, (float)uvCapa); }   // solo si no es la base (diffs estables)
+                s += ", \"on\": "; s += on ? "true" : "false"; s += " }";
             }
             s += " ]";
         }
@@ -644,6 +740,7 @@ static void EscribirMateriales(std::string& s, CtxGuardar* cx) {
 // .obj de origen) y sus curvas de transform. Reemplaza al viejo guardado (solo basePath).
 static void EscribirAnimsVertex(std::string& s, Mesh* m, int ind, CtxGuardar* cx) {
     if (m->animations.empty()) return;
+    if (gSeco) return;   // (en seco: sus frames no tienen entrada; la generacion los copia de la plantilla)
     // ---- EL FRENO DE MANO DE LAS ANIMS (hermano del de la malla, mas arriba) -------------
     //  Una vertex anim cuyo blob de frames NO se pudo leer al abrir quedo con 0 keyframes.
     //  Guardar encima la destruye SIN RASTRO: sin frames no se emite "buffers", y el
@@ -807,13 +904,27 @@ static void LayoutEscribirNodo(std::string& s, ViewportBase* v, int ind) {
         // OVERLAYS POR TIPO (submenu Overlays > Objects): el lector ya los entendia pero no se escribian, asi
         // que apagar el overlay del esqueleto (o de las luces...) se perdia al guardar. Solo si difieren del
         // default del viewport: un layout comun sale igual que antes.
+        // "showOverlays" (el ojo de Overlays) tampoco se escribia: un proyecto guardado con los overlays apagados
+        // volvia a abrir con ellos prendidos, y como el Play respeta ese tilde, el juego del editor tambien.
         struct { const char* k; bool v, def; } ov[] = {
+            { "showOverlays", v3->showOverlays, true },
             { "showArmature", v3->showArmature, true }, { "showLights", v3->showLights, true },
             { "showCamera", v3->showCamera, true }, { "showEmpty", v3->showEmpty, true },
             { "showParticulas", v3->showParticulas, false }, { "showCurvas", v3->showCurvas, true },
+            { "showHitbox", v3->showHitbox, true },
             { "ShowRelantionshipsLines", v3->ShowRelantionshipsLines, true } };
         for (size_t k = 0; k < sizeof(ov) / sizeof(ov[0]); k++)
             if (ov[k].v != ov[k].def) { JSang(s, ind + 1); s += ov[k].k; s += ": "; s += ov[k].v ? "true" : "false"; s += "\n"; }
+        // MIRAR POR LA CAMARA, el MODO de sombreado y el FAR: el lector (ApplyViewport3DProps) ya los entendia pero
+        // no se escribian -> un layout de dos vistas (una por la camara en Rendered, otra libre para ver aparecer y
+        // desaparecer el culling) volvia como dos vistas iguales. Solo si difieren del default del viewport.
+        if (v3->ViewFromCameraActive) { JSang(s, ind + 1); s += "ViewFromCameraActive: true\n"; }
+        if (v3->view != RenderType::MaterialPreview) {
+            static const char* kVista[] = { "Solid", "MaterialPreview", "Rendered", "ZBuffer", "Wireframe", "NormalView", "Alpha" };
+            const int vi = (int)v3->view;
+            if (vi >= 0 && vi < 7) { JSang(s, ind + 1); s += "view: "; s += kVista[vi]; s += "\n"; }
+        }
+        if (v3->farClip != 1000.0f) { JSang(s, ind + 1); s += "farClip: "; JNum(s, v3->farClip); s += "\n"; }
         JSang(s, ind); s += "}\n";
         return;
     }
@@ -865,6 +976,19 @@ static void LayoutEscribirNodo(std::string& s, ViewportBase* v, int ind) {
             JSang(s, ind + 1); s += "zoomValor: ";   JNum(s, tl->pxPerUnit);   s += "\n"; // px por unidad de valor
             JSang(s, ind + 1); s += "centroValor: "; JNum(s, tl->viewCenterV); s += "\n"; // valor en el centro
         }
+        JSang(s, ind); s += "}\n";
+        return;
+    }
+    // ---- LA VISTA DEL OUTLINER (por recursos) VIAJA CON EL LAYOUT ----------------
+    //  Como el modo del timeline: es de ESA hoja (puede haber dos outliners, uno en la
+    //  escena y otro en los materiales). Va por la CLAVE ("mallas"), no por el numero.
+    //  En la vista Escena (la de siempre) no se escribe nada: un layout comun sale igual.
+    if (v->ViewportKind() == 2 && ((Outliner*)v)->vista != OUT_VISTA_ESCENA) {
+        const Outliner* o = (const Outliner*)v;
+        JSang(s, ind); s += nombre; s += " {\n";
+        JSang(s, ind + 1); s += "vista: "; s += o->VistaClave(); s += "\n";
+        if (o->filtro > W3D_VISTA_ESCENA) { JSang(s, ind + 1); s += "filtro: "; s += W3dVistaClave(o->filtro); s += "\n"; }
+        if (o->cuadricula) { JSang(s, ind + 1); s += "cuadricula: 1\n"; }
         JSang(s, ind); s += "}\n";
         return;
     }
@@ -931,7 +1055,18 @@ static void EscribirSesion(std::string& s) {
             primero = false;
         }
     }
-    s += "]\n";
+    s += "]";
+    // la RAIZ que se esta editando, si no es la escena del bloque (la seleccion de arriba es suya).
+    // Ausente = la del bloque: un proyecto de una sola escena sale como siempre.
+    {
+        const int act = W3dRaizActiva(), blq = W3dRaizBloque();
+        if (act >= 0 && act != blq && act < (int)W3dRaices().size()) {
+            const W3dRaizFila& f = W3dRaices()[(size_t)act];
+            s += ",\n    \"raiz\": "; JEsc(s, f.nombre);
+            s += ", \"raizTipo\": "; JEsc(s, W3dRaizTipoClave(W3dRaizTipoDe(act)));
+        }
+    }
+    s += "\n";
     s += "  },\n";
 }
 
@@ -1023,7 +1158,20 @@ static void EscribirArmature(std::string& s, Armature* a, int ind) {
     }
     JSang(s, ind); s += "]";
     if (!a->capas.empty()) { s += ",\n"; JSang(s, ind); s += "\"capas\": "; EscribirCapas(s, a->capas, ind); }
-    if (!a->animations.empty()) {
+    // LOS CLIPS van a un ANIMSET (animaciones/<slug>.w3da, ver GuardarAnimSets.h): aca solo el
+    // nombre del animset y que clips usa de el. El INLINE de abajo queda para el harness
+    // (g_w3dAnimsInline: archivos "de antes" para probar la migracion) y como red: un armature
+    // que el plan no vio no pierde sus clips.
+    std::string animSet; std::vector<int> clipsIdx;
+    if (gSeco) {
+        // (en seco: los clips los COMPARTE la generacion con los de la plantilla -W3dPrefabArreglarHook-: N
+        //  instancias de un prefab sin guardar usan los mismos clips en memoria, como un Alt+D)
+    } else if (!g_w3dAnimsInline && GuardarAnimSetsDe(a, animSet, clipsIdx)) {
+        s += ",\n"; JSang(s, ind); s += "\"anims\": "; JEsc(s, animSet);
+        s += ",\n"; JSang(s, ind); s += "\"clips\": [";
+        for (size_t k = 0; k < clipsIdx.size(); k++) { if (k) s += ", "; JInt(s, clipsIdx[k]); }
+        s += "]";
+    } else if (!a->animations.empty()) {
         s += ",\n"; JSang(s, ind); s += "\"anims\": [\n";
         for (size_t i = 0; i < a->animations.size(); i++) {
             SkeletalAnimation* an = a->animations[i];
@@ -1350,6 +1498,7 @@ static void EscribirConstraints(std::string& s, Object* o, int ind) {
 
 static void EscribirObjeto(std::string& s, Object* o, int ind, CtxGuardar* cx, bool* primero,
                            const std::string* padre2d = NULL);
+static void EscribirClipsJerarquia(std::string& s, const Object* o, int ind);   // (definida con las animaciones de escena)
 
 // un hijo que NO va en el .w3d: los ELEMENTOS 2D de una escena UI viven en SU
 // .w3dui (UI2DFormato::EscribirHijos). Escribirlos tambien aca los DUPLICARIA al
@@ -1400,6 +1549,9 @@ static void JuntarHuespedesUI(Object* nodo2d, std::vector<HuespedUI>& out) {
 //  su autor tenga que acordarse de nada.
 // ---------------------------------------------------------------------------
 static void EscribirHijos(std::string& s, Object* o, int ind, CtxGuardar* cx) {
+    // una INSTANCIA DE PREFAB no escribe sus hijos: los GENERA de la definicion de su prefab al abrir (y un PROXY
+    // de una libreria tampoco: los genera la libreria)
+    if (W3dEsTipoInstancia(o->getType())) return;
     // los NO-2D que cuelgan de los elementos 2D de esta UI: van aca, con "padre2d" (fallo B)
     std::vector<HuespedUI> huespedes;
     if (o->getType() == ObjectType::ui)
@@ -1474,6 +1626,9 @@ static void EscribirObjeto(std::string& s, Object* o, int ind, CtxGuardar* cx, b
     gQuien = "objeto \"" + o->name + "\"";
 
     JSang(s, ind); s += "{\n";
+    // (en seco: de que objeto de la plantilla sale este nodo; ver gSeco)
+    // (el serial SIN signo y entero: pasado por int -o leido como float- se corria a partir de 2^31 / 2^24)
+    if (gSeco) { JSang(s, ind + 1); s += "\"_origen\": "; { char nb[16]; snprintf(nb, sizeof(nb), "%u", o->serial); s += nb; } s += ",\n"; }
     // el nodo cuelga de un ELEMENTO 2D de esta escena UI (ver JuntarHuespedesUI): el .w3d lo
     // escribe bajo el nodo UI y este campo dice de QUE elemento re-colgarlo al abrir. Ausente
     // en todos los demas nodos -> el archivo sale byte a byte igual que antes.
@@ -1485,6 +1640,11 @@ static void EscribirObjeto(std::string& s, Object* o, int ind, CtxGuardar* cx, b
         // que conserva la subcarpeta, ej "contenido/menu.w3dui"). Una UI nueva
         // toma "<nombre>.w3dui", bajo contenido/ con la estructura nueva.
         UI* u = (UI*)o;
+        if (gSeco || !cx->esc) {
+            // (en seco: la escena UI tal como quedo en su entrada; lo que se le edito se ve al guardar)
+            JSang(s, ind + 1); s += "\"tipo\": \"ui\",\n";
+            JSang(s, ind + 1); s += "\"archivo\": "; JEsc(s, u->archivoW3dui);
+        } else {
         // la escena es una ENTRADA del contenedor (escenas/<slug>.w3dui). El nombre
         // sale del nombre VISIBLE de la escena, slugueado; el nombre visible no se
         // toca nunca (vive en el .w3dui) y el de entrada es un derivado.
@@ -1511,6 +1671,7 @@ static void EscribirObjeto(std::string& s, Object* o, int ind, CtxGuardar* cx, b
         }
         JSang(s, ind + 1); s += "\"tipo\": \"ui\",\n";
         JSang(s, ind + 1); s += "\"archivo\": "; JEsc(s, nom);
+        }
     }
     // (el objeto de SCRIPT no tiene rama propia A PROPOSITO: cae por el 'else'
     //  generico del final y se guarda como "objeto" + CamposComunes + sus scripts.
@@ -1554,6 +1715,7 @@ static void EscribirObjeto(std::string& s, Object* o, int ind, CtxGuardar* cx, b
         JNum(s, l->diffuse[0]); s += ", "; JNum(s, l->diffuse[1]); s += ", "; JNum(s, l->diffuse[2]); s += "]";
         // tipo/atenuacion/trazado de rayos: SOLO si no son los defaults (un proyecto que no los toca guarda igual)
         if (l->direccional) { s += ",\n"; JSang(s, ind + 1); s += "\"direccional\": true"; }
+        if (!l->ignorarOrden) { s += ",\n"; JSang(s, ind + 1); s += "\"ignorarOrden\": false"; }   // default true
         if (l->attConstant != 0.5f || l->attLinear != 0.1f || l->attQuadratic != 0.0f) {
             s += ",\n"; JSang(s, ind + 1); s += "\"atenuacion\": [";
             JNum(s, l->attConstant); s += ", "; JNum(s, l->attLinear); s += ", "; JNum(s, l->attQuadratic); s += "]";
@@ -1646,6 +1808,62 @@ static void EscribirObjeto(std::string& s, Object* o, int ind, CtxGuardar* cx, b
         // que no lo tocan queden byte a byte como antes
         if (l->soloCamaraActiva) { s += ",\n"; JSang(s, ind + 1); s += "\"soloCamaraActiva\": true"; }
     }
+    else if (t == ObjectType::niebla) {
+        // NIEBLA: todas sus propiedades, siempre (tipo nuevo, no hay archivos viejos que cuidar)
+        Niebla* ni = (Niebla*)o;
+        static const char* kModos[] = { "lineal", "exp", "exp2" };
+        JSang(s, ind + 1); s += "\"tipo\": \"niebla\",\n";
+        CamposComunes(s, ind + 1, o);
+        s += ",\n"; JSang(s, ind + 1); s += "\"activa\": "; s += ni->activa ? "true" : "false";
+        s += ",\n"; JSang(s, ind + 1); s += "\"modo\": "; JEsc(s, std::string(kModos[(ni->modo >= 0 && ni->modo <= 2) ? ni->modo : 0]));
+        s += ",\n"; JSang(s, ind + 1); s += "\"inicio\": "; JNum(s, ni->inicio);
+        s += ",\n"; JSang(s, ind + 1); s += "\"fin\": "; JNum(s, ni->fin);
+        s += ",\n"; JSang(s, ind + 1); s += "\"densidad\": "; JNum(s, ni->densidad);
+        s += ",\n"; JSang(s, ind + 1); s += "\"color\": ["; JNum(s, ni->color[0]); s += ", "; JNum(s, ni->color[1]);
+        s += ", "; JNum(s, ni->color[2]); s += "]";
+        s += ",\n"; JSang(s, ind + 1); s += "\"fondo\": "; s += ni->fondo ? "true" : "false";
+    }
+    else if (t == ObjectType::limpiarz) {
+        JSang(s, ind + 1); s += "\"tipo\": \"limpiarz\",\n";
+        CamposComunes(s, ind + 1, o);
+        s += ",\n"; JSang(s, ind + 1); s += "\"activo\": "; s += ((LimpiarZ*)o)->activo ? "true" : "false";
+    }
+    else if (t == ObjectType::recorte) {
+        Recorte* rc = (Recorte*)o;
+        JSang(s, ind + 1); s += "\"tipo\": \"recorte\",\n";
+        CamposComunes(s, ind + 1, o);
+        s += ",\n"; JSang(s, ind + 1); s += "\"activo\": "; s += rc->activo ? "true" : "false";
+        s += ",\n"; JSang(s, ind + 1); s += "\"x\": "; JNum(s, rc->x);
+        s += ",\n"; JSang(s, ind + 1); s += "\"y\": "; JNum(s, rc->y);
+        s += ",\n"; JSang(s, ind + 1); s += "\"ancho\": "; JNum(s, rc->ancho);
+        s += ",\n"; JSang(s, ind + 1); s += "\"alto\": "; JNum(s, rc->alto);
+        s += ",\n"; JSang(s, ind + 1); s += "\"camara\": "; JEsc(s, rc->camara);
+        s += ",\n"; JSang(s, ind + 1); s += "\"limpiarZ\": "; s += rc->limpiarZ ? "true" : "false";
+        s += ",\n"; JSang(s, ind + 1); s += "\"fondo\": "; s += rc->fondo ? "true" : "false";
+        s += ",\n"; JSang(s, ind + 1); s += "\"color\": ["; JNum(s, rc->color[0]); s += ", "; JNum(s, rc->color[1]);
+        s += ", "; JNum(s, rc->color[2]); s += ", "; JNum(s, rc->color[3]); s += "]";
+    }
+    else if (t == ObjectType::hitbox) {
+        JSang(s, ind + 1); s += "\"tipo\": \"hitbox\",\n";
+        CamposComunes(s, ind + 1, o);
+        HitboxEscribirCampos(s, ind + 1, (Hitbox*)o);
+    }
+    else if (t == ObjectType::prefab) {
+        // INSTANCIA DE PREFAB: el nodo, su prefab y sus overrides (sus hijos NO: ver EscribirHijos)
+        JSang(s, ind + 1); s += "\"tipo\": \"prefab\",\n";
+        CamposComunes(s, ind + 1, o);
+        // (los overrides son lo que el usuario cambio en lo generado: el visible de un hijo, un valor de script)
+        W3dPrefabSincronizarOverrides((InstanciaPrefab*)o);
+        InstanciaPrefabEscribirCampos(s, ind + 1, (InstanciaPrefab*)o);
+    }
+    else if (t == ObjectType::proxy) {
+        // PROXY W3D: el nodo, su libreria, su elemento y sus overrides. Lo que genera NO (ver EscribirHijos) y sus
+        // recursos tampoco: son de la libreria (no se ingiere nada)
+        JSang(s, ind + 1); s += "\"tipo\": \"proxy\",\n";
+        CamposComunes(s, ind + 1, o);
+        W3dPrefabSincronizarOverrides((InstanciaPrefab*)o);
+        ProxyW3dEscribirCampos(s, ind + 1, (ProxyW3d*)o);
+    }
     else if (t == ObjectType::culling) {
         // Culling: contenedor de culling unificado (metodo frustum/grid/triangulo/bsp)
         Culling* cu = (Culling*)o;
@@ -1667,6 +1885,7 @@ static void EscribirObjeto(std::string& s, Object* o, int ind, CtxGuardar* cx, b
             s += ",\n"; JSang(s, ind + 1); s += "\"distanciaMax\": "; JNum(s, cu->distanciaMax);
         }
         if (cu->ordenAlpha) { s += ",\n"; JSang(s, ind + 1); s += "\"ordenAlpha\": true"; }
+        if (cu->ordenCercania) { s += ",\n"; JSang(s, ind + 1); s += "\"ordenCercania\": true"; }
         // campos del metodo Grid: solo se escriben con metodo=Grid (los demas metodos no los usan)
         if (cu->metodo == Culling::Grid) {
             s += ",\n"; JSang(s, ind + 1); s += "\"cellSize\": "; JNum(s, cu->cellSize);
@@ -1676,6 +1895,10 @@ static void EscribirObjeto(std::string& s, Object* o, int ind, CtxGuardar* cx, b
         if (cu->metodo == Culling::Riel) {
             if (!cu->rielNombre.empty())      { s += ",\n"; JSang(s, ind + 1); s += "\"riel\": ";     JEsc(s, cu->rielNombre); }
             if (!cu->visHijosArchivo.empty()) { s += ",\n"; JSang(s, ind + 1); s += "\"visHijos\": "; JEsc(s, cu->visHijosArchivo); }
+        }
+        // campo del metodo Bsp: el .w3dbsp (arbol + PVS + clusters por hijo)
+        if (cu->metodo == Culling::Bsp && !cu->bspArchivo.empty()) {
+            s += ",\n"; JSang(s, ind + 1); s += "\"bsp\": "; JEsc(s, cu->bspArchivo);
         }
     }
     else if (t == ObjectType::viszona) {
@@ -1769,6 +1992,15 @@ static void EscribirObjeto(std::string& s, Object* o, int ind, CtxGuardar* cx, b
                 s += ",\n"; JSang(s, ind + 1); s += "\""; s += fl[q].k; s += "\": "; JNum(s, fl[q].v);
             }
             if (!pt->giroSignoAzar) { s += ",\n"; JSang(s, ind + 1); s += "\"giroSignoAzar\": false"; }
+            if (pt->aparecer != 0.0f) { s += ",\n"; JSang(s, ind + 1); s += "\"aparecer\": "; JNum(s, pt->aparecer); }
+            if (pt->fundeCerca[1] > 0.0f) {
+                s += ",\n"; JSang(s, ind + 1); s += "\"fundeCerca\": ["; JNum(s, pt->fundeCerca[0]); s += ", ";
+                JNum(s, pt->fundeCerca[1]); s += "]";
+            }
+            if (pt->fundeLejos[1] > 0.0f) {
+                s += ",\n"; JSang(s, ind + 1); s += "\"fundeLejos\": ["; JNum(s, pt->fundeLejos[0]); s += ", ";
+                JNum(s, pt->fundeLejos[1]); s += "]";
+            }
             if (pt->flipUnaVez)     { s += ",\n"; JSang(s, ind + 1); s += "\"flipUnaVez\": true"; }
             if (pt->usarColorFinal) {
                 s += ",\n"; JSang(s, ind + 1); s += "\"colorFinal\": [";
@@ -1849,18 +2081,36 @@ static void EscribirObjeto(std::string& s, Object* o, int ind, CtxGuardar* cx, b
         //  usuario sepa de donde salio: si falta, se avisa y NO pasa nada.
         // ==================================================================
         Mesh* m = (Mesh*)o;
-        MatRegistrar(m);                 // sus materiales van al bloque raiz "materiales"
-        std::string nomGeo = EscribirMallaW3dm(cx, m, o->name);
+        if (!gSeco) MatRegistrar(m);     // sus materiales van al bloque raiz "materiales"
+        // LA MALLA COMO RECURSO: el objeto nombra su malla del registro "mallas" (una entrada
+        // por malla -.w3db, o .w3dm en el formato de texto- compartida por todos sus objetos; el
+        // plan del guardado ya la escribio). Una malla que no entra al plan (mas de 65535
+        // vertices con indices de 16 bits) va por el camino de siempre: su "geometria" propia.
+        // (en seco: la malla por el nombre de su RECURSO en memoria; toda malla tiene uno)
+        // (una malla de una LIBRERIA externa -soltada desde su biblioteca- se NOMBRA con su prefijo y no se escribe:
+        //  el plan del guardado no la toca, io/MallasProyecto.cpp)
+        // (y la de una libreria que NO ESTA -desvinculada o sin su archivo, io/Librerias.h-: el objeto quedo vacio pero
+        //  su referencia se escribe tal cual, y vuelve a resolverse al vincularla)
+        const W3dLibRef* refLib = m->malla ? NULL : W3dLibRefDe(m, W3D_LIBREF_MALLA);
+        const bool deLib = m->malla && !m->malla->libreria.empty();
+        const std::string nomMalla = refLib ? refLib->nombre
+                                           : (gSeco || deLib) ? (m->malla ? m->malla->nombre : std::string())
+                                           : (g_w3dMallasLegado ? std::string() : W3dMallasGuardarNombreDe(m));
+        std::string nomGeo;
+        // (con el plan fallado el guardado ya se aborto y se aviso: no se repiten los frenos)
+        const bool planFallo = !g_w3dMallasLegado && cx->error;
+        if (nomMalla.empty() && !planFallo) nomGeo = EscribirMallaW3dm(cx, m, o->name);
         JSang(s, ind + 1); s += "\"tipo\": \"malla\",\n";
         CamposComunes(s, ind + 1, o);
-        s += ",\n"; JSang(s, ind + 1); s += "\"geometria\": "; JEsc(s, nomGeo);
+        if (!nomMalla.empty()) { s += ",\n"; JSang(s, ind + 1); s += "\"malla\": "; JEsc(s, nomMalla); }
+        else { s += ",\n"; JSang(s, ind + 1); s += "\"geometria\": "; JEsc(s, nomGeo); }
         // ESCENARIO CERRADO A EDICION: sin esto el reabrir recalculaba bordes
         // (edges 0 -> N) y la malla dejaba de ser identica a la original.
         if (m->noEditable) { s += ",\n"; JSang(s, ind + 1); s += "\"noEditable\": true"; }
         if (!m->origen.empty()) {
             // el .obj/.fbx del usuario lo edita OTRO programa: es suyo y queda EXTERNO
             // (listado en EXTERNOS.txt). Ya no es de donde carga la malla.
-            W3dRefExternaMarcar(m->origen);
+            if (!gSeco) W3dRefExternaMarcar(m->origen);
             // LOS SIDECARS DEL MODELO (<base>.pvs.json) SI ENTRAN AL CONTENEDOR.
             // Son datos derivados que ningun otro programa edita, no hay forma de
             // regenerarlos en la maquina de destino, y sin esto se perdian en
@@ -1910,6 +2160,10 @@ static void EscribirObjeto(std::string& s, Object* o, int ind, CtxGuardar* cx, b
     // mismo motivo) que EscribirConstraints/EscribirHijos. El lector espejo es
     // el call site unico de JsonScripts en JsonObjeto (import_w3d.cpp).
     EscribirScripts(s, o, ind + 1, cx);
+
+    // SU BIBLIOTECA DE CLIPS DE JERARQUIA (animation/W3dAnimSet.h): el nombre del animset compartido con
+    // el que se anima a si mismo y a sus hijos. Sin biblioteca no se escribe nada (el archivo no cambia).
+    EscribirClipsJerarquia(s, o, ind + 1);
 
     // LOS HIJOS, DE TODOS LOS TIPOS, DE UNA SOLA VEZ (ver EscribirHijos arriba).
     // Va al FINAL a proposito: para las ramas que YA lo llamaban (coleccion,
@@ -1974,74 +2228,147 @@ static bool AnimObjTieneKeys(const AnimationObject& ao) {
 // true si el estado de animaciones es EXACTAMENTE el que crea InitSceneAnimations
 // (una escena "Scene", rango/fps default, sin una sola curva). En ese caso el bloque
 // no se escribe: un proyecto sin animar sale byte a byte como antes de este cambio.
+// (los CLIPS DE OBJETO no van en este bloque: se guardan con su objeto, ver EscribirClipsObjeto)
 static bool AnimacionesSonElDefault() {
-    if (SceneAnimations.size() != 1 || !SceneAnimations[0]) return false;
-    const SceneAnimation* e = SceneAnimations[0];
+    std::vector<int> esc;
+    for (size_t i = 0; i < SceneAnimations.size(); i++) if (SceneAnimations[i] && !SceneAnimations[i]->esClip) esc.push_back((int)i);
+    if (esc.size() != 1 || W3dAnimEsClip(SceneAnimActiva)) return false;
+    const SceneAnimation* e = SceneAnimations[(size_t)esc[0]];
     if (e->name != "Scene" || e->startFrame != 1 || e->endFrame != 250 || e->fps != 30) return false;
-    const std::vector<AnimationObject>& objs = CurvasDeEscena(0);
+    if (!e->camPista.empty() && !e->camPista[0].keyframes.empty()) return false;   // tiene cortes de camara
+    const std::vector<AnimationObject>& objs = CurvasDeEscena(esc[0]);
     for (size_t i = 0; i < objs.size(); i++) if (AnimObjTieneKeys(objs[i])) return false;
     return true;
+}
+
+// las curvas de UNA animacion (la lista "objetos" de una animacion de escena o de un clip de objeto):
+// el objeto por su nombre (con su escena UI si vive en una). 'duenio' = el dueno de un clip de objeto:
+// sus curvas propias se escriben con el nombre vacio (el clip viaja con el objeto aunque se renombre).
+static void EscribirCurvasDeObjetos(std::string& s, const std::vector<AnimationObject>& objs, const char* sangria,
+                                    const Object* duenio) {
+    bool primero = true;
+    for (size_t i = 0; i < objs.size(); i++) {
+        const AnimationObject& ao = objs[i];
+        if (!ao.obj || !AnimObjTieneKeys(ao)) continue;
+        // (lo GENERADO por una instancia de prefab no se guarda: sus curvas no tendrian a quien nombrar al abrir)
+        if (W3dEsGenerado(ao.obj)) continue;
+        if (!primero) s += ",\n";
+        primero = false;
+        s += sangria; s += "{ \"objeto\": "; JEsc(s, (duenio && ao.obj == duenio) ? std::string() : ao.obj->name);
+        // SCOPE del nombre: si el objeto vive dentro de una escena UI, el nombre
+        // solo es unico AHI ADENTRO -> se escribe de que UI se trata.
+        Object* scope = W3dNombreScopeDe(ao.obj);
+        if (ao.obj != duenio && scope && scope != SceneCollection) {
+            s += ", \"escena\": "; JEsc(s, scope->name);
+        }
+        s += ",\n"; s += sangria; s += "  \"curvas\": [";
+        bool primerCurva = true;
+        for (size_t p = 0; p < ao.Propertys.size(); p++) {
+            if (ao.Propertys[p].keyframes.empty()) continue;   // curva sin keys: no es dato
+            if (!primerCurva) { s += ",\n"; s += sangria; s += "              "; }
+            primerCurva = false;
+            EscribirCurva(s, ao.Propertys[p]);
+        }
+        s += "] }";
+    }
 }
 
 static void EscribirAnimacionesEscena(std::string& s) {
     InitSceneAnimations();   // idempotente: garantiza que exista "Scene"
     if (AnimacionesSonElDefault()) return;
+    // las animaciones de ESCENA (los clips de objeto van con su objeto): "activa" es su indice ENTRE
+    // ELLAS; si lo que se estaba editando era un clip, "activaClip" dice de que objeto y cual
+    std::vector<int> esc;
+    int activa = 0;
+    for (size_t i = 0; i < SceneAnimations.size(); i++) {
+        if (!SceneAnimations[i] || SceneAnimations[i]->esClip) continue;
+        if ((int)i == SceneAnimActiva) activa = (int)esc.size();
+        esc.push_back((int)i);
+    }
     s += "  \"animaciones\": {\n";
-    s += "    \"activa\": "; JInt(s, SceneAnimActiva); s += ",\n";
+    s += "    \"activa\": "; JInt(s, activa); s += ",\n";
+    if (W3dAnimEsClip(SceneAnimActiva) && SceneAnimations[SceneAnimActiva]->duenio) {
+        const SceneAnimation* c = SceneAnimations[SceneAnimActiva];
+        s += "    \"activaClip\": { \"objeto\": "; JEsc(s, c->duenio->name);
+        s += ", \"clip\": "; JEsc(s, c->name); s += " },\n";
+    }
     s += "    \"escenas\": [\n";
-    for (size_t si = 0; si < SceneAnimations.size(); si++) {
+    for (size_t k = 0; k < esc.size(); k++) {
+        const size_t si = (size_t)esc[k];
         const SceneAnimation* e = SceneAnimations[si];
         s += "      { \"nombre\": "; JEsc(s, e ? e->name : std::string("Scene"));
         s += ", \"inicio\": "; JInt(s, e ? e->startFrame : 1);
         s += ", \"fin\": ";    JInt(s, e ? e->endFrame : 250);
         s += ", \"fps\": ";    JInt(s, e ? e->fps : 30);
+        // pista "CAMARA ACTIVA" (los cortes de una cinematica): frame -> nombre de la camara
+        if (e && !e->camPista.empty() && !e->camPista[0].keyframes.empty()) {
+            s += ",\n        \"camaraActiva\": [";
+            const std::vector<keyFrame>& k = e->camPista[0].keyframes;
+            for (size_t q = 0; q < k.size(); q++) {
+                const int idx = (int)(k[q].value + 0.5f);
+                if (q) s += ", ";
+                s += "{ \"frame\": "; JInt(s, k[q].frame); s += ", \"camara\": ";
+                JEsc(s, (idx >= 0 && idx < (int)e->camNombres.size()) ? e->camNombres[idx] : std::string());
+                s += " }";
+            }
+            s += "]";
+        }
         const std::vector<AnimationObject>& objs = CurvasDeEscena((int)si);
         bool hayAlguno = false;
         for (size_t i = 0; i < objs.size() && !hayAlguno; i++)
-            if (objs[i].obj && AnimObjTieneKeys(objs[i])) hayAlguno = true;
+            if (objs[i].obj && AnimObjTieneKeys(objs[i]) && !W3dEsGenerado(objs[i].obj)) hayAlguno = true;
         if (hayAlguno) {
             s += ",\n        \"objetos\": [\n";
-            bool primero = true;
-            for (size_t i = 0; i < objs.size(); i++) {
-                const AnimationObject& ao = objs[i];
-                if (!ao.obj || !AnimObjTieneKeys(ao)) continue;
-                if (!primero) s += ",\n";
-                primero = false;
-                s += "          { \"objeto\": "; JEsc(s, ao.obj->name);
-                // SCOPE del nombre: si el objeto vive dentro de una escena UI, el nombre
-                // solo es unico AHI ADENTRO -> se escribe de que UI se trata.
-                Object* scope = W3dNombreScopeDe(ao.obj);
-                if (scope && scope != SceneCollection) {
-                    s += ", \"escena\": "; JEsc(s, scope->name);
-                }
-                s += ",\n            \"curvas\": [";
-                bool primerCurva = true;
-                for (size_t p = 0; p < ao.Propertys.size(); p++) {
-                    if (ao.Propertys[p].keyframes.empty()) continue;   // curva sin keys: no es dato
-                    if (!primerCurva) s += ",\n                        ";
-                    primerCurva = false;
-                    EscribirCurva(s, ao.Propertys[p]);
-                }
-                s += "] }";
-            }
+            EscribirCurvasDeObjetos(s, objs, "          ", NULL);
             s += "\n        ]";
         }
         s += " }";
-        if (si + 1 < SceneAnimations.size()) s += ",";
+        if (k + 1 < esc.size()) s += ",";
         s += "\n";
     }
     s += "    ]\n";
     s += "  },\n";
 }
 
+// LA BIBLIOTECA DE CLIPS DE JERARQUIA de 'o' ("clipsJerarquia": el animset que le toco en el plan del
+// guardado, GuardarAnimSetsJerDe: la suya, u otra igual con la que se deduplico)
+// ...su RETARGET PROPIO ("retarget": "completo" | "rotaciones"; un armature, el de sus clips de esqueleto, que
+// solo se escribe si no es el de siempre; cualquier otro objeto, el de sus clips de jerarquia, que solo se escribe
+// si pisa el de cada clip) y sus CAPAS del Mix ("capasJer", la forma de siempre de las capas). Sin nada de eso no
+// se escribe nada (el archivo no cambia).
+static void EscribirClipsJerarquia(std::string& s, const Object* o, int ind) {
+    std::string lib;
+    // (en seco, la biblioteca por su nombre en memoria: W3dJerAsignar la encuentra aunque no tenga entrada)
+    const bool hayLib = gSeco ? (o->clipsJer && !o->clipsJer->animset.empty() && (lib = o->clipsJer->animset, true))
+                              : GuardarAnimSetsJerDe(o, lib);
+    if (hayLib) { s += ",\n"; JSang(s, ind); s += "\"clipsJerarquia\": "; JEsc(s, lib); }
+    int ret = -1;
+    if (const_cast<Object*>(o)->getType() == ObjectType::armature) {
+        const Armature* a = (const Armature*)o;
+        if (a->retarget == W3D_RETARGET_ROTACIONES) ret = W3D_RETARGET_ROTACIONES;
+    } else if (o->clipsJer && o->clipsJer->retarget >= 0) ret = o->clipsJer->retarget;
+    if (ret >= 0) {
+        s += ",\n"; JSang(s, ind); s += "\"retarget\": ";
+        s += (ret == W3D_RETARGET_ROTACIONES) ? "\"rotaciones\"" : "\"completo\"";
+    }
+    if (o->clipsJer && !o->clipsJer->capas.empty()) {
+        s += ",\n"; JSang(s, ind); s += "\"capasJer\": "; EscribirCapas(s, o->clipsJer->capas, ind);
+    }
+}
+
 // FLIPBOOKS CON NOMBRE de la escena (assets compartidos). Bloque raiz "flipbooks": solo la
 // config (nombre/atlas/grilla/fps); las 8 curvas de UV se regeneran al cargar (GenerarCeldas).
 // Sin flipbooks no se escribe nada (proyecto viejo sale igual).
 static void EscribirFlipbooks(std::string& s) {
-    if (SceneFlipbooks.empty()) return;
+    // (los de una LIBRERIA -Flipbook::libreria, o un atlas "lib:..."- no son del proyecto: se registran al usarla)
+    std::vector<const Flipbook*> fs;
+    for (size_t i = 0; i < SceneFlipbooks.size(); i++)
+        if (SceneFlipbooks[i] && SceneFlipbooks[i]->libreria.empty() && SceneFlipbooks[i]->atlas.compare(0, 4, "lib:") != 0)
+            fs.push_back(SceneFlipbooks[i]);
+    if (fs.empty()) return;
     s += "  \"flipbooks\": [\n";
-    for (size_t i = 0; i < SceneFlipbooks.size(); i++) {
-        const Flipbook* f = SceneFlipbooks[i]; if (!f) continue;
+    for (size_t i = 0; i < fs.size(); i++) {
+        const Flipbook* f = fs[i];
         s += "    { \"nombre\": "; JEsc(s, f->nombre);
         s += ", \"atlas\": ";     JEsc(s, f->atlas);
         s += ", \"cols\": ";      JInt(s, f->cols);
@@ -2050,7 +2377,7 @@ static void EscribirFlipbooks(std::string& s) {
         s += ", \"fps\": ";       JNum(s, f->fps);
         if (f->crossfade) s += ", \"crossfade\": true";
         s += " }";
-        if (i + 1 < SceneFlipbooks.size()) s += ",";
+        if (i + 1 < fs.size()) s += ",";
         s += "\n";
     }
     s += "  ],\n";
@@ -2117,6 +2444,12 @@ class ReposoAnimObjetos {
         ReposoAnimObjetos() {
             const bool propiaManda = (ActiveAnimKind == 3);   // el playhead esta en la anim propia de una malla
             InitSceneAnimations();
+            // 0) lo que poso el MIX (las capas de escena y las de clips de jerarquia de cada raiz) vuelve a su
+            //    BASE: la transformacion que tenia antes de que el Mix lo tocara. Una raiz que solo anima el Mix
+            //    (sus capas usan un clip sin vista abierta) no esta en ninguna lista de curvas y se guardaba con
+            //    la mezcla del frame del cabezal. Va PRIMERO: lo que ademas tiene curvas vuelve despues al cuadro
+            //    base de su animacion, como siempre.
+            MixBases();
             // 1) las animaciones de escena que NO son la activa: sus curvas viven en el
             //    SceneAnimation (el swap las guardo ahi), pero los objetos que posaron
             //    siguen posados.
@@ -2129,6 +2462,11 @@ class ReposoAnimObjetos {
             }
             if (propiaManda) { EscenaActiva(); Mallas(); }
             else             { Mallas(); EscenaActiva(); }
+            // un JUEGO editando uno de sus clips se guarda en su ESTADO BASE (su frame 1), no en el
+            // cuadro de inicio del clip: lo reposado vuelve a la foto que se tomo al salir de "Juego"
+            // (el destructor le devuelve a cada uno la pose de la pantalla, igual que siempre)
+            if (W3dJuegoBaseHay())
+                for (size_t i = 0; i < previos.size(); i++) W3dJuegoBaseAplicarA(previos[i].o);
         }
         ~ReposoAnimObjetos() {
             // al reves de como se guardaron: si un objeto entro dos veces (no deberia,
@@ -2184,6 +2522,17 @@ class ReposoAnimObjetos {
             Recorrer(SceneCollection, (Object*)ActiveAnimMesh);
             if (ActiveAnimMesh) Propia((Object*)ActiveAnimMesh);
         }
+        // las bases del Mix (ver el paso 0 del constructor)
+        void MixBases() {
+            std::vector<Object*> os; std::vector<Vector3> bp, br, be;
+            W3dMixEscenasBases(os, bp, br, be);
+            for (size_t i = 0; i < os.size(); i++) {
+                Object* o = os[i];
+                if (!o) continue;
+                Foto(o);
+                o->pos = bp[i]; o->SetRotEuler(br[i]); o->scale = be[i];
+            }
+        }
         void Aplicar(Object* o, std::vector<AnimProperty>& props, int frameBase) {
             if (!o) return;
             // SOLO lo que el playhead poso DE VERDAD (Object::posadoPorCurvas, que prende
@@ -2196,6 +2545,11 @@ class ReposoAnimObjetos {
             for (size_t p = 0; p < props.size() && !hay; p++)
                 if (!props[p].keyframes.empty()) hay = true;
             if (!hay) return;   // sin keyframes no hay pose que deshacer (caso normal: gratis)
+            Foto(o);
+            W3dAplicarCurvasEnFrame(o, props, frameBase);
+        }
+        // la pose de la pantalla de 'o' (el destructor se la devuelve)
+        void Foto(Object* o) {
             ReposoUno g;
             g.o = o;
             o->ActualizarDisplayRot();
@@ -2216,7 +2570,6 @@ class ReposoAnimObjetos {
                 g.lightID = l->LightID; g.direccional = l->direccional;
             }
             previos.push_back(g);
-            W3dAplicarCurvasEnFrame(o, props, frameBase);
         }
         std::vector<ReposoUno> previos;
         ReposoAnimObjetos(const ReposoAnimObjetos&);              // sin copia (C++03)
@@ -2224,11 +2577,150 @@ class ReposoAnimObjetos {
 };
 } // namespace
 
+// ===========================================================================
+//  LAS OTRAS RAICES DEL PROYECTO (escenas 3D y prefabs, ver W3dRaices.h): cada una
+//  va a SU entrada, con el MISMO escritor de objetos (asi sus mallas, materiales,
+//  animsets y scripts entran al contenedor como los de la escena del bloque).
+// ===========================================================================
+// el nombre de entrada de cada fila del registro ("" = la del bloque, que va en proyecto.json):
+// escenas/<slug>.w3de y prefabs/<slug>.w3dp, sin repetir. Sale del NOMBRE: re-guardar sin
+// cambios da las mismas entradas; renombrar la escena muda su entrada.
+static void EntradasDeRaices(W3dContenedorEscritor* esc, std::vector<std::string>& out) {
+    const std::vector<W3dRaizFila>& fs = W3dRaices();
+    out.assign(fs.size(), std::string());
+    std::set<std::string> tomadas;
+    for (size_t i = 0; i < fs.size(); i++) {
+        if (fs[i].bloque) continue;
+        const bool pf = (fs[i].tipo == W3D_RAIZ_PREFAB);
+        const std::string carp = pf ? "prefabs/" : "escenas/";
+        const std::string ext  = pf ? ".w3dp" : ".w3de";
+        const std::string slug = W3dSlugEntrada(fs[i].nombre);
+        std::string n = carp + slug + ext;
+        for (int k = 2; tomadas.count(n) || esc->Tiene(n); k++) {
+            char sf[16]; snprintf(sf, sizeof(sf), "-%d", k);
+            n = carp + slug + sf + ext;
+        }
+        tomadas.insert(n);
+        out[i] = n;
+    }
+}
+
+// el JSON de UNA raiz, que en este momento es SceneCollection (con SU contexto: sus animaciones
+// de escena y sus capas del Mix). Las animaciones van antes que los objetos solo para que el
+// JSON cierre sin coma colgando (el lector no mira el orden de las claves).
+static void EscribirContenidoRaiz(std::string& s, const W3dRaizFila& f, CtxGuardar* cx) {
+    s += "{\n";
+    s += "  \"version\": 4,\n";
+    s += "  \"nombre\": "; JEsc(s, f.nombre); s += ",\n";
+    EscribirAnimacionesEscena(s);
+    if (!g_mixEscenas.empty()) { s += "  \"mix\": { \"escenas\": "; EscribirCapas(s, g_mixEscenas, 2); s += " },\n"; }
+    ReposoAnimObjetos reposo;   // (el playhead no se hornea: ver GuardarW3D)
+    const std::vector<Object*>& ch = SceneCollection->Childrens;
+    bool primero = true;
+    if (f.tipo == W3D_RAIZ_PREFAB) {
+        // "raiz": el objeto que una instancia genera (el primero del primer nivel). Lo que haya
+        // quedado suelto a su lado se conserva en "sueltos" (la instancia no lo usa).
+        s += "  \"raiz\":";
+        if (ch.empty()) s += " null";
+        else { s += "\n"; EscribirObjeto(s, ch[0], 1, cx, &primero); }
+        if (ch.size() > 1) {
+            s += ",\n  \"sueltos\": [\n";
+            primero = true;
+            for (size_t i = 1; i < ch.size(); i++) EscribirObjeto(s, ch[i], 2, cx, &primero);
+            s += "\n  ]";
+        }
+        s += "\n";
+    } else {
+        s += "  \"objetos\": [\n";
+        for (size_t i = 0; i < ch.size(); i++) EscribirObjeto(s, ch[i], 2, cx, &primero);
+        s += "\n  ]\n";
+    }
+    s += "}\n";
+}
+
+// el registro en proyecto.json (solo si hay algo que decir: una escena "Scene" sola no se escribe).
+// "escenas3d" lleva las escenas Y los juegos (comparten nombres: cambiarEscena los nombra igual),
+// cada uno con su "tipo"; "prefabs", los prefabs.
+static void EscribirRegistroRaices(std::string& s, const std::vector<std::string>& entradas) {
+    if (!W3dRaicesHayRegistro()) return;
+    const std::vector<W3dRaizFila>& fs = W3dRaices();
+    static const int kClases[2] = { W3D_RAIZ_ESCENA, W3D_RAIZ_PREFAB };
+    for (int k = 0; k < 2; k++) {
+        const int clase = kClases[k];
+        bool hay = false;
+        for (size_t i = 0; i < fs.size() && !hay; i++) hay = (W3dRaizClase(fs[i].tipo) == clase);
+        if (!hay) continue;
+        s += (clase == W3D_RAIZ_ESCENA) ? "  \"escenas3d\": [\n" : "  \"prefabs\": [\n";
+        bool primero = true;
+        for (size_t i = 0; i < fs.size(); i++) {
+            if (W3dRaizClase(fs[i].tipo) != clase) continue;
+            if (!primero) s += ",\n";
+            primero = false;
+            s += "    { \"nombre\": "; JEsc(s, fs[i].nombre);
+            // el tipo EFECTIVO (el de un proyecto viejo sale de su contenido: al reabrir es el mismo)
+            if (clase == W3D_RAIZ_ESCENA) { s += ", \"tipo\": "; JEsc(s, W3dRaizTipoClave(W3dRaizTipoDe((int)i))); }
+            if (!entradas[i].empty()) { s += ", \"entrada\": "; JEsc(s, entradas[i]); }
+            // (la carpeta es COSMETICA: con la barra adelante si parece un nombre de entrada, como las
+            //  de los demas recursos, asi la verificacion del guardado no la toma por una referencia)
+            if (!fs[i].carpeta.empty()) { s += ", \"carpeta\": "; JEsc(s, W3dRutaCosmeticaJson(fs[i].carpeta)); }
+            s += " }";
+        }
+        s += "\n  ],\n";
+        if (clase == W3D_RAIZ_ESCENA && !W3dRaizInicial().empty()) {
+            s += "  \"escena3dInicial\": "; JEsc(s, W3dRaizInicial()); s += ",\n";
+        }
+    }
+}
+
+// ===========================================================================
+//  LA DEFINICION EN MEMORIA DE UN PREFAB (io/Prefabs.h): su objeto raiz escrito EN SECO (ver gSeco) como
+//  {"raiz": <objeto>}. Es lo que generan sus instancias mientras el prefab se edita sin guardar.
+// ===========================================================================
+static bool SerializarPrefabSeco(Object* raiz, std::string& json) {
+    if (!raiz) return false;
+    CtxGuardar cx;
+    cx.esc = NULL;
+    cx.vtxN = 0;
+    cx.error = false;
+    const std::string quienAntes = gQuien;
+    gSeco = true;
+    std::string s = "{\n  \"raiz\":\n";
+    bool primero = true;
+    EscribirObjeto(s, raiz, 1, &cx, &primero);
+    s += "\n}\n";
+    gSeco = false;
+    gQuien = quienAntes;
+    json.swap(s);
+    return !cx.error;
+}
+namespace {
+struct RegistrarSerializadorPrefab { RegistrarSerializadorPrefab() { W3dPrefabSerializarHook = SerializarPrefabSeco; } } gRegistrarSerializadorPrefab;
+}
+
+// vuelve a la raiz que estaba activa pase lo que pase (el guardado cambia de raiz para escribir cada una)
+namespace {
+struct VolverARaiz {
+    int idx;
+    explicit VolverARaiz(int i) : idx(i) {}
+    ~VolverARaiz() { if (idx >= 0) W3dRaizUsar(idx); }
+};
+}
+
 // ---------------------------------------------------------------------------
 //  guardar el proyecto completo (v3: el .w3d ES el JSON, plano y editable)
 // ---------------------------------------------------------------------------
 bool GuardarW3D(const std::string& ruta) {
     if (!SceneCollection) return false;
+    // ---- CON EL PLAY ANDANDO: la ESTRUCTURA del usuario ------------------------------------------
+    //  Jugando, lo que un script destruyo esta DESCOLGADO hasta el Stop y lo que instanciar() creo son nodos
+    //  reales que el Stop borra. Guardar asi perdia para siempre los objetos destruidos y escribia los creados.
+    //  Mientras dura el guardado lo destruido vuelve a su lugar y lo creado sale del arbol (SimJuego.cpp); al
+    //  salir (salga o no el guardado) todo queda como estaba y la partida sigue. Lo que los scripts movieron se
+    //  guarda como esta, igual que siempre.
+    struct PlayEstructuraUsuario {
+        PlayEstructuraUsuario() { extern void SimGuardadoInicio(); SimGuardadoInicio(); }
+        ~PlayEstructuraUsuario() { extern void SimGuardadoFin(); SimGuardadoFin(); }
+    } playEstructura;
     // una CURVE a medio editar (proxy de nodos abierto): volcar los nodos ANTES de serializar
     { extern void W3dCurveEdicionCerrar(); W3dCurveEdicionCerrar(); }
     // ---- FRENO: UNA ESCENA UI DEL PROYECTO NO CARGO --------------------------------------
@@ -2243,6 +2735,33 @@ bool GuardarW3D(const std::string& ruta) {
         W3dAvisof(true, "No guardo: la escena UI '%s' no se pudo leer al abrir y guardar la sacaria del proyecto",
                   W3dNombreCorto(g_w3dUINoCargo).c_str());
         return false;
+    }
+    // ---- TODAS LAS RAICES DEL PROYECTO (escenas 3D y prefabs, ver W3dRaices.h) --------------
+    //  El guardado las necesita CARGADAS: cada una se re-escribe con los nombres de HOY de los
+    //  materiales, mallas, animsets y texturas que nombra (una entrada vieja copiada tal cual
+    //  podria nombrar un recurso renombrado o purgado desde que se guardo), y los nombres de
+    //  entrada que el guardado reparte (.w3dui, texturas) no pueden pisar los de una que no se ve.
+    //  Las que se cargan SOLO para esto se DESCARGAN al salir (salga o no el guardado): ya estan en su
+    //  entrada y se vuelven a leer de ahi si se las abre. Si no, desde el primer Ctrl+S todo el proyecto
+    //  quedaba en memoria hasta cerrarlo (la carga perezosa del editor se perdia).
+    struct DescargarAlSalir {
+        std::vector<int> filas;
+        ~DescargarAlSalir() { W3dRaicesDescargar(filas); }
+    } descargar;
+    W3dRaicesCargarTodas(&descargar.filas);
+    // la VISTA de un clip de jerarquia que se esta editando se escribe en su clip (la biblioteca es lo
+    // que se guarda; las de las raices que no se miran se escribieron al dejarlas)
+    W3dClipsVistasSincronizar();
+    {
+        const std::vector<W3dRaizFila>& fs = W3dRaices();
+        for (size_t i = 0; i < fs.size(); i++)
+            if (fs[i].cargaFallo) {
+                w3dLogfE("[W3D] %s '%s' no se pudo leer al abrirla: NO guardo encima (se perderia)",
+                         W3dRaizTipoClave(fs[i].tipo), fs[i].nombre.c_str());
+                W3dAvisof(true, "No guardo: '%s' no se pudo leer y guardar la dejaria vacia",
+                          W3dNombreCorto(fs[i].nombre).c_str());
+                return false;
+            }
     }
     gNoCubiertos = 0;
     gMats.clear();   // los materiales se juntan durante el recorrido de la escena
@@ -2265,6 +2784,13 @@ bool GuardarW3D(const std::string& ruta) {
     cx.vtxN = 0;
     cx.error = false;
     MkdirRec(cx.dirW3d);   // "guardar como" a una carpeta que todavia no existe
+    // LAS MALLAS COMO RECURSO (io/MallasProyecto.h), en los DOS formatos: antes de recorrer la
+    // escena se agrupan por contenido y cada malla entra UNA vez al contenedor (.w3db, o .w3dm
+    // en texto). El plan se descarta al salir pase lo que pase (Confirmar lo consume si el
+    // guardado sale).
+    struct PlanMallasGuard { ~PlanMallasGuard() { W3dMallasGuardarDescartar(); } } planMallas;
+    const bool mallasRecurso = !g_w3dMallasLegado;
+    if (mallasRecurso && !W3dMallasGuardarPreparar(&esc)) cx.error = true;
 
     std::string s;
     s += "{\n";
@@ -2316,6 +2842,9 @@ bool GuardarW3D(const std::string& ruta) {
     // no cambian ni un byte al re-guardarlos).
     if (w3dEngine::PixeladoGlobal()) s += "  \"pixelado\": true,\n";
     if (!w3dEngine::MipmapsGlobal()) s += "  \"mipmaps\": false,\n";   // default true: solo se guarda el apagado
+    // FORMATO DE LAS MALLAS: solo se escribe el que NO es el default (texto). Es la opcion del
+    // PROYECTO; el forzado del harness no se guarda.
+    if (g_w3dFormatoMallasProyecto == W3D_MALLAS_TEXTO) s += "  \"formatoMallas\": \"texto\",\n";
     // CONFIG de la tarjeta Juego (Compilar juego): los valores VIGENTES del
     // editor, con strings legibles para editarlos a mano. Un .w3d viejo sin el
     // bloque abre con los defaults (W3dCompilarReset, ver import_w3d).
@@ -2363,10 +2892,34 @@ bool GuardarW3D(const std::string& ruta) {
     // no lo tocan quedan igual. Lo lee el loop de escritorio (Symbian lo clampea a 60).
     { extern int g_fpsCap; if (g_fpsCap != 60) { s += "  \"fpsCap\": "; JNum(s, (float)g_fpsCap); s += ",\n"; } }
     s += "  \"fullscreen\": "; s += cfg.fullscreen ? "true" : "false"; s += ",\n";
+    // CACHE DE JUEGO (rewind del Play del editor): solo se escribe APAGADO (un juego pesado, ej. para el N95, abre
+    // fluido sin grabar snapshots por frame). Ausente = la preferencia de la sesion, como antes.
+    { extern bool gSimCacheOn; if (!gSimCacheOn) s += "  \"cacheJuego\": false,\n"; }
+    // la VISTA PREVIA del streaming en el editor (io/Streaming.h): solo prendida (default apagada)
+    { extern bool g_w3dStreamingVistaPrevia; if (g_w3dStreamingVistaPrevia) s += "  \"streamingVistaPrevia\": true,\n"; }
     // estado de REPRODUCCION al guardar (v3): reabrir el proyecto respeta si estaba
     // en PLAY o en PAUSA (guardado en pausa -> abre en pausa). En archivos viejos el
     // campo no existe y AbrirW3D cae al auto-play de siempre (retrocompat).
     s += "  \"reproduciendo\": "; s += PlayAnimation ? "true" : "false"; s += ",\n";
+    if (mallasRecurso) W3dMallasGuardarRegistro(s);   // "mallas": el registro (antes de los objetos que las nombran)
+    // ANIMSETS: el plan (que animset y que clips le toca a cada armature) y sus entradas .w3da,
+    // ANTES de recorrer la escena (el nodo de cada armature los nombra). Un animset que no se
+    // pudo leer al abrir frena el guardado (ya avisado).
+    // (NULL = los armatures de TODAS las raices: las escenas y prefabs que no se estan mirando tambien)
+    if (!GuardarAnimSetsPreparar(&esc, NULL)) cx.error = true;
+    // ESCENAS 3D Y PREFABS: el registro y la entrada de cada uno (la escena del bloque va abajo)
+    std::vector<std::string> entradasRaices;
+    EntradasDeRaices(&esc, entradasRaices);
+    EscribirRegistroRaices(s, entradasRaices);
+    // la escena del BLOQUE "escena" es la que se escribe aca (si se esta editando otra raiz, se usa
+    // la del bloque mientras tanto: sus objetos, sus animaciones y su Mix)
+    VolverARaiz volverARaiz(W3dRaizActiva());
+    if (!W3dRaizUsar(W3dRaizBloque())) {
+        // (sin la del bloque el bloque "escena" saldria con los objetos de la raiz activa, que ademas va a su
+        //  entrada: repetidos al reabrir. W3dRaizBloque siempre promueve una; esto es por las dudas)
+        w3dLogfE("[W3D] no hay escena del bloque para escribir: NO guardo");
+        cx.error = true;
+    }
     s += "  \"escena\": {\n";
     s += "    \"objetos\": [\n";
     {
@@ -2383,15 +2936,59 @@ bool GuardarW3D(const std::string& ruta) {
     // ANIMACIONES DE ESCENA (las curvas de transform de los objetos): van DESPUES de
     // la escena porque referencian a los objetos por nombre y asi se leen en orden.
     EscribirAnimacionesEscena(s);
+    // ...y cada OTRA raiz a su entrada (.w3de / .w3dp), con el mismo contexto de escritura
+    {
+        const std::vector<W3dRaizFila>& fs = W3dRaices();
+        for (size_t i = 0; i < fs.size(); i++) {
+            if (fs[i].bloque || entradasRaices[i].empty()) continue;
+            if (!W3dRaizUsar((int)i)) { cx.error = true; continue; }
+            std::string js;
+            gQuien = std::string(W3dRaizTipoClave(fs[i].tipo)) + " \"" + fs[i].nombre + "\"";
+            EscribirContenidoRaiz(js, fs[i], &cx);
+            gQuien.clear();
+            if (!esc.AgregarBytes(entradasRaices[i], js)) cx.error = true;
+        }
+        W3dRaizUsar(volverARaiz.idx);   // la de verdad (la sesion y el layout son suyos)
+    }
     EscribirFlipbooks(s);   // assets de flipbook con nombre (config; las curvas se regeneran al cargar)
     // MATERIALES: van DESPUES de la escena porque la lista se arma recorriendola (orden de
     // primera aparicion = deterministico). En el JSON el orden de las claves no significa nada:
     // el lector los resuelve por nombre, y los carga ANTES de armar los objetos.
+    // los materiales de las mallas HUERFANAS (nadie las usa en la escena, pero se guardan)
+    if (mallasRecurso) {
+        std::vector<Material*> mh; W3dMallasGuardarMateriales(mh);
+        for (size_t i = 0; i < mh.size(); i++)
+            if (mh[i] && mh[i]->libreria.empty() && std::find(gMats.begin(), gMats.end(), mh[i]) == gMats.end())
+                gMats.push_back(mh[i]);
+    }
+    // TODOS LOS MATERIALES DEL PROYECTO, no solo los que usa una malla: un material sin usuarios
+    // es un HUERFANO del proyecto (el outliner por recursos lo muestra y lo purga a pedido) y se
+    // conserva, como las mallas y los animsets huerfanos. Van DESPUES de los usados, en el orden
+    // de la lista global (el de la carga): re-guardar sin cambios da los mismos bytes. Los de la
+    // UI (debajo de la marca) y el material por defecto no son del proyecto.
+    for (size_t i = (size_t)MaterialesBase(); i < Materials.size(); i++) {
+        Material* mt = Materials[i];
+        if (!mt || mt == MaterialDefecto) continue;
+        if (!mt->libreria.empty()) continue;   // (los de las LIBRERIAS no son del proyecto: viven en su .w3d)
+        if (std::find(gMats.begin(), gMats.end(), mt) == gMats.end()) gMats.push_back(mt);
+    }
+    // la carpeta de cada textura sigue a su ruta (la ingesta de los materiales la cambia)
+    W3dRecursosVistaGuardarAntes();
     EscribirMateriales(s, &cx);
+    // las texturas del proyecto que viven SOLO EN MEMORIA y nadie usa (huerfanas): ningun Asset()
+    // las llevo, y un huerfano se conserva hasta purgarlo (antes del JSON: su carpeta tambien va)
+    W3dRecursosVistaGuardarEnMemoria(&esc);
+    GuardarAnimSetsRegistro(s);   // el registro "animsets" (lo arma GuardarAnimSetsPreparar)
+    // CARPETAS del outliner por recursos ("carpetas") y la carpeta de cada textura ("texturas"):
+    // despues de los materiales (la ingesta ya dejo cada textura con su nombre de entrada)
+    W3dRecursosVistaGuardarJson(s, &esc);
+    W3dLibreriasGuardarJson(s);   // las librerias externas vinculadas (la biblioteca del outliner)
     // SESION: donde estaba trabajando el usuario EN ESTE proyecto. Va DESPUES de la escena
     // porque nombra objetos (ver el comentario grande de EscribirSesion).
     EscribirRender(s);
-    EscribirMix(s);
+    // (el Mix de escenas es de la escena del BLOQUE; el modo y el rango, del proyecto)
+    if (W3dRaizActiva() != W3dRaizBloque()) { W3dRaizUsar(W3dRaizBloque()); EscribirMix(s); W3dRaizUsar(volverARaiz.idx); }
+    else EscribirMix(s);
     EscribirSesion(s);
     // LAYOUT: el arbol VIVO (tipos + splits). Los .w3d guardados con el literal
     // "2d" siguen abriendo por el template estandar (ver AplicarLayoutTexto).
@@ -2429,6 +3026,21 @@ bool GuardarW3D(const std::string& ruta) {
         if (ok) esc.EscribirCabeceraOdf();
         // lo que el editor no referencia y venia en el .w3d se preserva VERBATIM
         // (alguien pudo meter un notas.txt a mano con un descompresor)
+        // las texturas PURGADAS en el outliner (entradas huerfanas) no se conservan
+        if (ok) W3dRecursosVistaGuardarDescartes(&esc);
+        // las entradas de escenas/prefabs que ya no son de nadie (una escena borrada o renombrada:
+        // todas las raices se acaban de escribir) no se conservan como pasajeras
+        if (ok && W3dContenedorLector()) {
+            std::vector<std::string> viejas;
+            W3dContenedorLector()->Listar(viejas);
+            std::set<std::string> nuevas(entradasRaices.begin(), entradasRaices.end());
+            for (size_t i = 0; i < viejas.size(); i++) {
+                const std::string& e = viejas[i];
+                const bool esRaiz = (e.size() > 13 && e.compare(0, 8, "escenas/") == 0 && e.compare(e.size() - 5, 5, ".w3de") == 0) ||
+                                    (e.size() > 13 && e.compare(0, 8, "prefabs/") == 0 && e.compare(e.size() - 5, 5, ".w3dp") == 0);
+                if (esRaiz && !nuevas.count(e)) esc.Descartar(e);
+            }
+        }
         if (ok) esc.PreservarPasajeras();
         if (ok) esc.EscribirExternos();
         std::string falta;
@@ -2465,7 +3077,19 @@ bool GuardarW3D(const std::string& ruta) {
         // memoria son sus nombres de entrada y ReadFileBytes las resuelve
         if (!W3dContenedorMontar(ruta))
             w3dLogfE("[W3D] guarde %s pero no lo pude volver a montar", ruta.c_str());
+        // las mallas en memoria siguen al archivo: entradas, nombres y objetos re-vinculados
+        if (mallasRecurso) W3dMallasGuardarConfirmar();
+        GuardarAnimSetsConfirmar();  // el registro en memoria = el escrito; los recursos, a sus entradas nuevas
+        // (Confirmar pasa las vistas de los clips de una biblioteca que se junto con otra a la que queda; si aun
+        //  asi la que se esta editando quedo huerfana, no se sigue keyeando en ella: se pierde lo que se le ponga.
+        //  La de una raiz BORRADA con su Ctrl+Z pendiente no: esa vuelve a editarse con el Ctrl+Z)
+        if (W3dAnimEsClip(SceneAnimActiva) && SceneAnimations[(size_t)SceneAnimActiva]->duenio &&
+            W3dRaizDeColgado(SceneAnimations[(size_t)SceneAnimActiva]->duenio))
+            W3dClipsVistaActivaRevisar();
+        W3dRaicesGuardadas(entradasRaices);   // cada escena/prefab nombra su entrada nueva
+        W3dRecursosVistaGuardado();  // lo purgado ya no esta; el listado del contenedor cambio
         TexEditProyectoGuardado();   // las texturas que vivian en memoria ya estan adentro del .w3d
+        { extern void W3dCambiosFoto(); W3dCambiosFoto(); }   // todo guardado: se apagan los '*' (CambiosProyecto)
         size_t nExt = esc.CantidadExternos(), nFaltan = esc.CantidadExternosQueFaltan();
         char b[256];
         if (nFaltan > 0) {

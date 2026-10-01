@@ -57,7 +57,7 @@ struct JVal {
     // FILA COMPACTA: una lista de SOLO numeros que es elemento de OTRA lista (un keyframe
     // [frame,v,i,...], una fila de pesos, una cara de 'topologia') guarda sus numeros ACA y
     // deja 'lista' vacia: un JVal + un vector en vez de un JVal por numero. Sin esto el
-    // proyecto RE4 (2.5 MB de anims horneadas = ~800 mil nodos) NO ENTRABA en la RAM del
+    // proyecto grande de prueba (2.5 MB de anims horneadas = ~800 mil nodos) NO ENTRABA en la RAM del
     // N95. Se leen con JFilaLen/JFilaNum (abajo), que entienden los DOS formatos; las
     // listas sueltas (pos/color/etc., hijas de un objeto) siguen como siempre.
     std::vector<float> nums;
@@ -165,6 +165,14 @@ inline float JF(JVal* o, const char* k, float def) {
     return (it != o->obj.end() && it->second->tipo == 1) ? (float)it->second->num : def;
 }
 inline int JI(JVal* o, const char* k, int def) { return (int)JF(o, k, (float)def); }
+// un entero SIN SIGNO de 32 bits EXACTO (un serial de objeto): del double del parser, sin pasar por float (JI lo
+// redondea desde 2^24: 16777217 volvia como 16777216)
+inline unsigned JU(JVal* o, const char* k, unsigned def) {
+    std::map<std::string, JVal*>::iterator it = o->obj.find(k);
+    if (it == o->obj.end() || it->second->tipo != 1) return def;
+    const double v = it->second->num;
+    return (v >= 0.0 && v <= 4294967295.0) ? (unsigned)v : def;
+}
 inline bool JB(JVal* o, const char* k, bool def) {
     std::map<std::string, JVal*>::iterator it = o->obj.find(k);
     return (it != o->obj.end() && it->second->tipo == 3) ? it->second->b : def;

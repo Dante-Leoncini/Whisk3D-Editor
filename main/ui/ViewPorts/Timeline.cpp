@@ -13,6 +13,7 @@
 #include "objects/Textures.h"          // Textures[0] = atlas (RenderBar/bordes)
 #include "animation/Animation.h"       // StartFrame/EndFrame/CurrentFrame/PlayAnimation/AnimPlayDir + AnimProperty
 #include "animation/SkeletalAnimation.h"
+#include "animation/W3dAnimSet.h"   // clips COMPARTIDOS: la curva que se edita desde el dope es de un clip PROPIO
 #include "animation/VertexAnimation.h"   // fila Vertex del dope: mover/borrar/interpolar frames
 #include "animation/Armature2DAnimation.h" // filas del dope de los CLIPS del armature 2D (kind 4)
 #include "ViewPorts/UVEditor.h"          // UVEditorEnModoPose: el dope 2D solo se lista posando (como el 3D)
@@ -661,8 +662,18 @@ static VertexAnimation* VertexCanalTemp(const std::string& ownerKey, AnimPropert
     }
     return van;
 }
-// resuelve ownerKey ("obj:<nombre>" / "arm:<nombre>/b<idx>") + (propId, compId) -> la CURVA viva
-static AnimProperty* DopeResolverProp(const std::string& ownerKey, int propId, int compId){
+// resuelve ownerKey ("obj:<nombre>" / "arm:<nombre>/b<idx>") + (propId, compId) -> la CURVA viva.
+// 'editar' = la curva que sale se va a ESCRIBIR (mover/borrar/escalar/interpolar/handles/tarjeta
+// Keyframe/cancelar un transform). Solo importa en los clips de esqueleto: si son de un animset
+// COMPARTIDO, el armature pasa antes a clips propios (copy-on-write, animation/W3dAnimSet.h). El
+// dibujo, el hit-test, el encuadre y la tarjeta Keyframe cuando solo MUESTRA piden editar=false:
+// mirar un clip compartido no lo copia (en el editor eso era memoria de mas por cada rig mirado).
+static AnimProperty* DopeResolverProp(const std::string& ownerKey, int propId, int compId, bool editar = true){
+    if (ownerKey.compare(0,8,"camact:e")==0){          // pista "Camara activa" de la escena (solo la ACTIVA)
+        if (propId != AnimCamActiva || compId != AnimX) return NULL;
+        if (atoi(ownerKey.c_str()+8) != SceneAnimActiva) return NULL;
+        return W3dCamPista(SceneAnimActiva, false);
+    }
     if (ownerKey.compare(0,8,"objanim:")==0){          // animacion PROPIA del objeto (kind 3)
         extern VertexAnimation* AnimObjetoActiva(Object*);
         // la clave tiene que ser DE LA MALLA ACTIVA (ver DopeDuenoEsAnimMesh): esta rama era la
@@ -708,6 +719,9 @@ static AnimProperty* DopeResolverProp(const std::string& ownerKey, int propId, i
         return NULL;
     } else if (ownerKey.compare(0,4,"arm:")==0){
         // "arm:<rig>/k<CLIP>/b<HUESO>": el rig y el clip van adentro de la clave (idem 2D).
+        // Si la curva que sale de aca se va a EDITAR y el clip es de un animset compartido, el
+        // armature pasa antes a clips propios (ver 'editar' arriba).
+        if (editar && ClipActivo()) W3dArmatureAnimsPropias(ActiveAnimArm);
         SkeletalAnimation* clip = ClipActivo(); if (!clip) return NULL;
         const std::string pref = DopePrefArm() + "/b";
         if (!DopeTrasPrefijo(ownerKey, pref)) return NULL;
@@ -813,6 +827,10 @@ static void DopeCanales2D(const std::vector<AnimProperty>& props, std::vector<Ti
 void Timeline::ConstruirDopeRows(){
     dopeRows.clear(); panelW = 0;
     rowH = RenglonHeightGS;
+    // "JUEGO" (el estado base de un juego, ver W3dRaices.h): un juego NO tiene keyframes propios. El
+    // timeline muestra el cache de la simulacion (la linea roja) y el cabezal recorre sus ticks; las
+    // curvas se ven eligiendo uno de sus CLIPS en el selector de animacion.
+    if (ActiveAnimKind == 2) return;
     std::vector<DopeRow> filas;
     SkeletalAnimation* clip = ClipActivo();
     if (clip){
@@ -984,6 +1002,20 @@ void Timeline::ConstruirDopeRows(){
                 filas.push_back(g);
                 if (!DopeColapsado(g.claveDespliegue)) DopeCanales(ao.Propertys, filas, 2, r.ownerKey);
             }
+        }
+        // ---- PISTA "CAMARA ACTIVA" (los cortes de la cinematica): aparece con una CAMARA seleccionada. Es una curva
+        // mas (SceneAnimation::camPista): mover / borrar / escalar y Ctrl+Z van por el camino de siempre
+        // (DopeResolverProp la resuelve por el prefijo "camact:e<escena>"). ----
+        bool camSel = false;
+        for (size_t i = 0; i < ObjSelects.size() && !camSel; i++)
+            if (ObjSelects[i] && ObjSelects[i]->getType() == ObjectType::camera) camSel = true;
+        AnimProperty* cp = W3dCamPista(SceneAnimActiva, false);
+        if (camSel && cp && !cp->keyframes.empty()){
+            char b[32]; snprintf(b, sizeof b, "camact:e%d", SceneAnimActiva);
+            DopeRow r; r.tipo=1; r.nivel=0; r.nombre=T("Active camera"); r.icono=(int)IconType::camera;
+            r.claveFila = b; r.ownerKey = b; r.propId = AnimCamActiva; r.compId = AnimX;
+            for (size_t k=0;k<cp->keyframes.size();k++) r.keys.push_back(cp->keyframes[k].frame);
+            filas.push_back(r);
         }
     }
     if (filas.empty()) return; // nada seleccionado/animado -> panelW=0 -> timeline clasico, igual que antes
@@ -1227,8 +1259,9 @@ void Timeline::SyncFields(){
     btnEnd->visible = !AnimEsJuego;   // MODO JUEGO: la animacion es infinita, sin Fin
     if (g_propFloatEditando != pfCur) fCur=(float)CurrentFrame;
 
-    // AUTO KEY prendido -> el boton queda ROJO (esta grabando)
+    // AUTO KEY prendido -> el boton queda ROJO (esta grabando). En "Juego" no hay keyframes que grabar.
     btnAutoKey->tinte = AutoKeyOn ? TL_ROJO_BTN : NULL;
+    btnAutoKey->visible = (ActiveAnimKind != 2);
     // play activo -> tinte verde en el boton correspondiente
     bool pf = (PlayAnimation && AnimPlayDir>0), pr = (PlayAnimation && AnimPlayDir<0);
     btnT[3]->tinte = pr ? TL_VERDE_BTN : NULL;
@@ -1238,7 +1271,7 @@ void Timeline::SyncFields(){
     // icono esqueleto = clip de armature. No depende del objeto seleccionado.
     btnAnim->visible = true;
     SkeletalAnimation* c = ClipActivo();
-    if (g_animMix){ btnAnim->text = "Mix"; btnAnim->icon = (int)IconType::falloff_smoother; }   // capas mezcladas
+    if (g_animMix){ btnAnim->text = "Mix"; btnAnim->icon = (int)IconType::igual; }   // capas mezcladas
     else if (ActiveAnimKind == 2){ btnAnim->text = "Juego"; btnAnim->icon = (int)IconType::gamepad; }
     else if (ActiveAnimKind == 3 && ActiveAnimMesh){
         // vertex anim de una malla: el nombre de la anim activa (via el controlador)
@@ -1264,7 +1297,12 @@ void Timeline::SyncFields(){
         btnAnim->icon = (int)IconType::textura;
     }
     else if (c){ btnAnim->text = c->name; btnAnim->icon = (int)IconType::armature; }
-    else  { btnAnim->text = NombreEscenaActiva(); btnAnim->icon = (int)IconType::camera; }
+    else  {
+        // una animacion de escena, o un CLIP DE OBJETO ("Puerta: abrir", con el icono de objeto)
+        InitSceneAnimations();
+        btnAnim->text = W3dAnimEscenaEtiqueta(SceneAnimActiva);
+        btnAnim->icon = W3dAnimEsClip(SceneAnimActiva) ? (int)IconType::object : (int)IconType::camera;
+    }
     bool hayFilas = !dopeRows.empty();
     btnModo->visible   = hayFilas;          // sin nada animado/seleccionado no hay curvas que mostrar
     btnModo->text      = (modo == TL_MODO_CURVAS) ? "Dope Sheet" : "Curves";  // dice a DONDE va
@@ -1480,9 +1518,9 @@ static bool g_hVirtPrimero = false; // el 1er motion: dx/dy son de ANTES de agar
 
 bool Timeline::HandleArrastrando() const { return g_hOn; }
 bool Timeline::HandleEsSalida() const { return g_hSalida; }
-AnimProperty* Timeline::CurvaDeFila(const DopeRow& d) const {
+AnimProperty* Timeline::CurvaDeFila(const DopeRow& d, bool editar) const {
     if (d.propId < 0) return NULL;                       // fila padre / summary: no es una curva
-    return DopeResolverProp(d.ownerKey, d.propId, d.compId);
+    return DopeResolverProp(d.ownerKey, d.propId, d.compId, editar);
 }
 
 // Posicion del handle del keyframe i, en coords LOCALES del timeline. El handle es un PUNTO (offset dF/dV desde
@@ -1595,7 +1633,7 @@ long long Timeline::CurvaTrazoCosto(){
     long long t = 0;
     for (size_t r=0; r<dopeRows.size(); r++){
         const DopeRow& d = dopeRows[r]; if (!FilaEsCurvaVisible(d)) continue;
-        AnimProperty* ap = DopeResolverProp(d.ownerKey, d.propId, d.compId); if (!ap) continue;
+        AnimProperty* ap = DopeResolverProp(d.ownerKey, d.propId, d.compId, false); if (!ap) continue;   // solo mide
         t += CurvaTrazo(ap, (float)GlobalScale*0.5f);
     }
     return t;
@@ -1638,9 +1676,9 @@ void Timeline::RenderCurvas(){
     for (size_t r=0; r<dopeRows.size(); r++){
         const DopeRow& d = dopeRows[r];
         if (!FilaEsCurvaVisible(d)) continue;             // solo canales, y solo con el ojo prendido
-        // canal VERTEX: su "curva" es la rampa por indice (ver VertexCanalTemp)
+        // canal VERTEX: su "curva" es la rampa por indice (ver VertexCanalTemp). Dibujar no edita.
         AnimProperty* ap = VertexCanalTemp(d.ownerKey, s_vtxTmp) ? &s_vtxTmp
-                         : DopeResolverProp(d.ownerKey, d.propId, d.compId);
+                         : DopeResolverProp(d.ownerKey, d.propId, d.compId, false);
         if (!ap || ap->keyframes.empty()) continue;
         const std::vector<keyFrame>& K = ap->keyframes;
         const size_t n = K.size();
@@ -1895,9 +1933,10 @@ bool Timeline::CurvaClickStrip(int mx, int my){
       static AnimProperty s_vtxTmp;
       for (size_t r=0; r<dopeRows.size(); r++){
         const DopeRow& d = dopeRows[r]; if (d.propId < 0 || d.oculto) continue;
-        // canal VERTEX: sus handles se agarran sobre la curva temporal (valor = indice)
+        // canal VERTEX: sus handles se agarran sobre la curva temporal (valor = indice). Es solo el
+        // hit-test: si se agarra un handle, el UndoKeyframesIniciar de abajo y HandleApply copian
         AnimProperty* ap = VertexCanalTemp(d.ownerKey, s_vtxTmp) ? &s_vtxTmp
-                         : DopeResolverProp(d.ownerKey, d.propId, d.compId);
+                         : DopeResolverProp(d.ownerKey, d.propId, d.compId, false);
         if (!ap) continue;
         for (size_t i=0;i<ap->keyframes.size();i++){
             const keyFrame& kf = ap->keyframes[i];
@@ -1930,9 +1969,9 @@ bool Timeline::CurvaClickStrip(int mx, int my){
       static AnimProperty s_vtxTmp;
       for (size_t r=0; r<dopeRows.size(); r++){
         const DopeRow& d = dopeRows[r]; if (d.propId < 0 || d.oculto) continue;
-        // canal VERTEX: hit-test sobre la curva temporal (valor = indice del keyframe)
+        // canal VERTEX: hit-test sobre la curva temporal (valor = indice del keyframe). Elegir no edita.
         AnimProperty* ap = VertexCanalTemp(d.ownerKey, s_vtxTmp) ? &s_vtxTmp
-                         : DopeResolverProp(d.ownerKey, d.propId, d.compId);
+                         : DopeResolverProp(d.ownerKey, d.propId, d.compId, false);
         if (!ap) continue;
         for (size_t i=0;i<ap->keyframes.size();i++){
             const keyFrame& kf = ap->keyframes[i];
@@ -2804,7 +2843,7 @@ bool Timeline::CurvaRangoVista(bool soloSel, float& fmn, float& fmx, float& vmn,
     for (size_t r=0;r<dopeRows.size();r++){
         const DopeRow& d = dopeRows[r]; if (!FilaEsCurvaVisible(d)) continue;
         const AnimProperty* ap = VertexCanalTemp(d.ownerKey, tmp) ? &tmp
-                               : DopeResolverProp(d.ownerKey, d.propId, d.compId);
+                               : DopeResolverProp(d.ownerKey, d.propId, d.compId, false);   // encuadrar solo mide
         if (!ap) continue;
         for (size_t i=0;i<ap->keyframes.size();i++){
             const keyFrame& kf = ap->keyframes[i];
@@ -2837,7 +2876,7 @@ bool Timeline::CurvaRangoVista(bool soloSel, float& fmn, float& fmx, float& vmn,
     for (size_t r=0;r<dopeRows.size();r++){
         const DopeRow& d = dopeRows[r]; if (!FilaEsCurvaVisible(d)) continue;
         const AnimProperty* ap = VertexCanalTemp(d.ownerKey, tmp) ? &tmp
-                               : DopeResolverProp(d.ownerKey, d.propId, d.compId);
+                               : DopeResolverProp(d.ownerKey, d.propId, d.compId, false);   // encuadrar solo mide
         if (!ap || ap->keyframes.empty()) continue;
         if (soloSel){   // con seleccion, solo aportan las filas que tienen algun keyframe elegido
             bool tieneSel = false;
@@ -2955,13 +2994,13 @@ bool DopeNavTecla(int dir){
 // ---- KEYFRAME ACTIVO: lo lee/escribe la tarjeta "Keyframe" del panel de propiedades ----
 // Se devuelve la curva VIVA y el indice. El indice se resuelve por FRAME cada vez (no se cachea): el vector de
 // keyframes se reordena en cuanto moves algo, asi que guardar un indice o un puntero seria colgarse.
-AnimProperty* DopeKeyframeActivo(int* idx){
+AnimProperty* DopeKeyframeActivo(int* idx, bool editar){
     if (!g_dopeActHay || !g_tlActivo) return NULL;
     // tiene que seguir SELECCIONADO y existir; si no, la tarjeta se va
     if (!g_dopeKeySel.count(DopeKeyId(g_dopeActOwner, g_dopeActProp, g_dopeActComp, g_dopeActFrame))){
         g_dopeActHay = false; return NULL;
     }
-    AnimProperty* ap = DopeResolverProp(g_dopeActOwner, g_dopeActProp, g_dopeActComp);
+    AnimProperty* ap = DopeResolverProp(g_dopeActOwner, g_dopeActProp, g_dopeActComp, editar);
     if (!ap){ g_dopeActHay = false; return NULL; }
     for (size_t k=0;k<ap->keyframes.size();k++)
         if (ap->keyframes[k].frame == g_dopeActFrame){ if (idx) *idx = (int)k; return ap; }
@@ -3094,9 +3133,10 @@ void Timeline::TogglePlay(int dir){
 void Timeline::GotoStart(){ CurrentFrame = StartFrame; g_redraw=true; }
 void Timeline::GotoEnd(){
     // MODO JUEGO: "ir al final" = el ultimo frame del cache de estados grabados
-    { extern bool SimActiva(); extern int SimFramesGrabados(); extern void SimIrA(int);
+    // (SimIrA toma el tick ABSOLUTO: con el cache que ya roto, el ultimo es el primero + n - 1)
+    { extern bool SimActiva(); extern int SimFramesGrabados(); extern int SimPrimerFrame(); extern void SimIrA(int);
       if (AnimEsJuego && SimActiva() && SimFramesGrabados() > 0){
-          SimIrA(SimFramesGrabados() - 1); g_redraw = true; return; } }
+          SimIrA(SimPrimerFrame() + SimFramesGrabados() - 1); g_redraw = true; return; } }
     if (!AnimEsJuego) CurrentFrame = EndFrame;
     g_redraw=true;
 }
@@ -3113,6 +3153,8 @@ void Timeline::StepFrame(int d){
         if (CurrentFrame < StartFrame) CurrentFrame = StartFrame;
         if (CurrentFrame > EndFrame && !AnimEsJuego) CurrentFrame = EndFrame;
     }
+    // "Juego" SIN partida: no hay cache que recorrer; lo que hay es el estado base (su frame 1)
+    { extern bool SimActiva(); if (ActiveAnimKind == 2 && !SimActiva()) CurrentFrame = StartFrame; }
     g_redraw=true;
 }
 void Timeline::StepKeyframe(int d){
@@ -3172,8 +3214,11 @@ void Timeline::SetFrameFromX(int lx){
         if (f < StartFrame) f = StartFrame;
         if (f > EndFrame && !AnimEsJuego) f = EndFrame;   // en modo juego no hay Fin
     }
+    // "Juego" SIN partida: no hay cache que recorrer; lo que hay es el estado base (su frame 1)
+    { extern bool SimActiva(); if (ActiveAnimKind == 2 && !SimActiva()) f = StartFrame; }
     CurrentFrame = f; g_redraw = true;
-    // simulacion en pausa: mover el playhead VIAJA al estado grabado de ese frame
+    // simulacion en pausa: mover el playhead VIAJA al estado grabado de ese frame (el cabezal recorre
+    // los ticks CACHEADOS: SimIrA lo acota a lo que hay)
     { extern bool SimActiva(); extern void SimIrA(int);
       if (SimActiva() && !PlayAnimation) SimIrA(f - StartFrame); }
 }

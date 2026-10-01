@@ -1,0 +1,36 @@
+# ==========================================================================
+#  ESCENAS y JUEGOS 3D en el JUEGO COMPILADO: cambiarEscena() descarga la raiz actual y
+#  carga la pedida DESDE SU ENTRADA (escenas/<slug>.w3de). A un JUEGO arranca su
+#  simulacion; a una ESCENA ademas le reproduce su animacion desde el inicio (cinematica).
+#  Correr DESDE ESTA CARPETA (ver prueba_juego3d.w3s):
+#    ../../platform/linux/build/whisk3d --script prueba_juego3d_escenas.w3s
+#
+#  El juego 3D minimo (juego3dmin) con TRES raices (juegoescenasmin): el JUEGO del bloque
+#  deja un dato en compartido() y a los 3 ticks pide la ESCENA "Intro"; su animacion
+#  "Cine" arranca sola y su script, al verla en el ultimo frame, pide el JUEGO "Nivel2";
+#  el JUEZ de "Nivel2" mira que los cubos de las anteriores ya no esten (se descargaron),
+#  que su camara y su cubo si (cargo), que la cinematica se reprodujo entera, que el dato
+#  sobrevivio y que cada raiz arranco UNA vez, y deja el veredicto en compartido("juez")
+#  y en el log ("[juegoescenas] OK ..."). El mismo veredicto en el Play (simplay) y en el
+#  binario (su whisk3d.log).
+#  Compila un juego de verdad (cmake + g++), asi que tarda mas que las demas.
+# ==========================================================================
+
+ventana 640 480
+juegoescenasmin /tmp/w3d_f6_juego
+guardarw3d /tmp/w3d_f6_juego/juegoescenas.w3d
+entradaexiste /tmp/w3d_f6_juego/juegoescenas.w3d escenas/nivel2.w3de 1
+entradaexiste /tmp/w3d_f6_juego/juegoescenas.w3d escenas/intro.w3de 1
+abrirw3d /tmp/w3d_f6_juego/juegoescenas.w3d
+raizinfo n 3 activa Scene tipo juego cargada Intro 0 cargada Nivel2 0 tipode Intro escena tipode Nivel2 juego
+
+# --- el Play del editor ---
+simplay 30
+raizinfo activa Nivel2
+scriptinfo compartido juez OK
+simstop
+raizinfo activa Scene
+
+# --- el binario (modo debug: deja su whisk3d.log) ---
+compilarjuego 0 0 1
+juegoescenaslog /tmp/w3d_f6_juego juegoescenas

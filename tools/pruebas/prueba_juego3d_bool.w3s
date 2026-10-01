@@ -1,0 +1,46 @@
+# ==========================================================================
+#  EL TARGET DE UN BOOLEAN EN EL JUEGO COMPILADO (malla binaria perezosa)
+#  Correr DESDE ESTA CARPETA:
+#    cd <motor>/tools/pruebas
+#    ../../platform/linux/build/whisk3d --script prueba_juego3d_bool.w3s
+#
+#  EL CASO. El juego compilado lee cada malla .w3db SOLO con sus bloques de
+#  RENDER: no edita, asi que no carga caras, capas ni aristas. Una malla cuyo
+#  stack GENERA malla lee tambien las caras (su stack arma poligonos al abrir),
+#  pero el TARGET de un Boolean es una malla comun: queda con la edicion PENDIENTE
+#  y ConstruirPolyMesh la materializa recien cuando el Boolean pide sus poligonos
+#  (W3dMallaBinMaterializarEdicion relee su entrada del contenedor). Si eso se
+#  rompe, el Boolean se queda sin poligonos del target y NO CORTA NADA, en
+#  silencio: el juego se ve "casi" bien. En el editor nunca hay nada pendiente
+#  (w3dbjuego, en prueba_w3db.w3s, simula esa carga en el editor); aca se
+#  compila el juego y se mira el binario.
+#
+#    1. el juego 3D minimo (juego3dmin) + un Boolean DIFFERENCE en el cubo con un
+#       target OCULTO que lo perfora de adelante hacia atras (juego3dbool ya
+#       verifica el agujero en el editor);
+#    2. se guarda con las mallas en BINARIO (el default) y se compila;
+#    3. el binario se corre con captura y se mira POR EL AGUJERO (juego3dboolpx):
+#       tiene que verse el fondo, no la cara del cubo.
+#
+#  Compila un juego de verdad (cmake + g++), asi que tarda mas que las demas.
+# ==========================================================================
+
+ventana 640 480
+
+# --- 1) el juego 3D minimo con el Boolean, guardado en binario -----------------
+formatomallas binario
+juego3dbool /tmp/w3d_juego3dbool
+guardarw3d /tmp/w3d_juego3dbool/juego3dbool.w3d
+# las tres mallas (el cubo, el testigo de afuera y el target) son la MISMA malla del proyecto
+# (juego3dbool las vincula como duplicados vinculados: un .w3db, "mallas" en proyecto.json, que
+# usan los tres objetos). El target NO tiene modificadores, asi que en el juego queda con la
+# edicion PENDIENTE (la materializa ConstruirPolyMesh desde los bytes del recurso compartido)
+w3dbinfo /tmp/w3d_juego3dbool/juego3dbool.w3d w3db 1 w3dm 0 tiene FACE
+abrirw3d /tmp/w3d_juego3dbool/juego3dbool.w3d
+
+# --- 2) compilarlo para Linux, con los assets sueltos -------------------------
+compilarjuego 0 0
+
+# --- 3) correr el BINARIO y mirar por el agujero ------------------------------
+juego3dboolpx /tmp/w3d_juego3dbool juego3dbool
+formatomallas proyecto

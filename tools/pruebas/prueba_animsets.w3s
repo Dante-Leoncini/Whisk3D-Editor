@@ -1,0 +1,246 @@
+# prueba_animsets.w3s — FASE 3: los clips de esqueleto como ANIMSETS binarios (.w3da) y COMPARTIDOS
+#
+#  Criterios de aceptacion:
+#   - los clips salen de proyecto.json a animaciones/<slug>.w3da (formato de bloques, determinista)
+#     y el guardado DEDUPLICA POR CLIP (el mismo clip en varios armatures va UNA vez);
+#   - en memoria el animset es UN recurso: los armatures con el mismo esqueleto apuntan a los MISMOS
+#     clips; el estado de reproduccion es de cada uno;
+#   - la reproduccion es IDENTICA antes y despues (posefoto: los bits de toda la pose de cada hueso,
+#     en frames de muestra de cada clip de cada armature, en el editor y con el cabezal del juego);
+#   - el formato inline viejo se sigue leyendo y al guardar se migra; re-guardar = mismos bytes;
+#   - editar es COPIAR (copy-on-write): renombrar un clip, crear uno, borrar un hueso no toca a los
+#     demas usuarios; el unico usuario se lleva los clips sin copiar;
+#   - huesos por NOMBRE: un armature con los huesos en otro orden usa el animset por una VARIANTE;
+#     una variante a la que le falta un hueso no le borra al animset las pistas de ese hueso;
+#   - los USUARIOS de un animset (outliner: EN USO / HUERFANO, purgar, renombrar) son los del
+#     guardado, tambien para un armature colgado cuyo esqueleto ya no calza;
+#   - un animset sin usuarios (huerfano) se conserva; uno roto frena el guardado.
+ventana 1280 720
+animsetregistro
+animsetcorrupto
+
+# ---- A) el formato INLINE de antes (5 armatures del mismo rig, 5x4 clips + 1 repetido) se lee
+#         igual y el guardado lo MIGRA: 22 clips -> 6 distintos (dos "Quieto" y el repetido, que al
+#         abrir se renombro "Caminar.001" porque los nombres son unicos por armature) ----
+animsinline 1
+animsetsintetica 5 prueba_animsets_viejo_rt.w3d
+animsinline 0
+animsetsw3d prueba_animsets_viejo_rt.w3d animsets 0 inline 5 armatures 0 registro 0
+abrirw3d prueba_animsets_viejo_rt.w3d
+animsetinfo vivos 0 registro 0
+posefoto animsets_base.pose juego 1
+guardarw3d prueba_animsets_v4.w3d
+animsetsw3d prueba_animsets_v4.w3d animsets 1 clips 6 inline 0 armatures 5 registro 1
+abrirw3d prueba_animsets_v4.w3d
+animsetinfo vivos 1 refs 5 clips 6 variantes 0 registro 1
+animsetarm Personaje compartido 1 animset Personaje clips 4 variante 0
+animsetarm Personaje.002 compartido 1 clips 5
+animsetarm SinClips compartido 0 clips 0
+# el mismo "Caminar" es EL MISMO objeto en memoria para todos; los dos "Quieto" no
+animsetclip Personaje 1 nombre Caminar mismo Personaje.003 1 1
+animsetclip Personaje 0 nombre Quieto mismo Personaje.001 0 0
+animsetclip Personaje.002 4 nombre Caminar.001
+posefoto animsets_v4.pose juego 1
+posefotoigual animsets_base.pose animsets_v4.pose
+# abrir/cerrar no deja animsets vivos ni memoria
+cargabench prueba_animsets_v4.w3d 3 armatures 6 clips 21 fugakb 64
+animsetinfo vivos 1 refs 5
+
+# ---- B) re-guardar sin cambios = los mismos bytes (dos vueltas) ----
+guardarw3d prueba_animsets_rt1.w3d
+w3diguales prueba_animsets_v4.w3d prueba_animsets_rt1.w3d
+# el recurso cargado quedo igual a su entrada nueva: sigue con ese id (un armature que se cargue
+# despues lo comparte)
+animsetrec animaciones/personaje.w3da refs 5
+abrirw3d prueba_animsets_rt1.w3d
+guardarw3d prueba_animsets_rt2.w3d
+w3diguales prueba_animsets_rt1.w3d prueba_animsets_rt2.w3d
+posefoto animsets_rt2.pose juego 1
+posefotoigual animsets_base.pose animsets_rt2.pose
+
+# ---- C) un armature con el MISMO clip dos veces (un archivo que no paso por el editor): al abrir,
+#         la reparacion de nombres renombra el repetido -> ese armature pasa a clips PROPIOS antes
+#         (sino renombraba el clip de todos) ----
+animsetsintetica 5 prueba_animsets_dup_rt.w3d
+animsetsw3d prueba_animsets_dup_rt.w3d animsets 1 clips 5 armatures 5
+abrirw3d prueba_animsets_dup_rt.w3d
+animsetinfo vivos 1 refs 4 clips 5
+animsetarm Personaje.002 compartido 0 clips 5
+animsetclip Personaje.002 4 nombre Caminar.001
+animsetclip Personaje 1 nombre Caminar mismo Personaje.004 1 1
+posefoto animsets_dup.pose juego 1
+posefotoigual animsets_base.pose animsets_dup.pose
+abrirw3d prueba_animsets_v4.w3d
+
+# ---- D) copy-on-write: editar un armature no toca a los demas ----
+animsetrenombrar Personaje.003 1 Paseo
+animsetinfo vivos 1 refs 4 clips 6
+animsetarm Personaje.003 compartido 0 clips 4
+animsetclip Personaje.003 1 nombre Paseo
+animsetclip Personaje 1 nombre Caminar mismo Personaje.001 1 1
+# 'anim add' (CrearAnimacion) sobre otro: tambien copia antes
+animsetactivo Personaje.001
+anim add
+animsetarm Personaje.001 compartido 0 clips 5
+animsetarm Personaje compartido 1 clips 4
+animsetinfo vivos 1 refs 3
+# borrar un hueso (remapea las pistas) solo en uno
+animsetborrarhueso Personaje.004 Brazo
+animsetarm Personaje.004 compartido 0
+animsetclip Personaje.004 2 nombre Correr keys 405
+animsetclip Personaje 2 nombre Correr keys 501
+animsetinfo vivos 1 refs 2
+guardarw3d prueba_animsets_cow_rt.w3d
+# la biblioteca cambio (sumo "Paseo" y el clip nuevo): el recurso viejo se DESENGANCHA de la entrada
+# (el proximo que la pida lee la nueva); sus dos usuarios siguen andando con el
+animsetrec animaciones/personaje.w3da nada
+animsetinfo vivos 1 refs 2
+# Personaje.004 cambio de esqueleto: biblioteca propia (4 clips); "Paseo" y el clip nuevo van a la
+# de siempre (6 + 2 = 8): lo que no cambio cae en los mismos clips
+animsetsw3d prueba_animsets_cow_rt.w3d animsets 2 clips 12 inline 0 armatures 5 registro 2
+abrirw3d prueba_animsets_cow_rt.w3d
+animsetinfo vivos 2 refs 5 registro 2
+animsetclip Personaje.003 1 nombre Paseo
+animsetclip Personaje 2 nombre Correr mismo Personaje.003 2 1
+animsetclip Personaje.004 2 keys 405
+animsetarm Personaje.001 compartido 1 clips 5
+
+# ---- D2) un hueso renombrado SIN tocar los clips (el rename de un vertex group lo arrastra): el
+#          armature sigue reproduciendo igual y el guardado NO lo deja en el animset por nombre (sus
+#          pistas quedarian huerfanas): va a una biblioteca de su esqueleto nuevo ----
+abrirw3d prueba_animsets_v4.w3d
+posefoto animsets_hueso_a.pose juego 1
+animsetrenombrarhueso Personaje.001 Cabeza Craneo
+animsetarm Personaje.001 compartido 1
+posefoto animsets_hueso_b.pose juego 1
+posefotoigual animsets_hueso_a.pose animsets_hueso_b.pose
+guardarw3d prueba_animsets_hueso_rt.w3d
+animsetsw3d prueba_animsets_hueso_rt.w3d animsets 2 armatures 5 registro 2
+# en memoria sigue COLGADO del recurso 'Personaje', pero el guardado lo puso en 'Personaje.001': sus
+# USUARIOS (lo que usa el outliner para EN USO / HUERFANO y purgar) son los del guardado, no los del
+# recurso -> 'Personaje.001' no es huerfano, conserva su carpeta y renombrar 'Personaje' no se lo lleva
+animsetarm Personaje.001 compartido 1 animset Personaje nombreset Personaje.001
+animsetusuarios Personaje 4
+animsetusuarios Personaje.001 1
+animsetcarpeta Personaje.001 fijar Enemigos
+animsetpurgar 0
+animsetrenombrarset Personaje Heroe Heroe
+animsetusuarios Heroe 4
+animsetarm Personaje.001 nombreset Personaje.001
+guardarw3d prueba_animsets_hueso2_rt.w3d
+animsetsw3d prueba_animsets_hueso2_rt.w3d animsets 2 armatures 5 registro 2
+zipentrada prueba_animsets_hueso2_rt.w3d animaciones/heroe.w3da
+zipentrada prueba_animsets_hueso2_rt.w3d animaciones/personaje.001.w3da
+animsetcarpeta Personaje.001 es Enemigos
+abrirw3d prueba_animsets_hueso_rt.w3d
+animsetinfo vivos 2 refs 5 variantes 0
+posefoto animsets_hueso_c.pose juego 1
+posefotoigual animsets_hueso_a.pose animsets_hueso_c.pose
+
+# ---- E) el UNICO usuario se lleva los clips sin copiar (el recurso muere) ----
+animsetsintetica 1 prueba_animsets_solo_v4.w3d
+abrirw3d prueba_animsets_solo_v4.w3d
+posefoto animsets_solo_a.pose
+animsetinfo vivos 1 refs 1 clips 4
+animsetrenombrar Personaje 3 Brinco
+animsetinfo vivos 0
+animsetarm Personaje compartido 0 clips 4
+animsetclip Personaje 3 nombre Brinco
+animsetrenombrar Personaje 3 Saltar
+posefoto animsets_solo_b.pose
+posefotoigual animsets_solo_a.pose animsets_solo_b.pose
+
+# ---- F) huesos por NOMBRE: un esqueleto en otro orden usa el animset por una VARIANTE ----
+animsetsintetica 3 prueba_animsets_var_v4.w3d invertido
+animsetsw3d prueba_animsets_var_v4.w3d animsets 2 clips 9 armatures 4 registro 2
+abrirw3d prueba_animsets_var_v4.w3d
+posefoto animsets_var_base.pose juego 1
+animsetapuntar prueba_animsets_var_v4.w3d prueba_animsets_var2_rt.w3d Invertido Personaje
+abrirw3d prueba_animsets_var2_rt.w3d
+# (Personaje.002 trae el clip repetido: pasa a propios al abrir, por eso refs 3)
+animsetinfo vivos 1 refs 3 variantes 1 clipsvariante 4 registro 2
+animsetarm Invertido compartido 1 animset Personaje variante 1 clips 4
+animsetarm Personaje compartido 1 variante 0
+posefoto animsets_var.pose juego 1
+posefotoigual animsets_var_base.pose animsets_var.pose
+# guardado: la variante vuelve al espacio del animset (dedup con los canonicos); "Invertido" queda huerfano
+guardarw3d prueba_animsets_var_rt.w3d
+animsetsw3d prueba_animsets_var_rt.w3d animsets 2 clips 10 armatures 4 registro 2
+abrirw3d prueba_animsets_var_rt.w3d
+animsetinfo vivos 1 refs 4 variantes 1 registro 2
+posefoto animsets_var2.pose juego 1
+posefotoigual animsets_var_base.pose animsets_var2.pose
+
+# ---- G) HUERFANOS: sin usuarios, el animset se conserva (bytes, nombre) ----
+animsetborrar Personaje
+animsetborrar Personaje.001
+animsetborrar Personaje.002
+animsetborrar Invertido
+animsetinfo vivos 0 registro 2
+guardarw3d prueba_animsets_huerf_rt.w3d
+animsetsw3d prueba_animsets_huerf_rt.w3d animsets 2 armatures 0 registro 2
+w3diguales prueba_animsets_var_rt.w3d prueba_animsets_huerf_rt.w3d animaciones/
+
+# ---- H) FRENO: un animset que no se puede leer deja al armature sin clips y no se guarda encima ----
+animsetromper prueba_animsets_v4.w3d prueba_animsets_roto_rt.w3d corte
+abrirw3d prueba_animsets_roto_rt.w3d
+animsetarm Personaje nocargo 1 clips 0
+fail guardarw3d prueba_animsets_roto2_rt.w3d
+animsetromper prueba_animsets_v4.w3d prueba_animsets_roto_rt.w3d version
+abrirw3d prueba_animsets_roto_rt.w3d
+animsetarm Personaje.004 nocargo 1 clips 0
+fail guardarw3d prueba_animsets_roto2_rt.w3d
+animsetromper prueba_animsets_v4.w3d prueba_animsets_roto_rt.w3d req
+abrirw3d prueba_animsets_roto_rt.w3d
+animsetarm Personaje nocargo 1
+fail guardarw3d prueba_animsets_roto2_rt.w3d
+animsetromper prueba_animsets_v4.w3d prueba_animsets_roto_rt.w3d falta
+abrirw3d prueba_animsets_roto_rt.w3d
+animsetarm Personaje nocargo 1
+fail guardarw3d prueba_animsets_roto2_rt.w3d
+# y reabrir el bueno limpia el freno (y no quedo ningun FALLO de los rotos en el almacen)
+abrirw3d prueba_animsets_v4.w3d
+animsetarm Personaje nocargo 0 compartido 1 clips 4
+animsetinfo vivos 1 refs 5 descriptores 1
+
+# ---- I) una VARIANTE a la que le FALTA un hueso de la tabla (un "anims" que apunta al animset de
+#         otro esqueleto): su copia reindexada deja en -1 las pistas de ese hueso. El guardado
+#         escribe el clip CANONICO del recurso: la biblioteca no se duplica (dedup con los demas
+#         usuarios; el recurso sigue enganchado a su entrada) y, con la variante como UNICA
+#         usuaria, las pistas del hueso que le falta siguen apuntando a el ----
+animsetsintetica 2 prueba_animsets_falta_v4.w3d
+abrirw3d prueba_animsets_falta_v4.w3d
+animsetborrarhueso Personaje.001 Brazo
+guardarw3d prueba_animsets_falta_b_rt.w3d
+animsetapuntar prueba_animsets_falta_b_rt.w3d prueba_animsets_falta_c_rt.w3d Personaje.001 Personaje
+abrirw3d prueba_animsets_falta_c_rt.w3d
+animsetarm Personaje.001 compartido 1 animset Personaje variante 1 clips 4
+animsetinfo vivos 1 refs 2 variantes 1 clipsvariante 4
+animsetpistas prueba_animsets_falta_c_rt.w3d animaciones/personaje.w3da Brazo 4 - 4
+posefoto animsets_falta_a.pose juego 1
+guardarw3d prueba_animsets_falta_d_rt.w3d
+# los mismos 4 clips en personaje.w3da (+ los 4 de 'Personaje.001', huerfano), byte a byte
+animsetsw3d prueba_animsets_falta_d_rt.w3d animsets 2 clips 8 armatures 2 registro 2
+animsetrec animaciones/personaje.w3da refs 2
+animsetpistas prueba_animsets_falta_d_rt.w3d animaciones/personaje.w3da Brazo 4 - 4
+w3diguales prueba_animsets_falta_c_rt.w3d prueba_animsets_falta_d_rt.w3d animaciones/
+# la variante como UNICA usuaria: el animset no pierde las pistas de 'Brazo'
+animsetborrar Personaje
+guardarw3d prueba_animsets_falta_e_rt.w3d
+animsetsw3d prueba_animsets_falta_e_rt.w3d animsets 2 clips 8 armatures 1 registro 2
+animsetpistas prueba_animsets_falta_e_rt.w3d animaciones/personaje.w3da Brazo 4 - 4
+w3diguales prueba_animsets_falta_c_rt.w3d prueba_animsets_falta_e_rt.w3d animaciones/
+# BORRAR un clip de esa variante UNICA usuaria tampoco la saca del animset (con clips propios el
+# guardado ya no tendria los canonicos): suelta el puntero y 'Brazo' sigue en los que quedan
+animsetactivo Personaje.001
+anim del
+animsetarm Personaje.001 compartido 1 variante 1 clips 3
+guardarw3d prueba_animsets_falta_f_rt.w3d
+animsetpistas prueba_animsets_falta_f_rt.w3d animaciones/personaje.w3da Brazo 3 - 3
+abrirw3d prueba_animsets_falta_d_rt.w3d
+posefoto animsets_falta_b.pose juego 1
+posefotoigual animsets_falta_a.pose animsets_falta_b.pose
+
+# ---- J) cerrar el proyecto suelta todo ----
+escenadefecto
+animsetinfo vivos 0 registro 0

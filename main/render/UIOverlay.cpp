@@ -262,8 +262,8 @@ static std::string TextoSegunTipo(Texto2D* t) {
 // ---- TEXTO MULTILINEA ----------------------------------------------------------------------
 // parte el texto en lineas al ancho maxW: 0 = una sola linea, 1 = salta por PALABRAS
 // (espacios), 2 = salta desde cualquier parte (por codepoint, sin romper UTF-8)
-static void PartirLineas(const w3dui::W3dTextAtlas* at, const std::string& txt, float px,
-                         float maxW, int modo, std::vector<std::string>& out) {
+static void PartirParrafo(const w3dui::W3dTextAtlas* at, const std::string& txt, float px,
+                          float maxW, int modo, std::vector<std::string>& out) {
     out.clear();
     if (modo == 0 || maxW <= 0.0f) { out.push_back(txt); return; }
     std::string linea;
@@ -294,6 +294,24 @@ static void PartirLineas(const w3dui::W3dTextAtlas* at, const std::string& txt, 
         }
     }
     if (!linea.empty() || out.empty()) out.push_back(linea);
+}
+// ...y los SALTOS DE LINEA duros ('\n') se respetan siempre (en cualquier modo, tambien "una linea"): cada
+// parrafo se parte por su cuenta. Un parrafo vacio es una linea vacia.
+static void PartirLineas(const w3dui::W3dTextAtlas* at, const std::string& txt, float px,
+                         float maxW, int modo, std::vector<std::string>& out) {
+    out.clear();
+    if (txt.find('\n') == std::string::npos) { PartirParrafo(at, txt, px, maxW, modo, out); return; }
+    size_t i = 0;
+    std::vector<std::string> parte;
+    while (true) {
+        size_t nl = txt.find('\n', i);
+        std::string par = txt.substr(i, nl == std::string::npos ? std::string::npos : nl - i);
+        if (!par.empty() && par[par.size() - 1] == '\r') par.erase(par.size() - 1);
+        PartirParrafo(at, par, px, maxW, modo, parte);
+        out.insert(out.end(), parte.begin(), parte.end());
+        if (nl == std::string::npos) break;
+        i = nl + 1;
+    }
 }
 
 // el tamano de fuente mas grande con el que el texto ENTRA en el area rw x rh
@@ -429,6 +447,9 @@ static void DibujarImagenRect(Imagen2D* im, float x0, float y0, float x1, float 
     }
     gfx::TexFilter(im->filtrado);                   // sin filtro = NEAREST pixel-perfect
     if (!im->usarAlpha) gfx::Disable(gfx::Blend);   // sin canal alpha: se dibuja opaca
+    // MEZCLA propia (aditiva: brillos / destellos de un HUD, el "suma" del juego). La normal es la del estado 2D.
+    const bool mezclaPropia = im->usarAlpha && im->mezcla != (int)gfx::MezclaAlpha;
+    if (mezclaPropia) gfx::SetMezcla(im->mezcla);
     const float* c = ColorResuelto(im, im->palTinte, im->color);   // TINTE (propio o de paleta)
     gfx::Color4f(c[0], c[1], c[2], c[3] * op);
     // FLIPBOOK: si anima, dibujar la VENTANA UV actual (el motor la avanzo en flipPlay.uvActual).
@@ -452,6 +473,7 @@ static void DibujarImagenRect(Imagen2D* im, float x0, float y0, float x1, float 
         ch = (int)(ih * vSc + 0.5f); if (ch < 1) ch = 1;
     }
     DibujarTexturaModo(tex, cw, ch, im->modo, x0, y0, x1, y1, uOff, vOff, uSc, vSc);
+    if (mezclaPropia) gfx::BlendAlpha();   // el siguiente elemento vuelve a la mezcla normal
 }
 
 // el FRAME actual del video dentro del rect. Con 'reproducir' avanza solo (y pide

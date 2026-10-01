@@ -1,0 +1,310 @@
+# prueba_outliner_seleccion.w3s — FASE 4: SELECCION MULTIPLE y CARPETAS que se mueven, en el outliner
+# por recursos, y el Esc que DESCARTA un rename
+#
+#  Criterios de aceptacion:
+#   - seleccion multiple con el mouse (Ctrl+click agrega/saca, Shift+click = rango desde el cursor,
+#     click comun = la fila sola; click sin arrastrar sobre una fila de la seleccion = queda sola),
+#     con el teclado de PC (Shift+flechas, A = todo / nada; por la MISMA puerta que el teclado real:
+#     la UI compartida con el mouse sobre el outliner) y SIN MOUSE en el N95 (el 5 marca / desmarca el
+#     cursor, las flechas recorren sin perder las marcas, "Deselect All" las suelta; C NO: C + flecha
+#     es undo/redo y el toque de C borra lo elegido);
+#   - mover la seleccion entera a una carpeta (arrastrar, "Move to Folder", el modo mover G / 1) en UN
+#     paso de undo;
+#     borrar varios juntos (una confirmacion; si alguno esta en uso, avisa y ofrece borrar igual o
+#     cancelar); "Select Users" con la union de los usuarios;
+#   - las CARPETAS se mueven adentro de otras (arrastrar una carpeta, "Move to Folder" sobre una
+#     carpeta, al vacio = a la raiz), con sus subcarpetas y sus recursos, con undo; una carpeta no se
+#     puede meter en si misma; se guarda y vuelve igual;
+#   - Esc (PC) / C (N95) DESCARTA un rename en linea o un campo de Properties (Name, Folder, el Name
+#     del objeto, y los que escriben en vivo, como la etiqueta de un hitbox): el valor queda como
+#     estaba. Enter sigue confirmando.
+ventana 1280 720
+
+# ---- 0) un proyecto con materiales huerfanos y dos mallas ----
+escenadefecto
+selobj Cubo
+matnew
+mallasrecurso
+malladup Cubo vinculado
+matsuelto Piel
+matsuelto Metal
+matsuelto Cuero
+matsuelto Hueso
+guardarw3d prueba_outliner_seleccion_v4.w3d
+abrirw3d prueba_outliner_seleccion_v4.w3d
+
+# ---- A) SELECCION MULTIPLE con el mouse ----
+outvista materiales
+outfilas n 5
+outclick Cuero
+outsel n 1 tiene Cuero
+outclick Metal ctrl
+outsel n 2 tiene Cuero tiene Metal
+outclick Metal ctrl
+outsel n 1 tiene Cuero notiene Metal
+outclick Hueso
+outclick Metal shift
+outsel n 3 tiene Hueso tiene Material tiene Metal notiene Cuero
+# click comun sobre una fila de la seleccion (sin arrastrar): queda sola
+outclick Material
+outsel n 1 tiene Material
+# el Name del panel sigue al CURSOR (el ultimo elegido)
+outclick Cuero
+outclick Piel ctrl
+recactivo materiales Piel
+outsel n 2 tiene Cuero tiene Piel
+
+# ---- B) MOVER la seleccion entera: arrastrar a una carpeta (un paso de undo) ----
+carpetanueva materiales - Pieles
+outclick Cuero
+outclick Piel ctrl
+outdrag Piel Pieles
+outfila Cuero carpeta Pieles prof 1
+outfila Piel carpeta Pieles prof 1
+outsel n 2 tiene Cuero tiene Piel
+undo
+recurso materiales Cuero carpeta -
+recurso materiales Piel carpeta -
+redo
+recurso materiales Cuero carpeta Pieles
+recurso materiales Piel carpeta Pieles
+# el menu "Move to Folder" con dos elegidos: los dos
+outclick Hueso
+outclick Metal ctrl
+outmenu mover Pieles
+recurso materiales Hueso carpeta Pieles
+recurso materiales Metal carpeta Pieles
+undo
+recurso materiales Hueso carpeta -
+recurso materiales Metal carpeta -
+
+# ---- C) TECLADO de PC: Shift+flechas extiende, A = todo / nada ----
+outclick Hueso
+outteclapc shiftdown
+outsel n 2 tiene Hueso tiene Material
+outteclapc down
+outsel n 1 tiene Metal
+outteclapc a
+outsel n 6
+outteclapc a
+outsel n 0
+
+# ---- D) SIN MOUSE (N95): el 5 marca, las flechas recorren sin perder las marcas, 1 mueve, "Deselect All" suelta ----
+outclick Hueso
+outtecla 5
+outsel n 1 tiene Hueso
+outtecla down 2
+outfila Metal cursor 1
+outsel n 1 tiene Hueso notiene Metal
+outtecla 5
+outsel n 2 tiene Hueso tiene Metal
+# el "1" del N95 (la G de PC): el MODO MOVER para TODA la seleccion; las flechas la llevan, OK confirma
+outteclapc g
+outmover si destino -
+outtecla down
+outmover si destino Pieles
+outtecla ok
+outmover no
+recurso materiales Hueso carpeta Pieles
+recurso materiales Metal carpeta Pieles
+undo
+recurso materiales Hueso carpeta -
+recurso materiales Metal carpeta -
+# el 5 sobre una marcada la desmarca; "Deselect All" del menu de acciones suelta las marcas (queda el
+# cursor). C NO las suelta: en el N95 es el modificador de undo/redo (C + flecha)
+outtecla 5
+outsel n 1 tiene Hueso notiene Metal
+outtecla 5
+outsel n 2
+outtecla c
+outsel n 2
+outmenu Deselect All
+outsel n 1 tiene Metal
+outfila Metal cursor 1
+# (en PC: A = todo, Esc = nada; y "Select All" del menu hace lo mismo que la A)
+outmenu Select All
+outsel n 6
+outteclapc esc
+outsel n 1 tiene Metal
+
+# ---- E) BORRAR varios huerfanos de una (una sola confirmacion); con uno EN USO el cartel avisa cuantos
+#         lo usan y ofrece borrar igual o cancelar (cancelar no borra NADA) ----
+outclick Hueso
+outclick Material ctrl
+outclick Metal ctrl
+outmenu Delete
+outconfirmar no tiene (2
+outfila Hueso
+outfila Material estado uso
+outclick Hueso
+outclick Metal ctrl
+outmenu Delete
+outconfirmar si
+outnofila Hueso
+outnofila Metal
+outfila Material estado uso
+
+# ---- E2) el TOQUE de C del N95 en una vista de recursos borra la seleccion (no los objetos de la escena) ----
+matsuelto Tmp1
+matsuelto Tmp2
+outclick Tmp1
+outtecla 5
+outtecla down
+outfila Tmp2 cursor 1
+outtecla 5
+outsel n 2 tiene Tmp1 tiene Tmp2
+outtecla ctoque
+outconfirmar si
+outnofila Tmp1
+outnofila Tmp2
+selobj Cubo
+
+# ---- F) "Select Users" con varios: la UNION de sus usuarios ----
+outvista mallas
+add cube
+mallasrecurso
+# (dos mallas + la carpeta Pieles: el arbol de carpetas es uno solo, el filtro no lo esconde)
+outfilas n 3
+outclick Cubo
+outclick Cubo.002 ctrl
+outmenu Select Users
+outvista es escena
+seleccion n 3 tiene Cubo tiene Cubo.001 tiene Cubo.002
+
+# ---- G) CARPETAS que se MUEVEN adentro de otras ----
+outvista materiales
+carpetanueva materiales - Organicos
+carpetanueva materiales Pieles Oscuras
+recmover materiales Cuero Pieles/Oscuras
+carpetas materiales tiene Pieles/Oscuras tiene Organicos
+# arrastrar la carpeta "Pieles" (con su subcarpeta y sus recursos) adentro de "Organicos"
+outclick Pieles
+outdrag Pieles Organicos
+carpetas materiales tiene Organicos/Pieles tiene Organicos/Pieles/Oscuras notiene Pieles
+recurso materiales Piel carpeta Organicos/Pieles
+recurso materiales Cuero carpeta Organicos/Pieles/Oscuras
+outfila Pieles prof 1 carpeta Organicos
+undo
+carpetas materiales tiene Pieles tiene Pieles/Oscuras notiene Organicos/Pieles
+recurso materiales Cuero carpeta Pieles/Oscuras
+redo
+recurso materiales Cuero carpeta Organicos/Pieles/Oscuras
+# no se puede meter una carpeta en si misma (ni en una de sus subcarpetas)
+fail carpetamover materiales Organicos Organicos/Pieles
+outclick Organicos
+outdrag Organicos Oscuras
+carpetas materiales tiene Organicos/Pieles/Oscuras notiene Organicos/Pieles/Oscuras/Organicos
+# "Move to Folder" sobre una CARPETA: el menu no se ofrece a si misma ni a sus hijas
+outclick Oscuras
+fail outmenu mover Oscuras
+outmenu mover -
+carpetas materiales tiene Oscuras notiene Organicos/Pieles/Oscuras
+recurso materiales Cuero carpeta Oscuras
+# al VACIO (la raiz) arrastrando; con un nombre tomado queda unico
+carpetanueva materiales Organicos Oscuras
+outclick Oscuras
+outdrag Oscuras Organicos
+carpetas materiales tiene Organicos/Oscuras.001 tiene Organicos/Oscuras
+recurso materiales Cuero carpeta Organicos/Oscuras.001
+outclick Oscuras.001
+outdrag Oscuras.001 -
+carpetas materiales tiene Oscuras.001
+# varias CARPETAS elegidas (y un recurso) van juntas, en un paso de undo
+carpetanueva materiales - Destino
+outclick Oscuras.001
+outclick Organicos ctrl
+outclick Material ctrl
+outdrag Material Destino
+carpetas materiales tiene Destino/Oscuras.001 tiene Destino/Organicos tiene Destino/Organicos/Pieles
+recurso materiales Material carpeta Destino
+undo
+carpetas materiales tiene Oscuras.001 tiene Organicos notiene Destino/Organicos
+recurso materiales Material carpeta -
+redo
+# borrar varias carpetas VACIAS de una (con undo): la vacia se va, la que tiene recursos queda
+carpetanueva materiales - Vacia1
+carpetanueva materiales - Vacia2
+outclick Vacia1
+outclick Vacia2 ctrl
+outmenu Delete
+carpetas materiales notiene Vacia1 notiene Vacia2
+undo
+carpetas materiales tiene Vacia1 tiene Vacia2
+
+# ---- H) guardar y reabrir: las carpetas movidas vuelven igual; re-guardar = los mismos bytes ----
+guardarw3d prueba_outliner_seleccion_rt1.w3d
+abrirw3d prueba_outliner_seleccion_rt1.w3d
+carpetas materiales tiene Destino/Organicos/Pieles tiene Destino/Oscuras.001 tiene Vacia1
+recurso materiales Material carpeta Destino
+recurso materiales Cuero carpeta Destino/Oscuras.001
+recurso materiales Piel carpeta Destino/Organicos/Pieles
+guardarw3d prueba_outliner_seleccion_rt2.w3d
+w3diguales prueba_outliner_seleccion_rt1.w3d prueba_outliner_seleccion_rt2.w3d
+
+# ---- I) Esc / C DESCARTAN: el rename en linea, la carpeta nueva y los campos de Properties ----
+outvista materiales
+outclick Piel
+outteclapc f2
+outtipear Descartado
+outesc
+recurso materiales Piel existe 1
+recurso materiales Descartado existe 0
+# (Enter sigue confirmando)
+outteclapc f2
+outescribir Pelaje
+recurso materiales Pelaje existe 1
+undo
+recurso materiales Piel existe 1
+# la carpeta nueva con Esc queda con su nombre por defecto
+outclick Vacia1
+outmenu New Folder
+outtipear Nombre
+outesc
+# (el nombre por defecto es "New Folder" traducido: la carpeta existe y no se llama Nombre)
+carpetas materiales n 8 notiene Vacia1/Nombre
+# el N95: C (Cancel del keypad) descarta igual
+outclick Piel
+outteclapc f2
+outtipear OtraCosa
+outtecla c
+recurso materiales Piel existe 1
+recurso materiales OtraCosa existe 0
+# los campos de Properties: Name y Folder del recurso
+outclick Piel
+campoenfocar recnombre
+outtipear Descartado
+outesc
+recurso materiales Piel existe 1 carpeta Destino/Organicos/Pieles
+campoenfocar reccarpeta
+outtipear Otra/Carpeta
+outesc
+recurso materiales Piel carpeta Destino/Organicos/Pieles
+recprops nombre Piel carpeta Destino/Organicos/Pieles
+# el Name del OBJETO (tab Objeto): cualquier campo de texto del editor
+outvista escena
+selobj Cubo
+campoenfocar nombreobj
+outtipear Renombrado
+outesc
+fail selobj Renombrado
+selobj Cubo
+# y confirmado con Enter si cambia
+campoenfocar nombreobj
+outescribir Renombrado
+selobj Renombrado
+# un campo que escribe EN VIVO (la etiqueta del hitbox: cada tecla ya cambio el dato): Esc lo devuelve
+hitboxnuevo Sensor etiqueta jugador
+selobj Sensor
+campoenfocar hbetiqueta
+outtipear enemigo
+outrender
+hitboxinfo Sensor etiqueta enemigo
+outesc
+hitboxinfo Sensor etiqueta jugador
+outrender
+hitboxinfo Sensor etiqueta jugador
+
+# ---- lo que no tiene que pasar ----
+fail carpetamover materiales NoExiste Destino
+fail carpetamover materiales Destino NoExiste
+fail outsel tiene NoExiste

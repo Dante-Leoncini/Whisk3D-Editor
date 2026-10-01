@@ -1,0 +1,13 @@
+{
+  "version": 3,
+  "escena": {
+    "objetos": [
+      {
+        "tipo": "prefab", "nombre": "Instancia", "prefab": "NoExiste", "pos": [1, 0, 0],
+        "overrides": { "propiedades": { "vida": 7 }, "visible": { "Esqueleto/Casco": false } },
+        "hijos": [ { "tipo": "objeto", "nombre": "Colado", "pos": [0, 0, 0] } ]
+      },
+      { "tipo": "objeto", "nombre": "Afuera", "pos": [0, 0, 0] }
+    ]
+  }
+}

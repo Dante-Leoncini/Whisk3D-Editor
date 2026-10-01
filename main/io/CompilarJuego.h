@@ -91,6 +91,12 @@ int W3dCompilarJobs();
 // vuelva a colarse un "-j" pelado, y el test 'compjobs' lo verifica de una sola vez.
 std::string W3dCompilarJobsFlag();
 
+// la raiz del repo Whisk3D que usa "Compilar juego" (las fuentes del runtime): Ajustes, la variable
+// de entorno W3D_REPO, subiendo desde res/, desde el binario o las fuentes con las que se compilo
+// el editor (ver RepoRoot en CompilarJuego.cpp). "" si no la encuentra. 'via' (opcional) dice cual
+// de esos caminos la dio: "ajustes", "entorno", "res", "binario" o "fuentes".
+std::string CompilarJuegoRepoRaiz(std::string* via);
+
 // ---- estado del build asincronico (lo consulta el hilo PRINCIPAL, 1x por frame) ----
 bool CompilarJuegoEnCurso();                    // hay un build corriendo (bloquea re-disparo)
 int  CompilarJuegoProgreso(std::string* etapa); // avance GLOBAL 0..100 + texto de la etapa actual

@@ -1,0 +1,55 @@
+# ==========================================================================
+#  LIBRERIAS en el JUEGO (2): lo de ADENTRO de una libreria en el Play del editor y en el JUEGO
+#  COMPILADO (io/Librerias.h, io/CompilarJuego.cpp).
+#  Correr DESDE ESTA CARPETA (ver prueba_juego3d.w3s):
+#    ../../platform/linux/build/whisk3d --script prueba_juego3d_librerias_extras.w3s
+#
+#  libjuegoextras: un juego 3D minimo que VINCULA solo la libreria "extras" (que a su vez vincula a
+#  "personajes": el juego no la vincula, se monta OCULTA como "extras~personajes"), con un proxy de su
+#  Cartel (textura y script AFUERA del .w3d de la libreria: el script importa un .w3d SUELTO al lado de
+#  la libreria y una ENTRADA suya), de su Escuadra (un proxy del Enemigo de la de adentro: su
+#  enemigo.lua cuenta en compartido) y de su Sonoro (sonido() de lo suelto y de una entrada). Un
+#  Director deja el veredicto ("[librerias] OK externo=OK anexos=Piedra+Roca enemigos=1 sonoro=listo")
+#  en el Play y en el binario. "Compilar juego" empaqueta lo de afuera en librerias/extras/_ext/, lo
+#  suelto en librerias/extras/<ruta>, la de adentro en librerias/extras~personajes/ y el mapeo en
+#  librerias/_anidadas.json: con los assets sueltos y con el pak.
+#  Compila un juego de verdad (cmake + g++), asi que tarda mas que las demas.
+# ==========================================================================
+
+ventana 640 480
+libcrear /tmp/w3d_f8y/lib personajes.w3d dosmats.png
+libcrearextras /tmp/w3d_f8y/extras extras.w3d dosmats.png /tmp/w3d_f8y/lib/personajes.w3d
+libjuegoextras /tmp/w3d_f8y/juego /tmp/w3d_f8y/extras/extras.w3d
+guardarw3d /tmp/w3d_f8y/juego/libjuego2.w3d
+entradatiene /tmp/w3d_f8y/juego/libjuego2.w3d proyecto.json ext:../extras/extras.w3d 1
+entradatiene /tmp/w3d_f8y/juego/libjuego2.w3d proyecto.json personajes 0
+abrirw3d /tmp/w3d_f8y/juego/libjuego2.w3d
+libinfo personajes vinculada 0
+prefabvivos 4
+libanidada extras personajes como extras~personajes
+
+# --- el Play del editor ---
+simcache 0
+simplay 30
+scriptinfo compartido juez OK
+scriptinfo compartido enemigos 1
+simstop
+simcache 1
+
+# --- el binario (modo debug: deja su whisk3d.log) con los assets sueltos ---
+compilarjuego 0 0 1
+libruta /tmp/w3d_f8y/juego/platform-build/linux/librerias/extras/proyecto.json lee 1
+libruta /tmp/w3d_f8y/juego/platform-build/linux/librerias/extras/_ext/fuera/cartel.png lee 1
+libruta /tmp/w3d_f8y/juego/platform-build/linux/librerias/extras/_ext/fuera/externo.lua lee 1
+libruta /tmp/w3d_f8y/juego/platform-build/linux/librerias/extras/anexos/piedra.w3d lee 1
+libruta /tmp/w3d_f8y/juego/platform-build/linux/librerias/extras/sonidos/bip.wav lee 1
+libruta /tmp/w3d_f8y/juego/platform-build/linux/librerias/extras/extra/roca.w3d lee 1
+libruta /tmp/w3d_f8y/juego/platform-build/linux/librerias/extras~personajes/proyecto.json lee 1
+libruta /tmp/w3d_f8y/juego/platform-build/linux/librerias/extras~personajes/scripts/enemigo.lua lee 1
+libruta /tmp/w3d_f8y/juego/platform-build/linux/librerias/_anidadas.json lee 1
+libruta /tmp/w3d_f8y/juego/platform-build/linux/librerias/personajes/proyecto.json lee 0
+libjuegolog /tmp/w3d_f8y/juego libjuego2 externo=OK anexos=Piedra+Roca enemigos=1 sonoro=listo
+
+# --- lo mismo con los assets EMPAQUETADOS (el pak) ---
+compilarjuego 0 1 1
+libjuegolog /tmp/w3d_f8y/juego libjuego2 externo=OK anexos=Piedra+Roca enemigos=1 sonoro=listo

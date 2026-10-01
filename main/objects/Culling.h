@@ -2,6 +2,7 @@
 #define CULLING_H
 #include "objects/Objects.h"
 #include "objects/VisSet.h"     // metodo Riel: visibilidad de hijos por nodo (dato .w3dvis)
+#include "objects/VisBsp.h"     // metodo Bsp: arbol BSP + PVS + clusters por hijo (dato .w3dbsp)
 #include "WhiskUI/draw/icons.h" // el icono compartido del outliner
 #include <map>
 #include <vector>
@@ -85,7 +86,11 @@ public:
     //               ENTERAS por frustum+distancia; los hijos ESTATICOS se cachean en su celda,
     //               los DINAMICOS (Object::estatico==false, ej. Crash/enemigos) se miden por
     //               frame. El boton "Recalcular" (MarcarSucio) rearma el reparto.
-    //   Bsp       = PENDIENTE (aun no implementado): hoy cae a Frustum (aviso al elegirlo).
+    //   Bsp       = PVS precalculado estilo Quake/Half-Life (dato .w3dbsp, formato/w3dbsp.md): la camara baja
+    //               por el arbol de planos hasta su hoja -> cluster -> fila del PVS; un hijo se dibuja si
+    //               alguno de sus clusters esta en esa fila (AND de bitsets), y despues pasa por el frustum
+    //               de siempre. Sin dato / camara en solido: frustum. Los hijos que no estan en el dato se
+    //               dibujan siempre (objetos dinamicos).
     // (El viejo "Triangulo" SE FUE de este objeto -pedido del dueno-: el contenedor
     //  muestra/oculta OBJETOS hijos, estilo Unity. El PVS por triangulo es asunto del
     //  modificador "Oclusion" (CullingTri) de cada malla; un .w3d viejo con
@@ -114,6 +119,11 @@ public:
     // material) para que el alpha se mezcle bien -> reemplaza al `ordenarPorCamara` de una Collection PERO
     // ademas cullea por frustum. Default false (opacos: orden por material + adelante->atras para early-z).
     bool  ordenAlpha;
+    // OPACOS SOLO POR DISTANCIA: true = adelante->atras puro (el mas cercano primero), sin agrupar por material.
+    // Para escenarios en trozos (chunks con varias texturas cada uno) agrupar por la PRIMERA textura no ahorra
+    // binds y rompe el orden de profundidad; adelante->atras deja que el z-buffer descarte lo tapado antes de
+    // pintarlo (menos relleno, que en el N95 es lo caro). Default false (el orden de siempre).
+    bool  ordenCercania;
     // --- metodo Grid: particion por celdas ---
     float cellSize;         // lado de la celda en unidades de mundo (default 16)
     bool  modo3D;           // false = grilla 2D en el plano XZ (default, niveles); true = 3D
@@ -130,6 +140,17 @@ public:
     // true = la lista cambio (redibujar)
     bool RielAplicarNodo(int nodo);
 
+    // --- metodo Bsp: PVS por cluster (dato .w3dbsp) ---
+    std::string bspArchivo;       // el .w3dbsp (ruta relativa al proyecto, como visHijosArchivo)
+    VisBsp      bsp;              // el dato cargado
+    bool        bspCargado;       // ya se intento leer (no reintentar por frame)
+    int         bspCluster;       // cluster de la camara en el ultimo frame (-1 = ninguno: frustum)
+    std::vector<unsigned char> bspFila;    // la fila del PVS de ese cluster
+    std::vector<int>  bspHijoIdx; // por hijo: su indice en bsp.hijos (-1 = no esta: siempre visible)
+    std::vector<char> bspVisible; // por hijo: se ve desde bspCluster
+    size_t            bspHijosSello; // Childrens.size() con que se armo bspHijoIdx
+    bool BspCargar();             // lee el archivo (una vez); true si el dato es valido
+
     Culling(Object* parent = NULL, Vector3 pos = Vector3(0,0,0))
         : Object(parent, "Culling", pos) {
         metodo = Frustum;
@@ -137,10 +158,14 @@ public:
         soloCamaraActiva = false;
         distanciaMax = 0.0f;
         ordenAlpha = false;
+        ordenCercania = false;
         cellSize = 16.0f;
         modo3D = false;
         visHijosCargado = false;
         nodoAplicado = -1;
+        bspCargado = false;
+        bspCluster = -1;
+        bspHijosSello = (size_t)-1;
         gridSucia = true;
         frusJugaba = false;
         sello = 0;
@@ -173,8 +198,11 @@ private:
     std::vector<int>            dinamicos;     // hijos DINAMICOS (estatico==false): fuera de la grilla
     std::vector<unsigned>       selloHijo;     // ultimo frame en que se dibujo cada hijo
     void RebuildGrid();      // reparte los hijos ESTATICOS en celdas (metodo Grid)
-    void RenderFrustum();    // metodo Frustum/Triangulo/Bsp: cull por AABB de cada hijo
+    // metodo Frustum (y la 2da mitad de Bsp): cull por AABB de cada hijo. 'filtro' (opcional): por hijo, 0 = ya
+    // descartado por el PVS (no se mide ni se dibuja)
+    void RenderFrustum(const std::vector<char>* filtro = NULL);
     void RenderGrid();       // metodo Grid: descarta celdas enteras + hijos dinamicos por frame
+    void RenderBsp();        // metodo Bsp: PVS del cluster de la camara + frustum
 };
 
 // (de)serializacion del metodo (texto/JSON): "frustum"/"grid"/"triangulo"/"bsp".

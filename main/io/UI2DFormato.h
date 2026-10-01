@@ -85,4 +85,11 @@ extern W3dRefEmitFn g_w3dRefEmit;
 typedef void (*W3dRefExtFn)(const std::string& rutaResuelta);
 extern W3dRefExtFn g_w3dRefExtMarcar;
 
+// AL CARGAR una escena UI que es CONTENIDO DE UNA LIBRERIA externa (io/Librerias.h: una escena de una libreria con
+// un nodo "ui", generada por un proxy): sus rutas son entradas de ESA libreria ("lib:<libreria>/...") y un "ext:"
+// suyo es relativo a SU .w3d. El lector del proyecto pone aca su resolucion mientras la carga (y la saca despues);
+// NULL = la regla de siempre (el proyecto). Nada de lo de una libreria se marca como externa del proyecto.
+typedef std::string (*W3dRutaCargaFn)(const std::string& guardada);
+extern W3dRutaCargaFn g_w3dRutaLibHook;
+
 #endif // UI2D_FORMATO_H

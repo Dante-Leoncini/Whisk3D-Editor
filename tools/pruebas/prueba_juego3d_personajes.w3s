@@ -1,0 +1,92 @@
+# ==========================================================================
+#  PRUEBA CRUZADA: MALLA COMO RECURSO + ANIMSET COMPARTIDO + HITBOX, juntos.
+#  Correr DESDE ESTA CARPETA:
+#    cd <motor>/tools/pruebas
+#    ../../platform/linux/build/whisk3d --script prueba_juego3d_personajes.w3s
+#
+#  Las tres cosas se hicieron por separado y cada una tiene sus pruebas
+#  (prueba_mallasrecurso, prueba_animsets*, prueba_hitbox*). Aca conviven en la
+#  escena del caso de uso: un personaje repetido muchas veces que comparte memoria.
+#    - 4 personajes en fila. El primero se arma por codigo: armature (2 huesos,
+#      clips "Saludo" y "Quieto"), cuerpo skinneado (el recurso de malla "Cuerpo")
+#      y un hitbox "Sensor" HIJO del armature (filtro "jugador"), que cuenta sus
+#      eventos en el armature. Los otros tres son ESE personaje entero duplicado
+#      con Alt+D (esqueleto + cuerpo + sensor elegidos, la puerta del teclado):
+#      otro esqueleto con los MISMOS clips (un animset en memoria), otro cuerpo
+#      con la MISMA malla skinneado a SU esqueleto y otro sensor hijo; el clip
+#      activo alterna;
+#    - un Jugador con un hitbox etiqueta "jugador" que pasa por delante de todos a
+#      paso fijo por tick, y un Juez que deja el veredicto (compartido + log).
+#  Se verifica: antes de guardar (UN recurso de malla y UN animset compartidos,
+#  cada copia en su lugar del arbol y deformada por su esqueleto), el contenedor
+#  (UNA entrada .w3da con los 4 armatures, ningun clip inline), la reapertura (1
+#  recurso de malla con 4 usuarios, 1 animset con 4 armatures y los MISMOS clips
+#  en memoria, poses por instancia), re-guardar byte a byte, los eventos y las
+#  POSES (los esqueletos se mueven) en el Play del editor y lo MISMO en el juego
+#  compilado (que ademas tiene que ver los clips de todos: el .w3da llego a sus
+#  assets).
+#  Compila un juego de verdad (cmake + g++), asi que tarda mas que las demas.
+# ==========================================================================
+
+ventana 640 480
+personajesmin /tmp/w3d_personajes 4
+
+# --- en memoria, antes de guardar: el Alt+D del personaje entero ya comparte TODO:
+#     UN recurso de malla y UN animset (todavia sin entrada), cada copia en su lugar ---
+mallainfo Cuerpo recurso Cuerpo usuarios 4
+mallainfo Cuerpo.003 recurso Cuerpo comparte Cuerpo
+animsetinfo vivos 1 refs 4 clips 2 enmemoria 1 registro 0
+personajesver 4 compartido 1
+objrel Personaje.002 padre - hijos 2 tipo armature
+objrel Cuerpo.002 padre Personaje.002 skin Personaje.002
+objrel Cuerpo padre Personaje skin Personaje
+hitboxinfo Sensor padre Personaje duenio Personaje filtro jugador
+hitboxinfo Sensor.003 padre Personaje.003 duenio Personaje.003 filtro jugador
+hitboxinfo CajaJugador etiqueta jugador duenio Jugador
+
+# --- guardar: los clips iguales van a UN animset, el cuerpo a UNA malla ---
+guardarw3d /tmp/w3d_personajes/personajes.w3d
+animsetsw3d /tmp/w3d_personajes/personajes.w3d animsets 1 clips 2 armatures 4 inline 0 registro 1
+# el animset en memoria se escribio tal cual: pasa a llamarse como su entrada (igual que uno leido)
+animsetinfo vivos 1 refs 4 enmemoria 0 descriptores 1 registro 1
+animsetrec animaciones/personaje.w3da refs 4
+
+# --- reabrir: todo compartido, poses por instancia ---
+abrirw3d /tmp/w3d_personajes/personajes.w3d
+mallainfo Cuerpo recurso Cuerpo usuarios 4 vbo pose
+mallainfo Cuerpo.002 comparte Cuerpo.001
+animsetinfo vivos 1 refs 4 clips 2 registro 1
+animsetarm Personaje.003 compartido 1 clips 2
+personajesver 4 compartido 1
+hitboxinfo Sensor.002 padre Personaje.002 duenio Personaje.002 filtro jugador
+
+# --- re-guardar sin tocar nada: las mismas entradas byte a byte. (El PRIMER guardado es de
+#     una escena armada en memoria: sus scripts todavia no tenian proyecto y la paleta del
+#     editor se suma al abrir; se compara desde el primer archivo ABIERTO.) ---
+guardarw3d /tmp/w3d_personajes/personajes_rt.w3d
+abrirw3d /tmp/w3d_personajes/personajes_rt.w3d
+guardarw3d /tmp/w3d_personajes/personajes_rt2.w3d
+w3diguales /tmp/w3d_personajes/personajes_rt.w3d /tmp/w3d_personajes/personajes_rt2.w3d
+abrirw3d /tmp/w3d_personajes/personajes.w3d
+
+# --- el Play del editor: cada sensor ve entrar/quedarse/salir al jugador ---
+simplay 60
+scriptinfo compartido juez OK
+scriptinfo compartido pose mueve
+compartidonum p0_entrar 1
+compartidonum p0_quedarse 5
+compartidonum p0_salir 1
+compartidonum p3_entrar 1
+compartidonum p3_quedarse 5
+compartidonum p3_salir 1
+compartidonum jugador_entrar 4
+compartidonum jugador_salir 4
+simstop
+# el Play no escribio los clips compartidos (los sellos lo verifican antes de cada comando)
+personajesver 4 compartido 1
+animsetsellos
+
+# --- el binario (modo debug: deja su whisk3d.log): el mismo veredicto, con los esqueletos
+#     REPRODUCIENDO sus clips (el runtime pone el modo juego de las animaciones) ---
+compilarjuego 0 0 1
+personajeslog /tmp/w3d_personajes personajes p=1/5/1 pose=mueve

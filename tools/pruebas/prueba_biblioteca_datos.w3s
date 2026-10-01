@@ -1,0 +1,261 @@
+# prueba_biblioteca_datos.w3s — FASE 4b: lo que la biblioteca sabe de cada recurso y lo que se hace con el
+#
+#  Criterios de aceptacion:
+#   - DATOS por tipo (la tarjeta del recurso en Properties): textura (formato, resolucion, canal alfa si/no
+#     binario/con transparencias, bytes, memoria sin/con mipmaps), sonido (formato, frecuencia, canales,
+#     bits, duracion, bytes, loop smpl), malla 3D (vertices, triangulos, partes, memoria, usuarios),
+#     material, animaciones, escena, script;
+#   - ADENTRO / AFUERA del .w3d por recurso (un archivo al lado del proyecto, relativo), con undo; se guarda
+#     como "ext:" y vuelve igual al abrir; si el archivo externo FALTA, sus datos lo avisan (tambien al abrir);
+#   - BORRAR un recurso EN USO (sus usuarios quedan sin el, con undo) y un huerfano; DUPLICAR un recurso;
+#   - TODA malla es un recurso con nombre (primitivas, duplicados, lo que se abre de un archivo viejo) y la
+#     vista Mallas 3D lista EXACTAMENTE los vivos + los huerfanos;
+#   - Properties: la tarjeta "Malla 3D" vive en la pestania VERTICES (la 3), primera, con el selector (nunca
+#     "(sin recurso)"); NO hay pestania "Recurso": un recurso de la biblioteca se muestra en la 3;
+#   - ARRASTRAR de la biblioteca al 3D (una malla = un objeto nuevo con esa malla; un material = el de la
+#     parte bajo el mouse) y a los desplegables de Properties (la malla del selector: cubo -> cilindro),
+#     con undo; lo que no se puede soltar ahi se marca invalido;
+#   - una LIBRERIA externa (.w3d vinculado) se explora SIN montarla, de solo lectura; su contenido se arrastra
+#     como una referencia (fase de librerias: prueba_librerias.w3s).
+ventana 1280 720
+
+# ---- 0) un proyecto con una textura por cada clase de alfa, un sonido y un script ----
+escenadefecto
+selobj Cubo
+matnew
+texasignar Cubo dosmats.png
+animsetsintetica 1 agregar
+guardarw3d prueba_biblioteca_datos_v4.w3d
+abrirw3d prueba_biblioteca_datos_v4.w3d
+entradacruda sonidos/bip.wav sonidos/bip.wav
+entradacruda texturas/particula.png texturas/particula.png
+texentrada dosmats-b.png
+entradatexto scripts/ia.lua -- un script
+outvista biblioteca
+outfila bip.wav tipo sonidos estado huerfano
+outfila ia.lua tipo scripts estado huerfano
+
+# ---- A) los DATOS de cada tipo ----
+recdato texturas texturas/dosmats.png Format = PNG
+recdato texturas texturas/dosmats.png Resolution = 64 x 64
+recdato texturas texturas/dosmats.png Alpha channel = Yes (binary)
+recdato texturas texturas/particula.png Alpha channel = Yes (with transparency)
+recdato texturas texturas/dosmats-b.png Alpha channel = Yes (all opaque)
+recdato texturas texturas/dosmats.png Memory = 16.0 KB (21.3 KB with mipmaps)
+recdato texturas texturas/particula.png Bytes = 132 B
+recdato sonidos sonidos/bip.wav Format = WAV
+recdato sonidos sonidos/bip.wav Sample rate = 11025 Hz
+recdato sonidos sonidos/bip.wav Channels = mono (1)
+recdato sonidos sonidos/bip.wav Bits = 16
+recdato sonidos sonidos/bip.wav Duration = 0.25 s
+recdato sonidos sonidos/bip.wav Loop (smpl) = No
+recdato mallas Cubo Vertices = 24
+recdato mallas Cubo Triangles = 12
+recdato mallas Cubo Parts = 1 (Material)
+recdato mallas Cubo Users = 1
+recdato materiales Material Texture = dosmats.png
+recdato animaciones Personaje Clips = 4
+recdato scripts scripts/ia.lua Type = Script
+recdato scripts scripts/ia.lua Bytes = 12 B
+# la tarjeta del recurso: la pestania 3 (no hay pestania "Recurso")
+outclick bip.wav
+recactivo sonidos sonidos/bip.wav
+propsmalla tab 3 recurso 1 malla3d 0 pestanias 10
+
+# las ACCIONES del tipo en la tarjeta: Play / Stop de un sonido, Open in IDE de un script, Open de una escena
+recboton accion
+recboton parar
+outclick ia.lua
+recboton accion
+recboton parar oculto
+raizboton escena
+outvista biblioteca
+outclick Scene
+recactivo escenas Scene
+recboton accion
+raizbarra outliner Scene
+recboton parar oculto
+
+# ---- B) ADENTRO / AFUERA del .w3d (con undo; se guarda "ext:") ----
+recubicacion texturas texturas/particula.png dentro
+recubicar texturas texturas/particula.png fuera prueba_biblioteca_rt_particula.png
+recubicacion texturas prueba_biblioteca_rt_particula.png fuera
+recdato texturas prueba_biblioteca_rt_particula.png Resolution = 8 x 8
+undo
+recubicacion texturas texturas/particula.png dentro
+redo
+recubicacion texturas prueba_biblioteca_rt_particula.png fuera
+recubicar sonidos sonidos/bip.wav fuera prueba_biblioteca_rt_bip.wav
+recdato sonidos prueba_biblioteca_rt_bip.wav Duration = 0.25 s
+# un HUERFANO que se paso afuera sigue en la biblioteca (nadie lo nombra, pero es del proyecto) y va a una carpeta
+outvista biblioteca
+outfila prueba_biblioteca_rt_particula.png tipo texturas estado huerfano
+outfila prueba_biblioteca_rt_bip.wav tipo sonidos estado huerfano
+outnofila particula.png
+carpetanueva - Afuera
+recmover texturas prueba_biblioteca_rt_particula.png Afuera
+recmover sonidos prueba_biblioteca_rt_bip.wav Afuera
+guardarw3d prueba_biblioteca_datos_rt1.w3d
+zipentrada prueba_biblioteca_datos_rt1.w3d texturas/particula.png no
+zipentrada prueba_biblioteca_datos_rt1.w3d sonidos/bip.wav no
+# (el registro "externos": los de afuera que no nombra nadie mas, con su carpeta; y EXTERNOS.txt)
+jsontiene prueba_biblioteca_datos_rt1.w3d "externos"
+entradatiene prueba_biblioteca_datos_rt1.w3d EXTERNOS.txt prueba_biblioteca_rt_bip.wav
+abrirw3d prueba_biblioteca_datos_rt1.w3d
+outvista biblioteca
+recubicacion texturas prueba_biblioteca_rt_particula.png fuera
+recubicacion sonidos prueba_biblioteca_rt_bip.wav fuera
+outfila prueba_biblioteca_rt_particula.png tipo texturas carpeta Afuera
+outfila prueba_biblioteca_rt_bip.wav tipo sonidos carpeta Afuera
+# el AVISO si el archivo externo FALTA (se movio o se borro por fuera de Whisk3D): la fila Warning
+recdato texturas prueba_biblioteca_rt_particula.png File size = 132 B
+fail recdato texturas prueba_biblioteca_rt_particula.png Warning = The external file is missing
+archivomover prueba_biblioteca_rt_particula.png prueba_biblioteca_rt_particula_movida.png
+recdato texturas prueba_biblioteca_rt_particula.png Warning = The external file is missing
+recdato texturas prueba_biblioteca_rt_particula.png Stored = External
+archivomover prueba_biblioteca_rt_bip.wav prueba_biblioteca_rt_bip_movido.wav
+recdato sonidos prueba_biblioteca_rt_bip.wav Warning = The external file is missing
+# (sin su archivo no se puede meter adentro)
+fail recubicar sonidos prueba_biblioteca_rt_bip.wav dentro
+# al ABRIR el proyecto sin sus archivos: siguen en la biblioteca, con el aviso
+abrirw3d prueba_biblioteca_datos_rt1.w3d
+outvista biblioteca
+outfila prueba_biblioteca_rt_particula.png tipo texturas carpeta Afuera
+outfila prueba_biblioteca_rt_bip.wav tipo sonidos carpeta Afuera
+recdato texturas prueba_biblioteca_rt_particula.png Warning = The external file is missing
+recdato sonidos prueba_biblioteca_rt_bip.wav Warning = The external file is missing
+# vuelven a su lugar: el aviso se va
+archivomover prueba_biblioteca_rt_particula_movida.png prueba_biblioteca_rt_particula.png
+archivomover prueba_biblioteca_rt_bip_movido.wav prueba_biblioteca_rt_bip.wav
+recdato texturas prueba_biblioteca_rt_particula.png File size = 132 B
+fail recdato texturas prueba_biblioteca_rt_particula.png Warning = The external file is missing
+recdato sonidos prueba_biblioteca_rt_bip.wav Duration = 0.25 s
+fail recdato sonidos prueba_biblioteca_rt_bip.wav Warning = The external file is missing
+# y de vuelta ADENTRO
+recubicar sonidos prueba_biblioteca_rt_bip.wav dentro
+recubicacion sonidos sonidos/prueba_biblioteca_rt_bip.wav dentro
+# (una sola fila: la de adentro, en la carpeta que tenia)
+outfila prueba_biblioteca_rt_bip.wav carpeta Afuera
+recurso sonidos prueba_biblioteca_rt_bip.wav existe 0
+guardarw3d prueba_biblioteca_datos_rt2.w3d
+zipentrada prueba_biblioteca_datos_rt2.w3d sonidos/prueba_biblioteca_rt_bip.wav
+entradatiene prueba_biblioteca_datos_rt2.w3d EXTERNOS.txt prueba_biblioteca_rt_bip.wav 0
+# BORRAR un huerfano de afuera: deja de ser del proyecto (su archivo de disco queda) y no vuelve al guardar
+recborrar texturas prueba_biblioteca_rt_particula.png
+recurso texturas prueba_biblioteca_rt_particula.png existe 0
+guardarw3d prueba_biblioteca_datos_rt2b.w3d
+jsontiene prueba_biblioteca_datos_rt2b.w3d "externos" 0
+recurso texturas prueba_biblioteca_rt_particula.png existe 0
+
+# ---- C) BORRAR (en uso: sus usuarios quedan sin el, con undo; huerfano) y DUPLICAR ----
+recduplicar materiales Material Material.001
+recurso materiales Material.001 usuarios 0
+recborrar materiales Material.001
+recurso materiales Material.001 existe 0
+recurso materiales Material usuarios 1
+recborrarforzado materiales Material
+recurso materiales Material existe 0
+mallainfo Cubo material 0 Default
+undo
+recurso materiales Material existe 1 usuarios 1
+mallainfo Cubo material 0 Material
+# una malla 3D en uso: se borran sus objetos (con undo)
+recduplicar mallas Cubo Cubo.001
+recurso mallas Cubo.001 usuarios 0
+recborrarforzado mallas Cubo
+recurso mallas Cubo existe 0
+outvista escena
+fail selobj Cubo
+undo
+selobj Cubo
+mallainfo Cubo recurso Cubo
+recpurgar mallas n 1
+recurso mallas Cubo.001 existe 0
+
+# ---- D) TODA malla es un recurso con nombre ----
+add cube
+add cylinder
+mallasrecurso n 3
+mallainfo Cubo.001 recurso Cubo.001
+mallainfo Cilindro recurso Cilindro
+selobj Cubo
+propstab 3
+propsmalla tab 3 malla3d 1 recurso 0 pestanias 10 selector Cubo
+
+# ---- E) ARRASTRAR de la biblioteca: al 3D y a Properties ----
+outvista mallas
+outsoltar Cilindro 3d 0 0
+seleccion n 1 tiene Cilindro.001
+mallainfo Cilindro.001 recurso Cilindro usuarios 2
+undo
+fail selobj Cilindro.001
+recurso mallas Cilindro usuarios 1
+# al selector "Malla 3D" de Properties: el cubo pasa a ser un cilindro
+selobj Cubo
+propstab 3
+outsoltar Cilindro props malla
+mallainfo Cubo recurso Cilindro
+undo
+mallainfo Cubo recurso Cubo
+# un material sobre la parte bajo el mouse (el cubo del centro de la vista)
+matsuelto Rojo
+outvista materiales
+outsoltar Rojo 3d 0 0
+mallainfo Cubo material 0 Rojo
+undo
+mallainfo Cubo material 0 Material
+# una textura sobre el material de esa parte
+outvista texturas
+outsoltar dosmats-b.png 3d 0 0
+texrefde material Material texturas/dosmats-b.png
+undo
+texrefde material Material texturas/dosmats.png
+# a los desplegables de la tarjeta Material (la pestania 2): el material de la parte y su textura
+selobj Cubo
+propstab 2
+outvista materiales
+outsoltar Rojo props material
+mallainfo Cubo material 0 Rojo
+undo
+mallainfo Cubo material 0 Material
+outvista texturas
+outsoltar dosmats-b.png props textura
+texrefde material Material texturas/dosmats-b.png
+undo
+texrefde material Material texturas/dosmats.png
+# un sonido no se suelta en el 3D
+outvista sonidos
+outsoltar prueba_biblioteca_rt_bip.wav 3d 0 0 invalido
+
+# ---- F) una LIBRERIA externa: se explora sin montarla, de solo lectura ----
+guardarw3d prueba_biblioteca_datos_lib_v4.w3d
+escenadefecto
+libvincular prueba_biblioteca_datos_lib_v4.w3d
+libs n 1
+fail libvincular prueba_biblioteca_datos_lib_v4.w3d
+fail libvincular dosmats.png
+outvista lib:prueba_biblioteca_datos_lib_v4
+outfiltro todo
+outfila Cilindro tipo mallas
+outfila Rojo tipo materiales
+outfila dosmats-b.png tipo texturas
+fail outdobleclick Rojo
+# (su contenido se ARRASTRA -fase de librerias-: la malla queda como una REFERENCIA al recurso de la libreria)
+outsoltar Cilindro 3d 0 0
+mallainfo Cilindro recurso prueba_biblioteca_datos_lib_v4/Cilindro
+undo
+fail selobj Cilindro
+guardarw3d prueba_biblioteca_datos_rt3.w3d
+# (el registro: nombre + archivo "ext:", relativo al .w3d cuando esta abajo de su carpeta)
+jsontiene prueba_biblioteca_datos_rt3.w3d "archivo"
+jsontiene prueba_biblioteca_datos_rt3.w3d "ext:
+abrirw3d prueba_biblioteca_datos_rt3.w3d
+libs n 1
+libdesvincular prueba_biblioteca_datos_lib_v4
+libs n 0
+undo
+libs n 1
+
+# ---- lo que no tiene que pasar ----
+fail recubicar texturas texturas/noexiste.png fuera x.png
+fail recdato texturas texturas/dosmats-b.png NoExiste = 1

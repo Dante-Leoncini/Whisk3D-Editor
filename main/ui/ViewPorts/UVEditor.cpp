@@ -32,6 +32,7 @@
 #include "ViewPorts/Timeline.h"    // DopeRemapIndiceClave: borrar un hueso 2D CORRE los indices que
                                    // guarda la seleccion del dope ("arm2d:<malla>/a<n>/b<IDX>")
 #include "animation/Animation.h"   // KfCanal* / ActiveAnimKind
+#include "objects/MallaRecurso.h"   // W3dMallaMarcarEditada: la malla de un recurso se publica tras editar sus UV
 #include <set>
 #include <vector>
 #include <algorithm> // std::sort (agrupar los bordes UV al buscar la isla del Select Linked)
@@ -190,9 +191,11 @@ bool UVEditor::EnEdicionUV() const {
     return ObjActivo && ObjActivo->getType() == ObjectType::mesh && (Object*)ObjActivo == g_editMesh;
 }
 
+static void UVOlvidarEditor(UVEditor* uv); // el estado de trazo/transform que apunta a este editor (mas abajo)
 UVEditor::~UVEditor() {
     for (size_t i = 0; i < gUVEditores.size(); i++)
         if (gUVEditores[i] == this) { gUVEditores.erase(gUVEditores.begin() + i); break; }
+    UVOlvidarEditor(this);
 }
 
 // FILA DE BARRAS del pincel (radio | valor): el UV la muestra en modo PESOS, con el mismo
@@ -694,6 +697,14 @@ struct B2DXformEstado {
                        pivU(0), pivV(0), valU(0), valV(0), valAng(0), valFac(1) {}
 };
 static B2DXformEstado gB2D;
+// el editor MUERE (abrir un proyecto libera el layout anterior; cambiar el tipo del viewport lo
+// borra) con un trazo o un transform de huesos en curso: soltar los punteros. El trazo no se
+// cierra (su malla puede haber muerto antes, con la escena): solo no queda colgando del editor.
+static void UVOlvidarEditor(UVEditor* uv) {
+    if (gUVPintando == uv)    gUVPintando = NULL;
+    if (gUVPintandoTex == uv) gUVPintandoTex = NULL;
+    if (gB2D.uv == uv)        gB2D.uv = NULL;
+}
 // nucleo del apply de huesos (definido mas abajo): tambien lo usa la entrada numerica (XformNumValor)
 static void B2DAplicarValores(Mesh* m, float du, float dv, float ang, float f);
 // eje para los botones X/Y de la toolbar durante el transform de huesos de ESTE editor (ver la
@@ -1594,6 +1605,9 @@ static void UVCarasSel(UVEditor* uv, Mesh* m, std::vector<char>& fsel) {
 static void UVSepararCarasSel(Mesh* m, const std::vector<char>& fsel) {
     const int oldN = m->vertexSize;
     if (oldN <= 0) return;
+    // COW: arma arrays nuevos LEYENDO los viejos y despues los libera: si son de un recurso
+    // compartido, primero se copian (los de los demas usuarios no se tocan)
+    m->DesinstanciarDatos(W3DMD_TODO);
     std::vector<char> usaSel(oldN, 0), usaUnsel(oldN, 0);
     for (size_t f = 0; f < m->faces3d.size(); f++) {
         const std::vector<int>& id = m->faces3d[f].idx;
@@ -1703,6 +1717,7 @@ static bool UVSplitNecesario(Mesh* m, const std::vector<char>& fsel) {
 void UVEditor::IniciarXform(Mesh* m, int modo) {
     if (uvModo != UVModoEdicion) return; // pintura/huesos/pose: el G/R/S de UVs ignora el input
     if (!m || !m->uv) return;
+    m->DesinstanciarDatos(W3DMD_UV);   // COW: el transform escribe uv[] en el lugar (recurso compartido)
     SincronizarSelDesde3D(m);   // sync: mover lo SELECCIONADO en el 3D (uvSelVert espeja al 3D)
     uvXIdx.clear(); uvXOrig.clear(); uvXPivots.clear(); uvXAxis = 0;
     const int modoUV = ModoUV();
@@ -1853,6 +1868,7 @@ void UVEditor::ConfirmarXform() {          // deja el cambio aplicado
     NumInputReset(); // la entrada numerica muere con el transform (como el Aceptar del 3D)
     if (!huboXform) return;
     UndoUVConfirmar(cambio); // pushea el pendiente (liviano o completo); sin cambio lo descarta
+    if (cambio && m) W3dMallaMarcarEditada(m);   // la malla de un RECURSO: la ven todos sus objetos
     // ARMATURE 2D - INVARIANTE uv = f(uv2dRest, pose) (ver Mesh.h): editar los UV a mano REDEFINE
     // el rest. Con la pose en identidad el rest ES el uv; con una pose puesta se invierte el
     // skinning para que la edicion quede donde el usuario la solto y SOBREVIVA al re-evaluar.
@@ -1913,6 +1929,8 @@ bool UVMoverSeleccionEdit(Mesh* m, float dU, float dV) {
     if (!m || !m->uv || m->vertexSize <= 0) return false;
     if ((Object*)m != g_editMesh) return false;              // solo en Edit Mode de esta malla
     if (dU == 0.0f && dV == 0.0f) return false;              // no-op: ni undo ni redraw
+    m->DesinstanciarDatos(W3DMD_UV);                         // COW (recurso compartido)
+    W3dMallaMarcarEditada(m);
     std::vector<char> sv;
     if (!UVVertsSelEfectivos(m, sv)) return false;
     UndoUVIniciar(m);                                        // snapshot ANTES (pendiente)
@@ -2324,6 +2342,8 @@ void UVEditor::SnapCursorToSel() {         // cursor 2D -> centro de la seleccio
 void UVEditor::SnapSelToCursor() {
     Mesh* m = (ObjActivo && ObjActivo->getType() == ObjectType::mesh) ? (Mesh*)ObjActivo : NULL;
     if (!m || !m->uv) return;
+    m->DesinstanciarDatos(W3DMD_UV);   // COW (recurso compartido)
+    W3dMallaMarcarEditada(m);
     std::vector<char> sel;                 // seleccion EFECTIVA (la propia del UV, o la del 3D en sync)
     if (!UVVertsSelEfectivos(m, sel)) return;
     const int nV = m->vertexSize;

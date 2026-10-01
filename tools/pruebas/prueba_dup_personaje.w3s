@@ -1,0 +1,97 @@
+# ==========================================================================
+#  DUPLICAR UN PERSONAJE ENTERO (esqueleto + cuerpo skinneado + hitbox hijo)
+#  Correr DESDE ESTA CARPETA:
+#    cd <motor>/tools/pruebas
+#    ../../platform/linux/build/whisk3d --script prueba_dup_personaje.w3s
+#
+#  Antes: Alt+D sobre un armature daba una Instance (un dibujo del original, sin
+#  pose propia ni hijos de verdad: sin hitbox, sin eventos) y Shift+D no creaba
+#  nada; con el cuerpo y el sensor elegidos tambien, el cuerpo nuevo quedaba
+#  colgado del esqueleto ORIGINAL y deformado por el. Ahora, con los mismos
+#  comandos del teclado (NewInstance / DuplicatedObject):
+#    A) Alt+D del personaje entero = otro personaje: otro esqueleto con los
+#       MISMOS clips (los propios del original pasan a un animset en memoria),
+#       otro cuerpo con la MISMA malla deformado por SU esqueleto y otro sensor
+#       hijo que avisa a SU esqueleto; el original no cambia;
+#    B) Ctrl+Z saca el personaje ENTERO (antes los hijos de un borrado se
+#       preservaban colgados del abuelo) y Ctrl+Y lo devuelve;
+#    C) Alt+D de un esqueleto solo / de un hitbox solo: copias de verdad;
+#    D) Shift+D del personaje entero = copia REAL (clips propios, malla con su
+#       propio recurso), con la misma jerarquia y el cuerpo en SU esqueleto;
+#    E) guardar y reabrir: los cuatro esqueletos caen en UN animset compartido.
+# ==========================================================================
+
+ventana 640 480
+personajesmin /tmp/w3d_duppj 1
+objrel Personaje padre - hijos 2 tipo armature
+animsetarm Personaje compartido 0 clips 2
+animsetinfo vivos 0
+
+# --- A) Alt+D del personaje entero ---
+dupjerarquia vinculado Personaje +hijos
+objrel Personaje.001 padre - hijos 2 tipo armature
+objrel Cuerpo.001 padre Personaje.001 skin Personaje.001 tipo mesh
+objrel Sensor.001 padre Personaje.001 tipo hitbox
+hitboxinfo Sensor.001 padre Personaje.001 duenio Personaje.001 filtro jugador
+mallainfo Cuerpo.001 recurso Cuerpo comparte Cuerpo
+animsetarm Personaje compartido 1 clips 2
+animsetarm Personaje.001 compartido 1 clips 2
+animsetclip Personaje.001 0 mismo Personaje 0 1
+animsetclip Personaje.001 1 mismo Personaje 1 1
+animsetinfo vivos 1 refs 2 clips 2 enmemoria 1
+# poses por instancia: con OTRO clip activo la copia se deforma distinto (su cuerpo sigue a SU
+# esqueleto; si siguiera al original quedaria con la misma pose)
+clipactivo Personaje.001 Quieto
+personajesver 2 compartido 1
+# el original no se movio de lugar ni de esqueleto
+objrel Personaje padre - hijos 2
+objrel Cuerpo padre Personaje skin Personaje
+hitboxinfo Sensor padre Personaje duenio Personaje
+
+# --- B) Ctrl+Z / Ctrl+Y ---
+undo
+objrel Personaje.001 nada
+objrel Cuerpo.001 nada
+objrel Sensor.001 nada
+objrel Personaje hijos 2
+redo
+objrel Personaje.001 padre - hijos 2
+objrel Cuerpo.001 padre Personaje.001 skin Personaje.001
+objrel Sensor.001 padre Personaje.001
+personajesver 2 compartido 1
+
+# --- C) un esqueleto solo, un hitbox solo ---
+dupjerarquia vinculado Personaje
+objrel Personaje.002 padre - hijos 0 tipo armature
+animsetarm Personaje.002 compartido 1 clips 2
+animsetinfo vivos 1 refs 3
+dupjerarquia vinculado Sensor
+objrel Sensor.002 padre Personaje tipo hitbox
+hitboxinfo Sensor.002 padre Personaje duenio Personaje filtro jugador
+objrel Personaje hijos 3
+
+# --- D) Shift+D del personaje entero: copia REAL ---
+dupjerarquia copia Personaje.001 +hijos
+objrel Personaje.003 padre - hijos 2 tipo armature
+objrel Cuerpo.002 padre Personaje.003 skin Personaje.003 tipo mesh
+objrel Sensor.003 padre Personaje.003 tipo hitbox
+hitboxinfo Sensor.003 padre Personaje.003 duenio Personaje.003
+animsetarm Personaje.003 compartido 0 clips 2 nombreset Personaje
+mallainfo Cuerpo.002 usuarios 1
+animsetinfo vivos 1 refs 3
+# el de origen sigue en su lugar y con su esqueleto
+objrel Cuerpo.001 padre Personaje.001 skin Personaje.001
+
+# --- E) guardar y reabrir: un animset para los cuatro ---
+guardarw3d /tmp/w3d_duppj/dup.w3d
+animsetsw3d /tmp/w3d_duppj/dup.w3d animsets 1 clips 2 armatures 4 inline 0 registro 1
+animsetinfo enmemoria 0
+abrirw3d /tmp/w3d_duppj/dup.w3d
+animsetinfo vivos 1 refs 4 clips 2 enmemoria 0 descriptores 1
+animsetarm Personaje.003 compartido 1 clips 2
+objrel Personaje.001 padre - hijos 2
+objrel Cuerpo.001 padre Personaje.001 skin Personaje.001
+objrel Cuerpo.002 padre Personaje.003 skin Personaje.003
+hitboxinfo Sensor.001 padre Personaje.001 duenio Personaje.001
+hitboxinfo Sensor.003 padre Personaje.003 duenio Personaje.003
+mallainfo Cuerpo.001 recurso Cuerpo comparte Cuerpo

@@ -138,6 +138,10 @@ public:
     float rotAzar;         // +- azar del angulo al nacer (grados)
     float velRotAzar;      // +- azar del giro (grados/s)
     bool  giroSignoAzar;   // true (default, como siempre) = el giro sale para un lado u otro al azar
+    // -- fundidos de dibujo (no cambian cuando muere) --
+    float aparecer;        // segundos de fundido de ENTRADA al nacer (0 = nace entera)
+    float fundeCerca[2];   // distancia a la camara: invisible hasta [0], entera desde [1] ([1] = 0: apagado)
+    float fundeLejos[2];   // entera hasta [0], invisible desde [1] ([1] = 0: apagado)
     // -- flipbook --
     float flipFps;         // cuadros por segundo (0 = el flipbook se reparte en la vida)
     bool  flipUnaVez;      // con flipFps: muere al terminar el ultimo cuadro
@@ -168,6 +172,7 @@ public:
         usarColorFinal = false; colorFinal[0] = 1.0f; colorFinal[1] = 1.0f; colorFinal[2] = 1.0f; colorFinal[3] = 1.0f;
         alphaDecae = 1.0f; alphaMuerte = 0.0f;
         rotInicial = 0.0f; rotAzar = 0.0f; velRotAzar = 0.0f; giroSignoAzar = true;
+        aparecer = 0.0f; fundeCerca[0] = fundeCerca[1] = 0.0f; fundeLejos[0] = fundeLejos[1] = 0.0f;
         flipFps = 0.0f; flipUnaVez = false;
         forma = 0; estiramiento = 0.05f; estelaPuntos = 4; estelaPaso = 1.0f / 30.0f; grosorLinea = 1.0f;
         sys.rate = 0.0f;      // la emision continua la lleva Tick (con cono), no el Core

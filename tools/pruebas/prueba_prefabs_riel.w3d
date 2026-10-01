@@ -1,0 +1,30 @@
+// ==========================================================================
+//  PRUEBA sintetica de PREFABS + RIEL DE CAMARA (formato texto). La corre prueba_prefabs_revision.w3s.
+//  Dos Curve (RielA y RielB), una Camera con riel RielA y un "Director" (prefab_rev_riel.lua) que JUGANDO
+//  instancia el prefab de RielB, le pone esa curva de riel a la camara y despues destruye la instancia.
+// ==========================================================================
+Whisk3D {
+    version: 20251127
+    Escena {
+        background: "0.02, 0.02, 0.03, 1.0"
+
+        Curve { name: "RielA" filePath: riel-a.cap }
+        Curve { name: "RielB" filePath: riel-b.cap }
+
+        Collection {
+            name: "Director"
+            x: 0.0
+            y: 0.0
+            z: 0.0
+            script: "prefab_rev_riel.lua"
+            ref_cam: "Camara"
+        }
+
+        Camera {
+            name: "Camara"
+            fov: 45.0
+            riel: "RielA"
+            offsetRiel: 0
+        }
+    }
+}

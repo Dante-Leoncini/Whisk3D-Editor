@@ -1,0 +1,45 @@
+# ===========================================================================
+#  MOUSE CAPTURADO (juego estilo FPS en PC): capturarRaton() / ratonRel()
+#
+#  prueba_raton_rel.w3d (hecho por hl2-w3d/tools/fixtures_pruebas.py): la
+#  escena por defecto con scripts/raton.lua en el Cubo, que en inicio() pide
+#  capturarRaton(true) y en cada tick mueve el Cubo con ratonRel():
+#  x += dx/100, y -= dy/100. En PC main.cpp captura el mouse con SDL mientras
+#  el juego corre (ESC pausa y lo suelta); aca el movimiento se inyecta con el
+#  comando `ratonrel dx dy` (lo mismo que llega de SDL_GetRelativeMouseState).
+#
+#  Lo que se verifica:
+#   1) el script pidio la captura (ratonrel captura 1) y sin movimiento el
+#      Cubo no se mueve
+#   2) ratonRel() entrega el delta acumulado y lo CONSUME (el tick siguiente
+#      da 0,0)
+#   3) dos deltas antes de un tick se SUMAN
+#   4) al parar el juego la captura se suelta (ratonrel captura 0)
+#
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_raton_rel.w3s
+# ===========================================================================
+abrirw3d prueba_raton_rel.w3d
+loadtex
+ratonrel captura 0
+juego on
+simplay 1
+ratonrel captura 1
+objat Cubo 0 0 0 0.001
+
+# un delta -> se mueve; el tick siguiente sin delta -> queda quieto
+ratonrel 100 -50
+simplay 1
+objat Cubo 1 0.5 0 0.01
+simplay 1
+objat Cubo 1 0.5 0 0.01
+
+# dos deltas antes del tick se suman
+ratonrel 10 0
+ratonrel 10 0
+simplay 1
+objat Cubo 1.2 0.5 0 0.01
+
+# parar el juego suelta la captura
+juego off
+ratonrel captura 0

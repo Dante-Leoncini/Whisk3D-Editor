@@ -17,12 +17,12 @@ texsave
 texlabel lienzo.png
 texdab 0.2 0.2 4
 texlabel lienzo.png*
-texext /tmp/claude-1000/-home-dante-Documentos-Whisk3decosystem-Whisk3D/66bd6498-7457-4f1d-941f-243ff1de6054/scratchpad/lienzo_ext.png
-texlabel lienzo_ext.png
+texext /tmp/w3d_lienzo_ext.png
+texlabel w3d_lienzo_ext.png
 texdab 0.8 0.8 4
-texlabel lienzo_ext.png*
+texlabel w3d_lienzo_ext.png*
 texint
-texlabel lienzo_ext.png
+texlabel w3d_lienzo_ext.png
 # pintura desde el 3D: cada cara en su isla (smart uv), la textura al material de la parte activa, un toque
 # grande en el centro de la vista -> solo las caras DE FRENTE quedan pintadas (proyeccion con perspectiva)
 newtex lienzo3d 128 128 blank

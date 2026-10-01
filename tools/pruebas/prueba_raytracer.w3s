@@ -12,7 +12,7 @@ vpvista rendered
 vporbita 0 0.5 0 12 -35 -23
 rtrender 96 72 2
 rttris 14
-rtsave /tmp/claude-1000/-home-dante-Documentos-Whisk3decosystem-Whisk3D/66bd6498-7457-4f1d-941f-243ff1de6054/scratchpad/rt_duro.png
+rtsave /tmp/w3d_rt_duro.png
 # fondo (negro), piso iluminado (blanco), sombra dura (negro, sin ambiente)
 rtpixel 4 4 0 0 0 0
 rtpixel 80 56 255 255 255 40
@@ -20,14 +20,14 @@ rtpixel 36 40 0 0 0 8
 # lampara con RADIO: la sombra se ablanda (el centro sigue oscuro, el borde queda gris)
 rtlight 1.5 16 0
 rtrender 96 72 4
-rtsave /tmp/claude-1000/-home-dante-Documentos-Whisk3decosystem-Whisk3D/66bd6498-7457-4f1d-941f-243ff1de6054/scratchpad/rt_suave.png
+rtsave /tmp/w3d_rt_suave.png
 rtpixel 36 40
 rtpixel 46 40
 rtpixel 30 44
 # luz SOLAR (direccional, desde arriba): el piso queda parejo (sin atenuacion) y las caras laterales del cubo oscuras
 rtlight 0 0 1
 rtrender 96 72 2
-rtsave /tmp/claude-1000/-home-dante-Documentos-Whisk3decosystem-Whisk3D/66bd6498-7457-4f1d-941f-243ff1de6054/scratchpad/rt_sol.png
+rtsave /tmp/w3d_rt_sol.png
 rtpixel 80 56 255 255 255 8
 rtpixel 8 56 255 255 255 8
 rtpixel 40 32
@@ -37,7 +37,7 @@ selobj Cubo.001
 matnew
 matalpha 0.5 1
 rtrender 96 72 2
-rtsave /tmp/claude-1000/-home-dante-Documentos-Whisk3decosystem-Whisk3D/66bd6498-7457-4f1d-941f-243ff1de6054/scratchpad/rt_a50.png
+rtsave /tmp/w3d_rt_a50.png
 rtpixel 44 46
 matalpha 0 1
 rtrender 96 72 2
@@ -49,14 +49,14 @@ newtex recorte 32 32 blank alpha
 texassign
 texalpha 0 0 1 0.5 0
 rtrender 96 72 2
-rtsave /tmp/claude-1000/-home-dante-Documentos-Whisk3decosystem-Whisk3D/66bd6498-7457-4f1d-941f-243ff1de6054/scratchpad/rt_cut.png
+rtsave /tmp/w3d_rt_cut.png
 rtpixel 20 36
 # ESPEJO: el piso metalico sin rugosidad refleja el cielo (negro) y el cubo; a medias con 0.5/0.5
 selobj Plano
 matnew
 matrt 0 1
 rtrender 96 72 2
-rtsave /tmp/claude-1000/-home-dante-Documentos-Whisk3decosystem-Whisk3D/66bd6498-7457-4f1d-941f-243ff1de6054/scratchpad/rt_esp0.png
+rtsave /tmp/w3d_rt_esp0.png
 rtpixel 30 44 0 0 0 4
 rtpixel 44 46
 matrt 0.5 0.5
@@ -75,7 +75,7 @@ texfill 0 0 0.5 1 0.5 0.5 1 1
 texfill 0.5 0 1 1 1 0.5 0.5 1
 matnormal 1
 rtrender 96 72 1
-rtsave /tmp/claude-1000/-home-dante-Documentos-Whisk3decosystem-Whisk3D/66bd6498-7457-4f1d-941f-243ff1de6054/scratchpad/rt_nm.png
+rtsave /tmp/w3d_rt_nm.png
 rtpixel 12 56 255 255 255 4
 rtpixel 84 56 0 0 0 6
 texfill 0.5 0 1 1 0.75 0.5 0.75 1

@@ -1,0 +1,22 @@
+{
+  "version": 3,
+  "escena": {
+    "objetos": [
+      {
+        "tipo": "hitbox", "nombre": "Zona", "pos": [0, 0, 0], "tam": [2, 2, 2],
+        "scripts": [
+          { "archivo": "hitbox_contador.lua", "refs": { "prefijo": "zona" } },
+          { "archivo": "hitbox_binds.lua" }
+        ]
+      },
+      {
+        "tipo": "objeto", "nombre": "Movil", "pos": [-5.05, 0, 0],
+        "scripts": [ { "archivo": "hitbox_mover.lua", "refs": { "x0": "-5.05" } } ],
+        "hijos": [
+          { "tipo": "hitbox", "nombre": "CajaMovil", "pos": [0, 0, 0], "tam": [1, 1, 1], "etiqueta": "jugador" }
+        ]
+      },
+      { "tipo": "objeto", "nombre": "Lejos", "pos": [0, 50, 0] }
+    ]
+  }
+}

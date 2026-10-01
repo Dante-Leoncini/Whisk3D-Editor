@@ -1,0 +1,102 @@
+# ==========================================================================
+#  STREAMING: instancias de prefab y proxies DIFERIDOS que cargan y descargan en tiempo real (io/Streaming.h)
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_streaming.w3s
+#
+#  streamcrear arma un nivel con una GRILLA de 16 x 16 = 256 instancias DIFERIDAS ("carga": "distancia", 25 m) cada
+#  10 m: 128 proxies del "Personaje" de una libreria (Esqueleto con su animset, Cuerpo skinneado con la Piel CON
+#  TEXTURA, Sensor, enemigo.lua) y 128 instancias del prefab del proyecto "Poste" (cubo con la Madera CON TEXTURA),
+#  en damero, y un Director que lleva la camara por un camino FIJO dos veces (afuera, una esquina, el centro, otra
+#  esquina, la opuesta, el centro, afuera), cuenta las cargadas en cada punto y deja el veredicto.
+#    A) el editor sin vista previa genera las 256 (se ve el nivel entero); al dar Play las diferidas sueltan lo suyo
+#       (la partida arranca como el juego compilado recien abierto) y lo que trajo el streaming se libera DE VERDAD:
+#       con la camara afuera las mallas, el animset, las texturas y las fuentes de los scripts vuelven a la base;
+#    B) el recorrido: cada vuelta cuenta lo mismo (0,8,20,8,8,20,0) y la memoria queda ACOTADA y ESTABLE (el RSS de
+#       la segunda vuelta no pasa el de la primera, el heap en uso vuelve a lo del principio) y sin tirones grandes
+#       (el peor frame); el Stop deja la escena del usuario como estaba (las 256 generadas);
+#    C) el JUEGO COMPILADO da el MISMO veredicto que el Play;
+#    D) la VISTA PREVIA del editor (sin jugar): carga y descarga segun el objetivo, se guarda en proyecto.json y con
+#       ella prendida las diferidas no se generan al abrir; al apagarla el editor vuelve a ver el nivel entero;
+#    E) la tarjeta de la instancia en Properties: como se carga, a que distancia (con Ctrl+Z) y la vista previa.
+#  Compila un juego de verdad (cmake + g++), asi que tarda mas que las demas.
+# ==========================================================================
+
+ventana 640 480
+streamcrear /tmp/w3d_f9_stream dosmats.png lado 16 paso 10 distancia 25 vueltas 2
+entradatiene /tmp/w3d_f9_stream/juego/streaming.w3d proyecto.json "carga": 1
+entradatiene /tmp/w3d_f9_stream/juego/streaming.w3d proyecto.json "distancia": 1
+entradatiene /tmp/w3d_f9_stream/juego/streaming.w3d proyecto.json streamingVistaPrevia 0
+
+# --- A) el editor genera todo; el Play arranca sin nada de lo diferido ---
+abrirw3d /tmp/w3d_f9_stream/juego/streaming.w3d
+streaminfo instancias 256 cargadas 256 pedidos 0
+streamtexrefs
+simcache 0
+simplay 1
+streaminfo cargadas 0 pidiendo 0 descargadas 256 pedidos 0
+# (la base: lo del nivel sin nada del streaming -los dos cubos del juego minimo-)
+streammem mallas 2 animsets 0 texturas 0 scripts 0 base
+
+# --- B) el recorrido, dos vueltas: acotado y estable ---
+streambench 579 etiqueta vuelta1 peor 250
+streaminfo cargadas 0 pidiendo 0 pedidos 0
+streammem igual
+streambench 540 etiqueta vuelta2 peor 250 heapcrece 512 rssmaxcomo vuelta1 2048
+streaminfo cargadas 0 pidiendo 0 pedidos 0
+streammem igual
+# (el meminfo de siempre dice lo mismo: dos mallas vivas, las de la escena)
+meminfo mallas 2
+streamtexrefs
+scriptinfo compartido juez OK
+scriptinfo compartido veredicto 0,8,20,8,8,20,0,8,20,8,8,20,0
+streamveredicto
+simstop
+simcache 1
+streaminfo cargadas 256 pidiendo 0 pedidos 0
+
+# --- C) el juego compilado: el mismo veredicto ---
+compilarjuego 0 0 1
+streamjuegolog /tmp/w3d_f9_stream/juego streaming igual
+
+# --- D) la VISTA PREVIA del editor ---
+abrirw3d /tmp/w3d_f9_stream/juego/streaming.w3d
+streaminfo cargadas 256
+streamvista 1
+streamobjetivo 75 6 75
+# (lo generado al abrir se descarga de a 4 por frame, 60 frames; quedan las 20 de adentro de 25 m y las 4 que estan
+#  en la franja de la histeresis -entre 25 y 27,5 m-: ya estaban cargadas)
+streamtick 80
+streaminfo cargadas 24 pidiendo 0
+streamestado S119 cargada
+streamestado S000 descargada
+streamobjetivo -80 6 -80
+streamtick 40
+streaminfo cargadas 0 pidiendo 0 pedidos 0
+streammem mallas 2 animsets 0 texturas 0 scripts 0
+guardarw3d /tmp/w3d_f9_stream/juego/vista.w3d
+entradatiene /tmp/w3d_f9_stream/juego/vista.w3d proyecto.json streamingVistaPrevia 1
+abrirw3d /tmp/w3d_f9_stream/juego/vista.w3d
+# (con la vista previa prendida, las diferidas NO se generan al abrir)
+streaminfo instancias 256 cargadas 0
+streammem mallas 2 animsets 0 texturas 0
+streamobjetivo 0 6 0
+streamtick 40
+streaminfo cargadas 8
+streamestado S000 cargada
+# (apagarla: el editor vuelve a ver el nivel entero)
+streamvista 0
+streaminfo cargadas 256
+streamobjetivo off
+
+# --- E) la tarjeta de Properties (con Ctrl+Z) ---
+selobj S017
+streamtarjeta visible 1 modo distancia distancia 25 objetivo 1 vista 1
+streamtarjeta editardistancia 40 distancia 40
+undo
+streamtarjeta distancia 25
+streamcarga S017 siempre
+streamtarjeta modo siempre objetivo 0
+undo
+streamtarjeta modo distancia distancia 25
+selobj Director
+streamtarjeta visible 0

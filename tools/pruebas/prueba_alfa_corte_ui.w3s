@@ -1,0 +1,77 @@
+# ===========================================================================
+#  FILA "ALPHA TEST" DE LA TARJETA MATERIAL (Material::alphaTest; 0 = apagado)
+#
+#  El recorte por alfa ya se importaba (glTF MASK + alphaCutoff), se guardaba
+#  (clave "alfaCorte" del material) y se dibujaba (prueba_alfa_corte.w3s), pero
+#  en el editor no habia forma de verlo ni de tocarlo. Ahora es una fila float
+#  0..1 de la tarjeta Material, con Ctrl+Z.
+#
+#  Lo que se verifica, con el MOUSE de verdad (propsalfa: click en la fila,
+#  arrastre con el dx global, soltar; o click sin arrastrar + tipear + Enter
+#  por la puerta del teclado de PC):
+#   1) la fila esta en la tarjeta, se llama "Alpha Test" y muestra el alfaCorte
+#   2) arrastrar cambia el valor, se clampea a [0, 1] y Ctrl+Z vuelve en UN paso
+#   3) la edicion por texto (click sin arrastrar) tambien se deshace (antes la
+#      foto del click se commiteaba vacia al soltar y lo tipeado no tenia undo)
+#   4) el valor editado viaja en el .w3d como "alfaCorte"
+#
+#  Usa el fixture de prueba_alfa_corte.w3s (prueba_alfa_corte.glb: un quad con
+#  la rejilla alfa_reja.png y alphaMode MASK, alphaCutoff 0.3).
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_alfa_corte_ui.w3s
+# ===========================================================================
+ventana 1280 720
+selobj Cubo
+delete
+importgltf prueba_alfa_corte.glb
+loadtex
+selobj prueba_alfa_corte
+matalfa alfa_reja es 0.3
+
+# --- 1) la fila muestra el valor del material
+propsalfa fila 0.3
+
+# --- 2) ARRASTRE: sube (0.005 por px, menos la zona muerta del click) y Ctrl+Z vuelve en un paso
+propsalfa arrastrar 40 0.31 0.5
+undo
+matalfa alfa_reja es 0.3
+propsalfa fila 0.3
+redo
+propsalfa fila arrastre
+undo
+matalfa alfa_reja es 0.3
+# el rango: lejos a la derecha queda en 1, lejos a la izquierda en 0 (= apagado)
+propsalfa arrastrar 2000
+matalfa alfa_reja es 1
+undo
+propsalfa arrastrar -2000
+matalfa alfa_reja es 0
+undo
+matalfa alfa_reja es 0.3
+
+# --- 3) TEXTO: click sin arrastrar + tipear + Enter, con Ctrl+Z
+propsalfa texto 0.75
+matalfa alfa_reja es 0.75
+propsalfa texto 0
+matalfa alfa_reja es 0
+undo
+matalfa alfa_reja es 0.75
+undo
+matalfa alfa_reja es 0.3
+redo
+matalfa alfa_reja es 0.75
+# fuera de rango: la fila lo clampea
+propsalfa texto 7
+matalfa alfa_reja es 1
+undo
+matalfa alfa_reja es 0.75
+propsalfa fila 0.75
+
+# --- 4) se guarda como "alfaCorte" y vuelve a la fila al reabrir
+guardarw3d /tmp/w3d_prueba_alfa_corte_ui.w3d
+jsontiene /tmp/w3d_prueba_alfa_corte_ui.w3d alfaCorte 1
+abrirw3d /tmp/w3d_prueba_alfa_corte_ui.w3d
+loadtex
+selobj prueba_alfa_corte
+matalfa alfa_reja es 0.75
+propsalfa fila 0.75

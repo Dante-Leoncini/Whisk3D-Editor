@@ -1,0 +1,332 @@
+# ==========================================================================
+#  LA BIBLIOTECA: los casos que la revision de la FASE 4b encontro rotos. Cada bloque es un caso que
+#  antes fallaba (el comentario dice que pasaba).
+# ==========================================================================
+ventana 1280 720
+
+# ---- A. una MALLA 3D borrada (la retiene el undo), guardar y Ctrl+Z: el proyecto se puede volver a guardar ----
+# (antes: el recurso seguia nombrando su entrada del .w3d viejo y todo guardado posterior fallaba)
+escenadefecto
+guardarw3d prueba_revision_rtA.w3d
+abrirw3d prueba_revision_rtA.w3d
+recborrarforzado mallas Cubo
+guardarw3d prueba_revision_rtA.w3d
+undo
+mallainfo Cubo recurso Cubo
+guardarw3d prueba_revision_rtA2.w3d
+abrirw3d prueba_revision_rtA2.w3d
+mallainfo Cubo recurso Cubo
+mallasrecurso n 1
+# la variante del HUERFANO: el objeto borrado primero y despues su recurso
+selobj Cubo
+delete
+recborrar mallas Cubo
+guardarw3d prueba_revision_rtA3.w3d
+undo
+guardarw3d prueba_revision_rtA4.w3d
+abrirw3d prueba_revision_rtA4.w3d
+mallainfo Cubo recurso Cubo
+
+# ---- B. una TEXTURA pasada afuera, guardar y Ctrl+Z: vuelve adentro con su archivo ----
+# (antes: el guardado siguiente la escribia "ext:texturas/..." como faltante)
+escenadefecto
+selobj Cubo
+matnew
+texasignar Cubo dosmats.png
+guardarw3d prueba_revision_rtB.w3d
+abrirw3d prueba_revision_rtB.w3d
+recubicar texturas texturas/dosmats.png fuera prueba_revision_rt_dosmats.png
+guardarw3d prueba_revision_rtB.w3d
+undo
+recubicacion texturas texturas/dosmats.png dentro
+guardarw3d prueba_revision_rtB2.w3d
+jsontiene prueba_revision_rtB2.w3d "ext:texturas 0
+abrirw3d prueba_revision_rtB2.w3d
+recurso texturas texturas/dosmats.png existe 1 usuarios 1
+# ...y BORRAR EN USO, guardar y Ctrl+Z: la unica copia estaba en el .w3d que se piso
+recborrarforzado texturas texturas/dosmats.png
+guardarw3d prueba_revision_rtB3.w3d
+undo
+guardarw3d prueba_revision_rtB4.w3d
+jsontiene prueba_revision_rtB4.w3d "ext:texturas 0
+abrirw3d prueba_revision_rtB4.w3d
+recurso texturas texturas/dosmats.png existe 1 usuarios 1
+
+# ---- C. un SONIDO pasado afuera, guardar y Ctrl+Z ----
+escenadefecto
+guardarw3d prueba_revision_rtC.w3d
+abrirw3d prueba_revision_rtC.w3d
+entradacruda sonidos/bip.wav sonidos/bip.wav
+guardarw3d prueba_revision_rtC.w3d
+abrirw3d prueba_revision_rtC.w3d
+recubicar sonidos sonidos/bip.wav fuera prueba_revision_rt_bip.wav
+guardarw3d prueba_revision_rtC.w3d
+undo
+guardarw3d prueba_revision_rtC2.w3d
+abrirw3d prueba_revision_rtC2.w3d
+recurso sonidos sonidos/bip.wav existe 1
+
+# ---- D. soltar un MATERIAL en el 3D sobre una malla COMPARTIDA: lo ven todos sus objetos ----
+# (antes: solo el tocado; al guardar el recurso se partia en dos y el Alt+D se perdia)
+escenadefecto
+selobj Cubo
+matnew
+malladup Cubo vinculado
+matsuelto Rojo
+outvista biblioteca
+outsoltar Rojo 3d 0 0
+mallainfo Cubo material 0 Rojo
+mallainfo Cubo.001 material 0 Rojo
+guardarw3d prueba_revision_rtD.w3d
+abrirw3d prueba_revision_rtD.w3d
+mallainfo Cubo.001 comparte Cubo
+mallasregistro n 1
+
+# ---- E. soltar en el 3D una malla cuya .w3db esta ROTA: no queda un objeto vacio ni una malla fantasma ----
+escenadefecto
+recduplicar mallas Cubo Cubo.001
+selobj Cubo
+delete
+guardarw3d prueba_revision_rtE.w3d
+w3dbromper prueba_revision_rtE.w3d prueba_revision_rtE2.w3d corte
+abrirw3d prueba_revision_rtE2.w3d
+outvista biblioteca
+outsoltar Cubo.001 3d 0 0
+fail selobj Cubo.001
+mallasregistro n 1
+mallasrecurso n 1
+
+# ---- F. el MODO MOVER de la biblioteca (G) y abrir otro proyecto: el undo de carpetas sigue andando ----
+# (antes: el grupo quedaba abierto para siempre y el proximo G + Esc metia las carpetas del proyecto anterior)
+escenadefecto
+carpetanueva - BCarpeta
+matsuelto Bmat
+guardarw3d prueba_revision_rtF.w3d
+escenadefecto
+matsuelto Xmat
+carpetanueva - Pieles
+outvista biblioteca
+outclick Xmat
+outteclapc g
+outtecla down
+outmover si
+abrirw3d prueba_revision_rtF.w3d
+outvista biblioteca
+carpetanueva - Nueva
+carpetas tiene Nueva
+undo
+carpetas notiene Nueva
+outclick Bmat
+outteclapc g
+outteclapc esc
+carpetas tiene BCarpeta notiene Pieles
+
+# ---- G. Ctrl+Z en medio del modo mover: CANCELA el modo (como Esc) y no se come lo deshecho ----
+escenadefecto
+matsuelto Suelto
+matsuelto Piel
+outvista biblioteca
+carpetanueva - A
+recmover materiales Piel A
+outclick Suelto
+outteclapc g
+outteclapc down
+outmover si
+recurso materiales Suelto carpeta A
+undo
+outmover no
+recurso materiales Suelto carpeta -
+recurso materiales Piel carpeta A
+undo
+recurso materiales Piel carpeta -
+
+# ---- H. un recurso elegido en EDIT MODE: volver a elegir el objeto en la escena lo suelta ----
+escenadefecto
+selobj Cubo
+matnew
+mode edit
+outvista biblioteca
+outclick Material
+propsmalla tab 3 recurso 1
+mode object
+outvista escena
+outclick Cubo
+seleccion n 1 tiene Cubo
+propstab 3
+propsmalla tab 3 recurso 0 malla3d 1
+
+# ---- I. elegir un OBJETO con la biblioteca a la vista: la fila del recurso deja de estar activa y elegida ----
+escenadefecto
+selobj Cubo
+matnew
+outvista biblioteca
+outclick Material
+outsel n 1
+selobj Cubo
+recactivo ninguno
+outrender
+outsel n 0
+fail outcolor Material activo
+
+# ---- J. borrar una seleccion con CARPETAS y recursos: la carpeta (vacia) tambien se borra ----
+escenadefecto
+guardarw3d prueba_revision_rtJ.w3d
+abrirw3d prueba_revision_rtJ.w3d
+matsuelto Suelto
+outvista biblioteca
+carpetanueva - Vacia
+outclick Vacia
+outclick Suelto ctrl
+outsel n 2
+outteclapc supr
+outconfirmar si tiene The selected folders are deleted too if they end up empty.
+carpetas n 0
+recurso materiales Suelto existe 0
+undo
+carpetas tiene Vacia
+
+# ---- K. el cartel de borrar una MALLA 3D en uso dice que sus OBJETOS se borran ----
+escenadefecto
+guardarw3d prueba_revision_rtK.w3d
+abrirw3d prueba_revision_rtK.w3d
+outvista biblioteca
+outclick Cubo
+outmenu Delete
+outconfirmar si tiene Its objects will be deleted too (Ctrl+Z brings them back).
+fail selobj Cubo
+undo
+selobj Cubo
+
+# ---- L. "Skinned" es del objeto (un armature), no "tiene grupos de vertices" ----
+escenadefecto
+selobj Cubo
+vgnew Seleccion
+guardarw3d prueba_revision_rtL.w3d
+abrirw3d prueba_revision_rtL.w3d
+recdato mallas Cubo Vertex groups = 1
+recdato mallas Cubo Skinned = No
+
+# ---- M. doble click en el OJO de una fila: alterna el ojo, NO abre el renombrar ----
+escenadefecto
+outvista escena
+fail outdobleclick Cubo ojo
+outdobleclick Cubo
+outesc
+
+# ---- N. la cuadricula de una LIBRERIA externa no dibuja el recurso homonimo del proyecto abierto ----
+escenadefecto
+selobj Cubo
+matnew
+matcolor 1 0 0
+guardarw3d prueba_revision_rtN_v4.w3d
+escenadefecto
+selobj Cubo
+matnew
+matcolor 0 0 1
+libvincular prueba_revision_rtN_v4.w3d
+outvista lib:prueba_revision_rtN_v4
+outcuadricula 1
+outmini Material no celda
+outvista biblioteca
+outmini Material si celda
+
+# ---- O. la esfera de un material lleva su TEXTURA (dos blancos con texturas distintas ya no son iguales) ----
+escenadefecto
+selobj Cubo
+matnew
+texasignar Cubo dosmats.png
+add cube
+selobj Cubo.001
+matnew
+texasignar Cubo.001 dosmats-b.png
+minidistintas materiales Material Material.001
+
+# ---- P. abrir un proyecto con varias texturas: nada queda "sin guardar" cuando terminan de cargar ----
+escenadefecto
+selobj Cubo
+matnew
+texasignar Cubo dosmats.png
+add cube
+selobj Cubo.001
+matnew
+texasignar Cubo.001 dosmats-b.png
+add cube
+selobj Cubo.002
+matnew
+texasignar Cubo.002 capas_base.png
+guardarw3d prueba_revision_rtP.w3d
+abrirw3d prueba_revision_rtP.w3d
+cambios n 0
+texdormidas cuadros 5
+cambios n 0
+
+# ---- Q. "Open in IDE" de la biblioteca con lo tipeado SIN GUARDAR: pregunta antes de descartar ----
+# (antes: el IDE recargaba el archivo y se perdian los cambios y su undo, sin ningun cartel)
+escenadefecto
+guardarw3d prueba_revision_rtQ.w3d
+abrirw3d prueba_revision_rtQ.w3d
+entradatexto scripts/a.lua -- script a
+entradatexto scripts/b.lua -- script b
+vpkind 5 7
+idebib abrir scripts/a.lua
+idebib archivo scripts/a.lua
+idebib ensuciar
+idebib sucio 1
+# el MISMO script: no se recarga (lo tipeado se queda)
+idebib abrir scripts/a.lua
+idebib tiene tipeado sin guardar
+# otro script: el cartel; "No" deja todo como estaba
+idebib abrir scripts/b.lua
+outconfirmar no
+idebib archivo scripts/a.lua
+idebib tiene tipeado sin guardar
+# "Si" descarta y abre el otro
+idebib abrir scripts/b.lua
+outconfirmar si
+idebib archivo scripts/b.lua
+idebib sucio 0
+idebib tiene script b
+
+# ---- R. "External (choose where)...": al lado del .w3d ya hay OTRO archivo con ese nombre -> otro lugar ----
+# (antes: la UI solo ofrecia la ruta de al lado del .w3d y no habia salida)
+escenadefecto
+guardarw3d prueba_revision_rtR.w3d
+abrirw3d prueba_revision_rtR.w3d
+entradacruda texturas/dosmats.png dosmats-b.png
+outvista biblioteca
+outclick dosmats.png
+recactivo texturas texturas/dosmats.png
+fail recubicar texturas texturas/dosmats.png fuera
+recexterno prueba_revision_rt_elegida.png
+recubicacion texturas prueba_revision_rt_elegida.png fuera
+undo
+recubicacion texturas texturas/dosmats.png dentro
+
+# ---- S. los ATAJOS que anuncian los menus del outliner andan con el mouse sobre el outliner ----
+# (antes: Shift+D, Alt+D y Ctrl+I no hacian nada ahi y Alt+A sin seleccion seleccionaba todo)
+escenadefecto
+outvista escena
+selobj Cubo
+outteclapc shiftd
+seleccion n 1 tiene Cubo.001
+mallainfo Cubo.001 nocomparte Cubo
+outteclapc altd
+seleccion n 1 tiene Cubo.002
+mallainfo Cubo.002 comparte Cubo.001
+outteclapc alta
+seleccion n 0
+outteclapc alta
+seleccion n 0
+outteclapc ctrli
+seleccion tiene Cubo tiene Cubo.001 tiene Cubo.002
+selobj Cubo
+outteclapc ctrli
+seleccion tiene Cubo.001 tiene Cubo.002
+matsuelto Uno
+matsuelto Dos
+outvista biblioteca
+outclick Uno
+outteclapc a
+outsel tiene Uno tiene Dos
+outteclapc alta
+outsel n 1 tiene Uno

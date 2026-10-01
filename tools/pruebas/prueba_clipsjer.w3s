@@ -1,0 +1,246 @@
+# ==========================================================================
+#  CLIPS DE JERARQUIA COMPARTIDOS (animation/W3dAnimSet.h) y RETARGET por tamano.
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_clipsjer.w3s
+#
+#  Un clip de jerarquia lo TIENE un objeto raiz y anima a la raiz y a sus descendientes por
+#  RUTA RELATIVA de nombres ("." / "Chasis/Puerta"); vive COMPARTIDO en una biblioteca (un
+#  animset .w3da, bloques JCLP) que cualquier jerarquia con los mismos nombres puede usar: N
+#  raices = UNA copia en memoria. Se prueba:
+#    - las rutas (con los sufijos .NNN de una copia) y crear el clip desde el selector del
+#      timeline ("New Animation > Hierarchy Clip"), editarlo en su VISTA (keyframes sobre la
+#      raiz y sus hijos; lo que no es de la jerarquia no entra) y el preview del editor;
+#    - duplicar la jerarquia: la copia usa la MISMA biblioteca (refs, una copia en memoria);
+#    - guardar/abrir: registro "animsets", entrada .w3da con JCLP, "clipsJerarquia" en el nodo,
+#      re-guardar da los mismos bytes;
+#    - reproducir en varias raices a la vez e independientes (loop / una pasada / velocidad), la
+#      raiz RELATIVA (cada una en su lugar), nodos que la jerarquia no tiene se ignoran;
+#    - editar el clip desde OTRA raiz lo cambia para todas;
+#    - retarget "rotaciones" de una jerarquia mas grande (el movimiento de la raiz escalado, los
+#      hijos con su traslacion propia) y de un armature (huesos con la traslacion de su reposo,
+#      la raiz escalada);
+#    - dos bibliotecas iguales quedan en una al guardar;
+#    - en un JUEGO editar un clip no lo vuelve animado (volver a "Juego" = su frame 1);
+#    - lua: animObjeto("Biblioteca/clip"), animObjetoVelocidad, animRetarget;
+#    - los "clips" de objeto inline de la primera version de esta fase se leen y se migran.
+# ==========================================================================
+
+ventana 1280 720
+
+# ---- el formato de la PRIMERA version de esta fase ("clips" de objeto inline en el nodo): se sigue
+#      leyendo y cada clip pasa a ser un clip de jerarquia de la biblioteca de su objeto ----
+abrirw3d prueba_clipsjer_viejo.w3d
+jerinfo Puerta lib Puerta clips 1 pistas abrir 2 ruta abrir . ruta abrir Hoja
+jerplay Puerta abrir loop 0
+jertick 0.1666667 1
+rotat Puerta 0 45 0 0.1
+objat Puerta 3 0 0 0.001
+objat Hoja 1.5 0 0 0.01
+jerreset
+guardarw3d /tmp/w3d_f6_clipsjer_viejo.w3d
+entradaexiste /tmp/w3d_f6_clipsjer_viejo.w3d animaciones/puerta.w3da 1
+entradatiene /tmp/w3d_f6_clipsjer_viejo.w3d proyecto.json "clips" 0
+entradatiene /tmp/w3d_f6_clipsjer_viejo.w3d proyecto.json clipsJerarquia 1
+
+escenadefecto
+
+# ---- la jerarquia: Auto > Chasis > Puerta (x=1) ; Auto > Antena ----
+add cube
+objname Auto
+add cube
+objname Chasis
+parent Chasis Auto
+add cube
+objname Puerta
+parent Puerta Chasis
+selobj Puerta
+objpos 1 0 0
+add cube
+objname Antena
+parent Antena Auto
+jerruta Auto Auto .
+jerruta Auto Puerta Chasis/Puerta
+jernodo Auto Chasis/Puerta Puerta
+jernodo Auto Chasis/Nada -
+
+# ---- un clip NUEVO desde el selector del timeline, sobre la raiz elegida ----
+selobj Auto
+clipmenu Hierarchy Clip
+clipinfo Auto n 1 activo Clip
+clipnombre abrir
+animrango 1 11
+clipinfo Auto n 1 tiene abrir activo abrir
+jerinfo Auto lib Auto clips 1 refs 1
+# keyframes en su VISTA: la puerta gira y avanza, la raiz sube
+animcurva Auto:abrir Puerta ry 1 0 11 90
+animcurva Auto:abrir Puerta x 1 1 11 3
+animcurva Auto:abrir . y 1 0 11 2
+jerinfo Auto pistas abrir 2 ruta abrir Chasis/Puerta ruta abrir .
+# lo que no es de su jerarquia no entra (la I sobre otro objeto no le agrega nada)
+add cube
+objname Suelto
+selobj Suelto
+raizkey n 0
+# el preview del editor: el cabezal posa la jerarquia
+frame 6
+objat Auto 0 1 0 0.01
+objat Puerta 2 0 0 0.01
+rotat Puerta 0 45 0 0.1
+frame 1
+objat Auto 0 0 0 0.001
+raizanim Scene
+
+# ---- duplicar la jerarquia: las copias usan la MISMA biblioteca ----
+dupjerarquia copia Auto +hijos
+dupjerarquia copia Auto +hijos
+jerinfo Auto.001 lib Auto refs 3
+jerruta Auto.001 Puerta.001 Chasis/Puerta
+jernodo Auto.001 Chasis/Puerta Puerta.001
+jermem clips 1
+selobj Auto.001
+objpos 10 0 0
+selobj Auto.002
+objpos -10 0 0
+objscale 2 2 2
+# una jerarquia que NO tiene la puerta (el nodo se ignora) usa la misma biblioteca
+add cube
+objname Moto
+add cube
+objname Chasis
+parent Chasis.003 Moto
+jerlib Moto Auto
+# y una SIN biblioteca (el juego le pide el clip por su nombre calificado)
+add cube
+objname Bici
+add cube
+objname Chasis
+parent Chasis.004 Bici
+
+# ---- guardar / abrir ----
+selobj Auto
+guardarw3d /tmp/w3d_f6_clipsjer.w3d
+entradaexiste /tmp/w3d_f6_clipsjer.w3d animaciones/auto.w3da 1
+entradatiene /tmp/w3d_f6_clipsjer.w3d proyecto.json clipsJerarquia 1
+entradatiene /tmp/w3d_f6_clipsjer.w3d proyecto.json animaciones/auto.w3da 1
+entradatiene /tmp/w3d_f6_clipsjer.w3d animaciones/auto.w3da JCLP 1
+entradatiene /tmp/w3d_f6_clipsjer.w3d animaciones/auto.w3da Chasis/Puerta 1
+abrirw3d /tmp/w3d_f6_clipsjer.w3d
+jerinfo Auto lib Auto clips 1 refs 4 pistas abrir 2
+jerinfo Moto lib Auto
+jerinfo Bici lib -
+jermem clips 1
+guardarw3d /tmp/w3d_f6_clipsjer_2.w3d
+w3diguales /tmp/w3d_f6_clipsjer.w3d /tmp/w3d_f6_clipsjer_2.w3d
+
+# ---- reproducir: varias raices a la vez, cada una con su cabezal y en su lugar ----
+jerplay Auto abrir loop 0 dur 0.3667
+jerplay Auto.001 abrir loop 1
+jerplay Moto abrir loop 0
+jermem sonando 3
+jerinfo Auto refs 7
+jertick 0.1666667 1
+jerframe Auto 6 0.01 clip abrir termino 0
+objat Auto 0 1 0 0.01
+objat Puerta 2 0 0 0.01
+rotat Puerta 0 45 0 0.1
+objat Auto.001 10 1 0 0.01
+objat Puerta.001 2 0 0 0.01
+objat Moto 0 1 0 0.01
+jervel Auto.001 2
+jertick 0.1666667 1
+jerframe Auto 11 0.01 termino 1
+jerframe Auto.001 5 0.01 termino 0
+objat Auto 0 2 0 0.01
+objat Auto.001 10 0.8 0 0.01
+jerreset
+jermem sonando 0
+jerinfo Auto refs 4
+
+# ---- retarget "rotaciones": la copia al doble de tamano ----
+jerretarget Auto.002 rotaciones
+jerplay Auto.002 abrir loop 0
+jertick 0.1666667 1
+objat Auto.002 -10 2 0 0.01
+objat Puerta.002 1 0 0 0.01
+rotat Puerta.002 0 45 0 0.1
+jerreset
+selobj Auto.002
+objpos -10 0 0
+# ...y el mismo retarget como opcion POR DEFECTO del clip (la instancia vuelve a "el del clip")
+jerretarget Auto.002 clip
+jerclipretarget Auto abrir rotaciones
+jerplay Auto.002 abrir loop 0
+jertick 0.1666667 1
+objat Auto.002 -10 2 0 0.01
+objat Puerta.002 1 0 0 0.01
+jerreset
+jerclipretarget Auto abrir completo
+selobj Auto.002
+objpos -10 0 0
+
+# ---- editar el clip desde OTRA raiz lo cambia para todas (es compartido) ----
+selobj Auto.001
+clipmenu Auto.001: abrir
+clipinfo Auto.001 activo abrir
+animcurva Auto.001:abrir Puerta.001 ry 11 45
+raizanim Scene
+jerplay Auto abrir loop 0
+jertick 0.5 1
+rotat Puerta 0 45 0 0.1
+jerreset
+
+# ---- lua: el nombre calificado, la velocidad y el retarget ----
+selobj Auto
+objpos 0 0 0
+raizscript Suelto prueba_clipsjer.lua
+simplay 4
+jerframe Bici 3 0.01 clip abrir
+objat Bici 0 0.4 0 0.01
+objat Auto.002 -10 1.6 0 0.01
+scriptinfo compartido bici_dur true
+scriptinfo compartido bici_vel true
+scriptinfo compartido nada true
+simstop
+objat Bici 0 0 0 0.001
+objat Auto.002 -10 0 0 0.001
+
+# ---- el retarget de un ARMATURE: la misma caminata en un esqueleto al doble ----
+rigretarget Rig 2
+huesopose RigA Cadera 5 1 0 0.01 frame 6
+huesopose RigB Cadera 5 1 0 0.01 frame 6
+huesopose RigB Pecho 0 2.5 0 0.01 frame 6
+jerretarget RigB rotaciones
+huesopose RigB Cadera 10 2 0 0.01 frame 6
+huesopose RigB Pecho 0 2 0 0.01 frame 6
+huesopose RigA Cadera 5 1 0 0.01 frame 6
+
+# ---- dos bibliotecas IGUALES quedan en una al guardar ----
+add cube
+objname Farol
+clipnuevo Farol parpadeo 1 11
+animcurva Farol:parpadeo . vis 1 1 6 0
+add cube
+objname Farol2
+clipnuevo Farol2 parpadeo 1 11
+animcurva Farol2:parpadeo . vis 1 1 6 0
+jerinfo Farol lib Farol
+jerinfo Farol2 lib Farol2
+raizanim Scene
+guardarw3d /tmp/w3d_f6_clipsjer_3.w3d
+jerinfo Farol2 lib Farol refs 2
+entradaexiste /tmp/w3d_f6_clipsjer_3.w3d animaciones/farol.w3da 1
+entradaexiste /tmp/w3d_f6_clipsjer_3.w3d animaciones/farol2.w3da 0
+
+# ---- en un JUEGO editar un clip no lo vuelve animado: volver a "Juego" = su frame 1 ----
+raiztipo juego
+raizanim juego
+raizmodo kind 2 juego 1
+selobj Auto
+clipmenu Auto: abrir
+raizmodo kind 0 juego 0
+frame 11
+objat Auto 0 2 0 0.01
+raizanim juego
+raizmodo kind 2 juego 1
+objat Auto 0 0 0 0.001
+raizinfo tipo juego

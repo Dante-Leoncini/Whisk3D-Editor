@@ -53,25 +53,30 @@ texinfo contenido 2
 
 # --- 3bis) NO SE DA PLAY CON TEXTURAS A MEDIO CARGAR ------------------------
 # ("no se puede dar play hasta que carguen todas las texturas"). Recien abierto,
-# el proyecto tiene los 7 pedidos en la cola DIFERIDA (1 por frame). `juegotex`
-# corre LA MISMA funcion que el boton Play del editor: si queda algo, lo carga
-# entero antes de arrancar.
+# el proyecto tiene 6 de los 7 pedidos en la cola DIFERIDA (1 por frame: la
+# PRECARGA del final de AbrirW3D ya consumio uno). `juegotex` corre LA MISMA
+# funcion que el boton Play del editor: si queda algo, lo carga entero antes
+# de arrancar.
 abrirw3d prueba_texcache.w3d
-texpend 7
+texpend 6
 juegotex
 texpend 0
 
 # --- 4) PIXELADO GLOBAL: sin mipmaps -> ~1/4 menos de GPU -------------------
 # ("pixela todas las texturas y no uses filtros de textura"). Se declara en la
 # cabecera del .w3d con `pixelado: true`; aca se prende a mano para medir el
-# mismo contenido con y sin.
+# mismo contenido con y sin. OJO: la PRECARGA del final de AbrirW3D ya subio
+# UNA textura (cuadrantes, con mipmaps: el pixelado todavia estaba apagado);
+# prenderlo a mano despues solo afecta a lo que se sube despues (rojo, sin
+# mipmaps): 21 845 + 256 = 22 101 (con mipmaps serian 22 186). El 16 640 exacto
+# (todo sin mipmaps) lo mide 4ter, donde el .w3d lo declara ANTES de la precarga.
 abrirw3d prueba_texcache.w3d
 pixelado on
 loadtex
 texinfo
 pixelado es true
-texinfo subidos 16640
-texinfo max 16640
+texinfo subidos 22101
+texinfo max 22101
 
 # --- 4ter) el .w3d de TEXTO tambien lo declara ------------------------------
 # Es la linea que hay que agregarle al .w3d de texto, adentro

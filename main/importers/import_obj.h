@@ -23,7 +23,7 @@
 #include "objects/Mesh.h"
 
 struct VertexKey {
-    int pos, normal, uv, color;
+    int pos, normal, uv, color, uv2;   // uv2: esquina en la 2da capa UV (-1 = no hay)
     bool operator==(const VertexKey &other) const;
     bool operator<(const VertexKey &other) const; // para std::map (RVCT)
 };
@@ -45,6 +45,7 @@ public:
     std::vector<GLubyte> cornerColors; // palette de color POR ESQUINA (lineas 'vc' del .obj)
     std::vector<GLbyte> normals;
     std::vector<GLfloat> uv;
+    std::vector<GLfloat> uv2;   // SEGUNDA capa UV (TEXCOORD_1 del glTF) por esquina (FaceCorner::uv2)
     std::vector<Face> faces;
     std::vector<int> looseEdges; // pares de indices de POSICION (0-based local) de las lineas 'l' (aristas sin cara)
     int facesSize;
@@ -114,7 +115,40 @@ void CargarTodasTexturasPendientes();
 // cuantas quedan sin decodificar. El PLAY del juego no arranca con esto > 0
 // (reporte del dueno: "no se puede dar play hasta que carguen todas las texturas").
 int  TexturasPendientes();
-// tira la cola SIN cargar (cierre de proyecto: apunta a materiales que se van)
+// tira la cola SIN cargar (cierre de proyecto: apunta a materiales que se van). Tambien las DORMIDAS.
 void OlvidarTexturasPendientes();
+
+// TEXTURAS DORMIDAS: las de un material del proyecto que al abrir NO usa ninguna malla de la escena
+// (un material HUERFANO: el proyecto lo conserva, pero nadie lo dibuja). No se cargan -ni la base,
+// ni el normal map, ni las capas- hasta que una malla lo use: no ocupan GPU ni RAM, el Play del editor
+// no las espera y el juego compilado no las carga nunca. Sus RUTAS siguen siendo del material: el
+// guardado las escribe (TexturaPendienteRefDe + TexturasDormidasDe), el outliner por recursos las
+// cuenta como usuarios y el rename de una textura las sigue.
+struct TexCapaDormida { std::string textura; int mezcla; int uv; bool on; TexCapaDormida() : mezcla(0), uv(0), on(true) {} };
+struct TexDormida {
+    Material* mat;
+    std::string base;                    // "" = sin textura base
+    std::string normal;                  // "" = sin normal map
+    std::vector<TexCapaDormida> capas;   // las capas extra, en su orden
+    TexDormida() : mat(0) {}
+};
+// deja dormidas las texturas de un material (el lector del proyecto, en vez de cargarlas)
+void TexturasDormir(const TexDormida& d);
+// las dormidas de 'mat' (NULL = no tiene). ESCRIBIBLES: el guardado y el rename reescriben sus rutas.
+TexDormida* TexturasDormidasDe(const Material* mat);
+// despierta las de los materiales que usa alguna malla de la escena: la base va a la cola diferida
+// y el normal map y las capas se cargan ya (como al abrir). Devuelve cuantos materiales desperto.
+// La llaman el lector (al terminar de armar la escena), la cola diferida cada tanto (una malla que
+// pasa a usar un material dormido) y el Play antes de esperar las texturas.
+int  TexturasDespertarUsadas();
+// despierta las de UN material (Properties lo va a mostrar o editar). true = tenia dormidas.
+bool TexturasDespertar(Material* mat);
+// DUERME OTRA VEZ las de un material que ya ninguna malla dibuja (el STREAMING, io/Streaming.h, descargo lo ultimo que
+// lo usaba): sus rutas vuelven a quedar dormidas (las guarda el guardado y despiertan como al abrir, cuando una malla
+// lo vuelva a usar) y sus texturas se SUELTAN: la que ningun otro material retiene sale de la GPU en el acto (el
+// refcount de las ranuras, Textures.h: TexturaPonerEn). Una base que esperaba en la cola diferida tambien duerme. Un
+// material ANIMADO no se duerme (sus cuadros pasan por su ranura). false = no tenia nada que dormir.
+bool TexturasAdormecer(Material* mat);
+int  TexturasDormidasCantidad();   // cuantos materiales tienen texturas dormidas (el harness)
 
 #endif

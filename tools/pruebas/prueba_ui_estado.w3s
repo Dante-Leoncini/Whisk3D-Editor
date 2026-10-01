@@ -18,6 +18,9 @@
 #    barra translucida (gris 0.5 sobre 13)  = 22,22,22   [con el bug: 31 opaco]
 #    tarjeta del boton sobre la barra        = 27,27,27   [con el bug: 0,0,0]
 # ==========================================================================
+# tamano de ventana FIJO: sin esto los pixeles dependen del config.ini de la
+# maquina (con 1920x1080 el eje Y de la grilla pasa bajo la tarjeta del boton)
+ventana 1280 720
 abrirw3d prueba_ui_estado.w3d
 loadtex
 juego on

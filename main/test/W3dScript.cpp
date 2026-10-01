@@ -1,4 +1,5 @@
 #include "test/W3dScript.h"
+#include "test/W3dPruebasRecursos.h" // los comandos de recursos/carga/formatos (archivo aparte: compila rapido)
 #include "W3dNombres.h"          // nombres unicos: la regla comun (tests de los helpers puros)
 #include "script/W3dScript.h"    // W3dScriptDatos/W3dScriptEntrada: refs por nombre (test del vinculo)
 #include <filesystem>   // W3dDebugFile: los dumps de debug van a la carpeta debug, no a la raiz
@@ -59,6 +60,7 @@ bool UpdateFlipbooks(float dtSeg); // Flipbook.cpp: flipbooks unificados (Imagen
 #include "io/GuardarVersion.h" // versave: guardado por versiones (boton "Guardar version vN")
 #include "io/W3dZip.h"         // versave/ziphard/contenedor: leer y fabricar zips
 #include "io/W3dMalla.h"      // w3dm: el formato de geometria propio (.w3dm)
+#include "io/W3dMallaBin.h"   // vaguardado: la edicion PENDIENTE de una malla de un recurso (W3dMallaBinMaterializarEdicion)
 #include "io/W3dTexto.h"      // w3dm: escaner/escritor de numeros exactos del .w3dm
 #include "io/W3dContenedor.h" // contenedor/migrar: el .w3d v4 (montaje, refs externas, hook de test)
 #include "objects/VisSet.h"    // vissettest: el dato de visibilidad por triangulo (formato/w3dvis.md)
@@ -69,7 +71,8 @@ bool UpdateFlipbooks(float dtSeg); // Flipbook.cpp: flipbooks unificados (Imagen
 #include "objects/Instance.h"  // modsave: round-trip de espejo/instancia/curva
 #include "objects/Mirror.h"
 #include "objects/Curve.h"
-#include "objects/Camera.h"    // modsave: riel de camara (Curve) en el .w3d
+#include "objects/Camera.h"
+#include "WhiskUI/Propieties/PropertieBase.h" // W3dKeyframeEstado/Toggle (rombo de la camara activa)    // modsave: riel de camara (Curve) en el .w3d
 #include "objects/Gamepad.h"   // deltarget: el quinto de la familia Target (ObjetoScript)
 #include "w3dlog.h"            // consciclo: el ring del log (el aviso de ciclo tiene que ser UNO, no por frame)
 #include "W3dPaletas.h"        // paltest: los invariantes de las paletas del proyecto
@@ -311,12 +314,18 @@ static std::string W3dDebugFile(const std::string& name){
     } catch (...) { return name; }
 }
 
+// (harness) 'simularsincorpus 1': el corpus "no esta" aunque la carpeta exista, como en un clon
+// limpio. Asi el camino de "salteo con aviso" se prueba tambien en la maquina que SI lo tiene.
+static bool g_simularSinCorpus = false;
+static int  g_corpusSalteos = 0;      // partes salteadas desde el ultimo 'simularsincorpus 1'
+
 // EL CORPUS DE ORO (Whisk3D/formato/corpus): archivos de VERSIONES HISTORICAS que ya no se
 // pueden fabricar guardando con el editor de hoy (un .w3d con la geometria en GLB, por ejemplo).
 // Sin corpus la retrocompatibilidad es una intencion; con corpus es un test que se pone rojo.
 // La ruta se prueba desde varios lugares porque el binario se corre tanto desde Whisk3D/ como
 // desde platform/linux/build/. "" = no esta (el test que lo pide falla y lo dice).
 static std::string W3dCorpusFile(const std::string& nombre) {
+    if (g_simularSinCorpus) return std::string();
     const char* bases[] = { "formato/corpus/", "../formato/corpus/", "../../formato/corpus/",
                             "../../../formato/corpus/", "../../../../formato/corpus/" };
     for (int i = 0; i < 5; i++) {
@@ -324,6 +333,36 @@ static std::string W3dCorpusFile(const std::string& nombre) {
         if (w3dFileSystem::FileExists(r)) return r;
     }
     return std::string();
+}
+
+// El corpus esta GITIGNOREADO (/formato/ no va al repo): un clon limpio, o la otra PC sin la
+// carpeta copiada, no lo tiene. Ahi la parte que lo usa se SALTEA con un aviso "SIN CORPUS:"
+// (correr_todas.sh los cuenta y lo dice al final) en vez de dejar la suite en rojo y, de paso,
+// cortar el resto del .w3s. Si la CARPETA esta pero falta un archivo, eso SI es una falla (el
+// corpus esta roto). W3D_CORPUS_OBLIGATORIO=1 convierte la ausencia en falla (la maquina que SI
+// tiene que tener el corpus no puede pasar en verde sin probarlo).
+static bool W3dCorpusPresente() {
+    if (g_simularSinCorpus) return false;
+    const char* bases[] = { "formato/corpus", "../formato/corpus", "../../formato/corpus",
+                            "../../../formato/corpus", "../../../../formato/corpus" };
+    for (int i = 0; i < 5; i++) {
+        try { if (std::filesystem::is_directory(bases[i])) return true; } catch (...) {}
+    }
+    return false;
+}
+// true = SALTEAR la parte 'que' del test 'tag' (no hay corpus y no es obligatorio; ya avisa).
+// false = correrla: con corpus, o sin corpus pero exigido (y ahi falla diciendo que archivo falta).
+static bool W3dSaltearSinCorpus(const char* tag, const char* que) {
+    if (W3dCorpusPresente()) return false;
+    // exigido por el entorno -> no se saltea (y la parte falla diciendo que falta). El simulado
+    // no: simular es pedir EXPLICITAMENTE el comportamiento del clon limpio.
+    const char* obl = getenv("W3D_CORPUS_OBLIGATORIO");
+    if (!g_simularSinCorpus && obl && *obl && strcmp(obl, "0") != 0) return false;
+    // el simulado se marca distinto: correr_todas.sh cuenta solo los "SIN CORPUS:" de verdad
+    printf("      [%s] SIN CORPUS%s: salteo %s (formato/corpus no esta: es gitignoreado; "
+           "W3D_CORPUS_OBLIGATORIO=1 lo exige)\n", tag, g_simularSinCorpus ? " (simulado)" : "", que);
+    g_corpusSalteos++;
+    return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -1007,7 +1046,14 @@ static int QsPuntosUnicos(const Mesh* m) {
 static Mesh* QsBuscarMesh(const std::string& nombre) {
     std::vector<Object*> st; if (SceneCollection) st.push_back(SceneCollection);
     while (!st.empty()) { Object* o = st.back(); st.pop_back();
-        if (o->getType() == ObjectType::mesh && o->name == nombre) return (Mesh*)o;
+        if (o->getType() == ObjectType::mesh && o->name == nombre) {
+            // la malla de un RECURSO (objects/MallaRecurso.h) abre con la edicion (caras, capas,
+            // marcas, aristas) PENDIENTE, en binario Y en texto: los tests miran la malla editable,
+            // asi que se pide como la pediria el editor al tocarla
+            Mesh* m = (Mesh*)o;
+            if (m->malla && !m->edicionPendiente.empty()) W3dMallaBinMaterializarEdicion(m);
+            return m;
+        }
         for (size_t i = 0; i < o->Childrens.size(); i++) st.push_back(o->Childrens[i]); }
     return NULL;
 }
@@ -1416,6 +1462,15 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
     std::istringstream ss(linea);
     std::string cmd; ss >> cmd;
     if (cmd.empty()) return true;
+
+    // ---- COMANDOS DE RECURSOS / CARGA / FORMATOS: viven en test/W3dPruebasRecursos.cpp
+    //      (compila en segundos; este archivo en minutos). Si el comando es de alla, su
+    //      resultado es el de la linea. Los comandos NUEVOS van alla, no aca. ----
+    {
+        bool manejado = false;
+        const bool r = W3dPruebasRecursosCmd(cmd, ss, err, manejado);
+        if (manejado) return r;
+    }
 
     // ---- add <cube|plane|circle|uvsphere|cone|cylinder|vertex> ----
     if (cmd == "add") {
@@ -1910,6 +1965,50 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         return true;
     }
     // ---- animpose <frame> : evalua la pose por FK y vuelca poseHead/poseTail de cada hueso ----
+    // ---- posedump <armature> <clip> <f0> <f1> : cabeza (espacio del armature) de cada hueso en cada frame del clip,
+    //      para comparar la reproduccion de Whisk3D contra la pose de la fuente (glTF) numero a numero ----
+    // ---- shapeinfo <malla> : sus shape keys + cuanto se mueve el skin con los pesos de AHORA (max, mm) ----
+    // ---- shapeset <malla> <k> <peso> : pone el peso de la forma k ----
+    if (cmd == "shapeinfo" || cmd == "shapeset") {
+        std::string nom; ss >> nom;
+        Object* o = SceneCollection ? FindObjectByName(SceneCollection, nom) : NULL;
+        if (!o || o->getType() != ObjectType::mesh) { err = cmd + ": no hay una malla '" + nom + "'"; return false; }
+        Mesh* m = (Mesh*)o;
+        if (cmd == "shapeset") { int k = 0; float w = 0; ss >> k >> w; m->SetShapePeso(k, w);
+            printf("      [shapeset] '%s' forma %d = %g\n", nom.c_str(), k, w); return true; }
+        extern void SkinearMesh(Mesh*);
+        std::vector<float> antes;
+        { std::vector<float> guard = m->shapePesos; m->shapePesos.assign(m->shapeKeys.size(), 0.0f); m->shapeSerial++;
+          SkinearMesh(m); if (m->skinVertex) antes.assign(m->skinVertex, m->skinVertex + m->vertexSize * 3);
+          m->shapePesos = guard; m->shapeSerial++; }
+        SkinearMesh(m);
+        float mx = 0; int movidos = 0;
+        if (m->skinVertex && (int)antes.size() == m->vertexSize * 3)
+            for (int i = 0; i < m->vertexSize; i++) {
+                float dx = m->skinVertex[i*3]-antes[i*3], dy = m->skinVertex[i*3+1]-antes[i*3+1], dz = m->skinVertex[i*3+2]-antes[i*3+2];
+                float d = sqrtf(dx*dx+dy*dy+dz*dz); if (d > 1e-6f) movidos++; if (d > mx) mx = d; }
+        printf("      [shapeinfo] '%s' %d formas, skin %s | con los pesos de ahora se mueven %d verts, max %.2f mm\n",
+               nom.c_str(), (int)m->shapeKeys.size(), m->skinArmature ? "si" : "no", movidos, mx * 1000.0f);
+        for (size_t k = 0; k < m->shapeKeys.size() && k < 4; k++)
+            printf("      [shapeinfo]   %s: %d puntos\n", m->shapeKeys[k].nombre.c_str(), (int)m->shapeKeys[k].idx.size());
+        return true;
+    }
+    if (cmd == "posedump") {
+        std::string arm, clip; int f0 = 0, f1 = 0; ss >> arm >> clip >> f0 >> f1;
+        Object* o = SceneCollection ? FindObjectByName(SceneCollection, arm) : NULL;
+        if (!o || o->getType() != ObjectType::armature) { err = "posedump: no hay armature '" + arm + "'"; return false; }
+        Armature* a = (Armature*)o;
+        int ci = -1; for (size_t i = 0; i < a->animations.size(); i++) if (a->animations[i]->name == clip) ci = (int)i;
+        if (ci < 0) { err = "posedump: el armature no tiene el clip '" + clip + "'"; return false; }
+        extern int ActiveAnimKind; extern Armature* ActiveAnimArm;
+        ActiveAnimKind = 1; ActiveAnimArm = a; a->animActiva = ci; a->capas.clear();
+        for (int f = f0; f <= f1; f++) {
+            a->poseDirty = true; a->lastPoseFrame = -999999; CurrentFrame = f; EvaluarPoseEsqueleto(a, f);
+            for (size_t b = 0; b < a->bones.size(); b++)
+                printf("POSE %d %d %.5f %.5f %.5f\n", f, (int)b, a->bones[b].poseHead.x, a->bones[b].poseHead.y, a->bones[b].poseHead.z);
+        }
+        return true;
+    }
     if (cmd == "animpose") {
         Armature* a = (ObjActivo && ObjActivo->getType()==ObjectType::armature) ? (Armature*)ObjActivo : NULL;
         if (!a) { err="animpose: sin armature activo"; return false; }
@@ -4727,6 +4826,41 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
     //      desaparecer lo que queda fuera del marco 4:3 de la camara del juego. Ademas
     //      DIBUJA un frame y reporta cuantos hijos pasaron el cull, asi el A/B queda
     //      medido en el mismo comando (el total lo confirma `bench`). ----
+    // ---- bspinfo <culling> [archivo <ruta>] : el metodo Bsp del Culling: carga el dato (o lo cambia), dibuja un
+    //      frame y reporta el cluster de la camara y cuantos hijos pasaron el PVS. Es el assert de prueba_bsp.w3s.
+    if (cmd == "bspinfo") {
+        std::string nombre, sub; ss >> nombre >> sub;
+        Object* o = SceneCollection ? FindObjectByName(SceneCollection, nombre) : NULL;
+        if (!o || o->getType() != ObjectType::culling) { err = "bspinfo: no hay un Culling '" + nombre + "'"; return false; }
+        Culling* cu = (Culling*)o;
+        if (sub == "archivo") { std::string r; ss >> r; cu->bspArchivo = r; cu->bspCargado = false; cu->bspCluster = -1; cu->metodo = Culling::Bsp; }
+        // ASSERTS opcionales (prueba_bsp_pvs.w3s): `cluster <n>` = la hoja donde cayo la camara activa,
+        // `pvs <n>` = cuantos hijos pasaron el PVS (antes del frustum). Se pueden encadenar: cluster 0 pvs 2
+        int clusterEsp = -2, pvsEsp = -1;
+        for (std::string k = sub; !k.empty(); k.clear(), ss >> k) {
+            if (k == "cluster") ss >> clusterEsp;
+            else if (k == "pvs") ss >> pvsEsp;
+        }
+        g_cullHijosTotal = 0; g_cullHijosVisibles = 0;
+        if (rootViewport) rootViewport->Render();
+        { extern Viewport3D* Viewport3DActive; if (Viewport3DActive) {
+            g_cullHijosTotal = 0; g_cullHijosVisibles = 0; Viewport3DActive->Render(); } }
+        int pasanPvs = 0;
+        for (size_t k = 0; k < cu->bspVisible.size(); k++) if (cu->bspVisible[k]) pasanPvs++;
+        printf("      [bspinfo] '%s' metodo=%s archivo='%s' valido=%s nodos=%d hojas=%d clusters=%d hijosDato=%d cluster=%d pvs=%d/%d frustum=%d/%d\n",
+               cu->name.c_str(), CullingMetodoNombre(cu->metodo), cu->bspArchivo.c_str(), cu->bsp.Valido() ? "si" : "no",
+               (int)cu->bsp.nodos.size(), (int)cu->bsp.hojaCluster.size(), cu->bsp.nClusters, (int)cu->bsp.hijos.size(),
+               cu->bspCluster, pasanPvs, (int)cu->Childrens.size(), g_cullHijosVisibles, g_cullHijosTotal);
+        if (clusterEsp != -2 && cu->bspCluster != clusterEsp) {
+            char b[160]; snprintf(b, sizeof(b), "bspinfo: la camara cayo en el cluster %d y se esperaba %d", cu->bspCluster, clusterEsp);
+            err = b; return false;
+        }
+        if (pvsEsp >= 0 && pasanPvs != pvsEsp) {
+            char b[160]; snprintf(b, sizeof(b), "bspinfo: pasaron el PVS %d hijos y se esperaban %d", pasanPvs, pvsEsp);
+            err = b; return false;
+        }
+        return true;
+    }
     if (cmd == "cullactivo") {
         std::string nombre, sub; ss >> nombre >> sub;
         Object* o = SceneCollection ? FindObjectByName(SceneCollection, nombre) : NULL;
@@ -5115,7 +5249,9 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
                 *fx = px; *fy = py; return true;
             }
         };
-        Vector3 P = base + ex * ((2.0f*u - 1.0f) * s) + ey * ((2.0f*v - 1.0f) * s);
+        // v = 0 es la fila de ARRIBA del PNG y va ARRIBA del quad (ey +): el quad muestra la textura derecha
+        // (antes el vertice de abajo tomaba v 0 y todas las particulas salian cabeza abajo)
+        Vector3 P = base + ex * ((2.0f*u - 1.0f) * s) + ey * ((1.0f - 2.0f*v) * s);
         int fx = 0, fy = 0;
         if (!Local::Pixel(M, P, vp, vpGLY, &fx, &fy)) { err = "partpx: el punto queda fuera de la vista"; return false; }
         unsigned char pix[4] = { 0, 0, 0, 0 };
@@ -5511,6 +5647,72 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
     // ---- matflags <material> [decal|aditivo|normal] : dump (y assert) de los campos de
     //      material que decidieron el DECAL y la MEZCLA. Sirve para probar el round-trip:
     //      lo que dice el .mtl -> lo que queda en memoria -> lo que se guarda en el .w3d v4. ----
+    // ---- matcapa <mat> [add <ruta> | <n> tex <ruta> | <n> uv <k> | <n> mezcla <m> | <n> on|off | <n> del |
+    //      capas <N> | <n> es uv <k> mezcla <m>] : las CAPAS DE TEXTURA del material (TexLayer: textura + capa UV
+    //      + mezcla), lo mismo que edita la tarjeta Material. Sin argumentos las lista; 'capas N' y 'es' son asserts.
+    // ---- matalfa <mat> [ref | es <ref>] : el recorte por alfa del material (Material::alphaTest, 0 = apagado).
+    //      Sin argumento lo imprime; con <ref> lo setea; `es <ref>` ASSERTEA (glTF MASK / alfaCorte del .w3d). ----
+    if (cmd == "matalfa") {
+        std::string nombre, sub; ss >> nombre >> sub;
+        Material* mt = BuscarMaterialPorNombre(nombre);
+        if (!mt) { err = "matalfa: no existe el material '" + nombre + "'"; return false; }
+        if (sub == "es") {
+            float esp = 0; ss >> esp;
+            if (fabsf(mt->alphaTest - esp) > 1e-4f) {
+                char b[160]; snprintf(b, sizeof(b), "matalfa: '%s' tiene alfaCorte %g y se esperaba %g", nombre.c_str(), mt->alphaTest, esp);
+                err = b; return false;
+            }
+        } else if (!sub.empty()) { mt->alphaTest = (float)atof(sub.c_str()); g_redraw = true; }
+        printf("      [matalfa] '%s' alfaCorte=%g transparente=%s\n", nombre.c_str(), mt->alphaTest, mt->transparent ? "si" : "no");
+        return true;
+    }
+    if (cmd == "matcapa") {
+        std::string nombre, sub; ss >> nombre >> sub;
+        Material* mt = BuscarMaterialPorNombre(nombre);
+        if (!mt) { err = "matcapa: no existe el material '" + nombre + "'"; return false; }
+        if (sub == "add") {
+            std::string ruta; ss >> ruta;
+            Texture* t = TexturaTomar(ruta);
+            if (!t) { err = "matcapa: no pude cargar '" + ruta + "'"; return false; }
+            TexLayer tl; tl.tex = t; mt->capas.push_back(tl);
+        } else if (sub == "capas") {
+            int n = -1; ss >> n;
+            if (n >= 0 && (int)mt->capas.size() != n) {
+                char b[160]; snprintf(b, sizeof b, "matcapa: '%s' tiene %d capa(s) y se esperaban %d", mt->name.c_str(), (int)mt->capas.size(), n);
+                err = b; return false;
+            }
+        } else if (!sub.empty()) {
+            const int n = atoi(sub.c_str());
+            if (n < 0 || n >= (int)mt->capas.size()) { err = "matcapa: capa fuera de rango"; return false; }
+            TexLayer& cap = mt->capas[(size_t)n];
+            std::string op; ss >> op;
+            if (op == "tex") { std::string ruta; ss >> ruta; Texture* t = TexturaTomar(ruta);
+                if (!t) { err = "matcapa: no pude cargar '" + ruta + "'"; return false; } cap.tex = t; }
+            else if (op == "uv")     { int k = 0; ss >> k; cap.uvMapa = k < 0 ? 0 : k; }
+            else if (op == "mezcla") { int m2 = 0; ss >> m2; if (m2 < 0 || m2 >= W3D_CAPA_MEZCLAS) { err = "matcapa: mezcla invalida"; return false; } cap.blend = m2; }
+            else if (op == "on")     cap.on = true;
+            else if (op == "off")    cap.on = false;
+            else if (op == "del")    mt->capas.erase(mt->capas.begin() + n);
+            else if (op == "es") {
+                std::string q; int esperado;
+                while (ss >> q >> esperado) {
+                    int real = (q == "uv") ? cap.uvMapa : (q == "mezcla") ? cap.blend : (q == "on") ? (cap.on ? 1 : 0) : -999;
+                    if (real != esperado) {
+                        char b[160]; snprintf(b, sizeof b, "matcapa: capa %d %s=%d y se esperaba %d", n, q.c_str(), real, esperado);
+                        err = b; return false;
+                    }
+                }
+            } else { err = "matcapa: operacion desconocida '" + op + "'"; return false; }
+        }
+        printf("      [matcapa] '%s' %d capa(s)\n", mt->name.c_str(), (int)mt->capas.size());
+        for (size_t c = 0; c < mt->capas.size(); c++) {
+            const TexLayer& cap = mt->capas[c];
+            printf("         [%d] tex='%s' uv=%d mezcla=%d (%s) %s\n", (int)c, (cap.tex ? cap.tex->path.c_str() : "(ninguna)"),
+                   cap.uvMapa, cap.blend, W3dCapaMezclaNombre(cap.blend), cap.on ? "on" : "off");
+        }
+        g_redraw = true;
+        return true;
+    }
     if (cmd == "matflags") {
         std::string nombre, esperado; ss >> nombre >> esperado;
         Material* mt = BuscarMaterialPorNombre(nombre);
@@ -6022,6 +6224,11 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         while(!st.empty()){ Object* o=st.back(); st.pop_back();
             if (o->getType()==ObjectType::mesh){ Mesh* m=(Mesh*)o; nm++;
                 printf("      [mesh] '%s' verts=%d faces3d=%d tris(idx/3)=%d edges=%d meshParts=%d\n", m->name.c_str(), m->vertexSize, (int)m->faces3d.size(), m->facesSize/3, (int)(m->edges.size()/2), (int)m->materialsGroup.size());
+                if (!m->uvMaps.empty() || !m->uvExtra.empty()) {   // capas UV: las del editor + las que estan en el render
+                    printf("         uvMaps=%d activa=%d uvExtra=[", (int)m->uvMaps.size(), m->uvMapActivo);
+                    for (size_t k = 0; k < m->uvExtra.size(); k++) printf("%s%d", k ? "," : "", (int)(m->uvExtra[k].size() / 2));
+                    printf("]\n");
+                }
                 if (m->flipbook)   // animacion UV = flipbook del Core (para verificar texto/v4 en los tests)
                     printf("         uvanim frames=%d fps=%g eje=%s desfase=%d\n", m->flipbook->cuadros, (double)m->flipbook->fps, m->flipbook->filas > 1 ? "v" : "u", m->flipPlay.desfase);
                 for (size_t g=0; g<m->materialsGroup.size(); g++){ MaterialGroup& mg=m->materialsGroup[g];
@@ -6948,10 +7155,11 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
             if (it->icon == (int)IconType::gamepad) iconoGamepad++;   // el viejo objeto "Script"
         }
         printf("\n");
-        // la PRIMERA fila es el submenu de mallas (8 primitivas); la ultima, Imports
+        // la PRIMERA fila es el submenu de mallas (8 primitivas); la ultima, Imports; y el de los PREFABS
+        // del proyecto (Add > Prefab)
         if (!MenuAdd->items.empty() && MenuAdd->items[0]->submenu)
             primitivas = (int)MenuAdd->items[0]->submenu->items.size();
-        const bool menuOk = (primitivas >= 6 && conSubmenu == 2 && iconoGamepad == 0);
+        const bool menuOk = (primitivas >= 6 && conSubmenu == 3 && iconoGamepad == 0);
         printf("      [uxeditor] D primera fila = submenu de mallas con %d primitivas | submenus=%d "
                "| filas con el icono del viejo objeto Script=%d %s\n",
                primitivas, conSubmenu, iconoGamepad,
@@ -7074,6 +7282,44 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         if (n.empty()) { err = "teclajuego: falta el nombre de la tecla"; return false; }
         W3dScriptTecla(n.c_str(), e != "off");
         printf("      [teclajuego] '%s' %s\n", n.c_str(), e != "off" ? "on" : "off");
+        return true;
+    }
+    // ---- ratonrel <dx> <dy> : inyecta movimiento de mouse CAPTURADO (lo que main.cpp saca de SDL_GetRelativeMouseState)
+    //      -> ratonRel() en lua. `ratonrel captura <0|1>` ASSERTEA si un script pidio capturarRaton(true). ----
+    if (cmd == "ratonrel") {
+        std::string a; ss >> a;
+        extern void W3dScriptRatonRel(float, float); extern bool W3dScriptRatonCapturar();
+        if (a == "captura") {
+            int esp = -1; ss >> esp;
+            const bool cap = W3dScriptRatonCapturar();
+            printf("      [ratonrel] captura pedida=%s\n", cap ? "si" : "no");
+            if (esp >= 0 && cap != (esp != 0)) { err = std::string("ratonrel: la captura pedida es ") + (cap ? "si" : "no") + " y se esperaba lo contrario"; return false; }
+            return true;
+        }
+        float dx = (float)atof(a.c_str()), dy = 0; ss >> dy;
+        W3dScriptRatonRel(dx, dy);
+        printf("      [ratonrel] +(%g, %g)\n", dx, dy);
+        return true;
+    }
+    // ---- uvat <malla> <i> [capa] [u v tol] : la UV del render-vert i (1-based) de la malla, en la capa UV 'capa'
+    //      (0 = la base, >= 1 = Mesh::uvExtra). Con u v tol ASSERTEA (prueba de setVerticeUV desde lua). ----
+    if (cmd == "uvat") {
+        std::string nombre; int i = 0, capa = 0; ss >> nombre >> i >> capa;
+        Object* o = SceneCollection ? FindObjectByName(SceneCollection, nombre) : NULL;
+        if (!o || o->getType() != ObjectType::mesh) { err = "uvat: no hay una malla '" + nombre + "'"; return false; }
+        Mesh* m = (Mesh*)o;
+        if (i < 1 || i > m->vertexSize) { err = "uvat: indice de vertice fuera de rango"; return false; }
+        const GLfloat* src = capa <= 0 ? m->uv : m->UVDeCapa(capa);
+        if (!src) { err = "uvat: la malla no tiene esa capa UV"; return false; }
+        const float u = src[(size_t)(i - 1) * 2], v = src[(size_t)(i - 1) * 2 + 1];
+        float eu, ev, tol;
+        if (ss >> eu >> ev >> tol) {
+            if (fabsf(u - eu) > tol || fabsf(v - ev) > tol) {
+                char b[160]; snprintf(b, sizeof(b), "uvat: %s vert %d capa %d = (%.4f, %.4f), se esperaba (%.4f, %.4f)", nombre.c_str(), i, capa, u, v, eu, ev);
+                err = b; return false;
+            }
+        }
+        printf("      [uvat] %s vert %d capa %d = (%.4f, %.4f)\n", nombre.c_str(), i, capa, u, v);
         return true;
     }
     // ---- tlciclo : CICLO RAPIDO del selector de animacion del timeline (pedido N95).
@@ -7805,57 +8051,59 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         //  Estos archivos YA NO SE PUEDEN FABRICAR guardando (hoy sale .w3dm), asi que viven
         //  versionados en el CORPUS DE ORO (Whisk3D/formato/corpus). Sin corpus la
         //  retrocompatibilidad seria una intencion; con corpus es un test que se pone rojo.
-        std::string corpus = W3dCorpusFile("v4_glb_quads.w3d");
-        if (corpus.empty()) { err = "quadsave: falta formato/corpus/v4_glb_quads.w3d (corpus de oro)"; return false; }
-        // -- 4) GLB + "topologia": abre con sus POLIGONOS y al guardar QUEDA EN .w3dm --
-        AbrirProyectoAhora(corpus);
-        { Mesh* rc = QsBuscarMesh("Mixta");
-          int nq = 0, ng = 0;
-          if (rc) for (size_t f = 0; f < rc->faces3d.size(); f++) {
-              size_t n = rc->faces3d[f].idx.size(); if (n == 4) nq++; else if (n == 5) ng++; }
-          printf("      [quadsave] corpus GLB+topologia: abre=%s verts=%d faces3d=%d quads=%d ngons=%d parts=%d\n",
-                 rc?"OK":"MAL", rc?rc->vertexSize:-1, rc?(int)rc->faces3d.size():-1, nq, ng,
-                 rc?(int)rc->materialsGroup.size():-1);
-          if (!rc || nq != 6 || ng != 1 || (int)rc->materialsGroup.size() != 2) ok = false; }
-        std::string fm = pref + "_migrado.w3d";
-        if (!GuardarW3D(fm)) { err = "quadsave: fallo el guardado del proyecto migrado"; return false; }
-        { // el .glb NO viaja (mallas/ es carpeta EXCLUSIVA del editor: lo no referenciado se descarta)
-          W3dZipLector z; bool hayW3dm = false, hayGlb = false;
-          std::vector<std::string> ents;
-          if (z.Abrir(fm)) z.Listar(ents);
-          for (size_t i = 0; i < ents.size(); i++) {
-              const std::string& n = ents[i];
-              if (n.size() > 5 && n.compare(n.size()-5, 5, ".w3dm") == 0) hayW3dm = true;
-              if (n.size() > 4 && n.compare(n.size()-4, 4, ".glb")  == 0) hayGlb  = true; }
-          printf("      [quadsave] tras guardar el migrado: mallas/*.w3dm=%s mallas/*.glb=%s\n",
-                 hayW3dm?"si":"NO", hayGlb?"SI (mal)":"no");
-          if (!hayW3dm || hayGlb) ok = false; }
-        AbrirProyectoAhora(fm);
-        { Mesh* rc = QsBuscarMesh("Mixta");
-          int nq = 0, ng = 0;
-          if (rc) for (size_t f = 0; f < rc->faces3d.size(); f++) {
-              size_t n = rc->faces3d[f].idx.size(); if (n == 4) nq++; else if (n == 5) ng++; }
-          printf("      [quadsave] migrado reabierto desde .w3dm: quads=%d ngons=%d parts=%d\n",
-                 nq, ng, rc?(int)rc->materialsGroup.size():-1);
-          if (!rc || nq != 6 || ng != 1 || (int)rc->materialsGroup.size() != 2) ok = false; }
+        if (!W3dSaltearSinCorpus("quadsave", "4/5 (migracion de los .w3d con la geometria en GLB)")) {
+            std::string corpus = W3dCorpusFile("v4_glb_quads.w3d");
+            if (corpus.empty()) { err = "quadsave: falta formato/corpus/v4_glb_quads.w3d (corpus de oro)"; return false; }
+            // -- 4) GLB + "topologia": abre con sus POLIGONOS y al guardar QUEDA EN .w3dm --
+            AbrirProyectoAhora(corpus);
+            { Mesh* rc = QsBuscarMesh("Mixta");
+              int nq = 0, ng = 0;
+              if (rc) for (size_t f = 0; f < rc->faces3d.size(); f++) {
+                  size_t n = rc->faces3d[f].idx.size(); if (n == 4) nq++; else if (n == 5) ng++; }
+              printf("      [quadsave] corpus GLB+topologia: abre=%s verts=%d faces3d=%d quads=%d ngons=%d parts=%d\n",
+                     rc?"OK":"MAL", rc?rc->vertexSize:-1, rc?(int)rc->faces3d.size():-1, nq, ng,
+                     rc?(int)rc->materialsGroup.size():-1);
+              if (!rc || nq != 6 || ng != 1 || (int)rc->materialsGroup.size() != 2) ok = false; }
+            std::string fm = pref + "_migrado.w3d";
+            if (!GuardarW3D(fm)) { err = "quadsave: fallo el guardado del proyecto migrado"; return false; }
+            { // el .glb NO viaja (mallas/ es carpeta EXCLUSIVA del editor: lo no referenciado se descarta)
+              W3dZipLector z; bool hayW3dm = false, hayGlb = false;
+              std::vector<std::string> ents;
+              if (z.Abrir(fm)) z.Listar(ents);
+              for (size_t i = 0; i < ents.size(); i++) {
+                  const std::string& n = ents[i];
+                  if (n.size() > 5 && n.compare(n.size()-5, 5, ".w3dm") == 0) hayW3dm = true;
+                  if (n.size() > 4 && n.compare(n.size()-4, 4, ".glb")  == 0) hayGlb  = true; }
+              printf("      [quadsave] tras guardar el migrado: mallas/*.w3dm=%s mallas/*.glb=%s\n",
+                     hayW3dm?"si":"NO", hayGlb?"SI (mal)":"no");
+              if (!hayW3dm || hayGlb) ok = false; }
+            AbrirProyectoAhora(fm);
+            { Mesh* rc = QsBuscarMesh("Mixta");
+              int nq = 0, ng = 0;
+              if (rc) for (size_t f = 0; f < rc->faces3d.size(); f++) {
+                  size_t n = rc->faces3d[f].idx.size(); if (n == 4) nq++; else if (n == 5) ng++; }
+              printf("      [quadsave] migrado reabierto desde .w3dm: quads=%d ngons=%d parts=%d\n",
+                     nq, ng, rc?(int)rc->materialsGroup.size():-1);
+              if (!rc || nq != 6 || ng != 1 || (int)rc->materialsGroup.size() != 2) ok = false; }
 
-        // -- 5) el MISMO .w3d sin "topologia" y con "topologia" ROTA: abren TRIANGULADOS --
-        //     Lo que ya se habia perdido no se resucita (en el .glb no queda ningun registro de
-        //     que dos triangulos eran un quad): la migracion corta la perdida hacia adelante.
-        {
-            const char* nombres[2] = { "sin topologia", "topologia INCONSISTENTE" };
-            std::string dsts[2] = { pref + "_viejo.w3d", pref + "_roto.w3d" };
-            for (int c = 0; c < 2; c++) {
-                bool hecho = (c == 0) ? QsQuitarTopologia(corpus, dsts[c]) : QsRomperTopologia(corpus, dsts[c]);
-                if (!hecho) { err = "quadsave: no pude fabricar el .w3d de migracion"; return false; }
-                AbrirProyectoAhora(dsts[c]);
-                Mesh* rv = QsBuscarMesh("Mixta");
-                int tri = 0, otras = 0;
-                if (rv) for (size_t f = 0; f < rv->faces3d.size(); f++) {
-                    if (rv->faces3d[f].idx.size() == 3) tri++; else otras++; }
-                printf("      [quadsave] corpus %-24s -> abre=%s verts=%d tris=%d otras=%d (esperado TODO triangulado)\n",
-                       nombres[c], rv?"OK":"MAL", rv?rv->vertexSize:-1, tri, otras);
-                if (!rv || tri <= 0 || otras != 0) ok = false;
+            // -- 5) el MISMO .w3d sin "topologia" y con "topologia" ROTA: abren TRIANGULADOS --
+            //     Lo que ya se habia perdido no se resucita (en el .glb no queda ningun registro de
+            //     que dos triangulos eran un quad): la migracion corta la perdida hacia adelante.
+            {
+                const char* nombres[2] = { "sin topologia", "topologia INCONSISTENTE" };
+                std::string dsts[2] = { pref + "_viejo.w3d", pref + "_roto.w3d" };
+                for (int c = 0; c < 2; c++) {
+                    bool hecho = (c == 0) ? QsQuitarTopologia(corpus, dsts[c]) : QsRomperTopologia(corpus, dsts[c]);
+                    if (!hecho) { err = "quadsave: no pude fabricar el .w3d de migracion"; return false; }
+                    AbrirProyectoAhora(dsts[c]);
+                    Mesh* rv = QsBuscarMesh("Mixta");
+                    int tri = 0, otras = 0;
+                    if (rv) for (size_t f = 0; f < rv->faces3d.size(); f++) {
+                        if (rv->faces3d[f].idx.size() == 3) tri++; else otras++; }
+                    printf("      [quadsave] corpus %-24s -> abre=%s verts=%d tris=%d otras=%d (esperado TODO triangulado)\n",
+                           nombres[c], rv?"OK":"MAL", rv?rv->vertexSize:-1, tri, otras);
+                    if (!rv || tri <= 0 || otras != 0) ok = false;
+                }
             }
         }
 
@@ -7961,26 +8209,28 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         { extern int g_w3dVaRemapeos;
           printf("      [quadsave] remapeos por cercania de posicion al abrir: %d (esperado 0)\n", g_w3dVaRemapeos);
           if (g_w3dVaRemapeos != 0) ok = false;
-          // ...y el gemelo positivo: en un .w3d VIEJO de verdad (vertex anim + GLB SIN el bloque
-          // "topologia") el GLB re-splitteaba los verts (24 -> 45) y el remapeo por cercania era
-          // lo unico que habia. Tiene que seguir disparandose ahi, y no volver a hacer falta
-          // nunca mas despues de migrar.
-          std::string cva = W3dCorpusFile("v4_glb_vertexanim.w3d");
-          if (cva.empty()) { err = "quadsave: falta formato/corpus/v4_glb_vertexanim.w3d (corpus de oro)"; return false; }
-          std::string cvaViejo = pref + "_va_viejo.w3d";
-          if (!QsQuitarTopologia(cva, cvaViejo)) { err = "quadsave: no pude fabricar el .w3d de vertex anim viejo"; return false; }
-          g_w3dVaRemapeos = 0;
-          AbrirProyectoAhora(cvaViejo);
-          int viejo = g_w3dVaRemapeos;
-          std::string hm = pref + "_va_migrada.w3d";
-          if (!GuardarW3D(hm)) { err = "quadsave: fallo el guardado de la vertex anim migrada"; return false; }
-          g_w3dVaRemapeos = 0;
-          AbrirProyectoAhora(hm);
-          Mesh* rv = QsBuscarMesh("AnimCubo");
-          int vc = (rv && !rv->animations.empty() && rv->animations[0]) ? rv->animations[0]->vcount : -1;
-          printf("      [quadsave] corpus vertex anim en GLB: remapeos al abrirlo=%d (esperado >0) | ya migrado=%d (esperado 0) vcount=%d/%d\n",
-                 viejo, g_w3dVaRemapeos, vc, rv?rv->vertexSize:-1);
-          if (viejo <= 0 || g_w3dVaRemapeos != 0 || !rv || vc != rv->vertexSize) ok = false; }
+          if (!W3dSaltearSinCorpus("quadsave", "6 (vertex anim vieja en GLB: el remapeo por cercania)")) {
+            // ...y el gemelo positivo: en un .w3d VIEJO de verdad (vertex anim + GLB SIN el bloque
+            // "topologia") el GLB re-splitteaba los verts (24 -> 45) y el remapeo por cercania era
+            // lo unico que habia. Tiene que seguir disparandose ahi, y no volver a hacer falta
+            // nunca mas despues de migrar.
+            std::string cva = W3dCorpusFile("v4_glb_vertexanim.w3d");
+            if (cva.empty()) { err = "quadsave: falta formato/corpus/v4_glb_vertexanim.w3d (corpus de oro)"; return false; }
+            std::string cvaViejo = pref + "_va_viejo.w3d";
+            if (!QsQuitarTopologia(cva, cvaViejo)) { err = "quadsave: no pude fabricar el .w3d de vertex anim viejo"; return false; }
+            g_w3dVaRemapeos = 0;
+            AbrirProyectoAhora(cvaViejo);
+            int viejo = g_w3dVaRemapeos;
+            std::string hm = pref + "_va_migrada.w3d";
+            if (!GuardarW3D(hm)) { err = "quadsave: fallo el guardado de la vertex anim migrada"; return false; }
+            g_w3dVaRemapeos = 0;
+            AbrirProyectoAhora(hm);
+            Mesh* rv = QsBuscarMesh("AnimCubo");
+            int vc = (rv && !rv->animations.empty() && rv->animations[0]) ? rv->animations[0]->vcount : -1;
+            printf("      [quadsave] corpus vertex anim en GLB: remapeos al abrirlo=%d (esperado >0) | ya migrado=%d (esperado 0) vcount=%d/%d\n",
+                   viejo, g_w3dVaRemapeos, vc, rv?rv->vertexSize:-1);
+            if (viejo <= 0 || g_w3dVaRemapeos != 0 || !rv || vc != rv->vertexSize) ok = false; }
+        }
 
         // ============== 7) LA MALLA CON TODO, POR EL FLUJO REAL DEL EDITOR (T3.1) ==============
         //  'w3dm' ya prueba que el FORMATO va y vuelve exacto. Esto prueba lo que el dueno va a
@@ -8044,7 +8294,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         //  la malla VACIA: el proyecto NO era autocontenido. Ahora la malla carga SIEMPRE de
         //  "geometria" (interna) y "origen" queda para reimportar del original; si falta, se avisa
         //  y no pasa nada.
-        {
+        if (!W3dSaltearSinCorpus("quadsave", "8 (malla importada de un .w3d viejo con origen externo)")) {
             std::string legado = W3dCorpusFile("v4_modelo_externo.w3d");
             if (legado.empty()) { err = "quadsave: falta formato/corpus/v4_modelo_externo.w3d (corpus de oro)"; return false; }
             AbrirProyectoAhora(legado);
@@ -8627,6 +8877,40 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
     //      "objkeyroty 90 / timeline goto 20 / objanimnew / guardarw3d" -> "rot": [0, 89.98, 0].
     //      La pose NO se borra al cambiar de kind (nadie la deshace), asi que el archivo
     //      tiene que salir igual guarde con el timeline donde guarde.
+    // ---- escenaactiva <nombre> : deja ACTIVA esa animacion de escena en el timeline (kind 0), como elegirla en
+    //      el dropdown de la tarjeta Animation. ----
+    if (cmd == "escenaactiva") {
+        std::string n; ss >> n;
+        extern int ActiveAnimKind;
+        const int idx = W3dAnimEscenaIdx(n.c_str());
+        if (idx < 0) { err = "escenaactiva: no hay una animacion de escena '" + n + "'"; return false; }
+        ActiveAnimKind = 0; SetEscenaActiva(idx); AnimCargarRangoActivo();
+        printf("      [escenaactiva] '%s' (%d) rango %d..%d\n", n.c_str(), idx, StartFrame, EndFrame);
+        return true;
+    }
+    // ---- camactiva [esperada] : la camara ACTIVA y la que dice la pista "Camara activa" en el frame actual ----
+    if (cmd == "camactiva") {
+        std::string esperada; ss >> esperada;
+        // camactiva set <camara> : la elige como activa (como el selector de la tarjeta)
+        if (esperada == "set") { std::string n; ss >> n; if (g_camaraActivaHook) g_camaraActivaHook(n.c_str());
+            printf("      [camactiva] activa -> '%s'\n", CameraActive ? CameraActive->name.c_str() : "(ninguna)"); return true; }
+        // camactiva rombo [click] : estado del rombo de la tarjeta (0 gris,1 tenue,2 key,3 verde) y opcional click
+        if (esperada == "rombo") { std::string c; ss >> c;
+            int e0 = W3dKeyframeEstado ? W3dKeyframeEstado(AnimCamActiva, 0) : -1;
+            if (c == "click" && W3dKeyframeToggle) W3dKeyframeToggle(AnimCamActiva, 0);
+            int e1 = W3dKeyframeEstado ? W3dKeyframeEstado(AnimCamActiva, 0) : -1;
+            printf("      [camactiva] rombo frame %d: estado %d%s -> %d\n", CurrentFrame, e0, c == "click" ? " (click)" : "", e1);
+            return true; }
+        extern void AplicarAnimacionObjetos();
+        AplicarAnimacionObjetos();
+        const char* pista = W3dCamEnFrame(SceneAnimActiva, CurrentFrame);
+        printf("      [camactiva] frame %d: activa '%s' | pista '%s'\n", CurrentFrame,
+               CameraActive ? CameraActive->name.c_str() : "(ninguna)", pista ? pista : "(sin pista)");
+        if (!esperada.empty() && (!CameraActive || CameraActive->name != esperada)) {
+            err = "camactiva: la activa no es '" + esperada + "'"; return false;
+        }
+        return true;
+    }
     if (cmd == "animkind") {
         std::string pref; ss >> pref;
         if (pref.empty()) pref = W3dDebugFile("animkind");
@@ -18357,13 +18641,27 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
             SceneAnimations[2]->name = "Vuelo";      // ['E0','E1','Vuelo','E3']
             SceneAnimActiva = 0;                     // el selector deja elegir CUALQUIERA
             _AnimDelCardFwd();                       // el "-": borra E0 -> ['E1','Vuelo','E3']
+            // (fase 6) el borrado es DESHACIBLE: el primer Ctrl+Z devuelve E0 a su lugar, el segundo el rename
+            // a SU escena (la de al lado no se toca)
+            UndoDeshacer();
+            const bool vuelta = (SceneAnimations.size() == 4 && SceneAnimations[0]->name == "E0" &&
+                                 SceneAnimations[2]->name == "Vuelo" && SceneAnimActiva == 0);
+            printf("      [escenaborra] B Ctrl+Z del '-': %s (esperado 'E0' 'E1' 'Vuelo' 'E3', activa 0) %s\n",
+                   Loc::Lista().c_str(), vuelta ? "OK" : "<-- MAL (el borrado no volvio a su lugar)");
+            if (!vuelta) ok = false;
             UndoDeshacer();                          // el rename vuelve a SU escena
-            bool repB = (SceneAnimations.size() == 3 && SceneAnimations[0]->name == "E1" &&
-                         SceneAnimations[1]->name == "E2" && SceneAnimations[2]->name == "E3");
-            printf("      [escenaborra] B borrar la escena de abajo + undo: %s (esperado 'E1' 'E2' 'E3') %s\n",
+            bool repB = (SceneAnimations.size() == 4 && SceneAnimations[0]->name == "E0" && SceneAnimations[1]->name == "E1" &&
+                         SceneAnimations[2]->name == "E2" && SceneAnimations[3]->name == "E3");
+            printf("      [escenaborra] B borrar la escena de abajo + undo x2: %s (esperado 'E0' 'E1' 'E2' 'E3') %s\n",
                    Loc::Lista().c_str(),
                    repB ? "OK" : "<-- MAL (el undo escribio el nombre viejo en la escena de al lado)");
             if (!repB) ok = false;
+            UndoRehacer(); UndoRehacer();            // ...y Ctrl+Y dos veces: el rename y el borrado otra vez
+            const bool rehecho = (SceneAnimations.size() == 3 && SceneAnimations[0]->name == "E1" &&
+                                  SceneAnimations[1]->name == "Vuelo" && SceneAnimations[2]->name == "E3");
+            printf("      [escenaborra] B Ctrl+Y x2: %s (esperado 'E1' 'Vuelo' 'E3') %s\n",
+                   Loc::Lista().c_str(), rehecho ? "OK" : "<-- MAL");
+            if (!rehecho) ok = false;
         }
 
         if (!ok) { err = "escenaborra: borrar una animacion de escena rompe el undo de los renames"; return false; }
@@ -19685,17 +19983,24 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         Eliminar(false);                                        // borrado REAL (DeleteUndo se lleva la curva)
 
         const void* dirBorrada = (const void*)SceneAnimations[1];
-        _AnimDelCardFwd();                                      // el "-" sobre la escena S1 (no es deshacible)
+        _AnimDelCardFwd();                                      // el "-" sobre la escena S1 (deshacible desde la fase 6)
         if (SceneAnimations.size() != 1){ err = "delescena: el '-' no borro la escena"; return false; }
-        const int iNueva = NuevaEscena();                       // el "+" : puede caer en la MISMA direccion
-        const void* dirNueva = (const void*)SceneAnimations[iNueva];
+        const int iNueva = NuevaEscena();                       // el "+" : el paso de undo se QUEDO con S1 (no se
+        const void* dirNueva = (const void*)SceneAnimations[iNueva];   // libera), asi que su direccion no se recicla
         printf("      [delescena] escena borrada=%p escena nueva=%p %s\n", dirBorrada, dirNueva,
-               (dirBorrada == dirNueva) ? "DIRECCION REUSADA (el caso que rompia)"
-                                        : "(direccion distinta: el puntero muerto no revalida)");
+               (dirBorrada == dirNueva) ? "DIRECCION REUSADA (no deberia: S1 vive en el undo)"
+                                        : "(direccion distinta: S1 vive en el paso de undo)");
+        if (dirBorrada == dirNueva) ok = false;
 
+        UndoDeshacer();                                         // Ctrl+Z del BORRADO DE LA ESCENA: S1 vuelve
         UndoDeshacer();                                         // Ctrl+Z del BORRADO DEL OBJETO
 
-        const int enNueva = DE::Cuenta(iNueva, o), enCero = DE::Cuenta(0, o);
+        int iS1 = -1, iN = -1;
+        for (size_t i = 0; i < SceneAnimations.size(); i++) {
+            if ((const void*)SceneAnimations[i] == dirBorrada) iS1 = (int)i;
+            if ((const void*)SceneAnimations[i] == dirNueva) iN = (int)i;
+        }
+        const int enNueva = iN >= 0 ? DE::Cuenta(iN, o) : -1, enCero = DE::Cuenta(0, o), enS1 = iS1 >= 0 ? DE::Cuenta(iS1, o) : -1;
         const bool limpias = (enNueva == 0 && enCero == 0);
         printf("      [delescena] curvas en la escena NUEVA=%d, en la escena 0=%d (esperado 0 / 0) %s\n",
                enNueva, enCero,
@@ -19703,10 +20008,10 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         if (!limpias) ok = false;
 
         const int total = DE::CuentaTodas(o);
-        const bool recuperada = (total == 1 && (int)SceneAnimations.size() == 3);
-        printf("      [delescena] la curva volvio (escenas=%d, curvas suyas=%d): esperado 3 escenas -la de "
-               "origen '%s' RECREADA- y 1 curva %s\n", (int)SceneAnimations.size(), total, nomS1.c_str(),
-               recuperada ? "OK" : "<-- MAL (Ctrl+Z que PIERDE la animacion en silencio)");
+        const bool recuperada = (total == 1 && enS1 == 1 && iS1 == 1 && (int)SceneAnimations.size() == 3);
+        printf("      [delescena] la curva volvio (escenas=%d, curvas suyas=%d, en '%s'=%d): esperado 3 escenas -la de "
+               "origen devuelta a su lugar por el undo- y 1 curva en ella %s\n", (int)SceneAnimations.size(), total,
+               nomS1.c_str(), enS1, recuperada ? "OK" : "<-- MAL (Ctrl+Z que PIERDE la animacion en silencio)");
         if (!recuperada) ok = false;
 
         UndoLimpiar();
@@ -25536,6 +25841,30 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
     }
     // ---- gizmotest : el gizmo de mover: agarrar una flecha mueve solo en ese eje, un cuadrado en su plano,
     //      el circulo libre; soltar confirma (con undo); en Edit Mode mueve los verts seleccionados ----
+    // ---- gizmocamtest : mirando POR LA CAMARA el gizmo mide lo mismo en pantalla aunque cambie la orbita del
+    //      visor (orbitDistance) o el zoom de inspeccion. Antes las cuentas usaban la lente del visor y no la de
+    //      la camara: al zoomear el gizmo se agrandaba/achicaba mal.
+    if (cmd == "gizmocamtest") {
+        std::string e2;
+        if (!W3dRunCommand("selobj Cubo", e2)) { err = "gizmocamtest: sin cubo"; return false; }
+        if (!W3dRunCommand("vpcamara on", e2)) { err = "gizmocamtest: " + e2; return false; }
+        Viewport3D* vp = (Viewport3D*)viewPortActive;
+        struct GZ { static float Largo(Viewport3D* vp) { float cx, cy, ax, ay;
+            if (!GizmoManijaEnPantalla(vp, GizmoCentro, cx, cy) || !GizmoManijaEnPantalla(vp, GizmoEjeZ, ax, ay)) return -1.0f;
+            return sqrtf((ax - cx) * (ax - cx) + (ay - cy) * (ay - cy)); } };
+        const float l0 = GZ::Largo(vp);
+        const float od = vp->orbitDistance; vp->orbitDistance = od * 4.0f;
+        const float l1 = GZ::Largo(vp);
+        vp->orbitDistance = od; const float z0 = vp->camViewZoom; vp->camViewZoom = 2.5f;
+        const float l2 = GZ::Largo(vp);
+        vp->camViewZoom = z0;
+        W3dRunCommand("vpcamara off", e2);
+        // tolerancia 3%: el gizmo cambia de tamanio en MUNDO y la perspectiva lo escorza un poquito distinto
+        const bool ok = l0 > 1.0f && fabsf(l1 - l0) < l0 * 0.03f && fabsf(l2 - l0) < l0 * 0.03f;
+        printf("      [gizmocamtest] largo en px: base=%.2f orbita x4=%.2f zoom 2.5=%.2f -> %s\n", l0, l1, l2, ok ? "OK" : "MAL");
+        if (!ok) { err = "gizmocamtest: el gizmo cambia de tamanio en pantalla mirando por la camara"; return false; }
+        return true;
+    }
     if (cmd == "gizmotest") {
         bool ok = true; std::string e2;
         if (!W3dRunCommand("add cube", e2)) { err = "gizmotest: " + e2; return false; }
@@ -28211,6 +28540,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         const long ahM = Ahorro::De(W3DREC_MALLA), ahA = Ahorro::De(W3DREC_ANIM);
         printf("      [meminfo] mallas:   vivas=%d refs=%ld compartido=%ld B (%.1f KB) AHORRO=%ld B (%.1f KB)\n", vM, rM, bM, bM/1024.0, ahM, ahM/1024.0);
         printf("      [meminfo] anims:    vivas=%d refs=%ld compartido=%ld B (%.1f KB) AHORRO=%ld B (%.1f KB)\n", vA, rA, bA, bA/1024.0, ahA, ahA/1024.0);
+        { extern void W3dPruebasAnimsMeminfo(); W3dPruebasAnimsMeminfo(); }   // clips de esqueleto (test/W3dPruebasAnims.cpp)
         printf("      [meminfo] texturas: vivas=%d gpu=%ld B (%.1f KB)\n", vT, bT, bT/1024.0);
         printf("      [meminfo] desinstanciadas por COW=%d (mallas) + %d (anims)\n",
                W3dMallaDesinstanciados, AnimsDesinstanciadas());
@@ -30881,7 +31211,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         //  tienen, asi que sus cotas siguen siendo parte del contrato. La base sale del CORPUS DE
         //  ORO (formato/corpus): un .w3d con la geometria en GLB no se puede fabricar guardando.
         //  (Las cotas del .w3dm de HOY las cubre el test 'w3dm', T1.6.)
-        {
+        if (!W3dSaltearSinCorpus("w3dcotas", "1/2/3 (el bloque topologia envenenado de un .w3d con GLB)")) {
             std::string legado = W3dCorpusFile("v4_glb_quads.w3d");
             if (legado.empty()) { err = "w3dcotas: falta formato/corpus/v4_glb_quads.w3d (corpus de oro)"; return false; }
             const char* nombres[3] = { "verts GIGANTE (2000000000)", "verts NEGATIVO (-5)", "indice FUERA DE RANGO" };
@@ -32001,6 +32331,30 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
     //        T1.6  archivos corruptos / truncados / adversariales: fallan LIMPIO y RAPIDO
     //        T1.7  costuras (seam) y bordes marcados (sharp) byte a byte
     //        T1.8  vertex anims: RVMAP ancla los indices de render
+    // ---- simularsincorpus 1 | 0 [salteadas N] : el corpus de oro "no esta" (como en un clon
+    //      limpio) aunque la carpeta exista. Con 0 vuelve a la normalidad y, con 'salteadas N',
+    //      asserta cuantas partes se saltearon mientras estuvo simulado (que se salteen de verdad,
+    //      no que corran igual contra el corpus real). ----
+    if (cmd == "simularsincorpus") {
+        int v = -1; ss >> v;
+        if (v != 0 && v != 1) { err = "simularsincorpus: uso: simularsincorpus 1 | 0 [salteadas N]"; return false; }
+        std::string clave; int esperado = -1;
+        if (ss >> clave) {
+            if (clave != "salteadas" || !(ss >> esperado) || v != 0) {
+                err = "simularsincorpus: uso: simularsincorpus 1 | 0 [salteadas N]"; return false;
+            }
+        }
+        const int salteadas = g_corpusSalteos;
+        g_simularSinCorpus = (v == 1);
+        if (v == 1) g_corpusSalteos = 0;
+        printf("      [simularsincorpus] %s (salteadas mientras estuvo simulado: %d)\n",
+               v == 1 ? "corpus AUSENTE (simulado)" : "corpus normal", salteadas);
+        if (esperado >= 0 && salteadas != esperado) {
+            char b[160]; sprintf(b, "simularsincorpus: se saltearon %d partes y se esperaban %d", salteadas, esperado);
+            err = b; return false;
+        }
+        return true;
+    }
     if (cmd == "w3dm") {
         extern void ReiniciarEscena();
         bool ok = true;
@@ -32388,12 +32742,17 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         //  bloque OFICIAL (sin punto) que no esta registrado, este test falla.
         // =====================================================================
         {
+            // las mismas bases que W3dCorpusFile: desde Whisk3D/, platform/linux/build/ o
+            // tools/pruebas/ (donde corre la suite y el resto de los tests de formato)
             std::string base;
-            { std::error_code ec;
-              if (std::filesystem::exists("formato/corpus", ec)) base = "formato/corpus";
-              else if (std::filesystem::exists("../formato/corpus", ec)) base = "../formato/corpus";
-              else if (std::filesystem::exists("../../../formato/corpus", ec)) base = "../../../formato/corpus"; }
-            if (base.empty()) { printf("      [w3dm] T1.9 FALLA: no encuentro formato/corpus (corre el test desde la carpeta Whisk3D)\n"); ok = false; }
+            { std::string cubo = W3dCorpusFile("cubo_v1.w3dm");
+              if (!cubo.empty()) base = cubo.substr(0, cubo.size() - std::string("/cubo_v1.w3dm").size()); }
+            if (base.empty()) {
+                if (!W3dSaltearSinCorpus("w3dm", "T1.9 (corpus de oro + registro de bloques)")) {
+                    printf("      [w3dm] T1.9 FALLA: no encuentro formato/corpus/cubo_v1.w3dm (corre el test desde Whisk3D o tools/pruebas)\n");
+                    ok = false;
+                }
+            }
             else {
                 // el registro, para cruzar los nombres
                 std::set<std::string> registro;
@@ -32689,11 +33048,14 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         }
 
         // =====================================================================
-        //  F6 - UN PESO QUE NO ENTRA EN EL ARCHIVO SE DICE
+        //  F6 - DOS CONTROL-POINTS EN LA MISMA POSICION NO PIERDEN SU PESO
         //  Repro: malla IMPORTADA (glTF/FBX) donde el importador dejo dos
-        //  control-points distintos en la MISMA posicion, con pesos distintos. En
-        //  el .w3dm son UN punto: gana el primero. Perderlo esta bien; perderlo
-        //  sin decirlo, no.
+        //  control-points distintos en la MISMA posicion, con pesos distintos.
+        //  Antes en el .w3dm eran UN punto (ganaba el primero) y el test exigia
+        //  al menos el aviso. Ahora el escritor identifica el punto por posicion
+        //  + sus DATOS (pesos / shape keys): "guardar nunca suelda lo que la malla
+        //  no tiene soldado". Asi que ya no hay perdida que avisar: los DOS pesos
+        //  tienen que volver, sin avisos, y el re-guardado dar los mismos bytes.
         // =====================================================================
         {
             ReiniciarEscena(); PlayAnimation = false;
@@ -32714,13 +33076,32 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
             m->grupoActivo = (int)m->vertexGroups.size() - 1;
             std::string txt; std::vector<std::string> av;
             W3dMallaEscribir(m, txt, &av);
-            bool dice = false;
-            for (size_t i = 0; i < av.size(); i++)
-                if (av[i].find("Brazo") != std::string::npos && av[i].find("MISMA posicion") != std::string::npos) dice = true;
-            printf("      [perdida] F6 dos control-points en la misma posicion (render %d y %d): avisos=%d, lo dice=%s\n",
-                   a, b, (int)av.size(), dice ? "si" : "NO <-- MAL");
+            // releer: cada entrada del grupo tiene que caer en ESA posicion y con uno de
+            // los dos pesos; y tienen que estar LOS DOS (el de 'a' y el de 'b')
+            Mesh* r = (Mesh*)NewMesh(MeshType(MeshType::cube), NULL, false);
+            W3dMallaInfo ri;
+            const bool abrio = (a >= 0) && W3dMallaLeer(txt.data(), txt.size(), r, &ri);
+            bool hay25 = false, hay75 = false, otros = false;
+            if (abrio && !r->vertexGroups.empty() && r->vertexGroups[0]) {
+                const VertexGroup* rg = r->vertexGroups[0];
+                for (size_t k = 0; k < rg->verts.size() && k < rg->pesos.size(); k++) {
+                    const int v = rg->verts[k];
+                    if (v < 0 || v >= r->vertexSize) { otros = true; continue; }
+                    if (r->vertex[v*3] != m->vertex[a*3] || r->vertex[v*3+1] != m->vertex[a*3+1] ||
+                        r->vertex[v*3+2] != m->vertex[a*3+2]) { otros = true; continue; }
+                    if (rg->pesos[k] == 0.25f) hay25 = true;
+                    else if (rg->pesos[k] == 0.75f) hay75 = true;
+                    else otros = true;
+                }
+            }
+            if (abrio) W3dmResolverMateriales(r, ri, m);   // el material lo engancha el que llama
+            std::string txt2; if (abrio) W3dMallaEscribir(r, txt2, 0);
+            printf("      [perdida] F6 dos control-points en la misma posicion (render %d y %d, pesos 0.25/0.75): "
+                   "vuelve 0.25=%s 0.75=%s pesos ajenos=%s avisos=%d round-trip=%s\n",
+                   a, b, hay25 ? "si" : "NO <-- MAL", hay75 ? "si" : "NO <-- MAL", otros ? "SI <-- MAL" : "no",
+                   (int)av.size(), (txt == txt2) ? "IDENTICO" : "DIFIERE <-- MAL");
             for (size_t i = 0; i < av.size(); i++) printf("      [perdida]   -> %s\n", av[i].c_str());
-            if (a < 0 || b < 0 || !dice || av.size() != 1) ok = false;
+            if (a < 0 || b < 0 || !abrio || !hay25 || !hay75 || otros || !av.empty() || txt != txt2) ok = false;
         }
 
         // =====================================================================
@@ -34861,6 +35242,9 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
               if (todos[i] && todos[i]->getType() == ObjectType::mesh && todos[i]->name == "CuboMarcado")
                   m2 = (Mesh*)todos[i]; }
         if (!m2) { err = "vaguardado: C la malla no volvio a la escena"; return false; }
+        // la malla de un RECURSO abre con la edicion (caras, marcas) PENDIENTE: el editor la lee al
+        // seleccionar el objeto; el test mira las marcas, asi que la pide igual (MallaRecurso.h)
+        if (!m2->edicionPendiente.empty()) W3dMallaBinMaterializarEdicion(m2);
         const float maxAbierto = MX::De(m2);
         const bool geoOk = (fabsf(maxAbierto - maxReposo) < 0.001f);
         printf("      [vaguardado] C reabierto: maxAbs=%.2f (reposo %.2f, pose %.2f) %s | sharp=%d seam=%d (esperado 12/12) %s\n",

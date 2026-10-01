@@ -159,6 +159,7 @@ SOURCE          PropSelectText.cpp PropButton.cpp PropLabel.cpp
 SOURCEPATH      ..\..\..\main\ui\ViewPorts\PopUp
 SOURCE          PopUpBase.cpp ColorPicker.cpp FileBrowser.cpp RedoMeshPanel.cpp ConfirmarPopup.cpp ProgressPopup.cpp NuevaTexturaPopup.cpp
 SOURCE          FalloffEditor.cpp // popup del editor de curva de falloff del pincel
+SOURCE          CambiosPopup.cpp // el cartel "Se perderan los cambios en:" (al salir / abrir otro proyecto)
 
 // La UI (WhiskUI) es su propia capa reutilizable en libs/. Ver documentacion/ui.html
 SOURCEPATH      ..\..\..\libs\WhiskUI\core
@@ -180,11 +181,21 @@ SOURCEPATH      ..\..\..\libs\Whisk3DCore\objects
 SOURCE          TexturaCache.cpp
 SOURCEPATH      ..\..\..\main
 SOURCE          W3dEscena.cpp
+SOURCE          W3dRaices.cpp   // las ESCENAS 3D y los PREFABS del proyecto (raices, carga perezosa, cambiarEscena)
 SOURCEPATH      ..\..\..\main\io
 SOURCE          GuardarW3D.cpp W3dContenedor.cpp UI2DFormato.cpp Textura2D.cpp Fuente2D.cpp SkinAtlas.cpp Video2DCache.cpp TexturaGenerada.cpp TexturaEditada.cpp
+SOURCE          MallasProyecto.cpp // editor: publicar/hacer unica/duplicar y el guardado de las mallas como recurso
 SOURCE          W3dNodos.cpp   // oclusion por nodos de riel (.w3dnodos, estilo SLST de PS1)
+SOURCE          GuardarAnimSets.cpp   // el guardado de los ANIMSETS (.w3da): plan + dedup por clip (lo llama GuardarW3D)
+SOURCE          RecursosProyecto.cpp  // el OUTLINER POR RECURSOS: proveedores, carpetas cosmeticas, recurso activo
+SOURCE          RaicesEditor.cpp      // escenas/prefabs en el editor: cambiar de raiz, el selector, sus vistas
+SOURCE          RecursosDatos.cpp     // la biblioteca: datos de cada archivo (resolucion/alfa de una imagen, formato/duracion de un sonido)
+SOURCE          BibliotecaExterna.cpp // la biblioteca: los .w3d VINCULADOS (explorar sin montar, solo lectura)
+SOURCE          CambiosProyecto.cpp   // lo SIN GUARDAR ('*' por recurso y por raiz) y el cartel al salir / abrir
+SOURCE          Miniaturas.cpp        // las miniaturas de la cuadricula de la biblioteca (perezosas, en memoria)
 SOURCEPATH      ..\..\..\main\objects
-SOURCE          Culling.cpp Particulas.cpp VisZona.cpp Gamepad.cpp
+SOURCE          Culling.cpp Particulas.cpp VisZona.cpp Gamepad.cpp Niebla.cpp Recorte.cpp
+SOURCE          Hitbox.cpp     // objeto Hitbox (caja de deteccion; el motor esta en Core\physics)
 SOURCEPATH      ..\..\..\main\render
 SOURCE          UIOverlay.cpp RayTracer.cpp   // RayTracer: trazado de rayos por CPU (un hilo en el N95)
 // audio del Core: el dispatcher (mixer por software) + el backend de salida de Symbian
@@ -201,6 +212,8 @@ SOURCEPATH      ..\..\..\libs\Whisk3DCore\io
 SOURCE          W3dRecursos.cpp W3dZip.cpp W3dAlmacen.cpp
 SOURCEPATH      ..\..\..\libs\Whisk3DCore\objects
 SOURCE          VisSet.cpp MallaDatos.cpp
+SOURCE          MallaRecurso.cpp // las mallas 3D como RECURSO compartido (registro "mallas", vinculo, VBO compartidos)
+SOURCE          VisBsp.cpp       // metodo Bsp del Culling: arbol BSP + PVS por cluster (.w3dbsp)
 SOURCEPATH      ..\..\..\libs\Whisk3DCore\base
 SOURCE          W3dConfig.cpp W3dClipboardSymbian.cpp
 SOURCEPATH      ..\..\..\libs\WhiskUI\draw
@@ -230,6 +243,9 @@ SOURCEPATH      ..\..\..\libs\Whisk3DCore\physics
 SOURCE          W3dFisica.cpp
 // cuerpos rigidos del Core (cajas + impulsos + raycast + contactos para lua)
 SOURCE          W3dRigido.cpp
+SOURCE          W3dColMalla.cpp
+// hitbox del Core (cajas de deteccion + eventos alEntrar/alSalir/alTocar para lua)
+SOURCE          W3dHitbox.cpp
 SOURCEPATH      ..\..\..\main\script
 // ScriptUI.cpp: engancha gBindExtra (constructor estatico) -> registra los binds de JUEGO
 // (sonido/setTexto/posPx/pantalla/...). Sin esto, un .lua que llama sonido() da "nil value".
@@ -344,6 +360,7 @@ SOURCEPATH ..\..\..\libs\Whisk3DCore\animation
 SOURCE Animation.cpp              // globales de playback: CurrentFrame / AnimFPS / Start-EndFrame / PlayAnimation + keyframes
 SOURCE Flipbook.cpp               // flipbook unificado (asset + player): UV de un quad por curvas; lo usan Imagen2D/Mesh/particulas
 SOURCE SkeletalAnimation.cpp      // ESQUELETO/SKINNING real (C++03): FK + linear blend skinning. Antes stubbeado; ya deforma en el N95.
+SOURCE W3dAnimSet.cpp             // ANIMSETS: los clips en binario (.w3da), compartidos entre armatures (C++03)
 SOURCE Armature2DAnimation.cpp    // clips del armature 2D (C++03). Animation.cpp lo llama SIN ifdef -> si falta, no linkea.
 
 SOURCEPATH ..\..\..\libs\Whisk3DCore\objects
@@ -351,6 +368,9 @@ SOURCE Armature.cpp              // clase Armature (PuntoFoco/RadioFoco/RenderOb
 
 SOURCEPATH ..\..\..\main\ui\ViewPorts
 SOURCE Timeline.cpp              // viewport Timeline (los metodos SDL van #ifndef W3D_SYMBIAN; el resto compila)
+SOURCE PropsHitbox.cpp           // tarjeta "Hitbox" del panel de propiedades
+SOURCE OutlinerRecursos.cpp      // las vistas de recursos del outliner (selector de vista, carpetas, en uso/huerfano)
+SOURCE SoltarRecurso.cpp         // soltar un recurso de la biblioteca en el 3D (malla/material/textura/animset)
 
 SOURCEPATH ..\src
 SOURCE w3dskelstubs.cpp          // solo w3dGetTicks (reloj de ms del core); los stubs del esqueleto ya no van (SkeletalAnimation.cpp compila)
@@ -364,6 +384,7 @@ SOURCEPATH ..\..\..\libs\Whisk3DCore\io
 SOURCE w3dCompress.cpp           // inflate DEFLATE/zlib self-contained (arrays comprimidos del FBX + futuro .w3d)
 SOURCE W3dTexto.cpp              // escaner de texto del .w3dm (numeros exactos, cero allocs por token)
 SOURCE W3dMalla.cpp              // lector/escritor del .w3dm (la geometria propia, en texto por lineas)
+SOURCE W3dMallaBin.cpp           // lector/escritor del .w3db (la misma geometria en binario, lista para memoria)
 
 SOURCEPATH ..\..\..\main\importers
 SOURCE import_fbx.cpp            // importador FBX binario (parseo + descompresion + malla/esqueleto/materiales)
@@ -376,3 +397,25 @@ SOURCE export_gltf.cpp           // exportador glTF 2.0 / GLB (inverso: bind pos
 SOURCEPATH ..\..\..\main\io
 SOURCE GuardarVersion.cpp
 SOURCE LuaCompilar.cpp           // compilar .lua a bytecode (Compilar juego): stub no-op en Symbian (sin lua en este build)
+
+// --- PREFABS: la INSTANCIA (sus hijos se generan del prefab), la generacion + instanciar()/destruir() de lua,
+//     el editor (lo generado no se toca, Add > Prefab, Create Prefab, Unpack) y su tarjeta de Properties ---
+SOURCEPATH ..\..\..\main\objects
+SOURCE InstanciaPrefab.cpp       // INSTANCIA DE PREFAB (ObjectType::prefab)
+SOURCEPATH ..\..\..\main\io
+SOURCE Prefabs.cpp               // la definicion de cada prefab y la generacion de sus instancias
+SOURCE PrefabsEditor.cpp         // el editor sobre las instancias de prefab
+SOURCEPATH ..\..\..\main\ui\ViewPorts
+SOURCE PropsPrefab.cpp           // tarjeta "Prefab Instance" del panel de propiedades
+
+// --- LIBRERIAS EXTERNAS: el PROXY W3D (un prefab o una escena de otro .w3d de solo lectura) y el registro /
+//     montaje / recursos con prefijo de las librerias ("lib:<nombre>/...") ---
+SOURCEPATH ..\..\..\main\objects
+SOURCE ProxyW3d.cpp              // PROXY W3D (ObjectType::proxy): genera sus hijos como una instancia de prefab
+SOURCEPATH ..\..\..\main\io
+SOURCE Librerias.cpp             // el registro de las librerias, su montaje y sus prefabs/escenas
+
+// --- STREAMING: las instancias de prefab y los proxies DIFERIDOS ("carga": "distancia") cargan y descargan en
+//     tiempo real segun la distancia a su objetivo (pedidos async al almacen + refcount) ---
+SOURCEPATH ..\..\..\main\io
+SOURCE Streaming.cpp             // el tick del streaming, la partida (Play/Stop) y cargar()/descargar() de lua

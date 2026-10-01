@@ -55,6 +55,12 @@ int  W3dPVSRecalcular(Mesh* m);             // re-lee el sidecar + re-arma; devu
 bool W3dVisSetCelda(Mesh* m, int celda);    // = W3dPVSAplicarSector con el nombre del contrato
 int  W3dVisInfo(Mesh* m, int* celdaActiva, int* trisLista, bool* ordenado); // nCeldas (-1 = sin metodo celdas)
 
+// el STACK de la malla GENERA malla? = hay algun modificador que corre (arma poligonos con
+// ConstruirPolyMesh): ni el Armature (deforma por frame) ni el PVS/Oclusion (elige indices), y
+// encendido en el viewport (en Edit Mode, ademas, en edit). La MISMA regla que usa el stack; la
+// carga del juego la usa para saber si una malla .w3db necesita sus bloques de edicion ya.
+bool W3dStackGeneraMalla(const Mesh* m);
+
 // CONNECT VERTEX PATH (tecla J / menu Vertex). Con 2 vertices seleccionados (el activo es el
 // destino) traza la linea RECTA entre los dos EN PANTALLA y la corta sobre la superficie: cada
 // cara que la linea atraviesa se parte en dos, y donde cruza una arista se crea un vertice nuevo
@@ -75,5 +81,11 @@ bool W3dRenderCornersSeparadosActivo();
 // (la "U" que deja el Boolean alrededor de un agujero). pos = float[3] por indice. Siempre m-2 triangulos. Lo usan el
 // index buffer del render, el loop cut, el export glTF y el snap a cara: TODOS ven la misma cara.
 void W3dTriangularCara(const float* pos, const std::vector<int>& idx, std::vector<MeshIndex>& tris);
+
+// EL INDEX BUFFER CANONICO de una malla, SIN tocarla: el que armaria ReagruparMeshParts si
+// la malla se guardara en .w3dm y se volviera a abrir (triangulos por mesh part + Forsyth,
+// con el MISMO codigo). Lo hornea el .w3db al guardar (io/W3dMallaBin.h): abrir no triangula.
+struct W3dMallaBinIndices;
+void W3dMallaIndicesCanonicos(const Mesh* m, W3dMallaBinIndices& out);
 
 #endif // MESHEDIT_H

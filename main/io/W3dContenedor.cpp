@@ -68,8 +68,12 @@ std::string W3dContenedorLeeme() {
     s += "  proyecto.json   EL PROYECTO: objetos, escenas, materiales, animaciones.\n";
     s += "                  Es texto y se puede leer y editar a mano.\n";
     s += "  escenas/        las escenas de interfaz (.w3dui)\n";
-    s += "  mallas/         la geometria de los objetos 3D\n";
-    s += "  animaciones/    los keyframes de vertices (binario)\n";
+    s += "  mallas/         las mallas 3D del proyecto (.w3db binario, o .w3dm de\n";
+    s += "                  texto si el proyecto lo pide): UNA por malla, compartida\n";
+    s += "                  por todos los objetos que la usan (registro \"mallas\"\n";
+    s += "                  del proyecto.json; cada objeto dice \"malla\": <nombre>)\n";
+    s += "  animaciones/    los keyframes de vertices y los clips de esqueleto\n";
+    s += "                  (.w3da: una biblioteca por esqueleto, binario)\n";
     s += "  scripts/        el codigo Lua\n";
     s += "  texturas/  fuentes/  sonidos/  videos/    los assets, por tipo\n";
     s += "  modelos/        los .obj y .fbx originales que importaste\n";
@@ -82,7 +86,10 @@ std::string W3dContenedorLeeme() {
     s += "\n";
     s += "Si agregas archivos tuyos aca adentro, Whisk3D los deja donde estan (no\n";
     s += "los borra al guardar), salvo en mallas/ y animaciones/, que son del\n";
-    s += "editor y ahi lo que no se usa se descarta.\n";
+    s += "editor: ahi se descarta lo que proyecto.json no nombra. Una malla del\n";
+    s += "registro \"mallas\" o una biblioteca de clips registrada se conserva\n";
+    s += "aunque ningun objeto la use (huerfana); las mallas iguales de objetos\n";
+    s += "distintos se guardan UNA sola vez.\n";
     return s;
 }
 
@@ -156,6 +163,20 @@ bool W3dContenedorLeerEditada(const std::string& entrada, std::vector<unsigned c
     return true;
 }
 size_t W3dContenedorEditadasCantidad() { return gAlmacen ? gAlmacen->editadas.size() : 0; }
+bool W3dContenedorMudarEditada(const std::string& vieja, const std::string& nueva) {
+    if (!gAlmacen || !W3dEsNombreDeEntrada(nueva) || vieja == nueva) return false;
+    std::map<std::string, std::vector<unsigned char> >::iterator it = gAlmacen->editadas.find(vieja);
+    if (it == gAlmacen->editadas.end()) return false;
+    std::vector<unsigned char> d;
+    d.swap(it->second);                    // los bytes cambian de dueno, no se copian
+    gAlmacen->editadas.erase(it);
+    gAlmacen->editadas[nueva].swap(d);
+    w3dLogf("[W3D] entrada editada mudada: %s -> %s", vieja.c_str(), nueva.c_str());
+    return true;
+}
+bool W3dContenedorExiste(const std::string& entrada) {
+    return gAlmacen && W3dEsNombreDeEntrada(entrada) && gAlmacen->Existe(entrada);
+}
 
 void W3dContenedorListarCarpeta(const std::string& carpeta, std::vector<std::string>& out) {
     out.clear();
@@ -314,6 +335,7 @@ static std::set<std::string> gExternas;
 bool g_w3dContOlvidarUna = false;
 
 void W3dRefExternaMarcar(const std::string& r) { if (!r.empty()) gExternas.insert(r); }
+void W3dRefExternaDesmarcar(const std::string& r) { gExternas.erase(r); }
 bool W3dRefEsExterna(const std::string& r)     { return !r.empty() && gExternas.count(r) != 0; }
 void W3dRefExternasLimpiar()                   { gExternas.clear(); }
 void W3dRefExternasListar(std::vector<std::string>* out) {
@@ -327,7 +349,7 @@ void W3dRefExternasListar(std::vector<std::string>* out) {
 // ===========================================================================
 static const char* const kCarpetas[] = {
     "escenas/", "scripts/", "texturas/", "fuentes/", "sonidos/", "videos/",
-    "mallas/", "animaciones/", "modelos/", "proyecto/", "extra/", 0
+    "mallas/", "animaciones/", "modelos/", "proyecto/", "extra/", "prefabs/", 0
 };
 
 bool W3dEsNombreDeEntrada(const std::string& r) {
@@ -408,17 +430,19 @@ const char* W3dCategoriaPorExtension(const std::string& r) {
     if (p == std::string::npos) return "extra";
     std::string e = r.substr(p + 1);
     for (size_t i = 0; i < e.size(); i++) if (e[i] >= 'A' && e[i] <= 'Z') e[i] = (char)(e[i] + 32);
-    if (e == "w3dui") return "escenas";
+    if (e == "w3dui" || e == "w3de") return "escenas";   // escenas UI y escenas 3D (W3dRaices.h)
+    if (e == "w3dp") return "prefabs";
     if (e == "lua" || e == "luac") return "scripts";
     if (e == "png" || e == "jpg" || e == "jpeg" || e == "webp" || e == "gif" ||
         e == "svg" || e == "bmp" || e == "tga") return "texturas";
     if (e == "ttf" || e == "otf" || e == "w3dfnt") return "fuentes";
     if (e == "ogg" || e == "wav" || e == "mp3") return "sonidos";
     if (e == "mp4" || e == "webm" || e == "mov" || e == "avi") return "videos";
-    // "w3dm" es el formato de geometria PROPIO (texto por lineas); glb/gltf
-    // quedan por los proyectos guardados antes de que existiera
-    if (e == "w3dm" || e == "glb" || e == "gltf" || e == "w3dmesh") return "mallas";
-    if (e == "bin" || e == "w3danim") return "animaciones";
+    // "w3db" (binario, el default) y "w3dm" (texto por lineas) son el formato de
+    // geometria PROPIO; glb/gltf quedan por los proyectos guardados antes de que existiera
+    if (e == "w3db" || e == "w3dm" || e == "glb" || e == "gltf" || e == "w3dmesh") return "mallas";
+    // "w3da": las bibliotecas de clips de esqueleto (animsets, animation/W3dAnimSet.h)
+    if (e == "bin" || e == "w3danim" || e == "w3da") return "animaciones";
     if (e == "obj" || e == "wobj" || e == "fbx" || e == "mtl") return "modelos";
     return "extra";
 }
@@ -458,6 +482,12 @@ std::string W3dContenedorEscritor::RutaTemporal(const char* etiqueta) {
 
 bool W3dContenedorEscritor::Tiene(const std::string& nombre) const {
     return porNombre.find(nombre) != porNombre.end();
+}
+
+void W3dContenedorEscritor::Ingeridas(std::vector<std::pair<std::string, std::string> >& out) const {
+    out.clear();
+    for (std::map<std::string, std::string>::const_iterator it = yaResueltas.begin(); it != yaResueltas.end(); ++it)
+        if (it->second.compare(0, 4, "ext:") != 0) out.push_back(*it);
 }
 
 // "texturas/pausa.png" libre, o "texturas/pausa-2.png" si ese nombre ya lo ocupa
@@ -531,6 +561,9 @@ void W3dContenedorEscritor::ExternoCorregirExiste(const std::string& ref, bool e
 std::string W3dContenedorEscritor::Ingerir(std::string& ruta, const char* categoria,
                                            const std::string& quien) {
     if (ruta.empty()) return ruta;
+    // UNA ENTRADA DE UNA LIBRERIA EXTERNA ("lib:<libreria>/texturas/x.png", io/Librerias.h): es de la libreria, no
+    // del proyecto. Se escribe TAL CUAL (una referencia) y no se copia adentro
+    if (ruta.compare(0, 4, "lib:") == 0) return ruta;
     std::map<std::string, std::string>::iterator ya = yaResueltas.find(ruta);
     if (ya != yaResueltas.end()) {
         std::string escrito = ya->second;
@@ -631,6 +664,27 @@ std::string W3dContenedorEscritor::Ingerir(std::string& ruta, const char* catego
     // re-guardado lo anotaba como referencia externa FALTA -> el round-trip
     // dejaba de ser byte a byte. Misma tolerancia que el LECTOR (Fuente2D.cpp,
     // busca "extra/<base>"): se reenvasa ESA entrada bajo su nombre real.
+    // Si ese hermano esta EDITADO en el overlay (renombrar la textura de una fuente bitmap muda su
+    // .json a "extra/<nombre nuevo>.json" en memoria) van esos bytes: son los vigentes.
+    if (W3dEsNombreDeEntrada(ruta) && !(viejo && viejo->Existe(ruta))) {
+        std::string alt = "extra/" + BaseDe(ruta);
+        if (alt != ruta && W3dContenedorEntradaEditada(alt)) {
+            if (!Tiene(alt)) {
+                std::vector<unsigned char> d;
+                W3dContenedorLeerEditada(alt, d);
+                W3dEntradaPend e;
+                e.nombre = alt; e.origen = 0; e.bytes = d;
+                e.tam = (unsigned)d.size();
+                e.crc = d.empty() ? 0u : Crc32(&d[0], d.size());
+                porNombre[e.nombre] = pend.size();
+                char h2[40]; snprintf(h2, sizeof(h2), "%08x:%u", e.crc, e.tam);
+                porHuella[h2].push_back(pend.size());
+                pend.push_back(e);
+            }
+            yaResueltas[original] = alt;
+            return alt;
+        }
+    }
     if (W3dEsNombreDeEntrada(ruta) && viejo && !viejo->Existe(ruta)) {
         std::string alt = "extra/" + BaseDe(ruta);
         if (alt != ruta && viejo->Existe(alt)) {
@@ -764,9 +818,22 @@ bool W3dContenedorEscritor::AgregarTemporal(const std::string& nombre, const std
 //  Es a proposito un escaneo de strings y no un parseo del esquema: un campo de
 //  ruta NUEVO (que manana alguien agregue en el .w3dui) queda cubierto igual, y
 //  esta verificacion existe justamente para atajar lo que el esquema no sabe.
+//
+//  LOS NOMBRES NO SON REFERENCIAS. Un recurso o un objeto puede LLAMARSE como una
+//  entrada (un material "texturas/piel", una malla "mallas/rocas", un objeto
+//  "scripts/jefe"): su nombre va en el JSON bajo la clave "nombre"/"name" y, en
+//  cada punta que lo nombra ("material", "malla", "target"...), como un string
+//  pelado. El escaneo lo tomaba por una referencia interna a una entrada que no
+//  existe y ABORTABA el guardado. Por eso se anota cada VALOR de "nombre"/"name"
+//  (el esquema nunca guarda una ruta bajo esas claves: es siempre un nombre) y
+//  una referencia que falta y es EXACTAMENTE uno de esos nombres es un vinculo
+//  POR NOMBRE, no una entrada perdida. Una entrada que falta de verdad y no se
+//  llama como nada del proyecto sigue abortando igual que siempre.
 // ---------------------------------------------------------------------------
-static void RefsDelTexto(const std::vector<unsigned char>& b, std::set<std::string>& out) {
-    std::string s;
+static bool EsClaveDeNombre(const std::string& k) { return k == "nombre" || k == "name"; }
+static void RefsDelTexto(const std::vector<unsigned char>& b, std::set<std::string>& out,
+                         std::set<std::string>& nombres) {
+    std::string s, clave;
     bool dentro = false;
     for (size_t i = 0; i < b.size(); i++) {
         char c = (char)b[i];
@@ -774,7 +841,13 @@ static void RefsDelTexto(const std::vector<unsigned char>& b, std::set<std::stri
         if (c == '\\') { if (i + 1 < b.size()) { s += (char)b[i + 1]; i++; } continue; }
         if (c == '"') {
             dentro = false;
+            // es una CLAVE si lo que sigue (salteando blancos) es ':'
+            size_t k = i + 1;
+            while (k < b.size() && (b[k] == ' ' || b[k] == '\t' || b[k] == '\n' || b[k] == '\r')) k++;
+            const bool esClave = (k < b.size() && b[k] == ':');
+            if (!esClave && EsClaveDeNombre(clave)) { nombres.insert(s); continue; }   // un NOMBRE
             if (W3dEsNombreDeEntrada(s)) out.insert(s);
+            if (esClave) clave = s;
             continue;
         }
         s += c;
@@ -784,6 +857,7 @@ static void RefsDelTexto(const std::vector<unsigned char>& b, std::set<std::stri
 bool W3dContenedorEscritor::Verificar(std::string& falta) {
     std::set<std::string> refs;      // de lo que GENERO este guardado -> abortar
     std::set<std::string> refsViejas;// de lo que se PRESERVO del zip viejo -> avisar
+    std::set<std::string> nombres;   // los NOMBRES declarados (ver RefsDelTexto): no son entradas
     for (size_t i = 0; i < pend.size(); i++) {
         const W3dEntradaPend& e = pend[i];
         // solo lo GENERADO por este guardado describe referencias: el JSON raiz
@@ -791,9 +865,9 @@ bool W3dContenedorEscritor::Verificar(std::string& falta) {
         bool esJson = (e.nombre == "proyecto.json");
         bool esUi   = (e.nombre.size() > 6 && e.nombre.compare(e.nombre.size() - 6, 6, ".w3dui") == 0);
         if (!esJson && !esUi) continue;
-        if (e.origen == 0) { RefsDelTexto(e.bytes, refs); continue; }
+        if (e.origen == 0) { RefsDelTexto(e.bytes, refs, nombres); continue; }
         std::vector<unsigned char> datos;
-        if (e.origen == 1 && w3dFileSystem::ReadFileBytes(e.fuente, datos)) RefsDelTexto(datos, refs);
+        if (e.origen == 1 && w3dFileSystem::ReadFileBytes(e.fuente, datos)) RefsDelTexto(datos, refs, nombres);
         // ORIGEN 2 = una escena que venia del .w3d viejo y que este guardado
         // PRESERVA sin haberla cargado (PreservarPasajeras). Antes no se escaneaba
         // NUNCA, o sea que era el unico .w3dui del archivo que podia quedar
@@ -801,12 +875,12 @@ bool W3dContenedorEscritor::Verificar(std::string& falta) {
         // guardado: no la generamos nosotros y una escena vieja a medias del
         // usuario no puede dejarlo sin poder guardar. Sale por el log y sigue.
         if (e.origen == 2 && viejo && viejo->Leer(e.fuente.empty() ? e.nombre : e.fuente, datos))
-            RefsDelTexto(datos, refsViejas);
+            RefsDelTexto(datos, refsViejas, nombres);
     }
     for (std::set<std::string>::iterator it = refs.begin(); it != refs.end(); ++it)
-        if (!Tiene(*it)) { falta = *it; return false; }
+        if (!Tiene(*it) && !nombres.count(*it)) { falta = *it; return false; }
     for (std::set<std::string>::iterator it = refsViejas.begin(); it != refsViejas.end(); ++it)
-        if (!Tiene(*it))
+        if (!Tiene(*it) && !nombres.count(*it))
             w3dLogfW("[W3D] una escena PRESERVADA del .w3d anterior nombra '%s', que ya no esta adentro "
                      "(no la genero este guardado: no aborto, pero queda dicho)", it->c_str());
     return true;
@@ -827,6 +901,18 @@ bool W3dContenedorEscritor::Verificar(std::string& falta) {
 //  (que es lo que el editor sabe ingerir), y el IDE importa los assets al
 //  agregarlos, no al nombrarlos.
 // ---------------------------------------------------------------------------
+
+bool W3dContenedorEscritor::CopiarDelViejo(const std::string& n) {
+    if (!viejo || n.empty() || Tiene(n)) return false;
+    W3dEntradaPend e;
+    e.nombre = n; e.origen = 2; e.fuente = n;
+    std::vector<unsigned char> crudo; unsigned met = 0, crc = 0, olen = 0;
+    if (!viejo->LeerCrudo(n, crudo, &met, &crc, &olen)) return false;
+    e.crc = crc; e.tam = olen;
+    porNombre[n] = pend.size();
+    pend.push_back(e);
+    return true;
+}
 
 void W3dContenedorEscritor::PreservarPasajeras() {
     if (!viejo) return;
@@ -864,6 +950,26 @@ void W3dContenedorEscritor::PreservarPasajeras() {
         e.crc = crc; e.tam = olen;
         porNombre[n] = pend.size();
         pend.push_back(e);
+    }
+    // LO IMPORTADO EN ESTA SESION que nadie referencia (una imagen que se trajo al proyecto y
+    // todavia no se asigno): vive solo en el overlay de editadas y no esta en el zip viejo, asi
+    // que el recorrido de arriba no lo ve. Es un HUERFANO del proyecto (el outliner por recursos
+    // lo lista y lo purga a pedido): se conserva igual que los que ya estaban en el archivo.
+    std::vector<std::string> montadas;
+    W3dContenedorListarCarpeta("", montadas);
+    for (size_t i = 0; i < montadas.size(); i++) {
+        const std::string& n = montadas[i];
+        if (Tiene(n) || olvidadas.count(n) || W3dEsEntradaDeServicio(n)) continue;
+        if (n.compare(0, 7, "mallas/") == 0 || n.compare(0, 12, "animaciones/") == 0) continue;
+        if (!W3dContenedorEntradaEditada(n) || viejo->Existe(n)) continue;
+        std::vector<unsigned char> d;
+        if (!W3dContenedorLeerEditada(n, d)) continue;
+        W3dEntradaPend ed;
+        ed.nombre = n; ed.origen = 0; ed.bytes = d;
+        ed.tam = (unsigned)d.size();
+        ed.crc = d.empty() ? 0u : Crc32(&d[0], d.size());
+        porNombre[n] = pend.size();
+        pend.push_back(ed);
     }
 }
 

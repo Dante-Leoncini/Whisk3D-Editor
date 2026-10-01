@@ -1,0 +1,69 @@
+# ==========================================================================
+#  PREFABS COMO RECURSO (W3dRaices.h): "New Prefab" crea uno vacio y abre su raiz
+#  AISLADA para editarlo (las instancias son de la fase siguiente).
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_escenas_prefab.w3s
+#
+#  El prefab se guarda en prefabs/<slug>.w3dp = {"nombre", "raiz": <objeto con hijos>}
+#  (lo que quede suelto al primer nivel, al lado de su objeto raiz, va a "sueltos" y
+#  vuelve igual). Su vista del outliner lista los prefabs (0 usuarios hasta las
+#  instancias: "Purge Orphans" no los toca), los renombra con undo y los borra.
+# ==========================================================================
+
+ventana 1280 720
+escenadefecto
+raiznueva prefab Enemigo
+raizinfo n 2 activa Enemigo tipo prefab prefabs 1 objetos 1
+raizcontexto coleccion Enemigo luces 0 camara -
+raizparent Enemigo
+add cube
+objname Cuerpo
+parent Cuerpo Enemigo
+objrel Cuerpo padre Enemigo
+raizcamara Suelta
+raizinfo objetos 3
+raizabrir Scene
+raizinfo objetos 4
+
+# ---- guardar: la entrada del prefab, con su raiz, sus hijos y lo suelto ----
+guardarw3d /tmp/w3d_f6_prefab.w3d
+entradaexiste /tmp/w3d_f6_prefab.w3d prefabs/enemigo.w3dp 1
+entradatiene /tmp/w3d_f6_prefab.w3d prefabs/enemigo.w3dp "raiz" 1
+entradatiene /tmp/w3d_f6_prefab.w3d prefabs/enemigo.w3dp Cuerpo 1
+entradatiene /tmp/w3d_f6_prefab.w3d prefabs/enemigo.w3dp sueltos 1
+entradatiene /tmp/w3d_f6_prefab.w3d proyecto.json Suelta 0
+entradatiene /tmp/w3d_f6_prefab.w3d proyecto.json prefabs/enemigo.w3dp 1
+
+# ---- abrir: el prefab no se carga hasta que se lo abre ----
+abrirw3d /tmp/w3d_f6_prefab.w3d
+raizinfo n 2 activa Scene cargada Enemigo 0
+raizabrir Enemigo prefab
+raizinfo tipo prefab objetos 3
+raizparent Enemigo
+raizparent Suelta
+objrel Cuerpo padre Enemigo
+raizabrir Scene
+guardarw3d /tmp/w3d_f6_prefab_2.w3d
+w3diguales /tmp/w3d_f6_prefab.w3d /tmp/w3d_f6_prefab_2.w3d
+
+# ---- su vista del outliner ----
+outvista prefabs
+outfilas n 1
+outfila Enemigo usuarios 0 estado huerfano
+recpurgar prefabs n 0
+outfilas n 1
+recrenombrar prefabs Enemigo Soldado
+outfila Soldado
+undo
+outfila Enemigo
+redo
+guardarw3d /tmp/w3d_f6_prefab_3.w3d
+entradaexiste /tmp/w3d_f6_prefab_3.w3d prefabs/soldado.w3dp 1
+entradaexiste /tmp/w3d_f6_prefab_3.w3d prefabs/enemigo.w3dp 0
+recborrar prefabs Soldado
+outfilas n 0
+raizinfo n 1 prefabs 0
+outvista escena
+guardarw3d /tmp/w3d_f6_prefab_4.w3d
+entradaexiste /tmp/w3d_f6_prefab_4.w3d prefabs/soldado.w3dp 0
+entradatiene /tmp/w3d_f6_prefab_4.w3d proyecto.json prefabs 0

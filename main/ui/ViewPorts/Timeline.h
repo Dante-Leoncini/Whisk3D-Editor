@@ -226,7 +226,9 @@ class Timeline : public ViewportBase, public WithBorder, public Scrollable {
         // Cada canal (X/Y/Z de cada propiedad) se dibuja como una curva con el color de SU EJE: X rojo, Y verde,
         // Z azul. La forma sale de AnimProperty::EvalF (el MISMO evaluador que anima) -> lo que ves es lo que corre.
         void RenderCurvas();                 // curvas + keyframes + handles del seleccionado
-        AnimProperty* CurvaDeFila(const DopeRow& d) const; // la CURVA viva de una fila de canal (NULL si no es canal)
+        // la CURVA viva de una fila de canal (NULL si no es canal). 'editar' = el que llama la va a ESCRIBIR:
+        // un clip de esqueleto de un animset compartido pasa antes a clips propios (ver DopeKeyframeActivo)
+        AnimProperty* CurvaDeFila(const DopeRow& d, bool editar = true) const;
         // Arma el trazo de UNA curva (por TRAMOS, no por pixel) para dibujarlo de UNA sola llamada. Devuelve
         // cuantos vertices genero. Culling adentro: descarta lo que no se ve.
         int  CurvaTrazo(const AnimProperty* ap, float w);
@@ -354,7 +356,9 @@ void DopeSoltarVertexAnim();
 // ---- KEYFRAME ACTIVO (el ultimo clickeado): lo edita la tarjeta "Keyframe" del panel de propiedades ----
 // Devuelve la curva viva + el indice, o NULL si no hay ninguno elegido. El indice se resuelve cada vez: el vector
 // de keyframes se reordena al moverlos, guardarse un indice seria colgarse.
-AnimProperty* DopeKeyframeActivo(int* idx);
+// 'editar' = la tarjeta va a ESCRIBIR el keyframe (sus acciones): un clip de esqueleto de un animset
+// COMPARTIDO pasa antes a clips propios. El refresco de la tarjeta (solo muestra) pasa false.
+AnimProperty* DopeKeyframeActivo(int* idx, bool editar = true);
 std::string   DopeKeyframeActivoCanal();          // nombre del canal ("X Location", ...) para el titulo
 void          DopeKeyframeActivoReFrame(int nuevoFrame); // el frame cambio: seguirlo (y mover la seleccion)
 // Aceptar / cancelar ese transform desde AFUERA: el click izq/der de PC, el OK/backspace de Symbian y el Tab

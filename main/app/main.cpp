@@ -2,6 +2,7 @@
 #include "render/OpcionesRender.h"   // RenderType / g_redraw: son del editor
 #include "W3dLang.h"   // config.ini: "idioma = es" fuerza el idioma por encima del SO
 #include "test/W3dScript.h" // modo test: whisk3d --script <ruta>
+#include "io/CambiosProyecto.h" // lo no guardado: el cartel al cerrar y el '*' del titulo
 
 #ifdef __EMSCRIPTEN__       // WebGL: el browser es 1 hilo -> el loop es emscripten_set_main_loop
 #include <emscripten.h>
@@ -54,6 +55,7 @@ static void PCWarpMouse(int x, int y) {
 extern void RebindMaterialMeshPart(); // Properties.cpp
 static Material* gTexMat = NULL;
 extern bool gCargarTexturaComoNormal; // Properties.cpp: el "Load Texture" del normal map lo prende (compartido 4 OS)
+extern int  gCargarTexturaCapa;       // Properties.cpp: >= 0 = el "Load Texture" de ESA capa de textura del material
 static void TexturaElegida(const std::string& pathElegido) {
     if (!gTexMat) return;
     // IMPORTAR = COPIAR ADENTRO: la textura elegida del disco pasa a ser del
@@ -64,13 +66,21 @@ static void TexturaElegida(const std::string& pathElegido) {
     // el refcount baja y esa textura se puede liberar de verdad.
     Texture* t = TexturaTomar(path);
     if (t) {
-        Texture* anterior = gCargarTexturaComoNormal ? gTexMat->normalTexture : gTexMat->texture;
-        if (gCargarTexturaComoNormal) { gTexMat->normalTexture = t; }
-        else { gTexMat->texture = t; gTexMat->textureOn = true; }
-        if (anterior && anterior != t) TexturaSoltar(anterior);
+        if (gCargarTexturaCapa >= 0) {   // a una CAPA de textura (se crea si es la fila "Add Layer")
+            const size_t n = (size_t)gCargarTexturaCapa;
+            if (n >= gTexMat->capas.size()) gTexMat->capas.resize(n + 1);
+            Texture* anterior = gTexMat->capas[n].tex;
+            gTexMat->capas[n].tex = t;
+            if (anterior && anterior != t) TexturaSoltar(anterior);
+        } else {
+            Texture* anterior = gCargarTexturaComoNormal ? gTexMat->normalTexture : gTexMat->texture;
+            if (gCargarTexturaComoNormal) { gTexMat->normalTexture = t; }
+            else { gTexMat->texture = t; gTexMat->textureOn = true; }
+            if (anterior && anterior != t) TexturaSoltar(anterior);
+        }
         RebindMaterialMeshPart();
     }
-    gTexMat = NULL; gCargarTexturaComoNormal = false;
+    gTexMat = NULL; gCargarTexturaComoNormal = false; gCargarTexturaCapa = -1;
 }
 // "Load Texture" (base Y normal map): el MISMO browser. Quien lo llama ya dejo gCargarTexturaComoNormal en el
 // valor correcto (false=textura, true=normal); el callback de arriba decide el destino.
@@ -531,9 +541,33 @@ bool g_didRender = false; // el ultimo MainLoopFrame DIBUJO? -> el loop de escri
 
 // procesa UN evento SDL. COMPARTIDO: lo llaman el poll del frame Y la espera de reposo del loop (asi el manejo de
 // input no esta duplicado). Cualquier evento marca g_redraw (hay que redibujar).
+// LO NO GUARDADO (io/CambiosProyecto.h): cerrar la ventana con algo sin guardar abre el cartel "Se perderan
+// los cambios en:" en vez de salir; el cartel sale (o guarda y sale) con estos ganchos
+static void CambiosSalir() { running = false; }
+static void CambiosAbrir(const std::string& ruta) { extern std::string g_proyAbrirPendiente; g_proyAbrirPendiente = ruta; g_redraw = true; }
+static bool CambiosGuardar() {
+    extern std::string w3dPath;
+    extern bool GuardarW3D(const std::string&);
+    extern void GuardarProyectoComo();
+    if (w3dPath.empty()) { GuardarProyectoComo(); return false; }   // (sin archivo: primero "Guardar como")
+    return GuardarW3D(w3dPath);
+}
 static void ProcesarEvento(SDL_Event& e) {
     g_redraw = true;
-    if (e.type == SDL_QUIT) { running = false; return; }
+    // el SISTEMA cierra la app (Android: SDLActivity.onDestroy inyecta SDL_QUIT + SDL_APP_TERMINATING y bloquea su
+    // hilo de UI hasta que main() vuelva): no hay a quien preguntarle; se sale siempre
+    if (e.type == SDL_APP_TERMINATING) { running = false; return; }
+    if (e.type == SDL_QUIT) {
+#ifdef __ANDROID__
+        // en Android el SDL_QUIT no lo pide el usuario (Atras no llega aca: es una tecla): lo manda el sistema al
+        // destruir la actividad. Abrir el cartel dejaba el loop dibujando sobre una superficie destruida y la app
+        // colgada hasta el ANR (y lo no guardado se perdia igual)
+        running = false;
+#else
+        if (!W3dCambiosPreguntar(W3D_CAMBIOS_SALIR, std::string())) running = false;
+#endif
+        return;
+    }
     if (e.type == SDL_WINDOWEVENT && e.window.event == SDL_WINDOWEVENT_RESIZED) {
         winW = e.window.data1;
         winH = e.window.data2;
@@ -559,6 +593,24 @@ static void MainLoopFrame() {
         }
     }
     Contadores();
+    // EL TITULO de la ventana dice el proyecto y un '*' si hay algo sin guardar (cada medio segundo: listar lo
+    // sucio recorre la biblioteca)
+    {
+        static Uint32 ultimoTitulo = 0;
+        const Uint32 ahora = SDL_GetTicks();
+        if (window && (ultimoTitulo == 0 || ahora - ultimoTitulo > 500)) {
+            ultimoTitulo = ahora;
+            extern std::string w3dPath;
+            std::string nom = w3dPath;
+            const size_t b = nom.find_last_of("/\\");
+            if (b != std::string::npos) nom = nom.substr(b + 1);
+            char titulo[512];
+            snprintf(titulo, sizeof(titulo), "Whisk3D Pre-Alpha %s%s%s%s", W3dVersion(), nom.empty() ? "" : " - ", nom.c_str(),
+                     W3dCambiosHayCache() ? " *" : "");
+            static std::string ultimo;
+            if (ultimo != titulo) { ultimo = titulo; SDL_SetWindowTitle(window, titulo); }
+        }
+    }
     W3dProfBegin(); // profiler: reset del frame
     double _profFrame0 = W3dNowMs();
 
@@ -676,11 +728,45 @@ static void MainLoopFrame() {
       if (!_animPre && !_needRender && !g_redraw && SDL_WaitEventTimeout(&e, 200)) ProcesarEvento(e); }
 #endif
     while (SDL_PollEvent(&e)) ProcesarEvento(e); // manejo compartido (mismo que la espera de reposo)
+    // la PULSACION LARGA tactil (agarrar una fila del outliner): se mide con el reloj, no con eventos
+    { extern void ControlesTick(); ControlesTick(); }
 
 #ifdef __EMSCRIPTEN__
     if (!running) { emscripten_cancel_main_loop(); return; } // SDL_QUIT -> salir del loop del browser
 #endif
 
+    // CAPTURA DEL MOUSE (juego estilo FPS, PC): mientras el juego CORRE, la ventana tiene el foco y un script pidio
+    // capturarRaton(true), el cursor se esconde y cada frame se lee cuanto se movio desde el CENTRO del viewport del
+    // juego y se lo TELETRANSPORTA de vuelta al centro (SDL_WarpMouseInWindow). Asi nunca se sale del viewport ni de
+    // la ventana (con el modo relativo de SDL el cursor se escapaba y dejaba de girar la vista). El delta llega a
+    // ratonRel() de lua. ESC pausa el juego (PlayAnimation = false, controles.cpp) -> se suelta el mouse; Play /
+    // espacio lo vuelve a capturar. Sin foco (alt-tab) no se toca el mouse del usuario.
+    {
+        extern bool SimActiva(); extern bool W3dScriptRatonCapturar(); extern void W3dScriptRatonRel(float, float);
+        extern void W3dScriptRatonCapturadoSet(bool); extern bool JuegoViewportRect(int*, int*, int*, int*);
+        static bool ratonCapturado = false;
+        int vx = 0, vy = 0, vw = 0, vh = 0;
+        const Uint32 wf = window ? SDL_GetWindowFlags(window) : 0;
+        const bool foco = (wf & SDL_WINDOW_INPUT_FOCUS) != 0 && (wf & SDL_WINDOW_MINIMIZED) == 0;
+        const bool quiere = AnimEsJuego && PlayAnimation && SimActiva() && W3dScriptRatonCapturar() && foco &&
+                            JuegoViewportRect(&vx, &vy, &vw, &vh);
+        if (quiere) {
+            const int cx = vx + vw / 2, cy = vy + vh / 2;
+            int mx = cx, my = cy; SDL_GetMouseState(&mx, &my);
+            if (!ratonCapturado) {
+                SDL_ShowCursor(SDL_DISABLE);
+                PCWarpMouse(cx, cy);   // el primer salto al centro no cuenta como movimiento
+                ratonCapturado = true;
+            } else {
+                const int dx = mx - cx, dy = my - cy;
+                if (dx || dy) { W3dScriptRatonRel((float)dx, (float)dy); PCWarpMouse(cx, cy); g_redraw = true; }
+            }
+        } else if (ratonCapturado) {
+            SDL_ShowCursor(SDL_ENABLE);
+            ratonCapturado = false;
+        }
+        W3dScriptRatonCapturadoSet(ratonCapturado);
+    }
     // Animación
     Uint32 now = SDL_GetTicks();
     // el avance de frames va al ritmo de AnimFPS (default 30), independiente de los fps de la UI (que puede ir a 60).
@@ -754,6 +840,9 @@ static void MainLoopFrame() {
     // la BOMBA del almacen de recursos: UNA carga async por frame (streaming).
     // Cola vacia = no-op: en el editor no cuesta nada.
     { extern void W3dRecursosPump(); W3dRecursosPump(); }
+    // la VISTA PREVIA del STREAMING (io/Streaming.h): sin jugar y con la opcion del proyecto prendida, las instancias
+    // diferidas cargan y descargan segun la vista del viewport (jugando lo hace el tick de la partida)
+    { extern void W3dStreamingTickEditor(); W3dStreamingTickEditor(); }
 
     // Render EVENT-DRIVEN: solo si algo cambio (g_redraw) o hay una animacion EN
     // PLAY (vertex-anim o materiales animados activos). Sino no se dibuja nada ->
@@ -851,6 +940,15 @@ int main(int argc, char* argv[]) {
     // X11/Windows; en Wayland el dock resuelve el icono por este app-id.
     SDL_setenv("SDL_VIDEO_WAYLAND_WMCLASS", "whisk3d", 1);
     SDL_setenv("SDL_VIDEO_X11_WMCLASS", "whisk3d", 1);
+    // MODO TEST SIN VENTANAS NI SONIDO: "whisk3d --script" dibuja en el driver 'offscreen' de SDL (GL por EGL, sin
+    // abrir nada en el escritorio: las suites no llenan la pantalla de ventanas). Para ver la ventana:
+    // W3D_VER_VENTANA=1. Un SDL_VIDEODRIVER explicito siempre manda.
+    for (int ai = 1; ai < argc; ai++)
+        if (std::string(argv[ai]) == "--script" && !SDL_getenv("W3D_VER_VENTANA") && !SDL_getenv("SDL_VIDEODRIVER")) {
+            SDL_setenv("SDL_VIDEODRIVER", "offscreen", 1);
+            if (!SDL_getenv("SDL_AUDIODRIVER")) SDL_setenv("SDL_AUDIODRIVER", "dummy", 1);   // y sin sonido
+            break;
+        }
 #endif
     if (SDL_Init(initFlags) != 0) {
         std::cerr << "Error SDL_Init: " << SDL_GetError() << std::endl;
@@ -1053,10 +1151,17 @@ int main(int argc, char* argv[]) {
     MenuPantallaH = winH;
     rootViewport->Resize(winW, winH);
 
+    // los ganchos del cartel de lo no guardado (salir, abrir otro proyecto, guardar)
+    W3dCambiosSalirHook = CambiosSalir;
+    W3dCambiosAbrirHook = CambiosAbrir;
+    W3dCambiosGuardarHook = CambiosGuardar;
+    W3dCambiosFoto();   // el proyecto de arranque esta "guardado" (no hay nada que perder todavia)
+
     // MODO TEST: "whisk3d --script <ruta>" corre un script de comandos (sin GUI) y
     // sale (0 = todo OK, 1 = fallo). Ver main/test/W3dScript.cpp.
     for (int ai = 1; ai < argc; ai++) {
         if (std::string(argv[ai]) == "--script" && ai + 1 < argc) {
+            g_w3dCambiosSinCartel = true;   // (el harness no muestra el cartel: el comando 'cambios' lo consulta)
             bool ok = W3dRunScript(argv[ai + 1]);
             SDL_Quit();
             return ok ? 0 : 1;

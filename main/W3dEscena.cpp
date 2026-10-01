@@ -35,6 +35,13 @@ static std::string gCambioNombre;
 
 void W3dEscenaSetInit(W3dEscenaInitFn fn) { gInitFn = fn; }
 
+// las ESCENAS 3D (ver W3dEscena.h): los pone main/W3dRaices.cpp, que solo existe con 3D
+static bool (*gPedir3D)(const std::string&, bool) = 0;
+static bool (*gAplicar3D)() = 0;
+void W3dEscenaSet3D(bool (*pedir)(const std::string&, bool), bool (*aplicar)()) {
+    gPedir3D = pedir; gAplicar3D = aplicar;
+}
+
 void W3dEscenaRegistrarTodas() {
     gEscenas.clear();
     gInited.clear();
@@ -80,12 +87,17 @@ void W3dEscenaArrancar() {
 }
 
 void W3dEscenaPedirCambio(const std::string& nombre, bool reiniciar) {
-    // ignorar un nombre inexistente: no romper el juego por un typo del script
-    if (!W3dEscenaBuscar(nombre)) return;
+    // no es una escena UI: puede ser una ESCENA 3D del proyecto (se descarga la actual y se
+    // carga esa, al final del frame). Un nombre inexistente se ignora: no romper el juego por
+    // un typo del script.
+    if (!W3dEscenaBuscar(nombre)) { if (gPedir3D) gPedir3D(nombre, reiniciar); return; }
     gHayCambio = true; gCambioNombre = nombre; gReiniciarPend = reiniciar;
 }
 
 void W3dEscenaAplicarPendiente() {
+    // una ESCENA 3D pedida cambia el arbol ENTERO (sus escenas UI incluidas): un cambio de UI
+    // pendiente era de la escena que se fue
+    if (gAplicar3D && gAplicar3D()) { gHayCambio = false; gReiniciarPend = false; return; }
     if (!gHayCambio) return;
     gHayCambio = false;
     UI* nueva = W3dEscenaBuscar(gCambioNombre);
@@ -107,12 +119,21 @@ Object* W3dEscenaRaizDe(Object* o) {
     return SceneCollection;   // fuera de toda escena UI (3D): la busqueda de refs sigue igual
 }
 
+Object* W3dEscenaBuscarRef(Object* o, const std::string& nombre) {
+    Object* raiz = W3dEscenaRaizDe(o);
+    if (raiz && raiz->getType() == ObjectType::ui) return FindObjectByName(raiz, nombre);
+    return W3dBuscarNombreDesde(o, nombre, raiz);
+}
+
 bool W3dEscenaEsDeActiva(Object* o) {
     if (!o) return false;
     if (!o->visible) return false;        // invisible: no corre (regla del editor de siempre)
     if (gEscenas.empty()) return true;    // sin multi-escena: solo importa visible
     Object* raiz = W3dEscenaRaizDe(o);
     if (!raiz || raiz->getType() != ObjectType::ui) return true;  // fuera de escenas UI (3D): regla vieja
+    // un juego 3D con su HUD: NO hay escena UI activa (manda la escena 3D) y la UI se dibuja encima como overlay;
+    // sus scripts tienen que correr igual (antes el HUD se veia pero su logica nunca corria)
+    if (!gEscActiva) return true;
     return raiz == (Object*)gEscActiva;   // pertenece a la escena activa?
 }
 
@@ -384,7 +405,47 @@ static int LCambiarEscena(lua_State* L) {
     if (n) W3dEscenaPedirCambio(n, re);
     return 0;
 }
+// ---------------------------------------------------------------------------
+//  BINDS lua de las CINEMATICAS (ver W3dEscena.h / W3dRaices.h):
+//    reproducirEscena("Cinematica 1" [, "alTerminar"]) -> true si la escena existe: se muestra esa
+//        escena 3D (sus luces, camaras, objetos y su animacion de Inicio a Fin) con el juego en pausa
+//        y al terminar se vuelve al juego tal cual estaba; ahi se llama alTerminar() del script que la
+//        pidio. Se aplica al final del frame, como cambiarEscena().
+//    pararEscena3D()          corta la cinematica (se vuelve al juego y se llama alTerminar igual)
+//    escenaReproduciendo()    el nombre de la escena que se esta reproduciendo (nil si ninguna)
+// ---------------------------------------------------------------------------
+static bool (*gCineReproducir)(const std::string&, Object*, const std::string&) = 0;
+static void (*gCineParar)() = 0;
+static const char* (*gCineActual)() = 0;
+void W3dEscenaSetCine(bool (*reproducir)(const std::string&, Object*, const std::string&), void (*parar)(),
+                      const char* (*actual)()) {
+    gCineReproducir = reproducir; gCineParar = parar; gCineActual = actual;
+}
+static int LReproducirEscena(lua_State* L) {
+    const char* n = lua_tostring(L, 1);
+    const char* fn = lua_tostring(L, 2);
+    // el objeto del script que la pide (el mismo registro que yo()): a sus scripts se les llama 'fn'
+    lua_getfield(L, LUA_REGISTRYINDEX, "w3d_duenio");
+    Object* llamador = lua_islightuserdata(L, -1) ? (Object*)lua_touserdata(L, -1) : 0;
+    lua_pop(L, 1);
+    const bool ok = n && gCineReproducir && gCineReproducir(n, llamador, fn ? std::string(fn) : std::string());
+    lua_pushboolean(L, ok ? 1 : 0);
+    return 1;
+}
+static int LPararEscena3D(lua_State* L) {
+    (void)L;
+    if (gCineParar) gCineParar();
+    return 0;
+}
+static int LEscenaReproduciendo(lua_State* L) {
+    const char* a = gCineActual ? gCineActual() : 0;
+    if (a && *a) lua_pushstring(L, a); else lua_pushnil(L);
+    return 1;
+}
 void W3dEscenaRegistrarBind(void* Lv) {
     lua_State* L = (lua_State*)Lv;
     lua_pushcfunction(L, LCambiarEscena); lua_setglobal(L, "cambiarEscena");
+    lua_pushcfunction(L, LReproducirEscena);    lua_setglobal(L, "reproducirEscena");
+    lua_pushcfunction(L, LPararEscena3D);       lua_setglobal(L, "pararEscena3D");
+    lua_pushcfunction(L, LEscenaReproduciendo); lua_setglobal(L, "escenaReproduciendo");
 }

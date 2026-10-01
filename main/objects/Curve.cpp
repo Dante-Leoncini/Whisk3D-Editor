@@ -491,6 +491,7 @@ static int CargasTipoDe(std::string& id) {
     else if (pref == "vis")     tipo = W3DREC_LISTA_VIS;
     else if (pref == "audio")   tipo = W3DREC_AUDIO;
     else if (pref == "otro")    tipo = W3DREC_OTRO;
+    else if (pref == "animset") tipo = W3DREC_ANIMSET;   // clips de esqueleto (.w3da): id = su entrada
     if (tipo < 0) return W3DREC_OTRO;      // prefijo desconocido: id entero, tipo otro
     id = id.substr(p + 1);
     return tipo;

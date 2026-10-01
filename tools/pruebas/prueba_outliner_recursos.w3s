@@ -1,0 +1,195 @@
+# prueba_outliner_recursos.w3s — la BIBLIOTECA del outliner (FASE 4 + 4b): en uso / huerfano por tipo
+#
+#  Criterios de aceptacion:
+#   - la barra del outliner tiene el selector de VISTA (el ojo: Escena / Biblioteca / librerias) y el
+#     FILTRO por tipo de la biblioteca (Mallas 3D, Materiales, Texturas, Animaciones, Prefabs...); se
+#     eligen con el mouse y SIN MOUSE (la tecla izquierda del N95 abre la vista, las flechas recorren la
+#     barra -[0] tipo, [1] vista, [2] Objeto, [3] Seleccion, [4] "+", [5] filtro- y el menu);
+#   - la vista Escena es la de siempre (el arbol; las pruebas de reparent/mover siguen verdes);
+#   - la biblioteca lista cada recurso con su icono, su nombre y a la derecha EN USO (tilde verde) /
+#     HUERFANO (cruz roja) + cuantos lo usan:
+#       mallas = objetos malla; materiales = mallas con alguna parte que lo usa; texturas =
+#       materiales (y particulas / 2D / scripts); animsets = armatures;
+#   - los MATERIALES se guardan TODOS (tambien los huerfanos) y las TEXTURAS listan las cargadas y
+#     las entradas texturas/ del contenedor que nadie carga (huerfanas);
+#   - click en un recurso: Properties lo muestra (en la pestania "Malla 3D": material -> su tarjeta
+#     Material, textura -> vista previa + ruta, malla / animset -> datos y usuarios);
+#   - la vista y el filtro se guardan en el layout; un PROVEEDOR nuevo llena un tipo sin tocar el outliner.
+#  Las carpetas (cosmeticas, UN arbol para todos los tipos) estan en prueba_outliner_carpetas.w3s.
+ventana 1280 720
+
+# ---- A) un proyecto con recursos EN USO y HUERFANOS de cada tipo ----
+escenadefecto
+selobj Cubo
+matnew
+malladup Cubo vinculado
+add cube
+matsuelto Suelto
+texasignar Cubo dosmats.png
+animsetsintetica 2 agregar
+guardarw3d prueba_outliner_v4.w3d
+# TODOS los materiales se guardan: el huerfano tambien
+jsontiene prueba_outliner_v4.w3d "Suelto" 1
+abrirw3d prueba_outliner_v4.w3d
+# una imagen importada al contenedor que nadie usa: una textura HUERFANA sin cargar
+texentrada dosmats-b.png
+
+# ---- B) el selector de VISTA (el menu de la barra) y la vista Escena de siempre ----
+outvista es escena
+outfilas n 0
+outvista mallas
+outfilas n 2
+# Cubo y Cubo.001 son la MISMA malla (Alt+D): un recurso con dos usuarios
+outfila Cubo usuarios 2 estado uso prof 0
+outfila Cubo.002 usuarios 1 estado uso
+outpx Cubo uso
+outvista materiales
+outfila Material usuarios 2 estado uso
+outfila Suelto usuarios 0 estado huerfano
+outpx Suelto huerfano
+outpx Material uso
+outvista texturas
+outfila dosmats.png usuarios 1 estado uso
+outfila dosmats-b.png usuarios 0 estado huerfano
+outvista animaciones
+outfila Personaje usuarios 2 estado uso
+outrender
+
+# ---- C) click en un recurso: Properties lo muestra (la pestania "Malla 3D", sin pestania aparte) ----
+outvista materiales
+outclick Suelto
+recactivo materiales Suelto
+# la tarjeta Material de siempre, bindeada al material ELEGIDO (sin mesh part)
+recprops tab 1 material Suelto nombre Suelto carpeta -
+outclick Material
+recprops tab 1 material Material
+outvista texturas
+outclick dosmats-b.png
+# una textura: vista previa (la huerfana se carga solo para mirarla) + su ruta
+recprops tab 1 preview 1
+recactivo texturas texturas/dosmats-b.png
+outvista mallas
+outclick Cubo
+recprops tab 1 preview 0 nombre Cubo
+# volver a la ESCENA (otro objeto activo): el panel vuelve a mostrar objetos
+selobj Cubo.002
+recactivo ninguno
+recprops tab 0
+
+# ---- D) EN USO cambia en vivo: un material que se deja de usar queda huerfano ----
+outvista materiales
+mallamaterial Cubo.002 0 Suelto
+outfila Suelto usuarios 1 estado uso
+undo
+outfila Suelto usuarios 0 estado huerfano
+
+# ---- E) sin mouse (N95): la tecla izquierda abre el selector de vista; izq/der recorren los menus
+#         de la barra ([0] tipo de viewport, [1] vista, [2] Objeto, [3] Seleccion, [4] el "+", [5] el
+#         filtro; el interruptor lista/cuadricula no tiene menu: se alterna desde la vista); abajo + OK elige ----
+outbarra soft menu vista
+outbarra der menu objeto
+outbarra der menu seleccion
+outbarra der menu nueva
+outbarra der menu filtro
+outbarra der menu tipo
+outbarra der menu vista
+outbarra izq menu tipo
+outbarra izq menu filtro
+outbarra izq menu nueva
+outbarra izq menu seleccion
+outbarra izq menu objeto
+outbarra izq menu vista
+outbarra der menu objeto
+outbarra der menu seleccion
+outbarra der menu nueva
+outbarra der menu filtro
+outbarra abajo
+outbarra abajo
+outbarra ok menu ninguno
+outvista es mallas
+# flechas del keypad recorren la lista y OK elige (Properties lo muestra)
+outtecla up 5
+outfila Cubo cursor 1
+outtecla down
+outfila Cubo.002 cursor 1 activo 1
+outtecla ok
+recactivo mallas Cubo.002
+recprops tab 1
+# el OK en una vista de recursos NUNCA cae al Edit Mode del 3D
+seleccion modo objeto
+
+# ---- F) "Select Users": selecciona en la escena a los que lo usan (y vuelve a la escena) ----
+outvista mallas
+outclick Cubo
+outmenu Select Users
+outvista es escena
+seleccion n 2 tiene Cubo tiene Cubo.001
+undo
+outvista animaciones
+outclick Personaje
+outmenu Select Users
+seleccion n 2 tiene Personaje tiene Personaje.001
+
+# ---- G) "Purge Orphans" (confirmado) y guardar: los huerfanos no vuelven ----
+outvista materiales
+outmenu Purge Orphans
+outconfirmar si
+outnofila Suelto
+outvista texturas
+outclick dosmats-b.png
+outteclapc supr
+outconfirmar si
+outnofila dosmats-b.png
+# una textura EN USO no se borra
+recborrar texturas texturas/dosmats.png falla
+outvista animaciones
+animsetborrar Personaje
+animsetborrar Personaje.001
+outfila Personaje usuarios 0 estado huerfano
+recpurgar animaciones n 1
+outnofila Personaje
+outvista mallas
+guardarw3d prueba_outliner_rt1.w3d
+jsontiene prueba_outliner_rt1.w3d "Suelto" 0
+zipentrada prueba_outliner_rt1.w3d texturas/dosmats-b.png no
+zipentrada prueba_outliner_rt1.w3d texturas/dosmats.png
+zipentrada prueba_outliner_rt1.w3d animaciones/personaje.w3da no
+
+# ---- H) la VISTA viaja con el layout ----
+abrirw3d prueba_outliner_rt1.w3d
+outvista es mallas
+outfilas n 2
+guardarw3d prueba_outliner_rt2.w3d
+w3diguales prueba_outliner_rt1.w3d prueba_outliner_rt2.w3d
+
+# ---- I) las vistas sin datos (prefabs/escenas/librerias) y un PROVEEDOR nuevo ----
+outvista prefabs
+outfilas n 0
+outrender
+recprovprueba prefabs on
+outfilas n 4
+outfila Alfa usuarios 2 estado uso
+outfila Beta usuarios 0 estado huerfano
+outfila Gamma carpeta Externo prof 1
+outclick Beta
+recactivo prefabs Beta
+recprops tab 1 nombre Beta
+outteclapc f2
+outescribir Enemigo
+outfila Enemigo estado huerfano cursor 1
+outmenu mover Externo
+outfila Enemigo carpeta Externo prof 1
+undo
+outfila Enemigo carpeta - prof 0
+# uno de solo lectura (una libreria, fase 8) no se mueve ni se borra
+fail recmover prefabs Gamma -
+outfila Gamma carpeta Externo
+recborrar prefabs Gamma falla
+outrender
+recprovprueba prefabs off
+outfilas n 0
+
+# ---- lo que no tiene que pasar ----
+fail outvista cualquiera
+fail outfila NoExiste
+fail recactivo materiales NoExiste

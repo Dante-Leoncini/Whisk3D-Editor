@@ -1,0 +1,23 @@
+# ==========================================================================
+#  LA RAIZ DEL REPO PARA "COMPILAR JUEGO"
+#  Correr DESDE ESTA CARPETA:
+#    cd <motor>/tools/pruebas
+#    ../../platform/linux/build/whisk3d --script prueba_reporaiz.w3s
+#
+#  "Compilar juego" necesita las fuentes del runtime (el repo Whisk3D). Las busca
+#  en Ajustes (repoPath), en la variable de entorno W3D_REPO, subiendo desde res/,
+#  desde el binario y, por ultimo, en las fuentes con las que se compilo el editor:
+#  asi un build FUERA del arbol (uno con sanitizers en otra carpeta) compila juegos
+#  sin configurar nada. Una ruta que no es el repo se saltea (se valida la marca
+#  libs/Whisk3DCore/objects/Objects.cpp). Desde esta carpeta el repo es ../..
+#  (el camino que la da depende del build: no se exige salvo con Ajustes/entorno).
+# ==========================================================================
+
+reporaiz ../..
+# Ajustes manda si es el repo; si no lo es, se saltea
+reporaiz ../.. ajustes ../.. via ajustes
+reporaiz ../.. ajustes /tmp/w3d_no_es_un_repo entorno -
+# la variable de entorno, detras de Ajustes
+reporaiz ../.. ajustes - entorno ../.. via entorno
+reporaiz ../.. ajustes ../.. entorno /tmp via ajustes
+reporaiz ../.. ajustes /tmp/w3d_no_es_un_repo entorno /tmp/w3d_tampoco

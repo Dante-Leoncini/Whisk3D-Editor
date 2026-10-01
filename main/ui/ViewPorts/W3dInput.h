@@ -37,6 +37,7 @@ enum W3dTecla {
     W3dK_LEFT, W3dK_RIGHT, W3dK_UP, W3dK_DOWN,
     W3dK_LSHIFT, W3dK_LCTRL, W3dK_LALT,
     W3dK_PGUP, W3dK_PGDN, // paginado (los usa el editor de texto del IDE)
+    W3dK_F2,              // renombrar (el outliner por recursos; como en Blender)
 
     // --- teclado numerico (en el telefono, el keypad ES el teclado) ---
     W3dK_KP_0 = 0x120, W3dK_KP_1, W3dK_KP_2, W3dK_KP_3, W3dK_KP_4,

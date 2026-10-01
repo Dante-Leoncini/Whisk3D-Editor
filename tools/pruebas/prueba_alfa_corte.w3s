@@ -1,0 +1,39 @@
+# ===========================================================================
+#  RECORTE POR ALFA (Material::alphaTest, GL_ALPHA_TEST): glTF alphaMode MASK
+#
+#  prueba_alfa_corte.glb (hecho por hl2-w3d/tools/fixtures_pruebas.py): un quad
+#  con una textura de rejilla (alfa 0 en los agujeros, RGB blanco como los VTF
+#  de HL2) y un material alphaMode MASK con alphaCutoff 0.3. Antes esas
+#  texturas se importaban como "transparente" (blend): el agujero escribia z y
+#  tapaba lo de atras (los rectangulos blancos/negros a traves de las rejas de
+#  la estacion). Con el recorte los texels con alfa <= 0.3 se descartan, sin
+#  blend, con z, en la pasada opaca: da igual el orden de dibujo.
+#
+#  Lo que se verifica:
+#   1) el importador glTF lee MASK + alphaCutoff -> alfaCorte 0.3, sin transparente
+#   2) el round-trip por el contenedor (clave "alfaCorte" del material) lo conserva
+#   3) matalfa lo edita (apagar / setear)
+#
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_alfa_corte.w3s
+# ===========================================================================
+selobj Cubo
+delete
+importgltf prueba_alfa_corte.glb
+loadtex
+matalfa alfa_reja es 0.3
+
+# round-trip
+guardarw3d /tmp/w3d_prueba_alfa_corte.w3d
+abrirw3d /tmp/w3d_prueba_alfa_corte.w3d
+loadtex
+matalfa alfa_reja es 0.3
+
+# editar
+matalfa alfa_reja 0
+matalfa alfa_reja es 0
+matalfa alfa_reja 0.5
+matalfa alfa_reja es 0.5
+guardarw3d /tmp/w3d_prueba_alfa_corte.w3d
+abrirw3d /tmp/w3d_prueba_alfa_corte.w3d
+matalfa alfa_reja es 0.5

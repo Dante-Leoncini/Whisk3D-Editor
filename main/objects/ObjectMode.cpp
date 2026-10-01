@@ -23,6 +23,11 @@
 #include "animation/SkeletalAnimation.h" // HornearTransformEnHuesos
 #include "animation/VertexAnimation.h"   // curvas propias de la animacion del objeto (kind 3)
 #include "animation/Armature2DAnimation.h" // Arm2DClonar: deep copy del rig 2D al duplicar la malla
+#include "animation/W3dAnimSet.h"          // duplicar un armature: clips propios (Shift+D) o compartidos (Alt+D)
+#include "io/MallasProyecto.h"  // la malla como RECURSO: Alt+D vinculado, Shift+D con recurso propio, hacer unica
+#include "io/W3dMallaBin.h"     // W3dMallaBinMaterializarEdicion: la edicion pendiente de una malla de un recurso
+#include "objects/MallaRecurso.h"
+#include "io/PrefabsEditor.h"   // lo GENERADO por una instancia de prefab: ni se borra, ni se duplica, ni se muda
 
 // SNAP en MODO OBJETO: se snapshotean los "puntos de snap" de la seleccion al empezar el transform (todos los
 // verts de las mallas + el ORIGEN de camara/lampara/empty) y move/rotate/scale imantan la BASE al target.
@@ -297,10 +302,22 @@ static const AnimProperty* CurvaDe(Object* o, int prop, int comp){
 	for (size_t k=0;k<P.size();k++) if (P[k].Property==prop && P[k].component==comp) return &P[k];
 	return NULL;
 }
+// "JUEGO" (el estado base de un juego, ver W3dRaices.h) no tiene keyframes: las curvas del timeline son las del
+// ultimo clip elegido, que en "Juego" no se ve (el dope sheet esta vacio). Keyear o borrar ahi escribia en ese
+// clip sin que se viera -en la vista de un clip de jerarquia, en el clip COMPARTIDO de la biblioteca-. Frena el
+// rombo de Properties y Delete/Clear Keyframe como la I y el autokey. true = se freno (y se aviso).
+static bool KeysEnJuego(){
+	extern int ActiveAnimKind;
+	if (ActiveAnimKind != 2) return false;
+	Notificar(T("A game has no keyframes: choose one of its clips in the timeline to animate"), true);
+	return true;
+}
 // estado del keyframe de un canal en 'frame': 0 = sin animacion; 1 = animado pero NO
 // hay key en este frame; 2 = HAY key en este frame. Lo usa el boton-rombo del panel.
+// En "Juego" siempre 0: no hay keyframes que mostrar (ver KeysEnJuego).
 int AnimCanalEstado(Object* o, int prop, int comp, int frame){
 	if (!o) return 0;
+	{ extern int ActiveAnimKind; if (ActiveAnimKind == 2) return 0; }
 	const AnimProperty* c = CurvaDe(o, prop, comp);
 	if (!c || c->keyframes.empty()) return 0;
 	for (size_t i=0;i<c->keyframes.size();i++) if (c->keyframes[i].frame==frame) return 2;
@@ -308,7 +325,15 @@ int AnimCanalEstado(Object* o, int prop, int comp, int frame){
 }
 // pone (si no hay) o QUITA (si hay) un key del canal en 'frame', con el valor actual
 void AnimCanalToggle(Object* o, int prop, int comp, int frame){
-	if (!o) return;
+	if (!o || KeysEnJuego()) return;
+	// en la vista de un CLIP DE JERARQUIA solo su raiz y sus descendientes (el clip nombra su jerarquia): el
+	// rombo lo dice, como la I (un click que no hace nada y no avisa parece roto)
+	if (!W3dAnimObjetoPermitido(o)) {
+		Notificar(T("This hierarchy clip only animates its root and its children"), true);
+		return;
+	}
+	// lo GENERADO por una instancia de prefab no se anima (sus curvas no se guardan: se anima el prefab)
+	if (W3dPrefabEsGeneradoAviso(o, true)) return;
 	// COLOR (diffuse/ambient/specular): UN solo rombo para las 3 curvas R/G/B -> se keyean/borran
 	// JUNTAS con el valor de cada componente. El estado se mide por la curva representante (AnimX).
 	if (prop == AnimColor || prop == AnimAmbient || prop == AnimSpecular){
@@ -369,10 +394,21 @@ static bool AutoKeyCanal(std::vector<AnimProperty>& props, int prop, int comp, i
 // Devuelve cuantos canales guardo (0 = no hubo cambios -> no se ensucia la animacion ni el undo).
 int AutoKeyObjetos(){
 	if (!AutoKeyOn) return 0;
-	int n = 0;
+	{ extern int ActiveAnimKind; if (ActiveAnimKind == 2) return 0; }   // "Juego": sin keyframes (sus clips si)
+	int n = 0, fuera = 0;
 	for (size_t e = 0; e < estadoObjetos.size(); e++){
 		Object* o = estadoObjetos[e].obj; if (!o) continue;
 		o->ActualizarDisplayRot();                 // rotEuler al dia (el transform trabaja sobre el quaternion)
+		// (la vista de un clip de jerarquia: solo su jerarquia. Lo que se movio afuera no se keyea y se avisa)
+		if (!W3dAnimObjetoPermitido(o)) {
+			const Vector3& p0 = estadoObjetos[e].pos; const Vector3& s0 = estadoObjetos[e].scale;
+			const Vector3& r0 = estadoObjetos[e].rotEuler;
+			if (AutoKeyCambio(o->pos.x, p0.x) || AutoKeyCambio(o->pos.y, p0.y) || AutoKeyCambio(o->pos.z, p0.z) ||
+			    AutoKeyCambio(o->rotEuler.x, r0.x) || AutoKeyCambio(o->rotEuler.y, r0.y) || AutoKeyCambio(o->rotEuler.z, r0.z) ||
+			    AutoKeyCambio(o->scale.x, s0.x) || AutoKeyCambio(o->scale.y, s0.y) || AutoKeyCambio(o->scale.z, s0.z))
+				fuera++;
+			continue;
+		}
 		// el euler de ANTES sale del quaternion del snapshot, que es lo unico que se guardo
 		// el euler de ANTES sale del snapshot TAL CUAL (con sus vueltas). Derivarlo del quaternion del snapshot
 		// lo devolvia canonico: rotar 360 daba "de 0 a 0" y el auto key no guardaba nada.
@@ -390,6 +426,7 @@ int AutoKeyObjetos(){
 		if (AutoKeyCanal(props, AnimScale,    AnimY, CurrentFrame, o->scale.y, s0.y)) n++;
 		if (AutoKeyCanal(props, AnimScale,    AnimZ, CurrentFrame, o->scale.z, s0.z)) n++;
 	}
+	if (fuera) Notificar(T("This hierarchy clip only animates its root and its children"), true);
 	if (n) g_redraw = true;
 	return n;
 }
@@ -472,17 +509,26 @@ bool MotionTrailDe(Object* o, std::vector<Vector3>& pts, std::vector<int>& keys,
 // historico, y lo que siguen pasando los ~20 callers viejos del harness).
 void InsertarKeyframeObjeto(int canales){
 	if (canales == 0) canales = KfCanalTodos;
+	int fuera = 0;
+	Object* generado = NULL;
 	for (size_t s=0;s<ObjSelects.size();s++){ Object* o=ObjSelects[s]; if (!o) continue;
+		// lo GENERADO por una instancia de prefab no se anima: sus curvas no se guardan (se anima el prefab)
+		if (W3dEsGenerado(o)) { if (!generado) generado = o; continue; }
+		// la vista de un CLIP DE JERARQUIA solo guarda su raiz y sus descendientes
+		if (!W3dAnimObjetoPermitido(o)) { fuera++; continue; }
 		o->ActualizarDisplayRot(); // rotEuler al dia
 		std::vector<AnimProperty>& props = CurvasActivas(o);   // propia (kind 3) o escena (kind 0)
 		if (canales & KfCanalLoc) SetKeyObj3(props, AnimPosition, CurrentFrame, o->pos.x, o->pos.y, o->pos.z);
 		if (canales & KfCanalRot) SetKeyObj3(props, AnimRotation, CurrentFrame, o->rotEuler.x, o->rotEuler.y, o->rotEuler.z);
 		if (canales & KfCanalScl) SetKeyObj3(props, AnimScale,    CurrentFrame, o->scale.x, o->scale.y, o->scale.z);
 	}
+	if (fuera) Notificar(T("This hierarchy clip only animates its root and its children"), true);
+	if (generado) W3dPrefabEsGeneradoAviso(generado, true);
 	g_redraw = true;
 }
 // Delete Keyframe: saca los keyframes del frame actual de cada objeto seleccionado
 void BorrarKeyframeObjeto(){
+	if (KeysEnJuego()) return;
 	for (size_t s=0;s<ObjSelects.size();s++){ Object* o=ObjSelects[s]; if (!o) continue;
 		std::vector<AnimProperty>& props = CurvasActivas(o);
 		for (size_t p=0;p<props.size();p++){
@@ -492,6 +538,7 @@ void BorrarKeyframeObjeto(){
 }
 // Clear Keyframe: borra TODA la animacion de los objetos seleccionados
 void LimpiarKeyframeObjeto(){
+	if (KeysEnJuego()) return;
 	for (size_t s=0;s<ObjSelects.size();s++) if (ObjSelects[s]) EliminarAnimaciones(*ObjSelects[s]);
 	g_redraw = true;
 }
@@ -522,6 +569,7 @@ void W3dAplicarCurvasEnFrame(Object* o, std::vector<AnimProperty>& props, int fr
 	if (hayP) o->pos   = EvalPropVec(props, AnimPosition, frame, o->pos);
 	if (hayS) o->scale = EvalPropVec(props, AnimScale,    frame, o->scale);
 	if (hayR){ Vector3 e = EvalPropVec(props, AnimRotation, frame, o->rotEuler); o->SetRotEuler(e); }
+	W3dAplicarFormas(o, props, frame);   // SHAPE KEYS: los pesos de las formas (la cara que habla)
 	if (hayV)   o->visible      = PropertyDeLista(props, AnimVisible, AnimX).Eval(frame, o->visible?1.f:0.f) >= 0.5f;
 	if (hayRnd) o->renderizable = PropertyDeLista(props, AnimRender,  AnimX).Eval(frame, o->renderizable?1.f:0.f) >= 0.5f;
 	// CAMARA: fov + distancias de dibujado (near/far). La vista al mirar por la camara sigue las curvas.
@@ -575,12 +623,19 @@ void AplicarAnimacionObjetos(){
 	}
 	// las curvas de objetos SON la animacion de ESCENA: solo con kind 0.
 	if (ActiveAnimKind != 0) return;
+	// solo al CAMBIAR de frame (aplicar cada render pisaria lo que se mueve a mano entre frames)... o
+	// cuando las curvas cambiaron por fuera del cabezal: otra raiz (escena/juego/prefab), otra animacion
+	// elegida, el estado base de un juego que volvio (g_animCurvasGen, ver Animation.h). Sin eso, elegir
+	// un clip en el MISMO frame que la ultima pose aplicada no posaba nada.
 	static int ultimoFrame = -999999;
-	if (CurrentFrame == ultimoFrame) return;
+	static unsigned int ultimaGen = 0;
+	if (CurrentFrame == ultimoFrame && ultimaGen == g_animCurvasGen) return;
 	ultimoFrame = CurrentFrame;
+	ultimaGen = g_animCurvasGen;
 	for (size_t i=0;i<AnimationObjects.size();i++){ AnimationObject& ao=AnimationObjects[i]; if (!ao.obj) continue;
 		AplicarCurvasDe(ao);
 	}
+	W3dCamActivaAplicar(SceneAnimActiva, CurrentFrame);   // pista "Camara activa": los cortes de la cinematica
 }
 void Eliminar(bool IncluirCollecciones){
 	if (InteractionMode == ObjectMode){
@@ -594,6 +649,16 @@ void Eliminar(bool IncluirCollecciones){
 		Cancelar();
 
 		if (!SceneCollection) return;
+		// lo GENERADO por una instancia de prefab no se borra (su estructura es la del prefab): se suelta de la
+		// seleccion con un aviso y se borra el resto
+		{
+			Object* generado = NULL;
+			for (size_t i = ObjSelects.size(); i-- > 0; )
+				if (ObjSelects[i] && W3dEsGenerado(ObjSelects[i])) { generado = ObjSelects[i]; ObjSelects[i]->select = false; ObjSelects.erase(ObjSelects.begin() + (long)i); }
+			if (generado) W3dPrefabEsGeneradoAviso(generado, true);
+			if (ObjActivo && W3dEsGenerado(ObjActivo)) ObjActivo = NULL;
+			if (!HayObjetosSeleccionados(IncluirCollecciones)) return;
+		}
 
 		// Ctrl+Z de borrar: NO libera los objetos -> los DETACHA de la escena y los guarda el comando
 		// (UndoCapturarBorrado), que los re-inserta al deshacer. Reemplaza al delete real + al UndoLimpiar.
@@ -724,8 +789,11 @@ void ProporcionalObjetosActualizar(){
     }
 }
 
+// lo GENERADO por una instancia de prefab no se mueve: su transform no se guarda (el archivo solo lleva la
+// instancia y sus overrides) y se perderia al guardar o al regenerar
 void guardarEstadoRec(Object* obj){
     if (!obj) return;
+    if (W3dEsGenerado(obj)) return;   // (lo de abajo tambien es generado)
 
     // PROPORTIONAL EDITING: un NO seleccionado al alcance entra al snapshot con peso por distancia (se mide al
     // terminar el recorrido, en ProporcionalObjetosMedir)
@@ -767,7 +835,14 @@ bool guardarEstado(){
     guardarEstadoRec(SceneCollection);
     ProporcionalObjetosMedir(); // proportional editing: pesos de los no seleccionados (sin seleccion, vacia)
 
-	if (estadoObjetos.empty()) return false;
+	if (estadoObjetos.empty()) {
+		// (lo unico elegido era generado por una instancia de prefab: se avisa por que no se mueve)
+		Object* gen = NULL;
+		for (size_t i = 0; i < ObjSelects.size() && !gen; i++)
+			if (ObjSelects[i] && ObjSelects[i]->select && W3dEsGenerado(ObjSelects[i])) gen = ObjSelects[i];
+		W3dPrefabEsGeneradoAviso(gen, true);
+		return false;
+	}
 	//std::cout << "moviendo "<< estadoObjetos.size() << " objetos" << std::endl;
 
     UndoTransformIniciar(); // captura pos/rot/escala PREVIAS (se confirma al aceptar el transform)
@@ -803,6 +878,12 @@ void SetPosicion(){
 #include "Empty.h"
 #include "LOD.h"     // W3dDuplicarUno: copiar los umbrales del LOD
 #include "Culling.h" // W3dDuplicarUno: copiar soloCamaraActiva
+#include "Niebla.h"  // W3dDuplicarUno: copiar la niebla
+#include "Recorte.h" // idem LimpiarZ / Recorte
+#include "Hitbox.h"  // W3dDuplicarUno: copiar tamano/centro/etiqueta/filtro del hitbox
+#include "InstanciaPrefab.h" // W3dDuplicarUno: otra instancia del mismo prefab (con sus overrides)
+#include "ProxyW3d.h"        // W3dDuplicarUno: otro proxy del mismo elemento de la libreria
+#include "io/Prefabs.h"      // ...que genera lo suyo
 #include "Particulas.h" // W3dDuplicarUno: copiar la config del emisor
 #include "Collection.h" // W3dDuplicarUno: copiar ordenarPorCamara/ordenarUnaVez
 #include "script/W3dScript.h" // W3dDuplicarUno: deep copy de scriptDatos (scripts + refs/valores)
@@ -828,10 +909,13 @@ static void CopiarBase2D(Elemento2D* d, Elemento2D* s) {
     d->expandir = s->expandir;
 }
 
-Object* W3dDuplicarUno(Object* src) {
+Object* W3dDuplicarUno(Object* src, bool vinculado) {
     Object* nuevo = NULL;
     if (src->getType() == ObjectType::mesh) {
         Mesh* m = (Mesh*)src;
+        // la edicion de una malla de un RECURSO puede estar pendiente: la copia es una malla
+        // COMPLETA (caras, capas, marcas), no solo sus arrays de render
+        if (!m->edicionPendiente.empty()) W3dMallaBinMaterializarEdicion(m);
         Mesh* d = new Mesh(src->Parent, src->pos);
         d->vertexSize = m->vertexSize;
         // POSICIONES + ESTADO DE POSE: por la UNICA puerta (W3dPosVerts, ver Mesh.h). Copiar el
@@ -850,7 +934,22 @@ Object* W3dDuplicarUno(Object* src) {
         }
         if (m->uv) {
             d->uv = new GLfloat[m->vertexSize * 2];
-            memcpy(d->uv, m->uv, sizeof(GLfloat) * m->vertexSize * 2);
+            // con un FLIPBOOK corriendo, uv[] tiene sumado el cuadro actual (estado de la sesion):
+            // la copia arranca de la BASE, y su propio player le aplica el cuadro en el proximo
+            // tick. Copiar el uv[] corrido lo volvia la base de la copia y el offset se sumaba dos veces.
+            const size_t nUV = (size_t)m->vertexSize * 2;
+            const bool conBase = m->flipbook && m->flipAplicado >= 0 && m->flipUvBase.size() == nUV;
+            memcpy(d->uv, conBase ? &m->flipUvBase[0] : m->uv, sizeof(GLfloat) * nUV);
+        }
+        // ANIMACION UV (flipbook): la copia anima igual que el original. El CON NOMBRE (asset de la
+        // escena, SceneFlipbooks) se comparte por referencia; el PROPIO (la tira "animUV") se vuelve
+        // a crear con los mismos parametros que guarda el proyecto. Cada copia tiene su player
+        // (mismo desfase) y su base (se captura sola en el primer tick). Antes Shift+D / Alt+D
+        // devolvian una malla con la UV del cuadro actual congelada y sin animacion.
+        if (m->flipbook) {
+            if (!m->flipbookPropio) d->UsarFlipbook(m->flipbook, m->flipPlay.desfase);
+            else d->SetUVAnimTira(m->flipbook->cuadros, m->flipbook->fps, m->flipbook->filas > 1 ? 1 : 0,
+                                  m->flipPlay.desfase, m->flipbook->tiraAncho, m->flipbook->tiraAlto);
         }
         d->facesSize = m->facesSize;
         if (m->faces) {
@@ -898,6 +997,7 @@ Object* W3dDuplicarUno(Object* src) {
         // el bloque VertexGroup/UVGroup en Mesh.h): vertexGroups = pesos por control-point (rig 3D) y uvGroups =
         // pesos por corner (rig 2D). Copiar solo los primeros dejaba el personaje 2D duplicado SIN pesos.
         for (size_t i = 0; i < m->uvMaps.size(); i++)       d->uvMaps.push_back(new UVMap(*m->uvMaps[i]));
+        d->uvExtra = m->uvExtra;   // el render de las capas UV extra (memoria propia por malla)
         for (size_t i = 0; i < m->colorLayers.size(); i++)  d->colorLayers.push_back(new ColorLayer(*m->colorLayers[i]));
         for (size_t i = 0; i < m->vertexGroups.size(); i++) d->vertexGroups.push_back(new VertexGroup(*m->vertexGroups[i]));
         for (size_t i = 0; i < m->uvGroups.size(); i++)     d->uvGroups.push_back(new UVGroup(*m->uvGroups[i]));
@@ -958,6 +1058,66 @@ Object* W3dDuplicarUno(Object* src) {
         d->soloCamaraActiva = ((LOD*)src)->soloCamaraActiva;
         nuevo = d;
     }
+    else if (src->getType() == ObjectType::niebla) {
+        Niebla* s = (Niebla*)src;
+        Niebla* d = new Niebla(src->Parent, src->pos);
+        d->activa = s->activa; d->modo = s->modo; d->inicio = s->inicio; d->fin = s->fin;
+        d->densidad = s->densidad; d->fondo = s->fondo;
+        for (int k = 0; k < 4; k++) d->color[k] = s->color[k];
+        nuevo = d;
+    }
+    else if (src->getType() == ObjectType::limpiarz) {
+        LimpiarZ* d = new LimpiarZ(src->Parent, src->pos);
+        d->activo = ((LimpiarZ*)src)->activo;
+        nuevo = d;
+    }
+    else if (src->getType() == ObjectType::recorte) {
+        Recorte* s = (Recorte*)src;
+        Recorte* d = new Recorte(src->Parent, src->pos);
+        d->activo = s->activo; d->x = s->x; d->y = s->y; d->ancho = s->ancho; d->alto = s->alto;
+        d->camara = s->camara; d->limpiarZ = s->limpiarZ; d->fondo = s->fondo;
+        for (int k = 0; k < 4; k++) d->color[k] = s->color[k];
+        nuevo = d;
+    }
+    else if (src->getType() == ObjectType::hitbox) {
+        nuevo = HitboxDuplicar((Hitbox*)src);   // los campos propios (la lista vive en Hitbox.cpp)
+    }
+    else if (W3dEsTipoInstancia(src->getType())) {
+        // otra INSTANCIA del mismo prefab con los mismos overrides (lo que genera se genera abajo, ya con su nombre).
+        // Un PROXY de una libreria, otro proxy del mismo elemento
+        InstanciaPrefab* sp = (InstanciaPrefab*)src;
+        // (los overrides salen de comparar lo generado con su base: lo que el usuario cambio desde el ultimo
+        //  cuadro -el ojo de un hijo, un valor de su script- se anota ANTES de copiarlos)
+        W3dPrefabSincronizarOverrides(sp);
+        InstanciaPrefab* d = (src->getType() == ObjectType::proxy) ? new ProxyW3d(src->Parent, src->pos)
+                                                                   : new InstanciaPrefab(src->Parent, src->pos);
+        d->prefab = sp->prefab;
+        d->overProps = sp->overProps;
+        d->overVisible = sp->overVisible;
+        // (y COMO se carga: la copia de una diferida tambien es diferida, io/Streaming.h)
+        d->carga = sp->carga; d->distancia = sp->distancia; d->objetivo = sp->objetivo;
+        nuevo = d;
+    }
+    else if (src->getType() == ObjectType::armature) {
+        // ESQUELETO: los huesos con su rest, su bind y sus matrices de skin (W3dBone es un struct
+        // plano: la copia es exacta y no hay que re-preparar el skinning), los flags del rig, el
+        // clip activo y las capas del mix. Antes no habia rama: Shift+D no creaba nada y Alt+D
+        // daba una Instance (un dibujo del original, sin pose propia ni hijos de verdad).
+        // Los CLIPS: copia propia (Shift+D) o los MISMOS del original (Alt+D). El estado de JUEGO
+        // (cabezal, velocidad, transicion) es runtime: la copia arranca de cero.
+        Armature* sa = (Armature*)src;
+        Armature* d = new Armature(src->Parent, src->pos);
+        d->bones = sa->bones;
+        d->skinUsaBind = sa->skinUsaBind; d->skinReconstruirFK = sa->skinReconstruirFK;
+        d->skinGltf = sa->skinGltf; d->skinAutorado = sa->skinAutorado;
+        d->figureScale = sa->figureScale;
+        if (vinculado) W3dArmatureAnimsVincular(d, sa);
+        else           W3dArmatureAnimsCopiar(d, sa);
+        d->animActiva = (sa->animActiva < (int)d->animations.size()) ? sa->animActiva : -1;
+        d->capas = sa->capas;
+        d->capaActiva = sa->capaActiva;
+        nuevo = d;
+    }
     else if (src->getType() == ObjectType::culling) {
         Culling* s = (Culling*)src;
         Culling* d = new Culling(src->Parent, src->pos);
@@ -967,6 +1127,7 @@ Object* W3dDuplicarUno(Object* src) {
         d->soloCamaraActiva = s->soloCamaraActiva;
         d->distanciaMax     = s->distanciaMax;
         d->ordenAlpha       = s->ordenAlpha;
+        d->ordenCercania    = s->ordenCercania;
         d->cellSize         = s->cellSize;
         d->modo3D           = s->modo3D;
         nuevo = d;   // la grilla (metodo Grid) se rearma sola al primer render (gridSucia = true en el ctor)
@@ -1094,8 +1255,86 @@ Object* W3dDuplicarUno(Object* src) {
         // cuando SimScriptsCambiados / el proximo Play los cargue.
         if (src->scriptDatos)
             nuevo->scriptDatos = new W3dScriptDatos(*src->scriptDatos);
+        // su BIBLIOTECA DE CLIPS DE JERARQUIA: la MISMA (Shift+D y Alt+D). Los clips son datos compartidos
+        // por nombre de ruta, como un material: la copia de la puerta abre con el mismo "abrir", sin copiarlo.
+        W3dJerVincular(nuevo, src);
+        // una INSTANCIA DE PREFAB genera lo suyo (con la seleccion como estaba: el que duplica la decide)
+        if (W3dEsTipoInstancia(nuevo->getType())) W3dPrefabGenerar((InstanciaPrefab*)nuevo);
     }
     return nuevo;
+}
+
+// ============================================================================
+//  LA JERARQUIA DE UNA SELECCION DUPLICADA (Shift+D y Alt+D)
+//
+//  Cada seleccionado se copia por su cuenta y la copia nace colgada del MISMO padre que su
+//  original. Si ese padre TAMBIEN se duplico, la copia se muda a la copia del padre (misma
+//  posicion local, mismo orden entre hermanos): duplicar un personaje entero (esqueleto +
+//  cuerpo + hitbox elegidos) da OTRO personaje, y no un esqueleto suelto con el cuerpo nuevo
+//  colgado del original. Despues, toda referencia de una copia a un objeto que TAMBIEN se
+//  duplico pasa a la copia de ese objeto: el esqueleto de la malla (skinArmature y el target
+//  de sus modificadores) y las refs que enumera el Core (familia Target, riel, fuente de cada
+//  constraint), con su vinculo por nombre. El cuerpo copiado se deforma con el esqueleto
+//  copiado y el hitbox copiado avisa a su propio dueno. Lo que apunta AFUERA de la seleccion
+//  queda como estaba (la copia mira al mismo objeto, como siempre).
+//  Una Instance (el Alt+D de lo que no tiene copia vinculada) no es una copia de verdad: no
+//  recibe hijos ni se le toca el target (dibuja a SU original).
+//  'raices' = las copias que no cuelgan de otra copia (en el orden de 'copia'): las que quedan
+//  elegidas para el "mover". Los hijos las siguen; elegirlos tambien los moveria dos veces.
+// ============================================================================
+#include <map>
+#include <set>
+static void W3dAdjuntarA(Object* obj, Object* nuevoPadre, Object* refHermano, bool despues);   // (mas abajo)
+
+static void EnlazarDuplicados(const std::vector<Object*>& orig, const std::vector<Object*>& copia,
+                              std::vector<Object*>& raices) {
+    raices.clear();
+    std::map<Object*, Object*> mapa;   // original -> su copia DE VERDAD
+    for (size_t i = 0; i < orig.size() && i < copia.size(); i++)
+        if (orig[i] && copia[i] && copia[i]->getType() != ObjectType::instance) mapa[orig[i]] = copia[i];
+    // 1) la jerarquia, en el orden de los hijos del original (sobre una FOTO de la lista: mudar
+    //    una copia la saca de la lista del original)
+    for (std::map<Object*, Object*>::iterator it = mapa.begin(); it != mapa.end(); ++it) {
+        const std::vector<Object*> hijos = it->first->Childrens;
+        for (size_t k = 0; k < hijos.size(); k++) {
+            std::map<Object*, Object*>::iterator h = mapa.find(hijos[k]);
+            if (h != mapa.end()) W3dAdjuntarA(h->second, it->second, NULL, false);   // misma escena: no renumera
+        }
+    }
+    // 2) las referencias entre objetos duplicados
+    for (std::map<Object*, Object*>::iterator it = mapa.begin(); it != mapa.end(); ++it) {
+        Object* c = it->second;
+        if (c->getType() == ObjectType::mesh) {
+            Mesh* m = (Mesh*)c;
+            bool tocada = false;
+            std::map<Object*, Object*>::iterator a = mapa.find((Object*)m->skinArmature);
+            if (a != mapa.end() && a->second->getType() == ObjectType::armature) {
+                m->skinArmature = (Armature*)a->second; tocada = true;
+            }
+            for (size_t k = 0; k < m->modificadores.size(); k++) {
+                Modifier* md = m->modificadores[k];
+                std::map<Object*, Object*>::iterator t = md ? mapa.find(md->target) : mapa.end();
+                if (t != mapa.end()) { md->target = t->second; tocada = true; }
+            }
+            if (tocada) {
+                m->lastSkinFrame = -999999;   // re-skinnear con el esqueleto nuevo
+                if (!m->modificadores.empty()) m->GenerarMallaModificada();
+            }
+        }
+        const int n = c->RefsObjeto();
+        for (int i = 0; i < n; i++) {
+            std::map<Object*, Object*>::iterator t = mapa.find(c->RefObjeto(i));
+            if (t == mapa.end()) continue;
+            c->SetRefObjeto(i, t->second);
+            std::string* nom = c->RefObjetoNombre(i);
+            if (nom) *nom = t->second->name;
+        }
+    }
+    // 3) las raices
+    std::set<Object*> copias;
+    for (size_t i = 0; i < copia.size(); i++) if (copia[i]) copias.insert(copia[i]);
+    for (size_t i = 0; i < copia.size(); i++)
+        if (copia[i] && !copias.count(copia[i]->Parent)) raices.push_back(copia[i]);
 }
 
 void DuplicatedObject(){
@@ -1109,22 +1348,35 @@ void DuplicatedObject(){
     // Se COPIA el vector: el ctor de cada copia llama DeseleccionarTodo y vacia
     // ObjSelects, asi que no podemos iterarlo en vivo.
     std::vector<Object*> seleccionados = ObjSelects;
+    // lo GENERADO por una instancia de prefab no se duplica (la copia quedaria adentro de la instancia, que solo
+    // tiene lo que su prefab genera): se duplica la instancia
+    for (size_t i = seleccionados.size(); i-- > 0; )
+        if (seleccionados[i] && W3dPrefabEsGeneradoAviso(seleccionados[i], true)) seleccionados.erase(seleccionados.begin() + (long)i);
     if (seleccionados.empty()) return;
 
     // copia REAL de cada uno (malla -> deep copy; luz/camara/empty -> sus
     // propiedades; NUNCA un link, eso es NewInstance/Duplicate Linked)
     std::vector<Object*> duplicados;
     for (size_t i = 0; i < seleccionados.size(); i++) {
-        Object* d = W3dDuplicarUno(seleccionados[i]);
-        if (d) duplicados.push_back(d);
+        // una malla que usa un RECURSO: la copia es otra malla con SU recurso (copia del
+        // original, con nombre libre: "Arbol" -> "Arbol.001"), como Shift+D en Blender
+        Object* s0 = seleccionados[i];
+        Object* d = (s0->getType() == ObjectType::mesh && ((Mesh*)s0)->malla)
+                    ? (Object*)W3dMallaDuplicarConRecursoPropio((Mesh*)s0) : W3dDuplicarUno(s0);
+        duplicados.push_back(d);   // (NULL tambien: paralelo a 'seleccionados')
     }
-    if (duplicados.empty()) return;
+    // padre + hijos elegidos juntos: la copia del hijo cuelga de la copia del padre y sus
+    // referencias entre si apuntan a las copias (ver EnlazarDuplicados)
+    std::vector<Object*> raices;
+    EnlazarDuplicados(seleccionados, duplicados, raices);
+    if (raices.empty()) return;
 
-    // dejar seleccionadas SOLO las copias y entrar en modo mover (como Blender:
+    // dejar seleccionadas SOLO las copias RAIZ y entrar en modo mover (como Blender:
     // Shift+D duplica y agarra; sino la copia queda justo encima y "no anda").
     // Es lo mismo que hace NewInstance, que ya funciona.
     DeseleccionarTodo();
-    for (size_t i = 0; i < duplicados.size(); i++) duplicados[i]->Seleccionar();
+    for (size_t i = 0; i < raices.size(); i++) raices[i]->Seleccionar();
+    UndoCapturarCreacion();   // Ctrl+Z saca las copias con sus hijos (y Ctrl+Y las devuelve)
     SetPosicion();
 }
 
@@ -1241,6 +1493,11 @@ void JoinObjetos(){
         if (!dup) merged.push_back(o); // la misma malla repetida -> sin este dedup se anexaba 2 veces (caras dobladas -> malla "invisible"/rota)
     }
     if (merged.empty()) { Notificar(T("Join: select 2+ mesh objects (active is the target)"), true); return; }
+    // lo GENERADO por una instancia de prefab no se une (ni como destino ni como mergeado): el borrado de los
+    // mergeados no pasa por la puerta protegida de Delete y el horneado le haria unica la malla a un hijo
+    // generado; nada de eso se guarda (se edita el prefab, o se desempaqueta la instancia)
+    if (W3dPrefabEsGeneradoAviso(active, true)) return;
+    for (size_t i = 0; i < merged.size(); i++) if (W3dPrefabEsGeneradoAviso(merged[i], true)) return;
 
     // BASE las dos puntas: el Join HORNEA los vertices del otro en la malla activa, asi que el
     // resultado no puede depender de la vista que se dibujo ultimo. Con la efectiva, juntar dos
@@ -1248,6 +1505,10 @@ void JoinObjetos(){
     Matrix4 Wa; active->GetWorldMatrixBase(Wa);   // mundo->local del activo (cadena de padres completa)
     Matrix4 invWa; Matrix4::InvertirAfin(Wa, invWa);
 
+    // el Join hornea geometria en la malla del OBJETO activo: si su malla es de un recurso que
+    // usan otros objetos, antes se hace UNICA (los demas no cambian). Todo en un Ctrl+Z.
+    UndoGrupoIniciar();
+    if (W3dMallaCompartida(am)) W3dMallaHacerUnica(am);
     UndoJoinIniciar(am); // snapshot de la geo del activo ANTES de anexar (undo atomico)
 
     for (size_t i = 0; i < merged.size(); i++) {
@@ -1271,6 +1532,7 @@ void JoinObjetos(){
     if (SceneCollection) SceneCollection->DeseleccionarCompleto(true);
     for (size_t i = 0; i < merged.size(); i++) merged[i]->select = true;
     UndoJoinConfirmar(); // DeleteUndo(los select=true) empaquetado con la geo -> 1 comando
+    UndoGrupoFinSecuencial();   // [hacer unica, join]: Ctrl+Z al reves, Ctrl+Y al derecho
 
     DeseleccionarTodo(); // seleccion final: solo el activo (resultado del join)
     active->Seleccionar();
@@ -1306,6 +1568,11 @@ void AplicarTransform(int what){
     if (mallas.empty() && arms.empty()) { Notificar(T("Apply: select mesh or armature object(s)"), true); return; }
 
     Quaternion idRot = Quaternion::FromEulerXYZ(0.0f,0.0f,0.0f); // identidad
+    // el transform es del OBJETO: hornearlo en una malla que usan OTROS objetos (un recurso
+    // compartido) los deformaria a todos. Esas se hacen UNICAS antes (como Blender, que no deja
+    // aplicar sobre datos multi-usuario). Todo en un solo Ctrl+Z.
+    UndoGrupoIniciar();
+    for (size_t i=0;i<mallas.size();i++) if (W3dMallaCompartida((Mesh*)mallas[i])) W3dMallaHacerUnica((Mesh*)mallas[i]);
     UndoApplyIniciar(); // snapshot de transforms + geo de mallas + rest de huesos de armatures (undo atomico)
 
     // MALLAS: hornear el transform en los VERTICES (v_new = inv(M_reset)*M_actual*v)
@@ -1339,6 +1606,7 @@ void AplicarTransform(int what){
         InvalidarSkinDeArmature(a); // libera el cache + re-skinnea las mallas hijas a la nueva rest
     }
     UndoApplyConfirmar();
+    UndoGrupoFinSecuencial();   // [hacer unica, hornear]: Ctrl+Z al reves, Ctrl+Y al derecho
     const char* nom = (what==0)?"Location":(what==1)?"Rotation":(what==2)?"Scale":"All Transforms";
     Notificar(std::string("Apply ") + nom + ": baked", false);
 }
@@ -1519,6 +1787,7 @@ static void W3dReparent(Object* obj, Object* nuevoPadre) {
     Object* viejoPadre = obj->Parent ? obj->Parent : SceneCollection;
     if (viejoPadre == nuevoPadre) return;
     if (!CruceUIValido(obj, nuevoPadre)) return;
+    if (!W3dPrefabCruceValido(obj, nuevoPadre)) return;   // (lo generado por una instancia no se muda)
     PasoReparent paso(obj);   // Ctrl+Z deshace esta mudanza (ver el bloque de arriba)
     // conservar la posicion GLOBAL (v1: solo traslacion). BASE: el pos que sale de aca se
     // ESCRIBE en el objeto y va al .w3d; con la efectiva, reparentar algo con un constraint
@@ -1572,6 +1841,7 @@ void ReparentSimple(Object* obj, Object* nuevoPadre) {
     if (!ReparentValido(obj, nuevoPadre)) return;
     if ((obj->Parent ? obj->Parent : SceneCollection) == nuevoPadre) return;
     if (!CruceUIValido(obj, nuevoPadre)) return;
+    if (!W3dPrefabCruceValido(obj, nuevoPadre)) return;
     PasoReparent paso(obj);   // Ctrl+Z deshace esta mudanza
     W3dAdjuntarA(obj, nuevoPadre, NULL, false);
 }
@@ -1582,6 +1852,7 @@ void ReparentKeepTransform(Object* obj, Object* nuevoPadre) {
     if (!ReparentValido(obj, nuevoPadre)) return;
     if ((obj->Parent ? obj->Parent : SceneCollection) == nuevoPadre) return;
     if (!CruceUIValido(obj, nuevoPadre)) return;
+    if (!W3dPrefabCruceValido(obj, nuevoPadre)) return;
     // el paso de undo se abre ANTES de tocar nada: este camino reescribe pos/rot/escala
     // DESPUES de la cirugia de punteros y el snapshot tiene que ser el de antes de todo
     PasoReparent paso(obj);
@@ -1617,6 +1888,7 @@ void MoverJuntoA(Object* obj, Object* ref, bool despues) {
     Object* padre = ref->Parent ? ref->Parent : SceneCollection;
     if (!ReparentValido(obj, padre) && padre != (obj->Parent ? obj->Parent : SceneCollection)) return;
     if (!CruceUIValido(obj, padre)) return;
+    if (!W3dPrefabCruceValido(obj, padre)) return;   // (ni reordenar lo generado: es la estructura del prefab)
     // REENTRADA: abajo se llama a ReparentKeepTransform (que tambien es una puerta) y despues
     // se vuelve al embudo. El contador de PasoReparent hace que la captura sea UNA sola, con el
     // estado de ANTES de todo, y que el grupo se cierre recien aca.
@@ -1682,15 +1954,45 @@ void NewInstance(){
 	// global (DeseleccionarTodo) -> iterar ObjSelects en vivo leia un vector ya
 	// vaciado con 2+ seleccionados (mismo fix que DuplicatedObject)
     std::vector<Object*> sel = ObjSelects;
+    for (size_t i = sel.size(); i-- > 0; )   // (lo generado por una instancia de prefab: ver DuplicatedObject)
+        if (sel[i] && W3dPrefabEsGeneradoAviso(sel[i], true)) sel.erase(sel.begin() + (long)i);
+    std::vector<Object*> origs, nuevos;   // paralelos: el original y su copia (NULL = no se pudo)
+    // UN Ctrl+Z: una malla SUELTA primero pasa a tener su recurso (su propio paso) y despues
+    // nacen las copias; deshacer va al reves (saca las copias y la vuelve suelta)
+    UndoGrupoIniciar();
     for (int i = (int)sel.size() - 1; i >= 0; i--) {
         Object* obj = sel[i];            // objeto original
         if (!obj) continue;
-
+        origs.push_back(obj);
+        // UNA MALLA: el duplicado VINCULADO es otra malla que usa el MISMO recurso (misma
+        // geometria en memoria y en la GPU; editar una edita las dos, como Alt+D en Blender)
+        if (obj->getType() == ObjectType::mesh) {
+            nuevos.push_back(W3dMallaDuplicarVinculado((Mesh*)obj));
+            continue;
+        }
+        // UN ESQUELETO: otro armature de verdad (su pose, su cabezal, sus hijos) con los MISMOS
+        // clips en memoria. UN HITBOX: no tiene nada pesado que compartir, y una Instance es solo
+        // un dibujo (sin eventos): la copia es otro hitbox. Con el cuerpo y el sensor elegidos
+        // junto al esqueleto, Alt+D da otro PERSONAJE que comparte malla y animaciones.
+        if (obj->getType() == ObjectType::armature || obj->getType() == ObjectType::hitbox) {
+            nuevos.push_back(W3dDuplicarUno(obj, true));
+            continue;
+        }
 		Instance* instance = new Instance(obj->Parent, obj);
 		obj->select = false;
 		instance->select = true;
 		if (ObjActivo == obj) ObjActivo = instance;
+		nuevos.push_back(instance);
 	}
+    // padre + hijos elegidos juntos: la copia del hijo cuelga de la copia del padre y sus
+    // referencias entre si apuntan a las copias (ver EnlazarDuplicados)
+    std::vector<Object*> raices;
+    EnlazarDuplicados(origs, nuevos, raices);
+    // quedan seleccionadas SOLO las copias RAIZ (el constructor de cada una ya pisa la seleccion)
+    DeseleccionarTodo();
+    for (size_t i = 0; i < raices.size(); i++) raices[i]->Seleccionar();
+    if (!raices.empty()) UndoCapturarCreacion();   // Ctrl+Z las saca con sus hijos (y Ctrl+Y las devuelve)
+    UndoGrupoFinSecuencial();
 	SetPosicion();
 }
 
@@ -2244,6 +2546,9 @@ void SnapCursorAlOrigen() {
 //      agrupa el paso de geometria con el del transform del objeto (ver UndoGrupo* abajo).
 static void DesplazarVertices(Mesh* m, const Vector3& d) {
     if (!m->vertex) return;
+    // el origen es del OBJETO: una malla de un recurso que usan otros se hace UNICA antes
+    // (el caller abrio el grupo de undo: todo vuelve con un Ctrl+Z)
+    if (W3dMallaCompartida(m)) W3dMallaHacerUnica(m);
     UndoCapturarMallaGeo(m);   // Ctrl+Z: snapshot ANTES de mover (antes esto no se deshacia)
     {
         W3dMoverVerts mv(m);   // <- re-ancla sharp/seam al cerrar el scope
@@ -2254,6 +2559,7 @@ static void DesplazarVertices(Mesh* m, const Vector3& d) {
         }
     }
     m->CalcularBordes(); // recalcula centroGeom + edges + bordesBuf (+ invalida edit)
+    W3dMallaMarcarEditada(m);   // su recurso (ya unico) toma la geometria nueva
 }
 
 // (R*S)^-1 * d : pasa un vector de PARENT-local a MESH-local (deshace rot+escala
@@ -2280,7 +2586,7 @@ void SetOriginGeometryToOrigin() {
     UndoGrupoIniciar();   // N mallas seleccionadas = UN SOLO Ctrl+Z (el objeto no se mueve aca)
     for (size_t i = 0; i < ms.size(); i++)
         DesplazarVertices(ms[i], ms[i]->centroGeom * -1.0f); // verts -= baricentro
-    UndoGrupoFin();
+    UndoGrupoFinSecuencial();   // (DesplazarVertices puede hacer unica la malla antes de moverla)
 }
 
 // 2) Origin to Geometry: el ORIGEN se mueve al baricentro y la geometria queda EN SU
@@ -2302,7 +2608,7 @@ void SetOriginOriginToGeometry() {
         DesplazarVertices(m, c * -1.0f); // verts -= baricentro (la geometria no se mueve)
     }
     UndoTransformConfirmar();
-    UndoGrupoFin();
+    UndoGrupoFinSecuencial();   // (idem: hacer unica + mover, y despues el transform)
 }
 
 // 3) Origin to 3D Cursor: el ORIGEN se mueve al cursor 3D y la geometria queda en su
@@ -2320,7 +2626,7 @@ void SetOriginToCursor() {
         DesplazarVertices(m, ParentLocalAMeshLocal(m, oldPos - m->pos));
     }
     UndoTransformConfirmar();
-    UndoGrupoFin();
+    UndoGrupoFinSecuencial();   // (idem)
 }
 
 // ====================================================================
@@ -2434,16 +2740,23 @@ void SnapCursorAlActivo() {
 // Las refs viven POR VALOR en un vector<pair> editable desde el IDE: se guardan como
 // (objeto, script, ref) y NO como std::string*, que se cuelga en cuanto se agrega o
 // borra una ref/script (ver W3dRenameDest en Undo.h).
-static void JuntarRefsDeScripts(Object* nodo, const std::string& viejo, std::vector<W3dRenameDest>& out) {
+//
+// SOLO las que RESUELVEN a 'objetivo' (el que se renombra) desde donde estan, como las resuelve el Play
+// (W3dEscenaBuscarRef: adentro de una instancia de prefab, primero lo de SU instancia). Los nombres son unicos
+// POR SCOPE: un objeto de la escena puede llamarse igual que uno generado por una instancia ("Cuerpo"), y
+// arrastrar por nombre pelado reescribia la ref del script generado que apuntaba a SU propio "Cuerpo" (y eso
+// quedaba como override de la instancia, guardado). NULL = todas las que dicen 'viejo' (sin objetivo).
+static void JuntarRefsDeScripts(Object* nodo, const std::string& viejo, Object* objetivo, std::vector<W3dRenameDest>& out) {
     if (!nodo) return;
     if (nodo->scriptDatos)
         for (size_t s = 0; s < nodo->scriptDatos->scripts.size(); s++) {
             W3dScriptEntrada& e = nodo->scriptDatos->scripts[s];
             for (size_t r = 0; r < e.refs.size(); r++)
-                if (e.refs[r].second == viejo) out.push_back(W3dDestRefLua(nodo, (int)s, (int)r));
+                if (e.refs[r].second == viejo && (!objetivo || W3dEscenaBuscarRef(nodo, viejo) == objetivo))
+                    out.push_back(W3dDestRefLua(nodo, (int)s, (int)r));
         }
     for (size_t i = 0; i < nodo->Childrens.size(); i++)
-        JuntarRefsDeScripts(nodo->Childrens[i], viejo, out);
+        JuntarRefsDeScripts(nodo->Childrens[i], viejo, objetivo, out);
 }
 // ---------------------------------------------------------------------------
 //  TODA punta de vinculo POR NOMBRE que nombra a 'viejo'. Se recorre el arbol
@@ -2461,28 +2774,39 @@ static void JuntarRefsDeScripts(Object* nodo, const std::string& viejo, std::vec
 //     'fuenteNombre' de todos los constraints que la nombraban, y
 //   - una clase nueva que guarde un Object* lo hereda sin tocar este archivo.
 // ---------------------------------------------------------------------------
-static void JuntarTargetsPorNombre(Object* nodo, const std::string& viejo, std::vector<W3dRenameDest>& out) {
+// Igual que las refs de script: SOLO las puntas que llevan a 'objetivo' (su puntero, o -sin puntero- lo que
+// encuentra su nombre desde ese objeto, por scope). Una punta que apunta a un HOMONIMO de otro scope (lo generado
+// por una instancia) no se toca.
+static void JuntarTargetsPorNombre(Object* nodo, const std::string& viejo, Object* objetivo, std::vector<W3dRenameDest>& out) {
     if (!nodo) return;
     const int n = nodo->RefsObjeto();
     for (int i = 0; i < n; i++) {
         // los nombres de las refs son MIEMBROS del objeto (targetName / RielName) o del
         // constraint, que el objeto tiene vivo: puntero directo, como antes
         std::string* p = nodo->RefObjetoNombre(i);
-        if (p && *p == viejo) out.push_back(W3dDestNombre(p));
+        if (!p || *p != viejo) continue;
+        if (objetivo) {
+            Object* t = nodo->RefObjeto(i);
+            if (t ? (t != objetivo) : (W3dBuscarNombreDesde(nodo, viejo) != objetivo)) continue;
+        }
+        out.push_back(W3dDestNombre(p));
     }
     for (size_t i = 0; i < nodo->Childrens.size(); i++)
-        JuntarTargetsPorNombre(nodo->Childrens[i], viejo, out);
+        JuntarTargetsPorNombre(nodo->Childrens[i], viejo, objetivo, out);
 }
 
 int W3dNombresContarRefs(Object* o, const std::string& viejo) {
     std::vector<W3dRenameDest> v;
     Object* esc = W3dEscenaRaizDe(o);
-    JuntarRefsDeScripts(esc ? esc : SceneCollection, viejo, v);
+    JuntarRefsDeScripts(esc ? esc : SceneCollection, viejo, NULL, v);
     return (int)v.size();
 }
 
 std::string W3dRenombrarObjeto(Object* o, const std::string& pedido, bool avisar) {
     if (!o) return std::string();
+    // lo GENERADO por una instancia de prefab se llama como en su prefab (las rutas de sus clips, sus refs y sus
+    // overrides van por esos nombres): se renombra en el prefab
+    if (W3dEsGenerado(o)) { W3dPrefabEsGeneradoAviso(o, avisar); return o->name; }
     const std::string viejo = o->name;
     const std::string nuevo = o->NombreLibre(pedido);
     if (nuevo == viejo) return viejo;
@@ -2493,10 +2817,10 @@ std::string W3dRenombrarObjeto(Object* o, const std::string& pedido, bool avisar
     aRenombrar.push_back(W3dDestNombre(&o->name));
     Object* esc = W3dEscenaRaizDe(o);
     int nrefs0 = (int)aRenombrar.size();
-    JuntarRefsDeScripts(esc ? esc : SceneCollection, viejo, aRenombrar);
+    JuntarRefsDeScripts(esc ? esc : SceneCollection, viejo, o, aRenombrar);
     const int nrefs = (int)aRenombrar.size() - nrefs0;
     int ntgt0 = (int)aRenombrar.size();
-    JuntarTargetsPorNombre(SceneCollection, viejo, aRenombrar);
+    JuntarTargetsPorNombre(SceneCollection, viejo, o, aRenombrar);
     const int ntgt = (int)aRenombrar.size() - ntgt0;
     // escena INICIAL del proyecto (el nombre de la escena es la clave)
     const bool esEscenaInicial = (o->getType() == ObjectType::ui && W3dEscenaInicial() == viejo);
@@ -2566,9 +2890,11 @@ static void RepararRec(Object* nodo, TomadosPorScope& tomados, std::vector<std::
         TomadosPorScope::iterator it = tomados.find(raiz);
         if (it == tomados.end()) {
             // scope nuevo: sembrarlo con el nombre de SU RAIZ (la busqueda por nombre
-            // arranca EN la raiz, asi que un hijo homonimo de la escena es ambiguo)
+            // arranca EN la raiz, asi que un hijo homonimo de la escena es ambiguo). Una
+            // INSTANCIA DE PREFAB no se siembra: su nombre es del scope de afuera y lo que
+            // genera se busca desde sus hijos (ver W3dEsFronteraScope en Objects.h)
             std::set<std::string> s0;
-            if (raiz) s0.insert(raiz->name);
+            if (raiz && !W3dEsTipoInstancia(raiz->getType())) s0.insert(raiz->name);
             it = tomados.insert(std::make_pair(raiz, s0)).first;
         }
         const std::string norm = W3dNombreNormalizar(h->name, "Objeto");
@@ -2577,10 +2903,13 @@ static void RepararRec(Object* nodo, TomadosPorScope& tomados, std::vector<std::
             nuevo = W3dNombreUnico(norm, "Objeto", NombreTomadoEnSet, &it->second);
         it->second.insert(nuevo);
         if (nuevo != h->name) cambios.push_back(std::make_pair(h, nuevo));
-        // si es una raiz UI, su scope propio arranca con SU nombre definitivo
+        // si es una raiz UI, su scope propio arranca con SU nombre definitivo; una instancia de
+        // prefab, vacio (la otra frontera de scope)
         if (h->getType() == ObjectType::ui) {
             std::set<std::string> s0; s0.insert(nuevo);
             tomados[h] = s0;
+        } else if (W3dEsTipoInstancia(h->getType())) {
+            tomados[h] = std::set<std::string>();
         }
         RepararRec(h, tomados, cambios);
     }
@@ -2644,6 +2973,8 @@ void W3dNombresJuntarEspacios(std::vector<W3dEspacioNombres>& out) {
     // ---- globales de PROYECTO ----
     W3D_ESPACIO_NAME(out, "MATERIAL", "Material", NULL, Materials)
     W3D_ESPACIO_NAME(out, "ANIMACION DE ESCENA", "Scene", NULL, SceneAnimations)
+    // las MALLAS 3D del registro (objects/MallaRecurso.h): el undo de un rename re-chequea aca
+    W3D_ESPACIO_NOMBRE(out, "MALLA 3D", "Malla", NULL, W3dMallasRegistro())
     { std::vector<Paleta>& ps = W3dPaletas();
       W3dEspacioNombres& P = NuevoEspacio(out, "PALETA", "Paleta", NULL);
       for (size_t i = 0; i < ps.size(); i++) P.nombres.push_back(&ps[i].nombre);

@@ -1,0 +1,48 @@
+# ==========================================================================
+#  STREAMING (revision 3): Ctrl+Z despues de que el streaming LIBERO lo generado
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_streaming_rev_undo.w3s
+#
+#  Los pasos de undo que guardan un objeto (la seleccion, el ojo -H-, el transform, la malla de una edicion...) lo
+#  sueltan cuando el objeto se LIBERA de verdad (el gancho del destructor: DesvincularDetachados). El Play libera lo
+#  generado de las diferidas al arrancar (y el Stop lo vuelve a generar: otros objetos); la vista previa del editor
+#  lo libera al descargar. Ctrl+Z / Ctrl+Y despues son no-ops seguros sobre lo que ya no esta (antes: escribian sobre
+#  memoria liberada, VisibilityUndo::Aplicar).
+# ==========================================================================
+
+ventana 1280 720
+streamlua /tmp/w3d_f9_rev3 dosmats.png
+abrirw3d /tmp/w3d_f9_rev3/streamlua.w3d
+
+# --- A) el ojo (H) de un generado de una diferida, Play/Stop y Ctrl+Z ---
+prefabh Cerca Tronco
+simcache 1
+simplay 3
+simstop
+undo
+undo
+redo
+redo
+streamestado Cerca cargada
+prefabnodo Cerca Tronco visible 0
+
+# --- B) elegir y ocultar un generado (H), mover la instancia; la vista previa lo descarga; Ctrl+Z ---
+prefabh Cerca Tronco
+selobj Cerca
+objmove 1 0 0
+streamvista 1
+streamobjetivo 1000 0 1000
+streamtick 30
+streamestado Cerca descargada
+undo
+undo
+undo
+undo
+redo
+redo
+redo
+streamobjetivo 0 0 3
+streamtick 30
+streamestado Cerca cargada
+streamobjetivo off
+streamvista 0

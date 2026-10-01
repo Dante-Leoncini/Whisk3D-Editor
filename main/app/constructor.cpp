@@ -1,6 +1,7 @@
 #include "constructor.h"
 #include "ViewPorts/Timeline.h" // el layout PC parte el 3D en columna [3D / Timeline]
 #include "ViewPorts/LayoutInput.h" // LayoutPorDefecto: EL layout por defecto, en un solo lugar
+#include "objects/Primitivas.h"   // W3dMallaNacioHook: el cubo por defecto nace con su recurso
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb/stb_image.h"
@@ -9,6 +10,21 @@
 
 // Variable global que estabas usando
 bool running = false;
+
+// LA ESCENA POR DEFECTO (arrancar sin archivo): una coleccion hija de la raiz (la del
+// usuario: CollectionActive != SceneCollection), camara, luz blanca y un cubo. UNA sola
+// definicion: la usa el arranque y el comando `escenadefecto` del harness (los tests que
+// trabajan "sobre la escena del usuario" la necesitan en un proceso que ya corrio otros).
+void W3dCrearEscenaPorDefecto() {
+    CollectionActive = new Collection(SceneCollection);
+
+    new Camera(CollectionActive, Vector3(-3, 2.5, 1.8), Vector3(-35.0f, -45.0f, 0.0f));
+    Light* L = Light::Create(CollectionActive, 1, 2.25, 2.25);
+    L->SetDiffuse(1, 1, 1); // luz BLANCA por defecto (antes era roja)
+
+    NewMesh(MeshType::cube, CollectionActive);
+    if (W3dMallaNacioHook) W3dMallaNacioHook();   // el cubo ya es el recurso "Cubo" de la biblioteca
+}
 
 void ConstructUniversal(int argc, char* argv[]) {
     // estado de graficos inicial: el MISMO inicializador universal que Symbian
@@ -90,13 +106,7 @@ void ConstructUniversal(int argc, char* argv[]) {
     // ======================================================
     // Si se abre sin archivo -> escena default
     // ======================================================
-    CollectionActive = new Collection(SceneCollection);
-
-    new Camera(CollectionActive, Vector3(-3, 2.5, 1.8), Vector3(-35.0f, -45.0f, 0.0f));
-    Light* L = Light::Create(CollectionActive, 1, 2.25, 2.25);
-    L->SetDiffuse(1, 1, 1); // luz BLANCA por defecto (antes era roja)
-
-    NewMesh(MeshType::cube, CollectionActive);
+    W3dCrearEscenaPorDefecto();
 
     // EL layout por defecto, UNA sola logica por TAMANO DE PANTALLA (LayoutPorDefecto, LayoutInput.cpp):
     // un lado < 320px -> 2 viewports (3D + Propiedades, segun orientacion); mas grande -> 4 viewports

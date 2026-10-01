@@ -1,0 +1,18 @@
+{
+  "version": 3,
+  "escena": {
+    "objetos": [
+      {
+        "tipo": "objeto", "nombre": "Puerta", "pos": [3, 0, 0],
+        "clips": [
+          { "nombre": "abrir", "inicio": 1, "fin": 11, "fps": 30,
+            "objetos": [
+              { "objeto": "", "curvas": [ { "p": 1, "c": 1, "k": [[1, 0, 1], [11, 90, 1]] } ] },
+              { "objeto": "Hoja", "curvas": [ { "p": 0, "c": 0, "k": [[1, 1, 1], [11, 2, 1]] } ] }
+            ] }
+        ],
+        "hijos": [ { "tipo": "objeto", "nombre": "Hoja", "pos": [1, 0, 0] } ]
+      }
+    ]
+  }
+}

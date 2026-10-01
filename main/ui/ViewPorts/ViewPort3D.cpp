@@ -1,3 +1,4 @@
+#include "io/RaicesEditor.h"   // el selector de escena/prefab de la barra (BR_Raiz)
 #include "objects/Light.h" // W3dLucesPrepase
 #include "w3dGraphics.h" // abstraccion de graficos (independencia de OpenGL)
 #include "W3dLang.h"
@@ -66,6 +67,7 @@ std::vector<UI2DPos>* g_hudCapturaPos = NULL;
 PopupMenu* MenuAdd = NULL;
 PopupMenu* MenuImports = NULL; // submenu "Add > Imports": OBJ / FBX / glTF / GLB
 PopupMenu* MenuMallas  = NULL; // submenu "Add > Mesh": las primitivas (8 de las 19 filas del menu)
+PopupMenu* MenuPrefabsAdd = NULL; // submenu "Add > Prefab": los prefabs del proyecto (io/PrefabsEditor.h)
 PopupMenu* MenuSelect = NULL;    // seleccion: All / None / Invert
 PopupMenu* MenuObject = NULL;    // operaciones de objeto (solo si hay seleccion)
 PopupMenu* MenuAnimation = NULL; // "Animation": keyframes del objeto + Motion Trail (solo con seleccion)
@@ -143,6 +145,10 @@ Viewport3D::Viewport3D(Vector3 pos){
     // (abierto = se ven; cerrado = apagados), asi que se elige por frame mas abajo, no aca.
     b = new Button("", IconType::visible); b->rol = BR_Overlays; b->desplegable = true; BarButtons.push_back(b);
     b = new Button("", IconType::camera);  b->rol = BR_Render;   b->desplegable = true; BarButtons.push_back(b);
+    // la ESCENA / el JUEGO / el PREFAB que se edita: icono + nombre, desplegable (escenas, juegos, prefabs,
+    // Nueva escena, Nuevo juego, Nuevo prefab). El icono lo pone W3dRaicesBotonSincronizar segun el tipo
+    b = new Button("", (int)IconType::camera); b->rol = BR_Raiz; b->desplegable = true; b->caretMenu = true;
+        BarButtons.push_back(b);
     // MODO JUEGO: transporte minimo (visible SOLO con la animacion "Juego" activa).
     // Sin ellos, un layout con solo el viewport 3D no tenia forma de pausar/parar.
     b = new Button(T("Stop")); b->rol = BR_JuegoStop; b->visible = false; BarButtons.push_back(b);
@@ -203,6 +209,7 @@ Viewport3D::Viewport3D(Vector3 pos){
         MenuAdd = new PopupMenu();
         MenuImports = new PopupMenu();
         MenuMallas = new PopupMenu();
+        MenuPrefabsAdd = new PopupMenu();
         extern void LayoutConstruirMenuAdd();
         LayoutConstruirMenuAdd();
         MenuAdd->titulo = T("Add");   // el boton es un icono sin texto -> el menu lleva titulo
@@ -252,6 +259,10 @@ Viewport3D::Viewport3D(Vector3 pos){
         MenuObject->Agregar(T("Set Parent"),   0, -1, LayoutSubmenuSetParent())->atajo = "Ctrl P";
         MenuObject->Agregar(T("Clear Parent"), 0, -1, LayoutSubmenuClearParent())->atajo = "Ctrl Alt P";
         MenuObject->Agregar(T("Delete"), 3)->atajo = "X";
+        // PREFABS (io/PrefabsEditor.h): lo elegido pasa a un prefab nuevo (queda una instancia) / la instancia
+        // activa se desempaqueta en objetos comunes
+        MenuObject->Agregar(T("Create Prefab"), 700, IconType::prefab);
+        MenuObject->Agregar(T("Unpack Prefab"), 701, IconType::prefab);
         // menu "Animation" (barra, Object Mode): keyframes del TRANSFORM del objeto + Motion Trail. Antes era un
         // SUBMENU de "Object"; es su propio menu de la barra (queda a un click, no a dos).
         // SUBMENU de canales de Insert Keyframe (compartido por el menu Animation, el menu Pose, el
@@ -421,6 +432,7 @@ Viewport3D::Viewport3D(Vector3 pos){
     showEmpty = true;
     showParticulas = false;  // DEFAULT DESTILDADO: no ver las flechas de los emisores en el juego del editor
     showCurvas = true;       // las curvas/rieles se ven por defecto; el checkbox permite ocultarlas
+    showHitbox = true;       // el alambre de los hitbox (sin apagar los demas overlays ni el hitbox)
     show3DCursor = true;
     ShowRelantionshipsLines = true;
     limpiarPantalla = true;
@@ -441,6 +453,9 @@ Viewport3D::~Viewport3D() {
     // si este viewport era el dueno del lienzo del juego (modo juego con UI
     // dinamica), soltarlo: un override colgado apuntaria a un viewport muerto
     UI2D_OverrideVentanaQuitar(this);
+    // idem el 3D ACTIVO: abrir un proyecto libera el layout anterior y cambiar el tipo de
+    // un viewport lo borra. El primer render de un 3D vivo lo re-engancha (Render).
+    if (Viewport3DActive == this) Viewport3DActive = NULL;
 };
 
 void Viewport3D::AbrirMenuOverlays(int x, int y){
@@ -471,6 +486,7 @@ void Viewport3D::AbrirMenuOverlays(int x, int y){
     MenuOverlayObjects->AgregarCheck(T("Empty"),    16, &showEmpty,    IconType::empty);
     MenuOverlayObjects->AgregarCheck(T("Particles"),17, &showParticulas, IconType::arrow);
     MenuOverlayObjects->AgregarCheck(T("Curves"),   18, &showCurvas,   IconType::curve);
+    MenuOverlayObjects->AgregarCheck(T("Hitbox"),   19, &showHitbox,   IconType::hitbox);
     MenuOverlays->Agregar(T("Objects"), 13, IconType::object, MenuOverlayObjects)->gris = &showOverlays;
     MenuOverlays->AgregarCheck(T("3D Cursor"), 5, &show3DCursor)->gris = &showOverlays;
     MenuOverlays->AgregarCheck(T("Relationship Lines"), 6, &ShowRelantionshipsLines)->gris = &showOverlays;
@@ -792,34 +808,44 @@ void Viewport3D::RecalcOrbitPosition(){
     camForward = viewRot * Vector3(0, 0, -1);
 }
 
+Viewport3D::Lente Viewport3D::LenteActual() const {
+    Lente L;
+    const CameraBase cam = VistaCam();        // ESTE viewport (no los globals, que pisa el ultimo render en multi-3D)
+    L.pos = cam.pos;
+    L.der = cam.rot * Vector3(1, 0, 0);
+    L.arr = cam.rot * Vector3(0, 1, 0);
+    L.fwd = cam.rot * Vector3(0, 0, -1);      // hacia la escena
+    const bool camFrame = (ViewFromCameraActive && CameraActive);
+    const float va = (height > 0) ? (float)width / (float)height : 1.0f;
+    float fov = fovDeg, ra = va, nx = 1.0f, ny = 1.0f;
+    L.orto = orthographic; L.zoom = 1.0f; L.panX = 0.0f; L.panY = 0.0f;
+    if (camFrame) {                            // la MISMA cuenta que Render() + W3dEscena3DProyeccion
+        fov = CameraActive->fov; L.orto = CameraActive->orthographic;
+        ra = (g_juegoPuro == 2) ? va : W3dAspectoJuego();
+        if (ra < 1e-4f) ra = va;
+        if (camFrameOn) { nx = camFrameNX; ny = camFrameNY; }
+        if (nx < 1e-4f) nx = 1.0f; if (ny < 1e-4f) ny = 1.0f;
+        L.zoom = camViewZoom; L.panX = camViewPanX; L.panY = camViewPanY;
+    }
+    // media-extension visible: en orto el volumen (size = orbitDistance*tan(fov/2), sigue el zoom); en
+    // perspectiva tan(fov/2) (se divide por la profundidad)
+    float h = tanf(fov * 0.5f * 3.14159265f / 180.0f);
+    if (L.orto) { h *= orbitDistance; if (h < 0.001f) h = 0.001f; }
+    L.sx = h * ra / nx; L.sy = h / ny;
+    return L;
+}
+
 bool Viewport3D::ProyectarPunto(const Vector3& p, float& sx, float& sy, float* outW){
-    // ejes de camara de ESTE viewport (no los globals, que pisa el ultimo
-    // renderizado en multi-3D)
-    Vector3 cr = viewRot * Vector3(1, 0, 0);
-    Vector3 cu = viewRot * Vector3(0, 1, 0);
-    Vector3 cf = viewRot * Vector3(0, 0, -1); // hacia la escena
-    Vector3 rel = p - viewPos;
-    float ez = rel.Dot(cf);                   // distancia hacia adelante
+    const Lente L = LenteActual();
+    Vector3 rel = p - L.pos;
+    float ez = rel.Dot(L.fwd);                // distancia hacia adelante
     if (ez < 0.0001f) return false;           // detras de la camara
     // divisor de perspectiva: en perspectiva es la profundidad (para interpolar perspective-correct); en
     // ortografica NO hay division -> 1.0 (la proyeccion es afin, el baricentrico de pantalla ya es el real).
-    if (outW) *outW = orthographic ? 1.0f : ez;
-    float ex = rel.Dot(cr);
-    float ey = rel.Dot(cu);
-    float aspectR = (height > 0) ? (float)width / (float)height : 1.0f;
-    float ndcX, ndcY;
-    if (orthographic) {
-        // ORTOGRAFICA: sin division por ez. MISMO extent que Render(): size = orbitDistance*tan(fov/2) (zoom).
-        float size = orbitDistance * tanf(fovDeg * 0.5f * 3.14159265f / 180.0f);
-        if (size < 0.001f) size = 0.001f;
-        ndcX = ex / (size * aspectR);
-        ndcY = ey / size;
-    } else {
-        float fRad = fovDeg * 3.14159265f / 180.0f;
-        float f = 1.0f / tanf(fRad * 0.5f);
-        ndcX = (ex * (f / aspectR)) / ez;
-        ndcY = (ey * f) / ez;
-    }
+    if (outW) *outW = L.orto ? 1.0f : ez;
+    const float d = L.orto ? 1.0f : ez;
+    float ndcX = rel.Dot(L.der) / (L.sx * d) * L.zoom + L.panX;
+    float ndcY = rel.Dot(L.arr) / (L.sy * d) * L.zoom + L.panY;
     sx = (ndcX * 0.5f + 0.5f) * (float)width;
     sy = (1.0f - (ndcY * 0.5f + 0.5f)) * (float)height; // pantalla: Y hacia abajo
     return true;
@@ -870,18 +896,15 @@ static Vector3 GizmoPivot(){
 // cerca movia muchisimo, de lejos poquito). Es la inversa exacta de ProyectarPunto (misma base/FOV).
 float Viewport3D::VelocidadArrastreMundo(){
     if (height <= 0) return 0.01f;                // guarda (no deberia pasar)
-    if (orthographic) {
-        // mismo extent que Render() y ProyectarPunto(): size = orbitDistance*tan(fov/2) (sigue el zoom)
-        float size = orbitDistance * tanf(fovDeg * 0.5f * 3.14159265f / 180.0f);
-        if (size < 0.001f) size = 0.001f;
-        return 2.0f * size / (float)height;      // ortho: mundo-por-pixel constante (no depende de z)
+    // la MISMA lente que ProyectarPunto (mirando por la camara: la de la camara, con marco y zoom)
+    const Lente L = LenteActual();
+    float ez = 1.0f;                             // ortho: mundo-por-pixel constante (no depende de z)
+    if (!L.orto) {
+        ez = (GizmoPivot() - L.pos).Dot(L.fwd);  // profundidad (eye-space) del pivot de transform
+        if (ez < nearClip) ez = nearClip;        // no detras de la camara
     }
-    Vector3 cf = viewRot * Vector3(0, 0, -1);    // hacia la escena (igual que ProyectarPunto)
-    float ez = (GizmoPivot() - viewPos).Dot(cf); // profundidad (eye-space) del pivot de transform
-    if (ez < nearClip) ez = nearClip;            // no detras de la camara
-    float fRad = fovDeg * 3.14159265f / 180.0f;
-    // alto visible del frustum a esa profundidad, repartido en 'height' pixeles = mundo por pixel
-    return 2.0f * ez * tanf(fRad * 0.5f) / (float)height;
+    // alto visible a esa profundidad, repartido en 'height' pixeles = mundo por pixel
+    return 2.0f * ez * L.sy / (L.zoom > 1e-4f ? L.zoom : 1.0f) / (float)height;
 }
 
 void Viewport3D::ActualizarLineaTransform(int mx, int my){
@@ -1800,6 +1823,7 @@ void Viewport3D::Render() {
     // overlays por tipo (submenu "Objects"): del viewport -> globales que lee el traversal del Core (Empty/Camera/luz)
     g_showLights = showLights && ovl; g_showCamera = showCamera && ovl; g_showEmpty = showEmpty && ovl;
     g_showParticulas = showParticulas && ovl; g_showCurvas = showCurvas && ovl;
+    { extern bool g_showHitbox; g_showHitbox = showHitbox && ovl; }   // objects/Hitbox.cpp (dibujo y pick)
     // LOCAL VIEW de ESTE viewport -> globals que lee Object::Render (mismo patron que g_mostrarOverlays). El set
     // vive en el viewport; otro viewport sin local view lo deja en false/NULL al publicar SU estado.
     { extern bool g_localViewActivo; extern const std::set<Object*>* g_localViewVisibles;
@@ -2769,7 +2793,7 @@ void Viewport3D::RenderUI() {
             // pausar/reanudar, y los menus View (cambiar camara) / Overlays /
             // Render. Nada de editar. Con STOP la interfaz vuelve a la normal. =====
             static const int kOcultar[] = { BR_Mode, BR_SelMode, BR_Pivot, BR_Orient, BR_Snap, BR_Proporcional,
-                                            BR_Select, BR_Add, BR_Mesh, BR_Animation, BR_Object, BR_UV };
+                                            BR_Select, BR_Add, BR_Mesh, BR_Animation, BR_Object, BR_UV, BR_Raiz };
             for (size_t i = 0; i < sizeof(kOcultar) / sizeof(kOcultar[0]); i++) {
                 Button* bo = BarRolBtn(BarButtons, kOcultar[i]);
                 if (bo) bo->visible = false;
@@ -2803,6 +2827,9 @@ void Viewport3D::RenderUI() {
               } }
             bool esMesh = ObjActivo && ObjActivo->getType() == ObjectType::mesh;
             bool esArm  = ObjActivo && ObjActivo->getType() == ObjectType::armature;
+            // la escena/prefab que se edita (en un juego empaquetado no se cambia de escena a mano)
+            { Button* bR = BarRolBtn(BarButtons, BR_Raiz);
+              if (bR) { extern bool g_modoJuego; bR->visible = !g_modoJuego; W3dRaicesBotonSincronizar(bR); } }
             // se buscan por ROL (no por indice) -> reordenar la barra no rompe esto.
             Button* bMode = BarRolBtn(BarButtons, BR_Mode);
             if (bMode) {
@@ -4031,6 +4058,14 @@ void Viewport3D::key_down_return(){
 }
 
 Viewport3D* Viewport3DActive = NULL;
+// rect (coords de ventana SDL, origen arriba-izquierda) del viewport 3D que dibuja el juego: lo usa la captura del
+// mouse de main.cpp para teletransportar el cursor al centro cada frame. false si todavia no se dibujo ninguno.
+bool JuegoViewportRect(int* x, int* y, int* w, int* h) {
+    Viewport3D* v = Viewport3DActive;
+    if (!v || v->width < 8 || v->height < 8) return false;
+    *x = v->x; *y = v->y; *w = v->width; *h = v->height;
+    return true;
+}
 
 //precalculos
 bool recalcularCamara = true;
@@ -4101,6 +4136,9 @@ void JuegoPrepararViewports(bool apagarOverlays) {
 //  veces sin saber por que.
 // ---------------------------------------------------------------------------
 bool JuegoEsperarTexturas() {
+    // un material DORMIDO (huerfano al abrir) que una malla paso a usar hace un momento: se despierta
+    // ya, asi el juego tampoco arranca con esa malla en gris (los huerfanos siguen sin cargarse)
+    TexturasDespertarUsadas();
     const int pend = TexturasPendientes();
     if (pend <= 0) return true;
     char msg[96];

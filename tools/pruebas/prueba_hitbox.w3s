@@ -1,0 +1,110 @@
+# ==========================================================================
+#  HITBOX: los eventos alEntrar / alQuedarse / alSalir, con valores EXACTOS
+#  Correr DESDE ESTA CARPETA:
+#    cd <motor>/tools/pruebas
+#    ../../platform/linux/build/whisk3d --script prueba_hitbox.w3s
+#
+#  La escena (prueba_hitbox.w3d, JSON v3 escrito a mano, asi tambien se prueba
+#  el LECTOR del "tipo":"hitbox"):
+#    - Puerta (vacio, contador 'puerta') con un hitbox HIJO ZonaPuerta 2x2x2 en el
+#      origen, filtro "jugador" (contador propio 'zona');
+#    - Trampa (contador 'trampa') con un hijo SoloEnemigos, filtro "enemigo";
+#    - Apagada (activo=false) y Oculta (visible=false), con contador propio;
+#    - Movil (vacio) con un hitbox hijo CajaMovil 1x1x1, etiqueta "jugador", y un
+#      script que lo lleva en X a PASO FIJO: el hitbox lo ve en x = -5.05 + 0.4*(t-1)
+#      en el tick t -> se solapa con la zona (|x| < 1.5) en los ticks 10..17.
+#  Tiene que dar, en 25 ticks:
+#    - ZonaPuerta y su dueno Puerta: entrar 1 (t10), quedarse 7 (t11..t17), salir 1
+#      (t18), con otro = Movil (el DUENO del otro hitbox), mio = ZonaPuerta,
+#      suyo = CajaMovil;
+#    - Trampa: nada (su filtro no deja pasar la etiqueta "jugador");
+#    - Apagada / Oculta: nada (no participan);
+#    - Movil (dueno de CajaMovil, sin filtro): entra a ZonaPuerta Y a SoloEnemigos:
+#      entrar 2, quedarse 14, salir 2 (cada lado filtra por su cuenta).
+#  Despues: Stop devuelve la escena, y un guardado + reapertura (contenedor v4)
+#  conserva los campos y da EXACTAMENTE los mismos eventos; re-guardar sin cambios
+#  da las mismas entradas byte a byte. Rebobinar (simpaso -1) olvida los pares.
+# ==========================================================================
+
+abrirw3d prueba_hitbox.w3d
+
+# --- lo que leyo el lector ---
+hitboxinfo ZonaPuerta activo 1 tam 2 2 2 centro 0 0 0 etiqueta - filtro jugador cuerpos 0 padre Puerta duenio Puerta
+hitboxinfo CajaMovil etiqueta jugador filtro - padre Movil duenio Movil tam 1 1 1
+hitboxinfo Apagada activo 0 padre - duenio Apagada
+hitboxinfo SoloEnemigos filtro enemigo duenio Trampa
+
+# --- a mitad de camino (tick 12: el movil esta adentro) ---
+simplay 12
+hitboxinfo ZonaPuerta tocando 1 dentro 1
+hitboxinfo CajaMovil tocando 1 dentro 2
+hitboxinfo SoloEnemigos tocando 0 dentro 0
+hitboxinfo Apagada tocando 0
+hitboxstats hitboxes 3 pares 2
+scriptinfo compartido puerta_entrar 1
+scriptinfo compartido puerta_quedarse 2
+
+# --- el recorrido completo ---
+simplay 13
+scriptinfo compartido puerta_entrar 1
+scriptinfo compartido puerta_quedarse 7
+scriptinfo compartido puerta_salir 1
+scriptinfo compartido puerta_otro Movil
+scriptinfo compartido puerta_mio ZonaPuerta
+scriptinfo compartido puerta_suyo CajaMovil
+scriptinfo compartido puerta_salio Movil
+scriptinfo compartido zona_entrar 1
+scriptinfo compartido zona_quedarse 7
+scriptinfo compartido zona_salir 1
+scriptinfo compartido zona_otro Movil
+scriptinfo compartido zona_mio ZonaPuerta
+scriptinfo compartido trampa_entrar 0
+scriptinfo compartido trampa_quedarse 0
+scriptinfo compartido apagada_entrar 0
+scriptinfo compartido oculta_entrar 0
+scriptinfo compartido movil_entrar 2
+scriptinfo compartido movil_quedarse 14
+scriptinfo compartido movil_salir 2
+scriptinfo compartido movil_mio CajaMovil
+hitboxinfo ZonaPuerta tocando 0 dentro 0
+hitboxstats hitboxes 3 pares 0
+
+# --- Stop: la escena del usuario vuelve y no queda nadie "adentro" ---
+simstop
+posobjeto Movil -5.05 0 0
+hitboxstats pares 0
+hitboxinfo ZonaPuerta tocando 0
+
+# --- guardar (contenedor v4) + abrir: los mismos campos y los mismos eventos ---
+guardarw3d prueba_hitbox_v4.w3d
+abrirw3d prueba_hitbox_v4.w3d
+hitboxinfo ZonaPuerta activo 1 tam 2 2 2 centro 0 0 0 etiqueta - filtro jugador cuerpos 0 padre Puerta
+hitboxinfo CajaMovil etiqueta jugador padre Movil
+hitboxinfo Apagada activo 0
+simplay 25
+scriptinfo compartido puerta_entrar 1
+scriptinfo compartido puerta_quedarse 7
+scriptinfo compartido puerta_salir 1
+scriptinfo compartido zona_quedarse 7
+scriptinfo compartido trampa_entrar 0
+scriptinfo compartido oculta_entrar 0
+scriptinfo compartido movil_quedarse 14
+simstop
+
+# --- re-guardar sin cambios: mismas entradas, mismos bytes ---
+guardarw3d prueba_hitbox_rt2.w3d
+w3diguales prueba_hitbox_v4.w3d prueba_hitbox_rt2.w3d
+
+# --- viaje en el tiempo: rebobinar OLVIDA quien estaba adentro (el estado de lua no se
+#     rebobina) y al seguir jugando se recalcula: la zona vuelve a avisar alEntrar ---
+abrirw3d prueba_hitbox_v4.w3d
+simplay 12
+hitboxinfo ZonaPuerta tocando 1
+simpaso -1
+hitboxinfo ZonaPuerta tocando 0
+hitboxstats pares 0
+simpaso 1
+simplay 1
+hitboxinfo ZonaPuerta tocando 1
+scriptinfo compartido puerta_entrar 2
+simstop

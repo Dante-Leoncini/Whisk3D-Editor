@@ -40,6 +40,8 @@ SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/io/W3dZip.cpp
 # y "W3dEscribirFloat". Al agregar un .cpp al Core hay que compararlo contra el CMakeLists del editor.
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/io/W3dTexto.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/io/W3dMalla.cpp
+# W3dMallaBin = el .w3db (la misma geometria en binario, el formato por defecto). Va siempre con W3dMalla.
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/io/W3dMallaBin.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/io/W3dAlmacen.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/io/W3dRecursos.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/base/w3dlog.cpp
@@ -62,6 +64,8 @@ SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/audio/W3dAudioSDL.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/audio/W3dVolumen.cpp        # volumen del proyecto (VolumenAplicarProyecto)
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/base/W3dClipboardSDL.cpp     # portapapeles del IDE (SDL_SetClipboardText)
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/physics/W3dRigido.cpp        # cuerpos rigidos (W3dRigidos*)
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/physics/W3dColMalla.cpp      # colision contra mallas (colSuelo/colPared)
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/physics/W3dHitbox.cpp        # hitbox + eventos alEntrar/alSalir/alTocar
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/audio/W3dMusic.cpp   # musica (W3dMusicRefrescarVolumenes)
 SRC_FILES += $(filter-out %/lua.c %/luac.c,$(wildcard $(PROJECT_ROOT)/thirdparty/lua/src/*.c))
 

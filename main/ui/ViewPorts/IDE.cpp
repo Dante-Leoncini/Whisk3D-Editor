@@ -320,6 +320,8 @@ void IDE::SetTexto(const std::string& texto) {
 // disco falla a mitad de camino, el original queda intacto.
 bool IDE::Guardar() {
     if (archivo.empty()) return false;
+    // el outliner por recursos busca en los scripts las texturas que nombran: su foto se re-arma
+    { extern void W3dRecursosVistaInvalidar(); W3dRecursosVistaInvalidar(); }
     std::string t = GetTexto();
     // ---------------------------------------------------------------------
     //  EL SCRIPT VIVE ADENTRO DEL .w3d: se guarda A SU ENTRADA.
@@ -1007,4 +1009,43 @@ bool IDETextoTexto(const char* utf8) {
     if (!ide) return false;
     ide->TextoTipeado(utf8);
     return true; // enfocado: el texto es del IDE aunque se haya filtrado todo
+}
+
+// "Open in IDE" de la BIBLIOTECA (un script elegido en el outliner): el primer IDE del layout lo abre.
+// false = no hay ningun IDE en el layout (el usuario tiene que abrir uno).
+#include "ViewPorts/LayoutArbol.h"
+#include "ViewPorts/PopUp/ConfirmarPopup.h"   // descartar lo tipeado pide confirmacion
+static IDE* PrimerIDE(ViewportBase* n) {
+    if (!n) return NULL;
+    if (n->isLeaf()) return n->ViewportKind() == 8 ? (IDE*)n : NULL;
+    IDE* a = NULL;
+    if (n->ContainerKind() == 1) { a = PrimerIDE(((ViewportRow*)n)->childA); return a ? a : PrimerIDE(((ViewportRow*)n)->childB); }
+    a = PrimerIDE(((ViewportColumn*)n)->childA);
+    return a ? a : PrimerIDE(((ViewportColumn*)n)->childB);
+}
+// el script que espera el "Si" del cartel de descartar (el IDE se vuelve a buscar al confirmar: el layout pudo
+// cambiar mientras el cartel estaba abierto)
+static std::string gIDEAbrirPendiente;
+static void IDEAbrirConfirmado() {
+    IDE* ide = PrimerIDE(LayoutRaizCompleta());
+    if (ide && !gIDEAbrirPendiente.empty()) ide->AbrirArchivo(gIDEAbrirPendiente);
+    gIDEAbrirPendiente.clear();
+    g_redraw = true;
+}
+bool IDEAbrirScript(const std::string& ruta) {
+    IDE* ide = PrimerIDE(LayoutRaizCompleta());
+    if (!ide) return false;
+    // el MISMO script que ya esta abierto: no se recarga (lo tipeado y su undo se quedan)
+    if (ide->archivo == ruta) { g_redraw = true; return true; }
+    // con cambios sin guardar AVISA antes de descartarlos, como el selector de scripts del propio IDE
+    if (ide->sucio) {
+        gIDEAbrirPendiente = ruta;
+        if (!confirmarPopup) confirmarPopup = new ConfirmarPopup();
+        confirmarPopup->Abrir(std::string(T("Discard the unsaved changes of")) + " " + IDENombreScript(ide->archivo) + "?",
+                              IDEAbrirConfirmado);
+        return true;
+    }
+    if (!ide->AbrirArchivo(ruta)) return false;
+    g_redraw = true;
+    return true;
 }

@@ -24,6 +24,7 @@
 #include "objects/ObjectMode.h"
 #include "edit/Modifier.h"                // ModifierType::Armature (mallas ligadas al rig, para el rename)
 #include "animation/SkeletalAnimation.h"  // PrepararSkinAutorado + BoneTrack (remap al borrar)
+#include "animation/W3dAnimSet.h"         // clips COMPARTIDOS: el remap de pistas escribe en los clips (copy-on-write)
 #include "ViewPorts/ViewPort3D.h"         // ProyectarPunto / VelocidadArrastreMundo (grab 3D)
 #include "ViewPorts/Notificaciones.h"     // aviso al renombrar el vertex group junto al hueso
 #include "ViewPorts/Timeline.h"           // DopeRemapIndiceClave: borrar un hueso CORRE los indices que
@@ -314,7 +315,9 @@ bool BoneEditBorrar(Armature* a){
         b.parent = (p >= 0 && p < n) ? ni[p] : -1;
         nuevos.push_back(b);
     }
-    // tracks de animacion: referencian huesos por INDICE -> remap (o fuera si su hueso se borro)
+    // tracks de animacion: referencian huesos por INDICE -> remap (o fuera si su hueso se borro).
+    // Escribe en los clips: si son de un animset compartido, el armature pasa a clips propios.
+    W3dArmatureAnimsPropias(a);
     for (size_t an = 0; an < a->animations.size(); an++){
         SkeletalAnimation* clip = a->animations[an];
         if (!clip) continue;

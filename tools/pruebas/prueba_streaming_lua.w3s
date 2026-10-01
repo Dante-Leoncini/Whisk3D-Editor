@@ -1,0 +1,71 @@
+# ==========================================================================
+#  STREAMING desde LUA: cargar(obj) / descargar(obj) / cargaAuto(obj) / cargado(obj) (io/Streaming.h), y el
+#  REFCOUNT de las texturas (las ranuras de los materiales las retienen: Textures.h, TexturaPonerEn)
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_streaming_lua.w3s
+#
+#  streamlua arma el juego 3D minimo con el prefab del proyecto "Poste" (cubo con la Madera CON TEXTURA) y tres
+#  instancias: "Fija" (siempre), "Cerca" (diferida a 8 m, la camara a 5 m) y "Lejos" (diferida a 8 m, la camara a
+#  38 m), y un "Control" (control.lua):
+#    1) al arrancar, Fija y Cerca YA cargadas (la cercana desde el primer frame) y Lejos no; cargado() y cargar() de
+#       algo que no es una instancia dan false;
+#    2) descargar(Fija), descargar(Cerca), cargar(Lejos): la distancia deja de decidir;
+#    3) cargaAuto(Lejos), cargaAuto(Cerca), cargar(Fija): vuelven a su carga (Lejos se va, Cerca vuelve).
+#  El veredicto ("[streaming] OK lua=F1C1L0,fijadas,auto") en el Play y en el JUEGO COMPILADO. El Stop deja las tres
+#  como estaban. La textura de la Madera: tantas referencias como ranuras que la apuntan, y se va de la GPU cuando
+#  ninguna malla dibuja su material (vuelve cuando una lo vuelve a dibujar).
+#  Compila un juego de verdad (cmake + g++), asi que tarda mas que las demas.
+# ==========================================================================
+
+ventana 640 480
+streamlua /tmp/w3d_f9_lua dosmats.png
+abrirw3d /tmp/w3d_f9_lua/streamlua.w3d
+streamestado Fija cargada
+streamestado Cerca cargada
+streamestado Lejos cargada
+streamtexrefs exacto
+
+# --- el Play ---
+simcache 0
+simplay 1
+# (el primer actualizar ya pidio: descargar Fija y Cerca, cargar Lejos -su malla y su textura ya estaban: se genera
+#  en el mismo frame-)
+streamestado Fija descargada
+streamestado Cerca descargada
+streamestado Lejos cargada
+streaminfo instancias 3 cargadas 1
+simplay 30
+streamestado Fija cargada
+streamestado Cerca cargada
+streamestado Lejos descargada
+scriptinfo compartido juez OK
+scriptinfo compartido veredicto F1C1L0,fijadas,auto
+streamtexrefs exacto
+streamveredicto
+# (descargar las tres desde afuera del script: la Madera sale de la GPU; cargar una la trae de vuelta. La Fija la
+#  fijo cargar() del script: vuelve a decidir su carga, ahora por distancia)
+streamobjetivo 1000 0 1000
+streamfijar Fija auto
+streamcarga Fija distancia 8
+simplay 5
+streaminfo cargadas 0 pidiendo 0 pedidos 0
+streammem mallas 2 texturas 0 scripts 0
+streamobjetivo 3 0 3
+simplay 5
+streaminfo cargadas 2
+streammem mallas 3 texturas 1
+streamtexrefs exacto
+streamobjetivo off
+simstop
+simcache 1
+# (el Stop: las tres como estaban antes del Play, y la Fija vuelve a ser de siempre -su paso de undo-)
+streamestado Fija cargada
+streamestado Cerca cargada
+streamestado Lejos cargada
+undo
+streamestado Fija cargada
+streamcarga Fija siempre
+
+# --- el juego compilado: el mismo veredicto ---
+compilarjuego 0 0 1
+streamjuegolog /tmp/w3d_f9_lua streamlua igual

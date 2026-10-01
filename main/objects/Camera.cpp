@@ -1,6 +1,7 @@
 #include "w3dGraphics.h" // abstraccion de graficos (independencia de OpenGL)
 #include "W3dLang.h"   // el nombre por defecto nace en el idioma del usuario
 #include "Camera.h"
+#include "animation/Animation.h" // hooks de la pista "Camara activa" (g_camaraActivaHook / g_animFovHook)
 #include <math.h>
 #include <algorithm>
 #include "WhiskUI/theme/colores.h"
@@ -65,6 +66,23 @@ const GLushort CameraEdges[CameraEdgesSize] = {
 };
 
 Camera* CameraActive = NULL;
+
+// ---- hooks del Core (animation/Animation.h): la pista "Camara activa" y el FOV animado en el JUEGO ----
+// El Core no conoce la clase Camera ni el global CameraActive: se los resuelve aca, por NOMBRE (la pista guarda
+// nombres para sobrevivir al guardado / a borrar y recrear camaras).
+static void CamActivaPorNombre(const char* nombre) {
+    if (!nombre || !SceneCollection) return;
+    if (CameraActive && CameraActive->name == nombre) return;
+    Object* o = FindObjectByName(SceneCollection, nombre);
+    if (o && o->getType() == ObjectType::camera) CameraActive = (Camera*)o;
+}
+static void FovCamara(Object* o, float fov) {
+    if (o && o->getType() == ObjectType::camera) ((Camera*)o)->fov = fov;
+}
+struct RegistrarHooksCamara {
+    RegistrarHooksCamara() { g_camaraActivaHook = CamActivaPorNombre; g_animFovHook = FovCamara; }
+};
+static RegistrarHooksCamara gRegistrarHooksCamara;
 
 // ------------------- MÉTODOS -------------------
 
@@ -198,7 +216,7 @@ void Camera::ReloadRiel(Object* me) {
     // viajan por una curva y Reload() llama a esto SIEMPRE, asi que cada apertura de
     // proyecto escupia un "RielTarget '' no encontrado" por camara. Vacio no es error.
     if (RielName.empty()) return;
-    Object* obj = FindObjectByName(SceneCollection, RielName);
+    Object* obj = W3dBuscarNombreDesde(me, RielName);   // (por scope: el riel de SU prefab primero)
 #ifdef W3D_SYMBIAN
     // sin RTTI en RVCT: el tipo se chequea por getType()
     Curve* RielTarget = (obj && obj->getType() == ObjectType::curve)
@@ -557,7 +575,7 @@ bool RielSet(Object* camObj, Object* curvaObj, const char* curvaNombre,
     Curve* cv = NULL;
     if (!soltar) {
         Object* o = curvaObj;
-        if (!o && curvaNombre) o = FindObjectByName(SceneCollection, curvaNombre);
+        if (!o && curvaNombre) o = W3dBuscarNombreDesde(camObj, curvaNombre, SceneCollection);
         cv = (o && o->getType() == ObjectType::curve) ? (Curve*)o : NULL;
         if (!cv) return false;                  // pidieron un riel que no existe
     }

@@ -193,6 +193,10 @@ struct HijoOrdenado {
 static bool HijoMasLejosPrimero(const HijoOrdenado& a, const HijoOrdenado& b) {
     return a.dist2 > b.dist2;
 }
+// adelante -> atras PURO (Culling::ordenCercania): el mas cercano primero, sin agrupar por material
+static bool HijoMasCercaPrimero(const HijoOrdenado& a, const HijoOrdenado& b) {
+    return a.dist2 < b.dist2;
+}
 
 // distancia^2 del punto 'p' al AABB [mn, mx] (0 si esta adentro): el punto del AABB
 // mas CERCANO a 'p' es p clampeado a la caja. Sirve para el culling por DISTANCIA:
@@ -204,8 +208,8 @@ float W3dDist2PuntoAabb(const Vector3& p, const Vector3& mn, const Vector3& mx) 
     return dx*dx + dy*dy + dz*dz;
 }
 
-// ---- metodo FRUSTUM (y Triangulo/Bsp, que se componen con este): cull por AABB de cada hijo.
-void Culling::RenderFrustum() {
+// ---- metodo FRUSTUM (y la segunda mitad de Bsp): cull por AABB de cada hijo.
+void Culling::RenderFrustum(const std::vector<char>* filtro) {
     // HERENCIA: la camara designada rige el subarbol entero (LOD/Culling
     // anidados miden desde la misma camara en TODOS los viewports). Cubre
     // tambien la rama "activo=false": apagar el recorte no cambia quien mide.
@@ -285,6 +289,10 @@ void Culling::RenderFrustum() {
     visibles.reserve(Childrens.size());
     for (size_t c = 0; c < Childrens.size(); c++) {
         Object* h = Childrens[c];
+        // un hijo OCULTO no se dibuja ni se mide: si se midiera (y cacheara) oculto quedaria "sin bounds" y
+        // al mostrarlo despues se cortaria por la posicion de su origen, que puede estar lejos de la geometria
+        if (!h->visible) continue;
+        if (filtro && c < filtro->size() && !(*filtro)[c]) continue;   // lo descarto el PVS (metodo Bsp)
         Vector3 mn, mx;
         bool hayBounds;
         unsigned matKey = 0;
@@ -310,7 +318,8 @@ void Culling::RenderFrustum() {
                 }
                 fc->matKey = MaterialKeySubarbol(h);
                 matKey = fc->matKey; tieneMatKey = true;
-                fc->valido = true;
+                // sin bounds (todo el subarbol oculto por ahora) no se cachea: se vuelve a medir
+                fc->valido = hayBounds;
             }
         }
         // en ORTOGRAFICA no se corta (el frustum en perspectiva mentiria; ver
@@ -345,6 +354,7 @@ void Culling::RenderFrustum() {
     // Es un orden LOCAL del render de este frame: el arbol (Childrens) no se toca,
     // asi que outliner/undo/guardado no se enteran. ----
     if (ordenAlpha) std::sort(visibles.begin(), visibles.end(), HijoMasLejosPrimero); // translucido: atras->adelante (alpha)
+    else if (ordenCercania) std::sort(visibles.begin(), visibles.end(), HijoMasCercaPrimero); // opaco: adelante->atras puro
     else            std::sort(visibles.begin(), visibles.end());                      // opaco: por material + adelante->atras (early-z)
     for (size_t i = 0; i < visibles.size(); i++) visibles[i].o->Render();
 }
@@ -374,6 +384,8 @@ void Culling::RebuildGrid() {
     for (size_t i = 0; i < Childrens.size(); i++) {
         Object* h = Childrens[i];
         if (!h->estatico) { dinamicos.push_back((int)i); continue; } // DINAMICO (Crash/enemigo): fuera de la grilla
+        // OCULTO al armar la grilla: no se puede medir (se mostraria en la celda de su origen); se mide por frame
+        if (!h->visible) { dinamicos.push_back((int)i); continue; }
         Vector3 mn, mx;
         if (!W3dBoundsSubarbol(h, mn, mx)) { Vector3 pn = h->GetGlobalPosition(); mn = mx = pn; }
         int x0 = (int)floorf(mn.x * inv), x1 = (int)floorf(mx.x * inv);
@@ -488,7 +500,9 @@ bool Culling::RielAplicarNodo(int nodo) {
             // JoinPath y no una concatenacion a mano: normaliza separadores (en Symbian
             // una ruta mezclada "E:\...\x/escenario/y.w3dvis" no abre y el Culling caia
             // a frustum EN SILENCIO -> el N95 dibujaba todo).
-            if (!(ruta.size() > 1 && (ruta[0] == '/' || ruta[1] == ':')) && !g_w3dDirProyecto.empty())
+            // (una entrada de una LIBRERIA externa, "lib:<libreria>/...": el Culling lo genero un proxy; tal cual)
+            if (!(ruta.size() > 1 && (ruta[0] == '/' || ruta[1] == ':')) && ruta.compare(0, 4, "lib:") != 0 &&
+                !g_w3dDirProyecto.empty())
                 ruta = w3dFileSystem::JoinPath(g_w3dDirProyecto, ruta);
             std::vector<unsigned char> bytes;
             std::string err;
@@ -517,6 +531,68 @@ bool Culling::RielAplicarNodo(int nodo) {
     return true;
 }
 
+// ---- metodo BSP: la camara baja por el arbol hasta su hoja -> cluster -> fila del PVS; cada hijo
+// pasa si alguno de sus clusters esta en la fila (AND de bitsets, cacheado mientras el cluster no
+// cambie); lo que pasa sigue por el frustum de siempre. Todo dato: cero geometria por frame.
+bool Culling::BspCargar() {
+    if (!bspCargado) {
+        bspCargado = true;
+        if (!bspArchivo.empty()) {
+            extern std::string g_w3dDirProyecto;
+            // primero como ENTRADA del contenedor montado ("bsp/nivel.w3dbsp": ReadFileBytes la sirve del zip);
+            // si no esta, como ruta relativa al directorio del proyecto (proyecto suelto en disco)
+            std::vector<unsigned char> bytes;
+            std::string err;
+            std::string ruta = bspArchivo;
+            if (!w3dFileSystem::ReadFileBytes(ruta, bytes) || bytes.empty()) {
+                if (!(ruta.size() > 1 && (ruta[0] == '/' || ruta[1] == ':')) && ruta.compare(0, 4, "lib:") != 0 &&
+                    !g_w3dDirProyecto.empty())
+                    ruta = w3dFileSystem::JoinPath(g_w3dDirProyecto, ruta);
+                bytes.clear();
+                w3dFileSystem::ReadFileBytes(ruta, bytes);
+            }
+            if (bytes.empty() || !bsp.Cargar(&bytes[0], bytes.size(), &err))
+                w3dLogfW("[Culling] '%s': no pude cargar el bsp %s (%s) -> frustum",
+                         name.c_str(), bspArchivo.c_str(), err.c_str());
+            else
+                w3dLogf("[Culling] '%s': bsp %s: %d nodos, %d hojas, %d clusters, %d hijos", name.c_str(),
+                        bspArchivo.c_str(), (int)bsp.nodos.size(), (int)bsp.hojaCluster.size(), bsp.nClusters,
+                        (int)bsp.hijos.size());
+        }
+    }
+    return bsp.Valido();
+}
+
+void Culling::RenderBsp() {
+    if (!activo || !BspCargar()) { bspCluster = -1; RenderFrustum(); return; }
+    // el ojo: la misma camara con la que mide el frustum (juego jugando / vista que dibuja)
+    Vector3 ojo;
+    Camera* camMedida = W3dCamaraDeMedida(soloCamaraActiva);
+    if (camMedida) ojo = camMedida->GetGlobalPosition();
+    else if (g_vistaBindeada) ojo = g_renderCamPos;
+    else { bspCluster = -1; RenderFrustum(); return; }   // headless sin vista: no hay ojo que ubicar
+    // al espacio LOCAL del Culling (el dato esta en las coordenadas de sus hijos)
+    { Matrix4 W, Wi; GetWorldMatrix(W); if (Matrix4::InvertirAfin(W, Wi)) ojo = Wi * ojo; }
+    const int cl = bsp.ClusterEn(ojo.x, ojo.y, ojo.z);
+    if (cl < 0) { bspCluster = -1; RenderFrustum(); return; }   // en solido / fuera del arbol: se ve todo
+    if (bspHijosSello != Childrens.size()) {   // los hijos cambiaron (editor): re-emparejar por nombre
+        bspHijoIdx.resize(Childrens.size());
+        for (size_t c = 0; c < Childrens.size(); c++) bspHijoIdx[c] = bsp.IndiceHijo(Childrens[c]->name);
+        bspHijosSello = Childrens.size();
+        bspCluster = -1;
+    }
+    if (cl != bspCluster) {
+        if (!bsp.Fila(cl, bspFila)) { bspCluster = -1; RenderFrustum(); return; }
+        bspCluster = cl;
+        bspVisible.assign(Childrens.size(), 0);
+        for (size_t c = 0; c < Childrens.size(); c++) {
+            const int k = bspHijoIdx[c];
+            bspVisible[c] = (k < 0) ? 1 : (VisBsp::Interseca(bspFila, bsp.hijos[(size_t)k].bits) ? 1 : 0);
+        }
+    }
+    RenderFrustum(&bspVisible);
+}
+
 // ---- DISPATCHER: elige el path segun el metodo elegido en el panel.
 void Culling::RenderHijos() {
     if (Childrens.empty()) return;
@@ -534,14 +610,9 @@ void Culling::RenderHijos() {
                 RenderFrustum();
             }
             break;
-        case Bsp: {
-            // BSP aun no implementado: cae a Frustum. El aviso "fuerte" al usuario va al elegirlo
-            // en el dropdown (Properties.cpp); aca no se spamea por-frame.
-            static bool avisadoBsp = false;
-            if (!avisadoBsp) avisadoBsp = true;
-            RenderFrustum();
+        case Bsp:
+            RenderBsp();
             break;
-        }
         case Frustum:
         default:
             RenderFrustum();

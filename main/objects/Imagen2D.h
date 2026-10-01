@@ -23,6 +23,7 @@ public:
     int   palTinte;       // indice en la paleta del UI (-1 = tinte propio)
     bool  usarAlpha;      // false: ignora el canal alpha de la textura (se dibuja opaca)
     bool  filtrado;       // false: sin filtro (NEAREST, pixel-perfect)
+    int   mezcla;         // w3dEngine::Mezcla (Alpha por defecto; Add/AddAlpha para brillos y destellos de un HUD)
     // SUB-RECT de la textura para la imagen FIJA (u0, v0, u1, v1; default
     // 0,0,1,1 = entera): con el ATLAS UNICO el HUD muestra solo su recorte.
     // Con flipbook enganchado manda la ventana del flipbook (que tiene su
@@ -41,6 +42,7 @@ public:
         usarAlpha = true;
         palTinte = -1;
         filtrado = true;
+        mezcla = 1;   // w3dEngine::MezclaAlpha
         uvRect[0] = 0.0f; uvRect[1] = 0.0f; uvRect[2] = 1.0f; uvRect[3] = 1.0f;
     }
 

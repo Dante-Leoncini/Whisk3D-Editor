@@ -1,0 +1,35 @@
+# ==========================================================================
+#  HITBOX con CIZALLA: un hitbox rotado que cuelga de un padre con escala NO
+#  uniforme tiene una matriz de mundo con columnas no perpendiculares; su caja
+#  en mundo (la que dibuja y clickea el editor) es un PARALELEPIPEDO. El motor
+#  tiene que detectar lo que esa caja toca, ni mas ni menos.
+#  Correr DESDE ESTA CARPETA (ver prueba_hitbox.w3s):
+#    ../../platform/linux/build/whisk3d --script prueba_hitbox_cizalla.w3s
+#
+#  prueba_hitbox_cizalla.w3d: Padre con escala (4, 1, 1) y un hijo Rombo (rot Z
+#  45, tam 1): en XY es un rombo de vertices (+-2.83, 0) y (0, +-0.707). Cajitas
+#  de 0.1: Adentro1..4 estan adentro (el SAT clasico perdia las del extremo:
+#  Adentro1 y Adentro2); Afuera1 esta justo afuera de un lado inclinado (solo lo
+#  separa la normal de CARA del paralelepipedo, no sus ejes), Afuera2..4 afuera.
+#  Despues: la grilla con paralelepipedos contra la fuerza bruta (la esfera
+#  envolvente tiene que alcanzar la diagonal mas larga) y el SAT contra una
+#  referencia exacta independiente en miles de pares al azar.
+# ==========================================================================
+
+abrirw3d prueba_hitbox_cizalla.w3d
+hitboxpaso 1
+hitboxinfo Adentro1 tocando 1
+hitboxinfo Adentro2 tocando 1
+hitboxinfo Adentro3 tocando 1
+hitboxinfo Adentro4 tocando 1
+hitboxinfo Afuera1 tocando 0
+hitboxinfo Afuera2 tocando 0
+hitboxinfo Afuera3 tocando 0
+hitboxinfo Afuera4 tocando 0
+hitboxinfo Rombo dentro 4
+hitboxstats hitboxes 9 pares 4
+
+hitboxsat 20000
+hitboxgrilla 400 cizalla 1
+hitboxgrilla 2000 grande 1 cizalla 1
+escenadefecto

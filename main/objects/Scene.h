@@ -41,4 +41,9 @@ public:
 
 extern Object* SceneCollection;
 
+// una RAIZ NUEVA (una escena 3D o un prefab mas del proyecto, ver main/W3dRaices.h): una Scene
+// que NO se cuelga de la raiz activa, no toca la seleccion ni el global 'scene' y queda con su
+// fondo por defecto. No la registra: eso lo hace quien la crea.
+Scene* W3dSceneNuevaRaiz();
+
 #endif

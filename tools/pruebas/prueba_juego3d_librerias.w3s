@@ -1,0 +1,54 @@
+# ==========================================================================
+#  LIBRERIAS en el JUEGO: los proxies de un nivel y instanciar("<libreria>/<prefab>", ...) de lua,
+#  en el Play del editor y en el JUEGO COMPILADO (io/Librerias.h, objects/ProxyW3d.h).
+#  Correr DESDE ESTA CARPETA (ver prueba_juego3d.w3s):
+#    ../../platform/linux/build/whisk3d --script prueba_juego3d_librerias.w3s
+#
+#  libjuegomin: un juego 3D minimo que VINCULA la libreria "personajes" (en una carpeta HERMANA del
+#  juego: "ext:../lib/personajes.w3d"), con 3 proxies de su prefab "Enemigo" (el del medio con el
+#  override vida=25) y un "Director" que jugando instancia 5 enemigos mas con instanciar("personajes/
+#  Enemigo", ...). El enemigo.lua es DE LA LIBRERIA: cada uno cuenta en compartido y mira SU cuerpo
+#  (scope por proxy). El veredicto ("[librerias] OK creados=5 enemigos=8 scope=8 vida=95") sale en el
+#  Play y en el binario. "Compilar juego" empaqueta las entradas de la libreria en librerias/personajes/
+#  (el runtime lee sus rutas "lib:personajes/..." de ahi, sin el .w3d de la libreria): con los assets
+#  sueltos al lado del binario y con los assets EMPAQUETADOS en el pak.
+#  Compila un juego de verdad (cmake + g++), asi que tarda mas que las demas.
+# ==========================================================================
+
+ventana 640 480
+libcrear /tmp/w3d_f8_juego/lib personajes.w3d dosmats.png
+entradaexiste /tmp/w3d_f8_juego/lib/personajes.w3d scripts/enemigo.lua 1
+libjuegomin /tmp/w3d_f8_juego/juego /tmp/w3d_f8_juego/lib/personajes.w3d
+guardarw3d /tmp/w3d_f8_juego/juego/libjuego.w3d
+entradatiene /tmp/w3d_f8_juego/juego/libjuego.w3d proyecto.json ext:../lib/personajes.w3d 1
+entradaexiste /tmp/w3d_f8_juego/juego/libjuego.w3d scripts/enemigo.lua 0
+abrirw3d /tmp/w3d_f8_juego/juego/libjuego.w3d
+prefabvivos 3
+libproxyinfo Enemigo.001 libreria personajes elemento Enemigo generados 4
+prefabinfo Enemigo.001 overrides 1
+libcompartido personajes prefab Enemigo proxies 3 mallas 1 animsets 1 materiales 1 texturas 1
+
+# --- el Play del editor: instanciar() de un prefab de la libreria crea proxies ---
+simcache 0
+simplay 30
+scriptinfo compartido juez OK
+scriptinfo compartido enemigos 8
+scriptinfo compartido scope_ok 8
+scriptinfo compartido vida_total 95
+prefabvivos 8
+simstop
+simcache 1
+prefabvivos 3
+
+# --- el binario (modo debug: deja su whisk3d.log); la libreria viaja en librerias/personajes/ ---
+compilarjuego 0 0 1
+libruta /tmp/w3d_f8_juego/juego/platform-build/linux/librerias/personajes/proyecto.json lee 1
+libruta /tmp/w3d_f8_juego/juego/platform-build/linux/librerias/personajes/scripts/enemigo.lua lee 1
+libruta /tmp/w3d_f8_juego/juego/platform-build/linux/librerias/personajes/texturas/piel.png lee 1
+libruta /tmp/w3d_f8_juego/juego/platform-build/linux/lib/personajes.w3d lee 0
+libjuegolog /tmp/w3d_f8_juego/juego libjuego creados=5 enemigos=8 scope=8 vida=95
+
+# --- lo mismo con los assets EMPAQUETADOS (el pak): la libreria viaja adentro del binario ---
+compilarjuego 0 1 1
+libruta /tmp/w3d_f8_juego/juego/build/linux/librerias/personajes/proyecto.json lee 0
+libjuegolog /tmp/w3d_f8_juego/juego libjuego creados=5 enemigos=8 scope=8 vida=95

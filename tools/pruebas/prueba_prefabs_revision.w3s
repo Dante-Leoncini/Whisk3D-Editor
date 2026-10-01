@@ -1,0 +1,305 @@
+# ==========================================================================
+#  PREFABS: los casos de borde de la revision de la fase (io/Prefabs.h, io/PrefabsEditor.h,
+#  script/SimJuego.cpp, objects/ObjectMode.cpp).
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_prefabs_revision.w3s
+#  (los casos de memoria -A y G- se miran con el build ASan: aca pasan igual, pero sin el arreglo
+#   el ASan corta con heap-use-after-free)
+#
+#    A) regenerar una instancia (cambiarle el prefab, Reset Overrides) con pasos en el historial que
+#       nombran lo generado (elegirlo, ocultarlo con H): el Ctrl+Z vuelve a colgar la generacion vieja
+#    B) con el Play andando: cambiar el prefab / Reset estan bloqueados; guardar escribe la estructura del
+#       usuario (lo destruido por un script si, lo instanciado no); destruir() de algo PUESTO en la escena
+#       deja su objeto("ref") en nil (como el juego compilado)
+#    C) renombrar un objeto de la escena no reescribe la ref de un script generado que apunta a SU
+#       propio homonimo (los nombres son por scope)
+#    D) instanciar() desde un inicio() (un spawner): lo creado es de la partida y el Stop lo borra
+#    E) un script agregado a mano a un objeto generado no se vuelve override (ni corre los valores)
+#    F) prefabs ANIDADOS: lo que se cambia en lo generado por la anidada se guarda como override de la
+#       de afuera; renombrar el anidado no deja rancia la definicion del que lo contiene
+#    G) el RIEL de una camara en una curva de una instancia destruida jugando: rebobinar no la devuelve
+#    H) Unpack: las refs internas siguen a su objeto renumerado (no al homonimo de afuera)
+#    I) instanciar(): los cuerpos rigidos existen en su inicio() (fisicaVel llega)
+#    J) el "_origen" de un nodo en seco se lee exacto (mas alla de 2^24)
+#    K) los overrides sin sincronizar sobreviven a regenerar (volver de editar) y a Shift+D
+#    L) editando un prefab, Add va adentro de su objeto raiz; Join, G y los keyframes no tocan lo
+#       generado
+#    M) borrar un prefab que solo usa una escena SIN CARGAR; "Select Users" y "borrar igual"
+# ==========================================================================
+
+ventana 1280 720
+
+# --- A) regenerar con el historial nombrando lo generado ---
+prefabenemigo /tmp/w3d_f7_rev/a fisica 1
+prefabinstanciar Enemigo 0 0 -6 nombre Enemigo
+prefabh Enemigo Esqueleto/Sensor
+prefabnodo Enemigo Esqueleto/Sensor visible 0
+# (lo generado no se mueve: G no arranca y no deja paso)
+prefabsel Enemigo Esqueleto/Cuerpo
+fail objmove 1 0 0
+notif tiene It belongs to a prefab instance: edit the prefab or unpack the instance
+prefabsel Enemigo
+prefabcambiar Enemigo Caja
+prefabinfo Enemigo prefab Caja generados 1 raiz Caja
+undo
+prefabinfo Enemigo prefab Enemigo generados 4 overrides 1
+prefabnodo Enemigo Esqueleto/Sensor visible 0
+undo
+prefabnodo Enemigo Esqueleto/Sensor visible 1
+undo
+redo
+redo
+prefabnodo Enemigo Esqueleto/Sensor visible 0
+redo
+prefabinfo Enemigo prefab Caja generados 1
+undo
+undo
+undo
+prefabinfo Enemigo prefab Enemigo generados 4 overrides 0
+# Reset Overrides con el historial nombrando lo generado
+prefabh Enemigo Esqueleto/Cuerpo
+prefabinfo Enemigo overrides 1
+prefabsel Enemigo
+prefabreset Enemigo
+prefabinfo Enemigo overrides 0
+prefabnodo Enemigo Esqueleto/Cuerpo visible 1
+undo
+prefabinfo Enemigo overrides 1
+prefabnodo Enemigo Esqueleto/Cuerpo visible 0
+undo
+undo
+prefabnodo Enemigo Esqueleto/Cuerpo visible 1
+redo
+redo
+redo
+prefabinfo Enemigo overrides 0
+prefabnodo Enemigo Esqueleto/Cuerpo visible 1
+
+# --- B) con el Play andando ---
+prefabenemigo /tmp/w3d_f7_rev/b fisica 1
+prefabinstanciar Enemigo -4 0 -6 nombre Enemigo
+prefabinstanciar Enemigo 0 0 -6 nombre Enemigo.001
+prefaboverride Enemigo.001 visible Esqueleto/Sensor 0
+guardarw3d /tmp/w3d_f7_rev/b/b.w3d
+abrirw3d /tmp/w3d_f7_rev/b/b.w3d
+raizscript Cubo prueba_prefabs_destructor.lua
+simplay 3
+prefabcambiar Enemigo Caja falla
+prefabreset Enemigo falla
+simplay 3
+scriptinfo compartido creado Enemigo.002
+# guardar JUGANDO escribe la estructura del usuario: lo destruido por el script esta y lo creado no (la partida
+# sigue igual despues)
+guardarw3d /tmp/w3d_f7_rev/b/enjuego.w3d
+prefabvivos 2
+fail prefabinfo Enemigo.001
+prefabinfo Enemigo.002 generados 4
+simplay 1
+simstop
+prefabvivos 2
+prefabinfo Enemigo prefab Enemigo generados 4 overrides 0
+prefabinfo Enemigo.001 generados 4 overrides 1
+abrirw3d /tmp/w3d_f7_rev/b/enjuego.w3d
+prefabvivos 2
+prefabinfo Enemigo.001 generados 4 overrides 1
+prefabnodo Enemigo.001 Esqueleto/Sensor visible 0
+fail prefabinfo Enemigo.002
+# destruir() de lo PUESTO en la escena: la ref del script queda en nil (objeto() da nil), como en el binario
+raizscript Cubo prefab_rev_objetivo.lua objetivo Enemigo.001
+simplay 4
+scriptinfo compartido sigue false
+simstop
+prefabinfo Enemigo.001 generados 4
+
+# --- C) renombrar en la escena no toca las refs de lo generado (su "Cuerpo" es el suyo) ---
+prefabenemigo /tmp/w3d_f7_rev/c
+prefabinstanciar Enemigo 0 0 -6 nombre Enemigo
+add cube
+objname Cuerpo
+objname Tronco
+prefabinfo Enemigo overrides 0
+prefabnodo Enemigo Esqueleto ref cuerpo Cuerpo
+guardarw3d /tmp/w3d_f7_rev/c/c.w3d
+abrirw3d /tmp/w3d_f7_rev/c/c.w3d
+prefabinfo Enemigo overrides 0
+prefabnodo Enemigo Esqueleto ref cuerpo Cuerpo
+
+# --- D) instanciar() en un inicio(): lo creado arranca (su inicio() corre) y el Stop lo borra ---
+prefabenemigo /tmp/w3d_f7_rev/d
+raizscript Cubo prefab_rev_spawn.lua
+prefabvivos 0
+simplay 3
+prefabvivos 1
+scriptinfo compartido spawn Enemigo
+scriptinfo compartido enemigos 1
+simstop
+prefabvivos 0
+
+# --- E) un script agregado a un objeto generado no es un override (y no corre los valores de los otros) ---
+prefabenemigo /tmp/w3d_f7_rev/e fisica 1
+prefabinstanciar Enemigo 0 0 -6 nombre Enemigo
+raizscript Esqueleto /tmp/w3d_f7_rev/e/caja.lua vida 5
+prefabinfo Enemigo overrides 0
+guardarw3d /tmp/w3d_f7_rev/e/e.w3d
+abrirw3d /tmp/w3d_f7_rev/e/e.w3d
+prefabinfo Enemigo overrides 0
+prefabnodo Enemigo Esqueleto ref vida 10
+
+# --- F) ANIDADOS: lo generado por la anidada es de la de afuera (se guarda); renombrar el anidado ---
+prefabenemigo /tmp/w3d_f7_rev/f fisica 1
+raizabrir Caja prefab
+prefabinstanciar Enemigo 0 3 0 nombre Enemigo
+raizabrir Scene
+prefabinstanciar Caja 4 5 -6 nombre Caja
+prefabinfo Caja generados 6 overrides 0
+prefaboverride Caja visible Enemigo/Enemigo/Esqueleto/Cuerpo 0
+prefaboverride Caja prop Enemigo/Enemigo/Esqueleto vida 77
+prefabinfo Caja overrides 2
+guardarw3d /tmp/w3d_f7_rev/f/n.w3d
+abrirw3d /tmp/w3d_f7_rev/f/n.w3d
+prefabinfo Caja generados 6 overrides 2
+prefabnodo Caja Enemigo/Enemigo/Esqueleto/Cuerpo visible 0
+prefabnodo Caja Enemigo/Enemigo/Esqueleto ref vida 77
+# volver de editar el ANIDADO regenera la de afuera con sus overrides
+raizabrir Enemigo prefab
+raizabrir Scene
+prefabinfo Caja generados 6 overrides 2
+prefabnodo Caja Enemigo/Enemigo/Esqueleto/Cuerpo visible 0
+# renombrar el anidado: la definicion del que lo contiene lo sigue (una instancia nueva lo genera entero)
+outvista prefabs
+recrenombrar prefabs Enemigo Soldado
+outvista escena
+prefabinstanciar Caja 8 5 -6 nombre Caja.001
+prefabinfo Caja.001 generados 6
+prefabnodo Caja.001 Enemigo tipo prefab
+prefabdesempaquetar Caja.001
+guardarw3d /tmp/w3d_f7_rev/f/r.w3d
+entradaexiste /tmp/w3d_f7_rev/f/r.w3d prefabs/soldado.w3dp 1
+entradaexiste /tmp/w3d_f7_rev/f/r.w3d prefabs/enemigo.w3dp 0
+abrirw3d /tmp/w3d_f7_rev/f/r.w3d
+prefabinfo Caja generados 6
+# (la instancia anidada que quedo en la escena al desempaquetar es de "Soldado", no de un prefab que ya no existe)
+prefabinfo Enemigo prefab Soldado generados 4 vacia 0
+
+# --- G) el riel de la camara en una curva de una instancia creada y destruida jugando + rebobinar ---
+abrirw3d prueba_prefabs_riel.w3d
+selobj RielB
+prefabcrear nombre RielB
+simcache 1
+simplay 10
+scriptinfo compartido riel true
+simira 3
+simpaso 1
+simira 8
+simstop
+
+# --- H) Unpack: las refs internas siguen a SU objeto renumerado ---
+prefabenemigo /tmp/w3d_f7_rev/h
+add cube
+objname Cuerpo
+objrel Cuerpo padre -
+prefabinstanciar Enemigo -4 0 -6 nombre Enemigo
+prefabinstanciar Enemigo 4 0 -6 nombre Enemigo.001
+prefabdesempaquetar Enemigo
+objrel Cuerpo.001 padre Esqueleto
+prefabobj Esqueleto ref cuerpo Cuerpo.001
+prefabdesempaquetar Enemigo.001
+objrel Cuerpo.002 padre Esqueleto.001
+prefabobj Esqueleto.001 ref cuerpo Cuerpo.002
+# (Ctrl+Z: vuelve la instancia y su ref vuelve a su nombre del prefab; Ctrl+Y la vuelve a arrastrar)
+undo
+prefabvivos 1
+prefabnodo Enemigo.001 Esqueleto ref cuerpo Cuerpo
+redo
+prefabvivos 0
+prefabobj Esqueleto.001 ref cuerpo Cuerpo.002
+guardarw3d /tmp/w3d_f7_rev/h/u.w3d
+abrirw3d /tmp/w3d_f7_rev/h/u.w3d
+prefabobj Esqueleto ref cuerpo Cuerpo.001
+prefabobj Esqueleto.001 ref cuerpo Cuerpo.002
+
+# --- I) instanciar() jugando: sus cuerpos rigidos existen en su inicio() ---
+prefabenemigo /tmp/w3d_f7_rev/i fisica 1
+prefabinstanciar Caja -3 5 0 nombre Caja
+raizscript Cubo prefab_rev_caida.lua
+simplay 4
+scriptinfo compartido caida cae
+simstop
+
+# --- J) el "_origen" en seco, exacto ---
+prefaborigen 16777215
+prefaborigen 16777217
+prefaborigen 16777219
+prefaborigen 4000000001
+
+# --- K) overrides SIN sincronizar (el ojo de un hijo, sin mirar la tarjeta): volver de editar el prefab y
+#     Shift+D los conservan ---
+prefabenemigo /tmp/w3d_f7_rev/k
+prefabinstanciar Enemigo 0 0 -6 nombre Enemigo
+visible 0 Sensor
+prefabnodo Enemigo Esqueleto/Sensor visible 0
+raizabrir Enemigo prefab
+raizabrir Scene
+prefabnodo Enemigo Esqueleto/Sensor visible 0
+visible 0 Cuerpo
+prefabsel Enemigo
+menuobjeto 1
+# (Shift+D deja la copia agarrada: elegirla termina el transform)
+prefabsel Enemigo.001
+prefabnodo Enemigo.001 Esqueleto/Sensor visible 0
+prefabnodo Enemigo.001 Esqueleto/Cuerpo visible 0
+prefabinfo Enemigo.001 overrides 2
+
+# --- L) editando un prefab Add va ADENTRO de su objeto raiz; Join, G y los keyframes no tocan lo generado ---
+prefabenemigo /tmp/w3d_f7_rev/l
+prefabinstanciar Enemigo 0 0 -6 nombre Enemigo
+raizabrir Enemigo prefab
+prefabadd cube
+objname Arma
+objrel Arma padre Enemigo
+raizabrir Scene
+prefabinfo Enemigo generados 5
+prefabnodo Enemigo Arma tipo mesh generado 1
+prefabelegir Cuerpo CuboAfuera
+join
+prefabinfo Enemigo generados 5
+prefabelegir CuboAfuera Cuerpo
+join
+objrel CuboAfuera padre -
+prefabinfo Enemigo generados 5
+prefabsel Enemigo Esqueleto
+fail objmove 2 0 0
+prefabmundo Enemigo Esqueleto x menor 0.1
+prefabkey
+prefabnodo Enemigo Esqueleto curvas 0
+keyrombo 0 0 estado 0
+prefabnodo Enemigo Esqueleto curvas 0
+
+# --- M) borrar un prefab: sus instancias en una escena SIN CARGAR cuentan; Select Users; borrar igual ---
+prefabenemigo /tmp/w3d_f7_rev/m
+raiznueva escena Nivel2
+prefabinstanciar Enemigo 0 0 -6 nombre Enemigo
+raizabrir Scene
+guardarw3d /tmp/w3d_f7_rev/m/p.w3d
+abrirw3d /tmp/w3d_f7_rev/m/p.w3d
+outvista prefabs
+recborrar prefabs Enemigo falla
+outfila Enemigo usuarios 1
+outvista escena
+raizabrir Nivel2
+prefabinfo Enemigo generados 4 vacia 0
+raizabrir Scene
+prefabinstanciar Enemigo -4 0 -6 nombre Enemigo
+prefabinstanciar Enemigo 4 0 -6 nombre Enemigo.001
+outvista prefabs
+outfila Enemigo usuarios 3
+outclick Enemigo
+outmenu Select Users
+seleccion n 2 tiene Enemigo tiene Enemigo.001
+recborrarforzado prefabs Enemigo
+outvista escena
+prefabvivos 2
+undo
+outvista prefabs
+outfila Enemigo usuarios 3
+outvista escena

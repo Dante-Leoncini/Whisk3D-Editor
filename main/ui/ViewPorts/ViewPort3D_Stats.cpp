@@ -20,7 +20,11 @@ static void W3dContarMallas(Object* o, int& vAgr, int& vReal, int& fLog, int& fT
         Mesh* m = (Mesh*)o;
         vAgr  += (m->vertsAgrupados > 0) ? m->vertsAgrupados : m->vertexSize;
         vReal += m->vertexSize;
-        fLog  += !m->faces3d.empty() ? (int)m->faces3d.size() : (m->facesSize / 3);
+        // caras LOGICAS: las de la edicion; si esta pendiente (la malla de un recurso compartido,
+        // o una .w3db leida como el juego), las que dice el sello del archivo (sin materializar)
+        fLog  += !m->faces3d.empty() ? (int)m->faces3d.size()
+               : (!m->edicionPendiente.empty() && m->w3dmAjenos.nCaras > 0) ? m->w3dmAjenos.nCaras
+               : (m->facesSize / 3);
         fTri  += m->facesSize / 3;
     }
     for (size_t i = 0; i < o->Childrens.size(); i++)

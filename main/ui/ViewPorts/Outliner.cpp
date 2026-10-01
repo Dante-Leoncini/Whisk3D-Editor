@@ -8,10 +8,12 @@
 #include "render/OpcionesRender.h" // g_redraw (CentrarSeleccion pide redibujar)
 #include "objects/ObjectMode.h" // reparent del drag&drop
 #include "objects/Instance.h"   // IconoDeObjeto: array/mirror/instance segun el modo
+#include "io/PrefabsEditor.h"   // lo generado por una instancia de prefab: en gris, sin arrastre ni mudanza
 #include "objects/Mesh.h"       // Mesh::armatures2d (una fila VIRTUAL azul por rig 2D bajo la malla)
 #include "ViewPorts/PopUp/ConfirmarPopup.h" // AbrirConfirmarBorrado (confirmar antes de borrar)
 #include "ViewPorts/Notificaciones.h"       // Notificar (renames del modo mover)
 #include "Undo.h"                           // UndoCapturarRenames (1 solo paso al confirmar el mover)
+#include "WhiskUI/widgets/Button.h"          // los botones de la barra: vista y acciones (por recursos)
 #include <cstdio>                           // sprintf (el contador del aviso)
 #ifdef W3D_SYMBIAN
     #include <GLES/gl.h>
@@ -45,6 +47,12 @@ size_t IconoDeObjeto(Object* o) {
         }
         case ObjectType::lod:        return (size_t)IconType::array;     // LOD: niveles de detalle
         case ObjectType::culling:    return (size_t)IconType::visible;   // Culling: que se ve / que se corta
+        case ObjectType::niebla:     return (size_t)IconType::niebla;    // Niebla (glFog en el arbol)
+        case ObjectType::limpiarz:   return (size_t)IconType::limpiarz;
+        case ObjectType::recorte:    return (size_t)IconType::recorte;
+        case ObjectType::hitbox:     return (size_t)IconType::hitbox;    // Hitbox: caja de deteccion
+        case ObjectType::prefab:     return (size_t)IconType::prefab;    // instancia de prefab (sus hijos: generados)
+        case ObjectType::proxy:      return (size_t)IconType::libreria;  // proxy W3D: lo que genera es de una libreria
         case ObjectType::particulas: return (size_t)IconType::circle;    // Particulas: emisor (puntitos redondos)
         case ObjectType::ui:         return (size_t)IconType::textura;   // interfaz 2D
         case ObjectType::imagen2d:   return (size_t)IconType::foto;      // elemento imagen 2D
@@ -112,7 +120,64 @@ Outliner::Outliner() : ViewportBase() {
     moverObj = NULL;
     moverPadreOrig = NULL;
     moverAnteriorOrig = NULL;
+    // LA BIBLIOTECA (OutlinerRecursos.cpp): arranca en la ESCENA, el arbol de siempre
+    vista = OUT_VISTA_ESCENA;
+    filtro = -1;
+    cuadricula = false;
+    cursorEsCarpeta = false;
+    recArrastre = recArrastrando = false;
+    recArrastreCarpeta = recSoloAlSoltar = recElegirAlSoltar = false;
+    selMarcada = false;
+    recArrastreY0 = recArrastreX0 = 0; recDropFila = -1;
+    agarreFila = -1; agarreMovido = false; agarreX = agarreY = 0;
+    renombrando = renombreCarpeta = renombreObjeto = false;
+    renombreSerial = 0;
+    renombreVista = OUT_VISTA_ESCENA;
+    moviendoRec = false;
+    selEscenaSerial = W3dSeleccionSerial;
     BarCrear();
+    // [1] la VISTA (el OJO: "lo que se ve en el outliner": Escena / Biblioteca / cada libreria) con su nombre
+    btnVista = new Button("", (int)IconType::visible);
+    btnVista->rol = 1;
+    btnVista->desplegable = true;
+    btnVista->caretMenu = true;
+    BarButtons.push_back(btnVista);
+    // [2] el menu OBJETO (borrar, renombrar, mover, ocultar, duplicar... / en la biblioteca: sus acciones)
+    btnObjeto = new Button("", -1);
+    btnObjeto->rol = 2;
+    btnObjeto->desplegable = true;
+    BarButtons.push_back(btnObjeto);
+    // [3] el menu SELECCION (todo / nada / invertir), en las dos vistas
+    btnSeleccion = new Button("", -1);
+    btnSeleccion->rol = 3;
+    btnSeleccion->desplegable = true;
+    BarButtons.push_back(btnSeleccion);
+    // [4] UN solo "+" desplegable, como el Add del viewport 3D (icono sin texto: el titulo va en el menu):
+    // Nueva escena / Nuevo juego / Nuevo prefab / Nueva carpeta / Nuevo material
+    btnNueva = new Button("", (int)IconType::mas);
+    btnNueva->rol = 4;
+    btnNueva->desplegable = true;
+    BarButtons.push_back(btnNueva);
+    // [5] el FILTRO de la biblioteca (todo / un tipo) y [6] lista / cuadricula: solo en la biblioteca
+    btnFiltro = new Button("", (int)IconType::filtro);
+    btnFiltro->rol = 5;
+    btnFiltro->desplegable = true;
+    btnFiltro->caretMenu = true;
+    btnFiltro->visible = false;
+    BarButtons.push_back(btnFiltro);
+    btnCuadricula = new Button("", (int)IconType::cuadricula);
+    btnCuadricula->rol = 6;
+    btnCuadricula->cuadrado = true;
+    btnCuadricula->visible = false;
+    BarButtons.push_back(btnCuadricula);
+    // [7] la raiz que se edita (escena / juego / prefab; el icono lo pone W3dRaicesBotonSincronizar): en la
+    // vista Escena (el arbol que se ve es el de esa raiz)
+    btnRaiz = new Button("", (int)IconType::camera);
+    btnRaiz->rol = 7;
+    btnRaiz->desplegable = true;
+    btnRaiz->caretMenu = true;
+    BarButtons.push_back(btnRaiz);
+    SincronizarBarraVista();
 }
 
 //para hacer el calculo si o si hay que hacerlo de forma recursiva
@@ -158,6 +223,7 @@ void Outliner::Resize(int newW, int newH){
     int MaxPosXtemp = 0;
     int MaxPosYtemp = 0;
 
+    if (vista != OUT_VISTA_ESCENA) { ResizeRecursos(); return; }   // la biblioteca
     if (!SceneCollection) {
         ResizeScrollbar(newW, newH, 0, 0, BarTopOffset());
         Renglon->SetSize(0, 0, (GLshort)width, RenglonHeightGS);
@@ -180,10 +246,30 @@ void Outliner::Resize(int newW, int newH){
 }
 
 void Outliner::Render(){
+    // la barra al dia (el selector de escena/prefab cambia cuando se abre otra raiz)
+    SincronizarBarraVista();
+    // un renombrar en linea que perdio el foco (Enter / click afuera) se confirma
+    if (vista == OUT_VISTA_ESCENA) RenombreSincronizar();
     // AUTO-REFRESH del scrollbar: si cambio la cantidad de FILAS VISIBLES (importar/agregar/borrar/desplegar) se
     // recalcula el rango de scroll. Antes solo se recalculaba al REDIMENSIONAR el viewport -> tras importar objetos
     // el scrollbar quedaba viejo y no se podia scrollear hasta cambiar el tamanio de un viewport a mano.
-    if (SceneCollection){
+    // vista de recursos: que filas estan en la SELECCION MULTIPLE (fondo resaltado)
+    std::vector<char> filaSel;
+    // las filas de la biblioteca: UNA vez por cuadro (RenderRecursos dibuja estas; armarlas lista la biblioteca
+    // entera y con un proyecto grande no es gratis)
+    std::vector<OutFilaRec> filas;
+    if (vista != OUT_VISTA_ESCENA) {
+        // un renombrar en linea que perdio el foco se confirma ANTES de armar las filas (cambia un nombre)
+        RenombreSincronizar();
+        // la lista de recursos: el mismo auto-refresh, contando SUS filas (FilasRecursos)
+        FilasRecursos(filas);
+        if ((int)filas.size() != lastContentRows) { lastContentRows = (int)filas.size(); Resize(width, height); }
+        if (SeleccionCantidad() > 1) {
+            filaSel.assign(filas.size(), 0);
+            for (size_t i = 0; i < filas.size(); i++) filaSel[i] = FilaEnSeleccion(filas[i]) ? 1 : 0;
+        }
+    }
+    else if (SceneCollection){
         struct C { static int rec(Object* o){ int n = 1;
             if (OutTieneHijos(o) && o->desplegado){
                 n += Arm2DCant(o);                        // una fila virtual por armature 2D
@@ -202,7 +288,7 @@ void Outliner::Render(){
 
     // arbol con origen ARRIBA-izquierda (4 OS): GL quiere abajo-izquierda
     const int glY = W3dPantallaAlto - y - height;
-    if (!SceneCollection) return;
+    if (!SceneCollection && vista == OUT_VISTA_ESCENA) return;
 
     // Limpiar pantalla
     w3dEngine::Enable(w3dEngine::ScissorTest);
@@ -231,18 +317,31 @@ void Outliner::Render(){
 
     //de aca en adelante es como antes
     w3dEngine::PushMatrix();
-    size_t RenglonesY = 0;
     w3dEngine::Translatef(0, PosY + borderGS + BarTopOffset(), 0);
-    for (size_t i = 0; i < CantidadRenglones; i++) {
+    // la franja i es la FILA i de la lista (mismo origen que los nombres: PosY). Con la lista
+    // scrolleada se dibujan las que caen en el panel, desde la primera visible: antes solo existian
+    // las franjas 0..CantidadRenglones-1 y las filas de mas abajo quedaban sin fondo (sin cebra, sin
+    // el resaltado de la seleccion multiple ni el del destino de un arrastre). (+1: la de abajo, a medias)
+    const size_t primeraFila = (PosY < 0) ? (size_t)(-PosY / (int)RenglonHeightGS) : 0;
+    // (la CUADRICULA de la biblioteca no tiene franjas: sus celdas y carpetas pintan su propio fondo)
+    const size_t franjas = (vista != OUT_VISTA_ESCENA && cuadricula) ? 0 : CantidadRenglones + 1;
+    for (size_t i = primeraFila; i < primeraFila + franjas; i++) {
         w3dEngine::PushMatrix();
-        w3dEngine::Translatef(0, RenglonesY, 0);
-        RenglonesY += RenglonHeightGS;
+        w3dEngine::Translatef(0, (GLfloat)((int)i * (int)RenglonHeightGS), 0);
         // Renglón Seleccionado
-        if (dragging && dropZona == 1 && (int)i == dropFila) {
+        if ((dragging && dropZona == 1 && (int)i == dropFila) ||
+            (vista != OUT_VISTA_ESCENA && recArrastrando && (int)i == recDropFila)) {
             // vista previa: este seria el futuro PADRE del drop
             w3dEngine::Color4ub(ListaColoresUbyte[static_cast<int>(ColorID::accentDark)][0],
                        ListaColoresUbyte[static_cast<int>(ColorID::accentDark)][1],
                        ListaColoresUbyte[static_cast<int>(ColorID::accentDark)][2], 255);
+        }
+        else if (i < filaSel.size() && filaSel[i]) {
+            // en la SELECCION MULTIPLE: el acento oscuro, mezclado con el fondo (el acento pleno es el drop)
+            const GLubyte* a = ListaColoresUbyte[static_cast<int>(ColorID::accentDark)];
+            const GLubyte* b = ListaColoresUbyte[static_cast<int>(ColorID::background)];
+            w3dEngine::Color4ub((GLubyte)((a[0] * 3 + b[0] * 2) / 5), (GLubyte)((a[1] * 3 + b[1] * 2) / 5),
+                                (GLubyte)((a[2] * 3 + b[2] * 2) / 5), 255);
         }
         else if ((int)i == hoverFila) {
             // hover: feedback antes de hacer click
@@ -272,6 +371,18 @@ void Outliner::Render(){
 #endif
     SetColorID(ColorID::grisUI);
 
+    // LA BIBLIOTECA: la lista / cuadricula (carpetas + recursos con su EN USO / HUERFANO) en vez del arbol
+    if (vista != OUT_VISTA_ESCENA) {
+        RenderRecursos(glY, filas);
+        RenderBar();
+        DibujarBordes(this);
+        DibujarScrollbar(this);
+#ifdef W3D_SYMBIAN
+        w3dEngine::EnableArray(w3dEngine::NormalArray); // baseline que asume la escena
+#endif
+        return;
+    }
+
     //esto es para recortar y que no se ponga el texto encima de los ojos de la derecha
     w3dEngine::Enable(w3dEngine::ScissorTest);
     if (scrollX){
@@ -281,7 +392,6 @@ void Outliner::Render(){
         w3dEngine::Scissor(x, glY, width - 2*IconSizeGS - gapGS - marginGS - borderGS - gapGS - (scrollY ? (GlobalScale*9 + gapGS) : 0), height); // - ojos+camaras+barra
     }
 
-    RenglonesY = 0;
     cullBaseY = PosY + borderGS + BarTopOffset(); filaDFS = 0; // culling: Y de la 1er fila del recorrido de NOMBRES
     w3dEngine::PushMatrix();
     w3dEngine::Translatef(marginGS + PosX, PosY + borderGS + BarTopOffset(), 0);
@@ -292,7 +402,6 @@ void Outliner::Render(){
     w3dEngine::PopMatrix();
 
     SetColorID(ColorID::grisUI);
-    RenglonesY = 0;
 
     w3dEngine::PushMatrix();
     //no usa PosX porque los ojos siempre estan en la misma posicion en X. al borde
@@ -339,6 +448,14 @@ void Outliner::Render(){
 #endif
 }
 
+// la MARCA que va despues del nombre de una fila de la escena (-1 = ninguna): el CANDADO en lo que genera un proxy
+// de una libreria (a cualquier profundidad: una instancia anidada adentro de lo que genera tambien es de ella)
+int OutlinerMarcaDeObjeto(Object* obj) {
+    for (Object* p = W3dInstanciaDe(obj); p; p = W3dInstanciaDe(p))
+        if (p->getType() == ObjectType::proxy) return (int)IconType::candado;
+    return -1;
+}
+
 void Outliner::DibujarRenglon(Object* obj, bool hidden){
     // CULLING: solo se DIBUJA la fila si cae en el area visible. El traversal de hijos (mas abajo) avanza la matriz
     // igual, asi que las filas visibles quedan bien ubicadas. Margen de 1 fila arriba/abajo (no cortar filas al borde).
@@ -347,6 +464,8 @@ void Outliner::DibujarRenglon(Object* obj, bool hidden){
     if (filaVisible) {
     w3dEngine::PushMatrix();
     GLfloat opacityRow = hidden ? 0.5f : 1.0f;
+    // lo GENERADO por una instancia de prefab va en GRIS (se ve y se elige, pero es del prefab: no se edita)
+    if (W3dEsGenerado(obj)) opacityRow *= 0.55f;
 
     if (moviendo && obj == moverObj){
         // MODO MOVER con teclado: el objeto que se esta moviendo se resalta (accent),
@@ -392,9 +511,26 @@ void Outliner::DibujarRenglon(Object* obj, bool hidden){
     w3dEngine::Translatef(IconSizeGS + gapGS, 0, 0);
     W3dDrawStrip4(IconMesh, IconsUV[IconoDeObjeto(obj)]->uvs);
 
-    //texto render
+    //texto render (o el campo del RENOMBRAR EN LINEA si es el objeto que se esta renombrando)
     w3dEngine::Translatef(IconSizeGS + gapGS, 0, 0);
-    RenderBitmapText(obj->name);
+    if (renombrando && renombreObjeto && obj->serial == renombreSerial) {
+        const bool foco = (g_textFieldActivo == &renombre);
+        if (foco && renombre.selectAll) { SetColorID(ColorID::accent); RenderBitmapText(renombre.text); }
+        else {
+            SetColorID(ColorID::blanco);
+            RenderBitmapText(foco ? renombre.text.substr(0, (size_t)renombre.caret) + "|" + renombre.text.substr((size_t)renombre.caret)
+                                  : renombre.text);
+        }
+    } else RenderBitmapText(obj->name);
+    // lo que genera un PROXY de una libreria lleva el CANDADO de solo lectura despues del nombre: no se edita ni se
+    // guarda, es de su .w3d (OutlinerMarcaDeObjeto)
+    {
+        const int marca = OutlinerMarcaDeObjeto(obj);
+        if (marca >= 0) {
+            w3dEngine::Translatef((GLfloat)((int)(obj->name.size() + 1) * (int)LetterWidthGS), 0, 0);
+            W3dDrawStrip4(IconMesh, IconsUV[(size_t)marca]->uvs);
+        }
+    }
 
     w3dEngine::PopMatrix();
     } // fin del DRAW de la fila (culling); el traversal de hijos de abajo corre siempre
@@ -546,7 +682,21 @@ void Outliner::event_mouse_motion(int mx, int my) {
     if (mouseOverScrollY || mouseOverScrollX) {
         hoverFila = -1;
     }
-    if (leftMouseDown && dragObjeto) {
+    // la BIBLIOTECA: el arrastre de un recurso (a una carpeta, al 3D, a Properties) o el scroll de siempre
+    if (vista != OUT_VISTA_ESCENA) {
+        if ((leftMouseDown || agarreFila >= 0) && recArrastre) {
+            MotionRecursos(mx, my);
+            if (recArrastrando || agarreFila >= 0) return;   // mientras se arrastra no scrollea
+        }
+        if (middleMouseDown || leftMouseDown) { ViewPortClickDown = true; ScrollX(dx); ScrollY(cuadricula ? dy : dy); }
+        return;
+    }
+    // TACTIL: el objeto AGARRADO con la pulsacion larga se arrastra (sin el boton del mouse de por medio)
+    if (agarreFila >= 0 && dragObjeto) {
+        int dm = my - agarreY; if (dm < 0) dm = -dm;
+        if (dm > (int)RenglonHeightGS / 2) agarreMovido = true;
+    }
+    if ((leftMouseDown || agarreFila >= 0) && dragObjeto) {
         int d = my - dragY0;
         if (d < 0) d = -d;
         if (!dragging && d > RenglonHeightGS / 2) dragging = true;
@@ -592,6 +742,8 @@ void Outliner::event_mouse_motion(int mx, int my) {
 #ifndef W3D_SYMBIAN
 void Outliner::event_key_down(int tecla, bool repeticion){
     const int key = tecla;
+    // vista de RECURSOS: sus propias teclas (flechas, Enter, F2, Supr, G = mover a carpeta)
+    if (vista != OUT_VISTA_ESCENA) { TeclaPCRecursos(tecla); return; }
     if (repeticion == 0) {
         // MODO MOVER: las flechas reordenan/reparentan en vez de navegar; OK confirma; C/backspace/Esc cancela.
         if (moviendo) {
@@ -609,8 +761,19 @@ void Outliner::event_key_down(int tecla, bool repeticion){
             case W3dK_G: // g = entrar en modo MOVER (reordenar / reparentar el objeto activo)
                 MoverIniciar();
                 break;
+            case W3dK_F2: // F2 = renombrar EN LINEA el objeto activo (su fila se vuelve un campo)
+                RenombrarObjetoEnLinea(ObjActivo);
+                break;
             case W3dK_A:
-                SeleccionarTodo(true);
+                if (LAltPressed) SeleccionEscena(1);   // Alt+A: deseleccionar todo (el atajo del menu Seleccion)
+                else SeleccionarTodo(true);
+                break;
+            case W3dK_I:
+                if (LCtrlPressed) SeleccionEscena(2);  // Ctrl+I: invertir la seleccion
+                break;
+            case W3dK_D:   // los atajos del menu Objeto: Shift+D duplica, Alt+D duplica vinculado
+                if (LAltPressed) DuplicarEscena(true);
+                else if (LShiftPressed) DuplicarEscena(false);
                 break;
             case W3dK_H:
                 UndoCapturarVisibilidad();   // Ctrl+Z: guarda el 'visible' PREVIO antes de togglear
@@ -711,6 +874,14 @@ static bool W3dBuscarFila(Object* obj, Object* objetivo, int* fila) {
     return false;
 }
 
+// el objeto de la fila visible N de la escena (NULL = vacio o una fila virtual): lo usan el doble click, el menu
+// contextual y la pulsacion larga de OutlinerRecursos.cpp
+Object* OutlinerObjetoEnFila(int fila) { return fila < 0 ? NULL : W3dObjetoEnFila(fila); }
+// la profundidad (sangria) de la fila de un objeto: donde empieza su NOMBRE (-1 = vacio o fila virtual)
+int OutlinerProfDeFila(int fila) { int p = 0; return (fila >= 0 && W3dObjetoEnFila(fila, &p)) ? p : -1; }
+static int W3dFilaDe(Object* objetivo);
+int OutlinerFilaDeObjeto(Object* o) { return W3dFilaDe(o); }   // (el harness: la fila de un objeto)
+
 static int W3dFilaDe(Object* objetivo) {
     if (!objetivo || !SceneCollection) return -1;
     int fila = 0;
@@ -776,11 +947,16 @@ void Outliner::AsegurarVisible() {
 // emparenta (centro de la fila, manteniendo la transformacion) o manda
 // a la raiz (soltar en el vacio)
 void Outliner::SoltarDrag(int mx, int my) {
+    if (vista != OUT_VISTA_ESCENA) { SoltarRecursos(mx, my); return; }   // soltar un recurso (carpeta, 3D, Properties)
     Object* obj = dragObjeto;
     bool estaba = dragging;
+    const bool agarrado = agarreFila >= 0, movido = agarreMovido;
+    agarreFila = -1; agarreMovido = false;
     dragObjeto = NULL;
     dragging = false;
     dropZona = -2;
+    // TACTIL: soltar SIN MOVER lo que se agarro con la pulsacion larga = el menu contextual (Objeto)
+    if (agarrado && !movido && !estaba) { MenuContexto(mx, my); return; }
     if (!obj || !estaba) return;
     if (!Contains(mx, my)) return;
     int rel = my - y - borderGS - PosY - BarTopOffset();
@@ -868,8 +1044,13 @@ static void MoverUniquificarSubarbol(Object* raiz) {
 
 // El objeto que se mueve es el ACTIVO. Guarda su posicion original para poder cancelar.
 void Outliner::MoverIniciar() {
+    // en la BIBLIOTECA "mover" es el MISMO modo mover que en la escena, pero por las CARPETAS: lo elegido
+    // viaja con las flechas y OK confirma (la G de PC y el "1" del N95 hacen lo mismo en las dos vistas)
+    if (vista != OUT_VISTA_ESCENA) { MoverRecIniciar(); return; }
     if (moviendo) return;
     if (!ObjActivo || !SceneCollection) return;
+    // (lo GENERADO por una instancia de prefab no se muda: es la estructura del prefab)
+    if (W3dPrefabEsGeneradoAviso(ObjActivo, true)) return;
     moverObj = ObjActivo;
     gMoverNombres.clear();
     MoverJuntarNombres(moverObj);
@@ -952,6 +1133,7 @@ void Outliner::MoverCancelar() {
 }
 
 void Outliner::ClickSeleccionar(int mx, int my) {
+    if (vista != OUT_VISTA_ESCENA) { ClickRecursos(mx, my); return; }   // la biblioteca
     if (!SceneCollection) return;
     int rel = my - y - borderGS - PosY - BarTopOffset();
     if (rel < 0) return;   // franja del borde: la division de un negativo chico daba fila 0
@@ -988,7 +1170,7 @@ void Outliner::ClickSeleccionar(int mx, int my) {
             if (!enOjo && !enCamara) {
                 // el click puede convertirse en ARRASTRE (reordenar /
                 // emparentar): se confirma al moverse con el boton
-                dragObjeto = hit;
+                dragObjeto = W3dEsGenerado(hit) ? NULL : hit;   // (lo generado no se arrastra)
                 dragging = false;
                 dragY0 = my;
             }
@@ -1033,5 +1215,12 @@ void Outliner::key_down_return(){
 }
 
 Outliner::~Outliner() {
+    // el rename en linea escribia en un campo de ESTE outliner: el foco del teclado no puede
+    // quedar apuntando a memoria liberada
+    if (g_textFieldActivo == &renombre) g_textFieldActivo = NULL;
+    // el MODO MOVER de la biblioteca a medias (cambiar el tipo del viewport, abrir otro proyecto): el grupo de
+    // carpetas que abrio se cancela (lo elegido vuelve a donde estaba). Abierto para siempre, ninguna operacion
+    // de carpetas volvia a tener undo y el proximo Esc aplicaba una foto vieja
+    if (moviendoRec) MoverRecCancelar();
     delete Renglon;
 }

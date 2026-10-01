@@ -1,0 +1,250 @@
+# ==========================================================================
+#  CLIPS DE JERARQUIA: los BORDES que encontro la revision de la fase 6.
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_clipsjer_bordes.w3s
+#
+#  Se prueba:
+#    A) borrar (con undo) la RAIZ cuya vista del clip esta abierta no le saca la pista "." al
+#       clip COMPARTIDO (la raiz detachada ya no escribe su vista): la copia que usa la misma
+#       biblioteca la conserva, en memoria, al deshacer y en el .w3da guardado;
+#    B) renombrar el clip que se edita con la raiz POSADA a mitad del clip (re-lee la vista) no
+#       corre su pista ".": la pose sigue igual y el guardado escribe la raiz en su reposo;
+#    C) guardar en el MIX con una raiz que solo anima una CAPA de clip de jerarquia (sin vista
+#       abierta) escribe su transform de reposo, no la mezcla del cabezal;
+#    D) el guardado que junta dos bibliotecas IGUALES en una pasa la vista que se edita al clip
+#       que queda: lo que se keyea despues llega al clip (y al archivo);
+#    E) una velocidad o un frame ENORMES (clip, capa) no cuelgan el tick: el cabezal queda adentro;
+#    F) en "Juego" el rombo de Properties, Delete Keyframe y Clear Keyframe no tocan el ultimo
+#       clip elegido (tampoco el clip de jerarquia compartido) y avisan; los rombos no muestran keys;
+#    G) en la vista de un clip de jerarquia, el rombo sobre un objeto de FUERA avisa (como la I);
+#    H) elegir en el desplegable "Clips" una biblioteca cuya entrada no se puede leer avisa (con
+#       T()) y deja el objeto como estaba: el proyecto se sigue pudiendo guardar.
+# ==========================================================================
+
+ventana 1280 720
+
+# ==== A) borrar la raiz con su vista abierta ====
+escenadefecto
+add cube
+objname Auto
+add cube
+objname Puerta
+parent Puerta Auto
+selobj Auto
+clipmenu Hierarchy Clip
+clipnombre abrir
+animrango 1 11
+animcurva Auto:abrir Puerta ry 1 0 11 90
+animcurva Auto:abrir . y 1 0 11 2
+dupjerarquia copia Auto +hijos
+jerinfo Auto.001 lib Auto pistas abrir 2
+selobj Auto
+delete
+# (la vista de Auto quedo sin su raiz: el clip compartido sigue entero para Auto.001)
+jerinfo Auto.001 lib Auto pistas abrir 2
+undo
+jerinfo Auto lib Auto pistas abrir 2
+redo
+jerinfo Auto.001 lib Auto pistas abrir 2
+guardarw3d /tmp/w3d_f6_bordes/a.w3d
+# (guardar con la raiz borrada no le cambia la animacion elegida: el Ctrl+Z la devuelve editandose)
+undo
+animlista activa Auto:abrir
+jerinfo Auto lib Auto pistas abrir 2
+frame 6
+objat Auto 0 1 0 0.001
+abrirw3d /tmp/w3d_f6_bordes/a.w3d
+jerinfo Auto.001 lib Auto pistas abrir 2
+
+# ==== B) renombrar el clip que se edita con la raiz posada ====
+escenadefecto
+add cube
+objname Auto
+selobj Auto
+clipmenu Hierarchy Clip
+clipnombre abrir
+animrango 1 11
+animcurva Auto:abrir . y 1 0 11 2
+frame 6
+objat Auto 0 1 0 0.001
+recrenombrar animaciones Auto/abrir cerrar Auto/cerrar
+frame 1
+frame 6
+objat Auto 0 1 0 0.001
+# (el Ctrl+Z / Ctrl+Y del renombre tambien re-leen la vista)
+undo
+frame 1
+frame 6
+objat Auto 0 1 0 0.001
+redo
+frame 1
+frame 6
+objat Auto 0 1 0 0.001
+raizanim Scene
+frame 1
+guardarw3d /tmp/w3d_f6_bordes/b.w3d
+abrirw3d /tmp/w3d_f6_bordes/b.w3d
+objat Auto 0 0 0 0.001
+
+# ==== C) guardar en el Mix: una raiz que solo tiene una capa ====
+escenadefecto
+add cube
+objname Auto
+selobj Auto
+clipmenu Hierarchy Clip
+clipnombre Clip
+animrango 1 11
+animcurva Auto:Clip . y 1 0 11 2
+raizanim Scene
+add cube
+objname Moto
+selobj Moto
+objpos 5 0 0
+jerlib Moto Auto
+clipmenu Mix
+mixjer Auto Clip
+jercapa Moto 1 Clip
+frame 11
+objat Moto 5 2 0 0.001
+guardarw3d /tmp/w3d_f6_bordes/c.w3d
+# (el guardado no la movio: sigue mostrando la mezcla)
+objat Moto 5 2 0 0.001
+abrirw3d /tmp/w3d_f6_bordes/c.w3d
+jermix soltar
+objat Moto 5 0 0 0.001
+objat Auto 0 0 0 0.001
+# ...y re-guardado y reabierto no acumula la pista de la raiz
+jermix frame 11
+objat Moto 5 2 0 0.001
+guardarw3d /tmp/w3d_f6_bordes/c2.w3d
+abrirw3d /tmp/w3d_f6_bordes/c2.w3d
+jermix soltar
+objat Moto 5 0 0 0.001
+
+# ==== D) dos bibliotecas iguales se juntan al guardar: la vista que se edita sigue viva ====
+escenadefecto
+add cube
+objname A
+add cube
+objname B
+selobj A
+clipmenu Hierarchy Clip
+raizanim Scene
+selobj B
+clipmenu Hierarchy Clip
+animlista activa B:Clip
+guardarw3d /tmp/w3d_f6_bordes/d.w3d
+jerinfo B lib A
+animlista activa B:Clip
+selobj B
+frame 1
+raizkey
+jerinfo B pistas Clip 1
+guardarw3d /tmp/w3d_f6_bordes/d.w3d
+abrirw3d /tmp/w3d_f6_bordes/d.w3d
+jerinfo B lib A pistas Clip 1
+
+# ==== E) velocidades y frames enormes: el tick no se cuelga ====
+escenadefecto
+add cube
+objname Auto
+selobj Auto
+clipmenu Hierarchy Clip
+clipnombre abrir
+animrango 1 11
+animcurva Auto:abrir . y 1 0 11 2
+raizanim Scene
+jerplay Auto abrir loop 1
+jervel Auto 1000000000
+jertick 0.0166667 3
+jervel Auto -1000000000
+jertick 0.0166667 3
+jervel Auto 1e38
+jertick 0.0166667 2
+jerreset
+add cube
+objname Moto
+jerlib Moto Auto
+jercapa Moto 1 abrir vel 1000000000
+jermix tick 0.0166667 3
+jercapa Moto 1 abrir frame 1e30
+jermix tick 0.0166667 2
+jercapa Moto 1 -
+
+# ==== F) "Juego": el rombo y Delete/Clear Keyframe no tocan el clip elegido ====
+escenadefecto
+raizmenu 3d New Game
+add cube
+objname Auto
+add cube
+objname Puerta
+parent Puerta Auto
+selobj Auto
+clipmenu Hierarchy Clip
+animcurva Auto:Clip Puerta x 1 1 11 3
+raizanim juego
+raizmodo kind 2 juego 1
+selobj Auto
+frame 1
+notif limpiar
+keyrombo 0 1 estado 0
+notif tiene A game has no keyframes: choose one of its clips in the timeline to animate
+jerinfo Auto pistas Clip 1
+selobj Puerta
+keyrombo 0 0 estado 0
+menuobjeto 511
+menuobjeto 512
+jerinfo Auto pistas Clip 1
+# (fuera de "Juego", en la vista del clip, el rombo si keyea: el clip gana la pista ".")
+clipmenu Auto: Clip
+selobj Auto
+keyrombo 0 1 estado 2
+jerinfo Auto pistas Clip 2
+guardarw3d /tmp/w3d_f6_bordes/f.w3d
+jerinfo Auto pistas Clip 2
+
+# ==== G) el rombo sobre un objeto de FUERA de la jerarquia avisa ====
+escenadefecto
+add cube
+objname Auto
+add cube
+objname Puerta
+parent Puerta Auto
+add cube
+objname Suelto
+selobj Auto
+clipmenu Hierarchy Clip
+selobj Suelto
+notif limpiar
+keyrombo 0 0 estado 0
+notif tiene This hierarchy clip only animates its root and its children
+jerinfo Auto pistas Clip 0
+selobj Puerta
+notif limpiar
+keyrombo 0 0 estado 2
+notif no This hierarchy clip only animates its root and its children
+jerinfo Auto pistas Clip 1
+
+# ==== H) una biblioteca rota en el desplegable "Clips" ====
+escenadefecto
+add cube
+objname Auto
+add cube
+objname Moto
+selobj Auto
+clipmenu Hierarchy Clip
+animcurva Auto:Clip . y 1 0 11 2
+raizanim Scene
+guardarw3d /tmp/w3d_f6_bordes/h.w3d
+# Auto la suelta: la biblioteca queda HUERFANA en el registro (se conserva tal cual)
+jerlibmenu Auto (none)
+guardarw3d /tmp/w3d_f6_bordes/h.w3d
+animsetromper /tmp/w3d_f6_bordes/h.w3d /tmp/w3d_f6_bordes/h_roto.w3d corte
+abrirw3d /tmp/w3d_f6_bordes/h_roto.w3d
+notif limpiar
+jerlibmenu Moto Auto
+notif tiene The clip library could not be read
+jerinfo Moto lib -
+# (sin paso de undo: no cambio nada)
+guardarw3d /tmp/w3d_f6_bordes/h2.w3d
+

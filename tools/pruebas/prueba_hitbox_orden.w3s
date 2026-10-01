@@ -1,0 +1,52 @@
+# ==========================================================================
+#  HITBOX: el ORDEN de los eventos de un mismo tick es el del ARBOL (el
+#  preorden del outliner, como SimPlay corre los scripts), no el de creacion
+#  de los objetos (Object::serial, que es de la sesion: otra carga = otros
+#  seriales). Asi la misma escena da el mismo orden en el Play del editor,
+#  guardada y reabierta, y en el juego compilado (que la carga del archivo).
+#  Correr DESDE ESTA CARPETA (ver prueba_hitbox.w3s):
+#    ../../platform/linux/build/whisk3d --script prueba_hitbox_orden.w3s
+#
+#  prueba_hitbox_orden.w3d: una Zona 4x4x4 (hitbox_orden.lua: anota el orden de
+#  los 'otro'; se apaga en el tick 3) y dos vacios P1, P2 en el origen. Se les
+#  crea un hitbox hijo AL REVES (primero el de P2): por serial P2 iria primero;
+#  por el arbol va P1.
+#    tick 1: alEntrar(P1), alEntrar(P2); hitboxDentro = P1, P2
+#    tick 2: alQuedarse(P1), alQuedarse(P2)
+#    tick 4: (apagada en el 3) alSalir(P1), alSalir(P2)
+#  prueba_hitbox_orden_rigido.w3d: dos cajas que caen JUNTAS sobre un Piso;
+#  ordenhijo deja CajaB antes que CajaA en el arbol (la creo despues): el piso
+#  recibe alTocar(CajaB) y despues alTocar(CajaA), tambien reabierto.
+# ==========================================================================
+
+abrirw3d prueba_hitbox_orden.w3d
+hitboxnuevo Z2 padre P2 tam 1 1 1
+hitboxnuevo Z1 padre P1 tam 1 1 1
+simplay 4
+scriptinfo compartido zona_entrar P1;P2;
+scriptinfo compartido zona_dentro P1;P2;
+scriptinfo compartido zona_quedarse P1;P2;
+scriptinfo compartido zona_salir P1;P2;
+simstop
+
+# --- guardada y reabierta (los seriales ahora siguen el orden del archivo): lo mismo ---
+guardarw3d prueba_hitbox_orden_v4.w3d
+abrirw3d prueba_hitbox_orden_v4.w3d
+simplay 4
+scriptinfo compartido zona_entrar P1;P2;
+scriptinfo compartido zona_dentro P1;P2;
+scriptinfo compartido zona_quedarse P1;P2;
+scriptinfo compartido zona_salir P1;P2;
+simstop
+
+# --- alTocar: el orden del arbol de los cuerpos (el de W3dRigido al dar Play) ---
+abrirw3d prueba_hitbox_orden_rigido.w3d
+ordenhijo CajaB 1
+simplay 60
+scriptinfo compartido piso_tocar CajaB;CajaA;
+simstop
+guardarw3d prueba_hitbox_orden_rigido_v4.w3d
+abrirw3d prueba_hitbox_orden_rigido_v4.w3d
+simplay 60
+scriptinfo compartido piso_tocar CajaB;CajaA;
+simstop

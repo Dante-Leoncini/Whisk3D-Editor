@@ -864,6 +864,10 @@ bool ImportFBX(const std::string& filepath) {
         int fps = (int)(FbxFrameRate(root) + 0.5); if (fps < 1) fps = 24;
         ParsearAnimaciones(root, *objs, esq, arm->animations, fps, escala);
         PrepararSkin(arm); // matrices de skinning (bind) de cada hueso
+        // el TAMANO del esqueleto que grabo cada clip (el retarget "rotaciones" de otro personaje con la misma
+        // jerarquia lo escala contra este). Despues de PrepararSkin: un biped se mide en su esqueleto reconstruido.
+        { const float tam = W3dArmatureTamReposo(arm);
+          for (size_t ci = 0; ci < arm->animations.size(); ci++) if (arm->animations[ci]) arm->animations[ci]->alturaReposo = tam; }
         // BIND POSE inicial: poseHead/poseTail (lo que DIBUJA el armature) = head/tail. En PC el pose-eval real los
         // recalcula al reproducir; en Symbian ese eval esta stub -> sin esto los huesos quedan en (0,0,0) e invisibles.
         for (size_t bi = 0; bi < arm->bones.size(); bi++) {

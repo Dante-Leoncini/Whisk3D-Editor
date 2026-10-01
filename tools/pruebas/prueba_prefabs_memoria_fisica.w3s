@@ -1,0 +1,111 @@
+# ==========================================================================
+#  PREFABS: VERTEX ANIMS COMPARTIDAS y FISICA ADENTRO DE LAS INSTANCIAS
+#  (io/Prefabs.h, animation/VertexAnimation.h: VertexAnimCompartir / VertexAnimAdoptarClave,
+#   physics/W3dRigido.cpp: EspacioDe)
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_prefabs_memoria_fisica.w3s
+#
+#  A) un prefab con una VERTEX ANIM y N instancias: UN solo juego de frames en memoria (el de la
+#     plantilla) mientras el prefab NO se guardo (la definicion sale de la memoria), y tambien despues de
+#     guardar/abrir (la definicion sale de su entrada: todas leen el MISMO blob y lo comparten). La pose
+#     es por instancia. Editar la plantilla le hace su copia (COW): las instancias no cambian hasta volver.
+#  B) cuerpos rigidos DOS niveles adentro de lo generado (Pila > Base > Bloque), con la instancia
+#     rotada y ESCALADA: la caja se mide con la escala de mundo, cae al piso y queda apoyada a su altura;
+#     mover la INSTANCIA jugando arrastra al cuerpo; el Stop devuelve todo.
+# ==========================================================================
+
+ventana 1280 720
+prefabenemigo /tmp/w3d_f7_mf
+prefabbandera
+meminfo anims 0
+
+# --- A) sin guardar: la definicion sale de la MEMORIA; las instancias comparten los frames de la plantilla ---
+prefabinstanciar Bandera -4 0 -6 nombre Bandera
+prefabinstanciar Bandera 0 0 -6 veces 4 nombre Bandera.004
+prefabframes Bandera instancias 5 juegos 1 plantilla 1
+meminfo anims 1
+meminfo animsrefs 6
+prefabvapose Bandera Bandera.001
+# regenerar las instancias (volver de editar el prefab) sigue compartiendo; las viejas sueltan su ref
+prefabregenerar Bandera n 5
+prefabframes Bandera instancias 5 juegos 1 plantilla 1
+meminfo anims 1
+meminfo animsrefs 6
+# editar la PLANTILLA (un keyframe nuevo): se hace su copia (COW) y las instancias siguen con los de antes
+prefabvakey Bandera 5
+prefabframes Bandera instancias 5 juegos 1 plantilla 0
+meminfo animsrefs 5
+prefabregenerar Bandera n 5
+prefabframes Bandera instancias 5 juegos 1 plantilla 1
+meminfo anims 1
+meminfo animsrefs 6
+
+# --- A2) guardar/abrir: la raiz del prefab NO esta cargada y la definicion sale de su ENTRADA: las cinco
+#     leen el MISMO blob de frames y lo comparten (uno solo en memoria) ---
+guardarw3d /tmp/w3d_f7_mf/mf.w3d
+abrirw3d /tmp/w3d_f7_mf/mf.w3d
+raizinfo cargada Bandera 0
+prefabframes Bandera instancias 5 juegos 1
+meminfo anims 1
+meminfo animsrefs 5
+prefabvapose Bandera.002 Bandera.003
+prefabregenerar Bandera n 5
+prefabframes Bandera instancias 5 juegos 1
+meminfo anims 1
+# abrir el prefab y volver: ahora la plantilla esta cargada y las instancias comparten con ella
+raizabrir Bandera prefab
+raizabrir Scene
+prefabframes Bandera instancias 5 juegos 1 plantilla 1
+guardarw3d /tmp/w3d_f7_mf/mf2.w3d
+abrirw3d /tmp/w3d_f7_mf/mf2.w3d
+prefabframes Bandera instancias 5 juegos 1
+guardarw3d /tmp/w3d_f7_mf/mf3.w3d
+w3diguales /tmp/w3d_f7_mf/mf2.w3d /tmp/w3d_f7_mf/mf3.w3d
+
+# --- B) FISICA: el cuerpo esta DOS niveles adentro (Pila > Base > Bloque); la segunda instancia esta
+#     girada 90 grados y ESCALADA x2 (su caja mide 2 de semieje y queda apoyada a y = 2) ---
+prefabpila
+prefabinstanciar Pila 0 6 0 nombre Pila
+prefabinstanciar Pila 8 6 0 nombre Pila.001
+selobj Pila.001
+objscale 2 2 2
+objrot 90
+prefabmundo Pila Base/Bloque y mayor 6.9
+prefabmundo Pila Base/Bloque x mayor 0.9
+prefabmundo Pila.001 Base/Bloque y mayor 7.9
+prefabmundo Pila.001 Base/Bloque z menor -1.9
+simplay 1
+prefabrigido Pila Base/Bloque cuerpo 1 semi 1
+prefabrigido Pila.001 Base/Bloque cuerpo 1 semi 2
+simplay 89
+prefabmundo Pila Base/Bloque y mayor 0.9
+prefabmundo Pila Base/Bloque y menor 1.1
+prefabmundo Pila Base/Bloque x mayor 0.9
+prefabmundo Pila Base/Bloque x menor 1.1
+prefabmundo Pila.001 Base/Bloque y mayor 1.9
+prefabmundo Pila.001 Base/Bloque y menor 2.1
+prefabmundo Pila.001 Base/Bloque x mayor 7.9
+prefabmundo Pila.001 Base/Bloque x menor 8.1
+prefabmundo Pila.001 Base/Bloque z mayor -2.1
+prefabmundo Pila.001 Base/Bloque z menor -1.9
+# mover la INSTANCIA jugando: su cuerpo la sigue (no se queda en el piso)
+selobj Pila
+objpos 0 20 0
+simplay 1
+prefabrigido Pila Base/Bloque centro y mayor 14
+prefabmundo Pila Base/Bloque y mayor 14
+simstop
+prefabmundo Pila Base/Bloque y mayor 6.9
+prefabmundo Pila Base/Bloque y menor 7.1
+prefabmundo Pila.001 Base/Bloque y mayor 7.9
+prefabmundo Pila.001 Base/Bloque y menor 8.1
+# guardar/abrir y jugar otra vez: lo mismo
+guardarw3d /tmp/w3d_f7_mf/fis.w3d
+abrirw3d /tmp/w3d_f7_mf/fis.w3d
+simplay 90
+prefabmundo Pila Base/Bloque y mayor 0.9
+prefabmundo Pila Base/Bloque y menor 1.1
+prefabmundo Pila.001 Base/Bloque y mayor 1.9
+prefabmundo Pila.001 Base/Bloque y menor 2.1
+simstop
+prefabmundo Pila.001 Base/Bloque y mayor 7.9

@@ -1,0 +1,56 @@
+# ===========================================================================
+#  CULLING CON METODO BSP (PVS): VisBsp + Culling::RenderBsp + clave "bsp"
+#
+#  prueba_bsp_pvs.w3d (hecho por hl2-w3d/tools/fixtures_pruebas.py): cuatro
+#  salas en fila sobre X (sala0..sala3 en X = -2, 0, 2, 4; planos del arbol en
+#  X = -1, 1, 3; cluster k = sala k) mas 'sinCluster', una caja que NO figura en
+#  el .w3dbsp. El PVS de cada cluster ve solo a sus vecinos (k-1, k, k+1). La
+#  camara CamBsp mira las cinco cajas de frente con fov 90 desde Z = 10: el
+#  frustum las pasa a TODAS, asi que lo que filtra es el PVS.
+#
+#  Lo que se verifica:
+#   1) el .w3dbsp se lee desde ADENTRO del contenedor (bsp/prueba_bsp_pvs.w3dbsp)
+#   2) la camara cae en el cluster correcto al bajar por el arbol
+#   3) pasan el PVS los hijos de los clusters visibles + el hijo sin cluster
+#   4) mover la camara de cluster cambia el filtro; con el Culling apagado
+#      se dibujan todos
+#
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_bsp_pvs.w3s
+# ===========================================================================
+abrirw3d prueba_bsp_pvs.w3d
+loadtex
+
+# cluster 0 (X = -2): sala0 + sala1 + sinCluster
+bspinfo CullBsp cluster 0 pvs 3
+cullvisibles 3 3
+
+# cluster 1 (X = 0): sala0 + sala1 + sala2 + sinCluster
+selobj CamBsp
+objmove 2 0 0
+objat CamBsp 0 0 10 0.001
+bspinfo CullBsp cluster 1 pvs 4
+cullvisibles 4 4
+
+# cluster 3 (X = 4): sala2 + sala3 + sinCluster
+objmove 4 0 0
+bspinfo CullBsp cluster 3 pvs 3
+cullvisibles 3 3
+
+# mas alla del ultimo plano sigue siendo el cluster 3
+objmove 10 0 0
+bspinfo CullBsp cluster 3 pvs 3
+
+# Culling apagado: se dibujan los 5
+cullactivo CullBsp off
+cullvisibles 5 5
+cullactivo CullBsp on
+cullvisibles 3 3
+
+# round-trip: guardar y reabrir conserva metodo bsp + archivo (la camara quedo
+# en X = 14, cluster 3)
+guardarw3d /tmp/w3d_prueba_bsp_pvs.w3d
+abrirw3d /tmp/w3d_prueba_bsp_pvs.w3d
+loadtex
+bspinfo CullBsp cluster 3 pvs 3
+cullvisibles 3 3

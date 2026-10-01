@@ -18,6 +18,12 @@ unsigned Textura2DObtener(const std::string& ruta, int* w = 0, int* h = 0);
 // Lo usa el dropdown Texture del editor UV para listar la UI del juego.
 void Textura2DListar(std::vector<std::string>& rutas);
 
+// CIERRE DEL PROYECTO: suelta TODO el cache (borra de la GPU las texturas propias; las
+// PRESTADAS del cache 3D no, esas son del material que las subio). La clave es la RUTA tal
+// como la escribe el proyecto ("texturas/hud.png" en un contenedor): sin vaciarlo, abrir
+// OTRO proyecto con una entrada del mismo nombre mostraba la imagen del anterior.
+void Textura2DLiberarTodas();
+
 // ruta que stb PUEDE decodificar: un .webp se convierte (ffmpeg, editor de PC) a un png
 // cacheado en /tmp una vez por sesion; cualquier otra ruta vuelve tal cual. La usan el
 // cache de texturas y las miniaturas del explorador.

@@ -1,0 +1,32 @@
+# ===========================================================================
+#  UV POR VERTICE DESDE LUA: setVerticeUV / verticePosAnim (+ uvat del harness)
+#
+#  prueba_vertice_uv.w3d (hecho por hl2-w3d/tools/fixtures_pruebas.py): la
+#  escena por defecto con scripts/uv.lua en el Cubo. En cada tick el script
+#  escribe la UV del vertice 1 en la capa base (0.25, 0.75) y en la capa UV 1
+#  (0.1, 0.9), y mueve el Cubo segun verticePosAnim(vert 2) - verticePos(vert 2)
+#  (sin skinning tienen que ser iguales: el Cubo solo sube 1 por tick en z).
+#  Es la base del iris del G-Man de la demo de HL2: un script que recalcula por
+#  frame la proyeccion del iris sobre el globo ocular deformado por los
+#  parpados.
+#
+#  Lo que se verifica:
+#   1) setVerticeUV escribe la capa base y crea/escribe la capa 1 (uvat)
+#   2) verticePosAnim sin skinning devuelve la posicion de reposo
+#  (lo que escribe el script es estado DEL JUEGO: al parar no se guarda en el
+#  proyecto, igual que las posiciones que mueve un script)
+#
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_vertice_uv.w3s
+# ===========================================================================
+abrirw3d prueba_vertice_uv.w3d
+loadtex
+juego on
+simplay 1
+uvat Cubo 1 0 0.25 0.75 0.0001
+uvat Cubo 1 1 0.1 0.9 0.0001
+objat Cubo 0 0 1 0.001
+simplay 2
+objat Cubo 0 0 3 0.001
+juego off
+uvat Cubo 1 0

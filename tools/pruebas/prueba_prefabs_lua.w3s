@@ -1,0 +1,102 @@
+# ==========================================================================
+#  PREFABS EN JUEGO: instanciar() / destruir() de lua (io/Prefabs.h, script/W3dScript.h)
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_prefabs_lua.w3s
+#
+#  juegoprefabsmin: el prefab "Enemigo" (esqueleto + cuerpo skinneado + sensor + enemigo.lua), 3
+#  instancias en la escena (la del medio con el override vida=25) y un "Director" que JUGANDO
+#  instancia 10 enemigos por ciclo y destruye los del ciclo anterior, 100 ciclos (1000 instanciar
+#  y 1000 destruir). Cada enemigo nuevo arranca como si hubiera estado desde el Play (su inicio()
+#  corre y cuenta en compartido; su buscar()/objeto() ven SU cuerpo: scope por instancia); los
+#  destruidos dejan de correr (latidos) y un puntero viejo en lua ya no es un objeto (tipo() = "").
+#  Sin fugas: el heap en pleno juego (10 vivos) es el mismo al ciclo 30 que al 90, y al Stop vuelve
+#  a la escena del usuario (3 instancias, las mismas mallas). Con el cache del rewind prendido, ir y volver
+#  en el tiempo despues de destruir no toca memoria liberada (las fotos se podan).
+#  Despues: destruir() de algo PUESTO en la escena y un instanciar() jugando: el Stop devuelve el
+#  destruido a su lugar y saca el creado.
+#  Al final, la ACEPTACION del diseno: 50 instancias comparten 1 recurso de malla y 1 animset, con
+#  poses y scripts propios, sobreviven a guardar/abrir y el Play arranca las 50 (cada una ve SU cuerpo).
+# ==========================================================================
+
+ventana 640 480
+juegoprefabsmin /tmp/w3d_f7_pl
+prefabinfo Enemigo.001 overrides 1
+guardarw3d /tmp/w3d_f7_pl/juegoprefabs.w3d
+abrirw3d /tmp/w3d_f7_pl/juegoprefabs.w3d
+prefabvivos 3
+meminfo recursosmalla 3
+# (sin el cache del rewind: su foto por tick haria crecer el heap y aca se mide lo que pierde instanciar/destruir)
+simcache 0
+simplay 30
+prefabvivos 13
+heapuso
+simplay 60
+prefabvivos 13
+heapuso max 256
+simplay 30
+prefabvivos 3
+scriptinfo compartido juez OK
+scriptinfo compartido enemigos 1003
+scriptinfo compartido scope_ok 1003
+scriptinfo compartido vida_total 10045
+simstop
+prefabvivos 3
+prefabinfo Enemigo.001 generados 4 overrides 1
+prefabcompartido Enemigo instancias 3 mallas 1 animsets 1
+meminfo recursosmalla 3
+simcache 1
+
+# --- con el cache del REWIND prendido: las fotos no pueden quedar nombrando lo que destruir() libero ---
+simplay 25
+simira 10
+simpaso -1
+simpaso 1
+simplay 5
+simstop
+prefabvivos 3
+prefabinfo Enemigo.001 generados 4 overrides 1
+
+# --- destruir() de lo PUESTO en la escena + instanciar() jugando: el Stop lo arregla ---
+prefabenemigo /tmp/w3d_f7_pl2
+prefabinstanciar Enemigo -4 0 -6 nombre Enemigo
+prefabinstanciar Enemigo 0 0 -6 nombre Enemigo.001
+raizscript Cubo prueba_prefabs_destructor.lua
+simplay 6
+scriptinfo compartido creado Enemigo.002
+scriptinfo compartido destruido si
+prefabvivos 2
+prefabinfo Enemigo.002 generados 4
+fail prefabinfo Enemigo.001
+simstop
+prefabvivos 2
+prefabinfo Enemigo.001 generados 4
+prefabskin Enemigo.001
+fail prefabinfo Enemigo.002
+
+# --- ACEPTACION del diseno: 50 instancias = 1 recurso de malla y 1 animset; poses y scripts
+#     independientes (yo(), buscar() por scope); guardar/abrir; el Play arranca las 50 ---
+prefabenemigo /tmp/w3d_f7_pl3
+prefabinstanciar Enemigo -50 0 -12 veces 50 nombre Enemigo.049
+prefabvivos 50
+prefabcompartido Enemigo instancias 50 mallas 1 animsets 1
+prefabskin Enemigo.049
+prefabscope Enemigo.037 Esqueleto Cuerpo Enemigo.037
+guardarw3d /tmp/w3d_f7_pl3/cincuenta.w3d
+abrirw3d /tmp/w3d_f7_pl3/cincuenta.w3d
+prefabvivos 50
+prefabcompartido Enemigo instancias 50 mallas 1 animsets 1
+prefabskin Enemigo.025
+prefabclip Enemigo.010 Esqueleto Quieto
+prefabclip Enemigo.011 Esqueleto Saludo
+prefabclip Enemigo.012 Esqueleto Saludo
+prefabpose Enemigo.010 Enemigo.011 10 distinta
+prefabpose Enemigo.011 Enemigo.012 10 igual
+simcache 0
+simplay 3
+scriptinfo compartido enemigos 50
+scriptinfo compartido scope_ok 50
+scriptinfo compartido vida_total 500
+simstop
+simcache 1
+prefabvivos 50
+prefabcompartido Enemigo instancias 50 mallas 1 animsets 1

@@ -1,6 +1,7 @@
 #include "w3dGraphics.h" // abstraccion de graficos (independencia de OpenGL)
 #include "render/OpcionesRender.h"   // RenderType / g_redraw: son del editor
 #include "ViewPorts/ViewPorts.h"
+#include "ViewPorts/LayoutArbol.h" // aviso de destruccion + borrar un arbol entero
 #include <math.h>
 
 // -----------------------------
@@ -29,6 +30,43 @@ void ViewportBase::Resize(int newW, int newH) {
     height = newH;
 }
 
+// ---- AVISO DE DESTRUCCION (ver LayoutArbol.h) ----
+// La lista arranca en NULL por inicializacion ESTATICA: los ganchos se registran desde
+// constructores globales de otros .cpp, en cualquier orden, y no dependen de que este
+// archivo haya "arrancado".
+static ViewportOlvidarFn s_olvidarGanchos[ViewportOlvidarMaxGanchos] = {0,0,0,0,0,0,0,0,0,0,0,0};
+bool ViewportOlvidarRegistrar(ViewportOlvidarFn f){
+    if (!f) return false;
+    for (int i = 0; i < (int)ViewportOlvidarMaxGanchos; i++){
+        if (s_olvidarGanchos[i] == f) return true;   // ya estaba
+        if (!s_olvidarGanchos[i]) { s_olvidarGanchos[i] = f; return true; }
+    }
+    return false;   // sin lugar: agrandar ViewportOlvidarMaxGanchos
+}
+
+// viewports vivos en el proceso (hojas + contenedores): el harness lo compara con el
+// arbol actual para probar que abrir un proyecto no deja el layout anterior huerfano
+static int s_viewportsVivos = 0;
+int ViewportsVivos(){ return s_viewportsVivos; }
+
+void ViewportBorrarArbol(ViewportBase* raiz){
+    if (!raiz) return;
+    if (!raiz->isLeaf()){
+        if (raiz->ContainerKind() == 1){
+            ViewportRow* r = (ViewportRow*)raiz;
+            ViewportBase* a = r->childA; ViewportBase* b = r->childB;
+            r->childA = NULL; r->childB = NULL;   // antes del delete: el dtor borra childB
+            ViewportBorrarArbol(a); ViewportBorrarArbol(b);
+        } else if (raiz->ContainerKind() == 2){
+            ViewportColumn* c = (ViewportColumn*)raiz;
+            ViewportBase* a = c->childA; ViewportBase* b = c->childB;
+            c->childA = NULL; c->childB = NULL;
+            ViewportBorrarArbol(a); ViewportBorrarArbol(b);
+        }
+    }
+    delete raiz;
+}
+
 ViewportBase::ViewportBase()
     : x(0), y(0), width(0), height(0) {
     // barra de botones (C++03: en el ctor)
@@ -41,9 +79,27 @@ ViewportBase::ViewportBase()
     barLinea = NULL;
     toolScroll = 0;    // toolbar compartida (ToolbarBase.cpp): sin scroll ni gesto al nacer
     toolGesto = false;
+    s_viewportsVivos++;
 }
 ViewportBase::~ViewportBase(){
+    s_viewportsVivos--;
     BrushBarOlvidarViewport(this); // no dejar el gesto de la fila del pincel apuntando a un viewport muerto
+    // los demas modulos que se guardan punteros a viewports (activo, gesto en curso, menu
+    // abierto desde...) sueltan ESTE (LayoutArbol.h)
+    for (int g = 0; g < (int)ViewportOlvidarMaxGanchos; g++)
+        if (s_olvidarGanchos[g]) s_olvidarGanchos[g](this);
+    if (viewPortActive == this) viewPortActive = NULL;
+    if (rootViewport == this) rootViewport = NULL;
+    // la BARRA es del viewport: sus botones, pestanias y toolbar se crean en el ctor de cada
+    // tipo (BarCrear + los push_back) y nadie mas los libera. Mientras el layout vivia para
+    // siempre daba igual; ahora un viewport borrado (abrir un proyecto, cambiar de tipo) los
+    // fugaba. Cada Button/Tab libera su Card.
+    for (size_t i = 0; i < BarButtons.size(); i++) delete BarButtons[i];
+    for (size_t i = 0; i < BarTabs.size(); i++)    delete BarTabs[i];
+    for (size_t i = 0; i < ToolButtons.size(); i++) delete ToolButtons[i];
+    BarButtons.clear(); BarTabs.clear(); ToolButtons.clear();
+    delete barCard;  barCard = NULL;
+    delete barLinea; barLinea = NULL;
 }
 void ViewportBase::event_mouse_motion(int mx, int my) {}
 void ViewportBase::button_left() {}

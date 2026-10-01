@@ -276,7 +276,7 @@ void PoseXformConfirm(){
     if (!g_poseModo) return;
     // AUTO KEY: va ANTES de limpiar g_poseSnap, que es contra lo que se mide QUE canal cambio. Solo los huesos
     // que se movieron de verdad dejan keyframe, y solo en sus canales.
-    if (AutoKeyOn){
+    if (AutoKeyOn && ActiveAnimKind != 2){   // ("Juego": sin keyframes; los clips se editan eligiendolos)
         Armature* a = PoseArmActiva();
         if (a && AutoKeyEsqueletoPrep(a)){
             int n = 0;
@@ -400,7 +400,7 @@ void Pose2DDelta(float du, float dv, float angDeg, float factor){
 void Pose2DConfirm(){
     if (!g_pose2dModo) return;
     // AUTO KEY: igual que el 3D (ANTES de soltar el snapshot; solo los canales que cambiaron)
-    if (AutoKeyOn){
+    if (AutoKeyOn && ActiveAnimKind != 2){   // ("Juego": sin keyframes; los clips se editan eligiendolos)
         Armature* a = PoseArmActiva();
         if (a && AutoKeyEsqueletoPrep(a)){
             int n = 0;

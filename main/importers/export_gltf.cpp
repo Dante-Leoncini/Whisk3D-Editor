@@ -1,3 +1,5 @@
+#include "io/W3dMallaBin.h"   // la edicion pendiente de una malla de un recurso (se materializa al exportar)
+#include "objects/MallaRecurso.h" // W3dMallaSoltarEdicion: vuelve a quedar pendiente al terminar
 #include "export_gltf.h"
 #include "edit/MeshEdit.h"   // W3dTriangularCara
 #include "import_obj.h"                  // ExtractBaseName
@@ -185,6 +187,18 @@ void OrdenCarasGLB(const Mesh* m, std::vector<int>& orden) {
 bool ExportGLTF(const std::string& filepath, bool selectedOnly, bool binary) {
     std::vector<Mesh*> meshes; RecolectarMeshes(SceneCollection, selectedOnly, meshes);
     if (meshes.empty()) { w3dLogfE("ExportGLTF: no hay meshes"); Notificar("glTF: nothing to export", true); return false; }
+    // las mallas de un RECURSO compartido tienen la edicion (las caras) PENDIENTE: el export
+    // emite por caras, asi que se leen antes (objects/MallaRecurso.h) y, al terminar, las que se
+    // leyeron solo para esto vuelven a quedar pendientes (no queda la memoria de todas cargada)
+    struct Prestadas {
+        std::vector<Mesh*> v;
+        ~Prestadas() { for (size_t i = 0; i < v.size(); i++) W3dMallaSoltarEdicion(v[i]); }
+    } prestadas;
+    for (size_t i = 0; i < meshes.size(); i++) {
+        if (meshes[i]->edicionPendiente.empty()) continue;
+        const bool delRecurso = meshes[i]->malla != NULL;
+        if (W3dMallaBinMaterializarEdicion(meshes[i]) && delRecurso) prestadas.v.push_back(meshes[i]);
+    }
 
     // FORZAR la carga de las texturas pendientes: el import las encola (EncolarTextura) y se cargan diferidas 1/frame.
     // Si exportas apenas importaste (antes de que corran esos frames) mat->texture sigue NULL -> se exportaba sin
@@ -200,6 +214,7 @@ bool ExportGLTF(const std::string& filepath, bool selectedOnly, bool binary) {
 
     Bufb buf;
     std::vector<std::string> nodesJson, meshesJson, animsJson, matsJson, texsJson, imgsJson;
+    std::vector<std::string> imgUri;   // uri de cada imagen (paralelo a imgsJson; las capas la citan)
 
     // ---- materiales + texturas (unicos, en el orden que aparecen) ----
     std::vector<Material*> mats; std::map<Material*, int> matIdx;
@@ -210,6 +225,10 @@ bool ExportGLTF(const std::string& filepath, bool selectedOnly, bool binary) {
             Material* mat = m->materialsGroup[g].material; if (!mat || matIdx.count(mat)) continue;
             matIdx[mat] = (int)mats.size(); mats.push_back(mat);
             if (mat->textureOn && mat->texture && !texIdx.count(mat->texture)) { texIdx[mat->texture] = (int)texs.size(); texs.push_back(mat->texture); }
+            for (size_t c = 0; c < mat->capas.size(); c++) {   // las texturas de las capas extra tambien salen
+                Texture* t = mat->capas[c].tex;
+                if (t && !texIdx.count(t)) { texIdx[t] = (int)texs.size(); texs.push_back(t); }
+            }
         }
     }
     // texturas: se COPIAN al lado del archivo exportado y se referencian por BASENAME. Asi el reimport (y Blender)
@@ -229,7 +248,8 @@ bool ExportGLTF(const std::string& filepath, bool selectedOnly, bool binary) {
                 }
             }
         }
-        imgsJson.push_back("{\"uri\":\"" + Jesc(base.empty() ? PathUri(texs[i]->path) : base) + "\"}");
+        imgUri.push_back(base.empty() ? PathUri(texs[i]->path) : base);   // (la uri de cada imagen: la usan las capas)
+        imgsJson.push_back("{\"uri\":\"" + Jesc(imgUri.back()) + "\"}");
         texsJson.push_back("{\"sampler\":0,\"source\":" + Itos((long)i) + "}");
     }
     for (size_t i = 0; i < mats.size(); i++) {
@@ -241,7 +261,8 @@ bool ExportGLTF(const std::string& filepath, bool selectedOnly, bool binary) {
         j += ",\"metallicFactor\":0,\"roughnessFactor\":1}";
         // doubleSided: propiedad ESTANDAR de glTF -> culling off = doubleSided true (lo entienden otros viewers).
         j += std::string(",\"doubleSided\":") + (mat->culling ? "false" : "true");
-        j += mat->transparent ? ",\"alphaMode\":\"BLEND\"" : "";
+        if (mat->transparent)            j += ",\"alphaMode\":\"BLEND\"";
+        else if (mat->alphaTest > 0.0f)  j += ",\"alphaMode\":\"MASK\",\"alphaCutoff\":" + Ftos(mat->alphaTest);
         // el RESTO de los flags de Whisk3D (lighting/reflejo/etc) van en "extras": el mecanismo ESTANDAR de glTF
         // para datos de aplicacion (otros viewers los ignoran; nuestro importer los lee de vuelta -> round-trip exacto).
         j += std::string(",\"extras\":{\"w3d_lighting\":") + (mat->lighting?"true":"false")
@@ -250,12 +271,23 @@ bool ExportGLTF(const std::string& filepath, bool selectedOnly, bool binary) {
            + ",\"w3d_filtrado\":"    + (mat->filtrado?"true":"false")
            + ",\"w3d_repeat\":"      + (mat->repeat?"true":"false")
            + ",\"w3d_transparent\":" + (mat->transparent?"true":"false")
+           + ",\"w3d_alfaCorte\":"   + Ftos(mat->alphaTest)
            + ",\"w3d_depthTest\":"   + (mat->depth_test?"true":"false")
            + ",\"w3d_vertexColor\":" + (mat->vertexColor?"true":"false")
            + ",\"w3d_chrome\":"      + (mat->chrome?"true":"false")
            + ",\"w3d_normalMap\":"   + (mat->normalMap?"true":"false")
            + ",\"w3d_reflectMode\":" + Itos((long)mat->reflectMode)
-           + ",\"w3d_shininess\":"   + Ftos(mat->shininess) + "}";
+           + ",\"w3d_shininess\":"   + Ftos(mat->shininess);
+        if (!mat->capas.empty()) {   // capas de textura extra: [{textura (uri), mezcla, uv, on}]
+            std::vector<std::string> cj;
+            for (size_t c = 0; c < mat->capas.size(); c++) {
+                Texture* t = mat->capas[c].tex; if (!t || !texIdx.count(t)) continue;
+                cj.push_back("{\"textura\":\"" + Jesc(imgUri[(size_t)texIdx[t]]) + "\",\"mezcla\":" + Itos((long)mat->capas[c].blend)
+                             + ",\"uv\":" + Itos((long)mat->capas[c].uvMapa) + ",\"on\":" + (mat->capas[c].on ? "true" : "false") + "}");
+            }
+            j += ",\"w3d_capas\":[" + JoinArr(cj) + "]";
+        }
+        j += "}";
         j += "}";
         matsJson.push_back(j);
     }
@@ -329,6 +361,12 @@ bool ExportGLTF(const std::string& filepath, bool selectedOnly, bool binary) {
         if (m->uv) { std::vector<float> UV((size_t)nV * 2);
             for (int i = 0; i < nV; i++) { UV[(size_t)i*2] = m->uv[i*2]; UV[(size_t)i*2+1] = m->uv[i*2+1]; }
             uvAcc = buf.addFloats(UV, 2, "VEC2", 34962, false); }
+        // capas UV extra (Mesh::uvExtra) -> TEXCOORD_1..: el unwrap propio de las capas de textura del material
+        std::string uvExtraAttrs;
+        for (size_t k = 1; k < m->uvExtra.size() && k < 8; k++) {
+            if ((int)m->uvExtra[k].size() != nV * 2) continue;
+            uvExtraAttrs += ",\"TEXCOORD_" + Itos((long)k) + "\":" + Itos(buf.addFloats(m->uvExtra[k], 2, "VEC2", 34962, false));
+        }
 
         // JOINTS_0 / WEIGHTS_0 desde los vertex groups (por control-point): top-4 pesos por vertice, normalizados.
         int jntAcc = -1, wgtAcc = -1;
@@ -363,6 +401,7 @@ bool ExportGLTF(const std::string& filepath, bool selectedOnly, bool binary) {
         std::string attrs = "\"POSITION\":" + Itos(posAcc);
         if (nrmAcc >= 0) attrs += ",\"NORMAL\":" + Itos(nrmAcc);
         if (uvAcc >= 0)  attrs += ",\"TEXCOORD_0\":" + Itos(uvAcc);
+        attrs += uvExtraAttrs;
         if (jntAcc >= 0) attrs += ",\"JOINTS_0\":" + Itos(jntAcc) + ",\"WEIGHTS_0\":" + Itos(wgtAcc);
 
         std::vector<std::string> prims;

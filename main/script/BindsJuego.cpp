@@ -5,6 +5,7 @@
 // ============================================================================
 #include "script/BindsJuego.h"
 #include "script/W3dScript.h"          // W3dScriptParamObjeto
+#include "animation/Animation.h"       // g_camaraActivaHook (setCamaraActiva)
 #include "physics/W3dFisica.h"         // adaptador 2D de la fisica del Core (lienzo + tamano del elemento)
 #include "W3dEscena.h"                 // cambiarEscena(): el bind multi-escena COMPARTIDO
 #include "objects/Objects.h"
@@ -12,6 +13,7 @@
 #include "objects/Texto2D.h"
 #include "objects/Boton2D.h"
 #include "objects/Imagen2D.h"
+#include "objects/Rect2D.h"             // setTinte: el relleno de un rect 2D
 #include "objects/Elemento2D.h"
 #include "render/UIOverlay.h"          // UI2D_TamanoLienzo, UI2D_EsElemento2D, UI2DPos
 #include "render/OpcionesRender.h"     // g_redraw (+ g_renderAspect para pantallaDe)
@@ -37,7 +39,7 @@ extern "C" {
 
 // audio del Core, forward-decl (evita el include del dir de audio, como en W3dScript.cpp).
 // Sin -DW3D_ENABLE_AUDIO son stubs no-op -> sonido() no hace nada y no rompe.
-namespace w3dEngine { class W3dSound; W3dSound* W3dSoundLoad(const char*); int W3dSoundPlayPitch(W3dSound*, float, bool, float); void W3dSoundStopFade(int, float); }
+namespace w3dEngine { class W3dSound; W3dSound* W3dSoundLoad(const char*); void W3dSoundFree(W3dSound*); int W3dSoundPlayPitch(W3dSound*, float, bool, float); void W3dSoundStopFade(int, float); }
 
 // ---------------------------------------------------------------------------
 //  TAMANO del lienzo del juego: el MISMO que ve el render del overlay
@@ -319,8 +321,10 @@ static int LSetTextura(lua_State* L) {
     Object* o = W3dScriptParamObjeto(L, 1);
     const char* s = lua_tostring(L, 2);
     if (o && o->getType() == ObjectType::imagen2d && s) {
-        std::string res = s;
-        bool absoluta = !res.empty() && (res[0] == '/' || (res.size() > 1 && res[1] == ':'));
+        // (un script de una LIBRERIA externa: primero la de SU libreria, W3dScriptRutaDeLibreria)
+        const std::string deLib = W3dScriptRutaDeLibreria(L, s);
+        std::string res = deLib.empty() ? std::string(s) : deLib;
+        bool absoluta = !deLib.empty() || (!res.empty() && (res[0] == '/' || (res.size() > 1 && res[1] == ':')));
         if (!absoluta && !g_w3dDirProyecto.empty()) {
             W3dAlmacen* alm = W3dAlmacenMontado();
             if (!(alm && alm->Existe(res)))
@@ -419,6 +423,15 @@ void W3dSonidosPrecargar() {
     if (nuevos) w3dLogf("[CARGA] sonidos precargados: %d wav", nuevos);
 }
 
+// cierre del proyecto (ver BindsJuego.h). W3dSoundFree corta antes las voces que lo usan.
+void W3dSonidosLiberar() {
+    for (std::map<std::string, w3dEngine::W3dSound*>::iterator it = gSonidos.begin(); it != gSonidos.end(); ++it)
+        if (it->second) w3dEngine::W3dSoundFree(it->second);
+    gSonidos.clear();
+}
+int W3dSonidosCacheados() { return (int)gSonidos.size(); }
+bool W3dSonidoCacheado(const std::string& ruta) { return gSonidos.find(ruta) != gSonidos.end(); }
+
 static int LSonido(lua_State* L) {
     const char* ruta = luaL_checkstring(L, 1);
     float vol   = (float)luaL_optnumber(L, 2, 1.0);
@@ -432,8 +445,11 @@ static int LSonido(lua_State* L) {
     // Mismo contrato que setTextura. Antes se colgaba SIEMPRE del proyecto: con los .wav
     // adentro del .w3d esa ruta absoluta no existe en el disco ni es una entrada -> NULL
     // cacheado y el juego quedaba MUDO aunque la precarga los hubiera leido bien.
-    std::string res = ruta;
-    if (!(res.size() > 0 && (res[0] == '/' || (res.size() > 1 && res[1] == ':')))) {
+    // Un script de una LIBRERIA externa busca primero en SU libreria (W3dScriptRutaDeLibreria).
+    std::string res = W3dScriptRutaDeLibreria(L, ruta);
+    if (res.empty()) res = ruta;
+    else ruta = 0;   // (ya resuelta)
+    if (ruta && !(res.size() > 0 && (res[0] == '/' || (res.size() > 1 && res[1] == ':')))) {
         W3dAlmacen* alm = W3dAlmacenMontado();
         if (!(alm && alm->Existe(res)) && !g_w3dDirProyecto.empty())
             res = g_w3dDirProyecto + "/" + res;
@@ -530,6 +546,8 @@ static int LSetLote(lua_State* L) {
 // emisor emite SOLO por rafagas). Hook instalado por el editor (ver BindsJuego.h):
 // en el runtime compilado queda NULL y el bind es un no-op seguro.
 void (*W3dParticulasEmitirHook)(Object* o, int n) = 0;
+void (*W3dParticulasActivoHook)(Object* o, bool activo) = 0;
+bool (*W3dNieblaHook)(Object* o, bool escribir, float* v, int n) = 0;
 
 // LA CAMARA POR HOOK (ver BindsJuego.h): los instala main/objects/Camera.cpp.
 bool (*W3dCamaraProyectarHook)(Object*, float, float, float*, float*, bool*) = 0;
@@ -545,6 +563,31 @@ static int LEmitir(lua_State* L) {
     Object* o = W3dScriptParamObjeto(L, 1);
     int n = (int)luaL_optinteger(L, 2, 1);
     if (o && n > 0 && W3dParticulasEmitirHook) W3dParticulasEmitirHook(o, n);
+    return 0;
+}
+// setEmitiendo(obj, bool): la EMISION continua del emisor (el 'activo' del panel). Apagar un emisor asi no hace
+// desaparecer de golpe lo que ya esta en el aire (setVisible si): las vivas terminan su vida y se funden solas.
+static int LSetEmitiendo(lua_State* L) {
+    Object* o = W3dScriptParamObjeto(L, 1);
+    if (o && W3dParticulasActivoHook) W3dParticulasActivoHook(o, lua_toboolean(L, 2) != 0);
+    return 0;
+}
+// niebla(obj) -> densidad, r, g, b, inicio, fin de un objeto Niebla (nil si no es una niebla).
+// setNiebla(obj, densidad [, r, g, b [, inicio, fin]]): cambiarla EN JUEGO (fundir la niebla al entrar a una casa,
+// con un fundido de un par de segundos). Lo que no se pasa queda como esta.
+static int LNiebla(lua_State* L) {
+    Object* o = W3dScriptParamObjeto(L, 1);
+    float v[6];
+    if (!o || !W3dNieblaHook || !W3dNieblaHook(o, false, v, 6)) { lua_pushnil(L); return 1; }
+    for (int k = 0; k < 6; k++) lua_pushnumber(L, v[k]);
+    return 6;
+}
+static int LSetNiebla(lua_State* L) {
+    Object* o = W3dScriptParamObjeto(L, 1);
+    float v[6];
+    if (!o || !W3dNieblaHook || !W3dNieblaHook(o, false, v, 6)) return 0;
+    for (int k = 0; k < 6; k++) if (!lua_isnoneornil(L, 2 + k)) v[k] = (float)luaL_checknumber(L, 2 + k);
+    W3dNieblaHook(o, true, v, 6);
     return 0;
 }
 // mostrar(obj, visible): prende/apaga el dibujado (para menus del juego).
@@ -564,6 +607,32 @@ static int LSetOpacidad(lua_State* L) {
         ((Elemento2D*)o)->opacidad = a;
         g_redraw = true;
     }
+    return 0;
+}
+// setTinte(obj, r, g, b [, a]): el color de un elemento 2D (tinte de una imagen, relleno de un rect, color de un
+// texto), 0..1. Para un HUD que late o cambia de color (un medidor de vida, un aviso).
+static float* ColorDe2D(Object* o) {
+    if (!o) return NULL;
+    if (o->getType() == ObjectType::imagen2d) return ((Imagen2D*)o)->color;
+    if (o->getType() == ObjectType::rect2d)   return ((Rect2D*)o)->color;
+    if (o->getType() == ObjectType::texto2d)  return ((Texto2D*)o)->color;
+    return NULL;
+}
+static int LSetTinte(lua_State* L) {
+    float* c = ColorDe2D(W3dScriptParamObjeto(L, 1));
+    if (!c) return 0;
+    for (int k = 0; k < 4; k++) {
+        if (k == 3 && lua_isnoneornil(L, 5)) break;
+        float v = (float)luaL_checknumber(L, 2 + k);
+        c[k] = v < 0.0f ? 0.0f : (v > 1.0f ? 1.0f : v);
+    }
+    g_redraw = true;
+    return 0;
+}
+// setRot2D(obj, grados): la rotacion de un elemento 2D (gira alrededor de su ancla; los hijos la heredan).
+static int LSetRot2D(lua_State* L) {
+    Object* o = W3dScriptParamObjeto(L, 1);
+    if (o && UI2D_EsElemento2D(o)) { ((Elemento2D*)o)->rot2d = (float)luaL_checknumber(L, 2); g_redraw = true; }
     return 0;
 }
 // setTam(obj, px): tamano de fuente de un texto 2D.
@@ -895,6 +964,16 @@ static int LRielDe(lua_State* L) {
 //  (fov entre 1 y 179; cerca > 0; lejos > cerca), asi un valor absurdo desde un
 //  script no deja la camara sin nada que dibujar.
 // ---------------------------------------------------------------------------
+// setCamaraActiva(cam): esa camara pasa a ser la ACTIVA (la que se ve jugando). Es el mismo camino que la pista
+// "Camara activa" de una animacion de escena (g_camaraActivaHook, por nombre): sirve para volver a la camara de
+// juego al terminar una cinematica. -> true si era una camara.
+static int LSetCamaraActiva(lua_State* L) {
+    Object* cam = W3dScriptParamObjeto(L, 1);
+    if (!cam || cam->getType() != ObjectType::camera || !g_camaraActivaHook) { lua_pushboolean(L, 0); return 1; }
+    g_camaraActivaHook(cam->name.c_str());
+    lua_pushboolean(L, 1);
+    return 1;
+}
 static int LLenteDe(lua_State* L) {
     Object* cam = W3dScriptParamObjeto(L, 1);
     float fov = 0, cerca = 0, lejos = 0;
@@ -1038,7 +1117,10 @@ static int LImportarW3D(lua_State* L) {
     extern Object* W3dImportarW3DAnexo(const std::string&);   // main/importers/import_w3d.h
     std::string ruta = r ? r : "";
     if (ruta.empty()) { lua_pushnil(L); return 1; }
-    const bool absoluta = (ruta[0] == '/') || (ruta.size() > 2 && ruta[1] == ':');
+    // (un script de una LIBRERIA externa: primero la de SU libreria, W3dScriptRutaDeLibreria)
+    const std::string deLib = W3dScriptRutaDeLibreria(L, ruta);
+    const bool absoluta = !deLib.empty() || (ruta[0] == '/') || (ruta.size() > 2 && ruta[1] == ':');
+    if (!deLib.empty()) ruta = deLib;
     if (!absoluta && !g_w3dDirProyecto.empty()) ruta = g_w3dDirProyecto + "/" + ruta;
     Object* o = W3dImportarW3DAnexo(ruta);
     if (o) lua_pushlightuserdata(L, o); else lua_pushnil(L);
@@ -1069,8 +1151,13 @@ void BindsJuegoRegistrar(void* Lv) {
     lua_pushcfunction(L, LSetVisCurvaT);  lua_setglobal(L, "setVisCurvaT");
     lua_pushcfunction(L, LSetLote);       lua_setglobal(L, "setLote");
     lua_pushcfunction(L, LEmitir);      lua_setglobal(L, "emitir");
+    lua_pushcfunction(L, LSetEmitiendo); lua_setglobal(L, "setEmitiendo");
+    lua_pushcfunction(L, LNiebla);      lua_setglobal(L, "niebla");
+    lua_pushcfunction(L, LSetNiebla);   lua_setglobal(L, "setNiebla");
     lua_pushcfunction(L, LMostrar);     lua_setglobal(L, "mostrar");
     lua_pushcfunction(L, LSetOpacidad); lua_setglobal(L, "setOpacidad");
+    lua_pushcfunction(L, LSetTinte);    lua_setglobal(L, "setTinte");
+    lua_pushcfunction(L, LSetRot2D);    lua_setglobal(L, "setRot2D");
     lua_pushcfunction(L, LSetTam);      lua_setglobal(L, "setTam");
     lua_pushcfunction(L, LSalir);       lua_setglobal(L, "salir");
     // facilidades: logica generica del juego (una linea en lua)
@@ -1089,6 +1176,7 @@ void BindsJuegoRegistrar(void* Lv) {
     lua_pushcfunction(L, LSetMiradaRiel); lua_setglobal(L, "setMiradaRiel");
     lua_pushcfunction(L, LRielDe);      lua_setglobal(L, "rielDe");
     lua_pushcfunction(L, LLenteDe);     lua_setglobal(L, "lenteDe");
+    lua_pushcfunction(L, LSetCamaraActiva); lua_setglobal(L, "setCamaraActiva");
     lua_pushcfunction(L, LSetLente);    lua_setglobal(L, "setLente");
     // los mandos enchufados (hotplug): cuantos hay y como se llama cada uno
     lua_pushcfunction(L, LControles);   lua_setglobal(L, "controles");

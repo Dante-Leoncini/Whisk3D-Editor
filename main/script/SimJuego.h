@@ -25,7 +25,7 @@ bool SimActiva();                 // hay una partida cargada (jugando o en pausa
 // empties, huesos, gizmos de camara, iconos 3D...) no se dibujan mientras esto
 // de true — mismo criterio que el borde blanco del passepartout.
 bool W3dJuegoCorriendo();
-bool SimHayScripts();             // hay algo con script en la escena?
+bool SimHayScripts();             // hay algo que simular? (algo con script, o la raiz activa es un JUEGO)
 void SimTickPlay(float dt);       // lo llama el main loop con el timeline en PLAY
 // instrumentacion de scripts (para [PERF]/overlay): activos este tick / total cargados / ms del loop
 extern int    g_luaScriptsActivos;

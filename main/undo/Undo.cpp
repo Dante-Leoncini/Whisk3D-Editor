@@ -15,17 +15,22 @@ extern bool g_redraw;   // el frame se redibuja cuando un undo/redo/borrado camb
 #include "objects/Armature.h"    // Armature (cast correcto Object*<->Armature* al limpiar/restaurar skinArmature)
 #include "script/W3dScript.h"    // W3dScriptEntrada::refs (destino RefLua de un rename: vive en un vector por valor)
 #include "animation/SkeletalAnimation.h" // KeyframesUndo: recorrer las curvas del clip activo (tracks/Propertys)
+#include "animation/W3dAnimSet.h"        // clips COMPARTIDOS: restaurar escribe en el clip (copy-on-write); capturar solo lee
 #include "animation/Animation.h"         // AnimationObjects / keyFrame / ActiveAnimKind
 #include "animation/Armature2DAnimation.h" // clips del armature 2D (kind 4): undo de sus keyframes
 #include "animation/VertexAnimation.h"   // KeyframesUndo: snapshot binario de los frames de la vertex anim de objeto
 #include "render/UIOverlay.h"    // UI2D_EsElemento2D / Rot2dDe / TamanoElem (campos 2D del transform)
 #include "objects/Texto2D.h"     // el texto 2D escala por su 'tam'
 #include "objects/UI.h"          // resize del lienzo (UI::ancho/alto)
+#include "objects/MallaRecurso.h" // el registro de mallas (destino MallaG de un rename) + publicar tras el undo
+#include "io/RecursosProyecto.h"  // lo PURGADO (material / textura en caliente) que el undo vuelve a poner en uso
+#include "io/W3dRecursos.h"       // las bibliotecas de clips de jerarquia que retiene un paso (referencias del historial)
 // CameraActive: NO incluyo Camera.h (header pesado del editor, arrastra Target/Curve/icons -> riesgo en el
 // build de Symbian). Forward-declaro: solo necesito el puntero (Object es la 1ra base -> el cast a Object* es offset 0).
 class Camera; extern Camera* CameraActive;
 #include <vector>
 #include <set>
+#include <map>
 #include <string>
 #include <stdio.h>   // sprintf GLOBAL (prefijos del remapeo del dope); Symbian/STLport no tiene std::snprintf
 // SceneCollection (raiz de la escena) viene de objects/Objects.h
@@ -293,6 +298,7 @@ std::string* W3dDestResolver(const W3dRenameDest& d) {
             Armature* a = (Armature*)d.dueno;
             if (!a || !ObjetoEnEscena(a)) return NULL;
             if (d.i < 0 || d.i >= (int)a->animations.size() || !a->animations[d.i]) return NULL;
+            W3dArmatureAnimsPropias(a);   // se va a escribir el nombre: nunca en un clip compartido
             return &a->animations[d.i]->name;
         }
         case W3dRenameDest::Clip2D: {    // clip del armature 2D: Armature2D::anims
@@ -309,6 +315,12 @@ std::string* W3dDestResolver(const W3dRenameDest& d) {
             if (d.cual == W3dRenameDest::SceneAnimG) {
                 if (d.i < 0 || d.i >= (int)SceneAnimations.size() || !SceneAnimations[d.i]) return NULL;
                 return &SceneAnimations[d.i]->name;
+            }
+            // el registro de mallas SE PURGA (W3dMallasPurgarSinUso): la malla va por su serial
+            if (d.cual == W3dRenameDest::MallaG || d.cual == W3dRenameDest::MallaCarpetaG) {
+                MallaRecurso* r = W3dMallaRecursoPorSerial(d.i);
+                if (!r) return NULL;
+                return (d.cual == W3dRenameDest::MallaG) ? &r->nombre : &r->carpeta;
             }
             return NULL;
         }
@@ -337,6 +349,9 @@ class RenameUndo : public UndoCmd {
     W3dRenameDest dest;
     std::string   guardado;
 public:
+    // (el DUENO del nombre que se LIBERA de verdad -el streaming descarga lo generado-: el destino muere, no-op seguro;
+    //  un Directo ya se valida por W3dNombrePunteroVivo)
+    void DesvincularDetachados(Object* borrado) { if (dest.dueno == (void*)borrado) { dest.dueno = NULL; dest.dueno2 = NULL; } }
     // NO hay ctor desde std::string*: el destino SIEMPRE es un W3dRenameDest (ver Undo.h).
     RenameUndo(const W3dRenameDest& D) : dest(D) {
         std::string* p = W3dDestResolver(dest);
@@ -362,6 +377,10 @@ public:
         }
         *t = vuelve;
         guardado = cur;
+        // el nombre de una capa / grupo / mesh part es dato de la MALLA: si es de un RECURSO
+        // compartido, el Ctrl+Z tambien le llega a sus otros objetos (el tick lo publica)
+        if (dest.tipo == W3dRenameDest::CapaMalla || dest.tipo == W3dRenameDest::MeshPart)
+            W3dMallaMarcarEditada((Mesh*)dest.dueno);
     }
     // la lista corrio sus indices: el destino sigue a SU elemento (ver UndoMoverCapaMalla /
     // UndoListaBorrada). b >= 0 = swap a<->b; b < 0 = se borro el indice 'a' (el destino de
@@ -380,11 +399,26 @@ public:
 // N comandos cualesquiera en UN SOLO paso (ver UndoFundirUltimos en Undo.h)
 class CompuestoUndo : public ContenedorUndo {
     std::vector<UndoCmd*> partes;
+    // SECUENCIAL (UndoGrupoFinSecuencial): cada parte se hizo SOBRE el resultado de la anterior
+    // (la malla se hizo unica y DESPUES se horneo el transform en ella). Deshacer va AL REVES y
+    // rehacer AL DERECHO. Con el mismo orden las dos veces, el vinculo volvia primero y el paso de
+    // geometria guardaba como "estado de redo" la geometria de ANTES: el Ctrl+Y la perdia.
+    // El compuesto de siempre (partes independientes, o que dependen de ir en ESE orden en los dos
+    // sentidos: la mudanza del outliner y los nombres) no cambia.
+    bool secuencial;
+    bool deshecho;   // (secuencial) el proximo Aplicar es el redo
 protected:
     void Partes(std::vector<UndoCmd*>& out){ out = partes; }   // el reenvio de los virtuales lo hace ContenedorUndo
 public:
+    CompuestoUndo(bool sec = false) : secuencial(sec), deshecho(false) {}
     ~CompuestoUndo(){ for (size_t i = 0; i < partes.size(); i++) delete partes[i]; }
     void Agregar(UndoCmd* c){ if (c) partes.push_back(c); }
+    void Aplicar() {
+        if (!secuencial) { ContenedorUndo::Aplicar(); return; }
+        if (!deshecho) { for (size_t i = partes.size(); i-- > 0; ) if (partes[i]) partes[i]->Aplicar(); }
+        else           { for (size_t i = 0; i < partes.size(); i++) if (partes[i]) partes[i]->Aplicar(); }
+        deshecho = !deshecho;
+    }
 };
 
 // ============================================================================
@@ -433,6 +467,14 @@ public:
 
 // seleccion de objetos: la lista seleccionada + el activo
 class SelectUndo : public UndoCmd {
+    // (un objeto que se LIBERA de verdad -el streaming descarga lo generado, una regeneracion- deja de ser de este
+    //  paso: Ctrl+Z ya no lo toca, en vez de escribir sobre memoria liberada)
+public:
+    void DesvincularDetachados(Object* borrado) {
+        for (size_t i = sel.size(); i-- > 0; ) if (sel[i] == borrado) sel.erase(sel.begin() + (long)i);
+        if (activo == borrado) activo = NULL;
+    }
+private:
     std::vector<Object*> sel;
     Object* activo;
 public:
@@ -452,6 +494,11 @@ public:
 // (puntero a Object; el arbol de escena no se indexa). Antes 'h' toggleaba sin registrar undo -> Ctrl+Z no lo
 // revertia (reporte del dueno). Espeja ChangeVisibilityObj (Objects.cpp): si queda oculto y es/contiene luz, la apaga.
 class VisibilityUndo : public UndoCmd {
+    // (un objeto que se LIBERA de verdad -el streaming descarga lo generado, una regeneracion- deja de ser de este
+    //  paso: Ctrl+Z ya no lo toca, en vez de escribir sobre memoria liberada)
+public:
+    void DesvincularDetachados(Object* borrado) { if (obj == borrado) obj = NULL; }
+private:
     Object* obj;
     bool    visible;   // estado GUARDADO (para el swap)
 public:
@@ -475,6 +522,11 @@ public:
 struct TEst { Object* o; Vector3 pos; Quaternion rot; Vector3 rotEuler; Vector3 scale;
               bool es2d; float rot2d, w2, h2; };
 class TransformUndo : public UndoCmd {
+    // (un objeto que se LIBERA de verdad -el streaming descarga lo generado, una regeneracion- deja de ser de este
+    //  paso: Ctrl+Z ya no lo toca, en vez de escribir sobre memoria liberada)
+public:
+    void DesvincularDetachados(Object* borrado) { for (size_t i = 0; i < e.size(); i++) if (e[i].o == borrado) e[i].o = NULL; }
+private:
     std::vector<TEst> e;
     // que campos 2D tiene 'o' y sus valores actuales (rot2d solo en Elemento2D)
     static bool Leer2D(Object* o, float* r, float* w, float* h) {
@@ -552,6 +604,11 @@ public:
 
 // mover verts/aristas/caras en EDIT MODE (move PURO): intercambia las posiciones+normales de la malla.
 class EditMoveUndo : public UndoCmd {
+    // (un objeto que se LIBERA de verdad -el streaming descarga lo generado, una regeneracion- deja de ser de este
+    //  paso: Ctrl+Z ya no lo toca, en vez de escribir sobre memoria liberada)
+public:
+    void DesvincularDetachados(Object* borrado) { if ((Object*)m == borrado) m = NULL; }
+private:
     Mesh* m;
     // POSICIONES + ESTADO DE POSE en un solo valor (W3dPosVerts, ver Mesh.h): restaurar
     // posiciones es restaurar tambien EN QUE ESPACIO estan (modelo o pose de un cuadro).
@@ -573,12 +630,14 @@ public:
             // CIERRA ANTES del CalcularBordes de abajo: primero re-anclar, despues podar.
             W3dMoverVerts mv(m);
             vpos.IntercambiarCon(m);   // <- posiciones Y estado de pose, en el mismo swap
+            m->DesinstanciarDatos(W3DMD_NOR);   // COW: las normales se intercambian en el lugar
             if (m->normals && (int)normals.size() == m->vertexSize * 3) for (size_t i = 0; i < normals.size(); i++) { GLbyte  c = m->normals[i]; m->normals[i] = normals[i]; normals[i] = c; }
         }
         // move PURO = NO cambia la topologia -> CalcularBordes(false) CONSERVA la edit mesh (no la rebuildea)
         // asi NO se pierde la SELECCION; SincronizarPos re-lee las posiciones restauradas al display del edit.
         m->CalcularBordes(false);
         if (m->edit) m->edit->SincronizarPos();
+        W3dMallaMarcarEditada(m);   // la malla de un RECURSO: el Ctrl+Z lo ven todos sus objetos
     }
     W3D_UNDO_SIN_INDICES // m: (a) Mesh*; vertex/normals: (b) snapshot completo de los arrays
 };
@@ -586,6 +645,11 @@ public:
 // SELECCION de sub-elementos en EDIT MODE (verts/edges/faces): intercambia los 3 vectores de seleccion
 // + el activo de la EditMesh (solo si el size matchea -> robusto al rearmado de la edit).
 class SelectEditUndo : public UndoCmd {
+    // (un objeto que se LIBERA de verdad -el streaming descarga lo generado, una regeneracion- deja de ser de este
+    //  paso: Ctrl+Z ya no lo toca, en vez de escribir sobre memoria liberada)
+public:
+    void DesvincularDetachados(Object* borrado) { if ((Object*)m == borrado) m = NULL; }
+private:
     Mesh* m;
     std::vector<unsigned char> vs, es, fs;
     int activo;
@@ -610,6 +674,11 @@ public:
 
 // cambiar el MATERIAL de un mesh part (AccionMaterialElegido): intercambia el Material* del mesh part
 class MaterialUndo : public UndoCmd {
+    // (un objeto que se LIBERA de verdad -el streaming descarga lo generado, una regeneracion- deja de ser de este
+    //  paso: Ctrl+Z ya no lo toca, en vez de escribir sobre memoria liberada)
+public:
+    void DesvincularDetachados(Object* borrado) { if ((Object*)m == borrado) m = NULL; }
+private:
     Mesh* m; int idx; Material* guardado;
 public:
     MaterialUndo(Mesh* M, int i) : m(M), idx(i),
@@ -618,6 +687,9 @@ public:
         if (m && idx >= 0 && idx < (int)m->materialsGroup.size()) {
             Material* cur = m->materialsGroup[idx].material;
             m->materialsGroup[idx].material = guardado; guardado = cur;
+            // el material es dato de la MALLA: si es un recurso compartido vuelve en todos sus objetos
+            if (m->malla && idx < (int)m->malla->partes.size())
+                W3dMallaRecursoCambiarMaterial(m->malla, idx, m->materialsGroup[idx].material);
         }
     }
     // 'idx' es (c): POSICION en Mesh::materialsGroup (la lista de los mesh parts). Hoy esa
@@ -635,6 +707,11 @@ public:
 // assign mesh part. Clona TODOS los arrays de render + faces3d + materialsGroup + las capas (uv/color/grupos).
 // Aplicar() = SWAP: snapshotea la geo viva, escribe la guardada, y se queda con la que estaba viva (redo).
 class MeshGeoUndo : public UndoCmd {
+    // (un objeto que se LIBERA de verdad -el streaming descarga lo generado, una regeneracion- deja de ser de este
+    //  paso: Ctrl+Z ya no lo toca, en vez de escribir sobre memoria liberada)
+public:
+    void DesvincularDetachados(Object* borrado) { if ((Object*)m == borrado) m = NULL; }
+private:
     Mesh* m;
     int vertexSize, facesSize;
     // POSICIONES + ESTADO DE POSE en un solo valor (W3dPosVerts, ver Mesh.h). Antes esto era
@@ -660,6 +737,7 @@ class MeshGeoUndo : public UndoCmd {
     // rest del skinning 2D: es PAREJO a uv[] (invariante uv = f(uv2dRest, pose), ver Mesh.h). Si
     // no viajara con la geo, deshacer una op de topologia dejaba un rest de otro layout.
     std::vector<GLfloat>     uv2dRest;
+    std::vector< std::vector<GLfloat> > uvExtra; // el render de las capas UV extra (parejo a uv[])
     std::vector<int>         vertCtrlPoint; int skinNCtrl; // SKINNING: mapeo render-vert -> control-point (sino el undo de una malla skinneada deja el mapeo viejo -> skin roto)
     std::set<std::string>    sharpEdges, seamEdges; // bordes sharp/seam (por POSICION). meshSmooth = shading
     std::vector<int>         posRep;     // agrupamiento por posicion de la JAULA: dos verts coincidentes que estaban separados (pre-merge) siguen separados al deshacer
@@ -705,6 +783,9 @@ class MeshGeoUndo : public UndoCmd {
     }
 
     void CapturarDe(Mesh* s) { // llena los miembros desde la malla viva
+        // la edicion de una malla de un RECURSO puede estar pendiente (MallaRecurso.h): el
+        // snapshot tiene que llevar las caras y capas de verdad, no las listas vacias
+        if (!s->edicionPendiente.empty()) W3dMallaBinMaterializarEdicion(s);
         vertexSize = s->vertexSize; facesSize = s->facesSize;
         VertexAnimSnapshot(s, vanims); // los frames de las vertex anims, parejos a ESTA geometria
         CapturarIdxVanims();           // recien capturado: cada slot esta en su lugar (identidad)
@@ -712,6 +793,7 @@ class MeshGeoUndo : public UndoCmd {
         normals.clear(); uv.clear(); color.clear(); faces.clear();
         uvMaps.clear(); colorLayers.clear(); vertexGroups.clear(); uvGroups.clear();
         uv2dRest = s->uv2dRest;
+        uvExtra = s->uvExtra;
         vpos.Capturar(s);   // posiciones Y estado de pose (la unica puerta; ver Mesh.h)
         if (s->normals)     normals.assign(s->normals, s->normals + vertexSize * 3);
         if (s->uv)          uv.assign(s->uv, s->uv + vertexSize * 2);
@@ -727,6 +809,9 @@ class MeshGeoUndo : public UndoCmd {
         vertCtrlPoint = s->vertCtrlPoint; skinNCtrl = s->skinNCtrl; // skinning: mapeo render->control-point
     }
     void AplicarA(Mesh* s) { // escribe los miembros (snapshot) a la malla viva
+        // las capas COMPARTIDAS (un recurso, un .obj) se abandonan sin liberarlas: se reemplazan enteras
+        s->DesinstanciarDatos(W3DMD_TODO, false);
+        s->edicionPendiente.clear();   // la edicion que se escribe abajo es la de verdad
         delete[] s->normals;     s->normals = NULL;
         delete[] s->uv;          s->uv = NULL;
         delete[] s->vertexColor; s->vertexColor = NULL;
@@ -746,6 +831,7 @@ class MeshGeoUndo : public UndoCmd {
         for (size_t i = 0; i < uvGroups.size(); i++)     s->uvGroups.push_back(new UVGroup(uvGroups[i]));
         s->uvMapActivo = uvMapActivo; s->colorActivo = colorActivo; s->grupoActivo = grupoActivo;
         s->uvGrupoActivo = uvGrupoActivo; s->uv2dRest = uv2dRest;
+        s->uvExtra = uvExtra;   // (LiberarCapas de arriba lo vacio)
         s->vertCtrlPoint = vertCtrlPoint; s->skinNCtrl = skinNCtrl; // restaurar el mapeo render->control-point (skinning)
         RestaurarVanims(s); // los frames de las vertex anims vuelven JUNTO con su geometria (mismo layout), CADA UNO A SU ANIM
         s->lastSkinFrame = -999999; // forzar re-skin con la geo/mapeo restaurados (CalcularBordes ya bumpea skinGeomVersion)
@@ -806,6 +892,9 @@ public:
         // la geometria cambio -> refrescar el preview del modificador (subdivision/screw). Antes esto lo hacia el
         // regen POR FRAME de ActualizarEditMeshActivo; ahora que ese esta gateado, hay que pedirlo aca explicito.
         if (!m->modificadores.empty()) m->GenerarMallaModificada();
+        // la malla de un RECURSO: el Ctrl+Z es del recurso (lo ven todos sus usuarios), se publica
+        // cuando sale de edicion (o ya, si el undo pasa en Modo Objeto)
+        W3dMallaMarcarEditada(m);
     }
     // (c) vanimIdx / vanims: vector PARALELO a Mesh::animations (vertex anims), familia (2)
     //     -> se remapea aca (ver el bloque de arriba).
@@ -862,35 +951,36 @@ class MaterialModUndo : public UndoCmd {
     Material* mat;
     bool b[NFLAGS]; int rmode; float shin; // rmode = reflectMode (era el bool chromeEquirect, ahora int de 3 modos)
     float glinea;                          // grosorLinea (px): viaja con el flag lineas
-    static void Leer(Material* s, bool* bo, int& rm, float& sh, float& gl) {
+    float acorte;                          // alphaTest (recorte por alfa, 0 = apagado): fila "Alpha Test" del panel
+    static void Leer(Material* s, bool* bo, int& rm, float& sh, float& gl, float& ac) {
         bo[0]=s->textureOn; bo[1]=s->filtrado; bo[2]=s->transparent; bo[3]=s->vertexColor;
         bo[4]=s->lighting; bo[5]=s->repeat; bo[6]=s->uv8bit; bo[7]=s->culling;
         bo[8]=s->depth_test; bo[9]=s->chrome; bo[10]=s->lineas;
-        rm=s->reflectMode; sh=s->shininess; gl=s->grosorLinea;
+        rm=s->reflectMode; sh=s->shininess; gl=s->grosorLinea; ac=s->alphaTest;
     }
-    static void Escribir(Material* s, const bool* bo, int rm, float sh, float gl) {
+    static void Escribir(Material* s, const bool* bo, int rm, float sh, float gl, float ac) {
         s->textureOn=bo[0]; s->filtrado=bo[1]; s->transparent=bo[2]; s->vertexColor=bo[3];
         s->lighting=bo[4]; s->repeat=bo[5]; s->uv8bit=bo[6]; s->culling=bo[7];
         s->depth_test=bo[8]; s->chrome=bo[9]; s->lineas=bo[10];
-        s->reflectMode=rm; s->shininess=sh; s->grosorLinea=gl;
+        s->reflectMode=rm; s->shininess=sh; s->grosorLinea=gl; s->alphaTest=ac;
     }
 public:
-    MaterialModUndo(Material* M) : mat(M), rmode(0), shin(0), glinea(1.0f) { if (mat) Leer(mat, b, rmode, shin, glinea); }
+    MaterialModUndo(Material* M) : mat(M), rmode(0), shin(0), glinea(1.0f), acorte(0.0f) { if (mat) Leer(mat, b, rmode, shin, glinea, acorte); }
     Material* Mat() const { return mat; }
     bool Difiere() const {
         if (!MaterialVivo(mat)) return false;
-        bool cb[NFLAGS]; int crm; GLfloat cs, cg; Leer(mat, cb, crm, cs, cg);
+        bool cb[NFLAGS]; int crm; GLfloat cs, cg, ca; Leer(mat, cb, crm, cs, cg, ca);
         for (int i=0;i<NFLAGS;i++) if (cb[i]!=b[i]) return true;
-        return crm != rmode || cs != shin || cg != glinea;
+        return crm != rmode || cs != shin || cg != glinea || ca != acorte;
     }
     void Aplicar() {
         if (!MaterialVivo(mat)) return;   // (a): el puntero se REVALIDA al aplicar, no se usa a ciegas
-        bool cb[NFLAGS]; int crm; GLfloat cs, cg; Leer(mat, cb, crm, cs, cg);   // estado vivo
-        Escribir(mat, b, rmode, shin, glinea);                                  // restaura el guardado
-        for (int i=0;i<NFLAGS;i++) b[i]=cb[i]; rmode=crm; shin=cs; glinea=cg;   // guarda lo vivo (para rehacer)
+        bool cb[NFLAGS]; int crm; GLfloat cs, cg, ca; Leer(mat, cb, crm, cs, cg, ca);   // estado vivo
+        Escribir(mat, b, rmode, shin, glinea, acorte);                                  // restaura el guardado
+        for (int i=0;i<NFLAGS;i++) b[i]=cb[i]; rmode=crm; shin=cs; glinea=cg; acorte=ca; // guarda lo vivo (para rehacer)
     }
     // b[NFLAGS] es un arreglo FIJO de flags del material, NO un vector paralelo a una lista.
-    W3D_UNDO_SIN_INDICES // mat: (a) Material* REVALIDADO al aplicar (MaterialVivo); b/rmode/shin/glinea: (d) valores propios
+    W3D_UNDO_SIN_INDICES // mat: (a) Material* REVALIDADO al aplicar (MaterialVivo); b/rmode/shin/glinea/acorte: (d) valores propios
 };
 
 // ============================================================================
@@ -1165,6 +1255,12 @@ class DeleteUndo : public UndoCmd {
     int animKindPrev; Armature* animArmPrev; Mesh* animMeshPrev; // seleccion de animacion previa (para restaurar al deshacer)
     bool enEscena; // true = los objetos estan en la escena; false = los tiene este comando (detachados)
     bool liberando; // true mientras el destructor libera lo detachado (ver DesvincularDetachados)
+    // CREACION: los SERIALES de los descendientes que las raices creadas ya tenian al capturar (las
+    // copias de los hijos de un Shift+D / Alt+D con padre e hijos elegidos, ver EnlazarDuplicados en
+    // ObjectMode.cpp). Nacieron con la raiz y se van con ella aunque no esten elegidos: si no, el
+    // Ctrl+Z los PRESERVABA como a los hijos de un borrado (quedaban colgados del abuelo). Por serial
+    // y no por puntero: un objeto borrado despues no deja una direccion que se pueda reciclar.
+    std::set<unsigned int> creados;
     // La ANIMACION de los borrados se la lleva ESTE comando, igual que los objetos. Tiene que ser asi: las listas de
     // curvas referencian al objeto POR PUNTERO, y cuando el comando muere hace delete del objeto -> el puntero queda
     // colgando. El proximo objeto que se cree puede caer EN ESA MISMA DIRECCION y "heredar" la animacion del muerto
@@ -1190,9 +1286,11 @@ class DeleteUndo : public UndoCmd {
     // allocator RECICLA el bloque y el puntero muerto vuelve a "validar" contra una escena NUEVA que nunca tuvo
     // esa curva. Reproducido: escenas [S0,S1] con la curva en S1, borrar el objeto, borrar S1, crear una escena
     // -misma direccion- y Ctrl+Z -> la curva caia en la escena nueva (test 'delescena').
-    // Ahora es el INDICE en SceneAnimations, remapeado en RemapLista igual que KeyframesUndo hace con KFLista::idx
-    // (el notificador ya existia: UndoBorrarEscenaActiva -> UndoListaBorrada -> RemapEnStacks). idx = -1 = su
-    // escena murio; ver DevolverAnimaciones para que se hace con la curva huerfana.
+    // Ahora es el INDICE en SceneAnimations, remapeado en RemapLista igual que KeyframesUndo hace con KFLista::idx.
+    // Desde la fase 6 borrar una animacion de escena es DESHACIBLE (UndoBorrarEscenaActiva empuja el paso que la
+    // devuelve a su posicion: familia (1)), asi que por LIFO la escena ya volvio cuando este paso aplica. El
+    // remapeo queda para quien avise un corrimiento (UndoListaBorrada): idx = -1 = su escena murio; ver
+    // DevolverAnimaciones para que se hace con la curva huerfana.
     struct AnimGuardada {
         int esc;                 // (c) INDICE en SceneAnimations, remapeado por RemapLista (-1 = escena borrada)
         std::string escNombre;   // (d) el nombre que tenia esa escena: solo para RESUCITARLA si murio
@@ -1356,6 +1454,10 @@ class DeleteUndo : public UndoCmd {
                 // (no tiene sentido dejarlos huerfanos en la escena). El subarbol entero viaja
                 // detachado con el comando y vuelve completo al deshacer.
                 if (e.obj->getType() == ObjectType::ui) continue;
+                // idem una INSTANCIA DE PREFAB o un PROXY de una libreria: lo que cuelga de ellos lo GENERARON (no es
+                // del usuario, no se guarda). Preservarlo lo dejaba suelto en el nivel como objetos normales -editables,
+                // sin candado, con sus scripts corriendo y guardados con recursos de la libreria-: se va con ellos
+                if (W3dEsTipoInstancia(e.obj->getType())) continue;
                 // BASE (ver Objects.h): 'posBajoAbuelo' se ESCRIBE en ch->pos y va al .w3d. Con la
                 // efectiva, borrar un padre con billboard le horneaba al hijo la orientacion de la
                 // ultima camara adentro de su posicion, en silencio y sin vuelta atras.
@@ -1369,8 +1471,11 @@ class DeleteUndo : public UndoCmd {
                     bool esRoot = false;
                     for (size_t j = 0; j < ents.size(); j++) if (ents[j].obj == ch) { esRoot = true; break; }
                     if (esRoot) continue; // ya es su propio delete-root (no deberia caer dentro de otro subarbol)
-                    if (ch->select) { // seleccionado -> se borra con el subarbol; seguir bajando a sus hijos
-                        for (size_t j = 0; j < ch->Childrens.size(); j++) pila.push_back(ch->Childrens[j]);
+                    // seleccionado (o CREADO con la raiz: ver 'creados') -> se borra con el subarbol; seguir bajando
+                    if (ch->select || creados.count(ch->serial)) {
+                        // (una instancia o un proxy borrado se lleva lo que genero: no se baja a preservarlo)
+                        if (!W3dEsTipoInstancia(ch->getType()))
+                            for (size_t j = 0; j < ch->Childrens.size(); j++) pila.push_back(ch->Childrens[j]);
                         continue;
                     }
                     // NO seleccionado -> preservar: reparent al abuelo (no se recursea adentro; queda como estaba)
@@ -1474,10 +1579,32 @@ class DeleteUndo : public UndoCmd {
     }
 public:
     DeleteUndo(bool incCol) : repsListos(false), actPrev(NULL), camPrev(NULL), colPrev(NULL), enEscena(true), liberando(false) {
+        // la vista de un clip de jerarquia que se esta editando va a su clip ANTES de que su raiz (o un nodo suyo)
+        // salga del arbol: detachada, la vista deja de escribirse
+        W3dClipsVistasSincronizar();
         selPrev = ObjSelects; actPrev = ObjActivo; camPrev = CameraActive; colPrev = CollectionActive;
         animKindPrev = ActiveAnimKind; animArmPrev = ActiveAnimArm; animMeshPrev = ActiveAnimMesh;
         if (SceneCollection) RecolectarBorrar(SceneCollection, incCol, ents);
         Detachar(); // el borrado YA paso: los saca de la escena (sin liberar)
+    }
+    // CREACION (Shift+D / Alt+D): los objetos seleccionados YA estan en la escena y NO se
+    // detachan ahora. El comando nace "en escena": su primer Aplicar (el Ctrl+Z) los detacha como
+    // un borrado y el Ctrl+Y los devuelve. Las reps/refs se computan en ese primer Detachar.
+    struct Creacion {};
+    DeleteUndo(bool incCol, Creacion) : repsListos(false), actPrev(NULL), camPrev(NULL), colPrev(NULL), enEscena(true), liberando(false) {
+        selPrev = ObjSelects; actPrev = ObjActivo; camPrev = CameraActive; colPrev = CollectionActive;
+        animKindPrev = ActiveAnimKind; animArmPrev = ActiveAnimArm; animMeshPrev = ActiveAnimMesh;
+        if (SceneCollection) RecolectarBorrar(SceneCollection, incCol, ents);
+        // lo que cuelga de cada raiz recien creada tambien es nuevo (ver 'creados')
+        for (size_t i = 0; i < ents.size(); i++) {
+            std::vector<Object*> pila(ents[i].obj->Childrens.begin(), ents[i].obj->Childrens.end());
+            while (!pila.empty()) {
+                Object* o = pila.back(); pila.pop_back();
+                if (!o) continue;
+                creados.insert(o->serial);
+                for (size_t k = 0; k < o->Childrens.size(); k++) pila.push_back(o->Childrens[k]);
+            }
+        }
     }
     bool Vacio() const { return ents.empty(); }
     void Aplicar() {
@@ -1758,11 +1885,17 @@ static void DesalojarViejos() {
     }
 }
 
+// LO NO GUARDADO (io/CambiosProyecto.h): cada paso que se apila (y cada Ctrl+Z / Ctrl+Y) marca la raiz activa
+// como editada. Las operaciones de la BIBLIOTECA (carpetas, renombrar un recurso) no son de la raiz: levantan
+// g_undoSinRaiz mientras apilan su paso.
+extern void W3dCambiosTocado();
+int g_undoSinRaiz = 0;
 static void Push(UndoCmd* c) {
     if (!c) return;
     LimpiarRedo(); // una accion NUEVA invalida el redo
     g_undo.push_back(c);
     DesalojarViejos();
+    if (g_undoSinRaiz <= 0) W3dCambiosTocado();
 }
 
 // ============================================================================
@@ -1871,8 +2004,14 @@ static void CapaPostCambio(Mesh* m, int capa) {
     if (!m) return;
     if (capa == W3dRenameDest::UVMap || capa == W3dRenameDest::ColorLayer) m->AplicarCapasAlRender();
     m->lastSkinFrame = -999999; m->pose2dDirty = true;
+    W3dMallaMarcarEditada(m);   // el orden de las listas es dato de la malla: su RECURSO lo publica
 }
 class CapaOrdenUndo : public UndoCmd {
+    // (un objeto que se LIBERA de verdad -el streaming descarga lo generado, una regeneracion- deja de ser de este
+    //  paso: Ctrl+Z ya no lo toca, en vez de escribir sobre memoria liberada)
+public:
+    void DesvincularDetachados(Object* borrado) { if ((Object*)m == borrado) m = NULL; }
+private:
     Mesh* m; int capa, a, b, activo;
 public:
     CapaOrdenUndo(Mesh* M, int C, int A, int B, int Act) : m(M), capa(C), a(A), b(B), activo(Act) {}
@@ -1944,6 +2083,11 @@ static void DopeRemapClip3D(const Armature* a, int i, int j) {
     DopeRemapIndiceClave("arm:" + DopeIdDueno(a) + "/k", i, j);   // el dueno POR SERIAL (el nombre se recicla)
 }
 class ClipOrdenUndo : public UndoCmd {
+    // (un objeto que se LIBERA de verdad -el streaming descarga lo generado, una regeneracion- deja de ser de este
+    //  paso: Ctrl+Z ya no lo toca, en vez de escribir sobre memoria liberada)
+public:
+    void DesvincularDetachados(Object* borrado) { if ((Object*)a == borrado) a = NULL; }
+private:
     Armature* a; int i, j, activo;
 public:
     ClipOrdenUndo(Armature* A, int I, int J, int Act) : a(A), i(I), j(J), activo(Act) {}
@@ -2009,22 +2153,304 @@ void UndoBorrarClip2D(Mesh* m) {
     }
     Arm2DBorrarAnimacionActiva(m);
 }
-// ANIMACIONES DE ESCENA (SceneAnimations, lista GLOBAL del proyecto): el "-" de la tarjeta
-// Animation cuando lo activo NO es un clip. Mismo caso que los clips (el borrado no es
-// deshacible) y el rename SI se captura por indice (W3dDestGlobal(SceneAnimG, SceneAnimActiva),
-// Properties.cpp) -> sin el aviso, borrar una escena de ABAJO dejaba el Ctrl+Z de un rename
-// anterior escribiendo el nombre viejo encima de la escena de al lado.
-// OJO CON EL CASO DE UNA SOLA ESCENA: ahi el Core NO borra nada (BorrarEscenaActiva solo vacia
-// las curvas de la unica escena, que siempre queda), asi que avisar correria los indices SIN
-// borrado y romperia justo al reves. Por eso el aviso va condicionado a size() > 1.
+// ============================================================================
+//  ANIMACIONES DE ESCENA (SceneAnimations, lista GLOBAL de la raiz activa) Y CLIPS DE JERARQUIA
+//  (animation/W3dAnimSet.h): borrar y crear SON DESHACIBLES.
+//
+//  El "-" de la tarjeta Animation con una animacion de ESCENA activa la SACA de la lista y el paso de undo se
+//  queda con ella (con sus curvas, su camara, su rango): Ctrl+Z la devuelve a SU posicion y la deja activa. Es
+//  la familia (1) de Undo.h -como los armatures 2D-: los indices de la lista vuelven a ser los originales antes
+//  de que aplique un paso de mas abajo, asi que NO se avisa con UndoListaBorrada (desplazarlos los dejaria
+//  corridos al reves). La unica animacion de escena no se saca: se VACIA, y el paso guarda sus curvas.
+//  La VISTA de un clip de jerarquia (SceneAnimation::esClip) se borra igual y ademas su CLIP sale de la
+//  biblioteca (lo dejan de ver todas sus raices): el paso guarda los dos y el Ctrl+Z los devuelve juntos.
+//  Las vistas se AGREGAN al final (W3dClipVista, sin paso de undo): agregar al final no corre ningun indice
+//  de abajo, y el que borra vuelve a dejar la lista como la encontro.
+// ============================================================================
+// una referencia del HISTORIAL a una biblioteca de clips (W3dAnimSet::refsUndo: no es un usuario)
+static void LibUndoRetener(W3dRecurso* r) {
+    if (!r) return;
+    W3dRecursoRetener(r, W3DREC_PERMANENTE);
+    W3dAnimSet* s = W3dJerBiblioteca(r);
+    if (s) s->refsUndo++;
+}
+static void LibUndoSoltar(W3dRecurso* r) {
+    if (!r) return;
+    W3dAnimSet* s = W3dJerBiblioteca(r);
+    if (s && s->refsUndo > 0) s->refsUndo--;
+    W3dRecursoSoltar(r, W3DREC_PERMANENTE);   // (con la ultima referencia, la biblioteca se libera)
+}
+// el timeline vuelve a una animacion de ESCENA (la que el paso acaba de devolver o la que quedo)
+static void AnimEscenaElegida() {
+    if (ActiveAnimKind == 2) AnimEsJuego = false;
+    ActiveAnimKind = 0; ActiveAnimArm = NULL; ActiveAnimMesh = NULL;
+    AnimCargarRangoActivo();
+    g_redraw = true;
+}
+static int IndiceEscena(const SceneAnimation* e) {
+    for (size_t i = 0; i < SceneAnimations.size(); i++) if (SceneAnimations[i] == e) return (int)i;
+    return -1;
+}
+class EscenaAnimListaUndo : public UndoCmd {
+    SceneAnimation* e;     // la animacion (mientras esta AFUERA de la lista es del paso: la libera el destructor)
+    int  pos;              // su posicion en SceneAnimations mientras esta afuera
+    bool dentro;           // esta AHORA en la lista?
+    bool vaciar;           // la UNICA animacion de escena: no sale, se vacian/devuelven sus curvas
+    std::vector<AnimationObject> curvas;   // (vaciar) las curvas guardadas
+    W3dRecurso* rec;       // la vista de un clip de jerarquia: la biblioteca de su clip (referencia del paso)
+    W3dClipJer* clip;      // ...y el clip, que sale y vuelve con ella (afuera es del paso)
+    int  posClip;
+    static void SoltarObjetos(std::vector<AnimationObject>& v, Object* borrado) {
+        for (size_t i = v.size(); i-- > 0; ) if (v[i].obj == borrado) v.erase(v.begin() + (long)i);
+    }
+public:
+    // 'dentro' = la animacion esta en la lista (se acaba de CREAR: Ctrl+Z la saca); si no, ya se saco (borrado)
+    EscenaAnimListaUndo(SceneAnimation* E, int P, bool Dentro, W3dRecurso* R, W3dClipJer* C, int PC)
+        : e(E), pos(P), dentro(Dentro), vaciar(false), rec(R), clip(C), posClip(PC) { LibUndoRetener(rec); }
+    // la UNICA escena vaciada: 'c' = sus curvas de antes
+    EscenaAnimListaUndo(SceneAnimation* E, std::vector<AnimationObject>& c)
+        : e(E), pos(-1), dentro(true), vaciar(true), rec(0), clip(0), posClip(-1) { curvas.swap(c); }
+    ~EscenaAnimListaUndo() {
+        if (!dentro && !vaciar) { delete e; if (clip && !W3dJerClipVivo(rec, clip, clip->serie)) delete clip; }
+        LibUndoSoltar(rec);
+    }
+    void Aplicar() {
+        InitSceneAnimations();
+        if (vaciar) {
+            const int i = IndiceEscena(e);
+            if (i < 0) return;
+            std::vector<AnimationObject>& viva = (i == SceneAnimActiva) ? AnimationObjects : e->objetos;
+            viva.swap(curvas);
+            W3dAnimCurvasInvalidar();
+            g_redraw = true;
+            return;
+        }
+        if (dentro) {                       // SACARLA (el redo de un borrado / el undo de una creacion)
+            const int i = IndiceEscena(e);
+            if (i < 0) return;
+            if (i != SceneAnimActiva) SetEscenaActiva(i);
+            if (clip) { W3dClipsVistasSincronizar(); posClip = W3dJerClipSacar(rec, clip); }
+            int p = -1;
+            SceneAnimation* x = W3dEscenaActivaSacar(&p);
+            if (x != e) { if (x) W3dEscenaDevolver(x, p); return; }   // (no deberia pasar)
+            pos = p;
+            dentro = false;
+            DopeRemapIndiceClave("obj:e", pos, -1);   // la seleccion del dope indexa esta lista
+        } else {                            // DEVOLVERLA a su lugar, activa (con su clip)
+            if (clip) W3dJerClipDevolver(rec, clip, posClip);
+            if (pos > (int)SceneAnimations.size()) pos = (int)SceneAnimations.size();
+            W3dEscenaDevolver(e, pos);
+            DopeInsertarIndiceClave("obj:e", pos);
+            dentro = true;
+        }
+        AnimEscenaElegida();
+    }
+    // (c) pos: posicion en SceneAnimations. La lista es familia (1) (sacar/devolver pasan por este paso), pero
+    //     si alguien avisara un corrimiento mientras esta afuera, se sigue. El resto: (a) e/rec/clip (del paso o
+    //     validados), (b) curvas (copia por valor), (d) posClip (posicion en la biblioteca, que solo cambia por pasos)
+    void RemapLista(const W3dRenameDest& lista, int a, int b) {
+        if (dentro || vaciar || !W3dMismaLista(W3dDestGlobal(W3dRenameDest::SceneAnimG, -1), lista)) return;
+        RemapIndiceGuardado(pos, a, b);
+    }
+    // un objeto que se LIBERA no puede quedar nombrado en las curvas que guarda el paso (ni ser la raiz de la vista)
+    void DesvincularDetachados(Object* borrado) {
+        if (vaciar) { SoltarObjetos(curvas, borrado); return; }
+        if (dentro || !e) return;
+        SoltarObjetos(e->objetos, borrado);
+        if (e->duenio == borrado) e->duenio = 0;
+    }
+};
 void UndoBorrarEscenaActiva() {
     InitSceneAnimations();
-    const int i = SceneAnimActiva;
-    if ((int)SceneAnimations.size() > 1 && i >= 0 && i < (int)SceneAnimations.size()) {
-        UndoListaBorrada(W3dDestGlobal(W3dRenameDest::SceneAnimG, i));
-        DopeRemapIndiceClave("obj:e", i, -1);   // las claves del dope llevan la escena adentro (ver Timeline.h)
+    SceneAnimation* act = SceneAnimations[SceneAnimActiva];
+    // la VISTA de un clip de jerarquia: primero su CLIP sale de la biblioteca (con lo ultimo que se edito)
+    W3dRecurso* rec = NULL; W3dClipJer* clip = NULL; int posClip = -1;
+    if (W3dClipVistaViva(SceneAnimActiva)) {
+        W3dClipsVistasSincronizar();
+        rec = W3dJerRecurso(act->duenio);
+        clip = act->clipJer;
+        posClip = W3dJerClipSacar(rec, clip);
+        if (posClip < 0) { rec = NULL; clip = NULL; }
     }
-    BorrarEscenaActiva();
+    int pos = -1;
+    SceneAnimation* e = W3dEscenaActivaSacar(&pos);
+    if (!e) {
+        // la UNICA animacion de escena: se vacia (sus curvas quedan en el paso)
+        std::vector<AnimationObject> antes;
+        antes.swap(AnimationObjects);
+        SceneAnimations[SceneAnimActiva]->objetos.clear();
+        W3dAnimCurvasInvalidar();
+        if (!antes.empty()) Push(new EscenaAnimListaUndo(act, antes));
+        return;
+    }
+    DopeRemapIndiceClave("obj:e", pos, -1);   // las claves del dope llevan la escena adentro (ver Timeline.h)
+    Push(new EscenaAnimListaUndo(e, pos, false, rec, clip, posClip));
+}
+int UndoNuevaEscena() {
+    const int idx = NuevaEscena();
+    InitSceneAnimations();
+    if (idx >= 0 && idx < (int)SceneAnimations.size())
+        Push(new EscenaAnimListaUndo(SceneAnimations[(size_t)idx], idx, true, NULL, NULL, -1));
+    return idx;
+}
+
+// ---- LA BIBLIOTECA DE CLIPS DE JERARQUIA de un objeto (el desplegable "Clips"): el paso guarda la OTRA ----
+class JerBibliotecaUndo : public UndoCmd {
+    Object* o;              // (a) el gancho del destructor lo pone en NULL
+    W3dRecurso* rec;        // (a) la otra biblioteca, con una referencia del paso (no se libera mientras exista)
+    std::string animset, noCargo;   // (d)
+public:
+    JerBibliotecaUndo(Object* O) : o(O), rec(W3dJerRecurso(O)) {
+        LibUndoRetener(rec);
+        if (O && O->clipsJer) { animset = O->clipsJer->animset; noCargo = O->clipsJer->noCargo; }
+    }
+    ~JerBibliotecaUndo() { LibUndoSoltar(rec); }
+    void Aplicar() {
+        if (!o) return;
+        W3dClipsVistasSincronizar();   // (la vista que se edita va a su clip antes de que la raiz cambie)
+        W3dRecurso* cur = W3dJerRecurso(o);
+        LibUndoRetener(cur);           // (antes de soltarla: puede ser la unica referencia)
+        const std::string curN = o->clipsJer ? o->clipsJer->animset : std::string();
+        const std::string curNC = o->clipsJer ? o->clipsJer->noCargo : std::string();
+        W3dJerRestaurar(o, rec, animset, noCargo);
+        LibUndoSoltar(rec);
+        rec = cur; animset = curN; noCargo = curNC;
+        W3dClipsVistaActivaRevisar();  // (una vista de la biblioteca que se fue queda huerfana: no se edita)
+        W3dRecursosVistaInvalidar();
+        g_redraw = true;
+    }
+    W3D_UNDO_SIN_INDICES   // o: (a); rec: (a) retenido; animset/noCargo: (d)
+    void DesvincularDetachados(Object* borrado) { if (o == borrado) o = NULL; }
+};
+void UndoCapturarJerBiblioteca(Object* o) {
+    if (!o) return;
+    Push(new JerBibliotecaUndo(o));
+}
+
+// ---- EL RETARGET PROPIO de un objeto (armature: el de sus clips de esqueleto; si no, el de sus clips de
+//      jerarquia, -1 = el de cada clip): el paso guarda el OTRO valor ----
+static int RetargetDe(Object* o) {   // (getType no es const)
+    if (!o) return -1;
+    if (o->getType() == ObjectType::armature) return ((Armature*)o)->retarget;
+    return o->clipsJer ? o->clipsJer->retarget : -1;
+}
+static void RetargetPoner(Object* o, int v) {
+    if (!o) return;
+    if (o->getType() == ObjectType::armature) { W3dArmatureRetarget((Armature*)o, v < 0 ? W3D_RETARGET_COMPLETO : v); InvalidarSkinDeArmature((Armature*)o); }
+    else {
+        W3dAnimObjetoRetarget(o, v);
+        if (v < 0 && o->clipsJer && o->clipsJer->animset.empty() && o->clipsJer->noCargo.empty() && o->clipsJer->capas.empty())
+            W3dJerSoltar(o);   // (nada que recordar: sin W3dJerRaiz, como antes)
+    }
+}
+class RetargetObjUndo : public UndoCmd {
+    Object* o;   // (a)
+    int valor;   // (d) el otro modo
+public:
+    RetargetObjUndo(Object* O) : o(O), valor(RetargetDe(O)) {}
+    void Aplicar() {
+        if (!o) return;
+        const int cur = RetargetDe(o);
+        RetargetPoner(o, valor);
+        valor = cur;
+        g_redraw = true;
+    }
+    W3D_UNDO_SIN_INDICES   // o: (a); valor: (d)
+    void DesvincularDetachados(Object* borrado) { if (o == borrado) o = NULL; }
+};
+void UndoCapturarRetarget(Object* o) {
+    if (!o) return;
+    Push(new RetargetObjUndo(o));
+}
+
+// ---- UN CLIP DE JERARQUIA ENTRA O SALE DE SU BIBLIOTECA (crear / borrar): mismo esquema que los armatures 2D ----
+class ClipJerListaUndo : public UndoCmd {
+    W3dRecurso* rec;   // (a) su biblioteca (referencia del paso)
+    W3dClipJer* clip;  // (a) mientras esta AFUERA es del paso (lo libera el destructor)
+    int pos;           // (d) su posicion en la biblioteca mientras esta afuera (se acota al devolverlo)
+    bool dentro;
+    Object* duenio;    // (a) CREAR: la raiz en cuya vista se creo (el Ctrl+Y la vuelve a elegir); el gancho la pone en NULL
+public:
+    ClipJerListaUndo(W3dRecurso* R, W3dClipJer* C, int P, bool Dentro, Object* D = NULL)
+        : rec(R), clip(C), pos(P), dentro(Dentro), duenio(D) { LibUndoRetener(rec); }
+    ~ClipJerListaUndo() {
+        if (!dentro && clip && !W3dJerClipVivo(rec, clip, clip->serie)) delete clip;   // (afuera es del paso)
+        LibUndoSoltar(rec);
+    }
+    void Aplicar() {
+        if (!rec || !clip) return;
+        if (dentro) {
+            W3dClipsVistasSincronizar();              // (lo ultimo que se edito en su vista sale con el)
+            const int p = W3dJerClipSacar(rec, clip);
+            if (p < 0) return;
+            pos = p; dentro = false;
+            W3dClipsVistaActivaRevisar();             // (su vista, si era la activa, deja de editarse)
+        } else {
+            if (!W3dJerClipDevolver(rec, clip, pos)) return;
+            dentro = true;
+            // el Ctrl+Y de CREAR deja el clip ELEGIDO, como quedo al crearlo (el Ctrl+Z habia pasado el timeline a
+            // una animacion de escena): solo si se sigue editando animaciones de escena de la misma raiz activa
+            // (no en "Juego" ni en el Mix) y la raiz sigue usando esa biblioteca (el paso de la biblioteca, en el
+            // mismo grupo, ya se la devolvio)
+            if (duenio && W3dJerRecurso(duenio) == rec && W3dRaizDe(duenio) == SceneCollection &&
+                ActiveAnimKind == 0 && !g_animMix) {
+                const int idx = W3dClipVista(duenio, clip);
+                if (idx >= 0) { SetEscenaActiva(idx); AnimEscenaElegida(); }
+            }
+        }
+        W3dRecursosVistaInvalidar();
+        g_redraw = true;
+    }
+    W3D_UNDO_SIN_INDICES   // rec/clip: (a) del paso o validados; pos: (d) posicion en la BIBLIOTECA (no en una lista con destinos)
+    void DesvincularDetachados(Object* borrado) { if (duenio == borrado) duenio = NULL; }
+};
+void UndoClipJerAgregado(W3dRecurso* r, W3dClipJer* c, Object* duenio) {
+    if (!r || !c) return;
+    const W3dAnimSet* set = W3dJerBiblioteca(r);
+    if (!set) return;
+    int pos = -1;
+    for (size_t i = 0; i < set->datos.jerarquias.size(); i++) if (set->datos.jerarquias[i] == c) pos = (int)i;
+    if (pos < 0) return;
+    Push(new ClipJerListaUndo(r, c, pos, true, duenio));
+}
+bool UndoClipJerBorrar(W3dRecurso* r, W3dClipJer* c) {
+    W3dClipsVistasSincronizar();
+    const int pos = W3dJerClipSacar(r, c);
+    if (pos < 0) return false;
+    Push(new ClipJerListaUndo(r, c, pos, false));
+    W3dClipsVistaActivaRevisar();
+    W3dRecursosVistaInvalidar();
+    return true;
+}
+
+// ---- EL NOMBRE Y EL RETARGET POR DEFECTO de un clip de jerarquia (el outliner, la tarjeta Animation) ----
+class ClipJerValorUndo : public UndoCmd {
+    W3dRecurso* rec;     // (a) su biblioteca (referencia del paso)
+    W3dClipJer* clip;    // (a) validado con su serie (W3dJerClipVivo)
+    unsigned serie;      // (d)
+    std::string nombre;  // (d) el otro nombre
+    int retarget;        // (d) el otro modo
+public:
+    ClipJerValorUndo(W3dRecurso* R, W3dClipJer* C) : rec(R), clip(C), serie(C ? C->serie : 0),
+        nombre(C ? C->nombre : std::string()), retarget(C ? C->retarget : 0) { LibUndoRetener(rec); }
+    ~ClipJerValorUndo() { LibUndoSoltar(rec); }
+    void Aplicar() {
+        if (!W3dJerClipVivo(rec, clip, serie)) return;
+        W3dClipsVistasSincronizar();
+        const std::string n = clip->nombre;
+        const int m = clip->retarget;
+        W3dJerClipRenombrar(W3dJerBiblioteca(rec), clip, nombre);
+        if (clip->retarget != retarget) { clip->retarget = retarget; clip->version++; }
+        nombre = n; retarget = m;
+        W3dClipVistaActivaReleer(clip);   // (la vista que se edita toma el nombre de su clip)
+        W3dRecursosVistaInvalidar();
+        g_redraw = true;
+    }
+    W3D_UNDO_SIN_INDICES   // rec/clip: (a); serie/nombre/retarget: (d)
+};
+void UndoCapturarClipJer(W3dRecurso* r, W3dClipJer* c) {
+    if (!r || !c) return;
+    Push(new ClipJerValorUndo(r, c));
 }
 
 // ============================================================================
@@ -2061,6 +2487,11 @@ void UndoJoinConfirmar() {
 // Apply Transform sobre el armature (que la hornea). Aplicar() = SWAP + invalida el cache de skin de las mallas del rig.
 struct BoneRestEst { Vector3 restT, restR, restS, preRot, head, tail, poseT, poseR, poseS; int rotOrder; Matrix4 tlNode; };
 class ArmatureBonesUndo : public UndoCmd {
+    // (un objeto que se LIBERA de verdad -el streaming descarga lo generado, una regeneracion- deja de ser de este
+    //  paso: Ctrl+Z ya no lo toca, en vez de escribir sobre memoria liberada)
+public:
+    void DesvincularDetachados(Object* borrado) { if ((Object*)a == borrado) a = NULL; }
+private:
     Armature* a; std::vector<BoneRestEst> e;
 public:
     ArmatureBonesUndo(Armature* arm) : a(arm) {
@@ -2134,6 +2565,11 @@ void UndoApplyConfirmar() {
 // ============================================================================
 struct PoseEst { Vector3 T, R, S; };
 class PoseUndo : public UndoCmd {
+    // (un objeto que se LIBERA de verdad -el streaming descarga lo generado, una regeneracion- deja de ser de este
+    //  paso: Ctrl+Z ya no lo toca, en vez de escribir sobre memoria liberada)
+public:
+    void DesvincularDetachados(Object* borrado) { if ((Object*)a == borrado) a = NULL; }
+private:
     Armature* a; std::vector<PoseEst> e;
 public:
     PoseUndo(Armature* arm) : a(arm) {
@@ -2191,7 +2627,7 @@ extern Mesh* ActiveAnimMesh;   // (kind 3) la malla cuya vertex anim de objeto e
 // 'kind' es el ActiveAnimKind CON EL QUE SE CAPTURO (el 2 -modo juego- usa las curvas de escena,
 // igual que el else de la recoleccion, asi que se guarda como 0). 'idx' es la posicion en LA
 // lista que corresponde a ese kind, y por eso es un miembro (c) que se remapea:
-//    kind 0 -> SceneAnimations           (familia (2): UndoBorrarEscenaActiva avisa)
+//    kind 0 -> SceneAnimations           (familia (1): UndoBorrarEscenaActiva/UndoNuevaEscena la sacan y la devuelven)
 //    kind 1 -> Armature::animations      (familia (2): UndoBorrarClipArm / UndoMoverClipArm avisan)
 //    kind 3 -> Mesh::animations          (familia (2): el "-" de la vertex anim avisa)
 //    kind 4 -> Armature2D::anims         (familia (2): UndoBorrarClip2D avisa)
@@ -2208,11 +2644,21 @@ struct KFLista {
 //        compara contra los punteros vivos de la lista.
 // bone : kind 1 y 4, el hueso del track (BoneTrack::bone / Bone2DTrack::bone).
 // prop/comp: la curva (AnimPosition/AnimRotation/..., AnimX/Y/Z).
+// ocur : la k-esima curva de la lista con esos mismos cuatro datos. Un clip puede traer DOS pistas
+//        del mismo hueso (un archivo importado; el FK usa la primera): sin esto las dos curvas
+//        tenian la MISMA identidad, el Ctrl+Z le devolvia el snapshot a la primera y a la segunda
+//        la vaciaba como "curva nueva" (se perdian sus keyframes). Lo numera KFResolver.
 struct KFId {
-    Object* obj; int bone; int prop, comp;
-    KFId() : obj(0), bone(-1), prop(-1), comp(-1) {}
+    Object* obj; int bone; int prop, comp; int ocur;
+    KFId() : obj(0), bone(-1), prop(-1), comp(-1), ocur(0) {}
     bool operator==(const KFId& o) const {
-        return obj == o.obj && bone == o.bone && prop == o.prop && comp == o.comp;
+        return obj == o.obj && bone == o.bone && prop == o.prop && comp == o.comp && ocur == o.ocur;
+    }
+    bool operator<(const KFId& o) const {   // solo los cuatro datos (la clave para numerar 'ocur')
+        if (obj != o.obj) return obj < o.obj;
+        if (bone != o.bone) return bone < o.bone;
+        if (prop != o.prop) return prop < o.prop;
+        return comp < o.comp;
     }
 };
 struct KFCurva { std::vector<keyFrame>* c; KFId id; };
@@ -2242,12 +2688,15 @@ static void KFIdentidadActiva(KFLista& id){
 }
 // resuelve LA LISTA GUARDADA (no la activa) -> sus curvas vivas + la identidad de cada una.
 // Sale VACIO si esa lista ya no existe: el paso queda en no-op seguro.
-static void KFResolver(const KFLista& id, std::vector<KFCurva>& out){
+// 'escribir' = el que llama va a escribir las curvas (Aplicar): un clip de esqueleto de un animset
+// COMPARTIDO pasa antes a clips propios. Capturar y comparar (Cambio) solo leen: no copian.
+static void KFResolver(const KFLista& id, std::vector<KFCurva>& out, bool escribir){
     out.clear();
     if (id.idx < 0) return;
     if (id.kind == 1){
         if (!id.arm || !ObjetoEnEscena(id.arm)) return;
         if (id.idx >= (int)id.arm->animations.size()) return;
+        if (escribir) W3dArmatureAnimsPropias(id.arm);   // se van a escribir: nunca las de un clip compartido
         SkeletalAnimation* an = id.arm->animations[id.idx]; if (!an) return;
         for (size_t t = 0; t < an->tracks.size(); t++) KFAgregar(out, an->tracks[t].Propertys, NULL, an->tracks[t].bone);
     } else if (id.kind == 4){
@@ -2268,7 +2717,12 @@ static void KFResolver(const KFLista& id, std::vector<KFCurva>& out){
         std::vector<AnimationObject>& lst = (id.idx == SceneAnimActiva)
                                           ? AnimationObjects : SceneAnimations[id.idx]->objetos;
         for (size_t i = 0; i < lst.size(); i++) KFAgregar(out, lst[i].Propertys, lst[i].obj, -1);
+        // la pista "Camara activa" de esa escena (dope: mover / borrar sus cortes -> Ctrl+Z)
+        if (SceneAnimations[id.idx]) KFAgregar(out, SceneAnimations[id.idx]->camPista, NULL, -2);
     }
+    // las curvas REPETIDAS (misma identidad) se distinguen por su orden en la lista (ver KFId::ocur)
+    std::map<KFId, int> vistas;
+    for (size_t i = 0; i < out.size(); i++) out[i].id.ocur = vistas[out[i].id]++;
 }
 static int KFBuscar(const std::vector<KFCurva>& c, const KFId& id){
     for (size_t i = 0; i < c.size(); i++) if (c[i].id == id) return (int)i;
@@ -2293,7 +2747,7 @@ class KeyframesUndo : public UndoCmd {
 public:
     KeyframesUndo(){
         KFIdentidadActiva(lid);
-        std::vector<KFCurva> c; KFResolver(lid, c);
+        std::vector<KFCurva> c; KFResolver(lid, c, false);   // capturar solo lee
         snap.resize(c.size());
         for (size_t i = 0; i < c.size(); i++){ snap[i].id = c[i].id; snap[i].kf = *c[i].c; }
         vfHay = false;
@@ -2302,7 +2756,7 @@ public:
     }
     bool Vacio() const { return snap.empty() && !vfHay; }
     bool Cambio() const { // hubo cambio real? (no empujar un undo vacio)
-        std::vector<KFCurva> c; KFResolver(lid, c);
+        std::vector<KFCurva> c; KFResolver(lid, c, false);   // comparar solo lee
         std::vector<char> visto(c.size(), 0);
         for (size_t i = 0; i < snap.size(); i++){
             const int k = KFBuscar(c, snap[i].id);
@@ -2328,7 +2782,7 @@ public:
         return false;
     }
     void Aplicar(){
-        std::vector<KFCurva> c; KFResolver(lid, c);   // LA lista guardada, no la activa
+        std::vector<KFCurva> c; KFResolver(lid, c, true);   // LA lista guardada, no la activa (se escribe)
         std::vector<char> visto(c.size(), 0);
         for (size_t i = 0; i < snap.size(); i++){
             const int k = KFBuscar(c, snap[i].id);
@@ -2348,6 +2802,9 @@ public:
         if (ActiveAnimArm && ActiveAnimArm != lid.arm){ ActiveAnimArm->lastPoseFrame = -999999; ActiveAnimArm->poseDirty = true;
                                        ActiveAnimArm->poseSerial++; InvalidarSkinDeArmature(ActiveAnimArm); }
         if (lid.kind == 4 && lid.mesh){ lid.mesh->pose2dDirty = true; lid.mesh->lastSkinFrame = -999999; }
+        // la VISTA de un clip de jerarquia (animation/Animation.h): lo deshecho va tambien a su clip, que es lo
+        // que reproducen todas sus raices (aunque la vista ya no sea la que se esta editando)
+        if (lid.kind == 0 && W3dClipVistaViva(lid.idx)) W3dClipVistaEscribir(lid.idx);
         // FRAMES de vertices: swap por serializacion (Deserializar libera lo vivo y reconstruye).
         // Si la malla se re-modelo (vertexSize distinto) Deserializar devuelve false y no toca nada.
         if (vfHay){ VertexAnimation* v = VfAnim();
@@ -2392,6 +2849,11 @@ void UndoKeyframesConfirmar(){
 //  rig autorado se deriva de head/tail -> restaurar los huesos exige recomputar las matrices de skin).
 // ============================================================================
 class BonesUndo : public UndoCmd {
+    // (un objeto que se LIBERA de verdad -el streaming descarga lo generado, una regeneracion- deja de ser de este
+    //  paso: Ctrl+Z ya no lo toca, en vez de escribir sobre memoria liberada)
+public:
+    void DesvincularDetachados(Object* borrado) { if ((Object*)a == borrado) a = NULL; }
+private:
     Armature* a;
     std::vector<W3dBone> bones;
     int boneActivo;
@@ -2433,6 +2895,7 @@ public:
     }
     void Aplicar(){
         if (!a) return;
+        W3dArmatureAnimsPropias(a);   // devuelve las pistas A LOS CLIPS: nunca a unos compartidos
         a->bones.swap(bones);
         int cur = a->boneActivo; a->boneActivo = boneActivo; boneActivo = cur;
         // cada entrada vuelve A SU CLIP (por indice remapeado), sin comparar conteos: si el
@@ -2487,6 +2950,11 @@ void UndoPoseConfirmar(){
 //  hay UN solo camino de undo para "pintar pesos" (venga del viewport que venga).
 // ============================================================================
 class PesosUndo : public UndoCmd {
+    // (un objeto que se LIBERA de verdad -el streaming descarga lo generado, una regeneracion- deja de ser de este
+    //  paso: Ctrl+Z ya no lo toca, en vez de escribir sobre memoria liberada)
+public:
+    void DesvincularDetachados(Object* borrado) { if ((Object*)m == borrado) m = NULL; }
+private:
     Mesh* m;
     std::vector<VertexGroup> grupos;   // copia por VALOR (nombre + verts/pesos por control-point)
     std::vector<UVGroup>     uvgrupos; // copia por VALOR (nombre + verts/pesos por corner)
@@ -2570,6 +3038,11 @@ void UndoPesosConfirmar(){
 //  en el proximo GenerarRender, ver UVSepararCarasSel).
 // ============================================================================
 class UVMapUndo : public UndoCmd {
+    // (un objeto que se LIBERA de verdad -el streaming descarga lo generado, una regeneracion- deja de ser de este
+    //  paso: Ctrl+Z ya no lo toca, en vez de escribir sobre memoria liberada)
+public:
+    void DesvincularDetachados(Object* borrado) { if ((Object*)m == borrado) m = NULL; }
+private:
     Mesh* m;
     std::vector<GLfloat> uv;      // capa mesh->uv completa (2 floats por render-vert)
     std::vector<GLfloat> rest2d;  // uv2dRest (rest del skinning 2D): acompana a la capa
@@ -2582,9 +3055,11 @@ public:
     void Aplicar() {
         if (!m || !m->uv) return;
         if ((int)uv.size() != m->vertexSize * 2) return; // la topologia cambio: no tocar (robusto)
+        m->DesinstanciarDatos(W3DMD_UV);   // COW: se intercambia en el lugar (recurso compartido)
         for (size_t i = 0; i < uv.size(); i++) { GLfloat c = m->uv[i]; m->uv[i] = uv[i]; uv[i] = c; }
         rest2d.swap(m->uv2dRest);  // puede quedar vacio: se recaptura lazy al posar
         m->skinGeomVersion++;      // re-subir el VBO de uv (sino el viewport muestra el mapeo viejo)
+        W3dMallaMarcarEditada(m);
     }
     W3D_UNDO_SIN_INDICES // uv/rest2d: (b) snapshot completo de los arrays (con guard de tamano); m: (a)
 };
@@ -2597,6 +3072,11 @@ static MeshGeoUndo* g_pendingUVGeo = NULL; // transform de cara CON split en cur
 //  LIVIANO de UVMapUndo: snapshot de la capa al empezar el trazo y swap al deshacer.
 // ============================================================================
 class ColorLayerUndo : public UndoCmd {
+    // (un objeto que se LIBERA de verdad -el streaming descarga lo generado, una regeneracion- deja de ser de este
+    //  paso: Ctrl+Z ya no lo toca, en vez de escribir sobre memoria liberada)
+public:
+    void DesvincularDetachados(Object* borrado) { if ((Object*)m == borrado) m = NULL; }
+private:
     Mesh* m;
     int capa;
     std::vector<GLubyte> color;   // la capa entera (4 por corner)
@@ -2666,6 +3146,11 @@ void UndoUVConfirmar(bool cambio) {
 //  rango- no lo tocan estas operaciones), en paralelo a los clips de ESE armature.
 // ============================================================================
 class Bones2DUndo : public UndoCmd {
+    // (un objeto que se LIBERA de verdad -el streaming descarga lo generado, una regeneracion- deja de ser de este
+    //  paso: Ctrl+Z ya no lo toca, en vez de escribir sobre memoria liberada)
+public:
+    void DesvincularDetachados(Object* borrado) { if ((Object*)m == borrado) m = NULL; }
+private:
     Mesh* m;
     Armature2D* arm;              // el armature 2D CONCRETO que se snapshoteo (no "el activo": el
                                   // usuario puede cambiar de armature entre capturar y deshacer)
@@ -2719,8 +3204,10 @@ public:
         int c = arm->boneActivo; arm->boneActivo = activo; activo = c;
         if (arm->boneActivo >= (int)arm->huesos.size()) arm->boneActivo = -1; // guard
         // la capa uv vuelve TAL CUAL estaba (swap byte-exacto, con guard de tamano)
-        if (m->uv && (int)uv.size() == m->vertexSize * 2)
+        if (m->uv && (int)uv.size() == m->vertexSize * 2) {
+            m->DesinstanciarDatos(W3DMD_UV);   // COW (recurso compartido)
             for (size_t i = 0; i < uv.size(); i++) { GLfloat t = m->uv[i]; m->uv[i] = uv[i]; uv[i] = t; }
+        }
         rest2d.swap(m->uv2dRest);
         // tracks de los clips 2D: cada entrada vuelve A SU CLIP (indice remapeado). Crear/borrar
         // clips es OTRA operacion, pero YA NO se salta el swap por conteo: los clips que siguen
@@ -2797,6 +3284,11 @@ void UndoBone2DRenameCapturar(Mesh* m, const std::vector<W3dRenameDest>& grupos)
 //  nada; un UV group sin hueso es inofensivo (no deforma).
 // ============================================================================
 class Arm2DListaUndo : public UndoCmd {
+    // (un objeto que se LIBERA de verdad -el streaming descarga lo generado, una regeneracion- deja de ser de este
+    //  paso: Ctrl+Z ya no lo toca, en vez de escribir sobre memoria liberada)
+public:
+    void DesvincularDetachados(Object* borrado) { if ((Object*)m == borrado) m = NULL; }
+private:
     Mesh* m;
     Armature2D* arm;   // el armature concreto que se agrego/borro
     int idx;           // su posicion en la lista
@@ -3112,18 +3604,25 @@ void UndoConMover(Object* o, int dir) {   // -1 = sube (hacia el principio), +1 
 
 extern void RedoMeshPanelCerrar();   // RedoMeshPanel.cpp: el panel redo (Add/Normales/Loop Cut) trabaja sobre un snapshot que el undo deja viejo
 void UndoDeshacer() {
+    // el modo mover de la biblioteca a medias: este Ctrl+Z solo lo cancela (RecursosProyecto.h)
+    if (W3dVistaRecAntesDeUndo()) return;
     if (g_undo.empty()) return;
     RedoMeshPanelCerrar();
     UndoCmd* c = g_undo.back(); g_undo.pop_back();
     c->Aplicar();          // intercambia: el comando queda con el estado NUEVO
     g_redo.push_back(c);   // disponible para rehacer
+    W3dCambiosTocado();    // (lo no guardado: la raiz activa cambio)
+    W3dRecursosRevisarPurgados();   // un material purgado de vuelta en una malla: vuelve con su textura
 }
 void UndoRehacer() {
+    if (W3dVistaRecAntesDeUndo()) return;   // (idem el Ctrl+Y)
     if (g_redo.empty()) return;
     RedoMeshPanelCerrar();
     UndoCmd* c = g_redo.back(); g_redo.pop_back();
     c->Aplicar();          // intercambia de nuevo: re-aplica el cambio
     g_undo.push_back(c);
+    W3dCambiosTocado();
+    W3dRecursosRevisarPurgados();
 }
 void UndoLimpiar() {
     BorrarCmds(g_undo);   // saca del stack y despues libera (ver BorrarCmds)
@@ -3163,23 +3662,26 @@ void UndoCapturarRename(const W3dRenameDest& destino) { if (W3dDestResolver(dest
 // las operaciones compuestas que se arman con capturas ya existentes (ej: rename de
 // hueso 3D = snapshot de bones + los nombres de los vertex groups homonimos). El orden
 // de aplicacion se conserva; con n<=1 o el stack corto no hace nada.
-void UndoFundirUltimos(int n) {
+static void FundirUltimos(int n, bool secuencial) {
     if (n < 2 || (int)g_undo.size() < n) return;
-    CompuestoUndo* cmd = new CompuestoUndo();
+    CompuestoUndo* cmd = new CompuestoUndo(secuencial);
     for (int i = (int)g_undo.size() - n; i < (int)g_undo.size(); i++) cmd->Agregar(g_undo[i]);
     g_undo.erase(g_undo.end() - n, g_undo.end());
     g_undo.push_back(cmd);   // NO por Push(): fundir no es una accion nueva (el redo ya se limpio)
 }
+void UndoFundirUltimos(int n) { FundirUltimos(n, false); }
 
 // ---- GRUPO: todo lo empujado entre Iniciar y Fin es UN SOLO Ctrl+Z (ver Undo.h) ----
 void UndoGrupoIniciar() { g_grupos.push_back(g_undo.size()); }
-void UndoGrupoFin() {
+static void GrupoFin(bool secuencial) {
     if (g_grupos.empty()) return;
     size_t base = g_grupos.back(); g_grupos.pop_back();
     if (base > g_undo.size()) base = g_undo.size();   // el desalojo se comio parte del grupo
     const int n = (int)(g_undo.size() - base);
-    if (n > 1) UndoFundirUltimos(n);
+    if (n > 1) FundirUltimos(n, secuencial);
 }
+void UndoGrupoFin()           { GrupoFin(false); }
+void UndoGrupoFinSecuencial() { GrupoFin(true); }
 
 // destinos de IDENTIDAD ESTABLE (huesos 3D/2D, mesh parts, refs de lua, capas de la malla):
 // ver W3dRenameDest en Undo.h. Los repetidos y los que ya no existen se descartan.
@@ -3207,6 +3709,30 @@ bool UndoCapturarBorrado(bool incCol) {
     if (d->Vacio()) { delete d; return false; }
     Push(d);
     return true;
+}
+
+bool UndoCapturarCreacion() {
+    DeleteUndo* d = new DeleteUndo(false, DeleteUndo::Creacion());
+    if (d->Vacio()) { delete d; return false; }
+    Push(d);
+    return true;
+}
+
+// el paso de undo de un modulo de afuera (ver UndoExterno en Undo.h)
+class ExternoUndo : public UndoCmd {
+    UndoExterno f;
+    void* dato;
+public:
+    ExternoUndo(const UndoExterno& F, void* D) : f(F), dato(D) {}
+    ~ExternoUndo() { if (f.liberar) f.liberar(dato); }
+    void Aplicar() { if (f.aplicar) f.aplicar(dato); }
+    // dato: (a)/(d) punteros que el modulo valida al aplicar y valores; ninguna POSICION en una
+    // lista (es el contrato de UndoExterno en Undo.h)
+    W3D_UNDO_SIN_INDICES
+    void DesvincularDetachados(Object* borrado) { if (f.desvincular) f.desvincular(dato, borrado); }
+};
+void UndoPushExterno(const UndoExterno& f, void* dato) {
+    Push(new ExternoUndo(f, dato));
 }
 
 // ============================================================================

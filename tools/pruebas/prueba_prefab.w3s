@@ -31,8 +31,10 @@ scriptinfo compartido pf_especial 1
 scriptinfo compartido pf_spawn 1
 scriptinfo compartido pf_spawn_nil 1
 simstop
-# el clon runtime tambien comparte la geometria (4ta ref del mismo dato)
-meminfo mallas 1
+# el clon runtime tambien comparte la geometria (4ta ref): los 3 clones del archivo ya son UNA malla 3D del
+# proyecto (TODA malla es un recurso, se les crea al abrir) y el que un script crea JUGANDO comparte los arrays
+# del cache de su OBJ (el editor no convierte en recursos lo que nace durante el Play): 2 datos, 4 refs
+meminfo mallas 2
 meminfo mallasrefs 4
 # y se dibuja donde se pidio (motor 0,4,0 -> cara frontal del cubo)
 escenapx 0.4 2.8 -1.5 es 255 0 0 8

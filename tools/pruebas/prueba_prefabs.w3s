@@ -1,0 +1,239 @@
+# ==========================================================================
+#  INSTANCIAS DE PREFAB (objects/InstanciaPrefab.h, io/Prefabs.h, io/PrefabsEditor.h)
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_prefabs.w3s
+#
+#  El prefab "Enemigo" (prefabenemigo): su objeto raiz "Enemigo" con un "Esqueleto" (armature con
+#  dos clips) que tiene un "Cuerpo" skinneado (recurso de malla "Cuerpo") y un "Sensor" (hitbox),
+#  y enemigo.lua en el esqueleto. Se prueba:
+#    A) N instancias: los hijos se GENERAN con los nombres del prefab tal cual (la instancia es
+#       frontera de scope: nada se renumera); todo lo que va por nombre (modArmature, el dueno del
+#       hitbox, las busquedas) se resuelve ADENTRO de cada instancia; 1 recurso de malla y 1
+#       animset para todas; poses independientes por instancia;
+#    B) editar el prefab (su raiz aislada) y volver REGENERA todas las instancias;
+#    B2) un clip de jerarquia de la raiz del prefab: cada instancia lo reproduce sobre SUS hijos;
+#    C) overrides (el visible de un hijo, un valor de propiedad de script) y guardar/abrir: la
+#       instancia se escribe SIN sus hijos ({"tipo":"prefab", "prefab", transform, "overrides"}),
+#       se regenera al abrir y el re-guardado es identico; editar el prefab despues de abrir
+#       (su raiz sale de su entrada) tambien regenera;
+#    D) lo generado no se toca (borrar/duplicar/reparentar bloqueados), la instancia si;
+#    E) Add > Prefab, soltar un prefab de la biblioteca en el 3D (con el mouse y con el dedo: pulsacion
+#       larga) y sobre el selector de la tarjeta de una instancia (Properties), cambiar el prefab: todo con Ctrl+Z;
+#    F) "Create Prefab" desde la seleccion y "Unpack" (con Ctrl+Z);
+#    G) prefabs ANIDADOS (una instancia adentro de un prefab) y el ciclo que no se puede armar;
+#    H) renombrar el prefab: sus instancias lo siguen (con Ctrl+Z);
+#    I) fisica: la raiz de un prefab instanciado con cuerpo rigido cae (simula en el espacio de
+#       su instancia) y el Stop la devuelve.
+#    J) un .w3d escrito a mano: prefab que falta (instancia vacia con sus overrides) e "hijos" ignorados.
+# ==========================================================================
+
+ventana 1280 720
+prefabenemigo /tmp/w3d_f7_pf fisica 1
+prefabdef Enemigo
+
+# --- A) instancias: generacion, scope, memoria compartida, poses ---
+prefabinstanciar Enemigo -4 0 -6 nombre Enemigo
+prefabinstanciar Enemigo 0 0 -6 nombre Enemigo.001
+prefabinstanciar Enemigo 4 0 -6 nombre Enemigo.002
+prefabinfo Enemigo prefab Enemigo generados 4 raiz Enemigo vacia 0 overrides 0
+prefabnodo Enemigo.001 . nombre Enemigo tipo vacio generado 1
+prefabnodo Enemigo.001 Esqueleto tipo esqueleto
+prefabnodo Enemigo.001 Esqueleto/Cuerpo tipo mesh
+prefabnodo Enemigo.001 Esqueleto/Sensor tipo hitbox
+prefabscope Enemigo.001 Esqueleto Cuerpo Enemigo.001
+prefabscope Enemigo.002 Esqueleto/Cuerpo Esqueleto Enemigo.002
+prefabscope Enemigo.002 Esqueleto Camara -
+prefabskin Enemigo
+prefabskin Enemigo.001
+prefabskin Enemigo.002
+prefabcompartido Enemigo instancias 3 mallas 1 animsets 1
+prefabclip Enemigo Esqueleto Saludo
+prefabclip Enemigo.001 Esqueleto Quieto
+prefabclip Enemigo.002 Esqueleto Saludo
+prefabpose Enemigo Enemigo.001 10 distinta
+prefabpose Enemigo Enemigo.002 10 igual
+prefabcontar Enemigo 3
+outvista prefabs
+outfila Enemigo usuarios 3
+outvista escena
+
+# --- B) editar el prefab y volver: todas sus instancias se regeneran ---
+raizabrir Enemigo prefab
+add cube
+objname Casco
+parent Casco Esqueleto
+raizabrir Scene
+prefabinfo Enemigo generados 5
+prefabinfo Enemigo.001 generados 5
+prefabinfo Enemigo.002 generados 5
+prefabnodo Enemigo.001 Esqueleto/Casco tipo mesh generado 1
+
+# --- B2) un CLIP DE JERARQUIA en la raiz del prefab: cada instancia lo reproduce sobre SUS hijos (sus rutas
+#     usan los nombres del prefab, que la instancia genera tal cual) sin mover los de las otras. A mitad
+#     del clip (0 -> 3 en x) el Sensor de la que suena esta en +1.5 ---
+raizabrir Enemigo prefab
+selobj Enemigo
+clipmenu Hierarchy Clip
+clipnombre giro
+animrango 1 11
+animcurva Enemigo:giro Sensor x 1 0 11 3
+jerinfo Enemigo pistas giro 1 ruta giro Esqueleto/Sensor
+raizabrir Scene
+prefabjer Enemigo.001 . giro loop 0
+jertick 0.1666667 1
+prefabmundo Enemigo.001 Esqueleto/Sensor x mayor 1.4
+prefabmundo Enemigo.001 Esqueleto/Sensor x menor 1.6
+prefabmundo Enemigo.002 Esqueleto/Sensor x menor 4.1
+prefabmundo Enemigo.002 Esqueleto/Sensor x mayor 3.9
+jerreset
+
+# --- C) overrides + guardar / abrir ---
+prefaboverride Enemigo.001 visible Esqueleto/Casco 0
+prefaboverride Enemigo.001 prop Esqueleto vida 25
+prefabinfo Enemigo.001 overrides 2
+prefabinfo Enemigo overrides 0
+guardarw3d /tmp/w3d_f7_pf/pf.w3d
+entradatiene /tmp/w3d_f7_pf/pf.w3d proyecto.json "prefab": 1
+entradatiene /tmp/w3d_f7_pf/pf.w3d proyecto.json Sensor 0
+entradatiene /tmp/w3d_f7_pf/pf.w3d proyecto.json Esqueleto/Casco 1
+entradatiene /tmp/w3d_f7_pf/pf.w3d prefabs/enemigo.w3dp Casco 1
+abrirw3d /tmp/w3d_f7_pf/pf.w3d
+raizinfo cargada Enemigo 0
+prefabinfo Enemigo generados 5 overrides 0
+prefabinfo Enemigo.001 generados 5 overrides 2
+prefabnodo Enemigo.001 Esqueleto/Casco visible 0
+prefabnodo Enemigo Esqueleto/Casco visible 1
+prefabcompartido Enemigo instancias 3 mallas 1 animsets 1
+prefabskin Enemigo.001
+# (el clip de jerarquia del prefab tambien volvio: la raiz del prefab NO esta cargada, sale de su entrada)
+prefabjer Enemigo . giro loop 0
+jertick 0.1666667 1
+prefabmundo Enemigo Esqueleto/Sensor x mayor -2.6
+prefabmundo Enemigo Esqueleto/Sensor x menor -2.4
+prefabmundo Enemigo.001 Esqueleto/Sensor x menor 0.1
+jerreset
+guardarw3d /tmp/w3d_f7_pf/pf2.w3d
+abrirw3d /tmp/w3d_f7_pf/pf2.w3d
+guardarw3d /tmp/w3d_f7_pf/pf3.w3d
+w3diguales /tmp/w3d_f7_pf/pf2.w3d /tmp/w3d_f7_pf/pf3.w3d
+# la raiz del prefab ahora sale de su ENTRADA: editarla y volver tambien regenera (sin el Casco, el override
+# de su visible ya no nombra a nadie y se cae; el de la vida queda)
+raizabrir Enemigo prefab
+selobj Casco
+delete
+raizabrir Scene
+prefabinfo Enemigo generados 4
+prefabinfo Enemigo.001 generados 4 overrides 1
+prefabcompartido Enemigo instancias 3 mallas 1 animsets 1
+
+# --- D) lo generado no se toca; la instancia si ---
+prefabsel Enemigo.001 Esqueleto/Cuerpo
+delete
+prefabinfo Enemigo.001 generados 4
+prefabsel Enemigo.001 Esqueleto
+menuobjeto 1
+prefabinfo Enemigo.001 generados 4
+prefabreparent Enemigo.001 Esqueleto/Sensor - falla
+prefabreparent - Cubo Enemigo.001 falla
+prefabreparent - Cubo Esqueleto falla
+prefabsel Enemigo.001
+menuobjeto 1
+prefabvivos 4
+prefabinfo Enemigo.003 prefab Enemigo generados 4 overrides 1
+prefabskin Enemigo.003
+prefabsel Enemigo.003
+delete
+prefabvivos 3
+undo
+prefabvivos 4
+undo
+prefabvivos 3
+
+# --- E) Add > Prefab, soltar de la biblioteca (3D y Properties), cambiar el prefab ---
+prefabmenu n 2 tiene Enemigo tiene Caja
+prefabmenuelegir Enemigo
+prefabvivos 4
+undo
+prefabvivos 3
+outvista prefabs
+outsoltar Enemigo 3d 0 0
+prefabvivos 4
+undo
+prefabvivos 3
+# (con el DEDO: pulsacion larga sobre la fila, arrastrarla al 3D y soltarla)
+outmantener Enemigo mover 3d
+prefabvivos 4
+undo
+prefabvivos 3
+outvista escena
+prefabcambiar Enemigo.002 Caja
+prefabinfo Enemigo.002 prefab Caja generados 1 raiz Caja
+undo
+prefabinfo Enemigo.002 prefab Enemigo generados 4
+selobj Enemigo.002
+propstab 2
+outvista prefabs
+outsoltar Caja props prefab
+prefabinfo Enemigo.002 prefab Caja
+undo
+prefabinfo Enemigo.002 prefab Enemigo
+outvista escena
+
+# --- F) Create Prefab (un objeto: es la raiz del prefab y la instancia toma su transform) / Unpack ---
+selobj CuboAfuera
+prefabcrear nombre CuboAfuera
+raizinfo prefabs 3
+prefabinfo CuboAfuera prefab CuboAfuera generados 1 raiz CuboAfuera
+prefabmundo CuboAfuera . x mayor 4.4
+prefabmundo CuboAfuera . x menor 4.6
+prefabdesempaquetar CuboAfuera
+prefabvivos 3
+objrel CuboAfuera padre - tipo mesh
+undo
+prefabvivos 4
+prefabinfo CuboAfuera generados 1 raiz CuboAfuera
+fail prefabdesempaquetar Cubo
+
+# --- G) prefabs ANIDADOS; un ciclo no se puede armar ---
+raizabrir Caja prefab
+prefabinstanciar Enemigo 0 3 0 nombre Enemigo
+prefabmenu notiene Caja tiene Enemigo
+raizabrir Scene
+prefabinstanciar Caja 4 5 -6 nombre Caja
+prefabinfo Caja generados 6
+raizabrir Enemigo prefab
+prefabmenu notiene Enemigo notiene Caja tiene CuboAfuera
+fail prefabinstanciar Caja 0 0 0
+raizabrir Scene
+
+# --- H) renombrar el prefab: sus instancias lo siguen ---
+outvista prefabs
+recrenombrar prefabs Enemigo Soldado
+prefabinfo Enemigo prefab Soldado generados 4
+prefabinfo Enemigo.001 prefab Soldado overrides 1
+undo
+prefabinfo Enemigo prefab Enemigo
+outvista escena
+
+# --- I) fisica: la raiz del prefab instanciado cae; el Stop la devuelve ---
+guardarw3d /tmp/w3d_f7_pf/fis.w3d
+abrirw3d /tmp/w3d_f7_pf/fis.w3d
+prefabinfo Caja generados 6
+prefabmundo Caja . y mayor 4.9
+simplay 20
+prefabmundo Caja . y menor 4.5
+simstop
+prefabmundo Caja . y mayor 4.9
+
+# --- J) un .w3d escrito a mano: la instancia de un prefab que NO existe queda vacia (con su cruz) y
+#     conserva sus overrides (un numero escrito a mano vale como texto); unos "hijos" bajo la instancia
+#     se ignoran (lo de una instancia lo genera su prefab, nunca el archivo) ---
+abrirw3d prueba_prefabs_hijos.w3d
+prefabinfo Instancia prefab NoExiste generados 0 vacia 1 overrides 2
+objrel Afuera padre -
+objrel Instancia hijos 0
+objrel Colado nada
+guardarw3d /tmp/w3d_f7_pf/hijos.w3d
+abrirw3d /tmp/w3d_f7_pf/hijos.w3d
+prefabinfo Instancia prefab NoExiste generados 0 vacia 1 overrides 2
+objrel Colado nada

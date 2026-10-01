@@ -1,0 +1,12 @@
+{
+  "version": 3,
+  "layout": "Layout {\n  ViewportRow {\n    Viewport3D {\n      posX: 0\n      posY: 0\n      posZ: 0\n      orbitDistance: 12\n    }\n    ViewportColumn {\n      Outliner\n      Properties\n      Split: 0.4\n    }\n    Split: 0.72\n  }\n}",
+  "escena": {
+    "objetos": [
+      {
+        "tipo": "hitbox", "nombre": "Zona", "pos": [0, 0, 0], "tam": [4, 4, 4],
+        "scripts": [ { "archivo": "hitbox_ver.lua" } ]
+      }
+    ]
+  }
+}

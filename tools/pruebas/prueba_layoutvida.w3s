@@ -1,0 +1,81 @@
+# ==========================================================================
+#  LAYOUTVIDA: abrir un proyecto LIBERA el layout anterior.
+#
+#  Antes el arbol de viewports del proyecto cerrado quedaba HUERFANO ("el viejo
+#  queda"): cada apertura dejaba ~0,2 MB de heap vivo, fijos, cualquiera fuera el
+#  proyecto (casi todo eran las tarjetas del panel de propiedades). Liberarlo pide
+#  dos cosas, y las dos se prueban aca:
+#    - que no quede NINGUN viewport vivo fuera del arbol actual (viewports: los
+#      vivos del proceso contra los nodos del arbol, con el maximizado adentro);
+#    - que ningun puntero global quede apuntando a uno liberado: el activo, el
+#      panel de propiedades activo, el campo de texto enfocado, el panel "Add"
+#      que recuerda el 3D que lo creo (los sueltan los ganchos de ~ViewportBase).
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_layoutvida.w3s
+# ==========================================================================
+ventana 1280 720
+
+# --- 1) el arranque: el layout por defecto (3D, timeline, outliner, propiedades)
+viewports hojas 4
+
+# --- 2) abrir proyectos seguidos no deja layouts huerfanos -------------------
+# texto viejo sin bloque Layout (va el default) y un contenedor v4 con el suyo
+abrirw3d prueba_texcache.w3d
+viewports hojas 4
+abrirw3d prueba_espejo_v4.w3d
+viewports
+abrirw3d prueba_texcache.w3d
+viewports hojas 4
+
+# --- 3) TODOS los tipos de viewport se liberan (cada destructor corre) -------
+# los cuatro por UV / Editor 2D / Consola / IDE (el cambio de tipo ya borraba el
+# viejo), y abrir un proyecto libera esos
+vpkind 5 3
+vpkind 2 5
+vpkind 3 6
+vpkind 1 7
+viewports hojas 4
+abrirw3d prueba_texcache.w3d
+viewports hojas 4
+
+# --- 4) con un viewport MAXIMIZADO rootViewport es solo esa hoja: el arbol
+#        guardado tambien se libera (y no queda "maximizado" en el nuevo)
+layoutmaximizar 3
+viewports
+abrirw3d prueba_texcache.w3d
+viewports hojas 4
+
+# --- 5) el campo de texto enfocado era del panel liberado: se suelta ----------
+propsfoco
+abrirw3d prueba_texcache.w3d
+propsfoco nulo
+viewports
+
+# y un RENAME en curso (el boton "Rename Material" del panel se volvio input): se
+# cancela antes de que el boton muera, no queda escribiendo en un boton liberado
+selobj Copia1
+propsrename
+abrirw3d prueba_texcache.w3d
+propsrename nulo
+viewports
+
+# --- 6) el panel "Add" recuerda el 3D que lo creo: si ese 3D muere (cambiar su
+#        tipo lo borra) el panel se cierra, como cuando muere su malla
+redopanel
+redopanel 1
+vpkind 1 3
+redopanel 0
+viewports
+
+# --- 7) memoria: reabrir el mismo proyecto no deja heap vivo ------------------
+# (con el layout huerfano eran ~205 KB por reapertura; ahora un par de KB)
+cargabench prueba_texcache.w3d 4 fugakb 24
+viewports hojas 4
+
+# --- 8) lo que no tiene que pasar ---------------------------------------------
+fail viewports hojas 3
+fail viewports ramas 2
+fail layoutmaximizar 9
+fail propsfoco otro
+fail propsrename otro
+fail redopanel 1

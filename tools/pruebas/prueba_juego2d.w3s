@@ -1,0 +1,34 @@
+# ==========================================================================
+#  UN JUEGO 2D PURO (sin un solo objeto 3D) COMPILA, LINKEA Y CORRE SU SCRIPT
+#  Correr DESDE ESTA CARPETA:
+#    cd <motor>/tools/pruebas
+#    ../../platform/linux/build/whisk3d --script prueba_juego2d.w3s
+#
+#  El hermano de prueba_juego3d.w3s. "Compilar juego" arma un proyecto SIN nada
+#  3D solo con kFuentesBase (sin kFuentes3D: ni el lector de escenas 3D ni el
+#  pase 3D). Nadie lo probaba y NO LINKEABA: el codigo compartido 2D nombra dos
+#  cosas que solo traia el camino 3D:
+#    - importarW3D() (BindsJuego) llama al lector 3D W3dImportarW3DAnexo;
+#    - W3dAvisof (el aviso de mando conectado) llama a Notificar, que el runtime
+#      definia solo en su bloque W3D_JUEGO_3D.
+#  Ahora el runtime (w3drun.cpp) trae Notificar para los dos y, en 2D, la version
+#  de juego de W3dImportarW3DAnexo (avisa y devuelve nil: no hay lector 3D).
+#
+#  juego2dmin arma el juego MINIMO: un HUD con una franja verde OCULTA y un .lua
+#  que la prende solo si los binds 2D existen en el binario (importarW3D
+#  incluido). juego2dpx corre el binario y busca la franja por pixel.
+#  Compila un juego de verdad (cmake + g++), asi que tarda mas que las demas.
+# ==========================================================================
+
+ventana 640 480
+
+# --- 1) el juego 2D minimo, guardado y abierto como proyecto ----------------
+juego2dmin /tmp/w3d_juego2d
+guardarw3d /tmp/w3d_juego2d/juego2dmin.w3d
+abrirw3d /tmp/w3d_juego2d/juego2dmin.w3d
+
+# --- 2) compilarlo para Linux (sin 3D: solo kFuentesBase) --------------------
+compilarjuego 0 0
+
+# --- 3) correr el BINARIO y mirarle los pixeles ------------------------------
+juego2dpx /tmp/w3d_juego2d juego2dmin

@@ -20,7 +20,17 @@ namespace w3dEngine { bool W3dAudioInit(int); void W3dAudioShutdown(); }
 
 #include <aknconsts.h>
 #include <apacmdln.h>   // CApaCommandLine: recibir el .w3d al lanzar la app desde un file manager
+#include <eikenv.h>     // CEikonEnv::Static(): el AppUi desde el gancho de salir del cartel de cambios
 #include <string>
+
+// LO SIN GUARDAR (main/io/CambiosProyecto.h, compartido): al salir con cambios pendientes primero va el
+// cartel "Se perderan los cambios en:"; su "Salir sin guardar" / "Guardar y salir" vuelve por el gancho
+bool W3dCambiosPreguntar(int accion, const std::string& ruta);
+extern void (*W3dCambiosSalirHook)();
+static void SalirConfirmado(){
+    CWhisk3DAppUi* ui = static_cast<CWhisk3DAppUi*>(CEikonEnv::Static()->EikAppUi());
+    if (ui) ui->Exit();
+}
 
 // ================= MEMBER FUNCTIONS =======================
 //
@@ -42,6 +52,7 @@ void CWhisk3DAppUi::ConstructL(){
     // el mismo rate que la demo de q3rev). Si el device no abre el stream, W3dAudioInit
     // devuelve false y todo queda mudo (no rompe la app).
     w3dEngine::W3dAudioInit(22050);
+    W3dCambiosSalirHook = SalirConfirmado;
 }
 
 // Destructor
@@ -304,6 +315,8 @@ void CWhisk3DAppUi::HandleCommandL(TInt aCommand){
             break;
         case EEikCmdExit:
             {
+            // con algo SIN GUARDAR: el cartel (0 = W3D_CAMBIOS_SALIR); la salida la hace su respuesta
+            if (W3dCambiosPreguntar(0, std::string())) break;
             Exit();
             break;
             }

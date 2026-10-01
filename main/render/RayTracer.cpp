@@ -11,6 +11,7 @@
 // ============================================================================
 #include "render/RayTracer.h"
 #include "ui/ViewPorts/ViewPort3D.h"
+#include "ui/ViewPorts/LayoutArbol.h"   // aviso de destruccion de viewports (el del preview)
 #include "objects/Objects.h"
 #include "objects/Mesh.h"
 #include "objects/Light.h"
@@ -292,11 +293,14 @@ static void AgregarMalla(RTEscena& e, Mesh* m, std::vector<Material*>& vistos) {
             }
         }
     } else if (m->faces3d.empty() && m->faces && m->facesSize >= 3) {
-        // sin caras logicas (malla cargada solo con su index buffer): triangulos por rango de mesh part
+        // sin caras logicas (malla cargada solo con su index buffer, o la de un RECURSO compartido
+        // con la edicion pendiente): triangulos por rango de mesh part. El rango que llena la carga
+        // es el de DIBUJO (startDrawn/indicesDrawnCount, en indices); start/count nadie los llena.
         const std::vector<MaterialGroup>& G = m->materialsGroup;
         for (size_t g = 0; g < G.size(); g++) {
             const int mi = MaterialIdx(e, G[g].material, vistos);
-            for (int t = G[g].start; t < G[g].start + G[g].count && (t + 1) * 3 <= m->facesSize; t++) {
+            const int t0 = G[g].startDrawn / 3, tn = G[g].indicesDrawnCount / 3;
+            for (int t = t0; t < t0 + tn && (t + 1) * 3 <= m->facesSize; t++) {
                 const int a = m->faces[t*3], b = m->faces[t*3+1], c = m->faces[t*3+2];
                 if (a >= nV || b >= nV || c >= nV) continue;
                 RTTri tr; tr.v0 = base + a; tr.v1 = base + b; tr.v2 = base + c; tr.mat = mi;
@@ -657,6 +661,14 @@ struct RTRender {
 // ---------------------------------------------------------------------------
 static RTRender* g_rtVp = NULL;
 static const Viewport3D* g_rtVpDe = NULL;
+// el viewport del preview MURIO (abrir un proyecto libera el layout anterior): olvidarlo. El
+// puntero solo se compara, pero con la direccion reciclada un 3D NUEVO en la misma direccion
+// seguiria el preview del muerto en vez de reiniciarlo (LayoutArbol.h).
+static void RTOlvidarViewport(ViewportBase* vp) {
+    if (g_rtVpDe && (const ViewportBase*)g_rtVpDe == vp) g_rtVpDe = NULL;
+}
+struct RTEngancharOlvido { RTEngancharOlvido() { ViewportOlvidarRegistrar(RTOlvidarViewport); } };
+static RTEngancharOlvido g_rtEngancheOlvido;
 static unsigned int g_rtTexId = 0; static int g_rtTexW = 0, g_rtTexH = 0;
 static double g_rtFirma = 0.0;
 static bool g_rtForzar = false;

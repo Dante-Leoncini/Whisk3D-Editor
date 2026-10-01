@@ -1,6 +1,7 @@
 #ifndef BINDSJUEGO_H
 #define BINDSJUEGO_H
 #include <vector>
+#include <string>
 
 // ============================================================================
 //  BindsJuego — el set COMPARTIDO de binds 2D de JUEGO que ven los scripts lua,
@@ -47,6 +48,11 @@ class Object;
 // editor; el editor lo instala (main/objects/Particulas.cpp) y sin instalar el
 // bind es un no-op que linkea igual.
 extern void (*W3dParticulasEmitirHook)(Object* o, int n);
+// setEmitiendo(obj, bool): prende/apaga la emision continua (las vivas terminan su vida). NULL en el runtime sin Particulas.
+extern void (*W3dParticulasActivoHook)(Object* o, bool activo);
+// niebla(obj) / setNiebla(obj, densidad [, r, g, b [, inicio, fin]]): la Niebla vive en main/objects (el hook lo
+// instala Niebla.cpp). v[0] densidad, v[1..3] color, v[4] inicio, v[5] fin. Leer: escribir=false (v de salida).
+extern bool (*W3dNieblaHook)(Object* o, bool escribir, float* v, int n);
 
 // ---------------------------------------------------------------------------
 //  LA CAMARA, POR HOOK (mismo patron que los dos de arriba)
@@ -98,6 +104,17 @@ extern Object* (*W3dObjetivoHook)(Object* duenio);
 // registrador (que ademas agrega camaraXZ/objetivo/parametro), el runtime la
 // pasa directo.
 void BindsJuegoRegistrar(void* L);
+
+// CIERRE DEL PROYECTO (editor): suelta los WAV precargados/cacheados por sonido(). La clave es
+// la ruta tal como la escribe el proyecto ("sonidos/x.wav" en un contenedor): sin vaciarlo el
+// siguiente proyecto con una entrada del mismo nombre sonaba con el WAV del anterior, y el
+// audio decodificado del proyecto cerrado quedaba en el heap para siempre.
+void W3dSonidosLiberar();
+// cuantos WAV hay en ese cache (incluye los que fallaron: se cachean NULL). Lo usa el harness.
+int  W3dSonidosCacheados();
+// true si sonido() ya cargo (o intento cargar: un faltante tambien se cachea) la ruta RESUELTA 'ruta' (la prueba:
+// un script de una libreria resuelve "sonidos/x.wav" en SU libreria)
+bool W3dSonidoCacheado(const std::string& ruta);
 
 // --- ALIMENTACION del estado por-frame (la llaman los dos builds) -----------
 // mapeo del ULTIMO render (ventana -> lienzo): escala + offset (x0,y0), el rect

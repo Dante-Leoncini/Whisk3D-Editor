@@ -34,6 +34,7 @@ bool         g_w3dRefsEntradas = false;
 std::string  g_w3dDirProyecto;
 W3dRefEmitFn g_w3dRefEmit      = NULL;
 W3dRefExtFn  g_w3dRefExtMarcar = NULL;
+W3dRutaCargaFn g_w3dRutaLibHook = NULL;   // (una escena UI de una libreria: ver UI2DFormato.h)
 
 // ---------------------------------------------------------------------------
 //  RUTAS relativas: si 'ruta' esta adentro de 'base' (la carpeta del .w3dui),
@@ -77,6 +78,8 @@ static std::string RutaParaGuardar(std::string& ruta, const std::string& base) {
 }
 static std::string RutaAlCargar(const std::string& guardada, const std::string& base) {
     if (guardada.empty()) return guardada;
+    // CONTENIDO DE UNA LIBRERIA externa: la resuelve el lector del proyecto en el contexto de esa libreria
+    if (g_w3dRutaLibHook) return g_w3dRutaLibHook(guardada);
     // "ext:" = referencia EXTERNA deliberada: se saca el prefijo y se resuelve
     // contra la carpeta del PROYECTO (no la del .w3dui). Queda anotada para que
     // el proximo guardado la vuelva a escribir externa.
@@ -290,6 +293,7 @@ static void EscribirElemento(FILE* f, Object* o, int ind, const std::string& bas
         CampoI(f, i2, "modo", im->modo);             // 0 estirar, 1 ajustar, 2 cover
         CampoColor(f, i2, "tinte", im->color);
         CampoB(f, i2, "usarAlpha", im->usarAlpha);
+        if (im->mezcla != 1) CampoI(f, i2, "mezcla", im->mezcla);   // solo si no es la normal (alpha)
         CampoB(f, i2, "filtrado", im->filtrado);
         CampoI(f, i2, "palTinte", im->palTinte);
         if (im->EsFlipbook()) {   // flipbook: solo si anima (el resto de las imagenes queda igual)
@@ -562,6 +566,7 @@ static void CargarElemento(JVal* j, Object* padre, const std::string& base) {
         im->modo = JI(j, "modo", im->modo);
         JColor(j, "tinte", im->color);
         im->usarAlpha = JB(j, "usarAlpha", im->usarAlpha);
+        im->mezcla = JI(j, "mezcla", im->mezcla);
         im->filtrado = JB(j, "filtrado", im->filtrado);
         im->palTinte = JI(j, "palTinte", im->palTinte);
         int _fc = JI(j, "flipCuadros", 0);

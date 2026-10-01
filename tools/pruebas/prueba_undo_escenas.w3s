@@ -1,0 +1,21 @@
+# ==========================================================================
+#  EL UNDO DE LAS ANIMACIONES DE ESCENA contra los pasos que guardan su INDICE
+#  (main/undo/Undo.cpp: UndoBorrarEscenaActiva / UndoNuevaEscena, familia (1) de Undo.h).
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_undo_escenas.w3s
+#
+#  Borrar una animacion de escena con el "-" de la tarjeta Animation es DESHACIBLE: el paso se
+#  queda con ella y el Ctrl+Z la devuelve a SU posicion. Por LIFO, los pasos de mas abajo
+#  (un rename por indice, el borrado de un objeto que se llevo su curva de esa escena) aplican
+#  con la lista como la dejaron:
+#    - escenaborra: renombrar la escena 2, borrar la 0; el primer Ctrl+Z devuelve la 0, el
+#      segundo el nombre a la 2 (no a la de al lado); Ctrl+Y rehace los dos. Con UNA sola
+#      escena el "-" no borra (se vacia) y el Ctrl+Z es el del rename.
+#    - delescena: la curva de un objeto borrado vuelve a la escena de la que salio aunque esa
+#      escena se haya borrado despues (el paso la devolvio) y aunque se haya creado otra.
+#  (escenaborra va PRIMERO: la lista de escenas es del proceso y arranca con una sola)
+# ==========================================================================
+
+ventana 640 480
+escenaborra
+delescena

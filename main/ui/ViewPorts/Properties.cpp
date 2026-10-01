@@ -3,6 +3,14 @@
 #include "variables.h"
 #include "io/GuardarW3D.h"   // tarjeta Archivo: guardar el proyecto (.w3d v3: JSON plano + archivos externos)
 #include "io/GuardarVersion.h" // tarjeta Archivo: "Guardar version vN" (guardado por versiones)
+#include "W3dRaices.h"         // renombrar un material/malla carga antes las escenas sin abrir; el tipo de la raiz
+#include "io/RaicesEditor.h"   // el estado BASE de un juego (volver a "Juego" desde uno de sus clips)
+#include "io/PrefabsEditor.h"  // soltar un prefab sobre el selector de una instancia; overrides de lo generado
+#include "objects/InstanciaPrefab.h"
+#include "objects/ProxyW3d.h"      // PROXY W3D: su tarjeta (PropsPrefab.cpp) y soltarle un elemento de una libreria
+#include "io/Librerias.h"
+#include "script/SimJuego.h"   // el CACHE de la simulacion: lo que se renderiza de un juego
+#include "w3dlog.h"
 #ifndef W3D_SYMBIAN
 #include <filesystem>   // listar los skins de res/Skins (la tarjeta Ajustes)
 #endif
@@ -22,6 +30,10 @@
 #include "objects/Curve.h"     // ramas del path (dropdown Ramas del modificador Oclusion)
 #include "io/UI2DFormato.h"    // guardar/cargar interfaces (.w3dui)
 #include "io/W3dContenedor.h"  // importar un asset = COPIARLO adentro del .w3d (ver el header)
+#include "io/MallasProyecto.h"   // tarjeta "3D Mesh": la malla como recurso (hacer unica, elegir, copiar)
+#include "io/CambiosProyecto.h"  // el '*' de lo no guardado (el selector de malla, el recurso, el proyecto)
+#include "io/RaicesEditor.h"     // "Open" de una escena / un prefab de la biblioteca
+#include "objects/MallaRecurso.h"
 #include "objects/UI.h"
 #include "W3dPaletas.h"   // paletas a nivel PROYECTO (gestion + resolucion efectiva)
 #include "render/UIOverlay.h"   // UI2D_PuntoAncla (rebase del ancla)   // T(): los textos salen en el idioma del sistema
@@ -50,23 +62,32 @@ static void AccionRTValores();  // Rays / Samples / Passes -> g_rt
 #include "objects/Instance.h" // selector de target de instance/array/mirror
 #include "objects/LOD.h"      // tarjeta del objeto LOD (umbrales de distancia)
 #include "objects/Culling.h"  // tarjeta del objeto Culling (soloCamaraActiva)
+#include "objects/Niebla.h"   // tarjeta del objeto Niebla
+#include "objects/Recorte.h"  // tarjetas LimpiarZ / Recorte
 #include "objects/Collection.h" // tarjeta de la Collection (ordenarPorCamara/ordenarUnaVez)
 #include "objects/Particulas.h" // tarjeta del objeto Particulas (emisor: textura + cono)
 #include "physics/W3dRigido.h"  // tarjeta Fisica (cuerpo rigido): W3dRigidoDef + Olvidar
 #include "edit/Modifier.h"    // ModifierType (ids del menu Add del stack de modificadores)
 #include "objects/Armature.h" // pestania Animation: clips del esqueleto
 #include "animation/SkeletalAnimation.h" // CrearAnimacion/BorrarAnimacionActiva/MoverAnimacionActiva
+#include "animation/W3dAnimSet.h"        // clips COMPARTIDOS: el rename copia antes de tomar el puntero al nombre
+#include "io/W3dRecursos.h"              // las bibliotecas de clips de jerarquia cargadas (el desplegable "Clips")
 #include "animation/Armature2DAnimation.h" // clips del ARMATURE 2D (selector del timeline + tarjeta Animacion)
 #include "edit/BoneEdit.h"               // BoneRenombradoDesdeUI (rename de hueso + vertex group juntos)
 #include "ViewPorts/UVEditor.h"          // tarjeta "Armature 2D": UVEditorEnModoHuesos + Bone2D* (huesos 2D del mesh)
 #include "edit/WeightPaint.h"          // Assign/Remove/Select/Deselect de Vertex Groups y UV Groups
 #include "importers/import_obj.h" // ExportOBJ (boton Wavefront.obj de la tarjeta Export)
+#include "importers/import_w3d.h" // g_w3dFormatoMallasProyecto (tilde "Meshes as text")
 #include "importers/export_gltf.h" // ExportGLTF (glTF/GLB: rig + animaciones, sin hornear el skinning)
 #include "render/OpcionesRender.h" // g_redraw (scroll de la lista con la rueda)
 #include "ViewPorts/ViewPort3D.h"  // Viewport3D::RenderAPNG + Viewport3DActive (render a PNG)
+#include "ViewPorts/PropImagen.h"  // pestania RECURSO: la vista previa de una textura
+#include "ViewPorts/LayoutArbol.h" // LayoutAnclarActivos: PropsIrARecurso sin panel activo todavia
+#include "io/RecursosProyecto.h"   // pestania RECURSO: el recurso activo del outliner por recursos
 #include <cstdio>
 #include <cstdlib> // atof: el valor configurado (string) -> buffer del PropFloat (tarjetas de script)
 #include <ctime>   // time(): semilla del UID random del juego
+#include <string.h> // memcpy (en Linux llegaba por <filesystem>, que el build de Symbian no incluye)
 #include <string>
 #include <set> // centro UV de la seleccion (posiciones UV unicas, tarjeta "Transform UV")
 #ifdef W3D_SYMBIAN
@@ -94,6 +115,11 @@ void DibujarTitulo(Object* obj, int maxPixels){
 }
 
 void RebindMaterialMeshPart(); // (definida mas abajo)
+static void AccionRecSeleccionarUsuarios(); // la tarjeta del RECURSO de la biblioteca (definidas junto a Rebind)
+static void AccionRecBorrar();
+static void AccionMenuRecUbicacion();
+static void AccionRecAccionTipo();
+static void AccionRecParar();
 
 // nombre clasico del programa: Material, Material.001, Material.002...
 // Delega en LA regla comun (el ctor de Material ya uniquifica igual; esto solo
@@ -148,8 +174,17 @@ extern bool LayoutToggleEditMode(); // LayoutInput.cpp
 
 // el contenido cambio (material/modo/rename distinto): recalcular la tarjeta y el scroll el proximo frame
 static bool PropertiesLayoutDirty = false;
+// (lo mismo desde las tarjetas que viven en su propio archivo: PropsPrefab.cpp)
+void PropsLayoutSucio() { PropertiesLayoutDirty = true; }
 
+// EL MATERIAL DEL RECURSO ACTIVO: con un material elegido en el OUTLINER POR RECURSOS (pestania
+// 10 del panel), la tarjeta Material edita ESE material y no el del mesh part del objeto activo.
+static Material* MaterialDeRecursoUI(){
+    if (!PropsActivo || PropsActivo->pestaniaActiva != 3) return NULL;
+    return W3dRecursoActivoMaterial();
+}
 static Mesh* MaterialMesh(){
+    if (MaterialDeRecursoUI()) return NULL;   // editando un material SUELTO (sin mesh part que capturar)
     return (ObjActivo && ObjActivo->getType() == ObjectType::mesh) ? static_cast<Mesh*>(ObjActivo) : NULL;
 }
 static int MeshPartActivoIdx(Mesh* m){
@@ -161,6 +196,8 @@ static int MeshPartActivoIdx(Mesh* m){
 }
 // material que muestra el panel (el del mesh part activo) -> para el Ctrl+Z de modificacion de material
 static Material* MaterialActivoUI(){
+    Material* rec = MaterialDeRecursoUI();
+    if (rec) return rec;
     Mesh* m = MaterialMesh(); int idx = MeshPartActivoIdx(m);
     if (!m || idx < 0 || idx >= (int)m->materialsGroup.size()) return NULL;
     return m->materialsGroup[idx].material;
@@ -182,12 +219,14 @@ static void SelEnListaModificador(){
 }
 static void AccionNuevoMeshPart(){
     Mesh* m = MaterialMesh(); if (!m) return;
+    if (W3dMallaSoloLecturaAviso(m, true)) return;   // (las partes de una malla de una libreria son de ella)
     UndoCapturarMallaGeo(m); // Ctrl+Z: snapshot pre-nuevo-mesh-part (materialsGroup)
     SelEnListaMeshPart(NuevoMeshPart(m)); // crea vacio + lo deja activo
     RebindMaterialMeshPart(); g_redraw = true;
 }
 static void AccionBorrarMeshPart(){
     Mesh* m = MaterialMesh(); int idx = MeshPartActivoIdx(m); if (idx < 0) return;
+    if (W3dMallaSoloLecturaAviso(m, true)) return;
     UndoCapturarMallaGeo(m); // Ctrl+Z: snapshot pre-borrar-mesh-part (faces3d.mat + materialsGroup)
     BorrarMeshPart(m, idx); // huerfanas -> anterior; siempre queda >=1
     int n = (int)m->materialsGroup.size();
@@ -196,6 +235,7 @@ static void AccionBorrarMeshPart(){
 }
 static void AccionAssignMeshPart(){
     Mesh* m = MaterialMesh(); int idx = MeshPartActivoIdx(m); if (idx < 0) return;
+    if (W3dMallaSoloLecturaAviso(m, true)) return;
     m->AsignarFacesAMeshPart(idx); // las caras seleccionadas (edit) pasan a este mesh part
     g_redraw = true;
 }
@@ -215,6 +255,7 @@ static void AccionDeselectMeshPart(){
 // reordenar el mesh part activo (el ORDEN = orden de dibujado: solidos primero, transparentes al final).
 static void AccionMeshPartUp(){
     Mesh* m = MaterialMesh(); int idx = MeshPartActivoIdx(m); if (idx <= 0) return; // el primero no sube
+    if (W3dMallaSoloLecturaAviso(m, true)) return;
     UndoCapturarMallaGeo(m); // Ctrl+Z: reordenar toca faces3d.mat + materialsGroup
     MoverMeshPart(m, idx, -1);
     SelEnListaMeshPart(idx - 1); // el mesh part MOVIDO queda seleccionado
@@ -223,6 +264,7 @@ static void AccionMeshPartUp(){
 static void AccionMeshPartDown(){
     Mesh* m = MaterialMesh(); int idx = MeshPartActivoIdx(m);
     if (idx < 0 || idx >= (int)m->materialsGroup.size() - 1) return; // el ultimo no baja
+    if (W3dMallaSoloLecturaAviso(m, true)) return;
     UndoCapturarMallaGeo(m);
     MoverMeshPart(m, idx, +1);
     SelEnListaMeshPart(idx + 1);
@@ -365,6 +407,10 @@ static TextField    g_renameField;         // el texto que se edita (se dibuja D
 static Button*      g_renameBoton = NULL;  // el boton que se volvio input
 static std::string (*g_renameUniq)(const std::string&, std::string*) = NULL; // uniquificador del scope (o NULL)
 static void (*g_renameDespues)() = NULL;   // hook POST-commit (ej: hueso -> renombrar su vertex group junto)
+// el destino NO es un nombre unico sino una RUTA (la carpeta de una malla): acepta quedar VACIO
+// ("" = sin carpeta) y lo que cambie su normalizacion no es un "ya existe". Un NOMBRE nunca: el
+// vacio cae al default ("Objeto"). Lo prende el que inicia el rename, despues de RenameIniciar.
+static bool g_renameVacioOk = false;
 // IDENTIDAD del destino PARA EL UNDO (ver W3dRenameDest en Undo.h): casi todos los renames
 // de esta tarjeta escriben en un dueno del heap (Object/Material/UVMap*/grupo*), pero el de
 // MESH PART apunta DENTRO de Mesh::materialsGroup, que es un vector POR VALOR: guardar ahi un
@@ -384,6 +430,7 @@ static void RenameLimpiar(){
     g_renameBoton = NULL;
     g_renameUniq = NULL;
     g_renameDespues = NULL;
+    g_renameVacioOk = false;
     g_textFieldActivo = NULL;
 }
 // el nombre que TENIA el destino antes del commit (lo leen los hooks post-commit que
@@ -392,14 +439,29 @@ static std::string g_renameViejo;
 void RenameCommit(){ // ACEPTAR: escribe el texto (uniquificado) en el nombre destino
     void (*despues)() = NULL;
     if (g_renameTarget) {
+        // el nombre de un recurso del PROYECTO (material, malla 3D): las escenas y prefabs sin abrir se
+        // cargan antes, asi no quedan nombrando el viejo (ver W3dRaices.h)
+        if (g_renameDest.tipo == W3dRenameDest::Global &&
+            (g_renameDest.cual == W3dRenameDest::MaterialG || g_renameDest.cual == W3dRenameDest::MallaG))
+            W3dRaicesCargarTodas();
         g_renameViejo = *g_renameTarget;
         UndoCapturarRename(g_renameDest);   // Ctrl+Z: guarda el nombre PREVIO antes de escribir
         // el uniquificador YA normaliza (trim + fallback): un campo vacio o con solo
         // espacios no puede quedar como nombre (dos vacios chocarian igual que dos "Cubo").
-        const std::string pedido = W3dNombreNormalizar(g_renameField.text, "Objeto");
+        bool soloEspacios = true;   // (lo que la normalizacion cambiaria por el default)
+        for (size_t k = 0; k < g_renameField.text.size() && soloEspacios; k++) {
+            const char c = g_renameField.text[k];
+            if (c != ' ' && c != '\t' && c != '\r' && c != '\n') soloEspacios = false;
+        }
+        const std::string pedido = (g_renameVacioOk && soloEspacios) ? std::string()
+                                                                     : W3dNombreNormalizar(g_renameField.text, "Objeto");
         *g_renameTarget = g_renameUniq ? g_renameUniq(pedido, g_renameTarget) : pedido;
-        if (*g_renameTarget != pedido)
+        if (*g_renameTarget != pedido && !g_renameVacioOk)   // (una carpeta solo se normaliza: no "ya existe")
             W3dAvisoYaExiste(pedido, *g_renameTarget); // no es un error: es informativo
+        // el nombre de una capa / grupo / mesh part es dato de la MALLA: si es de un RECURSO
+        // compartido, lo ven todos sus objetos (el tick del editor lo publica)
+        if (g_renameDest.tipo == W3dRenameDest::CapaMalla || g_renameDest.tipo == W3dRenameDest::MeshPart)
+            W3dMallaMarcarEditada((Mesh*)g_renameDest.dueno);
         despues = g_renameDespues;         // el hook corre DESPUES de limpiar (puede abrir notificaciones)
     }
     RenameLimpiar();
@@ -425,6 +487,7 @@ static void RenameIniciar(Button* boton, std::string* destino, std::string (*uni
     g_renameBoton = boton;
     g_renameUniq = uniq;
     g_renameDespues = despues; // hook post-commit (rename de vertex group / UV group: la otra punta)
+    g_renameVacioOk = false;   // (un nombre: la carpeta lo prende despues)
     g_renameField.SetText(*destino);
     g_renameField.SelectAll();   // TODO seleccionado: la 1ra tecla reemplaza
     boton->editField = &g_renameField; // el boton se dibuja como input
@@ -437,14 +500,15 @@ static void RenameIniciar(Button* boton, std::string* destino, std::string (*uni
 }
 static void AccionRenameMeshPart(){ // las PARTES tambien son unicas dentro de la malla
     Mesh* m = MaterialMesh(); int idx = MeshPartActivoIdx(m); if (idx < 0 || !PropsActivo) return;
+    if (W3dMallaSoloLecturaAviso(m, true)) return;
     if (!PropsActivo->propRowDelRen || PropsActivo->propRowDelRen->botones.size() < 2) return;
     const W3dRenameDest dest = W3dDestMeshPart(m, idx);  // el nombre vive DENTRO del vector de partes
     RenameIniciar(PropsActivo->propRowDelRen->botones[1], &m->materialsGroup[idx].name, UniqMeshPart,
                   NULL, &dest); // [1] = Rename
 }
 static void AccionRenameMaterial(){
-    Mesh* m = MaterialMesh(); int idx = MeshPartActivoIdx(m); if (idx < 0 || !PropsActivo) return;
-    Material* mat = m->materialsGroup[idx].material;
+    if (!PropsActivo) return;
+    Material* mat = MaterialActivoUI();   // el del mesh part, o el material elegido en el outliner
     if (!mat || mat == MaterialDefecto) return; // el material POR DEFECTO no se renombra (es global)
     if (!PropsActivo->propBtnRenameMat) return;
     // el destino va por INDICE en Materials (lista global de punteros): un material borrado
@@ -458,6 +522,7 @@ static void AccionRenameMaterial(){
 static void AccionRenameUVMap(){
     if (!ObjActivo || ObjActivo->getType() != ObjectType::mesh || !PropsActivo || !PropsActivo->propBtnRenameUV) return;
     Mesh* m = (Mesh*)ObjActivo;
+    if (W3dMallaSoloLecturaAviso(m, true)) return;
     if (m->uvMapActivo < 0 || m->uvMapActivo >= (int)m->uvMaps.size()) return;
     // (malla, lista, indice): el UVMap* se libera y se recrea (LiberarCapas / boton "-"), ver Undo.h
     const W3dRenameDest dest = W3dDestCapaMalla(m, W3dRenameDest::UVMap, m->uvMapActivo);
@@ -467,6 +532,7 @@ static void AccionRenameUVMap(){
 static void AccionRenameColor(){
     if (!ObjActivo || ObjActivo->getType() != ObjectType::mesh || !PropsActivo || !PropsActivo->propBtnRenameColor) return;
     Mesh* m = (Mesh*)ObjActivo;
+    if (W3dMallaSoloLecturaAviso(m, true)) return;
     if (m->colorActivo < 0 || m->colorActivo >= (int)m->colorLayers.size()) return;
     const W3dRenameDest dest = W3dDestCapaMalla(m, W3dRenameDest::ColorLayer, m->colorActivo);
     RenameIniciar(PropsActivo->propBtnRenameColor->button, &m->colorLayers[m->colorActivo]->nombre, UniqColor,
@@ -504,6 +570,7 @@ static void RenameDespuesVGroup(){
 static void AccionRenameGroup(){
     if (!ObjActivo || ObjActivo->getType() != ObjectType::mesh || !PropsActivo || !PropsActivo->propBtnRenameGroup) return;
     Mesh* m = (Mesh*)ObjActivo;
+    if (W3dMallaSoloLecturaAviso(m, true)) return;
     if (m->grupoActivo < 0 || m->grupoActivo >= (int)m->vertexGroups.size()) return;
     const W3dRenameDest dest = W3dDestCapaMalla(m, W3dRenameDest::VGroup, m->grupoActivo);
     RenameIniciar(PropsActivo->propBtnRenameGroup->button, &m->vertexGroups[m->grupoActivo]->nombre,
@@ -534,6 +601,7 @@ static void RenameDespuesUVGroup(){
 static void AccionRenameUVGroup(){
     if (!ObjActivo || ObjActivo->getType() != ObjectType::mesh || !PropsActivo || !PropsActivo->propBtnRenameUVGroup) return;
     Mesh* m = (Mesh*)ObjActivo;
+    if (W3dMallaSoloLecturaAviso(m, true)) return;
     if (m->uvGrupoActivo < 0 || m->uvGrupoActivo >= (int)m->uvGroups.size()) return;
     const W3dRenameDest dest = W3dDestCapaMalla(m, W3dRenameDest::UVGroup, m->uvGrupoActivo);
     RenameIniciar(PropsActivo->propBtnRenameUVGroup->button, &m->uvGroups[m->uvGrupoActivo]->nombre,
@@ -543,6 +611,9 @@ static void AccionRenameAnim(){
     Armature* a = ArmActiva();
     if (!a || !PropsActivo || !PropsActivo->propBtnRenameAnim) return;
     if (a->animActiva < 0 || a->animActiva >= (int)a->animations.size()) return;
+    // el rename guarda un PUNTERO al nombre del clip: si el clip es de un animset compartido, el
+    // armature pasa ANTES a clips propios (sino renombraba el clip de todos los que lo usan)
+    W3dArmatureAnimsPropias(a);
     const W3dRenameDest dest = W3dDestClipArm(a, a->animActiva);   // el clip se borra con el "-"
     RenameIniciar(PropsActivo->propBtnRenameAnim->button, &a->animations[a->animActiva]->name, UniqAnim,
                   NULL, &dest);
@@ -576,7 +647,7 @@ static void SincronizarTextoBoton(Properties* p){
     if (!p || !p->propBtnTexto) return;
     Boton2D* b = (ObjActivo && ObjActivo->getType() == ObjectType::boton2d) ? (Boton2D*)ObjActivo : NULL;
     PropText* pt = p->propBtnTexto;
-    bool foco = (g_textFieldActivo == &pt->field);
+    bool foco = TextFieldEnVivo(&pt->field);   // (en vivo: un Esc re-escribe el texto de antes)
     if (foco && !g_btnEditTarget && b) g_btnEditTarget = &b->texto;
     if (foco && g_btnEditTarget && *g_btnEditTarget != pt->field.text){
         *g_btnEditTarget = pt->field.text;   // vista previa EN VIVO
@@ -609,7 +680,7 @@ static void SincronizarTexto2D(Properties* p){
     if (!p || !p->propT2dTexto) return;
     Texto2D* t = (ObjActivo && ObjActivo->getType() == ObjectType::texto2d) ? (Texto2D*)ObjActivo : NULL;
     PropText* pt = p->propT2dTexto;
-    bool foco = (g_textFieldActivo == &pt->field);
+    bool foco = TextFieldEnVivo(&pt->field);   // (en vivo: un Esc re-escribe el texto de antes)
     if (foco && !g_t2dEditTarget && t) g_t2dEditTarget = &t->texto;
     if (foco && g_t2dEditTarget && *g_t2dEditTarget != pt->field.text){
         *g_t2dEditTarget = pt->field.text;   // VISTA PREVIA EN VIVO: cada tecla se ve en el lienzo
@@ -629,7 +700,7 @@ static void SincronizarLodDist(Properties* p){
     if (!p || !p->propLodDist) return;
     LOD* l = (ObjActivo && ObjActivo->getType() == ObjectType::lod) ? (LOD*)ObjActivo : NULL;
     PropText* pt = p->propLodDist;
-    bool foco = (g_textFieldActivo == &pt->field);
+    bool foco = TextFieldEnVivo(&pt->field);   // (en vivo: un Esc re-aplica las distancias de antes)
     if (foco && l && pt->field.text != g_lodDistUlt){
         l->SetDistanciasTexto(pt->field.text);   // vista previa EN VIVO en el viewport
         g_lodDistUlt = pt->field.text;
@@ -653,7 +724,7 @@ static void SincronizarMirrorTarget(Properties* p){
     if (!p || !p->propMirrorTarget) return;
     Mirror* m = (ObjActivo && ObjActivo->getType() == ObjectType::mirror) ? (Mirror*)ObjActivo : NULL;
     PropText* pt = p->propMirrorTarget;
-    bool foco = (g_textFieldActivo == &pt->field);
+    bool foco = TextFieldEnVivo(&pt->field);   // (en vivo: un Esc vuelve al target de antes)
     if (foco && m && pt->field.text != g_mirrorTgtUlt){
         std::string* nom = m->RefPropiaNombre(0);
         if (nom) *nom = pt->field.text;
@@ -692,6 +763,12 @@ static void AccionFisQuitar(){
 static std::string NombreDeTextura(Texture* t);
 static std::string NombreDeArchivo(const std::string& ruta);
 static void AbrirMenuBajoBoton(PopupMenu* menu, Button* boton);
+// tarjeta HITBOX (ViewPorts/PropsHitbox.cpp)
+void PropsHitboxConstruir(Properties* p);
+void PropsHitboxActualizar(Properties* p, bool visible);
+// tarjeta INSTANCIA DE PREFAB (ViewPorts/PropsPrefab.cpp)
+void PropsPrefabConstruir(Properties* p);
+void PropsPrefabActualizar(Properties* p, int pestania);
 static const char* NombreMezcla(int m);   // nombre del modo de mezcla (reusa el del material, definido mas abajo)
 
 // TEXTURA del objeto Particulas: dropdown de texturas ya cargadas + "Load Texture" (file browser), IGUAL que
@@ -757,6 +834,25 @@ static void AccionMenuPartMezcla(){
     AbrirMenuBajoBoton(MenuPartMezcla, PropsActivo->propPartMezcla->button);
 }
 
+// MEZCLA de una IMAGEN 2D (mismo menu que las particulas): Alpha normal, Aditiva para brillos de HUD, etc.
+static Imagen2D* Img2dActiva();      // (definido mas abajo)
+static PopupMenu* MenuImgMezcla = NULL;
+static void AccionImgMezclaElegida(int id){
+    Imagen2D* im = Img2dActiva(); if (!im) return;
+    if (id < 0 || id >= (int)w3dEngine::MezclaCount_) return;
+    im->mezcla = id;
+    if (PropsActivo && PropsActivo->propImgMezcla) PropsActivo->propImgMezcla->button->text = NombreMezcla(id);
+    g_redraw = true;
+}
+static void AccionMenuImgMezcla(){
+    if (!PropsActivo || !Img2dActiva()) return;
+    if (!MenuImgMezcla){ MenuImgMezcla = new PopupMenu(); MenuImgMezcla->action = AccionImgMezclaElegida; }
+    MenuImgMezcla->Limpiar();
+    for (int i = 0; i < (int)w3dEngine::MezclaCount_; i++)
+        MenuImgMezcla->Agregar(NombreMezcla(i), i, IconType::material);
+    AbrirMenuBajoBoton(MenuImgMezcla, PropsActivo->propImgMezcla->button);
+}
+
 // ---- PARTICULAS AVANZADAS: la FORMA (dropdown) y los int espejados en float ----
 static const char* NombreFormaPart(int f){
     return f == w3dEngine::FormaEstirada ? T("Stretched") : f == w3dEngine::FormaLinea ? T("Line (trail)") : T("Billboard");
@@ -815,24 +911,18 @@ bool gCargarTexturaComoNormal = false;
 // (las primeras 5 son de la UI: font/origen/cursor/linea/lampara)
 static void AccionTexturaElegida(int id){
     if (!PropsActivo) return;
-    if (!ObjActivo || ObjActivo->getType() != ObjectType::mesh) return;
-    Mesh* mesh = static_cast<Mesh*>(ObjActivo);
-    if (mesh->materialsGroup.empty()) return;
-    PropListMeshParts* lista =
-        static_cast<PropListMeshParts*>(PropsActivo->propMeshParts->properties[0]);
-    int idx = lista->selectIndex;
-    if (idx < 0 || idx >= (int)mesh->materialsGroup.size()) idx = 0;
-    Material* mat = mesh->materialsGroup[idx].material;
+    Material* mat = MaterialActivoUI();   // el del mesh part activo, o el elegido en el outliner
     if (!mat) return;
 
+    // (la RANURA del material retiene su textura y suelta la anterior: Textures.h, TexturaPonerEn)
     if (id == 0) {
-        mat->texture = NULL; // No Texture
+        TexturaPonerEn(mat->texture, NULL); // No Texture
     } else if (id == 1) {
         // Load Texture: el browser COMPARTIDO carga la imagen y la asigna a
         // 'mat' (async: el rebind lo hace el callback al elegir el archivo)
         if (DialogoCargarTextura) { gCargarTexturaComoNormal = false; DialogoCargarTextura(mat); return; }
     } else if (5 + id - 2 < (int)Textures.size()) {
-        mat->texture = Textures[5 + id - 2];
+        TexturaPonerEn(mat->texture, Textures[5 + id - 2]);
         mat->textureOn = true;
     }
     RebindMaterialMeshPart();
@@ -851,9 +941,95 @@ static void AbrirMenuBajoBoton(PopupMenu* menu, Button* boton){
     MenuAbierto = menu;
 }
 
+// ============================================================================
+//  TARJETA "3D Mesh": LA MALLA COMO RECURSO (objects/MallaRecurso.h, io/MallasProyecto.h).
+//  Que malla del proyecto usa el objeto (desplegable con todas + "New Copy"), su NOMBRE
+//  (renombra el recurso: lo ven todos los objetos que la usan), su CARPETA (cosmetica: ordena
+//  la vista de mallas), cuantos objetos de la escena la usan y "Make Single User" (el objeto
+//  pasa a una copia propia). Todo con Ctrl+Z.
+// ============================================================================
+static PopupMenu* MenuMallas3D = NULL;
+// id del menu - 1 -> SERIAL del recurso (se rearma en cada apertura). El serial y no el puntero:
+// el registro se purga (W3dMallasPurgarSinUso) y un menu abierto no puede quedar colgando
+static std::vector<int> gMallasMenu;
+static Mesh* MallaActivaProps() {
+    return (ObjActivo && ObjActivo->getType() == ObjectType::mesh) ? (Mesh*)ObjActivo : NULL;
+}
+static void AccionMalla3DElegida(int id) {
+    Mesh* m = MallaActivaProps();
+    if (!m) return;
+    if (W3dMallaSoloLecturaAviso(m, false)) return;   // (lo que genera un proxy usa la malla que dice su libreria)
+    if (id == 0) W3dMallaNuevaCopia(m);
+    else if (id - 1 < (int)gMallasMenu.size()) {
+        MallaRecurso* r = W3dMallaRecursoPorSerial(gMallasMenu[(size_t)(id - 1)]);
+        if (r) W3dMallaAsignar(m, r);
+    }
+    PropertiesLayoutDirty = true;
+    g_redraw = true;
+}
+static void AccionMenuMallas3D() {
+    if (!PropsActivo || !PropsActivo->propBtnMallaSel) return;
+    Mesh* m = MallaActivaProps();
+    if (!m) return;
+    if (W3dMallaSoloLecturaAviso(m, false)) return;
+    if (!MenuMallas3D) { MenuMallas3D = new PopupMenu(); MenuMallas3D->action = AccionMalla3DElegida; }
+    MenuMallas3D->Limpiar();
+    MenuMallas3D->Agregar(T("New Copy"), 0, IconType::mas);
+    gMallasMenu.clear();
+    const std::vector<MallaRecurso*>& reg = W3dMallasRegistro();
+    for (size_t i = 0; i < reg.size(); i++) {
+        gMallasMenu.push_back(reg[i]->serial);
+        if (reg[i]->borrado) continue;   // (el usuario lo borro de la biblioteca: vive solo para el undo)
+        const bool actual = (reg[i] == m->malla);
+        MenuItem* it = MenuMallas3D->Agregar(reg[i]->nombre, (int)i + 1, actual ? IconType::notifOk : IconType::mesh);
+        if (it) it->verde = actual;
+    }
+    AbrirMenuBajoBoton(MenuMallas3D, PropsActivo->propBtnMallaSel->button);
+}
+static void AccionMallaHacerUnica() {
+    Mesh* m = MallaActivaProps();
+    if (!m || !W3dMallaCompartida(m)) return;
+    if (W3dMallaSoloLecturaAviso(m, false)) return;
+    if (W3dMallaHacerUnica(m)) Notificar(T("Mesh made single user"), false);
+    PropertiesLayoutDirty = true;
+    g_redraw = true;
+}
+// LO DE UNA LIBRERIA NO SE EDITA (W3dMallaSoloLectura): las filas que editan se ocultan por frame. Compara antes
+// de asignar (sin redibujado infinito); un cambio de alto re-layoutea
+static void VisibleSiCambia(Button* b, bool v) {
+    if (b && b->visible != v) { b->visible = v; PropertiesLayoutDirty = true; g_redraw = true; }
+}
+static void OcultoSiCambia(PropButton* p, bool o) {
+    if (p && p->oculto != o) { p->oculto = o; PropertiesLayoutDirty = true; g_redraw = true; }
+}
+static void OcultoSiCambia(PropLabel* p, bool o) {
+    if (p && p->oculto != o) { p->oculto = o; PropertiesLayoutDirty = true; g_redraw = true; }
+}
+static void FilaSoloLectura(PropButtonRow* f) {   // (solo oculta: la regla de cada fila la repone despues)
+    if (f) for (size_t b = 0; b < f->botones.size(); b++) VisibleSiCambia(f->botones[b], false);
+}
+
+// lo que la tarjeta muestra, por frame (compara antes de asignar: sin redibujado infinito). TODA malla es un
+// recurso (la biblioteca): el selector dice su nombre, con un '*' si no esta guardado
+static void SincronizarMalla3D(Properties* p, Mesh* m) {
+    if (!p || !m || !p->propBtnMallaSel || !p->propLblMallaUsos || !p->propBtnMallaUnica) return;
+    W3dMallasAsegurarRecursos();   // (la que nacio en este cuadro ya tiene el suyo)
+    std::string sel = m->malla ? m->malla->nombre : m->name;
+    if (m->malla && W3dCambiosRecursoSucio(W3D_VISTA_MALLAS, m->malla->nombre)) sel += "*";
+    if (p->propBtnMallaSel->button->text != sel) { p->propBtnMallaSel->button->text = sel; g_redraw = true; }
+    const int us = m->malla ? W3dMallaRecursoUsuariosEnEscena(m->malla) : 1;
+    char b[96]; snprintf(b, sizeof(b), "%s: %d", T("Users"), us);
+    if (p->propLblMallaUsos->name != b) { p->propLblMallaUsos->name = b; g_redraw = true; }
+    // (lo que genera un PROXY usa la malla que dice su libreria: no se separa)
+    const bool ocultar = !(m->malla && us > 1) || W3dMallaSoloLectura(m, false);
+    if (p->propBtnMallaUnica->oculto != ocultar) { p->propBtnMallaUnica->oculto = ocultar; PropertiesLayoutDirty = true; }
+    // el aviso de SOLO LECTURA: su recurso es de una libreria (o la genero un proxy)
+    OcultoSiCambia(p->propLblMallaLib, !W3dMallaSoloLectura(m, true));
+}
+
 static void AccionMenuTexturas(){
     if (!PropsActivo) return;
-    if (!ObjActivo || ObjActivo->getType() != ObjectType::mesh) return;
+    if (!MaterialActivoUI()) return;   // un mesh part con material, o el material elegido en el outliner
     if (!MenuTexturas) {
         MenuTexturas = new PopupMenu();
         MenuTexturas->action = AccionTexturaElegida;
@@ -871,23 +1047,17 @@ static void AccionMenuTexturas(){
 // === NORMAL MAP: selector de textura (mirror del de la textura base, pero -> mat->normalTexture) ===
 static void AccionNormalTexElegida(int id){
     if (!PropsActivo) return;
-    if (!ObjActivo || ObjActivo->getType() != ObjectType::mesh) return;
-    Mesh* mesh = static_cast<Mesh*>(ObjActivo);
-    if (mesh->materialsGroup.empty()) return;
-    PropListMeshParts* lista = static_cast<PropListMeshParts*>(PropsActivo->propMeshParts->properties[0]);
-    int idx = lista->selectIndex;
-    if (idx < 0 || idx >= (int)mesh->materialsGroup.size()) idx = 0;
-    Material* mat = mesh->materialsGroup[idx].material;
+    Material* mat = MaterialActivoUI();
     if (!mat) return;
-    if (id == 0) { mat->normalTexture = NULL; }                                   // sin normal map
+    if (id == 0) { TexturaPonerEn(mat->normalTexture, NULL); }                   // sin normal map (la ranura suelta la suya)
     else if (id == 1) { if (DialogoCargarTextura) { gCargarTexturaComoNormal = true; DialogoCargarTextura(mat); return; } } // cargar archivo (MISMO browser que la textura base, flag -> normalTexture)
-    else if (5 + id - 2 < (int)Textures.size()) { mat->normalTexture = Textures[5 + id - 2]; } // una ya cargada
+    else if (5 + id - 2 < (int)Textures.size()) { TexturaPonerEn(mat->normalTexture, Textures[5 + id - 2]); } // una ya cargada
     RebindMaterialMeshPart();
 }
 
 static void AccionMenuTexturasNormal(){
     if (!PropsActivo) return;
-    if (!ObjActivo || ObjActivo->getType() != ObjectType::mesh) return;
+    if (!MaterialActivoUI()) return;
     if (!MenuTexturasNormal) {
         MenuTexturasNormal = new PopupMenu();
         MenuTexturasNormal->action = AccionNormalTexElegida;
@@ -901,6 +1071,100 @@ static void AccionMenuTexturasNormal(){
     AbrirMenuBajoBoton(MenuTexturasNormal, PropsActivo->propBtnNormalTex->button);
 }
 
+// ===========================================================================
+//  CAPAS DE TEXTURA (TexLayer, objects/Materials.h): hasta 4 filas en la tarjeta Material, cada una con su
+//  textura, la capa UV de la malla con la que se dibuja y la mezcla. La fila que sigue a la ultima capa es
+//  la de "Add Layer": elegir una textura ahi CREA la capa; "No Texture" en una capa la BORRA. Los tres
+//  desplegables comparten menu; gCapaMenu dice sobre que fila se abrio.
+// ===========================================================================
+static const int kCapasUI = 4;
+static PopupMenu* MenuCapaTex = NULL;
+static PopupMenu* MenuCapaUV = NULL;
+static PopupMenu* MenuCapaMezcla = NULL;
+static int gCapaMenu = 0;
+int gCargarTexturaCapa = -1;   // "Load Texture" de una capa: main.cpp deja la imagen en esa capa (-1 = base/normal)
+// la malla del mesh part que edita la tarjeta (para nombrar sus capas UV); NULL con el material de un recurso
+static Mesh* MallaActivaUI() {
+    if (!ObjActivo || ObjActivo->getType() != ObjectType::mesh) return NULL;
+    return (Mesh*)ObjActivo;
+}
+static std::string NombreCapaUV(int k) {
+    Mesh* m = MallaActivaUI();
+    if (m && k >= 0 && k < (int)m->uvMaps.size()) return m->uvMaps[(size_t)k]->nombre;
+    char b[24]; snprintf(b, sizeof b, "UV %d", k + 1);
+    return b;
+}
+static void AccionCapaTexElegida(int id) {
+    Material* mat = MaterialActivoUI();
+    if (!PropsActivo || !mat) return;
+    const int n = gCapaMenu;
+    if (id == 0) {                                     // "No Texture": la capa se va (y suelta su textura)
+        if (n < (int)mat->capas.size()) {
+            Texture* t = mat->capas[(size_t)n].tex;
+            mat->capas.erase(mat->capas.begin() + n);
+            TexturaSoltar(t);
+        }
+    } else if (id == 1) {                              // cargar archivo: el MISMO browser, con la capa como destino
+        if (DialogoCargarTextura) { gCargarTexturaComoNormal = false; gCargarTexturaCapa = n; DialogoCargarTextura(mat); return; }
+    } else if (5 + id - 2 < (int)Textures.size()) {    // una ya cargada (la ranura de la capa la retiene)
+        if (n >= (int)mat->capas.size()) mat->capas.resize((size_t)n + 1);
+        TexturaPonerEn(mat->capas[(size_t)n].tex, Textures[5 + id - 2]);
+    }
+    RebindMaterialMeshPart();
+}
+static void AccionMenuCapaTex(int n) {
+    if (!PropsActivo || !MaterialActivoUI()) return;
+    gCapaMenu = n;
+    if (!MenuCapaTex) { MenuCapaTex = new PopupMenu(); MenuCapaTex->action = AccionCapaTexElegida; }
+    MenuCapaTex->Limpiar();
+    MenuCapaTex->Agregar(T("No Texture"), 0, IconType::notifError);
+    MenuCapaTex->Agregar(T("Load Texture"), 1, IconType::archive);
+    for (size_t i = 5; i < Textures.size(); i++) MenuCapaTex->Agregar(NombreDeTextura(Textures[i]), 2 + (int)(i - 5), IconType::textura);
+    AbrirMenuBajoBoton(MenuCapaTex, PropsActivo->propCapaTex[n]->button);
+}
+static void AccionCapaUVElegida(int id) {
+    Material* mat = MaterialActivoUI();
+    if (!mat || gCapaMenu >= (int)mat->capas.size() || id < 0) return;
+    mat->capas[(size_t)gCapaMenu].uvMapa = id;
+    RebindMaterialMeshPart();
+}
+static void AccionMenuCapaUV(int n) {
+    if (!PropsActivo || !MaterialActivoUI()) return;
+    gCapaMenu = n;
+    if (!MenuCapaUV) { MenuCapaUV = new PopupMenu(); MenuCapaUV->action = AccionCapaUVElegida; }
+    MenuCapaUV->Limpiar();
+    Mesh* m = MallaActivaUI();
+    int cuantas = m ? (int)m->uvMaps.size() : 0;
+    if (m && (int)m->uvExtra.size() > cuantas) cuantas = (int)m->uvExtra.size();   // importadas sin capa del editor
+    if (cuantas < 2) cuantas = 2;
+    for (int k = 0; k < cuantas && k < 8; k++) MenuCapaUV->Agregar(NombreCapaUV(k), k, IconType::material);
+    AbrirMenuBajoBoton(MenuCapaUV, PropsActivo->propCapaUV[n]->button);
+}
+static void AccionCapaMezclaElegida(int id) {
+    Material* mat = MaterialActivoUI();
+    if (!mat || gCapaMenu >= (int)mat->capas.size() || id < 0 || id >= W3D_CAPA_MEZCLAS) return;
+    mat->capas[(size_t)gCapaMenu].blend = id;
+    RebindMaterialMeshPart();
+}
+static void AccionMenuCapaMezcla(int n) {
+    if (!PropsActivo || !MaterialActivoUI()) return;
+    gCapaMenu = n;
+    if (!MenuCapaMezcla) { MenuCapaMezcla = new PopupMenu(); MenuCapaMezcla->action = AccionCapaMezclaElegida; }
+    MenuCapaMezcla->Limpiar();
+    for (int k = 0; k < W3D_CAPA_MEZCLAS; k++) MenuCapaMezcla->Agregar(W3dCapaMezclaNombre(k), k, IconType::material);
+    AbrirMenuBajoBoton(MenuCapaMezcla, PropsActivo->propCapaMezcla[n]->button);
+}
+// los botones no reciben argumentos: una accion por fila
+static void AccionCapaTex0() { AccionMenuCapaTex(0); }  static void AccionCapaTex1() { AccionMenuCapaTex(1); }
+static void AccionCapaTex2() { AccionMenuCapaTex(2); }  static void AccionCapaTex3() { AccionMenuCapaTex(3); }
+static void AccionCapaUV0()  { AccionMenuCapaUV(0); }   static void AccionCapaUV1()  { AccionMenuCapaUV(1); }
+static void AccionCapaUV2()  { AccionMenuCapaUV(2); }   static void AccionCapaUV3()  { AccionMenuCapaUV(3); }
+static void AccionCapaMz0()  { AccionMenuCapaMezcla(0); } static void AccionCapaMz1() { AccionMenuCapaMezcla(1); }
+static void AccionCapaMz2()  { AccionMenuCapaMezcla(2); } static void AccionCapaMz3() { AccionMenuCapaMezcla(3); }
+static void (*const kAccionCapaTex[4])() = { AccionCapaTex0, AccionCapaTex1, AccionCapaTex2, AccionCapaTex3 };
+static void (*const kAccionCapaUV[4])()  = { AccionCapaUV0,  AccionCapaUV1,  AccionCapaUV2,  AccionCapaUV3 };
+static void (*const kAccionCapaMz[4])()  = { AccionCapaMz0,  AccionCapaMz1,  AccionCapaMz2,  AccionCapaMz3 };
+
 // === REFLECTION: el MODO del reflejo (Matcap HW / Sphere Map / Equirect) en un desplegable (reemplaza el viejo
 // checkbox "Chrome 360"). Los tags (hardware)/(software) son para el N95 (donde importa el perf): el Matcap es por
 // matriz de textura = HW en los 4 OS; el Sphere Map exacto es HW en PC (texgen) pero SW en el N95; el Equirect es SW.
@@ -912,13 +1176,7 @@ static const char* NombreReflectMode(int m){
 }
 static void AccionReflectModeElegido(int id){
     if (!PropsActivo) return;
-    if (!ObjActivo || ObjActivo->getType() != ObjectType::mesh) return;
-    Mesh* mesh = static_cast<Mesh*>(ObjActivo);
-    if (mesh->materialsGroup.empty()) return;
-    PropListMeshParts* lista = static_cast<PropListMeshParts*>(PropsActivo->propMeshParts->properties[0]);
-    int idx = lista->selectIndex;
-    if (idx < 0 || idx >= (int)mesh->materialsGroup.size()) idx = 0;
-    Material* mat = mesh->materialsGroup[idx].material;
+    Material* mat = MaterialActivoUI();
     if (!mat) return;
     if (id >= 0 && id <= 2) mat->reflectMode = id;
     RebindMaterialMeshPart();
@@ -996,6 +1254,15 @@ static void OnMatGrosorLineaChange() {
     Material* mat = MaterialActivoUI();
     if (!mat || mat == MaterialDefecto) return;
     mat->grosorLinea = (g_matGrosorLinea < 1.0f) ? 1.0f : g_matGrosorLinea;
+    g_redraw = true;
+}
+
+// --- ALPHA TEST (Material::alphaTest, la clave "alfaCorte" del .w3d): recorte por alfa, 0 = apagado; con > 0 se
+// descartan los texels de alfa menor, sin blend y escribiendo z (rejas, hojas, pasto). La fila apunta DIRECTO al
+// campo del material (como Shininess): tras un Ctrl+Z muestra el valor restaurado sin re-armar la tarjeta. El
+// Ctrl+Z lo da MaterialModUndo: el click en la fila toma la foto y el panel la commitea al soltar (arrastre) o al
+// terminar la edicion por texto (click sin arrastrar / OK del teclado + Enter). El rango lo clampea la fila.
+static void OnMatAlfaChange() {
     g_redraw = true;
 }
 
@@ -1196,7 +1463,7 @@ static void AccionGuardarConfig(){
 // que el campo Name. La ruta se valida recien al Compilar (RepoRoot chequea que exista Objects.cpp).
 static void SincronizarRepoCampo(PropText* pt){
     if (!pt) return;
-    bool foco = (g_textFieldActivo == &pt->field);
+    bool foco = TextFieldEnVivo(&pt->field);   // (en vivo: un Esc vuelve a la ruta de antes)
     if (foco){
         if (cfg.repoPath != pt->field.text){ cfg.repoPath = pt->field.text; g_redraw = true; }
     } else if (pt->field.text != cfg.repoPath){
@@ -1228,12 +1495,14 @@ static PopupMenu* MenuAddModifier = NULL;
 
 static void AccionAddModifierElegido(int id){
     if (!ObjActivo || ObjActivo->getType() != ObjectType::mesh) return;
+    if (W3dMallaSoloLecturaAviso((Mesh*)ObjActivo, false)) return;   // (los modificadores de lo que genera un proxy son de la libreria)
     UndoModAgregar((Mesh*)ObjActivo, id); // id = ModifierType (Screw/Mirror/Array/SubSurf/Boolean). Ctrl+Z: puerta unica (Undo.h)
     SelEnListaModificador();                     // el nuevo queda seleccionado en el selector
     PropertiesLayoutDirty = true;                // re-layout (aparecen Remove / Move / la 2da tarjeta)
 }
 static void AccionMenuAddModifier(){
     if (!PropsActivo || !ObjActivo || ObjActivo->getType() != ObjectType::mesh) return;
+    if (W3dMallaSoloLecturaAviso((Mesh*)ObjActivo, false)) return;
     if (!MenuAddModifier){
         MenuAddModifier = new PopupMenu();
         MenuAddModifier->action = AccionAddModifierElegido;
@@ -1251,18 +1520,21 @@ static void AccionMenuAddModifier(){
 }
 static void AccionRemoveModifier(){
     if (!ObjActivo || ObjActivo->getType() != ObjectType::mesh) return;
+    if (W3dMallaSoloLecturaAviso((Mesh*)ObjActivo, false)) return;
     UndoModQuitar((Mesh*)ObjActivo); // Ctrl+Z: el modificador NO se libera, lo adopta el paso de undo (Undo.h)
     SelEnListaModificador();
     PropertiesLayoutDirty = true;
 }
 static void AccionModifierUp(){
     if (!ObjActivo || ObjActivo->getType() != ObjectType::mesh) return;
+    if (W3dMallaSoloLecturaAviso((Mesh*)ObjActivo, false)) return;
     UndoModMover((Mesh*)ObjActivo, -1); // sube en el stack (el orden importa)
     SelEnListaModificador();                  // mantiene seleccionado el modificador MOVIDO
     PropertiesLayoutDirty = true;
 }
 static void AccionModifierDown(){
     if (!ObjActivo || ObjActivo->getType() != ObjectType::mesh) return;
+    if (W3dMallaSoloLecturaAviso((Mesh*)ObjActivo, false)) return;
     UndoModMover((Mesh*)ObjActivo, +1); // baja en el stack
     SelEnListaModificador();
     PropertiesLayoutDirty = true;
@@ -2187,7 +2459,7 @@ public:
     void RenderPropertiValue(Card* propertiBox) W3D_OVERRIDE {
         if (!value) return;
         int cb = RenglonHeightGS + GlobalScale * 2;
-        bool foco = (g_textFieldActivo == &field);
+        bool foco = TextFieldEnVivo(&field);   // (un Esc re-escribe el nombre de antes)
         if (foco && nom) *nom = field.text;   // lo tipeado pisa el nombre EN VIVO
         // el nombre arranca en el borde IZQUIERDO de la fila (no en la col de valores)
         w3dEngine::PushMatrix();
@@ -2290,6 +2562,9 @@ static void ScriptRefrescar(){
 // el file browser eligio un .lua: agregarlo o cambiar el del script elegido
 static void ScriptElegido(const std::string& rutaElegida) {
     if (!ObjActivo) return;
+    // lo GENERADO por una instancia de prefab: sus scripts son los del prefab (uno agregado o cambiado no se
+    // guarda y corria los valores de los demas al guardar sus overrides). Se edita el prefab
+    if (W3dPrefabEsGeneradoAviso(ObjActivo, true)) { g_scriptCambiarIdx = -1; return; }
     // IMPORTAR = COPIAR ADENTRO: el archivo que el usuario acaba de elegir de su
     // disco pasa a ser del proyecto en el acto y se referencia como INTERNO
     // ("texturas/piso.png"). Sin contenedor montado (proyecto v3) no cambia nada.
@@ -2307,6 +2582,7 @@ static void ScriptElegido(const std::string& rutaElegida) {
 }
 static void AccionScriptAgregar() {
     if (!ObjActivo) return;
+    if (W3dPrefabEsGeneradoAviso(ObjActivo, true)) return;   // (ver ScriptElegido)
     g_scriptCambiarIdx = -1;
     AbrirFileBrowser("Elegir script", T("Open"), ".lua .luac", ScriptElegido);
 }
@@ -2414,6 +2690,7 @@ static void AccionScriptRefElegida(int id) {
 static void QuitarScriptDeObjeto(Object* o, int card) {
     if (!o || !o->scriptDatos) return;
     if (card < 0 || card >= (int)o->scriptDatos->scripts.size()) return;
+    if (W3dPrefabEsGeneradoAviso(o, true)) return;   // (los scripts de lo generado son los del prefab)
     UndoListaBorrada(W3dDestRefLua(o, card, 0));
     o->scriptDatos->scripts.erase(o->scriptDatos->scripts.begin() + card);
     { extern void SimScriptsCambiados(Object*); SimScriptsCambiados(o); }
@@ -2441,6 +2718,7 @@ static void MoverScriptDe(Object* o, int i, int j) {
     if (!o || !o->scriptDatos) return;
     std::vector<W3dScriptEntrada>& v = o->scriptDatos->scripts;
     if (i < 0 || j < 0 || i >= (int)v.size() || j >= (int)v.size() || i == j) return;
+    if (W3dPrefabEsGeneradoAviso(o, true)) return;   // (los scripts de lo generado son los del prefab)
     W3dScriptEntrada t = v[i]; v[i] = v[j]; v[j] = t;
     o->scriptDatos->activo = j;                    // el activo VIAJA con el script que se movio
     UndoListaMovida(W3dDestRefLua(o, -1, 0), i, j);
@@ -2470,6 +2748,7 @@ static void AccionScriptCardFila() {
     GroupPropertie* g = PropsActivo->propScriptCards[card];
     int ultima = (int)g->properties.size() - 1;
     if (fila == 0) {                 // [0] el archivo: elegir otro .lua
+        if (W3dPrefabEsGeneradoAviso(ObjActivo, true)) return;   // (ver ScriptElegido)
         g_scriptCambiarIdx = card;
         AbrirFileBrowser("Elegir script", T("Open"), ".lua .luac", ScriptElegido);
         return;
@@ -2662,7 +2941,7 @@ static void SincronizarNombrePaleta(Properties* p){
     std::vector<Paleta>& ps = W3dPaletas();
     if (gPalEdit < 0 || gPalEdit >= (int)ps.size()) return;
     PropText* pt = p->propPaletaNombre;
-    bool foco = (g_textFieldActivo == &pt->field);
+    bool foco = TextFieldEnVivo(&pt->field);   // (en vivo: un Esc vuelve al nombre de antes)
     if (foco && !pt->field.text.empty() && pt->field.text != ps[gPalEdit].nombre){
         W3dPaletaRenombrar(gPalEdit, pt->field.text);
         if (p->propPaletaSel) p->propPaletaSel->button->text = ps[gPalEdit].nombre;
@@ -3166,6 +3445,7 @@ static void AccionPvsNodoChanged(){
 static void AccionMeshEditableToggle(){
     if (!ObjActivo || ObjActivo->getType() != ObjectType::mesh) return;
     Mesh* m = (Mesh*)ObjActivo;
+    if (W3dMallaSoloLecturaAviso(m, true)) return;   // (los datos de edicion de una malla de una libreria son de ella)
     if (m->noEditable) {
         m->noEditable = false;
         m->CalcularBordes();                       // reconstruye posRep/edges/bordesBuf
@@ -3183,6 +3463,7 @@ static void AccionMeshEditableToggle(){
 // "Apply Modifier": hornea la malla generada en la editable + saca el modificador del stack
 static void AccionAplicarModificador(){
     if (!ObjActivo || ObjActivo->getType()!=ObjectType::mesh) return;
+    if (W3dMallaSoloLecturaAviso((Mesh*)ObjActivo, true)) return;   // (hornear toca la geometria: la del recurso)
     ((Mesh*)ObjActivo)->AplicarModificadorActivo();
     PropertiesLayoutDirty = true; g_redraw = true;
     Notificar(T("Modifier applied"), false);
@@ -3201,6 +3482,7 @@ static void HacerOptimizarVG(){
 }
 static void AccionOptimizarVertexGroups(){
     if (!ObjActivo || ObjActivo->getType() != ObjectType::mesh) return;
+    if (W3dMallaSoloLecturaAviso((Mesh*)ObjActivo, true)) return;
     g_pendingOptVGMesh = (Mesh*)ObjActivo;
     if (!confirmarPopup) confirmarPopup = new ConfirmarPopup();
     confirmarPopup->Abrir("Esto modificara el vertex group y lo simplificara a 1 hueso por vertice (skinning mas rapido). Puede haber perdida de datos.", HacerOptimizarVG);
@@ -3537,8 +3819,89 @@ static void AccionRenderImage(){
 // RANGO DEL RENDER (tarjeta Render): propio, independiente del timeline. 0 = usar el del timeline.
 // Se guarda en el .w3d (raiz "render").
 float g_renderIni = 0.0f, g_renderFin = 0.0f, g_renderFps = 0.0f;
+
+// ---------------------------------------------------------------------------------------------------
+//  EL RENDER DE UN JUEGO (el timeline en "Juego", ver W3dRaices.h): un juego no tiene keyframes, asi que
+//  lo que se renderiza es el CACHE DE ESTADOS de la simulacion (el rewind de SimJuego, un snapshot por
+//  tick). El rango Inicio/Fin se ADAPTA SOLO a lo cacheado (el minimo y el maximo, en frames del
+//  timeline) y se puede achicar a mano, pero siempre ADENTRO de [min, max]. Sin cache no hay rango:
+//  solo Render Image (el frame actual) y Render Animation queda deshabilitado con un aviso.
+//  No se guarda en el .w3d: el cache tampoco (muere con el Stop).
+// ---------------------------------------------------------------------------------------------------
+float g_renderJuegoIni = 0.0f, g_renderJuegoFin = 0.0f;
+static bool g_renderJuegoManual = false;   // el usuario lo ajusto: se respeta (acotado); si no, sigue al cache
+static bool RenderDesdeCache(){ return ActiveAnimKind == 2 && AnimEsJuego; }
+// el rango CACHEADO en frames del timeline. false = no hay cache (no hay partida o el cache esta apagado)
+bool W3dRenderJuegoCache(int* mn, int* mx){
+    if (!SimActiva() || !SimHayCache() || SimFramesGrabados() <= 0) return false;
+    const int a = StartFrame + SimPrimerFrame();
+    if (mn) *mn = a;
+    if (mx) *mx = a + SimFramesGrabados() - 1;
+    return true;
+}
+// Inicio/Fin del render del juego al dia con el cache (lo llama el refresco de Properties cada cuadro)
+bool W3dRenderJuegoSincronizar(){
+    int mn = 0, mx = -1;
+    if (!W3dRenderJuegoCache(&mn, &mx)) {
+        g_renderJuegoManual = false; g_renderJuegoIni = g_renderJuegoFin = 0.0f;
+        return false;
+    }
+    int a = (int)(g_renderJuegoIni + 0.5f), b = (int)(g_renderJuegoFin + 0.5f);
+    if (!g_renderJuegoManual) { a = mn; b = mx; }
+    if (a < mn) a = mn; if (a > mx) a = mx;
+    if (b < mn) b = mn; if (b > mx) b = mx;
+    if (b < a) b = a;
+    g_renderJuegoIni = (float)a; g_renderJuegoFin = (float)b;
+    return true;
+}
+// fijar el rango a mano (la tarjeta Render o el harness): queda acotado al cache
+void W3dRenderJuegoFijar(float ini, float fin){
+    g_renderJuegoIni = ini; g_renderJuegoFin = fin; g_renderJuegoManual = true;
+    W3dRenderJuegoSincronizar();
+}
+void W3dRenderJuegoAuto(){ g_renderJuegoManual = false; W3dRenderJuegoSincronizar(); }
+static void AccionRenderJuegoRango(){ g_renderJuegoManual = true; W3dRenderJuegoSincronizar(); g_redraw = true; }
+// renderiza [Inicio, Fin] del CACHE: cada frame es el snapshot de su tick (SimIrA), el mismo que se ve
+// al scrubear. Al terminar vuelve al tick en el que estaba. Devuelve cuantos frames guardo (-1 = sin cache).
+int W3dRenderJuegoDesdeCache(int* fallosOut){
+    if (fallosOut) *fallosOut = 0;
+    if (!PropsActivo || !Viewport3DActive) return -1;
+    if (!W3dRenderJuegoSincronizar()) return -1;
+    Viewport3D* vp = Viewport3DActive;
+    int w = (int)(PropsActivo->renderW + 0.5f); if (w < 1) w = 1;
+    int h = (int)(PropsActivo->renderH + 0.5f); if (h < 1) h = 1;
+    const int f0 = (int)g_renderJuegoIni, f1 = (int)g_renderJuegoFin;
+    const int nFrames = f1 - f0 + 1;
+    const int total = nFrames * PasesActivos() * vp->TilesNecesarios(w, h);
+    const int tickAntes = SimFrameActual();
+    const bool playAntes = PlayAnimation;
+    PlayAnimation = false;   // (el cache se recorre quieto: nada simula mientras tanto)
+    ProgresoIniciar("Rendering the game cache...");
+    int fallos = 0, base = 0;
+    for (int f = f0; f <= f1; f++){
+        SimIrA(f - StartFrame);                     // el estado de ese tick (pone CurrentFrame = f)
+        base += RenderPasesFrame(vp, w, h, base, total, fallos);
+    }
+    ProgresoFin();
+    SimIrA(tickAntes);   // de vuelta donde estaba el cabezal
+    PlayAnimation = playAntes;
+    if (fallosOut) *fallosOut = fallos;
+    w3dLogf("[render] cache del juego: frames %d..%d (%d) renderizados%s", f0, f1, nFrames, fallos ? " CON FALLOS" : "");
+    g_redraw = true;
+    return nFrames;
+}
+
 static void HacerRenderAnimation(){
     if (!PropsActivo || !Viewport3DActive) return;
+    // un JUEGO: lo que hay para renderizar es su cache (sin cache: solo Render Image)
+    if (RenderDesdeCache()){
+        int fallos = 0;
+        const int n = W3dRenderJuegoDesdeCache(&fallos);
+        if (n < 0)            Notificar(T("No game cache to render: play the game first (Render Image renders the current frame)"), true);
+        else if (fallos == 0) Notificar(T("Animation rendered!"), false);
+        else                  Notificar(T("Error rendering animation"), true);
+        return;
+    }
     Viewport3D* vp = Viewport3DActive;
     extern int CurrentFrame, StartFrame, EndFrame;
     extern void AplicarAnimacionObjetos();
@@ -3571,8 +3934,11 @@ static void HacerRenderAnimation(){
 static void AccionRenderAnimation(){
     if (!PropsActivo) return;
     if (!Viewport3DActive) { Notificar(T("No active 3D viewport"), true); return; }
+    CalcularRenderBase();   // (Path + File name: la secuencia usa la misma base que Render Image)
     HacerRenderAnimation();
 }
+// harness: "Render Animation" tal cual (el del juego renderiza su cache)
+void W3dHarnessRenderAnimation(){ if (PropsActivo && Viewport3DActive) { CalcularRenderBase(); HacerRenderAnimation(); } }
 
 // === pestaña VERTICES: helpers + acciones (UV Maps + capas de color) ===
 static Mesh* VerticesMesh() {
@@ -3580,18 +3946,18 @@ static Mesh* VerticesMesh() {
 }
 // (la SELECCION de la capa activa la hace la lista PropListMeshParts; aca solo Add + el toggle)
 // PropertiesLayoutDirty = recalcula alturas + la SCROLLBAR (sino no se podia scrollear al item nuevo)
-static void AccionVertAddUVMap()  { Mesh* m = VerticesMesh(); if (m) { DuplicarUVMapActivo(m); PropertiesLayoutDirty = true; g_redraw = true; } }
-static void AccionVertAddColor()  { Mesh* m = VerticesMesh(); if (m) { DuplicarColorLayerActivo(m); PropertiesLayoutDirty = true; g_redraw = true; } }
-static void AccionVertDelUVMap()  { Mesh* m = VerticesMesh(); if (m) { BorrarUVMapActivo(m);   m->AplicarCapasAlRender(); PropertiesLayoutDirty = true; g_redraw = true; } }
-static void AccionVertUVMapUp()   { Mesh* m = VerticesMesh(); if (m) { MoverUVMapActivo(m,-1);  m->AplicarCapasAlRender(); PropertiesLayoutDirty = true; g_redraw = true; } }
-static void AccionVertUVMapDown() { Mesh* m = VerticesMesh(); if (m) { MoverUVMapActivo(m,+1);  m->AplicarCapasAlRender(); PropertiesLayoutDirty = true; g_redraw = true; } }
-static void AccionVertDelColor()  { Mesh* m = VerticesMesh(); if (m) { BorrarColorLayerActivo(m);  m->AplicarCapasAlRender(); PropertiesLayoutDirty = true; g_redraw = true; } }
-static void AccionVertColorUp()   { Mesh* m = VerticesMesh(); if (m) { MoverColorLayerActivo(m,-1); m->AplicarCapasAlRender(); PropertiesLayoutDirty = true; g_redraw = true; } }
-static void AccionVertColorDown() { Mesh* m = VerticesMesh(); if (m) { MoverColorLayerActivo(m,+1); m->AplicarCapasAlRender(); PropertiesLayoutDirty = true; g_redraw = true; } }
-static void AccionVertAddGroup()  { Mesh* m = VerticesMesh(); if (m) { CrearVertexGroup(m);         PropertiesLayoutDirty = true; g_redraw = true; } }
-static void AccionVertDelGroup()  { Mesh* m = VerticesMesh(); if (m) { BorrarVertexGroupActivo(m);  PropertiesLayoutDirty = true; g_redraw = true; } }
-static void AccionVertGroupUp()   { Mesh* m = VerticesMesh(); if (m) { MoverVertexGroupActivo(m,-1); PropertiesLayoutDirty = true; g_redraw = true; } }
-static void AccionVertGroupDown() { Mesh* m = VerticesMesh(); if (m) { MoverVertexGroupActivo(m,+1); PropertiesLayoutDirty = true; g_redraw = true; } }
+static void AccionVertAddUVMap()  { Mesh* m = VerticesMesh(); if (m && !W3dMallaSoloLecturaAviso(m, true)) { DuplicarUVMapActivo(m); PropertiesLayoutDirty = true; g_redraw = true; } }
+static void AccionVertAddColor()  { Mesh* m = VerticesMesh(); if (m && !W3dMallaSoloLecturaAviso(m, true)) { DuplicarColorLayerActivo(m); PropertiesLayoutDirty = true; g_redraw = true; } }
+static void AccionVertDelUVMap()  { Mesh* m = VerticesMesh(); if (m && !W3dMallaSoloLecturaAviso(m, true)) { BorrarUVMapActivo(m);   m->AplicarCapasAlRender(); PropertiesLayoutDirty = true; g_redraw = true; } }
+static void AccionVertUVMapUp()   { Mesh* m = VerticesMesh(); if (m && !W3dMallaSoloLecturaAviso(m, true)) { MoverUVMapActivo(m,-1);  m->AplicarCapasAlRender(); PropertiesLayoutDirty = true; g_redraw = true; } }
+static void AccionVertUVMapDown() { Mesh* m = VerticesMesh(); if (m && !W3dMallaSoloLecturaAviso(m, true)) { MoverUVMapActivo(m,+1);  m->AplicarCapasAlRender(); PropertiesLayoutDirty = true; g_redraw = true; } }
+static void AccionVertDelColor()  { Mesh* m = VerticesMesh(); if (m && !W3dMallaSoloLecturaAviso(m, true)) { BorrarColorLayerActivo(m);  m->AplicarCapasAlRender(); PropertiesLayoutDirty = true; g_redraw = true; } }
+static void AccionVertColorUp()   { Mesh* m = VerticesMesh(); if (m && !W3dMallaSoloLecturaAviso(m, true)) { MoverColorLayerActivo(m,-1); m->AplicarCapasAlRender(); PropertiesLayoutDirty = true; g_redraw = true; } }
+static void AccionVertColorDown() { Mesh* m = VerticesMesh(); if (m && !W3dMallaSoloLecturaAviso(m, true)) { MoverColorLayerActivo(m,+1); m->AplicarCapasAlRender(); PropertiesLayoutDirty = true; g_redraw = true; } }
+static void AccionVertAddGroup()  { Mesh* m = VerticesMesh(); if (m && !W3dMallaSoloLecturaAviso(m, true)) { CrearVertexGroup(m);         PropertiesLayoutDirty = true; g_redraw = true; } }
+static void AccionVertDelGroup()  { Mesh* m = VerticesMesh(); if (m && !W3dMallaSoloLecturaAviso(m, true)) { BorrarVertexGroupActivo(m);  PropertiesLayoutDirty = true; g_redraw = true; } }
+static void AccionVertGroupUp()   { Mesh* m = VerticesMesh(); if (m && !W3dMallaSoloLecturaAviso(m, true)) { MoverVertexGroupActivo(m,-1); PropertiesLayoutDirty = true; g_redraw = true; } }
+static void AccionVertGroupDown() { Mesh* m = VerticesMesh(); if (m && !W3dMallaSoloLecturaAviso(m, true)) { MoverVertexGroupActivo(m,+1); PropertiesLayoutDirty = true; g_redraw = true; } }
 // ===== ASSIGN / REMOVE / SELECT / DESELECT de los DOS grupos de pesos =====
 // Es el MISMO patron (y los mismos labels) que la fila de Mesh Parts, aplicado a las dos
 // entidades de pesos. Antes, la unica forma de meter algo en un grupo era PINTARLO con el
@@ -3607,19 +3973,19 @@ static void AccionVertGroupDown() { Mesh* m = VerticesMesh(); if (m) { MoverVert
 //   UV Groups     -> RENDER-VERTS (corners), operan la seleccion EFECTIVA del UV
 //                    (UVVertsSelEfectivos: la propia del editor UV si la hay, si no la del 3D).
 // Nada se bakea de una a la otra.
-static void AccionVertGroupAssign()   { Mesh* m = VerticesMesh(); VertexGroupAsignarSel(m, true); }
-static void AccionVertGroupRemove()   { Mesh* m = VerticesMesh(); VertexGroupAsignarSel(m, false); }
+static void AccionVertGroupAssign()   { Mesh* m = VerticesMesh(); if (!W3dMallaSoloLecturaAviso(m, true)) VertexGroupAsignarSel(m, true); }
+static void AccionVertGroupRemove()   { Mesh* m = VerticesMesh(); if (!W3dMallaSoloLecturaAviso(m, true)) VertexGroupAsignarSel(m, false); }
 static void AccionVertGroupSelect()   { Mesh* m = VerticesMesh(); VertexGroupSeleccionar(m, true); }
 static void AccionVertGroupDeselect() { Mesh* m = VerticesMesh(); VertexGroupSeleccionar(m, false); }
-static void AccionUVGroupAssign()     { Mesh* m = VerticesMesh(); UVGroupAsignarSel(m, true); }
-static void AccionUVGroupRemove()     { Mesh* m = VerticesMesh(); UVGroupAsignarSel(m, false); }
+static void AccionUVGroupAssign()     { Mesh* m = VerticesMesh(); if (!W3dMallaSoloLecturaAviso(m, true)) UVGroupAsignarSel(m, true); }
+static void AccionUVGroupRemove()     { Mesh* m = VerticesMesh(); if (!W3dMallaSoloLecturaAviso(m, true)) UVGroupAsignarSel(m, false); }
 static void AccionUVGroupSelect()     { Mesh* m = VerticesMesh(); UVGroupSeleccionar(m, true); }
 static void AccionUVGroupDeselect()   { Mesh* m = VerticesMesh(); UVGroupSeleccionar(m, false); }
 // UV GROUPS (pesos por corner: editor UV + armature 2D). Mismas 4 acciones, otra entidad.
-static void AccionUVAddGroup()    { Mesh* m = VerticesMesh(); if (m) { CrearUVGroup(m, "UV Group"); PropertiesLayoutDirty = true; g_redraw = true; } }
-static void AccionUVDelGroup()    { Mesh* m = VerticesMesh(); if (m) { BorrarUVGroupActivo(m);   PropertiesLayoutDirty = true; g_redraw = true; } }
-static void AccionUVGroupUp()     { Mesh* m = VerticesMesh(); if (m) { MoverUVGroupActivo(m,-1); PropertiesLayoutDirty = true; g_redraw = true; } }
-static void AccionUVGroupDown()   { Mesh* m = VerticesMesh(); if (m) { MoverUVGroupActivo(m,+1); PropertiesLayoutDirty = true; g_redraw = true; } }
+static void AccionUVAddGroup()    { Mesh* m = VerticesMesh(); if (m && !W3dMallaSoloLecturaAviso(m, true)) { CrearUVGroup(m, "UV Group"); PropertiesLayoutDirty = true; g_redraw = true; } }
+static void AccionUVDelGroup()    { Mesh* m = VerticesMesh(); if (m && !W3dMallaSoloLecturaAviso(m, true)) { BorrarUVGroupActivo(m);   PropertiesLayoutDirty = true; g_redraw = true; } }
+static void AccionUVGroupUp()     { Mesh* m = VerticesMesh(); if (m && !W3dMallaSoloLecturaAviso(m, true)) { MoverUVGroupActivo(m,-1); PropertiesLayoutDirty = true; g_redraw = true; } }
+static void AccionUVGroupDown()   { Mesh* m = VerticesMesh(); if (m && !W3dMallaSoloLecturaAviso(m, true)) { MoverUVGroupActivo(m,+1); PropertiesLayoutDirty = true; g_redraw = true; } }
 // ARMATURE: crear / borrar / mover el clip de animacion activo (mismo patron que los vertex groups)
 static void InvalidarSkinEscena(); // def mas abajo (re-deforma las mallas skinneadas a la pose actual)
 static void AccionAnimAdd()  { Armature* a = ArmActiva(); if (a) { CrearAnimacion(a); InvalidarSkinEscena(); PropertiesLayoutDirty = true; g_redraw = true; } } // New Animation: clip vacio en pose reset
@@ -3704,7 +4070,8 @@ static std::string NombreAnimActiva(){
         ActiveAnimArm->animActiva >= 0 && ActiveAnimArm->animActiva < (int)ActiveAnimArm->animations.size() &&
         ActiveAnimArm->animations[ActiveAnimArm->animActiva])
         return ActiveAnimArm->animations[ActiveAnimArm->animActiva]->name;
-    return NombreEscenaActiva();
+    InitSceneAnimations();
+    return W3dAnimEscenaEtiqueta(SceneAnimActiva);   // (un clip de objeto dice de quien es: "Puerta: abrir")
 }
 static void RecolectarMeshesAnim(Object* nodo, std::vector<Mesh*>& out){
     if (!nodo) return;
@@ -3747,16 +4114,75 @@ static PopupMenu* AnimSubmenuPool(size_t i){ while (g_animSubmenus.size() <= i) 
 #define ANIM_ID_NEW_ARM    99992
 #define ANIM_ID_NEW_ARM2D  99993
 #define ANIM_ID_NEW_FLIP   99994
+#define ANIM_ID_NEW_CLIPOBJ 99995   // un CLIP DE JERARQUIA nuevo del objeto activo (animation/W3dAnimSet.h)
 static const int ANIM_FLIP_BASE = 400000;  // seleccionar un FLIPBOOK con nombre: [BASE + idx en SceneFlipbooks]
+static const int ANIM_JER_BASE  = 500000;  // un CLIP DE JERARQUIA de una raiz: [BASE + idx en g_animMenuJer]
+// los clips de jerarquia que ofrece el selector: (raiz, clip, serie). Se rearma con el menu.
+struct AnimMenuJer { Object* raiz; W3dClipJer* clip; unsigned serie; };
+static std::vector<AnimMenuJer> g_animMenuJer;
+// las RAICES cuyos clips de jerarquia se ofrecen: el objeto activo y sus ancestros con biblioteca (se puede
+// estar mirando la puerta de un auto y querer editar el clip del auto) y las raices de las vistas vivas (lo
+// que ya se estuvo editando). Cada clip: "Raiz: clip".
+static void RecolectarClipsJer(){
+    g_animMenuJer.clear();
+    std::vector<Object*> raices;
+    for (Object* o = ObjActivo; o && o != SceneCollection; o = o->Parent)
+        if (W3dJerAnimSet(o)) raices.push_back(o);
+    for (size_t i = 0; i < SceneAnimations.size(); i++)
+        if (W3dClipVistaViva((int)i)) raices.push_back(SceneAnimations[i]->duenio);
+    std::vector<Object*> vistos;
+    for (size_t r = 0; r < raices.size(); r++){
+        bool ya = false;
+        for (size_t v = 0; v < vistos.size(); v++) if (vistos[v] == raices[r]) ya = true;
+        if (ya) continue;
+        vistos.push_back(raices[r]);
+        const W3dAnimSet* set = W3dJerAnimSet(raices[r]);
+        if (!set) continue;
+        for (size_t c = 0; c < set->datos.jerarquias.size(); c++){
+            if (!set->datos.jerarquias[c]) continue;
+            AnimMenuJer m; m.raiz = raices[r]; m.clip = set->datos.jerarquias[c]; m.serie = m.clip->serie;
+            g_animMenuJer.push_back(m);
+        }
+    }
+}
+// elige el clip de jerarquia k del selector: su vista (la que habia o una nueva, atada a su raiz) pasa a ser
+// la animacion que se edita
+static void AnimSelClipJer(int k){
+    if (k < 0 || k >= (int)g_animMenuJer.size()) return;
+    const AnimMenuJer& m = g_animMenuJer[(size_t)k];
+    if (!W3dJerClipVivo(W3dJerRecurso(m.raiz), m.clip, m.serie)) return;
+    const int idx = W3dClipVista(m.raiz, m.clip);
+    if (idx < 0) return;
+    ActiveAnimKind = 0; ActiveAnimMesh = NULL; ActiveAnimArm = NULL;
+    SetEscenaActiva(idx);
+}
 
 void ConstruirMenuAnim(PopupMenu* menu){
     menu->Limpiar();
     InitSceneAnimations();
-    menu->Agregar("Juego", ANIM_ID_JUEGO, IconType::gamepad);
-    menu->Agregar("Mix", ANIM_ID_MIX, IconType::falloff_smoother);   // capas mezcladas (pestania Animacion)
+    // "Juego" (el estado base + la simulacion) solo existe en una raiz de tipo JUEGO: una ESCENA no
+    // simula, se anima (ver W3dRaices.h). En un juego, las animaciones de escena de abajo son sus CLIPS.
+    if (W3dRaizActivaEsJuego() || ActiveAnimKind == 2) menu->Agregar("Juego", ANIM_ID_JUEGO, IconType::gamepad);
+    menu->Agregar("Mix", ANIM_ID_MIX, IconType::igual);   // capas mezcladas (pestania Animacion)
     PopupMenu* subEsc = AnimSubmenuPool(0); subEsc->Limpiar(); subEsc->action = menu->action; // submenu "Scenes"
-    for (size_t i=0;i<SceneAnimations.size();i++) subEsc->Agregar(SceneAnimations[i]->name, (int)i, IconType::camera);
+    for (size_t i=0;i<SceneAnimations.size();i++){
+        if (SceneAnimations[i]->esClip) continue;   // (las vistas de los clips de jerarquia van abajo)
+        subEsc->Agregar(SceneAnimations[i]->name, (int)i, IconType::camera);
+    }
     menu->Agregar(T("Scenes"), 0, IconType::camera, subEsc);
+    // los CLIPS DE JERARQUIA ("Puerta: abrir"): los de la biblioteca de la raiz elegida (y de lo que ya se
+    // estuvo editando). Se editan igual que una animacion de escena, sobre esa raiz; el juego los reproduce
+    // con animObjeto(raiz, clip), cada raiz con su cabezal (varios a la vez). Son COMPARTIDOS: editarlo
+    // desde una raiz lo cambia para todas las que usan esa biblioteca.
+    RecolectarClipsJer();
+    if (!g_animMenuJer.empty()){
+        static PopupMenu* subC = NULL;   // (propio: los indices del pool dependen de cuantos armatures/mallas hay)
+        if (!subC) subC = new PopupMenu();
+        subC->Limpiar(); subC->action = menu->action;
+        for (size_t k=0;k<g_animMenuJer.size();k++)
+            subC->Agregar(g_animMenuJer[k].raiz->name + ": " + g_animMenuJer[k].clip->nombre, ANIM_JER_BASE + (int)k, IconType::object);
+        menu->Agregar(T("Hierarchy Clips"), 0, IconType::object, subC);
+    }
     g_animMenuArms.clear();                                                   // un submenu por armadura CON clips
     std::vector<Armature*> todas; RecolectarArmaduras(SceneCollection, todas);
     for (size_t t=0;t<todas.size();t++){
@@ -3813,9 +4239,12 @@ void ConstruirMenuAnim(PopupMenu* menu){
     // malla sin animaciones ni siquiera aparecia aca -> no habia camino desde el timeline).
     // Cada item es EXPLICITO (no adivina por contexto como hacia el boton New de la tarjeta).
     {
-        PopupMenu* subN = AnimSubmenuPool(2 + g_animMenuArms.size() + g_animMenuMeshes.size() + g_animMenu2D.size());
+        // (3 +: el 2 + es el de Flipbooks, que se armo arriba con el mismo pool)
+        PopupMenu* subN = AnimSubmenuPool(3 + g_animMenuArms.size() + g_animMenuMeshes.size() + g_animMenu2D.size());
         subN->Limpiar(); subN->action = menu->action;
         subN->Agregar(T("Scene Animation"), ANIM_ID_NEW_ESCENA, IconType::camera);
+        // (cualquier objeto: una camara, una luz, un vacio con hijos, la raiz de un prefab...)
+        if (ObjActivo && ObjActivo != SceneCollection) subN->Agregar(T("Hierarchy Clip"), ANIM_ID_NEW_CLIPOBJ, IconType::object);
         subN->Agregar(T("New Flipbook"), ANIM_ID_NEW_FLIP, IconType::textura);
         Mesh* mAct = (ObjActivo && ObjActivo->getType()==ObjectType::mesh) ? (Mesh*)ObjActivo : NULL;
         if (mAct) subN->Agregar(T("Object Animation"), ANIM_ID_NEW_OBJETO, IconType::mesh);
@@ -3895,14 +4324,33 @@ static void InvalidarSkinEscena(){
     g_redraw = true;
 }
 void MixEntrar();   // mas abajo (el modo Mix)
+void AnimSelPorId(int id);
+// el "Juego" del selector por su nombre (quien no conoce los ids del menu: el harness, las raices)
+void AnimSelJuego(){ AnimSelPorId(ANIM_ID_JUEGO); }
 void AnimSelPorId(int id){
+    // "Juego" en una ESCENA: no hay simulacion que mostrar (se convierte desde el selector de raiz)
+    if (id == ANIM_ID_JUEGO && !W3dRaizActivaEsJuego() && ActiveAnimKind != 2){
+        Notificar(T("This is a scene: convert it to a game to simulate it"), true);
+        return;
+    }
+    // elegir OTRA cosa que el Juego (Mix, una escena, un clip...) con la partida corriendo = STOP: el juego termina
+    // (los objetos vuelven a como estaban) antes de pasar a editar esa animacion. Es lo mismo que el boton Stop.
+    if (id != ANIM_ID_JUEGO){
+        extern bool SimActiva(); extern void SimStop();
+        if (SimActiva()) { SimStop(); PlayAnimation = false; }
+        // un JUEGO que deja "Juego" para editar uno de sus CLIPS: la foto de su estado base (su frame 1),
+        // para devolverselo al volver (el scrub del clip posa a los objetos)
+        if (ActiveAnimKind == 2 && W3dRaizActivaEsJuego() && !W3dJuegoBaseHay()) W3dJuegoBaseGuardar();
+    }
     if (id == ANIM_ID_MIX){ MixEntrar(); return; }
     // elegir cualquier otra cosa SALE del Mix: las escenas mezcladas vuelven a su base
     if (g_animMix){ extern void W3dMixEscenasSoltar(); g_animMix = false; W3dMixEscenasSoltar(); }
     if (id == ANIM_ID_JUEGO){
-        // el JUEGO: tiempo INFINITO (sin Fin, sin loop); el PLAY corre la simulacion
-        // de scripts y el cache rojo del viaje en el tiempo vive aca. Las animaciones
-        // normales se siguen editando eligiendo una escena o un clip.
+        // el JUEGO: tiempo INFINITO (sin Fin, sin loop, sin keyframes); el PLAY corre la simulacion
+        // de scripts y el cache rojo del viaje en el tiempo vive aca. Sus clips (animaciones de
+        // escena, de armature...) se editan eligiendolos; volver aca devuelve su ESTADO BASE (frame 1).
+        W3dJuegoBaseReponer();
+        PlayAnimation = false;
         ActiveAnimKind = 2; AnimEsJuego = true;
         StartFrame = 1;
         if (CurrentFrame < StartFrame) CurrentFrame = StartFrame;
@@ -3910,8 +4358,22 @@ void AnimSelPorId(int id){
         return;
     }
     // ---- "Nueva animacion": CREAR (los ids van ANTES de las bases; ver ANIM_ID_NEW_*) ----
-    if (id == ANIM_ID_NEW_ESCENA){ AnimEsJuego = false; NuevaEscena(); ActiveAnimKind = 0; ActiveAnimMesh = NULL;
+    if (id == ANIM_ID_NEW_ESCENA){ AnimEsJuego = false; UndoNuevaEscena(); ActiveAnimKind = 0; ActiveAnimMesh = NULL;
                                    AnimCargarRangoActivo(); InvalidarSkinEscena(); return; }
+    // un CLIP DE JERARQUIA nuevo del activo (en su biblioteca; si no tiene, una nueva con su nombre): vacio, y
+    // queda ELEGIDO (los keyframes que se inserten, en el activo o en sus hijos, son suyos)
+    if (id == ANIM_ID_NEW_CLIPOBJ){ AnimEsJuego = false;
+        if (!ObjActivo || ObjActivo == SceneCollection){ Notificar(T("Select an object first"), true); return; }
+        // Ctrl+Z en UN paso: el clip sale de la biblioteca y, si se le creo una, el objeto vuelve a no tener
+        UndoGrupoIniciar();
+        if (!W3dJerAnimSet(ObjActivo)) UndoCapturarJerBiblioteca(ObjActivo);
+        W3dClipJer* c = W3dJerClipNuevo(ObjActivo, "Clip");
+        if (c) UndoClipJerAgregado(W3dJerRecurso(ObjActivo), c, ObjActivo);
+        UndoGrupoFin();
+        const int idx = c ? W3dClipVista(ObjActivo, c) : -1;
+        if (idx >= 0){ ActiveAnimKind = 0; ActiveAnimMesh = NULL; ActiveAnimArm = NULL; SetEscenaActiva(idx);
+                       AnimCargarRangoActivo(); InvalidarSkinEscena(); W3dRecursosVistaInvalidar(); }
+        return; }
     if (id == ANIM_ID_NEW_OBJETO){ AnimEsJuego = false;
         extern void _NuevaVertexAnimationFwd(Mesh*);   // definida mas abajo (orden de declaracion)
         if (ObjActivo && ObjActivo->getType()==ObjectType::mesh) _NuevaVertexAnimationFwd((Mesh*)ObjActivo);
@@ -3929,6 +4391,12 @@ void AnimSelPorId(int id){
     if (id == ANIM_ID_NEW_FLIP){ AnimEsJuego = false;   // CREAR un flipbook con nombre y ponerlo activo
         g_flipActivo = FlipbookNuevo("Flipbook"); ActiveAnimKind = 5; return; }
     AnimEsJuego = false;
+    if (id >= ANIM_JER_BASE){    // un clip de jerarquia (la base mas alta de todas)
+        AnimSelClipJer(id - ANIM_JER_BASE);
+        AnimCargarRangoActivo();
+        InvalidarSkinEscena();
+        return;
+    }
     if (id >= ANIM_FLIP_BASE){   // seleccionar un flipbook (base MAS ALTA: va ANTES que las otras)
         int idx = id - ANIM_FLIP_BASE;
         if (idx >= 0 && idx < (int)SceneFlipbooks.size()){ ActiveAnimKind = 5; g_flipActivo = SceneFlipbooks[idx]; }
@@ -3970,7 +4438,9 @@ void AnimSelPorId(int id){
 static void AnimSelIdsPlanos(std::vector<int>& out){
     out.clear();
     InitSceneAnimations();
-    for (size_t i=0;i<SceneAnimations.size();i++) out.push_back((int)i);
+    // (las animaciones de escena y las vistas VIVAS de los clips de jerarquia; una huerfana no se ve)
+    for (size_t i=0;i<SceneAnimations.size();i++)
+        if (!SceneAnimations[i]->esClip || W3dClipVistaViva((int)i)) out.push_back((int)i);
     g_animMenuArms.clear();
     std::vector<Armature*> todas; RecolectarArmaduras(SceneCollection, todas);
     for (size_t t=0;t<todas.size();t++){
@@ -4065,12 +4535,53 @@ static void SincronizarAnimClipDesdeLista(Armature* a, int clipIdx){
 //  (animaciones de escena), g_animMix = el modo. La capa ELEGIDA es la que el timeline / dope sheet
 //  muestran y editan: elegirla deja su clip (o su escena) como la animacion activa de siempre.
 // ============================================================================
-struct MixFila { int tipo; Armature* arm; int capa; };   // 0 objeto, 1 capa de armature, 2 "Escenas", 3 capa de escena
+// 0 armature, 1 capa de armature, 2 "Escenas", 3 capa de escena, 4 raiz de CLIPS DE JERARQUIA, 5 capa de jerarquia
+// (W3dJerRaiz::capas, animation/W3dAnimSet.h: los clips que una raiz mezcla sobre si misma y sus hijos)
+struct MixFila { int tipo; Armature* arm; int capa; Object* obj; MixFila() : tipo(0), arm(NULL), capa(-1), obj(NULL) {} };
 static std::vector<MixFila> gMixFilas;
 static std::vector<Object*> gMixPlegados;   // objetos plegados en el arbol
 static bool gMixEscenasPlegadas = false;
+// la RAIZ cuya capa de jerarquia esta elegida (su W3dJerRaiz::capaActiva); NULL = ninguna. Se valida contra el
+// arbol (MixJerRaizViva): nunca se desreferencia sin estar en la escena activa.
+static Object* g_mixJerRaiz = NULL;
 static bool MixPlegado(Object* o){ for (size_t i=0;i<gMixPlegados.size();i++) if (gMixPlegados[i]==o) return true; return false; }
 static void RecolectarArmaduras(Object* nodo, std::vector<Armature*>& out); // definida abajo
+// las raices de la escena activa con CAPAS de clips de jerarquia (en el orden del arbol)
+static void RecolectarRaicesCapas(Object* nodo, std::vector<Object*>& out){
+    if (!nodo) return;
+    if (nodo != SceneCollection && nodo->clipsJer && !nodo->clipsJer->capas.empty()) out.push_back(nodo);
+    for (size_t i = 0; i < nodo->Childrens.size(); i++) RecolectarRaicesCapas(nodo->Childrens[i], out);
+}
+// idem con BIBLIOTECA (las que pueden sumar una capa: el menu Agregar)
+static void RecolectarRaicesJer(Object* nodo, std::vector<Object*>& out){
+    if (!nodo) return;
+    if (nodo != SceneCollection && W3dJerAnimSet(nodo) && !W3dJerAnimSet(nodo)->datos.jerarquias.empty()) out.push_back(nodo);
+    for (size_t i = 0; i < nodo->Childrens.size(); i++) RecolectarRaicesJer(nodo->Childrens[i], out);
+}
+static bool MixJerRaizViva(){
+    if (!g_mixJerRaiz) return false;
+    std::vector<Object*> rs; RecolectarRaicesCapas(SceneCollection, rs);
+    for (size_t i = 0; i < rs.size(); i++) if (rs[i] == g_mixJerRaiz) return true;
+    g_mixJerRaiz = NULL;
+    return false;
+}
+// la capa de jerarquia elegida (NULL = ninguna); 'raiz' = su raiz
+static W3dCapaAnim* MixCapaJerElegida(Object** raiz){
+    if (raiz) *raiz = NULL;
+    // (elegirla deja el timeline en su vista, kind 0: si despues se eligio un clip de armature, manda ese)
+    if (g_mixEscenaActiva >= 0 || ActiveAnimKind != 0 || !MixJerRaizViva()) return NULL;
+    W3dJerRaiz* j = g_mixJerRaiz->clipsJer;
+    if (j->capaActiva < 0 || j->capaActiva >= (int)j->capas.size()) return NULL;
+    if (raiz) *raiz = g_mixJerRaiz;
+    return &j->capas[(size_t)j->capaActiva];
+}
+// la capa de jerarquia elegida pasa a editarse en el timeline: la VISTA de su clip (si es de la biblioteca de la raiz)
+static void MixJerEditar(Object* raiz, const W3dCapaAnim& c){
+    W3dClipJer* clip = raiz ? W3dJerClip(raiz, c.anim) : NULL;
+    const int idx = clip ? W3dClipVista(raiz, clip) : -1;
+    if (idx >= 0) SetEscenaActiva(idx);
+    ActiveAnimKind = 0; ActiveAnimArm = NULL; ActiveAnimMesh = NULL;
+}
 static void MixArmarFilas(){
     gMixFilas.clear();
     std::vector<Armature*> todas; RecolectarArmaduras(SceneCollection, todas);
@@ -4080,31 +4591,47 @@ static void MixArmarFilas(){
         if (MixPlegado(a)) continue;
         for (size_t k=0;k<a->capas.size();k++){ MixFila c; c.tipo = 1; c.arm = a; c.capa = (int)k; gMixFilas.push_back(c); }
     }
+    // las raices con CAPAS de clips de jerarquia, como los armatures (la raiz y debajo sus capas)
+    std::vector<Object*> raices; RecolectarRaicesCapas(SceneCollection, raices);
+    for (size_t r=0;r<raices.size();r++){
+        MixFila f; f.tipo = 4; f.obj = raices[r]; gMixFilas.push_back(f);
+        if (MixPlegado(raices[r])) continue;
+        for (size_t k=0;k<raices[r]->clipsJer->capas.size();k++){ MixFila c; c.tipo = 5; c.obj = raices[r]; c.capa = (int)k; gMixFilas.push_back(c); }
+    }
     if (!g_mixEscenas.empty()){
         MixFila f; f.tipo = 2; f.arm = NULL; f.capa = -1; gMixFilas.push_back(f);
         if (!gMixEscenasPlegadas)
             for (size_t k=0;k<g_mixEscenas.size();k++){ MixFila c; c.tipo = 3; c.arm = NULL; c.capa = (int)k; gMixFilas.push_back(c); }
     }
 }
-// la capa elegida (NULL = ninguna); 'arm' = su armature (NULL si es de escena)
+// la capa de una fila (1, 3 o 5)
+static W3dCapaAnim& MixCapaDeFila(const MixFila& f){
+    if (f.tipo == 1) return f.arm->capas[f.capa];
+    if (f.tipo == 5) return f.obj->clipsJer->capas[f.capa];
+    return g_mixEscenas[f.capa];
+}
+// la capa elegida (NULL = ninguna); 'arm' = su armature (NULL si es de escena o de jerarquia: MixCapaJerElegida)
 static W3dCapaAnim* MixCapaElegida(Armature** arm){
     if (arm) *arm = NULL;
     if (g_mixEscenaActiva >= 0 && g_mixEscenaActiva < (int)g_mixEscenas.size()) return &g_mixEscenas[g_mixEscenaActiva];
+    W3dCapaAnim* cj = MixCapaJerElegida(NULL);
+    if (cj) return cj;
     Armature* a = (ActiveAnimKind == 1) ? ActiveAnimArm : NULL;
     if (a && a->capaActiva >= 0 && a->capaActiva < (int)a->capas.size()){ if (arm) *arm = a; return &a->capas[a->capaActiva]; }
     return NULL;
 }
+static int MixModoIcono(int m){ return m == 1 ? (int)IconType::mas : m == 2 ? (int)IconType::menos : (int)IconType::igual; }
 static std::string MixModoTexto(int m){ return m == 1 ? T("Add") : m == 2 ? T("Subtract") : T("Mix"); }
 static int  HookMixCount(){ MixArmarFilas(); return (int)gMixFilas.size(); }
 static std::string HookMixTexto(int i){
     if (i < 0 || i >= (int)gMixFilas.size()) return std::string();
     const MixFila& f = gMixFilas[i];
     if (f.tipo == 0) return f.arm->name;
+    if (f.tipo == 4) return f.obj->name;
     if (f.tipo == 2) return T("Scenes");
-    const W3dCapaAnim& c = (f.tipo == 1) ? f.arm->capas[f.capa] : g_mixEscenas[f.capa];
+    const W3dCapaAnim& c = MixCapaDeFila(f);
     char b[32]; snprintf(b, sizeof b, "  %d%%", (int)(c.influencia + 0.5f));
     std::string t = c.anim + b;
-    if (c.modo == 1) t += " +"; else if (c.modo == 2) t += " -";
     if (!c.hueso.empty()) t += " [" + c.hueso + "]";
     return t;
 }
@@ -4112,6 +4639,7 @@ static int  HookMixPlegada(int i){
     if (i < 0 || i >= (int)gMixFilas.size()) return -1;
     const MixFila& f = gMixFilas[i];
     if (f.tipo == 0) return MixPlegado(f.arm) ? 1 : 0;
+    if (f.tipo == 4) return MixPlegado(f.obj) ? 1 : 0;
     if (f.tipo == 2) return gMixEscenasPlegadas ? 1 : 0;
     return -1;
 }
@@ -4119,15 +4647,16 @@ static int  HookMixIcono(int i){
     if (i < 0 || i >= (int)gMixFilas.size()) return (int)IconType::armature;
     const MixFila& f = gMixFilas[i];
     if (f.tipo == 0) return (int)IconType::armature;
+    if (f.tipo == 4) return (int)IconType::object;
     if (f.tipo == 2) return (int)IconType::camera;
-    return (int)IconType::falloff_smoother;   // una capa: la curva (una animacion)
+    // una capa: el icono de SU MODO (= mezclar, + sumar, - restar): se lee como se combina sin abrirla
+    return MixModoIcono(MixCapaDeFila(f).modo);
 }
-static int  HookMixNivel(int i){ return (i >= 0 && i < (int)gMixFilas.size() && (gMixFilas[i].tipo == 1 || gMixFilas[i].tipo == 3)) ? 1 : 0; }
+static int  HookMixNivel(int i){ return (i >= 0 && i < (int)gMixFilas.size() && (gMixFilas[i].tipo == 1 || gMixFilas[i].tipo == 3 || gMixFilas[i].tipo == 5)) ? 1 : 0; }
 static int  HookMixOjo(int i){
     if (i < 0 || i >= (int)gMixFilas.size()) return -1;
     const MixFila& f = gMixFilas[i];
-    if (f.tipo == 1) return f.arm->capas[f.capa].visible ? 1 : 0;
-    if (f.tipo == 3) return g_mixEscenas[f.capa].visible ? 1 : 0;
+    if (f.tipo == 1 || f.tipo == 3 || f.tipo == 5) return MixCapaDeFila(f).visible ? 1 : 0;
     return -1;
 }
 static void MixAplicarRango(){
@@ -4141,14 +4670,23 @@ static void HookMixSeleccionar(int i){
         for (size_t k=0;k<gMixPlegados.size();k++) if (gMixPlegados[k]==f.arm){ gMixPlegados.erase(gMixPlegados.begin()+k); PropertiesLayoutDirty = true; g_redraw = true; return; }
         gMixPlegados.push_back(f.arm); PropertiesLayoutDirty = true; g_redraw = true; return;
     }
+    if (f.tipo == 4){ // plegar / desplegar la raiz
+        for (size_t k=0;k<gMixPlegados.size();k++) if (gMixPlegados[k]==f.obj){ gMixPlegados.erase(gMixPlegados.begin()+k); PropertiesLayoutDirty = true; g_redraw = true; return; }
+        gMixPlegados.push_back(f.obj); PropertiesLayoutDirty = true; g_redraw = true; return;
+    }
     if (f.tipo == 2){ gMixEscenasPlegadas = !gMixEscenasPlegadas; PropertiesLayoutDirty = true; g_redraw = true; return; }
     if (f.tipo == 1){
         // la capa elegida es la animacion ACTIVA del timeline: sus keyframes se ven y se editan
         Armature* a = f.arm; W3dCapaAnim& c = a->capas[f.capa];
-        a->capaActiva = f.capa; g_mixEscenaActiva = -1;
+        a->capaActiva = f.capa; g_mixEscenaActiva = -1; g_mixJerRaiz = NULL;
         int ci = W3dCapaClip(a, c);
         ActiveAnimKind = 1; ActiveAnimArm = a; if (ci >= 0) a->animActiva = ci;
+    } else if (f.tipo == 5){
+        // una capa de CLIP DE JERARQUIA: su clip se edita en su vista (sobre la raiz de la capa)
+        f.obj->clipsJer->capaActiva = f.capa; g_mixEscenaActiva = -1; g_mixJerRaiz = f.obj;
+        MixJerEditar(f.obj, f.obj->clipsJer->capas[f.capa]);
     } else {
+        g_mixJerRaiz = NULL;
         g_mixEscenaActiva = f.capa;
         int idx = W3dAnimEscenaIdx(g_mixEscenas[f.capa].anim.c_str());
         if (idx >= 0) SetEscenaActiva(idx);
@@ -4161,15 +4699,15 @@ static int  HookMixActiva(){
     MixArmarFilas();
     for (size_t i=0;i<gMixFilas.size();i++){ const MixFila& f = gMixFilas[i];
         if (f.tipo == 3 && f.capa == g_mixEscenaActiva) return (int)i;
-        if (f.tipo == 1 && g_mixEscenaActiva < 0 && ActiveAnimKind == 1 && f.arm == ActiveAnimArm && f.capa == f.arm->capaActiva) return (int)i; }
+        if (f.tipo == 5 && g_mixEscenaActiva < 0 && f.obj == g_mixJerRaiz && f.capa == f.obj->clipsJer->capaActiva) return (int)i;
+        if (f.tipo == 1 && g_mixEscenaActiva < 0 && !g_mixJerRaiz && ActiveAnimKind == 1 && f.arm == ActiveAnimArm && f.capa == f.arm->capaActiva) return (int)i; }
     return -1;
 }
 // el OJO: click en la columna del icono de una fila de capa
 static bool MixToggleOjo(int i){
     if (i < 0 || i >= (int)gMixFilas.size()) return false;
     const MixFila& f = gMixFilas[i];
-    if (f.tipo == 1){ f.arm->capas[f.capa].visible = !f.arm->capas[f.capa].visible; }
-    else if (f.tipo == 3){ g_mixEscenas[f.capa].visible = !g_mixEscenas[f.capa].visible; }
+    if (f.tipo == 1 || f.tipo == 3 || f.tipo == 5){ W3dCapaAnim& c = MixCapaDeFila(f); c.visible = !c.visible; }
     else return false;
     InvalidarSkinEscena(); g_redraw = true; return true;
 }
@@ -4187,26 +4725,44 @@ void MixEntrar(){
 }
 // ---- Agregar: menu con los clips de cada armature y las animaciones de escena ----
 static std::vector<Armature*> gMixAddArms;
+static std::vector<Object*> gMixAddJer;      // las raices con biblioteca de clips de jerarquia (ids 700000 + r*1000 + k)
 static std::vector<PopupMenu*> gMixAddSubs;
 static PopupMenu* MenuMixAdd = NULL;
+// suma una capa con el clip 'nombre' a la raiz y la deja ELEGIDA (sin undo: como las demas capas del Mix)
+static void MixAgregarCapaJer(Object* raiz, const std::string& nombre){
+    if (!raiz) return;
+    if (!raiz->clipsJer) raiz->clipsJer = new W3dJerRaiz();
+    W3dCapaAnim c; c.anim = nombre; raiz->clipsJer->capas.push_back(c);
+    raiz->clipsJer->capaActiva = (int)raiz->clipsJer->capas.size() - 1;
+    W3dJerCapasCambiaron(raiz);
+    g_mixEscenaActiva = -1; g_mixJerRaiz = raiz;
+    MixJerEditar(raiz, raiz->clipsJer->capas.back());
+}
+// el "Agregar" del Mix con un clip de jerarquia de esa raiz (el harness: sin abrir el menu)
 static void AccionMixAddElegida(int id){
-    if (id >= 500000){ // escena
+    if (id >= 700000){ // un clip de jerarquia de una raiz
+        const int r = (id - 700000) / 1000, k = (id - 700000) % 1000;
+        if (r < 0 || r >= (int)gMixAddJer.size()) return;
+        const W3dAnimSet* set = W3dJerAnimSet(gMixAddJer[r]);
+        if (!set || k < 0 || k >= (int)set->datos.jerarquias.size()) return;
+        MixAgregarCapaJer(gMixAddJer[r], set->datos.jerarquias[k]->nombre);
+    } else if (id >= 500000){ // escena
         int e = id - 500000; if (e < 0 || e >= (int)SceneAnimations.size()) return;
         W3dCapaAnim c; c.anim = SceneAnimations[e]->name; g_mixEscenas.push_back(c);
-        g_mixEscenaActiva = (int)g_mixEscenas.size() - 1;
+        g_mixEscenaActiva = (int)g_mixEscenas.size() - 1; g_mixJerRaiz = NULL;
     } else {
         int a = id / 1000, k = id % 1000;
         if (a < 0 || a >= (int)gMixAddArms.size()) return;
         Armature* arm = gMixAddArms[a]; if (k < 0 || k >= (int)arm->animations.size()) return;
         W3dCapaAnim c; c.anim = arm->animations[k]->name; arm->capas.push_back(c);
-        arm->capaActiva = (int)arm->capas.size() - 1; g_mixEscenaActiva = -1;
+        arm->capaActiva = (int)arm->capas.size() - 1; g_mixEscenaActiva = -1; g_mixJerRaiz = NULL;
         ActiveAnimKind = 1; ActiveAnimArm = arm; arm->animActiva = k;
     }
     if (!g_animMix) MixEntrar();
     InvalidarSkinEscena(); PropertiesLayoutDirty = true; g_redraw = true;
 }
-static void AccionMixAdd(){
-    if (!PropsActivo || !PropsActivo->propRowMix) return;
+// arma el menu "Agregar" del Mix (lo abre AccionMixAdd; el harness lo recorre sin abrirlo)
+static void ArmarMenuMixAdd(){
     if (!MenuMixAdd){ MenuMixAdd = new PopupMenu(); MenuMixAdd->action = AccionMixAddElegida; }
     MenuMixAdd->Limpiar();
     MenuMixAdd->titulo = T("Add");
@@ -4219,16 +4775,51 @@ static void AccionMixAdd(){
         for (size_t k=0;k<arm->animations.size();k++) sub->Agregar(arm->animations[k]->name, (int)(a*1000 + k), IconType::armature);
         MenuMixAdd->Agregar(arm->name, 0, IconType::armature, sub);
     }
+    // los CLIPS DE JERARQUIA de cada raiz con biblioteca (una capa que se mezcla sobre ella y sus hijos)
+    gMixAddJer.clear(); RecolectarRaicesJer(SceneCollection, gMixAddJer);
+    for (size_t r=0;r<gMixAddJer.size() && r < 100;r++){
+        const W3dAnimSet* set = W3dJerAnimSet(gMixAddJer[r]);
+        if (gMixAddSubs.size() <= n) gMixAddSubs.push_back(new PopupMenu());
+        PopupMenu* sub = gMixAddSubs[n++]; sub->Limpiar(); sub->action = AccionMixAddElegida;
+        for (size_t k=0;k<set->datos.jerarquias.size() && k < 1000;k++) sub->Agregar(set->datos.jerarquias[k]->nombre, 700000 + (int)(r*1000 + k), IconType::object);
+        MenuMixAdd->Agregar(gMixAddJer[r]->name, 0, IconType::object, sub);
+    }
     InitSceneAnimations();
     if (gMixAddSubs.size() <= n) gMixAddSubs.push_back(new PopupMenu());
     PopupMenu* subE = gMixAddSubs[n++]; subE->Limpiar(); subE->action = AccionMixAddElegida;
-    for (size_t e=0;e<SceneAnimations.size();e++) subE->Agregar(SceneAnimations[e]->name, 500000 + (int)e, IconType::camera);
+    for (size_t e=0;e<SceneAnimations.size();e++){
+        if (SceneAnimations[e]->esClip) continue;   // (las vistas de los clips de jerarquia van con su raiz, arriba)
+        subE->Agregar(SceneAnimations[e]->name, 500000 + (int)e, IconType::camera);
+    }
     MenuMixAdd->Agregar(T("Scenes"), 0, IconType::camera, subE);
+}
+static void AccionMixAdd(){
+    if (!PropsActivo || !PropsActivo->propRowMix) return;
+    ArmarMenuMixAdd();
     AbrirMenuBajoBoton(MenuMixAdd, PropsActivo->propRowMix->botones[0]);
+}
+// el "Agregar" del Mix desde afuera (el harness): el submenu 'sub' (un armature, una raiz, "Scenes") y su item
+bool PropsMixAgregarMenu(const std::string& sub, const std::string& item){
+    ArmarMenuMixAdd();
+    for (size_t i = 0; i < MenuMixAdd->items.size(); i++){
+        MenuItem* it = MenuMixAdd->items[i];
+        if (!it || !it->submenu || (it->text != sub && it->text != T(sub.c_str()))) continue;
+        for (size_t k = 0; k < it->submenu->items.size(); k++)
+            if (it->submenu->items[k] && it->submenu->items[k]->text == item){ AccionMixAddElegida(it->submenu->items[k]->id); return true; }
+    }
+    return false;
 }
 static void AccionMixQuitar(){
     Armature* a = NULL; W3dCapaAnim* c = MixCapaElegida(&a); if (!c) return;
-    if (a){ a->capas.erase(a->capas.begin() + a->capaActiva); if (a->capaActiva >= (int)a->capas.size()) a->capaActiva = (int)a->capas.size() - 1; }
+    Object* rj = NULL;
+    if (MixCapaJerElegida(&rj) == c && rj){
+        W3dJerRaiz* j = rj->clipsJer;
+        j->capas.erase(j->capas.begin() + j->capaActiva);
+        if (j->capaActiva >= (int)j->capas.size()) j->capaActiva = (int)j->capas.size() - 1;
+        W3dJerCapasCambiaron(rj);
+        W3dMixEscenasSoltar();   // (los nodos vuelven a su base: la mezcla se rearma sin esa capa)
+        if (j->capas.empty()) g_mixJerRaiz = NULL;
+    } else if (a){ a->capas.erase(a->capas.begin() + a->capaActiva); if (a->capaActiva >= (int)a->capas.size()) a->capaActiva = (int)a->capas.size() - 1; }
     else { g_mixEscenas.erase(g_mixEscenas.begin() + g_mixEscenaActiva);
            extern void W3dMixEscenasSoltar(); W3dMixEscenasSoltar();
            if (g_mixEscenaActiva >= (int)g_mixEscenas.size()) g_mixEscenaActiva = (int)g_mixEscenas.size() - 1; }
@@ -4236,8 +4827,10 @@ static void AccionMixQuitar(){
 }
 static void MixMover(int d){
     Armature* a = NULL; W3dCapaAnim* c = MixCapaElegida(&a); if (!c) return;
-    std::vector<W3dCapaAnim>& v = a ? a->capas : g_mixEscenas;
-    int& i = a ? a->capaActiva : g_mixEscenaActiva;
+    Object* rj = NULL;
+    const bool jer = (MixCapaJerElegida(&rj) == c && rj);
+    std::vector<W3dCapaAnim>& v = jer ? rj->clipsJer->capas : (a ? a->capas : g_mixEscenas);
+    int& i = jer ? rj->clipsJer->capaActiva : (a ? a->capaActiva : g_mixEscenaActiva);
     int j = i + d; if (j < 0 || j >= (int)v.size()) return;
     W3dCapaAnim t = v[i]; v[i] = v[j]; v[j] = t; i = j;
     InvalidarSkinEscena(); PropertiesLayoutDirty = true; g_redraw = true;
@@ -4250,7 +4843,14 @@ static void AccionCapaCambio(){ InvalidarSkinEscena(); g_redraw = true; }
 static PopupMenu* MenuCapaAnim = NULL;
 static void AccionCapaAnimElegida(int id){
     Armature* a = NULL; W3dCapaAnim* c = MixCapaElegida(&a); if (!c) return;
-    if (a){ if (id < 0 || id >= (int)a->animations.size()) return; c->anim = a->animations[id]->name; c->clipCache = -1; a->animActiva = id; }
+    Object* rj = NULL;
+    if (MixCapaJerElegida(&rj) == c && rj){
+        const W3dAnimSet* set = W3dJerAnimSet(rj);
+        if (!set || id < 0 || id >= (int)set->datos.jerarquias.size()) return;
+        c->anim = set->datos.jerarquias[id]->nombre; c->retClip = 0;
+        W3dMixEscenasSoltar();
+        MixJerEditar(rj, *c);
+    } else if (a){ if (id < 0 || id >= (int)a->animations.size()) return; c->anim = a->animations[id]->name; c->clipCache = -1; a->animActiva = id; }
     else { if (id < 0 || id >= (int)SceneAnimations.size()) return; c->anim = SceneAnimations[id]->name;
            extern void W3dMixEscenasSoltar(); W3dMixEscenasSoltar(); SetEscenaActiva(id); }
     AccionCapaCambio(); PropertiesLayoutDirty = true;
@@ -4259,7 +4859,12 @@ static void AccionMenuCapaAnim(){
     Armature* a = NULL; W3dCapaAnim* c = MixCapaElegida(&a); if (!c || !PropsActivo) return;
     if (!MenuCapaAnim){ MenuCapaAnim = new PopupMenu(); MenuCapaAnim->action = AccionCapaAnimElegida; }
     MenuCapaAnim->Limpiar();
-    if (a) for (size_t k=0;k<a->animations.size();k++) MenuCapaAnim->Agregar(a->animations[k]->name, (int)k, IconType::armature);
+    Object* rj = NULL;
+    if (MixCapaJerElegida(&rj) == c && rj){
+        const W3dAnimSet* set = W3dJerAnimSet(rj);
+        for (size_t k=0; set && k<set->datos.jerarquias.size(); k++) MenuCapaAnim->Agregar(set->datos.jerarquias[k]->nombre, (int)k, IconType::object);
+    }
+    else if (a) for (size_t k=0;k<a->animations.size();k++) MenuCapaAnim->Agregar(a->animations[k]->name, (int)k, IconType::armature);
     else for (size_t e=0;e<SceneAnimations.size();e++) MenuCapaAnim->Agregar(SceneAnimations[e]->name, (int)e, IconType::camera);
     AbrirMenuBajoBoton(MenuCapaAnim, PropsActivo->propCapaAnim->button);
 }
@@ -4269,7 +4874,7 @@ static void AccionMenuCapaModo(){
     if (!PropsActivo || !MixCapaElegida(NULL)) return;
     if (!MenuCapaModo){ MenuCapaModo = new PopupMenu(); MenuCapaModo->action = AccionCapaModoElegido; }
     MenuCapaModo->Limpiar();
-    for (int m = 0; m < 3; m++) MenuCapaModo->Agregar(MixModoTexto(m), m, IconType::falloff_smoother);
+    for (int m = 0; m < 3; m++) MenuCapaModo->Agregar(MixModoTexto(m), m, MixModoIcono(m));
     AbrirMenuBajoBoton(MenuCapaModo, PropsActivo->propCapaModo->button);
 }
 static PopupMenu* MenuCapaHueso = NULL;
@@ -4525,7 +5130,7 @@ static void AccionAnimNewCard(){
         return;
     }
     if (ActiveAnimKind == 1 && ActiveAnimArm){ CrearAnimacion(ActiveAnimArm); InvalidarSkinEscena(); } // nuevo clip (arranca en pose reset)
-    else { NuevaEscena(); ActiveAnimKind = 0; }                             // nueva animacion de ESCENA
+    else { UndoNuevaEscena(); ActiveAnimKind = 0; }                         // nueva animacion de ESCENA (con undo)
     AnimCargarRangoActivo(); // la animacion nueva arranca con su rango/fps por defecto
     PropertiesLayoutDirty = true; g_redraw = true;
 }
@@ -4598,6 +5203,7 @@ static void AccionAnimRenameCard(){                                          // 
     }
     if (ActiveAnimKind == 1 && ActiveAnimArm &&
         ActiveAnimArm->animActiva >= 0 && ActiveAnimArm->animActiva < (int)ActiveAnimArm->animations.size()) {
+        W3dArmatureAnimsPropias(ActiveAnimArm);   // idem el rename de la tarjeta del armature: el puntero, de un clip PROPIO
         const W3dRenameDest dest = W3dDestClipArm(ActiveAnimArm, ActiveAnimArm->animActiva);
         RenameIniciar(PropsActivo->propBtnAnimRename->button, &ActiveAnimArm->animations[ActiveAnimArm->animActiva]->name,
                       UniqAnim, NULL, &dest);
@@ -4717,7 +5323,12 @@ static void SincronizarCamposBone(){
 // ============================================================================
 static float g_b2dPosX = 0, g_b2dPosY = 0, g_b2dRot = 0, g_b2dSclX = 1, g_b2dSclY = 1;
 static bool  g_b2dConectado = false;   // mirror del checkbox "Connected" del hueso 2D activo
-static PropFloat *gB2dPosX = NULL, *gB2dPosY = NULL, *gB2dRot = NULL, *gB2dSclX = NULL, *gB2dSclY = NULL;
+// Las FILAS Pos/Rotation/Scale son miembros de cada panel (propBone2DPosX..propBone2DSclY), no
+// punteros estaticos: un estatico apuntaba a las del ULTIMO panel construido y quedaba colgando
+// cuando ese panel se liberaba. Los VALORES (g_b2d*) si son compartidos: todos los paneles
+// muestran el mismo hueso activo.
+// el valor 'v' se esta tipeando en una fila de CUALQUIER panel: el refresco por frame no lo pisa
+static bool B2dEditando(const float* v) { return g_propFloatEditando && g_propFloatEditando->value == v; }
 // el mesh cuya tarjeta Armature 2D esta activa (NULL = la tarjeta no aplica)
 static Mesh* Bones2DMeshUI() {
     if (!ObjActivo || ObjActivo->getType() != ObjectType::mesh) return NULL;
@@ -4887,6 +5498,7 @@ static void VertColorModeAplicar() {
 }
 static void AccionVertColorMode() {   // toggle Per-Vertex / Per-Corner de la capa de color activa
     Mesh* m = VerticesMesh(); if (!m) return;
+    if (W3dMallaSoloLecturaAviso(m, true)) return;
     if (m->colorActivo < 0 || m->colorActivo >= (int)m->colorLayers.size()) return;
     gVertColorModeMesh = m;
     // PASAR A PER-VERTEX ACHICA LA INFORMACION: un vertice puede tener varios face corner con
@@ -5044,8 +5656,23 @@ static void AccionBrowseProyCarpeta() {
     AbrirFileBrowser("Carpeta del proyecto", T("Use this file"), ".w3d", ProyCarpetaElegida, true);
 }
 
+// FORMATO DE LAS MALLAS del proyecto (la opcion "formatoMallas" del proyecto.json, ver
+// import_w3d.h). Destildado = .w3db BINARIO, el default: abrir es leer la entrada + memcpy.
+// Tildado = .w3dm de TEXTO, para quien quiere diffs legibles. El tilde es un ESPEJO de
+// g_w3dFormatoMallasProyecto: el proyecto que se abre lo fija (ReiniciarEscena lo vuelve al
+// default) y ProyectoSincronizarCampos / ActualizarPestanias refrescan el tilde. Tocarlo
+// cambia el formato del PROXIMO guardado; el forzado del harness no se toca.
+static bool g_proyMallasTexto = false;
+static void MallasTextoRefrescar() {
+    g_proyMallasTexto = (g_w3dFormatoMallasProyecto == W3D_MALLAS_TEXTO);
+}
+static void AccionMallasTexto() {
+    g_w3dFormatoMallasProyecto = g_proyMallasTexto ? W3D_MALLAS_TEXTO : W3D_MALLAS_BINARIO;
+}
+
 // llena los campos de la tarjeta desde w3dPath (al abrir/guardar/cambiar)
 void ProyectoSincronizarCampos() {
+    MallasTextoRefrescar();   // el formato de las mallas viaja con el proyecto
     if (!PropsActivo) return;
     std::string dir, nom;
     if (!w3dPath.empty()) {
@@ -5155,11 +5782,41 @@ static void AccionProyExtraer() {
 
 
 // ROMBO de keyframe del panel: opera sobre el OBJETO ACTIVO en el FRAME ACTUAL.
+// rombo de la CAMARA ACTIVA: 3 (verde) = la camara elegida NO es la que dice la pista en este frame (cambio sin
+// guardar); 2 = hay un corte en este frame y coincide; 1 = la pista existe y coincide; 0 = no hay pista
+static int CamActivaEstado(){
+    AnimProperty* ap = W3dCamPista(SceneAnimActiva, false);
+    const char* pista = W3dCamEnFrame(SceneAnimActiva, CurrentFrame);
+    if (!ap || !pista) return CameraActive ? 3 : 0;          // sin pista: cualquier camara es un "cambio" a guardar
+    if (!CameraActive || CameraActive->name != pista) return 3;
+    for (size_t i = 0; i < ap->keyframes.size(); i++) if (ap->keyframes[i].frame == CurrentFrame) return 2;
+    return 1;
+}
+static void CamActivaToggle(){
+    // "Juego" no tiene keyframes (ver KeysEnJuego en ObjectMode.cpp): el corte iba a parar al ultimo clip elegido
+    if (ActiveAnimKind == 2) { Notificar(T("A game has no keyframes: choose one of its clips in the timeline to animate"), true); return; }
+    if (!CameraActive) { Notificar(T("There is no active camera"), false); return; }
+    UndoKeyframesIniciar();
+    const int est = CamActivaEstado();
+    AnimProperty* ap = W3dCamPista(SceneAnimActiva, false);
+    if (est == 2 && ap) {                                     // corte aca y coincide: el click lo SACA (como los demas rombos)
+        for (size_t i = 0; i < ap->keyframes.size(); i++)
+            if (ap->keyframes[i].frame == CurrentFrame) { ap->keyframes.erase(ap->keyframes.begin() + i); break; }
+        W3dCamActivaAplicar(SceneAnimActiva, CurrentFrame);   // la pista vuelve a mandar
+    } else {
+        W3dCamKey(SceneAnimActiva, CurrentFrame, CameraActive->name);   // guarda el CORTE en el frame actual
+    }
+    UndoKeyframesConfirmar();
+    PropertiesLayoutDirty = true; g_redraw = true;
+}
 static int PropKeyEstadoHook(int prop, int comp){
+    if (ActiveAnimKind == 2) return 0;   // "Juego": los rombos no muestran keyframes (no tiene)
+    if (prop == AnimCamActiva) return CamActivaEstado();
     extern int AnimCanalEstado(Object*, int, int, int);
     return ObjActivo ? AnimCanalEstado(ObjActivo, prop, comp, CurrentFrame) : 0;
 }
 static void PropKeyToggleHook(int prop, int comp){
+    if (prop == AnimCamActiva) { CamActivaToggle(); return; }
     extern void AnimCanalToggle(Object*, int, int, int);
     if (ObjActivo){ AnimCanalToggle(ObjActivo, prop, comp, CurrentFrame);
                     PropertiesLayoutDirty = true; g_redraw = true; }
@@ -5188,7 +5845,7 @@ static void AccionCullMetodoElegido(int id){
     Culling* cu = static_cast<Culling*>(ObjActivo);
     cu->metodo = id;
     cu->MarcarSucio();                 // al cambiar de metodo, rearma la grilla si aplica
-    if (id == Culling::Bsp) Notificar(T("BSP pendiente: se usa frustum por ahora"), false);
+    if (id == Culling::Bsp && cu->bspArchivo.empty()) Notificar(T("BSP: falta el archivo .w3dbsp (Culling.bsp)"), false);
     g_redraw = true;
 }
 static void AccionMenuCullMetodo(){
@@ -5198,15 +5855,233 @@ static void AccionMenuCullMetodo(){
     MenuCullMetodo->Agregar(T("Frustum (AABB)"),  Culling::Frustum,  IconType::visible);
     MenuCullMetodo->Agregar(T("Grid (cells)"),    Culling::Grid,     IconType::cuadricula);
     MenuCullMetodo->Agregar(T("Riel (nodos)"),    Culling::Riel,     IconType::curve); // hijos por nodo, estilo NSD
-    MenuCullMetodo->Agregar("BSP (pending)",      Culling::Bsp,      IconType::empty);
+    MenuCullMetodo->Agregar("BSP (PVS)",          Culling::Bsp,      IconType::empty); // arbol + PVS por cluster (.w3dbsp)
     AbrirMenuBajoBoton(MenuCullMetodo, PropsActivo->propCullMetodo->button);
 }
+// ---- tarjeta "Camara activa": las camaras de la escena (recorrido del arbol) ----
+static void CamarasDeEscena(Object* o, std::vector<Object*>& out){
+    if (!o) return;
+    if (o->getType() == ObjectType::camera) out.push_back(o);
+    for (size_t i = 0; i < o->Childrens.size(); i++) CamarasDeEscena(o->Childrens[i], out);
+}
+static std::vector<Object*> gCamMenu;
+static PopupMenu* MenuCamActiva = NULL;
+// inserta el CORTE en el frame actual con la camara activa (1 paso de undo, como cualquier keyframe)
+static void AccionCamActivaKey(){
+    if (!CameraActive) { Notificar(T("There is no active camera"), false); return; }
+    UndoKeyframesIniciar();
+    W3dCamKey(SceneAnimActiva, CurrentFrame, CameraActive->name);
+    UndoKeyframesConfirmar();
+    g_redraw = true;
+}
+static void AccionCamActivaElegida(int id){
+    if (id < 0 || id >= (int)gCamMenu.size()) return;
+    CameraActive = (Camera*)gCamMenu[id];
+    extern int ActiveAnimKind;
+    if (AutoKeyOn && ActiveAnimKind == 0) AccionCamActivaKey();   // Auto Key prendido: elegir la camara ya deja el corte
+    g_redraw = true;
+}
+static void AccionMenuCamActiva(){
+    if (!PropsActivo || !PropsActivo->propCamActivaSel) return;
+    if (!MenuCamActiva){ MenuCamActiva = new PopupMenu(); MenuCamActiva->action = AccionCamActivaElegida; }
+    gCamMenu.clear(); CamarasDeEscena(SceneCollection, gCamMenu);
+    MenuCamActiva->Limpiar();
+    for (size_t i = 0; i < gCamMenu.size(); i++) MenuCamActiva->Agregar(gCamMenu[i]->name, (int)i, IconType::camera);
+    AbrirMenuBajoBoton(MenuCamActiva, PropsActivo->propCamActivaSel->button);
+}
+
+// DROPDOWN de la CAMARA de un Recorte: "(ninguna)" = solo recorta; una camara = los hijos se ven desde ella
+static PopupMenu* MenuRcCamara = NULL;
+// ---- la BIBLIOTECA DE CLIPS DE JERARQUIA del objeto activo (tarjeta Animacion, pestania Objeto). Todos los
+//      objetos que la eligen comparten sus clips (una copia en memoria): cualquier jerarquia con los mismos
+//      nombres los reproduce con animObjeto(). ----
+static PopupMenu* MenuJerLib = NULL;
+static std::vector<std::string> gJerLibMenu;   // id-2 -> nombre de la biblioteca
+static void AccionJerLibElegida(int id){
+    if (!ObjActivo || ObjActivo == SceneCollection) return;
+    const std::string antes = (ObjActivo->clipsJer) ? ObjActivo->clipsJer->animset : std::string();
+    if (id == 0 && antes.empty()) return;   // (ya no tenia: nada que deshacer)
+    if (id >= 2 && id - 2 < (int)gJerLibMenu.size() && gJerLibMenu[(size_t)(id - 2)] == antes && W3dJerRecurso(ObjActivo)) return;
+    if (id >= 2 && id - 2 >= (int)gJerLibMenu.size()) return;
+    // la biblioteca elegida se LEE antes de tocar nada: si su entrada no se puede leer, el objeto sigue con la que
+    // tenia (sin paso de undo). Asignarla igual lo dejaba sin biblioteca y con el guardado de TODO el proyecto
+    // frenado ("no se pudieron leer al abrir", que ademas no era lo que paso) hasta un Ctrl+Z.
+    W3dRecurso* elegida = NULL;
+    if (id >= 2) {
+        std::string motivo;
+        elegida = W3dJerBibliotecaTomar(gJerLibMenu[(size_t)(id - 2)], ObjActivo->name.c_str(), &motivo);
+        if (!elegida) {
+            w3dLogfE("[W3D] clips de '%s': la biblioteca '%s' no se pudo leer: %s", ObjActivo->name.c_str(),
+                     gJerLibMenu[(size_t)(id - 2)].c_str(), motivo.c_str());
+            Notificar(std::string(T("The clip library could not be read")) + ": \"" + gJerLibMenu[(size_t)(id - 2)] + "\"", true);
+            return;
+        }
+    }
+    // Ctrl+Z: la biblioteca que tenia (el paso la retiene: una nueva que quedo sin usuarios sigue viva)
+    W3dClipsVistasSincronizar();
+    UndoCapturarJerBiblioteca(ObjActivo);
+    if (id == 0) W3dJerSoltar(ObjActivo);
+    else if (id == 1) W3dJerBibliotecaNueva(ObjActivo, ObjActivo->name);
+    else {
+        std::string motivo;   // (ya esta en memoria: la toma de ahi)
+        if (!W3dJerAsignar(ObjActivo, gJerLibMenu[(size_t)(id - 2)], &motivo))
+            Notificar(std::string(T("The clip library could not be read")) + ": \"" + gJerLibMenu[(size_t)(id - 2)] + "\"", true);
+    }
+    if (elegida) W3dRecursoSoltar(elegida, W3DREC_PERMANENTE);   // (la referencia de la prueba: ya la tiene el objeto)
+    W3dClipsVistaActivaRevisar();   // (la vista de un clip de la biblioteca que se fue ya no se edita)
+    W3dRecursosVistaInvalidar();
+    PropertiesLayoutDirty = true;
+    g_redraw = true;
+}
+// el desplegable desde afuera (el harness: elige por texto como el click en el menu)
+bool PropsJerLibElegir(const std::string& texto){
+    if (!ObjActivo || ObjActivo == SceneCollection) return false;
+    if (texto == "(none)" || texto == T("(none)")) { AccionJerLibElegida(0); return true; }
+    if (texto == "New Library" || texto == T("New Library")) { AccionJerLibElegida(1); return true; }
+    gJerLibMenu.clear();
+    const std::vector<W3dAnimSetFila>& reg = W3dAnimSetsRegistro();
+    for (size_t i = 0; i < reg.size(); i++) gJerLibMenu.push_back(reg[i].nombre);
+    std::vector<W3dRecurso*> todos;
+    W3dRecursosListar(W3DREC_ANIMSET, todos);
+    for (size_t i = 0; i < todos.size(); i++) {
+        if (!todos[i] || todos[i]->estado != W3DREC_LISTO || !todos[i]->dato) continue;
+        const std::string& n = ((const W3dAnimSet*)todos[i]->dato)->nombre;
+        if (n.empty() || std::find(gJerLibMenu.begin(), gJerLibMenu.end(), n) != gJerLibMenu.end()) continue;
+        gJerLibMenu.push_back(n);
+    }
+    for (size_t i = 0; i < gJerLibMenu.size(); i++) if (gJerLibMenu[i] == texto) { AccionJerLibElegida((int)i + 2); return true; }
+    return false;
+}
+
+// ---- el RETARGET PROPIO del objeto activo (tarjeta Animacion, pestania Objeto) ----
+static PopupMenu* MenuObjRetarget = NULL;
+static int RetargetPropio(Object* o){
+    if (!o) return -1;
+    if (o->getType() == ObjectType::armature) return ((Armature*)o)->retarget;
+    return o->clipsJer ? o->clipsJer->retarget : -1;
+}
+static void AccionObjRetargetElegido(int id){
+    Object* o = ObjActivo;
+    if (!o || o == SceneCollection) return;
+    const bool arm = (o->getType() == ObjectType::armature);
+    // ids: 0 = el de cada clip (solo raices de jerarquia), 1 = completo, 2 = rotaciones
+    const int modo = (id == 2) ? W3D_RETARGET_ROTACIONES : (id == 1 || arm) ? W3D_RETARGET_COMPLETO : -1;
+    if (modo == RetargetPropio(o)) return;
+    UndoCapturarRetarget(o);
+    if (arm) { W3dArmatureRetarget((Armature*)o, modo); InvalidarSkinEscena(); }
+    else W3dAnimObjetoRetarget(o, modo);
+    PropertiesLayoutDirty = true;
+    g_redraw = true;
+}
+static void AccionMenuObjRetarget(){
+    if (!PropsActivo || !PropsActivo->propObjRetarget || !ObjActivo || ObjActivo == SceneCollection) return;
+    if (!MenuObjRetarget){ MenuObjRetarget = new PopupMenu(); MenuObjRetarget->action = AccionObjRetargetElegido; }
+    MenuObjRetarget->Limpiar();
+    if (ObjActivo->getType() != ObjectType::armature) MenuObjRetarget->Agregar(T("Clip default"), 0, -1);
+    MenuObjRetarget->Agregar(T("Complete"), 1, -1);
+    MenuObjRetarget->Agregar(T("Rotations only"), 2, -1);
+    AbrirMenuBajoBoton(MenuObjRetarget, PropsActivo->propObjRetarget->button);
+}
+// idem desde afuera (el harness): "Clip default" / "Complete" / "Rotations only"
+bool PropsObjRetargetElegir(const std::string& texto){
+    if (texto == "Clip default" || texto == T("Clip default")) { AccionObjRetargetElegido(0); return true; }
+    if (texto == "Complete" || texto == T("Complete")) { AccionObjRetargetElegido(1); return true; }
+    if (texto == "Rotations only" || texto == T("Rotations only")) { AccionObjRetargetElegido(2); return true; }
+    return false;
+}
+static void AccionMenuJerLib(){
+    if (!PropsActivo || !PropsActivo->propJerLib || !ObjActivo || ObjActivo == SceneCollection) return;
+    if (!MenuJerLib){ MenuJerLib = new PopupMenu(); MenuJerLib->action = AccionJerLibElegida; }
+    // las del registro del proyecto y las que viven en memoria (todavia sin guardar), sin repetir
+    gJerLibMenu.clear();
+    const std::vector<W3dAnimSetFila>& reg = W3dAnimSetsRegistro();
+    for (size_t i = 0; i < reg.size(); i++) gJerLibMenu.push_back(reg[i].nombre);
+    std::vector<W3dRecurso*> todos;
+    W3dRecursosListar(W3DREC_ANIMSET, todos);
+    for (size_t i = 0; i < todos.size(); i++) {
+        if (!todos[i] || todos[i]->estado != W3DREC_LISTO || !todos[i]->dato) continue;
+        const std::string& n = ((const W3dAnimSet*)todos[i]->dato)->nombre;
+        if (n.empty() || std::find(gJerLibMenu.begin(), gJerLibMenu.end(), n) != gJerLibMenu.end()) continue;
+        gJerLibMenu.push_back(n);
+    }
+    MenuJerLib->Limpiar();
+    MenuJerLib->Agregar(T("(none)"), 0, IconType::empty);
+    MenuJerLib->Agregar(T("New Library"), 1, IconType::mas);
+    for (size_t i = 0; i < gJerLibMenu.size(); i++) MenuJerLib->Agregar(gJerLibMenu[i], (int)i + 2, IconType::animacion);
+    AbrirMenuBajoBoton(MenuJerLib, PropsActivo->propJerLib->button);
+}
+
+// ---- el RETARGET por defecto del clip de jerarquia elegido (tarjeta Animacion) ----
+static PopupMenu* MenuClipRetarget = NULL;
+static void AccionClipRetargetElegido(int id){
+    if (!W3dClipVistaViva(SceneAnimActiva)) return;
+    SceneAnimation* v = SceneAnimations[(size_t)SceneAnimActiva];
+    W3dClipJer* c = v->clipJer;
+    const int modo = (id == 1) ? W3D_RETARGET_ROTACIONES : W3D_RETARGET_COMPLETO;
+    if (c->retarget != modo) {
+        W3dClipsVistasSincronizar();
+        UndoCapturarClipJer(W3dJerRecurso(v->duenio), c);   // Ctrl+Z: el modo que tenia
+        c->retarget = modo; c->version++; v->versionVista = c->version;
+    }
+    g_redraw = true;
+}
+// idem desde afuera (el harness): "Complete" / "Rotations only"
+bool PropsClipRetargetElegir(const std::string& texto){
+    if (texto == "Complete" || texto == T("Complete")) { AccionClipRetargetElegido(0); return true; }
+    if (texto == "Rotations only" || texto == T("Rotations only")) { AccionClipRetargetElegido(1); return true; }
+    return false;
+}
+static void AccionMenuClipRetarget(){
+    if (!PropsActivo || !PropsActivo->propClipRetarget || !W3dClipVistaViva(SceneAnimActiva)) return;
+    if (!MenuClipRetarget){ MenuClipRetarget = new PopupMenu(); MenuClipRetarget->action = AccionClipRetargetElegido; }
+    MenuClipRetarget->Limpiar();
+    MenuClipRetarget->Agregar(T("Complete"), 0, -1);
+    MenuClipRetarget->Agregar(T("Rotations only"), 1, -1);
+    AbrirMenuBajoBoton(MenuClipRetarget, PropsActivo->propClipRetarget->button);
+}
+
+static void AccionRcCamaraElegida(int id){
+    if (!ObjActivo || ObjActivo->getType() != ObjectType::recorte) return;
+    Recorte* rc = (Recorte*)ObjActivo;
+    if (id <= 0) rc->camara.clear();
+    else if (id - 1 < (int)gCamMenu.size()) rc->camara = gCamMenu[id - 1]->name;
+    if (PropsActivo && PropsActivo->propRcCamara) PropsActivo->propRcCamara->button->text = rc->camara.empty() ? T("(none)") : rc->camara;
+    g_redraw = true;
+}
+static void AccionMenuRcCamara(){
+    if (!PropsActivo || !PropsActivo->propRcCamara) return;
+    if (!MenuRcCamara){ MenuRcCamara = new PopupMenu(); MenuRcCamara->action = AccionRcCamaraElegida; }
+    gCamMenu.clear(); CamarasDeEscena(SceneCollection, gCamMenu);
+    MenuRcCamara->Limpiar();
+    MenuRcCamara->Agregar(T("(none)"), 0, IconType::empty);
+    for (size_t i = 0; i < gCamMenu.size(); i++) MenuRcCamara->Agregar(gCamMenu[i]->name, (int)i + 1, IconType::camera);
+    AbrirMenuBajoBoton(MenuRcCamara, PropsActivo->propRcCamara->button);
+}
+
+// DROPDOWN del MODO de la Niebla (Lineal / Exp / Exp2)
+static PopupMenu* MenuNieblaModo = NULL;
+static const char* NieblaModoLabel(int m){ return m == 2 ? "Exp2" : (m == 1 ? "Exp" : T("Linear")); }
+static void AccionNieblaModoElegido(int id){
+    if (!ObjActivo || ObjActivo->getType() != ObjectType::niebla) return;
+    static_cast<Niebla*>(ObjActivo)->modo = id;
+    g_redraw = true;
+}
+static void AccionMenuNieblaModo(){
+    if (!PropsActivo || !PropsActivo->propNieblaModo) return;
+    if (!MenuNieblaModo){ MenuNieblaModo = new PopupMenu(); MenuNieblaModo->action = AccionNieblaModoElegido; }
+    MenuNieblaModo->Limpiar();
+    MenuNieblaModo->Agregar(T("Linear"), 0, IconType::niebla);
+    MenuNieblaModo->Agregar("Exp",       1, IconType::niebla);
+    MenuNieblaModo->Agregar("Exp2",      2, IconType::niebla);
+    AbrirMenuBajoBoton(MenuNieblaModo, PropsActivo->propNieblaModo->button);
+}
+
 // nombre visible del metodo para el texto del boton
 static const char* CullMetodoLabel(int m){
     switch (m) {
         case Culling::Grid:      return "Grid (cells)";
         case Culling::Riel:      return "Riel (nodos)";
-        case Culling::Bsp:       return "BSP (pending)";
+        case Culling::Bsp:       return "BSP (PVS)";
         default:                 return "Frustum (AABB)";
     }
 }
@@ -5306,6 +6181,18 @@ void Properties::ConstruirGrupos(){
     { PropButton* pb = new PropButton(T("Delete"), -1);
       pb->action = AccionObjAnimDel;
       propObjAnim->properties.push_back(pb); }
+    // su BIBLIOTECA de clips de jerarquia (los que anima a si mismo y a sus hijos: animObjeto de lua)
+    propJerLib = new PropButton(T("Clips"), IconType::animacion);   // (label "Clips"; el boton, la biblioteca)
+    propJerLib->button->desplegable = true;
+    propJerLib->conLabel = true;
+    propJerLib->action = AccionMenuJerLib;
+    propObjAnim->properties.push_back(propJerLib);
+    // su RETARGET propio (animRetarget de lua): con que proporciones reproduce clips grabados en otro tamano
+    propObjRetarget = new PropButton(T("Retarget"), -1);
+    propObjRetarget->button->desplegable = true;
+    propObjRetarget->conLabel = true;
+    propObjRetarget->action = AccionMenuObjRetarget;
+    propObjAnim->properties.push_back(propObjRetarget);
     GroupProperties.push_back(propObjAnim);
 
     // ===== Tarjeta "Texto" (elemento Texto2D del Editor 2D) =====
@@ -5439,6 +6326,10 @@ void Properties::ConstruirGrupos(){
     propImagen2D->properties.push_back(propImgOpac);
     propImgAlpha = new PropBool("Alpha");   // usar el canal alpha de la textura
     propImagen2D->properties.push_back(propImgAlpha);
+    propImgMezcla = new PropButton(T("Blend"), IconType::material);
+    propImgMezcla->button->desplegable = true;
+    propImgMezcla->action = AccionMenuImgMezcla;
+    propImagen2D->properties.push_back(propImgMezcla);
     propImgFiltro = new PropBool(T("Filtering"));   // off = NEAREST (pixel-perfect)
     propImagen2D->properties.push_back(propImgFiltro);
     propImgPal = new PropButton(T("Palette"));
@@ -5957,6 +6848,27 @@ void Properties::ConstruirGrupos(){
     // EDICION de la malla. Una malla "no editable" (escenario) no tiene posRep/edges/
     // bordesBuf ni entra a Edit Mode -> ahorra memoria y carga. El boton alterna:
     // borra los datos de edicion o los recalcula (CalcularBordes).
+    // ===== Tarjeta "3D Mesh" (la PRIMERA de la pestania "Malla 3D"): que malla 3D -un RECURSO de la
+    // biblioteca- usa el objeto. SOLO se elige (selector + usuarios + Make Single User): el nombre y la
+    // carpeta del recurso se editan en la biblioteca del outliner =====
+    propMalla3D = new GroupPropertie(T("3D Mesh"));
+    propMalla3D->anchoValores = 0.30f;
+    propMalla3D->icono = (int)IconType::mesh;
+    propBtnMallaSel = new PropButton("", IconType::mesh);
+    propBtnMallaSel->button->desplegable = true;
+    propBtnMallaSel->action = AccionMenuMallas3D;
+    propMalla3D->properties.push_back(propBtnMallaSel);
+    propLblMallaUsos = new PropLabel(std::string(T("Users")) + ": 1");
+    propMalla3D->properties.push_back(propLblMallaUsos);
+    propBtnMallaUnica = new PropButton(T("Make Single User"), IconType::mesh);
+    propBtnMallaUnica->action = AccionMallaHacerUnica;
+    propMalla3D->properties.push_back(propBtnMallaUnica);
+    // (una malla de una LIBRERIA externa, o lo que genera un proxy: de solo lectura; se ve solo entonces)
+    propLblMallaLib = new PropLabel(T("It belongs to a library (read-only): open the library to edit it"), true /*wrap*/);
+    propLblMallaLib->oculto = true;
+    propMalla3D->properties.push_back(propLblMallaLib);
+    GroupProperties.push_back(propMalla3D);
+
     propMeshEdicion = new GroupPropertie(T("Edicion"));
     propBtnMeshEditable = new PropButton(T("Borrar datos para edicion"), IconType::borrar);
     propBtnMeshEditable->action = AccionMeshEditableToggle;
@@ -5969,6 +6881,7 @@ void Properties::ConstruirGrupos(){
     propMeshParts->properties.push_back(new PropListMeshParts("Mesh Parts")); // [0] selector (lo lee Rebind)
     PropButton* pbNewPart = new PropButton(T("New Mesh Part"), IconType::mesh);
     pbNewPart->action = AccionNuevoMeshPart;      propMeshParts->properties.push_back(pbNewPart);
+    propBtnNewPart = pbNewPart;   // (se oculta con una malla de una libreria)
     // fila: Assign | Select | Deselect (sin icono, 33% c/u, auto-ancho con gap)
     propRowPartOps = new PropButtonRow();
     propRowPartOps->Agregar(T("Assign"),   AccionAssignMeshPart);
@@ -5991,6 +6904,46 @@ void Properties::ConstruirGrupos(){
     // ===== Tarjeta APARTE "Material". Orden: New Material + Rename Material (las opciones
     // del material), LINEA separadora, y abajo la textura + sus opciones. Los props se guardan en arrays
     // (propMatChk/propMatCol/propMatShin) -> Rebind los setea por nombre, NO por indice (reordenar = libre).
+    // ===== Tarjeta "Resource" (pestania "Malla 3D", la 3): el recurso elegido en la BIBLIOTECA del outliner.
+    // Va ANTES de la tarjeta Material: con un material elegido, la de abajo es su tarjeta Material.
+    propRecurso = new GroupPropertie(T("Resource"));
+    propRecurso->anchoValores = 0.30f;
+    propRecurso->icono = (int)IconType::carpeta;
+    propRecNombre = new PropText(T("Name"));
+    propRecurso->properties.push_back(propRecNombre);
+    propRecCarpeta = new PropText(T("Folder"));
+    propRecurso->properties.push_back(propRecCarpeta);
+    propRecTipo = new PropLabel("", true /*wrap*/);
+    propRecurso->properties.push_back(propRecTipo);
+    propRecEntrada = new PropLabel("", true /*wrap*/);
+    propRecurso->properties.push_back(propRecEntrada);
+    // los DATOS POR TIPO (una fila cada uno; las que sobran se ocultan)
+    for (int k = 0; k < 14; k++) {
+        PropLabel* l = new PropLabel("", true /*wrap*/);
+        l->oculto = true;
+        propRecDatos.push_back(l);
+        propRecurso->properties.push_back(l);
+    }
+    // DENTRO / FUERA del .w3d (solo los que tienen archivo propio: texturas, sonidos, scripts...)
+    propRecUbicacion = new PropButton(T("Inside the .w3d"), IconType::archive);
+    propRecUbicacion->button->desplegable = true;
+    propRecUbicacion->action = AccionMenuRecUbicacion;
+    propRecUbicacion->oculto = true;
+    propRecurso->properties.push_back(propRecUbicacion);
+    propRecPreview = new PropImagen("Preview");
+    propRecurso->properties.push_back(propRecPreview);
+    // lo del tipo: escuchar/parar un sonido, abrir una escena/prefab, abrir un script en el IDE
+    propRecAcciones2 = new PropButtonRow();
+    propRecAcciones2->Agregar(T("Play"), AccionRecAccionTipo);
+    propRecAcciones2->Agregar(T("Stop"), AccionRecParar);
+    propRecurso->properties.push_back(propRecAcciones2);
+    propRecAcciones = new PropButtonRow();
+    propRecAcciones->Agregar(T("Select Users"), AccionRecSeleccionarUsuarios);
+    propRecAcciones->Agregar(T("Delete"), AccionRecBorrar);
+    propRecurso->properties.push_back(propRecAcciones);
+    propRecurso->visible = false;
+    GroupProperties.push_back(propRecurso);
+
     propMaterial = new GroupPropertie("Material");
     propMaterial->anchoValores = 0.30f;
     propBtnNewMaterial = new PropButton(T("New Material"), IconType::material);
@@ -6061,6 +7014,11 @@ void Properties::ConstruirGrupos(){
     propMatGrosorLinea->SetRango(1.0f, 64.0f);
     propMatGrosorLinea->stepFino = 1.0f; propMatGrosorLinea->stepGrueso = 2.0f; propMatGrosorLinea->dragStep = 0.5f;
     propMatGrosorLinea->onChange = OnMatGrosorLineaChange;
+    // --- ALPHA TEST: recorte por alfa 0..1 (0 = apagado), ver OnMatAlfaChange ---
+    propMatAlfa = new PropFloat(T("Alpha Test"));
+    propMatAlfa->SetRango(0.0f, 1.0f);
+    propMatAlfa->stepFino = 0.05f; propMatAlfa->stepGrueso = 0.1f; propMatAlfa->dragStep = 0.005f;
+    propMatAlfa->onChange = OnMatAlfaChange;
     // --- ORDEN VISUAL ---
     propMaterial->properties.push_back(propMatChk[3]);  // Lighting  (ARRIBA DE TODO)
     propMaterial->properties.push_back(propMatChk[2]);  // Vertex Color (sobre Base Color)
@@ -6087,6 +7045,29 @@ void Properties::ConstruirGrupos(){
     propMaterial->properties.push_back(propMatChk[9]);  // (oculto: reemplazado por el dropdown)
     propMaterial->properties.push_back(propBtnReflectMode);
     propMaterial->properties.push_back(propBtnMezcla);  // modo de mezcla (visible si Transparent ON)
+    propMaterial->properties.push_back(propMatAlfa);    // Alpha Test (recorte por alfa; 0 = apagado)
+    // --- CAPAS DE TEXTURA: titulo + hasta 4 filas [textura | UV | mezcla | on] (ver el bloque de arriba) ---
+    propCapasTitulo = new PropLabel(T("Texture Layers"));
+    propMaterial->properties.push_back(propCapasTitulo);
+    for (int i = 0; i < kCapasUI; i++) {
+        propCapaTex[i] = new PropButton(T("Add Layer"), IconType::textura);
+        propCapaTex[i]->button->desplegable = true;
+        propCapaTex[i]->action = kAccionCapaTex[i];
+        propCapaUV[i] = new PropButton("UV 1", IconType::material);
+        propCapaUV[i]->conLabel = true;
+        propCapaUV[i]->button->desplegable = true;
+        propCapaUV[i]->action = kAccionCapaUV[i];
+        propCapaMezcla[i] = new PropButton("Mix", IconType::material);
+        propCapaMezcla[i]->conLabel = true;
+        propCapaMezcla[i]->button->desplegable = true;
+        propCapaMezcla[i]->action = kAccionCapaMz[i];
+        propCapaOn[i] = new PropBool(T("Layer On"));
+        propCapaOn[i]->onChange = RebindMaterialMeshPart;
+        propMaterial->properties.push_back(propCapaTex[i]);
+        propMaterial->properties.push_back(propCapaUV[i]);
+        propMaterial->properties.push_back(propCapaMezcla[i]);
+        propMaterial->properties.push_back(propCapaOn[i]);
+    }
     propMaterial->properties.push_back(propMatLineas);      // Lines (aristas por material)
     propMaterial->properties.push_back(propMatGrosorLinea); // Line Width (visible con Lines ON)
     propMaterial->properties.push_back(propMatChk[5]);  // Culling    (ABAJO DE TODO: pro)
@@ -6105,6 +7086,9 @@ void Properties::ConstruirGrupos(){
     // objeto activo es una luz. OpenGL = UN tipo de luz configurable: Direccional / Puntual / Spot (ver Light.h).
     propLight = new GroupPropertie(T("Light"));
     propLight->reservaKeyBtn = true;   // columna del rombo (el color diffuse es animable)
+    // "Ignorar orden" (del arbol): prendido (default) la luz alumbra TODO; apagado solo lo que sigue en el arbol
+    propLightIgnOrden = new PropBool(T("Ignore order"));
+    propLight->properties.push_back(propLightIgnOrden);
     propLightDir = new PropBool(T("Directional"));                 // w=0 (sol) vs puntual/spot
     propLightDir->animProp = AnimLightMisc; propLightDir->animComp = AnimY;   // animable (escalon)
     propLight->properties.push_back(propLightDir);
@@ -6222,6 +7206,9 @@ void Properties::ConstruirGrupos(){
     // translucido: ordena atras->adelante (alpha) en vez de por material.
     propCullOrdenAlpha = new PropBool(T("Alpha order"));
     propCulling->properties.push_back(propCullOrdenAlpha);
+    // opaco: adelante->atras puro (el mas cercano primero), sin agrupar por material
+    propCullOrdenCerca = new PropBool(T("Front to back"));
+    propCulling->properties.push_back(propCullOrdenCerca);
     // --- campos del metodo Grid (se ocultan con value=NULL cuando el metodo no es Grid) ---
     propCullCellSize = new PropFloat(T("Cell size"), "m");
     propCullCellSize->SetRango(0.5f, 100000.0f);
@@ -6234,6 +7221,60 @@ void Properties::ConstruirGrupos(){
     propCullRecalc->action = AccionCullRecalcular;
     propCulling->properties.push_back(propCullRecalc);
     GroupProperties.push_back(propCulling);
+
+    // pestania del objeto NIEBLA: la llamada glFog puesta en el arbol (de ahi en adelante, solo en Render)
+    propNiebla = new GroupPropertie(T("Fog"));
+    propNieblaActiva = new PropBool(T("Active"));
+    propNiebla->properties.push_back(propNieblaActiva);
+    propNieblaModo = new PropButton(T("Linear"), IconType::niebla);
+    propNieblaModo->button->desplegable = true;
+    propNieblaModo->action = AccionMenuNieblaModo;
+    propNiebla->properties.push_back(propNieblaModo);
+    propNieblaInicio = new PropFloat(T("Start"), "m");
+    propNieblaInicio->SetRango(0.0f, 100000.0f);
+    propNiebla->properties.push_back(propNieblaInicio);
+    propNieblaFin = new PropFloat(T("End"), "m");
+    propNieblaFin->SetRango(0.0f, 100000.0f);
+    propNiebla->properties.push_back(propNieblaFin);
+    propNieblaDens = new PropFloat(T("Density"));
+    propNieblaDens->SetRango(0.0f, 10.0f);
+    propNiebla->properties.push_back(propNieblaDens);
+    propNieblaColor = new PropColor(T("Color"));
+    propNiebla->properties.push_back(propNieblaColor);
+    propNieblaFondo = new PropBool(T("Paint background"));   // el fondo del render toma el color de la niebla
+    propNiebla->properties.push_back(propNieblaFondo);
+    GroupProperties.push_back(propNiebla);
+
+    // LIMPIAR Z y RECORTE: composicion de la pantalla puesta en el arbol
+    propLimpiarZ = new GroupPropertie(T("Clear Depth"));
+    propLzActivo = new PropBool(T("Active"));
+    propLimpiarZ->properties.push_back(propLzActivo);
+    GroupProperties.push_back(propLimpiarZ);
+    propRecorte = new GroupPropertie(T("Screen Rect"));
+    propRcActivo = new PropBool(T("Active"));
+    propRecorte->properties.push_back(propRcActivo);
+    propRcX = new PropFloat("X"); propRcX->SetRango(-1.0f, 1.0f); propRcX->stepFino = 0.01f; propRcX->dragStep = 0.002f;
+    propRecorte->properties.push_back(propRcX);
+    propRcY = new PropFloat("Y"); propRcY->SetRango(-1.0f, 1.0f); propRcY->stepFino = 0.01f; propRcY->dragStep = 0.002f;
+    propRecorte->properties.push_back(propRcY);
+    propRcAncho = new PropFloat(T("Width")); propRcAncho->SetRango(0.0f, 1.0f); propRcAncho->stepFino = 0.01f; propRcAncho->dragStep = 0.002f;
+    propRecorte->properties.push_back(propRcAncho);
+    propRcAlto = new PropFloat(T("Height")); propRcAlto->SetRango(0.0f, 1.0f); propRcAlto->stepFino = 0.01f; propRcAlto->dragStep = 0.002f;
+    propRecorte->properties.push_back(propRcAlto);
+    propRcCamara = new PropButton(T("(none)"), IconType::camera);
+    propRcCamara->button->desplegable = true;
+    propRcCamara->action = AccionMenuRcCamara;
+    propRecorte->properties.push_back(propRcCamara);
+    propRcLimpiarZ = new PropBool(T("Clear depth"));
+    propRecorte->properties.push_back(propRcLimpiarZ);
+    propRcFondo = new PropBool(T("Fill"));
+    propRecorte->properties.push_back(propRcFondo);
+    propRcColor = new PropColor(T("Color"));
+    propRecorte->properties.push_back(propRcColor);
+    GroupProperties.push_back(propRecorte);
+    // HITBOX: caja de deteccion (la tarjeta entera vive en PropsHitbox.cpp)
+    PropsHitboxConstruir(this);
+    PropsPrefabConstruir(this);   // la tarjeta de una instancia de prefab (y de lo que genera)
 
     // pestania del objeto MIRROR (pedido del dueno: "el mirror no tiene propiedades"):
     // a quien espeja (por nombre, commit en vivo) + en que ejes + el rectangulo del
@@ -6399,6 +7440,23 @@ void Properties::ConstruirGrupos(){
     propPartAlphaMuerte = new PropFloat(T("Dies below alpha"), "");
     propPartAlphaMuerte->SetRango(0.0f, 1.0f);
     propPartColCard->properties.push_back(propPartAlphaMuerte);
+    propPartAparecer = new PropFloat(T("Fade in"), "s");
+    propPartAparecer->SetRango(0.0f, 60.0f);
+    propPartColCard->properties.push_back(propPartAparecer);
+    {
+        const char* nc[2] = { "Near fade from", "Near fade to" };
+        const char* nl[2] = { "Far fade from", "Far fade to" };
+        for (int k = 0; k < 2; k++) {
+            propPartFundeCerca[k] = new PropFloat(T(nc[k]), "m");
+            propPartFundeCerca[k]->SetRango(0.0f, 10000.0f);
+            propPartColCard->properties.push_back(propPartFundeCerca[k]);
+        }
+        for (int k = 0; k < 2; k++) {
+            propPartFundeLejos[k] = new PropFloat(T(nl[k]), "m");
+            propPartFundeLejos[k]->SetRango(0.0f, 10000.0f);
+            propPartColCard->properties.push_back(propPartFundeLejos[k]);
+        }
+    }
     propPartUsarColFin = new PropBool(T("End color"));
     propPartColCard->properties.push_back(propPartUsarColFin);
     propPartColorFin = new PropColor(T("Color at death"));
@@ -6507,6 +7565,13 @@ void Properties::ConstruirGrupos(){
     propProyExtraer = new PropButton("Extraer assets", IconType::carpeta);
     propProyExtraer->action = AccionProyExtraer;
     propArchivo->properties.push_back(propProyExtraer);
+    // como se GUARDAN las mallas del proyecto: binario (.w3db, destildado) o texto (.w3dm).
+    // Viaja con el proyecto ("formatoMallas" del proyecto.json); ver AccionMallasTexto.
+    propProyMallasTexto = new PropBool(T("Meshes as text"));
+    MallasTextoRefrescar();
+    propProyMallasTexto->value = &g_proyMallasTexto;
+    propProyMallasTexto->onChange = AccionMallasTexto;
+    propArchivo->properties.push_back(propProyMallasTexto);
     GroupProperties.push_back(propArchivo);
 
 
@@ -6656,9 +7721,21 @@ void Properties::ConstruirGrupos(){
     propBtnAnimRename = new PropButton(T("Rename"), -1);
     propBtnAnimRename->action = AccionAnimRenameCard;
     propAnimation->properties.push_back(propBtnAnimRename);
+    // el RETARGET por defecto de un clip de jerarquia (solo con la vista de uno elegida): "Complete" = el clip
+    // tal cual; "Rotations only" = las raices de otro tamano lo reproducen con sus proporciones (animRetarget
+    // de lua lo cambia por instancia)
+    propClipRetarget = new PropButton(T("Retarget"), -1);
+    propClipRetarget->button->desplegable = true;
+    propClipRetarget->conLabel = true;
+    propClipRetarget->action = AccionMenuClipRetarget;
+    propClipRetarget->oculto = true;
+    propAnimation->properties.push_back(propClipRetarget);
     propBtnAnimRender = new PropButton(T("Render Animation"), IconType::camera);
     propBtnAnimRender->action = AccionRenderAnimation;
     propRender->properties.push_back(propBtnAnimRender);   // la secuencia es del RENDER (tarjeta Render)
+    propRenderNota = new PropLabel("", true /*wrap*/);     // (solo en un juego: que se renderiza su cache)
+    propRenderNota->oculto = true;
+    propRender->properties.push_back(propRenderNota);
     GroupProperties.push_back(propAnimation);
 
     // ===== MIX (pestania Animacion): el arbol de capas + la capa elegida =====
@@ -6670,8 +7747,8 @@ void Properties::ConstruirGrupos(){
     propListMix->filasMax = 8;
     propMix->properties.push_back(propListMix);
     propRowMix = new PropButtonRow();
-    propRowMix->Agregar(T("Add"), AccionMixAdd);
-    propRowMix->Agregar(T("Remove"), AccionMixQuitar, IconType::borrar);
+    propRowMix->Agregar(T("Add"), AccionMixAdd, IconType::mas);
+    propRowMix->Agregar(T("Remove"), AccionMixQuitar, IconType::menos);
     propMix->properties.push_back(propRowMix);
     propRowMixMove = new PropButtonRow();
     propRowMixMove->Agregar(T("Move Up"), AccionMixSubir);
@@ -6688,7 +7765,7 @@ void Properties::ConstruirGrupos(){
     propCapa->properties.push_back(propCapaVisible);
     propCapaInfl = new PropFloat(T("Influence"), "%"); propCapaInfl->SetRango(0.0f, 200.0f); propCapaInfl->onChange = AccionCapaCambio;
     propCapa->properties.push_back(propCapaInfl);
-    propCapaModo = new PropButton(T("Blend"), IconType::falloff_smoother);
+    propCapaModo = new PropButton(T("Blend"), IconType::igual);
     propCapaModo->button->desplegable = true; propCapaModo->action = AccionMenuCapaModo;
     propCapa->properties.push_back(propCapaModo);
     propCapaHueso = new PropButton(T("Bone"), IconType::armature);
@@ -6820,6 +7897,19 @@ void Properties::ConstruirGrupos(){
       propKeyframe->properties.push_back(p1); }
     GroupProperties.push_back(propKeyframe);
 
+    // tarjeta "Camara activa" (pestania Animacion): cual camara manda y los CORTES de la cinematica
+    // [selector de camara] [rombo]: el rombo se pone VERDE al elegir otra camara (cambio sin guardar); un click
+    // guarda el CORTE en el frame actual (mismo rombo y mismo idioma que las demas propiedades animables)
+    propCamActiva = new GroupPropertie(T("Active camera"));
+    propCamActiva->reservaKeyBtn = true;
+    propCamActivaSel = new PropButton("", IconType::camera);
+    propCamActivaSel->button->desplegable = true;
+    propCamActivaSel->action = AccionMenuCamActiva;
+    propCamActivaSel->animProp = AnimCamActiva; propCamActivaSel->animComp = AnimX;
+    propCamActiva->properties.push_back(propCamActivaSel);
+    propCamActivaKey = NULL;
+    GroupProperties.push_back(propCamActiva);
+
     propExport = new GroupPropertie(T("Export"));
     propExport->anchoValores = 0.62f;
     // dropdown de FORMATO (arriba de todo): OBJ / FBX / glTF / GLB. La etiqueta muestra el formato activo.
@@ -6926,6 +8016,7 @@ void Properties::ConstruirGrupos(){
     PropButton* pbAddGrp = new PropButton(T("Add Vertex Group"), IconType::mesh);
     pbAddGrp->action = AccionVertAddGroup;
     propVertexGroups->properties.push_back(pbAddGrp);
+    propBtnAddVG = pbAddGrp;
     propBtnRenameGroup = new PropButton(T("Rename"), -1); // renombra el grupo activo (nombre unico por malla)
     propBtnRenameGroup->action = AccionRenameGroup;
     propVertexGroups->properties.push_back(propBtnRenameGroup);
@@ -6959,6 +8050,7 @@ void Properties::ConstruirGrupos(){
     PropButton* pbAddUVGrp = new PropButton(T("Add UV Group"), IconType::mesh);
     pbAddUVGrp->action = AccionUVAddGroup;
     propUVGroups->properties.push_back(pbAddUVGrp);
+    propBtnAddUVG = pbAddUVGrp;
     propBtnRenameUVGroup = new PropButton(T("Rename"), -1);
     propBtnRenameUVGroup->action = AccionRenameUVGroup;
     propUVGroups->properties.push_back(propBtnRenameUVGroup);
@@ -7064,12 +8156,17 @@ void Properties::ConstruirGrupos(){
     propBone2DConectado->value = &g_b2dConectado;
     propBone2DConectado->onChange = AccionBone2DConectado;
     propBones2D->properties.push_back(propBone2DConectado);
-    { gB2dPosX = new PropFloat("Pos X"); gB2dPosX->value = &g_b2dPosX; gB2dPosX->onChange = AccionBone2DPos; propBones2D->properties.push_back(gB2dPosX);
-      gB2dPosY = new PropFloat("Pos Y"); gB2dPosY->value = &g_b2dPosY; gB2dPosY->onChange = AccionBone2DPos; propBones2D->properties.push_back(gB2dPosY);
-      gB2dRot  = new PropFloat(T("Rotation")); gB2dRot->value = NULL; gB2dRot->onChange = AccionBone2DPose; propBones2D->properties.push_back(gB2dRot);
-      gB2dSclX = new PropFloat(T("Scale X")); gB2dSclX->value = NULL; gB2dSclX->onChange = AccionBone2DPose; propBones2D->properties.push_back(gB2dSclX);
-      gB2dSclY = new PropFloat(T("Scale Y")); gB2dSclY->value = NULL; gB2dSclY->onChange = AccionBone2DPose; propBones2D->properties.push_back(gB2dSclY); }
-    propBone2DPosX = gB2dPosX; propBone2DRot = gB2dRot; // (miembros: los mira el test uvarm2d)
+    // filas DE ESTE PANEL (miembros): ActualizarPestanias refresca las suyas, no las de otro panel
+    propBone2DPosX = new PropFloat("Pos X"); propBone2DPosX->value = &g_b2dPosX; propBone2DPosX->onChange = AccionBone2DPos;
+    propBones2D->properties.push_back(propBone2DPosX);
+    propBone2DPosY = new PropFloat("Pos Y"); propBone2DPosY->value = &g_b2dPosY; propBone2DPosY->onChange = AccionBone2DPos;
+    propBones2D->properties.push_back(propBone2DPosY);
+    propBone2DRot  = new PropFloat(T("Rotation")); propBone2DRot->value = NULL; propBone2DRot->onChange = AccionBone2DPose;
+    propBones2D->properties.push_back(propBone2DRot);
+    propBone2DSclX = new PropFloat(T("Scale X")); propBone2DSclX->value = NULL; propBone2DSclX->onChange = AccionBone2DPose;
+    propBones2D->properties.push_back(propBone2DSclX);
+    propBone2DSclY = new PropFloat(T("Scale Y")); propBone2DSclY->value = NULL; propBone2DSclY->onChange = AccionBone2DPose;
+    propBones2D->properties.push_back(propBone2DSclY);
     GroupProperties.push_back(propBones2D);
 
     propUVMaps = new GroupPropertie(T("UV Maps"));
@@ -7078,6 +8175,7 @@ void Properties::ConstruirGrupos(){
     PropButton* pbAddUV = new PropButton(T("Add UV Map"), IconType::mesh);
     pbAddUV->action = AccionVertAddUVMap;
     propUVMaps->properties.push_back(pbAddUV);
+    propBtnAddUV = pbAddUV;
     propBtnRenameUV = new PropButton(T("Rename"), -1); // renombra la UV map activa (nombre unico por malla)
     propBtnRenameUV->action = AccionRenameUVMap;
     propUVMaps->properties.push_back(propBtnRenameUV);
@@ -7095,6 +8193,7 @@ void Properties::ConstruirGrupos(){
     PropButton* pbAddCol = new PropButton(T("Add Color Layer"), IconType::mesh);
     pbAddCol->action = AccionVertAddColor;
     propColorLayers->properties.push_back(pbAddCol);
+    propBtnAddCol = pbAddCol;
     propBtnColorMode = new PropButton(T("Color Mode"), IconType::mesh);
     propBtnColorMode->action = AccionVertColorMode;
     propColorLayers->properties.push_back(propBtnColorMode);
@@ -7130,6 +8229,10 @@ void Properties::ConstruirGrupos(){
     propRowModMove->Agregar(T("Move Up"),   AccionModifierUp);
     propRowModMove->Agregar(T("Move Down"), AccionModifierDown);
     propModifiers->properties.push_back(propRowModMove);
+    // (lo que genera un PROXY: sus modificadores son de la libreria; se ve solo entonces)
+    propLblModsLib = new PropLabel(T("It belongs to a library (read-only): open the library to edit it"), true /*wrap*/);
+    propLblModsLib->oculto = true;
+    propModifiers->properties.push_back(propLblModsLib);
     GroupProperties.push_back(propModifiers);
 
     // ===== 2da tarjeta: props del modificador SELECCIONADO. Por ahora las del MIRROR (bindeadas al modificador
@@ -7365,24 +8468,542 @@ static float gFloatDragAccum = 0.0f;  // delta acumulado desde el mouse-down (zo
 
 // el rebind global opera sobre el panel con el que se interactuo
 void RebindMaterialMeshPart(){
+    // EL MATERIAL ES DATO DE LA MALLA: si la malla del objeto activo es un RECURSO compartido,
+    // el material que se le acaba de poner a una parte lo ven TODOS sus objetos (como Blender)
+    if (ObjActivo && ObjActivo->getType() == ObjectType::mesh) {
+        Mesh* m = (Mesh*)ObjActivo;
+        if (m->malla && m->materialsGroup.size() == m->malla->partes.size())
+            for (size_t k = 0; k < m->materialsGroup.size(); k++)
+                if (k >= m->malla->materiales.size() || m->malla->materiales[k] != m->materialsGroup[k].material)
+                    W3dMallaRecursoCambiarMaterial(m->malla, (int)k, m->materialsGroup[k].material);
+    }
     if (PropsActivo) PropsActivo->Rebind();
 }
 
+// ============================================================================
+//  EL RECURSO ACTIVO de la BIBLIOTECA (el outliner), en la pestania "Malla 3D" (la 3)
+// ============================================================================
+// Name / Folder del recurso: muestran lo vigente mientras no se editan y, al perder el foco,
+// renombran / mueven con su paso de undo (W3dVistaRecRenombrar / W3dVistaRecMover). Mismo patron
+// que el Name del objeto: el destino se captura al ENFOCAR (si el activo cambia mientras se tipea,
+// el commit va al que se estaba editando).
+struct RecCampoEdit { bool editando; int vista; std::string id; RecCampoEdit() : editando(false), vista(-1) {} };
+static RecCampoEdit gRecNombreEd, gRecCarpetaEd;
+static void SincronizarCampoRecurso(PropText* pt, bool carpeta, RecCampoEdit& ed) {
+    if (!pt) return;
+    const bool foco = (g_textFieldActivo == &pt->field);
+    int v = -1; std::string id;
+    const bool hay = W3dRecursoActivo(&v, &id);
+    if (foco && !ed.editando && hay) { ed.editando = true; ed.vista = v; ed.id = id; }
+    if (!foco && ed.editando) {
+        ed.editando = false;
+        if (carpeta) W3dVistaRecMover(ed.vista, ed.id, pt->field.text);
+        else W3dVistaRecRenombrar(ed.vista, ed.id, pt->field.text, NULL);
+        PropertiesLayoutDirty = true;
+        g_redraw = true;
+    }
+    if (!foco && hay) {
+        W3dRecursoItem it;
+        if (W3dVistaRecInfo(v, id, &it)) {
+            const std::string& val = carpeta ? it.carpeta : it.nombre;
+            if (pt->field.text != val) { pt->field.SetText(val); g_redraw = true; }
+        }
+    }
+}
+static void SincronizarRecurso(Properties* p) {
+    if (!p) return;
+    SincronizarCampoRecurso(p->propRecNombre, false, gRecNombreEd);
+    SincronizarCampoRecurso(p->propRecCarpeta, true, gRecCarpetaEd);
+}
+// "Select Users": LA MISMA accion que el menu del outliner (OutlinerRecursos.cpp): selecciona los
+// objetos que lo usan y el outliner que miraba la biblioteca vuelve a la escena, centrado en ellos
+extern int OutlinerSeleccionarUsuarios(const std::vector<std::string>& claves);
+static void AccionRecSeleccionarUsuarios() {
+    int v = -1; std::string id;
+    if (!W3dRecursoActivo(&v, &id)) return;
+    OutlinerSeleccionarUsuarios(std::vector<std::string>(1, W3dBibClave(v, id)));
+    PropertiesLayoutDirty = true;
+    g_redraw = true;
+}
+static int gRecBorrarVista = -1;
+static std::string gRecBorrarId;
+static bool gRecBorrarForzado = false;
+static void RecBorrarConfirmado() {
+    std::string motivo;
+    const bool ok = gRecBorrarForzado ? W3dVistaRecBorrarForzado(gRecBorrarVista, gRecBorrarId, &motivo)
+                                      : W3dVistaRecBorrar(gRecBorrarVista, gRecBorrarId, &motivo);
+    if (ok) Notificar(std::string(T("Deleted")) + ": " + gRecBorrarId, false);
+    else Notificar(std::string(T("Not deleted")) + ": " + T(motivo.c_str()), true);
+    gRecBorrarId.clear();
+    gRecBorrarForzado = false;
+    PropertiesLayoutDirty = true;
+    g_redraw = true;
+}
+// "Delete": un huerfano se confirma; uno EN USO avisa CUANTOS lo usan y ofrece borrarlo igual (sus usuarios
+// quedan sin el, con Ctrl+Z) o cancelar
+static void AccionRecBorrar() {
+    int v = -1; std::string id;
+    if (!W3dRecursoActivo(&v, &id)) return;
+    W3dRecursoItem it;
+    if (!W3dVistaRecInfo(v, id, &it)) return;
+    gRecBorrarVista = v; gRecBorrarId = id; gRecBorrarForzado = false;
+    // una PARTE de un recurso (un clip de jerarquia de su biblioteca) se borra con su paso de undo: sin preguntar
+    if (!it.padre.empty()) { RecBorrarConfirmado(); return; }
+    if (!confirmarPopup) confirmarPopup = new ConfirmarPopup();
+    char b[640];
+    if (it.usuarios > 0) {
+        if (!W3dVistaRecSabeBorrarEnUso(v)) { Notificar(std::string(T("Not deleted")) + ": " + T("It is in use"), true); return; }
+        gRecBorrarForzado = true;
+        // (los usuarios de una MALLA 3D son objetos que no pueden quedar sin su malla: se BORRAN, con Ctrl+Z)
+        if (v == W3D_VISTA_MALLAS) {
+            snprintf(b, sizeof(b), T("\"%s\" is used by %d object(s). Delete it anyway?"), it.nombre.c_str(), it.usuarios);
+            snprintf(b + strlen(b), sizeof(b) - strlen(b), " %s", T("Its objects will be deleted too (Ctrl+Z brings them back)."));
+        } else
+            snprintf(b, sizeof(b), T("\"%s\" is in use by %d user(s). Delete it anyway? Its users will be left without it."),
+                     it.nombre.c_str(), it.usuarios);
+        confirmarPopup->Abrir(b, RecBorrarConfirmado);
+        return;
+    }
+    confirmarPopup->Abrir(std::string(T("Delete the orphan resource")) + " \"" + it.nombre + "\"?", RecBorrarConfirmado);
+}
+// DENTRO / FUERA del .w3d
+static PopupMenu* MenuRecUbicacion = NULL;
+// "External (choose where)...": el EXPLORADOR elige la carpeta (o el archivo a pisar, si tiene el mismo
+// contenido). El recurso que se pasa afuera es el que estaba activo al abrir el explorador (se recuerda:
+// mientras el explorador esta abierto se puede elegir otra cosa en la biblioteca)
+static int gRecExtVista = -1;
+static std::string gRecExtId;
+void PropsRecExternoElegido(const std::string& elegido) {
+    const int v = gRecExtVista;
+    const std::string rid = gRecExtId;
+    gRecExtVista = -1; gRecExtId.clear();
+    if (v < 0 || rid.empty() || !W3dVistaRecInfo(v, rid, NULL)) return;
+    // el archivo se llama como su entrada ("texturas/piso.png" -> <carpeta elegida>/piso.png)
+    std::string base = rid;
+    const size_t b = base.find_last_of("/\\");
+    if (b != std::string::npos) base = base.substr(b + 1);
+    std::string ext;
+    const size_t p = base.rfind('.');
+    if (p != std::string::npos && p > 0) { ext = base.substr(p); base = base.substr(0, p); }
+    const std::string ruta = W3dRutaDeSalida(elegido, base, ext);
+    std::string nuevo, motivo;
+    if (!W3dVistaRecFijarUbicacion(v, rid, 1, ruta, &nuevo, &motivo)) {
+        Notificar(std::string(T("Not moved")) + ": " + T(motivo.c_str()), true);
+        return;
+    }
+    Notificar(std::string(T("Now external")) + ": " + nuevo, false);
+    PropertiesLayoutDirty = true;
+    g_redraw = true;
+}
+// el recurso ACTIVO pasa a "External (choose where)..." (el harness elige la carpeta con PropsRecExternoElegido)
+void PropsRecExternoPreparar() {
+    int v = -1; std::string rid;
+    if (!W3dRecursoActivo(&v, &rid)) { gRecExtVista = -1; gRecExtId.clear(); return; }
+    gRecExtVista = v; gRecExtId = rid;
+}
+static void AccionRecUbicacionElegida(int id) {
+    int v = -1; std::string rid;
+    if (!W3dRecursoActivo(&v, &rid)) return;
+    if (id == 2) {
+        PropsRecExternoPreparar();
+        const size_t p = rid.rfind('.'), b = rid.find_last_of("/\\");
+        const std::string ext = (p != std::string::npos && (b == std::string::npos || p > b)) ? rid.substr(p) : std::string();
+        AbrirFileBrowser(T("External (choose where)..."), T("Save"), ext, PropsRecExternoElegido, true);
+        return;
+    }
+    std::string nuevo, motivo;
+    const std::string ruta = (id == 1) ? W3dVistaRecRutaExternaSugerida(v, rid) : std::string();
+    if (!W3dVistaRecFijarUbicacion(v, rid, id, ruta, &nuevo, &motivo)) {
+        // (al lado del .w3d ya hay OTRO archivo con ese nombre, por ejemplo: se dice que se puede elegir otro lugar)
+        Notificar(std::string(T("Not moved")) + ": " + T(motivo.c_str()) +
+                  (id == 1 ? std::string(" - ") + T("External (choose where)...") : std::string()), true);
+        return;
+    }
+    Notificar(id == 1 ? std::string(T("Now external")) + ": " + nuevo : std::string(T("Now inside the .w3d")) + ": " + nuevo, false);
+    PropertiesLayoutDirty = true;
+    g_redraw = true;
+}
+static void AccionMenuRecUbicacion() {
+    if (!PropsActivo || !PropsActivo->propRecUbicacion) return;
+    int v = -1; std::string id;
+    if (!W3dRecursoActivo(&v, &id)) return;
+    const int u = W3dVistaRecUbicacion(v, id);
+    if (!MenuRecUbicacion) { MenuRecUbicacion = new PopupMenu(); MenuRecUbicacion->action = AccionRecUbicacionElegida; }
+    MenuRecUbicacion->Limpiar();
+    MenuItem* a = MenuRecUbicacion->Agregar(T("Inside the .w3d"), 0, IconType::archive);
+    if (a) a->verde = (u == 0);
+    MenuItem* b = MenuRecUbicacion->Agregar(T("External"), 1, IconType::carpeta);   // al lado del .w3d
+    if (b) b->verde = (u == 1);
+    MenuRecUbicacion->Agregar(T("External (choose where)..."), 2, IconType::carpeta);   // con el explorador
+    AbrirMenuBajoBoton(MenuRecUbicacion, PropsActivo->propRecUbicacion->button);
+}
+// (audio/W3dAudio.h, declarado a mano: evita meter el dir de audio al include path de todas las plataformas)
+namespace w3dEngine {
+    class W3dSound;
+    W3dSound* W3dSoundLoadMemory(const void* bytes, size_t len);
+    void      W3dSoundFree(W3dSound* s);
+    int       W3dSoundPlay(W3dSound* s, float volume, bool loop);
+    void      W3dSoundStop(int voice);
+}
+// lo PROPIO DEL TIPO: escuchar un sonido (y pararlo), abrir una escena / un prefab, abrir un script en el IDE
+static int gRecVozSonido = -1;
+static void* gRecSonido = NULL;   // (el W3dSound cargado para escucharlo: se libera al parar)
+static void AccionRecParar() {
+    if (gRecVozSonido >= 0) { w3dEngine::W3dSoundStop(gRecVozSonido); gRecVozSonido = -1; }
+    if (gRecSonido) { w3dEngine::W3dSoundFree((w3dEngine::W3dSound*)gRecSonido); gRecSonido = NULL; }
+    g_redraw = true;
+}
+static void AccionRecAccionTipo() {
+    int v = -1; std::string id;
+    if (!W3dRecursoActivo(&v, &id)) return;
+    if (v == W3D_VISTA_SONIDOS) {
+        AccionRecParar();
+        std::vector<unsigned char> b;
+        if (!w3dFileSystem::ReadFileBytes(id, b) || b.empty()) { Notificar(T("The sound couldn't be read"), true); return; }
+        w3dEngine::W3dSound* snd = w3dEngine::W3dSoundLoadMemory(&b[0], b.size());
+        if (!snd) { Notificar(T("The sound couldn't be decoded"), true); return; }
+        gRecSonido = snd;
+        gRecVozSonido = w3dEngine::W3dSoundPlay(snd, 1.0f, false);
+        return;
+    }
+    if (v == W3D_VISTA_ESCENAS || v == W3D_VISTA_PREFABS) {
+        const int i = W3dRaizBuscar(v == W3D_VISTA_PREFABS ? W3D_RAIZ_PREFAB : W3D_RAIZ_ESCENA, id);
+        std::string motivo;
+        if (i < 0 || !W3dActivarRaiz(i, &motivo)) Notificar(std::string(T("Not opened")) + ": " + T(motivo.c_str()), true);
+        return;
+    }
+    if (v == W3D_VISTA_SCRIPTS) {
+        extern bool IDEAbrirScript(const std::string& ruta);
+        if (!IDEAbrirScript(id)) Notificar(T("There is no script editor (IDE) in the layout"), true);
+        return;
+    }
+}
+// el texto de una fila informativa cambio: se reescribe y se pide re-layout (las WRAP cambian de alto)
+static void RecLabel(PropLabel* l, const std::string& t) {
+    if (!l) return;
+    const bool ocultar = t.empty();
+    if (l->name != t || l->oculto != ocultar) { l->name = t; l->oculto = ocultar; PropertiesLayoutDirty = true; g_redraw = true; }
+}
+static void RecBoton(Button* b, bool ver, const char* texto) {
+    if (!b) return;
+    const std::string t = texto ? T(texto) : std::string();
+    if (b->visible != ver || (texto && b->text != t)) { b->visible = ver; if (texto) b->text = t; PropertiesLayoutDirty = true; g_redraw = true; }
+}
+// bindeo POR CUADRO de la tarjeta del recurso (lo llama ActualizarPestanias al final)
+static void ActualizarTarjetaRecurso(Properties* p, bool enRec, int vista, const std::string& id) {
+    if (!p || !p->propRecurso) return;
+    if (p->propRecurso->visible != enRec) { p->propRecurso->visible = enRec; PropertiesLayoutDirty = true; }
+    if (!enRec) {
+        if (p->propRecPreview) p->propRecPreview->tex = NULL;
+        // salio de la tarjeta con la tarjeta Material bindeada a un material SUELTO: vuelve al mesh part
+        if (p->recVersionBind != 0) {
+            p->recVersionBind = 0;
+            if (p->propBtnNewMaterial) p->propBtnNewMaterial->oculto = false;
+            if (ObjActivo && ObjActivo->getType() == ObjectType::mesh) p->Rebind();
+        }
+        return;
+    }
+    W3dRecursoItem it;
+    if (!W3dVistaRecInfo(vista, id, &it)) return;
+    p->propRecurso->icono = W3dVistaIcono(vista);
+    char b[32]; sprintf(b, "%d", it.usuarios);
+    std::string tipo = std::string(T(W3dVistaSingular(vista))) + " - ";
+    if (it.usuarios > 0) tipo += std::string(T("In use")) + " (" + T("Users") + ": " + b + ")";
+    else tipo += T("Orphan (no users)");
+    if (it.soloLectura) tipo += std::string(" - ") + T("read-only");
+    if (W3dCambiosRecursoSucio(vista, id)) tipo += std::string(" - ") + T("not saved") + " *";
+    RecLabel(p->propRecTipo, tipo);
+    // la ENTRADA del contenedor (los materiales no tienen: viajan adentro de proyecto.json)
+    if (vista == W3D_VISTA_MATERIALES) RecLabel(p->propRecEntrada, std::string());
+    else RecLabel(p->propRecEntrada, it.entrada.empty() ? std::string(T("Not saved in the project yet"))
+                                                        : std::string(T("Entry")) + ": " + it.entrada);
+    // los DATOS DEL TIPO (en el idioma de la UI): una fila cada uno ("Resolution: 256 x 256")
+    std::vector<W3dRecursoDato> datos;
+    W3dVistaRecDatos(vista, id, datos);
+    for (size_t k = 0; k < p->propRecDatos.size(); k++)
+        RecLabel(p->propRecDatos[k], k < datos.size() ? datos[k].etiqueta + ": " + datos[k].valor : std::string());
+    if (p->propRecNombre) {
+        const bool o = !it.renombrable || it.soloLectura;
+        if (p->propRecNombre->oculto != o) { p->propRecNombre->oculto = o; PropertiesLayoutDirty = true; }
+    }
+    // (una PARTE va en la carpeta de su recurso: no tiene la suya)
+    const bool sinCarpeta = it.soloLectura || !it.padre.empty();
+    if (p->propRecCarpeta && p->propRecCarpeta->oculto != sinCarpeta) {
+        p->propRecCarpeta->oculto = sinCarpeta; PropertiesLayoutDirty = true;
+    }
+    // DENTRO / FUERA: solo los que tienen archivo propio
+    if (p->propRecUbicacion) {
+        const int u = W3dVistaRecUbicacion(vista, id);
+        const bool o = (u < 0) || it.soloLectura;
+        if (p->propRecUbicacion->oculto != o) { p->propRecUbicacion->oculto = o; PropertiesLayoutDirty = true; }
+        const std::string t = u == 1 ? T("External") : T("Inside the .w3d");
+        if (p->propRecUbicacion->button->text != t) { p->propRecUbicacion->button->text = t; g_redraw = true; }
+    }
+    if (p->propRecPreview) {
+        Texture* t = (vista == W3D_VISTA_TEXTURAS) ? W3dRecursoActivoTextura() : NULL;
+        if (p->propRecPreview->tex != t) { p->propRecPreview->tex = t; PropertiesLayoutDirty = true; }
+    }
+    // lo propio del tipo
+    if (p->propRecAcciones2 && p->propRecAcciones2->botones.size() >= 2) {
+        const bool sonido = (vista == W3D_VISTA_SONIDOS), raiz = (vista == W3D_VISTA_ESCENAS || vista == W3D_VISTA_PREFABS),
+                   script = (vista == W3D_VISTA_SCRIPTS);
+        RecBoton(p->propRecAcciones2->botones[0], sonido || raiz || script,
+                 sonido ? "Play" : raiz ? "Open" : script ? "Open in IDE" : NULL);
+        RecBoton(p->propRecAcciones2->botones[1], sonido, NULL);
+    }
+    if (p->propRecAcciones && p->propRecAcciones->botones.size() >= 2) {
+        // "Select Users" solo si alguno de sus usuarios es un OBJETO (una malla huerfana, un script o un
+        // flipbook cuentan, pero no hay nada que seleccionar)
+        const bool usuarios = it.usuarios > 0 && W3dVistaRecObjetosUsuarios(vista, std::vector<std::string>(1, id)) > 0;
+        const bool borrar = !it.soloLectura && (it.usuarios == 0 || !it.padre.empty() || W3dVistaRecSabeBorrarEnUso(vista));
+        if (p->propRecAcciones->botones[0]->visible != usuarios || p->propRecAcciones->botones[1]->visible != borrar) {
+            p->propRecAcciones->botones[0]->visible = usuarios;
+            p->propRecAcciones->botones[1]->visible = borrar;
+            PropertiesLayoutDirty = true;
+        }
+    }
+    // un MATERIAL: su tarjeta Material de siempre, bindeada a el (re-bind al cambiar de recurso)
+    const bool esMat = (vista == W3D_VISTA_MATERIALES);   // (su visibilidad la decide ActualizarPestanias)
+    const unsigned ver = W3dRecursoActivoVersion() + 1u;   // +1: 0 queda para "sin bindear"
+    if (esMat && p->recVersionBind != ver) { p->recVersionBind = ver; p->Rebind(); }
+    if (!esMat && p->recVersionBind != 0) { p->recVersionBind = 0; if (p->propBtnNewMaterial) p->propBtnNewMaterial->oculto = false; }
+}
+
+// ============================================================================
+//  SOLTAR UN RECURSO DE LA BIBLIOTECA SOBRE UN DESPLEGABLE (el arrastre del outliner): una malla 3D sobre
+//  el selector de malla del objeto (cambia el cubo por el cilindro), un material sobre el selector de
+//  material de la parte, una textura sobre el de la textura. Con Ctrl+Z (los pasos de siempre).
+// ============================================================================
+// el desplegable de Properties que acepta ese tipo de recurso (NULL = ninguno a la vista)
+static PropButton* DestinoDeTipo(Properties* p, int tipo) {
+    if (!p) return NULL;
+    Mesh* m = MallaActivaProps();
+    switch (tipo) {
+        case W3D_VISTA_MALLAS:
+            return (m && p->propMalla3D && p->propMalla3D->visible) ? p->propBtnMallaSel : NULL;
+        case W3D_VISTA_MATERIALES:
+            return (m && p->propMaterial && p->propMaterial->visible && p->propBtnNewMaterial && !p->propBtnNewMaterial->oculto)
+                   ? p->propBtnNewMaterial : NULL;
+        case W3D_VISTA_TEXTURAS:
+            return (p->propMaterial && p->propMaterial->visible && p->propBtnTextura && !p->propBtnTextura->oculto)
+                   ? p->propBtnTextura : NULL;
+        case W3D_VISTA_PREFABS:   // el selector de prefab de una INSTANCIA (PropsPrefab.cpp), o el elemento de un PROXY
+        case W3D_VISTA_ESCENAS:   // (una escena: solo el de un proxy)
+            if (tipo == W3D_VISTA_ESCENAS && !(ObjActivo && ObjActivo->getType() == ObjectType::proxy)) return NULL;
+            return (ObjActivo && W3dEsTipoInstancia(ObjActivo->getType()) && p->propPrefab && p->propPrefab->visible &&
+                    p->propPfSel && !p->propPfSel->oculto) ? p->propPfSel : NULL;
+    }
+    return NULL;
+}
+// el rectangulo EN PANTALLA de un boton de una tarjeta (el mismo recorrido que SetRectFilaSeleccionada / ClickEn:
+// titulo, tarjetas visibles de arriba, la cabecera de la suya y las filas de antes). Lo deja en button->sx/sy.
+// false = su tarjeta no se ve o esta plegada
+static bool UbicarBotonDeTarjeta(Properties* p, PropButton* pb) {
+    if (!p || !pb || !pb->button || pb->oculto) return false;
+    int yFila = borderGS + RenglonHeightGS + gapGS;   // titulo
+    for (size_t i = 0; i < p->GroupProperties.size(); i++) {
+        GroupPropertie* g = p->GroupProperties[i];
+        if (!g->visible) continue;
+        int j = -1;
+        for (size_t k = 0; k < g->properties.size(); k++) if (g->properties[k] == pb) { j = (int)k; break; }
+        if (j < 0) { yFila += g->height + borderGS + (g->open ? GlobalScale : 0); continue; }
+        if (!g->open) return false;
+        yFila += borderGS + RenglonHeightGS + gapGS;  // cabecera de la tarjeta
+        for (int k = 0; k < j; k++) yFila += g->properties[(size_t)k]->Resize(g->width);
+        pb->button->sx = p->x + p->PosX + borderGS + borderGS + (pb->conLabel ? g->colEtiqueta : 0);
+        pb->button->sy = p->y + p->BarTopOffset() + p->PosY + yFila;
+        return true;
+    }
+    return false;
+}
+void PropsDestinosRecurso(Properties* p, int tipo, std::vector<int>& rects) {
+    rects.clear();
+    PropButton* b = DestinoDeTipo(p, tipo);
+    if (!b || !b->button || b->button->width <= 0) return;
+    if (!UbicarBotonDeTarjeta(p, b)) return;
+    // (el boton sabe su rectangulo del ultimo dibujo; fuera del panel no se resalta)
+    const int bx = b->button->sx, by = b->button->sy;
+    if (bx + b->button->width < p->x || bx > p->x + p->width || by + b->button->height < p->y || by > p->y + p->height) return;
+    rects.push_back(bx); rects.push_back(by); rects.push_back(b->button->width); rects.push_back(b->button->height);
+}
+bool PropsSoltarRecurso(Properties* p, int mx, int my, int tipo, const std::string& id, bool soloProbar, std::string* que) {
+    if (que) que->clear();
+    PropButton* b = DestinoDeTipo(p, tipo);
+    if (b && !UbicarBotonDeTarjeta(p, b)) b = NULL;
+    const bool sobre = b && b->button && mx >= b->button->sx && mx < b->button->sx + b->button->width &&
+                       my >= b->button->sy && my < b->button->sy + b->button->height;
+    if (!sobre) {
+        if (que) *que = T("Drop it on a compatible selector");
+        return false;
+    }
+    PropsActivo = p;
+    // lo de una LIBRERIA (lo genera un proxy, o su malla es de una libreria) no recibe nada: es de solo lectura
+    if (tipo == W3D_VISTA_MALLAS || tipo == W3D_VISTA_MATERIALES) {
+        Mesh* m = MallaActivaProps();
+        bool deLib = m && m->malla && !m->malla->libreria.empty() && tipo == W3D_VISTA_MATERIALES;
+        for (Object* q = m ? W3dInstanciaDe(m) : NULL; q && !deLib; q = W3dInstanciaDe(q)) deLib = (q->getType() == ObjectType::proxy);
+        if (deLib) { if (que) *que = T("read-only library"); return false; }
+    }
+    switch (tipo) {
+        case W3D_VISTA_MALLAS: {
+            Mesh* m = MallaActivaProps();
+            MallaRecurso* r = W3dMallaRecursoPorNombre(id);
+            if (!m || !r) return false;
+            if (que) *que = std::string(T("3D Mesh of")) + " " + m->name;
+            if (soloProbar) return true;
+            const bool ok = W3dMallaAsignar(m, r);
+            PropertiesLayoutDirty = true;
+            g_redraw = true;
+            return ok;
+        }
+        case W3D_VISTA_MATERIALES: {
+            Mesh* m = MallaActivaProps();
+            Material* mat = W3dMaterialDeId(id);
+            if (!m || !mat || m->materialsGroup.empty()) return false;
+            if (que) *que = std::string(T("Material of")) + " " + m->name;
+            if (soloProbar) return true;
+            PropListMeshParts* lista = static_cast<PropListMeshParts*>(p->propMeshParts->properties[0]);
+            int idx = lista->selectIndex;
+            if (idx < 0 || idx >= (int)m->materialsGroup.size()) idx = 0;
+            UndoCapturarMaterial(m, idx);
+            m->materialsGroup[(size_t)idx].material = mat;
+            RebindMaterialMeshPart();
+            return true;
+        }
+        case W3D_VISTA_TEXTURAS: {
+            Material* mat = MaterialActivoUI();
+            if (!mat || mat == MaterialDefecto) { if (que) *que = T("The default material can't be edited"); return false; }
+            if (!mat->libreria.empty()) { if (que) *que = T("read-only library"); return false; }
+            if (que) *que = std::string(T("Texture of")) + " " + mat->name;
+            if (soloProbar) return true;
+            Texture* t = W3dTexturaCargadaDe(id);
+            const bool tomada = (t == NULL);   // (la cargo este gesto: su referencia es temporal)
+            if (!t) t = TexturaTomar(id);
+            if (!t) return false;
+            extern void W3dMaterialPonerTextura(Material* mat, Texture* tex);   // (SoltarRecurso.cpp: con undo)
+            W3dMaterialPonerTextura(mat, t);   // (la ranura toma la suya)
+            if (tomada) TexturaSoltar(t);
+            RebindMaterialMeshPart();
+            return true;
+        }
+        case W3D_VISTA_ESCENAS:
+        case W3D_VISTA_PREFABS: {
+            // un prefab o una escena de una LIBRERIA sobre el selector de un PROXY: pasa a generar ese (con Ctrl+Z)
+            if (ObjActivo && ObjActivo->getType() == ObjectType::proxy) {
+                std::string lib, elem; int tipoEl = W3D_LIB_PREFAB;
+                if (!W3dLibsDeClave(id, &lib, &tipoEl, &elem)) { if (que) *que = T("Drop an element of a library"); return false; }
+                if (que) *que = std::string(T("Element of")) + " " + ObjActivo->name;
+                if (soloProbar) return true;
+                std::string motivo;
+                const bool ok = W3dProxyCambiar((ProxyW3d*)ObjActivo, lib, tipoEl, elem, &motivo);
+                if (!ok && que) *que = T(motivo.c_str());
+                PropertiesLayoutDirty = true;
+                g_redraw = true;
+                return ok;
+            }
+            if (tipo == W3D_VISTA_ESCENAS) return false;
+            // un prefab sobre el selector de una INSTANCIA: pasa a generar ese (con Ctrl+Z)
+            if (!ObjActivo || ObjActivo->getType() != ObjectType::prefab) return false;
+            if (que) *que = std::string(T("Prefab of")) + " " + ObjActivo->name;
+            if (soloProbar) return true;
+            std::string motivo;
+            const bool ok = W3dPrefabCambiar((InstanciaPrefab*)ObjActivo, id, &motivo);
+            if (!ok && que) *que = T(motivo.c_str());
+            PropertiesLayoutDirty = true;
+            g_redraw = true;
+            return ok;
+        }
+    }
+    return false;
+}
+
+// (declarada en Properties.h) ReiniciarEscena: los objetos se liberaron. Sin esto el panel seguia con
+// 'target' y la lista de partes apuntando a la malla LIBERADA: un Resize antes del primer cuadro (elegir
+// un recurso en el outliner: PropsIrARecurso) la leia, y un objeto nuevo nacido en la MISMA direccion
+// no se re-bindeaba nunca (RefreshTargetProperties lo tomaba por el mismo).
+static void OlvidarEscenaEn(ViewportBase* n) {
+    if (!n) return;
+    if (n->isLeaf()) {
+        if (n->ViewportKind() != 3) return;
+        Properties* p = (Properties*)n;
+        p->target = NULL;
+        if (p->propMeshParts && !p->propMeshParts->properties.empty())
+            static_cast<PropListMeshParts*>(p->propMeshParts->properties[0])->mesh = NULL;
+        // TODAS las listas que miran un objeto (grupos de vertices, UV groups, clips, huesos, scripts...): una
+        // tarjeta visible se re-mide ANTES de re-bindearse (la pestania de Vertices con un recurso de la biblioteca)
+        // (toda propiedad de tipo lista ES un PropListMeshParts: PropList no se instancia sola)
+        for (size_t g = 0; g < p->GroupProperties.size(); g++) {
+            GroupPropertie* gp = p->GroupProperties[g];
+            if (!gp) continue;
+            for (size_t k = 0; k < gp->properties.size(); k++) {
+                if (!gp->properties[k] || gp->properties[k]->GetType() != PropertyType::List) continue;
+                PropListMeshParts* l = static_cast<PropListMeshParts*>(gp->properties[k]);
+                l->mesh = NULL; l->arm = NULL; l->obj = NULL;
+            }
+        }
+        return;
+    }
+    if (n->ContainerKind() == 1) { OlvidarEscenaEn(((ViewportRow*)n)->childA); OlvidarEscenaEn(((ViewportRow*)n)->childB); }
+    else { OlvidarEscenaEn(((ViewportColumn*)n)->childA); OlvidarEscenaEn(((ViewportColumn*)n)->childB); }
+}
+void PropsOlvidarEscena() { OlvidarEscenaEn(LayoutRaizCompleta()); }
+
+// (declarada en Properties.h) el outliner por recursos la llama al ELEGIR un recurso
+void PropsIrARecurso(){
+    if (!PropsActivo) LayoutAnclarActivos();
+    Properties* p = PropsActivo;
+    if (!p || p->BarTabs.size() < 4) return;
+    if (!W3dRecursoActivo(NULL, NULL)) return;
+    if (g_textFieldActivo == &p->propRecNombre->field || g_textFieldActivo == &p->propRecCarpeta->field)
+        g_textFieldActivo = NULL;   // cambiar de recurso termina la edicion de su nombre/carpeta
+    p->pestaniaActiva = 3;          // la pestania "Malla 3D" muestra el recurso (no hay una aparte)
+    p->focoEnTabs = false;
+    p->LimpiarSeleccionGrupos();
+    p->recVersionBind = 0;          // forzar el re-bind de la tarjeta Material
+    p->ActualizarPestanias();
+    p->Resize(p->width, p->height);
+    g_redraw = true;
+}
+
 void Properties::Rebind(){
-    if (!propMeshParts || !propMaterial || !ObjActivo) return;
-    if (ObjActivo->getType() != ObjectType::mesh) return;
-    PropListMeshParts* lista = static_cast<PropListMeshParts*>(propMeshParts->properties[0]);
-    Mesh* mesh = lista->mesh;
-    if (!mesh || mesh->materialsGroup.empty()) return;
-    int idx = lista->selectIndex;
-    if (idx < 0 || idx >= (int)mesh->materialsGroup.size()) idx = 0;
-    Material* material = mesh->materialsGroup[idx].material;
+    if (!propMeshParts || !propMaterial) return;
+    // PESTANIA RECURSO: la tarjeta Material edita el material elegido en el outliner por recursos
+    // (sin mesh part: el selector de material de la parte no aplica y se oculta)
+    Material* material = NULL;
+    Mesh* mesh = NULL;
+    Material* recMat = (pestaniaActiva == 3) ? W3dRecursoActivoMaterial() : NULL;
+    if (propBtnNewMaterial) propBtnNewMaterial->oculto = (recMat != NULL);
+    if (recMat) {
+        material = recMat;
+    } else {
+        if (!ObjActivo || ObjActivo->getType() != ObjectType::mesh) return;
+        PropListMeshParts* lista = static_cast<PropListMeshParts*>(propMeshParts->properties[0]);
+        mesh = lista->mesh;
+        if (!mesh || mesh->materialsGroup.empty()) return;
+        int idx = lista->selectIndex;
+        if (idx < 0 || idx >= (int)mesh->materialsGroup.size()) idx = 0;
+        material = mesh->materialsGroup[idx].material;
+    }
 
     // Tarjeta "Material" (propMaterial): el bind es POR MEMBER (propMatChk/propMatCol/...),
     // reordenar la tarjeta no rompe nada. El material POR DEFECTO no se edita: se ocultan
     // sus filas (value=NULL) y se muestra el aviso.
-    bool esDefault = (!material || material == MaterialDefecto);
-    if (propMsgDefault) propMsgDefault->oculto = !esDefault; // aviso: SOLO con el material por defecto
+    // un material HUERFANO recien abierto tiene sus texturas DORMIDAS (import_obj.h): la tarjeta lo
+    // va a mostrar y editar (su textura, su normal map, sus capas), asi que se cargan ya
+    if (material) TexturasDespertar(material);
+    // UN MATERIAL DE UNA LIBRERIA externa (o la parte de una malla que genera un proxy o que es de una libreria):
+    // de SOLO LECTURA, como el por defecto (se edita abriendo su libreria)
+    bool deLibreria = material && !material->libreria.empty();
+    if (mesh && mesh->malla && !mesh->malla->libreria.empty()) deLibreria = true;
+    for (Object* q = mesh ? W3dInstanciaDe(mesh) : NULL; q && !deLibreria; q = W3dInstanciaDe(q)) deLibreria = (q->getType() == ObjectType::proxy);
+    if (deLibreria && propBtnNewMaterial) propBtnNewMaterial->oculto = true;
+    bool esDefault = (!material || material == MaterialDefecto || deLibreria);
+    if (propMsgDefault) {
+        propMsgDefault->oculto = !esDefault; // aviso: con el material por defecto o uno de una libreria
+        const char* aviso = deLibreria ? "It belongs to a library (read-only): open the library to edit it"
+                                       : "The default material can not be edited. Create a new material.";
+        if (propMsgDefault->name != aviso) { propMsgDefault->name = aviso; PropertiesLayoutDirty = true; }
+    }
     if (propSepMat)     propSepMat->oculto     = esDefault;  // separador: OCULTO con el default (sino linea huerfana)
     if (propBtnRenameMat) propBtnRenameMat->oculto = esDefault; // el material por defecto NO se renombra
     if (propBtnTextura) {
@@ -7392,10 +9013,10 @@ void Properties::Rebind(){
     }
     // "Delete" (botones[0] de la fila Delete|Rename) solo si hay >1 parte. Aca (Rebind se llama tras
     // Add/Delete via RebindMaterialMeshPart) se actualiza apenas cambia la cantidad de partes.
-    if (propRowDelRen && !propRowDelRen->botones.empty())
+    if (mesh && propRowDelRen && !propRowDelRen->botones.empty())
         propRowDelRen->botones[0]->visible = (mesh->materialsGroup.size() > 1);
     // "Move Up/Down": toda la fila solo si hay >1 parte (reordenar = orden de dibujado)
-    if (propRowPartMove && propRowPartMove->botones.size() >= 2) {
+    if (mesh && propRowPartMove && propRowPartMove->botones.size() >= 2) {
         bool m2 = (mesh->materialsGroup.size() > 1);
         propRowPartMove->botones[0]->visible = m2;
         propRowPartMove->botones[1]->visible = m2;
@@ -7443,6 +9064,8 @@ void Properties::Rebind(){
         g_matGrosorLinea = esDefault ? 1.0f : material->grosorLinea;
         propMatGrosorLinea->value = (esDefault || !material->lineas) ? NULL : &g_matGrosorLinea;
     }
+    // --- ALPHA TEST: directo al campo del material (el material por defecto no se edita) ---
+    if (propMatAlfa) propMatAlfa->value = esDefault ? NULL : &material->alphaTest;
     // el desplegable de MEZCLA solo tiene sentido con Transparent ON (sin blend, el modo no
     // se aplica); el de PROFUNDIDAD siempre, que es la mitad que el checkbox no mostraba.
     if (propBtnMezcla) {
@@ -7464,6 +9087,27 @@ void Properties::Rebind(){
         //    material NULL, ej. linea de propBtnTextura). En PC no se veia porque autocargaba una escena con material real.
         propBtnNormalTex->button->text = (material && material->normalTexture)
             ? NombreDeTextura(material->normalTexture) : std::string("No Normal Map");
+    }
+    // CAPAS DE TEXTURA: una fila por capa + la de "Add Layer" (si quedan filas); el resto oculto
+    if (propCapasTitulo) {
+        const int nCapas = (esDefault || !material) ? 0 : (int)material->capas.size();
+        propCapasTitulo->oculto = esDefault;
+        for (int i = 0; i < kCapasUI; i++) {
+            const bool hay = !esDefault && i < nCapas;
+            const bool agregar = !esDefault && i == nCapas;      // la fila libre que crea una capa nueva
+            propCapaTex[i]->oculto = !(hay || agregar);
+            propCapaUV[i]->oculto = !hay;
+            propCapaMezcla[i]->oculto = !hay;
+            propCapaOn[i]->value = hay ? &material->capas[(size_t)i].on : NULL;
+            if (hay) {
+                const TexLayer& cap = material->capas[(size_t)i];
+                propCapaTex[i]->button->text = NombreDeTextura(cap.tex);
+                propCapaUV[i]->button->text = NombreCapaUV(cap.uvMapa);
+                propCapaMezcla[i]->button->text = W3dCapaMezclaNombre(cap.blend);
+            } else if (agregar) {
+                propCapaTex[i]->button->text = T("Add Layer");
+            }
+        }
     }
     // Base Color: se OCULTA si Vertex Color esta ON (ahi manda el color del vertice, la base "no se ve" -> al pepe).
     propMatCol[0]->value = (esDefault || material->vertexColor) ? NULL : material->diffuse;
@@ -7516,8 +9160,54 @@ static PropColor* gColorAbierto = NULL;
 // posicion en pantalla de la fila seleccionada por TECLADO (para abrir el ColorPicker con OK/Enter)
 static int gColorSelSx = 0, gColorSelSy = 0;
 
+// la tarjeta Render en un JUEGO (timeline en "Juego"): Inicio/Fin son los del CACHE de la simulacion
+// (adaptados solos, acotados a lo cacheado) y Render Animation lo recorre; sin cache no hay rango y
+// Render Animation queda deshabilitado con el aviso. Fuera del juego, el rango propio de siempre.
+static void SincronizarRenderJuego(Properties* P){
+    if (!P || !P->propRenderIni || !P->propRenderFin) return;
+    const bool juego = RenderDesdeCache();
+    int mn = 0, mx = -1;
+    const bool hay = juego && W3dRenderJuegoSincronizar() && W3dRenderJuegoCache(&mn, &mx);
+    float* vIni = juego ? (hay ? &g_renderJuegoIni : NULL) : &g_renderIni;
+    float* vFin = juego ? (hay ? &g_renderJuegoFin : NULL) : &g_renderFin;
+    if (P->propRenderIni->value != vIni || P->propRenderFin->value != vFin) {
+        P->propRenderIni->value = vIni; P->propRenderFin->value = vFin;
+        PropertiesLayoutDirty = true; g_redraw = true;
+    }
+    if (juego && hay) {
+        P->propRenderIni->SetRango((float)mn, (float)mx); P->propRenderFin->SetRango((float)mn, (float)mx);
+        P->propRenderIni->onChange = AccionRenderJuegoRango; P->propRenderFin->onChange = AccionRenderJuegoRango;
+    } else {
+        P->propRenderIni->SetRango(0.0f, 100000.0f); P->propRenderFin->SetRango(0.0f, 100000.0f);
+        P->propRenderIni->onChange = NULL; P->propRenderFin->onChange = NULL;
+    }
+    if (P->propBtnAnimRender) {
+        const bool ocultar = false;   // (antes el juego lo escondia: ahora renderiza su cache)
+        const bool gris = juego ? !hay : P->propBtnAnimRender->gris;
+        if (P->propBtnAnimRender->oculto != ocultar || (juego && P->propBtnAnimRender->gris != gris)) {
+            P->propBtnAnimRender->oculto = ocultar; if (juego) P->propBtnAnimRender->gris = gris;
+            PropertiesLayoutDirty = true; g_redraw = true;
+        }
+    }
+    if (P->propRenderNota) {
+        std::string t;
+        if (juego) {
+            if (hay) {
+                char b[160]; snprintf(b, sizeof(b), "%s: %d - %d", T("Game cache"), mn, mx);
+                t = b;
+            } else t = T("No game cache: play the game to record frames. Render Image renders the current frame.");
+        }
+        const bool ocultar = t.empty();
+        if (P->propRenderNota->name != t || P->propRenderNota->oculto != ocultar) {
+            P->propRenderNota->name = t; P->propRenderNota->oculto = ocultar;
+            PropertiesLayoutDirty = true; g_redraw = true;
+        }
+    }
+}
+
 void Properties::RefreshTargetProperties(){
     SincronizarAnimFps(); // el campo "FPS" refleja el AnimFPS real (el import lo pone al fps del archivo)
+    SincronizarRenderJuego(this);   // el rango del render de un juego sigue a su cache
     // al cerrarse el picker, la fila del color pierde el borde verde
     if (gColorAbierto && !PopUpActive) {
         gColorAbierto->editando = false;
@@ -7536,6 +9226,7 @@ void Properties::RefreshTargetProperties(){
         Resize(width, height); // tambien recalcula la scrollbar
     }
     SincronizarNombreObjeto(this); // el campo "Name": muestra el nombre del objeto y commitea lo editado al perder foco
+    SincronizarRecurso(this);      // idem Name / Folder del RECURSO activo (su tarjeta, en la pestania 3)
     // proxy de POSICION 2D: muestra pos.x/y relativa al tamano de la UI (o en px con el checkbox)
     {
         Object* e2d = (ObjActivo && UI2D_EsElemento2D(ObjActivo)) ? ObjActivo : NULL;
@@ -7674,6 +9365,7 @@ void Properties::RefreshTargetProperties(){
                            propImgColor->palRef = im ? &im->palTinte : NULL; propImgColor->palObj = im; }
         if (propImgPal && im) propImgPal->button->text = PalNombre(im, im->palTinte);
         if (propImgAlpha) propImgAlpha->value = im ? &im->usarAlpha : NULL;
+        if (propImgMezcla) propImgMezcla->button->text = im ? NombreMezcla(im->mezcla) : std::string(T("Blend"));
         if (propImgFiltro) propImgFiltro->value = im ? &im->filtrado : NULL;
         AjustarFilaTam(propImgAncho, im ? im->tamModo : TAM2D_PX);
         AjustarFilaTam(propImgAlto,  im ? im->tamModo : TAM2D_PX);
@@ -8164,6 +9856,7 @@ void Properties::RefreshTargetProperties(){
         bool esLuz = ObjActivo->getType() == ObjectType::light;
         Light* l = esLuz ? static_cast<Light*>(ObjActivo) : NULL;
         propLightDir->value      = l ? &l->direccional   : NULL;
+        if (propLightIgnOrden) propLightIgnOrden->value = l ? &l->ignorarOrden : NULL;
         if (l) g_lightGLIdx = (float)(l->LightID - GL_LIGHT0);
         propLightGL->value       = l ? &g_lightGLIdx     : NULL;
         propLightDiffuse->value  = l ? l->diffuse        : NULL;
@@ -8217,6 +9910,7 @@ void Properties::RefreshTargetProperties(){
         propCullSoloCam->value  = cu ? &cu->soloCamaraActiva : NULL;
         if (propCullDistMax)    propCullDistMax->value    = cu ? &cu->distanciaMax : NULL;
         if (propCullOrdenAlpha) propCullOrdenAlpha->value = cu ? &cu->ordenAlpha : NULL;
+        if (propCullOrdenCerca) propCullOrdenCerca->value = cu ? &cu->ordenCercania : NULL;
         if (propCullCellSize)   propCullCellSize->value   = grid ? &cu->cellSize : NULL;
         if (propCullModo3D)     propCullModo3D->value      = grid ? &cu->modo3D : NULL;
         if (propCullMetodo){
@@ -8226,6 +9920,36 @@ void Properties::RefreshTargetProperties(){
         if (propCullRecalc) propCullRecalc->oculto = !grid; // Recalcular solo tiene sentido con grilla
     }
 
+
+    // NIEBLA: bind directo; inicio/fin solo en lineal, densidad solo en exp/exp2 (NULL = oculto)
+    if (propNieblaActiva){
+        Niebla* ni = (ObjActivo->getType() == ObjectType::niebla) ? static_cast<Niebla*>(ObjActivo) : NULL;
+        propNieblaActiva->value = ni ? &ni->activa : NULL;
+        propNieblaInicio->value = (ni && ni->modo == 0) ? &ni->inicio : NULL;
+        propNieblaFin->value    = (ni && ni->modo == 0) ? &ni->fin : NULL;
+        propNieblaDens->value   = (ni && ni->modo != 0) ? &ni->densidad : NULL;
+        propNieblaColor->value  = ni ? ni->color : NULL;
+        propNieblaFondo->value  = ni ? &ni->fondo : NULL;
+        propNieblaModo->button->text = ni ? NieblaModoLabel(ni->modo) : "";
+        propNieblaModo->oculto       = !ni;
+    }
+
+    // LIMPIAR Z / RECORTE: bind directo
+    if (propLzActivo){
+        LimpiarZ* lz = (ObjActivo->getType() == ObjectType::limpiarz) ? static_cast<LimpiarZ*>(ObjActivo) : NULL;
+        propLzActivo->value = lz ? &lz->activo : NULL;
+    }
+    if (propRcActivo){
+        Recorte* rc = (ObjActivo->getType() == ObjectType::recorte) ? static_cast<Recorte*>(ObjActivo) : NULL;
+        propRcActivo->value = rc ? &rc->activo : NULL;
+        propRcX->value = rc ? &rc->x : NULL;         propRcY->value = rc ? &rc->y : NULL;
+        propRcAncho->value = rc ? &rc->ancho : NULL; propRcAlto->value = rc ? &rc->alto : NULL;
+        propRcLimpiarZ->value = rc ? &rc->limpiarZ : NULL;
+        propRcFondo->value = rc ? &rc->fondo : NULL;
+        propRcColor->value = rc ? rc->color : NULL;
+        propRcCamara->button->text = (rc && !rc->camara.empty()) ? rc->camara : std::string(T("(none)"));
+        propRcCamara->oculto = !rc;
+    }
 
     // PARTICULAS: numeros y checks directo a los campos del activo (el color va por Sincronizar*, es de texto;
     // la textura es un dropdown -> solo se refresca el texto del boton).
@@ -8262,6 +9986,11 @@ void Properties::RefreshTargetProperties(){
         if (propPartFreno)       propPartFreno->value       = (pt && pt->crecimiento != 0.0f) ? &pt->frenoCrecimiento : NULL;
         if (propPartAlphaDecae)  propPartAlphaDecae->value  = pt ? &pt->alphaDecae       : NULL;
         if (propPartAlphaMuerte) propPartAlphaMuerte->value = pt ? &pt->alphaMuerte      : NULL;
+        if (propPartAparecer)    propPartAparecer->value    = pt ? &pt->aparecer         : NULL;
+        for (int k = 0; k < 2; k++) {
+            if (propPartFundeCerca[k]) propPartFundeCerca[k]->value = pt ? &pt->fundeCerca[k] : NULL;
+            if (propPartFundeLejos[k]) propPartFundeLejos[k]->value = pt ? &pt->fundeLejos[k] : NULL;
+        }
         if (propPartUsarColFin)  propPartUsarColFin->value  = pt ? &pt->usarColorFinal   : NULL;
         if (propPartColorFin)    propPartColorFin->value    = (pt && pt->usarColorFinal) ? pt->colorFinal : NULL;
         // con "angulo al azar 0-360" prendido, el angulo inicial y su azar no se usan: se esconden
@@ -8362,7 +10091,7 @@ Properties::Properties() : ViewportBase() {
     for (int i = 0; i < kMaxScriptCards; i++) propScriptCards[i] = NULL;
     propJuego = NULL; propJuegoCompilar = NULL; propJuegoPlat = NULL; propJuegoModoVent = NULL;
     propJuegoOrient = NULL; propJuegoIcono = NULL; propJuegoFisica = NULL; propJuegoSonido = NULL;
-    propObjAnim = NULL; propListObjAnims = NULL;
+    propObjAnim = NULL; propListObjAnims = NULL; propJerLib = NULL; propClipRetarget = NULL; propObjRetarget = NULL;
     propAnimConservar = NULL;
     propBtnPalFondo = NULL; propBtnPalTexto = NULL; propBtnPalBorde = NULL;
     propBtnPalHover = NULL; propBtnColHover = NULL;
@@ -8370,7 +10099,7 @@ Properties::Properties() : ViewportBase() {
     propT2dPal = NULL; propImgPal = NULL; propRectPal = NULL; propS9Pal = NULL;
     propHijosClipX = NULL; propHijosClipY = NULL; propHijosScroll = NULL;
     propHijosScrollX = NULL; propHijosScrollY = NULL;
-    propImgUnidad = NULL; propImgColor = NULL; propImgAlpha = NULL;
+    propImgUnidad = NULL; propImgColor = NULL; propImgAlpha = NULL; propImgMezcla = NULL;
     propRectUnidad = NULL; propContUnidad = NULL; propUIcolor = NULL;
     propS9card = NULL; propS9Nombre = NULL; propS9PosX = NULL; propS9PosY = NULL;
     propS9PosZ = NULL; propS9PosAbs = NULL; propS9Peso = NULL; propS9Textura = NULL;
@@ -8386,6 +10115,18 @@ Properties::Properties() : ViewportBase() {
     propObjEstatico = NULL;                                            // estatico/dinamico (tarjeta generica, culling grid)
     propLodSoloCam = NULL;                                             // objeto LOD (camara de medida)
     propCulling = NULL; propCullMetodo = NULL; propCullActivo = NULL; propCullSoloCam = NULL; // objeto Culling unificado
+    propCullOrdenCerca = NULL;
+    propCamActiva = NULL; propCamActivaSel = NULL; propCamActivaKey = NULL;
+    propLimpiarZ = NULL; propLzActivo = NULL; propRecorte = NULL; propRcActivo = NULL; propRcX = NULL; propRcY = NULL;
+    propHitbox = NULL; propHbActivo = NULL; propHbEtiqueta = NULL; propHbFiltro = NULL; propHbCuerpos = NULL;
+    propPrefab = NULL; propPfSel = NULL; propPfInfo = NULL; propPfEditar = NULL; propPfUnpack = NULL; propPfReset = NULL;
+    propPxLib = NULL;
+    propPfInstancia = NULL;
+    propPfCarga = NULL; propPfDistancia = NULL; propPfObjetivo = NULL; propPfVista = NULL;   // (el streaming de la tarjeta)
+    for (int k = 0; k < 3; k++) { propHbTam[k] = NULL; propHbCentro[k] = NULL; }
+    propRcAncho = NULL; propRcAlto = NULL; propRcCamara = NULL; propRcLimpiarZ = NULL; propRcFondo = NULL; propRcColor = NULL;
+    propNiebla = NULL; propNieblaActiva = NULL; propNieblaModo = NULL; propNieblaInicio = NULL; propNieblaFin = NULL;
+    propNieblaDens = NULL; propNieblaColor = NULL; propNieblaFondo = NULL;
     propCullDistMax = NULL; propCullOrdenAlpha = NULL; propCullCellSize = NULL; propCullModo3D = NULL; propCullRecalc = NULL;
     propCollection = NULL; propCollOrdenCam = NULL; propCollOrdenUnaVez = NULL; // Collection (orden transparentes)
     propMirror = NULL; propMirrorTarget = NULL;                                 // objeto Mirror (target + ejes + rect)
@@ -8400,6 +10141,7 @@ Properties::Properties() : ViewportBase() {
     propPartRotacion = NULL; propPartVelRot = NULL;
     propPartMovCard = NULL; propPartTamCard = NULL; propPartColCard = NULL; propPartRotCard = NULL; propPartFormaCard = NULL;
     propPartArrastre = NULL; propPartCrec = NULL; propPartFreno = NULL; propPartAlphaDecae = NULL; propPartAlphaMuerte = NULL;
+    propPartAparecer = NULL; propPartFundeCerca[0] = propPartFundeCerca[1] = NULL; propPartFundeLejos[0] = propPartFundeLejos[1] = NULL;
     propPartUsarColFin = NULL; propPartColorFin = NULL; propPartRotIni = NULL; propPartRotAzar = NULL; propPartVelRotAzar = NULL;
     propPartGiroSigno = NULL; propPartForma = NULL; propPartEstir = NULL; propPartEstelaPts = NULL; propPartEstelaPaso = NULL;
     propPartGrosor = NULL; propPartFlipC = NULL; propPartFlipCols = NULL; propPartFlipFilas = NULL; propPartFlipFps = NULL;
@@ -8410,7 +10152,7 @@ Properties::Properties() : ViewportBase() {
     propMix = NULL; propListMix = NULL; propRowMix = NULL; propRowMixMove = NULL; propMixIni = NULL; propMixFin = NULL;
     propCapa = NULL; propCapaAnim = NULL; propCapaInfl = NULL; propCapaModo = NULL; propCapaHueso = NULL;
     propCapaDesde = NULL; propCapaVel = NULL; propCapaLoop = NULL; propCapaVisible = NULL;
-    propRenderIni = NULL; propRenderFin = NULL; propRenderFps = NULL;
+    propRenderIni = NULL; propRenderFin = NULL; propRenderFps = NULL; propRenderNota = NULL;
     propBtnCamTarget = NULL;
     propBtnInstTarget = NULL;
     // tarjeta Fisica (cuerpo rigido)
@@ -8423,7 +10165,7 @@ Properties::Properties() : ViewportBase() {
     propBtnNormalTex = NULL; // (faltaba: normal map UI)
     propBtnReflectMode = NULL; // dropdown del modo de Reflection
     // luz: punteros nuevos a NULL (si no se inicializan quedan BASURA y el rebind crashea antes de ConstruirGrupos)
-    propLightDir = NULL; propLightGL = NULL; propLightDiffuse = NULL; propLightAmbient = NULL; propLightSpecular = NULL;
+    propLightDir = NULL; propLightIgnOrden = NULL; propLightGL = NULL; propLightDiffuse = NULL; propLightAmbient = NULL; propLightSpecular = NULL;
     propLightAttC = NULL; propLightAttL = NULL; propLightAttQ = NULL; propLightSpotCut = NULL; propLightSpotExp = NULL;
     propLightRTRadio = NULL; propLightRTRayos = NULL;
     propRT = NULL; propRTRayos = NULL; propRTSamples = NULL; propRTPases = NULL;
@@ -8438,6 +10180,10 @@ Properties::Properties() : ViewportBase() {
     propPvsMetodo = NULL; propPvsRecalc = NULL; propPvsInfo = NULL; // modificador Oclusion (PVS por triangulo)
     propPvsPath = NULL; propPvsSoloCam = NULL; propPvsNodo = NULL; propPvsRamas = NULL;
     propMeshEdicion = NULL; propBtnMeshEditable = NULL; // card "Edicion" (editable/no-editable)
+    propMalla3D = NULL; propBtnMallaSel = NULL; // card "3D Mesh"
+    propLblMallaUsos = NULL; propBtnMallaUnica = NULL;
+    propLblMallaLib = NULL; propLblModsLib = NULL; propBtnNewPart = NULL;   // (lo de una libreria: solo lectura)
+    propBtnAddVG = NULL; propBtnAddUVG = NULL; propBtnAddUV = NULL; propBtnAddCol = NULL;
     propSubSimple = NULL; propSubLevel = NULL; propSubRender = NULL;
     propScrewAngle = NULL; propScrewHeight = NULL; propScrewSteps = NULL; propScrewRender = NULL;
     propScrewAxis = NULL; propScrewStretchU = NULL; propScrewStretchV = NULL;
@@ -8452,6 +10198,7 @@ Properties::Properties() : ViewportBase() {
     propBones2D = NULL; propListBones2D = NULL; propBone2DNombre = NULL; propBone2DParent = NULL;
     propListArm2Ds = NULL; propBtnRenameArm2D = NULL;
     propBone2DConectado = NULL; propBoneConectado = NULL;
+    propBone2DPosX = NULL; propBone2DPosY = NULL; propBone2DRot = NULL; propBone2DSclX = NULL; propBone2DSclY = NULL;
     propConstraints = NULL; propListConstraints = NULL; propRowCon = NULL; propRowConMove = NULL;
     propConstraintProps = NULL; propConActivo = NULL; propConVerEdit = NULL; propConFuente = NULL;
     propConAvisoFuente = NULL; propConInfluencia = NULL;
@@ -8461,6 +10208,9 @@ Properties::Properties() : ViewportBase() {
     propRotMode = NULL;
     propMsgDefault = NULL; propSepMat = NULL;
     propMaterial = NULL; propBtnRenameMat = NULL;
+    propRecurso = NULL; propRecNombre = NULL; propRecCarpeta = NULL; propRecTipo = NULL;   // pestania RECURSO
+    propRecEntrada = NULL; propRecUbicacion = NULL; propRecPreview = NULL; propRecAcciones = NULL; propRecAcciones2 = NULL;
+    recVersionBind = 0;
     propBtnRenameUV = NULL; propBtnRenameColor = NULL; propNameObj = NULL;
     propRowPartOps = NULL; propRowDelRen = NULL; propRowPartMove = NULL;
     for (int i = 0; i < 11; i++) propMatChk[i] = NULL;   // los 11 (antes 10: [10] quedaba con basura)
@@ -8522,6 +10272,8 @@ Properties::Properties() : ViewportBase() {
     // antes en Render) + el MIX de capas. Siempre visible, como Render. AL FINAL (ver el comentario de arriba).
     Tab* tAnim = new Tab("", IconType::falloff_smoother);
     BarTabs.push_back(tAnim);
+    // (NO hay pestania "Recurso" aparte, pedido del dueno: el recurso elegido en la BIBLIOTECA del outliner se
+    // ve en la pestania 3, "Malla 3D", en lugar de las tarjetas de la malla del objeto)
 }
 
 // segun el objeto activo y la pestania elegida: que tab se ve, cual esta
@@ -8530,6 +10282,8 @@ void Properties::ActualizarPestanias(){
     // espejo del checkbox Mipmaps de la tarjeta Render: el proyecto abierto pudo
     // cambiar el global (cabecera `mipmaps:` del .w3d)
     g_renderMipmaps = w3dEngine::MipmapsGlobal();
+    // idem el tilde del formato de las mallas (tarjeta Archivo): lo fija el proyecto abierto
+    MallasTextoRefrescar();
     // la 1ra pestania ("Objeto") siempre esta (transforms). La 2da depende del
     // tipo del objeto activo: Mesh -> mesh parts (icono material); Light ->
     // color (icono luz). (Camara / objetos especiales: a futuro.)
@@ -8554,11 +10308,17 @@ void Properties::ActualizarPestanias(){
     bool esScript = (tipo == (int)ObjectType::script);
     bool esLOD  = (tipo == (int)ObjectType::lod);
     bool esCull = (tipo == (int)ObjectType::culling);
+    bool esNiebla = (tipo == (int)ObjectType::niebla);
+    bool esLz = (tipo == (int)ObjectType::limpiarz);
+    bool esRc = (tipo == (int)ObjectType::recorte);
+    bool esHb = (tipo == (int)ObjectType::hitbox);
+    bool esPf = (tipo == (int)ObjectType::prefab);   // instancia de prefab (su tarjeta: PropsPrefab.cpp)
+    bool esPx = (tipo == (int)ObjectType::proxy);    // proxy W3D (la misma tarjeta, con su libreria y su elemento)
     bool esPart = (tipo == (int)ObjectType::particulas);
     bool esMirror = (tipo == (int)ObjectType::mirror);
     // Collection REAL (no la raiz Scene, que comparte el tipo pero no tiene Parent)
     bool esColl = (tipo == (int)ObjectType::collection && ObjActivo && ObjActivo->Parent);
-    bool hayTab3 = esMesh || esLuz || esCam || esInst || esArm || esT2d || esImg || esRect || esCont || esS9 || esBtn || esExp || esVid || esUI || esScript || esLOD || esCull || esColl || esPart || esMirror;
+    bool hayTab3 = esMesh || esLuz || esCam || esInst || esArm || esT2d || esImg || esRect || esCont || esS9 || esBtn || esExp || esVid || esUI || esScript || esLOD || esCull || esColl || esPart || esMirror || esNiebla || esLz || esRc || esHb || esPf || esPx;
 
     if (BarTabs.size() >= 3){
         BarTabs[2]->visible = hayTab3;
@@ -8582,6 +10342,12 @@ void Properties::ActualizarPestanias(){
         else if (esColl) icono = (int)IconType::archive;         // Collection (orden transparentes)
         else if (esPart) icono = (int)IconType::circle;          // objeto Particulas (emisor)
         else if (esMirror) icono = (int)IconType::mirror;        // objeto Mirror (target + ejes)
+        else if (esNiebla) icono = (int)IconType::niebla;        // objeto Niebla (glFog en el arbol)
+        else if (esLz) icono = (int)IconType::limpiarz;
+        else if (esRc) icono = (int)IconType::recorte;
+        else if (esHb) icono = (int)IconType::hitbox;
+        else if (esPf) icono = (int)IconType::prefab;
+        else if (esPx) icono = (int)IconType::libreria;
         BarTabs[2]->icon = icono;
     }
     // los objetos 2D no muestran el tab Objeto (su Nombre y Posicion viven arriba de su
@@ -8590,7 +10356,14 @@ void Properties::ActualizarPestanias(){
     bool es2D = esT2d || esImg || esRect || esCont || esS9 || esBtn || esExp || esVid || esUI;
     if (BarTabs.size() >= 2) BarTabs[1]->visible = ObjActivo != NULL && !es2D && !esScript;
     if (pestaniaActiva == 1 && (es2D || esScript)) pestaniaActiva = 2;
-    if (BarTabs.size() >= 4) BarTabs[3]->visible = esMesh; // pestaña Vertices: SOLO meshes
+    // pestania 3 "MALLA 3D": la malla del objeto (sus tarjetas: la malla 3D que usa, edicion, UV, capas,
+    // grupos) o el RECURSO elegido en la biblioteca del outliner (con su icono)
+    int recVista = -1; std::string recId;
+    const bool hayRec = W3dRecursoActivo(&recVista, &recId);
+    if (BarTabs.size() >= 4) {
+        BarTabs[3]->visible = esMesh || hayRec;
+        BarTabs[3]->icon = hayRec ? W3dVistaIcono(recVista) : (int)IconType::mesh;
+    }
     if (BarTabs.size() >= 5) BarTabs[4]->visible = esMesh; // pestaña Modifiers: SOLO meshes
     // pestana 5 "Transformar": SOLO en Edit Mode con malla activa (la seleccion a transformar
     // vive en la edit mesh). Su icono es el del modo de seleccion (selVertex/selEdge/selFace).
@@ -8617,7 +10390,7 @@ void Properties::ActualizarPestanias(){
     if (BarTabs.size() >= 9) BarTabs[8]->visible = scriptsTabOk;
     if (BarTabs.size() >= 10) BarTabs[9]->visible = true;   // Animacion: siempre (como Render)
     if (pestaniaActiva == 2 && !hayTab3) pestaniaActiva = 1;
-    if (pestaniaActiva == 3 && !esMesh)  pestaniaActiva = 1;
+    if (pestaniaActiva == 3 && !esMesh && !hayRec) pestaniaActiva = 1;
     if (pestaniaActiva == 4 && !esMesh)  pestaniaActiva = 1;
     if (pestaniaActiva == 5 && !transTabOk) pestaniaActiva = 1; // salir de Edit Mode cae a Objeto
     // salir de la edicion de huesos 2D (o del Edit Mode) parado en la 6 cae a Objeto, como la 5
@@ -8637,7 +10410,8 @@ void Properties::ActualizarPestanias(){
     // esto corria antes (y solo cubria la 1), deseleccionar parado en Material/
     // Vertices/Modifiers dejaba activa la pestania Objeto sin objeto: la pestania
     // fantasma con el panel entero VACIO que se reporto.
-    if (!ObjActivo && !PestaniaGlobal()) pestaniaActiva = 0;
+    // (con un RECURSO de la biblioteca elegido -y la escena suelta- la pestania 3 lo muestra aunque no haya objeto)
+    if (!ObjActivo && !PestaniaGlobal() && !(hayRec && pestaniaActiva == 3)) pestaniaActiva = 0;
     for (size_t i = 0; i < BarTabs.size(); i++){
         BarTabs[i]->activa = ((int)i == pestaniaActiva);
         BarTabs[i]->foco   = (focoEnTabs && (int)i == pestaniaActiva);
@@ -8670,8 +10444,18 @@ void Properties::ActualizarPestanias(){
     if (propJuego)     propJuego->visible     = (pestaniaActiva == 0); // Juego: debajo de Animation
     // tarjeta Keyframe: SOLO si hay un keyframe elegido en el editor de curvas. Los campos se refrescan desde la
     // curva viva (que la puede haber movido el propio timeline), salvo el que se este editando a mano.
+    if (propCamActiva){
+        extern int ActiveAnimKind;
+        // SIEMPRE en la pestania Animacion (elegir la camara activa sirve en cualquier modo); el ROMBO (los cortes)
+        // solo con una animacion de ESCENA en el timeline: la pista es de la escena
+        propCamActiva->visible = (pestaniaActiva == 9);
+        const int ap = (ActiveAnimKind == 0 && !g_animMix) ? AnimCamActiva : -1;
+        if (ap != propCamActivaSel->animProp) { propCamActivaSel->animProp = ap; PropertiesLayoutDirty = true; }
+        if (propCamActiva->visible)
+            propCamActivaSel->button->text = CameraActive ? CameraActive->name : std::string(T("(none)"));
+    }
     if (propKeyframe){
-        int ki; AnimProperty* kap = DopeKeyframeActivo(&ki);
+        int ki; AnimProperty* kap = DopeKeyframeActivo(&ki, false);   // solo MUESTRA: un clip compartido no se copia
         propKeyframe->visible = (pestaniaActiva == 9) && kap != NULL;   // keyframe elegido: pestania Animacion
         if (propKeyframe->visible){
             const keyFrame& k = kap->keyframes[ki];
@@ -8716,8 +10500,10 @@ void Properties::ActualizarPestanias(){
         if (propCapaLoop)    propCapaLoop->value    = c ? &c->loop : NULL;
         if (propCapaVisible) propCapaVisible->value = c ? &c->visible : NULL;
         if (propCapaAnim && c){ if (propCapaAnim->button->text != c->anim){ propCapaAnim->button->text = c->anim; g_redraw = true; }
-                                propCapaAnim->button->icon = ca ? (int)IconType::armature : (int)IconType::camera; }
-        if (propCapaModo && c){ std::string t = MixModoTexto(c->modo); if (propCapaModo->button->text != t){ propCapaModo->button->text = t; g_redraw = true; } }
+                                propCapaAnim->button->icon = ca ? (int)IconType::armature
+                                                           : (MixCapaJerElegida(NULL) == c ? (int)IconType::object : (int)IconType::camera); }
+        if (propCapaModo && c){ std::string t = MixModoTexto(c->modo); if (propCapaModo->button->text != t){ propCapaModo->button->text = t; g_redraw = true; }
+                                propCapaModo->button->icon = MixModoIcono(c->modo); }
         if (propCapaHueso){ propCapaHueso->oculto = !(c && ca);
             if (c && ca){ std::string t = c->hueso.empty() ? std::string(T("All")) : c->hueso;
                           if (propCapaHueso->button->text != t){ propCapaHueso->button->text = t; g_redraw = true; } } }
@@ -8732,7 +10518,7 @@ void Properties::ActualizarPestanias(){
         bool clipActivo = (ActiveAnimKind == 1 && ActiveAnimArm);
         if (propBtnAnimSel && propBtnAnimSel->button){
             propBtnAnimSel->button->text = NombreAnimActiva();
-            propBtnAnimSel->button->icon = g_animMix ? (int)IconType::falloff_smoother
+            propBtnAnimSel->button->icon = g_animMix ? (int)IconType::igual
                                           : (ActiveAnimKind == 2) ? (int)IconType::gamepad
                                           : clipActivo ? (int)IconType::armature : (int)IconType::camera;
         }
@@ -8755,7 +10541,7 @@ void Properties::ActualizarPestanias(){
         }
         // Render Animation: se grisa solo si hay CERO animaciones. Siempre existe la escena "Scene" (rendea su rango
         // aunque no tenga keyframes: secuencia estatica) -> nunca se desactiva.
-        if (propBtnAnimRender) propBtnAnimRender->gris = (SceneAnimations.empty() && nClips == 0);
+        if (propBtnAnimRender && !RenderDesdeCache()) propBtnAnimRender->gris = (SceneAnimations.empty() && nClips == 0);
         // MODO JUEGO: el Fin y Render Animation desaparecen (la animacion es infinita);
         // "No reemplazar estados" y su nota solo aparecen siendo un juego
         if (g_animMix && AnimEsJuego) AnimEsJuego = false;   // Mix y Juego son excluyentes (un .w3d viejo pudo traer los dos)
@@ -8767,7 +10553,17 @@ void Properties::ActualizarPestanias(){
             for (size_t k = 0; k < propRowAnimNewDel->botones.size(); k++) propRowAnimNewDel->botones[k]->visible = false;
         else if (propRowAnimNewDel && !propRowAnimNewDel->botones.empty()) propRowAnimNewDel->botones[0]->visible = true;
         if (propBtnAnimRename) propBtnAnimRename->oculto = (AnimEsJuego || g_animMix);
-        if (propBtnAnimRender) propBtnAnimRender->oculto = AnimEsJuego;
+        // el retarget del CLIP DE JERARQUIA elegido (su vista): el modo por defecto con que lo reproducen sus raices
+        if (propClipRetarget) {
+            const bool vista = (ActiveAnimKind == 0 && !g_animMix && W3dClipVistaViva(SceneAnimActiva));
+            if (propClipRetarget->oculto == vista) { propClipRetarget->oculto = !vista; PropertiesLayoutDirty = true; g_redraw = true; }
+            if (vista) {
+                const std::string t = T(SceneAnimations[(size_t)SceneAnimActiva]->clipJer->retarget == W3D_RETARGET_ROTACIONES
+                                        ? "Rotations only" : "Complete");
+                if (propClipRetarget->button->text != t) { propClipRetarget->button->text = t; g_redraw = true; }
+            }
+        }
+        // (Render Animation de un JUEGO renderiza su cache: lo sincroniza SincronizarRenderJuego)
         // con el cache de juego DESTILDADO, el limite "Cache" y "No reemplazar estados" (opciones del rewind)
         // no tienen sentido -> se ocultan (value=NULL). "No reemplazar estados" ademas solo aplica en modo juego.
         if (propJuegoCacheMax) propJuegoCacheMax->value = gSimCacheOn ? &g_simCacheF : NULL;
@@ -8787,6 +10583,18 @@ void Properties::ActualizarPestanias(){
         if (gPropObjAnimStart) gPropObjAnimStart->value = hayAnimActiva ? &g_objAnimStartF : NULL;
         if (gPropObjAnimEnd)   gPropObjAnimEnd->value   = hayAnimActiva ? &g_objAnimEndF   : NULL;
         if (gPropObjAnimFps)   gPropObjAnimFps->value   = hayAnimActiva ? &g_objAnimFpsF   : NULL;
+        // el desplegable de su biblioteca de clips de jerarquia (el texto se compara antes de asignar: sin
+        // eso cada cuadro pediria redibujar)
+        if (propJerLib && ObjActivo) {
+            const std::string t = (ObjActivo->clipsJer && !ObjActivo->clipsJer->animset.empty())
+                                  ? ObjActivo->clipsJer->animset : std::string(T("(none)"));
+            if (propJerLib->button->text != t) { propJerLib->button->text = t; g_redraw = true; }
+        }
+        if (propObjRetarget && ObjActivo) {
+            const int m = RetargetPropio(ObjActivo);
+            const std::string t = T(m == W3D_RETARGET_ROTACIONES ? "Rotations only" : m == W3D_RETARGET_COMPLETO ? "Complete" : "Clip default");
+            if (propObjRetarget->button->text != t) { propObjRetarget->button->text = t; g_redraw = true; }
+        }
     }
     if (propTexto2D)   propTexto2D->visible   = (pestaniaActiva == 2 && esT2d);
     if (propImagen2D)  propImagen2D->visible  = (pestaniaActiva == 2 && esImg);
@@ -8852,22 +10660,50 @@ void Properties::ActualizarPestanias(){
         propMargen->visible = enFila;
     }
     if (propMeshParts) propMeshParts->visible = (pestaniaActiva == 2 && esMesh);
+    // MESH PARTS de una malla de una LIBRERIA (o de lo que genera un proxy): la lista se ve (elige de que parte se
+    // muestra el material), las filas que la editan no. Fuera de eso, las reglas de siempre (Delete y Move con >1)
+    if (propMeshParts && propMeshParts->visible && ObjActivo->getType() == ObjectType::mesh) {
+        Mesh* mp = (Mesh*)ObjActivo;
+        const bool ro = W3dMallaSoloLectura(mp, true);
+        const bool mas = mp->materialsGroup.size() > 1;
+        OcultoSiCambia(propBtnNewPart, ro);
+        if (propRowPartOps) for (size_t b = 0; b < propRowPartOps->botones.size(); b++) VisibleSiCambia(propRowPartOps->botones[b], !ro);
+        if (propRowDelRen && propRowDelRen->botones.size() >= 2) {
+            VisibleSiCambia(propRowDelRen->botones[0], !ro && mas);
+            VisibleSiCambia(propRowDelRen->botones[1], !ro);
+        }
+        if (propRowPartMove) for (size_t b = 0; b < propRowPartMove->botones.size(); b++) VisibleSiCambia(propRowPartMove->botones[b], !ro && mas);
+    }
+    // la pestania 3 muestra la MALLA del objeto... salvo con un recurso de la biblioteca elegido (lo muestra a el)
+    const bool tabMalla = (pestaniaActiva == 3 && esMesh && !hayRec);
+    if (propMalla3D) {   // card "3D Mesh": que malla 3D (recurso) usa el objeto, sus usuarios, Make Single User
+        propMalla3D->visible = tabMalla;
+        if (propMalla3D->visible && ObjActivo->getType() == ObjectType::mesh) SincronizarMalla3D(this, (Mesh*)ObjActivo);
+    }
     // card "Edicion" (pestania MESH = 3, la de UV Maps/Vertex Groups; la 2 es Materiales):
     // el boton alterna el texto segun el estado
     if (propMeshEdicion) {
-        propMeshEdicion->visible = (pestaniaActiva == 3 && esMesh);
+        // (los datos de edicion de una malla de una LIBRERIA son de ella: sin la tarjeta)
+        propMeshEdicion->visible = tabMalla && !(ObjActivo->getType() == ObjectType::mesh && W3dMallaSoloLectura((Mesh*)ObjActivo, true));
         if (esMesh && propBtnMeshEditable && ObjActivo->getType() == ObjectType::mesh) {
             bool noEd = ((Mesh*)ObjActivo)->noEditable;
             propBtnMeshEditable->button->text = noEd ? T("Convertir en mesh editable") : T("Borrar datos para edicion");
             propBtnMeshEditable->button->icon = (int)(noEd ? IconType::mesh : IconType::borrar); // mesh al convertir, tacho al borrar
         }
     }
-    if (propMaterial)  propMaterial->visible  = (pestaniaActiva == 2 && esMesh);
+    // (con un material elegido en la biblioteca, la tarjeta Material de la pestania 3 edita ESE material)
+    if (propMaterial)  propMaterial->visible  = (pestaniaActiva == 2 && esMesh) ||
+                                                (pestaniaActiva == 3 && hayRec && W3dRecursoActivoMaterial() != NULL);
     if (propLight)     propLight->visible     = (pestaniaActiva == 2 && esLuz);
     if (propCamera)    propCamera->visible    = (pestaniaActiva == 2 && esCam);
     if (propInstance)  propInstance->visible  = (pestaniaActiva == 2 && esInst);
     if (propLOD)       propLOD->visible       = (pestaniaActiva == 2 && esLOD);
     if (propCulling)   propCulling->visible   = (pestaniaActiva == 2 && esCull);
+    if (propNiebla)    propNiebla->visible    = (pestaniaActiva == 2 && esNiebla);
+    if (propLimpiarZ)  propLimpiarZ->visible  = (pestaniaActiva == 2 && esLz);
+    if (propRecorte)   propRecorte->visible   = (pestaniaActiva == 2 && esRc);
+    PropsHitboxActualizar(this, pestaniaActiva == 2 && esHb);   // visibilidad + bindeo + textos
+    PropsPrefabActualizar(this, pestaniaActiva);                 // (instancia: pestania 2; lo generado: la 1)
     if (propCollection) propCollection->visible = (pestaniaActiva == 2 && esColl);
     if (propParticulas) propParticulas->visible = (pestaniaActiva == 2 && esPart);
     if (propPartMovCard)   propPartMovCard->visible   = (pestaniaActiva == 2 && esPart);
@@ -8972,24 +10808,25 @@ void Properties::ActualizarPestanias(){
             }
             // Pos siempre (rest o traslacion de pose); Rotation/Scale SOLO posando el hueso
             // entero (la punta no tiene rotacion). value = NULL oculta la fila (idioma del panel).
-            if (gB2dPosX) gB2dPosX->value = b2 ? &g_b2dPosX : NULL;
-            if (gB2dPosY) gB2dPosY->value = b2 ? &g_b2dPosY : NULL;
-            if (gB2dRot)  gB2dRot->value  = (b2 && pose2d) ? &g_b2dRot  : NULL;
-            if (gB2dSclX) gB2dSclX->value = (b2 && pose2d) ? &g_b2dSclX : NULL;
-            if (gB2dSclY) gB2dSclY->value = (b2 && pose2d) ? &g_b2dSclY : NULL;
-            // refresco por frame (los huesos se mueven en el viewport), SIN pisar el campo que
-            // se este tipeando (mismo guard g_propFloatEditando que la tarjeta Keyframe)
+            if (propBone2DPosX) propBone2DPosX->value = b2 ? &g_b2dPosX : NULL;
+            if (propBone2DPosY) propBone2DPosY->value = b2 ? &g_b2dPosY : NULL;
+            if (propBone2DRot)  propBone2DRot->value  = (b2 && pose2d) ? &g_b2dRot  : NULL;
+            if (propBone2DSclX) propBone2DSclX->value = (b2 && pose2d) ? &g_b2dSclX : NULL;
+            if (propBone2DSclY) propBone2DSclY->value = (b2 && pose2d) ? &g_b2dSclY : NULL;
+            // refresco por frame (los huesos se mueven en el viewport), SIN pisar el valor que
+            // se este tipeando (mismo guard g_propFloatEditando que la tarjeta Keyframe). Se mira
+            // el VALOR y no la fila: el valor es compartido y puede tipearse en otro panel.
             if (b2) {
                 if (pose2d) {
-                    if (g_propFloatEditando != gB2dPosX) g_b2dPosX = b2->poseTU;
-                    if (g_propFloatEditando != gB2dPosY) g_b2dPosY = b2->poseTV;
-                    if (g_propFloatEditando != gB2dRot)  g_b2dRot  = b2->poseRot;
-                    if (g_propFloatEditando != gB2dSclX) g_b2dSclX = b2->poseSX;
-                    if (g_propFloatEditando != gB2dSclY) g_b2dSclY = b2->poseSY;
+                    if (!B2dEditando(&g_b2dPosX)) g_b2dPosX = b2->poseTU;
+                    if (!B2dEditando(&g_b2dPosY)) g_b2dPosY = b2->poseTV;
+                    if (!B2dEditando(&g_b2dRot))  g_b2dRot  = b2->poseRot;
+                    if (!B2dEditando(&g_b2dSclX)) g_b2dSclX = b2->poseSX;
+                    if (!B2dEditando(&g_b2dSclY)) g_b2dSclY = b2->poseSY;
                 } else {
                     float pu, pv; Bone2DPuntoUI(b2, pu, pv);
-                    if (g_propFloatEditando != gB2dPosX) g_b2dPosX = pu;
-                    if (g_propFloatEditando != gB2dPosY) g_b2dPosY = pv;
+                    if (!B2dEditando(&g_b2dPosX)) g_b2dPosX = pu;
+                    if (!B2dEditando(&g_b2dPosY)) g_b2dPosY = pv;
                 }
             }
         } else {
@@ -8997,7 +10834,7 @@ void Properties::ActualizarPestanias(){
             if (propBone2DConectado) propBone2DConectado->value = NULL;
         }
     }
-    bool vertTab = (pestaniaActiva == 3 && esMesh);
+    bool vertTab = (pestaniaActiva == 3 && esMesh && !hayRec);
     // pestana TRANSFORMAR (5, solo Edit Mode con malla activa): card "Transform Mesh" (X/Y/Z de la
     // seleccion; antes vivia en la pestania Vertices) + card "Transform UV" (centro X/Y de los UVs
     // de la MISMA seleccion). Recalculan el centro cada frame; el mesh mapea con la convencion
@@ -9136,6 +10973,16 @@ void Properties::ActualizarPestanias(){
         }
         // Apply: con cualquier modificador seleccionado, SALVO el Culling (no hornea nada: la malla ya esta intacta)
         if (propBtnApplyMod) propBtnApplyMod->oculto = !haySel || esPvs;
+        // lo que genera un PROXY: sus modificadores son de la libreria (la lista se ve; ni Add, ni Remove, ni Move,
+        // ni sus propiedades). Hornear uno (Apply) toca la geometria: tampoco con una malla de una libreria
+        const bool roMods = W3dMallaSoloLectura(mm, false);
+        OcultoSiCambia(propLblModsLib, !roMods);
+        if (propRowMod && !propRowMod->botones.empty()) VisibleSiCambia(propRowMod->botones[0], !roMods);
+        if (roMods) {
+            FilaSoloLectura(propRowMod); FilaSoloLectura(propRowModMove);
+            if (propModifierProps) propModifierProps->visible = false;
+        }
+        if (propBtnApplyMod && W3dMallaSoloLectura(mm, true)) propBtnApplyMod->oculto = true;
     } else if (propModifierProps) propModifierProps->visible = false;
 
     // ===== pestania CONSTRAINTS (7): tarjeta del stack + tarjeta del constraint elegido =====
@@ -9272,6 +11119,23 @@ void Properties::ActualizarPestanias(){
             for (int b = 0; b < 2; b++) propRowUVGroupAsig->botones[b]->visible = hayUVG;
         if (propRowUVGroupSel && propRowUVGroupSel->botones.size() >= 2)
             for (int b = 0; b < 2; b++) propRowUVGroupSel->botones[b]->visible = hayUVG;
+        // una malla de una LIBRERIA (o de lo que genera un proxy) es de SOLO LECTURA: las listas se ven, lo que las
+        // edita no (el aviso esta en la tarjeta 3D Mesh; las acciones avisan igual: W3dMallaSoloLecturaAviso)
+        const bool ro = W3dMallaSoloLectura(mv, true);
+        OcultoSiCambia(propBtnAddUV, ro);
+        OcultoSiCambia(propBtnAddCol, ro);
+        OcultoSiCambia(propBtnAddVG, ro);
+        OcultoSiCambia(propBtnAddUVG, ro);
+        OcultoSiCambia(propBtnColorMode, ro);
+        OcultoSiCambia(propBtnRenameUV, ro);
+        OcultoSiCambia(propBtnRenameColor, ro);
+        if (ro) {
+            OcultoSiCambia(propBtnRenameGroup, true);
+            OcultoSiCambia(propBtnRenameUVGroup, true);
+            FilaSoloLectura(propRowUVOps); FilaSoloLectura(propRowColorOps);
+            FilaSoloLectura(propRowGroupOps); FilaSoloLectura(propRowGroupAsig); FilaSoloLectura(propRowGroupSel);
+            FilaSoloLectura(propRowUVGroupOps); FilaSoloLectura(propRowUVGroupAsig); FilaSoloLectura(propRowUVGroupSel);
+        }
     }
 
     // el boton de target muestra el objeto apuntado (se actualiza cada frame
@@ -9282,6 +11146,8 @@ void Properties::ActualizarPestanias(){
         if (tgt && btn)
             btn->button->text = tgt->target ? tgt->target->name : std::string("None");
     }
+
+    ActualizarTarjetaRecurso(this, hayRec && pestaniaActiva == 3, recVista, recId);
 }
 
 // (declarada en Properties.h) el editor UV la llama al ENTRAR a la edicion de huesos 2D (Tab, menu
@@ -9311,6 +11177,14 @@ void Properties::ClickTab(int mx, int my){
             return;
         }
     }
+}
+
+// las pestanias que tienen contenido SIN objeto activo (se miden, se dibujan y reciben el mouse): la 0 y la 9, y
+// la 3 mientras hay un RECURSO de la biblioteca elegido (antes era la 10, la pestania "Recurso" que ya no existe;
+// sin esto la tarjeta del recurso quedaba vacia, porque elegirlo suelta la escena)
+bool Properties::PestaniaGlobal() const {
+    if (pestaniaActiva == 0 || pestaniaActiva == 9) return true;
+    return pestaniaActiva == 3 && W3dRecursoActivo(NULL, NULL);
 }
 
 void Properties::Resize(int newW, int newH){
@@ -9352,9 +11226,17 @@ void Properties::Resize(int newW, int newH){
 }
 
 void Properties::Render(){
-    if (!leftMouseDown) UndoMaterialModCommit(); // Ctrl+Z: al soltar el mouse, pushea el cambio de material (si difiere)
+    // Ctrl+Z: al soltar el mouse, pushea el cambio de material (si difiere). Con un numero EDITANDOSE POR TEXTO
+    // (click sin arrastrar o OK del teclado sobre Shininess / Alpha Test / ...) espera a que termine (Enter, Esc o
+    // un click afuera): antes la foto del click se commiteaba vacia al soltar y lo tipeado quedaba sin Ctrl+Z.
+    if (!leftMouseDown && !NumEditActivo()) UndoMaterialModCommit();
     RefreshTargetProperties();
     ActualizarPestanias(); // que grupo mostrar segun la pestania (Objeto/Mesh)
+    // el '*' del nombre del proyecto en la tarjeta Archivo: hay cambios sin guardar (io/CambiosProyecto.h)
+    if (propProyNombre && propArchivo && propArchivo->visible) {
+        const char* quiero = W3dCambiosHayCache() ? "Nombre *" : "Nombre";
+        if (propProyNombre->name != quiero) propProyNombre->name = quiero;
+    }
 
     w3dEngine::MatrixMode(w3dEngine::Projection);
     w3dEngine::LoadIdentity();
@@ -9418,7 +11300,18 @@ void Properties::Render(){
         // seleccion se deja el hueco, porque el hit-test del click y el culling ya
         // la cuentan (sin esto todo se dibujaba una fila mas arriba y el mouse "le
         // pegaba" a la opcion de arriba, bug al abrir sin seleccion)
-        if (ObjActivo) DibujarTitulo(ObjActivo, maxPixelsTitle);
+        int recV = -1; std::string recId; W3dRecursoItem recIt;
+        if (pestaniaActiva == 3 && W3dRecursoActivo(&recV, &recId) && W3dVistaRecInfo(recV, recId, &recIt)) {
+            // PESTANIA RECURSO: el titulo es el RECURSO elegido en el outliner (icono del tipo + nombre)
+            SetColorID(ColorID::blanco);
+            if (recIt.icono >= 0 && recIt.icono < (int)IconsUV.size()) W3dDrawStrip4(IconMesh, IconsUV[(size_t)recIt.icono]->uvs);
+            w3dEngine::PushMatrix();
+            w3dEngine::Translatef((GLfloat)(IconSizeGS + gapGS), 0, 0);
+            RenderBitmapText(recIt.nombre, textAlign::left, maxPixelsTitle);
+            w3dEngine::PopMatrix();
+            w3dEngine::Translatef(0, (GLfloat)(RenglonHeightGS + gapGS), 0);
+        }
+        else if (ObjActivo) DibujarTitulo(ObjActivo, maxPixelsTitle);
         else w3dEngine::Translatef(0, RenglonHeightGS + gapGS, 0);
 
         //render de los grupos de propiedades, con CULLING: el grupo que
@@ -9869,6 +11762,8 @@ void Properties::EnterPropertieSelect(){
     if (g->selectIndex >= 0 && g->selectIndex < (int)g->properties.size() &&
         g->properties[g->selectIndex]->GetType() == PropertyType::Float) {
         PropFloat* pf = (PropFloat*)g->properties[g->selectIndex];
+        // la foto del Ctrl+Z de material, como el click (el panel la commitea al terminar la edicion por texto)
+        if (pf->value && g == propMaterial) UndoMaterialModIniciar(MaterialActivoUI());
         if (pf->value) { pf->IniciarEdicionTexto(); editando = true; ViewPortClickDown = true; }
     }
 }
@@ -10080,6 +11975,14 @@ void Properties::ClickEn(int mx, int my) {
                     }
                     else if (prop->GetType() == PropertyType::Color) {
                         PropColor* pc = (PropColor*)prop;
+                        // BOTON de keyframe a la DERECHA de todo (como el checkbox): antes que el selector de color
+                        if (pc->animProp >= 0 && W3dKeyframeToggle && g->keyBtnCol > 0) {
+                            int xDer = x + PosX + borderGS * 2 + g->width - bordersGS;
+                            if (mx >= xDer - g->keyBtnCol && mx < xDer) {
+                                W3dKeyframeToggle(pc->animProp, pc->animComp);
+                                return;
+                            }
+                        }
                         // fila de PALETA: [nombre editable][swatch][boton X], cada zona lo suyo
                         int pidx = pc->PaletaIdx();
                         if (pidx >= 0) {
@@ -10098,7 +12001,7 @@ void Properties::ClickEn(int mx, int my) {
                             if (mx < xSw) {             // el nombre: se edita inline (como Name)
                                 PropColorPal* pp = (PropColorPal*)pc;
                                 if (pp->nom) pp->field.SetText(*pp->nom);
-                                g_textFieldActivo = &pp->field;
+                                TextFieldEnfocar(&pp->field);   // (Esc vuelve al nombre de antes)
 #ifdef __EMSCRIPTEN__
                                 if (g_uiTapEnCurso) SDL_StartTextInput();
 #else
@@ -10127,6 +12030,14 @@ void Properties::ClickEn(int mx, int my) {
                         // vive en la COLUMNA DE VALORES: sin el corrimiento el menu abria
                         // enganchado al borde izquierdo de la fila, no al del boton.
                         PropButton* pb = (PropButton*)prop;
+                        // ROMBO de keyframe a la derecha (boton animable, ej: la camara activa): antes que la accion
+                        if (pb->AnimProp() >= 0 && W3dKeyframeToggle && g->keyBtnCol > 0) {
+                            int xDer = x + PosX + borderGS * 2 + g->width - bordersGS;
+                            if (mx >= xDer - g->keyBtnCol && mx < xDer) {
+                                W3dKeyframeToggle(pb->AnimProp(), pb->AnimComp());
+                                return;
+                            }
+                        }
                         pb->button->sx = x + PosX + borderGS + borderGS +
                                          (pb->conLabel ? g->colEtiqueta : 0);
                         pb->button->sy = yFila;
@@ -10281,9 +12192,76 @@ void Properties::key_down_return(){
     EnterPropertieSelect();
 }
 
+// una FILA de este panel se destruye: ningun puntero global puede quedar apuntandola. Son
+// los mismos que sueltan las filas dinamicas (tarjetas de scripts, paleta) al reconstruirse,
+// mas los campos que ConstruirGrupos publica para refrescarlos desde afuera (FPS, keyframe,
+// animacion del objeto...: apuntan al ULTIMO panel construido, asi que en general no son de
+// este) y los gestos en curso (arrastre de un valor, scroll de una lista, color abierto).
+static void PropsOlvidarFila(PropertieBase* p) {
+    if (!p) return;
+    if (p->GetType() == PropertyType::Float) {
+        PropFloat* pf = (PropFloat*)p;
+        if (g_textFieldActivo == &pf->field) g_textFieldActivo = NULL;
+        if (g_propFloatEditando == pf) g_propFloatEditando = NULL;
+    }
+    if (p->GetType() == PropertyType::Text && g_textFieldActivo == &((PropText*)p)->field)
+        g_textFieldActivo = NULL;
+    if (p->GetType() == PropertyType::Color) {
+        PropColor* pc = (PropColor*)p;
+        if (pc->PaletaIdx() >= 0 && g_textFieldActivo == &((PropColorPal*)pc)->field)
+            g_textFieldActivo = NULL;
+    }
+    if (g_kfFocoProp == (void*)p) g_kfFocoProp = 0;
+    // un rename EN CURSO sobre un boton de esta fila (el boton se volvio input): se cancela
+    // antes de que el boton muera (RenameLimpiar le escribe editField)
+    if (g_renameBoton) {
+        bool suyo = (p->GetType() == PropertyType::Button && ((PropButton*)p)->button == g_renameBoton);
+        if (p->GetType() == PropertyType::ButtonRow) {
+            PropButtonRow* r = (PropButtonRow*)p;
+            for (size_t i = 0; i < r->botones.size(); i++) if (r->botones[i] == g_renameBoton) suyo = true;
+        }
+        if (suyo) RenameCancel();
+    }
+    // un rename a medio tipear en ESTE campo Name: se pierde (el campo ya no existe)
+    if ((PropertieBase*)g_nameEditCampo == p) { g_nameEditCampo = NULL; g_nameEditTarget = NULL; g_nameEditObj = NULL; }
+    if ((PropertieBase*)g_palBoton == p) { g_palBoton = NULL; g_palTarget = NULL; }
+    PropFloat** pfs[] = { &gPropAnimFps, &gPropAnimStart, &gPropAnimEnd, &gPropVertVel,
+                          &gKfFrame, &gKfValor, &gKfInDF, &gKfInDV, &gKfOutDF, &gKfOutDV,
+                          &gPropObjAnimStart, &gPropObjAnimEnd, &gPropObjAnimFps,
+                          &gFloatDrag, &gTouchSlide };
+    for (size_t i = 0; i < sizeof(pfs) / sizeof(pfs[0]); i++)
+        if ((PropertieBase*)*pfs[i] == p) *pfs[i] = NULL;
+    if ((PropertieBase*)gKfInterp == p) gKfInterp = NULL;
+    if ((PropertieBase*)gKfHandle == p) gKfHandle = NULL;
+    if ((PropertieBase*)gListaScrollLista == p) gListaScrollLista = NULL;
+    if ((PropertieBase*)gTouchScrollLista == p) gTouchScrollLista = NULL;
+    if ((PropertieBase*)gColorAbierto == p) gColorAbierto = NULL;
+}
+
 Properties::~Properties() {
     // si este panel era el ACTIVO, limpiar el puntero global: sino queda colgando
     // (dangling) y cualquier lectura de PropsActivo crashea (ej. al reemplazar este
     // panel por un UV Editor, que lee la parte activa via PropsActivo).
     if (PropsActivo == this) PropsActivo = NULL;
+    // LAS TARJETAS SON DEL PANEL. ConstruirGrupos las arma en el ctor (una por grupo, cada una
+    // duena de sus filas: ~GroupPropertie las libera) y nadie las soltaba: mientras el layout
+    // vivia para siempre daba igual, pero abrir un proyecto ahora libera el layout anterior y
+    // este panel era casi todo lo que quedaba vivo de el (~170 KB por apertura).
+    std::set<PropertieBase*> enTarjetas;
+    for (size_t g = 0; g < GroupProperties.size(); g++) {
+        GroupPropertie* gp = GroupProperties[g];
+        if (!gp) continue;
+        if (PropHoverGroup == gp) PropHoverGroup = NULL;
+        for (size_t i = 0; i < gp->properties.size(); i++) {
+            PropsOlvidarFila(gp->properties[i]);
+            enTarjetas.insert(gp->properties[i]);
+        }
+        delete gp;
+    }
+    GroupProperties.clear();
+    // filas que ConstruirGrupos arma pero no mete en ninguna tarjeta (hoy: el tilde "Smooth
+    // Shading" de los propMatChk del material): son del panel igual
+    for (int i = 0; i < 11; i++)
+        if (propMatChk[i] && !enTarjetas.count(propMatChk[i])) { PropsOlvidarFila(propMatChk[i]); delete propMatChk[i]; }
+    for (int i = 0; i < 11; i++) propMatChk[i] = NULL;
 }

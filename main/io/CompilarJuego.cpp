@@ -9,6 +9,8 @@
 #include "io/W3dContenedor.h"      // FORMATO v4: el staging es un espejo del contenedor
 #include "io/W3dZip.h"             // W3dZipLector: volcar las entradas al staging
 #include "io/LuaCompilar.h"           // produccion: .lua del staging -> bytecode stripped
+#include "io/Librerias.h"             // las LIBRERIAS externas que usa el proyecto viajan con el juego
+#include "io/W3dAlmacen.h"            // W3dRutaLibreriaEmpaquetada: donde las busca el runtime
 #include "objects/Objects.h"
 #include "objects/UI.h"
 #include "objects/Gamepad.h"
@@ -229,6 +231,9 @@ static void RecolectarScripts(Object* o, std::vector<ObjScript>* out,
         }
         out->push_back(os);
     }
+    // (lo que genera un PROXY es de su LIBRERIA: sus scripts son entradas de ella -"lib:<libreria>/..."- y viajan con
+    //  ella en librerias/<nombre>/, no sueltos en el staging)
+    if (o->getType() == ObjectType::proxy) return;
     for (size_t i = 0; i < o->Childrens.size(); i++)
         RecolectarScripts(o->Childrens[i], out, rutasLua);
 }
@@ -439,25 +444,62 @@ static void RecolectarEscenas(std::vector<UI*>* out) {
     }
 }
 
-// la raiz del repo Whisk3D (Core + UI 2D + game runtime). Dos formas de encontrarla:
+// la raiz del repo Whisk3D (Core + UI 2D + game runtime). Se busca en este orden:
 //   1) la que el usuario fijo a mano en Ajustes (cfg.repoPath): es lo que hace que el editor
 //      INSTALADO -- que no tiene el repo al lado -- pueda compilar juegos igual;
-//   2) subiendo de carpeta desde res/ hasta dar con libs/Whisk3DCore, para el editor corriendo
-//      desde el arbol de codigo (build/ con res/ copiado al lado del binario).
-// En ambos casos se valida que exista la marca del repo (Objects.cpp). "" si no se encuentra.
-static std::string RepoRoot() {
-    if (!cfg.repoPath.empty() &&
-        w3dFileSystem::FileExists(cfg.repoPath + "/libs/Whisk3DCore/objects/Objects.cpp"))
-        return cfg.repoPath;
-    std::string dir = Carpeta(w3dFileSystem::GetResDir());   // sube de res/
-    for (int i = 0; i < 8; i++) {
-        if (w3dFileSystem::FileExists(dir + "/libs/Whisk3DCore/objects/Objects.cpp")) return dir;
+//   2) la variable de entorno W3D_REPO (scripts, CI, un build de prueba sin tocar su config.ini);
+//   3) subiendo de carpeta desde res/ hasta dar con libs/Whisk3DCore, para el editor corriendo
+//      desde el arbol de codigo (build/ con res/ copiado al lado del binario);
+//   4) subiendo desde la carpeta del BINARIO (Linux): un build dentro del arbol que tomo el res/
+//      de una instalacion (/usr/share) igual encuentra su repo;
+//   5) las FUENTES con las que se compilo este binario (__FILE__ de este archivo): un build FUERA
+//      del arbol -- uno con sanitizers en otra carpeta, por ejemplo -- encuentra el repo sin
+//      configurar nada. Solo si la ruta es absoluta (CMake las pasa asi) y todavia existe.
+// En todos los casos se valida que exista la marca del repo (Objects.cpp). "" si no se encuentra.
+static bool EsRepo(const std::string& dir) {
+    return !dir.empty() && w3dFileSystem::FileExists(dir + "/libs/Whisk3DCore/objects/Objects.cpp");
+}
+static std::string SubirHastaRepo(std::string dir) {
+    for (int i = 0; i < 8 && !dir.empty(); i++) {
+        if (EsRepo(dir)) return dir;
         std::string arriba = Carpeta(dir);
         if (arriba == dir) break;
         dir = arriba;
     }
     return "";
 }
+static std::string RepoRoot(std::string* via) {
+    std::string v, r;
+    const char* env = getenv("W3D_REPO");
+    if (EsRepo(cfg.repoPath))  { v = "ajustes"; r = cfg.repoPath; }
+    else if (env && EsRepo(env)) { v = "entorno"; r = env; }
+    else {
+        r = SubirHastaRepo(Carpeta(w3dFileSystem::GetResDir()));   // sube de res/
+        if (!r.empty()) v = "res";
+    }
+#if defined(__linux__) && !defined(__ANDROID__)
+    if (r.empty()) {
+        char exe[4096];
+        ssize_t n = readlink("/proc/self/exe", exe, sizeof(exe) - 1);
+        if (n > 0) {
+            exe[n] = 0;
+            r = SubirHastaRepo(Carpeta(exe));
+            if (!r.empty()) v = "binario";
+        }
+    }
+#endif
+    if (r.empty()) {
+        // <repo>/main/io/CompilarJuego.cpp -> <repo>
+        const std::string fuente = __FILE__;
+        const bool absoluta = (!fuente.empty() && (fuente[0] == '/' || fuente[0] == '\\')) ||
+                              (fuente.size() > 2 && fuente[1] == ':');
+        const std::string repo = absoluta ? Carpeta(Carpeta(Carpeta(fuente))) : std::string();
+        if (EsRepo(repo)) { v = "fuentes"; r = repo; }
+    }
+    if (via) *via = v;
+    return r;
+}
+std::string CompilarJuegoRepoRaiz(std::string* via) { return RepoRoot(via); }
 
 // asegura el .gitignore de la carpeta del juego: platform-build/ (todo lo generado
 // para compilar) y build/ (los resultados) se REGENERAN con "Compilar juego", asi que
@@ -573,10 +615,16 @@ static const char* const kCarpetasAssets[] = {
     "mallas", "animaciones", "modelos", "proyecto", "extra",
     // escenas/: los .w3dui que referencia el proyecto.json de un juego 3D (el
     // compilador los RE-EXPORTA ahi adentro con el nombre de entrada que el
-    // archivo referencia, para que la UI del juego sea la VIVA del editor)
+    // archivo referencia, para que la UI del juego sea la VIVA del editor). Tambien
+    // las ESCENAS 3D (.w3de) que cambiarEscena() carga desde su entrada.
     "escenas",
+    // prefabs/: los .w3dp del proyecto (las instancias los generan)
+    "prefabs",
     // proyectos v3 (archivos sueltos al lado del .w3d): siguen funcionando
     "assets", "contenido",
+    // librerias/<nombre>/: las entradas de cada LIBRERIA externa que el proyecto usa (io/Librerias.h). El runtime
+    // lee sus rutas "lib:<nombre>/..." de ahi (W3dRutaLibreriaEmpaquetada), sin montar ningun .w3d
+    "librerias",
     0
 };
 
@@ -661,13 +709,17 @@ static bool RefRelValida(const std::string& s) {
 // Una "ruta" aca es una corrida de caracteres de ruta que contiene una '/'. Los
 // falsos positivos no cuestan nada: mas abajo cada candidato se verifica contra
 // el disco y el que no existe se descarta.
+static void RefsRutasDeTexto(const char* p, size_t n, std::vector<std::string>* out);
 static void RefsRutasDe(const std::string& archivo, std::vector<std::string>* out) {
     std::vector<unsigned char> datos;
     if (!w3dFileSystem::ReadFileBytes(archivo, datos) || datos.empty()) return;
+    RefsRutasDeTexto((const char*)&datos[0], datos.size(), out);
+}
+// (lo mismo sobre un texto ya leido: los .lua de una LIBRERIA, que se leen de su .w3d)
+static void RefsRutasDeTexto(const char* p, size_t n, std::vector<std::string>* out) {
+    if (!p || n == 0) return;
     // bytecode lua (0x1B "Lua") u otro binario: no tiene rutas que leer asi
-    if (datos[0] == 0x1B) return;
-    const char* p = (const char*)&datos[0];
-    const size_t n = datos.size();
+    if ((unsigned char)p[0] == 0x1B) return;
     std::string cur;
     for (size_t i = 0; i <= n; i++) {
         char c = (i < n) ? p[i] : ' ';
@@ -707,8 +759,15 @@ static void CopiarRefsRelativasDeLua(const std::string& out, const std::string& 
     std::vector<std::string> rutas;
     for (size_t i = 0; i < textos.size(); i++) RefsRutasDe(textos[i], &rutas);
     std::set<std::string> archivos, carpetas;
+    // (el .w3d de una LIBRERIA vinculada no viaja por su nombre: sus entradas ya van en librerias/<nombre>/)
+    std::set<std::string> libs;
+    for (int l = 0; l < W3dLibsCantidad(); l++) {
+        std::string rel;
+        if (W3dRutaBajoCarpeta(W3dLibsRutaDisco(l), proy, rel)) libs.insert(rel);
+    }
     for (size_t i = 0; i < rutas.size(); i++) {
         const std::string& s = rutas[i];
+        if (libs.count(s)) continue;
         std::string dir = Carpeta(s);            // "sonidos/x.wav" -> "sonidos"
         if (dir.empty() || dir == s) {
             // nombre pelado con '/' raro: solo puede ser un archivo suelto
@@ -744,6 +803,37 @@ static void CopiarRefsRelativasDeLua(const std::string& out, const std::string& 
     if (nA || nC)
         w3dLogf("CompilarJuego: %d carpeta(s) y %d archivo(s) que el proyecto nombra por "
                 "ruta relativa, completados en el staging", nC, nA);
+}
+
+// ============================================================================
+//  LAS LIBRERIAS EXTERNAS en el juego (io/Librerias.h): lo que nombra un texto, lo que dejan afuera
+// ============================================================================
+// las referencias "ext:..." de un texto JSON (el string entero, sin el prefijo y sin escapes)
+static void ExtsDeTexto(const std::string& t, std::vector<std::string>* out) {
+    for (size_t p = t.find("\"ext:"); p != std::string::npos; p = t.find("\"ext:", p + 5)) {
+        std::string r;
+        size_t i = p + 5;
+        for (; i < t.size() && t[i] != '"'; i++) {
+            if (t[i] == '\\' && i + 1 < t.size()) { i++; r += (t[i] == 'n') ? '\n' : t[i]; }
+            else r += t[i];
+        }
+        if (i < t.size() && !r.empty()) out->push_back(r);
+    }
+}
+// copia un archivo de disco (o una ruta que ReadFileBytes sepa leer) a 'dst' (crea su carpeta). false = no se pudo
+static bool CopiarAlStaging(const std::string& src, const std::string& dst) {
+    std::vector<unsigned char> d;
+    if (!w3dFileSystem::ReadFileBytes(src, d)) return false;
+    { char cmd[2000]; snprintf(cmd, sizeof(cmd), "mkdir -p \"%s\"", Carpeta(dst).c_str()); if (system(cmd)) {} }
+    FILE* fh = fopen(dst.c_str(), "wb");
+    if (!fh) return false;
+    if (!d.empty()) fwrite(&d[0], 1, d.size(), fh);
+    return fclose(fh) == 0;
+}
+static void JsonTexto(std::string& s, const std::string& t) {
+    s += '"';
+    for (size_t k = 0; k < t.size(); k++) { if (t[k] == '"' || t[k] == '\\') s += '\\'; s += t[k]; }
+    s += '"';
 }
 
 // junta las rutas RELATIVAS (contra 'out') de todos los archivos del juego:
@@ -1316,8 +1406,9 @@ static bool EscribirMain(const std::string& ruta, const std::string& fontRel,
 static const char* kFuentesBase[] = {
     "${CORE}/gfx/w3dTexture.cpp",
     "${CORE}/io/w3dFilesystem.cpp", "${CORE}/io/w3dCompress.cpp",
-    // .w3dm: la geometria de las mallas viaja en NUESTRO formato de texto (el juego la lee igual que el editor)
-    "${CORE}/io/W3dTexto.cpp", "${CORE}/io/W3dMalla.cpp",
+    // .w3db / .w3dm: la geometria de las mallas viaja en NUESTRO formato (binario lista para memoria,
+    // o texto): el juego la lee con el MISMO lector que el editor
+    "${CORE}/io/W3dTexto.cpp", "${CORE}/io/W3dMalla.cpp", "${CORE}/io/W3dMallaBin.cpp",
     "${CORE}/base/w3dlog.cpp", "${CORE}/base/W3dInteractionState.cpp", "${CORE}/base/W3dConfig.cpp",
     "${CORE}/math/Vector3.cpp", "${CORE}/math/Quaternion.cpp", "${CORE}/math/Matrix4.cpp",
     "${CORE}/objects/Objects.cpp", "${CORE}/objects/Mesh.cpp", "${CORE}/objects/Light.cpp",
@@ -1327,11 +1418,25 @@ static const char* kFuentesBase[] = {
     // Armature2DAnimation.cpp va SIEMPRE: Animation.cpp lo llama sin ifdef (Arm2DClipActivo /
     // Armature2DEvaluar) y sin el .cpp el juego no linkea
     "${CORE}/animation/SkeletalAnimation.cpp", "${CORE}/animation/Armature2DAnimation.cpp",
+    // W3dAnimSet.cpp va SIEMPRE con SkeletalAnimation.cpp: los clips de esqueleto se cargan de los
+    // animsets (.w3da) y el Armature los suelta por ahi (sin el .cpp el juego no linkea)
+    "${CORE}/animation/W3dAnimSet.cpp",
+    // Flipbook.cpp va SIEMPRE: Mesh.cpp (UV anim por tira) y la Imagen2D del HUD (UI2DFormato/BindsJuego)
+    // lo usan sin ifdef -> sin el .cpp ni un juego 2D ni uno 3D linkean
+    "${CORE}/animation/Flipbook.cpp",
     // el almacen de recursos + datos compartidos van SIEMPRE: VertexAnimation.cpp,
     // Textures.cpp y el import los llaman sin ifdef (W3dRecursoBuscar/Retener) ->
     // sin estos .cpp el juego compilado no linkea (visto en integracion_portales)
     "${CORE}/io/W3dRecursos.cpp", "${CORE}/objects/MallaDatos.cpp", "${CORE}/objects/TexturaCache.cpp",
+    // las mallas 3D como RECURSO (registro "mallas" del proyecto, una copia en memoria/GPU para
+    // todos los objetos que la usan): Mesh.cpp la llama sin ifdef (vinculo, VBO compartidos)
+    "${CORE}/objects/MallaRecurso.cpp",
     "${CORE}/script/W3dScript.cpp",
+    // W3dScript.cpp registra SIEMPRE los binds de los cuerpos rigidos (fisicaVel...) y de la colision
+    // contra mallas (colSuelo/colPared...): sin estos dos el juego compilado no linkea
+    "${CORE}/physics/W3dRigido.cpp", "${CORE}/physics/W3dColMalla.cpp",
+    // ...y los de HITBOX (hitboxActivo/hitboxDentro/...) + el despacho de alEntrar/alTocar
+    "${CORE}/physics/W3dHitbox.cpp",
     "${UILIB}/text/W3dFont.cpp", "${UILIB}/text/bitmapText.cpp", "${UILIB}/text/font.cpp",
     "${UILIB}/draw/glesdraw.cpp", "${UILIB}/draw/W3dAtlasPacker.cpp",
     "${UILIB}/core/UI.cpp", "${UILIB}/theme/colores.cpp",
@@ -1352,6 +1457,7 @@ static const char* kIncludesBase[] = {
 
 static const char* kFuentes3D[] = {
     "${CORE}/objects/VisSet.cpp",              // sets de visibilidad por celda (PVS)
+    "${CORE}/objects/VisBsp.cpp",              // arbol BSP + PVS por cluster (Culling metodo Bsp)
     "${CORE}/io/W3dZip.cpp",                   // el .w3d es un zip (rutas/entradas del proyecto)
     "${CORE}/io/W3dAlmacen.cpp",
     "${W3DROOT}/main/render/OpcionesRender.cpp",  // g_renderBg + los flags de dibujo del Core
@@ -1360,12 +1466,16 @@ static const char* kFuentes3D[] = {
     "${W3DROOT}/main/importers/import_obj.cpp",   // carga diferida de texturas + materiales
     "${W3DROOT}/main/importers/import_wobj.cpp",  // mallas .obj referenciadas (proyectos viejos)
     "${W3DROOT}/main/edit/MeshEdit.cpp",          // genera la malla de render (modificadores, bordes, PVS)
+    "${W3DROOT}/main/edit/BooleanMod.cpp",        // BooleanPoly: el modificador booleano de Mesh_AplicarStack
     "${W3DROOT}/main/objects/EditMesh.cpp",
     "${W3DROOT}/main/objects/Primitivas.cpp",
     "${W3DROOT}/main/objects/Camera.cpp",         // camara + riel (el encuadre del juego sale de aca)
     "${W3DROOT}/main/objects/Curve.cpp",
     "${W3DROOT}/main/objects/Culling.cpp",
     "${W3DROOT}/main/objects/LOD.cpp",
+    "${W3DROOT}/main/objects/Niebla.cpp",         // la niebla puesta en el arbol (solo en Render)
+    "${W3DROOT}/main/objects/Recorte.cpp",        // LimpiarZ / Recorte (composicion de la pantalla)
+    "${W3DROOT}/main/objects/Hitbox.cpp",         // Hitbox: caja de deteccion (el motor esta en el Core)
     "${W3DROOT}/main/objects/VisZona.cpp",
     "${W3DROOT}/main/objects/Collection.cpp",
     "${W3DROOT}/main/objects/Mirror.cpp",
@@ -1375,10 +1485,23 @@ static const char* kFuentes3D[] = {
     "${W3DROOT}/main/objects/Target.cpp",
     "${W3DROOT}/main/objects/Gamepad.cpp",
     "${W3DROOT}/main/objects/Scene.cpp",
+    "${W3DROOT}/main/W3dRaices.cpp",              // las escenas 3D del proyecto: cambiarEscena() las carga/descarga
     "${W3DROOT}/main/io/W3dContenedor.cpp",
+    // volumen inicial por proyecto (`volumen:` del .w3d, lo aplica el lector): W3dVolumen reenvia el cambio
+    // a la musica, asi que viaja con su dispatcher (sin W3D_ENABLE_MUSIC son stubs mudos)
+    "${CORE}/audio/W3dVolumen.cpp", "${CORE}/audio/W3dMusic.cpp",
     "${W3DROOT}/main/ui/W3dColors.cpp",
     "${W3DROOT}/main/config/W3dLang.cpp",
     "${W3DROOT}/main/config/w3dVersion.cpp",
+    // (fase de prefabs) la INSTANCIA de prefab y la generacion de sus hijos + instanciar()/destruir() de lua
+    "${W3DROOT}/main/objects/InstanciaPrefab.cpp",
+    "${W3DROOT}/main/io/Prefabs.cpp",
+    // (fase de librerias) el PROXY W3D (un prefab o una escena de una libreria externa) y el registro/lectura de
+    // las librerias: sus prefijos "lib:" y sus recursos con nombre de libreria
+    "${W3DROOT}/main/objects/ProxyW3d.cpp",
+    "${W3DROOT}/main/io/Librerias.cpp",
+    // (fase de streaming) las instancias DIFERIDAS: cargar/descargar en tiempo real segun la distancia
+    "${W3DROOT}/main/io/Streaming.cpp",
     0
 };
 // LOS DIRECTORIOS DE INCLUDE que agrega el 3D (misma razon que arriba: uno solo).
@@ -1853,7 +1976,8 @@ void CompilarJuegoTick() {
 //
 //  Un juego 3D es el que tiene ALGO que dibujar en 3D: una malla, una camara,
 //  una luz, una curva/riel, un espejo, una coleccion, un LOD, un culling, una
-//  zona de visibilidad, un emisor de particulas o una instancia. Un juego 2D
+//  zona de visibilidad, un emisor de particulas, una instancia (o un proxy de una
+//  libreria). Un juego 2D
 //  (una UI con scripts, como el whiskpaddle) no tiene nada de eso y se compila
 //  como siempre: sin el lector de proyecto ni el pase 3D, o sea un binario mucho
 //  mas chico. La deteccion es automatica -- el usuario no tiene que elegir nada.
@@ -1867,6 +1991,10 @@ static bool EsObjeto3D(Object* o) {
         case ObjectType::collection: case ObjectType::lod:
         case ObjectType::culling:    case ObjectType::viszona:
         case ObjectType::particulas: case ObjectType::armature:
+        case ObjectType::niebla:
+        case ObjectType::limpiarz:   case ObjectType::recorte:
+        case ObjectType::hitbox:     case ObjectType::prefab:
+        case ObjectType::proxy:      // (un proxy de una libreria: lo que genera es contenido 3D)
             return true;
         default: return false;
     }
@@ -1916,7 +2044,7 @@ bool CompilarJuego(UI* u, int plataforma, int modoVentana, int orientacion,
         Notificar("Compilar: el proyecto no tiene scripts (agregalos a un objeto Script)", true);
         return false;
     }
-    std::string repo = RepoRoot();
+    std::string repo = RepoRoot(NULL);
     if (repo.empty()) {
         Notificar("Compilar: no encuentro el repo Whisk3D (fuentes del runtime). "
                   "Fija la raiz del repo en Ajustes (o compila desde el arbol de codigo).", true);
@@ -2195,6 +2323,147 @@ bool CompilarJuego(UI* u, int plataforma, int modoVentana, int orientacion,
             Notificar("Compilar: hay referencias externas fuera de la carpeta del proyecto; "
                       "no viajan con el juego", true);
     }
+    // ------------------------------------------------------------------
+    //  LAS LIBRERIAS EXTERNAS (io/Librerias.h) del proyecto viajan con el juego: todas las entradas de
+    //  cada una (sus prefabs y escenas, sus mallas, animsets, materiales, texturas, scripts: lo que sus
+    //  scripts lean en tiempo de ejecucion no se puede adivinar, igual que con el proyecto) en
+    //  librerias/<nombre>/<entrada>, que es donde el runtime busca sus rutas "lib:<nombre>/...". Viajan TODAS
+    //  las VINCULADAS (el registro es lo que el usuario declaro que el proyecto usa), no solo las que nombra el
+    //  JSON guardado: un script puede usar una sin que nada mas la nombre (instanciar("<lib>/<prefab>") con el
+    //  nombre armado en lua, sin ningun proxy en el nivel), y sin sus entradas el juego no la encontraria.
+    //  Ademas, de cada una:
+    //    - lo que deja AFUERA de su .w3d a proposito ("ext:", relativo a SU carpeta) en
+    //      librerias/<nombre>/_ext/<rel> (W3dLibsEntradaExterna: de ahi lo lee el lector del juego);
+    //    - lo que SUS SCRIPTS nombran por ruta y vive SUELTO al lado de su .w3d (la misma regla que
+    //      CopiarRefsRelativasDeLua para el proyecto) en librerias/<nombre>/<ruta>;
+    //    - las librerias de ADENTRO (TODO su registro, por lo mismo: sus scripts pueden usar una sin nombrarla
+    //      en su JSON), con el nombre con que viven en memoria, y el mapeo en librerias/_anidadas.json
+    //      (W3dLibsAnidada del juego lo lee de ahi).
+    // ------------------------------------------------------------------
+    {
+        { char cmd[1400]; snprintf(cmd, sizeof(cmd), "rm -rf \"%s/librerias\"", out.c_str()); if (system(cmd)) {} }
+        // LA COLA: las vinculadas al nivel, y las de adentro de cada una (por su nombre en memoria)
+        std::vector<std::string> cola;
+        std::set<std::string> enCola;
+        for (int l = 0; l < W3dLibsCantidad(); l++) {
+            const std::string& nom = W3dLibsFila(l).nombre;
+            if (enCola.insert(nom).second) cola.push_back(nom);
+        }
+        std::string anidadas;   // el mapeo de las de adentro (librerias/_anidadas.json)
+        int nLibs = 0, nEnt = 0, nExt = 0, nSueltos = 0, afuera = 0;
+        for (size_t q = 0; q < cola.size(); q++) {
+            const std::string nom = cola[q];
+            const std::string ruta = W3dLibsRutaDiscoDe(nom);
+            W3dZipLector z;
+            if (ruta.empty() || !z.Abrir(ruta)) {
+                Notificar("Compilar: no pude abrir la libreria '" + nom + "' (" + ruta + ")", true);
+                w3dLogfE("CompilarJuego: no pude abrir la libreria '%s' (%s)", nom.c_str(), ruta.c_str());
+                continue;
+            }
+            const std::string dirLib = Carpeta(ruta);
+            std::vector<std::string> ents;
+            z.Listar(ents);
+            const std::set<std::string> entradas(ents.begin(), ents.end());
+            std::vector<std::string> textosLib, luas;
+            for (size_t i = 0; i < ents.size(); i++) {
+                const std::string& e = ents[i];
+                // (proyecto.json SI: el runtime lee de ahi sus registros; mimetype/LEEME/EXTERNOS no)
+                if (W3dEsEntradaDeServicio(e) && e != "proyecto.json") continue;
+                if (e.empty() || e[e.size() - 1] == '/') continue;
+                std::vector<unsigned char> d;
+                if (!z.Leer(e, d)) continue;
+                const std::string dst = out + "/" + W3dRutaLibreriaEmpaquetada(nom, e);
+                { char cmd[2000]; snprintf(cmd, sizeof(cmd), "mkdir -p \"%s\"", Carpeta(dst).c_str()); if (system(cmd)) {} }
+                FILE* fh = fopen(dst.c_str(), "wb");
+                if (fh) {
+                    if (!d.empty()) fwrite(&d[0], 1, d.size(), fh);
+                    if (fclose(fh) == 0) nEnt++;
+                }
+                if (d.empty()) continue;
+                const size_t pt = e.find_last_of('.');
+                const std::string ext = (pt == std::string::npos) ? std::string() : e.substr(pt);
+                if (e == "proyecto.json" || ext == ".w3de" || ext == ".w3dp" || ext == ".w3dui")
+                    textosLib.push_back(std::string((const char*)&d[0], d.size()));
+                else if (ext == ".lua" && d[0] != 0x1B) luas.push_back(std::string((const char*)&d[0], d.size()));
+            }
+            // lo que deja AFUERA a proposito ("ext:", relativo a SU carpeta)
+            {
+                std::vector<std::string> exts;
+                for (size_t t = 0; t < textosLib.size(); t++) ExtsDeTexto(textosLib[t], &exts);
+                std::set<std::string> vistos;
+                for (size_t i = 0; i < exts.size(); i++) {
+                    const std::string& x = exts[i];
+                    if (!vistos.insert(x).second) continue;
+                    if (x[0] == '/' || x[0] == '\\' || (x.size() > 1 && x[1] == ':')) { afuera++; continue; }
+                    const std::string src = w3dFileSystem::JoinPath(dirLib, x);
+                    const std::string dst = out + "/" + W3dRutaLibreriaEmpaquetada(nom, W3dLibsEntradaExterna(x));
+                    if (!CopiarAlStaging(src, dst)) {
+                        w3dLogfW("CompilarJuego: la libreria '%s' nombra '%s' afuera de su .w3d y no esta (%s)", nom.c_str(),
+                                 x.c_str(), src.c_str());
+                        continue;
+                    }
+                    nExt++;
+                    // (un script que vive afuera tambien nombra rutas)
+                    if (x.size() > 4 && x.compare(x.size() - 4, 4, ".lua") == 0) {
+                        std::vector<unsigned char> d;
+                        if (w3dFileSystem::ReadFileBytes(src, d) && !d.empty() && d[0] != 0x1B)
+                            luas.push_back(std::string((const char*)&d[0], d.size()));
+                    }
+                }
+            }
+            // lo que SUS SCRIPTS nombran por ruta y vive SUELTO al lado de su .w3d (adentro de su carpeta)
+            {
+                std::vector<std::string> rutas;
+                for (size_t t = 0; t < luas.size(); t++) RefsRutasDeTexto(luas[t].data(), luas[t].size(), &rutas);
+                std::set<std::string> vistos;
+                for (size_t i = 0; i < rutas.size(); i++) {
+                    const std::string& r = rutas[i];
+                    if (!vistos.insert(r).second || entradas.count(r)) continue;   // (adentro de su .w3d ya viajo)
+                    const std::string src = dirLib + "/" + r;
+                    const std::string dst = out + "/" + W3dRutaLibreriaEmpaquetada(nom, r);
+                    if (w3dFileSystem::FileExists(src) && !w3dFileSystem::IsDir(src)) {
+                        if (!w3dFileSystem::FileExists(dst) && CopiarAlStaging(src, dst)) nSueltos++;
+                        continue;
+                    }
+                    // (la CARPETA del literal: un script que ARMA la ruta con una variable, como en el proyecto)
+                    const std::string dir = Carpeta(r);
+                    if (dir.empty() || dir == r || dir == "platform-build" || dir == "build") continue;
+                    if (!w3dFileSystem::IsDir(dirLib + "/" + dir)) continue;
+                    char cmd[3000];
+                    snprintf(cmd, sizeof(cmd), "mkdir -p \"%s\" && cp -rn \"%s/%s/.\" \"%s/\" 2>/dev/null || true",
+                             Carpeta(dst).c_str(), dirLib.c_str(), dir.c_str(), Carpeta(dst).c_str());
+                    if (system(cmd) == 0) nSueltos++;
+                }
+            }
+            // sus librerias de ADENTRO (todo su registro): con el nombre con que viven en memoria (W3dLibsAnidada)
+            {
+                std::vector<W3dLibFila> sub;
+                W3dLibsSubFilas(nom, sub);
+                for (size_t i = 0; i < sub.size(); i++) {
+                    const std::string g = W3dLibsAnidada(nom, sub[i].nombre);
+                    anidadas += anidadas.empty() ? "\n    " : ",\n    ";
+                    anidadas += "{ \"libreria\": "; JsonTexto(anidadas, nom);
+                    anidadas += ", \"nombre\": "; JsonTexto(anidadas, sub[i].nombre);
+                    anidadas += ", \"como\": "; JsonTexto(anidadas, g);
+                    anidadas += " }";
+                    if (enCola.insert(g).second) cola.push_back(g);
+                }
+            }
+            nLibs++;
+        }
+        if (!anidadas.empty()) {
+            const std::string j = "{\n  \"anidadas\": [" + anidadas + "\n  ]\n}\n";
+            const std::string dst = out + "/" + kW3dLibsAnidadasEntrada;
+            { char cmd[2000]; snprintf(cmd, sizeof(cmd), "mkdir -p \"%s\"", Carpeta(dst).c_str()); if (system(cmd)) {} }
+            FILE* fh = fopen(dst.c_str(), "wb");
+            if (fh) { fwrite(j.data(), 1, j.size(), fh); fclose(fh); }
+        }
+        if (nLibs)
+            w3dLogf("CompilarJuego: %d libreria(s) empaquetadas (%d entradas, %d externas, %d sueltas en librerias/)",
+                    nLibs, nEnt, nExt, nSueltos);
+        if (afuera > 0)
+            Notificar("Compilar: una libreria usa archivos por ruta absoluta; no viajan con el juego", true);
+    }
     { char cmd[1200]; snprintf(cmd, sizeof(cmd), "cp \"%s/res/Skins/Whisk3D/font.png\" \"%s/font.png\"", repo.c_str(), out.c_str()); if (system(cmd)) {} }
     // ...y lo que SOLO nombra el lua por ruta relativa (sonidos/, musica/): ver
     // CopiarRefsRelativasDeLua. Va DESPUES de todo lo demas (no pisa nada de lo que
@@ -2365,7 +2634,11 @@ bool CompilarJuego(UI* u, int plataforma, int modoVentana, int orientacion,
         const char* embeds = embedsStr.c_str();
         char cmd[6000];
         snprintf(cmd, sizeof(cmd),
-            "cd \"%s\" && source ~/emsdk/emsdk_env.sh >/dev/null 2>&1; "
+            // emsdk: con '.' y DESDE su carpeta. popen corre /bin/sh (dash en Debian/Ubuntu), que
+            // no conoce 'source' y donde emsdk_env.sh no sabe donde esta: sin esto, un editor
+            // lanzado sin emsdk activo daba "emcc: not found"
+            "if [ -f ~/emsdk/emsdk_env.sh ]; then cd ~/emsdk && . ./emsdk_env.sh >/dev/null 2>&1; fi; "
+            "cd \"%s\" && "
             // (las listas de fuentes/includes son LAS MISMAS de PC y Android: ver kFuentesBase)
             // emcc reparte las ~75 unidades entre EMCC_CORES procesos y por default agarra
             // TODOS los nucleos: misma cota que el resto (ver W3dCompilarJobs)

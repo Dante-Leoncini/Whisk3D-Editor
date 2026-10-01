@@ -1,0 +1,43 @@
+# ==========================================================================
+#  STREAMING (revision 1): borrar desde la BIBLIOTECA una textura que el streaming tiene PEDIDA
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_streaming_rev_purga.w3s
+#
+#  La Fija (un Poste, con la Madera CON TEXTURA) pasa a ser diferida y se carga con la vista previa: su instancia
+#  RETIENE madera.png (un pedido al almacen). Despues su material pasa a usar otra textura (soltar dosmats-b.png en la
+#  tarjeta): madera.png ya no esta en ninguna ranura, pero el pedido sigue.
+#    - "Delete" de madera.png: NO se borra (los pedidos del streaming son usuarios: "It is in use");
+#    - "Delete anyway" (forzado): se purga; el pedido guarda el descriptor CON SU SERIE y al descargar la instancia
+#      no toca el que ya no existe (antes: use-after-free al soltar el pedido).
+# ==========================================================================
+
+ventana 1280 720
+streamlua /tmp/w3d_f9_rev1 dosmats.png
+abrirw3d /tmp/w3d_f9_rev1/streamlua.w3d
+texentrada dosmats-b.png
+streamvista 1
+streamcarga Fija distancia 8
+streamobjetivo 1000 0 1000
+streamtick 30
+streamobjetivo 0 0 3
+streamtick 30
+streamestado Fija cargada
+selobj Tronco
+propstab 2
+outvista texturas
+outsoltar dosmats-b.png props textura
+# (la Madera ya no la usa ningun material: la retienen los pedidos del streaming -la Fija y la Cerca cargadas-)
+recborrar texturas texturas/madera.png falla
+recborrarforzado texturas texturas/madera.png
+streamtexrefs
+# descargar con el descriptor purgado: no se toca
+streamobjetivo 1000 0 1000
+streamtick 30
+streaminfo cargadas 0 pidiendo 0 pedidos 0
+streamtexrefs
+# y vuelve a cargar sin la textura borrada
+streamobjetivo 0 0 3
+streamtick 30
+streamestado Fija cargada
+streamobjetivo off
+streamvista 0

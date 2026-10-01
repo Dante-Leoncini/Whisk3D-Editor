@@ -35,15 +35,18 @@ scriptinfo compartido nverts 2
 scriptinfo compartido fuera 0
 simstop
 
-# --- TRAS EL ROUND-TRIP: el grupo vuelve COMPLETO --------------------------
-# El archivo guardo DOS POSICIONES; al cargar, cada una reparte su peso a sus
-# DOS control-points -> 4. Antes volvian 2 y los otros dos quedaban sin peso.
+# --- TRAS EL ROUND-TRIP: el grupo vuelve IGUAL ------------------------------
+# GUARDAR NO CAMBIA LOS DATOS. Los dos control-points de cada lado de la costura
+# tienen datos de punto DISTINTOS (unos estan en el grupo y los otros no), asi
+# que el archivo los guarda como puntos distintos y el grupo vuelve con sus 2,
+# ni uno menos (el bug viejo: volvia incompleto) ni uno mas (el bug siguiente:
+# soldarlos por posicion le regalaba el peso a los del otro lado).
 guardarw3d prueba_costura_v4.w3d
 abrirw3d prueba_costura_v4.w3d
-vertinfo QuadCostura costura 4 4
+vertinfo QuadCostura costura 2 2
 # y lo que ve LUA por grupoVertices() (la via por la que un juego mueve o tine
-# un subconjunto de la malla) son los 4, todos en las dos posiciones del grupo
+# un subconjunto de la malla) son los mismos 2, en las dos posiciones del grupo
 simplay 1
-scriptinfo compartido nverts 4
+scriptinfo compartido nverts 2
 scriptinfo compartido fuera 0
 simstop

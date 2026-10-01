@@ -19,14 +19,17 @@ extern const char* W3dGameFontPng();
 #include "stb/stb_truetype.h"
 
 #include <map>
+#include <set>
 #include <vector>
 #include <math.h>
 #include <string.h>   // memcpy (padding POT del atlas)
 
 namespace gfx = w3dEngine;
 
-// cache: una fuente se hornea UNA vez por sesion ("" = la default de Whisk3D)
+// cache: una fuente se hornea UNA vez por proyecto abierto ("" = la default de Whisk3D)
 static std::map<std::string, w3dui::W3dTextAtlas*> gFuentes;
+// las que usan una textura AJENA (atlas_unico: el id es del cache 2D/3D): al liberar no se borra
+static std::set<w3dui::W3dTextAtlas*> gFuentesPrestadas;
 
 // ---------------------------------------------------------------------------
 //  ATLAS SIEMPRE POT. GLES 1.1 (N95/Symbian) NO soporta texturas non-power-of-two:
@@ -371,6 +374,7 @@ static w3dui::W3dTextAtlas* CargarBitmapJson(const std::string& ruta) {
     if (at->glyphs.empty()) { if (rgba) gfx::FreeImage(rgba); delete at; return NULL; }
     if (atlasUnico) {
         at->tex = texCompartida;               // el MISMO id del atlas del juego
+        gFuentesPrestadas.insert(at);          // el id no es de la fuente: no se borra al liberar
         at->mezcla = gfx::MezclaAlpha;         // RGBA recto (no premultiplicado)
     } else {
         at->tex = SubirAtlasPOT(rgba, w, h, false, &tw, &th);   // NEAREST: pixel-perfect al escalar
@@ -400,6 +404,19 @@ w3dui::W3dTextAtlas* Fuente2DObtener(const std::string& ruta) {
                             : (EsRutaBitmap(ruta) ? CargarBitmapJson(ruta) : HornearTTF(ruta));
     gFuentes[ruta] = at;   // se cachea aunque sea NULL (no reintentar por frame)
     return at;
+}
+
+// cierre del proyecto (ver Fuente2D.h): el arbol ya se destruyo, nadie guarda un atlas
+// (UIOverlay lo pide por ruta en cada dibujo) y la proxima vez se vuelve a cargar solo
+void Fuente2DLiberarTodas() {
+    for (std::map<std::string, w3dui::W3dTextAtlas*>::iterator it = gFuentes.begin(); it != gFuentes.end(); ++it) {
+        w3dui::W3dTextAtlas* at = it->second;
+        if (!at) continue;
+        if (at->tex && gFuentesPrestadas.find(at) == gFuentesPrestadas.end()) gfx::DeleteTexture(at->tex);
+        delete at;
+    }
+    gFuentes.clear();
+    gFuentesPrestadas.clear();
 }
 
 std::string Fuente2DNombre(const std::string& ruta) {

@@ -85,21 +85,17 @@ static float UnidadesPorPixel(Viewport3D* vp, const Vector3& c) {
 // rayo de MUNDO que sale del pixel (lx,ly) (coords locales del viewport): la inversa exacta de ProyectarPunto
 static bool RayoDesdePixel(Viewport3D* vp, float lx, float ly, Vector3& o, Vector3& d) {
     if (vp->width <= 0 || vp->height <= 0) return false;
-    const Vector3 cr = vp->viewRot * Vector3(1, 0, 0);
-    const Vector3 cu = vp->viewRot * Vector3(0, 1, 0);
-    const Vector3 cf = vp->viewRot * Vector3(0, 0, -1);
-    const float aspectR = (float)vp->width / (float)vp->height;
-    const float ndcX = lx / (float)vp->width * 2.0f - 1.0f;
-    const float ndcY = 1.0f - ly / (float)vp->height * 2.0f;
-    const float fRad = fovDeg * 3.14159265f / 180.0f;
-    if (vp->orthographic) {
-        float size = vp->orbitDistance * tanf(fRad * 0.5f); if (size < 0.001f) size = 0.001f;
-        o = vp->viewPos + cr * (ndcX * size * aspectR) + cu * (ndcY * size);
-        d = cf;
+    // la MISMA lente que ProyectarPunto (mirando por la camara: la de la camara, con marco/zoom/pan)
+    const Viewport3D::Lente L = vp->LenteActual();
+    const float z = (L.zoom > 1e-4f) ? L.zoom : 1.0f;
+    const float u = ((lx / (float)vp->width * 2.0f - 1.0f) - L.panX) / z * L.sx;
+    const float v = ((1.0f - ly / (float)vp->height * 2.0f) - L.panY) / z * L.sy;
+    if (L.orto) {
+        o = L.pos + L.der * u + L.arr * v;
+        d = L.fwd;
     } else {
-        const float f = 1.0f / tanf(fRad * 0.5f);
-        o = vp->viewPos;
-        d = (cf + cr * (ndcX * aspectR / f) + cu * (ndcY / f)).Normalized();
+        o = L.pos;
+        d = (L.fwd + L.der * u + L.arr * v).Normalized();
     }
     return true;
 }

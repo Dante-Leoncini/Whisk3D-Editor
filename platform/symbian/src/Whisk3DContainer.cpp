@@ -711,6 +711,8 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 			if (sc == '8'){ W3dLayoutTecla8(); return EKeyWasConsumed; }
 			if (sc == '9'){ if (!W3dOutlinerActivo()) W3dLayoutLockOrbit(); return EKeyWasConsumed; } // 9 = bloquear orbital (NO en el outliner)
 			if (sc == '4'){ return EKeyWasConsumed; } // 4 = nada
+			// 5 sobre el outliner en una vista de RECURSOS = marcar/desmarcar (seleccion multiple sin mouse)
+			if (sc == '5' && W3dOutlinerActivo() && !W3dNewTransformActive()){ W3dOutlinerMarcarToggle(); return EKeyWasConsumed; }
 			if (sc == '5'){ return EKeyWasConsumed; } // 5 = nada
 			// con mouse BT activo el teclado navega como en PC: las
 			// flechas/OK van al panel bajo el cursor (no mueven el mouse)
@@ -863,7 +865,8 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 			if (usc == EStdKeyBackspace){
 				if (gCHeld && !gCArrowUsed){
 					extern GLshort mouseX; extern GLshort mouseY;
-					if (!LayoutDeleteEdit(mouseX, mouseY)) AbrirConfirmarBorrado();
+					// (en una vista de RECURSOS del outliner borra los recursos elegidos, no la escena)
+					if (!LayoutDeleteEdit(mouseX, mouseY) && !W3dOutlinerRecursosBorrar()) AbrirConfirmarBorrado();
 				}
 				gCHeld = EFalse;
 				return EKeyWasConsumed;

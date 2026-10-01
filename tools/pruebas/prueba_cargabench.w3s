@@ -1,0 +1,92 @@
+# ==========================================================================
+#  CARGABENCH: la apertura de un .w3d medida POR FASE (la linea base contra la
+#  que se compara todo lo que acelere la carga) + ESCENASINTETICA: la escena de
+#  "N mallas iguales" (mil arboles) contra la que se mide compartir mallas.
+#  Correr DESDE ESTA CARPETA:
+#    cd <motor>/tools/pruebas
+#    ../../platform/linux/build/whisk3d --script prueba_cargabench.w3s
+#
+#  cargabench abre con vsync y barra de progreso APAGADOS (con vsync, cada swap
+#  de la barra esperaba un vblank: ~80% de la apertura de un archivo chico) y
+#  reloj de PARED. Reparte: montaje / json / objetos (mallas, armatures+clips)
+#  / animaciones de escena / precarga + texturas pendientes / primer render
+#  (subida perezosa a la GPU), mas RSS y cantidad de recursos. Imprime UNA linea
+#  parseable:  [cargabench] total=.. ms json=.. mallas=.. clips=.. tex=.. render=.. rssKB=..
+#  Los TIEMPOS no se asertan (dependen de la maquina). Si se asertan, siempre y
+#  sin pedirlo, que el reparto MIDIO: fase json > 0, mallas > 0 si hay mallas,
+#  clips > 0 si hay armatures, y el lector conto las mismas mallas/armatures/
+#  clips que quedaron en el arbol; y que la linea parseable tiene su formato.
+#  Los asserts de cantidad (mallas N ...) cuentan el ARBOL.
+# ==========================================================================
+ventana 1280 720
+
+# --- 1) la escena sintetica: N mallas IGUALES en un contenedor v4 -----------
+# 40 "Arbol" (esfera UV 32x16) + camara + luz + la coleccion que los agrupa
+escenasintetica 40 prueba_sintetica_v4.w3d
+cargabench prueba_sintetica_v4.w3d 2 mallas 40 objetos 43 armatures 0 clips 0 texturas 0
+# el reparto conto las 40 mallas en su fase y las midio (si no, cargabench mismo falla)
+
+# --- 2) armature con clips + texturas: el reparto los separa ----------------
+# prueba_texcache.w3d: 7 mallas (7 materiales, 2 imagenes distintas) + su camara
+abrirw3d prueba_texcache.w3d
+addarmature
+anim add
+animkey 0 pos 1 0 0 0
+animkey 0 pos 10 0 1 0
+anim add
+guardarw3d prueba_cargabench_v4.w3d
+cargabench prueba_cargabench_v4.w3d 2 mallas 7 armatures 1 clips 2 texturas 2 objetos 9
+
+# --- 3) el TEXTO viejo tambien se reparte (BuildScene + ImportWOBJ en los
+#        mismos acumuladores: json = parsear el texto, mallas = leer/parsear el
+#        .obj + derivados). Si el reparto no ve las 7 mallas, cargabench falla solo.
+cargabench prueba_texcache.w3d 1 mallas 7 texturas 2
+
+# --- 4) cerrar y reabrir NO deja memoria viva --------------------------------
+# ~Mesh no liberaba su geometria de render (vertex/normals/uv/color/faces): cada
+# reapertura del mismo proyecto sumaba toda su geometria al heap (1000 arboles:
+# +27 MB por apertura). fugaKB = heap que sobrevive a cada ciclo cerrar+abrir
+# (glibc mallinfo2, sin lo que el allocator retiene). Tampoco queda el LAYOUT de la
+# apertura anterior (antes huerfano: ~0,2 MB fijos por vuelta, casi todo el panel de
+# propiedades; ver prueba_layoutvida.w3s): lo que sobrevive son un par de KB, y la
+# cota agarra tanto una malla sin liberar (~27 KB cada una) como el layout huerfano.
+cargabench prueba_sintetica_v4.w3d 3 fugakb 32
+# armar y borrar la escena N veces: exactamente nada vivo (sin layout de por medio)
+escenasintetica 40
+heapuso
+escenasintetica 40
+escenasintetica 40
+heapuso max 64
+
+# --- 5) los caches del proyecto (sonidos, imagenes 2D) se vacian al cerrar ---
+# se llenan en la precarga de la apertura; el proyecto de texto con sonidos/
+# carga su bip.wav (sin mixer se cachea NULL igual: cuenta la entrada)
+abrirw3d prueba_sonido.w3d
+cachesproyecto sonidos >=1
+escenasintetica 1
+cachesproyecto sonidos 0 tex2d 0
+# el HUD de este proyecto precarga 2 imagenes 2D (Imagen2D / Slice9): al cerrar se van
+abrirw3d prueba_hud_sustractivo.w3d
+cachesproyecto tex2d 2
+escenasintetica 1
+cachesproyecto sonidos 0 tex2d 0
+
+# --- 6) lo que no tiene que pasar ---------------------------------------------
+# una ruta que no existe FALLA (no mide la nada)
+fail cargabench no_existe_v4.w3d
+# un assert de cantidad mal puesto falla, y la cota de tiempo tambien
+fail cargabench prueba_sintetica_v4.w3d 1 mallas 41
+fail cargabench prueba_sintetica_v4.w3d 1 maxms 0.001
+# un assert desconocido no pasa en silencio
+fail cargabench prueba_sintetica_v4.w3d 1 vertices 3
+# si el reparto deja de medir (el reloj del lector no se instala: todas las fases en
+# 0) cargabench FALLA aunque las cantidades del arbol den bien
+fail cargabench prueba_sintetica_v4.w3d 1 sinreloj 1
+fail cargabench prueba_sintetica_v4.w3d 1 mallas 40 objetos 43 sinreloj 1
+fail cargabench prueba_texcache.w3d 1 sinreloj 1
+# escenasintetica sin cantidad es un error de uso
+fail escenasintetica 0
+# fugakb necesita al menos 3 aperturas (la primera paga lo perezoso y se descarta)
+fail cargabench prueba_sintetica_v4.w3d 2 fugakb 600
+# y un heapuso con un assert que no existe tampoco pasa en silencio
+fail heapuso min 3

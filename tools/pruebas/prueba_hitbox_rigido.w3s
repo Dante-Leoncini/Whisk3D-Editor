@@ -1,0 +1,65 @@
+# ==========================================================================
+#  HITBOX contra CUERPOS RIGIDOS + el evento alTocar de los contactos.
+#  Correr DESDE ESTA CARPETA (ver prueba_hitbox.w3s):
+#    ../../platform/linux/build/whisk3d --script prueba_hitbox_rigido.w3s
+#
+#  Escena prueba_hitbox_rigido.w3d: una Caja dinamica (1x1x1, arranca en y=4; su
+#  script la despierta) cae sobre un Piso estatico. En el camino atraviesa:
+#    - Zona (y 2..3, detectarCuerpos): la zona y la caja reciben entrar 1 y salir 1
+#      (la caja con mio = nil y suyo = Zona: los cuerpos no tienen hitbox propio);
+#    - Ciega (y 1.25..1.75, SIN detectarCuerpos): nada;
+#    - ConFiltro (y 3.3..3.7, detecta cuerpos pero con filtro): nada (los cuerpos
+#      no tienen etiqueta).
+#  Al aterrizar, alTocar en el piso y en la caja (normal de cada uno HACIA el
+#  otro: +Y para el piso, -Y para la caja). Apoyada, la caja se DUERME y el par
+#  sigue "tocandose": dormir no dispara otro alTocar.
+#  prueba_hitbox_rigido_oculta.w3d es la misma escena con la Caja OCULTA: la
+#  fisica la sigue simulando (cae y se apoya), pero un objeto oculto no participa:
+#  ni entra a la Zona ni dispara alTocar (ni en el piso ni en ella).
+# ==========================================================================
+
+abrirw3d prueba_hitbox_rigido.w3d
+hitboxinfo Zona cuerpos 1
+hitboxinfo Ciega cuerpos 0
+
+simplay 60
+scriptinfo compartido zona_entrar 1
+scriptinfo compartido zona_salir 1
+scriptinfo compartido zona_otro Caja
+scriptinfo compartido zona_suyo nil
+scriptinfo compartido caja_entrar 1
+scriptinfo compartido caja_salir 1
+scriptinfo compartido caja_otro Zona
+scriptinfo compartido caja_mio nil
+scriptinfo compartido caja_suyo Zona
+scriptinfo compartido ciega_entrar 0
+scriptinfo compartido confiltro_entrar 0
+scriptinfo compartido piso_tocado Caja
+scriptinfo compartido caja_tocado Piso
+compartidonum piso_tocar 1
+compartidonum caja_tocar 1
+compartidonum piso_ny 0.99 1.01
+compartidonum caja_ny -1.01 -0.99
+posobjeto Caja 0 0.5 0 0.05
+hitboxstats cuerpos 2 contactos 1
+
+# 100 ticks mas: la caja se duerme apoyada y NO vuelve a "tocar"
+simplay 100
+compartidonum piso_tocar 1
+compartidonum caja_tocar 1
+hitboxstats contactos 1
+
+simstop
+posobjeto Caja 0 4 0
+hitboxstats contactos 0
+
+# --- la misma caja OCULTA: se simula, pero no participa (ni hitbox ni alTocar) ---
+abrirw3d prueba_hitbox_rigido_oculta.w3d
+simplay 60
+posobjeto Caja 0 0.5 0 0.05
+scriptinfo compartido zona_entrar 0
+scriptinfo compartido caja_entrar 0
+compartidonum piso_tocar 0
+compartidonum caja_tocar 0
+hitboxstats cuerpos 1 contactos 0
+simstop

@@ -1,0 +1,329 @@
+# ==========================================================================
+#  LAS MALLAS 3D COMO RECURSO: los BORDES (lo que prueba_mallasrecurso.w3s no
+#  miraba). Correr DESDE ESTA CARPETA:
+#    cd <motor>/tools/pruebas
+#    ../../platform/linux/build/whisk3d --script prueba_mallasrecurso_bordes.w3s
+#
+#  Cada seccion es un caso que perdia datos, dejaba memoria colgando o no se
+#  podia deshacer:
+#   A) EXPORTAR a .obj mallas con la edicion PENDIENTE en su recurso (salian sin caras).
+#   B) una HUERFANA sin cargar conserva el material que solo ella usa, y un rename del
+#      material le llega a su PART.
+#   C) dos mallas que INTERCAMBIAN nombres (entradas) al guardar: cada recurso queda con SU
+#      descriptor en el almacen (antes quedaba uno ajeno y el vinculo recargaba encima).
+#   D) mas de 32767 usuarios de una malla: purgar las transitorias no la libera.
+#   E) guardar despues de ABRIR otro proyecto estando en Edit Mode (puntero colgando).
+#   F) publicar desde un objeto no borra lo que OTRO objeto del recurso tenia sin publicar.
+#   G) editar la topologia desde un objeto no mata las vertex anims de los demas.
+#   H) vincular mientras la carga ASYNC de la malla esta EN_VUELO (no falla ni pierde refs).
+#   I) una huerfana cuya entrada falta en el contenedor no impide guardar.
+#   J) dos usuarios con el MISMO cambio terminan en UN recurso (no en dos identicos).
+#   K) seleccionar no deja la edicion de todo en memoria (solo la ACTIVA, y se suelta).
+#   L) Shift+D, o dos primitivas iguales, NO quedan vinculadas al guardar (cada una nace con SU malla 3D).
+#   M) Ctrl+Z / Ctrl+Y de Apply Transform y de Join sobre una malla COMPARTIDA.
+#   N) TODA malla nace con su malla 3D (con nombre): New Copy (la tarjeta), Rename y Folder (la
+#      biblioteca), con undo (y la carpeta de verdad: vacio, espacios, normalizacion).
+#   O) el ORDEN del registro "mallas" no depende de que la activa tenga su edicion en memoria
+#      (abrir y guardar sin tocar nada daba otro proyecto.json).
+#  Escribe en tools/debug.
+# ==========================================================================
+ventana 1280 720
+formatomallas binario
+
+# --- A) EXPORT OBJ con la edicion pendiente ------------------------------------------
+escenasintetica 3 ../debug/mrb_exp.w3d
+abrirw3d ../debug/mrb_exp.w3d
+mallainfo Arbol edicion pendiente usuarios 3
+export ../debug/mrb_exp.obj 0 0
+# 3 esferas de 32x16 = 3 x 512 caras (antes: 0 caras, solo los vertices)
+objcaras ../debug/mrb_exp.obj 1536
+export ../debug/mrb_exp_mod.obj 1 1
+objcaras ../debug/mrb_exp_mod.obj 1536
+# el export devuelve la edicion prestada (no deja las caras de todas en memoria)
+mallainfo Arbol edicion pendiente
+mallainfo Arbol.002 edicion pendiente
+
+# --- B) una HUERFANA sin cargar conserva su material ---------------------------------
+escenasintetica 3 ../debug/mrb_o1.w3d
+abrirw3d ../debug/mrb_o1.w3d
+mallaunica Arbol.001
+mallamaterial Arbol.001 0 MatSolo
+guardarw3d ../debug/mrb_o2.w3d
+abrirw3d ../debug/mrb_o2.w3d
+mallaasignar Arbol.001 Arbol
+guardarw3d ../debug/mrb_o3.w3d
+# o3: Arbol.001 es huerfana y es la UNICA que usa MatSolo
+abrirw3d ../debug/mrb_o3.w3d
+mallasregistro n 2 tiene Arbol.001 cargados 1
+guardarw3d ../debug/mrb_o4.w3d
+abrirw3d ../debug/mrb_o4.w3d
+mallaasignar Arbol.002 Arbol.001
+mallainfo Arbol.002 recurso Arbol.001 material 0 MatSolo
+# un rename del material en una sesion donde la huerfana NO se cargo le llega a su PART
+abrirw3d ../debug/mrb_o3.w3d
+matrenombrar MatSolo MatSola
+guardarw3d ../debug/mrb_o5.w3d
+abrirw3d ../debug/mrb_o5.w3d
+mallaasignar Arbol.002 Arbol.001
+mallainfo Arbol.002 material 0 MatSola
+
+# --- C) dos mallas que intercambian nombres (y entradas) al guardar ------------------
+escenasintetica 2 ../debug/mrb_r1.w3d
+abrirw3d ../debug/mrb_r1.w3d
+mallaunica Arbol.001
+guardarw3d ../debug/mrb_r2.w3d
+abrirw3d ../debug/mrb_r2.w3d
+mallarender
+mallarenombrar Arbol.001 Pino
+mallarenombrar Arbol Arbol.001
+guardarw3d ../debug/mrb_r3.w3d
+# cada recurso quedo con SU descriptor (la clave vieja no quedo huerfana en el almacen)
+recinfo malla mallas/arbol.001.w3db estado LISTO
+recinfo malla mallas/pino.w3db estado LISTO
+recinfo malla mallas/arbol.w3db estado NADA
+mallavert Arbol 0 guardar r0
+malladup Arbol vinculado
+mallainfo @ultimo recurso Arbol.001 usuarios 2 comparte Arbol
+mallavert Arbol 0 delta r0 0 0 0
+abrirw3d ../debug/mrb_r3.w3d
+mallasregistro n 2 tiene Pino tiene Arbol.001 notiene Arbol
+mallainfo Arbol recurso Arbol.001
+mallainfo Arbol.001 recurso Pino
+
+# --- D) mas de 32767 usuarios: purgar las transitorias no libera la malla -------------
+escenasintetica 3 ../debug/mrb_k1.w3d
+abrirw3d ../debug/mrb_k1.w3d
+recinfo malla mallas/arbol.w3db refs 3
+# 32767 objetos mas que la usan (referencias permanentes, sin armar los objetos)
+mallarefs mallas/arbol.w3db 32767
+recinfo malla mallas/arbol.w3db refs 32770
+mallaadquirir mallas/arbol.w3db bloqueante
+recinfo malla mallas/arbol.w3db trefs 1
+purgar
+recinfo malla mallas/arbol.w3db estado LISTO
+recinfo malla mallas/arbol.w3db refs 32770
+mallarefs mallas/arbol.w3db -32767
+recinfo malla mallas/arbol.w3db refs 3
+mallainfo Arbol usuarios 3 vbo compartido
+
+# --- E) guardar tras abrir otro proyecto estando en Edit Mode -------------------------
+escenasintetica 2 ../debug/mrb_g1.w3d
+escenasintetica 1 ../debug/mrb_g2.w3d
+abrirw3d ../debug/mrb_g1.w3d
+selobj Arbol
+mode edit
+abrirw3d ../debug/mrb_g2.w3d
+selobj Arbol
+vgnew G
+guardarw3d ../debug/mrb_g3.w3d
+abrirw3d ../debug/mrb_g3.w3d
+mallainfo Arbol grupos 1
+
+# --- F) publicar desde un objeto no borra lo que OTRO tenia sin publicar --------------
+escenasintetica 2 ../debug/mrb_v1.w3d
+abrirw3d ../debug/mrb_v1.w3d
+selobj Arbol.001
+vgnew Hueso
+mallarender
+mallainfo Arbol.001 grupos 1
+selobj Arbol
+mode edit
+select all
+move 0.5
+mode object
+# el grupo de Arbol.001 se publico al dejar de ser la activa: lo ven los dos y el move tambien
+mallainfo Arbol.001 grupos 1 recurso Arbol usuarios 2
+mallainfo Arbol grupos 1 comparte Arbol.001
+
+# --- G) cambiar la topologia desde un objeto no mata las vertex anims de otro ----------
+escenasintetica 4 ../debug/mrb_va1.w3d
+abrirw3d ../debug/mrb_va1.w3d
+mallava Arbol.003 10
+mallavert Arbol.003 0 guardar va10
+selobj Arbol.001
+mode edit
+select all
+duplicate
+mode object
+# Arbol.003 (animada) se aparto a una copia con la malla ANTERIOR y sigue en su pose
+mallainfo Arbol.003 recurso Arbol.001 usuarios 1 caras 512
+mallavert Arbol.003 0 delta va10 0 0 0
+# los demas ven la edicion (el doble de caras)
+mallainfo Arbol recurso Arbol usuarios 3 caras 1024 comparte Arbol.002
+
+# --- H) vincular mientras la carga ASYNC esta EN_VUELO -------------------------------
+abrirw3d ../debug/mrb_o3.w3d
+mallaadquirir mallas/arbol.001.w3db async
+recinfo malla mallas/arbol.001.w3db estado EN_VUELO
+mallaasignar Arbol.002 Arbol.001
+mallainfo Arbol.002 recurso Arbol.001 usuarios 1
+recinfo malla mallas/arbol.001.w3db refs 2
+pump 1
+purgar
+recinfo malla mallas/arbol.001.w3db refs 1
+undo
+mallainfo Arbol.002 recurso Arbol usuarios 3
+# sin usuarios ni transitorias: la malla se descargo (no quedo una referencia perdida)
+recinfo malla mallas/arbol.001.w3db estado NADA
+
+# --- I) una huerfana cuya entrada falta no impide guardar ----------------------------
+w3dsinentrada ../debug/mrb_o3.w3d ../debug/mrb_o3sin.w3d mallas/arbol.001.w3db
+abrirw3d ../debug/mrb_o3sin.w3d
+mallasregistro n 2 tiene Arbol.001
+guardarw3d ../debug/mrb_o3sin2.w3d
+abrirw3d ../debug/mrb_o3sin2.w3d
+mallasregistro n 1 notiene Arbol.001
+mallainfo Arbol usuarios 3
+
+# --- J) dos usuarios con el MISMO cambio: un solo recurso -----------------------------
+escenasintetica 2 ../debug/mrb_d1.w3d
+abrirw3d ../debug/mrb_d1.w3d
+selobj Arbol
+vgnew G
+selobj Arbol.001
+vgnew G
+mallarender
+guardarw3d ../debug/mrb_d2.w3d
+abrirw3d ../debug/mrb_d2.w3d
+mallasregistro n 1
+mallainfo Arbol grupos 1 comparte Arbol.001
+
+# --- K) seleccionar no deja la edicion de todo en memoria ----------------------------
+escenasintetica 200 ../debug/mrb_sel.w3d
+abrirw3d ../debug/mrb_sel.w3d
+selectall
+activename Arbol.100
+mallarender
+# solo la ACTIVA tiene su edicion en memoria (las demas se miran con la topologia del recurso)
+mallainfo Arbol.100 edicion cargada
+mallainfo Arbol.050 edicion pendiente
+mallainfo Arbol.199 edicion pendiente
+selobj Arbol.050
+mallarender
+# la que dejo de ser la activa suelta su edicion
+mallainfo Arbol.100 edicion pendiente
+mallainfo Arbol.050 edicion cargada
+deselectall
+mallarender
+# guardar sin cambios sigue copiando la entrada tal cual (proyecto.json cambia: la sesion
+# recuerda el objeto activo)
+guardarw3d ../debug/mrb_sel2.w3d
+w3diguales ../debug/mrb_sel.w3d ../debug/mrb_sel2.w3d mallas/
+
+# --- L) Shift+D y dos primitivas iguales NO se vinculan al guardar (cada una nace con su malla 3D) --
+# (cada caso arranca ABRIENDO la escena base: abrir rearma el layout. Un ReiniciarEscena del
+# harness sin abrir deja el panel de Properties atado a mallas liberadas hasta el proximo dibujo)
+escenasintetica 1 ../debug/mrb_base.w3d
+abrirw3d ../debug/mrb_base.w3d
+add cube
+mallainfo Cubo recurso Cubo usuarios 1
+malladup Cubo copia
+mallainfo @ultimo recurso Cubo.001 usuarios 1
+add cube
+mallainfo Cubo.002 recurso Cubo.002 usuarios 1
+guardarw3d ../debug/mrb_l1.w3d
+mallasregistro n 4
+mallainfo Cubo usuarios 1 nocomparte Cubo.001 nocomparte Cubo.002
+mallavert Cubo.001 0 guardar l0
+selobj Cubo
+mode edit
+select all
+move 0.5
+mode object
+mallavert Cubo.001 0 delta l0 0 0 0
+abrirw3d ../debug/mrb_l1.w3d
+mallasregistro n 4
+mallainfo Cubo usuarios 1 nocomparte Cubo.001 nocomparte Cubo.002
+# (y un archivo VIEJO sigue juntando sus sueltas iguales: prueba_mallasrecurso.w3s, seccion G)
+
+# --- M) Ctrl+Z / Ctrl+Y de Apply Transform y Join sobre una malla COMPARTIDA ----------
+abrirw3d ../debug/mrb_base.w3d
+add cube
+mallavert Cubo 0 guardar c0
+malladup Cubo vinculado
+selobj Cubo
+objscale 2 1 1
+apply scale
+mallainfo Cubo recurso Cubo.001 usuarios 1
+mallavert Cubo 0 delta c0 -1 0 0
+mallavert @ultimo 0 delta c0 0 0 0
+undo
+mallainfo Cubo recurso Cubo usuarios 2
+mallavert Cubo 0 delta c0 0 0 0
+redo
+mallarender
+mallainfo Cubo recurso Cubo.001 usuarios 1
+mallavert Cubo 0 delta c0 -1 0 0
+mallavert @ultimo 0 delta c0 0 0 0
+undo
+redo
+mallavert Cubo 0 delta c0 -1 0 0
+# JOIN
+abrirw3d ../debug/mrb_base.w3d
+add cube
+malladup Cubo vinculado
+add cube
+selobj Cubo.002
+selname Cubo
+activename Cubo
+join
+mallainfo Cubo caras 12 usuarios 1
+mallainfo Cubo.001 caras 6
+undo
+mallainfo Cubo caras 6 usuarios 2 comparte Cubo.001
+mallainfo Cubo.002 caras 6
+redo
+mallarender
+mallainfo Cubo caras 12 usuarios 1
+mallainfo Cubo.001 caras 6
+fail mallainfo Cubo.002
+
+# --- N) TODA malla nace con su malla 3D: New Copy, Rename y Folder, con undo --------------
+abrirw3d ../debug/mrb_base.w3d
+add cube
+mallarender
+mallainfo Cubo recurso Cubo usuarios 1
+mallamaterial Cubo 0 MatX
+mallanueva Cubo
+mallainfo Cubo recurso Cubo.001
+undo
+# el Ctrl+Z deshace el New Copy (vuelve a su malla 3D de antes), no el cambio de material
+mallainfo Cubo recurso Cubo material 0 MatX
+redo
+mallainfo Cubo recurso Cubo.001 material 0 MatX
+# el RENAME (la biblioteca: el mismo paso que el renombrar en linea del outliner)
+mallarenombrar Cubo Caja
+mallainfo Cubo recurso Caja
+undo
+mallainfo Cubo recurso Cubo.001
+redo
+mallainfo Cubo recurso Caja
+# el nombre ya tomado se uniquifica (con el aviso de siempre)
+add cube
+mallarenombrar Cubo.001 Caja
+mallainfo Cubo.001 recurso Caja.001
+# la CARPETA (la biblioteca): se normaliza, vacio y solo espacios = sin carpeta
+mallacarpeta Cubo.001 Rocas//Grandes/
+mallainfo Cubo.001 carpeta Rocas/Grandes
+mallacarpeta Cubo.001 __
+mallainfo Cubo.001 carpeta -
+undo
+mallainfo Cubo.001 carpeta Rocas/Grandes
+mallacarpeta Cubo.001 -
+mallainfo Cubo.001 carpeta -
+
+# --- O) el orden del registro no depende de la edicion materializada de la activa ------
+# Arbol (el PRIMER usuario de su malla) activa y con su edicion en memoria al guardar; al
+# reabrir se guarda sin dibujar (edicion pendiente): el registro sale en el mismo orden
+escenasintetica 3 ../debug/mrb_ord.w3d
+abrirw3d ../debug/mrb_ord.w3d
+mallaunica Arbol.001
+selobj Arbol
+mallarender
+mallainfo Arbol edicion cargada
+guardarw3d ../debug/mrb_ord1.w3d
+abrirw3d ../debug/mrb_ord1.w3d
+mallainfo Arbol edicion pendiente
+guardarw3d ../debug/mrb_ord2.w3d
+w3diguales ../debug/mrb_ord1.w3d ../debug/mrb_ord2.w3d
+formatomallas proyecto

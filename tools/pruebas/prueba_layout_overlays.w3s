@@ -1,0 +1,38 @@
+# ===========================================================================
+#  EL OJO "SHOW OVERLAYS" DEL VIEWPORT 3D VIAJA CON EL LAYOUT
+#
+#  El lector del layout (ApplyViewport3DProps) entendia "showOverlays", pero
+#  el guardado no lo escribia: un proyecto guardado con los overlays APAGADOS
+#  volvia a abrir con ellos prendidos, y como dar Play respeta ese tilde, el
+#  juego del editor tambien volvia a mostrar grilla, gizmos y contornos.
+#  Ahora va con las demas opciones del viewport: solo si difiere del default
+#  (prendido), asi un layout comun sale igual que antes.
+#
+#  vpoverlays: el primer viewport 3D del layout ('publicado' = el valor que
+#  publica al dibujarse, el que miran los gizmos, la grilla y las curvas).
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_layout_overlays.w3s
+# ===========================================================================
+ventana 1280 720
+vpoverlays es 1 publicado 1
+
+# --- 1) apagado: se escribe en el layout y vuelve apagado al reabrir
+vpoverlays off es 0 publicado 0
+guardarw3d /tmp/w3d_prueba_layout_overlays.w3d
+jsontiene /tmp/w3d_prueba_layout_overlays.w3d showOverlays 1
+abrirw3d /tmp/w3d_prueba_layout_overlays.w3d
+vpoverlays es 0 publicado 0
+
+# --- 2) el Play del editor lo respeta: no vuelve a prenderlos al jugar ni al parar
+juego on
+simplay 3
+vpoverlays es 0 publicado 0
+juego off
+vpoverlays es 0 publicado 0
+
+# --- 3) prendido (el default) no se escribe y vuelve prendido
+vpoverlays on es 1 publicado 1
+guardarw3d /tmp/w3d_prueba_layout_overlays.w3d
+jsontiene /tmp/w3d_prueba_layout_overlays.w3d showOverlays 0
+abrirw3d /tmp/w3d_prueba_layout_overlays.w3d
+vpoverlays es 1 publicado 1

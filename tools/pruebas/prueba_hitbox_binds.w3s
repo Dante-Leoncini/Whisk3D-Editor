@@ -1,0 +1,45 @@
+# ==========================================================================
+#  HITBOX: los binds lua (hitboxActivo / setHitboxActivo / setHitboxTam /
+#  hitboxDentro / hitboxTocando) y que el Stop devuelva lo que el script cambio.
+#  Correr DESDE ESTA CARPETA (ver prueba_hitbox.w3s):
+#    ../../platform/linux/build/whisk3d --script prueba_hitbox_binds.w3s
+#
+#  Escena prueba_hitbox_binds.w3d: un hitbox Zona 2x2x2 en el origen con el
+#  contador ('zona') y hitbox_binds.lua; el mismo Movil a paso fijo de
+#  prueba_hitbox (adentro en los ticks 10..17). El script de la zona:
+#    t12: consulta todo y la APAGA   -> t13 alSalir
+#    t14: la prende                   -> t15 alEntrar
+#    t20: la agranda a 20 de ancho    -> t21 alEntrar (el movil esta en x=2.95)
+#  En 30 ticks: entrar 3 (t10, t15, t21), quedarse 13 (t11, t12, t16, t17,
+#  t22..t30), salir 2 (t13, t18).
+# ==========================================================================
+
+abrirw3d prueba_hitbox_binds.w3d
+hitboxinfo Zona activo 1 tam 2 2 2 duenio Zona
+
+simplay 12
+hitboxinfo Zona tocando 1 activo 0
+scriptinfo compartido dentro12 1
+scriptinfo compartido dentroNombre12 Movil
+scriptinfo compartido tocaMovil12 si
+scriptinfo compartido tocaCaja12 si
+scriptinfo compartido tocaLejos12 no
+scriptinfo compartido movilDentro12 1
+scriptinfo compartido movilActivo12 si
+scriptinfo compartido activo12 no
+
+# t13: apagada -> sale (sin estar ya adentro de nada)
+simplay 1
+hitboxinfo Zona tocando 0 dentro 0 activo 0
+scriptinfo compartido zona_salir 1
+scriptinfo compartido zona_salio Movil
+
+simplay 17
+hitboxinfo Zona activo 1 tam 20 2 2 tocando 1 dentro 1
+scriptinfo compartido zona_entrar 3
+scriptinfo compartido zona_quedarse 13
+scriptinfo compartido zona_salir 2
+
+# Stop devuelve el hitbox como lo dejo el usuario (el script lo agrando)
+simstop
+hitboxinfo Zona activo 1 tam 2 2 2 tocando 0

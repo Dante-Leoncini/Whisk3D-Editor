@@ -3,12 +3,14 @@
 //  viewport del editor y el runtime de un juego compilado.
 // ============================================================================
 #include "EscenaRender.h"
+#include "objects/CameraBase.h"   // g_renderMarco: el cuadro de la imagen (lo miden los Recortes)
 #include "gfx/w3dGraphics.h"
 #include "objects/Objects.h"
 #include "objects/Mesh.h"        // w3dLoteStamp + los diferidos (calcomanias / luces aditivas)
 #include "objects/Particulas.h"  // particulas diferidas (billboards translucidos)
 #include "objects/Light.h"        // MAX_LIGHTS: apagar los GL lights antes del pase
 #include "render/OpcionesRender.h"// RenderType + la luz de los modos de preview
+#include "objects/Niebla.h"        // la niebla arranca y termina apagada en cada pase
 #include <math.h>
 
 namespace gfx = w3dEngine;
@@ -38,6 +40,9 @@ void W3dEncuadreMarco(float aspectoVista, float aspectoDeclarado, float margen,
 void W3dEscena3DProyeccion(const W3dVista3D& v) {
     gfx::MatrixMode(gfx::Projection);
     gfx::LoadIdentity();
+    // el cuadro de la imagen adentro del viewport (con el zoom / pan de inspeccion del editor): ver g_renderMarco
+    g_renderMarco[0] = v.panX; g_renderMarco[1] = v.panY;
+    g_renderMarco[2] = v.marcoNX * v.zoom; g_renderMarco[3] = v.marcoNY * v.zoom;
 
     // la LENTE con la que se dibuja de verdad: de aca saca el objeto Culling sus
     // 6 planos. Se publica el frustum de la IMAGEN (el aspecto declarado cuando
@@ -139,6 +144,7 @@ void W3dEscena3DPasada() {
     // dibujo antes (chrome del editor, HUD del frame anterior) pudo tocar GL crudo.
     gfx::Invalidate();
     w3dLoteStamp++;              // sello del pase: las Collection con lote marcan a sus horneadas
+    W3dNieblaReiniciar();               // la NIEBLA la prende el objeto Niebla del arbol (desde ahi en adelante)
     W3dLucesPrepase(SceneCollection);   // las luces ANTES de la geometria (el fogonazo ilumina todo)
     SceneCollection->Render();
     W3dLucesPrepaseFin();
@@ -148,6 +154,7 @@ void W3dEscena3DPasada() {
     W3dLucesDibujarPendientes();
     // PARTICULAS translucidas al final, con el z-buffer de la escena ya escrito.
     W3dParticulasDibujarPendientes();
+    W3dNieblaReiniciar();               // nada de niebla para lo que se dibuja despues (overlays, HUD, UI)
 }
 
 // ---------------------------------------------------------------------------

@@ -1,0 +1,52 @@
+# ==========================================================================
+#  LOS DESCRIPTORES DE UN ANIMSET QUE NO CARGO NO SE ACUMULAN EN EL ALMACEN
+#  Correr DESDE ESTA CARPETA:
+#    cd <motor>/tools/pruebas
+#    ../../platform/linux/build/whisk3d --script prueba_animsets_olvido.w3s
+#
+#  Un .w3da roto deja en el almacen un descriptor FALLO (nadie lo referencia:
+#  la carga que falla no suma la referencia). Al cerrar el proyecto ese FALLO
+#  no puede bloquear la entrada homonima del proyecto siguiente. Antes se lo
+#  CORRIA de clave ("#olvidadoN:<entrada>") y nunca se borraba: cada proyecto
+#  roto que se cerraba dejaba un descriptor zombie mas, y cada cierre le volvia
+#  a agregar otro prefijo a los anteriores (ids cada vez mas largos). Lo mismo
+#  hacia el GUARDADO con el FALLO de una entrada que reescribe ("#guardadoN:").
+#  Ahora, sin referencias, se OLVIDA (como el FALLO de una malla del proyecto).
+#    A) abrir tres veces el proyecto roto y despues el sano: en el almacen queda
+#       SOLO el animset del sano;
+#    B) el proyecto roto sin sus armatures, guardado: el animset roto queda como
+#       huerfano (se conserva tal cual, con su misma entrada) y el FALLO de esa
+#       entrada se olvida en vez de correrse a '#guardado...'.
+# ==========================================================================
+
+ventana 640 480
+personajesmin /tmp/w3d_animolvido 2
+guardarw3d /tmp/w3d_animolvido/sano.w3d
+animsetromper /tmp/w3d_animolvido/sano.w3d /tmp/w3d_animolvido/roto.w3d corte
+
+# --- A) el proyecto roto tres veces: UN solo FALLO a la vez (el del proyecto abierto) ---
+abrirw3d /tmp/w3d_animolvido/roto.w3d
+animsetarm Personaje nocargo 1 clips 0
+animsetinfo vivos 0 descriptores 1
+abrirw3d /tmp/w3d_animolvido/roto.w3d
+animsetinfo vivos 0 descriptores 1
+abrirw3d /tmp/w3d_animolvido/roto.w3d
+animsetinfo vivos 0 descriptores 1
+# el sano despues: solo SU animset, ningun '#olvidado...' colgando
+abrirw3d /tmp/w3d_animolvido/sano.w3d
+animsetarm Personaje nocargo 0 compartido 1 clips 2
+animsetarm Personaje.001 nocargo 0 compartido 1 clips 2
+animsetinfo vivos 1 refs 2 descriptores 1
+animsetrec animaciones/personaje.w3da refs 2
+animsetrec #olvidado1:animaciones/personaje.w3da nada
+
+# --- B) el guardado que reescribe la entrada rota (huerfana) olvida su FALLO ---
+abrirw3d /tmp/w3d_animolvido/roto.w3d
+animsetinfo vivos 0 descriptores 1
+animsetborrar Personaje
+animsetborrar Personaje.001
+guardarw3d /tmp/w3d_animolvido/sin.w3d
+animsetinfo vivos 0 descriptores 0 registro 1
+# y el sano se sigue abriendo entero despues de todo eso
+abrirw3d /tmp/w3d_animolvido/sano.w3d
+animsetinfo vivos 1 refs 2 descriptores 1

@@ -1,0 +1,51 @@
+# ==========================================================================
+#  TODA MALLA ES UN RECURSO (FASE 4b, C2), camino por camino: la malla que nace (una primitiva, un import
+#  OBJ o glTF, un duplicado, una cara separada, un modificador aplicado, un archivo que se abre) tiene su
+#  recurso desde el cuadro en que nace. 'mallasrecurso estricto' cuenta las mallas SIN recurso ANTES de
+#  listar la biblioteca (listarla le crea el suyo a la que no lo tiene: sin 'estricto' la prueba arreglaba
+#  antes de verificar) y corre solo lo que corre un cuadro del editor.
+#  (FBX: no hay un .fbx sintetico en esta carpeta. Lua: lo que un script crea jugando se va con el Stop.)
+# ==========================================================================
+ventana 1280 720
+escenadefecto
+mallasrecurso estricto n 1
+mallainfo Cubo recurso Cubo
+
+# ---- el Add de una primitiva ----
+add cylinder
+mallasrecurso estricto n 2
+
+# ---- importar OBJ ----
+import dosmats.obj
+mallasrecurso estricto
+
+# ---- importar glTF ----
+importgltf prueba_capas_uv.glb
+mallasrecurso estricto
+
+# ---- duplicar: Shift+D = un recurso NUEVO, Alt+D = el MISMO ----
+malladup Cubo copia
+mallasrecurso estricto
+malladup Cubo vinculado
+mallasrecurso estricto
+
+# ---- SEPARAR una cara: el objeto nuevo tiene su malla 3D ----
+selobj Cubo
+mode edit
+selmode face
+select none
+select face 0
+separate
+mode object
+mallasrecurso estricto
+
+# ---- APLICAR un modificador ----
+selobj Cubo
+modadd mirror
+modapply
+mallasrecurso estricto
+
+# ---- guardar y abrir: cada malla sigue con su recurso ----
+guardarw3d prueba_mallasrecurso_caminos_rt1.w3d
+abrirw3d prueba_mallasrecurso_caminos_rt1.w3d
+mallasrecurso estricto

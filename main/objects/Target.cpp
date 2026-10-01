@@ -17,7 +17,8 @@ bool Target::IsMyAncestor(Object* node, Object* possibleAncestor) {
 // Busca y asigna el target según targetName
 void Target::ReloadTarget(Object* me) {
     // std::cout << "buscando target : " << targetName << std::endl;
-    Object* FindTarget = FindObjectByName(SceneCollection, targetName);
+    // por SCOPE: adentro de una instancia de prefab, primero lo suyo (ver W3dBuscarNombreDesde en Objects.h)
+    Object* FindTarget = W3dBuscarNombreDesde(me, targetName);
     if (!FindTarget) return;
 
     // 1) Evitar apuntarse a sí mismo

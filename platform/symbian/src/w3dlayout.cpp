@@ -776,23 +776,46 @@ TBool W3dOutlinerActivo() {
             viewPortActive->ViewportKind() == 2) ? ETrue : EFalse;
 }
 
-// "1" sobre el outliner: entra al modo MOVER; si ya esta moviendo, confirma (toggle).
+// "1" sobre el outliner: entra al modo MOVER; si ya esta moviendo, confirma (toggle). En las dos vistas: el de
+// la escena (ModoMover) y el de la biblioteca (moviendoRec, lo elegido viaja por las carpetas)
 void W3dOutlinerMoverToggle() {
     if (!W3dOutlinerActivo()) return;
     Outliner* out = (Outliner*)viewPortActive;
-    if (out->ModoMover()) out->MoverConfirmar();
-    else                  out->MoverIniciar();
+    if (out->ModoMover())       out->MoverConfirmar();
+    else if (out->moviendoRec)  out->MoverRecConfirmar();
+    else                        out->MoverIniciar();
 }
 
 // "2"/"3" sobre el outliner: 2 = ocultar/mostrar (visible), 3 = visibilidad de RENDER (renderizable) del
 // objeto activo. El estado vive en el Core (ObjActivo); el redibujo ya lo puso el container en cualquier tecla.
 void W3dOutlinerToggleVisible() {
     if (!W3dOutlinerActivo()) return;
+    // en una vista de RECURSOS (mallas, materiales...) no hay ojo: el 2 no toca la escena
+    if (((Outliner*)viewPortActive)->vista != W3D_VISTA_ESCENA) return;
     extern void ChangeVisibilityObj();
     ChangeVisibilityObj();
 }
+// "5" sobre el outliner en una vista de RECURSOS: marca/desmarca la fila del cursor (la SELECCION
+// MULTIPLE sin mouse: se marcan varias y el 1 / Actions las mueve o borra juntas). C NO suelta las
+// marcas: C + flecha es undo/redo y el toque de C BORRA lo elegido (W3dOutlinerRecursosBorrar, con
+// confirmacion); se sueltan con "Deselect All" del menu de acciones. En la vista Escena no hace nada
+// (EFalse: el 5 sigue su camino).
+TBool W3dOutlinerMarcarToggle() {
+    if (!W3dOutlinerActivo()) return EFalse;
+    Outliner* out = (Outliner*)viewPortActive;
+    if (out->vista == W3D_VISTA_ESCENA) return EFalse;
+    return out->MarcarCursor() ? ETrue : EFalse;
+}
+// toque de C (soltada sin flecha) sobre el outliner en una vista de RECURSOS: borra los recursos
+// elegidos (huerfanos, con confirmacion), como el Supr de PC. EFalse = vista Escena: el C borra
+// los objetos seleccionados como siempre.
+TBool W3dOutlinerRecursosBorrar() {
+    if (!W3dOutlinerActivo()) return EFalse;
+    return ((Outliner*)viewPortActive)->TeclaBorrarRecursos() ? ETrue : EFalse;
+}
 void W3dOutlinerToggleRender() {
     if (!W3dOutlinerActivo()) return;
+    if (((Outliner*)viewPortActive)->vista != W3D_VISTA_ESCENA) return;   // idem: sin camara en los recursos
     extern void ChangeRenderizableObj();
     ChangeRenderizableObj();
 }

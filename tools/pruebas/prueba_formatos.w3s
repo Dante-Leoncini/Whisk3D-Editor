@@ -1,0 +1,92 @@
+# ==========================================================================
+#  LOS TESTS DE FORMATO AUTOCONTENIDOS, ADENTRO DE LA SUITE.
+#  Correr DESDE ESTA CARPETA:
+#    cd <motor>/tools/pruebas
+#    ../../platform/linux/build/whisk3d --script prueba_formatos.w3s
+#
+#  Cada comando arma su caso, lo guarda/abre, asserta y limpia (ver
+#  test/W3dScript.cpp). Existian, pero ninguno corria en correr_todas.sh: una
+#  regresion del .w3dm, del contenedor o de las marcas SHARP/SEAM pasaba sin que
+#  nada se pusiera rojo (asi se colaron cuatro que ya estaban rotos: un
+#  destructor con un puntero sin inicializar, una costura que el escritor perdia
+#  con dos puntos en la misma posicion, un aviso que ya no correspondia y una
+#  captura del log que el lector pisaba). Son la aceptacion de todo cambio de
+#  formato de malla: tienen que seguir verdes.
+#
+#  Los que trabajan "sobre la escena del usuario" (la coleccion activa no es la
+#  raiz) van precedidos de `escenadefecto`: la escena de arrancar sin archivo,
+#  armada por la MISMA funcion que usa el arranque.
+#
+#  w3dm (T1.9), quadsave (4/5, 6 y 8) y w3dcotas (1/2/3) usan el CORPUS DE ORO
+#  (formato/corpus, gitignoreado: un clon limpio no lo tiene). Sin la carpeta,
+#  esas partes se SALTEAN con un aviso "SIN CORPUS:" y el resto corre igual
+#  (correr_todas.sh cuenta las salteadas). Si la carpeta esta pero le falta un
+#  archivo, FALLA diciendo cual. W3D_CORPUS_OBLIGATORIO=1 hace que su falta
+#  sea una falla. Escriben en tools/debug.
+# ==========================================================================
+ventana 1280 720
+
+# --- ESTOS TESTS MIDEN EL .w3dm DE TEXTO: buscan sus bloques adentro de los .w3d
+#     que guardan, fabrican un .w3dm "del futuro", etc. Desde la malla binaria
+#     (.w3db) el formato por defecto del guardado es binario, asi que aca se FIJA
+#     texto para todo el proceso. La malla binaria tiene su propia prueba
+#     (prueba_w3db.w3s), que ademas corre en binario los que no miran el texto. ---
+formatomallas texto
+
+# --- el .w3dm (texto) y sus caminos de perdida --------------------------------
+w3dm
+perdida
+w3dmf1
+escenadefecto
+w3dmf2
+w3dmf3
+w3dmf4
+w3dmf5
+w3dmf6
+w3dmf7
+w3dmf8
+w3dmf9
+escenadefecto
+w3dmf10
+
+# --- la geometria por el flujo real del editor (guardar / reabrir) -----------
+quadsave
+
+# --- el contenedor (zip) y las cotas del lector --------------------------------
+contenedor
+ziphard
+zipidx
+montaje
+w3dcotas
+
+# --- marcas SHARP/SEAM a traves de las operaciones de edicion ----------------
+escenadefecto
+dupmarcas
+escenadefecto
+sepmarcas
+escenadefecto
+delmarcas
+escenadefecto
+modmarcas
+escenadefecto
+movmarcas
+escenadefecto
+joinmarcas
+escenadefecto
+mirmarcas
+escenadefecto
+extmarcas
+escenadefecto
+vamarcas
+
+# --- sin el corpus (clon limpio): las partes que lo usan se SALTEAN con aviso
+#     y el resto de cada test corre igual. Simulado, para probar ese camino
+#     tambien en la maquina que tiene el corpus: w3dm (T1.9) + quadsave (4/5, 6
+#     y 8) + w3dcotas (1/2/3) = 5 partes salteadas, ni una mas ni una menos ----
+simularsincorpus 1
+w3dm
+quadsave
+w3dcotas
+simularsincorpus 0 salteadas 5
+fail simularsincorpus 2
+fail simularsincorpus 1 salteadas 5

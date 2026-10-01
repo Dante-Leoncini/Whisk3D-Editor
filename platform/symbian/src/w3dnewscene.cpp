@@ -36,6 +36,7 @@
 #include "w3dlog.h"
 #include "ViewPorts/LayoutInput.h" // ScenePick3D compartido
 #include "objects/Collection.h"
+#include "io/CambiosProyecto.h"   // W3dCambiosFoto: la escena de arranque es lo "guardado" (el '*' y el cartel)
 #include <GLES/gl.h>
 #include <math.h>
 
@@ -105,6 +106,10 @@ void W3dNewSceneInit() {
     if (!CollectionActive) {
         CollectionActive = SceneCollection;
     }
+    // LO NO GUARDADO (io/CambiosProyecto.h): la escena de arranque esta "guardada" (no hay nada que perder
+    // todavia), como en PC (main.cpp). Sin esta foto, hasta el primer guardar o abrir nada tenia '*' y
+    // Opciones > Salir cerraba sin el cartel. (Si despues se abre un .w3d, la apertura toma la suya.)
+    W3dCambiosFoto();
     w3dLogf("nuevoModelo: escena default (hijos: %d)",
         SceneCollection ? (TInt)SceneCollection->Childrens.size() : -1);
 }

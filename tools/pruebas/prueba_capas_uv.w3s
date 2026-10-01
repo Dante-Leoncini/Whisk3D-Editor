@@ -1,0 +1,45 @@
+# ===========================================================================
+#  CAPAS DE TEXTURA CON UV PROPIO (TexLayer::uvMapa / Mesh::uvExtra / bloque RUVX)
+#
+#  Un cuadrado (prueba_capas_uv.glb, hecho por hl2-w3d/tools/fixtures_pruebas.py)
+#  con DOS capas UV: TEXCOORD_0 repite el damero 4 veces, TEXCOORD_1 cubre el
+#  cuadrado una vez con un degrade ("lightmap"). El material trae la capa en
+#  extras.w3d_capas: {textura, mezcla 3 = Multiply 2x, uv 1}.
+#
+#  Lo que se verifica:
+#   1) el importador glTF trae TEXCOORD_1 como capa UV extra del render
+#      (meshinfo: uvExtra=[0,4]) y la capa del material con su UV y mezcla
+#   2) el round-trip por el contenedor v4 (.w3db con RUVX + "uv" del JSON del
+#      material) conserva las dos cosas
+#   3) matcapa edita la capa como lo haria la tarjeta Material
+#
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_capas_uv.w3s
+# ===========================================================================
+selobj Cubo
+delete
+importgltf prueba_capas_uv.glb
+loadtex
+meshinfo
+matcapa capas_piso capas 1
+matcapa capas_piso 0 es uv 1 mezcla 3 on 1
+
+# --- round-trip v4 ---
+guardarw3d /tmp/w3d_prueba_capas_uv.w3d
+abrirw3d /tmp/w3d_prueba_capas_uv.w3d
+loadtex
+meshinfo
+matcapa capas_piso capas 1
+matcapa capas_piso 0 es uv 1 mezcla 3 on 1
+
+# --- editar la capa como el panel: otra mezcla, la UV base, apagar, borrar ---
+matcapa capas_piso 0 mezcla 1
+matcapa capas_piso 0 es mezcla 1
+matcapa capas_piso 0 uv 0
+matcapa capas_piso 0 es uv 0
+matcapa capas_piso 0 off
+matcapa capas_piso 0 es on 0
+matcapa capas_piso 0 del
+matcapa capas_piso capas 0
+matcapa capas_piso add capas_lightmap.png
+matcapa capas_piso capas 1

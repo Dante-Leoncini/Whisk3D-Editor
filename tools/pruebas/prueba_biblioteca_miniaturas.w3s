@@ -1,0 +1,91 @@
+# prueba_biblioteca_miniaturas.w3s — FASE 4b: las MINIATURAS de ESCENAS, JUEGOS y PREFABS en la cuadricula de
+# la biblioteca (las de texturas, materiales y mallas estan en prueba_biblioteca.w3s)
+#
+#  Criterios de aceptacion:
+#   - una ESCENA (o un juego) se ve desde SU camara ACTIVA: la de la raiz activa y la que guarda el contexto
+#     de las otras (no la primera camara que aparezca en su arbol);
+#   - un PREFAB se ve ENCUADRADO de frente, aunque tenga una camara adentro; uno vacio no tiene miniatura
+#     (se dibuja el icono de su tipo);
+#   - la miniatura del CACHE (la que se DIBUJA en la celda: 'outmini ... celda' lee la pantalla) se REHACE
+#     cuando la escena se edita (cada paso de undo) y cuando cambia su camara activa (que no apila undo);
+#   - una raiz sin cargar (perezosa) no se carga por su miniatura;
+#   - no van al .w3d.
+ventana 1280 720
+
+# ---- 0) la escena por defecto: su camara mira al cubo (el medio de la miniatura esta pintado) ----
+escenadefecto
+outvista biblioteca
+outcuadricula 1
+outmini Scene si centro colorvivo
+outmini Scene si celda centro colorvivo
+
+# ---- A) una escena que mira por su camara ACTIVA: "Frente" ve el cubo, "Atras" le da la espalda ----
+raiznueva escena Otra
+raizcamara Frente 0 0 8
+add cube
+raizcamara Atras 0 0 -8
+camactiva set Atras
+raizcontexto camara Atras
+raizabrir Scene
+outvista biblioteca
+outcuadricula 1
+# (la activa de Otra es Atras, que no ve nada; la primera de su arbol, Frente, si veria el cubo)
+outmini Otra si vacia
+outmini Otra si celda vacia
+# elegir otra camara activa no apila un paso de undo: la miniatura se rehace igual
+raizabrir Otra
+camactiva set Frente
+raizabrir Scene
+outvista biblioteca
+outmini Otra si centro colorvivo
+outmini Otra si celda centro colorvivo
+
+# ---- B) la del CACHE se rehace con cada EDICION: esconder el cubo de la escena la vacia; Ctrl+Z la vuelve ----
+outvista escena
+outclick Cubo
+outmenu Hide/Show
+objvis Cubo 0
+outvista biblioteca
+outmini Scene si celda vacia
+undo
+objvis Cubo 1
+outmini Scene si celda centro colorvivo
+
+# ---- C) un PREFAB: encuadrado de frente (su camara no cuenta); uno vacio no tiene ----
+raiznueva prefab Caja
+add cube
+raizcamara Mirilla 0 0 -8
+raiznueva prefab Vacio
+raizabrir Scene
+outvista biblioteca
+outmini Caja si centro colorvivo
+outmini Caja si celda centro colorvivo
+outmini Vacio no
+
+# ---- D) no van al .w3d (con 1 miniatura en el cache y con 3, los mismos bytes); al abrir, las raices
+#      perezosas no se cargan por su miniatura ----
+guardarw3d prueba_biblioteca_miniaturas_v4.w3d
+abrirw3d prueba_biblioteca_miniaturas_v4.w3d
+outvista biblioteca
+outcuadricula 1
+outmini Scene si celda centro colorvivo
+outmini Otra no
+outmini Caja no
+# (guardar carga las perezosas solo para escribirlas y las vuelve a soltar: siguen sin miniatura)
+guardarw3d prueba_biblioteca_miniaturas_rt1.w3d
+outmini Otra no
+# abrirla la carga: desde ahi tiene la suya (desde su camara)
+raizabrir Otra
+raizabrir Caja prefab
+raizabrir Scene
+outvista biblioteca
+outmini Otra si celda centro colorvivo
+outmini Caja si celda centro colorvivo
+guardarw3d prueba_biblioteca_miniaturas_rt2.w3d
+w3diguales prueba_biblioteca_miniaturas_v4.w3d prueba_biblioteca_miniaturas_rt1.w3d
+w3diguales prueba_biblioteca_miniaturas_rt1.w3d prueba_biblioteca_miniaturas_rt2.w3d
+
+# ---- lo que no tiene que pasar ----
+fail outmini Scene si celda vacia
+fail outmini Vacio si
+fail outmini Otra si nada

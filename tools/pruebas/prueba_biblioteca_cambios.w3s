@@ -1,0 +1,78 @@
+# prueba_biblioteca_cambios.w3s — FASE 4b: lo NO GUARDADO (el '*') y el cartel "Se perderan los cambios en:"
+#
+#  Criterios de aceptacion:
+#   - cada recurso y cada raiz (escena / juego / prefab) sabe si tiene cambios sin guardar: '*' en su fila
+#     de la biblioteca, en el selector de raiz de la barra, en el selector de malla 3D de Properties, en el
+#     nombre del proyecto de la tarjeta Archivo (y en el titulo de la ventana);
+#   - guardar limpia TODAS las marcas; abrir tambien; un Ctrl+Z despues de guardar vuelve a ensuciar;
+#   - al CERRAR (o abrir / crear otro proyecto) con algo sin guardar aparece el cartel con la lista
+#     (icono + tipo + nombre) y "Guardar y salir" / "Salir sin guardar" / "Cancelar"; sin cambios no
+#     aparece; en el harness no se muestra solo (el comando 'cartel' lo prende a proposito).
+ventana 1280 720
+
+# ---- 0) un proyecto recien guardado: nada sucio ----
+escenadefecto
+selobj Cubo
+matnew
+matsuelto Piel
+guardarw3d prueba_biblioteca_cambios_v4.w3d
+abrirw3d prueba_biblioteca_cambios_v4.w3d
+cambios n 0
+cambiosmarca 0
+cambioraiz Scene 0
+cartel salir noabre
+outvista biblioteca
+outfila Piel sucio 0
+
+# ---- A) editar la ESCENA: la raiz queda sucia ----
+outvista escena
+outdobleclick Cubo
+outescribir Caja
+cambioraiz Scene 1
+cambios n 1 tiene Scene
+cambiosmarca 1
+raizbarra outliner Scene*
+# ---- B) editar RECURSOS: su fila con '*' ----
+recrenombrar materiales Piel Cuero Cuero
+cambiosucio materiales Cuero 1
+cambiosucio materiales Material 0
+outvista biblioteca
+outfila Cuero sucio 1
+outfila Material sucio 0
+mallarenombrar Caja Roca
+cambiosucio mallas Roca 1
+selobj Caja
+propstab 3
+propsmalla selector Roca*
+cambios tiene Scene tiene Cuero tiene Roca
+
+# ---- C) el CARTEL: cancelar / seguir sin guardar / guardar y seguir ----
+cartel salir abre
+cartelresponder cancelar salio 0
+cambios tiene Cuero
+cartel salir abre
+cartelresponder seguir salio 1
+cartel abrir abre
+cartelresponder guardar abrio 1
+cambios n 0
+cambiosmarca 0
+cambioraiz Scene 0
+cambiosucio mallas Roca 0
+outfila Cuero sucio 0
+propstab 3
+propsmalla selector Roca
+# un Ctrl+Z despues de guardar vuelve a ensuciar
+undo
+cambios tiene Cubo
+cambiosmarca 1
+redo
+
+# ---- D) guardar y abrir limpian las marcas ----
+guardarw3d prueba_biblioteca_cambios_rt1.w3d
+cambios n 0
+recmover materiales Cuero Pieles
+# (la carpeta de un recurso es del arbol de carpetas: "Biblioteca: Carpetas")
+cambios n 1
+abrirw3d prueba_biblioteca_cambios_rt1.w3d
+cambios n 0
+cartel nuevo noabre

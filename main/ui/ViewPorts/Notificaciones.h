@@ -17,5 +17,8 @@ void NotificacionesTick(float dt);                     // 1x por frame: expira l
 void NotificacionesRender(int screenW, int screenH);   // dibuja encima de todo
 bool NotificacionesClick(int mx, int my);              // 'x' de error: cierra. true si consumio
 void NotificacionesMotion(int mx, int my);             // hover de la 'x' (gris->blanca)
+// las que se ven ahora (no los hints): alguna contiene 'texto'? Para las pruebas (el harness: 'notif')
+bool NotificacionVisible(const std::string& texto);
+void NotificacionesLimpiar();                          // las cierra todas (una prueba arranca de cero)
 
 #endif

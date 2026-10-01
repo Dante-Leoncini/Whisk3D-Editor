@@ -1,0 +1,81 @@
+# ==========================================================================
+#  ESCENAS 3D EN EL PLAY DEL EDITOR: cambiarEscena() con escenas 3D del proyecto.
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_escenas_play.w3s
+#
+#  Dos JUEGOS 3D (W3dRaices.h): el del bloque ("Scene", con DirA y el script
+#  prueba_escenas_a.lua: un juego por tener scripts) y "Nivel2" (JugB con
+#  prueba_escenas_b.lua, creado con "New Game"). La A mueve DirA
+#  en X y a los 3 ticks pide la B; la B sube JugB en Y y, la primera vez, a los 4
+#  ticks pide volver a la A. Cada escena pedida arranca DE CERO (su inicio() otra vez
+#  y sus objetos como los dejo el usuario), igual que el juego compilado que la
+#  recarga de su entrada; compartido() sobrevive a los cambios. Durante el Play no se
+#  puede cambiar de escena a mano, y el Stop vuelve a la escena del Play con TODAS
+#  las escenas como estaban.
+#    t1..t3  A (DirA x 1..3)            -> pide Nivel2
+#    t4..t7  B (JugB y 1..4)            -> pide Scene
+#    t8..t10 A de cero (DirA x 1..3)    -> pide Nivel2
+#    t11..   B de cero (JugB y 1..)
+# ==========================================================================
+
+ventana 1280 720
+escenadefecto
+raizinfo n 1 activa Scene
+add cube
+objname DirA
+raizscript DirA prueba_escenas_a.lua
+raiznueva juego Nivel2
+add cube
+objname JugB
+raizscript JugB prueba_escenas_b.lua
+raizabrir Scene
+
+# ---- el Play: A -> B -> A -> B ----
+simplay 2
+raizinfo activa Scene
+scriptinfo compartido a_n 2
+# el cambio pedido en el tick 3 se aplica al final de ESE tick
+simplay 1
+raizinfo activa Nivel2
+scriptinfo compartido a_inicios 1
+scriptinfo compartido b_inicios 1
+objat JugB 0 0 0 0.001
+# con la partida andando no se cambia de escena a mano
+raizabrir Scene falla
+simplay 1
+objat JugB 0 1 0 0.001
+scriptinfo compartido b_n 1
+# t5..t7: la B vuelve a la A, que arranca de cero (DirA donde lo dejo el usuario)
+simplay 3
+raizinfo activa Scene
+scriptinfo compartido b_n 4
+scriptinfo compartido a_inicios 2
+objat DirA 0 0 0 0.001
+# t8..t10: la A otra vez a la B, que tambien arranca de cero
+simplay 3
+raizinfo activa Nivel2
+scriptinfo compartido a_n 3
+scriptinfo compartido b_inicios 2
+objat JugB 0 0 0 0.001
+simplay 2
+scriptinfo compartido b_n 2
+objat JugB 0 2 0 0.001
+
+# ---- el Stop: vuelve a la escena del Play y TODAS quedan como las dejo el usuario ----
+simstop
+raizinfo activa Scene
+objat DirA 0 0 0 0.001
+raizabrir Nivel2
+objat JugB 0 0 0 0.001
+raizabrir Scene
+
+# ---- lo mismo despues de guardar y abrir (Nivel2 se carga de su entrada al pedirla) ----
+guardarw3d /tmp/w3d_f6_escenas_play.w3d
+abrirw3d /tmp/w3d_f6_escenas_play.w3d
+raizinfo n 2 activa Scene cargada Nivel2 0
+simplay 4
+raizinfo activa Nivel2 cargada Nivel2 1
+objat JugB 0 1 0 0.001
+simstop
+raizinfo activa Scene
+objat DirA 0 0 0 0.001

@@ -1,0 +1,142 @@
+# ==========================================================================
+#  ESCENAS / JUEGOS / PREFABS: los BORDES que encontro la revision de la fase 6.
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_escenas_bordes.w3s
+#
+#  Se prueba:
+#    A) borrar la escena del BLOQUE cuando lo que queda es un JUEGO: el juego pasa a ser la del
+#       bloque (no aparece una escena "Scene" fantasma al reabrir ni sus objetos repetidos, y el
+#       juego compilado arranca en el juego);
+#    B) un prefab creado ANTES que una escena: el registro queda en el orden del proyecto y
+#       re-guardar sin cambios da los mismos bytes;
+#    C) guardar no deja cargadas las escenas que no se abrieron (carga perezosa): el guardado las
+#       carga para escribirlas y las vuelve a soltar; la que se abrio sigue cargada;
+#    D) borrar una escena desde la vista Scenes del outliner tiene Ctrl+Z / Ctrl+Y (vuelve con sus
+#       objetos, en su lugar) y el cartel dice que se borra una escena con sus objetos (no un
+#       "recurso huerfano"); tambien la del bloque (al deshacer vuelve a serlo).
+# ==========================================================================
+
+ventana 1280 720
+
+# ==== A) borrar la escena del bloque: queda un juego ====
+escenadefecto
+add cube
+objname CuboEscena
+raiznueva juego Nivel
+add cube
+objname CuboJuego
+raizborrar Scene
+raizinfo n 1 bloque Nivel tipo juego
+guardarw3d /tmp/w3d_f6_rbordes/a.w3d
+entradaexiste /tmp/w3d_f6_rbordes/a.w3d escenas/nivel.w3de 0
+abrirw3d /tmp/w3d_f6_rbordes/a.w3d
+raizinfo n 1 activa Nivel bloque Nivel tipo juego inicial -
+raizinfo objetos 1
+objat CuboJuego 0 0 0 0.001
+# re-guardar sin cambios: los mismos bytes
+guardarw3d /tmp/w3d_f6_rbordes/a2.w3d
+w3diguales /tmp/w3d_f6_rbordes/a.w3d /tmp/w3d_f6_rbordes/a2.w3d
+# ...y si la inicial era el juego que pasa a ser la del bloque, no queda nombrada dos veces
+escenadefecto
+raiznueva juego Nivel
+raizinicial Nivel
+raizabrir Nivel
+raizborrar Scene
+raizinfo n 1 bloque Nivel inicial -
+
+# ==== B) un prefab antes que una escena: el orden del proyecto ====
+escenadefecto
+raiznueva prefab Enemigo
+add cube
+objname Cuerpo
+raiznueva escena Intro
+add cube
+objname Caja
+guardarw3d /tmp/w3d_f6_rbordes/b.w3d
+abrirw3d /tmp/w3d_f6_rbordes/b.w3d
+guardarw3d /tmp/w3d_f6_rbordes/b2.w3d
+w3diguales /tmp/w3d_f6_rbordes/b.w3d /tmp/w3d_f6_rbordes/b2.w3d
+
+# ==== C) el guardado no deja cargado lo que no se abrio ====
+escenadefecto
+raizmenu 3d New Scene
+add cube
+objname CajaB
+raizmenu 3d New Scene
+add cube
+objname CajaC
+raizabrir Scene
+guardarw3d /tmp/w3d_f6_rbordes/c.w3d
+abrirw3d /tmp/w3d_f6_rbordes/c.w3d
+raizinfo cargada Scene.001 0 cargada Scene.002 0
+guardarw3d /tmp/w3d_f6_rbordes/c2.w3d
+raizinfo cargada Scene.001 0 cargada Scene.002 0
+w3diguales /tmp/w3d_f6_rbordes/c.w3d /tmp/w3d_f6_rbordes/c2.w3d
+# la que se abre queda cargada; la que se vuelve a leer de su entrada nueva esta entera
+raizabrir Scene.001
+raizinfo objetos 1
+objat CajaB 0 0 0 0.001
+raizabrir Scene
+guardarw3d /tmp/w3d_f6_rbordes/c3.w3d
+raizinfo cargada Scene.001 1 cargada Scene.002 0
+raizabrir Scene.002
+objat CajaC 0 0 0 0.001
+
+# ==== D) borrar una escena desde la vista Scenes: con Ctrl+Z ====
+escenadefecto
+raizmenu 3d New Scene
+add cube
+objname CajaB
+add cube
+objname CajaB2
+raizmenu 3d New Prefab
+raizabrir Scene
+outvista escenas
+outclick Scene.001
+outteclapc supr
+outconfirmar si no Delete the orphan resource
+raizinfo n 2
+undo
+raizinfo n 3 cargada Scene.001 1
+redo
+raizinfo n 2
+undo
+raizabrir Scene.001
+raizinfo objetos 2
+objat CajaB2 0 0 0 0.001
+raizabrir Scene
+# (el registro del modelo, sin UI: borrar y deshacer la del BLOQUE desde otra raiz)
+raizabrir Scene.001
+outvista escenas
+recborrar escenas Scene
+raizinfo n 2 bloque Scene.001
+undo
+raizinfo n 3 bloque Scene
+guardarw3d /tmp/w3d_f6_rbordes/d.w3d
+abrirw3d /tmp/w3d_f6_rbordes/d.w3d
+raizinfo n 3 bloque Scene
+raizabrir Scene.001
+objat CajaB2 0 0 0 0.001
+# borrada y guardada: no va al archivo; el Ctrl+Z (despues del guardado) la devuelve de memoria y el
+# guardado siguiente la vuelve a escribir entera
+raizabrir Scene
+outvista escenas
+recborrar escenas Scene.001
+raizinfo n 2
+guardarw3d /tmp/w3d_f6_rbordes/e.w3d
+entradaexiste /tmp/w3d_f6_rbordes/e.w3d escenas/scene.001.w3de 0
+undo
+raizinfo n 3
+guardarw3d /tmp/w3d_f6_rbordes/e2.w3d
+entradaexiste /tmp/w3d_f6_rbordes/e2.w3d escenas/scene.001.w3de 1
+abrirw3d /tmp/w3d_f6_rbordes/e2.w3d
+raizinfo n 3
+raizabrir Scene.001
+objat CajaB2 0 0 0 0.001
+# el paso de undo se queda con el arbol de la escena borrada: cerrar el proyecto con el adentro lo libera
+raizabrir Scene
+outvista escenas
+recborrar escenas Scene.001
+raizinfo n 2
+escenadefecto
+raizinfo n 1

@@ -70,6 +70,10 @@ void LayoutModoElegir(int modo);
 void LayoutMenuContexto3D(int mx, int my);
 
 bool LayoutClickUI(int mx, int my);
+// DOBLE CLICK / DOBLE TAP (renombrar en linea en el outliner) y PULSACION LARGA (tactil: agarrar una fila del
+// outliner para arrastrarla, o su menu contextual al soltar sin mover). true = lo uso alguien.
+bool LayoutDobleClickUI(int mx, int my);
+bool LayoutPulsacionLargaUI(int mx, int my);
 
 // click en la barra del UV editor, por ROL (BarRolUV). Publica para que el comando de test
 // 'uvbar' (W3dScript) ejercite el MISMO camino que el click real.

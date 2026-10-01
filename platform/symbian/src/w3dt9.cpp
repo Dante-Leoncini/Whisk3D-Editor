@@ -27,8 +27,8 @@ void (*W3dT9IDEBorrar)()       = 0;   // backspace en el IDE
 bool (*W3dT9IDEInicioPalabra)() = 0;  // true si el cursor del IDE esta al inicio de palabra (modo Abc)
 
 static bool IDEEdit() { return (W3dT9IDEEditando && W3dT9IDEEditando()) ? true : false; }
-static void SinkInsertar(int c) { if (IDEEdit()) { if (W3dT9IDEInsertar) W3dT9IDEInsertar(c); } else if (g_textFieldActivo) g_textFieldActivo->InsertChar(c); }
-static void SinkBorrar()        { if (IDEEdit()) { if (W3dT9IDEBorrar) W3dT9IDEBorrar(); }     else if (g_textFieldActivo) g_textFieldActivo->Backspace(); }
+static void SinkInsertar(int c) { if (IDEEdit()) { if (W3dT9IDEInsertar) W3dT9IDEInsertar(c); } else if (g_textFieldActivo) { TextFieldSeguirFoco(); g_textFieldActivo->InsertChar(c); } }
+static void SinkBorrar()        { if (IDEEdit()) { if (W3dT9IDEBorrar) W3dT9IDEBorrar(); }     else if (g_textFieldActivo) { TextFieldSeguirFoco(); g_textFieldActivo->Backspace(); } }
 
 // modo: 0=Abc (1a mayuscula) / 1=abc / 2=ABC / 3=123 (numerico)
 static int   gModo = 0;

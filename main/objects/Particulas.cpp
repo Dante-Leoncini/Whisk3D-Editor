@@ -105,6 +105,9 @@ static void SincronizarConfig(Particulas* p) {
     s.colorFinR = p->colorFinal[0]; s.colorFinG = p->colorFinal[1]; s.colorFinB = p->colorFinal[2];
     s.alphaFinMul = p->colorFinal[3];
     s.flipFps = p->flipFps; s.flipUnaVez = p->flipUnaVez;
+    s.aparecer = p->aparecer;
+    s.cerca0 = p->fundeCerca[0]; s.cerca1 = p->fundeCerca[1];
+    s.lejos0 = p->fundeLejos[0]; s.lejos1 = p->fundeLejos[1];
     s.forma = p->forma; s.estiramiento = p->estiramiento;
     s.estelaPuntos = p->estelaPuntos; s.estelaPaso = p->estelaPaso; s.grosorLinea = p->grosorLinea;
 }
@@ -347,6 +350,7 @@ void W3dParticulasDibujarPendientes() {
         if (!tex) continue;   // sin textura no hay nada que dibujar (el decode fallido se cachea)
         unsigned t[1] = { tex };
         p->sys.SetTexturas(t, 1);
+        p->sys.ojoX = g_renderCamPos.x; p->sys.ojoY = g_renderCamPos.y; p->sys.ojoZ = g_renderCamPos.z;
         for (size_t k = 0; k < p->sys.parts.size(); k++) {
             const w3dEngine::Particle& q = p->sys.parts[k];
             PartOrdenada e;
@@ -481,5 +485,8 @@ bool W3dParticulasAnimando() {
 static void EmitirHook(Object* o, int n) {
     if (o && o->getType() == ObjectType::particulas) ((Particulas*)o)->Emitir(n);
 }
-struct ParticulasHookReg { ParticulasHookReg() { W3dParticulasEmitirHook = EmitirHook; } };
+static void ActivoHook(Object* o, bool activo) {
+    if (o && o->getType() == ObjectType::particulas) ((Particulas*)o)->activo = activo;
+}
+struct ParticulasHookReg { ParticulasHookReg() { W3dParticulasEmitirHook = EmitirHook; W3dParticulasActivoHook = ActivoHook; } };
 static ParticulasHookReg gParticulasHookReg;

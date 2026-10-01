@@ -5,6 +5,8 @@
 #include "edit/PolyMesh.h"      // la malla de POLIGONOS sobre la que corre el stack (compartida con el Boolean)
 #include "edit/BooleanMod.h"    // el CSG del modificador Boolean (BSP sobre poligonos)
 #include "edit/WeightPaint.h"   // WeightPaintAsegurarMapa: vive aca (la usa la CARGA, no el pincel)
+#include "io/W3dMallaBin.h"     // W3dMallaBinIndices (el index buffer canonico del .w3db) + materializar la edicion
+#include "objects/MallaRecurso.h" // la malla como recurso: las puertas al render anotan la malla editada
 #include "animation/SkeletalAnimation.h" // SkinearMesh (Apply del modificador Armature: hornear la pose)
 #include "animation/Animation.h"         // CurrentFrame
 #include "animation/VertexAnimation.h"   // RemapVertexAnims: remapear la vertex anim al editar la topologia
@@ -38,12 +40,25 @@ namespace gfx = w3dEngine;
 //  incluye EditMesh.h. Siguen siendo miembros de Mesh (declarados en Mesh.h).
 // ============================================================================
 
+// ============================================================================
+//  LA EDICION PENDIENTE SE MATERIALIZA EN LA PUERTA. Una malla de un RECURSO compartido
+//  (objects/MallaRecurso.h) no tiene sus caras/capas/aristas en memoria hasta que alguien
+//  las pide: toda operacion que las LEE para reconstruir la malla (GenerarRender,
+//  CalcularBordes, capas, mesh parts, normales, Join) las pide aca primero. Sin esto una de
+//  esas operaciones reconstruiria la malla desde listas VACIAS y la dejaria sin caras, en
+//  silencio (ver carga-malla, "construir perezosamente nunca crashea; rompe en silencio").
+// ============================================================================
+static inline void AsegurarEdicion(Mesh* m) {
+    if (m && !m->edicionPendiente.empty()) W3dMallaBinMaterializarEdicion(m);
+}
+
 // EDITAR el render IN-PLACE (rapido, tiempo real, N95): empuja las posiciones del edit +
 // la capa activa (uv/color) a los arrays de render SIN realloc ni re-merge ni re-triangular.
 // Para mover verts / pintar. NO sirve si cambia la TOPOLOGIA (ahi va GenerarRender).
 void Mesh::RefrescarRender() {
     geoVersion++;                             // la geometria editable cambio (ver Mesh.h: lo lee el Boolean)
     { extern bool g_mallasEditadas; g_mallasEditadas = true; }
+    W3dMallaMarcarEditada(this);              // la malla de un RECURSO: el editor la publica (MallaRecurso.h)
     if (edit) DesinstanciarDatos(W3DMD_POS);  // COW: EmpujarPosiciones escribe vertex[] (MallaDatos.h)
     if (edit) { edit->EmpujarPosiciones();  // posiciones (autoritativas en el edit) -> render
                 edit->RefrescarOverlay(); } // lineas/puntos del overlay desde pos[]
@@ -58,6 +73,9 @@ void Mesh::RefrescarRender() {
 // cage (cubre todos los llamadores: render, undo, weight paint, tests).
 void Mesh::EnsureEdit() {
     if (noEditable) return;
+    // la edicion de una malla que usa un RECURSO (o que se cargo como el juego) todavia no
+    // esta en memoria: la jaula se arma sobre sus caras y aristas, asi que primero se leen
+    if (!edicionPendiente.empty()) W3dMallaBinMaterializarEdicion(this);
     if (!edit) { edit = new EditMesh(); edit->Construir(this); }
 }
 
@@ -2181,6 +2199,7 @@ void Mesh::RenderEditOverlay() {
 // nuevos. NO rebuildea: el caller hace LiberarCapas + PoblarCapas + GenerarRender al final (recompone normales
 // limpias de la geo mergeada y preserva UV/color desde las capas rearmadas del render).
 void Mesh::AnexarMallaTransformada(Mesh* otra, const Matrix4& M) {
+    AsegurarEdicion(this); AsegurarEdicion(otra);   // las caras de las DOS mallas (recurso compartido)
     DesinstanciarDatos(W3DMD_TODO);  // COW: la op de edicion muta la geometria (MallaDatos.h)
     if (!otra || otra->vertexSize <= 0 || !otra->vertex) return;
     const int base = vertexSize;          // primer indice de los verts nuevos
@@ -2323,6 +2342,9 @@ void Mesh::AnexarMallaTransformada(Mesh* otra, const Matrix4& M) {
 // resetear el location/rotation/scale del objeto. No cambia la topologia (B es biyectiva salvo escala 0).
 void Mesh::AplicarMatriz(const Matrix4& B) {
     if (!vertex || vertexSize <= 0) return;
+    // COW: las normales se reescriben EN EL LUGAR (las posiciones las copia W3dMoverVerts): si
+    // son las de un recurso compartido, la matriz de ESTE objeto no puede tocar a los demas
+    DesinstanciarDatos(W3DMD_NOR);
     {
         // SHARP / SEAM: sus claves son los BYTES de la posicion, asi que hornear la
         // matriz las deja apuntando a donde ya no hay ningun punto. El bug del dueno:
@@ -2490,6 +2512,10 @@ static bool AristaEnPlanoMirror(Mesh* m, int ra, int rb){
 
 // arma la PolyMesh desde faces3d: deduplica los verts de render por POSICION (posRep) -> verts topologicos.
 void ConstruirPolyMesh(Mesh* m, PolyMesh& W) {
+    // el juego compilado carga el .w3db SIN los bloques de edicion (faces3d/posRep): si esta
+    // malla los necesita (un modificador geometrico, o es el target de un Boolean) se leen ACA,
+    // una sola vez, de su entrada. En el editor nunca hay nada pendiente.
+    if (!m->edicionPendiente.empty()) W3dMallaBinMaterializarEdicion(m);
     const int nV = m->vertexSize;
     const bool hayRep = ((int)m->posRep.size() == nV);
     std::map<int,int> repToTopo; std::vector<int> gpuToTopo(nV, -1);
@@ -2689,6 +2715,24 @@ static void ScrewPoly(PolyMesh& W, int axis, float angleDeg, float height, int s
     if (merge) SoldarPolyPorPos(W); // suelda polos + costura del torno 360
 }
 
+// el modificador CORRE en el stack (arma poligonos y genera malla)? enEdit = la malla esta en Edit Mode.
+static bool ModificadorGeneraMalla(const Modifier* md, bool enEdit) {
+    if (!md) return false;
+    if (md->tipo == ModifierType::Armature) return false;   // skinning: deform por-frame en el render, no gen
+    if (md->tipo == ModifierType::CullingTri) return false; // PVS: override de INDICES en el render, no gen (W3dPVSSincronizar)
+    if (!md->mostrarViewport) return false;                 // OFF -> NUNCA se calcula
+    if (enEdit && !md->mostrarEdit) return false;           // OFF -> se saltea SOLO en Edit Mode
+    return true;
+}
+
+bool W3dStackGeneraMalla(const Mesh* m) {
+    if (!m) return false;
+    const bool enEdit = ((const Object*)m == (const Object*)g_editMesh);
+    for (size_t i = 0; i < m->modificadores.size(); i++)
+        if (ModificadorGeneraMalla(m->modificadores[i], enEdit)) return true;
+    return false;
+}
+
 // aplica el STACK de modificadores sobre poligonos. render=true usa los niveles/steps de RENDER (sino los de
 // viewport). Devuelve false si nada corrio. outSmooth -> normales smooth. (free function: miembros publicos del Mesh)
 static bool Mesh_AplicarStack(Mesh* m, bool render, PolyMesh& W, bool& outSmooth) {
@@ -2696,19 +2740,14 @@ static bool Mesh_AplicarStack(Mesh* m, bool render, PolyMesh& W, bool& outSmooth
     // modificador marca las caras que genera (W.Fsmooth) y las que ya estaban conservan su flag.
     outSmooth = false;
     const bool enEdit = ((Object*)m == g_editMesh); // en Edit Mode se saltean los mods con mostrarEdit=false
-    { bool alguno=false; for (size_t i=0;i<m->modificadores.size();i++){ Modifier* md=m->modificadores[i];
-        if (md->tipo == ModifierType::Armature) continue; // el Armature NO genera malla (deform por-frame en el render)
-        if (md->tipo == ModifierType::CullingTri) continue; // el PVS no genera malla: solo elige INDICES (override en el render)
-        if (!md->mostrarViewport) continue; if (enEdit && !md->mostrarEdit) continue; alguno=true; break; }
-      if (!alguno) return false; }
+    // ni el Armature (deforma por frame en el render) ni el PVS (elige INDICES) generan malla: un stack
+    // que solo tiene esos, o todo apagado, no arma poligonos (W3dStackGeneraMalla, la MISMA regla)
+    if (!W3dStackGeneraMalla(m)) return false;
     ConstruirPolyMesh(m, W);
     if (W.F.empty() && W.E.empty()) return false; // sin caras ni aristas -> nada que modificar
     int aplicados = 0;
     for (size_t i=0; i<m->modificadores.size(); i++){ Modifier* mod = m->modificadores[i];
-        if (mod->tipo == ModifierType::Armature) continue; // skinning: deform por-frame en el render, no gen
-        if (mod->tipo == ModifierType::CullingTri) continue; // PVS: override de indices, no gen (W3dPVSSincronizar)
-        if (!mod->mostrarViewport) continue;        // OFF -> NUNCA se calcula
-        if (enEdit && !mod->mostrarEdit) continue;  // OFF -> se saltea SOLO en Edit Mode
+        if (!ModificadorGeneraMalla(mod, enEdit)) continue; // Armature/PVS/apagado: no corre en el stack
         aplicados++;
         if (mod->tipo == ModifierType::SubdivisionSurface){
             int lvl = (int)((render ? mod->subRenderLevel : mod->subLevel) + 0.5f);
@@ -3048,24 +3087,12 @@ static void PVSArmarOverride(Mesh* m, const unsigned* tris, size_t nLista, bool 
 void Mesh::CalcularAABBSolo() {
     edges.clear(); bordesBuf.clear(); posRep.clear(); vertsAgrupados = 0;
     if (!vertex || vertexSize <= 0) { aabbOk = false; return; }
-    const int nV = vertexSize;
-    float cgx = 0, cgy = 0, cgz = 0;
-    aabbMin = Vector3(vertex[0], vertex[1], vertex[2]);
-    aabbMax = aabbMin;
-    for (int i = 0; i < nV; i++) {
-        float vx = vertex[i*3], vy = vertex[i*3+1], vz = vertex[i*3+2];
-        cgx += vx; cgy += vy; cgz += vz;
-        if (vx < aabbMin.x) aabbMin.x = vx; if (vx > aabbMax.x) aabbMax.x = vx;
-        if (vy < aabbMin.y) aabbMin.y = vy; if (vy > aabbMax.y) aabbMax.y = vy;
-        if (vz < aabbMin.z) aabbMin.z = vz; if (vz > aabbMax.z) aabbMax.z = vz;
-    }
-    centroGeom = Vector3(cgx / nV, cgy / nV, cgz / nV);
-    float rg2 = 0.0f;
-    for (int i = 0; i < nV; i++) {
-        float dx = vertex[i*3] - centroGeom.x, dy = vertex[i*3+1] - centroGeom.y, dz = vertex[i*3+2] - centroGeom.z;
-        float d2 = dx*dx + dy*dy + dz*dz; if (d2 > rg2) rg2 = d2;
-    }
-    radioGeom = sqrtf(rg2);
+    // el centro es el promedio de TODOS los vertices (sin posRep). Mismo codigo que usa el
+    // .w3db para hornearlo (W3dCalcularGeomStats): tiene que dar los mismos bits.
+    W3dGeomStats st;
+    W3dCalcularGeomStats(vertex, vertexSize, NULL, st);
+    aabbMin = st.aabbMin; aabbMax = st.aabbMax;
+    centroGeom = st.centro; radioGeom = st.radio;
     aabbOk = true;
 }
 
@@ -3587,7 +3614,15 @@ void Mesh::AplicarModificadorActivo() {
 // MESH PARTS (materialsGroup): crear / borrar / reordenar. Antes eran metodos de
 // Mesh (core); son edicion (editor), asi que viven aca como funciones libres.
 // ===================================================
+// LAS LISTAS DE LA MALLA (mesh parts, capas, grupos) SON DATO DE LA MALLA: si es de un RECURSO
+// compartido (objects/MallaRecurso.h), tocarlas en Modo Objeto (las tarjetas de Properties) edita
+// el recurso. Se anota la malla como editada y el tick del editor la publica YA: sin esto el cambio
+// quedaba solo en ese objeto y el proximo que publicara el recurso (salir de Edit Mode en otro
+// usuario) lo borraba sin aviso. No-op para una malla suelta.
+static inline void ListaDeMallaCambio(Mesh* m) { W3dMallaMarcarEditada(m); }
+
 int NuevoMeshPart(Mesh* m) {
+    ListaDeMallaCambio(m);
     MaterialGroup g; // name "Mesh", material NULL = usa el material por defecto
     // nombre UNICO dentro de la malla: las PARTES tambien entran a la regla
     // ("nada con el mismo nombre"; antes dos partnew daban dos "Mesh")
@@ -3600,6 +3635,8 @@ int NuevoMeshPart(Mesh* m) {
 // Borra el mesh part 'idx'. Las caras huerfanas pasan al ANTERIOR (idx-1, o al que quede en 0 si era
 // el primero). SIEMPRE queda >=1 mesh part (no borra el ultimo). Remapea los indices de arriba.
 void BorrarMeshPart(Mesh* m, int idx) {
+    AsegurarEdicion(m);   // reasigna las caras de la parte: tienen que estar en memoria
+    ListaDeMallaCambio(m);
     int n = (int)m->materialsGroup.size();
     if (n <= 1) return;                 // siempre tiene que haber al menos 1
     if (idx < 0 || idx >= n) return;
@@ -3617,6 +3654,8 @@ void BorrarMeshPart(Mesh* m, int idx) {
 // mueve el mesh part 'idx' una posicion (dir: -1 sube / +1 baja) intercambiandolo con el vecino. Cambia el ORDEN
 // del materialsGroup = ORDEN DE DIBUJADO. Remapea faces3d.mat de los 2 intercambiados.
 void MoverMeshPart(Mesh* m, int idx, int dir) {
+    AsegurarEdicion(m);   // remapea las caras: tienen que estar en memoria
+    ListaDeMallaCambio(m);
     int n = (int)m->materialsGroup.size();
     int j = idx + dir;
     if (idx < 0 || idx >= n || j < 0 || j >= n) return;
@@ -3633,6 +3672,8 @@ void MoverMeshPart(Mesh* m, int idx, int dir) {
 // son edicion (editor), asi que viven aca como funciones libres sobre Mesh*.
 // ===================================================
 void DuplicarUVMapActivo(Mesh* m) {
+    AsegurarEdicion(m);   // (pendiente, PoblarCapas inventaria una capa del render)
+    ListaDeMallaCambio(m);
     m->PoblarCapas();
     if (m->uvMapActivo < 0 || m->uvMapActivo >= (int)m->uvMaps.size()) return;
     UVMap* src = m->uvMaps[m->uvMapActivo];
@@ -3643,6 +3684,8 @@ void DuplicarUVMapActivo(Mesh* m) {
 }
 
 void DuplicarColorLayerActivo(Mesh* m) {
+    AsegurarEdicion(m);
+    ListaDeMallaCambio(m);
     m->PoblarCapas();
     if (m->colorActivo < 0 || m->colorActivo >= (int)m->colorLayers.size()) return;
     ColorLayer* src = m->colorLayers[m->colorActivo];
@@ -3661,7 +3704,9 @@ void DuplicarColorLayerActivo(Mesh* m) {
 // (la 2da puerta del bug de W3dRenameDest; la 1ra es MeshGeoUndo::AplicarA, que tambien
 // destruye y recrea estas capas). La red de seguridad esta igual en W3dDestResolver.
 void BorrarUVMapActivo(Mesh* m) {
+    AsegurarEdicion(m);
     if ((int)m->uvMaps.size() <= 1) return;
+    ListaDeMallaCambio(m);
     int i = m->uvMapActivo; if (i < 0 || i >= (int)m->uvMaps.size()) return;
     UndoCapturarMallaGeo(m); // Ctrl+Z: snapshot pre-borrado de la capa
     delete m->uvMaps[i]; m->uvMaps.erase(m->uvMaps.begin() + i);
@@ -3677,7 +3722,9 @@ void MoverUVMapActivo(Mesh* m, int dir) {
     UndoMoverCapaMalla(m, W3dRenameDest::UVMap, m->uvMapActivo, m->uvMapActivo + dir);
 }
 void BorrarColorLayerActivo(Mesh* m) {
+    AsegurarEdicion(m);
     if ((int)m->colorLayers.size() <= 1) return;
+    ListaDeMallaCambio(m);
     int i = m->colorActivo; if (i < 0 || i >= (int)m->colorLayers.size()) return;
     UndoCapturarMallaGeo(m); // Ctrl+Z: snapshot pre-borrado de la capa
     delete m->colorLayers[i]; m->colorLayers.erase(m->colorLayers.begin() + i);
@@ -3691,6 +3738,7 @@ void MoverColorLayerActivo(Mesh* m, int dir) {   // idem MoverUVMapActivo (undo 
 // GRUPOS DE VERTICES (huesos del rig / pesos). A diferencia de UV/color pueden ser 0 (no hay que poblar por defecto).
 void CrearVertexGroup(Mesh* m) {
     if (!m) return;
+    ListaDeMallaCambio(m);
     m->vertexGroups.push_back(new VertexGroup(m->NombreLibreVGroup("Group", -1)));
     m->grupoActivo = (int)m->vertexGroups.size() - 1;
 }
@@ -3741,6 +3789,7 @@ std::string VertexGroupRenombrar(Mesh* m, int idx, const std::string& pedido) {
     UndoCapturarRenames(aRenombrar);     // UN solo paso: las dos puntas juntas
     for (size_t k = 0; k < aRenombrar.size(); k++)
         if (std::string* p = W3dDestResolver(aRenombrar[k])) *p = nuevo;
+    ListaDeMallaCambio(m);
     m->lastSkinFrame = -999999;          // el CSR de skinning hashea los nombres
     if (nb > 0) W3dAvisoArrastre(nb, "hueso(s)", viejo, nuevo);
     if (nuevo != W3dNombreNormalizar(pedido, "Group"))
@@ -3750,6 +3799,7 @@ std::string VertexGroupRenombrar(Mesh* m, int idx, const std::string& pedido) {
 void BorrarVertexGroupActivo(Mesh* m) {
     if (!m) return;
     int i = m->grupoActivo; if (i < 0 || i >= (int)m->vertexGroups.size()) return;
+    ListaDeMallaCambio(m);
     UndoCapturarMallaGeo(m); // Ctrl+Z: snapshot pre-borrado del grupo (ver el bloque de BorrarUVMapActivo)
     delete m->vertexGroups[i]; m->vertexGroups.erase(m->vertexGroups.begin() + i);
     if (m->grupoActivo >= (int)m->vertexGroups.size()) m->grupoActivo = (int)m->vertexGroups.size() - 1;
@@ -3766,6 +3816,7 @@ void MoverVertexGroupActivo(Mesh* m, int dir) {
 // lista aparte: son dos entidades distintas (ver el bloque VertexGroup/UVGroup en Mesh.h).
 void CrearUVGroup(Mesh* m, const std::string& base) {
     if (!m) return;
+    ListaDeMallaCambio(m);
     m->uvGroups.push_back(new UVGroup(m->NombreLibreUVGroup(base, -1)));
     m->uvGrupoActivo = (int)m->uvGroups.size() - 1;
 }
@@ -3808,6 +3859,7 @@ std::string UVGroupRenombrar(Mesh* m, int idx, const std::string& pedido) {
     UndoCapturarRenames(aRenombrar);
     for (size_t k = 0; k < aRenombrar.size(); k++)
         if (std::string* p = W3dDestResolver(aRenombrar[k])) *p = nuevo;
+    ListaDeMallaCambio(m);
     m->pose2dDirty = true;
     if (nb > 0) W3dAvisoArrastre(nb, "hueso(s) 2D", viejo, nuevo);
     if (nuevo != W3dNombreNormalizar(pedido, "UV Group"))
@@ -3817,6 +3869,7 @@ std::string UVGroupRenombrar(Mesh* m, int idx, const std::string& pedido) {
 void BorrarUVGroupActivo(Mesh* m) {
     if (!m) return;
     int i = m->uvGrupoActivo; if (i < 0 || i >= (int)m->uvGroups.size()) return;
+    ListaDeMallaCambio(m);
     UndoCapturarMallaGeo(m); // Ctrl+Z: snapshot pre-borrado del grupo (ver el bloque de BorrarUVMapActivo)
     delete m->uvGroups[i]; m->uvGroups.erase(m->uvGroups.begin() + i);
     if (m->uvGrupoActivo >= (int)m->uvGroups.size()) m->uvGrupoActivo = (int)m->uvGroups.size() - 1;
@@ -3972,8 +4025,10 @@ void W3dRenderCornersSeparados(bool on) { g_cornersSeparados = on; }
 bool W3dRenderCornersSeparadosActivo() { return g_cornersSeparados; }
 
 void Mesh::GenerarRender(bool recomputarNormales) {
+    AsegurarEdicion(this);           // reconstruye DESDE las caras: tienen que estar en memoria
     geoVersion++;                    // idem RefrescarRender: cualquier rebuild es un cambio de geometria
     { extern bool g_mallasEditadas; g_mallasEditadas = true; }
+    W3dMallaMarcarEditada(this);     // idem: la malla de un RECURSO se publica al salir de edicion
     DesinstanciarDatos(W3DMD_TODO);  // COW: el rebuild lee y reemplaza las capas (MallaDatos.h)
     int nC = ContarCorners();
     // Sin caras (nC=0) igual seguimos si hay geometria SUELTA (loose edges/verts): para preservarla y, sobre todo,
@@ -4000,6 +4055,12 @@ void Mesh::GenerarRender(bool recomputarNormales) {
     UVMap* um = (uvMapActivo>=0 && uvMapActivo<(int)uvMaps.size()) ? uvMaps[uvMapActivo] : NULL;
     ColorLayer* cl = (colorActivo>=0 && colorActivo<(int)colorLayers.size()) ? colorLayers[colorActivo] : NULL;
     bool tUV  = um && (int)um->uv.size()==nC*2;
+    // CAPAS UV EXTRA (las no activas con tamano valido): entran en la CLAVE del merge (un seam de la capa 2 tambien
+    // parte el render-vert) y salen por render-vert en uvExtra (Mesh.h)
+    std::vector<const UVMap*> umX;
+    for (size_t k=0;k<uvMaps.size();k++) umX.push_back(((int)k!=uvMapActivo && (int)uvMaps[k]->uv.size()==nC*2) ? uvMaps[k] : (const UVMap*)NULL);
+    std::vector< std::vector<GLfloat> > vux(uvMaps.size());
+    const int viejoN = vertexSize;
     bool tCol = cl && !cl->porVertice && (int)cl->color.size()==nC*4;
     bool tNor = (normals != NULL);
     bool tCN  = ((int)cornerNormal.size() == nC*3); // normal AUTORITATIVA por corner
@@ -4022,9 +4083,10 @@ void Mesh::GenerarRender(bool recomputarNormales) {
             else if (tNor){ nbx=normals[gv*3]; nby=normals[gv*3+1]; nbz=normals[gv*3+2]; }
             float u0 = tUV ? um->uv[L*2] : 0.0f, v0 = tUV ? um->uv[L*2+1] : 0.0f;
             GLubyte r=255,g=255,b=255,a=255; if (tCol){ r=cl->color[L*4];g=cl->color[L*4+1];b=cl->color[L*4+2];a=cl->color[L*4+3]; }
-            char buf[40]; int p=0;
+            char buf[40 + 8*16]; int p=0;
             memcpy(buf+p,&px,4);p+=4; memcpy(buf+p,&py,4);p+=4; memcpy(buf+p,&pz,4);p+=4;
             memcpy(buf+p,&u0,4);p+=4; memcpy(buf+p,&v0,4);p+=4;
+            for (size_t k=0;k<umX.size() && k<16;k++) if (umX[k]) { memcpy(buf+p,&umX[k]->uv[L*2],4);p+=4; memcpy(buf+p,&umX[k]->uv[L*2+1],4);p+=4; }
             buf[p++]=(char)nbx;buf[p++]=(char)nby;buf[p++]=(char)nbz;
             buf[p++]=(char)r;buf[p++]=(char)g;buf[p++]=(char)b;buf[p++]=(char)a;
             if (g_cornersSeparados) { memcpy(buf+p,&L,4); p+=4; }   // Vertex Paint: un render-vert POR CORNER (ver W3dRenderCornersSeparados)
@@ -4036,6 +4098,7 @@ void Mesh::GenerarRender(bool recomputarNormales) {
                 vp.push_back(px);vp.push_back(py);vp.push_back(pz);
                 vn.push_back(nbx);vn.push_back(nby);vn.push_back(nbz);
                 vu.push_back(u0);vu.push_back(v0);
+                for (size_t k=0;k<umX.size();k++) if (umX[k]) { vux[k].push_back(umX[k]->uv[L*2]); vux[k].push_back(umX[k]->uv[L*2+1]); }
                 vc.push_back(r);vc.push_back(g);vc.push_back(b);vc.push_back(a);
                 // origen para la vertex anim: normalmente el vert VIEJO gv (splits incluidos).
                 // RECETA soloUV (duplicar/extrude): gv es el vert appendeado y su receta apunta
@@ -4080,6 +4143,7 @@ void Mesh::GenerarRender(bool recomputarNormales) {
                 vp.push_back(vertex[o*3]);vp.push_back(vertex[o*3+1]);vp.push_back(vertex[o*3+2]);
                 vn.push_back(0);vn.push_back(127);vn.push_back(0);
                 vu.push_back(0);vu.push_back(0);
+                for (size_t k=0;k<umX.size();k++) if (umX[k]) { vux[k].push_back(0);vux[k].push_back(0); }
                 vc.push_back(255);vc.push_back(255);vc.push_back(255);vc.push_back(255);
                 newToOld.push_back(o);
                 oldToNew[o]=gi; nn[s]=gi;
@@ -4095,6 +4159,7 @@ void Mesh::GenerarRender(bool recomputarNormales) {
         int gi=(int)(vp.size()/3);
         vp.push_back(vertex[o*3]);vp.push_back(vertex[o*3+1]);vp.push_back(vertex[o*3+2]);
         vn.push_back(0);vn.push_back(127);vn.push_back(0); vu.push_back(0);vu.push_back(0);
+        for (size_t k=0;k<umX.size();k++) if (umX[k]) { vux[k].push_back(0);vux[k].push_back(0); }
         vc.push_back(255);vc.push_back(255);vc.push_back(255);vc.push_back(255);
         newToOld.push_back(o);
         oldToNew[o]=gi; nLooseV.push_back(gi);
@@ -4105,6 +4170,17 @@ void Mesh::GenerarRender(bool recomputarNormales) {
     delete[] uv;          uv=new GLfloat[nuevoN*2];      for(int i=0;i<nuevoN*2;i++) uv[i]=vu[i];
     delete[] vertexColor; vertexColor=new GLubyte[nuevoN*4]; for(int i=0;i<nuevoN*4;i++) vertexColor[i]=vc[i];
     vertexSize=nuevoN;
+    // capas UV extra al render nuevo: de las capas del editor (vux) o, sin capas, remapeando las viejas por newToOld
+    if (!uvMaps.empty()) uvExtra = vux;
+    else if (!uvExtra.empty()) {
+        for (size_t k=0;k<uvExtra.size();k++){
+            if ((int)uvExtra[k].size() != viejoN*2) { uvExtra[k].clear(); continue; }
+            std::vector<GLfloat> nx((size_t)nuevoN*2, 0.0f);
+            for (int gi=0; gi<nuevoN && gi<(int)newToOld.size(); gi++){ const int o=newToOld[gi];
+                if (o>=0 && o<viejoN){ nx[(size_t)gi*2]=uvExtra[k][(size_t)o*2]; nx[(size_t)gi*2+1]=uvExtra[k][(size_t)o*2+1]; } }
+            uvExtra[k].swap(nx);
+        }
+    }
     // SKINNING: remapear vertCtrlPoint (render-vert -> control-point) al render NUEVO. El merge de arriba re-dedupea
     // los render verts, asi que el mapeo viejo queda invalido: sin esto, editar/joinear una malla skinneada rompia el
     // skin (los verts sin CP -> peso 0 -> la malla colapsaba). oldToNew mapea viejo->nuevo; verts nuevos (loose) = -1.
@@ -4331,6 +4407,7 @@ namespace { struct PosKeyBordes {
 }; }
 
 void Mesh::CalcularBordes(bool invalidarEdit, bool reagruparPosRep) {
+    AsegurarEdicion(this);   // las aristas salen de las caras
     skinGeomVersion++; // la geometria de render se regenero -> invalida el cache CSR de skinning (aunque nV no cambie)
     edges.clear();
     bordesBuf.clear();
@@ -4367,33 +4444,18 @@ void Mesh::CalcularBordes(bool invalidarEdit, bool reagruparPosRep) {
     }
     // cantidad de posiciones unicas + CENTRO GEOMETRICO (promedio de las posiciones
     // unicas = los grupos de vertice). El foco/pivot lo usan en vez del origen.
-    float cgx = 0, cgy = 0, cgz = 0;
-    for (int i = 0; i < nV; i++) if (posRep[i] == i) {
-        vertsAgrupados++;
-        cgx += vertex[i*3]; cgy += vertex[i*3+1]; cgz += vertex[i*3+2];
-    }
-    if (vertsAgrupados > 0)
-        centroGeom = Vector3(cgx / vertsAgrupados, cgy / vertsAgrupados, cgz / vertsAgrupados);
-    else
-        centroGeom = Vector3(0, 0, 0);
-
     // RADIO del bounding LOCAL alrededor de centroGeom (la distancia mas lejana). Lo usa el foco/encuadre
     // (tecla '.') para ajustar el zoom a lo que se ve. Se recalcula solo cuando cambia la geometria.
     // De paso (mismo loop de posiciones, mismo invalidador) sale el AABB LOCAL que usa
     // el objeto Culling: min/max de todos los vertices. Cachearlo aca es lo que pide el
     // contrato ("invalidar si la malla cambia"): CalcularBordes corre en cada cambio.
-    float rg2 = 0.0f;
-    aabbMin = Vector3(vertex[0], vertex[1], vertex[2]);
-    aabbMax = aabbMin;
-    for (int i = 0; i < nV; i++) {
-        float vx = vertex[i*3], vy = vertex[i*3+1], vz = vertex[i*3+2];
-        float dx = vx - centroGeom.x, dy = vy - centroGeom.y, dz = vz - centroGeom.z;
-        float d2 = dx*dx + dy*dy + dz*dz; if (d2 > rg2) rg2 = d2;
-        if (vx < aabbMin.x) aabbMin.x = vx; if (vx > aabbMax.x) aabbMax.x = vx;
-        if (vy < aabbMin.y) aabbMin.y = vy; if (vy > aabbMax.y) aabbMax.y = vy;
-        if (vz < aabbMin.z) aabbMin.z = vz; if (vz > aabbMax.z) aabbMax.z = vz;
-    }
-    radioGeom = sqrtf(rg2);
+    // El calculo es W3dCalcularGeomStats (Mesh.cpp): el MISMO que hornea el .w3db al guardar.
+    W3dGeomStats st;
+    W3dCalcularGeomStats(vertex, nV, &posRep[0], st);
+    vertsAgrupados = st.agrupados;
+    centroGeom = st.centro;
+    aabbMin = st.aabbMin; aabbMax = st.aabbMax;
+    radioGeom = st.radio;
     aabbOk = true;
 
     // la geometria cambio -> la malla de EDICION (si existia) queda invalida.
@@ -4466,17 +4528,30 @@ void Mesh::CalcularBordes(bool invalidarEdit, bool reagruparPosRep) {
 }
 
 
+// optimiza el cache de vertices de CADA mesh part de un index buffer (Forsyth) sobre rangos
+// [inicio, inicio+cantidad). Es EL cuerpo de OptimizarCacheRender, sacado afuera para que el
+// indice canonico del .w3db (W3dMallaIndicesCanonicos, abajo) salga por el MISMO camino.
+static void OptimizarCacheIndices(MeshIndex* idx, int nIdx, const int* inicio, const int* cantidad,
+                                  int nGrupos, int numVerts) {
+    if (!idx || nIdx < 192) return; // <64 triangulos: entran enteros al cache, no hace falta
+    for (int gi=0; gi<nGrupos; gi++) {
+        int start = inicio[gi], cnt = cantidad[gi];
+        int gt = cnt/3;
+        if (gt < 64 || start < 0 || start+cnt > nIdx) continue;
+        float acmr; { std::vector<int> f; int m=0; for(int i=0;i<cnt;i++){ int v=(int)idx[start+i]; bool h=false; for(size_t j=0;j<f.size();j++) if(f[j]==v){h=true;break;} if(!h){ m++; f.insert(f.begin(),v); if((int)f.size()>16) f.pop_back(); } } acmr=(float)m/gt; }
+        if (acmr > 1.0f) OptimizarCacheVertices(&idx[start], gt, numVerts);
+    }
+}
+
 // optimiza el cache de vertices de CADA mesh part del render (Forsyth). Antes en el Core; se
 // movio aca con su helper OptimizarCacheVertices. Lo llaman ReagruparMeshParts + el importador.
 void Mesh::OptimizarCacheRender() {
-    if (!faces || facesSize < 192) return; // <64 triangulos: entran enteros al cache, no hace falta
+    if (!faces || facesSize < 192) return;
+    std::vector<int> ini(materialsGroup.size()), cnt(materialsGroup.size());
     for (size_t gi=0; gi<materialsGroup.size(); gi++) {
-        int start = materialsGroup[gi].startDrawn, cnt = materialsGroup[gi].indicesDrawnCount;
-        int gt = cnt/3;
-        if (gt < 64 || start < 0 || start+cnt > facesSize) continue;
-        float acmr; { std::vector<int> f; int m=0; for(int i=0;i<cnt;i++){ int v=(int)faces[start+i]; bool h=false; for(size_t j=0;j<f.size();j++) if(f[j]==v){h=true;break;} if(!h){ m++; f.insert(f.begin(),v); if((int)f.size()>16) f.pop_back(); } } acmr=(float)m/gt; }
-        if (acmr > 1.0f) OptimizarCacheVertices(&faces[start], gt, vertexSize);
+        ini[gi] = materialsGroup[gi].startDrawn; cnt[gi] = materialsGroup[gi].indicesDrawnCount;
     }
+    if (!ini.empty()) OptimizarCacheIndices(faces, facesSize, &ini[0], &cnt[0], (int)ini.size(), vertexSize);
 }
 
 // ===================================================
@@ -4488,6 +4563,7 @@ void Mesh::OptimizarCacheRender() {
 // es SMOOTH se promedia agrupando por POSICION (posRep). Lo llama el transform de
 // malla al CONFIRMAR (mover vertices invalida las normales viejas).
 void Mesh::RecalcularNormales() {
+    AsegurarEdicion(this);
     if (!vertex || !normals || vertexSize <= 0) return;
     const int nV = vertexSize;
     std::vector<float> acc(nV*3, 0.0f);
@@ -4670,6 +4746,7 @@ void Mesh::LiberarCapas(bool incluirGrupos) {
     for (size_t i=0;i<uvMaps.size();i++)       delete uvMaps[i];
     for (size_t i=0;i<colorLayers.size();i++)  delete colorLayers[i];
     uvMaps.clear(); colorLayers.clear();
+    uvExtra.clear();   // el render de las capas UV extra se deriva de uvMaps: se va con ellas
     uvMapActivo = -1; colorActivo = -1;
     // vertex groups / UV groups: NO son una "capa" derivable del render (PoblarCapas NO los rehace). Solo se borran
     // cuando se pide (reset total / geometria nueva / destructor). En un JOIN/APPLY hay que PRESERVARLOS
@@ -4694,6 +4771,7 @@ int Mesh::ContarCorners() const {
 // cambio en una edit-op), rehace las capas desde el render (la capa activa = lo que las
 // ops preservaron en uv[]/vertexColor[], asi sus datos sobreviven). Idempotente si no.
 void Mesh::PoblarCapas() {
+    AsegurarEdicion(this);   // las capas de verdad (no unas derivadas del render)
     int nC = ContarCorners();
     if (nC <= 0) return;
     bool stale =
@@ -4710,6 +4788,17 @@ void Mesh::PoblarCapas() {
         int L=0; for (size_t f=0;f<faces3d.size();f++) for (size_t c=0;c<faces3d[f].idx.size();c++){
             int gv=faces3d[f].idx[c]; mp->uv[L*2]=uv[gv*2]; mp->uv[L*2+1]=uv[gv*2+1]; L++; }
         uvMaps.push_back(mp); uvMapActivo = 0;
+        // las capas UV extra que ya vinieron en el render (TEXCOORD_1 del glTF, RUVX del .w3db) tambien se vuelven
+        // capas editables, en su MISMO indice (TexLayer::uvMapa las nombra por indice)
+        for (size_t k = 1; k < uvExtra.size(); k++) {
+            char nb[16]; snprintf(nb, sizeof nb, "UV%d", (int)k + 1);
+            UVMap* mk = new UVMap(NombreLibreUVMap(nb, -1)); mk->uv.assign((size_t)nC*2, 0.0f);
+            if ((int)uvExtra[k].size() == vertexSize*2) {
+                int L2=0; for (size_t f=0;f<faces3d.size();f++) for (size_t c=0;c<faces3d[f].idx.size();c++){
+                    int gv=faces3d[f].idx[c]; mk->uv[L2*2]=uvExtra[k][gv*2]; mk->uv[L2*2+1]=uvExtra[k][gv*2+1]; L2++; }
+            }
+            uvMaps.push_back(mk);
+        }
     }
     if (colorLayers.empty() && vertexColor) {
         ColorLayer* cl = new ColorLayer(NombreLibreColor("Col", -1)); cl->color.resize((size_t)nC*4);
@@ -4731,12 +4820,24 @@ void Mesh::PoblarCapas() {
 // activa o al editar una capa. (Sin re-split de verts: las capas de PoblarCapas/duplicadas
 // comparten el seam del render; cambiar seams es FASE 4 con GenerarRender.)
 void Mesh::AplicarCapasAlRender() {
+    AsegurarEdicion(this);
     int nC = ContarCorners();
     if (nC <= 0) return;
     UVMap* um = (uvMapActivo>=0 && uvMapActivo<(int)uvMaps.size()) ? uvMaps[uvMapActivo] : NULL;
     ColorLayer* cl = (colorActivo>=0 && colorActivo<(int)colorLayers.size()) ? colorLayers[colorActivo] : NULL;
     if (um && (int)um->uv.size() != nC*2) um = NULL;       // guard de tamano
     if (cl && (int)cl->color.size() != nC*4) cl = NULL;    // la capa SIEMPRE guarda por-corner (nC*4)
+    // las capas UV NO activas tambien van al render (uvExtra, memoria propia): las capas de textura con UV propio
+    {
+        uvExtra.resize(uvMaps.size());
+        for (size_t k = 0; k < uvMaps.size(); k++) {
+            if ((int)k == uvMapActivo || (int)uvMaps[k]->uv.size() != nC*2 || !vertexSize) { uvExtra[k].clear(); continue; }
+            uvExtra[k].assign((size_t)vertexSize*2, 0.0f);
+            int L2 = 0;
+            for (size_t f=0;f<faces3d.size();f++) for (size_t c=0;c<faces3d[f].idx.size();c++){
+                int gv=faces3d[f].idx[c]; uvExtra[k][gv*2]=uvMaps[k]->uv[L2*2]; uvExtra[k][gv*2+1]=uvMaps[k]->uv[L2*2+1]; L2++; }
+        }
+    }
     bool tCN = (normals && (int)cornerNormal.size() == nC*3); // normal autoritativa -> render
     if (!um && !cl && !tCN) return;
     DesinstanciarDatos((um ? W3DMD_UV : 0) | (cl ? W3DMD_COL : 0) | (tCN ? W3DMD_NOR : 0));  // COW (MallaDatos.h)
@@ -4777,12 +4878,57 @@ void Mesh::AplicarCapasAlRender() {
 //       GenerarRender = REBUILD completo (cambio de topologia). =====
 
 
+// EL ARMADO del index buffer por mesh part: los triangulos de las caras de la parte 0, despues
+// los de la 1, ... (cada cara en su orden de faces3d), y despues Forsyth por parte. grupoDe[f] =
+// la parte de la cara f (-1 = la cara no entra). Lo usan ReagruparMeshParts (la malla viva) y
+// W3dMallaIndicesCanonicos (el .w3db, sin tocar la malla): el MISMO codigo da el MISMO buffer.
+static void ArmarIndicesPorParte(const float* vertex, int nV, const std::vector<MeshFace>& caras,
+                                 const std::vector<int>& grupoDe, int nGrupos, std::vector<MeshIndex>& tris,
+                                 std::vector<int>& ini, std::vector<int>& cnt) {
+    tris.clear(); ini.assign((size_t)nGrupos, 0); cnt.assign((size_t)nGrupos, 0);
+    for (int gi=0; gi<nGrupos; gi++){
+        ini[(size_t)gi] = (int)tris.size();
+        for (size_t f=0;f<caras.size();f++){ if (grupoDe[f] != gi) continue;
+            W3dTriangularCara(vertex, caras[f].idx, tris); }                     // abanico si es convexo, ear clipping si no
+        cnt[(size_t)gi] = (int)tris.size() - ini[(size_t)gi];
+    }
+    // reordena los triangulos de cada mesh part para el cache de vertices (no cambia la geometria)
+    if (nGrupos > 0 && !tris.empty())
+        OptimizarCacheIndices(&tris[0], (int)tris.size(), &ini[0], &cnt[0], nGrupos, nV);
+}
+
+// ---------------------------------------------------------------------------
+//  EL INDEX BUFFER CANONICO de una malla, sin tocarla: exactamente el que armaria
+//  ReagruparMeshParts si la malla se guardara en .w3dm y se volviera a abrir. El lector
+//  del .w3dm manda al mesh part 0 toda cara con una parte que no existe y DESCARTA las
+//  caras con menos de 3 lados o con un indice fuera de rango; aca se hace lo mismo.
+//  Lo hornea el .w3db al guardar (io/W3dMallaBin.h) y asi abrir no triangula nada.
+// ---------------------------------------------------------------------------
+void W3dMallaIndicesCanonicos(const Mesh* m, W3dMallaBinIndices& out) {
+    out.idx.clear(); out.inicio.clear(); out.cantidad.clear();
+    if (!m) return;
+    const int nV = m->vertex ? m->vertexSize : 0;
+    int nGrupos = (int)m->materialsGroup.size();
+    if (nGrupos < 1) nGrupos = 1;
+    std::vector<int> grupoDe(m->faces3d.size(), -1);
+    for (size_t f = 0; f < m->faces3d.size(); f++) {
+        const std::vector<int>& idx = m->faces3d[f].idx;
+        bool ok = idx.size() >= 3;
+        for (size_t c = 0; c < idx.size() && ok; c++) if (idx[c] < 0 || idx[c] >= nV) ok = false;
+        if (!ok) continue;
+        const int g = m->faces3d[f].mat;
+        grupoDe[f] = (g < 0 || g >= nGrupos) ? 0 : g;
+    }
+    ArmarIndicesPorParte(m->vertex, nV, m->faces3d, grupoDe, nGrupos, out.idx, out.inicio, out.cantidad);
+}
+
 // Reconstruye el index buffer (faces[]) AGRUPANDO los triangulos por material POR-CARA (mf.mat), y
 // los rangos de cada mesh part (materialsGroup[g].startDrawn/indicesDrawnCount). Antes GenerarRender
 // colapsaba TODO a un grupo (perdia los mesh parts al editar). NO toca vertices/uv/normales/color ni
 // el edit mesh: por eso Assign/Delete pueden usarla SIN un GenerarRender completo (la edicion sigue
 // viva). Se preservan las entradas de materialsGroup (nombre+material); las vacias quedan con count 0.
 void Mesh::ReagruparMeshParts() {
+    AsegurarEdicion(this);   // el index buffer sale de las caras
     DesinstanciarDatos(W3DMD_FACES, false);  // COW: faces[] se regenera de cero (MallaDatos.h)
     int nGrupos = (int)materialsGroup.size();
     { int mx = 0; for (size_t f=0;f<faces3d.size();f++){ int m=faces3d[f].mat; if (m<0){ faces3d[f].mat=0; m=0; } if (m>mx) mx=m; }
@@ -4790,16 +4936,15 @@ void Mesh::ReagruparMeshParts() {
     if (nGrupos < 1) nGrupos = 1;
     while ((int)materialsGroup.size() < nGrupos){ MaterialGroup g; materialsGroup.push_back(g); } // pad (nombre default)
     std::vector<MeshIndex> tris; // MeshIndex: en PC los indices pueden pasar 65535 (no truncar a 16 bits)
-    for (int gi=0; gi<(int)materialsGroup.size(); gi++){
-        materialsGroup[gi].startDrawn = (int)tris.size();
-        for (size_t f=0;f<faces3d.size();f++){ if (faces3d[f].mat != gi) continue;
-            const std::vector<int>& idx=faces3d[f].idx;
-            W3dTriangularCara(vertex, idx, tris); }                                // abanico si es convexo, ear clipping si no
-        materialsGroup[gi].indicesDrawnCount = (int)tris.size() - materialsGroup[gi].startDrawn;
+    std::vector<int> grupoDe(faces3d.size()), ini, cnt;
+    for (size_t f=0;f<faces3d.size();f++) grupoDe[f] = faces3d[f].mat;
+    ArmarIndicesPorParte(vertex, vertexSize, faces3d, grupoDe, (int)materialsGroup.size(), tris, ini, cnt);
+    for (size_t gi=0; gi<materialsGroup.size(); gi++){
+        materialsGroup[gi].startDrawn = ini[gi];
+        materialsGroup[gi].indicesDrawnCount = cnt[gi];
     }
     facesSize=(int)tris.size(); delete[] faces; faces=new MeshIndex[facesSize>0?facesSize:1];
     for (int i=0;i<facesSize;i++) faces[i]=tris[i];
-    OptimizarCacheRender(); // reordena los triangulos de cada mesh part para el cache de vertices (no cambia la geometria)
     // el index buffer (faces[]) cambio de agrupamiento -> invalidar el VBO de indices: sino en OBJECT MODE (que
     // dibuja del vboIdx) queda el agrupamiento VIEJO y la reasignacion de mesh part "no se veia" (se veia en Edit,
     // que no usa VBO). Bumpear skinGeomVersion fuerza el re-SubirVBO en el proximo draw.

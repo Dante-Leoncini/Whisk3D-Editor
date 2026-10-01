@@ -71,6 +71,14 @@ extern Properties* PropsActivo;
 // reporto que "no veia" el panel del rig 2D porque vivia mezclado en la pestania de datos del mesh
 // y habia que ir a buscarlo. No-op sin panel activo (headless) o si el tab no corresponde.
 void PropsIrAArmature2D();
+// lleva el panel activo (o el primero del layout) a la pestania "RECURSO" (10): lo que se eligio en
+// una vista de recursos del outliner (material -> su tarjeta Material; textura -> vista previa + ruta;
+// malla / animset -> datos y usuarios). No-op sin panel o sin recurso activo.
+void PropsIrARecurso();
+// el proyecto se CERRO (ReiniciarEscena libero los objetos): cada panel de propiedades suelta lo que
+// apuntaba al objeto activo (su 'target' y la lista de partes de la malla) y re-bindea con el proximo
+void PropsOlvidarEscena();
+class PropImagen;
 
 // une los campos "Path" + "File name" de las tarjetas EXPORT y RENDER en la ruta final.
 // Es un envoltorio finito de W3dRutaEnCarpeta (FileBrowser.h), la UNICA implementacion de
@@ -100,6 +108,12 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         // (contenedores; hoy vertex anims de la malla) — lista + New + Delete
         GroupPropertie* propObjAnim;
         PropListMeshParts* propListObjAnims;
+        // la BIBLIOTECA de CLIPS DE JERARQUIA del objeto (animation/W3dAnimSet.h): el desplegable "Clips"
+        // de la tarjeta Animacion (ninguna / una del proyecto / una nueva)
+        PropButton* propJerLib;
+        // el RETARGET PROPIO del objeto (animRetarget de lua, guardado en su nodo): un armature, el de sus clips de
+        // esqueleto (Complete / Rotations only); cualquier otro, el de sus clips de jerarquia (+ "Clip default")
+        PropButton* propObjRetarget;
         GroupPropertie* propMeshParts; // tarjeta: selector de parte + gestion (New/Assign/Select/.../Rename)
         GroupPropertie* propMaterial;  // tarjeta APARTE: el material del mesh part seleccionado
         PropButtonRow* propRowPartOps; // fila: Assign | Select | Deselect
@@ -123,7 +137,9 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropFloat* propMatOrden;   // ordenPasada 0 opaco / 1 decal / 2 transparente
         PropBool*  propMatLineas;      // LINEAS: dibujar las aristas de la malla con el material
         PropFloat* propMatGrosorLinea; // grosor de esas lineas en px (glLineWidth); visible con Lines ON
-        GroupPropertie* propLight;   // pestania de luz: TODAS las propiedades editables de la luz GL
+        PropFloat* propMatAlfa;        // ALPHA TEST: Material::alphaTest 0..1 (0 = apagado; clave "alfaCorte" del .w3d)
+        GroupPropertie* propLight;
+        PropBool* propLightIgnOrden;   // "Ignorar orden del arbol" (pre-pase) vs solo lo que sigue en el arbol   // pestania de luz: TODAS las propiedades editables de la luz GL
         // tarjeta del elemento TEXTO 2D (se edita en el Editor 2D)
         GroupPropertie* propTexto2D;
         PropText*   propT2dNombre;   // nombre del objeto (arriba de todo; el tab Objeto no se muestra)
@@ -165,6 +181,7 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropColor*  propImgColor;    // tinte de la textura
         PropButton* propImgPal;
         PropBool*   propImgAlpha;    // usar el canal alpha de la textura
+        PropButton* propImgMezcla;   // modo de mezcla (Alpha / Aditiva / ...)
         PropBool*   propImgFiltro;   // filtrado de textura (off = pixel-perfect)
         // tarjeta del elemento RECTANGULO 2D (color solido o transparente: acomoda hijos)
         GroupPropertie* propRect2D;
@@ -365,9 +382,62 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropBool*   propCullSoloCam;   // medir desde la camara ACTIVA (calc una vez para todas las vistas)
         PropFloat*  propCullDistMax;   // culling por distancia (0 = sin limite)
         PropBool*   propCullOrdenAlpha;// translucido: ordena atras->adelante (alpha)
+        PropBool*   propCullOrdenCerca;// opaco: adelante->atras puro (sin agrupar por material)
         PropFloat*  propCullCellSize;  // metodo Grid: lado de la celda (unidades de mundo)
         PropBool*   propCullModo3D;    // metodo Grid: grilla 3D (default 2D en XZ)
         PropButton* propCullRecalc;    // BOTON "Recalcular": rearma la grilla del metodo Grid
+        // pestania del objeto NIEBLA (glFog en el arbol, solo en Render)
+        GroupPropertie* propNiebla;
+        PropBool*   propNieblaActiva;  // false = apaga la niebla desde este punto del arbol
+        PropButton* propNieblaModo;    // dropdown: Lineal / Exp / Exp2
+        PropFloat*  propNieblaInicio;  // lineal: distancia donde empieza
+        PropFloat*  propNieblaFin;     // lineal: distancia donde ya es toda niebla
+        PropFloat*  propNieblaDens;    // exp / exp2
+        PropColor*  propNieblaColor;
+        PropBool*   propNieblaFondo;   // el fondo del render toma el color de la niebla
+        // objetos LimpiarZ / Recorte (composicion de la pantalla en el arbol)
+        GroupPropertie* propLimpiarZ;
+        PropBool*   propLzActivo;
+        GroupPropertie* propRecorte;
+        PropBool*   propRcActivo;
+        PropFloat*  propRcX;
+        PropFloat*  propRcY;
+        PropFloat*  propRcAncho;
+        PropFloat*  propRcAlto;
+        PropButton* propRcCamara;      // dropdown: (ninguna) + las camaras de la escena
+        PropBool*   propRcLimpiarZ;
+        PropBool*   propRcFondo;
+        PropColor*  propRcColor;
+        // tarjeta HITBOX (objects/Hitbox.h): la arman, la bindean y sincronizan sus textos
+        // PropsHitboxConstruir / PropsHitboxActualizar (ViewPorts/PropsHitbox.cpp)
+        GroupPropertie* propHitbox;
+        PropBool*   propHbActivo;
+        PropFloat*  propHbTam[3];       // ancho X / alto Y / largo Z (locales)
+        PropFloat*  propHbCentro[3];
+        PropText*   propHbEtiqueta;     // commit en vivo (patron LOD: sync por frame)
+        PropText*   propHbFiltro;
+        PropBool*   propHbCuerpos;      // detectar cuerpos rigidos
+        // tarjeta INSTANCIA DE PREFAB (objects/InstanciaPrefab.h): la arman y la bindean PropsPrefabConstruir /
+        // PropsPrefabActualizar (ViewPorts/PropsPrefab.cpp). En una instancia: su prefab (desplegable, acepta un
+        // prefab arrastrado de la biblioteca), Edit Prefab, Unpack y Reset Overrides; en un objeto GENERADO por
+        // una: de que instancia es y "Select Instance"
+        GroupPropertie* propPrefab;
+        PropButton* propPfSel;
+        PropLabel*  propPfInfo;
+        PropButton* propPfEditar;
+        PropButton* propPfUnpack;
+        PropButton* propPfReset;
+        PropButton* propPfInstancia;
+        // (la misma tarjeta en un PROXY W3D, objects/ProxyW3d.h: la LIBRERIA -desplegable con las vinculadas y
+        //  "Add Library..."-; el elemento va en propPfSel)
+        PropButton* propPxLib;
+        // (y el STREAMING de la instancia o el proxy, io/Streaming.h: COMO se carga -desplegable siempre / por
+        //  distancia-, a que DISTANCIA, contra que OBJETIVO, y la VISTA PREVIA del streaming en el editor -opcion del
+        //  proyecto-. Con Ctrl+Z: PropsPrefab.cpp los anota al soltar el mouse / dejar de tipear)
+        PropButton* propPfCarga;
+        PropFloat*  propPfDistancia;
+        PropText*   propPfObjetivo;
+        PropBool*   propPfVista;
         // pestania de la Collection: orden de dibujo para transparentes
         GroupPropertie* propCollection;
         PropBool*   propCollOrdenCam;
@@ -435,6 +505,9 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropFloat* propPartFreno;
         PropFloat* propPartAlphaDecae;
         PropFloat* propPartAlphaMuerte;
+        PropFloat* propPartAparecer;
+        PropFloat* propPartFundeCerca[2];
+        PropFloat* propPartFundeLejos[2];
         PropBool*  propPartUsarColFin;
         PropColor* propPartColorFin;
         PropFloat* propPartRotIni;
@@ -466,6 +539,7 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropButton* propProyVersion; // "Guardar version vN" (guardado por versiones; N real segun versiones/)
         PropButton* propProyComo;
         PropButton* propProyExtraer; // "Extraer assets": saca lo de adentro del .w3d a una carpeta
+        PropBool*   propProyMallasTexto; // "Meshes as text": la opcion "formatoMallas" del proyecto
         GroupPropertie* propRender;  // pestania RENDER: tarjeta "Render" (output)
         GroupPropertie* propAnimation; // pestania ANIMACION (9): tarjeta "Animation" (selector + New/Delete)
         // ===== pestania ANIMACION (9): el MIX de animaciones (capas estilo Maya) =====
@@ -489,10 +563,20 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropFloat* propRenderFin;
         PropFloat* propRenderFps;
         GroupPropertie* propKeyframe;  // tarjeta "Keyframe": el keyframe elegido en el editor de curvas, con numeros exactos
+        // tarjeta "Camara activa" (pestania Animacion, animacion de ESCENA): elegir la camara activa + insertar un
+        // CORTE (keyframe de la pista SceneAnimation::camPista) en el frame actual. Los cortes se mueven/borran en el
+        // dope sheet (fila "Camara activa", con una camara seleccionada).
+        GroupPropertie* propCamActiva;
+        PropButton* propCamActivaSel;   // dropdown con las camaras de la escena
+        PropButton* propCamActivaKey;   // inserta el corte en el frame actual
         PropButton* propBtnAnimSel;    // dropdown: animacion ACTIVA (Scene(s) / clips del armature seleccionado)
         PropButtonRow* propRowAnimNewDel; // fila: New | Delete (Delete oculto si no hay nada que borrar)
         PropButton* propBtnAnimRename; // "Rename" de la animacion activa (escena o clip)
+        PropButton* propClipRetarget;  // el retarget por defecto del CLIP DE JERARQUIA elegido (Complete / Rotations only)
         PropButton* propBtnAnimRender; // "Render Animation" (gris si no hay animaciones)
+        // la nota del render de un JUEGO (timeline en "Juego"): se renderiza su CACHE de simulacion;
+        // sin cache avisa que solo hay Render Image del frame actual
+        PropLabel*  propRenderNota;
         // CONFIG del flipbook activo (kind 5): en la card Animation, ocultos salvo con flipbook activo
         PropButton* propFlipAtlas;     // dropdown del atlas (textura) del flipbook
         PropFloat*  propFlipCuadros;   // cantidad de celdas del ciclo
@@ -559,6 +643,22 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropLabel*  propPvsInfo;
         GroupPropertie* propMeshEdicion;   // card "Edicion" (pestania Mesh): interruptor editable/no-editable
         PropButton* propBtnMeshEditable;   // "Borrar datos para edicion" / "Convertir en mesh editable"
+        // card "3D Mesh" (la PRIMERA de la pestania "Malla 3D", la 3): que malla 3D (un RECURSO de la
+        // biblioteca, objects/MallaRecurso.h) usa el objeto. SOLO se elige: el nombre y la carpeta del
+        // recurso se editan en la biblioteca (el outliner)
+        GroupPropertie* propMalla3D;
+        PropButton* propBtnMallaSel;       // desplegable: que malla del proyecto usa el objeto (+ New Copy); '*' = sin guardar
+        PropLabel*  propLblMallaUsos;      // cuantos objetos de la escena la usan
+        PropButton* propBtnMallaUnica;     // Make Single User (solo si la usan varios)
+        // una malla de una LIBRERIA externa (o lo que genera un proxy) es de SOLO LECTURA: el aviso de la tarjeta
+        // "3D Mesh" (y el de la de modificadores) y los botones que la editan, que se ocultan (las listas se ven)
+        PropLabel*  propLblMallaLib;       // "It belongs to a library (read-only)..." (pestania 3)
+        PropLabel*  propLblModsLib;        // idem en la tarjeta Modifiers (lo que genera un proxy)
+        PropButton* propBtnNewPart;        // "New Mesh Part"
+        PropButton* propBtnAddVG;          // "Add Vertex Group"
+        PropButton* propBtnAddUVG;         // "Add UV Group"
+        PropButton* propBtnAddUV;          // "Add UV Map"
+        PropButton* propBtnAddCol;         // "Add Color Layer"
         PropButton* propPvsPath;      // dropdown: el PATH del recorrido (Curve / malla de aristas)
         PropBool*   propPvsSoloCam;   // OFF = el nodo sigue la vista libre del viewport (demo A/B)
         PropButton* propPvsRamas;     // dropdown-toggles: que RAMAS del path participan del nearest
@@ -620,8 +720,15 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropText* propBone2DNombre;
         PropButton* propBone2DParent;
         PropBool* propBone2DConectado;     // fila "Connected" del hueso 2D (mismo flag/semantica que el 3D)
+        // Pos/Rotation/Scale del hueso 2D: filas DE ESTE PANEL. Antes eran punteros estaticos del
+        // .cpp que apuntaban a las filas del ULTIMO panel construido: al liberarse ese panel quedaban
+        // colgando y ActualizarPestanias de otro panel escribia sobre filas ya liberadas (y sus propias
+        // filas nunca se refrescaban). Cada panel refresca las suyas.
         PropFloat* propBone2DPosX;         // fila "Pos X" del hueso 2D (rest de lo seleccionado, o traslacion en Pose)
+        PropFloat* propBone2DPosY;         // fila "Pos Y" (idem Pos X)
         PropFloat* propBone2DRot;          // fila "Rotation" del hueso 2D: SOLO posando (value=NULL la oculta)
+        PropFloat* propBone2DSclX;         // fila "Scale X": SOLO posando
+        PropFloat* propBone2DSclY;         // fila "Scale Y": SOLO posando
         PropButton* propBtnColorMode;   // toggle Per-Vertex / Per-Corner color
         PropText* propRenderPath;    // campo editable "Path" del render (carpeta de salida)
         PropText* propRenderOutput;  // campo editable "File name" del render (solo el nombre + .png)
@@ -667,10 +774,33 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropButton* propBtnTextura;
         PropButton* propBtnNormalTex; // selector de la textura del normal map (visible si Normal Mapping ON)
         PropButton* propBtnReflectMode; // dropdown del MODO de Reflection (Matcap/Sphere Map/Equirect; visible si Reflection ON)
+        // ---- CAPAS DE TEXTURA (TexLayer): hasta 4 filas de [textura | UV | mezcla | on]. La fila que sigue a la
+        //      ultima capa es la de "Add Layer" (elegir una textura ahi crea la capa); "No Texture" la borra. ----
+        PropLabel*  propCapasTitulo;
+        PropButton* propCapaTex[4];
+        PropButton* propCapaUV[4];
+        PropButton* propCapaMezcla[4];
+        PropBool*   propCapaOn[4];
         PropButton* propBtnMezcla;      // dropdown del MODO DE MEZCLA (Alpha/Aditivo/Multiply/...; visible si Transparent ON)
         PropButton* propBtnProfundidad; // dropdown del TEST DE PROFUNDIDAD (test + escritura de z, en 4 combinaciones)
         PropButton* propRotMode; // selector del modo de rotacion (Euler/Quat/Axis)
         PropLabel* propMsgDefault; // aviso "material por defecto no editable" (1 label WRAP multilinea)
+        // ---- el RECURSO ACTIVO de la BIBLIOTECA (el outliner): se muestra en la pestania "Malla 3D" (la 3,
+        //      sin pestania aparte). Su nombre y su carpeta se editan aca (con undo); sus DATOS POR TIPO
+        //      (resolucion/alfa/formato/bytes de una textura, frecuencia/canales/duracion de un sonido...),
+        //      dentro/fuera del .w3d, sus acciones; un material ademas usa la tarjeta Material de siempre,
+        //      bindeada al material elegido en vez del de un mesh part.
+        GroupPropertie* propRecurso;
+        PropText*   propRecNombre;     // Name: renombrar el recurso (lo ven todos sus usuarios)
+        PropText*   propRecCarpeta;    // Folder: su carpeta cosmetica ("" = la raiz)
+        PropLabel*  propRecTipo;       // el tipo + EN USO (N usuarios) / HUERFANO
+        PropLabel*  propRecEntrada;    // su entrada del contenedor / su ruta (WRAP)
+        std::vector<PropLabel*> propRecDatos;   // los DATOS del tipo, una fila cada uno ("Resolution: 256 x 256")
+        PropButton* propRecUbicacion;  // desplegable: "Inside the .w3d" / "External" (los que tienen archivo)
+        PropImagen* propRecPreview;    // vista previa de una textura
+        PropButtonRow* propRecAcciones; // Select Users | Delete (en uso: avisa cuantos lo usan)
+        PropButtonRow* propRecAcciones2; // sonido: Play | Stop; escena/prefab: Open; script: Open in IDE
+        unsigned    recVersionBind;    // W3dRecursoActivoVersion con la que se bindeo la tarjeta
         PropSeparator* propSepMat; // separador del card Material (se oculta con el material por defecto)
 
         void ConstruirGrupos(); // arma los grupos (en el constructor)
@@ -681,7 +811,9 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
                                 // 5 = Transformar (Edit Mode: Transform Mesh + Transform UV),
                                 // 6 = Armature 2D (solo editando/posando los huesos 2D del mesh),
                                 // 7 = Constraints (cualquier objeto 3D)
-                                // 8 = Scripts, 9 = Animacion (selector + MIX de capas)
+                                // 8 = Scripts, 9 = Animacion (selector + MIX de capas).
+                                // La 3 es la pestania "Malla 3D": la malla del objeto, o el RECURSO
+                                // elegido en la biblioteca del outliner (no hay pestania aparte)
                                 // *** ESTOS NUMEROS SON LITERALES EN ~40 LUGARES (y en los tests,
                                 //     que indexan BarTabs[1]/[5]/[6]/[7]): una pestania nueva va
                                 //     SIEMPRE AL FINAL, nunca intercalada. ***
@@ -698,8 +830,9 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         // en ClickEn). Mismo recorrido que CentrarSeleccion.
         void SetRectFilaSeleccionada();
         void ActualizarPestanias(); // visibilidad de tabs/grupos segun el objeto
-        // pestanias GLOBALES (no dependen del objeto seleccionado): 0 Render/Archivo y 9 Animacion
-        bool PestaniaGlobal() const { return pestaniaActiva == 0 || pestaniaActiva == 9; }
+        // pestanias GLOBALES (no dependen del objeto seleccionado): 0 Render/Archivo y 9 Animacion; y la 3 con un
+        // RECURSO de la biblioteca elegido (su tarjeta vive ahi, y elegirlo suelta la escena: no hay objeto activo)
+        bool PestaniaGlobal() const;
         void ClickTab(int mx, int my); // click en una pestania de la barra
 
         Object* target;

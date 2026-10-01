@@ -1,0 +1,85 @@
+# ==========================================================================
+#  UN JUEGO CON CINEMATICAS en el Play del editor: cambiarEscena() a una raiz de tipo
+#  ESCENA reproduce SU animacion desde el inicio (una sola vez) y la partida sigue;
+#  a un JUEGO arranca su simulacion (W3dRaices.h).
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_escenas_cine.w3s
+#
+#  "Scene" (JUEGO: el bloque, deducido por tener scripts) pide la ESCENA "Intro" a los 3
+#  ticks. Intro es una escena explicita (aunque tenga un script): al entrar arranca su
+#  animacion "Cine" (CuboIntro va de x=0 en el frame 1 a x=10 en el 11); su script solo
+#  la mira con animEscenaActual() y al llegar al ultimo frame pide el JUEGO "Nivel2".
+#  El Stop vuelve a "Scene" con todas las raices como las dejo el usuario, cada una en
+#  el modo de su tipo (Intro en su animacion, no en "Juego").
+# ==========================================================================
+
+ventana 1280 720
+escenadefecto
+add cube
+objname DirA
+raizscript DirA prueba_escenas_cine_a.lua
+raizinfo n 1 tipo juego
+
+# ---- la cinematica: una ESCENA con su animacion (la activa) y un script que la sigue ----
+raiznueva escena Intro
+raizmodo kind 0 juego 0
+add cube
+objname CuboIntro
+raizclip Cine CuboIntro 1 0 11 10
+raizanim Cine
+raizscript CuboIntro prueba_escenas_c.lua
+raizinfo tipo escena
+raizmodo kind 0 juego 0
+
+# ---- el nivel: un JUEGO ----
+raiznueva juego Nivel2
+raizmodo kind 2 juego 1
+add cube
+objname JugB
+raizscript JugB prueba_escenas_cine_b.lua
+raizabrir Scene
+raizmodo kind 2 juego 1
+
+# ---- el Play: Scene -> Intro (cinematica) -> Nivel2 ----
+simplay 3
+raizinfo activa Intro
+# la animacion arranco en su frame 1 (posada) y la partida sigue en "Juego"
+objat CuboIntro 0 0 0 0.001
+raizmodo kind 2 juego 1
+simplay 5
+objat CuboIntro 5 0 0 0.01
+scriptinfo compartido intro_f 5
+scriptinfo compartido intro_anim Cine
+# con la partida andando no se cambia de escena a mano
+raizabrir Scene falla
+simplay 6
+raizinfo activa Nivel2
+scriptinfo compartido intro_f 11
+scriptinfo compartido c_inicios 1
+scriptinfo compartido b_inicios 1
+simplay 2
+scriptinfo compartido b_n 2
+
+# ---- el Stop: vuelve a Scene; cada raiz como la dejo el usuario y en el modo de su tipo ----
+simstop
+raizinfo activa Scene
+raizmodo kind 2 juego 1
+raizabrir Intro
+raizmodo kind 0 juego 0
+objat CuboIntro 0 0 0 0.001
+raizabrir Nivel2
+raizmodo kind 2 juego 1
+objat JugB 0 0 0 0.001
+raizabrir Scene
+
+# ---- lo mismo despues de guardar y abrir (Intro y Nivel2 se cargan de su entrada al pedirlas) ----
+guardarw3d /tmp/w3d_f6_cine.w3d
+abrirw3d /tmp/w3d_f6_cine.w3d
+raizinfo n 3 activa Scene cargada Intro 0 cargada Nivel2 0 tipode Intro escena tipode Nivel2 juego
+simplay 3
+raizinfo activa Intro cargada Intro 1
+simplay 11
+raizinfo activa Nivel2
+scriptinfo compartido intro_f 11
+simstop
+raizinfo activa Scene

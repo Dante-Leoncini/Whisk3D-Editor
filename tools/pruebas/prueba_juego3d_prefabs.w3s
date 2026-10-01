@@ -1,0 +1,37 @@
+# ==========================================================================
+#  PREFABS en el JUEGO COMPILADO: las instancias de la escena se GENERAN desde prefabs/<slug>.w3dp
+#  (el mismo lector que el editor) e instanciar()/destruir() de lua andan igual que en el Play.
+#  Correr DESDE ESTA CARPETA (ver prueba_juego3d.w3s):
+#    ../../platform/linux/build/whisk3d --script prueba_juego3d_prefabs.w3s
+#
+#  juegoprefabsmin: el prefab "Enemigo" (esqueleto + cuerpo skinneado + sensor + enemigo.lua), 3
+#  instancias en la escena (la del medio con el override vida=25) y un "Director" que instancia y
+#  destruye 1000 enemigos por lua (100 ciclos de 10). El director deja su veredicto en compartido("juez")
+#  y en el log ("[prefabs] OK creados=1000 enemigos=1003 scope=1003 latidos=15 muerto=true vida=10045
+#  primer=3 hud=true"): cada inicio() corrio, cada enemigo vio SU cuerpo (scope por instancia), los destruidos
+#  dejaron de correr, el puntero viejo ya no es un objeto, el override de la vida llego, lo instanciado corre
+#  su actualizar() desde el frame SIGUIENTE (primer=3: entre un frame y el otro solo latieron los 3 de la
+#  escena) y destruir() de la escena UI "HUD" no la destruye (hud=true; el binario se caia). El mismo
+#  veredicto en el Play (simplay) y en el binario (su whisk3d.log).
+#  Compila un juego de verdad (cmake + g++), asi que tarda mas que las demas.
+# ==========================================================================
+
+ventana 640 480
+juegoprefabsmin /tmp/w3d_f7_juego
+guardarw3d /tmp/w3d_f7_juego/juegoprefabs.w3d
+entradaexiste /tmp/w3d_f7_juego/juegoprefabs.w3d prefabs/enemigo.w3dp 1
+abrirw3d /tmp/w3d_f7_juego/juegoprefabs.w3d
+prefabvivos 3
+prefabinfo Enemigo.001 generados 4 overrides 1
+
+# --- el Play del editor ---
+simcache 0
+simplay 130
+scriptinfo compartido juez OK
+simstop
+simcache 1
+prefabvivos 3
+
+# --- el binario (modo debug: deja su whisk3d.log) ---
+compilarjuego 0 0 1
+juegoprefabslog /tmp/w3d_f7_juego juegoprefabs creados=1000 enemigos=1003 scope=1003 latidos=15 muerto=true vida=10045 primer=3 hud=true

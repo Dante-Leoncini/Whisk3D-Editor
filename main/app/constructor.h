@@ -34,4 +34,8 @@ extern bool running;
 // Constructor universal para todas las plataformas
 void ConstructUniversal(int argc, char* argv[]);
 
+// la escena de arrancar SIN archivo (coleccion del usuario + camara + luz + cubo), sobre
+// una raiz vacia. Tambien la usa el harness (escenadefecto) despues de ReiniciarEscena.
+void W3dCrearEscenaPorDefecto();
+
 #endif

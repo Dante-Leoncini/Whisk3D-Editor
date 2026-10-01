@@ -144,8 +144,12 @@ Object* NewMesh(MeshType type, Object* parent, bool query){
         MaterialGroup g; g.startDrawn = 0; g.material = MaterialDefecto;
         mesh->materialsGroup.push_back(g);
     }
+    // el recurso de la biblioteca NO se crea aca (el que llama puede reemplazar los arreglos enseguida: un
+    // loader que parte de un cubo). Lo crean el Add del editor (TrasCrearAdd) y la escena por defecto, via
+    // W3dMallaNacioHook; el resto lo toma el tick del editor (W3dMallasAsegurarRecursos)
     return mesh;
 };
+void (*W3dMallaNacioHook)() = 0;
 // ===================================================
 // Generacion de PRIMITIVAS (cubo/plano/circulo/esfera/cono/cilindro). Antes vivia en el
 // Core (Mesh.cpp); es creacion de geometria del editor. Regenerar sigue como Mesh::.

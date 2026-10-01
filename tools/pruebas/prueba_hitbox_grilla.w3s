@@ -1,0 +1,15 @@
+# ==========================================================================
+#  HITBOX: el BROADPHASE (grilla uniforme + esferas) contra la FUERZA BRUTA.
+#  Correr DESDE ESTA CARPETA (ver prueba_hitbox.w3s):
+#    ../../platform/linux/build/whisk3d --script prueba_hitbox_grilla.w3s
+#
+#  Hitbox al azar (determinista) con tamanos, rotaciones, escalas de mundo y
+#  centros distintos; uno ENORME (va a la lista de los grandes). El paso del motor
+#  tiene que encontrar EXACTAMENTE los mismos pares que el SAT de todos contra
+#  todos, y con miles de hitbox el paso tiene que ser barato.
+# ==========================================================================
+
+hitboxgrilla 50
+hitboxgrilla 400 grande 1
+hitboxgrilla 3000 grande 1 maxms 60
+escenadefecto

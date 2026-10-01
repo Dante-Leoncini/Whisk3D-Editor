@@ -3,3 +3,5 @@
 *_rt*.w3d
 *.ppm
 whisk3d.log
+*_rt_*.png
+*_rt_*.wav

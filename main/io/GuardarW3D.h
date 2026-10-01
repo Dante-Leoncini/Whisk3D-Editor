@@ -19,7 +19,7 @@
 //      escenas/           los .w3dui
 //      scripts/           los .lua internos
 //      texturas/  fuentes/  sonidos/  videos/
-//      mallas/            la geometria (.w3dm propio; .glb en los archivos viejos)
+//      mallas/            la geometria (.w3db binario / .w3dm texto; .glb en los archivos viejos)
 //      animaciones/       los blobs de vertex anim
 //      modelos/  proyecto/  extra/
 //      EXTERNOS.txt       solo si hay alguna referencia "ext:"
@@ -35,12 +35,14 @@
 //  falta alguno se avisa CLARO. Una referencia rota se CONSERVA (un pendrive
 //  sacado no puede convertirse en perdida de configuracion).
 //
-//  LA GEOMETRIA VA EN mallas/<slug>.w3dm (formato propio, W3dMalla.h): poligonos
-//  nativos, capas UV y de color, costuras, bordes marcados, normales del usuario,
-//  geometria suelta, mesh parts y los pesos de los grupos, TODO por indice. El GLB
-//  quedo solo para importar y para el "Export to..." del usuario. Los materiales,
-//  que viajaban adentro del GLB, ahora son el bloque raiz "materiales" del JSON y
-//  cada .w3dm los referencia POR NOMBRE.
+//  LA GEOMETRIA VA EN mallas/<slug>.w3db (binario lista para memoria, W3dMallaBin.h;
+//  el default) o mallas/<slug>.w3dm (texto, W3dMalla.h; opcion del proyecto
+//  "formatoMallas": "texto"): poligonos nativos, capas UV y de color, costuras,
+//  bordes marcados, normales del usuario, geometria suelta, mesh parts y los pesos
+//  de los grupos, TODO por indice. El binario ademas hornea lo que el texto obliga a
+//  derivar al abrir (index buffer, aristas, AABB). El GLB quedo solo para importar y
+//  para el "Export to..." del usuario. Los materiales, que viajaban adentro del GLB,
+//  ahora son el bloque raiz "materiales" del JSON y cada malla los referencia POR NOMBRE.
 //
 //  Cubre: mallas, materiales, vertex anims, armatures + clips, modArmature,
 //  armature 2D, el STACK de modificadores (Mirror/Screw/SubSurf/...),
@@ -93,6 +95,16 @@ void GuardarProyectoComo();
 // para verificar que un guardado a medias NO destruye la version anterior.
 // Siempre false en el editor real.
 extern bool g_w3dFallarEscritura;
+
+// TEST del harness (comando 'indices16'): el guardado de las mallas se comporta como en una
+// plataforma con indices de 16 bits (el N95): una malla de mas de 65535 render-verts no entra
+// en el .w3db (W3dMallaBinIndicesAlcanzan) y sale en texto (.w3dm). Siempre false en el editor real.
+extern bool g_w3dIndices16Simulado;
+
+// TEST del harness (comando 'mallaslegado'): el guardado escribe las mallas como ANTES de las
+// mallas como recurso (una entrada por objeto con "geometria", sin registro "mallas" ni dedup),
+// para fabricar un proyecto viejo y probar que abre y migra. Siempre false en el editor real.
+extern bool g_w3dMallasLegado;
 
 // ICONO del juego (tarjeta Juego): un PNG con alpha en su maxima definicion.
 // Se guarda en el .w3d como RUTA EXTERNA relativa al .w3d (nunca embebido);

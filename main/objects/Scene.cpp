@@ -31,6 +31,17 @@ ObjectType Scene::getType() {
 Scene::~Scene() {
 }
 
+// una raiz nueva, AFUERA del arbol activo (ver Scene.h): el ctor de Object la deja suelta con
+// W3dRaizCreando, y el de Scene no puede pisar el 'scene' de la raiz que se esta mirando
+Scene* W3dSceneNuevaRaiz() {
+    Scene* antes = scene;
+    W3dRaizCreando = true;
+    Scene* r = new Scene();
+    W3dRaizCreando = false;
+    scene = antes;
+    return r;
+}
+
 // SceneCollection lo DEFINE el Core (objects/Objects.cpp) y arranca en 0; aca solo se llena con
 // la raiz del editor. En Symbian eso ya se hacia asi, por el orden de inicializacion estatica
 // entre unidades: el ctor de Scene usa globals de Objects.cpp (ObjSelects).

@@ -1,0 +1,183 @@
+# prueba_animsets_edicion.w3s — FASE 3: los clips COMPARTIDOS de un animset en el EDITOR
+#
+#  Criterios de aceptacion:
+#   - MIRAR no copia: ver el clip de un armature en el dope sheet y en el editor de curvas,
+#     encuadrarlo, elegir un keyframe (la tarjeta Keyframe), posar en Pose Mode, reproducir y
+#     dibujar la UI entera dejan al armature colgado del animset (sin memoria de mas);
+#   - EDITAR copia (copy-on-write) SOLO al armature editado, por cualquier camino de la UI:
+#     mover/escalar/cancelar/borrar/duplicar keyframes, interpolacion, tipo de handle, Smart
+#     Euler, la tarjeta Keyframe, arrastrar un handle, la I de Pose Mode, el End del clip (solo si
+#     cambia) y el Ctrl+Z. El animset queda INTACTO (los SELLOS se verifican antes de cada
+#     comando) y los demas usuarios reproducen exactamente igual;
+#   - reordenar o borrar los clips de un armature no copia nada y se guarda;
+#   - los animsets como RECURSOS del proyecto (lo que usa el outliner por recursos): usuarios,
+#     renombrar (unico en el registro), carpeta cosmetica, purgar huerfanos; todo sobrevive al
+#     guardado.
+ventana 1280 720
+
+# 16 armatures del mismo rig (el segundo con un "Quieto" propio, el tercero con un clip repetido,
+# que pasa a clips propios al abrir) -> 15 colgados del animset "Personaje"
+animsetsintetica 16 prueba_animsets_ed_v4.w3d
+abrirw3d prueba_animsets_ed_v4.w3d
+animsetinfo vivos 1 refs 15 clips 5 copias 1
+animsetarm Personaje.002 compartido 0
+animsetsellos clips 5
+posefoto animsets_ed_base.pose juego 1
+# los dos que NO se van a editar, para compararlos al final de B
+posefoto animsets_ed_otros_a.pose juego 1 solo Personaje.001 solo Personaje.002
+
+# ---- A) MIRAR no copia ----
+animsetver Personaje 1 compartido 1 copias 0
+animsetver Personaje.001 0 compartido 1 copias 0
+animsetver Personaje.004 2 compartido 1 copias 0
+animsetver Personaje.002 1 compartido 0 copias 0
+meminfo
+animsetinfo vivos 1 refs 15 copias 1
+posefoto animsets_ed_ver.pose juego 1
+posefotoigual animsets_ed_base.pose animsets_ed_ver.pose
+
+# ---- B) EDITAR copia solo al editado; el animset y los demas no se enteran ----
+# (cada 'animsetdope' asierta que SU armature paso a clips propios con UNA copia; los sellos del
+#  comando siguiente, que el animset sigue intacto)
+posefoto animsets_ed_p3a.pose juego 1 solo Personaje.003
+animsetdope Personaje.003 1 mover compartido 0 copias 1
+posefoto animsets_ed_p3b.pose juego 1 solo Personaje.003
+fail posefotoigual animsets_ed_p3a.pose animsets_ed_p3b.pose
+# Ctrl+Z devuelve las curvas (en sus clips ya propios: no hay otra copia)
+animsetdope Personaje.003 1 undo compartido 0 copias 0
+posefoto animsets_ed_p3c.pose juego 1 solo Personaje.003
+posefotoigual animsets_ed_p3a.pose animsets_ed_p3c.pose
+animsetdope Personaje.004 1 escalar compartido 0 copias 1
+# cancelar un transform: arrancarlo ya es editar (copia) pero la animacion queda como estaba
+posefoto animsets_ed_p5a.pose juego 1 solo Personaje.005
+animsetdope Personaje.005 1 cancelar compartido 0 copias 1
+posefoto animsets_ed_p5b.pose juego 1 solo Personaje.005
+posefotoigual animsets_ed_p5a.pose animsets_ed_p5b.pose
+posefoto animsets_ed_p6a.pose juego 1 solo Personaje.006
+animsetdope Personaje.006 1 borrar compartido 0 copias 1
+posefoto animsets_ed_p6b.pose juego 1 solo Personaje.006
+fail posefotoigual animsets_ed_p6a.pose animsets_ed_p6b.pose
+animsetdope Personaje.007 1 duplicar compartido 0 copias 1
+animsetdope Personaje.008 1 interp compartido 0 copias 1
+animsetdope Personaje.009 1 handletipo compartido 0 copias 1
+animsetdope Personaje.010 1 euler compartido 0 copias 1
+posefoto animsets_ed_p11a.pose juego 1 solo Personaje.011
+animsetdope Personaje.011 1 kfvalor compartido 0 copias 1
+posefoto animsets_ed_p11b.pose juego 1 solo Personaje.011
+fail posefotoigual animsets_ed_p11a.pose animsets_ed_p11b.pose
+animsetdope Personaje.012 1 handle compartido 0 copias 1
+posefoto animsets_ed_p13a.pose juego 1 solo Personaje.013
+animsetdope Personaje.013 1 insertar compartido 0 copias 1
+posefoto animsets_ed_p13b.pose juego 1 solo Personaje.013
+fail posefotoigual animsets_ed_p13a.pose animsets_ed_p13b.pose
+# el End del clip: confirmado IGUAL no copia; cambiado, si
+animsetdope Personaje 2 finigual compartido 1 copias 0
+animsetdope Personaje 2 fin compartido 0 copias 1
+# los dos botones Rename del clip (el rename in-place guarda un PUNTERO al nombre: tiene que ser
+# el de un clip ya propio, sino renombraba el clip de todos)
+animsetdope Personaje.014 3 renombrar compartido 0 copias 1
+animsetclip Personaje.014 3 nombre Renombrado
+animsetdope Personaje.015 3 renombrararm compartido 0 copias 1
+animsetclip Personaje.015 3 nombre Renombrado
+animsetclip Personaje.001 3 nombre Saltar
+animsetsellos clips 5
+# el detector de los sellos, probado: una escritura sin copiar SE VE
+animsetsellos prueba Personaje.001
+# quedan colgados Personaje.001 (el del "Quieto" propio, que igual esta en la biblioteca)
+animsetinfo vivos 1 refs 1
+animsetarm Personaje.001 compartido 1
+# y los que no se editaron reproducen EXACTAMENTE como al abrir
+posefoto animsets_ed_otros_b.pose juego 1 solo Personaje.001 solo Personaje.002
+posefotoigual animsets_ed_otros_a.pose animsets_ed_otros_b.pose
+
+# ---- C) REORDENAR los clips de un armature colgado no copia (su lista de punteros es suya) ----
+animsetactivo Personaje.001
+anim down
+animsetarm Personaje.001 compartido 1 clips 4
+animsetclip Personaje.001 1 nombre Quieto
+animsetinfo copias 15
+guardarw3d prueba_animsets_ed_rt.w3d
+posefoto animsets_ed_rt_a.pose juego 1
+abrirw3d prueba_animsets_ed_rt.w3d
+animsetclip Personaje.001 1 nombre Quieto
+posefoto animsets_ed_rt_b.pose juego 1
+posefotoigual animsets_ed_rt_a.pose animsets_ed_rt_b.pose
+
+# ---- C2) BORRAR un clip de un armature colgado tampoco copia: solo suelta el puntero (el clip
+#          sigue en el animset para los demas) y el guardado escribe el subconjunto. Sin clips,
+#          el armature suelta el recurso (ya no es usuario) ----
+abrirw3d prueba_animsets_ed_v4.w3d
+animsetinfo vivos 1 refs 15 copias 16
+posefoto animsets_ed_del_a.pose juego 1 sin Personaje.004
+animsetactivo Personaje.004
+anim del
+animsetarm Personaje.004 compartido 1 clips 3
+animsetclip Personaje.004 0 nombre Caminar mismo Personaje 1 1
+animsetinfo vivos 1 refs 15 clips 5 copias 16
+anim del
+anim del
+animsetarm Personaje.004 compartido 1 clips 1
+anim del
+animsetarm Personaje.004 compartido 0 clips 0
+animsetinfo vivos 1 refs 14 clips 5 copias 16
+animsetusuarios Personaje 15
+posefoto animsets_ed_del_b.pose juego 1 sin Personaje.004
+posefotoigual animsets_ed_del_a.pose animsets_ed_del_b.pose
+guardarw3d prueba_animsets_ed_del_rt.w3d
+animsetsw3d prueba_animsets_ed_del_rt.w3d animsets 1 clips 6 armatures 15 registro 1
+# el UNICO usuario se lleva los clips (sin copiar) y el borrado se libera: el recurso muere
+animsetsintetica 1 prueba_animsets_ed_del1_v4.w3d
+abrirw3d prueba_animsets_ed_del1_v4.w3d
+animsetinfo vivos 1 refs 1 clips 4
+animsetactivo Personaje
+anim del
+animsetarm Personaje compartido 0 clips 3
+animsetinfo vivos 0
+
+# ---- D) los animsets como RECURSOS del proyecto ----
+abrirw3d prueba_animsets_ed_v4.w3d
+# usuarios: los 15 colgados + Personaje.002, que paso a clips propios pero vuelve a este animset
+animsetusuarios Personaje 16
+animsetpurgar 0
+animsetrenombrarset Personaje Enemigos Enemigos
+animsetusuarios Enemigos 16
+animsetusuarios Personaje 0
+animsetarm Personaje animset Enemigos
+animsetcarpeta Enemigos fijar Personajes/Malos
+animsetcarpeta Enemigos es Personajes/Malos
+# (el guardado suma el "Caminar.001" que la reparacion de nombres le dio al repetido de Personaje.002)
+guardarw3d prueba_animsets_ed_rec_rt.w3d
+animsetsw3d prueba_animsets_ed_rec_rt.w3d animsets 1 clips 6 armatures 16 registro 1
+zipentrada prueba_animsets_ed_rec_rt.w3d animaciones/enemigos.w3da
+zipentrada prueba_animsets_ed_rec_rt.w3d animaciones/personaje.w3da no
+abrirw3d prueba_animsets_ed_rec_rt.w3d
+animsetinfo vivos 1 refs 16 registro 1
+animsetcarpeta Enemigos es Personajes/Malos
+animsetarm Personaje.004 compartido 1 animset Enemigos
+posefoto animsets_ed_rec.pose juego 1
+posefotoigual animsets_ed_base.pose animsets_ed_rec.pose
+# sin usuarios queda HUERFANO (se conserva al guardar) hasta que se purga
+animsetborrar Personajes
+animsetusuarios Enemigos 0
+guardarw3d prueba_animsets_ed_huerf_rt.w3d
+animsetsw3d prueba_animsets_ed_huerf_rt.w3d animsets 1 armatures 0 registro 1
+animsetpurgar 1
+animsetinfo registro 0
+guardarw3d prueba_animsets_ed_purga_rt.w3d
+animsetsw3d prueba_animsets_ed_purga_rt.w3d animsets 0 armatures 0 registro 0
+zipentrada prueba_animsets_ed_purga_rt.w3d animaciones/enemigos.w3da no
+
+# ---- E) renombrar a un nombre que ya usa OTRO animset del registro: queda unico (.NNN) ----
+animsetsintetica 3 prueba_animsets_ed_var_v4.w3d invertido
+abrirw3d prueba_animsets_ed_var_v4.w3d
+animsetinfo registro 2
+animsetrenombrarset Invertido Personaje Personaje.001
+animsetarm Invertido animset Personaje.001
+animsetrenombrarset Personaje.001 Invertido Invertido
+animsetrenombrarset Personaje " Personaje " Personaje
+fail animsetrenombrarset NoExiste Algo
+
+# ---- F) cerrar el proyecto ----
+escenadefecto
+animsetinfo vivos 0 registro 0
+animsetsellos clips 0

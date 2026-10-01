@@ -1,0 +1,76 @@
+# ==========================================================================
+#  CINEMATICAS EN UN JUEGO -- los DOS CAMINOS -- en el Play y en el JUEGO COMPILADO
+#  (W3dRaices.h: reproducirEscena; animation/Animation.h: animObjeto / escenaCapa).
+#  Correr DESDE ESTA CARPETA (ver prueba_juego3d.w3s):
+#    ../../platform/linux/build/whisk3d --script prueba_juego3d_cine.w3s
+#
+#  El juego 3D minimo (juego3dmin) mas lo de juegocinemin:
+#   - camino 2, VARIAS ANIMACIONES A LA VEZ: la Puerta y el Ascensor tienen SUS clips de
+#     jerarquia ("abrir" de una pasada, "subir" con loop; cada uno en la biblioteca de su
+#     raiz, un animset .w3da) y el juego los hace sonar juntos con animObjeto(); ademas dos
+#     capas de escena (escenaCapa): "Luces" prende la Lampara (canal de visibilidad) y
+#     "Cielo" corre el Cubo.
+#   - camino 1, REPRODUCIR UNA ESCENA: a los 5 ticks el juego pide
+#     reproducirEscena("Cine1", "alVolver"): se muestra la escena "Cine1" (su camara, su
+#     cubo, su animacion "Anim" de 1 a 11) con el juego en pausa y al terminar se vuelve.
+#   - clips AJENOS por su nombre calificado "Biblioteca/clip" (raices SIN biblioteca propia): la
+#     Grua reproduce "Puerta/abrir" al doble (animObjetoVelocidad), la Puerta2 (el doble de
+#     grande) lo reproduce con animRetarget "rotaciones" (sube el doble) y la Plataforma mezcla
+#     "Ascensor/subir" al 50% en una CAPA (objetoCapa). El juez lo verifica en el Play y en el
+#     binario compilado.
+#   - pararEscena3D(): un rato despues de volver, el juego pide la cinematica OTRA VEZ
+#     (reproducirEscena("Cine1", "alCortada")) y esta vez el script de la escena la CORTA con
+#     pararEscena3D() en su segundo cuadro: se vuelve igual, se llama alCortada() y el juego
+#     sigue exactamente donde estaba.
+#  El JUEZ (el script del juego) verifica en alVolver() que el juego quedo EXACTAMENTE como
+#  estaba (el cabezal de la Puerta, ni un frame de mas, y su posicion), que sus scripts no
+#  corrieron mientras tanto, que la escena corrio sus scripts una vez por cinematica, que la
+#  cortada volvio en el mismo tick en que se pidio y antes del final de su animacion, y medio
+#  segundo despues que todo siguio andando (clips, capas, visibilidad). Todo se mide contra el dt (el del
+#  juego compilado es de reloj, no fijo). El veredicto va a compartido("juez") y al
+#  log ("[juegocine] OK ..."): el mismo en el Play y en el binario, donde ademas la escena
+#  se carga de su entrada para la cinematica (escenas/cine1.w3de) y vuelve al juego.
+#  Compila un juego de verdad (cmake + g++), asi que tarda mas que las demas.
+# ==========================================================================
+
+ventana 640 480
+juegocinemin /tmp/w3d_f6_cine
+guardarw3d /tmp/w3d_f6_cine/juegocine.w3d
+entradaexiste /tmp/w3d_f6_cine/juegocine.w3d escenas/cine1.w3de 1
+entradatiene /tmp/w3d_f6_cine/juegocine.w3d proyecto.json "clipsJerarquia" 1
+entradaexiste /tmp/w3d_f6_cine/juegocine.w3d animaciones/puerta.w3da 1
+entradaexiste /tmp/w3d_f6_cine/juegocine.w3d animaciones/ascensor.w3da 1
+abrirw3d /tmp/w3d_f6_cine/juegocine.w3d
+raizinfo n 2 activa Scene tipo juego cargada Cine1 0 tipode Cine1 escena
+clipinfo Puerta n 1 tiene abrir
+clipinfo Ascensor n 1 tiene subir
+
+# --- el Play del editor ---
+simplay 5
+cineinfo activa 1 escena Cine1 juego Scene
+raizinfo activa Cine1 cargada Cine1 1
+raizcontexto camara CamCine
+raizmodo kind 2 juego 1
+simplay 11
+cineinfo activa 0
+raizinfo activa Scene
+scriptinfo compartido vuelta 5
+scriptinfo compartido iguales true
+raizobjat Cine1 CuboCine 0 0 0 0.001
+# (la segunda, la que corta pararEscena3D(), y medio segundo de juego despues)
+simplay 25
+scriptinfo compartido cortada 8
+scriptinfo compartido iguales2 true
+cineinfo activa 0
+raizobjat Cine1 CuboCine 0 0 0 0.001
+scriptinfo compartido juez OK
+simstop
+raizinfo activa Scene
+objat Puerta -3 0 0 0.001
+objat Grua -6 0 0 0.001
+objat Puerta2 -9 0 0 0.001
+objat Plataforma 6 0 0 0.001
+
+# --- el binario (modo debug: deja su whisk3d.log) ---
+compilarjuego 0 0 1
+juegocinelog /tmp/w3d_f6_cine juegocine

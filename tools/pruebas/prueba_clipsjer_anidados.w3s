@@ -1,0 +1,137 @@
+# ==========================================================================
+#  CLIPS DE JERARQUIA ANIDADOS: un nodo del clip de una raiz es, a su vez, la raiz de OTRO clip
+#  que suena (el auto abre la puerta con su clip y la puerta, ademas, tiembla con el suyo).
+#  "Los objetos tienen sus animaciones o los controla el padre": las dos cosas a la vez.
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/linux/build/whisk3d --script prueba_clipsjer_anidados.w3s
+#
+#  Se prueba (animation/Animation.cpp, "RAICES ANIDADAS"):
+#    - el resultado NO depende del orden en que se arrancaron: el ancestro se posa primero;
+#    - la pista "." de la raiz anidada se SUMA a lo que le hizo el ancestro en los canales que
+#      el le anima; en los demas va desde donde estaba al arrancar;
+#    - un clip de una pasada que ya termino sigue sumando su ultima pose mientras el ancestro
+#      la mueve; si el que termina es el del ancestro, la anidada sigue desde la ultima pose
+#      que el le dio (no salta a donde estaba al arrancar);
+#    - un nodo que animan dos clips que suenan: gana el de la raiz MAS CERCANA;
+#    - lo mismo con CAPAS (el Mix de clips de jerarquia): las del ancestro primero y la raiz
+#      anidada mezcla sobre lo que le dejaron.
+# ==========================================================================
+
+ventana 1280 720
+escenadefecto
+
+# ---- la jerarquia: Auto > Chasis > Puerta (x=1) ----
+add cube
+objname Auto
+add cube
+objname Chasis
+parent Chasis Auto
+add cube
+objname Puerta
+parent Puerta Chasis
+selobj Puerta
+objpos 1 0 0
+
+# ---- los clips: cada objeto con SU biblioteca ----
+# el del auto abre la puerta (ry 0 -> 90); el de la puerta tiembla sobre si misma (ry 0 -> 20 y sube 1);
+# el del chasis la cierra (ry 0 -> -90)
+clipnuevo Auto abrir 1 11
+animcurva Auto:abrir Puerta ry 1 0 11 90
+clipnuevo Puerta temblar 1 11
+animcurva Puerta:temblar . ry 1 0 11 20
+animcurva Puerta:temblar . y 1 0 11 1
+clipnuevo Chasis cerrar 1 11
+animcurva Chasis:cerrar Puerta ry 1 0 11 -90
+jerinfo Auto lib Auto pistas abrir 1 ruta abrir Chasis/Puerta
+jerinfo Puerta lib Puerta pistas temblar 1 ruta temblar .
+jerinfo Chasis lib Chasis pistas cerrar 1 ruta cerrar Puerta
+raizanim Scene
+
+# una copia INTACTA de la jerarquia para las capas (usa las mismas bibliotecas)
+dupjerarquia copia Auto +hijos
+jerinfo Auto.001 lib Auto
+jerinfo Puerta.001 lib Puerta
+
+# ---- la puerta arranca PRIMERO y el auto despues: igual se posa primero el auto ----
+jerplay Puerta temblar loop 0
+jerplay Auto abrir loop 0
+jertick 0.1666667 1
+jerframe Auto 6 0.01
+jerframe Puerta 6 0.01
+# ry: 45 del auto + 10 de su temblor; y: 0 (donde estaba) + 0,5
+rotat Puerta 0 55 0 0.1
+objat Puerta 1 0.5 0 0.01
+jertick 0.1666667 1
+jerframe Auto 11 0.01 termino 1
+jerframe Puerta 11 0.01 termino 1
+rotat Puerta 0 110 0 0.1
+objat Puerta 1 1 0 0.01
+
+# ---- la puerta YA TERMINO (una pasada) y el auto vuelve a abrirla en loop: su ultima pose se suma ----
+# (ticks de un pelito menos de 5 frames: un loop que pasa del ultimo frame vuelve al primero)
+jerplay Auto abrir loop 1
+jertick 0.1666666 1
+jerframe Puerta 11 0.01 termino 1
+rotat Puerta 0 65 0 0.1
+objat Puerta 1 1 0 0.01
+jertick 0.1666666 1
+rotat Puerta 0 110 0 0.1
+# (el loop del auto da la vuelta: frame 5 = 36 grados)
+jertick 0.1666666 1
+jerframe Auto 5 0.01
+rotat Puerta 0 56 0 0.1
+
+# ---- el del AUTO termina y la puerta sigue en loop: sigue desde la ultima pose que el le dio ----
+jerplay Auto abrir loop 0
+jerplay Puerta temblar loop 1
+# (la puerta arranca donde quedo: ry 0 del auto recien arrancado, y = 1)
+jertick 0.1666666 1
+rotat Puerta 0 55 0 0.1
+objat Puerta 1 1.5 0 0.01
+jertick 0.1666666 1
+rotat Puerta 0 110 0 0.1
+objat Puerta 1 2 0 0.01
+# el del auto llega al final (su ultima pose: 90) y la puerta da la vuelta (frame 5 = 8 grados, 0,4 de altura)
+jertick 0.1666666 1
+jerframe Auto 11 0.01 termino 1
+jerframe Puerta 5 0.01 termino 0
+rotat Puerta 0 98 0 0.1
+objat Puerta 1 1.4 0 0.01
+# el auto ya no suena: la puerta sigue sobre los 90 que el le dejo (frame 10 = 18 grados), no sobre su 0
+jertick 0.1666666 1
+jerframe Puerta 10 0.01
+rotat Puerta 0 108 0 0.1
+objat Puerta 1 1.9 0 0.01
+
+# ---- un nodo que animan DOS clips: gana el de la raiz mas cercana (el chasis, no el auto) ----
+jerreset
+jerplay Chasis cerrar loop 0
+jerplay Auto abrir loop 0
+jertick 0.1666667 1
+rotat Puerta 0 -45 0 0.1
+jerreset
+# (y en el otro orden, lo mismo)
+jerplay Auto abrir loop 0
+jerplay Chasis cerrar loop 0
+jertick 0.1666667 1
+rotat Puerta 0 -45 0 0.1
+jerreset
+jermem sonando 0
+
+# ---- CAPAS: las del auto primero; la puerta mezcla SU clip sobre lo que le dejaron ----
+jercapa Puerta.001 1 temblar infl 100
+jercapa Auto.001 1 abrir infl 100
+jermix tick 0.1666667 1
+rotat Puerta.001 0 55 0 0.1
+objat Puerta.001 1 0.5 0 0.01
+# "sumar" al 50% sobre el ancestro: 45 + 5
+jercapa Puerta.001 1 temblar infl 50 modo sumar frame 0
+jercapa Auto.001 1 abrir infl 100 frame 0
+jermix tick 0.1666667 1
+rotat Puerta.001 0 50 0 0.1
+objat Puerta.001 1 0.25 0 0.01
+jermix soltar
+rotat Puerta.001 0 0 0 0.1
+objat Puerta.001 1 0 0 0.01
+jercapa Puerta.001 1 -
+jercapa Auto.001 1 -

@@ -102,8 +102,39 @@ TextField* g_textFieldActivo = NULL;
 extern bool NumEditActivo();
 extern void NumEditCommit();
 extern void NumEditCancel();
+// CANCELAR con Esc/C (ver TextField.h): el texto que tenia el campo enfocado ANTES de tocarlo.
+// gFocoDe = de que campo es (si el foco cambia, se vuelve a anotar).
+static TextField*  gFocoDe = NULL;
+static std::string gFocoTexto;
+TextField* g_textFieldRestaurado = NULL;   // el que un Esc descarto en ESTE cuadro (ver TextField.h)
+void TextFieldEnfocar(TextField* f){
+    g_textFieldActivo = f;
+    g_textFieldRestaurado = NULL;
+    gFocoDe = f;
+    gFocoTexto = f ? f->text : std::string();
+}
+void TextFieldFinDeCuadro(){
+    TextFieldSeguirFoco();
+    g_textFieldRestaurado = NULL;          // los duenos en vivo ya escribieron el texto restaurado
+}
+void TextFieldSeguirFoco(){
+    if (g_textFieldActivo == gFocoDe) return;
+    gFocoDe = g_textFieldActivo;
+    gFocoTexto = gFocoDe ? gFocoDe->text : std::string();
+}
+bool TextFieldCancelar(){
+    if (!g_textFieldActivo) return false;
+    TextFieldSeguirFoco();                 // (enfocado a mano y sin teclas todavia: no cambio nada)
+    g_textFieldActivo->SetText(gFocoTexto);
+    g_textFieldRestaurado = g_textFieldActivo;   // los duenos EN VIVO lo re-escriben este cuadro
+    g_textFieldActivo = NULL;
+    gFocoDe = NULL;
+    g_redraw = true;
+    return true;
+}
 bool TextFieldInputChar(int c){
     if (!g_textFieldActivo) return false;
+    TextFieldSeguirFoco();                 // antes de la PRIMERA tecla: el texto de antes
     if (c == 8)       g_textFieldActivo->Backspace();
     else if (c == 127)g_textFieldActivo->DelForward();
     else if (c >= 32 && c < 127) g_textFieldActivo->InsertChar(c); // ASCII imprimible
