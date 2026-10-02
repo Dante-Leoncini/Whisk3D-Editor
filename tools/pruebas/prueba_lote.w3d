@@ -14,7 +14,11 @@ Whisk3D {
 
         Camera {
             name: "Camara"
-            y: -10.0
+            // en +10 MIRANDO los cubos (la camara sin rotacion mira hacia -Z): antes estaba en -10
+            // de espaldas y los 48 tris del gate se mandaban al GL pero el clipping los tiraba --
+            // con el autocull de mallas dejaron de mandarse y el minimo del presupuesto fallaba.
+            // Asi el trisOpacosMin verifica geometria que de verdad esta en pantalla.
+            y: 10.0
             z: 3.0
         }
 

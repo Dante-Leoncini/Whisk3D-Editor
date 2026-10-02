@@ -39,7 +39,7 @@ extern "C" {
 
 // audio del Core, forward-decl (evita el include del dir de audio, como en W3dScript.cpp).
 // Sin -DW3D_ENABLE_AUDIO son stubs no-op -> sonido() no hace nada y no rompe.
-namespace w3dEngine { class W3dSound; W3dSound* W3dSoundLoad(const char*); void W3dSoundFree(W3dSound*); int W3dSoundPlayPitch(W3dSound*, float, bool, float); void W3dSoundStopFade(int, float); }
+namespace w3dEngine { class W3dSound; W3dSound* W3dSoundLoad(const char*); void W3dSoundFree(W3dSound*); int W3dSoundPlayPitch(W3dSound*, float, bool, float); void W3dSoundStopFade(int, float); float W3dSoundPos(int); }
 
 // ---------------------------------------------------------------------------
 //  TAMANO del lienzo del juego: el MISMO que ve el render del overlay
@@ -475,6 +475,18 @@ static int LPararSonido(lua_State* L) {
     float fade = (float)luaL_optnumber(L, 2, 0.005);
     if (id > 0) w3dEngine::W3dSoundStopFade(id, fade);
     return 0;
+}
+// sonidoPosicion(handle): SEGUNDOS del sonido ya reproducidos por esa voz, o nil si la voz
+// no existe (termino, se corto o el handle es nil/viejo). Es el RELOJ MAESTRO para una
+// cinematica con audio: el mixer avanza en tiempo real aunque el render vaya a 5 fps, asi
+// que el lua hace t = sonidoPosicion(h) y la animacion SALTA los frames que haga falta
+// para quedar donde va el sonido (frameskip) en vez de irse quedando atras del audio.
+static int LSonidoPosicion(lua_State* L) {
+    int id = (int)luaL_optinteger(L, 1, 0);
+    float seg = (id > 0) ? w3dEngine::W3dSoundPos(id) : -1.0f;
+    if (seg < 0.0f) return 0;   // nil
+    lua_pushnumber(L, seg);
+    return 1;
 }
 // setSector(obj, s): sector ACTIVO del modificador "Culling" (PVS por triangulo) de la
 // malla. s es 1-based; 0 o fuera de rango = malla completa (fallback). El lua del juego
@@ -1145,6 +1157,7 @@ void BindsJuegoRegistrar(void* Lv) {
     lua_pushcfunction(L, LSetUVRect);   lua_setglobal(L, "setUVRect");
     lua_pushcfunction(L, LSonido);      lua_setglobal(L, "sonido");
     lua_pushcfunction(L, LPararSonido); lua_setglobal(L, "pararSonido");
+    lua_pushcfunction(L, LSonidoPosicion); lua_setglobal(L, "sonidoPosicion");
     lua_pushcfunction(L, LSetSector);   lua_setglobal(L, "setSector");
     lua_pushcfunction(L, LVisCelda);      lua_setglobal(L, "visCelda");
     lua_pushcfunction(L, LSetVisAncla);   lua_setglobal(L, "setVisAncla");

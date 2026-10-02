@@ -60,6 +60,7 @@ bool UpdateFlipbooks(float dtSeg); // Flipbook.cpp: flipbooks unificados (Imagen
 #include "io/GuardarVersion.h" // versave: guardado por versiones (boton "Guardar version vN")
 #include "io/W3dZip.h"         // versave/ziphard/contenedor: leer y fabricar zips
 #include "io/W3dMalla.h"      // w3dm: el formato de geometria propio (.w3dm)
+#include "base/W3dConfig.h"   // cullcamaras: ConfigSetMudo (silenciar para que el frameskip avance en headless)
 #include "io/W3dMallaBin.h"   // vaguardado: la edicion PENDIENTE de una malla de un recurso (W3dMallaBinMaterializarEdicion)
 #include "io/W3dTexto.h"      // w3dm: escaner/escritor de numeros exactos del .w3dm
 #include "io/W3dContenedor.h" // contenedor/migrar: el .w3d v4 (montaje, refs externas, hook de test)
@@ -4653,6 +4654,62 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
     //      (--juego: sim + scripts lua + fisica + snapshot de rewind) y mide el frame
     //      COMPLETO con su desglose: sim (lua+fisica+snapshot), anims (esqueletos/
     //      materiales/uv) y render. Al final PARA el juego y restaura la escena. ----
+    // ---- cullcamaras [frames] : corre la cinematica registrando QUE mallas ven las camaras (pasan el
+    //      autocull y se dibujan) en algun frame, y BORRA las mallas que NUNCA se ven (exterior, fondos
+    //      tapados). Deja la escena lista para guardar un .w3d "interior real". Solo toca mallas (no
+    //      camaras/luces/emisores). Pensado para preparar demos de juego en PC. ----
+    if (cmd == "cullcamaras") {
+        int n = 1600; ss >> n; if (n < 1) n = 1;
+        extern Viewport3D* Viewport3DActive;
+        if (!rootViewport) { err = "cullcamaras: no hay layout"; return false; }
+        { extern void CargarTexturasPendientes(); CargarTexturasPendientes(); }
+        rootViewport->Render();
+        Viewport3D* vp = Viewport3DActive;
+        if (!vp) { err = "cullcamaras: no hay viewport 3D"; return false; }
+        bool camPrev = vp->ViewFromCameraActive;
+        if (CameraActive) vp->ViewFromCameraActive = true;
+        ActiveAnimKind = 2; AnimEsJuego = true; StartFrame = 1; PlayAnimation = true;
+        extern void SimTickPlay(float); extern void SimStop(); extern void AplicarAnimacionObjetos();
+        extern bool g_mallaAutocull; const bool cullPrev = g_mallaAutocull; g_mallaAutocull = true;
+        extern bool g_cullGrabar; extern void W3dCullVistaLimpiar(); extern bool W3dCullVistaTiene(const char*); extern int W3dCullVistaCantidad();
+        // MUTE: con el audio mudo, sonido() devuelve nil -> los scripts de demo (frameskip: t=sonidoPosicion)
+        // caen a t=t+dt y la cinematica AVANZA por ticks (headless no corre en tiempo real). dt=1/30 = el reloj
+        // de la cinematica (30 fps), asi 'frames' ticks recorren toda la escena y sus cortes de camara.
+        const bool mudoPrev = w3dEngine::ConfigMudo(); w3dEngine::ConfigSetMudo(true);
+        const float dt = 1.0f / 30.0f;
+        for (int i = 0; i < 5; i++) {   // warmup: inicio() de los scripts + primera pose
+            SimTickPlay(dt); UpdateAnimations(dt); W3dParticulasTick(dt);
+            { extern void W3dVisZonasTick(); W3dVisZonasTick(); }
+            AplicarAnimacionObjetos(); vp->Render();
+        }
+        W3dCullVistaLimpiar(); g_cullGrabar = true;
+        for (int i = 0; i < n; i++) {
+            SimTickPlay(dt); UpdateAnimations(dt); UpdateAnimatedMaterials(dt); UpdateUVAnims(dt); UpdateFlipbooks(dt);
+            W3dParticulasTick(dt); { extern void W3dVisZonasTick(); W3dVisZonasTick(); }
+            AplicarAnimacionObjetos(); vp->Render();
+        }
+        g_cullGrabar = false;
+        PlayAnimation = false; SimStop(); vp->ViewFromCameraActive = camPrev; g_mallaAutocull = cullPrev;
+        w3dEngine::ConfigSetMudo(mudoPrev);
+        const int vistas = W3dCullVistaCantidad();
+        // recolectar las mallas NUNCA vistas (type mesh) y borrarlas del arbol
+        std::vector<Mesh*> aBorrar;
+        { std::vector<Object*> st; if (SceneCollection) st.push_back(SceneCollection);
+          while (!st.empty()) { Object* o = st.back(); st.pop_back();
+              if (o->getType() == ObjectType::mesh && !W3dCullVistaTiene(o->name.c_str())) aBorrar.push_back((Mesh*)o);
+              for (size_t i = 0; i < o->Childrens.size(); i++) st.push_back(o->Childrens[i]); } }
+        extern void W3dLiberarSubarbol(Object*);
+        int borradas = 0;
+        for (size_t i = 0; i < aBorrar.size(); i++) {
+            Object* o = aBorrar[i]; Object* padre = o->Parent ? o->Parent : SceneCollection;
+            for (size_t k = 0; k < padre->Childrens.size(); k++) if (padre->Childrens[k] == o) { padre->Childrens.erase(padre->Childrens.begin() + k); break; }
+            if (ObjActivo == o) ObjActivo = NULL;
+            W3dLiberarSubarbol(o); borradas++;
+        }
+        DeseleccionarTodo(); ObjSelects.clear();
+        printf("      [cullcamaras] %d frames | mallas vistas por las camaras=%d | borradas (nunca vistas)=%d\n", n, vistas, borradas);
+        return true;
+    }
     if (cmd == "benchjuego") {
         int n = 300; ss >> n; if (n < 1) n = 1;
         // tokens opcionales en cualquier orden: 'noswap' (no presenta el frame) y
@@ -4688,6 +4745,11 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         double msSim = 0.0, msAnim = 0.0, msRender = 0.0, msFin = 0.0;
         long dc = 0, dcv = 0, idx = 0, binds = 0, mallas = 0, cullVis = 0, cullTot = 0;
         long stCh = 0, upB = 0, trO = 0, trB = 0, catP = 0, catU = 0;
+        // DIAGNOSTICO skinning (mismo contador que el log del N95): instalar un reloj ms y leer
+        // g_skinPerf* para ver si el incremental corta o cae al camino COMPLETO en modo juego.
+        extern unsigned int (*g_skinRelojMs)(); extern int g_skinPerfMs, g_skinPerfSkins, g_skinPerfCompletos;
+        struct RelojPC { static unsigned int Ms(){ double W3dNowMs(); return (unsigned int)W3dNowMs(); } };
+        g_skinRelojMs = RelojPC::Ms; g_skinPerfMs = 0; g_skinPerfSkins = 0; g_skinPerfCompletos = 0;
         for (int i = 0; i < n; i++) {
             gfx::StatsReset(); g_cullHijosTotal = 0; g_cullHijosVisibles = 0;
             double t0 = W3dNowMs();
@@ -4727,6 +4789,9 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
                dc / n, dcv / n, idx / n, mallas / n, binds / n, cullVis / n, cullTot / n);
         printf("      [benchjuego] presupuesto/frame: stateChanges=%ld bytesSubidos=%ld trisOpacos=%ld trisBlend=%ld | dc particulas=%ld ui=%ld\n",
                stCh / n, upB / n, trO / n, trB / n, catP / n, catU / n);
+        printf("      [benchjuego] skinning: %.2f ms/frame | recalc=%.1f/frame completos=%.1f/frame (si completos~=recalc el incremental NO corta)\n",
+               (double)g_skinPerfMs / n, (double)g_skinPerfSkins / n, (double)g_skinPerfCompletos / n);
+        g_skinRelojMs = 0;
         return true;
     }
     // ---- skinbench <frames> : mide el costo de SkinearMesh (forzando recompute cada frame) sobre la 1er malla skinneada. ----
@@ -5142,11 +5207,12 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
                 Particulas* pt = (Particulas*)o; np++;
                 printf("      [particulas] '%s' textura=\"%s\" cantidad=%g vida=%g tam=%g vel=%g "
                        "dispersion=%g gravedad=%g mezcla=%d color=\"%s\" desvanecer=%s activo=%s "
-                       "variacion=%g turbulencia=%g rotacion=%s velRotacion=%g\n",
+                       "filtrado=%s variacion=%g turbulencia=%g rotacion=%s velRotacion=%g\n",
                        pt->name.c_str(), pt->textura.c_str(), pt->cantidad, pt->vida, pt->tam,
                        pt->vel, pt->dispersion, pt->gravedad, pt->mezcla,
                        pt->ColorTexto().c_str(), pt->desvanecer ? "true" : "false",
-                       pt->activo ? "true" : "false", pt->variacion, pt->turbulencia,
+                       pt->activo ? "true" : "false", pt->filtrado ? "true" : "false",
+                       pt->variacion, pt->turbulencia,
                        pt->rotacion ? "true" : "false", pt->velRotacion);
                 printf("      [particulas] '%s' vivas=%d (tope=%d)\n",
                        pt->name.c_str(), (int)pt->sys.parts.size(), pt->sys.maxParts);
@@ -6218,12 +6284,38 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         return true;
     }
     // ---- meshinfo : lista las mallas de la escena con sus MESH PARTS (materiales) -> verificar el import multi-material. ----
+    // ---- mallasnoedit : marca TODAS las mallas de la escena como NO-EDITABLES (descarta datos de edicion;
+    //      conserva grupos/formas/skinning). Al guardar, el .w3db sale COMPACTO (skinning agrupado horneado) y
+    //      sin caras/bordes -> mas liviano y sin recalculos al abrir en el telefono. Para preparar demos de juego. ----
+    if (cmd == "mallasnoedit") {
+        int n = 0;
+        std::vector<Object*> st; if (SceneCollection) st.push_back(SceneCollection);
+        while (!st.empty()) { Object* o = st.back(); st.pop_back();
+            if (o->getType() == ObjectType::mesh) { Mesh* m = (Mesh*)o;
+                if (!m->noEditable) { m->InvalidarEdit(); m->CalcularAABBSolo(); m->noEditable = true; n++; }
+            }
+            for (size_t i = 0; i < o->Childrens.size(); i++) st.push_back(o->Childrens[i]); }
+        // forzar que el proximo guardado RE-HORNEE los .w3db (sino copia la entrada vieja del contenedor
+        // sin tocar, y el skinning compacto no se escribe). Ver W3dMallasGuardarPreparar.
+        extern bool g_w3dRehornearMallas; g_w3dRehornearMallas = true;
+        printf("      [mallasnoedit] %d malla(s) marcadas no-editables + re-horneado activado (el .w3db saldra compacto)\n", n);
+        return true;
+    }
     if (cmd == "meshinfo") {
         std::vector<Object*> st; if(SceneCollection) st.push_back(SceneCollection);
         int nm=0;
         while(!st.empty()){ Object* o=st.back(); st.pop_back();
             if (o->getType()==ObjectType::mesh){ Mesh* m=(Mesh*)o; nm++;
                 printf("      [mesh] '%s' verts=%d faces3d=%d tris(idx/3)=%d edges=%d meshParts=%d\n", m->name.c_str(), m->vertexSize, (int)m->faces3d.size(), m->facesSize/3, (int)(m->edges.size()/2), (int)m->materialsGroup.size());
+                // DIAGNOSTICO AGRUPACION: posiciones UNICAS (puntos) vs render-verts, y el nCtrl vigente.
+                // Si nP << verts hay redundancia que el skinning por control-point puede aprovechar (calcular
+                // la pose 1 vez por punto y copiarla a sus render-verts); si nCtrl == verts el CSR NO esta
+                // agrupando (el .w3db se guardo con ctrl=identidad) y se pierde ese ahorro.
+                if (m->vertexSize > 0) {
+                    W3dMallaPuntos P; W3dMallaCalcularPuntos(m, P);
+                    printf("         puntos(pos+pesos unicos)=%d  nCtrl(CSR)=%d  %s\n", P.nP, m->skinNCtrl,
+                           (P.nP > 0 && P.nP < m->vertexSize*9/10) ? "<-- REDUNDANCIA: hay para agrupar" : "(sin agrupar posible o ya agrupado)");
+                }
                 if (!m->uvMaps.empty() || !m->uvExtra.empty()) {   // capas UV: las del editor + las que estan en el render
                     printf("         uvMaps=%d activa=%d uvExtra=[", (int)m->uvMaps.size(), m->uvMapActivo);
                     for (size_t k = 0; k < m->uvExtra.size(); k++) printf("%s%d", k ? "," : "", (int)(m->uvExtra[k].size() / 2));
@@ -6616,6 +6708,247 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         double ms = 1000.0*(double)(t1-t0)/CLOCKS_PER_SEC;
         printf("      [skinbench] malla='%s' nv=%d bones=%d frames=%d -> %.2f ms total, %.3f ms/frame\n",
                found->name.c_str(), found->vertexSize, (int)a->bones.size(), nf, ms, ms/nf);
+        return true;
+    }
+    // ---- autocull <0|1> : interruptor A/B del autocull por frustum de las mallas (Mesh::RenderObject). ----
+    if (cmd == "autocull") {
+        int on = 1; ss >> on;
+        extern bool g_mallaAutocull;
+        g_mallaAutocull = (on != 0);
+        printf("      [autocull] %s\n", g_mallaAutocull ? "ON" : "OFF");
+        return true;
+    }
+    // ---- cullprobe : renderiza una vez y vuelca la vista bindeada + el test del hook con un AABB
+    //      unitario en el origen (debug del autocull: con que frustum esta decidiendo). ----
+    if (cmd == "cullprobe") {
+        if (rootViewport) rootViewport->Render();
+        extern bool g_vistaBindeada, g_renderCamOrto;
+        extern Vector3 g_renderCamPos;
+        extern float g_renderCamFov, g_renderCamNear, g_renderCamFar, g_renderCamAspect;
+        extern bool (*g_mallaVisibleHook)(const Vector3&, const Vector3&);
+        bool vis = g_mallaVisibleHook ? g_mallaVisibleHook(Vector3(-1,-1,-1), Vector3(1,1,1)) : true;
+        printf("      [cullprobe] bindeada=%d orto=%d pos=(%.2f,%.2f,%.2f) fov=%.1f near=%.3f far=%.1f aspect=%.3f | AABB(-1..1) visible=%d\n",
+               g_vistaBindeada ? 1 : 0, g_renderCamOrto ? 1 : 0,
+               g_renderCamPos.x, g_renderCamPos.y, g_renderCamPos.z,
+               g_renderCamFov, g_renderCamNear, g_renderCamFar, g_renderCamAspect,
+               vis ? 1 : 0);
+        { int listados = 0; std::vector<Object*> st; if (SceneCollection) st.push_back(SceneCollection);
+          while (!st.empty() && listados < 8) { Object* o = st.back(); st.pop_back();
+              if (o->getType() == ObjectType::mesh) { Mesh* M = (Mesh*)o; listados++;
+                  printf("      [cullprobe]   '%s' aabbOk=%d aabb=(%.2f,%.2f,%.2f)..(%.2f,%.2f,%.2f) skinAabbOk=%d\n",
+                         M->name.c_str(), M->aabbOk ? 1 : 0,
+                         M->aabbMin.x, M->aabbMin.y, M->aabbMin.z, M->aabbMax.x, M->aabbMax.y, M->aabbMax.z,
+                         M->skinAabbOk ? 1 : 0); }
+              for (size_t i = 0; i < o->Childrens.size(); i++) st.push_back(o->Childrens[i]); } }
+        return true;
+    }
+    // ---- skininc <0|1> : interruptor A/B del skinning incremental (SkeletalAnimation). ----
+    if (cmd == "skininc") {
+        int on = 1; ss >> on;
+        extern bool g_skinIncremental;
+        g_skinIncremental = (on != 0);
+        printf("      [skininc] %s\n", g_skinIncremental ? "ON" : "OFF");
+        return true;
+    }
+    // ---- skinverify <frames> [tolMult] : JUGANDO, cada frame skinnea con el camino INCREMENTAL y
+    //      despues re-skinnea COMPLETO, y compara vertex a vertex. El maximo desvio tiene que quedar
+    //      dentro del presupuesto del umbral (skinEpsPos * palanca); si lo pasa, FALLA. Ademas imprime
+    //      el desvio maximo observado por malla (la prueba de "no se mueve nada visible de mas"). ----
+    if (cmd == "skinverify") {
+        int n = 240; ss >> n; if (n < 1) n = 1;
+        float tolMult = 40.0f; ss >> tolMult;   // palanca generosa: eps es por COMPONENTE de matriz
+        int cadaK = 30; ss >> cadaK; if (cadaK < 1) cadaK = 1;   // cada cuantos frames verificar (1 = todos)
+        extern Viewport3D* Viewport3DActive;
+        if (!rootViewport) { err = "skinverify: no hay layout"; return false; }
+        { extern void CargarTexturasPendientes(); CargarTexturasPendientes(); }
+        rootViewport->Render();
+        Viewport3D* vp = Viewport3DActive;
+        if (!vp) { err = "skinverify: no hay viewport 3D"; return false; }
+        bool camPrev = vp->ViewFromCameraActive;
+        if (CameraActive) vp->ViewFromCameraActive = true;
+        ActiveAnimKind = 2; AnimEsJuego = true; StartFrame = 1; PlayAnimation = true;
+        extern void SimTickPlay(float); extern void SimStop(); extern void AplicarAnimacionObjetos();
+        extern void SkinearMesh(Mesh*);
+        extern bool g_skinIncremental;
+        // el AUTOCULL saltea el skinning de mallas fuera de camara (correcto en el juego): aca se apaga
+        // para que TODAS skinneen cada frame y el verificador compare incremental vs completo de verdad
+        // (sino una malla culleada aparece "desviada" solo por tener la pose vieja... invisible).
+        extern bool g_mallaAutocull;
+        const bool cullPrev = g_mallaAutocull; g_mallaAutocull = false;
+        const float dt = 1.0f / 60.0f;
+        std::vector<Mesh*> ms; { std::vector<Object*> st; if (SceneCollection) st.push_back(SceneCollection);
+            while (!st.empty()){ Object* o = st.back(); st.pop_back();
+                if (o->getType()==ObjectType::mesh && ((Mesh*)o)->skinArmature) ms.push_back((Mesh*)o);
+                for (size_t i=0;i<o->Childrens.size();i++) st.push_back(o->Childrens[i]); } }
+        std::vector<float> peor(ms.size(), 0.0f);
+        std::vector<float> inc;   // copia del resultado incremental
+        bool ok = true;
+        for (int f = 0; f < n && ok; f++) {
+            SimTickPlay(dt); UpdateAnimations(dt); UpdateAnimatedMaterials(dt); UpdateUVAnims(dt); UpdateFlipbooks(dt);
+            W3dParticulasTick(dt); { extern void W3dVisZonasTick(); W3dVisZonasTick(); }
+            AplicarAnimacionObjetos(); vp->Render();   // el render skinnea con el camino que este activo (incremental)
+            // verificar cada K frames: entre chequeos el incremental ACUMULA sus parches (si corrigieramos
+            // cada frame, la deriva acumulada no se probaria nunca)
+            if (f < 3 || (f % cadaK) != 0) continue;
+            for (size_t m = 0; m < ms.size(); m++) {
+                Mesh* M = ms[m];
+                if (!M->skinVertex || M->vertexSize <= 0) continue;
+                // una malla OCULTA (por setVisible del script en ella O en un ANCESTRO: un prop como Evento_palo
+                // oculta el objeto padre, no la malla hija) no se re-skinnea en el render -> su skinVertex queda en
+                // la pose vieja, y el pase completo forzado la veria como "desviada": falso positivo (mismo caso que
+                // el autocull). Se saltea mirando la visibilidad EFECTIVA (subiendo por los padres).
+                { bool oculta = false; for (Object* a2 = M; a2; a2 = a2->Parent) if (!a2->visible) { oculta = true; break; }
+                  if (oculta) continue; }
+                const int fc = M->vertexSize * 3;
+                inc.assign(M->skinVertex, M->skinVertex + fc);
+                // foto del estado del INCREMENTAL antes de pisarlo con el pase completo (debug)
+                std::vector<float> fotoDelta(M->shapeCpDelta);
+                std::vector<float> fotoPrevW(M->skinPrevPesos);
+                std::vector<float> fotoW(M->shapePesos);
+                // re-correr el INCREMENTAL con los mismos insumos: que camino toma y si repite el resultado
+                extern int g_skinUltimoCamino;
+                const unsigned fotoShapeSerial = M->shapeSerial, fotoSkinShapeSerial = M->skinShapeSerial;
+                M->lastSkinFrame = -999999;
+                SkinearMesh(M);
+                const int caminoInc = g_skinUltimoCamino;
+                float dRe = 0.0f; for (int i = 0; i < fc; i++) { float d = inc[(size_t)i] - M->skinVertex[i]; if (d < 0) d = -d; if (d > dRe) dRe = d; }
+                // re-skinnear COMPLETO el MISMO frame (la referencia exacta)
+                g_skinIncremental = false;
+                M->lastSkinFrame = -999999; M->skinIncOk = false;
+                SkinearMesh(M);
+                g_skinIncremental = true;
+                float worst = 0.0f; int worstI = -1;
+                for (int i = 0; i < fc; i++) { float d = inc[(size_t)i] - M->skinVertex[i]; if (d < 0) d = -d; if (d > worst) { worst = d; worstI = i; } }
+                if (worst > peor[m]) peor[m] = worst;
+                if (worstI >= 0 && worst > (M->skinEpsPos > 0.0f ? M->skinEpsPos : 1e-4f) * tolMult) {
+                    const int ri = worstI / 3;
+                    const int c = (ri < (int)M->vertCtrlPoint.size()) ? M->vertCtrlPoint[ri] : -1;
+                    const bool conPeso = (c >= 0 && c + 1 < (int)M->skinCpOff.size() && M->skinCpOff[c] < M->skinCpOff[c+1]);
+                    float dflexI[3] = { 0, 0, 0 }, dflexF[3] = { 0, 0, 0 };
+                    if (c >= 0 && (size_t)c*3+2 < fotoDelta.size()) { dflexI[0]=fotoDelta[(size_t)c*3]; dflexI[1]=fotoDelta[(size_t)c*3+1]; dflexI[2]=fotoDelta[(size_t)c*3+2]; }
+                    if (c >= 0 && (size_t)c*3+2 < M->shapeCpDelta.size()) { dflexF[0]=M->shapeCpDelta[(size_t)c*3]; dflexF[1]=M->shapeCpDelta[(size_t)c*3+1]; dflexF[2]=M->shapeCpDelta[(size_t)c*3+2]; }
+                    printf("      [skinverify-dbg] '%s' f=%d vert=%d cp=%d conPeso=%d | inc=(%.5f,%.5f,%.5f) full=(%.5f,%.5f,%.5f)\n",
+                           M->name.c_str(), f, ri, c, conPeso ? 1 : 0,
+                           inc[(size_t)ri*3], inc[(size_t)ri*3+1], inc[(size_t)ri*3+2],
+                           M->skinVertex[ri*3], M->skinVertex[ri*3+1], M->skinVertex[ri*3+2]);
+                    printf("      [skinverify-dbg]   deltaCP inc=(%.5f,%.5f,%.5f) exacto=(%.5f,%.5f,%.5f) | tamDelta inc=%d exacto=%d | re-camino=%d re-dif=%.6f\n",
+                           dflexI[0], dflexI[1], dflexI[2], dflexF[0], dflexF[1], dflexF[2],
+                           (int)fotoDelta.size()/3, (int)M->shapeCpDelta.size()/3, caminoInc, dRe);
+                    printf("      [skinverify-dbg]   shapeSerial=%u skinShapeSerial(aplicado)=%u -> %s\n",
+                           fotoShapeSerial, fotoSkinShapeSerial,
+                           fotoShapeSerial == fotoSkinShapeSerial ? "IGUALES (el skin del render creyo estar al dia)" : "distintos");
+                    for (size_t k = 0; k < fotoW.size(); k++) {
+                        float wPrev = (k < fotoPrevW.size()) ? fotoPrevW[k] : -99.0f;
+                        if (fotoW[k] != 0.0f || wPrev != 0.0f)
+                            printf("      [skinverify-dbg]   shape[%d]: w=%.4f prevAplicado=%.4f\n", (int)k, fotoW[k], wPrev);
+                    }
+                }
+                const float tol = (M->skinEpsPos > 0.0f ? M->skinEpsPos : 1e-4f) * tolMult;
+                if (worst > tol) {
+                    char b[200]; snprintf(b, sizeof(b), "skinverify: '%s' frame %d desvio %.6f > tolerancia %.6f", M->name.c_str(), f, worst, tol);
+                    err = b; ok = false; break;
+                }
+            }
+        }
+        PlayAnimation = false; SimStop(); vp->ViewFromCameraActive = camPrev;
+        g_mallaAutocull = cullPrev;
+        for (size_t m = 0; m < ms.size(); m++)
+            printf("      [skinverify] '%s': desvio maximo incremental vs completo = %.6f (eps=%.6f)\n",
+                   ms[m]->name.c_str(), peor[m], ms[m]->skinEpsPos);
+        return ok;
+    }
+    // ---- skindirty <frames> : JUGANDO (como benchjuego), mide cuanto CAMBIA por frame lo que alimenta el
+    //      skinning: huesos con skinMatrix distinta al frame anterior (comparacion EXACTA, bit a bit), pesos
+    //      de shape keys que cambiaron, y cuantos control-points / render-verts quedarian SUCIOS con un
+    //      skinning incremental (= el trabajo minimo real). Es la medicion previa a implementarlo. ----
+    if (cmd == "skindirty") {
+        int n = 120; ss >> n; if (n < 1) n = 1;
+        extern Viewport3D* Viewport3DActive;
+        if (!rootViewport) { err = "skindirty: no hay layout"; return false; }
+        { extern void CargarTexturasPendientes(); CargarTexturasPendientes(); }
+        rootViewport->Render();
+        Viewport3D* vp = Viewport3DActive;
+        if (!vp) { err = "skindirty: no hay viewport 3D"; return false; }
+        bool camPrev = vp->ViewFromCameraActive;
+        if (CameraActive) vp->ViewFromCameraActive = true;
+        ActiveAnimKind = 2; AnimEsJuego = true; StartFrame = 1; PlayAnimation = true;
+        extern void SimTickPlay(float); extern void SimStop(); extern void AplicarAnimacionObjetos();
+        const float dt = 1.0f / 60.0f;
+        std::vector<Mesh*> ms; { std::vector<Object*> st; if (SceneCollection) st.push_back(SceneCollection);
+            while (!st.empty()){ Object* o = st.back(); st.pop_back();
+                if (o->getType()==ObjectType::mesh && ((Mesh*)o)->skinArmature) ms.push_back((Mesh*)o);
+                for (size_t i=0;i<o->Childrens.size();i++) st.push_back(o->Childrens[i]); } }
+        std::vector< std::vector<float> > prevM(ms.size());   // por malla: skinMatrix previa de cada hueso del rig
+        std::vector< std::vector<float> > prevW(ms.size());   // por malla: pesos previos de los shape keys
+        std::vector<long> accB(ms.size(),0), accK(ms.size(),0), accCp(ms.size(),0), accRv(ms.size(),0);
+        long frames = 0;
+        long sdH[5] = {0,0,0,0,0};   // histograma de |delta| de matriz por hueso/frame: 0, <1e-5, <1e-4, <1e-3, >=1e-3
+        for (int f = 0; f < n; f++) {
+            SimTickPlay(dt); UpdateAnimations(dt); UpdateAnimatedMaterials(dt); UpdateUVAnims(dt); UpdateFlipbooks(dt);
+            W3dParticulasTick(dt); { extern void W3dVisZonasTick(); W3dVisZonasTick(); }
+            AplicarAnimacionObjetos(); vp->Render();
+            bool medir = (f > 0);   // el primer frame es "todo cambio" (no hay previo): no cuenta
+            for (size_t m = 0; m < ms.size(); m++) {
+                Mesh* M = ms[m]; Armature* a = M->skinArmature;
+                const size_t nb = a->bones.size();
+                std::vector<float>& pm = prevM[m];
+                std::vector<char> boneCh(nb, 1);              // sin previo = todos cambiados
+                if (pm.size() == nb*16) {
+                    for (size_t b = 0; b < nb; b++) { boneCh[b] = 0; float dmax = 0.0f;
+                        for (int k = 0; k < 16; k++) { float d = a->bones[b].skinMatrix.m[k] - pm[b*16+k];
+                            if (d < 0) d = -d; if (d > dmax) dmax = d; }
+                        if (dmax > 0.0f) boneCh[b] = 1;
+                        // histograma de MAGNITUD del delta (solo la primera malla, el rig es el mismo):
+                        // responde si el "todos los huesos cambian" es ruido microscopico o movimiento real
+                        if (m == 0 && medir)
+                            sdH[dmax <= 0.0f ? 0 : dmax < 1e-5f ? 1 : dmax < 1e-4f ? 2 : dmax < 1e-3f ? 3 : 4]++;
+                    }
+                } else pm.assign(nb*16, 0.0f);
+                for (size_t b = 0; b < nb; b++) for (int k = 0; k < 16; k++) pm[b*16+k] = a->bones[b].skinMatrix.m[k];
+                std::vector<float>& pw = prevW[m];
+                const size_t nk = M->shapePesos.size();
+                std::vector<char> keyCh(nk ? nk : 1, 1);
+                if (pw.size() == nk) { for (size_t k2 = 0; k2 < nk; k2++) keyCh[k2] = (M->shapePesos[k2] != pw[k2]) ? 1 : 0; }
+                pw.assign(M->shapePesos.begin(), M->shapePesos.end());
+                if (!medir) continue;
+                int nbCh = 0; for (size_t b = 0; b < nb; b++) if (boneCh[b]) nbCh++;
+                int nkCh = 0; for (size_t k2 = 0; k2 < nk; k2++) if (keyCh[k2]) nkCh++;
+                // CPs sucios = CPs con algun hueso cambiado (CSR del skinning) + CPs de shape keys cambiadas
+                long cpSucios = 0, rvSucios = 0;
+                const int nCtrl = M->skinNCtrl;
+                if (!M->skinCpOff.empty() && nCtrl > 0) {
+                    std::vector<char> dirty((size_t)nCtrl, 0);
+                    for (int c = 0; c < nCtrl; c++)
+                        for (int k = M->skinCpOff[c]; k < M->skinCpOff[c+1]; k++) {
+                            int bi = M->skinCpBone[k];
+                            if (bi >= 0 && bi < (int)nb && boneCh[bi]) { dirty[c] = 1; break; } }
+                    for (size_t k2 = 0; k2 < nk && k2 < M->shapeKeys.size(); k2++) if (keyCh[k2])
+                        for (size_t j = 0; j < M->shapeKeys[k2].idx.size(); j++) {
+                            int c = M->shapeKeys[k2].idx[j]; if (c >= 0 && c < nCtrl) dirty[c] = 1; }
+                    for (int c = 0; c < nCtrl; c++) if (dirty[c]) cpSucios++;
+                    for (int ri = 0; ri < M->vertexSize && ri < (int)M->vertCtrlPoint.size(); ri++) {
+                        int c = M->vertCtrlPoint[ri]; if (c >= 0 && c < nCtrl && dirty[c]) rvSucios++; }
+                }
+                accB[m] += nbCh; accK[m] += nkCh; accCp[m] += cpSucios; accRv[m] += rvSucios;
+            }
+            if (f > 0) frames++;
+        }
+        PlayAnimation = false; SimStop(); vp->ViewFromCameraActive = camPrev;
+        for (size_t m = 0; m < ms.size(); m++) {
+            Mesh* M = ms[m];
+            printf("      [skindirty] '%s': nv=%d nCtrl=%d shapes=%d | por frame: huesos cambiados=%.1f/%d  shapes cambiadas=%.1f  CPs sucios=%.0f/%d (%.0f%%)  verts sucios=%.0f/%d (%.0f%%)\n",
+                   M->name.c_str(), M->vertexSize, M->skinNCtrl, (int)M->shapePesos.size(),
+                   frames ? (double)accB[m]/frames : 0.0, (int)M->skinArmature->bones.size(),
+                   frames ? (double)accK[m]/frames : 0.0,
+                   frames ? (double)accCp[m]/frames : 0.0, M->skinNCtrl,
+                   (frames && M->skinNCtrl) ? 100.0*accCp[m]/frames/M->skinNCtrl : 0.0,
+                   frames ? (double)accRv[m]/frames : 0.0, M->vertexSize,
+                   (frames && M->vertexSize) ? 100.0*accRv[m]/frames/M->vertexSize : 0.0);
+        }
+        { long tot = sdH[0]+sdH[1]+sdH[2]+sdH[3]+sdH[4];
+          if (tot > 0) printf("      [skindirty] |delta| de matriz por hueso/frame: =0: %ld (%.0f%%)  <1e-5: %ld (%.0f%%)  <1e-4: %ld (%.0f%%)  <1e-3: %ld (%.0f%%)  >=1e-3: %ld (%.0f%%)\n",
+                   sdH[0], 100.0*sdH[0]/tot, sdH[1], 100.0*sdH[1]/tot, sdH[2], 100.0*sdH[2]/tot,
+                   sdH[3], 100.0*sdH[3]/tot, sdH[4], 100.0*sdH[4]/tot); }
         return true;
     }
     // ---- vgsimplify : "1 hueso por vertice" sobre la 1er malla con vertex groups (destructivo; para medir el skin). ----

@@ -490,6 +490,7 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropColor*  propPartColor;      // tinte + alpha: swatch -> ColorPicker de Whisk3D (bindea a Particulas::color[4])
         PropBool*   propPartDesvanecer; // alpha -> 0 con la vida
         PropBool*   propPartActivo;     // false = no emite
+        PropBool*   propPartFiltrado;   // textura LINEAR (suave) vs NEAREST (pixelada)
         // ---- particulas AVANZADAS: tarjetas aparte (Movimiento / Tamanio / Color / Rotacion / Forma) ----
         GroupPropertie* propPartMovCard;   // Movimiento
         GroupPropertie* propPartTamCard;   // Tamanio y crecimiento

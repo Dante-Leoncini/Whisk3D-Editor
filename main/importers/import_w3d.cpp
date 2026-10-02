@@ -1192,6 +1192,7 @@ Object* CreateObjectFromNode(Node* n, Object* parent){
         if (p.count("color")) pt->SetColorTexto(Unquote(w3dMapAt(p, "color")));
         pt->desvanecer = GetBoolOrDefault(p, "desvanecer",  pt->desvanecer);
         pt->activo     = GetBoolOrDefault(p, "activo",      pt->activo);
+        pt->filtrado   = GetBoolOrDefault(p, "filtrado",    pt->filtrado);   // ausente -> true (suave)
         // azar (defaults 0 = sin jitter ni deriva: los archivos viejos no cambian)
         pt->variacion   = GetFloatOrDefault(p, "variacion",   pt->variacion);
         pt->turbulencia = GetFloatOrDefault(p, "turbulencia", pt->turbulencia);
@@ -3223,6 +3224,7 @@ static Object* JsonObjetoCrear(JVal* j, Object* parent, const std::string& base)
             if (c->lista[i]) pt->color[i] = (float)c->lista[i]->num;
         pt->desvanecer = JB(j, "desvanecer", pt->desvanecer);
         pt->activo     = JB(j, "activo",     pt->activo);
+        pt->filtrado   = JB(j, "filtrado",   pt->filtrado);   // ausente -> true (suave)
         // azar (ausente en archivos v4 viejos -> 0: mismo comportamiento de antes)
         pt->variacion   = JF(j, "variacion",   pt->variacion);
         pt->turbulencia = JF(j, "turbulencia", pt->turbulencia);

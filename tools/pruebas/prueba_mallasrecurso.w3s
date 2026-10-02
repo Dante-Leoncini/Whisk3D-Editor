@@ -33,6 +33,10 @@
 #      migra a binario y vuelve, huerfanas incluidas.
 #  Escribe en tools/debug.
 # ==========================================================================
+# autocull APAGADO para esta prueba: es de CONTABILIDAD de recursos (las 1000 instancias tienen
+# que materializar sus arrays/VBO para que los contadores cierren); el autocull por frustum no
+# dibuja (ni materializa) lo que la camara no ve, y eso es correcto pero no es lo que se mide aca.
+autocull 0
 ventana 1280 720
 formatomallas binario
 
@@ -210,7 +214,7 @@ mallainfo PersonajeA vbo pose
 guardarw3d ../debug/mr_skin.w3d
 abrirw3d ../debug/mr_skin.w3d
 # cada personaje tiene SUS grupos (el skinning los lee de la malla) y el recurso ya no guarda
-# otra copia: los soltó cuando el primer usuario limpio los tuvo
+# otra copia: los solt?? cuando el primer usuario limpio los tuvo
 mallasregistro n 1 extras 0
 mallainfo PersonajeA recurso Personaje usuarios 2 comparte PersonajeB grupos 2
 mallainfo PersonajeB grupos 2

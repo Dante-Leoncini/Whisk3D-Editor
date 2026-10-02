@@ -89,6 +89,11 @@ public:
     float color[4];        // tinte r,g,b + alpha inicial
     bool  desvanecer;      // alpha -> 0 con la vida
     bool  activo;          // false = no emite nada (las vivas terminan su vida)
+    // FILTRADO de la textura (checkbox del panel): true = LINEAR (suave), false = NEAREST (pixelada,
+    // pixel-art). El pase de particulas lo aplica con TexFilter al bindear (como el material). Default
+    // true: el fuego y el humo quieren bordes suaves. Igual que el resto del 2D, respeta el "modo
+    // pixelado" global del editor (PixeladoGlobal).
+    bool  filtrado;
     // AZAR (feedback del dueno: "el juego original era mas azaroso"). Defaults 0 =
     // comportamiento exacto de antes (round-trip de escenas viejas intacto).
     float variacion;       // 0..1: jitter POR PARTICULA sobre vel, vida y tam (0.3 = +-30%)
@@ -166,7 +171,7 @@ public:
         radioEmision = 45.0f;                   // no emitir lejos de la camara (0 = sin limite)
         uvRect[0] = 0.0f; uvRect[1] = 0.0f; uvRect[2] = 1.0f; uvRect[3] = 1.0f;
         color[0] = 1.0f; color[1] = 1.0f; color[2] = 1.0f; color[3] = 1.0f;
-        desvanecer = true; activo = true; emAcc = 0.0f;
+        desvanecer = true; activo = true; filtrado = true; emAcc = 0.0f;
         for (int i = 0; i < 3; i++) { velLocal[i] = 0.0f; velAzar[i] = 0.0f; posAzar[i] = 0.0f; aceleracion[i] = 0.0f; }
         arrastre = 1.0f; crecimiento = 0.0f; frenoCrecimiento = 1.0f;
         usarColorFinal = false; colorFinal[0] = 1.0f; colorFinal[1] = 1.0f; colorFinal[2] = 1.0f; colorFinal[3] = 1.0f;

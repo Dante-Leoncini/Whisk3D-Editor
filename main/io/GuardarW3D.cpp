@@ -1952,6 +1952,9 @@ static void EscribirObjeto(std::string& s, Object* o, int ind, CtxGuardar* cx, b
         JNum(s, pt->color[2]); s += ", "; JNum(s, pt->color[3]); s += "]";
         s += ",\n"; JSang(s, ind + 1); s += "\"desvanecer\": "; s += pt->desvanecer ? "true" : "false";
         s += ",\n"; JSang(s, ind + 1); s += "\"activo\": ";     s += pt->activo ? "true" : "false";
+        // FILTRADO de la textura: default true (suave); solo se escribe si NO filtra (pixelada),
+        // asi los emisores comunes y los .w3d viejos quedan byte a byte como antes.
+        if (!pt->filtrado) { s += ",\n"; JSang(s, ind + 1); s += "\"filtrado\": false"; }
         s += ",\n"; JSang(s, ind + 1); s += "\"variacion\": ";   JNum(s, pt->variacion);
         s += ",\n"; JSang(s, ind + 1); s += "\"turbulencia\": "; JNum(s, pt->turbulencia);
         // radioEmision: solo si difiere del default (round-trip byte a byte)

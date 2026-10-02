@@ -1073,6 +1073,11 @@ int CWhisk3DContainer::DrawCallBack( TAny* aInstance )
                 // (corren fuera de su ventana). El bonus con 437 draws a 8fps ya prueba que el cuello es un COSTO FIJO
                 // por frame (CPU), no los draws. Esto dice cual: lua (SimTickPlay), vertex-anim, PVS o particulas.
                 // Loguea el acumulado + promedio cada 30 ticks a e:\whisk3d.log. NTickCount = ms en el N95 (1000 Hz).
+                // reloj de ms para el PERF del SKINNING (lo consumen Mesh::RenderObject +
+                // SkeletalAnimation.cpp): instalado aca, una vez, solo en modo juego.
+                { extern unsigned int (*g_skinRelojMs)();
+                  struct RelojN95 { static unsigned int Ms() { return (unsigned int)User::NTickCount(); } };
+                  if (!g_skinRelojMs) g_skinRelojMs = RelojN95::Ms; }
                 static TUint gPfSim=0, gPfAnim=0, gPfPvs=0, gPfPart=0, gPfN=0; TUint _pf;
                 _pf=User::NTickCount(); SimTickPlay(dtSim);                                              gPfSim  += User::NTickCount()-_pf;
                 // AVANCE de las vertex-anims (Crash y demas mallas animadas): en PC vive en main.cpp; en el N95 FALTABA.
@@ -1089,15 +1094,21 @@ int CWhisk3DContainer::DrawCallBack( TAny* aInstance )
                     // el frustum cull no corta y hay que ver por que). El profiler del render mide aparte (overlay stats).
                     extern int g_cullHijosTotal, g_cullHijosVisibles;
                     extern int g_luaScriptsActivos, g_luaScriptsTotal, g_renderCaras, g_renderDraws;
+                    // SKINNING (acumulado por Mesh::RenderObject en los 30 frames): skin= ms promedio
+                    // por frame; recalc= cuantos SkinearMesh recalcularon de verdad y cuantos cayeron
+                    // al camino COMPLETO (el incremental deberia dejar casi todo en salpicado/nada).
+                    extern int g_skinPerfMs, g_skinPerfSkins, g_skinPerfCompletos;
                     // TOP de scripts por ms (promedio del bloque de 30): dice CUAL lua se come el sim=
                     extern void SimLuaPerfTop(char*, int, int);
                     char topLua[96]; SimLuaPerfTop(topLua, sizeof(topLua), 30);
-                    w3dLogf("[PERF] /30f logica: sim=%u anim=%u pvs=%u part=%u ms | lua %d/%d scripts [%s] | RENDER: %d caras %d draws | CULLING: %d de %d hijos",
+                    w3dLogf("[PERF] /30f logica: sim=%u anim=%u pvs=%u part=%u ms | skin=%d ms (recalc %d, completos %d) | lua %d/%d scripts [%s] | RENDER: %d caras %d draws | CULLING: %d de %d hijos",
                             gPfSim/30, gPfAnim/30, gPfPvs/30, gPfPart/30,
+                            g_skinPerfMs/30, g_skinPerfSkins/30, g_skinPerfCompletos/30,
                             g_luaScriptsActivos, g_luaScriptsTotal, topLua, g_renderCaras, g_renderDraws,
                             g_cullHijosVisibles/30, g_cullHijosTotal/30);
                     gPfSim=gPfAnim=gPfPvs=gPfPart=gPfN=0;
                     g_cullHijosTotal=0; g_cullHijosVisibles=0;
+                    g_skinPerfMs=0; g_skinPerfSkins=0; g_skinPerfCompletos=0;
                 }
                 g_redraw = true;
             }

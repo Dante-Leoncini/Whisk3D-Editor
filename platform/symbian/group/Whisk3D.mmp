@@ -37,6 +37,12 @@ ALWAYS_BUILD_AS_ARM
 OPTION_REPLACE  ARMCC --cpu 6
 OPTION_REPLACE  ARMCC --fpu vfpv2 --fpmode fast
 OPTION_REPLACE  ARMCC -O2 -Otime
+// El CODIGO (region RO) ya supera los 4 MB linkeados: con la base RW default (--rw-base
+// 0x400000) armlink cortaba con L6221E "Load region LR_1 overlaps". Se sube la base de
+// datos a 8 MB; es solo una direccion DE LINK (el loader de Symbian reubica igual), lo
+// unico que importa es que RO y RW no se pisen. Si el codigo algun dia pasa los 8 MB,
+// subir de nuevo. (armlink toma la ULTIMA --rw-base de la linea: esta pisa la default.)
+LINKEROPTION    ARMCC --rw-base 0x800000
 
 VENDORID        0
 

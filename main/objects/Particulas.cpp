@@ -78,6 +78,7 @@ static void SincronizarConfig(Particulas* p) {
     // MODO DE MEZCLA: el enum del Core va directo (ver Particulas.h). El humo/polvo usan Subtract (dst-src),
     // que OSCURECE el fondo en vez de aclararlo.
     s.blend = p->mezcla;
+    s.filtrar = p->filtrado;   // LINEAR/NEAREST de la textura: lo aplica el pase con TexFilter al bindear
     // con mezcla ALFA el color se deja quieto y solo baja el alfa (ver w3dParticles.h); con cualquier otra
     // (aditiva/sustractiva/etc) el color x alfa es lo que hace "desaparecer" la particula sin dejar un agujero.
     s.colorPlano = (p->mezcla == w3dEngine::MezclaAlpha);
@@ -400,7 +401,9 @@ void W3dParticulasDibujarPendientes() {
     static std::vector<unsigned char> bCol;
     bPos.clear(); bUV.clear(); bCol.clear();
     const size_t kMaxQuads = 512;               // tope del stream por draw (plan P2)
-    unsigned texLote = 0; int blendLote = -1;
+    // FILTRADO por emisor (checkbox "Smooth texture"): TexFilter es estado POR textura, asi que se
+    // fija al bindear cada corrida (como el material). Respeta el "modo pixelado" global del editor.
+    unsigned texLote = 0; int blendLote = -1; bool filtLote = true;
     for (size_t i = 0; i < gOrdenadas.size(); i++) {
         const PartOrdenada& e = gOrdenadas[i];
         const w3dEngine::Particle& q = e.sys->parts[e.idx];
@@ -409,16 +412,18 @@ void W3dParticulasDibujarPendientes() {
         // corte de corrida: cambio la textura o la mezcla, o el lote llego al tope
         if (!bPos.empty() && (tex != texLote || e.sys->blend != blendLote || bPos.size() >= kMaxQuads * 18)) {
             gfx::SetMezcla(blendLote); gfx::BindTexture(texLote);
+            gfx::TexFilter(!gfx::PixeladoGlobal() && filtLote);
             gfx::VertexPointer3f(0, &bPos[0]); gfx::TexCoordPointer2f(0, &bUV[0]);
             gfx::ColorPointer4ub(&bCol[0]);
             gfx::DrawTrianglesArray((int)(bPos.size() / 3));
             bPos.clear(); bUV.clear(); bCol.clear();
         }
-        texLote = tex; blendLote = e.sys->blend;
+        texLote = tex; blendLote = e.sys->blend; filtLote = e.sys->filtrar;
         e.sys->AppendBillboard(q, R.x, R.y, R.z, U.x, U.y, U.z, bPos, bUV, bCol);
     }
     if (!bPos.empty()) {                        // la ultima corrida
         gfx::SetMezcla(blendLote); gfx::BindTexture(texLote);
+        gfx::TexFilter(!gfx::PixeladoGlobal() && filtLote);
         gfx::VertexPointer3f(0, &bPos[0]); gfx::TexCoordPointer2f(0, &bUV[0]);
         gfx::ColorPointer4ub(&bCol[0]);
         gfx::DrawTrianglesArray((int)(bPos.size() / 3));

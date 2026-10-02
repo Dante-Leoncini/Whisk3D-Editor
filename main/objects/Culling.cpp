@@ -3,6 +3,7 @@
 #include "objects/CameraBase.h"  // g_renderCam* : la vista bindeada + su lente
 #include "objects/Mesh.h"        // Mesh::aabbMin/aabbMax (AABB local cacheado)
 #include "render/OpcionesRender.h" // g_renderAspect (el aspecto con el que dibuja el juego)
+#include "w3dGraphics.h"         // GetMatrix: P x MV vigentes (autocull de mallas por pase actual)
 #include "w3dFilesystem.h"       // metodo Riel: leer el .w3dvis de hijos por nodo
 #include "w3dlog.h"              // aviso si el dato no carga
 #include <math.h>
@@ -104,6 +105,35 @@ bool W3dAabbVisible(const Vector3& mn, const Vector3& mx) {
     FrustumDeMatriz(cam.ProjectionMatrix(aspect) * cam.ViewMatrix(), planos);
     return AabbEnFrustum(planos, mn, mx);
 }
+
+// AUTOCULL de mallas: los planos salen de las MATRICES VIGENTES (Projection x ModelView del pase
+// que esta dibujando AHORA, con el transform del objeto ya cargado) y el AABB se testea en LOCAL:
+// el criterio es EXACTAMENTE lo que el draw esta por mandar, en CUALQUIER pase (viewport del
+// editor con orbita u orto, vista desde camara, espejo reflejado, miniatura de la biblioteca,
+// render offscreen). NO se reconstruye la camara desde g_renderCam* ni se usa la camara "de
+// medida" del juego: ambas pueden NO ser la vista del pase actual (los tests de lote/mallacache/
+// prefab/stats quedaban con 0 mallas dibujadas por cullear con la lente equivocada).
+static bool W3dMallaVisibleVistaActual(const Vector3& mn, const Vector3& mx) {
+    if (!g_vistaBindeada) return true;   // headless / sin lente real: no cortar
+    float P[16], MV[16];
+    w3dEngine::GetMatrix(w3dEngine::Projection, P);
+    w3dEngine::GetMatrix(w3dEngine::ModelView, MV);
+    Matrix4 pm, mv;
+    for (int i = 0; i < 16; i++) { pm.m[i] = P[i]; mv.m[i] = MV[i]; }
+    PlanoFrustum planos[6];
+    FrustumDeMatriz(pm * mv, planos);
+    return AabbEnFrustum(planos, mn, mx);
+}
+// instala en el Core el test de visibilidad (Mesh::RenderObject lo consulta antes de skinnear/
+// dibujar). Va por hook porque el Core no puede linkear al editor (los juegos de ejemplo compilan
+// el Core solo). Constructor estatico, mismo patron que gBindExtra.
+struct W3dInstalarAutocullMallas {
+    W3dInstalarAutocullMallas() {
+        extern bool (*g_mallaVisibleHook)(const Vector3&, const Vector3&);
+        g_mallaVisibleHook = W3dMallaVisibleVistaActual;
+    }
+};
+static W3dInstalarAutocullMallas gInstalarAutocullMallas;
 
 // suma al AABB de mundo (mn/mx, 'hay' dice si ya arranco) el AABB local de una
 // malla llevado a mundo: las 8 esquinas por su GetWorldMatrix (la EFECTIVA: es

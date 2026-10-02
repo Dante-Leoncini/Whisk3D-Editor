@@ -1141,6 +1141,7 @@ Object* W3dDuplicarUno(Object* src, bool vinculado) {
         d->gravedad = sp->gravedad;     d->mezcla = sp->mezcla;
         for (int i = 0; i < 4; i++) d->color[i] = sp->color[i];
         d->desvanecer = sp->desvanecer; d->activo = sp->activo;
+        d->filtrado = sp->filtrado;
         d->variacion = sp->variacion;   d->turbulencia = sp->turbulencia;
         // las particulas VIVAS no se copian: el duplicado arranca su propia emision
         nuevo = d;

@@ -111,7 +111,10 @@ unsigned Textura2DObtener(const std::string& ruta, int* w, int* h) {
             // asi el filtrado por elemento (TexFilter) manda de verdad.
             unsigned char* rgba = NULL;
             if (gfx::DecodeImage(Textura2DRutaDecodificable(ruta).c_str(), &rgba, &e.w, &e.h) && rgba) {
-                e.id = gfx::UploadRGBA(rgba, e.w, e.h, true, false);   // UI 2D sin mips (slice9)
+                // forzarPOT=true: en el N95 una textura NPOT se rechaza y el billboard sale SIN
+                // textura (los atlas de fuego 960x24 / 1440x48 son NPOT). El camino de material ya
+                // remuestrea a POT; este (particulas / imagenes 2D) se lo saltaba. No-op en PC/Android/Web.
+                e.id = gfx::UploadRGBA(rgba, e.w, e.h, true, false, true);   // UI 2D sin mips (slice9), POT en N95
                 gfx::FreeImage(rgba);
             }
         }

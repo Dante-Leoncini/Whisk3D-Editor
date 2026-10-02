@@ -736,6 +736,10 @@ static std::vector<size_t> gOrden;                 // gPlan en el orden del regi
 static std::map<const Mesh*, size_t> gPlanDe;      // malla -> su grupo
 static bool gPlanListo = false;
 static bool gPlanTexto = false;                    // el plan escribio .w3dm (formato de texto)
+// RE-HORNEAR: fuerza a TODAS las mallas por el camino de serializacion (PASADA B), ignorando la copia del
+// contenido del recurso sin tocar. Lo usa el guardado de "optimizar para juego" (convertir a no-editable):
+// el .w3db sale re-escrito con el skinning agrupado COMPACTO horneado, aunque el render no haya cambiado.
+bool g_w3dRehornearMallas = false;
 // LOS BORRADOS QUE EL UNDO RETIENE (MallaRecurso::borrado) y todavia nombran su entrada del .w3d que este
 // guardado reemplaza: no se escriben, pero un Ctrl+Z despues de guardar les devuelve sus objetos. Sus bytes se
 // leen del contenedor VIEJO al preparar (serial del recurso -> su .w3db; vacio = ya los tenia en memoria) y al
@@ -744,6 +748,7 @@ static bool gPlanTexto = false;                    // el plan escribio .w3dm (fo
 static std::vector<std::pair<int, std::string> > gDesalojados;
 
 void W3dMallasGuardarDescartar() {
+    g_w3dRehornearMallas = false;   // el re-horneado es por-guardado: no se arrastra al siguiente
     gPlan.clear(); gOrden.clear(); gPlanDe.clear();
     gDesalojados.clear();
     gPlanListo = false;
@@ -844,6 +849,7 @@ static bool NombreTomado(const std::string& n, const MallaRecurso* excepto) {
 static bool NombreTomadoFn(const std::string& n, void* ctx) { return NombreTomado(n, (const MallaRecurso*)ctx); }
 
 bool W3dMallasGuardarPreparar(W3dContenedorEscritor* esc) {
+    const bool rehornear = g_w3dRehornearMallas;   // leer ANTES de Descartar (que lo resetea)
     W3dMallasGuardarDescartar();
     if (!esc || !SceneCollection) return false;
     // lo que se ve es lo que se guarda: la malla en edicion y las editadas se publican antes
@@ -870,6 +876,7 @@ bool W3dMallasGuardarPreparar(W3dContenedorEscritor* esc) {
     for (size_t i = 0; i < mallas.size(); i++) {
         Mesh* m = mallas[i];
         if (!m->malla || !W3dMallaLimpia(m)) continue;
+        if (rehornear) continue;   // forzar re-serializacion (PASADA B): hornear el skinning compacto
         // una malla que no entra en el .w3db de ESTA plataforma (indices de 16 bits) va por el
         // camino de texto aunque su recurso este sin tocar (ver EscribirMallaW3dm)
         if (!W3dMallaBinIndicesAlcanzan(m->vertexSize) || (g_w3dIndices16Simulado && m->vertexSize > 65535)) {

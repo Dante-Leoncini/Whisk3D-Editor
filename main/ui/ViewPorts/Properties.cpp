@@ -7350,6 +7350,9 @@ void Properties::ConstruirGrupos(){
     propPartTextura->button->desplegable = true;
     propPartTextura->action = AccionMenuPartTextura;
     propParticulas->properties.push_back(propPartTextura);
+    // FILTRADO de la textura: suave (LINEAR) o pixelada (NEAREST). Junto a la textura, que es lo que afecta.
+    propPartFiltrado = new PropBool(T("Smooth texture"));
+    propParticulas->properties.push_back(propPartFiltrado);
     propPartCantidad = new PropFloat(T("Rate"), "p/s");     // 0 = solo rafagas emitir()
     propPartCantidad->SetRango(0.0f, 4096.0f);
     propParticulas->properties.push_back(propPartCantidad);
@@ -9973,6 +9976,7 @@ void Properties::RefreshTargetProperties(){
         if (propPartMezcla)   propPartMezcla->button->text = pt ? NombreMezcla(pt->mezcla) : std::string(T("Blend"));
         propPartDesvanecer->value = pt ? &pt->desvanecer : NULL;
         propPartActivo->value     = pt ? &pt->activo     : NULL;
+        if (propPartFiltrado) propPartFiltrado->value = pt ? &pt->filtrado : NULL;
         // ---- lo avanzado ----
         for (int k = 0; k < 3; k++) {
             if (propPartAcc[k])     propPartAcc[k]->value     = pt ? &pt->aceleracion[k] : NULL;
@@ -10136,7 +10140,7 @@ Properties::Properties() : ViewportBase() {
     propParticulas = NULL; propPartTextura = NULL; propPartCantidad = NULL;     // objeto Particulas
     propPartVida = NULL; propPartTam = NULL; propPartVel = NULL; propPartDispersion = NULL;
     propPartGravedad = NULL; propPartMezcla = NULL; propPartColor = NULL;
-    propPartDesvanecer = NULL; propPartActivo = NULL;
+    propPartDesvanecer = NULL; propPartActivo = NULL; propPartFiltrado = NULL;
     propPartVariacion = NULL; propPartTurbulencia = NULL;
     propPartRotacion = NULL; propPartVelRot = NULL;
     propPartMovCard = NULL; propPartTamCard = NULL; propPartColCard = NULL; propPartRotCard = NULL; propPartFormaCard = NULL;
