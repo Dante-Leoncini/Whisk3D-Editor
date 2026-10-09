@@ -168,9 +168,26 @@ void W3dEscena3DPasada() {
 // ---------------------------------------------------------------------------
 //  BANDAS del encuadre
 // ---------------------------------------------------------------------------
+// true si el marco cubre todo el rect (menos de medio pixel de banda por lado): no hay nada que tapar
+bool W3dEscena3DSinBandas(float W, float H, float marcoNX, float marcoNY, float zoom, float panX, float panY) {
+    const float cx = (panX * 0.5f + 0.5f) * W, cy = (0.5f - panY * 0.5f) * H;
+    const float hw = marcoNX * zoom * W * 0.5f, hh = marcoNY * zoom * H * 0.5f;
+    return cx - hw <= 0.5f && cy - hh <= 0.5f && cx + hw >= W - 0.5f && cy + hh >= H - 0.5f;
+}
+
 void W3dEscena3DBandas(float W, float H, float marcoNX, float marcoNY,
                        float zoom, float panX, float panY, bool opaco) {
     if (W < 1.0f || H < 1.0f) return;
+    // el marco sigue el zoom/pan de inspeccion (la MISMA transform que la proyeccion)
+    float cx = (panX * 0.5f + 0.5f) * W;
+    float cy = (0.5f - panY * 0.5f) * H;
+    float hw = marcoNX * zoom * W * 0.5f, hh = marcoNY * zoom * H * 0.5f;
+    float x0 = cx - hw, x1 = cx + hw, y0 = cy - hh, y1 = cy + hh;
+    // acotadas al rect (el marco puede quedar parcialmente afuera al panear/zoomear)
+    float bx0 = x0<0?0:(x0>W?W:x0), bx1 = x1<0?0:(x1>W?W:x1);
+    float by0 = y0<0?0:(y0>H?H:y0), by1 = y1<0?0:(y1>H?H:y1);
+    // el marco ocupa todo (el aspecto del juego es el de la pantalla): no hay bandas que dibujar
+    if (W3dEscena3DSinBandas(W, H, marcoNX, marcoNY, zoom, panX, panY)) return;
     gfx::MatrixMode(gfx::Projection); gfx::LoadIdentity();
     gfx::Ortho(0, W, H, 0, -1, 1);
     gfx::MatrixMode(gfx::ModelView); gfx::LoadIdentity();
@@ -183,14 +200,6 @@ void W3dEscena3DBandas(float W, float H, float marcoNX, float marcoNY,
     gfx::Enable(gfx::Blend); gfx::BlendAlpha();
     gfx::DisableArray(gfx::TexCoordArray); gfx::DisableArray(gfx::NormalArray);
     gfx::DisableArray(gfx::ColorArray);    gfx::EnableArray(gfx::VertexArray);
-    // el marco sigue el zoom/pan de inspeccion (la MISMA transform que la proyeccion)
-    float cx = (panX * 0.5f + 0.5f) * W;
-    float cy = (0.5f - panY * 0.5f) * H;
-    float hw = marcoNX * zoom * W * 0.5f, hh = marcoNY * zoom * H * 0.5f;
-    float x0 = cx - hw, x1 = cx + hw, y0 = cy - hh, y1 = cy + hh;
-    // acotadas al rect (el marco puede quedar parcialmente afuera al panear/zoomear)
-    float bx0 = x0<0?0:(x0>W?W:x0), bx1 = x1<0?0:(x1>W?W:x1);
-    float by0 = y0<0?0:(y0>H?H:y0), by1 = y1<0?0:(y1>H?H:y1);
     if (opaco) gfx::Color4f(0.0f, 0.0f, 0.0f, 1.0f);
     else       gfx::Color4f(0.0f, 0.0f, 0.0f, 0.5f);
     GLfloat bandas[] = {

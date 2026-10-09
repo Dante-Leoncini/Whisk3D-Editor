@@ -60,7 +60,7 @@ Camera* W3dCamaraDeMedida(bool soloCamaraActiva);
 // autocullearse por el rectangulo del agua.
 bool W3dAabbVisible(const Vector3& mn, const Vector3& mx);
 // (la Rutina) los planos de esa camara UNA vez (false = no cortar: orto o sin vista) y el test contra ellos
-bool W3dFrustumMedidaPlanos(float planos[24]);
+bool W3dFrustumMedidaPlanos(float planos[24], float* posCamara = 0);   // (posCamara: 3 floats, opcional)
 bool W3dAabbEnPlanos(const float planos[24], const Vector3& mn, const Vector3& mx);
 
 // HERENCIA de la designacion (ver Culling.cpp): mientras un Culling/LOD con

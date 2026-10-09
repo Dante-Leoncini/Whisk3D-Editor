@@ -127,8 +127,12 @@ los arrays de una **malla 3D de la biblioteca** (el recurso, no un objeto) y **D
   arrays se dibuja es estado de los pasos de puntero (dibujar 40 veces el mismo auto = los punteros una vez).
 
 **Test de visibilidad**: la caja de una parte (movida por la matriz de un objeto, opcional) o, sin malla, 6 números
-de una memoria (mínimo y máximo: una celda de un mundo unido) contra el frustum de la cámara (los planos se arman una
-vez por rutina; no lee matrices de GL) → 1/0 en una memoria, para "Skip if zero" o las banderas de un array.
+de una memoria (mínimo y máximo: una celda o una pieza de un mundo unido) contra el frustum de la cámara (los planos se
+arman una vez por rutina; no lee matrices de GL) → 1/0 en una memoria, para "Skip if zero" o las banderas de un array.
+Con **Distancia máxima** (fija o de una memoria; 0 = sin límite) también da 0 si la caja está más lejos que eso de la
+cámara (al punto más cercano de la caja): lo chico y lejano no se manda. En un teléfono cada triángulo cuesta (el N95
+transforma ~270 mil por segundo): probar la caja de cada pieza de un mundo, con una distancia para el nivel y otra más
+corta para la decoración, manda menos de la mitad de triángulos que probar celdas grandes.
 
 ## Desde Lua
 

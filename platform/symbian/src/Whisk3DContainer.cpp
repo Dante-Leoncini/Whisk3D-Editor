@@ -969,6 +969,10 @@ void CWhisk3DContainer::Draw(const TRect& /*aRect*/ ) const
 // Called by the CPeriodic in order to draw the graphics
 // ---------------------------------------------------------
 //
+// PERF del RENDER (lo escribe el [PERF] del modo juego): ms en armar el cuadro (las llamadas al driver: CPU) y en
+// eglSwapBuffers (lo que espera al GPU del tiler), y los cuadros dibujados entre dos lineas del log (los fps reales)
+static TUint gPfRender = 0, gPfSwap = 0, gPfCuadros = 0, gPfDesde = 0;
+
 int CWhisk3DContainer::DrawCallBack( TAny* aInstance )
     {
     CWhisk3DContainer* instance = (CWhisk3DContainer*) aInstance;
@@ -1104,6 +1108,12 @@ int CWhisk3DContainer::DrawCallBack( TAny* aInstance )
                     char topLua[96]; SimLuaPerfTop(topLua, sizeof(topLua), 30);
                     // GL: TODAS las llamadas al driver del ultimo cuadro (escena + HUD del juego + editor + GL crudo)
                     const w3dEngine::StatsDeCuadro& gc = w3dEngine::g_statCuadro;
+                    // el render: promedio por cuadro dibujado y los fps de verdad (cuadros / tiempo entre lineas)
+                    const TUint ahoraPf = User::NTickCount();
+                    const TUint cuadrosPf = gPfCuadros ? gPfCuadros : 1;
+                    const TUint fpsPf = (gPfDesde && ahoraPf > gPfDesde) ? (gPfCuadros * 1000u) / (ahoraPf - gPfDesde) : 0;
+                    w3dLogf("[PERF] %u fps | render=%u swap=%u ms por cuadro", fpsPf, gPfRender / cuadrosPf, gPfSwap / cuadrosPf);
+                    gPfRender = gPfSwap = gPfCuadros = 0; gPfDesde = ahoraPf;
                     w3dLogf("[PERF] /30f logica: sim=%u anim=%u pvs=%u part=%u ms | skin=%d ms (recalc %d, completos %d) | lua %d/%d scripts [%s] | RENDER: %d caras %d draws | GL %d (esc %d ui %d ed %d) | CULLING: %d de %d hijos",
                             gPfSim/30, gPfAnim/30, gPfPvs/30, gPfPart/30,
                             g_skinPerfMs/30, g_skinPerfSkins/30, g_skinPerfCompletos/30,
@@ -1146,11 +1156,16 @@ int CWhisk3DContainer::DrawCallBack( TAny* aInstance )
         // hasta la proxima tecla -> "solo renderiza cuando aprieto flechas".
         g_redraw = false;
         // arbol de viewports (3D confinado a su rectangulo + props) y el cursor encima
+        TUint _pfR = User::NTickCount();
         W3dLayoutRender();
         instance->iWhisk3D->DrawMouseCursor();
+        TUint _pfS = User::NTickCount();
+        gPfRender += _pfS - _pfR;
 
         // Call eglSwapBuffers, which blit the graphics to the window
         eglSwapBuffers( instance->iEglDisplay, instance->iEglSurface );
+        gPfSwap += User::NTickCount() - _pfS;
+        gPfCuadros++;
     }
 
     // To keep the background light on

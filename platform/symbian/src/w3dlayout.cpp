@@ -103,25 +103,26 @@ static const TInt KBorderCorner = 6;
 static GLfloat gBorderUVExp[96];
 static TBool gBorderUVInit = EFalse;
 
-// setea ortho de pantalla en pixeles (push); RestaurarOrtho hace el pop
+// setea ortho de pantalla en pixeles (push); RestaurarOrtho hace el pop. Las matrices van por el motor: lleva su
+// sombra en la CPU (GetMatrix sin glGet) y una matriz tocada por GL crudo la dejaria distinta de GL
 static void SetOrthoPantalla() {
     glViewport(0, 0, gScreenW, gScreenH);
-    glMatrixMode(GL_PROJECTION);
-    glPushMatrix();
-    glLoadIdentity();
-    glOrthof(0.0f, (GLfloat)gScreenW, (GLfloat)gScreenH, 0.0f, -5.0f, 1000.0f);
-    glMatrixMode(GL_MODELVIEW);
-    glPushMatrix();
-    glLoadIdentity();
+    w3dEngine::MatrixMode(w3dEngine::Projection);
+    w3dEngine::PushMatrix();
+    w3dEngine::LoadIdentity();
+    w3dEngine::Ortho(0.0f, (GLfloat)gScreenW, (GLfloat)gScreenH, 0.0f, -5.0f, 1000.0f);
+    w3dEngine::MatrixMode(w3dEngine::ModelView);
+    w3dEngine::PushMatrix();
+    w3dEngine::LoadIdentity();
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_LIGHTING);
 }
 
 static void RestaurarOrtho() {
-    glPopMatrix();
-    glMatrixMode(GL_PROJECTION);
-    glPopMatrix();
-    glMatrixMode(GL_MODELVIEW);
+    w3dEngine::PopMatrix();
+    w3dEngine::MatrixMode(w3dEngine::Projection);
+    w3dEngine::PopMatrix();
+    w3dEngine::MatrixMode(w3dEngine::ModelView);
 }
 
 static void ClearRect(TInt aX, TInt aY, TInt aW, TInt aH, const float* aRGBA) {
@@ -146,7 +147,7 @@ static void DibujarBordeLeaf(ViewportBase* aLeaf, WithBorder* aBorde) {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glBindTexture(GL_TEXTURE_2D, Textures[0]->iID);
-    glTranslatef((GLfloat)aLeaf->x, (GLfloat)aLeaf->y, 0.0f);
+    w3dEngine::Translatef((GLfloat)aLeaf->x, (GLfloat)aLeaf->y, 0.0f);
     glEnableClientState(GL_TEXTURE_COORD_ARRAY); // el render 3D lo apaga
     glDisableClientState(GL_NORMAL_ARRAY);
     aBorde->DibujarBordes(aLeaf); // <- el de PC, identico arte y colores
@@ -388,6 +389,10 @@ void W3dLayoutRender() {
                        ListaColores[static_cast<int>(ColorID::background)][2], 1.0f));
           W3D_GL_CRUDO(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
       } }
+
+    // el resync del estado por malla (Mesh::RenderObject) es por el GL crudo del editor de esta plataforma: en el
+    // modo juego puro no hay (y cada malla re-mandaba todo su estado al driver)
+    { extern int g_juegoPuro; w3dEngine::g_invalidarPorMalla = !g_juegoPuro; }
 
     // renderiza el rootViewport COMPARTIDO (no gRoot): "Maximize" reemplaza rootViewport por el viewport
     // activo -> dibuja SOLO ese y los demas NO se renderizan ni recalculan (clave para el rendimiento del N95).

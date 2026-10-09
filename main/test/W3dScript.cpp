@@ -2086,10 +2086,27 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
     // ---- visibles : lo que el recorrido del arbol de la escena DIBUJA (visible con toda su cadena): por tipo, y cada
     //      malla y cada vacio que no dibuja nada (sin hijos visibles: igual hace push / mult / pop) ----
     // ---- gltraza on|ver : cada llamada al driver por su lugar en el codigo (on: empieza; ver: imprime y apaga) ----
+    if (cmd == "invalidarpormalla") {
+        // (medir lo que cuesta) el resync del estado en cada malla, como el editor de Symbian
+        int v = 0; ss >> v;
+        w3dEngine::g_invalidarPorMalla = (v != 0);
+        return true;
+    }
+    if (cmd == "matrizaudit") {
+        // la sombra de las matrices (GetMatrix sin glGet) contra GL: "on" compara cada lectura, "ver" dice cuantas
+        // no dieron igual
+        std::string q; ss >> q;
+        if (q == "on") { w3dEngine::g_matrizAuditar = true; w3dEngine::g_matrizDesyncs = 0; }
+        else if (q == "off") w3dEngine::g_matrizAuditar = false;
+        printf("      [matrizaudit] desyncs=%d\n", w3dEngine::g_matrizDesyncs);
+        if (q == "cero" && w3dEngine::g_matrizDesyncs != 0) { err = "matrizaudit: la sombra no coincide con GL"; return false; }
+        return true;
+    }
     if (cmd == "gltraza") {
         std::string q; ss >> q;
-        w3dEngine::g_trazaGL = (q == "on");
-        if (q != "on") w3dEngine::TrazaGLVer();
+        w3dEngine::g_trazaGL = (q == "on" || q == "sec");
+        w3dEngine::g_trazaGLSec = (q == "sec");   // "sec": cada llamada en orden
+        if (!w3dEngine::g_trazaGL) w3dEngine::TrazaGLVer();
         return true;
     }
     if (cmd == "visibles") {

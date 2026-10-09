@@ -106,9 +106,9 @@ void CWhisk3D::DrawMouseCursor(){
     w3dEngine::Viewport(0, 0, winW, winH);
     w3dEngine::MatrixMode(w3dEngine::Projection);
     w3dEngine::LoadIdentity();
-    W3D_GL_CRUDO(glOrthof(0.0f, (GLfloat)winW, (GLfloat)winH, 0.0f, -5.0f, 1000.0f));
-    w3dEngine::MatrixMode(w3dEngine::ModelView);
-    W3D_GL_CRUDO(glPushMatrix());
+    w3dEngine::Ortho(0.0f, (GLfloat)winW, (GLfloat)winH, 0.0f, -5.0f, 1000.0f);   // (por el motor: lleva la sombra
+    w3dEngine::MatrixMode(w3dEngine::ModelView);                                   //  de las matrices en la CPU)
+    w3dEngine::PushMatrix();
     w3dEngine::LoadIdentity();
 
     w3dEngine::Enable(w3dEngine::Blend);
@@ -123,7 +123,7 @@ void CWhisk3D::DrawMouseCursor(){
     // (sin push de matriz de textura: los point sprites no la usan y un push
     // sin pop aca desbordaba el stack -> glErr 503 cada frame)
     W3D_GL_CRUDO(glColor4f(1.0f, 1.0f, 1.0f, 1.0f));
-    W3D_GL_CRUDO(glTranslatef(mouseX, mouseY, 0));
+    w3dEngine::Translatef((float)mouseX, (float)mouseY, 0.0f);
 
     if (W3dMouseTex() != 0){
         // mouse.png como POINT SPRITE de 32px (16x32 acolchada): el unico
@@ -166,7 +166,7 @@ void CWhisk3D::DrawMouseCursor(){
     }
 
     w3dEngine::EnableArray(w3dEngine::NormalArray);
-    W3D_GL_CRUDO(glPopMatrix());
+    w3dEngine::PopMatrix();
 }
 
 // ============================================================================

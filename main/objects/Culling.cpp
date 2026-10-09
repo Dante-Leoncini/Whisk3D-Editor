@@ -80,7 +80,7 @@ static bool AabbEnFrustum(const PlanoFrustum* p, const Vector3& mn, const Vector
 // ortografica devuelve true (no cortar: headless / editor sin lente).
 // los 6 planos de la camara de medida (el MISMO criterio que W3dAabbVisible), para el que testea MUCHAS cajas
 // por frame (la Rutina: el paso "Test de visibilidad"): se arman una vez y se reusan. false = no cortar
-bool W3dFrustumMedidaPlanos(float planos[24]) {
+bool W3dFrustumMedidaPlanos(float planos[24], float* posCamara) {
     CameraBase cam;
     float aspect;
     Camera* camMedida = W3dCamaraDeMedida(false);
@@ -103,6 +103,7 @@ bool W3dFrustumMedidaPlanos(float planos[24]) {
         aspect = (g_renderCamAspect > 1e-4f) ? g_renderCamAspect : 1.0f;
     }
     FrustumDeMatriz(cam.ProjectionMatrix(aspect) * cam.ViewMatrix(), (PlanoFrustum*)planos);
+    if (posCamara) { posCamara[0] = cam.pos.x; posCamara[1] = cam.pos.y; posCamara[2] = cam.pos.z; }
     return true;
 }
 bool W3dAabbEnPlanos(const float planos[24], const Vector3& mn, const Vector3& mx) {

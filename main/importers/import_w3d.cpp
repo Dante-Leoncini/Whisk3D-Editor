@@ -1513,6 +1513,7 @@ void BuildScene(Node* root){
     }
     w3dEngine::SetTexturas16Siempre(root->props.count("texturas16") &&
                                     (w3dMapAt(root->props, "texturas16") == "true" || w3dMapAt(root->props, "texturas16") == "1"));
+    w3dEngine::SetTexturasMitadDesde(GetIntOrDefault(root->props, "texturasMitadDesde", 0));   // (en el N95)
 
     // CACHE DE JUEGO (rewind) del proyecto: un .w3d puede abrir con el cache YA destildado -> un JUEGO se juega
     // FLUIDO (no rebobina). Si el .w3d no declara "cacheJuego", gSimCacheOn queda como estaba (pref de sesion).
@@ -4367,6 +4368,8 @@ static bool AbrirEscenaJson(const char* datos, size_t n, const std::string& base
     { JVal* jm = JHijo(raiz, "mipmaps", 3); if (jm) w3dEngine::SetMipmapsGlobal(jm->b); }
     // TEXTURAS DE 16 BITS (ausente = solo las exactas). Antes de la cola diferida: gobierna esta carga
     { JVal* j16 = JHijo(raiz, "texturas16", 3); w3dEngine::SetTexturas16Siempre(j16 && j16->b); }
+    // TEXTURAS A LA MITAD EN EL N95 (ausente = 0, ninguna): un lado mayor a este se sube a la mitad. Idem: antes de la cola
+    w3dEngine::SetTexturasMitadDesde(JI(raiz, "texturasMitadDesde", 0));
     // icono del juego (opcional): ruta EXTERNA relativa al .w3d. La usa la tarjeta
     // Juego y Compilar juego (genera los tamanos chicos al compilar).
     AplicarIcono(RutaJson(JS(raiz, "icono", ""), base));

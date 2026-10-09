@@ -233,13 +233,22 @@ bool LoadTexture(const char* path, unsigned int& outId, int* outW, int* outH) {
     // limpiar errores GL VIEJOS encolados (p.ej. la miniatura NPOT del file browser): sin esto,
     // el glGetError() de abajo los atribuia a ESTA subida y "Cargar textura" fallaba en SILENCIO
     // (el browser se cerraba y la textura nunca aparecia) aunque el upload hubiera salido bien.
+    // el PROYECTO pidio sus texturas a la MITAD en el telefono (TexturasMitadDesde: un proyecto pensado para PC no
+    // entra en la memoria). Se informa el tamano de antes (las UV van de 0 a 1: el dibujo no cambia)
+    const int origW = w, origH = h;
+    const int mitad = TexturasMitadDesde();
+    if (mitad > 0 && (w > mitad || h > mitad)) {
+        int mw = 0, mh = 0;
+        unsigned char* m = ReducirMitadRGBA(rgba, w, h, mw, mh);
+        if (m) { FreeImage(rgba); rgba = m; w = mw; h = mh; }
+    }
     while (glGetError() != GL_NO_ERROR) {}
     outId = UploadRGBA(rgba, w, h, true, true, false, true);   // (16 bits si entra sin perdida: la mitad de memoria)
     GLenum e = glGetError();
     w3dLogf("LoadTexture: subida %dx%d glErr=%x id=%d", w, h, e, (TInt)outId);
     FreeImage(rgba);
-    if (outW) { *outW = w; }
-    if (outH) { *outH = h; }
+    if (outW) { *outW = origW; }
+    if (outH) { *outH = origH; }
     return (e == 0 && outId != 0);
 }
 

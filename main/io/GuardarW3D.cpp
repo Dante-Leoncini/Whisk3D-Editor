@@ -2915,6 +2915,9 @@ bool GuardarW3D(const std::string& ruta) {
     if (w3dEngine::PixeladoGlobal()) s += "  \"pixelado\": true,\n";
     if (!w3dEngine::MipmapsGlobal()) s += "  \"mipmaps\": false,\n";   // default true: solo se guarda el apagado
     if (w3dEngine::Texturas16Siempre()) s += "  \"texturas16\": true,\n";   // default false (solo las de 16 bits exactas)
+    if (w3dEngine::TexturasMitadDesde() > 0) {   // default 0 (en el N95 todas a su tamano)
+        char b[64]; snprintf(b, sizeof b, "  \"texturasMitadDesde\": %d,\n", w3dEngine::TexturasMitadDesde()); s += b;
+    }
     // FORMATO DE LAS MALLAS: solo se escribe el que NO es el default (texto). Es la opcion del
     // PROYECTO; el forzado del harness no se guarda.
     if (g_w3dFormatoMallasProyecto == W3D_MALLAS_TEXTO) s += "  \"formatoMallas\": \"texto\",\n";

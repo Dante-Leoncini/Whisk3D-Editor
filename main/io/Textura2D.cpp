@@ -114,7 +114,20 @@ unsigned Textura2DObtener(const std::string& ruta, int* w, int* h) {
                 // forzarPOT=true: en el N95 una textura NPOT se rechaza y el billboard sale SIN
                 // textura (los atlas de fuego 960x24 / 1440x48 son NPOT). El camino de material ya
                 // remuestrea a POT; este (particulas / imagenes 2D) se lo saltaba. No-op en PC/Android/Web.
+#ifdef W3D_SYMBIAN
+                // el proyecto pidio sus texturas a la MITAD en el telefono (TexturasMitadDesde): sube la mitad, pero el
+                // tamano que se informa (e.w, e.h) sigue siendo el de la imagen: la UI mide con el
+                int sw = e.w, sh = e.h;
+                const int mitad = gfx::TexturasMitadDesde();
+                if (mitad > 0 && (sw > mitad || sh > mitad)) {
+                    int mw = 0, mh = 0;
+                    unsigned char* m = gfx::ReducirMitadRGBA(rgba, sw, sh, mw, mh);
+                    if (m) { gfx::FreeImage(rgba); rgba = m; sw = mw; sh = mh; }
+                }
+                e.id = gfx::UploadRGBA(rgba, sw, sh, true, false, true, true);   // UI 2D sin mips (slice9), POT en N95, 16 bits si entra
+#else
                 e.id = gfx::UploadRGBA(rgba, e.w, e.h, true, false, true, true);   // UI 2D sin mips (slice9), POT en N95, 16 bits si entra
+#endif
                 gfx::FreeImage(rgba);
             }
         }

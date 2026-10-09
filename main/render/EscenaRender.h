@@ -102,6 +102,8 @@ void W3dEscena3DPasada();
 // 'opaco' = negro pleno (lo que ve el jugador en el aparato: el RUNTIME siempre
 // las dibuja asi); 'opaco' falso = negro al 50% (el editor, para poder auditar
 // lo que queda afuera del encuadre). Dibuja en 2D; el que llama restaura lo suyo.
+// el marco cubre todo el rect: no hay bandas (el que dibuja se ahorra el 2D entero)
+bool W3dEscena3DSinBandas(float W, float H, float marcoNX, float marcoNY, float zoom, float panX, float panY);
 void W3dEscena3DBandas(float W, float H, float marcoNX, float marcoNY,
                        float zoom, float panX, float panY, bool opaco);
 

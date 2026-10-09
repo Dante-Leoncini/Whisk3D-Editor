@@ -2224,6 +2224,12 @@ void Viewport3D::RenderSnapIndicador(){
 void Viewport3D::RenderCamPassepartout(){
     if (!camFrameOn) return;
     namespace gfx = w3dEngine;
+    // con el JUEGO corriendo no va el borde blanco: si ademas el marco ocupa todo el viewport (el aspecto del juego
+    // es el de la pantalla) no hay nada que dibujar. Ni el 2D ni el Invalidate del final (en el N95 son ~40 llamadas
+    // por cuadro: la UI que sigue arma su estado 2D completo)
+    if (AnimEsJuego && JuegoSimActiva() &&
+        W3dEscena3DSinBandas((float)width, (float)height, camFrameNX, camFrameNY, camViewZoom, camViewPanX, camViewPanY))
+        return;
     // 2D local del viewport (0..width, 0..height ; y hacia abajo)
     gfx::MatrixMode(gfx::Projection); gfx::LoadIdentity();
     gfx::Ortho(0, width, height, 0, -1, 1);

@@ -9,6 +9,7 @@
 #include "io/JsonW3d.h"            // JVal / JsonNumTexto: los campos del .w3d
 #include "animation/Animation.h"   // AnimPaso: los pasos se animan (g_animPasoHook)
 #include <map>
+#include <math.h>                  // cosf / sinf (el giro de "Matriz del objeto")
 #include <stdlib.h>
 #include <string.h>
 
@@ -39,7 +40,7 @@ static const PasoInfo kPasos[PasoN] = {
     { "trasladar",       "Translate",         GrupoTransformar, 3, RefNada,    EnteroNada,   OpcNada,          false, 0, { "X", "Y", "Z" } },
     { "rotar",           "Rotate",            GrupoTransformar, 4, RefNada,    EnteroNada,   OpcNada,          false, 0, { "Angle", "Axis X", "Axis Y", "Axis Z" } },
     { "escalar",         "Scale",             GrupoTransformar, 3, RefNada,    EnteroNada,   OpcNada,          false, 0, { "X", "Y", "Z" } },
-    { "matrizObjeto",    "Object matrix",     GrupoTransformar, 0, RefObjeto,  EnteroNada,   OpcMatriz,        false, 0, { 0 } },
+    { "matrizObjeto",    "Object matrix",     GrupoTransformar, 1, RefObjeto,  EnteroNada,   OpcMatriz,        false, 0, { "Spin Y" } },
     { "array",           "Array on/off",      GrupoDibujar,     0, RefNada,    EnteroNada,   OpcArray,         true,  "On", { 0 } },
     { "punteroVertices", "Vertex pointer",    GrupoDibujar,     0, RefMalla,   EnteroNada,   OpcNada,          false, 0, { 0 } },
     { "punteroNormales", "Normal pointer",    GrupoDibujar,     0, RefMalla,   EnteroNada,   OpcNada,          false, 0, { 0 } },
@@ -88,7 +89,7 @@ static const PasoInfo kPasos[PasoN] = {
     { "caras",           "Face culling",      GrupoCaras,       0, RefNada,    EnteroNada,   OpcNada,          true,  "On", { 0 } },
     { "saltarSi",        "Skip if zero",      GrupoControl,     1, RefNada,    EnteroCuenta, OpcNada,          false, 0, { "Value" } },
     { "saltarOculto",    "Skip if hidden",    GrupoControl,     0, RefObjeto,  EnteroCuenta, OpcNada,          false, 0, { 0 } },
-    { "visible",         "Visibility test",   GrupoControl,     2, RefMalla,   EnteroParte,  OpcNada,          false, 0, { "Write to", "Box (memory)" } },
+    { "visible",         "Visibility test",   GrupoControl,     3, RefMalla,   EnteroParte,  OpcNada,          false, 0, { "Write to", "Box (memory)", "Max distance" } },
     { "lua",             "Call Lua",          GrupoControl,     0, RefFuncion, EnteroNada,   OpcNada,          false, 0, { 0 } },
 };
 static const char* const kGrupos[GrupoN] = { "Transform", "Draw", "Texture", "Fog", "Lights", "Alpha test", "Color",
@@ -369,6 +370,7 @@ static unsigned gIboActual = 0;        // el IBO bindeado (0xFFFFFFFF = no se sa
 static bool  gVboEnUso = false;        // algun puntero quedo en un VBO (al terminar se desbindea)
 static int   gPlanosEstado = 0;        // 0 sin armar, 1 listos, -1 no cortar (orto / sin vista)
 static float gPlanos[24];
+static float gCamPos[3];               // (con los planos) de donde mira: la distancia maxima de "visible"
 static bool  gAlfaOn = false;          // el alpha test es UN estado con dos pasos (on/off y la referencia)
 static float gAlfaRef = 0.5f;
 static Rutina* gEnCurso = NULL;        // la rutina cuya lista se esta ejecutando (lua: paso())
@@ -483,7 +485,7 @@ static void Dibujar(const W3dPaso& p) {
 
 // la caja de la parte (movida por la matriz de un objeto, si hay) contra los planos de la camara
 static bool Visible(const W3dPaso& p) {
-    if (gPlanosEstado == 0) gPlanosEstado = W3dFrustumMedidaPlanos(gPlanos) ? 1 : -1;
+    if (gPlanosEstado == 0) gPlanosEstado = W3dFrustumMedidaPlanos(gPlanos, gCamPos) ? 1 : -1;
     if (gPlanosEstado < 0) return true;
     // la caja: la de la parte de la malla o, sin malla, 6 numeros de una memoria (minimo y maximo: las celdas de un mundo
     // unido, que no son partes)
@@ -505,6 +507,18 @@ static bool Visible(const W3dPaso& p) {
             if (e.z > c1.z) c1.z = e.z;
         }
         a = c0; b = c1;
+    }
+    // la distancia maxima (0 = sin limite): de la camara al punto mas cercano de la caja. Lo chico y lejano no se
+    // manda (en una pantalla de 320 x 240 son pocos pixeles y cada triangulo cuesta lo mismo)
+    const float lim = p.n[2].Valor();
+    if (lim > 0.0f) {
+        const float q0[3] = { a.x, a.y, a.z }, q1[3] = { b.x, b.y, b.z };
+        float d2 = 0.0f;
+        for (int k = 0; k < 3; k++) {
+            const float e = (gCamPos[k] < q0[k]) ? q0[k] - gCamPos[k] : ((gCamPos[k] > q1[k]) ? gCamPos[k] - q1[k] : 0.0f);
+            d2 += e * e;
+        }
+        if (d2 > lim * lim) return false;
     }
     return W3dAabbEnPlanos(gPlanos, a, b);
 }
@@ -535,6 +549,16 @@ static void EjecutarPasoCrudo(W3dPaso& p, size_t& i, Rutina* yo) {
     case PasoEscalar:   gfx::Scalef(p.n[0].Valor(), p.n[1].Valor(), p.n[2].Valor()); break;
     case PasoMatrizObjeto: {
         Matrix4 w; ((Object*)p.ptr)->GetWorldMatrix(w);
+        // el GIRO en Y (grados, fijo o de una memoria: los anillos que giran todos juntos) va en la misma matriz: una
+        // llamada al driver en vez de cargar + rotar
+        const float giro = p.n[0].Valor();
+        if (giro != 0.0f) {
+            const float r = giro * 3.14159265f / 180.0f, c = cosf(r), s = sinf(r);
+            Matrix4 ry;   // (column-major, como GL: la rotacion de glRotatef(giro, 0, 1, 0))
+            for (int i = 0; i < 16; i++) ry.m[i] = (i % 5 == 0) ? 1.0f : 0.0f;
+            ry.m[0] = c; ry.m[2] = -s; ry.m[8] = s; ry.m[10] = c;
+            w = w * ry;
+        }
         if (p.modo == 0) { gfx::MultMatrix(w.m); break; }
         if (!gBaseMVLeida) { gfx::GetMatrix(gfx::ModelView, gBaseMV.m); gBaseMVLeida = true; }
         Matrix4 m = gBaseMV * w;
