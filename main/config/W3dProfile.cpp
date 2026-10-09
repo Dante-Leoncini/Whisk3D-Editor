@@ -6,6 +6,7 @@
  * (el reloj cambia segun el OS). Lo consume el overlay "Statistics" del Viewport3D.
  */
 #include "W3dProfile.h"
+#include "w3dGraphics.h"   // StatsCuadro: el contador de llamadas GL cierra el cuadro aca
 
 #ifdef W3D_SYMBIAN
 #include <e32std.h> // User::NTickCount
@@ -26,7 +27,10 @@ double W3dNowMs() {
 #endif
 }
 
-void W3dProfBegin() { g_prof.logic = g_prof.scene = g_prof.viewport3d = g_prof.render = g_prof.swap = 0.0; }
+void W3dProfBegin() {
+    g_prof.logic = g_prof.scene = g_prof.viewport3d = g_prof.render = g_prof.swap = 0.0;
+    w3dEngine::StatsCuadro();   // (las llamadas GL del cuadro anterior, completo: escena + HUD + editor)
+}
 
 void W3dProfEnd() {
     g_profShow.logic      = g_profShow.logic      * 0.9 + g_prof.logic      * 0.1;

@@ -39,6 +39,7 @@ bool W3dConfigGuardar(){
     // raiz del repo para Compilar (la fija el usuario en Ajustes cuando el editor corre instalado). Solo se
     // escribe si hay una: sin valor no se escribe la clave, asi un editor "desde el arbol" no la clava vacia.
     if (!cfg.repoPath.empty()) fprintf(f, "repoPath = %s\n", cfg.repoPath.c_str());
+    fprintf(f, "logs = %d\n",               cfg.logs);
     // "auto" = seguir al sistema (lo que hace si la clave no esta). Un idioma explicito PISA la deteccion: el que
     // quiere el editor en ingles con Windows en espaniol tiene que poder. Si el usuario NUNCA eligio idioma
     // (g_idiomaForzado false), se escribe "auto": guardar otro ajuste no debe clavar el idioma detectado.

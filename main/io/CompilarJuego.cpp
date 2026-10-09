@@ -1076,7 +1076,7 @@ static bool EscribirMain(const std::string& ruta, const std::string& fontRel,
     fputs("  case SDL_CONTROLLER_TYPE_PS5: return \"playstation\";\n", f);
     fputs("  case SDL_CONTROLLER_TYPE_NINTENDO_SWITCH_PRO: return \"nintendo\";\n", f);
     fputs("  default: return \"generico\";}}\n", f);
-    fputs("static void padSoltar(){W3dGameStick(0,0,0);W3dGameStick(1,0,0);\n", f);
+    fputs("static void padSoltar(){W3dGameStick(0,0,0);W3dGameStick(1,0,0);W3dGameGatillo(0,0);W3dGameGatillo(1,0);\n", f);
     fputs(" static const char* nn[8]={\"a\",\"b\",\"x\",\"y\",\"arriba\",\"abajo\",\"izquierda\",\"derecha\"};\n", f);
     fputs(" for(int i=0;i<8;i++)W3dGameBoton(nn[i],false);}\n", f);
     fputs("static void padAbrir(int idx){\n", f);
@@ -1152,7 +1152,7 @@ static bool EscribirMain(const std::string& ruta, const std::string& fontRel,
     // modulo y los botones se OR-ean, que es lo que hace falta en un juego de un
     // jugador con dos mandos a mano.
     fputs("{const float DZ=0.2f,M=1.0f/32767.0f;\n", f);
-    fputs("float lx=0,ly=0,rx=0,ry=0;int du=0,dd=0,dl=0,dr=0,ba=0,bb=0,bx=0,by=0;\n", f);
+    fputs("float lx=0,ly=0,rx=0,ry=0,gl=0,gr=0;int du=0,dd=0,dl=0,dr=0,ba=0,bb=0,bx=0,by=0;\n", f);
     fputs("for(int ci=0;ci<W3dControlesCuantos();ci++){\n", f);
     fputs(" SDL_GameController* gc=(SDL_GameController*)W3dControlHandle(ci);if(!gc)continue;\n", f);
     fputs(" float ax=SDL_GameControllerGetAxis(gc,SDL_CONTROLLER_AXIS_LEFTX)*M;\n", f);
@@ -1163,6 +1163,9 @@ static bool EscribirMain(const std::string& ruta, const std::string& fontRel,
     fputs(" if(ay<0?-ay>(ly<0?-ly:ly):ay>(ly<0?-ly:ly))ly=ay;\n", f);
     fputs(" if(bx2<0?-bx2>(rx<0?-rx:rx):bx2>(rx<0?-rx:rx))rx=bx2;\n", f);
     fputs(" if(by2<0?-by2>(ry<0?-ry:ry):by2>(ry<0?-ry:ry))ry=by2;\n", f);
+    // los gatillos analogicos (pedales): gana el mas apretado de todos los mandos
+    fputs(" float tl=SDL_GameControllerGetAxis(gc,SDL_CONTROLLER_AXIS_TRIGGERLEFT)*M,tr=SDL_GameControllerGetAxis(gc,SDL_CONTROLLER_AXIS_TRIGGERRIGHT)*M;\n", f);
+    fputs(" if(tl>gl)gl=tl;if(tr>gr)gr=tr;\n", f);
     fputs(" du|=SDL_GameControllerGetButton(gc,SDL_CONTROLLER_BUTTON_DPAD_UP);\n", f);
     fputs(" dd|=SDL_GameControllerGetButton(gc,SDL_CONTROLLER_BUTTON_DPAD_DOWN);\n", f);
     fputs(" dl|=SDL_GameControllerGetButton(gc,SDL_CONTROLLER_BUTTON_DPAD_LEFT);\n", f);
@@ -1177,7 +1180,8 @@ static bool EscribirMain(const std::string& ruta, const std::string& fontRel,
     // con el analogico en reposo la cruceta manda ejes de exactamente 0/+-1, que es lo
     // que el juego reconoce como cruceta para aplicarle el modulo de las 8 direcciones.
     fputs("if(lx==0&&ly==0){lx=(float)(dr-dl);ly=(float)(dd-du);}\n", f);
-    fputs("W3dGameStick(0,lx,ly);W3dGameStick(1,rx,ry);\n", f);
+    fputs("if(gl<DZ)gl=0;if(gr<DZ)gr=0;\n", f);
+    fputs("W3dGameStick(0,lx,ly);W3dGameStick(1,rx,ry);W3dGameGatillo(0,gl);W3dGameGatillo(1,gr);\n", f);
     fputs("W3dGameBoton(\"a\",ba!=0);W3dGameBoton(\"b\",bb!=0);\n", f);
     fputs("W3dGameBoton(\"x\",bx!=0);W3dGameBoton(\"y\",by!=0);\n", f);
     fputs("W3dGameBoton(\"arriba\",du!=0);W3dGameBoton(\"abajo\",dd!=0);\n", f);
@@ -1431,6 +1435,7 @@ static const char* kFuentesBase[] = {
     // las mallas 3D como RECURSO (registro "mallas" del proyecto, una copia en memoria/GPU para
     // todos los objetos que la usan): Mesh.cpp la llama sin ifdef (vinculo, VBO compartidos)
     "${CORE}/objects/MallaRecurso.cpp",
+    "${CORE}/objects/MallaFlujos.cpp",          // las rutinas: tiras, aristas, vertices y quads simulados por parte
     "${CORE}/script/W3dScript.cpp",
     // W3dScript.cpp registra SIEMPRE los binds de los cuerpos rigidos (fisicaVel...) y de la colision
     // contra mallas (colSuelo/colPared...): sin estos dos el juego compilado no linkea
@@ -1472,6 +1477,7 @@ static const char* kFuentes3D[] = {
     "${W3DROOT}/main/objects/Camera.cpp",         // camara + riel (el encuadre del juego sale de aca)
     "${W3DROOT}/main/objects/Curve.cpp",
     "${W3DROOT}/main/objects/Culling.cpp",
+    "${W3DROOT}/main/objects/Rutina.cpp",         // Rutina: lista de pasos del render (sin la validacion del editor)
     "${W3DROOT}/main/objects/LOD.cpp",
     "${W3DROOT}/main/objects/Niebla.cpp",         // la niebla puesta en el arbol (solo en Render)
     "${W3DROOT}/main/objects/Recorte.cpp",        // LimpiarZ / Recorte (composicion de la pantalla)
@@ -1995,6 +2001,7 @@ static bool EsObjeto3D(Object* o) {
         case ObjectType::limpiarz:   case ObjectType::recorte:
         case ObjectType::hitbox:     case ObjectType::prefab:
         case ObjectType::proxy:      // (un proxy de una libreria: lo que genera es contenido 3D)
+        case ObjectType::rutina:     // (una rutina dibuja 3D)
             return true;
         default: return false;
     }

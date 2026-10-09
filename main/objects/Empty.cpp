@@ -9,6 +9,8 @@
 
 extern bool g_showEmpty; // toggle del submenu "Objects" (overlays)
 
+bool Empty::DibujaAlgo() { return g_showEmpty; }
+
 void Empty::RenderObject() {
     if (!g_showEmpty) return; // oculto por el toggle "Empty" del menu de overlays
     static const GLfloat cruz[] = {

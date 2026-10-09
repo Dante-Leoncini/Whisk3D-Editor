@@ -59,6 +59,9 @@ Camera* W3dCamaraDeMedida(bool soloCamaraActiva);
 // true si es visible o si no hay lente real (headless). Lo usa el Mirror para
 // autocullearse por el rectangulo del agua.
 bool W3dAabbVisible(const Vector3& mn, const Vector3& mx);
+// (la Rutina) los planos de esa camara UNA vez (false = no cortar: orto o sin vista) y el test contra ellos
+bool W3dFrustumMedidaPlanos(float planos[24]);
+bool W3dAabbEnPlanos(const float planos[24], const Vector3& mn, const Vector3& mx);
 
 // HERENCIA de la designacion (ver Culling.cpp): mientras un Culling/LOD con
 // soloCamaraActiva dibuja su subarbol, el contador queda > 0 y todo el que mida

@@ -51,7 +51,9 @@ extern GLfloat LastPivotZ;
 extern PopupMenu* MenuAdd;      // el desplegable del boton "Add"
 extern PopupMenu* MenuImports;  // submenu "Add > Imports": OBJ / FBX / glTF / GLB
 extern PopupMenu* MenuMallas;   // submenu "Add > Mesh": las primitivas (plano, cubo, esfera...)
+extern PopupMenu* MenuCore;     // submenu "Add > Core": las rutinas (pasos del render)
 extern PopupMenu* MenuPrefabsAdd; // submenu "Add > Prefab": los prefabs del proyecto (se rearma al abrir el Add)
+extern PopupMenu* MenuEscenasAdd; // submenu "Add > Scene": las otras escenas del proyecto (se rearma al abrir el Add)
 extern PopupMenu* MenuSelect;   // el desplegable del boton "Select"
 extern PopupMenu* MenuObject;
 extern PopupMenu* MenuAnimation; // el desplegable del boton "Animation"   // el desplegable del boton "Object"
@@ -148,6 +150,7 @@ class Viewport3D : public ViewportBase, public WithBorder {
         int statDrawsFrame;   // draw calls de triangulos
         int statBindsFrame;   // glBindTexture REALES (los cacheados no cuentan)
         int statEstadosFrame; // cambios de estado que llegaron al driver
+        int statOtrasFrame;   // matrices, glGet, punteros y binds de VBO (w3dEngine::g_statOtras)
         // (aca vivia ShowUi, que salteaba RenderUI entero: dada de baja. RenderUI no es un
         //  overlay, es el chrome del area + el reseteo del estado GL 2D; sin el, viewport
         //  inusable y estado sucio. El lector de .w3d IGNORA la prop si viene guardada.)

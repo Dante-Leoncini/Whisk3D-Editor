@@ -138,6 +138,7 @@ SOURCE          Proporcional.cpp // proportional editing (tecla O): pesos por di
 SOURCE          BoxSelect.cpp // B: caja de seleccion (compartida por 3D/UV/2D)
 SOURCE          W3dFalloff.cpp // curvas de falloff del pincel (pesos + vertex color)
 SOURCE          BooleanMod.cpp // modificador booleano (C++03, compila en Symbian)
+SOURCE          RutinaEditor.cpp // validacion de las rutinas antes de dibujarlas (solo el editor)
 
 SOURCEPATH      ..\..\..\main\render
 SOURCE          render.cpp OpcionesRender.cpp
@@ -201,6 +202,7 @@ SOURCE          CambiosProyecto.cpp   // lo SIN GUARDAR ('*' por recurso y por r
 SOURCE          Miniaturas.cpp        // las miniaturas de la cuadricula de la biblioteca (perezosas, en memoria)
 SOURCEPATH      ..\..\..\main\objects
 SOURCE          Culling.cpp Particulas.cpp VisZona.cpp Gamepad.cpp Niebla.cpp Recorte.cpp
+SOURCE          Rutina.cpp // objeto Rutina: lista de pasos del render (C++03)
 SOURCE          Hitbox.cpp     // objeto Hitbox (caja de deteccion; el motor esta en Core\physics)
 SOURCEPATH      ..\..\..\main\render
 SOURCE          UIOverlay.cpp RayTracer.cpp   // RayTracer: trazado de rayos por CPU (un hilo en el N95)
@@ -219,6 +221,7 @@ SOURCE          W3dRecursos.cpp W3dZip.cpp W3dAlmacen.cpp
 SOURCEPATH      ..\..\..\libs\Whisk3DCore\objects
 SOURCE          VisSet.cpp MallaDatos.cpp
 SOURCE          MallaRecurso.cpp // las mallas 3D como RECURSO compartido (registro "mallas", vinculo, VBO compartidos)
+SOURCE          MallaFlujos.cpp // los flujos de indices por parte para las rutinas (tiras, aristas, vertices, quads simulados)
 SOURCE          VisBsp.cpp       // metodo Bsp del Culling: arbol BSP + PVS por cluster (.w3dbsp)
 SOURCEPATH      ..\..\..\libs\Whisk3DCore\base
 SOURCE          W3dConfig.cpp W3dClipboardSymbian.cpp
@@ -375,6 +378,7 @@ SOURCE Armature.cpp              // clase Armature (PuntoFoco/RadioFoco/RenderOb
 SOURCEPATH ..\..\..\main\ui\ViewPorts
 SOURCE Timeline.cpp              // viewport Timeline (los metodos SDL van #ifndef W3D_SYMBIAN; el resto compila)
 SOURCE PropsHitbox.cpp           // tarjeta "Hitbox" del panel de propiedades
+SOURCE PropsRutina.cpp           // tarjeta "Routine" del panel de propiedades (los pasos de una rutina)
 SOURCE OutlinerRecursos.cpp      // las vistas de recursos del outliner (selector de vista, carpetas, en uso/huerfano)
 SOURCE SoltarRecurso.cpp         // soltar un recurso de la biblioteca en el 3D (malla/material/textura/animset)
 

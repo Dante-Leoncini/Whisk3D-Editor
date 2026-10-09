@@ -106,13 +106,13 @@ void CWhisk3D::DrawMouseCursor(){
     w3dEngine::Viewport(0, 0, winW, winH);
     w3dEngine::MatrixMode(w3dEngine::Projection);
     w3dEngine::LoadIdentity();
-    glOrthof(0.0f, (GLfloat)winW, (GLfloat)winH, 0.0f, -5.0f, 1000.0f);
+    W3D_GL_CRUDO(glOrthof(0.0f, (GLfloat)winW, (GLfloat)winH, 0.0f, -5.0f, 1000.0f));
     w3dEngine::MatrixMode(w3dEngine::ModelView);
-    glPushMatrix();
+    W3D_GL_CRUDO(glPushMatrix());
     w3dEngine::LoadIdentity();
 
     w3dEngine::Enable(w3dEngine::Blend);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    W3D_GL_CRUDO(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
     w3dEngine::Disable(w3dEngine::DepthTest);
     w3dEngine::Disable(w3dEngine::Lighting);
 
@@ -122,8 +122,8 @@ void CWhisk3D::DrawMouseCursor(){
     w3dEngine::DisableArray(w3dEngine::NormalArray); // puntero viciado de la escena
     // (sin push de matriz de textura: los point sprites no la usan y un push
     // sin pop aca desbordaba el stack -> glErr 503 cada frame)
-    glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-    glTranslatef(mouseX, mouseY, 0);
+    W3D_GL_CRUDO(glColor4f(1.0f, 1.0f, 1.0f, 1.0f));
+    W3D_GL_CRUDO(glTranslatef(mouseX, mouseY, 0));
 
     if (W3dMouseTex() != 0){
         // mouse.png como POINT SPRITE de 32px (16x32 acolchada): el unico
@@ -131,23 +131,23 @@ void CWhisk3D::DrawMouseCursor(){
         static const GLfloat MousePt[2] = { 16.0f, 16.0f }; // centro de la celda
         if (W3dLayoutArrastrePopup()){
             // VIOLETA: arrastrando un valor del selector de color
-            glColor4f(0.65f, 0.4f, 1.0f, 1.0f);
+            W3D_GL_CRUDO(glColor4f(0.65f, 0.4f, 1.0f, 1.0f));
         } else if (W3dLayoutOcupado()){
             // VERDE: estas en medio de algo (scroll/divisor agarrado)
-            glColor4f(ListaColores[static_cast<int>(ColorID::accent)][0], ListaColores[static_cast<int>(ColorID::accent)][1],
-                      ListaColores[static_cast<int>(ColorID::accent)][2], 1.0f);
+            W3D_GL_CRUDO(glColor4f(ListaColores[static_cast<int>(ColorID::accent)][0], ListaColores[static_cast<int>(ColorID::accent)][1],
+                      ListaColores[static_cast<int>(ColorID::accent)][2], 1.0f));
         } else {
-            glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+            W3D_GL_CRUDO(glColor4f(1.0f, 1.0f, 1.0f, 1.0f));
         }
         w3dEngine::BindTexture(W3dMouseTex());
-        glEnable(GL_POINT_SPRITE_OES);
-        glTexEnvf(GL_POINT_SPRITE_OES, GL_COORD_REPLACE_OES, GL_TRUE);
-        glPointSize(32.0f);
-        glVertexPointer(2, GL_FLOAT, 0, MousePt);
-        glTexCoordPointer(2, GL_FLOAT, 0, MousePt); // dummy (COORD_REPLACE)
-        glDrawArrays(GL_POINTS, 0, 1);
-        glTexEnvf(GL_POINT_SPRITE_OES, GL_COORD_REPLACE_OES, GL_FALSE);
-        glDisable(GL_POINT_SPRITE_OES);
+        W3D_GL_CRUDO(glEnable(GL_POINT_SPRITE_OES));
+        W3D_GL_CRUDO(glTexEnvf(GL_POINT_SPRITE_OES, GL_COORD_REPLACE_OES, GL_TRUE));
+        W3D_GL_CRUDO(glPointSize(32.0f));
+        W3D_GL_CRUDO(glVertexPointer(2, GL_FLOAT, 0, MousePt));
+        W3D_GL_CRUDO(glTexCoordPointer(2, GL_FLOAT, 0, MousePt)); // dummy (COORD_REPLACE)
+        W3D_GL_CRUDO(glDrawArrays(GL_POINTS, 0, 1));
+        W3D_GL_CRUDO(glTexEnvf(GL_POINT_SPRITE_OES, GL_COORD_REPLACE_OES, GL_FALSE));
+        W3D_GL_CRUDO(glDisable(GL_POINT_SPRITE_OES));
     }
     else {
         // fallback: flecha plana mientras mouse.png no este subida
@@ -155,18 +155,18 @@ void CWhisk3D::DrawMouseCursor(){
         static const GLfloat ArrowVerts[]  = { 0,0,0,  0,14,0,  10,10,0 };
         w3dEngine::Disable(w3dEngine::Texture2D);
         w3dEngine::DisableArray(w3dEngine::TexCoordArray);
-        glColor4f(0.0f, 0.0f, 0.0f, 1.0f);
-        glVertexPointer(3, GL_FLOAT, 0, ArrowShadow);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
-        glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-        glVertexPointer(3, GL_FLOAT, 0, ArrowVerts);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
+        W3D_GL_CRUDO(glColor4f(0.0f, 0.0f, 0.0f, 1.0f));
+        W3D_GL_CRUDO(glVertexPointer(3, GL_FLOAT, 0, ArrowShadow));
+        W3D_GL_CRUDO(glDrawArrays(GL_TRIANGLES, 0, 3));
+        W3D_GL_CRUDO(glColor4f(1.0f, 1.0f, 1.0f, 1.0f));
+        W3D_GL_CRUDO(glVertexPointer(3, GL_FLOAT, 0, ArrowVerts));
+        W3D_GL_CRUDO(glDrawArrays(GL_TRIANGLES, 0, 3));
         w3dEngine::EnableArray(w3dEngine::TexCoordArray);
         w3dEngine::Enable(w3dEngine::Texture2D);
     }
 
     w3dEngine::EnableArray(w3dEngine::NormalArray);
-    glPopMatrix();
+    W3D_GL_CRUDO(glPopMatrix());
 }
 
 // ============================================================================

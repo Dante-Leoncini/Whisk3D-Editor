@@ -22,6 +22,7 @@
 #include "config/W3dLang.h"
 #include "WhiskUI/draw/icons.h"
 #include "w3dGraphics.h"
+#include "w3dTexture.h"   // Texturas16Siempre
 #include "w3dlog.h"
 #include <map>
 #include <set>
@@ -52,7 +53,7 @@ static std::string FirmaMaterial(const Material* m) {
     std::string s = m->name + "\x01";
     Col(s, m->diffuse); Col(s, m->specular); Col(s, m->emission); Col(s, m->ambient);
     Num(s, m->shininess); Num(s, m->interpolacion); Num(s, m->reflectMode); Num(s, m->rtRugosidad); Num(s, m->rtMetalico);
-    Num(s, m->depth_bias); Num(s, m->orden_pasada); Num(s, m->mezcla); Num(s, m->grosorLinea);
+    Num(s, m->depth_bias); Num(s, m->sesgo_metros); Num(s, m->orden_pasada); Num(s, m->mezcla); Num(s, m->grosorLinea);
     const bool bs[14] = { m->textureOn, m->filtrado, m->transparent, m->vertexColor, m->lighting, m->repeat, m->uv8bit,
                           m->culling, m->depth_test, m->fondo, m->depth_write, m->chrome, m->normalMap, m->lineas };
     for (int k = 0; k < 14; k++) s += bs[k] ? '1' : '0';
@@ -89,6 +90,7 @@ static std::string FirmaProyecto() {
     std::string s;
     Num(s, AnimFPS);
     s += w3dEngine::MipmapsGlobal() ? 'm' : '-';
+    s += w3dEngine::Texturas16Siempre() ? 't' : '-';
     s += w3dEngine::PixeladoGlobal() ? 'p' : '-';
     s += W3dRaizInicial() + "\x01";
     s += W3dLibreriasFirma();

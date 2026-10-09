@@ -1,3 +1,4 @@
+#include "audio/W3dAudio.h"   // pausa del mixer con el juego en pausa
 #include "w3dGraphics.h" // abstraccion de graficos (independencia de OpenGL)
 #include "render/OpcionesRender.h"   // RenderType / g_redraw: son del editor
 #include "W3dLang.h"   // config.ini: "idioma = es" fuerza el idioma por encima del SO
@@ -374,6 +375,7 @@ Config loadConfig(const std::string& filename) {
             else if (key == "SkinName") cfg.SkinName = value;
             else if (key == "graphicsAPI") cfg.graphicsAPI = value;
             else if (key == "repoPath") cfg.repoPath = value;   // raiz del repo para Compilar (editor instalado)
+            else if (key == "logs") cfg.logs = std::stoi(value);   // nivel de los logs del editor (Ajustes > Logs)
             else if (key == "idioma") {
                 // "auto" (o ausente) = seguir al sistema. Cualquier otra cosa FUERZA ese idioma.
                 if (value != "auto" && !value.empty()) { g_idioma = W3dIdiomaDe(value.c_str()); g_idiomaForzado = true; }
@@ -777,6 +779,9 @@ static void MainLoopFrame() {
     if (AnimEsJuego && PlayAnimation) animMs = 1000 / 60;
     if (now - lastAnimTime >= animMs) {
         lastAnimTime = now;
+        // juego en PAUSA (partida cargada sin Play): el mixer se congela (la musica no sigue sonando de fondo);
+        // SimTickPlay lo despausa al reanudar y SimStop corta todo
+        { extern bool SimActiva(); if (AnimEsJuego && !PlayAnimation && SimActiva() && !w3dEngine::W3dAudioPaused()) w3dEngine::W3dAudioPause(true); }
         // Timeline: si esta en PLAY, avanzar CurrentFrame (loop Start..End) y forzar redibujo
         if (PlayAnimation) {
             extern void SimTickPlay(float); extern bool SimHayScripts(); extern bool SimActiva();
@@ -1041,6 +1046,8 @@ int main(int argc, char* argv[]) {
     // AUTO KEY: el config MANDA sobre el global de animacion (que arranca apagado). Reporte del
     // dueno: "no se guarda que en el timeline puse auto key" -> se prendia de nuevo en cada sesion.
     { extern bool AutoKeyOn; AutoKeyOn = cfg.autoKey; }
+    // LOGS: el nivel del config (Ajustes > Logs)
+    g_w3dLogNivel = cfg.logs;
 
     //TODO: Esto muy probablemente de problemas en gama baja? no se si deba configurable
     if (cfg.enableAntialiasing) {
@@ -1162,6 +1169,7 @@ int main(int argc, char* argv[]) {
     for (int ai = 1; ai < argc; ai++) {
         if (std::string(argv[ai]) == "--script" && ai + 1 < argc) {
             g_w3dCambiosSinCartel = true;   // (el harness no muestra el cartel: el comando 'cambios' lo consulta)
+            { extern void W3dScriptSemillaFija(bool); W3dScriptSemillaFija(true); }   // (el mismo script juega siempre igual: las capturas se comparan)
             bool ok = W3dRunScript(argv[ai + 1]);
             SDL_Quit();
             return ok ? 0 : 1;

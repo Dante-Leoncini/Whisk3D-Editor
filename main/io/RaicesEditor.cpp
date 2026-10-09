@@ -252,8 +252,10 @@ bool W3dActivarRaiz(int idx, std::string* motivo) {
     if (!W3dRaizCambiarActiva(idx)) { if (motivo) *motivo = "It could not be loaded"; return false; }
     W3dClipsVistasPurgar();
     W3dMallasTickEditor();   // (la activa que se miraba era de la otra raiz: se suelta)
-    // se DEJO DE EDITAR un prefab: sus instancias (de todas las raices cargadas) se regeneran con lo que quedo
+    // se DEJO DE EDITAR un prefab: sus instancias (de todas las raices cargadas) se regeneran con lo que quedo. Una
+    // ESCENA tambien: se puede instanciar en otra ("escena:<nombre>", io/Prefabs.h)
     if (eraPrefab) W3dPrefabDejoDeEditarse(antes);
+    else if (!antes.empty()) W3dPrefabDejoDeEditarse(W3dPrefabClaveEscena(antes));
     RefrescarUI();
     w3dLogf("[raices] editando %s '%s' (antes '%s')", W3dRaizTipoClave(W3dRaizTipoDe(idx)),
             fs[(size_t)idx].nombre.c_str(), antes.c_str());

@@ -137,7 +137,12 @@ bool W3dEscenaEsDeActiva(Object* o) {
     return raiz == (Object*)gEscActiva;   // pertenece a la escena activa?
 }
 
+static bool gDibujar3D = true;     // lua dibujar3D(on): false = el pase 3D no se hace
+bool W3dEscena3DActiva() { return gDibujar3D; }
+void W3dEscena3DSetActiva(bool on) { gDibujar3D = on; }
+
 void W3dEscenaLimpiar() {
+    gDibujar3D = true;     // el editor vuelve a ver la escena aunque el juego la haya apagado
     // el editor vuelve a EDICION: deshacer el MostrarSolo del Play (que dejo OCULTAS las
     // escenas no-activas con visible=false). Al cargar, TODAS las ventanas UI nacen visibles
     // (el .w3dui no guarda "visible" de la ventana), asi que restaurar a visible=true deja el
@@ -442,10 +447,17 @@ static int LEscenaReproduciendo(lua_State* L) {
     if (a && *a) lua_pushstring(L, a); else lua_pushnil(L);
     return 1;
 }
+// dibujar3D(on): prende/apaga el pase 3D entero (ver W3dEscena.h). Sin argumento devuelve el estado.
+static int LDibujar3D(lua_State* L) {
+    if (lua_gettop(L) >= 1) gDibujar3D = lua_toboolean(L, 1) != 0;
+    lua_pushboolean(L, gDibujar3D ? 1 : 0);
+    return 1;
+}
 void W3dEscenaRegistrarBind(void* Lv) {
     lua_State* L = (lua_State*)Lv;
     lua_pushcfunction(L, LCambiarEscena); lua_setglobal(L, "cambiarEscena");
     lua_pushcfunction(L, LReproducirEscena);    lua_setglobal(L, "reproducirEscena");
     lua_pushcfunction(L, LPararEscena3D);       lua_setglobal(L, "pararEscena3D");
     lua_pushcfunction(L, LEscenaReproduciendo); lua_setglobal(L, "escenaReproduciendo");
+    lua_pushcfunction(L, LDibujar3D);           lua_setglobal(L, "dibujar3D");
 }

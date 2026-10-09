@@ -203,7 +203,7 @@ static w3dui::W3dTextAtlas* HornearTTF(const std::string& ruta) {
 // ---- fuente BITMAP: un .png + su .json de glifos ------------------------------------------
 // Formato completo en formato/fuente-bitmap.md; el generador de referencia es
 // tools/build_fuente_bitmap.py (cualquier extractor de un proyecto escribe lo mismo).
-// JSON esperado: { "textura": "x.png", "alto_linea": N, "mayusculas_si_falta": false,
+// JSON esperado: { "textura": "x.png", "alto_linea": N, "mayusculas_si_falta": false, "pixel_perfect": true,
 //                  "glifos": { "A": {"x":..,"y":..,"w":..,"h":..,
 //                                    "xoff":..,"yoff":..,"avance":..}, ... } }
 // xoff / yoff / avance son OPCIONALES: el default apoya el glifo en la BASE del renglon
@@ -322,7 +322,10 @@ static w3dui::W3dTextAtlas* CargarBitmapJson(const std::string& ruta) {
     w3dui::W3dTextAtlas* at = new w3dui::W3dTextAtlas();
     at->atlasW = tw; at->atlasH = th;
     at->fontPx = altoLinea; at->ascent = altoLinea; at->lineH = altoLinea;
-    at->pixelPerfect = true;   // pixel-art: multiplos enteros + pen entero (como la default)
+    // pixel-art: multiplos enteros + pen entero (como la default). "pixel_perfect": false en el json la deja
+    // escalar FRACCIONARIA como el resto de la UI (una pantalla de arcade 496x384 encajada en cualquier ventana:
+    // con el snap entero el texto sale mas chico que las imagenes que lo rodean)
+    at->pixelPerfect = JBool(root, "pixel_perfect", true);
     std::map<std::string, JVal*>::iterator itG = root->obj.find("glifos");
     if (itG != root->obj.end() && itG->second->tipo == 4) {
         for (std::map<std::string, JVal*>::iterator g = itG->second->obj.begin();

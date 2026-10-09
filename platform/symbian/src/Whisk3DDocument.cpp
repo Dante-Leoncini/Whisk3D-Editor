@@ -84,6 +84,9 @@ void CWhisk3DDocument::OpenFileL(CFileStore*& aFileStore, RFile& aFile)
         extern std::string g_proyAbrirPendiente;
         g_proyAbrirPendiente = buf;
         }
+    // el editor abre el .w3d por su cuenta (fopen): este handle del framework no se usa y, abierto, BLOQUEA el
+    // archivo (en Symbian no se puede reemplazar ni borrar un archivo en uso: guardar encima fallaba)
+    aFile.Close();
     }
 
 // End of File

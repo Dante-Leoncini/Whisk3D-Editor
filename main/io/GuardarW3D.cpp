@@ -50,6 +50,7 @@
 #include "physics/W3dRigido.h"         // W3dRigidoDef: el bloque "fisica" del objeto
 #include "objects/UI.h"
 #include "objects/Camera.h"
+#include <errno.h>
 #include "objects/Light.h"
 #include "objects/Gamepad.h"
 #include "objects/Mesh.h"
@@ -57,6 +58,7 @@
 #include "objects/Instance.h"          // idem Instance (duplicado enlazado / array de copias)
 #include "objects/LOD.h"               // objeto LOD (un hijo por distancia): distancias
 #include "objects/Culling.h"           // objeto Culling (frustum culling): soloCamaraActiva
+#include "objects/Rutina.h"            // objeto Rutina (lista de pasos del render)
 #include "objects/Niebla.h"            // objeto Niebla (glFog en el arbol)
 #include "objects/Recorte.h"           // LimpiarZ / Recorte
 #include "objects/Hitbox.h"            // HITBOX (sus campos los escribe objects/Hitbox.cpp)
@@ -108,6 +110,7 @@
 #include <set>
 #include <sstream>     // el nombre del PRIMER frame de una vertex anim (base + 001 + .obj)
 #include <iomanip>     // std::setw/std::setfill: el mismo padding que VertexAnimation::LoadFrames
+#include "gfx/w3dTexture.h"   // Texturas16Siempre: se guarda en la cabecera
 #ifdef _WIN32
     #include <direct.h>
     #define W3D_MKDIR(p) _mkdir(p)
@@ -216,17 +219,31 @@ static std::string BaseSinExt(const std::string& r) {
 // ---------------------------------------------------------------------------
 static const char* const kTmpSufijo = ".w3dtmp";
 
-// renombra tmp -> fin. POSIX: atomico, pisa el destino. Windows: rename() no
-// pisa, hay que sacar el destino antes (mismo patron que LuaCompilar).
+// renombra tmp -> fin. POSIX: atomico, pisa el destino. Windows Y SYMBIAN: rename() NO pisa un destino que
+// ya existe (Symbian: RFs::Rename -> KErrAlreadyExists). Reporte del dueno: "en symbian al abrir un w3d y querer
+// guardarlo no se puede guardar" -- abrir deja w3dPath apuntando a un archivo que existe, y el rename fallaba
+// SIEMPRE (un proyecto nuevo se guardaba bien solo la primera vez). Ahi el viejo se corre a .w3dbak, entra el
+// nuevo y recien entonces se borra el viejo; si el nuevo no entra, el viejo vuelve a su lugar.
 static bool RenombrarSobre(const std::string& tmp, const std::string& fin) {
-#ifdef _WIN32
-    remove(fin.c_str());
-#endif
+#if defined(_WIN32) || defined(W3D_SYMBIAN)
+    const std::string bak = fin + ".w3dbak";
+    remove(bak.c_str());
+    const bool habiaViejo = (rename(fin.c_str(), bak.c_str()) == 0);
     if (rename(tmp.c_str(), fin.c_str()) != 0) {
-        w3dLogfE("GuardarW3D: no pude renombrar %s -> %s", tmp.c_str(), fin.c_str());
+        const int err = errno;
+        if (habiaViejo) rename(bak.c_str(), fin.c_str());
+        w3dLogfE("GuardarW3D: no pude renombrar %s -> %s (errno %d)", tmp.c_str(), fin.c_str(), err);
+        return false;
+    }
+    if (habiaViejo) remove(bak.c_str());
+    return true;
+#else
+    if (rename(tmp.c_str(), fin.c_str()) != 0) {
+        w3dLogfE("GuardarW3D: no pude renombrar %s -> %s (errno %d)", tmp.c_str(), fin.c_str(), errno);
         return false;
     }
     return true;
+#endif
 }
 
 // ---------------------------------------------------------------------------
@@ -323,6 +340,9 @@ static std::string Asset(CtxGuardar* cx, std::string& rutaDisco) {
     return cx->esc->Ingerir(rutaDisco, NULL, gQuien);
 }
 
+// la textura de un paso "Bind texture" de una Rutina: entra al .w3d como la de un material
+static std::string RutinaEmitirTextura(std::string& ruta, void* cx) { return Asset((CtxGuardar*)cx, ruta); }
+
 static void CamposComunes(std::string& s, int ind, Object* o) {
     JSang(s, ind); s += "\"nombre\": "; JEsc(s, o->name); s += ",\n";
     if (!o->visible) { JSang(s, ind); s += "\"visible\": false,\n"; }
@@ -346,6 +366,12 @@ static void CamposComunes(std::string& s, int ind, Object* o) {
         s += "], \"friccion\": "; JNum(s, d->friccion);
         s += ", \"rebote\": "; JNum(s, d->rebote);
         s += " },\n";
+    }
+    // SIN TRANSFORMACION (la Rutina): no tiene posicion, rotacion ni escala -> no se escriben (el campo anterior
+    // ya cerro con ",\n": se lo saca, el que sigue pone su propia coma)
+    if (o->sinTransformacion) {
+        if (s.size() >= 2 && s.compare(s.size() - 2, 2, ",\n") == 0) s.erase(s.size() - 2);
+        return;
     }
     JSang(s, ind); s += "\"pos\": ["; JNum(s, o->pos.x); s += ", "; JNum(s, o->pos.y); s += ", "; JNum(s, o->pos.z); s += "],\n";
     JSang(s, ind); s += "\"rot\": ["; JNum(s, o->rotEuler.x); s += ", "; JNum(s, o->rotEuler.y); s += ", "; JNum(s, o->rotEuler.z); s += "],\n";
@@ -675,6 +701,7 @@ static void EscribirMateriales(std::string& s, CtxGuardar* cx) {
         // DECAL / mezcla: se escriben SOLO si se apartan del default, asi un proyecto que no los
         // usa guarda exactamente el mismo texto de siempre (los diffs del .w3d siguen legibles).
         if (mt->depth_bias != 0.0f) { s += ", \"sesgoProfundidad\": "; JNum(s, mt->depth_bias); }
+        if (mt->sesgo_metros != 0.0f) { s += ", \"sesgoMetros\": "; JNum(s, mt->sesgo_metros); }
         if (mt->alphaTest != 0.0f)  { s += ", \"alfaCorte\": ";        JNum(s, mt->alphaTest); }
         if (mt->orden_pasada != 0)  { s += ", \"ordenPasada\": ";      JNum(s, (float)mt->orden_pasada); }
         if (mt->mezcla != 0)        { s += ", \"mezcla\": ";           JNum(s, (float)mt->mezcla); }
@@ -1864,6 +1891,12 @@ static void EscribirObjeto(std::string& s, Object* o, int ind, CtxGuardar* cx, b
         W3dPrefabSincronizarOverrides((InstanciaPrefab*)o);
         ProxyW3dEscribirCampos(s, ind + 1, (ProxyW3d*)o);
     }
+    else if (t == ObjectType::rutina) {
+        // RUTINA: la lista de pasos del render (y las propias de cada modo)
+        JSang(s, ind + 1); s += "\"tipo\": \"rutina\",\n";
+        CamposComunes(s, ind + 1, o);
+        RutinaEscribirCampos(s, ind + 1, (Rutina*)o, RutinaEmitirTextura, cx);
+    }
     else if (t == ObjectType::culling) {
         // Culling: contenedor de culling unificado (metodo frustum/grid/triangulo/bsp)
         Culling* cu = (Culling*)o;
@@ -2696,8 +2729,44 @@ static bool SerializarPrefabSeco(Object* raiz, std::string& json) {
     json.swap(s);
     return !cx.error;
 }
+// UNA ESCENA CARGADA como definicion de sus instancias (io/Prefabs.h: "escena:<nombre>"): sus objetos de primer nivel
+// debajo de un objeto raiz con el nombre de la escena, EN SECO, menos lo que es de la escena y no de sus objetos (las
+// UI 2D, las rutinas constructor y las que limpian la pantalla)
+static bool EsDeLaEscena(Object* o) {
+    if (!o) return true;
+    if (o->getType() == ObjectType::ui) return true;
+    if (o->getType() != ObjectType::rutina) return false;
+    Rutina* r = (Rutina*)o;
+    if (r->constructor) return true;
+    for (int m = 0; m < Rutina::ModoN; m++)
+        for (size_t i = 0; i < r->listas[m].size(); i++)
+            if (r->listas[m][i].tipo == PasoLimpiar || r->listas[m][i].tipo == PasoColorLimpieza) return true;
+    return false;
+}
+static bool SerializarEscenaSeca(Object* raizEscena, const std::string& nombre, std::string& json) {
+    if (!raizEscena) return false;
+    CtxGuardar cx;
+    cx.esc = NULL;
+    cx.vtxN = 0;
+    cx.error = false;
+    const std::string quienAntes = gQuien;
+    gSeco = true;
+    std::string s = "{\n  \"raiz\": {\n    \"tipo\": \"objeto\",\n    \"nombre\": ";
+    JEsc(s, nombre);
+    s += ",\n    \"hijos\": [\n";
+    bool primero = true;
+    for (size_t i = 0; i < raizEscena->Childrens.size(); i++)
+        if (!EsDeLaEscena(raizEscena->Childrens[i])) EscribirObjeto(s, raizEscena->Childrens[i], 3, &cx, &primero);
+    s += "\n    ]\n  }\n}\n";
+    gSeco = false;
+    gQuien = quienAntes;
+    json.swap(s);
+    return !cx.error;
+}
 namespace {
-struct RegistrarSerializadorPrefab { RegistrarSerializadorPrefab() { W3dPrefabSerializarHook = SerializarPrefabSeco; } } gRegistrarSerializadorPrefab;
+struct RegistrarSerializadorPrefab {
+    RegistrarSerializadorPrefab() { W3dPrefabSerializarHook = SerializarPrefabSeco; W3dEscenaSerializarHook = SerializarEscenaSeca; }
+} gRegistrarSerializadorPrefab;
 }
 
 // vuelve a la raiz que estaba activa pase lo que pase (el guardado cambia de raiz para escribir cada una)
@@ -2845,6 +2914,7 @@ bool GuardarW3D(const std::string& ruta) {
     // no cambian ni un byte al re-guardarlos).
     if (w3dEngine::PixeladoGlobal()) s += "  \"pixelado\": true,\n";
     if (!w3dEngine::MipmapsGlobal()) s += "  \"mipmaps\": false,\n";   // default true: solo se guarda el apagado
+    if (w3dEngine::Texturas16Siempre()) s += "  \"texturas16\": true,\n";   // default false (solo las de 16 bits exactas)
     // FORMATO DE LAS MALLAS: solo se escribe el que NO es el default (texto). Es la opcion del
     // PROYECTO; el forzado del harness no se guarda.
     if (g_w3dFormatoMallasProyecto == W3D_MALLAS_TEXTO) s += "  \"formatoMallas\": \"texto\",\n";

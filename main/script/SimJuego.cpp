@@ -12,6 +12,7 @@
 #include "W3dRaices.h"                // cambiarEscena() a otra ESCENA 3D del proyecto (el Stop vuelve a la de antes)
 #include "io/Streaming.h"             // las instancias DIFERIDAS cargan/descargan jugando (el Stop las repone)
 #include "w3dlog.h"
+#include "audio/W3dAudio.h"           // Parar = cortar TODAS las voces; Play = despausar el mixer
 #include "objects/Objects.h"
 #include "objects/Armature.h"         // el estado de JUEGO de los esqueletos (clip, cabezal, capas, transicion)
 #include "animation/W3dAnimSet.h"      // las CAPAS de clips de jerarquia de una raiz (objetoCapa las cambia jugando)
@@ -902,6 +903,9 @@ static void EntradaPad() {
     }
     W3dScriptStick(0, lx, ly);
     W3dScriptStick(1, axisState[SDL_CONTROLLER_AXIS_RIGHTX], axisState[SDL_CONTROLLER_AXIS_RIGHTY]);
+    // los GATILLOS analogicos (LT / RT): pedales de un juego de autos (gatillo() en lua, 0..1)
+    W3dScriptGatillo(0, axisState[SDL_CONTROLLER_AXIS_TRIGGERLEFT]);
+    W3dScriptGatillo(1, axisState[SDL_CONTROLLER_AXIS_TRIGGERRIGHT]);
     W3dScriptBotonPad("a", buttonState[SDL_CONTROLLER_BUTTON_A]);
     W3dScriptBotonPad("b", buttonState[SDL_CONTROLLER_BUTTON_B]);
     W3dScriptBotonPad("x", buttonState[SDL_CONTROLLER_BUTTON_X]);
@@ -1025,6 +1029,7 @@ static void TickReal(float dt) {
 }
 
 void SimTickPlay(float dt) {
+    if (w3dEngine::W3dAudioPaused()) w3dEngine::W3dAudioPause(false);   // Play / reanudar: el mixer sigue donde estaba
     if (!gActiva) { SimPlay(); if (!gActiva) return; }
     if (gTick + 1 - gGrabOffset < (int)gGrab.size()) {
         // hay FUTURO grabado. "No reemplazar estados": se REPRODUCE lo grabado
@@ -1156,6 +1161,9 @@ bool SimStep(int dir) {
 }
 
 void SimStop() {
+    // el "Parar" del editor: nada sigue sonando (la musica secuenciada, los loops del motor...)
+    w3dEngine::W3dAudioPause(false);
+    w3dEngine::W3dSoundStopAll();
     if (!gActiva) return;
     // una CINEMATICA sonando: la escena vuelve a como estaba y el juego a ser la raiz activa (sin su
     // alTerminar: la partida se corta)

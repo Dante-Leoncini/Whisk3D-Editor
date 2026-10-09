@@ -51,6 +51,10 @@ bool UpdateFlipbooks(float dtSeg); // Flipbook.cpp: flipbooks unificados (Imagen
 #include "objects/UI.h"        // compilarjuego: la UI raiz que compila la tarjeta Juego
 #include "objects/LOD.h"       // lodinfo: los objetos LOD del arbol (umbrales + hijo elegido)
 #include "objects/Culling.h"   // lodinfo: los objetos Culling (soloCamaraActiva)
+#include "objects/Rutina.h"
+#include "w3dTexture.h"   // memtex: la memoria de las texturas
+#include "objects/MallaRecurso.h"
+#include "objects/MallaFlujos.h"    // rutina/rutinapaso/rutinainfo: los objetos avanzados
 #include "objects/Particulas.h" // partinfo: los emisores de particulas (config + vivas)
 #include "objects/Collection.h" // lodinfo: las Collection (ordenarPorCamara/ordenarUnaVez)
 #include "io/Fuente2D.h"        // uifuente: forzar la carga del atlas + verificar POT
@@ -2079,6 +2083,32 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
     // ---- visible <0|1> <nombre> : setea Object::visible (el "ojito" del outliner) por
     //      nombre. Para verificar headless que ocultar un LOD/Culling/Collection de
     //      verdad lo saca del render (bench: mallas/drawcalls tienen que bajar). ----
+    // ---- visibles : lo que el recorrido del arbol de la escena DIBUJA (visible con toda su cadena): por tipo, y cada
+    //      malla y cada vacio que no dibuja nada (sin hijos visibles: igual hace push / mult / pop) ----
+    // ---- gltraza on|ver : cada llamada al driver por su lugar en el codigo (on: empieza; ver: imprime y apaga) ----
+    if (cmd == "gltraza") {
+        std::string q; ss >> q;
+        w3dEngine::g_trazaGL = (q == "on");
+        if (q != "on") w3dEngine::TrazaGLVer();
+        return true;
+    }
+    if (cmd == "visibles") {
+        std::map<std::string, int> porTipo;
+        std::vector<Object*> pila; if (SceneCollection) pila.push_back(SceneCollection);
+        while (!pila.empty()) {
+            Object* o = pila.back(); pila.pop_back();
+            if (!o->visible) continue;
+            porTipo[W3dNombreTipo(o->getType())]++;
+            bool hijoVisible = false;
+            for (size_t i = 0; i < o->Childrens.size(); i++) { pila.push_back(o->Childrens[i]); hijoVisible |= o->Childrens[i]->visible; }
+            if (o->getType() == ObjectType::mesh) printf("      [visibles] malla %s\n", o->name.c_str());
+            else if ((o->getType() == ObjectType::empty || o->getType() == ObjectType::baseObject) && !hijoVisible)
+                printf("      [visibles] vacio sin nada visible %s\n", o->name.c_str());
+        }
+        for (std::map<std::string, int>::iterator it = porTipo.begin(); it != porTipo.end(); ++it)
+            printf("      [visibles] %s: %d\n", it->first.c_str(), it->second);
+        return true;
+    }
     if (cmd == "visible") {
         int v = 1; ss >> v;
         std::string nombre = ScriptNombreArg(ss);
@@ -4794,6 +4824,235 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         g_skinRelojMs = 0;
         return true;
     }
+    // ---- RUTINAS (objetos avanzados: listas de pasos del render) ----
+    //  rutina <nombre> [padre]                     crea una rutina vacia (al final del padre, o de la escena)
+    //  rutinapaso <rutina> <tipo> [k=v ...]        agrega un paso a la lista que se edita:
+    //                                              n0..n4=numero|@memoria[i]  ref=nombre  on=0|1  entero=N  modo=N
+    //  rutinalista <rutina> <modo>                 la lista que se edita (defecto solido material render alambre zbuffer)
+    //  rutinausar <rutina> <modo> <lista>          que lista usa ese modo (la de un modo, o "defecto")
+    //  rutinainfo <rutina>                         los pasos de cada lista, si es valida y el motivo
+    //  memoria <nombre> <i> <valor>                escribe una memoria (lo mismo que setMemoria de lua)
+    if (cmd == "rutina" || cmd == "rutinapaso" || cmd == "rutinalista" || cmd == "rutinausar" || cmd == "rutinainfo" || cmd == "rutinasel" ||
+        cmd == "rutinaset") {
+        std::string nom; ss >> nom;
+        Object* o = SceneCollection ? FindObjectByName(SceneCollection, nom) : NULL;
+        if (cmd == "rutina") {
+            std::string padre; ss >> padre;
+            Object* p = padre.empty() ? NULL : FindObjectByName(SceneCollection, padre);
+            Rutina* r = new Rutina(p, nom);
+            printf("      [rutina] creada '%s' en '%s'\n", r->name.c_str(), r->Parent ? r->Parent->name.c_str() : "?");
+            return true;
+        }
+        if (!o || o->getType() != ObjectType::rutina) { printf("      [rutina] no hay una rutina '%s'\n", nom.c_str()); return false; }
+        Rutina* r = (Rutina*)o;
+        static const char* modos[] = { "defecto", "solido", "material", "render", "alambre", "zbuffer" };
+        if (cmd == "rutinasel") { int i = 0; ss >> i; r->pasoActivo = i; return true; }   // el paso elegido (0..)
+        // rutinaset <rutina> <i> on 0|1 | n v1 v2...   un campo del paso i (0..) de la lista que se edita (como setPaso)
+        if (cmd == "rutinaset") {
+            int i = 0; std::string campo; ss >> i >> campo;
+            std::vector<W3dPaso>& L = r->listas[r->listaEditada];
+            if (i < 0 || i >= (int)L.size()) { err = "rutinaset: no hay ese paso"; return false; }
+            if (campo == "on") { int v = 1; ss >> v; L[(size_t)i].on = (v != 0); }
+            else { float v; int k = 0; while (k < 5 && (ss >> v)) { L[(size_t)i].n[k].v = v; L[(size_t)i].n[k].ref.clear(); k++; } }
+            g_w3dRutinasGen++;
+            return true;
+        }
+        if (cmd == "rutinalista" || cmd == "rutinausar") {
+            std::string m, l; ss >> m >> l;
+            int im = -1, il = -1;
+            for (int k = 0; k < Rutina::ModoN; k++) { if (m == modos[k]) im = k; if (l == modos[k]) il = k; }
+            if (im < 0) { printf("      [rutina] modo desconocido '%s'\n", m.c_str()); return false; }
+            if (cmd == "rutinalista") r->listaEditada = im;
+            else r->usar[im] = (signed char)(il <= 0 ? -1 : il);
+            r->sucia = true;
+            return true;
+        }
+        if (cmd == "rutinapaso") {
+            std::string tipo; ss >> tipo;
+            const int t = W3dPasoDesdeNombre(tipo);
+            if (t < 0) { printf("      [rutina] paso desconocido '%s'\n", tipo.c_str()); return false; }
+            W3dPaso p = W3dPasoNuevo(t);
+            std::string kv;
+            while (ss >> kv) {
+                size_t eq = kv.find('=');
+                if (eq == std::string::npos) continue;
+                std::string k = kv.substr(0, eq), v = kv.substr(eq + 1);
+                if (k == "ref") p.ref = v;
+                else if (k == "on") p.on = (v != "0");
+                else if (k == "entero") p.entero = atoi(v.c_str());
+                else if (k == "modo") p.modo = atoi(v.c_str());
+                else if (k == "sub" || k == "rango") p.sub = atoi(v.c_str());
+                else if (k == "ref2") p.ref2 = v;
+                else if (k == "constructor") r->constructor = (v != "0");
+                else if (k.size() == 2 && k[0] == 'n' && k[1] >= '0' && k[1] <= '4') {
+                    W3dNum& n = p.n[k[1] - '0'];
+                    if (!v.empty() && v[0] == '@') n.ref = v; else { n.v = (float)atof(v.c_str()); n.ref.clear(); }
+                }
+            }
+            r->listas[r->listaEditada].push_back(p);
+            r->sucia = true;
+            return true;
+        }
+        // rutinainfo: lo del ULTIMO CUADRO dibujado (la validacion depende de como estaban los arrays en ese punto del
+        // cuadro) y una validacion ahora mismo (con el estado de afuera del dibujo)
+        printf("      [rutina] '%s' ultimo cuadro: ejecutada=%d invalida=%d%s%s\n", r->name.c_str(), r->ejecutada ? 1 : 0,
+               r->invalida ? 1 : 0, r->invalida ? " motivo=" : "", r->invalida ? r->motivo.c_str() : "");
+        extern bool W3dRutinaValidar(Rutina*);
+        const bool ok = W3dRutinaValidar(r);
+        printf("      [rutina] '%s' valida=%s%s%s\n", r->name.c_str(), ok ? "si" : "NO", ok ? "" : " motivo=", ok ? "" : r->motivo.c_str());
+        for (int m = 0; m < Rutina::ModoN; m++) {
+            if (m > 0 && r->listas[m].empty() && r->usar[m] < 0) continue;
+            printf("      [rutina]   lista %s (usa %s): %d pasos\n", modos[m], r->usar[m] < 0 ? "defecto" : modos[(int)r->usar[m]], (int)r->listas[m].size());
+            for (size_t i = 0; i < r->listas[m].size(); i++) {
+                const W3dPaso& p = r->listas[m][i];
+                std::string nums;
+                for (int k = 0; k < W3dPasoNumeros(p); k++) {
+                    char b[96];
+                    if (!p.n[k].ref.empty()) snprintf(b, sizeof b, " %s=%s(%g)", W3dPasoNumeroNombre(p, k), p.n[k].ref.c_str(), p.n[k].Valor());
+                    else snprintf(b, sizeof b, " %s=%g", W3dPasoNumeroNombre(p, k), p.n[k].v);
+                    nums += b;
+                }
+                printf("      [rutina]     %d. %s%s%s%s%s on=%d entero=%d modo=%d sub=%d\n", (int)i + 1, W3dPasoNombre(p.tipo),
+                       p.ref.empty() ? "" : " ref=", p.ref.c_str(), p.ref.empty() || p.ptr || W3dPasoRef(p.tipo) == RefFuncion ? "" : "(NO RESUELTA)", nums.c_str(), p.on ? 1 : 0, p.entero, p.modo, p.sub);
+            }
+        }
+        return true;
+    }
+    // ---- rutinamenu <cual> [fila] : abre un desplegable de la tarjeta Routine (0 Add, 1 referencia, 2 opcion, 3 luz,
+    //      4 Render mode), lista sus filas y, con 'fila', pasa el mouse por ella (abre su submenu) ----
+    if (cmd == "rutinamenu") {   // [x]: el menu pegado a esa x (-1 = contra el borde derecho), para probar los submenus
+        int cual = 0, fila = -1, xm = -9999, wm = 0; ss >> cual >> fila >> xm >> wm;   // [ancho]: pantalla simulada
+        const int wReal = MenuPantallaW;
+        if (wm > 0) MenuPantallaW = wm;
+        extern void PropsRutinaAbrirMenu(int);
+        PropsRutinaAbrirMenu(cual);
+        PopupMenu* m = MenuAbierto;
+        if (!m || !m->abierto) { MenuPantallaW = wReal; printf("      [rutinamenu] no abrio\n"); return false; }
+        if (xm != -9999) {
+            m->x = xm < 0 ? MenuPantallaW - m->width : xm;
+            if (m->submenuAbierto) { m->submenuAbierto->Cerrar(); m->submenuAbierto = NULL; m->selectIndex = -1; }
+        }
+        for (size_t i = 0; i < m->items.size(); i++)
+            printf("      [rutinamenu] %d. %s%s icono=%d\n", (int)i, m->items[i]->text.c_str(), m->items[i]->submenu ? " >" : "", m->items[i]->icon);
+        if (fila >= 0 && fila < (int)m->items.size()) {
+            int oy = m->titulo.empty() ? 0 : (RenglonHeightGS + gapGS);
+            m->MouseMove(m->x + m->width / 2, m->y + borderGS + oy + fila * (RenglonHeightGS + gapGS) + 1);
+            PopupMenu* s = m->submenuAbierto;
+            if (s) for (size_t i = 0; i < s->items.size(); i++)
+                printf("      [rutinamenu]    %s icono=%d\n", s->items[i]->text.c_str(), s->items[i]->icon);
+            // donde quedaron (el submenu no tiene que tapar al menu entero: queda una columna para pasar el mouse)
+            printf("      [rutinamenu] menu x=%d..%d  submenu x=%d..%d  pantalla=%d\n", m->x, m->x + m->width,
+                   s ? s->x : -1, s ? s->x + s->width : -1, MenuPantallaW);
+            // (un nivel mas: el submenu del submenu, si su primera fila tiene)
+            if (s && !s->items.empty() && s->items[0]->submenu) {
+                int oy2 = s->titulo.empty() ? 0 : (RenglonHeightGS + gapGS);
+                s->MouseMove(s->x + s->width / 2, s->y + borderGS + oy2 + 1);
+                PopupMenu* s2 = s->submenuAbierto;
+                printf("      [rutinamenu] nivel 3: submenu x=%d..%d  sub-submenu x=%d..%d\n", s->x, s->x + s->width,
+                       s2 ? s2->x : -1, s2 ? s2->x + s2->width : -1);
+            }
+        }
+        MenuPantallaW = wReal;
+        return true;
+    }
+    // ---- panelmouse down|move|up <x> <y> : el MOUSE (boton izquierdo) sobre el panel de propiedades que esta en
+    //      (x, y), como lo manda el loop del editor: el click, el arrastre y el soltar (prueba los arrastres de las
+    //      listas). paneltecla <tecla> : una tecla a ese panel (x, g, delete, up, down, return, escape o un caracter) ----
+    if (cmd == "panelmouse" || cmd == "paneltecla") {
+        static int ultX = 0, ultY = 0;
+        extern bool leftMouseDown;
+        if (cmd == "paneltecla") {
+            std::string t; ss >> t;
+            int k = t.size() == 1 ? (int)t[0] : t == "delete" ? (int)W3dK_DELETE : t == "up" ? (int)W3dK_UP : t == "down" ? (int)W3dK_DOWN :
+                    t == "return" ? (int)W3dK_RETURN : t == "escape" ? (int)W3dK_ESCAPE : 0;
+            if (!PropsActivo || !k) { err = "paneltecla: sin panel activo o tecla desconocida"; return false; }
+            PropsActivo->event_key_down(k, false);
+            if (rootViewport) rootViewport->Render();
+            return true;
+        }
+        std::string q; int mx = 0, my = 0; ss >> q >> mx >> my;
+        if (!rootViewport) { err = "panelmouse: sin layout"; return false; }
+        rootViewport->Render();
+        ViewportBase* v = FindViewportUnderMouse(rootViewport, mx, my);
+        if (!v || v->ViewportKind() != 3) { err = "panelmouse: no hay un panel de propiedades ahi"; return false; }
+        Properties* pr = (Properties*)v;
+        if (q == "down") { leftMouseDown = true; pr->ClickEn(mx, my); }
+        else if (q == "move") { dx = mx - ultX; dy = my - ultY; pr->event_mouse_motion(mx, my); }
+        else if (q == "up") { leftMouseDown = false; pr->mouse_button_up(W3dMB_IZQ); }
+        else { err = "panelmouse: down|move|up"; return false; }
+        ultX = mx; ultY = my;
+        rootViewport->Render();
+        return true;
+    }
+    // ---- juegopuro : el modo SOLO JUEGO del editor (VERDE+0): entra / pasa a cover / sale (como la tecla) e imprime
+    //      el estado del constructor de las rutinas ----
+    if (cmd == "juegopuro") {
+        extern void LayoutJuegoPuroToggle();
+        extern int g_juegoPuro;
+        LayoutJuegoPuroToggle();
+        printf("      [juegopuro] modo=%d soloJuego=%d generacion=%u constructor=%d\n", g_juegoPuro, g_w3dSoloJuego ? 1 : 0,
+               g_w3dConstructorGen, W3dHayConstructor() ? 1 : 0);
+        return true;
+    }
+    // ---- mallasinfo <archivo.json> : las MALLAS 3D del proyecto para quien arma rutinas desde afuera (el conversor de
+    //      Daytona): por malla su carpeta, vertices, que arrays trae, su caja y sus PARTES (material, rango en el index
+    //      buffer, triangulos e indices como TIRA de triangulos). Carga cada una (y la suelta) ----
+    if (cmd == "mallasinfo") {
+        std::string ruta; ss >> ruta;
+        FILE* f = fopen(ruta.c_str(), "wb");
+        if (!f) { err = "mallasinfo: no se puede escribir " + ruta; return false; }
+        const std::vector<MallaRecurso*>& reg = W3dMallasRegistro();
+        fprintf(f, "{\"mallas\": [\n");
+        int n = 0;
+        for (size_t i = 0; i < reg.size(); i++) {
+            MallaRecurso* r = reg[i];
+            if (!r || r->borrado) continue;
+            const bool ok = W3dMallaRecursoRetener(r);
+            float mn[3] = { 0, 0, 0 }, mx[3] = { 0, 0, 0 };
+            if (ok) W3dMallaParteCaja(r, -1, mn, mx);
+            fprintf(f, "%s  {\"nombre\": \"%s\", \"carpeta\": \"%s\", \"verts\": %d, \"normales\": %d, \"uv\": %d, "
+                       "\"colores\": %d, \"caja\": [%g, %g, %g, %g, %g, %g], \"partes\": [",
+                    n ? ",\n" : "", r->nombre.c_str(), r->carpeta.c_str(), r->vertexSize, r->normals ? 1 : 0, r->uv ? 1 : 0,
+                    r->vertexColor ? 1 : 0, mn[0], mn[1], mn[2], mx[0], mx[1], mx[2]);
+            for (size_t k = 0; ok && k < r->partes.size(); k++) {
+                const W3dMallaBinParte& pa = r->partes[k];
+                float a[3], b[3];
+                W3dMallaParteCaja(r, (int)k, a, b);
+                fprintf(f, "%s{\"nombre\": \"%s\", \"material\": \"%s\", \"inicio\": %d, \"cantidad\": %d, \"tira\": %d, "
+                           "\"caja\": [%g, %g, %g, %g, %g, %g]}",
+                        k ? ", " : "", pa.nombre.c_str(), pa.material.c_str(), pa.inicio, pa.cantidad,
+                        W3dMallaFlujoIndices(r, (int)k, RPrimTiraTriangulos), a[0], a[1], a[2], b[0], b[1], b[2]);
+            }
+            fprintf(f, "]}");
+            if (ok) W3dMallaRecursoSoltar(r);
+            n++;
+        }
+        fprintf(f, "\n]}\n");
+        fclose(f);
+        printf("      [mallasinfo] %d mallas -> %s\n", n, ruta.c_str());
+        return true;
+    }
+    // ---- rutinaperfil on|off|ver : el PERFIL de las rutinas: por tipo de paso, cuantas veces corrio y cuantas llamadas
+    //      GL hizo (draws + binds + estados + otras) desde el 'on' ----
+    if (cmd == "rutinaperfil") {
+        std::string q; ss >> q;
+        if (q == "on") { for (int t = 0; t < PasoN; t++) { g_rutinaPerfilVeces[t] = 0; g_rutinaPerfilGL[t] = 0; } g_rutinaPerfil = true; return true; }
+        if (q == "off") { g_rutinaPerfil = false; return true; }
+        long tv = 0, tg = 0;
+        for (int t = 0; t < PasoN; t++) {
+            if (!g_rutinaPerfilVeces[t]) continue;
+            printf("      [rutinaperfil] %-16s veces=%7ld gl=%7ld\n", W3dPasoNombre(t), g_rutinaPerfilVeces[t], g_rutinaPerfilGL[t]);
+            tv += g_rutinaPerfilVeces[t]; tg += g_rutinaPerfilGL[t];
+        }
+        printf("      [rutinaperfil] TOTAL veces=%ld gl=%ld\n", tv, tg);
+        return true;
+    }
+    if (cmd == "memoria") {
+        std::string nom; int i = 0; float v = 0; ss >> nom >> i >> v;
+        if (i < 0 || i >= W3D_MEMORIA_TAM) return false;
+        W3dMemoria(nom)[i] = v;
+        return true;
+    }
     // ---- skinbench <frames> : mide el costo de SkinearMesh (forzando recompute cada frame) sobre la 1er malla skinneada. ----
     // ---- skincache <on> [skip] : activa/desactiva el cache de vertex-animation en la 1er malla skinneada (para medir). ----
     // ---- lodinfo : lista los objetos LOD (umbrales + hijo elegido con la vista actual) y
@@ -7075,6 +7334,16 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
     // ---- uishot <archivo.png> : guarda la PANTALLA ENTERA (la UI dibujada, no la escena) a PNG.
     //      Es el companiero visual de vppx: vppx asierta UN pixel, esto deja mirar el resultado.
     //      Sirve para revisar trabajo de UI sin tener que manejar la ventana a mano. ----
+    // ---- hudrect : donde dibujo el viewport 3D activo el lienzo de la UI del juego (px de pantalla, origen arriba-izq;
+    //      el rect del HUD es relativo al viewport). Para ubicar el lienzo en una captura de uishot ----
+    if (cmd == "hudrect") {
+        extern Viewport3D* Viewport3DActive;
+        Viewport3D* vp = Viewport3DActive;
+        if (!vp) { err = "hudrect: no hay viewport 3D"; return false; }
+        printf("      [hudrect] viewport %d %d %d %d hud %.2f %.2f %.2f %.2f esc %.4f\n", vp->x, vp->y, vp->width, vp->height,
+               vp->hudX0, vp->hudY0, vp->hudW, vp->hudH, vp->hudEsc);
+        return true;
+    }
     if (cmd == "uishot") {
         std::string ruta; ss >> ruta;
         if (ruta.empty()) { err = "uishot: falta la ruta del .png"; return false; }
@@ -7352,8 +7621,10 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         ObjActivo = o; return true;
     }
     // ---- selname <nombre> : agrega ese objeto a la seleccion ----
-    if (cmd == "selname") {
-        std::string nm; ss >> nm;
+    if (cmd == "selname") {   // (el nombre es el resto de la linea: puede tener espacios, "Clear screen")
+        std::string nm; std::getline(ss, nm);
+        while (!nm.empty() && (nm[0] == ' ' || nm[0] == '\t')) nm.erase(0, 1);
+        while (!nm.empty() && (nm[nm.size() - 1] == ' ' || nm[nm.size() - 1] == '\r')) nm.erase(nm.size() - 1);
         Object* o = SceneCollection ? FindObjectByName(SceneCollection, nm) : NULL;
         if (!o) { err = "objeto no encontrado: " + nm; return false; }
         o->Seleccionar(); return true;
@@ -7384,6 +7655,56 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
     // ---- undo : Ctrl+Z (deshace el ultimo comando) ----
     if (cmd == "undo") { UndoDeshacer(); return true; }
     // ---- outliner : dump del arbol de objetos (nombre + tipo + padre) para ver la jerarquia tras un join/delete. ----
+    // ---- outautoscroll : el AUTO-SCROLL del arrastre de filas del outliner, sin pantalla. Un outliner de 320x300
+    //      con 80 objetos, arrastrando uno: el mouse en el medio no mueve nada; en la franja de arriba sube despacio;
+    //      afuera de la lista (arriba) a la velocidad maxima; abajo baja; nunca se pasa de los extremos; y el cursor
+    //      no se envuelve mientras dura. Cada paso simula 50 ms (autoScrollMs = ahora - 50). ----
+    if (cmd == "outautoscroll") {
+        extern void ReiniciarEscena();
+        ReiniciarEscena();
+        std::vector<Object*> objs;
+        for (int i = 0; i < 80; i++) {
+            Object* o = new Object(NULL, "Fila", Vector3(0, 0, 0));
+            char b[32]; snprintf(b, sizeof b, "Fila%02d", i); W3dRenombrarObjeto(o, b, false);
+            objs.push_back(o);
+        }
+        Outliner* ol = new Outliner();
+        ol->x = 0; ol->y = 100; ol->Resize(320, 300);
+        const bool lmdAntes = leftMouseDown;
+        leftMouseDown = true;
+        ol->dragObjeto = objs[40]; ol->dragging = true; ol->dragMx = 100;
+        struct P { static int pasos(Outliner* o, int my, int n, bool alMedio = true) {
+            if (alMedio) o->PosY = o->MaxPosY / 2;   // (cada medicion arranca en el medio: lejos de los topes)
+            const int antes = o->PosY; o->dragMy = my;
+            for (int i = 0; i < n; i++) { o->autoScrollMs = W3dNowMs() - 50.0; o->AutoScrollArrastre(); }
+            return o->PosY - antes; } };
+        const int fila = (int)RenglonHeightGS;
+        const int arriba = ol->y + borderGS + ol->BarTopOffset();
+        printf("      [outautoscroll] MaxPosY=%d fila=%d arriba=%d\n", ol->MaxPosY, fila, arriba);
+        bool ok = ol->MaxPosY < -fila * 40;
+        ol->PosY = ol->MaxPosY / 2;
+        int dMedio = P::pasos(ol, ol->y + 150, 10);
+        int dLento = P::pasos(ol, arriba + fila * 2 - 2, 10);       // apenas adentro de la franja de arriba
+        int dCerca = P::pasos(ol, arriba + 2, 10);                   // pegado al borde
+        int dAfuera = P::pasos(ol, ol->y - 80, 10);                  // arriba de la lista
+        printf("      [outautoscroll] medio=%d franja=%d borde=%d afuera=%d (px en 0.5 s)\n", dMedio, dLento, dCerca, dAfuera);
+        ok = ok && dMedio == 0 && dLento > 0 && dCerca > dLento && dAfuera >= dCerca;
+        // afuera: 40 filas/s -> 20 filas en 0.5 s
+        ok = ok && dAfuera >= fila * 19 && dAfuera <= fila * 21;
+        P::pasos(ol, ol->y - 80, 200, false);
+        const int tope = ol->PosY;
+        int dAbajo = P::pasos(ol, ol->y + 300 + 50, 10);
+        P::pasos(ol, ol->y + 300 + 50, 400, false);
+        printf("      [outautoscroll] tope=%d abajo=%d fondo=%d (MaxPosY=%d) sinEnvolver=%d\n", tope, dAbajo, ol->PosY,
+               ol->MaxPosY, ol->SinEnvolverCursor() ? 1 : 0);
+        ok = ok && tope == 0 && dAbajo < 0 && ol->PosY == ol->MaxPosY && ol->SinEnvolverCursor();
+        ol->dragging = false;
+        ok = ok && !ol->SinEnvolverCursor();
+        leftMouseDown = lmdAntes;
+        ol->dragObjeto = NULL;
+        printf("      [outautoscroll] %s\n", ok ? "OK" : "FALLA");
+        return ok;
+    }
     if (cmd == "outliner") {
         struct L { static void rec(Object* o, int d){ if(!o) return;
             for(size_t i=0;i<o->Childrens.size();i++){ Object* c=o->Childrens[i]; std::string ind(d*2,' ');
@@ -29140,17 +29461,45 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
     //      fuente que 'bench'). Dibuja un frame y las reporta; con trisMin/trisMax
     //      ASSERTA el rango de triangulos dibujados (es la prueba del "faces:
     //      dibujadas/total" del overlay de estadisticas). ----
+    // ---- memtex : la MEMORIA de las texturas subidas (bytes con mips, cuantas y cuantas en 16 bits) ----
+    if (cmd == "memtex") {
+        const w3dEngine::MemoriaTexturas m = w3dEngine::TexturasMemoria();
+        printf("      [memtex] %d texturas (%d en 16 bits), %.2f MiB (todas en RGBA8 serian %.2f MiB; en el N95 ~%.2f MiB)\n",
+               m.cantidad, m.de16, m.bytes / 1048576.0, m.bytes32 / 1048576.0, m.bytesPot / 1048576.0);
+        // y las MALLAS cargadas (arrays de render del recurso: un juego por malla aunque la usen muchos objetos)
+        { long bm = 0; int nm = 0, nreg = 0;
+          const std::vector<MallaRecurso*>& reg = W3dMallasRegistro();
+          for (size_t i = 0; i < reg.size(); i++) {
+              const MallaRecurso* r = reg[i];
+              if (!r) continue;
+              nreg++;
+              if (!r->vertex) continue;
+              nm++;
+              bm += (long)r->vertexSize * (12 + (r->normals ? 3 : 0) + (r->uv ? 8 : 0) + (r->vertexColor ? 4 : 0));
+              bm += (long)r->facesSize * (long)sizeof(MeshIndex);
+          }
+          printf("      [memtex] mallas: %d en el registro, %d cargadas, %.2f MiB\n", nreg, nm, bm / 1048576.0); }
+        return true;
+    }
     if (cmd == "statsvivo") {
         long mn = -1, mx = -1; ss >> mn >> mx;
         extern Viewport3D* Viewport3DActive;
         if (!rootViewport) { err = "statsvivo: no hay layout de viewports"; return false; }
+        // el CUADRO COMPLETO (toda la ventana: escena + HUD del juego + interfaz del editor + menus), por categoria
+        w3dEngine::StatsCuadro();
         rootViewport->Render();
+        { extern int MenuPantallaW, MenuPantallaH; LayoutRenderMenu(MenuPantallaW, MenuPantallaH); }
+        w3dEngine::StatsCuadro();
+        { const w3dEngine::StatsDeCuadro& c = w3dEngine::g_statCuadro;
+          printf("      [statsvivo] cuadro: gl=%d (escena %d, particulas %d, ui %d, editor %d) draws=%d binds=%d estados=%d tris=%d\n",
+                 c.total, c.llamadas[w3dEngine::StatCatEscena], c.llamadas[w3dEngine::StatCatParticulas],
+                 c.llamadas[w3dEngine::StatCatUI], c.llamadas[w3dEngine::StatCatEditor], c.draws, c.binds, c.estados, c.tris); }
         Viewport3D* vp = Viewport3DActive;
         if (!vp) { err = "statsvivo: no hay viewport 3D"; return false; }
-        vp->Render();   // el frame que se mide (deja stat*Frame frescos)
-        printf("      [statsvivo] tris=%d draws=%d binds=%d estados=%d (gl=%d)\n",
-               vp->statTrisFrame, vp->statDrawsFrame, vp->statBindsFrame, vp->statEstadosFrame,
-               vp->statDrawsFrame + vp->statBindsFrame + vp->statEstadosFrame);
+        vp->Render();   // el frame que se mide (deja stat*Frame frescos: solo el pase de escena)
+        printf("      [statsvivo] escena: tris=%d draws=%d binds=%d estados=%d otras=%d (gl=%d)\n",
+               vp->statTrisFrame, vp->statDrawsFrame, vp->statBindsFrame, vp->statEstadosFrame, vp->statOtrasFrame,
+               vp->statDrawsFrame + vp->statBindsFrame + vp->statEstadosFrame + vp->statOtrasFrame);
         if (mn >= 0 && vp->statTrisFrame < mn) {
             char b[140]; snprintf(b, sizeof(b), "statsvivo: se dibujaron %d tris y el minimo era %ld", vp->statTrisFrame, mn);
             err = b; return false;

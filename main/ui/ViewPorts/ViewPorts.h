@@ -251,6 +251,9 @@ class ViewportBase {
         // sin duplicar. El 3D NO los implementa: su transform va por el estado global (es la
         // referencia de la que se extrajo esta mecanica) y NumInput cae a sus caminos de siempre. ----
         virtual bool XformEnCurso() const { return false; }   // hay un G/R/S propio en curso
+        // un ARRASTRE propio que tiene que poder salir del viewport (las filas del outliner: llegar al borde hace
+        // auto-scroll): el cursor NO se envuelve al borde opuesto mientras dura (controles.cpp)
+        virtual bool SinEnvolverCursor() const { return false; }
         virtual void XformNumValor(float v) { (void)v; }      // aplicar el valor exacto tipeado (NumInput)
         virtual void XformConfirmar() {}                      // tilde / Enter / click
         virtual void XformCancelar() {}                       // cruz / Esc / click derecho

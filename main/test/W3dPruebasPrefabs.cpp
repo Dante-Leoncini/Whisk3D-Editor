@@ -45,6 +45,9 @@
 //    prefabadd cube|empty|proxy                      el item del menu Add del viewport 3D
 //    prefabmenu [n N] [tiene P]... [notiene P]...    el submenu Add > Prefab
 //    prefabmenuelegir <prefab>                       elige esa fila del submenu (una instancia en el cursor 3D)
+//    escenamenu [n N] [tiene E]... [notiene E]...   el submenu Add > Scene (las otras escenas, sin ciclos)
+//    escenamenuelegir <escena>                       elige esa fila (una instancia de la ESCENA en el cursor 3D;
+//                                                    prefabinstanciar escena:<nombre> x y z hace lo mismo en un punto)
 //    prefaboverride <instancia> visible <ruta> 0|1   el ojo de un hijo generado
 //    prefaboverride <instancia> prop <ruta> <prop> <valor>   el valor de la tarjeta Scripts de un generado
 //    prefabvivos <n>                                 cuantas instancias hay en la raiz activa (todo el arbol)
@@ -659,6 +662,42 @@ bool CmdPrefabMenu(std::istringstream& ss, std::string& err) {
     return true;
 }
 
+// escenamenu [n N] [tiene E]... [notiene E]...   el submenu Add > Scene (las otras escenas, sin ciclos)
+bool CmdEscenaMenu(std::istringstream& ss, std::string& err) {
+    PopupMenu m;
+    W3dEscenaMenuAddArmar(&m);
+    std::vector<std::string> nombres;
+    for (size_t i = 0; i < m.items.size(); i++) if (m.items[i]->id > 0) nombres.push_back(m.items[i]->text);
+    printf("      [escenamenu] %d escena(s):", (int)nombres.size());
+    for (size_t i = 0; i < nombres.size(); i++) printf(" %s", nombres[i].c_str());
+    printf("\n");
+    std::string k, v;
+    while (ss >> k >> v) {
+        bool esta = false;
+        for (size_t i = 0; i < nombres.size(); i++) if (nombres[i] == v) esta = true;
+        if (k == "n" && (int)nombres.size() != atoi(v.c_str())) { err = "escenamenu: tiene " + Ent((long)nombres.size()) + " filas"; return false; }
+        if (k == "tiene" && !esta) { err = "escenamenu: no ofrece '" + v + "'"; return false; }
+        if (k == "notiene" && esta) { err = "escenamenu: ofrece '" + v + "'"; return false; }
+    }
+    return true;
+}
+// escenamenuelegir <escena>   elige esa fila de Add > Scene (una instancia de la escena en el cursor 3D)
+bool CmdEscenaMenuElegir(std::istringstream& ss, std::string& err) {
+    std::string p; ss >> p;
+    if (!MenuEscenasAdd) { err = "escenamenuelegir: no hay menu Add (sin viewport 3D)"; return false; }
+    W3dEscenaMenuAddArmar(MenuEscenasAdd);
+    for (size_t i = 0; i < MenuEscenasAdd->items.size(); i++)
+        if (MenuEscenasAdd->items[i]->text == p && MenuEscenasAdd->items[i]->id > 0) {
+            InteractionMode = ObjectMode; estado = editNavegacion;
+            MenuEscenasAdd->Ejecutar(MenuEscenasAdd->items[i]->id);
+            printf("      [escenamenuelegir] %s -> activo '%s'\n", p.c_str(), ObjActivo ? ObjActivo->name.c_str() : "-");
+            if (!ObjActivo || !W3dEsTipoInstancia(ObjActivo->getType())) { err = "escenamenuelegir: no se creo la instancia"; return false; }
+            return true;
+        }
+    err = "escenamenuelegir: el menu no ofrece '" + p + "'";
+    return false;
+}
+
 bool CmdPrefabMenuElegir(std::istringstream& ss, std::string& err) {
     std::string p; ss >> p;
     if (!MenuPrefabsAdd) { err = "prefabmenuelegir: no hay menu Add (sin viewport 3D)"; return false; }
@@ -1101,6 +1140,8 @@ bool W3dPruebasPrefabsCmd(const std::string& cmd, std::istringstream& ss, std::s
     if (cmd == "prefabkey")           return CmdPrefabKey(ss, err);
     if (cmd == "prefabadd")           return CmdPrefabAdd(ss, err);
     if (cmd == "prefabmenu")          return CmdPrefabMenu(ss, err);
+    if (cmd == "escenamenu")          return CmdEscenaMenu(ss, err);
+    if (cmd == "escenamenuelegir")    return CmdEscenaMenuElegir(ss, err);
     if (cmd == "prefabmenuelegir")    return CmdPrefabMenuElegir(ss, err);
     if (cmd == "prefaboverride")      return CmdPrefabOverride(ss, err);
     if (cmd == "prefabvivos")         return CmdPrefabVivos(ss, err);

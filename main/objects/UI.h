@@ -138,5 +138,6 @@ public:
 
     ObjectType getType() W3D_OVERRIDE { return ObjectType::ui; }
     void RenderObject() W3D_OVERRIDE {}   // nada en el 3D: vive en el Editor 2D
+    bool DibujaAlgo() W3D_OVERRIDE { return false; }   // (el pase 3D se saltea toda la interfaz)
 };
 #endif

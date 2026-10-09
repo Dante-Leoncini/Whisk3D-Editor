@@ -725,7 +725,13 @@ static void DibujarHijosRecortados(Object* padre, float clipX0, float clipY0,
                                    float escala, std::vector<UI2DPos>* outPos, float op) {
     bool cx = RecortaXDe(padre), cy = RecortaYDe(padre);
     float prev[4] = { gClip[0], gClip[1], gClip[2], gClip[3] };
+    // el SCISSOR tiene que estar prendido para que el recorte exista: el viewport 3D lo apaga despues de limpiar la
+    // escena y su RenderUI no lo vuelve a prender (el overflow de un contenedor no recortaba nada jugando; en el
+    // Editor 2D si, porque ahi el area ya lo tenia prendido). Se prende aca y se deja como estaba (consulta al cache)
+    bool scissorAntes = true;
     if (cx || cy) {
+        scissorAntes = gfx::IsEnabled(gfx::ScissorTest);
+        if (!scissorAntes) gfx::Enable(gfx::ScissorTest);
         // interseccion del recorte del padre con el vigente (los recortes se anidan)
         float nx0 = cx ? clipX0 : gClip[0], nx1 = cx ? clipX1 : gClip[2];
         float ny0 = cy ? clipY0 : gClip[1], ny1 = cy ? clipY1 : gClip[3];
@@ -745,6 +751,7 @@ static void DibujarHijosRecortados(Object* padre, float clipX0, float clipY0,
     if (cx || cy) {
         gClip[0] = prev[0]; gClip[1] = prev[1]; gClip[2] = prev[2]; gClip[3] = prev[3];
         AplicarScissorLocal(prev[0], prev[1], prev[2], prev[3]);
+        if (!scissorAntes) gfx::Disable(gfx::ScissorTest);
     }
 }
 
@@ -804,7 +811,6 @@ static void DibujarTextoBloque(Texto2D* t, float sx, float sy, float rw, float r
         at->DrawText(lin[i].c_str(), tx, ty + lh * i, px,
                      tc[0], tc[1], tc[2], tc[3] * op);
     }
-    at->End();
 }
 
 // mide el tamano NATURAL del boton (padding + icono + texto), en px de PANTALLA.
@@ -911,7 +917,6 @@ static void DibujarBoton(Boton2D* b, float x0, float y0, float x1, float y1,
         at->Begin();
         at->DrawText(b->texto.c_str(), cx, ty, px,
                      cTexto[0], cTexto[1], cTexto[2], cTexto[3] * op);
-        at->End();
     }
     // BORDE de HOVER: feedback de mouse-over. Se dibuja SOLO con un mouse presente
     // (gHoverOk; en tactil no hay hover) y con el cursor DENTRO del rect resuelto del
@@ -1077,6 +1082,7 @@ static void DibujarElemRec(Object* o, float rx0, float ry0, float rw, float rh,
 void UI2D_DibujarOverlay(float x0, float y0, float w, float h, float escala,
                          std::vector<UI2DPos>* outPos, bool saltarVerEn3D) {
     if (!SceneCollection) return;
+    gfx::StatScope cat(gfx::StatCatUI);   // (el contador de llamadas: esto es la interfaz del juego)
     // HOVER: pasar el mouse (coords de LIENZO, centro 0,0) a las coords de DIBUJO de ESTE
     // overlay. El mapeo es el mismo del dibujo: el lienzo entero ocupa el rect (x0,y0,w,h).
     // Sin mouse presente (tactil) gHoverOk queda false y ningun boton dibuja el borde.
@@ -1118,7 +1124,8 @@ void UI2D_DibujarOverlay(float x0, float y0, float w, float h, float escala,
         DibujarHijosRecortados(o, x0, y0, x0 + w, y0 + h,
                                x0 + pi, y0 + pa, w - pi - pd, h - pa - pb,
                                esc2, outPos, u->opacidad);
-    }
+    }    // (el texto ya no apaga lo suyo en cada cadena: una vez, al terminar)
+    gfx::DisableArray(gfx::TexCoordArray); gfx::Disable(gfx::Blend);
 }
 
 bool UI2D_HayVerEn3D() {
@@ -1221,7 +1228,6 @@ static void DibujarElemMundoRec(Object* o, float rx0, float ry0, float rw, float
             gfx::Enable(gfx::DepthTest);           // que la profundidad se note contra la escena
             at->DrawText(txt.c_str(), ox, oy, pxU,
                          tcM[0], tcM[1], tcM[2], tcM[3] * op);
-            at->End();
         }
     } else if (o->getType() == ObjectType::boton2d || o->getType() == ObjectType::expandir2d) {
         // en el modo mundo el boton/expandir no se dibujan (es inspeccion de profundidad)
@@ -1258,6 +1264,7 @@ static void DibujarElemMundoRec(Object* o, float rx0, float ry0, float rw, float
 
 void UI2D_DibujarEnMundo() {
     if (!SceneCollection) return;
+    gfx::StatScope cat(gfx::StatCatUI);
     for (size_t i = 0; i < SceneCollection->Childrens.size(); i++) {
         Object* o = SceneCollection->Childrens[i];
         if (!o || o->getType() != ObjectType::ui || !o->visible || !((UI*)o)->verEn3D) continue;
@@ -1269,5 +1276,5 @@ void UI2D_DibujarEnMundo() {
         PaddingLados(o, 1.0f, vw, vh, &pi, &pd, &pa, &pb);
         DibujarHijosMundo(o, pi, pa, vw - pi - pd, vh - pa - pb,
                           vw, vh, u->opacidad);
-    }
+    }    gfx::DisableArray(gfx::TexCoordArray); gfx::Disable(gfx::Blend);
 }

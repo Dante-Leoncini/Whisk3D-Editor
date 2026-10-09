@@ -30,6 +30,7 @@
 #include "WhiskUI/draw/rectangle.h" // el velo del modo foco
 #include "objects/Objects.h"
 #include "objects/Mesh.h"
+#include "objects/Rutina.h"   // Add > Core: las rutinas
 #include "objects/MallaRecurso.h"   // W3dMallaAristasVista / W3dMallaCarasVista: el snap a una malla de un recurso
 #include "physics/W3dRigido.h" // Add > Physics: W3dRigidoDef del objeto activo
 #include "objects/Curve.h"   // edicion de riel/path via proxy de malla (CurveEntrarEdicion)
@@ -479,6 +480,8 @@ void LayoutJuegoPuroToggle() {
             v3->SetViewFromCameraActive(true);
         }
         g_juegoPuro = 1;
+        // el CONSTRUCTOR de las rutinas: en solo-juego corre UNA vez (de nuevo al entrar)
+        g_w3dSoloJuego = true; g_w3dConstructorGen++;
     } else if (g_juegoPuro == 1) {
         // estado 2, COVER: solo cambia la proyeccion/encuadre (ViewPort3D lo
         // lee); el layout maximizado y la vista de camara quedan como estan
@@ -486,6 +489,7 @@ void LayoutJuegoPuroToggle() {
     } else {
         // SALIR: restaurar vista y layout como estaban
         g_juegoPuro = 0;
+        g_w3dSoloJuego = false;
         if (viewPortActive && viewPortActive->ViewportKind() == 1 && !gPuroVistaCam)
             ((Viewport3D*)viewPortActive)->SetViewFromCameraActive(false);
         if (gPuroMaximizo && LayoutEstaMaximizado()) LayoutMaximizar();
@@ -701,6 +705,34 @@ void AddGridCull(){ Culling* c = new Culling(NULL, cursor3D.pos); c->metodo = Cu
 // Particulas: nace emitiendo (cantidad 10/s) pero SIN textura -> no dibuja nada
 // hasta que el usuario le carga un PNG en el panel
 void AddParticulas(){ TrasCrearAdd(new Particulas(NULL, cursor3D.pos)); }
+
+// ---- Add > Core: RUTINAS (objetos avanzados: una lista de pasos del render, sin transformacion) ----
+// Cada fila crea una Rutina con ESE paso y con su nombre (el outliner se lee como el programa). Si el activo es
+// una Rutina, la nueva va JUSTO DESPUES de ella y en el mismo padre: el orden del arbol es el orden de ejecucion.
+static void AddRutinaCon(int tipo) {
+    Object* activo = ObjActivo;
+    const bool vacia = (tipo < 0 || tipo >= PasoN);   // "Empty routine" (id PasoN)
+    Rutina* r = new Rutina(NULL, vacia ? T("Routine") : T(W3dPasoEtiqueta(tipo)));
+    if (!vacia) { r->listas[Rutina::ModoDefecto].push_back(W3dPasoNuevo(tipo)); r->pasoActivo = 0; }
+    if (activo && activo->getType() == ObjectType::rutina && activo->Parent) {
+        Object* viejo = r->Parent;
+        if (viejo) {
+            std::vector<Object*>& h = viejo->Childrens;
+            for (size_t i = 0; i < h.size(); i++) if (h[i] == r) { h.erase(h.begin() + (long)i); break; }
+        }
+        Object* p = activo->Parent;
+        std::vector<Object*>& hp = p->Childrens;
+        size_t pos = hp.size();
+        for (size_t i = 0; i < hp.size(); i++) if (hp[i] == activo) { pos = i + 1; break; }
+        hp.insert(hp.begin() + (long)pos, r);
+        r->Parent = p;
+    }
+    TrasCrearAdd(r);
+}
+// el menu Core: los pasos AGRUPADOS (Transform, Draw, Texture, Fog, Lights...) con sus iconos, el mismo del panel
+// (edit/RutinaEditor.cpp); el id de cada item es el tipo de paso
+void W3dRutinaMenuPasos(PopupMenu* raiz, std::vector<PopupMenu*>& subs, void (*accion)(int), bool conVacia);
+static std::vector<PopupMenu*> gSubsCore;
 
 // ---- Add > Physics: cuerpo rigido para el objeto ACTIVO --------------------
 // No crea un objeto: le cuelga la DEFINICION de fisica (physics/W3dRigido.h)
@@ -956,8 +988,10 @@ static const MenuDef ADD[] = {
     { "Collection", AddCollection,      NULL, ICONO(IconType::archive) },
     { "UI",         AddUI,              NULL, ICONO(IconType::textura) },
     { "Prefab",     NULL,               NULL, ICONO(IconType::prefab), &MenuPrefabsAdd },   // los del proyecto
+    { "Scene",      NULL,               NULL, ICONO(IconType::camera), &MenuEscenasAdd },   // otra escena, instanciada
     { "Proxy W3D",  AddProxyW3d,        NULL, ICONO(IconType::libreria) },   // un prefab/escena de una libreria
     { "Imports",    NULL,               NULL, ICONO(IconType::mesh),   &MenuImports },
+    { "Core (advanced)", NULL,          NULL, ICONO(IconType::lista),  &MenuCore },   // rutinas: pasos del render
 };
 // (aca estaba la fila "Script", que creaba el objeto Script. Se dio de baja: cualquier
 //  objeto acepta scripts desde la pestania "Scripts" del panel.)
@@ -967,8 +1001,10 @@ void LayoutConstruirMenuAdd(){
     if (!MenuAdd || !MenuImports || !MenuMallas) return;
     // "Add > Prefab": su contenido es DEL PROYECTO (se rearma cada vez que se abre el Add: LayoutSyncMenuPrefabs)
     if (MenuPrefabsAdd) { MenuPrefabsAdd->action = W3dPrefabMenuAddAccion; W3dPrefabMenuAddArmar(MenuPrefabsAdd); }
+    if (MenuEscenasAdd) { MenuEscenasAdd->action = W3dEscenaMenuAddAccion; W3dEscenaMenuAddArmar(MenuEscenasAdd); }
     MenuImports->Construir(ADD_IMPORTS, (int)(sizeof(ADD_IMPORTS)/sizeof(ADD_IMPORTS[0])));
     MenuMallas->Construir(ADD_MESHES, (int)(sizeof(ADD_MESHES)/sizeof(ADD_MESHES[0])));
+    if (MenuCore) W3dRutinaMenuPasos(MenuCore, gSubsCore, AddRutinaCon, true);
     MenuAdd->Construir(ADD, (int)(sizeof(ADD)/sizeof(ADD[0])));
 }
 // opcion del menu Select: 0 All / 1 None / 2 Invert
@@ -1697,25 +1733,6 @@ static void LayoutAccionView(int aId) {
 // llamarla cada vez que cambia InteractionMode o ObjActivo. COMPARTIDA PC+Symbian: antes
 // solo la seteaba el render de PC (ViewPort3D::Render), asi que en Symbian g_editMesh
 // quedaba NULL -> en Edit Mode no se podia ni seleccionar ni mover sub-elementos.
-// regenera el preview SOLO de las mallas que tienen un modificador MIRROR con TARGET (su plano de espejo sale del
-// mundo del target relativo al objeto -> si cualquiera de los dos se movio, cambia). El resto de modificadores es
-// local y no depende de la posicion. Recorre el arbol; barato: los que no tienen modificadores se saltean.
-// los modificadores que dependen de DONDE ESTA otro objeto: Mirror y Boolean con target. Si se
-// movio algo, su resultado cambio -> regenerar SOLO esos (el resto sigue cacheado en genValido).
-static void RegenerarMirrorsConTargetRec(Object* nodo){
-    if (!nodo) return;
-    for (size_t i=0;i<nodo->Childrens.size();i++){
-        Object* o = nodo->Childrens[i];
-        if (o->getType()==ObjectType::mesh){
-            Mesh* m=(Mesh*)o;
-            for (size_t k=0;k<m->modificadores.size();k++){
-                const int t = m->modificadores[k]->tipo;
-                if ((t==ModifierType::Mirror || t==ModifierType::Boolean) && m->modificadores[k]->target){ m->GenerarMallaModificada(); break; }
-            }
-        }
-        RegenerarMirrorsConTargetRec(o);
-    }
-}
 // BOOLEAN cuyo TARGET fue editado: el target sube su geoVersion en cada cambio de geometria;
 // aca se compara con la version con la que se genero. UN entero por modificador, y solo se
 // recorre cuando g_mallasEditadas avisa que alguna malla cambio (no por frame).
@@ -1761,7 +1778,22 @@ void ActualizarEditMeshActivo() {
     // regenerar SOLO esos previews. Chequeo barato (1 bool/frame); no corre nada al orbitar/idle.
     if (g_objetosMovidos) {
         g_objetosMovidos = false;
-        if (SceneCollection) RegenerarMirrorsConTargetRec(SceneCollection);
+        // los modificadores que dependen de DONDE ESTA otro objeto (Mirror y Boolean con target): si se movio algo, su
+        // resultado cambio -> regenerar SOLO esos (el resto sigue cacheado en genValido). Las mallas de la escena salen
+        // de W3dVivosDeTipo: jugando esto corre en cada cuadro (todo se mueve) y recorrer el arbol eran miles de nodos
+        if (SceneCollection) {
+            const std::vector<Object*>& mallas = W3dVivosDeTipo(ObjectType::mesh);
+            for (size_t i = 0; i < mallas.size(); i++) {
+                Mesh* m = (Mesh*)mallas[i];
+                for (size_t k = 0; k < m->modificadores.size(); k++) {
+                    const int t = m->modificadores[k]->tipo;
+                    if ((t == ModifierType::Mirror || t == ModifierType::Boolean) && m->modificadores[k]->target) {
+                        if (W3dColgadoDe(m, SceneCollection)) m->GenerarMallaModificada();
+                        break;
+                    }
+                }
+            }
+        }
         g_redraw = true;
     }
     // BOOLEAN con el target EDITADO (mover un vertice del cilindro tiene que rehacer el corte del
@@ -2982,6 +3014,7 @@ bool LayoutAbrirMenuDeBarra(ViewportBase* vp, int mx, int my) {
     } else if (MenuAdd && bAdd && bAdd->visible && bAdd->Contains(mx, my)) {
         objetivo = MenuAdd; boton = bAdd;
         W3dPrefabMenuAddArmar(MenuPrefabsAdd);   // "Add > Prefab": los prefabs del proyecto de AHORA
+        W3dEscenaMenuAddArmar(MenuEscenasAdd);   // "Add > Scene": las escenas de AHORA
     } else if (MenuMesh && bMesh && bMesh->visible && bMesh->Contains(mx, my)) {
         // Edit Mode: menu "Mesh" (Transform/Snap/Delete), comun a vertice/borde/cara.
         objetivo = MenuMesh; boton = bMesh;
@@ -3389,6 +3422,7 @@ void LayoutMenuAdd(int mx, int my) {
     if (!MenuAdd) return; // se crea en el setup de menus (1er frame)
     if (MenuAbierto) MenuAbierto->Cerrar();
     W3dPrefabMenuAddArmar(MenuPrefabsAdd);   // (los prefabs del proyecto de AHORA)
+    W3dEscenaMenuAddArmar(MenuEscenasAdd);
     MenuAdd->Abrir(mx, my, MenuPantallaW, MenuPantallaH); // EN EL CURSOR
     MenuAbierto = MenuAdd;
 }
@@ -4591,9 +4625,11 @@ static int  g_menuDragY0 = 0, g_menuDragScroll0 = 0;
 static bool g_menuDragMoved = false;
 static PopupMenu* MenuScrollBajoCursor(int mx, int my){
     if (!MenuAbierto) return NULL;
-    PopupMenu* t = MenuAbierto;
-    while (t->submenuAbierto && t->submenuAbierto->abierto && t->submenuAbierto->Contains(mx, my)) t = t->submenuAbierto;
-    return (t->Contains(mx, my) && t->MaxScroll() > 0) ? t : NULL;
+    // el MAS PROFUNDO que contiene el punto (se dibuja encima). Caminar "mientras el siguiente contenga" se
+    // frenaba en un submenu que no contiene el punto aunque su hijo si (un sub-submenu se extiende mas alla)
+    PopupMenu* t = NULL;
+    for (PopupMenu* m = MenuAbierto; m && m->abierto; m = m->submenuAbierto) if (m->Contains(mx, my)) t = m;
+    return (t && t->MaxScroll() > 0) ? t : NULL;
 }
 // llamado en el DOWN sobre un menu SCROLLABLE: arranca un posible drag/tap (difiere la seleccion). true = diferido.
 bool LayoutMenuDragArrancar(int mx, int my){

@@ -42,6 +42,7 @@
 #include "objects/Instance.h"    // Instance ("tipo": "Instance"): usado antes del include de mas abajo
 #include "objects/LOD.h"         // objeto LOD (un hijo por distancia a la camara)
 #include "objects/Culling.h"     // objeto Culling (frustum culling de sus hijos)
+#include "objects/Rutina.h"      // objeto Rutina (lista de pasos del render)
 #include "objects/Niebla.h"      // objeto Niebla (glFog en el arbol)
 #include "objects/Recorte.h"     // LimpiarZ / Recorte (composicion de la pantalla en el arbol)
 #include "objects/Hitbox.h"      // HITBOX: caja de deteccion con eventos lua
@@ -66,6 +67,7 @@
 #include "io/W3dNodos.h"         // .w3dnodos: oclusion por nodos de riel (estilo SLST de PS1)
 #include "objects/Materials.h"   // bloque raiz "materiales" (antes viajaban dentro del GLB)
 #include "gfx/w3dGraphics.h"     // gfx::Mezcla: acotar el modo de mezcla que venga del archivo
+#include "gfx/w3dTexture.h"      // Texturas16Siempre: el formato de las texturas del proyecto
 #include "objects/Textures.h"
 #include "importers/import_obj.h" // EncolarTextura: la carga de texturas es DIFERIDA (1 por frame)
 #include "w3dFilesystem.h"
@@ -1509,6 +1511,8 @@ void BuildScene(Node* root){
         std::string v = w3dMapAt(root->props, "mipmaps");
         w3dEngine::SetMipmapsGlobal(v == "true" || v == "1");
     }
+    w3dEngine::SetTexturas16Siempre(root->props.count("texturas16") &&
+                                    (w3dMapAt(root->props, "texturas16") == "true" || w3dMapAt(root->props, "texturas16") == "1"));
 
     // CACHE DE JUEGO (rewind) del proyecto: un .w3d puede abrir con el cache YA destildado -> un JUEGO se juega
     // FLUIDO (no rebobina). Si el .w3d no declara "cacheJuego", gSimCacheOn queda como estaba (pref de sesion).
@@ -1642,6 +1646,11 @@ static std::string RutaJson(const std::string& r, const std::string& base) {
         if (w3dFileSystem::FileExists(enProy)) return enProy;
     }
     return enBase;
+}
+
+// la textura de un paso "Bind texture" de una Rutina: la misma regla que la de un material (ctx = la base)
+static std::string RutinaRefTextura(const std::string& guardada, void* base) {
+    return RutaJson(guardada, *(const std::string*)base);
 }
 
 // los campos de RUTA que el lector guarda CRUDOS (se resuelven mas tarde, al dibujar o al usarlos: la textura de
@@ -3157,6 +3166,12 @@ static Object* JsonObjetoCrear(JVal* j, Object* parent, const std::string& base)
         HitboxLeerCampos(j, hb);
         return hb;
     }
+    if (tipo == "rutina") {    // Rutina: lista de pasos del render (sin transformacion propia)
+        Rutina* ru = new Rutina(parent);
+        JsonComunes(j, ru);
+        RutinaLeerCampos(j, ru, RutinaRefTextura, (void*)&base);   // ("Bind texture": como la de un material)
+        return ru;
+    }
     if (tipo == "culling") {   // Culling: contenedor de culling (frustum/grid/triangulo/bsp)
         Culling* cu = new Culling(parent);
         JsonComunes(j, cu);
@@ -3580,7 +3595,7 @@ static bool W3dMismoMaterial(const Material* v, const Material& n, const std::st
         v->culling != n.culling || v->depth_test != n.depth_test || v->chrome != n.chrome ||
         v->normalMap != n.normalMap || v->uv8bit != n.uv8bit) return false;
     if (v->depth_write != n.depth_write || v->orden_pasada != n.orden_pasada ||
-        v->mezcla != n.mezcla || !W3dMatCasi(v->depth_bias, n.depth_bias) || !W3dMatCasi(v->alphaTest, n.alphaTest)) return false;
+        v->mezcla != n.mezcla || !W3dMatCasi(v->depth_bias, n.depth_bias) || !W3dMatCasi(v->sesgo_metros, n.sesgo_metros) || !W3dMatCasi(v->alphaTest, n.alphaTest)) return false;
     if (v->lineas != n.lineas || !W3dMatCasi(v->grosorLinea, n.grosorLinea)) return false;
     if (W3dMatRutaTex(v) != texPath) return false;
     return true;
@@ -3597,7 +3612,7 @@ static void W3dCopiarMaterial(const Material& src, Material* dst) {
     dst->transparent = src.transparent; dst->lighting = src.lighting; dst->vertexColor = src.vertexColor;
     dst->culling = src.culling; dst->depth_test = src.depth_test; dst->chrome = src.chrome;
     dst->normalMap = src.normalMap; dst->uv8bit = src.uv8bit;
-    dst->depth_write = src.depth_write; dst->depth_bias = src.depth_bias; dst->alphaTest = src.alphaTest;
+    dst->depth_write = src.depth_write; dst->depth_bias = src.depth_bias; dst->sesgo_metros = src.sesgo_metros; dst->alphaTest = src.alphaTest;
     dst->orden_pasada = src.orden_pasada; dst->mezcla = src.mezcla;
     dst->lineas = src.lineas; dst->grosorLinea = src.grosorLinea;
 }
@@ -3627,6 +3642,7 @@ static void CargarMateriales(JVal* raiz, const std::string& base, const std::str
         tmp.rtMetalico    = JF(e, "metalico",  tmp.rtMetalico);
         // DECAL / mezcla. Ausentes en TODO lo guardado hasta hoy -> el default deja el material igual.
         tmp.depth_bias    = JF(e, "sesgoProfundidad", tmp.depth_bias);
+        tmp.sesgo_metros  = JF(e, "sesgoMetros",      tmp.sesgo_metros);   // sesgo de profundidad en metros (ausente = 0)
         tmp.alphaTest     = JF(e, "alfaCorte",        tmp.alphaTest);   // recorte por alfa (rejas); ausente = 0
         tmp.orden_pasada  = JI(e, "ordenPasada",      tmp.orden_pasada);
         tmp.mezcla        = JI(e, "mezcla",           tmp.mezcla);
@@ -4349,6 +4365,8 @@ static bool AbrirEscenaJson(const char* datos, size_t n, const std::string& base
     // presente = manda el proyecto. Antes de la cola diferida, asi gobierna la subida.
     w3dEngine::SetMipmapsGlobal(cfg.mipmaps);
     { JVal* jm = JHijo(raiz, "mipmaps", 3); if (jm) w3dEngine::SetMipmapsGlobal(jm->b); }
+    // TEXTURAS DE 16 BITS (ausente = solo las exactas). Antes de la cola diferida: gobierna esta carga
+    { JVal* j16 = JHijo(raiz, "texturas16", 3); w3dEngine::SetTexturas16Siempre(j16 && j16->b); }
     // icono del juego (opcional): ruta EXTERNA relativa al .w3d. La usa la tarjeta
     // Juego y Compilar juego (genera los tamanos chicos al compilar).
     AplicarIcono(RutaJson(JS(raiz, "icono", ""), base));

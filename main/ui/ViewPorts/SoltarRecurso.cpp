@@ -40,6 +40,7 @@
 #include "w3dlog.h"
 #include <cmath>
 #include <cfloat>
+#include "io/Prefabs.h"   // W3dPrefabClaveEscena: una escena del proyecto se instancia
 
 // ---- EL RAYO ----
 namespace {
@@ -323,14 +324,16 @@ bool W3dSoltarRecursoEn3D(Viewport3D* vp, int mx, int my, int tipo, const std::s
                 w3dLogf("[biblioteca] '%s' de la libreria '%s' soltado en el 3D (proxy)", elem.c_str(), lib.c_str());
                 return true;
             }
-            if (tipo == W3D_VISTA_ESCENAS) break;   // (una escena del proyecto no se suelta en el 3D)
-            // una INSTANCIA del prefab donde cae el rayo (sobre la superficie tocada o el plano del cursor 3D)
+            // una INSTANCIA del prefab -o de la ESCENA del proyecto ("escena:<nombre>", io/Prefabs.h)- donde cae el
+            // rayo (sobre la superficie tocada o el plano del cursor 3D)
+            const bool esEscena = (tipo == W3D_VISTA_ESCENAS);
+            const std::string clave = esEscena ? W3dPrefabClaveEscena(id) : id;
             std::string motivo;
-            if (!W3dPrefabSePuedeAgregar(id, &motivo)) { if (que) *que = T(motivo.c_str()); return false; }
-            if (que) *que = T("New instance of this prefab");
+            if (!W3dPrefabSePuedeAgregar(clave, &motivo)) { if (que) *que = T(motivo.c_str()); return false; }
+            if (que) *que = T(esEscena ? "New instance of this scene" : "New instance of this prefab");
             if (soloProbar) return true;
-            if (!W3dPrefabAgregar(id, PuntoDeSoltar(t, rayo), &motivo)) { if (que) *que = T(motivo.c_str()); return false; }
-            w3dLogf("[biblioteca] prefab '%s' soltado en el 3D", id.c_str());
+            if (!W3dPrefabAgregar(clave, PuntoDeSoltar(t, rayo), &motivo)) { if (que) *que = T(motivo.c_str()); return false; }
+            w3dLogf("[biblioteca] %s '%s' soltado en el 3D", esEscena ? "escena" : "prefab", id.c_str());
             return true;
         }
     }

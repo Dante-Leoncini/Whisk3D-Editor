@@ -53,6 +53,7 @@ static bool GizmoBase(Vector3& c, Vector3 ejes[3]) {
     Matrix4 W; bool local = false;
     if (InteractionMode == ObjectMode) {
         if (!ObjActivo || !ObjActivo->select) return false;
+        if (ObjActivo->sinTransformacion) return false;   // (la Rutina: no tiene transformacion que mover)
         SetTransformPivotPoint(); c = TransformPivotPoint;
         if (transformOrientation == LocalOrient) { ObjActivo->GetWorldMatrix(W); local = true; }
     } else if (InteractionMode == EditMode && g_editMesh && g_editMesh->getType() == ObjectType::mesh) {

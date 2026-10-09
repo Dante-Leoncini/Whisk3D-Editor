@@ -21,6 +21,7 @@
 #include "render/OpcionesRender.h"     // g_redraw (render event-driven)
 #include "objects/Materials.h"         // HayAnimacionActiva / UpdateAnimatedMaterials
 #include "animation/Animation.h"       // PlayAnimation / AnimFPS / AnimTick (avance del play)
+#include "w3dGraphics.h"               // g_statCuadro: las llamadas GL del ultimo cuadro en el [PERF]
 
 // BARRA DE PROGRESO (export/import OBJ): el hook de swap que faltaba en Symbian. ProgresoIniciar/Actualizar lo
 // llaman para mostrar la barra DURANTE la operacion bloqueante (sin esto, ProgresoIniciar hacia return y la
@@ -1101,10 +1102,14 @@ int CWhisk3DContainer::DrawCallBack( TAny* aInstance )
                     // TOP de scripts por ms (promedio del bloque de 30): dice CUAL lua se come el sim=
                     extern void SimLuaPerfTop(char*, int, int);
                     char topLua[96]; SimLuaPerfTop(topLua, sizeof(topLua), 30);
-                    w3dLogf("[PERF] /30f logica: sim=%u anim=%u pvs=%u part=%u ms | skin=%d ms (recalc %d, completos %d) | lua %d/%d scripts [%s] | RENDER: %d caras %d draws | CULLING: %d de %d hijos",
+                    // GL: TODAS las llamadas al driver del ultimo cuadro (escena + HUD del juego + editor + GL crudo)
+                    const w3dEngine::StatsDeCuadro& gc = w3dEngine::g_statCuadro;
+                    w3dLogf("[PERF] /30f logica: sim=%u anim=%u pvs=%u part=%u ms | skin=%d ms (recalc %d, completos %d) | lua %d/%d scripts [%s] | RENDER: %d caras %d draws | GL %d (esc %d ui %d ed %d) | CULLING: %d de %d hijos",
                             gPfSim/30, gPfAnim/30, gPfPvs/30, gPfPart/30,
                             g_skinPerfMs/30, g_skinPerfSkins/30, g_skinPerfCompletos/30,
                             g_luaScriptsActivos, g_luaScriptsTotal, topLua, g_renderCaras, g_renderDraws,
+                            gc.total, gc.llamadas[w3dEngine::StatCatEscena] + gc.llamadas[w3dEngine::StatCatParticulas],
+                            gc.llamadas[w3dEngine::StatCatUI], gc.llamadas[w3dEngine::StatCatEditor],
                             g_cullHijosVisibles/30, g_cullHijosTotal/30);
                     gPfSim=gPfAnim=gPfPvs=gPfPart=gPfN=0;
                     g_cullHijosTotal=0; g_cullHijosVisibles=0;

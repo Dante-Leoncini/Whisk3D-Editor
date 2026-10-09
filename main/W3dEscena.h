@@ -79,6 +79,12 @@ Object* W3dEscenaBuscarRef(Object* o, const std::string& nombre);
 // limpia TODO (mapa/activa/inited/pendiente); NO borra la escena inicial. Lo llama el STOP.
 void W3dEscenaLimpiar();
 
+// DIBUJAR EL 3D: lua dibujar3D(false) apaga el pase 3D entero (W3dEscena3DPasada no recorre el arbol)
+// mientras la UI sigue dibujandose y los scripts siguen corriendo. Para las pantallas que tapan todo
+// (un menu con fondo opaco): no se gasta nada en una escena que no se ve. El STOP lo vuelve a prender.
+bool W3dEscena3DActiva();
+void W3dEscena3DSetActiva(bool on);
+
 // ESCENAS 3D (main/W3dRaices.h): cambiarEscena(nombre) que no nombra una escena UI se le pasa
 // al modulo de raices. 'pedir' anota el cambio (false = no es una escena 3D) y 'aplicar' lo
 // hace al final del frame (true = cambio el arbol entero: el cambio de UI pendiente se descarta).

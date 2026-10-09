@@ -393,6 +393,7 @@ void W3dParticulasDibujarPendientes() {
     gfx::Enable(gfx::DepthTest);
     gfx::DepthFunc(gfx::DepthLess);
     gfx::DepthMask(false);
+    const gfx::StatCat catAntes = gfx::StatCategoriaActual();
     gfx::StatCategoria(gfx::StatCatParticulas); // presupuesto: estos draws son PARTICULAS
     w3dEngine::ParticleSystem::DrawBillboardEstado();
     gfx::EnableArray(gfx::ColorArray);          // el lote lleva el color POR VERTICE
@@ -431,7 +432,7 @@ void W3dParticulasDibujarPendientes() {
     gfx::DisableArray(gfx::ColorArray);
     DibujarLineas();
     w3dEngine::ParticleSystem::DrawBillboardFin();
-    gfx::StatCategoria(gfx::StatCatEscena);
+    gfx::StatCategoria(catAntes);
     gfx::DepthMask(true);
     gfx::Invalidate();
 }

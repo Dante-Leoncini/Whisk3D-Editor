@@ -53,6 +53,9 @@ struct Config {
     // corre desde el arbol de codigo se encuentra sola subiendo carpetas; cuando corre INSTALADO (junto al
     // binario no hay repo) el que compila juegos la fija a mano en Ajustes y queda guardada aca.
     std::string repoPath;
+    // LOGS del editor (Ajustes > Logs): 3 = todo, 2 = avisos y errores, 1 = solo errores, 0 = nada.
+    // Apagados el editor va mas rapido (cada linea abre, escribe y cierra el archivo).
+    int logs;
     Config()
         : fullscreen(false), enableAntialiasing(false), mipmaps(true),
           width(800), height(600), displayIndex(0),
@@ -62,7 +65,7 @@ struct Config {
           scale(3), nuevoUsuario(true),
 #endif
           autoKey(false),
-          SkinName("Whisk3D"), graphicsAPI("opengl"), repoPath("") {}
+          SkinName("Whisk3D"), graphicsAPI("opengl"), repoPath(""), logs(3) {}
 };
 extern Config cfg;
 

@@ -2,6 +2,9 @@
 #include "ViewPorts/Timeline.h" // el layout PC parte el 3D en columna [3D / Timeline]
 #include "ViewPorts/LayoutInput.h" // LayoutPorDefecto: EL layout por defecto, en un solo lugar
 #include "objects/Primitivas.h"   // W3dMallaNacioHook: el cubo por defecto nace con su recurso
+#include "objects/Rutina.h"       // el CONSTRUCTOR y el "Limpiar pantalla" que trae todo proyecto
+#include "WhiskUI/theme/colores.h" // el fondo del tema: el "Clear color" de un proyecto nuevo
+#include "W3dLang.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb/stb_image.h"
@@ -16,6 +19,10 @@ bool running = false;
 // definicion: la usa el arranque y el comando `escenadefecto` del harness (los tests que
 // trabajan "sobre la escena del usuario" la necesitan en un proceso que ya corrio otros).
 void W3dCrearEscenaPorDefecto() {
+    // arriba de todo: el CONSTRUCTOR (corre una vez al empezar el juego: fija el "Clear color", el fondo del tema) y
+    // la rutina que LIMPIA la pantalla en cada cuadro (apagarla o quitarla = no limpiar, tambien en el editor)
+    W3dRutinasPorDefecto(SceneCollection, T("Constructor"), T("Clear screen"),
+                         ListaColores[static_cast<int>(ColorID::background)]);
     CollectionActive = new Collection(SceneCollection);
 
     new Camera(CollectionActive, Vector3(-3, 2.5, 1.8), Vector3(-35.0f, -45.0f, 0.0f));

@@ -90,7 +90,7 @@ static bool LoteElegible(Mesh* m) {
         Material* mt = m->materialsGroup[g].material;
         if (!mt) continue;   // material default: simple
         if (mt->transparent || mt->chrome || mt->normalMap || !mt->capas.empty()) return false;
-        if (mt->orden_pasada != 0 || mt->depth_bias != 0.0f) return false;
+        if (mt->orden_pasada != 0 || mt->depth_bias != 0.0f || mt->sesgo_metros != 0.0f) return false;
         if (!mt->depth_test || !mt->depth_write) return false;
     }
     return true;

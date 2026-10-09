@@ -1,3 +1,5 @@
+#include "objects/Rutina.h"   // g_w3dSoloJuego / W3dHayConstructor: quien limpia la pantalla
+#include "W3dEscena.h"        // W3dEscena3DActiva (lua dibujar3D(false): el "Clear" del proyecto no corre)
 #include "io/RaicesEditor.h"   // el selector de escena/prefab de la barra (BR_Raiz)
 #include "objects/Light.h" // W3dLucesPrepase
 #include "w3dGraphics.h" // abstraccion de graficos (independencia de OpenGL)
@@ -68,6 +70,8 @@ PopupMenu* MenuAdd = NULL;
 PopupMenu* MenuImports = NULL; // submenu "Add > Imports": OBJ / FBX / glTF / GLB
 PopupMenu* MenuMallas  = NULL; // submenu "Add > Mesh": las primitivas (8 de las 19 filas del menu)
 PopupMenu* MenuPrefabsAdd = NULL; // submenu "Add > Prefab": los prefabs del proyecto (io/PrefabsEditor.h)
+PopupMenu* MenuEscenasAdd = NULL; // submenu "Add > Scene": las otras escenas instanciadas (io/PrefabsEditor.h)
+PopupMenu* MenuCore = NULL;      // submenu "Add > Core": las RUTINAS (objetos avanzados: pasos del render)
 PopupMenu* MenuSelect = NULL;    // seleccion: All / None / Invert
 PopupMenu* MenuObject = NULL;    // operaciones de objeto (solo si hay seleccion)
 PopupMenu* MenuAnimation = NULL; // "Animation": keyframes del objeto + Motion Trail (solo con seleccion)
@@ -210,6 +214,8 @@ Viewport3D::Viewport3D(Vector3 pos){
         MenuImports = new PopupMenu();
         MenuMallas = new PopupMenu();
         MenuPrefabsAdd = new PopupMenu();
+        MenuEscenasAdd = new PopupMenu();
+        MenuCore = new PopupMenu();
         extern void LayoutConstruirMenuAdd();
         LayoutConstruirMenuAdd();
         MenuAdd->titulo = T("Add");   // el boton es un icono sin texto -> el menu lleva titulo
@@ -413,7 +419,7 @@ Viewport3D::Viewport3D(Vector3 pos){
     ViewFromCameraActive = false;
     camFrameOn = false; camFrameNX = 1.0f; camFrameNY = 1.0f; camFrameLetterbox = false;
     letterboxNegro = false;   // editor: bandas ATENUADAS por default (auditar el culling)
-    statTrisFrame = 0; statDrawsFrame = 0; statBindsFrame = 0; statEstadosFrame = 0;
+    statTrisFrame = 0; statDrawsFrame = 0; statBindsFrame = 0; statEstadosFrame = 0; statOtrasFrame = 0;
     camViewZoom = 1.0f; camViewPanX = 0.0f; camViewPanY = 0.0f;
     hudX0 = 0.0f; hudY0 = 0.0f; hudW = 0.0f; hudH = 0.0f; hudEsc = 1.0f; // aun sin HUD dibujado
     hudOverride = false;
@@ -510,10 +516,9 @@ void Viewport3D::AbrirMenuOverlays(int x, int y){
     MenuOverlayStats->AgregarCheck("Modgen",   19, &OverlayStatModgen);
     MenuOverlayStats->AgregarCheck(T("Times"),    20, &OverlayStatTimes);
     MenuOverlays->Agregar(T("Statistics"), 11, -1, MenuOverlayStats)->gris = &showOverlays;
-    // Clear Screen: limpia el framebuffer (glClear) cada frame. NO es un overlay (no se grisa con
-    // Show Overlays). Apagarlo gana rendimiento en juegos/renders donde la escena llena la pantalla.
-    // ON por defecto (limpiarPantalla = true en el ctor).
-    MenuOverlays->AgregarCheck(T("Clear Screen"), 13, &limpiarPantalla);
+    // (aca estaba "Clear Screen": limpiar la pantalla ahora es PROGRAMABLE. Todo proyecto trae arriba de todo el
+    // "Clear color" en el constructor y la rutina "Limpiar pantalla" (Rutina.h, W3dRutinasPorDefecto): quitarla o
+    // apagarla = no limpiar, tambien en el editor (ver "QUIEN LIMPIA" en Render).)
     // X-Ray (retopologia): la malla EN EDICION se dibuja semitransparente (30%) sin z-test y sus bordes/vertices
     // siempre encima -> se ven y se pueden SELECCIONAR los verts/aristas de atras (los tapados por las caras).
     // Modo propio, NO se grisa con Show Overlays. Global (una sola malla en edicion a la vez).
@@ -1692,6 +1697,7 @@ void Viewport3D::Render() {
     vst.aspectoImagen = (camFrame && g_juegoPuro != 2) ? W3dAspectoJuego() : vst.aspectoVista;
     vst.marcoNX       = camNX;
     vst.marcoNY       = camNY;
+    vst.altoImagenPx  = (float)height * ((camNY > 1e-4f) ? camNY : 1.0f) * ((camFrame && camViewZoom > 0.0f) ? camViewZoom : 1.0f);
     if (camFrame) { vst.zoom = camViewZoom; vst.panX = camViewPanX; vst.panY = camViewPanY; }
     W3dEscena3DProyeccion(vst);   // (deja el MatrixMode en ModelView con identidad)
 
@@ -1721,7 +1727,22 @@ void Viewport3D::Render() {
                      ListaColores[static_cast<int>(ColorID::background)][2], ListaColores[static_cast<int>(ColorID::background)][3]);
     }
 
-    if (limpiarPantalla) {
+    // QUIEN LIMPIA. Un proyecto con CONSTRUCTOR limpia el solo, con sus pasos "Clear color" y "Clear" (sin un "Clear"
+    // no se limpia nada, tambien aca): el viewport no limpia, deja el SCISSOR puesto en su rectangulo mientras se
+    // dibuja la escena (un "Clear" del proyecto no borra el resto de la ventana) y dibuja la grilla DESPUES de la
+    // escena (un "Clear" la borraria). Los modos de ANALISIS (Z-Buffer, Alfa, Normales: el fondo dice algo) limpian el
+    // color con su fondo fijo y ahi el proyecto solo limpia profundidad y estencil. Un proyecto viejo (sin
+    // constructor) lo limpia el viewport, como siempre. En el modo juego puro la escena es la pantalla entera: sin
+    // scissor (el "Clear" del proyecto la limpia toda, como en el juego compilado)
+    const bool modoAnalisis = (view == RenderType::ZBuffer || view == RenderType::Alpha || view == RenderType::NormalView);
+    const bool proyectoLimpia = W3dHayConstructor() && W3dEscena3DActiva();   // (lua dibujar3D(false): no corre)
+    const bool limpiaElProyecto = proyectoLimpia && !modoAnalisis;
+    g_w3dLimpiarColorFijo = proyectoLimpia && modoAnalisis;
+    const bool recortarEscena = proyectoLimpia && !g_juegoPuro;
+    const bool pisoDespues = limpiaElProyecto;
+    if (limpiaElProyecto) {
+        // (nada: ni color ni profundidad)
+    } else {
         if (view == RenderType::ZBuffer || view == RenderType::Alpha) {
             w3dEngine::ClearColor(0.0f, 0.0f, 0.0f, 1.0f); // ZBuffer y Alpha: fondo NEGRO
         } else if (view == RenderType::NormalView) {
@@ -1740,11 +1761,9 @@ void Viewport3D::Render() {
                              ListaColores[static_cast<int>(ColorID::background)][2], ListaColores[static_cast<int>(ColorID::background)][3]);
         }
         w3dEngine::Clear(w3dEngine::ColorBuffer | w3dEngine::DepthBuffer);
-    } else {
-        w3dEngine::Clear(w3dEngine::DepthBuffer);
     }
 
-    w3dEngine::Disable(w3dEngine::ScissorTest);
+    if (!recortarEscena) w3dEngine::Disable(w3dEngine::ScissorTest);
     w3dEngine::Viewport(x, glY, width, height);
 
     w3dEngine::Disable(w3dEngine::Texture2D);
@@ -1801,7 +1820,7 @@ void Viewport3D::Render() {
         // `if (showOverlays)`). Antes el piso quedaba fuera del corte de modo juego y
         // jugando se veia la grilla pero no los contornos: "Mostrar Superposiciones"
         // significaba dos cosas distintas segun la rama.
-        if (showFloor || showXaxis || showYaxis) RenderFloor();
+        if (!pisoDespues && (showFloor || showXaxis || showYaxis)) RenderFloor();
         w3dEngine::DepthMask(true);
     }
 
@@ -1845,6 +1864,7 @@ void Viewport3D::Render() {
 
     WeightPaintActualizar(); // prende/apaga el degradado de peso en el mesh activo (modo Weight Paint)
 
+    const unsigned limpiezas0 = g_w3dLimpiezasColor;   // (si el proyecto limpio el color en este cuadro: las barras)
     // Renderiza la escena recursivamente
     { double _tScn0 = W3dNowMs();
       // base para las ESTADISTICAS del frame de este viewport (overlay "faces"/"gl"):
@@ -1855,6 +1875,7 @@ void Viewport3D::Render() {
       const int _stDraw0 = w3dEngine::g_statDrawTris;
       const int _stBind0 = w3dEngine::g_statTexBinds;
       const int _stEst0  = w3dEngine::g_statStateChanges;
+      const int _stOtr0  = w3dEngine::g_statOtras;
       // EL PASE DE ESCENA vive en main/render/EscenaRender.cpp y lo llama TAMBIEN el
       // runtime del juego compilado: recorrido del arbol (que adentro resuelve culling,
       // LOD, visibilidad por celdas, espejos, instancias, luces y lotes) y despues los
@@ -1877,10 +1898,27 @@ void Viewport3D::Render() {
       statDrawsFrame   =  w3dEngine::g_statDrawTris     - _stDraw0;
       statBindsFrame   =  w3dEngine::g_statTexBinds     - _stBind0;
       statEstadosFrame =  w3dEngine::g_statStateChanges - _stEst0;
+      statOtrasFrame   =  w3dEngine::g_statOtras        - _stOtr0;
       // exponer caras/draws del viewport ACTIVO como globals planos (para el [PERF] del juego).
       { extern int g_renderCaras, g_renderDraws;
         if (Viewport3DActive == this) { g_renderCaras = statTrisFrame; g_renderDraws = statDrawsFrame; } }
       g_prof.scene += W3dNowMs() - _tScn0; } // profiler: escena (skinning + modelos)
+
+    // la GRILLA de un proyecto que limpia el solo: despues de la escena (su "Clear" la habria borrado), con el estado
+    // que espera (la escena dejo cualquiera) y contra el z de la escena
+    if (pisoDespues && showOverlays && !g_juegoPuro && (showFloor || showXaxis || showYaxis)) {
+        w3dEngine::UnbindVBOs();   // (la grilla apunta a RAM)
+        w3dEngine::Disable(w3dEngine::Lighting); w3dEngine::Disable(w3dEngine::Texture2D);
+        w3dEngine::Disable(w3dEngine::Blend); w3dEngine::Disable(w3dEngine::CullFace);
+        w3dEngine::Disable(w3dEngine::ColorMaterial); w3dEngine::AlphaTest(0.0f);
+        w3dEngine::EnableArray(w3dEngine::VertexArray);
+        w3dEngine::DisableArray(w3dEngine::TexCoordArray); w3dEngine::DisableArray(w3dEngine::NormalArray);
+        w3dEngine::DisableArray(w3dEngine::ColorArray);
+        w3dEngine::Enable(w3dEngine::DepthTest); w3dEngine::DepthFunc(w3dEngine::DepthLess);   // (la de GL por defecto)
+        RenderFloor();
+        w3dEngine::DepthMask(true);
+    }
+    if (recortarEscena) w3dEngine::Disable(w3dEngine::ScissorTest);
 
     // TRAZADO DE RAYOS (vista Rendered con "Ray Tracing" tildado): avanza unos tiles y pega la imagen trazada
     // sobre la escena GL (una textura del tamano del viewport). Los overlays del editor siguen encima con GL.
@@ -1896,6 +1934,19 @@ void Viewport3D::Render() {
 
     if (ovl) RenderOverlay();
     RenderCamPassepartout(); // marco de camara (lo que se va a renderizar) + oscurecido afuera. Antes de la UI (queda debajo).
+    // un proyecto que NO limpio el color en este cuadro (sin "Clear", o solo profundidad): el 3D deja estela, que es lo
+    // pedido, pero las BARRAS del area son translucidas sobre el 3D y se encimaban con las del cuadro anterior (texto
+    // fantasma). Sus franjas se limpian con el fondo del tema: la interfaz del editor no se ensucia
+    if (limpiaElProyecto && !g_juegoPuro && g_w3dLimpiezasColor == limpiezas0) {
+        const int arri = barAbajo ? 0 : BarTopOffset();
+        const int abaj = (ToolbarVisible() ? ToolbarHeight() : 0) + (barAbajo ? BarTopOffset() : 0);
+        const float* bg = ListaColores[static_cast<int>(ColorID::background)];
+        w3dEngine::ClearColor(bg[0], bg[1], bg[2], 1.0f);
+        w3dEngine::Enable(w3dEngine::ScissorTest);
+        if (arri > 0) { w3dEngine::Scissor(x, glY + height - arri, width, arri); w3dEngine::Clear(w3dEngine::ColorBuffer); }
+        if (abaj > 0) { w3dEngine::Scissor(x, glY, width, abaj); w3dEngine::Clear(w3dEngine::ColorBuffer); }
+        w3dEngine::Disable(w3dEngine::ScissorTest);
+    }
     // SIEMPRE: RenderUI es el chrome del area (toolbar/menus/bordes) Y el reseteo del
     // estado GL 2D tras las mallas. La opcion ShowUi que lo salteaba se dio de baja:
     // sin chrome el viewport quedaba inusable y el estado sucio (CULL_FACE + arrays
@@ -2753,7 +2804,7 @@ void Viewport3D::RenderUI() {
         // MODO JUEGO PURO (VERDE+0): el HUD del juego ya se dibujo; todo lo que
         // sigue es CHROME del editor (barras, botones, toolbar, estadisticas).
         // Un corte temprano = cero draws y cero texto del editor por frame.
-        if (g_juegoPuro) { w3dEngine::Invalidate(); return; }
+        if (g_juegoPuro) { if (!W3dHayConstructor()) w3dEngine::Invalidate(); return; }
         // el OVERLAY DEL JUEGO pudo dejar CUALQUIER estado 2D: una imagen/video
         // sin canal alpha APAGA Blend (UIOverlay::DibujarImagenRect), el texto
         // deja mezcla premultiplicada, un elemento con profundidad prende el
@@ -2764,7 +2815,9 @@ void Viewport3D::RenderUI() {
         // cache lo sabia, asi que este bloque -- que solo reponia la FUNCION de
         // mezcla -- no lo volvia a prender) y la barra translucida y las
         // esquinas de los botones salian opacas/negras. Con el cache fino,
-        // re-afirmar lo que ya estaba puesto cuesta cero llamadas de driver.
+        // re-afirmar lo que ya estaba puesto cuesta cero llamadas de driver. Tambien el estado de MATERIAL que dejo la
+        // escena: un alpha test prendido borraba la barra translucida, la UI de la camara y las filas tenues
+        w3dEngine::EstadoBase();
         w3dEngine::Disable(w3dEngine::DepthTest);
         w3dEngine::Disable(w3dEngine::CullFace);
         w3dEngine::Enable(w3dEngine::Blend);

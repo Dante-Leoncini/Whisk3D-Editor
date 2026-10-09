@@ -78,5 +78,6 @@ public:
         conScroll = false; scrollX = 0.0f; scrollY = 0.0f;
     }
     void RenderObject() W3D_OVERRIDE {}   // nada en el 3D: se dibujan en el Editor 2D
+    bool DibujaAlgo() W3D_OVERRIDE { return false; }   // (el pase 3D ni los apila)
 };
 #endif

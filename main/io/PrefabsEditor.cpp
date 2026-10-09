@@ -125,15 +125,29 @@ static std::string PrefabEditado() {
     const W3dRaizFila& f = W3dRaices()[(size_t)a];
     return f.tipo == W3D_RAIZ_PREFAB ? f.nombre : std::string();
 }
+// la CLAVE de definicion de lo que se edita: el prefab, o la escena ("escena:<nombre>": tambien se instancia)
+static std::string ClaveEditada() {
+    const int a = W3dRaizActiva();
+    if (a < 0 || a >= (int)W3dRaices().size()) return std::string();
+    const W3dRaizFila& f = W3dRaices()[(size_t)a];
+    return f.tipo == W3D_RAIZ_PREFAB ? f.nombre : W3dPrefabClaveEscena(f.nombre);
+}
 // meter una instancia de 'nombre' en lo que se edita armaria un ciclo?
 static bool SeriaCiclo(const std::string& nombre) {
-    const std::string ed = PrefabEditado();
+    const std::string ed = ClaveEditada();
     return !ed.empty() && W3dPrefabContiene(nombre, ed);
+}
+// la definicion existe? (un prefab del registro o una escena del proyecto)
+static bool ExisteDefinicion(const std::string& clave) {
+    std::string esc;
+    if (W3dPrefabEsEscena(clave, &esc)) return W3dRaizBuscar(W3D_RAIZ_ESCENA, esc) >= 0;
+    return W3dRaizBuscar(W3D_RAIZ_PREFAB, clave) >= 0;
 }
 
 bool W3dPrefabSePuedeAgregar(const std::string& nombre, std::string* motivo) {
-    if (W3dRaizBuscar(W3D_RAIZ_PREFAB, nombre) < 0) { if (motivo) *motivo = "There is no such prefab"; return false; }
-    if (SeriaCiclo(nombre)) { if (motivo) *motivo = "A prefab can't contain itself"; return false; }
+    const bool esc = W3dPrefabEsEscena(nombre);
+    if (!ExisteDefinicion(nombre)) { if (motivo) *motivo = esc ? "There is no such scene" : "There is no such prefab"; return false; }
+    if (SeriaCiclo(nombre)) { if (motivo) *motivo = esc ? "A scene can't contain itself" : "A prefab can't contain itself"; return false; }
     if (InteractionMode != ObjectMode || estado != editNavegacion) { if (motivo) *motivo = "Only in Object Mode"; return false; }
     return true;
 }
@@ -316,7 +330,7 @@ bool W3dPrefabCambiar(InstanciaPrefab* ip, const std::string& nuevo, std::string
     // (con el Play andando lo generado tiene scripts, cuerpos y fotos de la partida: regenerarlo no se puede)
     if (SimActiva()) { if (motivo) *motivo = "Stop the game first"; return false; }
     if (W3dEsGenerado(ip)) { if (motivo) *motivo = "It belongs to a prefab instance: edit the prefab or unpack the instance"; return false; }
-    if (W3dRaizBuscar(W3D_RAIZ_PREFAB, nuevo) < 0) { if (motivo) *motivo = "There is no such prefab"; return false; }
+    if (!ExisteDefinicion(nuevo)) { if (motivo) *motivo = "There is no such prefab"; return false; }
     if (SeriaCiclo(nuevo)) { if (motivo) *motivo = "A prefab can't contain itself"; return false; }
     if (ip->prefab == nuevo) return true;
     RegenerarConUndo(ip, &nuevo, false);
@@ -1096,6 +1110,30 @@ void W3dPrefabMenuAddArmar(PopupMenu* m) {
     }
     if (gMenuAdd.empty()) m->Agregar(T("No prefabs yet"), 0, -1);
 }
+// ============================================================================
+//  Add > Scene: una ESCENA del proyecto instanciada en la que se edita (io/Prefabs.h: "escena:<nombre>")
+// ============================================================================
+static std::vector<std::string> gMenuAddEscena;
+void W3dEscenaMenuAddArmar(PopupMenu* m) {
+    if (!m) return;
+    m->Limpiar();
+    gMenuAddEscena.clear();
+    const std::vector<W3dRaizFila>& fs = W3dRaices();
+    for (size_t i = 0; i < fs.size(); i++) {
+        if (!W3dRaizEs3D(fs[i].tipo) || (int)i == W3dRaizActiva()) continue;   // (la que se edita no)
+        const std::string clave = W3dPrefabClaveEscena(fs[i].nombre);
+        if (SeriaCiclo(clave)) continue;                                           // (ni las que la contienen)
+        gMenuAddEscena.push_back(clave);
+        m->Agregar(fs[i].nombre, (int)gMenuAddEscena.size(), W3dRaizIcono(fs[i].tipo));
+    }
+    if (gMenuAddEscena.empty()) m->Agregar(T("No other scenes"), 0, -1);
+}
+void W3dEscenaMenuAddAccion(int id) {
+    if (id < 1 || id > (int)gMenuAddEscena.size()) return;
+    std::string motivo;
+    if (!W3dPrefabAgregar(gMenuAddEscena[(size_t)(id - 1)], cursor3D.pos, &motivo)) Notificar(std::string(T(motivo.c_str())), true);
+}
+
 std::string W3dPrefabMenuAddNombre(int id) {
     return (id >= 1 && id <= (int)gMenuAdd.size()) ? gMenuAdd[(size_t)(id - 1)] : std::string();
 }

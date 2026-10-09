@@ -1,4 +1,5 @@
 #include "ViewPorts/LayoutInput.h" // ruteo compartido (menus/barras/paneles)
+#include <set>
 #include "ViewPorts/LayoutArbol.h"  // aviso de destruccion de viewports (los gestos en curso los sueltan)
 #include "edit/BoxSelect.h"
 #include "ui/ViewPorts/Gizmo.h"   // GizmoDown: click/tap sobre el gizmo de mover
@@ -275,7 +276,15 @@ void W3dControlesAbrirLosQueHay() {
     for (int i = 0; i < SDL_NumJoysticks(); i++) ControlAbrir(i);
 }
 
+// las teclas que el JUEGO tiene apretadas (en play): su soltar va al juego siempre, y si la ventana pierde el
+// foco (alt-tab) se las suelta todas (SDL no manda el KEY_UP de lo que se suelta afuera)
+static std::set<int> gTeclasJuego;
 void InputUsuarioSDL3(SDL_Event &e){
+    if (e.type == SDL_WINDOWEVENT && e.window.event == SDL_WINDOWEVENT_FOCUS_LOST && !gTeclasJuego.empty()) {
+        extern void SimTeclaSDL(int, bool);
+        for (std::set<int>::iterator it = gTeclasJuego.begin(); it != gTeclasJuego.end(); ++it) SimTeclaSDL(*it, false);
+        gTeclasJuego.clear();
+    }
     RefreshInputControllerSDL(e);
 
     // HOTPLUG: enchufar/desenchufar con el editor abierto
@@ -618,7 +627,7 @@ void InputUsuarioSDL3(SDL_Event &e){
 
         // GIZMO: el punto agarrado sigue al puntero en ABSOLUTO (GizmoMotion): envolver el cursor lo haria saltar
         if (GizmoArrastrando()) { ViewPortClickDown = true; }
-        else if ((leftMouseDown || middleMouseDown) && viewPortActive) {
+        else if ((leftMouseDown || middleMouseDown) && viewPortActive && !viewPortActive->SinEnvolverCursor()) {
             CheckWarpMouseInViewport(mx, my, viewPortActive);
         }
         // POSE Mode NO envuelve el cursor: el transform de huesos usa el delta REAL mx/my (PoseXformMotion). Si se
@@ -662,13 +671,23 @@ void InputUsuarioSDL3(SDL_Event &e){
         // haga nada raro). Fuera del viewport todo se comporta como siempre. La barra
         // espaciadora es DEL JUEGO (disparar, saltar...): no pausa. La pausa es ESC, que
         // sigue de largo: es la PAUSA global del juego (ver el bloque "ESC = PAUSA" en KEY_DOWN).
+        // Y con el mouse FUERA de la ventana (o sobre ningun panel) el teclado SIGUE siendo del juego: reporte del
+        // dueno, textual: "la camara se sale cuando saco el mouse de la ventana". Manejando con las flechas y el
+        // mouse afuera, las teclas caian en el editor (las flechas navegaban la vista) y el juego no recibia el
+        // SOLTAR de la flecha que tenia apretada (volante trabado). Ademas: la tecla que el juego recibio APRETADA
+        // le llega SOLTADA siempre, este donde este el mouse (si no, quedaba trabada al pasar a otro panel).
         { extern bool SimActiva(); extern void SimTeclaSDL(int, bool);
           if (SimActiva() && PlayAnimation) {
             int smx, smy; SDL_GetMouseState(&smx, &smy);
             ViewportBase* vj = FindViewportUnderMouse(rootViewport, smx, smy);
-            if (vj && (vj->ViewportKind() == 1 || vj->ViewportKind() == 6)) {
-                SimTeclaSDL(e.key.keysym.sym, down);
-                if (e.key.keysym.sym != SDLK_ESCAPE) return;
+            const int sym = (int)e.key.keysym.sym;
+            const bool fuera = (SDL_GetMouseFocus() == NULL) || vj == NULL;
+            bool alJuego = fuera || (vj && (vj->ViewportKind() == 1 || vj->ViewportKind() == 6));
+            if (!down && gTeclasJuego.count(sym)) alJuego = true;
+            if (alJuego) {
+                if (down) gTeclasJuego.insert(sym); else gTeclasJuego.erase(sym);
+                SimTeclaSDL(sym, down);
+                if (sym != SDLK_ESCAPE) return;
             }
           } }
     }

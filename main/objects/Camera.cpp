@@ -681,16 +681,12 @@ InstalarHooksCamara gInstalarHooksCamara;
 //  target, no del viewport), asi que el dibujo que venga despues recalcula
 //  exactamente lo mismo.
 // ============================================================================
+// (las camaras de la escena salen de W3dVivosDeTipo: recorrer el arbol entero por tick eran miles de nodos)
 void W3dCamarasRielTick() {
     if (!SceneCollection) return;
-    std::vector<Object*> st;
-    st.push_back(SceneCollection);
-    while (!st.empty()) {
-        Object* o = st.back(); st.pop_back();
-        if (o->getType() == ObjectType::camera) {
-            Camera* c = (Camera*)o;
-            if (c->Riel) c->UpdatePosition();
-        }
-        for (size_t i = 0; i < o->Childrens.size(); i++) st.push_back(o->Childrens[i]);
+    const std::vector<Object*>& cams = W3dVivosDeTipo(ObjectType::camera);
+    for (size_t i = 0; i < cams.size(); i++) {
+        Camera* c = (Camera*)cams[i];
+        if (c->Riel && W3dColgadoDe(c, SceneCollection)) c->UpdatePosition();
     }
 }

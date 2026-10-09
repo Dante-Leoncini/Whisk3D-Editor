@@ -1,4 +1,5 @@
 #include "w3dGraphics.h" // abstraccion de graficos (independencia de OpenGL)
+#include "gfx/w3dTexture.h"   // Texturas16Siempre (tarjeta Render)
 #include "W3dNombres.h"   // LA regla de nombres unicos (compartida por todo el editor)
 #include "variables.h"
 #include "io/GuardarW3D.h"   // tarjeta Archivo: guardar el proyecto (.w3d v3: JSON plano + archivos externos)
@@ -766,6 +767,15 @@ static void AbrirMenuBajoBoton(PopupMenu* menu, Button* boton);
 // tarjeta HITBOX (ViewPorts/PropsHitbox.cpp)
 void PropsHitboxConstruir(Properties* p);
 void PropsHitboxActualizar(Properties* p, bool visible);
+void PropsRutinaConstruir(Properties* p);
+void PropsRutinaActualizar(Properties* p, bool visible);
+// la LISTA DE PASOS de la rutina: el checkbox de la derecha, arrastrar para mover, las teclas (X/Supr, G)
+bool PropsRutinaClicValor(int fila);
+void PropsRutinaMoverPaso(int desde, int hasta);
+bool PropsRutinaTecla(int tecla);
+bool PropsRutinaAgarrando();
+void PropsRutinaAgarreMouse(int dy);
+void PropsRutinaAgarreFin(bool confirmar);
 // tarjeta INSTANCIA DE PREFAB (ViewPorts/PropsPrefab.cpp)
 void PropsPrefabConstruir(Properties* p);
 void PropsPrefabActualizar(Properties* p, int pestania);
@@ -931,6 +941,9 @@ static void AccionTexturaElegida(int id){
 // ESTANDAR de los desplegables de Properties: abre 'menu' JUSTO debajo de 'boton', tocando su borde inferior
 // (sin gap; el borde superior del menu se funde con el del boton, como los menus de la barra). Un solo lugar ->
 // todos los dropdowns quedan iguales y bien pegados (antes cada accion lo calculaba a mano con un gap de mas).
+static void AbrirMenuBajoBoton(PopupMenu* menu, Button* boton);
+// (la misma puerta para las tarjetas que viven en su propio archivo: PropsRutina)
+void PropsAbrirMenuBajoBoton(PopupMenu* menu, Button* boton) { AbrirMenuBajoBoton(menu, boton); }
 static void AbrirMenuBajoBoton(PopupMenu* menu, Button* boton){
     if (!menu || !boton) return;
     // el menu se engancha al borde DERECHO del boton (nunca al izquierdo): los items quedan
@@ -1211,6 +1224,7 @@ static void AccionMenuReflectMode(){
 // espejos de UI (los Prop* editan un bool/float suelto y el onChange lo baja al material)
 static bool  g_matDecal = false;
 static float g_matSesgo = 0.0f;
+static float g_matSesgoM = 0.0f;
 static float g_matOrden = 0.0f;
 
 static void OnMatDecalChange() {
@@ -1227,6 +1241,12 @@ static void OnMatSesgoChange() {
     Material* mat = MaterialActivoUI();
     if (!mat || mat == MaterialDefecto) return;
     mat->depth_bias = g_matSesgo;
+    g_redraw = true;
+}
+static void OnMatSesgoMChange() {
+    Material* mat = MaterialActivoUI();
+    if (!mat || mat == MaterialDefecto) return;
+    mat->sesgo_metros = g_matSesgoM;
     g_redraw = true;
 }
 static void OnMatOrdenChange() {
@@ -1395,6 +1415,24 @@ static void W3dListarSkins(std::vector<std::string>& out){
     if (out.empty()) out.push_back(cfg.SkinName);
 }
 
+// LOGS del editor: el nivel en vivo (w3dlog.h). Apagados no cuestan ni el formateo de la linea.
+static const char* LogsLabel(int n) {
+    switch (n) { case 0: return "Off"; case 1: return "Errors only"; case 2: return "Warnings and errors"; default: return "All"; }
+}
+static PopupMenu* MenuLogs = NULL;
+static void AccionLogsElegido(int id){
+    if (id < 0 || id > 3) return;
+    cfg.logs = id; g_w3dLogNivel = id;
+    if (PropsActivo && PropsActivo->propAjLogs) PropsActivo->propAjLogs->button->text = T(LogsLabel(id));
+    g_redraw = true;
+}
+static void AccionMenuLogs(){
+    if (!PropsActivo || !PropsActivo->propAjLogs) return;
+    if (!MenuLogs){ MenuLogs = new PopupMenu(); MenuLogs->action = AccionLogsElegido; }
+    MenuLogs->Limpiar();
+    for (int n = 3; n >= 0; n--) MenuLogs->Agregar(T(LogsLabel(n)), n);
+    AbrirMenuBajoBoton(MenuLogs, PropsActivo->propAjLogs->button);
+}
 static PopupMenu* MenuSkin = NULL;
 static void AccionSkinElegido(int id){
     std::vector<std::string> skins; W3dListarSkins(skins);
@@ -1432,6 +1470,13 @@ static void AccionMipmapsEditor(){
 // MIPMAPPING del PROYECTO (tarjeta Render): pisa el global SOLO en esta sesion y se
 // guarda en la cabecera del .w3d (`mipmaps: false` cuando esta apagado).
 static bool g_renderMipmaps = true;
+// TEXTURAS DE 16 BITS del proyecto (tarjeta Render): se guarda en el .w3d ("texturas16") y vale desde la proxima carga
+static bool g_renderTex16 = false;
+static void AccionTex16Proyecto(){
+    w3dEngine::SetTexturas16Siempre(g_renderTex16);
+    Notificar(T("Reload the project to upload the textures again"), false);
+    g_redraw = true;
+}
 static void AccionMipmapsProyecto(){
     w3dEngine::SetMipmapsGlobal(g_renderMipmaps);
     if (g_renderMipmaps)
@@ -1555,7 +1600,8 @@ static bool TipoSinTransform3D(int tipo){
            tipo == (int)ObjectType::rect2d  || tipo == (int)ObjectType::cont2d   ||
            tipo == (int)ObjectType::slice9  || tipo == (int)ObjectType::boton2d  ||
            tipo == (int)ObjectType::expandir2d || tipo == (int)ObjectType::video2d ||
-           tipo == (int)ObjectType::ui      || tipo == (int)ObjectType::script;
+           tipo == (int)ObjectType::ui      || tipo == (int)ObjectType::script ||
+           tipo == (int)ObjectType::rutina;   // la Rutina: una lista de pasos, sin posicion/rotacion/escala
 }
 // el objeto cuyo stack muestra la pestania, o NULL. El 'ObjActivo != NULL' NO es opcional: sin
 // seleccion no hay ninguna pestania de objeto (ver el fallback a la 0 en ActualizarPestanias).
@@ -7002,6 +7048,11 @@ void Properties::ConstruirGrupos(){
     propMatSesgo->SetRango(-64.0f, 64.0f);
     propMatSesgo->stepFino = 1.0f; propMatSesgo->stepGrueso = 4.0f; propMatSesgo->dragStep = 0.5f;
     propMatSesgo->onChange = OnMatSesgoChange;
+    // el sesgo de profundidad en METROS (pesa lo mismo cerca y lejos): + aleja la malla para el z-buffer, - la acerca
+    propMatSesgoM = new PropFloat("Depth Bias (m)");
+    propMatSesgoM->SetRango(-2.0f, 2.0f);
+    propMatSesgoM->stepFino = 0.01f; propMatSesgoM->stepGrueso = 0.05f; propMatSesgoM->dragStep = 0.005f;
+    propMatSesgoM->onChange = OnMatSesgoMChange;
     propMatOrden = new PropFloat("Pass Order");
     propMatOrden->SetRango(0.0f, 2.0f);
     propMatOrden->entero = true;
@@ -7076,6 +7127,7 @@ void Properties::ConstruirGrupos(){
     propMaterial->properties.push_back(propMatDecal);       // Decal (preset)
     propMaterial->properties.push_back(propBtnProfundidad); // Depth Test/Write (desplegable)
     propMaterial->properties.push_back(propMatSesgo);       // Depth Bias
+    propMaterial->properties.push_back(propMatSesgoM);      // Depth Bias (m)
     propMaterial->properties.push_back(propMatOrden);       // Pass Order
     // el viejo checkbox "Depth Test" queda OCULTO: lo reemplaza el desplegable de arriba,
     // que ademas expone la escritura de z (la mitad que faltaba).
@@ -7274,6 +7326,7 @@ void Properties::ConstruirGrupos(){
     GroupProperties.push_back(propRecorte);
     // HITBOX: caja de deteccion (la tarjeta entera vive en PropsHitbox.cpp)
     PropsHitboxConstruir(this);
+    PropsRutinaConstruir(this);
     PropsPrefabConstruir(this);   // la tarjeta de una instancia de prefab (y de lo que genera)
 
     // pestania del objeto MIRROR (pedido del dueno: "el mirror no tiene propiedades"):
@@ -7639,6 +7692,12 @@ void Properties::ConstruirGrupos(){
       pm->value = &g_renderMipmaps;
       pm->onChange = AccionMipmapsProyecto;
       propRender->properties.push_back(pm); }
+    // TEXTURAS DE 16 BITS: apagado = solo las que entran sin perdida; prendido = siempre (la mitad de memoria)
+    { PropBool* pt = new PropBool(T("16-bit textures"));
+      g_renderTex16 = w3dEngine::Texturas16Siempre();
+      pt->value = &g_renderTex16;
+      pt->onChange = AccionTex16Proyecto;
+      propRender->properties.push_back(pt); }
     // boton con action real (antes era no-op)
     PropButton* pbRenderImg = new PropButton(T("Render Image"), IconType::foto); // foto: renderiza una imagen
     pbRenderImg->action = AccionRenderImage;
@@ -7975,6 +8034,13 @@ void Properties::ConstruirGrupos(){
     propAjSkin->button->desplegable = true;
     propAjSkin->action = AccionMenuSkin;
     propAjustes->properties.push_back(propAjSkin);
+
+    propAjLogs = new PropButton("Logs");
+    propAjLogs->conLabel = true;
+    propAjLogs->button->text = T(LogsLabel(cfg.logs));
+    propAjLogs->button->desplegable = true;
+    propAjLogs->action = AccionMenuLogs;
+    propAjustes->properties.push_back(propAjLogs);
 
     // RAIZ DEL REPO para Compilar: solo hace falta cuando el editor corre INSTALADO (sin el repo al lado).
     // El que compila juegos pega aca la ruta a la carpeta del repo (la que tiene libs/Whisk3DCore) y con
@@ -8460,6 +8526,10 @@ static int gListaFilas0 = 3;
 // DRAG-SCROLL tactil de un mini-listado (UV/color/grupos/modificadores/parts): al arrastrar el dedo sobre la lista
 // se scrollea ELLA (scrollFila), no el panel entero. Antes solo se podia con la rueda -> inusable en tactil.
 static PropListMeshParts* gListaScrollLista = NULL;
+// ARRASTRAR UN PASO de la lista de una rutina: de que fila salio, donde empezo y el tope de la lista en pantalla
+static PropListMeshParts* gPasoArrastre = NULL;
+static int gPasoDesde = -1, gPasoY0 = 0, gPasoTope = 0;
+static bool gPasoMovio = false;
 static int gListaScrollY0 = 0;   // my del press
 static int gListaScroll0 = 0;    // scrollFila al empezar el arrastre
 
@@ -8813,7 +8883,7 @@ static bool UbicarBotonDeTarjeta(Properties* p, PropButton* pb) {
         if (!g->open) return false;
         yFila += borderGS + RenglonHeightGS + gapGS;  // cabecera de la tarjeta
         for (int k = 0; k < j; k++) yFila += g->properties[(size_t)k]->Resize(g->width);
-        pb->button->sx = p->x + p->PosX + borderGS + borderGS + (pb->conLabel ? g->colEtiqueta : 0);
+        pb->button->sx = p->x + p->PosX + borderGS + borderGS + pb->ColBoton();
         pb->button->sy = p->y + p->BarTopOffset() + p->PosY + yFila;
         return true;
     }
@@ -9053,6 +9123,10 @@ void Properties::Rebind(){
     if (propMatSesgo) {
         g_matSesgo = esDefault ? 0.0f : material->depth_bias;
         propMatSesgo->value = esDefault ? NULL : &g_matSesgo;
+    }
+    if (propMatSesgoM) {
+        g_matSesgoM = esDefault ? 0.0f : material->sesgo_metros;
+        propMatSesgoM->value = esDefault ? NULL : &g_matSesgoM;
     }
     if (propMatOrden) {
         g_matOrden = esDefault ? 0.0f : (float)material->orden_pasada;
@@ -10123,6 +10197,13 @@ Properties::Properties() : ViewportBase() {
     propCamActiva = NULL; propCamActivaSel = NULL; propCamActivaKey = NULL;
     propLimpiarZ = NULL; propLzActivo = NULL; propRecorte = NULL; propRcActivo = NULL; propRcX = NULL; propRcY = NULL;
     propHitbox = NULL; propHbActivo = NULL; propHbEtiqueta = NULL; propHbFiltro = NULL; propHbCuerpos = NULL;
+    propRutina = NULL; propRuLista = NULL; propRuUsar = NULL; propRuPasos = NULL; propRuFilaAdd = NULL;
+    propRuOn = NULL; propRuRef = NULL; propRuEntero = NULL; propRuMotivo = NULL;
+    propRuRef2 = NULL; propRuTexto = NULL; propRuAviso = NULL; propRuColor = NULL; propRuColorNum = NULL;
+    for (int k = 0; k < 5; k++) propRuInfo[k] = NULL;
+    propRuLuz = NULL; propRuOpcion = NULL; propRuManual = NULL; propRuArray = NULL;
+    propRuMax = NULL; for (int k = 0; k < 3; k++) propRuBuffer[k] = NULL;
+    for (int k = 0; k < 5; k++) propRuNum[k] = NULL;
     propPrefab = NULL; propPfSel = NULL; propPfInfo = NULL; propPfEditar = NULL; propPfUnpack = NULL; propPfReset = NULL;
     propPxLib = NULL;
     propPfInstancia = NULL;
@@ -10286,6 +10367,7 @@ void Properties::ActualizarPestanias(){
     // espejo del checkbox Mipmaps de la tarjeta Render: el proyecto abierto pudo
     // cambiar el global (cabecera `mipmaps:` del .w3d)
     g_renderMipmaps = w3dEngine::MipmapsGlobal();
+    g_renderTex16 = w3dEngine::Texturas16Siempre();
     // idem el tilde del formato de las mallas (tarjeta Archivo): lo fija el proyecto abierto
     MallasTextoRefrescar();
     // la 1ra pestania ("Objeto") siempre esta (transforms). La 2da depende del
@@ -10316,13 +10398,14 @@ void Properties::ActualizarPestanias(){
     bool esLz = (tipo == (int)ObjectType::limpiarz);
     bool esRc = (tipo == (int)ObjectType::recorte);
     bool esHb = (tipo == (int)ObjectType::hitbox);
+    bool esRu = (tipo == (int)ObjectType::rutina);
     bool esPf = (tipo == (int)ObjectType::prefab);   // instancia de prefab (su tarjeta: PropsPrefab.cpp)
     bool esPx = (tipo == (int)ObjectType::proxy);    // proxy W3D (la misma tarjeta, con su libreria y su elemento)
     bool esPart = (tipo == (int)ObjectType::particulas);
     bool esMirror = (tipo == (int)ObjectType::mirror);
     // Collection REAL (no la raiz Scene, que comparte el tipo pero no tiene Parent)
     bool esColl = (tipo == (int)ObjectType::collection && ObjActivo && ObjActivo->Parent);
-    bool hayTab3 = esMesh || esLuz || esCam || esInst || esArm || esT2d || esImg || esRect || esCont || esS9 || esBtn || esExp || esVid || esUI || esScript || esLOD || esCull || esColl || esPart || esMirror || esNiebla || esLz || esRc || esHb || esPf || esPx;
+    bool hayTab3 = esMesh || esLuz || esCam || esInst || esArm || esT2d || esImg || esRect || esCont || esS9 || esBtn || esExp || esVid || esUI || esScript || esLOD || esCull || esColl || esPart || esMirror || esNiebla || esLz || esRc || esHb || esPf || esPx || esRu;
 
     if (BarTabs.size() >= 3){
         BarTabs[2]->visible = hayTab3;
@@ -10350,6 +10433,7 @@ void Properties::ActualizarPestanias(){
         else if (esLz) icono = (int)IconType::limpiarz;
         else if (esRc) icono = (int)IconType::recorte;
         else if (esHb) icono = (int)IconType::hitbox;
+        else if (esRu) icono = (int)IconType::lista;
         else if (esPf) icono = (int)IconType::prefab;
         else if (esPx) icono = (int)IconType::libreria;
         BarTabs[2]->icon = icono;
@@ -10358,8 +10442,9 @@ void Properties::ActualizarPestanias(){
     // tarjeta contextual, que era lo unico que se usaba de ahi). Sin objeto activo
     // TAMPOCO hay tab Objeto: estaria vacio (todas sus tarjetas piden seleccion).
     bool es2D = esT2d || esImg || esRect || esCont || esS9 || esBtn || esExp || esVid || esUI;
-    if (BarTabs.size() >= 2) BarTabs[1]->visible = ObjActivo != NULL && !es2D && !esScript;
-    if (pestaniaActiva == 1 && (es2D || esScript)) pestaniaActiva = 2;
+    // la RUTINA tampoco: no tiene posicion, rotacion ni escala (sus pasos mueven lo que dibuja)
+    if (BarTabs.size() >= 2) BarTabs[1]->visible = ObjActivo != NULL && !es2D && !esScript && !esRu;
+    if (pestaniaActiva == 1 && (es2D || esScript || esRu)) pestaniaActiva = 2;
     // pestania 3 "MALLA 3D": la malla del objeto (sus tarjetas: la malla 3D que usa, edicion, UV, capas,
     // grupos) o el RECURSO elegido en la biblioteca del outliner (con su icono)
     int recVista = -1; std::string recId;
@@ -10390,6 +10475,7 @@ void Properties::ActualizarPestanias(){
     if (BarTabs.size() >= 8) BarTabs[7]->visible = (consObj != NULL);
     // pestana 8 "Scripts": CUALQUIER objeto seleccionado (estilo Unity: cajas/frutas/enemigos
     // con su .lua). El objeto Script NO la necesita: sus scripts ya viven en su contextual (2).
+    // (la RUTINA tambien: su script le cambia los pasos jugando -setPaso- y sus pasos se animan)
     bool scriptsTabOk = (ObjActivo != NULL) && !esScript;
     if (BarTabs.size() >= 9) BarTabs[8]->visible = scriptsTabOk;
     if (BarTabs.size() >= 10) BarTabs[9]->visible = true;   // Animacion: siempre (como Render)
@@ -10404,7 +10490,7 @@ void Properties::ActualizarPestanias(){
     // cuando llegamos aca, asi que mandar todo a la 1 dejaria al panel parado en una pestania
     // OCULTA (la que no existe para los 2D): es el mismo caso de la pestania fantasma de palcard.
     // Sin objeto la 1 esta bien: la agarra el fallback a la 0 de abajo.
-    if (pestaniaActiva == 7 && !consObj) pestaniaActiva = (es2D || esScript) ? 2 : 1;
+    if (pestaniaActiva == 7 && !consObj) pestaniaActiva = (es2D || esScript || esRu) ? 2 : 1;
     // pasar al objeto Script parado en la 8 cae a su contextual (ahi estan sus scripts);
     // sin objeto el fallback general de abajo la manda a la 0.
     if (pestaniaActiva == 8 && !scriptsTabOk) pestaniaActiva = esScript ? 2 : 1;
@@ -10707,6 +10793,7 @@ void Properties::ActualizarPestanias(){
     if (propLimpiarZ)  propLimpiarZ->visible  = (pestaniaActiva == 2 && esLz);
     if (propRecorte)   propRecorte->visible   = (pestaniaActiva == 2 && esRc);
     PropsHitboxActualizar(this, pestaniaActiva == 2 && esHb);   // visibilidad + bindeo + textos
+    PropsRutinaActualizar(this, pestaniaActiva == 2 && esRu);   // los pasos de la rutina
     PropsPrefabActualizar(this, pestaniaActiva);                 // (instancia: pestania 2; lo generado: la 1)
     if (propCollection) propCollection->visible = (pestaniaActiva == 2 && esColl);
     if (propParticulas) propParticulas->visible = (pestaniaActiva == 2 && esPart);
@@ -11442,6 +11529,9 @@ void Properties::mouse_button_up(int boton){
     }
     gFloatDrag = NULL; gFloatDragMoved = false; gFloatDragAccum = 0.0f;
     gListaScrollLista = NULL; // fin del drag-scroll de la lista
+    // fin del arrastre de un paso de rutina: cae ARRIBA de la fila marcada
+    if (gPasoArrastre && gPasoMovio && g_rutinaFilaDestino >= 0) PropsRutinaMoverPaso(gPasoDesde, g_rutinaFilaDestino);
+    gPasoArrastre = NULL; g_rutinaFilaDestino = -1;
     if (!editando) ViewPortClickDown = false;
 }
 #endif
@@ -11620,6 +11710,26 @@ void Properties::event_mouse_motion(int mx, int my) {
         return;
     }
 
+    // un PASO DE RUTINA arrastrado: la linea marca la fila donde cae (mas de media fila de movimiento = arrastre)
+    if (gPasoArrastre) {
+        if (!leftMouseDown) { gPasoArrastre = NULL; g_rutinaFilaDestino = -1; g_redraw = true; }
+        else {
+            const int rowH = RenglonHeightGS + gapGS;
+            if (gPasoMovio || abs(my - gPasoY0) >= rowH / 2) {
+                gPasoMovio = true;
+                const int n = gPasoArrastre->ListaCount();
+                int d = gPasoArrastre->scrollFila + (my - gPasoTope + rowH / 2) / rowH;
+                if (d < 0) d = 0;
+                if (d > n) d = n;
+                if (d != g_rutinaFilaDestino) { g_rutinaFilaDestino = d; g_redraw = true; }
+            }
+            ViewPortClickDown = true;
+            return;
+        }
+    }
+    // un paso AGARRADO con G: lo mueve el mouse (una fila por alto de renglon)
+    if (PropsRutinaAgarrando()) { PropsRutinaAgarreMouse(dy); g_redraw = true; return; }
+
     // DRAG-SCROLL de un mini-listado: si el press empezo sobre una lista, arrastrar vertical scrollea ESA lista
     // (scrollFila sigue al dedo) en vez del panel entero. Se suelta al levantar el dedo.
     if (gListaScrollLista) {
@@ -11655,6 +11765,8 @@ void Properties::event_mouse_motion(int mx, int my) {
 #ifndef W3D_SYMBIAN
 void Properties::event_key_down(int tecla, bool repeticion){
     const int key = tecla;
+    // la lista de pasos de una rutina: X / Supr borra el paso, G lo agarra (y agarrado, las flechas lo mueven)
+    if (!editando && PropsRutinaTecla(key)) { g_redraw = true; return; }
     if (repeticion == 0) {
         switch (key) {
             case W3dK_LEFT:
@@ -11724,7 +11836,7 @@ void Properties::SetRectFilaSeleccionada(){
     int syFila = y + BarTopOffset() + PosY + yFila;
     if (prop->GetType() == PropertyType::Button) {
         PropButton* pb = (PropButton*)prop;
-        pb->button->sx = sxFila + (pb->conLabel ? gsel->colEtiqueta : 0);
+        pb->button->sx = sxFila + pb->ColBoton();
         pb->button->sy = syFila;
     } else { // Color: guardo la posicion para abrir el ColorPicker desde EnterPropertieSelect
         gColorSelSx = sxFila; gColorSelSy = syFila;
@@ -11920,6 +12032,7 @@ PropListMeshParts* Properties::ListaBajoY(int py) {
 
 void Properties::ClickEn(int mx, int my) {
     PropsActivo = this; // este panel pasa a ser el activo
+    if (PropsRutinaAgarrando()) { PropsRutinaAgarreFin(true); g_redraw = true; return; }   // (un paso agarrado: queda ahi)
     g_textFieldActivo = NULL; // cualquier click des-enfoca; abajo se re-enfoca si es texto
     (void)mx; // el arrastre usa el delta global 'dx', no la X del click
     if (editando) {
@@ -12042,8 +12155,7 @@ void Properties::ClickEn(int mx, int my) {
                                 return;
                             }
                         }
-                        pb->button->sx = x + PosX + borderGS + borderGS +
-                                         (pb->conLabel ? g->colEtiqueta : 0);
+                        pb->button->sx = x + PosX + borderGS + borderGS + pb->ColBoton();
                         pb->button->sy = yFila;
                         prop->EditPropertie(); // accion del boton
                     }
@@ -12082,6 +12194,16 @@ void Properties::ClickEn(int mx, int my) {
                                    (my - yFila - borderGS) / (RenglonHeightGS + gapGS);
                         int n = lista->ListaCount(); // parts / uv maps / colors segun el modo
                         if (item >= n) item = n - 1;
+                        // los PASOS de una rutina: el checkbox de la derecha prende/apaga el paso sin elegirlo; en el
+                        // resto de la fila se elige y, arrastrando, se mueve (en vez del drag-scroll de la lista)
+                        if (lista->modo == 14 && item >= 0 && item < n) {
+                            if (mx >= x + PosX + g->width - CheckboxLado() - gapGS * 6 && PropsRutinaClicValor(item)) return;
+                            lista->ListaSeleccionar(item);
+                            lista->AjustarVentana();
+                            gPasoArrastre = lista; gPasoDesde = item; gPasoY0 = my;
+                            gPasoTope = yFila + borderGS; gPasoMovio = false;
+                            return;
+                        }
                         // MIX: el click en la columna del OJO (a la derecha) oculta/muestra la capa sin elegirla
                         if (lista->modo == 13 && item >= 0 && item < n &&
                             mx >= x + PosX + g->width - (int)IconSizeGS - gapGS * 6 && MixToggleOjo(item)) {

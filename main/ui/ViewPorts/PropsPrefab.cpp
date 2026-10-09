@@ -167,6 +167,15 @@ static void AccionPfMenu() {
         MenuItem* it = gMenuPf->Agregar(fs[i].nombre, (int)gMenuPfNombres.size(), actual ? (int)IconType::notifOk : (int)IconType::prefab);
         if (it) it->verde = actual;
     }
+    // las ESCENAS del proyecto (una escena tambien se instancia: "escena:<nombre>"), menos la que se edita
+    for (size_t i = 0; i < fs.size(); i++) {
+        if (!W3dRaizEs3D(fs[i].tipo) || (int)i == W3dRaizActiva()) continue;
+        const std::string clave = W3dPrefabClaveEscena(fs[i].nombre);
+        gMenuPfNombres.push_back(clave);
+        const bool actual = (clave == ip->prefab);
+        MenuItem* it = gMenuPf->Agregar(fs[i].nombre, (int)gMenuPfNombres.size(), actual ? (int)IconType::notifOk : W3dRaizIcono(fs[i].tipo));
+        if (it) it->verde = actual;
+    }
     Button* b = PropsActivo->propPfSel->button;
     gMenuPf->Resize();
     gMenuPf->Abrir(b->sx + b->width - gMenuPf->width, b->sy + b->height - GlobalScale, MenuPantallaW, MenuPantallaH);
@@ -175,9 +184,11 @@ static void AccionPfMenu() {
 static void AccionPfEditar() {
     InstanciaPrefab* ip = PfActiva();
     if (!ip) return;
-    const int idx = W3dRaizBuscar(W3D_RAIZ_PREFAB, ip->prefab);
+    std::string esc;
+    const bool esEscena = W3dPrefabEsEscena(ip->prefab, &esc);   // (la de una ESCENA: se edita la escena)
+    const int idx = esEscena ? W3dRaizBuscar(W3D_RAIZ_ESCENA, esc) : W3dRaizBuscar(W3D_RAIZ_PREFAB, ip->prefab);
     std::string motivo;
-    if (idx < 0) { Notificar(std::string(T("There is no such prefab")), true); return; }
+    if (idx < 0) { Notificar(std::string(T(esEscena ? "There is no such scene" : "There is no such prefab")), true); return; }
     if (!W3dActivarRaiz(idx, &motivo)) Notificar(std::string(T(motivo.c_str())), true);
 }
 static void AccionPfUnpack() {
@@ -357,11 +368,20 @@ void PropsPrefabActualizar(Properties* p, int pestania) {
     ProxyW3d* px = (ip && ip->getType() == ObjectType::proxy) ? (ProxyW3d*)ip : NULL;
     const bool esProxy = (px != NULL);
     // la tarjeta de un PROXY se llama distinto y no tiene Edit Prefab ni Unpack (es de solo lectura)
+    // (la de una ESCENA: "Scene Instance" y "Edit Scene")
+    const bool esEscena = ip && !esProxy && W3dPrefabEsEscena(ip->prefab);
     {
-        const std::string titulo = esProxy ? std::string(T("Proxy W3D")) : std::string(T("Prefab Instance"));
-        const int icono = esProxy ? (int)IconType::libreria : (int)IconType::prefab;
+        const std::string titulo = esProxy ? std::string(T("Proxy W3D")) : esEscena ? std::string(T("Scene Instance"))
+                                                                                    : std::string(T("Prefab Instance"));
+        const int icono = esProxy ? (int)IconType::libreria : esEscena ? (int)IconType::camera : (int)IconType::prefab;
         if (p->propPrefab->name != titulo || p->propPrefab->icono != icono) {
             p->propPrefab->name = titulo; p->propPrefab->icono = icono; layout = true;
+        }
+        const std::string ed = T(esEscena ? "Edit Scene" : "Edit Prefab");
+        if (p->propPfEditar->button->text != ed) {
+            p->propPfEditar->button->text = ed;
+            p->propPfEditar->button->icon = esEscena ? (int)IconType::camera : (int)IconType::prefab;
+            layout = true;
         }
     }
     if (p->propPxLib && p->propPxLib->oculto == esProxy) { p->propPxLib->oculto = !esProxy; layout = true; }
@@ -387,6 +407,7 @@ void PropsPrefabActualizar(Properties* p, int pestania) {
     if (ip) {
         W3dPrefabSincronizarOverrides(ip);   // (lo que el usuario cambio en lo generado desde el ultimo cuadro)
         std::string sel = ip->prefab.empty() ? std::string(T("(none)")) : ip->prefab;
+        W3dPrefabEsEscena(ip->prefab, &sel);   // (la de una escena muestra el nombre de la escena)
         if (px) {
             // el proxy: su libreria (con "(!)" si no esta vinculada) y su elemento
             std::string lib = px->Libreria();

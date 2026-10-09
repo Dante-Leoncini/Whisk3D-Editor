@@ -21,6 +21,16 @@
 #include <set>
 
 bool (*W3dPrefabSerializarHook)(Object* raizPrefab, std::string& json) = 0;
+bool (*W3dEscenaSerializarHook)(Object* raizEscena, const std::string& nombre, std::string& json) = 0;
+
+// ---- ESCENAS COMO PREFAB ("escena:<nombre>", ver Prefabs.h) ----
+static const char kPrefijoEscena[] = "escena:";
+bool W3dPrefabEsEscena(const std::string& clave, std::string* escena) {
+    if (clave.compare(0, sizeof(kPrefijoEscena) - 1, kPrefijoEscena) != 0) return false;
+    if (escena) *escena = clave.substr(sizeof(kPrefijoEscena) - 1);
+    return true;
+}
+std::string W3dPrefabClaveEscena(const std::string& escena) { return std::string(kPrefijoEscena) + escena; }
 void (*W3dPrefabArreglarHook)(Object* generado, Object* plantilla) = 0;
 
 // ============================================================================
@@ -85,6 +95,70 @@ static JVal* Parsear(const char* datos, size_t n, const std::string& quien) {
     return v;
 }
 
+// ---- una ESCENA del proyecto como definicion ----
+// lo que es DE LA ESCENA y no viaja con sus instancias (Prefabs.h): las UI 2D, las rutinas constructor y las que
+// limpian la pantalla
+static bool EsDeLaEscenaJson(JVal* o) {
+    if (!o || o->tipo != 4) return false;
+    const std::string t = JS(o, "tipo", "");
+    if (t == "ui") return true;
+    if (t != "rutina") return false;
+    if (JB(o, "constructor", false)) return true;
+    JVal* pasos = JHijo(o, "pasos", 5);
+    if (pasos)
+        for (size_t i = 0; i < pasos->lista.size(); i++) {
+            const std::string p = JS(pasos->lista[i], "paso", "");
+            if (p == "limpiar" || p == "colorLimpieza") return true;
+        }
+    return false;
+}
+static JVal* TextoJ(const std::string& t) { JVal* v = new JVal(); v->tipo = 2; v->str = t; return v; }
+// el documento {"raiz": {"tipo": "objeto", "nombre": <escena>, "hijos": [...]}} con los objetos de 'objs' (se los
+// queda) menos los que son de la escena
+static JVal* EnvolverEscena(JVal* objs, const std::string& nombre) {
+    JVal* r = new JVal(); r->tipo = 4;
+    r->obj["tipo"] = TextoJ("objeto");
+    r->obj["nombre"] = TextoJ(nombre);
+    JVal* hijos = new JVal(); hijos->tipo = 5;
+    if (objs && objs->tipo == 5) {
+        for (size_t i = 0; i < objs->lista.size(); i++) {
+            if (EsDeLaEscenaJson(objs->lista[i])) delete objs->lista[i];
+            else hijos->lista.push_back(objs->lista[i]);
+        }
+        objs->lista.clear();
+    }
+    delete objs;
+    r->obj["hijos"] = hijos;
+    JVal* doc = new JVal(); doc->tipo = 4;
+    doc->obj["raiz"] = r;
+    return doc;
+}
+// saca 'clave' de un objeto JSON sin borrarla (pasa a ser del que llama)
+static JVal* Arrancar(JVal* o, const char* clave) {
+    if (!o || o->tipo != 4) return NULL;
+    std::map<std::string, JVal*>::iterator it = o->obj.find(clave);
+    if (it == o->obj.end()) return NULL;
+    JVal* v = it->second;
+    o->obj.erase(it);
+    return v;
+}
+// la escena de su ENTRADA (el juego compilado, o el editor con la escena sin cargar): su .w3de ({"objetos": [...]})
+// o, la principal, el "escena" de proyecto.json
+static JVal* LeerEscenaDeEntrada(const W3dRaizFila& f, const std::string& nombre) {
+    const std::string ruta = f.bloque ? std::string("proyecto.json") : f.entrada;
+    if (ruta.empty()) return NULL;
+    std::vector<unsigned char> datos;
+    if (!w3dFileSystem::ReadFileBytes(ruta, datos) || datos.empty()) {
+        w3dLogfE("[prefabs] no pude leer '%s' (la escena '%s')", ruta.c_str(), nombre.c_str());
+        return NULL;
+    }
+    JVal* doc = Parsear((const char*)&datos[0], datos.size(), nombre);
+    if (!doc) return NULL;
+    JVal* objs = f.bloque ? Arrancar(JHijo(doc, "escena", 4), "objetos") : Arrancar(doc, "objetos");
+    delete doc;
+    return EnvolverEscena(objs, nombre);
+}
+
 // la definicion de 'nombre': la cacheada o la que se lee ahora (de la memoria del editor si su raiz esta
 // cargada, si no de su entrada). Nunca NULL para un nombre del registro: una que no se pudo leer queda
 // cacheada con version 0 (no se reintenta en cada instancia)
@@ -112,6 +186,33 @@ static DefPrefab* Definicion(const std::string& nombre) {
         if (d->raiz) d->version = gVersionProx++;
         gDefs[nombre] = d;
         return d;
+    }
+    // UNA ESCENA DEL PROYECTO ("escena:<nombre>"): de la memoria del editor si esta cargada, si no de su entrada
+    {
+        std::string esc;
+        if (W3dPrefabEsEscena(nombre, &esc)) {
+            DefPrefab* d = new DefPrefab();
+            const int ie = W3dRaizBuscar(W3D_RAIZ_ESCENA, esc);   // (la clase escena: escenas y juegos)
+            if (ie >= 0) {
+                const W3dRaizFila& f = W3dRaices()[(size_t)ie];
+                if (f.raiz && W3dEscenaSerializarHook) {
+                    std::string json;
+                    if (W3dEscenaSerializarHook(f.raiz, esc, json) && !json.empty()) {
+                        d->doc = Parsear(json.data(), json.size(), nombre);
+                        d->deMemoria = true;
+                        d->plantilla = f.raiz;
+                        d->plantillaSerial = f.raiz->serial;
+                    }
+                } else {
+                    d->doc = LeerEscenaDeEntrada(f, esc);
+                }
+            }
+            if (d->doc) d->raiz = JHijo(d->doc, "raiz", 4);
+            if (d->raiz) d->version = gVersionProx++;
+            else w3dLogfW("[prefabs] la escena '%s' no se pudo leer: sus instancias quedan vacias", esc.c_str());
+            gDefs[nombre] = d;
+            return d;
+        }
     }
     const int idx = W3dRaizBuscar(W3D_RAIZ_PREFAB, nombre);
     if (idx < 0) return NULL;
@@ -674,9 +775,11 @@ bool W3dPrefabContiene(const std::string& nombre, const std::string& otro) {
 //  CREAR
 // ============================================================================
 InstanciaPrefab* W3dPrefabCrearInstancia(const std::string& nombre, Object* padre, const Vector3& pos, float rotYGrados) {
-    if (W3dRaizBuscar(W3D_RAIZ_PREFAB, nombre) < 0) return NULL;
+    std::string esc;
+    const bool esEscena = W3dPrefabEsEscena(nombre, &esc);   // (una ESCENA del proyecto: "escena:<nombre>")
+    if (esEscena ? W3dRaizBuscar(W3D_RAIZ_ESCENA, esc) < 0 : W3dRaizBuscar(W3D_RAIZ_PREFAB, nombre) < 0) return NULL;
     InstanciaPrefab* ip = new InstanciaPrefab(padre, pos);   // (el constructor lo cuelga y lo elige)
-    ip->SetNameObj(nombre);                                   // "Enemigo", "Enemigo.001"... en su scope
+    ip->SetNameObj(esEscena ? esc : nombre);                  // "Enemigo", "Enemigo.001"... en su scope
     ip->prefab = nombre;
     if (rotYGrados != 0.0f) ip->SetRotEuler(Vector3(0.0f, rotYGrados, 0.0f));
     W3dPrefabGenerar(ip);
@@ -747,6 +850,8 @@ static Object* HookInstanciar(const char* nombre, const float* pos, float rotY) 
         }
     }
     if (!ip) ip = W3dPrefabCrearInstancia(nombre, NULL, p, rotY);
+    // una ESCENA del proyecto por su nombre ("Auto": si no hay un prefab que se llame asi)
+    if (!ip && W3dRaizBuscar(W3D_RAIZ_ESCENA, nombre) >= 0) ip = W3dPrefabCrearInstancia(W3dPrefabClaveEscena(nombre), NULL, p, rotY);
     if (!ip) {
         std::string lib, elem; int tipo = W3D_LIB_PREFAB;
         if (W3dProxyNombre(nombre, &lib, &tipo, &elem)) ip = W3dProxyCrear(lib, tipo, elem, NULL, p, rotY);

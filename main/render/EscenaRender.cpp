@@ -2,6 +2,7 @@
 //  EscenaRender.cpp — ver EscenaRender.h. El pase 3D COMPARTIDO entre el
 //  viewport del editor y el runtime de un juego compilado.
 // ============================================================================
+#include "objects/Rutina.h"   // g_w3dSoloJuego / W3dHayConstructor (el cache no se invalida)
 #include "EscenaRender.h"
 #include "objects/CameraBase.h"   // g_renderMarco: el cuadro de la imagen (lo miden los Recortes)
 #include "gfx/w3dGraphics.h"
@@ -11,6 +12,7 @@
 #include "objects/Light.h"        // MAX_LIGHTS: apagar los GL lights antes del pase
 #include "render/OpcionesRender.h"// RenderType + la luz de los modos de preview
 #include "objects/Niebla.h"        // la niebla arranca y termina apagada en cada pase
+#include "W3dEscena.h"             // dibujar3D(false) de lua: el pase no se hace
 #include <math.h>
 
 namespace gfx = w3dEngine;
@@ -52,6 +54,7 @@ void W3dEscena3DProyeccion(const W3dVista3D& v) {
     g_renderCamFar    = v.farC;
     g_renderCamAspect = (v.aspectoImagen > 1e-4f) ? v.aspectoImagen : 1.0f;
     g_renderCamOrto   = v.orto;
+    if (v.altoImagenPx > 0.5f) g_renderImagenAltoPx = v.altoImagenPx;
 
     float nx = (v.marcoNX > 1e-4f) ? v.marcoNX : 1.0f;
     float ny = (v.marcoNY > 1e-4f) ? v.marcoNY : 1.0f;
@@ -135,14 +138,18 @@ void W3dEscena3DModo(int vista) {
 //  EL PASE
 // ---------------------------------------------------------------------------
 void W3dEscena3DPasada() {
-    if (!SceneCollection) return;
+    if (!SceneCollection || !W3dEscena3DActiva()) return;
+    gfx::StatScope cat(gfx::StatCatEscena);   // (el contador de llamadas: esto es la escena)
     // por si un pase anterior dejo anotados sin dibujar
     W3dParticulasLimpiarPendientes();
     W3dDecalesLimpiarPendientes();
     W3dLucesLimpiarPendientes();
     // resync del cache de estado UNA vez por frame, ANTES del recorrido: lo que se
     // dibujo antes (chrome del editor, HUD del frame anterior) pudo tocar GL crudo.
-    gfx::Invalidate();
+    // En SOLO JUEGO con CONSTRUCTOR no: el estado que dejo el constructor se repone por el cache (la foto) y un
+    // cache "desconocido" obligaria a re-mandar todo en cada cuadro (sin chrome del editor no hay GL crudo:
+    // lo vigila 'glaudit')
+    if (!(g_w3dSoloJuego && W3dHayConstructor())) gfx::Invalidate();
     w3dLoteStamp++;              // sello del pase: las Collection con lote marcan a sus horneadas
     W3dNieblaReiniciar();               // la NIEBLA la prende el objeto Niebla del arbol (desde ahi en adelante)
     W3dLucesPrepase(SceneCollection);   // las luces ANTES de la geometria (el fogonazo ilumina todo)
@@ -155,6 +162,7 @@ void W3dEscena3DPasada() {
     // PARTICULAS translucidas al final, con el z-buffer de la escena ya escrito.
     W3dParticulasDibujarPendientes();
     W3dNieblaReiniciar();               // nada de niebla para lo que se dibuja despues (overlays, HUD, UI)
+    gfx::EstadoBase();                  // ni el alpha test, el sesgo o la matriz de textura que dejo la escena
 }
 
 // ---------------------------------------------------------------------------

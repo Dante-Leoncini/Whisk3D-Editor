@@ -67,11 +67,15 @@ void Viewport3D::RenderEstadisticas(){
         if (OverlayStatFaces){    sprintf(buf, "faces: %d/%d", statTrisFrame, fTri); StatLinea(buf, width, margen, ly, lineH); }
     }
     if (OverlayStatGL){
-        // llamadas GL REALES del pase de escena de este frame (los ahorros del cache
-        // de estado no cuentan: este numero ES el churn contra el driver).
-        sprintf(buf, "gl: %d (dw %d tx %d st %d)",
-                statDrawsFrame + statBindsFrame + statEstadosFrame,
-                statDrawsFrame, statBindsFrame, statEstadosFrame);
+        // TODAS las llamadas al driver del cuadro anterior (cada gl* = 1; los ahorros del cache de estado no llegan):
+        // la escena (con sus particulas), la interfaz del JUEGO y la del editor, y de la escena los draws, binds y
+        // cambios de estado. Antes era solo la escena y sin clear/viewport/color/niebla/lineas: no contaba la UI
+        const w3dEngine::StatsDeCuadro& c = w3dEngine::g_statCuadro;
+        sprintf(buf, "gl: %d", c.total); StatLinea(buf, width, margen, ly, lineH);
+        sprintf(buf, " esc %d ui %d ed %d", c.llamadas[w3dEngine::StatCatEscena] + c.llamadas[w3dEngine::StatCatParticulas],
+                c.llamadas[w3dEngine::StatCatUI], c.llamadas[w3dEngine::StatCatEditor]);
+        StatLinea(buf, width, margen, ly, lineH);
+        sprintf(buf, " escena: dw %d tx %d st %d", statDrawsFrame, statBindsFrame, statEstadosFrame);
         StatLinea(buf, width, margen, ly, lineH);
     }
     if (OverlayStatModgen){

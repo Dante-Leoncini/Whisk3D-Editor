@@ -3,6 +3,10 @@
 //  editor (Play) y el runtime compilado, mas el estado por-frame que necesitan.
 //  C++03 puro (Symbian/Android). Comentarios sin acentos.
 // ============================================================================
+#include "objects/Rutina.h"
+#include "objects/MallaFlujos.h"    // paso(): los nombres de las primitivas
+#include "config/W3dProfile.h"   // W3dNowMs (relojMs)
+#include <ctype.h>   // setMemoria / memoria: las memorias que leen las rutinas
 #include "script/BindsJuego.h"
 #include "script/W3dScript.h"          // W3dScriptParamObjeto
 #include "animation/Animation.h"       // g_camaraActivaHook (setCamaraActiva)
@@ -14,6 +18,7 @@
 #include "objects/Boton2D.h"
 #include "objects/Imagen2D.h"
 #include "objects/Rect2D.h"             // setTinte: el relleno de un rect 2D
+#include "objects/Mesh.h"               // setTinte: el tinte de una malla 3D (Mesh::tinte)
 #include "objects/Elemento2D.h"
 #include "render/UIOverlay.h"          // UI2D_TamanoLienzo, UI2D_EsElemento2D, UI2DPos
 #include "render/OpcionesRender.h"     // g_redraw (+ g_renderAspect para pantallaDe)
@@ -39,7 +44,7 @@ extern "C" {
 
 // audio del Core, forward-decl (evita el include del dir de audio, como en W3dScript.cpp).
 // Sin -DW3D_ENABLE_AUDIO son stubs no-op -> sonido() no hace nada y no rompe.
-namespace w3dEngine { class W3dSound; W3dSound* W3dSoundLoad(const char*); void W3dSoundFree(W3dSound*); int W3dSoundPlayPitch(W3dSound*, float, bool, float); void W3dSoundStopFade(int, float); float W3dSoundPos(int); }
+namespace w3dEngine { class W3dSound; W3dSound* W3dSoundLoad(const char*); void W3dSoundFree(W3dSound*); int W3dSoundPlayPitch(W3dSound*, float, bool, float); int W3dSoundPlayPitchPan(W3dSound*, float, bool, float, float); void W3dSoundStopFade(int, float); int W3dSoundPlayAt(W3dSound*, float, bool, float, float, double); void W3dSoundStopFadeAt(int, float, double); double W3dAudioReloj(); void W3dSoundStopAll(); void W3dSoundSetVolume(int, float); void W3dSoundSetPitch(int, float); float W3dSoundPos(int); }
 
 // ---------------------------------------------------------------------------
 //  TAMANO del lienzo del juego: el MISMO que ve el render del overlay
@@ -247,6 +252,173 @@ static int LPantalla(lua_State* L) {
     float w, h; TamLienzo(&w, &h);
     lua_pushnumber(L, w); lua_pushnumber(L, h); return 2;
 }
+// resolucion(): ancho y alto en PIXELES REALES de la imagen 3D que se dibuja (no el lienzo de la UI). Sirve para
+// elegir detalle por tamaño en pantalla. Antes del primer frame devuelve 0, 0.
+static int LResolucion(lua_State* L) {
+    extern float g_renderImagenAltoPx; extern float g_renderCamAspect;
+    lua_pushnumber(L, g_renderImagenAltoPx * g_renderCamAspect); lua_pushnumber(L, g_renderImagenAltoPx); return 2;
+}
+// ---- MEMORIAS de las rutinas (objects/Rutina.h): bloques de 256 floats por nombre que leen los pasos "@nombre[i]" ----
+// setMemoria(nombre, i, v) / memoria(nombre, i) / setMemorias(nombre, i, v1, v2, ...): escribe varias seguidas
+static int LSetMemoria(lua_State* L) {
+    float* m = W3dMemoria(luaL_checkstring(L, 1));
+    const int i = (int)luaL_checkinteger(L, 2);
+    if (i >= 0 && i < W3D_MEMORIA_TAM) m[i] = (float)luaL_checknumber(L, 3);
+    return 0;
+}
+static int LMemoria(lua_State* L) {
+    const char* n = luaL_checkstring(L, 1);
+    const int i = (int)luaL_checkinteger(L, 2);
+    lua_pushnumber(L, (W3dMemoriaExiste(n) && i >= 0 && i < W3D_MEMORIA_TAM) ? W3dMemoria(n)[i] : 0.0f);
+    return 1;
+}
+static int LSetMemorias(lua_State* L) {
+    float* m = W3dMemoria(luaL_checkstring(L, 1));
+    int i = (int)luaL_checkinteger(L, 2);
+    const int top = lua_gettop(L);
+    for (int a = 3; a <= top && i < W3D_MEMORIA_TAM; a++, i++) if (i >= 0) m[i] = (float)lua_tonumber(L, a);
+    return 0;
+}
+// opcion de un paso por su nombre (la etiqueta en ingles, sin importar mayusculas; en "dibujar", tambien el nombre del
+// .w3d: "tira", "abanico"...) o por su numero. -1 = no existe
+static int OpcionLua(int t, const std::string& s) {
+    const int l = W3dPasoOpciones(t);
+    std::string b;
+    for (size_t i = 0; i < s.size(); i++) b += (char)tolower((unsigned char)s[i]);
+    for (int i = 0; i < W3dOpcionesN(l); i++) {
+        std::string e = W3dOpcionEtiqueta(l, i);
+        for (size_t k = 0; k < e.size(); k++) e[k] = (char)tolower((unsigned char)e[k]);
+        if (e == b) return i;
+        if (t == PasoDibujar && s == W3dPrimitivaNombre(i)) return i;
+        static const char* const kArrayEs[ArrayN] = { "vertices", "normales", "uv", "colores" };   // paso("array", "normales", true)
+        if (t == PasoArray && i < (int)ArrayN && b == kArrayEs[i]) return i;
+    }
+    return -1;
+}
+// paso(nombre, ...): ejecuta UN paso de rutina, como una llamada de OpenGL. Vale SOLO mientras se dibuja: adentro
+// de una funcion que llama el paso "Llamar Lua" de una rutina. Los argumentos se reparten por su tipo, en orden:
+//   texto     -> la referencia (malla / objeto / textura / rutina), despues la OPCION ("tira", "Diffuse"...);
+//                "@nombre[i]" es una memoria (un numero del paso; en "dibujar", el array de rangos)
+//   numero    -> el entero si el paso lo usa (la parte, el numero de luz, cuantos saltear), la opcion si el paso no
+//                tiene numeros, y despues los numeros en orden
+//   booleano  -> on/off
+//   paso("punteroVertices", "rival_comun_0")   paso("dibujar", "rival_comun_0", 2, "tira")
+//   paso("trasladar", 0, 2, 0)   paso("niebla", true)   paso("luzColor", 0, "Diffuse", 1, 0.9, 0.8, 1)
+// ---- los PASOS de una rutina desde el juego (su indice: 1 = el primero de la lista que usa la rutina) ----
+//   setPaso(rutina, i, "on", true|false)          prende / apaga
+//   setPaso(rutina, i, "n", v1 [, v2 ...])         sus numeros (nil = ese queda); "color" es lo mismo: r, g, b, a
+//   setPaso(rutina, i, "ref", "nombre")            otra malla / textura / objeto / rutina (error si no existe)
+//   setPaso(rutina, i, "modo" | "entero", n)       la opcion (la primitiva, el modo de mezcla...) / la parte, la luz...
+//   leerPaso(rutina, i, campo) -> lo mismo que se escribe ("n" / "color" devuelve los numeros)
+static W3dPaso* PasoArg(lua_State* L, Rutina** rOut) {
+    Object* o = W3dScriptParamObjeto(L, 1);
+    if (!o || o->getType() != ObjectType::rutina) { luaL_error(L, "no es una rutina"); return NULL; }
+    Rutina* r = (Rutina*)o;
+    std::vector<W3dPaso>& lista = r->ListaActual();
+    const int i = (int)luaL_checkinteger(L, 2) - 1;
+    if (i < 0 || i >= (int)lista.size()) { luaL_error(L, "la rutina '%s' no tiene el paso %d", r->name.c_str(), i + 1); return NULL; }
+    if (rOut) *rOut = r;
+    return &lista[(size_t)i];
+}
+static int LSetPaso(lua_State* L) {
+    Rutina* r = NULL;
+    W3dPaso* p = PasoArg(L, &r);
+    if (!p) return 0;
+    const std::string campo = luaL_checkstring(L, 3);
+    if (campo == "on") p->on = lua_toboolean(L, 4) != 0;
+    else if (campo == "n" || campo == "color") {
+        for (int k = 0; k < 5; k++)
+            if (!lua_isnoneornil(L, 4 + k)) { p->n[k].v = (float)luaL_checknumber(L, 4 + k); p->n[k].ref.clear(); p->n[k].p = NULL; }
+    }
+    else if (campo == "modo") p->modo = (int)luaL_checkinteger(L, 4);
+    else if (campo == "entero") p->entero = (int)luaL_checkinteger(L, 4);
+    else if (campo == "ref") {
+        const std::string antes = p->ref;
+        p->ref = luaL_checkstring(L, 4);
+        r->Resolver();
+        const int rt = W3dPasoRef(p->tipo);
+        if (rt != RefNada && rt != RefFuncion && !p->ptr) {
+            const std::string pedido = p->ref;
+            p->ref = antes; r->Resolver();
+            return luaL_error(L, "setPaso: no existe '%s'", pedido.c_str());
+        }
+    }
+    else return luaL_error(L, "setPaso: campo '%s' (on, n, color, ref, modo, entero)", campo.c_str());
+    g_w3dRutinasGen++;   // (el editor la revalida)
+    return 0;
+}
+static int LLeerPaso(lua_State* L) {
+    W3dPaso* p = PasoArg(L, NULL);
+    if (!p) return 0;
+    const std::string campo = luaL_checkstring(L, 3);
+    if (campo == "on") { lua_pushboolean(L, p->on ? 1 : 0); return 1; }
+    if (campo == "modo") { lua_pushinteger(L, p->modo); return 1; }
+    if (campo == "entero") { lua_pushinteger(L, p->entero); return 1; }
+    if (campo == "ref") { lua_pushstring(L, p->ref.c_str()); return 1; }
+    if (campo == "n" || campo == "color") {
+        const int nn = W3dPasoNumeros(*p);
+        for (int k = 0; k < nn; k++) lua_pushnumber(L, p->n[k].Valor());
+        return nn;
+    }
+    return luaL_error(L, "leerPaso: campo '%s' (on, n, color, ref, modo, entero)", campo.c_str());
+}
+static int LPaso(lua_State* L) {
+    const char* nombre = luaL_checkstring(L, 1);
+    const int t = W3dPasoDesdeNombre(nombre);
+    if (t < 0) return luaL_error(L, "paso(): no existe el paso '%s'", nombre);
+    W3dPaso p = W3dPasoNuevo(t);
+    const int rt = W3dPasoRef(t), opc = W3dPasoOpciones(t);
+    const bool usaEntero = W3dPasoEntero(t) != EnteroNada;
+    bool refPuesta = false, enteroPuesto = false, opcPuesta = false;
+    int k = 0;
+    const int top = lua_gettop(L);
+    for (int a = 2; a <= top; a++) {
+        const int tipo = lua_type(L, a);
+        if (tipo == LUA_TBOOLEAN) { p.on = lua_toboolean(L, a) != 0; continue; }
+        if (tipo == LUA_TSTRING) {
+            const std::string s = lua_tostring(L, a);
+            if (!s.empty() && s[0] == '@') {
+                if (t == PasoDibujar) { p.n[2].ref = s; p.sub = RangoArray; }
+                else if (k < 5) p.n[k++].ref = s;
+                continue;
+            }
+            if (t == PasoLimpiar) {   // paso("limpiar", "color", "profundidad"): los buffers por nombre
+                const int bit = (s == "color") ? (int)LimpiarColor :
+                                (s == "profundidad" || s == "z" || s == "depth") ? (int)LimpiarProfundidad :
+                                (s == "estencil" || s == "stencil") ? (int)LimpiarStencil : 0;
+                if (!bit) return luaL_error(L, "paso('limpiar'): '%s' no es un buffer (color, profundidad, estencil)", s.c_str());
+                if (!enteroPuesto) { p.entero = 0; enteroPuesto = true; }
+                p.entero |= bit;
+                continue;
+            }
+            if (rt != RefNada && !refPuesta) { p.ref = s; refPuesta = true; continue; }
+            if ((t == PasoVisible || t == PasoLua) && p.ref2.empty()) { p.ref2 = s; continue; }
+            if (opc != OpcNada && !opcPuesta) {
+                const int o = OpcionLua(t, s);
+                if (o < 0) return luaL_error(L, "paso('%s'): no existe la opcion '%s'", nombre, s.c_str());
+                p.modo = o; opcPuesta = true; continue;
+            }
+            return luaL_error(L, "paso('%s'): no se que hacer con '%s'", nombre, s.c_str());
+        }
+        if (tipo == LUA_TNUMBER) {
+            const float v = (float)lua_tonumber(L, a);
+            if (usaEntero && !enteroPuesto) { p.entero = (int)v; enteroPuesto = true; continue; }
+            if (opc != OpcNada && !opcPuesta && W3dPasoNumeros(p) == 0 && t != PasoDibujar) {
+                p.modo = (int)v; opcPuesta = true; continue;
+            }
+            if (t == PasoDibujar) {   // despues de la parte: el rango manual (primero, ultimo)
+                if (k < 2) { p.n[k++].v = v; p.sub = RangoManual; }
+                continue;
+            }
+            if (k < 5) p.n[k++].v = v;
+            continue;
+        }
+    }
+    std::string error;
+    if (!W3dRutinaPasoDesdeLua(p, error)) return luaL_error(L, "paso('%s'): %s", nombre, error.c_str());
+    return 0;
+}
+
 static int LPosPx(lua_State* L) {
     Object* o = W3dScriptParamObjeto(L, 1);
     float w, h; TamLienzo(&w, &h);
@@ -377,7 +549,7 @@ static int LSetUVRect(lua_State* L) {
     }
     return 0;
 }
-// sonido("sonidos/bip.wav" [, vol [, pitch]]): reproduce un WAV one-shot. La ruta relativa
+// sonido("sonidos/bip.wav" [, vol [, pitch [, loop [, pan]]]]): reproduce un WAV. La ruta relativa
 // cuelga de la carpeta del PROYECTO (g_w3dDirProyecto, la del .w3d abierto); vol 0..1 (default 1);
 // pitch 1 = normal (paso fraccional en la voz, W3dSoundPlayPitch). El WAV se carga UNA vez y se
 // cachea por ruta resuelta (NULL tambien: un archivo que falta no reintenta cada frame). No
@@ -437,6 +609,7 @@ static int LSonido(lua_State* L) {
     float vol   = (float)luaL_optnumber(L, 2, 1.0);
     float pitch = (float)luaL_optnumber(L, 3, 1.0);
     bool  loop  = lua_toboolean(L, 4) != 0;   // arg 4 opcional: true = sample en LOOP (nota sostenida)
+    float pan   = (float)luaL_optnumber(L, 5, 0.0);   // arg 5 opcional: paneo -1 (izq) .. 0 .. 1 (der)
     if (vol < 0.0f) vol = 0.0f; if (vol > 1.0f) vol = 1.0f;
     if (w3dEngine::ConfigMudo()) return 0;   // mute global del Core (mismo criterio que beep()); nil = no sono
     // resolver la ruta: absoluta queda tal cual; una ENTRADA del contenedor v4 montado queda
@@ -461,7 +634,9 @@ static int LSonido(lua_State* L) {
     // DEVUELVE el handle de la voz (> 0) o nil si no sono (WAV faltante, mixer cerrado,
     // 32 voces ocupadas). El handle se le pasa a pararSonido(h [, fadeSeg]) — es lo que
     // necesita el secuenciador de musica en lua (notas sostenidas: loop=true + release).
-    int id = s ? w3dEngine::W3dSoundPlayPitch(s, vol, loop, pitch) : 0;
+    // arg 6 opcional: el momento EXACTO en el reloj del mixer (relojAudio()); sin el, suena ya
+    double en = luaL_optnumber(L, 6, -1.0);
+    int id = s ? w3dEngine::W3dSoundPlayAt(s, vol, loop, pitch, pan, en) : 0;
     if (id <= 0) return 0;   // nil
     lua_pushinteger(L, id);
     return 1;
@@ -470,11 +645,41 @@ static int LSonido(lua_State* L) {
 // corta (default ~5 ms; el mixer la baja a cero por muestra -> no clickea). fadeSeg
 // mas largo = release musical. handle nil/0/viejo = no-op seguro (los ids de voz no
 // se reciclan: cortar una voz que ya termino no toca a la que reuso el slot).
+// ajustarSonido(h, vol [, pitch]): cambia el volumen (y el pitch) de una voz que YA suena, sin
+// re-dispararla ni cortarla: para sonidos continuos que siguen al juego (el motor de un auto con
+// las RPM). h nil/viejo = no-op. vol 0..1; pitch como en sonido().
+static int LAjustarSonido(lua_State* L) {
+    int id = (int)luaL_optinteger(L, 1, 0);
+    if (id <= 0) return 0;
+    float vol = (float)luaL_checknumber(L, 2);
+    if (vol < 0.0f) vol = 0.0f; if (vol > 1.0f) vol = 1.0f;
+    w3dEngine::W3dSoundSetVolume(id, vol);
+    if (!lua_isnoneornil(L, 3)) w3dEngine::W3dSoundSetPitch(id, (float)luaL_checknumber(L, 3));
+    return 0;
+}
+// pararSonidos(): corta TODAS las voces (musica y efectos) en el acto. Para cambiar de tema o de
+// pantalla sin que quede sonando lo anterior.
+static int LPararSonidos(lua_State*) {
+    w3dEngine::W3dSoundStopAll();
+    return 0;
+}
 static int LPararSonido(lua_State* L) {
     int id = (int)luaL_optinteger(L, 1, 0);
     float fade = (float)luaL_optnumber(L, 2, 0.005);
-    if (id > 0) w3dEngine::W3dSoundStopFade(id, fade);
+    double en = luaL_optnumber(L, 3, -1.0);     // arg 3 opcional: el corte AGENDADO en el reloj del mixer
+    if (id > 0) w3dEngine::W3dSoundStopFadeAt(id, fade, en);
     return 0;
+}
+// relojAudio(): los SEGUNDOS de audio que mezclo el mixer (no avanza en pausa): el reloj de las agendas de sonido() y
+// pararSonido(). Un secuenciador lo usa como base del tiempo de la musica: las notas suenan en la muestra exacta.
+static int LRelojAudio(lua_State* L) {
+    lua_pushnumber(L, w3dEngine::W3dAudioReloj());
+    return 1;
+}
+// relojMs(): el reloj de pared en milisegundos (con decimales): para MEDIR lo que cuesta una parte del script
+static int LRelojMs(lua_State* L) {
+    lua_pushnumber(L, W3dNowMs());
+    return 1;
 }
 // sonidoPosicion(handle): SEGUNDOS del sonido ya reproducidos por esa voz, o nil si la voz
 // no existe (termino, se corto o el handle es nil/viejo). Es el RELOJ MAESTRO para una
@@ -622,7 +827,8 @@ static int LSetOpacidad(lua_State* L) {
     return 0;
 }
 // setTinte(obj, r, g, b [, a]): el color de un elemento 2D (tinte de una imagen, relleno de un rect, color de un
-// texto), 0..1. Para un HUD que late o cambia de color (un medidor de vida, un aviso).
+// texto), 0..1. Para un HUD que late o cambia de color (un medidor de vida, un aviso). Sobre un objeto 3D (una malla
+// o un vacio con mallas adentro) es el TINTE de sus mallas: multiplica la luz de sus materiales.
 static float* ColorDe2D(Object* o) {
     if (!o) return NULL;
     if (o->getType() == ObjectType::imagen2d) return ((Imagen2D*)o)->color;
@@ -630,8 +836,23 @@ static float* ColorDe2D(Object* o) {
     if (o->getType() == ObjectType::texto2d)  return ((Texto2D*)o)->color;
     return NULL;
 }
+// un objeto 3D: el TINTE de sus mallas (Mesh::tinte, multiplica la luz de sus materiales); si es un vacio o un
+// grupo, el de todas las mallas que cuelgan de el. setTinte(auto, 0.5, 0.5, 0.5) lo oscurece a la mitad.
+static void TinteMallas(Object* o, float r, float g, float b) {
+    if (!o) return;
+    if (o->getType() == ObjectType::mesh) { Mesh* m = (Mesh*)o; m->tinte[0] = r; m->tinte[1] = g; m->tinte[2] = b; }
+    for (size_t i = 0; i < o->Childrens.size(); i++) TinteMallas(o->Childrens[i], r, g, b);
+}
 static int LSetTinte(lua_State* L) {
-    float* c = ColorDe2D(W3dScriptParamObjeto(L, 1));
+    Object* o3 = W3dScriptParamObjeto(L, 1);
+    if (o3 && !UI2D_EsElemento2D(o3) && o3->getType() != ObjectType::ui) {
+        float t[3];
+        for (int k = 0; k < 3; k++) { float v = (float)luaL_checknumber(L, 2 + k); t[k] = v < 0.0f ? 0.0f : v; }
+        TinteMallas(o3, t[0], t[1], t[2]);
+        g_redraw = true;
+        return 0;
+    }
+    float* c = ColorDe2D(o3);
     if (!c) return 0;
     for (int k = 0; k < 4; k++) {
         if (k == 3 && lua_isnoneornil(L, 5)) break;
@@ -1147,6 +1368,13 @@ void BindsJuegoRegistrar(void* Lv) {
     W3dFisicaSetAdaptador2D(FisicaLienzo, FisicaTam2D, FisicaCajaUI,
                             FisicaPosCruda);   // idempotente (se llama por cada lua_State)
     lua_pushcfunction(L, LPantalla);    lua_setglobal(L, "pantalla");
+    lua_pushcfunction(L, LResolucion);  lua_setglobal(L, "resolucion");
+    lua_pushcfunction(L, LSetMemoria);  lua_setglobal(L, "setMemoria");
+    lua_pushcfunction(L, LMemoria);     lua_setglobal(L, "memoria");
+    lua_pushcfunction(L, LSetMemorias); lua_setglobal(L, "setMemorias");
+    lua_pushcfunction(L, LPaso);        lua_setglobal(L, "paso");      // un paso de rutina (adentro de "Llamar Lua")
+    lua_pushcfunction(L, LSetPaso);     lua_setglobal(L, "setPaso");   // cambiar un paso de una rutina (por su indice)
+    lua_pushcfunction(L, LLeerPaso);    lua_setglobal(L, "leerPaso");
     lua_pushcfunction(L, LPosPx);       lua_setglobal(L, "posPx");
     lua_pushcfunction(L, LSetPosPx);    lua_setglobal(L, "setPosPx");
     lua_pushcfunction(L, LTamPx);       lua_setglobal(L, "tamPx");
@@ -1157,6 +1385,10 @@ void BindsJuegoRegistrar(void* Lv) {
     lua_pushcfunction(L, LSetUVRect);   lua_setglobal(L, "setUVRect");
     lua_pushcfunction(L, LSonido);      lua_setglobal(L, "sonido");
     lua_pushcfunction(L, LPararSonido); lua_setglobal(L, "pararSonido");
+    lua_pushcfunction(L, LRelojAudio);  lua_setglobal(L, "relojAudio");
+    lua_pushcfunction(L, LRelojMs);     lua_setglobal(L, "relojMs");
+    lua_pushcfunction(L, LPararSonidos); lua_setglobal(L, "pararSonidos");
+    lua_pushcfunction(L, LAjustarSonido); lua_setglobal(L, "ajustarSonido");
     lua_pushcfunction(L, LSonidoPosicion); lua_setglobal(L, "sonidoPosicion");
     lua_pushcfunction(L, LSetSector);   lua_setglobal(L, "setSector");
     lua_pushcfunction(L, LVisCelda);      lua_setglobal(L, "visCelda");

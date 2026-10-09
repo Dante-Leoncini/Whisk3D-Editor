@@ -442,8 +442,8 @@ bool UI2DGuardar(UI* u, const std::string& ruta, const std::string& baseRel) {
         w3dLogfE("UI2D: escritura incompleta de %s (queda la version anterior)", ruta.c_str());
         return false;
     }
-#ifdef _WIN32
-    remove(ruta.c_str());   // Windows: rename() no pisa el destino (como LuaCompilar)
+#if defined(_WIN32) || defined(W3D_SYMBIAN)
+    remove(ruta.c_str());   // Windows y Symbian: rename() no pisa el destino (Symbian: KErrAlreadyExists)
 #endif
     if (rename(tmp.c_str(), ruta.c_str()) != 0) {
         remove(tmp.c_str());

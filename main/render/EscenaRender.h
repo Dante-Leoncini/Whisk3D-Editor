@@ -57,11 +57,12 @@ struct W3dVista3D {
     float aspectoImagen;       // aspecto del frustum que se dibuja (el declarado, o el de la vista)
     float marcoNX, marcoNY;    // marco del encuadre en NDC (1,1 = sin encuadre)
     float zoom, panX, panY;    // inspeccion del editor (el runtime usa 1,0,0)
+    float altoImagenPx;        // alto en px de la imagen (el encuadre adentro del viewport); 0 = no se sabe
 
     W3dVista3D()
         : fov(45.0f), nearC(0.1f), farC(1000.0f), orto(false), ortoSize(1.0f),
           aspectoVista(1.0f), aspectoImagen(1.0f), marcoNX(1.0f), marcoNY(1.0f),
-          zoom(1.0f), panX(0.0f), panY(0.0f) {}
+          zoom(1.0f), panX(0.0f), panY(0.0f), altoImagenPx(0.0f) {}
 };
 
 // Carga la matriz de PROYECCION de esta vista (deja el MatrixMode en ModelView

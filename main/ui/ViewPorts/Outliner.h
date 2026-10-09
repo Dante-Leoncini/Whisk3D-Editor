@@ -88,12 +88,12 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable {
                                // el scrollbar (antes solo se recalculaba al redimensionar -> tras importar no scrolleaba)
         Rec2D* Renglon;
 
-        // CULLING vertical: DibujarRenglon/DibujarOjos recorren TODA la jerarquia (avanzan la matriz igual), pero SALTEAN
-        // el DRAW (iconos + texto) de las filas fuera del area visible. Sin esto, una escena con muchos objetos dibuja
-        // miles de filas/nombres que el Scissor descarta despues (pagando igual los draw-calls). filaDFS = indice de fila
-        // en orden DFS (mapea 1:1 con la Y de la matriz); cullBaseY = Y en pantalla de la 1er fila del recorrido actual.
+        // CULLING vertical: DibujarRenglon/DibujarOjos recorren la jerarquia contando filas (filaDFS = indice de fila en
+        // orden DFS) y solo DIBUJAN (y ubican: su numero de fila y su profundidad, sin recorrer la matriz) las que caen en
+        // el area visible: el costo es el de las filas que se ven, no el del arbol. cullBaseY = Y en pantalla de la fila 0
         int cullBaseY;
         unsigned filaDFS;
+        bool FilaEnVista(unsigned fila) const;
 
         Outliner();
         ~Outliner() W3D_OVERRIDE;
@@ -101,13 +101,12 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable {
         void CalcularRenglon(Object* obj, int* MaxPosXtemp, int* MaxPosYtemp);
         void Resize(int newW, int newH) W3D_OVERRIDE;
         void Render() W3D_OVERRIDE;
-        void DibujarRenglon(Object* obj, bool hidden);
+        void DibujarRenglon(Object* obj, bool hidden, int prof);   // prof: la profundidad (las lineas del arbol)
         // fila VIRTUAL "Armature 2D" de una malla: UNA sola fila informativa, en AZUL y colgando de
         // la malla, que avisa que el rig 2D es PARTE del mesh y no un objeto de escena. Inerte: no
         // se arrastra, no acepta drops, no se desempareja y NO se despliega (los huesos se listan
         // en la pestania "Armature 2D" del panel Properties).
-        void DibujarArm2D(Mesh* m, int idx, bool hidden);
-        void DibujarLineaDesplegada(Object* obj);
+        void DibujarArm2D(Mesh* m, int idx, bool hidden, int prof);
         void DibujarOjos(Object* obj, bool hidden, bool noRender);
 
         void button_left() W3D_OVERRIDE;
@@ -144,6 +143,16 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable {
         int dropZona;
         int dropProf; // profundidad (nivel de sangria) del destino: la linea de insercion se indenta a ese nivel
         void SoltarDrag(int mx, int my);
+        void DibujarSeparador();   // la fila virtual constructor / rutina (ver EsConstructor en Outliner.cpp)
+        // AUTO-SCROLL del arrastre: con el mouse en la franja de arriba/abajo de la lista, la lista se mueve sola
+        // (mas rapido cuanto mas cerca del borde; afuera de la lista, a la velocidad maxima). Por TIEMPO (W3dNowMs),
+        // no por evento: el mouse quieto en el borde sigue scrolleando. Lo corre Render cada cuadro.
+        int dragMx, dragMy;            // el ultimo mouse del arrastre (pantalla)
+        double autoScrollMs;           // el reloj del cuadro anterior con auto-scroll (0 = no venia scrolleando)
+        float autoScrollResto;         // la fraccion de pixel que quedo
+        void ActualizarDrop(int mx, int my);   // la vista previa del drop bajo (mx, my)
+        void AutoScrollArrastre();
+        bool SinEnvolverCursor() const W3D_OVERRIDE { return dragging; }
 
         // MODO MOVER con teclado (sin mouse, clave en N95 para ordenar lamparas antes de los objetos):
         // g (PC) / 1 (Symbian) entra; flechas reordenan (arriba/abajo) o reparentan (izq=sacar / der=meter);

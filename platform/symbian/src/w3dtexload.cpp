@@ -230,7 +230,7 @@ bool LoadTexture(const char* path, unsigned int& outId, int* outW, int* outH) {
     // el glGetError() de abajo los atribuia a ESTA subida y "Cargar textura" fallaba en SILENCIO
     // (el browser se cerraba y la textura nunca aparecia) aunque el upload hubiera salido bien.
     while (glGetError() != GL_NO_ERROR) {}
-    outId = UploadRGBA(rgba, w, h, true);
+    outId = UploadRGBA(rgba, w, h, true, true, false, true);   // (16 bits si entra sin perdida: la mitad de memoria)
     GLenum e = glGetError();
     w3dLogf("LoadTexture: subida %dx%d glErr=%x id=%d", w, h, e, (TInt)outId);
     FreeImage(rgba);

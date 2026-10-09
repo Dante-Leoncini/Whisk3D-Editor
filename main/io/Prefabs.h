@@ -135,10 +135,21 @@ int  W3dPrefabRegenerarDeLibreria(const std::string& lib, bool tambienActiva);
 void W3dPrefabPilaEntrar(const std::string& nombre);
 void W3dPrefabPilaSalir();
 
+// ---- ESCENAS COMO PREFAB: una escena del proyecto se instancia en otra ("Add > Scene", instanciar("Auto")) ----
+// La instancia es una InstanciaPrefab con la clave "escena:<nombre>": genera los objetos de la escena debajo de un
+// objeto raiz con su nombre; se mueve, se oculta y se borra como una unidad; adentro no se edita (se edita la
+// escena: al volver, sus instancias se regeneran). No viaja lo que es DE LA ESCENA y no de sus objetos: las rutinas
+// constructor y las que limpian la pantalla (limpiarian en el medio del cuadro de la que la contiene) y las UI 2D
+bool        W3dPrefabEsEscena(const std::string& clave, std::string* escena = 0);
+std::string W3dPrefabClaveEscena(const std::string& escena);
+
 // ---- GANCHOS DEL EDITOR (NULL en el juego compilado) ----
 // serializa "en seco" (sin contenedor) el objeto raiz de un prefab CARGADO al JSON de siempre, con un
 // "_origen" (el serial del objeto de la plantilla) en cada nodo. false = no se pudo.
 extern bool (*W3dPrefabSerializarHook)(Object* raizPrefab, std::string& json);
+// idem una ESCENA cargada (su raiz): sus objetos de primer nivel debajo de un objeto raiz con el nombre de la escena
+// (sin lo que es de la escena y no de sus objetos: ver W3dPrefabEsDeLaEscena)
+extern bool (*W3dEscenaSerializarHook)(Object* raizEscena, const std::string& nombre, std::string& json);
 // despues de generar desde una definicion de MEMORIA, por cada objeto generado con su objeto de la
 // PLANTILLA: lo que la serializacion en seco no lleva (los clips compartidos de un armature, los frames de
 // las vertex anims) se toma de la plantilla

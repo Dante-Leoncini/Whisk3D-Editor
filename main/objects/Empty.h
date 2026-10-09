@@ -11,5 +11,6 @@ public:
     }
     ObjectType getType() W3D_OVERRIDE { return ObjectType::empty; }
     void RenderObject() W3D_OVERRIDE;
+    bool DibujaAlgo() W3D_OVERRIDE;   // su cruz, solo con el overlay "Empty"
 };
 #endif

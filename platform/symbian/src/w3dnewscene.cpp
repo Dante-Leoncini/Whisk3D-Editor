@@ -9,6 +9,9 @@
  * ==============================================================================
  */
 
+#include "objects/Rutina.h"   // el CONSTRUCTOR y el "Limpiar pantalla" de todo proyecto
+#include "WhiskUI/theme/colores.h"   // el fondo del tema: el "Clear color" de un proyecto nuevo
+#include "W3dLang.h"
 #include "w3dnewscene.h"
 #include "ViewPorts/Timeline.h"  // DopeXformActivo/Aceptar/Cancelar (transform de keyframes)
 #include "w3dlayout.h"
@@ -87,6 +90,9 @@ void W3dNewSceneInit() {
     W3dModelInit();
 
     if (SceneCollection && SceneCollection->Childrens.empty()) {
+        // arriba de todo el CONSTRUCTOR y el "Limpiar pantalla" de cada cuadro (igual que el constructor de PC)
+        W3dRutinasPorDefecto(SceneCollection, T("Constructor"), T("Clear screen"),
+                             ListaColores[static_cast<int>(ColorID::background)]);
         // todo cuelga de una "Collection" (igual que el constructor de PC)
         CollectionActive = new Collection(SceneCollection);
         // luz de escena default: arriba-derecha-atras

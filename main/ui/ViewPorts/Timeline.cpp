@@ -30,6 +30,7 @@
 #include <vector>
 #include <set>
 #include <algorithm>
+#include "objects/Rutina.h"   // las filas de los PASOS de una rutina animados (AnimPaso)
 
 namespace gfx = w3dEngine;
 
@@ -774,7 +775,8 @@ static std::vector<int> DopeUnionProps(const std::vector<AnimProperty>& props){
 }
 // agrega las filas de CANAL (X/Y/Z de Location / Euler Rotation / Scale). Cada canal es una CURVA propia y muestra
 // SUS keyframes: X puede tener un rombo en el frame 4 y Y no. Solo se listan los canales que tienen keyframes.
-static void DopeCanales(const std::vector<AnimProperty>& props, std::vector<Timeline::DopeRow>& out, int nivel, const std::string& ownerKey){
+static void DopeCanales(const std::vector<AnimProperty>& props, std::vector<Timeline::DopeRow>& out, int nivel, const std::string& ownerKey,
+                        Object* obj = NULL){
     static const char* nP[3] = {"X Location","Y Location","Z Location"};
     static const char* nR[3] = {"X Euler Rotation","Y Euler Rotation","Z Euler Rotation"};
     static const char* nS[3] = {"X Scale","Y Scale","Z Scale"};
@@ -801,6 +803,23 @@ static void DopeCanales(const std::vector<AnimProperty>& props, std::vector<Time
         Timeline::DopeRow r; r.tipo=3; r.nivel=nivel; r.nombre=nomUno[u]; r.icono=-1; r.keys=ks;
         r.ownerKey = ownerKey; r.propId = propUno[u]; r.compId = AnimX;
         char cb[24]; snprintf(cb,sizeof cb,"|p%d|c0", propUno[u]);
+        r.claveFila = ownerKey + cb;
+        out.push_back(r);
+    }
+    // los PASOS de una rutina (AnimPaso): una fila por campo animado, con el nombre del paso ("Color · R", "Textura · on")
+    std::vector<int> comps;
+    for (size_t p = 0; p < props.size(); p++)
+        if (props[p].Property == AnimPaso && !props[p].keyframes.empty()) comps.push_back(props[p].component);
+    std::sort(comps.begin(), comps.end());
+    for (size_t i = 0; i < comps.size(); i++) {
+        std::vector<int> ks; DopeKeysDeCurva(props, AnimPaso, comps[i], ks);
+        const int campo = comps[i] % AnimPasoCampos;
+        W3dPaso* paso = (obj && obj->getType() == ObjectType::rutina) ? ((Rutina*)obj)->PasoPorId((unsigned)(comps[i] / AnimPasoCampos)) : NULL;
+        std::string nom = paso ? std::string(T(W3dPasoEtiqueta(paso->tipo))) : std::string("?");
+        nom += std::string(" \xC2\xB7 ") + (campo == AnimPasoOn ? std::string("on") : paso ? std::string(T(W3dPasoNumeroNombre(*paso, campo))) : std::string("?"));
+        Timeline::DopeRow r; r.tipo=3; r.nivel=nivel; r.nombre=nom; r.icono=-1; r.keys=ks;
+        r.ownerKey = ownerKey; r.propId = AnimPaso; r.compId = comps[i];
+        char cb[32]; snprintf(cb,sizeof cb,"|p%d|c%d", AnimPaso, comps[i]);
         r.claveFila = ownerKey + cb;
         out.push_back(r);
     }
@@ -976,7 +995,7 @@ void Timeline::ConstruirDopeRows(){
                         v.ownerKey = v.claveDespliegue; v.propId=AnimVertex; v.compId=2; v.keys = vnrm;
                         filas.push_back(v);
                     }
-                    DopeCanales(an->curvas, filas, 1, r.ownerKey);
+                    DopeCanales(an->curvas, filas, 1, r.ownerKey, o);
                 }
             }
         }
@@ -1000,7 +1019,7 @@ void Timeline::ConstruirDopeRows(){
                 g.claveDespliegue = prefEsc + DopeIdDueno(ao.obj) + "/xf"; g.claveFila = g.claveDespliegue;
                 g.ownerKey = r.ownerKey; g.propId=-1; g.compId=-1; g.keys = u;
                 filas.push_back(g);
-                if (!DopeColapsado(g.claveDespliegue)) DopeCanales(ao.Propertys, filas, 2, r.ownerKey);
+                if (!DopeColapsado(g.claveDespliegue)) DopeCanales(ao.Propertys, filas, 2, r.ownerKey, ao.obj);
             }
         }
         // ---- PISTA "CAMARA ACTIVA" (los cortes de la cinematica): aparece con una CAMARA seleccionada. Es una curva

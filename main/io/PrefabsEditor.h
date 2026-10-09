@@ -109,6 +109,10 @@ extern unsigned g_w3dCargaVersion;
 // arma el submenu con los prefabs del proyecto (sin el que se esta editando ni los que lo contienen)
 void W3dPrefabMenuAddArmar(PopupMenu* m);
 void W3dPrefabMenuAddAccion(int id);   // crea la instancia en el cursor 3D
+// "Add > Scene": las otras escenas del proyecto (menos la que se edita y las que la contienen); la instancia va al
+// cursor 3D (una InstanciaPrefab de "escena:<nombre>", io/Prefabs.h)
+void W3dEscenaMenuAddArmar(PopupMenu* m);
+void W3dEscenaMenuAddAccion(int id);
 // el prefab que el menu arma en la fila 'id' ("" = ninguno): el harness
 std::string W3dPrefabMenuAddNombre(int id);
 

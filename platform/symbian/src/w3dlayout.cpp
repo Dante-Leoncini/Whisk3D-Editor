@@ -42,6 +42,9 @@ extern bool MouseWheel;
 #include "WhiskUI/text/font.h"      // Font/WhiskFont REALES de PC
 #include "WhiskUI/text/bitmapText.h"
 #include "WhiskUI/theme/colores.h"
+#include "objects/Rutina.h"   // W3dHayConstructor: el proyecto limpia la pantalla (modo juego puro)
+#include "w3dGraphics.h"      // W3D_GL_CRUDO: el GL crudo de este archivo entra al contador de llamadas
+#include "W3dEscena.h"        // W3dEscena3DActiva
 #include "WhiskUI/text/W3dFont.h"
 #include "w3dlog.h"
 #include "w3dnewscene.h" // mundo nuevo (Fase 3c-2)
@@ -369,16 +372,22 @@ void W3dLayoutRender() {
     W3dProfBegin(); // profiler: arranca el frame (scene/viewport3d se acumulan dentro de rootViewport->Render)
     double _profR0 = W3dNowMs();
 
-    glDisable(GL_SCISSOR_TEST);
+    W3D_GL_CRUDO(glDisable(GL_SCISSOR_TEST));
     // matriz de TEXTURA siempre identidad: si algo viejo la toca, los UV
     // de TODO el dibujado texturizado colapsan (leccion aprendida 2 veces)
-    glMatrixMode(GL_TEXTURE);
-    glLoadIdentity();
-    glMatrixMode(GL_MODELVIEW);
-    glViewport(0, 0, gScreenW, gScreenH);
-    glClearColor(ListaColores[static_cast<int>(ColorID::background)][0], ListaColores[static_cast<int>(ColorID::background)][1],
-                 ListaColores[static_cast<int>(ColorID::background)][2], 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    W3D_GL_CRUDO(glMatrixMode(GL_TEXTURE));
+    W3D_GL_CRUDO(glLoadIdentity());
+    W3D_GL_CRUDO(glMatrixMode(GL_MODELVIEW));
+    W3D_GL_CRUDO(glViewport(0, 0, gScreenW, gScreenH));
+    // el fondo de TODA la pantalla (los paneles lo pisan). En el MODO JUEGO PURO con un proyecto que limpia el solo
+    // (constructor + su "Clear") no: limpiar es cosa del proyecto (sin su "Clear" no se limpia nada) y en el N95 un
+    // clear de mas es un cuadro entero de relleno
+    { extern int g_juegoPuro;
+      if (!(g_juegoPuro && W3dHayConstructor() && W3dEscena3DActiva())) {
+          W3D_GL_CRUDO(glClearColor(ListaColores[static_cast<int>(ColorID::background)][0], ListaColores[static_cast<int>(ColorID::background)][1],
+                       ListaColores[static_cast<int>(ColorID::background)][2], 1.0f));
+          W3D_GL_CRUDO(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
+      } }
 
     // renderiza el rootViewport COMPARTIDO (no gRoot): "Maximize" reemplaza rootViewport por el viewport
     // activo -> dibuja SOLO ese y los demas NO se renderizan ni recalculan (clave para el rendimiento del N95).
@@ -401,10 +410,10 @@ void W3dLayoutRender() {
         static TInt diag = 0;
         if ((++diag & 0x7F) == 1) {
             w3dLogf("post-arbol: err=%x luz=%d l0=%d cm=%d tex2d=%d fog=%d sci=%d alto=%d outl=%d,%d %dx%d",
-                glGetError(),
-                (TInt)glIsEnabled(GL_LIGHTING), (TInt)glIsEnabled(GL_LIGHT0),
-                (TInt)glIsEnabled(GL_COLOR_MATERIAL), (TInt)glIsEnabled(GL_TEXTURE_2D),
-                (TInt)glIsEnabled(GL_FOG), (TInt)glIsEnabled(GL_SCISSOR_TEST),
+                W3D_GL_CRUDO(glGetError()),
+                (TInt)W3D_GL_CRUDO(glIsEnabled(GL_LIGHTING)), (TInt)W3D_GL_CRUDO(glIsEnabled(GL_LIGHT0)),
+                (TInt)W3D_GL_CRUDO(glIsEnabled(GL_COLOR_MATERIAL)), (TInt)W3D_GL_CRUDO(glIsEnabled(GL_TEXTURE_2D)),
+                (TInt)W3D_GL_CRUDO(glIsEnabled(GL_FOG)), (TInt)W3D_GL_CRUDO(glIsEnabled(GL_SCISSOR_TEST)),
                 W3dPantallaAlto,
                 gOutliner ? gOutliner->x : -1, gOutliner ? gOutliner->y : -1,
                 gOutliner ? gOutliner->width : -1, gOutliner ? gOutliner->height : -1);
@@ -754,7 +763,19 @@ TBool W3dLayoutTimelineActivo() { return LayoutTimelineNavFrame(0, 0, false, fal
 
 
 // keypad SIN mouse: rutea la flecha/OK al viewport ACTIVO (propiedades/outliner)
+// la lista de pasos de una rutina en el panel de propiedades (main/ui/ViewPorts/PropsRutina.cpp): el "1" agarra el
+// paso elegido (la G de PC) y, agarrado, las flechas lo mueven, el centro lo deja y la C lo devuelve
+bool PropsRutinaTecla(int tecla);
+bool PropsRutinaAgarrando();
+static bool PropiedadesActivas() { return viewPortActive && viewPortActive->isLeaf() && viewPortActive->ViewportKind() == 3; }
+
 TBool W3dLayoutTeclaPanel(TInt aScan) {
+    if (PropiedadesActivas() && PropsRutinaAgarrando()) {
+        const int t = aScan == EStdKeyUpArrow ? W3dK_UP : aScan == EStdKeyDownArrow ? W3dK_DOWN :
+                      (aScan == EStdKeyDevice3 || aScan == EStdKeyEnter) ? W3dK_RETURN :
+                      (aScan == EStdKeyBackspace || aScan == EStdKeyEscape) ? W3dK_ESCAPE : -1;
+        if (t >= 0 && PropsRutinaTecla(t)) return ETrue;
+    }
     int k = -1;
     switch (aScan) {
         case EStdKeyUpArrow:    k = LayoutKey::Up; break;
@@ -947,6 +968,7 @@ TBool W3dLayoutTeclaViewport(TInt aScanCode) {
 // ...para las teclas que el telefono TIPEA distinto: su keypad no tiene letras, asi que el 1/2/3 se manda como la
 // g/r/s que serian en PC y del viewport para adentro es exactamente el mismo comando.
 TBool W3dLayoutTeclaViewportDirecta(TInt aTecla) {
+    if (aTecla == W3dK_G && PropiedadesActivas() && PropsRutinaTecla(W3dK_G)) return ETrue;
     return LayoutTeclaViewport(aTecla, false) ? ETrue : EFalse;
 }
 TBool W3dLayoutTeclaViewportUp(TInt aScanCode) {

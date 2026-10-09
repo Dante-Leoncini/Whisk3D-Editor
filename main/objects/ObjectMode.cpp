@@ -1,3 +1,4 @@
+#include "objects/Rutina.h"   // duplicar una rutina
 #include "ObjectMode.h"
 #include "edit/Proporcional.h" // proportional editing: peso de los objetos no seleccionados
 #include "w3dlog.h"    // w3dLogfW: los renames automaticos quedan registrados
@@ -276,6 +277,7 @@ static std::vector<AnimProperty>& CurvasActivas(Object* o){
 }
 // valor ACTUAL de un canal (prop, comp) del objeto: lo que se ve ahora (para keyar)
 static float CanalValorActual(Object* o, int prop, int comp){
+	if (prop == AnimPaso)      return o->getType() == ObjectType::rutina ? W3dRutinaPasoValor((Rutina*)o, comp) : 0.0f;
 	if (prop == AnimVisible)   return o->visible      ? 1.0f : 0.0f;
 	if (prop == AnimRender)    return o->renderizable ? 1.0f : 0.0f;
 	// CAMARA: fov + distancias de dibujado (near/far)
@@ -353,12 +355,61 @@ void AnimCanalToggle(Object* o, int prop, int comp, int frame){
 		SetKeyCurva(ap, frame, CanalValorActual(o, prop, comp));      // poner con el valor actual
 		// visible/render son TRUE/FALSE -> keyframe CONSTANTE (escalon); los
 		// numericos (pos/rot/escala) quedan en bezier (curvas suaves)
-		if ((prop == AnimVisible || prop == AnimRender || prop == AnimLightMisc)){
+		if ((prop == AnimVisible || prop == AnimRender || prop == AnimLightMisc ||
+		     (prop == AnimPaso && comp % AnimPasoCampos == AnimPasoOn))){
 			for (size_t k=0;k<ap.keyframes.size();k++)
 				if (ap.keyframes[k].frame==frame){ ap.keyframes[k].Interpolation = KfConstant; break; }
 		}
 	}
 	g_redraw = true;
+}
+
+// ---- los PASOS de una RUTINA (canal AnimPaso: componente = id del paso * 8 + campo) ----
+// los campos ANIMABLES de un paso: su on/off y sus numeros FIJOS (uno que nombra una memoria lo escribe lua)
+static void CamposPaso(const W3dPaso& p, std::vector<int>& campos) {
+	campos.clear();
+	if (W3dPasoUsaOn(p.tipo)) campos.push_back(AnimPasoOn);
+	for (int k = 0; k < W3dPasoNumeros(p); k++) if (p.n[k].ref.empty()) campos.push_back(k);
+}
+// la I sobre la lista de pasos: keyframe de TODOS sus campos animables en 'frame' (si ya los tenia todos, los saca)
+void W3dAnimKeyPaso(Object* o, unsigned id, int frame) {
+	if (!o || o->getType() != ObjectType::rutina || KeysEnJuego()) return;
+	W3dPaso* p = ((Rutina*)o)->PasoPorId(id);
+	std::vector<int> campos;
+	if (p) CamposPaso(*p, campos);
+	if (campos.empty()) { Notificar(T("This step has nothing to animate"), false); return; }
+	bool todos = true;
+	for (size_t i = 0; i < campos.size(); i++)
+		if (AnimCanalEstado(o, AnimPaso, (int)id * AnimPasoCampos + campos[i], frame) != 2) todos = false;
+	for (size_t i = 0; i < campos.size(); i++) {
+		const int comp = (int)id * AnimPasoCampos + campos[i];
+		AnimProperty& ap = PropertyDeLista(CurvasActivas(o), AnimPaso, comp);
+		if (todos) BorrarKeyframeManteniendoForma(ap, frame);
+		else {
+			SetKeyCurva(ap, frame, CanalValorActual(o, AnimPaso, comp));
+			if (campos[i] == AnimPasoOn)   // (prendido / apagado: un escalon)
+				for (size_t k = 0; k < ap.keyframes.size(); k++)
+					if (ap.keyframes[k].frame == frame) ap.keyframes[k].Interpolation = KfConstant;
+		}
+	}
+	g_redraw = true;
+}
+// borraron un paso: sus curvas tambien (de todas las animaciones de escena y de la propia activa)
+static void SacarCurvasPaso(std::vector<AnimProperty>& P, unsigned id) {
+	for (size_t k = P.size(); k-- > 0;)
+		if (P[k].Property == AnimPaso && (unsigned)(P[k].component / AnimPasoCampos) == id) P.erase(P.begin() + (long)k);
+}
+void W3dAnimBorrarPaso(Object* o, unsigned id) {
+	if (!o || !id) return;
+	for (size_t i = 0; i < AnimationObjects.size(); i++)
+		if (AnimationObjects[i].obj == o) SacarCurvasPaso(AnimationObjects[i].Propertys, id);
+	for (size_t e = 0; e < SceneAnimations.size(); e++) {
+		if (!SceneAnimations[e]) continue;
+		std::vector<AnimationObject>& ob = SceneAnimations[e]->objetos;
+		for (size_t i = 0; i < ob.size(); i++) if (ob[i].obj == o) SacarCurvasPaso(ob[i].Propertys, id);
+	}
+	VertexAnimation* an = AnimObjetoActiva(o);
+	if (an) SacarCurvasPaso(an->curvas, id);
 }
 
 // keyframe en las TRES curvas (X/Y/Z) de una propiedad del objeto. Cada componente es una curva independiente
@@ -514,6 +565,8 @@ void InsertarKeyframeObjeto(int canales){
 	for (size_t s=0;s<ObjSelects.size();s++){ Object* o=ObjSelects[s]; if (!o) continue;
 		// lo GENERADO por una instancia de prefab no se anima: sus curvas no se guardan (se anima el prefab)
 		if (W3dEsGenerado(o)) { if (!generado) generado = o; continue; }
+		// sin posicion, rotacion ni escala (la Rutina: una lista de llamadas de GL) no hay nada que animar
+		if (o->sinTransformacion) continue;
 		// la vista de un CLIP DE JERARQUIA solo guarda su raiz y sus descendientes
 		if (!W3dAnimObjetoPermitido(o)) { fuera++; continue; }
 		o->ActualizarDisplayRot(); // rotEuler al dia
@@ -757,7 +810,7 @@ void GuardarMousePos() {
 // PROPORTIONAL EDITING: que objetos NO seleccionados pueden venir arrastrados. Nada 2D ni colecciones, y un hijo
 // de algo seleccionado no (su padre ya lo lleva).
 static bool ObjElegibleProporcional(Object* o){
-    if (!o || o->select || !o->visible) return false;
+    if (!o || o->select || !o->visible || o->sinTransformacion) return false;
     switch (o->getType()) {
         case ObjectType::scene: case ObjectType::collection: case ObjectType::ui: case ObjectType::texto2d:
         case ObjectType::imagen2d: case ObjectType::rect2d: case ObjectType::cont2d: case ObjectType::slice9:
@@ -805,8 +858,8 @@ void guardarEstadoRec(Object* obj){
         estadoObjetos.push_back(st);
     }
 
-    // Si está seleccionado, guardar estado
-    if (obj->select && obj->visible) {
+    // Si está seleccionado, guardar estado (un objeto SIN TRANSFORMACION -la Rutina- no se mueve: no tiene que)
+    if (obj->select && obj->visible && !obj->sinTransformacion) {
         SaveState NuevoEstado;
         NuevoEstado.obj = obj;
         NuevoEstado.pos = obj->pos;
@@ -1081,6 +1134,14 @@ Object* W3dDuplicarUno(Object* src, bool vinculado) {
     }
     else if (src->getType() == ObjectType::hitbox) {
         nuevo = HitboxDuplicar((Hitbox*)src);   // los campos propios (la lista vive en Hitbox.cpp)
+    }
+    else if (src->getType() == ObjectType::rutina) {
+        // RUTINA: las listas y que lista usa cada modo (los punteros se vuelven a resolver: sucia)
+        Rutina* s = (Rutina*)src;
+        Rutina* d = new Rutina(src->Parent, s->name);
+        for (int m = 0; m < Rutina::ModoN; m++) { d->listas[m] = s->listas[m]; d->usar[m] = s->usar[m]; }
+        d->listaEditada = s->listaEditada; d->pasoActivo = s->pasoActivo; d->sucia = true;
+        nuevo = d;
     }
     else if (W3dEsTipoInstancia(src->getType())) {
         // otra INSTANCIA del mismo prefab con los mismos overrides (lo que genera se genera abajo, ya con su nombre).
@@ -1857,6 +1918,8 @@ void ReparentKeepTransform(Object* obj, Object* nuevoPadre) {
     // el paso de undo se abre ANTES de tocar nada: este camino reescribe pos/rot/escala
     // DESPUES de la cirugia de punteros y el snapshot tiene que ser el de antes de todo
     PasoReparent paso(obj);
+    // SIN TRANSFORMACION (la Rutina): no hay nada que conservar, se muda y sigue en identidad
+    if (obj->sinTransformacion) { W3dAdjuntarA(obj, nuevoPadre, NULL, false); return; }
 
     // las tres componentes por el MISMO camino: RotGlobalDe/ScaleGlobalDe leen los CAMPOS (o
     // sea la base), asi que la posicion tambien tiene que ser BASE o la ida y vuelta

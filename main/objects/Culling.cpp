@@ -78,6 +78,37 @@ static bool AabbEnFrustum(const PlanoFrustum* p, const Vector3& mn, const Vector
 // otros objetos se autoculleen (el Mirror corta por el rectangulo del agua: espejo
 // fuera de pantalla = re-dibujo del target ahorrado). Sin vista real bindeada u
 // ortografica devuelve true (no cortar: headless / editor sin lente).
+// los 6 planos de la camara de medida (el MISMO criterio que W3dAabbVisible), para el que testea MUCHAS cajas
+// por frame (la Rutina: el paso "Test de visibilidad"): se arman una vez y se reusan. false = no cortar
+bool W3dFrustumMedidaPlanos(float planos[24]) {
+    CameraBase cam;
+    float aspect;
+    Camera* camMedida = W3dCamaraDeMedida(false);
+    if (camMedida) {
+        if (camMedida->orthographic) return false;
+        cam.pos   = camMedida->GetGlobalPosition();
+        cam.rot   = camMedida->Rot();
+        cam.fov   = camMedida->fov;
+        cam.nearZ = camMedida->nearClip;
+        cam.farZ  = camMedida->farClip;
+        float adec = camMedida->AspectoDeclarado();
+        aspect = (adec > 0.01f) ? adec : ((g_renderAspect > 1e-4f) ? g_renderAspect : 1.0f);
+    } else {
+        if (!g_vistaBindeada || g_renderCamOrto) return false;
+        cam.pos   = g_renderCamPos;
+        cam.rot   = g_renderCamRot;
+        cam.fov   = g_renderCamFov;
+        cam.nearZ = g_renderCamNear;
+        cam.farZ  = g_renderCamFar;
+        aspect = (g_renderCamAspect > 1e-4f) ? g_renderCamAspect : 1.0f;
+    }
+    FrustumDeMatriz(cam.ProjectionMatrix(aspect) * cam.ViewMatrix(), (PlanoFrustum*)planos);
+    return true;
+}
+bool W3dAabbEnPlanos(const float planos[24], const Vector3& mn, const Vector3& mx) {
+    return AabbEnFrustum((const PlanoFrustum*)planos, mn, mx);
+}
+
 bool W3dAabbVisible(const Vector3& mn, const Vector3& mx) {
     CameraBase cam;
     float aspect;

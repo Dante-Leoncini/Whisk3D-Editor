@@ -134,6 +134,7 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         // sesgo, el orden de pasada y un tilde "Decal" que aplica la receta entera.
         PropBool*  propMatDecal;   // preset DECAL (transparente + sin escribir z + sesgo + pasada 1)
         PropFloat* propMatSesgo;   // sesgoProfundidad (glPolygonOffset; negativo = hacia el ojo)
+        PropFloat* propMatSesgoM;  // sesgoMetros (sesgo de profundidad en metros: + aleja, - acerca)
         PropFloat* propMatOrden;   // ordenPasada 0 opaco / 1 decal / 2 transparente
         PropBool*  propMatLineas;      // LINEAS: dibujar las aristas de la malla con el material
         PropFloat* propMatGrosorLinea; // grosor de esas lineas en px (glLineWidth); visible con Lines ON
@@ -408,6 +409,29 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropBool*   propRcLimpiarZ;
         PropBool*   propRcFondo;
         PropColor*  propRcColor;
+        // tarjeta RUTINA (objects/Rutina.h): PropsRutinaConstruir / PropsRutinaActualizar (ViewPorts/PropsRutina.cpp)
+        GroupPropertie* propRutina;
+        PropButton* propRuLista;            // "Render mode": la lista que se edita (All / Solid / ...)
+        PropButton* propRuUsar;             // que lista usa ese modo (desplegable)
+        PropListMeshParts* propRuPasos;     // los pasos (modo 14)
+        PropButtonRow* propRuFilaAdd;       // Add (desplegable agrupado) | Remove
+        PropButton* propRuRef;              // la malla / textura / objeto / rutina (desplegable por carpetas)
+        PropButton* propRuRef2;             // "Test de visibilidad": el objeto que mueve la caja (opcional)
+        PropText*   propRuTexto;            // "Llamar Lua": el nombre de la funcion
+        PropLabel*  propRuInfo[5];          // en filas: triangulos / indices / y lo que APUNTAN los punteros en ese paso
+        PropLabel*  propRuAviso;            // primitiva simulada / el formato del array
+        PropColor*  propRuColor;            // los pasos de color: el selector de color de Whisk3D
+        PropBool*   propRuColorNum;         // ...o los 4 numeros (para usar memorias)
+        PropButton* propRuLuz;              // GL_LIGHT0..7 (desplegable)
+        PropButton* propRuOpcion;           // la opcion del paso: modo de niebla, funcion z... (desplegable)
+        PropBool*   propRuOn;
+        PropBool*   propRuManual;           // Draw mesh: rango MANUAL de triangulos
+        PropText*   propRuArray;            // Draw mesh sin rango manual: el array (memoria) o nada (las partes)
+        PropText*   propRuEntero;           // la parte / los pasos a saltear
+        PropText*   propRuNum[5];
+        PropButtonRow* propRuMax;           // Draw mesh manual: el ultimo triangulo = el ultimo de la malla
+        PropBool*   propRuBuffer[3];        // Clear: que buffers limpia (color, profundidad, estencil)
+        PropLabel*  propRuMotivo;           // por que esta en rojo
         // tarjeta HITBOX (objects/Hitbox.h): la arman, la bindean y sincronizan sus textos
         // PropsHitboxConstruir / PropsHitboxActualizar (ViewPorts/PropsHitbox.cpp)
         GroupPropertie* propHitbox;
@@ -873,6 +897,7 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropBool*   propAjAntialias;
         PropButton* propAjBackend;  // dropdown del backend grafico
         PropButton* propAjSkin;     // dropdown del skin
+        PropButton* propAjLogs;      // nivel de los logs del editor (todo / avisos / errores / nada)
         PropText*   propAjRepo;     // raiz del repo para Compilar (editor instalado)
 
 #ifndef W3D_SYMBIAN
