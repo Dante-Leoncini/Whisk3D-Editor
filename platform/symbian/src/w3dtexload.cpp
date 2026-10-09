@@ -26,8 +26,12 @@
 #include "w3dTexture.h" // engine: UploadRGBA (subida comun a los 4 OS)
 #include "io/w3dFilesystem.h" // ReadFileBytes: resuelve el contenedor v4 (VFS) y disco
 
-// global compartido del modelo de PC (Textures.cpp es PC-only)
+// globales compartidos del modelo de PC (Textures.cpp es PC-only, no se compila en Symbian).
+// g_w3dTexturasGen = contador de generacion del cache de texturas (lo incrementa TexturaCache al
+// borrar una textura); las RUTINAS (RutinaEditor.cpp) lo consultan para invalidar su cache. Sin
+// esta definicion el link del N95 falla con L6218E: Undefined symbol g_w3dTexturasGen.
 std::vector<Texture*> Textures;
+unsigned g_w3dTexturasGen = 1;
 
 namespace {
 
