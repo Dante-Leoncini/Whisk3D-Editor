@@ -20,6 +20,7 @@ extern bool g_viewEditMode;   // toggle "vista" tactil (ViewPort3D_Toolbar): en 
 #include "Undo.h" // Ctrl+Z
 #include "objects/Gamepad.h"    // axisState/buttonState: se sueltan al desenchufar el mando
 #include "script/BindsJuego.h"  // el REGISTRO compartido de controles (hotplug + avisos + lua)
+#include "script/W3dScript.h"   // W3dScriptMandosVibrarHook: vibrar() de lua en los mandos
 #include "app/W3dAtajos.h"      // atajos de teclado reasignables
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -265,6 +266,22 @@ static void ControlesOlvidarViewport(ViewportBase* vp) {
 }
 struct ControlesEngancharOlvido { ControlesEngancharOlvido() { ViewportOlvidarRegistrar(ControlesOlvidarViewport); } };
 static ControlesEngancharOlvido g_controlesEngancheOlvido;
+
+// vibrar() de lua en los MANDOS (W3dScriptMandosVibrarHook de script/W3dScript.h): todos los conectados, la fuerza en
+// los dos motores. (SDL 2.0.7, la de Android 2.3, no tiene rumble: ahi vibra el telefono)
+static void VibrarMandos(int ms, float fuerza) {
+#if SDL_VERSION_ATLEAST(2, 0, 9)
+    const Uint16 v = (Uint16)(fuerza * 65535.0f);
+    for (int i = 0; i < W3dControlesCuantos(); i++) {
+        SDL_GameController* gc = (SDL_GameController*)W3dControlHandle(i);
+        if (gc) SDL_GameControllerRumble(gc, v, v, (Uint32)ms);
+    }
+#else
+    (void)ms; (void)fuerza;
+#endif
+}
+struct ControlesEngancharVibrar { ControlesEngancharVibrar() { W3dScriptMandosVibrarHook = VibrarMandos; } };
+static ControlesEngancharVibrar g_controlesEngancheVibrar;
 
 // MULTI-TOUCH del juego: alimenta cada dedo tactil activo al script (dedo(1), dedo(2), ...) durante el
 // play. Aditivo: si NO hay dedos (mouse/desktop) no hace nada -> el dedo 0 lo sigue manejando

@@ -3570,6 +3570,7 @@ static void AplicarCompilar(JVal* jc) {
     g_proyCompilar.plataforma  = W3dCompilarPlataformaInt(JS(jc, "plataforma", ""));
     g_proyCompilar.uid         = (unsigned)strtoul(JS(jc, "uid", "0").c_str(), 0, 16);  // UID3 Symbian (hex string)
     g_proyCompilar.volumen     = JIRango(jc, "volumen", 100, 0, 100, "compilar");        // 0..100 volumen del gameplay
+    g_proyCompilar.resolucion  = JIRango(jc, "resolucion", 100, 25, 100, "compilar");    // % de la pantalla (Android 2.3)
     w3dEngine::W3dAudioJuegoVolume(g_proyCompilar.volumen / 100.0f);                      // aplicar YA la ganancia al mixer
     { extern void W3dJuegoVolRefUI(); W3dJuegoVolRefUI(); }                               // refrescar el numero de la tarjeta Juego
 #endif

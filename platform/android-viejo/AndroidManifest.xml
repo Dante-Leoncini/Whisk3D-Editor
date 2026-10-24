@@ -9,6 +9,8 @@
     <uses-sdk android:minSdkVersion="10" android:targetSdkVersion="10" />
     <uses-feature android:glEsVersion="0x00020000" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <!-- jugar en red (net/W3dRed.cpp): sin esto, socket() falla -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application android:label="Whisk3D"
                  android:icon="@drawable/icono"

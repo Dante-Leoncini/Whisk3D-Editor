@@ -23,6 +23,7 @@ extern const char* W3dGameFontPng();
 #include <vector>
 #include <math.h>
 #include <string.h>   // memcpy (padding POT del atlas)
+#include <stdio.h>    // snprintf (la clave de una fuente por tamano)
 
 namespace gfx = w3dEngine;
 
@@ -123,7 +124,9 @@ static w3dui::W3dTextAtlas* CargarDefault() {
 // Rellena el W3dTextAtlas igual que lo haria bake_atlas.py + Load(): glifos empaquetados en
 // una hoja de 512 a 64px, con yoff medido desde la CIMA DEL ASCENDER (stb lo da desde el
 // baseline: se corrige sumando el ascent).
-static w3dui::W3dTextAtlas* HornearTTF(const std::string& ruta) {
+// FPX = el alto al que se hornea. 64 es el atlas de siempre (se escala libre); uno MENOR es el de un tamano de PANTALLA
+// (Fuente2DObtenerPx): la hoja mas chica en la que entran los glifos, y se dibuja 1:1 en pixel entero (pixelPerfect)
+static w3dui::W3dTextAtlas* HornearTTF(const std::string& ruta, int FPX = 64) {
     std::vector<unsigned char> ttf;
     if (!w3dFileSystem::ReadFileBytes(ruta, ttf) || ttf.empty()) {
         w3dLogfE("Fuente2D: no pude leer %s", ruta.c_str());
@@ -135,29 +138,33 @@ static w3dui::W3dTextAtlas* HornearTTF(const std::string& ruta) {
         return NULL;
     }
 
-    const int FPX = 64, AT = 512;   // mismos valores que el atlas de Whisk3D (nitido hasta ~64px)
-    std::vector<unsigned char> gris((size_t)AT * AT, 0);
-
-    stbtt_pack_context pc;
-    if (!stbtt_PackBegin(&pc, &gris[0], AT, AT, 0, 1, NULL)) return NULL;
-    stbtt_PackSetOversampling(&pc, 1, 1);
-
+    // (el de 64 px: 512, como el atlas de Whisk3D; uno chico: desde 64 x 64, doblando hasta que entran todos)
+    int AT = (FPX >= 64) ? 512 : 64;
+    std::vector<unsigned char> gris;
     stbtt_packedchar ascii[95], extras[kNumExtras];
     int cps[kNumExtras];
     for (int i = 0; i < kNumExtras; i++) cps[i] = (int)kExtras[i];
-    stbtt_pack_range rangos[2];
-    rangos[0].font_size = (float)FPX;
-    rangos[0].first_unicode_codepoint_in_range = 32;
-    rangos[0].array_of_unicode_codepoints = NULL;
-    rangos[0].num_chars = 95;
-    rangos[0].chardata_for_range = ascii;
-    rangos[1].font_size = (float)FPX;
-    rangos[1].first_unicode_codepoint_in_range = 0;
-    rangos[1].array_of_unicode_codepoints = cps;
-    rangos[1].num_chars = kNumExtras;
-    rangos[1].chardata_for_range = extras;
-    stbtt_PackFontRanges(&pc, &ttf[0], 0, rangos, 2);
-    stbtt_PackEnd(&pc);
+    for (;;) {
+        gris.assign((size_t)AT * AT, 0);
+        stbtt_pack_context pc;
+        if (!stbtt_PackBegin(&pc, &gris[0], AT, AT, 0, 1, NULL)) return NULL;
+        stbtt_PackSetOversampling(&pc, 1, 1);
+        stbtt_pack_range rangos[2];
+        rangos[0].font_size = (float)FPX;
+        rangos[0].first_unicode_codepoint_in_range = 32;
+        rangos[0].array_of_unicode_codepoints = NULL;
+        rangos[0].num_chars = 95;
+        rangos[0].chardata_for_range = ascii;
+        rangos[1].font_size = (float)FPX;
+        rangos[1].first_unicode_codepoint_in_range = 0;
+        rangos[1].array_of_unicode_codepoints = cps;
+        rangos[1].num_chars = kNumExtras;
+        rangos[1].chardata_for_range = extras;
+        const int entro = stbtt_PackFontRanges(&pc, &ttf[0], 0, rangos, 2);
+        stbtt_PackEnd(&pc);
+        if (entro || AT >= 1024) break;
+        AT *= 2;
+    }
 
     int asc, desc, gap;
     stbtt_GetFontVMetrics(&fi, &asc, &desc, &gap);
@@ -196,7 +203,9 @@ static w3dui::W3dTextAtlas* HornearTTF(const std::string& ruta) {
     at->tex = gfx::UploadRGBA(&rgba[0], AT, AT, true);
     if (!at->tex) { delete at; return NULL; }
     gfx::BindTexture(at->tex); gfx::TexFilter(true); gfx::TexWrap(false);
-    w3dLogf("Fuente2D: horneada %s (%d glifos)", ruta.c_str(), (int)at->glyphs.size());
+    // (la de un tamano de pantalla va 1:1: escala entera de su alto y pluma en pixel entero, ver PxSnap en UIOverlay)
+    if (FPX < 64) at->pixelPerfect = true;
+    w3dLogf("Fuente2D: horneada %s a %d px (%d glifos, hoja de %d)", ruta.c_str(), FPX, (int)at->glyphs.size(), AT);
     return at;
 }
 
@@ -407,6 +416,22 @@ w3dui::W3dTextAtlas* Fuente2DObtener(const std::string& ruta) {
                             : (EsRutaBitmap(ruta) ? CargarBitmapJson(ruta) : HornearTTF(ruta));
     gFuentes[ruta] = at;   // se cachea aunque sea NULL (no reintentar por frame)
     return at;
+}
+
+// una TTF horneada al tamano de PANTALLA con que se va a dibujar (redondeado; de 6 a 63 px: mas grande, la de 64 escalada)
+// -> nitida en cualquier definicion. Las demas (la de Whisk3D, las bitmap) no cambian con el tamano
+w3dui::W3dTextAtlas* Fuente2DObtenerPx(const std::string& ruta, float px) {
+    if (ruta.empty() || EsRutaBitmap(ruta)) return Fuente2DObtener(ruta);
+    int n = (int)(px + 0.5f);
+    if (n >= 64) return Fuente2DObtener(ruta);
+    if (n < 6) n = 6;
+    char clave[24]; snprintf(clave, sizeof(clave), "@%d|", n);
+    const std::string k = clave + ruta;
+    std::map<std::string, w3dui::W3dTextAtlas*>::iterator it = gFuentes.find(k);
+    if (it != gFuentes.end()) return it->second ? it->second : Fuente2DObtener(ruta);
+    w3dui::W3dTextAtlas* at = HornearTTF(ruta, n);
+    gFuentes[k] = at;   // (NULL tambien: no reintentar por cuadro)
+    return at ? at : Fuente2DObtener(ruta);
 }
 
 // cierre del proyecto (ver Fuente2D.h): el arbol ya se destruyo, nadie guarda un atlas

@@ -14,6 +14,9 @@ namespace w3dui { struct W3dTextAtlas; }
 
 // la fuente lista para dibujar (cacheada). "" = la fuente de Whisk3D. NULL si fallo.
 w3dui::W3dTextAtlas* Fuente2DObtener(const std::string& ruta);
+// la misma para dibujarla a 'px' pixeles de PANTALLA: una .ttf se hornea a ese tamano (cacheada por tamano) y se
+// dibuja 1:1 -> el texto queda nitido en cualquier definicion (un telefono, un monitor 4K). Las demas: Fuente2DObtener
+w3dui::W3dTextAtlas* Fuente2DObtenerPx(const std::string& ruta, float px);
 
 // CIERRE DEL PROYECTO: suelta todas las fuentes cacheadas (sus texturas propias; el atlas
 // COMPARTIDO de una fuente "atlas_unico" es del cache 2D/3D y no se borra aca). Va junto con

@@ -444,6 +444,19 @@ static PunteroPend gPend[4];
 static bool gHayPend = false;
 static void PendLimpiar() { for (int k = 0; k < 4; k++) gPend[k].hay = false; gHayPend = false; }
 
+// UN DIBUJO PENDIENTE ENTRE PASOS (solo con g_rutinaHuecoTris > 0): los rangos visibles de un "Dibujar elementos" con
+// banderas no salen enseguida; si el proximo de la MISMA parte sigue cerca (las tandas de banderas de un material del
+// mundo trozado: una memoria tiene 256) se suman al mismo draw. Lo que no toca GL entre medio (los saltos, los "Test de
+// visibilidad", fijar la MISMA textura) no lo corta; cualquier otro paso, y el fin de la corrida, lo mandan antes
+struct DibujoPend { bool hay; W3dFlujo f; const MallaRecurso* r; int parte, modo, x0, y0; unsigned tex; };
+static DibujoPend gDibPend = { false, W3dFlujo(), 0, 0, 0, 0, 0, 0u };
+static unsigned gTexRutina = 0xFFFFFFFFu;   // la textura que puso el ultimo "Fijar textura" de la corrida (o no se sabe)
+static void Mandar(const W3dFlujo& f, int desde, int cuantos);
+static void DibPendMandar() {
+    if (!gDibPend.hay) return;
+    gDibPend.hay = false;
+    Mandar(gDibPend.f, gDibPend.x0 * 3, (gDibPend.y0 - gDibPend.x0 + 1) * 3);
+}
 // el TIEMPO de las rutinas (ms acumulados de las corridas de afuera: las anidadas van adentro). Lo leen el [PERF] del
 // N95 y benchjuego: cuanto del render es armar la escena con rutinas
 double g_rutinasMs = 0.0;
@@ -453,11 +466,13 @@ static void AbrirCorrida() {
     { extern double W3dNowMs(); gCorridaDesde = W3dNowMs(); }
     gIboActual = 0xFFFFFFFFu; gVboEnUso = false; gPlanosEstado = 0;
     gBaseMVLeida = gMVCargada = false;
+    gDibPend.hay = false; gTexRutina = 0xFFFFFFFFu;
     OlvidarPunteros();
     PendLimpiar();
 }
 static void CerrarCorrida() {
     if (--gProf > 0) return;
+    DibPendMandar();
     { extern double W3dNowMs(); g_rutinasMs += W3dNowMs() - gCorridaDesde; }
     if (gVboEnUso) gfx::UnbindVBOs();
     gVboEnUso = false; gIboActual = 0xFFFFFFFFu;
@@ -542,12 +557,19 @@ static void Mandar(const W3dFlujo& f, int desde, int cuantos) {
         gfx::DrawElements((gfx::Primitiva)f.primGL, n, idx);
     }
 }
+// EL HUECO QUE SE DIBUJA IGUAL: dos rangos visibles de un "Dibujar elementos" con banderas que estan a menos de estos
+// triangulos van en UNA llamada, con lo oculto del medio (la GPU lo descarta al recortar). Cuanto conviene depende del
+// aparato: en la VideoCore IV del Galaxy Ace cada draw le cuesta al driver ~0.2 ms de CPU (busca cada buffer y textura en
+// una tabla) y la GPU le sobra; en el N95 los triangulos de mas pesan. 0 = solo los seguidos (lo de siempre). Lo pone la
+// plataforma (el main del juego compilado)
+int g_rutinaHuecoTris = 0;
 static void Dibujar(const W3dPaso& p) {
     MallaRecurso* r = (MallaRecurso*)p.ptr;
     W3dMallaRecursoAsegurarVBO(r);   // (el IBO de la malla: los indices de la parte)
     W3dFlujo f;
     if (!W3dMallaFlujo(r, p.entero, p.modo, f)) return;
     const int tris = f.cantidad / 3;
+    if (p.sub != RangoArray) DibPendMandar();   // (lo pendiente va antes)
     if (p.sub == RangoManual) {
         const int a = (int)p.n[0].Valor();
         int b = (int)p.n[1].Valor(); if (b < 0) b = tris - 1;
@@ -555,17 +577,32 @@ static void Dibujar(const W3dPaso& p) {
     } else if (p.sub == RangoArray) {
         // [cantidad, primero0, ultimo0, primero1, ultimo1...] (ultimo < 0 = el ultimo de la parte). Con BANDERAS (n[3],
         // otra memoria) cada rango lleva la suya: [cantidad, primero, ultimo, bandera, ...] y se dibujan los de bandera
-        // prendida. Los seguidos (uno empieza donde termino el anterior) van en UNA llamada
+        // prendida. Los seguidos (uno empieza donde termino el anterior) van en UNA llamada, y tambien los separados por
+        // un hueco de hasta g_rutinaHuecoTris triangulos
         const float* a = p.n[2].p;
         const float* on = p.n[3].p;
         const int k = (int)a[0], ancho = on ? 3 : 2;
+        if (g_rutinaHuecoTris > 0) {   // (al dibujo pendiente: puede seguir en el proximo paso)
+            DibujoPend& d = gDibPend;
+            if (d.hay && (d.r != r || d.parte != p.entero || d.modo != p.modo)) DibPendMandar();
+            for (int j = 0; j < k; j++) {
+                const float* e = a + 1 + ancho * j;
+                if (on && on[(int)e[2]] == 0.0f) continue;
+                const int x = (int)e[0];
+                int y = (int)e[1]; if (y < 0) y = tris - 1;
+                if (d.hay && x > d.y0 && x - (d.y0 + 1) <= g_rutinaHuecoTris) { if (y > d.y0) d.y0 = y; continue; }
+                DibPendMandar();
+                d.hay = true; d.f = f; d.r = r; d.parte = p.entero; d.modo = p.modo; d.x0 = x; d.y0 = y; d.tex = gTexRutina;
+            }
+            return;
+        }
         int x0 = -1, y0 = -1;
         for (int j = 0; j < k; j++) {
             const float* e = a + 1 + ancho * j;
             if (on && on[(int)e[2]] == 0.0f) continue;
             const int x = (int)e[0];
             int y = (int)e[1]; if (y < 0) y = tris - 1;
-            if (x0 >= 0 && x == y0 + 1) { y0 = y; continue; }
+            if (x0 >= 0 && x > y0 && x - (y0 + 1) <= g_rutinaHuecoTris) { if (y > y0) y0 = y; continue; }
             if (x0 >= 0) Mandar(f, x0 * 3, (y0 - x0 + 1) * 3);
             x0 = x; y0 = y;
         }
@@ -773,6 +810,13 @@ static void EjecutarPaso(W3dPaso& p, size_t& i, Rutina* yo) {
     if (medir) g_rutinaPerfilMs[p.tipo] += RelojPerfil() - t0;
 }
 static void EjecutarPasoCrudo(W3dPaso& p, size_t& i, Rutina* yo) {
+    if (gDibPend.hay) {
+        const bool sigue = p.tipo == PasoDibujar || p.tipo == PasoVisible || p.tipo == PasoSaltarSi ||
+                           p.tipo == PasoSaltarSiNinguna || p.tipo == PasoSaltarOculto || p.tipo == PasoSaltarFuera ||
+                           p.tipo == PasoSaltarRiel || p.tipo == PasoSaltarNoListado ||
+                           (p.tipo == PasoFijarTextura && p.ptr && ((Texture*)p.ptr)->iID == gDibPend.tex);
+        if (!sigue) DibPendMandar();
+    }
     switch (p.tipo) {
     // ---- transformar ----
     case PasoApilar:    gfx::PushMatrix(); break;
@@ -835,7 +879,7 @@ static void EjecutarPasoCrudo(W3dPaso& p, size_t& i, Rutina* yo) {
     }
     // ---- textura ----
     case PasoTextura:        if (p.on) gfx::Enable(gfx::Texture2D); else gfx::Disable(gfx::Texture2D); break;
-    case PasoFijarTextura:   gfx::BindTexture(((Texture*)p.ptr)->iID); break;
+    case PasoFijarTextura:   gTexRutina = ((Texture*)p.ptr)->iID; gfx::BindTexture(gTexRutina); break;
     case PasoCopiarPantalla: W3dCapturaCopiarYa(p.ref); break;
     case PasoTexturaModo:
         // (DOT3: el color de vertice es la direccion de la luz, horneada; solo alfa: RGB del color, alfa de la textura por el del color)

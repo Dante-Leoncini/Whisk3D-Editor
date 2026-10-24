@@ -65,13 +65,18 @@ static void FrustumDeMatriz(const Matrix4& M, PlanoFrustum* p) {
 }
 
 // test AABB vs frustum por el VERTICE POSITIVO: si hasta la esquina mas favorable
-// al plano queda del lado de afuera, el AABB entero esta afuera.
+// al plano queda del lado de afuera, el AABB entero esta afuera. Con el centro y la
+// mitad de la caja la esquina favorable sale sin elegir: n . c + |a| ex + |b| ey + |c| ez
+// (la misma cuenta). Una comparacion por plano en vez de cuatro: en el ARM11 cada
+// comparacion de floats vacia el pipeline del VFP, y la Rutina del mundo de DBZ prueba
+// 1332 cajas por cuadro
 static bool AabbEnFrustum(const PlanoFrustum* p, const Vector3& mn, const Vector3& mx) {
+    const float cx = (mn.x + mx.x) * 0.5f, cy = (mn.y + mx.y) * 0.5f, cz = (mn.z + mx.z) * 0.5f;
+    const float ex = (mx.x - mn.x) * 0.5f, ey = (mx.y - mn.y) * 0.5f, ez = (mx.z - mn.z) * 0.5f;
     for (int i = 0; i < 6; i++) {
-        float px = (p[i].a >= 0.0f) ? mx.x : mn.x;
-        float py = (p[i].b >= 0.0f) ? mx.y : mn.y;
-        float pz = (p[i].c >= 0.0f) ? mx.z : mn.z;
-        if (p[i].a*px + p[i].b*py + p[i].c*pz + p[i].d < 0.0f) return false;
+        const float d = p[i].a*cx + p[i].b*cy + p[i].c*cz + p[i].d
+                      + fabsf(p[i].a)*ex + fabsf(p[i].b)*ey + fabsf(p[i].c)*ez;
+        if (d < 0.0f) return false;
     }
     return true;
 }

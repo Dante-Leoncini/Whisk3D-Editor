@@ -761,12 +761,14 @@ static void DibujarHijosRecortados(Object* padre, float clipX0, float clipY0,
 // fuente EFECTIVA de un texto 2D: la BITMAP declarada (fuenteBitmap: png + json de
 // glifos, ver Texto2D.h) si carga; si falta el archivo cae a la fuente comun (ttf o
 // la de Whisk3D) para que el texto nunca desaparezca.
-static w3dui::W3dTextAtlas* FuenteDeTexto2D(Texto2D* t) {
+// 'px' = el alto con que se va a dibujar en pixeles de PANTALLA (0 = sin saberlo): una .ttf viene horneada a ese tamano
+// (Fuente2DObtenerPx: nitida en cualquier definicion)
+static w3dui::W3dTextAtlas* FuenteDeTexto2D(Texto2D* t, float px = 0.0f) {
     if (!t->fuenteBitmap.empty()) {
         w3dui::W3dTextAtlas* at = Fuente2DObtener(t->fuenteBitmap);
         if (at) return at;
     }
-    return Fuente2DObtener(t->fuente);
+    return (px > 0.0f) ? Fuente2DObtenerPx(t->fuente, px) : Fuente2DObtener(t->fuente);
 }
 
 // EL ARMADO de un texto (el tamano que entra, las lineas partidas y sus anchos) por elemento: se rehace solo si cambio
@@ -794,10 +796,10 @@ std::map<const Texto2D*, ArmadoTexto> gArmados;
 static void DibujarTextoBloque(Texto2D* t, float sx, float sy, float rw, float rh,
                                float escala, float op, float* outB) {
     outB[0] = sx; outB[1] = sy; outB[2] = sx; outB[3] = sy;
-    w3dui::W3dTextAtlas* at = FuenteDeTexto2D(t);
+    const float pxPedido = t->tam * escala * FactorTexto(t->tamModo);
+    w3dui::W3dTextAtlas* at = FuenteDeTexto2D(t, pxPedido);
     std::string txt = TextoSegunTipo(t);
     if (!at || txt.empty()) return;
-    const float pxPedido = t->tam * escala * FactorTexto(t->tamModo);
     const bool ajusta = t->autoTam && rw > 4.0f && rh > 4.0f;
     if (gArmados.size() > 1024) gArmados.clear();   // (los de elementos que ya no existen)
     ArmadoTexto& A = gArmados[t];
@@ -849,9 +851,9 @@ static void DibujarTextoBloque(Texto2D* t, float sx, float sy, float rw, float r
 // mide el tamano NATURAL del boton (padding + icono + texto), en px de PANTALLA.
 // rw/rh = rect de referencia (para el boton de solo arte con tamano RELATIVO).
 static void MedirBoton(Boton2D* b, float escala, float rw, float rh, float* w, float* h) {
-    w3dui::W3dTextAtlas* at = Fuente2DObtener(b->fuente);
     float fT = FactorTexto(b->tamModo);
     float px = b->tam * escala * fT;
+    w3dui::W3dTextAtlas* at = Fuente2DObtenerPx(b->fuente, px);
     if (at) px = PxSnap(at, px, false);
     float tw = (at && !b->texto.empty()) ? at->TextWidth(b->texto.c_str(), px) : 0.0f;
     float icoW = 0.0f, icoH = 0.0f;
@@ -923,7 +925,7 @@ static void DibujarBoton(Boton2D* b, float x0, float y0, float x1, float y1,
     unsigned texIco = b->icono.empty() ? 0 : Textura2DObtener(b->icono, &iw, &ih);
     float icoW = texIco ? iw * escala : 0.0f;
     float icoH = texIco ? ih * escala : 0.0f;
-    w3dui::W3dTextAtlas* at = b->texto.empty() ? NULL : Fuente2DObtener(b->fuente);
+    w3dui::W3dTextAtlas* at = b->texto.empty() ? NULL : Fuente2DObtenerPx(b->fuente, b->tam * escala * fT);
     float px = 0.0f, tw = 0.0f;
     if (at) {
         px = PxSnap(at, b->tam * escala * fT, false);
@@ -981,7 +983,7 @@ static float MedirNatural(Object* o, float escala, float rw, float rh, bool ejeX
     }
     if (t == ObjectType::texto2d) {
         Texto2D* tx = (Texto2D*)o;
-        w3dui::W3dTextAtlas* at = FuenteDeTexto2D(tx);
+        w3dui::W3dTextAtlas* at = FuenteDeTexto2D(tx, tx->tam * escala * FactorTexto(tx->tamModo));
         std::string txt = TextoSegunTipo(tx);
         if (!at || txt.empty()) return 0.0f;
         float px = PxSnap(at, tx->tam * escala * FactorTexto(tx->tamModo), false);

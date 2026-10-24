@@ -828,6 +828,7 @@ static std::string LibreriaDeGenerado(Object* o) {
 static Object* HookInstanciar(const char* nombre, const float* pos, float rotY) {
     if (!nombre || !SceneCollection) return NULL;
     const Vector3 p = pos ? Vector3(pos[0], pos[1], pos[2]) : Vector3(0, 0, 0);
+    Object* padre = W3dObjetoVivo(W3dPrefabInstanciarPadre) ? W3dPrefabInstanciarPadre : NULL;   // (NULL = la raiz)
     std::vector<Object*> sel = ObjSelects;
     Object* activo = ObjActivo;
     const unsigned serial = W3dSeleccionSerial;
@@ -838,24 +839,24 @@ static Object* HookInstanciar(const char* nombre, const float* pos, float rotY) 
         const std::string libDue = LibreriaDeGenerado(W3dPrefabInstanciarDuenio);
         const std::string n = nombre;
         if (!libDue.empty() && n.find('/') == std::string::npos && W3dLibsTieneElemento(libDue, W3D_LIB_PREFAB, n))
-            ip = W3dProxyCrear(libDue, W3D_LIB_PREFAB, n, NULL, p, rotY);
+            ip = W3dProxyCrear(libDue, W3D_LIB_PREFAB, n, padre, p, rotY);
         // "Otra/Rifle" desde un script de una libreria que vincula a "Otra" (una de adentro): la de SU registro
         const size_t barra = n.find('/');
         if (!ip && !libDue.empty() && barra != std::string::npos && barra > 0) {
             const std::string an = W3dLibsNombreAnidado(libDue, n);
             if (!an.empty()) {
                 const std::string g = an.substr(0, an.size() - (n.size() - barra)), elem = n.substr(barra + 1);
-                if (W3dLibsTieneElemento(g, W3D_LIB_PREFAB, elem)) ip = W3dProxyCrear(g, W3D_LIB_PREFAB, elem, NULL, p, rotY);
-                else if (W3dLibsTieneElemento(g, W3D_LIB_ESCENA, elem)) ip = W3dProxyCrear(g, W3D_LIB_ESCENA, elem, NULL, p, rotY);
+                if (W3dLibsTieneElemento(g, W3D_LIB_PREFAB, elem)) ip = W3dProxyCrear(g, W3D_LIB_PREFAB, elem, padre, p, rotY);
+                else if (W3dLibsTieneElemento(g, W3D_LIB_ESCENA, elem)) ip = W3dProxyCrear(g, W3D_LIB_ESCENA, elem, padre, p, rotY);
             }
         }
     }
-    if (!ip) ip = W3dPrefabCrearInstancia(nombre, NULL, p, rotY);
+    if (!ip) ip = W3dPrefabCrearInstancia(nombre, padre, p, rotY);
     // una ESCENA del proyecto por su nombre ("Auto": si no hay un prefab que se llame asi)
-    if (!ip && W3dRaizBuscar(W3D_RAIZ_ESCENA, nombre) >= 0) ip = W3dPrefabCrearInstancia(W3dPrefabClaveEscena(nombre), NULL, p, rotY);
+    if (!ip && W3dRaizBuscar(W3D_RAIZ_ESCENA, nombre) >= 0) ip = W3dPrefabCrearInstancia(W3dPrefabClaveEscena(nombre), padre, p, rotY);
     if (!ip) {
         std::string lib, elem; int tipo = W3D_LIB_PREFAB;
-        if (W3dProxyNombre(nombre, &lib, &tipo, &elem)) ip = W3dProxyCrear(lib, tipo, elem, NULL, p, rotY);
+        if (W3dProxyNombre(nombre, &lib, &tipo, &elem)) ip = W3dProxyCrear(lib, tipo, elem, padre, p, rotY);
     }
     if (!ip) return NULL;
     ip->select = false;

@@ -18,6 +18,7 @@ puerto 47023 en su router).
 | `redEstado() → estado, error` | `"nada"`, `"buscando"`, `"esperando"` (sos el anfitrión), `"conectando"`, `"conectado"` o `"error"` (con el porqué). |
 | `redYo() → id` | Tu número en la partida (0 = el anfitrión; -1 sin partida). |
 | `redJugadores() → { {id, nombre, yo}, … }` | Los que están en la partida (el nombre es el de su dispositivo). |
+| `redSilencio([id]) → segundos, limite` | Hace cuánto no llega nada de ese jugador (sin `id`: del que hace más). El que se une solo oye al anfitrión, así que para él es el silencio del anfitrión. Pasado el `limite` (8 s) se lo da por ido: el anfitrión lo saca de la partida y al que se unió `redEstado()` le da `"error"`. |
 | `redEnviar(valor [, para [, confiable]]) → bool` | Manda un valor de Lua (número, texto, booleano o tabla, con tablas adentro) a un jugador (`para` = su id) o a todos (`nil`). **Confiable** (por defecto): llega seguro y en orden. Con `false` no se reenvía si se pierde: para lo que mandás cada cuadro (posiciones, el mando), donde el siguiente lo reemplaza. |
 | `redRecibir() → { {de, datos}, … }` | Todo lo que llegó desde la última vez, en orden. |
 | `redCerrar()` | Sale de la partida (al anfitrión: la cierra para todos). El Stop del editor también la cierra. |
@@ -58,6 +59,9 @@ end
   anfitrión calcule el juego y les mande a los demás lo que tienen que mostrar; los demás solo le mandan su mando. Así
   lo hace la demo de Dragon Ball (`dbz2w3d/lua/pelea.lua`).
 - Lo que se manda cada cuadro, **no confiable**; lo que pasa una vez (un aviso, "empezar"), **confiable**.
+- **Cuando la red se traba**: si en una pelea `redSilencio()` pasa de unas décimas de segundo, el otro dejó de
+  mandar (se cortó el wifi, el teléfono pasó a segundo plano). Pausá el juego y avisá ("esperando a…", con lo que
+  falta para `limite`): si vuelve, sigue donde estaba; si no, `redEstado()` o `redJugadores()` lo dicen.
 - Mandá lo justo: números y textos cortos. Un mensaje no puede pasar los 60000 bytes.
 - En el navegador todavía no hay red (no tiene UDP). Android pide el permiso `INTERNET` (el juego compilado lo trae);
   Symbian, la capacidad `NetworkServices` (el teléfono pregunta por qué punto de acceso salir).

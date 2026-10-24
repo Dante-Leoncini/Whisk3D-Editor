@@ -152,6 +152,7 @@ void W3dCompilarReset() {
     g_proyCompilar.modoDebug   = false;  // produccion
     g_proyCompilar.uid         = 0;       // sin UID: un proyecto sin "uid" no hereda el del anterior. El save/load lo persiste.
     g_proyCompilar.volumen     = 100;     // volumen del gameplay al maximo por defecto
+    g_proyCompilar.resolucion  = 100;     // la pantalla nativa
 }
 
 // int <-> string legible del bloque "compilar" (el JSON se edita a mano: nada
@@ -175,7 +176,7 @@ int W3dCompilarOrientacionInt(const std::string& s) {
 const char* W3dCompilarAssetsStr(int a) { return (a == 1) ? "empaquetados" : "sueltos"; }
 int W3dCompilarAssetsInt(const std::string& s) { return (s == "empaquetados") ? 1 : 0; }
 const char* W3dCompilarPlataformaStr(int p) {
-    return (p == 5) ? "symbian" : (p == 4) ? "windows" :
+    return (p == 6) ? "android23" : (p == 5) ? "symbian" : (p == 4) ? "windows" :
            (p == 3) ? "android" : (p == 2) ? "web" : (p == 1) ? "appimage" : "linux-deb";
 }
 int W3dCompilarPlataformaInt(const std::string& s) {
@@ -184,6 +185,7 @@ int W3dCompilarPlataformaInt(const std::string& s) {
     if (s == "android")  return 3;
     if (s == "windows")  return 4;
     if (s == "symbian")  return 5;
+    if (s == "android23") return 6;   // (Android 2.3: el APK de platform/android-viejo)
     return 0;
 }
 
@@ -2961,6 +2963,8 @@ bool GuardarW3D(const std::string& ruta) {
     s += "    \"sonido\": ";  s += g_proyCompilar.usarSonido ? "true" : "false"; s += ",\n";
     { char volbuf[16]; snprintf(volbuf, sizeof(volbuf), "%d", g_proyCompilar.volumen);
       s += "    \"volumen\": "; s += volbuf; s += ",\n"; }   // 0..100 volumen del gameplay
+    { char resbuf[16]; snprintf(resbuf, sizeof(resbuf), "%d", g_proyCompilar.resolucion);
+      s += "    \"resolucion\": "; s += resbuf; s += ",\n"; }   // 25..100 % de la pantalla (Android 2.3)
     s += "    \"debug\": ";   s += g_proyCompilar.modoDebug  ? "true" : "false"; s += ",\n";
     s += "    \"assets\": ";  JEsc(s, W3dCompilarAssetsStr(g_proyCompilar.assetsModo)); s += ",\n";
     s += "    \"plataforma\": "; JEsc(s, W3dCompilarPlataformaStr(g_proyCompilar.plataforma)); s += ",\n";

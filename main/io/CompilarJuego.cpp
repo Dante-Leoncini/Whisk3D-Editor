@@ -658,7 +658,9 @@ static void CarpAssetsDescubrir(const std::string& out) {
         if (!ent[i].isDir) continue;
         const std::string& n = ent[i].name;
         // artefactos del build, no assets del juego
-        if (n == "out" || n == "icons" || n == "androidprj" || n == "." || n == "..") continue;
+        // (androidviejo y obj23: el proyecto y lo compilado del APK de Android 2.3)
+        if (n == "out" || n == "icons" || n == "androidprj" || n == "androidviejo" || n == "obj23" ||
+            n == "." || n == "..") continue;
         bool ya = false;
         for (size_t k = 0; k < gCarpAssets.size(); k++) if (gCarpAssets[k] == n) { ya = true; break; }
         if (!ya) gCarpAssets.push_back(n);
@@ -743,7 +745,7 @@ static void TextosDelStaging(const std::string& dir, const std::string& rel,
         const std::string& n = ent[i].name;
         if (n == "." || n == "..") continue;
         if (ent[i].isDir) {
-            if (n == "out" || n == "icons" || n == "androidprj") continue;
+            if (n == "out" || n == "icons" || n == "androidprj" || n == "androidviejo" || n == "obj23") continue;
             TextosDelStaging(dir + "/" + n, rel.empty() ? n : rel + "/" + n, out, prof + 1);
             continue;
         }
@@ -800,6 +802,15 @@ static void CopiarRefsRelativasDeLua(const std::string& out, const std::string& 
         snprintf(cmd, sizeof(cmd), "mkdir -p \"%s/%s\" && cp -rn \"%s/%s/.\" \"%s/%s/\" 2>/dev/null || true",
                  out.c_str(), it->c_str(), proy.c_str(), it->c_str(), out.c_str(), it->c_str());
         if (system(cmd) == 0) nC++;
+    }
+    // (ni por su CARPETA: un texto que nombra la carpeta de las librerias -"autos/auto_1.w3d" en un comentario- la
+    // copiaba entera, y cada .w3d viajaba dos veces, suelto y en librerias/<nombre>/: +2.8 MB en el APK de Daytona)
+    for (std::set<std::string>::iterator it = libs.begin(); it != libs.end(); ++it) {
+        const std::string suelto = out + "/" + *it;
+        if (!w3dFileSystem::FileExists(suelto)) continue;
+        remove(suelto.c_str());
+        const std::string dir = Carpeta(*it);
+        if (!dir.empty() && dir != *it) rmdir((out + "/" + dir).c_str());   // (si quedo vacia)
     }
     if (nA || nC)
         w3dLogf("CompilarJuego: %d carpeta(s) y %d archivo(s) que el proyecto nombra por "
@@ -1037,9 +1048,11 @@ static bool EscribirMain(const std::string& ruta, const std::string& fontRel,
     fputs("#include \"w3dGraphics.h\"\n", f);
     fputs("#include \"io/w3dFilesystem.h\"\n#include \"base/W3dConfig.h\"\n", f);
     fputs("#include \"script/W3dScript.h\"\n", f);
+    fputs("#include \"base/w3dlog.h\"\n", f);   // (w3dLogf: el medidor de cuadros del modo debug)
     // el registro COMPARTIDO de mandos (hotplug + avisos + los binds de lua)
     fputs("#include \"script/BindsJuego.h\"\n", f);
-    fputs("#include <cstdio>\n#include <cstdlib>\n#include <ctime>\n", f);
+    fputs("#include <cstdio>\n#include <cstdlib>\n#include <cstring>\n#include <ctime>\n", f);
+    fputs("#if defined(__linux__) || defined(__ANDROID__)\n#include <unistd.h>\n#endif\n", f);
     fputs("#ifdef __ANDROID__\n#include <jni.h>\n#include <android/asset_manager.h>\n"
           "#include <android/asset_manager_jni.h>\n#endif\n", f);
     fputs("#ifdef __EMSCRIPTEN__\n#include <emscripten.h>\n#include <emscripten/html5.h>\n#endif\n", f);
@@ -1053,6 +1066,19 @@ static bool EscribirMain(const std::string& ruta, const std::string& fontRel,
               "extern const unsigned char g_w3dPakDatos[];\nextern const unsigned g_w3dPakTam;\n", f);
     fputs("namespace gfx = w3dEngine;\nstatic SDL_Window* g_win=0; static bool g_run=true;\n", f);
     fputs("static SDL_GameController* g_pad=0; static Uint32 g_lastMs=0;\n", f);
+    // LA RESOLUCION REDUCIDA (Android 2.3, W3D_RESOLUCION = % de la pantalla): SDL 2.0.7 da el dedo (y el mouse que
+    // simula) en px de la VISTA divididos por el ancho del bufer achicado -> se lleva al bufer
+    fputs("#if defined(__ANDROID__) && defined(W3D_RESOLUCION)\n#define W3D_KDEDO (W3D_RESOLUCION/100.0f)\n#else\n"
+          "#define W3D_KDEDO 1.0f\n#endif\n", f);
+    // EL ACELEROMETRO (Android): SDL lo da como un joystick de 3 ejes ("Android Accelerometer", en g, en los ejes de la
+    // pantalla ya girada) -> inclinacion() de lua (W3dScriptInclinacion)
+    fputs("#ifdef __ANDROID__\nstatic SDL_Joystick* g_acel=0;\n#endif\n", f);
+    // vibrar() de lua en los MANDOS (W3dScriptMandosVibrarHook): todos los conectados (SDL 2.0.9 o mas nuevo; la 2.0.7 de
+    // Android 2.3 no tiene: ahi vibra el telefono, base/W3dVibrar.cpp)
+    fputs("static void vibrarMandos(int ms,float f){\n#if SDL_VERSION_ATLEAST(2,0,9)\n"
+          "Uint16 v=(Uint16)(f*65535.0f);for(int ci=0;ci<W3dControlesCuantos();ci++){\n"
+          " SDL_GameController* gc=(SDL_GameController*)W3dControlHandle(ci);if(gc)SDL_GameControllerRumble(gc,v,v,(Uint32)ms);}\n"
+          "#else\n(void)ms;(void)f;\n#endif\n}\n", f);
     // multi-touch: SDL da un fingerId arbitrario por dedo; se mapea a un slot fijo
     // 0..3 (dedo(1..4) en lua) para que cada jugador tactil conserve su dedo
     fputs("#define W3D_NDEDOS 4\n", f);
@@ -1099,12 +1125,17 @@ static bool EscribirMain(const std::string& ruta, const std::string& fontRel,
     fputs("#else\nSDL_GL_GetDrawableSize(g_win,w,h);\n", f);
     fputs("if(*w<1||*h<1)SDL_GetWindowSize(g_win,w,h);\n#endif\nif(*w<1)*w=1;if(*h<1)*h=1;}\n", f);
     // Android: insets del notch/barras (getSafeInsets del Activity) -> la UI se acota
+    // (cada medio segundo, no cada cuadro: es una llamada a Java. Si el Activity no tiene getSafeInsets -una
+    //  plantilla vieja- no se vuelve a preguntar: GetMethodID tira una excepcion de Java cada vez)
     fputs("#ifdef __ANDROID__\nstatic void actualizarSafeArea(){\n", f);
+    fputs("static int cuadros=0;static bool sinMetodo=false;\n", f);
+    fputs("if(sinMetodo||(cuadros++%30)!=0)return;\n", f);
     fputs("JNIEnv* env=(JNIEnv*)SDL_AndroidGetJNIEnv();\n", f);
     fputs("jobject act=(jobject)SDL_AndroidGetActivity();\n", f);
     fputs("if(!env||!act)return;\n", f);
     fputs("jclass cl=env->GetObjectClass(act);\n", f);
     fputs("jmethodID mid=cl?env->GetMethodID(cl,\"getSafeInsets\",\"()[I\"):0;\n", f);
+    fputs("if(!mid)sinMetodo=true;\n", f);
     fputs("if(mid){jintArray arr=(jintArray)env->CallObjectMethod(act,mid);\n", f);
     fputs("if(arr&&env->GetArrayLength(arr)>=4){jint* v=env->GetIntArrayElements(arr,0);\n", f);
     fputs("W3dGameSafeArea((int)v[0],(int)v[1],(int)v[2],(int)v[3]);\n", f);
@@ -1112,6 +1143,50 @@ static bool EscribirMain(const std::string& ruta, const std::string& fontRel,
     fputs("if(arr)env->DeleteLocalRef(arr);}\n", f);
     fputs("if(env->ExceptionCheck())env->ExceptionClear();\n", f);
     fputs("if(cl)env->DeleteLocalRef(cl);\nenv->DeleteLocalRef(act);}\n#endif\n", f);
+    // (el medidor del modo debug: el skinning y las rutinas de la escena 3D, con sus contadores del motor)
+    fputs("#if W3D_DEV_LOG && defined(W3D_JUEGO_3D)\nextern unsigned int (*g_skinRelojMs)();extern int g_skinPerfMs;"
+          "extern double g_rutinasMs;\nstatic unsigned int relojSkin(){return SDL_GetTicks();}\n"
+          "extern double (*g_skinRelojAlto)();extern double g_skinTotalMs,g_skinPoseMs;extern double W3dNowMs();\n#endif\n", f);
+    // (las pruebas del modo debug, sin recompilar: W3D_LUA="Objeto:codigo" corre ese lua en el script del objeto al tercer
+    // cuadro -ir directo a una pelea, esconder una parte de la escena- y W3D_MEDIR_GPU=1 espera a la GPU antes del swap y
+    // lo mide aparte. En Android las variables salen de /data/local/tmp/w3d_env.txt: NOMBRE=valor por linea, con adb push)
+    fputs("#if W3D_DEV_LOG && defined(W3D_JUEGO_3D)\n#include \"objects/Objects.h\"\n"
+          "static void pruebaLua(){static int n=0;if(++n!=3)return;const char* c=getenv(\"W3D_LUA\");if(!c||!*c)return;\n"
+          "const char* d=strchr(c,':');if(!d)return;std::string nom(c,d-c),e;\n"
+          "Object* o=SceneCollection?FindObjectByName(SceneCollection,nom):0;\n"
+          "if(!o){w3dLogf(\"[juego] W3D_LUA: no hay un objeto '%s'\",nom.c_str());return;}\n"
+          "if(W3dScriptEjecutar(o,d+1,e))w3dLogf(\"[juego] W3D_LUA: %s\",d+1);"
+          "else w3dLogf(\"[juego] W3D_LUA: %s\",e.c_str());}\n#endif\n", f);
+    // (modo debug, Android ARM: W3D_PERFIL=<segundos> muestrea el programa con el reloj de CPU (SIGPROF) durante esos
+    // segundos desde el cuadro 300, y el log dice cuanto cayo en cada biblioteca y en cada bloque de 64 bytes de cada una:
+    // con el libmain.so sin recortar de obj23 y addr2line sale la funcion de cada bloque; las del sistema, con adb pull y nm -D)
+    fputs("#if W3D_DEV_LOG && defined(__ANDROID__) && defined(__arm__)\n"
+          "#include <signal.h>\n#include <sys/time.h>\n#include <dlfcn.h>\n#include <asm/sigcontext.h>\n#include <map>\n"
+          "static unsigned long g_perfPc[32768];static volatile int g_perfN=0;\n"
+          "struct PerfUc{unsigned long fl;void* enlace;struct{void* sp;int fl;size_t tam;}pila;struct sigcontext mc;};\n"
+          "static void perfSenal(int,siginfo_t*,void* uc){int n=g_perfN;"
+          "if(n<32768){g_perfPc[n]=((PerfUc*)uc)->mc.arm_pc;g_perfN=n+1;}}\n"
+          "static void perfilCuadro(){static int cuadro=0,estado=0;static Uint32 hasta=0;const char* e=getenv(\"W3D_PERFIL\");\n"
+          "if(!e||!*e||estado==2)return;\n"
+          "if(estado==0){if(++cuadro<300)return;struct sigaction sa;memset(&sa,0,sizeof(sa));sa.sa_sigaction=perfSenal;\n"
+          "sa.sa_flags=SA_SIGINFO|SA_RESTART;sigaction(SIGPROF,&sa,0);struct itimerval it;it.it_interval.tv_sec=0;\n"
+          "it.it_interval.tv_usec=1000;it.it_value=it.it_interval;setitimer(ITIMER_PROF,&it,0);\n"
+          "hasta=SDL_GetTicks()+1000u*(Uint32)atoi(e);estado=1;w3dLogf(\"[perfil] empieza\");return;}\n"
+          "if(SDL_GetTicks()<hasta)return;\n"
+          "struct itimerval no;memset(&no,0,sizeof(no));setitimer(ITIMER_PROF,&no,0);estado=2;\n"
+          "std::map<std::string,int> libs,num;std::map<std::pair<int,unsigned long>,int> bloques;const int n=g_perfN;\n"
+          "for(int i=0;i<n;i++){Dl_info di;memset(&di,0,sizeof(di));\n"
+          "const bool hay=dladdr((void*)g_perfPc[i],&di)&&di.dli_fname;const std::string lib=hay?di.dli_fname:\"?\";libs[lib]++;\n"
+          "if(!num.count(lib)){const int k=(int)num.size();num[lib]=k;}\n"
+          "if(hay)bloques[std::make_pair(num[lib],(g_perfPc[i]-(unsigned long)di.dli_fbase)>>6)]++;}\n"
+          "w3dLogf(\"[perfil] %d muestras\",n);\n"
+          "for(std::map<std::string,int>::iterator it=libs.begin();it!=libs.end();++it)"
+          "w3dLogf(\"[perfil] lib %d %s %d\",num[it->first],it->first.c_str(),it->second);\n"
+          "char l[400];int k=0,m=0,lib=-1;\n"
+          "for(std::map<std::pair<int,unsigned long>,int>::iterator it=bloques.begin();it!=bloques.end();++it){\n"
+          "if(it->first.first!=lib&&m){w3dLogf(\"[perfil] b%d%s\",lib,l);k=m=0;}lib=it->first.first;\n"
+          "k+=snprintf(l+k,sizeof(l)-k,\" %lx:%d\",it->first.second<<6,it->second);if(++m==16){w3dLogf(\"[perfil] b%d%s\",lib,l);k=m=0;}}\n"
+          "if(m)w3dLogf(\"[perfil] b%d%s\",lib,l);w3dLogf(\"[perfil] fin\");}\n#endif\n", f);
     fputs("static void frame(){SDL_Event e;while(SDL_PollEvent(&e)){\n", f);
     fputs("if(e.type==SDL_QUIT)g_run=false;\n", f);
     fputs("else if(e.type==SDL_KEYDOWN&&e.key.keysym.sym==SDLK_ESCAPE)g_run=false;\n", f);
@@ -1124,21 +1199,21 @@ static bool EscribirMain(const std::string& ruta, const std::string& fontRel,
     fputs("else if(e.type==SDL_CONTROLLERDEVICEREMOVED)padCerrar(e.cdevice.which);\n", f);
     // mouse: click/arrastre -> toque() en lua; posicion sin clic -> raton()
     fputs("else if(e.type==SDL_MOUSEBUTTONDOWN&&e.button.button==SDL_BUTTON_LEFT)\n", f);
-    fputs(" W3dGameToque((int)e.button.x,(int)e.button.y,true);\n", f);
+    fputs(" W3dGameToque((int)(e.button.x*W3D_KDEDO),(int)(e.button.y*W3D_KDEDO),true);\n", f);
     fputs("else if(e.type==SDL_MOUSEMOTION){\n", f);
-    fputs(" W3dGameRaton((int)e.motion.x,(int)e.motion.y,true);\n", f);
-    fputs(" if(e.motion.state&SDL_BUTTON_LMASK)W3dGameToque((int)e.motion.x,(int)e.motion.y,true);}\n", f);
+    fputs(" W3dGameRaton((int)(e.motion.x*W3D_KDEDO),(int)(e.motion.y*W3D_KDEDO),true);\n", f);
+    fputs(" if(e.motion.state&SDL_BUTTON_LMASK)W3dGameToque((int)(e.motion.x*W3D_KDEDO),(int)(e.motion.y*W3D_KDEDO),true);}\n", f);
     fputs("else if(e.type==SDL_MOUSEBUTTONUP&&e.button.button==SDL_BUTTON_LEFT)\n", f);
-    fputs(" W3dGameToque((int)e.button.x,(int)e.button.y,false);\n", f);
+    fputs(" W3dGameToque((int)(e.button.x*W3D_KDEDO),(int)(e.button.y*W3D_KDEDO),false);\n", f);
     // multi-touch real (tactil/movil): cada dedo -> su slot -> dedo(1..4) en lua
     fputs("else if(e.type==SDL_FINGERDOWN||e.type==SDL_FINGERMOTION){\n", f);
     fputs(" int s=dedoSlot(e.tfinger.fingerId,e.type==SDL_FINGERDOWN);\n", f);
     fputs(" if(s>=0){int w,h;tamActual(&w,&h);"
-          "W3dGameDedo(s,(int)(e.tfinger.x*w),(int)(e.tfinger.y*h),true);}}\n", f);
+          "W3dGameDedo(s,(int)(e.tfinger.x*w*W3D_KDEDO),(int)(e.tfinger.y*h*W3D_KDEDO),true);}}\n", f);
     fputs("else if(e.type==SDL_FINGERUP){\n", f);
     fputs(" int s=dedoSlot(e.tfinger.fingerId,false);\n", f);
     fputs(" if(s>=0){int w,h;tamActual(&w,&h);"
-          "W3dGameDedo(s,(int)(e.tfinger.x*w),(int)(e.tfinger.y*h),false);\n", f);
+          "W3dGameDedo(s,(int)(e.tfinger.x*w*W3D_KDEDO),(int)(e.tfinger.y*h*W3D_KDEDO),false);\n", f);
     fputs(" g_dedoId[s]=(SDL_FingerID)-1;}}\n", f);
     fputs("}\n", f);
     fputs("#ifdef __EMSCRIPTEN__\nif(!g_run){emscripten_cancel_main_loop();return;}\n#endif\n", f);
@@ -1187,8 +1262,19 @@ static bool EscribirMain(const std::string& ruta, const std::string& fontRel,
     fputs("W3dGameBoton(\"x\",bx!=0);W3dGameBoton(\"y\",by!=0);\n", f);
     fputs("W3dGameBoton(\"arriba\",du!=0);W3dGameBoton(\"abajo\",dd!=0);\n", f);
     fputs("W3dGameBoton(\"izquierda\",dl!=0);W3dGameBoton(\"derecha\",dr!=0);}\n", f);
+    fputs("#ifdef __ANDROID__\nif(g_acel){const float M=1.0f/32767.0f;SDL_JoystickUpdate();\n"
+          "W3dScriptInclinacion(SDL_JoystickGetAxis(g_acel,0)*M,SDL_JoystickGetAxis(g_acel,1)*M,SDL_JoystickGetAxis(g_acel,2)*M);}\n"
+          "#endif\n", f);
     fputs("Uint32 now=SDL_GetTicks();float dt=(now-g_lastMs)/1000.0f;g_lastMs=now;\n", f);
     fputs("if(dt<0)dt=0;if(dt>0.1f)dt=0.1f;\n", f);
+    // (modo debug: cada 2 s el log dice los cuadros por segundo y cuanto tardan la logica, el dibujo y el swap)
+    fputs("#if W3D_DEV_LOG\nUint64 m0=SDL_GetPerformanceCounter();\n#endif\n", f);
+    fputs("#if W3D_DEV_LOG && defined(W3D_JUEGO_3D)\npruebaLua();\n#endif\n", f);
+    fputs("#if W3D_DEV_LOG && defined(__ANDROID__) && defined(__arm__)\nperfilCuadro();\n#endif\n", f);
+    // (modo debug, Android: si existe /data/local/tmp/w3d_salir el juego se cierra. Android 2.3 no tiene am force-stop:
+    // asi una prueba arranca de cero sin reinstalar)
+    fputs("#if W3D_DEV_LOG && defined(__ANDROID__)\n{static int nSalir=0;"
+          "if(++nSalir%30==0&&access(\"/data/local/tmp/w3d_salir\",F_OK)==0){SDL_Quit();exit(0);}}\n#endif\n", f);
     fputs("W3dGameActualizar(dt);\n", f);
     // lua salir(): cerrar el juego (no en web). En Android hay que MATAR el proceso:
     // si solo se retorna, la Activity queda viva y al reabrir arranca con los globals
@@ -1197,7 +1283,32 @@ static bool EscribirMain(const std::string& ruta, const std::string& fontRel,
     fputs("#ifdef __ANDROID__\nSDL_Quit();exit(0);\n#endif\n", f);
     fputs("g_run=false;return;}\n#endif\n", f);
     fputs("#ifdef __ANDROID__\nactualizarSafeArea();\n#endif\n", f);
-    fputs("int w,h;tamActual(&w,&h);W3dGameRender(w,h);gfx::DibujarPendiente();SDL_GL_SwapWindow(g_win);}\n", f);
+    fputs("#if W3D_DEV_LOG\nUint64 m1=SDL_GetPerformanceCounter();\n#endif\n", f);
+    fputs("int w,h;tamActual(&w,&h);W3dGameRender(w,h);gfx::DibujarPendiente();\n", f);
+    fputs("#if W3D_DEV_LOG\nUint64 m2=SDL_GetPerformanceCounter(),mg=m2;\n"
+          "static int medirGpu=-1;if(medirGpu<0){const char* g=getenv(\"W3D_MEDIR_GPU\");medirGpu=(g&&*g=='1')?1:0;}\n"
+          "if(medirGpu){gfx::Finish();mg=SDL_GetPerformanceCounter();}\n#endif\n", f);
+    fputs("SDL_GL_SwapWindow(g_win);\n", f);
+    fputs("#if W3D_DEV_LOG\n{Uint64 m3=SDL_GetPerformanceCounter();double k=1000.0/(double)SDL_GetPerformanceFrequency();\n", f);
+    fputs("static double sa=0,sr=0,ss=0,s3=0,s2=0,sg=0;static int n=0;static Uint32 t0=0;\n", f);
+    fputs("{float a3=0,a2=0;W3dGameTiempos(&a3,&a2);s3+=a3;s2+=a2;}\n", f);
+    fputs("sa+=(double)(m1-m0)*k;sr+=(double)(m2-m1)*k;sg+=(double)(mg-m2)*k;ss+=(double)(m3-mg)*k;n++;if(!t0)t0=now;\n", f);
+    fputs("if(now-t0>=2000){const gfx::StatsDeCuadro& st=gfx::g_statCuadro;\n", f);
+    fputs("if(medirGpu)w3dLogf(\"[juego] esperando a la GPU antes del swap: %.1f ms\",sg/n);sg=0;\n", f);
+    // (Linux/Android: cuanto de esos 2 s el proceso uso la CPU, todos sus hilos. Cerca de 100% = el cuadro es CPU, tambien
+    // la del driver adentro del swap; menos = algo espera, la GPU o el compositor)
+    fputs("#if defined(__linux__) && !defined(__EMSCRIPTEN__)\n{static long antes=-1;FILE* st=fopen(\"/proc/self/stat\",\"r\");"
+          "if(st){char b[512];size_t k=fread(b,1,sizeof(b)-1,st);fclose(st);b[k]=0;const char* q=strrchr(b,')');\n"
+          "unsigned long ut=0,stt=0;if(q&&sscanf(q+2,\"%*c %*d %*d %*d %*d %*d %*u %*u %*u %*u %*u %lu %lu\",&ut,&stt)==2){\n"
+          "const long ahora=(long)(ut+stt);if(antes>=0)w3dLogf(\"[juego] CPU del proceso: %.0f%%\",(ahora-antes)*1000.0/(double)sysconf(_SC_CLK_TCK)/(now-t0)*100.0);"
+          "antes=ahora;}}}\n#endif\n", f);
+    fputs("#if defined(W3D_JUEGO_3D)\nw3dLogf(\"[juego] skinning %.1f ms (la pose %.1f ms), rutinas %.1f ms\","
+          "g_skinTotalMs/n,g_skinPoseMs/n,g_rutinasMs/n);g_skinPerfMs=0;g_skinTotalMs=g_skinPoseMs=0;g_rutinasMs=0;\n#endif\n", f);
+    fputs("w3dLogf(\"[juego] %.1f fps | logica %.1f ms, dibujo %.1f ms (3D %.1f, HUD %.1f), swap %.1f ms | \"\n"
+          "\"draws %d (%.1f ms; el peor %.2f ms: %d indices, %d vertices%s), llamadas GL %d, tris %d\",n*1000.0/(now-t0),"
+          "sa/n,sr/n,s3/n,s2/n,ss/n,st.draws,st.msDraws,st.msDrawMax,st.drawMaxIdx,st.drawMaxVerts,"
+          "st.drawMaxVBO?\" VBO\":\"\",st.total,st.tris);sa=sr=ss=s3=s2=0;n=0;t0=now;}}\n#endif\n", f);
+    fputs("}\n", f);
     fputs("int main(int,char**){\n", f);
     if (empaquetar)   // ANTES de cargar nada: que icono/fuente/escenas ya salgan del pak
         fputs("w3dFileSystem::W3dPakRegistrar(g_w3dPakDatos,g_w3dPakTam);\n", f);
@@ -1230,10 +1341,27 @@ static bool EscribirMain(const std::string& ruta, const std::string& fontRel,
     } else {
         fputs("SDL_Init(SDL_INIT_VIDEO|SDL_INIT_GAMECONTROLLER);\n", f);
     }
+    fputs("#if W3D_DEV_LOG && defined(__ANDROID__)\n{FILE* fe=fopen(\"/data/local/tmp/w3d_env.txt\",\"r\");char l[512];\n"
+          "while(fe&&fgets(l,sizeof(l),fe)){l[strcspn(l,\"\\r\\n\")]=0;char* q=strchr(l,'=');\n"
+          "if(q&&l[0]!='#'){*q=0;setenv(l,q+1,1);w3dLogf(\"[juego] %s=%s\",l,q+1);}}\nif(fe)fclose(fe);}\n#endif\n", f);
+    // ARM DE 32 BITS: el VFP en RunFast (los denormales a cero y NaN por defecto). En el modo IEEE de Android un NaN o un
+    // denormal en una cuenta salta al soporte del kernel: medido en el ARM1136 del Galaxy Ace, 600 a 1300 ciclos por
+    // operacion en vez de 5 a 20. Symbian ya corre asi. Es por hilo: el del juego (en el modo debug, W3D_FPU_IEEE=1 lo deja)
+    fputs("#if defined(__arm__) && defined(__VFP_FP__) && !defined(__SOFTFP__)\n"
+          "#if W3D_DEV_LOG\nif(!getenv(\"W3D_FPU_IEEE\"))\n#endif\n"
+          "{unsigned x;__asm__ volatile(\"fmrx %0, fpscr\":\"=r\"(x));x|=(1u<<24)|(1u<<25);"
+          "__asm__ volatile(\"fmxr fpscr, %0\"::\"r\"(x));}\n#endif\n", f);
     fputs("SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE,16);SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER,1);\n", f);
     // ESTENCIL: el reflejo del espejo recorta con el (ver Mirror.cpp). Si el
     // driver no lo da, EstencilBits()=0 y el reflejo se recorta por planos.
     fputs("SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE,8);\n", f);
+    // (modo debug: W3D_GL_ATRIB="r g b a profundidad estencil" pide otro formato de pantalla, para medir. El log dice el
+    // que dio el driver)
+    fputs("#if W3D_DEV_LOG\n{const char* a=getenv(\"W3D_GL_ATRIB\");int v[6];\n"
+          "if(a&&sscanf(a,\"%d %d %d %d %d %d\",&v[0],&v[1],&v[2],&v[3],&v[4],&v[5])==6){\n"
+          "SDL_GL_SetAttribute(SDL_GL_RED_SIZE,v[0]);SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE,v[1]);"
+          "SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE,v[2]);\nSDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE,v[3]);"
+          "SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE,v[4]);SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE,v[5]);}}\n#endif\n", f);
     // WebGL y Android: contexto GLES 2.0 (backend de shaders); desktop: COMPATIBILITY 2.1
     // (pipeline fijo; sin esto el driver puede dar un contexto CORE y no dibuja nada)
     fputs("#if defined(W3D_WEBGL)||defined(__ANDROID__)\n", f);
@@ -1265,6 +1393,9 @@ static bool EscribirMain(const std::string& ruta, const std::string& fontRel,
     }
     fputs("#endif\n", f);
     fputs("SDL_GLContext ctx=SDL_GL_CreateContext(g_win);if(!ctx)return 2;SDL_GL_SetSwapInterval(1);\n", f);
+    // (modo debug: W3D_SIN_VSYNC=1 no espera el refresco: los cuadros por segundo dicen lo que cuesta un cuadro, sin
+    // redondear a 60/n)
+    fputs("#if W3D_DEV_LOG\nif(getenv(\"W3D_SIN_VSYNC\"))w3dLogf(\"[juego] sin vsync: %d\",SDL_GL_SetSwapInterval(0));\n#endif\n", f);
     if (modoVentana != 0) {
         // Android: pantalla completa INMERSIVA (oculta las barras de estado/navegacion).
         // "Sin bordes" tambien va por aca porque en Android no existen las ventanas.
@@ -1272,6 +1403,17 @@ static bool EscribirMain(const std::string& ruta, const std::string& fontRel,
         fputs("#ifdef __ANDROID__\nSDL_SetWindowFullscreen(g_win,SDL_WINDOW_FULLSCREEN_DESKTOP);\n#endif\n", f);
     }
     fputs("#ifdef W3D_GLES2\ngfx::GLES2Init((void*(*)(const char*))SDL_GL_GetProcAddress);\n#endif\n", f);
+    fputs("#if W3D_DEV_LOG\ngfx::g_medirDraws=true;   // (el medidor: el tiempo de los draws)\n"
+          "{int r=0,g=0,b=0,a=0,z=0,e=0;SDL_GL_GetAttribute(SDL_GL_RED_SIZE,&r);SDL_GL_GetAttribute(SDL_GL_GREEN_SIZE,&g);\n"
+          "SDL_GL_GetAttribute(SDL_GL_BLUE_SIZE,&b);SDL_GL_GetAttribute(SDL_GL_ALPHA_SIZE,&a);"
+          "SDL_GL_GetAttribute(SDL_GL_DEPTH_SIZE,&z);SDL_GL_GetAttribute(SDL_GL_STENCIL_SIZE,&e);\n"
+          "w3dLogf(\"[juego] pantalla GL: color %d%d%d%d, profundidad %d, estencil %d\",r,g,b,a,z,e);}\n#endif\n", f);
+    fputs("#if W3D_DEV_LOG && defined(W3D_JUEGO_3D)\ng_skinRelojMs=relojSkin;g_skinRelojAlto=W3dNowMs;\n#endif\n", f);
+    // ANDROID: los rangos visibles de una rutina separados por pocos triangulos van en un draw (ver g_rutinaHuecoTris en
+    // Rutina.cpp): en un telefono cada draw le cuesta mucho mas al driver que esos triangulos a la GPU. En el modo debug,
+    // W3D_HUECO_TRIS lo cambia (para medir)
+    fputs("#if defined(__ANDROID__) && defined(W3D_JUEGO_3D)\n{extern int g_rutinaHuecoTris;g_rutinaHuecoTris=4096;\n"
+          "#if W3D_DEV_LOG\nconst char* h=getenv(\"W3D_HUECO_TRIS\");if(h&&*h)g_rutinaHuecoTris=atoi(h);\n#endif\n}\n#endif\n", f);
     if (conIcono) {
         // icono de la VENTANA (desktop): el icono.png generado del icono del proyecto
         fputs("#if !defined(__ANDROID__) && !defined(__EMSCRIPTEN__)\n", f);
@@ -1349,6 +1491,10 @@ static bool EscribirMain(const std::string& ruta, const std::string& fontRel,
     // SDL_CONTROLLERDEVICEADDED: si el juego arranca con el pad puesto, se abre
     // ACA (y si el evento llega igual, W3dControlAlta descarta el repetido).
     fputs("for(int i=0;i<SDL_NumJoysticks();i++)padAbrir(i);\n", f);
+    fputs("W3dScriptMandosVibrarHook=vibrarMandos;\n", f);
+    fputs("#ifdef __ANDROID__\nfor(int i=0;i<SDL_NumJoysticks()&&!g_acel;i++){const char* n=SDL_JoystickNameForIndex(i);\n"
+          " if(n&&strstr(n,\"Accelerometer\")){g_acel=SDL_JoystickOpen(i);w3dLogf(\"[juego] acelerometro: %s\",n);}}\n"
+          "#endif\n", f);
     fputs("W3dGameInicio();g_lastMs=SDL_GetTicks();\n", f);
     fputs("#ifdef __EMSCRIPTEN__\nemscripten_set_main_loop(frame,0,1);\n#else\n", f);
     fputs("while(g_run)frame();SDL_Quit();\n#endif\nreturn 0;}\n", f);
@@ -1415,6 +1561,8 @@ static const char* kFuentesBase[] = {
     // o texto): el juego la lee con el MISMO lector que el editor
     "${CORE}/io/W3dTexto.cpp", "${CORE}/io/W3dMalla.cpp", "${CORE}/io/W3dMallaBin.cpp",
     "${CORE}/base/w3dlog.cpp", "${CORE}/base/W3dInteractionState.cpp", "${CORE}/base/W3dConfig.cpp",
+    // (vibrar() de lua: el telefono, la web y la opcion "vibracion"; se instala solo)
+    "${CORE}/base/W3dVibrar.cpp",
     "${CORE}/math/Vector3.cpp", "${CORE}/math/Quaternion.cpp", "${CORE}/math/Matrix4.cpp",
     "${CORE}/objects/Objects.cpp", "${CORE}/objects/Mesh.cpp", "${CORE}/objects/Light.cpp",
     "${CORE}/objects/Materials.cpp", "${CORE}/objects/Textures.cpp", "${CORE}/objects/CameraBase.cpp",
@@ -1451,6 +1599,7 @@ static const char* kFuentesBase[] = {
     // Rutina va SIEMPRE: BindsJuego la usa sin ifdef (memorias, paso/setPaso). Los planos del paso "Test de
     // visibilidad" le llegan por hook desde Culling.cpp (solo 3D)
     "${W3DROOT}/main/objects/Rutina.cpp",         // Rutina: lista de pasos del render (sin la validacion del editor)
+    "${W3DROOT}/main/config/W3dProfile.cpp",      // W3dNowMs: el reloj de las rutinas (CerrarCorrida)
     "${W3DROOT}/main/W3dEscena.cpp",
     "${W3DROOT}/main/io/UI2DFormato.cpp", "${W3DROOT}/main/io/Fuente2D.cpp",
     "${W3DROOT}/main/io/Textura2D.cpp",
@@ -1899,10 +2048,205 @@ static bool EscribirBuildAndroid(const std::string& ruta, const std::string& rep
 }
 
 // ----------------------------------------------------------------------------
+//  ANDROID 2.3 (plataforma 6): el APK del juego para los telefonos de Android 2.3 (API 10, ARMv6: el Galaxy Ace),
+//  con la cadena de platform/android-viejo: el NDK r15c y SDL 2.0.7 (en ~/android-viejo, o W3D_ANDROID_VIEJO: los
+//  deja preparar_android_viejo.sh), el Java con javac + d8 y el APK armado a mano con aapt (sin Gradle), firmado con
+//  la llave de debug. Las fuentes son LAS MISMAS listas que los otros destinos (kFuentesBase...), con lo propio del
+//  ARMv6 de platform/android-viejo/jni/Android.mk: instrucciones ARM con la FPU (VFP) y el shim de lo que SDL 2.0.7
+//  no tiene (-include w3d_sdl207.h). Si hay un telefono conectado (adb), lo instala y lo abre.
+//  Lo compilado (obj23/) queda entre compilaciones: la segunda solo rehace lo que cambio.
+// ----------------------------------------------------------------------------
+static bool EscribirBuildAndroidViejo(const std::string& ruta, const std::string& repo,
+                                      const std::string& out, const std::string& nombre,
+                                      int orientacion, bool usarFisica, bool usarSonido, bool modoDebug,
+                                      bool conIcono, bool empaquetar, bool con3D) {
+    std::string root = Carpeta(repo);
+    // el paquete de Java (y del APK): com.whisk3d.<juego>, que no empiece con un numero
+    std::string pkg = nombre;
+    if (pkg.empty() || (pkg[0] >= '0' && pkg[0] <= '9')) pkg = "j" + pkg;
+    FILE* f = fopen(ruta.c_str(), "w");
+    if (!f) return false;
+    fputs("#!/usr/bin/env bash\n", f);
+    fputs("# GENERADO por Whisk3D (Compilar juego -> Android 2.3). Arma el APK del juego para Android 2.3 (ARMv6).\n", f);
+    fputs("set -euo pipefail\n", f);
+    fprintf(f, "OUT=\"%s\"\n", Esc(out).c_str());
+    fprintf(f, "ROOT=\"%s\"\n", Esc(root).c_str());
+    fprintf(f, "NOMBRE=\"%s\"\nPKG=\"com.whisk3d.%s\"\n", nombre.c_str(), pkg.c_str());
+    fputs("W3D=\"$ROOT/Whisk3D\"\n", f);
+    fputs("VIEJO=\"${W3D_ANDROID_VIEJO:-$HOME/android-viejo}\"\n", f);
+    fputs("NDK=\"$VIEJO/android-ndk-r15c\"\nSDLD=\"$VIEJO/fuentes/SDL-release-2.0.7\"\n", f);
+    fputs("SDK=\"${ANDROID_HOME:-$HOME/Android/Sdk}\"\n", f);
+    fputs("BT=\"$(ls -d \"$SDK\"/build-tools/* 2>/dev/null | sort -V | tail -1)\"\n", f);
+    fputs("JAR=\"$(ls -d \"$SDK\"/platforms/android-*/android.jar 2>/dev/null | sort -V | tail -1)\"\n", f);
+    fputs("KS=\"${W3D_KEYSTORE:-$HOME/.android/debug.keystore}\"\n", f);
+    fputs("AND=\"$OUT/androidviejo\"\nB=\"$OUT/obj23\"\n", f);
+    fputs("[ -x \"$NDK/ndk-build\" ] && [ -f \"$SDLD/Android.mk\" ] || { echo \"ERROR: falta el NDK r15c o SDL 2.0.7 en "
+          "$VIEJO (correr Whisk3D/platform/android-viejo/preparar_android_viejo.sh)\"; exit 1; }\n", f);
+    fputs("[ -x \"$BT/aapt\" ] && [ -f \"$JAR\" ] || { echo \"ERROR: faltan las build-tools o android.jar en $SDK\"; exit 1; }\n", f);
+    // (el clang del r15c pide libncurses.so.5: preparar_android_viejo.sh deja unos enlaces en host/lib)
+    fputs("export LD_LIBRARY_PATH=\"$VIEJO/host/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}\"\n", f);
+    fputs("echo \"[W3D] 12 Preparando el proyecto Android 2.3\"\n", f);
+    fputs("rm -rf \"$AND\"; mkdir -p \"$AND/jni\" \"$AND/java\" \"$AND/res/drawable\" \"$AND/assets\" \"$B\"\n", f);
+    fputs("cp \"$OUT/main.cpp\" \"$AND/jni/main_generado.cpp\"\n", f);
+    if (empaquetar) fputs("cp \"$OUT/pak.cpp\" \"$AND/jni/pak_generado.cpp\"\n", f);
+    fputs("cp \"$W3D/platform/android-viejo/jni/Application.mk\" \"$AND/jni/\"\n", f);
+    // el Android.mk: SDL 2.0.7 (su propio Android.mk) y el juego (libmain.so) con las listas de siempre
+    fputs("cat > \"$AND/jni/Android.mk\" <<'W3DMK'\n", f);
+    fputs("LOCAL_PATH := $(call my-dir)\nMY_PATH := $(LOCAL_PATH)\n", f);
+    fputs("# GENERADO por Whisk3D (Compilar juego -> Android 2.3). No hace falta editarlo.\n", f);
+    fputs("ROOT  := $(W3DROOTABS)\n", f);
+    fputs("W3D   := $(ROOT)/Whisk3D\nEXAMP := $(ROOT)/Whisk3D-Examples\n", f);
+    fputs("CORE  := $(W3D)/libs/Whisk3DCore\nUILIB := $(W3D)/libs/WhiskUI\nVIEJO := $(W3D)/platform/android-viejo\n", f);
+    fputs("include $(SDL_DIR)/Android.mk\n", f);
+    fputs("LOCAL_PATH := $(MY_PATH)\ninclude $(CLEAR_VARS)\nLOCAL_MODULE := main\n", f);
+    fputs("LOCAL_SRC_FILES := \\\n  $(MY_PATH)/main_generado.cpp \\\n", f);
+    if (empaquetar) fputs("  $(MY_PATH)/pak_generado.cpp \\\n", f);
+    fputs("  $(EXAMP)/game/w3drun.cpp \\\n  $(CORE)/gles2/w3dGraphicsGLES2.cpp \\\n", f);
+    for (int i = 0; kFuentesBase[i]; i++) fprintf(f, "  %s \\\n", AMk(kFuentesBase[i]).c_str());
+    if (usarFisica) fputs("  $(CORE)/physics/W3dFisica.cpp \\\n", f);
+    if (usarSonido) fputs("  $(CORE)/audio/W3dAudio.cpp $(CORE)/audio/W3dAudioSDL.cpp \\\n", f);
+    else            fputs("  $(CORE)/audio/W3dAudio.cpp \\\n", f);
+    if (con3D)
+        for (int i = 0; kFuentes3D[i]; i++) fprintf(f, "  %s \\\n", AMk(kFuentes3D[i]).c_str());
+    fputs("  $(filter-out %/lua.c %/luac.c,$(wildcard $(W3D)/thirdparty/lua/src/*.c))\n", f);
+    // (el shim de android-viejo primero: su <filesystem> le gana al que falta en el r15c)
+    fputs("LOCAL_C_INCLUDES := \\\n  $(VIEJO)/jni/shim \\\n  $(W3D)/platform/android/jni/shim \\\n  $(EXAMP)/game \\\n", f);
+    for (int i = 0; kIncludesBase[i]; i++) fprintf(f, "  %s \\\n", AMk(kIncludesBase[i]).c_str());
+    if (con3D)
+        for (int i = 0; kIncludes3D[i]; i++) fprintf(f, "  %s \\\n", AMk(kIncludes3D[i]).c_str());
+    fputs("  $(W3D)/thirdparty/lua/src \\\n  $(SDL_DIR)/include\n", f);
+    fputs("LOCAL_CPP_FEATURES := exceptions rtti\n", f);
+    // instrucciones ARM (no Thumb: el de 16 bits del ARMv6 no tiene la FPU) y la FPU VFP del ARM11
+    fputs("LOCAL_ARM_MODE := arm\n", f);
+    fputs("LOCAL_CFLAGS := -O2 -march=armv6 -mfpu=vfp -mfloat-abi=softfp -DW3D_ANDROID_VIEJO -DLUA_USE_POSIX \\\n", f);
+    fputs("  '-Dl_fseek(f,o,w)=fseek(f,o,w)' '-Dl_ftell(f)=ftell(f)' -Dl_seeknum=long\n", f);
+    char defRes[32] = "";
+    if (g_proyCompilar.resolucion > 0 && g_proyCompilar.resolucion < 100)
+        snprintf(defRes, sizeof(defRes), " -DW3D_RESOLUCION=%d", g_proyCompilar.resolucion);
+    fprintf(f, "LOCAL_CPPFLAGS := -std=c++1z -include $(VIEJO)/jni/shim/w3d_sdl207.h -DW3D_GLES2 -DW3D_GAME_RUNTIME "
+               "-DW3D_GAME_NO_TEX -DW3D_STB_IMPL -DW3D_DEV_LOG=%d%s%s%s%s\n",
+            modoDebug ? 1 : 0, defRes,
+            usarSonido ? " -DW3D_ENABLE_AUDIO" : "",
+            usarFisica ? "" : " -DW3D_SIN_FISICA",
+            con3D ? " -DW3D_SIN_EDITOR -DW3D_JUEGO_3D" : "");
+    // (-latomic: en ARMv6 las atomicas de libc++ son llamadas a esa libreria)
+    fputs("LOCAL_SHARED_LIBRARIES := SDL2\nLOCAL_LDLIBS := -lGLESv2 -llog -landroid -latomic\n", f);
+    fputs("include $(BUILD_SHARED_LIBRARY)\nW3DMK\n", f);
+    fputs("sed -i \"s#^ROOT  := .*#ROOT  := $ROOT#\" \"$AND/jni/Android.mk\"\n", f);
+    // la actividad del juego: la de SDL 2.0.7 con las dos librerias (libSDL2.so y libmain.so)
+    fputs("mkdir -p \"$AND/java/${PKG//.//}\"\n", f);
+    fputs("cat > \"$AND/java/${PKG//.//}/JuegoActivity.java\" <<W3DJAVA\n", f);
+    fputs("package $PKG;\n// GENERADO por Whisk3D: la actividad de SDL 2.0.7 que carga libSDL2.so y libmain.so (el juego)\n", f);
+    fputs("public class JuegoActivity extends org.libsdl.app.SDLActivity {\n", f);
+    fputs("    @Override protected String[] getLibraries() { return new String[] { \"SDL2\", \"main\" }; }\n", f);
+    // (el main generado pregunta por el notch: en Android 2.3 no hay)
+    fputs("    public int[] getSafeInsets() { return new int[] { 0, 0, 0, 0 }; }\n", f);
+    // vibrar el telefono: lo llama el juego por JNI sobre la actividad (SDL_AndroidGetActivity + GetMethodID
+    // "vibrar" "(I)V"; desde el hilo de SDL, FindClass de una clase de la app no la encuentra)
+    // la RESOLUCION de la tarjeta Juego (menos de 100 %): el bufer de la superficie mas chico y el sistema lo estira a la
+    // pantalla; se vuelve a poner al girar el telefono (la actividad no se rearma: configChanges orientation)
+    if (g_proyCompilar.resolucion > 0 && g_proyCompilar.resolucion < 100) {
+        // (el tamano sale de la ORIENTACION nueva, no de las medidas de la pantalla: al girar, las medidas pueden venir
+        // todavia con las de antes, y el bufer quedaba con la forma vieja y el sistema lo estiraba)
+        fprintf(f, "    private void escalar(int orientacion) {\n"
+                   "        android.util.DisplayMetrics dm = getResources().getDisplayMetrics();\n"
+                   "        int a = Math.max(dm.widthPixels, dm.heightPixels), b = Math.min(dm.widthPixels, dm.heightPixels);\n"
+                   "        int w = dm.widthPixels, h = dm.heightPixels;\n"
+                   "        if (orientacion == android.content.res.Configuration.ORIENTATION_LANDSCAPE) { w = a; h = b; }\n"
+                   "        else if (orientacion == android.content.res.Configuration.ORIENTATION_PORTRAIT) { w = b; h = a; }\n"
+                   "        w = w * %d / 100; h = h * %d / 100;\n"
+                   "        android.util.Log.i(\"Whisk3D\", \"[juego] resolucion: \" + w + \"x\" + h + \" (orientacion \" + orientacion + \")\");\n"
+                   "        Object o = mSurface;\n        if (o instanceof android.view.SurfaceView)\n"
+                   "            ((android.view.SurfaceView) o).getHolder().setFixedSize(w, h);\n"
+                   "    }\n", g_proyCompilar.resolucion, g_proyCompilar.resolucion);
+        fputs("    @Override protected void onCreate(android.os.Bundle b) {\n"
+              "        super.onCreate(b); escalar(getResources().getConfiguration().orientation);\n    }\n", f);
+        fputs("    @Override public void onConfigurationChanged(android.content.res.Configuration c) {\n"
+              "        super.onConfigurationChanged(c); escalar(c.orientation);\n    }\n", f);
+    }
+    fputs("    public void vibrar(int ms) {\n        try {\n            android.os.Vibrator v = (android.os.Vibrator) "
+          "getSystemService(android.content.Context.VIBRATOR_SERVICE);\n            if (v != null) v.vibrate(ms);\n"
+          "        } catch (Exception e) {}\n    }\n}\nW3DJAVA\n", f);
+    // el manifiesto: API 10, GLES 2, la red (W3dRed) y la orientacion de la tarjeta del juego
+    const char* orient = orientacion == 1 ? " android:screenOrientation=\"portrait\""
+                       : orientacion == 2 ? " android:screenOrientation=\"landscape\"" : "";
+    fputs("cat > \"$AND/AndroidManifest.xml\" <<W3DMAN\n", f);
+    fputs("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n", f);
+    fputs("<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\" package=\"$PKG\"\n", f);
+    // (en la memoria del telefono: sin tarjeta SD, "auto" con poco lugar fallaba con INSTALL_FAILED_MEDIA_UNAVAILABLE)
+    fputs("          android:versionCode=\"1\" android:versionName=\"1.0\" android:installLocation=\"internalOnly\">\n", f);
+    fputs("    <uses-sdk android:minSdkVersion=\"10\" android:targetSdkVersion=\"10\" />\n", f);
+    fputs("    <uses-feature android:glEsVersion=\"0x00020000\" />\n", f);
+    fputs("    <uses-permission android:name=\"android.permission.INTERNET\" />\n", f);
+    fputs("    <uses-permission android:name=\"android.permission.VIBRATE\" />\n", f);
+    fputs("    <application android:label=\"$NOMBRE\" android:icon=\"@drawable/icono\"\n", f);
+    fputs("                 android:theme=\"@android:style/Theme.NoTitleBar.Fullscreen\">\n", f);
+    fprintf(f, "        <activity android:name=\".JuegoActivity\" android:label=\"$NOMBRE\"%s\n", orient);
+    fputs("                  android:configChanges=\"keyboardHidden|orientation\">\n", f);
+    fputs("            <intent-filter>\n                <action android:name=\"android.intent.action.MAIN\" />\n", f);
+    fputs("                <category android:name=\"android.intent.category.LAUNCHER\" />\n", f);
+    fputs("            </intent-filter>\n        </activity>\n    </application>\n</manifest>\nW3DMAN\n", f);
+    // el icono del launcher (48 x 48, la densidad de estas pantallas): el del juego o el de Whisk3D
+    if (conIcono)
+        fputs("ICONO=\"$OUT/icons/android-mdpi.png\"; [ -f \"$ICONO\" ] || ICONO=\"$W3D/res/Whisk3D.png\"\n", f);
+    else
+        fputs("ICONO=\"$W3D/res/Whisk3D.png\"\n", f);
+    fputs("convert \"$ICONO\" -resize 48x48 \"$AND/res/drawable/icono.png\"\n", f);
+    // los assets: como el Android de siempre (sueltos en assets/, o empaquetados adentro de libmain.so)
+    if (!empaquetar) {
+        fputs("cp \"$OUT\"/*.w3dui \"$OUT\"/*.lua \"$OUT\"/*.png \"$OUT\"/*.json \"$AND/assets\"/ 2>/dev/null || true\n", f);
+        for (int c = 0; CarpAsset(c); c++)
+            fprintf(f, "if [ -d \"$OUT/%s\" ]; then mkdir -p \"$AND/assets/%s\"; cp -r \"$OUT/%s/.\" \"$AND/assets/%s/\"; fi\n",
+                    CarpAsset(c), CarpAsset(c), CarpAsset(c), CarpAsset(c));
+    }
+    fputs("echo \"[W3D] 16 ndk-build (armeabi, Android 2.3)\"\n", f);
+    fprintf(f, "\"$NDK/ndk-build\" %s NDK_PROJECT_PATH=\"$AND\" APP_BUILD_SCRIPT=\"$AND/jni/Android.mk\" "
+               "NDK_APPLICATION_MK=\"$AND/jni/Application.mk\" NDK_OUT=\"$B/obj\" NDK_LIBS_OUT=\"$B/lib\" "
+               "SDL_DIR=\"$SDLD\"\n", W3dCompilarJobsFlag().c_str());
+    fputs("echo \"[W3D] 70 Java (javac + d8)\"\n", f);
+    fputs("rm -rf \"$B/clases\" \"$B/dex\" && mkdir -p \"$B/clases\" \"$B/dex\"\n", f);
+    fputs("javac -nowarn -source 8 -target 8 -bootclasspath \"$JAR\" -classpath \"$JAR\" -d \"$B/clases\" "
+          "\"$SDLD\"/android-project/src/org/libsdl/app/*.java $(find \"$AND/java\" -name '*.java')\n", f);
+    fputs("\"$BT/d8\" --min-api 10 --lib \"$JAR\" --output \"$B/dex\" $(find \"$B/clases\" -name '*.class')\n", f);
+    fputs("echo \"[W3D] 80 APK (aapt, firma)\"\n", f);
+    fputs("rm -rf \"$B/apk\" && mkdir -p \"$B/apk/lib/armeabi\"\n", f);
+    fputs("\"$BT/aapt\" package -f -M \"$AND/AndroidManifest.xml\" -S \"$AND/res\" -A \"$AND/assets\" -I \"$JAR\" "
+          "-F \"$B/sin_firmar.apk\"\n", f);
+    fputs("cp \"$B/dex/classes.dex\" \"$B/apk/\" && cp \"$B\"/lib/armeabi/*.so \"$B/apk/lib/armeabi/\"\n", f);
+    fputs("(cd \"$B/apk\" && \"$BT/aapt\" add \"$B/sin_firmar.apk\" classes.dex lib/armeabi/*.so > /dev/null)\n", f);
+    fputs("[ -f \"$KS\" ] || keytool -genkeypair -keystore \"$KS\" -storepass android -alias androiddebugkey "
+          "-keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname \"CN=Android Debug,O=Android,C=US\"\n", f);
+    fputs("\"$BT/zipalign\" -f 4 \"$B/sin_firmar.apk\" \"$B/alineado.apk\"\n", f);
+    fputs("\"$BT/apksigner\" sign --ks \"$KS\" --ks-pass pass:android --key-pass pass:android --min-sdk-version 10 "
+          "--out \"$OUT/$NOMBRE-android23.apk\" \"$B/alineado.apk\"\n", f);
+    fputs("rm -f \"$B/sin_firmar.apk\" \"$B/alineado.apk\"\n", f);
+    // un telefono conectado: se instala y se abre (sin telefono, el APK queda en build/android23)
+    fputs("ADB=\"$SDK/platform-tools/adb\"\n", f);
+    fputs("if [ -x \"$ADB\" ] && [ \"$(\"$ADB\" devices | awk 'NR>1 && $2==\"device\"' | wc -l)\" = 1 ]; then\n", f);
+    fputs("  echo \"[W3D] 90 Instalando en el telefono\"\n", f);
+    // (adb de esa epoca sale con 0 aunque falle: se mira lo que dice)
+    // (con -r el telefono guarda el APK nuevo mientras el viejo sigue instalado: en uno de poca memoria -el Galaxy Ace,
+    // ~35 MB libres- no entra. Entonces se desinstala la version anterior del MISMO juego -se pierden sus datos guardados en
+    // el telefono- y se instala de nuevo)
+    fputs("  INST=\"$(\"$ADB\" install -r \"$OUT/$NOMBRE-android23.apk\" 2>&1 || true)\"; echo \"$INST\"\n", f);
+    fputs("  if echo \"$INST\" | grep -q 'INSUFFICIENT_STORAGE' && \"$ADB\" shell pm path \"$PKG\" | grep -q package; then\n", f);
+    fputs("    echo \"[W3D] 92 Falta lugar: se desinstala la version anterior de $PKG (sus datos en el telefono se pierden)\"\n", f);
+    fputs("    \"$ADB\" uninstall \"$PKG\" || true\n", f);
+    fputs("    INST=\"$(\"$ADB\" install \"$OUT/$NOMBRE-android23.apk\" 2>&1 || true)\"; echo \"$INST\"\n  fi\n", f);
+    fputs("  if echo \"$INST\" | grep -q '^Success'; then\n", f);
+    fputs("    \"$ADB\" shell am start -n \"$PKG/.JuegoActivity\"\n", f);
+    fputs("  else\n    echo \"[W3D] 95 NO SE PUDO INSTALAR en el telefono (poco lugar?): el APK queda en build/android23\"\n  fi\n", f);
+    fputs("else\n  echo \"(sin un telefono conectado por adb: el APK queda en build/android23)\"\nfi\n", f);
+    bool okSh = (ferror(f) == 0);
+    if (fclose(f) != 0) okSh = false;
+    return okSh;
+}
+
+// ----------------------------------------------------------------------------
 //  El TRABAJO del worker: todo por VALOR (strings propios). El worker no ve la
 //  escena ni la UI: solo corre estos comandos y copia archivos.
 struct BldTrabajo {
-    int plataforma;          // 0 .deb / 1 AppImage / 2 web / 3 android
+    int plataforma;          // 0 .deb / 1 AppImage / 2 web / 3 android / 6 android 2.3
     std::string plat;        // "linux" / "web" / "android" (para los mensajes)
     std::string out;         // <juego>/platform-build/<plat> (ahi vive build.log)
     std::string cmdCfg;      // linux: cmake -S . -B out (configurar)
@@ -1924,8 +2268,8 @@ struct BldTrabajo {
 static void BldWorker(BldTrabajo t) {
     FILE* log = fopen((t.out + "/build.log").c_str(), "w");
     int rc;
-    if (t.plataforma == 3) {
-        BldPublicar("Preparando Android (plantilla)", 10);
+    if (t.plataforma == 3 || t.plataforma == 6) {
+        BldPublicar(t.plataforma == 6 ? "Preparando Android 2.3" : "Preparando Android (plantilla)", 10);
         rc = BldCorrer(t.cmdBuild, log, BLD_MARCAS, 10, 90);
     } else if (t.plataforma == 2) {
         BldPublicar("Compilando (emcc)", 10);
@@ -2084,7 +2428,8 @@ bool CompilarJuego(UI* u, int plataforma, int modoVentana, int orientacion,
     //   build/<plat>/           SOLO los RESULTADOS: ejecutable+instaladores (linux),
     //                           .html/.js/.wasm (web), .apk (android). Se limpia y
     //                           rellena al final de cada compilacion.
-    const char* plat = (plataforma == 3) ? "android" : (plataforma == 2) ? "web" : "linux";
+    const char* plat = (plataforma == 6) ? "android23" : (plataforma == 3) ? "android"
+                     : (plataforma == 2) ? "web" : "linux";
     std::string out        = proy + "/platform-build/" + plat;
     std::string resultados = proy + "/build/" + plat;
     // nombre del JUEGO (proyecto CMake / binario / artefactos): el archivo .w3d ABIERTO
@@ -2579,8 +2924,8 @@ bool CompilarJuego(UI* u, int plataforma, int modoVentana, int orientacion,
     // NADA toca la escena. El hilo de UI solo ARMA los comandos (strings propios)
     // y lanza el worker, que los corre + copia los resultados publicando etapa y
     // porcentaje para la barra (overlay) que dibuja el hilo principal cada frame.
-    const char* nomPlat = (plataforma == 3) ? "Android" : (plataforma == 2) ? "WebGL"
-                        : (plataforma == 1) ? "Linux AppImage" : "Linux .deb";
+    const char* nomPlat = (plataforma == 6) ? "Android 2.3" : (plataforma == 3) ? "Android"
+                        : (plataforma == 2) ? "WebGL" : (plataforma == 1) ? "Linux AppImage" : "Linux .deb";
     w3dLogf("CompilarJuego [3/4]: compilando (%s) en segundo plano", nomPlat);
     BldTrabajo t;
     t.plataforma = plataforma;
@@ -2593,6 +2938,17 @@ bool CompilarJuego(UI* u, int plataforma, int modoVentana, int orientacion,
         std::string sh = out + "/build_android.sh";
         if (!EscribirBuildAndroid(sh, repo, out, nombre, orientacion, usarFisica, usarSonido,
                                   modoDebug, conIcono, empaquetarAssets, con3D)) {
+            Notificar(T("Build: could not generate the Android script"), true); return false;
+        }
+        char cmd[1200];
+        snprintf(cmd, sizeof(cmd), "bash \"%s\"", sh.c_str());
+        t.cmdBuild = cmd;
+    } else if (plataforma == 6) {
+        // ANDROID 2.3: el script arma el APK con la cadena de platform/android-viejo (ver EscribirBuildAndroidViejo)
+        // y, con un telefono conectado, lo instala y lo abre
+        std::string sh = out + "/build_android23.sh";
+        if (!EscribirBuildAndroidViejo(sh, repo, out, nombre, orientacion, usarFisica, usarSonido,
+                                       modoDebug, conIcono, empaquetarAssets, con3D)) {
             Notificar(T("Build: could not generate the Android script"), true); return false;
         }
         char cmd[1200];
@@ -2718,7 +3074,12 @@ bool CompilarJuego(UI* u, int plataforma, int modoVentana, int orientacion,
         // holgado a proposito: la copia de Linux lleva UN cp por carpeta de assets
         // (kCarpetasAssets) y cada uno nombra dos rutas absolutas
         char cmd[9000];
-        if (plataforma == 3) {
+        if (plataforma == 6) {
+            // ANDROID 2.3: el APK firmado que dejo el script en platform-build/android23
+            snprintf(cmd, sizeof(cmd),
+                "rm -rf \"%s\" && mkdir -p \"%s\" && cp \"%s/%s-android23.apk\" \"%s/\"",
+                resultados.c_str(), resultados.c_str(), out.c_str(), nombre.c_str(), resultados.c_str());
+        } else if (plataforma == 3) {
             // ANDROID: el .apk (assembleDebug) como <juego>-android.apk (fat: sin
             // arch unica en el nombre), coherente con <juego>-linux-<arch>.deb.
             // El nombre y la ruta ESTANDAR los garantiza EscribirBuildAndroid (sed
@@ -2771,7 +3132,8 @@ bool CompilarJuego(UI* u, int plataforma, int modoVentana, int orientacion,
         }
         t.cmdCopia = cmd;
     }
-    std::string donde = (plataforma == 3) ? (nombre + " -> build/android/" + nombre + "-android.apk")
+    std::string donde = (plataforma == 6) ? (nombre + " -> build/android23/" + nombre + "-android23.apk")
+                      : (plataforma == 3) ? (nombre + " -> build/android/" + nombre + "-android.apk")
                       : (plataforma == 2) ? (nombre + " -> build/web/" + nombre + ".html")
                                           : (nombre + " -> build/linux/");
     t.msgOk = "Juego compilado: " + donde;

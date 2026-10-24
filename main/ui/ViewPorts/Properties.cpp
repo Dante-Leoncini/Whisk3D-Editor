@@ -2079,8 +2079,16 @@ static void AccionJuegoVolumen(){
     g_proyCompilar.volumen = v;
     w3dEngine::W3dAudioJuegoVolume(v / 100.0f);
 }
-// refresca el numero mostrado desde g_proyCompilar (lo llama import_w3d al abrir un .w3d con volumen guardado)
-void W3dJuegoVolRefUI(){ g_juegoVolF = (float)g_proyCompilar.volumen; }
+// RESOLUCION del juego compilado (25..100 % de la pantalla; hoy la usa Android 2.3: dibuja a menos pixeles y el
+// sistema la estira, el driver de esos telefonos cuesta por pixel). Viaja en el .w3d
+static float g_juegoResF = 100.0f;
+static void AccionJuegoResolucion(){
+    int v = (int)(g_juegoResF + 0.5f);
+    if (v < 25) v = 25; else if (v > 100) v = 100;
+    g_proyCompilar.resolucion = v;
+}
+// refresca los numeros mostrados desde g_proyCompilar (lo llama import_w3d al abrir un .w3d con el bloque guardado)
+void W3dJuegoVolRefUI(){ g_juegoVolF = (float)g_proyCompilar.volumen; g_juegoResF = (float)g_proyCompilar.resolucion; }
 // Compilar juego: exporta + genera + compila EN SEGUNDO PLANO (worker): el editor no
 // se congela; el progreso (etapa + %) lo muestra la barra overlay de abajo y el
 // resultado llega por notificacion. Si ya hay un build corriendo, CompilarJuego avisa
@@ -2091,7 +2099,7 @@ void W3dJuegoVolRefUI(){ g_juegoVolF = (float)g_proyCompilar.volumen; }
 // y se escribe al guardar con los valores vigentes. Antes eran statics de aca y
 // se reseteaban en cada arranque (el modo ventana elegido se perdia).
 // nombres VISIBLES de cada valor (los del JSON son otros: ver W3dCompilar*Str)
-static const char* NombrePlat(int p){ return (p==5)?"Symbian .sisx":(p==4)?"Windows .exe":(p==3)?"Android":(p==2)?"WebGL":(p==1)?"Linux AppImage":"Linux .deb"; }
+static const char* NombrePlat(int p){ return (p==6)?"Android 2.3":(p==5)?"Symbian .sisx":(p==4)?"Windows .exe":(p==3)?"Android":(p==2)?"WebGL":(p==1)?"Linux AppImage":"Linux .deb"; }
 static const char* NombreModoVent(int m){ return (m==2)?T("Borderless"):(m==0)?T("Window"):T("Fullscreen"); }
 // la ORIENTACION solo afecta a Android (manifest + hint SDL); en desktop/web no aplica.
 static const char* NombreOrientacion(int o){ return (o==2)?T("Landscape only"):(o==1)?T("Portrait only"):T("Any orientation"); }
@@ -2140,6 +2148,7 @@ static void AccionMenuPlat(){
     MenuPlat->Agregar("Linux AppImage", 1);
     MenuPlat->Agregar("WebGL", 2);
     MenuPlat->Agregar("Android", 3);
+    MenuPlat->Agregar("Android 2.3", 6);   // (los telefonos viejos: ARMv6, API 10; ver platform/android-viejo)
     AbrirMenuBajoBoton(MenuPlat, PropsActivo->propJuegoPlat->button);
 }
 // GENERAR un UID3 random para el JUEGO (app propia de Symbian: no pisa el editor). Rango
@@ -7980,6 +7989,12 @@ void Properties::ConstruirGrupos(){
       pV->stepFino = 1.0f; pV->stepGrueso = 10.0f; pV->dragStep = 1.0f;
       g_juegoVolF = (float)g_proyCompilar.volumen; pV->value = &g_juegoVolF; pV->onChange = AccionJuegoVolumen;
       propJuego->properties.push_back(pV); }
+    // resolucion del juego compilado (% de la pantalla: Android 2.3)
+    { PropFloat* pR = new PropFloat(T("Resolution"), "%");
+      pR->SetRango(25.0f, 100.0f); pR->entero = true;
+      pR->stepFino = 5.0f; pR->stepGrueso = 25.0f; pR->dragStep = 1.0f;
+      g_juegoResF = (float)g_proyCompilar.resolucion; pR->value = &g_juegoResF; pR->onChange = AccionJuegoResolucion;
+      propJuego->properties.push_back(pR); }
     // modo debug: tildado = W3D_DEV_LOG=1 (log + ring + depurar()); destildado
     // (default) = produccion, W3D_DEV_LOG=0 (sin mensajes de debug ni ring)
     propJuegoDebug = new PropBool(T("Debug mode"));

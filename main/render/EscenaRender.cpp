@@ -289,6 +289,8 @@ bool W3dCapturaUV(const std::string& nombre, float uv[4]) {
     if (!c || c->pedida || !Viva(*c) || c->w < 1 || c->h < 1) return false;   // (pedida: todavia no se dibujo)
     uv[0] = 0.0f; uv[1] = (float)c->h / (float)c->texH;
     uv[2] = (float)c->w / (float)c->texW; uv[3] = 0.0f;
+    // (un driver que la copia al reves: la fila 0 ya es la de arriba)
+    if (gfx::CopiaPantallaDadaVuelta()) { uv[3] = uv[1]; uv[1] = 0.0f; }
     return true;
 }
 

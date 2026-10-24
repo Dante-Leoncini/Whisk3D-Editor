@@ -7476,6 +7476,39 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         printf("      [vgsimplify] malla='%s' -> 1 hueso/vertice\n", found->name.c_str());
         return true;
     }
+    // ---- skindatos <archivo> : vuelca en binario lo que lee el skinning de CADA malla con esqueleto, en la pose de
+    //      ahora: los vertices y las normales de bind, el CSR de pesos por punto, los render-verts de cada punto y las
+    //      matrices de los huesos. Para medir el bucle del skinning afuera del motor (un banco en el telefono) con los
+    //      datos de verdad. "W3SK", la cantidad de mallas y por malla nv, nCtrl, huesos, influencias y los arreglos ----
+    if (cmd == "skindatos") {
+        std::string path; ss>>path;
+        if (path.empty()) { err="skindatos: falta el archivo"; return false; }
+        std::vector<Mesh*> mallas;
+        { std::vector<Object*> stack; if (SceneCollection) stack.push_back(SceneCollection);
+          while(!stack.empty()){ Object* o=stack.back(); stack.pop_back();
+            if (o->getType()==ObjectType::mesh && ((Mesh*)o)->skinArmature && ((Mesh*)o)->vertex) mallas.push_back((Mesh*)o);
+            for (size_t i=0;i<o->Childrens.size();i++) stack.push_back(o->Childrens[i]); } }
+        FILE* fp=fopen(path.c_str(),"wb"); if(!fp){ err="skindatos: no pude abrir "+path; return false; }
+        fwrite("W3SK",1,4,fp); int n=(int)mallas.size(); fwrite(&n,4,1,fp);
+        for (size_t k=0;k<mallas.size();k++){ Mesh* m=mallas[k]; Armature* a=m->skinArmature;
+            m->lastSkinFrame=-999999; SkinearMesh(m);   // (arma el CSR)
+            const int nv=m->vertexSize, nCtrl=m->skinNCtrl, nb=(int)a->bones.size(), nInf=(int)m->skinCpBone.size();
+            const int nRv=m->skinCpRvOff.empty() ? 0 : m->skinCpRvOff[(size_t)nCtrl];
+            int cab[5]={nv,nCtrl,nb,nInf,nRv}; fwrite(cab,4,5,fp);
+            fwrite(m->vertex,4,(size_t)nv*3,fp);
+            std::vector<signed char> nor((size_t)nv*3,0); if (m->normals) memcpy(&nor[0],m->normals,nor.size()); fwrite(&nor[0],1,nor.size(),fp);
+            fwrite(&m->skinCpOff[0],4,(size_t)nCtrl+1,fp);
+            if (nInf){ fwrite(&m->skinCpBone[0],4,(size_t)nInf,fp); fwrite(&m->skinCpW[0],4,(size_t)nInf,fp); }
+            fwrite(&m->skinCpRvOff[0],4,(size_t)nCtrl+1,fp);
+            if (nRv) fwrite(&m->skinCpRv[0],4,(size_t)nRv,fp);
+            for (int b=0;b<nb;b++) fwrite(a->bones[(size_t)b].skinMatrix.m,4,16,fp);
+            printf("      [skindatos] '%s': nv=%d puntos=%d huesos=%d influencias=%d (%.2f por punto) render-verts=%d luz=%d\n",
+                   m->name.c_str(), nv, nCtrl, nb, nInf, nCtrl ? (float)nInf/nCtrl : 0.0f, nRv, m->skinConLuz ? 1 : 0);
+        }
+        fclose(fp);
+        printf("      [skindatos] %d mallas -> %s\n", n, path.c_str());
+        return true;
+    }
     // ---- skinexport <frame> <archivo> : busca la 1er malla con skinArmature, la skinnea en <frame> y vuelca
     //      TODOS los vertices skinneados (x y z por linea) a <archivo>. Para Procrustes vs Blender (ground truth). ----
     if (cmd == "skinexport") {
@@ -8198,6 +8231,17 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         extern void W3dScriptToque(float, float, bool);
         W3dScriptToque(x, y, e != "off");
         printf("      [toquejuego] %.1f %.1f %s\n", x, y, e != "off" ? "on" : "off");
+        return true;
+    }
+    // ---- dedojuego <n> <x> <y> on|off : un DEDO de verdad (dedo(n) en lua, 1..4), el camino de SimToquePantallaDedo:
+    //      a diferencia del clic, prende tactil() (los controles en pantalla de los juegos) ----
+    if (cmd == "dedojuego") {
+        int n = 1; float x = 0, y = 0; std::string e; ss >> n >> x >> y >> e;
+        extern void W3dScriptDedo(int, float, float, bool);
+        extern void BindsJuegoPunto(int, float, float, bool);
+        W3dScriptDedo(n - 1, x, y, e != "off");
+        BindsJuegoPunto(n - 1, x, y, e != "off");
+        printf("      [dedojuego] %d %.1f %.1f %s\n", n, x, y, e != "off" ? "on" : "off");
         return true;
     }
     if (cmd == "ratonjuego") {
@@ -32026,6 +32070,16 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         }
         printf("      [malla] editVerts=%d faces=%d edges=%d | render verts=%d tris=%d | smooth=%d sharp=%d | sel(%s)=%d\n",
                ev, ef, ee, m->vertexSize, m->facesSize/3, (int)m->meshSmooth, (int)m->sharpEdges.size(), selN, selC);
+        return true;
+    }
+
+    // ---- nivellog <0..3> : el nivel del log SOLO para esta corrida (3 = todo, con los info() de los scripts; el de los
+    //      Ajustes del editor queda como esta: no se guarda) ----
+    if (cmd == "nivellog") {
+        extern int g_w3dLogNivel;
+        int n = 3; ss >> n;
+        g_w3dLogNivel = n;
+        printf("      [nivellog] %d\n", n);
         return true;
     }
 

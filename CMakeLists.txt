@@ -99,6 +99,7 @@ list(APPEND SRC_FILES
     # configuracion persistente del Core (clave=valor): W3dScript.cpp la usa para
     # los bindings de config/mute de lua. Sin este .cpp el link falla (w3dEngine::Config*).
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/base/W3dConfig.cpp
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/base/W3dVibrar.cpp
     # matematica del engine (antes en core/math): Vector3/Quaternion/Matrix4.
     # Se incluyen como "math/X.h" (engine es include dir). No los globea core/.
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/math/Vector3.cpp

@@ -132,6 +132,7 @@ struct W3dCompilarCfg {
     bool modoDebug;     // true = W3D_DEV_LOG=1 (log + ring + depurar())
     unsigned uid;       // UID3 de Symbian del juego (app propia). 0 = sin asignar. Rango self-signed: 0xE0000000-0xEFFFFFFF
     int  volumen;       // 0..100 volumen del gameplay (audio del juego). 100 = sin atenuar.
+    int  resolucion;    // 25..100 % de la pantalla al que dibuja el juego (Android 2.3: el sistema lo estira). 100 = nativa
 };
 extern W3dCompilarCfg g_proyCompilar;
 
