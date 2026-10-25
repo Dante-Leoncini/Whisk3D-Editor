@@ -140,7 +140,7 @@ extern std::string g_w3dUINoCargo;
 
 // CONFIG de la tarjeta Juego (Compilar juego): viaja con el proyecto como
 // objeto raiz "compilar" del .w3d (ver GuardarW3D.h). Arranca en los defaults.
-W3dCompilarCfg g_proyCompilar = { 1, 0, 0, 0, true, true, false, 0, 100 };
+W3dCompilarCfg g_proyCompilar = { 1, 0, 0, 0, true, true, false, 0, 100, 100 };   // (volumen y resolucion al 100)
 
 void W3dCompilarReset() {
     g_proyCompilar.modoVentana = 1;      // Pantalla completa (el default de siempre)

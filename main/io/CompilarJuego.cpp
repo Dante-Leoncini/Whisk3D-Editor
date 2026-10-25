@@ -1497,7 +1497,10 @@ static bool EscribirMain(const std::string& ruta, const std::string& fontRel,
           "#endif\n", f);
     fputs("W3dGameInicio();g_lastMs=SDL_GetTicks();\n", f);
     fputs("#ifdef __EMSCRIPTEN__\nemscripten_set_main_loop(frame,0,1);\n#else\n", f);
-    fputs("while(g_run)frame();SDL_Quit();\n#endif\nreturn 0;}\n", f);
+    // ANDROID: al salir (la tecla de volver, SDL_QUIT) el proceso NO muere: la proxima vez que se abre el juego, main
+    // corre en el mismo proceso con los globales del anterior (g_run en false: no dibujaba nada, pantalla negra). Se
+    // termina el proceso, como cuando el juego pide pararse
+    fputs("while(g_run)frame();SDL_Quit();\n#ifdef __ANDROID__\nexit(0);\n#endif\n#endif\nreturn 0;}\n", f);
     bool okMain = (ferror(f) == 0);
     if (fclose(f) != 0) okMain = false;   // el flush pasa al cerrar: sin esto el main.cpp quedaba truncado
     return okMain;
@@ -2154,15 +2157,24 @@ static bool EscribirBuildAndroidViejo(const std::string& ruta, const std::string
                    "        int w = dm.widthPixels, h = dm.heightPixels;\n"
                    "        if (orientacion == android.content.res.Configuration.ORIENTATION_LANDSCAPE) { w = a; h = b; }\n"
                    "        else if (orientacion == android.content.res.Configuration.ORIENTATION_PORTRAIT) { w = b; h = a; }\n"
-                   "        w = w * %d / 100; h = h * %d / 100;\n"
-                   "        android.util.Log.i(\"Whisk3D\", \"[juego] resolucion: \" + w + \"x\" + h + \" (orientacion \" + orientacion + \")\");\n"
-                   "        Object o = mSurface;\n        if (o instanceof android.view.SurfaceView)\n"
-                   "            ((android.view.SurfaceView) o).getHolder().setFixedSize(w, h);\n"
+                   "        final int fw = w * %d / 100, fh = h * %d / 100;\n"
+                   "        Object o = mSurface;\n        if (!(o instanceof android.view.SurfaceView)) return;\n"
+                   "        final android.view.SurfaceView sv = (android.view.SurfaceView) o;\n"
+                   "        if (!girando) { sv.getHolder().setFixedSize(fw, fh); return; }\n"
+                   // (AL GIRAR: la superficie primero vuelve al tamano de la vista, para que Android la reacomode a la
+                   // orientacion nueva, y despues se achica otra vez; achicarla de una dejaba la vista con la forma vieja:
+                   // la imagen estirada y una franja negra)
+                   "        sv.getHolder().setSizeFromLayout();\n"
+                   "        sv.postDelayed(new Runnable() { public void run() {\n"
+                   "            sv.getHolder().setFixedSize(fw, fh);\n"
+                   "            android.util.Log.i(\"Whisk3D\", \"[juego] resolucion: \" + fw + \"x\" + fh + \" en una vista de \" + sv.getWidth() + \"x\" + sv.getHeight());\n"
+                   "        } }, 250);\n"
                    "    }\n", g_proyCompilar.resolucion, g_proyCompilar.resolucion);
+        fputs("    private boolean girando = false;\n", f);
         fputs("    @Override protected void onCreate(android.os.Bundle b) {\n"
               "        super.onCreate(b); escalar(getResources().getConfiguration().orientation);\n    }\n", f);
         fputs("    @Override public void onConfigurationChanged(android.content.res.Configuration c) {\n"
-              "        super.onConfigurationChanged(c); escalar(c.orientation);\n    }\n", f);
+              "        super.onConfigurationChanged(c); girando = true; escalar(c.orientation);\n    }\n", f);
     }
     fputs("    public void vibrar(int ms) {\n        try {\n            android.os.Vibrator v = (android.os.Vibrator) "
           "getSystemService(android.content.Context.VIBRATOR_SERVICE);\n            if (v != null) v.vibrate(ms);\n"
