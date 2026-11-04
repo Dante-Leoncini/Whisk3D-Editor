@@ -1,0 +1,52 @@
+# DESENFOQUE DE MOVIMIENTO TRAZADO (render/RayTracer.cpp, g_rt.desenfoque): cada pase del render a archivo en otro
+# instante del obturador. Un cubo que del cuadro 1 al 2 se corre 1 m en X y despues queda quieto:
+#  - en el 2 con el obturador centrado (1.5 .. 2.5) el borde sale corrido: muchos pixeles distintos de la imagen sin
+#    desenfoque; con "fin del cuadro" (1 .. 2) tambien; con "inicio del cuadro" (2 .. 3) el cubo ya no se mueve: igual
+#  - en el 5 (quieto) el desenfoque no cambia nada
+add cube
+frame 1
+keychan 0 0
+frame 2
+objmove 1 0 0
+keychan 0 0
+deselectall
+vporbita 0 0 0 12 0 0
+rtgpu 0
+frame 2
+rtdesenfoque 0
+rtrender 160 120 16
+rtref
+rtdesenfoque 1 1.0
+rtrender 160 120 16
+rtdif 40 30
+rtdesenfoque 1 1.0 fin
+rtrender 160 120 16
+rtdif 40 30
+rtdesenfoque 1 1.0 inicio
+rtrender 160 120 16
+rtdif 40 0 20
+frame 5
+rtdesenfoque 0
+rtrender 160 120 16
+rtref
+rtdesenfoque 1 1.0
+rtrender 160 120 16
+rtdif 40 0 20
+# lo mismo en la GPU (sin GPU con Vulkan, la prueba termina aca)
+rtgpu 1 saltar
+frame 2
+rtdesenfoque 0
+rtrender 160 120 16
+rtref
+rtdesenfoque 1 1.0
+rtrender 160 120 16
+rtengpu si
+rtdif 40 30
+frame 5
+rtdesenfoque 0
+rtrender 160 120 16
+rtref
+rtdesenfoque 1 1.0
+rtrender 160 120 16
+rtdif 40 0 20
+rtdesenfoque 0

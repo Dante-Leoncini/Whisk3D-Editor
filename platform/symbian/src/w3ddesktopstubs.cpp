@@ -5,8 +5,6 @@
 //
 //   - CompilarJuego: compila el juego a binario (cmake/emcc/ndk via popen/system):
 //     no aplica en el telefono. Devuelve false (el build no arranco).
-//   - AlimentarDedosJuego: multi-touch del editor de escritorio (SDL); en Symbian
-//     el input entra por otra via.
 //
 //  (g_w3dUINoCargo y AbrirProyectoDesde ya NO van aca: los define import_w3d.cpp,
 //   que ahora SI compila en Symbian.)
@@ -17,4 +15,3 @@ class UI;
 
 bool CompilarJuego(UI*, int, int, int, bool, bool, bool, bool) { return false; }
 
-void AlimentarDedosJuego() {}

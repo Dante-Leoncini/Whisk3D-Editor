@@ -63,11 +63,12 @@ static bool PickSeleccionable(Object* obj) {
     if (t == ObjectType::light  && !g_showLights) return false;
     if (t == ObjectType::camera && !g_showCamera) return false;
     if (t == ObjectType::empty  && !g_showEmpty)  return false;
+    { extern bool g_showSonidos; if (t == ObjectType::sonido && !g_showSonidos) return false; }   // (overlay "Sounds")
     if (t == ObjectType::hitbox && !HitboxSeDibuja()) return false;   // la MISMA regla que su dibujo
     return t == ObjectType::mesh || t == ObjectType::camera ||
            t == ObjectType::light || t == ObjectType::empty ||
            t == ObjectType::instance || t == ObjectType::armature ||
-           t == ObjectType::hitbox;
+           t == ObjectType::hitbox || t == ObjectType::sonido;
 }
 // pick en 2 pasadas: primero NO-armatures (con z-buffer), despues armatures (XRAY, sin z, encima de todo)
 // para que el esqueleto se pickee EXACTAMENTE como se ve. 'armaturePass' filtra que se pinta/cuenta en cada pasada.
@@ -212,20 +213,10 @@ static int EditPickIndex(int modo, int mx, int my, int vx, int vy, int vw, int v
     w3dEngine::Viewport(vx, glY, vw, vh);
     w3dEngine::Scissor(vx, glY, vw, vh);
     w3dEngine::Enable(w3dEngine::ScissorTest);
-    w3dEngine::MatrixMode(w3dEngine::Projection);
-    w3dEngine::LoadIdentity();
-    float pkNear = Viewport3DActive ? Viewport3DActive->nearClip : 0.01f;
-    float pkFar  = Viewport3DActive ? Viewport3DActive->farClip  : 1000.0f;
-    float pkAspect = (float)vw / (float)vh;
-    if (Viewport3DActive && Viewport3DActive->orthographic) {
-        // MISMA proyeccion ortografica que Render() (size = orbitDistance*tan(fov/2)); antes pickeaba SIEMPRE con
-        // perspectiva -> en orto el click caia corrido. Ahora el color-id usa el mismo volumen que se ve.
-        float size = Viewport3DActive->orbitDistance * tanf(fovDeg * 0.5f * 3.14159265f / 180.0f);
-        if (size < 0.001f) size = 0.001f;
-        w3dEngine::Ortho(-size * pkAspect, size * pkAspect, -size, size, pkNear, Viewport3DActive->orbitDistance + pkFar);
-    } else {
-        w3dEngine::Perspective(fovDeg, pkAspect, pkNear, pkFar);
-    }
+    // LA proyeccion del viewport (la misma funcion que usa su Render): mirando por la camara, la lente de la CAMARA con
+    // su marco. Antes se armaba aca con la del visor: desde la camara el click caia en otro lado (una luz no se podia
+    // elegir; un cubo grande en el centro, de casualidad si)
+    if (Viewport3DActive) Viewport3DActive->CargarProyeccionVista();
     w3dEngine::MatrixMode(w3dEngine::ModelView);
     w3dEngine::LoadIdentity();
     if (Viewport3DActive) Viewport3DActive->UpdateViewOrbit();
@@ -296,6 +287,13 @@ static int EditPickIndex(int modo, int mx, int my, int vx, int vy, int vw, int v
         w3dEngine::ColorMask(true, true, true, true);
         w3dEngine::EnableArray(w3dEngine::ColorArray);
     }
+#if defined(W3D_SYMBIAN) && defined(W3D_GLES2)
+    // el N8 (VideoCore III, z de 16 bits) no aplica bien el polygon offset de la oclusion: el vertice/arista quedaba
+    // TAPADO por su propia cara y no se podia clickear. El mismo arreglo que la jaula (EditMesh::Render): los empates
+    // pasan y un sesgo chico hacia la camara
+    w3dEngine::DepthFunc(w3dEngine::DepthLEqual);
+    w3dEngine::SesgoMetros(-0.02f);
+#endif
 
     if (faceMode) {
         // caras: triangulos EXPANDIDOS con color-ID por cara (vertices propios por
@@ -354,6 +352,10 @@ static int EditPickIndex(int modo, int mx, int my, int vx, int vy, int vw, int v
 
     GLubyte area[33 * 33 * 4]; // dimensionado para el WD mas grande (vertice+touch: 33); otros modos usan menos
     w3dEngine::ReadPixelsRGBA(x0, y0, WD, WD, area);
+#if defined(W3D_SYMBIAN) && defined(W3D_GLES2)
+    w3dEngine::SesgoMetros(0.0f);
+    w3dEngine::DepthFunc(w3dEngine::DepthLess);
+#endif
     w3dEngine::Enable(w3dEngine::Dither);
     w3dEngine::Enable(w3dEngine::Multisample); // restaurar el MSAA para el render normal
     w3dEngine::Disable(w3dEngine::ScissorTest);
@@ -1472,19 +1474,8 @@ bool ScenePick3D(int mx, int my, int vx, int vy, int vw, int vh, int screenH) {
         w3dEngine::Viewport(vx, glY, vw, vh);
         w3dEngine::Scissor(vx, glY, vw, vh);
         w3dEngine::Enable(w3dEngine::ScissorTest);
-        w3dEngine::MatrixMode(w3dEngine::Projection);
-        w3dEngine::LoadIdentity();
-        float pkNear = Viewport3DActive ? Viewport3DActive->nearClip : 0.01f;
-        float pkFar  = Viewport3DActive ? Viewport3DActive->farClip  : 1000.0f;
-        float pkAspect = (float)vw / (float)vh;
-        if (Viewport3DActive && Viewport3DActive->orthographic) {
-            // orto: mismo volumen que Render() (sino el pick de objetos cae corrido al zoomear en ortografica)
-            float size = Viewport3DActive->orbitDistance * tanf(fovDeg * 0.5f * 3.14159265f / 180.0f);
-            if (size < 0.001f) size = 0.001f;
-            w3dEngine::Ortho(-size * pkAspect, size * pkAspect, -size, size, pkNear, Viewport3DActive->orbitDistance + pkFar);
-        } else {
-            w3dEngine::Perspective(fovDeg, pkAspect, pkNear, pkFar);
-        }
+        // LA proyeccion del viewport (la de su Render: mirando por la camara, la de la CAMARA; ver EditPickIndex)
+        if (Viewport3DActive) Viewport3DActive->CargarProyeccionVista();
         w3dEngine::MatrixMode(w3dEngine::ModelView);
         w3dEngine::LoadIdentity();
         if (Viewport3DActive) Viewport3DActive->UpdateViewOrbit();
@@ -1534,3 +1525,293 @@ bool ScenePick3D(int mx, int my, int vx, int vy, int vw, int vh, int screenH) {
     return true; // el frame siguiente redibuja la escena real
 }
 
+
+// ============================================================================
+//  INSET FACES: el MODAL (I en Edit Mode / menu Face) y el panel redo. La op de malla es Mesh::InsetEdit
+//  (edit/MeshEdit.cpp). Como Blender: acercar el mouse al centro de la seleccion = mas grosor; con Ctrl el
+//  mouse maneja la profundidad; I = Individual, B = Boundary, O = Outset; click / Enter confirma, click
+//  derecho / Esc cancela. En vivo: cada movimiento vuelve a la malla de ANTES (el snapshot) y re-inseta.
+//  Al confirmar recien se toma el undo (de la malla de antes) y se abre el panel "Inset Faces".
+// ============================================================================
+struct InsetSnap { W3dPosVerts vp; std::vector<GLbyte> vn; std::vector<GLfloat> vu; std::vector<GLubyte> vc; int vsz;
+                   std::vector<MeshFace> f3d; std::vector<MaterialGroup> mg; std::vector<int> le, lv, rep;
+                   std::vector<std::vector<GLfloat> > uvs; std::vector<std::vector<GLubyte> > cols; std::vector<GLbyte> cn;
+                   std::set<std::string> sharp, seam; VtxAnimSnap vanims; bool tiene;
+                   InsetSnap() : vsz(0), tiene(false) {} };
+static InsetSnap gInSnap;
+static Mesh* gInMalla = NULL;              // la malla del snapshot (si cambia, el snapshot no sirve)
+static bool gInsetOn = false;
+static std::vector<char> gInsetSel;        // las faces3d seleccionadas (sobre la malla del snapshot)
+static std::vector<Vector3> gInsetCentros; // los centros de esas caras: la seleccion vuelve al cancelar
+static InsetOpciones gInsetOp;
+static float gInCx = 0, gInCy = 0;         // el centro de la seleccion en pantalla
+static float gInPxPorU = 100.0f;           // pixeles por unidad (local) alrededor de ese centro
+static float gInDistBase = 0, gInValorBase = 0;
+static bool  gInProf = false;              // el mouse maneja la profundidad (Ctrl)
+
+static void InsetGuardar(Mesh* m) {
+    InsetSnap& s = gInSnap;
+    s.vsz = m->vertexSize; s.vp.Capturar(m);
+    if (m->normals)     s.vn.assign(m->normals, m->normals + m->vertexSize*3); else s.vn.clear();
+    if (m->uv)          s.vu.assign(m->uv, m->uv + m->vertexSize*2); else s.vu.clear();
+    if (m->vertexColor) s.vc.assign(m->vertexColor, m->vertexColor + m->vertexSize*4); else s.vc.clear();
+    s.f3d = m->faces3d; s.mg = m->materialsGroup; s.le = m->looseEdges; s.lv = m->looseVerts; s.rep = m->posRep;
+    s.uvs.clear(); for (size_t k = 0; k < m->uvMaps.size(); k++) s.uvs.push_back(m->uvMaps[k]->uv);
+    s.cols.clear(); for (size_t k = 0; k < m->colorLayers.size(); k++) s.cols.push_back(m->colorLayers[k]->color);
+    s.cn = m->cornerNormal; s.sharp = m->sharpEdges; s.seam = m->seamEdges;
+    VertexAnimSnapshot(m, s.vanims);
+    s.tiene = true; gInMalla = m;
+}
+// vuelve la malla a como estaba al arrancar. 'regenerar' = dejarla entera (render + edicion); sin eso queda lista
+// solo para que InsetEdit la vuelva a insetar (que regenera al final)
+static void InsetRestaurar(Mesh* m, bool regenerar) {
+    InsetSnap& s = gInSnap;
+    if (!s.tiene || m != gInMalla) return;
+    VertexAnimRestaurarSnap(m, s.vanims);
+    m->vertexSize = s.vsz; s.vp.EscribirEn(m);
+    delete[] m->normals; m->normals = NULL; if (!s.vn.empty()) { m->normals = new GLbyte[s.vsz*3]; for (int i = 0; i < s.vsz*3; i++) m->normals[i] = s.vn[i]; }
+    delete[] m->uv; m->uv = NULL; if (!s.vu.empty()) { m->uv = new GLfloat[s.vsz*2]; for (int i = 0; i < s.vsz*2; i++) m->uv[i] = s.vu[i]; }
+    delete[] m->vertexColor; m->vertexColor = NULL; if (!s.vc.empty()) { m->vertexColor = new GLubyte[s.vsz*4]; for (int i = 0; i < s.vsz*4; i++) m->vertexColor[i] = s.vc[i]; }
+    m->faces3d = s.f3d; m->materialsGroup = s.mg; m->looseEdges = s.le; m->looseVerts = s.lv; m->posRep = s.rep;
+    for (size_t k = 0; k < m->uvMaps.size() && k < s.uvs.size(); k++) m->uvMaps[k]->uv = s.uvs[k];
+    for (size_t k = 0; k < m->colorLayers.size() && k < s.cols.size(); k++) m->colorLayers[k]->color = s.cols[k];
+    m->cornerNormal = s.cn; m->sharpEdges = s.sharp; m->seamEdges = s.seam;
+    if (regenerar) m->GenerarRender();
+}
+
+bool InsetActivo() { return gInsetOn; }
+InsetOpciones& InsetOpcionesActuales() { return gInsetOp; }
+void InsetCentroPantalla(float& x, float& y, float& pxPorU) { x = gInCx; y = gInCy; pxPorU = gInPxPorU; }
+
+static void InsetHint() {
+    if (!gInsetOn) { NotificarHintClear(); return; }
+    NotificarHint("Inset: move toward the center = thickness, Ctrl = depth, I/B/O = individual/boundary/outset, click to confirm");
+}
+
+// re-inseta desde el snapshot con las opciones de ahora (el modal y el panel redo)
+static void InsetAplicar() {
+    Mesh* m = (Mesh*)g_editMesh;
+    if (!m || m != gInMalla || !gInSnap.tiene) return;
+    InsetRestaurar(m, false);
+    m->InsetEdit(gInsetOp, gInsetSel);
+    g_redraw = true;
+}
+void InsetRedoAplicar() { InsetAplicar(); }
+
+void InsetIniciar(int mx, int my) {
+    if (InteractionMode != EditMode || !g_editMesh) { Notificar(T("Inset: enter Edit Mode first"), true); return; }
+    if (gInsetOn || LoopCutActivo()) return;
+    Mesh* m = (Mesh*)g_editMesh;
+    std::vector<char> sel;
+    if (!m->CarasSeleccionadas3d(sel)) { Notificar(T("Inset: select faces first"), true); g_redraw = true; return; }
+    RedoMeshPanelCerrar();   // (otro panel redo trabaja sobre su propio snapshot)
+    // el centro de la seleccion y la escala de la pantalla alrededor de el
+    Vector3 c(0, 0, 0); int n = 0; gInsetCentros.clear();
+    for (size_t f = 0; f < sel.size(); f++) { if (!sel[f]) continue;
+        const std::vector<int>& idx = m->faces3d[f].idx; Vector3 cf(0, 0, 0);
+        for (size_t k = 0; k < idx.size(); k++) cf = cf + Vector3(m->vertex[idx[k]*3], m->vertex[idx[k]*3+1], m->vertex[idx[k]*3+2]);
+        cf = cf * (1.0f / (float)idx.size()); gInsetCentros.push_back(cf); c = c + cf; n++; }
+    c = c * (1.0f / (float)n);
+    gInCx = (float)mx - 200.0f; gInCy = (float)my; gInPxPorU = 100.0f;   // (sin vista: un centro 200 px a la izquierda)
+    if (Viewport3DActive) {
+        Viewport3DActive->BindVista();
+        Matrix4 W; m->GetWorldMatrix(W);
+        float sx, sy;
+        if (Viewport3DActive->ProyectarPunto(W * c, sx, sy)) {
+            gInCx = sx; gInCy = sy;
+            const Vector3 ejes[3] = { Vector3(1,0,0), Vector3(0,1,0), Vector3(0,0,1) };
+            float mejor = 0.0f;
+            for (int k = 0; k < 3; k++) { float ax, ay;
+                if (!Viewport3DActive->ProyectarPunto(W * (c + ejes[k]), ax, ay)) continue;
+                const float d = sqrtf((ax-sx)*(ax-sx) + (ay-sy)*(ay-sy)); if (d > mejor) mejor = d; }
+            if (mejor > 1.0f) gInPxPorU = mejor;
+        }
+    }
+    InsetGuardar(m);
+    gInsetSel = sel;
+    gInsetOp.grosor = 0.0f; gInsetOp.profundidad = 0.0f;   // (las tildes quedan como se usaron la ultima vez)
+    gInProf = false;
+    float d = sqrtf(((float)mx-gInCx)*((float)mx-gInCx) + ((float)my-gInCy)*((float)my-gInCy));
+    gInDistBase = d < 10.0f ? 10.0f : d; gInValorBase = 0.0f;
+    gInsetOn = true;
+    InsetHint();
+    g_redraw = true;
+}
+
+void InsetMotion(int mx, int my) {
+    if (!gInsetOn) return;
+    const float d = sqrtf(((float)mx-gInCx)*((float)mx-gInCx) + ((float)my-gInCy)*((float)my-gInCy));
+    const bool prof = LCtrlPressed;
+    if (prof != gInProf) {   // cambia lo que maneja el mouse: arranca desde el valor que ya tenia
+        gInProf = prof; gInDistBase = d; gInValorBase = prof ? gInsetOp.profundidad : gInsetOp.grosor;
+    }
+    const float v = gInValorBase + (gInDistBase - d) / gInPxPorU;   // acercarse al centro = mas
+    if (gInProf) gInsetOp.profundidad = v;
+    else         gInsetOp.grosor = v > 0.0f ? v : 0.0f;
+    InsetAplicar();
+}
+
+void InsetCancelar() {
+    if (!gInsetOn) return;
+    gInsetOn = false;
+    Mesh* m = (Mesh*)g_editMesh;
+    if (m && m == gInMalla) { InsetRestaurar(m, true); m->SeleccionarCarasPorCentro(gInsetCentros); }
+    gInSnap.tiene = false;
+    InsetHint();
+    g_redraw = true;
+}
+
+void InsetConfirmar() {
+    if (!gInsetOn) return;
+    gInsetOn = false;
+    InsetHint();
+    Mesh* m = (Mesh*)g_editMesh;
+    if (!m || m != gInMalla) { gInSnap.tiene = false; return; }
+    // el undo guarda la malla de ANTES: se vuelve a ella, se captura y se re-inseta (el snapshot queda para el panel)
+    InsetRestaurar(m, true); m->SeleccionarCarasPorCentro(gInsetCentros);
+    UndoCapturarMallaGeo(m);
+    m->InsetEdit(gInsetOp, gInsetSel);
+    AbrirRedoInsetPanel(m);
+    g_redraw = true;
+}
+
+// teclas del modal: true = la uso
+bool InsetTecla(int tecla) {
+    if (!gInsetOn) return false;
+    switch (tecla) {
+        case W3dK_RETURN: case W3dK_KP_ENTER: InsetConfirmar(); return true;
+        case W3dK_ESCAPE: case W3dK_BACKSPACE: InsetCancelar(); return true;
+        case W3dK_I: gInsetOp.individual = !gInsetOp.individual; InsetAplicar(); return true;
+        case W3dK_B: gInsetOp.borde = !gInsetOp.borde; InsetAplicar(); return true;
+        case W3dK_O: gInsetOp.afuera = !gInsetOp.afuera; InsetAplicar(); return true;
+    }
+    return true;   // (el resto no hace nada mientras dura: que no se escape a los atajos del viewport)
+}
+
+
+// ============================================================================
+//  BEVEL: el MODAL (Ctrl+B en Edit Mode / menus Edge y Vertex) y el panel redo. La op de malla es Mesh::BevelEdit
+//  (edit/MeshEdit.cpp). Como Blender: ALEJAR el mouse del centro de la seleccion = mas ancho; la rueda (o arriba /
+//  abajo, Re Pag / Av Pag) = mas o menos segmentos; V = vertices / aristas; click / Enter confirma, click derecho /
+//  Esc cancela. En vivo: cada cambio vuelve a la malla de ANTES (el mismo snapshot del inset) y re-bisela. Al
+//  confirmar se toma el undo (de la malla de antes) y se abre el panel "Bevel".
+// ============================================================================
+static bool gBevelOn = false;
+static std::vector<char> gBvSelRep;                       // la seleccion de ANTES (sobre la malla del snapshot)
+static std::vector<std::pair<int,int> > gBvAristas;
+static std::vector<Vector3> gBvCentros;                   // los centros de las caras elegidas: vuelven al cancelar
+static BevelOpciones gBevelOp;
+static float gBvCx = 0, gBvCy = 0, gBvPxPorU = 100.0f, gBvDistBase = 0;
+static bool gBvTieneSnap = false;
+
+bool BevelActivo() { return gBevelOn; }
+BevelOpciones& BevelOpcionesActuales() { return gBevelOp; }
+void BevelCentroPantalla(float& x, float& y, float& pxPorU) { x = gBvCx; y = gBvCy; pxPorU = gBvPxPorU; }
+
+static void BevelHint() {
+    if (!gBevelOn) { NotificarHintClear(); return; }
+    NotificarHint("Bevel: move away from the center = width, wheel / up-down = segments, V = vertices/edges, click to confirm");
+}
+static void BevelAplicar() {
+    Mesh* m = (Mesh*)g_editMesh;
+    if (!m || m != gInMalla || !gInSnap.tiene || !gBvTieneSnap) return;
+    InsetRestaurar(m, false);
+    if (!m->BevelEdit(gBevelOp, gBvSelRep, gBvAristas)) m->GenerarRender();   // (ancho 0: la malla de antes, entera)
+    g_redraw = true;
+}
+void BevelRedoAplicar() { BevelAplicar(); }
+
+void BevelIniciar(int mx, int my, int afecta) {
+    if (InteractionMode != EditMode || !g_editMesh) { Notificar(T("Bevel: enter Edit Mode first"), true); return; }
+    if (gBevelOn || gInsetOn || LoopCutActivo()) return;
+    Mesh* m = (Mesh*)g_editMesh;
+    std::vector<char> selRep; std::vector<std::pair<int,int> > aristas;
+    if (!m->BevelSeleccion(selRep, aristas) || (afecta == 1 && aristas.empty())) {
+        Notificar(T(afecta == 1 ? "Bevel: select edges first" : "Bevel: select vertices first"), true); g_redraw = true; return; }
+    RedoMeshPanelCerrar();
+    // el centro de lo elegido y la escala de la pantalla alrededor de el
+    Vector3 c(0, 0, 0); int n = 0;
+    for (int i = 0; i < m->vertexSize && i < (int)selRep.size(); i++) if (selRep[i]) {
+        c = c + Vector3(m->vertex[i*3], m->vertex[i*3+1], m->vertex[i*3+2]); n++; }
+    if (n > 0) c = c * (1.0f / (float)n);
+    gBvCentros.clear();
+    { std::vector<char> sf; if (m->CarasSeleccionadas3d(sf)) for (size_t f = 0; f < sf.size(); f++) { if (!sf[f]) continue;
+        const std::vector<int>& idx = m->faces3d[f].idx; Vector3 cf(0, 0, 0);
+        for (size_t k = 0; k < idx.size(); k++) cf = cf + Vector3(m->vertex[idx[k]*3], m->vertex[idx[k]*3+1], m->vertex[idx[k]*3+2]);
+        gBvCentros.push_back(cf * (1.0f / (float)idx.size())); } }
+    gBvCx = (float)mx - 100.0f; gBvCy = (float)my; gBvPxPorU = 100.0f;
+    if (Viewport3DActive) {
+        Viewport3DActive->BindVista();
+        Matrix4 W; m->GetWorldMatrix(W);
+        float sx, sy;
+        if (Viewport3DActive->ProyectarPunto(W * c, sx, sy)) {
+            gBvCx = sx; gBvCy = sy;
+            const Vector3 ejes[3] = { Vector3(1,0,0), Vector3(0,1,0), Vector3(0,0,1) };
+            float mejor = 0.0f;
+            for (int k = 0; k < 3; k++) { float ax, ay;
+                if (!Viewport3DActive->ProyectarPunto(W * (c + ejes[k]), ax, ay)) continue;
+                const float d = sqrtf((ax-sx)*(ax-sx) + (ay-sy)*(ay-sy)); if (d > mejor) mejor = d; }
+            if (mejor > 1.0f) gBvPxPorU = mejor;
+        }
+    }
+    InsetGuardar(m);   // (el mismo snapshot que el inset: geometria + capas + marcas)
+    gBvTieneSnap = true;
+    gBvSelRep = selRep; gBvAristas = aristas;
+    gBevelOp.afecta = afecta; gBevelOp.ancho = 0.0f;   // (el resto queda como se uso la ultima vez)
+    const float d = sqrtf(((float)mx-gBvCx)*((float)mx-gBvCx) + ((float)my-gBvCy)*((float)my-gBvCy));
+    gBvDistBase = d;
+    gBevelOn = true;
+    BevelHint();
+    g_redraw = true;
+}
+
+void BevelMotion(int mx, int my) {
+    if (!gBevelOn) return;
+    const float d = sqrtf(((float)mx-gBvCx)*((float)mx-gBvCx) + ((float)my-gBvCy)*((float)my-gBvCy));
+    float v = (d - gBvDistBase) / gBvPxPorU;   // alejarse del centro = mas ancho
+    if (gBevelOp.tipoAncho == 3) v *= 100.0f;   // (Percent: en por ciento)
+    gBevelOp.ancho = v > 0.0f ? v : 0.0f;
+    BevelAplicar();
+}
+void BevelRueda(int dir) {
+    if (!gBevelOn) return;
+    gBevelOp.segmentos += dir > 0 ? 1 : -1;
+    if (gBevelOp.segmentos < 1) gBevelOp.segmentos = 1; if (gBevelOp.segmentos > 100) gBevelOp.segmentos = 100;
+    BevelAplicar();
+}
+
+void BevelCancelar() {
+    if (!gBevelOn) return;
+    gBevelOn = false;
+    Mesh* m = (Mesh*)g_editMesh;
+    if (m && m == gInMalla) { InsetRestaurar(m, true); if (!gBvCentros.empty()) m->SeleccionarCarasPorCentro(gBvCentros); }
+    gInSnap.tiene = false; gBvTieneSnap = false;
+    BevelHint();
+    g_redraw = true;
+}
+
+void BevelConfirmar() {
+    if (!gBevelOn) return;
+    gBevelOn = false;
+    BevelHint();
+    Mesh* m = (Mesh*)g_editMesh;
+    if (!m || m != gInMalla) { gInSnap.tiene = false; gBvTieneSnap = false; return; }
+    // el undo guarda la malla de ANTES: se vuelve a ella, se captura y se re-bisela (el snapshot queda para el panel)
+    InsetRestaurar(m, true);
+    UndoCapturarMallaGeo(m);
+    if (!m->BevelEdit(gBevelOp, gBvSelRep, gBvAristas)) m->GenerarRender();
+    AbrirRedoBevelPanel(m);
+    g_redraw = true;
+}
+
+bool BevelTecla(int tecla) {
+    if (!gBevelOn) return false;
+    switch (tecla) {
+        case W3dK_RETURN: case W3dK_KP_ENTER: BevelConfirmar(); return true;
+        case W3dK_ESCAPE: case W3dK_BACKSPACE: BevelCancelar(); return true;
+        case W3dK_UP: case W3dK_PGUP:   BevelRueda(+1); return true;
+        case W3dK_DOWN: case W3dK_PGDN: BevelRueda(-1); return true;
+        case W3dK_V: gBevelOp.afecta = gBevelOp.afecta ? 0 : 1; BevelAplicar(); return true;
+    }
+    return true;   // (el resto no hace nada mientras dura)
+}

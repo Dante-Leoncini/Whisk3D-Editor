@@ -83,7 +83,7 @@ static Matrix4 PoseW2N(Armature* a){
 static Vector3 PoseDirW2N(const Matrix4& W2N, const Vector3& d){ // direccion world -> nodo (resta el origen)
     Vector3 o = W2N * Vector3(0,0,0); Vector3 r = (W2N * d) - o; float l = r.Length(); return (l>1e-8f)? r*(1.0f/l): r; }
 static Vector3 PoseCam(int which){ // ejes de camara: 0=right 1=up 2=forward
-    Quaternion vr = Viewport3DActive ? Viewport3DActive->viewRot : Quaternion(1,0,0,0);
+    Quaternion vr = Viewport3DActive ? Viewport3DActive->RotVista() : Quaternion(1,0,0,0);   // (mirando por la camara: la suya)
     return vr * ((which==0)?Vector3(1,0,0):(which==1)?Vector3(0,1,0):Vector3(0,0,-1));
 }
 // eje constrenido (X/Y/Z) en espacio NODO segun axisSelect/transformOrientation (misma convencion que EjeMundo: Y=profundidad, Z=arriba)

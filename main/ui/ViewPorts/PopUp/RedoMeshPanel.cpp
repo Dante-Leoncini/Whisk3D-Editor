@@ -8,6 +8,8 @@
 #include "ViewPorts/LayoutArbol.h" // aviso de destruccion de viewports (vpCreador)
 #include "WhiskUI/widgets/PopupMenu.h"          // MenuPantallaW / MenuPantallaH (tamano ventana)
 #include "NumPad.h"                     // teclado numerico (editar el valor por texto/formula)
+#include "edit/MeshEdit.h"              // InsetOpciones (el panel "Inset Faces")
+#include "ViewPorts/Pick3D.h"           // InsetRedoAplicar / InsetOpcionesActuales
 
 // la malla que el panel esta editando + un espejo float de los vertices (los
 // PropFloat trabajan con float*; meshVerts es int). onChange unico para todos.
@@ -78,9 +80,103 @@ static void RedoLoopCutOnChange(){
     LoopCutRedoAplicar(cortes, gRedoFactorF, gRedoLCCorrectUV, (int)(gRedoLCEdgeF + 0.5f) - 1);
 }
 
+// BEVEL: las opciones de "elegir uno" van como numeros (PropFloat con nombres): estos los reflejan y vuelven
+static float gBvF[10];   // 0 afecta, 1 tipo de ancho, 2 segmentos, 3 material, 4 inglete afuera, 5 adentro, 6 interseccion,
+                         // 7 fuerza de cara, 8 tipo de perfil
+static void BevelPanelOnChange() {
+    BevelOpciones& o = BevelOpcionesActuales();
+    o.afecta = (int)(gBvF[0] + 0.5f); o.tipoAncho = (int)(gBvF[1] + 0.5f);
+    o.segmentos = (int)(gBvF[2] + 0.5f); if (o.segmentos < 1) o.segmentos = 1;
+    o.material = (int)floorf(gBvF[3] + 0.5f);
+    o.ingleteAfuera = (int)(gBvF[4] + 0.5f); o.ingleteAdentro = (int)(gBvF[5] + 0.5f);
+    o.interseccion = (int)(gBvF[6] + 0.5f); o.fuerzaCara = (int)(gBvF[7] + 0.5f); o.tipoPerfil = (int)(gBvF[8] + 0.5f);
+    BevelRedoAplicar();
+}
+
 RedoMeshPanel::RedoMeshPanel(Mesh* m, int modo)
     : PopUpBase("Add"), grupo(NULL), dragField(NULL), dragMoved(false), lastDragMx(0) {
     gRedoMesh = m;
+
+    if (modo == 4) { // Bevel: lo mismo que el panel de Blender. Cada cambio re-bisela desde la malla de antes
+        BevelOpciones& o = BevelOpcionesActuales();
+        gBvF[0] = (float)o.afecta; gBvF[1] = (float)o.tipoAncho; gBvF[2] = (float)o.segmentos; gBvF[3] = (float)o.material;
+        gBvF[4] = (float)o.ingleteAfuera; gBvF[5] = (float)o.ingleteAdentro; gBvF[6] = (float)o.interseccion;
+        gBvF[7] = (float)o.fuerzaCara; gBvF[8] = (float)o.tipoPerfil;
+        grupo = new GroupPropertie(T("Bevel"));
+        grupo->anchoValores = 0.5f;
+        struct Lista { static PropFloat* Nueva(const char* nombre, float* v, const char* const* ops, int n) {
+            PropFloat* p = new PropFloat(T(nombre)); p->value = v; p->entero = true; p->flechas = true; p->centrado = true;
+            p->opciones = ops; p->nOpciones = n; p->stepFino = 1.0f; p->stepGrueso = 1.0f; p->dragStep = 0.05f;
+            p->SetRango(0.0f, (float)(n - 1)); p->onChange = BevelPanelOnChange; return p; } };
+        static const char* const kAfecta[2] = { "Vertices", "Edges" };
+        static const char* const kTipo[5] = { "Offset", "Width", "Depth", "Percent", "Absolute" };
+        static const char* const kInter[2] = { "Grid Fill", "Cutoff" };
+        static const char* const kFuerza[4] = { "None", "New", "Affected", "All" };
+        grupo->properties.push_back(Lista::Nueva("Affect", &gBvF[0], kAfecta, 2));
+        grupo->properties.push_back(Lista::Nueva("Width Type", &gBvF[1], kTipo, 5));
+        PropFloat* ancho = new PropFloat(T("Width"));
+        ancho->value = &o.ancho; ancho->stepFino = 0.01f; ancho->stepGrueso = 0.1f; ancho->dragStep = 0.005f;
+        ancho->SetRango(0.0f, 100000.0f); ancho->onChange = BevelRedoAplicar; ancho->centrado = true;
+        grupo->properties.push_back(ancho);
+        PropFloat* segs = new PropFloat(T("Segments"));
+        segs->value = &gBvF[2]; segs->entero = true; segs->flechas = true; segs->centrado = true;
+        segs->stepFino = 1.0f; segs->stepGrueso = 1.0f; segs->dragStep = 0.1f; segs->SetRango(1.0f, 100.0f); segs->onChange = BevelPanelOnChange;
+        grupo->properties.push_back(segs);
+        PropFloat* perfil = new PropFloat(T("Profile Shape"));
+        perfil->value = &o.perfil; perfil->stepFino = 0.01f; perfil->stepGrueso = 0.1f; perfil->dragStep = 0.005f;
+        perfil->SetRango(0.0f, 1.0f); perfil->onChange = BevelRedoAplicar; perfil->centrado = true;
+        grupo->properties.push_back(perfil);
+        PropFloat* mat = new PropFloat(T("Material Index"));
+        mat->value = &gBvF[3]; mat->entero = false; mat->centrado = true;
+        mat->stepFino = 1.0f; mat->stepGrueso = 1.0f; mat->dragStep = 0.1f; mat->SetRango(-1.0f, 1000.0f); mat->onChange = BevelPanelOnChange;
+        grupo->properties.push_back(mat);
+        struct Tilde { const char* nombre; bool* valor; };
+        const Tilde tildes[5] = { { "Harden Normals", &o.endurecer }, { "Clamp Overlap", &o.limitarSolape },
+                                  { "Loop Slide", &o.deslizar }, { "Mark Seams", &o.marcarSeams }, { "Mark Sharp", &o.marcarSharp } };
+        for (int i = 0; i < 5; i++) {
+            PropBool* b = new PropBool(T(tildes[i].nombre)); b->value = tildes[i].valor; b->onChange = BevelRedoAplicar;
+            grupo->properties.push_back(b);
+        }
+        grupo->properties.push_back(Lista::Nueva("Intersection Type", &gBvF[6], kInter, 2));
+        grupo->properties.push_back(Lista::Nueva("Face Strength", &gBvF[7], kFuerza, 4));
+        grupo->selectIndex = 0;
+        vpCreador = Viewport3DActive; g_redoVpCreador = vpCreador;
+        ResizeGrupo();
+        Reubicar();
+        return;
+    }
+
+    if (modo == 3) { // Inset Faces: lo mismo que el panel de Blender. Cada cambio re-inseta desde la malla de antes
+        InsetOpciones& o = InsetOpcionesActuales();
+        grupo = new GroupPropertie(T("Inset Faces"));
+        grupo->anchoValores = 0.5f;
+        struct Tilde { const char* nombre; bool* valor; };
+        const Tilde arriba[4] = { { "Boundary", &o.borde }, { "Offset Even", &o.parejo },
+                                  { "Offset Relative", &o.relativo }, { "Edge Rail", &o.riel } };
+        for (int i = 0; i < 4; i++) {
+            PropBool* b = new PropBool(T(arriba[i].nombre)); b->value = arriba[i].valor; b->onChange = InsetRedoAplicar;
+            grupo->properties.push_back(b);
+        }
+        PropFloat* grosor = new PropFloat(T("Thickness"));
+        grosor->value = &o.grosor; grosor->stepFino = 0.01f; grosor->stepGrueso = 0.1f; grosor->dragStep = 0.005f;
+        grosor->SetRango(0.0f, 1000.0f); grosor->onChange = InsetRedoAplicar; grosor->centrado = true;
+        grupo->properties.push_back(grosor);
+        PropFloat* prof = new PropFloat(T("Depth"));
+        prof->value = &o.profundidad; prof->stepFino = 0.01f; prof->stepGrueso = 0.1f; prof->dragStep = 0.005f;
+        prof->SetRango(-1000.0f, 1000.0f); prof->onChange = InsetRedoAplicar; prof->centrado = true;
+        grupo->properties.push_back(prof);
+        const Tilde abajo[4] = { { "Outset", &o.afuera }, { "Select Outer", &o.selAfuera },
+                                 { "Individual", &o.individual }, { "Interpolate", &o.interpolar } };
+        for (int i = 0; i < 4; i++) {
+            PropBool* b = new PropBool(T(abajo[i].nombre)); b->value = abajo[i].valor; b->onChange = InsetRedoAplicar;
+            grupo->properties.push_back(b);
+        }
+        grupo->selectIndex = 0;
+        vpCreador = Viewport3DActive; g_redoVpCreador = vpCreador;
+        ResizeGrupo();
+        Reubicar();
+        return;
+    }
 
     if (modo == 1) { // Recalculate Normals: una tarjeta con la tilde "Inside"
         grupo = new GroupPropertie(T("Recalculate Normals"));
@@ -327,6 +423,9 @@ bool RedoMeshPanel::Click(int mx, int my){
     if (!Contains(mx, my)) return false; // afuera -> el caller cierra el panel
     int myL = my - y; // a coordenadas locales del panel
     int lx  = mx - x;
+    // el TITULO pliega / despliega la tarjeta
+    if (myL < borderGS + RenglonHeightGS + gapGS) { grupo->open = !grupo->open; g_redraw = true; return true; }
+    if (!grupo->open) return true;
     // rect de la columna de valores (igual que el render: titulo + box)
     int boxStart = grupo->colEtiqueta + 2 * borderGS;
     int boxW = grupo->propertiBox->width - bordersGS;
@@ -369,6 +468,12 @@ bool RedoMeshPanel::Motion(int mx, int my){
 
 bool RedoMeshPanel::Tecla(int tecla){
     if (!grupo || grupo->properties.empty()) return true;
+    // PLEGADO: OK / derecha lo despliega, C lo cierra; lo demas sigue de largo (se sigue trabajando)
+    if (!grupo->open) {
+        if (tecla == LayoutKey::Enter || tecla == LayoutKey::Right) { grupo->open = true; g_redraw = true; return true; }
+        if (tecla == LayoutKey::Cancel) { Cerrar(); return true; }
+        return false;
+    }
     int n = (int)grupo->properties.size();
     switch (tecla){
         // arriba/abajo: navegar entre campos con WRAP (sin los estados -1/-2 de
@@ -417,6 +522,11 @@ void RedoMeshPanel::Soltar(){
 // el panel sigue vivo? (para el test 'uipunteros': despues de borrar SU malla tiene que dar
 // false, sino quedan colgados gRedoMesh y los PropFloat::value que apuntan adentro de ella)
 // undo/redo: el panel trabaja sobre un snapshot PRE-operacion que ya no corresponde a la malla -> se cierra
+// LOS PANELES DE "AJUSTAR LA ULTIMA OPERACION" NACEN PLEGADOS: solo la flecha y el titulo de la operacion. Lo normal
+// es que ya haya quedado bien y se quiera seguir trabajando (en el N95 un panel grande desplegado de golpe interrumpia
+// todo); se despliega con un click en el titulo u OK. Plegado no se queda con las teclas ni con el mouse de afuera
+void RedoMeshPanel::Plegar() { if (grupo) { grupo->open = false; grupo->flecha = true; } }
+static void RedoPlegar(RedoMeshPanel* p) { if (p) p->Plegar(); }
 void RedoMeshPanelCerrar(){
     if (!gRedoPanel) return;
     if (PopUpActive == gRedoPanel) PopUpActive = NULL;
@@ -429,6 +539,7 @@ void AbrirRedoMeshPanel(Mesh* m){
     if (!m) return;
     if (gRedoPanel){ delete gRedoPanel; gRedoPanel = NULL; } // reemplaza el anterior
     gRedoPanel = new RedoMeshPanel(m);
+    RedoPlegar(gRedoPanel);
     PopUpActive = gRedoPanel;
 }
 
@@ -436,6 +547,23 @@ void AbrirRedoNormalesPanel(Mesh* m){
     if (!m) return;
     if (gRedoPanel){ delete gRedoPanel; gRedoPanel = NULL; }
     gRedoPanel = new RedoMeshPanel(m, 1); // modo 1 = Recalculate Normals
+    RedoPlegar(gRedoPanel);
+    PopUpActive = gRedoPanel;
+}
+
+void AbrirRedoBevelPanel(Mesh* m){
+    if (!m) return;
+    if (gRedoPanel){ delete gRedoPanel; gRedoPanel = NULL; }
+    gRedoPanel = new RedoMeshPanel(m, 4); // modo 4 = Bevel
+    RedoPlegar(gRedoPanel);
+    PopUpActive = gRedoPanel;
+}
+
+void AbrirRedoInsetPanel(Mesh* m){
+    if (!m) return;
+    if (gRedoPanel){ delete gRedoPanel; gRedoPanel = NULL; }
+    gRedoPanel = new RedoMeshPanel(m, 3); // modo 3 = Inset Faces
+    RedoPlegar(gRedoPanel);
     PopUpActive = gRedoPanel;
 }
 
@@ -443,5 +571,6 @@ void AbrirRedoLoopCutPanel(Mesh* m){
     if (!m) return;
     if (gRedoPanel){ delete gRedoPanel; gRedoPanel = NULL; }
     gRedoPanel = new RedoMeshPanel(m, 2); // modo 2 = Loop Cut and Slide
+    RedoPlegar(gRedoPanel);
     PopUpActive = gRedoPanel;
 }

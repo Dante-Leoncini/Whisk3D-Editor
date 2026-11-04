@@ -40,3 +40,12 @@ Mostra e edita a animação: folha de keyframes (dope sheet) ou editor de curvas
 | Euler inteligente | Remove as voltas a mais nas rotações selecionadas. | Menu Key |
 | Ocultar uma curva | O olho de cada linha a oculta. | Clique no olho |
 | Valores exatos | Quadro, valor e alças do keyframe escolhido. | Propriedades → Animação → Keyframe |
+
+## Sons
+
+| Função | Descrição | Atalho |
+|---|---|---|
+| Faixa do som | Cada objeto Som selecionado tem sua faixa: onde começa e quanto dura, em **segundos** (mudar os FPS não a move). Com loop, repete até o final. | — |
+| Mover | Arrastar a faixa, ou <kbd>G</kbd> sem keyframes escolhidos (move todos os sons selecionados). <kbd>Ctrl</kbd> encaixa nos frames. | Arrastar / <kbd>G</kbd> |
+| Cortar | Pegar uma ponta da faixa. | Arrastar uma ponta |
+| Forma de onda / Linha de volume | Menu View: a forma de onda e a curva do volume dentro da faixa (a faixa ocupa três linhas). Sem elas é só uma faixa. | Menu View |

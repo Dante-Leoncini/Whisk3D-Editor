@@ -32,4 +32,4 @@ end
 
 ## Al detener el juego
 
-Al apretar Stop se cierran todos los scripts, se borra lo compartido y la escena vuelve a como estaba antes del Play. Si editás un script mientras el juego corre, ese objeto lo recarga: sus variables vuelven a cero y se llama otra vez a `inicio()`. Rebobinar el timeline devuelve los objetos a su lugar, pero **no** las variables de Lua.
+Al apretar Stop se cierran todos los scripts, se borra lo compartido y la escena vuelve a como estaba antes del Play. Si editás un script mientras el juego corre, ese objeto lo recarga: sus variables vuelven a cero y se llama otra vez a `inicio()`.

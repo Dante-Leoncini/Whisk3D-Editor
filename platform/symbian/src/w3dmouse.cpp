@@ -12,12 +12,30 @@
 #include <string.h>            // memset / memcpy
 #include "Whisk3D.h"           // CWhisk3D (DrawMouseCursor/SetMouse son metodos)
 #include "w3dGraphics.h"       // motor: abstraccion del ESTADO de graficos
+#include "app/W3dRatonEditor.h"  // el mouse Bluetooth por el camino de la PC (controles.cpp)
+#include "ViewPorts/PantallasExternas.h"   // el MONITOR EXTENDIDO: el mouse pasa a la pantalla externa
 #include "w3dlayout.h"         // W3dLayoutArrastrePopup / W3dLayoutOcupado
 #include "w3dnewscene.h"   // W3dNew* (transform/orbit/zoom) + DuplicatedObject
 #include "WhiskUI/theme/colores.h"        // ListaColores / ColorID (paleta del editor)
 #include "w3dlog.h"
+#include "w3dpantallas.h"      // W3dPantallaConservaCuadro (mover solo el cursor)
+#include "w3dTexture.h"        // ReservarPantalla / CopiarPantalla (lo que esta debajo del cursor)
+#include "base/W3dInteractionState.h"   // InteractionMode
 #include "render/OpcionesRender.h" // g_redraw (render event-driven)
 #include "ViewPorts/LayoutInput.h" // LayoutDeleteEdit (menu Delete de edit mode)
+#include "ViewPorts/Pick3D.h"      // LoopCutActivo / LoopSelOrientando (siguen al mouse: no es solo el cursor)
+#include "edit/BoxSelect.h"        // BoxSelectActivo
+#include "ViewPorts/Timeline.h"     // DopeXformActivo (el transform de keyframes lo maneja el mouse como en la PC)
+
+// el color y el triangulo del cursor: GL crudo en ES 1.1 (el camino probado del N95); por el motor en ES 2.0 (N8),
+// donde glColor4f/glTexEnvf/glPointSize no existen
+#ifdef W3D_GLES2
+#define COLOR_CURSOR(r, g, b, a) w3dEngine::Color4f((r), (g), (b), (a))
+#define DIBUJAR_FLECHA() w3dEngine::DrawTrianglesArray(3)
+#else
+#define COLOR_CURSOR(r, g, b, a) W3D_GL_CRUDO(glColor4f((r), (g), (b), (a)))
+#define DIBUJAR_FLECHA() W3D_GL_CRUDO(glDrawArrays(GL_TRIANGLES, 0, 3))
+#endif
 
 #ifndef GL_POINT_SPRITE_OES
 #define GL_POINT_SPRITE_OES 0x8861
@@ -51,6 +69,9 @@ void W3dMouseBuildTex(const unsigned char* aRGBA, int aW, int aH) {
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 32, 32, 0,
                  GL_RGBA, GL_UNSIGNED_BYTE, celda);
+#ifdef W3D_GLES2
+    w3dEngine::GLES2Resincronizar();   // (el glBindTexture de arriba no paso por el motor)
+#endif
     w3dLog("mouse.png acolchada a 32x32 (point sprite)");
 }
 
@@ -67,9 +88,25 @@ void W3dMouseWarp(int aX, int aY) {
 // mover el cursor con las FLECHAS (mouse virtual visible): como mover el mouse BT, pero
 // el delta viene del teclado. Clampea a la pantalla y deja activo el viewport bajo el cursor.
 void W3dMouseMoverFlechas(int aDx, int aDy) {
-    if (!mouseVisible) { return; }
+    // el DELTA de este movimiento (las globales que leen los viewports, como el xrel del mouse en la PC). Sin esto
+    // el transform de KEYFRAMES (acumula dx/dy) usaba el que habia quedado de antes: derecha los movia para atras
+    extern int dx, dy;
+    dx = aDx; dy = aDy;
     mouseX = (GLshort)(mouseX + aDx);
     mouseY = (GLshort)(mouseY + aDy);
+    // moviendo keyframes: el cursor da la vuelta DENTRO del timeline (como el mouse en la PC) y el transform sigue
+    if (DopeXformActivo() && viewPortActive && viewPortActive->ViewportKind() == 5) {
+        const int l = viewPortActive->x + 1, r = viewPortActive->x + viewPortActive->width - 2;
+        const int t = viewPortActive->y + 1, b = viewPortActive->y + viewPortActive->height - 2;
+        if (r > l && b > t) {
+            if (mouseX < l) { mouseX = (GLshort)r; } else if (mouseX > r) { mouseX = (GLshort)l; }
+            if (mouseY < t) { mouseY = (GLshort)b; } else if (mouseY > b) { mouseY = (GLshort)t; }
+        }
+        g_redraw = true;
+        viewPortActive->event_mouse_motion(mouseX, mouseY);
+        return;
+    }
+    if (!mouseVisible) { mouseX = (GLshort)(mouseX - aDx); mouseY = (GLshort)(mouseY - aDy); return; }
     if (mouseX < 0) { mouseX = 0; }
     if (mouseX > winW-1) { mouseX = (GLshort)(winW-1); }
     if (mouseY < 0) { mouseY = 0; }
@@ -88,7 +125,9 @@ void CWhisk3D::SetMouse(){
 
 // dibuja el cursor encima de todo (lo llama el container tras el render del
 // arbol de viewports)
+static CWhisk3D* gCursorDueno = NULL;   // (el que dibuja el cursor: el hook de la pantalla externa lo reusa)
 void CWhisk3D::DrawMouseCursor(){
+    gCursorDueno = this;
     static TInt cl = 0;
     if ((++cl & 0xFF) == 1){
         w3dLogf("cursor: visible=%d tex=%d", (TInt)mouseVisible, (TInt)W3dMouseTex());
@@ -112,7 +151,11 @@ void CWhisk3D::DrawMouseCursor(){
     w3dEngine::LoadIdentity();
 
     w3dEngine::Enable(w3dEngine::Blend);
+#ifdef W3D_GLES2
+    w3dEngine::BlendAlpha();
+#else
     W3D_GL_CRUDO(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
+#endif
     w3dEngine::Disable(w3dEngine::DepthTest);
     w3dEngine::Disable(w3dEngine::Lighting);
 
@@ -122,7 +165,7 @@ void CWhisk3D::DrawMouseCursor(){
     w3dEngine::DisableArray(w3dEngine::NormalArray); // puntero viciado de la escena
     // (sin push de matriz de textura: los point sprites no la usan y un push
     // sin pop aca desbordaba el stack -> glErr 503 cada frame)
-    W3D_GL_CRUDO(glColor4f(1.0f, 1.0f, 1.0f, 1.0f));
+    COLOR_CURSOR(1.0f, 1.0f, 1.0f, 1.0f);
     w3dEngine::Translatef((float)mouseX, (float)mouseY, 0.0f);
 
     if (W3dMouseTex() != 0){
@@ -131,15 +174,23 @@ void CWhisk3D::DrawMouseCursor(){
         static const GLfloat MousePt[2] = { 16.0f, 16.0f }; // centro de la celda
         if (W3dLayoutArrastrePopup()){
             // VIOLETA: arrastrando un valor del selector de color
-            W3D_GL_CRUDO(glColor4f(0.65f, 0.4f, 1.0f, 1.0f));
+            COLOR_CURSOR(0.65f, 0.4f, 1.0f, 1.0f);
         } else if (W3dLayoutOcupado()){
             // VERDE: estas en medio de algo (scroll/divisor agarrado)
-            W3D_GL_CRUDO(glColor4f(ListaColores[static_cast<int>(ColorID::accent)][0], ListaColores[static_cast<int>(ColorID::accent)][1],
-                      ListaColores[static_cast<int>(ColorID::accent)][2], 1.0f));
+            COLOR_CURSOR(ListaColores[static_cast<int>(ColorID::accent)][0], ListaColores[static_cast<int>(ColorID::accent)][1],
+                         ListaColores[static_cast<int>(ColorID::accent)][2], 1.0f);
         } else {
-            W3D_GL_CRUDO(glColor4f(1.0f, 1.0f, 1.0f, 1.0f));
+            COLOR_CURSOR(1.0f, 1.0f, 1.0f, 1.0f);
         }
         w3dEngine::BindTexture(W3dMouseTex());
+#ifdef W3D_GLES2
+        // ES 2.0: el sprite es del shader del motor (gl_PointCoord); sin GL crudo
+        w3dEngine::PointSpriteCoordReplace(true);
+        w3dEngine::PointSize(32.0f);
+        w3dEngine::VertexPointer2f(0, MousePt);
+        w3dEngine::DrawPoints(1);
+        w3dEngine::PointSpriteCoordReplace(false);
+#else
         W3D_GL_CRUDO(glEnable(GL_POINT_SPRITE_OES));
         W3D_GL_CRUDO(glTexEnvf(GL_POINT_SPRITE_OES, GL_COORD_REPLACE_OES, GL_TRUE));
         W3D_GL_CRUDO(glPointSize(32.0f));
@@ -151,6 +202,7 @@ void CWhisk3D::DrawMouseCursor(){
         W3D_GL_CRUDO(glDrawArrays(GL_POINTS, 0, 1));
         W3D_GL_CRUDO(glTexEnvf(GL_POINT_SPRITE_OES, GL_COORD_REPLACE_OES, GL_FALSE));
         W3D_GL_CRUDO(glDisable(GL_POINT_SPRITE_OES));
+#endif
     }
     else {
         // fallback: flecha plana mientras mouse.png no este subida
@@ -158,13 +210,13 @@ void CWhisk3D::DrawMouseCursor(){
         static const GLfloat ArrowVerts[]  = { 0,0,0,  0,14,0,  10,10,0 };
         w3dEngine::Disable(w3dEngine::Texture2D);
         w3dEngine::DisableArray(w3dEngine::TexCoordArray);
-        W3D_GL_CRUDO(glColor4f(0.0f, 0.0f, 0.0f, 1.0f));
+        COLOR_CURSOR(0.0f, 0.0f, 0.0f, 1.0f);
         w3dEngine::VertexPointer3f(0, ArrowShadow);   // (por el motor, como el sprite de arriba)
         w3dEngine::MatricesSincronizar();
-        W3D_GL_CRUDO(glDrawArrays(GL_TRIANGLES, 0, 3));
-        W3D_GL_CRUDO(glColor4f(1.0f, 1.0f, 1.0f, 1.0f));
+        DIBUJAR_FLECHA();
+        COLOR_CURSOR(1.0f, 1.0f, 1.0f, 1.0f);
         w3dEngine::VertexPointer3f(0, ArrowVerts);
-        W3D_GL_CRUDO(glDrawArrays(GL_TRIANGLES, 0, 3));
+        DIBUJAR_FLECHA();
         w3dEngine::EnableArray(w3dEngine::TexCoordArray);
         w3dEngine::Enable(w3dEngine::Texture2D);
     }
@@ -207,316 +259,342 @@ static TBool gHayTecladoBT = EFalse;
 bool W3dSymbianTecladoBT() { return gHayTecladoBT ? true : false; }
 bool W3dSymbianMouseBT()   { return gHayMouseBT ? true : false; }
 
+// EL MOUSE BLUETOOTH COMO EL DE LA PC: con el driver bthid-s60 llegan el apretar y el soltar de verdad (el de Hinkka
+// mandaba un click por reporte y nada se podia mantener: de ahi el modo orbita con el derecho y el debounce). Ahora va
+// por W3dRatonEditor -> controles.cpp, el mismo camino que la PC: click derecho = menu contextual, arrastrar = caja,
+// pintar, rueda = zoom, el del medio (o izquierdo + derecho juntos) = orbitar.
+// La EXCEPCION: un mover/rotar/escalar arrancado con el teclado Bluetooth (g/r/s, el modelo del N95): el mouse lo
+// maneja como siempre (W3dNewTransform*) hasta que se acepta o se cancela.
+// ---- EL MONITOR EXTENDIDO: el cursor sale por la derecha del telefono y entra por la izquierda de la pantalla externa
+//      (la que tiene arbol propio, PantallaExternaVecina), y vuelve por su borde izquierdo. Mientras esta ahi, cada
+//      evento del mouse se atiende ADENTRO de esa pantalla (PantallaExternaEntrar: su arbol, sus activos, su tamano) y
+//      con las coordenadas de ella; el cursor se dibuja ahi (PantallaExternaCursor) y no en el telefono.
+static TInt gRatonEn = 0;            // la pantalla donde esta el cursor (0 = el telefono)
+
+// un mover/rotar/escalar que arranco EL MOUSE (el gizmo, la barra de herramientas, un menu): lo sigue manejando el camino
+// de la PC hasta que termina. W3dNewTransformActive() tambien es true con esos (un transform de malla en Edit Mode lo
+// es siempre) y el camino del N95 se quedaba con el soltar: el gizmo no se soltaba nunca.
+static TBool gXformDelRaton = EFalse;
+static TBool XformDelTeclado() {
+	if (!W3dNewTransformActive()) { gXformDelRaton = EFalse; return EFalse; }
+	// el de KEYFRAMES (1/2/3 = g/r/s en el timeline) lo maneja el mouse por el camino de la PC aunque lo haya
+	// arrancado el teclado: el cursor da la vuelta dentro del TIMELINE y mueve los keyframes. Por este camino se
+	// encerraba en el viewport 3D (saltaba arriba de todo) y el movimiento iba a un transform 3D que no existe
+	if (DopeXformActivo()) return EFalse;
+	return !gXformDelRaton;
+}
+// todo lo que el mouse le entrega al editor pasa con uno de estos: si un transform arranca adentro, es del mouse. El
+// apretar sale DEMORADO (W3dRatonEditor espera kRatonAcordeMs por el acorde izquierdo+derecho = boton del medio): el
+// gizmo arranca en el tick o en el movimiento siguiente, no en el click. Mirando solo el click no se marcaba, el camino
+// del N95 se quedaba con el soltar y el gizmo no se soltaba (y despues el mouse seguia escalando sin boton)
+class TMiraXform {
+public:
+	TMiraXform() : iHabia(W3dNewTransformActive()) {}
+	~TMiraXform() { if (!iHabia && W3dNewTransformActive()) gXformDelRaton = ETrue; }
+private:
+	TBool iHabia;
+};
+static TInt gExtX = 0, gExtY = 0, gExtW = 1, gExtH = 1;
+
+// atender un evento del mouse en la pantalla externa: sus globales y el cursor (mouseX/mouseY, lo que leen
+// GuardarMousePos y SDL_GetMouseState) en SUS coordenadas, y despues todo como estaba
+// aSuperficie: ademas, SU superficie de GL pasa a ser la de dibujo mientras dura el evento. El pick por color (click,
+// el hover del loop cut, el snap) dibuja y lee pixeles: sobre la del telefono (640x360) solo andaba en la parte de la
+// TV que cae adentro de esos 640x360 -un borde si, otro no; vertices imposibles de clickear-. Lo que se dibuje ahi
+// pisa el cuadro conservado: el cuadro siguiente se redibuja entero
+class TEnPantallaExterna {
+public:
+	TEnPantallaExterna(TBool aActivar = ETrue, TBool aSuperficie = ETrue) : iX(mouseX), iY(mouseY), iDentro(EFalse), iSup(EFalse) {
+		if (aActivar && gRatonEn && PantallaExternaEntrar(gRatonEn)) {
+			iDentro = ETrue;
+			mouseX = (GLshort)gExtX; mouseY = (GLshort)gExtY;
+			if (aSuperficie && PantallaExternaActivar && PantallaExternaActivar(gRatonEn)) iSup = ETrue;
+		}
+	}
+	~TEnPantallaExterna() {
+		if (!iDentro) return;
+		if (iSup) { if (PantallaExternaVolver) PantallaExternaVolver(); g_redraw = true; }
+		mouseX = iX; mouseY = iY;
+		PantallaExternaSalir();
+	}
+private:
+	GLshort iX, iY;
+	TBool iDentro, iSup;
+};
+// un movimiento sin boton solo pickea con una herramienta que sigue al mouse (o un transform: el snap). Fuera de eso no
+// se cambia de superficie por cada movimiento (eglMakeCurrent dos veces por evento)
+static TBool MovimientoPickea() {
+	return estado != editNavegacion || LoopCutActivo() || LoopSelOrientando() || PickPathGuiado() || W3dRatonAlgunoApretado();
+}
+
+// la pantalla externa se desconecto o volvio a clonar: el cursor vuelve al telefono
+static void RatonVerificarPantalla() {
+	TInt id = 0, w = 0, h = 0;
+	// SOLO LA EXTERNA: el cursor vive ahi (arranca en el medio) y no vuelve al telefono
+	if (PantallaExternaSolo()) {
+		// (el tamaño se relee siempre: si el cursor ya estaba en la externa de antes, o la superficie cambio de tamaño,
+		// el gExtW viejo no lo dejaba llegar al borde derecho -la barra de desplazamiento-)
+		for (TInt i = 0; PantallaExternaInfo(i, &id, &w, &h, NULL); i++) {
+			if (id != PantallaExternaSolo()) continue;
+			if (gRatonEn != id) { gRatonEn = id; gExtX = w / 2; gExtY = h / 2; mouseVisible = false; }
+			if (gExtW != w || gExtH != h) w3dLogf("[raton] solo la externa: el cursor va en %dx%d", w, h);
+			gExtW = w; gExtH = h;
+			if (gExtX > w - 1) gExtX = w - 1;
+			if (gExtY > h - 1) gExtY = h - 1;
+			break;
+		}
+		return;
+	}
+	if (gRatonEn && (!PantallaExternaVecina(&id, &w, &h) || id != gRatonEn)) {
+		gRatonEn = 0;
+		mouseVisible = ETrue;
+	}
+}
+
+// ---- MOVER SOLO EL CURSOR ("solo la externa", 1280x720): pasar el mouse sin botones por el contenido del 3D no cambia
+//      nada de lo dibujado (como mucho el overlay). Redibujar el editor entero por eso era lo que lo hacia inusable. Si el
+//      swap conserva el cuadro, se guarda lo que queda debajo del cursor (32x32, el sprite) antes de dibujarlo; al moverse
+//      se repone eso, se guarda lo del lugar nuevo y se dibuja ahi. El resto del cuadro queda como estaba
+static TUint gFondoTex = 0;
+static TInt gFondoX = -1, gFondoY = -1, gFondoAlto = 0;
+static TBool gCursorPendiente = EFalse;   // se movio solo el cursor: falta presentarlo (W3dMouseCuadroCursor)
+static const TInt KCursorLado = 32;
+
+static void GuardarFondoCursor(int aW, int aH) {
+	if (!gFondoTex) gFondoTex = w3dEngine::ReservarPantalla(0, KCursorLado, KCursorLado);
+	TInt x = gExtX, y = gExtY;   // (el sprite va de la punta hacia abajo a la derecha: cerca del borde, el ultimo cuadrado)
+	if (x > aW - KCursorLado) x = aW - KCursorLado;
+	if (y > aH - KCursorLado) y = aH - KCursorLado;
+	if (x < 0) x = 0;
+	if (y < 0) y = 0;
+	w3dEngine::CopiarPantalla(gFondoTex, x, aH - y - KCursorLado, KCursorLado, KCursorLado);
+	gFondoX = x; gFondoY = y; gFondoAlto = aH;
+}
+
+static void ReponerFondoCursor(int aW, int aH) {
+	if (!gFondoTex || gFondoX < 0 || gFondoAlto != aH) return;
+	const GLfloat x0 = (GLfloat)gFondoX, y0 = (GLfloat)gFondoY;
+	const GLfloat x1 = x0 + KCursorLado, y1 = y0 + KCursorLado;
+	// (la copia tiene la fila de ABAJO en t = 0)
+	static GLfloat v[12], t[12];
+	const GLfloat vv[12] = { x0,y0, x0,y1, x1,y1,  x0,y0, x1,y1, x1,y0 };
+	const GLfloat tt[12] = { 0,1,   0,0,   1,0,    0,1,   1,0,   1,1 };
+	memcpy(v, vv, sizeof(v)); memcpy(t, tt, sizeof(t));   // (el backend puede juntar el draw: punteros que sigan vivos)
+	w3dEngine::Invalidate();
+	w3dEngine::Disable(w3dEngine::ScissorTest);
+	w3dEngine::Disable(w3dEngine::Blend);
+	w3dEngine::Disable(w3dEngine::DepthTest);
+	w3dEngine::Disable(w3dEngine::Lighting);
+	w3dEngine::Disable(w3dEngine::Fog);
+	w3dEngine::Viewport(0, 0, aW, aH);
+	w3dEngine::MatrixMode(w3dEngine::Projection);
+	w3dEngine::LoadIdentity();
+	w3dEngine::Ortho(0.0f, (GLfloat)aW, (GLfloat)aH, 0.0f, -5.0f, 1000.0f);
+	w3dEngine::MatrixMode(w3dEngine::ModelView);
+	w3dEngine::LoadIdentity();
+	w3dEngine::Enable(w3dEngine::Texture2D);
+	w3dEngine::BindTexture(gFondoTex);
+	w3dEngine::Color4f(1.0f, 1.0f, 1.0f, 1.0f);
+	w3dEngine::DisableArray(w3dEngine::NormalArray);
+	w3dEngine::DisableArray(w3dEngine::ColorArray);
+	w3dEngine::EnableArray(w3dEngine::TexCoordArray);
+	w3dEngine::VertexPointer2f(0, v);
+	w3dEngine::TexCoordPointer2f(0, t);
+	w3dEngine::DrawTrianglesArray(6);
+}
+
+// el puntero (ya Entrado a su pantalla) esta donde moverlo no cambia nada de lo dibujado
+static TBool SoloCursorAca() {
+	return PantallaExternaSolo() && gRatonEn == PantallaExternaSolo() && W3dPantallaConservaCuadro(gRatonEn) &&
+	       !W3dRatonAlgunoApretado() && !W3dNewTransformActive() && !W3dLayoutMenuAbierto() && !W3dLayoutPopupActivo() &&
+	       (InteractionMode == ObjectMode || InteractionMode == EditMode) && W3dLayoutSobreContenido3D(mouseX, mouseY) &&
+	       // las herramientas que siguen al mouse sin boton (los cortes posibles del loop cut, la direccion del loop
+	       // select, el camino guiado, un transform que arranco el teclado) SI cambian el cuadro
+	       estado == editNavegacion && !LoopCutActivo() && !InsetActivo() && !BevelActivo() && !LoopSelOrientando() && !PickPathGuiado() && !BoxSelectActivo();
+}
+
+// el cursor en la pantalla externa: el mismo dibujo, con su tamano y su posicion
+static void CursorEnPantallaExterna(int aId, int aW, int aH) {
+	if (aId != gRatonEn || !gCursorDueno) return;
+	gCursorPendiente = EFalse;   // (este cuadro ya lo dibuja donde esta)
+	if (W3dPantallaConservaCuadro(aId)) GuardarFondoCursor(aW, aH);
+	const GLshort x0 = mouseX, y0 = mouseY; const int w0 = winW, h0 = winH; const bool vis0 = mouseVisible;
+	mouseX = (GLshort)gExtX; mouseY = (GLshort)gExtY; winW = aW; winH = aH; mouseVisible = true;
+	gCursorDueno->DrawMouseCursor();
+	mouseX = x0; mouseY = y0; winW = w0; winH = h0; mouseVisible = vis0;
+}
+struct TEngancharCursorExterno { TEngancharCursorExterno() { PantallaExternaCursor = CursorEnPantallaExterna; } };
+static TEngancharCursorExterno gEngancheCursorExterno;
+
+// el envolver del cursor dentro del viewport (CheckWarpMouseInViewport, como la PC): en la pantalla donde esta
+static void TeletransportarRaton(int aX, int aY) {
+	if (gRatonEn) { gExtX = aX; gExtY = aY; }   // (mouseX/mouseY tienen las de la externa solo durante el evento)
+	mouseX = (GLshort)aX; mouseY = (GLshort)aY;
+}
+struct TEngancharTeletransporte { TEngancharTeletransporte() { W3dRatonTeletransportar = TeletransportarRaton; } };
+static TEngancharTeletransporte gEngancheTeletransporte;
+
+// el container, cuando no hay nada que redibujar: si solo se movio el cursor, se presenta eso. false = no habia nada
+TBool W3dMouseCuadroCursor() {
+	if (!gCursorPendiente) return EFalse;
+	gCursorPendiente = EFalse;
+	const TInt id = gRatonEn;
+	if (!id || !W3dPantallaConservaCuadro(id) || gFondoX < 0 || !PantallaExternaActivar) { g_redraw = true; return ETrue; }
+	w3dEngine::DibujarPendiente();
+	if (!PantallaExternaActivar(id)) { g_redraw = true; return ETrue; }
+	ReponerFondoCursor(gExtW, gExtH);
+	CursorEnPantallaExterna(id, gExtW, gExtH);   // (guarda lo de abajo del lugar nuevo y lo dibuja)
+	w3dEngine::DibujarPendiente();
+	if (PantallaExternaPresentar) PantallaExternaPresentar(id);
+	if (PantallaExternaVolver) PantallaExternaVolver();
+	return ETrue;
+}
+
+// una vez por cuadro (container): el apretar que esperaba por si era el boton del medio, en la pantalla donde esta
+void W3dMouseTick() {
+	RatonVerificarPantalla();
+	TEnPantallaExterna en(ETrue, W3dRatonAlgunoApretado());   // (el apretar demorado puede pickear)
+	TMiraXform mira;
+	W3dRatonTick();
+}
+
 void CWhisk3D::HidMouseMove(TInt aDx, TInt aDy){
+	if (!gHayMouseBT){ extern bool g_gizmoOn; g_gizmoOn = true; }   // con mouse, el gizmo (como la PC)
 	gHayMouseBT = ETrue;
+	const bool redrawPrevio = g_redraw;
 	g_redraw = true; // se movio el mouse BT -> redibujar
-	// el delta gigante que el driver acumula mientras un boton esta apretado
-	// y larga al soltar se descarta: ni el cursor ni la camara deben saltar
+	// el delta gigante que algunos drivers acumulan mientras un boton esta apretado se descarta
 	if (aDx > 100 || aDx < -100 || aDy > 100 || aDy < -100){
 		return;
 	}
-	// transformacion del modelo NUEVO (teclas 1/2/3): el mouse la maneja.
-	if (W3dNewTransformActive()){
-		// el cursor DEBE seguir moviendose (antes se quedaba clavado)
-		if (!mouseVisible){ mouseVisible = true; }
-		mouseX = (GLshort)(mouseX + aDx);
-		mouseY = (GLshort)(mouseY + aDy);
-		if (mouseX < 0){ mouseX = 0; }
-		if (mouseX > winW-1){ mouseX = (GLshort)(winW-1); }
-		if (mouseY < 0){ mouseY = 0; }
-		if (mouseY > winH-1){ mouseY = (GLshort)(winH-1); }
-		if (W3dNewEsRotarDesdeVista()){
-			// rotar LIBRE = trackball: angulo del mouse alrededor del pivot
-			W3dNewRotarDesdeVista(mouseX, mouseY);
-		} else {
-			// mover/rotar-eje/escalar: 2x sensibilidad (le faltaba)
-			W3dNewTransformMove(aDx * 2, aDy * 2);
+	RatonVerificarPantalla();
+	TMiraXform mira;
+	// "solo la externa" con un transform del teclado: el cursor da la vuelta dentro del 3D (que esta en la externa)
+	if (gRatonEn && PantallaExternaSolo() && XformDelTeclado()){
+		gExtX += aDx; gExtY += aDy;
+		TInt vx, vy, vw, vh, sh;
+		{ TEnPantallaExterna en(ETrue, EFalse); W3dLayoutGet3DRect(vx, vy, vw, vh, sh); }
+		if (vw > 2 && vh > 2){
+			if (gExtX <= vx)                { gExtX = vx + vw - 2; }
+			else if (gExtX >= vx + vw - 1) { gExtX = vx + 1; }
+			if (gExtY <= vy)                { gExtY = vy + vh - 2; }
+			else if (gExtY >= vy + vh - 1) { gExtY = vy + 1; }
 		}
-		W3dNewTransformLinea(mouseX, mouseY); // linea punteada (rotar/escalar)
+		TEnPantallaExterna en;
+		if (W3dNewEsRotarDesdeVista()){ W3dNewRotarDesdeVista(mouseX, mouseY); }
+		else { W3dNewTransformMove(aDx * 2, aDy * 2); }
+		W3dNewTransformLinea(mouseX, mouseY);
 		return;
 	}
-
-	if (hidMiddleDown || hidOrbitMode){
-		// Fase 3c-2: la orbita maneja la camara del mundo NUEVO (PC)
-		W3dNewSceneOrbit(aDx, aDy);
-	}
-	else {
-		// mover el cursor virtual (aparece solo al mover el mouse);
-		// mismos limites de pantalla que el movimiento con flechas
-		if (!mouseVisible){
+	// EN LA PANTALLA EXTERNA: se mueve ahi; por su borde izquierdo vuelve al telefono (salvo en "solo la externa")
+	if (gRatonEn && !XformDelTeclado()){
+		TInt nx = gExtX + aDx;
+		if (nx < 0 && PantallaExternaSolo()) nx = 0;
+		if (nx < 0){
+			gRatonEn = 0;
+			mouseX = (GLshort)(winW - 1 + nx);
+			mouseY = (GLshort)(gExtY * winH / (gExtH > 0 ? gExtH : 1));
+			if (mouseX < 0){ mouseX = 0; }
+			if (mouseY > winH-1){ mouseY = (GLshort)(winH-1); }
 			mouseVisible = true;
+			W3dRatonMovio(mouseX, mouseY, aDx, aDy);
+			return;
 		}
-		mouseX = (GLshort)(mouseX + aDx);
-		mouseY = (GLshort)(mouseY + aDy);
-		// como la flecha de Windows: el hotspot (esquina superior izquierda)
-		// puede llegar hasta el ultimo pixel de la pantalla
-		if (mouseX < 0){mouseX = 0;}
-		if (mouseX > winW-1){mouseX = (GLshort)(winW-1);}
-		if (mouseY < 0){mouseY = 0;}
-		if (mouseY > winH-1){mouseY = (GLshort)(winH-1);}
-
-		// arrastrando con el izquierdo dentro de un panel: el mouse no
-		// se sale del viewport, da la vuelta (como PC)
-		if (leftMouseDown){
-			TInt wx = mouseX, wy = mouseY;
-			if (W3dLayoutWrapMouse(wx, wy)){
-				mouseX = (GLshort)wx;
-				mouseY = (GLshort)wy;
-			}
-		}
-
-		// los paneles de PC reciben el movimiento (drag de scrollbar con
-		// el izquierdo apretado + mouse-over): dx/dy son los globals reales
-		dx = aDx;
-		dy = aDy;
-		W3dLayoutMouseMotion(mouseX, mouseY);
-
-		// layout: si hay un divisor agarrado, el movimiento lo redimensiona;
-		// y el viewport bajo el cursor pasa a ser el activo (cambia camaras)
-		if (W3dLayoutDragging()){
-			W3dLayoutDragMove(aDx, aDy);
-		}
-		else {
-			W3dLayoutMouseMoved(mouseX, mouseY);
+		TBool soloCursor;
+		{ TEnPantallaExterna en0(ETrue, EFalse); soloCursor = SoloCursorAca(); }
+		gExtX = nx < gExtW - 1 ? nx : gExtW - 1;
+		gExtY = gExtY + aDy;
+		if (gExtY < 0){ gExtY = 0; }
+		if (gExtY > gExtH - 1){ gExtY = gExtH - 1; }
+		TEnPantallaExterna en(ETrue, MovimientoPickea());
+		W3dRatonMovio(mouseX, mouseY, aDx, aDy);
+		// de un lugar del 3D a otro, sin botones: nada cambio salvo el cursor (el cuadro no se redibuja)
+		if (soloCursor && SoloCursorAca()){ g_redraw = redrawPrevio; gCursorPendiente = ETrue; }
+		return;
+	}
+	if (!mouseVisible){ mouseVisible = true; }
+	// por el borde DERECHO del telefono se pasa a la pantalla externa (si tiene arbol propio)
+	{
+		TInt id = 0, w = 0, h = 0;
+		if (!XformDelTeclado() && mouseX + aDx > winW - 1 && PantallaExternaVecina(&id, &w, &h)){
+			gRatonEn = id; gExtW = w; gExtH = h;
+			gExtX = mouseX + aDx - winW;
+			if (gExtX > w - 1){ gExtX = w - 1; }
+			gExtY = mouseY * h / (winH > 0 ? winH : 1);
+			mouseVisible = false;   // (el cursor se dibuja en la otra pantalla)
+			TEnPantallaExterna en;
+			W3dRatonMovio(mouseX, mouseY, aDx, aDy);
+			return;
 		}
 	}
+	mouseX = (GLshort)(mouseX + aDx);
+	mouseY = (GLshort)(mouseY + aDy);
+	// como la flecha de Windows: el hotspot puede llegar hasta el ultimo pixel de la pantalla
+	if (mouseX < 0){ mouseX = 0; }
+	if (mouseX > winW-1){ mouseX = (GLshort)(winW-1); }
+	if (mouseY < 0){ mouseY = 0; }
+	if (mouseY > winH-1){ mouseY = (GLshort)(winH-1); }
+	// transformacion del modelo del N95 (teclas g/r/s): el mouse la maneja. Como en la PC, el cursor no se sale del
+	// viewport 3D: aparece por el borde opuesto y el transform sigue
+	if (XformDelTeclado()){
+		TInt vx, vy, vw, vh, sh;
+		W3dLayoutGet3DRect(vx, vy, vw, vh, sh);
+		if (vw > 2 && vh > 2){
+			if (mouseX <= vx)            { mouseX = (GLshort)(vx + vw - 2); }
+			else if (mouseX >= vx + vw - 1) { mouseX = (GLshort)(vx + 1); }
+			if (mouseY <= vy)            { mouseY = (GLshort)(vy + vh - 2); }
+			else if (mouseY >= vy + vh - 1) { mouseY = (GLshort)(vy + 1); }
+		}
+		if (W3dNewEsRotarDesdeVista()){
+			W3dNewRotarDesdeVista(mouseX, mouseY);   // rotar LIBRE = trackball alrededor del pivot
+		} else {
+			W3dNewTransformMove(aDx * 2, aDy * 2);   // mover/rotar-eje/escalar
+		}
+		W3dNewTransformLinea(mouseX, mouseY);
+		return;
+	}
+	W3dRatonMovio(mouseX, mouseY, aDx, aDy);
 }
 
 void CWhisk3D::HidMouseButton(TInt aButton, TBool aDown){
+	gHayMouseBT = ETrue;
 	g_redraw = true; // click del mouse BT -> redibujar
-	// el HID rebota (~8ms): tras aceptar/cancelar/salir de orbita, los
-	// clicks fantasma NO deben caer en la seleccion
-	static TUint gUltimaAccionClick = 0;
-
-	// transformacion del modelo NUEVO: izquierdo acepta, derecho cancela
-	if (W3dNewTransformActive() && aDown){
-		if (aButton == EMouseButtonLeft){
-			W3dNewTransformEnd(EFalse);
-			gUltimaAccionClick = User::NTickCount();
-			return;
-		}
-		if (aButton == EMouseButtonRight){
-			W3dNewTransformEnd(ETrue);
-			gUltimaAccionClick = User::NTickCount();
-			return;
-		}
-	}
-
-	// orbitando: el click IZQUIERDO tambien sale de la orbita (en vez de
-	// seleccionar en el medio de la vuelta, que arruina todo)
-	if (hidOrbitMode && aDown && aButton == EMouseButtonLeft){
-		hidOrbitMode = EFalse;
-		mouseVisible = ETrue;
-		gUltimaAccionClick = User::NTickCount();
+	// transformacion del modelo del N95 (la arranco el teclado): izquierdo acepta, derecho cancela
+	if (XformDelTeclado()){
+		if (aDown && aButton == EMouseButtonLeft){ W3dNewTransformEnd(EFalse); }
+		else if (aDown && aButton != EMouseButtonNull){ W3dNewTransformEnd(ETrue); }
 		return;
 	}
-
-	// (el accept/cancel-por-click de la transformacion ya se maneja
-	//  arriba con W3dNewTransformActive(); el bloque viejo era duplicado)
-
-	// estado real del boton izquierdo (lo usan los Scrollable de PC para
-	// el drag de la scrollbar)
-	static TBool gIzqYaAbajo = EFalse;
-	if (aButton == EMouseButtonLeft){
-		leftMouseDown = aDown ? true : false;
-		if (!aDown){
-			// soltar: dropea el drag del outliner / suelta el scroll
-			W3dLayoutSoltar(mouseX, mouseY);
-		}
-		// el driver RE-EMITE downs mientras arrastras con el boton
-		// apretado: solo el primer down de la secuencia cuenta como click
-		if (aDown && gIzqYaAbajo){
-			return; // metralleta del driver: ignorar
-		}
-		gIzqYaAbajo = aDown;
-	}
-
-	if (aButton == EMouseButtonLeft){
-		if (aDown){
-			// primero el layout: divisor y panel de propiedades consumen
-			// el click antes que la seleccion 3D
-			// la UI compartida (menu abierto > barras > paneles) primero;
-			// si no consume, el click es de la escena 3D
-			if (W3dLayoutClickUI(mouseX, mouseY)){
-				return;
-			}
-			if (W3dLayoutToggleSplitter(mouseX, mouseY)){
-				return;
-			}
-			// comerse el rebote del click que acepto/cancelo/salio de orbita
-			if (User::NTickCount() - gUltimaAccionClick < 350){
-				return;
-			}
-			ClickSelect();
-		}
-	}
-	else if (aButton == EMouseButtonMiddle){
-		hidMiddleDown = aDown;
-	}
-	else if (aButton != EMouseButtonNull && aDown &&
-	          W3dLayoutScrollGrab(mouseX, mouseY)){
-		// click derecho sobre outliner/properties: entra/sale del modo
-		// scroll-arrastre (toggle, como el divisor: el driver no manda
-		// movimiento con el derecho APRETADO, pero el toggle no lo retiene)
-		return;
-	}
-	else if (aButton != EMouseButtonNull){
-		// derecho (o cualquier boton extra: hay mouses que reportan el
-		// derecho como Side/Forward/Back) = TOGGLE de modo orbita, con
-		// debounce porque un solo click fisico llega como varios down/up
-		if (aDown){
-			// entrar al modo orbita solo si el cursor esta sobre el 3D
-			// (salir se puede siempre)
-			if (!hidOrbitMode && !W3dLayoutMouseSobre3D(mouseX, mouseY)){
-				return;
-			}
-			TUint now = User::NTickCount();
-			if (now - hidLastRightTick > 300){
-				hidLastRightTick = now;
-				hidOrbitMode = !hidOrbitMode;
-				// sin cursor = "estas orbitando"; al salir reaparece
-				mouseVisible = !hidOrbitMode;
-				w3dLogf("HidBtn: modo orbita=%d", (TInt)hidOrbitMode);
-			}
-		}
-	}
-	// (el viejo workaround del "boton Null en el UP" se borro: ahora hidmonitor
-	//  filtra los UP espurios con iValue=0, asi que aca solo llegan UPs reales)
+	const TInt boton = (aButton == EMouseButtonLeft) ? 1 : (aButton == EMouseButtonMiddle) ? 2 :
+	                   (aButton == EMouseButtonRight) ? 3 : 0;
+	if (boton == 0){ return; }
+	RatonVerificarPantalla();
+	TEnPantallaExterna en;   // (en la pantalla externa: sus coordenadas y su arbol)
+	TMiraXform mira;
+	W3dRatonBoton(boton, aDown ? true : false, mouseX, mouseY);
 }
 
 void CWhisk3D::HidMouseWheel(TInt aDelta){
+	gHayMouseBT = ETrue;
 	g_redraw = true; // rueda del mouse BT -> redibujar
-	// con un desplegable abierto la rueda no scrollea nada de atras
-	if (W3dLayoutMenuAbierto()){
-		return;
-	}
-	// la rueda sobre el panel de propiedades edita la fila activa
-	if (W3dLayoutWheelProps(mouseX, mouseY, aDelta)){
-		return;
-	}
-	if (W3dLayoutWheelOutliner(mouseX, mouseY, aDelta)){
-		return;
-	}
-	// el zoom solo actua si el cursor esta sobre el viewport 3D del layout
-	if (!W3dLayoutMouseSobre3D(mouseX, mouseY)){
-		return;
-	}
-	// Fase 3c-2: zoom del mundo NUEVO (medio metro por click de rueda)
-	W3dNewSceneZoom(aDelta);
+	{ static TInt sLog = 0; if (sLog < 10) { sLog++; w3dLogf("[raton] rueda %d", aDelta); } }
+	RatonVerificarPantalla();
+	TEnPantallaExterna en;
+	TMiraXform mira;
+	W3dRatonRueda(aDelta, mouseX, mouseY);
 }
 
 void CWhisk3D::HidKey(TInt aScanCode, TBool aDown){
 	g_redraw = true; // tecla del teclado BT -> redibujar
 	gHayTecladoBT = ETrue;
-	// teclado BT de hinkka: manda CODIGOS DE USO USB HID (a=4..z=29, .=55,
-	// shift izq/der=225/229, alt izq/der=226/230)
-	static TBool hidShift = EFalse;
-	static TBool hidAlt = EFalse;
-	if (aScanCode == 225 || aScanCode == 229){
-		hidShift = aDown;
-		LShiftPressed = aDown ? true : false; // global de PC (multi-seleccion)
-		return;
-	}
-	if (aScanCode == 226 || aScanCode == 230){
-		hidAlt = aDown;
-		LAltPressed = aDown ? true : false;
-		return;
-	}
-	static TBool hidCtrl = EFalse;
-	if (aScanCode == 224 || aScanCode == 228){
-		hidCtrl = aDown;
-		LCtrlPressed = aDown ? true : false; // global de PC (rango/toggle)
-		return;
-	}
-	// JUGANDO, las letras van al juego (tecla("a") del lua): el jugador 2 de la pantalla dividida juega con el teclado
-	// bluetooth (el N95 no tiene letras). Lo mismo que en la PC; en pausa siguen siendo los atajos del editor
-	if (aScanCode >= 4 && aScanCode <= 29){
-		extern bool AnimEsJuego; extern bool PlayAnimation;
-		if (AnimEsJuego && PlayAnimation && W3dLayoutJuegoViewportActivo() && !W3dLayoutPopupActivo() &&
-		    !W3dLayoutMenuAbierto()){
-			static const char* const kLetras[26] = { "a","b","c","d","e","f","g","h","i","j","k","l","m","n","o",
-			                                         "p","q","r","s","t","u","v","w","x","y","z" };
-			extern void W3dScriptTecla(const char* nombre, bool apretada);
-			W3dScriptTecla(kLetras[aScanCode - 4], aDown ? true : false);
-			return;
-		}
-	}
-	if (!aDown){ return; }
-
-	switch (aScanCode){
-		case 10: // g = mover (como PC; SOLO con el mouse sobre el 3D)
-			if (!W3dLayoutMouseSobre3D(mouseX, mouseY)){ break; }
-			if (W3dNewTransformActive()){ W3dNewTransformEnd(ETrue); }
-			W3dNewTransformStart(1);
-			break;
-		case 21: // r = rotar (solo sobre el 3D)
-			if (!W3dLayoutMouseSobre3D(mouseX, mouseY)){ break; }
-			if (W3dNewTransformActive()){ W3dNewTransformEnd(ETrue); }
-			W3dNewTransformStart(2);
-			break;
-		case 22: // s = escalar; shift+s = menu de snap (cursor/seleccion)
-			if (hidShift){
-				W3dLayoutMenuSnap(mouseX, mouseY);
-				break;
-			}
-			if (!W3dLayoutMouseSobre3D(mouseX, mouseY)){ break; }
-			if (W3dNewTransformActive()){ W3dNewTransformEnd(ETrue); }
-			W3dNewTransformStart(3);
-			break;
-		case 7: // d: shift+d = duplicar, alt+d = duplicado linkeado
-			if (hidShift){
-				DuplicatedObject(); // el compartido de ObjectMode (PC)
-			}
-			else if (hidAlt){
-				W3dNewInstancia(); // duplicado LINKEADO (Instance de PC)
-			}
-			break;
-		case 27: // x = borrar
-			// con un popup abierto (color picker) la X CANCELA, no borra
-			if (W3dLayoutTecla(EStdKeyEscape, mouseX, mouseY)){
-				break;
-			}
-			// Edit Mode: menu Delete CERCA DEL CURSOR; Object Mode: borra objetos
-			if (LayoutDeleteEdit(mouseX, mouseY)){
-				break;
-			}
-			if (W3dNewDeleteActive()){
-			}
-			break;
-		case 55: // '.' = enfocar el objeto activo
-			W3dNewEnfocar();
-			break;
-		case 19: // 'p': ctrl+p = menu Set Parent, alt+p = Clear Parent
-			if (hidCtrl){
-				W3dLayoutMenuParent(EFalse, mouseX, mouseY);
-			}
-			else if (hidAlt){
-				W3dLayoutMenuParent(ETrue, mouseX, mouseY);
-			}
-			break;
-		case 4: // 'a' = seleccionar/deseleccionar todo (como PC)
-			W3dNewSeleccionarTodo();
-			break;
-		case 41: // esc del teclado BT = cancelar
-			if (W3dNewTransformActive()){
-				W3dNewTransformEnd(ETrue);
-			}
-			else if (W3dLayoutTecla(EStdKeyEscape, mouseX, mouseY)) {}
-			break;
-		case 42: // backspace BT: Edit Mode = Delete; sino cancelar (como la C)
-			if (W3dNewTransformActive()){
-				W3dNewTransformEnd(ETrue);
-			}
-			else if (LayoutDeleteEdit(mouseX, mouseY)){} // Edit: menu Delete en el cursor
-			else if (W3dLayoutTecla(EStdKeyBackspace, mouseX, mouseY)) {}
-			break;
-		// flechas + enter del teclado BT -> el panel bajo el mouse
-		case 82: if (W3dLayoutTecla(EStdKeyUpArrow, mouseX, mouseY)) {} break;
-		case 81: if (W3dLayoutTecla(EStdKeyDownArrow, mouseX, mouseY)) {} break;
-		case 80: if (W3dLayoutTecla(EStdKeyLeftArrow, mouseX, mouseY)) {} break;
-		case 79: if (W3dLayoutTecla(EStdKeyRightArrow, mouseX, mouseY)) {} break;
-		case 40: if (W3dLayoutTecla(EStdKeyEnter, mouseX, mouseY)) {} break;
-	}
+	{ static TInt sLog = 0; if (sLog < 400) { sLog++; w3dLogf("[teclas] hid: codigo %d %s", aScanCode, aDown ? "abajo" : "arriba"); } }
+	// el teclado Bluetooth es el de la PC: cada tecla se vuelve el evento de teclado de SDL y entra por el mismo camino
+	// (controles.cpp -> el viewport bajo el cursor), con los mismos atajos. Antes habia aca una lista propia de una docena
+	// de teclas que se iba quedando atras (faltaban E, Shift+R, Ctrl+Z, el Esc de los teclados compactos...)
+	RatonVerificarPantalla();
+	TEnPantallaExterna en;   // (con el cursor en la pantalla externa: su arbol, como el mouse)
+	TMiraXform mira;         // (un transform que arranca con una tecla lo maneja el mouse, como en la PC)
+	W3dTecladoTeclaHID(aScanCode, aDown ? true : false);
 }
 
 // seleccion con click izquierdo: el pick real + el ciclado de solapados los

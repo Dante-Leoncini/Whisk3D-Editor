@@ -1,0 +1,34 @@
+# EL MODO JUEGO PURO (VERDE + 0 en el N95, LayoutJuegoPuroToggle): pantalla completa y sin la UI de Whisk3D. Ahi se ve
+# SOLO el juego adaptado a la pantalla (reporte del dueno: "muchas veces veo en el n95 el borde inferior blanco de la
+# camara y encima me deja hacer un paneo al apretar las flechas"):
+#  - el marco de la camara llena el viewport (sin aire, sin el borde blanco, sin las bandas de alrededor);
+#  - las flechas y la rueda NO panean ni hacen zoom (la inspeccion es del modo con la UI);
+#  - con la UI (mirando por la camara, "modo A") el paneo y el zoom siguen andando.
+# Una ventana ANCHA: con la UI el marco del render (16:9) queda con aire a los costados
+ventana 900 300
+vpcamara on
+# --- con la UI: se panea y se hace zoom ---
+vpestado flecha 45 0
+vpestado espera 1 !0 0
+vpestado rueda 10
+vpestado espera !0 !0 0
+vpestado inspeccion 1 0 0
+# (el marco con aire: no llena)
+vpestado marco 0.6461 0.92
+# --- juego puro (con bandas): el marco es la pantalla, sin inspeccion ---
+juegopuro
+vpestado marco 1 1
+vpestado espera 1 0 0
+vpestado flecha 45 0
+vpestado rueda 10
+vpestado espera 1 0 0
+# --- cover: igual ---
+juegopuro
+vpestado marco 1 1
+vpestado flecha 45 0
+vpestado espera 1 0 0
+# --- de vuelta con la UI: se panea otra vez ---
+juegopuro
+vpcamara on
+vpestado flecha 45 0
+vpestado espera 1 !0 0

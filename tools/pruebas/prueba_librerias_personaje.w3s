@@ -58,14 +58,12 @@ prefabpose Personaje.001 Personaje.002 10 distinta
 # (un override de su script en UNO: como en una instancia de prefab)
 prefaboverride Personaje.004 prop Esqueleto vida 25
 # (el Play: 20 scripts, uno por proxy, cada uno con su scope y su vida; 20 hitbox en el motor)
-simcache 0
 simplay 3
 scriptinfo compartido enemigos 20
 scriptinfo compartido scope_ok 20
 scriptinfo compartido vida_total 215
 hitboxstats hitboxes 20
 simstop
-simcache 1
 prefabvivos 20
 
 # --- B) guardar el nivel: NADA de la libreria entra; abrir lo regenera igual ---
@@ -152,7 +150,6 @@ entradaexiste /tmp/w3d_f8_pj/juego/libpersonaje.w3d prefabs/personaje.w3dp 0
 abrirw3d /tmp/w3d_f8_pj/juego/libpersonaje.w3d
 prefabvivos 3
 libcompartido personajes prefab Personaje proxies 3 mallas 2 animsets 1 materiales 2 texturas 1 scripts 1 hitboxes 3
-simcache 0
 simplay 30
 scriptinfo compartido juez OK
 scriptinfo compartido enemigos 8
@@ -161,7 +158,6 @@ scriptinfo compartido vida_total 95
 prefabvivos 8
 libcompartido personajes prefab Personaje proxies 8 mallas 2 animsets 1 materiales 2 texturas 1 scripts 1 hitboxes 8
 simstop
-simcache 1
 prefabvivos 3
 compilarjuego 0 1 1
 libjuegolog /tmp/w3d_f8_pj/juego libpersonaje creados=5 enemigos=8 scope=8 vida=95

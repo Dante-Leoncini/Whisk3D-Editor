@@ -26,4 +26,13 @@ public class Whisk3DActivity extends SDLActivity {
     public boolean tieneNotch() {
         return false;
     }
+
+    // la VIBRACION (base/W3dVibrar.cpp la llama por JNI): el agarre de la biblioteca (pulsacion larga) avisa asi
+    // que ya se puede arrastrar
+    public void vibrar(int ms) {
+        try {
+            android.os.Vibrator v = (android.os.Vibrator) getSystemService(android.content.Context.VIBRATOR_SERVICE);
+            if (v != null) v.vibrate(ms);
+        } catch (Exception e) {}
+    }
 }

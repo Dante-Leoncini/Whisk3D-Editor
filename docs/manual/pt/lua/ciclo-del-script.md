@@ -32,4 +32,4 @@ end
 
 ## Ao parar o jogo
 
-Ao apertar Stop, todos os scripts são fechados, o espaço compartilhado é apagado e a cena volta a ficar como estava antes do Play. Se você editar um script enquanto o jogo roda, esse objeto o recarrega: suas variáveis voltam a zero e `inicio()` é chamada de novo. Rebobinar a timeline devolve os objetos ao seu lugar, mas **não** as variáveis de Lua.
+Ao apertar Stop, todos os scripts são fechados, o espaço compartilhado é apagado e a cena volta a ficar como estava antes do Play. Se você editar um script enquanto o jogo roda, esse objeto o recarrega: suas variáveis voltam a zero e `inicio()` é chamada de novo.

@@ -7,6 +7,7 @@
 #include "io/Miniaturas.h"
 #include "io/RecursosProyecto.h"
 #include "io/CambiosProyecto.h"         // la version de lo editado (una escena se rehace si se toco)
+#include "io/MallasProyecto.h"          // W3dMallasPublicarPendientesDe: la edicion diferida antes de mirar el recurso
 #include "W3dRaices.h"
 #include "objects/MallaRecurso.h"
 #include "objects/Mesh.h"
@@ -242,6 +243,7 @@ static bool Arbol(Lienzo& L, Object* raiz, Camera* cam) {
 static bool PixelesMalla(const std::string& id, Lienzo& L) {
     MallaRecurso* r = W3dMallaRecursoPorNombre(id);
     if (!r) return false;
+    W3dMallasPublicarPendientesDe(NULL, r);   // la que salio de Edit sin publicar (unica usuaria): mirar lo editado
     // una malla que solto su RAM (soloGPU, la dibujan solo rutinas) se relee de sus bytes para mirarla; la
     // proxima corrida de rutinas la vuelve a soltar (prueba_mallas_solo_gpu.w3s)
     if (r->soloGPU) W3dMallaRecursoAsegurarRAM(r);

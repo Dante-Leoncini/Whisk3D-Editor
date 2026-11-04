@@ -46,6 +46,7 @@ outclick Cubo
 outmenu Hide/Show
 objvis Cubo 0
 outvista biblioteca
+outcuadricula 1
 outmini Scene si celda vacia
 undo
 objvis Cubo 1

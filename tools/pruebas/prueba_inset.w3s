@@ -1,0 +1,31 @@
+# Inset Faces: una cara, la region entera, individual, sin borde (plano), profundidad, outset, undo y el modal
+ventana 1280 720
+add cube
+mode edit
+selmode face
+select face 0
+inset 0.2
+undo
+select all
+inset 0.1 individual
+undo
+inset 0.2 esquina ensuperficie
+undo
+inset 0.2 esquina ensuperficie noparejo
+undo
+select face 0
+inset 0.2 0.3 selafuera
+undo
+select face 0
+inset 0.2 afuera riel relativo nointerp noparejo
+undo
+mode object
+add plane
+mode edit
+selmode face
+select all
+inset 0.2
+undo
+select face 0
+inset modal 80
+undo

@@ -1,6 +1,6 @@
 # Script Editor (IDE)
 
-Editor di testo per gli script Lua, con numeri di riga, colori della sintassi, guide di indentazione e supporto per la ñ e le lettere accentate. Quando ha il focus, le lettere scrivono (non attivano le scorciatoie dell'editor). Su Android, toccando il testo si apre la tastiera. Sull'N95 si scrive con il T9.
+Editor di testo per gli script Lua e gli [shader scritti](shaders.md) (`.glsl`), con numeri di riga, colori della sintassi, guide di indentazione e supporto per la ñ e le lettere accentate. Quando ha il focus, le lettere scrivono (non attivano le scorciatoie dell'editor). Su Android, toccando il testo si apre la tastiera. Sull'N95 si scrive con il T9.
 
 | Funzione | Descrizione | Scorciatoia |
 |---|---|---|
@@ -10,6 +10,7 @@ Editor di testo per gli script Lua, con numeri di riga, colori della sintassi, g
 | Save inside the .w3d | Solo se lo script è esterno: lo inserisce nel progetto. | File |
 | Save outside the .w3d… | Solo se lo script è interno: lo porta fuori in un file; gli oggetti passano a usare quel file. | File |
 | Refresh | Ricarica il file così com'è sul disco (ciò che è stato modificato con un altro editor). Se nell'editor ci sono modifiche non salvate, chiede prima di scartarle (e si possono recuperare con <kbd>Ctrl+Z</kbd>). Con il gioco in esecuzione, ricarica al volo gli oggetti che usano lo script. | Pulsante |
+| Shader (.glsl) | Si aprono dal materiale (il pulsantino della riga **Shader**), dalla Library o dal selettore, e sono colorati come GLSL. Accanto al nome compare **Compile**: compila ciò che stai scrivendo (se un materiale lo usa, lo salva e compila quel materiale). Salvare uno shader lo compila in tutti i materiali che lo usano e avvisa se è stato compilato, oppure mostra l'errore con la sua riga. | <kbd>Ctrl+S</kbd> |
 | Protezione al salvataggio | Se il file esterno è stato modificato fuori dall'editor da quando è stato aperto, Save chiede prima di sovrascriverlo. Save ricarica anche lo script al volo se il gioco è in esecuzione. | Automatico |
 | Indentazione (Tab) | <kbd>Tab</kbd> completa fino al prossimo multiplo di 4; con più righe selezionate aggiunge loro un livello e <kbd>Shift+Tab</kbd> lo toglie. Le linee verticali segnano ogni livello; quella del blocco del cursore appare più chiara. | <kbd>Tab</kbd> / <kbd>Shift+Tab</kbd> |
 | Menu Edit | Undo, Redo, Cut, Copy, Paste, Find… e Replace… | Pulsante Edit |

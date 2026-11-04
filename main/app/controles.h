@@ -2,6 +2,9 @@
 #define CONTROLES_H
 
 #include <map>
+#ifdef W3D_SYMBIAN
+#include "W3dSdlMinimo.h"   // sin SDL: el telefono arma los mismos eventos (W3dTactilEditor.cpp)
+#endif
 #include "sdl_key_compat.h"
 #include "variables.h"
 #include "objects/Gamepad.h"

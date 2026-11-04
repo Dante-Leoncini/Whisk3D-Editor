@@ -56,6 +56,6 @@
 | Percorrer a seleção / adicionar, remover, tudo ou nada | Lápis / Lápis + setas |
 | Barra de menus / cursor virtual | Tecla de seleção esquerda / direita |
 | Mudar de viewport, redimensionar, maximizar | Tecla verde (sozinha, + setas, + OK) |
-| Modo jogo em tela cheia | Tecla verde + <kbd>0</kbd> |
+| Modo jogo em tela cheia | Tecla verde + <kbd>0</kbd> (de novo: a imagem cobre a tela toda; de novo: volta). Sem a UI, sem a borda da câmera nem a área escura em volta (só ficam faixas pretas se a câmera declarar um aspecto diferente do da tela, até a segunda vez), e as setas não fazem pan: vê-se o jogo tal como é |
 
 O N95 também aceita mouse e teclado Bluetooth. Para digitar texto, usa-se o T9.

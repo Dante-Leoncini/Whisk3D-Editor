@@ -2447,7 +2447,7 @@ std::string Mesh::NombreModificador(int i) const {
 void Mesh::LiberarMallaModificada() {
     delete[] genVertex; delete[] genNormals; delete[] genUV; delete[] genColor; delete[] genFaces;
     genVertex=NULL; genNormals=NULL; genUV=NULL; genColor=NULL; genFaces=NULL;
-    genVertexSize=0; genFacesSize=0; genMaterialsGroup.clear(); genBordesBuf.clear(); genValido=false;
+    genVertexSize=0; genFacesSize=0; genMaterialsGroup.clear(); genBordesBuf.clear(); genLineasIdx.clear(); genValido=false;
     delete[] genChromeExpPos; delete[] genChromeExpUV; genChromeExpPos=NULL; genChromeExpUV=NULL; genChromeCount=0; genChromeValid=false; // el reflejo gen se recalcula
 }
 
@@ -3483,7 +3483,7 @@ void Mesh::GenerarMallaModificada() {
     // el objeto con modificadores (subdiv/screw) SI muestra que esta seleccionado (antes quedaba sin borde).
     {
         std::set<std::pair<int,int> > eset;
-        genBordesBuf.clear();
+        genBordesBuf.clear(); genLineasIdx.clear();
         for (size_t f=0; f<poly.size(); f++){
             int mm=(int)poly[f].size();
             for (int i=0;i<mm;i++){
@@ -3493,6 +3493,7 @@ void Mesh::GenerarMallaModificada() {
                 if (eset.insert(key).second){
                     genBordesBuf.push_back(gvp[a*3]); genBordesBuf.push_back(gvp[a*3+1]); genBordesBuf.push_back(gvp[a*3+2]);
                     genBordesBuf.push_back(gvp[b*3]); genBordesBuf.push_back(gvp[b*3+1]); genBordesBuf.push_back(gvp[b*3+2]);
+                    genLineasIdx.push_back((MeshIndex)a); genLineasIdx.push_back((MeshIndex)b);
                 }
             }
         }
@@ -5265,5 +5266,807 @@ bool ConectarVerticesEdit(Mesh* m, W3dProy2D proy, void* ctx, std::string& msg) 
     m->GenerarRender();               // re-merge + render + posRep + control-points de los verts nuevos
     m->ReconstruirEditSelPorPos(posSel);
     msg = "Vertices connected";
+    return true;
+}
+
+// ============================================================================
+//  INSET FACES (I en Edit Mode / menu Face). Codigo propio; el comportamiento es el de Blender:
+//
+//  - REGION (por defecto): las caras seleccionadas son UNA region. Su CONTORNO (aristas de una sola cara
+//    seleccionada) se corre hacia adentro 'grosor', sobre el plano de cada cara: por cada vertice del contorno
+//    nace uno nuevo, las caras de la region pasan a usar los nuevos y entre la arista vieja y la nueva queda
+//    un QUAD (el anillo). Lo de adentro de la region no se toca (salvo 'profundidad').
+//  - INDIVIDUAL: cada cara es su propia region (todas sus aristas son contorno).
+//  - La direccion en un vertice del contorno es la suma de las "hacia adentro" de sus dos aristas (la
+//    perpendicular a la arista, en el plano de su cara). Con OFFSET EVEN se divide por el coseno del medio
+//    angulo: el anillo queda del mismo ancho en las esquinas. Con EDGE RAIL, si el vertice tiene UNA arista
+//    hacia adentro de la region, corre por ella. Sin BOUNDARY, las aristas del borde ABIERTO de la malla no
+//    se insetan: el vertice nuevo se desliza por ellas. OFFSET RELATIVE multiplica por el largo medio de sus
+//    aristas del contorno. OUTSET da vuelta la direccion (y el orden del anillo, para que mire igual).
+//  - DEPTH sube lo de adentro (vertices nuevos e interiores) por la normal media de sus caras.
+//  - INTERPOLATE: en las caras de la region, el UV / color de cada esquina que se corrio se recalcula en la
+//    posicion nueva (combinacion de sus dos aristas en esa cara); el anillo lleva los dos.
+//  Todo en REPRESENTANTES (posRep), como el extrude: un vertice partido por UV es UN vertice de la malla.
+// ============================================================================
+namespace {
+    struct V3 { float x, y, z; V3() : x(0), y(0), z(0) {} V3(float a, float b, float c) : x(a), y(b), z(c) {} };
+    inline V3 operator+(const V3& a, const V3& b) { return V3(a.x+b.x, a.y+b.y, a.z+b.z); }
+    inline V3 operator-(const V3& a, const V3& b) { return V3(a.x-b.x, a.y-b.y, a.z-b.z); }
+    inline V3 operator*(const V3& a, float s) { return V3(a.x*s, a.y*s, a.z*s); }
+    inline float Punto(const V3& a, const V3& b) { return a.x*b.x + a.y*b.y + a.z*b.z; }
+    inline V3 Cruz(const V3& a, const V3& b) { return V3(a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x); }
+    inline float Largo(const V3& a) { return sqrtf(Punto(a, a)); }
+    inline V3 Unit(const V3& a) { const float l = Largo(a); return l > 1e-12f ? a * (1.0f / l) : V3(); }
+    // lo que se junta de cada vertice del contorno de una region
+    struct InsetInfoV {
+        V3 adentroSum; std::vector<V3> adentros;   // la "hacia adentro" de cada arista del contorno que lo toca
+        std::vector<V3> normalesBorde;             // la normal de la cara de cada una de esas aristas
+        float largoSum; int nLargo;
+        std::vector<int> abiertos, interiores;     // otras puntas: aristas del borde abierto (sin Boundary) / de adentro
+        V3 normalSum;                              // suma de las normales de las caras de la region que lo tocan
+        bool contorno;                             // tiene arista de contorno insetada -> nace un vertice nuevo
+        InsetInfoV() : largoSum(0), nLargo(0), contorno(false) {}
+    };
+    struct InsetPared { int grupo, cara, esquina; };   // el quad del anillo de la arista (esquina, esquina+1) de 'cara'
+    struct InsetAjuste { int L, Ln, Lp; float a, b; }; // valor(L) += a*(valor(Ln)-valor(L)) + b*(valor(Lp)-valor(L))
+}
+
+bool Mesh::CarasSeleccionadas3d(std::vector<char>& selFace) {
+    EnsureEdit();
+    selFace.assign(faces3d.size(), 0);
+    if (!edit || !vertex || vertexSize <= 0) return false;
+    EditMesh* e = edit;
+    const int nV = vertexSize;
+    const bool hayRep = ((int)posRep.size() == nV);
+    std::vector<char> selRep(nV, 0);   // (la misma lectura de la seleccion que el extrude, segun el modo de la UI)
+    if (EditSelectMode == SelVertex) {
+        for (size_t k = 0; k < e->editVerts.size(); k++)
+            if (k < e->vertSel.size() && e->vertSel[k] && e->editVerts[k] >= 0 && e->editVerts[k] < nV) selRep[e->editVerts[k]] = 1;
+    } else if (EditSelectMode == SelEdge) {
+        for (size_t eg = 0; eg < e->edgeSel.size(); eg++) { if (!e->edgeSel[eg]) continue;
+            const int ea = e->lineIdx[eg*2], eb = e->lineIdx[eg*2+1];
+            if (ea >= 0 && ea < (int)e->editVerts.size()) selRep[e->editVerts[ea]] = 1;
+            if (eb >= 0 && eb < (int)e->editVerts.size()) selRep[e->editVerts[eb]] = 1;
+        }
+    } else {
+        for (size_t fe = 0; fe < e->faces.size(); fe++) { if (fe >= e->faceSel.size() || !e->faceSel[fe]) continue;
+            const std::vector<int>& poly = e->faces[fe];
+            for (size_t c = 0; c < poly.size(); c++)
+                if (poly[c] >= 0 && poly[c] < (int)e->editVerts.size()) selRep[e->editVerts[poly[c]]] = 1;
+        }
+    }
+    int n = 0;
+    for (size_t f = 0; f < faces3d.size(); f++) {
+        const std::vector<int>& idx = faces3d[f].idx;
+        if (idx.size() < 3) continue;
+        bool todos = true;
+        for (size_t c = 0; c < idx.size() && todos; c++) {
+            const int gi = idx[c];
+            if (gi < 0 || gi >= nV || !selRep[hayRep ? posRep[gi] : gi]) todos = false;
+        }
+        if (todos) { selFace[f] = 1; n++; }
+    }
+    return n > 0;
+}
+
+void Mesh::SeleccionarCarasPorCentro(const std::vector<Vector3>& centros) {
+    EnsureEdit();
+    if (!edit) return;
+    EditMesh* e = edit;
+    e->vertSel.assign(e->editVerts.size(), 0);
+    e->edgeSel.assign(e->lineIdx.size() / 2, 0);
+    e->faceSel.assign(e->faces.size(), 0);
+    for (size_t f = 0; f < e->faces.size() && f*3+2 < e->faceCenter.size(); f++) {
+        const float* c = &e->faceCenter[f*3];
+        bool es = false;
+        for (size_t i = 0; i < centros.size() && !es; i++) {
+            const float dx = c[0]-centros[i].x, dy = c[1]-centros[i].y, dz = c[2]-centros[i].z;
+            es = dx*dx + dy*dy + dz*dz < 1e-8f;
+        }
+        if (!es) continue;
+        e->faceSel[f] = 1;
+        const std::vector<int>& p = e->faces[f];
+        for (size_t k = 0; k < p.size(); k++) if (p[k] >= 0 && p[k] < (int)e->vertSel.size()) e->vertSel[p[k]] = 1;
+        if (f < e->faceEdges.size())
+            for (size_t k = 0; k < e->faceEdges[f].size(); k++) { const int eg = e->faceEdges[f][k]; if (eg >= 0 && eg < (int)e->edgeSel.size()) e->edgeSel[eg] = 1; }
+    }
+    e->activeIdx = -1;
+    e->Recolorear();
+}
+
+bool Mesh::InsetEdit(const InsetOpciones& o, const std::vector<char>& selFace) {
+    if (!vertex || vertexSize <= 0 || selFace.size() != faces3d.size()) return false;
+    DesinstanciarDatos(W3DMD_TODO);   // COW: la op muta la geometria (MallaDatos.h)
+    PoblarCapas();                    // las capas por corner existen y estan al dia (las paredes agregan corners)
+    const int nV = vertexSize;
+    const bool hayRep = ((int)posRep.size() == nV);
+    #define IREP(gi) (hayRep ? posRep[gi] : (gi))
+    #define IPOS(r)  V3(vertex[(r)*3], vertex[(r)*3+1], vertex[(r)*3+2])
+    const size_t F = faces3d.size();
+
+    // normal (Newell) de cada cara seleccionada, y el primer corner de cada cara (las capas van por corner)
+    std::vector<V3> normal(F);
+    std::vector<int> base(F + 1, 0);
+    int nSel = 0;
+    for (size_t f = 0; f < F; f++) {
+        const std::vector<int>& idx = faces3d[f].idx; const int m = (int)idx.size();
+        base[f+1] = base[f] + m;
+        if (!selFace[f] || m < 3) continue;
+        nSel++;
+        V3 n;
+        for (int k = 0; k < m; k++) { const V3 a = IPOS(idx[k]), b = IPOS(idx[(k+1) % m]);
+            n.x += (a.y-b.y)*(a.z+b.z); n.y += (a.z-b.z)*(a.x+b.x); n.z += (a.x-b.x)*(a.y+b.y); }
+        normal[f] = Unit(n);
+    }
+    if (nSel == 0) return false;
+    const int cornersViejos = base[F];
+
+    // cuantas caras (de TODA la malla) usa cada arista: la de una sola es del borde abierto
+    std::map<std::pair<int,int>, int> usoMalla;
+    for (size_t f = 0; f < F; f++) { const std::vector<int>& idx = faces3d[f].idx; const int m = (int)idx.size();
+        for (int c = 0; c < m; c++) { const int ra = IREP(idx[c]), rb = IREP(idx[(c+1) % m]); if (ra == rb) continue;
+            usoMalla[std::make_pair(ra < rb ? ra : rb, ra < rb ? rb : ra)]++; } }
+    // cuantas caras de SU region usa cada arista (region = 0 entera, o la cara misma con Individual)
+    std::map<std::pair<int, std::pair<int,int> >, int> usoRegion;
+    for (size_t f = 0; f < F; f++) { if (!selFace[f]) continue;
+        const std::vector<int>& idx = faces3d[f].idx; const int m = (int)idx.size(); const int g = o.individual ? (int)f : 0;
+        for (int c = 0; c < m; c++) { const int ra = IREP(idx[c]), rb = IREP(idx[(c+1) % m]); if (ra == rb) continue;
+            usoRegion[std::make_pair(g, std::make_pair(ra < rb ? ra : rb, ra < rb ? rb : ra))]++; } }
+
+    std::map<std::pair<int,int>, InsetInfoV> info;   // (region, rep)
+    std::vector<InsetPared> paredes;
+    for (size_t f = 0; f < F; f++) { if (!selFace[f]) continue;
+        const std::vector<int>& idx = faces3d[f].idx; const int m = (int)idx.size(); const int g = o.individual ? (int)f : 0;
+        for (int c = 0; c < m; c++) { InsetInfoV& iv = info[std::make_pair(g, IREP(idx[c]))]; iv.normalSum = iv.normalSum + normal[f]; }
+        for (int c = 0; c < m; c++) {
+            const int ra = IREP(idx[c]), rb = IREP(idx[(c+1) % m]); if (ra == rb) continue;
+            const std::pair<int,int> k(ra < rb ? ra : rb, ra < rb ? rb : ra);
+            InsetInfoV& ia = info[std::make_pair(g, ra)]; InsetInfoV& ib = info[std::make_pair(g, rb)];
+            if (usoRegion[std::make_pair(g, k)] >= 2) { ia.interiores.push_back(rb); ib.interiores.push_back(ra); continue; }
+            if (!o.borde && usoMalla[k] == 1) { ia.abiertos.push_back(rb); ib.abiertos.push_back(ra); continue; }
+            const V3 pa = IPOS(ra), pb = IPOS(rb);
+            const V3 adentro = Unit(Cruz(normal[f], Unit(pb - pa)));   // (la cara es antihoraria vista desde su normal)
+            const float largo = Largo(pb - pa);
+            ia.adentros.push_back(adentro); ia.adentroSum = ia.adentroSum + adentro; ia.largoSum += largo; ia.nLargo++; ia.contorno = true;
+            ib.adentros.push_back(adentro); ib.adentroSum = ib.adentroSum + adentro; ib.largoSum += largo; ib.nLargo++; ib.contorno = true;
+            ia.normalesBorde.push_back(normal[f]); ib.normalesBorde.push_back(normal[f]);
+            InsetPared w; w.grupo = g; w.cara = (int)f; w.esquina = c; paredes.push_back(w);
+        }
+    }
+    if (paredes.empty()) return false;
+
+    // la posicion nueva de cada vertice del contorno (y la de los de adentro, que solo suben con Depth)
+    std::map<std::pair<int,int>, V3> posNueva;   // (region, rep) -> donde va
+    for (std::map<std::pair<int,int>, InsetInfoV>::iterator it = info.begin(); it != info.end(); ++it) {
+        const InsetInfoV& iv = it->second; const int r = it->first.second; const V3 p = IPOS(r);
+        V3 q = p;
+        if (iv.contorno) {
+            const V3 media = Unit(iv.adentroSum);
+            V3 dir = media; float escala = 1.0f;
+            // las dos aristas del contorno en caras de PLANOS distintos (3 caras de un cubo: el vertice sobre la
+            // arista entre arriba y adelante): sumar sus "hacia adentro" apunta al interior del solido y el anillo
+            // hacia una V. Ahi el vertice corre por la arista que comparten esas caras, como en Blender
+            bool quiebre = false;
+            for (size_t k = 1; k < iv.normalesBorde.size(); k++)
+                if (Punto(iv.normalesBorde[0], iv.normalesBorde[k]) < 0.999f) quiebre = true;
+            if ((o.riel || quiebre) && iv.interiores.size() == 1) {
+                dir = Unit(IPOS(iv.interiores[0]) - p);
+                // cuanto se aleja de cada arista del contorno por unidad de recorrido (el promedio): asi el anillo
+                // queda 'grosor' de ancho, no 'grosor' medido sobre la arista de adentro
+                float d = 0.0f; for (size_t k = 0; k < iv.adentros.size(); k++) d += Punto(dir, iv.adentros[k]);
+                if (!iv.adentros.empty()) d /= (float)iv.adentros.size();
+                if ((o.parejo || quiebre) && d > 0.05f) escala = 1.0f / d;
+            } else if (quiebre && iv.adentros.size() == 2) {
+                // (varias aristas de adentro, o ninguna) el desplazamiento mas corto que se aleja 'grosor' de las
+                // dos aristas a la vez: d = a*in1 + b*in2 con d.in1 = d.in2 = 1
+                const V3 i1 = iv.adentros[0], i2 = iv.adentros[1];
+                const float g12 = Punto(i1, i2), det = 1.0f - g12*g12;
+                if (det > 1e-4f) { const float a = (1.0f - g12) / det; dir = (i1 + i2) * a; escala = 1.0f; }
+            } else if (iv.abiertos.size() == 1 && iv.adentros.size() == 1) {
+                dir = Unit(IPOS(iv.abiertos[0]) - p);   // (sin Boundary: corre por la arista abierta)
+                const float d = Punto(dir, iv.adentros[0]); escala = d > 0.05f ? 1.0f / d : 1.0f;
+            } else if (o.parejo && !iv.adentros.empty()) {
+                const float d = Punto(media, iv.adentros[0]); if (d > 0.05f) escala = 1.0f / d;
+            }
+            float t = o.grosor * escala;
+            if (o.relativo && iv.nLargo > 0) t *= iv.largoSum / (float)iv.nLargo;
+            if (o.afuera) t = -t;
+            q = p + dir * t;
+        }
+        if (o.profundidad != 0.0f) q = q + Unit(iv.normalSum) * o.profundidad;
+        posNueva[it->first] = q;
+    }
+
+    // ---- crecer los arrays: un vertice nuevo por (region, rep) del contorno ----
+    std::map<std::pair<int,int>, int> nuevoDe;
+    for (std::map<std::pair<int,int>, InsetInfoV>::iterator it = info.begin(); it != info.end(); ++it)
+        if (it->second.contorno) { const int n = nV + (int)nuevoDe.size(); nuevoDe[it->first] = n; }
+    const int nuevoN = nV + (int)nuevoDe.size();
+    const bool tNor = (normals != NULL), tUV = (uv != NULL), tCol = (vertexColor != NULL);
+    GLfloat* nVtx = new GLfloat[nuevoN*3]; GLbyte* nNor = new GLbyte[nuevoN*3];
+    GLfloat* nUV = new GLfloat[nuevoN*2]; GLubyte* nCol = new GLubyte[nuevoN*4];
+    for (int gi = 0; gi < nV; gi++) {
+        for (int q = 0; q < 3; q++) nVtx[gi*3+q] = vertex[gi*3+q];
+        if (tNor) { for (int q = 0; q < 3; q++) nNor[gi*3+q] = normals[gi*3+q]; } else { nNor[gi*3] = 0; nNor[gi*3+1] = 127; nNor[gi*3+2] = 0; }
+        if (tUV) { nUV[gi*2] = uv[gi*2]; nUV[gi*2+1] = uv[gi*2+1]; } else { nUV[gi*2] = 0; nUV[gi*2+1] = 0; }
+        if (tCol) { for (int q = 0; q < 4; q++) nCol[gi*4+q] = vertexColor[gi*4+q]; } else { for (int q = 0; q < 4; q++) nCol[gi*4+q] = 255; }
+    }
+    // los de ADENTRO de la region (sin vertice nuevo) solo se mueven con Depth: todas sus copias GPU
+    if (o.profundidad != 0.0f && !o.individual)
+        for (int gi = 0; gi < nV; gi++) {
+            std::map<std::pair<int,int>, InsetInfoV>::iterator it = info.find(std::make_pair(0, IREP(gi)));
+            if (it == info.end() || it->second.contorno) continue;
+            const V3 q = posNueva[it->first]; nVtx[gi*3] = q.x; nVtx[gi*3+1] = q.y; nVtx[gi*3+2] = q.z;
+        }
+    vtxAnimRecipes.clear(); vtxAnimRecipeBase = nV;   // (como el extrude: el vert nuevo hereda el UV animado de su origen)
+    for (std::map<std::pair<int,int>, int>::iterator it = nuevoDe.begin(); it != nuevoDe.end(); ++it) {
+        const int r = it->first.second, w = it->second; const V3 q = posNueva[it->first];
+        nVtx[w*3] = q.x; nVtx[w*3+1] = q.y; nVtx[w*3+2] = q.z;
+        if (tNor) { for (int k = 0; k < 3; k++) nNor[w*3+k] = normals[r*3+k]; } else { nNor[w*3] = 0; nNor[w*3+1] = 127; nNor[w*3+2] = 0; }
+        if (tUV) { nUV[w*2] = uv[r*2]; nUV[w*2+1] = uv[r*2+1]; } else { nUV[w*2] = 0; nUV[w*2+1] = 0; }
+        if (tCol) { for (int k = 0; k < 4; k++) nCol[w*4+k] = vertexColor[r*4+k]; } else { for (int k = 0; k < 4; k++) nCol[w*4+k] = 255; }
+        VtxRecipe rc(r, r, 0.0f); rc.soloUV = true; vtxAnimRecipes.push_back(rc);
+    }
+
+    // ---- las marcas sharp/seam de las aristas de ADENTRO de la region siguen a sus puntas (las del contorno se
+    //      quedan en la arista vieja, que sigue existiendo: es la base del anillo) ----
+    if (!sharpEdges.empty() || !seamEdges.empty()) {
+        std::map<std::string, std::string> remap;   // clave de arista vieja -> nueva
+        for (std::map<std::pair<int, std::pair<int,int> >, int>::iterator it = usoRegion.begin(); it != usoRegion.end(); ++it) {
+            if (it->second < 2) continue;
+            const int g = it->first.first, a = it->first.second.first, b = it->first.second.second;
+            std::string ka((const char*)&vertex[a*3], 12), kb((const char*)&vertex[b*3], 12);
+            const V3 qa = posNueva[std::make_pair(g, a)], qb = posNueva[std::make_pair(g, b)];
+            const float fa[3] = { qa.x, qa.y, qa.z }, fb[3] = { qb.x, qb.y, qb.z };
+            std::string na((const char*)fa, 12), nb((const char*)fb, 12);
+            remap[ka < kb ? ka + kb : kb + ka] = na < nb ? na + nb : nb + na;
+        }
+        std::set<std::string>* marcas[2] = { &sharpEdges, &seamEdges };
+        for (int q = 0; q < 2; q++) {
+            std::set<std::string> nuevo;
+            for (std::set<std::string>::iterator it = marcas[q]->begin(); it != marcas[q]->end(); ++it) {
+                std::map<std::string, std::string>::iterator r = remap.find(*it);
+                nuevo.insert(r != remap.end() ? r->second : *it);
+            }
+            marcas[q]->swap(nuevo);
+        }
+    }
+    const std::vector<GLfloat> posVieja(vertex, vertex + nV*3);   // (Interpolate mide en la cara de ANTES)
+    delete[] vertex; delete[] normals; delete[] uv; delete[] vertexColor;
+    vertex = nVtx; normals = nNor; uv = nUV; vertexColor = nCol; vertexSize = nuevoN;
+
+    // ---- caras: las de la region repuntadas (MISMO orden de corners: sus capas siguen valiendo), despues el anillo ----
+    std::vector<MeshFace> nf3d; nf3d.reserve(F + paredes.size());
+    std::vector<Vector3> centrosAdentro, centrosAnillo;
+    for (size_t f = 0; f < F; f++) {
+        MeshFace mf; mf.mat = faces3d[f].mat; mf.smooth = faces3d[f].smooth; mf.idx = faces3d[f].idx;
+        if (selFace[f]) {
+            const int g = o.individual ? (int)f : 0; V3 c;
+            for (size_t k = 0; k < mf.idx.size(); k++) {
+                const std::pair<int,int> key(g, IREP(faces3d[f].idx[k]));
+                std::map<std::pair<int,int>, int>::iterator nw = nuevoDe.find(key);
+                if (nw != nuevoDe.end()) mf.idx[k] = nw->second;
+                c = c + IPOS(mf.idx[k]);
+            }
+            c = c * (1.0f / (float)mf.idx.size()); centrosAdentro.push_back(Vector3(c.x, c.y, c.z));
+        }
+        nf3d.push_back(mf);
+    }
+    std::vector<std::pair<int,int> > copiarCorner;   // (corner del anillo, corner de la region): el de adentro, tras interpolar
+    int L = cornersViejos;
+    for (size_t i = 0; i < paredes.size(); i++) {
+        const InsetPared& w = paredes[i];
+        const std::vector<int>& idx = faces3d[w.cara].idx; const int m = (int)idx.size();
+        const int c0 = w.esquina, c1 = (w.esquina + 1) % m;
+        const int ra = IREP(idx[c0]), rb = IREP(idx[c1]);
+        const int na = nuevoDe[std::make_pair(w.grupo, ra)], nb = nuevoDe[std::make_pair(w.grupo, rb)];
+        const int La = base[w.cara] + c0, Lb = base[w.cara] + c1;
+        // adentro: a, b, b', a' (el anillo a la izquierda de a->b, como la cara). Outset: b, a, a', b'
+        int v[4], src[4];
+        if (!o.afuera) { v[0]=ra; v[1]=rb; v[2]=nb; v[3]=na; src[0]=La; src[1]=Lb; src[2]=Lb; src[3]=La; }
+        else           { v[0]=rb; v[1]=ra; v[2]=na; v[3]=nb; src[0]=Lb; src[1]=La; src[2]=La; src[3]=Lb; }
+        MeshFace mf; mf.mat = faces3d[w.cara].mat; mf.smooth = faces3d[w.cara].smooth; V3 c;
+        for (int k = 0; k < 4; k++) {
+            mf.idx.push_back(v[k]); c = c + IPOS(v[k]);
+            AgregarCornerCapas(this, src[k]);
+            if (k >= 2) copiarCorner.push_back(std::make_pair(L, src[k]));   // (las dos de adentro)
+            L++;
+        }
+        c = c * 0.25f; centrosAnillo.push_back(Vector3(c.x, c.y, c.z));
+        nf3d.push_back(mf);
+    }
+
+    // ---- INTERPOLATE: el UV / color de las esquinas corridas de la region, en su lugar nuevo ----
+    if (o.interpolar && (!uvMaps.empty() || !colorLayers.empty())) {
+        std::vector<InsetAjuste> ajustes;
+        for (size_t f = 0; f < F; f++) { if (!selFace[f]) continue;
+            const std::vector<int>& viejo = faces3d[f].idx; const int m = (int)viejo.size();
+            for (int c = 0; c < m; c++) {
+                const int gN = nf3d[f].idx[c]; if (gN < nV && o.profundidad == 0.0f) continue;   // esta esquina no se corrio
+                #define IPOSV(r) V3(posVieja[(r)*3], posVieja[(r)*3+1], posVieja[(r)*3+2])
+                const V3 p  = IPOSV(IREP(viejo[c]));
+                const V3 e1 = IPOSV(IREP(viejo[(c+1) % m])) - p, e2 = IPOSV(IREP(viejo[(c+m-1) % m])) - p;
+                #undef IPOSV
+                const V3 d  = IPOS(gN) - p;
+                // d ~ a*e1 + b*e2 (minimos cuadrados: la parte en el plano de la cara; la de Depth no cuenta)
+                const float g11 = Punto(e1,e1), g12 = Punto(e1,e2), g22 = Punto(e2,e2), det = g11*g22 - g12*g12;
+                if (fabsf(det) < 1e-12f) continue;
+                const float r1 = Punto(e1,d), r2 = Punto(e2,d);
+                InsetAjuste aj; aj.L = base[f] + c; aj.Ln = base[f] + (c+1) % m; aj.Lp = base[f] + (c+m-1) % m;
+                aj.a = (r1*g22 - r2*g12) / det; aj.b = (r2*g11 - r1*g12) / det;
+                ajustes.push_back(aj);
+            }
+        }
+        for (size_t k = 0; k < uvMaps.size(); k++) {
+            std::vector<GLfloat>& u = uvMaps[k]->uv; const std::vector<GLfloat> u0 = u;
+            for (size_t i = 0; i < ajustes.size(); i++) { const InsetAjuste& a = ajustes[i];
+                if (a.L*2+1 >= (int)u0.size() || a.Ln*2+1 >= (int)u0.size() || a.Lp*2+1 >= (int)u0.size()) continue;
+                for (int q = 0; q < 2; q++)
+                    u[a.L*2+q] = u0[a.L*2+q] + a.a*(u0[a.Ln*2+q] - u0[a.L*2+q]) + a.b*(u0[a.Lp*2+q] - u0[a.L*2+q]); }
+        }
+        for (size_t k = 0; k < colorLayers.size(); k++) {
+            std::vector<GLubyte>& col = colorLayers[k]->color; const std::vector<GLubyte> c0 = col;
+            for (size_t i = 0; i < ajustes.size(); i++) { const InsetAjuste& a = ajustes[i];
+                if (a.L*4+3 >= (int)c0.size() || a.Ln*4+3 >= (int)c0.size() || a.Lp*4+3 >= (int)c0.size()) continue;
+                for (int q = 0; q < 4; q++) {
+                    const float v = (float)c0[a.L*4+q] + a.a*((float)c0[a.Ln*4+q] - (float)c0[a.L*4+q]) + a.b*((float)c0[a.Lp*4+q] - (float)c0[a.L*4+q]);
+                    col[a.L*4+q] = (GLubyte)(v < 0.0f ? 0 : v > 255.0f ? 255 : (int)(v + 0.5f)); } }
+        }
+        for (size_t i = 0; i < copiarCorner.size(); i++) {   // el borde de adentro del anillo = la esquina ya corrida
+            const int Ld = copiarCorner[i].first, Ls = copiarCorner[i].second;
+            for (size_t k = 0; k < uvMaps.size(); k++) { std::vector<GLfloat>& u = uvMaps[k]->uv;
+                if (Ld*2+1 < (int)u.size() && Ls*2+1 < (int)u.size()) { u[Ld*2] = u[Ls*2]; u[Ld*2+1] = u[Ls*2+1]; } }
+            for (size_t k = 0; k < colorLayers.size(); k++) { std::vector<GLubyte>& c = colorLayers[k]->color;
+                if (Ld*4+3 < (int)c.size() && Ls*4+3 < (int)c.size()) for (int q = 0; q < 4; q++) c[Ld*4+q] = c[Ls*4+q]; }
+        }
+    }
+    #undef IREP
+    #undef IPOS
+    faces3d.swap(nf3d);
+    GenerarRender();   // re-merge + render (re-triangula + materialsGroup + CalcularBordes)
+    SeleccionarCarasPorCentro(o.selAfuera ? centrosAnillo : centrosAdentro);
+    return true;
+}
+
+// ============================================================================
+//  BEVEL (Ctrl+B en Edit Mode; Mesh::BevelEdit): redondea ARISTAS (o VERTICES) cambiandolas por una tira de caras con
+//  un PERFIL (superelipse: 0.5 = cuarto de circulo, 0.25 = chanfle recto, 1 = esquina, 0 = hacia adentro) de N
+//  segmentos. Todo en REPRESENTANTES (posRep), como el inset: un vertice partido por UV es UN vertice de la malla.
+//  Por cada vertice que toca el bevel se ordenan sus caras alrededor (el abanico) y la esquina de cada cara se cambia
+//  por los puntos nuevos:
+//   - entre dos aristas biseladas: el ENCUENTRO de las dos lineas corridas 'ancho' adentro de la cara;
+//   - junto a UNA biselada: el punto que CORRE por la otra arista ("Loop Slide"; sin el, corrido en perpendicular);
+//   - sin ninguna biselada al lado: los puntos que corrieron por sus dos aristas (o el vertice, si no corrieron).
+//  Cruzando cada arista biselada queda el ARCO del perfil entre los dos puntos de sus caras; la tira de la arista une
+//  el arco de una punta con el de la otra. Donde se juntan varias aristas biseladas queda un hueco: se tapa con un
+//  abanico curvado (Grid Fill) o con una cara plana (Cutoff). Bevel de VERTICES: cada arista del vertice tiene su
+//  punto corrido y cada cara su arco; el hueco es la tapa.
+// ============================================================================
+namespace {
+    struct BvEsq { int f, c, prev, next; };          // una esquina (cara f, corner c) en el vertice: sus vecinos en la cara
+    struct BvArco { int desde; std::vector<int> p; }; // el arco del perfil cruzando una arista, desde la cara 'desde'
+    // el exponente de la superelipse del perfil: 0.5 -> 2 (circulo), 0.25 -> 1 (recto), 1 -> infinito, 0 -> 0
+    float BevelExponente(float perfil) {
+        if (perfil < 0.001f) perfil = 0.001f; if (perfil > 0.999f) perfil = 0.999f;
+        return logf(0.25f) / logf(perfil);
+    }
+    // el punto t (0..1) del perfil entre L y R alrededor de la esquina V
+    V3 BevelPerfil(const V3& L, const V3& R, const V3& V, float t, float r) {
+        const V3 c = L + R - V, ex = L - c, ey = R - c;
+        const float th = t * 1.5707963f;
+        const float co = cosf(th), si = sinf(th);
+        const float x = co <= 0.0f ? 0.0f : powf(co, 2.0f / r), y = si <= 0.0f ? 0.0f : powf(si, 2.0f / r);
+        return c + ex * x + ey * y;
+    }
+}
+
+bool Mesh::BevelSeleccion(std::vector<char>& selRep, std::vector<std::pair<int,int> >& aristas) {
+    EnsureEdit();
+    selRep.assign(vertexSize > 0 ? vertexSize : 0, 0); aristas.clear();
+    if (!edit || !vertex || vertexSize <= 0) return false;
+    EditMesh* e = edit;
+    const int nV = vertexSize;
+    for (size_t k = 0; k < e->editVerts.size(); k++)
+        if (k < e->vertSel.size() && e->vertSel[k] && e->editVerts[k] >= 0 && e->editVerts[k] < nV) selRep[e->editVerts[k]] = 1;
+    // las aristas: en modo borde, las elegidas; sino, las que tienen las dos puntas elegidas
+    for (size_t eg = 0; eg * 2 + 1 < e->lineIdx.size(); eg++) {
+        const int ea = e->lineIdx[eg*2], eb = e->lineIdx[eg*2+1];
+        if (ea < 0 || eb < 0 || ea >= (int)e->editVerts.size() || eb >= (int)e->editVerts.size()) continue;
+        const bool sel = (EditSelectMode == SelEdge) ? (eg < e->edgeSel.size() && e->edgeSel[eg] != 0)
+                                                     : (selRep[e->editVerts[ea]] && selRep[e->editVerts[eb]]);
+        if (sel) aristas.push_back(std::make_pair(e->editVerts[ea], e->editVerts[eb]));
+    }
+    for (int i = 0; i < nV; i++) if (selRep[i]) return true;
+    return !aristas.empty();
+}
+
+bool Mesh::BevelEdit(const BevelOpciones& o, const std::vector<char>& selRep, const std::vector<std::pair<int,int> >& selAristas) {
+    if (!vertex || vertexSize <= 0 || faces3d.empty()) return false;
+    const int nV = vertexSize;
+    const bool hayRep = ((int)posRep.size() == nV);
+    #define IREP(gi) (hayRep ? posRep[gi] : (gi))
+    #define IPOS(r)  V3(vertex[(r)*3], vertex[(r)*3+1], vertex[(r)*3+2])
+    const bool deVertices = (o.afecta == 0);
+    const int segs = o.segmentos < 1 ? 1 : (o.segmentos > 100 ? 100 : o.segmentos);
+    const float rExp = BevelExponente(o.perfil);
+    const size_t F = faces3d.size();
+
+    // ---- las caras en representantes, y que caras usan cada arista (cara, corner de la punta de salida) ----
+    std::vector<std::vector<int> > R(F);
+    std::vector<int> base(F + 1, 0);
+    std::map<std::pair<int,int>, std::vector<std::pair<int,int> > > usoArista;   // arista (a<b) -> (cara, corner)
+    for (size_t f = 0; f < F; f++) {
+        const std::vector<int>& idx = faces3d[f].idx; const int m = (int)idx.size();
+        base[f+1] = base[f] + m;
+        R[f].resize(m);
+        for (int c = 0; c < m; c++) R[f][c] = IREP(idx[c]);
+        for (int c = 0; c < m; c++) { const int a = R[f][c], b = R[f][(c+1) % m]; if (a == b) continue;
+            usoArista[std::make_pair(a < b ? a : b, a < b ? b : a)].push_back(std::make_pair((int)f, c)); }
+    }
+    // ---- las aristas biseladas (de dos caras: el borde abierto no se bisela) y los vertices que toca el bevel ----
+    std::set<std::pair<int,int> > bev;
+    std::set<int> bvs;
+    if (deVertices) {
+        for (int i = 0; i < nV; i++) if (i < (int)selRep.size() && selRep[i] && IREP(i) == i) bvs.insert(i);
+    } else {
+        for (size_t i = 0; i < selAristas.size(); i++) {
+            const int a = IREP(selAristas[i].first), b = IREP(selAristas[i].second); if (a == b) continue;
+            const std::pair<int,int> k(a < b ? a : b, a < b ? b : a);
+            std::map<std::pair<int,int>, std::vector<std::pair<int,int> > >::iterator it = usoArista.find(k);
+            if (it == usoArista.end() || it->second.size() != 2) continue;
+            bev.insert(k); bvs.insert(a); bvs.insert(b);
+        }
+    }
+    if (bvs.empty() || (!deVertices && bev.empty()) || o.ancho <= 0.0f) return false;
+    #define ESBEV(a, b) (bev.count(std::make_pair((a) < (b) ? (a) : (b), (a) < (b) ? (b) : (a))) != 0)
+    DesinstanciarDatos(W3DMD_TODO);   // COW: la op muta la geometria (MallaDatos.h)
+    PoblarCapas();
+    const int cornersViejos = base[F];
+
+    // normal (Newell) de cada cara
+    std::vector<V3> nCara(F);
+    for (size_t f = 0; f < F; f++) { const int m = (int)R[f].size(); V3 n;
+        for (int k = 0; k < m; k++) { const V3 a = IPOS(R[f][k]), b = IPOS(R[f][(k+1) % m]);
+            n.x += (a.y-b.y)*(a.z+b.z); n.y += (a.z-b.z)*(a.x+b.x); n.z += (a.x-b.x)*(a.y+b.y); }
+        nCara[f] = Unit(n); }
+
+    // el CORRIMIENTO de cada arista biselada segun el tipo de ancho (Offset: adentro de cada cara; Width: entre las
+    // dos aristas nuevas; Depth: de la arista vieja a la cara nueva). Percent y Absolute se miden SOBRE las aristas
+    std::map<std::pair<int,int>, float> corr;
+    for (std::set<std::pair<int,int> >::iterator it = bev.begin(); it != bev.end(); ++it) {
+        const std::vector<std::pair<int,int> >& u = usoArista[*it];
+        const V3 pa = IPOS(it->first), pb = IPOS(it->second), d = Unit(pb - pa);
+        V3 in1 = Unit(Cruz(nCara[u[0].first], d)), in2 = Unit(Cruz(nCara[u[1].first], d));
+        // (hacia adentro de cada cara: el centro de la cara del lado correcto)
+        for (int q = 0; q < 2; q++) { const int f = u[q].first; V3 cen; for (size_t k = 0; k < R[f].size(); k++) cen = cen + IPOS(R[f][k]);
+            cen = cen * (1.0f / (float)R[f].size()); V3& in = q ? in2 : in1; if (Punto(in, cen - pa) < 0.0f) in = in * -1.0f; }
+        const float cosPhi = Punto(in1, in2), phi = acosf(cosPhi < -1.0f ? -1.0f : cosPhi > 1.0f ? 1.0f : cosPhi);
+        float c = o.ancho;
+        if (o.tipoAncho == 1) { const float s = sinf(phi * 0.5f); c = o.ancho / (2.0f * (s > 0.05f ? s : 0.05f)); }   // Width
+        else if (o.tipoAncho == 2) { const float s = cosf(phi * 0.5f); c = o.ancho / (s > 0.05f ? s : 0.05f); }       // Depth
+        corr[*it] = c;
+    }
+    #define CORR(a, b) (corr[std::make_pair((a) < (b) ? (a) : (b), (a) < (b) ? (b) : (a))])
+
+    // ---- vertices nuevos ----
+    std::vector<V3> nuevos; std::vector<int> nuevoRep;   // (posicion, de que vertice sale: hereda sus datos)
+    #define NUEVO(p, rep) (nuevos.push_back(p), nuevoRep.push_back(rep), (int)nuevos.size() - 1)
+    // el punto que CORRE por la arista (v,u): un solo vertice por arista dirigida (lo comparten sus dos caras)
+    std::map<std::pair<int,int>, float> distCorre;
+    std::map<std::pair<int,int>, V3> posFija;            // (sin Loop Slide: corrido en perpendicular, no por la arista)
+    std::map<std::pair<int,int>, int> idCorre;
+    std::map<std::pair<int,int>, std::vector<int> > lista;   // (cara, corner) -> los vertices nuevos (-1 = el viejo)
+    std::map<std::pair<int,int>, BvArco> arcos;           // (v, u) -> el arco cruzando la arista biselada en v
+    std::vector<std::vector<int> > caras; std::vector<int> carasSrc, carasMat, carasSuave;   // las caras nuevas
+    std::vector<Vector3> centrosNuevos;
+
+    // el abanico (ordenado) de cada vertice del bevel
+    std::map<int, std::vector<BvEsq> > abanico; std::map<int, bool> cerrado;
+    for (std::set<int>::iterator it = bvs.begin(); it != bvs.end(); ++it) {
+        const int v = *it;
+        std::vector<BvEsq> todas;
+        for (size_t f = 0; f < F; f++) { const int m = (int)R[f].size();
+            for (int c = 0; c < m; c++) if (R[f][c] == v) { BvEsq e; e.f = (int)f; e.c = c; e.prev = R[f][(c+m-1) % m]; e.next = R[f][(c+1) % m];
+                if (e.prev != v && e.next != v) todas.push_back(e); } }
+        if (todas.size() < 2) continue;
+        // arrancar en una esquina sin vecina "de atras" (abanico abierto) o en cualquiera (cerrado)
+        size_t ini = 0;
+        for (size_t i = 0; i < todas.size(); i++) { bool hay = false;
+            for (size_t j = 0; j < todas.size(); j++) if (todas[j].next == todas[i].prev) hay = true;
+            if (!hay) { ini = i; break; } }
+        std::vector<BvEsq> ord; std::vector<char> usada(todas.size(), 0);
+        size_t cur = ini;
+        for (;;) {
+            ord.push_back(todas[cur]); usada[cur] = 1;
+            size_t sig = todas.size();
+            for (size_t j = 0; j < todas.size(); j++) if (!usada[j] && todas[j].prev == todas[cur].next) { sig = j; break; }
+            if (sig == todas.size()) break;
+            cur = sig;
+        }
+        if (ord.size() != todas.size()) continue;   // (no es un abanico simple: el vertice no se toca)
+        abanico[v] = ord;
+        cerrado[v] = (ord.back().next == ord.front().prev);
+    }
+
+    // pasada 1: cuanto corre cada punto por su arista
+    for (std::map<int, std::vector<BvEsq> >::iterator it = abanico.begin(); it != abanico.end(); ++it) {
+        const int v = it->first; const V3 pv = IPOS(v);
+        for (size_t i = 0; i < it->second.size(); i++) {
+            const BvEsq& e = it->second[i];
+            const V3 ua = Unit(IPOS(e.prev) - pv), ub = Unit(IPOS(e.next) - pv);
+            const float s = Largo(Cruz(ua, ub));
+            const float la = Largo(IPOS(e.prev) - pv), lb = Largo(IPOS(e.next) - pv);
+            struct Pide { static void En(std::map<std::pair<int,int>, float>& m, int v, int u, float d) {
+                std::map<std::pair<int,int>, float>::iterator q = m.find(std::make_pair(v, u));
+                if (q == m.end() || d > q->second) m[std::make_pair(v, u)] = d; } };
+            if (deVertices) {
+                Pide::En(distCorre, v, e.prev, o.tipoAncho == 3 ? o.ancho * 0.01f * la : o.ancho);
+                Pide::En(distCorre, v, e.next, o.tipoAncho == 3 ? o.ancho * 0.01f * lb : o.ancho);
+                continue;
+            }
+            const bool BA = ESBEV(v, e.prev), BB = ESBEV(v, e.next);
+            if (BA == BB) continue;
+            // la biselada es 'bz' (con su corrimiento), el punto corre por la otra ('u', de largo 'lu', direccion 'uu')
+            const int bz = BA ? e.prev : e.next, u = BA ? e.next : e.prev; const float lu = BA ? lb : la;
+            const V3 uz = BA ? ua : ub, uu = BA ? ub : ua;
+            const float c = CORR(v, bz);
+            float d = c / (s > 0.05f ? s : 0.05f);
+            if (o.tipoAncho == 4) d = o.ancho;                    // Absolute: sobre la arista
+            else if (o.tipoAncho == 3) d = o.ancho * 0.01f * lu;  // Percent: del largo de la arista
+            Pide::En(distCorre, v, u, d);
+            if (!o.deslizar) {   // sin Loop Slide: corrido en perpendicular a la biselada, adentro de esta cara
+                const V3 perp = Unit(uu - uz * Punto(uz, uu));
+                posFija[std::make_pair(v, u)] = pv + perp * c;
+            }
+        }
+    }
+    // los puntos que corren (con Clamp Overlap: nunca mas alla de la mitad de su arista)
+    for (std::map<std::pair<int,int>, float>::iterator it = distCorre.begin(); it != distCorre.end(); ++it) {
+        const int v = it->first.first, u = it->first.second;
+        const V3 pv = IPOS(v), pu = IPOS(u); const float l = Largo(pu - pv);
+        float d = it->second;
+        if (o.limitarSolape && d > l * 0.5f) d = l * 0.5f;
+        if (d > l * 0.999f) d = l * 0.999f;
+        std::map<std::pair<int,int>, V3>::iterator pf = posFija.find(it->first);
+        const V3 p = (pf != posFija.end() && !deVertices) ? pf->second : pv + Unit(pu - pv) * d;
+        idCorre[it->first] = NUEVO(p, v);
+    }
+    struct Busca { static int Corre(std::map<std::pair<int,int>, int>& m, int v, int u) {
+        std::map<std::pair<int,int>, int>::iterator q = m.find(std::make_pair(v, u)); return q == m.end() ? -1 : q->second; } };
+
+    // pasada 2: la esquina de cada cara, los arcos y el hueco de cada vertice
+    for (std::map<int, std::vector<BvEsq> >::iterator it = abanico.begin(); it != abanico.end(); ++it) {
+        const int v = it->first; const V3 pv = IPOS(v);
+        std::vector<BvEsq>& K = it->second; const int m = (int)K.size();
+        std::vector<std::vector<int> > L(m);
+        for (int i = 0; i < m; i++) {
+            const BvEsq& e = K[i];
+            const V3 ua = Unit(IPOS(e.prev) - pv), ub = Unit(IPOS(e.next) - pv);
+            if (deVertices) {
+                L[i].push_back(Busca::Corre(idCorre, v, e.prev));
+                // el arco de la esquina (perfil alrededor de v, adentro de la cara)
+                const int a = Busca::Corre(idCorre, v, e.prev), b = Busca::Corre(idCorre, v, e.next);
+                if (a >= 0 && b >= 0) for (int j = 1; j < segs; j++) L[i].push_back(NUEVO(BevelPerfil(nuevos[a], nuevos[b], pv, (float)j / (float)segs, rExp), v));
+                L[i].push_back(b);
+                continue;
+            }
+            const bool BA = ESBEV(v, e.prev), BB = ESBEV(v, e.next);
+            if (BA && BB) {   // el encuentro de las dos corridas
+                const float s = Largo(Cruz(ua, ub)), ca = CORR(v, e.prev), cb = CORR(v, e.next);
+                const V3 p = (s > 0.05f) ? pv + ua * (cb / s) + ub * (ca / s) : pv + Unit(ua + ub) * ((ca + cb) * 0.5f);
+                L[i].push_back(NUEVO(p, v));
+            } else if (BA) L[i].push_back(Busca::Corre(idCorre, v, e.next));
+            else if (BB) L[i].push_back(Busca::Corre(idCorre, v, e.prev));
+            else { L[i].push_back(Busca::Corre(idCorre, v, e.prev)); L[i].push_back(Busca::Corre(idCorre, v, e.next)); }
+        }
+        // (dos -1 seguidos = el vertice viejo una sola vez)
+        for (int i = 0; i < m; i++) { std::vector<int> q;
+            for (size_t k = 0; k < L[i].size(); k++) if (q.empty() || q.back() != L[i][k]) q.push_back(L[i][k]);
+            L[i].swap(q); }
+        // los ARCOS cruzando cada arista biselada (de la ultima de esta esquina a la primera de la que sigue)
+        std::vector<std::vector<int> > arcoTras(m);   // los puntos de ADENTRO del arco despues de la esquina i
+        // DOS aristas biseladas cuyos arcos unen los MISMOS dos puntos (dos aristas de una esquina de cubo: el encuentro
+        // arriba y el punto que corre por la tercera): es UNA sola curva, la costura donde se cruzan las dos tiras (con
+        // la esquina en el vertice viejo sale exacta: la interseccion de los dos cilindros). Se comparte y no hay hueco
+        std::map<std::pair<int,int>, std::vector<int> > arcoPar;   // (a, b) -> los de adentro, de a hacia b
+        bool hayCompartido = false;
+        if (!deVertices) {
+            std::map<std::pair<int,int>, int> cuantos;
+            for (int i = 0; i < m; i++) {
+                if (!ESBEV(v, K[i].next)) continue;
+                const int j = (i + 1) % m; if (j == 0 && !cerrado[v]) continue;
+                const int a = L[i].back(), b = L[j].front(); if (a < 0 || b < 0 || a == b) continue;
+                cuantos[std::make_pair(a < b ? a : b, a < b ? b : a)]++;
+            }
+            for (std::map<std::pair<int,int>, int>::iterator q = cuantos.begin(); q != cuantos.end(); ++q) if (q->second > 1) hayCompartido = true;
+            for (int i = 0; i < m; i++) {
+                if (!ESBEV(v, K[i].next)) continue;
+                const int j = (i + 1) % m; if (j == 0 && !cerrado[v]) continue;
+                const int a = L[i].back(), b = L[j].front(); if (a < 0 || b < 0) continue;
+                const std::pair<int,int> par(a < b ? a : b, a < b ? b : a);
+                if (cuantos[par] > 1) {
+                    std::map<std::pair<int,int>, std::vector<int> >::iterator ya = arcoPar.find(par);
+                    std::vector<int> adentro;
+                    if (ya == arcoPar.end()) {   // la primera vez: la costura, con la esquina en el vertice viejo
+                        for (int s = 1; s < segs; s++) adentro.push_back(NUEVO(BevelPerfil(nuevos[par.first], nuevos[par.second], pv, (float)s / (float)segs, rExp), v));
+                        arcoPar[par] = adentro;
+                    } else adentro = ya->second;
+                    if (a != par.first) std::reverse(adentro.begin(), adentro.end());
+                    BvArco arc; arc.desde = K[i].f; arc.p.push_back(a);
+                    for (size_t k = 0; k < adentro.size(); k++) arc.p.push_back(adentro[k]);
+                    arc.p.push_back(b);
+                    arcos[std::make_pair(v, K[i].next)] = arc;
+                    continue;
+                }
+                // la esquina del perfil: el punto de la ARISTA VIEJA a la altura de este corte (la proyeccion del medio de
+                // las dos puntas sobre ella). Con una sola biselada en el vertice es el vertice mismo; donde se juntan varias,
+                // no: el arco tiene que ser el corte de la arista redondeada, no ir hacia la punta del cubo
+                const V3 ue = Unit(IPOS(K[i].next) - pv), medio = (nuevos[a] + nuevos[b]) * 0.5f;
+                const V3 esq = pv + ue * Punto(medio - pv, ue);
+                BvArco arc; arc.desde = K[i].f; arc.p.push_back(a);
+                for (int s = 1; s < segs; s++) { const int id = NUEVO(BevelPerfil(nuevos[a], nuevos[b], esq, (float)s / (float)segs, rExp), v);
+                    arc.p.push_back(id); arcoTras[i].push_back(id); }
+                arc.p.push_back(b);
+                arcos[std::make_pair(v, K[i].next)] = arc;
+            }
+        }
+        // el HUECO (abanico cerrado): la vuelta al reves (las caras van al reves alrededor del vertice)
+        if (cerrado[v] && !hayCompartido) {
+            std::vector<int> ida;
+            for (int i = 0; i < m; i++) { for (size_t k = 0; k < L[i].size(); k++) ida.push_back(L[i][k]);
+                for (size_t k = 0; k < arcoTras[i].size(); k++) ida.push_back(arcoTras[i][k]); }
+            std::vector<int> hueco;
+            for (int k = (int)ida.size() - 1; k >= 0; k--) if (hueco.empty() || hueco.back() != ida[k]) hueco.push_back(ida[k]);
+            while (hueco.size() > 1 && hueco.front() == hueco.back()) hueco.pop_back();
+            // (un solo arco contra una cara que ya tiene las dos puntas: el arco va ADENTRO de esa cara, sin hueco)
+            if (!deVertices && hueco.size() >= 3) {
+                std::set<int> enArco; for (int i = 0; i < m; i++) for (size_t k = 0; k < arcoTras[i].size(); k++) enArco.insert(arcoTras[i][k]);
+                std::vector<int> otros; for (size_t k = 0; k < hueco.size(); k++) if (!enArco.count(hueco[k])) otros.push_back(hueco[k]);
+                if (otros.size() == 2) {
+                    for (int i = 0; i < m; i++) {
+                        if (L[i].size() != 2) continue;
+                        const bool ab = (L[i][0] == otros[0] && L[i][1] == otros[1]), ba = (L[i][0] == otros[1] && L[i][1] == otros[0]);
+                        if (!ab && !ba) continue;
+                        // el arco va de L[i][1] a L[i][0] en el sentido de la cara: los puntos del hueco entre ellos
+                        std::vector<int> medio; size_t k0 = 0;
+                        for (size_t k = 0; k < hueco.size(); k++) if (hueco[k] == L[i][0]) k0 = k;
+                        for (size_t k = 1; k < hueco.size(); k++) { const int q = hueco[(k0 + k) % hueco.size()]; if (q == L[i][1]) break; medio.push_back(q); }
+                        if (medio.size() + 2 != hueco.size()) { medio.clear(); for (size_t k = 1; k < hueco.size(); k++) { const int q = hueco[(k0 + hueco.size() - k) % hueco.size()]; if (q == L[i][1]) break; medio.push_back(q); } }
+                        std::vector<int> q; q.push_back(L[i][0]); for (size_t k = 0; k < medio.size(); k++) q.push_back(medio[k]); q.push_back(L[i][1]);
+                        L[i].swap(q); hueco.clear(); break;
+                    }
+                }
+            }
+            bool conViejo = false; for (size_t k = 0; k < hueco.size(); k++) if (hueco[k] < 0) conViejo = true;
+            if (hueco.size() >= 3 && !conViejo) {
+                const int src = base[K[0].f] + K[0].c;
+                const int mat = o.material >= 0 ? o.material : faces3d[K[0].f].mat;
+                V3 cen; for (size_t k = 0; k < hueco.size(); k++) cen = cen + nuevos[hueco[k]];
+                cen = cen * (1.0f / (float)hueco.size());
+                if (o.interseccion == 0 && segs > 1 && hueco.size() >= 4) {
+                    // GRID FILL: un abanico alrededor de un centro empujado hacia la esquina (la tapa curvada)
+                    // cuanto se acerca el centro a la esquina segun el perfil: 0.25 (recto) = plano, 0.5 (circular) = sobre
+                    // la esfera de una esquina de cubo (0.273), 1 = la esquina misma; menos de 0.25 = hacia adentro
+                    const float s = o.perfil < 0.0f ? 0.0f : (o.perfil > 1.0f ? 1.0f : o.perfil);
+                    const float k = s >= 0.25f ? powf((s - 0.25f) / 0.75f, 1.181f) : -powf((0.25f - s) / 0.25f, 1.181f) * 0.5f;
+                    const int c = NUEVO(cen + (pv - cen) * k, v);
+                    for (size_t q = 0; q < hueco.size(); q++) {
+                        std::vector<int> t; t.push_back(hueco[q]); t.push_back(hueco[(q + 1) % hueco.size()]); t.push_back(c);
+                        caras.push_back(t); carasSrc.push_back(src); carasMat.push_back(mat); carasSuave.push_back(1);
+                        const V3 tc = (nuevos[t[0]] + nuevos[t[1]] + nuevos[t[2]]) * (1.0f / 3.0f);
+                        centrosNuevos.push_back(Vector3(tc.x, tc.y, tc.z));
+                    }
+                } else {   // CUTOFF: una cara plana
+                    caras.push_back(hueco); carasSrc.push_back(src); carasMat.push_back(mat); carasSuave.push_back(o.endurecer ? 1 : faces3d[K[0].f].smooth);
+                    centrosNuevos.push_back(Vector3(cen.x, cen.y, cen.z));
+                }
+            }
+        }
+        for (int i = 0; i < m; i++) lista[std::make_pair(K[i].f, K[i].c)] = L[i];
+    }
+
+    // ---- la TIRA de cada arista biselada: del arco de una punta al de la otra ----
+    std::vector<std::pair<V3, V3> > bordesTira;
+    for (std::set<std::pair<int,int> >::iterator it = bev.begin(); it != bev.end(); ++it) {
+        const int a = it->first, b = it->second;
+        const std::vector<std::pair<int,int> >& u = usoArista[*it];
+        // la cara donde la arista va de a hacia b
+        int Fa = -1, ca = 0;
+        for (size_t q = 0; q < u.size(); q++) if (R[u[q].first][u[q].second] == a) { Fa = u[q].first; ca = u[q].second; }
+        if (Fa < 0) continue;
+        std::map<std::pair<int,int>, BvArco>::iterator A = arcos.find(std::make_pair(a, b)), B = arcos.find(std::make_pair(b, a));
+        if (A == arcos.end() || B == arcos.end()) continue;
+        std::vector<int> pa = A->second.p, pb = B->second.p;
+        if (A->second.desde != Fa) std::reverse(pa.begin(), pa.end());
+        if (B->second.desde != Fa) std::reverse(pb.begin(), pb.end());
+        if (pa.size() != pb.size()) continue;
+        const int src = base[Fa] + ca;
+        const int mat = o.material >= 0 ? o.material : faces3d[Fa].mat;
+        for (size_t j = 0; j + 1 < pa.size(); j++) {
+            std::vector<int> q; q.push_back(pb[j]); q.push_back(pa[j]); q.push_back(pa[j+1]); q.push_back(pb[j+1]);
+            std::vector<int> qq; for (size_t k = 0; k < 4; k++) if (qq.empty() || qq.back() != q[k]) qq.push_back(q[k]);
+            while (qq.size() > 1 && qq.front() == qq.back()) qq.pop_back();
+            if (qq.size() < 3) continue;
+            caras.push_back(qq); carasSrc.push_back(src); carasMat.push_back(mat);
+            carasSuave.push_back((o.endurecer || segs > 1) ? 1 : faces3d[Fa].smooth);
+            V3 c; for (size_t k = 0; k < qq.size(); k++) c = c + nuevos[qq[k]]; c = c * (1.0f / (float)qq.size());
+            centrosNuevos.push_back(Vector3(c.x, c.y, c.z));
+        }
+        bordesTira.push_back(std::make_pair(nuevos[pa.front()], nuevos[pb.front()]));
+        bordesTira.push_back(std::make_pair(nuevos[pa.back()], nuevos[pb.back()]));
+    }
+    if (nuevos.empty()) return false;
+
+    // ---- crecer los arrays: los vertices nuevos heredan los datos del vertice del que salen ----
+    const int nuevoN = nV + (int)nuevos.size();
+    const bool tNor = (normals != NULL), tUV = (uv != NULL), tCol = (vertexColor != NULL);
+    GLfloat* nVtx = new GLfloat[nuevoN*3]; GLbyte* nNor = new GLbyte[nuevoN*3];
+    GLfloat* nUV = new GLfloat[nuevoN*2]; GLubyte* nCol = new GLubyte[nuevoN*4];
+    for (int gi = 0; gi < nV; gi++) {
+        for (int q = 0; q < 3; q++) nVtx[gi*3+q] = vertex[gi*3+q];
+        if (tNor) { for (int q = 0; q < 3; q++) nNor[gi*3+q] = normals[gi*3+q]; } else { nNor[gi*3] = 0; nNor[gi*3+1] = 127; nNor[gi*3+2] = 0; }
+        if (tUV) { nUV[gi*2] = uv[gi*2]; nUV[gi*2+1] = uv[gi*2+1]; } else { nUV[gi*2] = 0; nUV[gi*2+1] = 0; }
+        if (tCol) { for (int q = 0; q < 4; q++) nCol[gi*4+q] = vertexColor[gi*4+q]; } else { for (int q = 0; q < 4; q++) nCol[gi*4+q] = 255; }
+    }
+    vtxAnimRecipes.clear(); vtxAnimRecipeBase = nV;
+    for (size_t i = 0; i < nuevos.size(); i++) {
+        const int w = nV + (int)i, r = nuevoRep[i];
+        nVtx[w*3] = nuevos[i].x; nVtx[w*3+1] = nuevos[i].y; nVtx[w*3+2] = nuevos[i].z;
+        if (tNor) { for (int k = 0; k < 3; k++) nNor[w*3+k] = normals[r*3+k]; } else { nNor[w*3] = 0; nNor[w*3+1] = 127; nNor[w*3+2] = 0; }
+        if (tUV) { nUV[w*2] = uv[r*2]; nUV[w*2+1] = uv[r*2+1]; } else { nUV[w*2] = 0; nUV[w*2+1] = 0; }
+        if (tCol) { for (int k = 0; k < 4; k++) nCol[w*4+k] = vertexColor[r*4+k]; } else { for (int k = 0; k < 4; k++) nCol[w*4+k] = 255; }
+        VtxRecipe rc(r, r, 0.0f); rc.soloUV = true; vtxAnimRecipes.push_back(rc);
+    }
+
+    // ---- las caras: las de antes con sus esquinas cambiadas, despues las tiras y las tapas ----
+    std::vector<MeshFace> nf3d; nf3d.reserve(F + caras.size());
+    std::vector<int> srcCorner; srcCorner.reserve(cornersViejos + caras.size() * 4);
+    for (size_t f = 0; f < F; f++) {
+        MeshFace mf; mf.mat = faces3d[f].mat; mf.smooth = faces3d[f].smooth;
+        const std::vector<int>& idx = faces3d[f].idx;
+        for (size_t c = 0; c < idx.size(); c++) {
+            std::map<std::pair<int,int>, std::vector<int> >::iterator l = lista.find(std::make_pair((int)f, (int)c));
+            if (l == lista.end()) { mf.idx.push_back(idx[c]); srcCorner.push_back(base[f] + (int)c); continue; }
+            for (size_t k = 0; k < l->second.size(); k++) {
+                const int id = l->second[k];
+                mf.idx.push_back(id < 0 ? idx[c] : nV + id); srcCorner.push_back(base[f] + (int)c);
+            }
+        }
+        // (una cara que quedo con vertices repetidos seguidos: se limpian)
+        std::vector<int> q; std::vector<int> qs;
+        for (size_t k = 0; k < mf.idx.size(); k++) if (q.empty() || q.back() != mf.idx[k]) { q.push_back(mf.idx[k]); qs.push_back(srcCorner[srcCorner.size() - mf.idx.size() + k]); }
+        while (q.size() > 1 && q.front() == q.back()) { q.pop_back(); qs.pop_back(); }
+        srcCorner.resize(srcCorner.size() - mf.idx.size());
+        if (q.size() < 3) continue;
+        mf.idx = q; for (size_t k = 0; k < qs.size(); k++) srcCorner.push_back(qs[k]);
+        nf3d.push_back(mf);
+    }
+    for (size_t i = 0; i < caras.size(); i++) {
+        MeshFace mf; mf.mat = carasMat[i]; mf.smooth = carasSuave[i];
+        for (size_t k = 0; k < caras[i].size(); k++) { mf.idx.push_back(nV + caras[i][k]); srcCorner.push_back(carasSrc[i]); }
+        nf3d.push_back(mf);
+    }
+    delete[] vertex; delete[] normals; delete[] uv; delete[] vertexColor;
+    vertex = nVtx; normals = nNor; uv = nUV; vertexColor = nCol; vertexSize = nuevoN;
+    CompactarCapas(this, srcCorner);   // las capas por corner: cada corner nuevo, del corner de donde sale
+
+    // MARK SEAMS / SHARP: los bordes de las tiras (donde la tira toca las caras de antes)
+    if (o.marcarSeams || o.marcarSharp)
+        for (size_t i = 0; i < bordesTira.size(); i++) {
+            const float fa[3] = { bordesTira[i].first.x, bordesTira[i].first.y, bordesTira[i].first.z };
+            const float fb[3] = { bordesTira[i].second.x, bordesTira[i].second.y, bordesTira[i].second.z };
+            std::string ka((const char*)fa, 12), kb((const char*)fb, 12);
+            const std::string k = ka < kb ? ka + kb : kb + ka;
+            if (o.marcarSeams) seamEdges.insert(k);
+            if (o.marcarSharp) sharpEdges.insert(k);
+        }
+    #undef ESBEV
+    #undef CORR
+    #undef NUEVO
+    #undef IREP
+    #undef IPOS
+    faces3d.swap(nf3d);
+    GenerarRender();   // re-merge + render (re-triangula + materialsGroup + CalcularBordes)
+    SeleccionarCarasPorCentro(centrosNuevos);
     return true;
 }

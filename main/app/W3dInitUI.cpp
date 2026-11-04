@@ -72,11 +72,13 @@ void W3dInitUI(const std::string& skinDir) {
     // reordena aunque se cierre el proyecto. Va JUSTO aca: lo que se cargue
     // despues ya es contenido.
     TexturasFijarBase();
+    TexturasConservarHuerfanas(true);   // el EDITOR: una textura sin usuarios sigue en la biblioteca (Purge Orphans la saca)
     // ...y lo MISMO con los materiales: los que existan a esta altura son del
     // editor y no se podan al cerrar un proyecto (ver Materials.h). Sin esta marca
     // no habia forma de podar `Materials`, y reabrir un proyecto en el mismo
     // proceso duplicaba TODOS sus materiales con sufijo ".001".
     MaterialesFijarBase();
+    { extern bool g_shaderTiempoLineaDeTiempo; g_shaderTiempoLineaDeTiempo = true; }   // (w3d_tiempo = la linea de tiempo)
 
     // UI armada sobre el atlas: UVs del 9-patch, scrollbar, tarjetas, iconos y la fuente
     CalcBorderUV(atlasW, atlasH);

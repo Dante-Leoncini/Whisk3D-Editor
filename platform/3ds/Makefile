@@ -44,6 +44,7 @@ FUENTES_CPP += \
     libs/Whisk3DCore/base/w3dlog.cpp \
     libs/Whisk3DCore/base/W3dInteractionState.cpp \
     libs/Whisk3DCore/base/W3dConfig.cpp \
+    libs/Whisk3DCore/base/W3dTactil.cpp \
     libs/Whisk3DCore/math/Vector3.cpp \
     libs/Whisk3DCore/math/Quaternion.cpp \
     libs/Whisk3DCore/math/Matrix4.cpp \

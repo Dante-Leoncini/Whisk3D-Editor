@@ -1,4 +1,5 @@
 #include "io/W3dWeb.h"   // navegador: guardar = descargar
+#include "app/W3dTactilEditor.h"   // W3D_SOLO_POR_CONTROLES (Symbian: el soltar de PC solo con el dedo o el mouse)
 #include "w3dGraphics.h" // abstraccion de graficos (independencia de OpenGL)
 #include "app/W3dTeclado.h"   // W3dTecladoAbrir: el teclado del celular (y el layout que se adapta)
 #include "gfx/w3dTexture.h"   // Texturas16Siempre (tarjeta Render)
@@ -34,6 +35,7 @@
 #include "io/UI2DFormato.h"    // guardar/cargar interfaces (.w3dui)
 #include "io/W3dContenedor.h"  // importar un asset = COPIARLO adentro del .w3d (ver el header)
 #include "io/MallasProyecto.h"   // tarjeta "3D Mesh": la malla como recurso (hacer unica, elegir, copiar)
+#include "PopUp/UVMapaPopup.h"   // la capa UV de un mapa del material (el boton de la malla)
 #include "io/CambiosProyecto.h"  // el '*' de lo no guardado (el selector de malla, el recurso, el proyecto)
 #include "io/RaicesEditor.h"     // "Open" de una escena / un prefab de la biblioteca
 #include "objects/MallaRecurso.h"
@@ -58,7 +60,21 @@
 #include "PopUp/ProgressPopup.h" // barra "Rendering..." durante el render (clave en N95)
 #include "ViewPorts/LayoutInput.h" // Notificar (toasts de exito/error)
 #include "objects/Camera.h"   // selector de target de la camara
-#include "render/RayTracer.h"  // g_rt: "Ray Tracing" de la tarjeta Render + render a PNG por trazado
+#include "objects/ShaderEscrito.h" // el shader escrito de un material (tarjeta Material: "Custom shader")
+#ifdef _WIN32
+    #include <direct.h>   // _mkdir: la carpeta de trabajo de los shaders sin proyecto
+#else
+    #include <sys/stat.h>
+#endif
+#include "render/RayTracer.h"
+#include "render/VectoresMovimiento.h"
+#include "render/Postproceso.h"   // la tarjeta "Post Processing"
+#include "objects/PostprocesoObj.h"   // ...que es la del objeto Postproceso   // el pase de vectores y el desenfoque de movimiento del render a PNG
+#ifdef W3D_MULTIBACKEND
+#include "w3dBackend.h"   // Ajustes > Graphics: el backend se elige al arrancar
+#endif
+#include "render/RTGpu.h"      // trazar en la GPU (si hay)
+#include "render/Denoiser.h"   // el desplegable del denoiser (los que hay en esta maquina)  // g_rt: "Ray Tracing" de la tarjeta Render + render a PNG por trazado
 static void AccionRTToggle();   // tilde "Ray Tracing" (tarjeta Render)
 void RTFilasPanel(Properties* P); // muestra/oculta Rays/Samples/Passes segun g_rt.on
 static void AccionRTValores();  // Rays / Samples / Passes -> g_rt
@@ -67,6 +83,7 @@ static void AccionRTValores();  // Rays / Samples / Passes -> g_rt
 #include "objects/LOD.h"      // tarjeta del objeto LOD (umbrales de distancia)
 #include "objects/Culling.h"  // tarjeta del objeto Culling (soloCamaraActiva)
 #include "objects/Niebla.h"   // tarjeta del objeto Niebla
+#include "objects/Sonido.h"   // tarjeta del objeto Sonido
 #include "objects/Recorte.h"  // tarjetas LimpiarZ / Recorte
 #include "objects/Collection.h" // tarjeta de la Collection (ordenarPorCamara/ordenarUnaVez)
 #include "objects/Particulas.h" // tarjeta del objeto Particulas (emisor: textura + cono)
@@ -1053,7 +1070,7 @@ static void AccionMenuTexturas(){
         MenuTexturas->action = AccionTexturaElegida;
     }
     MenuTexturas->Limpiar(); // las texturas cargadas van cambiando
-    MenuTexturas->Agregar(T("No Texture"), 0, IconType::notifError); // la "cruz" de error = sin textura
+    MenuTexturas->Agregar(T("None"), 0);   // sin textura (como el normal map)
     MenuTexturas->Agregar(T("Load Texture"), 1, IconType::archive);
     for (size_t i = 5; i < Textures.size(); i++) {
         MenuTexturas->Agregar(NombreDeTextura(Textures[i]),
@@ -1067,9 +1084,11 @@ static void AccionNormalTexElegida(int id){
     if (!PropsActivo) return;
     Material* mat = MaterialActivoUI();
     if (!mat) return;
-    if (id == 0) { TexturaPonerEn(mat->normalTexture, NULL); }                   // sin normal map (la ranura suelta la suya)
+    // (UNA fila: tener una textura de normal map ES tener normal map; "None" lo apaga)
+    if (id == 0) { TexturaPonerEn(mat->normalTexture, NULL); mat->normalMap = false; }   // sin normal map (la ranura suelta la suya)
     else if (id == 1) { if (DialogoCargarTextura) { gCargarTexturaComoNormal = true; DialogoCargarTextura(mat); return; } } // cargar archivo (MISMO browser que la textura base, flag -> normalTexture)
-    else if (5 + id - 2 < (int)Textures.size()) { TexturaPonerEn(mat->normalTexture, Textures[5 + id - 2]); } // una ya cargada
+    else if (5 + id - 2 < (int)Textures.size()) { TexturaPonerEn(mat->normalTexture, Textures[5 + id - 2]); mat->normalMap = true; } // una ya cargada
+    PropertiesLayoutDirty = true;   // (Reflection se oculta/aparece con el normal map)
     RebindMaterialMeshPart();
 }
 
@@ -1081,13 +1100,263 @@ static void AccionMenuTexturasNormal(){
         MenuTexturasNormal->action = AccionNormalTexElegida;
     }
     MenuTexturasNormal->Limpiar();
-    MenuTexturasNormal->Agregar(T("No Normal Map"), 0, IconType::notifError);
+    MenuTexturasNormal->Agregar(T("None"), 0);
     MenuTexturasNormal->Agregar(T("Load Texture"), 1, IconType::archive);
     for (size_t i = 5; i < Textures.size(); i++) {
         MenuTexturasNormal->Agregar(NombreDeTextura(Textures[i]), 2 + (int)(i - 5), IconType::textura);
     }
     AbrirMenuBajoBoton(MenuTexturasNormal, PropsActivo->propBtnNormalTex->button);
 }
+
+// === LOS MAPAS DEL MATERIAL (W3dMatMapa): el color base, el normal map y los del trazado de rayos (emision,
+//     rugosidad, metalico, alfa). Cada fila: [nombre] [numero / textura] [la capa UV] [la textura, o el numero para
+//     toda la superficie]. La base y el normal map son siempre textura (su selector de siempre) ===
+int gCargarTexturaMapa = -1;   // >= 0: el "Load Texture" de ESE mapa (lo atiende el browser, main.cpp / w3dlayout.cpp)
+static int gMapaMenu = -1;     // el mapa del menu abierto
+static Mesh* MallaActivaUI();
+static PopupMenu* MenuTexturasMapa = NULL;
+static PopupMenu* MenuUVMapa = NULL;
+static PropButton* BotonDeMapa(Properties* p, int k) {
+    if (!p || k < 0 || k >= W3D_MAPAS) return NULL;
+    if (k == W3D_MAPA_BASE) return p->propBtnTextura;
+    if (k == W3D_MAPA_NORMAL) return p->propBtnNormalTex;
+    return p->propMapa[k];
+}
+static bool MaterialEditableUI(Material* m) { return m && m != MaterialDefecto && m->libreria.empty(); }
+// el NUMERO de un mapa de valor (la rugosidad, el metalico, el alfa; la emision es un color)
+static float* ValorDeMapa(Material* m, int k) {
+    if (!m) return NULL;
+    if (k == W3D_MAPA_RUGOSIDAD) return &m->rtRugosidad;
+    if (k == W3D_MAPA_METALICO) return &m->rtMetalico;
+    if (k == W3D_MAPA_ALFA) return &m->diffuse[3];
+    return NULL;
+}
+// "0.50" sin printf de punto flotante (no anda en estlib, Symbian)
+static std::string NumMapaTexto(float v) {
+    if (v < 0.0f) v = 0.0f;
+    const int c = (int)(v * 100.0f + 0.5f);
+    char b[24]; sprintf(b, "%d.%02d", c / 100, c % 100);
+    return b;
+}
+static bool NumMapaLeer(const std::string& t, float& out) {
+    double ent = 0.0, frac = 0.0, div = 1.0; bool punto = false, alguno = false;
+    for (size_t i = 0; i < t.size(); i++) {
+        const char ch = t[i];
+        if (ch >= '0' && ch <= '9') { alguno = true; if (punto) { div *= 10.0; frac = frac * 10.0 + (ch - '0'); } else ent = ent * 10.0 + (ch - '0'); }
+        else if ((ch == '.' || ch == ',') && !punto) punto = true;
+        else if (ch == ' ') continue;
+        else return false;
+    }
+    if (!alguno) return false;
+    out = (float)(ent + frac / div);
+    return true;
+}
+static std::string ColorHex(const float* c) {
+    char b[16];
+    sprintf(b, "#%02X%02X%02X", (int)(c[0] * 255.0f + 0.5f) & 255, (int)(c[1] * 255.0f + 0.5f) & 255, (int)(c[2] * 255.0f + 0.5f) & 255);
+    return b;
+}
+// ---- el NUMERO en el lugar: el boton se vuelve un campo; al soltar el foco (Enter, click afuera) se aplica, con undo
+static TextField g_mapaNum;
+static Button* g_mapaNumBoton = NULL;
+static int g_mapaNumK = -1;
+static Material* g_mapaNumMat = NULL;
+static void TransparenteDesdeAlfa(Material* m);
+static void MapaNumEditar(int k) {
+    Material* mat = MaterialActivoUI();
+    float* v = ValorDeMapa(mat, k);
+    PropButton* b = BotonDeMapa(PropsActivo, k);
+    if (!v || !b || !MaterialEditableUI(mat)) return;
+    g_mapaNumBoton = b->button; g_mapaNumK = k; g_mapaNumMat = mat;
+    g_mapaNum.SetText(NumMapaTexto(*v));
+    g_mapaNum.SelectAll();                     // (la 1ra tecla reemplaza)
+    b->button->editField = &g_mapaNum;
+    TextFieldEnfocar(&g_mapaNum);
+#if !defined(__EMSCRIPTEN__)
+    { extern bool g_uiTapEnCurso; void QwertyAbrir(); if (g_uiTapEnCurso) QwertyAbrir(); }
+#endif
+    g_redraw = true;
+}
+// (cada cuadro, Properties::Render) el campo del numero perdio el foco: se aplica lo tipeado (Esc ya lo restauro)
+static void MapaNumSeguir() {
+    if (!g_mapaNumBoton || g_textFieldActivo == &g_mapaNum) return;
+    g_mapaNumBoton->editField = NULL;
+    g_mapaNumBoton = NULL;
+    Material* mat = g_mapaNumMat; g_mapaNumMat = NULL;
+    bool vivo = false;
+    for (size_t i = 0; i < Materials.size() && !vivo; i++) vivo = (Materials[i] == mat);
+    float* v = vivo ? ValorDeMapa(mat, g_mapaNumK) : NULL;
+    float n = 0.0f;
+    if (v && NumMapaLeer(g_mapaNum.text, n)) {
+        if (n < 0.0f) n = 0.0f;
+        if (n > 1.0f) n = 1.0f;
+        if (n != *v) { UndoMaterialModIniciar(mat); *v = n; if (g_mapaNumK == W3D_MAPA_ALFA) TransparenteDesdeAlfa(mat); UndoMaterialModCommit(); RTInvalidar(); }
+    }
+    RebindMaterialMeshPart();
+    g_redraw = true;
+}
+static void AccionTexturaMapaElegida(int id) {
+    Material* mat = MaterialActivoUI();
+    const int k = gMapaMenu;
+    if (!PropsActivo || !MaterialEditableUI(mat) || k < W3D_MAPA_EMISION || k >= W3D_MAPAS) return;
+    if (id == 0) {   // "None": suelta la textura y el mapa vuelve al NUMERO
+        UndoMaterialModIniciar(mat);
+        TexturaPonerEn(mat->mapaTex[k], NULL);
+        mat->mapaConTextura[k] = false;
+        UndoMaterialModCommit();
+    } else if (id == 1) {
+        if (DialogoCargarTextura) { gCargarTexturaComoNormal = false; gCargarTexturaMapa = k; DialogoCargarTextura(mat); return; }
+    } else if (5 + id - 2 < (int)Textures.size()) {
+        extern void W3dMaterialPonerMapa(Material* mat, Texture* tex, int mapa);   // (SoltarRecurso.cpp: con undo)
+        W3dMaterialPonerMapa(mat, Textures[5 + id - 2], k);
+    }
+    RTInvalidar();
+    RebindMaterialMeshPart();
+}
+static void AbrirMenuTexturaMapa(int k) {
+    PropButton* b = BotonDeMapa(PropsActivo, k);
+    if (!b) return;
+    gMapaMenu = k;
+    if (!MenuTexturasMapa) { MenuTexturasMapa = new PopupMenu(); MenuTexturasMapa->action = AccionTexturaMapaElegida; }
+    MenuTexturasMapa->Limpiar();
+    MenuTexturasMapa->Agregar(T("None"), 0);
+    MenuTexturasMapa->Agregar(T("Load Texture"), 1, IconType::archive);
+    for (size_t i = 5; i < Textures.size(); i++) MenuTexturasMapa->Agregar(NombreDeTextura(Textures[i]), 2 + (int)(i - 5), IconType::textura);
+    AbrirMenuBajoBoton(MenuTexturasMapa, b->button);
+}
+// el material es TRANSPARENTE si su Alfa lo pide: un numero menor que 1, o una textura de alfa (el tilde se fue)
+static void TransparenteDesdeAlfa(Material* m) {
+    if (!m) return;
+    const bool t = m->diffuse[3] < 0.999f || m->mapaConTextura[W3D_MAPA_ALFA];
+    if (m->transparent != t) { m->transparent = t; PropertiesLayoutDirty = true; }
+}
+// el CUADRADITO del color base (al lado de la textura): su selector de color
+static void AccionColorBase() {
+    Material* mat = MaterialActivoUI();
+    PropButton* b = PropsActivo ? PropsActivo->propBtnTextura : NULL;
+    if (!MaterialEditableUI(mat) || !b || b->nExtras < 1) return;
+    if (!colorPicker) colorPicker = new ColorPicker();
+    colorPicker->Abrir(mat->diffuse, b->extras[0]->sx, b->extras[0]->sy + b->extras[0]->height);
+}
+// ARRASTRAR el numero de un mapa (rugosidad, metalico, alfa): de izquierda a derecha va de 0 a 1; soltar sin moverlo
+// lo deja escribir con el teclado
+static int gMapaDragK = -1;
+static int gMapaDragX0 = 0, gMapaDragW = 1, gMapaDragMx = 0;
+static bool gMapaDragMovio = false;
+static Material* gMapaDragMat = NULL;
+static void MapaNumEditar(int k);
+static void MapaDragMover(int mx) {
+    if (gMapaDragK < 0) return;
+    Material* mat = gMapaDragMat;
+    float* v = ValorDeMapa(mat, gMapaDragK);
+    if (!v) { gMapaDragK = -1; return; }
+    if (!gMapaDragMovio) {
+        if (mx - gMapaDragMx < 3 && gMapaDragMx - mx < 3) return;   // (zona muerta: un click no lo mueve)
+        gMapaDragMovio = true;
+        UndoMaterialModIniciar(mat);
+    }
+    float n = (float)(mx - gMapaDragX0) / (float)(gMapaDragW > 0 ? gMapaDragW : 1);
+    if (n < 0.0f) n = 0.0f; if (n > 1.0f) n = 1.0f;
+    n = (float)((int)(n * 100.0f + 0.5f)) / 100.0f;   // (de a centesimos)
+    if (n != *v) { *v = n; if (gMapaDragK == W3D_MAPA_ALFA) TransparenteDesdeAlfa(mat); RTInvalidar(); RebindMaterialMeshPart(); g_redraw = true; }
+}
+static void MapaDragSoltar() {
+    if (gMapaDragK < 0) return;
+    const int k = gMapaDragK; const bool movio = gMapaDragMovio;
+    gMapaDragK = -1; gMapaDragMovio = false;
+    if (movio) UndoMaterialModCommit();
+    else MapaNumEditar(k);   // un click: escribirlo
+}
+// el BOTON GRANDE de un mapa: la textura (su desplegable) o el numero (la emision: el color; el resto: tipearlo)
+static void AccionMapaPrincipal(int k) {
+    Material* mat = MaterialActivoUI();
+    PropButton* b = BotonDeMapa(PropsActivo, k);
+    if (!b || !MaterialEditableUI(mat)) return;
+    if (mat->mapaConTextura[k]) { AbrirMenuTexturaMapa(k); return; }
+    if (k == W3D_MAPA_EMISION) {
+        if (!colorPicker) colorPicker = new ColorPicker();
+        colorPicker->Abrir(mat->emission, b->button->sx, b->button->sy + b->button->height);
+        return;
+    }
+    MapaNumEditar(k);
+}
+// NUMERO <-> TEXTURA (el primer boton chico)
+static void AccionMapaModo(int k) {
+    Material* mat = MaterialActivoUI();
+    if (!MaterialEditableUI(mat) || k < W3D_MAPA_EMISION) return;
+    UndoMaterialModIniciar(mat);
+    mat->mapaConTextura[k] = !mat->mapaConTextura[k];
+    if (k == W3D_MAPA_ALFA) TransparenteDesdeAlfa(mat);
+    UndoMaterialModCommit();
+    RTInvalidar();
+    RebindMaterialMeshPart();
+}
+// EL UV PERSONALIZADO de un objeto (Mesh::uvPersonal), con undo: ida y vuelta entre el de antes y el de ahora
+struct UndoUVPersonal { Mesh* m; std::string mat; int mapa; std::string otro; };
+static void UndoUVPersonalAplicar(void* d) {
+    UndoUVPersonal* u = (UndoUVPersonal*)d;
+    if (!u->m) return;
+    Material* mt = BuscarMaterialPorNombre(u->mat);
+    Material tmp(u->mat, true);   // (por si el material ya no esta: la clave es su nombre)
+    const Material* clave = mt ? mt : &tmp;
+    const std::string ahora = u->m->UVPersonalizado(clave, u->mapa);
+    u->m->FijarUVPersonalizado(clave, u->mapa, u->otro);
+    u->otro = ahora;
+    RebindMaterialMeshPart();
+    g_redraw = true;
+}
+static void UndoUVPersonalDesvincular(void* d, Object* borrado) { UndoUVPersonal* u = (UndoUVPersonal*)d; if ((Object*)u->m == borrado) u->m = NULL; }
+static void UndoUVPersonalLiberar(void* d) { delete (UndoUVPersonal*)d; }
+static void FijarUVPersonalConUndo(Mesh* m, Material* mat, int k, const std::string& uvNom) {
+    if (!m || !mat) return;
+    const std::string antes = m->UVPersonalizado(mat, k);
+    if (antes == uvNom) return;
+    UndoUVPersonal* u = new UndoUVPersonal();
+    u->m = m; u->mat = mat->name; u->mapa = k; u->otro = antes;
+    m->FijarUVPersonalizado(mat, k, uvNom);
+    UndoExterno f; f.aplicar = UndoUVPersonalAplicar; f.desvincular = UndoUVPersonalDesvincular; f.liberar = UndoUVPersonalLiberar;
+    UndoPushExterno(f, u);
+    W3dCambiosTocado();
+}
+// la UV del mapa (el boton chico con la malla). Arriba, el INDICE (del material, compartido: el de siempre); abajo de
+// la linea, los UV de ESTE objeto por nombre (PERSONALIZADO: solo este objeto, el boton se pone amarillo)
+enum { UVMAPA_PERSONAL = 100 };
+static void AccionUVMapaElegida(int id) {
+    Material* mat = MaterialActivoUI();
+    Mesh* m = MallaActivaUI();
+    const int k = gMapaMenu;
+    if (!MaterialEditableUI(mat) || k < 0 || k >= W3D_MAPAS || id < 0) return;
+    if (id >= UVMAPA_PERSONAL) {   // un UV de este objeto, por nombre
+        const int j = id - UVMAPA_PERSONAL;
+        if (!m || j >= (int)m->uvMaps.size() || !m->uvMaps[(size_t)j]) return;
+        FijarUVPersonalConUndo(m, mat, k, m->uvMaps[(size_t)j]->nombre);
+    } else {                       // el INDICE (y este objeto vuelve a usarlo)
+        UndoGrupoIniciar();
+        if (m) FijarUVPersonalConUndo(m, mat, k, std::string());
+        UndoMaterialModIniciar(mat);
+        mat->uvMapa[k] = id;
+        UndoMaterialModCommit();
+        UndoGrupoFinSecuencial();
+    }
+    RTInvalidar();
+    RebindMaterialMeshPart();
+}
+static std::string NombreCapaUV(int k);
+static Mesh* MallaActivaUI();
+// el boton de la malla de un mapa: el POPUP de la capa UV (el indice del material, y si ESTE objeto usa lo suyo: su
+// indice o una capa UV por nombre). Puede haber cientos de capas: un menu no alcanza (PopUp/UVMapaPopup)
+static void AccionMapaUV(int k) {
+    Material* mat = MaterialActivoUI();
+    if (!MaterialEditableUI(mat) || k < 0 || k >= W3D_MAPAS) return;
+    static const char* const kNom[W3D_MAPAS] = { "Base Color", "Normal Map", "Emission Map", "Roughness Map", "Metallic Map", "Alpha" };
+    AbrirUVMapaPopup(mat, MallaActivaUI(), k, std::string(T("UV Map")) + ": " + T(kNom[k]));
+}
+#define W3D_MAPA_ACCIONES(k) \
+    static void AccionMapaPrincipal##k() { AccionMapaPrincipal(k); } \
+    static void AccionMapaModo##k() { AccionMapaModo(k); } \
+    static void AccionMapaUV##k() { AccionMapaUV(k); }
+W3D_MAPA_ACCIONES(0) W3D_MAPA_ACCIONES(1) W3D_MAPA_ACCIONES(2) W3D_MAPA_ACCIONES(3) W3D_MAPA_ACCIONES(4) W3D_MAPA_ACCIONES(5)
+#undef W3D_MAPA_ACCIONES
 
 // === TEXTURA B (mezcla de texturas en una pasada, Material::texturaB): mirror del selector del normal map ===
 static void AccionTexBElegida(int id){
@@ -1213,6 +1482,147 @@ static void (*const kAccionCapaMz[4])()  = { AccionCapaMz0,  AccionCapaMz1,  Acc
 // === REFLECTION: el MODO del reflejo (Matcap HW / Sphere Map / Equirect) en un desplegable (reemplaza el viejo
 // checkbox "Chrome 360"). Los tags (hardware)/(software) son para el N95 (donde importa el perf): el Matcap es por
 // matriz de textura = HW en los 4 OS; el Sphere Map exacto es HW en PC (texgen) pero SW en el N95; el Equirect es SW.
+// SOMBREADO del material: por vertice (la luz se calcula en cada vertice y se interpola) o por pixel (en cada pixel).
+// Solo existe con shaders (gfx::SombreadoPorPixelSoportado): con el pipeline fijo (GLES 1.1) ni se muestra
+static PopupMenu* MenuSombreado = NULL;
+static const char* NombreSombreado(bool porPixel){ return porPixel ? "Per pixel" : "Per vertex"; }
+static void AccionSombreadoElegido(int id){
+    Material* mat = MaterialActivoUI();
+    if (!mat || mat == MaterialDefecto) return;
+    UndoMaterialModIniciar(mat);
+    mat->porPixel = (id == 1);
+    UndoMaterialModCommit();
+    RebindMaterialMeshPart();
+}
+static void AccionMenuSombreado(){
+    if (!PropsActivo) return;
+    if (!MenuSombreado) { MenuSombreado = new PopupMenu(); MenuSombreado->action = AccionSombreadoElegido; }
+    Material* mat = MaterialActivoUI();
+    MenuSombreado->Limpiar();
+    MenuSombreado->titulo = T("Shading");
+    MenuItem* it = MenuSombreado->Agregar(T(NombreSombreado(false)), 0, IconType::material);
+    if (it && mat) it->verde = !mat->porPixel;
+    it = MenuSombreado->Agregar(T(NombreSombreado(true)), 1, IconType::material);
+    if (it && mat) it->verde = mat->porPixel;
+    AbrirMenuBajoBoton(MenuSombreado, PropsActivo->propBtnSombreado->button);
+}
+// ===========================================================================
+//  SHADER ESCRITO (objects/ShaderEscrito.h): el tilde "Custom shader", el archivo (los .glsl de shaders/ adentro del
+//  proyecto, uno nuevo o uno del disco), "Compile" (con el lapiz que lo abre en el IDE) y el resultado de compilar
+// ===========================================================================
+static PopupMenu* MenuShader = NULL;
+static std::vector<std::string> gShaderRutas;   // las entradas del menu (por id)
+static const int kShaderNuevo = 100000, kShaderDisco = 100001;
+std::string W3dShaderNombre(const std::string& ruta) {   // "shaders/vidrio.glsl" -> "vidrio.glsl"
+    const size_t b = ruta.find_last_of("/\\");
+    return b == std::string::npos ? ruta : ruta.substr(b + 1);
+}
+// el material pasa a usar el archivo 'ruta' y se compila (el resultado lo muestra la tarjeta)
+static void ShaderAsignar(Material* mat, const std::string& ruta) {
+    if (!mat) return;
+    mat->shaderArchivo = ruta;
+    mat->shaderOn = true;
+    W3dShaderMaterialCompilar(mat);
+    W3dCambiosTocado();
+    RebindMaterialMeshPart();
+    g_redraw = true;
+}
+// Sin proyecto guardado (no hay .w3d montado) el shader se escribe en una carpeta de TRABAJO del editor y se usa en el
+// acto; al guardar el proyecto entra adentro del .w3d (GuardarW3D: Asset) y el material pasa a usar esa entrada.
+static std::string CarpetaShadersTrabajo() {
+    std::string d = w3dFileSystem::GetUserDataDir();   // (la del usuario: config.ini, atajos)
+    if (d.empty()) d = w3dFileSystem::GetHomeDir();
+    d = w3dFileSystem::JoinPath(d, "shaders_sin_proyecto");
+#ifdef _WIN32
+    _mkdir(d.c_str());
+#else
+    mkdir(d.c_str(), 0755);
+#endif
+    return d;
+}
+// un shader NUEVO (shader.glsl, shader1.glsl...) con la plantilla: adentro del proyecto o en la carpeta de trabajo; y al IDE
+bool W3dShaderNuevoParaMaterial(Material* mat) {
+    if (!mat) return false;
+    const bool adentro = W3dContenedorHayMontado();
+    const std::string dir = adentro ? std::string() : CarpetaShadersTrabajo();
+    std::string ruta;
+    for (int i = 0; i < 1000; i++) {
+        char n[64]; if (i == 0) snprintf(n, sizeof(n), "shader.glsl"); else snprintf(n, sizeof(n), "shader%d.glsl", i);
+        const std::string r = adentro ? std::string("shaders/") + n : w3dFileSystem::JoinPath(dir, n);
+        if (adentro ? !W3dContenedorExiste(r) : !w3dFileSystem::FileExists(r)) { ruta = r; break; }
+    }
+    const char* t = W3dShaderPlantilla();
+    bool ok = !ruta.empty();
+    if (ok && adentro) ok = W3dContenedorEscribirEntrada(ruta, t, strlen(t));
+    else if (ok) { FILE* f = fopen(ruta.c_str(), "wb"); ok = f && fwrite(t, 1, strlen(t), f) == strlen(t); if (f) fclose(f); }
+    if (!ok) { Notificar(T("Could not write the file"), true); mat->shaderOn = false; return false; }
+    ShaderAsignar(mat, ruta);
+    extern bool IDEAbrirScript(const std::string& ruta);
+    IDEAbrirScript(ruta);
+    return true;
+}
+static void AccionShaderDiscoElegido(const std::string& ruta) {
+    Material* mat = MaterialActivoUI();
+    if (!mat || ruta.empty()) return;
+    // (como los scripts: lo elegido del disco se copia adentro del proyecto; sin proyecto queda la ruta del disco)
+    ShaderAsignar(mat, W3dImportarAsset(ruta, "shaders"));
+}
+static void AccionShaderElegido(int id) {
+    Material* mat = MaterialActivoUI();
+    if (!mat) return;
+    if (id == kShaderNuevo) { W3dShaderNuevoParaMaterial(mat); return; }
+    if (id == kShaderDisco) { AbrirFileBrowser(T("Load shader"), T("Open"), ".glsl", AccionShaderDiscoElegido); return; }
+    if (id >= 0 && id < (int)gShaderRutas.size()) ShaderAsignar(mat, gShaderRutas[(size_t)id]);
+}
+static void AccionMenuShader() {
+    if (!PropsActivo) return;
+    if (!MenuShader) { MenuShader = new PopupMenu(); MenuShader->action = AccionShaderElegido; }
+    Material* mat = MaterialActivoUI();
+    MenuShader->Limpiar();
+    MenuShader->titulo = T("Shader");
+    gShaderRutas.clear();
+    std::vector<std::string> ents;
+    W3dContenedorListarCarpeta("shaders/", ents);
+    for (size_t i = 0; i < ents.size(); i++) {
+        const std::string& e = ents[i];
+        if (e.size() < 5 || e.compare(e.size() - 5, 5, ".glsl") != 0) continue;
+        gShaderRutas.push_back(e);
+        MenuItem* it = MenuShader->Agregar(W3dShaderNombre(e), (int)gShaderRutas.size() - 1, IconType::script);
+        if (it && mat) it->verde = (mat->shaderArchivo == e);
+    }
+    if (mat && !mat->shaderArchivo.empty() && !W3dEsNombreDeEntrada(mat->shaderArchivo)) {   // (uno del disco)
+        gShaderRutas.push_back(mat->shaderArchivo);
+        MenuItem* it = MenuShader->Agregar(W3dShaderNombre(mat->shaderArchivo), (int)gShaderRutas.size() - 1, IconType::script);
+        if (it) it->verde = true;
+    }
+    MenuShader->Agregar(T("New shader"), kShaderNuevo, IconType::mas);
+    MenuShader->Agregar(T("Load from disk..."), kShaderDisco, IconType::carpeta);
+    AbrirMenuBajoBoton(MenuShader, PropsActivo->propBtnShader->button);
+}
+static void AccionShaderCompilar() {
+    Material* mat = MaterialActivoUI();
+    if (!mat || mat->shaderArchivo.empty()) return;
+    // (lo que tiene el IDE sin guardar no lo ve el compilador: el archivo es la verdad. Se avisa)
+    if (W3dShaderMaterialCompilar(mat)) Notificar(W3dShaderNombre(mat->shaderArchivo) + " " + T("compiled"), false);
+    else Notificar(std::string(T("The shader does not compile")) + ": " + W3dShaderNombre(mat->shaderArchivo), true);
+    RebindMaterialMeshPart();
+    g_redraw = true;
+}
+static void AccionShaderEditar() {
+    Material* mat = MaterialActivoUI();
+    if (!mat || mat->shaderArchivo.empty()) return;
+    extern bool IDEAbrirScript(const std::string& ruta);
+    if (!IDEAbrirScript(mat->shaderArchivo)) Notificar(T("There is no script editor (IDE) in the layout"), true);
+}
+static void OnMatShaderOn() {
+    Material* mat = MaterialActivoUI();
+    if (mat && mat->shaderOn && mat->shaderArchivo.empty()) W3dShaderNuevoParaMaterial(mat);   // (sin archivo: uno nuevo)
+    W3dCambiosTocado();
+    RebindMaterialMeshPart();
+    PropertiesLayoutDirty = true;
+    g_redraw = true;
+}
+
 static PopupMenu* MenuReflectMode = NULL;
 static const char* NombreReflectMode(int m){
     return (m == 1) ? "Sphere Map (software)"
@@ -1248,27 +1658,15 @@ static void AccionMenuReflectMode(){
 //  `sesgoProfundidad`, `ordenPasada`): para probar una sombra pegada al piso habia
 //  que editar un archivo de texto y reabrir el proyecto.
 //
-//  El TILDE "Decal" no es un campo mas: es la RECETA COMPLETA, la misma que aplica
-//  la palabra `decal` del .mtl y la misma que asserta `matflags <mat> decal` del
-//  harness -- transparente + NO escribe z + sesgo hacia el ojo + orden de pasada 1.
-//  Se muestra tildado cuando el material cumple las cuatro.
+//  (Habia un tilde "Decal" que aplicaba la receta entera -la de la palabra `decal` del .mtl:
+//  transparente + NO escribe z + sesgo hacia el ojo + orden de pasada 1-. Se saco: era un atajo
+//  a esos mismos campos, que estan abajo, y confundia. El .mtl la sigue entendiendo.)
 // ===========================================================================
 // espejos de UI (los Prop* editan un bool/float suelto y el onChange lo baja al material)
-static bool  g_matDecal = false;
 static float g_matSesgo = 0.0f;
 static float g_matSesgoM = 0.0f;
 static float g_matOrden = 0.0f;
 
-static void OnMatDecalChange() {
-    Mesh* me = MaterialMesh();
-    Material* mat = MaterialActivoUI();
-    if (!mat || mat == MaterialDefecto) return;
-    UndoCapturarMaterial(me, MeshPartActivoIdx(me));
-    // LA MISMA receta que la palabra `decal` del .mtl (Materials.cpp): un solo lugar.
-    // Se conserva el sesgo que ya tuviera (el usuario pudo afinarlo con Depth Bias).
-    W3dMaterialAplicarDecal(mat, g_matDecal, mat->depth_bias < 0.0f ? mat->depth_bias : 0.0f);
-    RebindMaterialMeshPart();
-}
 static void OnMatSesgoChange() {
     Material* mat = MaterialActivoUI();
     if (!mat || mat == MaterialDefecto) return;
@@ -1357,9 +1755,9 @@ static void AccionMenuMezcla() {
 static PopupMenu* MenuProfundidad = NULL;
 static const char* NombreProfundidad(bool test, bool write) {
     if (test  &&  write) return T("Test + Write (opaque)");
-    if (test  && !write) return "Test, no Write (decal)";
-    if (!test &&  write) return "No Test, Write";
-    return "Off (no test, no write)";
+    if (test  && !write) return T("Test, no Write (decal)");
+    if (!test &&  write) return T("No Test, Write");
+    return T("Off (no test, no write)");
 }
 static void AccionProfundidadElegida(int id) {
     Mesh* me = MaterialMesh();
@@ -1419,17 +1817,47 @@ static void AccionMenuIdioma(){
 }
 
 static PopupMenu* MenuBackend = NULL;
+// EL BACKEND GRAFICO (Ajustes > Graphics): con varios en el ejecutable (la PC, gfx/w3dBackend.h) se elige al ARRANCAR;
+// el boton dice el elegido y, si todavia corre otro (falta reiniciar, o el elegido no anda aca), cual esta corriendo
+static std::string TextoBackend(){
+#ifdef W3D_MULTIBACKEND
+    const int pedido = w3dEngine::BackendDeNombre(cfg.graphicsAPI.c_str());
+    const int activo = w3dEngine::BackendActivo();
+    std::string t = w3dEngine::BackendNombre(pedido >= 0 ? pedido : activo);
+    if (pedido >= 0 && pedido != activo) t += std::string(" (") + T("running") + ": " + w3dEngine::BackendNombre(activo) + ")";
+    return t;
+#else
+    return cfg.graphicsAPI;
+#endif
+}
 static void AccionBackendElegido(int id){
+#ifdef W3D_MULTIBACKEND
+    if (!w3dEngine::BackendDisponible(id)) return;
+    cfg.graphicsAPI = w3dEngine::BackendNombre(id);
+    W3dConfigGuardar();
+    if (id != w3dEngine::BackendActivo()) Notificar(T("Restart Whisk3D for this change to take effect"), false);
+#else
     cfg.graphicsAPI = (id == 1) ? "opengles" : "opengl";
     Notificar(T("Restart Whisk3D for this change to take effect"), false);
+#endif
+    if (PropsActivo && PropsActivo->propAjBackend) PropsActivo->propAjBackend->button->text = TextoBackend();
     g_redraw = true;
 }
 static void AccionMenuBackend(){
     if (!PropsActivo || !PropsActivo->propAjBackend) return;
     if (!MenuBackend){ MenuBackend = new PopupMenu(); MenuBackend->action = AccionBackendElegido; }
     MenuBackend->Limpiar();
+#ifdef W3D_MULTIBACKEND
+    const int pedido = w3dEngine::BackendDeNombre(cfg.graphicsAPI.c_str());
+    for (int b = 0; b < w3dEngine::Backends_; b++) {
+        if (!w3dEngine::BackendDisponible(b)) continue;
+        MenuItem* it = MenuBackend->Agregar(w3dEngine::BackendNombre(b), b);
+        if (it) it->verde = (b == (pedido >= 0 ? pedido : w3dEngine::BackendActivo()));
+    }
+#else
     MenuBackend->Agregar("OpenGL", 0);
     MenuBackend->Agregar("OpenGL ES", 1);
+#endif
     AbrirMenuBajoBoton(MenuBackend, PropsActivo->propAjBackend->button);
 }
 
@@ -1564,7 +1992,7 @@ static void AccionMenuMateriales(){
         MenuMateriales->action = AccionMaterialElegido;
     }
     MenuMateriales->Limpiar(); // la lista de materiales va cambiando
-    MenuMateriales->Agregar(T("New Material"), 0, IconType::material);
+    MenuMateriales->Agregar(T("New Material"), 0, IconType::mas);
     MenuMateriales->Agregar(T("Default Material"), 1, IconType::material);
     for (size_t i = 0; i < Materials.size(); i++) {
         MenuMateriales->Agregar(Materials[i]->name, 2 + (int)i, IconType::material);
@@ -1995,6 +2423,7 @@ static const char* UINombreRes(int p){
 static const char* UINombreAspecto(int a){
     return a == 0 ? "16:9" : (a == 1 ? "4:3" : "1:1");
 }
+static void AccionUIenArbol() { extern void W3dCambiosTocado(); W3dCambiosTocado(); g_redraw = true; }
 static void AccionUIigualRender(){   // onChange del checkbox "como el render"
     UI* u = UIActivaProps(); if (!u) return;
     // recien pasado a RESPONSIVE: arranca del tamano actual del render (continuidad visual)
@@ -2054,20 +2483,6 @@ static void UIExportCarpetaElegida(const std::string& carpeta){
     std::string ruta = W3dRutaDeSalida(carpeta, u->name, ".w3dui");
     if (UI2DGuardar(u, ruta)) { Notificar(std::string(T("Saved: ")) + ruta, false); W3dDescargarSiWeb(ruta); }
     else                      Notificar(T("Could not write the file"), true);
-}
-// el techo del cache de estados (espejo float del int de SimJuego)
-extern int gSimCacheMax;   // SimJuego.cpp
-extern bool gSimCacheOn;   // SimJuego.cpp: cache de juego ON/OFF (checkbox)
-static float g_simCacheF = 250.0f;
-static void AccionSimCache(){
-    gSimCacheMax = (int)(g_simCacheF + 0.5f);
-    if (gSimCacheMax < 10) gSimCacheMax = 10;
-}
-// al DES/TILDAR "Cache de juego": cortar/reiniciar el buffer LIMPIO desde el tick actual, asi destildarlo a mitad
-// de partida no deja frames "fantasma" (banda de cache / rewind sobre frames viejos) hasta el proximo Stop.
-static void AccionSimCacheOn(){
-    extern void SimCacheReset();
-    SimCacheReset();
 }
 // Volumen del gameplay (0..100): escribe g_proyCompilar.volumen (viaja en el .w3d) y aplica YA la ganancia al
 // mixer del Core (0..100 -> 0..1), asi baja/sube en vivo mientras jugas. Ver W3dAudioJuegoVolume.
@@ -2560,15 +2975,8 @@ public:
         w3dEngine::PushMatrix();
         w3dEngine::Translatef((float)(bordersGS - PropColEtiqueta), 0, 0);
         int wNombre = width - cb * 2 - gapGS * 2 - bordersGS * 2;
-        if (foco && field.selectAll) {
-            w3dEngine::Color4fv(ListaColores[static_cast<int>(ColorID::accent)]);
-            RenderBitmapText(field.text, textAlign::left, wNombre);
-            w3dEngine::Color4fv(ListaColores[static_cast<int>(ColorID::blanco)]);
-        } else {
-            std::string s = foco ? field.text.substr(0, field.caret) + "|" + field.text.substr(field.caret)
-                                 : (nom ? *nom : field.text);
-            RenderBitmapText(s, textAlign::left, wNombre);
-        }
+        if (foco) RenderTextField(field, g_textFieldActivo == &field, textAlign::left, wNombre);
+        else RenderBitmapText(nom ? *nom : field.text, textAlign::left, wNombre);
         w3dEngine::PopMatrix();
         // la X centrada sobre su boton
         float dxX = (float)(width - PropColEtiqueta - cb - bordersGS);
@@ -3278,6 +3686,34 @@ static void AccionMenuTarget(){
     MenuAbierto = MenuTarget;
 }
 
+// ===== la PROFUNDIDAD DE CAMPO de la camara: el objeto al que sigue el foco (por NOMBRE: Camera::focoObjeto) =====
+static PopupMenu* MenuFocoObj = NULL;
+static void AccionFocoObjElegido(int id){
+    if (!ObjActivo || ObjActivo->getType() != ObjectType::camera) return;
+    Camera* c = static_cast<Camera*>(ObjActivo);
+    if (id == 0) c->focoObjeto.clear();   // None: la distancia a mano
+    else if (id - 1 >= 0 && id - 1 < (int)gTargetCandidatos.size()) c->focoObjeto = gTargetCandidatos[id - 1]->name;
+    PropertiesLayoutDirty = true; RTInvalidar(); g_redraw = true;
+}
+static void AccionMenuFocoObj(){
+    if (!PropsActivo || !PropsActivo->propBtnCamFocoObj || !ObjActivo || ObjActivo->getType() != ObjectType::camera) return;
+    if (!MenuFocoObj){ MenuFocoObj = new PopupMenu(); MenuFocoObj->action = AccionFocoObjElegido; }
+    MenuFocoObj->Limpiar();
+    MenuFocoObj->titulo = T("Focus object");
+    MenuFocoObj->Agregar(T("None"), 0);
+    gTargetCandidatos.clear();
+    RecolectarTargets(SceneCollection);
+    for (size_t i = 0; i < gTargetCandidatos.size(); i++)
+        MenuFocoObj->Agregar(gTargetCandidatos[i]->name, 1 + (int)i, (int)IconoDeObjeto(gTargetCandidatos[i]));
+    AbrirMenuBajoBoton(MenuFocoObj, PropsActivo->propBtnCamFocoObj->button);
+}
+static void AccionCamDof(){ PropertiesLayoutDirty = true; RTInvalidar(); g_redraw = true; }
+static void AccionCamDofOn(){
+    // (tildar "Depth of field": la apertura, el foco y el objeto aparecen YA; el bind corre solo al cambiar de objeto)
+    if (PropsActivo) { PropsActivo->target = NULL; PropsActivo->RefreshTargetProperties(); }
+    PropertiesLayoutDirty = true; RTInvalidar(); g_redraw = true;
+}
+
 // ===== props del modificador MIRROR (tarjeta de abajo): helper + acciones (param change / target / apply) =====
 static Modifier* ModActivoUI(){
     if (!ObjActivo || ObjActivo->getType()!=ObjectType::mesh) return NULL;
@@ -3386,11 +3822,6 @@ static void ActualizarSkinArmature(Mesh* m){
         // Edit Mode" OFF -> NO se deforma (la malla se ve en bind, igual que con target=none).
         if (!md->target || !md->mostrarViewport || (enEdit && !md->mostrarEdit)) arm = NULL;
         else arm = md->target;
-        // CACHE de vertex-animation: sincronizar on/off + skip desde el modificador. Si el skip cambia, la firma del
-        // cache cambia (SkinCacheFirma) y se re-dimensiona solo en el proximo SkinearMesh. Apagar libera la memoria.
-        m->skinCacheOn = md->cacheAnim;
-        int nuevoSkip = (int)(md->cacheSkip + 0.5f); if (nuevoSkip < 0) nuevoSkip = 0;
-        m->skinCacheSkip = nuevoSkip;
         break;
     }
     if ((Object*)m->skinArmature != arm){
@@ -3785,9 +4216,43 @@ static void ActualizarAspectoRender(){
     g_renderAspect = (h > 0.5f) ? (w / h) : 1.0f;
 }
 
-// pases activos a guardar: beauty (siempre) + los tildados (zbuffer/normal/alpha)
+// pases activos a guardar: beauty (siempre) + los tildados (zbuffer/normal/alpha) + el de vectores (tambien si solo
+// se usa para el desenfoque)
+// (con el trazado de rayos y SU desenfoque, el de los vectores no va: el trazado ya sale desenfocado)
+static bool DesenfoqueVectores(){ return PropsActivo->renderDesenfoque && PropsActivo->renderObturador > 0.0f && !(g_rt.on && g_rt.desenfoque); }
+// (el desenfoque de movimiento del POSTPROCESADO tambien lee los vectores)
+// EL POSTPROCESADO del render a imagen: los objetos Postproceso del arbol, en su orden, sobre la imagen entera (el render
+// a archivo va por tiles: no se puede cortar a mitad del recorrido como en el viewport)
+static bool PostArchivo(int que) {   // 0 = alguno hace algo, 1 = alguno lee la profundidad, 2 = el movimiento
+    std::vector<Postproceso*> ps; W3dPostprocesosDe(SceneCollection, ps);
+    bool r = false;
+    for (size_t i = 0; i < ps.size() && !r; i++) {
+        W3dPostUsar(&ps[i]->opc);
+        r = (que == 0) ? W3dPostHay() : (que == 1) ? W3dPostNecesitaProfundidad() : W3dPostNecesitaMovimiento();
+    }
+    W3dPostUsar(NULL);
+    return r;
+}
+static bool ConVectores(){ return PropsActivo->renderVectores || DesenfoqueVectores() || PostArchivo(2); }
 static int PasesActivos(){
-    return 1 + (PropsActivo->renderZbuffer?1:0) + (PropsActivo->renderNormal?1:0) + (PropsActivo->renderAlpha?1:0);
+    return 1 + (PropsActivo->renderZbuffer?1:0) + (PropsActivo->renderNormal?1:0) + (PropsActivo->renderAlpha?1:0) + (ConVectores()?1:0);
+}
+// LOS VECTORES necesitan el cuadro ANTERIOR: la escena en f-1 (con el nivel de render de los modificadores), recordada
+static void RecordarCuadro(Viewport3D* vp, int w, int h){
+    float VP[16]; vp->MatrizImagen(w, h, VP);
+    W3dVecRecordar(SceneCollection, VP);
+}
+static void PrepararAnterior(Viewport3D* vp, int w, int h, int frame){
+    extern int CurrentFrame; extern void AplicarAnimacionObjetos(); extern bool g_modRenderMode;
+    W3dVecOlvidar();
+    if (!ConVectores()) return;
+    const int guardado = CurrentFrame;
+    CurrentFrame = frame - 1; AplicarAnimacionObjetos();
+    g_modRenderMode = true; RegenerarModsEscena(SceneCollection);
+    RecordarCuadro(vp, w, h);
+    g_modRenderMode = false;
+    CurrentFrame = guardado; AplicarAnimacionObjetos();
+    RegenerarModsEscena(SceneCollection);
 }
 // rendea los pases de UN frame, avanzando la barra de progreso desde 'progBase' hacia 'progTotal' (contados en
 // TILES). Devuelve cuantos tiles consumio (para que el caller acumule el base entre frames). Suma a 'fallos'.
@@ -3799,7 +4264,45 @@ static int RenderPasesFrame(Viewport3D* vp, int w, int h, int progBase, int prog
     extern bool g_modRenderMode;
     g_modRenderMode = true; RegenerarModsEscena(SceneCollection);
     int base = progBase;
-    if (g_rt.on) {
+    // los VECTORES DE MOVIMIENTO primero (desde lo recordado del cuadro anterior): el pase _vectores y/o el desenfoque
+    const bool desenfocar = DesenfoqueVectores();
+    std::vector<unsigned char> vec;
+    if (ConVectores()) {
+        if (!vp->RenderABuffer(w, h, RenderType::Vectores, vec, base, progTotal)) { fallos++; vec.clear(); }
+        else if (PropsActivo->renderVectores && !w3dEngine::SavePNG(RenderFileNamePNG("vectores").c_str(), &vec[0], w, h, false)) fallos++;
+        base += tpp;
+    }
+    // EL POSTPROCESADO (tarjeta "Post Processing"): la misma pila que la vista Rendered, por CPU sobre la imagen entera
+    const bool post = PostArchivo(0);
+    if ((desenfocar && !vec.empty()) || post) {
+        // el beauty a memoria, desenfocado por CPU a lo largo de sus vectores y/o postprocesado, y recien ahi al PNG
+        std::vector<unsigned char> img; std::string msg;
+        const bool ok = g_rt.on ? RTRenderizarABuffer(vp, w, h, img, msg) : vp->RenderABuffer(w, h, RenderType::Rendered, img, base, progTotal);
+        if (!ok || img.size() != (size_t)w * h * 4) fallos++;
+        else {
+            if (desenfocar && img.size() == vec.size())
+                W3dDesenfoqueMovimiento(&img[0], &vec[0], w, h, PropsActivo->renderObturador, 12, &img[0]);
+            if (post) {
+                // la PROFUNDIDAD de cada pixel (m) sale del pase ZBuffer: la niebla lineal de nearClip (blanco) a 40 m
+                std::vector<float> prof; std::vector<unsigned char> zb;
+                if (PostArchivo(1) && vp->RenderABuffer(w, h, RenderType::ZBuffer, zb, base, progTotal) &&
+                    zb.size() == img.size()) {
+                    prof.resize((size_t)w * h);
+                    const float n0 = vp->nearClip, rango = 40.0f - vp->nearClip;
+                    for (size_t i = 0; i < prof.size(); i++) prof[i] = n0 + (1.0f - zb[i * 4] / 255.0f) * rango;
+                }
+                extern int CurrentFrame;
+                std::vector<Postproceso*> ps; W3dPostprocesosDe(SceneCollection, ps);
+                for (size_t k = 0; k < ps.size(); k++) {
+                    W3dPostUsar(&ps[k]->opc);
+                    W3dPostCPU(&img[0], w, h, prof.empty() ? NULL : &prof[0], vec.size() == img.size() ? &vec[0] : NULL,
+                               (unsigned)CurrentFrame * 7919u + 17u);
+                }
+                W3dPostUsar(NULL);
+            }
+            if (!w3dEngine::SavePNG(RenderFileNamePNG("").c_str(), &img[0], w, h, false)) fallos++;
+        }
+    } else if (g_rt.on) {
         // TRAZADO DE RAYOS: el pase beauty lo hace la CPU (todos los pases, con la barra de progreso)
         std::string msg;
         if (!RTRenderizarAPNG(vp, w, h, RenderFileNamePNG(""), msg)) fallos++;
@@ -3808,17 +4311,273 @@ static int RenderPasesFrame(Viewport3D* vp, int w, int h, int progBase, int prog
     if (doZ){ if (!vp->RenderAPNG(w, h, RenderType::ZBuffer,    RenderFileNamePNG("zbuffer").c_str(), base, progTotal)) fallos++; base += tpp; }
     if (doN){ if (!vp->RenderAPNG(w, h, RenderType::NormalView, RenderFileNamePNG("normal").c_str(),  base, progTotal)) fallos++; base += tpp; }
     if (doA){ if (!vp->RenderAPNG(w, h, RenderType::Alpha,      RenderFileNamePNG("alpha").c_str(),   base, progTotal)) fallos++; base += tpp; }
+    if (ConVectores()) RecordarCuadro(vp, w, h);   // este cuadro es el "anterior" del que sigue (Render Animation)
     g_modRenderMode = false; RegenerarModsEscena(SceneCollection); // volver al nivel de VIEWPORT
     return base - progBase; // tiles consumidos por este frame (nPases * tpp)
 }
 
+// "Motion blur": la fila del obturador solo con el tilde puesto
+static void AccionRenderDesenfoque(){
+    if (!PropsActivo || !PropsActivo->propRenderObturador) return;
+    PropsActivo->propRenderObturador->value = PropsActivo->renderDesenfoque ? &PropsActivo->renderObturador : NULL;
+    PropertiesLayoutDirty = true;
+}
 // "Ray Tracing" (tarjeta Render): con el tilde se muestran Rays/Samples/Passes; sin el, las filas no ocupan lugar.
 void RTFilasPanel(Properties* P){
     if (!P || !P->propRT || !P->propRTRayos) return;
-    P->rtRayos = (float)g_rt.rayos; P->rtSamples = (float)g_rt.samples; P->rtPases = (float)g_rt.pases;
+    P->rtRayos = (float)g_rt.rayos; P->rtSamples = (float)g_rt.samples; P->rtPases = (float)g_rt.pases; P->rtCapas = (float)g_rt.capas;
+    if (P->propRTCapas) P->propRTCapas->value = g_rt.on ? &P->rtCapas : NULL;
     P->propRTRayos->value   = g_rt.on ? &P->rtRayos   : NULL;
     P->propRTSamples->value = g_rt.on ? &P->rtSamples : NULL;
     P->propRTPases->value   = g_rt.on ? &P->rtPases   : NULL;
+    if (P->propRTEscala) {
+        if (P->propRTEscala->oculto != !g_rt.on) { P->propRTEscala->oculto = !g_rt.on; PropertiesLayoutDirty = true; }
+        char b[16]; if (g_rt.escala > 1) snprintf(b, sizeof(b), "x%d", g_rt.escala); else snprintf(b, sizeof(b), "%s", T("Off"));
+        P->propRTEscala->button->text = b;
+    }
+    if (P->propRTReesc) {
+#ifdef W3D_SYMBIAN
+        const bool ver = false;   // (en el telefono el reescalado va siempre lineal)
+#else
+        const bool ver = g_rt.on && g_rt.escala > 1;
+#endif
+        if (P->propRTReesc->oculto != !ver) { P->propRTReesc->oculto = !ver; PropertiesLayoutDirty = true; }
+        P->propRTReesc->button->text = T(RTReescaladorNombre(g_rt.reescalador));
+    }
+    if (P->propRTSoloFinal) {
+        P->propRTSoloFinal->value = g_rt.on ? &g_rt.soloFinal : NULL;
+        if (P->propRTSemilla) P->propRTSemilla->value = g_rt.on ? &g_rt.semillaVariable : NULL;
+    }
+    // el DESENFOQUE TRAZADO: el tilde con el trazado; el obturador y su posicion solo con el tilde puesto
+    if (P->propRTDesenfoque) {
+        P->propRTDesenfoque->value = g_rt.on ? &g_rt.desenfoque : NULL;
+        const bool ver = g_rt.on && g_rt.desenfoque;
+        if (P->propRTObturador) P->propRTObturador->value = ver ? &g_rt.obturador : NULL;
+        if (P->propRTObtPos) {
+            if (P->propRTObtPos->oculto != !ver) { P->propRTObtPos->oculto = !ver; PropertiesLayoutDirty = true; }
+            P->propRTObtPos->button->text = T(RTObturadorPosNombre(g_rt.obturadorPos));
+        }
+    }
+    if (P->propRTGpu) {
+        const bool ver = g_rt.on && RTGpuDisponible();
+        if (P->propRTGpu->oculto != !ver) { P->propRTGpu->oculto = !ver; PropertiesLayoutDirty = true; }
+        P->propRTGpu->button->text = (g_rt.gpu && RTGpuDisponible()) ? std::string("GPU (") + RTGpuNombre() + (RTGpuConNucleosRT() ? ", RTX)" : ")") : std::string("CPU");
+    }
+    if (P->propRTDenoiser) {
+        if (P->propRTDenoiser->oculto != !g_rt.on) { P->propRTDenoiser->oculto = !g_rt.on; PropertiesLayoutDirty = true; }
+        P->propRTDenoiser->button->text = T(W3dDenoiserNombre(g_rt.denoiser));
+    }
+}
+// EL TIPO DE LUZ: 0 Punto, 1 Sol (direccional), 2 Foco (cono: spotCutoff < 180)
+static const char* kLuzTipos[3] = { "Point", "Sun", "Spot" };
+static int LuzTipo(const Light* l) { return l->direccional ? 1 : (l->spotCutoff < 179.5f ? 2 : 0); }
+static PopupMenu* MenuLuzTipo = NULL;
+static void AccionLuzTipoElegido(int id) {
+    Light* l = (ObjActivo && ObjActivo->getType() == ObjectType::light) ? static_cast<Light*>(ObjActivo) : NULL;
+    if (!l || id < 0 || id > 2) return;
+    W3dLuzPonerTipo(l, id);
+    PropertiesLayoutDirty = true;
+    RTInvalidar();
+    g_redraw = true;
+}
+static void AccionMenuLuzTipo() {
+    if (!PropsActivo || !PropsActivo->propLightTipo) return;
+    Light* l = (ObjActivo && ObjActivo->getType() == ObjectType::light) ? static_cast<Light*>(ObjActivo) : NULL;
+    if (!l) return;
+    if (!MenuLuzTipo) { MenuLuzTipo = new PopupMenu(); MenuLuzTipo->action = AccionLuzTipoElegido; }
+    MenuLuzTipo->Limpiar();
+    MenuLuzTipo->titulo = T("Type");
+    for (int i = 0; i < 3; i++) { MenuItem* it = MenuLuzTipo->Agregar(T(kLuzTipos[i]), i, IconType::light); if (it) it->verde = (LuzTipo(l) == i); }
+    AbrirMenuBajoBoton(MenuLuzTipo, PropsActivo->propLightTipo->button);
+}
+// EL REESCALADO: trazar a la mitad (x2), un tercio (x3) o un cuarto (x4) de la resolucion del viewport y agrandar
+static PopupMenu* MenuRTEscala = NULL;
+static void AccionRTEscalaElegida(int id) {
+    g_rt.escala = (id >= 1 && id <= 4) ? id : 1;
+    RTFilasPanel(PropsActivo);
+    RTInvalidar();
+    g_redraw = true;
+}
+static void AccionMenuRTEscala() {
+    if (!PropsActivo || !PropsActivo->propRTEscala) return;
+    if (!MenuRTEscala) { MenuRTEscala = new PopupMenu(); MenuRTEscala->action = AccionRTEscalaElegida; }
+    MenuRTEscala->Limpiar();
+    MenuRTEscala->titulo = T("Upscaling");
+    const char* nom[4] = { "Off", "x2", "x3", "x4" };
+    for (int i = 1; i <= 4; i++) {
+        MenuItem* it = MenuRTEscala->Agregar(i == 1 ? std::string(T(nom[0])) : std::string(nom[i - 1]), i);
+        if (it) it->verde = (g_rt.escala == i || (i == 1 && g_rt.escala < 1));
+    }
+    AbrirMenuBajoBoton(MenuRTEscala, PropsActivo->propRTEscala->button);
+}
+// EL REESCALADOR: lineal (la textura estirada) o FSR 1 de AMD (bordes nitidos, por CPU)
+static PopupMenu* MenuRTReesc = NULL;
+static void AccionRTReescElegido(int id) {
+    g_rt.reescalador = (id == 1) ? 1 : 0;
+    RTFilasPanel(PropsActivo);
+    RTInvalidar();
+    g_redraw = true;
+}
+static void AccionMenuRTReesc() {
+    if (!PropsActivo || !PropsActivo->propRTReesc) return;
+    if (!MenuRTReesc) { MenuRTReesc = new PopupMenu(); MenuRTReesc->action = AccionRTReescElegido; }
+    MenuRTReesc->Limpiar();
+    MenuRTReesc->titulo = T("Upscaler");
+    for (int i = 0; i < 2; i++) { MenuItem* it = MenuRTReesc->Agregar(T(RTReescaladorNombre(i)), i); if (it) it->verde = (g_rt.reescalador == i); }
+    AbrirMenuBajoBoton(MenuRTReesc, PropsActivo->propRTReesc->button);
+}
+// "solo la imagen final": el viewport no muestra como se va formando (el valor ya lo escribio la tilde en g_rt)
+static void AccionRTSoloFinal() { g_redraw = true; }
+// ===== tarjeta "Post Processing": la pila de efectos (render/Postproceso.h) =====
+// la pila del objeto Postproceso ACTIVO (la tarjeta es suya); sin uno, una vacia y apagada (la tarjeta no se ve)
+static W3dPostOpciones gPostPanelVacio;
+static W3dPostOpciones& PostPanel() {
+    if (ObjActivo && ObjActivo->getType() == ObjectType::postproceso) return ((Postproceso*)ObjActivo)->opc;
+    gPostPanelVacio = W3dPostOpciones();
+    return gPostPanelVacio;
+}
+#define g_post PostPanel()
+// las filas del efecto ELEGIDO apuntan a SUS numeros (la lista es un vector: al agregar o quitar se vuelven a enlazar)
+void PostFilasPanel(Properties* P) {
+    if (!P || !P->propPost) return;
+    const bool hayObj = ObjActivo && ObjActivo->getType() == ObjectType::postproceso;
+    if (P->propPostOn) P->propPostOn->value = hayObj ? &g_post.on : NULL;
+    const int n = (int)g_post.efectos.size();
+    if (g_post.activo >= n) g_post.activo = n - 1;
+    if (g_post.activo < 0 && n > 0) g_post.activo = 0;
+    W3dPostEfecto* e = (g_post.on && g_post.activo >= 0) ? &g_post.efectos[(size_t)g_post.activo] : NULL;
+    const int t = e ? e->tipo : -1;
+    if (P->propPostCPU) {
+        const bool ver = g_post.on && W3dPostPorCPU();
+        if (P->propPostCPU->oculto != !ver) { P->propPostCPU->oculto = !ver; PropertiesLayoutDirty = true; }
+    }
+    if (P->propListPost) { P->propListPost->selectIndex = g_post.activo; P->propListPost->AjustarVentana(); }
+    if (P->propRowPost && P->propRowPost->botones.size() >= 2) {
+        VisibleSiCambia(P->propRowPost->botones[0], g_post.on);
+        VisibleSiCambia(P->propRowPost->botones[1], g_post.on && n >= 1);
+    }
+    if (P->propRowPostMove && P->propRowPostMove->botones.size() >= 2) {
+        VisibleSiCambia(P->propRowPostMove->botones[0], g_post.on && n >= 2);
+        VisibleSiCambia(P->propRowPostMove->botones[1], g_post.on && n >= 2);
+    }
+    P->propPostActivo->value     = e ? &e->activo : NULL;
+    P->propPostGranoInt->value   = (t == W3dPostGrano) ? &e->v[0] : NULL;
+    P->propPostGranoTam->value   = (t == W3dPostGrano) ? &e->v[1] : NULL;
+    P->propPostGranoColor->value = (t == W3dPostGrano) ? &e->opc : NULL;
+    P->propPostFocoCam->value    = (t == W3dPostFoco) ? &e->opc : NULL;
+    // (con el foco de la camara la distancia la pone ella: la fila se esconde)
+    P->propPostFocoDist->value   = (t == W3dPostFoco && !e->opc) ? &e->v[0] : NULL;
+    P->propPostFocoRango->value  = (t == W3dPostFoco) ? &e->v[1] : NULL;
+    // (y el desenfoque lo da la APERTURA de la camara)
+    P->propPostFocoDesenf->value = (t == W3dPostFoco && !e->opc) ? &e->v[2] : NULL;
+    P->propPostMovObt->value     = (t == W3dPostMovimiento) ? &e->v[0] : NULL;
+    for (int k = 0; k < 6; k++) if (P->propPostBloom[k]) P->propPostBloom[k]->value = (t == W3dPostBloom) ? &e->v[k] : NULL;
+    if (P->propPostBloomColor)  P->propPostBloomColor->value  = (t == W3dPostBloom) ? e->col : NULL;
+    if (P->propPostBloomRapido) P->propPostBloomRapido->value = (t == W3dPostBloom) ? &e->opc : NULL;
+    PropertiesLayoutDirty = true;
+}
+static void AccionPostCambio() { PostFilasPanel(PropsActivo); g_redraw = true; }
+static int PostCantidad() { return (int)g_post.efectos.size(); }
+static std::string PostTexto(int i) {
+    if (i < 0 || i >= (int)g_post.efectos.size()) return std::string();
+    const W3dPostEfecto& e = g_post.efectos[(size_t)i];
+    return std::string(T(W3dPostNombre(e.tipo))) + (e.activo ? "" : std::string(" (") + T("off") + ")");
+}
+static void PostElegir(int i) { g_post.activo = i; PostFilasPanel(PropsActivo); g_redraw = true; }
+struct RegistrarPostLista { RegistrarPostLista() { PostFilasCount = PostCantidad; PostFilaTexto = PostTexto; PostFilaSeleccionar = PostElegir; } };
+static RegistrarPostLista gRegistrarPostLista;
+static PopupMenu* MenuAddPost = NULL;
+static void AccionAddPostElegido(int tipo) {
+    if (tipo < 0 || tipo >= W3dPostTipos) return;
+    W3dPostEfecto e; W3dPostDefectos(e, tipo);
+    g_post.efectos.push_back(e);
+    g_post.activo = (int)g_post.efectos.size() - 1;
+    PostFilasPanel(PropsActivo); g_redraw = true;
+}
+static void AccionMenuAddPost() {
+    if (!PropsActivo || !PropsActivo->propRowPost || PropsActivo->propRowPost->botones.empty()) return;
+    if (!MenuAddPost) {
+        MenuAddPost = new PopupMenu(); MenuAddPost->action = AccionAddPostElegido;
+        for (int t = 0; t < W3dPostTipos; t++) MenuAddPost->Agregar(T(W3dPostNombre(t)), t);
+    }
+    AbrirMenuBajoBoton(MenuAddPost, PropsActivo->propRowPost->botones[0]);
+}
+static void AccionQuitarPost() {
+    if (g_post.activo < 0 || g_post.activo >= (int)g_post.efectos.size()) return;
+    g_post.efectos.erase(g_post.efectos.begin() + g_post.activo);
+    if (g_post.activo >= (int)g_post.efectos.size()) g_post.activo = (int)g_post.efectos.size() - 1;
+    PostFilasPanel(PropsActivo); g_redraw = true;
+}
+static void MoverPost(int d) {
+    const int i = g_post.activo, j = i + d;
+    if (i < 0 || j < 0 || i >= (int)g_post.efectos.size() || j >= (int)g_post.efectos.size()) return;
+    std::swap(g_post.efectos[(size_t)i], g_post.efectos[(size_t)j]);
+    g_post.activo = j;
+    PostFilasPanel(PropsActivo); g_redraw = true;
+}
+static void AccionPostSubir() { MoverPost(-1); }
+static void AccionPostBajar() { MoverPost(1); }
+#undef g_post
+
+// EL DESENFOQUE TRAZADO: el tilde muestra el obturador (0.5 de fabrica) y su posicion en el cuadro
+static void AccionRTDesenfoque() {
+    if (g_rt.desenfoque && (g_rt.obturador < 0.01f || g_rt.obturador > 1.0f)) g_rt.obturador = 0.5f;
+    RTFilasPanel(PropsActivo);
+    PropertiesLayoutDirty = true;
+    g_redraw = true;
+}
+static PopupMenu* MenuRTObtPos = NULL;
+static void AccionRTObtPosElegida(int id) {
+    g_rt.obturadorPos = (id >= 0 && id <= 2) ? id : 0;
+    RTFilasPanel(PropsActivo);
+    g_redraw = true;
+}
+static void AccionMenuRTObtPos() {
+    if (!PropsActivo || !PropsActivo->propRTObtPos) return;
+    if (!MenuRTObtPos) { MenuRTObtPos = new PopupMenu(); MenuRTObtPos->action = AccionRTObtPosElegida; }
+    MenuRTObtPos->Limpiar();
+    MenuRTObtPos->titulo = T("Shutter position");
+    for (int i = 0; i < 3; i++) { MenuItem* it = MenuRTObtPos->Agregar(T(RTObturadorPosNombre(i)), i); if (it) it->verde = (g_rt.obturadorPos == i); }
+    AbrirMenuBajoBoton(MenuRTObtPos, PropsActivo->propRTObtPos->button);
+}
+// DONDE se traza: la CPU (cualquier maquina) o la GPU (Vulkan: NVIDIA, AMD, Intel)
+static PopupMenu* MenuRTGpu = NULL;
+static void AccionRTGpuElegido(int id) {
+    g_rt.gpu = (id == 1) && RTGpuDisponible();
+    RTFilasPanel(PropsActivo);
+    RTInvalidar();
+    g_redraw = true;
+}
+static void AccionMenuRTGpu() {
+    if (!PropsActivo || !PropsActivo->propRTGpu) return;
+    if (!MenuRTGpu) { MenuRTGpu = new PopupMenu(); MenuRTGpu->action = AccionRTGpuElegido; }
+    MenuRTGpu->Limpiar();
+    MenuRTGpu->titulo = T("Device");
+    MenuItem* c = MenuRTGpu->Agregar("CPU", 0);
+    if (c) c->verde = !g_rt.gpu;
+    if (RTGpuDisponible()) { MenuItem* g = MenuRTGpu->Agregar(std::string("GPU (") + RTGpuNombre() + (RTGpuConNucleosRT() ? ", RTX)" : ")"), 1); if (g) g->verde = g_rt.gpu; }
+    AbrirMenuBajoBoton(MenuRTGpu, PropsActivo->propRTGpu->button);
+}
+// el DENOISER: solo se ofrecen los que hay en ESTA maquina (todos opcionales: se cargan al usarse)
+static PopupMenu* MenuDenoiser = NULL;
+static void AccionDenoiserElegido(int id) {
+    if (id < 0 || id >= W3D_DENOISERS || !W3dDenoiserDisponible(id)) return;
+    g_rt.denoiser = id;
+    RTFilasPanel(PropsActivo);
+    RTInvalidar();
+    g_redraw = true;
+}
+static void AccionMenuDenoiser() {
+    if (!PropsActivo || !PropsActivo->propRTDenoiser) return;
+    if (!MenuDenoiser) { MenuDenoiser = new PopupMenu(); MenuDenoiser->action = AccionDenoiserElegido; }
+    MenuDenoiser->Limpiar();
+    MenuDenoiser->titulo = T("Denoiser");
+    for (int d = 0; d < W3D_DENOISERS; d++) {
+        if (!W3dDenoiserDisponible(d)) continue;
+        MenuItem* it = MenuDenoiser->Agregar(T(W3dDenoiserNombre(d)), d);
+        if (it) it->verde = (g_rt.denoiser == d);
+    }
+    AbrirMenuBajoBoton(MenuDenoiser, PropsActivo->propRTDenoiser->button);
 }
 static void AccionRTToggle(){
     RTFilasPanel(PropsActivo);
@@ -3831,6 +4590,7 @@ static void AccionRTValores(){
     g_rt.rayos = (int)(P->rtRayos + 0.5f); if (g_rt.rayos < 1) g_rt.rayos = 1;
     g_rt.samples = (int)(P->rtSamples + 0.5f); if (g_rt.samples < 1) g_rt.samples = 1;
     g_rt.pases = (int)(P->rtPases + 0.5f); if (g_rt.pases < 1) g_rt.pases = 1;
+    g_rt.capas = (int)(P->rtCapas + 0.5f); if (g_rt.capas < 1) g_rt.capas = 1; if (g_rt.capas > 64) g_rt.capas = 64;
     RTInvalidar();
 }
 // hace el render REAL de UNA imagen (llamado directo, o desde el "Si" de la confirmacion de sobrescritura).
@@ -3843,6 +4603,8 @@ static void HacerRenderImage(){
     int total = PasesActivos() * vp->TilesNecesarios(w, h); // 1 frame: PASES x TILES
     ProgresoIniciar("Rendering...");
     int fallos = 0;
+    extern int CurrentFrame;
+    PrepararAnterior(vp, w, h, CurrentFrame);   // (los vectores: el movimiento desde el cuadro anterior)
     RenderPasesFrame(vp, w, h, 0, total, fallos);
     ProgresoFin();
     if (fallos == 0) Notificar(T("Render saved!"), false);
@@ -3914,88 +4676,13 @@ static void AccionRenderImage(){
 // Se guarda en el .w3d (raiz "render").
 float g_renderIni = 0.0f, g_renderFin = 0.0f, g_renderFps = 0.0f;
 
-// ---------------------------------------------------------------------------------------------------
-//  EL RENDER DE UN JUEGO (el timeline en "Juego", ver W3dRaices.h): un juego no tiene keyframes, asi que
-//  lo que se renderiza es el CACHE DE ESTADOS de la simulacion (el rewind de SimJuego, un snapshot por
-//  tick). El rango Inicio/Fin se ADAPTA SOLO a lo cacheado (el minimo y el maximo, en frames del
-//  timeline) y se puede achicar a mano, pero siempre ADENTRO de [min, max]. Sin cache no hay rango:
-//  solo Render Image (el frame actual) y Render Animation queda deshabilitado con un aviso.
-//  No se guarda en el .w3d: el cache tampoco (muere con el Stop).
-// ---------------------------------------------------------------------------------------------------
-float g_renderJuegoIni = 0.0f, g_renderJuegoFin = 0.0f;
-static bool g_renderJuegoManual = false;   // el usuario lo ajusto: se respeta (acotado); si no, sigue al cache
-static bool RenderDesdeCache(){ return ActiveAnimKind == 2 && AnimEsJuego; }
-// el rango CACHEADO en frames del timeline. false = no hay cache (no hay partida o el cache esta apagado)
-bool W3dRenderJuegoCache(int* mn, int* mx){
-    if (!SimActiva() || !SimHayCache() || SimFramesGrabados() <= 0) return false;
-    const int a = StartFrame + SimPrimerFrame();
-    if (mn) *mn = a;
-    if (mx) *mx = a + SimFramesGrabados() - 1;
-    return true;
-}
-// Inicio/Fin del render del juego al dia con el cache (lo llama el refresco de Properties cada cuadro)
-bool W3dRenderJuegoSincronizar(){
-    int mn = 0, mx = -1;
-    if (!W3dRenderJuegoCache(&mn, &mx)) {
-        g_renderJuegoManual = false; g_renderJuegoIni = g_renderJuegoFin = 0.0f;
-        return false;
-    }
-    int a = (int)(g_renderJuegoIni + 0.5f), b = (int)(g_renderJuegoFin + 0.5f);
-    if (!g_renderJuegoManual) { a = mn; b = mx; }
-    if (a < mn) a = mn; if (a > mx) a = mx;
-    if (b < mn) b = mn; if (b > mx) b = mx;
-    if (b < a) b = a;
-    g_renderJuegoIni = (float)a; g_renderJuegoFin = (float)b;
-    return true;
-}
-// fijar el rango a mano (la tarjeta Render o el harness): queda acotado al cache
-void W3dRenderJuegoFijar(float ini, float fin){
-    g_renderJuegoIni = ini; g_renderJuegoFin = fin; g_renderJuegoManual = true;
-    W3dRenderJuegoSincronizar();
-}
-void W3dRenderJuegoAuto(){ g_renderJuegoManual = false; W3dRenderJuegoSincronizar(); }
-static void AccionRenderJuegoRango(){ g_renderJuegoManual = true; W3dRenderJuegoSincronizar(); g_redraw = true; }
-// renderiza [Inicio, Fin] del CACHE: cada frame es el snapshot de su tick (SimIrA), el mismo que se ve
-// al scrubear. Al terminar vuelve al tick en el que estaba. Devuelve cuantos frames guardo (-1 = sin cache).
-int W3dRenderJuegoDesdeCache(int* fallosOut){
-    if (fallosOut) *fallosOut = 0;
-    if (!PropsActivo || !Viewport3DActive) return -1;
-    if (!W3dRenderJuegoSincronizar()) return -1;
-    Viewport3D* vp = Viewport3DActive;
-    int w = (int)(PropsActivo->renderW + 0.5f); if (w < 1) w = 1;
-    int h = (int)(PropsActivo->renderH + 0.5f); if (h < 1) h = 1;
-    const int f0 = (int)g_renderJuegoIni, f1 = (int)g_renderJuegoFin;
-    const int nFrames = f1 - f0 + 1;
-    const int total = nFrames * PasesActivos() * vp->TilesNecesarios(w, h);
-    const int tickAntes = SimFrameActual();
-    const bool playAntes = PlayAnimation;
-    PlayAnimation = false;   // (el cache se recorre quieto: nada simula mientras tanto)
-    ProgresoIniciar("Rendering the game cache...");
-    int fallos = 0, base = 0;
-    for (int f = f0; f <= f1; f++){
-        SimIrA(f - StartFrame);                     // el estado de ese tick (pone CurrentFrame = f)
-        base += RenderPasesFrame(vp, w, h, base, total, fallos);
-    }
-    ProgresoFin();
-    SimIrA(tickAntes);   // de vuelta donde estaba el cabezal
-    PlayAnimation = playAntes;
-    if (fallosOut) *fallosOut = fallos;
-    w3dLogf("[render] cache del juego: frames %d..%d (%d) renderizados%s", f0, f1, nFrames, fallos ? " CON FALLOS" : "");
-    g_redraw = true;
-    return nFrames;
-}
+// el timeline en "Juego" (ver W3dRaices.h): un juego no tiene keyframes ni graba su pasado, asi que no hay
+// animacion que renderizar. Solo Render Image (el cuadro actual); Render Animation queda en gris.
+static bool RenderEsJuego(){ return ActiveAnimKind == 2 && AnimEsJuego; }
 
 static void HacerRenderAnimation(){
     if (!PropsActivo || !Viewport3DActive) return;
-    // un JUEGO: lo que hay para renderizar es su cache (sin cache: solo Render Image)
-    if (RenderDesdeCache()){
-        int fallos = 0;
-        const int n = W3dRenderJuegoDesdeCache(&fallos);
-        if (n < 0)            Notificar(T("No game cache to render: play the game first (Render Image renders the current frame)"), true);
-        else if (fallos == 0) Notificar(T("Animation rendered!"), false);
-        else                  Notificar(T("Error rendering animation"), true);
-        return;
-    }
+    if (RenderEsJuego()) return;   // (el boton esta en gris: un juego no tiene animacion)
     Viewport3D* vp = Viewport3DActive;
     extern int CurrentFrame, StartFrame, EndFrame;
     extern void AplicarAnimacionObjetos();
@@ -4013,6 +4700,7 @@ static void HacerRenderAnimation(){
     CalcularRenderBase();
     ProgresoIniciar("Rendering animation...");
     int fallos = 0, base = 0;
+    PrepararAnterior(vp, w, h, f0);   // (los vectores del primer cuadro: desde f0-1; los demas, del que se acaba de renderizar)
     for (int f = f0; f <= f1; f++){
         CurrentFrame = f;
         AplicarAnimacionObjetos(); // transform de objetos al frame f
@@ -4031,8 +4719,15 @@ static void AccionRenderAnimation(){
     CalcularRenderBase();   // (Path + File name: la secuencia usa la misma base que Render Image)
     HacerRenderAnimation();
 }
-// harness: "Render Animation" tal cual (el del juego renderiza su cache)
-void W3dHarnessRenderAnimation(){ if (PropsActivo && Viewport3DActive) { CalcularRenderBase(); HacerRenderAnimation(); } }
+// los atajos F12 / Ctrl+F12 (app/W3dAtajos.cpp): lo mismo que los botones, aunque el panel de propiedades no este a
+// la vista (usa los valores del ultimo activo)
+void W3dAtajoRender(bool animacion){
+    if (!PropsActivo) { Notificar(T("No Properties panel"), true); return; }
+    if (animacion) {
+        if (RenderEsJuego()) { Notificar(T("A game has no animation to render"), true); return; }
+        AccionRenderAnimation();
+    } else AccionRenderImage();
+}
 
 // === pestaña VERTICES: helpers + acciones (UV Maps + capas de color) ===
 static Mesh* VerticesMesh() {
@@ -5687,9 +6382,9 @@ static void AccionKfBtnInterp(){
     if (!g_menuKfInterp){ g_menuKfInterp = new PopupMenu(); g_menuKfInterp->action = AccionMenuKfInterp;
                           g_menuKfInterp->titulo = T("Interpolation"); }
     g_menuKfInterp->Limpiar();
-    g_menuKfInterp->Agregar(T("Constant"), KfConstant);
-    g_menuKfInterp->Agregar(T("Linear"), KfLinear);
-    g_menuKfInterp->Agregar(T("Bezier"), KfBezier);
+    g_menuKfInterp->Agregar(T("Constant"), KfConstant, IconType::interp_constant);
+    g_menuKfInterp->Agregar(T("Linear"), KfLinear, IconType::interp_linear);
+    g_menuKfInterp->Agregar(T("Bezier"), KfBezier, IconType::interp_bezier);
     if (MenuAbierto && MenuAbierto != g_menuKfInterp) MenuAbierto->Cerrar();
     g_menuKfInterp->Abrir(gKfInterp->button->sx, gKfInterp->button->sy + gKfInterp->button->height,
                           MenuPantallaW, MenuPantallaH);
@@ -6170,6 +6865,56 @@ static void AccionMenuRcCamara(){
     MenuRcCamara->Agregar(T("(none)"), 0, IconType::empty);
     for (size_t i = 0; i < gCamMenu.size(); i++) MenuRcCamara->Agregar(gCamMenu[i]->name, (int)i + 1, IconType::camera);
     AbrirMenuBajoBoton(MenuRcCamara, PropsActivo->propRcCamara->button);
+}
+
+// EL ARCHIVO del Sonido: los sonidos del proyecto (soltar un .wav en la biblioteca o en la vista 3D los agrega)
+static PopupMenu* MenuSonArchivo = NULL;
+static std::vector<std::string> gSonArchivos;
+// el .wav elegido en el explorador: COPIA adentro del proyecto (como una textura) y es el del Sonido activo
+static void SonArchivoDelExplorador(const std::string& rutaElegida){
+    if (!ObjActivo || ObjActivo->getType() != ObjectType::sonido) return;
+    Sonido* s = static_cast<Sonido*>(ObjActivo);
+    s->archivo = W3dImportarAsset(rutaElegida);
+    W3dRecursosVistaInvalidar();
+    extern void W3dCambiosTocado(); W3dCambiosTocado();
+    g_redraw = true;
+}
+static void AccionSonArchivoElegido(int id){
+    if (id == -2) { AbrirFileBrowser(T("Load sound"), T("Open"), ".wav", SonArchivoDelExplorador); return; }
+    if (id < 0 || !ObjActivo || ObjActivo->getType() != ObjectType::sonido) return;
+    Sonido* s = static_cast<Sonido*>(ObjActivo);
+    s->archivo = (id >= 1 && id <= (int)gSonArchivos.size()) ? gSonArchivos[(size_t)id - 1] : std::string();
+    W3dRecursosVistaInvalidar();
+    g_redraw = true;
+}
+static void AccionMenuSonArchivo(){
+    if (!PropsActivo || !PropsActivo->propSonArchivo) return;
+    if (!ObjActivo || ObjActivo->getType() != ObjectType::sonido) return;
+    if (!MenuSonArchivo){ MenuSonArchivo = new PopupMenu(); MenuSonArchivo->action = AccionSonArchivoElegido; }
+    MenuSonArchivo->Limpiar();
+    MenuSonArchivo->titulo = T("Sound");
+    std::vector<W3dRecursoItem> it; W3dVistaRecListar(W3D_VISTA_SONIDOS, it);
+    gSonArchivos.clear();
+    const std::string& actual = static_cast<Sonido*>(ObjActivo)->archivo;
+    MenuItem* n = MenuSonArchivo->Agregar(T("None"), 0, IconType::empty); if (n) n->verde = actual.empty();
+    for (size_t i = 0; i < it.size(); i++) {
+        gSonArchivos.push_back(it[i].id);
+        MenuItem* m = MenuSonArchivo->Agregar(it[i].nombre, (int)i + 1, IconType::sonido);
+        if (m) m->verde = (it[i].id == actual);
+    }
+    // (separado con una linea) CARGAR uno del disco con el explorador: entra al proyecto como cualquier asset
+    MenuItem* cargar = MenuSonArchivo->Agregar(T("Load sound from the file browser..."), -2, IconType::carpeta);
+    if (cargar) cargar->lineaArriba = true;
+    AbrirMenuBajoBoton(MenuSonArchivo, PropsActivo->propSonArchivo->button);
+}
+
+// tildar / destildar "Posicional (3D)": las filas que dependen de eso (paneo / radio, alcance, ver alcance) se
+// rearman YA (antes recien al elegir otro objeto)
+static void AccionSonPosicional(){
+    // (el bind de la tarjeta corre solo cuando CAMBIA el objeto activo -target-: se lo olvida para que corra ya)
+    if (PropsActivo) { PropsActivo->target = NULL; PropsActivo->RefreshTargetProperties(); }
+    PropertiesLayoutDirty = true;
+    g_redraw = true;
 }
 
 // DROPDOWN del MODO de la Niebla (Lineal / Exp / Exp2)
@@ -6783,6 +7528,9 @@ void Properties::ConstruirGrupos(){
     propUIescala->SetRango(1.0f, 8.0f); propUIescala->entero = true;
     propUIcard->properties.push_back(propUIescala);
     // el lienzo: "como el render" (default, en vivo) o RESPONSIVE con tamano propio
+    // el ORDEN: en su lugar del outliner (lo que este despues se dibuja encima) o al final, encima de todo
+    propUIenArbol = new PropBool(T("Draw in outliner order")); propUIenArbol->onChange = AccionUIenArbol;
+    propUIcard->properties.push_back(propUIenArbol);
     propUIigualRender = new PropBool(T("Match render"));
     propUIigualRender->onChange = AccionUIigualRender;
     propUIcard->properties.push_back(propUIigualRender);
@@ -7060,7 +7808,7 @@ void Properties::ConstruirGrupos(){
 
     propMaterial = new GroupPropertie(T("Material"));
     propMaterial->anchoValores = 0.30f;
-    propBtnNewMaterial = new PropButton(T("New Material"), IconType::material);
+    propBtnNewMaterial = new PropButton(T("New Material"), IconType::material);   // (el selector: icono de material; el "+" es solo la opcion "New Material" de su lista)
     propBtnNewMaterial->button->desplegable = true;
     propBtnNewMaterial->action = AccionMenuMateriales;
     propMaterial->properties.push_back(propBtnNewMaterial);
@@ -7075,10 +7823,60 @@ void Properties::ConstruirGrupos(){
     // material por defecto (sino queda una linea huerfana molesta debajo del aviso).
     propSepMat = new PropSeparator();
     propMaterial->properties.push_back(propSepMat);
-    propBtnTextura = new PropButton(T("No Texture"), IconType::textura);
+    // LOS MAPAS DEL MATERIAL, uno por fila: [nombre corto] [el valor: la textura, el color o el numero] [numero /
+    // textura] [la capa UV]. Los botones chicos van a la DERECHA y la UV en el mismo lugar en todas (alineadas). Orden:
+    // Color, Metalico, Rugosidad, Emision, Normal, Alfa (+ su recorte) e IOR. De estos valores el motor arma lo que
+    // cada backend puede dibujar (el brillo de GL sale de la rugosidad y el metalico; ver Mesh::AplicarMaterial)
+    propBtnTextura = new PropButton(T("Color"));
+    propBtnTextura->conLabel = true;
     propBtnTextura->button->desplegable = true;
+    // el COLOR base va en el lugar de la derecha que en las otras filas es el de numero / textura (la textura usa todo
+    // el ancho que queda)
+    propBtnTextura->AgregarExtra(-1, AccionColorBase, "Base Color");
+    propBtnTextura->AgregarExtra(IconType::mesh, AccionMapaUV0, "UV Map");
     propBtnTextura->action = AccionMenuTexturas;
-    propMaterial->properties.push_back(propBtnTextura);
+    propBtnNormalTex = new PropButton(T("Normal"));
+    propBtnNormalTex->conLabel = true;
+    propBtnNormalTex->button->desplegable = true;
+    propBtnNormalTex->AgregarExtra(IconType::mesh, AccionMapaUV1, "UV Map");
+    propBtnNormalTex->action = AccionMenuTexturasNormal;
+    {
+        static const char* const kNom[W3D_MAPAS] = { "", "", "Emission", "Roughness", "Metallic", "Alpha" };
+        void (*kPri[W3D_MAPAS])() = { 0, 0, AccionMapaPrincipal2, AccionMapaPrincipal3, AccionMapaPrincipal4, AccionMapaPrincipal5 };
+        void (*kMod[W3D_MAPAS])() = { 0, 0, AccionMapaModo2, AccionMapaModo3, AccionMapaModo4, AccionMapaModo5 };
+        void (*kUV[W3D_MAPAS])() = { 0, 0, AccionMapaUV2, AccionMapaUV3, AccionMapaUV4, AccionMapaUV5 };
+        propMapa[0] = propMapa[1] = NULL;
+        for (int k = W3D_MAPA_EMISION; k < W3D_MAPAS; k++) {
+            PropButton* b = new PropButton(T(kNom[k]));
+            b->conLabel = true;
+            b->button->desplegable = true;
+            b->AgregarExtra(IconType::numero, kMod[k], "Number / Texture");
+            b->AgregarExtra(IconType::mesh, kUV[k], "UV Map");
+            b->action = kPri[k];
+            b->oculto = true;
+            propMapa[k] = b;
+        }
+        for (int k = W3D_MAPAS; k < 8; k++) propMapa[k] = NULL;
+        // la columna del NOMBRE igual en todas (las filas quedan alineadas) y los dos lugares de la derecha reservados
+        PropButton* filas[6] = { propBtnTextura, propMapa[W3D_MAPA_METALICO], propMapa[W3D_MAPA_RUGOSIDAD],
+                                 propMapa[W3D_MAPA_EMISION], propBtnNormalTex, propMapa[W3D_MAPA_ALFA] };
+        int largo = 0;
+        for (int f = 0; f < 6; f++) {
+            int c = 0; const std::string& n = filas[f]->name;
+            for (size_t q = 0; q < n.size(); q++) if (((unsigned char)n[q] & 0xC0) != 0x80) c++;
+            if (c > largo) largo = c;
+        }
+        for (int f = 0; f < 6; f++) { filas[f]->labelChars = largo; filas[f]->slotsExtras = 2; propMaterial->properties.push_back(filas[f]); }
+        propMatIOR = new PropFloat(T("IOR")); propMatIOR->SetRango(1.0f, 3.0f);
+        propMatIOR->stepFino = 0.01f; propMatIOR->stepGrueso = 0.1f; propMatIOR->dragStep = 0.01f;
+        propMatIOR->onChange = AccionRTValores;
+        // TRANSMISION: cuanto de la superficie es vidrio (la luz pasa doblada por el IOR); va arriba del IOR
+        propMatTrans = new PropFloat(T("Transmission")); propMatTrans->SetRango(0.0f, 1.0f);
+        propMatTrans->stepFino = 0.05f; propMatTrans->stepGrueso = 0.1f; propMatTrans->dragStep = 0.01f;
+        propMatTrans->onChange = AccionRTValores;
+        propMaterial->properties.push_back(propMatTrans);
+        propMaterial->properties.push_back(propMatIOR);
+    }
     // Se CONSTRUYE todo primero (el bind es por member, no importa el orden de construccion); el PUSH define el
     // orden VISUAL, que se reorganizo: Lighting arriba de todo, Vertex Color sobre Base Color, y los
     // "pro" (Culling / Depth Test) abajo de todo.
@@ -7097,19 +7895,19 @@ void Properties::ConstruirGrupos(){
         // que dependen de otro (Base Color si Vertex Color; Shininess/Emission/Specular si Lighting; etc).
         propMatChk[i]->onChange = RebindMaterialMeshPart;
     }
-    propBtnNormalTex = new PropButton(T("No Normal Map"), IconType::textura);
-    propBtnNormalTex->button->desplegable = true;
-    propBtnNormalTex->action = AccionMenuTexturasNormal;
+    propBtnSombreado = new PropButton(T("Shading"));   // [Sombreado] [Por vertice / Por pixel]
+    propBtnSombreado->conLabel = true;
+    propBtnSombreado->button->desplegable = true;
+    propBtnSombreado->action = AccionMenuSombreado;
     propBtnReflectMode = new PropButton(T("Matcap (hardware)"), IconType::material);
     propBtnReflectMode->button->desplegable = true;
     propBtnReflectMode->action = AccionMenuReflectMode;
     // --- calcomanias / mezcla / profundidad (ver el bloque de arriba) ---
-    propMatDecal = new PropBool(T("Decal"));
-    propMatDecal->onChange = OnMatDecalChange;
     propBtnMezcla = new PropButton(T("Alpha (normal)"), IconType::material);
     propBtnMezcla->button->desplegable = true;
     propBtnMezcla->action = AccionMenuMezcla;
-    propBtnProfundidad = new PropButton(T("Test + Write (opaque)"), IconType::material);
+    propBtnProfundidad = new PropButton(T("Test"));   // [Test] [Test + escritura (opaco) / ... / Apagado]
+    propBtnProfundidad->conLabel = true;
     propBtnProfundidad->button->desplegable = true;
     propBtnProfundidad->action = AccionMenuProfundidad;
     propMatSesgo = new PropFloat(T("Depth Bias"));
@@ -7138,6 +7936,8 @@ void Properties::ConstruirGrupos(){
     propMatAlfa->SetRango(0.0f, 1.0f);
     propMatAlfa->stepFino = 0.05f; propMatAlfa->stepGrueso = 0.1f; propMatAlfa->dragStep = 0.005f;
     propMatAlfa->onChange = OnMatAlfaChange;
+    { std::vector<PropertieBase*>& v = propMaterial->properties;   // (debajo de la fila Alfa)
+      for (size_t q = 0; q < v.size(); q++) if (v[q] == propMapa[W3D_MAPA_ALFA]) { v.insert(v.begin() + (long)q + 1, propMatAlfa); break; } }
     // --- MEZCLA DE TEXTURAS (una pasada, multitextura): la textura B y cuanto de ella (0 = solo la base), ver
     //     Material::texturaB / mezclaB. La fila del numero apunta DIRECTO al campo, como Alpha Test (mismo undo) ---
     propBtnTexB = new PropButton(T("No Texture B"), IconType::textura);
@@ -7149,31 +7949,35 @@ void Properties::ConstruirGrupos(){
     propMatMezclaB->onChange = OnMatAlfaChange;   // (redibujar: el valor ya esta en el material)
     // --- ORDEN VISUAL ---
     propMaterial->properties.push_back(propMatChk[3]);  // Lighting  (ARRIBA DE TODO)
+    propMaterial->properties.push_back(propBtnSombreado); // por vertice / por pixel (solo con shaders y Lighting ON)
+    // SHADER ESCRITO (al FINAL de la tarjeta: es lo avanzado): el tilde; con el, el archivo (su boton chico lo abre en el
+    // IDE), "Compile" y lo que dijo el compilador
+    propMatShaderOn = new PropBool(T("Advanced: custom shader"));
+    propMatShaderOn->onChange = OnMatShaderOn;
+    propBtnShader = new PropButton(T("Shader"));
+    propBtnShader->conLabel = true;
+    propBtnShader->button->desplegable = true;
+    propBtnShader->action = AccionMenuShader;
+    propBtnShader->AgregarExtra(IconType::script, AccionShaderEditar, "Edit in the IDE");   // (el lapiz: al IDE)
+    propBtnShaderComp = new PropButton(T("Compile"), IconType::notifOk);
+    propBtnShaderComp->action = AccionShaderCompilar;
+    propMatShaderMsg = new PropLabel("", true /*wrap*/);
     propMaterial->properties.push_back(propMatChk[2]);  // Vertex Color (sobre Base Color)
-    propMaterial->properties.push_back(propMatCol[0]);  // Base Color (se oculta si Vertex Color ON)
-    propMaterial->properties.push_back(propMatCol[1]);  // Specular  (se oculta si Lighting OFF)
-    propMaterial->properties.push_back(propMatCol[2]);  // Emission  (se oculta si Lighting OFF)
-    propMaterial->properties.push_back(propMatShin);    // Shininess (se oculta si Lighting OFF)
     // TRAZADO DE RAYOS: rugosidad (0 = espejo .. 1 = mate) y metalico (0 = difuso .. 1 = metal). Solo se ven con el
     // tilde "Ray Tracing" de la pestania Render; el render GL no los usa.
     propMatRough = new PropFloat(T("Roughness")); propMatRough->SetRango(0.0f, 1.0f);
     propMatRough->stepFino = 0.05f; propMatRough->stepGrueso = 0.1f; propMatRough->dragStep = 0.01f;
-    propMatRough->onChange = AccionRTValores;
-    propMaterial->properties.push_back(propMatRough);
+    propMatRough->onChange = AccionRTValores;   // (ya no va en la lista: es el numero del "Roughness Map")
     propMatMetal = new PropFloat(T("Metallic")); propMatMetal->SetRango(0.0f, 1.0f);
     propMatMetal->stepFino = 0.05f; propMatMetal->stepGrueso = 0.1f; propMatMetal->dragStep = 0.01f;
-    propMatMetal->onChange = AccionRTValores;
-    propMaterial->properties.push_back(propMatMetal);
+    propMatMetal->onChange = AccionRTValores;   // (ya no va en la lista: es el numero del "Metallic Map")
     propMaterial->properties.push_back(propMatChk[0]);  // Filtering
-    propMaterial->properties.push_back(propMatChk[1]);  // Transparent
     propMaterial->properties.push_back(propMatChk[4]);  // Repeat
-    propMaterial->properties.push_back(propMatChk[10]); // Normal Mapping
-    propMaterial->properties.push_back(propBtnNormalTex);
+    // (el NORMAL MAP va debajo del color base: ver arriba)
     propMaterial->properties.push_back(propMatChk[8]);  // Reflection
     propMaterial->properties.push_back(propMatChk[9]);  // (oculto: reemplazado por el dropdown)
     propMaterial->properties.push_back(propBtnReflectMode);
     propMaterial->properties.push_back(propBtnMezcla);  // modo de mezcla (visible si Transparent ON)
-    propMaterial->properties.push_back(propMatAlfa);    // Alpha Test (recorte por alfa; 0 = apagado)
     propMaterial->properties.push_back(propBtnTexB);    // Texture B (mezcla de texturas en una pasada)
     propMaterial->properties.push_back(propMatMezclaB); // Texture mix (cuanto de B; visible con una textura B)
     // --- CAPAS DE TEXTURA: titulo + hasta 4 filas [textura | UV | mezcla | on] (ver el bloque de arriba) ---
@@ -7201,9 +8005,7 @@ void Properties::ConstruirGrupos(){
     propMaterial->properties.push_back(propMatLineas);      // Lines (aristas por material)
     propMaterial->properties.push_back(propMatGrosorLinea); // Line Width (visible con Lines ON)
     propMaterial->properties.push_back(propMatChk[5]);  // Culling    (ABAJO DE TODO: pro)
-    // los "pro" de calcomania: el tilde que aplica la receta y sus tres piezas sueltas.
-    // Van al final, debajo de Culling, para no cambiar de lugar nada de lo que ya estaba.
-    propMaterial->properties.push_back(propMatDecal);       // Decal (preset)
+    // los "pro" de calcomania (profundidad, sesgo, orden de pasada): al final, debajo de Culling
     propMaterial->properties.push_back(propBtnProfundidad); // Depth Test/Write (desplegable)
     propMaterial->properties.push_back(propMatSesgo);       // Depth Bias
     propMaterial->properties.push_back(propMatSesgoM);      // Depth Bias (m)
@@ -7211,6 +8013,10 @@ void Properties::ConstruirGrupos(){
     // el viejo checkbox "Depth Test" queda OCULTO: lo reemplaza el desplegable de arriba,
     // que ademas expone la escritura de z (la mitad que faltaba).
     propMaterial->properties.push_back(propMatChk[6]);
+    propMaterial->properties.push_back(propMatShaderOn);    // Avanzado: shader personalizado (ABAJO DE TODO)
+    propMaterial->properties.push_back(propBtnShader);
+    propMaterial->properties.push_back(propBtnShaderComp);
+    propMaterial->properties.push_back(propMatShaderMsg);
     GroupProperties.push_back(propMaterial);
 
     // pestania de LUZ: TODAS las propiedades editables de la luz de OpenGL. Se ve solo si el
@@ -7220,6 +8026,12 @@ void Properties::ConstruirGrupos(){
     // "Ignorar orden" (del arbol): prendido (default) la luz alumbra TODO; apagado solo lo que sigue en el arbol
     propLightIgnOrden = new PropBool(T("Ignore order"));
     propLight->properties.push_back(propLightIgnOrden);
+    // EL TIPO: Punto (alumbra para todos lados), Sol (direccional: rayos paralelos) o Foco (un cono)
+    propLightTipo = new PropButton(T("Type"));
+    propLightTipo->conLabel = true;
+    propLightTipo->button->desplegable = true;
+    propLightTipo->action = AccionMenuLuzTipo;
+    propLight->properties.push_back(propLightTipo);
     propLightDir = new PropBool(T("Directional"));                 // w=0 (sol) vs puntual/spot
     propLightDir->animProp = AnimLightMisc; propLightDir->animComp = AnimY;   // animable (escalon)
     propLight->properties.push_back(propLightDir);
@@ -7230,6 +8042,12 @@ void Properties::ConstruirGrupos(){
     propLightGL->animProp = AnimLightMisc; propLightGL->animComp = AnimX;     // animable (escalon)
     propLight->properties.push_back(propLightGL);
     propLightDiffuse = new PropColor(T("Diffuse"));  propLight->properties.push_back(propLightDiffuse);
+    // la INTENSIDAD (el color queda en 0..1; esto la hace mas fuerte). Animable
+    propLightIntens = new PropFloat(T("Intensity")); propLightIntens->SetRango(0.0f, 1000.0f);
+    propLightIntens->stepFino = 0.1f; propLightIntens->stepGrueso = 1.0f; propLightIntens->dragStep = 0.02f;
+    propLightIntens->animProp = AnimLuzIntens; propLightIntens->animComp = AnimX;
+    propLightIntens->onChange = AccionRTValores;
+    propLight->properties.push_back(propLightIntens);
     propLightDiffuse->animProp = AnimColor; propLightDiffuse->animComp = AnimX; // rombo -> anima el color (RGB)
     propLightAmbient = new PropColor(T("Ambient"));  propLight->properties.push_back(propLightAmbient);
     propLightAmbient->animProp = AnimAmbient; propLightAmbient->animComp = AnimX;
@@ -7257,6 +8075,11 @@ void Properties::ConstruirGrupos(){
     propLightSpotExp->stepFino = 1.0f; propLightSpotExp->stepGrueso = 8.0f; propLightSpotExp->dragStep = 1.0f;
     propLightSpotExp->animProp = AnimSpot; propLightSpotExp->animComp = AnimY;
     propLight->properties.push_back(propLightSpotExp);
+    // DISTANCIA (m): hasta donde alumbra la puntual/foco = el largo del cono. 0 = sin limite
+    propLightDist = new PropFloat(T("Distance"), "m"); propLightDist->SetRango(0.0f, 1000.0f);
+    propLightDist->stepFino = 0.1f; propLightDist->stepGrueso = 1.0f; propLightDist->dragStep = 0.05f;
+    propLightDist->onChange = AccionRTValores;
+    propLight->properties.push_back(propLightDist);
     // TRAZADO DE RAYOS: tamano de la lampara (0 = puntual -> sombra dura; mas = penumbra) y rayos de sombra (0 = global)
     propLightRTRadio = new PropFloat(T("Radius")); propLightRTRadio->SetRango(0.0f, 100.0f);
     propLightRTRadio->stepFino = 0.05f; propLightRTRadio->stepGrueso = 0.5f; propLightRTRadio->dragStep = 0.02f;
@@ -7287,6 +8110,22 @@ void Properties::ConstruirGrupos(){
     propCamFar->SetRango(1.0f, 100000.0f); propCamFar->stepFino = 5.0f; propCamFar->stepGrueso = 50.0f; propCamFar->dragStep = 2.0f;
     propCamFar->animProp = AnimClip; propCamFar->animComp = AnimY;
     propCamera->properties.push_back(propCamFar);
+    // PROFUNDIDAD DE CAMPO: la hace el trazado de rayos (desde la lente); el desenfoque de campo del postprocesado
+    // puede usar el mismo foco. La linea y la cruz del gizmo marcan donde esta enfocado
+    propCamDof = new PropBool(T("Depth of field")); propCamDof->onChange = AccionCamDofOn;
+    propCamera->properties.push_back(propCamDof);
+    propCamFStop = new PropFloat(T("F-stop")); propCamFStop->SetRango(0.1f, 64.0f);   // (como el .w3d: hasta f/0.1)
+    propCamFStop->stepFino = 0.1f; propCamFStop->stepGrueso = 1.0f; propCamFStop->dragStep = 0.05f; propCamFStop->onChange = AccionCamDof;
+    propCamera->properties.push_back(propCamFStop);
+    propCamFoco = new PropFloat(T("Focus distance"), "m"); propCamFoco->SetRango(0.01f, 10000.0f);
+    propCamFoco->stepFino = 0.1f; propCamFoco->stepGrueso = 1.0f; propCamFoco->dragStep = 0.05f; propCamFoco->onChange = AccionCamDof;
+    propCamFoco->animProp = AnimCamFoco; propCamFoco->animComp = AnimX;   // rombo de keyframe -> anima el foco
+    propCamera->properties.push_back(propCamFoco);
+    propBtnCamFocoObj = new PropButton(T("Focus object"), IconType::object);
+    propBtnCamFocoObj->conLabel = true;
+    propBtnCamFocoObj->button->desplegable = true;
+    propBtnCamFocoObj->action = AccionMenuFocoObj;
+    propCamera->properties.push_back(propBtnCamFocoObj);
     propBtnCamTarget = new PropButton(T("Target"), IconType::object);
     propBtnCamTarget->button->desplegable = true;
     propBtnCamTarget->action = AccionMenuTarget;
@@ -7354,6 +8193,51 @@ void Properties::ConstruirGrupos(){
     GroupProperties.push_back(propCulling);
 
     // pestania del objeto NIEBLA: la llamada glFog puesta en el arbol (de ahi en adelante, solo en Render)
+    // SONIDO: el parlante de la escena
+    propSonido = new GroupPropertie(T("Sound"));
+    propSonido->reservaKeyBtn = true;   // columna del rombo (volumen / tono / reverb se animan)
+    propSonArchivo = new PropButton(T("Sound"), IconType::sonido);
+    propSonArchivo->conLabel = true;
+    propSonArchivo->button->desplegable = true;
+    propSonArchivo->action = AccionMenuSonArchivo;
+    propSonido->properties.push_back(propSonArchivo);
+    propSonActivo = new PropBool(T("Active"));                 propSonido->properties.push_back(propSonActivo);
+    propSonVol = new PropFloat(T("Volume")); propSonVol->SetRango(0.0f, 2.0f);
+    propSonVol->stepFino = 0.05f; propSonVol->stepGrueso = 0.1f; propSonVol->dragStep = 0.01f;
+    propSonVol->animProp = AnimSonido; propSonVol->animComp = AnimX;
+    propSonido->properties.push_back(propSonVol);
+    propSonTono = new PropFloat(T("Pitch")); propSonTono->SetRango(0.25f, 4.0f);
+    propSonTono->stepFino = 0.01f; propSonTono->stepGrueso = 0.1f; propSonTono->dragStep = 0.005f;
+    propSonTono->animProp = AnimSonido; propSonTono->animComp = AnimY;
+    propSonido->properties.push_back(propSonTono);
+    propSonReverb = new PropFloat(T("Reverb")); propSonReverb->SetRango(0.0f, 1.0f);
+    propSonReverb->stepFino = 0.05f; propSonReverb->stepGrueso = 0.1f; propSonReverb->dragStep = 0.01f;
+    propSonReverb->animProp = AnimSonido; propSonReverb->animComp = AnimZ;
+    propSonido->properties.push_back(propSonReverb);
+    propSonPaneo = new PropFloat(T("Pan")); propSonPaneo->SetRango(-1.0f, 1.0f);
+    propSonPaneo->stepFino = 0.05f; propSonPaneo->stepGrueso = 0.25f; propSonPaneo->dragStep = 0.01f;
+    propSonido->properties.push_back(propSonPaneo);
+    // los TIEMPOS van en SEGUNDOS (no en frames): cambiar los fps de la escena no corre ningun audio
+    propSonInicio = new PropFloat(T("Start time"), "s"); propSonInicio->SetRango(-100000.0f, 100000.0f);
+    propSonInicio->stepFino = 0.01f; propSonInicio->stepGrueso = 1.0f; propSonInicio->dragStep = 0.01f;
+    propSonido->properties.push_back(propSonInicio);
+    propSonRecIni = new PropFloat(T("Trim start"), "s"); propSonRecIni->SetRango(0.0f, 100000.0f);
+    propSonRecIni->stepFino = 0.01f; propSonRecIni->stepGrueso = 0.5f; propSonRecIni->dragStep = 0.01f;
+    propSonido->properties.push_back(propSonRecIni);
+    propSonRecFin = new PropFloat(T("Trim end"), "s"); propSonRecFin->SetRango(0.0f, 100000.0f);
+    propSonRecFin->stepFino = 0.01f; propSonRecFin->stepGrueso = 0.5f; propSonRecFin->dragStep = 0.01f;
+    propSonido->properties.push_back(propSonRecFin);
+    propSonBucle = new PropBool(T("Loop forever"));            propSonido->properties.push_back(propSonBucle);
+    propSonPos = new PropBool(T("Positional (3D)"));           propSonido->properties.push_back(propSonPos);
+    propSonPos->onChange = AccionSonPosicional;   // (las filas del 3D aparecen / se van al tildarlo)
+    propSonRadio = new PropFloat(T("Full volume radius"), "m"); propSonRadio->SetRango(0.0f, 100000.0f);
+    propSonRadio->stepFino = 0.1f; propSonRadio->stepGrueso = 1.0f; propSonRadio->dragStep = 0.05f;
+    propSonido->properties.push_back(propSonRadio);
+    propSonAlcance = new PropFloat(T("Audible range"), "m"); propSonAlcance->SetRango(0.0f, 100000.0f);
+    propSonAlcance->stepFino = 0.5f; propSonAlcance->stepGrueso = 5.0f; propSonAlcance->dragStep = 0.1f;
+    propSonido->properties.push_back(propSonAlcance);
+    GroupProperties.push_back(propSonido);
+
     propNiebla = new GroupPropertie(T("Fog"));
     propNieblaActiva = new PropBool(T("Active"));
     propNiebla->properties.push_back(propNieblaActiva);
@@ -7751,6 +8635,17 @@ void Properties::ConstruirGrupos(){
     propRender->properties.push_back(propRenderNormal);
     propRenderAlpha = new PropBool(T("Alpha")); propRenderAlpha->value = &renderAlpha;
     propRender->properties.push_back(propRenderAlpha);
+    // VECTORES DE MOVIMIENTO (base_vectores_0001.png) y DESENFOQUE DE MOVIMIENTO del beauty, con su obturador (0..1)
+    renderVectores = false; renderDesenfoque = false; renderObturador = 0.5f;
+    propRenderVectores = new PropBool(T("Motion vectors")); propRenderVectores->value = &renderVectores;
+    propRender->properties.push_back(propRenderVectores);
+    propRenderDesenfoque = new PropBool(T("Motion blur")); propRenderDesenfoque->value = &renderDesenfoque;
+    propRenderDesenfoque->onChange = AccionRenderDesenfoque;
+    propRender->properties.push_back(propRenderDesenfoque);
+    propRenderObturador = new PropFloat(T("Shutter")); propRenderObturador->SetRango(0.0f, 1.0f);
+    propRenderObturador->stepFino = 0.05f; propRenderObturador->stepGrueso = 0.25f; propRenderObturador->dragStep = 0.01f;
+    propRenderObturador->value = NULL;   // (la fila solo con el desenfoque tildado)
+    propRender->properties.push_back(propRenderObturador);
     // TRAZADO DE RAYOS por CPU (render/RayTracer): apagado por defecto. Con el tilde aparecen los rayos de sombra por
     // luz, las muestras por pixel (bajas) y los pases hasta "done" (16). Las filas se ocultan (value NULL) si esta apagado.
     propRT = new PropBool(T("Ray Tracing")); propRT->value = &g_rt.on; propRT->onChange = AccionRTToggle;
@@ -7764,6 +8659,50 @@ void Properties::ConstruirGrupos(){
     propRTPases = new PropFloat(T("Passes")); propRTPases->SetRango(1.0f, 1024.0f); propRTPases->entero = true;
     propRTPases->stepFino = 1.0f; propRTPases->stepGrueso = 8.0f; propRTPases->dragStep = 1.0f; propRTPases->onChange = AccionRTValores;
     propRender->properties.push_back(propRTPases);
+    propRTCapas = new PropFloat(T("Transparency layers")); propRTCapas->SetRango(1.0f, 64.0f); propRTCapas->entero = true;
+    propRTCapas->stepFino = 1.0f; propRTCapas->stepGrueso = 4.0f; propRTCapas->dragStep = 1.0f; propRTCapas->onChange = AccionRTValores;
+    propRender->properties.push_back(propRTCapas);
+    propRTEscala = new PropButton(T("Upscaling"));
+    propRTEscala->conLabel = true;
+    propRTEscala->button->desplegable = true;
+    propRTEscala->action = AccionMenuRTEscala;
+    propRender->properties.push_back(propRTEscala);
+    propRTReesc = new PropButton(T("Upscaler"));
+    propRTReesc->conLabel = true;
+    propRTReesc->button->desplegable = true;
+    propRTReesc->action = AccionMenuRTReesc;
+    propRTReesc->oculto = true;
+    propRender->properties.push_back(propRTReesc);
+    propRTSoloFinal = new PropBool(T("Only the final image"));
+    propRTSoloFinal->onChange = AccionRTSoloFinal;
+    propRender->properties.push_back(propRTSoloFinal);
+    propRTSemilla = new PropBool(T("New noise each image"));   // (prendido de fabrica)
+    propRTSemilla->onChange = RTInvalidar;
+    propRender->properties.push_back(propRTSemilla);
+    // el DESENFOQUE DE MOVIMIENTO por trazado (solo el render a archivo): el obturador 0.01..1 y donde cae en el cuadro
+    propRTDesenfoque = new PropBool(T("Ray traced motion blur"));
+    propRTDesenfoque->onChange = AccionRTDesenfoque;
+    propRender->properties.push_back(propRTDesenfoque);
+    propRTObturador = new PropFloat(T("Shutter")); propRTObturador->SetRango(0.01f, 1.0f);
+    propRTObturador->stepFino = 0.05f; propRTObturador->stepGrueso = 0.25f; propRTObturador->dragStep = 0.01f;
+    propRTObturador->value = NULL;   // (la fila solo con el tilde puesto)
+    propRender->properties.push_back(propRTObturador);
+    propRTObtPos = new PropButton(T("Position"));   // (debajo de "Shutter": la posicion del obturador)
+    propRTObtPos->conLabel = true;
+    propRTObtPos->button->desplegable = true;
+    propRTObtPos->action = AccionMenuRTObtPos;
+    propRTObtPos->oculto = true;
+    propRender->properties.push_back(propRTObtPos);
+    propRTGpu = new PropButton(T("Device"));
+    propRTGpu->conLabel = true;
+    propRTGpu->button->desplegable = true;
+    propRTGpu->action = AccionMenuRTGpu;
+    propRender->properties.push_back(propRTGpu);
+    propRTDenoiser = new PropButton(T("Denoiser"));
+    propRTDenoiser->conLabel = true;
+    propRTDenoiser->button->desplegable = true;
+    propRTDenoiser->action = AccionMenuDenoiser;
+    propRender->properties.push_back(propRTDenoiser);
     RTFilasPanel(this); // bindea (o esconde) las filas segun el estado inicial
     // color de FONDO del render (global g_renderBg, solo para el pase Rendered). Se edita con el color picker.
     propRenderBg = new PropColor(T("Background"));
@@ -7805,6 +8744,75 @@ void Properties::ConstruirGrupos(){
     propRenderFps->SetRango(0.0f, 240.0f); propRenderFps->entero = true; propRenderFps->value = &g_renderFps;
     propRender->properties.push_back(propRenderFps);
     GroupProperties.push_back(propRender);
+
+    // tarjeta "Post Processing" (debajo de Render): la pila de efectos de la vista Rendered y del render a archivo
+    propPost = new GroupPropertie(T("Post Processing"));
+    propPostOn = new PropBool(T("Post Processing")); propPostOn->value = NULL; propPostOn->onChange = AccionPostCambio;   // (PostFilasPanel)
+    propPost->properties.push_back(propPostOn);
+    propPostCPU = new PropLabel(T("Done by CPU on this graphics backend (slow)"), true);   // (GLES 1.1: sin shaders)
+    propPostCPU->oculto = true;
+    propPost->properties.push_back(propPostCPU);
+    propListPost = new PropListMeshParts(T("Effects"));
+    propListPost->modo = 15;
+    propPost->properties.push_back(propListPost);
+    propRowPost = new PropButtonRow();
+    { Button* b = propRowPost->Agregar(T("Add"), AccionMenuAddPost); if (b) b->desplegable = true; }
+    propRowPost->Agregar(T("Remove"), AccionQuitarPost);
+    propPost->properties.push_back(propRowPost);
+    propRowPostMove = new PropButtonRow();
+    propRowPostMove->Agregar(T("Move Up"), AccionPostSubir);
+    propRowPostMove->Agregar(T("Move Down"), AccionPostBajar);
+    propPost->properties.push_back(propRowPostMove);
+    propPostActivo = new PropBool(T("Enabled")); propPostActivo->onChange = AccionPostCambio;
+    propPost->properties.push_back(propPostActivo);
+    // GRANO
+    propPostGranoInt = new PropFloat(T("Intensity")); propPostGranoInt->SetRango(0.0f, 1.0f);
+    propPostGranoInt->stepFino = 0.01f; propPostGranoInt->stepGrueso = 0.1f; propPostGranoInt->dragStep = 0.005f;
+    propPost->properties.push_back(propPostGranoInt);
+    propPostGranoTam = new PropFloat(T("Grain size")); propPostGranoTam->SetRango(1.0f, 8.0f); propPostGranoTam->entero = true;
+    propPostGranoTam->stepFino = 1.0f; propPostGranoTam->stepGrueso = 1.0f; propPostGranoTam->dragStep = 1.0f;
+    propPost->properties.push_back(propPostGranoTam);
+    propPostGranoColor = new PropBool(T("Colored grain"));
+    propPost->properties.push_back(propPostGranoColor);
+    // DESENFOQUE DE CAMPO
+    propPostFocoCam = new PropBool(T("Use camera focus")); propPostFocoCam->onChange = AccionPostCambio;
+    propPost->properties.push_back(propPostFocoCam);
+    propPostFocoDist = new PropFloat(T("Focus distance")); propPostFocoDist->SetRango(0.01f, 10000.0f);
+    propPostFocoDist->stepFino = 0.1f; propPostFocoDist->stepGrueso = 1.0f; propPostFocoDist->dragStep = 0.05f; propPostFocoDist->unit = "m";
+    propPost->properties.push_back(propPostFocoDist);
+    propPostFocoRango = new PropFloat(T("Sharp range")); propPostFocoRango->SetRango(0.01f, 1000.0f);
+    propPostFocoRango->stepFino = 0.1f; propPostFocoRango->stepGrueso = 1.0f; propPostFocoRango->dragStep = 0.05f; propPostFocoRango->unit = "m";
+    propPost->properties.push_back(propPostFocoRango);
+    propPostFocoDesenf = new PropFloat(T("Blur")); propPostFocoDesenf->SetRango(0.0f, 10.0f);
+    propPostFocoDesenf->stepFino = 0.1f; propPostFocoDesenf->stepGrueso = 1.0f; propPostFocoDesenf->dragStep = 0.05f; propPostFocoDesenf->unit = "%";
+    propPost->properties.push_back(propPostFocoDesenf);
+    // DESENFOQUE DE MOVIMIENTO
+    propPostMovObt = new PropFloat(T("Shutter")); propPostMovObt->SetRango(0.0f, 1.0f);
+    propPostMovObt->stepFino = 0.05f; propPostMovObt->stepGrueso = 0.25f; propPostMovObt->dragStep = 0.01f;
+    propPost->properties.push_back(propPostMovObt);
+    // BLOOM: intensidad, umbral, rodilla suave, tope, difusion, relacion anamorfica + el tinte + el modo rapido
+    {
+        struct Fila { const char* nombre; float mn, mx, fino, grueso, drag; };
+        static const Fila kF[6] = {
+            { "Intensity",        0.0f, 10.0f, 0.05f, 0.5f, 0.01f },
+            { "Threshold",        0.0f,  1.0f, 0.01f, 0.1f, 0.005f },
+            { "Soft Knee",        0.0f,  1.0f, 0.01f, 0.1f, 0.005f },
+            { "Clamp",            0.0f,  1.0f, 0.01f, 0.1f, 0.005f },
+            { "Diffusion",        1.0f, 10.0f, 0.1f,  1.0f, 0.05f },
+            { "Anamorphic Ratio", -1.0f, 1.0f, 0.01f, 0.1f, 0.005f } };
+        for (int k = 0; k < 6; k++) {
+            propPostBloom[k] = new PropFloat(T(kF[k].nombre)); propPostBloom[k]->SetRango(kF[k].mn, kF[k].mx);
+            propPostBloom[k]->stepFino = kF[k].fino; propPostBloom[k]->stepGrueso = kF[k].grueso; propPostBloom[k]->dragStep = kF[k].drag;
+            propPostBloom[k]->value = NULL;
+            propPost->properties.push_back(propPostBloom[k]);
+        }
+        propPostBloomColor = new PropColor(T("Color")); propPostBloomColor->value = NULL;
+        propPost->properties.push_back(propPostBloomColor);
+        propPostBloomRapido = new PropBool(T("Fast Mode"));
+        propPost->properties.push_back(propPostBloomRapido);
+    }
+    GroupProperties.push_back(propPost);
+    PostFilasPanel(this);
 
     // tarjeta "Animation" (pestania Render): selector de la animacion ACTIVA (Scene(s) / clips del armature) + Start/End/
     // FPS + New|Delete + Rename + Render Animation (rendea la SECUENCIA StartFrame..EndFrame). Delete se oculta sin nada
@@ -7886,9 +8894,6 @@ void Properties::ConstruirGrupos(){
     propBtnAnimRender = new PropButton(T("Render Animation"), IconType::camera);
     propBtnAnimRender->action = AccionRenderAnimation;
     propRender->properties.push_back(propBtnAnimRender);   // la secuencia es del RENDER (tarjeta Render)
-    propRenderNota = new PropLabel("", true /*wrap*/);     // (solo en un juego: que se renderiza su cache)
-    propRenderNota->oculto = true;
-    propRender->properties.push_back(propRenderNota);
     GroupProperties.push_back(propAnimation);
 
     // ===== MIX (pestania Animacion): el arbol de capas + la capa elegida =====
@@ -7957,6 +8962,7 @@ void Properties::ConstruirGrupos(){
     // chicas las genera Compilar juego. Se guarda en el .w3d como ruta externa.
     propJuegoIcono = new PropButton(T("Icon"));
     propJuegoIcono->conLabel = true;
+    propJuegoIcono->button->desplegable = true;   // (abre un menu: lleva la flechita)
     propJuegoIcono->button->text = NombreIconoJuego();
     propJuegoIcono->action = AccionMenuIcono;
     propJuego->properties.push_back(propJuegoIcono);
@@ -8003,20 +9009,6 @@ void Properties::ConstruirGrupos(){
     propJuegoCompilar = new PropButton(T("Build game"), IconType::gamepad);
     propJuegoCompilar->action = AccionCompilarJuego;
     propJuego->properties.push_back(propJuegoCompilar);
-    // checkbox: cache de juego (rewind) ON/OFF. Destildado -> el sim NO snapshotea la escena cada tick = juego
-    // FLUIDO (ver SimJuego.cpp). Con el cache OFF, el campo "Cache" y "No reemplazar estados" se ocultan (refresh).
-    propJuegoCacheOn = new PropBool(T("Game cache"));
-    propJuegoCacheOn->value = &gSimCacheOn;
-    propJuegoCacheOn->onChange = AccionSimCacheOn;   // al togglear: corta el cache limpio (sin frames fantasma)
-    propJuego->properties.push_back(propJuegoCacheOn);
-    propJuegoCacheMax = new PropFloat(T("Cache"), "frames");
-    propJuegoCacheMax->SetRango(10.0f, 100000.0f); propJuegoCacheMax->entero = true;
-    propJuegoCacheMax->stepFino = 10.0f; propJuegoCacheMax->stepGrueso = 50.0f; propJuegoCacheMax->dragStep = 1.0f;
-    g_simCacheF = (float)gSimCacheMax; propJuegoCacheMax->value = &g_simCacheF; propJuegoCacheMax->onChange = AccionSimCache;
-    propJuego->properties.push_back(propJuegoCacheMax);
-    propAnimConservar = new PropBool(T("Do not replace states"));
-    propAnimConservar->value = &AnimConservarEstados;
-    propJuego->properties.push_back(propAnimConservar);
     GroupProperties.push_back(propJuego);
 
     // ===== Tarjeta "Keyframe": el keyframe elegido en el editor de curvas, con numeros exactos =====
@@ -8120,7 +9112,7 @@ void Properties::ConstruirGrupos(){
 
     propAjBackend = new PropButton(T("Graphics"));
     propAjBackend->conLabel = true;
-    propAjBackend->button->text = cfg.graphicsAPI;
+    propAjBackend->button->text = TextoBackend();
     propAjBackend->button->desplegable = true;
     propAjBackend->action = AccionMenuBackend;
     propAjustes->properties.push_back(propAjBackend);
@@ -8499,13 +9491,6 @@ void Properties::ConstruirGrupos(){
     propBtnOptVG = new PropButton(T("Optimize Vertex Groups"));
     propBtnOptVG->action = AccionOptimizarVertexGroups;
     propModifierProps->properties.push_back(propBtnOptVG);
-    // "Cache Animation" (SOLO Armature): bakea el skinning por frame -> reproduccion sin recomputar (4fps -> techo de
-    // render). "Frame Skip": 0 = todos los frames; N = guarda cada N+1 e interpola (menos memoria en el N95).
-    propArmCache = new PropBool(T("Cache Animation")); propArmCache->onChange = AccionModParamChanged;
-    propModifierProps->properties.push_back(propArmCache);
-    propArmCacheSkip = new PropFloat(T("Frame Skip")); propArmCacheSkip->SetRango(0.0f, 10.0f); propArmCacheSkip->entero = true;
-    propArmCacheSkip->onChange = AccionModParamChanged;
-    propModifierProps->properties.push_back(propArmCacheSkip);
     // Culling (PVS por triangulo): metodo (desplegable) + Recalcular + info del sidecar
     propPvsMetodo = new PropButton(T("Method")); propPvsMetodo->button->desplegable = true;
     propPvsMetodo->action = AccionMenuPvsMetodo;
@@ -8874,7 +9859,7 @@ static void AccionRecAccionTipo() {
         if (i < 0 || !W3dActivarRaiz(i, &motivo)) Notificar(std::string(T("Not opened")) + ": " + T(motivo.c_str()), true);
         return;
     }
-    if (v == W3D_VISTA_SCRIPTS) {
+    if (v == W3D_VISTA_SCRIPTS || v == W3D_VISTA_SHADERS) {
         extern bool IDEAbrirScript(const std::string& ruta);
         if (!IDEAbrirScript(id)) Notificar(T("There is no script editor (IDE) in the layout"), true);
         return;
@@ -8928,8 +9913,9 @@ static void ActualizarTarjetaRecurso(Properties* p, bool enRec, int vista, const
         const bool o = !it.renombrable || it.soloLectura;
         if (p->propRecNombre->oculto != o) { p->propRecNombre->oculto = o; PropertiesLayoutDirty = true; }
     }
-    // (una PARTE va en la carpeta de su recurso: no tiene la suya)
-    const bool sinCarpeta = it.soloLectura || !it.padre.empty();
+    // la CARPETA no se muestra (pedido del dueno: "no tiene sentido" en las propiedades de un recurso); su carpeta se
+    // cambia en el outliner, arrastrandolo o con Move to Folder
+    const bool sinCarpeta = true;
     if (p->propRecCarpeta && p->propRecCarpeta->oculto != sinCarpeta) {
         p->propRecCarpeta->oculto = sinCarpeta; PropertiesLayoutDirty = true;
     }
@@ -8948,7 +9934,7 @@ static void ActualizarTarjetaRecurso(Properties* p, bool enRec, int vista, const
     // lo propio del tipo
     if (p->propRecAcciones2 && p->propRecAcciones2->botones.size() >= 2) {
         const bool sonido = (vista == W3D_VISTA_SONIDOS), raiz = (vista == W3D_VISTA_ESCENAS || vista == W3D_VISTA_PREFABS),
-                   script = (vista == W3D_VISTA_SCRIPTS);
+                   script = (vista == W3D_VISTA_SCRIPTS || vista == W3D_VISTA_SHADERS);
         RecBoton(p->propRecAcciones2->botones[0], sonido || raiz || script,
                  sonido ? "Play" : raiz ? "Open" : script ? "Open in IDE" : NULL);
         RecBoton(p->propRecAcciones2->botones[1], sonido, NULL);
@@ -8977,6 +9963,22 @@ static void ActualizarTarjetaRecurso(Properties* p, bool enRec, int vista, const
 //  material de la parte, una textura sobre el de la textura. Con Ctrl+Z (los pasos de siempre).
 // ============================================================================
 // el desplegable de Properties que acepta ese tipo de recurso (NULL = ninguno a la vista)
+static PropButton* DestinoDeTipo(Properties* p, int tipo);
+// TODOS los desplegables que aceptan ese tipo (una textura: el "Base Color" y el "Normal Map" del material)
+static void DestinosDeTipo(Properties* p, int tipo, std::vector<PropButton*>& out) {
+    out.clear();
+    if (!p) return;
+    if (tipo == W3D_VISTA_TEXTURAS) {
+        const bool mat = p->propMaterial && p->propMaterial->visible;
+        if (mat && p->propBtnTextura && !p->propBtnTextura->oculto) out.push_back(p->propBtnTextura);
+        if (mat && p->propBtnNormalTex && !p->propBtnNormalTex->oculto) out.push_back(p->propBtnNormalTex);
+        for (int k = W3D_MAPA_EMISION; k < W3D_MAPAS; k++)
+            if (mat && p->propMapa[k] && !p->propMapa[k]->oculto) out.push_back(p->propMapa[k]);
+        return;
+    }
+    PropButton* b = DestinoDeTipo(p, tipo);
+    if (b) out.push_back(b);
+}
 static PropButton* DestinoDeTipo(Properties* p, int tipo) {
     if (!p) return NULL;
     Mesh* m = MallaActivaProps();
@@ -9020,20 +10022,53 @@ static bool UbicarBotonDeTarjeta(Properties* p, PropButton* pb) {
 }
 void PropsDestinosRecurso(Properties* p, int tipo, std::vector<int>& rects) {
     rects.clear();
-    PropButton* b = DestinoDeTipo(p, tipo);
-    if (!b || !b->button || b->button->width <= 0) return;
-    if (!UbicarBotonDeTarjeta(p, b)) return;
-    // (el boton sabe su rectangulo del ultimo dibujo; fuera del panel no se resalta)
-    const int bx = b->button->sx, by = b->button->sy;
-    if (bx + b->button->width < p->x || bx > p->x + p->width || by + b->button->height < p->y || by > p->y + p->height) return;
-    rects.push_back(bx); rects.push_back(by); rects.push_back(b->button->width); rects.push_back(b->button->height);
+    std::vector<PropButton*> bs; DestinosDeTipo(p, tipo, bs);
+    for (size_t i = 0; i < bs.size(); i++) {
+        PropButton* b = bs[i];
+        if (!b || !b->button || b->button->width <= 0) continue;
+        if (!UbicarBotonDeTarjeta(p, b)) continue;
+        // (el boton sabe su rectangulo del ultimo dibujo; fuera del panel no se resalta)
+        const int bx = b->button->sx, by = b->button->sy;
+        if (bx + b->button->width < p->x || bx > p->x + p->width || by + b->button->height < p->y || by > p->y + p->height) continue;
+        rects.push_back(bx); rects.push_back(by); rects.push_back(b->button->width); rects.push_back(b->button->height);
+    }
+}
+// el CARTELITO DE AYUDA de los botones chicos de los mapas del material (numero / textura, la capa UV): el que queda
+// bajo el puntero (con su rectangulo de pantalla en sx / sy), o NULL. Lo pregunta W3dAyudaRender (LayoutInput.cpp)
+Button* PropsAyudaEn(Properties* p, int mx, int my) {
+    if (!p || !p->Contains(mx, my)) return NULL;
+    for (int k = 0; k < W3D_MAPAS; k++) {
+        PropButton* b = BotonDeMapa(p, k);
+        if (!b || b->oculto || b->nExtras <= 0 || !UbicarBotonDeTarjeta(p, b)) continue;
+        const int x0 = b->button->sx - b->ColBoton();   // (el borde izquierdo del renglon)
+        const int ey = b->button->sy;
+        for (int i = 0; i < b->nExtras; i++) {
+            Button* e = b->extras[i];
+            if (!e || !e->visible) continue;
+            const int ex = x0 + b->ExtraX(i);
+            if (mx >= ex && mx < ex + e->width && my >= ey && my < ey + e->height) { e->sx = ex; e->sy = ey; return e; }
+        }
+        if (b->prefijo && b->prefijo->visible) {
+            const int px = x0 + b->colPrefijo;
+            if (mx >= px && mx < px + b->prefijo->width && my >= ey && my < ey + b->prefijo->height) { b->prefijo->sx = px; b->prefijo->sy = ey; return b->prefijo; }
+        }
+    }
+    return NULL;
 }
 bool PropsSoltarRecurso(Properties* p, int mx, int my, int tipo, const std::string& id, bool soloProbar, std::string* que) {
     if (que) que->clear();
-    PropButton* b = DestinoDeTipo(p, tipo);
-    if (b && !UbicarBotonDeTarjeta(p, b)) b = NULL;
-    const bool sobre = b && b->button && mx >= b->button->sx && mx < b->button->sx + b->button->width &&
-                       my >= b->button->sy && my < b->button->sy + b->button->height;
+    // el desplegable compatible que queda BAJO el puntero (una textura: Base Color o Normal Map)
+    PropButton* b = NULL;
+    {
+        std::vector<PropButton*> bs; DestinosDeTipo(p, tipo, bs);
+        for (size_t i = 0; i < bs.size() && !b; i++) {
+            PropButton* c = bs[i];
+            if (!c || !c->button || !UbicarBotonDeTarjeta(p, c)) continue;
+            if (mx >= c->button->sx && mx < c->button->sx + c->button->width &&
+                my >= c->button->sy && my < c->button->sy + c->button->height) b = c;
+        }
+    }
+    const bool sobre = (b != NULL);
     if (!sobre) {
         if (que) *que = T("Drop it on a compatible selector");
         return false;
@@ -9076,14 +10111,22 @@ bool PropsSoltarRecurso(Properties* p, int mx, int my, int tipo, const std::stri
             Material* mat = MaterialActivoUI();
             if (!mat || mat == MaterialDefecto) { if (que) *que = T("The default material can't be edited"); return false; }
             if (!mat->libreria.empty()) { if (que) *que = T("read-only library"); return false; }
-            if (que) *que = std::string(T("Texture of")) + " " + mat->name;
+            const bool aNormal = (b == p->propBtnNormalTex);
+            int aMapa = -1;   // (un mapa del trazado de rayos: la textura queda en su ranura y el mapa pasa a usarla)
+            for (int k = W3D_MAPA_EMISION; k < W3D_MAPAS; k++) if (b == p->propMapa[k]) aMapa = k;
+            if (que) *que = std::string(T(aNormal ? "Normal Map of" : "Texture of")) + " " + mat->name;
             if (soloProbar) return true;
             Texture* t = W3dTexturaCargadaDe(id);
             const bool tomada = (t == NULL);   // (la cargo este gesto: su referencia es temporal)
             if (!t) t = TexturaTomar(id);
             if (!t) return false;
             extern void W3dMaterialPonerTextura(Material* mat, Texture* tex);   // (SoltarRecurso.cpp: con undo)
-            W3dMaterialPonerTextura(mat, t);   // (la ranura toma la suya)
+            extern void W3dMaterialPonerNormal(Material* mat, Texture* tex);
+            extern void W3dMaterialPonerMapa(Material* mat, Texture* tex, int mapa);
+            if (aMapa >= 0) W3dMaterialPonerMapa(mat, t, aMapa);
+            else if (aNormal) W3dMaterialPonerNormal(mat, t); else W3dMaterialPonerTextura(mat, t);   // (la ranura toma la suya)
+            RTInvalidar();
+            PropertiesLayoutDirty = true;
             if (tomada) TexturaSoltar(t);
             RebindMaterialMeshPart();
             return true;
@@ -9210,8 +10253,8 @@ void Properties::Rebind(){
     if (propBtnRenameMat) propBtnRenameMat->oculto = esDefault; // el material por defecto NO se renombra
     if (propBtnTextura) {
         propBtnTextura->oculto = esDefault;
-        propBtnTextura->button->text =
-            NombreDeTextura(material ? material->texture : NULL);
+        propBtnTextura->button->text = (material && material->texture)
+            ? NombreDeTextura(material->texture) : std::string(T("None"));
     }
     // "Delete" (botones[0] de la fila Delete|Rename) solo si hay >1 parte. Aca (Rebind se llama tras
     // Add/Delete via RebindMaterialMeshPart) se actualiza apenas cambia la cantidad de partes.
@@ -9236,6 +10279,36 @@ void Properties::Rebind(){
     propMatChk[8]->value = (esDefault || material->normalMap) ? NULL : &material->chrome; // Reflection on/off
     propMatChk[9]->value = NULL; // viejo "Chrome 360": SIEMPRE oculto -> lo reemplaza el dropdown propBtnReflectMode
     propMatChk[10]->value = esDefault ? NULL : &material->normalMap; // NORMAL MAPPING (DOT3)
+    // SOMBREADO por vertice / por pixel: con la luz prendida y si el backend tiene shaders
+    if (propBtnSombreado) {
+        propBtnSombreado->oculto = (esDefault || !material->lighting || !w3dEngine::SombreadoPorPixelSoportado());
+        propBtnSombreado->button->text = T(NombreSombreado(material && material->porPixel));
+    }
+    // SHADER ESCRITO: el archivo y Compile solo con el tilde; el mensaje dice si compilo, el error, o que este backend
+    // no tiene shaders (el material se dibuja como siempre)
+    if (propMatShaderOn) {
+        propMatShaderOn->value = esDefault ? NULL : &material->shaderOn;
+        const bool con = !esDefault && material && material->shaderOn;
+        OcultoSiCambia(propBtnShader, !con);
+        OcultoSiCambia(propBtnShaderComp, !con || material->shaderArchivo.empty());
+        std::string msg; bool rojo = false;
+        if (con) {
+            extern std::string W3dShaderNombre(const std::string& ruta);
+            const std::string t = material->shaderArchivo.empty() ? std::string(T("Choose a shader")) : W3dShaderNombre(material->shaderArchivo);
+            if (propBtnShader->button->text != t) { propBtnShader->button->text = t; g_redraw = true; }
+            // (sin shaders en este backend: el @vertice corre en la CPU y el resto del material se dibuja como siempre)
+            if (!w3dEngine::ShadersEscritos() && material->shaderEstado == 0) W3dShaderVerticeCPU(material);
+            if (material->shaderEstado == -1) { msg = material->shaderError; rojo = true; }
+            else if (!w3dEngine::ShadersEscritos())
+                msg = material->shaderCPU ? T("This graphics backend has no shaders: the @vertice section runs on the CPU and the rest of the material is drawn as usual")
+                                          : T("This graphics backend has no shaders: the material is drawn as usual (GLES 2.0 and Vulkan have them)");
+            else if (material->shaderEstado == 1) msg = T("Compiled");
+        }
+        OcultoSiCambia(propMatShaderMsg, msg.empty());
+        if (propMatShaderMsg->name != msg || propMatShaderMsg->rojo != rojo) {
+            propMatShaderMsg->name = msg; propMatShaderMsg->rojo = rojo; PropertiesLayoutDirty = true; g_redraw = true;
+        }
+    }
     // dropdown del MODO de Reflection: visible SOLO si Reflection esta tildado (y sin normal map); muestra el modo.
     if (propBtnReflectMode) {
         propBtnReflectMode->oculto = (esDefault || material->normalMap || !material->chrome);
@@ -9243,23 +10316,17 @@ void Properties::Rebind(){
                                                     : std::string(T("Matcap (hardware)"));
     }
     // --- calcomania / mezcla / profundidad ---
-    // El tilde "Decal" es DERIVADO: refleja si el material cumple la receta entera, y al
-    // togglearlo la aplica o la deshace (OnMatDecalChange). Por eso su value es un espejo.
-    if (propMatDecal) {
-        g_matDecal = W3dMaterialEsDecal(material);
-        propMatDecal->value = esDefault ? NULL : &g_matDecal;
-    }
     if (propMatSesgo) {
         g_matSesgo = esDefault ? 0.0f : material->depth_bias;
-        propMatSesgo->value = esDefault ? NULL : &g_matSesgo;
+        propMatSesgo->value = (esDefault || !material || !material->depth_test) ? NULL : &g_matSesgo;   // (sin test no hace nada)
     }
     if (propMatSesgoM) {
         g_matSesgoM = esDefault ? 0.0f : material->sesgo_metros;
-        propMatSesgoM->value = esDefault ? NULL : &g_matSesgoM;
+        propMatSesgoM->value = (esDefault || !material || !material->depth_test) ? NULL : &g_matSesgoM;
     }
     if (propMatOrden) {
         g_matOrden = esDefault ? 0.0f : (float)material->orden_pasada;
-        propMatOrden->value = esDefault ? NULL : &g_matOrden;
+        propMatOrden->value = (esDefault || !material || !material->depth_test) ? NULL : &g_matOrden;
     }
     // --- LINEAS: el tilde + su grosor (el grosor solo se ve con el tilde puesto) ---
     if (propMatLineas) {
@@ -9293,12 +10360,58 @@ void Properties::Rebind(){
     }
     // selector de la textura del normal map: visible SOLO si Normal Mapping esta tildado; muestra su nombre
     if (propBtnNormalTex) {
-        propBtnNormalTex->oculto = (esDefault || !material->normalMap);
+        propBtnNormalTex->oculto = esDefault;
         // GUARD material!=NULL (CRASH N95): el cubo de escena fresca (W3dNewSceneInit) tiene material==NULL
         // -> esDefault, pero ESTA linea derefenciaba material-> sin chequear (todo el resto del rebind SI guardea
         //    material NULL, ej. linea de propBtnTextura). En PC no se veia porque autocargaba una escena con material real.
-        propBtnNormalTex->button->text = (material && material->normalTexture)
-            ? NombreDeTextura(material->normalTexture) : std::string("No Normal Map");
+        propBtnNormalTex->button->text = (material && material->normalMap && material->normalTexture)
+            ? NombreDeTextura(material->normalTexture) : std::string(T("None"));
+    }
+    // LOS MAPAS del trazado de rayos: solo con "Ray Tracing" prendido (sin el, lo que se ve es lo que GL ES 1.1 puede
+    // dibujar). El icono del primer boton chico dice que usa (numero o textura); el boton grande, la textura o el numero
+    {
+        const bool rt = g_rt.on && !esDefault && material;
+        const bool hayMat = !esDefault && material;
+        for (int k = W3D_MAPA_EMISION; k < W3D_MAPAS; k++) {
+            PropButton* b = propMapa[k];
+            if (!b) continue;
+            OcultoSiCambia(b, !hayMat);
+            if (!hayMat) continue;
+            const bool conTex = material->mapaConTextura[k];
+            if (b->nExtras > 0) b->extras[0]->icon = conTex ? (int)IconType::textura : (int)IconType::numero;
+            b->button->desplegable = conTex;
+            b->button->caretMenu = conTex;
+            std::string t;
+            b->button->relleno = NULL;
+            b->button->barra = -1.0f;
+            if (conTex) t = material->mapaTex[k] ? NombreDeTextura(material->mapaTex[k]) : std::string(T("None"));
+            else if (k == W3D_MAPA_EMISION) b->button->relleno = material->emission;   // (el COLOR: su selector)
+            else { float* v = ValorDeMapa(material, k); t = v ? NumMapaTexto(*v) : std::string(); if (v) b->button->barra = *v; }
+            if (b->button->editField == NULL && b->button->text != t) { b->button->text = t; g_redraw = true; }
+        }
+        // el cuadradito del COLOR base (con Vertex Color no hay color base: se oculta)
+        if (propBtnTextura && propBtnTextura->nExtras > 1) {
+            Button* c = propBtnTextura->extras[0];
+            c->relleno = hayMat ? material->diffuse : NULL;
+            const bool ver = hayMat && !material->vertexColor;
+            if (c->visible != ver) { c->visible = ver; PropertiesLayoutDirty = true; }
+        }
+        // la capa UV de cada mapa: AMARILLO si este objeto usa una PERSONALIZADA (se ve de un vistazo que es distinta a la
+        // del indice del material); el cartelito dice "UV Map"
+        static const float kAmarillo[4] = { 1.0f, 0.85f, 0.2f, 1.0f };
+        Mesh* mAct = MallaActivaUI();
+        for (int k = 0; k < W3D_MAPAS; k++) {
+            PropButton* b = BotonDeMapa(this, k);
+            if (!b || b->nExtras < 1 || !material) continue;
+            Button* ub = b->extras[b->nExtras - 1];
+            ub->ayuda = "UV Map";
+            const bool personal = mAct && mAct->UVEsPersonal(material, k);
+            const float* c = personal ? kAmarillo : NULL;
+            if (ub->colorTexto != c || ub->colorBorde != c) { ub->colorTexto = c; ub->colorBorde = c; g_redraw = true; }
+        }
+        // el IOR: con transmision (la parte de vidrio) o con lo transparente por alfa (como antes de la transmision)
+        if (propMatIOR) propMatIOR->value = (!rt || !(material->transmision > 0.0f || material->transparent)) ? NULL : &material->ior;
+        if (propMatTrans) propMatTrans->value = rt ? &material->transmision : NULL;
     }
     // CAPAS DE TEXTURA: una fila por capa + la de "Add Layer" (si quedan filas); el resto oculto
     if (propCapasTitulo) {
@@ -9329,6 +10442,27 @@ void Properties::Rebind(){
     propMatShin->value   = (esDefault || !material->lighting) ? NULL : &material->shininess;
     if (propMatRough) propMatRough->value = (esDefault || !g_rt.on) ? NULL : &material->rtRugosidad;   // solo trazando
     if (propMatMetal) propMatMetal->value = (esDefault || !g_rt.on) ? NULL : &material->rtMetalico;
+
+    // CON EL SHADER AVANZADO TILDADO el material lo dibuja el shader: las opciones de arriba se van (quedan el selector del
+    // material, renombrarlo y las filas del shader). Cada pasada de Rebind las vuelve a poner, asi que al destildarlo vuelven
+    if (propMaterial && !esDefault && material && material->shaderOn) {
+        std::vector<PropertieBase*>& v = propMaterial->properties;
+        for (size_t q = 0; q < v.size(); q++) {
+            PropertieBase* p = v[q];
+            if (p == propBtnNewMaterial || p == propBtnRenameMat || p == propMatShaderOn || p == propBtnShader ||
+                p == propBtnShaderComp || p == propMatShaderMsg) continue;
+            switch (p->GetType()) {
+                case PropertyType::Bool:   ((PropBool*)p)->value = NULL; break;
+                case PropertyType::Float:  ((PropFloat*)p)->value = NULL; break;
+                case PropertyType::Color:  ((PropColor*)p)->value = NULL; break;
+                case PropertyType::Button: ((PropButton*)p)->oculto = true; break;
+                default:
+                    if (p == propSepMat) propSepMat->oculto = true;
+                    else if (p == propMsgDefault || p == propCapasTitulo) ((PropLabel*)p)->oculto = true;
+                    break;
+            }
+        }
+    }
 
     // el selector muestra el material actual del mesh part
     if (propBtnNewMaterial) {
@@ -9372,54 +10506,26 @@ static PropColor* gColorAbierto = NULL;
 // posicion en pantalla de la fila seleccionada por TECLADO (para abrir el ColorPicker con OK/Enter)
 static int gColorSelSx = 0, gColorSelSy = 0;
 
-// la tarjeta Render en un JUEGO (timeline en "Juego"): Inicio/Fin son los del CACHE de la simulacion
-// (adaptados solos, acotados a lo cacheado) y Render Animation lo recorre; sin cache no hay rango y
-// Render Animation queda deshabilitado con el aviso. Fuera del juego, el rango propio de siempre.
+// la tarjeta Render en un JUEGO (timeline en "Juego"): no hay animacion que renderizar, asi que no hay rango
+// (Inicio/Fin se ocultan) y Render Animation queda en gris; solo Render Image. Fuera del juego, el rango de siempre.
 static void SincronizarRenderJuego(Properties* P){
     if (!P || !P->propRenderIni || !P->propRenderFin) return;
-    const bool juego = RenderDesdeCache();
-    int mn = 0, mx = -1;
-    const bool hay = juego && W3dRenderJuegoSincronizar() && W3dRenderJuegoCache(&mn, &mx);
-    float* vIni = juego ? (hay ? &g_renderJuegoIni : NULL) : &g_renderIni;
-    float* vFin = juego ? (hay ? &g_renderJuegoFin : NULL) : &g_renderFin;
+    const bool juego = RenderEsJuego();
+    float* vIni = juego ? NULL : &g_renderIni;
+    float* vFin = juego ? NULL : &g_renderFin;
     if (P->propRenderIni->value != vIni || P->propRenderFin->value != vFin) {
         P->propRenderIni->value = vIni; P->propRenderFin->value = vFin;
         PropertiesLayoutDirty = true; g_redraw = true;
     }
-    if (juego && hay) {
-        P->propRenderIni->SetRango((float)mn, (float)mx); P->propRenderFin->SetRango((float)mn, (float)mx);
-        P->propRenderIni->onChange = AccionRenderJuegoRango; P->propRenderFin->onChange = AccionRenderJuegoRango;
-    } else {
-        P->propRenderIni->SetRango(0.0f, 100000.0f); P->propRenderFin->SetRango(0.0f, 100000.0f);
-        P->propRenderIni->onChange = NULL; P->propRenderFin->onChange = NULL;
-    }
-    if (P->propBtnAnimRender) {
-        const bool ocultar = false;   // (antes el juego lo escondia: ahora renderiza su cache)
-        const bool gris = juego ? !hay : P->propBtnAnimRender->gris;
-        if (P->propBtnAnimRender->oculto != ocultar || (juego && P->propBtnAnimRender->gris != gris)) {
-            P->propBtnAnimRender->oculto = ocultar; if (juego) P->propBtnAnimRender->gris = gris;
-            PropertiesLayoutDirty = true; g_redraw = true;
-        }
-    }
-    if (P->propRenderNota) {
-        std::string t;
-        if (juego) {
-            if (hay) {
-                char b[160]; snprintf(b, sizeof(b), "%s: %d - %d", T("Game cache"), mn, mx);
-                t = b;
-            } else t = T("No game cache: play the game to record frames. Render Image renders the current frame.");
-        }
-        const bool ocultar = t.empty();
-        if (P->propRenderNota->name != t || P->propRenderNota->oculto != ocultar) {
-            P->propRenderNota->name = t; P->propRenderNota->oculto = ocultar;
-            PropertiesLayoutDirty = true; g_redraw = true;
-        }
+    if (juego && P->propBtnAnimRender && !P->propBtnAnimRender->gris) {
+        P->propBtnAnimRender->gris = true;
+        PropertiesLayoutDirty = true; g_redraw = true;
     }
 }
 
 void Properties::RefreshTargetProperties(){
     SincronizarAnimFps(); // el campo "FPS" refleja el AnimFPS real (el import lo pone al fps del archivo)
-    SincronizarRenderJuego(this);   // el rango del render de un juego sigue a su cache
+    SincronizarRenderJuego(this);   // un juego no tiene animacion: sin rango y Render Animation en gris
     // al cerrarse el picker, la fila del color pierde el borde verde
     if (gColorAbierto && !PopUpActive) {
         gColorAbierto->editando = false;
@@ -9905,6 +11011,7 @@ void Properties::RefreshTargetProperties(){
         propUIver3D->value = u ? &u->verEn3D : NULL;
         bool resp = (u && !u->igualQueRender);
         if (propUIigualRender) propUIigualRender->value = u ? &u->igualQueRender : NULL;
+        if (propUIenArbol) propUIenArbol->value = u ? &u->enArbol : NULL;
         if (propUIancho) propUIancho->value = resp ? &u->ancho : NULL;
         if (propUIalto)  propUIalto->value  = resp ? &u->alto  : NULL;
         if (propUIres){     propUIres->oculto = !resp;
@@ -10067,18 +11174,29 @@ void Properties::RefreshTargetProperties(){
     if (propLight && propLightDir){
         bool esLuz = ObjActivo->getType() == ObjectType::light;
         Light* l = esLuz ? static_cast<Light*>(ObjActivo) : NULL;
-        propLightDir->value      = l ? &l->direccional   : NULL;
+        // (el bool Directional queda oculto: lo maneja el Tipo; las filas del cono solo en un Foco, la atenuacion no en un Sol)
+        propLightDir->value      = NULL;
+        const int tipo = l ? LuzTipo(l) : 0;
+        if (propLightTipo) {
+            const bool ocultar = (l == NULL);
+            if (propLightTipo->oculto != ocultar) { propLightTipo->oculto = ocultar; PropertiesLayoutDirty = true; }
+            propLightTipo->button->text = T(kLuzTipos[tipo]);
+            static int tipoAntes = -1;
+            if (tipo != tipoAntes) { tipoAntes = tipo; PropertiesLayoutDirty = true; }
+        }
         if (propLightIgnOrden) propLightIgnOrden->value = l ? &l->ignorarOrden : NULL;
         if (l) g_lightGLIdx = (float)(l->LightID - GL_LIGHT0);
         propLightGL->value       = l ? &g_lightGLIdx     : NULL;
         propLightDiffuse->value  = l ? l->diffuse        : NULL;
+        if (propLightIntens) propLightIntens->value = l ? &l->intensidad : NULL;
         propLightAmbient->value  = l ? l->ambient        : NULL;
         propLightSpecular->value = l ? l->specular       : NULL;
-        propLightAttC->value     = l ? &l->attConstant   : NULL;
-        propLightAttL->value     = l ? &l->attLinear     : NULL;
-        propLightAttQ->value     = l ? &l->attQuadratic  : NULL;
-        propLightSpotCut->value  = l ? &l->spotCutoff    : NULL;
-        propLightSpotExp->value  = l ? &l->spotExponent  : NULL;
+        propLightAttC->value     = (l && tipo != 1) ? &l->attConstant   : NULL;
+        propLightAttL->value     = (l && tipo != 1) ? &l->attLinear     : NULL;
+        propLightAttQ->value     = (l && tipo != 1) ? &l->attQuadratic  : NULL;
+        propLightSpotCut->value  = (l && tipo == 2) ? &l->spotCutoff    : NULL;
+        propLightSpotExp->value  = (l && tipo == 2) ? &l->spotExponent  : NULL;
+        if (propLightDist) propLightDist->value = (l && tipo != 1) ? &l->distancia : NULL;
         if (propLightRTRadio) propLightRTRadio->value = l ? &l->rtRadio : NULL;
         if (propLightRTRayos) propLightRTRayos->value = l ? &l->rtRayos : NULL;
     }
@@ -10090,6 +11208,14 @@ void Properties::RefreshTargetProperties(){
         propCamOrtho->value = c ? &c->orthographic : NULL;
         propCamNear->value  = c ? &c->nearClip     : NULL;
         propCamFar->value   = c ? &c->farClip      : NULL;
+        if (propCamDof) {
+            const bool dof = c && c->dof;
+            propCamDof->value   = c ? &c->dof : NULL;
+            propCamFStop->value = dof ? &c->fStop : NULL;
+            propCamFoco->value  = (dof && c->focoObjeto.empty()) ? &c->focoDist : NULL;   // (con objeto, lo sigue solo)
+            if (propBtnCamFocoObj->oculto != !dof) { propBtnCamFocoObj->oculto = !dof; PropertiesLayoutDirty = true; }
+            if (dof) propBtnCamFocoObj->button->text = c->focoObjeto.empty() ? std::string(T("None")) : c->focoObjeto;
+        }
     }
 
     // LOD: el checkbox bindea directo al campo del objeto activo (NULL = no editable)
@@ -10133,6 +11259,32 @@ void Properties::RefreshTargetProperties(){
     }
 
 
+    // SONIDO: bind directo; el paneo solo sin 3D, radio / alcance / esferas solo con 3D (NULL = oculto)
+    if (propSonActivo){
+        Sonido* so = (ObjActivo->getType() == ObjectType::sonido) ? static_cast<Sonido*>(ObjActivo) : NULL;
+        if (propSonArchivo->oculto != !so) { propSonArchivo->oculto = !so; PropertiesLayoutDirty = true; }
+        if (so) {
+            std::string t = so->archivo.empty() ? std::string(T("None")) : so->archivo.substr(so->archivo.find_last_of('/') + 1);
+            const float d = so->DuracionArchivo();
+            if (d > 0.0f) { char b[32]; snprintf(b, sizeof b, " (%.2f s)", d); t += b; }
+            propSonArchivo->button->text = t;
+        }
+        propSonActivo->value  = so ? &so->activo : NULL;
+        propSonVol->value     = so ? &so->volumen : NULL;
+        propSonTono->value    = so ? &so->tono : NULL;
+        propSonReverb->value  = so ? &so->reverb : NULL;
+        propSonPaneo->value   = (so && !so->posicional) ? &so->paneo : NULL;
+        propSonInicio->value  = so ? &so->inicio : NULL;
+        propSonRecIni->value  = so ? &so->recorteIni : NULL;
+        propSonRecFin->value  = so ? &so->recorteFin : NULL;
+        propSonBucle->value   = so ? &so->bucle : NULL;
+        propSonPos->value     = so ? &so->posicional : NULL;
+        propSonRadio->value   = (so && so->posicional) ? &so->radio : NULL;
+        propSonAlcance->value = (so && so->posicional) ? &so->alcance : NULL;
+        static bool posAntes = false;
+        if (so && so->posicional != posAntes) { posAntes = so->posicional; PropertiesLayoutDirty = true; }
+    }
+
     // NIEBLA: bind directo; inicio/fin solo en lineal, densidad solo en exp/exp2 (NULL = oculto)
     if (propNieblaActiva){
         Niebla* ni = (ObjActivo->getType() == ObjectType::niebla) ? static_cast<Niebla*>(ObjActivo) : NULL;
@@ -10146,6 +11298,8 @@ void Properties::RefreshTargetProperties(){
         propNieblaModo->oculto       = !ni;
     }
 
+    // POSTPROCESO: su tarjeta (la pila del objeto: PostFilasPanel la vuelve a enlazar)
+    PostFilasPanel(this);
     // LIMPIAR Z / RECORTE: bind directo
     if (propLzActivo){
         LimpiarZ* lz = (ObjActivo->getType() == ObjectType::limpiarz) ? static_cast<LimpiarZ*>(ObjActivo) : NULL;
@@ -10264,7 +11418,7 @@ Properties::Properties() : ViewportBase() {
     propT2dAncla = NULL; propT2dRot = NULL; propUIcard = NULL; propUIver3D = NULL;
     propImagen2D = NULL; propImgTextura = NULL; propImgAncho = NULL; propImgAlto = NULL;
     propImgRot = NULL; propImgModo = NULL; propImgAncla = NULL;
-    propUIigualRender = NULL; propUIancho = NULL; propUIalto = NULL;
+    propUIigualRender = NULL; propUIenArbol = NULL; propUIancho = NULL; propUIalto = NULL;
     propUIres = NULL; propUIaspecto = NULL; propUIrotar = NULL;
     propT2dNombre = NULL; propT2dPosX = NULL; propT2dPosY = NULL; propT2dPosZ = NULL;
     propT2dOpac = NULL; propImgNombre = NULL; propImgPosX = NULL; propImgPosY = NULL;
@@ -10305,7 +11459,6 @@ Properties::Properties() : ViewportBase() {
     propJuego = NULL; propJuegoCompilar = NULL; propJuegoPlat = NULL; propJuegoModoVent = NULL;
     propJuegoOrient = NULL; propJuegoIcono = NULL; propJuegoFisica = NULL; propJuegoSonido = NULL;
     propObjAnim = NULL; propListObjAnims = NULL; propJerLib = NULL; propClipRetarget = NULL; propObjRetarget = NULL;
-    propAnimConservar = NULL;
     propBtnPalFondo = NULL; propBtnPalTexto = NULL; propBtnPalBorde = NULL;
     propBtnPalHover = NULL; propBtnColHover = NULL;
     propBtnTex = NULL; propBtnTexBX = NULL; propBtnTexBY = NULL; propBtnTexEsc = NULL;
@@ -10322,6 +11475,7 @@ Properties::Properties() : ViewportBase() {
     propS9Color = NULL; propImgFiltro = NULL; propS9Filtro = NULL;
     propCamera = NULL;
     propCamOrtho = NULL; propCamFov = NULL; propCamNear = NULL; propCamFar = NULL;
+    propCamDof = NULL; propCamFStop = NULL; propCamFoco = NULL; propBtnCamFocoObj = NULL;
     propInstance = NULL;
     propLOD = NULL; propLodDist = NULL;           // objeto LOD (umbrales de distancia)
     propObjRelLines = NULL;                                            // lineas parentales (tarjeta generica)
@@ -10345,6 +11499,9 @@ Properties::Properties() : ViewportBase() {
     propPfCarga = NULL; propPfDistancia = NULL; propPfObjetivo = NULL; propPfVista = NULL;   // (el streaming de la tarjeta)
     for (int k = 0; k < 3; k++) { propHbTam[k] = NULL; propHbCentro[k] = NULL; }
     propRcAncho = NULL; propRcAlto = NULL; propRcCamara = NULL; propRcLimpiarZ = NULL; propRcFondo = NULL; propRcColor = NULL;
+    propSonido = NULL; propSonArchivo = NULL; propSonActivo = NULL; propSonVol = NULL; propSonTono = NULL; propSonReverb = NULL;
+    propSonPaneo = NULL; propSonInicio = NULL; propSonRecIni = NULL; propSonRecFin = NULL; propSonBucle = NULL; propSonPos = NULL;
+    propSonRadio = NULL; propSonAlcance = NULL;
     propNiebla = NULL; propNieblaActiva = NULL; propNieblaModo = NULL; propNieblaInicio = NULL; propNieblaFin = NULL;
     propNieblaDens = NULL; propNieblaColor = NULL; propNieblaFondo = NULL;
     propCullDistMax = NULL; propCullOrdenAlpha = NULL; propCullCellSize = NULL; propCullModo3D = NULL; propCullRecalc = NULL;
@@ -10372,7 +11529,7 @@ Properties::Properties() : ViewportBase() {
     propMix = NULL; propListMix = NULL; propRowMix = NULL; propRowMixMove = NULL; propMixIni = NULL; propMixFin = NULL;
     propCapa = NULL; propCapaAnim = NULL; propCapaInfl = NULL; propCapaModo = NULL; propCapaHueso = NULL;
     propCapaDesde = NULL; propCapaVel = NULL; propCapaLoop = NULL; propCapaVisible = NULL;
-    propRenderIni = NULL; propRenderFin = NULL; propRenderFps = NULL; propRenderNota = NULL;
+    propRenderIni = NULL; propRenderFin = NULL; propRenderFps = NULL;
     propBtnCamTarget = NULL;
     propBtnInstTarget = NULL;
     // tarjeta Fisica (cuerpo rigido)
@@ -10383,14 +11540,22 @@ Properties::Properties() : ViewportBase() {
     propBtnNewMaterial = NULL;
     propBtnTextura = NULL;
     propBtnNormalTex = NULL; // (faltaba: normal map UI)
+    for (int k = 0; k < 8; k++) propMapa[k] = NULL;
+    propMatIOR = NULL; propMatTrans = NULL;
+    propMatShaderOn = NULL; propBtnShader = NULL; propBtnShaderComp = NULL; propMatShaderMsg = NULL;
     propBtnTexB = NULL; propMatMezclaB = NULL;   // (mezcla de texturas)
     propBtnReflectMode = NULL; // dropdown del modo de Reflection
+    propBtnSombreado = NULL;   // dropdown del sombreado (por vertice / por pixel)
     // luz: punteros nuevos a NULL (si no se inicializan quedan BASURA y el rebind crashea antes de ConstruirGrupos)
-    propLightDir = NULL; propLightIgnOrden = NULL; propLightGL = NULL; propLightDiffuse = NULL; propLightAmbient = NULL; propLightSpecular = NULL;
-    propLightAttC = NULL; propLightAttL = NULL; propLightAttQ = NULL; propLightSpotCut = NULL; propLightSpotExp = NULL;
+    propLightDir = NULL; propLightTipo = NULL; propLightIgnOrden = NULL; propLightGL = NULL; propLightDiffuse = NULL; propLightAmbient = NULL; propLightSpecular = NULL;
+    propLightAttC = NULL; propLightAttL = NULL; propLightAttQ = NULL; propLightSpotCut = NULL; propLightIntens = NULL; propLightSpotExp = NULL; propLightDist = NULL;
     propLightRTRadio = NULL; propLightRTRayos = NULL;
-    propRT = NULL; propRTRayos = NULL; propRTSamples = NULL; propRTPases = NULL;
-    rtRayos = (float)g_rt.rayos; rtSamples = (float)g_rt.samples; rtPases = (float)g_rt.pases;
+    propRT = NULL; propRTRayos = NULL; propRTSamples = NULL; propRTPases = NULL; propRTCapas = NULL; propRTGpu = NULL; propRTSoloFinal = NULL; propRTSemilla = NULL;
+    propRTDesenfoque = NULL; propRTObturador = NULL; propRTObtPos = NULL;
+    propPost = NULL; propPostOn = NULL; propPostCPU = NULL; propListPost = NULL; propRowPost = NULL; propRowPostMove = NULL;
+    propPostActivo = NULL; propPostGranoInt = NULL; propPostGranoTam = NULL; propPostGranoColor = NULL;
+    propPostFocoDist = NULL; propPostFocoRango = NULL; propPostFocoDesenf = NULL; propPostFocoCam = NULL; propPostMovObt = NULL; for (int k = 0; k < 6; k++) propPostBloom[k] = NULL; propPostBloomColor = NULL; propPostBloomRapido = NULL; propRTEscala = NULL; propRTReesc = NULL; propRTDenoiser = NULL;
+    rtRayos = (float)g_rt.rayos; rtSamples = (float)g_rt.samples; rtPases = (float)g_rt.pases; rtCapas = (float)g_rt.capas;
     propEditItem = NULL; editPosX = editPosY = editPosZ = 0.0f;
     propUVTransform = NULL; uvPosU = uvPosV = 0.0f; // tarjeta "Transform UV" (pestania Transformar)
     propUVMaps = NULL; propColorLayers = NULL; propVertexGroups = NULL; propUVGroups = NULL; propModifiers = NULL;
@@ -10536,7 +11701,9 @@ void Properties::ActualizarPestanias(){
     bool esLOD  = (tipo == (int)ObjectType::lod);
     bool esCull = (tipo == (int)ObjectType::culling);
     bool esNiebla = (tipo == (int)ObjectType::niebla);
+    bool esSon    = (tipo == (int)ObjectType::sonido);
     bool esLz = (tipo == (int)ObjectType::limpiarz);
+    bool esPost = (tipo == (int)ObjectType::postproceso);
     bool esRc = (tipo == (int)ObjectType::recorte);
     bool esHb = (tipo == (int)ObjectType::hitbox);
     bool esRu = (tipo == (int)ObjectType::rutina);
@@ -10546,7 +11713,7 @@ void Properties::ActualizarPestanias(){
     bool esMirror = (tipo == (int)ObjectType::mirror);
     // Collection REAL (no la raiz Scene, que comparte el tipo pero no tiene Parent)
     bool esColl = (tipo == (int)ObjectType::collection && ObjActivo && ObjActivo->Parent);
-    bool hayTab3 = esMesh || esLuz || esCam || esInst || esArm || esT2d || esImg || esRect || esCont || esS9 || esBtn || esExp || esVid || esUI || esScript || esLOD || esCull || esColl || esPart || esMirror || esNiebla || esLz || esRc || esHb || esPf || esPx || esRu;
+    bool hayTab3 = esMesh || esLuz || esCam || esInst || esArm || esT2d || esImg || esRect || esCont || esS9 || esBtn || esExp || esVid || esUI || esScript || esLOD || esCull || esColl || esPart || esMirror || esNiebla || esSon || esLz || esRc || esHb || esPf || esPx || esRu || esPost;
 
     if (BarTabs.size() >= 3){
         BarTabs[2]->visible = hayTab3;
@@ -10571,7 +11738,9 @@ void Properties::ActualizarPestanias(){
         else if (esPart) icono = (int)IconType::circle;          // objeto Particulas (emisor)
         else if (esMirror) icono = (int)IconType::mirror;        // objeto Mirror (target + ejes)
         else if (esNiebla) icono = (int)IconType::niebla;        // objeto Niebla (glFog en el arbol)
+        else if (esSon)    icono = (int)IconType::sonido;        // objeto Sonido (el parlante)
         else if (esLz) icono = (int)IconType::limpiarz;
+        else if (esPost) icono = (int)IconType::monitor;
         else if (esRc) icono = (int)IconType::recorte;
         else if (esHb) icono = (int)IconType::hitbox;
         else if (esRu) icono = (int)IconType::lista;
@@ -10669,6 +11838,8 @@ void Properties::ActualizarPestanias(){
     // no hay nada que exportar).
     if (propArchivo) propArchivo->visible = (pestaniaActiva == 0);
     if (propRender)    propRender->visible    = (pestaniaActiva == 0);
+    // Post Processing: la tarjeta del OBJETO Postproceso (pestania del objeto)
+    if (propPost)      propPost->visible      = (pestaniaActiva == 2 && ObjActivo && ObjActivo->getType() == ObjectType::postproceso);
     if (propAnimation) propAnimation->visible = (pestaniaActiva == 9); // tarjeta Animation: su propia pestania
     if (propMix)       propMix->visible  = (pestaniaActiva == 9 && g_animMix);
     if (propCapa)      propCapa->visible = (pestaniaActiva == 9 && g_animMix && MixCapaElegida(NULL) != NULL);
@@ -10717,7 +11888,7 @@ void Properties::ActualizarPestanias(){
     if (propAjustes)   propAjustes->visible   = (pestaniaActiva == 0);
     // los selectores muestran lo que hay puesto AHORA (el idioma se puede cambiar desde aca mismo)
     if (propAjIdioma)  propAjIdioma->button->text  = W3dIdiomaNombre(g_idioma);
-    if (propAjBackend) propAjBackend->button->text = cfg.graphicsAPI;
+    if (propAjBackend) propAjBackend->button->text = TextoBackend();
     if (propAjSkin)    propAjSkin->button->text    = cfg.SkinName;
     if (propAjRepo)    SincronizarRepoCampo(propAjRepo);
     if (propAjDispositivo) SincronizarDispositivoCampo(propAjDispositivo);
@@ -10773,9 +11944,8 @@ void Properties::ActualizarPestanias(){
         }
         // Render Animation: se grisa solo si hay CERO animaciones. Siempre existe la escena "Scene" (rendea su rango
         // aunque no tenga keyframes: secuencia estatica) -> nunca se desactiva.
-        if (propBtnAnimRender && !RenderDesdeCache()) propBtnAnimRender->gris = (SceneAnimations.empty() && nClips == 0);
-        // MODO JUEGO: el Fin y Render Animation desaparecen (la animacion es infinita);
-        // "No reemplazar estados" y su nota solo aparecen siendo un juego
+        if (propBtnAnimRender && !RenderEsJuego()) propBtnAnimRender->gris = (SceneAnimations.empty() && nClips == 0);
+        // MODO JUEGO: el Fin desaparece (la animacion es infinita)
         if (g_animMix && AnimEsJuego) AnimEsJuego = false;   // Mix y Juego son excluyentes (un .w3d viejo pudo traer los dos)
         if (gPropAnimEnd) gPropAnimEnd->value = AnimEsJuego ? NULL : &g_animEndF;
         // MIX: Start/End de esta tarjeta SON el rango del mix (AnimSetStart/End los desvian a g_mixInicio/Fin)
@@ -10795,11 +11965,6 @@ void Properties::ActualizarPestanias(){
                 if (propClipRetarget->button->text != t) { propClipRetarget->button->text = t; g_redraw = true; }
             }
         }
-        // (Render Animation de un JUEGO renderiza su cache: lo sincroniza SincronizarRenderJuego)
-        // con el cache de juego DESTILDADO, el limite "Cache" y "No reemplazar estados" (opciones del rewind)
-        // no tienen sentido -> se ocultan (value=NULL). "No reemplazar estados" ademas solo aplica en modo juego.
-        if (propJuegoCacheMax) propJuegoCacheMax->value = gSimCacheOn ? &g_simCacheF : NULL;
-        if (propAnimConservar) propAnimConservar->value = (AnimEsJuego && gSimCacheOn) ? &AnimConservarEstados : NULL;
     }
     // el objeto UI NO tiene transformacion: es el ORDEN DE DIBUJO (la interfaz se dibuja al
     // final, sobre la escena). No se mueve, ni rota, ni escala: su tarjeta no aplica.
@@ -10932,6 +12097,7 @@ void Properties::ActualizarPestanias(){
     if (propLOD)       propLOD->visible       = (pestaniaActiva == 2 && esLOD);
     if (propCulling)   propCulling->visible   = (pestaniaActiva == 2 && esCull);
     if (propNiebla)    propNiebla->visible    = (pestaniaActiva == 2 && esNiebla);
+    if (propSonido)    propSonido->visible    = (pestaniaActiva == 2 && esSon);
     if (propLimpiarZ)  propLimpiarZ->visible  = (pestaniaActiva == 2 && esLz);
     if (propRecorte)   propRecorte->visible   = (pestaniaActiva == 2 && esRc);
     PropsHitboxActualizar(this, pestaniaActiva == 2 && esHb);   // visibilidad + bindeo + textos
@@ -11175,9 +12341,6 @@ void Properties::ActualizarPestanias(){
         if (propArmTarget) { propArmTarget->oculto = !esArmMod;
             if (esArmMod) propArmTarget->button->text = mod->target ? mod->target->name : std::string("None"); }
         if (propBtnOptVG) propBtnOptVG->oculto = !esArmMod; // "Optimize Vertex Groups": solo en el modificador Armature
-        // Cache Animation + Frame Skip: solo en el Armature (PropBool/PropFloat se ocultan con value=NULL)
-        if (propArmCache)     propArmCache->value     = esArmMod ? &mod->cacheAnim : NULL;
-        if (propArmCacheSkip) propArmCacheSkip->value = esArmMod ? &mod->cacheSkip : NULL;
         if (esArmMod) ActualizarSkinArmature(mm); // mantener skinArmature en sync con el modificador
         // Culling (PVS por triangulo): metodo + Recalcular + la info del sidecar cargado
         if (propPvsMetodo) { propPvsMetodo->oculto = !esPvs;
@@ -11474,6 +12637,7 @@ void Properties::Resize(int newW, int newH){
 }
 
 void Properties::Render(){
+    MapaNumSeguir();
     // Ctrl+Z: al soltar el mouse, pushea el cambio de material (si difiere). Con un numero EDITANDOSE POR TEXTO
     // (click sin arrastrar o OK del teclado sobre Shininess / Alpha Test / ...) espera a que termine (Enter, Esc o
     // un click afuera): antes la foto del click se commiteaba vacia al soltar y lo tipeado quedaba sin Ctrl+Z.
@@ -11618,6 +12782,20 @@ void Properties::EntrarPrimerGrupoVisible(){
     }
 }
 
+// volver al panel con la tecla VERDE (sin mouse): sigue en la fila donde estaba (re-elegirla con las flechas era muy
+// molesto). Solo si esa fila ya no esta (la tarjeta se oculto) arranca del primer grupo visible
+void Properties::RetomarSeleccion(){
+    if (focoEnTabs) { g_redraw = true; return; }   // estaba en las pestanias: ahi sigue
+    if (selectIndex >= 0 && selectIndex < (int)GroupProperties.size() && GroupProperties[selectIndex]->visible) {
+        GroupPropertie* g = GroupProperties[selectIndex];
+        if (g->selectIndex >= (int)g->properties.size() || (g->selectIndex >= 0 && !g->open)) g->selectIndex = -1;
+        CentrarSeleccion();
+        g_redraw = true;
+        return;
+    }
+    EntrarPrimerGrupoVisible();
+}
+
 // arriba estando en las pestañas: wrap a la ULTIMA propiedad del ULTIMO grupo visible (simetrico a bajar
 // desde la ultima opcion -> pestanias).
 void Properties::EntrarUltimoGrupoVisible(){
@@ -11676,8 +12854,9 @@ void Properties::button_right(){
     }
 }
 
-#ifndef W3D_SYMBIAN
 void Properties::mouse_button_up(int boton){
+    W3D_SOLO_POR_CONTROLES();   // (Symbian: el OK del cursor virtual sigue como estaba)
+    if (gMapaDragK >= 0 && boton == W3dMB_IZQ) { MapaDragSoltar(); return; }
     // si se apreto sobre un PropFloat y NO se arrastro (click puro) -> abrir la edicion por TEXTO (todo seleccionado,
     // tipear reemplaza + enter). Si se arrastro, el valor ya cambio y no se edita.
     if (gFloatDrag && !gFloatDragMoved && boton == W3dMB_IZQ) {
@@ -11691,9 +12870,7 @@ void Properties::mouse_button_up(int boton){
     gPasoArrastre = NULL; g_rutinaFilaDestino = -1;
     if (!editando) ViewPortClickDown = false;
 }
-#endif
 
-#ifndef W3D_SYMBIAN
 void Properties::event_mouse_wheel(float dy, int mx, int my){
     if (editando) return;
     // rueda sobre las PESTAÑAS (barra superior) = scroll horizontal (para llegar a Modifiers cuando el
@@ -11722,7 +12899,6 @@ void Properties::event_mouse_wheel(float dy, int mx, int my){
     ScrollY(dy*12*GlobalScale);
     MouseWheel = false;
 }
-#endif
 
 // apaga el hover de TODOS los botones de fila (no solo los conocidos: si no, el
 // hover de los nuevos -Render/Export- quedaba pegado al salir el mouse)
@@ -11823,6 +12999,7 @@ bool Properties::event_finger_scroll(int px, int py, int dx, int dy){
 }
 
 void Properties::event_mouse_motion(int mx, int my) {
+    if (gMapaDragK >= 0) { if (leftMouseDown) MapaDragMover(mx); return; }   // (el numero de un mapa del material)
     // arrastre de un PropFloat (posicion/rotacion/escala/shininess): mover el
     // mouse en horizontal cambia el valor. Va ANTES del check de 'editando'.
     if (gFloatDrag) {
@@ -11919,7 +13096,6 @@ void Properties::event_mouse_motion(int mx, int my) {
     }
 }
 
-#ifndef W3D_SYMBIAN
 void Properties::event_key_down(int tecla, bool repeticion){
     const int key = tecla;
     // la lista de pasos de una rutina: X / Supr borra el paso, G lo agarra (y agarrado, las flechas lo mueven)
@@ -11964,7 +13140,6 @@ void Properties::event_key_down(int tecla, bool repeticion){
         }
     }
 }
-#endif
 
 // rect en pantalla del boton de la fila seleccionada (para abrir su desplegable
 // alineado por teclado). Igual recorrido que CentrarSeleccion + igual cuenta de
@@ -11975,8 +13150,10 @@ void Properties::SetRectFilaSeleccionada(){
     if (!gsel->open || gsel->selectIndex < 0 ||
         gsel->selectIndex >= (int)gsel->properties.size()) return;
     PropertieBase* prop = gsel->properties[gsel->selectIndex];
-    // Button (desplegable alineado) y Color (abrir el picker con teclado) necesitan la posicion
-    if (prop->GetType() != PropertyType::Button && prop->GetType() != PropertyType::Color) return;
+    // Button (desplegable alineado), ButtonRow (el "Add" de una fila abre su desplegable debajo) y Color (abrir el
+    // picker con teclado) necesitan la posicion
+    if (prop->GetType() != PropertyType::Button && prop->GetType() != PropertyType::Color &&
+        prop->GetType() != PropertyType::ButtonRow) return;
     int yFila = borderGS + RenglonHeightGS + gapGS; // titulo
     for (int i = 0; i < (int)GroupProperties.size() && i <= selectIndex; i++) {
         GroupPropertie* g = GroupProperties[i];
@@ -11995,6 +13172,16 @@ void Properties::SetRectFilaSeleccionada(){
         PropButton* pb = (PropButton*)prop;
         pb->button->sx = sxFila + pb->ColBoton();
         pb->button->sy = syFila;
+    } else if (prop->GetType() == PropertyType::ButtonRow) {
+        // las celdas como en el click (ClickEn): partes iguales del ancho, en orden, solo las visibles
+        PropButtonRow* row = (PropButtonRow*)prop;
+        const int cw = row->AnchoCelda(gsel->width);
+        int cx = sxFila;
+        for (size_t b = 0; b < row->botones.size(); b++) {
+            if (!row->botones[b]->visible) continue;
+            row->botones[b]->sx = cx; row->botones[b]->sy = syFila;
+            cx += cw + gapGS;
+        }
     } else { // Color: guardo la posicion para abrir el ColorPicker desde EnterPropertieSelect
         gColorSelSx = sxFila; gColorSelSy = syFila;
     }
@@ -12156,10 +13343,8 @@ void Properties::PrevSelect(){
     }
 }
 
-#ifndef W3D_SYMBIAN
 void Properties::event_key_up(int tecla){
 }
-#endif
 
 // devuelve el mini-listado (PropListMeshParts) cuyo BOX cae bajo la coordenada 'py' (o NULL). Mismo recorrido de
 // filas que ClickEn/PropFloatEnValueBox. Lo usa el scroll TACTIL para saber si el dedo empezo sobre una lista.
@@ -12314,6 +13499,33 @@ void Properties::ClickEn(int mx, int my) {
                         }
                         pb->button->sx = x + PosX + borderGS + borderGS + pb->ColBoton();
                         pb->button->sy = yFila;
+                        // los botones CHICOS (los de un mapa del material): entre el nombre y el boton grande
+                        if (pb->conLabel && (pb->nExtras > 0 || pb->prefijo)) {
+                            const int lx = mx - (x + PosX + borderGS + borderGS);
+                            const int e = pb->ExtraEnX(lx);
+                            if (e >= 0) {
+                                pb->extras[e]->sx = x + PosX + borderGS + borderGS + pb->ExtraX(e);
+                                pb->extras[e]->sy = yFila;
+                                if (pb->accionExtra[e]) pb->accionExtra[e]();
+                                return;
+                            }
+                            if (pb->prefijo && pb->prefijo->visible && lx >= pb->colPrefijo && lx < pb->colPrefijo + pb->prefijo->width) {
+                                pb->prefijo->sx = x + PosX + borderGS + borderGS + pb->colPrefijo;
+                                pb->prefijo->sy = yFila;
+                                if (pb->accionPrefijo) pb->accionPrefijo();
+                                return;
+                            }
+                            if (lx < pb->colPrefijo || lx >= pb->colExtras) return;   // (el nombre y el hueco no hacen nada)
+                            // el NUMERO de un mapa (rugosidad, metalico, alfa): se arrastra (o un click lo deja escribir)
+                            Material* mm = MaterialActivoUI();
+                            for (int k = W3D_MAPA_RUGOSIDAD; k <= W3D_MAPA_ALFA && mm; k++) {
+                                if (pb != propMapa[k] || mm->mapaConTextura[k] || !MaterialEditableUI(mm)) continue;
+                                PropsActivo = this;
+                                gMapaDragK = k; gMapaDragMat = mm; gMapaDragMovio = false; gMapaDragMx = mx;
+                                gMapaDragX0 = pb->button->sx; gMapaDragW = pb->button->width;
+                                return;
+                            }
+                        }
                         prop->EditPropertie(); // accion del boton
                     }
                     else if (prop->GetType() == PropertyType::ButtonRow) {

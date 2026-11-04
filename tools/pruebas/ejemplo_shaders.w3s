@@ -1,0 +1,155 @@
+# GENERA examples/shaders/Ejemplos_Shaders.w3d: un proyecto con TODOS los shaders de ejemplo de examples/shaders/
+# (quedan copiados ADENTRO del .w3d, en shaders/, con sus texturas). Delante de unas tablas de colores:
+#   Esfera_Vidrio   vidrio_esmerilado.glsl   lo de atras borroso y doblado
+#   Vidrio_Plano    vidrio_plano.glsl        un plano de vidrio esmerilado (la textura escarcha.png dice donde)
+#   Esfera_Reflejo  reflejo_entorno.glsl     metal que refleja el entorno (la textura entorno.png, panoramica)
+#   Esfera_Matcap   reflejo_matcap.glsl      el reflejo barato (la textura matcap.png, una esfera pintada)
+#   Cubo_Latido     latido.glsl              un brillo que late (w3d_tiempo)
+#   Cilindro_Dibujo dibujo_animado.glsl      la luz en tres tonos
+#   Agua            agua.glsl                olas (@vertice) y lo de abajo corrido
+# Se corre con:  whisk3d.exe --backend es2 --script ejemplo_shaders.w3s
+ventana 1280 720
+selobj Cubo
+delete
+# el piso
+add plane
+objname Piso
+objscale 8 1 6
+objpos 0 -1 0
+matnew
+matnombre Piso
+matcolor 0.55 0.55 0.6
+# las tablas de colores de atras (lo que se ve a traves del vidrio y en los reflejos)
+add cube
+objname Tabla_1
+objscale 0.85 1.8 0.08
+objpos -5.1 0.8 -3
+matnew
+matnombre Rojo
+matcolor 0.95 0.15 0.1
+add cube
+objname Tabla_2
+objscale 0.85 1.8 0.08
+objpos -3.4 0.8 -3
+matnew
+matnombre Amarillo
+matcolor 1 0.85 0.1
+add cube
+objname Tabla_3
+objscale 0.85 1.8 0.08
+objpos -1.7 0.8 -3
+matnew
+matnombre Verde
+matcolor 0.1 0.8 0.25
+add cube
+objname Tabla_4
+objscale 0.85 1.8 0.08
+objpos 0 0.8 -3
+matnew
+matnombre Celeste
+matcolor 0.1 0.6 1
+add cube
+objname Tabla_5
+objscale 0.85 1.8 0.08
+objpos 1.7 0.8 -3
+matnew
+matnombre Violeta
+matcolor 0.6 0.2 0.9
+add cube
+objname Tabla_6
+objscale 0.85 1.8 0.08
+objpos 3.4 0.8 -3
+matnew
+matnombre Naranja
+matcolor 1 0.5 0.1
+add cube
+objname Tabla_7
+objscale 0.85 1.8 0.08
+objpos 5.1 0.8 -3
+matnew
+matnombre Rosa
+matcolor 1 0.4 0.7
+# el proyecto se guarda primero: los shaders van ADENTRO del .w3d (shaders/)
+borrararchivo ../../examples/shaders/Ejemplos_Shaders.w3d
+guardarw3d ../../examples/shaders/Ejemplos_Shaders.w3d
+# ---- la fila de atras ----
+add uvsphere
+objname Esfera_Vidrio
+objpos -4.4 0 0
+matnew
+matnombre Vidrio
+matcolor 0.85 0.95 1
+matrt 0.45 0
+mattrans 1
+matmapa ior 1.5
+matshader importar ../../examples/shaders/vidrio_esmerilado.glsl
+matshader compila si
+add plane
+objname Vidrio_Plano
+objscale 0.9 1 1.1
+objrot 90 1 0 0
+objpos -2.2 0.1 0.6
+matnew
+matnombre Vidrio_Esmerilado
+matcolor 0.8 0.95 0.9
+matrt 0.8 0
+mattrans 1
+matcull 0
+matmapa base textura ../../examples/shaders/texturas/escarcha.png
+matshader importar ../../examples/shaders/vidrio_plano.glsl
+matshader compila si
+add uvsphere
+objname Esfera_Reflejo
+objpos 0 0 0
+matnew
+matnombre Cromo
+matcolor 0.95 0.9 0.8
+matrt 0.05 1
+matmapa base textura ../../examples/shaders/texturas/entorno.png
+matshader importar ../../examples/shaders/reflejo_entorno.glsl
+matshader compila si
+add uvsphere
+objname Esfera_Matcap
+objpos 2.2 0 0
+matnew
+matnombre Matcap
+matcolor 1 1 1
+matmapa base textura ../../examples/shaders/texturas/matcap.png
+matshader importar ../../examples/shaders/reflejo_matcap.glsl
+matshader compila si
+add cube
+objname Cubo_Latido
+objscale 0.7 0.7 0.7
+objrot 25
+objpos 4.4 -0.3 0
+matnew
+matnombre Latido
+matcolor 0.5 0.15 0.15
+matshader importar ../../examples/shaders/latido.glsl
+matshader compila si
+# ---- la fila de adelante ----
+add cylinder
+objname Cilindro_Dibujo
+objscale 0.6 0.9 0.6
+objpos -1.6 -0.1 2.6
+matnew
+matnombre Dibujo
+matcolor 1 0.6 0.2
+matshader importar ../../examples/shaders/dibujo_animado.glsl
+matshader compila si
+add plane
+objname Agua
+objscale 1.4 1 1.1
+objpos 1.6 -0.85 2.6
+modadd subsurf
+modsubsurf 4
+matnew
+matnombre Agua
+matcolor 0.55 0.8 0.9
+matshader importar ../../examples/shaders/agua.glsl
+matshader compila si
+deselectall
+vporbita 0 0 0.3 11 -16 0
+vpvista material
+escenapx foto ejemplo_shaders.ppm
+guardarw3d ../../examples/shaders/Ejemplos_Shaders.w3d

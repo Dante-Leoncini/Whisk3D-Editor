@@ -13,6 +13,7 @@
 #include "io/MallasProyecto.h"         // TODA malla es un recurso: se asegura antes de listar
 #include "io/UI2DFormato.h"            // la carpeta del .w3d abierto (base de las rutas "ext:")
 #include "io/RecursosDatos.h"          // los datos de imagenes y sonidos (Properties)
+#include "w3dTexture.h"                // TexturaMemoriaDe (lo que ocupa una textura en la GPU)
 #include "io/Miniaturas.h"             // las miniaturas de la cuadricula se sueltan al cerrar el proyecto
 #include "base/W3dInteractionState.h"  // InteractionMode (borrar objetos solo en Object Mode)
 #include "w3dGraphics.h"               // MipmapsGlobal (la memoria de una textura)
@@ -28,6 +29,7 @@
 #include "objects/Boton2D.h"
 #include "objects/Texto2D.h"           // la FUENTE BITMAP de un texto 2D es un usuario de textura
 #include "objects/Video2D.h"           // el archivo de un video 2D
+#include "objects/Sonido.h"            // el archivo de un objeto Sonido
 #include "animation/W3dAnimSet.h"
 #include "animation/SkeletalAnimation.h" // W3D_RETARGET_*: el retarget por defecto de un clip de jerarquia
 #include "animation/Flipbook.h"        // SceneFlipbooks: el atlas de un flipbook es un usuario de textura
@@ -60,15 +62,15 @@ struct SinRaiz { SinRaiz() { g_undoSinRaiz++; } ~SinRaiz() { g_undoSinRaiz--; } 
 // ============================================================================
 static const char* const kClaves[W3D_VISTAS] = {
     "escena", "mallas", "materiales", "texturas", "animaciones", "prefabs", "escenas", "librerias",
-    "sonidos", "scripts", "fuentes", "videos"
+    "sonidos", "scripts", "fuentes", "videos", "shaders"
 };
 static const char* const kTitulos[W3D_VISTAS] = {
     "Scene", "3D Meshes", "Materials", "Textures", "Animations", "Prefabs", "Scenes", "Libraries",
-    "Sounds", "Scripts", "Fonts", "Videos"
+    "Sounds", "Scripts", "Fonts", "Videos", "Shaders"
 };
 static const char* const kSingular[W3D_VISTAS] = {
     "Scene", "3D Mesh", "Material", "Texture", "Animation", "Prefab", "Scene", "Library",
-    "Sound", "Script", "Font", "Video"
+    "Sound", "Script", "Font", "Video", "Shader"
 };
 const char* W3dVistaClave(int v)    { return (v >= 0 && v < W3D_VISTAS) ? kClaves[v] : ""; }
 const char* W3dVistaTitulo(int v)   { return (v >= 0 && v < W3D_VISTAS) ? kTitulos[v] : ""; }
@@ -91,6 +93,7 @@ int W3dVistaIcono(int v) {
         case W3D_VISTA_SCRIPTS:     return (int)IconType::script;
         case W3D_VISTA_FUENTES:     return (int)IconType::lista;    // (el de un texto 2D)
         case W3D_VISTA_VIDEOS:      return (int)IconType::video;
+        case W3D_VISTA_SHADERS:     return (int)IconType::script;
     }
     return (int)IconType::archive;
 }
@@ -258,10 +261,18 @@ public:
         it.entrada = r->entrada;
         it.icono = (int)IconType::mesh;
         it.usuarios = usuarios;
-        if (r->Cargada() && r->vertexSize > 0)
-            it.info = Cantidad(r->vertexSize, "vertex", "vertices") + ", " + Cantidad(r->facesSize / 3, "triangle", "triangles") +
+        // los numeros VIVOS: los de un usuario (la geometria que se esta editando todavia no se publico al recurso: el
+        // tamanio quedaba en el de la ultima publicacion). Solo cuando se lista (el outliner mostrando la biblioteca)
+        int nV = r->vertexSize, nI = r->facesSize;
+        const bool hayUsuario = !r->usuarios.empty() && r->usuarios[0];
+        if (hayUsuario) { nV = r->usuarios[0]->vertexSize; nI = r->usuarios[0]->facesSize; }
+        it.cargado = r->Cargada() || hayUsuario;
+        if (it.cargado && nV > 0)
+            it.info = Cantidad(nV, "vertex", "vertices") + ", " + Cantidad(nI / 3, "triangle", "triangles") +
                       ", " + Cantidad((long)r->partes.size(), "part", "parts");
         else it.info = T("not loaded");   // (un huerfano que nadie pidio: sus arrays no estan en memoria)
+        // lo que ocupan sus arrays de render: posicion 12 + normal 3 + uv 8 + color 4 bytes por vertice, 2 por indice
+        if (it.cargado) it.bytes = (long)nV * 27L + (long)nI * 2L;
     }
     void Listar(std::vector<W3dRecursoItem>& out) {
         out.clear();
@@ -441,6 +452,7 @@ static Material* MaterialNuevoConUndo(const std::string& base, const Material* d
         TexturaRetener(n->texture);
         TexturaRetener(n->normalTexture);
         TexturaRetener(n->texturaB);
+        for (int k = W3D_MAPA_EMISION; k < W3D_MAPAS; k++) TexturaRetener(n->mapaTex[k]);
         for (size_t c = 0; c < n->capas.size(); c++) TexturaRetener(n->capas[c].tex);
     }
     UndoMatCreado* u = new UndoMatCreado();
@@ -595,6 +607,9 @@ public:
         out.push_back(W3dRecursoDato(T("Texture"), tex.empty() ? std::string(T("(none)")) : tex));
         if (m->normalTexture) out.push_back(W3dRecursoDato(T("Normal map"), BaseDeRuta(m->normalTexture->path)));
         if (m->texturaB) out.push_back(W3dRecursoDato(T("Texture B"), BaseDeRuta(m->texturaB->path)));
+        { static const char* const kN[W3D_MAPAS] = { "", "", "Emission Map", "Roughness Map", "Metallic Map", "Alpha Map" };
+          for (int k = W3D_MAPA_EMISION; k < W3D_MAPAS; k++)
+              if (m->mapaTex[k]) out.push_back(W3dRecursoDato(T(kN[k]), BaseDeRuta(m->mapaTex[k]->path))); }
         if (!m->capas.empty()) out.push_back(W3dRecursoDato(T("Texture layers"), EnteroTexto((long)m->capas.size())));
         out.push_back(W3dRecursoDato(T("Transparent"), SiNo(m->transparent)));
         out.push_back(W3dRecursoDato(T("Users"), EnteroTexto(it.usuarios)));
@@ -797,6 +812,8 @@ static void UsuariosTexturas(std::map<std::string, TexUso>& uso, bool conObjetos
         else { const std::string p = TexturaPendienteDe(m); if (!p.empty()) s.insert(ClaveTextura(p)); }
         if (m->normalTexture && !m->normalTexture->path.empty()) s.insert(ClaveTextura(m->normalTexture->path));
         if (m->texturaB && !m->texturaB->path.empty()) s.insert(ClaveTextura(m->texturaB->path));
+        for (int k = W3D_MAPA_EMISION; k < W3D_MAPAS; k++)
+            if (m->mapaTex[k] && !m->mapaTex[k]->path.empty()) s.insert(ClaveTextura(m->mapaTex[k]->path));
         for (size_t c = 0; c < m->capas.size(); c++)
             if (m->capas[c].tex && !m->capas[c].tex->path.empty()) s.insert(ClaveTextura(m->capas[c].tex->path));
         std::vector<std::string*> rd; RutasDormidas(m, rd);
@@ -1100,6 +1117,7 @@ static const char* CarpetaDeTipo(int tipo) {
         case W3D_VISTA_SCRIPTS: return "scripts/";
         case W3D_VISTA_FUENTES: return "fuentes/";
         case W3D_VISTA_VIDEOS:  return "videos/";
+        case W3D_VISTA_SHADERS: return "shaders/";
         case W3D_VISTA_TEXTURAS: return "texturas/";
     }
     return "";
@@ -1108,8 +1126,8 @@ static void AsegurarEntradasArch() {
     if (gEntradasArchLeidas) return;
     gEntradasArchLeidas = true;
     gEntradasArch.clear();
-    const int tipos[4] = { W3D_VISTA_SONIDOS, W3D_VISTA_SCRIPTS, W3D_VISTA_FUENTES, W3D_VISTA_VIDEOS };
-    for (int k = 0; k < 4; k++) W3dContenedorListarCarpeta(CarpetaDeTipo(tipos[k]), gEntradasArch[tipos[k]]);
+    const int tipos[5] = { W3D_VISTA_SONIDOS, W3D_VISTA_SCRIPTS, W3D_VISTA_FUENTES, W3D_VISTA_VIDEOS, W3D_VISTA_SHADERS };
+    for (int k = 0; k < 5; k++) W3dContenedorListarCarpeta(CarpetaDeTipo(tipos[k]), gEntradasArch[tipos[k]]);
 }
 // el TIPO de archivo por su extension (lo que el contenedor clasificaria): -1 = no es de estos
 static int TipoArchivoDeRuta(const std::string& r) {
@@ -1118,6 +1136,7 @@ static int TipoArchivoDeRuta(const std::string& r) {
     if (c == "scripts") return W3D_VISTA_SCRIPTS;
     if (c == "fuentes") return W3D_VISTA_FUENTES;
     if (c == "videos")  return W3D_VISTA_VIDEOS;
+    if (c == "shaders") return W3D_VISTA_SHADERS;
     return -1;
 }
 
@@ -1139,6 +1158,17 @@ static void JuntarRefsArchivo(Object* o, int tipo, std::vector<RefArchivo>& out)
         }
         if (tipo == W3D_VISTA_VIDEOS && h->getType() == ObjectType::video2d && !((Video2D*)h)->video.empty()) {
             RefArchivo r; r.obj = h; r.ruta = &((Video2D*)h)->video; out.push_back(r);
+        }
+        // un SHADER lo usan las mallas cuyos materiales lo nombran (la referencia es la del material)
+        if (tipo == W3D_VISTA_SHADERS && h->getType() == ObjectType::mesh) {
+            Mesh* me = (Mesh*)h;
+            for (size_t k = 0; k < me->materialsGroup.size(); k++) {
+                Material* mt = me->materialsGroup[k].material;
+                if (mt && !mt->shaderArchivo.empty()) { RefArchivo r; r.obj = h; r.ruta = &mt->shaderArchivo; out.push_back(r); }
+            }
+        }
+        if (tipo == W3D_VISTA_SONIDOS && h->getType() == ObjectType::sonido && !((Sonido*)h)->archivo.empty()) {
+            RefArchivo r; r.obj = h; r.ruta = &((Sonido*)h)->archivo; out.push_back(r);
         }
         JuntarRefsArchivo(h, tipo, out);
     }
@@ -1347,6 +1377,7 @@ static void UndoTexSacadaAplicar(void* d) {
         if (u->mats[i].donde == -1) m->texture = t;
         else if (u->mats[i].donde == -2) m->normalTexture = t;
         else if (u->mats[i].donde == -3) m->texturaB = t;
+        else if (u->mats[i].donde <= -10 && -10 - u->mats[i].donde < W3D_MAPAS) m->mapaTex[-10 - u->mats[i].donde] = t;   // (los mapas)
         else if (u->mats[i].donde < (int)m->capas.size()) m->capas[(size_t)u->mats[i].donde].tex = t;
     }
     for (size_t i = 0; i < u->objs.size(); i++) {
@@ -1422,7 +1453,7 @@ public:
     }
     int UsuariosDe(const std::string& k, int deObjetos) {
         // los sonidos (y lo que un script nombre por su nombre de archivo) cuentan los scripts que lo nombran
-        if (tipo == W3D_VISTA_SCRIPTS) return deObjetos;
+        if (tipo == W3D_VISTA_SCRIPTS || tipo == W3D_VISTA_SHADERS) return deObjetos;
         return deObjetos + ScriptsQueNombran(k);
     }
     void Item(const std::string& k, int usuarios, W3dRecursoItem& it) {
@@ -1436,6 +1467,8 @@ public:
         it.renombrable = W3dContenedorHayMontado() && W3dEsNombreDeEntrada(k) && tipo != W3D_VISTA_SCRIPTS;
         const long tam = TamArchivo(k);
         it.info = tam >= 0 ? W3dBytesTexto((double)tam) : std::string(T("missing"));
+        it.bytes = tam;
+        it.cargado = usuarios > 0;   // (un archivo se lee cuando alguien lo usa)
     }
     void Listar(std::vector<W3dRecursoItem>& out) {
         out.clear();
@@ -1501,9 +1534,9 @@ public:
     }
     // EN USO: los objetos que lo nombran lo SUELTAN (una fuente vuelve a la de Whisk3D, un video queda
     // vacio), con Ctrl+Z; los scripts que lo nombran por texto quedan como estan (se avisa)
-    bool SabeBorrarEnUso() const { return tipo != W3D_VISTA_SCRIPTS; }
+    bool SabeBorrarEnUso() const { return tipo != W3D_VISTA_SCRIPTS && tipo != W3D_VISTA_SHADERS; }
     bool BorrarEnUso(const std::string& id, std::string* motivo) {
-        if (tipo == W3D_VISTA_SCRIPTS) { if (motivo) *motivo = "It is in use"; return false; }
+        if (tipo == W3D_VISTA_SCRIPTS || tipo == W3D_VISTA_SHADERS) { if (motivo) *motivo = "It is in use"; return false; }
         UndoArchSacado* u = new UndoArchSacado();
         u->tipo = tipo; u->clave = id; u->sacado = false;
         u->ret = RetenerEntrada(id);
@@ -1595,12 +1628,14 @@ static ProveedorArchivos gProvSonidos(W3D_VISTA_SONIDOS);
 static ProveedorArchivos gProvScripts(W3D_VISTA_SCRIPTS);
 static ProveedorArchivos gProvFuentes(W3D_VISTA_FUENTES);
 static ProveedorArchivos gProvVideos(W3D_VISTA_VIDEOS);
+static ProveedorArchivos gProvShaders(W3D_VISTA_SHADERS);
 static ProveedorArchivos* ProvArchivo(int tipo) {
     switch (tipo) {
         case W3D_VISTA_SONIDOS: return &gProvSonidos;
         case W3D_VISTA_SCRIPTS: return &gProvScripts;
         case W3D_VISTA_FUENTES: return &gProvFuentes;
         case W3D_VISTA_VIDEOS:  return &gProvVideos;
+        case W3D_VISTA_SHADERS: return &gProvShaders;
     }
     return NULL;
 }
@@ -1654,6 +1689,10 @@ public:
         if (t && t->ancho > 0) it.info = EnteroTexto(t->ancho) + "x" + EnteroTexto(t->alto);
         else if (t) it.info.clear();
         else it.info = T("not loaded");
+        it.cargado = (t && t->iID);
+        long b = -1, bPot = -1; bool de16 = false;
+        if (it.cargado && w3dEngine::TexturaMemoriaDe((unsigned int)t->iID, b, bPot, de16)) it.bytes = b;   // (en la GPU)
+        else it.bytes = TamArchivo(k);                                                                  // (su archivo)
     }
     void Listar(std::vector<W3dRecursoItem>& out) {
         out.clear();
@@ -1778,6 +1817,8 @@ public:
             if (m->texture && ClaveTextura(m->texture->path) == id) { x.donde = -1; x.t = m->texture; u->mats.push_back(x); }
             if (m->normalTexture && ClaveTextura(m->normalTexture->path) == id) { x.donde = -2; x.t = m->normalTexture; u->mats.push_back(x); }
             if (m->texturaB && ClaveTextura(m->texturaB->path) == id) { x.donde = -3; x.t = m->texturaB; u->mats.push_back(x); }
+            for (int k = W3D_MAPA_EMISION; k < W3D_MAPAS; k++)
+                if (m->mapaTex[k] && ClaveTextura(m->mapaTex[k]->path) == id) { x.donde = -10 - k; x.t = m->mapaTex[k]; u->mats.push_back(x); }
             for (size_t c = 0; c < m->capas.size(); c++)
                 if (m->capas[c].tex && ClaveTextura(m->capas[c].tex->path) == id) { x.donde = (int)c; x.t = m->capas[c].tex; u->mats.push_back(x); }
         }
@@ -2054,6 +2095,7 @@ public:
 static bool MaterialNombraTextura(const Material* m, const Texture* t) {
     if (!m || !t) return false;
     if (m->texture == t || m->normalTexture == t || m->texturaB == t) return true;
+    for (int k = W3D_MAPA_EMISION; k < W3D_MAPAS; k++) if (m->mapaTex[k] == t) return true;
     for (size_t c = 0; c < m->capas.size(); c++) if (m->capas[c].tex == t) return true;
     return false;
 }
@@ -2063,6 +2105,7 @@ static void RepuntarTextura(Material* m, Texture* de, Texture* a) {
     if (m->texture == de) { TexturaRetener(a); m->texture = a; }
     if (m->normalTexture == de) { TexturaRetener(a); m->normalTexture = a; }
     if (m->texturaB == de) { TexturaRetener(a); m->texturaB = a; }
+    for (int k = W3D_MAPA_EMISION; k < W3D_MAPAS; k++) if (m->mapaTex[k] == de) { TexturaRetener(a); m->mapaTex[k] = a; }
     for (size_t c = 0; c < m->capas.size(); c++) if (m->capas[c].tex == de) { TexturaRetener(a); m->capas[c].tex = a; }
 }
 // cuantas RANURAS de material (y cuadros de materiales animados) apuntan a 't': lo que la textura revivida tiene que
@@ -2077,6 +2120,7 @@ static int RanurasDe(const Texture* t) {
         if (m->texture == t) n++;
         if (m->normalTexture == t) n++;
         if (m->texturaB == t) n++;
+        for (int k = W3D_MAPA_EMISION; k < W3D_MAPAS; k++) if (m->mapaTex[k] == t) n++;
         for (size_t c = 0; c < m->capas.size(); c++) if (m->capas[c].tex == t) n++;
     }
     for (size_t i = 0; i < AnimatedMaterials.size(); i++)
@@ -2138,7 +2182,7 @@ static ProveedorTexturas    gProvTexturas;
 static ProveedorAnimaciones gProvAnimaciones;
 static W3dProveedorRecursos* gProv[W3D_VISTAS] = {
     NULL, &gProvMallas, &gProvMateriales, &gProvTexturas, &gProvAnimaciones, NULL, NULL, NULL,
-    &gProvSonidos, &gProvScripts, &gProvFuentes, &gProvVideos
+    &gProvSonidos, &gProvScripts, &gProvFuentes, &gProvVideos, &gProvShaders
 };
 
 void W3dRecursosVistaRegistrar(int vista, W3dProveedorRecursos* p) {
@@ -2175,7 +2219,7 @@ bool W3dVistaRecInfo(int vista, const std::string& id, W3dRecursoItem* out) {
 // el ORDEN de los tipos en el filtro (el de la lista de mas arriba del .h, sin los que no tienen datos)
 static const int kOrdenTipos[] = {
     W3D_VISTA_MALLAS, W3D_VISTA_MATERIALES, W3D_VISTA_TEXTURAS, W3D_VISTA_SONIDOS, W3D_VISTA_ANIMACIONES,
-    W3D_VISTA_PREFABS, W3D_VISTA_ESCENAS, W3D_VISTA_SCRIPTS, W3D_VISTA_FUENTES, W3D_VISTA_VIDEOS, W3D_VISTA_LIBRERIAS
+    W3D_VISTA_PREFABS, W3D_VISTA_ESCENAS, W3D_VISTA_SCRIPTS, W3D_VISTA_SHADERS, W3D_VISTA_FUENTES, W3D_VISTA_VIDEOS, W3D_VISTA_LIBRERIAS
 };
 void W3dBibliotecaTipos(std::vector<int>& out) {
     out.clear();
@@ -2208,6 +2252,19 @@ bool W3dBibDeClave(const std::string& c, int* tipo, std::string* id) {
 //  CARPETAS (UN arbol para todos los tipos)
 // ============================================================================
 static std::vector<std::string> gCreadas;   // ordenadas, sin repetir
+static std::vector<std::string> gOrdenBib;  // el orden MANUAL (W3dBibOrden): claves de biblioteca
+static std::map<std::string, int> gOrdenIdx; // (su indice, para ordenar rapido)
+static bool gOrdenIdxListo = false;
+static void OrdenCambio() { gOrdenIdxListo = false; }
+int W3dBibOrden(const std::string& clave) {
+    if (!gOrdenIdxListo) {
+        gOrdenIdx.clear();
+        for (size_t i = 0; i < gOrdenBib.size(); i++) gOrdenIdx[gOrdenBib[i]] = (int)i;
+        gOrdenIdxListo = true;
+    }
+    std::map<std::string, int>::const_iterator it = gOrdenIdx.find(clave);
+    return it == gOrdenIdx.end() ? -1 : it->second;
+}
 
 std::string W3dCarpetaNormalizar(const std::string& ruta) { return W3dMallaCarpetaNormalizar(ruta); }
 std::string W3dCarpetaPadre(const std::string& ruta) {
@@ -2252,6 +2309,8 @@ std::string W3dCarpetasFirma() {
 std::string W3dCarpetasFirma(const std::vector<W3dRecursoItem>& its) {
     std::string f;
     for (size_t i = 0; i < gCreadas.size(); i++) { f += gCreadas[i]; f += '\n'; }
+    f += '\x03';
+    for (size_t i = 0; i < gOrdenBib.size(); i++) { f += gOrdenBib[i]; f += '\n'; }   // (reordenar tambien es un cambio)
     f += '\x01';
     std::vector<std::string> filas;
     for (size_t i = 0; i < its.size(); i++)
@@ -2265,6 +2324,7 @@ std::string W3dCarpetasFirma(const std::vector<W3dRecursoItem>& its) {
 //      carpeta de cada item que cambio, de cualquier tipo). Aplicar = ir al otro. ----
 struct PasoCarpetas {
     std::vector<std::string> creadasAntes, creadasDespues;
+    std::vector<std::string> ordenAntes, ordenDespues;   // el orden manual
     std::vector<int> tipos;
     std::vector<std::string> ids, antes, despues;
     bool enAntes;
@@ -2272,6 +2332,7 @@ struct PasoCarpetas {
 };
 static void PasoCarpetasIr(PasoCarpetas* p, bool aAntes) {
     gCreadas = aAntes ? p->creadasAntes : p->creadasDespues;
+    gOrdenBib = aAntes ? p->ordenAntes : p->ordenDespues; OrdenCambio();
     for (size_t i = 0; i < p->ids.size(); i++) {
         W3dProveedorRecursos* prov = W3dRecursosVistaProveedor(p->tipos[i]);
         if (prov) prov->FijarCarpeta(p->ids[i], aAntes ? p->antes[i] : p->despues[i]);
@@ -2292,11 +2353,12 @@ static int gGrupoProf = 0;
 class TransaccionCarpetas {
 public:
     bool activa;   // false = adentro de un grupo (el paso lo arma el grupo)
-    std::vector<std::string> creadas0;
+    std::vector<std::string> creadas0, orden0;
     std::map<std::string, std::string> items0;   // clave de biblioteca -> carpeta
     explicit TransaccionCarpetas(bool esGrupo = false) : activa(true) {
         if (!esGrupo && gGrupoProf > 0) { activa = false; return; }
         creadas0 = gCreadas;
+        orden0 = gOrdenBib;
         std::vector<W3dRecursoItem> its; W3dBibliotecaListar(-1, its);
         for (size_t i = 0; i < its.size(); i++) items0[W3dBibClave(its[i].tipo, its[i].id)] = its[i].carpeta;
     }
@@ -2305,6 +2367,8 @@ public:
         PasoCarpetas* p = new PasoCarpetas();
         p->creadasAntes = creadas0;
         p->creadasDespues = gCreadas;
+        p->ordenAntes = orden0;
+        p->ordenDespues = gOrdenBib;
         std::vector<W3dRecursoItem> its; W3dBibliotecaListar(-1, its);
         for (size_t i = 0; i < its.size(); i++) {
             std::map<std::string, std::string>::iterator a = items0.find(W3dBibClave(its[i].tipo, its[i].id));
@@ -2312,7 +2376,7 @@ public:
             p->tipos.push_back(its[i].tipo); p->ids.push_back(its[i].id);
             p->antes.push_back(a->second); p->despues.push_back(its[i].carpeta);
         }
-        if (p->ids.empty() && p->creadasAntes == p->creadasDespues) { delete p; return NULL; }
+        if (p->ids.empty() && p->creadasAntes == p->creadasDespues && p->ordenAntes == p->ordenDespues) { delete p; return NULL; }
         return p;
     }
     bool Confirmar() {
@@ -2332,6 +2396,18 @@ public:
         delete p;
     }
 };
+
+void W3dBibOrdenFijar(const std::vector<std::string>& hermanas) {
+    if (hermanas.empty()) return;
+    TransaccionCarpetas tx;
+    std::set<std::string> van(hermanas.begin(), hermanas.end());
+    std::vector<std::string> nuevo;
+    for (size_t i = 0; i < gOrdenBib.size(); i++) if (!van.count(gOrdenBib[i])) nuevo.push_back(gOrdenBib[i]);
+    nuevo.insert(nuevo.end(), hermanas.begin(), hermanas.end());
+    gOrdenBib.swap(nuevo);
+    OrdenCambio();
+    tx.Confirmar();
+}
 
 // los nombres de las hermanas de una carpeta nueva (las carpetas hijas directas de 'padre')
 static void Hermanas(const std::string& padre, std::vector<std::string>& out) {
@@ -2884,6 +2960,19 @@ void W3dRecursosVistaGuardarJson(std::string& s, W3dContenedorEscritor* esc) {
         JsonListaTextos(s, gCreadas);
         s += ",\n";
     }
+    // "orden": el orden MANUAL de la biblioteca (lo que se reordeno arrastrando), solo lo que sigue existiendo
+    {
+        std::vector<std::string> vivos;
+        for (size_t i = 0; i < gOrdenBib.size(); i++) {
+            int t = 0; std::string id; W3dRecursoItem it;
+            if (W3dBibDeClave(gOrdenBib[i], &t, &id) && W3dVistaRecInfo(t, id, &it)) vivos.push_back(gOrdenBib[i]);
+        }
+        if (!vivos.empty()) {
+            s += "  \"orden\": ";
+            JsonListaTextos(s, vivos);
+            s += ",\n";
+        }
+    }
     // "texturas": la carpeta de cada textura que la tiene. Solo las que van a estar ADENTRO del
     // archivo: la verificacion del guardado exige que toda entrada nombrada exista.
     W3dZipLector* viejo = W3dContenedorLector();
@@ -2929,9 +3018,9 @@ void W3dRecursosVistaGuardarJson(std::string& s, W3dContenedorEscritor* esc) {
     // un HUERFANO de afuera no lo nombra nadie y sin esta lista se perdia al volver a abrir. Pasan por la
     // ingesta: quedan en EXTERNOS.txt (y en el aviso del guardado si el archivo falta).
     if (esc) {
-        static const int kTipos[5] = { W3D_VISTA_TEXTURAS, W3D_VISTA_SONIDOS, W3D_VISTA_SCRIPTS, W3D_VISTA_FUENTES, W3D_VISTA_VIDEOS };
+        static const int kTipos[6] = { W3D_VISTA_TEXTURAS, W3D_VISTA_SONIDOS, W3D_VISTA_SCRIPTS, W3D_VISTA_FUENTES, W3D_VISTA_VIDEOS, W3D_VISTA_SHADERS };
         std::string ex;
-        for (int k = 0; k < 5; k++) {
+        for (int k = 0; k < 6; k++) {
             std::vector<W3dRecursoItem> its;
             W3dVistaRecListar(kTipos[k], its);
             const std::set<std::string>& pur = PurgadasDe(kTipos[k]);
@@ -3013,6 +3102,7 @@ static std::string RutaExternaAlAbrir(const std::string& j) {
 
 void W3dRecursosVistaLeerJson(JVal* raiz) {
     gCreadas.clear();
+    gOrdenBib.clear(); OrdenCambio();
     gCarpetaTex.clear();
     gCarpetaArch.clear();
     gTexExternasBib.clear();
@@ -3036,6 +3126,12 @@ void W3dRecursosVistaLeerJson(JVal* raiz) {
         }
         w3dLogf("[biblioteca] carpetas por tipo migradas al arbol unico (%d)", (int)gCreadas.size());
     }
+    JVal* jo = JHijo(raiz, "orden", 5);
+    if (jo)
+        for (size_t i = 0; i < jo->lista.size(); i++) {
+            JVal* e = jo->lista[i];
+            if (e && e->tipo == 2 && W3dBibOrden(e->str) < 0) { gOrdenBib.push_back(e->str); OrdenCambio(); }
+        }
     JVal* jt = JHijo(raiz, "texturas", 5);
     if (jt)
         for (size_t i = 0; i < jt->lista.size(); i++) {
@@ -3083,6 +3179,7 @@ void W3dRecursosVistaCerrarProyecto() {
     for (std::set<EntradaRetenida*>::iterator it = gRetenidas.begin(); it != gRetenidas.end(); ++it)
         std::vector<unsigned char>().swap((*it)->bytes);
     gCreadas.clear();
+    gOrdenBib.clear(); OrdenCambio();
     gCarpetaTex.clear();
     gCarpetaArch.clear();
     gTexPurgadas.clear();

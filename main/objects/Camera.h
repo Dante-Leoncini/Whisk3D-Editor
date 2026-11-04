@@ -85,6 +85,19 @@ class Camera : public Object, public Target {
         // si el propio esta en 0. Devuelve 0 si nadie declara nada.
         float AspectoDeclarado() const;
 
+        // PROFUNDIDAD DE CAMPO (el trazado de rayos la hace de verdad, desde la lente; el desenfoque de campo del
+        // postprocesado puede usar este mismo foco). Con 'dof' apagado la camara es un agujerito (todo nitido).
+        // fStop = la apertura como en una camara de verdad (f/2.8: mas chico = mas desenfoque); el tamanio de la lente
+        // sale de eso y del fov (sensor de 24 mm de alto). focoDist = la distancia enfocada (m, animable: AnimCamFoco).
+        // focoObjeto = el NOMBRE de un objeto: si esta, el foco lo sigue solo (la distancia hasta el, a lo largo de la
+        // mirada) y focoDist no se usa
+        bool  dof;
+        float fStop;
+        float focoDist;
+        std::string focoObjeto;
+        float DistanciaFoco() const;   // la que se usa ahora (el objeto, o focoDist), en m
+        float RadioLente() const;      // el radio de la lente (m): fov + fStop
+
         // ¡Nuevas variables para guardar los ejes ya calculados!
         Vector3 rightVector;
         Vector3 forwardVector;

@@ -25,11 +25,9 @@ prefabvivos 3
 prefabinfo Enemigo.001 generados 4 overrides 1
 
 # --- el Play del editor ---
-simcache 0
 simplay 130
 scriptinfo compartido juez OK
 simstop
-simcache 1
 prefabvivos 3
 
 # --- el binario (modo debug: deja su whisk3d.log) ---

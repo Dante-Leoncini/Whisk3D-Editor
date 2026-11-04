@@ -26,7 +26,6 @@ streamestado Lejos cargada
 streamtexrefs exacto
 
 # --- el Play ---
-simcache 0
 simplay 1
 # (el primer actualizar ya pidio: descargar Fija y Cerca, cargar Lejos -su malla y su textura ya estaban: se genera
 #  en el mismo frame-)
@@ -57,7 +56,6 @@ streammem mallas 3 texturas 1
 streamtexrefs exacto
 streamobjetivo off
 simstop
-simcache 1
 # (el Stop: las tres como estaban antes del Play, y la Fija vuelve a ser de siempre -su paso de undo-)
 streamestado Fija cargada
 streamestado Cerca cargada

@@ -9,3 +9,6 @@
 | `soltarSonido(h)` | Notayı bırakır: zarf bırakma aşamasına geçer. |
 | `reverb(sala, amortiguacion, nivel)` | Genel yankı: oda boyutu, sönümleme ve seviye (her biri 0 ile 1 arası; seviye 0 kapatır). |
 | `silenciar(bool)`, `estaMudo()` | Genel sessize alma. |
+| `tocarSonido(obj [, seg])`, `callarSonido(obj)` | Bir **Sound nesnesini** yeniden başlatır (bölümünün `seg` saniyesinden) ya da susturur. |
+| `sonidoObj(obj) → t`, `setSonidoObj(obj, t)` | Bir Sound nesnesini okur / değiştirir: `archivo` (kaynak), `activo`, `volumen`, `tono`, `reverb`, `paneo`, `inicio`, `recorteIni`, `recorteFin`, `bucle`, `posicional`, `radio`, `alcance` (okurken `duracion`, `sonando` da). |
+| `crearSonido("sonidos/x.wav" [, padre]) → obj` | Yeni bir Sound nesnesi (`destruir(obj)` onu kaldırır). Bir prefab içinde her nesne gibi örneklenir. |

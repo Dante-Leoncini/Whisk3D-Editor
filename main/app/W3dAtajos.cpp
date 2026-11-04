@@ -38,6 +38,8 @@ static const W3dAtajoDef kAtajos[] = {
     { "global.emparentar",    W3dATC_GLOBAL,   "Parent",                     "Ctrl+P", NULL, "Ctrl P" },
     { "global.desemparentar", W3dATC_GLOBAL,   "Clear Parent",               "Alt+P", NULL, "Alt P" },
     { "global.pantalla",      W3dATC_GLOBAL,   "Fullscreen",                 "F11" },
+    { "global.render",        W3dATC_GLOBAL,   "Render Image",               "F12" },
+    { "global.renderAnim",    W3dATC_GLOBAL,   "Render Animation",           "Ctrl+F12" },
 
     // ---- vista 3D ----
     { "3d.seleccionarTodo",   W3dATC_3D,       "Select All",                 "A", "Pencil+Up", "A" },
@@ -71,6 +73,7 @@ static const W3dAtajoDef kAtajos[] = {
     { "3d.vistaArriba",       W3dATC_3D,       "Top View",                   "Num7", "#+Up", NULL },
     { "3d.vistaAbajo",        W3dATC_3D,       "Bottom View",                "Ctrl+Num7", "#+Down", NULL },
     { "3d.perspectiva",       W3dATC_3D,       "Perspective / Orthographic", "Num5", "#", NULL },
+    { "3d.modoVista",         W3dATC_3D,       "Next Viewport Shading",      "Z", "6", NULL },
     { "3d.rodarIzq",          W3dATC_3D,       "Roll Left",                  "Num4" },
     { "3d.rodarDer",          W3dATC_3D,       "Roll Right",                 "Num6" },
     { "3d.vistaCamara",       W3dATC_3D,       "Camera View",                "Num0", "8", NULL },
@@ -547,7 +550,7 @@ int W3dAtajoContextos(int* c) {
     if (xf) c[n++] = W3dATC_XFORM;
     switch (kind) {
         case 1: c[n++] = W3dATC_3D; break;
-        case 2: c[n++] = W3dATC_OUTLINER; break;
+        case 2: case 9: c[n++] = W3dATC_OUTLINER; break;   // (la biblioteca es un outliner)
         case 3: c[n++] = W3dATC_PROPS; break;
         case 4: c[n++] = W3dATC_UV; break;
         case 5: c[n++] = W3dATC_TIMELINE; break;

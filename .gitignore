@@ -116,7 +116,7 @@ platform/linux/debug/
 
 # proyectos sueltos en la RAIZ del repo: son basura de pruebas manuales (guardarw3d con
 # ruta relativa deja el .w3d y su carpeta de contenido al lado del ejecutable/cwd).
-# Los proyectos de verdad viven en Whisk3D-Examples o en "W3D Examples".
+# Los proyectos de verdad viven en Whisk3D-Examples o en examples/
 /*.w3d
 /*.w3dm
 /contenido/

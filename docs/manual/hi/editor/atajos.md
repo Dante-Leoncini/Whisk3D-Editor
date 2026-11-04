@@ -57,6 +57,8 @@ xf.cancelar = Esc, Q
 | Parent | <kbd>Ctrl+P</kbd> | — | `global.emparentar` |
 | Clear Parent | <kbd>Alt+P</kbd> | — | `global.desemparentar` |
 | Fullscreen | <kbd>F11</kbd> | — | `global.pantalla` |
+| Render Image | <kbd>F12</kbd> | — | `global.render` |
+| Render Animation | <kbd>Ctrl+F12</kbd> | — | `global.renderAnim` |
 
 ### 3D Viewport
 

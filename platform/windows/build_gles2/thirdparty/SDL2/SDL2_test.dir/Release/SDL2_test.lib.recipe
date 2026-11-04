@@ -1,0 +1,14 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project>
+  <ProjectOutputs>
+    <ProjectOutput>
+      <FullPath>C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\x64\Release\ZERO_CHECK</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\x64\Release\sdl_headers_copy</FullPath>
+    </ProjectOutput>
+  </ProjectOutputs>
+  <ContentFiles />
+  <SatelliteDlls />
+  <NonRecipeFileRefs />
+</Project>

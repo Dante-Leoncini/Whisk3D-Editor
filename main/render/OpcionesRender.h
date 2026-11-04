@@ -19,7 +19,7 @@ enum { lineal, closest };
 
 // dialecto C++03 compartido
 struct RenderType {
-    enum Enum { Solid, MaterialPreview, Rendered, ZBuffer, Wireframe, NormalView, Alpha };
+    enum Enum { Solid, MaterialPreview, Rendered, ZBuffer, Wireframe, NormalView, Alpha, Vectores };   // Vectores: el pase a PNG y la vista "Motion Vectors" (render/VectoresMovimiento.h)
     Enum v;
     RenderType() : v(Solid) {}
     RenderType(Enum e) : v(e) {}

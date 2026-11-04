@@ -33,7 +33,7 @@ The list of everything in the scene, and also the project's resource library. On
 
 | Function | Description |
 |---|---|
-| Resources | Meshes, materials, textures, animations, prefabs, scenes, sounds, scripts, fonts and videos, in folders. Green check mark = in use; red cross = orphan; `*` = unsaved. |
+| Resources | Meshes, materials, textures, animations, prefabs, scenes, sounds, scripts, [shaders](shaders.md), fonts and videos, in folders. A material or a shader dragged onto a mesh in the 3D Viewport shows on the part under the pointer before you drop it. Green check mark = in use; red cross = orphan; `*` = unsaved. |
 | Filter / List or grid | Show only one type; view thumbnails. |
 | Drag a resource | Onto a folder (moves it), onto the 3D Viewport (mesh = new object, material or texture = assigned to what you drop it on, prefab = instance) or onto a Properties drop-down. |
 | New Folder / Move to Folder | Organize (folders are only for sorting). |

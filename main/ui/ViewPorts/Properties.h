@@ -132,7 +132,6 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         // una sombra pegada al piso sin salir a editar un archivo de texto. Ahora estan
         // en la tarjeta Material: DOS DESPLEGABLES (mezcla y test de profundidad) + el
         // sesgo, el orden de pasada y un tilde "Decal" que aplica la receta entera.
-        PropBool*  propMatDecal;   // preset DECAL (transparente + sin escribir z + sesgo + pasada 1)
         PropFloat* propMatSesgo;   // sesgoProfundidad (glPolygonOffset; negativo = hacia el ojo)
         PropFloat* propMatSesgoM;  // sesgoMetros (sesgo de profundidad en metros: + aleja, - acerca)
         PropFloat* propMatOrden;   // ordenPasada 0 opaco / 1 decal / 2 transparente
@@ -302,6 +301,7 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         GroupPropertie* propUIcard;
         PropBool*   propUIver3D;     // ver los elementos con su profundidad en la escena 3D
         PropBool*   propUIigualRender; // lienzo = tamano del render (default); apagado = responsive
+        PropBool*   propUIenArbol;     // la UI se dibuja en su lugar del outliner (UI::enArbol)
         PropFloat*  propUIancho;     // el lienzo propio (solo en responsive)
         PropFloat*  propUIalto;
         PropButton* propUIres;       // desplegable de resoluciones (4k .. 240p)
@@ -355,7 +355,8 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropBool*   propHijosScroll; // permitir scrollear el contenido recortado
         PropFloat*  propHijosScrollX;
         PropFloat*  propHijosScrollY;
-        PropBool*   propLightDir;     // Directional (w=0) vs puntual/spot
+        PropBool*   propLightDir;     // Directional (w=0) vs puntual/spot (oculta: la reemplaza el Tipo)
+        PropButton* propLightTipo;    // Tipo: Punto / Sol / Foco (direccional + cono)
         PropFloat*  propLightGL;      // numero de GL light (0..7, entero)
         PropColor*  propLightDiffuse; // color difuso
         PropColor*  propLightAmbient; // color ambiente
@@ -363,6 +364,8 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropFloat*  propLightAttC;    // atenuacion constante / lineal / cuadratica
         PropFloat*  propLightAttL;
         PropFloat*  propLightAttQ;
+        PropFloat*  propLightIntens;  // la intensidad (multiplica el color)
+        PropFloat*  propLightDist;    // la distancia en metros (hasta donde alumbra; el largo del cono)
         PropFloat*  propLightSpotCut; // spot: angulo del cono
         PropFloat*  propLightSpotExp; // spot: concentracion del haz
         PropFloat*  propLightRTRadio; // trazado de rayos: tamano de la lampara (0 = puntual, sombra dura)
@@ -372,6 +375,9 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropFloat*  propCamFov;      // campo de vision (grados), animable (AnimFov)
         PropFloat*  propCamNear;     // distancia minima de dibujado, animable (AnimClip/X)
         PropFloat*  propCamFar;      // distancia maxima de dibujado, animable (AnimClip/Y)
+        // PROFUNDIDAD DE CAMPO de la camara (Camera::dof): el tilde, la apertura, la distancia de foco (animable:
+        // AnimCamFoco) y el objeto al que sigue el foco (desplegable; si hay uno, la distancia se esconde)
+        PropBool* propCamDof; PropFloat* propCamFStop; PropFloat* propCamFoco; PropButton* propBtnCamFocoObj;
         GroupPropertie* propInstance;// pestania de instance/array/mirror: target
         // pestania del objeto LOD: umbrales de distancia como texto "20, 45, 90"
         // (commit en vivo, mismo patron que el texto del elemento 2D)
@@ -398,6 +404,21 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropFloat*  propNieblaDens;    // exp / exp2
         PropColor*  propNieblaColor;
         PropBool*   propNieblaFondo;   // el fondo del render toma el color de la niebla
+        // SONIDO (objects/Sonido.h): el archivo, como suena, desde cuando (segundos), el recorte, el bucle y el 3D
+        GroupPropertie* propSonido;
+        PropButton* propSonArchivo;    // desplegable: los sonidos del proyecto
+        PropBool*   propSonActivo;
+        PropFloat*  propSonVol;        // animable (AnimSonido X)
+        PropFloat*  propSonTono;       // animable (AnimSonido Y): pitch
+        PropFloat*  propSonReverb;     // animable (AnimSonido Z): envio a la reverb
+        PropFloat*  propSonPaneo;      // solo sin 3D
+        PropFloat*  propSonInicio;     // segundos de la escena
+        PropFloat*  propSonRecIni;     // recorte del principio (s)
+        PropFloat*  propSonRecFin;     // recorte del final (s)
+        PropBool*   propSonBucle;      // se repite hasta el infinito
+        PropBool*   propSonPos;        // sonido 3D
+        PropFloat*  propSonRadio;      // 3D: hasta aca entero
+        PropFloat*  propSonAlcance;    // 3D: desde aca no se oye
         // objetos LimpiarZ / Recorte (composicion de la pantalla en el arbol)
         GroupPropertie* propLimpiarZ;
         PropBool*   propLzActivo;
@@ -603,9 +624,6 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropButton* propBtnAnimRename; // "Rename" de la animacion activa (escena o clip)
         PropButton* propClipRetarget;  // el retarget por defecto del CLIP DE JERARQUIA elegido (Complete / Rotations only)
         PropButton* propBtnAnimRender; // "Render Animation" (gris si no hay animaciones)
-        // la nota del render de un JUEGO (timeline en "Juego"): se renderiza su CACHE de simulacion;
-        // sin cache avisa que solo hay Render Image del frame actual
-        PropLabel*  propRenderNota;
         // CONFIG del flipbook activo (kind 5): en la card Animation, ocultos salvo con flipbook activo
         PropButton* propFlipAtlas;     // dropdown del atlas (textura) del flipbook
         PropFloat*  propFlipCuadros;   // cantidad de celdas del ciclo
@@ -624,9 +642,6 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropBool*   propJuegoSonido;    // checkbox: compilar CON el audio (default si)
         PropBool*   propJuegoDebug;     // checkbox: modo debug W3D_DEV_LOG=1 (default NO = produccion)
         PropButton* propJuegoCompilar;
-        PropBool*   propAnimConservar; // play no pisa lo grabado: lo reproduce
-        PropBool*   propJuegoCacheOn;  // cache de juego (rewind) ON/OFF: OFF = sin snapshot por tick = fluido
-        PropFloat*  propJuegoCacheMax; // limite del cache (frames); se oculta cuando el cache esta OFF
         GroupPropertie* propExport;  // pestania RENDER: tarjeta "Export" (.obj)
         // pestania TRANSFORMAR (tab 5, icono del modo de seleccion; SOLO Edit Mode con malla activa):
         // 2 tarjetas. "Transform Mesh" = X/Y/Z del centro de la seleccion (antes en la pestania
@@ -663,8 +678,6 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropButton*    propBoolTarget;
         PropButton* propArmTarget; // "Target" del modificador Armature (dropdown: solo esqueletos)
         PropButton* propBtnOptVG;  // "Optimize Vertex Groups" (1 hueso/vertice) del modificador Armature (destructivo, con confirm)
-        PropBool*   propArmCache;      // "Cache Animation" del modificador Armature (bakea el skinning por frame)
-        PropFloat*  propArmCacheSkip;  // "Frame Skip" del cache (0=todos; N=cada N+1 e interpola -> menos memoria)
         PropBool*  propMirMerge; PropFloat* propMirDist; PropBool* propMirClip; // merge + distancia + clipping
         // Subdivision Surface: modo (Catmull-Clark/Simple) + niveles viewport/render
         PropBool*  propSubSimple; PropFloat* propSubLevel; PropFloat* propSubRender;
@@ -772,9 +785,30 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropColor* propRenderBg;     // color de fondo del render (global g_renderBg, solo pase Rendered)
         float renderW; float renderH;          // valores del render (default 640 x 480)
         bool  renderZbuffer; bool renderNormal; bool renderAlpha; // pases extra tildados (el beauty siempre)
+        // VECTORES DE MOVIMIENTO (el pase _vectores) y el DESENFOQUE DE MOVIMIENTO del beauty (render/VectoresMovimiento.h)
+        bool  renderVectores; bool renderDesenfoque; float renderObturador;
+        PropBool* propRenderVectores; PropBool* propRenderDesenfoque; PropFloat* propRenderObturador;
         PropBool*  propRT;           // "Ray Tracing": el pase Rendered se traza por CPU (render/RayTracer)
         PropFloat* propRTRayos; PropFloat* propRTSamples; PropFloat* propRTPases; // solo visibles con Ray Tracing tildado
-        float rtRayos, rtSamples, rtPases;     // espejos float de g_rt (los PropFloat bindean float*)
+        PropFloat* propRTCapas;   // las capas transparentes que atraviesa un rayo
+        PropButton* propRTGpu;
+        PropBool* propRTSoloFinal;   // ver solo la imagen terminada (g_rt.soloFinal)
+        PropBool* propRTSemilla;     // otro ruido en cada imagen (g_rt.semillaVariable)
+        PropBool* propRTDesenfoque; PropFloat* propRTObturador; PropButton* propRTObtPos;   // el desenfoque trazado (g_rt.desenfoque)
+        // tarjeta "Post Processing" (pestania Render, debajo de Render): la pila de efectos (render/Postproceso.h), como
+        // los modificadores: la lista + Add|Remove + Move Up|Move Down y los parametros del ELEGIDO
+        GroupPropertie* propPost;
+        PropBool* propPostOn; PropLabel* propPostCPU; PropListMeshParts* propListPost;
+        PropButtonRow* propRowPost; PropButtonRow* propRowPostMove;
+        PropBool* propPostActivo;
+        PropFloat* propPostGranoInt; PropFloat* propPostGranoTam; PropBool* propPostGranoColor;
+        PropFloat* propPostFocoDist; PropFloat* propPostFocoRango; PropFloat* propPostFocoDesenf; PropBool* propPostFocoCam;
+        PropFloat* propPostMovObt;
+        PropFloat* propPostBloom[6]; PropColor* propPostBloomColor; PropBool* propPostBloomRapido;   // (BLOOM: v[0..5])
+        PropButton* propRTReesc;     // COMO se agranda (g_rt.reescalador: lineal o FSR 1); solo con el reescalado puesto
+        PropButton* propRTEscala;    // el reescalado del viewport (g_rt.escala: Off, x2, x3, x4)       // DONDE se traza: CPU o la GPU (render/RTGpu.h); solo si hay una GPU con Vulkan
+        PropButton* propRTDenoiser;  // el DENOISER (desplegable: los que hay en esta maquina; render/Denoiser.h)
+        float rtRayos, rtSamples, rtPases, rtCapas;     // espejos float de g_rt (los PropFloat bindean float*)
         PropText* propExportPath;    // campo editable "Path" del export (carpeta de salida)
         PropText* propExportName;    // campo editable "File name" del export (solo el nombre + extension del formato)
         PropButton* propExportFormat;// dropdown de formato de export (OBJ / FBX / glTF / GLB)
@@ -808,7 +842,18 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropButton* propBtnNewMaterial;
         PropButton* propBtnTextura;
         PropButton* propBtnNormalTex; // selector de la textura del normal map (visible si Normal Mapping ON)
+        // LOS MAPAS del trazado de rayos / PBR (W3dMatMapa EMISION..ALFA; [0] y [1] = NULL: son propBtnTextura y
+        // propBtnNormalTex). [nombre] [numero/textura] [UV] [la textura o el numero]. Solo con el trazado de rayos
+        PropButton* propMapa[8];
+        PropFloat*  propMatIOR;      // indice de refraccion (trazado de rayos)
+        PropFloat*  propMatTrans;    // TRANSMISION 0..1 (trazado de rayos): lo que es vidrio
+        // SHADER ESCRITO (objects/ShaderEscrito.h): el tilde, el archivo, Compile (+ el lapiz: editar en el IDE) y el resultado
+        PropBool*   propMatShaderOn;
+        PropButton* propBtnShader;
+        PropButton* propBtnShaderComp;
+        PropLabel*  propMatShaderMsg;
         PropButton* propBtnReflectMode; // dropdown del MODO de Reflection (Matcap/Sphere Map/Equirect; visible si Reflection ON)
+        PropButton* propBtnSombreado;   // dropdown del SOMBREADO: por vertice / por pixel (solo con shaders y Lighting ON)
         // ---- CAPAS DE TEXTURA (TexLayer): hasta 4 filas de [textura | UV | mezcla | on]. La fila que sigue a la
         //      ultima capa es la de "Add Layer" (elegir una textura ahi crea la capa); "No Texture" la borra. ----
         PropLabel*  propCapasTitulo;
@@ -858,6 +903,7 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         bool focoEnTabs;
         void CambiarTab(int dir);   // -1/+1 entre las pestañas visibles
         void EntrarPrimerGrupoVisible(); // foco al 1er grupo VISIBLE de la pestaña
+        void RetomarSeleccion();         // volver al panel (tecla verde): la fila donde estaba, si sigue a la vista
         void EntrarUltimoGrupoVisible(); // foco a la ULTIMA propiedad (arriba en las pestañas -> wrap)
         void LimpiarSeleccionGrupos();   // sin nada resaltado (foco en pestañas)
         // setea el rect en pantalla del boton de la fila seleccionada para que
@@ -911,12 +957,10 @@ class Properties : public ViewportBase, public WithBorder, public Scrollable {
         PropText*   propAjRepo;     // raiz del repo para Compilar (editor instalado)
         PropText*   propAjDispositivo; // el nombre de este dispositivo en la red (el que ven al buscar partidas)
 
-#ifndef W3D_SYMBIAN
-        void mouse_button_up(int boton) W3D_OVERRIDE;
+        void mouse_button_up(int boton) W3D_OVERRIDE;   // (Symbian: solo con el dedo)
         void event_mouse_wheel(float dy, int mx, int my) W3D_OVERRIDE;
         void event_key_down(int tecla, bool repeticion) W3D_OVERRIDE;
         void event_key_up(int tecla) W3D_OVERRIDE;
-#endif
         // click: plegar/desplegar el grupo cuyo titulo este bajo el mouse
         // (compartido; en PC se cablea a mouse_button_up)
         void ClickEn(int mx, int my);

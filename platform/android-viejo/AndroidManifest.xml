@@ -10,6 +10,8 @@
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <!-- jugar en red (net/W3dRed.cpp): sin esto, socket() falla -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- la vibracion del agarre de la biblioteca (pulsacion larga) -->
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <application android:label="Whisk3D"
                  android:icon="@drawable/icono"

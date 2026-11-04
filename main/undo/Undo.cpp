@@ -47,7 +47,7 @@ extern std::string DopeIdDueno(const Object* o);
 // las filas de VERTEX ANIM se resuelven por la anim ACTIVA -> todo camino que la cambie tiene
 // que soltar esa seleccion (ver DopeSoltarVertexAnim en Timeline.h)
 extern void DopeSoltarVertexAnim();
-extern void InvalidarSkinDeArmature(Armature* a); // ObjectMode.cpp (libera el cache de vertex-anim de las mallas del rig)
+extern void InvalidarSkinDeArmature(Armature* a); // ObjectMode.cpp (re-skinnea las mallas del rig)
 
 // ============================================================================
 //  Comandos de UNDO/REDO. Cada comando guarda UN snapshot del estado y su
@@ -947,38 +947,51 @@ class MaterialModUndo : public UndoCmd {
     // b[10], o sea FUERA del arreglo, pisando el miembro de al lado (rmode), y Difiere() comparaba
     // el bool basura de cb[10] (daba "cambio" un material que no cambio). GCC lo cantaba con
     // -Waggressive-loop-optimizations. Si se agrega un flag: sumarlo en Leer/Escribir y aca.
-    static const int NFLAGS = 11;   // [10] = lineas (aristas por material)
+    static const int NFLAGS = 12;   // [10] = lineas (aristas por material), [11] = porPixel (sombreado por pixel)
     Material* mat;
     bool b[NFLAGS]; int rmode; float shin; // rmode = reflectMode (era el bool chromeEquirect, ahora int de 3 modos)
     float glinea;                          // grosorLinea (px): viaja con el flag lineas
     float acorte;                          // alphaTest (recorte por alfa, 0 = apagado): fila "Alpha Test" del panel
     float mezb;                            // mezclaB (mezcla de texturas, 0 = solo la base): fila "Texture mix"
+    // LOS MAPAS: numero / textura y la capa UV de cada uno, sus numeros (rugosidad, metalico, alfa) y el IOR
+    struct Mapas { bool ct[W3D_MAPAS]; int uv[W3D_MAPAS]; float rug, met, alfa, ior;
+        void Leer(const Material* m) { for (int k = 0; k < W3D_MAPAS; k++) { ct[k] = m->mapaConTextura[k]; uv[k] = m->uvMapa[k]; }
+                                       rug = m->rtRugosidad; met = m->rtMetalico; alfa = m->diffuse[3]; ior = m->ior; }
+        void Escribir(Material* m) const { for (int k = 0; k < W3D_MAPAS; k++) { m->mapaConTextura[k] = ct[k]; m->uvMapa[k] = uv[k]; }
+                                           m->rtRugosidad = rug; m->rtMetalico = met; m->diffuse[3] = alfa; m->ior = ior; }
+        bool Igual(const Mapas& o) const { for (int k = 0; k < W3D_MAPAS; k++) if (ct[k] != o.ct[k] || uv[k] != o.uv[k]) return false;
+                                           return rug == o.rug && met == o.met && alfa == o.alfa && ior == o.ior; } };
+    Mapas mapas;
     static void Leer(Material* s, bool* bo, int& rm, float& sh, float& gl, float& ac, float& mb) {
         bo[0]=s->textureOn; bo[1]=s->filtrado; bo[2]=s->transparent; bo[3]=s->vertexColor;
         bo[4]=s->lighting; bo[5]=s->repeat; bo[6]=s->uv8bit; bo[7]=s->culling;
-        bo[8]=s->depth_test; bo[9]=s->chrome; bo[10]=s->lineas;
+        bo[8]=s->depth_test; bo[9]=s->chrome; bo[10]=s->lineas; bo[11]=s->porPixel;
         rm=s->reflectMode; sh=s->shininess; gl=s->grosorLinea; ac=s->alphaTest; mb=s->mezclaB;
     }
     static void Escribir(Material* s, const bool* bo, int rm, float sh, float gl, float ac, float mb) {
         s->textureOn=bo[0]; s->filtrado=bo[1]; s->transparent=bo[2]; s->vertexColor=bo[3];
         s->lighting=bo[4]; s->repeat=bo[5]; s->uv8bit=bo[6]; s->culling=bo[7];
-        s->depth_test=bo[8]; s->chrome=bo[9]; s->lineas=bo[10];
+        s->depth_test=bo[8]; s->chrome=bo[9]; s->lineas=bo[10]; s->porPixel=bo[11];
         s->reflectMode=rm; s->shininess=sh; s->grosorLinea=gl; s->alphaTest=ac; s->mezclaB=mb;
     }
 public:
-    MaterialModUndo(Material* M) : mat(M), rmode(0), shin(0), glinea(1.0f), acorte(0.0f), mezb(0.0f) { if (mat) Leer(mat, b, rmode, shin, glinea, acorte, mezb); }
+    MaterialModUndo(Material* M) : mat(M), rmode(0), shin(0), glinea(1.0f), acorte(0.0f), mezb(0.0f) { if (mat) { Leer(mat, b, rmode, shin, glinea, acorte, mezb); mapas.Leer(mat); } }
     Material* Mat() const { return mat; }
     bool Difiere() const {
         if (!MaterialVivo(mat)) return false;
         bool cb[NFLAGS]; int crm; GLfloat cs, cg, ca, cm; Leer(mat, cb, crm, cs, cg, ca, cm);
         for (int i=0;i<NFLAGS;i++) if (cb[i]!=b[i]) return true;
+        Mapas cmp; cmp.Leer(mat); if (!cmp.Igual(mapas)) return true;
         return crm != rmode || cs != shin || cg != glinea || ca != acorte || cm != mezb;
     }
     void Aplicar() {
         if (!MaterialVivo(mat)) return;   // (a): el puntero se REVALIDA al aplicar, no se usa a ciegas
         bool cb[NFLAGS]; int crm; GLfloat cs, cg, ca, cm; Leer(mat, cb, crm, cs, cg, ca, cm);   // estado vivo
+        Mapas vivos; vivos.Leer(mat);
         Escribir(mat, b, rmode, shin, glinea, acorte, mezb);                                   // restaura el guardado
+        mapas.Escribir(mat);
         for (int i=0;i<NFLAGS;i++) b[i]=cb[i]; rmode=crm; shin=cs; glinea=cg; acorte=ca; mezb=cm; // guarda lo vivo (para rehacer)
+        mapas = vivos;
     }
     // b[NFLAGS] es un arreglo FIJO de flags del material, NO un vector paralelo a una lista.
     W3D_UNDO_SIN_INDICES // mat: (a) Material* REVALIDADO al aplicar (MaterialVivo); b/rmode/shin/glinea/acorte: (d) valores propios
@@ -2485,7 +2498,7 @@ void UndoJoinConfirmar() {
 }
 
 // ARMATURE: snapshot de la REST (T/R/S/preRot/rotOrder/tlNode/head/tail/pose) de todos los huesos, para deshacer un
-// Apply Transform sobre el armature (que la hornea). Aplicar() = SWAP + invalida el cache de skin de las mallas del rig.
+// Apply Transform sobre el armature (que la hornea). Aplicar() = SWAP + re-skinnea las mallas del rig.
 struct BoneRestEst { Vector3 restT, restR, restS, preRot, head, tail, poseT, poseR, poseS; int rotOrder; Matrix4 tlNode; };
 class ArmatureBonesUndo : public UndoCmd {
     // (un objeto que se LIBERA de verdad -el streaming descarga lo generado, una regeneracion- deja de ser de este
@@ -2511,7 +2524,7 @@ public:
             b.head=t.head; b.tail=t.tail; b.poseT=t.poseT; b.poseR=t.poseR; b.poseS=t.poseS;
             t.restT=rt; t.restR=rr; t.restS=rs; t.preRot=pr; t.rotOrder=ro; t.tlNode=tn; t.head=hd; t.tail=tl; t.poseT=pt; t.poseR=pR; t.poseS=pS; }
         a->poseSerial++; // la pose se recalcula (rest nueva)
-        InvalidarSkinDeArmature(a); // libera el cache stale + fuerza re-skin (la firma del cache no ve la rest)
+        InvalidarSkinDeArmature(a); // fuerza re-skin con la rest nueva
     }
     // e[] es (c): vector PARALELO a Armature::bones. Esa lista es familia (1) -TODA edicion de
     // huesos empuja un BonesUndo, que la restaura entera, asi que por LIFO los indices vuelven
@@ -2912,7 +2925,7 @@ public:
         // el rest de un rig AUTORADO sale de head/tail -> recomputar matrices de skin con lo restaurado
         if (a->skinAutorado) PrepararSkinAutorado(a);
         a->poseDirty = false; a->lastPoseFrame = -999999; a->poseSerial++;
-        InvalidarSkinDeArmature(a); // cache de skin/vertex-anim de las mallas del rig: stale
+        InvalidarSkinDeArmature(a); // el skin de las mallas del rig quedo con la rest vieja
     }
     // (c) tracks[].idx: POSICION en Armature::animations (clips 3D), familia (2) -> se remapea.
     //     Cubre las DOS operaciones: borrar un clip (UndoBorrarClipArm) y reordenarlos

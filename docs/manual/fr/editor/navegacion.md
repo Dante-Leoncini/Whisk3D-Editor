@@ -56,6 +56,6 @@
 | Parcourir la sélection / ajouter, retirer, tout ou rien | Crayon / Crayon + flèches |
 | Barre de menus / curseur virtuel | Touche de sélection gauche / droite |
 | Changer de viewport, redimensionner, agrandir | Touche verte (seule, + flèches, + OK) |
-| Mode jeu en plein écran | Touche verte + <kbd>0</kbd> |
+| Mode jeu en plein écran | Touche verte + <kbd>0</kbd> (encore une fois : l'image couvre tout l'écran ; encore une fois : retour). Sans l'interface, sans le bord de la caméra ni la zone sombre autour (des bandes noires ne restent que si la caméra déclare un format différent de celui de l'écran, jusqu'au deuxième appui), et les flèches ne déplacent pas la vue : on voit le jeu tel quel |
 
 Le N95 accepte aussi une souris et un clavier Bluetooth. Pour saisir du texte, on utilise le T9.

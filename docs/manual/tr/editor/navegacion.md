@@ -56,6 +56,6 @@
 | Seçimde sırayla dolaşma / ekleme, çıkarma, hepsi ya da hiçbiri | Pencil / Pencil + ok tuşları |
 | Menü çubuğu / sanal imleç | Sol / sağ seçim tuşu |
 | Viewport değiştirme, yeniden boyutlandırma, büyütme | Yeşil tuş (tek başına, + ok tuşları, + OK) |
-| Tam ekran oyun modu | Yeşil tuş + <kbd>0</kbd> |
+| Tam ekran oyun modu | Yeşil tuş + <kbd>0</kbd> (bir daha: görüntü tüm ekranı kaplar; bir daha: geri döner). Arayüz yok, kamera kenarlığı ve çevresindeki karanlık alan yok (siyah şeritler yalnızca kamera ekrandan farklı bir en-boy oranı bildirirse, ikinci basışa kadar kalır) ve oklar kaydırma yapmaz: oyun olduğu gibi görünür |
 
 N95 ayrıca Bluetooth fare ve klavye de kabul eder. Metin yazmak için T9 kullanılır.

@@ -17,6 +17,15 @@ rtsave /tmp/w3d_rt_duro.png
 rtpixel 4 4 0 0 0 0
 rtpixel 80 56 255 255 255 40
 rtpixel 36 40 0 0 0 8
+# DISTANCIA de la luz (m): la lampara nueva esta a mas de 4 m del piso -> con 1 no llega y queda solo la luz de la
+# escena inicial (gris, sin quemar); con 50 vuelve casi igual que sin limite (blanco)
+rtlight 0 0 0 1
+rtrender 96 72 2
+rtpixel 80 56 184 184 184 16
+rtlight 0 0 0 50
+rtrender 96 72 2
+rtpixel 80 56 255 255 255 40
+rtlight 0 0 0
 # lampara con RADIO: la sombra se ablanda (el centro sigue oscuro, el borde queda gris)
 rtlight 1.5 16 0
 rtrender 96 72 4
@@ -84,3 +93,10 @@ rtpixel 84 56 217 217 217 12
 matnormal 0
 rtrender 96 72 1
 rtpixel 84 56 255 255 255 4
+
+# una malla con MODIFICADORES se traza con su malla generada: el cubo con Subdivision (6 caras x 4 = 48 triangulos)
+# mas el plano. Antes la malla generada no aportaba ni un triangulo (tomaba start/count, que nadie llena)
+selobj Cubo
+modadd subsurf
+rtrender 96 72 1
+rttris 48

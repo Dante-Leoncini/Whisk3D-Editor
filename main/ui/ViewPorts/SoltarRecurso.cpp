@@ -6,6 +6,7 @@
 //    - malla 3D  -> un OBJETO malla nuevo con ese recurso, en el punto del rayo (sobre
 //                   la superficie tocada, o en el plano del cursor 3D si no toca nada);
 //    - material  -> a la PARTE de la malla tocada;
+//    - shader    -> al material de la PARTE tocada (con el material por defecto: uno nuevo con ese shader);
 //    - textura   -> al material de la parte tocada (el por defecto no se edita);
 //    - animset   -> al armature de la malla tocada (o el que se toca);
 //    - prefab    -> una INSTANCIA en el punto del rayo (io/PrefabsEditor.h).
@@ -17,6 +18,7 @@
 //  (el resaltado mientras se arrastra).
 //  Solo editor. C++03. Motor generico.
 // ============================================================================
+#include "objects/Sonido.h"   // soltar un sonido en el 3D: un objeto Sonido
 #include "ViewPort3D.h"
 #include "io/RecursosProyecto.h"
 #include "io/MallasProyecto.h"
@@ -41,6 +43,7 @@
 #include <cmath>
 #include <cfloat>
 #include "io/Prefabs.h"   // W3dPrefabClaveEscena: una escena del proyecto se instancia
+#include "objects/ShaderEscrito.h"   // soltar un shader: el material de la parte lo usa
 
 // ---- EL RAYO ----
 namespace {
@@ -140,7 +143,7 @@ static bool DeLibreria(Object* o) {
 // la TEXTURA base de un material (ida y vuelta). El paso es DUENO de una referencia a 'otra' (la ranura del material
 // tiene la suya: Textures.h, TexturaPonerEn): ir y volver intercambia las dos sin tocar la cuenta, y la que el paso
 // tenia guardada se suelta cuando se cae del historial
-struct UndoTexMat { Material* m; Texture* otra; bool onOtro; };
+struct UndoTexMat { Material* m; Texture* otra; bool onOtro; int mapa; };   // mapa = W3dMatMapa (la ranura)
 // los pasos VIVOS (en el historial): una textura PURGADA que revive le devuelve su referencia a cada paso que la
 // guarda (W3dUndoTexturaDuenos; la purga las habia cerrado todas, y el paso la suelta igual al caerse)
 static std::vector<UndoTexMat*> gUndoTexMats;
@@ -154,8 +157,12 @@ static void UndoTexMatAplicar(void* d) {
     bool vivo = false;
     for (size_t i = 0; i < Materials.size() && !vivo; i++) vivo = (Materials[i] == u->m);
     if (!vivo) return;
-    Texture* t = u->m->texture; const bool on = u->m->textureOn;
-    u->m->texture = u->otra; u->m->textureOn = u->onOtro;
+    Texture** pr = u->m->RanuraDeMapa(u->mapa);
+    if (!pr) return;
+    Texture*& ranura = *pr;
+    bool& prendida = u->mapa == W3D_MAPA_NORMAL ? u->m->normalMap : u->mapa == W3D_MAPA_BASE ? u->m->textureOn : u->m->mapaConTextura[u->mapa];
+    Texture* t = ranura; const bool on = prendida;
+    ranura = u->otra; prendida = u->onOtro;
     u->otra = t; u->onOtro = on;
     W3dRecursosRevisarPurgados();
     g_redraw = true;
@@ -167,17 +174,24 @@ static void UndoTexMatLiberar(void* d) {
     delete u;
 }
 // la textura BASE de un material (prendida), con su paso de undo: la usan soltar en el 3D y en Properties
-void W3dMaterialPonerTextura(Material* mat, Texture* tex) {
-    if (!mat || !tex) return;
+static void PonerEnRanura(Material* mat, Texture* tex, int mapa) {
+    if (!mat || !tex || !mat->RanuraDeMapa(mapa)) return;
+    Texture*& ranura = *mat->RanuraDeMapa(mapa);
+    bool& prendida = mapa == W3D_MAPA_NORMAL ? mat->normalMap : mapa == W3D_MAPA_BASE ? mat->textureOn : mat->mapaConTextura[mapa];
     UndoTexMat* u = new UndoTexMat();
-    u->m = mat; u->otra = mat->texture; u->onOtro = mat->textureOn;   // (la referencia de la ranura pasa al paso)
-    TexturaRetener(tex);                                             // (y la ranura toma una de la nueva)
-    mat->texture = tex; mat->textureOn = true;
+    u->m = mat; u->otra = ranura; u->onOtro = prendida; u->mapa = mapa;   // (la referencia de la ranura pasa al paso)
+    TexturaRetener(tex);                                                      // (y la ranura toma una de la nueva)
+    ranura = tex; prendida = true;
     UndoExterno f; f.aplicar = UndoTexMatAplicar; f.liberar = UndoTexMatLiberar;
     gUndoTexMats.push_back(u);
     UndoPushExterno(f, u);
     g_redraw = true;
 }
+void W3dMaterialPonerTextura(Material* mat, Texture* tex) { PonerEnRanura(mat, tex, W3D_MAPA_BASE); }
+// el NORMAL MAP de un material (prendido), con su paso de undo: soltar una textura en su selector de Properties
+void W3dMaterialPonerNormal(Material* mat, Texture* tex) { PonerEnRanura(mat, tex, W3D_MAPA_NORMAL); }
+// cualquier MAPA (W3dMatMapa): la textura queda en su ranura y el mapa pasa a usarla, con su paso de undo
+void W3dMaterialPonerMapa(Material* mat, Texture* tex, int mapa) { PonerEnRanura(mat, tex, mapa); }
 // el ANIMSET de un armature (ida y vuelta: el de antes, o ninguno)
 struct UndoAnimArm { Armature* a; std::string otro; };
 static void PonerAnimSet(Armature* a, const std::string& nombre) {
@@ -200,8 +214,63 @@ static void UndoAnimArmAplicar(void* d) {
 static void UndoAnimArmDesvincular(void* d, Object* borrado) { UndoAnimArm* u = (UndoAnimArm*)d; if ((Object*)u->a == borrado) u->a = NULL; }
 static void UndoAnimArmLiberar(void* d) { delete (UndoAnimArm*)d; }
 
+// "sonidos/musica.wav" -> "musica" (el nombre del objeto Sonido)
+static std::string HojaSinExt(const std::string& r) {
+    size_t a = r.find_last_of("/\\"); a = (a == std::string::npos) ? 0 : a + 1;
+    size_t b = r.find_last_of('.'); if (b == std::string::npos || b < a) b = r.size();
+    return r.substr(a, b - a);
+}
+// ---- LA VISTA PREVIA mientras se arrastra un MATERIAL o un SHADER sobre una malla: la parte bajo el puntero se dibuja
+// con lo arrastrado (se ve a que parte le vas a pegar); al moverse a otra parte, salir de la malla o soltar en otro lado
+// vuelve a su material. Es solo de dibujo: no hay paso de undo ni el proyecto queda cambiado ---
+namespace {
+struct VistaPrevia {
+    Mesh* m; int parte; Material* original;   // lo que tenia la parte
+    Material* puesto;                          // lo que se le puso (el material arrastrado o la copia con el shader)
+    int tipo; std::string id;
+    VistaPrevia() : m(NULL), parte(-1), original(NULL), puesto(NULL), tipo(-1) {}
+};
+}
+static VistaPrevia gPrevia;
+static Material* gPreviaShader = NULL;   // la copia del material de la parte con el shader arrastrado (sin registrar)
+void W3dSoltarVistaPreviaFin() {
+    if (!gPrevia.m) return;
+    if (gPrevia.parte < (int)gPrevia.m->materialsGroup.size() &&
+        gPrevia.m->materialsGroup[(size_t)gPrevia.parte].material == gPrevia.puesto)
+        gPrevia.m->materialsGroup[(size_t)gPrevia.parte].material = gPrevia.original;
+    gPrevia = VistaPrevia();
+    g_redraw = true;
+}
+static std::string gPreviaShaderDe;      // de que material + shader es la copia (asi no se recompila en cada movimiento)
+static void VistaPreviaPoner(Mesh* m, int parte, int tipo, const std::string& id, Material* mat) {
+    Material* original = m->materialsGroup[(size_t)parte].material;
+    Material* puesto = mat;
+    if (tipo == W3D_VISTA_SHADERS) {
+        // una copia del material de la parte (o uno nuevo) con el shader: el de verdad no se toca
+        char clave[64]; snprintf(clave, sizeof(clave), "%p|", (void*)original);
+        if (!gPreviaShader || gPreviaShaderDe != std::string(clave) + id) {
+            if (!gPreviaShader) gPreviaShader = new Material("(preview)", true);
+            else W3dShaderMaterialOlvidar(gPreviaShader);
+            if (original && original != MaterialDefecto) { *gPreviaShader = *original; gPreviaShader->shaderCPU = NULL; }
+            gPreviaShader->shaderOn = true; gPreviaShader->shaderArchivo = id;
+            gPreviaShader->shaderId = 0; gPreviaShader->shaderEstado = 0;
+            gPreviaShaderDe = std::string(clave) + id;
+        }
+        puesto = gPreviaShader;
+    }
+    if (!puesto) return;
+    m->materialsGroup[(size_t)parte].material = puesto;
+    gPrevia.m = m; gPrevia.parte = parte; gPrevia.original = original; gPrevia.puesto = puesto;
+    gPrevia.tipo = tipo; gPrevia.id = id;
+    g_redraw = true;
+}
+
 bool W3dSoltarRecursoEn3D(Viewport3D* vp, int mx, int my, int tipo, const std::string& id, bool soloProbar, std::string* que) {
     if (que) que->clear();
+    // (el rayo y el soltar ven lo de VERDAD: la vista previa se saca primero; si el puntero sigue sobre una parte que
+    //  la acepta, se vuelve a poner abajo)
+    W3dSoltarVistaPreviaFin();
+
     if (!vp || !SceneCollection) return false;
     if (InteractionMode != ObjectMode || estado != editNavegacion) {
         if (que) *que = T("Only in Object Mode");
@@ -257,13 +326,28 @@ bool W3dSoltarRecursoEn3D(Viewport3D* vp, int mx, int my, int tipo, const std::s
             w3dLogf("[biblioteca] malla '%s' soltada en el 3D -> '%s'", id.c_str(), m->name.c_str());
             return true;
         }
+        case W3D_VISTA_SONIDOS: {
+            // un SONIDO soltado en la vista 3D: un objeto Sonido con ese archivo, donde cayo
+            if (que) *que = T("New sound object here");
+            if (soloProbar) return true;
+            UndoGrupoIniciar();
+            Sonido* so = new Sonido(NULL, PuntoDeSoltar(t, rayo));
+            so->archivo = id;
+            so->SetNameObj(HojaSinExt(id));
+            DeseleccionarTodo();
+            so->Seleccionar();
+            UndoCapturarCreacion();
+            UndoGrupoFin();
+            g_redraw = true;
+            return true;
+        }
         case W3D_VISTA_MATERIALES: {
             Material* mat = W3dMaterialDeId(id);
             if (!mat) return false;
             if (!t.m || t.parte < 0) { if (que) *que = T("Drop it on a mesh"); return false; }
             if (DeLibreria(t.m)) { if (que) *que = T("read-only library"); return false; }
             if (que) *que = std::string(T("Material of")) + " " + t.m->name;
-            if (soloProbar) return true;
+            if (soloProbar) { VistaPreviaPoner(t.m, t.parte, tipo, id, mat); return true; }
             UndoCapturarMaterial(t.m, t.parte);
             t.m->materialsGroup[(size_t)t.parte].material = mat;
             // EL MATERIAL ES DATO DE LA MALLA (como en Properties): si es un recurso compartido lo ven TODOS sus
@@ -273,13 +357,41 @@ bool W3dSoltarRecursoEn3D(Viewport3D* vp, int mx, int my, int tipo, const std::s
             g_redraw = true;
             return true;
         }
+        case W3D_VISTA_SHADERS: {
+            // un SHADER: el material de la PARTE tocada lo usa (el tilde "Avanzado: shader personalizado" prendido). Con
+            // el material POR DEFECTO (que no se edita) la parte recibe un material NUEVO con ese shader
+            if (!t.m || t.parte < 0) { if (que) *que = T("Drop it on a mesh"); return false; }
+            Material* mat = t.m->materialsGroup[(size_t)t.parte].material;
+            if (DeLibreria(t.m) || (mat && !mat->libreria.empty())) { if (que) *que = T("read-only library"); return false; }
+            const bool nuevoMat = (!mat || mat == MaterialDefecto);
+            if (que) *que = nuevoMat ? std::string(T("New material with this shader")) : std::string(T("Shader of")) + " " + mat->name;
+            if (soloProbar) { VistaPreviaPoner(t.m, t.parte, tipo, id, NULL); return true; }
+            UndoCapturarMaterial(t.m, t.parte);
+            if (nuevoMat) {
+                extern Material* NuevoMaterialEnMeshPart(Mesh*, int);
+                mat = NuevoMaterialEnMeshPart(t.m, t.parte);
+                if (!mat) { if (que) *que = T("The default material can't be edited"); return false; }
+            }
+            mat->shaderArchivo = id; mat->shaderOn = true;
+            W3dShaderMaterialCompilar(mat);
+            extern void RebindMaterialMeshPart(); RebindMaterialMeshPart();
+            g_redraw = true;
+            w3dLogf("[biblioteca] shader '%s' soltado en '%s' (parte %d)", id.c_str(), t.m->name.c_str(), t.parte);
+            return true;
+        }
         case W3D_VISTA_TEXTURAS: {
             if (!t.m || t.parte < 0) { if (que) *que = T("Drop it on a mesh"); return false; }
             Material* mat = t.m->materialsGroup[(size_t)t.parte].material;
-            if (!mat || mat == MaterialDefecto) { if (que) *que = T("The default material can't be edited"); return false; }
-            if (DeLibreria(t.m) || !mat->libreria.empty()) { if (que) *que = T("read-only library"); return false; }
-            if (que) *que = std::string(T("Texture of")) + " " + mat->name;
+            if (DeLibreria(t.m) || (mat && !mat->libreria.empty())) { if (que) *que = T("read-only library"); return false; }
+            // con el material POR DEFECTO (que no se edita): la parte recibe un material NUEVO con esa textura
+            const bool nuevoMat = (!mat || mat == MaterialDefecto);
+            if (que) *que = nuevoMat ? std::string(T("New material with this texture")) : std::string(T("Texture of")) + " " + mat->name;
             if (soloProbar) return true;
+            if (nuevoMat) {
+                extern Material* NuevoMaterialEnMeshPart(Mesh*, int);
+                mat = NuevoMaterialEnMeshPart(t.m, t.parte);
+                if (!mat) { if (que) *que = T("The default material can't be edited"); return false; }
+            }
             Texture* tex = W3dTexturaCargadaDe(id);
             const bool tomada = (tex == NULL);   // (la cargo este gesto: su referencia es temporal)
             if (!tex) tex = TexturaTomar(id);
@@ -339,4 +451,142 @@ bool W3dSoltarRecursoEn3D(Viewport3D* vp, int mx, int my, int tipo, const std::s
     }
     if (que) *que = T("This resource can't be dropped in the 3D view");
     return false;
+}
+
+// ============================================================================
+//  UN ARCHIVO SOLTADO DESDE EL SISTEMA (Windows / Linux / Mac: arrastrarlo desde el explorador a la ventana)
+//    - sobre el VIEWPORT 3D: un modelo (.obj .fbx .gltf .glb) se importa a la escena; una imagen se suma a la
+//      biblioteca y va al material de la malla que queda bajo el puntero;
+//    - sobre la BIBLIOTECA (o cualquier otro panel): queda en la biblioteca del proyecto, en memoria hasta guardar el
+//      .w3d. Un modelo pasa a ser un PREFAB (no queda en la escena); imagenes, sonidos, scripts, fuentes y videos, su
+//      recurso de siempre.
+// ============================================================================
+#include "io/W3dContenedor.h"          // W3dImportarAsset / W3dCategoriaPorExtension
+#include "Outliner.h"                  // la biblioteca bajo el puntero: a que CARPETA va lo soltado
+#include "io/lectura-escritura.h"      // ImportModeloPorExtension (la puerta unica de los modelos)
+static unsigned int SerialMaxRec(Object* o) {
+    if (!o) return 0;
+    unsigned int m = o->serial;
+    for (size_t i = 0; i < o->Childrens.size(); i++) { const unsigned int s = SerialMaxRec(o->Childrens[i]); if (s > m) m = s; }
+    return m;
+}
+// selecciona lo de ARRIBA de lo que nacio en el import (serial > 'antes'), donde lo haya colgado (la coleccion activa)
+static void SeleccionarNuevos(Object* o, unsigned int antes, Object** primero) {
+    if (!o) return;
+    for (size_t i = 0; i < o->Childrens.size(); i++) {
+        Object* h = o->Childrens[i];
+        if (!h) continue;
+        if (h->serial > antes && h->getType() != ObjectType::collection) { h->Seleccionar(); if (!*primero) *primero = h; }
+        else SeleccionarNuevos(h, antes, primero);
+    }
+}
+static std::string ExtDe(const std::string& r) {
+    const size_t p = r.find_last_of('.');
+    std::string e = p == std::string::npos ? std::string() : r.substr(p + 1);
+    for (size_t i = 0; i < e.size(); i++) if (e[i] >= 'A' && e[i] <= 'Z') e[i] = (char)(e[i] + 32);
+    return e;
+}
+static std::string HojaDe(const std::string& r) {
+    const size_t p = r.find_last_of("/\\");
+    return p == std::string::npos ? r : r.substr(p + 1);
+}
+// la CARPETA de la biblioteca donde cae lo soltado: la carpeta bajo el puntero, la de la fila apuntada o, en la
+// cuadricula, la que se esta viendo ("" = la raiz; tambien si no es una biblioteca)
+static std::string CarpetaBajo(ViewportBase* bajo, int mx, int my) {
+    if (!bajo || !bajo->isLeaf() || !VpEsOutliner(bajo)) return std::string();
+    Outliner* o = (Outliner*)bajo;
+    if (!o->EnBiblioteca() || o->VistaSoloLectura()) return std::string();
+    std::vector<OutFilaRec> filas; o->FilasRecursos(filas);
+    const int i = o->FilaEnPunto(filas, mx, my);
+    if (i >= 0 && filas[(size_t)i].carpeta && !filas[(size_t)i].atras) return filas[(size_t)i].clave;
+    if (i >= 0) return filas[(size_t)i].carpetaDe;
+    return o->cuadricula ? o->carpetaGrid : std::string();
+}
+// el TIPO de la biblioteca de un archivo del proyecto (por su categoria)
+static int TipoDeCategoria(const std::string& c) {
+    if (c == "texturas") return W3D_VISTA_TEXTURAS;
+    if (c == "sonidos")  return W3D_VISTA_SONIDOS;
+    if (c == "scripts")  return W3D_VISTA_SCRIPTS;
+    if (c == "fuentes")  return W3D_VISTA_FUENTES;
+    if (c == "videos")   return W3D_VISTA_VIDEOS;
+    if (c == "shaders")  return W3D_VISTA_SHADERS;
+    return -1;
+}
+bool W3dSoltarArchivo(const std::string& ruta0, int mx, int my, std::string* que) {
+    if (que) que->clear();
+    // (Windows suelta "C:\carpeta\foto.png" con barras invertidas: la biblioteca nombra todo con '/', y Windows abre
+    //  igual con '/')
+    std::string ruta = ruta0;
+    for (size_t i = 0; i < ruta.size(); i++) if (ruta[i] == '\\') ruta[i] = '/';
+    extern ViewportBase* rootViewport;
+    ViewportBase* bajo = rootViewport ? FindViewportUnderMouse(rootViewport, mx, my) : NULL;
+    const bool en3D = bajo && bajo->isLeaf() && bajo->ViewportKind() == 1;
+    const std::string carpeta = en3D ? std::string() : CarpetaBajo(bajo, mx, my);
+    const std::string ext = ExtDe(ruta);
+    const std::string cat = W3dCategoriaPorExtension(ruta);
+    const bool esModelo = (ext == "obj" || ext == "fbx" || ext == "gltf" || ext == "glb");
+    if (!esModelo && cat != "texturas" && cat != "sonidos" && cat != "scripts" && cat != "fuentes" && cat != "videos" && cat != "shaders") {
+        if (que) *que = std::string(T("This file type can't be added")) + ": " + HojaDe(ruta);
+        return false;
+    }
+    if (esModelo) {
+        if (InteractionMode != ObjectMode || estado != editNavegacion) { if (que) *que = T("Only in Object Mode"); return false; }
+        const unsigned int antes = SerialMaxRec(SceneCollection);
+#ifndef W3D_SYMBIAN
+        if (!ImportModeloPorExtension(ruta)) { if (que) *que = std::string(T("Could not import")) + ": " + HojaDe(ruta); return false; }
+#else
+        if (que) *que = std::string(T("Could not import")) + ": " + HojaDe(ruta); return false;   // (el telefono no importa modelos sueltos)
+#endif
+        if (en3D) { if (que) *que = std::string(T("Imported")) + ": " + HojaDe(ruta); return true; }
+        // a la BIBLIOTECA: lo que nacio en este import pasa a un prefab nuevo y la instancia se va de la escena
+        DeseleccionarTodo();
+        Object* primero = NULL;
+        SeleccionarNuevos(SceneCollection, antes, &primero);
+        if (!primero) { if (que) *que = std::string(T("Imported")) + ": " + HojaDe(ruta); return true; }
+        ObjActivo = primero;
+        std::string nom, motivo;
+        if (!W3dPrefabCrearDesdeSeleccion(&nom, &motivo)) { if (que) *que = T(motivo.c_str()); return false; }
+        Eliminar(false);   // (la instancia que dejo el prefab: el modelo queda solo en la biblioteca)
+        if (!carpeta.empty()) W3dVistaRecMover(W3D_VISTA_PREFABS, nom, carpeta);   // (a la carpeta donde se solto)
+        if (que) *que = std::string(T("Prefab created")) + ": " + nom;
+        w3dLogf("[biblioteca] '%s' soltado: prefab '%s'", ruta.c_str(), nom.c_str());
+        return true;
+    }
+    // un ARCHIVO del proyecto: se copia adentro del .w3d (en memoria hasta guardar)
+    const std::string entrada = W3dImportarAsset(ruta, cat.c_str());
+    if (entrada.empty()) { if (que) *que = std::string(T("Could not import")) + ": " + HojaDe(ruta); return false; }
+    if (cat == "texturas") {
+        Texture* tex = TexturaTomar(entrada);   // (cargada: la biblioteca la conserva aunque nadie la use todavia)
+        if (!tex) { if (que) *que = T("The texture couldn't be loaded"); return false; }
+        bool puesta = false;
+        if (en3D) puesta = W3dSoltarRecursoEn3D((Viewport3D*)bajo, mx, my, W3D_VISTA_TEXTURAS, entrada, false, que);
+        TexturaSoltar(tex);
+        W3dRecursosVistaInvalidar();
+        if (!puesta && !carpeta.empty()) W3dVistaRecMover(W3D_VISTA_TEXTURAS, entrada, carpeta);
+        if (!puesta && que) *que = std::string(T("Added to the library")) + ": " + HojaDe(ruta) + (que->empty() ? "" : " (" + *que + ")");
+        g_redraw = true;
+        return true;
+    }
+    W3dRecursosVistaInvalidar();
+    // un SONIDO soltado en la vista 3D: ademas de entrar a la biblioteca, un objeto Sonido donde cayo
+    if (cat == "sonidos" && en3D) {
+        std::string q2;
+        W3dSoltarRecursoEn3D((Viewport3D*)bajo, mx, my, W3D_VISTA_SONIDOS, entrada, false, &q2);
+        if (que) *que = std::string(T("New sound object here")) + ": " + HojaDe(ruta);
+        g_redraw = true;
+        return true;
+    }
+    // un SHADER soltado sobre una malla: ademas de entrar a la biblioteca, el material de la parte tocada lo usa
+    if (cat == "shaders" && en3D) {
+        std::string q2;
+        if (W3dSoltarRecursoEn3D((Viewport3D*)bajo, mx, my, W3D_VISTA_SHADERS, entrada, false, &q2)) {
+            if (que) *que = q2 + ": " + HojaDe(ruta);
+            g_redraw = true;
+            return true;
+        }
+    }
+    if (!carpeta.empty() && TipoDeCategoria(cat) >= 0) W3dVistaRecMover(TipoDeCategoria(cat), entrada, carpeta);
+    if (que) *que = std::string(T("Added to the library")) + ": " + HojaDe(ruta);
+    g_redraw = true;
+    return true;
 }

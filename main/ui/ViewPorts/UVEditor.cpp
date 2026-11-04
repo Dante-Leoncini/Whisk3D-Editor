@@ -136,17 +136,22 @@ UVEditor::UVEditor() {
     // menu Select: MISMO icono y MISMO lugar (pegado a View) que el del viewport 3D, para que la
     // barra del UV no diverja de la del 3D. Solo operativo y fuera de la pintura de pesos.
     b = new Button("", IconType::seleccion); b->rol = BRUV_Select;    // All / None / Invert / Select Linked
+        b->ayuda = "Select";
         b->desplegable = true; b->visible = false; BarButtons.push_back(b);
     b = new Button("", IconType::mas); b->rol = BRUV_Add;             // menu Add: Armature 2D / Bone
+        b->ayuda = "Add";
         b->desplegable = true; b->visible = false; BarButtons.push_back(b); // solo operativo (Edit Mode)
     b = new Button(T("Armature")); b->rol = BRUV_Armature;            // menu Armature: Extrude/Duplicate/Delete/Parent
         b->desplegable = true; b->visible = false; BarButtons.push_back(b); // solo en UVModoHuesos
+    b = new Button("UVMap"); b->rol = BRUV_UVMap;                     // dropdown: que mapa UV se edita (+ uno nuevo)
+        b->desplegable = true; b->visible = false; BarButtons.push_back(b); // con una malla (el texto: el mapa activo)
     b = new Button(T("Texture")); b->rol = BRUV_Texture;              // dropdown: elegir que textura ver
         b->desplegable = true; BarButtons.push_back(b);
     b = new Button(T("Mipmap")); b->rol = BRUV_Mipmap;                   // inspector de la piramide (Auto / nivel)
         b->desplegable = true; b->visible = false; BarButtons.push_back(b); // visible con textura mostrada (SyncBarra)
     b = new Button(T("Edit")); b->rol = BRUV_Editar; b->visible = false; BarButtons.push_back(b);   // pintura de textura
     b = new Button("", IconType::guardar); b->rol = BRUV_Guardar;    // Save Texture / Make External / Make Internal
+        b->ayuda = "Save Texture";
         b->desplegable = true; b->visible = false; BarButtons.push_back(b);
     b = new Button("", IconType::keyframe); b->rol = BRUV_Animation;  // menu Animation (icono rombo, = el 3D)
         b->desplegable = true; b->visible = false; BarButtons.push_back(b); // solo operativo (Edit Mode)
@@ -1079,6 +1084,14 @@ void UVEditor::SyncBarra() {
           bEd->colorTexto = texpaint ? acc : NULL;
       }
       if (bGu) bGu->visible = true;   // siempre: Export UV Layout no necesita textura (Save Texture sale solo si hay una en edicion)
+    }
+    // el MAPA UV que se ve y se edita (el activo de la malla): su nombre en el boton
+    { Button* bMapa = BarRolBtn(BarButtons, BRUV_UVMap);
+      if (bMapa) {
+          bMapa->visible = (m != NULL) && uvModo != UVModoTextura;
+          if (m && m->uvMapActivo >= 0 && m->uvMapActivo < (int)m->uvMaps.size()) bMapa->text = m->uvMaps[m->uvMapActivo]->nombre;
+          else bMapa->text = "UVMap";   // (todavia sin capas: la del render, que es la primera)
+      }
     }
     // Mipmap: inspector de la piramide de la textura mostrada. Visible cuando hay
     // textura; el texto dice que se esta viendo (Auto o el tamano del nivel).
@@ -2055,7 +2068,6 @@ void UVEditor::ZoomCentro(int dir) {
     g_redraw = true;
 }
 
-#ifndef W3D_SYMBIAN
 // teclas del editor UV: flechas = paneo (cualquier modo); G/R/S inician mover/rotar/escalar; ESC/ENTER transform.
 extern bool LShiftPressed, LCtrlPressed, LAltPressed;
 void UVEditor::event_key_down(int tecla, bool repeticion) {
@@ -2229,21 +2241,18 @@ void UVEditor::mouse_button_up(int boton) {
     ViewPortClickDown = false;
     g_redraw = true;
 }
-#endif
 
 // click izquierdo en el editor UV = seleccionar el sub-elemento (vertex/edge/face) bajo el cursor.
 void UVEditor::button_left() {
-#ifdef W3D_SYMBIAN
-    return; // Symbian: el pick por OK/lapiz se cablea aparte (llama directo a PickUV)
-#else
+    // (tambien en Symbian: el mouse Bluetooth llega por el mismo camino que el de la PC; el OK/lapiz del keypad
+    //  sigue llamando directo a PickUV. Los modificadores, de los globales que mantienen las dos plataformas)
     if (PopUpActive) return;                    // un popup modal abierto (file browser) tiene prioridad
     Mesh* m = (ObjActivo && ObjActivo->getType() == ObjectType::mesh) ? (Mesh*)ObjActivo : NULL;
     if (!m || !m->uv || (Object*)m != g_editMesh) return; // solo en Edit Mode sobre esta malla
     // ===== BOX SELECT ARMADO (tecla B): este press ABRE el rectangulo; el arrastre lo agranda y
     // el soltar (mouse_button_up) lo aplica. Consume el click: no pickea nada. =====
     if (uvBoxArmado) {
-        const Uint8* ksB = SDL_GetKeyboardState(NULL);
-        uvBoxAdd = ksB && (ksB[SDL_SCANCODE_LSHIFT] || ksB[SDL_SCANCODE_RSHIFT]); // shift = sumar
+                uvBoxAdd = LShiftPressed; // shift = sumar
         uvBoxArmado = false; uvBoxSel = true;
         uvBoxX0 = uvBoxX1 = lastMx - x; uvBoxY0 = uvBoxY1 = lastMy - y;
         g_redraw = true;
@@ -2259,8 +2268,7 @@ void UVEditor::button_left() {
     // o pickear hueso (+ arrancar el drag de la punta en Huesos / el traslado en Pose) =====
     if (uvModo == UVModoHuesos || uvModo == UVModoPose) {
         if (Bone2DXformActivo()) { if (!gB2D.porClick) XformConfirmar(); return; } // modal (G/E): click confirma (con gate)
-        const Uint8* ks = SDL_GetKeyboardState(NULL);
-        bool add = ks && (ks[SDL_SCANCODE_LSHIFT] || ks[SDL_SCANCODE_RSHIFT]);
+        bool add = LShiftPressed;
         bool pose = (uvModo == UVModoPose);
         int mask = 3;
         int b = Bone2DPick(m, (float)(lastMx - x), (float)(lastMy - y), pose, &mask);
@@ -2299,8 +2307,7 @@ void UVEditor::button_left() {
         // Se pide Ctrl a proposito: con el click pelado, los huesos (radio de pick ~14px) se
         // comerian los trazos justo donde mas se pinta.
         {
-            const Uint8* ksP = SDL_GetKeyboardState(NULL);
-            const bool ctrlP = ksP && (ksP[SDL_SCANCODE_LCTRL] || ksP[SDL_SCANCODE_RCTRL]);
+            const bool ctrlP = LCtrlPressed;
             if (ctrlP && Bone2DElegirGrupoPorClick(m, (float)(lastMx - x), (float)(lastMy - y)))
                 return;   // el ctrl+click elige grupo: NO pinta
         }
@@ -2308,11 +2315,9 @@ void UVEditor::button_left() {
         return;
     }
     if (uvXform) { XformConfirmar(); return; } // si hay transform en curso, el click lo CONFIRMA (con gate)
-    const Uint8* ks = SDL_GetKeyboardState(NULL);
-    bool add = ks && (ks[SDL_SCANCODE_LSHIFT] || ks[SDL_SCANCODE_RSHIFT]); // shift = sumar/toggle
+    bool add = LShiftPressed; // shift = sumar/toggle
     PickUV(m, lastMx - x, lastMy - y, add); // lastMx/My son GLOBALES; - origen del viewport = local
     g_redraw = true;
-#endif
 }
 
 // click derecho: cancela el transform en curso; si no hay, COLOCA el cursor 2D en el mouse.

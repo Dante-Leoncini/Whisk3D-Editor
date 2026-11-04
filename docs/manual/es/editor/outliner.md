@@ -33,7 +33,7 @@ La lista de todo lo que hay en la escena, y también la biblioteca de recursos d
 
 | Función | Descripción |
 |---|---|
-| Recursos | Mallas, materiales, texturas, animaciones, prefabs, escenas, sonidos, scripts, fuentes y videos, en carpetas. Tilde verde = en uso; cruz roja = huérfano; `*` = sin guardar. |
+| Recursos | Mallas, materiales, texturas, animaciones, prefabs, escenas, sonidos, scripts, [shaders](shaders.md), fuentes y videos, en carpetas. Un material o un shader arrastrado sobre una malla del 3D se ve en la parte bajo el puntero antes de soltarlo. Tilde verde = en uso; cruz roja = huérfano; `*` = sin guardar. |
 | Filtro / Lista o cuadrícula | Mostrar un solo tipo; ver miniaturas. |
 | Arrastrar un recurso | A una carpeta (lo mueve), a la Vista 3D (malla = objeto nuevo, material o textura = se asigna a lo tocado, prefab = instancia) o a un desplegable de Propiedades. |
 | Carpeta nueva / Mover a carpeta | Organizar (las carpetas son solo para ordenar). |

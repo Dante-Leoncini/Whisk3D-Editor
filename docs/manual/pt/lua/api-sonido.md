@@ -9,3 +9,6 @@
 | `soltarSonido(h)` | Solta a nota: o envelope passa para a liberação. |
 | `reverb(sala, amortiguacion, nivel)` | A reverberação geral: tamanho da sala, amortecimento e nível (0 a 1 cada; nível 0 a desliga). |
 | `silenciar(bool)`, `estaMudo()` | Silêncio geral. |
+| `tocarSonido(obj [, seg])`, `callarSonido(obj)` | Toca de novo um **objeto Som** (a partir de `seg` segundos do seu trecho) ou o cala. |
+| `sonidoObj(obj) → t`, `setSonidoObj(obj, t)` | Ler / mudar um objeto Som: `archivo` (a fonte), `activo`, `volumen`, `tono`, `reverb`, `paneo`, `inicio`, `recorteIni`, `recorteFin`, `bucle`, `posicional`, `radio`, `alcance` (e ao ler `duracion`, `sonando`). |
+| `crearSonido("sonidos/x.wav" [, padre]) → obj` | Um objeto Som novo (`destruir(obj)` o remove). Num prefab é instanciado como qualquer objeto. |

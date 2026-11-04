@@ -40,3 +40,12 @@ Muestra y edita la animación: hoja de keyframes (dope sheet) o editor de curvas
 | Euler inteligente | Quita las vueltas de más en las rotaciones seleccionadas. | Menú Key |
 | Ocultar una curva | El ojo de cada fila la oculta. | Click en el ojo |
 | Valores exactos | Frame, valor y manijas del keyframe elegido. | Propiedades → Animación → Keyframe |
+
+## Sonidos
+
+| Función | Descripción | Atajo |
+|---|---|---|
+| Tira del sonido | Cada objeto Sonido seleccionado tiene su tira: dónde arranca y cuánto dura, en **segundos** (cambiar los FPS no la corre). Con bucle se repite hasta el final. | — |
+| Mover | Arrastrar la tira, o <kbd>G</kbd> sin keyframes elegidos (corre todos los sonidos seleccionados). <kbd>Ctrl</kbd> engancha a los frames. | Arrastre / <kbd>G</kbd> |
+| Recortar | Agarrar una punta de la tira. | Arrastrar una punta |
+| Forma de onda / Línea de volumen | Menú Vista: la forma de onda y la curva del volumen adentro de la tira (la tira ocupa tres filas). Sin eso es solo una tira. | Menú Vista |

@@ -57,6 +57,8 @@ Nombres de teclas: letras y números tal cual, `Enter`, `Esc`, `Tab`, `Space`, `
 | Padre | <kbd>Ctrl+P</kbd> | — | `global.emparentar` |
 | Desemparentar | <kbd>Alt+P</kbd> | — | `global.desemparentar` |
 | Pantalla completa | <kbd>F11</kbd> | — | `global.pantalla` |
+| Renderizar Imagen | <kbd>F12</kbd> | — | `global.render` |
+| Renderizar Animación | <kbd>Ctrl+F12</kbd> | — | `global.renderAnim` |
 
 ### Vista 3D
 

@@ -87,6 +87,7 @@ outfila Suelto usuarios 0 estado huerfano
 #         de la barra ([0] tipo de viewport, [1] vista, [2] Objeto, [3] Seleccion, [4] el "+", [5] el
 #         filtro; el interruptor lista/cuadricula no tiene menu: se alterna desde la vista); abajo + OK elige ----
 outbarra soft menu vista
+outbarra der menu opciones
 outbarra der menu objeto
 outbarra der menu seleccion
 outbarra der menu nueva
@@ -98,7 +99,9 @@ outbarra izq menu filtro
 outbarra izq menu nueva
 outbarra izq menu seleccion
 outbarra izq menu objeto
+outbarra izq menu opciones
 outbarra izq menu vista
+outbarra der menu opciones
 outbarra der menu objeto
 outbarra der menu seleccion
 outbarra der menu nueva

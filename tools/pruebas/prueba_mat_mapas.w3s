@@ -1,0 +1,61 @@
+# ==========================================================================
+#  LOS MAPAS DEL MATERIAL (W3dMatMapa): color base, normal map y los del trazado de rayos (emision, rugosidad,
+#  metalico, alfa) + el IOR. Cada mapa: NUMERO para toda la superficie o TEXTURA, y su capa UV.
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/windows/build/Release/whisk3d.exe --script prueba_mat_mapas.w3s
+#
+#  - el trazado de rayos lee el mapa de EMISION en modo textura (y el numero en modo numero);
+#  - numero / textura y la capa UV tienen undo;
+#  - un objeto puede usar un UV PERSONALIZADO (por nombre) en vez del indice del material ("uvMateriales");
+#  - todo se guarda en el .w3d ("mapas", "ior", "uvMateriales"): reabrir da lo mismo y re-guardar los mismos bytes.
+# ==========================================================================
+ventana 1280 720
+add plane
+objscale 6 1 6
+matnew
+vpvista rendered
+vporbita 0 0 0 20 -90 0
+rtopt 1 1 1 1
+# el numero (emision negra): el plano NO sale rojo (se mira arriba del centro: en el centro esta el cubo)
+matmapa emision es numero
+rtrender 96 72 1
+fail rtpixel 48 20 255 0 0 40
+# la TEXTURA de emision (roja): el plano brilla rojo
+matmapa emision textura bsp_rojo.png
+matmapa emision es textura tex bsp_rojo.png
+rtrender 96 72 1
+rtpixel 48 20 255 0 0 40
+# numero / textura y la capa UV, con undo
+matmapa rugosidad es numero
+matmapa rugosidad uv 1
+matmapa rugosidad es numero uv 1
+undo
+matmapa rugosidad es numero uv 0
+redo
+matmapa ior 1.33
+# el UV PERSONALIZADO de ESTE objeto (por nombre; el material sigue con su indice)
+matmapa rugosidad uvobjeto UVMap
+matmapa rugosidad es numero uv 1 uvobj UVMap
+# el POPUP de la UV (lo que hace su Accept): el indice del MATERIAL (desde 1) y, destildado "usar el del material",
+# el indice PROPIO de este objeto o una capa UV por nombre. Cada Accept es UN paso de undo
+matmapa rugosidad abrirpopup
+matmapa rugosidad popup 3 1 - 1
+matmapa rugosidad es numero uv 2 uvobj - uvobjidx -1
+matmapa rugosidad popup 3 0 - 5
+matmapa rugosidad es numero uv 2 uvobj - uvobjidx 4
+matmapa rugosidad popup 3 0 UVMap 1
+matmapa rugosidad es numero uv 2 uvobj UVMap uvobjidx -1
+undo
+matmapa rugosidad es numero uv 2 uvobj - uvobjidx 4
+redo
+matmapa rugosidad es numero uv 2 uvobj UVMap uvobjidx -1
+# se GUARDA
+guardarw3d prueba_mat_mapas_rt1.w3d
+abrirw3d prueba_mat_mapas_rt1.w3d
+selobj Plano
+matmapa emision es textura tex bsp_rojo.png
+matmapa rugosidad es numero uv 2 uvobj UVMap
+matmapa esior 1.33
+guardarw3d prueba_mat_mapas_rt2.w3d
+w3diguales prueba_mat_mapas_rt1.w3d prueba_mat_mapas_rt2.w3d
+fail matmapa nada es numero

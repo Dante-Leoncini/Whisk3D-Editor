@@ -4,6 +4,7 @@
 #endif
 
 #include "Outliner.h"
+#include "app/W3dTactilEditor.h"   // W3D_SOLO_POR_CONTROLES (Symbian: el soltar de PC solo con el dedo o el mouse)
 #include "WhiskUI/draw/glesdraw.h"
 #include "render/OpcionesRender.h" // g_redraw (CentrarSeleccion pide redibujar)
 #include "objects/ObjectMode.h" // reparent del drag&drop
@@ -54,7 +55,9 @@ size_t IconoDeObjeto(Object* o) {
         case ObjectType::lod:        return (size_t)IconType::array;     // LOD: niveles de detalle
         case ObjectType::culling:    return (size_t)IconType::visible;   // Culling: que se ve / que se corta
         case ObjectType::niebla:     return (size_t)IconType::niebla;    // Niebla (glFog en el arbol)
+        case ObjectType::sonido:     return (size_t)IconType::sonido;    // Sonido (el parlante)
         case ObjectType::limpiarz:   return (size_t)IconType::limpiarz;
+        case ObjectType::postproceso: return (size_t)IconType::monitor;
         case ObjectType::recorte:    return (size_t)IconType::recorte;
         case ObjectType::hitbox:     return (size_t)IconType::hitbox;    // Hitbox: caja de deteccion
         case ObjectType::prefab:     // instancia de prefab (sus hijos: generados); la de una ESCENA, el icono de escena
@@ -160,11 +163,21 @@ Outliner::Outliner() : ViewportBase() {
     vista = OUT_VISTA_ESCENA;
     filtro = -1;
     cuadricula = false;
+    verMemoria = true;
+    celdaZoom = 1.0f;
+    entroMs = 0;
+    hoverMx = hoverMy = -1;
+    verTamanos = false;   // (se prende desde el ojo: en un outliner angosto le come el ancho a los nombres)
+    verTipo = false;      // (idem: la columna Tipo se prende desde el ojo)
+    verUsos = true;
     cursorEsCarpeta = false;
     recArrastre = recArrastrando = false;
     recArrastreCarpeta = recSoloAlSoltar = recElegirAlSoltar = false;
     selMarcada = false;
     recArrastreY0 = recArrastreX0 = 0; recDropFila = -1;
+    recInsFila = -1; recInsDespues = false;
+    colAncho[0] = colAncho[1] = colAncho[2] = -1;
+    colArrastre = colHover = -1;
     agarreFila = -1; agarreMovido = false; agarreX = agarreY = 0;
     renombrando = renombreCarpeta = renombreObjeto = false;
     renombreSerial = 0;
@@ -172,12 +185,19 @@ Outliner::Outliner() : ViewportBase() {
     moviendoRec = false;
     selEscenaSerial = W3dSeleccionSerial;
     BarCrear();
-    // [1] la VISTA (el OJO: "lo que se ve en el outliner": Escena / Biblioteca / cada libreria) con su nombre
-    btnVista = new Button("", (int)IconType::visible);
+    // [1] la VISTA: QUE se ve en el outliner (Escena / Biblioteca / cada libreria), con su nombre y su icono (la
+    // camara en la escena, la carpeta en la biblioteca)
+    btnVista = new Button("", (int)IconType::camera);
     btnVista->rol = 1;
     btnVista->desplegable = true;
     btnVista->caretMenu = true;
     BarButtons.push_back(btnVista);
+    // [1b] el OJO: COMO se ve (lista / cuadricula, la fila de memoria, los tamanos; en la escena, sus columnas)
+    btnOpciones = new Button("", (int)IconType::visible);
+    btnOpciones->rol = 8;
+    btnOpciones->desplegable = true;
+    btnOpciones->ayuda = "View options";
+    BarButtons.push_back(btnOpciones);
     // [2] el menu OBJETO (borrar, renombrar, mover, ocultar, duplicar... / en la biblioteca: sus acciones)
     btnObjeto = new Button("", -1);
     btnObjeto->rol = 2;
@@ -193,6 +213,7 @@ Outliner::Outliner() : ViewportBase() {
     btnNueva = new Button("", (int)IconType::mas);
     btnNueva->rol = 4;
     btnNueva->desplegable = true;
+    btnNueva->ayuda = "Add";
     BarButtons.push_back(btnNueva);
     // [5] el FILTRO de la biblioteca (todo / un tipo) y [6] lista / cuadricula: solo en la biblioteca
     btnFiltro = new Button("", (int)IconType::filtro);
@@ -359,7 +380,7 @@ void Outliner::Render(){
 
     //de aca en adelante es como antes
     w3dEngine::PushMatrix();
-    w3dEngine::Translatef(0, PosY + borderGS + BarTopOffset(), 0);
+    w3dEngine::Translatef(0, PosY + borderGS + TopContenido(), 0);   // (la biblioteca en lista: debajo de los titulos)
     // la franja i es la FILA i de la lista (mismo origen que los nombres: PosY). Con la lista
     // scrolleada se dibujan las que caen en el panel, desde la primera visible: antes solo existian
     // las franjas 0..CantidadRenglones-1 y las filas de mas abajo quedaban sin fondo (sin cebra, sin
@@ -607,13 +628,8 @@ void Outliner::DibujarRenglon(Object* obj, bool hidden, int prof){
     //texto render (o el campo del RENOMBRAR EN LINEA si es el objeto que se esta renombrando)
     w3dEngine::Translatef(IconSizeGS + gapGS, 0, 0);
     if (renombrando && renombreObjeto && obj->serial == renombreSerial) {
-        const bool foco = (g_textFieldActivo == &renombre);
-        if (foco && renombre.selectAll) { SetColorID(ColorID::accent); RenderBitmapText(renombre.text); }
-        else {
-            SetColorID(ColorID::blanco);
-            RenderBitmapText(foco ? renombre.text.substr(0, (size_t)renombre.caret) + "|" + renombre.text.substr((size_t)renombre.caret)
-                                  : renombre.text);
-        }
+        SetColorID(ColorID::blanco);
+        RenderTextField(renombre, g_textFieldActivo == &renombre, textAlign::left, 1920);
     } else RenderBitmapText(obj->name);
     // lo que genera un PROXY de una libreria lleva el CANDADO de solo lectura despues del nombre: no se edita ni se
     // guarda, es de su .w3d (OutlinerMarcaDeObjeto)
@@ -675,7 +691,9 @@ void Outliner::DibujarOjos(Object* obj, bool hidden, bool noRender){
     if (FilaEnVista(fila)) {
         w3dEngine::PushMatrix();
         w3dEngine::Translatef(0, (GLfloat)((int)fila * (int)RenglonHeightGS), 0);
-        // OJO (visible): ocultado por si mismo o por un PADRE oculto -> tenue
+        // OJO (visible): ocultado por si mismo o por un PADRE oculto -> tenue. Sin la columna de la CAMARA, el ojo
+        // ocupa su lugar (pegado a la derecha)
+        if (!g_outVerRender) w3dEngine::Translatef((GLfloat)(IconSizeGS + gapGS), 0, 0);
         SetColorID(ColorID::grisUI, hidden ? 0.5f : 1.0f);
         if (g_outVerOjos) W3dDrawStrip4(IconMesh, IconsUV[static_cast<size_t>(obj->visible ? IconType::visible : IconType::hidden)]->uvs);
         // CAMARA (renderizar) a la DERECHA del ojo: si el objeto NO se renderiza -> camara_off;
@@ -705,8 +723,8 @@ void Outliner::button_left(){
     }
 }
 
-#ifndef W3D_SYMBIAN
 void Outliner::mouse_button_up(int boton){
+    W3D_SOLO_POR_CONTROLES();   // (Symbian: el OK del cursor virtual sigue como estaba)
     ViewPortClickDown = false;
     if (boton == W3dMB_IZQ) {
         mouseOverScrollYpress = false;
@@ -717,17 +735,31 @@ void Outliner::mouse_button_up(int boton){
     //}
     FindMouseOver(lastMouseX,lastMouseY);
 }
-#endif
 
-#ifndef W3D_SYMBIAN
+// ZOOM de la CUADRICULA (la rueda / dos dedos): el tamanio de las celdas, entre la mitad y cuatro veces el de siempre
+static void ZoomCeldas(Outliner* o, float factor) {
+    float z = o->celdaZoom * factor;
+    if (z < 0.6f) z = 0.6f;
+    if (z > 4.0f) z = 4.0f;
+    if (z == o->celdaZoom) return;
+    o->celdaZoom = z;
+    o->lastContentRows = -1;
+    o->Resize(o->width, o->height);
+    g_redraw = true;
+}
+void Outliner::event_finger_gesture(float zoomDelta, float panDx, float panDy){
+    (void)panDx; (void)panDy;
+    if (EnBiblioteca() && cuadricula && zoomDelta != 0.0f) ZoomCeldas(this, 1.0f + zoomDelta * 0.05f);
+}
 void Outliner::event_mouse_wheel(float dy, int mx, int my){
     {
       if (BarScrollHorizontal(mx, my, (int)(dy * 40))) return; } // sobre la barra -> horizontal
+    // la CUADRICULA: la rueda agranda / achica las celdas (se scrollea con la barra o arrastrando)
+    if (EnBiblioteca() && cuadricula) { ZoomCeldas(this, dy > 0 ? 1.12f : 1.0f / 1.12f); return; }
     MouseWheel = true;
     ScrollY(dy*6*GlobalScale);
     MouseWheel = false;
 }
-#endif
 
 void Outliner::FindMouseOver(int mx, int my){
     // (el hover de las barras lo calcula LayoutInput con la zona del
@@ -741,6 +773,7 @@ bool Outliner::event_finger_scroll(int px, int py, int dx, int dy){
 }
 
 void Outliner::event_mouse_motion(int mx, int my) {
+    if (hoverMx != mx || hoverMy != my) { hoverMx = mx; hoverMy = my; if (vista != OUT_VISTA_ESCENA) g_redraw = true; }
     // hover: fila bajo el mouse (feedback antes del click)
     hoverFila = (my - y - borderGS - PosY - BarTopOffset()) / RenglonHeightGS;
     // el "scrollbar area" esta reservada: ahi no hay hover de renglon
@@ -749,6 +782,20 @@ void Outliner::event_mouse_motion(int mx, int my) {
     }
     // la BIBLIOTECA: el arrastre de un recurso (a una carpeta, al 3D, a Properties) o el scroll de siempre
     if (vista != OUT_VISTA_ESCENA) {
+        // el DIVISOR de una columna: con el mouse encima se pone blanco; arrastrandolo, cambia el ancho
+        if (colArrastre >= 0 && leftMouseDown) {
+            int xT, xTm, xE, xF; ColumnasLista(xT, xTm, xE, xF);
+            const int der = colArrastre == 0 ? xTm : colArrastre == 1 ? xE : xF;   // el borde derecho de esa columna
+            int w = der - (mx - x);
+            const int minimo = 3 * CharacterWidthGS;
+            if (w < minimo) w = minimo;
+            if (w > width / 2) w = width / 2;
+            colAncho[colArrastre] = w / (GlobalScale > 0 ? GlobalScale : 1);
+            g_redraw = true;
+            return;
+        }
+        const int hc = (!leftMouseDown && !cuadricula) ? DivisorEnPunto(mx, my) : -1;
+        if (hc != colHover) { colHover = hc; g_redraw = true; }
         if ((leftMouseDown || agarreFila >= 0) && recArrastre) {
             MotionRecursos(mx, my);
             if (recArrastrando || agarreFila >= 0) return;   // mientras se arrastra no scrollea
@@ -784,7 +831,6 @@ void Outliner::event_mouse_motion(int mx, int my) {
     }
 }
 
-#ifndef W3D_SYMBIAN
 void Outliner::event_key_down(int tecla, bool repeticion){
     const int key = tecla;
     // vista de RECURSOS: sus propias teclas (flechas, Enter, F2, Supr, G = mover a carpeta)
@@ -850,9 +896,7 @@ void Outliner::event_key_down(int tecla, bool repeticion){
         };
     }
 }
-#endif
 
-#ifndef W3D_SYMBIAN
 void Outliner::event_key_up(int tecla){
     const int key = tecla;
     switch (key) {
@@ -869,7 +913,6 @@ void Outliner::event_key_up(int tecla){
             break;
     }
 }
-#endif
 
 // fila visible N (respetando desplegado) -> objeto REAL o fila VIRTUAL del armature 2D.
 // Devuelve true si la fila cayo en este subarbol (out queda cargado).
@@ -1059,7 +1102,10 @@ void Outliner::AutoScrollArrastre() {
 // emparenta (centro de la fila, manteniendo la transformacion) o manda
 // a la raiz (soltar en el vacio)
 void Outliner::SoltarDrag(int mx, int my) {
-    if (vista != OUT_VISTA_ESCENA) { SoltarRecursos(mx, my); return; }   // soltar un recurso (carpeta, 3D, Properties)
+    if (vista != OUT_VISTA_ESCENA) {
+        if (colArrastre >= 0) { colArrastre = -1; g_redraw = true; return; }   // (se solto el divisor de una columna)
+        SoltarRecursos(mx, my); return;   // soltar un recurso (carpeta, 3D, Properties)
+    }
     Object* obj = dragObjeto;
     bool estaba = dragging;
     const bool agarrado = agarreFila >= 0, movido = agarreMovido;
@@ -1258,8 +1304,9 @@ void Outliner::ClickSeleccionar(int mx, int my) {
                     (mx - x) <  (width - marginGS - borderGS - reservaBarra);
     bool enOjo = !enCamara && (mx - x) >= (width - 2*IconSizeGS - gapGS - marginGS - borderGS - reservaBarra) &&
                  (mx - x) < (width - IconSizeGS - gapGS - marginGS - borderGS - reservaBarra);
-    // columnas ocultas por el menu del ojo: no se tocan (el click cae en la fila)
-    if (!g_outVerRender) enCamara = false;
+    // columnas ocultas por el menu del ojo: no se tocan (el click cae en la fila). Sin la CAMARA, el ojo esta en su
+    // lugar (pegado a la derecha)
+    if (!g_outVerRender) { enOjo = enCamara; enCamara = false; }
     if (!g_outVerOjos) enOjo = false;
     // ---- fila VIRTUAL del armature 2D: INERTE. No se selecciona, no se arrastra, no se empareja,
     // no tiene ojo/camara y no se despliega (los huesos se listan y se editan en la pestania

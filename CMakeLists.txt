@@ -100,6 +100,8 @@ list(APPEND SRC_FILES
     # los bindings de config/mute de lua. Sin este .cpp el link falla (w3dEngine::Config*).
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/base/W3dConfig.cpp
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/base/W3dVibrar.cpp
+    # la pantalla tactil de las plataformas sin SDL (Symbian); el editor le engancha su receptor en todas
+    ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/base/W3dTactil.cpp
     # matematica del engine (antes en core/math): Vector3/Quaternion/Matrix4.
     # Se incluyen como "math/X.h" (engine es include dir). No los globea core/.
     ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/math/Vector3.cpp
@@ -125,6 +127,39 @@ if(W3D_PC_GLES2)
     list(REMOVE_ITEM SRC_FILES ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/gfx/w3dGraphics.cpp)
     list(APPEND SRC_FILES ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/gles2/w3dGraphicsGLES2.cpp)
     add_compile_definitions(W3D_WEBGL)
+endif()
+
+# VARIOS BACKENDS EN UN EJECUTABLE (libs/Whisk3DCore/gfx/w3dBackend.h): en la PC el editor trae OpenGL fijo Y OpenGL ES 2.0
+# (y despues Vulkan); el que se usa se elige AL ARRANCAR (Ajustes > Graphics). Cada backend se compila en su namespace
+# (w3dEngine::gl / ::es2) y gfx/w3dGraphicsDespacho.cpp reparte las llamadas al activo. (Con W3D_PC_GLES2 queda uno solo.)
+if(NOT W3D_PC_GLES2 AND (WIN32 OR (UNIX AND NOT APPLE AND NOT ANDROID)) AND NOT EMSCRIPTEN)
+    option(W3D_MULTIBACKEND "Varios backends graficos en el ejecutable, elegidos al arrancar" ON)
+else()
+    set(W3D_MULTIBACKEND OFF)
+endif()
+if(W3D_MULTIBACKEND)
+    list(APPEND SRC_FILES
+        ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/gles2/w3dGraphicsGLES2.cpp
+        ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/gfx/w3dGraphicsDespacho.cpp)
+    set_source_files_properties(${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/gfx/w3dGraphics.cpp PROPERTIES COMPILE_DEFINITIONS "W3D_BACKEND_NS=gl")
+    set_source_files_properties(${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/gles2/w3dGraphicsGLES2.cpp PROPERTIES COMPILE_DEFINITIONS "W3D_BACKEND_NS=es2")
+    add_compile_definitions(W3D_MULTIBACKEND)
+    message(STATUS "Whisk3D: varios backends graficos (OpenGL + OpenGL ES 2.0), elegidos al arrancar")
+    # VULKAN (vk/w3dVk.h): el backend de ES 2.0 compilado otra vez sobre un ES 2.0 hecho con Vulkan. Nada se enlaza: el
+    # cargador lo abre la ventana (SDL) y el compilador de shaders (shaderc_shared, del SDK) va al lado del ejecutable;
+    # sin ellos el editor sigue con OpenGL. Los headers de Vulkan vienen en libs/Whisk3DCore/thirdparty/vulkan.
+    option(W3D_VULKAN "Backend Vulkan (opcional al arrancar: sin el driver o sin shaderc queda OpenGL)" ON)
+    if(W3D_VULKAN AND EXISTS ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/thirdparty/vulkan/include/vulkan/vulkan_core.h)
+        list(APPEND SRC_FILES
+            ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/vk/w3dGraphicsVk.cpp
+            ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/vk/w3dVkGL.cpp)
+        set_source_files_properties(${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/vk/w3dGraphicsVk.cpp PROPERTIES COMPILE_DEFINITIONS "W3D_BACKEND_NS=vk;W3D_VKGL")
+        set_source_files_properties(${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/vk/w3dVkGL.cpp ${CMAKE_SOURCE_DIR}/main/render/RTGpu.cpp PROPERTIES
+            INCLUDE_DIRECTORIES ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/thirdparty/vulkan/include)
+        add_compile_definitions(W3D_VULKAN)
+        set(W3D_VULKAN_ON ON)
+        message(STATUS "Whisk3D: backend Vulkan (opcional: necesita el driver y shaderc_shared al lado del ejecutable)")
+    endif()
 endif()
 
 if(ANDROID)
@@ -158,6 +193,44 @@ endif()
 # Whisk3DCore owns graphics backend selection and native graphics dependencies.
 include(${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/cmake/w3dGraphicsBackend.cmake)
 w3d_configure_graphics_backend(whisk3d)
+
+# ---- LOS DENOISERS del trazado de rayos (render/Denoiser.cpp): OPCIONALES. Nada se enlaza: se cargan al usarse.
+#      OptiX: si estan sus headers (tools/bajar_terceros.ps1 -> libs/Whisk3DCore/thirdparty/optix), sin CUDA Toolkit
+#      (un cuda.h minimo; las funciones las trae el driver). Open Image Denoise: sus DLL al lado del ejecutable.
+set(W3D_TERCEROS ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/thirdparty)
+if((WIN32 OR (UNIX AND NOT APPLE AND NOT ANDROID)) AND EXISTS ${W3D_TERCEROS}/optix/include/optix.h AND NOT EMSCRIPTEN)
+    target_include_directories(whisk3d PRIVATE ${W3D_TERCEROS}/optix/include ${CMAKE_SOURCE_DIR}/main/render/cuda_min)
+    target_compile_definitions(whisk3d PRIVATE W3D_OPTIX)
+    message(STATUS "Whisk3D: denoiser OptiX (opcional, solo con una NVIDIA)")
+endif()
+if(WIN32 AND EXISTS ${W3D_TERCEROS}/oidn/bin/OpenImageDenoise.dll)
+    # (la CPU y la GPU de NVIDIA; las de AMD / Intel GPU -hip, sycl- no se copian: pesan y casi no se usan)
+    foreach(dll OpenImageDenoise.dll OpenImageDenoise_core.dll OpenImageDenoise_device_cpu.dll OpenImageDenoise_device_cuda.dll tbb12.dll)
+        add_custom_command(TARGET whisk3d POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${W3D_TERCEROS}/oidn/bin/${dll} $<TARGET_FILE_DIR:whisk3d>)
+    endforeach()
+    message(STATUS "Whisk3D: denoiser Open Image Denoise (opcional)")
+endif()
+
+# shaderc_shared (el compilador de shaders del backend Vulkan): del SDK de Vulkan instalado, al lado del ejecutable
+if(W3D_VULKAN_ON)
+    if(UNIX)
+        target_link_libraries(whisk3d PRIVATE ${CMAKE_DL_LIBS})
+    endif()
+    if(DEFINED ENV{VULKAN_SDK})
+        file(TO_CMAKE_PATH "$ENV{VULKAN_SDK}" W3D_VULKAN_SDK)
+    elseif(WIN32)   # (la variable no siempre llega a la consola del build: el lugar donde lo instala el SDK, el mas nuevo)
+        file(GLOB W3D_VULKAN_SDKS "C:/VulkanSDK/*")
+        if(W3D_VULKAN_SDKS)
+            list(SORT W3D_VULKAN_SDKS)
+            list(GET W3D_VULKAN_SDKS -1 W3D_VULKAN_SDK)
+        endif()
+    endif()
+    if(WIN32 AND W3D_VULKAN_SDK AND EXISTS "${W3D_VULKAN_SDK}/Bin/shaderc_shared.dll")
+        add_custom_command(TARGET whisk3d POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${W3D_VULKAN_SDK}/Bin/shaderc_shared.dll $<TARGET_FILE_DIR:whisk3d>)
+    endif()
+endif()
 
 if(APPLE)
     include(${CMAKE_SOURCE_DIR}/platform/mac/CMakeLists.txt)

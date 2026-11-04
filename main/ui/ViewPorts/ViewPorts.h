@@ -319,4 +319,8 @@ class ViewportColumn : public ViewportBase {
         void event_mouse_motion(int mx, int my) W3D_OVERRIDE;
 };
 
+// el OUTLINER de la escena (2) y la BIBLIOTECA (9) son la misma clase (Outliner): el input, el arrastre y los atajos
+// los tratan igual
+inline bool VpEsOutliner(const ViewportBase* v) { if (!v) return false; const int k = v->ViewportKind(); return k == 2 || k == 9; }
+
 #endif

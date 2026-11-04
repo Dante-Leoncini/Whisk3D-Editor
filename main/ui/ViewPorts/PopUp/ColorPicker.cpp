@@ -8,6 +8,8 @@
 #include "WhiskUI/text/bitmapText.h"
 #include "objects/Textures.h"
 #include "Undo.h" // Ctrl+Z: captura el cambio de color al cerrar
+#include "base/W3dClipboard.h"   // pestania Hex: Copiar / Pegar
+#include "W3dAviso.h"            // Notificar (el portapapeles no tiene un color)
 #include <cstdio>
 #include <cmath>
 
@@ -127,6 +129,11 @@ ColorPicker::ColorPicker() : PopUpBase("Color") {
     btnOk = new Button("OK");
     btnCancel = new Button(T("Cancel"));
     btnUnidad = new Button(T("Switch to 0-100%"));
+    btnCopiar = new Button(T("Copy"));
+    btnPegar = new Button(T("Paste"));
+    btnCopiar->adaptar = false; btnPegar->adaptar = false;
+    btnCopiar->centrado = true; btnPegar->centrado = true;
+    hexBtnY = 0;
     btnOk->adaptar = false;
     btnCancel->adaptar = false;
     btnUnidad->adaptar = false;
@@ -153,6 +160,8 @@ ColorPicker::~ColorPicker() {
     delete btnOk;
     delete btnCancel;
     delete btnUnidad;
+    delete btnCopiar;
+    delete btnPegar;
     delete tabs[0];
     delete tabs[1];
     delete tabs[2];
@@ -307,6 +316,7 @@ void ColorPicker::Reflow() {
         btnOkY = btnY;
     } else {
         alphaY = filasY + gapGS + grupoH + gapGS;
+        hexBtnY = filasY + gapGS + RenglonHeightGS + GlobalScale * 2 + gapGS;   // (Hex: debajo de su unica fila)
         // boton de unidad (ancho completo) y abajo OK / Cancel al 50% cada uno
         btnY = alphaY + RenglonHeightGS + GlobalScale * 2 + gapGS;
         btnOkY = btnY + (RenglonHeightGS + bordersGS) + gapGS;
@@ -325,6 +335,7 @@ void ColorPicker::Reflow() {
 // llamar Cerrar -> target == original -> UndoCapturarColor no pushea. Aceptar deja target cambiado -> pushea.
 void ColorPicker::Cerrar() {
     if (target) UndoCapturarColor(target, original);
+    if (g_textFieldActivo == &hexCampo) g_textFieldActivo = NULL;   // (la caja del hex no sobrevive al popup)
     editCirculo = false; editValue = false; // por si quedo editando
     // SOLTAR lo que apunta adentro del elemento: 'target' (el float[4] del color), 'palRef' (su
     // campo indice) y 'palObj' (el elemento). Nada de eso puede sobrevivir al cierre: el objeto
@@ -652,6 +663,13 @@ void ColorPicker::Render() {
                     (int)(target[1] * 255.0f + 0.5f),
                     (int)(target[2] * 255.0f + 0.5f),
                     (int)(target[3] * 255.0f + 0.5f));
+            // EDITANDO con el teclado: lo escrito (con el cursor); en vivo, si es un hex valido ya es el color
+            bool hexMal = false;
+            std::string hexTxt = buf;
+            if (TextFieldEnVivo(&hexCampo)) {
+                hexMal = !HexAplicar(hexCampo.text);
+                hexTxt = hexCampo.text;
+            }
             w3dEngine::PushMatrix();
             w3dEngine::Translatef((GLfloat)(gapGS * 2), (GLfloat)GlobalScale, 0);
             w3dEngine::Color4f(grisUI[0], grisUI[1], grisUI[2], 1.0f);
@@ -659,8 +677,10 @@ void ColorPicker::Render() {
             w3dEngine::PopMatrix();
             w3dEngine::PushMatrix();
             w3dEngine::Translatef((GLfloat)(cajaW - gapGS * 2), (GLfloat)GlobalScale, 0);
-            w3dEngine::Color4f(blanco[0], blanco[1], blanco[2], 1.0f);
-            RenderBitmapText(buf, textAlign::right, cajaW - gapGS * 4);
+            if (hexMal) w3dEngine::Color4f(1.0f, 0.35f, 0.35f, 1.0f);   // (todavia no es un hex: rojo)
+            else w3dEngine::Color4f(blanco[0], blanco[1], blanco[2], 1.0f);
+            if (g_textFieldActivo == &hexCampo) RenderTextField(hexCampo, true, textAlign::right, cajaW - gapGS * 4);
+            else RenderBitmapText(hexTxt.c_str(), textAlign::right, cajaW - gapGS * 4);
             w3dEngine::PopMatrix();
             w3dEngine::PopMatrix();
         } else {
@@ -774,6 +794,16 @@ void ColorPicker::Render() {
 
         // OK a la DERECHA, Cancel a la IZQUIERDA (logica de popup S60, igual que el popup de borrar)
         int mitad = (contW - gapGS) / 2;
+        // Hex: Copiar / Pegar en el lugar libre de abajo del valor (50% y 50%, como OK / Cancel)
+        if (pestania == 2) {
+            btnCopiar->Resize(mitad); btnPegar->Resize(mitad);
+            w3dEngine::PushMatrix(); w3dEngine::Translatef((GLfloat)izq, (GLfloat)hexBtnY, 0); btnCopiar->Render(); w3dEngine::PopMatrix();
+            w3dEngine::PushMatrix(); w3dEngine::Translatef((GLfloat)(izq + mitad + gapGS), (GLfloat)hexBtnY, 0); btnPegar->Render(); w3dEngine::PopMatrix();
+            btnCopiar->sx = x + izq;                 btnCopiar->sy = y + hexBtnY;
+            btnPegar->sx  = x + izq + mitad + gapGS; btnPegar->sy  = y + hexBtnY;
+        } else {
+            btnCopiar->sx = btnCopiar->sy = btnPegar->sx = btnPegar->sy = -10000;
+        }
         int filaOk = Filas() + (pestania == 0 ? 1 : 0); // la fila virtual de OK/Cancel (despues del switch en RGB)
         btnOk->focoMenu     = (fila == filaOk && okFoco == 0); // enfocado con flechas (verde)
         btnCancel->focoMenu = (fila == filaOk && okFoco == 1);
@@ -794,6 +824,36 @@ void ColorPicker::Render() {
     }
 
     endView();
+}
+
+// "#RRGGBB", "RRGGBB", "RRGGBBAA" (con o sin #, espacios afuera, mayusculas o minusculas)
+bool ColorPicker::HexAplicar(const std::string& t) {
+    if (!target) return false;
+    std::string d;
+    for (size_t i = 0; i < t.size(); i++) {
+        const char c = t[i];
+        if (c == '#' || c == ' ' || c == '\t' || c == '\r' || c == '\n') continue;
+        if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'))) return false;
+        d += c;
+    }
+    if (d.size() != 6 && d.size() != 8) return false;
+    for (size_t k = 0; k < d.size() / 2; k++) {
+        unsigned v = 0;
+        for (int q = 0; q < 2; q++) { const char c = d[k*2+q];
+            v = v * 16 + (unsigned)((c >= '0' && c <= '9') ? c - '0' : (c >= 'a' && c <= 'f') ? c - 'a' + 10 : c - 'A' + 10); }
+        target[k] = (float)v / 255.0f;
+    }
+    DeRGB();
+    return true;
+}
+void ColorPicker::HexEditar() {
+    if (!target) return;
+    char buf[16];
+    sprintf(buf, "%02X%02X%02X%02X", (int)(target[0] * 255.0f + 0.5f), (int)(target[1] * 255.0f + 0.5f),
+            (int)(target[2] * 255.0f + 0.5f), (int)(target[3] * 255.0f + 0.5f));
+    hexCampo.SetText(buf);
+    hexCampo.SelectAll();          // tipear reemplaza todo (como renombrar)
+    TextFieldEnfocar(&hexCampo);
 }
 
 void ColorPicker::AjustarFila(int delta) {
@@ -873,6 +933,23 @@ bool ColorPicker::Click(int mx, int my) {
         return true;
     }
 
+    // Hex: Copiar (#RRGGBB, +AA si no es opaco) / Pegar (cualquier hex del portapapeles)
+    if (pestania == 2 && btnCopiar->Contains(mx, my)) {
+        if (target) {
+            char b[16]; const int a = (int)(target[3] * 255.0f + 0.5f);
+            if (a >= 255) sprintf(b, "#%02X%02X%02X", (int)(target[0]*255.0f+0.5f), (int)(target[1]*255.0f+0.5f), (int)(target[2]*255.0f+0.5f));
+            else sprintf(b, "#%02X%02X%02X%02X", (int)(target[0]*255.0f+0.5f), (int)(target[1]*255.0f+0.5f), (int)(target[2]*255.0f+0.5f), a);
+            w3dEngine::W3dClipboardSet(b);
+            Notificar(std::string(T("Copied")) + " " + b, false);
+        }
+        return true;
+    }
+    if (pestania == 2 && btnPegar->Contains(mx, my)) {
+        const std::string t = w3dEngine::W3dClipboardGet();
+        if (!HexAplicar(t)) Notificar(T("The clipboard has no hex color"), true);
+        else if (g_textFieldActivo == &hexCampo) HexEditar();   // (la caja muestra lo pegado)
+        return true;
+    }
     // botones OK / Cancel
     if (btnOk->Contains(mx, my)) {
         Cerrar(); // aceptar: el color ya esta aplicado en vivo
@@ -911,6 +988,7 @@ bool ColorPicker::Click(int mx, int my) {
     if (ly >= filasY && ly < btnY - gapGS) {
         if (pestania == 2) {
             fila = 0;
+            if (ly < hexBtnY) HexEditar();   // click en el valor: escribirlo con el teclado
             return true;
         }
         int grupoY = filasY + gapGS;
@@ -1132,6 +1210,8 @@ bool ColorPicker::Tecla(int tecla) {
             } else if (fila == filaOk && okFoco == 1) { // Cancel enfocado: restaurar
                 if (target) { target[0]=original[0]; target[1]=original[1]; target[2]=original[2]; target[3]=original[3]; }
                 Cerrar();
+            } else if (pestania == 2 && fila == 0) {
+                HexEditar();                        // Hex: Enter = escribir el valor (Enter de nuevo lo deja)
             } else if (pestania == 3 && fila >= 0 && fila < filas) {
                 PalAplicarFila(fila);               // pestania Paleta: ejecutar la fila (no cierra)
             } else {                                // OK enfocado / cualquier otra fila: aceptar (ya esta vivo)

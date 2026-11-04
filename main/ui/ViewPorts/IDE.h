@@ -20,7 +20,8 @@ enum BarRolIDE {
     BRIDE_Guardar,    // menu ARCHIVO: Guardar (Ctrl+S) / Guardar como... / Guardar en el w3d o fuera del w3d / Cargar .lua
     BRIDE_Refresh,    // TRAE el archivo (lo editado afuera) + recarga los scripts EN VIVO si el juego corre
     BRIDE_Editar,     // menu EDITAR: deshacer / rehacer / cortar / copiar / pegar / buscar / reemplazar
-    BRIDE_Seleccionar // menu SELECCIONAR: seleccionar todo
+    BRIDE_Seleccionar, // menu SELECCIONAR: seleccionar todo
+    BRIDE_Compilar    // COMPILAR (solo con un shader .glsl abierto): guarda y compila los materiales que lo usan
 };
 
 // =====================================================================
@@ -98,6 +99,9 @@ class IDE : public ViewportBase, public WithBorder, public Scrollable {
         bool SeleccionEsCoincidencia(const std::string& t, bool mayus) const;
         int  ReemplazarTodas(const std::string& t, const std::string& por, bool mayus, bool palabra);   // un solo paso de deshacer
         void RecargarEnVivo(bool avisarSiNada);     // con el juego corriendo: recarga los objetos que usan este script
+        // COMPILAR un shader (.glsl): si algun material lo usa, se guarda y se compilan esos materiales; si no, se
+        // compila lo que hay en el editor de prueba. El resultado sale en un aviso (el error con su renglon)
+        void CompilarShader();
         std::string textoDisco;                     // el archivo como estaba la ultima vez que se leyo o escribio
         bool hayTextoDisco;
         void SetTexto(const std::string& texto);    // reemplaza el buffer entero (resetea undo)
@@ -145,10 +149,8 @@ class IDE : public ViewportBase, public WithBorder, public Scrollable {
         void button_left() W3D_OVERRIDE;
         void event_mouse_motion(int mx, int my) W3D_OVERRIDE; // drag izq = seleccion; medio = scroll
         void event_key_down(int tecla, bool repeticion) W3D_OVERRIDE; // Symbian / ruta normal
-#ifndef W3D_SYMBIAN
-        void mouse_button_up(int boton) W3D_OVERRIDE; // IMPRESCINDIBLE: libera ViewPortClickDown
+        void mouse_button_up(int boton) W3D_OVERRIDE; // IMPRESCINDIBLE: libera ViewPortClickDown (Symbian: con el dedo)
         void event_mouse_wheel(float dy, int mx, int my) W3D_OVERRIDE;
-#endif
         bool event_finger_scroll(int px, int py, int dx, int dy) W3D_OVERRIDE; // touch: arrastrar = scroll
 
         // sincroniza la barra (texto del selector = script abierto + '*' si esta sucio).

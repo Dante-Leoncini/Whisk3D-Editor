@@ -270,6 +270,14 @@ void EditMesh::Render() {
     // X-RAY: los bordes/vertices (incluso los de ATRAS de las caras) se dibujan SIEMPRE encima (sin z-test),
     // asi se pueden ver y seleccionar los que estaban ocultos. Se restaura al final.
     if (g_xray) gfx::Disable(gfx::DepthTest);
+#if defined(W3D_SYMBIAN) && defined(W3D_GLES2)
+    // el N8 (VideoCore III, z de 16 bits) no aplica bien el glPolygonOffset con que la malla se corre atras: el overlay
+    // peleaba con ella y las caras seleccionadas salian RAYADAS. Aca el overlay gana por si mismo, sin el offset: los
+    // empates pasan (LEqual) y un sesgo chico hacia la camara en la proyeccion (anda en cualquier GPU)
+    gfx::Disable(gfx::PolygonOffsetFill);
+    gfx::DepthFunc(gfx::DepthLEqual);
+    gfx::SesgoMetros(-0.02f);
+#endif
 
     // 1) CARAS seleccionadas: verde 50%, blend, sin escribir z (para no tapar lo de arriba)
     if (!faceTriDyn.empty()) {
@@ -287,31 +295,131 @@ void EditMesh::Render() {
     gfx::SmoothShading(true); // degradado de color a lo largo de la linea
     gfx::EnableArray(gfx::ColorArray);
 
+    // los arrays que se dibujan: los de siempre, o (telefono, sin X-Ray) solo lo que da a la camara
+    const GLfloat* lp = linePos.empty() ? NULL : &linePos[0];   const GLubyte* lc = lineCol.empty() ? NULL : &lineCol[0];
+    int nLineas = (int)(linePos.size() / 3);
+    const GLfloat* vp = &pos[0];   const GLubyte* vc = col.empty() ? NULL : &col[0];   int nVerts = (int)(pos.size() / 3);
+    const GLfloat* fp = faceCenter.empty() ? NULL : &faceCenter[0];   const GLubyte* fc = facePtCol.empty() ? NULL : &facePtCol[0];
+    int nCaras = (int)(faceCenter.size() / 3);
+#if defined(W3D_SYMBIAN)
+    // el z de 16 bits del telefono (a 5 metros distingue de a ~4 cm) no tapa la jaula de ATRAS: en un modelo denso se
+    // veian los bordes, vertices y puntitos de las caras de atras. Sin X-Ray, una cara que mira para atras (la camara
+    // del lado de adentro de su plano, en coordenadas LOCALES: vale con espejo y escala) Y es de un pedazo CERRADO de la
+    // malla esta tapada por la propia malla: lo que solo toca caras asi no se dibuja. Un pedazo ABIERTO (un plano, una
+    // grilla) visto de atras se ve entero. Lo de adelante tapado lo sigue resolviendo el z
+    static std::vector<GLfloat> visLP, visVP, visFP; static std::vector<GLubyte> visLC, visVC, visFC;
+    static std::vector<unsigned char> frente, eUso, vUso;   // (uso: bit 1 = tiene cara, bit 2 = tiene cara de frente)
+    if (!g_xray && !faces.empty()) {
+        float M[16], P[16];
+        gfx::GetMatrix(gfx::ModelView, M); gfx::GetMatrix(gfx::Projection, P);
+        // inversa de la 3x3 (columnas M[0..2], M[4..6], M[8..10]) -> la camara en coordenadas locales
+        const float a = M[0], b = M[4], c = M[8], d = M[1], e = M[5], f = M[9], g = M[2], h = M[6], k = M[10];
+        const float A = e*k - f*h, B = f*g - d*k, C = d*h - e*g;
+        float det = a*A + b*B + c*C; if (det == 0.0f) det = 1e-12f;
+        const float id = 1.0f / det;
+        const float i00 = A*id, i01 = (c*h - b*k)*id, i02 = (b*f - c*e)*id;
+        const float i10 = B*id, i11 = (a*k - c*g)*id, i12 = (c*d - a*f)*id;
+        const float i20 = C*id, i21 = (b*g - a*h)*id, i22 = (a*e - b*d)*id;
+        const bool orto = (P[11] == 0.0f);
+        float cam[3] = { 0, 0, 0 }, dir[3] = { 0, 0, 0 };
+        if (orto) {   // la direccion de la vista (0,0,-1 del ojo) en local
+            dir[0] = -i02; dir[1] = -i12; dir[2] = -i22;
+        } else {      // el ojo (el origen) en local = -A^-1 t
+            cam[0] = -(i00*M[12] + i01*M[13] + i02*M[14]);
+            cam[1] = -(i10*M[12] + i11*M[13] + i12*M[14]);
+            cam[2] = -(i20*M[12] + i21*M[13] + i22*M[14]);
+        }
+        const size_t F = faces.size();
+        if (caraCerrada.size() != F) {   // pedazos (caras unidas por aristas) sin arista de una sola cara
+            std::vector<int> padre(F); for (size_t f = 0; f < F; f++) padre[f] = (int)f;
+            const size_t E = lineIdx.size() / 2;
+            std::vector<int> primera(E, -1), cuenta(E, 0);
+            for (size_t f = 0; f < F && f < faceEdges.size(); f++)
+                for (size_t q = 0; q < faceEdges[f].size(); q++) { const int eg = faceEdges[f][q]; if (eg < 0 || eg >= (int)E) continue;
+                    cuenta[eg]++;
+                    if (primera[eg] < 0) { primera[eg] = (int)f; continue; }
+                    int a = (int)f, b = primera[eg];
+                    while (padre[a] != a) a = padre[a] = padre[padre[a]];
+                    while (padre[b] != b) b = padre[b] = padre[padre[b]];
+                    if (a != b) padre[a] = b; }
+            std::vector<unsigned char> abierto(F, 0);
+            for (size_t eg = 0; eg < E; eg++) if (cuenta[eg] == 1) { int a = primera[eg]; while (padre[a] != a) a = padre[a]; abierto[a] = 1; }
+            caraCerrada.assign(F, 0);
+            for (size_t f = 0; f < F; f++) { int a = (int)f; while (padre[a] != a) a = padre[a]; caraCerrada[f] = abierto[a] ? 0 : 1; }
+        }
+        frente.assign(F, 0); eUso.assign(lineIdx.size() / 2, 0); vUso.assign(pos.size() / 3, 0);
+        for (size_t fi = 0; fi < F && fi*3+2 < faceCenter.size(); fi++) {
+            const std::vector<int>& p = faces[fi];
+            float nx = 0, ny = 0, nz = 0;   // normal de Newell (sirve para n-gons)
+            for (size_t q = 0; q < p.size(); q++) {
+                const float* u = &pos[p[q]*3]; const float* v = &pos[p[(q+1) % p.size()]*3];
+                nx += (u[1]-v[1])*(u[2]+v[2]); ny += (u[2]-v[2])*(u[0]+v[0]); nz += (u[0]-v[0])*(u[1]+v[1]);
+            }
+            const float* cc = &faceCenter[fi*3];
+            const float sg = orto ? (nx*dir[0] + ny*dir[1] + nz*dir[2])
+                                  : (nx*(cc[0]-cam[0]) + ny*(cc[1]-cam[1]) + nz*(cc[2]-cam[2]));
+            const unsigned char u = (unsigned char)((sg <= 0.0f || !caraCerrada[fi]) ? 3 : 1);   // 1 = tapada por la malla
+            frente[fi] = (unsigned char)(u == 3);
+            for (size_t q = 0; q < p.size(); q++) vUso[p[q]] |= u;
+            if (fi < faceEdges.size())
+                for (size_t q = 0; q < faceEdges[fi].size(); q++) { const int ei = faceEdges[fi][q]; if (ei >= 0 && ei < (int)eUso.size()) eUso[ei] |= u; }
+        }
+        visLP.clear(); visLC.clear();
+        for (size_t ei = 0; ei < eUso.size() && (ei*2+1)*3+2 < linePos.size(); ei++) {
+            if (eUso[ei] == 1) continue;   // solo caras de atras
+            visLP.insert(visLP.end(), &linePos[ei*6], &linePos[ei*6] + 6);
+            visLC.insert(visLC.end(), &lineCol[ei*8], &lineCol[ei*8] + 8);
+        }
+        lp = visLP.empty() ? NULL : &visLP[0]; lc = visLC.empty() ? NULL : &visLC[0]; nLineas = (int)(visLP.size() / 3);
+        if (mode == SelVertex) {
+            visVP.clear(); visVC.clear();
+            for (size_t vi = 0; vi < vUso.size() && vi*4+3 < col.size(); vi++) {
+                if (vUso[vi] == 1) continue;
+                visVP.insert(visVP.end(), &pos[vi*3], &pos[vi*3] + 3);
+                visVC.insert(visVC.end(), &col[vi*4], &col[vi*4] + 4);
+            }
+            vp = visVP.empty() ? NULL : &visVP[0]; vc = visVC.empty() ? NULL : &visVC[0]; nVerts = (int)(visVP.size() / 3);
+        } else if (mode == SelFace) {
+            visFP.clear(); visFC.clear();
+            for (size_t fi = 0; fi < frente.size() && fi*4+3 < facePtCol.size(); fi++) {
+                if (!frente[fi]) continue;
+                visFP.insert(visFP.end(), &faceCenter[fi*3], &faceCenter[fi*3] + 3);
+                visFC.insert(visFC.end(), &facePtCol[fi*4], &facePtCol[fi*4] + 4);
+            }
+            fp = visFP.empty() ? NULL : &visFP[0]; fc = visFC.empty() ? NULL : &visFC[0]; nCaras = (int)(visFP.size() / 3);
+        }
+    }
+#endif
+
     // 2) LINEAS (glDrawArrays GL_LINES, expandidas, color por vertice)
-    if (!linePos.empty()) {
-        gfx::VertexPointer3f(0, &linePos[0]);
-        gfx::ColorPointer4ub(&lineCol[0]);
+    if (nLineas > 0 && lp && lc) {
+        gfx::VertexPointer3f(0, lp);
+        gfx::ColorPointer4ub(lc);
         gfx::LineWidth(1.0f);
-        gfx::DrawLines((int)(linePos.size() / 3));
+        gfx::DrawLines(nLineas);
     }
 
     // 3) PUNTOS: vertices (modo vertex) o puntitos en el centro de cada cara (modo
     //    face). En modo edge no se dibujan puntos.
-    if (mode == SelVertex) {
-        gfx::VertexPointer3f(0, &pos[0]);
-        gfx::ColorPointer4ub(&col[0]);
+    if (mode == SelVertex && nVerts > 0 && vp && vc) {
+        gfx::VertexPointer3f(0, vp);
+        gfx::ColorPointer4ub(vc);
         gfx::PointSize(6.0f);
-        gfx::DrawPoints((int)(pos.size() / 3));
+        gfx::DrawPoints(nVerts);
         gfx::PointSize(1.0f);
-    } else if (mode == SelFace && !faceCenter.empty()) {
-        gfx::VertexPointer3f(0, &faceCenter[0]);
-        gfx::ColorPointer4ub(&facePtCol[0]);
+    } else if (mode == SelFace && nCaras > 0 && fp && fc) {
+        gfx::VertexPointer3f(0, fp);
+        gfx::ColorPointer4ub(fc);
         gfx::PointSize(6.0f);
-        gfx::DrawPoints((int)(faceCenter.size() / 3));
+        gfx::DrawPoints(nCaras);
         gfx::PointSize(1.0f);
     }
 
     if (g_xray) gfx::Enable(gfx::DepthTest); // restaurar el z-test tras el overlay X-Ray
+#if defined(W3D_SYMBIAN) && defined(W3D_GLES2)
+    gfx::SesgoMetros(0.0f);
+    gfx::DepthFunc(gfx::DepthLess);
+#endif
     gfx::DisableArray(gfx::ColorArray);
     if (src && src->vertex) gfx::VertexPointer3f(0, src->vertex);
     gfx::Invalidate();

@@ -24,6 +24,7 @@ class RedoMeshPanel : public PopUpBase {
         bool Tecla(int tecla) W3D_OVERRIDE;
         void Soltar() W3D_OVERRIDE;
         bool CierraConViewport() W3D_OVERRIDE { return true; } // se cierra al tocar el viewport
+        void Plegar();   // nace PLEGADO: solo la flecha y el titulo (ver RedoMeshPanel.cpp)
 
     private:
         GroupPropertie* grupo;
@@ -43,6 +44,11 @@ void AbrirRedoNormalesPanel(Mesh* m);
 
 // abre/reemplaza el panel "Loop Cut and Slide" (Number of Cuts + Factor)
 void AbrirRedoLoopCutPanel(Mesh* m);
+
+// abre/reemplaza el panel "Inset Faces" (Thickness, Depth y las tildes de Blender)
+void AbrirRedoInsetPanel(Mesh* m);
+// abre/reemplaza el panel "Bevel" (Affect, Width Type, Width, Segments, Profile... como el de Blender)
+void AbrirRedoBevelPanel(Mesh* m);
 
 // el panel (o su malla) sigue vivo? Lo usa el test 'uipunteros': si borran la malla que edita,
 // el panel tiene que cerrarse, porque sus campos apuntan a MIEMBROS de ella y los ESCRIBEN.

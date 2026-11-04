@@ -46,9 +46,10 @@ raizabrir Scene
 raizcontexto activo Cubo sel 1 camara Cámara luces 1 coleccion Colección
 # (los 4 de la escena + las 2 rutinas que trae todo proyecto: Constructor y Limpiar pantalla)
 raizinfo objetos 6
-# las LUCES son por escena: la del bloque llena sus 8 y la otra sigue pudiendo crear
-raizluces 9 creadas 7
-raizcontexto luces 8
+# las LUCES son por escena: la del bloque crea 9 mas (pasadas las 8 de GL comparten numero: el trazado usa todas) y la
+# otra sigue creando las suyas
+raizluces 9 creadas 9
+raizcontexto luces 10
 selobj Cubo
 raizmenu outliner Scene.001
 raizinfo activa Scene.001
@@ -62,7 +63,7 @@ objname Temporal
 raizinfo objetos 6
 raizabrir Scene
 undo
-raizinfo objetos 13
+raizinfo objetos 15
 raizabrir Scene.001
 raizinfo objetos 6
 undo
@@ -87,7 +88,7 @@ recpurgar escenas n 0
 outfilas n 3
 outvista escena
 
-# ---- un PREFAB por el "+" de la barra del outliner (su raiz aislada, con su objeto raiz) ----
+# ---- un PREFAB por el selector de la escena de la barra del outliner (su raiz aislada, con su objeto raiz) ----
 raizboton prefab
 raizinfo n 3 activa Prefab tipo prefab prefabs 1 objetos 1
 raizcontexto coleccion Prefab

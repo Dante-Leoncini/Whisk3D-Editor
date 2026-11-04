@@ -649,7 +649,7 @@ static Vector3 BDirMundoALocal(const Vector3& d){
     return (g_grabInvW * d) - (g_grabInvW * Vector3(0, 0, 0));
 }
 static Vector3 BCam(int which){ // ejes de camara en mundo: 0=right 1=up 2=forward
-    Quaternion vr = Viewport3DActive ? Viewport3DActive->viewRot : Quaternion(1,0,0,0);
+    Quaternion vr = Viewport3DActive ? Viewport3DActive->RotVista() : Quaternion(1,0,0,0);   // (mirando por la camara: la suya)
     return vr * ((which==0)?Vector3(1,0,0):(which==1)?Vector3(0,1,0):Vector3(0,0,-1));
 }
 // eje X/Y/Z (0/1/2, convencion usuario) en MUNDO segun transformOrientation. Global: X=(1,0,0),
@@ -893,8 +893,9 @@ void BoneGrabMotion3D(Viewport3D* vp, int mx, int my){
         return;
     }
     float wpp = vp->VelocidadArrastreMundo();
-    Vector3 wd = (vp->viewRot * Vector3(1, 0, 0)) * (dx * wpp)
-               + (vp->viewRot * Vector3(0, 1, 0)) * (-dy * wpp);
+    const Quaternion vr = vp->RotVista();   // (mirando por la camara: la suya)
+    Vector3 wd = (vr * Vector3(1, 0, 0)) * (dx * wpp)
+               + (vr * Vector3(0, 1, 0)) * (-dy * wpp);
     // EFECTIVA por el mismo motivo que en BoneGrabStartEx (ver el comentario de g_grabW): 'wd'
     // ya viene de la camara de ESTE viewport y se baja a local como DIRECCION, o sea que es una
     // medicion en pantalla, no un horneado. Y como es efectiva hay que decir de QUE vista: la

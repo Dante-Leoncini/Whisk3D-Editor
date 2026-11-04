@@ -25,7 +25,13 @@ cd "$(dirname "$0")" || exit 1
 W3D_BIN="${W3D_BIN:-../../platform/linux/build/whisk3d}"
 # SIN VENTANAS: por defecto las pruebas dibujan en el driver 'offscreen' de SDL (GL por EGL, sin
 # abrir ninguna ventana en el escritorio). Para verlas: W3D_VER_VENTANA=1 ./correr_todas.sh
-if [ -z "${W3D_VER_VENTANA:-}" ]; then export SDL_VIDEODRIVER="${SDL_VIDEODRIVER:-offscreen}" SDL_AUDIODRIVER="${SDL_AUDIODRIVER:-dummy}"; fi
+# (en Windows no hay EGL para el 'offscreen': el exe con --script ya crea la ventana OCULTA solo, ver main.cpp)
+if [ -z "${W3D_VER_VENTANA:-}" ]; then
+    case "$(uname -s)" in
+        MINGW*|MSYS*|CYGWIN*) export SDL_AUDIODRIVER="${SDL_AUDIODRIVER:-dummy}" ;;
+        *) export SDL_VIDEODRIVER="${SDL_VIDEODRIVER:-offscreen}" SDL_AUDIODRIVER="${SDL_AUDIODRIVER:-dummy}" ;;
+    esac
+fi
 if [ ! -x "$W3D_BIN" ]; then
     echo "ERROR: no encuentro el binario del motor en '$W3D_BIN'."
     echo "       Compilalo o pasa W3D_BIN=<ruta> ./correr_todas.sh"

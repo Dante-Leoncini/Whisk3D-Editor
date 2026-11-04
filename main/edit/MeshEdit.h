@@ -82,6 +82,45 @@ bool W3dRenderCornersSeparadosActivo();
 // index buffer del render, el loop cut, el export glTF y el snap a cara: TODOS ven la misma cara.
 void W3dTriangularCara(const float* pos, const std::vector<int>& idx, std::vector<MeshIndex>& tris);
 
+// las opciones de INSET FACES (Mesh::InsetEdit), las del panel "Inset Faces". Por defecto, las de Blender
+struct InsetOpciones {
+    float grosor;        // Thickness: cuanto se corre el contorno hacia adentro
+    float profundidad;   // Depth: cuanto sube (o baja) lo de adentro por la normal
+    bool borde;          // Boundary: tambien el contorno abierto de la malla (sin: se desliza por el)
+    bool parejo;         // Offset Even: el grosor parejo en las esquinas (no se afina en los angulos)
+    bool relativo;       // Offset Relative: el grosor escala con el largo de las aristas de alrededor
+    bool riel;           // Edge Rail: el vertice nuevo corre por la arista de adentro que ya habia
+    bool afuera;         // Outset: hacia afuera en vez de hacia adentro
+    bool selAfuera;      // Select Outer: queda seleccionado el anillo nuevo, no lo de adentro
+    bool individual;     // Individual: cada cara por su lado (no la region entera)
+    bool interpolar;     // Interpolate: los UV / colores de lo de adentro se achican con la cara
+    InsetOpciones() : grosor(0.0f), profundidad(0.0f), borde(true), parejo(true), relativo(false), riel(false),
+                      afuera(false), selAfuera(false), individual(false), interpolar(true) {}
+};
+
+// las opciones del BEVEL (Mesh::BevelEdit), las del panel "Bevel". Por defecto, las de Blender
+struct BevelOpciones {
+    int afecta;          // Affect: 0 = vertices, 1 = aristas
+    int tipoAncho;       // Width Type: 0 Offset, 1 Width, 2 Depth, 3 Percent, 4 Absolute
+    float ancho;         // Width
+    int segmentos;       // Segments
+    float perfil;        // Profile Shape (0.5 = circular)
+    int material;        // Material Index (-1 = el de la cara de al lado)
+    bool endurecer;      // Harden Normals (aca: las caras nuevas, suaves)
+    bool limitarSolape;  // Clamp Overlap: ningun punto corre mas de la mitad de su arista
+    bool deslizar;       // Loop Slide: los puntos corren POR las aristas de al lado
+    bool marcarSeams;    // Mark Seams: los bordes de las tiras
+    bool marcarSharp;    // Mark Sharp: idem
+    int ingleteAfuera;   // Miter Outer: 0 Sharp, 1 Patch, 2 Arc (hoy: Sharp)
+    int ingleteAdentro;  // Miter Inner: 0 Sharp, 1 Arc (hoy: Sharp)
+    int interseccion;    // Intersection Type: 0 Grid Fill, 1 Cutoff
+    int fuerzaCara;      // Face Strength: 0 None, 1 New, 2 Affected, 3 All (para Weighted Normal: hoy no hace nada)
+    int tipoPerfil;      // Profile Type: 0 Superellipse, 1 Custom (hoy: superelipse)
+    BevelOpciones() : afecta(1), tipoAncho(0), ancho(0.0f), segmentos(1), perfil(0.5f), material(-1), endurecer(false),
+                      limitarSolape(false), deslizar(true), marcarSeams(false), marcarSharp(false), ingleteAfuera(0),
+                      ingleteAdentro(0), interseccion(0), fuerzaCara(0), tipoPerfil(0) {}
+};
+
 // EL INDEX BUFFER CANONICO de una malla, SIN tocarla: el que armaria ReagruparMeshParts si
 // la malla se guardara en .w3dm y se volviera a abrir (triangulos por mesh part + Forsyth,
 // con el MISMO codigo). Lo hornea el .w3db al guardar (io/W3dMallaBin.h): abrir no triangula.

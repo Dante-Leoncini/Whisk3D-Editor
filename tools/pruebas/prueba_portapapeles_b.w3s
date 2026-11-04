@@ -1,0 +1,6 @@
+# EL PORTAPAPELES DE OBJETOS ENTRE VENTANAS (2/2): OTRO Whisk3D (otro proceso, la escena de siempre) PEGA lo que copio
+# prueba_portapapeles_a.w3s: el cubo biselado (su malla viaja con el), con su material rojo. Pegar dos veces da dos
+# objetos nuevos; Ctrl+Z saca lo pegado
+pegar espera 1
+pegar espera 1
+undo

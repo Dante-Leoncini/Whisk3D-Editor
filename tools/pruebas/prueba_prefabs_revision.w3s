@@ -17,7 +17,7 @@
 #    E) un script agregado a mano a un objeto generado no se vuelve override (ni corre los valores)
 #    F) prefabs ANIDADOS: lo que se cambia en lo generado por la anidada se guarda como override de la
 #       de afuera; renombrar el anidado no deja rancia la definicion del que lo contiene
-#    G) el RIEL de una camara en una curva de una instancia destruida jugando: rebobinar no la devuelve
+#    G) el RIEL de una camara en una curva de una instancia destruida jugando: el Stop no la devuelve
 #    H) Unpack: las refs internas siguen a su objeto renumerado (no al homonimo de afuera)
 #    I) instanciar(): los cuerpos rigidos existen en su inicio() (fisicaVel llega)
 #    J) el "_origen" de un nodo en seco se lee exacto (mas alla de 2^24)
@@ -181,16 +181,12 @@ prefabinfo Caja generados 6
 # (la instancia anidada que quedo en la escena al desempaquetar es de "Soldado", no de un prefab que ya no existe)
 prefabinfo Enemigo prefab Soldado generados 4 vacia 0
 
-# --- G) el riel de la camara en una curva de una instancia creada y destruida jugando + rebobinar ---
+# --- G) el riel de la camara en una curva de una instancia creada y destruida jugando ---
 abrirw3d prueba_prefabs_riel.w3d
 selobj RielB
 prefabcrear nombre RielB
-simcache 1
 simplay 10
 scriptinfo compartido riel true
-simira 3
-simpaso 1
-simira 8
 simstop
 
 # --- H) Unpack: las refs internas siguen a SU objeto renumerado ---

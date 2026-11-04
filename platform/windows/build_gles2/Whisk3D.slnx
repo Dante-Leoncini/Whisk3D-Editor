@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Solution>
+	<Configurations>
+		<BuildType Name="Debug"/>
+		<BuildType Name="Release"/>
+		<BuildType Name="MinSizeRel"/>
+		<BuildType Name="RelWithDebInfo"/>
+		<Platform Name="x64"/>
+	</Configurations>
+	<Project Path="ALL_BUILD.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="60078801-3171-3c4c-ac10-a43417fa3caa" DefaultStartup="true">
+		<BuildDependency Project="thirdparty/SDL2/SDL2-static.vcxproj"/>
+		<BuildDependency Project="thirdparty/SDL2/SDL2_test.vcxproj"/>
+		<BuildDependency Project="thirdparty/SDL2/SDL2main.vcxproj"/>
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		<BuildDependency Project="thirdparty/luac.vcxproj"/>
+		<BuildDependency Project="thirdparty/w3dlua.vcxproj"/>
+		<BuildDependency Project="w3dversion.vcxproj"/>
+		<BuildDependency Project="whisk3d.vcxproj"/>
+	</Project>
+	<Project Path="INSTALL.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="e5866ef5-4f7c-312a-8223-f3b1942604a0">
+		<BuildDependency Project="ALL_BUILD.vcxproj"/>
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		<Build Solution="Debug|*" Project="false"/>
+		<Build Solution="Release|*" Project="false"/>
+		<Build Solution="MinSizeRel|*" Project="false"/>
+		<Build Solution="RelWithDebInfo|*" Project="false"/>
+	</Project>
+	<Project Path="PACKAGE.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="f0f44e3f-7d60-356a-8197-e2e3cd611cdf">
+		<BuildDependency Project="ALL_BUILD.vcxproj"/>
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		<Build Solution="Debug|*" Project="false"/>
+		<Build Solution="Release|*" Project="false"/>
+		<Build Solution="MinSizeRel|*" Project="false"/>
+		<Build Solution="RelWithDebInfo|*" Project="false"/>
+	</Project>
+	<Project Path="thirdparty/SDL2/SDL2-static.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="5baa0dec-de8b-3a79-a676-5f15f2424183">
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		<BuildDependency Project="thirdparty/SDL2/sdl_headers_copy.vcxproj"/>
+	</Project>
+	<Project Path="thirdparty/SDL2/SDL2_test.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="e35d1dc0-29d2-3f92-82fa-625bf2484aca">
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		<BuildDependency Project="thirdparty/SDL2/sdl_headers_copy.vcxproj"/>
+	</Project>
+	<Project Path="thirdparty/SDL2/SDL2main.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="6da4b201-108f-3429-b1da-c7ff41e619db">
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		<BuildDependency Project="thirdparty/SDL2/sdl_headers_copy.vcxproj"/>
+	</Project>
+	<Project Path="ZERO_CHECK.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="4c5c7496-fa47-367b-aef8-c01d0f161824"/>
+	<Project Path="thirdparty/luac.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="8bde46be-2148-3c1c-af4a-0a3314ec7846">
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		<BuildDependency Project="thirdparty/w3dlua.vcxproj"/>
+	</Project>
+	<Project Path="thirdparty/SDL2/sdl_headers_copy.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="20bb0075-6f34-3e51-820a-6eca9bdc4e00">
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+	</Project>
+	<Project Path="thirdparty/SDL2/uninstall.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="a7c55965-b2a1-332c-a495-bd169cfbbfe4">
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		<Build Solution="Debug|*" Project="false"/>
+		<Build Solution="Release|*" Project="false"/>
+		<Build Solution="MinSizeRel|*" Project="false"/>
+		<Build Solution="RelWithDebInfo|*" Project="false"/>
+	</Project>
+	<Project Path="thirdparty/w3dlua.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="a7f7c434-2657-3eaa-8674-3395ce4cc71d">
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+	</Project>
+	<Project Path="w3dversion.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="406cb726-ecc7-3dfa-913e-2890203b5ee2">
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+	</Project>
+	<Project Path="whisk3d.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="50bdf5d3-b017-34ec-9622-e03f1426279f">
+		<BuildDependency Project="thirdparty/SDL2/SDL2-static.vcxproj"/>
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		<BuildDependency Project="thirdparty/w3dlua.vcxproj"/>
+		<BuildDependency Project="w3dversion.vcxproj"/>
+	</Project>
+</Solution>

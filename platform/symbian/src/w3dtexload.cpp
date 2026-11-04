@@ -104,12 +104,21 @@ static void DecodeImageSymbianL(const char* aFilename,
     TInt h = info.iOverallSizeInPixels.iHeight;
     TBool alpha = (info.iFlags & TFrameInfo::ETransparencyPossible) != 0;
 
+    // ES 2.0 (Symbian^3, el N8): el alfa viene EN el color (EColor16MA, el decodificador PNG lo soporta). La mascara
+    // EGray256 aparte de ese decodificador sale TRAMADA (dithering): en los iconos de 10x10, con bordes semitransparentes,
+    // quedaban pixeles si y pixeles no ("iconos rotos"; las letras, de pixel duro, se veian bien). El N95 (9.2) sigue
+    // con la mascara: su decodificador no da alfa en EColor16MA
+#ifdef W3D_GLES2
+    const TBool alfaEnColor = alpha;
+#else
+    const TBool alfaEnColor = EFalse;
+#endif
     CFbsBitmap* bmp = new (ELeave) CFbsBitmap();
     CleanupStack::PushL(bmp);
-    User::LeaveIfError(bmp->Create(TSize(w, h), EColor16MU));
+    User::LeaveIfError(bmp->Create(TSize(w, h), alfaEnColor ? EColor16MA : EColor16MU));
 
     CFbsBitmap* mask = NULL;
-    if (alpha) {
+    if (alpha && !alfaEnColor) {
         mask = new (ELeave) CFbsBitmap();
         CleanupStack::PushL(mask);
         User::LeaveIfError(mask->Create(TSize(w, h), EGray256));
@@ -155,11 +164,12 @@ static void DecodeImageSymbianL(const char* aFilename,
         TInt strideW = bmp->DataStride() / 4;
         for (TInt y = 0; y < h; y++) {
             for (TInt x = 0; x < w; x++) {
-                TUint32 px = src[y * strideW + x]; // EColor16MU = XRGB
+                TUint32 px = src[y * strideW + x]; // EColor16MU = XRGB, EColor16MA = ARGB
                 TUint8* d = &rgba[(y * w + x) * 4];
                 d[0] = (TUint8)((px >> 16) & 0xFF);
                 d[1] = (TUint8)((px >> 8) & 0xFF);
                 d[2] = (TUint8)(px & 0xFF);
+                if (alfaEnColor) d[3] = (TUint8)(px >> 24);
             }
         }
         bmp->UnlockHeap();

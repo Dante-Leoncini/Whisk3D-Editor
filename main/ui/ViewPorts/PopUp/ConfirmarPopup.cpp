@@ -94,27 +94,30 @@ int ConfirmarPopup::AltoBarra()  const {
     return Padding() * 2 + nL * LineHeight() + gapGS + (RenglonHeightGS + bordersGS);
 }
 
+// LA BARRA AL FONDO (ancho completo, sobre los soft keys) es para el telefono SIN pantalla tactil manejado con su
+// keypad (el N95): ahi se contesta con los soft keys. Con mouse y teclado (Bluetooth o PC) o con pantalla tactil (el
+// N8: la variante ES 2.0 de Symbian es la de Symbian^3) va centrado, igual en todas las plataformas
+#if defined(W3D_SYMBIAN) && !defined(W3D_GLES2)
+extern int W3dHayMouseBT();          // (w3dmouse.cpp; TBool es int)
+extern bool W3dSymbianTecladoBT();
+static bool ConfirmarAbajo() { return !W3dHayMouseBT() && !W3dSymbianTecladoBT(); }
+#else
+static bool ConfirmarAbajo() { return false; }
+#endif
+
 void ConfirmarPopup::Layout() {
     // ancho del dialogo primero (independiente del alto), para saber cuantos caracteres entran por renglon
-#ifdef W3D_SYMBIAN
-    int w = MenuPantallaW; // barra al FONDO, ancho COMPLETO (ahi estan los soft keys)
-#else
-    int w = MenuPantallaW / 2;
+    const bool abajo = ConfirmarAbajo();
+    int w = abajo ? MenuPantallaW : MenuPantallaW / 2;   // abajo: ancho COMPLETO (ahi estan los soft keys)
     if (w < 200) w = MenuPantallaW; // pantallas muy chicas: ancho completo
-#endif
     // word-wrap del mensaje al ancho INTERIOR (w - padding a ambos lados). Asi nunca se corta.
     int cw = (CharacterWidthGS > 0) ? CharacterWidthGS : 1;
     int maxChars = (w - Padding() * 2) / cw;
     WrapMensaje(mensaje, maxChars, lineas);
     int h = AltoBarra(); // usa lineas.size() (ya calculado)
     popUpWindow->Resize(w, h);
-#ifdef W3D_SYMBIAN
-    x = 0;
-    y = MenuPantallaH - h;
-#else
-    x = (MenuPantallaW - w) / 2;
-    y = (MenuPantallaH - h) / 2;
-#endif
+    if (abajo) { x = 0; y = MenuPantallaH - h; }
+    else { x = (MenuPantallaW - w) / 2; y = (MenuPantallaH - h) / 2; }
 }
 
 void ConfirmarPopup::Render() {

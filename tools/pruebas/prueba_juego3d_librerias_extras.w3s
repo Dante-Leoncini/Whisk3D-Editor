@@ -29,12 +29,10 @@ prefabvivos 4
 libanidada extras personajes como extras~personajes
 
 # --- el Play del editor ---
-simcache 0
 simplay 30
 scriptinfo compartido juez OK
 scriptinfo compartido enemigos 1
 simstop
-simcache 1
 
 # --- el binario (modo debug: deja su whisk3d.log) con los assets sueltos ---
 compilarjuego 0 0 1

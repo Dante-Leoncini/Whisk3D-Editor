@@ -46,4 +46,28 @@ float LoopCutGetFactor();
 void LoopCutRenderPreview();
 bool ScenePick3D(int mx, int my, int vx, int vy, int vw, int vh, int screenH);
 
+// INSET FACES (I en Edit Mode / menu Face): el modal + el panel redo (la op de malla: Mesh::InsetEdit)
+struct InsetOpciones;
+bool InsetActivo();
+void InsetIniciar(int mx, int my);
+void InsetMotion(int mx, int my);
+void InsetConfirmar();
+void InsetCancelar();
+bool InsetTecla(int tecla);                 // W3dK_*: true = la uso (mientras dura el modal, todas)
+void InsetRedoAplicar();                    // el panel cambio una opcion: re-inseta desde la malla de antes
+InsetOpciones& InsetOpcionesActuales();     // las opciones (las tildes del panel apuntan aca)
+void InsetCentroPantalla(float& x, float& y, float& pxPorU);   // (pruebas) el centro de la seleccion en pantalla
+// BEVEL (Ctrl+B en Edit Mode / menus Edge y Vertex): el modal + el panel redo (la op de malla: Mesh::BevelEdit)
+struct BevelOpciones;
+bool BevelActivo();
+void BevelIniciar(int mx, int my, int afecta = 1);   // afecta: 1 = aristas, 0 = vertices
+void BevelMotion(int mx, int my);
+void BevelRueda(int dir);
+void BevelConfirmar();
+void BevelCancelar();
+bool BevelTecla(int tecla);
+void BevelRedoAplicar();
+BevelOpciones& BevelOpcionesActuales();
+void BevelCentroPantalla(float& x, float& y, float& pxPorU);
+
 #endif

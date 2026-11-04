@@ -9,3 +9,6 @@
 | `soltarSonido(h)` | 释放音符：包络进入释音阶段。 |
 | `reverb(sala, amortiguacion, nivel)` | 全局混响：房间大小、阻尼和电平（各 0 到 1；电平 0 关闭）。 |
 | `silenciar(bool)`, `estaMudo()` | 全局静音。 |
+| `tocarSonido(obj [, seg])`、`callarSonido(obj)` | 重新播放一个 **Sound 对象**（从其片段的第 `seg` 秒开始）或让它静音。 |
+| `sonidoObj(obj) → t`、`setSonidoObj(obj, t)` | 读取 / 修改 Sound 对象：`archivo`（音源）、`activo`、`volumen`、`tono`、`reverb`、`paneo`、`inicio`、`recorteIni`、`recorteFin`、`bucle`、`posicional`、`radio`、`alcance`（读取时还有 `duracion`、`sonando`）。 |
+| `crearSonido("sonidos/x.wav" [, padre]) → obj` | 新建一个 Sound 对象（`destruir(obj)` 删除它）。在预制体中会像其他对象一样被实例化。 |

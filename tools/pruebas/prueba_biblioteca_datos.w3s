@@ -73,7 +73,11 @@ outvista biblioteca
 outclick Scene
 recactivo escenas Scene
 recboton accion
+# (el selector de la escena es del OUTLINER: la biblioteca es otro viewport)
+outvista escena
 raizbarra outliner Scene
+outvista biblioteca
+outclick Scene
 recboton parar oculto
 
 # ---- B) ADENTRO / AFUERA del .w3d (con undo; se guarda "ext:") ----
@@ -223,9 +227,10 @@ outsoltar dosmats-b.png props textura
 texrefde material Material texturas/dosmats-b.png
 undo
 texrefde material Material texturas/dosmats.png
-# un sonido no se suelta en el 3D
+# un sonido soltado en el 3D es un objeto Sonido nuevo donde cae (objects/Sonido.h); Ctrl+Z lo saca
 outvista sonidos
-outsoltar prueba_biblioteca_rt_bip.wav 3d 0 0 invalido
+outsoltar prueba_biblioteca_rt_bip.wav 3d 0 0
+undo
 
 # ---- F) una LIBRERIA externa: se explora sin montarla, de solo lectura ----
 guardarw3d prueba_biblioteca_datos_lib_v4.w3d

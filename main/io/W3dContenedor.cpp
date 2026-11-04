@@ -358,7 +358,7 @@ void W3dRefExternasListar(std::vector<std::string>* out) {
 // ===========================================================================
 static const char* const kCarpetas[] = {
     "escenas/", "scripts/", "texturas/", "fuentes/", "sonidos/", "videos/",
-    "mallas/", "animaciones/", "modelos/", "proyecto/", "extra/", "prefabs/", 0
+    "mallas/", "animaciones/", "modelos/", "proyecto/", "extra/", "prefabs/", "shaders/", 0
 };
 
 bool W3dEsNombreDeEntrada(const std::string& r) {
@@ -442,6 +442,7 @@ const char* W3dCategoriaPorExtension(const std::string& r) {
     if (e == "w3dui" || e == "w3de") return "escenas";   // escenas UI y escenas 3D (W3dRaices.h)
     if (e == "w3dp") return "prefabs";
     if (e == "lua" || e == "luac") return "scripts";
+    if (e == "glsl") return "shaders";   // los shaders escritos de los materiales (objects/ShaderEscrito.h)
     if (e == "png" || e == "jpg" || e == "jpeg" || e == "webp" || e == "gif" ||
         e == "svg" || e == "bmp" || e == "tga") return "texturas";
     if (e == "ttf" || e == "otf" || e == "w3dfnt") return "fuentes";

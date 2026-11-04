@@ -1,0 +1,788 @@
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_ASSERT.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_assert.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_assert.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_ATOMIC.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_atomic.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_atomic.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_AUDIO.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_audio.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_audio.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_BITS.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_bits.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_bits.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_BLENDMODE.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_blendmode.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_blendmode.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_CLIPBOARD.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_clipboard.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_clipboard.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_COPYING.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_copying.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_copying.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_CPUINFO.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_cpuinfo.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_cpuinfo.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_EGL.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_egl.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_egl.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_ENDIAN.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_endian.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_endian.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_ERROR.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_error.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_error.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_EVENTS.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_events.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_events.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_FILESYSTEM.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_filesystem.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_filesystem.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_GAMECONTROLLER.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_gamecontroller.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_gamecontroller.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_GESTURE.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_gesture.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_gesture.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_GUID.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_guid.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_guid.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_HAPTIC.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_haptic.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_haptic.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_HIDAPI.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_hidapi.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_hidapi.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_HINTS.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_hints.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_hints.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_JOYSTICK.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_joystick.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_joystick.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_KEYBOARD.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_keyboard.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_keyboard.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_KEYCODE.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_keycode.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_keycode.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_LOADSO.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_loadso.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_loadso.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_LOCALE.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_locale.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_locale.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_LOG.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_log.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_log.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_MAIN.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_main.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_main.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_MESSAGEBOX.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_messagebox.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_messagebox.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_METAL.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_metal.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_metal.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_MISC.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_misc.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_misc.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_MOUSE.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_mouse.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_mouse.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_MUTEX.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_mutex.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_mutex.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_NAME.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_name.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_name.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_OPENGL.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_opengl.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_opengl.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_OPENGL_GLEXT.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_opengl_glext.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_opengl_glext.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_OPENGLES.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_opengles.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_opengles.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_OPENGLES2.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_opengles2.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_opengles2.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_OPENGLES2_GL2.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_opengles2_gl2.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_opengles2_gl2.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_OPENGLES2_GL2EXT.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_opengles2_gl2ext.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_opengles2_gl2ext.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_OPENGLES2_GL2PLATFORM.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_opengles2_gl2platform.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_opengles2_gl2platform.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_OPENGLES2_KHRPLATFORM.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_opengles2_khrplatform.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_opengles2_khrplatform.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_PIXELS.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_pixels.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_pixels.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_PLATFORM.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_platform.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_platform.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_POWER.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_power.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_power.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_QUIT.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_quit.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_quit.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_RECT.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_rect.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_rect.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_RENDER.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_render.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_render.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_RWOPS.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_rwops.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_rwops.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_SCANCODE.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_scancode.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_scancode.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_SENSOR.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_sensor.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_sensor.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_SHAPE.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_shape.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_shape.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_STDINC.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_stdinc.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_stdinc.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_SURFACE.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_surface.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_surface.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_SYSTEM.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_system.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_system.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_SYSWM.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_syswm.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_syswm.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_TEST.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_test.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_test.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_TEST_ASSERT.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_test_assert.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_test_assert.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_TEST_COMMON.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_test_common.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_test_common.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_TEST_COMPARE.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_test_compare.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_test_compare.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_TEST_CRC32.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_test_crc32.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_test_crc32.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_TEST_FONT.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_test_font.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_test_font.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_TEST_FUZZER.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_test_fuzzer.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_test_fuzzer.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_TEST_HARNESS.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_test_harness.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_test_harness.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_TEST_IMAGES.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_test_images.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_test_images.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_TEST_LOG.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_test_log.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_test_log.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_TEST_MD5.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_test_md5.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_test_md5.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_TEST_MEMORY.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_test_memory.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_test_memory.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_TEST_RANDOM.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_test_random.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_test_random.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_THREAD.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_thread.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_thread.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_TIMER.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_timer.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_timer.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_TOUCH.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_touch.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_touch.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_TYPES.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_types.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_types.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_VERSION.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_version.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_version.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_VIDEO.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_video.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_video.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\SDL_VULKAN.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_vulkan.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/SDL_vulkan.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\BEGIN_CODE.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/begin_code.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/begin_code.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\34CA029E1739C5DB36928589511F7DE9\CLOSE_CODE.H.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/close_code.h C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/include/SDL2/close_code.h
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\PLATFORM\WINDOWS\BUILD_GLES2\CMAKEFILES\3D5946F9869F41DC3F89670509D77297\SDL_HEADERS_COPY.RULE
+setlocal
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\THIRDPARTY\SDL2\CMAKELISTS.TXT
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor -BC:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2 --check-stamp-file C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

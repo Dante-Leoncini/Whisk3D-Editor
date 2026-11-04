@@ -9,3 +9,6 @@
 | `soltarSonido(h)` | ノートを離します。エンベロープがリリースに移ります。 |
 | `reverb(sala, amortiguacion, nivel)` | 全体のリバーブ：部屋の大きさ、ダンピング、レベル（それぞれ 0〜1、レベル 0 でオフ）。 |
 | `silenciar(bool)`、`estaMudo()` | 全体のミュート。 |
+| `tocarSonido(obj [, seg])`、`callarSonido(obj)` | **Sound オブジェクト**を最初から（区間の `seg` 秒から）鳴らし直す／止める。 |
+| `sonidoObj(obj) → t`、`setSonidoObj(obj, t)` | Sound オブジェクトを読む／変える：`archivo`（ソース）、`activo`、`volumen`、`tono`、`reverb`、`paneo`、`inicio`、`recorteIni`、`recorteFin`、`bucle`、`posicional`、`radio`、`alcance`（読み取り時は `duracion`、`sonando` も）。 |
+| `crearSonido("sonidos/x.wav" [, padre]) → obj` | 新しい Sound オブジェクト（`destruir(obj)` で削除）。プレハブ内では他のオブジェクトと同様にインスタンス化されます。 |

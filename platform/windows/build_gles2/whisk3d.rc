@@ -1,0 +1,5 @@
+// Recurso de icono embebido en el exe (lo genera CMake via configure_file -> C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/res/Whisk3D.ico = ruta
+// absoluta de res/Whisk3D.ico). El ICON con el ID mas bajo (1) es el que el Explorador, el menu
+// inicio, la barra de tareas y Alt+Tab usan como icono del programa. Sin esto el exe queda con el
+// icono generico de Windows (SDL_SetWindowIcon en runtime NO afecta al acceso directo del menu inicio).
+1 ICON "C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/res/Whisk3D.ico"

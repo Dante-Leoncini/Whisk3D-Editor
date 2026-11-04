@@ -166,8 +166,10 @@ static ViewportBase* BuscarHoja(ViewportBase* n, int kind) {
     return r ? r : BuscarHoja(b, kind);
 }
 static Outliner* ElOutliner(std::string& err, const char* cmd) {
-    Outliner* o = (Outliner*)BuscarHoja(rootViewport, 2);
+    Outliner* o = (Outliner*)BuscarHoja(rootViewport, 9); if (!o) o = (Outliner*)BuscarHoja(rootViewport, 2);
     if (!o) err = std::string(cmd) + ": no hay outliner en el layout";
+    // (entre un comando y otro paso mas que un doble click: el click que sigue a entrar a una carpeta es un click SUELTO)
+    else o->entroMs = 0;
     return o;
 }
 static Properties* ElPanel() {
@@ -188,13 +190,17 @@ static std::string IdDeVista(int vista, const std::string& id) {
     if (id.empty() || id[0] == '/' || W3dVistaRecInfo(vista, id, NULL)) return id;
     char b[4096];
     if (!getcwd(b, sizeof(b))) return id;
-    const std::string abs = std::string(b) + "/" + id;
+    std::string abs = std::string(b) + "/" + id;
+    if (W3dVistaRecInfo(vista, abs, NULL)) return abs;
+    // (Windows: getcwd da '\' y la biblioteca nombra los archivos de afuera con '/')
+    for (size_t i = 0; i < abs.size(); i++) if (abs[i] == '\\') abs[i] = '/';
     return W3dVistaRecInfo(vista, abs, NULL) ? abs : id;
 }
 
 // la fila por CLAVE (la ruta de una carpeta, el id de un recurso: es unica) o por NOMBRE (lo que
 // se ve: dos carpetas hermanas de madres distintas pueden llamarse igual)
 static int FilaDe(const std::vector<OutFilaRec>& filas, const std::string& n) {
+    if (n == "atras") { for (size_t i = 0; i < filas.size(); i++) if (filas[i].atras) return (int)i; return -1; }   // la celda "Ir atras" de la cuadricula
     for (size_t i = 0; i < filas.size(); i++) if (filas[i].clave == n) return (int)i;
     for (size_t i = 0; i < filas.size(); i++) if (!filas[i].carpeta && filas[i].id == n) return (int)i;
     for (size_t i = 0; i < filas.size(); i++) if (filas[i].nombre == n) return (int)i;
@@ -215,14 +221,15 @@ static std::string SinClaveDeTipo(std::istringstream& ss) {
 }
 // deja la fila a la vista (scroll) y devuelve la Y de su centro
 static int YDeFila(Outliner* o, int fila) {
-    const int top = o->BarTopOffset();
+    o->Resize(o->width, o->height);   // (las medidas del scroll al dia: el harness no dibuja entre pasos)
+    const int top = o->TopContenido();
     int yf, alto, base;
     if (o->cuadricula) {
         std::vector<OutFilaRec> filas; o->FilasRecursos(filas);
         int rx, ry, rw, rh; o->RectFila(filas, fila, rx, ry, rw, rh);
         base = ry - borderGS - top; alto = rh; yf = ry + o->PosY;
     } else { alto = (int)RenglonHeightGS; base = fila * alto; yf = borderGS + o->PosY + top + base; }
-    if (yf < top || yf + alto > o->height) {
+    if (yf < top || yf + alto > o->height - o->AltoFilaMemoria()) {   // (la fila de memoria de abajo la tapa)
         o->PosY = -base;
         if (o->PosY < o->MaxPosY) o->PosY = o->MaxPosY;
         if (o->PosY > 0) o->PosY = 0;
@@ -230,7 +237,7 @@ static int YDeFila(Outliner* o, int fila) {
     return o->FilaRecursoY(fila);
 }
 static int XNombre(Outliner* o, const OutFilaRec& f) {
-    if (o->cuadricula && !f.carpeta) {
+    if (o->cuadricula) {   // (la CELDA: tambien la de una carpeta)
         std::vector<OutFilaRec> filas; o->FilasRecursos(filas);
         for (size_t i = 0; i < filas.size(); i++)
             if (filas[i].carpeta == f.carpeta && filas[i].clave == f.clave) {
@@ -258,6 +265,7 @@ static std::string MenuAbiertoNombre(Outliner* o) {
     if (!LayoutMenuAbierto()) return "ninguno";
     const int b = o->BotonDelMenuAbierto();
     if (b >= 0 && o->BarButtons[(size_t)b] == o->btnVista) return "vista";
+    if (b >= 0 && o->BarButtons[(size_t)b] == o->btnOpciones) return "opciones";   // el OJO (como se ve)
     if (b >= 0 && o->BarButtons[(size_t)b] == o->btnObjeto) return "objeto";
     if (b >= 0 && o->BarButtons[(size_t)b] == o->btnSeleccion) return "seleccion";
     if (b >= 0 && o->BarButtons[(size_t)b] == o->btnFiltro) return "filtro";
@@ -309,7 +317,23 @@ static bool CmdOutVista(std::istringstream& ss, std::string& err) {
             const int t = VistaDe(a, err, "outvista"); if (t < 0) return false;
             v = OUT_VISTA_BIBLIOTECA; filtro = t;
         }
-        if (!ElegirEnMenuBarra(o, o->btnVista, v, err, "outvista")) return false;
+        // el OUTLINER muestra la escena y la BIBLIOTECA es otro viewport: pasar de una a la otra es cambiar el TIPO del
+        // viewport (la misma puerta que el menu de tipos). La biblioteca nueva arranca en cuadricula: las pruebas de
+        // siempre la miran en lista (outcuadricula la cambia)
+        extern void LayoutCambiarTipoViewport(ViewportBase* v, int aId);
+        if (v != OUT_VISTA_ESCENA && o->ViewportKind() == 2) {
+            LayoutCambiarTipoViewport(o, 8);
+            o = (Outliner*)BuscarHoja(rootViewport, 9);
+            if (!o) { err = "outvista: no se creo la biblioteca"; return false; }
+            o->CambiarCuadricula(false);
+            printf("      [outvista] el outliner paso a ser la BIBLIOTECA\n");
+        } else if (v == OUT_VISTA_ESCENA && o->ViewportKind() == 9) {
+            LayoutCambiarTipoViewport(o, 1);
+            o = (Outliner*)BuscarHoja(rootViewport, 2);
+            if (!o) { err = "outvista: no volvio el outliner"; return false; }
+            printf("      [outvista] la biblioteca volvio a ser el OUTLINER\n");
+        }
+        if (v != OUT_VISTA_ESCENA && o->vista != v && !ElegirEnMenuBarra(o, o->btnVista, v, err, "outvista")) return false;
         if (filtro != -2 && o->filtro != filtro && !ElegirEnMenuBarra(o, o->btnFiltro, filtro < 0 ? 0 : filtro, err, "outvista")) return false;
         ss >> a;
     }
@@ -409,9 +433,11 @@ static bool CmdOutClick(std::istringstream& ss, std::string& err) {
     return true;
 }
 
+// outdrag <nombre> <destino|-> [antes|despues]: arrastra la fila y la suelta sobre otra (en el centro: a su carpeta y
+// despues de ella; 'antes' / 'despues' = en el borde de arriba / de abajo de la fila: REORDENAR) o en el vacio ('-')
 static bool CmdOutDrag(std::istringstream& ss, std::string& err) {
     Outliner* o = ElOutliner(err, "outdrag"); if (!o) return false;
-    std::string n, d; ss >> n >> d;
+    std::string n, d, borde; ss >> n >> d >> borde;
     std::vector<OutFilaRec> filas; o->FilasRecursos(filas);
     const int i = FilaDe(filas, n);
     if (i < 0) { err = "outdrag: no hay una fila '" + n + "'"; return false; }
@@ -426,6 +452,12 @@ static bool CmdOutDrag(std::istringstream& ss, std::string& err) {
         if (j < 0) { err = "outdrag: no hay una fila destino '" + d + "'"; return false; }
         y1 = o->FilaRecursoY(j);
         x1 = XNombre(o, filas[(size_t)j]);
+        if (borde == "antes" || borde == "despues") {
+            if (o->cuadricula) {
+                int rx, ry, rw, rh; o->RectFila(filas, j, rx, ry, rw, rh);
+                x1 = o->x + rx + (borde == "antes" ? rw / 4 : 3 * rw / 4);
+            } else y1 += (borde == "antes" ? -1 : 1) * ((int)RenglonHeightGS / 2 - 2 * GlobalScale);
+        } else if (!borde.empty()) { err = "outdrag: no entiendo '" + borde + "'"; return false; }
     }
     leftMouseDown = true;
     LayoutClickUI(x0, y0);
@@ -433,10 +465,83 @@ static bool CmdOutDrag(std::istringstream& ss, std::string& err) {
     o->event_mouse_motion(x0, y0 + (y1 > y0 ? 1 : -1) * (int)RenglonHeightGS);
     o->event_mouse_motion(x1, y1);
     const bool arrastraba = o->recArrastrando;
+    const bool fantasma = g_outArrastre.fantasma;
+    rootViewport->Render();   // (el hueco oscuro, la linea de insercion y el fantasma se dibujan sin romper nada)
     leftMouseDown = false;
     LayoutSoltar(x1, y1);
-    printf("      [outdrag] '%s' -> '%s' (arrastre %s)\n", n.c_str(), d.c_str(), arrastraba ? "si" : "no");
+    printf("      [outdrag] '%s' -> '%s'%s (arrastre %s, fantasma %s)\n", n.c_str(), d.c_str(),
+           borde.empty() ? "" : (" " + borde).c_str(), arrastraba ? "si" : "no", fantasma ? "si" : "no");
+    if (g_outArrastre.fantasma) { err = "outdrag: el fantasma quedo despues de soltar"; return false; }
     if (!arrastraba) { err = "outdrag: el arrastre no arranco"; return false; }
+    return true;
+}
+
+// soltararchivo <ruta> <kind> [dx dy]: un ARCHIVO soltado desde el explorador del sistema (SDL_DROPFILE) en el centro
+// del primer viewport de ese kind (1 = 3D, 9 = la biblioteca), corrido dx, dy px. Lo que pasa lo cuentan los comandos
+// de siempre (recurso, outfila, objeto...)
+static bool CmdSoltarArchivo(std::istringstream& ss, std::string& err) {
+    std::string ruta; int kind = 9, dx = 0, dy = 0; ss >> ruta >> kind >> dx >> dy;
+    // (el explorador del sistema siempre suelta la ruta ABSOLUTA: la relativa es desde la carpeta de las pruebas)
+    if (!ruta.empty() && ruta[0] != '/' && !(ruta.size() > 2 && ruta[1] == ':')) {
+        char cwd[1024] = { 0 };
+#ifdef _WIN32
+        if (_getcwd(cwd, sizeof(cwd))) ruta = std::string(cwd) + "/" + ruta;
+#else
+        if (getcwd(cwd, sizeof(cwd))) ruta = std::string(cwd) + "/" + ruta;
+#endif
+    }
+    ViewportBase* v = BuscarHoja(rootViewport, kind);
+    if (!v) { err = "soltararchivo: no hay un viewport de ese kind"; return false; }
+    rootViewport->Render();   // (el 3D sabe su lente para el rayo)
+    extern bool W3dSoltarArchivo(const std::string& ruta, int mx, int my, std::string* que);
+    std::string que;
+    const bool ok = W3dSoltarArchivo(ruta, v->x + v->width / 2 + dx, v->y + v->height / 2 + dy, &que);
+    printf("      [soltararchivo] '%s' en kind %d -> %s (%s)\n", ruta.c_str(), kind, ok ? "ok" : "NO", que.c_str());
+    if (!ok) { err = "soltararchivo: " + que; return false; }
+    return true;
+}
+// outorden <a> <b> <c>...: las filas aparecen en ESTE orden (relativo: puede haber otras en el medio)
+static bool CmdOutOrden(std::istringstream& ss, std::string& err) {
+    Outliner* o = ElOutliner(err, "outorden"); if (!o) return false;
+    std::vector<OutFilaRec> filas; o->FilasRecursos(filas);
+    std::string n, txt; int antes = -1;
+    while (ss >> n) {
+        const int i = FilaDe(filas, n);
+        if (i < 0) { err = "outorden: no hay una fila '" + n + "'"; return false; }
+        if (i <= antes) { err = "outorden: '" + n + "' no esta despues de la anterior"; return false; }
+        antes = i;
+    }
+    for (size_t i = 0; i < filas.size(); i++) txt += " " + filas[i].nombre;
+    printf("      [outorden] filas:%s\n", txt.c_str());
+    return true;
+}
+// outcolumna <tipo|tam|usos> <dx> [ancho <px esperado +-2>]: arrastra el DIVISOR de esa columna dx px (negativo = a la
+// izquierda: la columna se agranda). Comprueba que con el mouse encima se resalta (hover) y que mientras se arrastra
+// esta agarrado.
+static bool CmdOutColumna(std::istringstream& ss, std::string& err) {
+    Outliner* o = ElOutliner(err, "outcolumna"); if (!o) return false;
+    std::string c, k; int dx = 0, esp = -1; ss >> c >> dx >> k >> esp;
+    const int col = c == "tipo" ? 0 : c == "tam" ? 1 : c == "usos" ? 2 : -1;
+    if (col < 0) { err = "outcolumna: tipo|tam|usos"; return false; }
+    o->Resize(o->width, o->height);
+    int xT, xTm, xE, xF; o->ColumnasLista(xT, xTm, xE, xF);
+    const int xs[3] = { xT, xTm, xE };
+    const int mx = o->x + xs[col], my = o->y + o->TopContenido() + (int)RenglonHeightGS / 2 + borderGS;
+    o->event_mouse_motion(mx, my);
+    if (o->colHover != col) { err = "outcolumna: el divisor no se resalta con el mouse encima"; return false; }
+    leftMouseDown = true;
+    LayoutClickUI(mx, my);
+    if (o->colArrastre != col) { leftMouseDown = false; LayoutSoltar(mx, my); err = "outcolumna: no se agarro el divisor"; return false; }
+    o->event_mouse_motion(mx + dx, my);
+    rootViewport->Render();
+    leftMouseDown = false;
+    LayoutSoltar(mx + dx, my);
+    o->ColumnasLista(xT, xTm, xE, xF);
+    const int der[3] = { xTm, xE, xF }, iz[3] = { xT, xTm, xE };
+    const int ancho = der[col] - iz[col];
+    printf("      [outcolumna] %s %+d -> ancho %d (columnas %d %d %d %d)\n", c.c_str(), dx, ancho, xT, xTm, xE, xF);
+    if (o->colArrastre >= 0) { err = "outcolumna: el divisor quedo agarrado"; return false; }
+    if (k == "ancho" && (ancho < esp - 2 || ancho > esp + 2)) { char b[96]; sprintf(b, "outcolumna: ancho %d (se esperaba %d)", ancho, esp); err = b; return false; }
     return true;
 }
 
@@ -614,7 +719,7 @@ static bool CmdOutEscribir(std::istringstream& ss, std::string& err) {
     if (t.empty()) g_textFieldActivo->Backspace();   // con todo seleccionado: lo borra
     for (size_t i = 0; i < t.size(); i++) TextFieldInputChar((unsigned char)t[i]);
     // Enter (la misma rama que el teclado: sale del campo) y un cuadro (los campos confirman al perder el foco)
-    Outliner* o = (Outliner*)BuscarHoja(rootViewport, 2);
+    Outliner* o = (Outliner*)BuscarHoja(rootViewport, 9); if (!o) o = (Outliner*)BuscarHoja(rootViewport, 2);
     LayoutTeclaUI(LayoutKey::Enter, o ? o->x + 2 : 0, o ? o->y + 2 : 0);
     if (rootViewport) rootViewport->Render();
     printf("      [outescribir] '%s'\n", t.c_str());
@@ -784,7 +889,7 @@ static bool CmdOutPx(std::istringstream& ss, std::string& err) {
     w3dEngine::Finish();
     const int reserva = o->scrollY ? (GlobalScale * 9 + gapGS) : 0;
     const int xi = o->x + o->width - IconSizeGS - marginGS - borderGS - reserva;
-    const int yi = o->y + borderGS + o->PosY + o->BarTopOffset() + i * (int)RenglonHeightGS + GlobalScale;
+    const int yi = o->y + borderGS + o->PosY + o->TopContenido() + i * (int)RenglonHeightGS + GlobalScale;
     std::vector<unsigned char> px((size_t)IconSizeGS * IconSizeGS * 4);
     w3dEngine::ReadPixelsRGBA(xi, W3dPantallaAlto - yi - IconSizeGS, IconSizeGS, IconSizeGS, &px[0]);
     int verdes = 0, rojos = 0;
@@ -1134,7 +1239,7 @@ static bool CmdRecProvPrueba(std::istringstream& ss, std::string& err) {
     }
     else W3dRecursosVistaRegistrar(v, previo[v]);
     // la biblioteca se re-arma sola (el filtro que se miraba sigue)
-    Outliner* o = (Outliner*)BuscarHoja(rootViewport, 2);
+    Outliner* o = (Outliner*)BuscarHoja(rootViewport, 9); if (!o) o = (Outliner*)BuscarHoja(rootViewport, 2);
     if (o && o->EnBiblioteca()) o->CambiarFiltro(o->filtro);
     printf("      [recprovprueba] %s %s\n", c.c_str(), onoff.c_str());
     return true;
@@ -1346,12 +1451,24 @@ static bool CmdOutDobleClick(std::istringstream& ss, std::string& err) {
         if (i < 0) { err = "outdobleclick: 'flecha' es de una fila de la biblioteca"; return false; }
         mx = XFlecha(o, filas[(size_t)i]);
     } else if (!donde.empty()) { err = "outdobleclick: no entiendo '" + donde + "'"; return false; }
+    // la CUADRICULA: el doble click en una carpeta (o "Ir atras") ENTRA en ella, no la renombra
+    std::string entrarA; bool entra = false;
+    if (o->vista != OUT_VISTA_ESCENA && o->cuadricula) {
+        std::vector<OutFilaRec> filas; o->FilasRecursos(filas);
+        const int i = FilaDe(filas, n);
+        if (i >= 0 && filas[(size_t)i].carpeta) { entra = true; entrarA = filas[(size_t)i].clave; }
+    }
     for (int k = 0; k < 2; k++) {
         leftMouseDown = true;
         LayoutClickUI(mx, my);
         if (k == 1) LayoutDobleClickUI(mx, my);
         leftMouseDown = false;
         LayoutSoltar(mx, my);
+    }
+    if (entra) {
+        printf("      [outdobleclick] '%s' -> la cuadricula muestra '%s'\n", n.c_str(), o->carpetaGrid.c_str());
+        if (o->carpetaGrid != entrarA) { err = "outdobleclick: no se entro a la carpeta '" + entrarA + "' (se ve '" + o->carpetaGrid + "')"; return false; }
+        return true;
     }
     printf("      [outdobleclick] '%s' -> %s (campo '%s')\n", n.c_str(), o->renombrando ? "renombrando" : "NADA",
            o->renombre.text.c_str());
@@ -1443,8 +1560,9 @@ static bool CmdOutCuadricula(std::istringstream& ss, std::string& err) {
     Outliner* o = ElOutliner(err, "outcuadricula"); if (!o) return false;
     std::string v; ss >> v;
     if (o->cuadricula != (v == "1")) {
-        Button* b = o->btnCuadricula;
-        if (!b || !b->visible) { err = "outcuadricula: el boton no se ve (en la biblioteca?)"; return false; }
+        // por el OJO de la barra (como el mouse): se abre su menu y se elige Lista / Cuadricula
+        Button* b = o->btnOpciones;
+        if (!b || !b->visible) { err = "outcuadricula: el ojo no se ve"; return false; }
         // (como ClickBotonBarra: sin el foco de teclado de la barra y con el boton a la vista)
         if (!MenuAbierto || !MenuAbierto->abierto) o->barFocusIndex = -1;
         o->barScrollManual = 0;
@@ -1454,6 +1572,11 @@ static bool CmdOutCuadricula(std::istringstream& ss, std::string& err) {
         const int bx = b->sx + b->width / 2, by = b->sy + b->height / 2;
         LayoutClickUI(bx, by);
         LayoutSoltar(bx, by);
+        MenuItem* it = (MenuAbierto && MenuAbierto->abierto) ? ItemPorTexto(MenuAbierto, v == "1" ? T("Grid") : T("List")) : NULL;
+        if (!it) { err = "outcuadricula: el menu del ojo no tiene Lista / Cuadricula"; return false; }
+        PopupMenu* m = MenuAbierto;
+        m->Cerrar(); MenuAbierto = NULL;
+        m->Ejecutar(it->id);
     }
     printf("      [outcuadricula] %s\n", o->cuadricula ? "cuadricula" : "lista");
     if (o->cuadricula != (v == "1")) { err = "outcuadricula: no cambio"; return false; }
@@ -1728,19 +1851,21 @@ static bool CmdOutSoltar(std::istringstream& ss, std::string& err) {
         std::vector<int> r;
         PropsDestinosRecurso(p, t, r);
         // (si el desplegable quedo abajo del panel, se scrollea como lo haria el usuario)
-        for (int k = 1; k <= 12 && (r.size() < 4 || r[1] + r[3] > p->y + p->height - 2); k++) {
+        // ('normal' = el SEGUNDO destino de una textura: el Normal Map del material; el primero es el Base Color)
+        const size_t k0 = (que == "normal") ? 4 : 0;
+        for (int k = 1; k <= 12 && (r.size() < k0 + 4 || r[k0 + 1] + r[k0 + 3] > p->y + p->height - 2); k++) {
             p->PosY = -k * 3 * (int)RenglonHeightGS;
             rootViewport->Render();
             PropsDestinosRecurso(p, t, r);
         }
-        if (r.size() < 4) {
+        if (r.size() < k0 + 4) {
             Button* sb = p->propBtnMallaSel ? p->propBtnMallaSel->button : NULL;
             printf("      [outsoltar] panel (%d,%d %dx%d) selector %s (%d,%d %dx%d) visible %d\n", p->x, p->y, p->width, p->height,
                    sb ? "si" : "no", sb ? sb->sx : 0, sb ? sb->sy : 0, sb ? sb->width : 0, sb ? sb->height : 0,
                    sb ? (int)sb->visible : -1);
             err = "outsoltar: Properties no muestra el desplegable de '" + que + "'"; return false;
         }
-        x1 = r[0] + r[2] / 2; y1 = r[1] + r[3] / 2;
+        x1 = r[k0] + r[k0 + 2] / 2; y1 = r[k0 + 1] + r[k0 + 3] / 2;
         printf("      [outsoltar] el desplegable de '%s' en (%d,%d %dx%d), panel scrolleado %d\n", que.c_str(), r[0], r[1], r[2], r[3], p->PosY);
     } else { err = "outsoltar: 3d | props <malla|material|textura|prefab>"; return false; }
     const int x0 = XNombre(o, filas[(size_t)i]), y0 = YDeFila(o, i);
@@ -1761,6 +1886,42 @@ static bool CmdOutSoltar(std::istringstream& ss, std::string& err) {
     std::string k;
     if ((ss >> k) && k == "invalido") { if (destino > 0) { err = "outsoltar: el destino era valido"; return false; } }
     else if (destino <= 0) { err = "outsoltar: el destino no era valido: " + qt; return false; }
+    return true;
+}
+// outprevia <recurso> <objeto> [dx dy]: la VISTA PREVIA de un material / shader arrastrado (SoltarRecurso.cpp). Arrastra
+// el recurso hasta el centro del viewport 3D (corrido dx,dy) SIN soltar: la parte 0 del objeto tiene que estar dibujandose
+// con otro material; despues vuelve al outliner y suelta ahi: la parte tiene que tener su material de antes
+static bool CmdOutPrevia(std::istringstream& ss, std::string& err) {
+    Outliner* o = ElOutliner(err, "outprevia"); if (!o) return false;
+    std::string n, obj; int dx = 0, dy = 0; ss >> n >> obj >> dx >> dy;
+    std::vector<OutFilaRec> filas; o->FilasRecursos(filas);
+    const int i = FilaDe(filas, n);
+    if (i < 0 || filas[(size_t)i].carpeta) { err = "outprevia: no hay un recurso '" + n + "'"; return false; }
+    Object* ob = SceneCollection ? FindObjectByName(SceneCollection, obj) : NULL;
+    if (!ob || ob->getType() != ObjectType::mesh || ((Mesh*)ob)->materialsGroup.empty()) { err = "outprevia: no hay una malla '" + obj + "'"; return false; }
+    Mesh* m = (Mesh*)ob;
+    Material* antes = m->materialsGroup[0].material;
+    rootViewport->Render();
+    ViewportBase* v = PrimeraDeTipo(rootViewport, 1);
+    if (!v) { err = "outprevia: no hay viewport 3D"; return false; }
+    const int x1 = v->x + v->width / 2 + dx, y1 = v->y + v->height / 2 + dy;
+    const int x0 = XNombre(o, filas[(size_t)i]), y0 = YDeFila(o, i);
+    leftMouseDown = true;
+    LayoutClickUI(x0, y0);
+    o->event_mouse_motion(x0 + (int)RenglonHeightGS * 2, y0 + (int)RenglonHeightGS);
+    o->event_mouse_motion(x1, y1);
+    rootViewport->Render();
+    Material* durante = m->materialsGroup[0].material;
+    printf("      [outprevia] sobre '%s': '%s' (antes '%s') shader '%s'\n", obj.c_str(), durante ? durante->name.c_str() : "-",
+           antes ? antes->name.c_str() : "-", durante ? durante->shaderArchivo.c_str() : "");
+    if (durante == antes) { err = "outprevia: la parte no muestra la vista previa"; leftMouseDown = false; LayoutSoltar(x0, y0); return false; }
+    o->event_mouse_motion(x0, y0);   // de vuelta al outliner: la vista previa se va
+    Material* fuera = m->materialsGroup[0].material;
+    leftMouseDown = false;
+    LayoutSoltar(x0, y0);
+    Material* final = m->materialsGroup[0].material;
+    printf("      [outprevia] afuera: '%s', soltado en el outliner: '%s'\n", fuera ? fuera->name.c_str() : "-", final ? final->name.c_str() : "-");
+    if (fuera != antes || final != antes) { err = "outprevia: la parte no volvio a su material"; return false; }
     return true;
 }
 // libvincular <ruta.w3d> [falla] / libdesvincular <nombre> / libs [n N]: las LIBRERIAS externas (el menu de la vista)
@@ -2230,6 +2391,9 @@ bool W3dPruebasOutlinerCmd(const std::string& cmd, std::istringstream& ss, std::
     if (cmd == "outnofila")       return CmdOutFila(ss, err, true);
     if (cmd == "outclick")        return CmdOutClick(ss, err);
     if (cmd == "outdrag")         return CmdOutDrag(ss, err);
+    if (cmd == "outorden")        return CmdOutOrden(ss, err);
+    if (cmd == "soltararchivo")   return CmdSoltarArchivo(ss, err);
+    if (cmd == "outcolumna")      return CmdOutColumna(ss, err);
     if (cmd == "outcontexto")     return CmdOutContexto(ss, err);
     if (cmd == "outtecla")        return CmdOutTecla(ss, err);
     if (cmd == "outteclapc")      return CmdOutTeclaPC(ss, err);
@@ -2285,6 +2449,7 @@ bool W3dPruebasOutlinerCmd(const std::string& cmd, std::istringstream& ss, std::
     if (cmd == "outlinea")        return CmdOutLinea(ss, err);
     if (cmd == "outcolor")        return CmdOutColor(ss, err);
     if (cmd == "outsoltar")       return CmdOutSoltar(ss, err);
+    if (cmd == "outprevia")       return CmdOutPrevia(ss, err);
     if (cmd == "libvincular")     return CmdLibVincular(ss, err);
     if (cmd == "libdesvincular")  return CmdLibDesvincular(ss, err);
     if (cmd == "libs")            return CmdLibs(ss, err);

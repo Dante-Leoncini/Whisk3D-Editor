@@ -1,16 +1,74 @@
-# Prueba del bind lua sonido(ruta[,vol[,pitch]]) (BindsJuego.cpp).
-# Correr DESDE ESTA CARPETA:
-#   cd <motor>/tools/pruebas
-#   ../../platform/linux/build/whisk3d --script prueba_sonido.w3s
-#
-# `sonidotest <ruta.wav> [<rutaInexistente.wav>]` carga el wav (relativo al
-# proyecto), lo re-dispara cacheado, lo toca con pitch fraccional, y pide uno
-# inexistente: nada puede romper (headless el mixer puede no abrir: cargar da
-# NULL y sonido() es no-op). El archivo lo pone ESTE script, no el comando.
-abrirw3d prueba_sonido.w3d
-
-# con las dos rutas explicitas
-sonidotest sonidos/bip.wav sonidos/no-existe.wav
-
-# y sin argumentos: el default retrocompatible tiene que dar lo mismo
-sonidotest
+# ==========================================================================
+#  El OBJETO SONIDO (main/objects/Sonido.h): suena con el Play del timeline de la escena, ubicado en SEGUNDOS
+#  (no en frames): arranca donde va la linea de tiempo, sigue los saltos, se recorta, se repite y se calla al
+#  pausar. Se guarda y se lee, y lua lo maneja.
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/windows/build/Release/whisk3d.exe --script prueba_sonido.w3s
+# ==========================================================================
+sonido nuevo prueba_sonido.wav 0 0 0
+sonido info
+sonido dur 2.0 0.01
+sonido onda
+# la TARJETA: tildar "Posicional (3D)" muestra YA radio / alcance / ver alcance (y saca el paneo); destildar, al reves
+sonido panel
+sonido panel
+# el TIMELINE (grande): las puntas se marcan con el mouse encima, y con Ctrl caen justo en un fotograma
+vpkind 1 4
+sonido vista 30 -2
+sonido tira
+# Play desde el frame 1 (0 s): suena desde el principio
+frame 1
+timeline play
+sonido tick
+sonido suena 1
+sonido pos 0 0.1
+# EL EDITOR LENTO (15 fps, mucho trazado): medio segundo sin vueltas del editor -> el timeline SALTA a donde va el
+# audio (frame 16 a 30 fps) y el audio NO se reacomoda (se escuchaba trabado)
+esperar 500
+sonido tick
+sonido frame 16 3
+sonido pos 0.5 0.12
+# la linea de tiempo SALTA al segundo 1 (frame 31 a 30 fps): el audio va con ella
+frame 31
+sonido tick
+sonido pos 1.0 0.1
+# arranca medio segundo despues: en el segundo 1 va por el 0.5
+sonido set inicio 0.5
+sonido tick
+sonido pos 0.5 0.1
+# pasado su final (sin bucle) se calla
+frame 200
+sonido tick
+sonido suena 0
+# con BUCLE se repite: en 6.633 s - 0.5 = 6.133 -> 0.133 del tramo de 2 s
+sonido set bucle 1
+sonido tick
+sonido suena 1
+sonido pos 0.133 0.1
+# RECORTE del final (1 s): el tramo dura 1 s y el bucle repite solo ese
+sonido set recorteFin 1.0
+sonido dur 1.0 0.01
+sonido tick
+sonido pos 0.133 0.1
+# el TONO al doble: la tira dura la mitad en la escena
+sonido set tono 2.0
+sonido dur 0.5 0.01
+sonido set tono 1.0
+# PAUSA: se calla
+timeline pause
+sonido tick
+sonido suena 0
+# LUA: leer y cambiar (otra fuente), crear uno nuevo
+sonido lua local t = sonidoObj(obj); assert(t.archivo == "prueba_sonido.wav" and t.bucle and math.abs(t.duracion - 1.0) < 0.01)
+sonido lua setSonidoObj(obj, { volumen = 0.5, recorteFin = 0, bucle = false }); assert(sonidoObj(obj).volumen == 0.5)
+sonido dur 2.0 0.01
+sonido lua local o = crearSonido("prueba_sonido.wav"); assert(sonidoObj(o).archivo == "prueba_sonido.wav")
+# guardar y volver a leer: todo igual (crear un objeto lo deja ACTIVO: se vuelve al primero)
+selobj Sound
+sonido set inicio 0.25
+guardarw3d /tmp/_prueba_sonido.w3d
+abrirw3d /tmp/_prueba_sonido.w3d
+selobj Sound
+sonido info
+sonido dur 2.0 0.01
+sonido lua local t = sonidoObj(obj); assert(t.inicio == 0.25 and t.volumen == 0.5 and not t.bucle)

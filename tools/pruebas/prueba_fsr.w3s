@@ -1,0 +1,5 @@
+# REESCALADO FSR 1 (render/ReescaladoFSR.h): lo parejo queda parejo y un borde sale mas nitido que estirado lineal
+fsr
+# el viewport en Rendered trazando a la mitad: la imagen agrandada con FSR es del tamano de la vista
+add cube
+fsr vista

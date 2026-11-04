@@ -1,0 +1,73 @@
+# EL CANDADO DE LA VISTA DE CAMARA y las FLECHAS del viewport 3D (pedido del dueno):
+#  - mirando por la camara activa, abajo al centro hay un CANDADO: abierto (rojo) de fabrica. Abierto, orbitar te SACA
+#    de la vista de camara (la orbita sigue desde donde estaba la camara) y la camara no se mueve; el paneo es de
+#    inspeccion (la camara tampoco se mueve).
+#  - cerrado (verde): orbitar, panear y el zoom MUEVEN la camara, y se sigue mirando por ella.
+#  - izquierda / derecha del teclado (PC y teclado Bluetooth en Symbian) en el viewport 3D: cuadro anterior / siguiente.
+#    (el keypad del N95 sigue orbitando: no pasa por aca)
+# --- las flechas: cuadro siguiente / anterior ---
+frame 5
+vpestado tecla der 6
+vpestado tecla der 7
+vpestado tecla izq 6
+# --- vista de camara, candado ABIERTO: el paneo es de inspeccion ---
+vpcamara on
+# (mover / rotar / escalar usan los ejes de la CAMARA, no los de la orbita)
+vpestado ejes
+vpestado camara guardar
+vpestado flecha 30 0
+vpestado camara igual
+vpestado espera 1 !0 0
+# orbitar sale de la vista de camara y la camara queda donde estaba
+vpestado orbitar 20 0
+vpestado camara igual
+vpestado vista no
+vpestado ejes
+# --- candado CERRADO: se mueve la camara y se sigue mirando por ella ---
+vpcamara on
+vpestado candado si
+vpestado orbitar 20 0
+vpestado camara movida
+vpestado vista si
+vpestado camara guardar
+vpestado flecha 30 0
+vpestado camara movida
+vpestado camara guardar
+vpestado rueda 5
+vpestado camara movida
+# --- abierto otra vez ---
+vpestado candado no
+# --- la TECLA VERDE del N95: al volver al panel de Propiedades sigue en la fila donde estaba (no vuelve al principio) ---
+propsfila 1 3
+verde 1
+verde 1
+verde 1
+verde 1
+propsfila espera 1 3
+# --- INSERT KEYFRAME desde el menu Animation POR TECLADO (el N95): Animation > Insert Keyframe > All ---
+add cube
+frame 3
+kfmenuteclado
+# --- "." (Frame Selected) mirando por la camara: con el candado CERRADO mueve la camara (sigue la vista de camara y el
+#     objeto queda en el centro del marco); ABIERTO sale de la vista de camara ---
+vpcamara on
+vpestado candado si
+selname Cubo
+objpos 3 1 -4
+vpestado camara guardar
+vpestado encuadrar
+vpestado camara movida
+vpestado vista si
+vpestado candado no
+vpestado camara guardar
+vpestado encuadrar
+vpestado camara igual
+vpestado vista no
+# --- el CLICK mirando por la camara: el pick usa la lente de la CAMARA (antes la del visor: una luz no se podia elegir) ---
+selname Light
+objpos 0 1.6 0
+deselectall
+vpcamara on
+clicobj Light si
+deselectall
+clicobj Cubo si

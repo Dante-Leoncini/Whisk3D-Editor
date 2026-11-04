@@ -103,6 +103,10 @@ enum W3dPasoTipo {
                         // la SLST del original dice que desde aca no se ve), saltea N pasos
     PasoCopiarPantalla, // copia lo dibujado hasta aca (el cuadro de la imagen) a la textura 'ref', la captura "pantalla:<ref>"
                         // (render a textura: dibujar, copiar, limpiar y dibujar lo demas con esa textura; EscenaRender.h)
+    PasoShader,         // un SHADER ESCRITO (el archivo .glsl 'ref', objects/ShaderEscrito.h): prendido, los triangulos que
+                        // se dibujan despues lo usan (como cualquier estado de GL); apagado, se saca. n[0..3] = IOR,
+                        // transmision, rugosidad y metalico (w3d_ior...). Solo en los backends con shaders (GLES 2.0,
+                        // Vulkan); en GLES 1.1 no hace nada. Al terminar la rutina se saca solo
     PasoN
 };
 
@@ -110,7 +114,7 @@ enum W3dPasoTipo {
 enum W3dPasoGrupo { GrupoTransformar = 0, GrupoDibujar, GrupoTextura, GrupoNiebla, GrupoLuces, GrupoAlfa,
                     GrupoColor, GrupoProfundidad, GrupoMezcla, GrupoCaras, GrupoControl, GrupoN };
 // a que apunta la referencia por nombre de un paso
-enum W3dPasoRefTipo { RefNada = 0, RefObjeto, RefMalla, RefTextura, RefRutina, RefFuncion };
+enum W3dPasoRefTipo { RefNada = 0, RefObjeto, RefMalla, RefTextura, RefRutina, RefFuncion, RefShader };
 // para que usa el ENTERO un paso
 // (EnteroCapaUV: el puntero de UV a una CAPA de la malla: 0 = la UV de render, k = la capa extra k, uvExtra[k])
 enum W3dPasoEnteroUso { EnteroNada = 0, EnteroParte, EnteroLuz, EnteroBool, EnteroCuenta, EnteroBuffers, EnteroCapaUV };

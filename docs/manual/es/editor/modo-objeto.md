@@ -28,7 +28,8 @@ Solo en Modo Objeto. Lo nuevo aparece en el cursor 3D y queda seleccionado. Las 
 |---|---|
 | Malla | Plano, Cubo, Círculo, Esfera UV, Cono, Cilindro (con tamaño, radio, segmentos, sombreado suave). También Vértice (un punto suelto para empezar a modelar) y Referencia (un plano con una imagen, para calcar). |
 | Vacío | Un objeto sin malla, para agrupar o como punto de referencia. |
-| Cámara / Luz / Niebla | Cámara, luz y niebla de la escena. |
+| Cámara / Luz / Niebla | Cámara, luz y niebla de la escena. La luz tiene **Tipo**: Punto, Sol (direccional) o Foco (un cono, que se dibuja en la vista); Agregar también ofrece Sol y Foco directo. **Intensidad** la hace más fuerte (animable); **Distancia** (m) es hasta dónde llega una luz puntual o foco y el largo de su cono (0 = sin límite; el trazado de rayos la apaga suave ahí). Con la luz seleccionada, un foco muestra su cono y una puntual una esfera de esa distancia; un sol muestra siempre una línea hasta el piso, hacia donde alumbra. |
+| Sonido | Un sonido puesto en la escena (icono de parlante). Suena con la línea de tiempo en **segundos**, no en frames; con **Posicional (3D)** se escucha desde donde está (más fuerte cuanto más cerca de la cámara, del lado en que está); sin eso es como una música. Soltar un .wav en la vista 3D crea uno ahí. |
 | Esqueleto | Un esqueleto con un hueso, para animar personajes. |
 | Ruta | Una curva de dos nodos (se edita como malla: <kbd>E</kbd> agrega nodos). |
 | Colección | Una carpeta para ordenar objetos. |

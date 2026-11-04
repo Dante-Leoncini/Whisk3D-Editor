@@ -90,7 +90,7 @@ Camera::Camera(Object* parent, Vector3 pos, Vector3 Rot)
     : Object(parent, T("Camera"), pos, Rot), offsetRiel(0), Riel(NULL), rielNodo(-1.0f),
       usarRotacionDelRiel(false), rielIndice(-1.0f),
       fov(45.0f), orthographic(false), nearClip(0.01f), farClip(1000.0f),
-      aspecto(0.0f)
+      aspecto(0.0f), dof(false), fStop(2.8f), focoDist(5.0f)
 {
 
     if (!CameraActive){
@@ -104,6 +104,26 @@ ObjectType Camera::getType() {
 
 // el aspecto DECLARADO por esta camara: el propio (`aspecto:` del .w3d) o, si esta
 // en 0, la cabecera `aspecto` del .cap de su riel. 0 = nadie declara.
+// ---- la PROFUNDIDAD DE CAMPO (ver Camera.h) ----
+float Camera::DistanciaFoco() const {
+    float d = focoDist;
+    if (!focoObjeto.empty() && SceneCollection) {
+        Object* o = FindObjectByName(SceneCollection, focoObjeto);
+        if (o && o != (Object*)this) {
+            Matrix4 Wo, Wc; o->GetWorldMatrix(Wo); ((Object*)this)->GetWorldMatrix(Wc);
+            // (a lo largo de la mirada: la camara mira a su -Z local)
+            Vector3 fw(-Wc.m[8], -Wc.m[9], -Wc.m[10]); fw = fw.Normalized();
+            d = (Wo.m[12] - Wc.m[12]) * fw.x + (Wo.m[13] - Wc.m[13]) * fw.y + (Wo.m[14] - Wc.m[14]) * fw.z;
+        }
+    }
+    return d < 0.01f ? 0.01f : d;
+}
+float Camera::RadioLente() const {
+    if (!dof || fStop <= 0.0f || orthographic) return 0.0f;
+    const float t = tanf(fov * 0.5f * 3.14159265f / 180.0f);
+    const float focalMm = (t > 1e-4f) ? 12.0f / t : 1000.0f;   // (el sensor: 24 mm de alto)
+    return focalMm * 0.001f / (2.0f * fStop);
+}
 float Camera::AspectoDeclarado() const {
     if (aspecto > 0.01f) return aspecto;
     if (Riel && Riel->aspecto > 0.01f) return Riel->aspecto;
@@ -301,6 +321,20 @@ extern bool g_showCamera; // toggle del submenu "Objects" (overlays)
 
 bool Camera::DibujaAlgo() { return g_showCamera; }
 
+// EL FOCO (profundidad de campo prendida): una linea por la mirada hasta la distancia enfocada y una cruz ahi. En el
+// espacio de la camara (mira a su -Z local); va antes del giro del gizmo
+static void DibujarFoco(Camera* c) {
+    if (!c->dof) return;
+    const float d = c->DistanciaFoco();
+    float s = d * 0.06f; if (s < 0.05f) s = 0.05f; if (s > 0.6f) s = 0.6f;
+    const GLfloat v[18] = { 0, 0, 0,   0, 0, -d,   -s, 0, -d,   s, 0, -d,   0, -s, -d,   0, s, -d };
+    w3dEngine::Disable(w3dEngine::Lighting); w3dEngine::Disable(w3dEngine::Texture2D);
+    w3dEngine::DisableArray(w3dEngine::NormalArray); w3dEngine::DisableArray(w3dEngine::ColorArray);
+    w3dEngine::Color4f(1.0f, 0.75f, 0.2f, 1.0f);
+    w3dEngine::LineWidth(1);
+    w3dEngine::VertexPointer3f(0, v);
+    w3dEngine::DrawLines(6);
+}
 void Camera::RenderObject() {
     if (!g_showCamera) return; // oculto por el toggle "Camera" del menu de overlays
 #ifdef W3D_SYMBIAN
@@ -308,6 +342,7 @@ void Camera::RenderObject() {
     // -> no dibujar el gizmo. Antes Symbian lo dibujaba SIEMPRE (se veia en el render del N95).
     if (!showOverlayGlobal || ViewFromCameraActiveGlobal) return;
     bool geomCambio = ActualizarGeometriaCamara(); // geometria responsive al aspecto del render
+    DibujarFoco(this);
     // gizmo de PC (piramide de lineas + triangulo si es la activa) pero con
     // drawArrays: vertices expandidos una sola vez desde CameraEdges (re-expande si cambio el aspecto)
     static GLfloat lineV[CameraEdgesSize * 3];
@@ -357,6 +392,7 @@ void Camera::RenderObject() {
 #else
     if (!showOverlayGlobal || ViewFromCameraActiveGlobal) return;
     ActualizarGeometriaCamara(); // geometria responsive al aspecto del render (usa CameraVertices directo)
+    DibujarFoco(this);
 
     w3dEngine::PushMatrix();
     w3dEngine::Rotatef(90.0f, 0, 1, 0);

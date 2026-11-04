@@ -221,11 +221,14 @@ TransformRedoPanel::TransformRedoPanel()
 TransformRedoPanel::~TransformRedoPanel() { delete grupo; delete lista; delete marco; }
 
 void TransformRedoPanel::Armar() {
+    // (nace PLEGADO: solo la flecha y el titulo -ver RedoPlegar en RedoMeshPanel.cpp-; al rearmarse queda como estaba)
+    const bool abierto = grupo ? grupo->open : false;
     delete grupo;
     const char* tit = (gOp.tipo == translacion) ? "Move" : (gOp.tipo == rotacion) ? "Rotate" : "Scale";
     grupo = new GroupPropertie(T(tit));
     grupo->anchoValores = 0.55f;
-    grupo->flecha = false;
+    grupo->flecha = true;
+    grupo->open = abierto;
     if (gOp.tipo == rotacion) {
         if (!gOp.libre) {
             PropFloat* a = new PropFloat(T("Angle"), "\xC2\xB0");
@@ -387,6 +390,9 @@ bool TransformRedoPanel::Click(int mx, int my) {
         g_redraw = true;
     }
     if (!Contains(mx, my)) return false;   // afuera: el panel se cierra (acepta) y el click sigue al viewport
+    // el TITULO pliega / despliega la tarjeta
+    if (myL < borderGS + RenglonHeightGS + gapGS) { grupo->open = !grupo->open; dz.scroll = 0; g_redraw = true; return true; }
+    if (!grupo->open) return true;
     dz.Abajo(mx, my);
     if (!dz.Desplazable()) { dz.presionado = false; ClickFila(mx, my, false); return true; }   // entra entero: directo
     ClickFila(mx, my, true);   // desplazable: solo se arma el arrastre de un valor; lo demas se resuelve al soltar
@@ -467,6 +473,12 @@ void TransformRedoPanel::Wheel(int delta) { dz.Rueda(delta); g_redraw = true; }
 bool TransformRedoPanel::Arrastrando() { return dragField != NULL || dz.presionado; }
 bool TransformRedoPanel::Tecla(int tecla) {
     if (!grupo) return true;
+    // PLEGADO: OK / derecha lo despliega, C lo cierra; lo demas sigue de largo (se sigue trabajando)
+    if (!grupo->open && !listaAbierta) {
+        if (tecla == LayoutKey::Enter || tecla == LayoutKey::Right) { grupo->open = true; g_redraw = true; return true; }
+        if (tecla == LayoutKey::Cancel) { Cerrar(); return true; }
+        return false;
+    }
     const int n = (int)grupo->properties.size();
     if (listaAbierta) {
         const int nl = ListaCantidad();

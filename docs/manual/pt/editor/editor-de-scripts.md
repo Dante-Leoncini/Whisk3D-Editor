@@ -1,6 +1,6 @@
 # Editor de scripts (IDE)
 
-Editor de texto para os scripts Lua, com números de linha, cores de sintaxe, guias de indentação e suporte ao ñ e aos acentos. Enquanto ele tem o foco, as letras escrevem (não disparam atalhos do editor). No Android, tocar no texto abre o teclado. No N95, escreve-se com T9.
+Editor de texto para os scripts Lua e os [shaders escritos](shaders.md) (`.glsl`), com números de linha, cores de sintaxe, guias de indentação e suporte ao ñ e aos acentos. Enquanto ele tem o foco, as letras escrevem (não disparam atalhos do editor). No Android, tocar no texto abre o teclado. No N95, escreve-se com T9.
 
 | Função | Descrição | Atalho |
 |---|---|---|
@@ -10,6 +10,7 @@ Editor de texto para os scripts Lua, com números de linha, cores de sintaxe, gu
 | Salvar no w3d | Só se o script for externo: coloca-o no projeto. | Arquivo |
 | Salvar fora do w3d… | Só se o script for interno: tira-o para um arquivo; os objetos passam a usar esse arquivo. | Arquivo |
 | Atualizar | Traz o arquivo tal como está no disco (o que foi editado com outro editor). Se houver mudanças não salvas no editor, pergunta antes de descartá-las (e dá para recuperá-las com <kbd>Ctrl+Z</kbd>). Com o jogo rodando, recarrega ao vivo os objetos que usam o script. | Botão |
+| Shaders (.glsl) | Abrem-se a partir do material (o botãozinho da linha **Shader**), da Biblioteca ou do seletor, e são coloridos como GLSL. Ao lado do nome aparece **Compilar**: compila o que você está escrevendo (se um material o usa, salva-o e compila esse material). Salvar um shader o compila em todos os materiais que o usam e avisa se compilou, ou o erro com a sua linha. | <kbd>Ctrl+S</kbd> |
 | Proteção ao salvar | Se o arquivo externo mudou por fora desde que foi aberto, Salvar pergunta antes de sobrescrevê-lo. Salvar também recarrega o script ao vivo se o jogo estiver rodando. | Automático |
 | Indentação (Tab) | <kbd>Tab</kbd> completa até o próximo múltiplo de 4; com várias linhas selecionadas, adiciona um nível a elas, e <kbd>Shift+Tab</kbd> o remove. As linhas verticais marcam cada nível; a do bloco do cursor aparece mais clara. | <kbd>Tab</kbd> / <kbd>Shift+Tab</kbd> |
 | Menu Editar | Desfazer, Refazer, Cortar, Copiar, Colar, Localizar… e Substituir… | Botão Editar |

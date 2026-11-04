@@ -40,3 +40,12 @@ Animasyonu gösterir ve düzenler: keyframe sayfası (dope sheet) ya da eğri ed
 | Smart Euler | Seçili dönüşlerdeki fazladan turları kaldırır. | Key menüsü |
 | Bir eğriyi gizleme | Her satırdaki göz onu gizler. | Göze tıkla |
 | Tam değerler | Seçilen keyframe'in karesi, değeri ve tutamaçları. | Properties → Animation → Keyframe |
+
+## Sesler
+
+| İşlev | Açıklama | Kısayol |
+|---|---|---|
+| Ses şeridi | Seçili her Sound nesnesinin bir şeridi vardır: nerede başladığı ve ne kadar sürdüğü, **saniye** cinsinden (FPS değiştirmek onu kaydırmaz). Döngüde sona kadar tekrarlar. | — |
+| Taşı | Şeridi sürükleyin ya da anahtar kare seçmeden <kbd>G</kbd> (seçili tüm sesleri taşır). <kbd>Ctrl</kbd> karelere yapıştırır. | Sürükle / <kbd>G</kbd> |
+| Kırp | Şeridin bir ucunu tutun. | Ucu sürükle |
+| Waveform / Volume line | View menüsü: şeridin içinde dalga biçimi ve ses düzeyi eğrisi (şerit üç satır kaplar). Bunlar olmadan yalnızca şerittir. | View menüsü |

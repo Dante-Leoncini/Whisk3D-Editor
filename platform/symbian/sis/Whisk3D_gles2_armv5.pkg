@@ -1,0 +1,120 @@
+;Whisk3D OpenGL ES 2.0 (N8). Mismo UID que la de ES 1.1: instalar una reemplaza a la otra.
+;Languages
+&EN
+
+;Header
+#{"Whisk3D"}, (0xA00D021D), 1, 0, 0,TYPE=SA
+
+;Localised Vendor name
+%{"Dante Leoncini"}
+
+;Unique Vendor name
+:"Vendor"
+
+; VARIANTE OpenGL ES 2.0: solo Symbian^3 en adelante (N8, C7, E7, Anna, Belle). El N95 usa Whisk3D_armv5.pkg (ES 1.1).
+[0x20022E6D], 0, 0, 0, {"Symbian^3"}
+
+;Files to install
+"\epoc32\release\armv5\urel\whisk3D_gles2.exe"                      -"!:\sys\bin\Whisk3D.exe"
+"\epoc32\data\z\resource\apps\Whisk3D.RSC"                    -"!:\resource\apps\Whisk3D.RSC"
+"\epoc32\data\Z\private\10003a3f\import\apps\whisk3D_reg.RSC" -"!:\private\10003a3f\import\apps\whisk3D_reg.RSC"
+"\epoc32\data\z\resource\apps\whisk3D_icon.mif"  			        -"!:\resource\apps\whisk3D_icon.mif"
+
+"..\..\..\res\Skins\Whisk3D\origen.png"   -"!:\private\A00D021D\origen.png"
+"..\..\..\res\Skins\Whisk3D\lamp.png"   -"!:\private\A00D021D\lamp.png"
+"..\..\..\res\Skins\Whisk3D\parlante.png"   -"!:\private\A00D021D\parlante.png"
+"..\..\..\res\Skins\Whisk3D\cursor3d.png"   -"!:\private\A00D021D\cursor3d.png"
+"..\..\..\res\Skins\Whisk3D\relationshipLine.png"   -"!:\private\A00D021D\relationshipLine.png"
+; cursor del mouse BT: asset propio de Symbian (PC usa el cursor del sistema)
+"..\inc\texturas\mouse.png"   -"!:\private\A00D021D\mouse.png"
+; fuente compartida con PC (mismo asset del skin)
+"..\..\..\res\Skins\Whisk3D\font.png"   -"!:\private\A00D021D\font.png"
+"..\..\..\res\Skins\Whisk3D\skin.ini"   -"!:\private\A00D021D\skin.ini"
+; atlas de iconos (arte dinamico, igual que PC): sin esto Symbian usa la tabla legacy de font.png
+; (disquete de guardar = archivador, keyframe recortado). Ver W3dInitUI/SkinAtlasArmar.
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\archive.png"   -"!:\private\A00D021D\atlas\iconos\archive.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\armature.png"   -"!:\private\A00D021D\atlas\iconos\armature.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\array.png"   -"!:\private\A00D021D\atlas\iconos\array.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\arrow.png"   -"!:\private\A00D021D\atlas\iconos\arrow.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\arrowRight.png"   -"!:\private\A00D021D\atlas\iconos\arrowRight.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\borrar.png"   -"!:\private\A00D021D\atlas\iconos\borrar.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\camera.png"   -"!:\private\A00D021D\atlas\iconos\camera.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\camera_off.png"   -"!:\private\A00D021D\atlas\iconos\camera_off.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\carpeta.png"   -"!:\private\A00D021D\atlas\iconos\carpeta.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\cilindro.png"   -"!:\private\A00D021D\atlas\iconos\cilindro.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\circle.png"   -"!:\private\A00D021D\atlas\iconos\circle.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\cono.png"   -"!:\private\A00D021D\atlas\iconos\cono.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\constraint.png"   -"!:\private\A00D021D\atlas\iconos\constraint.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\cuadricula.png"   -"!:\private\A00D021D\atlas\iconos\cuadricula.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\curve.png"   -"!:\private\A00D021D\atlas\iconos\curve.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\empty.png"   -"!:\private\A00D021D\atlas\iconos\empty.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\falloff_constant.png"   -"!:\private\A00D021D\atlas\iconos\falloff_constant.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\falloff_custom.png"   -"!:\private\A00D021D\atlas\iconos\falloff_custom.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\falloff_linear.png"   -"!:\private\A00D021D\atlas\iconos\falloff_linear.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\falloff_root.png"   -"!:\private\A00D021D\atlas\iconos\falloff_root.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\falloff_sharp.png"   -"!:\private\A00D021D\atlas\iconos\falloff_sharp.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\falloff_smoother.png"   -"!:\private\A00D021D\atlas\iconos\falloff_smoother.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\falloff_sphere.png"   -"!:\private\A00D021D\atlas\iconos\falloff_sphere.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\foto.png"   -"!:\private\A00D021D\atlas\iconos\foto.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\gamepad.png"   -"!:\private\A00D021D\atlas\iconos\gamepad.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\guardar.png"   -"!:\private\A00D021D\atlas\iconos\guardar.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\hidden.png"   -"!:\private\A00D021D\atlas\iconos\hidden.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\instance.png"   -"!:\private\A00D021D\atlas\iconos\instance.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\keyframe.png"   -"!:\private\A00D021D\atlas\iconos\keyframe.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\light.png"   -"!:\private\A00D021D\atlas\iconos\light.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\line.png"   -"!:\private\A00D021D\atlas\iconos\line.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\lista.png"   -"!:\private\A00D021D\atlas\iconos\lista.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\mas.png"   -"!:\private\A00D021D\atlas\iconos\mas.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\menos.png"   -"!:\private\A00D021D\atlas\iconos\menos.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\igual.png"   -"!:\private\A00D021D\atlas\iconos\igual.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\niebla.png"   -"!:\private\A00D021D\atlas\iconos\niebla.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\limpiarz.png"   -"!:\private\A00D021D\atlas\iconos\limpiarz.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\recorte.png"   -"!:\private\A00D021D\atlas\iconos\recorte.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\hitbox.png"   -"!:\private\A00D021D\atlas\iconos\hitbox.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\animacion.png"   -"!:\private\A00D021D\atlas\iconos\animacion.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\prefab.png"   -"!:\private\A00D021D\atlas\iconos\prefab.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\libreria.png"   -"!:\private\A00D021D\atlas\iconos\libreria.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\sonido.png"   -"!:\private\A00D021D\atlas\iconos\sonido.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\script.png"   -"!:\private\A00D021D\atlas\iconos\script.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\video.png"   -"!:\private\A00D021D\atlas\iconos\video.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\filtro.png"   -"!:\private\A00D021D\atlas\iconos\filtro.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\candado.png"   -"!:\private\A00D021D\atlas\iconos\candado.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\interp_constant.png"   -"!:\private\A00D021D\atlas\iconos\interp_constant.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\interp_linear.png"   -"!:\private\A00D021D\atlas\iconos\interp_linear.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\interp_bezier.png"   -"!:\private\A00D021D\atlas\iconos\interp_bezier.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\numero.png"   -"!:\private\A00D021D\atlas\iconos\numero.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\reloj.png"   -"!:\private\A00D021D\atlas\iconos\reloj.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\columnas.png"   -"!:\private\A00D021D\atlas\iconos\columnas.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\filas.png"   -"!:\private\A00D021D\atlas\iconos\filas.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\maximizar.png"   -"!:\private\A00D021D\atlas\iconos\maximizar.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\minimizar.png"   -"!:\private\A00D021D\atlas\iconos\minimizar.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\expandir.png"   -"!:\private\A00D021D\atlas\iconos\expandir.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\candado_abierto.png"   -"!:\private\A00D021D\atlas\iconos\candado_abierto.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\consola.png"   -"!:\private\A00D021D\atlas\iconos\consola.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\material.png"   -"!:\private\A00D021D\atlas\iconos\material.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\mesh.png"   -"!:\private\A00D021D\atlas\iconos\mesh.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\mirror.png"   -"!:\private\A00D021D\atlas\iconos\mirror.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\modificador.png"   -"!:\private\A00D021D\atlas\iconos\modificador.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\monitor.png"   -"!:\private\A00D021D\atlas\iconos\monitor.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\normalCustom.png"   -"!:\private\A00D021D\atlas\iconos\normalCustom.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\normalFace.png"   -"!:\private\A00D021D\atlas\iconos\normalFace.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\normalVertex.png"   -"!:\private\A00D021D\atlas\iconos\normalVertex.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\notifError.png"   -"!:\private\A00D021D\atlas\iconos\notifError.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\notifOk.png"   -"!:\private\A00D021D\atlas\iconos\notifOk.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\object.png"   -"!:\private\A00D021D\atlas\iconos\object.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\pivotActive.png"   -"!:\private\A00D021D\atlas\iconos\pivotActive.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\pivotCursor.png"   -"!:\private\A00D021D\atlas\iconos\pivotCursor.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\pivotIndividual.png"   -"!:\private\A00D021D\atlas\iconos\pivotIndividual.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\pivotMedian.png"   -"!:\private\A00D021D\atlas\iconos\pivotMedian.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\plane.png"   -"!:\private\A00D021D\atlas\iconos\plane.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\selEdge.png"   -"!:\private\A00D021D\atlas\iconos\selEdge.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\selFace.png"   -"!:\private\A00D021D\atlas\iconos\selFace.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\selVertex.png"   -"!:\private\A00D021D\atlas\iconos\selVertex.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\seleccion.png"   -"!:\private\A00D021D\atlas\iconos\seleccion.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\snap.png"   -"!:\private\A00D021D\atlas\iconos\snap.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\textura.png"   -"!:\private\A00D021D\atlas\iconos\textura.png"
+"..\..\..\res\Skins\Whisk3D\atlas\iconos\visible.png"   -"!:\private\A00D021D\atlas\iconos\visible.png"
+
+;required for application to be covered by backup/restore facility
+"backup_registration.xml"						                                    -"!:\private\A00D021D\backup_registration.xml"
+

@@ -47,6 +47,11 @@ class PopUpBase {
         // click) con el mouse AFUERA del popup lo cierra y deja pasar la accion
         // Por defecto los popups son modales.
         virtual bool CierraConViewport() { return false; }
+        // SEGUIR TRABAJANDO: el usuario usa el viewport AFUERA del popup (la rueda, orbitar) sin contestarle. Solo los
+        // paneles de ajustar la ultima operacion (abajo a la izquierda: mover, escalar, inset...) se resuelven solos:
+        // la operacion ya esta hecha, seguir trabajando la deja asi -> se cierran y la accion pasa al viewport. Los que
+        // piden una respuesta (borrar, pisar un archivo, descartar cambios) devuelven false: hay que contestarles
+        virtual bool SeguirTrabajando() { if (!CierraConViewport()) return false; Cerrar(); return true; }
         // NO MODAL (Buscar del IDE): un click o una tecla con el puntero AFUERA del popup van al viewport de abajo
         // como si no estuviera, y el popup sigue abierto (se cierra con su boton o con Esc).
         virtual bool NoModal() { return false; }

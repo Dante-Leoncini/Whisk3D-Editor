@@ -17,6 +17,7 @@ Qué puede hacer el editor, ordenado por panel y por modo. Borrador para revisar
 6. [Línea de tiempo](linea-de-tiempo.md)
 7. [Outliner](outliner.md)
 8. [Propiedades](propiedades.md)
+   - [Shaders escritos](shaders.md)
 9. [Editor 2D](editor-2d.md)
 10. [Editor de scripts (IDE)](editor-de-scripts.md)
 11. [Consola](consola.md)

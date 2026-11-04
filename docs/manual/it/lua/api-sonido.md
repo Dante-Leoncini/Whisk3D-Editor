@@ -9,3 +9,6 @@
 | `soltarSonido(h)` | Rilascia la nota: l'inviluppo passa al rilascio. |
 | `reverb(sala, amortiguacion, nivel)` | Il riverbero generale: dimensione della sala, smorzamento e livello (da 0 a 1; livello 0 lo spegne). |
 | `silenciar(bool)`, `estaMudo()` | Silenzio generale. |
+| `tocarSonido(obj [, seg])`, `callarSonido(obj)` | Fa ripartire un **oggetto Sound** (da `seg` secondi del suo tratto) o lo zittisce. |
+| `sonidoObj(obj) → t`, `setSonidoObj(obj, t)` | Leggere / cambiare un oggetto Sound: `archivo` (la sorgente), `activo`, `volumen`, `tono`, `reverb`, `paneo`, `inicio`, `recorteIni`, `recorteFin`, `bucle`, `posicional`, `radio`, `alcance` (e in lettura `duracion`, `sonando`). |
+| `crearSonido("sonidos/x.wav" [, padre]) → obj` | Un nuovo oggetto Sound (`destruir(obj)` lo toglie). In un prefab si istanzia come qualsiasi oggetto. |

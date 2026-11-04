@@ -1,0 +1,34 @@
+# EL PASO "Shader" DE UNA RUTINA (objects/Rutina.cpp: PasoShader): como un estado de GL, prendido hace que los triangulos
+# que se dibujan despues usen el shader escrito del archivo; al terminar la rutina se saca solo (lo que se dibuja
+# despues, como el cubo de la escena, no lo usa). Solo los backends con shaders (GLES 2.0, Vulkan)
+matshader soporte hay
+ventana 1280 720
+rutina Vidrio
+rutinapaso Vidrio array modo=0 on=1
+rutinapaso Vidrio array modo=1 on=0
+rutinapaso Vidrio array modo=2 on=0
+rutinapaso Vidrio array modo=3 on=0
+rutinapaso Vidrio punteroVertices ref=Cubo
+rutinapaso Vidrio shader ref=../pruebas/shaders/verde.glsl on=1
+rutinapaso Vidrio trasladar n0=2.5 n1=0 n2=0
+rutinapaso Vidrio dibujar ref=Cubo
+deselectall
+vporbita 1.25 0 0 9 -60 0
+vpvista material
+# el cubo que dibuja la rutina (corrido 2.5 en X): con el shader, verde
+escenapx 3 1 0.5 es 0 255 0 20
+# el cubo de la escena: sin el shader (se saco al terminar la rutina)
+escenapx 0.5 1 0.5 noes 0 255 0 40
+# el paso apagado: la rutina dibuja sin shader
+rutinaset Vidrio 5 on 0
+escenapx 3 1 0.5 noes 0 255 0 40
+# GUARDADO: el .glsl del paso entra al .w3d (shaders/) y vuelve al abrir
+rutinaset Vidrio 5 on 1
+borrararchivo prueba_shaders_rutina_tmp.w3d
+guardarw3d prueba_shaders_rutina_tmp.w3d
+abrirw3d prueba_shaders_rutina_tmp.w3d
+deselectall
+vporbita 1.25 0 0 9 -60 0
+vpvista material
+escenapx 3 1 0.5 es 0 255 0 20
+borrararchivo prueba_shaders_rutina_tmp.w3d

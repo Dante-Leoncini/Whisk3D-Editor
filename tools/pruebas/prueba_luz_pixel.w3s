@@ -1,0 +1,23 @@
+# SOMBREADO POR PIXEL (material: "Sombreado" por vertice / por pixel). Un plano grande de 4 vertices con una luz
+# puntual cerca de su centro: cerca del centro la luz cae derecha (brillante); en las esquinas, de costado (oscuro).
+#  - POR VERTICE la luz se calcula en las 4 esquinas y se interpola: todo el plano sale parejo (no hay vertice
+#    cerca de la luz para verla).
+#  - POR PIXEL se calcula en cada pixel: cerca del centro sale mucho mas claro que cerca de una esquina.
+# Solo con shaders (la PC con -DW3D_PC_GLES2=ON, la web, Android, el N8): sin ellos la prueba termina en el paso 1.
+# (vista "rendered": las luces de la escena; el centro exacto no se mira, ahi se dibuja el origen)
+sombreadopixel
+ventana 1280 720
+add plane
+objscale 6 1 6
+matnew
+addlight
+objpos 0 1 0
+vpvista rendered
+vporbita 0 0 0 20 -90 0
+deselectall
+# por vertice: cerca del centro NO es mucho mas claro que cerca de una esquina
+matflags Material set vertice
+fail escenapx 1.5 0 1.5 masclaroque 4.5 0 4.5 120
+# por pixel: si
+matflags Material set pixel
+escenapx 1.5 0 1.5 masclaroque 4.5 0 4.5 120

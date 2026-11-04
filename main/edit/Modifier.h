@@ -106,10 +106,6 @@ class Modifier {
         bool  arrMerge;          // soldar los vertices que quedan pegados entre copias
         float arrMergeDist;
 
-        // --- ARMATURE: cache de vertex-animation (bakea el skinning por frame -> reproduccion sin recomputar) ---
-        bool  cacheAnim;        // Cache Animation: guarda las poses deformadas en memoria (default OFF)
-        float cacheSkip;        // Frame Skip: 0=todos los frames; N=guarda cada N+1 e interpola (menos memoria). float para PropFloat entero.
-
         // --- CULLING (por triangulo, "CullingTri"): PVS precalculado estilo PS1 ---
         // La malla se parte en SECTORES; cada sector lista QUE triangulos se dibujan desde
         // ahi. Los datos vienen PRECALCULADOS del juego original en un sidecar junto al
@@ -192,7 +188,6 @@ class Modifier {
               boolOp(2), boolTargetGeoVer(0),
               arrCount(2.0f), arrRelOn(true), arrRelX(1.0f), arrRelY(0.0f), arrRelZ(0.0f),
               arrConstOn(false), arrConstX(0.0f), arrConstY(0.0f), arrConstZ(0.0f), arrMerge(false), arrMergeDist(0.001f),
-              cacheAnim(false), cacheSkip(0.0f),
               metodoPVS(0), sectorPVS(0), sectorFallback(0), soloCamaraActiva(true),
               pvsCargado(false), pvsAplicado(-1), pvsFacesBase(0) {}
         virtual ~Modifier() {}

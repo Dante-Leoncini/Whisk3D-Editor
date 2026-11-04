@@ -15,6 +15,7 @@
 #include "w3dnewscene.h"
 #include "ViewPorts/Timeline.h"  // DopeXformActivo/Aceptar/Cancelar (transform de keyframes)
 #include "w3dlayout.h"
+#include "w3dGraphics.h"   // w3dEngine::GLES2Resincronizar (la textura blanca se crea con GL directo)
 
 #ifndef GL_POINT_SPRITE_OES
 #define GL_POINT_SPRITE_OES 0x8861
@@ -79,6 +80,9 @@ unsigned int W3dNewWhiteTex() {
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 1, 1, 0,
                      GL_RGBA, GL_UNSIGNED_BYTE, px);
+#ifdef W3D_GLES2
+        w3dEngine::GLES2Resincronizar();   // (el glBindTexture de arriba no paso por el motor)
+#endif
     }
     return gWhiteTex;
 }

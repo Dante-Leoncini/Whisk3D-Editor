@@ -1,0 +1,118 @@
+# SHADERS ESCRITOS y TRANSMISION (objects/ShaderEscrito.*, gles2/w3dGraphicsGLES2.cpp: setupEscrito, render/RayTracer.cpp)
+#  1. TRANSMISION en el trazado de rayos (todos los backends; CPU y GPU): con transmision el cubo deja ver lo de atras,
+#     y con IOR 1.5 lo de atras sale doblado (distinto que con IOR 1)
+#  2. (solo los backends con shaders: GLES 2.0 y Vulkan) el material con un archivo .glsl se dibuja con el: un color
+#     fijo, lo que esta detras (la copia de la pantalla: el objeto se dibuja al final), el vidrio borroso, la seccion
+#     @vertice, un error de compilacion (dice el renglon DEL ARCHIVO y el material se dibuja como siempre) y que el
+#     archivo queda guardado en el .w3d
+ventana 1280 720
+add plane
+objname Rojo
+objscale 2 1 4
+objpos -2 -2 0
+matnew
+matcolor 1 0 0
+add plane
+objname Azul
+objscale 2 1 4
+objpos 2 -2 0
+matnew
+matcolor 0 0 1
+selobj Cubo
+matnew
+matcolor 0.8 0.9 1
+deselectall
+vporbita 0 0 0 9 -60 0
+# ---- 1. TRANSMISION (trazado de rayos) ----
+rtgpu 0
+selobj Cubo
+rtrender 160 120 8
+rtref
+mattrans 1
+matmapa ior 1
+rtrender 160 120 8
+# (el cubo deja ver lo de atras: cambia todo lo que tapaba)
+rtdif 40 1500
+rtref
+matmapa ior 1.5
+rtrender 160 120 8
+# (doblado por el vidrio: lo de atras se corre)
+rtdif 40 200
+mattrans 0
+matmapa ior 1
+rtgpu 1 saltar
+rtrender 160 120 8
+rtengpu si
+rtref
+mattrans 1
+rtrender 160 120 8
+rtdif 40 1500
+mattrans 0
+rtgpu 0
+# ---- 2. SHADERS ESCRITOS (los backends sin shaders terminan aca: ver prueba_shaders_fijo) ----
+matshader soporte hay
+vpvista material
+# el cubo con su color de siempre
+escenapx 0.5 1 0.5 noes 0 255 0 40
+# un COLOR FIJO: el shader se usa
+matshader shaders/verde.glsl
+matshader compila si
+escenapx 0.5 1 0.5 es 0 255 0 20
+# LO DE ATRAS (w3d_Pantalla): el cubo desaparece, se ve el plano rojo de atras como en el resto del plano
+matshader shaders/detras.glsl
+matshader compila si
+escenapx -0.5 1 0.5 comoen -2 -2 2 40
+# el VIDRIO ESMERILADO del ejemplo: en el borde rojo / azul se mezclan los dos colores
+matshader ../../examples/shaders/vidrio_esmerilado.glsl
+matshader compila si
+mattrans 1
+matmapa ior 1.0
+matrt 0.6 0
+escenapx 0.08 1 0.8 noes 255 0 0 90
+escenapx 0.08 1 0.8 noes 0 0 255 90
+# un ERROR: el mensaje dice el renglon 4 del archivo y el material se dibuja como siempre
+matshader shaders/roto.glsl
+matshader compila no 4
+escenapx 0.5 1 0.5 noes 0 255 0 40
+# la seccion @vertice: el cubo sube 3 metros
+matshader shaders/sube.glsl
+matshader compila si
+escenapx 0.5 4 0.5 es 0 255 0 20
+# el mismo @vertice que corre la CPU en los backends sin shaders (prueba_shaders_fijo): la cuenta da 3 tambien aca
+matshader shaders/cpu_completo.glsl
+matshader compila si
+escenapx 0.5 4 0.5 es 0 255 0 20
+# w3d_tiempo en el editor = la LINEA DE TIEMPO (cuadro / FPS, 30 de fabrica): quieto en pausa, cambia con el cuadro
+matshader shaders/tiempo.glsl
+matshader compila si
+frame 6
+escenapx 0.5 1 0.5 es 51 0 0 6
+frame 15
+escenapx 0.5 1 0.5 es 127 0 0 6
+# GUARDADO: el archivo y el tilde vuelven al abrir, y compila
+matshader shaders/verde.glsl
+borrararchivo prueba_shaders_tmp.w3d
+guardarw3d prueba_shaders_tmp.w3d
+abrirw3d prueba_shaders_tmp.w3d
+selobj Cubo
+matshader compila si
+vporbita 0 0 0 9 -60 0
+vpvista material
+escenapx 0.5 1 0.5 es 0 255 0 20
+# el tilde apagado: el material de siempre
+matshader off
+escenapx 0.5 1 0.5 noes 0 255 0 40
+borrararchivo prueba_shaders_tmp.w3d
+# TILDAR SIN PROYECTO GUARDADO (el pedido: "si lo tildas ya deberia poder usarlo"): un shader nuevo en la carpeta de
+# trabajo, compilado y en uso en el acto; al guardar el proyecto entra al .w3d (shaders/) y sigue compilando
+escenadefecto
+selobj Cubo
+matnew
+propstab 2
+matshader tilde
+matshader compila si
+borrararchivo prueba_shaders_tmp.w3d
+guardarw3d prueba_shaders_tmp.w3d
+selobj Cubo
+matshader compila si
+borrararchivo prueba_shaders_tmp.w3d

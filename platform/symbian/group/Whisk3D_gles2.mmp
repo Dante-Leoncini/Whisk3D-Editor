@@ -1,0 +1,10 @@
+/*
+ * ==============================================================================
+ *  Name        : Whisk3D_gles2.mmp
+ *  Part of     : Whisk3D
+ *  Variante OpenGL ES 2.0 (N8, C7, E7, Symbian^3/Anna/Belle). Comparte TODO con
+ *  Whisk3D.mmp: ahi estan las fuentes y los #ifdef W3D_MMP_GLES2 que cambian.
+ * ==============================================================================
+ */
+#define W3D_MMP_GLES2
+#include "Whisk3D.mmp"

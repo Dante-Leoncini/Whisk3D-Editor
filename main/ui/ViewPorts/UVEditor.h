@@ -34,9 +34,10 @@ enum BarRolUV {
     BRUV_Armature,  // menu Armature (solo en UVModoHuesos): Extrude/Duplicate/Delete/Set Parent/Clear Parent
     BRUV_Editar,    // "Edit": entra/sale de la PINTURA DE TEXTURA (UVModoTextura)
     BRUV_Guardar,   // icono diskette: Save Texture / Make External... / Make Internal (texturas en memoria: "*")
-    BRUV_Select     // menu Select (icono seleccion, CALCADO del BR_Select del 3D): All / None /
+    BRUV_Select,    // menu Select (icono seleccion, CALCADO del BR_Select del 3D): All / None /
                     // Invert / Select Linked. Contextual: en edicion opera los UVs, en Huesos/Pose
                     // los huesos 2D. Oculto en pintura de pesos (ahi no hay seleccion que operar).
+    BRUV_UVMap      // dropdown: QUE mapa UV de la malla se ve y se edita (el activo, en verde) + "New UV Map"
 };
 
 // MODO del editor UV. Es un estado PROPIO del viewport, NO el InteractionMode global del 3D:
@@ -356,13 +357,11 @@ class UVEditor : public ViewportBase, public WithBorder {
         int  Bone2DPick(Mesh* m, float lx, float ly, bool pose, int* outMask);
         void Panear(float dx, float dy); // paneo de la vista UV (flechas; COMPARTIDO PC/Symbian -> FUERA del #ifndef SDL)
         void ZoomCentro(int dir);        // zoom centrado en el viewport (sin cursor): teclado 0+arriba/abajo (Symbian)
-#ifndef W3D_SYMBIAN
         void event_key_down(int tecla, bool repeticion) W3D_OVERRIDE; // G/R/S + ESC/ENTER (transform)
         void event_mouse_wheel(float dy, int mx, int my) W3D_OVERRIDE;
         // IMPRESCINDIBLE: resetear ViewPortClickDown al soltar (sino queda en true y
         // viewPortActive se CONGELA -> el borde verde no cambia + no se puede resize).
         void mouse_button_up(int boton) W3D_OVERRIDE;
-#endif
 };
 
 // dropdown "Texture" de la barra del UV editor: fija a mano que parte/textura del modelo se muestra (-1 = auto).

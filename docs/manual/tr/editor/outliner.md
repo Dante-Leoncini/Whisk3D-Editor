@@ -33,7 +33,7 @@ Sahnedeki her şeyin listesi ve aynı zamanda projenin kaynak kütüphanesi. And
 
 | İşlev | Açıklama |
 |---|---|
-| Kaynaklar | Klasörler içinde mesh'ler, materyaller, dokular, animasyonlar, prefab'lar, sahneler, sesler, script'ler, yazı tipleri ve videolar. Yeşil onay işareti = kullanımda; kırmızı çarpı = sahipsiz; `*` = kaydedilmemiş. |
+| Kaynaklar | Klasörler içinde mesh'ler, materyaller, dokular, animasyonlar, prefab'lar, sahneler, sesler, script'ler, [shader'lar](shaders.md), yazı tipleri ve videolar. 3D Viewport'ta bir mesh'in üzerine sürüklenen bir materyal ya da shader, bırakılmadan önce işaretçinin altındaki parçada görünür. Yeşil onay işareti = kullanımda; kırmızı çarpı = sahipsiz; `*` = kaydedilmemiş. |
 | Filter / Liste ya da Grid | Yalnızca tek bir türü gösterme; küçük resimleri görme. |
 | Bir kaynağı sürükleme | Bir klasöre (onu taşır), 3D Viewport'a (mesh = yeni nesne, materyal ya da doku = dokunulan şeye atanır, prefab = örnek) ya da Properties'teki bir açılır listeye. |
 | New Folder / Move to Folder | Düzenleme (klasörler yalnızca düzen içindir). |

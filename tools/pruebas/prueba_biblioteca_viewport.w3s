@@ -1,0 +1,59 @@
+# ==========================================================================
+#  EL VIEWPORT BIBLIOTECA y los ARCHIVOS soltados desde el explorador del sistema (Windows / Linux / Mac).
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/windows/build/Release/whisk3d.exe --script prueba_biblioteca_viewport.w3s
+#
+#  - la biblioteca es su propio tipo de viewport ("Library", kind 9) y arranca en cuadricula;
+#  - en la cuadricula una carpeta se ABRE con UN click ("Ir atras" sube);
+#  - una imagen soltada en la biblioteca queda como textura del proyecto (sin usuarios) EN LA CARPETA que se esta
+#    viendo; un modelo, como PREFAB (no queda nada en la escena);
+#  - arrastrar un recurso sobre una carpeta (en la cuadricula) lo mete ADENTRO de esa carpeta;
+#  - en el 3D: una imagen va al material de la malla bajo el puntero (con el material por defecto: uno nuevo); un
+#    modelo se importa a la escena;
+#  - una textura de la biblioteca soltada en el "Normal Map" de Properties pasa a ser el normal map del material;
+#  - un archivo que no es de ningun tipo no se agrega;
+#  - los iconos nuevos (la interpolacion de las keys) estan en el skin y en los .pkg de Symbian.
+# ==========================================================================
+ventana 1280 720
+escenadefecto
+raizinfo objetos 6
+# el outliner pasa a ser una BIBLIOTECA (alta: la cuadricula entra)
+vpkind 2 8
+outvista es biblioteca
+carpetanueva - Fotos
+outfila Fotos
+outnofila atras
+# UN click abre la carpeta; un archivo soltado queda ahi adentro
+outclick Fotos
+outfila atras
+soltararchivo alfa_reja.png 9
+outfila alfa_reja.png carpeta Fotos
+outclick atras
+outnofila atras
+outnofila alfa_reja.png
+# un modelo soltado: un PREFAB (en la raiz, que es lo que se ve)
+soltararchivo anim-cubo-f1.obj 9
+recursos prefabs
+outfila anim-cubo-f1 carpeta -
+raizinfo n 2 objetos 6
+# ARRASTRAR un recurso sobre una carpeta: queda adentro de ESA carpeta
+soltararchivo bsp_azul.png 9
+outfila bsp_azul.png
+outdrag bsp_azul.png Fotos
+outnofila bsp_azul.png
+outclick Fotos
+outfila bsp_azul.png carpeta Fotos
+outclick atras
+# en el 3D (el cubo esta en el centro y tiene el material POR DEFECTO: recibe uno nuevo con la textura)
+soltararchivo bsp_rojo.png 1
+recursos texturas
+soltararchivo anim-cubo-f2.obj 1
+raizinfo objetos 7
+# una textura de la biblioteca al NORMAL MAP del material del cubo (Properties)
+outclick Fotos
+selobj Cubo
+propstab 2
+outsoltar bsp_azul.png props normal
+recursos texturas
+fail soltararchivo prueba_biblioteca_viewport.w3s 9
+iconospkg

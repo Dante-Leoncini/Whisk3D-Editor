@@ -40,3 +40,12 @@ Shows and edits the animation: keyframe sheet (dope sheet) or curve editor. It s
 | Smart Euler | Removes extra turns from the selected rotations. | Key menu |
 | Hide a curve | The eye on each row hides it. | Click on the eye |
 | Exact values | Frame, value and handles of the chosen keyframe. | Properties → Animation → Keyframe |
+
+## Sounds
+
+| Function | Description | Shortcut |
+|---|---|---|
+| Sound strip | Each selected Sound object has a strip: where it starts and how long it lasts, in **seconds** (changing the FPS does not move it). With a loop it repeats until the end. | — |
+| Move | Drag the strip, or <kbd>G</kbd> with no keyframes selected (moves all the selected sounds). <kbd>Ctrl</kbd> snaps to frames. | Drag / <kbd>G</kbd> |
+| Trim | Grab an end of the strip. | Drag an end |
+| Waveform / Volume line | View menu: the waveform and the volume curve inside the strip (the strip takes three rows). Without them it is just a strip. | View menu |

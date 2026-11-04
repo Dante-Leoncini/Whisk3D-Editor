@@ -1,0 +1,10 @@
+^C:\SYMBIAN\CARBIDE\WORKSPACE\WHISK3DECOSYSTEM\WHISK3D-EDITOR\THIRDPARTY\SDL2\CMAKELISTS.TXT
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor -BC:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2 --check-stamp-file C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

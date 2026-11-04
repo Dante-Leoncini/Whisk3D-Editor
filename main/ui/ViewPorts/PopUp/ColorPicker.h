@@ -6,6 +6,7 @@
 #include "WhiskUI/draw/rectangle.h"
 #include "WhiskUI/widgets/Tab.h"
 #include "WhiskUI/widgets/Button.h"
+#include "WhiskUI/widgets/TextField.h"
 
 class Object;   // el objeto dueno del color (contexto de la pestania Paleta)
 
@@ -47,6 +48,14 @@ class ColorPicker : public PopUpBase {
         Button* btnOk;       // aceptar (el color ya esta aplicado)
         Button* btnCancel;   // cancelar (restaura el original)
         Button* btnUnidad;   // switch 0-255 / 0-100% (no existe en HSV)
+        // pestania Hex: el valor se ESCRIBE con el teclado (la caja de texto de siempre, en vivo: cada hex valido ya
+        // pinta) y se copia / pega con el portapapeles del sistema (los dos botones de abajo)
+        TextField hexCampo;
+        Button* btnCopiar;
+        Button* btnPegar;
+        int hexBtnY;         // fila de Copiar / Pegar (debajo del valor)
+        void HexEditar();    // enfoca la caja con el valor actual (todo seleccionado)
+        bool HexAplicar(const std::string& t);   // un hex valido -> el color (false = no es un hex)
 
         // layout (se calculan en Abrir, en pixeles del popup)
         int circX, circY, circLado;

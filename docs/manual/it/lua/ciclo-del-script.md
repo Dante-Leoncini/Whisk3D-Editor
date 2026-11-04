@@ -32,4 +32,4 @@ end
 
 ## Quando si ferma il gioco
 
-Quando premi Stop si chiudono tutti gli script, si cancella lo spazio condiviso e la scena torna com'era prima del Play. Se modifichi uno script mentre il gioco è in esecuzione, quell'oggetto lo ricarica: le sue variabili tornano a zero e `inicio()` viene chiamata di nuovo. Riavvolgere la timeline riporta gli oggetti al loro posto, ma **non** le variabili di Lua.
+Quando premi Stop si chiudono tutti gli script, si cancella lo spazio condiviso e la scena torna com'era prima del Play. Se modifichi uno script mentre il gioco è in esecuzione, quell'oggetto lo ricarica: le sue variabili tornano a zero e `inicio()` viene chiamata di nuovo.

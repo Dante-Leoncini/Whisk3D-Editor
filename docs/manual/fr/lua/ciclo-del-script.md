@@ -32,4 +32,4 @@ end
 
 ## À l'arrêt du jeu
 
-Quand vous appuyez sur Stop, tous les scripts sont fermés, l'espace partagé est effacé et la scène revient à son état d'avant le Play. Si vous modifiez un script pendant que le jeu tourne, l'objet concerné le recharge : ses variables reviennent à zéro et `inicio()` est appelée à nouveau. Rembobiner la Timeline remet les objets à leur place, mais **pas** les variables Lua.
+Quand vous appuyez sur Stop, tous les scripts sont fermés, l'espace partagé est effacé et la scène revient à son état d'avant le Play. Si vous modifiez un script pendant que le jeu tourne, l'objet concerné le recharge : ses variables reviennent à zéro et `inicio()` est appelée à nouveau.

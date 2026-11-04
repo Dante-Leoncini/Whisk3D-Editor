@@ -56,6 +56,6 @@
 | Cycle the selection / add, remove, all or none | Pencil / Pencil + arrows |
 | Menu bar / virtual cursor | Left / right selection key |
 | Switch viewport, resize, maximize | Green key (alone, + arrows, + OK) |
-| Fullscreen game mode | Green key + <kbd>0</kbd> |
+| Fullscreen game mode | Green key + <kbd>0</kbd> (again: the image fills the whole screen; again: back). No UI, no camera border and no dark area around it (black bars remain only if the camera declares an aspect ratio different from the screen's, until the second press), and the arrows do not pan: you see the game as it is |
 
 The N95 also accepts a Bluetooth mouse and keyboard. To type text, T9 is used.

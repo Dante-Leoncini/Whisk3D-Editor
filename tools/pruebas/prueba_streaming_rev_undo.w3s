@@ -16,7 +16,6 @@ abrirw3d /tmp/w3d_f9_rev3/streamlua.w3d
 
 # --- A) el ojo (H) de un generado de una diferida, Play/Stop y Ctrl+Z ---
 prefabh Cerca Tronco
-simcache 1
 simplay 3
 simstop
 undo

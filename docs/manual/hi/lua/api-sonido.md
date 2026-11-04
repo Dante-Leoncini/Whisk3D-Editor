@@ -9,3 +9,6 @@
 | `soltarSonido(h)` | नोट छोड़ता है: एनवेलप अपने रिलीज़ में चला जाता है। |
 | `reverb(sala, amortiguacion, nivel)` | सामान्य रिवर्ब: कमरे का आकार, डैम्पिंग और स्तर (हर एक 0 से 1; स्तर 0 बंद करता है)। |
 | `silenciar(bool)`, `estaMudo()` | सारी आवाज़ बंद करना। |
+| `tocarSonido(obj [, seg])`, `callarSonido(obj)` | किसी **Sound ऑब्जेक्ट** को फिर से शुरू करें (उसके हिस्से के `seg` सेकंड से) या चुप कराएँ। |
+| `sonidoObj(obj) → t`, `setSonidoObj(obj, t)` | Sound ऑब्जेक्ट पढ़ें / बदलें: `archivo` (स्रोत), `activo`, `volumen`, `tono`, `reverb`, `paneo`, `inicio`, `recorteIni`, `recorteFin`, `bucle`, `posicional`, `radio`, `alcance` (पढ़ते समय `duracion`, `sonando` भी)। |
+| `crearSonido("sonidos/x.wav" [, padre]) → obj` | नया Sound ऑब्जेक्ट (`destruir(obj)` उसे हटाता है)। प्रीफ़ैब में यह किसी भी ऑब्जेक्ट की तरह बनता है। |

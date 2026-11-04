@@ -1,0 +1,31 @@
+# PROFUNDIDAD DE CAMPO TRAZADA (Camera::dof, render/RayTracer.cpp: RayoLente): mirando por la camara, con la lente
+# abierta (f/0.1, una lente de 15 cm) y enfocada en el cubo de cerca, el de lejos sale desenfocado y el de cerca casi igual. Enfocando el de
+# lejos (por objeto: el foco lo sigue solo) se desenfoca el de cerca. Con la profundidad de campo apagada, igual que
+# antes. En la CPU y en la GPU
+add cube
+objpos 0 0 -12
+objname Lejos
+deselectall
+vpcamara on
+rtgpu 0
+camdof 0
+rtrender 200 150 24
+rtref
+camdof 1 0.1 0 Cubo
+rtrender 200 150 24
+rtdif 40 60
+camdof 0
+rtrender 200 150 24
+rtdif 40 0 20
+camdof 1 0.1 0 Lejos
+rtrender 200 150 24
+rtdif 40 60
+rtgpu 1 saltar
+camdof 0
+rtrender 200 150 24
+rtref
+camdof 1 0.1 0 Cubo
+rtrender 200 150 24
+rtengpu si
+rtdif 40 60
+camdof 0

@@ -32,4 +32,4 @@ end
 
 ## Oyunu durdurunca
 
-Stop'a basınca tüm script'ler kapatılır, ortak alan silinir ve sahne Play'den önceki hâline döner. Oyun çalışırken bir script'i düzenlersen, o nesne script'i yeniden yükler: değişkenleri sıfırlanır ve `inicio()` yeniden çağrılır. Timeline'ı geri sarmak nesneleri yerine döndürür ama Lua değişkenlerini **döndürmez**.
+Stop'a basınca tüm script'ler kapatılır, ortak alan silinir ve sahne Play'den önceki hâline döner. Oyun çalışırken bir script'i düzenlersen, o nesne script'i yeniden yükler: değişkenleri sıfırlanır ve `inicio()` yeniden çağrılır.

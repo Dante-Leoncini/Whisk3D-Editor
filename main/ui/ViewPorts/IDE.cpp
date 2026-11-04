@@ -1,4 +1,5 @@
 #include "io/W3dWeb.h"   // navegador: guardar = descargar
+#include "app/W3dTactilEditor.h"   // W3D_SOLO_POR_CONTROLES (Symbian: el soltar de PC solo con el dedo o el mouse)
 #include "ViewPorts/PopUp/ConfirmarPopup.h"   // Guardar/Refresh preguntan antes de pisar o descartar
 #include "ViewPorts/PopUp/BuscarPopup.h"      // Buscar/Reemplazar: lo que se resalta
 #include "ViewPorts/IDE.h"
@@ -22,6 +23,9 @@
 #include "variables.h"                   // w3dPath (el proyecto abierto)
 #include "animation/Animation.h"         // w3dGetTicks: doble/triple toque
 #include "ViewPorts/TransformUI.h"       // ToolbarUsaTactil: las agarraderas solo con pantalla tactil
+#include "objects/Materials.h"           // un shader guardado: los materiales que lo usan se compilan de nuevo
+#include "objects/ShaderEscrito.h"
+#include "objects/ShaderCPU.h"            // (sin shaders: Compilar prueba el @vertice de la CPU)
 #include <stdio.h>                       // guardado atomico: fopen/fwrite/rename
 #include <string.h>                      // strncmp: las keywords del lexer
 #include <math.h>                        // cosf/sinf: las agarraderas
@@ -110,7 +114,7 @@ std::string IDENombreScript(const std::string& ruta) {
 //  arbol vivo ya tiene las rutas resueltas (y cubre lo editado sin guardar).
 // ---------------------------------------------------------------------------
 static void IdeAgregarRuta(const std::string& ruta, std::vector<std::string>* out) {
-    if (!IdeTerminaEn(ruta, ".lua")) return; // .luac (bytecode) no se edita como texto
+    if (!IdeTerminaEn(ruta, ".lua") && !IdeTerminaEn(ruta, ".glsl")) return; // .luac (bytecode) no se edita como texto
     for (size_t i = 0; i < out->size(); i++)
         if (IdeMismoArchivo((*out)[i], ruta)) return;
     out->push_back(ruta);
@@ -126,6 +130,15 @@ static void IdeColectarEscena(Object* o, std::vector<std::string>* out) {
 void IDEColectarScripts(std::vector<std::string>* rutas) {
     rutas->clear();
     IdeColectarEscena(SceneCollection, rutas);
+    // LOS SHADERS de los materiales (objects/ShaderEscrito.h): los que usa algun material (tambien el de un proyecto sin
+    // guardar, en la carpeta de trabajo) y los .glsl de shaders/ adentro del proyecto
+    for (size_t i = 0; i < Materials.size(); i++)
+        if (Materials[i] && !Materials[i]->shaderArchivo.empty()) IdeAgregarRuta(Materials[i]->shaderArchivo, rutas);
+    if (W3dContenedorHayMontado()) {
+        std::vector<std::string> sh;
+        W3dContenedorListarCarpeta("shaders/", sh);
+        for (size_t i = 0; i < sh.size(); i++) IdeAgregarRuta(sh[i], rutas);
+    }
     // DE DONDE SALEN LOS .lua QUE NO CUELGAN DE NINGUN OBJETO:
     //  - proyecto v4 (el .w3d es un contenedor): de la carpeta scripts/ de ADENTRO.
     //    Ya no se escanea contenido/ en el disco, que con el contenedor no existe
@@ -172,7 +185,56 @@ static void IdeMarcar(std::vector<unsigned char>* tipos, size_t d, size_t h, uns
     if (!tipos) return;
     for (size_t i = d; i < h && i < tipos->size(); i++) (*tipos)[i] = t;
 }
+// LOS SHADERS (.glsl, objects/ShaderEscrito.h) se pintan como GLSL: comentarios // y /* */, numeros, los tipos y las
+// palabras del lenguaje, y las marcas @vertice / @fragmento. Lo prende quien lexea un archivo .glsl (gIdeLexGLSL)
+static bool gIdeLexGLSL = false;
+static bool IdeEsKeywordGLSL(const char* p, size_t n) {
+    static const char* kw[] = {
+        "void", "float", "int", "bool", "vec2", "vec3", "vec4", "ivec2", "ivec3", "ivec4", "bvec2", "bvec3", "bvec4",
+        "mat2", "mat3", "mat4", "sampler2D", "samplerCube", "in", "out", "inout", "const", "return", "if", "else", "for",
+        "while", "do", "break", "continue", "discard", "true", "false", "struct", "uniform", "varying", "attribute",
+        "precision", "highp", "mediump", "lowp", "@vertice", "@fragmento", 0 };
+    for (int i = 0; kw[i]; i++) if (strncmp(p, kw[i], n) == 0 && kw[i][n] == 0) return true;
+    return false;
+}
+static void LexLineaGLSL(const std::string& s, bool* enBloque, std::vector<unsigned char>* tipos, size_t hasta) {
+    const size_t n = s.size();
+    if (tipos) tipos->assign(hasta < n ? hasta : n, 0);
+    bool bloque = enBloque ? *enBloque : false;
+    size_t i = 0;
+    while (i < n && i < hasta) {
+        if (bloque) {   // adentro de /* ... */
+            size_t fin = s.find("*/", i);
+            if (fin == std::string::npos) { IdeMarcar(tipos, i, n, 1); i = n; }
+            else { IdeMarcar(tipos, i, fin + 2, 1); i = fin + 2; bloque = false; }
+            continue;
+        }
+        const char c = s[i];
+        if (c == '/' && i + 1 < n && s[i + 1] == '/') { IdeMarcar(tipos, i, n, 1); i = n; continue; }
+        if (c == '/' && i + 1 < n && s[i + 1] == '*') { bloque = true; IdeMarcar(tipos, i, i + 2, 1); i += 2; continue; }
+        if (c >= '0' && c <= '9' && (i == 0 || !IdeEsIdent(s[i - 1]))) {
+            size_t j = i;
+            while (j < n && ((s[j] >= '0' && s[j] <= '9') || s[j] == '.' || s[j] == 'e' || s[j] == 'E' ||
+                             ((s[j] == '+' || s[j] == '-') && (s[j - 1] == 'e' || s[j - 1] == 'E')))) j++;
+            IdeMarcar(tipos, i, j, 4); i = j; continue;
+        }
+        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_' || c == '@' || c == '#') {
+            size_t j = i + 1;
+            while (j < n && IdeEsIdent(s[j])) j++;
+            // (las directivas #define / #ifdef y las w3d_* del motor como las palabras del lenguaje)
+            if (tipos && (c == '#' || IdeEsKeywordGLSL(s.c_str() + i, j - i) || (j - i > 4 && strncmp(s.c_str() + i, "w3d_", 4) == 0)))
+                IdeMarcar(tipos, i, j, 3);
+            i = j; continue;
+        }
+        i++;
+    }
+    if (enBloque && hasta >= n) *enBloque = bloque;
+}
+static bool IdeEsGLSL(const std::string& archivo) {
+    return archivo.size() > 5 && archivo.compare(archivo.size() - 5, 5, ".glsl") == 0;
+}
 void IDE::LexLinea(const std::string& s, bool* enBloque, std::vector<unsigned char>* tipos, size_t hasta) {
+    if (gIdeLexGLSL) { LexLineaGLSL(s, enBloque, tipos, hasta); return; }
     const size_t n = s.size();
     if (tipos) tipos->assign(hasta < n ? hasta : n, 0);   // (IdeMarcar no escribe mas alla del largo)
     bool bloque = enBloque ? *enBloque : false;
@@ -235,6 +297,7 @@ void IDE::LexLinea(const std::string& s, bool* enBloque, std::vector<unsigned ch
 static int IdeColVisual(const std::string& s, int b);
 
 void IDE::RecalcularBloques() {
+    gIdeLexGLSL = IdeEsGLSL(archivo);
     bloqueAlInicio.assign(lineas.size(), 0);
     anchoMaxCols = 0;
     bool b = false;
@@ -263,6 +326,10 @@ IDE::IDE() {
     Button* b;
     b = new Button(T("Script"), -1);
     b->rol = BRIDE_Script; b->desplegable = true; b->caretMenu = true;
+    BarButtons.push_back(b);
+    b = new Button(T("Compile"));   // (solo con un shader .glsl abierto, al lado de su nombre: ver SincronizarBarra)
+    b->rol = BRIDE_Compilar;
+    b->visible = false;
     BarButtons.push_back(b);
     b = new Button(T("File"), -1);   // menu ARCHIVO: Guardar / Guardar como... / dentro o fuera del w3d / Cargar .lua
     b->rol = BRIDE_Guardar; b->desplegable = true; b->caretMenu = true;
@@ -443,6 +510,25 @@ static IDE* gIdePregunta = NULL;   // el IDE que pregunto (la respuesta del popu
 static void IdeGuardarForzado() { if (gIdePregunta) gIdePregunta->Guardar(true); }
 static void IdeRefreshForzado() { if (gIdePregunta) gIdePregunta->Refresh(true); }
 
+// UN SHADER GUARDADO (.glsl): los materiales que lo usan se compilan de nuevo (lo mismo que su boton "Compile") y
+// el resultado sale en un aviso: el error con su renglon, o que compilo
+static void IdeShaderGuardado(const std::string& archivo) {
+    if (!IdeEsGLSL(archivo)) return;
+    W3dShaderArchivoOlvidar(archivo);   // (el paso "Shader" de las rutinas lo vuelve a compilar al dibujar)
+    int n = 0; std::string error;
+    for (size_t i = 0; i < Materials.size(); i++) {
+        Material* m = Materials[i];
+        if (!m || m->shaderArchivo != archivo) continue;
+        if (!W3dShaderMaterialCompilar(m) && error.empty()) error = m->shaderError;
+        n++;
+    }
+    if (n == 0) return;
+    if (!error.empty()) Notificar(std::string(T("The shader does not compile")) + ": " + error, true);
+    else Notificar(IDENombreScript(archivo) + " " + T("compiled"), false);
+    extern void RebindMaterialMeshPart(); RebindMaterialMeshPart();   // (la tarjeta del material dice el resultado)
+    g_redraw = true;
+}
+
 bool IDE::Guardar(bool forzar) {
     if (archivo.empty()) return false;
     // EXTERNO editado por otro programa desde que se abrio: pisarlo sin avisar borra ese trabajo
@@ -475,6 +561,7 @@ bool IDE::Guardar(bool forzar) {
         sucio = false;
         textoDisco = t; hayTextoDisco = true;
         if (!silencioso) Notificar(IDENombreScript(archivo) + " guardado (guarda el proyecto para que quede en el .w3d)", false);
+        IdeShaderGuardado(archivo);
         RecargarEnVivo(false);
         g_redraw = true;
         return true;
@@ -505,6 +592,7 @@ bool IDE::Guardar(bool forzar) {
     textoDisco = t; hayTextoDisco = true;
     W3dDescargarSiWeb(archivo);   // navegador: el .lua externo guardado baja a la PC
     if (!silencioso) Notificar(IDENombreScript(archivo) + " guardado", false);
+    IdeShaderGuardado(archivo);
     RecargarEnVivo(false);
     g_redraw = true;
     return true;
@@ -1237,10 +1325,10 @@ void IDE::event_mouse_motion(int mx, int my) {
     }
 }
 
-#ifndef W3D_SYMBIAN
 // IMPRESCINDIBLE (regla de la casa): soltar libera ViewPortClickDown. Sin esto
 // el foco por hover queda CLAVADO en este viewport (bug conocido de Console).
 void IDE::mouse_button_up(int boton) {
+    W3D_SOLO_POR_CONTROLES();
     ViewPortClickDown = false;
     if (boton == W3dMB_IZQ) {
         selDrag = false;
@@ -1256,7 +1344,6 @@ void IDE::event_mouse_wheel(float dy, int mx, int my) {
     else               ScrollByTouch(0, paso);
     g_redraw = true;
 }
-#endif
 
 bool IDE::event_finger_scroll(int px, int py, int dx, int dy) {
     (void)px; (void)py;
@@ -1306,6 +1393,32 @@ void IDE::SincronizarBarra() {
     std::string t = archivo.empty() ? std::string(T("Script")) : IDENombreScript(archivo);
     if (sucio) t += " *"; // asterisco = cambios sin guardar
     if (b->text != t) b->text = t;
+    Button* c = BarRolBtn(BarButtons, BRIDE_Compilar);
+    const bool shader = IdeEsGLSL(archivo);
+    if (c && c->visible != shader) { c->visible = shader; g_redraw = true; }
+}
+void IDE::CompilarShader() {
+    if (!IdeEsGLSL(archivo)) return;
+    bool usado = false;
+    for (size_t i = 0; i < Materials.size() && !usado; i++) usado = Materials[i] && Materials[i]->shaderArchivo == archivo;
+    if (usado) { if (sucio) Guardar(); else IdeShaderGuardado(archivo); return; }   // (guardar ya compila)
+    // nadie lo usa: se prueba lo que hay en el editor
+    std::string vs, fs; W3dShaderPartir(GetTexto(), vs, fs);
+    if (!w3dEngine::ShadersEscritos()) {   // (sin shaders: solo el @vertice, que es lo que corre aca, en la CPU)
+        std::string e;
+        W3dVertCPU* p = strstr(vs.c_str(), "Vertice") ? W3dVertCPUCompilar(vs, e) : NULL;
+        if (p || !strstr(vs.c_str(), "Vertice")) { W3dVertCPUBorrar(p); Notificar(IDENombreScript(archivo) + " " + T("compiled"), false); }
+        else Notificar(std::string(T("The shader does not compile")) + ": @vertice (CPU): " + e, true);
+        return;
+    }
+    char log[2048]; log[0] = 0;
+    const int id = w3dEngine::ShaderEscritoCompilar(vs.c_str(), fs.c_str(), log, (int)sizeof(log));
+    if (id > 0) { w3dEngine::ShaderEscritoBorrar(id); Notificar(IDENombreScript(archivo) + " " + T("compiled"), false); }
+    else {
+        std::string e = log[0] ? log : T("This graphics backend has no shaders: the material is drawn as usual (GLES 2.0 and Vulkan have them)");
+        for (size_t k = 0; k < e.size(); k++) if (e[k] == 10 || e[k] == 13) e[k] = 32;   // (en un renglon)
+        Notificar(std::string(T("The shader does not compile")) + ": " + e, true);
+    }
 }
 
 // un rectangulo lleno en coords locales del viewport (sin textura)
@@ -1496,10 +1609,11 @@ void IDE::Render() {
     // el codigo, por tramos de color del lexer
     gfx::Scissor(x + gutterW, glY, (width > gutterW) ? width - gutterW : 0, hVis);
     if (archivo.empty() && n == 1 && lineas[0].empty()) {
-        IdeTexto(textX0, py0, "(no hay scripts .lua en el proyecto)",
+        IdeTexto(textX0, py0, "(no hay scripts .lua ni shaders .glsl en el proyecto)",
                  ListaColores[static_cast<int>(ColorID::grisUI)]);
     }
     std::vector<unsigned char> tipos;
+    gIdeLexGLSL = IdeEsGLSL(archivo);   // (un shader se pinta como GLSL)
     for (int l = primera; l < ultima; l++) {
         const std::string& s = lineas[l];
         if (s.empty()) continue;
@@ -1634,6 +1748,24 @@ static void IDEAbrirConfirmado() {
     gIDEAbrirPendiente.clear();
     g_redraw = true;
 }
+// un archivo cambio de lugar (el shader de un proyecto sin guardar entro al .w3d al guardarlo): los IDE que lo tienen
+// abierto pasan a la ruta nueva, con lo que tenian (el texto es el mismo)
+static void IDEMudarEn(ViewportBase* n, const std::string& viejo, const std::string& nuevo) {
+    if (!n) return;
+    if (n->isLeaf()) {
+        if (n->ViewportKind() == 8) {
+            IDE* ide = (IDE*)n;
+            if (ide->archivo == viejo) { ide->archivo = nuevo; ide->SincronizarBarra(); g_redraw = true; }
+        }
+        return;
+    }
+    if (n->ContainerKind() == 1) { IDEMudarEn(((ViewportRow*)n)->childA, viejo, nuevo); IDEMudarEn(((ViewportRow*)n)->childB, viejo, nuevo); return; }
+    IDEMudarEn(((ViewportColumn*)n)->childA, viejo, nuevo); IDEMudarEn(((ViewportColumn*)n)->childB, viejo, nuevo);
+}
+void IDEArchivoMudado(const std::string& viejo, const std::string& nuevo) {
+    if (viejo != nuevo) IDEMudarEn(LayoutRaizCompleta(), viejo, nuevo);
+}
+
 bool IDEAbrirScript(const std::string& ruta) {
     IDE* ide = PrimerIDE(LayoutRaizCompleta());
     if (!ide) return false;

@@ -114,7 +114,8 @@ class Viewport3D : public ViewportBase, public WithBorder {
         bool camFrameLetterbox;
         bool letterboxNegro; // toggle: bandas OPACAS como en el dispositivo (default false = atenuadas)
         void RenderCamPassepartout(); // dibuja el borde blanco + oscurece afuera del marco (lo que NO sale en el render)
-        void RenderMotionTrail();     // Motion Trail: el camino de los objetos animados, en x-ray
+        void RenderMotionTrail();
+        void RTGizmosEncima(Object* o);   // camaras y luces encima de la imagen trazada     // Motion Trail: el camino de los objetos animados, en x-ray
         void RenderSnapIndicador();   // recuadro verde en el target de snap bajo el cursor
         void RenderArmaturasEncima(Object* node); // huesos del esqueleto (lineas azules) encima de todo
         int  PickBone(class Armature* arm, float lmx, float lmy); // Pose Mode: hueso mas cercano al click (px), o -1
@@ -161,6 +162,8 @@ class Viewport3D : public ViewportBase, public WithBorder {
         bool showFloor;
         bool showYaxis; 
         bool showXaxis; 
+        // el CANDADO de la vista de camara (abajo al centro): cerrado = orbitar / panear / zoom MUEVEN la camara
+        // activa; abierto (de fabrica) = orbitar te saca de la vista de camara (el paneo y el zoom son de inspeccion)
         bool CameraToView; 
         bool showOrigins;
         bool showArmature; // overlays por tipo de objeto (submenu "Objects" del menu de overlays)
@@ -169,6 +172,7 @@ class Viewport3D : public ViewportBase, public WithBorder {
         bool showEmpty;
         bool showParticulas;   // overlay "Objects": gizmo (flecha) de los emisores de particulas. Default OFF.
         bool showCurvas;       // overlay "Objects": la LINEA de las curvas/rieles. Default ON (se puede ocultar).
+        bool showSonidos;      // overlay "Objects": el icono de parlante de los Sonido (oculto = tampoco se clickea)
         bool showHitbox;       // overlay "Objects": el alambre de los hitbox. Default ON (oculto = tampoco se clickea).
         bool show3DCursor;
         bool ShowRelantionshipsLines; 
@@ -178,6 +182,7 @@ class Viewport3D : public ViewportBase, public WithBorder {
         RenderType view;
 
         GLfloat nearClip;
+        float NearVista() const;   // el plano cercano con que se dibuja la orbita (en el telefono, crece con la distancia)
         GLfloat farClip;
         GLfloat aspect;
 
@@ -195,6 +200,7 @@ class Viewport3D : public ViewportBase, public WithBorder {
         // --- LOCAL VIEW (aislar la seleccion en ESTE viewport, tecla "/" / menu View) ---
         bool localViewActivo;
         std::set<Object*> localViewSet;   // objetos visibles mientras dura el aislamiento
+        std::set<Object*> localViewPaso;  // sus PADRES: se atraviesan (por la matriz) pero no se dibujan
         Quaternion lvViewRot; Vector3 lvPivot; float lvOrbitDistance;   // camara guardada al entrar (se restaura al salir)
         bool lvOrtho; bool lvFromCam; float lvZoom, lvPanX, lvPanY;
         void LocalViewToggle();
@@ -220,6 +226,20 @@ class Viewport3D : public ViewportBase, public WithBorder {
         int  TilesNecesarios(int outW, int outH) const; // tiles de un render (para el total de la barra)
         bool RenderAPNG(int outW, int outH, RenderType::Enum pass, const char* filename,
                         int progBase = 0, int progTotal = 0);
+        // lo mismo a un buffer RGBA de outW x outH con las filas de ARRIBA hacia abajo (sin guardar)
+        bool RenderABuffer(int outW, int outH, RenderType::Enum pass, std::vector<unsigned char>& rgba,
+                           int progBase = 0, int progTotal = 0);
+        // la matriz PROYECCION x VISTA de la imagen entera de outW x outH de RenderAPNG (desde la camara activa si hay)
+        void MatrizImagen(int outW, int outH, float* VP16);
+        void VistaVectores();   // la vista "Motion Vectors": la escena con el color de su movimiento desde el cuadro anterior
+        void VistaMovimiento(bool datos, float lejos);   // (la de arriba, o el pase de DATOS del postprocesado: + profundidad)
+        void VistaDatos(bool profundidad, bool propiaZ = false);   // propiaZ: sin la escena dibujada (de antemano)
+        bool RectPost(int glY, int& rx, int& ry, int& w, int& h) const;   // el marco de la camara (GL) del postprocesado
+        void PostDatosPrevios(int glY);   // la profundidad / el movimiento de los Postproceso del arbol, ANTES de la escena   // un pase de datos del postprocesado (la profundidad o el movimiento): lo limpia y lo dibuja
+        void PostProcesar(int glY);   // EL POSTPROCESADO de la vista Rendered (render/Postproceso.h): solo mirando por la
+                                      // camara activa y adentro de su marco (en el modo juego puro, todo el viewport)
+        void PaseProfundidadCPU();    // (sin shaders) la escena en ZBuffer sobre este viewport, para leerla
+        float PostLejos() const { return farClip < 200.0f ? farClip : 200.0f; }
 
         void RenderFloor();
         void RenderAllAxisTransform();
@@ -254,6 +274,7 @@ class Viewport3D : public ViewportBase, public WithBorder {
         // ndc = (e.xy / (sx,sy)) [/ ez en perspectiva] * zoom + pan
         struct Lente { Vector3 pos, der, arr, fwd; bool orto; float sx, sy, zoom, panX, panY; };
         Lente LenteActual() const;
+        void CargarProyeccionVista();   // la proyeccion con la que se dibuja (Render y los picks: ver el .cpp)
         // mundo-por-pixel al arrastrar (mover/extrude): a la PROFUNDIDAD del pivot de transform, para
         // que lo agarrado se mueva 1:1 con el mouse/flechas en pantalla a cualquier zoom.
         float VelocidadArrastreMundo();
@@ -267,6 +288,7 @@ class Viewport3D : public ViewportBase, public WithBorder {
         void RenderRelantionshipsLines();
         void Render3Dcursor();
         void RenderUI();
+        void DibujarHUDJuego();   // la interfaz 2D del juego sobre la pantalla del juego (RenderUI o en su lugar del arbol)
         // la PANTALLA DIVIDIDA de un juego (setVistas(2)): la escena una vez por mitad, cada una con su camara, y el
         // HUD una vez encima. false = no corresponde (se dibuja como siempre)
         bool RenderDividido();
@@ -293,12 +315,8 @@ class Viewport3D : public ViewportBase, public WithBorder {
         void ChangePerspective();
         void Aceptar();
         void button_left() W3D_OVERRIDE;
-#ifndef W3D_SYMBIAN
-        void mouse_button_up(int boton) W3D_OVERRIDE;
-#endif
-#ifndef W3D_SYMBIAN
+        void mouse_button_up(int boton) W3D_OVERRIDE;   // (Symbian: solo con el dedo, W3dTactil)
         void event_mouse_wheel(float dy, int mx, int my) W3D_OVERRIDE;
-#endif
         void event_mouse_motion(int mx, int my) W3D_OVERRIDE;
         void event_finger_gesture(float zoomDelta, float panDx, float panDy) W3D_OVERRIDE; // 2 dedos: zoom + paneo
         bool event_finger_scroll(int px, int py, int dx, int dy) W3D_OVERRIDE; // 1 dedo sobre el TOOLBAR = scroll horiz
@@ -319,13 +337,20 @@ class Viewport3D : public ViewportBase, public WithBorder {
         void ToolbarSincronizar() W3D_OVERRIDE;     // visibilidad contextual + colores (estado puro)
         void ToolbarAccionRol(int rol) W3D_OVERRIDE; // que hace cada boton (roles TBR_*)
         bool ClickBarraTransform(int mx, int my); // tap TACTIL en la barra de estado del transform -> abre el teclado numerico
+        // el CANDADO de la vista de camara (ver CameraToView): si se ve, su rect (local) y el click (pantalla)
+        bool CandadoCamaraVisible() const;
+        void CandadoCamaraRect(int& rx, int& ry, int& lado) const;
+        bool CandadoCamaraClick(int mx, int my);
+        void RenderCandadoCamara();
+        // la ORIENTACION de lo que se ve: la de la camara activa mirando por ella, la de la orbita si no. Es la que
+        // usan mover / rotar / escalar (los ejes de la vista) y la publican camRight / camUp / camForward
+        Quaternion RotVista() const;
+        void PublicarEjesVista();
+        void OrbitaDesdeCamara();   // la orbita del viewport toma la pose de la camara activa (el pivot, adelante)
+        void CamaraDesdeOrbita();   // y al reves: la camara activa toma la pose de la orbita (candado cerrado)
         void RenderToolbar() W3D_OVERRIDE;            // + ocultarla en MODO JUEGO (el juego se mira limpio)
-#ifndef W3D_SYMBIAN
         void event_key_down(int tecla, bool repeticion) W3D_OVERRIDE;
-#endif
-#ifndef W3D_SYMBIAN
         void event_key_up(int tecla) W3D_OVERRIDE;
-#endif
         void key_down_return();
 };
 

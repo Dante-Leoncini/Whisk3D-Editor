@@ -17,6 +17,7 @@ O que o editor pode fazer, organizado por painel e por modo. Rascunho para revis
 6. [Linha do Tempo](linea-de-tiempo.md)
 7. [Outliner](outliner.md)
 8. [Propriedades](propiedades.md)
+   - [Shaders escritos](shaders.md)
 9. [Editor 2D](editor-2d.md)
 10. [Editor de scripts (IDE)](editor-de-scripts.md)
 11. [Console](consola.md)

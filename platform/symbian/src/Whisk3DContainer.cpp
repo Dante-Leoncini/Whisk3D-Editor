@@ -21,8 +21,21 @@
 #include "render/OpcionesRender.h"     // g_redraw (render event-driven)
 #include "objects/Materials.h"         // HayAnimacionActiva / UpdateAnimatedMaterials
 #include "animation/Animation.h"       // PlayAnimation / AnimFPS / AnimTick (avance del play)
+#include "w3dpantallas.h"              // pantallas externas (TV-out / HDMI): deteccion + superficie propia
+#include "ViewPorts/PantallasExternas.h" // ...y su dibujo (el popup y los viewports son del editor)
 #include "w3dGraphics.h"               // g_statCuadro: las llamadas GL del ultimo cuadro en el [PERF]
 #include <string.h>                    // strlen/memcpy: el volcado de capacidades GL
+#include <hal.h>                       // HAL EPen: el telefono es tactil
+#include <stdio.h>                     // sprintf (la captura de diagnostico)
+#include "w3dTexture.h"                // SavePNG (idem)
+#include "base/W3dTactil.h"            // la pantalla tactil (Core): los mismos eventos que SDL en Android
+#include "app/variables.h"             // cfg (la barra de herramientas en los tactiles)
+#include "objects/Gamepad.h"           // MandosSymbianTick: los joysticks Bluetooth
+#include "app/W3dRatonEditor.h"        // W3dRatonTick: el mouse Bluetooth (boton del medio emulado)
+#include "base/W3dMandos.h"            // MandosCerrar
+void ControlesTick();                  // (controles.cpp) la pulsacion larga tactil, por reloj
+bool LayoutToggleEditMode();            // (LayoutInput.cpp) Tab: entrar/salir del modo edicion
+void LayoutCiclarViewportActivo(int dir);
 
 // BARRA DE PROGRESO (export/import OBJ): el hook de swap que faltaba en Symbian. ProgresoIniciar/Actualizar lo
 // llaman para mostrar la barra DURANTE la operacion bloqueante (sin esto, ProgresoIniciar hacia return y la
@@ -30,7 +43,8 @@
 extern void (*LayoutSwapBuffers)();
 static EGLDisplay gSwapDisplay = NULL;
 static EGLSurface gSwapSurface = NULL;
-static void W3dProgresoSwap() { if (gSwapDisplay) eglSwapBuffers(gSwapDisplay, gSwapSurface); }
+// (antes del swap, lo que el motor tiene JUNTADO sin dibujar: el swap es EGL directo y no lo manda. Como PCSwapBuffers)
+static void W3dProgresoSwap() { w3dEngine::DibujarPendiente(); if (gSwapDisplay) eglSwapBuffers(gSwapDisplay, gSwapSurface); }
 
 // ---- LO QUE EXPONE EL DRIVER GL/EGL DEL TELEFONO (diagnostico, una vez al arrancar) ----------------------------
 // Para decidir que caminos de render sirven en cada equipo: las extensiones (programas de vertices, paleta de
@@ -96,12 +110,22 @@ static void VolcarCapacidadesGL(EGLDisplay d){
 // ---------------------------------------------------------
 //
 void CWhisk3DContainer::ConstructL(const TRect& /*aRect*/){
+    // el log arranca ACA (antes de EGL y del compilado de shaders): si el arranque de GL falla, queda escrito
+    w3dLogReset();
+    w3dLog("ConstructL: inicio");
     CreateWindowL();
     iOpenGlInitialized = EFalse;
+    iSoltarDedos = EFalse;
     // Create the input handler
     iInputHandler = CWhisk3DInput::NewL();
 
     SetExtentToWholeScreen();                // Take the whole screen into use
+    // PANTALLA TACTIL: arrastrar el dedo (sin esto solo llegan el down y el up). En Symbian^3, ademas, un evento
+    // por cada dedo (multitactil); tiene que pedirse ANTES de activar la ventana. (Sin tactil, el N95, no llega nada.)
+    EnableDragEvents();
+#ifdef W3D_GLES2
+    Window().EnableAdvancedPointers();
+#endif
     ActivateL();
     
     iFrame = 0;                              // Frame counter
@@ -122,6 +146,11 @@ void CWhisk3DContainer::ConstructL(const TRect& /*aRect*/){
         _LIT(KInitializeFailed, "eglInitialize failed");
         User::Panic( KInitializeFailed, 0 );
     }
+#ifdef W3D_GLES2
+    // variante ES 2.0 (N8): la API de EGL tiene que ser OpenGL ES (lo es por defecto, pero el driver de Symbian^3
+    // tambien trae OpenVG y no conviene dejarlo librado al azar)
+    eglBindAPI( EGL_OPENGL_ES_API );
+#endif
 
     EGLConfig *configList = NULL;            // Pointer for EGLConfigs
     EGLint numOfConfigs = 0;
@@ -194,15 +223,42 @@ void CWhisk3DContainer::ConstructL(const TRect& /*aRect*/){
     };
 
     // Define properties for requesting a non-antialiased window surface
+#ifdef W3D_GLES2
+    // primero una config cuyo swap pueda CONSERVAR el cuadro (EGL_SWAP_BEHAVIOR_PRESERVED_BIT): la pantalla externa en
+    // "solo la externa" mueve el cursor sin redibujar 1280x720 de editor. Si el driver no tiene, la de siempre
+    const EGLint attrib_list_conserva[] = {
+        EGL_SURFACE_TYPE, EGL_WINDOW_BIT | 0x0400 /*EGL_SWAP_BEHAVIOR_PRESERVED_BIT*/,
+        EGL_BUFFER_SIZE,  BufferSize,
+        EGL_DEPTH_SIZE,   16,
+        EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
+        EGL_NONE
+    };
+#endif
     const EGLint attrib_list[] = {
 		EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
         EGL_BUFFER_SIZE,  BufferSize,
+        // (16 tambien en el N8: con 24 la superficie de la TV de 1280x720 no entraba en la memoria del VideoCore III,
+        // EGL_BAD_ALLOC al elegir "nuevo viewport")
         EGL_DEPTH_SIZE,   16,
+#ifdef W3D_GLES2
+        EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,   // solo configs que sirven para un contexto ES 2.0
+#endif
         EGL_NONE
     };
 
     // Choose an EGLConfig that best matches to the properties in attrib_list_fsaa
     //if ( eglChooseConfig( iEglDisplay, attrib_list_fsaa, configList, configSize, &numOfConfigs ) == EGL_FALSE ){
+    numOfConfigs = 0;
+#ifdef W3D_GLES2
+    // (solo para la superficie de la TV: el telefono y el contexto van con la de siempre. Con esta config TODAS las
+    // superficies pedian mas memoria grafica y la de 1280x720 de la TV ya no entraba: quedaba a 960x540 con bordes)
+    if ( eglChooseConfig( iEglDisplay, attrib_list_conserva, configList, configSize, &numOfConfigs ) == EGL_FALSE ){
+        numOfConfigs = 0;
+    }
+    w3dLogf( "EGL: config que conserva el cuadro en el swap: %s", numOfConfigs > 0 ? "SI" : "no" );
+    if ( numOfConfigs > 0 ) W3dPantallasConfigConserva( configList[0] );
+    numOfConfigs = 0;
+#endif
     if ( eglChooseConfig( iEglDisplay, attrib_list, configList, configSize, &numOfConfigs ) == EGL_FALSE ){
         _LIT( KChooseConfigFailed, "eglChooseConfig failed" );
         User::Panic( KChooseConfigFailed, 0 );
@@ -231,6 +287,17 @@ void CWhisk3DContainer::ConstructL(const TRect& /*aRect*/){
 
     // Create a window where the graphics are blitted
     iEglSurface = eglCreateWindowSurface( iEglDisplay, Config, &Window(), NULL );
+    // SIN MEMORIA GRAFICA (EGL_BAD_ALLOC): en Symbian^3 la comparten todas las apps y una que quedo abierta en segundo
+    // plano (un juego) puede tenerla tomada; el sistema la libera cerrando apps de fondo. Se reintenta unos segundos
+    // antes de rendirse, y queda en el log el porque
+    for ( TInt intento = 0; iEglSurface == NULL && intento < 10; intento++ )
+        {
+        const EGLint err = eglGetError();
+        w3dLogf( "EGL: eglCreateWindowSurface fallo (0x%x%s), reintento %d", (TInt)err,
+                 err == EGL_BAD_ALLOC ? ": sin memoria grafica, hay otra app abierta?" : "", (TInt)( intento + 1 ) );
+        User::After( 500000 );
+        iEglSurface = eglCreateWindowSurface( iEglDisplay, Config, &Window(), NULL );
+        }
     if ( iEglSurface == NULL )
         {
         _LIT(KCreateWindowSurfaceFailed, "eglCreateWindowSurface failed");
@@ -238,7 +305,20 @@ void CWhisk3DContainer::ConstructL(const TRect& /*aRect*/){
         }
 
     // Create a rendering context
+#ifdef W3D_GLES2
+    const EGLint atributosContexto[] = { EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE };
+    iEglContext = eglCreateContext( iEglDisplay, Config, EGL_NO_CONTEXT, atributosContexto );
+#else
     iEglContext = eglCreateContext( iEglDisplay, Config, EGL_NO_CONTEXT, NULL );
+#endif
+    iEglConfig = Config;   // (la segunda pantalla crea su superficie con la misma config: comparte el contexto)
+    {   // la config que dio el driver (color, profundidad, multisample)
+        EGLint buf = 0, prof = 0, mues = 0;
+        eglGetConfigAttrib(iEglDisplay, Config, EGL_BUFFER_SIZE, &buf);
+        eglGetConfigAttrib(iEglDisplay, Config, EGL_DEPTH_SIZE, &prof);
+        eglGetConfigAttrib(iEglDisplay, Config, EGL_SAMPLES, &mues);
+        w3dLogf("EGL: config de %d bits de color, %d de profundidad, %d muestras", (TInt)buf, (TInt)prof, (TInt)mues);
+    }
     if ( iEglContext == NULL )
         {
         _LIT(KCreateContextFailed, "eglCreateContext failed");
@@ -259,9 +339,27 @@ void CWhisk3DContainer::ConstructL(const TRect& /*aRect*/){
     gSwapSurface = iEglSurface;
     LayoutSwapBuffers = W3dProgresoSwap;
 
+#ifdef W3D_GLES2
+    // backend de shaders: compila el uber-shader y arma los VBOs. TIENE que ir antes de AppInit (que ya dibuja
+    // por la abstraccion), igual que en PC/Android. En ES 2.0 nativo no hay funciones que cargar (NULL).
+    w3dLog("GLES2Init: compilando los shaders");
+    w3dEngine::GLES2Init( NULL );
+    w3dLogf("GLES2Init: listo (glErr=%x)", (TInt)glGetError());
+#endif
+
 
     TSize size;
     size = this->Size();
+
+    // telefono TACTIL (5800, N97, N8...): la barra de herramientas del 3D, como en Android. Con el dedo es la unica
+    // forma de aceptar/cancelar un transform (tocar la pantalla lo MUEVE, no lo confirma). El N95 sigue sin ella.
+    {
+        TInt lapiz = 0;
+        if (HAL::Get(HALData::EPen, lapiz) == KErrNone && lapiz) {
+            cfg.nuevoUsuario = true;
+            extern bool g_gizmoOn; g_gizmoOn = true;   // (y el gizmo, como Android: con el dedo se agarra)
+        }
+    }
 
     iWhisk3D = CWhisk3D::NewL( size.iWidth, size.iHeight, iInputHandler ); // Create an instance of Whisk3D
     iWhisk3D->AppInit();                                       // Initialize OpenGL ES
@@ -275,6 +373,10 @@ void CWhisk3DContainer::ConstructL(const TRect& /*aRect*/){
     // Fase 3c: raiz del modelo compartido de PC + cubo default (como
     // ConstructUniversal). Su render sale en cada frame del viewport 3D.
     W3dNewSceneInit();
+
+    // PANTALLAS EXTERNAS (TV-out RCA, HDMI): al conectarse una, el popup "clonar / nuevo viewport / propiedades".
+    // Despues del layout: el popup se centra con el tamano de pantalla que arma W3dLayoutBuild.
+    W3dPantallasInit( iEglDisplay, iEglConfig, iEglContext, iEglSurface );
 
     // Mouse/teclado bluetooth (HID). hidsrv.dll se carga en runtime: si el
     // telefono no tiene el driver, NewL deja y seguimos sin mouse (por eso
@@ -419,7 +521,7 @@ static void AplicarFlechas3D(){
 	// Durante un transform 3D/de malla NO: ahi las flechas mueven la seleccion. El de KEYFRAMES es al reves: lo
 	// maneja el CURSOR (event_mouse_motion -> DopeMoveApply, el mismo camino que arrastrar con el mouse en PC), asi
 	// que ahi las flechas tienen que seguir moviendolo o el transform no se puede manejar con nada.
-	if (mouseVisible && (!W3dNewTransformActive() || DopeXformActivo())){
+	if ((mouseVisible && !W3dNewTransformActive()) || DopeXformActivo()){   // (keyframes: aunque el cursor este oculto)
 		// arranca LENTO (2px/frame) y acelera al mantener (hasta 9px) -> control fino al inicio, rapido al cruzar
 		int spd = (gMouseAccel < 6) ? 2 : (gMouseAccel < 14) ? 4 : (gMouseAccel < 24) ? 6 : 9;
 		gMouseAccel++;
@@ -488,6 +590,13 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 			// NO pasa por aca: 1/2/3 del BT quedan libres, como pidio Dante)
 			// 1/2/3 = mover/rotar/escalar (G/R/S de PC) - 0 = modo de vista
 			TInt sc = aKeyEvent.iScanCode;
+			{ static TInt sLog = 0; if (sLog < 30) { sLog++; w3dLogf("[teclas] telefono: scancode %d", sc); } }
+			// TAB (teclado Bluetooth que el sistema entrega como tecla normal): como en la PC, con una malla activa
+			// entra/sale del modo edicion; si no, cicla el viewport activo
+			if (sc == EStdKeyTab){
+				if (!LayoutToggleEditMode()) LayoutCiclarViewportActivo(+1);
+				return EKeyWasConsumed;
+			}
 			// VERDE + '0' = MODO JUEGO PURO (pedido del dueno): el 3D del juego a
 			// pantalla completa y CERO editor (menu/headers/overlays/estadisticas),
 			// para medir el rendimiento REAL. Re-apretar restaura todo. gGreenUsado
@@ -700,6 +809,14 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 				    (sc == EStdKeyUpArrow || sc == EStdKeyDownArrow)){
 					if (W3dLayoutTeclaViewport(sc)) return EKeyWasConsumed;
 				}
+				// TIMELINE + izquierda/derecha: el TOQUE mueve UN cuadro ya (como en PC); mantenida sigue el scrub,
+				// que arranca despues de un ratito (W3dTimelineFlechaPulsada). Sigue abajo para marcarla mantenida.
+				if (!g0Held && !gStarHeld && !gGreenHeld && !mouseVisible && W3dLayoutTimelineActivo() &&
+				    (sc == EStdKeyLeftArrow || sc == EStdKeyRightArrow)){
+					extern void W3dTimelineFlechaPulsada();
+					W3dLayoutTeclaViewport(sc);
+					W3dTimelineFlechaPulsada();
+				}
 				// 3D con FOCO DE TRANSPORTE (Stop/Play): la flecha NO orbita, cae al dispatch del panel (linea 618)
 				// para navegar Stop<->Play, igual que el Timeline con foco suelta las flechas. De ahi el && !W3dLayoutFocoTransporte().
 				// UV con foco en "Edit" (W3dLayoutFocoUVEditar): la flecha NO panea, cae al dispatch del panel
@@ -794,7 +911,11 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 			}
 			// lapiz/shift del telefono: ciclar la seleccion entre objetos
 			if (sc == EStdKeyHash){ gHashHeld = ETrue; gHashArrowUsed = EFalse; return EKeyWasConsumed; } // # = vistas (mantener + flechas); tap = orto/perspectiva
-			if (sc == EStdKeyLeftShift){ // LAPIZ (solo shift ahora; el # se separo para la camara)
+			if (sc == EStdKeyLeftShift || sc == EStdKeyRightShift){ // LAPIZ (solo shift ahora; el # se separo para la camara)
+				// mantenido = SHIFT (shift + boton del medio = paneo): el shift de un teclado Bluetooth llega por aca, no
+				// por el HID (que solo ve los codigos de las letras)
+				{ extern bool LShiftPressed; LShiftPressed = true; }
+				{ static TInt sLog = 0; if (sLog < 5) { sLog++; w3dLogf("[teclas] shift del sistema (scan %d)", (TInt)sc); } }
 				// LAPIZ: solo REGISTRAR. La accion (ciclar) va al SOLTAR si fue una pulsacion
 				// corta SIN flecha. Larga = nada. Mantener + flecha = navegar (handler de flechas).
 				gLapizHeld = ETrue; gLapizArrowUsed = EFalse; gLapizDownTick = User::NTickCount();
@@ -858,6 +979,9 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 				if (W3dLayoutTecla(EStdKeyBackspace, 0, 0)){
 					return EKeyWasConsumed;
 				}
+				// el TIMELINE activo con keyframes / curvas elegidos: la C los BORRA (no al objeto activo)
+				{ extern bool TimelineHaySeleccion();
+				  if (W3dLayoutTimelineActivo() && TimelineHaySeleccion() && W3dLayoutTeclaViewport(EStdKeyBackspace)) return EKeyWasConsumed; }
 				// nada que cancelar: C = MODIFICADOR. Registrar (NO borra en el down). La accion va al
 				// SOLTAR: tap (sin flecha) = popup de confirmar borrado; mantener + flecha = undo/redo.
 				// gCArrowUsed se resetea SOLO en el PRIMER down: los repeats del backspace mantenido NO deben
@@ -921,7 +1045,8 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 				gHashHeld = EFalse;
 				return EKeyWasConsumed;
 			}
-			if (usc == EStdKeyLeftShift){ // LAPIZ (solo shift ahora)
+			if (usc == EStdKeyLeftShift || usc == EStdKeyRightShift){ // LAPIZ (solo shift ahora)
+				{ extern bool LShiftPressed; LShiftPressed = false; }
 				TUint dt = User::NTickCount() - gLapizDownTick; // lapiz soltado: corto + sin flecha = ciclar
 				{ extern void IDELapizSostenido(bool); IDELapizSostenido(false); }   // se va la barra Copiar | Pegar
 				// (editando un script el lapiz es solo shift: no cicla la seleccion de la escena)
@@ -955,6 +1080,10 @@ TKeyResponse CWhisk3DContainer::OfferKeyEventL( const TKeyEvent& aKeyEvent,TEven
 
 // Destructor
 CWhisk3DContainer::~CWhisk3DContainer(){
+    // desde aca el editor se esta desarmando: el tactil ya no le manda nada (perder el foco al cerrar levantaba los
+    // dedos y mandaba eventos a viewports a medio destruir: KERN-EXEC 3 al salir)
+    iOpenGlInitialized = EFalse;
+    w3dEngine::MandosCerrar();   // (apaga la vibracion y suelta el driver de los joysticks)
     delete iPeriodic;
 
     if ( iWhisk3D ){
@@ -966,6 +1095,7 @@ CWhisk3DContainer::~CWhisk3DContainer(){
     delete iHidMonitor;
     W3dLayoutDestroy();
 
+    W3dPantallasDestroy();   // (sus superficies comparten el contexto: antes de destruirlo)
     eglMakeCurrent( iEglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT );
     eglDestroySurface( iEglDisplay, iEglSurface );
     eglDestroyContext( iEglDisplay, iEglContext );
@@ -1101,8 +1231,21 @@ int CWhisk3DContainer::DrawCallBack( TAny* aInstance )
         W3dNewTransformEnd(ETrue);
     }
 
+    // pantallas externas: conectar/desconectar (revisa 1 vez por segundo)
+    W3dPantallasTick();
+
     // T9: confirmar el caracter multi-tap a medio elegir cuando vence el timeout (1 seg sin apretar)
     W3dT9Tick();
+    // la PULSACION LARGA tactil (agarrar una fila del outliner, la lupa del IDE): se mide con el reloj, como en PC
+    ControlesTick();
+    // los JOYSTICKS Bluetooth (driver bthid-s60): conectar/desconectar + su estado, como los mandos de SDL en PC
+    MandosSymbianTick();
+    // el mouse Bluetooth: el apretar que esperaba por si era el boton del medio (izquierdo + derecho juntos), en la
+    // pantalla donde esta el cursor (el telefono o la externa)
+    extern void W3dMouseTick();
+    W3dMouseTick();
+    // se perdio el foco con dedos apoyados (FocusChanged): se levantan aca, fuera de cualquier otro evento
+    if (instance->iSoltarDedos) { instance->iSoltarDedos = EFalse; w3dEngine::TactilSoltarTodo(); }
     // flechas MANTENIDAS: aplicar CADA frame (orbitar/mover/rotar/escalar
     // fluido con el teclado, sin depender del auto-repeat lento del telefono)
     AplicarFlechas3D();
@@ -1121,6 +1264,7 @@ int CWhisk3DContainer::DrawCallBack( TAny* aInstance )
     // igual que en PC (main.cpp:609). En PLAY (PlayAnimation) y en el editor normal (AnimEsJuego==false) el
     // gate da true y todo anima como antes. ActiveAnimKind!=3 = no pisar la edicion de vertex-anim del timeline.
     // (Las particulas ya estan gateadas por PlayAnimation dentro del bloque 'juego' de abajo: no van aca.)
+    { extern bool TextFieldParpadeoTick(); if (TextFieldParpadeoTick()) g_redraw = true; }   // el cursor que parpadea
     { extern int ActiveAnimKind;
       if (!(AnimEsJuego && !PlayAnimation) && ActiveAnimKind != 3) {
           UpdateAnimatedMaterials();
@@ -1235,21 +1379,76 @@ int CWhisk3DContainer::DrawCallBack( TAny* aInstance )
     // prende cualquier tecla/cursor/flecha) o hay una animacion en play. Si la escena
     // esta quieta, el frame se saltea ENTERO (sin GL ni swap/vsync) -> CPU y bateria
     // casi 0. El timer sigue tickeando, pero sin trabajo de GPU.
-    if (g_redraw || HayAnimacionActiva()) {
+    // SOLO LA EXTERNA: el editor entero se dibuja en la pantalla externa; el telefono no gasta GPU (ni swap)
+    extern TBool W3dMouseCuadroCursor();   // (w3dmouse.cpp)
+    if (PantallaExternaSolo() && (g_redraw || HayAnimacionActiva())) {
+        g_redraw = false;
+        TUint _pfS = User::NTickCount();
+        PantallasExternasRender();
+        gPfSwap += User::NTickCount() - _pfS;
+        gPfCuadros++;
+        // (el log paso a paso se apaga tambien aca: el telefono no dibuja, y escribirlo cada cuadro en la tarjeta frenaba)
+        extern int g_pantallasLogCuadros;
+        if (g_pantallasLogCuadros > 0) g_pantallasLogCuadros--;
+    }
+    else if (PantallaExternaSolo() && W3dMouseCuadroCursor()) {
+        // (solo se movio el cursor: repuesto lo de abajo y dibujado en el lugar nuevo, sin redibujar el editor)
+    }
+    else if (g_redraw || HayAnimacionActiva()) {
         // CAPTURAR y apagar g_redraw ANTES de dibujar (mismo orden que PC main.cpp): lo que se prenda
         // DURANTE el render vale para el frame SIGUIENTE. Apagarlo despues PISABA esos pedidos: el ray
         // tracer progresivo (RTViewportPaso prende g_redraw para seguir avanzando) quedaba congelado
         // hasta la proxima tecla -> "solo renderiza cuando aprieto flechas".
         g_redraw = false;
+        // los PRIMEROS cuadros dejan cada paso en el log: si el telefono se cuelga dibujando, la ultima linea dice donde
+        static TInt sCuadrosLog = 0;
+        extern int g_pantallasLogCuadros;   // (PantallasExternas.cpp: elegir el modo de una pantalla lo vuelve a prender)
+        const TBool logCuadro = (sCuadrosLog < 3) || g_pantallasLogCuadros > 0;
+        if (logCuadro) w3dLogf("cuadro %d: dibujando el arbol", sCuadrosLog);
         // arbol de viewports (3D confinado a su rectangulo + props) y el cursor encima
         TUint _pfR = User::NTickCount();
         W3dLayoutRender();
+        if (logCuadro) w3dLogf("cuadro %d: arbol listo (glErr=%x), el cursor", sCuadrosLog, (TInt)glGetError());
         instance->iWhisk3D->DrawMouseCursor();
         TUint _pfS = User::NTickCount();
         gPfRender += _pfS - _pfR;
 
         // Call eglSwapBuffers, which blit the graphics to the window
-        eglSwapBuffers( instance->iEglDisplay, instance->iEglSurface );
+        if (logCuadro) w3dLogf("cuadro %d: swap (glErr=%x)", sCuadrosLog, (TInt)glGetError());
+#ifdef W3D_GLES2
+        // CAPTURA de diagnostico del N8 (E:\whisk3d_cap_N.png, se baja por CODA): lo que se va a presentar, leido con TODO
+        // dibujado (despues de mandar lo juntado, antes del swap: no cambia lo que se ve). Una del cuadro 10 (sin menu:
+        // los iconos) y la del 2do cuadro de cada menu o popup que se abre, hasta 4 en total
+        {
+            static TInt sCapturas = 0, sCuadros = 0, sConMenu = 0;
+            sCuadros++;
+            const TBool hayMenu = W3dLayoutMenuAbierto() || W3dLayoutPopupActivo();
+            sConMenu = hayMenu ? sConMenu + 1 : 0;
+            if (sCapturas < 4 && (sCuadros == 10 || sConMenu == 2)) {
+                w3dEngine::DibujarPendiente();
+                const TSize t = instance->Size();
+                unsigned char* px = (unsigned char*)User::Alloc(t.iWidth * t.iHeight * 4);
+                if (px) {
+                    w3dEngine::ReadPixelsRGBA(0, 0, t.iWidth, t.iHeight, px);
+                    char ruta[40];
+                    sprintf(ruta, "E:\\whisk3d_cap_%d.png", (int)sCapturas);
+                    w3dEngine::SavePNG(ruta, px, t.iWidth, t.iHeight, true);
+                    User::Free(px);
+                    w3dLogf("captura %d (%s)", (TInt)sCapturas, hayMenu ? "con un menu abierto" : "sin menu");
+                    sCapturas++;
+                }
+            }
+        }
+#endif
+        // lo JUNTADO sin dibujar (el lote de la UI 2D del backend ES 2.0: lo ultimo del cuadro, el menu y su texto) va
+        // ANTES del swap, que es EGL directo y no lo manda: sin esto quedaba para el cuadro siguiente, dibujado encima
+        // de otra cosa (el N8: los popups rompian todo). Como PCSwapBuffers en PC
+        w3dEngine::DibujarPendiente();
+        const EGLBoolean swapOk = eglSwapBuffers( instance->iEglDisplay, instance->iEglSurface );
+        if (logCuadro) w3dLogf("cuadro %d: swap=%d eglErr=%x, pantallas externas", sCuadrosLog, (TInt)swapOk, (TInt)eglGetError());
+        // las pantallas externas con viewport propio (TV/HDMI): su superficie, su arbol, su swap
+        PantallasExternasRender();
+        if (logCuadro) { w3dLogf("cuadro %d: listo", sCuadrosLog); sCuadrosLog++; if (g_pantallasLogCuadros > 0) g_pantallasLogCuadros--; }
         gPfSwap += User::NTickCount() - _pfS;
         gPfCuadros++;
     }
@@ -1278,6 +1477,57 @@ int CWhisk3DContainer::DrawCallBack( TAny* aInstance )
 void CWhisk3DContainer::HandleControlEventL(
     CCoeControl* /*aControl*/,TCoeEvent /*aEventType*/)
     {
+    }
+
+// ---------------------------------------------------------
+// PANTALLA TACTIL: cada dedo -> el Core (base/W3dTactil), que arma los mismos eventos que SDL en Android; el
+// editor los recibe por controles.cpp, el mismo camino que Android y la web
+// ---------------------------------------------------------
+//
+void CWhisk3DContainer::HandlePointerEventL( const TPointerEvent& aPointerEvent )
+    {
+    if ( !iOpenGlInitialized )
+        {
+        return;
+        }
+    const TSize tam = Size();
+    w3dEngine::TactilSymbian( aPointerEvent, tam.iWidth, tam.iHeight );
+    }
+
+// SEGUNDO PLANO (minimizar, otra app al frente): el loop de dibujo se detiene. Symbian^3 cierra las apps de fondo que
+// siguen usando la GPU cuando otra necesita memoria grafica (y dibujar en una ventana que no se ve no sirve). Al volver
+// arranca de nuevo y se redibuja todo
+void CWhisk3DContainer::SetPrimerPlano( TBool aPrimerPlano )
+    {
+    if ( !iPeriodic )
+        {
+        return;
+        }
+    w3dLogf( "[app] %s", aPrimerPlano ? "vuelve al frente" : "pasa a segundo plano: el dibujo se detiene" );
+    if ( aPrimerPlano )
+        {
+        if ( !iPeriodic->IsActive() )
+            {
+            iPeriodic->Start( 100, 100, TCallBack( CWhisk3DContainer::DrawCallBack, this ) );
+            }
+        g_redraw = true;
+        }
+    else
+        {
+        iPeriodic->Cancel();
+        if ( iOpenGlInitialized && w3dEngine::TactilDedos() > 0 ) w3dEngine::TactilSoltarTodo();
+        }
+    }
+
+void CWhisk3DContainer::FocusChanged( TDrawNow /*aDrawNow*/ )
+    {
+    // (solo con el editor vivo y algun dedo apoyado: al cerrar la app tambien se pierde el foco)
+    // (no aca adentro: este aviso puede llegar en medio de otro evento -crear la ventana de una pantalla externa desde
+    // el click de un popup- y levantar los dedos manda eventos al editor; va en el cuadro siguiente)
+    if ( !IsFocused() && iOpenGlInitialized && w3dEngine::TactilDedos() > 0 )
+        {
+        iSoltarDedos = ETrue;
+        }
     }
 
 // End of File

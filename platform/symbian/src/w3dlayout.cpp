@@ -49,6 +49,7 @@ extern bool MouseWheel;
 #include "w3dlog.h"
 #include "w3dnewscene.h" // mundo nuevo (Fase 3c-2)
 #include "ViewPorts/LayoutInput.h" // ruteo COMPARTIDO (menus/barras/paneles)
+#include "ViewPorts/PantallasExternas.h" // el monitor extendido: su menu y su arbol
 #include "ViewPorts/LayoutArbol.h" // LayoutRaizCompleta: el arbol entero aunque haya un viewport maximizado
 #include "render/OpcionesRender.h"      // g_redraw (render event-driven)
 #include <GLES/gl.h>
@@ -107,7 +108,11 @@ static TBool gBorderUVInit = EFalse;
 // setea ortho de pantalla en pixeles (push); RestaurarOrtho hace el pop. Las matrices van por el motor: lleva su
 // sombra en la CPU (GetMatrix sin glGet) y una matriz tocada por GL crudo la dejaria distinta de GL
 static void SetOrthoPantalla() {
+#ifdef W3D_GLES2
+    w3dEngine::Viewport(0, 0, gScreenW, gScreenH);   // (ES 2.0: por el motor, que recuerda el viewport puesto)
+#else
     glViewport(0, 0, gScreenW, gScreenH);
+#endif
     w3dEngine::MatrixMode(w3dEngine::Projection);
     w3dEngine::PushMatrix();
     w3dEngine::LoadIdentity();
@@ -115,8 +120,13 @@ static void SetOrthoPantalla() {
     w3dEngine::MatrixMode(w3dEngine::ModelView);
     w3dEngine::PushMatrix();
     w3dEngine::LoadIdentity();
+#ifdef W3D_GLES2
+    w3dEngine::Disable(w3dEngine::DepthTest);
+    w3dEngine::Disable(w3dEngine::Lighting);
+#else
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_LIGHTING);
+#endif
 }
 
 static void RestaurarOrtho() {
@@ -128,11 +138,20 @@ static void RestaurarOrtho() {
 
 static void ClearRect(TInt aX, TInt aY, TInt aW, TInt aH, const float* aRGBA) {
     if (aW < 1 || aH < 1) return;
+#ifdef W3D_GLES2
+    // ES 2.0: por el motor (recuerda el scissor; el GL crudo lo dejaba desincronizado)
+    w3dEngine::Scissor(aX, gScreenH - aY - aH, aW, aH);
+    w3dEngine::Enable(w3dEngine::ScissorTest);
+    w3dEngine::ClearColor(aRGBA[0], aRGBA[1], aRGBA[2], aRGBA[3]);
+    w3dEngine::Clear(w3dEngine::ColorBuffer);
+    w3dEngine::Disable(w3dEngine::ScissorTest);
+#else
     glScissor(aX, gScreenH - aY - aH, aW, aH);
     glEnable(GL_SCISSOR_TEST);
     glClearColor(aRGBA[0], aRGBA[1], aRGBA[2], aRGBA[3]);
     glClear(GL_COLOR_BUFFER_BIT);
     glDisable(GL_SCISSOR_TEST);
+#endif
 }
 
 // dibuja el 9-patch de una hoja (aMesh = 16 vertices ya armados por Resize)
@@ -144,6 +163,20 @@ static void ClearRect(TInt aX, TInt aY, TInt aW, TInt aH, const float* aRGBA) {
 static void DibujarBordeLeaf(ViewportBase* aLeaf, WithBorder* aBorde) {
     if (Textures.empty() || Textures[0]->iID == 0) return;
     SetOrthoPantalla();
+#ifdef W3D_GLES2
+    // ES 2.0: el mismo estado por el motor (glEnableClientState no existe)
+    w3dEngine::Enable(w3dEngine::Texture2D);
+    w3dEngine::Enable(w3dEngine::Blend);
+    w3dEngine::BlendAlpha();
+    w3dEngine::BindTexture(Textures[0]->iID);
+    w3dEngine::Translatef((GLfloat)aLeaf->x, (GLfloat)aLeaf->y, 0.0f);
+    w3dEngine::EnableArray(w3dEngine::TexCoordArray);
+    w3dEngine::DisableArray(w3dEngine::NormalArray);
+    aBorde->DibujarBordes(aLeaf);
+    w3dEngine::EnableArray(w3dEngine::NormalArray);
+    w3dEngine::BindTexture((GLuint)W3dNewWhiteTex());
+    w3dEngine::Disable(w3dEngine::Blend);
+#else
     glEnable(GL_TEXTURE_2D);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -155,6 +188,7 @@ static void DibujarBordeLeaf(ViewportBase* aLeaf, WithBorder* aBorde) {
     glEnableClientState(GL_NORMAL_ARRAY);
     glBindTexture(GL_TEXTURE_2D, (GLuint)W3dNewWhiteTex());
     glDisable(GL_BLEND);
+#endif
     RestaurarOrtho();
 }
 
@@ -234,7 +268,11 @@ static void W3dTexturaElegida(const std::string& aPath) {
         Texture* t = new Texture(aPath);
         t->iID = id;
         Textures.push_back(t);
-        if (gCargarTexturaComoNormal) { gSymTexMat->normalTexture = t; } // MISMO browser, destino segun el flag
+        extern int gCargarTexturaMapa;
+        if (gCargarTexturaMapa >= W3D_MAPA_EMISION && gCargarTexturaMapa < W3D_MAPAS) {   // un MAPA del trazado de rayos
+            gSymTexMat->mapaTex[gCargarTexturaMapa] = t; gSymTexMat->mapaConTextura[gCargarTexturaMapa] = true;
+        }
+        else if (gCargarTexturaComoNormal) { gSymTexMat->normalTexture = t; gSymTexMat->normalMap = true; } // MISMO browser, destino segun el flag
         else if (gCargarTexturaComoB) { gSymTexMat->texturaB = t; }        // (la textura B de la mezcla de texturas)
         else { gSymTexMat->texture = t; gSymTexMat->textureOn = true; }
         RebindMaterialMeshPart();
@@ -244,6 +282,7 @@ static void W3dTexturaElegida(const std::string& aPath) {
         Notificar("No se pudo cargar la textura", true);
     }
     gSymTexMat = NULL; gCargarTexturaComoNormal = false; gCargarTexturaComoB = false;
+    { extern int gCargarTexturaMapa; gCargarTexturaMapa = -1; }
 }
 // "Load Texture" (base Y normal map): el MISMO browser en los 4 OS. Quien lo llama ya dejo el flag en el valor
 // correcto (false=textura, true=normal); el callback de arriba decide el destino.
@@ -326,6 +365,8 @@ void W3dLayoutBuild(CWhisk3D* aWhisk, TInt aWidth, TInt aHeight) {
     // LayoutMaximizar restaura el arbol con el tamano del maximizado -> el tamano viejo quedaba pegado para siempre.
     // Primero el arbol completo (reparte el espacio entre sus hojas, incluida la maximizada) y despues el
     // maximizado a pantalla completa, en ese orden. Mismo criterio que PC (main.cpp: rootViewport->Resize).
+    // el editor esta entero en la pantalla externa: el arbol tiene SU tamano (al volver al telefono se restaura)
+    if (gRoot && PantallaExternaSolo()) return;
     if (gRoot) {
         ViewportBase* completa = LayoutRaizCompleta();
         if (!completa) completa = gRoot;
@@ -390,21 +431,45 @@ void W3dLayoutRender() {
     W3dProfBegin(); // profiler: arranca el frame (scene/viewport3d se acumulan dentro de rootViewport->Render)
     double _profR0 = W3dNowMs();
 
-    W3D_GL_CRUDO(glDisable(GL_SCISSOR_TEST));
     // matriz de TEXTURA siempre identidad: si algo viejo la toca, los UV
     // de TODO el dibujado texturizado colapsan (leccion aprendida 2 veces)
+#ifdef W3D_GLES2
+    // ES 2.0: el GL directo que quede en la capa del telefono (el cursor, las texturas propias) no desincroniza al
+    // motor de un cuadro al otro; y el scissor se apaga por el motor
+    w3dEngine::GLES2Resincronizar();
+    w3dEngine::Disable(w3dEngine::ScissorTest);
+    // ES 2.0: las matrices son del motor (uniforms): la de textura se resetea ahi
+    w3dEngine::MatrixMode(w3dEngine::TextureMatrix);
+    w3dEngine::LoadIdentity();
+    w3dEngine::MatrixMode(w3dEngine::ModelView);
+    w3dEngine::Viewport(0, 0, gScreenW, gScreenH);
+#else
+    W3D_GL_CRUDO(glDisable(GL_SCISSOR_TEST));
     W3D_GL_CRUDO(glMatrixMode(GL_TEXTURE));
     W3D_GL_CRUDO(glLoadIdentity());
     W3D_GL_CRUDO(glMatrixMode(GL_MODELVIEW));
     W3D_GL_CRUDO(glViewport(0, 0, gScreenW, gScreenH));
+#endif
     // el fondo de TODA la pantalla (los paneles lo pisan). En el MODO JUEGO PURO con un proyecto que limpia el solo
     // (constructor + su "Clear") no: limpiar es cosa del proyecto (sin su "Clear" no se limpia nada) y en el N95 un
     // clear de mas es un cuadro entero de relleno
     { extern int g_juegoPuro;
       if (!(g_juegoPuro && W3dHayConstructor() && W3dEscena3DActiva())) {
+#ifdef W3D_GLES2
+          // ES 2.0: glClear respeta las mascaras. Si el cuadro anterior termino con la escritura de profundidad
+          // apagada (lo ultimo que dibuja un popup o un menu), el clear NO limpiaba la profundidad: todo lo que la usa
+          // (el 3D, el outliner) quedaba rechazado y solo se veian Properties y el popup (el N8: "los menus rompen
+          // todo"). Las mascaras se prenden por el motor (las recuerda) y el clear tambien va por el
+          w3dEngine::DepthMask(true);
+          w3dEngine::ColorMask(true, true, true, true);
+          w3dEngine::ClearColor(ListaColores[static_cast<int>(ColorID::background)][0], ListaColores[static_cast<int>(ColorID::background)][1],
+                                ListaColores[static_cast<int>(ColorID::background)][2], 1.0f);
+          w3dEngine::Clear(w3dEngine::ColorBuffer | w3dEngine::DepthBuffer);
+#else
           W3D_GL_CRUDO(glClearColor(ListaColores[static_cast<int>(ColorID::background)][0], ListaColores[static_cast<int>(ColorID::background)][1],
                        ListaColores[static_cast<int>(ColorID::background)][2], 1.0f));
           W3D_GL_CRUDO(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
+#endif
       } }
 
     // el resync del estado por malla (Mesh::RenderObject) es por el GL crudo del editor de esta plataforma: en el
@@ -420,7 +485,8 @@ void W3dLayoutRender() {
     // MODO JUEGO PURO (VERDE+0): ni menu ni toasts -- SOLO el juego en pantalla
     { extern int g_juegoPuro;
       if (!g_juegoPuro) {
-          LayoutRenderMenu(gScreenW, gScreenH); // desplegable abierto (compartido)
+          // desplegable abierto (compartido), salvo que se haya abierto en la pantalla externa (se dibuja alla)
+          if (PantallaExternaDelMenu() == 0) LayoutRenderMenu(gScreenW, gScreenH);
           extern void NotificacionesRender(int, int); NotificacionesRender(gScreenW, gScreenH); // toasts encima (export/import)
       } }
     g_prof.render = W3dNowMs() - _profR0; // profiler: TODO el render (viewports 3D + paneles + menus). En Symbian el
@@ -431,6 +497,13 @@ void W3dLayoutRender() {
     {
         static TInt diag = 0;
         if ((++diag & 0x7F) == 1) {
+#ifdef W3D_GLES2
+            // (ES 2.0: GL_LIGHTING/GL_FOG/... no son estado de GL: el error, el scissor y la geometria)
+            w3dLogf("post-arbol: err=%x sci=%d alto=%d outl=%d,%d %dx%d", W3D_GL_CRUDO(glGetError()),
+                (TInt)W3D_GL_CRUDO(glIsEnabled(GL_SCISSOR_TEST)), W3dPantallaAlto,
+                gOutliner ? gOutliner->x : -1, gOutliner ? gOutliner->y : -1,
+                gOutliner ? gOutliner->width : -1, gOutliner ? gOutliner->height : -1);
+#else
             w3dLogf("post-arbol: err=%x luz=%d l0=%d cm=%d tex2d=%d fog=%d sci=%d alto=%d outl=%d,%d %dx%d",
                 W3D_GL_CRUDO(glGetError()),
                 (TInt)W3D_GL_CRUDO(glIsEnabled(GL_LIGHTING)), (TInt)W3D_GL_CRUDO(glIsEnabled(GL_LIGHT0)),
@@ -439,6 +512,7 @@ void W3dLayoutRender() {
                 W3dPantallaAlto,
                 gOutliner ? gOutliner->x : -1, gOutliner ? gOutliner->y : -1,
                 gOutliner ? gOutliner->width : -1, gOutliner ? gOutliner->height : -1);
+#endif
         }
     }
 }
@@ -452,6 +526,14 @@ void W3dLayoutMouseMoved(TInt aX, TInt aY) {
     if (under && under->isLeaf() && under != viewPortActive) {
         viewPortActive = under;
     }
+}
+
+// sobre el CONTENIDO de un viewport 3D (no sus barras ni su barra de herramientas): pasar el mouse por ahi sin botones
+// no cambia nada de lo dibujado
+TBool W3dLayoutSobreContenido3D(TInt aX, TInt aY) {
+    if (!rootViewport) return EFalse;
+    ViewportBase* under = FindViewportUnderMouse(rootViewport, aX, aY);
+    return under && under->isLeaf() && under->ViewportKind() == 1 && !under->OnBar(aX, aY);
 }
 
 TBool W3dLayoutMouseSobre3D(TInt aX, TInt aY) {
@@ -488,7 +570,7 @@ TBool W3dLayoutScrollGrab(TInt aMx, TInt aMy) {
     if (!gRoot) return EFalse;
     ViewportBase* under = FindViewportUnderMouse(gRoot, aMx, aMy);
     if (under && under->isLeaf() &&
-        (under->ViewportKind() == 2 || under->ViewportKind() == 3)) {
+        (VpEsOutliner(under) || under->ViewportKind() == 3)) {
         gScrollGrab2 = under;
         w3dLog("scroll-arrastre: agarrado (derecho de nuevo para soltar)");
         return ETrue;
@@ -561,6 +643,9 @@ static ViewportBase* W3dPrimerContenedor(ViewportBase* aNodo) {
 
 // hook de LayoutInput: el arbol cambio (cambio de tipo / expand / split)
 static void W3dArbolCambiadoHook() {
+    // cambio el arbol de la PANTALLA EXTERNA (un split en el monitor extendido): no es el del telefono
+    // (en el modo "solo la externa" el arbol SI es el del telefono)
+    if (PantallaExternaEnUso() && PantallaExternaEnUso() != PantallaExternaSolo()) return;
     gRoot = rootViewport; // expand puede cambiar el root
     gScrollGrab2 = 0;
     gSplitterGrab = 0;
@@ -676,7 +761,7 @@ TBool W3dLayoutOcupado() {
 TBool W3dLayoutWrapMouse(TInt& aX, TInt& aY) {
     ViewportBase* v = viewPortActive;
     if (!v || !v->isLeaf()) return EFalse;
-    if (v->ViewportKind() != 2 && v->ViewportKind() != 3) return EFalse;
+    if (!VpEsOutliner(v) && v->ViewportKind() != 3) return EFalse;
     TInt margen = borderGS;
     TBool warped = EFalse;
     if (aX <= v->x + margen) {
@@ -816,7 +901,7 @@ TBool W3dLayoutTeclaPanel(TInt aScan) {
 // el viewport ACTIVO es el outliner? (para que "1" entre al modo mover ahi, sin mouse)
 TBool W3dOutlinerActivo() {
     return (viewPortActive && viewPortActive->isLeaf() &&
-            viewPortActive->ViewportKind() == 2) ? ETrue : EFalse;
+            VpEsOutliner(viewPortActive)) ? ETrue : EFalse;
 }
 
 // "1" sobre el outliner: entra al modo MOVER; si ya esta moviendo, confirma (toggle). En las dos vistas: el de

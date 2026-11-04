@@ -1,0 +1,33 @@
+# VECTORES DE MOVIMIENTO (render/VectoresMovimiento.h): el pase de GL que pinta cada vertice con su movimiento en la
+# pantalla desde el cuadro anterior, y el desenfoque por CPU a lo largo de esos vectores. Un cubo que en el cuadro 2
+# esta 1 m mas a la derecha (X) que en el 1: en el pase, sus pixeles dicen "a la derecha" (dx > 0, dy ~ 0); sin
+# cuadro anterior todo sale quieto (128,128) y el desenfoque no toca nada.
+add cube
+frame 1
+keychan 0 0
+frame 2
+objmove 1 0 0
+keychan 0 0
+vpvista solid
+vporbita 0 0 0 12 0 0
+vectores quieto 160 120
+vectores 160 120 objeto 1.5 /tmp/w3d_vectores.png
+# del 2 al 3 no hay clave nueva: queda quieto (dx = dy = 0)
+frame 3
+vectores 160 120 0 0 0.5
+# EL RENDER A PNG con los tildes: el pase _vectores y el beauty desenfocado
+renderopc 1 1 0.5
+frame 2
+renderimage /tmp w3d_vec.png
+existe /tmp/w3d_vec_vectores_0002.png
+existe /tmp/w3d_vec_0002.png
+renderopc 0 0 0.5
+# LA VISTA "Motion vectors" del viewport: en el cuadro 2 el cubo se movio a la derecha (rojo > 128, verde ~128); en el 3
+# esta quieto (128,128) y el fondo es (128,128,0)
+vpvista vectores
+frame 2
+escenapx 1.5 0.5 1
+escenapx 1.5 0.5 1 noes 128 128 255 8
+frame 3
+escenapx 1.5 0.5 1 es 128 128 255 3
+vpvista solid

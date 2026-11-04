@@ -10,6 +10,7 @@
 #include "WhiskUI/core/UI.h"             // gapGS, LetterHeightGS
 #include "W3dProfile.h"                  // g_profShow (ms por categoria del frame)
 #include "render/OpcionesRender.h"       // g_genMallaCount, g_fpsActual
+#include "render/RayTracer.h"            // g_rt / RTImagenesPorSegundo (las imagenes trazadas por segundo)
 #include "objects/Mesh.h"               // Mesh (contar vertices/caras de la escena)
 #include "objects/Rutina.h"             // W3dRutinaContar (lo que dibujan las rutinas)
 #include <cstdio>                        // sprintf
@@ -110,5 +111,11 @@ void Viewport3D::RenderEstadisticas(){
     }
     if (OverlayFps){
         sprintf(buf, "fps: %d", (int)(g_fpsActual + 0.5f)); StatLinea(buf, width, margen, ly, lineH);
+        // con el trazado: las imagenes trazadas terminadas por segundo (el editor puede dibujar mas cuadros que eso)
+        if (view == RenderType::Rendered && g_rt.on) {
+            sprintf(buf, "rt: %.1f fps", RTImagenesPorSegundo()); StatLinea(buf, width, margen, ly, lineH);
+            const double rps = RTRayosPorSegundo();
+            if (rps > 0.0) { sprintf(buf, "rt: %.0f Mrayos/s", rps / 1e6); StatLinea(buf, width, margen, ly, lineH); }
+        }
     }
 }

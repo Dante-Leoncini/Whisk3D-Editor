@@ -28,7 +28,8 @@ Só no Modo Objeto. O que é novo aparece no cursor 3D e fica selecionado. As pr
 |---|---|
 | Malha | Plano, Cubo, Círculo, Esfera UV, Cone, Cilindro (com tamanho, raio, segmentos, sombreamento suave). Também Vértice (um ponto solto para começar a modelar) e Referência (um plano com uma imagem, para decalcar). |
 | Vazio | Um objeto sem malha, para agrupar ou como ponto de referência. |
-| Câmera / Luz / Névoa | Câmera, luz e névoa da cena. |
+| Câmera / Luz / Névoa | Câmera, luz e névoa da cena. A luz tem **Tipo**: Ponto, Sol (direcional) ou Foco (um cone, desenhado na vista); Adicionar também oferece Sol e Foco. **Intensidade** a deixa mais forte (animável); **Distância** (m) é até onde chega uma luz pontual ou foco, e o comprimento do seu cone (0 = sem limite; o ray tracing a apaga suavemente ali). Com a luz selecionada, um foco mostra seu cone e uma pontual uma esfera dessa distância; um sol mostra sempre uma linha até o chão, para onde ilumina. |
+| Som | Um som colocado na cena (ícone de alto-falante). Toca com a linha do tempo em **segundos**, não em frames; com **Posicional (3D)** é ouvido de onde está (mais alto quanto mais perto da câmera, do lado em que está); sem isso é como uma música. Soltar um .wav na vista 3D cria um ali. |
 | Armação | Uma armação com um osso, para animar personagens. |
 | Caminho | Uma curva de dois nós (é editada como malha: <kbd>E</kbd> adiciona nós). |
 | Coleção | Uma pasta para organizar objetos. |

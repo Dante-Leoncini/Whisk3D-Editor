@@ -54,6 +54,7 @@
 | Material Preview | 默认模式：从视图方向打一盏中性灯光，不依赖场景中的灯光。 |
 | Solid / Wireframe / ZBuffer Preview | 灰色实体、只显示边，或显示深度。 |
 | Normal View / Alpha Preview | 用颜色显示法线，或用黑白显示透明度。 |
+| Motion vectors | 每个像素自上一帧以来在屏幕上移动了多少（红 = X，绿 = Y；淡紫 = 静止，橄榄绿 = 背景）。与渲染的 `_vectores` 通道是同一张图。 |
 | Wireframe: Only Visible | 线框视图只显示真正被绘制出来的部分。 |
 
 ### Overlays

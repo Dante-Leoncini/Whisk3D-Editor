@@ -1111,6 +1111,10 @@ static int LSetLote(lua_State* L) {
 void (*W3dParticulasEmitirHook)(Object* o, int n) = 0;
 void (*W3dParticulasActivoHook)(Object* o, bool activo) = 0;
 bool (*W3dNieblaHook)(Object* o, bool escribir, float* v, int n) = 0;
+// los objetos SONIDO (main/objects/Sonido.cpp los instala): sus binds de lua y su tick del juego (este .cpp lo compila
+// tambien el runtime; sin el objeto Sonido quedan en NULL y no cuestan nada)
+void (*W3dSonidoLuaHook)(lua_State* L) = 0;
+void (*W3dSonidosJuegoHook)() = 0;
 
 // LA CAMARA POR HOOK (ver BindsJuego.h): los instala main/objects/Camera.cpp.
 bool (*W3dCamaraProyectarHook)(Object*, float, float, float*, float*, bool*) = 0;
@@ -1786,6 +1790,7 @@ void BindsJuegoRegistrar(void* Lv) {
     lua_pushcfunction(L, LSetEmitiendo); lua_setglobal(L, "setEmitiendo");
     lua_pushcfunction(L, LNiebla);      lua_setglobal(L, "niebla");
     lua_pushcfunction(L, LSetNiebla);   lua_setglobal(L, "setNiebla");
+    if (W3dSonidoLuaHook) W3dSonidoLuaHook(L);   // tocarSonido / callarSonido / sonidoObj / setSonidoObj / crearSonido
     lua_pushcfunction(L, LMostrar);     lua_setglobal(L, "mostrar");
     lua_pushcfunction(L, LSetTexturaB);      lua_setglobal(L, "setTexturaB");       // mezcla de texturas (material)
     lua_pushcfunction(L, LSetMezclaTextura); lua_setglobal(L, "setMezclaTextura");
@@ -1856,6 +1861,8 @@ void BindsJuegoSnapshotPunteros(void) {
     // el flanco de apretado() del PROXIMO frame compara contra ESTE estado; se hace DESPUES de correr
     // los scripts para que todas las llamadas de ESTE frame vean el mismo "estado anterior".
     for (int i = 0; i < W3D_GAME_MAXDEDOS; i++) gPunPrev[i] = gPunAct[i];
+    // (una vez por cuadro del juego, en el Play del editor y en el compilado: los objetos Sonido)
+    if (W3dSonidosJuegoHook) W3dSonidosJuegoHook();
 }
 
 void BindsJuegoResetPunteros(void) {

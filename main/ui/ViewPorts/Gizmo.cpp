@@ -34,6 +34,7 @@ void GizmoSetModo(int m) { g_gizmoModo = (m < 0 || m > 2) ? 0 : m; g_redraw = tr
 static void GizmoSiguienteModo() { g_gizmoModo = (g_gizmoModo + 1) % 3; g_redraw = true; }
 // el agarre: donde fue (para distinguir el click del arrastre)
 static int    g_gizmoDownX = 0, g_gizmoDownY = 0;
+static int    g_gizmoPrevX = 0, g_gizmoPrevY = 0;   // el giro LIBRE (centro del de rotar): su propio delta del puntero
 static bool   g_gizmoSeMovio = false;
 // ROTAR por eje: el angulo de pantalla alrededor del centro, acumulado (cruza +-180 sin saltar) y su signo
 static float g_gizmoAngPrev = 0.0f, g_gizmoAngAcum = 0.0f, g_gizmoSigno = 1.0f, g_gizmoCx = 0.0f, g_gizmoCy = 0.0f;
@@ -137,7 +138,7 @@ static bool PuntoRestriccion(Viewport3D* vp, int manija, const Vector3& c0, cons
         P = c0 + a * ((b * w.Dot(d) - w.Dot(a)) / den);
         return true;
     }
-    Vector3 n = vp->viewRot * Vector3(0, 0, -1);
+    Vector3 n = vp->RotVista() * Vector3(0, 0, -1);   // (mirando por la camara: la suya)
     if (manija >= GizmoPlanoX && manija <= GizmoPlanoZ) n = ejes[manija - GizmoPlanoX];
     const float dn = d.Dot(n); if (fabsf(dn) < 1e-5f) return false;
     P = o + d * ((c0 - o).Dot(n) / dn);
@@ -196,6 +197,9 @@ static int GizmoHitRot(Viewport3D* vp, const Vector3& c, const Vector3 ejes[3], 
     const GizmoMedidas md = Medidas();
     float cx, cy; if (!vp->ProyectarPunto(c, cx, cy)) return GizmoNinguna;
     const Vector3 hc = HaciaCamara(vp, c);
+    // el CENTRO primero (= R R, el giro libre): un anillo visto de CANTO se proyecta como una linea que pasa justo por
+    // el centro, y si los anillos se probaban antes, arrastrar desde el medio agarraba un eje
+    { const float dx = lx - cx, dy = ly - cy; if (sqrtf(dx * dx + dy * dy) < md.rotR * 0.45f) return GizmoLibre; }
     const int N = 48;
     float mejor = md.hit; int cual = GizmoNinguna;
     for (int k = 0; k < 3; k++) {
@@ -379,11 +383,20 @@ bool GizmoMotion(Viewport3D* vp, int mx, int my) {
         const int ddx = mx - g_gizmoDownX, ddy = my - g_gizmoDownY;
         if ((ddx < 0 ? -ddx : ddx) + (ddy < 0 ? -ddy : ddy) <= 8 * GlobalScale) return true;
         g_gizmoSeMovio = true;
+        g_gizmoPrevX = mx; g_gizmoPrevY = my;   // (el giro libre arranca desde aca: sin el salto del umbral)
     }
     const float lx = (float)(mx - vp->x), ly = (float)(my - vp->y);
     const bool edit = (InteractionMode != ObjectMode);
     if (estado == rotacion) {
         // anillo de la vista / interior: la rotacion de siempre (R: alrededor de la vista / R R: libre)
+        // el CENTRO = R R (giro libre / orbital). Arrastrando el gizmo el cursor NO se envuelve, y el delta del mouse
+        // (dx/dy) lo calcula ese envolver: quedaba en cero y el objeto no giraba. Aca el delta es el del gizmo
+        if (g_gizmoManija == GizmoLibre) {
+            const int mdx = mx - g_gizmoPrevX, mdy = my - g_gizmoPrevY;
+            g_gizmoPrevX = mx; g_gizmoPrevY = my;
+            if (mdx || mdy) { if (edit) EditXformRotOrbital(mdx, mdy); else RotarOrbital(mdx, mdy); g_redraw = true; }
+            return true;
+        }
         if (g_gizmoManija < GizmoEjeX || g_gizmoManija > GizmoEjeZ) return false;
         float a = 0.0f;
         if (g_gizmoRotPlano) { if (!AnguloEnPlano(vp, lx, ly, a)) return true; }

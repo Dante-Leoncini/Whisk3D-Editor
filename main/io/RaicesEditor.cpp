@@ -191,7 +191,7 @@ static void SoltarUIDeLaRaiz() {
         if (v->ViewportKind() == 1) {
             Viewport3D* v3 = (Viewport3D*)v;
             if (v3->localViewActivo) v3->LocalViewSalir();
-        } else if (v->ViewportKind() == 2) {
+        } else if (VpEsOutliner(v)) {
             Outliner* o = (Outliner*)v;
             if (o->moviendo) o->MoverCancelar();
             o->dragObjeto = NULL; o->dragging = false; o->dropZona = -2; o->dropFila = -1;
@@ -205,7 +205,7 @@ static void RefrescarUI() {
     std::vector<ViewportBase*> hojas;
     JuntarHojas(LayoutRaizCompleta(), hojas);
     for (size_t i = 0; i < hojas.size(); i++)
-        if (hojas[i]->ViewportKind() == 2) {
+        if (VpEsOutliner(hojas[i])) {
             Outliner* o = (Outliner*)hojas[i];
             if (o->vista == W3D_VISTA_ESCENA) { o->PosY = 0; o->PosX = 0; }
             o->lastContentRows = -1;

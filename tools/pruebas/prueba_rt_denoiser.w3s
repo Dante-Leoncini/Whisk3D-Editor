@@ -1,0 +1,31 @@
+# ==========================================================================
+#  EL DENOISER del trazado de rayos (render/Denoiser.h): OPCIONAL (se carga al usarse). Una sombra suave con UN rayo
+#  por luz y UN pase tiene mucho ruido; Open Image Denoise (y OptiX, si hay una NVIDIA) lo limpia.
+#  (Sin la DLL de OIDN al lado del exe -tools/bajar_terceros.ps1- o sin NVIDIA para OptiX, esos pasos no aplican.)
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/windows/build/Release/whisk3d.exe --script prueba_rt_denoiser.w3s
+# ==========================================================================
+add plane
+objscale 6 1 6
+add cube
+objmove 0 1 0
+addlight
+objmove 2 4 -2
+rtopt 1 1 1 1
+# una lampara GRANDE con un solo rayo: la penumbra sale granulada
+rtlight 2 1 0
+vpvista rendered
+vporbita 0 0.5 0 12 -35 -23
+# sin denoiser: ruido
+rtdenoiser 0
+rtrender 96 72 1
+rtruido 10 50 86 70 mayorque 4
+# Open Image Denoise (cualquier PC): mucho menos ruido
+rtdenoiser 1 si
+rtdenoiser 1
+rtrender 96 72 1
+rtruido 10 50 86 70 menorque 3
+# OptiX (solo con una placa NVIDIA: sin ella la prueba termina aca, bien)
+rtdenoiser 2 saltar
+rtrender 96 72 1
+rtruido 10 50 86 70 menorque 3

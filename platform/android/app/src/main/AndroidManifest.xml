@@ -17,6 +17,8 @@
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
     <!-- Jugar en red (net/W3dRed.cpp: LAN, wifi o internet por UDP). Es un permiso "normal": no se pide en
          runtime. El permiso de cada proyecto lo da el editor (le pregunta al usuario al abrirlo). -->
+    <!-- la vibracion del agarre de la biblioteca (pulsacion larga) -->
+    <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />

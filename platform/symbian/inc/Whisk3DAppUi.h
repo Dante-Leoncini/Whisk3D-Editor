@@ -68,6 +68,9 @@ class CWhisk3DAppUi : public CAknAppUi
         virtual TKeyResponse HandleKeyEventL(
             const TKeyEvent& aKeyEvent,TEventCode aType);
 
+        /** Minimizar / volver: detiene o arranca el loop de dibujo (CWhisk3DContainer::SetPrimerPlano). */
+        void HandleForegroundEventL( TBool aForeground );
+
         /**
          * Recibe el documento cuando la app se lanza desde un file manager ("abrir con", X-plore):
          * si es un .w3d lo encola en g_proyAbrirPendiente para abrirlo en el primer frame.

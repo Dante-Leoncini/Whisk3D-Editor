@@ -1,0 +1,20 @@
+# LA UI EN SU LUGAR DEL OUTLINER (UI::enArbol): el arbol es el orden de dibujado. Una UI (un rectangulo rojo que tapa la
+# pantalla), un Limpiar Z y DESPUES un cubo: el cubo se dibuja ENCIMA de la UI. Con la UI "al final" (como los proyectos
+# de antes) la UI tapa al cubo
+ventana 1280 720
+vpcamara on
+uirect 4000 4000 1 0 0
+addlimpiarz
+add cube
+objpos 1.6 0.4 1.2
+objscale 0.5 0.5 0.5
+deselectall
+# al final: la UI roja tapa todo (el cubo no se ve)
+uienarbol no
+vpref
+# en su lugar: el cubo, que esta DESPUES, se ve encima de la UI
+uienarbol si
+vpdif 30 50 -1 obj Cubo.001 10
+# y lo que esta ANTES (el Cubo del principio) sigue tapado por la UI (lo unico que cambia ahi es el CURSOR 3D del editor,
+# en el origen: las ayudas del editor se dibujan despues de la escena, ahora encima de la UI)
+vpdif 30 0 100 obj Cubo 6

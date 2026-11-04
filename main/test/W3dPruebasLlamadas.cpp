@@ -26,6 +26,7 @@
 //                                                mismos draws
 // ============================================================================
 #include "test/W3dPruebasRecursos.h"
+#include "gfx/w3dTexture.h"     // SavePNG (W3D_CUADRO_PNG)
 #include "objects/Objects.h"
 #include "objects/Mesh.h"
 #include "objects/Empty.h"
@@ -340,6 +341,8 @@ bool CmdCuadro(std::istringstream& ss, std::string& err) {
     c.n[CUI] = s.llamadas[gfx::StatCatUI]; c.n[CEditor] = s.llamadas[gfx::StatCatEditor];
     c.n[CDraws] = s.draws; c.n[CBinds] = s.binds; c.n[CEstados] = s.estados;
     c.hash = Hash(&px[0], px.size());
+    // (para ver la diferencia: W3D_CUADRO_PNG=<carpeta> guarda cada cuadro como <clave>.png)
+    if (getenv("W3D_CUADRO_PNG")) gfx::SavePNG((std::string(getenv("W3D_CUADRO_PNG")) + "/" + clave + ".png").c_str(), &px[0], c.w, c.h, false);
     long distintos = 0;   // (que el cuadro dibujo algo: no comparar dos pantallas vacias)
     for (size_t i = 4; i < px.size(); i += 4)
         if (px[i] != px[0] || px[i + 1] != px[1] || px[i + 2] != px[2]) distintos++;

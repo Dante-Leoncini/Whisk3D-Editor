@@ -48,6 +48,8 @@ class EditMesh {
         std::vector<std::vector<int> > faceEdges; // faceEdges[f] = indices de arista del poligono
         std::vector<GLfloat> faceCenter;          // centro xyz de cada cara (los puntitos)
         std::vector<GLubyte> facePtCol;           // color del puntito por cara (negro/verde/blanco)
+        std::vector<unsigned char> caraCerrada;   // (telefono) la cara es de un pedazo CERRADO de la malla: si mira para
+                                                  // atras, la tapa la propia malla (se calcula al dibujar, una vez)
         std::vector<MeshIndex> faceTriDyn;         // triangulos de las caras SELECCIONADAS (fill)
         int activeIdx;                            // ultimo sub-elemento seleccionado (activo) o -1
         // skinGeomVersion de src con el que se lleno pos[]. Si src->skinGeomVersion difiere,

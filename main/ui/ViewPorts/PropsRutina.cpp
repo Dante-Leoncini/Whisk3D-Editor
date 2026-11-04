@@ -25,6 +25,7 @@
 #include "objects/Textures.h"
 #include "objects/MallaRecurso.h"
 #include "objects/MallaFlujos.h"
+#include "io/RecursosProyecto.h"   // el paso "Shader": los .glsl de la biblioteca
 #include "W3dLang.h"
 #include "WhiskUI/widgets/PopupMenu.h"
 #include "ViewPorts/W3dInput.h"   // W3dK_*: las teclas de la lista de pasos
@@ -115,7 +116,7 @@ static std::string RuFilaTexto(Object* o, int i) {
         return t + (q.empty() ? std::string(" (") + T("nothing") + ")" : q);
     }
     if (W3dPasoEntero(p.tipo) == EnteroLuz) { snprintf(b, sizeof b, " %d", p.entero); t += b; }
-    if (!p.ref.empty()) t += " " + (W3dPasoRef(p.tipo) == RefTextura ? Base(p.ref) : p.ref);
+    if (!p.ref.empty()) t += " " + ((W3dPasoRef(p.tipo) == RefTextura || W3dPasoRef(p.tipo) == RefShader) ? Base(p.ref) : p.ref);
     if (UsaPartes(p.tipo) && p.entero >= 0) { snprintf(b, sizeof b, " [%d]", p.entero); t += b; }
     if (W3dPasoOpciones(p.tipo) != OpcNada) t += std::string(" ") + T(W3dOpcionEtiqueta(W3dPasoOpciones(p.tipo), p.modo));
     if (p.tipo == PasoDibujar) {
@@ -390,6 +391,13 @@ static void ArmarTexturas(PopupMenu* raiz, const W3dPaso& p) {
         m->Agregar(Base(rutas[i]), Opcion(rutas[i], 0), (int)IconType::textura)->verde = (rutas[i] == p.ref);
     }
 }
+// los SHADERS (.glsl) del proyecto: los de la biblioteca (shaders/ adentro del .w3d, o de afuera)
+static void ArmarShaders(PopupMenu* raiz, const W3dPaso& p) {
+    std::vector<W3dRecursoItem> its;
+    W3dVistaRecListar(W3D_VISTA_SHADERS, its);
+    for (size_t i = 0; i < its.size(); i++)
+        raiz->Agregar(its[i].nombre, Opcion(its[i].id, 0), (int)IconType::script)->verde = (its[i].id == p.ref);
+}
 static void Juntar(Object* o, int rt, Rutina* yo, std::vector<std::string>& v) {
     if (!o) return;
     bool ok = false;
@@ -432,6 +440,7 @@ static void AbrirMenuRef(bool segunda) {
     const int rt = segunda ? RefObjeto : W3dPasoRef(p->tipo);
     if (rt == RefMalla)        ArmarMallas(raiz, *p, UsaPartes(p->tipo));
     else if (rt == RefTextura) ArmarTexturas(raiz, *p);
+    else if (rt == RefShader)  ArmarShaders(raiz, *p);
     else                       ArmarObjetos(raiz, r, rt, segunda ? p->ref2 : p->ref, segunda);
     if (raiz->items.empty()) raiz->Agregar(T("(nothing to choose)"), -1, -1);
     PropsAbrirMenuBajoBoton(raiz, boton->button);
@@ -620,6 +629,7 @@ static const char* EtiquetaRef(int t, int rt) {
     case RefMalla:   return "Mesh";
     case RefObjeto:  return "Object";
     case RefTextura: return "Texture";
+    case RefShader:  return "Shader";
     case RefRutina:  return "Routine";
     default:         return "Name";
     }
@@ -628,6 +638,7 @@ static int IconoRef(int rt) {
     switch (rt) {
     case RefMalla:   return (int)IconType::mesh;
     case RefTextura: return (int)IconType::textura;
+    case RefShader:  return (int)IconType::script;
     case RefRutina:  return (int)IconType::lista;
     default:         return (int)IconType::object;
     }
@@ -680,7 +691,7 @@ void PropsRutinaActualizar(Properties* p, bool visible) {
         firma |= 1;
         p->propRuRef->name = T(EtiquetaRef(t, rt));
         p->propRuRef->button->icon = IconoRef(rt);
-        std::string txt = paso->ref.empty() ? std::string(T("(choose)")) : (rt == RefTextura ? Base(paso->ref) : paso->ref);
+        std::string txt = paso->ref.empty() ? std::string(T("(choose)")) : ((rt == RefTextura || rt == RefShader) ? Base(paso->ref) : paso->ref);
         if (UsaPartes(t) && !paso->ref.empty()) {
             MallaRecurso* m = MallaDe(paso);
             if (paso->entero < 0) txt += std::string(" / ") + T("all");

@@ -4,7 +4,11 @@
 #include "app/W3dTeclado.h"   // teclado en pantalla de Android + pantalla completa automatica
 #include "audio/W3dAudio.h"   // pausa del mixer con el juego en pausa
 #include "w3dGraphics.h" // abstraccion de graficos (independencia de OpenGL)
-#include "render/OpcionesRender.h"   // RenderType / g_redraw: son del editor
+#include "render/OpcionesRender.h"
+#ifdef W3D_MULTIBACKEND
+#include "w3dBackend.h"   // el backend grafico se elige al arrancar
+#endif
+#include "WhiskUI/widgets/TextField.h"   // TextFieldParpadeoTick (el cursor que parpadea)   // RenderType / g_redraw: son del editor
 #include "W3dLang.h"   // config.ini: "idioma = es" fuerza el idioma por encima del SO
 #include "test/W3dScript.h" // modo test: whisk3d --script <ruta>
 #include "test/W3dMcp.h"    // whisk3d --mcp: el editor atiende a una IA (Model Context Protocol, solo en la PC)
@@ -41,9 +45,25 @@ static void PCImportFbx()  { AbrirFileBrowser("Import FBX",  "Import FBX",  ".fb
 static void PCImportGltf() { AbrirFileBrowser("Import glTF", "Import glTF", ".gltf", ImportModeloCallback); }
 static void PCImportGlb()  { AbrirFileBrowser("Import GLB",  "Import GLB",  ".glb",  ImportModeloCallback); }
 
+// EL CUADRO A LA VENTANA y el vsync: con el backend Vulkan no hay contexto de GL, los hace el (vk/w3dVk.h)
+#ifdef W3D_VULKAN
+#include "vk/w3dVk.h"
+#endif
+static void W3dPresentar(SDL_Window* w) {
+#ifdef W3D_VULKAN
+    if (w3dEngine::BackendActivo() == w3dEngine::BackendVulkan) { VkGLPresentar(); return; }
+#endif
+    SDL_GL_SwapWindow(w);
+}
+static void W3dVsync(int intervalo) {
+#ifdef W3D_VULKAN
+    if (w3dEngine::BackendActivo() == w3dEngine::BackendVulkan) { VkGLVsync(intervalo); return; }
+#endif
+    SDL_GL_SetSwapInterval(intervalo);
+}
 // hook de swap para la barra de progreso (se redibuja DENTRO del export/import bloqueante)
 static SDL_Window* g_swapWindow = NULL;
-static void PCSwapBuffers() { w3dEngine::DibujarPendiente(); if (g_swapWindow) SDL_GL_SwapWindow(g_swapWindow); }
+static void PCSwapBuffers() { w3dEngine::DibujarPendiente(); if (g_swapWindow) W3dPresentar(g_swapWindow); }
 
 #include "ViewPorts/Properties.h" // DialogoCargarTextura
 #include "objects/Textures.h"
@@ -77,6 +97,7 @@ static Material* gTexMat = NULL;
 extern bool gCargarTexturaComoNormal; // Properties.cpp: el "Load Texture" del normal map lo prende (compartido 4 OS)
 extern bool gCargarTexturaComoB;      // Properties.cpp: idem el de la TEXTURA B (mezcla de texturas)
 extern int  gCargarTexturaCapa;       // Properties.cpp: >= 0 = el "Load Texture" de ESA capa de textura del material
+extern int  gCargarTexturaMapa;       // Properties.cpp: >= 0 = el "Load Texture" de ESE mapa del material (W3dMatMapa)
 static void TexturaElegida(const std::string& pathElegido) {
     if (!gTexMat) return;
     // IMPORTAR = COPIAR ADENTRO: la textura elegida del disco pasa a ser del
@@ -87,7 +108,11 @@ static void TexturaElegida(const std::string& pathElegido) {
     // el refcount baja y esa textura se puede liberar de verdad.
     Texture* t = TexturaTomar(path);
     if (t) {
-        if (gCargarTexturaCapa >= 0) {   // a una CAPA de textura (se crea si es la fila "Add Layer")
+        if (gCargarTexturaMapa >= W3D_MAPA_EMISION && gCargarTexturaMapa < W3D_MAPAS) {   // a un MAPA (emision, rugosidad...)
+            extern void W3dMaterialPonerMapa(Material* mat, Texture* tex, int mapa);   // (con undo; la ranura toma la suya)
+            W3dMaterialPonerMapa(gTexMat, t, gCargarTexturaMapa);
+            TexturaSoltar(t);   // (la del cache: la ranura ya retuvo la suya)
+        } else if (gCargarTexturaCapa >= 0) {   // a una CAPA de textura (se crea si es la fila "Add Layer")
             const size_t n = (size_t)gCargarTexturaCapa;
             if (n >= gTexMat->capas.size()) gTexMat->capas.resize(n + 1);
             Texture* anterior = gTexMat->capas[n].tex;
@@ -99,13 +124,13 @@ static void TexturaElegida(const std::string& pathElegido) {
             if (anterior && anterior != t) TexturaSoltar(anterior);
         } else {
             Texture* anterior = gCargarTexturaComoNormal ? gTexMat->normalTexture : gTexMat->texture;
-            if (gCargarTexturaComoNormal) { gTexMat->normalTexture = t; }
+            if (gCargarTexturaComoNormal) { gTexMat->normalTexture = t; gTexMat->normalMap = true; }
             else { gTexMat->texture = t; gTexMat->textureOn = true; }
             if (anterior && anterior != t) TexturaSoltar(anterior);
         }
         RebindMaterialMeshPart();
     }
-    gTexMat = NULL; gCargarTexturaComoNormal = false; gCargarTexturaComoB = false; gCargarTexturaCapa = -1;
+    gTexMat = NULL; gCargarTexturaComoNormal = false; gCargarTexturaComoB = false; gCargarTexturaCapa = -1; gCargarTexturaMapa = -1;
 }
 // "Load Texture" (base Y normal map): el MISMO browser. Quien lo llama ya dejo gCargarTexturaComoNormal en el
 // valor correcto (false=textura, true=normal); el callback de arriba decide el destino.
@@ -348,6 +373,7 @@ static unsigned int RelojSDL() { return SDL_GetTicks(); }
 #endif
 struct W3dIntentoGL { int msaa, estencil, z; const char* que; };
 static bool g_glSinMsaa = false;   // se pidio antialiasing y el driver no lo dio (se avisa al abrir)
+static bool g_ventanaOculta = false;   // --script en Windows: la ventana se crea oculta (ver el arranque de main)
 static SDL_Window* CrearVentanaGL(const char* titulo, int w, int h, Uint32 flags, bool antialias, SDL_GLContext* ctxOut) {
 #ifdef W3D_3DS
     // la 3DS no tiene OpenGL: la ventana es la pantalla de abajo (la tactil, donde SDL entrega los toques) y dibuja
@@ -386,6 +412,37 @@ static SDL_Window* CrearVentanaGL(const char* titulo, int w, int h, Uint32 flags
     *ctxOut = NULL;
     return NULL;
 }
+#ifdef W3D_VULKAN
+// LA VENTANA DE VULKAN: la abre SDL con el cargador del sistema (vulkan-1.dll / libvulkan.so.1) y el backend arranca
+// sobre ella (vk/w3dVk.h). NULL = no anduvo (ya quedo en el log por que)
+#include <SDL2/SDL_vulkan.h>
+static bool VkSuperficieSDL(void* user, void* instancia, void* out) {
+    return SDL_Vulkan_CreateSurface((SDL_Window*)user, (VkInstance)instancia, (VkSurfaceKHR*)out) == SDL_TRUE;
+}
+static void VkTamanioSDL(void* user, int* w, int* h) { SDL_Vulkan_GetDrawableSize((SDL_Window*)user, w, h); }
+static SDL_Window* CrearVentanaVulkan(const char* titulo, int w, int h, Uint32 flags) {
+    if (SDL_Vulkan_LoadLibrary(NULL) != 0) { w3dLogfW("[vk] sin el cargador de Vulkan: %s", SDL_GetError()); return NULL; }
+    flags = (flags & ~SDL_WINDOW_OPENGL) | SDL_WINDOW_VULKAN;
+    SDL_Window* win = SDL_CreateWindow(titulo, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, w, h, flags);
+    if (!win) { w3dLogfW("[vk] ventana: %s", SDL_GetError()); SDL_Vulkan_UnloadLibrary(); return NULL; }
+    unsigned n = 0;
+    SDL_Vulkan_GetInstanceExtensions(win, &n, NULL);
+    std::vector<const char*> ext(n);
+    if (n) SDL_Vulkan_GetInstanceExtensions(win, &n, &ext[0]);
+    W3dVkVentana v;
+    v.getInstanceProcAddr = SDL_Vulkan_GetVkGetInstanceProcAddr();
+    v.extensiones = n ? &ext[0] : NULL; v.nExtensiones = n;
+    v.crearSuperficie = VkSuperficieSDL; v.tamanio = VkTamanioSDL; v.user = win;
+    std::string err;
+    if (!VkGLIniciar(v, &err)) {
+        w3dLogfW("[vk] no arranco: %s", err.c_str());
+        SDL_DestroyWindow(win);
+        SDL_Vulkan_UnloadLibrary();
+        return NULL;
+    }
+    return win;
+}
+#endif
 
 // Función simple para leer el ini
 Config loadConfig(const std::string& filename) {
@@ -661,6 +718,26 @@ static void ProcesarEvento(SDL_Event& e) {
 #endif
         return;
     }
+#if !defined(__ANDROID__) && !defined(__EMSCRIPTEN__)
+    // un ARCHIVO soltado desde el explorador del sistema (Windows / Linux / Mac): al viewport que queda bajo el puntero
+    // (el 3D importa el modelo o le pone la imagen a la malla; la biblioteca lo guarda en el proyecto: ver
+    // UI/ViewPorts/SoltarRecurso.cpp). Durante el arrastre del sistema la ventana no recibe el movimiento: la posicion
+    // sale del mouse global menos la ventana
+    if (e.type == SDL_DROPFILE) {
+        if (e.drop.file) {
+            int gx = 0, gy = 0, wx = 0, wy = 0;
+            SDL_GetGlobalMouseState(&gx, &gy);
+            SDL_GetWindowPosition(window, &wx, &wy);
+            extern bool W3dSoltarArchivo(const std::string& ruta, int mx, int my, std::string* que);
+            extern void Notificar(const std::string& msg, bool error);
+            std::string que;
+            const bool ok = W3dSoltarArchivo(e.drop.file, gx - wx, gy - wy, &que);
+            if (!que.empty()) Notificar(que, !ok);
+            SDL_free(e.drop.file);
+        }
+        return;
+    }
+#endif
     if (e.type == SDL_WINDOWEVENT && e.window.event == SDL_WINDOWEVENT_RESIZED) {
         winW = e.window.data1;
         winH = e.window.data2;
@@ -765,6 +842,7 @@ static void MainLoopFrame() {
     // ... y con una VERTEX ANIM en el timeline (kind 3) el RESTO del mundo queda
     // QUIETO: solo se ve la animacion del objeto que estas editando (las demas
     // vertex anims y las texturas animadas no corren).
+    if (TextFieldParpadeoTick()) g_redraw = true;   // el cursor de la caja de texto enfocada parpadea
     if (!(AnimEsJuego && !PlayAnimation) && ActiveAnimKind != 3) {
         UpdateAnimations(dtFrame);
         UpdateAnimatedMaterials(dtFrame);
@@ -927,8 +1005,6 @@ static void MainLoopFrame() {
         // Timeline: si esta en PLAY, avanzar CurrentFrame (loop Start..End) y forzar redibujo
         if (PlayAnimation) {
             extern void SimTickPlay(float); extern bool SimHayScripts(); extern bool SimActiva();
-            extern bool SimStep(int); extern int SimFrameActual(); extern int SimPrimerFrame();
-            extern bool SimHayCache();
             bool juego = AnimEsJuego && (SimActiva() || SimHayScripts());
             // el dt de la SIMULACION tambien es TIEMPO REAL entre ticks (el fisico
             // del juego rinde lo mismo a 30, 60 o 10 fps)
@@ -943,12 +1019,8 @@ static void MainLoopFrame() {
             }
             lastSimMs = now;
             if (juego && AnimPlayDir < 0) {
-                // PLAY EN REVERSA (modo juego): reproduce lo grabado HACIA ATRAS;
-                // al llegar al inicio se PAUSA (el final es infinito, no hay loop). Con el CACHE OFF (gGrab vacio)
-                // no hay nada que rebobinar -> SimHayCache() pausa YA (sino SimStep(-1) era no-op y el boton de
-                // reversa quedaba trabado con PlayAnimation=true para siempre).
-                if (!SimActiva() || !SimHayCache() || SimFrameActual() <= SimPrimerFrame()) PlayAnimation = false;
-                else SimStep(-1);
+                // PLAY EN REVERSA en modo juego: el juego no graba su pasado, no hay nada que rebobinar -> pausa
+                PlayAnimation = false;
             } else if (juego) {
                 // MODO JUEGO hacia adelante: el playhead lo lleva la simulacion
                 // (sin AnimTick: no hay Fin ni loop)
@@ -961,6 +1033,8 @@ static void MainLoopFrame() {
         }
         // Actualizar frame
     }
+    // LOS SONIDOS de la escena (objetos Sonido): suenan con el Play del timeline, en segundos (main/objects/Sonido.cpp)
+    { extern void W3dSonidosTickEditor(); W3dSonidosTickEditor(); }
     // ANIMACION DE OBJETOS (transform pos/rot/escala): aplica los keyframes al frame actual (play o scrub del timeline).
     // Guard interno: solo trabaja al CAMBIAR de frame -> editar/keyframear un objeto en un frame fijo no lo resnapea.
     { extern void AplicarAnimacionObjetos(); AplicarAnimacionObjetos(); }
@@ -1045,7 +1119,7 @@ static void MainLoopFrame() {
         { extern void W3d3dsCuadroDibujado(); W3d3dsCuadroDibujado(); }   // (la captura de prueba en la SD)
 #else
         w3dEngine::DibujarPendiente();
-        SDL_GL_SwapWindow(window);
+        W3dPresentar(window);
 #endif
 #ifdef W3D_DREAMCAST
         { extern void W3dDcCuadroDibujado(); W3dDcCuadroDibujado(); }   // (la captura de prueba por la consola serie)
@@ -1114,6 +1188,17 @@ int main(int argc, char* argv[]) {
     for (int ai = 1; ai < argc; ai++)
         if (std::string(argv[ai]) == "--script" && !SDL_getenv("W3D_VER_VENTANA") && !SDL_getenv("SDL_VIDEODRIVER")) {
             SDL_setenv("SDL_VIDEODRIVER", "offscreen", 1);
+            if (!SDL_getenv("SDL_AUDIODRIVER")) SDL_setenv("SDL_AUDIODRIVER", "dummy", 1);   // y sin sonido
+            break;
+        }
+#endif
+#ifdef _WIN32
+    // lo mismo en Windows: el driver 'offscreen' de SDL necesita EGL (no hay), asi que la ventana se crea OCULTA
+    // (SDL_WINDOW_HIDDEN: contexto WGL real, no aparece en el escritorio ni en la barra de tareas). W3D_VER_VENTANA=1
+    // la muestra.
+    for (int ai = 1; ai < argc; ai++)
+        if (std::string(argv[ai]) == "--script" && !SDL_getenv("W3D_VER_VENTANA")) {
+            g_ventanaOculta = true;
             if (!SDL_getenv("SDL_AUDIODRIVER")) SDL_setenv("SDL_AUDIODRIVER", "dummy", 1);   // y sin sonido
             break;
         }
@@ -1261,6 +1346,19 @@ int main(int argc, char* argv[]) {
     // LOGS: el nivel del config (Ajustes > Logs)
     g_w3dLogNivel = cfg.logs;
 
+#ifdef W3D_MULTIBACKEND
+    // EL BACKEND GRAFICO se elige ACA, antes de crear la ventana (gfx/w3dBackend.h): Ajustes > Graphics
+    // (cfg.graphicsAPI), o "--backend <OpenGL|es2>" en la linea de comandos (el harness corre las pruebas con cada uno)
+    {
+        std::string pedido = cfg.graphicsAPI;
+        for (int k = 1; k + 1 < argc; k++) if (std::string(argv[k]) == "--backend") pedido = argv[k + 1];
+        if (pedido == "es2" || pedido == "gles2") pedido = "OpenGL ES 2.0";
+        const int b = w3dEngine::BackendDeNombre(pedido.c_str());
+        if (b >= 0 && !w3dEngine::BackendUsar(b))
+            w3dLogfW("[graficos] '%s' no esta en este ejecutable: se usa OpenGL", pedido.c_str());
+        w3dLogf("[graficos] backend: %s", w3dEngine::BackendNombre(w3dEngine::BackendActivo()));
+    }
+#endif
     //TODO: Esto muy probablemente de problemas en gama baja? no se si deba configurable
     // (multisample / estencil / profundidad: los prueba CrearVentanaGL, de lo mas completo a lo mas basico)
     #ifdef __ANDROID__
@@ -1278,7 +1376,17 @@ int main(int argc, char* argv[]) {
     #else
         Uint32 windowFlags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE;
         if (cfg.fullscreen) windowFlags |= SDL_WINDOW_MAXIMIZED;
+        if (g_ventanaOculta) windowFlags = (windowFlags & ~SDL_WINDOW_MAXIMIZED) | SDL_WINDOW_HIDDEN;   // --script en Windows
     #endif
+#ifdef W3D_VULKAN
+        // VULKAN: su ventana (sin contexto de GL). Si no arranca en esta maquina (sin driver, sin GPU, sin shaderc) se sigue
+        // con OpenGL, como si se hubiera elegido ese
+        if (w3dEngine::BackendActivo() == w3dEngine::BackendVulkan) {
+            window = CrearVentanaVulkan("Whisk3D Pre-Alpha", winW, winH, windowFlags);
+            if (!window) { w3dLogfW("[graficos] Vulkan no arranco en esta maquina: se usa OpenGL"); w3dEngine::BackendUsar(w3dEngine::BackendOpenGL); }
+        }
+        if (!window)
+#endif
         window = CrearVentanaGL("Whisk3D Pre-Alpha", winW, winH, windowFlags, cfg.enableAntialiasing, &glContext);
         #if !defined(__EMSCRIPTEN__) && !defined(_WIN32)
         // ULTIMO RESPALDO: en una sesion Wayland, SDL abre por X11 (XWayland) y ahi puede no haber GLX usable.
@@ -1317,7 +1425,8 @@ int main(int argc, char* argv[]) {
 
     SDL_GetWindowSize(window, &winW, &winH);
 
-#ifdef W3D_WEBGL
+#if defined(W3D_WEBGL) || defined(W3D_MULTIBACKEND)
+    // (con varios backends: solo si el elegido es el de shaders; el despacho lo ignora en el resto)
     // backend ES2/WebGL: carga GL2.0 + compila los shaders. TIENE que ir antes de initGL
     // (initGL ya dibuja por la abstraccion); sin esto el canvas queda en negro.
     w3dEngine::GLES2Init((void* (*)(const char*))SDL_GL_GetProcAddress);
@@ -1327,7 +1436,7 @@ int main(int argc, char* argv[]) {
 #endif
 
     //hay que ver que onda estos dos
-    SDL_GL_SetSwapInterval(1);
+    W3dVsync(1);
     initGL(winW, winH);
 
     // Cargar skin
@@ -1486,7 +1595,7 @@ int main(int argc, char* argv[]) {
         int cap = (g_fpsCap > 0) ? g_fpsCap : 60;
         const double frameMs = 1000.0 / (double)cap;
         int quiereVsync = (cap > 60) ? 0 : 1;
-        if (quiereVsync != capVsync) { SDL_GL_SetSwapInterval(quiereVsync); capVsync = quiereVsync; }
+        if (quiereVsync != capVsync) { W3dVsync(quiereVsync); capVsync = quiereVsync; }
         MainLoopFrame();
         if (g_didRender) {
             nextFrame += frameMs;
@@ -1502,6 +1611,9 @@ int main(int argc, char* argv[]) {
 
     W3dDockProgresoFin(); // ultimo seguro: cerrar el editor no puede dejar la barra prendida en el dock
     if (controller) SDL_GameControllerClose(controller);
+#ifdef W3D_VULKAN
+    VkGLTerminar();
+#endif
     SDL_GL_DeleteContext(glContext);
     SDL_DestroyWindow(window);
     SDL_Quit();

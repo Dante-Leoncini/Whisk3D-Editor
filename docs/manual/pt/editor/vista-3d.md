@@ -54,6 +54,7 @@ A Viewport 3D é onde você vê e edita a cena. Ela trabalha em diferentes **mod
 | Prévia Material | A padrão: uma luz neutra a partir da vista, sem depender das luzes da cena. |
 | Prévia Sólido / Aramado / ZBuffer | Cinza sólido, só as arestas, ou a profundidade. |
 | Vista Normal / Prévia Alpha | As normais em cor, ou a transparência em preto e branco. |
+| Vetores de movimento | Quanto cada pixel se moveu na tela desde o quadro anterior (vermelho = X, verde = Y; lavanda = parado, verde-oliva = o fundo). A mesma imagem da passada `_vectores` do render. |
 | Aramado: só o visível | A vista aramada mostra só o que é desenhado de verdade. |
 
 ### Sobreposições

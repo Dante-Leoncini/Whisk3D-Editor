@@ -23,7 +23,6 @@ prefabinfo Casa overrides 1
 prefabnodo Casa Poste/Poste/Tronco visible 0
 
 # --- el Play: el Poste se suelta al arrancar y el streaming lo genera de nuevo (con el override de la Casa) ---
-simcache 0
 streamobjetivo 0 0 3
 simplay 3
 streamestado Poste cargada
@@ -36,7 +35,6 @@ simplay 10
 streamestado Poste cargada
 prefabnodo Casa Poste/Poste/Tronco visible 0
 simstop
-simcache 1
 prefabinfo Casa overrides 1
 prefabnodo Casa Poste/Poste/Tronco visible 0
 

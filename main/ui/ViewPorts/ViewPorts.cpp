@@ -538,6 +538,31 @@ void CheckWarpMouseInViewport(int mx, int my, const ViewportBase* vp) {
     lastMouseX = mx;
     lastMouseY = my;
 }
+#else
+// Symbian: lo llama controles.cpp con el DEDO o con el MOUSE Bluetooth. El mouse se envuelve como en la PC (el cursor
+// sale por un borde del viewport y aparece por el otro: se puede seguir moviendo/rotando sin quedarse sin pantalla); el
+// cursor lo mueve la plataforma (W3dRatonTeletransportar). Un dedo no se puede teletransportar: queda solo el delta.
+#include "app/W3dRatonEditor.h"
+void CheckWarpMouseInViewport(int mx, int my, const ViewportBase* vp) {
+    if (vp && W3dEventoRaton() && W3dRatonTeletransportar) {
+        const int left = vp->x + borderGS, right = vp->x + vp->width - borderGS;
+        const int top = vp->y + borderGS, bottom = vp->y + vp->height - borderGS;
+        bool warped = false;
+        if (mx <= left)        { mx = right - 1; warped = true; }
+        else if (mx >= right)  { mx = left + 1;  warped = true; }
+        if (my <= top)         { my = bottom - 1; warped = true; }
+        else if (my >= bottom) { my = top + 1;    warped = true; }
+        if (warped) { W3dRatonTeletransportar(mx, my); dx = 0; dy = 0; }
+        else        { dx = mx - lastMouseX; dy = my - lastMouseY; }
+        lastMouseX = mx; lastMouseY = my;
+        return;
+    }
+    (void)vp;
+    dx = mx - lastMouseX;
+    dy = my - lastMouseY;
+    lastMouseX = mx;
+    lastMouseY = my;
+}
 #endif
 // ============== barra de botones de los viewports ==============
 
@@ -567,6 +592,23 @@ int ViewportBase::BarHeight() const {
 // absolutos de botones/pestañas. SIN GL: la usa RenderBar y tambien el ruteo
 // de teclado antes de abrir un menu (para que el hit-test acierte la posicion
 // YA scrolleada). El foco solo vale con un menu abierto.
+// EL ICONO DE CADA TIPO de viewport en el MENU de tipo (el boton de la esquina sigue siendo la flecha para abajo): el cubo
+// el 3D, el ojo el outliner, la llave inglesa las propiedades, la malla el editor UV, el reloj la linea de tiempo, la
+// textura el editor 2D, el codigo el IDE, la carpeta la biblioteca. Los que no tienen uno propio, ninguno (la flecha)
+int W3dIconoDeViewport(int kind) {
+    switch (kind) {
+        case 1: return (int)IconType::object;
+        case 2: return (int)IconType::visible;
+        case 3: return (int)IconType::modificador;
+        case 4: return (int)IconType::mesh;
+        case 5: return (int)IconType::reloj;
+        case 6: return (int)IconType::textura;
+        case 7: return (int)IconType::consola;
+        case 8: return (int)IconType::script;
+        case 9: return (int)IconType::carpeta;
+    }
+    return (int)IconType::arrow;
+}
 void ViewportBase::ActualizarBarra(){
     if (!barCard || BarButtons.empty()) return;
     int barH = BarHeight();

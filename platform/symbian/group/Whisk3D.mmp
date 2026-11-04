@@ -6,7 +6,17 @@
  */
 
 //New style application exe
+// DOS VARIANTES desde este mismo archivo (una sola lista de fuentes):
+//  - Whisk3D.mmp       -> whisk3D.exe, OpenGL ES 1.1 (pipeline fijo): N95 y todo S60 3rd/5th
+//  - Whisk3D_gles2.mmp -> whisk3D_gles2.exe, OpenGL ES 2.0 (shaders): N8/C7/E7 y Symbian^3+.
+//    Define W3D_MMP_GLES2 e incluye este archivo. Cambia el backend de graficos (gles2/w3dGraphicsGLES2.cpp,
+//    el mismo de Android y la web), las libs (libglesv2 + libegl) y no vuelve a compilar los recursos.
+//    El .pkg de GLES2 lo instala como Whisk3D.exe (misma UID: una variante reemplaza a la otra).
+#ifdef W3D_MMP_GLES2
+TARGET          whisk3D_gles2.exe
+#else
 TARGET          whisk3D.exe
+#endif
 TARGETTYPE      exe
 UID             0x100039CE 0xA00D021D
 
@@ -16,6 +26,11 @@ EPOCHEAPSIZE    0x10000 0x6000000  // heap: 64 KB min, 96 MB max (subido de 64 M
 // Fase 3 unificacion: el codigo compartido del core se compila con este
 // define (activa el dialecto Symbian: GLES/gl.h, shims de app-state, etc.)
 MACRO           W3D_SYMBIAN
+#ifdef W3D_MMP_GLES2
+// backend de shaders: W3D_GLES2 = "Symbian con ES 2.0"; W3D_WEBGL = el backend emulado (Light.cpp, etc.)
+MACRO           W3D_GLES2
+MACRO           W3D_WEBGL
+#endif
 
 // Lua 5.4 en RVCT/C89: sin esto luaconf.h corta con "Compiler does not support
 // 'long long'". LUA_USE_C89 usa numeros C89 (long + double) y evita las
@@ -65,11 +80,20 @@ SOURCE          w3dnewscene.cpp
 SOURCE          w3dtexload.cpp
 SOURCE          w3dmouse.cpp // cursor virtual de Symbian
 SOURCE          w3dinput.cpp // input propio del telefono (teclado/keypad)
+SOURCE          w3dpantallas.cpp // pantallas externas (TV-out RCA / HDMI): deteccion + superficie EGL propia
+SOURCE          w3dsdlminimo.cpp // lo poco de SDL que lee controles.cpp (reloj, mouse, pantalla)
+SOURCEPATH      ..\..\..\main\ui\ViewPorts
+SOURCE          PantallasExternas.cpp // el popup clonar/viewport y el dibujo de cada pantalla externa (compartido)
 
 // motor compartido (Whisk3DCore / libs\Whisk3DCore): texturas + estado de graficos + log
 SOURCEPATH      ..\..\..\libs\Whisk3DCore\gfx
 SOURCE          w3dTexture.cpp
+#ifdef W3D_MMP_GLES2
+SOURCEPATH      ..\..\..\libs\Whisk3DCore\gles2
+SOURCE          w3dGraphicsGLES2.cpp
+#else
 SOURCE          w3dGraphics.cpp
+#endif
 SOURCEPATH      ..\..\..\libs\Whisk3DCore\base
 SOURCE          w3dlog.cpp
 SOURCE          W3dInteractionState.cpp // estado de interaccion (InteractionMode/estado): ahora en el motor
@@ -92,6 +116,8 @@ SOURCE          Matrix4.cpp
 SOURCEPATH      ..\..\..\libs\Whisk3DCore\objects
 SOURCE          Objects.cpp
 SOURCE          Materials.cpp
+SOURCE          ShaderEscrito.cpp
+SOURCE          ShaderCPU.cpp
 SOURCE          Mesh.cpp
 SOURCE          CameraBase.cpp // camara BASE del core (la vista que usa el render)
 SOURCE          RenderColors.cpp // paleta de render del core (Fase D, sin depender de la UI)
@@ -149,6 +175,9 @@ SOURCE          variables.cpp
 SOURCE          W3dInitUI.cpp // init de UI compartido
 SOURCE          W3dAtajos.cpp // atajos de teclado reasignables (la tabla + el traductor + atajos.ini)
 SOURCE          W3dTeclado.cpp // teclado en pantalla (Android); en Symbian son stubs vacios
+SOURCE          controles.cpp // el input de PC/Android: los gestos tactiles (Symbian les manda los mismos eventos)
+SOURCE          W3dTactilEditor.cpp // los dedos del Core (base/W3dTactil) -> SDL_Event -> controles.cpp
+SOURCE          W3dRatonEditor.cpp // el mouse Bluetooth -> SDL_Event -> controles.cpp (como el mouse de la PC)
 SOURCEPATH      ..\..\..\main\config
 SOURCE          W3dLang.cpp   // idiomas del editor (T() + deteccion del idioma del telefono)
 SOURCE          W3dConfigGuardar.cpp // escribe el config.ini (la tarjeta "Ajustes" de Properties)
@@ -167,7 +196,7 @@ SOURCE          PropSelectText.cpp PropButton.cpp PropLabel.cpp
 
 // pila de UI de PC (fase outliner real)
 SOURCEPATH      ..\..\..\main\ui\ViewPorts\PopUp
-SOURCE          PopUpBase.cpp ColorPicker.cpp FileBrowser.cpp RedoMeshPanel.cpp ConfirmarPopup.cpp ProgressPopup.cpp GuardarComoPopup.cpp TransformRedoPanel.cpp AtajosPopup.cpp BuscarPopup.cpp ExportarUVPopup.cpp NuevaTexturaPopup.cpp
+SOURCE          PopUpBase.cpp ColorPicker.cpp FileBrowser.cpp RedoMeshPanel.cpp ConfirmarPopup.cpp ProgressPopup.cpp GuardarComoPopup.cpp TransformRedoPanel.cpp AtajosPopup.cpp BuscarPopup.cpp ExportarUVPopup.cpp NuevaTexturaPopup.cpp UVMapaPopup.cpp
 SOURCE          FalloffEditor.cpp // popup del editor de curva de falloff del pincel
 SOURCE          CambiosPopup.cpp // el cartel "Se perderan los cambios en:" (al salir / abrir otro proyecto)
 
@@ -204,11 +233,11 @@ SOURCE          BibliotecaExterna.cpp // la biblioteca: los .w3d VINCULADOS (exp
 SOURCE          CambiosProyecto.cpp   // lo SIN GUARDAR ('*' por recurso y por raiz) y el cartel al salir / abrir
 SOURCE          Miniaturas.cpp        // las miniaturas de la cuadricula de la biblioteca (perezosas, en memoria)
 SOURCEPATH      ..\..\..\main\objects
-SOURCE          Culling.cpp Particulas.cpp VisZona.cpp Gamepad.cpp Niebla.cpp Recorte.cpp
+SOURCE          Culling.cpp Particulas.cpp VisZona.cpp Gamepad.cpp Niebla.cpp Recorte.cpp Sonido.cpp PostprocesoObj.cpp
 SOURCE          Rutina.cpp // objeto Rutina: lista de pasos del render (C++03)
 SOURCE          Hitbox.cpp     // objeto Hitbox (caja de deteccion; el motor esta en Core\physics)
 SOURCEPATH      ..\..\..\main\render
-SOURCE          UIOverlay.cpp RayTracer.cpp   // RayTracer: trazado de rayos por CPU (un hilo en el N95)
+SOURCE          UIOverlay.cpp RayTracer.cpp Denoiser.cpp RTGpu.cpp VectoresMovimiento.cpp ReescaladoFSR.cpp Postproceso.cpp   // Postproceso: la pila de efectos (por CPU en el N95); VectoresMovimiento: el pase de vectores (GL 1.1) y el desenfoque por CPU; RayTracer: trazado de rayos por CPU (un hilo en el N95); Denoiser y RTGpu: vacios en Symbian
 // audio del Core: el dispatcher (mixer por software) + el backend de salida de Symbian
 // (CMdaAudioOutputStream en su propio hilo, doble-buffer). Con W3D_ENABLE_AUDIO arriba
 // compilan el camino REAL; sin el, W3dAudio.cpp cae a stubs no-op.
@@ -229,6 +258,9 @@ SOURCE          VisBsp.cpp       // metodo Bsp del Culling: arbol BSP + PVS por 
 SOURCE          MundoBsp.cpp     // el MUNDO del .w3dbsp v2: geometria por hoja y material, un draw por material (C++03)
 SOURCEPATH      ..\..\..\libs\Whisk3DCore\base
 SOURCE          W3dConfig.cpp W3dClipboardSymbian.cpp
+SOURCE          W3dVibrar.cpp // la vibracion (en el telefono: la rama de escritorio, sin vibrador)
+SOURCE          W3dTactil.cpp W3dTactilSymbian.cpp // la pantalla tactil (S60 5th: 1 dedo; Symbian^3: multitactil)
+SOURCE          W3dMandosSymbian.cpp // los joysticks Bluetooth (DualShock 3/4) del driver bthid-s60, cargado en runtime
 SOURCEPATH      ..\..\..\libs\WhiskUI\draw
 SOURCE          W3dAtlasPacker.cpp
 // objetos del editor que faltaban: LOD (niveles de detalle) y el espejo/agua
@@ -274,11 +306,13 @@ SOURCE          BindsJuego.cpp SimJuego.cpp ScriptUI.cpp
 // (las rutas de recursos se resuelven contra el ultimo SOURCEPATH)
 SOURCEPATH      ..\src
 
+#ifndef W3D_MMP_GLES2 // los recursos los compila solo la variante ES 1.1 (son los mismos para las dos)
 START RESOURCE  ..\data\whisk3D.rss
 HEADER
 TARGETPATH      \\resource\\apps
 LANG            SC
 END //RESOURCE
+#endif
 
 USERINCLUDE     .
 USERINCLUDE     ..\inc
@@ -336,7 +370,12 @@ LIBRARY         efsrv.lib
 LIBRARY         hal.lib // HAL::Get(EMemoryRAMFree): la RAM libre en el log ([mem], w3dlog.cpp)
 LIBRARY         ImageConversion.lib
 LIBRARY         mediaclientaudiostream.lib // CMdaAudioOutputStream: salida de audio del Core
+#ifdef W3D_MMP_GLES2
+LIBRARY         libglesv2.lib libegl.lib
+LIBRARY         accmonitor.lib // el cable HDMI/video compuesto (pantallas externas); Symbian^3, no existe en el N95
+#else
 LIBRARY         libgles_cm.lib
+#endif
 LIBRARY         ws32.lib commondialogs.lib
 LIBRARY         estor.lib eikctl.lib aknnotify.lib apgrfx.lib eikdlg.lib charconv.lib
 LIBRARY         bafl.lib etext.lib // portapapeles del sistema: CClipboard (bafl) + CPlainText (etext)
@@ -351,6 +390,7 @@ LIBRARY         libstdcpp.lib
 //LIBRARY         NokiaAccSensor.lib
 
 
+#ifndef W3D_MMP_GLES2
 START RESOURCE ..\data\whisk3D_reg.rss
 #ifdef WINSCW
 TARGETPATH 	  \private\10003a3f\apps
@@ -358,6 +398,7 @@ TARGETPATH 	  \private\10003a3f\apps
 TARGETPATH 	  \private\10003a3f\import\apps
 #endif
 END
+#endif
 // Solo capabilities auto-firmables. ReadDeviceData
 // necesita DevCert de Symbian y Location no es auto-firmable en el 9.2 del
 // N95: con cualquiera de las dos el telefono rechaza el binario self-signed

@@ -1,0 +1,24 @@
+# EL POSTPROCESADO ES UN OBJETO DEL ARBOL (main/objects/PostprocesoObj.h): cuando el recorrido llega a el, sus efectos
+# se aplican a lo YA DIBUJADO; lo que sigue en el outliner se dibuja limpio. Asi el outliner es el orden de dibujado.
+#  - el Cubo (antes del Postproceso) sale con grano; el Cubo.001 (despues) sale limpio
+#  - con el Postproceso al FINAL (despues de los dos), los dos con grano
+#  - el desenfoque de campo (lee la profundidad: de antemano, sin redibujar la escena en el medio) igual
+ventana 1280 720
+vpcamara on
+vpvista rendered
+# el Postproceso (lo crea 'post' al final del arbol) y DESPUES un cubo nuevo
+post agregar grano 0.5 1
+post off
+add cube
+objpos 1.6 0.4 1.2
+objscale 0.5 0.5 0.5
+vpref
+post on
+# el de ANTES: con grano; el de DESPUES: limpio
+vpdif 12 300 -1 obj Cubo 40
+vpdif 12 0 0 obj Cubo.001 12
+# el de despues SIGUE tapando (la profundidad de lo de antes se respeta): igual que sin postprocesado
+# --- el Postproceso al final: los dos con grano ---
+objalfinal Postproceso
+vpdif 12 300 -1 obj Cubo 40
+vpdif 12 30 -1 obj Cubo.001 12

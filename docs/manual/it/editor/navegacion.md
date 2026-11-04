@@ -56,6 +56,6 @@
 | Ciclare la selezione / aggiungere, togliere, tutto o niente | Pencil / Pencil + frecce |
 | Barra dei menu / cursore virtuale | Tasto di selezione sinistro / destro |
 | Cambiare viewport, ridimensionare, massimizzare | Tasto verde (da solo, + frecce, + OK) |
-| Modalità gioco a schermo intero | Tasto verde + <kbd>0</kbd> |
+| Modalità gioco a schermo intero | Tasto verde + <kbd>0</kbd> (di nuovo: l'immagine copre tutto lo schermo; di nuovo: si torna indietro). Senza la UI, senza il bordo della camera né l'area scura intorno (restano bande nere solo se la camera dichiara un aspetto diverso da quello dello schermo, fino alla seconda pressione), e le frecce non fanno pan: si vede il gioco così com'è |
 
 L'N95 accetta anche mouse e tastiera Bluetooth. Per scrivere testo si usa il T9.

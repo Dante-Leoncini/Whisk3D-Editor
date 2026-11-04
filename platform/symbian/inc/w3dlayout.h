@@ -36,6 +36,7 @@ void W3dLayoutMouseMoved(TInt aX, TInt aY);
 TBool W3dLayoutClickUI(TInt aX, TInt aY); // menu/barras/paneles (compartido)
 TBool W3dLayoutClickProps(TInt aX, TInt aY);
 TBool W3dLayoutMenuAbierto();
+TBool W3dLayoutSobreContenido3D(TInt aX, TInt aY);   // sobre el contenido de un 3D (no sus barras)
 TBool W3dLayoutPopupActivo(); // hay un popup modal (File browser) abierto
 void  W3dLayoutCiclarViewport(TInt aDir); // tecla verde: cambia viewport activo
 void  W3dLayoutToggleBarra();             // soft-izq: abre/cierra barra de menu

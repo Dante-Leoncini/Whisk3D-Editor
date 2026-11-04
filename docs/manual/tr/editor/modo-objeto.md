@@ -28,7 +28,8 @@ Yalnızca Object Mode'da. Yeni nesne 3D imleçte belirir ve seçili kalır. İlk
 |---|---|
 | Mesh | Plane, Cube, Circle, UV Sphere, Cone, Cylinder (boyut, yarıçap, segment sayısı ve yumuşak gölgelendirme ile). Ayrıca Vertex (modellemeye başlamak için tek başına bir nokta) ve Reference (üzerinden kopya çizmek için resimli bir düzlem). |
 | Empty | Gruplamak ya da referans noktası olarak kullanmak için mesh'i olmayan bir nesne. |
-| Camera / Light / Fog | Sahnenin kamerası, ışığı ve sisi. |
+| Camera / Light / Fog | Sahnenin kamerası, ışığı ve sisi. Işığın bir **Type** değeri var: Point, Sun (yönlü) veya Spot (görünümde çizilen bir koni); Add menüsü Sun ve Spot da sunar. **Intensity** ışığı güçlendirir (canlandırılabilir); **Distance** (m), nokta ışığın ya da spotun ne kadar uzağa ulaştığıdır ve konisinin uzunluğudur (0 = sınırsız; ışın izleme ışığı orada yumuşakça söndürür). Işık seçiliyken spot konisini, nokta ışık da o mesafede bir küre gösterir; güneş her zaman aydınlattığı yöne doğru zemine kadar bir çizgi gösterir. |
+| Sound | Sahneye yerleştirilmiş bir ses (hoparlör simgesi). Zaman çizelgesiyle **saniye** cinsinden çalar, kare değil; **Positional (3D)** ile bulunduğu yerden duyulur (kamera yaklaştıkça daha yüksek, bulunduğu taraftan); onsuz müzik gibidir. 3D görünüme bir .wav bırakmak orada bir tane oluşturur. |
 | Armature | Karakterleri canlandırmak için tek kemikli bir iskelet. |
 | Path | İki düğümlü bir eğri (mesh gibi düzenlenir: <kbd>E</kbd> düğüm ekler). |
 | Collection | Nesneleri düzenlemek için bir klasör. |

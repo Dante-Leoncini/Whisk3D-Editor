@@ -182,6 +182,7 @@ static std::vector<std::string> NotifWrap(const std::string& s, int cpl, int max
 }
 
 void NotificacionesRender(int screenW, int screenH) {
+    { extern void W3dAyudaRender(int, int); W3dAyudaRender(screenW, screenH); }   // (el cartelito de los iconos: encima de todo)
     if (gNotifs.empty()) return;
     if (!gNotifCard) gNotifCard = new Card(NULL, 10, 10);
 

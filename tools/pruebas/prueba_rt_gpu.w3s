@@ -1,0 +1,43 @@
+# trazado de rayos en la GPU (render/RTGpu.cpp, Vulkan): la misma escena de prueba_raytracer (piso + cubo + lampara)
+# tiene que dar lo mismo que en la CPU: fondo, piso iluminado y sombra dura. Despues el denoiser propio (A-Trous en la
+# GPU) con pocos pases: menos ruido que sin el. Sin una GPU con Vulkan la prueba termina bien sin hacer nada.
+add plane
+objscale 6 1 6
+add cube
+objmove 0 1 0
+addlight
+objmove 2 4 -2
+rtopt 1 1 16
+rtlight 0 0 0
+vpvista rendered
+vporbita 0 0.5 0 12 -35 -23
+rtgpu 1 saltar
+rtrender 96 72 2
+rtengpu si
+rttris 14
+rtpixel 4 4 0 0 0 0
+rtpixel 80 56 255 255 255 40
+rtpixel 36 40 0 0 0 8
+# la DISTANCIA de la luz tambien en el shader: a 1 m no llega al piso (queda la luz de la escena inicial, gris)
+rtlight 0 0 0 1
+rtrender 96 72 2
+rtengpu si
+rtpixel 80 56 184 184 184 16
+rtlight 0 0 0
+# penumbra con pocos pases: ruido; con el denoiser de la GPU, liso
+rtlight 1.5 1 0
+rtopt 1 1 2
+rtdenoiser 0
+rtrender 160 120 2
+rtruido 20 70 70 100 mayorque 10.0
+rtdenoiser 4
+rtrender 160 120 2
+rtengpu si
+rtruido 20 70 70 100 menorque 4.0
+rtdenoiser 0
+# y en la CPU sigue andando
+rtgpu 0
+rtrender 96 72 2
+rtengpu no
+# la GPU compartida entre el viewport (a la mitad) y el render a archivo (a tamano completo): no se cuelga
+rtgpucompartida

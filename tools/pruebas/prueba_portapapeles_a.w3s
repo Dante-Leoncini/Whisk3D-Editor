@@ -1,0 +1,12 @@
+# EL PORTAPAPELES DE OBJETOS ENTRE VENTANAS (1/2): este Whisk3D bisela el cubo, le pone un material rojo y lo COPIA
+# (Ctrl+C). La otra mitad (prueba_portapapeles_b.w3s) corre en OTRO proceso y lo pega
+selname Cubo
+mode edit
+selmode edge
+select all
+bevel 0.2 segs 2
+mode object
+selname Cubo
+matnombre Rojo_Portapapeles
+matcolor 1 0 0
+copiar

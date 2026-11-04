@@ -15,3 +15,5 @@ DEFAULT ARMV6
 PRJ_MMPFILES
 gnumakefile Icons_scalable_dc.mk
 Whisk3D.mmp
+// variante OpenGL ES 2.0 (N8): mismas fuentes, otro backend de graficos (ver el encabezado de Whisk3D.mmp)
+Whisk3D_gles2.mmp

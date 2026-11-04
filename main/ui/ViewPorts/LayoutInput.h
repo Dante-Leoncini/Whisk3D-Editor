@@ -261,6 +261,10 @@ bool  GuiadoUnClickActivo();             // true mientras espera el click
 // menu de contexto de Edit Mode (W / boton de barra): abre el menu Vertex/Edge/Face
 // segun el sub-modo, en (mx,my). Los menus son separados (no submenus de "Mesh").
 void LayoutMenuEditContexto(int mx, int my);
+class PopupMenu;
+PopupMenu* LayoutSubmenuEditVertex();   // los menus Vertex / Edge / Face (W y submenus de "Mesh")
+PopupMenu* LayoutSubmenuEditEdge();
+PopupMenu* LayoutSubmenuEditFace();
 // menu de contexto del EDIT MODE de ARMATURE (Fase 3): Extrude/Duplicate/Delete/Disconnect en (mx,my)
 void LayoutMenuArmEdit(int mx, int my);
 // submenus reutilizables para embeber en los menus de barra construidos en ViewPort3D.cpp
@@ -282,6 +286,8 @@ void EditXformRotEje(int dx, int dy);
 void EditXformRotOrbital(int dx, int dy);
 void EditXformRotAbs(const Quaternion& qAbs); // trackball (delta absoluto desde el inicio)
 void EditXformScale(int dx, int dy, float factor);
+void EditXformScaleSet(float f);   // el factor ABSOLUTO desde el inicio (el mouse: distancia al pivote / la inicial)
+Vector3 EditXformPivotMundo();     // el pivote del transform de malla en curso (mundo)
 // valores acumulados para la barra de estado (Translate/Scale; la rotacion usa gAnguloTransform)
 Vector3 EditXformTransDelta();
 float   EditXformScaleFactor();

@@ -1,6 +1,6 @@
 # Script Editor (IDE)
 
-Lua script'leri için satır numaraları, sözdizimi renklendirme, girinti kılavuzları ve ñ ile aksanlı harf desteği olan bir metin editörü. Odaktayken harfler yazı yazar (editörün kısayollarını tetiklemez). Android'de metne dokunmak klavyeyi açar. N95'te T9 ile yazılır.
+Lua script'leri ve [yazılan shader'lar](shaders.md) (`.glsl`) için satır numaraları, sözdizimi renklendirme, girinti kılavuzları ve ñ ile aksanlı harf desteği olan bir metin editörü. Odaktayken harfler yazı yazar (editörün kısayollarını tetiklemez). Android'de metne dokunmak klavyeyi açar. N95'te T9 ile yazılır.
 
 | İşlev | Açıklama | Kısayol |
 |---|---|---|
@@ -10,6 +10,7 @@ Lua script'leri için satır numaraları, sözdizimi renklendirme, girinti kıla
 | Save inside the .w3d | Yalnızca script haricîyse: onu projenin içine alır. | File |
 | Save outside the .w3d… | Yalnızca script dahilîyse: onu bir dosyaya çıkarır; nesneler artık o dosyayı kullanır. | File |
 | Refresh | Dosyayı diskteki hâliyle getirir (başka bir editörle düzenlenenler). Editörde kaydedilmemiş değişiklikler varsa, onları atmadan önce sorar (<kbd>Ctrl+Z</kbd> ile geri getirilebilirler). Oyun çalışırken, script'i kullanan nesneleri canlı olarak yeniden yükler. | Düğme |
+| Shader'lar (.glsl) | Materyalden (**Shader** satırındaki küçük düğme), Library'den ya da seçiciden açılır ve GLSL olarak renklendirilir. Adın yanında **Compile** görünür: yazmakta olduğunu derler (bir materyal onu kullanıyorsa kaydeder ve o materyali derler). Bir shader'ı kaydetmek onu kullanan tüm materyallerde derler ve derlenip derlenmediğini ya da satırıyla birlikte hatayı bildirir. | <kbd>Ctrl+S</kbd> |
 | Kaydetme koruması | Harici dosya açıldığından beri dışarıda değiştiyse, Save üzerine yazmadan önce sorar. Oyun çalışıyorsa Save script'i canlı olarak da yeniden yükler. | Otomatik |
 | Girinti (Tab) | <kbd>Tab</kbd> bir sonraki 4'ün katına kadar tamamlar; birden fazla satır seçiliyken onlara bir seviye ekler, <kbd>Shift+Tab</kbd> ise bir seviye çıkarır. Dikey çizgiler her seviyeyi işaretler; imlecin bulunduğu bloğunki daha açık görünür. | <kbd>Tab</kbd> / <kbd>Shift+Tab</kbd> |
 | Edit menüsü | Undo, Redo, Cut, Copy, Paste, Find… ve Replace… | Edit düğmesi |

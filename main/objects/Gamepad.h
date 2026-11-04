@@ -45,8 +45,11 @@
 #include "objects/Mesh.h"
 #include "Target.h"
 
-#ifndef W3D_SYMBIAN
-// ---- (1) ENTRADA CRUDA DEL MANDO (SDL): generica, la lee cualquier juego (PC/desktop) --------
+#ifdef W3D_SYMBIAN
+#include "app/W3dSdlMinimo.h"   // los numeros de ejes y botones de SDL: el telefono pone ahi sus joysticks (bthid)
+#endif
+// ---- (1) ENTRADA CRUDA DEL MANDO: generica, la lee cualquier juego. PC/Android/web por SDL; Symbian por el driver
+//          Bluetooth bthid-s60 (W3dMandos del Core, ver MandosSymbianTick) en los MISMOS lugares --------
 extern float axisState[SDL_CONTROLLER_AXIS_MAX];
 extern bool buttonState[SDL_CONTROLLER_BUTTON_MAX];
 extern GLfloat deadzone;
@@ -56,8 +59,13 @@ enum { W3D_MANDOS_SDL = 4 };
 extern float axisStateM[W3D_MANDOS_SDL][SDL_CONTROLLER_AXIS_MAX];
 extern bool buttonStateM[W3D_MANDOS_SDL][SDL_CONTROLLER_BUTTON_MAX];
 
+#ifndef W3D_SYMBIAN
 // Refresca axisState/buttonState desde un evento SDL
 void RefreshInputControllerSDL(SDL_Event &e);
+#else
+// Symbian: lee los joysticks del driver (una vez por cuadro), avisa los que se conectan o desconectan y deja su
+// estado en axisState / buttonState (por mando y mezclados), como hace SDL en PC
+void MandosSymbianTick();
 #endif
 
 struct VertexAnimationActive;   // solo por puntero (ver targetAnim)

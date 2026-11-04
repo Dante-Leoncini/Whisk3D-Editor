@@ -17,6 +17,7 @@
 class AnimProperty; // animation/Animation.h (una CURVA: propiedad + componente). Lo incluye el .cpp
 class PopupMenu;    // WhiskUI/PopupMenu.h (idem)
 class Object;       // objects/Objects.h (DopeIdDueno)
+class Sonido;       // objects/Sonido.h (las tiras de sonido)
 
 // ============================================================================
 //  IDENTIDAD DEL DUENO adentro de las claves del dope: "#<serial>", NO el nombre.
@@ -173,14 +174,25 @@ class Timeline : public ViewportBase, public WithBorder, public Scrollable {
             bool oculto;         // OJO apagado: la curva no se dibuja, no se puede clickear ni la agarran las
                                  // acciones de seleccion. Lo calcula ConstruirDopeRows y BAJA a los hijos (apagar
                                  // el ojo de un hueso apaga sus canales).
+            Object* sonido;      // la fila de un objeto SONIDO: en el strip va su TIRA (se mueve y se recorta)
+            int tiraFilas;       // la tira ocupa esta fila y 'tiraFilas' mas (con la forma de onda o el volumen a la
+                                 // vista: mas alta); -1 = es una de esas filas de CONTINUACION (sin nombre)
             // los campos que NO son de canal arrancan en "no soy un canal": armar una fila padre y olvidarse de
             // propId/compId dejaba basura adentro
-            DopeRow() : tipo(0), nivel(0), propId(-1), compId(-1), icono(-1), oculto(false) {}
+            DopeRow() : tipo(0), nivel(0), propId(-1), compId(-1), icono(-1), oculto(false), sonido(NULL), tiraFilas(0) {}
         };
         std::vector<DopeRow> dopeRows;
         int panelW;      // ancho del panel (0 = sin dope sheet -> timeline clasico)
         int panelWUser;  // ancho FIJADO por el usuario arrastrando el borde (0 = automatico segun el texto)
         bool panelResize;// arrastrando el borde del panel
+        bool panelBordeHover; // el mouse sobre el borde (se pinta blanco; arrastrando, verde)
+        int  panelPosX;  // scroll HORIZONTAL del texto del panel (<= 0)
+        int  panelContW; // ancho del texto mas largo (flecha + icono + nombre), sin la columna de ojos
+        bool panelBarraH;// arrastrando la barra horizontal del panel
+        int  panelPaneo; // boton del medio: 0 = sin decidir, 1 = scrollea el PANEL, 2 = panea el strip
+        int  PanelMaxX() const;            // tope del scroll horizontal del panel (<= 0)
+        bool PanelBarraH(int& bx, int& by, int& bw, int& bh, int& tx, int& tw) const; // barra horizontal del panel
+        bool PanelEnBorde(int lx, int ly) const; // (lx, ly) sobre el borde que cambia el ancho del panel
         int rowH;        // alto de fila
         int hoverRow;    // fila bajo el mouse (-1 = ninguna) para el mouse-over
 
@@ -276,6 +288,22 @@ class Timeline : public ViewportBase, public WithBorder, public Scrollable {
         void HandleSoltar();
         std::string DopeTextoTransform() const; // readout: "Move: 2 frames" / "Scale: [2*2] = 4"
         bool DopeMoviendo() const;           // hay un 'g' de keyframes en curso?
+        // ===== LAS TIRAS DE SONIDO (objects/Sonido.h) =====
+        // Un objeto Sonido seleccionado tiene su fila con una TIRA: donde arranca y cuanto dura, en SEGUNDOS de la
+        // escena (no se engancha a los frames). Arrastrarla la corre, agarrarla de una punta la recorta; 'g' corre
+        // todas las seleccionadas. Con View > Waveform se ve su forma de onda y con View > Volume line, la curva de
+        // su volumen (animado o no). Sin eso es solo la tira.
+        void DibujarTira(const DopeRow& d, int ry0);
+        bool TiraClick(int mx, int my);      // true = agarro una tira (o la punta de una)
+        void TiraHover(int mx, int my);      // la punta bajo el mouse (se pinta blanca; arrastrandola, verde)
+        // que hay en (mx,my): la fila de un sonido y si es su punta izquierda (2), la derecha (3) o el cuerpo (1).
+        // 0 = nada. La comparten el click y el hover: no se pueden desincronizar
+        int  TiraEn(int mx, int my, Sonido** s);
+        bool TiraGrabStart();                // 'g' sin keyframes elegidos: corre los sonidos seleccionados
+        void TiraAplicar(int mx);
+        void TiraConfirmar(); void TiraCancelar();
+        bool TiraActiva() const;
+        void TiraSoltar();                   // soltar el boton: el arrastre termina
         int  DopeAltoContenido() const { return (int)dopeRows.size()*rowH; }
 
         // espejos float <- globales + texto/visibilidad de los botones de la barra. Va SIEMPRE despues de

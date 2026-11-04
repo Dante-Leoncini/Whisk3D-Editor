@@ -66,7 +66,7 @@ void CWhisk3D::AppInit( void ){
 
     RFs fs;
     User::LeaveIfError(fs.Connect());
-    w3dLogReset();
+    // (el log arranca en CWhisk3DContainer::ConstructL, antes de EGL: asi queda el init de GL y de los shaders)
     w3dLog("AppInit: inicio");
 
     // carpetas de SALIDA del editor: render PNG en E:\whisk3d\render, export OBJ en E:\whisk3d\models.

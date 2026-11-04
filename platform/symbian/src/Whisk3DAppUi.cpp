@@ -106,6 +106,7 @@ void CWhisk3DAppUi::ConstructL(){
 // Destructor
 CWhisk3DAppUi::~CWhisk3DAppUi(){
 	w3dEngine::W3dAudioShutdown();   // parar el hilo de audio antes de soltar el resto
+	w3dLogBajar();   // lo que el log tenia juntado, al archivo (ver w3dlog.cpp)
 	if ( iAppContainer ){
 		RemoveFromStack( iAppContainer );
 		delete iAppContainer;
@@ -165,8 +166,9 @@ TBool CWhisk3DAppUi::ProcessCommandParametersL(CApaCommandLine& aCommandLine)
 // ----------------------------------------------------
 //
 TKeyResponse CWhisk3DAppUi::HandleKeyEventL(const TKeyEvent& aKeyEvent, TEventCode aType ){
-    if ( iAppContainer->iWhisk3D ){ // (la FSM se retiro: siempre corriendo)   
+    if ( iAppContainer->iWhisk3D ){ // (la FSM se retiro: siempre corriendo)
         TUint scan = aKeyEvent.iScanCode;
+        { static TInt sLog = 0; if (aType == EEventKeyDown && sLog < 60) { sLog++; w3dLogf("[teclas] appui: scancode %d", (TInt)scan); } }
             
         // Imprimir el código de escaneo para depuración
         /*if (scan != 165){
@@ -355,6 +357,12 @@ typedef enum { AnimPosition, AnimRotation, AnimScale };
 // Command handler
 // ----------------------------------------------------
 //
+void CWhisk3DAppUi::HandleForegroundEventL( TBool aForeground )
+    {
+    CAknAppUi::HandleForegroundEventL( aForeground );
+    if ( iAppContainer ) iAppContainer->SetPrimerPlano( aForeground );
+    }
+
 void CWhisk3DAppUi::HandleCommandL(TInt aCommand){
     switch ( aCommand )
         {
@@ -363,8 +371,7 @@ void CWhisk3DAppUi::HandleCommandL(TInt aCommand){
             break;
         case EEikCmdExit:
             {
-            // con algo SIN GUARDAR: el cartel (0 = W3D_CAMBIOS_SALIR); la salida la hace su respuesta
-            if (W3dCambiosPreguntar(0, std::string())) break;
+            // en el telefono se cierra y punto: sin el cartel de "cambios sin guardar" (ver CambiosProyecto.cpp)
             Exit();
             break;
             }

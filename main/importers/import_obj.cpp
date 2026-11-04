@@ -154,7 +154,9 @@ std::string* TexturaPendienteRefDe(const Material* mat) {
 }
 
 void TexturasDormir(const TexDormida& d) {
-    if (!d.mat || (d.base.empty() && d.normal.empty() && d.texB.empty() && d.capas.empty())) return;
+    bool algunMapa = false;
+    for (int k = W3D_MAPA_EMISION; k < W3D_MAPAS; k++) if (!d.mapas[k].empty()) algunMapa = true;
+    if (!d.mat || (d.base.empty() && d.normal.empty() && d.texB.empty() && d.capas.empty() && !algunMapa)) return;
     TexDormida* ya = TexturasDormidasDe(d.mat);
     if (ya) *ya = d; else g_texDormidas.push_back(d);
 }
@@ -184,6 +186,11 @@ static void DespertarUna(const TexDormida& d) {
         m->texturaB = TexturaTomar(d.texB);
         if (!m->texturaB) w3dLogfW("[W3D] no pude cargar la textura '%s'", d.texB.c_str());
     }
+    for (int k = W3D_MAPA_EMISION; k < W3D_MAPAS; k++)   // los MAPAS (emision, rugosidad, metalico, alfa): como el normal
+        if (!d.mapas[k].empty() && !m->mapaTex[k]) {
+            m->mapaTex[k] = TexturaTomar(d.mapas[k]);
+            if (!m->mapaTex[k]) w3dLogfW("[W3D] no pude cargar la textura '%s'", d.mapas[k].c_str());
+        }
     std::vector<TexLayer> capas;
     for (size_t c = 0; c < d.capas.size(); c++) {
         Texture* t = TexturaTomar(d.capas[c].textura);
@@ -227,6 +234,7 @@ bool TexturasAdormecer(Material* m) {
         }
     if (m->normalTexture) d.normal = m->normalTexture->path;
     if (m->texturaB) d.texB = m->texturaB->path;
+    for (int k = W3D_MAPA_EMISION; k < W3D_MAPAS; k++) if (m->mapaTex[k]) d.mapas[k] = m->mapaTex[k]->path;
     // las capas duermen TODAS o ninguna (despiertan adelante de las que tenga: el orden se conserva)
     bool capasTodas = !m->capas.empty();
     for (size_t c = 0; c < m->capas.size(); c++) if (!m->capas[c].tex) capasTodas = false;

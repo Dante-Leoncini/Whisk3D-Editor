@@ -199,10 +199,23 @@ outsel n 0
 
 # ---- G) la CUADRICULA: miniaturas perezosas; la seleccion y el rename andan igual ----
 outcuadricula 1
+# una carpeta a la vez: en la raiz se ve la carpeta Arte (no lo de adentro) y no hay "Ir atras"
+outfila Arte
+outnofila dosmats.png
+outnofila atras
+outmini Personaje no
+# doble click en la carpeta: se entra (se ve solo lo de adentro y la celda "Ir atras")
+outdobleclick Arte
+outfila atras
+outnofila Personaje
 outmini dosmats.png si colorvivo
 outmini Cuero si colorvivo
 outmini Cubo si colorvivo
-outmini Personaje no
+# "Ir atras" sube a la raiz; y se vuelve a entrar
+outclick atras
+outfila Personaje
+outnofila Cuero
+outdobleclick Arte
 outclick Cuero
 recactivo materiales Cuero
 outdobleclick Cuero

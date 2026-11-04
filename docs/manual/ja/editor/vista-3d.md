@@ -54,6 +54,7 @@
 | Material Preview | 初期設定の表示です。ビューの方向からのニュートラルなライトで照らし、シーンのライトには依存しません。 |
 | Solid Preview / Wireframe Preview / ZBuffer Preview | 単色のグレー、辺のみ、または深度を表示します。 |
 | Normal View / Alpha Preview | 法線をカラーで、または透明度を白黒で表示します。 |
+| Motion vectors | 前のフレームから各ピクセルが画面上でどれだけ動いたか（赤 = X、緑 = Y、ラベンダー色 = 静止、オリーブ色 = 背景）。レンダーの `_vectores` パスと同じ画像です。 |
 | Wireframe: Only Visible | ワイヤーフレーム表示で、実際に描画されるものだけを表示します。 |
 
 ### Overlays

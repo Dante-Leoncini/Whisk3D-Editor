@@ -20,6 +20,7 @@ extern bool g_viewEditMode;   // toggle "vista" tactil (ViewPort3D_Toolbar): en 
 #include "Undo.h" // Ctrl+Z
 #include "objects/Gamepad.h"    // axisState/buttonState: se sueltan al desenchufar el mando
 #include "script/BindsJuego.h"  // el REGISTRO compartido de controles (hotplug + avisos + lua)
+#include "base/W3dVibrar.h"     // el agarre del outliner vibra
 #include "script/W3dScript.h"   // W3dScriptMandosVibrarHook: vibrar() de lua en los mandos
 #include "app/W3dAtajos.h"      // atajos de teclado reasignables
 
@@ -32,10 +33,13 @@ extern bool g_viewEditMode;   // toggle "vista" tactil (ViewPort3D_Toolbar): en 
 // ---------------------------------------------------------------------------------------------------------------
 // La identidad de los imprimibles no es una suposicion: si SDL cambiara de numeracion, esto no compila en vez de
 // morirse en silencio dejando todos los atajos rotos.
+// (Symbian compila con RVCT 2.2, C++03: sin static_assert. Usa W3dSdlMinimo.h, con los mismos numeros)
+#ifndef W3D_SYMBIAN
 static_assert(SDLK_g == W3dK_G && SDLK_x == W3dK_X && SDLK_0 == W3dK_0 && SDLK_SPACE == W3dK_SPACE,
               "SDL dejo de numerar los imprimibles por su ASCII: revisar W3dTeclaDesdeSDL");
 static_assert(SDL_BUTTON_LEFT == W3dMB_IZQ && SDL_BUTTON_MIDDLE == W3dMB_MEDIO && SDL_BUTTON_RIGHT == W3dMB_DER,
               "SDL cambio los numeros de los botones: revisar W3dBotonDesdeSDL");
+#endif
 
 static int W3dTeclaDesdeSDL(SDL_Keycode k){
     switch (k){
@@ -79,6 +83,9 @@ static int W3dTeclaDesdeSDL(SDL_Keycode k){
         case SDLK_KP_9:      return W3dK_KP_9;
         case SDLK_KP_ENTER:  return W3dK_KP_ENTER;
         case SDLK_KP_PERIOD: return W3dK_KP_PERIOD;
+#ifndef W3D_SYMBIAN
+        case SDLK_KP_DIVIDE: return W3dK_SLASH;   // el "/" del teclado numerico = la Vista local (como el "/")
+#endif
         default: break;
     }
     if (k >= 32 && k < 127) return (int)k;   // imprimible: vale su ASCII
@@ -134,6 +141,7 @@ extern void NumEditCancel();
 extern void NumEditSalirDelPanel(); // limpia el 'editando' del panel al terminar (sino te clava en la propiedad)
 
 std::map<SDL_FingerID, Finger> fingers;
+static Finger DedoEn(float x, float y) { Finger f; f.x = x; f.y = y; return f; }   // (C++03: sin {x, y})
 // DOBLE TAP DE 2 DEDOS (tactil): dos toques cortos con dos dedos, sin moverlos, sobre el viewport 3D = encuadrar la
 // seleccion (lo mismo que View > Frame Selected). El gesto se mide desde que apoya el 2do dedo hasta que se levantan
 // los dos; si alguno se corrio (pinch/paneo) o tardo mucho, no es un tap.
@@ -194,6 +202,9 @@ Uint32 g_lastFingerTicks = 0;       // ultimo evento de DEDO: filtra los mouse F
 // mover = el menu contextual). Mientras tanto, arrastrar el dedo sigue siendo SCROLL (lo normal). El agarre queda en
 // g_outAgarre hasta levantar el dedo: el motion va derecho al outliner (no scrollea) y el up lo suelta ahi.
 static const Uint32 kPulsacionLargaMs = 500;
+// el AGARRE de la biblioteca / el outliner: un SEGUNDO quieto (mas corto se confundia con empezar a scrollear) y el
+// telefono vibra: recien ahi arrastrar mueve el elemento; antes, arrastrar es scroll
+static const Uint32 kAgarreOutlinerMs = 1000;
 // IDE TACTIL: la lupa (pulsacion larga) o una agarradera de la seleccion en curso; mientras dura, el dedo es de el
 static IDE* g_ideGestoVp = NULL;
 static bool g_outAgarre = false;
@@ -216,9 +227,10 @@ void ControlesTick() {
         }
         return;
     }
-    if (!g_barTapView || !g_barTapView->isLeaf() || g_barTapView->ViewportKind() != 2) return;
-    if (SDL_GetTicks() - g_tapStartTicks < kPulsacionLargaMs) { g_redraw = true; return; }   // (sigue esperando)
+    if (!g_barTapView || !g_barTapView->isLeaf() || !VpEsOutliner(g_barTapView)) return;
+    if (SDL_GetTicks() - g_tapStartTicks < kAgarreOutlinerMs) { g_redraw = true; return; }   // (sigue esperando)
     if (LayoutPulsacionLargaUI(g_tapStartX, g_tapStartY)) {
+        w3dEngine::Vibrar(w3dEngine::VibGolpe);   // el aviso: ya esta agarrado, ahora se arrastra
         g_contentTapPending = false;   // ya no es ni tap ni scroll: es un agarre
         g_outAgarre = true;
         ViewPortClickDown = true;
@@ -267,6 +279,9 @@ static void ControlesOlvidarViewport(ViewportBase* vp) {
 struct ControlesEngancharOlvido { ControlesEngancharOlvido() { ViewportOlvidarRegistrar(ControlesOlvidarViewport); } };
 static ControlesEngancharOlvido g_controlesEngancheOlvido;
 
+// LOS MANDOS (vibrar + enchufar en caliente) son de SDL: Symbian no tiene SDL y sus controles BT entran por otra
+// via. Hasta el fin de la seccion de mandos queda solo para las plataformas con SDL.
+#ifndef W3D_SYMBIAN
 // vibrar() de lua en los MANDOS (W3dScriptMandosVibrarHook de script/W3dScript.h): todos los conectados, la fuerza en
 // los dos motores. (SDL 2.0.7, la de Android 2.3, no tiene rumble: ahi vibra el telefono)
 static void VibrarMandos(int ms, float fuerza) {
@@ -282,6 +297,7 @@ static void VibrarMandos(int ms, float fuerza) {
 }
 struct ControlesEngancharVibrar { ControlesEngancharVibrar() { W3dScriptMandosVibrarHook = VibrarMandos; } };
 static ControlesEngancharVibrar g_controlesEngancheVibrar;
+#endif
 
 // MULTI-TOUCH del juego: alimenta cada dedo tactil activo al script (dedo(1), dedo(2), ...) durante el
 // play. Aditivo: si NO hay dedos (mouse/desktop) no hace nada -> el dedo 0 lo sigue manejando
@@ -299,6 +315,7 @@ void AlimentarDedosJuego() {
     for (; i < 4; i++) SimToquePantallaDedo(g_toqueJuegoVp, i, 0, 0, false); // los que no hay: inactivos
 }
 
+#ifndef W3D_SYMBIAN
 // ============================================================================
 //  HOTPLUG DE CONTROLES (pedido del dueno).
 //
@@ -355,6 +372,7 @@ static void ControlCerrar(int id) {
 void W3dControlesAbrirLosQueHay() {
     for (int i = 0; i < SDL_NumJoysticks(); i++) ControlAbrir(i);
 }
+#endif // (fin de los mandos de SDL)
 
 // las teclas que el JUEGO tiene apretadas (en play): su soltar va al juego siempre, y si la ventana pierde el
 // foco (alt-tab) se las suelta todas (SDL no manda el KEY_UP de lo que se suelta afuera)
@@ -365,17 +383,19 @@ void InputUsuarioSDL3(SDL_Event &e){
         for (std::set<int>::iterator it = gTeclasJuego.begin(); it != gTeclasJuego.end(); ++it) SimTeclaSDL(*it, false);
         gTeclasJuego.clear();
     }
+#ifndef W3D_SYMBIAN
     RefreshInputControllerSDL(e);
 
     // HOTPLUG: enchufar/desenchufar con el editor abierto
     if (e.type == SDL_CONTROLLERDEVICEADDED)   { ControlAbrir(e.cdevice.which);  g_redraw = true; return; }
     if (e.type == SDL_CONTROLLERDEVICEREMOVED) { ControlCerrar(e.cdevice.which); g_redraw = true; return; }
+#endif
 
     switch(e.type) {
         case SDL_FINGERDOWN:
             // OJO ORDEN: SDL sintetiza el MOUSEBUTTONDOWN ANTES de pushear este FINGERDOWN -> el reset del
             // gesto va en el down del mouse (aca borraria los flags recien seteados por ese down).
-            fingers[e.tfinger.fingerId] = {e.tfinger.x, e.tfinger.y};
+            fingers[e.tfinger.fingerId] = DedoEn(e.tfinger.x, e.tfinger.y);
             g_lastFingerTicks = SDL_GetTicks();
             // POPUP activo (explorador, etc): lo maneja el DEDO directo (la sintesis de mouse de SDL se
             // desincroniza). 1 dedo = click del popup; si Click devuelve false (afuera) se cierra.
@@ -455,7 +475,7 @@ void InputUsuarioSDL3(SDL_Event &e){
             break;
 
         case SDL_FINGERMOTION:
-            fingers[e.tfinger.fingerId] = {e.tfinger.x, e.tfinger.y};
+            fingers[e.tfinger.fingerId] = DedoEn(e.tfinger.x, e.tfinger.y);
             if (g_dosDedosTicks != 0 && !g_dosDedosMovio) {   // tap de 2 dedos: si un dedo se corre, era pinch/paneo
                 std::map<SDL_FingerID, Finger>::iterator i0 = g_dosDedosInicio.find(e.tfinger.fingerId);
                 if (i0 != g_dosDedosInicio.end()) {
@@ -571,6 +591,9 @@ void InputUsuarioSDL3(SDL_Event &e){
 
         // loop cut en curso: el motion maneja el preview (sigue la arista) o el slide
         if (LoopCutActivo()) { LoopCutMotion(mx, my); return; }
+        // inset en curso: el mouse maneja el grosor (o la profundidad con Ctrl)
+        if (InsetActivo()) { InsetMotion(mx, my); GuardarMousePos(); return; }
+        if (BevelActivo()) { BevelMotion(mx, my); GuardarMousePos(); return; }
 
         // BOX SELECT: mientras esta armado la cruz sigue al cursor, y mientras se arrastra la
         // caja se estira. En los dos casos se queda con el motion: si siguiera de largo, el
@@ -821,6 +844,13 @@ void InputUsuarioSDL3(SDL_Event &e){
     // rueda del mouse (bloqueada con un desplegable abierto)
     if (e.type == SDL_EVENT_MOUSE_WHEEL) {
         if (LoopCutActivo()) { LoopCutWheel(e.wheel.y > 0 ? 1 : -1); return; } // mas/menos cortes
+        if (BevelActivo()) { BevelRueda(e.wheel.y > 0 ? 1 : -1); return; }      // mas/menos segmentos
+        // la rueda AFUERA de un popup que se resuelve solo (el panel de la ultima operacion, un borrado recien pedido):
+        // seguir trabajando lo cierra y la rueda va al viewport (zoom) en vez de quedar trabada
+        if (PopUpActive && !PopUpDejaPasar()) {
+            int pmx, pmy; SDL_GetMouseState(&pmx, &pmy);
+            if (!PopUpActive->Contains(pmx, pmy)) PopUpActive->SeguirTrabajando();
+        }
         if (PopUpActive && !PopUpDejaPasar()) {
             PopUpActive->Wheel(e.wheel.y); // popup modal (file browser, etc)
         } else if (LayoutMenuAbierto() && MenuAbierto) {
@@ -842,6 +872,21 @@ void InputUsuarioSDL3(SDL_Event &e){
 
     // Botones del mouse
     if (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
+        // inset en curso: izq confirma (y abre el panel), der cancela
+        if (BevelActivo()) {
+            if (e.button.button == SDL_BUTTON_LEFT)       BevelConfirmar();
+            else if (e.button.button == SDL_BUTTON_RIGHT) BevelCancelar();
+            if (e.button.which == SDL_TOUCH_MOUSEID && PopUpActive) g_popupOpenedByMouseDown = true;
+            GuardarMousePos();
+            return;
+        }
+        if (InsetActivo()) {
+            if (e.button.button == SDL_BUTTON_LEFT)       InsetConfirmar();
+            else if (e.button.button == SDL_BUTTON_RIGHT) InsetCancelar();
+            if (e.button.which == SDL_TOUCH_MOUSEID && PopUpActive) g_popupOpenedByMouseDown = true;
+            GuardarMousePos();
+            return;
+        }
         // loop cut en curso: izq aplica/confirma, der centra+confirma (o cancela en preview)
         if (LoopCutActivo()) {
             bool popupAntes = (PopUpActive != NULL);
@@ -901,6 +946,7 @@ void InputUsuarioSDL3(SDL_Event &e){
             // sintetiza este mouse-down ANTES de pushear el SDL_FINGERDOWN -> en este punto 'fingers'
             // todavia esta VACIO y chequearlo hacia caer el touch al flujo de mouse (clickeaba al apoyar).
             bool esTouch = (e.button.which == SDL_TOUCH_MOUSEID);
+            g_ultimoDownTactil = esTouch;   // el arrastre que sigue es de un dedo (el 3D orbita con 1 dedo)
             // gesto NUEVO: limpiar lo que quedo del anterior (scroll lockeado, tap a medio decidir, slider)
             g_fingerScrolling = false; g_scrollView = NULL; g_slideNum = false;
             g_barTapPending = false; g_contentTapPending = false;
@@ -1002,7 +1048,7 @@ void InputUsuarioSDL3(SDL_Event &e){
                 g_redraw = true;
             }
             else if (esTouch && !LayoutMenuAbierto() && vpDown &&
-                     (vpDown->ViewportKind() == 2 || vpDown->ViewportKind() == 3 ||
+                     (VpEsOutliner(vpDown) || vpDown->ViewportKind() == 3 ||
                       vpDown->ViewportKind() == 7 || vpDown->ViewportKind() == 8)) {
                 g_contentTapPending = true;
                 g_contentTapTactil = true;
@@ -1054,6 +1100,8 @@ void InputUsuarioSDL3(SDL_Event &e){
                     g_barTapView = hoja3d; g_tapStartX = (int)e.button.x; g_tapStartY = (int)e.button.y; g_tapStartTicks = SDL_GetTicks();
                     if (!pinturaAlt) { viewPortActive->button_left(); g_view3dTapPending = true; }
                 }
+                // el CANDADO de la vista de camara (abajo al centro): abre / cierra, mouse o dedo
+                else if (es3Dnav && ((Viewport3D*)hoja3d)->CandadoCamaraClick((int)e.button.x, (int)e.button.y)) {}
                 else if (es3Dnav && !esTouch && GizmoDown(hoja3d, (int)e.button.x, (int)e.button.y)) {
                     ViewPortClickDown = true;
                 }
@@ -1082,9 +1130,8 @@ void InputUsuarioSDL3(SDL_Event &e){
             middleMouseDown = true;
             // orbitar con el mouse AFUERA cierra el redo-panel (semi-modal);
             // al quedar PopUpActive=NULL, las motions de la orbita ya pasan
-            if (PopUpActive && PopUpActive->CierraConViewport() &&
-                !PopUpActive->Contains((int)e.button.x, (int)e.button.y))
-                PopUpActive->Cerrar();
+            if (PopUpActive && !PopUpActive->Contains((int)e.button.x, (int)e.button.y))
+                PopUpActive->SeguirTrabajando();   // (un panel de la ultima operacion se cierra; un borrado se confirma)
             GuardarMousePos();
         }
         else if (e.button.button == SDL_BUTTON_RIGHT) {
@@ -1141,7 +1188,7 @@ void InputUsuarioSDL3(SDL_Event &e){
                 }
                 // OUTLINER en una vista de RECURSOS: el derecho elige la fila y abre el menu de
                 // acciones (carpetas, renombrar, mover, borrar huerfanos) en el mouse
-                if (vpDer && vpDer->isLeaf() && vpDer->ViewportKind() == 2 &&
+                if (vpDer && vpDer->isLeaf() && VpEsOutliner(vpDer) &&
                     !vpDer->OnBar((int)e.button.x, (int)e.button.y) &&
                     ((Outliner*)vpDer)->MenuContexto((int)e.button.x, (int)e.button.y)) {
                     g_redraw = true; GuardarMousePos(); return;
@@ -1281,6 +1328,9 @@ void InputUsuarioSDL3(SDL_Event &e){
     // eventos del teclado
     W3dModsTemporales modsAtajo;   // (vuelve los modificadores a lo apretado al salir, por cualquier return)
     if (e.type == SDL_EVENT_KEY_DOWN) {
+        // los menus que abre una tecla (W, Shift+S, Ctrl+P...) salen EN EL CURSOR: lastMouseX/Y es donde esta ahora, no
+        // el ultimo click (en el telefono solo se actualizaba al clickear: el menu salia lejos y se cerraba al mover)
+        if (estado == editNavegacion) GuardarMousePos();
 
         // CAPTURA de la ventana de atajos: la combinacion que se aprieta es para la funcion que la espera
         if (g_atajoCapturando >= 0 &&
@@ -1362,6 +1412,9 @@ void InputUsuarioSDL3(SDL_Event &e){
         // TECLADO durante un LOOP CUT (mismo flujo que Symbian):
         //  flechas = orientacion (quad) / +-cortes (preview) / slide; enter = acepta/avanza;
         //  ESC/backspace/click-der = centra el corte (factor 0.5) y CONFIRMA, no cancela.
+        // TECLADO durante un INSET: Enter confirma, Esc cancela, I/B/O cambian Individual/Boundary/Outset
+        if (InsetActivo() && InsetTecla(W3dTeclaDesdeSDL(e.key.keysym.sym))) return;
+        if (BevelActivo() && BevelTecla(W3dTeclaDesdeSDL(e.key.keysym.sym))) return;
         if (LoopCutActivo()) {
             SDL_Keycode k = e.key.keysym.sym;
             if (k == SDLK_ESCAPE || k == SDLK_BACKSPACE)      { LoopCutClickDer(); return; }
@@ -1419,6 +1472,16 @@ void InputUsuarioSDL3(SDL_Event &e){
         // entrar o salir de la pantalla completa F11
         if (e.key.keysym.sym == SDLK_F11) {
             SetFullScreen(!cfg.fullscreen);
+        }
+        // F12 = Render Image, Ctrl+F12 = Render Animation (los botones de la tarjeta Render). Sin la repeticion de
+        // la tecla mantenida: cada render es largo y no tiene que encolarse otro
+        if (e.key.keysym.sym == SDLK_F12) {
+            if (!e.key.repeat) {
+                extern void W3dAtajoRender(bool animacion);
+                W3dAtajoRender((e.key.keysym.mod & KMOD_CTRL) != 0);
+            }
+            g_redraw = true;
+            return;
         }
         // ===== SHIFT USADO COMO MODIFICADOR: ANULA EL GESTO DE "SIGUIENTE OBJETO" =====
         // Soltar Shift a secas cambia de objeto (el gesto rapido: apretar y soltar Shift
@@ -1580,8 +1643,22 @@ void InputUsuarioSDL3(SDL_Event &e){
         // prioridad: una caja de texto enfocada; si no, el transform del 3D; si no, el de los keyframes del dope sheet
         else
         for (const char* p = e.text.text; *p; ++p)
-            if (!TextFieldInputChar((unsigned char)*p) && !NumInputChar((unsigned char)*p))
-                DopeNumInputChar((unsigned char)*p);
+            if (!TextFieldInputChar((unsigned char)*p) && !NumInputChar((unsigned char)*p) &&
+                !DopeNumInputChar((unsigned char)*p) && *p == '/') {
+                // VISTA LOCAL con un teclado que hace el "/" con Shift+7 (espanol, aleman...): SDL manda la tecla
+                // "7", no la barra, y el atajo nunca llegaba. El TEXTO si dice "/". Si la barra (o la del teclado
+                // numerico) esta apretada de verdad, ya la tomo el keydown: no se repite.
+#ifndef W3D_SYMBIAN
+                const Uint8* est = SDL_GetKeyboardState(NULL);
+                const bool barraFisica = est && (est[SDL_GetScancodeFromKey(SDLK_SLASH)] || est[SDL_SCANCODE_KP_DIVIDE]);
+#else
+                const bool barraFisica = false;   // (el teclado del telefono no tiene SDL: la barra llega como texto)
+#endif
+                if (!barraFisica && viewPortActive && viewPortActive->ViewportKind() == 1 && !g_textFieldActivo) {
+                    ((Viewport3D*)viewPortActive)->LocalViewToggle();
+                    g_redraw = true;
+                }
+            }
     }
     #endif
 }

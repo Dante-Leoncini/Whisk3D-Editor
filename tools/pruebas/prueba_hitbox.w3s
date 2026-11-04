@@ -23,7 +23,7 @@
 #      entrar 2, quedarse 14, salir 2 (cada lado filtra por su cuenta).
 #  Despues: Stop devuelve la escena, y un guardado + reapertura (contenedor v4)
 #  conserva los campos y da EXACTAMENTE los mismos eventos; re-guardar sin cambios
-#  da las mismas entradas byte a byte. Rebobinar (simpaso -1) olvida los pares.
+#  da las mismas entradas byte a byte.
 # ==========================================================================
 
 abrirw3d prueba_hitbox.w3d
@@ -94,17 +94,3 @@ simstop
 # --- re-guardar sin cambios: mismas entradas, mismos bytes ---
 guardarw3d prueba_hitbox_rt2.w3d
 w3diguales prueba_hitbox_v4.w3d prueba_hitbox_rt2.w3d
-
-# --- viaje en el tiempo: rebobinar OLVIDA quien estaba adentro (el estado de lua no se
-#     rebobina) y al seguir jugando se recalcula: la zona vuelve a avisar alEntrar ---
-abrirw3d prueba_hitbox_v4.w3d
-simplay 12
-hitboxinfo ZonaPuerta tocando 1
-simpaso -1
-hitboxinfo ZonaPuerta tocando 0
-hitboxstats pares 0
-simpaso 1
-simplay 1
-hitboxinfo ZonaPuerta tocando 1
-scriptinfo compartido puerta_entrar 2
-simstop

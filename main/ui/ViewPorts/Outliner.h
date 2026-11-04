@@ -47,8 +47,11 @@ struct OutFilaRec {
     bool renombrable;
     bool parte;            // PARTE de otro recurso (un clip de jerarquia debajo de su biblioteca: W3dRecursoItem::padre)
     bool sucio;            // no esta guardado (se dibuja con un '*': CambiosProyecto)
+    bool atras;            // CUADRICULA: la celda "Ir atras" (la carpeta de arriba; clave = esa carpeta)
+    long bytes;            // recurso: cuanto ocupa (-1 = no se sabe)
+    bool cargado;          // recurso: esta en memoria (false: guardado, sin cargar -> la carpeta azul)
     OutFilaRec() : carpeta(false), tipo(0), prof(0), icono(-1), usuarios(0), plegada(false), soloLectura(false),
-                   renombrable(true), parte(false), sucio(false) {}
+                   renombrable(true), parte(false), sucio(false), atras(false), bytes(-1), cargado(true) {}
 };
 
 // "Select Users" de la biblioteca (el menu del outliner y el boton de la tarjeta del recurso de
@@ -74,13 +77,15 @@ struct OutArrastreBib {
     int x, y;               // el puntero
     int destino;            // lo que pasaria al soltar ahi: 0 nada, 1 valido, -1 invalido
     std::string destinoTexto;   // que haria (en el idioma de la UI): "Assign to the 3D Mesh selector"
-    OutArrastreBib() : activo(false), tipo(0), icono(-1), soloLectura(false), x(0), y(0), destino(0) {}
+    bool fantasma;          // ADENTRO del outliner (reordenar / a una carpeta): solo lo que se lleva junto al puntero
+    OutArrastreBib() : activo(false), tipo(0), icono(-1), soloLectura(false), x(0), y(0), destino(0), fantasma(false) {}
 };
 extern OutArrastreBib g_outArrastre;
 // dibuja el recurso arrastrado junto al puntero (lo llama LayoutRenderMenu, encima de todo)
 void OutlinerArrastreRender(int pantallaW, int pantallaH);
 
 class Outliner : public ViewportBase, public WithBorder, public Scrollable {
+    friend class Biblioteca;   // (la biblioteca es un outliner fijo en los recursos: arma su barra)
     public:
         Scrollable* ComoScrollable() { return this; }
         size_t CantidadRenglones;
@@ -113,12 +118,10 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable {
         void FindMouseOver(int mx, int my);
         void event_mouse_motion(int mx, int my) W3D_OVERRIDE;
         bool event_finger_scroll(int px, int py, int dx, int dy) W3D_OVERRIDE; // touch: arrastrar = scroll v/h
-#ifndef W3D_SYMBIAN
-        void mouse_button_up(int boton) W3D_OVERRIDE;
+        void mouse_button_up(int boton) W3D_OVERRIDE;   // (Symbian: solo con el dedo)
         void event_mouse_wheel(float dy, int mx, int my) W3D_OVERRIDE;
         void event_key_down(int tecla, bool repeticion) W3D_OVERRIDE;
         void event_key_up(int tecla) W3D_OVERRIDE;
-#endif
         // click para seleccionar la fila (compartido; en el N95 lo llama el
         // router del mouse HID, en PC se puede cablear a mouse_button_up)
         void ClickSeleccionar(int mx, int my);
@@ -152,7 +155,9 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable {
         float autoScrollResto;         // la fraccion de pixel que quedo
         void ActualizarDrop(int mx, int my);   // la vista previa del drop bajo (mx, my)
         void AutoScrollArrastre();
-        bool SinEnvolverCursor() const W3D_OVERRIDE { return dragging; }
+        // arrastrando una fila de la escena, un RECURSO (puede salir hacia otro viewport: el 3D, Properties) o el divisor
+        // de una columna, el cursor NO da la vuelta al llegar al borde
+        bool SinEnvolverCursor() const W3D_OVERRIDE { return dragging || recArrastre || colArrastre >= 0; }
 
         // MODO MOVER con teclado (sin mouse, clave en N95 para ordenar lamparas antes de los objetos):
         // g (PC) / 1 (Symbian) entra; flechas reordenan (arriba/abajo) o reparentan (izq=sacar / der=meter);
@@ -167,7 +172,8 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable {
         void MoverCancelar();      // restaura la posicion original y sale
         bool ModoMover() const { return moviendo; }
         int ViewportKind() const { return 2; } // (menu de tipo)
-        void ClearHover() { hoverFila = -1; } // el mouse se fue
+        void ClearHover() { hoverFila = -1; hoverMx = hoverMy = -1; colHover = -1; } // el mouse se fue
+        void event_finger_gesture(float zoomDelta, float panDx, float panDy) W3D_OVERRIDE;   // 2 dedos: zoom de la cuadricula
 
         void key_down_return();
 
@@ -185,9 +191,22 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable {
         int vista;                 // OUT_VISTA_* (se guarda en el layout como "vista: <clave>")
         int filtro;                // el filtro de la biblioteca: un tipo (W3dVistaRec) o -1 = todo
         bool cuadricula;           // la biblioteca como CUADRICULA de miniaturas (false = lista)
+        bool verMemoria;           // la biblioteca: la fila de abajo con la memoria (RAM / video) usada y libre
+        bool verTamanos;           // la biblioteca: cuanto ocupa cada recurso (la columna / la etiqueta de la celda)
+        bool verTipo;              // la biblioteca en LISTA: la columna Tipo (apagada por defecto: el icono ya lo dice)
+        bool verUsos;              // la biblioteca: cuantos lo usan + en uso / huerfano (la columna; en la cuadricula, el icono)
+        // CUADRICULA: se ve UNA carpeta a la vez (doble click en una carpeta entra; la celda "Ir atras" sube) y el
+        // tamanio de las celdas lo elige el usuario (la rueda o dos dedos)
+        std::string carpetaGrid;   // la carpeta que se ve ("" = la raiz)
+        float celdaZoom;           // 1 = el tamanio de siempre
+        unsigned entroMs;          // cuando se entro a una carpeta con UN click (0 = no): el 2do click de un doble click
+                                   // no cae en lo que aparecio adentro
+        void EntrarCarpetaGrid(const std::string& carpeta);
+        int hoverMx, hoverMy;      // el mouse sobre el panel (la celda / fila bajo el se resalta); -1 = afuera
         void CambiarVista(int v);
         void CambiarFiltro(int f);
         void CambiarCuadricula(bool on);
+        int AltoFilaMemoria() const;   // el alto de la fila de memoria de abajo (0 = no se ve)
         bool EnBiblioteca() const { return vista != OUT_VISTA_ESCENA; }
         bool VistaSoloLectura() const { return vista >= OUT_VISTA_LIBEXT; }
         // la clave de la vista para el layout ("escena", "biblioteca", "lib:<ruta>") y al reves
@@ -195,6 +214,7 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable {
         bool VistaDeClave(const std::string& c);
         // la barra: [0] tipo  [1] VISTA (ojo)  [2] OBJETO  [3] SELECCION  [4] "+"  [5] filtro  [6] lista/cuadricula  [7] raiz
         Button* btnVista;
+        Button* btnOpciones;       // el OJO: COMO se ve (lista / cuadricula, memoria, tamanos; en la escena, sus columnas)
         Button* btnObjeto;
         Button* btnSeleccion;
         Button* btnNueva;
@@ -217,6 +237,19 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable {
         bool recElegirAlSoltar;    // el click ELIGE la fila (suelta la escena, activa el recurso) al soltar sin
                                    // arrastrar: un arrastre a Properties no puede apagar la tarjeta destino
         int recArrastreY0, recArrastreX0, recDropFila;
+        // REORDENAR: el recurso que se arrastra va ANTES (o despues) de esta fila. -1 = no (a una carpeta, afuera)
+        int recInsFila;
+        bool recInsDespues;
+        // LISTA: las COLUMNAS (Nombre | Tipo | Tamanio | Usos), con la fila de los titulos arriba (siempre a la vista).
+        // El ancho de Tipo / Tamanio / Usos se ajusta arrastrando el divisor de su izquierda (blanco con el mouse
+        // encima, verde mientras se arrastra); el Nombre se queda con el resto. -1 = el ancho de siempre.
+        int colAncho[3];           // en px a escala 1 (se multiplica por GlobalScale)
+        int colArrastre, colHover; // el divisor que se arrastra / bajo el mouse (0 Tipo, 1 Tamanio, 2 Usos; -1 ninguno)
+        int AltoCabecera() const;  // la fila de los titulos (0 en la escena y en la cuadricula)
+        int TopContenido() const;  // donde empiezan las filas de la biblioteca (la barra + los titulos)
+        // las columnas en coordenadas del panel: el nombre va de 0 a xTipo; xFin = el borde derecho
+        void ColumnasLista(int& xTipo, int& xTam, int& xEst, int& xFin) const;
+        int DivisorEnPunto(int mx, int my) const;   // -1 = ninguno
         // TACTIL: la fila AGARRADA con una pulsacion larga (arrastrar = mover; soltar sin mover = menu
         // contextual). -1 = nada agarrado.
         int agarreFila;
@@ -326,6 +359,16 @@ class Outliner : public ViewportBase, public WithBorder, public Scrollable {
         void CursorATecla(const std::vector<OutFilaRec>& filas, int n, int modoSel);
         void AsegurarVisibleFila(int fila);
         void SincronizarBarraVista();
+};
+
+// LA BIBLIOTECA: los recursos del proyecto (mallas, materiales, texturas, prefabs, escenas, sonidos...) y los de las
+// librerias .w3d vinculadas, en su PROPIO viewport (el tipo "Library" del menu de viewports). Es el mismo Outliner, fijo
+// en la vista de recursos y en CUADRICULA por defecto; el outliner de la escena ya no la muestra (su barra queda con el
+// selector de la escena / el juego / el prefab que se edita).
+class Biblioteca : public Outliner {
+    public:
+        Biblioteca();
+        int ViewportKind() const W3D_OVERRIDE { return 9; }
 };
 
 #endif

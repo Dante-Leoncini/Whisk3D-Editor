@@ -1,0 +1,53 @@
+# ==========================================================================
+#  LA BIBLIOTECA: REORDENAR arrastrando, las COLUMNAS de la lista y la CUADRICULA.
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/windows/build/Release/whisk3d.exe --script prueba_biblioteca_orden.w3s
+#
+#  - arrastrar un recurso al borde de arriba / de abajo de otro lo deja antes / despues (el ORDEN MANUAL); mientras
+#    se arrastra, lo que se lleva va junto al puntero (el fantasma) y se va al soltar;
+#  - el orden tiene undo / redo y se guarda en el .w3d ("orden"): reabrir da el mismo orden y re-guardar los mismos
+#    bytes;
+#  - en la cuadricula se reordena igual (la mitad izquierda / derecha de la celda);
+#  - el divisor de una columna se resalta con el mouse encima y arrastrarlo cambia su ancho.
+# ==========================================================================
+ventana 1280 720
+escenadefecto
+selobj Cubo
+matnew
+matsuelto Piel
+matsuelto Metal
+matsuelto Cuero
+outvista materiales
+# sin orden manual: por nombre
+outorden Cuero Material Metal Piel
+
+# ---- A) LISTA: Piel antes de Cuero; Cuero despues de Metal ----
+outdrag Piel Cuero antes
+outorden Piel Cuero Material Metal
+outdrag Cuero Metal despues
+outorden Piel Material Metal Cuero
+# undo / redo (un paso por arrastre)
+undo
+outorden Piel Cuero Material Metal
+redo
+outorden Piel Material Metal Cuero
+
+# ---- B) se GUARDA: reabrir da el mismo orden y re-guardar, los mismos bytes ----
+guardarw3d prueba_biblioteca_orden_rt1.w3d
+abrirw3d prueba_biblioteca_orden_rt1.w3d
+outvista materiales
+outorden Piel Material Metal Cuero
+guardarw3d prueba_biblioteca_orden_rt2.w3d
+w3diguales prueba_biblioteca_orden_rt1.w3d prueba_biblioteca_orden_rt2.w3d
+
+# ---- C) CUADRICULA: la mitad izquierda de una celda = antes ----
+outcuadricula 1
+outdrag Cuero Piel antes
+outorden Cuero Piel Material Metal
+outcuadricula 0
+outorden Cuero Piel Material Metal
+
+# ---- D) las COLUMNAS: el divisor de "Usos" se arrastra a la izquierda (se agranda) y vuelve ----
+outcolumna usos -40
+outcolumna usos 40
+fail outcolumna nada 10

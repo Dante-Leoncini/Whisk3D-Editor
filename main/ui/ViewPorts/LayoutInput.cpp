@@ -19,6 +19,8 @@
 #include "ViewPorts/NumInput.h" // entrada numerica/formulas (extraido a su propio archivo)
 #include "ViewPorts/Parent.h" // emparentar/desemparentar (extraido a su propio archivo)
 #include "ViewPorts/Pick3D.h"  // pick/seleccion 3D + loop cut (extraido a su propio archivo)
+#include "W3dClipboard.h"      // el portapapeles del sistema (cortar / copiar / pegar objetos)
+#include <time.h>              // (la carpeta de cada copia)
 #include "edit/BoxSelect.h"    // Box Select (tecla B / menu Select)
 #include "ViewPorts/ViewPort3D.h"
 #include "ViewPorts/Outliner.h"
@@ -49,7 +51,9 @@
 #include "objects/LOD.h"     // Add > LOD (un hijo por distancia a la camara)
 #include "objects/Culling.h" // Add > Culling (frustum culling de sus hijos)
 #include "objects/Niebla.h"  // Add > Fog (niebla en el arbol)
+#include "objects/Sonido.h"  // Add > Sound (audio en la escena)
 #include "objects/Recorte.h" // Add > Clear Depth / Screen Rect
+#include "objects/PostprocesoObj.h" // Add > Post Processing
 #include "objects/Hitbox.h"  // Add > Hitbox (caja de deteccion con eventos lua)
 #include "io/PrefabsEditor.h"   // Add > Prefab (una instancia en el cursor 3D) + "Create Prefab" / "Unpack"
 #include "objects/InstanciaPrefab.h"
@@ -93,6 +97,7 @@
 #include "WhiskUI/widgets/card.h"        // tarjeta de las notificaciones
 #include "WhiskUI/text/bitmapText.h"  // texto de las notificaciones
 #include "WhiskUI/draw/icons.h"       // iconos notifOk / notifError
+#include "config/W3dProfile.h"     // W3dNowMs (el cartelito de ayuda)
 #include "WhiskUI/theme/colores.h"     // ColorID
 #include "w3dlog.h"         // las notificaciones tambien van al log
 // (los tipos GL + el dibujo vienen del engine: w3dGraphics.h / w3dEngine, ya incluido arriba)
@@ -123,6 +128,7 @@ static ViewportBase* LayoutCrearViewport(int aId) {
         case 5: return new Editor2D();
         case 6: return new Console();
         case 7: return new IDE();
+        case 8: return new Biblioteca();
     }
     return NULL;
 }
@@ -290,11 +296,11 @@ void LayoutCiclarViewportActivo(int dir) {
     viewPortActive = hojas[next];
     if (viewPortActive->isLeaf() && viewPortActive->ViewportKind() == 1)
         Viewport3DActive = (Viewport3D*)viewPortActive;
-    // al ENTRAR (verde) a un panel de Propiedades sin mouse: resetear al primer grupo visible + recentrar el
-    // scroll. Sin esto retoma en una fila vieja fuera de vista y las flechas parecen "no hacer nada" hasta
-    // llegar a las pestanias. EntrarPrimerGrupoVisible fija selectIndex, limpia focoEnTabs y recentra.
+    // al ENTRAR (verde) a un panel de Propiedades sin mouse: SIGUE en la fila donde estaba (pedido del dueno: volver
+    // a buscarla con las flechas era muy molesto) y recentra el scroll para que se vea; solo si esa fila ya no esta
+    // arranca del primer grupo visible (RetomarSeleccion)
     if (viewPortActive->isLeaf() && viewPortActive->ViewportKind() == 3)
-        ((Properties*)viewPortActive)->EntrarPrimerGrupoVisible();
+        ((Properties*)viewPortActive)->RetomarSeleccion();
 }
 
 // redimensiona el viewport ACTIVO en UN eje (dx!=0 izq/der; dy!=0 arr/ab).
@@ -715,7 +721,18 @@ void AddEmpty(){    TrasCrearAdd(new Empty(NULL, cursor3D.pos)); }
 void AddLOD(){      TrasCrearAdd(new LOD(NULL, cursor3D.pos)); }
 void AddCulling(){  TrasCrearAdd(new Culling(NULL, cursor3D.pos)); }
 void AddNiebla(){   TrasCrearAdd(new Niebla(NULL, cursor3D.pos)); }
+// un SONIDO en el cursor 3D (con el primer sonido del proyecto, si hay; se cambia en su tarjeta)
+void AddSonido(){
+    Sonido* s = new Sonido(NULL, cursor3D.pos);
+    s->SetNameObj(T("Sound"));
+    std::vector<W3dRecursoItem> it; W3dVistaRecListar(W3D_VISTA_SONIDOS, it);
+    if (!it.empty()) s->archivo = it[0].id;
+    TrasCrearAdd(s);
+}
 void AddLimpiarZ(){ TrasCrearAdd(new LimpiarZ(NULL, cursor3D.pos)); }
+// (nace con un efecto, para que se note que hace algo: el grano, el mas barato)
+void AddPostproceso(){ Postproceso* p = new Postproceso(NULL, cursor3D.pos); W3dPostEfecto e; W3dPostDefectos(e, W3dPostGrano);
+                       p->opc.efectos.push_back(e); p->opc.activo = 0; TrasCrearAdd(p); }
 void AddRecorte(){  TrasCrearAdd(new Recorte(NULL, cursor3D.pos)); }
 // GridCull: atajo que crea un Culling con metodo=Grid (celda 16, grilla 2D XZ); se le cuelgan los objetos
 // y se toca "Recalcular". El objeto es el mismo Culling: el metodo se puede cambiar despues en el panel.
@@ -841,6 +858,14 @@ void AddLight(){
     if (l){ l->pos = cursor3D.pos; l->SetNameObj(T("Light")); }
     TrasCrearAdd(l);
 }
+// el SOL y el FOCO: la misma luz con otro tipo (el sol mira hacia abajo en diagonal; el foco, hacia abajo)
+static void AddLuzTipo(int tipo, const char* nombre, float rotX) {
+    Light* l = Light::Create(NULL, 0, 0, 0);
+    if (l){ l->pos = cursor3D.pos; l->SetNameObj(T(nombre)); W3dLuzPonerTipo(l, tipo); l->SetRotEuler(Vector3(rotX, 0.0f, 0.0f)); }
+    TrasCrearAdd(l);
+}
+void AddLuzSol(){  AddLuzTipo(1, "Sun", -45.0f); }
+void AddLuzFoco(){ AddLuzTipo(2, "Spot", -90.0f); }
 void AddArmature(){
     // un solo hueso desde el origen, 0.3 hacia arriba (Y), en el cursor 3D.
     Armature* arm = new Armature(NULL, cursor3D.pos);
@@ -1005,8 +1030,12 @@ static const MenuDef ADD[] = {
     { "Armature",   AddArmature,        NULL, ICONO(IconType::armature) },
     { "Camera",     AddCamera,          NULL, ICONO(IconType::camera) },
     { "Light",      AddLight,           NULL, ICONO(IconType::light) },
+    { "Sun",        AddLuzSol,          NULL, ICONO(IconType::light) },
+    { "Spot",       AddLuzFoco,         NULL, ICONO(IconType::light) },
+    { "Sound",      AddSonido,          NULL, ICONO(IconType::sonido) },
     { "Fog",        AddNiebla,          NULL, ICONO(IconType::niebla) },
     { "Clear Depth", AddLimpiarZ,       NULL, ICONO(IconType::limpiarz) },
+    { "Post Processing", AddPostproceso, NULL, ICONO(IconType::monitor) },
     { "Screen Rect", AddRecorte,        NULL, ICONO(IconType::recorte) },
     { "Collection", AddCollection,      NULL, ICONO(IconType::archive) },
     { "UI",         AddUI,              NULL, ICONO(IconType::textura) },
@@ -1581,9 +1610,71 @@ void LayoutMenuInsertKeyframe(int mx, int my, bool desdeUV) {
     MenuAbierto = MenuInsertKey;
 }
 
+
+// ============================================================================
+//  CORTAR / COPIAR / PEGAR OBJETOS (Ctrl+X / Ctrl+C / Ctrl+V y el menu del click derecho). ENTRE VENTANAS DE WHISK3D:
+//  copiar deja una carpeta propia en el portapapeles de Whisk3D (la carpeta de datos del usuario, la misma para
+//  todos) y en el portapapeles del SISTEMA una marca con esa carpeta; otro Whisk3D (u otro proyecto) la lee al pegar.
+//  Cada copia tiene su carpeta: lo que se pego antes sigue nombrando sus texturas aunque despues se copie otra cosa.
+// ============================================================================
+static const char* kMarcaPortapapeles = "whisk3d-portapapeles:";
+extern bool W3dPortapapelesCopiar(const std::vector<Object*>& objs, const std::string& carpeta);   // GuardarW3D.cpp
+extern bool W3dPortapapelesPegar(const std::string& carpeta, std::vector<Object*>& nuevos);       // import_w3d.cpp
+static std::string CarpetaPortapapeles() { return w3dFileSystem::GetUserDataDir() + "/portapapeles"; }
+// lo elegido sin lo que ya viaja adentro de otro elegido (los hijos van con su padre)
+static void ElegidosArriba(std::vector<Object*>& out) {
+    out.clear();
+    for (size_t i = 0; i < ObjSelects.size(); i++) {
+        Object* o = ObjSelects[i];
+        if (!o || o == SceneCollection) continue;
+        bool adentro = false;
+        for (Object* p = o->Parent; p && p != SceneCollection && !adentro; p = p->Parent) if (p->select) adentro = true;
+        if (!adentro) out.push_back(o);
+    }
+}
+void LayoutObjetosCopiar(bool cortar) {
+    if (InteractionMode != ObjectMode) return;
+    std::vector<Object*> objs; ElegidosArriba(objs);
+    if (objs.empty()) { w3dLogfE("[portapapeles] nada elegido para copiar"); Notificar(T("Select objects first"), true); return; }
+    // (una carpeta POR COPIA: la hora + un contador + la direccion de algo de este proceso, para que dos Whisk3D que
+    //  copian en el mismo segundo no se pisen)
+    static unsigned nCopia = 0; nCopia++;
+    char sub[80]; snprintf(sub, sizeof(sub), "/c%lu_%u_%lx", (unsigned long)time(NULL), nCopia, (unsigned long)(size_t)&nCopia);
+    const std::string carpeta = CarpetaPortapapeles() + sub;
+    if (!W3dPortapapelesCopiar(objs, carpeta)) { w3dLogfE("[portapapeles] no pude copiar %d objeto(s) a %s", (int)objs.size(), carpeta.c_str()); Notificar(T("Could not copy the objects"), true); return; }
+    w3dEngine::W3dClipboardSet(std::string(kMarcaPortapapeles) + carpeta);
+    { FILE* f = fopen((CarpetaPortapapeles() + "/ultimo.txt").c_str(), "wb"); if (f) { fputs(carpeta.c_str(), f); fclose(f); } }
+    char b[96]; snprintf(b, sizeof(b), "%s: %d", cortar ? T("Cut") : T("Copied"), (int)objs.size());
+    if (cortar) Eliminar(true);   // (con su paso de undo, como Supr)
+    Notificar(b, false);
+    g_redraw = true;
+}
+void LayoutObjetosPegar() {
+    if (InteractionMode != ObjectMode) return;
+    std::string carpeta, clip = w3dEngine::W3dClipboardGet();
+    if (clip.compare(0, strlen(kMarcaPortapapeles), kMarcaPortapapeles) == 0) carpeta = clip.substr(strlen(kMarcaPortapapeles));
+    else {   // (el portapapeles del sistema tiene otra cosa: el ultimo que copio algun Whisk3D)
+        std::vector<unsigned char> b;
+        if (w3dFileSystem::ReadFileBytes(CarpetaPortapapeles() + "/ultimo.txt", b) && !b.empty()) carpeta.assign((const char*)&b[0], b.size());
+    }
+    if (carpeta.empty()) { Notificar(T("Nothing to paste"), true); return; }
+    std::vector<Object*> nuevos;
+    if (!W3dPortapapelesPegar(carpeta, nuevos)) { Notificar(T("Nothing to paste"), true); return; }
+    UndoCapturarSeleccion();
+    DeseleccionarTodo();
+    for (size_t i = 0; i < nuevos.size(); i++) { W3dPrefabAdoptarNuevo(nuevos[i]); nuevos[i]->Seleccionar(); }
+    UndoCapturarCreacion();   // Ctrl+Z los saca (y Ctrl+Y los devuelve), como un duplicado
+    char b[96]; snprintf(b, sizeof(b), "%s: %d", T("Pasted"), (int)nuevos.size());
+    Notificar(b, false);
+    g_redraw = true;
+}
+
 // opcion del menu Object/Mesh y su submenu Transform (ids 100-102, 300=extrude)
 void LayoutAccionObject(int aId) {
     switch (aId) {
+        case 720: LayoutObjetosCopiar(true); break;    // Cut (Ctrl+X)
+        case 721: LayoutObjetosCopiar(false); break;   // Copy (Ctrl+C)
+        case 722: LayoutObjetosPegar(); break;         // Paste (Ctrl+V)
         case 1: DuplicatedObject(); break; // Duplicate Objects (Shift D)
         case 2: NewInstance();      break; // Duplicate Linked  (Alt D)
         case 3: AbrirConfirmarBorrado(); break; // Delete (X): popup de confirmacion -> Si borra (con undo)
@@ -1634,6 +1725,9 @@ void LayoutAccionObject(int aId) {
         case 523: PoseClearTransform(3); break; // Clear Scale (Alt+S)
         case 103: LayoutShrinkFatten(); break; // Shrink/Fatten (Alt+S): cada vert por su normal
         case 300: LayoutExtrudeFaces(); break; // Extrude (segun el modo) (E)
+        case 344: InsetIniciar(lastMouseX, lastMouseY); break; // Inset Faces (I)
+        case 345: BevelIniciar(lastMouseX, lastMouseY, 1); break; // Bevel Edges (Ctrl+B)
+        case 346: BevelIniciar(lastMouseX, lastMouseY, 0); break; // Bevel Vertices (Ctrl+Shift+B)
         case 310: LayoutNewFaceEdit(); break;  // Vertex > New Edge/Face from Vertices (F)
         case 314: LayoutDuplicarEdit(); break; // Duplicate (Shift D)
         case 316: LayoutSepararEdit();  break; // Separate (P): caras selec -> mesh nuevo
@@ -1700,6 +1794,7 @@ static void LayoutAccionRender(int aId) {
         case 4: Viewport3DActive->view = RenderType::ZBuffer;         break;
         case 5: Viewport3DActive->view = RenderType::NormalView;      break;
         case 6: Viewport3DActive->view = RenderType::Alpha;           break;
+        case 8: Viewport3DActive->view = RenderType::Vectores;        break;
     }
 }
 
@@ -1953,22 +2048,27 @@ void LayoutAbrirMenuTipo(ViewportBase* aVp) {
     gMenuTipo->Limpiar();
     if (LayoutEstaMaximizado()) {
         // en FULLSCREEN no se cambia tipo/split/expand: solo restaurar el layout
-        gMenuTipo->Agregar(T("Minimize"), 23);
+        gMenuTipo->Agregar(T("Minimize"), 23, (int)IconType::minimizar);
     } else {
-        gMenuTipo->Agregar(T("3D Viewport"), 0);
-        gMenuTipo->Agregar(T("Outliner"), 1);
-        gMenuTipo->Agregar(T("Properties"), 2);
-        gMenuTipo->Agregar(T("UV Editor"), 3);
-        gMenuTipo->Agregar(T("Timeline"), 4);
-        gMenuTipo->Agregar(T("2D Editor"), 5);
-        gMenuTipo->Agregar(T("Console"), 6);
-        gMenuTipo->Agregar("IDE", 7);
-        if (aVp != rootViewport) gMenuTipo->Agregar(T("Expand"), 20);
+        // (cada tipo con el icono que muestra su barra: W3dIconoDeViewport)
+        extern int W3dIconoDeViewport(int kind);
+        gMenuTipo->Agregar(T("3D Viewport"), 0, W3dIconoDeViewport(1));
+        gMenuTipo->Agregar(T("Outliner"), 1, W3dIconoDeViewport(2));
+        gMenuTipo->Agregar(T("Library"), 8, W3dIconoDeViewport(9));   // los recursos del proyecto (su propio viewport)
+        gMenuTipo->Agregar(T("Properties"), 2, W3dIconoDeViewport(3));
+        gMenuTipo->Agregar(T("UV Editor"), 3, W3dIconoDeViewport(4));
+        gMenuTipo->Agregar(T("Timeline"), 4, W3dIconoDeViewport(5));
+        gMenuTipo->Agregar(T("2D Editor"), 5, W3dIconoDeViewport(6));
+        gMenuTipo->Agregar(T("Console"), 6, W3dIconoDeViewport(7));
+        gMenuTipo->Agregar("IDE", 7, W3dIconoDeViewport(8));
+        // (una LINEA separa los tipos de viewport de lo que se hace con el: expandir, dividir, maximizar)
+        { MenuItem* it = (aVp != rootViewport) ? gMenuTipo->Agregar(T("Expand"), 20, (int)IconType::expandir) : NULL;
+          MenuItem* div = gMenuTipo->Agregar(T("Split in Columns"), 21, (int)IconType::columnas);
+          (it ? it : div)->lineaArriba = true; }
         // OJO nombres: dividir "en columnas" = 2 paneles LADO A LADO (ViewportRow);
         // "en filas" = APILADOS (ViewportColumn). Antes decia Fila/Columna al reves.
-        gMenuTipo->Agregar(T("Split in Columns"), 21);
-        gMenuTipo->Agregar(T("Split in Rows"), 22);
-        if (aVp != rootViewport) gMenuTipo->Agregar(T("Maximize"), 23); // fullscreen del viewport activo
+        gMenuTipo->Agregar(T("Split in Rows"), 22, (int)IconType::filas);
+        if (aVp != rootViewport) gMenuTipo->Agregar(T("Maximize"), 23, (int)IconType::maximizar); // fullscreen del viewport activo
     }
     gMenuTipoDe = aVp;
     if (MenuAbierto && MenuAbierto != gMenuTipo) MenuAbierto->Cerrar();
@@ -2336,6 +2436,37 @@ static void LayoutAbrirMenuUVTex(UVEditor* uv, int x, int y) {
 // "Auto" = el filtro elige el nivel por zoom (comportamiento normal del render);
 // elegir un tamano lo clava para inspeccionarlo (GL_TEXTURE_BASE_LEVEL, solo PC).
 static PopupMenu* gMenuUVMip = NULL;
+// ---- barra del EDITOR UV: el MAPA UV que se edita (los de la malla, el activo en verde) + uno nuevo ----
+static PopupMenu* gMenuUVMapas = NULL;
+static void LayoutAccionUVMapa(int id) {
+    Mesh* m = (ObjActivo && ObjActivo->getType() == ObjectType::mesh) ? (Mesh*)ObjActivo : NULL;
+    if (!m) return;
+    if (id == 9000) {   // New UV Map: una copia de la activa, que pasa a ser la activa (como el "+" de Properties)
+        if (W3dMallaSoloLecturaAviso(m, true)) return;
+        DuplicarUVMapActivo(m);
+    } else if (id >= 0 && id < (int)m->uvMaps.size()) {
+        m->uvMapActivo = id;
+    } else return;
+    m->AplicarCapasAlRender();   // el render (y el editor UV) pasan a mostrar la activa
+    { extern void PropsLayoutSucio(); PropsLayoutSucio(); }   // (la tarjeta UV Maps de Properties)
+    g_redraw = true;
+}
+static void LayoutAbrirMenuUVMapas(UVEditor* uv, int x, int y) {
+    if (!uv) return;
+    Mesh* m = (ObjActivo && ObjActivo->getType() == ObjectType::mesh) ? (Mesh*)ObjActivo : NULL;
+    if (!m) return;
+    m->PoblarCapas();   // (las capas por corner existen: la primera sale del UV del render)
+    if (!gMenuUVMapas) gMenuUVMapas = new PopupMenu();
+    gMenuUVMapas->Limpiar();
+    gMenuUVMapas->titulo = T("UV Maps");
+    for (size_t i = 0; i < m->uvMaps.size(); i++)
+        gMenuUVMapas->Agregar(m->uvMaps[i]->nombre, (int)i)->verde = ((int)i == m->uvMapActivo);
+    gMenuUVMapas->Agregar(T("New UV Map"), 9000, IconType::mas);
+    gMenuUVMapas->action = LayoutAccionUVMapa;
+    if (MenuAbierto && MenuAbierto != gMenuUVMapas) MenuAbierto->Cerrar();
+    gMenuUVMapas->Abrir(x, y, MenuPantallaW, MenuPantallaH);
+    MenuAbierto = gMenuUVMapas;
+}
 static void LayoutAccionUVMip(int id) {
     UVSetMipNivel(id >= 9000 ? -1 : id);
     g_redraw = true;
@@ -2856,6 +2987,7 @@ bool LayoutClickBarraIDE(IDE* ide, int mx, int my) {
             case BRIDE_Refresh: ide->Refresh(); return true;
             case BRIDE_Editar:  LayoutAbrirMenuIDEEditar(ide, bx, by); return true;       // menu Editar
             case BRIDE_Seleccionar: LayoutAbrirMenuIDESeleccionar(ide, bx, by); return true;
+            case BRIDE_Compilar: ide->CompilarShader(); return true;   // (un shader .glsl)
         }
     }
     return false;
@@ -3118,6 +3250,7 @@ bool LayoutClickBarraUV(UVEditor* uv, int mx, int my) {
             case BRUV_SelMode:   LayoutAbrirMenuUVSelMode(uv, bx, by); return true; // Vertex/Edge/Face
             case BRUV_Pivot:     LayoutMenuPivotUV(bx, by);            return true; // variante 2D (sin Active Element)
             case BRUV_Snap:      LayoutAbrirMenuUVSnap(uv, bx, by);    return true;
+            case BRUV_UVMap:     LayoutAbrirMenuUVMapas(uv, bx, by);   return true; // que mapa UV se edita (+ nuevo)
             case BRUV_Texture:   LayoutAbrirMenuUVTex(uv, bx, by);     return true; // dropdown de texturas
             case BRUV_Mipmap:    LayoutAbrirMenuUVMip(uv, bx, by);     return true; // inspector de la piramide
             case BRUV_Editar:    UVToggleEditarTextura(uv);            return true; // pintura de textura on/off
@@ -3378,7 +3511,7 @@ void LayoutToggleBarraViewportActivo() {
         // Timeline: entra/sale del foco de la barra de TRANSPORTE (play/inicio/fin/Start/End/anim). Antes caia en
         // el else -> abria el menu de tipo/split, que no es lo que se quiere navegar.
         LayoutTimelineBarToggle();
-    } else if (vp->ViewportKind() == 2) {
+    } else if (VpEsOutliner(vp)) {
         // Outliner: abre el SELECTOR DE VISTA ([1]: escena / mallas / materiales...). Izq/der recorren
         // la barra ([0] tipo de viewport, [2] acciones de la vista de recursos).
         if (!((Outliner*)vp)->AbrirMenuBoton(1)) LayoutAbrirMenuTipo(vp);
@@ -3392,7 +3525,7 @@ void LayoutToggleBarraViewportActivo() {
 // boton vecino visible y abre su desplegable (el N95 recorre la barra sin mouse). false = el menu
 // abierto no es de la barra del outliner activo.
 static bool LayoutCambiarMenuBarraOutliner(int dir) {
-    if (!viewPortActive || !viewPortActive->isLeaf() || viewPortActive->ViewportKind() != 2) return false;
+    if (!viewPortActive || !viewPortActive->isLeaf() || !VpEsOutliner(viewPortActive)) return false;
     if (!LayoutMenuAbierto()) return false;
     Outliner* out = (Outliner*)viewPortActive;
     int idx = out->BotonDelMenuAbierto();
@@ -3485,6 +3618,7 @@ static void LayoutCambiarMenuBarraUV(int dir) {
         else if (MenuAbierto == gMenuPivot)     rol = BRUV_Pivot;
         else if (MenuAbierto == gMenuUVSnap)    rol = BRUV_Snap;
         else if (MenuAbierto == gMenuUVTex)     rol = BRUV_Texture;
+        else if (MenuAbierto == gMenuUVMapas)   rol = BRUV_UVMap;
         else if (MenuAbierto == gMenuUVMip)     rol = BRUV_Mipmap;
         else if (MenuAbierto == gMenuUVGuardar) rol = BRUV_Guardar;
         else if (MenuAbierto == gMenuUVAnim)    rol = BRUV_Animation;
@@ -3513,6 +3647,7 @@ static void LayoutCambiarMenuBarraUV(int dir) {
         case BRUV_SelMode:   LayoutAbrirMenuUVSelMode(uv, mx, my); break;
         case BRUV_Pivot:     LayoutMenuPivot(mx, my);              break;
         case BRUV_Snap:      LayoutAbrirMenuUVSnap(uv, mx, my);    break;
+        case BRUV_UVMap:     LayoutAbrirMenuUVMapas(uv, mx, my);   break;
         case BRUV_Texture:   LayoutAbrirMenuUVTex(uv, mx, my);     break;
         case BRUV_Mipmap:    LayoutAbrirMenuUVMip(uv, mx, my);     break;
         // "Edit" es ACCION DIRECTA (sin desplegable), como Stop/Play del 3D: al aterrizar se cierra el
@@ -3642,47 +3777,54 @@ void LayoutMenuContexto3D(int mx, int my) {
 // menus de CONTEXTO de Edit Mode (Vertex / Edge / Face), separados (no submenus de
 // "Mesh"). Se abren con W o el boton de barra, EN (mx,my). Comparten LayoutAccionObject.
 // (gMenuVertex/Edge/Face se declaran mas arriba: los usan dispatch + nav.)
+// los menus Vertex / Edge / Face: los abre W en el cursor (segun el sub-modo) y son submenus de "Mesh" (los tres)
+PopupMenu* LayoutSubmenuEditFace() {
+    if (!gMenuFace) {
+        gMenuFace = new PopupMenu(); gMenuFace->titulo = T("Face"); gMenuFace->action = LayoutAccionObject;
+        gMenuFace->Agregar(T("Extrude Faces"), 300)->atajo = "@3d.extruir";
+        gMenuFace->Agregar(T("Inset Faces"), 344)->atajo = "I";   // (texto: la I del 3D es Insert Keyframe en la tabla)
+        gMenuFace->Agregar(T("Loop Cut and Slide"), 340)->atajo = "@3d.loopcut";
+        gMenuFace->Agregar(T("Rip"), 341)->atajo = "@3d.rip";
+        gMenuFace->Agregar(T("Shade Smooth"), 320);
+        gMenuFace->Agregar(T("Shade Flat"), 321);
+        gMenuFace->Agregar(T("Recalculate Normals"), 322);
+        gMenuFace->Agregar(T("Triangulate Faces"), 323)->atajo = "@3d.triangular";
+        // (Delete se movio al menu "Mesh": es comun a vertice/borde/cara)
+    }
+    return gMenuFace;
+}
+PopupMenu* LayoutSubmenuEditEdge() {
+    if (!gMenuEdge) {
+        gMenuEdge = new PopupMenu(); gMenuEdge->titulo = T("Edge"); gMenuEdge->action = LayoutAccionObject;
+        gMenuEdge->Agregar(T("Extrude Edges"), 300)->atajo = "@3d.extruir";
+        gMenuEdge->Agregar(T("Loop Cut and Slide"), 340)->atajo = "@3d.loopcut";
+        gMenuEdge->Agregar(T("Bevel Edges"), 345)->atajo = "Ctrl+B";
+        gMenuEdge->Agregar(T("Rip"), 341)->atajo = "@3d.rip";
+        gMenuEdge->Agregar(T("Mark Sharp"), 330);
+        gMenuEdge->Agregar(T("Clear Sharp"), 331);
+        gMenuEdge->Agregar(T("Mark Seam"), 358);   // costuras del unwrap (tambien en el menu U)
+        gMenuEdge->Agregar(T("Clear Seam"), 359);
+        // (Delete se movio al menu "Mesh": es comun a vertice/borde/cara)
+    }
+    return gMenuEdge;
+}
+PopupMenu* LayoutSubmenuEditVertex() {
+    if (!gMenuVertex) {
+        gMenuVertex = new PopupMenu(); gMenuVertex->titulo = T("Vertex"); gMenuVertex->action = LayoutAccionObject;
+        gMenuVertex->Agregar(T("New Edge/Face from Vertices"), 310)->atajo = "@3d.cara";
+        gMenuVertex->Agregar(T("Connect Vertex Path"), 342)->atajo = "@3d.conectar";
+        gMenuVertex->Agregar(T("Extrude Vertices"), 300)->atajo = "@3d.extruir";
+        gMenuVertex->Agregar(T("Bevel Vertices"), 346)->atajo = "Ctrl+Shift+B";
+        gMenuVertex->Agregar(T("Slide Vertices"), 343)->atajo = "@3d.slide";
+        gMenuVertex->Agregar(T("Rip"), 341)->atajo = "@3d.rip";
+        // (Delete se movio al menu "Mesh": es comun a vertice/borde/cara)
+    }
+    return gMenuVertex;
+}
 void LayoutMenuEditContexto(int mx, int my) {
     if (InteractionMode != EditMode) return;
-    PopupMenu* m = NULL;
-    if (EditSelectMode == SelFace) {
-        if (!gMenuFace) {
-            gMenuFace = new PopupMenu(); gMenuFace->titulo = T("Face"); gMenuFace->action = LayoutAccionObject;
-            gMenuFace->Agregar(T("Extrude Faces"), 300)->atajo = "@3d.extruir";
-            gMenuFace->Agregar(T("Loop Cut and Slide"), 340)->atajo = "@3d.loopcut";
-            gMenuFace->Agregar(T("Rip"), 341)->atajo = "@3d.rip";
-            gMenuFace->Agregar(T("Shade Smooth"), 320);
-            gMenuFace->Agregar(T("Shade Flat"), 321);
-            gMenuFace->Agregar(T("Recalculate Normals"), 322);
-            gMenuFace->Agregar(T("Triangulate Faces"), 323)->atajo = "@3d.triangular";
-            // (Delete se movio al menu "Mesh": es comun a vertice/borde/cara)
-        }
-        m = gMenuFace;
-    } else if (EditSelectMode == SelEdge) {
-        if (!gMenuEdge) {
-            gMenuEdge = new PopupMenu(); gMenuEdge->titulo = T("Edge"); gMenuEdge->action = LayoutAccionObject;
-            gMenuEdge->Agregar(T("Extrude Edges"), 300)->atajo = "@3d.extruir";
-            gMenuEdge->Agregar(T("Loop Cut and Slide"), 340)->atajo = "@3d.loopcut";
-            gMenuEdge->Agregar(T("Rip"), 341)->atajo = "@3d.rip";
-            gMenuEdge->Agregar(T("Mark Sharp"), 330);
-            gMenuEdge->Agregar(T("Clear Sharp"), 331);
-            gMenuEdge->Agregar(T("Mark Seam"), 358);   // costuras del unwrap (tambien en el menu U)
-            gMenuEdge->Agregar(T("Clear Seam"), 359);
-            // (Delete se movio al menu "Mesh": es comun a vertice/borde/cara)
-        }
-        m = gMenuEdge;
-    } else {
-        if (!gMenuVertex) {
-            gMenuVertex = new PopupMenu(); gMenuVertex->titulo = T("Vertex"); gMenuVertex->action = LayoutAccionObject;
-            gMenuVertex->Agregar(T("New Edge/Face from Vertices"), 310)->atajo = "@3d.cara";
-            gMenuVertex->Agregar(T("Connect Vertex Path"), 342)->atajo = "@3d.conectar";
-            gMenuVertex->Agregar(T("Extrude Vertices"), 300)->atajo = "@3d.extruir";
-            gMenuVertex->Agregar(T("Slide Vertices"), 343)->atajo = "@3d.slide";
-            gMenuVertex->Agregar(T("Rip"), 341)->atajo = "@3d.rip";
-            // (Delete se movio al menu "Mesh": es comun a vertice/borde/cara)
-        }
-        m = gMenuVertex;
-    }
+    PopupMenu* m = (EditSelectMode == SelFace) ? LayoutSubmenuEditFace()
+                 : (EditSelectMode == SelEdge) ? LayoutSubmenuEditEdge() : LayoutSubmenuEditVertex();
     if (MenuAbierto) MenuAbierto->Cerrar();
     m->Abrir(mx, my, MenuPantallaW, MenuPantallaH);
     MenuAbierto = m;
@@ -4453,6 +4595,13 @@ void EditXformRotAbs(const Quaternion& qAbs){ // trackball: rotacion absoluta de
     SnapAjustarEditRot(); // imanta la aguja al target (si snap ON) -> gira desde el pivote hacia el target
     EVEscribir();
 }
+void EditXformScaleSet(float f){
+    if (!gEVmesh) return;
+    gEVscaleAmt = f - 1.0f;
+    SnapAjustarEditScale();
+    EVEscribir();
+}
+Vector3 EditXformPivotMundo(){ return gEVpivot; }
 void EditXformScale(int dx,int dy,float factor){
     if (!gEVmesh) return;
     gEVscaleAmt += (dx+dy)*factor;
@@ -4831,7 +4980,7 @@ bool LayoutPopupArrastrando() {
 static void SoltarDragOutliners(ViewportBase* aNodo, int mx, int my) {
     if (!aNodo) return;
     if (aNodo->isLeaf()) {
-        if (aNodo->ViewportKind() == 2) ((Outliner*)aNodo)->SoltarDrag(mx, my);
+        if (VpEsOutliner(aNodo)) ((Outliner*)aNodo)->SoltarDrag(mx, my);
         return;
     }
     if (aNodo->ContainerKind() == 1) {
@@ -4992,7 +5141,9 @@ bool LayoutMotionUI(int mx, int my) {
             if (mm->Contains(mx, my)){ sobreMenu = true; break; }
             if (!mm->submenuAbierto || !mm->submenuAbierto->abierto) break;
         }
-        if (!sobreMenu){
+        // (un menu que no se abrio en el mouse -el popup centrado de la pantalla externa- no se cambia por el de una
+        // barra al pasarle por encima: se cierra solo eligiendo o con un click afuera)
+        if (!sobreMenu && (!MenuAbierto || MenuAbierto->cerrarLejos)){
             // el cursor SALIO del menu (esta sobre una barra): permitir el SLIDE entre menus de barra sin click
             ViewportBase* bajo = FindViewportUnderMouse(rootViewport, mx, my);
             LayoutAbrirMenuDeBarra(bajo, mx, my);
@@ -5088,7 +5239,7 @@ bool LayoutClickUI(int mx, int my) {
             LayoutClickBarra2D((Editor2D*)under, mx, my); // boton "Add" del editor 2D
         } else if (under->ViewportKind() == 8) {
             LayoutClickBarraIDE((IDE*)under, mx, my); // selector de script / Save / Refresh
-        } else if (under->ViewportKind() == 2 && ((Outliner*)under)->ClickBarra(mx, my)) {
+        } else if (VpEsOutliner(under) && ((Outliner*)under)->ClickBarra(mx, my)) {
             // outliner: lo directo de su barra (el interruptor lista / cuadricula de la biblioteca)
         } else {
             // transporte (Stop/Play) SOLO por click real; si no fue transporte, abrir el menu
@@ -5127,7 +5278,7 @@ bool LayoutClickUI(int mx, int my) {
         ((Properties*)under)->ClickEn(mx, my);
         return true;
     }
-    if (under->ViewportKind() == 2) {
+    if (VpEsOutliner(under)) {
         ((Outliner*)under)->ClickSeleccionar(mx, my);
         return true;
     }
@@ -5145,7 +5296,7 @@ bool LayoutDobleClickUI(int mx, int my) {
     if (PopUpActive || LayoutMenuAbierto()) return false;
     ViewportBase* under = FindViewportUnderMouse(rootViewport, mx, my);
     if (!under || !under->isLeaf()) return false;
-    if (under->ViewportKind() == 2) return ((Outliner*)under)->DobleClick(mx, my);
+    if (VpEsOutliner(under)) return ((Outliner*)under)->DobleClick(mx, my);
     return false;
 }
 // PULSACION LARGA (tactil: el dedo quieto ~0,5 s sobre un panel): el outliner AGARRA la fila (despues se
@@ -5154,7 +5305,7 @@ bool LayoutPulsacionLargaUI(int mx, int my) {
     if (PopUpActive || LayoutMenuAbierto()) return false;
     ViewportBase* under = FindViewportUnderMouse(rootViewport, mx, my);
     if (!under || !under->isLeaf()) return false;
-    if (under->ViewportKind() == 2) {
+    if (VpEsOutliner(under)) {
         if (!((Outliner*)under)->PulsacionLarga(mx, my)) return false;
         viewPortActive = under;
         return true;
@@ -5305,7 +5456,7 @@ bool LayoutTeclaUI(int tecla, int mx, int my) {
         }
         return false;
     }
-    if (under->ViewportKind() == 2) {
+    if (VpEsOutliner(under)) {
         // vista de RECURSOS: flechas/OK recorren y eligen su lista (no la seleccion de la escena). En PC
         // esta es LA puerta de las flechas (controles.cpp las manda aca antes que a event_key_down): el
         // modo de PC (Shift+flechas suma, sin Shift la fila queda sola); en el N95, el del keypad.
@@ -5375,7 +5526,7 @@ bool LayoutTeclaPanelActivo(int tecla) {
         }
         return false;
     }
-    if (viewPortActive->ViewportKind() == 2) {
+    if (VpEsOutliner(viewPortActive)) {
         Outliner* out = (Outliner*)viewPortActive;
         // MODO MOVER (sin mouse, N95): las flechas reordenan/reparentan el objeto
         // activo en vez de navegar; OK confirma; C/backspace/Esc cancela.
@@ -5801,3 +5952,76 @@ static void LayoutOlvidarViewport(ViewportBase* vp) {
 }
 struct LayoutEngancharOlvido { LayoutEngancharOlvido() { ViewportOlvidarRegistrar(LayoutOlvidarViewport); } };
 static LayoutEngancharOlvido g_layoutEngancheOlvido;
+
+
+// ============================================================================
+//  EL CARTELITO DE AYUDA de los botones de SOLO ICONO (Button::ayuda): dejar el mouse quieto encima un momento
+//  muestra que es ("Overlays", "Snap"...) en un recuadro chico debajo del boton, y se va solo despues de unos
+//  segundos o al salir. Con un menu o un popup abierto no sale (el menu abierto ya lleva su titulo). Se dibuja
+//  encima de todo: lo llama NotificacionesRender, que corre al final del cuadro en todas las plataformas
+// ============================================================================
+static Button* AyudaBotonBajoMouse(ViewportBase* n) {
+    if (!n) return NULL;
+    if (n->isLeaf()) {
+        for (size_t i = 0; i < n->BarButtons.size(); i++) {
+            Button* b = n->BarButtons[i];
+            if (b && b->visible && b->hover && !b->ayuda.empty()) return b;
+        }
+        // (Properties: los botones chicos de los mapas del material, adentro de sus filas)
+        if (n->ViewportKind() == 3) { extern Button* PropsAyudaEn(Properties* p, int mx, int my); return PropsAyudaEn((Properties*)n, lastMouseX, lastMouseY); }
+        return NULL;
+    }
+    ViewportBase* a = NULL; ViewportBase* c = NULL;
+    if (n->ContainerKind() == 1)      { a = ((ViewportRow*)n)->childA;    c = ((ViewportRow*)n)->childB; }
+    else if (n->ContainerKind() == 2) { a = ((ViewportColumn*)n)->childA; c = ((ViewportColumn*)n)->childB; }
+    Button* b = AyudaBotonBajoMouse(a);
+    return b ? b : AyudaBotonBajoMouse(c);
+}
+void W3dAyudaRender(int screenW, int screenH) {
+    static Button* sBoton = NULL;
+    static double sDesde = 0.0;
+    const double kEspera = 600.0, kDura = 3500.0;   // ms: cuanto hay que quedarse encima, y cuanto se ve
+    Button* b = (MenuAbierto && MenuAbierto->abierto) || PopUpActive ? NULL : AyudaBotonBajoMouse(rootViewport);
+    const double ahora = W3dNowMs();
+    if (b != sBoton) { sBoton = b; sDesde = ahora; }
+    if (!b) return;
+    const double t = ahora - sDesde;
+    if (t < kEspera) { g_redraw = true; return; }   // (todavia no: el cuadro siguiente vuelve a mirar el reloj)
+    if (t > kEspera + kDura) return;                 // ya se mostro: hasta que el mouse se vaya y vuelva
+    g_redraw = true;                                 // (para que se vaya solo al cumplir el tiempo)
+    const std::string txt = T(b->ayuda.c_str());
+    const int pad = gapGS * 2;
+    const int w = (int)txt.size() * CharacterWidthGS + 2 * pad;
+    const int h = (int)RenglonHeightGS + 2 * GlobalScale;
+    int x0 = b->sx;
+    int y0 = b->sy + b->height + 2 * GlobalScale;              // debajo del boton...
+    if (y0 + h > screenH) y0 = b->sy - h - 2 * GlobalScale;    // ...o arriba si es una barra de abajo
+    if (x0 + w > screenW) x0 = screenW - w;
+    if (x0 < 0) x0 = 0;
+    if (y0 < 0) y0 = 0;
+    w3dEngine::Viewport(0, 0, screenW, screenH);
+    w3dEngine::Disable(w3dEngine::ScissorTest);
+    w3dEngine::MatrixMode(w3dEngine::Projection); w3dEngine::LoadIdentity();
+    w3dEngine::Ortho(0, screenW, screenH, 0, -1, 1);
+    w3dEngine::MatrixMode(w3dEngine::ModelView); w3dEngine::LoadIdentity();
+    w3dEngine::Disable(w3dEngine::DepthTest); w3dEngine::Disable(w3dEngine::Lighting); w3dEngine::Disable(w3dEngine::Fog);
+    w3dEngine::Enable(w3dEngine::Blend); w3dEngine::BlendAlpha();
+    w3dEngine::EnableArray(w3dEngine::VertexArray); w3dEngine::EnableArray(w3dEngine::TexCoordArray);
+    w3dEngine::DisableArray(w3dEngine::NormalArray); w3dEngine::DisableArray(w3dEngine::ColorArray);
+    static Rec2D* fondo = NULL;
+    if (!fondo) fondo = new Rec2D();
+    w3dEngine::Disable(w3dEngine::Texture2D);
+    SetColorID(ColorID::grisUI, 1.0f);                          // el borde (1 px)
+    fondo->SetSize((GLshort)(x0 - GlobalScale), (GLshort)(y0 - GlobalScale), (GLshort)(w + 2 * GlobalScale), (GLshort)(h + 2 * GlobalScale));
+    fondo->RenderObject(false);
+    SetColorID(ColorID::background, 1.0f);
+    fondo->SetSize((GLshort)x0, (GLshort)y0, (GLshort)w, (GLshort)h);
+    fondo->RenderObject(false);
+    w3dEngine::Enable(w3dEngine::Texture2D);
+    if (!Textures.empty()) w3dEngine::BindTexture(Textures[0]->iID);
+    SetColorID(ColorID::blanco, 1.0f);
+    w3dEngine::PushMatrix();
+    w3dEngine::Translatef((GLfloat)(x0 + pad), (GLfloat)(y0 + GlobalScale), 0);
+    RenderBitmapText(txt);
+    w3dEngine::PopMatrix();
+}

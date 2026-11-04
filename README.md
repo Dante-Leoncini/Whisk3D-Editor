@@ -46,6 +46,9 @@ El video original, en el Nokia N95: [Blender for Nokia N95](https://youtu.be/dMe
 - **Pintura:** vertex paint, weight paint y texture paint.
 - **Materiales y texturas:** capas de texturas, normal maps, mezcla de dos texturas, matcap y contorno estilo dibujo animado. Editor UV.
 - **Render:** vistas sólida, material, render, alambre, Z-Buffer y normales, y trazado de rayos en el viewport.
+- **Trazado de rayos en la GPU (nuevo):** sombras suaves, transparencias, reflejos metálicos, normal maps y luces de foco, en la GPU con Vulkan (NVIDIA, AMD o Intel; con los núcleos RTX/RDNA2/Arc si el driver los ofrece) o en la CPU. Con **denoiser** (GPU A-Trous en tiempo real, Open Image Denoise u OptiX) y **reescalado** x2/x3/x4 para ir a 60 cuadros por segundo.
+- **Gráficos (nuevo):** OpenGL (el pipeline fijo), OpenGL ES 2.0 y **Vulkan** en el mismo ejecutable; se elige en Ajustes → Gráficos.
+- **Objeto Sonido (nuevo):** audio puesto en la escena, ubicado en **segundos** en la línea de tiempo (cambiar los FPS no lo corre). Se mueve y se recorta en el timeline, con forma de onda y línea de volumen; volumen, tono y reverb animables; bucle; **sonido 3D** según la cámara (más cerca, más fuerte; de qué lado suena) o como música, con la esfera del alcance en la vista 3D. Se maneja por lua y viaja en los prefabs.
 - **Videojuegos:** scripts en Lua con un editor integrado (IDE), física (cuerpos rígidos y hitboxes), partículas, LOD, oclusión, streaming de mundos abiertos, interfaz 2D con su propio editor y sonido. El juego se compila desde el editor para Linux (.deb y AppImage), Android y la web (WebGL).
 - **Archivos:** importa OBJ, FBX, glTF y GLB; exporta OBJ y glTF. Los proyectos se guardan en `.w3d`, un formato abierto (ver más abajo).
 
@@ -57,7 +60,7 @@ El piso de referencia es el **Nokia N95** (2007): un CPU ARM11 de 332 MHz, 64 MB
 
 | Sistema | Qué hace falta |
 |---|---|
-| Windows, GNU/Linux, macOS | Una placa de video con OpenGL 1.x (usa el pipeline fijo; si hay OpenGL 1.5, aprovecha los VBO) |
+| Windows, GNU/Linux, macOS | Una placa de video con OpenGL 1.x (usa el pipeline fijo; si hay OpenGL 1.5, aprovecha los VBO). Opcional: Vulkan para el backend Vulkan y el trazado de rayos en la GPU (si no está, esas opciones no aparecen y sigue todo con OpenGL) |
 | Android | Android 2.3 (API 10) o más nuevo: desde el 5.0, el APK de siempre; de 2.3 a 4.4, un APK aparte para ARMv6 y OpenGL ES 2.0 (probado en un Samsung Galaxy Ace de 2011, con un ARM11 de 832 MHz) |
 | Web | Un navegador con WebGL |
 | Symbian (s60v3, s60v5, Symbian^3) | OpenGL ES 1.1 (por ejemplo un Nokia N95 o N8) |

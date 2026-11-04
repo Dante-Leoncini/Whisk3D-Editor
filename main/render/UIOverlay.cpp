@@ -72,6 +72,8 @@ void UI2D_TamanoVentana(float* w, float* h) {
 #endif
 }
 
+void (*g_uiEnArbol)(UI* u) = 0;
+
 UI* UI2D_UIDelEditor() {
     // con un juego CORRIENDO (Play o runtime) manda la escena ACTIVA: su lienzo/tamano es
     // el que ven el script (pantalla/posPx) y el dibujo. Sin juego, gActiva es NULL.

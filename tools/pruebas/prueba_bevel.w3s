@@ -1,0 +1,73 @@
+# BEVEL (Ctrl+B en Edit Mode; Mesh::BevelEdit): redondea aristas (o vertices) con un perfil de N segmentos. Sobre el
+# cubo (lados de 2): la malla queda sana (indices, una entrada por corner en las capas, ninguna cara mirando para
+# adentro) y con la cantidad de vertices y caras que da Blender en los casos de siempre.
+ventana 1280 720
+selname Cubo
+mode edit
+selmode edge
+# una arista: 10 vertices, 7 caras (con 3 segmentos: 14, 9)
+seledgepos 1 1 1 1 1 -1
+bevel 0.2 espera 10 7
+undo
+seledgepos 1 1 1 1 1 -1
+bevel 0.2 segs 3 espera 14 9
+undo
+# las tres aristas de una esquina: 13 vertices, 10 caras (la esquina, un triangulo)
+seledgepos 1 1 1 1 1 -1
+seledgepos 1 1 1 -1 1 1 add
+seledgepos 1 1 1 1 -1 1 add
+bevel 0.2 espera 13 10
+undo
+# con 3 segmentos la esquina se tapa con el abanico curvado (Grid Fill) o con una cara plana (Cutoff)
+seledgepos 1 1 1 1 1 -1
+seledgepos 1 1 1 -1 1 1 add
+seledgepos 1 1 1 1 -1 1 add
+bevel 0.2 segs 3 espera 26 24
+undo
+seledgepos 1 1 1 1 1 -1
+seledgepos 1 1 1 -1 1 1 add
+seledgepos 1 1 1 1 -1 1 add
+bevel 0.2 segs 3 cutoff espera 25 16
+undo
+# DOS aristas de una esquina: sus tiras se juntan en UNA costura (la interseccion de los dos cilindros), sin
+# vertices de mas ni tapa: 11 vertices, 8 caras (con 4 segmentos: 20, 14)
+seledgepos 1 1 1 1 1 -1
+seledgepos 1 1 1 -1 1 1 add
+bevel 0.4 espera 11 8
+undo
+seledgepos 1 1 1 1 1 -1
+seledgepos 1 1 1 -1 1 1 add
+bevel 0.4 segs 4 espera 20 14
+undo
+# los tipos de ancho, Clamp Overlap, sin Loop Slide: la malla sigue sana
+seledgepos 1 1 1 1 1 -1
+bevel 0.3 tipo 1 segs 2
+undo
+seledgepos 1 1 1 1 1 -1
+bevel 0.3 tipo 2 segs 2
+undo
+seledgepos 1 1 1 1 1 -1
+bevel 30 tipo 3 segs 2
+undo
+seledgepos 1 1 1 1 1 -1
+bevel 5 clamp segs 2
+undo
+seledgepos 1 1 1 1 1 -1
+bevel 0.3 noslide segs 2
+undo
+# todo el cubo
+select all
+bevel 0.2 segs 2 espera 56 78
+undo
+# VERTICES (Ctrl+Shift+B): una esquina cortada (10, 7); con 3 segmentos, redondeada
+selmode vert
+selectpos 1 1 1
+bevel 0.3 vertices espera 10 7
+undo
+selectpos 1 1 1
+bevel 0.3 segs 3 vertices
+undo
+# EL MODAL (Ctrl+B): alejarse del centro da ancho, la rueda suma un segmento, el click confirma y abre el panel
+selmode edge
+seledgepos 1 1 1 1 1 -1
+bevel modal 40

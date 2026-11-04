@@ -31,7 +31,6 @@ entradatiene /tmp/w3d_f9_stream/juego/streaming.w3d proyecto.json streamingVista
 abrirw3d /tmp/w3d_f9_stream/juego/streaming.w3d
 streaminfo instancias 256 cargadas 256 pedidos 0
 streamtexrefs
-simcache 0
 simplay 1
 streaminfo cargadas 0 pidiendo 0 descargadas 256 pedidos 0
 # (la base: lo del nivel sin nada del streaming -los dos cubos del juego minimo-)
@@ -51,7 +50,6 @@ scriptinfo compartido juez OK
 scriptinfo compartido veredicto 0,8,20,8,8,20,0,8,20,8,8,20,0
 streamveredicto
 simstop
-simcache 1
 streaminfo cargadas 256 pidiendo 0 pedidos 0
 
 # --- C) el juego compilado: el mismo veredicto ---

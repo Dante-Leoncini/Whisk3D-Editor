@@ -92,6 +92,9 @@ void W3dMallasEditorOlvidar();
 void W3dMallasMarcarSueltasDelArchivo();
 // publica YA lo pendiente, sin salir de Edit Mode (lo pide el guardado: guarda lo que se ve)
 void W3dMallasSincronizar();
+// publica las mallas de PUBLICACION DIFERIDA que tocan a 'm' (la malla misma) o a 'r' (su recurso): las que
+// salieron de Edit siendo la unica usuaria. Llamar antes de LEER el contenido de un recurso (miniatura, export)
+void W3dMallasPublicarPendientesDe(Mesh* m, MallaRecurso* r);
 
 // ---------------------------------------------------------------------------
 //  EL GUARDADO (GuardarW3D, los dos formatos: .w3db o .w3dm por malla)

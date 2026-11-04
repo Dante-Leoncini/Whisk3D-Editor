@@ -33,7 +33,7 @@ La liste de tout ce qui se trouve dans la scène, et aussi la bibliothèque de r
 
 | Fonction | Description |
 |---|---|
-| Ressources | Maillages, matériaux, textures, animations, prefabs, scènes, sons, scripts, polices et vidéos, rangés dans des dossiers. Coche verte = utilisée ; croix rouge = orpheline ; `*` = non enregistrée. |
+| Ressources | Maillages, matériaux, textures, animations, prefabs, scènes, sons, scripts, [shaders](shaders.md), polices et vidéos, rangés dans des dossiers. Un matériau ou un shader glissé sur un maillage du 3D Viewport s'affiche sur la partie sous le pointeur avant d'être relâché. Coche verte = utilisée ; croix rouge = orpheline ; `*` = non enregistrée. |
 | Filter / liste ou Grid | Afficher un seul type ; voir des miniatures. |
 | Faire glisser une ressource | Vers un dossier (la déplace), vers le 3D Viewport (maillage = nouvel objet, matériau ou texture = assigné à l'élément touché, prefab = instance) ou vers une liste déroulante de Properties. |
 | New Folder / Move to Folder | Organiser (les dossiers servent uniquement à ranger). |

@@ -62,6 +62,7 @@
 #include "objects/Culling.h"           // objeto Culling (frustum culling): soloCamaraActiva
 #include "objects/Rutina.h"            // objeto Rutina (lista de pasos del render)
 #include "objects/Niebla.h"            // objeto Niebla (glFog en el arbol)
+#include "objects/Sonido.h"            // objeto Sonido (audio puesto en la escena)
 #include "objects/Recorte.h"           // LimpiarZ / Recorte
 #include "objects/Hitbox.h"            // HITBOX (sus campos los escribe objects/Hitbox.cpp)
 #include "objects/InstanciaPrefab.h"   // INSTANCIA DE PREFAB: se escribe el nodo (prefab + overrides), NO lo que genera
@@ -99,6 +100,9 @@
 #include "ViewPorts/PopUp/FileBrowser.h"
 #include "ViewPorts/PopUp/ConfirmarPopup.h"  // "Guardar como": confirmar antes de pisar un .w3d
 #include "render/OpcionesRender.h"
+#include "render/RayTracer.h"   // g_rt: el trazado de rayos del proyecto
+#include "render/Postproceso.h"   // los efectos del objeto Postproceso
+#include "objects/PostprocesoObj.h"
 #include "animation/Animation.h"   // AnimFPS (se guarda con el proyecto)
 #include "variables.h"   // w3dPath (el archivo abierto)
 #include "w3dFilesystem.h"
@@ -709,6 +713,7 @@ static void EscribirMateriales(std::string& s, CtxGuardar* cx) {
         if (mt->alphaTest != 0.0f)  { s += ", \"alfaCorte\": ";        JNum(s, mt->alphaTest); }
         if (mt->orden_pasada != 0)  { s += ", \"ordenPasada\": ";      JNum(s, (float)mt->orden_pasada); }
         if (mt->mezcla != 0)        { s += ", \"mezcla\": ";           JNum(s, (float)mt->mezcla); }
+        if (mt->porPixel) s += ", \"luzPorPixel\": true";   // (sombreado por pixel: solo si esta prendido)
         // LINEAS (aristas por material): solo si esta prendido (mismo criterio que decal)
         if (mt->lineas) {
             s += ", \"lineas\": true";
@@ -740,6 +745,38 @@ static void EscribirMateriales(std::string& s, CtxGuardar* cx) {
         std::string tb = MatTextura(cx, mt->texturaB);
         if (tb.empty() && dz && !dz->texB.empty()) tb = Asset(cx, dz->texB);
         if (!tb.empty()) { s += ",\n      \"texturaB\": "; JEsc(s, tb); s += ", \"mezclaB\": "; JNum(s, mt->mezclaB); }
+        // LOS MAPAS (W3dMatMapa): la capa UV de cada uno, si es numero o textura y la textura de los del trazado de
+        // rayos (la base y el normal map ya van arriba). Solo los que no son el default
+        {
+            std::string ms;
+            for (int k = 0; k < W3D_MAPAS; k++) {
+                std::string tx;
+                if (k >= W3D_MAPA_EMISION) {
+                    tx = MatTextura(cx, mt->mapaTex[k]);
+                    if (tx.empty() && dz && !dz->mapas[k].empty()) tx = Asset(cx, dz->mapas[k]);
+                }
+                if (tx.empty() && !mt->mapaConTextura[k] && mt->uvMapa[k] == 0) continue;
+                ms += ms.empty() ? "\n        " : ",\n        ";
+                ms += "{ \"mapa\": \""; ms += W3dMatMapaClave(k); ms += "\"";
+                if (mt->uvMapa[k] != 0) { ms += ", \"uv\": "; JNum(ms, (float)mt->uvMapa[k]); }
+                if (mt->mapaConTextura[k]) ms += ", \"conTextura\": true";
+                if (!tx.empty()) { ms += ", \"textura\": "; JEsc(ms, tx); }
+                ms += " }";
+            }
+            if (!ms.empty()) { s += ",\n      \"mapas\": ["; s += ms; s += " ]"; }
+            if (mt->ior < 0.9999f || mt->ior > 1.0001f) { s += ",\n      \"ior\": "; JNum(s, mt->ior); }   // (1 = sin refraccion)
+            if (mt->transmision > 0.0f) { s += ",\n      \"transmision\": "; JNum(s, mt->transmision); }   // (0 = nada de vidrio)
+        }
+        // SHADER ESCRITO (objects/ShaderEscrito.h): el archivo (la entrada "shaders/x.glsl" o una ruta del disco) y el tilde
+        if (!mt->shaderArchivo.empty()) {
+            // (uno del disco -el de un proyecto que todavia no se habia guardado- entra al .w3d como las texturas, y el
+            //  material y el IDE pasan a usar la entrada)
+            const std::string antes = mt->shaderArchivo;
+            const std::string ref = Asset(cx, mt->shaderArchivo);
+            if (mt->shaderArchivo != antes) { extern void IDEArchivoMudado(const std::string&, const std::string&); IDEArchivoMudado(antes, mt->shaderArchivo); }
+            s += ",\n      \"shader\": "; JEsc(s, ref);
+            if (mt->shaderOn) s += ",\n      \"shaderOn\": true";
+        }
         // SOMBREADO TOON: la texturaB es la rampa (solo si no es el default, como el resto de lo opcional)
         if (mt->toon != 0) { s += ",\n      \"toon\": "; JNum(s, (float)mt->toon); }
         if (mt->contorno > 0.0f) { s += ",\n      \"contorno\": "; JNum(s, mt->contorno); }
@@ -887,6 +924,7 @@ static const char* LayoutNombreDeHoja(int kind) {
         case 6: return "Editor2D";
         case 7: return "Console";
         case 8: return "IDE";
+        case 9: return "Library";
     }
     return NULL;   // kind sin nombre todavia: el caller avisa y cae a Viewport3D
 }
@@ -949,7 +987,7 @@ static void LayoutEscribirNodo(std::string& s, ViewportBase* v, int ind) {
             { "showArmature", v3->showArmature, true }, { "showLights", v3->showLights, true },
             { "showCamera", v3->showCamera, true }, { "showEmpty", v3->showEmpty, true },
             { "showParticulas", v3->showParticulas, false }, { "showCurvas", v3->showCurvas, true },
-            { "showHitbox", v3->showHitbox, true },
+            { "showHitbox", v3->showHitbox, true }, { "showSonidos", v3->showSonidos, true },
             { "ShowRelantionshipsLines", v3->ShowRelantionshipsLines, true } };
         for (size_t k = 0; k < sizeof(ov) / sizeof(ov[0]); k++)
             if (ov[k].v != ov[k].def) { JSang(s, ind + 1); s += ov[k].k; s += ": "; s += ov[k].v ? "true" : "false"; s += "\n"; }
@@ -957,10 +995,11 @@ static void LayoutEscribirNodo(std::string& s, ViewportBase* v, int ind) {
         // no se escribian -> un layout de dos vistas (una por la camara en Rendered, otra libre para ver aparecer y
         // desaparecer el culling) volvia como dos vistas iguales. Solo si difieren del default del viewport.
         if (v3->ViewFromCameraActive) { JSang(s, ind + 1); s += "ViewFromCameraActive: true\n"; }
+        if (v3->OverlayFps) { JSang(s, ind + 1); s += "OverlayFps: true\n"; }   // (el contador de fps del overlay)
         if (v3->view != RenderType::MaterialPreview) {
-            static const char* kVista[] = { "Solid", "MaterialPreview", "Rendered", "ZBuffer", "Wireframe", "NormalView", "Alpha" };
+            static const char* kVista[] = { "Solid", "MaterialPreview", "Rendered", "ZBuffer", "Wireframe", "NormalView", "Alpha", "MotionVectors" };
             const int vi = (int)v3->view;
-            if (vi >= 0 && vi < 7) { JSang(s, ind + 1); s += "view: "; s += kVista[vi]; s += "\n"; }
+            if (vi >= 0 && vi < 8) { JSang(s, ind + 1); s += "view: "; s += kVista[vi]; s += "\n"; }
         }
         if (v3->farClip != 1000.0f) { JSang(s, ind + 1); s += "farClip: "; JNum(s, v3->farClip); s += "\n"; }
         JSang(s, ind); s += "}\n";
@@ -1021,12 +1060,15 @@ static void LayoutEscribirNodo(std::string& s, ViewportBase* v, int ind) {
     //  Como el modo del timeline: es de ESA hoja (puede haber dos outliners, uno en la
     //  escena y otro en los materiales). Va por la CLAVE ("mallas"), no por el numero.
     //  En la vista Escena (la de siempre) no se escribe nada: un layout comun sale igual.
-    if (v->ViewportKind() == 2 && ((Outliner*)v)->vista != OUT_VISTA_ESCENA) {
+    //  La BIBLIOTECA (kind 9) siempre lleva su vista (el proyecto o una libreria), el filtro y lista / cuadricula. El
+    //  outliner de la escena (kind 2) solo la lleva si el harness lo paso a los recursos (al leerlo sale una Biblioteca)
+    if ((v->ViewportKind() == 2 && ((Outliner*)v)->vista != OUT_VISTA_ESCENA) || v->ViewportKind() == 9) {
         const Outliner* o = (const Outliner*)v;
         JSang(s, ind); s += nombre; s += " {\n";
         JSang(s, ind + 1); s += "vista: "; s += o->VistaClave(); s += "\n";
         if (o->filtro > W3D_VISTA_ESCENA) { JSang(s, ind + 1); s += "filtro: "; s += W3dVistaClave(o->filtro); s += "\n"; }
-        if (o->cuadricula) { JSang(s, ind + 1); s += "cuadricula: 1\n"; }
+        if (v->ViewportKind() == 9) { JSang(s, ind + 1); s += o->cuadricula ? "cuadricula: 1\n" : "cuadricula: 0\n"; }
+        else if (o->cuadricula) { JSang(s, ind + 1); s += "cuadricula: 1\n"; }
         JSang(s, ind); s += "}\n";
         return;
     }
@@ -1253,8 +1295,6 @@ static void EscribirRigMesh(std::string& s, Mesh* m, int ind) {
         if (m->modificadores[i] && m->modificadores[i]->tipo == ModifierType::Armature) { mod = m->modificadores[i]; break; }
     if (mod && mod->target) {
         s += ",\n"; JSang(s, ind); s += "\"modArmature\": "; JEsc(s, mod->target->name);
-        if (mod->cacheAnim) { s += ",\n"; JSang(s, ind); s += "\"modArmatureCache\": true"; }
-        if (mod->cacheSkip > 0.5f) { s += ",\n"; JSang(s, ind); s += "\"modArmatureSkip\": "; JNum(s, mod->cacheSkip); }
     }
     // ARMATURES 2D DEL MESH (huesos en espacio UV; binding POR NOMBRE con los uvgroups de abajo).
     // Viajan como campo del objeto malla, junto a vgroups/modArmature. FORMATO NUEVO (multi-rig):
@@ -1740,6 +1780,13 @@ static void EscribirObjeto(std::string& s, Object* o, int ind, CtxGuardar* cx, b
         // ENCUADRE DECLARADO: solo si la camara lo declara, asi un proyecto que no
         // lo usa guarda exactamente el mismo texto de siempre (ver Camera::aspecto).
         if (c->aspecto > 0.01f) { s += ",\n"; JSang(s, ind + 1); s += "\"aspecto\": "; JNum(s, c->aspecto); }
+        // PROFUNDIDAD DE CAMPO (Camera::dof): solo si se toco algo (un proyecto viejo guarda el mismo texto de siempre)
+        if (c->dof || c->fStop != 2.8f || c->focoDist != 5.0f || !c->focoObjeto.empty()) {
+            s += ",\n"; JSang(s, ind + 1); s += "\"dof\": "; s += (c->dof ? "true" : "false");
+            s += ",\n"; JSang(s, ind + 1); s += "\"fStop\": "; JNum(s, c->fStop);
+            s += ",\n"; JSang(s, ind + 1); s += "\"foco\": "; JNum(s, c->focoDist);
+            if (!c->focoObjeto.empty()) { s += ",\n"; JSang(s, ind + 1); s += "\"focoObjeto\": "; JEsc(s, c->focoObjeto); }
+        }
         if (c->target) { s += ",\n"; JSang(s, ind + 1); s += "\"target\": "; JEsc(s, c->target->name); }
         // RIEL de la camara (AUDIT versiones: el texto viejo lo traia y el JSON lo perdia):
         // referencia POR NOMBRE a una Curve de la escena + el offset sobre el riel
@@ -1767,8 +1814,17 @@ static void EscribirObjeto(std::string& s, Object* o, int ind, CtxGuardar* cx, b
             s += ",\n"; JSang(s, ind + 1); s += "\"atenuacion\": [";
             JNum(s, l->attConstant); s += ", "; JNum(s, l->attLinear); s += ", "; JNum(s, l->attQuadratic); s += "]";
         }
-        if (l->rtRadio > 0.0f) { s += ",\n"; JSang(s, ind + 1); s += "\"rtRadio\": "; JNum(s, l->rtRadio); }
+        // (el radio SIEMPRE: sin la clave se lee 0, como los proyectos de antes)
+        { s += ",\n"; JSang(s, ind + 1); s += "\"rtRadio\": "; JNum(s, l->rtRadio); }
         if (l->rtRayos > 0.0f) { s += ",\n"; JSang(s, ind + 1); s += "\"rtRayos\": "; JNum(s, l->rtRayos); }
+        if (l->intensidad != 1.0f) { s += ",\n"; JSang(s, ind + 1); s += "\"intensidad\": "; JNum(s, l->intensidad); }
+        if (l->distancia > 0.0f) { s += ",\n"; JSang(s, ind + 1); s += "\"distancia\": "; JNum(s, l->distancia); }
+        // FOCO y AMBIENTE: solo si no son los de fabrica (180 = sin cono; ambiente negro)
+        { if (l->spotCutoff != 180.0f || l->spotExponent != 0.0f) {
+              s += ",\n"; JSang(s, ind + 1); s += "\"spot\": ["; JNum(s, l->spotCutoff); s += ", "; JNum(s, l->spotExponent); s += "]"; }
+          if (l->ambient[0] != 0.0f || l->ambient[1] != 0.0f || l->ambient[2] != 0.0f) {
+              s += ",\n"; JSang(s, ind + 1); s += "\"ambiente\": ["; JNum(s, l->ambient[0]); s += ", "; JNum(s, l->ambient[1]);
+              s += ", "; JNum(s, l->ambient[2]); s += "]"; } }
     }
     else if (t == ObjectType::collection) {
         JSang(s, ind + 1); s += "\"tipo\": \"coleccion\",\n";
@@ -1855,6 +1911,25 @@ static void EscribirObjeto(std::string& s, Object* o, int ind, CtxGuardar* cx, b
         // que no lo tocan queden byte a byte como antes
         if (l->soloCamaraActiva) { s += ",\n"; JSang(s, ind + 1); s += "\"soloCamaraActiva\": true"; }
     }
+    else if (t == ObjectType::sonido) {
+        // SONIDO: todas sus propiedades, siempre (los tiempos en SEGUNDOS: cambiar los fps no los corre)
+        Sonido* so = (Sonido*)o;
+        JSang(s, ind + 1); s += "\"tipo\": \"sonido\",\n";
+        CamposComunes(s, ind + 1, o);
+        s += ",\n"; JSang(s, ind + 1); s += "\"archivo\": "; JEsc(s, so->archivo);
+        s += ",\n"; JSang(s, ind + 1); s += "\"activo\": "; s += so->activo ? "true" : "false";
+        s += ",\n"; JSang(s, ind + 1); s += "\"volumen\": "; JNum(s, so->volumen);
+        s += ",\n"; JSang(s, ind + 1); s += "\"tono\": "; JNum(s, so->tono);
+        s += ",\n"; JSang(s, ind + 1); s += "\"reverb\": "; JNum(s, so->reverb);
+        s += ",\n"; JSang(s, ind + 1); s += "\"paneo\": "; JNum(s, so->paneo);
+        s += ",\n"; JSang(s, ind + 1); s += "\"inicio\": "; JNum(s, so->inicio);
+        s += ",\n"; JSang(s, ind + 1); s += "\"recorteIni\": "; JNum(s, so->recorteIni);
+        s += ",\n"; JSang(s, ind + 1); s += "\"recorteFin\": "; JNum(s, so->recorteFin);
+        s += ",\n"; JSang(s, ind + 1); s += "\"bucle\": "; s += so->bucle ? "true" : "false";
+        s += ",\n"; JSang(s, ind + 1); s += "\"posicional\": "; s += so->posicional ? "true" : "false";
+        s += ",\n"; JSang(s, ind + 1); s += "\"radio\": "; JNum(s, so->radio);
+        s += ",\n"; JSang(s, ind + 1); s += "\"alcance\": "; JNum(s, so->alcance);
+    }
     else if (t == ObjectType::niebla) {
         // NIEBLA: todas sus propiedades, siempre (tipo nuevo, no hay archivos viejos que cuidar)
         Niebla* ni = (Niebla*)o;
@@ -1869,6 +1944,26 @@ static void EscribirObjeto(std::string& s, Object* o, int ind, CtxGuardar* cx, b
         s += ",\n"; JSang(s, ind + 1); s += "\"color\": ["; JNum(s, ni->color[0]); s += ", "; JNum(s, ni->color[1]);
         s += ", "; JNum(s, ni->color[2]); s += "]";
         s += ",\n"; JSang(s, ind + 1); s += "\"fondo\": "; s += ni->fondo ? "true" : "false";
+    }
+    else if (t == ObjectType::postproceso) {
+        const W3dPostOpciones& po = ((Postproceso*)o)->opc;
+        JSang(s, ind + 1); s += "\"tipo\": \"postproceso\",\n";
+        CamposComunes(s, ind + 1, o);
+        s += ",\n"; JSang(s, ind + 1); s += "\"on\": "; s += po.on ? "true" : "false";
+        s += ",\n"; JSang(s, ind + 1); s += "\"elegido\": "; JInt(s, po.activo);
+        s += ",\n"; JSang(s, ind + 1); s += "\"efectos\": [";
+        for (size_t i = 0; i < po.efectos.size(); i++) {
+            const W3dPostEfecto& e = po.efectos[i];
+            if (i) s += ", ";
+            s += "{ \"tipo\": "; JInt(s, e.tipo);
+            s += ", \"activo\": "; s += e.activo ? "true" : "false";
+            s += ", \"opc\": "; s += e.opc ? "true" : "false";
+            const int nv = W3dPostNumeros(e.tipo);
+            s += ", \"v\": ["; for (int k = 0; k < nv; k++) { if (k) s += ", "; JNum(s, e.v[k]); } s += "]";
+            if (e.tipo == W3dPostBloom) { s += ", \"col\": ["; for (int k = 0; k < 3; k++) { if (k) s += ", "; JNum(s, e.col[k]); } s += "]"; }
+            s += " }";
+        }
+        s += "]";
     }
     else if (t == ObjectType::limpiarz) {
         JSang(s, ind + 1); s += "\"tipo\": \"limpiarz\",\n";
@@ -2172,6 +2267,29 @@ static void EscribirObjeto(std::string& s, Object* o, int ind, CtxGuardar* cx, b
         // (edges 0 -> N) y la malla dejaba de ser identica a la original.
         if (m->noEditable) { s += ",\n"; JSang(s, ind + 1); s += "\"noEditable\": true"; }
         if (m->soloRutina) { s += ",\n"; JSang(s, ind + 1); s += "\"soloRutina\": true"; }
+        // el UV PERSONALIZADO de los mapas de sus materiales (Mesh::uvPersonal): material, mapa y la capa UV por nombre
+        // (por NOMBRE de su capa UV, o un INDICE propio)
+        if (!m->uvPersonal.empty() || !m->uvPersonalIdx.empty()) {
+            s += ",\n"; JSang(s, ind + 1); s += "\"uvMateriales\": [";
+            bool primero = true;
+            for (std::map<std::string, std::string>::const_iterator it = m->uvPersonal.begin(); it != m->uvPersonal.end(); ++it) {
+                const size_t c = it->first.find('\x1f');
+                if (c == std::string::npos || it->second.empty()) continue;
+                s += primero ? " " : ", "; primero = false;
+                s += "{ \"material\": "; JEsc(s, it->first.substr(0, c));
+                s += ", \"mapa\": "; JEsc(s, it->first.substr(c + 1));
+                s += ", \"uv\": "; JEsc(s, it->second); s += " }";
+            }
+            for (std::map<std::string, int>::const_iterator it = m->uvPersonalIdx.begin(); it != m->uvPersonalIdx.end(); ++it) {
+                const size_t c = it->first.find('\x1f');
+                if (c == std::string::npos || it->second < 0 || m->uvPersonal.count(it->first)) continue;
+                s += primero ? " " : ", "; primero = false;
+                s += "{ \"material\": "; JEsc(s, it->first.substr(0, c));
+                s += ", \"mapa\": "; JEsc(s, it->first.substr(c + 1));
+                s += ", \"indice\": "; JNum(s, (float)it->second); s += " }";
+            }
+            s += " ]";
+        }
         if (!m->origen.empty()) {
             // el .obj/.fbx del usuario lo edita OTRO programa: es suyo y queda EXTERNO
             // (listado en EXTERNOS.txt). Ya no es de donde carga la malla.
@@ -2300,6 +2418,7 @@ static bool AnimacionesSonElDefault() {
     if (esc.size() != 1 || W3dAnimEsClip(SceneAnimActiva)) return false;
     const SceneAnimation* e = SceneAnimations[(size_t)esc[0]];
     if (e->name != "Scene" || e->startFrame != 1 || e->endFrame != 250 || e->fps != 30) return false;
+    if (!e->esqueletos.empty()) return false;   // (tiene tiras)
     if (!e->camPista.empty() && !e->camPista[0].keyframes.empty()) return false;   // tiene cortes de camara
     const std::vector<AnimationObject>& objs = CurvasDeEscena(esc[0]);
     for (size_t i = 0; i < objs.size(); i++) if (AnimObjTieneKeys(objs[i])) return false;
@@ -2375,6 +2494,16 @@ static void EscribirAnimacionesEscena(std::string& s) {
                 s += "{ \"frame\": "; JInt(s, k[q].frame); s += ", \"camara\": ";
                 JEsc(s, (idx >= 0 && idx < (int)e->camNombres.size()) ? e->camNombres[idx] : std::string());
                 s += " }";
+            }
+            s += "]";
+        }
+        // las TIRAS de esqueleto (los clips que tocan los armatures)
+        if (e && !e->esqueletos.empty()) {
+            s += ",\n        \"esqueletos\": [";
+            for (size_t q = 0; q < e->esqueletos.size(); q++) {
+                if (q) s += ", ";
+                s += "{ \"armature\": "; JEsc(s, e->esqueletos[q].armature); s += ", \"clip\": "; JEsc(s, e->esqueletos[q].clip);
+                s += ", \"frame\": "; JInt(s, e->esqueletos[q].frame); s += " }";
             }
             s += "]";
         }
@@ -2479,10 +2608,10 @@ struct ReposoUno {
     Quaternion rot;
     bool       visible, renderizable;
     // camara
-    float fov, nearClip, farClip;
+    float fov, nearClip, farClip, focoDist;
     // luz
     float dif[3], amb[3], spe[3];
-    float attC, attL, attQ, spotCut, spotExp;
+    float attC, attL, attQ, spotCut, spotExp, intens;
     GLenum lightID;
     bool  direccional;
 };
@@ -2544,12 +2673,12 @@ class ReposoAnimObjetos {
                 o->visible = g.visible; o->renderizable = g.renderizable;
                 if (o->getType() == ObjectType::camera) {
                     Camera* c = (Camera*)o;
-                    c->fov = g.fov; c->nearClip = g.nearClip; c->farClip = g.farClip;
+                    c->fov = g.fov; c->nearClip = g.nearClip; c->farClip = g.farClip; c->focoDist = g.focoDist;
                 } else if (o->getType() == ObjectType::light) {
                     Light* l = (Light*)o;
                     for (int k = 0; k < 3; k++) { l->diffuse[k] = g.dif[k]; l->ambient[k] = g.amb[k]; l->specular[k] = g.spe[k]; }
                     l->attConstant = g.attC; l->attLinear = g.attL; l->attQuadratic = g.attQ;
-                    l->spotCutoff = g.spotCut; l->spotExponent = g.spotExp;
+                    l->spotCutoff = g.spotCut; l->spotExponent = g.spotExp; l->intensidad = g.intens;
                     l->SetLightID(g.lightID);
                     l->direccional = g.direccional;
                 }
@@ -2620,18 +2749,18 @@ class ReposoAnimObjetos {
             o->ActualizarDisplayRot();
             g.pos = o->pos; g.scale = o->scale; g.rot = o->Rot(); g.rotEuler = o->rotEuler;
             g.visible = o->visible; g.renderizable = o->renderizable;
-            g.fov = g.nearClip = g.farClip = 0.0f;
+            g.fov = g.nearClip = g.farClip = g.focoDist = 0.0f;
             for (int k = 0; k < 3; k++) { g.dif[k] = g.amb[k] = g.spe[k] = 0.0f; }
-            g.attC = g.attL = g.attQ = g.spotCut = g.spotExp = 0.0f;
+            g.attC = g.attL = g.attQ = g.spotCut = g.spotExp = 0.0f; g.intens = 1.0f;
             g.lightID = GL_LIGHT0; g.direccional = false;
             if (o->getType() == ObjectType::camera) {
                 Camera* c = (Camera*)o;
-                g.fov = c->fov; g.nearClip = c->nearClip; g.farClip = c->farClip;
+                g.fov = c->fov; g.nearClip = c->nearClip; g.farClip = c->farClip; g.focoDist = c->focoDist;
             } else if (o->getType() == ObjectType::light) {
                 Light* l = (Light*)o;
                 for (int k = 0; k < 3; k++) { g.dif[k] = l->diffuse[k]; g.amb[k] = l->ambient[k]; g.spe[k] = l->specular[k]; }
                 g.attC = l->attConstant; g.attL = l->attLinear; g.attQ = l->attQuadratic;
-                g.spotCut = l->spotCutoff; g.spotExp = l->spotExponent;
+                g.spotCut = l->spotCutoff; g.spotExp = l->spotExponent; g.intens = l->intensidad;
                 g.lightID = l->LightID; g.direccional = l->direccional;
             }
             previos.push_back(g);
@@ -2810,6 +2939,103 @@ struct VolverARaiz {
 // ---------------------------------------------------------------------------
 //  guardar el proyecto completo (v3: el .w3d ES el JSON, plano y editable)
 // ---------------------------------------------------------------------------
+
+// ============================================================================
+//  EL PORTAPAPELES DE OBJETOS (Ctrl+C / Ctrl+X / Ctrl+V, el menu del click derecho): copiar escribe lo elegido en una
+//  CARPETA (la del portapapeles, compartida por todos los Whisk3D de la maquina) con TODO lo que hace falta para
+//  armarlo en otro proyecto: los objetos (en seco, como la definicion de un prefab: sus mallas por el nombre del
+//  recurso), los BYTES de cada malla (.w3db), sus materiales y los archivos que nombran (texturas, shaders) copiados
+//  al lado. Pegar (import_w3d.cpp: W3dPortapapelesPegar) registra las mallas con un nombre libre, trae los materiales
+//  y arma los objetos con el lector de siempre.
+// ============================================================================
+static void JuntarMallasClip(Object* o, std::vector<Mesh*>& out) {
+    if (!o) return;
+    if (o->getType() == ObjectType::mesh) out.push_back((Mesh*)o);
+    for (size_t i = 0; i < o->Childrens.size(); i++) JuntarMallasClip(o->Childrens[i], out);
+}
+static bool EsArchivoCopiable(const std::string& v) {
+    const size_t p = v.find_last_of('.');
+    if (p == std::string::npos || v.size() > 512) return false;
+    std::string e = v.substr(p + 1);
+    for (size_t i = 0; i < e.size(); i++) if (e[i] >= 'A' && e[i] <= 'Z') e[i] = (char)(e[i] - 'A' + 'a');
+    return e == "png" || e == "jpg" || e == "jpeg" || e == "tga" || e == "bmp" || e == "webp" || e == "gif" ||
+           e == "ktx" || e == "glsl" || e == "hdr";
+}
+bool W3dPortapapelesCopiar(const std::vector<Object*>& objs, const std::string& carpeta) {
+    if (objs.empty()) return false;
+    MkdirRec(carpeta + "/mallas"); MkdirRec(carpeta + "/archivos");
+    CtxGuardar cx; cx.esc = NULL; cx.vtxN = 0; cx.error = false; cx.dirW3d = carpeta;
+    const std::string quienAntes = gQuien;
+    // LOS OBJETOS, en seco (cada uno con sus hijos)
+    std::string so = "  \"objetos\": [\n";
+    gSeco = true;
+    bool primero = true;
+    for (size_t i = 0; i < objs.size(); i++) EscribirObjeto(so, objs[i], 1, &cx, &primero);
+    gSeco = false;
+    so += "\n  ]\n";
+    // LAS MALLAS: los bytes de cada recurso que usan (una vez)
+    std::vector<Mesh*> ms;
+    for (size_t i = 0; i < objs.size(); i++) JuntarMallasClip(objs[i], ms);
+    // (lo editado que todavia no se publico en su recurso: la geometria de HOY, no la del ultimo guardado)
+    { extern bool W3dMallaPublicar(Mesh* m); for (size_t i = 0; i < ms.size(); i++) W3dMallaPublicar(ms[i]); }
+    std::vector<MallaRecurso*> rs;
+    std::string sm = "  \"mallas\": [";
+    for (size_t i = 0; i < ms.size(); i++) {
+        if (ms[i]->malla == NULL) continue;
+        bool ya = false; for (size_t k = 0; k < rs.size() && !ya; k++) if (rs[k] == ms[i]->malla) ya = true;
+        if (ya) continue;
+        std::string bytes;
+        if (!W3dMallaRecursoLeerBytes(ms[i]->malla, bytes) || bytes.empty()) continue;
+        char nom[32]; snprintf(nom, sizeof(nom), "mallas/%d.w3db", (int)rs.size());
+        FILE* f = fopen((carpeta + "/" + nom).c_str(), "wb");
+        if (!f) continue;
+        fwrite(bytes.data(), 1, bytes.size(), f); fclose(f);
+        if (!rs.empty()) sm += ",";
+        sm += "\n    { \"nombre\": "; JEsc(sm, ms[i]->malla->nombre); sm += ", \"archivo\": "; JEsc(sm, nom); sm += " }";
+        rs.push_back(ms[i]->malla);
+    }
+    sm += "\n  ],\n";
+    // LOS MATERIALES de esas mallas (el bloque de siempre, con las rutas como estan en memoria)
+    gMats.clear();
+    for (size_t i = 0; i < ms.size(); i++) MatRegistrar(ms[i]);
+    std::string smat;
+    EscribirMateriales(smat, &cx);
+    gMats.clear();
+    gQuien = quienAntes;
+    // los ARCHIVOS que nombran (texturas, shaders): se copian al lado y el JSON los nombra desde la carpeta
+    std::string todo = smat + so;
+    std::string out; out.reserve(todo.size());
+    std::map<std::string, std::string> copiados;
+    for (size_t i = 0; i < todo.size(); ) {
+        if (todo[i] != '"') { out += todo[i++]; continue; }
+        size_t j = i + 1; std::string val;
+        while (j < todo.size() && todo[j] != '"') { if (todo[j] == '\\' && j + 1 < todo.size()) { val += todo[j+1]; j += 2; continue; } val += todo[j++]; }
+        const std::string lit = todo.substr(i, j + 1 - i);
+        i = j + 1;
+        if (EsArchivoCopiable(val)) {
+            std::map<std::string, std::string>::iterator c = copiados.find(val);
+            if (c == copiados.end()) {
+                std::vector<unsigned char> b;
+                if (w3dFileSystem::ReadFileBytes(val, b) && !b.empty()) {
+                    char pre[16]; snprintf(pre, sizeof(pre), "%d_", (int)copiados.size());
+                    const std::string nuevo = std::string("archivos/") + pre + Base(val);
+                    FILE* f = fopen((carpeta + "/" + nuevo).c_str(), "wb");
+                    if (f) { fwrite(&b[0], 1, b.size(), f); fclose(f); copiados[val] = nuevo; }
+                }
+                c = copiados.find(val);
+            }
+            if (c != copiados.end()) { std::string q; JEsc(q, c->second); out += q; continue; }
+        }
+        out += lit;
+    }
+    std::string s = "{\n  \"whisk3dPortapapeles\": 1,\n";
+    s += sm; s += out; s += "}\n";
+    FILE* f = fopen((carpeta + "/portapapeles.json").c_str(), "wb");
+    if (!f) return false;
+    fwrite(s.data(), 1, s.size(), f); fclose(f);
+    return !cx.error;
+}
+
 bool GuardarW3D(const std::string& ruta) {
     if (!SceneCollection) return false;
     // ---- CON EL PLAY ANDANDO: la ESTRUCTURA del usuario ------------------------------------------
@@ -2943,6 +3169,44 @@ bool GuardarW3D(const std::string& ruta) {
     // no cambian ni un byte al re-guardarlos).
     if (w3dEngine::PixeladoGlobal()) s += "  \"pixelado\": true,\n";
     if (!w3dEngine::MipmapsGlobal()) s += "  \"mipmaps\": false,\n";   // default true: solo se guarda el apagado
+    // EL TRAZADO DE RAYOS del proyecto (Propiedades > Render): solo si se toco algo (un proyecto comun sale igual)
+    {
+        const W3dRTOpciones def;
+        if (g_rt.on != def.on || g_rt.rayos != def.rayos || g_rt.samples != def.samples || g_rt.pases != def.pases ||
+            g_rt.denoiser != def.denoiser || g_rt.gpu != def.gpu || g_rt.soloFinal != def.soloFinal || g_rt.escala != def.escala ||
+            g_rt.capas != def.capas || g_rt.semillaVariable != def.semillaVariable || g_rt.reescalador != def.reescalador ||
+            g_rt.desenfoque != def.desenfoque || g_rt.obturador != def.obturador || g_rt.obturadorPos != def.obturadorPos) {
+            s += "  \"trazado\": { \"on\": "; s += g_rt.on ? "true" : "false";
+            s += ", \"rayos\": "; JInt(s, g_rt.rayos); s += ", \"samples\": "; JInt(s, g_rt.samples);
+            s += ", \"pases\": "; JInt(s, g_rt.pases); s += ", \"denoiser\": "; JInt(s, g_rt.denoiser);
+            s += ", \"gpu\": "; s += g_rt.gpu ? "true" : "false";
+            s += ", \"soloFinal\": "; s += g_rt.soloFinal ? "true" : "false";
+            s += ", \"escala\": "; JInt(s, g_rt.escala); s += ", \"reescalador\": "; JInt(s, g_rt.reescalador);
+            s += ", \"capas\": "; JInt(s, g_rt.capas);
+            s += ", \"semillaVariable\": "; s += g_rt.semillaVariable ? "true" : "false";
+            s += ", \"desenfoque\": "; s += g_rt.desenfoque ? "true" : "false";
+            s += ", \"obturador\": "; JNum(s, g_rt.obturador); s += ", \"obturadorPos\": "; JInt(s, g_rt.obturadorPos);
+            s += " },\n";
+        }
+    }
+    // EL POSTPROCESADO (render/Postproceso.h): la pila de efectos en orden. Solo si hay algo (prendido o con efectos)
+    if (false) {   // (el postprocesado es un OBJETO del arbol: se guarda con el, ver EscribirPostEfectos)
+        const W3dPostOpciones g_post;
+        for (size_t i = 0; i < g_post.efectos.size(); i++) {
+            const W3dPostEfecto& e = g_post.efectos[i];
+            if (i) s += ", ";
+            s += "{ \"tipo\": "; JInt(s, e.tipo);
+            s += ", \"activo\": "; s += e.activo ? "true" : "false";
+            s += ", \"opc\": "; s += e.opc ? "true" : "false";
+            const int nv = W3dPostNumeros(e.tipo);
+            s += ", \"v\": ["; for (int k = 0; k < nv; k++) { if (k) s += ", "; JNum(s, e.v[k]); } s += "]";
+            if (e.tipo == W3dPostBloom) {   // (el tinte: solo el que tiene color)
+                s += ", \"col\": ["; for (int k = 0; k < 3; k++) { if (k) s += ", "; JNum(s, e.col[k]); } s += "]";
+            }
+            s += " }";
+        }
+        s += "] },\n";
+    }
     if (w3dEngine::Texturas16Siempre()) s += "  \"texturas16\": true,\n";   // default false (solo las de 16 bits exactas)
     if (w3dEngine::Texturas16Movil()) s += "  \"texturas16Movil\": true,\n";   // default false (en el N95 como en PC)
     if (w3dEngine::TexturasMitadDesde() > 0) {   // default 0 (en el N95 todas a su tamano)
@@ -3002,9 +3266,6 @@ bool GuardarW3D(const std::string& ruta) {
     // no lo tocan quedan igual. Lo lee el loop de escritorio (Symbian lo clampea a 60).
     { extern int g_fpsCap; if (g_fpsCap != 60) { s += "  \"fpsCap\": "; JNum(s, (float)g_fpsCap); s += ",\n"; } }
     s += "  \"fullscreen\": "; s += cfg.fullscreen ? "true" : "false"; s += ",\n";
-    // CACHE DE JUEGO (rewind del Play del editor): solo se escribe APAGADO (un juego pesado, ej. para el N95, abre
-    // fluido sin grabar snapshots por frame). Ausente = la preferencia de la sesion, como antes.
-    { extern bool gSimCacheOn; if (!gSimCacheOn) s += "  \"cacheJuego\": false,\n"; }
     // la VISTA PREVIA del streaming en el editor (io/Streaming.h): solo prendida (default apagada)
     { extern bool g_w3dStreamingVistaPrevia; if (g_w3dStreamingVistaPrevia) s += "  \"streamingVistaPrevia\": true,\n"; }
     // estado de REPRODUCCION al guardar (v3): reabrir el proyecto respeta si estaba

@@ -1,0 +1,35 @@
+# VISTA LOCAL ("/") con una MALLA hija de un ARMATURE (ViewPort3D.cpp: LocalViewEntrar, Objects.cpp: Object::Render).
+# Los padres de lo elegido entran a la vista local solo DE PASO (para llegar al hijo con su matriz): no se dibujan.
+# Antes los huesos del armature padre se veian igual, encima de todo, aunque solo se hubiera elegido la malla.
+# Los huesos van de (0,0,0) a (0,2,0) en azul, encima de todo (X-RAY); el cubo hijo esta al costado.
+ventana 1280 720
+selobj Light
+delete
+selobj Cámara
+delete
+addarmature
+selobj Cubo
+objpos 1.6 1 0
+objscale 0.4 0.4 0.4
+parent Cubo Armature
+deselectall
+vporbita 0.8 1 0 6 0 0
+# sin vista local: el hueso se ve (azul) en (0, 0.5, 0)
+escenapx 0 0.5 0 es 71 140 255 60
+selobj Cubo
+teclareal 3d /
+vporbita 0.8 1 0 6 0 0
+# en la vista local del cubo (con la vista de antes, la vista local la encuadra): ni el hueso del armature padre
+escenapx 0 0.5 0 noes 71 140 255 60
+# y el cubo sigue en su lugar (la matriz del padre se aplica)
+escenapx 1.6 1 0 noes 48 48 48 25
+teclareal 3d /
+vporbita 0.8 1 0 6 0 0
+escenapx 0 0.5 0 es 71 140 255 60
+# eligiendo el ARMATURE, sus huesos si (y el cubo hijo, que es su descendencia)
+selobj Armature
+teclareal 3d /
+vporbita 0.8 1 0 6 0 0
+escenapx 0 0.5 0 es 71 140 255 60
+teclareal 3d /
+vporbita 0.8 1 0 6 0 0

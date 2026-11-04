@@ -32,4 +32,4 @@ end
 
 ## When the game stops
 
-When you press Stop, all scripts are closed, the shared space is cleared and the scene goes back to how it was before Play. If you edit a script while the game is running, that object reloads it: its variables go back to zero and `inicio()` is called again. Rewinding the timeline puts the objects back in their place, but **not** the Lua variables.
+When you press Stop, all scripts are closed, the shared space is cleared and the scene goes back to how it was before Play. If you edit a script while the game is running, that object reloads it: its variables go back to zero and `inicio()` is called again.

@@ -1,0 +1,93 @@
+# GENERA examples/shaders/Ejemplos_Vertex_N95.w3d: los shaders de VERTICES (@vertice) de examples/shaders/, en mallas
+# chicas para que el N95 los corra en la CPU (GLES 1.1 no tiene shaders: el mismo @vertice lo corre un interprete).
+# En GLES 2.0 / Vulkan los corre la GPU. Se mueven con Play de la linea de tiempo (w3d_tiempo = cuadro / FPS).
+#   Bandera        bandera.glsl    un plano subdividido (Simple) que flamea
+#   Esfera_Respira respirar.glsl   se infla y desinfla sobre sus normales
+#   Columna_Torcer torcer.glsl     se retuerce en Y
+#   Cubo_Salta     saltar.glsl     rebota y se aplasta
+#   Agua           agua.glsl       olas (en el N95 sin lo de atras: el @fragmento no corre)
+# Se corre con:  whisk3d.exe --script ejemplo_vertex_n95.w3s
+ventana 1280 720
+selobj Cubo
+delete
+add plane
+objname Piso
+objscale 6 1 4
+objpos 0 -1 0
+matnew
+matnombre Piso
+matcolor 0.5 0.5 0.55
+borrararchivo ../../examples/shaders/Ejemplos_Vertex_N95.w3d
+guardarw3d ../../examples/shaders/Ejemplos_Vertex_N95.w3d
+# la BANDERA con su asta
+add cylinder
+objname Asta
+objscale 0.05 1.4 0.05
+objpos -4.2 0.4 0
+matnew
+matnombre Madera
+matcolor 0.45 0.3 0.15
+add plane
+objname Bandera
+objscale 1.1 1 0.7
+objrot 90 1 0 0
+objpos -3.05 1.1 0
+modadd subsurf
+modsubsurf 3 simple
+matnew
+matnombre Bandera
+matcolor 0.2 0.5 1
+matcull 0
+matshader importar ../../examples/shaders/bandera.glsl
+matshader compila si
+# RESPIRAR
+add uvsphere
+objname Esfera_Respira
+objscale 0.7 0.7 0.7
+objpos -0.9 -0.2 0
+matnew
+matnombre Corazon
+matcolor 0.9 0.2 0.25
+matshader importar ../../examples/shaders/respirar.glsl
+matshader compila si
+# TORCER
+add cylinder
+objname Columna_Torcer
+objscale 0.4 1.1 0.4
+objpos 1 0.1 0
+modadd subsurf
+modsubsurf 2 simple
+matnew
+matnombre Columna
+matcolor 0.95 0.75 0.2
+matshader importar ../../examples/shaders/torcer.glsl
+matshader compila si
+# SALTAR
+add cube
+objname Cubo_Salta
+objscale 0.4 0.4 0.4
+objpos 2.9 -0.6 0
+matnew
+matnombre Goma
+matcolor 0.3 0.85 0.4
+matshader importar ../../examples/shaders/saltar.glsl
+matshader compila si
+# AGUA
+add plane
+objname Agua
+objscale 2 1 1.2
+objpos 0 -0.95 2.4
+modadd subsurf
+modsubsurf 3 simple
+matnew
+matnombre Agua
+matcolor 0.45 0.75 0.9
+matshader importar ../../examples/shaders/agua.glsl
+matshader compila si
+deselectall
+vporbita 0 0.2 0.8 10 -14 0
+vpvista material
+frame 20
+escenapx foto ejemplo_vertex.ppm
+frame 1
+guardarw3d ../../examples/shaders/Ejemplos_Vertex_N95.w3d

@@ -1,6 +1,11 @@
 # Whisk3D en Symbian (Nokia N95 y S60)
 
-Backend OpenGL ES 1.1. El objetivo insignia del proyecto: correr en un teléfono de 2007.
+Dos variantes, desde el mismo proyecto:
+
+- **OpenGL ES 1.1** (pipeline fijo): el N95 y todo S60 3rd/5th. El objetivo insignia del proyecto: correr en un teléfono de 2007.
+- **OpenGL ES 2.0** (shaders): el N8, C7, E7 y todo Symbian^3/Anna/Belle. Usa el mismo backend de shaders que Android y la web (`libs/Whisk3DCore/gles2/w3dGraphicsGLES2.cpp`).
+
+Las dos tienen la misma UID: instalar una reemplaza a la otra.
 
 ## Instalar (usuario final)
 
@@ -14,11 +19,42 @@ Si el instalador falla, probablemente tengas que "hackear" el teléfono para ign
 
 El proyecto de Symbian está en esta carpeta:
 
-- `group/Whisk3D.mmp` — el proyecto (fuentes, includes, libs). Comparte casi todo el código con el resto de las plataformas (`main/`, `libs/Whisk3DCore`, `libs/WhiskUI`); lo específico del teléfono está en `src/`.
+- `group/Whisk3D.mmp` — el proyecto ES 1.1 (fuentes, includes, libs). Comparte casi todo el código con el resto de las plataformas (`main/`, `libs/Whisk3DCore`, `libs/WhiskUI`); lo específico del teléfono está en `src/`.
+- `group/Whisk3D_gles2.mmp` — la variante ES 2.0. Define `W3D_MMP_GLES2` e incluye `Whisk3D.mmp`: la lista de fuentes es una sola. Lo que cambia está en los `#ifdef W3D_MMP_GLES2` de `Whisk3D.mmp` (el ejecutable `whisk3D_gles2.exe`, el backend, `libglesv2` + `libegl` + `accmonitor`). En el código, la variante se reconoce por `W3D_GLES2`.
+- `sis/Whisk3D_armv5.pkg` (ES 1.1) y `sis/Whisk3D_gles2_armv5.pkg` (ES 2.0, instala `whisk3D_gles2.exe` como `Whisk3D.exe`).
 - `src/` — la capa de Symbian: app framework (`Whisk3D*.cpp`), input (teclado/keypad, mouse virtual, HID bluetooth), carga de texturas por ICL, y el reloj/glue.
 - `data/`, `sis/` — recursos e instaladores.
 
 Se compila con el SDK de S60 3rd Edition + **Carbide.c++** (o `bldmake` + `abld` a mano). La toolchain es vieja (**C++03**: sin `nullptr`, `auto`, range-for, `vector::data`...) y no todo el subsistema nuevo (FBX, skinning) está portado — mirá los `#ifndef W3D_SYMBIAN` del código.
+
+## Pantalla táctil
+
+Los gestos son los mismos de Android y la web, con el mismo código:
+
+- S60 5th (5800, N97): un dedo. Symbian^3 (N8 y los que siguen; la variante ES 2.0): multitáctil.
+- Los dedos los sigue el Core (`libs/Whisk3DCore/base/W3dTactil.cpp`, y `W3dTactilSymbian.cpp` para el `TPointerEvent`). Arma los mismos eventos que SDL en Android: el primer dedo mueve y aprieta el mouse, los demás solo avisan como dedos.
+- El editor los convierte en `SDL_Event` (`main/app/W3dTactilEditor.cpp`) y entran por `controles.cpp`, como en Android. Para eso `controles.cpp` compila en Symbian contra `main/app/W3dSdlMinimo.h`.
+- Una mejora de los gestos en Android llega sola al teléfono. En la PC se prueba con `tactiltest` (`tools/pruebas/prueba_tactil.w3s`), que pasa por el mismo camino del Core.
+- En Symbian los handlers de PC del viewport 3D y de los paneles corren solo con el dedo o el mouse Bluetooth (`W3D_SOLO_POR_CONTROLES`): el keypad y el cursor virtual del N95 siguen como antes.
+- En un teléfono táctil la barra de herramientas del 3D sale prendida: con el dedo, el transform se confirma con el tilde.
+- Todavía no: el editor UV y el Editor 2D con el dedo (su input sigue apagado en Symbian).
+
+## Pantallas externas (TV-out y HDMI)
+
+Al conectar una pantalla, el editor pregunta qué hacer con ella:
+
+- **Clonar pantalla**: no hace nada; el sistema copia la pantalla del teléfono, como siempre.
+- **Usar nuevo viewport**: la pantalla externa muestra un viewport 3D propio, a su resolución. Sigue la vista del 3D del teléfono, porque la TV no tiene entrada.
+- **Viewport de propiedades**: la pantalla externa muestra un panel de propiedades propio.
+
+Cómo funciona:
+
+- La lógica es compartida (`main/UI/ViewPorts/PantallasExternas.cpp`). Se prueba en la PC con el comando `pantalla` del harness.
+- La parte del teléfono es `src/w3dpantallas.cpp`. Revisa una vez por segundo las pantallas que expone wserv (`RWsSession::NumberOfScreens`). En la variante ES 2.0, además, confirma con el AccMonitor que haya un cable de video (HDMI o compuesto).
+- Si se elige un viewport, crea en esa pantalla un window group, una ventana y una superficie EGL que comparte el contexto de la principal.
+- El N8 tiene salida RCA de 480i y HDMI de 720p. La variante ES 1.1 dibuja la pantalla externa a 320x240 como máximo, porque el TV-out del N95 muestra 240p.
+
+Todo queda en el log con el prefijo `[pantallas]`: cuántas pantallas hay, sus tamaños, el cable y los errores de EGL.
 
 ## Diagnosticar un cierre en el teléfono
 

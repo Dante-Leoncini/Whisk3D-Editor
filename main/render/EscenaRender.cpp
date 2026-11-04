@@ -114,6 +114,12 @@ void W3dEscena3DLuces(int vista) {
             gfx::Light0f(gfx::LightConstantAtt, 1.0f);
             gfx::Light0f(gfx::LightLinearAtt, 0.0f);
             gfx::Light0f(gfx::LightQuadraticAtt, 0.0f);
+#if !(defined(W3D_SYMBIAN) && !defined(W3D_GLES2))   // (el N95 no le pone cono a ninguna luz: Light.cpp)
+            // SIN CONO: el slot 0 es el de la primera luz de la escena, y en Rendered un FOCO le deja su cono (corte,
+            // exponente y direccion). Volver de Rendered a Material dejaba la luz del preview como ese foco: oscuro
+            { static const float adelante[3] = { 0.0f, 0.0f, -1.0f };
+              gfx::LightNSpot(0, 180.0f, 0.0f, adelante); }
+#endif
             break;
         case RenderType::ZBuffer:      // profundidad: sin luz
         case RenderType::NormalView:   // color por normal (unlit), lo dibuja el Core

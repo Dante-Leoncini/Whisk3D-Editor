@@ -31,7 +31,7 @@ SRC="$SRC $CORE/io/W3dTexto.cpp $CORE/io/W3dMalla.cpp $CORE/io/W3dAlmacen.cpp"
 # W3dMallaBin = el .w3db (la misma geometria en binario, el formato por defecto). Va siempre con W3dMalla.
 SRC="$SRC $CORE/io/W3dMallaBin.cpp"
 SRC="$SRC $CORE/io/W3dRecursos.cpp"
-SRC="$SRC $CORE/base/w3dlog.cpp $CORE/base/W3dInteractionState.cpp $CORE/base/W3dConfig.cpp"
+SRC="$SRC $CORE/base/w3dlog.cpp $CORE/base/W3dInteractionState.cpp $CORE/base/W3dConfig.cpp $CORE/base/W3dTactil.cpp"
 SRC="$SRC $CORE/math/Vector3.cpp $CORE/math/Quaternion.cpp $CORE/math/Matrix4.cpp"
 SRC="$SRC $CORE/gles2/w3dGraphicsGLES2.cpp"
 # scripts lua: el modulo del Core + el interprete vendorizado. Los .c de lua NO

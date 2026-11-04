@@ -1,6 +1,6 @@
 # Editor de scripts (IDE)
 
-Editor de texto para los scripts Lua, con números de línea, colores de sintaxis, guías de sangría y soporte para la ñ y las tildes. Mientras tiene el foco, las letras escriben (no disparan atajos del editor). En Android, tocar el texto abre el teclado. En el N95 se escribe con T9.
+Editor de texto para los scripts Lua y los [shaders escritos](shaders.md) (`.glsl`), con números de línea, colores de sintaxis, guías de sangría y soporte para la ñ y las tildes. Mientras tiene el foco, las letras escriben (no disparan atajos del editor). En Android, tocar el texto abre el teclado. En el N95 se escribe con T9.
 
 | Función | Descripción | Atajo |
 |---|---|---|
@@ -10,6 +10,7 @@ Editor de texto para los scripts Lua, con números de línea, colores de sintaxi
 | Guardar en el w3d | Solo si el script es externo: lo mete en el proyecto. | Archivo |
 | Guardar fuera del w3d… | Solo si el script es interno: lo saca a un archivo; los objetos pasan a usar ese archivo. | Archivo |
 | Refrescar | Trae el archivo tal como está en el disco (lo que se editó con otro editor). Si hay cambios en el editor sin guardar, pregunta antes de descartarlos (y se pueden recuperar con <kbd>Ctrl+Z</kbd>). Con el juego corriendo, recarga en vivo los objetos que usan el script. | Botón |
+| Shaders (.glsl) | Se abren desde el material (el botoncito de la fila **Shader**), desde la Biblioteca o desde el selector, y se pintan como GLSL. Al lado del nombre aparece **Compilar**: compila lo que estás escribiendo (si un material lo usa, lo guarda y compila ese material). Guardar un shader lo compila en todos los materiales que lo usan y avisa si compiló o el error con su renglón. | <kbd>Ctrl+S</kbd> |
 | Protección al guardar | Si el archivo externo cambió afuera desde que se abrió, Guardar pregunta antes de sobrescribirlo. Guardar también recarga el script en vivo si el juego está corriendo. | Automático |
 | Sangría (Tab) | <kbd>Tab</kbd> completa hasta el próximo múltiplo de 4; con varias líneas seleccionadas les suma un nivel y <kbd>Shift+Tab</kbd> lo saca. Las líneas verticales marcan cada nivel; la del bloque del cursor se ve más clara. | <kbd>Tab</kbd> / <kbd>Shift+Tab</kbd> |
 | Menú Editar | Deshacer, Rehacer, Cortar, Copiar, Pegar, Buscar… y Reemplazar… | Botón Editar |

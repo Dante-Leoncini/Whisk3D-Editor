@@ -384,6 +384,7 @@ bool UI2DGuardar(UI* u, const std::string& ruta, const std::string& baseRel) {
     CampoS(f, 1, "nombre", u->name);
     Sangria(f, 1); fputs("\"ventana\": {\n", f);
     CampoB(f, 2, "igualQueRender", u->igualQueRender);
+    CampoB(f, 2, "enArbol", u->enArbol);
     CampoF(f, 2, "ancho", u->ancho);
     CampoF(f, 2, "alto", u->alto);
     CampoF(f, 2, "escalaGlobal", u->escalaGlobal);
@@ -752,6 +753,7 @@ UI* UI2DCargar(const std::string& ruta) {
     JVal* v = JHijo(raiz, "ventana", 4);
     if (v) {
         u->igualQueRender = JB(v, "igualQueRender", u->igualQueRender);
+        u->enArbol = JB(v, "enArbol", false);   // (sin la clave: un proyecto de antes -> al final, como se veia)
         u->ancho = JF(v, "ancho", u->ancho);
         u->alto = JF(v, "alto", u->alto);
         u->escalaGlobal = JF(v, "escalaGlobal", u->escalaGlobal);

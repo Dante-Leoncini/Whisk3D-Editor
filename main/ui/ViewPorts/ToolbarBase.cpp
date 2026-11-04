@@ -363,8 +363,7 @@ bool BrushBarTecla(ViewportBase* vp, int tecla){
 // dibuja UNA celda: track (+ relleno si tiene fraccion) + texto centrado. 'frac' < 0 = sin relleno
 // (la barra del radio, que no tiene tope). Asume la matriz ya trasladada al origen de la fila.
 static void BBrenderCelda(Card* card, int cx, int cw, int h, float frac,
-                          const std::string& txt, bool enfocada, bool editando,
-                          const std::string& textoEdit, float alpha){
+                          const std::string& txt, bool enfocada, const TextField* edit, float alpha){
     int barH = h - 2 * GlobalScale;
     if (barH < 1) barH = 1;
     w3dEngine::PushMatrix();
@@ -385,10 +384,11 @@ static void BBrenderCelda(Card* card, int cx, int cw, int h, float frac,
     w3dEngine::PopMatrix();
 
     // texto: el valor normal, o lo que se esta tipeando con el caret si esta en edicion numerica
-    SetColorID(editando ? ColorID::accent : ColorID::blanco, 1.0f);
+    SetColorID(ColorID::blanco, 1.0f);
     w3dEngine::PushMatrix();
     w3dEngine::Translatef((GLfloat)cx, (GLfloat)((h - LetterHeightGS) / 2), 0);
-    RenderBitmapText(editando ? textoEdit : txt, textAlign::center, cw);
+    if (edit) RenderTextField(*edit, true, textAlign::center, cw);
+    else RenderBitmapText(txt, textAlign::center, cw);
     w3dEngine::PopMatrix();
 }
 
@@ -413,7 +413,7 @@ void ViewportBase::RenderBrushBar(){
         w3dEngine::Color4f(grisP[0], grisP[1], grisP[2], barAlpha);
         barCard->Resize(width, h);
         barCard->RenderObject(false);
-        BBrenderCelda(barCard, sx - x, sw, h, -1.0f, txt, false, false, std::string(), barAlpha);
+        BBrenderCelda(barCard, sx - x, sw, h, -1.0f, txt, false, NULL, barAlpha);
         w3dEngine::PopMatrix();
         return;
     }
@@ -427,13 +427,6 @@ void ViewportBase::RenderBrushBar(){
     // que celda esta en edicion numerica (para mostrar lo tipeado + caret en vez del valor)
     bool edR = (gBBpfRadio && g_propFloatEditando == gBBpfRadio);
     bool edV = (gBBpfValor && g_propFloatEditando == gBBpfValor);
-    std::string txtEdR, txtEdV;
-    if (edR) txtEdR = gBBpfRadio->field.selectAll ? gBBpfRadio->field.text
-                    : gBBpfRadio->field.text.substr(0, gBBpfRadio->field.caret) + "|" +
-                      gBBpfRadio->field.text.substr(gBBpfRadio->field.caret);
-    if (edV) txtEdV = gBBpfValor->field.selectAll ? gBBpfValor->field.text
-                    : gBBpfValor->field.text.substr(0, gBBpfValor->field.caret) + "|" +
-                      gBBpfValor->field.text.substr(gBBpfValor->field.caret);
 
     int cx0, cx1, cw; BBceldas(this, cx0, cx1, cw);
     bool foco = (this == viewPortActive) && gBBfoco >= 0; // el foco de teclado es de UN viewport
@@ -446,8 +439,8 @@ void ViewportBase::RenderBrushBar(){
     barCard->Resize(width, h);
     barCard->RenderObject(false);
     // RADIO: sin relleno (no tiene tope) | VALOR: relleno 0..100%
-    BBrenderCelda(barCard, cx0 - x, cw, h, -1.0f, txtRadio, foco && gBBfoco == 0, edR, txtEdR, barAlpha);
-    BBrenderCelda(barCard, cx1 - x, cw, h, BrushGet().fuerza, txtValor, foco && gBBfoco == 1, edV, txtEdV, barAlpha);
+    BBrenderCelda(barCard, cx0 - x, cw, h, -1.0f, txtRadio, foco && gBBfoco == 0, edR ? &gBBpfRadio->field : NULL, barAlpha);
+    BBrenderCelda(barCard, cx1 - x, cw, h, BrushGet().fuerza, txtValor, foco && gBBfoco == 1, edV ? &gBBpfValor->field : NULL, barAlpha);
     w3dEngine::PopMatrix();
 }
 

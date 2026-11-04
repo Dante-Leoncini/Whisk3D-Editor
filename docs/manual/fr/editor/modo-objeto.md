@@ -28,7 +28,8 @@ Uniquement en Object Mode. Le nouvel élément apparaît au curseur 3D et reste 
 |---|---|
 | Mesh | Plane, Cube, Circle, UV Sphere, Cone, Cylinder (avec taille, rayon, segments, ombrage lisse). Aussi Vertex (un point isolé pour commencer à modéliser) et Reference (un plan avec une image, pour décalquer). |
 | Empty | Un objet sans maillage, pour regrouper ou comme point de référence. |
-| Camera / Light / Fog | Caméra, lumière et brouillard de la scène. |
+| Camera / Light / Fog | Caméra, lumière et brouillard de la scène. La lumière a un **Type** : Point, Soleil (directionnelle) ou Spot (un cône, dessiné dans la vue) ; Ajouter propose aussi Soleil et Spot. **Intensity** la rend plus forte (animable) ; **Distance** (m) indique jusqu'où porte une lumière ponctuelle ou un spot, et la longueur de son cône (0 = sans limite ; le lancer de rayons l'éteint en douceur à cette distance). Quand la lumière est sélectionnée, un spot montre son cône et une lumière ponctuelle une sphère de cette distance ; un soleil montre toujours une ligne jusqu'au sol, vers où il éclaire. |
+| Son | Un son placé dans la scène (icône de haut-parleur). Il joue avec la timeline en **secondes**, pas en frames ; avec **Positional (3D)** il s'entend depuis sa position (plus fort quand la caméra est proche, du côté où il est) ; sinon c'est comme une musique. Déposer un .wav dans la vue 3D en crée un à cet endroit. |
 | Armature | Une armature avec un os, pour animer des personnages. |
 | Path | Une courbe à deux nœuds (elle se modifie comme un maillage : <kbd>E</kbd> ajoute des nœuds). |
 | Collection | Un dossier pour ranger les objets. |

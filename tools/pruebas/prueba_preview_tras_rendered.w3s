@@ -1,0 +1,26 @@
+# MATERIAL PREVIEW DESPUES DE RENDERED (render/EscenaRender.cpp): la luz del preview es el slot 0 de GL, el mismo de
+# la primera luz de la escena. En Rendered un FOCO le deja su cono; al volver a Material la luz del preview quedaba
+# como ese foco (un cono angosto apuntando a cualquier lado) y la escena se veia casi negra. Tiene que verse igual
+# que antes de pasar por Rendered. (Sin la luz y el cubo de fabrica: el foco tiene que ser la luz del slot 0)
+ventana 1280 720
+selobj Light
+delete
+selobj Cubo
+delete
+add plane
+objscale 4 1 4
+addlight
+objpos 3 2 3
+luzfoco 8 20
+deselectall
+vporbita 0 0 0 12 -60 0
+vpvista material
+escenapx 1.5 0 -1.5 noes 0 0 0 150
+# en Rendered el foco apunta para otro lado: el plano queda a oscuras
+vpvista rendered
+escenapx 1.5 0 -1.5 es 0 0 0 60
+# y de vuelta en Material (y en Solid, que usa la misma luz), claro como al principio (antes: casi negro)
+vpvista material
+escenapx 1.5 0 -1.5 noes 0 0 0 150
+vpvista solid
+escenapx 1.5 0 -1.5 noes 0 0 0 150

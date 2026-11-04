@@ -19,6 +19,7 @@
 #include <thread>              // compjobs: hardware_concurrency (la cota del -j del build)
 #include "objects/Objects.h"   // ObjActivo, g_editMesh, EditSelectMode, Sel*, DeseleccionarTodo
 #include "objects/Mesh.h"      // NewMesh, MeshType, Mesh
+#include "objects/Sonido.h"    // sonido: el objeto Sonido (crear, tocar, escuchar)
 #include "objects/MallaDatos.h" // mallacache/meminfo: geometria compartida (A/B + medicion)
 #include "io/W3dRecursos.h"     // meminfo: el almacen de recursos (descriptores por tipo)
 #include "edit/Modifier.h"     // Modifier (params del Mirror en el harness)
@@ -26,7 +27,14 @@
 #include "edit/UVUnwrap.h"
 #include "edit/Proporcional.h"
 #include "io/TexturaGenerada.h"      // newtex / texgentest / newtexclean
-#include "render/RayTracer.h"        // rtrender / rtpixel / rtsave / rttris
+#include "render/RayTracer.h"
+#include "objects/ShaderEscrito.h" // matshader: el shader escrito del material
+#include "render/VectoresMovimiento.h"   // vectores / renderopc
+#include "render/ReescaladoFSR.h"        // fsr
+#include "render/Denoiser.h"   // rtdenoiser        // rtrender / rtpixel / rtsave / rttris
+#include "render/RTGpu.h"      // rtgpu
+#include "render/Postproceso.h"   // post (la pila de postprocesado)
+#include "objects/PostprocesoObj.h"   // el objeto Postproceso (los comandos post)
 #include "io/UVExportar.h"            // uvexport / uvexportdef
 #include "ViewPorts/PopUp/ExportarUVPopup.h"   // uvexportpopup / uvexportnow
 #include "ViewPorts/PopUp/GuardarComoPopup.h"  // guardarcomo
@@ -37,6 +45,9 @@
 #include "render/OpcionesRender.h" // bonetest: g_transformPivot (pivote de los R/S de huesos)
 #include "objects/EditMesh.h"  // EditMesh
 #include "ViewPorts/LayoutInput.h" // LayoutToggleEditMode/ExtrudeFaces, EditXform*
+#include "base/W3dTactil.h"        // tactiltest: la pantalla tactil del Core (Symbian: dedos -> eventos SDL)
+#include "app/W3dTactilEditor.h"    // W3dEventoTactil
+extern int W3dDedosActivos();       // (controles.cpp) dedos apoyados segun el editor
 #include "ViewPorts/PopUp/FalloffEditor.h" // test 'falloff': el popup reutilizable de la curva
 #include "ViewPorts/Pick3D.h"              // test 'boxtest': BoxSelectAplicar3D
 #include "edit/BoxSelect.h"                // test 'boxtest': la caja de seleccion
@@ -96,9 +107,11 @@ bool UpdateFlipbooks(float dtSeg); // Flipbook.cpp: flipbooks unificados (Imagen
 #include "config/W3dProfile.h" // bench: g_prof.scene (desglose del traversal) + W3dNowMs
 #include "objects/Texto2D.h"   // paltest: elementos con campos pal*
 #include "objects/Rect2D.h"
+#include "objects/Recorte.h"   // addlimpiarz
 #include "ViewPorts/PopUp/ColorPicker.h"     // uipunteros: target/palRef/palObj apuntan adentro del elemento
 #include "ViewPorts/PopUp/RedoMeshPanel.h"   // uipunteros: sus campos apuntan a miembros de la malla
 #include "ViewPorts/Gizmo.h"                // gizmotest: el gizmo de mover
+#include "ViewPorts/PantallasExternas.h"    // pantalla: el popup y el dibujo de las pantallas externas (TV/HDMI)
 #include "objects/Empty.h"     // nombresmover/nombresscope: objetos sueltos del scope global
 #include "objects/Collection.h" // delarbol: 'delete col' (la coleccion es la raiz del borrado)
 #include "objects/Boton2D.h"
@@ -121,6 +134,7 @@ extern "C" {                      // chocantest: los binds se prueban sobre un l
 #include "objects/Armature.h"   // test de la pestania Animation (clips del esqueleto)
 #include "animation/SkeletalAnimation.h" // CrearAnimacion/BorrarAnimacionActiva/MoverAnimacionActiva
 #include "animation/Armature2DAnimation.h" // arm2dtest/arm2dsave: clips del armature 2D
+#include "io/RecursosProyecto.h"   // texhuerfana: Purge Orphans (W3dVistaRecPurgar)
 #include "Undo.h"               // UndoCapturarSeleccionEdit / UndoDeshacer (test del Ctrl+Z)
 #include "variables.h"         // InteractionMode, enum { ObjectMode, EditMode, ... }
 #include <fstream>
@@ -344,6 +358,8 @@ static std::string W3dDebugFile(const std::string& name){
 
 // (harness) 'simularsincorpus 1': el corpus "no esta" aunque la carpeta exista, como en un clon
 // limpio. Asi el camino de "salteo con aviso" se prueba tambien en la maquina que SI lo tiene.
+// un comando pidio terminar el script ACA y darlo por bueno (lo que sigue no aplica en esta plataforma)
+static bool gScriptTerminarOk = false;
 static bool g_simularSinCorpus = false;
 static int  g_corpusSalteos = 0;      // partes salteadas desde el ultimo 'simularsincorpus 1'
 
@@ -4829,9 +4845,12 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         // tokens opcionales en cualquier orden: 'noswap' (no presenta el frame) y
         // 'tecla:<nombre>' (mantiene esa tecla APRETADA durante el bench -> el juego CORRE:
         // avanza por el nivel, se cargan trozos nuevos, los enemigos animan = peor caso real)
-        bool conSwap = true; std::string teclaHold;
+        // 'escena': el Play del TIMELINE de la escena (no el juego): avanza un frame por cuadro (las tiras de los
+        // esqueletos, las curvas, las luces) y al final informa el trazado de rayos
+        bool conSwap = true, escena = false; std::string teclaHold;
         { std::string opt; while (ss >> opt) {
               if (opt == "noswap") conSwap = false;
+              else if (opt == "escena") escena = true;
               else if (opt.compare(0, 6, "tecla:") == 0) teclaHold = opt.substr(6); } }
         namespace gfx = w3dEngine;
         extern Viewport3D* Viewport3DActive;
@@ -4844,7 +4863,8 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         bool camPrev = vp->ViewFromCameraActive;
         if (CameraActive) vp->ViewFromCameraActive = true; // la vista DEL JUEGO
         // modo juego + play (lo mismo que arrancar con --juego)
-        ActiveAnimKind = 2; AnimEsJuego = true; StartFrame = 1; PlayAnimation = true;
+        if (escena) { ActiveAnimKind = 0; AnimEsJuego = false; PlayAnimation = true; AnimPlayDir = 1; }
+        else { ActiveAnimKind = 2; AnimEsJuego = true; StartFrame = 1; PlayAnimation = true; }
         extern void SimTickPlay(float); extern void SimStop(); extern void AplicarAnimacionObjetos();
         SDL_GL_SetSwapInterval(0);
         if (!teclaHold.empty()) W3dScriptTecla(teclaHold.c_str(), true); // jugar de verdad
@@ -4876,6 +4896,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
             UpdateFlipbooks(dt);                   // flipbooks unificados (junto a UpdateUVAnims)
             W3dParticulasTick(dt);                 // emisores de particulas (como el main loop)
             { extern void W3dVisZonasTick(); W3dVisZonasTick(); }
+            if (escena && CurrentFrame < EndFrame) CurrentFrame++;
             AplicarAnimacionObjetos();             // keyframes de transform
             double t2 = W3dNowMs();
             vp->Render();
@@ -4898,6 +4919,8 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         double msTot = msSim + msAnim + msRender + msFin;
         printf("      [benchjuego] %d frames | total: %.2f ms/frame (%.0f fps)\n",
                n, msTot / n, (msTot > 0.0) ? 1000.0 * n / msTot : 0.0);
+        if (g_rt.on) printf("      [benchjuego] trazado: %.1f imagenes terminadas/s, %.0f Mrayos/s (frame %d)\n",
+                            RTImagenesPorSegundo(), RTRayosPorSegundo() / 1e6, CurrentFrame);
         printf("      [benchjuego] desglose: sim=%.2f anims=%.2f render(cpu)=%.2f glFinish(gpu)=%.2f ms\n",
                msSim / n, msAnim / n, msRender / n, msFin / n);
         { extern double g_rutinasMs, g_uiMs;
@@ -5171,7 +5194,6 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         return true;
     }
     // ---- skinbench <frames> : mide el costo de SkinearMesh (forzando recompute cada frame) sobre la 1er malla skinneada. ----
-    // ---- skincache <on> [skip] : activa/desactiva el cache de vertex-animation en la 1er malla skinneada (para medir). ----
     // ---- lodinfo : lista los objetos LOD (umbrales + hijo elegido con la vista actual) y
     //      Culling (soloCamaraActiva + hijos) de la escena -> verificar carga/roundtrip v4. ----
     if (cmd == "lodinfo") {
@@ -5248,17 +5270,12 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         }
         return true;
     }
-    // ---- simira <tick> / simpaso <-1|1> : EL SCRUB DEL TIMELINE en modo juego, por
-    //      script. Son las MISMAS puertas que usa el timeline del editor (SimIrA /
-    //      SimStep), o sea que prueban de verdad la captura/restauracion de estados
-    //      -- incluida la vertex animation, que es lo que reporto el dueno. ----
-    if (cmd == "simira" || cmd == "simpaso") {
-        extern void SimIrA(int); extern bool SimStep(int);
-        extern bool SimActiva(); extern int SimFramesGrabados(); extern int SimFrameActual();
+    // ---- simpaso : el boton > del timeline con la partida en PAUSA (SimStep: simula un frame) ----
+    if (cmd == "simpaso") {
+        extern bool SimStep(int); extern bool SimActiva(); extern int SimFrameActual();
         if (!SimActiva()) { err = cmd + ": no hay una partida cargada (falta juego on + simplay)"; return false; }
-        if (cmd == "simira") { int t = 0; ss >> t; SimIrA(t); }
-        else { int d = -1; ss >> d; SimStep(d < 0 ? -1 : 1); }
-        printf("      [%s] frame=%d de %d grabado(s)\n", cmd.c_str(), SimFrameActual(), SimFramesGrabados());
+        SimStep(1);
+        printf("      [%s] frame=%d\n", cmd.c_str(), SimFrameActual());
         return true;
     }
     // ---- cullactivo <culling> [on|off] : el CHECKBOX "Active" del objeto Culling (la
@@ -5356,6 +5373,40 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
     //      Es la prueba de la regresion que reporto el dueno: "cuando aprieto play no
     //      quiero que me modifiques el paneo/zoom de la camara activa". Se guarda, se
     //      juega (juego on + simplay N + juego off) y se compara: tiene que dar igual. ----
+    // ---- verde [n] : la tecla VERDE del N95 (tap): cicla el viewport activo n veces (LayoutCiclarViewportActivo) ----
+    // ---- propsfila g p | propsfila espera g p : elige la fila p del grupo g del panel de Propiedades (como las
+    //      flechas; p = -1 la cabecera) / ERROR si la seleccion no es esa ----
+    if (cmd == "verde") {
+        int n = 1; ss >> n;
+        extern void LayoutCiclarViewportActivo(int dir);
+        for (int i = 0; i < n; i++) LayoutCiclarViewportActivo(1);
+        printf("      [verde] activo: tipo %d\n", viewPortActive ? viewPortActive->ViewportKind() : -1);
+        return true;
+    }
+    if (cmd == "propsfila") {
+        Properties* P = ScriptProps();
+        if (!P) { err = "propsfila: no hay panel de Propiedades"; return false; }
+        std::string q; ss >> q;
+        if (q.empty()) {   // sin argumentos: los grupos (visible / abierto / filas)
+            for (size_t i = 0; i < P->GroupProperties.size(); i++)
+                printf("      [propsfila] grupo %d: %s %s %d filas\n", (int)i, P->GroupProperties[i]->visible ? "visible" : "oculto",
+                       P->GroupProperties[i]->open ? "abierto" : "cerrado", (int)P->GroupProperties[i]->properties.size());
+            return true;
+        }
+        const bool espera = (q == "espera");
+        int g = espera ? -1 : atoi(q.c_str()), pf = -1;
+        if (espera) ss >> g;
+        ss >> pf;
+        if (g < 0 || g >= (int)P->GroupProperties.size()) { err = "propsfila: grupo fuera de rango"; return false; }
+        if (espera) {
+            printf("      [propsfila] seleccion: grupo %d fila %d\n", P->selectIndex,
+                   (P->selectIndex >= 0 && P->selectIndex < (int)P->GroupProperties.size()) ? P->GroupProperties[P->selectIndex]->selectIndex : -9);
+            if (P->selectIndex != g || P->GroupProperties[g]->selectIndex != pf) { err = "propsfila espera: la seleccion es otra"; return false; }
+            return true;
+        }
+        P->focoEnTabs = false; P->selectIndex = g; P->GroupProperties[g]->selectIndex = pf;
+        return true;
+    }
     if (cmd == "vpestado") {
         std::string sub; ss >> sub;
         extern Viewport3D* Viewport3DActive;
@@ -5379,6 +5430,94 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         // usuario se arma a mano con la rueda y el arrastre en vista de camara). Sin
         // esto no se puede probar la regresion: con los valores por defecto (1,0,0)
         // un reseteo pasa desapercibido.
+        // 'flecha dx dy' / 'rueda d': el paneo de las FLECHAS (el keypad del N95) y la rueda, por la misma puerta
+        if (sub == "flecha") { int fx = 0, fy = 0; ss >> fx >> fy; vp->PanFlecha(fx, fy); return true; }
+        // 'encuadrar': el "." (Frame Selected) sobre la seleccion
+        if (sub == "encuadrar") { vp->EnfocarObject(); return true; }
+        // 'orbitar dx dy': el arrastre de orbitar (mouse / dedo / keypad del N95)
+        if (sub == "orbitar") { int fx = 0, fy = 0; ss >> fx >> fy; vp->OrbitarFlecha(fx, fy); return true; }
+        // 'tecla izq|der [frame]': la flecha del TECLADO (PC / teclado Bluetooth) sobre el viewport 3D; con frame, ERROR
+        // si no quedo en ese cuadro
+        if (sub == "tecla") {
+            std::string t; int esp = -999999; ss >> t >> esp;
+            vp->event_key_down(t == "izq" ? W3dK_LEFT : W3dK_RIGHT, false);
+            printf("      [vpestado] tecla %s -> frame %d\n", t.c_str(), CurrentFrame);
+            if (esp != -999999 && CurrentFrame != esp) { err = "vpestado tecla: el frame no es el esperado"; return false; }
+            return true;
+        }
+        // 'ejes': ERROR si los ejes con los que se mueve / rota / escala (camRight/camUp/camForward) no son los de lo
+        //  que se ve (mirando por la camara activa: los de la camara)
+        if (sub == "ejes") {
+            vp->Render();
+            const Quaternion r = (vp->ViewFromCameraActive && CameraActive) ? CameraActive->Rot() : vp->viewRot;
+            const Vector3 er = r * Vector3(1, 0, 0), eu = r * Vector3(0, 1, 0);
+            const float d = fabsf(er.x - camRight.x) + fabsf(er.y - camRight.y) + fabsf(er.z - camRight.z) +
+                            fabsf(eu.x - camUp.x) + fabsf(eu.y - camUp.y) + fabsf(eu.z - camUp.z);
+            printf("      [vpestado] ejes: derecha=(%.3f, %.3f, %.3f) arriba=(%.3f, %.3f, %.3f) %s\n", camRight.x, camRight.y,
+                   camRight.z, camUp.x, camUp.y, camUp.z, d < 1e-3f ? "(los de la vista)" : "(NO son los de la vista)");
+            if (d >= 1e-3f) { err = "vpestado ejes: no son los de la vista"; return false; }
+            return true;
+        }
+        // 'vista si|no': ERROR si no se esta (o si se esta) mirando por la camara activa
+        if (sub == "vista") {
+            std::string q; ss >> q;
+            if ((q == "si") != vp->ViewFromCameraActive) {
+                err = std::string("vpestado vista: ") + (vp->ViewFromCameraActive ? "mira por la camara" : "no mira por la camara");
+                return false;
+            }
+            return true;
+        }
+        // 'candado [si|no]': un click en el CANDADO de la vista de camara; con si/no, ERROR si no quedo asi
+        if (sub == "candado") {
+            std::string esp; ss >> esp;
+            int rx, ry, lado; vp->CandadoCamaraRect(rx, ry, lado);
+            if (!vp->CandadoCamaraClick(vp->x + rx + lado / 2, vp->y + ry + lado / 2)) { err = "vpestado candado: no se ve"; return false; }
+            printf("      [vpestado] candado %s\n", vp->CameraToView ? "cerrado" : "abierto");
+            if ((esp == "si" && !vp->CameraToView) || (esp == "no" && vp->CameraToView)) { err = "vpestado candado: quedo al reves"; return false; }
+            return true;
+        }
+        // 'camara': imprime la pose de la camara activa; 'camara guardar' / 'camara igual|movida': ERROR si no
+        if (sub == "camara") {
+            std::string q; ss >> q;
+            static Vector3 gp; static Quaternion gr;
+            if (!CameraActive) { err = "vpestado camara: sin camara activa"; return false; }
+            const Vector3 cp = CameraActive->pos; const Quaternion cr = CameraActive->Rot();
+            printf("      [vpestado] camara pos=(%.3f, %.3f, %.3f) rot=(%.4f, %.4f, %.4f, %.4f)\n", cp.x, cp.y, cp.z, cr.w, cr.x, cr.y, cr.z);
+            if (q == "guardar") { gp = cp; gr = cr; return true; }
+            const float d = fabsf(cp.x - gp.x) + fabsf(cp.y - gp.y) + fabsf(cp.z - gp.z) +
+                            fabsf(cr.w - gr.w) + fabsf(cr.x - gr.x) + fabsf(cr.y - gr.y) + fabsf(cr.z - gr.z);
+            if (q == "igual" && d > 1e-4f) { err = "vpestado camara: se movio"; return false; }
+            if (q == "movida" && d <= 1e-4f) { err = "vpestado camara: no se movio"; return false; }
+            return true;
+        }
+        if (sub == "rueda") { float d = 0.0f; ss >> d; vp->Zoom(d); return true; }
+        // 'espera z px py': ERROR si el zoom/paneo de inspeccion no es ese ('!0' en vez de un numero: distinto de 0)
+        if (sub == "espera") {
+            std::string t[3]; ss >> t[0] >> t[1] >> t[2];
+            bool mal = false;
+            for (int k = 0; k < 3; k++) {
+                if (t[k] == "!0") mal = mal || fabsf(a[8 + k] - (k == 0 ? 1.0f : 0.0f)) < 1e-3f;
+                else mal = mal || fabsf(a[8 + k] - (float)atof(t[k].c_str())) > 1e-3f;
+            }
+            const float z = (float)atof(t[0].c_str()), px = (float)atof(t[1].c_str()), py = (float)atof(t[2].c_str());
+            if (mal) {
+                char b[160]; sprintf(b, "vpestado espera: camZoom=%.4f camPan=(%.4f, %.4f), se esperaba %.4f (%.4f, %.4f)",
+                                     a[8], a[9], a[10], z, px, py);
+                err = b; return false;
+            }
+            return true;
+        }
+        // 'marco nx ny': las medias-extensiones del marco de la camara (1 1 = llena el viewport)
+        if (sub == "marco") {
+            float nx = 1.0f, ny = 1.0f; ss >> nx >> ny;
+            vp->Render();
+            printf("      [vpestado] marco %s NX=%.4f NY=%.4f\n", vp->camFrameOn ? "si" : "no", vp->camFrameNX, vp->camFrameNY);
+            if (!vp->camFrameOn || fabsf(vp->camFrameNX - nx) > 0.01f || fabsf(vp->camFrameNY - ny) > 0.01f) {
+                char b[128]; sprintf(b, "vpestado marco: NX=%.4f NY=%.4f, se esperaba %.4f %.4f", vp->camFrameNX, vp->camFrameNY, nx, ny);
+                err = b; return false;
+            }
+            return true;
+        }
         if (sub == "inspeccion") {
             float z = 1.0f, px = 0.0f, py = 0.0f; ss >> z >> px >> py;
             vp->camViewZoom = z; vp->camViewPanX = px; vp->camViewPanY = py;
@@ -5781,6 +5920,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         else if (modo == "wire")     vp->view = RenderType::Wireframe;
         else if (modo == "zbuffer")  vp->view = RenderType::ZBuffer;
         else if (modo == "normal")   vp->view = RenderType::NormalView;
+        else if (modo == "vectores") vp->view = RenderType::Vectores;   // la vista "Motion vectors"
         else { err = "vpvista: modo desconocido '" + modo + "'"; return false; }
         if (modo == "wire") {
             std::string filtro; ss >> filtro;
@@ -6233,7 +6373,10 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
             else if (que2 == "lineas")   { float v = 0; ss >> v; mt->lineas = true;
                 if (v >= 1.0f) mt->grosorLinea = v; }
             else if (que2 == "nolineas") { mt->lineas = false; }
-            else { err = "matflags set: decal|nodecal|mezcla|profundidad|transparente|sesgo|pasada|lineas|nolineas"; return false; }
+            // pixel / vertice: el sombreado (el desplegable "Sombreado" del panel; solo cambia algo con shaders)
+            else if (que2 == "pixel")    { mt->porPixel = true; }
+            else if (que2 == "vertice")  { mt->porPixel = false; }
+            else { err = "matflags set: decal|nodecal|mezcla|profundidad|transparente|sesgo|pasada|lineas|nolineas|pixel|vertice"; return false; }
             printf("      [matflags] set %s aplicado a '%s'\n", que2.c_str(), mt->name.c_str());
             return true;
         }
@@ -7178,18 +7321,6 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         return true;
     }
 
-    if (cmd == "skincache") {
-        int on=1, skip=0; ss>>on; ss>>skip;
-        Mesh* found=NULL;
-        { std::vector<Object*> st; if(SceneCollection) st.push_back(SceneCollection);
-          while(!st.empty()&&!found){ Object* o=st.back(); st.pop_back();
-            if (o->getType()==ObjectType::mesh && ((Mesh*)o)->skinArmature) found=(Mesh*)o;
-            for(size_t i=0;i<o->Childrens.size();i++) st.push_back(o->Childrens[i]); } }
-        if (!found){ err="skincache: no hay malla con skinArmature"; return false; }
-        found->skinCacheOn = (on!=0); if(skip<0)skip=0; found->skinCacheSkip = skip; found->LiberarSkinCache();
-        printf("      [skincache] on=%d skip=%d\n", on, skip);
-        return true;
-    }
     if (cmd == "skinbench") {
         int nf=200; ss>>nf; if(nf<1)nf=1;
         Mesh* found=NULL;
@@ -7585,6 +7716,15 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         if (!ObjActivo) { err = "no hay objeto activo"; return false; }
         float x=0,y=0,z=0; ss>>x>>y>>z; ObjActivo->pos = Vector3(x,y,z); return true;
     }
+    // ---- sombreadopixel : la prueba sigue solo si el backend tiene la luz POR PIXEL (shaders: GLES 2.0 / WebGL / la
+    //      PC con -DW3D_PC_GLES2=ON). Sin shaders (la PC fija, el N95) la opcion no existe: el script termina aca, bien ----
+    if (cmd == "sombreadopixel") {
+        if (!w3dEngine::SombreadoPorPixelSoportado()) {
+            printf("      [sombreadopixel] este backend no tiene shaders: el resto de la prueba no aplica\n");
+            gScriptTerminarOk = true;
+        }
+        return true;
+    }
     // ---- objscale <x> <y> <z> : escala del objeto activo (los Mirror/Boolean con target se enteran) ----
     if (cmd == "objscale") {
         if (!ObjActivo) { err = "no hay objeto activo"; return false; }
@@ -7593,6 +7733,46 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
     }
 
     // ---- mode <object|edit> ----
+    // ---- modotiempo [n] : CUANTO CUESTA ENTRAR Y SALIR DE EDIT MODE con la malla activa (Tab real,
+    //      LayoutToggleEditMode). Por vuelta: 'entrar' = el Tab (materializar la edicion del recurso + la
+    //      copia de los arrays), 'jaula' = EnsureEdit (lo que paga el primer render en Edit) y 'salir' = el
+    //      Tab de vuelta (publicar en el recurso + re-vincular). Muestra si la jaula y la edicion
+    //      SOBREVIVEN a la salida: si no, cada vuelta paga todo de nuevo. ----
+    if (cmd == "modotiempo") {
+        int n = 3; ss >> n; if (n < 1) n = 1;
+        if (!ObjActivo || ObjActivo->getType() != ObjectType::mesh) { err = "modotiempo: no hay malla activa"; return false; }
+        if (InteractionMode != ObjectMode) { err = "modotiempo: empezar en Object Mode"; return false; }
+        Mesh* m = (Mesh*)ObjActivo;
+        double W3dNowMs();
+        printf("      [modotiempo] '%s' %d verts %d caras recurso=%s\n", m->name.c_str(), m->vertexSize,
+               m->facesSize, m->malla ? "si" : "no");
+        for (int i = 0; i < n; i++) {
+            const bool jaulaAntes = m->edit != NULL;
+            const double t0 = W3dNowMs();
+            LayoutToggleEditMode();
+            const double t1 = W3dNowMs();
+            if (InteractionMode != EditMode) { err = "modotiempo: no entro a Edit Mode"; return false; }
+            m->EnsureEdit();
+            const double t2 = W3dNowMs();
+            LayoutToggleEditMode();
+            const double t3 = W3dNowMs();
+            if (InteractionMode == EditMode) { err = "modotiempo: no salio de Edit Mode"; return false; }
+            printf("      [modotiempo] vuelta %d: entrar %.1f ms, jaula %.1f ms, salir %.1f ms | jaula antes=%d "
+                   "despues=%d edicionPendiente=%s compartidos=0x%x\n", i + 1, t1 - t0, t2 - t1, t3 - t2,
+                   (int)jaulaAntes, (int)(m->edit != NULL), m->edicionPendiente.empty() ? "no" : "si",
+                   (unsigned)m->datosComp);
+        }
+        return true;
+    }
+
+    // ---- newinstance : Alt+D, el MISMO camino que el atajo (NewInstance): copia del objeto que COMPARTE la malla ----
+    if (cmd == "newinstance") {
+        extern void NewInstance();
+        if (!ObjActivo) { err = "newinstance: no hay objeto activo"; return false; }
+        NewInstance();
+        return true;
+    }
+
     if (cmd == "mode") {
         std::string md; ss >> md;
         if (md == "edit") {
@@ -7630,6 +7810,78 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
                vp->hudX0, vp->hudY0, vp->hudW, vp->hudH, vp->hudEsc);
         return true;
     }
+    // ---- pantalla <sub> : PANTALLAS EXTERNAS (PantallasExternas.cpp; en el telefono las avisa w3dpantallas.cpp)
+    //        conectar <id> <w> <h> [soloclona]  -> como si se enchufara una (abre el popup)
+    //        menu                               -> lista el popup abierto
+    //        menuelegir <fila>                  -> elige esa fila del popup (como el OK del keypad)
+    //        elegir <id> <modo>                 -> 1 clonar, 2 viewport 3D, 3 propiedades (sin popup)
+    //        render [png]                       -> dibuja las que tienen viewport (sin ganchos: en la ventana de
+    //                                              la PC, abajo a la izquierda) y cuenta los pixeles no-fondo
+    //        desconectar <id> | info
+    if (cmd == "pantalla") {
+        std::string sub; ss >> sub;
+        if (sub == "conectar") {
+            int id = 0, w = 0, h = 0; std::string sc; ss >> id >> w >> h >> sc;
+            if (id <= 0 || w <= 0 || h <= 0) { err = "pantalla conectar <id> <w> <h> [soloclona]"; return false; }
+            PantallaExternaConectada(id, w, h, sc != "soloclona");
+            return true;
+        }
+        if (sub == "desconectar") { int id = 0; ss >> id; PantallaExternaDesconectada(id); return true; }
+        if (sub == "elegir") { int id = 0, modo = 0; ss >> id >> modo; PantallaExternaElegir(id, modo); return true; }
+        if (sub == "menu" || sub == "menuelegir") {
+            PopupMenu* m = MenuAbierto;
+            if (!m || !m->abierto) { printf("      [pantalla] no hay popup abierto\n"); return sub == "menu"; }
+            if (sub == "menu") {
+                printf("      [pantalla] popup '%s' en %d,%d %dx%d (pantalla %dx%d)\n", m->titulo.c_str(), m->x, m->y,
+                       m->width, m->height, MenuPantallaW, MenuPantallaH);
+                for (size_t i = 0; i < m->items.size(); i++)
+                    printf("      [pantalla] %d. %s%s\n", (int)i, m->items[i]->text.c_str(),
+                           (m->items[i]->gris && !*m->items[i]->gris) ? " (gris)" : "");
+                return true;
+            }
+            int fila = -1; ss >> fila;
+            if (fila < 0 || fila >= (int)m->items.size()) { err = "pantalla menuelegir: fila fuera de rango"; return false; }
+            m->selectIndex = fila;
+            const int id = m->Enter();
+            if (id >= 0) m->Ejecutar(id);
+            if (MenuAbierto == m && !m->abierto) MenuAbierto = NULL;
+            return true;
+        }
+        if (sub == "info") {
+            printf("      [pantalla] %d pantalla(s) externa(s)\n", PantallasExternasCantidad());
+            for (int i = 0; i < PantallasExternasCantidad(); i++) {
+                int id, w, h, modo; PantallaExternaInfo(i, &id, &w, &h, &modo);
+                printf("      [pantalla] id %d: %dx%d modo %d\n", id, w, h, modo);
+            }
+            return true;
+        }
+        if (sub == "render") {
+            std::string ruta; ss >> ruta;
+            extern int W3dPantallaAlto;
+            const int altoAntes = W3dPantallaAlto, wAntes = MenuPantallaW, hAntes = MenuPantallaH;
+            const int n = PantallasExternasRender();
+            if (W3dPantallaAlto != altoAntes || MenuPantallaW != wAntes || MenuPantallaH != hAntes) {
+                err = "pantalla render: no restauro los globales de pantalla"; return false;
+            }
+            printf("      [pantalla] dibujo %d pantalla(s)\n", n);
+            int id, w, h, modo;
+            if (n > 0 && PantallaExternaInfo(0, &id, &w, &h, &modo)) {
+                w3dEngine::Finish();
+                // (sin ganchos se dibujo en la ventana, abajo a la izquierda: se lee lo que entre)
+                const int lw = w < wAntes ? w : wAntes, lh = h < altoAntes ? h : altoAntes;
+                std::vector<unsigned char> px((size_t)lw * lh * 4, 0);
+                w3dEngine::ReadPixelsRGBA(0, 0, lw, lh, &px[0]);
+                int distintos = 0;
+                for (size_t i = 0; i + 4 <= px.size(); i += 4)
+                    if (px[i] != px[0] || px[i + 1] != px[1] || px[i + 2] != px[2]) distintos++;
+                printf("      [pantalla] %dx%d leidos, %d pixeles distintos del fondo\n", lw, lh, distintos);
+                if (!ruta.empty()) w3dEngine::SavePNG(ruta.c_str(), &px[0], lw, lh, true);
+            }
+            return true;
+        }
+        err = "pantalla: subcomando desconocido '" + sub + "'"; return false;
+    }
+
     if (cmd == "uishot") {
         std::string ruta; ss >> ruta;
         if (ruta.empty()) { err = "uishot: falta la ruta del .png"; return false; }
@@ -7880,8 +8132,26 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
     if (cmd == "objrot") {
         if (!ObjActivo) { err = "no hay objeto activo"; return false; }
         float deg=0.0f; ss >> deg;
+        // (opcional: el eje; sin el, Y como siempre)
+        float ex = 0, ey = 1, ez = 0; if (!(ss >> ex >> ey >> ez)) { ex = 0; ey = 1; ez = 0; }
         // por la puerta: antes escribia SOLO el quaternion y el .w3d (que guarda rotEuler) perdia la rotacion
-        ObjActivo->SetRotAxisAngle(Vector3(0,1,0), deg);
+        ObjActivo->SetRotAxisAngle(Vector3(ex,ey,ez), deg);
+        return true;
+    }
+    // ---- matnombre <nombre> : renombra el material activo (por la puerta: queda unico) ----
+    if (cmd == "matnombre") {
+        std::string n; ss >> n;
+        Material* mat = ScriptActiveMaterial();
+        if (!mat || n.empty()) { err = "matnombre: sin material activo o sin nombre"; return false; }
+        mat->SetName(n);
+        return true;
+    }
+    // ---- matcull 0|1 : el Culling del material activo (0 = se ven las dos caras) ----
+    if (cmd == "matcull") {
+        int on = 1; ss >> on;
+        Material* mat = ScriptActiveMaterial();
+        if (!mat) { err = "matcull: sin material activo"; return false; }
+        mat->culling = (on != 0);
         return true;
     }
     // ---- active <n> : ObjActivo = hijo n de la escena (top-level), sin tocar la seleccion ----
@@ -8364,6 +8634,18 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         int tipo = (t=="screw")?0:(t=="mirror")?1:(t=="array")?2:(t=="subsurf")?3:(t=="boolean")?4:(t=="cullingtri")?(int)ModifierType::CullingTri:-1;
         if (tipo < 0) { err = "tipo de modificador desconocido: '" + t + "'"; return false; }
         UndoModAgregar(m, tipo); m->GenerarMallaModificada(); return true; // la MISMA puerta que el boton Add (deja paso de undo)
+    }
+    // ---- modsubsurf n : los niveles (viewport y render) del Subdivision activo ----
+    if (cmd == "modsubsurf") {
+        Mesh* m = ScriptActiveMesh(); if (!m) { err = "no hay malla activa"; return false; }
+        if (m->modificadorActivo < 0 || m->modificadorActivo >= (int)m->modificadores.size()) { err = "sin modificador activo"; return false; }
+        float n = 1; ss >> n;
+        std::string tipo; ss >> tipo;   // "simple" = subdivide sin redondear (una grilla plana)
+        m->modificadores[(size_t)m->modificadorActivo]->subLevel = n;
+        m->modificadores[(size_t)m->modificadorActivo]->subRenderLevel = n;
+        if (!tipo.empty()) m->modificadores[(size_t)m->modificadorActivo]->subSimple = (tipo == "simple");
+        m->GenerarMallaModificada();
+        return true;
     }
     // ---- modarray copias relX relY relZ [constX constY constZ] [merge] : parametros del Array activo (ejes de la UI) ----
     // ---- genbbox [nverts ncaras] [minx miny minz maxx maxy maxz tol] : caja de la malla GENERADA (ejes internos) ----
@@ -10956,6 +11238,69 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
             printf("%s\n", d.keys.size()>10?" ...":"");
         }
         delete tl; return true;
+    }
+    // ---- tlpanel : el PANEL izquierdo del timeline y el borrado. Con el panel angosto: el texto se recorta antes
+    //      de los ojos, hay barra horizontal, el boton del medio sobre el panel lo scrollea (y NO panea los frames),
+    //      el borde se pinta con el hover y se arrastra; Backspace (la C del N95) borra la CURVA elegida y despues
+    //      los keyframes elegidos, y el area para agarrar un keyframe es generosa ----
+    if (cmd == "tlpanel") {
+        extern bool leftMouseDown, middleMouseDown; extern int dx, dy;
+        extern bool TimelineHaySeleccion();
+        bool ok = true;
+        #define TLP_VER(cond, que) do { const bool _c = (cond); printf("      [tlpanel] %-60s %s\n", que, _c ? "OK" : "MAL"); if (!_c) ok = false; } while (0)
+        Timeline* tl = new Timeline(); tl->x = 0; tl->y = 0; tl->Resize(900, 300);
+        tl->ConstruirDopeRows();
+        if (tl->dopeRows.size() < 3){ printf("      [tlpanel] sin filas (keychan antes)\n"); delete tl; err = "tlpanel: sin filas"; return false; }
+        const int filas0 = (int)tl->dopeRows.size();
+        tl->panelWUser = 50 * GlobalScale; tl->ConstruirDopeRows();
+        TLP_VER(tl->PanelMaxX() < 0, "panel angosto: el texto no entra -> scroll horizontal");
+        { int bx, by, bw, bh, tx, tw; TLP_VER(tl->PanelBarraH(bx, by, bw, bh, tx, tw), "hay barra horizontal");
+          TLP_VER(bw <= tl->DopeOjoX(), "el texto (y la barra) terminan antes de los ojos"); }
+        // boton del medio sobre el panel: scrollea el panel y NO los frames
+        const float vc0 = tl->viewStartF;
+        const int py = tl->stripY + tl->rowH;
+        tl->lastMx = 10 * GlobalScale; tl->lastMy = py;
+        middleMouseDown = true; dx = -20 * GlobalScale; dy = 0;
+        tl->event_mouse_motion(tl->lastMx + dx, py);
+        middleMouseDown = false; dx = dy = 0; tl->event_mouse_motion(tl->lastMx, py);
+        TLP_VER(tl->panelPosX < 0, "medio sobre el panel: corre el texto");
+        TLP_VER(tl->viewStartF == vc0, "...y no panea los frames");
+        // el borde: hover blanco, click lo agarra (verde) y arrastrar cambia el ancho
+        tl->event_mouse_motion(tl->panelW, py);
+        TLP_VER(tl->panelBordeHover, "mouse sobre el borde: se marca");
+        tl->lastMx = tl->panelW; tl->lastMy = py; tl->button_left();
+        TLP_VER(tl->panelResize, "click en el borde: lo agarra");
+        leftMouseDown = true; tl->event_mouse_motion(80 * GlobalScale, py); leftMouseDown = false;
+        TLP_VER(tl->panelWUser == 80 * GlobalScale, "arrastrar el borde cambia el ancho");
+        tl->mouse_button_up(1);
+        // borrar: click en una fila de CANAL (una curva) + Backspace = esa curva se va
+        tl->panelWUser = 0; tl->ConstruirDopeRows();
+        int rc = -1; for (int r = 0; r < (int)tl->dopeRows.size(); r++) if (tl->dopeRows[r].propId >= 0){ rc = r; break; }
+        TLP_VER(rc >= 0, "hay una fila de canal");
+        if (rc >= 0){
+            tl->lastMx = tl->x + 4 * GlobalScale; tl->lastMy = tl->y + tl->stripY + rc * tl->rowH + tl->PosY + tl->rowH / 2;
+            tl->button_left(); tl->mouse_button_up(1);
+            TLP_VER(TimelineHaySeleccion(), "click en la fila: la curva queda elegida");
+            tl->event_key_down(W3dK_BACKSPACE, false);
+            tl->ConstruirDopeRows();
+            TLP_VER((int)tl->dopeRows.size() < filas0, "Backspace borra la curva elegida");
+        }
+        // keyframe: un click a 6 px del rombo lo agarra (antes tenia que caer a 5 px exactos)
+        { int r = -1; for (int i = 0; i < (int)tl->dopeRows.size(); i++) if (!tl->dopeRows[i].keys.empty()){ r = i; break; }
+          if (r >= 0){
+            const int kx = (int)tl->FrameToX((float)tl->dopeRows[r].keys[0]);
+            tl->lastMx = tl->x + kx + 6 * GlobalScale; tl->lastMy = tl->y + tl->stripY + r * tl->rowH + tl->PosY + tl->rowH / 2;
+            tl->DopeSelectNone(); tl->button_left(); tl->mouse_button_up(1);
+            TLP_VER(TimelineHaySeleccion(), "click cerca del rombo: el keyframe queda elegido");
+            tl->DopeSelectAll(); tl->event_key_down(W3dK_BACKSPACE, false);
+            tl->ConstruirDopeRows();
+            int quedan = 0; for (size_t i = 0; i < tl->dopeRows.size(); i++) quedan += (int)tl->dopeRows[i].keys.size();
+            TLP_VER(quedan == 0, "Backspace borra los keyframes elegidos");
+          } else TLP_VER(false, "queda una fila con keyframes"); }
+        #undef TLP_VER
+        delete tl;
+        if (!ok) { err = "tlpanel: el panel / el borrado no se comportan como se pidio"; return false; }
+        return true;
     }
     // ---- dopexform <g|s> <expr> [center|cur] : selecciona TODOS los keyframes del dope sheet y les aplica el
     //      transform tipeando el valor tal cual lo haria el usuario ('g' 2 = mover 2 frames; 's' 2 = lo que
@@ -27048,6 +27393,58 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         if (!ok) { err = "gizmotest: ver los MAL de arriba"; return false; }
         return true;
     }
+    // ---- tactiltest : la pantalla tactil de las plataformas SIN SDL (Symbian), por TactilDedo del Core (pixeles por dedo)
+    //      del Core -> los mismos eventos que SDL en Android -> controles.cpp. Es exactamente lo que hace el N8/5800: si esto
+    //      pasa en la PC, los gestos del telefono son los de Android. ----
+    if (cmd == "tactiltest") {
+        using namespace w3dEngine;
+        bool ok = true; std::string e2;
+        if (!W3dRunCommand("add cube", e2)) { err = "tactiltest: " + e2; return false; }   // (en el centro de la vista)
+        if (!viewPortActive || viewPortActive->ViewportKind() != 1) { err = "tactiltest: el viewport activo no es 3D"; return false; }
+        Viewport3D* vp = (Viewport3D*)viewPortActive;
+        int ww = 0, hh = 0; if (window) SDL_GetWindowSize(window, &ww, &hh);
+        if (ww <= 0 || hh <= 0) { err = "tactiltest: sin ventana"; return false; }
+        const int cx = vp->x + vp->width / 2, cy = vp->y + vp->height / 2;           // el cubo (en el centro de la vista)
+        const int fx = vp->x + vp->width / 8, fy = vp->y + vp->height * 2 / 3;       // fondo vacio
+        struct D { static void Dedo(int id, int fase, int x, int y, int w, int h) { TactilDedo(id, fase, x, y, w, h); } };
+        // (1) TAP en el fondo: deselecciona. TAP en el cubo: lo selecciona (el pick es al LEVANTAR, como en Android)
+        D::Dedo(0, DedoAbajo, fx, fy, ww, hh); D::Dedo(0, DedoArriba, fx, fy, ww, hh);
+        const bool vacio = ObjSelects.empty();
+        D::Dedo(0, DedoAbajo, cx, cy, ww, hh);
+        const bool noEnElDown = ObjSelects.empty();   // (en el down todavia no: puede ser una orbita)
+        D::Dedo(0, DedoArriba, cx, cy, ww, hh);
+        Object* cubo = ObjActivo;   // (el que eligio el tap: hay mas de un cubo en el origen)
+        const bool elegido = (cubo && ObjSelects.size() == 1);
+        { const bool bien = vacio && noEnElDown && elegido;
+          printf("      [tactiltest] tap en el fondo deselecciona=%s, en el down no elige=%s, tap en el cubo lo elige=%s -> %s\n", vacio ? "si" : "no", noEnElDown ? "si" : "no", elegido ? "si" : "no", bien ? "OK" : "MAL"); if (!bien) ok = false; }
+        // (2) ARRASTRE de 1 dedo (pasada la espera anti-gesto): orbita y NO cambia la seleccion
+        { const Quaternion r0 = vp->viewRot;
+          D::Dedo(0, DedoAbajo, fx, fy, ww, hh); SDL_Delay(220);
+          for (int i = 1; i <= 10; i++) D::Dedo(0, DedoMovio, fx + i * 6, fy, ww, hh);
+          D::Dedo(0, DedoArriba, fx + 60, fy, ww, hh);
+          const float dr = fabsf(vp->viewRot.w - r0.w) + fabsf(vp->viewRot.x - r0.x) + fabsf(vp->viewRot.y - r0.y) + fabsf(vp->viewRot.z - r0.z);
+          const bool sigue = (ObjActivo == cubo && ObjSelects.size() == 1);
+          const bool bien = dr > 1e-3f && sigue;
+          printf("      [tactiltest] arrastre de 1 dedo: orbito=%s (cambio %.4f), la seleccion sigue=%s -> %s\n", dr > 1e-3f ? "si" : "no", dr, sigue ? "si" : "no", bien ? "OK" : "MAL"); if (!bien) ok = false; }
+        // (3) PINCH de 2 dedos: abrirlos acerca (orbitDistance baja), sin orbitar ni seleccionar nada
+        { const float d0 = vp->orbitDistance; const Quaternion r0 = vp->viewRot;
+          D::Dedo(0, DedoAbajo, cx - 20, cy, ww, hh); D::Dedo(1, DedoAbajo, cx + 20, cy, ww, hh);
+          const bool dos = (TactilDedos() == 2 && W3dDedosActivos() == 2);
+          for (int i = 1; i <= 8; i++) { D::Dedo(0, DedoMovio, cx - 20 - i * 8, cy, ww, hh); D::Dedo(1, DedoMovio, cx + 20 + i * 8, cy, ww, hh); }
+          D::Dedo(1, DedoArriba, cx + 84, cy, ww, hh); D::Dedo(0, DedoArriba, cx - 84, cy, ww, hh);
+          const float dr = fabsf(vp->viewRot.w - r0.w) + fabsf(vp->viewRot.x - r0.x) + fabsf(vp->viewRot.y - r0.y) + fabsf(vp->viewRot.z - r0.z);
+          const bool sigue = (ObjActivo == cubo && ObjSelects.size() == 1);
+          const bool bien = dos && vp->orbitDistance < d0 - 1e-3f && dr < 1e-4f && sigue;
+          printf("      [tactiltest] pinch: 2 dedos=%s, acerco=%s (%.3f -> %.3f), no orbito=%s, la seleccion sigue=%s -> %s\n", dos ? "si" : "no", vp->orbitDistance < d0 - 1e-3f ? "si" : "no", d0, vp->orbitDistance, dr < 1e-4f ? "si" : "no", sigue ? "si" : "no", bien ? "OK" : "MAL"); if (!bien) ok = false; }
+        // (4) PERDER EL FOCO con 2 dedos apoyados: se levantan todos y no queda nada trabado
+        { D::Dedo(3, DedoAbajo, fx, fy, ww, hh); D::Dedo(4, DedoAbajo, fx + 30, fy, ww, hh);
+          TactilSoltarTodo();
+          extern bool leftMouseDown;
+          const bool limpio = TactilDedos() == 0 && W3dDedosActivos() == 0 && !leftMouseDown && !W3dEventoTactil();
+          printf("      [tactiltest] perder el foco con 2 dedos: todo levantado y sin boton trabado=%s -> %s\n", limpio ? "si" : "no", limpio ? "OK" : "MAL"); if (!limpio) ok = false; }
+        if (!ok) { err = "tactiltest: ver los MAL de arriba"; return false; }
+        return true;
+    }
     // ---- tap2test : doble tap de 2 dedos sobre el viewport 3D = encuadrar la seleccion (eventos de dedo reales) ----
     if (cmd == "tap2test") {
         bool ok = true; std::string e2;
@@ -30160,6 +30557,96 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
     // ---- idetactil : el editor de scripts con el DEDO, por la misma puerta que la pantalla tactil (botones con
     //      which = SDL_TOUCH_MOUSEID): doble toque = palabra, triple = renglon, pulsacion larga = lupa que mueve el
     //      cursor, y las agarraderas de la seleccion se arrastran ----
+    // ---- clicobj <nombre> [si|no] : un CLICK de mouse (down + up, por la misma puerta que el mouse) sobre el centro de ese
+    //      objeto en el viewport 3D activo; con si/no, ERROR si no quedo (o si quedo) seleccionado ----
+    // ---- uirect <ancho> <alto> <r> <g> <b> : una UI nueva (al final del arbol) con un RECTANGULO de ese color, centrado
+    // ---- uienarbol si|no : la UI que se muestra, en su lugar del outliner o al final (UI::enArbol)
+    // ---- addlimpiarz : un Limpiar Z nuevo al final del arbol ----
+    if (cmd == "uirect") {
+        float an = 100, al = 100, r = 1, g = 0, b = 0; ss >> an >> al >> r >> g >> b;
+        UI* u = new UI(NULL, Vector3(0, 0, 0));
+        Rect2D* rc = new Rect2D(u, Vector3(0, 0, 0));
+        rc->ancho = an; rc->alto = al; rc->color[0] = r; rc->color[1] = g; rc->color[2] = b; rc->color[3] = 1.0f;
+        g_redraw = true;
+        return true;
+    }
+    if (cmd == "uienarbol") {
+        std::string q; ss >> q;
+        UI* u = UI2D_UIDelEditor();
+        if (!u) { err = "uienarbol: no hay UI"; return false; }
+        u->enArbol = (q == "si");
+        g_redraw = true;
+        return true;
+    }
+    if (cmd == "addlimpiarz") { new LimpiarZ(NULL, Vector3(0, 0, 0)); g_redraw = true; return true; }
+    // ---- copiar | cortar | pegar [espera N] : el portapapeles de OBJETOS (LayoutObjetosCopiar / Pegar), por la misma puerta
+    //      que Ctrl+C / Ctrl+X / Ctrl+V. 'pegar' imprime cada objeto pegado (vertices, su primer material y su color) ----
+    if (cmd == "copiar" || cmd == "cortar") {
+        extern void LayoutObjetosCopiar(bool cortar);
+        InteractionMode = ObjectMode; estado = editNavegacion;
+        std::string q; ss >> q;
+        if (q == "todo") { extern void SeleccionarTodoForzado(bool); SeleccionarTodoForzado(true); }   // (como la A)
+        printf("      [%s] %d elegido(s)\n", cmd.c_str(), (int)ObjSelects.size());
+        LayoutObjetosCopiar(cmd == "cortar");
+        return true;
+    }
+    if (cmd == "pegar") {
+        extern void LayoutObjetosPegar();
+        std::string q; int esp = -1; ss >> q >> esp;
+        InteractionMode = ObjectMode; estado = editNavegacion;
+        LayoutObjetosPegar();
+        int n = 0;
+        for (size_t i = 0; i < ObjSelects.size(); i++) {
+            Object* o = ObjSelects[i]; if (!o) continue; n++;
+            if (o->getType() == ObjectType::mesh) {
+                Mesh* m = (Mesh*)o;
+                Material* mt = (!m->materialsGroup.empty()) ? m->materialsGroup[0].material : NULL;
+                printf("      [pegar] '%s' malla: %d vertices, material '%s' (%.2f %.2f %.2f)\n", o->name.c_str(), m->vertexSize,
+                       mt ? mt->name.c_str() : "-", mt ? mt->diffuse[0] : 0.0f, mt ? mt->diffuse[1] : 0.0f, mt ? mt->diffuse[2] : 0.0f);
+            } else printf("      [pegar] '%s'\n", o->name.c_str());
+        }
+        if (q == "espera" && n != esp) { char b[80]; sprintf(b, "pegar: se pegaron %d objetos, se esperaban %d", n, esp); err = b; return false; }
+        return true;
+    }
+    // ---- objalfinal <nombre> : lo pasa al FINAL de los hijos de su padre (el ultimo del outliner: lo ultimo que se dibuja) ----
+    if (cmd == "objalfinal") {
+        std::string nom; ss >> nom;
+        Object* o = SceneCollection ? FindObjectByName(SceneCollection, nom) : NULL;
+        if (!o) { err = "objalfinal: no existe '" + nom + "'"; return false; }
+        Object* pa = o->Parent ? o->Parent : SceneCollection;
+        std::vector<Object*>& v = pa->Childrens;
+        for (size_t i = 0; i < v.size(); i++) if (v[i] == o) { v.erase(v.begin() + i); break; }
+        v.push_back(o);
+        g_redraw = true;
+        return true;
+    }
+    if (cmd == "clicobj") {
+        std::string nom, esp; ss >> nom >> esp;
+        extern Viewport3D* Viewport3DActive;
+        Object* o = SceneCollection ? FindObjectByName(SceneCollection, nom) : NULL;
+        if (!o) { err = "clicobj: no existe '" + nom + "'"; return false; }
+        if (!rootViewport) { err = "clicobj: sin layout"; return false; }
+        rootViewport->Render();
+        Viewport3D* vp = Viewport3DActive;
+        if (!vp) { err = "clicobj: sin viewport 3D"; return false; }
+        float px = 0, py = 0;
+        if (!vp->ProyectarPunto(o->GetGlobalPosition(), px, py)) { err = "clicobj: el objeto no se ve"; return false; }
+        const int mx = vp->x + (int)px, my = vp->y + (int)py;
+        struct Ev { static void Boton(Uint32 tipo, int x, int y) { extern void InputUsuarioSDL3(SDL_Event&);
+            SDL_Event ev; memset(&ev, 0, sizeof(ev)); ev.type = tipo; ev.button.button = SDL_BUTTON_LEFT; ev.button.which = 0;
+            ev.button.x = x; ev.button.y = y; ev.button.clicks = 1; ev.button.state = (tipo == SDL_MOUSEBUTTONDOWN) ? SDL_PRESSED : SDL_RELEASED;
+            InputUsuarioSDL3(ev); } };
+        { extern void InputUsuarioSDL3(SDL_Event&); SDL_Event mv; memset(&mv, 0, sizeof(mv)); mv.type = SDL_MOUSEMOTION;
+          mv.motion.x = mx; mv.motion.y = my; InputUsuarioSDL3(mv); }
+        Ev::Boton(SDL_MOUSEBUTTONDOWN, mx, my);
+        Ev::Boton(SDL_MOUSEBUTTONUP, mx, my);
+        rootViewport->Render();
+        const bool sel = o->select;
+        printf("      [clicobj] '%s' en (%d, %d): %s (activo: %s)\n", nom.c_str(), mx, my, sel ? "seleccionado" : "NO seleccionado",
+               ObjActivo ? ObjActivo->name.c_str() : "ninguno");
+        if ((esp == "si" && !sel) || (esp == "no" && sel)) { err = "clicobj: la seleccion no es la esperada"; return false; }
+        return true;
+    }
     if (cmd == "idetactil") {
         struct VK { static ViewportBase* Buscar(ViewportBase* n, int k) { if (!n) return NULL; if (n->isLeaf()) return n->ViewportKind() == k ? n : NULL;
                         ViewportBase* a = Buscar(((ViewportColumn*)n)->childA, k); if (a) return a; return Buscar(((ViewportColumn*)n)->childB, k); } };
@@ -30481,6 +30968,122 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
     //      mundo sea exactamente mundo(armature) * poseWorld(hueso) * inversa * local, e imprime su posicion de mundo
     //      (para compararla con otro evaluador, ej. Blender). ----
     // ---- frame N : pone el playhead en N (el editor evalua la pose / las curvas en ese frame al dibujar) ----
+    // ---- sonido <sub> : el OBJETO SONIDO (objects/Sonido.h). Subcomandos (los que comprueban ASERTAN):
+    //        sonido nuevo <archivo> [x y z]   crea uno (activo y seleccionado)
+    //        sonido set <campo> <valor>       inicio recorteIni recorteFin volumen tono reverb paneo radio alcance
+    //                                         (numeros) | bucle posicional activo (0/1) | archivo <ruta>
+    //        sonido tick                      corre el tick del editor (el del main loop)
+    //        sonido suena <0|1>               ASERTA que su voz suena (1) o no (0)
+    //        sonido pos <seg> [tol]           ASERTA la posicion de su voz (segundos del archivo; tol 0.05)
+    //        sonido dur <seg> [tol]           ASERTA la duracion del tramo en la escena
+    //        sonido onda                      ASERTA que hay forma de onda (la textura del timeline)
+    //        sonido info                      informa
+    if (cmd == "sonido") {
+        std::string sub; ss >> sub;
+        if (sub == "nuevo") {
+            std::string a; float px = 0, py = 0, pz = 0; ss >> a >> px >> py >> pz;
+            Sonido* so = new Sonido(NULL, Vector3(px, py, pz));
+            so->archivo = a;
+            DeseleccionarTodo(); so->Seleccionar();
+            return true;
+        }
+        Sonido* so = (ObjActivo && ObjActivo->getType() == ObjectType::sonido) ? (Sonido*)ObjActivo : NULL;
+        if (!so) { err = "sonido: el activo no es un Sonido"; return false; }
+        extern float W3dSoundPosDeVoz(int);
+        if (sub == "set") {
+            std::string c; ss >> c;
+            if (c == "archivo") { ss >> so->archivo; return true; }
+            float v = 0; ss >> v;
+            if (c == "inicio") so->inicio = v; else if (c == "recorteIni") so->recorteIni = v; else if (c == "recorteFin") so->recorteFin = v;
+            else if (c == "volumen") so->volumen = v; else if (c == "tono") so->tono = v; else if (c == "reverb") so->reverb = v;
+            else if (c == "paneo") so->paneo = v; else if (c == "radio") so->radio = v; else if (c == "alcance") so->alcance = v;
+            else if (c == "bucle") so->bucle = v != 0; else if (c == "posicional") so->posicional = v != 0; else if (c == "activo") so->activo = v != 0;
+            else { err = "sonido set: campo desconocido " + c; return false; }
+            return true;
+        }
+        if (sub == "tick") { W3dSonidosTickEditor(); return true; }
+        if (sub == "frame") {   // ASERTA el frame del timeline (el reloj del audio lo lleva): sonido frame <f> [tol]
+            int e = 1, tol = 0; ss >> e >> tol;
+            printf("      [sonido] frame=%d (esperado %d +-%d)\n", CurrentFrame, e, tol);
+            if (CurrentFrame < e - tol || CurrentFrame > e + tol) { err = "sonido: el timeline no va con el audio"; return false; }
+            return true;
+        }
+        if (sub == "tira") {   // el MOUSE sobre la tira del primer timeline: hover de las puntas, recortar / mover con Ctrl, undo
+            struct VK { static ViewportBase* Buscar(ViewportBase* n) { if (!n) return NULL; if (n->isLeaf()) return n->ViewportKind() == 5 ? n : NULL;
+                            ViewportBase* a = Buscar(((ViewportColumn*)n)->childA); if (a) return a; return Buscar(((ViewportColumn*)n)->childB); } };
+            Timeline* t = (Timeline*)VK::Buscar(rootViewport);
+            if (!t) { err = "sonido tira: no hay timeline"; return false; }
+            if (rootViewport) rootViewport->Render();
+            extern bool W3dScriptTiraPrueba(Timeline*, std::string&);
+            return W3dScriptTiraPrueba(t, err);
+        }
+        if (sub == "panel") {   // TILDA / destilda "Posicional (3D)" como la casilla (su onChange) y ASERTA las filas del 3D
+            Properties* P = ScriptProps();
+            if (!P || !P->propSonPos || !P->propSonAlcance) { err = "sonido panel: sin la tarjeta"; return false; }
+            P->RefreshTargetProperties();
+            so->posicional = !so->posicional;
+            if (P->propSonPos->onChange) P->propSonPos->onChange();
+            const bool filas = P->propSonAlcance->value != NULL && P->propSonRadio->value != NULL;
+            printf("      [sonido] posicional=%d filas del 3D=%d paneo=%d\n", so->posicional ? 1 : 0, filas ? 1 : 0, P->propSonPaneo->value ? 1 : 0);
+            if (filas != so->posicional || (P->propSonPaneo->value != NULL) == so->posicional) { err = "sonido panel: las filas no siguen al tilde"; return false; }
+            return true;
+        }
+        if (sub == "vista") {   // el ZOOM de los timelines del layout: sonido vista <px por frame> <frame a la izquierda>
+            float z = 1.0f, f0 = 0.0f; ss >> z >> f0;
+            struct VK { static void Todos(ViewportBase* n, std::vector<ViewportBase*>& o) { if (!n) return;
+                            if (n->isLeaf()) { if (n->ViewportKind() == 5) o.push_back(n); return; }
+                            Todos(((ViewportColumn*)n)->childA, o); Todos(((ViewportColumn*)n)->childB, o); } };
+            std::vector<ViewportBase*> tl; VK::Todos(rootViewport, tl);
+            for (size_t i = 0; i < tl.size(); i++) { Timeline* t = (Timeline*)tl[i]; t->VistaAplicar(z, f0, t->pxPerUnit, t->viewCenterV); }
+            return true;
+        }
+        if (sub == "key") {   // un keyframe del VOLUMEN (el rombo de la tarjeta): sonido key <frame> <volumen>
+            int f = 1; float v = 1.0f; ss >> f >> v;
+            extern void AnimCanalToggle(Object*, int, int, int);
+            CurrentFrame = f; so->volumen = v;
+            AnimCanalToggle(so, AnimSonido, AnimX, f);
+            return true;
+        }
+        if (sub == "lua") {   // los BINDS: un lua propio con los del Sonido y 'obj' = el activo
+            std::string codigo; std::getline(ss, codigo);
+            extern void (*W3dSonidoLuaHook)(lua_State* L);
+            if (!W3dSonidoLuaHook) { err = "sonido lua: sin binds"; return false; }
+            lua_State* L = luaL_newstate(); luaL_openlibs(L);
+            W3dSonidoLuaHook(L);
+            lua_pushlightuserdata(L, (Object*)so); lua_setglobal(L, "obj");
+            const bool ok = luaL_dostring(L, codigo.c_str()) == 0;
+            if (!ok) err = std::string("sonido lua: ") + lua_tostring(L, -1);
+            lua_close(L);
+            return ok;
+        }
+        if (sub == "info") {
+            printf("      [sonido] '%s' archivo=%s dur=%.3f tramo=%.3f inicio=%.3f rec=%.3f/%.3f bucle=%d voz=%d pos=%.3f\n",
+                   so->name.c_str(), so->archivo.c_str(), so->DuracionArchivo(), so->DuracionEnEscena(), so->inicio,
+                   so->recorteIni, so->recorteFin, so->bucle ? 1 : 0, so->voz, W3dSoundPosDeVoz(so->voz));
+            return true;
+        }
+        if (sub == "suena") {
+            int e = 0; ss >> e;
+            const bool suena = so->voz > 0 && W3dSoundPosDeVoz(so->voz) >= 0.0f;
+            printf("      [sonido] suena=%d\n", suena ? 1 : 0);
+            if (suena != (e != 0)) { err = e ? "sonido: no suena" : "sonido: suena"; return false; }
+            return true;
+        }
+        if (sub == "pos" || sub == "dur") {
+            float e = 0, tol = 0.05f; ss >> e >> tol;
+            const float v = (sub == "pos") ? W3dSoundPosDeVoz(so->voz) : so->DuracionEnEscena();
+            printf("      [sonido] %s=%.4f (esperado %.4f)\n", sub.c_str(), v, e);
+            if (fabsf(v - e) > tol) { err = "sonido: " + sub + " distinto"; return false; }
+            return true;
+        }
+        if (sub == "onda") {
+            const unsigned int t = W3dSonidoOnda(so->archivo);
+            printf("      [sonido] onda tex=%u\n", t);
+            if (!t) { err = "sonido: sin forma de onda"; return false; }
+            return true;
+        }
+        err = "sonido: subcomando desconocido '" + sub + "'"; return false;
+    }
     if (cmd == "frame") {
         int f = 1; ss >> f; CurrentFrame = f; g_redraw = true;
         { extern void AplicarAnimacionObjetos(); AplicarAnimacionObjetos(); }
@@ -30548,7 +31151,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         if(!a->animations.empty()){ActiveAnimKind=1;ActiveAnimArm=a;a->animActiva=0;}
         // transform NO trivial (simula el rig movido/rotado/achicado por el usuario)
         a->pos=Vector3(1.2f,0.5f,-0.8f); a->SetRotEuler(Vector3(20,35,-15));
-        a->scale=Vector3(0.37f,0.37f,0.37f); a->lastPoseFrame=-999999; a->poseSerial++; m->LiberarSkinCache(); m->lastSkinFrame=-999999;
+        a->scale=Vector3(0.37f,0.37f,0.37f); a->lastPoseFrame=-999999; a->poseSerial++; m->lastSkinFrame=-999999;
         CurrentFrame=frame; SkinearMesh(m); if(!m->skinVertex){err="applyarmtest: sin skinVertex";return false;}
         struct BB { static void medir(Mesh* mm, float* b){ Matrix4 W; mm->GetWorldMatrix(W);
             for(int k=0;k<3;k++){b[k]=1e30f;b[k+3]=-1e30f;}
@@ -30565,7 +31168,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         float b1[6]; BB::medir(m,b1);
         float d1=0; for(int k=0;k<6;k++){ float d=fabsf(b1[k]-b0[k]); if(d>d1)d1=d; }
         UndoDeshacer();
-        a->lastPoseFrame=-999999; m->LiberarSkinCache(); m->lastSkinFrame=-999999; SkinearMesh(m);
+        a->lastPoseFrame=-999999; m->lastSkinFrame=-999999; SkinearMesh(m);
         float b2[6]; BB::medir(m,b2);
         float d2=0; for(int k=0;k<6;k++){ float d=fabsf(b2[k]-b0[k]); if(d>d2)d2=d; }
         printf("      [applyarmtest] tras apply armT(%.2f,%.2f,%.2f) armR(%.0f,%.0f,%.0f) armS(%.3f,%.3f,%.3f)\n         world ANTES =(%.2f,%.2f,%.2f)..(%.2f,%.2f,%.2f)\n         world APPLY =(%.2f,%.2f,%.2f)..(%.2f,%.2f,%.2f)  maxdiff=%.5f %s\n         world UNDO  =(%.2f,%.2f,%.2f)..(%.2f,%.2f,%.2f)  maxdiff=%.5f %s\n",
@@ -30729,6 +31332,160 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         return true;
     }
 
+    // ---- inset <grosor> [prof] [individual|noborde|riel|relativo|afuera|selafuera|nointerp|noparejo]... : Inset Faces
+    //      sobre las caras seleccionadas (la op de malla directo, sin el modal). Verifica que la malla quede sana: los
+    //      indices de faces3d dentro de rango, las capas por corner del tamano de los corners, y lo imprime ----
+    //      inset modal <dx> : el MODAL por la puerta del teclado/mouse (I, mover hacia el centro, click) + el panel ----
+    if (cmd == "inset") {
+        Mesh* m = ScriptActiveMesh();
+        if (!m) { err = "no hay malla activa"; return false; }
+        std::string a; ss >> a;
+        if (a == "modal") {
+            int dx = 50; ss >> dx;
+            lastMouseX = 60.0f; lastMouseY = 60.0f;   // (lejos del centro: hay lugar para acercarse)
+            InsetIniciar(lastMouseX, lastMouseY);
+            if (!InsetActivo()) { err = "el modal del inset no arranco"; return false; }
+            float cx, cy, ppu; InsetCentroPantalla(cx, cy, ppu);
+            printf("      [inset] modal: centro en pantalla (%.0f, %.0f), %.1f px por unidad, mouse en (%.0f, %.0f)\n",
+                   (double)cx, (double)cy, (double)ppu, (double)lastMouseX, (double)lastMouseY);
+            // acercarse 'dx' pixeles al centro (desde donde arranco el mouse)
+            const float vx = cx - lastMouseX, vy = cy - lastMouseY, dl = sqrtf(vx*vx + vy*vy);
+            if (dl > 1.0f) InsetMotion((int)(lastMouseX + vx * (float)dx / dl), (int)(lastMouseY + vy * (float)dx / dl));
+            if (InsetOpcionesActuales().grosor <= 0.0f) { err = "inset modal: acercarse al centro no dio grosor"; return false; }
+            InsetConfirmar();
+            if (InsetActivo()) { err = "el modal del inset no termino"; return false; }
+            if (!RedoMeshPanelActivo()) { err = "inset modal: no se abrio el panel"; return false; }
+            const int vModal = m->vertexSize;
+            InsetOpcionesActuales().individual = true; InsetRedoAplicar();   // (lo que hace una tilde del panel)
+            printf("      [inset] modal: grosor=%.4f verts=%d, con Individual desde el panel=%d\n",
+                   (double)InsetOpcionesActuales().grosor, vModal, m->vertexSize);
+            InsetOpcionesActuales().individual = false;
+        } else {
+            InsetOpciones o; o.grosor = (float)atof(a.c_str());
+            std::string t; bool ensuperficie = false;
+            while (ss >> t) {
+                if (t == "esquina") {   // las caras que comparten el vertice 0 de la edicion (3 en un cubo)
+                    m->EnsureEdit(); EditMesh* e = m->edit; if (!e) { err = "inset: sin edicion"; return false; }
+                    e->faceSel.assign(e->faces.size(), 0);
+                    for (size_t f = 0; f < e->faces.size(); f++)
+                        for (size_t k = 0; k < e->faces[f].size(); k++) if (e->faces[f][k] == 0) e->faceSel[f] = 1;
+                    continue;
+                }
+                if (t == "ensuperficie") { ensuperficie = true; continue; }
+                if (t == "individual") o.individual = true; else if (t == "noborde") o.borde = false;
+                else if (t == "riel") o.riel = true; else if (t == "relativo") o.relativo = true;
+                else if (t == "afuera") o.afuera = true; else if (t == "selafuera") o.selAfuera = true;
+                else if (t == "nointerp") o.interpolar = false; else if (t == "noparejo") o.parejo = false;
+                else o.profundidad = (float)atof(t.c_str());
+            }
+            std::vector<char> sel;
+            if (!m->CarasSeleccionadas3d(sel)) { err = "inset: no hay caras seleccionadas"; return false; }
+            UndoCapturarMallaGeo(m);
+            float lado = 0.0f;   // (el cubo: el mayor |coordenada| de ANTES; todo vertice tiene que seguir en esa superficie)
+            for (int i = 0; i < m->vertexSize*3; i++) if (fabsf(m->vertex[i]) > lado) lado = fabsf(m->vertex[i]);
+            if (!m->InsetEdit(o, sel)) { err = "inset: la op no hizo nada"; return false; }
+            if (ensuperficie)
+                for (int i = 0; i < m->vertexSize; i++) {
+                    const float* v = &m->vertex[i*3];
+                    const float mx = fabsf(v[0]) > fabsf(v[1]) ? (fabsf(v[0]) > fabsf(v[2]) ? fabsf(v[0]) : fabsf(v[2])) : (fabsf(v[1]) > fabsf(v[2]) ? fabsf(v[1]) : fabsf(v[2]));
+                    if (mx < lado - 1e-4f) { char b2[160]; sprintf(b2, "inset: el vertice %d (%.3f %.3f %.3f) quedo ADENTRO del cubo (la V)", i, v[0], v[1], v[2]); err = b2; return false; }
+                }
+        }
+        int corners = 0;
+        for (size_t f = 0; f < m->faces3d.size(); f++) { corners += (int)m->faces3d[f].idx.size();
+            for (size_t k = 0; k < m->faces3d[f].idx.size(); k++)
+                if (m->faces3d[f].idx[k] < 0 || m->faces3d[f].idx[k] >= m->vertexSize) { err = "inset: indice de faces3d fuera de rango"; return false; } }
+        for (size_t k = 0; k < m->uvMaps.size(); k++)
+            if ((int)m->uvMaps[k]->uv.size() != corners*2) { err = "inset: la capa UV no tiene un valor por corner"; return false; }
+        for (size_t k = 0; k < m->colorLayers.size(); k++)
+            if ((int)m->colorLayers[k]->color.size() != corners*4) { err = "inset: la capa de color no tiene un valor por corner"; return false; }
+        // en una malla CONVEXA cerrada (el cubo) toda cara tiene que mirar hacia afuera del centro: un anillo al reves
+        // (orden de las esquinas dado vuelta) se ve aca
+        int alReves = 0;
+        { float c[3] = {0,0,0}; for (int i = 0; i < m->vertexSize; i++) for (int q = 0; q < 3; q++) c[q] += m->vertex[i*3+q] / (float)m->vertexSize;
+          for (size_t f = 0; f < m->faces3d.size(); f++) { const std::vector<int>& p = m->faces3d[f].idx; float n[3] = {0,0,0}, fc[3] = {0,0,0};
+              for (size_t k = 0; k < p.size(); k++) { const float* a = &m->vertex[p[k]*3]; const float* b = &m->vertex[p[(k+1) % p.size()]*3];
+                  n[0] += (a[1]-b[1])*(a[2]+b[2]); n[1] += (a[2]-b[2])*(a[0]+b[0]); n[2] += (a[0]-b[0])*(a[1]+b[1]);
+                  for (int q = 0; q < 3; q++) fc[q] += a[q] / (float)p.size(); }
+              const float d = n[0]*(fc[0]-c[0]) + n[1]*(fc[1]-c[1]) + n[2]*(fc[2]-c[2]);
+              if (d < -1e-6f) alReves++; } }
+        m->EnsureEdit();
+        int nSel = 0; if (m->edit) for (size_t f = 0; f < m->edit->faceSel.size(); f++) nSel += m->edit->faceSel[f] ? 1 : 0;
+        printf("      [inset] verts=%d faces3d=%d corners=%d caras seleccionadas=%d caras hacia adentro=%d\n", m->vertexSize, (int)m->faces3d.size(), corners, nSel, alReves);
+        return true;
+    }
+
+    // ---- bevel <ancho> [segs N] [perfil P] [tipo T] [vertices] [cutoff] [noslide] [clamp] [espera V C] : el BEVEL de la
+    //      seleccion (la op de malla directo). Verifica que la malla quede sana (indices, capas por corner) y, en una malla
+    //      convexa, que ninguna cara mire para adentro; con 'espera' ERROR si no quedan V vertices y C caras ----
+    //      bevel modal <dx> : el MODAL (Ctrl+B, alejarse 'dx' px del centro, la rueda +1, click) + el panel ----
+    if (cmd == "bevel") {
+        Mesh* m = ScriptActiveMesh();
+        if (!m) { err = "no hay malla activa"; return false; }
+        std::string a; ss >> a;
+        int espV = -1, espC = -1;
+        if (a == "modal") {
+            int dx = 40; ss >> dx;
+            lastMouseX = 0.0f; lastMouseY = 0.0f;
+            float cx, cy, ppu;
+            // (el mouse arranca EN el centro de lo elegido: alejarse da ancho)
+            BevelIniciar(0, 0, 1);
+            if (!BevelActivo()) { err = "el modal del bevel no arranco"; return false; }
+            BevelCentroPantalla(cx, cy, ppu);
+            BevelCancelar();
+            lastMouseX = cx; lastMouseY = cy;
+            BevelIniciar((int)cx, (int)cy, 1);
+            if (!BevelActivo()) { err = "el modal del bevel no arranco (2)"; return false; }
+            BevelMotion((int)cx + dx, (int)cy);
+            BevelRueda(+1);
+            if (BevelOpcionesActuales().ancho <= 0.0f) { err = "bevel modal: alejarse del centro no dio ancho"; return false; }
+            BevelConfirmar();
+            if (BevelActivo()) { err = "el modal del bevel no termino"; return false; }
+            if (!RedoMeshPanelActivo()) { err = "bevel modal: no se abrio el panel"; return false; }
+            const int vModal = m->vertexSize;
+            BevelOpcionesActuales().segmentos = 4; BevelRedoAplicar();   // (lo que hace el panel)
+            printf("      [bevel] modal: ancho=%.4f verts=%d, con 4 segmentos desde el panel=%d\n",
+                   (double)BevelOpcionesActuales().ancho, vModal, m->vertexSize);
+        } else {
+            BevelOpciones o; o.ancho = (float)atof(a.c_str());
+            std::string t;
+            while (ss >> t) {
+                if (t == "segs") ss >> o.segmentos; else if (t == "perfil") ss >> o.perfil; else if (t == "tipo") ss >> o.tipoAncho;
+                else if (t == "vertices") o.afecta = 0; else if (t == "cutoff") o.interseccion = 1;
+                else if (t == "noslide") o.deslizar = false; else if (t == "clamp") o.limitarSolape = true;
+                else if (t == "espera") ss >> espV >> espC;
+            }
+            std::vector<char> selRep; std::vector<std::pair<int,int> > aristas;
+            if (!m->BevelSeleccion(selRep, aristas)) { err = "bevel: no hay nada seleccionado"; return false; }
+            UndoCapturarMallaGeo(m);
+            if (!m->BevelEdit(o, selRep, aristas)) { err = "bevel: la op no hizo nada"; return false; }
+        }
+        int corners = 0;
+        for (size_t f = 0; f < m->faces3d.size(); f++) { corners += (int)m->faces3d[f].idx.size();
+            for (size_t k = 0; k < m->faces3d[f].idx.size(); k++)
+                if (m->faces3d[f].idx[k] < 0 || m->faces3d[f].idx[k] >= m->vertexSize) { err = "bevel: indice de faces3d fuera de rango"; return false; } }
+        for (size_t k = 0; k < m->uvMaps.size(); k++)
+            if ((int)m->uvMaps[k]->uv.size() != corners*2) { err = "bevel: la capa UV no tiene un valor por corner"; return false; }
+        for (size_t k = 0; k < m->colorLayers.size(); k++)
+            if ((int)m->colorLayers[k]->color.size() != corners*4) { err = "bevel: la capa de color no tiene un valor por corner"; return false; }
+        int alReves = 0;
+        { float c[3] = {0,0,0}; for (int i = 0; i < m->vertexSize; i++) for (int q = 0; q < 3; q++) c[q] += m->vertex[i*3+q] / (float)m->vertexSize;
+          for (size_t f = 0; f < m->faces3d.size(); f++) { const std::vector<int>& p = m->faces3d[f].idx; float n[3] = {0,0,0}, fc[3] = {0,0,0};
+              for (size_t k = 0; k < p.size(); k++) { const float* pa = &m->vertex[p[k]*3]; const float* pb = &m->vertex[p[(k+1) % p.size()]*3];
+                  n[0] += (pa[1]-pb[1])*(pa[2]+pb[2]); n[1] += (pa[2]-pb[2])*(pa[0]+pb[0]); n[2] += (pa[0]-pb[0])*(pa[1]+pb[1]);
+                  for (int q = 0; q < 3; q++) fc[q] += pa[q] / (float)p.size(); }
+              const float d = n[0]*(fc[0]-c[0]) + n[1]*(fc[1]-c[1]) + n[2]*(fc[2]-c[2]);
+              if (d < -1e-6f) alReves++; } }
+        // los vertices DISTINTOS (por posicion: los partidos por UV cuentan una vez)
+        std::set<std::string> pos; for (int i = 0; i < m->vertexSize; i++) pos.insert(std::string((const char*)&m->vertex[i*3], 12));
+        printf("      [bevel] vertices=%d caras=%d corners=%d caras hacia adentro=%d\n", (int)pos.size(), (int)m->faces3d.size(), corners, alReves);
+        if (alReves) { err = "bevel: hay caras mirando para adentro"; return false; }
+        if (espV >= 0 && ((int)pos.size() != espV || (int)m->faces3d.size() != espC)) {
+            char b[120]; sprintf(b, "bevel: quedaron %d vertices y %d caras, se esperaban %d y %d", (int)pos.size(), (int)m->faces3d.size(), espV, espC);
+            err = b; return false;
+        }
+        return true;
+    }
     // ---- extrude <dist> (caras/aristas/verts seleccionados, a lo largo de la normal) ----
     if (cmd == "extrude") {
         float dist = 0.0f; ss >> dist;
@@ -31177,6 +31934,26 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
     }
     // ---- newtex <nombre> <w> <h> <blank|uvgrid|colorgrid> [alpha] : crea la textura en el proyecto y la asigna
     //      al material de la parte activa (revisa tamano y asignacion) ----
+    // ---- texhuerfana <png> : (el EDITOR) cargar una textura, ponersela al material de la malla activa y SACARSELA:
+    //      tiene que seguir cargada (huerfana, en la biblioteca). Despues Purge Orphans de texturas si la libera ----
+    if (cmd == "texhuerfana") {
+        std::string ruta; ss >> ruta;
+        Mesh* m = ScriptActiveMesh();
+        Material* mt = (m && !m->materialsGroup.empty()) ? m->materialsGroup[0].material : NULL;
+        if (!mt || mt == MaterialDefecto) { err = "texhuerfana: la malla activa necesita un material propio"; return false; }
+        Texture* t = TexturaTomar(ruta);
+        if (!t) { err = "texhuerfana: no se pudo cargar " + ruta; return false; }
+        const std::string clave = t->path;
+        TexturaPonerEn(mt->texture, t);
+        TexturaSoltar(t);                  // (la de TexturaTomar: ahora el unico usuario es el material)
+        TexturaPonerEn(mt->texture, NULL); // "No Texture"
+        if (!TexturaBuscar(clave)) { err = "texhuerfana: sacarla del material la BORRO (tiene que quedar huerfana)"; return false; }
+        std::vector<std::string> purgadas;
+        W3dVistaRecPurgar(-1, &purgadas);
+        if (TexturaBuscar(clave)) { err = "texhuerfana: Purge Orphans no la libero"; return false; }
+        printf("      [texhuerfana] '%s' quedo huerfana al sacarla y Purge Orphans la libero OK\n", clave.c_str());
+        return true;
+    }
     if (cmd == "newtex") {
         std::string nombre, tipoS, alphaS; int w = 0, h = 0; ss >> nombre >> w >> h >> tipoS >> alphaS;
         const int tipo = (tipoS == "blank") ? TexGenBlank : (tipoS == "uvgrid") ? TexGenUVGrid : (tipoS == "colorgrid") ? TexGenColorGrid : -1;
@@ -31272,6 +32049,128 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         return true;
     }
     // ---- rtpixel x y [er eg eb tol] : color del pixel del ultimo rtrender; con esperado, falla si no coincide ----
+    // ---- matmapa <mapa> numero | textura <ruta> | uv <N> | es numero|textura [uv N] [tex <hoja>] | ior <n> | esior <n> :
+    //      los MAPAS del material activo (W3dMatMapa: base normal emision rugosidad metalico alfa): pasar a numero o a
+    //      textura (con esa textura, con undo), elegir su capa UV (0 = "UV 1"), o comprobar como quedo ----
+    if (cmd == "matmapa") {
+        Material* mat = ScriptActiveMaterial();
+        if (!mat || mat == MaterialDefecto) { err = "matmapa: no hay material activo (o es el por defecto)"; return false; }
+        std::string m, que; ss >> m;
+        if (m == "ior" || m == "esior") {
+            float n = 0.0f; ss >> n;
+            if (m == "ior") { mat->ior = n; RTInvalidar(); return true; }
+            printf("      [matmapa] ior %.3f\n", mat->ior);
+            if (mat->ior < n - 0.001f || mat->ior > n + 0.001f) { err = "matmapa: el ior no es el esperado"; return false; }
+            return true;
+        }
+        const int k = W3dMatMapaDeClave(m);
+        if (k < 0) { err = "matmapa: '" + m + "' no es un mapa (base normal emision rugosidad metalico alfa)"; return false; }
+        ss >> que;
+        if (que == "numero") {
+            if (k < W3D_MAPA_EMISION) { err = "matmapa: la base y el normal map son siempre textura"; return false; }
+            UndoMaterialModIniciar(mat); mat->mapaConTextura[k] = false; UndoMaterialModCommit(); RTInvalidar(); return true;
+        }
+        if (que == "textura") {
+            std::string ruta; ss >> ruta;
+            Texture* t = TexturaTomar(ruta);
+            if (!t) { err = "matmapa: no pude cargar '" + ruta + "'"; return false; }
+            extern void W3dMaterialPonerMapa(Material* mat, Texture* tex, int mapa);
+            W3dMaterialPonerMapa(mat, t, k);
+            TexturaSoltar(t);
+            RTInvalidar();
+            return true;
+        }
+        if (que == "uv") {
+            int n = 0; ss >> n;
+            UndoMaterialModIniciar(mat); mat->uvMapa[k] = n; UndoMaterialModCommit(); RTInvalidar(); return true;
+        }
+        if (que == "abrirpopup") {   // ABRE el popup de verdad (el boton de la malla), lo dibuja y lo cierra
+            extern void AbrirUVMapaPopup(Material*, Mesh*, int, const std::string&);
+            AbrirUVMapaPopup(mat, ScriptActiveMesh(), k, "UV Map");
+            if (!PopUpActive) { err = "matmapa: el popup no se abrio"; return false; }
+            if (rootViewport) rootViewport->Render();
+            PopUpActive->Render();
+            printf("      [matmapa] popup de la UV abierto (%dx%d)\n", PopUpActive->popUpWindow ? PopUpActive->popUpWindow->width : 0,
+                   PopUpActive->popUpWindow ? PopUpActive->popUpWindow->height : 0);
+            PopUpActive->Cerrar();
+            return true;
+        }
+        if (que == "popup") {   // lo que hace el ACCEPT del popup: indiceMat usarMat(0|1) uv|- indiceObj (los indices desde 1)
+            int im = 1, um = 1, io = 1; std::string un; ss >> im >> um >> un >> io;
+            extern void UVMapaPopupAplicar(Material*, Mesh*, int, int, bool, const std::string&, int);
+            UVMapaPopupAplicar(mat, ScriptActiveMesh(), k, im, um != 0, un == "-" ? std::string() : un, io);
+            return true;
+        }
+        if (que == "uvobjeto") {   // el UV PERSONALIZADO del objeto activo para ese mapa ('-' = vuelve al indice)
+            std::string n; ss >> n;
+            Mesh* me = ScriptActiveMesh();
+            if (!me) { err = "matmapa: no hay malla activa"; return false; }
+            me->FijarUVPersonalizado(mat, k, n == "-" ? std::string() : n);
+            RTInvalidar();
+            return true;
+        }
+        if (que == "es") {
+            std::string modo, k2; ss >> modo;
+            const bool conTex = (k == W3D_MAPA_BASE) ? (mat->texture != NULL) : (k == W3D_MAPA_NORMAL) ? (mat->normalTexture != NULL) : mat->mapaConTextura[k];
+            Texture* t = mat->TexturaDeMapa(k);
+            printf("      [matmapa] %s: %s, uv %d, textura '%s'\n", m.c_str(), conTex ? "textura" : "numero", mat->uvMapa[k], t ? t->path.c_str() : "");
+            if ((modo == "textura") != conTex) { err = "matmapa: '" + m + "' no es " + modo; return false; }
+            while (ss >> k2) {
+                if (k2 == "uv") { int n = -1; ss >> n; if (mat->uvMapa[k] != n) { err = "matmapa: la capa UV no es la esperada"; return false; } }
+                else if (k2 == "uvobjidx") {
+                    int n = -2; ss >> n;
+                    Mesh* me = ScriptActiveMesh();
+                    const int hay = me ? me->UVPersonalIndice(mat, k) : -1;
+                    printf("      [matmapa] %s: indice propio del objeto %d\n", m.c_str(), hay);
+                    if (hay != n) { err = "matmapa: el indice propio del objeto no es el esperado"; return false; }
+                }
+                else if (k2 == "uvobj") {
+                    std::string n; ss >> n;
+                    Mesh* me = ScriptActiveMesh();
+                    const std::string hay = me ? me->UVPersonalizado(mat, k) : std::string();
+                    printf("      [matmapa] %s: UV personalizado del objeto '%s'\n", m.c_str(), hay.c_str());
+                    if (hay != (n == "-" ? std::string() : n)) { err = "matmapa: el UV personalizado no es '" + n + "'"; return false; }
+                }
+                else if (k2 == "tex") {
+                    std::string h; ss >> h;
+                    const std::string p2 = t ? t->path : std::string();
+                    if (p2.size() < h.size() || p2.compare(p2.size() - h.size(), h.size(), h) != 0) { err = "matmapa: la textura no es '" + h + "'"; return false; }
+                } else { err = "matmapa: no entiendo '" + k2 + "'"; return false; }
+            }
+            return true;
+        }
+        err = "matmapa: <mapa> numero | textura <ruta> | uv <N> | es numero|textura [uv N] [tex <hoja>]"; return false;
+    }
+    // ---- rtdesenfoque <0|1> [obturador] [centro|inicio|fin] : el desenfoque de movimiento TRAZADO (g_rt.desenfoque) ----
+    if (cmd == "rtdesenfoque") {
+        int on = 0; float obt = 0.5f; std::string pos; ss >> on >> obt >> pos;
+        g_rt.desenfoque = (on != 0); g_rt.obturador = obt;
+        g_rt.obturadorPos = (pos == "inicio") ? 1 : (pos == "fin") ? 2 : 0;
+        { extern void RTFilasPanel(Properties*); RTFilasPanel(ScriptProps()); }
+        RTInvalidar();
+        return true;
+    }
+    // ---- rtref : guarda la ultima imagen del render a archivo como REFERENCIA ----
+    // ---- rtdif <umbral> <min> [max] : cuantos pixeles difieren de la referencia en mas de 'umbral' (en algun canal);
+    //      assert de que sean al menos 'min' (y como mucho 'max') ----
+    if (cmd == "rtref" || cmd == "rtdif") {
+        static std::vector<unsigned char> ref; static int rw = 0, rh = 0;
+        std::vector<unsigned char> img; int w = 0, h = 0;
+        if (!RTHarnessImagen(img, w, h)) { err = cmd + ": sin render"; return false; }
+        if (cmd == "rtref") { ref = img; rw = w; rh = h; return true; }
+        if (ref.empty() || rw != w || rh != h) { err = "rtdif: sin referencia del mismo tamano (rtref)"; return false; }
+        int umbral = 30, mn = 0, mx = -1; ss >> umbral >> mn >> mx;
+        int n = 0;
+        for (size_t i = 0; i + 3 < img.size(); i += 4) {
+            int d = 0;
+            for (int k = 0; k < 3; k++) { const int e = abs((int)img[i + k] - (int)ref[i + k]); if (e > d) d = e; }
+            if (d > umbral) n++;
+        }
+        printf("      [rtdif] %d pixeles distintos (> %d) de %d\n", n, umbral, w * h);
+        if (n < mn) { char b[96]; sprintf(b, "rtdif: %d pixeles distintos, se esperaban al menos %d", n, mn); err = b; return false; }
+        if (mx >= 0 && n > mx) { char b[96]; sprintf(b, "rtdif: %d pixeles distintos, se esperaban como mucho %d", n, mx); err = b; return false; }
+        return true;
+    }
     if (cmd == "rtpixel") {
         int x = 0, y = 0; ss >> x >> y;
         unsigned char p[3];
@@ -31285,6 +32184,57 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         return true;
     }
     // ---- rtopt rayos samples pases : opciones globales del trazado (g_rt) ----
+    // ---- rtdenoiser <0 ninguno | 1 oidn | 2 optix> [si|no] : el denoiser del trazado de rayos; 'si' / 'no' = assert de que
+    //      esta (o no) en esta maquina ----
+    if (cmd == "rtdenoiser") {
+        int d = 0; std::string esp; ss >> d >> esp;
+        const bool hay = W3dDenoiserDisponible(d);
+        printf("      [rtdenoiser] %d (%s): %s en esta maquina\n", d, W3dDenoiserNombre(d), hay ? "esta" : "NO esta");
+        if (esp == "saltar") {   // (no esta en esta maquina: lo que sigue de la prueba no aplica, termina bien)
+            if (!hay) gScriptTerminarOk = true; else { g_rt.denoiser = d; RTInvalidar(); }
+            return true;
+        }
+        if (esp == "si" && !hay) { err = "rtdenoiser: no esta"; return false; }
+        if (esp == "no" && hay) { err = "rtdenoiser: esta"; return false; }
+        if (esp.empty()) { if (!hay) { err = "rtdenoiser: no esta en esta maquina"; return false; } g_rt.denoiser = d; RTInvalidar(); }
+        return true;
+    }
+    // ---- rtgpu <0|1> [saltar] : trazar en la CPU (0) o en la GPU (1, render/RTGpu.h). 'saltar' = sin GPU con Vulkan en esta
+    //      maquina lo que sigue no aplica (termina bien) ----
+    // ---- rtengpu <si|no> : el ultimo rtrender se hizo (o no) en la GPU ----
+    if (cmd == "rtgpu") {
+        int on = 1; std::string esp; ss >> on >> esp;
+        const bool hay = RTGpuDisponible();
+        printf("      [rtgpu] %s: %s%s\n", on ? "GPU" : "CPU", hay ? RTGpuNombre() : "sin GPU con Vulkan", RTGpuConNucleosRT() ? " (nucleos RTX)" : "");
+        if (on && !hay) { if (esp == "saltar") { gScriptTerminarOk = true; return true; } err = "rtgpu: no hay GPU con Vulkan"; return false; }
+        g_rt.gpu = on != 0;
+        RTInvalidar();
+        return true;
+    }
+    if (cmd == "rtengpu") {
+        std::string esp; ss >> esp;
+        const bool en = RTHarnessEnGpu();
+        printf("      [rtengpu] el ultimo render: %s\n", en ? "GPU" : "CPU");
+        if ((esp == "si") != en) { err = en ? "rtengpu: fue en la GPU" : "rtengpu: fue en la CPU"; return false; }
+        return true;
+    }
+    // ---- rtruido x0 y0 x1 y1 [menorque N | mayorque N] : el RUIDO del ultimo rtrender en esa zona (lo que cambia un pixel
+    //      contra el de al lado, promedio, 0..255) ----
+    if (cmd == "rtruido") {
+        int x0 = 0, y0 = 0, x1 = 0, y1 = 0; std::string k; float lim = 0.0f; ss >> x0 >> y0 >> x1 >> y1 >> k >> lim;
+        double suma = 0.0; int n = 0;
+        for (int y = y0; y <= y1; y++) for (int x = x0; x < x1; x++) {
+            unsigned char a[3], b2[3];
+            if (!RTHarnessPixel(x, y, a) || !RTHarnessPixel(x + 1, y, b2)) continue;
+            for (int c = 0; c < 3; c++) suma += (a[c] > b2[c]) ? a[c] - b2[c] : b2[c] - a[c];
+            n += 3;
+        }
+        const float r = n ? (float)(suma / n) : 0.0f;
+        printf("      [rtruido] (%d,%d)-(%d,%d): %.2f\n", x0, y0, x1, y1, r);
+        if (k == "menorque" && !(r < lim)) { err = "rtruido: hay mas ruido del esperado"; return false; }
+        if (k == "mayorque" && !(r > lim)) { err = "rtruido: hay menos ruido del esperado"; return false; }
+        return true;
+    }
     if (cmd == "rtopt") {
         int r = 1, sm = 1, ps = 16, on = -1; ss >> r >> sm >> ps >> on;
         g_rt.rayos = r < 1 ? 1 : r; g_rt.samples = sm < 1 ? 1 : sm; g_rt.pases = ps < 1 ? 1 : ps;
@@ -31295,12 +32245,305 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         return true;
     }
     // ---- rtlight radio rayos dir : tamano / rayos de sombra / direccional de la luz activa (o la primera) ----
+    // ---- vectores W H [dx dy | objeto] [tol] [ruta] : el PASE DE VECTORES DE MOVIMIENTO (render/VectoresMovimiento.h) de
+    //      W x H desde el cuadro anterior (CurrentFrame-1) y el desenfoque por CPU del beauty. Imprime el movimiento medio
+    //      de los pixeles que se mueven y lo exige (+- tol pixeles): dx dy a mano, u 'objeto' = lo que se movio el ORIGEN
+    //      del objeto activo en la imagen (proyectado aparte, con la matriz de la imagen). 'vectores quieto W H': sin
+    //      anterior, todo tiene que salir 128,128 ----
+    if (cmd == "vectores") {
+#ifndef W3D_SYMBIAN
+        std::string a; ss >> a;
+        const bool quieto = (a == "quieto");
+        int w = quieto ? 0 : atoi(a.c_str()), h = 0; if (quieto) ss >> w; ss >> h;
+        float ex = 0, ey = 0, tol = -1;
+        std::string e1; ss >> e1;
+        const bool porObjeto = (e1 == "objeto");
+        if (!porObjeto && !e1.empty()) { ex = (float)atof(e1.c_str()); ss >> ey; }
+        ss >> tol;
+        if (!rootViewport) { err = "vectores: sin layout"; return false; }
+        rootViewport->Render();
+        extern Viewport3D* Viewport3DActive;
+        Viewport3D* vp = Viewport3DActive;
+        if (!vp || w <= 0 || h <= 0) { err = "vectores: sin viewport 3D o tamano invalido"; return false; }
+        extern void AplicarAnimacionObjetos();
+        W3dVecOlvidar();
+        if (!quieto) {
+            // (el origen del objeto activo en la imagen, en cada cuadro: lo esperado con 'objeto')
+            struct P { static bool Px(const float* M, const Vector3& p, int w, int h, float& x, float& y) {
+                const float cx = M[0]*p.x + M[4]*p.y + M[8]*p.z + M[12], cy = M[1]*p.x + M[5]*p.y + M[9]*p.z + M[13];
+                const float cw = M[3]*p.x + M[7]*p.y + M[11]*p.z + M[15];
+                if (cw <= 1e-6f) return false;
+                x = (cx / cw * 0.5f + 0.5f) * w; y = (0.5f - cy / cw * 0.5f) * h; return true; } };
+            const int f = CurrentFrame;
+            float x0 = 0, y0 = 0, x1 = 0, y1 = 0; bool ok0 = false, ok1 = false;
+            CurrentFrame = f - 1; AplicarAnimacionObjetos();
+            float VP[16]; vp->MatrizImagen(w, h, VP); W3dVecRecordar(SceneCollection, VP);
+            if (ObjActivo) ok0 = P::Px(VP, ObjActivo->GetGlobalPosition(), w, h, x0, y0);
+            CurrentFrame = f; AplicarAnimacionObjetos();
+            vp->MatrizImagen(w, h, VP);
+            if (ObjActivo) ok1 = P::Px(VP, ObjActivo->GetGlobalPosition(), w, h, x1, y1);
+            if (porObjeto) {
+                if (!ok0 || !ok1) { err = "vectores: el objeto activo no se ve"; return false; }
+                ex = x1 - x0; ey = y1 - y0;
+                printf("      [vectores] el origen del objeto se movio (%.2f, %.2f) px en la imagen\n", ex, ey);
+            }
+        }
+        std::vector<unsigned char> vec, img, borroso;
+        if (!vp->RenderABuffer(w, h, RenderType::Vectores, vec)) { err = "vectores: el pase no se renderizo"; return false; }
+        // (el promedio, de los pixeles que SE MUEVEN: lo quieto de la escena no lo diluye)
+        int n = 0, quietos = 0, mov = 0; double sx = 0, sy = 0;
+        for (size_t i = 0; i + 3 < vec.size(); i += 4) {
+            if (vec[i] == 128 && vec[i + 1] == 128) quietos++;
+            if (vec[i + 2] != 255) continue;
+            n++;
+            if (vec[i] == 128 && vec[i + 1] == 128) continue;
+            mov++; sx += ((int)vec[i] - 128) / W3D_VEC_PASOS_POR_PIXEL; sy += ((int)vec[i + 1] - 128) / W3D_VEC_PASOS_POR_PIXEL;
+        }
+        const float mx = mov ? (float)(sx / mov) : 0.0f, my = mov ? (float)(sy / mov) : 0.0f;
+        // el DESENFOQUE: el beauty (GL) desenfocado a lo largo de los vectores cambia algun pixel (si algo se movio)
+        int cambiados = 0;
+        if (vp->RenderABuffer(w, h, RenderType::Rendered, img) && img.size() == vec.size()) {
+            borroso.resize(img.size());
+            W3dDesenfoqueMovimiento(&img[0], &vec[0], w, h, 1.0f, 12, &borroso[0]);
+            for (size_t i = 0; i < img.size(); i += 4) if (abs((int)img[i] - (int)borroso[i]) > 8) cambiados++;
+        }
+        printf("      [vectores] %dx%d: %d px con geometria (%d se mueven), movimiento medio (%.2f, %.2f) px, %d quietos, desenfoque cambio %d px\n",
+               w, h, n, mov, mx, my, quietos, cambiados);
+        { std::string ruta; ss >> ruta; if (!ruta.empty()) w3dEngine::SavePNG(ruta.c_str(), &vec[0], w, h, false); }
+        if (n == 0) { err = "vectores: el pase no dibujo ninguna malla"; return false; }
+        if (quieto) {
+            if (quietos != w * h) { err = "vectores: sin cuadro anterior todo tiene que salir quieto (128,128)"; return false; }
+            if (cambiados != 0) { err = "vectores: quieto y el desenfoque cambio la imagen"; return false; }
+            return true;
+        }
+        if (tol >= 0.0f && (fabsf(mx - ex) > tol || fabsf(my - ey) > tol)) { err = "vectores: el movimiento medio no es el esperado"; return false; }
+        if (tol >= 0.0f && (fabsf(ex) > 1.0f || fabsf(ey) > 1.0f) && cambiados == 0) { err = "vectores: se movio y el desenfoque no cambio nada"; return false; }
+        return true;
+#else
+        return true;
+#endif
+    }
+    // ---- renderopc <vectores 0/1> <desenfoque 0/1> <obturador> : los tildes del pase de vectores y del desenfoque ----
+    if (cmd == "renderopc") {
+        int v = 0, d = 0; float ob = 0.5f; ss >> v >> d >> ob;
+        if (!rootViewport) { err = "renderopc: sin layout"; return false; }
+        rootViewport->Render(); ScriptProps();
+        if (!PropsActivo) { err = "renderopc: sin panel de propiedades"; return false; }
+        PropsActivo->renderVectores = (v != 0); PropsActivo->renderDesenfoque = (d != 0); PropsActivo->renderObturador = ob;
+        return true;
+    }
+    // ---- existe <ruta> [no] : el archivo esta (o NO esta, con 'no') ----
+    if (cmd == "existe") {
+        std::string ruta, no; ss >> ruta >> no;
+        const bool hay = w3dFileSystem::FileExists(ruta);
+        printf("      [existe] %s -> %s\n", ruta.c_str(), hay ? "si" : "no");
+        if (hay == (no == "no")) { err = "existe: " + ruta + (hay ? " esta y no tendria que estar" : " no esta"); return false; }
+        return true;
+    }
+    // ---- rtgpucompartida : la GPU del trazado la comparten el viewport (aca a la mitad: escala 2) y el render a archivo
+    //      (a tamano completo). El viewport trazando, un render a archivo en el medio y el viewport sigue: antes leia la
+    //      imagen de la GPU del otro tamano en su buffer y se colgaba el editor (Render Image / F12 con la vista en
+    //      Rendered). Sin GPU con Vulkan no hay nada que probar ----
+    if (cmd == "rtgpucompartida") {
+        if (!RTGpuDisponible()) { printf("      [rtgpucompartida] sin GPU: se saltea\n"); return true; }
+        extern Viewport3D* Viewport3DActive;
+        if (!rootViewport) { err = "rtgpucompartida: sin layout"; return false; }
+        rootViewport->Render();
+        Viewport3D* vp = Viewport3DActive;
+        if (!vp) { err = "rtgpucompartida: sin viewport 3D"; return false; }
+        const W3dRTOpciones g0 = g_rt; const RenderType v0 = vp->view;
+        g_rt.on = true; g_rt.gpu = true; g_rt.escala = 2; g_rt.pases = 100000; g_rt.soloFinal = false;
+        vp->view = RenderType::Rendered; RTInvalidar();
+        for (int i = 0; i < 4; i++) rootViewport->Render();
+        const bool ok = RTHarnessRender(vp, vp->width, vp->height, 2);
+        const bool enGpu = RTHarnessEnGpu();
+        for (int i = 0; i < 4; i++) rootViewport->Render();
+        g_rt = g0; vp->view = v0; RTInvalidar();
+        rootViewport->Render();
+        printf("      [rtgpucompartida] vista %dx%d (trazada a la mitad), a archivo %dx%d %s\n", vp->width, vp->height,
+               vp->width, vp->height, enGpu ? "en la GPU" : "en la CPU");
+        if (!ok) { err = "rtgpucompartida: el render a archivo fallo"; return false; }
+        return true;
+    }
+    // ---- borrararchivo ruta : borra un archivo si esta (que la prueba arranque sin lo de la corrida anterior) ----
+    if (cmd == "borrararchivo") {
+        std::string ruta; ss >> ruta;
+        remove(ruta.c_str());
+        return true;
+    }
+    // ---- renderrango ini fin : el rango propio de Render Animation (tarjeta Render; 0 0 = el del timeline) ----
+    if (cmd == "renderrango") {
+        extern float g_renderIni, g_renderFin;
+        ss >> g_renderIni >> g_renderFin;
+        return true;
+    }
+    // ---- fsr : el REESCALADO FSR 1 (render/ReescaladoFSR.h) sobre imagenes sinteticas x2: lo parejo queda parejo y un
+    //      borde diagonal blanco/negro sale con MENOS grises en el medio que estirado con lineal (mas nitido) ----
+    if (cmd == "fsr") {
+        std::string sub; ss >> sub;
+        if (sub == "vista") {   // fsr vista: el viewport en Rendered con trazado x2 + FSR, unos cuadros
+            if (!rootViewport) { err = "fsr vista: sin layout"; return false; }
+            extern Viewport3D* Viewport3DActive;
+            rootViewport->Render();
+            Viewport3D* vp = Viewport3DActive;
+            if (!vp) { err = "fsr vista: sin viewport 3D"; return false; }
+            const bool on0 = g_rt.on; const int e0 = g_rt.escala, r0 = g_rt.reescalador;
+            g_rt.on = true; g_rt.escala = 2; g_rt.reescalador = 1; vp->view = RenderType::Rendered; RTInvalidar();
+            for (int i = 0; i < 40; i++) rootViewport->Render();
+            int w = 0, h = 0; unsigned char c[3] = { 0, 0, 0 };
+            const bool hubo = RTHarnessFsrVista(w, h, c);
+            g_rt.on = on0; g_rt.escala = e0; g_rt.reescalador = r0; RTInvalidar();
+            printf("      [fsr] vista %dx%d: reescalado %dx%d centro (%d,%d,%d)\n", vp->width, vp->height, w, h, c[0], c[1], c[2]);
+            if (!hubo) { err = "fsr vista: el viewport no reescalo con FSR"; return false; }
+            if (w != vp->width || h != vp->height) { err = "fsr vista: el reescalado no es del tamano de la vista"; return false; }
+            return true;
+        }
+        const int sw = 64, sh = 64, dw = 128, dh = 128;
+        std::vector<unsigned char> src((size_t)sw * sh * 4), dst((size_t)dw * dh * 4), lin((size_t)dw * dh * 4);
+        // 1) parejo: gris 100 -> gris 100
+        for (size_t i = 0; i < src.size(); i += 4) { src[i] = src[i+1] = src[i+2] = 100; src[i+3] = 255; }
+        W3dFSR1(&src[0], sw, sh, &dst[0], dw, dh, 0.2f, 0);
+        int peor = 0;
+        for (size_t i = 0; i < dst.size(); i += 4) { const int d = abs((int)dst[i] - 100); if (d > peor) peor = d; }
+        // 2) borde diagonal (x > y*0.6+10: blanco)
+        for (int y = 0; y < sh; y++) for (int x = 0; x < sw; x++) {
+            unsigned char* p = &src[((size_t)y * sw + x) * 4];
+            p[0] = p[1] = p[2] = (x > y * 0.6f + 10.0f) ? 255 : 0; p[3] = 255;
+        }
+        W3dFSR1(&src[0], sw, sh, &dst[0], dw, dh, 0.2f, 0);
+        // (el lineal de referencia: bilineal con los mismos centros de pixel)
+        for (int y = 0; y < dh; y++) for (int x = 0; x < dw; x++) {
+            float fx = (x + 0.5f) * sw / (float)dw - 0.5f, fy = (y + 0.5f) * sh / (float)dh - 0.5f;
+            int x0 = (int)floorf(fx), y0 = (int)floorf(fy); float ax = fx - x0, ay = fy - y0;
+            int x1 = x0 + 1, y1 = y0 + 1;
+            if (x0 < 0) x0 = 0; if (y0 < 0) y0 = 0; if (x1 >= sw) x1 = sw - 1; if (y1 >= sh) y1 = sh - 1; if (x0 >= sw) x0 = sw - 1; if (y0 >= sh) y0 = sh - 1;
+            const float v = src[((size_t)y0*sw+x0)*4] * (1-ax)*(1-ay) + src[((size_t)y0*sw+x1)*4] * ax*(1-ay)
+                          + src[((size_t)y1*sw+x0)*4] * (1-ax)*ay + src[((size_t)y1*sw+x1)*4] * ax*ay;
+            lin[((size_t)y*dw+x)*4] = (unsigned char)(v + 0.5f);
+        }
+        int grisFsr = 0, grisLin = 0;
+        for (size_t i = 0; i < dst.size(); i += 4) { if (dst[i] > 30 && dst[i] < 225) grisFsr++; if (lin[i] > 30 && lin[i] < 225) grisLin++; }
+        printf("      [fsr] parejo: peor diferencia %d; borde: %d grises con FSR, %d con lineal\n", peor, grisFsr, grisLin);
+        if (peor > 1) { err = "fsr: una imagen pareja no quedo pareja"; return false; }
+        if (grisFsr == 0 || grisFsr * 10 > grisLin * 8) { err = "fsr: el borde no salio mas nitido que con lineal"; return false; }
+        return true;
+    }
     if (cmd == "rtlight") {
-        float radio = 0, rayos = 0; int dir = 0; ss >> radio >> rayos >> dir;
+        float radio = 0, rayos = 0, dist = 0; int dir = 0; ss >> radio >> rayos >> dir >> dist;   // dist: Light::distancia (opcional)
         Light* l = (ObjActivo && ObjActivo->getType() == ObjectType::light) ? (Light*)ObjActivo : NULL;
         if (!l) for (size_t i = 0; i < Lights.size() && !l; i++) l = Lights[i];
         if (!l) { err = "rtlight: sin luz en la escena"; return false; }
-        l->rtRadio = radio; l->rtRayos = rayos; l->direccional = (dir != 0);
+        l->rtRadio = radio; l->rtRayos = rayos; l->direccional = (dir != 0); l->distancia = dist;
+        RTInvalidar();
+        return true;
+    }
+    // ---- post on|off | post agregar <grano|foco|mov> [v0 v1 v2 v3] | post limpiar | post cpu [si|no] : la pila de
+    //      POSTPROCESADO (render/Postproceso.h). 'cpu' = assert de si va por CPU (sin shaders) ----
+    if (cmd == "post") {
+        std::string sub; ss >> sub;
+        // el postprocesado es un OBJETO del arbol: el primero de la escena, o uno nuevo al FINAL (donde se aplicaba antes)
+        Postproceso* po = NULL;
+        { std::vector<Postproceso*> ps; W3dPostprocesosDe(SceneCollection, ps); if (!ps.empty()) po = ps[0]; }
+        if (!po && SceneCollection) { po = new Postproceso(SceneCollection); po->opc.on = false; }
+        if (!po) { err = "post: sin escena"; return false; }
+        W3dPostOpciones& g_post = po->opc;
+        struct PanelPost { ~PanelPost() { extern void PostFilasPanel(Properties*); PostFilasPanel(ScriptProps()); } } panelPost;   // (la tarjeta al dia)
+        if (sub == "on" || sub == "off") { g_post.on = (sub == "on"); g_redraw = true; return true; }
+        if (sub == "limpiar") { g_post.efectos.clear(); g_post.activo = -1; return true; }
+        if (sub == "agregar") {
+            std::string t; ss >> t;
+            const int tipo = (t == "grano") ? W3dPostGrano : (t == "foco") ? W3dPostFoco : (t == "mov") ? W3dPostMovimiento :
+                             (t == "bloom") ? W3dPostBloom : -1;
+            if (tipo < 0) { err = "post agregar: tipo desconocido '" + t + "' (grano|foco|mov|bloom)"; return false; }
+            W3dPostEfecto e; W3dPostDefectos(e, tipo);
+            // (los numeros en orden; el que sigue al ultimo parametro es la opcion de si/no: el color del grano, usar
+            // el foco de la camara)
+            const int np = (tipo == W3dPostGrano) ? 2 : (tipo == W3dPostFoco) ? 3 : (tipo == W3dPostBloom) ? 6 : 1;
+            for (int k = 0; k <= np; k++) { float v; if (!(ss >> v)) break; if (k < np) e.v[k] = v; else e.opc = (v != 0.0f); }
+            g_post.efectos.push_back(e); g_post.activo = (int)g_post.efectos.size() - 1;
+            return true;
+        }
+        if (sub == "cpu") {
+            std::string esp; ss >> esp;
+            printf("      [post] %s\n", W3dPostPorCPU() ? "por CPU (sin shaders)" : "por GPU (shaders)");
+            if (esp == "si" && !W3dPostPorCPU()) { err = "post cpu: va por GPU"; return false; }
+            if (esp == "no" && W3dPostPorCPU()) { err = "post cpu: va por CPU"; return false; }
+            return true;
+        }
+        err = "post: uso on|off|limpiar|agregar|cpu"; return false;
+    }
+    // ---- vpref : guarda los pixeles del viewport 3D (render REAL) como referencia ----
+    // ---- vpdif <umbral> <min> [max] [afuera] : cuantos pixeles del viewport difieren de la referencia en mas de 'umbral'
+    //      ('afuera': solo los de FUERA del marco de la camara) ----
+    if (cmd == "vpref" || cmd == "vpdif") {
+        static std::vector<unsigned char> ref; static int rw = 0, rh = 0;
+        extern Viewport3D* Viewport3DActive; extern int W3dPantallaAlto;
+        if (!rootViewport) { err = cmd + ": sin layout"; return false; }
+        { extern void CargarTexturasPendientes(); CargarTexturasPendientes(); }
+        rootViewport->Render();
+        Viewport3D* vp = Viewport3DActive;
+        if (!vp) { err = cmd + ": sin viewport 3D"; return false; }
+        vp->Render(); w3dEngine::Finish();
+        const int w = vp->width, h = vp->height, gy = W3dPantallaAlto - vp->y - vp->height;
+        std::vector<unsigned char> img((size_t)w * h * 4);
+        w3dEngine::ReadPixelsRGBA(vp->x, gy, w, h, &img[0]);
+        if (cmd == "vpref") { ref = img; rw = w; rh = h; return true; }
+        if (ref.empty() || rw != w || rh != h) { err = "vpdif: sin referencia (vpref)"; return false; }
+        int umbral = 30, mn = 0, mx = -1; std::string zona; ss >> umbral >> mn >> mx >> zona;
+        // 'afuera': solo los pixeles FUERA del marco de la camara (el postprocesado no los toca)
+        int fx0 = 0, fx1 = w, fy0 = 0, fy1 = h;
+        const bool afuera = (zona == "afuera");
+        if (afuera) {
+            if (!vp->camFrameOn) { err = "vpdif afuera: no se mira por la camara"; return false; }
+            const float cx = (vp->camViewPanX * 0.5f + 0.5f) * w, cy = (0.5f - vp->camViewPanY * 0.5f) * h;
+            const float hw = vp->camFrameNX * vp->camViewZoom * w * 0.5f, hh = vp->camFrameNY * vp->camViewZoom * h * 0.5f;
+            fx0 = (int)(cx - hw) - 2; fx1 = (int)(cx + hw) + 2; fy0 = (int)(cy - hh) - 2; fy1 = (int)(cy + hh) + 2;   // (y el borde)
+        }
+        // 'obj <nombre> <radio>': solo los pixeles a menos de 'radio' del CENTRO de ese objeto en pantalla
+        const bool zobj = (zona == "obj");
+        float ocx = 0, ocy = 0; int orad = 0;
+        if (zobj) {
+            std::string on; ss >> on >> orad;
+            Object* o = SceneCollection ? FindObjectByName(SceneCollection, on) : NULL;
+            if (!o || !vp->ProyectarPunto(o->GetGlobalPosition(), ocx, ocy)) { err = "vpdif obj: no se ve '" + on + "'"; return false; }
+        }
+        int n = 0;
+        for (size_t i = 0; i + 3 < img.size(); i += 4) {
+            if (afuera) {
+                const int px = (int)((i / 4) % (size_t)w), py = h - 1 - (int)((i / 4) / (size_t)w);
+                if (px >= fx0 && px < fx1 && py >= fy0 && py < fy1) continue;
+            }
+            if (zobj) {
+                const float px = (float)((i / 4) % (size_t)w), py = (float)(h - 1 - (int)((i / 4) / (size_t)w));
+                if ((px - ocx) * (px - ocx) + (py - ocy) * (py - ocy) > (float)(orad * orad)) continue;
+            }
+            int d = 0;
+            for (int k = 0; k < 3; k++) { const int e = abs((int)img[i + k] - (int)ref[i + k]); if (e > d) d = e; }
+            if (d > umbral) n++;
+        }
+        printf("      [vpdif] %d pixeles distintos (> %d) de %d\n", n, umbral, w * h);
+        if (n < mn) { char b[96]; sprintf(b, "vpdif: %d pixeles distintos, se esperaban al menos %d", n, mn); err = b; return false; }
+        if (mx >= 0 && n > mx) { char b[96]; sprintf(b, "vpdif: %d pixeles distintos, se esperaban como mucho %d", n, mx); err = b; return false; }
+        return true;
+    }
+    // ---- camdof <0|1> [fStop] [foco m] [objeto] : la PROFUNDIDAD DE CAMPO de la camara activa (Camera::dof); 'objeto' =
+    //      el foco lo sigue (sin el: la distancia a mano). Imprime la distancia enfocada y el radio de la lente ----
+    if (cmd == "camdof") {
+        int on = 0; float f = 2.8f, foco = 5.0f; std::string obj; ss >> on >> f >> foco >> obj;
+        if (!CameraActive) { err = "camdof: sin camara activa"; return false; }
+        CameraActive->dof = (on != 0); CameraActive->fStop = f; CameraActive->focoDist = foco; CameraActive->focoObjeto = obj;
+        RTInvalidar(); g_redraw = true;
+        printf("      [camdof] %s f/%.2f foco %.3f m (%s) lente %.4f m\n", CameraActive->dof ? "prendida" : "apagada", f,
+               CameraActive->DistanciaFoco(), obj.empty() ? "a mano" : obj.c_str(), CameraActive->RadioLente());
+        return true;
+    }
+    // ---- luzfoco <corte> [exponente] : la luz activa (o la primera) pasa a FOCO con ese cono en grados (180 = sin cono) ----
+    if (cmd == "luzfoco") {
+        float corte = 180.0f, expo = 0.0f; ss >> corte >> expo;
+        Light* l = (ObjActivo && ObjActivo->getType() == ObjectType::light) ? (Light*)ObjActivo : NULL;
+        if (!l) for (size_t i = 0; i < Lights.size() && !l; i++) l = Lights[i];
+        if (!l) { err = "luzfoco: sin luz en la escena"; return false; }
+        l->spotCutoff = corte; l->spotExponent = expo; l->direccional = false;
         RTInvalidar();
         return true;
     }
@@ -31348,6 +32591,85 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         if (!mat) { err = "matrt: no hay material activo"; return false; }
         mat->rtRugosidad = rug; mat->rtMetalico = met;
         RTInvalidar();
+        return true;
+    }
+    // ---- mattrans t : la TRANSMISION del material activo (trazado de rayos: lo que es vidrio, 0..1) ----
+    if (cmd == "mattrans") {
+        float t = 0.0f; ss >> t;
+        Material* mat = ScriptActiveMaterial();
+        if (!mat) { err = "mattrans: no hay material activo"; return false; }
+        mat->transmision = t;
+        RTInvalidar();
+        return true;
+    }
+    // ---- matshader : el SHADER ESCRITO del material activo (objects/ShaderEscrito.h)
+    //        matshader <archivo>            el archivo del disco (y compila)
+    //        matshader importar <archivo>   lo copia adentro del proyecto (shaders/) y lo usa
+    //        matshader nuevo                uno nuevo adentro del proyecto, con la plantilla
+    //        matshader off | on             el tilde
+    //        matshader compilar             "Compile" del panel
+    //        matshader compila si|no [texto] el resultado (no: el error tiene que decir 'texto', ej. el renglon)
+    if (cmd == "matshader") {
+        std::string a; ss >> a;
+        // matshader soporte hay|nohay : si el backend no es asi, lo que sigue de la prueba no aplica (termina bien)
+        if (a == "soporte") {
+            std::string q; ss >> q;
+            const bool hay = w3dEngine::ShadersEscritos();
+            printf("      [matshader] este backend %s shaders escritos\n", hay ? "TIENE" : "no tiene");
+            if ((q == "hay") != hay) gScriptTerminarOk = true;
+            return true;
+        }
+        Material* mat = ScriptActiveMaterial();
+        if (!mat) { err = "matshader: no hay material activo"; return false; }
+        if (a == "off" || a == "on") { mat->shaderOn = (a == "on"); return true; }
+        if (a == "tilde") {   // el tilde del panel, como un click (con su onChange)
+            if (!ScriptProps() || !PropsActivo->propMatShaderOn || !PropsActivo->propMatShaderOn->value) { err = "matshader tilde: el tilde no esta en el panel"; return false; }
+            PropsActivo->propMatShaderOn->EditPropertie();
+            if (rootViewport) rootViewport->Render();
+            return true;
+        }
+        if (a == "editar") {   // el lapiz del panel: el archivo al primer IDE del layout
+            extern bool IDEAbrirScript(const std::string& ruta);
+            if (!IDEAbrirScript(mat->shaderArchivo)) { err = "matshader editar: no hay IDE en el layout"; return false; }
+            return true;
+        }
+        if (a == "compilar") { W3dShaderMaterialCompilar(mat); }
+        else if (a == "nuevo") {
+            extern bool W3dShaderNuevoParaMaterial(Material*);
+            if (!W3dShaderNuevoParaMaterial(mat)) { err = "matshader nuevo: no se pudo (hay proyecto?)"; return false; }
+        } else if (a == "compila") {
+            std::string sino, texto; ss >> sino; std::getline(ss, texto);
+            { size_t p = texto.find_first_not_of(" \t"); texto = (p == std::string::npos) ? std::string() : texto.substr(p); }
+            // (con shaders: el programa de la GPU; sin shaders: el @vertice en la CPU, y "compilo" es que no dio error)
+            int sh = W3dShaderMaterial(mat);
+            if (!w3dEngine::ShadersEscritos()) { W3dShaderVerticeCPU(mat); sh = (mat->shaderEstado == 1) ? 1 : 0; }
+            printf("      [matshader] %s: estado %d id %d cpu %s %s\n", mat->shaderArchivo.c_str(), mat->shaderEstado, sh,
+                   mat->shaderCPU ? "si" : "no", mat->shaderError.c_str());
+            if (sino == "si" && sh <= 0) { err = "matshader: no compilo: " + mat->shaderError; return false; }
+            if (sino == "no" && sh > 0) { err = "matshader: compilo y se esperaba un error"; return false; }
+            if (sino == "no" && !texto.empty() && mat->shaderError.find(texto) == std::string::npos) { err = "matshader: el error no dice '" + texto + "'"; return false; }
+            return true;
+        } else {
+            std::string ruta = a, resto;   // (la ruta hasta el final del renglon: puede tener espacios)
+            std::getline(ss, resto);
+            if (a == "importar") { size_t p = resto.find_first_not_of(" \t"); ruta = (p == std::string::npos) ? std::string() : resto.substr(p); }
+            else ruta += resto;
+            {   // (una ruta RELATIVA del disco, desde la carpeta de la prueba: "shaders/x.glsl" sola seria una entrada del proyecto)
+                char abs[1024];
+#ifdef _WIN32
+                if (_fullpath(abs, ruta.c_str(), sizeof(abs))) ruta = abs;
+#else
+                if (realpath(ruta.c_str(), abs)) ruta = abs;
+#endif
+            }
+            if (a == "importar") ruta = W3dImportarAsset(ruta, "shaders");
+            if (ruta.empty()) { err = "matshader: falta el archivo"; return false; }
+            mat->shaderArchivo = ruta; mat->shaderOn = true;
+            W3dShaderMaterialCompilar(mat);
+        }
+        printf("      [matshader] %s %s %s\n", mat->shaderArchivo.c_str(), mat->shaderEstado == 1 ? "compilado" : "NO compila", mat->shaderError.c_str());
+        { extern void RebindMaterialMeshPart(); RebindMaterialMeshPart(); }   // (la tarjeta, como desde el panel)
+        g_redraw = true;
         return true;
     }
     // ---- matalpha a [transparente 0|1] : alpha del color difuso del material activo (+ el tilde Transparent) ----
@@ -31493,6 +32815,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         bool ok = true;
         #define TRS_VER(cond, que) do { const bool _c = (cond); printf("      [trpanelscroll] %-56s %s\n", que, _c ? "OK" : "MAL"); if (!_c) ok = false; } while (0)
         MenuPantallaH = 300 * GlobalScale / 3;              // pantalla chica: la mitad no alcanza para todas las filas
+        tp->grupo->open = true;                             // (nace PLEGADO: se despliega para probar el scroll)
         if (rootViewport) rootViewport->Render();
         tp->Render();
         TRS_VER(tp->dz.Desplazable() && tp->popUpWindow->height <= MenuPantallaH / 2 + 1, "mas alto que media pantalla: se recorta a la mitad");
@@ -31596,6 +32919,44 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
     // ---- gizmomodos : el gizmo con sus 3 modos, con eventos de mouse REALES. Click rapido = modo siguiente (sin
     //      cambio ni paso de undo); rotar con el semicirculo de un eje (el punto agarrado queda bajo el puntero);
     //      escalar con la punta cuadrada; un toque (dedo) tambien cambia de modo ----
+    // ---- gizmocentro : el gizmo de ROTAR agarrado en el CENTRO = R R (giro libre / orbital), no un eje. Un anillo
+    //      visto de canto pasa por el centro y antes se llevaba el click ----
+    if (cmd == "gizmocentro") {
+#ifndef W3D_SYMBIAN
+        if (!rootViewport) { err = "gizmocentro: sin layout"; return false; }
+        rootViewport->Render();
+        extern Viewport3D* Viewport3DActive;
+        Viewport3D* vp = Viewport3DActive;
+        if (!vp || !ObjActivo) { err = "gizmocentro: sin viewport 3D / objeto activo"; return false; }
+        struct EV {
+            static void Boton(Uint32 tipo, int x, int y) { extern void InputUsuarioSDL3(SDL_Event&);
+                SDL_Event ev; memset(&ev, 0, sizeof(ev)); ev.type = tipo; ev.button.button = SDL_BUTTON_LEFT; ev.button.which = 0;
+                ev.button.x = x; ev.button.y = y; ev.button.clicks = 1; ev.button.state = (tipo == SDL_MOUSEBUTTONDOWN) ? SDL_PRESSED : SDL_RELEASED;
+                InputUsuarioSDL3(ev); }
+            static void Mover(int x, int y, int rx, int ry) { extern void InputUsuarioSDL3(SDL_Event&);
+                SDL_Event ev; memset(&ev, 0, sizeof(ev)); ev.type = SDL_MOUSEMOTION; ev.motion.which = 0; ev.motion.state = SDL_BUTTON_LMASK;
+                ev.motion.x = x; ev.motion.y = y; ev.motion.xrel = rx; ev.motion.yrel = ry; InputUsuarioSDL3(ev); }
+        };
+        GizmoSetModo(GizmoModoRotar);
+        rootViewport->Render();
+        float cx = 0, cy = 0;
+        if (!vp->ProyectarPunto(ObjActivo->pos, cx, cy)) { err = "gizmocentro: el objeto no se ve"; return false; }
+        const Quaternion r0 = ObjActivo->Rot();
+        const int X0 = vp->x + (int)cx, Y0 = vp->y + (int)cy;
+        EV::Mover(X0, Y0, 0, 0); EV::Boton(SDL_MOUSEBUTTONDOWN, X0, Y0);
+        for (int i = 1; i <= 12; i++) EV::Mover(X0 + i * 5, Y0 + i * 2, 5, 2);
+        const int ejeAgarrado = axisSelect;        EV::Boton(SDL_MOUSEBUTTONUP, X0 + 60, Y0 + 24);
+        const float dot = fabsf(r0.w*ObjActivo->Rot().w + r0.x*ObjActivo->Rot().x + r0.y*ObjActivo->Rot().y + r0.z*ObjActivo->Rot().z);
+        const float giro = 2.0f * acosf(dot > 1.0f ? 1.0f : dot) * 57.2957795f;
+        printf("      [gizmocentro] eje=%d (orbital=%d) giro=%.1f grados\n", ejeAgarrado, (int)OrbitalAxis, giro);
+        GizmoSetModo(GizmoModoMover);
+        if (ejeAgarrado != OrbitalAxis) { err = "gizmocentro: el centro agarro un eje, no el giro libre"; return false; }
+        if (giro < 1.0f) { err = "gizmocentro: el arrastre no giro el objeto"; return false; }
+        return true;
+#else
+        return true;
+#endif
+    }
     if (cmd == "gizmomodos") {
 #ifndef W3D_SYMBIAN
         if (!rootViewport) { err = "gizmomodos: sin layout"; return false; }
@@ -31900,6 +33261,18 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
     }
     // ---- vpkind <kindActual> <nuevoId> : cambia el primer viewport de ese kind (1=3D 2=outliner 3=props 4=UV 5=timeline)
     //      por uno nuevo del tipo nuevoId (0=3D 1=outliner 2=props 3=UV 4=timeline 5=2D 6=consola 7=IDE) ----
+    // ---- vpmenutipo <kind> : abre el menu de tipo / dividir del primer viewport de ese tipo (el boton [0] de su barra) ----
+    if (cmd == "vpmenutipo") {
+        int kind = 1; ss >> kind;
+        struct VK { static ViewportBase* Buscar(ViewportBase* n, int k) { if (!n) return NULL; if (n->isLeaf()) return n->ViewportKind() == k ? n : NULL;
+                        ViewportBase* a = Buscar(((ViewportColumn*)n)->childA, k); if (a) return a; return Buscar(((ViewportColumn*)n)->childB, k); } };
+        ViewportBase* v = VK::Buscar(rootViewport, kind);
+        if (!v) { err = "vpmenutipo: no hay un viewport de ese tipo"; return false; }
+        extern void LayoutAbrirMenuTipo(ViewportBase*);
+        v->ActualizarBarra();
+        LayoutAbrirMenuTipo(v);
+        return true;
+    }
     if (cmd == "vpkind") {
         int kind = 0, nuevo = 3; ss >> kind >> nuevo;
         struct VK { static ViewportBase* Buscar(ViewportBase* n, int k) { if (!n) return NULL; if (n->isLeaf()) return n->ViewportKind() == k ? n : NULL;
@@ -32094,6 +33467,31 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
     //      llegue: InsertarKeyframeObjeto(KfCanalRot) deja curvas SOLO en AnimRotation; (b) que el
     //      menu tenga los 4 items; (c) que en el contexto de VERTICES la 'i' NO abra menu (inserta
     //      directo) y que en Object/Pose Mode SI lo abra. ----
+    // ---- kfmenuteclado : "Insert Keyframe > All" del menu ANIMATION por TECLADO (como el N95, sin la tecla I: la
+    //      I le ponia la accion al submenu y sin ella elegir "All" no hacia nada). ERROR si no hay keyframes ----
+    if (cmd == "kfmenuteclado") {
+        extern PopupMenu* MenuInsertKey;
+        extern void LayoutSyncInsertKeySubmenu(PopupMenu* menu, int idxItem, bool desdeUV);
+        if (!MenuAnimation || !MenuInsertKey) { err = "kfmenuteclado: sin menus"; return false; }
+        if (!ObjActivo) { err = "kfmenuteclado: sin objeto activo"; return false; }
+        InteractionMode = ObjectMode; estado = editNavegacion; ActiveAnimKind = 0;
+        if (MenuAbierto) MenuAbierto->Cerrar();
+        MenuAnimation->Abrir(100, 100, MenuPantallaW, MenuPantallaH); MenuAbierto = MenuAnimation;
+        LayoutSyncInsertKeySubmenu(MenuAnimation, 0, false);
+        MenuAnimation->selectIndex = 0;                                       // "Insert Keyframe"
+        LayoutTeclaUI(LayoutKey::Enter, 0, 0);                                // OK: abre el submenu de canales
+        if (!MenuAnimation->submenuAbierto) { err = "kfmenuteclado: no se abrio el submenu"; return false; }
+        MenuAnimation->submenuAbierto->selectIndex = 0;                       // "All"
+        LayoutTeclaUI(LayoutKey::Enter, 0, 0);                                // OK: inserta
+        int n = 0;
+        for (size_t i = 0; i < AnimationObjects.size(); i++) {
+            if (AnimationObjects[i].obj != ObjActivo) continue;
+            for (size_t p = 0; p < AnimationObjects[i].Propertys.size(); p++) n += (int)AnimationObjects[i].Propertys[p].keyframes.size();
+        }
+        printf("      [kfmenuteclado] '%s' frame %d: %d keyframes\n", ObjActivo->name.c_str(), CurrentFrame, n);
+        if (n == 0) { err = "kfmenuteclado: no se inserto ningun keyframe"; return false; }
+        return true;
+    }
     if (cmd == "kfmenu") {
         extern void ReiniciarEscena();
         ReiniciarEscena();
@@ -38301,6 +39699,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
 //  Runner: corre el archivo entero, corta al primer fallo
 // ============================================================================
 bool W3dRunScript(const std::string& path) {
+    gScriptTerminarOk = false;
     std::ifstream f(path.c_str());
     if (!f) { printf("FALLO: no se pudo abrir el script '%s'\n", path.c_str()); return false; }
     printf("=== W3dScript: %s ===\n", path.c_str()); fflush(stdout);
@@ -38325,6 +39724,7 @@ bool W3dRunScript(const std::string& path) {
         if (W3dRunCommand(t, err)) {
             printf("OK    [%2d] %s\n", nLinea, t.c_str()); fflush(stdout);
             nOk++;
+            if (gScriptTerminarOk) break;
         } else {
             printf("FALLO [%2d] %s\n           -> %s\n", nLinea, t.c_str(), err.c_str()); fflush(stdout);
             return false;                               // corta al primer fallo

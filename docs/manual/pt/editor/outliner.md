@@ -33,7 +33,7 @@ A lista de tudo o que há na cena, e também a biblioteca de recursos do projeto
 
 | Função | Descrição |
 |---|---|
-| Recursos | Malhas, materiais, texturas, animações, prefabs, cenas, sons, scripts, fontes e vídeos, em pastas. Visto verde = em uso; X vermelho = órfão; `*` = não salvo. |
+| Recursos | Malhas, materiais, texturas, animações, prefabs, cenas, sons, scripts, [shaders](shaders.md), fontes e vídeos, em pastas. Um material ou um shader arrastado sobre uma malha do Viewport 3D aparece na parte sob o ponteiro antes de soltá-lo. Visto verde = em uso; X vermelho = órfão; `*` = não salvo. |
 | Filtro / Lista ou grade | Mostrar um só tipo; ver miniaturas. |
 | Arrastar um recurso | Para uma pasta (move-o), para a Viewport 3D (malha = objeto novo, material ou textura = é atribuído ao que for tocado, prefab = instância) ou para uma lista suspensa de Propriedades. |
 | Nova pasta / Mover para pasta | Organizar (as pastas servem só para organizar). |

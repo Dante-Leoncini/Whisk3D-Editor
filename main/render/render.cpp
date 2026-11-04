@@ -1,8 +1,11 @@
 #include "w3dGraphics.h" // abstraccion de graficos (independencia de OpenGL)
 #include "render.h"
+#include "w3dTexture.h"     // LoadTexture: el icono del parlante
+#include <string>
 #include "objects/Light.h"
 #include "WhiskUI/draw/glesdraw.h"
 #include "WhiskUI/core/UI.h" // GlobalScale (point sprites relativos)
+#include "WhiskUI/draw/icons.h" // IconSizeGS: el parlante del 3D, del tamano del icono del panel
 #include "ui/W3dColors.h" // W3dColores: colores del editor (ejes de transformacion)
 #include "objects/Mesh.h"          // Mesh + g_meshOverlayHook (hook de overlays)
 #include "objects/RenderColors.h"  // gRenderColors / RC_selActive (color del contorno)
@@ -256,6 +259,12 @@ void RenderOrigins(){
 }
 
 // visible considerando TODOS los ancestros (ocultar la coleccion
+// VISTA LOCAL ("/"): lo que no esta aislado tampoco muestra su icono ni sus lineas (Objects.cpp: g_localView*)
+#include <set>
+extern bool g_localViewActivo;
+extern const std::set<Object*>* g_localViewVisibles;
+static bool FueraDeVistaLocal(Object* o) { return g_localViewActivo && g_localViewVisibles && !g_localViewVisibles->count(o); }   // (los padres de paso tampoco)
+
 // tambien oculta la linea de la lampara al piso)
 static bool VisibleEnArbol(Object* o) {
     while (o) {
@@ -263,6 +272,67 @@ static bool VisibleEnArbol(Object* o) {
         o = o->Parent;
     }
     return true;
+}
+
+// LA GUIA de una luz, con el color que ya puso el que llama:
+//   SOL: una linea hacia donde alumbra HASTA EL PISO (la altura 0), SIEMPRE (seleccionado o no); si no apunta al
+//        piso, 10 m. FOCO: su cono (8 aristas y el circulo del borde) del largo de su distancia. PUNTUAL: la esfera
+//        de su distancia (tres circulos). El cono y la esfera, solo con la luz seleccionada ('sel').
+// Pool propio rotativo (como el de las lineas: el driver puede leer tarde)
+static void DibujarGuiaLuz(Light* L, bool sel) {
+    const bool foco = !L->direccional && L->spotCutoff < 179.5f;
+    const bool punto = !L->direccional && !foco;
+    if (!L->direccional && !sel) return;
+    if (punto && L->distancia <= 0.0f) return;   // (sin limite: no hay esfera que mostrar)
+    static GLfloat pool[8][192 * 3];
+    static int slot = 0;
+    GLfloat* v = pool[slot]; slot = (slot + 1) % 8;
+    Matrix4 W; L->GetWorldMatrix(W);
+    const Vector3 p(W.m[12], W.m[13], W.m[14]);
+    Vector3 ex(W.m[0], W.m[1], W.m[2]), ey(W.m[4], W.m[5], W.m[6]), ez(W.m[8], W.m[9], W.m[10]);
+    ex = ex.Normalized(); ey = ey.Normalized(); ez = ez.Normalized();
+    int n = 0;
+    if (L->direccional) {   // SOL: alumbra hacia su -Y local, hasta cortar el piso
+        float largo = 10.0f;
+        if (ey.y > 0.02f && p.y > 0.0f) { largo = p.y / ey.y; if (largo > 1000.0f) largo = 1000.0f; }
+        v[0] = p.x; v[1] = p.y; v[2] = p.z;
+        v[3] = p.x - ey.x * largo; v[4] = p.y - ey.y * largo; v[5] = p.z - ey.z * largo;
+        n = 2;
+    } else if (punto) {     // PUNTUAL: la esfera de su distancia (en el mundo: no la deforma la escala del objeto)
+        const float r = L->distancia;
+        const int N = 32;
+        for (int pl = 0; pl < 3; pl++)
+            for (int i = 0; i < N; i++) {
+                const float a0 = i * (6.2831853f / N), a1 = (i + 1) * (6.2831853f / N);
+                const float c0 = cosf(a0) * r, s0 = sinf(a0) * r, c1 = cosf(a1) * r, s1 = sinf(a1) * r;
+                GLfloat* q = &v[n * 3];
+                if (pl == 0)      { q[0] = p.x + c0; q[1] = p.y + s0; q[2] = p.z; q[3] = p.x + c1; q[4] = p.y + s1; q[5] = p.z; }
+                else if (pl == 1) { q[0] = p.x + c0; q[1] = p.y; q[2] = p.z + s0; q[3] = p.x + c1; q[4] = p.y; q[5] = p.z + s1; }
+                else              { q[0] = p.x; q[1] = p.y + c0; q[2] = p.z + s0; q[3] = p.x; q[4] = p.y + c1; q[5] = p.z + s1; }
+                n += 2;
+            }
+    } else {       // FOCO: hacia su -Z local, el cono de 'spotCutoff' grados
+        // el largo del cono: su DISTANCIA en metros (hasta donde alumbra); sin limite (0), un cono corto de 2 m
+        float largo = L->distancia > 0.0f ? L->distancia : 2.0f; if (largo < 0.05f) largo = 0.05f; if (largo > 1000.0f) largo = 1000.0f;
+        float ang = L->spotCutoff; if (ang > 85.0f) ang = 85.0f;
+        const float r = largo * tanf(ang * 3.14159265f / 180.0f);
+        const Vector3 c(p.x - ez.x * largo, p.y - ez.y * largo, p.z - ez.z * largo);
+        for (int i = 0; i < 24; i++) {
+            const float a0 = i * (6.2831853f / 24.0f), a1 = (i + 1) * (6.2831853f / 24.0f);
+            const float c0 = cosf(a0) * r, s0 = sinf(a0) * r, c1 = cosf(a1) * r, s1 = sinf(a1) * r;
+            GLfloat* q = &v[n * 3];
+            q[0] = c.x + ex.x * c0 + ey.x * s0; q[1] = c.y + ex.y * c0 + ey.y * s0; q[2] = c.z + ex.z * c0 + ey.z * s0;
+            q[3] = c.x + ex.x * c1 + ey.x * s1; q[4] = c.y + ex.y * c1 + ey.y * s1; q[5] = c.z + ex.z * c1 + ey.z * s1;
+            n += 2;
+            if ((i % 3) == 0) {   // (8 aristas del vertice al borde)
+                GLfloat* e = &v[n * 3];
+                e[0] = p.x; e[1] = p.y; e[2] = p.z; e[3] = q[0]; e[4] = q[1]; e[5] = q[2];
+                n += 2;
+            }
+        }
+    }
+    w3dEngine::VertexPointer3f(0, v);
+    w3dEngine::DrawLines(n);
 }
 
 void RenderLightLines(){
@@ -274,7 +344,7 @@ void RenderLightLines(){
     w3dEngine::DisableArray(w3dEngine::TexCoordArray);
     w3dEngine::LineWidth(1);
     for (size_t l = 0; l < Lights.size(); l++) {
-        if (!VisibleEnArbol(Lights[l])) continue;
+        if (!VisibleEnArbol(Lights[l]) || FueraDeVistaLocal(Lights[l])) continue;
         // mismo esquema de color que el icono de la luz
         if (Lights[l] == (Light*)ObjActivo && Lights[l]->select)
             w3dEngine::Color4fv(ListaColores[static_cast<int>(ColorID::accent)]);
@@ -289,12 +359,13 @@ void RenderLightLines(){
         v[3] = p.x; v[4] = 0.0f; v[5] = p.z;
         w3dEngine::VertexPointer3f(0, v);
         w3dEngine::DrawLines(2);
+        DibujarGuiaLuz(Lights[l], Lights[l]->select);   // (el cono y la esfera, solo de la SELECCIONADA; la linea del sol, siempre)
     }
     w3dEngine::EnableArray(w3dEngine::TexCoordArray);
 }
 
 void DibujarIcono3D(Object* obj){
-    if (!obj->visible) return;
+    if (!obj->visible || FueraDeVistaLocal(obj)) return;
 
     w3dEngine::PushMatrix();
     Matrix4 local;                 // LOCAL, no obj->M: ver el comentario de 'M' en Objects.h
@@ -323,6 +394,31 @@ void DibujarIcono3D(Object* obj){
     w3dEngine::PopMatrix();
 }
 
+// el PARLANTE de los objetos Sonido: el mismo punto con icono que la lampara de las luces (parlante.png del skin)
+static void DibujarIconoSonido3D(Object* obj){
+    if (!obj->visible || FueraDeVistaLocal(obj)) return;
+    w3dEngine::PushMatrix();
+    Matrix4 local; obj->GetMatrix(local);
+    w3dEngine::MultMatrix(local.m);
+    if (obj->getType() == ObjectType::sonido){
+        if (ObjActivo == obj && obj->select)  w3dEngine::Color4fv(ListaColores[static_cast<int>(ColorID::accent)]);
+        else if (obj->select)                 w3dEngine::Color4fv(ListaColores[static_cast<int>(ColorID::accentDark)]);
+        else                                  w3dEngine::Color4fv(ListaColores[static_cast<int>(ColorID::grisUI)]);
+        w3dEngine::DrawPoints(1);
+    }
+    for (size_t c = 0; c < obj->Childrens.size(); c++) DibujarIconoSonido3D(obj->Childrens[c]);
+    w3dEngine::PopMatrix();
+}
+static unsigned int TexParlante(){
+    static bool probado = false; static unsigned int id = 0;
+    if (!probado){
+        probado = true;
+        extern std::string g_skinDir;
+        if (!w3dEngine::LoadTexture((g_skinDir + "parlante.png").c_str(), id)) id = 0;
+    }
+    return id;
+}
+
 void RenderIcons3D(){
     w3dEngine::DepthMask(false);
     w3dEngine::Enable(w3dEngine::Texture2D);
@@ -338,6 +434,18 @@ void RenderIcons3D(){
     w3dEngine::PointSize(16 * GlobalScale); // iconos de 16 relativos a la UI
 
     DibujarIcono3D(SceneCollection);
+    // los SONIDOS (overlay "Sounds"): su parlante
+    { extern bool g_showSonidos;
+      const unsigned int tp = g_showSonidos ? TexParlante() : 0;
+      if (tp){
+          // el MISMO tamano y la misma nitidez que el icono del panel: el icono (10 de los 16 del png) a IconSizeGS
+          w3dEngine::BindTexture(tp);
+#ifndef W3D_SYMBIAN
+          w3dEngine::TexFilter(false);
+#endif
+          w3dEngine::PointSize((float)IconSizeGS * 16.0f / 10.0f);
+          DibujarIconoSonido3D(SceneCollection);
+      } }
 
     w3dEngine::PointSpriteCoordReplace(false);
     w3dEngine::Disable(w3dEngine::PointSprite);

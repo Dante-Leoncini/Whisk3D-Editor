@@ -38,6 +38,14 @@ static Mesh* gEnEdicion = NULL;     // la malla (de un recurso) que esta en edic
 // soltarla se compara contra el recurso)
 static Mesh* gActivaVista = NULL;
 static std::string gFirmaVista;
+// PUBLICACION DIFERIDA: mallas que salieron de Edit (o de un modo de pintura) siendo la UNICA usuaria de su
+// recurso. Nadie mas lo mira, asi que publicar al salir solo pagaba W3dMallaSerializar entero (61 ms por 30K
+// verts en PC, segundos en el N95) para un recurso que no lee nadie, y el re-vinculo de despues tiraba la jaula
+// de edicion (rearmarla al volver a entrar es otro tanto). La malla sigue con SUS arrays y su jaula (lo que se
+// ve es lo suyo) y se publica cuando alguien necesita el recurso: el guardado (W3dMallasSincronizar), otro
+// objeto que se vincula a el o la malla que se re-vincula (hook del Core) y la miniatura de la biblioteca.
+static std::vector<Mesh*> gPendientes;
+static void QuitarPendiente(const Mesh* m);   // (abajo, con el tick)
 
 // ============================================================================
 //  SERIALIZAR / PUBLICAR
@@ -223,6 +231,7 @@ static void VolverACompartir(Mesh* m) {
 
 bool W3dMallaPublicar(Mesh* m) {
     if (!m || !m->malla) return false;
+    QuitarPendiente(m);   // publicada por cualquier camino (Alt+D, guardado...): ya no tiene nada diferido
     MallaRecurso* r = m->malla;
     if (W3dMallaLimpia(m)) return false;   // nada propio que pueda haber cambiado
     std::string nuevos;
@@ -565,7 +574,43 @@ void W3dMallasEditorOlvidar() {
     gEnEdicion = NULL;
     gActivaVista = NULL;
     gFirmaVista.clear();
+    gPendientes.clear();
 }
+
+// (ver gPendientes) solo se COMPARAN punteros hasta confirmar con UsuarioVivo: una malla destruida sale de los
+// usuarios de su recurso en ~Mesh y su puntero puede quedar colgando en la lista
+static bool EsPendiente(const Mesh* m) {
+    for (size_t i = 0; i < gPendientes.size(); i++) if (gPendientes[i] == m) return true;
+    return false;
+}
+static void QuitarPendiente(const Mesh* m) {
+    for (size_t i = 0; i < gPendientes.size(); i++)
+        if (gPendientes[i] == m) { gPendientes.erase(gPendientes.begin() + (long)i); return; }
+}
+// diferir la publicacion solo si NADIE MAS usa el recurso: con otra instancia, la edicion se tiene que ver ya
+static bool PuedeDiferir(const Mesh* m) {
+    const MallaRecurso* r = m ? m->malla : NULL;
+    return r && r->usuarios.size() == 1 && r->usuarios[0] == m;
+}
+static void PublicarPendiente(Mesh* m) {
+    QuitarPendiente(m);   // ANTES de publicar: publicar re-vincula y el hook del Core no tiene que volver a entrar
+    if (UsuarioVivo(m)) W3dMallaPublicar(m);
+}
+// las pendientes que tocan a 'm' (la malla misma) o a 'r' (su recurso): el Core lo llama antes de sumarle un usuario
+// a un recurso o de re-vincular una malla (W3dMallaAntesDeVincularHook), la miniatura antes de leerlo
+void W3dMallasPublicarPendientesDe(Mesh* m, MallaRecurso* r) {
+    if (gPendientes.empty()) return;
+    std::vector<Mesh*> pub;
+    for (size_t i = 0; i < gPendientes.size(); i++) {
+        Mesh* p = gPendientes[i];
+        if (p == m || (r && UsuarioVivo(p) && p->malla == r)) pub.push_back(p);
+    }
+    for (size_t i = 0; i < pub.size(); i++) PublicarPendiente(pub[i]);
+}
+struct PendientesHookReg {
+    PendientesHookReg() { W3dMallaAntesDeVincularHook = W3dMallasPublicarPendientesDe; }
+};
+static PendientesHookReg gPendientesHookReg;
 
 static Mesh* ContextoDeEdicion() {
     if (!ObjActivo || ObjActivo->getType() != ObjectType::mesh) return NULL;
@@ -620,6 +665,7 @@ static std::string FirmaEdicion(const Mesh* m) {
 // editar la malla de un objeto edita el recurso, y asi ningun otro usuario lo pisa despues.
 static void SoltarVista(Mesh* v, const std::string& firma) {
     if (!v || !v->malla || v == gEnEdicion || v == (Mesh*)g_editMesh) return;
+    if (EsPendiente(v)) return;   // publicacion diferida: se queda con lo suyo hasta que alguien pida el recurso
     if (!v->edicionPendiente.empty()) return;   // ya estaba pendiente
     const bool igual = !firma.empty() && FirmaEdicion(v) == firma && W3dMallaExtrasComoRecurso(v);
     if (!igual) {
@@ -636,11 +682,26 @@ void W3dMallasTickEditor() {
     W3dMallasAsegurarRecursos();
     Mesh* ctx = ContextoDeEdicion();
     Mesh* act = ActivaConRecurso();
-    // 1) SALIR DE EDICION: la malla que sale se publica en su recurso (la ven todos)
+    // (las pendientes que se destruyeron salen de la lista sin tocarlas; la que dejo de ser la UNICA usuaria de su
+    //  recurso -le aparecio otra instancia por un camino que no paso por el hook- se publica ya: la otra la tiene que ver)
+    if (!gPendientes.empty()) {
+        std::vector<Mesh*> compartidas;
+        for (size_t i = 0; i < gPendientes.size(); ) {
+            if (!UsuarioVivo(gPendientes[i])) { gPendientes.erase(gPendientes.begin() + (long)i); continue; }
+            if (!PuedeDiferir(gPendientes[i])) compartidas.push_back(gPendientes[i]);
+            i++;
+        }
+        for (size_t i = 0; i < compartidas.size(); i++) PublicarPendiente(compartidas[i]);
+    }
+    // 1) SALIR DE EDICION: la malla que sale se publica en su recurso (la ven todos). Si es la UNICA usuaria,
+    //    la publicacion se difiere (ver gPendientes): sale al instante y conserva su jaula
     if (gEnEdicion != ctx && gEnEdicion) {
         Mesh* sale = gEnEdicion;
         gEnEdicion = NULL;
-        if (UsuarioVivo(sale)) W3dMallaPublicar(sale);
+        if (UsuarioVivo(sale)) {
+            if (PuedeDiferir(sale)) { if (!EsPendiente(sale)) gPendientes.push_back(sale); }
+            else W3dMallaPublicar(sale);
+        }
     }
     // 2) LA ACTIVA QUE SE MIRABA dejo de serlo: se suelta (publicando antes lo que tenga). ANTES
     //    de entrar a editar otra: la que entra re-apunta a lo publicado y lo ve
@@ -654,6 +715,7 @@ void W3dMallasTickEditor() {
     //    (copia): ninguna operacion de edicion puede escribir la geometria de los demas usuarios
     if (gEnEdicion != ctx && ctx) {
         gEnEdicion = ctx;
+        QuitarPendiente(ctx);   // vuelve a edicion con lo suyo (arrays y jaula): nada que materializar ni copiar
         if (!ctx->edicionPendiente.empty()) W3dMallaBinMaterializarEdicion(ctx);
         ctx->DesinstanciarDatos(W3DMD_TODO, true);
     }
@@ -664,13 +726,20 @@ void W3dMallasTickEditor() {
     for (size_t i = 0; i < ed.size(); i++) {
         Mesh* m = ed[i];
         if (!m || m == gEnEdicion || !m->malla) continue;   // la de edicion se publica al salir
+        if (EsPendiente(m)) continue;                       // la diferida sigue esperando a que pidan el recurso
         W3dMallaPublicar(m);
     }
     // 5) LA ACTIVA (y SOLO ella) necesita su edicion: sus listas en Properties (UV maps, capas de
     //    color) y el editor UV. Lo demas seleccionado se MIRA con la topologia compartida del
     //    recurso (contorno, snap, seleccion por caja): materializar a todo lo seleccionado no se
     //    soltaba nunca (Select All sobre mil arboles = +90 MB para siempre).
-    if (act && act != gEnEdicion && act != gActivaVista) {
+    // (las PENDIENTES que dejaron de ser la activa sueltan la jaula: memoria del N95. Sus arrays ya tienen todo lo
+    //  editado -RefrescarRender empuja la jaula a vertex[] en cada operacion- y la siguen dibujando)
+    for (size_t i = 0; i < gPendientes.size(); i++) {
+        Mesh* p = gPendientes[i];
+        if (p != act && p != (Mesh*)g_editMesh && p->edit) p->InvalidarEdit();
+    }
+    if (act && act != gEnEdicion && act != gActivaVista && !EsPendiente(act)) {
         if (!act->edicionPendiente.empty()) {
             if (W3dMallaBinMaterializarEdicion(act)) { gActivaVista = act; gFirmaVista = FirmaEdicion(act); }
         } else if (EdicionEnMemoria(act)) {
@@ -682,6 +751,8 @@ void W3dMallasTickEditor() {
 }
 
 void W3dMallasSincronizar() {
+    // las de publicacion diferida: lo que se ve es lo que se guarda
+    { std::vector<Mesh*> pend(gPendientes); for (size_t i = 0; i < pend.size(); i++) PublicarPendiente(pend[i]); }
     if (gEnEdicion && UsuarioVivo(gEnEdicion) && gEnEdicion->malla) {
         // publicar SIN salir de edicion: la malla se queda con lo suyo (su jaula no se toca)
         Mesh* m = gEnEdicion;

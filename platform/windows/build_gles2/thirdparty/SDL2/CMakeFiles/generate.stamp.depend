@@ -1,0 +1,39 @@
+# CMake generation dependency list for this directory.
+C:/Program Files/CMake/share/cmake-4.2/Modules/CMakeCheckCompilerFlagCommonPatterns.cmake
+C:/Program Files/CMake/share/cmake-4.2/Modules/CMakeDependentOption.cmake
+C:/Program Files/CMake/share/cmake-4.2/Modules/CMakeParseArguments.cmake
+C:/Program Files/CMake/share/cmake-4.2/Modules/CMakePushCheckState.cmake
+C:/Program Files/CMake/share/cmake-4.2/Modules/CheckCCompilerFlag.cmake
+C:/Program Files/CMake/share/cmake-4.2/Modules/CheckCSourceCompiles.cmake
+C:/Program Files/CMake/share/cmake-4.2/Modules/CheckCSourceRuns.cmake
+C:/Program Files/CMake/share/cmake-4.2/Modules/CheckCXXCompilerFlag.cmake
+C:/Program Files/CMake/share/cmake-4.2/Modules/CheckCXXSourceCompiles.cmake
+C:/Program Files/CMake/share/cmake-4.2/Modules/CheckIncludeFile.cmake
+C:/Program Files/CMake/share/cmake-4.2/Modules/CheckIncludeFiles.cmake
+C:/Program Files/CMake/share/cmake-4.2/Modules/CheckLanguage.cmake
+C:/Program Files/CMake/share/cmake-4.2/Modules/CheckLibraryExists.cmake
+C:/Program Files/CMake/share/cmake-4.2/Modules/CheckSourceCompiles.cmake
+C:/Program Files/CMake/share/cmake-4.2/Modules/CheckStructHasMember.cmake
+C:/Program Files/CMake/share/cmake-4.2/Modules/CheckSymbolExists.cmake
+C:/Program Files/CMake/share/cmake-4.2/Modules/FindGit.cmake
+C:/Program Files/CMake/share/cmake-4.2/Modules/FindPackageHandleStandardArgs.cmake
+C:/Program Files/CMake/share/cmake-4.2/Modules/FindPackageMessage.cmake
+C:/Program Files/CMake/share/cmake-4.2/Modules/FindPkgConfig.cmake
+C:/Program Files/CMake/share/cmake-4.2/Modules/GNUInstallDirs.cmake
+C:/Program Files/CMake/share/cmake-4.2/Modules/Internal/CheckCompilerFlag.cmake
+C:/Program Files/CMake/share/cmake-4.2/Modules/Internal/CheckFlagCommonConfig.cmake
+C:/Program Files/CMake/share/cmake-4.2/Modules/Internal/CheckSourceCompiles.cmake
+C:/Program Files/CMake/share/cmake-4.2/Modules/Internal/CheckSourceRuns.cmake
+C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/SDL_config.h.intermediate
+C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/CMakeLists.txt
+C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/SDL2.spec.in
+C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/cmake/CheckCPUArchitecture.cmake
+C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/cmake/macros.cmake
+C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/cmake/sdlchecks.cmake
+C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/cmake/sdlfind.cmake
+C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/cmake/sdlplatform.cmake
+C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/cmake_uninstall.cmake.in
+C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_config.h.cmake
+C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/include/SDL_revision.h.cmake
+C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/sdl2-config.in
+C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/sdl2.pc.in

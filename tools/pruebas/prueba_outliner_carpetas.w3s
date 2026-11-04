@@ -127,6 +127,7 @@ recurso materiales Piel existe 1
 # ---- F2) lo mismo SIN MOUSE (N95): la barra abre el menu Objeto, OK elige, el T9 escribe ----
 outclick Piel
 outbarra soft menu vista
+outbarra der menu opciones
 outbarra der menu objeto
 outbarra abajo
 outbarra abajo

@@ -53,7 +53,6 @@
 //    prefabvivos <n>                                 cuantas instancias hay en la raiz activa (todo el arbol)
 //    prefabmundo <instancia> <ruta> <eje x|y|z> <menor|mayor> <valor>   posicion de MUNDO de un generado
 //    prefabdef <prefab> [memoria 0|1]                su definicion (de la memoria del editor o de su entrada)
-//    simcache 0|1                                    el cache del rewind del Play (para medir el heap sin el)
 //    juegoprefabsmin <carpeta>
 //        prefabenemigo + 3 instancias en la escena (la del medio con el override vida=25) + un
 //        "Director" (director.lua) que en el Play instancia y destruye enemigos por lua (100 ciclos
@@ -1148,13 +1147,6 @@ bool W3dPruebasPrefabsCmd(const std::string& cmd, std::istringstream& ss, std::s
     if (cmd == "prefabmundo")         return CmdPrefabMundo(ss, err);
     if (cmd == "prefabdef")           return CmdPrefabDef(ss, err);
     if (cmd == "prefabsel")           return CmdPrefabSel(ss, err);
-    if (cmd == "simcache") {   // simcache 0|1: el cache del rewind del Play (apagado, el heap no crece por tick)
-        extern bool gSimCacheOn;
-        int v = 1; ss >> v;
-        gSimCacheOn = (v != 0);
-        printf("      [simcache] %s\n", gSimCacheOn ? "prendido" : "apagado");
-        return true;
-    }
     if (cmd == "prefabreparent")      return CmdPrefabReparent(ss, err);
     if (cmd == "prefabjer")           return CmdPrefabJer(ss, err);
     if (cmd == "juegoprefabsmin")     return CmdJuegoPrefabsMin(ss, err);

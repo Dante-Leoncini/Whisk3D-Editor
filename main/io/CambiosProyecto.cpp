@@ -54,10 +54,12 @@ static std::string FirmaMaterial(const Material* m) {
     Col(s, m->diffuse); Col(s, m->specular); Col(s, m->emission); Col(s, m->ambient);
     Num(s, m->shininess); Num(s, m->interpolacion); Num(s, m->reflectMode); Num(s, m->rtRugosidad); Num(s, m->rtMetalico);
     Num(s, m->depth_bias); Num(s, m->sesgo_metros); Num(s, m->orden_pasada); Num(s, m->mezcla); Num(s, m->grosorLinea);
-    const bool bs[14] = { m->textureOn, m->filtrado, m->transparent, m->vertexColor, m->lighting, m->repeat, m->uv8bit,
-                          m->culling, m->depth_test, m->fondo, m->depth_write, m->chrome, m->normalMap, m->lineas };
-    for (int k = 0; k < 14; k++) s += bs[k] ? '1' : '0';
+    const bool bs[15] = { m->textureOn, m->filtrado, m->transparent, m->vertexColor, m->lighting, m->repeat, m->uv8bit,
+                          m->culling, m->depth_test, m->fondo, m->depth_write, m->chrome, m->normalMap, m->lineas, m->porPixel };
+    for (int k = 0; k < 15; k++) s += bs[k] ? '1' : '0';
     s += RutaBase(m) + "\x01" + Ruta(m->normalTexture) + "\x01" + Ruta(m->texturaB); Num(s, m->mezclaB); Num(s, m->toon); Num(s, m->contorno);
+    for (int k = 0; k < W3D_MAPAS; k++) { s += "\x01" + Ruta(m->mapaTex[k]); Num(s, (float)m->uvMapa[k]); Num(s, m->mapaConTextura[k] ? 1.0f : 0.0f); }
+    Num(s, m->ior); Num(s, m->transmision); s += std::string("\x01") + m->shaderArchivo + (m->shaderOn ? "1" : "0");
     for (size_t c = 0; c < m->capas.size(); c++) { s += "\x02" + Ruta(m->capas[c].tex); Num(s, m->capas[c].blend); Num(s, m->capas[c].uvMapa); s += m->capas[c].on ? '1' : '0'; }
     return s;
 }
@@ -195,10 +197,10 @@ bool W3dCambiosRecursoSucio(int tipo, const std::string& id) {
             Texture* t = W3dTexturaCargadaDe(id);
             return t && TexEditSinGuardar(t);
         }
-        case W3D_VISTA_SONIDOS: case W3D_VISTA_SCRIPTS: case W3D_VISTA_FUENTES: case W3D_VISTA_VIDEOS:
+        case W3D_VISTA_SONIDOS: case W3D_VISTA_SCRIPTS: case W3D_VISTA_FUENTES: case W3D_VISTA_VIDEOS: case W3D_VISTA_SHADERS:
             if (!gClaves.count(k)) return true;
             if (W3dContenedorEntradaEditada(id)) return true;
-            return tipo == W3D_VISTA_SCRIPTS && ScriptSucioEnIDE(id);
+            return (tipo == W3D_VISTA_SCRIPTS || tipo == W3D_VISTA_SHADERS) && ScriptSucioEnIDE(id);
         case W3D_VISTA_ANIMACIONES: {
             if (!gClaves.count(k)) return true;
             const size_t barra = id.find('/');
@@ -329,6 +331,12 @@ extern void CambiosPopupAbrir(int accion);   // ui/ViewPorts/PopUp/CambiosPopup.
 bool W3dCambiosCartelAbierto() { return gCartel; }
 
 bool W3dCambiosPreguntar(int accion, const std::string& ruta) {
+#ifdef W3D_SYMBIAN
+    // en el telefono NO se pregunta (pedido del dueno: "en symbian se cierra y punto"): salir, abrir otro proyecto o
+    // empezar uno nuevo lo hacen directo. El cartel queda para PC, Android y el resto.
+    (void)accion; (void)ruta;
+    return false;
+#endif
     if (g_w3dCambiosSinCartel) return false;
     if (!W3dCambiosHay()) return false;
     gCartel = true;

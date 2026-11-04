@@ -40,3 +40,12 @@ Mostra e modifica l'animazione: foglio dei keyframe (dope sheet) o editor delle 
 | Smart Euler | Elimina i giri di troppo nelle rotazioni selezionate. | Menu Key |
 | Nascondere una curva | L'occhio di ogni riga la nasconde. | Clic sull'occhio |
 | Valori esatti | Frame, valore e maniglie del keyframe scelto. | Properties → Animation → Keyframe |
+
+## Suoni
+
+| Funzione | Descrizione | Scorciatoia |
+|---|---|---|
+| Striscia del suono | Ogni oggetto Sound selezionato ha la sua striscia: dove inizia e quanto dura, in **secondi** (cambiare gli FPS non la sposta). Con il loop si ripete fino alla fine. | — |
+| Spostare | Trascinare la striscia, o <kbd>G</kbd> senza keyframe scelti (sposta tutti i suoni selezionati). <kbd>Ctrl</kbd> aggancia ai frame. | Trascinare / <kbd>G</kbd> |
+| Tagliare | Afferrare un estremo della striscia. | Trascinare un estremo |
+| Forma d'onda / Linea del volume | Menu View: la forma d'onda e la curva del volume dentro la striscia (la striscia occupa tre righe). Senza, è solo una striscia. | Menu View |

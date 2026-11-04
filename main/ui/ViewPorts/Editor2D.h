@@ -123,13 +123,11 @@ class Editor2D : public ViewportBase, public WithBorder {
         void XformCancelar() W3D_OVERRIDE;
         void XformToggleEje(int eje) W3D_OVERRIDE;  // teclas X/Y y botones de la toolbar
         std::string XformTextoBarra() W3D_OVERRIDE; // texto de la barra de info (px)
-#ifndef W3D_SYMBIAN
         void event_key_down(int tecla, bool repeticion) W3D_OVERRIDE; // flechas = paneo
         void event_mouse_wheel(float dy, int mx, int my) W3D_OVERRIDE;
         // IMPRESCINDIBLE: resetear ViewPortClickDown al soltar (sino viewPortActive se congela
         // y el borde verde/resize dejan de andar; mismo gotcha documentado en UVEditor).
         void mouse_button_up(int boton) W3D_OVERRIDE;
-#endif
         // toolbar inferior compartida (ToolbarBase): Mover/Rotar/Escalar de elementos (MRU).
         // Oculta en vista de juego y durante el Play (el juego se mira limpio, como el 3D).
         bool ToolbarVisible() const W3D_OVERRIDE;

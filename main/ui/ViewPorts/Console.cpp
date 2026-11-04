@@ -1,4 +1,5 @@
 #include "ViewPorts/Console.h"
+#include "app/W3dTactilEditor.h"   // W3D_SOLO_POR_CONTROLES (Symbian: el soltar de PC solo con el dedo o el mouse)
 #include "w3dGraphics.h"                 // w3dEngine (abstraccion grafica)
 #include "WhiskUI/draw/glesdraw.h"       // W3dPantallaAlto
 #include "WhiskUI/theme/colores.h"       // ListaColores / ColorID / SetColorID
@@ -182,20 +183,18 @@ void Console::event_mouse_motion(int mx, int my) {
     }
 }
 
-#ifndef W3D_SYMBIAN
 // IMPRESCINDIBLE (como en todos los viewports): soltar libera ViewPortClickDown.
 // Sin esto, cualquier click sobre la consola dejaba el foco por hover CLAVADO aca
 // (las teclas seguian viniendo a la consola aunque muevas el mouse a otro viewport).
 void Console::mouse_button_up(int boton) {
+    W3D_SOLO_POR_CONTROLES();
     ViewPortClickDown = false;
     if (boton == W3dMB_IZQ) {
         mouseOverScrollYpress = false;
         mouseOverScrollXpress = false;
     }
 }
-#endif
 
-#ifndef W3D_SYMBIAN
 void Console::event_mouse_wheel(float dy, int mx, int my) {
     if (BarScrollHorizontal(mx, my, (int)(dy * 40))) return; // sobre la barra superior -> scroll de la barra
     // rueda = scroll vertical (arriba = mirar hacia atras en el historial);
@@ -206,7 +205,6 @@ void Console::event_mouse_wheel(float dy, int mx, int my) {
     else               ScrollByTouch(0, paso);
     g_redraw = true;
 }
-#endif
 
 // TOUCH: arrastrar 1 dedo sobre el contenido = scroll (v/h), como el Outliner
 bool Console::event_finger_scroll(int px, int py, int dx, int dy) {

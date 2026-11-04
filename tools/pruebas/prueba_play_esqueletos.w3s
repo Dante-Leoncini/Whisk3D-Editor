@@ -10,17 +10,15 @@
 #  la transicion (animTransicion) y las capas del mix de ESCENAS (escenaCapa).
 #  El clip activo y las capas se GUARDAN en el .w3d: si el Stop no los repone,
 #  el armature queda con el clip que eligio el script y el proximo guardado lo
-#  escribe en el archivo. Y si el cache del timeline no los guarda por tick, el
-#  viaje en el tiempo repone las posiciones pero no el cabezal de los huesos.
+#  escribe en el archivo.
 #
 #    1. dos personajes (personajesmin) y un Director cuyo inicio() cambia todo
 #       eso (personajesdirector); guardado y abierto;
 #    2. Play: el estado cambia y el reloj avanza (a 24 fps del clip, dt 1/30:
 #       0.8 frames por tick, 1.6 con velocidad 2); el clip sin loop termina;
-#    3. simira / simpaso: cada tick vuelve con SU clip, cabezal y transicion;
-#    4. Stop: todo como lo dejo el usuario; guardar y abrir lo confirma, y un
+#    3. Stop: todo como lo dejo el usuario; guardar y abrir lo confirma, y un
 #       segundo Play arranca igual que el primero;
-#    5. el Mix de escenas del EDITOR mezcla al Paseante desde SU base: la que el
+#    4. el Mix de escenas del EDITOR mezcla al Paseante desde SU base: la que el
 #       mix anoto jugando (con el Paseante subido a y=50) no sobrevive al Stop, y
 #       abrir otro proyecto con el Mix aplicado olvida las bases (apuntaban a
 #       objetos que se borran: con ASan, escribirles encima es un error).
@@ -46,16 +44,7 @@ simplay 15
 esqjuego Personaje clip Quieto frame 29 termino 1
 esqjuego Personaje.001 frame 16 trans 0
 
-# --- 3) el viaje en el tiempo: el tick 5 y el 6, con su cabezal y su transicion -
-simira 5
-esqjuego Personaje clip Quieto frame 8 vel 2 loop 0 termino 0
-esqjuego Personaje.001 frame 4 capas 1 trans 1
-esqjuego escenas capas 1
-simpaso 1
-esqjuego Personaje frame 9.6 termino 0
-esqjuego Personaje.001 frame 4.8
-
-# --- 4) Stop: como lo dejo el usuario ------------------------------------------
+# --- 3) Stop: como lo dejo el usuario ------------------------------------------
 simstop
 esqjuego Personaje clip Saludo frame 0 vel 1 loop 1 termino 0 capas 0 trans 0
 esqjuego Personaje.001 clip Quieto frame 0 vel 1 loop 1 capas 0 trans 0
@@ -76,7 +65,7 @@ simstop
 esqjuego Personaje clip Saludo frame 0 vel 1 loop 1 termino 0 capas 0 trans 0
 esqjuego escenas capas 0
 
-# --- 5) el Mix de escenas del editor despues del Stop, y abrir otro proyecto -----
+# --- 4) el Mix de escenas del editor despues del Stop, y abrir otro proyecto -----
 mixescena mezclar Paseo 15 Paseante
 mixescena soltar Paseante -20 0 -8
 mixescena mezclar Paseo 15 Paseante

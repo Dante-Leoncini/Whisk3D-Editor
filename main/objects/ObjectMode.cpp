@@ -1,4 +1,5 @@
 #include "objects/Rutina.h"   // duplicar una rutina
+#include "objects/Sonido.h"   // duplicar un sonido + su canal animable (AnimSonido)
 #include "ObjectMode.h"
 #include "edit/Proporcional.h" // proportional editing: peso de los objetos no seleccionados
 #include "w3dlog.h"    // w3dLogfW: los renames automaticos quedan registrados
@@ -278,10 +279,16 @@ static std::vector<AnimProperty>& CurvasActivas(Object* o){
 // valor ACTUAL de un canal (prop, comp) del objeto: lo que se ve ahora (para keyar)
 static float CanalValorActual(Object* o, int prop, int comp){
 	if (prop == AnimPaso)      return o->getType() == ObjectType::rutina ? W3dRutinaPasoValor((Rutina*)o, comp) : 0.0f;
+	if (prop == AnimLuzIntens) return o->getType() == ObjectType::light ? ((Light*)o)->intensidad : 1.0f;
+	if (prop == AnimSonido){   // SONIDO: volumen / tono / reverb
+		if (o->getType() != ObjectType::sonido) return comp == AnimY ? 1.0f : 0.0f;
+		Sonido* s = (Sonido*)o; return comp == AnimX ? s->volumen : comp == AnimY ? s->tono : s->reverb;
+	}
 	if (prop == AnimVisible)   return o->visible      ? 1.0f : 0.0f;
 	if (prop == AnimRender)    return o->renderizable ? 1.0f : 0.0f;
 	// CAMARA: fov + distancias de dibujado (near/far)
 	if (prop == AnimFov)  return (o->getType()==ObjectType::camera) ? ((Camera*)o)->fov : 45.0f;
+	if (prop == AnimCamFoco) return (o->getType()==ObjectType::camera) ? ((Camera*)o)->focoDist : 5.0f;
 	if (prop == AnimClip){ if (o->getType()==ObjectType::camera){ Camera* c=(Camera*)o; return (comp==AnimX)? c->nearClip : c->farClip; } return 0.0f; }
 	// LUZ: colores (diffuse/ambient/specular) + numericos (atenuacion/spot/GL/direccional)
 	if (prop==AnimColor||prop==AnimAmbient||prop==AnimSpecular||prop==AnimAtten||prop==AnimSpot||prop==AnimLightMisc){
@@ -613,7 +620,10 @@ void W3dAplicarCurvasEnFrame(Object* o, std::vector<AnimProperty>& props, int fr
 		else if (P==AnimClip)     hayClip=true;else if (P==AnimColor)     hayCol=true;
 		else if (P==AnimAmbient)  hayAmb=true; else if (P==AnimSpecular)  haySpec=true;
 		else if (P==AnimAtten)    hayAtt=true; else if (P==AnimSpot)      haySpot=true;
-		else if (P==AnimLightMisc)hayMisc=true; }
+		else if (P==AnimLightMisc)hayMisc=true;
+		else if (P==AnimSonido)   hayCol=true;
+		else if (P==AnimLuzIntens)hayCol=true;
+		else if (P==AnimCamFoco)  hayFov=true; }   // (el foco de la camara: lo aplica el bloque de la camara)   // (la intensidad la aplica el bloque de la luz, abajo)   // (un sonido animado tambien lo posa el playhead: su volumen)
 	// alguna curva de verdad va a escribir un canal -> el playhead POSA a este objeto.
 	// Lo lee ReposoAnimObjetos al guardar, para devolverlo al cuadro base y no hornear el
 	// scrub. Si nadie lo posa, el guardado NO lo toca (lo que el usuario movio a mano manda).
@@ -628,10 +638,12 @@ void W3dAplicarCurvasEnFrame(Object* o, std::vector<AnimProperty>& props, int fr
 	// CAMARA: fov + distancias de dibujado (near/far). La vista al mirar por la camara sigue las curvas.
 	if (o->getType()==ObjectType::camera){ Camera* c=(Camera*)o;
 		if (hayFov)  c->fov      = PropertyDeLista(props, AnimFov, AnimX).Eval(frame, c->fov);
+		{ const AnimProperty& cf = PropertyDeLista(props, AnimCamFoco, AnimX); if (!cf.keyframes.empty()) c->focoDist = cf.Eval(frame, c->focoDist); }
 		if (hayClip){ c->nearClip = PropertyDeLista(props, AnimClip, AnimX).Eval(frame, c->nearClip);
 		              c->farClip  = PropertyDeLista(props, AnimClip, AnimY).Eval(frame, c->farClip); } }
 	// LUZ: colores (diffuse/ambient/specular) + numericos (atenuacion/spot/GL/direccional)
 	if (o->getType()==ObjectType::light){ Light* l=(Light*)o;
+		{ const AnimProperty& ci = PropertyDeLista(props,AnimLuzIntens,AnimX); if (!ci.keyframes.empty()) l->intensidad = ci.Eval(frame,l->intensidad); }
 		if (hayCol) { Vector3 d(l->diffuse[0],l->diffuse[1],l->diffuse[2]); Vector3 v=EvalPropVec(props,AnimColor,frame,d);    l->diffuse[0]=v.x; l->diffuse[1]=v.y; l->diffuse[2]=v.z; }
 		if (hayAmb) { Vector3 d(l->ambient[0],l->ambient[1],l->ambient[2]); Vector3 v=EvalPropVec(props,AnimAmbient,frame,d);  l->ambient[0]=v.x; l->ambient[1]=v.y; l->ambient[2]=v.z; }
 		if (haySpec){ Vector3 d(l->specular[0],l->specular[1],l->specular[2]); Vector3 v=EvalPropVec(props,AnimSpecular,frame,d); l->specular[0]=v.x; l->specular[1]=v.y; l->specular[2]=v.z; }
@@ -933,6 +945,7 @@ void SetPosicion(){
 #include "Culling.h" // W3dDuplicarUno: copiar soloCamaraActiva
 #include "Niebla.h"  // W3dDuplicarUno: copiar la niebla
 #include "Recorte.h" // idem LimpiarZ / Recorte
+#include "PostprocesoObj.h" // idem Postproceso
 #include "Hitbox.h"  // W3dDuplicarUno: copiar tamano/centro/etiqueta/filtro del hitbox
 #include "InstanciaPrefab.h" // W3dDuplicarUno: otra instancia del mismo prefab (con sus overrides)
 #include "ProxyW3d.h"        // W3dDuplicarUno: otro proxy del mismo elemento de la libreria
@@ -1090,7 +1103,7 @@ Object* W3dDuplicarUno(Object* src, bool vinculado) {
             // duplicado volvia a los defaults: direccional/atenuacion/spot)
             l->direccional = sl->direccional;
             l->attConstant = sl->attConstant; l->attLinear = sl->attLinear; l->attQuadratic = sl->attQuadratic;
-            l->spotCutoff = sl->spotCutoff; l->spotExponent = sl->spotExponent;
+            l->spotCutoff = sl->spotCutoff; l->spotExponent = sl->spotExponent; l->intensidad = sl->intensidad; l->distancia = sl->distancia;
         }
         nuevo = l;
     }
@@ -1100,6 +1113,7 @@ Object* W3dDuplicarUno(Object* src, bool vinculado) {
         // el LENTE tambien se duplica (antes fov/orto/near/far volvian al default)
         d->fov = sc->fov; d->orthographic = sc->orthographic;
         d->nearClip = sc->nearClip; d->farClip = sc->farClip;
+        d->dof = sc->dof; d->fStop = sc->fStop; d->focoDist = sc->focoDist; d->focoObjeto = sc->focoObjeto;
         nuevo = d;
     }
     else if (src->getType() == ObjectType::empty) {
@@ -1111,12 +1125,22 @@ Object* W3dDuplicarUno(Object* src, bool vinculado) {
         d->soloCamaraActiva = ((LOD*)src)->soloCamaraActiva;
         nuevo = d;
     }
+    else if (src->getType() == ObjectType::sonido) {
+        Sonido* d = new Sonido(src->Parent, src->pos);
+        d->CopiarDe((Sonido*)src);
+        nuevo = d;
+    }
     else if (src->getType() == ObjectType::niebla) {
         Niebla* s = (Niebla*)src;
         Niebla* d = new Niebla(src->Parent, src->pos);
         d->activa = s->activa; d->modo = s->modo; d->inicio = s->inicio; d->fin = s->fin;
         d->densidad = s->densidad; d->fondo = s->fondo;
         for (int k = 0; k < 4; k++) d->color[k] = s->color[k];
+        nuevo = d;
+    }
+    else if (src->getType() == ObjectType::postproceso) {
+        Postproceso* d = new Postproceso(src->Parent, src->pos);
+        d->opc = ((Postproceso*)src)->opc;
         nuevo = d;
     }
     else if (src->getType() == ObjectType::limpiarz) {
@@ -1610,13 +1634,12 @@ void JoinObjetos(){
 //   Scale    -> scale queda 1 (una escala 1.34 pasa a 1; la malla mantiene su tamaño)
 // Matematica: v_new = inv(M_reset) * M_actual * v, con M = T*R*S LOCAL del objeto -> M_reset*v_new = M_actual*v
 // (la malla no se mueve en el espacio del padre). Aplica a TODAS las mallas seleccionadas. Undo atomico.
-// libera el cache de vertex-animation + fuerza el re-skin de TODAS las mallas de la escena que deforman con 'a'. Tras
-// hornear el transform del objeto en los huesos, el cache tiene deformaciones VIEJAS y su firma NO incluye la rest ->
-// hay que liberarlo a mano, sino SkinearMesh reproduce el frame stale en vez de re-skinnear. (Lo usa tambien el undo.)
+// fuerza el re-skin de TODAS las mallas de la escena que deforman con 'a': tras hornear el transform del objeto en los
+// huesos, el skin de cada malla quedo calculado con la rest VIEJA. (Lo usa tambien el undo.)
 void InvalidarSkinDeArmature(Armature* a){
     if (!a || !SceneCollection) return;
     struct L { static void rec(Object* o, Armature* a){ if(!o) return;
-        if (o->getType()==ObjectType::mesh){ Mesh* m=(Mesh*)o; if (m->skinArmature==a){ m->LiberarSkinCache(); m->lastSkinFrame=-999999; } }
+        if (o->getType()==ObjectType::mesh){ Mesh* m=(Mesh*)o; if (m->skinArmature==a){ m->lastSkinFrame=-999999; } }
         for (size_t i=0;i<o->Childrens.size();i++) rec(o->Childrens[i], a); } };
     L::rec(SceneCollection, a);
     a->lastPoseFrame=-999999; a->lastPoseAnim=-999; a->poseDirty=false;
@@ -1666,7 +1689,7 @@ void AplicarTransform(int what){
         Matrix4 B = invMp * M;                                 // se hornea en espacio nodo (world_FK'=B*world_FK)
         HornearTransformEnHuesos(a, B);
         a->pos = pos2; a->scale = scl2; a->SetRot(rot2);
-        InvalidarSkinDeArmature(a); // libera el cache + re-skinnea las mallas hijas a la nueva rest
+        InvalidarSkinDeArmature(a); // re-skinnea las mallas hijas a la nueva rest
     }
     UndoApplyConfirmar();
     UndoGrupoFinSecuencial();   // [hacer unica, hornear]: Ctrl+Z al reves, Ctrl+Y al derecho
@@ -2166,6 +2189,30 @@ void SetScale(int dx, int dy, float factor){
 	AplicarPivotATransform(); // aleja/acerca las posiciones del pivote segun el factor
 	SnapAjustarObjScale(); // imanta: la base toca el target radialmente (si snap ON)
 	{ extern bool g_objetosMovidos; g_objetosMovidos = true; } // Mirror con target depende de la posicion/escala
+}
+
+void SetScaleFactor(float f){
+	for (size_t o = 0; o < estadoObjetos.size(); o++) {
+		Object& obj = *estadoObjetos[o].obj;
+		const Vector3 s0 = estadoObjetos[o].scale;
+		const float k = 1.0f + (f - 1.0f) * estadoObjetos[o].peso; // proportional editing: parte del factor
+		bool ex = true, ey = true, ez = true;   // (los ejes del MODELO: X->scale.x, Y->scale.z, Z->scale.y)
+		switch (axisSelect) {
+			case X:      ey = ez = false; break;
+			case Y:      ex = ey = false; break;
+			case Z:      ex = ez = false; break;
+			case PlaneX: ex = false; break;
+			case PlaneY: ez = false; break;
+			case PlaneZ: ey = false; break;
+			default: break;
+		}
+		obj.scale.x = ex ? s0.x * k : s0.x;
+		obj.scale.y = ey ? s0.y * k : s0.y;
+		obj.scale.z = ez ? s0.z * k : s0.z;
+	}
+	AplicarPivotATransform();
+	SnapAjustarObjScale();
+	{ extern bool g_objetosMovidos; g_objetosMovidos = true; }
 }
 
 void SetEscala(){

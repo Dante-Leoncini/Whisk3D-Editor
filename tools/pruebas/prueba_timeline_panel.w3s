@@ -1,0 +1,16 @@
+# El PANEL izquierdo del timeline (dope sheet) y el BORRADO de curvas / keyframes:
+#  - con el panel angosto el texto ("Object Transforms") se recorta ANTES de la columna de ojos, no debajo
+#  - hay barra horizontal y el boton del medio sobre el panel lo scrollea (texto y filas) sin panear los frames
+#  - el borde se pinta blanco con el mouse encima, verde arrastrando, y arrastrarlo cambia el ancho
+#  - Backspace (la C del N95) / Supr / X borran la CURVA elegida (fila) o los keyframes elegidos
+#  - un keyframe se agarra con un click cerca, no hace falta caer justo en el rombo
+ventana 1280 720
+add cube
+frame 1
+keychan 0 0
+keychan 0 1
+frame 10
+objmove 1 1 0
+keychan 0 0
+keychan 0 1
+tlpanel

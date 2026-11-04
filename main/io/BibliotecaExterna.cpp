@@ -229,6 +229,7 @@ static bool Leer(LibVinculada& l) {
         else if (e.compare(0, 8, "scripts/") == 0) tipo = W3D_VISTA_SCRIPTS;
         else if (e.compare(0, 8, "fuentes/") == 0) tipo = W3D_VISTA_FUENTES;
         else if (e.compare(0, 7, "videos/") == 0) tipo = W3D_VISTA_VIDEOS;
+        else if (e.compare(0, 8, "shaders/") == 0) tipo = W3D_VISTA_SHADERS;
         if (tipo < 0 || e[e.size() - 1] == '/') continue;
         std::map<std::string, std::string>::iterator c = carpetaDe.find(e);
         Item(l.items, tipo, e, Base(e), c != carpetaDe.end() ? c->second : std::string(), e, -1);

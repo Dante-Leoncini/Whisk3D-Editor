@@ -28,8 +28,15 @@ struct Paleta {
 //  (intercambia ancho y alto) o arrastrando el marco en el Editor 2D:
 //  sirve para probar como se re-anclan los elementos en cada pantalla.
 // =====================================================================
+class UI;
+// lo que hace el que DIBUJA cuando el recorrido del arbol llega a la UI que se muestra (el viewport del editor: la dibuja
+// AHI, en su lugar del outliner). NULL = nadie: la UI se dibuja al final, como siempre
+extern void (*g_uiEnArbol)(UI* u);
 class UI : public Object {
 public:
+    bool enArbol;        // DIBUJARLA EN SU LUGAR DEL OUTLINER (el arbol es el orden de dibujado: la UI, un Limpiar Z y
+                         // un cubo encima; o un Postproceso despues que la afecta). Apagado: al final, encima de todo
+                         // (los proyectos de antes; las UI nuevas nacen con el prendido)
     bool verEn3D;        // ver los elementos 2D DENTRO de la escena 3D (con su profundidad Z).
                          // Apagado por defecto: lo normal es verla como overlay (simula la ventana).
     bool igualQueRender; // true (default): el lienzo es el tamano del render. false: responsive.
@@ -73,6 +80,7 @@ public:
 
     UI(Object* parent = NULL, Vector3 pos = Vector3(0,0,0))
         : Object(parent, "UI", pos) {
+        enArbol = true;
         verEn3D = false;
         igualQueRender = true;
         ancho = 640.0f; alto = 480.0f;
@@ -137,7 +145,9 @@ public:
     }
 
     ObjectType getType() W3D_OVERRIDE { return ObjectType::ui; }
-    void RenderObject() W3D_OVERRIDE {}   // nada en el 3D: vive en el Editor 2D
-    bool DibujaAlgo() W3D_OVERRIDE { return false; }   // (el pase 3D se saltea toda la interfaz)
+    // nada en el 3D (vive en el Editor 2D)... salvo que se dibuje en su lugar del arbol: ahi la dibuja el que esta
+    // dibujando (g_uiEnArbol), como un overlay en ese momento del recorrido
+    void RenderObject() W3D_OVERRIDE { if (enArbol && g_uiEnArbol) g_uiEnArbol(this); }
+    bool DibujaAlgo() W3D_OVERRIDE { return enArbol && g_uiEnArbol; }   // (sino el pase 3D se saltea toda la interfaz)
 };
 #endif

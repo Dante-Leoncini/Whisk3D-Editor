@@ -6,7 +6,7 @@
 |---|---|
 | File / Render（フロッピーディスク） | **File**：Open project、Save、Save As、Save Version、Extract assets。**Render**：出力先、サイズ、追加のレンダーパス、背景、**Ray Tracing**（レイ数、サンプル数、パス数）、Render ImageとRender Animation。**Game**：プラットフォーム（Windows、Symbian、Linux .deb、AppImage、WebGL、Android）、ウィンドウ、画面の向き、アイコン、物理、サウンド、Build game。**Export**：OBJ、glTF、GLB。**Settings**：言語、アンチエイリアス、グラフィックス、スキン、ログ、スケール、**Keyboard Shortcuts…**、Save Changes。 |
 | Object | 位置、回転（オイラー角、クォータニオン、軸と角度）、スケール、名前、表示、レンダリング。オブジェクトのアニメーションとパレット。 |
-| Contextual | 種類によって変わります：メッシュのパーツと**マテリアル**（テクスチャ、ライティング、頂点カラー、透明、反射、ノーマルマップ、ブレンド、深度、テクスチャレイヤー。レイトレーシングではRoughnessとMetallic）、ライト、カメラ、フォグ、パーティクル、物理、ヒットボックス、アーマチュアとボーン、2D要素、プレハブ、ルーチン。 |
+| Contextual | 種類によって変わります：メッシュのパーツと**マテリアル**（テクスチャ、ライティング、頂点カラー、透明、反射、ノーマルマップ、ブレンド、深度、テクスチャレイヤー、**Advanced: custom shader**（[自作シェーダー](shaders.md)を参照）。レイトレーシングではRoughness、Metallic、Transmission、IOR）、ライト、カメラ、フォグ、パーティクル、物理、ヒットボックス、アーマチュアとボーン、2D要素、プレハブ、ルーチン。 |
 | 3D Mesh | 使用しているメッシュ（と、それを共有している数）、UVマップ、カラーレイヤー、頂点グループ、UVグループ。Libraryでリソースを選んでいる場合は、そのデータと場所（.w3dの中か外か）。 |
 | Modifiers | [モディファイアー](modificadores.md)を参照してください。 |
 | Transform | Edit Modeのみ：選択範囲とそのUVの中心を表示し、編集できます。 |

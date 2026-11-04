@@ -54,6 +54,7 @@ The 3D Viewport is where you see and edit the scene. It works in different **mod
 | Material Preview | The default: a neutral light from the view, independent of the scene's lights. |
 | Solid / Wireframe / ZBuffer Preview | Solid gray, only the edges, or the depth. |
 | Normal View / Alpha Preview | The normals in color, or the transparency in black and white. |
+| Motion vectors | How far each pixel moved on screen since the previous frame (red = X, green = Y; lavender = still, olive = background). The same image as the `_vectores` pass of the render. |
 | Wireframe: Only Visible | The wireframe view shows only what is actually drawn. |
 
 ### Overlays

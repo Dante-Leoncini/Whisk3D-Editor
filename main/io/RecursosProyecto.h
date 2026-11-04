@@ -75,6 +75,7 @@ enum W3dVistaRec {
     W3D_VISTA_SCRIPTS,        // archivos .lua de scripts/
     W3D_VISTA_FUENTES,        // archivos de fuentes/ (.ttf, .otf, .w3dfnt)
     W3D_VISTA_VIDEOS,         // archivos de videos/
+    W3D_VISTA_SHADERS,        // archivos .glsl de shaders/ (los shaders escritos de los materiales)
     W3D_VISTAS                // tope
 };
 const char* W3dVistaClave(int vista);                 // "escena", "mallas", "materiales"...
@@ -100,7 +101,10 @@ struct W3dRecursoItem {
     // padre), no se mueve a otra carpeta, "Purge orphans" no lo toca y se BORRA aunque su padre este en uso
     // (con su paso de undo: es editar el contenido del padre, no purgar un recurso).
     std::string padre;
-    W3dRecursoItem() : tipo(0), icono(-1), usuarios(0), soloLectura(false), renombrable(true) {}
+    long bytes;              // cuanto ocupa: cargado, lo que ocupa en memoria (una textura: en la GPU); si no, su archivo
+                             // (-1 = no se sabe / no aplica, un material)
+    bool cargado;            // esta en memoria (false = guardado en el proyecto o en un archivo, sin cargar)
+    W3dRecursoItem() : tipo(0), icono(-1), usuarios(0), soloLectura(false), renombrable(true), bytes(-1), cargado(true) {}
 };
 
 // un DATO de un recurso para Properties: etiqueta y valor, ya en el idioma de la UI
@@ -221,6 +225,11 @@ extern void (*W3dVistaRecGrupoCancelarHook)();
 // (el seguimiento de lo no guardado, CambiosProyecto). 'items' = la biblioteca ya listada (sin eso la lista)
 std::string W3dCarpetasFirma();
 std::string W3dCarpetasFirma(const std::vector<W3dRecursoItem>& items);
+// el ORDEN MANUAL de la biblioteca (arrastrar un recurso entre otros dos): una lista de claves de biblioteca
+// ("mallas:Arbol"). Lo que esta en la lista va primero y en ese orden; el resto despues, por nombre. Se guarda en el
+// .w3d ("orden") y tiene undo (es parte del paso de las carpetas).
+int  W3dBibOrden(const std::string& clave);                     // su lugar (-1 = sin orden manual)
+void W3dBibOrdenFijar(const std::vector<std::string>& hermanas); // estas claves quedan seguidas en este orden
 
 // ---------------------------------------------------------------------------
 //  ACCIONES SOBRE UN ITEM (con su paso de undo cuando corresponde)

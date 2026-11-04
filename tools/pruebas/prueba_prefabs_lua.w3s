@@ -10,8 +10,7 @@
 #  corre y cuenta en compartido; su buscar()/objeto() ven SU cuerpo: scope por instancia); los
 #  destruidos dejan de correr (latidos) y un puntero viejo en lua ya no es un objeto (tipo() = "").
 #  Sin fugas: el heap en pleno juego (10 vivos) es el mismo al ciclo 30 que al 90, y al Stop vuelve
-#  a la escena del usuario (3 instancias, las mismas mallas). Con el cache del rewind prendido, ir y volver
-#  en el tiempo despues de destruir no toca memoria liberada (las fotos se podan).
+#  a la escena del usuario (3 instancias, las mismas mallas).
 #  Despues: destruir() de algo PUESTO en la escena y un instanciar() jugando: el Stop devuelve el
 #  destruido a su lugar y saca el creado.
 #  Al final, la ACEPTACION del diseno: 50 instancias comparten 1 recurso de malla y 1 animset, con
@@ -25,8 +24,6 @@ guardarw3d /tmp/w3d_f7_pl/juegoprefabs.w3d
 abrirw3d /tmp/w3d_f7_pl/juegoprefabs.w3d
 prefabvivos 3
 meminfo recursosmalla 3
-# (sin el cache del rewind: su foto por tick haria crecer el heap y aca se mide lo que pierde instanciar/destruir)
-simcache 0
 simplay 30
 prefabvivos 13
 heapuso
@@ -44,14 +41,9 @@ prefabvivos 3
 prefabinfo Enemigo.001 generados 4 overrides 1
 prefabcompartido Enemigo instancias 3 mallas 1 animsets 1
 meminfo recursosmalla 3
-simcache 1
 
-# --- con el cache del REWIND prendido: las fotos no pueden quedar nombrando lo que destruir() libero ---
-simplay 25
-simira 10
-simpaso -1
-simpaso 1
-simplay 5
+# --- seguir jugando y Stop: lo destruido no queda en las fotos de la partida ---
+simplay 30
 simstop
 prefabvivos 3
 prefabinfo Enemigo.001 generados 4 overrides 1
@@ -91,12 +83,10 @@ prefabclip Enemigo.011 Esqueleto Saludo
 prefabclip Enemigo.012 Esqueleto Saludo
 prefabpose Enemigo.010 Enemigo.011 10 distinta
 prefabpose Enemigo.011 Enemigo.012 10 igual
-simcache 0
 simplay 3
 scriptinfo compartido enemigos 50
 scriptinfo compartido scope_ok 50
 scriptinfo compartido vida_total 500
 simstop
-simcache 1
 prefabvivos 50
 prefabcompartido Enemigo instancias 50 mallas 1 animsets 1

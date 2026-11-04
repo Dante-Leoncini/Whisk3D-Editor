@@ -28,7 +28,8 @@ Solo in Object Mode. Il nuovo oggetto appare nel cursore 3D e resta selezionato.
 |---|---|
 | Mesh | Plane, Cube, Circle, UV Sphere, Cone, Cylinder (con dimensione, raggio, segmenti, shading smussato). Anche Vertex (un punto isolato per iniziare a modellare) e Reference (un piano con un'immagine, per ricalcare). |
 | Empty | Un oggetto senza mesh, per raggruppare o come punto di riferimento. |
-| Camera / Light / Fog | Camera, luce e nebbia della scena. |
+| Camera / Light / Fog | Camera, luce e nebbia della scena. La luce ha un **Tipo**: Punto, Sole (direzionale) o Spot (un cono, disegnato nella vista); Aggiungi offre anche Sole e Spot. **Intensity** la rende più forte (animabile); **Distance** (m) è fin dove arriva una luce puntiforme o uno spot, e la lunghezza del suo cono (0 = senza limite; il ray tracing la spegne dolcemente lì). Con la luce selezionata, uno spot mostra il suo cono e una luce puntiforme una sfera di quella distanza; un sole mostra sempre una linea fino al pavimento, verso dove illumina. |
+| Suono | Un suono posizionato nella scena (icona dell'altoparlante). Suona con la timeline in **secondi**, non in frame; con **Positional (3D)** si sente da dove si trova (più forte quanto più è vicina la camera, dal lato in cui sta); senza, è come una musica. Rilasciare un .wav nella vista 3D ne crea uno lì. |
 | Armature | Un'armatura con un osso, per animare personaggi. |
 | Path | Una curva di due nodi (si modifica come una mesh: <kbd>E</kbd> aggiunge nodi). |
 | Collection | Una cartella per organizzare gli oggetti. |

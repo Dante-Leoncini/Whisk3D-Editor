@@ -157,6 +157,9 @@ void CiclarPlanoTransform(int eje);
 // Lo usa el render para dibujar las guias con la orientacion correcta.
 Vector3 EjeOrientado(Object& obj, int a);
 void SetScale(int dx, int dy, float factor = 0.01f);
+// la escala de los objetos en curso = la de ANTES * f (en los ejes elegidos; proportional editing con su peso). La usa
+// el mouse: f = distancia del puntero al pivote / la de cuando empezo (como Blender: proporcional a lo que se ve)
+void SetScaleFactor(float f);
 void SetEscala();
 void SetTranslacionObjetos(int dx, int dy, float factor = 1.0f);
 void SetTranslacionObjetosMundo(const Vector3& d); // absoluta (mundo) desde el snapshot: la usa el gizmo

@@ -52,7 +52,7 @@ static bool PunterosAlDiaTodo(Rutina* r) {
             if (!p.ref2.empty() && (!p.ptr2 || !W3dObjetoVivo((const Object*)p.ptr2) || ((const Object*)p.ptr2)->name != p.ref2))
                 return false;
             const int rt = W3dPasoRef(p.tipo);
-            if (p.ref.empty() || rt == RefNada || rt == RefFuncion) continue;
+            if (p.ref.empty() || rt == RefNada || rt == RefFuncion || rt == RefShader) continue;
             if (!p.ptr) return false;                                 // (se reintenta: quiza ya existe)
             if (rt == RefTextura) { if (!TexturaViva(p.ptr)) return false; continue; }
             if (rt == RefMalla) {
@@ -289,7 +289,7 @@ static int Profundidad(Rutina* r, std::vector<W3dPaso>& L, std::string& motivo, 
             motivo = buf; return -1;
         }
         const bool cajaEnMemoria = (p.tipo == PasoVisible && p.ref.empty() && p.n[1].p);   // (la caja, 6 numeros de una memoria)
-        if (rt != RefNada && rt != RefFuncion && !p.ptr && !(p.tipo == PasoMatcap && !p.on) && !cajaEnMemoria) {   // (apagar el matcap: sin malla)
+        if (rt != RefNada && rt != RefFuncion && rt != RefShader && !p.ptr && !(p.tipo == PasoMatcap && !p.on) && !cajaEnMemoria) {   // (apagar el matcap: sin malla)
             if (p.ref.empty()) snprintf(buf, sizeof buf, "step %d (%s): nothing chosen", num, W3dPasoEtiqueta(p.tipo));
             else snprintf(buf, sizeof buf, "step %d (%s): '%s' not found", num, W3dPasoEtiqueta(p.tipo), p.ref.c_str());
             motivo = buf; return -1;

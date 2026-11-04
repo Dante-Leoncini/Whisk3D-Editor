@@ -48,11 +48,9 @@ entradatiene /tmp/w3d_f8_rev/nivel/borrado.w3d proyecto.json Tronco 0
 entradatiene /tmp/w3d_f8_rev/nivel/borrado.w3d proyecto.json Sensor 0
 entradatiene /tmp/w3d_f8_rev/nivel/borrado.w3d proyecto.json personajes/Cuerpo 0
 entradatiene /tmp/w3d_f8_rev/nivel/borrado.w3d proyecto.json lib:personajes/ 0
-simcache 0
 simplay 3
 scriptinfo compartido enemigos 1
 simstop
-simcache 1
 # (borrar el PADRE de un proxy, sin el proxy: el proxy sube con lo suyo; borrar los dos: no queda nada)
 prefabadd empty
 objname Grupo
@@ -85,11 +83,9 @@ guardarw3d /tmp/w3d_f8_rev/pf/inst.w3d
 entradatiene /tmp/w3d_f8_rev/pf/inst.w3d proyecto.json Sensor 0
 abrirw3d /tmp/w3d_f8_rev/pf/inst.w3d
 prefabvivos 1
-simcache 0
 simplay 3
 scriptinfo compartido enemigos 1
 simstop
-simcache 1
 
 # --- B) una libreria usada SOLO desde lua viaja con el juego compilado ---
 libjuegomin /tmp/w3d_f8_rev/sololua /tmp/w3d_f8_rev/lib/personajes.w3d proxies 0
@@ -97,12 +93,10 @@ prefabvivos 0
 guardarw3d /tmp/w3d_f8_rev/sololua/sololua.w3d
 entradatiene /tmp/w3d_f8_rev/sololua/sololua.w3d proyecto.json "proxy", 0
 abrirw3d /tmp/w3d_f8_rev/sololua/sololua.w3d
-simcache 0
 simplay 30
 scriptinfo compartido juez OK
 scriptinfo compartido enemigos 5
 simstop
-simcache 1
 compilarjuego 0 0 1
 libruta /tmp/w3d_f8_rev/sololua/platform-build/linux/librerias/personajes/proyecto.json lee 1
 libruta /tmp/w3d_f8_rev/sololua/platform-build/linux/librerias/personajes/scripts/enemigo.lua lee 1

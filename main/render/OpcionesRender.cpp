@@ -54,6 +54,7 @@ RenderType StringToRenderType(const std::string& s){
     if(s == "Alpha")            return RenderType::Alpha;
     if(s == "Wireframe")        return RenderType::Wireframe;
     if(s == "NormalView")       return RenderType::NormalView;
+    if(s == "MotionVectors")    return RenderType::Vectores;
 
     std::cerr << "[StringToRenderType] WARNING: valor desconocido '" << s
               << "' → usando RenderType::Solid" << std::endl;

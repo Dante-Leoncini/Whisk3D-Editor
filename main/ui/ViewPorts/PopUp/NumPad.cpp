@@ -164,15 +164,9 @@ void NumPad::Render(){
         w3dEngine::Color4f(grisUI[0], grisUI[1], grisUI[2], 1.0f);
         keyCard->RenderBorder(false);
         w3dEngine::Translatef((GLfloat)(boxW - gapGS), (GLfloat)((boxH - RenglonHeightGS) / 2), 0);
-        if (f.selectAll){
-            // TODO seleccionado (recien abierto): valor en accent, tipear lo reemplaza
-            w3dEngine::Color4f(accent[0], accent[1], accent[2], 1.0f);
-            RenderBitmapText(f.text, textAlign::right, boxW - gapGS * 2);
-        } else {
-            std::string shown = f.text.substr(0, f.caret) + "|" + f.text.substr(f.caret);
-            w3dEngine::Color4f(blanco[0], blanco[1], blanco[2], 1.0f);
-            RenderBitmapText(shown, textAlign::right, boxW - gapGS * 2);
-        }
+        // TODO seleccionado (recien abierto): fondo atras, tipear lo reemplaza; si no, el cursor que parpadea
+        w3dEngine::Color4f(blanco[0], blanco[1], blanco[2], 1.0f);
+        RenderTextField(f, true, textAlign::right, boxW - gapGS * 2);
         w3dEngine::PopMatrix();
     }
 
@@ -401,10 +395,9 @@ void QwertyPad::Render(){
         w3dEngine::Color4f(grisUI[0], grisUI[1], grisUI[2], 1.0f);
         keyCard->RenderBorder(false);
         TextField& f = *g_textFieldActivo;
-        std::string shown = f.selectAll ? f.text : (f.text.substr(0, f.caret) + "|" + f.text.substr(f.caret));
         w3dEngine::Translatef((GLfloat)gapGS, (GLfloat)((boxH - RenglonHeightGS) / 2), 0);
         w3dEngine::Color4f(blanco[0], blanco[1], blanco[2], 1.0f);
-        RenderBitmapText(shown, textAlign::left, boxW - gapGS * 2);
+        RenderTextField(f, true, textAlign::left, boxW - gapGS * 2);
         w3dEngine::PopMatrix();
     }
 

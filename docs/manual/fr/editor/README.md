@@ -17,6 +17,7 @@ Ce que l'éditeur sait faire, classé par panneau et par mode. Brouillon à reli
 6. [Timeline](linea-de-tiempo.md)
 7. [Outliner](outliner.md)
 8. [Properties](propiedades.md)
+   - [Shaders écrits](shaders.md)
 9. [2D Editor](editor-2d.md)
 10. [Script Editor (IDE)](editor-de-scripts.md)
 11. [Console](consola.md)

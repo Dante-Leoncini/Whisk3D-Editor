@@ -31,6 +31,7 @@
 #include <set>
 #include <algorithm>
 #include "objects/Rutina.h"   // las filas de los PASOS de una rutina animados (AnimPaso)
+#include "objects/Sonido.h"   // las TIRAS de los sonidos (se mueven y se recortan en segundos)
 
 namespace gfx = w3dEngine;
 
@@ -328,6 +329,9 @@ static bool DopeColapsado(const std::string& k){ return !k.empty() && g_dopeCola
 // tiempo. Es lo MISMO que plegar el summary a mano (panelW=0), pero desde el menu y sin tener que buscar la flecha.
 static bool g_dopePanelOn = true;
 static bool g_dopeAutoFrame = true;
+// las TIRAS de sonido: su forma de onda y la linea de su volumen (sin las dos es solo la tira, de una fila)
+static bool g_tlVerOnda = true, g_tlVerVolumen = true;
+static const int kTiraFilasExtra = 2;   // con alguna de las dos, la tira ocupa su fila y dos mas
 // TOGGLE "Solo vertices seleccionados" (menu Vista, dope Y curvas; static = persiste la
 // sesion). Con la malla en EDIT MODE:
 //  - VISTA: las filas de vertex anim (Vertices/UV/Normales) muestran SOLO los keyframes
@@ -339,6 +343,7 @@ static bool g_dopeAutoFrame = true;
 //    seleccionados EVALUADOS (no saltan). Asi se anima o DES-anima un subconjunto.
 static bool g_dopeSoloSelVerts = false;
 static float g_scrubAcum = 0.0f;  // resto en frames del scrub por flecha (ver ScrubFlecha)
+static int g_scrubEspera = 0;      // ticks que el scrub espera despues del toque (ver W3dTimelineFlechaPulsada)
 static std::set<std::string> g_dopeOjoOff;
 static bool DopeOjoOff(const std::string& k){ return !k.empty() && g_dopeOjoOff.count(k) > 0; }
 
@@ -348,6 +353,14 @@ static bool DopeOjoOff(const std::string& k){ return !k.empty() && g_dopeOjoOff.
 // DISTINTO de "Y Location @4": se selecciona, mueve y borra por separado.
 static std::set<std::string> g_dopeRowSel;   // claveFila
 static std::set<std::string> g_dopeKeySel;   // DopeKeyId(ownerKey, propId, compId, frame)
+// EL AREA PARA AGARRAR un keyframe / un handle (px): generosa con el mouse, mas con el dedo
+static float RadioAgarre() {
+#ifndef W3D_SYMBIAN
+    extern Uint32 g_lastFingerTicks;
+    if (g_lastFingerTicks != 0) return (float)GlobalScale * 12.0f;
+#endif
+    return (float)GlobalScale * 8.0f;
+}
 // keyframe ACTIVO = el ultimo que se clickeo. Es el que edita la tarjeta "Keyframe" del panel de propiedades.
 // Se guarda por IDENTIDAD (curva + frame) y no por puntero: los keyframes viven en un vector que se reordena al
 // moverlos, asi que un puntero quedaria colgado en cuanto tocas algo.
@@ -745,6 +758,7 @@ static size_t DopeIconoObj(Object* o){
         case ObjectType::camera:   return (size_t)IconType::camera;
         case ObjectType::armature: return (size_t)IconType::armature;
         case ObjectType::curve:    return (size_t)IconType::curve;
+        case ObjectType::sonido:   return (size_t)IconType::sonido;
         default:                   return (size_t)IconType::empty;
     }
 }
@@ -768,9 +782,9 @@ static void DopeUnir(std::vector<int>& dst, const std::vector<int>& src){
 }
 // UNION de los frames de las 3 propiedades (lo que marca la fila PADRE, este o no desplegada)
 static std::vector<int> DopeUnionProps(const std::vector<AnimProperty>& props){
-    const int propId[5] = { AnimPosition, AnimRotation, AnimScale, AnimVisible, AnimRender };
+    const int propId[6] = { AnimPosition, AnimRotation, AnimScale, AnimVisible, AnimRender, AnimSonido };
     std::vector<int> uni;
-    for (int g=0;g<5;g++){ std::vector<int> ks; DopeKeysDeProp(props, propId[g], ks); DopeUnir(uni, ks); }
+    for (int g=0;g<6;g++){ std::vector<int> ks; DopeKeysDeProp(props, propId[g], ks); DopeUnir(uni, ks); }
     return uni;
 }
 // agrega las filas de CANAL (X/Y/Z de Location / Euler Rotation / Scale). Cada canal es una CURVA propia y muestra
@@ -803,6 +817,17 @@ static void DopeCanales(const std::vector<AnimProperty>& props, std::vector<Time
         Timeline::DopeRow r; r.tipo=3; r.nivel=nivel; r.nombre=nomUno[u]; r.icono=-1; r.keys=ks;
         r.ownerKey = ownerKey; r.propId = propUno[u]; r.compId = AnimX;
         char cb[24]; snprintf(cb,sizeof cb,"|p%d|c0", propUno[u]);
+        r.claveFila = ownerKey + cb;
+        out.push_back(r);
+    }
+    // un SONIDO: volumen / tono / reverb (AnimSonido X / Y / Z)
+    const char* nomSon[3] = { "Volume", "Pitch", "Reverb" };
+    for (int c = 0; c < 3; c++){
+        std::vector<int> ks; DopeKeysDeCurva(props, AnimSonido, AnimX + c, ks);
+        if (ks.empty()) continue;
+        Timeline::DopeRow r; r.tipo=3; r.nivel=nivel; r.nombre=T(nomSon[c]); r.icono=-1; r.keys=ks;
+        r.ownerKey = ownerKey; r.propId = AnimSonido; r.compId = AnimX + c;
+        char cb[24]; snprintf(cb,sizeof cb,"|p%d|c%d", AnimSonido, AnimX + c);
         r.claveFila = ownerKey + cb;
         out.push_back(r);
     }
@@ -846,9 +871,8 @@ static void DopeCanales2D(const std::vector<AnimProperty>& props, std::vector<Ti
 void Timeline::ConstruirDopeRows(){
     dopeRows.clear(); panelW = 0;
     rowH = RenglonHeightGS;
-    // "JUEGO" (el estado base de un juego, ver W3dRaices.h): un juego NO tiene keyframes propios. El
-    // timeline muestra el cache de la simulacion (la linea roja) y el cabezal recorre sus ticks; las
-    // curvas se ven eligiendo uno de sus CLIPS en el selector de animacion.
+    // "JUEGO" (el estado base de un juego, ver W3dRaices.h): un juego NO tiene keyframes propios (el cabezal
+    // lo lleva la simulacion); las curvas se ven eligiendo uno de sus CLIPS en el selector de animacion.
     if (ActiveAnimKind == 2) return;
     std::vector<DopeRow> filas;
     SkeletalAnimation* clip = ClipActivo();
@@ -1015,13 +1039,36 @@ void Timeline::ConstruirDopeRows(){
             r.ownerKey = r.claveDespliegue; r.propId=-1; r.compId=-1; r.keys = u;
             filas.push_back(r);
             if (!DopeColapsado(r.claveDespliegue)){
-                DopeRow g; g.tipo=2; g.nivel=1; g.nombre="Object Transforms"; g.icono=-1; // SIN icono -> el texto va mas a la izquierda
+                DopeRow g; g.tipo=2; g.nivel=1; g.nombre=(ao.obj->getType()==ObjectType::sonido) ? std::string(T("Sound")) : std::string("Object Transforms"); g.icono=-1; // SIN icono -> el texto va mas a la izquierda
                 g.claveDespliegue = prefEsc + DopeIdDueno(ao.obj) + "/xf"; g.claveFila = g.claveDespliegue;
                 g.ownerKey = r.ownerKey; g.propId=-1; g.compId=-1; g.keys = u;
                 filas.push_back(g);
                 if (!DopeColapsado(g.claveDespliegue)) DopeCanales(ao.Propertys, filas, 2, r.ownerKey, ao.obj);
             }
         }
+        // ---- LOS SONIDOS seleccionados: su fila lleva la TIRA (la del objeto si esta animado; si no, una propia) ----
+        for (size_t i = 0; i < ObjSelects.size(); i++){
+            Object* o = ObjSelects[i];
+            if (!o || o->getType() != ObjectType::sonido) continue;
+            const std::string k = prefEsc + DopeIdDueno(o);
+            bool hay = false;
+            for (size_t f = 0; f < filas.size(); f++) if (filas[f].tipo == 1 && filas[f].ownerKey == k){ filas[f].sonido = o; hay = true; }
+            if (hay) continue;
+            DopeRow r; r.tipo=1; r.nivel=0; r.nombre=o->name; r.icono=(int)IconType::sonido;
+            r.claveFila = k; r.ownerKey = k; r.propId=-1; r.compId=-1; r.sonido = o;
+            filas.push_back(r);
+        }
+        // ...y con la forma de onda o el volumen a la vista, la tira es MAS ALTA: filas de continuacion debajo
+        if (g_tlVerOnda || g_tlVerVolumen)
+            for (size_t f = 0; f < filas.size(); f++){
+                if (!filas[f].sonido || filas[f].tiraFilas != 0) continue;
+                filas[f].tiraFilas = kTiraFilasExtra;
+                for (int e = 0; e < kTiraFilasExtra; e++){
+                    DopeRow c; c.tipo=1; c.nivel=filas[f].nivel; c.icono=-1; c.sonido=filas[f].sonido; c.tiraFilas=-1;
+                    c.ownerKey = filas[f].ownerKey;   // (el ojo del Summary / del objeto tambien la oculta)
+                    filas.insert(filas.begin() + (long)f + 1, c);
+                }
+            }
         // ---- PISTA "CAMARA ACTIVA" (los cortes de la cinematica): aparece con una CAMARA seleccionada. Es una curva
         // mas (SceneAnimation::camPista): mover / borrar / escalar y Ctrl+Z van por el camino de siempre
         // (DopeResolverProp la resuelve por el prefijo "camact:e<escena>"). ----
@@ -1074,6 +1121,7 @@ void Timeline::ConstruirDopeRows(){
         w += IconSizeGS + gapGS;   // la columna de OJOS de la derecha
         if (w > maxw) maxw = w;
     }
+    panelContW = maxw - (IconSizeGS + gapGS) - marginGS;   // lo que se scrollea: el texto, sin los ojos
     // ancho: el que fijo el usuario arrastrando el borde, o el automatico (fila mas larga)
     panelW = (panelWUser > 0) ? panelWUser : maxw;
     int tope = width/2; if (tope < IconSizeGS*4) tope = IconSizeGS*4;
@@ -1086,7 +1134,12 @@ void Timeline::ConstruirDopeRows(){
     // arrastre y touch, todo por el ruteo generico. Solo en DOPE: en CURVAS el eje vertical es el VALOR, no una
     // lista de filas, asi que no hay nada que scrollear.
     if (modo == TL_MODO_DOPE) ResizeScrollbar(width, height, 0, -DopeAltoContenido(), stripY);
-    else { scrollY = scrollX = false; PosY = 0; }
+    else {   // CURVAS: sin barra (el eje vertical del strip es el VALOR), pero el PANEL igual se scrollea con el medio
+        scrollY = scrollX = false;
+        int maxY = (height - stripY) - DopeAltoContenido(); if (maxY > 0) maxY = 0;
+        if (PosY < maxY) PosY = maxY; if (PosY > 0) PosY = 0;
+    }
+    if (panelPosX < PanelMaxX()) panelPosX = PanelMaxX(); if (panelPosX > 0) panelPosX = 0;
 }
 
 // ------------------------------------------------------------------ onChange -> timeline activo
@@ -1102,13 +1155,14 @@ static void TL_menuSelAction(int id){
     g_redraw = true;
 }
 // menu View del dope sheet: encuadrar los keyframes seleccionados
-enum { TL_VIEW_FRAMESEL = 0, TL_VIEW_AUTOFRAME = 1, TL_VIEW_PANEL = 2, TL_VIEW_SOLOSEL = 3 };
+enum { TL_VIEW_FRAMESEL = 0, TL_VIEW_AUTOFRAME = 1, TL_VIEW_PANEL = 2, TL_VIEW_SOLOSEL = 3, TL_VIEW_ONDA = 4, TL_VIEW_VOLUMEN = 5 };
 static void TL_menuViewAction(int id){
     // el CHECKBOX ya lo toggleo PopupMenu::Click, que a proposito NO cierra el menu (asi se prenden/apagan
     // varios de una). Cerrarlo aca romperia eso.
     if (id == TL_VIEW_AUTOFRAME){ g_redraw = true; return; }
     if (id == TL_VIEW_PANEL){ g_redraw = true; return; }   // el checkbox ya toco el bool; el ancho se recalcula solo
     if (id == TL_VIEW_SOLOSEL){ g_redraw = true; return; } // idem: las filas se re-arman solas con el filtro
+    if (id == TL_VIEW_ONDA || id == TL_VIEW_VOLUMEN){ g_redraw = true; return; }
     if (g_tlActivo && id == TL_VIEW_FRAMESEL) g_tlActivo->DopeFrameSelected();
     TL_CerrarMenu(g_tlMenuView);
     g_redraw = true;
@@ -1158,7 +1212,8 @@ Timeline::Timeline(){
     viewCenterV = 0.0f;                    // el CENTRO del strip es el CERO
     scrubbing = false; lastMx = lastMy = 0;
     stripY = numY = barH2 = 0; curBtnX = curBtnW = 0;
-    panelW = 0; panelWUser = 0; panelResize = false; rowH = RenglonHeightGS; hoverRow = -1; // dope sheet (panelW=0 -> timeline clasico)
+    panelW = 0; panelWUser = 0; panelResize = false; rowH = RenglonHeightGS; hoverRow = -1;
+    panelBordeHover = false; panelPosX = 0; panelContW = 0; panelBarraH = false; panelPaneo = 0; // dope sheet (panelW=0 -> timeline clasico)
     fStart=(float)StartFrame; fEnd=(float)EndFrame; fCur=(float)CurrentFrame;
 
     pfStart = new PropFloat(T("Start")); pfStart->value=&fStart; pfStart->entero=true; pfStart->onChange=TL_onStart;
@@ -1167,10 +1222,14 @@ Timeline::Timeline(){
     pfFps   = new PropFloat(T("FPS"));   pfFps->value=&fFpsTL;   pfFps->entero=true;   pfFps->onChange=TL_onFps;
 
     BarCrear(); // [0] = icono/menu de tipo
+    // (el cartelito de AYUDA de cada uno: que hace, al dejar el mouse encima)
+    static const char* const kAyudaT[8] = { "Jump to Start", "Previous Keyframe", "Previous Frame", "Play Reverse",
+                                            "Play", "Next Frame", "Next Keyframe", "Jump to End" };
     for (int i=0;i<8;i++){
         Button* b = new Button("");          // vacio + cuadrado: el glyph vectorial va encima
         b->rol = TL_ROL_T0 + i;
         b->cuadrado = true;                  // ancho = alto (con el padding de UIBotonAltura)
+        b->ayuda = kAyudaT[i];
         BarButtons.push_back(b); btnT[i] = b;
     }
     btnStart = new Button(std::string(T("Start")) + ":1");   btnStart->rol = TL_ROL_START; BarButtons.push_back(btnStart);
@@ -1188,19 +1247,22 @@ Timeline::Timeline(){
     btnModo = new Button(T("Curves")); btnModo->rol = TL_ROL_MODO;
     btnModo->visible = false;
     BarButtons.push_back(btnModo);
-    btnSelect = new Button(T("Select")); btnSelect->rol = TL_ROL_SELECT; btnSelect->desplegable = true;
+    // (el MISMO icono que el Select de la vista 3D y del outliner: el cuadrado punteado)
+    btnSelect = new Button("", IconType::seleccion); btnSelect->rol = TL_ROL_SELECT; btnSelect->desplegable = true; btnSelect->ayuda = "Select";
     btnSelect->visible = false;
     BarButtons.push_back(btnSelect);
     // menu Key: Transform (Move/Rotate/Scale) + Duplicate + Delete
-    btnKey = new Button(T("Key")); btnKey->rol = TL_ROL_KEY; btnKey->desplegable = true;
+    // (solo el ROMBO de la key: el menu abierto lleva su titulo y el cartelito dice que es)
+    btnKey = new Button("", IconType::keyframe); btnKey->rol = TL_ROL_KEY; btnKey->desplegable = true; btnKey->ayuda = "Key";
     btnKey->visible = false;
     BarButtons.push_back(btnKey);
     // menu View del dope sheet: encuadrar el timeline en los keyframes seleccionados
-    btnView = new Button("", IconType::monitor); btnView->rol = TL_ROL_VIEW; btnView->desplegable = true;
+    btnView = new Button("", IconType::monitor); btnView->rol = TL_ROL_VIEW; btnView->desplegable = true; btnView->ayuda = "View";
     btnView->visible = false;
     BarButtons.push_back(btnView);
     // menu Pivot del dope sheet (desde donde escala 's'): mismo criterio que el Pivot Point del viewport 3D
-    btnPivot = new Button(T("Center")); btnPivot->rol = TL_ROL_PIVOT; btnPivot->desplegable = true; btnPivot->caretMenu = true;
+    // (un ICONO, como el Pivot Point del 3D: punto medio = centro, cursor 3D = frame actual)
+    btnPivot = new Button("", (int)IconType::pivotMedian); btnPivot->rol = TL_ROL_PIVOT; btnPivot->desplegable = true; btnPivot->caretMenu = true;
     btnPivot->visible = false;
     BarButtons.push_back(btnPivot);
 #ifdef W3D_SYMBIAN
@@ -1332,7 +1394,7 @@ void Timeline::SyncFields(){
     // las cosas.
     btnKey->visible    = true;
     btnPivot->visible  = hayFilas;          // menu Pivot: idem (sin keyframes no hay nada que escalar)
-    btnPivot->text = (g_dopePivot == DOPE_PIV_CURFRAME) ? "Current Frame" : "Center";
+    btnPivot->icon = (g_dopePivot == DOPE_PIV_CURFRAME) ? (int)IconType::pivotCursor : (int)IconType::pivotMedian;
 }
 
 // ------------------------------------------------------------------ Render
@@ -1375,16 +1437,6 @@ void Timeline::Render(){
       float xb = AnimEsJuego ? (float)width : FrameToX((float)EndFrame + 1);
       int ia = (int)(xa<panelW?panelW:xa), ib = (int)(xb>width?width:xb); // nunca invade el panel del dope sheet
       if (ib > ia){ SetCol(ColorID::gris, 1.0f); FillRect(ia, stripY, ib-ia, height-stripY); } }
-    // LINEA ROJA: los frames con ESTADO DE JUEGO grabado (la simulacion guarda un
-    // snapshot por frame; sirve para ver hasta donde se puede viajar en el tiempo)
-    { extern int SimFramesGrabados(); extern int SimPrimerFrame();
-      int ng = SimFramesGrabados();
-      if (ng > 0){
-        float xa = FrameToX((float)(StartFrame + SimPrimerFrame()));
-        float xb = FrameToX((float)(StartFrame + SimPrimerFrame() + ng));
-        int ia = (int)(xa<panelW?panelW:xa), ib = (int)(xb>width?width:xb);
-        if (ib > ia){ gfx::Color4f(0.85f, 0.15f, 0.15f, 1.0f);
-                      FillRect(ia, height - GlobalScale*2, ib-ia, GlobalScale*2); } } }
 
     // ---------------- LINEAS verticales (van del piso hasta tocar la barra de numeros) ----------------
     // ALTERNAN color: las "oscuras" (mas oscuras que la tarjeta) llevan numero; las "claras" (color del texto) no.
@@ -1416,6 +1468,7 @@ void Timeline::Render(){
             }
             const DopeRow& dr = dopeRows[r];
             if (dr.oculto) continue;                      // ojo apagado: no se dibuja
+            if (dr.sonido && dr.tiraFilas >= 0) DibujarTira(dr, ry0);   // la TIRA del sonido (debajo de sus rombos)
             const std::vector<int>& ks = dr.keys;
             for (size_t i=0;i<ks.size();i++){
                 float fx = FrameToX((float)ks[i]);
@@ -1759,6 +1812,25 @@ bool Timeline::DopeRectFlotante(int& rx, int& ry, int& rw, int& rh) const {
 // X (local) de la columna de OJOS: pegada al borde derecho del panel, igual que en el Outliner.
 int Timeline::DopeOjoX() const { return panelW - GlobalScale - IconSizeGS - marginGS; }
 
+// SCROLL HORIZONTAL del panel: el texto visible va de 0 a la columna de ojos; lo que sobra se scrollea
+int Timeline::PanelMaxX() const {
+    int vis = DopeOjoX() - gapGS; if (vis < 1) vis = 1;
+    int m = vis - panelContW; return m < 0 ? m : 0;
+}
+// la barra horizontal del panel (abajo, del ancho del texto). tx/tw = el agarre. false = no hace falta
+bool Timeline::PanelBarraH(int& bx, int& by, int& bw, int& bh, int& tx, int& tw) const {
+    if (panelW <= 0 || PanelMaxX() >= 0) return false;
+    bh = GlobalScale*4; bx = 0; by = height - bh - GlobalScale; bw = DopeOjoX() - gapGS;
+    if (bw < GlobalScale*4) return false;
+    tw = bw * bw / (panelContW > 1 ? panelContW : 1); if (tw < GlobalScale*6) tw = GlobalScale*6; if (tw > bw) tw = bw;
+    tx = bx + (int)((float)(bw - tw) * (float)panelPosX / (float)PanelMaxX());
+    return true;
+}
+// banda de unos px alrededor del separador del panel (arrastrarla cambia su ancho)
+bool Timeline::PanelEnBorde(int lx, int ly) const {
+    return panelW > 0 && ly >= numY && ly < height && lx >= panelW - GlobalScale*3 && lx <= panelW + GlobalScale*3;
+}
+
 void Timeline::RenderDopePanel(){
     if (dopeRows.empty()) return;
     // PANEL OCULTO (Summary plegado): el timeline ocupa TODO y el texto "Summary" queda FLOTANDO encima,
@@ -1783,7 +1855,10 @@ void Timeline::RenderDopePanel(){
     // a la misma altura (la 1ra fila, Summary, queda en la banda de los numeros).
     gfx::Disable(gfx::Texture2D); gfx::DisableArray(gfx::TexCoordArray); gfx::Disable(gfx::Blend);
     gfx::Color4f(0.13f,0.13f,0.13f,1.0f); FillRect(0, numY, panelW, height - numY);
-    SetCol(ColorID::grisLinea, 1.0f); FillRect(panelW - GlobalScale, numY, GlobalScale, height - numY);
+    // separador: BLANCO con el mouse encima, VERDE mientras se arrastra (asi se sabe que se puede agarrar)
+    if (panelResize)          { SetCol(ColorID::accent, 1.0f); FillRect(panelW - GlobalScale*2, numY, GlobalScale*2, height - numY); }
+    else if (panelBordeHover) { SetCol(ColorID::blanco, 1.0f); FillRect(panelW - GlobalScale*2, numY, GlobalScale*2, height - numY); }
+    else { SetCol(ColorID::grisLinea, 1.0f); FillRect(panelW - GlobalScale, numY, GlobalScale, height - numY); }
     // fondo de la fila del SUMMARY dentro del panel (que quede continuo con el strip)
     { int ry0 = stripY + PosY; if (ry0 + rowH > stripY && ry0 < height){
         gfx::Color4f(0.10f,0.10f,0.10f,1.0f); FillRect(0, ry0<numY?numY:ry0, panelW - GlobalScale, rowH); } }
@@ -1806,7 +1881,8 @@ void Timeline::RenderDopePanel(){
     if (!Textures.empty() && Textures[0]) gfx::BindTexture(Textures[0]->iID);
     // SCISSOR: el texto largo se RECORTA en el borde del panel (antes se derramaba sobre los keyframes).
     // El scissor va en coords de ventana GL (origen abajo-izquierda); el viewport ya esta en (x, glY, w, h).
-    { int lw = panelW - GlobalScale, lh = height - stripY;
+    // Termina ANTES de la columna de OJOS: el texto largo no se mete debajo de ellos.
+    { int lw = DopeOjoX() - gapGS, lh = height - stripY;
       if (lw < 0) lw = 0; if (lh < 0) lh = 0;
       gfx::Enable(gfx::ScissorTest);
       gfx::Scissor(x, W3dPantallaAlto - y - stripY - lh, lw, lh); }
@@ -1815,7 +1891,7 @@ void Timeline::RenderDopePanel(){
         if (ry + rowH < stripY || ry > height) continue;  // culling vertical
         DopeRow& d = dopeRows[r];
         gfx::PushMatrix();
-        gfx::Translatef((float)(marginGS + d.nivel*(IconSizeGS+gapGS)), (float)ry, 0);
+        gfx::Translatef((float)(panelPosX + marginGS + d.nivel*(IconSizeGS+gapGS)), (float)ry, 0);
         if (d.tipo==3) SetCol(ColorID::grisUI, 1.0f); else SetCol(ColorID::blanco, 1.0f);
         if (!d.claveDespliegue.empty()){
             W3dDrawStrip4(IconMesh, IconsUV[(size_t)(DopeColapsado(d.claveDespliegue) ? IconType::arrowRight : IconType::arrow)]->uvs);
@@ -1835,6 +1911,7 @@ void Timeline::RenderDopePanel(){
         int ry = stripY + (int)r*rowH + PosY;
         if (ry + rowH < stripY || ry > height) continue;   // culling vertical
         const DopeRow& d = dopeRows[r];
+        if (d.tiraFilas < 0) continue;   // (continuacion de una tira: el ojo es el de su fila)
         SetCol(ColorID::grisUI, d.oculto ? 0.5f : 1.0f);
         gfx::PushMatrix();
         gfx::Translatef((float)DopeOjoX(), (float)(ry + (rowH - IconSizeGS)/2), 0);
@@ -1842,6 +1919,16 @@ void Timeline::RenderDopePanel(){
         gfx::PopMatrix();
     }
 
+    // ---- BARRA HORIZONTAL del panel (el texto no entra): agarre gris, verde arrastrando ----
+    { int bx, by, bw, bh, tx, tw;
+      if (PanelBarraH(bx, by, bw, bh, tx, tw)){
+        gfx::Disable(gfx::Texture2D); gfx::DisableArray(gfx::TexCoordArray); gfx::Disable(gfx::Blend);
+        gfx::Color4f(0.08f,0.08f,0.08f,1.0f); FillRect(bx, by, bw, bh);
+        if (panelBarraH) SetCol(ColorID::accent, 1.0f); else SetCol(ColorID::grisUI, 1.0f);
+        FillRect(tx, by + GlobalScale, tw, bh - GlobalScale*2);
+        gfx::Enable(gfx::Texture2D); gfx::Enable(gfx::Blend); gfx::BlendAlpha(); gfx::EnableArray(gfx::TexCoordArray);
+        if (!Textures.empty() && Textures[0]) gfx::BindTexture(Textures[0]->iID);
+      } }
     // ---- BARRA DE SCROLL: la compartida del editor (hover/agarre/arrastre/touch los da el ruteo generico) ----
     if (scrollY) DibujarScrollbar(this);
 }
@@ -1858,9 +1945,17 @@ bool Timeline::DopeClickPanel(int mx, int my){
         return false;
       } }
     // BORDE del panel: arrastrarlo cambia su ancho (banda de unos px alrededor del separador)
-    if (ly >= numY && ly < height && lx >= panelW - GlobalScale*3 && lx <= panelW + GlobalScale*3){
-        panelResize = true; return true;
-    }
+    if (PanelEnBorde(lx, ly)){ panelResize = true; g_redraw = true; return true; }
+    // BARRA HORIZONTAL del panel: el agarre se arrastra; afuera del agarre, salta ahi
+    { int bx, by, bw, bh, tx, tw;
+      if (PanelBarraH(bx, by, bw, bh, tx, tw) && lx >= bx && lx < bx+bw && ly >= by - GlobalScale && ly < by+bh+GlobalScale){
+        if (lx < tx || lx >= tx + tw){
+            int m = PanelMaxX(), rec = bw - tw;
+            panelPosX = rec > 0 ? (int)((float)m * (float)(lx - bx - tw/2) / (float)rec) : 0;
+            if (panelPosX < m) panelPosX = m; if (panelPosX > 0) panelPosX = 0;
+        }
+        panelBarraH = true; g_redraw = true; return true;
+      } }
     if (lx < 0 || lx >= panelW || ly < stripY || ly >= height) return false;
     int r = (ly - stripY - PosY) / (rowH>0?rowH:1);
     if (r < 0 || r >= (int)dopeRows.size()) return true; // dentro del panel pero sin fila: igual consumido
@@ -1870,7 +1965,7 @@ bool Timeline::DopeClickPanel(int mx, int my){
         if (DopeOjoOff(d.claveFila)) g_dopeOjoOff.erase(d.claveFila); else g_dopeOjoOff.insert(d.claveFila);
         g_redraw = true; return true;
     }
-    int xFlecha = marginGS + d.nivel*(IconSizeGS+gapGS);
+    int xFlecha = panelPosX + marginGS + d.nivel*(IconSizeGS+gapGS);
     if (!d.claveDespliegue.empty() && lx >= xFlecha && lx < xFlecha + IconSizeGS + gapGS){
         if (DopeColapsado(d.claveDespliegue)) g_dopeColapsado.erase(d.claveDespliegue); else g_dopeColapsado.insert(d.claveDespliegue);
         g_redraw = true; return true;
@@ -1919,7 +2014,7 @@ bool Timeline::DopeClickStrip(int mx, int my){
     // en un flag aparte, sino los keyframes en frames negativos no se podian clickear
     int mejor = 0; bool hayMejor = false; float mejorD = 1e9f;
     for (size_t i=0;i<d.keys.size();i++){ float dd = fabsf(FrameToX((float)d.keys[i]) - (float)lx); if (dd < mejorD){ mejorD=dd; mejor=d.keys[i]; hayMejor=true; } }
-    if (!hayMejor || mejorD > GlobalScale*5.0f) return false; // no cayo sobre un rombo
+    if (!hayMejor || mejorD > RadioAgarre()) return false; // no cayo sobre un rombo
     if (!LShiftPressed) g_dopeKeySel.clear();
     if (d.propId >= 0){
         std::string id = DopeKeyId(d.ownerKey, d.propId, d.compId, mejor);
@@ -1942,7 +2037,7 @@ bool Timeline::CurvaClickStrip(int mx, int my){
     if (dopeRows.empty()) return false;
     int lx = mx - x, ly = my - y;
     if (lx < panelW || ly < stripY || ly >= height) return false;
-    const float rHandle = (float)GlobalScale*4.5f, rKey = (float)GlobalScale*5.0f;
+    const float rHandle = RadioAgarre(), rKey = RadioAgarre();
 
     // 1) HANDLES (tienen prioridad: estan encima del keyframe y son mas chicos). Gana el MAS CERCANO, no el primero
     //    que entre en el radio: los dos handles de un keyframe estan a la misma distancia de el y con keyframes
@@ -2290,6 +2385,8 @@ void Timeline::DopeSelectInvert(){
 }
 
 // 'x': si hay KEYFRAMES seleccionados los borra; sino borra la animacion de las FILAS seleccionadas.
+// hay keyframes o curvas elegidos en el timeline? (la C del N95 los borra a ellos y no al objeto activo)
+bool TimelineHaySeleccion() { return !g_dopeKeySel.empty() || !g_dopeRowSel.empty(); }
 void Timeline::DopeBorrarSeleccion(){
     if (g_dopeKeySel.empty() && g_dopeRowSel.empty()) return;
     UndoKeyframesIniciar(); // Ctrl+Z: snapshot de las curvas ANTES de borrar
@@ -3044,9 +3141,9 @@ void DopeKeyframeActivoReFrame(int nuevoFrame){
 // Cancela el transform de keyframes desde AFUERA. Lo llama el Tab (que cicla de viewport por encima del ruteo a
 // los viewports): irse del timeline con un transform a medio hacer dejaba ViewPortClickDown trabado en true -> el
 // foco quedaba congelado y no se podia volver a cambiar de viewport, y el transform seguia vivo y huerfano.
-void DopeXformCancelar(){ if (g_tlActivo && g_dopeMov) g_tlActivo->DopeMoveCancel(); }
+void DopeXformCancelar(){ if (g_tlActivo && g_dopeMov) g_tlActivo->DopeMoveCancel(); if (g_tlActivo && g_tlActivo->TiraActiva()) g_tlActivo->TiraCancelar(); }
 // ...y aceptarlo. Lo llaman el click IZQUIERDO (PC) y el OK/Enter de Symbian, igual que el transform del 3D.
-void DopeXformAceptar(){ if (g_tlActivo && g_dopeMov) g_tlActivo->DopeMoveConfirm(); }
+void DopeXformAceptar(){ if (g_tlActivo && g_dopeMov) g_tlActivo->DopeMoveConfirm(); if (g_tlActivo && g_tlActivo->TiraActiva()) g_tlActivo->TiraConfirmar(); }
 // readout del transform de keyframes (lo dibuja Render arriba del strip)
 std::string Timeline::DopeTextoTransform() const {
     if (!g_dopeMov) return "";
@@ -3151,17 +3248,16 @@ void Timeline::TogglePlay(int dir){
 }
 void Timeline::GotoStart(){ CurrentFrame = StartFrame; g_redraw=true; }
 void Timeline::GotoEnd(){
-    // MODO JUEGO: "ir al final" = el ultimo frame del cache de estados grabados
-    // (SimIrA toma el tick ABSOLUTO: con el cache que ya roto, el ultimo es el primero + n - 1)
-    { extern bool SimActiva(); extern int SimFramesGrabados(); extern int SimPrimerFrame(); extern void SimIrA(int);
-      if (AnimEsJuego && SimActiva() && SimFramesGrabados() > 0){
-          SimIrA(SimPrimerFrame() + SimFramesGrabados() - 1); g_redraw = true; return; } }
+    // (modo juego: no hay Fin al que ir)
     if (!AnimEsJuego) CurrentFrame = EndFrame;
     g_redraw=true;
 }
-void Timeline::StepFrame(int d){
-    // simulacion en PAUSA: < > van FRAME A FRAME por el juego. Adelante simula (o
-    // re-ve lo grabado); atras VIAJA EN EL TIEMPO al snapshot anterior (solo editor)
+// el cuadro anterior / siguiente desde CUALQUIER lado (las flechas del viewport 3D): lo mismo que el <| |> del timeline
+void W3dPasoFrame(int d);
+void Timeline::StepFrame(int d){ W3dPasoFrame(d); }
+void W3dPasoFrame(int d){
+    // simulacion en PAUSA: > avanza el juego FRAME A FRAME (simula uno); < no hace nada: el juego no
+    // graba su pasado
     { extern bool SimActiva(); extern bool SimStep(int);
       if (SimActiva() && !PlayAnimation && SimStep(d)) { g_redraw = true; return; } }
     CurrentFrame += d;
@@ -3172,7 +3268,7 @@ void Timeline::StepFrame(int d){
         if (CurrentFrame < StartFrame) CurrentFrame = StartFrame;
         if (CurrentFrame > EndFrame && !AnimEsJuego) CurrentFrame = EndFrame;
     }
-    // "Juego" SIN partida: no hay cache que recorrer; lo que hay es el estado base (su frame 1)
+    // "Juego" SIN partida: lo que hay es el estado base (su frame 1)
     { extern bool SimActiva(); if (ActiveAnimKind == 2 && !SimActiva()) CurrentFrame = StartFrame; }
     g_redraw=true;
 }
@@ -3233,13 +3329,9 @@ void Timeline::SetFrameFromX(int lx){
         if (f < StartFrame) f = StartFrame;
         if (f > EndFrame && !AnimEsJuego) f = EndFrame;   // en modo juego no hay Fin
     }
-    // "Juego" SIN partida: no hay cache que recorrer; lo que hay es el estado base (su frame 1)
+    // "Juego" SIN partida: lo que hay es el estado base (su frame 1)
     { extern bool SimActiva(); if (ActiveAnimKind == 2 && !SimActiva()) f = StartFrame; }
     CurrentFrame = f; g_redraw = true;
-    // simulacion en pausa: mover el playhead VIAJA al estado grabado de ese frame (el cabezal recorre
-    // los ticks CACHEADOS: SimIrA lo acota a lo que hay)
-    { extern bool SimActiva(); extern void SimIrA(int);
-      if (SimActiva() && !PlayAnimation) SimIrA(f - StartFrame); }
 }
 void Timeline::ApplyStart(){ int v=(int)(fStart+0.5f); if(v<0)v=0;
     AnimSetStart(v);   // editar Start = editar el Start PROPIO de la animacion activa (escena o clip)
@@ -3267,7 +3359,12 @@ void Timeline::EditarCampo(int i){
 // mide en PIXELES DE PANTALLA y no en frames: recorrer la animacion cuesta lo mismo con cualquier zoom. Los
 // sobrantes se ACUMULAN, que es lo que da el control fino: con mucho zoom un frame son varios ticks (antes el paso
 // se redondeaba a 1 frame minimo -> con zoom alto volaba a 1 frame por tick).
+// el TOQUE de izquierda / derecha (keypad del N95): ya movio UN cuadro (la tecla, Timeline::event_key_down); el scrub
+// de la flecha MANTENIDA arranca recien despues de un ratito. Sin esto un toque rapido con el timeline acercado (un
+// cuadro mas ancho que lo que avanza el scrub por tick) no llegaba a moverse ni un cuadro
+void W3dTimelineFlechaPulsada(){ g_scrubAcum = 0.0f; g_scrubEspera = 8; }
 void Timeline::ScrubFlecha(int dir){
+    if (g_scrubEspera > 0) { g_scrubEspera--; return; }
     const float pxPorTick = 3.3f;
     float px = (pxPerFrame > 0.01f) ? pxPerFrame : 0.01f;
     g_scrubAcum += (float)dir * pxPorTick / px;      // en frames (con fraccion)
@@ -3312,8 +3409,9 @@ void Timeline::AbrirMenuKey(int mx, int my){
     ConstruirMenuInterp(g_tlMenuKeyIn);
     ConstruirMenuHandle(g_tlMenuHandle);
     g_tlMenuKey->Limpiar();
+    g_tlMenuKey->titulo = T("Key");   // (el boton es el rombo, sin texto)
     g_tlMenuKey->Agregar(T("Transform"), -1, -1, g_tlMenuKeyXf);
-    g_tlMenuKey->Agregar(T("Interpolation Mode"), -1, -1, g_tlMenuKeyIn)->atajo = "@tl.interp";
+    g_tlMenuKey->Agregar(T("Interpolation Mode"), -1, IconType::interp_bezier, g_tlMenuKeyIn)->atajo = "@tl.interp";
     // los handles solo existen en CURVAS: en el dope sheet no hay nada que ajustar
     if (modo == TL_MODO_CURVAS) g_tlMenuKey->Agregar(T("Handle Type"), -1, -1, g_tlMenuHandle)->atajo = "@tl.handle";
     g_tlMenuKey->Agregar(T("Smart Euler"), TL_KEY_SMARTEULER);
@@ -3327,14 +3425,15 @@ void Timeline::AbrirMenuKey(int mx, int my){
 // menu Key y la 't'.
 void Timeline::ConstruirMenuInterp(PopupMenu* m){
     m->Limpiar();
-    m->Agregar(T("Constant"), TL_KEY_INTERP0 + KfConstant);
-    m->Agregar(T("Linear"),   TL_KEY_INTERP0 + KfLinear);
-    m->Agregar(T("Bezier"),   TL_KEY_INTERP0 + KfBezier);
+    m->Agregar(T("Constant"), TL_KEY_INTERP0 + KfConstant, IconType::interp_constant);
+    m->Agregar(T("Linear"),   TL_KEY_INTERP0 + KfLinear,   IconType::interp_linear);
+    m->Agregar(T("Bezier"),   TL_KEY_INTERP0 + KfBezier,   IconType::interp_bezier);
 }
 // menu Select del dope sheet (All / None / Invert)
 void Timeline::AbrirMenuSelect(int mx, int my){
     if (!g_tlMenuSel){
-        g_tlMenuSel = new PopupMenu(); g_tlMenuSel->action = TL_menuSelAction;
+        // (el boton es un icono: el menu lleva titulo, como el View)
+        g_tlMenuSel = new PopupMenu(); g_tlMenuSel->titulo = T("Select"); g_tlMenuSel->action = TL_menuSelAction;
         g_tlMenuSel->Agregar(T("All"), 0)->atajo = "@tl.seleccionarTodo";
         g_tlMenuSel->Agregar(T("None"), 1)->atajo = "@tl.deseleccionar";
         g_tlMenuSel->Agregar(T("Invert"), 2)->atajo = "@tl.invertir";
@@ -3347,9 +3446,12 @@ void Timeline::AbrirMenuSelect(int mx, int my){
 void Timeline::AbrirMenuPivot(int mx, int my){
     if (!g_tlMenuPivot){
         g_tlMenuPivot = new PopupMenu(); g_tlMenuPivot->action = TL_menuPivotAction;
-        g_tlMenuPivot->Agregar(T("Center"), 0);
-        g_tlMenuPivot->Agregar(T("Current Frame"), 1);
+        g_tlMenuPivot->titulo = T("Transform Pivot Point");
     }
+    // se rearma cada vez: cada opcion con su ICONO y la ACTIVA en verde (igual que el Pivot Point del 3D)
+    g_tlMenuPivot->Limpiar();
+    g_tlMenuPivot->Agregar(T("Center"), 0, (int)IconType::pivotMedian)->verde = (g_dopePivot != DOPE_PIV_CURFRAME);
+    g_tlMenuPivot->Agregar(T("Current Frame"), 1, (int)IconType::pivotCursor)->verde = (g_dopePivot == DOPE_PIV_CURFRAME);
     if (MenuAbierto && MenuAbierto != g_tlMenuPivot) MenuAbierto->Cerrar();
     g_tlMenuPivot->Abrir(mx, my, MenuPantallaW, MenuPantallaH);
     MenuAbierto = g_tlMenuPivot;
@@ -3378,6 +3480,8 @@ void Timeline::AbrirMenuView(int mx, int my){
     // toggle "Solo vertices seleccionados" (dope Y curvas: es el MISMO menu View). Con la
     // malla en Edit Mode filtra las filas de vertex anim y hace el move por mascara.
     g_tlMenuView->AgregarCheck(T("Only selected vertices"), TL_VIEW_SOLOSEL, &g_dopeSoloSelVerts);
+    g_tlMenuView->AgregarCheck(T("Waveform"), TL_VIEW_ONDA, &g_tlVerOnda);         // las tiras de sonido
+    g_tlMenuView->AgregarCheck(T("Volume line"), TL_VIEW_VOLUMEN, &g_tlVerVolumen);
     if (MenuAbierto && MenuAbierto != g_tlMenuView) MenuAbierto->Cerrar();
     g_tlMenuView->Abrir(mx, my, MenuPantallaW, MenuPantallaH);
     MenuAbierto = g_tlMenuView;
@@ -3463,8 +3567,10 @@ void Timeline::button_left(){
     // PANEL del dope sheet: flecha = plegar/desplegar; resto = seleccionar la fila (NO scrubbea)
     if (DopeClickPanel(lastMx, lastMy)) return;
     // STRIP: en CURVAS, handles y keyframes (hit-test 2D); en DOPE, el rombo de la fila. Si no cae en nada, scrubbea.
+    if (TiraActiva()){ TiraConfirmar(); return; }   // ('g' de una tira: el click acepta)
     if (modo == TL_MODO_CURVAS){ if (CurvaClickStrip(lastMx, lastMy)) return; }
     else if (DopeClickStrip(lastMx, lastMy)) return;
+    else if (TiraClick(lastMx, lastMy)) return;     // (los rombos tienen prioridad: se puede clickear uno sobre la tira)
     // boton VERDE del frame actual (sobresale por arriba de los numeros) -> editar por texto (teclado / pad numerico)
     if (ly >= numY - GlobalScale*2 && ly < stripY && lx >= curBtnX && lx <= curBtnX + curBtnW){ EditarCampo(2); return; }
     // CLICK IZQUIERDO en TODO el cuerpo (numeros + bandas) = SCRUB: fija el frame YA (en el DOWN) y lo sigue con el
@@ -3474,6 +3580,7 @@ void Timeline::button_left(){
 }
 void Timeline::event_mouse_motion(int mx, int my){
     if (PopUpActive){ lastMx=mx; lastMy=my; return; }
+    if (TiraActiva()){ TiraAplicar(mx); lastMx=mx; lastMy=my; return; }   // corriendo / recortando una tira
     // g/s/r: el arrastre transforma. Se usa el cursor VIRTUAL (acumula dx/dy), NO la posicion real: el cursor se
     // envuelve al llegar al borde para poder seguir escalando/rotando sin limite, y ese salto no tiene que verse.
     if (g_dopeMov){
@@ -3508,7 +3615,33 @@ void Timeline::event_mouse_motion(int mx, int my){
     // BORDE del panel: arrastrando cambia su ancho (queda FIJADO por el usuario -> panelWUser)
     if (panelResize && leftMouseDown){ panelWUser = mx - x; if (panelWUser < 1) panelWUser = 1; lastMx=mx; lastMy=my; g_redraw=true; return; }
     if (!leftMouseDown) panelResize = false;
+    // la barra horizontal del panel: arrastrar el agarre corre el texto (en proporcion al recorrido)
+    if (panelBarraH && leftMouseDown){
+        int bx, by, bw, bh, tx, tw;
+        if (PanelBarraH(bx, by, bw, bh, tx, tw) && bw > tw && dx){
+            panelPosX += (int)((float)dx * (float)PanelMaxX() / (float)(bw - tw));
+            if (panelPosX < PanelMaxX()) panelPosX = PanelMaxX(); if (panelPosX > 0) panelPosX = 0;
+        }
+        lastMx=mx; lastMy=my; g_redraw=true; return;
+    }
+    if (!leftMouseDown) panelBarraH = false;
+    { bool h = !leftMouseDown && PanelEnBorde(mx - x, my - y);   // el borde se pinta BLANCO con el mouse encima
+      if (h != panelBordeHover){ panelBordeHover = h; g_redraw = true; } }
+    // BOTON DEL MEDIO sobre el PANEL: scrollea el panel (texto en horizontal, filas en vertical), NO el timeline.
+    // Se decide donde arranco el arrastre y queda asi hasta soltar.
+    if (!middleMouseDown) panelPaneo = 0;
+    else if (panelPaneo == 0){ int lx0 = lastMx - x, ly0 = lastMy - y; panelPaneo = (panelW > 0 && lx0 >= 0 && lx0 < panelW && ly0 >= stripY) ? 1 : 2; }
+    if (middleMouseDown && panelPaneo == 1){
+        if (dx){ panelPosX += dx; if (panelPosX < PanelMaxX()) panelPosX = PanelMaxX(); if (panelPosX > 0) panelPosX = 0; }
+        if (dy){
+            if (modo == TL_MODO_DOPE) ScrollY(dy);
+            else { int maxY = (height - stripY) - DopeAltoContenido(); if (maxY > 0) maxY = 0;
+                   PosY += dy; if (PosY < maxY) PosY = maxY; if (PosY > 0) PosY = 0; }
+        }
+        lastMx = mx; lastMy = my; g_redraw = true; return;
+    }
     DopeHover(mx, my); // mouse-over de las filas del panel
+    if (!leftMouseDown) TiraHover(mx, my);   // la punta de una tira bajo el mouse (blanca)
     if (scrubbing && leftMouseDown)  SetFrameFromX(mx - x);                                              // izquierdo: scrub (arrastra el frame actual)
     else if (middleMouseDown){       // MEDIO: PANEA. Horizontal = frames; vertical = filas del dope sheet.
         // Se usan las GLOBALES dx/dy, NO (mx-lastMx): al llegar al borde el cursor SE ENVUELVE al otro lado
@@ -3565,7 +3698,8 @@ void Timeline::mouse_button_up(int boton){
     // pendiente se descarta y el click queda como una simple seleccion.
     if (g_dopeMov && !g_dopeDragPend) DopeMoveConfirm();
     g_dopeDragPend = false;
-    scrubbing=false; panelResize=false; ViewPortClickDown=false; g_redraw=true;
+    if (TiraActiva()) TiraSoltar();   // arrastrar una tira y soltar = listo ('g' sigue hasta el click)
+    scrubbing=false; panelResize=false; panelBarraH=false; panelPaneo=0; ViewPortClickDown=false; g_redraw=true;
 }
 // CERO (Symbian: la tecla 0 del teclado numerico del telefono) MANTENIDO = modificador de zoom para las flechas.
 // Si se suelta sin haber tocado ninguna flecha, fue un TOQUE: Frame Selected (el equivalente al numpad '.' de PC).
@@ -3582,6 +3716,11 @@ void Timeline::event_key_down(int tecla, bool repeticion){
     if (PopUpActive || g_textFieldActivo) return;
     const int k = tecla;
     // ---- DOPE SHEET (solo si hay filas) ----
+    if (TiraActiva()){ // corriendo una tira con 'g': Enter acepta, Esc cancela
+        if (k==W3dK_RETURN || k==W3dK_KP_ENTER){ TiraConfirmar(); return; }
+        if (k==W3dK_ESCAPE){ TiraCancelar(); return; }
+        return;
+    }
     if (g_dopeMov){ // transformando keyframes: Enter acepta, Esc cancela. El valor numerico lo alimenta
         if (k==W3dK_RETURN || k==W3dK_KP_ENTER){ DopeMoveConfirm(); return; }  // DopeNumInputChar (SDL_TEXTINPUT en
         if (k==W3dK_ESCAPE){ DopeMoveCancel(); return; }                       // PC, keypad en Symbian), igual que el 3D
@@ -3609,7 +3748,9 @@ void Timeline::event_key_down(int tecla, bool repeticion){
         if (k==W3dK_A)               { DopeSelectAll();  return; }    // A: seleccionar todos los keyframes
         if (k==W3dK_I && LCtrlPressed){ DopeSelectInvert(); return; } // Ctrl+I: invertir
         if (k==W3dK_D && LShiftPressed){ DopeDuplicarSeleccion(); return; } // Shift+D: DUPLICAR (y agarrar)
-        if (k==W3dK_X)               { DopeBorrarSeleccion(); return; } // X: borrar keyframes/filas seleccionadas
+        // X / Supr / Backspace (la C del N95): borrar los keyframes / las CURVAS (filas) elegidas
+        if (k==W3dK_X || k==W3dK_DELETE || k==W3dK_BACKSPACE) { DopeBorrarSeleccion(); return; }
+        if (k==W3dK_G && g_dopeKeySel.empty() && TiraGrabStart()) return; // G sin keyframes elegidos: los SONIDOS
         if (k==W3dK_G)               { DopeMoveStart(DOPE_MOV); return; } // G: MOVER
         if (k==W3dK_S)               { DopeMoveStart(DOPE_ESC); return; } // S: ESCALAR desde el pivote
         // R: ROTAR. Solo en CURVAS: en el dope sheet hay un solo eje (el tiempo) y girar no significa nada.
@@ -3631,4 +3772,307 @@ void Timeline::event_key_down(int tecla, bool repeticion){
     if (k==W3dK_DOWN)  { StepKeyframe(-1); return; }
     if (k==W3dK_HOME)  { GotoStart(); return; }
     if (k==W3dK_END)   { GotoEnd(); return; }
+}
+
+// ============================================================================
+//  LAS TIRAS DE SONIDO (objects/Sonido.h). Todo en SEGUNDOS de la escena: la tira de un sonido arranca en
+//  'inicio' y dura su tramo / su tono; con bucle se repite hasta el final del timeline (las repeticiones mas
+//  apagadas). Se corren y se recortan sin engancharse a los frames (Ctrl engancha al frame, si se quiere).
+// ============================================================================
+namespace {
+struct TiraOrig { Sonido* s; float inicio, ri, rf; };
+enum { TIRA_NADA = 0, TIRA_MOVER = 1, TIRA_RECINI = 2, TIRA_RECFIN = 3 };
+int  g_tiraModo = TIRA_NADA;
+bool g_tiraGrab = false;      // 'g': sigue al mouse hasta el click / Enter
+bool g_tiraArrancada = false; // arrastre: paso el umbral (un click limpio no corre nada)
+int  g_tiraX0 = 0, g_tiraY0 = 0;
+std::vector<TiraOrig> g_tiraOrig;
+Sonido* g_tiraHoverS = NULL; int g_tiraHoverB = 0;   // la punta bajo el mouse (TIRA_RECINI / TIRA_RECFIN)
+// el ANCHO de la zona que agarra una punta: generoso, para el dedo (y nunca menos que media fila)
+int TiraZonaBorde(int rowH) { int z = GlobalScale * 10; if (z < rowH / 2) z = rowH / 2; return z; }
+// el UNDO de una tira: intercambia lo vivo con lo guardado (undo y redo son el mismo toggle)
+struct UndoTira { std::vector<TiraOrig> v; };
+void UndoTiraAplicar(void* d) {
+    UndoTira* u = (UndoTira*)d;
+    for (size_t i = 0; i < u->v.size(); i++) {
+        TiraOrig& o = u->v[i]; if (!o.s) continue;
+        TiraOrig vivo = { o.s, o.s->inicio, o.s->recorteIni, o.s->recorteFin };
+        o.s->inicio = o.inicio; o.s->recorteIni = o.ri; o.s->recorteFin = o.rf;
+        o = vivo;
+    }
+    g_redraw = true;
+}
+void UndoTiraDesvincular(void* d, Object* borrado) {
+    UndoTira* u = (UndoTira*)d;
+    for (size_t i = 0; i < u->v.size(); i++) if ((Object*)u->v[i].s == borrado) u->v[i].s = NULL;
+}
+void UndoTiraLiberar(void* d) { delete (UndoTira*)d; }
+// la curva del VOLUMEN del sonido en la escena activa (NULL = no esta animado)
+const AnimProperty* CurvaVolumen(Object* o) {
+    for (size_t i = 0; i < AnimationObjects.size(); i++) {
+        if (AnimationObjects[i].obj != o) continue;
+        const std::vector<AnimProperty>& P = AnimationObjects[i].Propertys;
+        for (size_t p = 0; p < P.size(); p++)
+            if (P[p].Property == AnimSonido && P[p].component == AnimX && !P[p].keyframes.empty()) return &P[p];
+    }
+    return NULL;
+}
+}
+
+bool Timeline::TiraActiva() const { return g_tiraModo != TIRA_NADA && (g_tiraGrab || g_tiraArrancada || leftMouseDown); }
+
+void Timeline::DibujarTira(const DopeRow& d, int ry0) {
+    Sonido* s = (Sonido*)d.sonido;
+    const float L = s->DuracionEnEscena();
+    const float durArch = s->DuracionArchivo();
+    const int y0 = ry0 + GlobalScale, h = rowH * (1 + (d.tiraFilas > 0 ? d.tiraFilas : 0)) - GlobalScale * 2;
+    if (h <= 0) return;
+    const bool sel = s->select;
+    gfx::Disable(gfx::Texture2D); gfx::DisableArray(gfx::TexCoordArray); gfx::Enable(gfx::Blend); gfx::BlendAlpha();
+    if (L <= 0.0f) {   // sin archivo (o no se pudo leer): una marca donde arranca
+        const float x = FrameToX(W3dSonidoFrameDeSeg(s->inicio));
+        if (x >= panelW && x <= width) { gfx::Color4f(0.8f, 0.3f, 0.3f, 0.9f); FillRect((int)x, y0, GlobalScale * 3, h); }
+        return;
+    }
+    const int reps = s->bucle ? 100000 : 1;
+    const AnimProperty* cv = g_tlVerVolumen ? CurvaVolumen(s) : NULL;
+    for (int k = 0; k < reps; k++) {
+        const float sa = s->inicio + L * (float)k, sb = sa + L;
+        const float xa = FrameToX(W3dSonidoFrameDeSeg(sa)), xb = FrameToX(W3dSonidoFrameDeSeg(sb));
+        if (xa > width) break;
+        if (xb < panelW) continue;
+        const float ca = xa < panelW ? (float)panelW : xa, cb = xb > width ? (float)width : xb;
+        if (cb - ca < 1.0f) { if (xb - xa < 1.0f) break; continue; }
+        // la tira (las repeticiones del bucle, mas apagadas)
+        const float a = (k == 0) ? 1.0f : 0.55f;
+        if (sel) gfx::Color4f(0.16f * a + 0.05f, 0.52f * a, 0.56f * a, 0.95f); else gfx::Color4f(0.12f * a, 0.34f * a, 0.38f * a, 0.9f);
+        FillRect((int)ca, y0, (int)(cb - ca), h);
+        // la FORMA DE ONDA: la textura del archivo entero, recortada al tramo (solo con View > Waveform)
+        if (g_tlVerOnda && durArch > 0.0f) {
+            const unsigned int tex = W3dSonidoOnda(s->archivo);
+            if (tex) {
+                const float u0 = s->recorteIni / durArch, u1 = (durArch - s->recorteFin) / durArch;
+                const float ua = u0 + (u1 - u0) * (ca - xa) / (xb - xa), ub = u0 + (u1 - u0) * (cb - xa) / (xb - xa);
+                gfx::Enable(gfx::Texture2D); gfx::EnableArray(gfx::TexCoordArray); gfx::BindTexture(tex);
+                gfx::Color4f(0.75f, 0.95f, 1.0f, (k == 0) ? 0.85f : 0.45f);
+                const GLshort v[8] = { (GLshort)ca, (GLshort)y0, (GLshort)cb, (GLshort)y0, (GLshort)ca, (GLshort)(y0 + h), (GLshort)cb, (GLshort)(y0 + h) };
+                const GLfloat uv[8] = { ua, 0.0f, ub, 0.0f, ua, 1.0f, ub, 1.0f };
+                W3dDrawStrip4(v, uv);
+                gfx::Disable(gfx::Texture2D); gfx::DisableArray(gfx::TexCoordArray);
+                if (!Textures.empty() && Textures[0]) gfx::BindTexture(Textures[0]->iID);
+            }
+        }
+        // la LINEA DEL VOLUMEN (animado: su curva; si no, el valor fijo). Arriba = 1.25
+        if (g_tlVerVolumen) {
+            g_curvaBuf.clear();
+            float px = -1.0f, py = 0.0f;
+            const float paso = (float)GlobalScale * 3.0f;
+            for (float x = ca; ; x += paso) {
+                if (x > cb) x = cb;
+                const float f = XToFrame(x);
+                const float vol = cv ? cv->EvalF(f, s->volumen) : s->volumen;
+                float yy = (float)(y0 + h) - (vol / 1.25f) * (float)h;
+                if (yy < (float)y0) yy = (float)y0; if (yy > (float)(y0 + h)) yy = (float)(y0 + h);
+                if (px >= 0.0f) QuadLinea(g_curvaBuf, px, py, x, yy, (float)GlobalScale * 0.6f);
+                px = x; py = yy;
+                if (x >= cb) break;
+            }
+            if (!g_curvaBuf.empty()) {
+                gfx::Color4f(1.0f, 0.78f, 0.25f, (k == 0) ? 1.0f : 0.5f);
+                gfx::VertexPointer2f(0, &g_curvaBuf[0]); gfx::DrawTrianglesArray((int)(g_curvaBuf.size() / 2));
+            }
+        }
+        // las PUNTAS (se agarran para recortar): solo en la primera pasada. Arrastrandola = VERDE; con el mouse
+        // encima = BLANCA (y mas ancha); si no, celeste apagado
+        if (k == 0) {
+            for (int lado = TIRA_RECINI; lado <= TIRA_RECFIN; lado++) {
+                const bool arrastre = (g_tiraModo == lado && !g_tiraOrig.empty() && g_tiraOrig[0].s == s);
+                const bool hover = !arrastre && g_tiraModo == TIRA_NADA && g_tiraHoverS == s && g_tiraHoverB == lado;
+                const int an = GlobalScale * ((arrastre || hover) ? 3 : 2);
+                if (arrastre)   gfx::Color4f(TL_VERDE_LINEA[0], TL_VERDE_LINEA[1], TL_VERDE_LINEA[2], 1.0f);
+                else if (hover) gfx::Color4f(1.0f, 1.0f, 1.0f, 1.0f);
+                else            gfx::Color4f(0.85f, 0.95f, 1.0f, sel ? 0.9f : 0.5f);
+                if (lado == TIRA_RECINI) { if (xa >= panelW) FillRect((int)xa, y0, an, h); }
+                else                     { if (xb <= width)  FillRect((int)xb - an, y0, an, h); }
+            }
+        }
+        if (!s->bucle) break;
+    }
+    gfx::Disable(gfx::Blend);
+}
+
+int Timeline::TiraEn(int mx, int my, Sonido** out) {
+    if (out) *out = NULL;
+    if (dopeRows.empty() || modo != TL_MODO_DOPE) return TIRA_NADA;
+    const int lx = mx - x, ly = my - y;
+    if (lx < panelW || ly < stripY || ly >= height) return TIRA_NADA;
+    const int r = (ly - stripY - PosY) / (rowH > 0 ? rowH : 1);
+    if (r < 0 || r >= (int)dopeRows.size()) return TIRA_NADA;
+    const DopeRow& d = dopeRows[r];
+    if (!d.sonido || d.oculto) return TIRA_NADA;
+    Sonido* s = (Sonido*)d.sonido;
+    const float L = s->DuracionEnEscena();
+    const float xa = FrameToX(W3dSonidoFrameDeSeg(s->inicio));
+    const float xb = (L > 0.0f) ? FrameToX(W3dSonidoFrameDeSeg(s->inicio + L)) : xa + GlobalScale * 3;
+    const float fin = s->bucle ? (float)width : xb;
+    const float borde = (float)TiraZonaBorde(rowH);
+    if ((float)lx < xa - borde || (float)lx > fin + borde) return TIRA_NADA;
+    if (out) *out = s;
+    if (L <= 0.0f) return TIRA_MOVER;
+    // la punta MAS CERCANA (en una tira corta las dos zonas se pisan): la izquierda, la derecha o el cuerpo
+    const float da = fabsf((float)lx - xa), db = fabsf((float)lx - xb);
+    if (da <= borde && da <= db) return TIRA_RECINI;
+    if (db <= borde) return TIRA_RECFIN;
+    return TIRA_MOVER;
+}
+void Timeline::TiraHover(int mx, int my) {
+    Sonido* s = NULL;
+    const int b = TiraEn(mx, my, &s);
+    const int borde = (b == TIRA_RECINI || b == TIRA_RECFIN) ? b : 0;
+    Sonido* hs = borde ? s : NULL;
+    if (hs != g_tiraHoverS || borde != g_tiraHoverB) { g_tiraHoverS = hs; g_tiraHoverB = borde; g_redraw = true; }
+}
+bool Timeline::TiraClick(int mx, int my) {
+    Sonido* s = NULL;
+    const int modoT = TiraEn(mx, my, &s);
+    if (modoT == TIRA_NADA || !s) return false;
+    // el sonido clickeado pasa a ser el ACTIVO (su tarjeta en Properties); los seleccionados se corren juntos
+    if (ObjActivo != s) { ObjActivo = s; if (!s->select) s->Seleccionar(); }
+    g_tiraOrig.clear();
+    for (size_t i = 0; i < ObjSelects.size(); i++) {
+        Object* o = ObjSelects[i];
+        if (!o || o->getType() != ObjectType::sonido) continue;
+        if (modoT != TIRA_MOVER && o != s) continue;   // (recortar es de UNA)
+        Sonido* so = (Sonido*)o; TiraOrig t = { so, so->inicio, so->recorteIni, so->recorteFin }; g_tiraOrig.push_back(t);
+    }
+    if (g_tiraOrig.empty()) { TiraOrig t = { s, s->inicio, s->recorteIni, s->recorteFin }; g_tiraOrig.push_back(t); }
+    g_tiraModo = modoT; g_tiraGrab = false; g_tiraArrancada = false; g_tiraX0 = mx; g_tiraY0 = my;
+    g_redraw = true;
+    return true;
+}
+bool Timeline::TiraGrabStart() {
+    g_tiraOrig.clear();
+    for (size_t r = 0; r < dopeRows.size(); r++) {
+        Object* o = dopeRows[r].sonido;
+        if (!o || dopeRows[r].oculto) continue;
+        bool ya = false; for (size_t i = 0; i < g_tiraOrig.size(); i++) if (g_tiraOrig[i].s == o) ya = true;
+        if (ya) continue;
+        Sonido* so = (Sonido*)o; TiraOrig t = { so, so->inicio, so->recorteIni, so->recorteFin }; g_tiraOrig.push_back(t);
+    }
+    if (g_tiraOrig.empty()) return false;
+    g_tiraModo = TIRA_MOVER; g_tiraGrab = true; g_tiraArrancada = true; g_tiraX0 = lastMx; g_tiraY0 = lastMy;
+    g_redraw = true;
+    return true;
+}
+void Timeline::TiraAplicar(int mx) {
+    if (g_tiraModo == TIRA_NADA) return;
+    if (!g_tiraArrancada) {   // arrastre: un umbral para que un click limpio no corra la tira
+        const int ddx = mx - g_tiraX0; if (ddx * ddx <= (3 * GlobalScale) * (3 * GlobalScale)) return;
+        g_tiraArrancada = true;
+    }
+    const float fps = (float)(AnimFPS > 0 ? AnimFPS : 30);
+    float dSeg = (float)(mx - g_tiraX0) / (pxPerFrame > 0.01f ? pxPerFrame : 0.01f) / fps;
+    for (size_t i = 0; i < g_tiraOrig.size(); i++) {
+        const TiraOrig& o = g_tiraOrig[i]; Sonido* s = o.s; if (!s) continue;
+        const float tono = s->tono > 0.05f ? s->tono : 0.05f;
+        const float dur = s->DuracionArchivo();
+        if (g_tiraModo == TIRA_MOVER) {
+            s->inicio = o.inicio + dSeg;
+            if (LCtrlPressed) s->inicio = floorf(s->inicio * fps + 0.5f) / fps;   // Ctrl: enganchado al frame
+        } else if (g_tiraModo == TIRA_RECINI) {
+            float ri = o.ri + dSeg * tono;
+            // Ctrl: la punta IZQUIERDA cae justo en un fotograma (lo que se mueve es su momento en la escena)
+            if (LCtrlPressed) { const float t = floorf((o.inicio + (ri - o.ri) / tono) * fps + 0.5f) / fps; ri = o.ri + (t - o.inicio) * tono; }
+            const float tope = dur - o.rf - 0.01f;
+            if (ri < 0.0f) ri = 0.0f; if (ri > tope) ri = tope > 0.0f ? tope : 0.0f;
+            s->recorteIni = ri;
+            s->inicio = o.inicio + (ri - o.ri) / tono;   // lo que queda sigue en su lugar (se come la punta)
+        } else {
+            float rf = o.rf - dSeg * tono;
+            // Ctrl: la punta DERECHA cae justo en un fotograma
+            if (LCtrlPressed) {
+                const float finT = floorf((o.inicio + (dur - o.ri - rf) / tono) * fps + 0.5f) / fps;
+                rf = dur - o.ri - (finT - o.inicio) * tono;
+            }
+            const float tope = dur - o.ri - 0.01f;
+            if (rf < 0.0f) rf = 0.0f; if (rf > tope) rf = tope > 0.0f ? tope : 0.0f;
+            s->recorteFin = rf;
+        }
+    }
+    g_redraw = true;
+}
+static void TiraCerrarUndo() {
+    UndoTira* u = new UndoTira();
+    for (size_t i = 0; i < g_tiraOrig.size(); i++) {
+        const TiraOrig& o = g_tiraOrig[i];
+        if (o.s && (o.s->inicio != o.inicio || o.s->recorteIni != o.ri || o.s->recorteFin != o.rf)) u->v.push_back(o);
+    }
+    if (u->v.empty()) { delete u; return; }
+    UndoExterno f; f.aplicar = UndoTiraAplicar; f.desvincular = UndoTiraDesvincular; f.liberar = UndoTiraLiberar;
+    UndoPushExterno(f, u);
+}
+void Timeline::TiraConfirmar() {
+    if (g_tiraModo == TIRA_NADA) return;
+    TiraCerrarUndo();
+    g_tiraModo = TIRA_NADA; g_tiraGrab = false; g_tiraArrancada = false; g_tiraOrig.clear();
+    g_redraw = true;
+}
+void Timeline::TiraCancelar() {
+    for (size_t i = 0; i < g_tiraOrig.size(); i++) {
+        const TiraOrig& o = g_tiraOrig[i]; if (!o.s) continue;
+        o.s->inicio = o.inicio; o.s->recorteIni = o.ri; o.s->recorteFin = o.rf;
+    }
+    g_tiraModo = TIRA_NADA; g_tiraGrab = false; g_tiraArrancada = false; g_tiraOrig.clear();
+    g_redraw = true;
+}
+// soltar el boton: un ARRASTRE termina ahi; el 'g' sigue hasta el click
+void Timeline::TiraSoltar() {
+    if (g_tiraModo == TIRA_NADA || g_tiraGrab) return;
+    if (g_tiraArrancada) TiraConfirmar();
+    else { g_tiraModo = TIRA_NADA; g_tiraOrig.clear(); }
+}
+
+// (harness: 'sonido tira') el MISMO camino que el mouse sobre la primera tira: el hover de cada punta (y la zona
+// ancha para el dedo), agarrar la punta izquierda con Ctrl (cae justo en un fotograma), correr la tira con Ctrl y
+// el Ctrl+Z. false + err si algo no da
+bool W3dScriptTiraPrueba(Timeline* t, std::string& err) {
+    t->ConstruirDopeRows();
+    int r = -1;
+    for (size_t i = 0; i < t->dopeRows.size() && r < 0; i++) if (t->dopeRows[i].sonido && t->dopeRows[i].tiraFilas >= 0) r = (int)i;
+    if (r < 0) { err = "tira: no hay una fila de sonido"; return false; }
+    Sonido* s = (Sonido*)t->dopeRows[(size_t)r].sonido;
+    const float fps = (float)(AnimFPS > 0 ? AnimFPS : 30);
+    const int my = t->y + t->stripY + r * t->rowH + t->PosY + t->rowH / 2;
+    const int xa = t->x + (int)t->FrameToX(W3dSonidoFrameDeSeg(s->inicio));
+    const int xb = t->x + (int)t->FrameToX(W3dSonidoFrameDeSeg(s->inicio + s->DuracionEnEscena()));
+    if (xb - xa < GlobalScale * 40) { err = "tira: la tira es muy corta en pantalla para probar"; return false; }
+    t->TiraHover(xa + 1, my);                if (g_tiraHoverB != TIRA_RECINI) { err = "tira: el hover no marca la punta izquierda"; return false; }
+    t->TiraHover(xa + GlobalScale * 8, my);  if (g_tiraHoverB != TIRA_RECINI) { err = "tira: la zona de la punta es angosta"; return false; }
+    t->TiraHover(xb - 1, my);                if (g_tiraHoverB != TIRA_RECFIN) { err = "tira: el hover no marca la punta derecha"; return false; }
+    t->TiraHover((xa + xb) / 2, my);         if (g_tiraHoverB != 0) { err = "tira: el medio no es una punta"; return false; }
+    const float ini0 = s->inicio, ri0 = s->recorteIni;
+    const bool lmd = leftMouseDown, ctrl = LCtrlPressed;
+    // la punta IZQUIERDA con Ctrl
+    if (!t->TiraClick(xa + 1, my) || g_tiraModo != TIRA_RECINI) { err = "tira: el click no agarro la punta"; leftMouseDown = lmd; return false; }
+    leftMouseDown = true; LCtrlPressed = true;
+    t->TiraAplicar(xa + 1 + GlobalScale * 23);
+    const float f1 = s->inicio * fps;
+    leftMouseDown = false; t->TiraSoltar();
+    printf("      [tira] recorte con Ctrl: inicio %.4f s (frame %.4f) recorteIni %.4f\n", s->inicio, f1, s->recorteIni);
+    if (fabsf(f1 - floorf(f1 + 0.5f)) > 1e-3f || s->recorteIni <= ri0) { err = "tira: el recorte con Ctrl no cae en un fotograma"; LCtrlPressed = ctrl; return false; }
+    // la tira entera con Ctrl
+    const int mid = t->x + (int)t->FrameToX(W3dSonidoFrameDeSeg(s->inicio + s->DuracionEnEscena() * 0.5f));
+    if (!t->TiraClick(mid, my) || g_tiraModo != TIRA_MOVER) { err = "tira: el click no agarro la tira"; LCtrlPressed = ctrl; return false; }
+    leftMouseDown = true;
+    t->TiraAplicar(mid + GlobalScale * 31);
+    const float f2 = s->inicio * fps;
+    leftMouseDown = false; t->TiraSoltar();
+    LCtrlPressed = ctrl; leftMouseDown = lmd;
+    printf("      [tira] mover con Ctrl: inicio %.4f s (frame %.4f)\n", s->inicio, f2);
+    if (fabsf(f2 - floorf(f2 + 0.5f)) > 1e-3f) { err = "tira: mover con Ctrl no cae en un fotograma"; return false; }
+    // Ctrl+Z dos veces: como estaba
+    UndoDeshacer(); UndoDeshacer();
+    printf("      [tira] Ctrl+Z x2: inicio %.4f recorteIni %.4f (antes %.4f / %.4f)\n", s->inicio, s->recorteIni, ini0, ri0);
+    if (fabsf(s->inicio - ini0) > 1e-5f || fabsf(s->recorteIni - ri0) > 1e-5f) { err = "tira: el Ctrl+Z no la devolvio"; return false; }
+    return true;
 }

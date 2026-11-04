@@ -40,3 +40,12 @@ Affiche et modifie l'animation : feuille de keyframes (dope sheet) ou éditeur 
 | Smart Euler | Supprime les tours en trop dans les rotations sélectionnées. | Menu Key |
 | Masquer une courbe | L'œil de chaque ligne la masque. | Clic sur l'œil |
 | Valeurs exactes | Frame, valeur et poignées de la keyframe choisie. | Properties → Animation → Keyframe |
+
+## Sons
+
+| Fonction | Description | Raccourci |
+|---|---|---|
+| Bande du son | Chaque objet Sound sélectionné a sa bande : où il commence et combien il dure, en **secondes** (changer les FPS ne la déplace pas). Avec une boucle, elle se répète jusqu'à la fin. | — |
+| Déplacer | Glisser la bande, ou <kbd>G</kbd> sans keyframe choisie (déplace tous les sons sélectionnés). <kbd>Ctrl</kbd> aimante aux frames. | Glisser / <kbd>G</kbd> |
+| Couper | Saisir une extrémité de la bande. | Glisser une extrémité |
+| Forme d'onde / Ligne de volume | Menu View : la forme d'onde et la courbe du volume dans la bande (la bande prend trois lignes). Sans elles, c'est juste une bande. | Menu View |

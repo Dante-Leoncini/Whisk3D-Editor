@@ -1,6 +1,6 @@
 # Script Editor (IDE)
 
-A text editor for Lua scripts, with line numbers, syntax colors, indentation guides and support for ñ and accented letters. While it has focus, letters type (they don't trigger editor shortcuts). On Android, tapping the text opens the keyboard. On the N95 you type with T9.
+A text editor for Lua scripts and [hand-written shaders](shaders.md) (`.glsl`), with line numbers, syntax colors, indentation guides and support for ñ and accented letters. While it has focus, letters type (they don't trigger editor shortcuts). On Android, tapping the text opens the keyboard. On the N95 you type with T9.
 
 | Function | Description | Shortcut |
 |---|---|---|
@@ -10,6 +10,7 @@ A text editor for Lua scripts, with line numbers, syntax colors, indentation gui
 | Save inside the .w3d | Only if the script is external: puts it into the project. | File |
 | Save outside the .w3d... | Only if the script is internal: takes it out to a file; the objects switch to using that file. | File |
 | Refresh | Loads the file as it is on disk (what was edited with another editor). If there are unsaved changes in the editor, it asks before discarding them (and they can be recovered with <kbd>Ctrl+Z</kbd>). With the game running, it live-reloads the objects that use the script. | Button |
+| Shaders (.glsl) | Opened from the material (the small button on the **Shader** row), from the Library or from the selector, and highlighted as GLSL. **Compile** appears next to the name: it compiles what you're writing (if a material uses it, it saves it and compiles that material). Saving a shader compiles it in every material that uses it and reports whether it compiled, or the error with its line. | <kbd>Ctrl+S</kbd> |
 | Save protection | If the external file was changed elsewhere since it was opened, Save asks before overwriting it. Save also live-reloads the script if the game is running. | Automatic |
 | Indentation (Tab) | <kbd>Tab</kbd> fills up to the next multiple of 4; with several lines selected it indents them one level and <kbd>Shift+Tab</kbd> removes it. Vertical lines mark each level; the one for the cursor's block looks brighter. | <kbd>Tab</kbd> / <kbd>Shift+Tab</kbd> |
 | Edit menu | Undo, Redo, Cut, Copy, Paste, Find... and Replace... | Edit button |

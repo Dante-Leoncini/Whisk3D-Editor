@@ -8,12 +8,9 @@
 //  - PLAY:  snapshot del estado, carga los scripts (en el orden del arbol,
 //           como se dibuja/outliner), resuelve las referencias y llama
 //           inicio(); despues corre actualizar(dt) una vez por frame.
-//  - PAUSA: (barra espaciadora / boton) congela; los botones < > del
-//           timeline van FRAME A FRAME: adelante re-simula, atras VUELVE
-//           EN EL TIEMPO (el editor graba un snapshot por frame).
-//  - PLAY tras retroceder: descarta el futuro grabado y se sigue jugando
-//           desde ese momento (las variables internas del lua no viajan
-//           en el tiempo: solo el estado de los objetos).
+//  - PAUSA: (barra espaciadora / boton) congela; el boton > del timeline
+//           avanza FRAME A FRAME (simula uno). El juego no graba su pasado:
+//           no se rebobina.
 //  - STOP:  (boton "inicio" del timeline) restaura TODO al estado inicial
 //           y descarga los scripts.
 // ============================================================================
@@ -37,12 +34,9 @@ enum { SIM_PERF_FISICA = 0, SIM_PERF_HITBOX, SIM_PERF_LUA, SIM_PERF_ANIM, SIM_PE
 int SimPerfDesglose(double out[SIM_PERF_N], bool reiniciar);
 void SimLuaPerfTop(char* buf, int bufLen, int frames);   // top-3 scripts por ms ("Juego:41 agua:12"), resetea
 void SimStop();                   // restaurar el estado inicial + descargar
-bool SimStep(int dir);            // en pausa: +1 re-simula / -1 vuelve un frame
-void SimIrA(int tick);            // saltar a un frame GRABADO (scrub / ir al final)
+bool SimStep(int dir);            // en pausa: +1 simula un frame (-1 no hace nada: no se rebobina)
 void SimTeclaSDL(int sdlk, bool down);   // teclado del editor -> scripts
-int  SimFramesGrabados();
 int  SimFrameActual();
-int  SimPrimerFrame();            // el tick mas viejo aun grabado (el cache RUEDA)
 // re-resuelve las referencias/opciones de los scripts de 'o' (editar una propiedad
 // del script durante el juego se ve al instante)
 void SimReresolver(class Object* o);
@@ -53,10 +47,5 @@ void SimScriptsCambiados(class Object* o);
 // coordenadas de pantalla al LIENZO del juego y alimenta toque() de los scripts.
 // En el Editor2D usa el mapeo real (zoom/pan); en el 3D, el rect del viewport.
 void SimToquePantalla(class ViewportBase* v, int mx, int my, bool activo);
-// techo del cache de estados (frames): configurable desde la tarjeta Juego
-extern int gSimCacheMax;
-extern bool gSimCacheOn;   // cache de juego (rewind) ON/OFF: OFF = sin snapshot por tick -> juego fluido
-bool SimHayCache();        // hay frames grabados para rebobinar? (OFF/juego compilado -> false)
-void SimCacheReset();      // limpia el cache y lo re-ancla al tick actual (al des/tildar "Cache de juego")
 
 #endif // SIMJUEGO_H

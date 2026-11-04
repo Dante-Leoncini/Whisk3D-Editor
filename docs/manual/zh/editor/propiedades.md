@@ -6,7 +6,7 @@
 |---|---|
 | File / Render（软盘图标） | **File**：打开、保存、另存为、保存版本、提取资源。**Render**：路径、尺寸、额外通道、背景、**Ray Tracing**（光线、采样、通道）、Render Image 和 Render Animation。**Game**：平台（Windows、Symbian、Linux .deb、AppImage、WebGL、Android）、窗口、方向、图标、物理、声音和 Build game。**Export**：OBJ、glTF、GLB。**Settings**：语言、抗锯齿、图形、皮肤、日志、缩放、**Keyboard Shortcuts…** 和 Save Changes。 |
 | Object | 位置、旋转（Euler、四元数或轴角）、缩放、名称、可见、可渲染；对象的动画和调色板。 |
-| Contextual | 取决于对象类型：网格部分和**材质**（纹理、光照、顶点颜色、透明、反射、法线贴图、混合、深度、纹理层；启用光线追踪时还有 Roughness 和 Metallic）、灯光、相机、雾、粒子、物理、碰撞盒、骨架和骨骼、2D 元素、预制体、例程。 |
+| Contextual | 取决于对象类型：网格部分和**材质**（纹理、光照、顶点颜色、透明、反射、法线贴图、混合、深度、纹理层、**Advanced: custom shader**（见[手写着色器](shaders.md)）；启用光线追踪时还有 Roughness、Metallic、Transmission 和 IOR）、灯光、相机、雾、粒子、物理、碰撞盒、骨架和骨骼、2D 元素、预制体、例程。 |
 | 3D Mesh | 使用的网格（以及有多少对象共享它）、UV 贴图、颜色层、顶点组、UV 组。在 Library 中选中某个资源时：显示它的数据和存放位置（.w3d 内部或外部）。 |
 | Modifiers | 参见[修改器](modificadores.md)。 |
 | Transform | 仅在 Edit Mode 中：所选内容及其 UV 的中心，可以编辑。 |

@@ -41,9 +41,12 @@
 #ifdef _WIN32
 #define W3D_POPEN  _popen
 #define W3D_PCLOSE _pclose
+#include <direct.h>   // _rmdir
+#define W3D_RMDIR  _rmdir
 #else
 #define W3D_POPEN  popen
 #define W3D_PCLOSE pclose
+#define W3D_RMDIR  rmdir
 #include <unistd.h>
 #include <errno.h>
 #include <sys/select.h>
@@ -810,7 +813,7 @@ static void CopiarRefsRelativasDeLua(const std::string& out, const std::string& 
         if (!w3dFileSystem::FileExists(suelto)) continue;
         remove(suelto.c_str());
         const std::string dir = Carpeta(*it);
-        if (!dir.empty() && dir != *it) rmdir((out + "/" + dir).c_str());   // (si quedo vacia)
+        if (!dir.empty() && dir != *it) W3D_RMDIR((out + "/" + dir).c_str());   // (si quedo vacia)
     }
     if (nA || nC)
         w3dLogf("CompilarJuego: %d carpeta(s) y %d archivo(s) que el proyecto nombra por "
@@ -1637,7 +1640,10 @@ static const char* kFuentes3D[] = {
     "${W3DROOT}/main/objects/Culling.cpp",
     "${W3DROOT}/main/objects/LOD.cpp",
     "${W3DROOT}/main/objects/Niebla.cpp",         // la niebla puesta en el arbol (solo en Render)
+    "${W3DROOT}/main/objects/Sonido.cpp",         // el audio puesto en la escena (objeto Sonido)
     "${W3DROOT}/main/objects/Recorte.cpp",        // LimpiarZ / Recorte (composicion de la pantalla)
+    "${W3DROOT}/main/objects/PostprocesoObj.cpp", // el objeto Postproceso (el arbol lo trae)
+    "${W3DROOT}/main/render/Postproceso.cpp",     // su pila de efectos
     "${W3DROOT}/main/objects/Hitbox.cpp",         // Hitbox: caja de deteccion (el motor esta en el Core)
     "${W3DROOT}/main/objects/VisZona.cpp",
     "${W3DROOT}/main/objects/Collection.cpp",

@@ -12,6 +12,7 @@
 #include "w3dTexture.h"                  // TexturasMemoria: lo subido a GL, en el log de la precarga
 #include "render/EscenaRender.h"         // las capturas de pantalla ("Copy screen" y las texturas "pantalla:")
 #include "w3dlog.h"
+#include "objects/ShaderEscrito.h"     // el paso "Shader" (un shader escrito por su archivo)
 #include <map>
 #include <math.h>                  // cosf / sinf (el giro de "Matriz del objeto")
 #include <stdlib.h>
@@ -106,6 +107,7 @@ static const PasoInfo kPasos[PasoN] = {
     { "saltarRiel",      "Skip if camera riel", GrupoControl,   0, RefObjeto,  EnteroCuenta, OpcRiel,          false, 0, { 0 } },
     { "saltarNoListado", "Skip if not listed", GrupoControl,    0, RefObjeto,  EnteroCuenta, OpcNada,          false, 0, { 0 } },
     { "copiarPantalla",  "Copy screen",       GrupoTextura,     0, RefTextura, EnteroNada,   OpcNada,          false, 0, { 0 } },
+    { "shader",          "Shader",            GrupoDibujar,     4, RefShader,  EnteroNada,   OpcNada,          true,  "On", { "IOR", "Transmission", "Roughness", "Metallic" } },
 };
 static const char* const kGrupos[GrupoN] = { "Transform", "Draw", "Texture", "Fog", "Lights", "Alpha test", "Color",
                                              "Depth & clear", "Blending", "Face culling", "Control" };
@@ -318,7 +320,7 @@ static void ResolverPaso(W3dPaso& p, Object* desde, Object* noSoy, std::vector<M
     p.ptr = NULL; p.ptr2 = NULL;
     if (!p.ref2.empty()) p.ptr2 = W3dBuscarNombreDesde(desde, p.ref2);
     const int rt = W3dPasoRef(p.tipo);
-    if (rt == RefNada || rt == RefFuncion || p.ref.empty()) return;
+    if (rt == RefNada || rt == RefFuncion || rt == RefShader || p.ref.empty()) return;   // (un shader: por su archivo, al dibujar)
     if (rt == RefTextura && (p.tipo == PasoCopiarPantalla || W3dEsRutaCaptura(p.ref))) {
         // una CAPTURA DE PANTALLA (EscenaRender.h): se crea si no existe y no se retiene (es del registro de capturas)
         p.ptr = W3dCapturaTextura(p.ref, true);
@@ -719,7 +721,10 @@ static void DibujarVisibles(const W3dPaso& p) {
         gIboActual = 0;   // (los indices de cliente dejaron el ELEMENT_ARRAY en 0)
         return;
     }
-    MallaRecurso* r = m->malla;
+    // el IBO del recurso SOLO si la malla comparte sus caras con el: una malla con caras propias (en Edit, o recien
+    // salida con la publicacion diferida) tiene otra topologia, y los indices del recurso sobre SUS vertices dibujan
+    // basura o leen fuera del array (un extrude/delete cambia la cantidad de vertices)
+    MallaRecurso* r = (m->datosComp & W3DMD_FACES) ? m->malla : NULL;
     W3dFlujo f;
     if (r && W3dMallaRecursoAsegurarVBO(r) && W3dMallaFlujo(r, -1, RPrimTriangulos, f)) { Mandar(f, 0, -1); return; }
     if (m->faces && m->facesSize >= 3) {
@@ -790,6 +795,7 @@ static int LlamadasGL() {
 }
 
 // UN paso. 'i' es el indice en la lista (Saltar si lo avanza). 'yo' = la rutina duenia de la lista
+static bool gShaderRutinaPuesto = false;   // un paso "Shader" dejo un programa puesto (se saca al terminar la rutina)
 static void EjecutarPasoCrudo(W3dPaso& p, size_t& i, Rutina* yo);
 static void EjecutarPaso(W3dPaso& p, size_t& i, Rutina* yo) {
 #ifndef W3D_SYMBIAN
@@ -881,6 +887,16 @@ static void EjecutarPasoCrudo(W3dPaso& p, size_t& i, Rutina* yo) {
     case PasoTextura:        if (p.on) gfx::Enable(gfx::Texture2D); else gfx::Disable(gfx::Texture2D); break;
     case PasoFijarTextura:   gTexRutina = ((Texture*)p.ptr)->iID; gfx::BindTexture(gTexRutina); break;
     case PasoCopiarPantalla: W3dCapturaCopiarYa(p.ref); break;
+    case PasoShader: {   // el SHADER ESCRITO del archivo: los triangulos de despues lo usan (prendido) o no (apagado)
+        const int sh = p.on ? W3dShaderArchivo(p.ref) : 0;
+        if (sh) {
+            float q[gfx::ShaderEscritoParams];
+            W3dShaderParametros(q, p.n[0].Valor(), p.n[1].Valor(), p.n[2].Valor(), p.n[3].Valor());
+            gfx::ShaderEscritoUsar(sh, q);
+            gShaderRutinaPuesto = true;
+        } else gfx::ShaderEscritoUsar(0, NULL);
+        break;
+    }
     case PasoTexturaModo:
         // (DOT3: el color de vertice es la direccion de la luz, horneada; solo alfa: RGB del color, alfa de la textura por el del color)
         if (p.modo == 2) gfx::TexEnvDot3(true); else if (p.modo == 3) gfx::TexEnvAlphaOnly(true); else gfx::TexEnvReplace(p.modo == 1);
@@ -1158,19 +1174,24 @@ void W3dRutinasPorDefecto(Object* raiz, const std::string& nombreConstructor, co
     W3dPaso col = W3dPasoNuevo(PasoColorLimpieza);   // (el color una vez; la limpieza, cada cuadro)
     for (int k = 0; k < 4; k++) col.n[k].v = fondo[k];
     c->listas[Rutina::ModoDefecto].push_back(col);
-    Rutina* l = new Rutina(raiz, nombreLimpiar);
+    // la que LIMPIA va ADENTRO del constructor (siempre esta: es parte de preparar el cuadro). Corre despues de la lista
+    // del constructor (el "Clear color") y en cada cuadro, tambien en el modo solo-juego (Object::Render)
+    Rutina* l = new Rutina(c, nombreLimpiar);
     l->listas[Rutina::ModoDefecto].push_back(W3dPasoNuevo(PasoLimpiar));
-    // las dos ARRIBA de todo (el constructor primero): el orden del arbol es el de ejecucion
+    // el constructor ARRIBA de todo: el orden del arbol es el de ejecucion
     std::vector<Object*>& h = raiz->Childrens;
-    for (size_t i = 0; i < h.size(); i++) if (h[i] == c || h[i] == l) { h.erase(h.begin() + (long)i); i--; }
-    h.insert(h.begin(), (Object*)l);
+    for (size_t i = 0; i < h.size(); i++) if (h[i] == c) { h.erase(h.begin() + (long)i); i--; }
     h.insert(h.begin(), (Object*)c);
     g_w3dConstructorGen++;
 }
 
 void Rutina::Ejecutar(std::vector<W3dPaso>& L) {
+    static int nivel = 0;   // (las subrutinas tambien pasan por aca: el shader se saca al terminar la de AFUERA)
+    nivel++;
     const size_t n = L.size();
     for (size_t i = 0; i < n; i++) EjecutarPaso(L[i], i, this);
+    nivel--;
+    if (nivel == 0 && gShaderRutinaPuesto) { gfx::ShaderEscritoUsar(0, NULL); gShaderRutinaPuesto = false; }
 }
 
 // ---------------------------------------------------------------------------
@@ -1207,7 +1228,7 @@ bool W3dRutinaPasoDesdeLua(W3dPaso& p, std::string& error) {
             for (size_t j = 0; j < gEnCurso->texRetenidas.size() && !ya; j++) ya = (gEnCurso->texRetenidas[j] == tex[k]);
             if (ya) TexturaSoltar(tex[k]); else gEnCurso->texRetenidas.push_back(tex[k]);
         }
-        if (rt != RefNada && rt != RefFuncion && !p.ptr) { error = "no se encontro '" + p.ref + "'"; return false; }
+        if (rt != RefNada && rt != RefFuncion && rt != RefShader && !p.ptr) { error = "no se encontro '" + p.ref + "'"; return false; }
     }
     if (p.tipo == PasoVisible && !p.n[0].p) { error = "visible: el destino tiene que ser una memoria (@nombre[i])"; return false; }
     if (p.tipo == PasoLua && !p.ref2.empty() && !p.ptr2) { error = "lua: no existe el objeto '" + p.ref2 + "'"; return false; }
@@ -1269,6 +1290,9 @@ static void EscribirLista(std::string& s, int ind, std::vector<W3dPaso>& L,
                 Texture* tx = (Texture*)p.ptr;
                 RuEsc(s, emitirTextura(tx->path, ctx));
                 p.ref = tx->path;
+            } else if (emitirTextura && W3dPasoRef(p.tipo) == RefShader) {
+                // el .glsl entra al .w3d (shaders/) como un archivo mas; en memoria queda su entrada
+                RuEsc(s, emitirTextura(p.ref, ctx));
             } else RuEsc(s, p.ref);
         }
         if (!p.ref2.empty()) { s += ", \"ref2\": "; RuEsc(s, p.ref2); }
@@ -1402,7 +1426,7 @@ static void LeerLista(JVal* l, std::vector<W3dPaso>& L, std::string (*refTextura
         } else {
             p.modo = JI(o, "modo", 0);
         }
-        if (refTextura && W3dPasoRef(t) == RefTextura && !p.ref.empty()) p.ref = refTextura(p.ref, ctx);
+        if (refTextura && (W3dPasoRef(t) == RefTextura || W3dPasoRef(t) == RefShader) && !p.ref.empty()) p.ref = refTextura(p.ref, ctx);
         if (n) for (size_t k = 0; k < 5 && k < JFilaLen(n); k++) p.n[k] = num[k];
         if (version < 2 && t == PasoLimpiar) {
             // (version 1) un solo "Clear": on = el color (con sus 4 numeros), entero = la profundidad

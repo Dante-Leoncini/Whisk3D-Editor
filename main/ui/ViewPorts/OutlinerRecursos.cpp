@@ -23,11 +23,31 @@
 //  recorren sus menus).
 //  Motor generico: aca no hay nombres de ningun juego.
 // ============================================================================
+// (la fila de MEMORIA de la biblioteca: MemoriaProcesoKB)
+#if defined(_WIN32) && !defined(W3D_SYMBIAN)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef PSAPI_VERSION
+#define PSAPI_VERSION 2   // (K32GetProcessMemoryInfo, en kernel32: sin linkear psapi)
+#endif
+#include <windows.h>
+#include <psapi.h>
+#elif defined(W3D_SYMBIAN)
+#include <e32std.h>
+#include <hal.h>
+#endif
+#include <cstdio>
 #include "w3dGraphics.h"
 #ifdef _WIN32
     #include <windows.h>
 #endif
 #include "Outliner.h"
+#include "io/RecursosDatos.h"    // W3dBytesTexto (el tamano de cada recurso, la fila de memoria)
+#include "w3dTexture.h"          // TexturasMemoria (la memoria de video)
 #include "LayoutInput.h"                     // LayoutKey, LayoutMenuAbierto
 #include "LayoutArbol.h"                     // gancho de destruccion (el menu recuerda su outliner)
 #include "ViewPort3D.h"                      // el arrastre de un recurso al 3D
@@ -96,6 +116,16 @@ static bool MenorItem(const W3dRecursoItem* a, const W3dRecursoItem* b) {
     if (a->tipo != b->tipo) return a->tipo < b->tipo;
     return a->id < b->id;
 }
+// el ORDEN MANUAL (arrastrar entre dos recursos) manda; lo que no lo tiene va despues, por nombre
+static bool MenorItemOrden(const W3dRecursoItem* a, const W3dRecursoItem* b) {
+    const int ra = W3dBibOrden(W3dBibClave(a->tipo, a->id)), rb = W3dBibOrden(W3dBibClave(b->tipo, b->id));
+    if (ra >= 0 || rb >= 0) {
+        if (ra < 0) return false;
+        if (rb < 0) return true;
+        if (ra != rb) return ra < rb;
+    }
+    return MenorItem(a, b);
+}
 static bool MenorHoja(const std::string& a, const std::string& b) {
     return MenorTexto(W3dCarpetaHoja(a), W3dCarpetaHoja(b));
 }
@@ -116,6 +146,8 @@ static OutFilaRec FilaDeItem(const W3dRecursoItem* it, const std::string& carpet
     f.renombrable = it->renombrable && !f.soloLectura;
     f.parte = !it->padre.empty();
     f.sucio = !libExt && W3dCambiosRecursoSucio(it->tipo, it->id);
+    f.bytes = it->bytes;
+    f.cargado = it->cargado;
     return f;
 }
 // arma las filas de 'carpeta' (sus subcarpetas primero, despues sus recursos) con su sangria. Las PARTES de un
@@ -143,7 +175,7 @@ static void ArmarFilas(const std::string& carpeta, int prof,
         if (!f.plegada) ArmarFilas(hs[i], prof + 1, hijas, deCarpeta, partes, cuenta, plegadas, libExt, out);
     }
     std::vector<const W3dRecursoItem*>& its = deCarpeta[carpeta];
-    std::sort(its.begin(), its.end(), MenorItem);
+    std::sort(its.begin(), its.end(), MenorItemOrden);
     for (size_t i = 0; i < its.size(); i++) {
         out.push_back(FilaDeItem(its[i], carpeta, prof, libExt));
         std::map<std::string, std::vector<const W3dRecursoItem*> >::iterator p =
@@ -203,7 +235,29 @@ void Outliner::FilasRecursos(std::vector<OutFilaRec>& out) {
         deCarpeta[items[i].carpeta].push_back(&items[i]);
         for (std::string c = items[i].carpeta; !c.empty(); c = W3dCarpetaPadre(c)) cuenta[c]++;
     }
-    ArmarFilas("", 0, hijas, deCarpeta, partes, cuenta, libExt ? plegadasExt : plegadas, libExt, out);
+    static const std::set<std::string> kNinguna;   // (la cuadricula no pliega: arma todo y se queda con una carpeta)
+    ArmarFilas("", 0, hijas, deCarpeta, partes, cuenta, cuadricula ? kNinguna : (libExt ? plegadasExt : plegadas), libExt, out);
+    if (cuadricula) {
+        // UNA carpeta a la vez: sus subcarpetas y sus recursos, como celdas. Arriba de la raiz, "Ir atras"
+        if (!carpetaGrid.empty() && std::find(carpetas.begin(), carpetas.end(), carpetaGrid) == carpetas.end()) carpetaGrid.clear();
+        std::vector<OutFilaRec> grilla;
+        if (!carpetaGrid.empty()) {
+            OutFilaRec b;
+            b.carpeta = true; b.atras = true;
+            b.clave = W3dCarpetaPadre(carpetaGrid);
+            b.nombre = T("Go back");
+            b.carpetaDe = carpetaGrid;
+            b.icono = (int)IconType::carpeta;
+            b.soloLectura = libExt;
+            grilla.push_back(b);
+        }
+        for (size_t i = 0; i < out.size(); i++) {
+            if (out[i].parte || out[i].carpetaDe != carpetaGrid) continue;
+            OutFilaRec f = out[i]; f.prof = 0;
+            grilla.push_back(f);
+        }
+        out.swap(grilla);
+    }
     // la SELECCION no puede nombrar lo que ya no esta (purgado, renombrado por un undo...)
     if (!selRecursos.empty()) {
         for (std::set<std::string>::iterator it = selRecursos.begin(); it != selRecursos.end(); )
@@ -222,40 +276,80 @@ static std::set<std::string>& PlegadasDe(Outliner* o) { return o->VistaSoloLectu
 // ============================================================================
 //  LA GEOMETRIA (lista y cuadricula)
 // ============================================================================
-int Outliner::CeldaTam() const { return 44 * GlobalScale; }
+// CUADRICULA: entrar a una carpeta (un click en ella; "Ir atras" sube)
+void Outliner::EntrarCarpetaGrid(const std::string& carpeta) {
+    extern unsigned int w3dGetTicks();
+    carpetaGrid = carpeta;
+    entroMs = w3dGetTicks();
+    if (entroMs == 0) entroMs = 1;
+    lastContentRows = -1; PosY = 0; g_redraw = true;
+}
+static bool RecienEntro(Outliner* o) {
+    extern unsigned int w3dGetTicks();
+    if (!o->entroMs) return false;
+    if (w3dGetTicks() - o->entroMs > 500u) { o->entroMs = 0; return false; }
+    return true;
+}
+int Outliner::AltoCabecera() const { return (EnBiblioteca() && !cuadricula) ? (int)RenglonHeightGS : 0; }
+int Outliner::TopContenido() const { return BarTopOffset() + AltoCabecera(); }
+void Outliner::ColumnasLista(int& xTipo, int& xTam, int& xEst, int& xFin) const {
+    const int g = GlobalScale > 0 ? GlobalScale : 1;
+    const int reservaBarra = scrollY ? (GlobalScale * 9 + gapGS) : 0;
+    const bool conEstado = !VistaSoloLectura() && verUsos;
+    // los anchos de siempre: "3D Mesh" / "123.4 KB" / [carpeta] 999 [tilde]
+    const int def[3] = { 10 * CharacterWidthGS + gapGS, 8 * CharacterWidthGS + 2 * gapGS,
+                         2 * IconSizeGS + 3 * CharacterWidthGS + 3 * gapGS };
+    int w[3];
+    for (int k = 0; k < 3; k++) w[k] = colAncho[k] > 0 ? colAncho[k] * g : def[k];
+    xFin = width - marginGS - borderGS - reservaBarra;
+    xEst = conEstado ? xFin - w[2] : xFin;
+    xTam = verTamanos ? xEst - w[1] : xEst;
+    xTipo = verTipo ? xTam - w[0] : xTam;
+    // (el nombre nunca desaparece del todo: la columna Tipo cede lo que haga falta)
+    const int minNombre = 2 * (IconSizeGS + gapGS) + 4 * CharacterWidthGS;
+    if (xTipo < minNombre) xTipo = minNombre < xTam ? minNombre : xTam;
+}
+int Outliner::DivisorEnPunto(int mx, int my) const {
+    if (!EnBiblioteca() || cuadricula || !Contains(mx, my)) return -1;
+    const int ly = my - y;
+    if (ly < BarTopOffset() || ly >= height - AltoFilaMemoria()) return -1;
+    int xT, xTm, xE, xF; ColumnasLista(xT, xTm, xE, xF);
+    const int lx = mx - x, tol = 3 * GlobalScale;
+    if (!VistaSoloLectura() && verUsos && xE < xF && lx >= xE - tol && lx <= xE + tol) return 2;
+    if (verTamanos && lx >= xTm - tol && lx <= xTm + tol) return 1;
+    if (xT < xTm && lx >= xT - tol && lx <= xT + tol) return 0;
+    return -1;
+}
+int Outliner::CeldaTam() const { return (int)(44.0f * (float)GlobalScale * celdaZoom); }
 
 // LISTA: la fila i ocupa una franja de RenglonHeightGS. CUADRICULA: las carpetas son franjas (con su
 // sangria, como en la lista) y los recursos de una misma carpeta fluyen en CELDAS cuadradas (miniatura +
 // nombre) de izquierda a derecha; una carpeta nueva (o el fin de la tanda) empieza otra franja.
 // Coordenadas del PANEL sin el scroll (quien dibuja o pickea suma PosY; la cuadricula no scrollea en X).
 void Outliner::RectFila(const std::vector<OutFilaRec>& filas, int i, int& rx, int& ry, int& rw, int& rh) const {
-    const int top = borderGS + BarTopOffset();
+    const int top = borderGS + TopContenido();
     const int alto = (int)RenglonHeightGS;
     rx = 0; rw = width; rh = alto; ry = top + i * alto;
     if (!cuadricula) return;
+    // CUADRICULA: celdas que fluyen de izquierda a derecha. Cada una: el CUADRADO (miniatura / icono) y debajo, afuera
+    // de el, el nombre y (con "Sizes") el tamanio
     const int celda = CeldaTam();
+    const int altoCelda = celda + gapGS + alto * (verTamanos ? 2 : 1);
     const int reserva = scrollY ? (GlobalScale * 9 + gapGS) : 0;
     const int limite = width - marginGS - reserva;
-    int yy = top, xx = marginGS, altoTanda = 0;
+    int yy = top, xx = marginGS;
     for (int k = 0; k <= i && k < (int)filas.size(); k++) {
-        const OutFilaRec& f = filas[(size_t)k];
-        if (f.carpeta) {
-            if (altoTanda) { yy += altoTanda; altoTanda = 0; }
-            if (k == i) { rx = 0; ry = yy; rw = width; rh = alto; return; }
-            yy += alto;
-            continue;
-        }
-        const int sangria = f.prof * (IconSizeGS + gapGS);
-        if (altoTanda == 0) { xx = marginGS + sangria; altoTanda = celda + gapGS; }
-        else if (xx + celda > limite) { yy += altoTanda; xx = marginGS + sangria; }
-        if (k == i) { rx = xx; ry = yy; rw = celda; rh = celda; return; }
+        if (xx + celda > limite && xx > marginGS) { xx = marginGS; yy += altoCelda + gapGS; }
+        if (k == i) { rx = xx; ry = yy; rw = celda; rh = altoCelda; return; }
         xx += celda + gapGS;
     }
 }
 int Outliner::FilaEnPunto(const std::vector<OutFilaRec>& filas, int mx, int my) const {
+    // la fila de la MEMORIA (fija, abajo) tapa lo que pasa por debajo: ahi no hay fila que elegir
+    if (AltoFilaMemoria() > 0 && my >= y + height - borderGS - AltoFilaMemoria()) return -1;
     const int ly = my - y - PosY;
     if (!cuadricula) {
-        const int rel = ly - borderGS - BarTopOffset();
+        const int rel = ly - borderGS - TopContenido();
         if (rel < 0) return -1;
         const int f = rel / (int)RenglonHeightGS;
         return (f >= 0 && f < (int)filas.size()) ? f : -1;
@@ -377,7 +471,7 @@ int Outliner::FilaDelCursor(const std::vector<OutFilaRec>& filas) const {
 }
 
 int Outliner::FilaRecursoY(int fila) const {
-    if (!cuadricula) return y + borderGS + PosY + BarTopOffset() + fila * (int)RenglonHeightGS + (int)RenglonHeightGS / 2;
+    if (!cuadricula) return y + borderGS + PosY + TopContenido() + fila * (int)RenglonHeightGS + (int)RenglonHeightGS / 2;
     std::vector<OutFilaRec> filas;
     const_cast<Outliner*>(this)->FilasRecursos(filas);
     int rx, ry, rw, rh;
@@ -408,10 +502,16 @@ bool Outliner::VistaDeClave(const std::string& c) {
     return false;
 }
 
-static std::string TituloVista(int v) {
+static std::string TituloVista(int v, bool enBiblioteca) {
     if (v == OUT_VISTA_ESCENA) return T("Scene");
-    if (v == OUT_VISTA_BIBLIOTECA) return T("Library");
+    if (v == OUT_VISTA_BIBLIOTECA) return enBiblioteca ? T("Project") : T("Library");   // (el viewport ya es "Library")
     return W3dLibreriaNombre(v - OUT_VISTA_LIBEXT);
+}
+
+Biblioteca::Biblioteca() {
+    vista = OUT_VISTA_BIBLIOTECA;
+    cuadricula = true;   // (la biblioteca arranca en cuadricula: las miniaturas)
+    SincronizarBarraVista();
 }
 
 void Outliner::SincronizarBarraVista() {
@@ -422,20 +522,32 @@ void Outliner::SincronizarBarraVista() {
         plegadasExt.clear();
         lastContentRows = -1;
     }
-    const std::string t = TituloVista(vista);
+    const bool esBib = (ViewportKind() == 9);
+    // el selector de la VISTA es de la BIBLIOTECA (el proyecto / cada libreria vinculada / vincular una): el outliner
+    // de la escena no lo tiene (ahi va el selector de la escena que se edita)
+    { const bool ver = esBib || EnBiblioteca(); if (btnVista->visible != ver) { btnVista->visible = ver; g_redraw = true; } }
+    const std::string t = TituloVista(vista, esBib);
     if (btnVista->text != t) { btnVista->text = t; g_redraw = true; }
-    btnVista->icon = (int)IconType::visible;   // el OJO: "lo que se ve en el outliner"
-    if (btnObjeto) btnObjeto->text = T("Object");
-    if (btnSeleccion) btnSeleccion->text = T("Select");
+    // QUE se ve: la camara (la escena), la carpeta (la biblioteca) o la libreria externa
+    btnVista->icon = (vista == OUT_VISTA_ESCENA) ? (int)IconType::camera
+                   : (vista == OUT_VISTA_BIBLIOTECA) ? (int)IconType::carpeta : (int)IconType::libreria;
+    if (btnOpciones) btnOpciones->icon = (int)IconType::visible;   // el OJO: COMO se ve
+    // (solo iconos, como la barra del 3D: el menu abierto lleva su titulo y el cartelito de ayuda dice que es)
+    if (btnObjeto) { btnObjeto->text.clear(); btnObjeto->icon = (int)IconType::object; btnObjeto->ayuda = "Element"; }
+    if (btnSeleccion) { btnSeleccion->text.clear(); btnSeleccion->icon = (int)IconType::seleccion; btnSeleccion->ayuda = "Select"; }
     const bool bib = EnBiblioteca();
+    // el "+" (nueva carpeta, nuevo material, nueva escena / juego / prefab) es de la biblioteca: en la escena no va
+    if (btnNueva && btnNueva->visible != bib) { btnNueva->visible = bib; g_redraw = true; }
     if (btnFiltro) {
         if (btnFiltro->visible != bib) { btnFiltro->visible = bib; g_redraw = true; }
-        const std::string ft = filtro < 0 ? std::string(T("All")) : std::string(T(W3dVistaTitulo(filtro)));
-        if (btnFiltro->text != ft) { btnFiltro->text = ft; g_redraw = true; }
-        btnFiltro->icon = (int)IconType::filtro;
+        // solo el icono: el embudo (todo) o el del tipo filtrado
+        if (!btnFiltro->text.empty()) { btnFiltro->text.clear(); g_redraw = true; }
+        btnFiltro->icon = filtro < 0 ? (int)IconType::filtro : W3dVistaIcono(filtro);
+        btnFiltro->ayuda = "Filter";
     }
     if (btnCuadricula) {
-        if (btnCuadricula->visible != bib) { btnCuadricula->visible = bib; g_redraw = true; }
+        // (lista / cuadricula paso al OJO: el interruptor suelto ya no va en la barra)
+        if (btnCuadricula->visible) { btnCuadricula->visible = false; g_redraw = true; }
         // el icono dice a que se PASA con el click (como un interruptor): en lista, la cuadricula
         btnCuadricula->icon = cuadricula ? (int)IconType::lista : (int)IconType::cuadricula;
     }
@@ -457,7 +569,7 @@ void Outliner::CambiarVista(int v) {
     PosY = 0; PosX = 0;
     hoverFila = -1;
     recArrastre = recArrastrando = recArrastreCarpeta = recSoloAlSoltar = false;
-    recDropFila = -1;
+    recDropFila = -1; recInsFila = -1; g_outArrastre.fantasma = false;
     agarreFila = -1;
     dragObjeto = NULL; dragging = false; dropZona = -2;
     cursorEsCarpeta = false;
@@ -575,31 +687,58 @@ static void AccionVistaElegida(int id) {
     }
     o->CambiarVista(id);
 }
+// ---- el OJO de la barra: COMO se ve lo que se ve. Biblioteca: lista / cuadricula, la fila de memoria y los tamanos;
+//      escena: el Constructor, las rutinas y las columnas de ojo y camara ----
+static PopupMenu* gMenuOpciones = NULL;
+enum { OPC_LISTA = 870, OPC_CUADRICULA, OPC_MEMORIA, OPC_TAMANOS, OPC_TIPO, OPC_USOS };
+static void AccionOpcionElegida(int id) {
+    Outliner* o = gMenuDe;
+    if (!o) return;
+    if (id == OPC_LISTA)      { o->CambiarCuadricula(false); return; }
+    if (id == OPC_CUADRICULA) { o->CambiarCuadricula(true); return; }
+    o->lastContentRows = -1;   // (la fila de memoria y la columna del tamano cambian lo que hay que scrollear)
+    o->Resize(o->width, o->height);
+    g_redraw = true;   // (los checks ya cambiaron su bool)
+}
+static void ArmarMenuOpciones(Outliner* o) {
+    if (!gMenuOpciones) { gMenuOpciones = new PopupMenu(); gMenuOpciones->action = AccionOpcionElegida; }
+    gMenuOpciones->Limpiar();
+    gMenuOpciones->titulo = T("View");
+    if (o->EnBiblioteca()) {
+        MenuItem* it = gMenuOpciones->Agregar(T("List"), OPC_LISTA, IconType::lista);
+        if (it) it->verde = !o->cuadricula;
+        it = gMenuOpciones->Agregar(T("Grid"), OPC_CUADRICULA, IconType::cuadricula);
+        if (it) it->verde = o->cuadricula;
+        gMenuOpciones->AgregarCheck(T("Memory usage"), OPC_MEMORIA, &o->verMemoria);
+        // las COLUMNAS (en la lista; en la cuadricula, el tamanio va debajo del nombre y los usos en el icono)
+        gMenuOpciones->AgregarCheck(T("Type"), OPC_TIPO, &o->verTipo);
+        gMenuOpciones->AgregarCheck(T("Sizes"), OPC_TAMANOS, &o->verTamanos);
+        if (!o->VistaSoloLectura()) gMenuOpciones->AgregarCheck(T("Users"), OPC_USOS, &o->verUsos);
+    } else {
+        gMenuOpciones->AgregarCheck(T("Constructor"), VIS_VER_CONSTRUCTOR, &g_outVerConstructor);
+        gMenuOpciones->AgregarCheck(T("Routines"), VIS_VER_RUTINAS, &g_outVerRutinas);
+        gMenuOpciones->AgregarCheck(T("Visibility icons"), VIS_VER_OJOS, &g_outVerOjos, (int)IconType::visible);
+        gMenuOpciones->AgregarCheck(T("Render icons"), VIS_VER_RENDER, &g_outVerRender, (int)IconType::camera);
+    }
+}
+
 static void ArmarMenuVista(Outliner* o) {
     if (!gMenuVista) { gMenuVista = new PopupMenu(); gMenuVista->action = AccionVistaElegida; }
     if (!gMenuDesvincular) { gMenuDesvincular = new PopupMenu(); gMenuDesvincular->action = AccionVistaElegida; }
     gMenuVista->Limpiar();
-    MenuItem* it = gMenuVista->Agregar(T("Scene"), OUT_VISTA_ESCENA, W3dRaizIcono(W3dRaizTipoActiva()));
-    if (it) it->verde = (o->vista == OUT_VISTA_ESCENA);
-    it = gMenuVista->Agregar(T("Library"), OUT_VISTA_BIBLIOTECA, IconType::carpeta);
+    const bool esBib = (o->ViewportKind() == 9);
+    MenuItem* it = NULL;
+    if (!esBib) {   // (un outliner que el harness paso a los recursos: puede volver a la escena)
+        it = gMenuVista->Agregar(T("Scene"), OUT_VISTA_ESCENA, W3dRaizIcono(W3dRaizTipoActiva()));
+        if (it) it->verde = (o->vista == OUT_VISTA_ESCENA);
+    }
+    it = gMenuVista->Agregar(TituloVista(OUT_VISTA_BIBLIOTECA, esBib), OUT_VISTA_BIBLIOTECA, IconType::carpeta);
     if (it) it->verde = (o->vista == OUT_VISTA_BIBLIOTECA);
     gMenuDesvincular->Limpiar();
     for (int i = 0; i < W3dLibreriasCantidad(); i++) {
         it = gMenuVista->Agregar(W3dLibreriaNombre(i), OUT_VISTA_LIBEXT + i, IconType::libreria);
         if (it) it->verde = (o->vista == OUT_VISTA_LIBEXT + i);
         gMenuDesvincular->Agregar(W3dLibreriaNombre(i), VIS_DESVINCULAR + i, IconType::libreria);
-    }
-    // lista / cuadricula (lo mismo que el interruptor de la barra: asi tambien se alterna sin mouse)
-    if (o->EnBiblioteca()) {
-        it = gMenuVista->Agregar(T("Grid"), VIS_CUADRICULA, IconType::cuadricula);
-        if (it) it->verde = o->cuadricula;
-    }
-    // vista ESCENA: que se muestra en el arbol (el Constructor, las demas rutinas, las columnas de ojo y camara)
-    if (o->vista == OUT_VISTA_ESCENA) {
-        gMenuVista->AgregarCheck(T("Constructor"), VIS_VER_CONSTRUCTOR, &g_outVerConstructor);
-        gMenuVista->AgregarCheck(T("Routines"), VIS_VER_RUTINAS, &g_outVerRutinas);
-        gMenuVista->AgregarCheck(T("Visibility icons"), VIS_VER_OJOS, &g_outVerOjos, (int)IconType::visible);
-        gMenuVista->AgregarCheck(T("Render icons"), VIS_VER_RENDER, &g_outVerRender, (int)IconType::camera);
     }
     gMenuVista->Agregar(T("Link .w3d..."), VIS_VINCULAR, IconType::mas);
     if (W3dLibreriasCantidad() > 0) gMenuVista->Agregar(T("Unlink"), 0, IconType::borrar, gMenuDesvincular);
@@ -714,7 +853,7 @@ static void ArmarMenuObjeto(Outliner* o) {
     if (!gMenuObjeto) { gMenuObjeto = new PopupMenu(); gMenuObjeto->action = AccionObjetoElegida; }
     if (!gMenuMover) { gMenuMover = new PopupMenu(); gMenuMover->action = AccionMoverElegida; }
     gMenuObjeto->Limpiar();
-    gMenuObjeto->titulo.clear();
+    gMenuObjeto->titulo = T("Element");   // (el boton es solo un icono: el menu dice que es)
     if (o->vista == OUT_VISTA_ESCENA) {
         const bool hay = (ObjActivo != NULL) || !ObjSelects.empty();
         MenuItem* it;
@@ -813,6 +952,7 @@ static void ArmarMenuSeleccion(Outliner* o) {
     (void)o;
     if (!gMenuSeleccion) { gMenuSeleccion = new PopupMenu(); gMenuSeleccion->action = AccionSeleccionElegida; }
     gMenuSeleccion->Limpiar();
+    gMenuSeleccion->titulo = T("Select");
     ConAtajo(gMenuSeleccion->Agregar(T("Select All"), SEL_TODO, IconType::seleccion), "@out.seleccionarTodo");
     ConAtajo(gMenuSeleccion->Agregar(T("Deselect All"), SEL_NADA, IconType::seleccion), "@out.deseleccionar");
     ConAtajo(gMenuSeleccion->Agregar(T("Invert Selection"), SEL_INVERTIR, IconType::seleccion), "@out.invertir");
@@ -842,6 +982,7 @@ static void AccionFiltroElegido(int id) { if (gMenuDe) gMenuDe->CambiarFiltro(id
 static void ArmarMenuFiltro(Outliner* o) {
     if (!gMenuFiltro) { gMenuFiltro = new PopupMenu(); gMenuFiltro->action = AccionFiltroElegido; }
     gMenuFiltro->Limpiar();
+    gMenuFiltro->titulo = T("Filter");
     MenuItem* it = gMenuFiltro->Agregar(T("All"), 0, IconType::filtro);
     if (it) it->verde = (o->filtro < 0);
     std::vector<int> tipos;
@@ -861,6 +1002,7 @@ bool Outliner::AbrirMenuBoton(int idx) {
     ActualizarBarra();         // sx/sy frescos
     gMenuDe = this;
     if (b == btnVista) { ArmarMenuVista(this); AbrirBajo(gMenuVista, b); return true; }
+    if (b == btnOpciones) { ArmarMenuOpciones(this); AbrirBajo(gMenuOpciones, b); return true; }
     if (b == btnObjeto) { ArmarMenuObjeto(this); AbrirBajo(gMenuObjeto, b); return true; }
     if (b == btnSeleccion) { ArmarMenuSeleccion(this); AbrirBajo(gMenuSeleccion, b); return true; }
     if (b == btnFiltro) { ArmarMenuFiltro(this); AbrirBajo(gMenuFiltro, b); return true; }
@@ -913,6 +1055,7 @@ int Outliner::BotonDelMenuAbierto() const {
     if (gMenuDe != this || !MenuAbierto || !MenuAbierto->abierto) return -1;
     for (size_t i = 0; i < BarButtons.size(); i++) {
         if (BarButtons[i] == btnVista && MenuAbierto == gMenuVista) return (int)i;
+        if (BarButtons[i] == btnOpciones && MenuAbierto == gMenuOpciones) return (int)i;
         if (BarButtons[i] == btnObjeto && MenuAbierto == gMenuObjeto) return (int)i;
         if (BarButtons[i] == btnSeleccion && MenuAbierto == gMenuSeleccion) return (int)i;
         if (BarButtons[i] == btnRaiz && MenuAbierto == gMenuRaiz) return (int)i;
@@ -985,9 +1128,11 @@ void Outliner::ResizeRecursos() {
         // la cuadricula no scrollea en X: su alto es el fondo de la ultima celda
         int rx, ry, rw, rh;
         RectFila(filas, (int)filas.size() - 1, rx, ry, rw, rh);
-        maxY = -(ry + rh - borderGS - BarTopOffset() + (int)RenglonHeightGS) - marginGS;
+        maxY = -(ry + rh - borderGS - TopContenido() + (int)RenglonHeightGS) - marginGS;
     }
-    ResizeScrollbar(width, height, maxX, maxY, BarTopOffset());
+    if (verTamanos && !cuadricula) maxX += 9 * LetterWidthGS;   // (la columna del tamano)
+    maxY -= AltoFilaMemoria();   // la fila de la MEMORIA (fija, abajo) no tapa la ultima fila: se puede scrollear hasta verla
+    ResizeScrollbar(width, height, maxX, maxY, TopContenido());
     const int reservaV = scrollY ? (borderGS + GlobalScale * 9 + 2) : 0;
     Renglon->SetSize(0, 0, (GLshort)(width - reservaV), RenglonHeightGS);
 }
@@ -1012,6 +1157,23 @@ static void RectLiso(int rx, int ry, int rw, int rh) {
     r->RenderObject(false);
     w3dEngine::Enable(w3dEngine::Texture2D);
 }
+// un icono de la UI en (px, py) a 'sz' px (espejado = la flecha de "Ir atras": arrowRight dada vuelta)
+static void IconoEn(int icono, int px, int py, int sz, bool espejado) {
+    if (icono < 0 || icono >= (int)IconsUV.size()) return;
+    const GLfloat* uv = IconsUV[(size_t)icono]->uvs;
+    GLfloat fuv[8];
+    if (espejado) {
+        fuv[0] = uv[2]; fuv[1] = uv[1]; fuv[2] = uv[0]; fuv[3] = uv[3];
+        fuv[4] = uv[6]; fuv[5] = uv[5]; fuv[6] = uv[4]; fuv[7] = uv[7]; uv = fuv;
+    }
+    w3dEngine::PushMatrix();
+    w3dEngine::Translatef((GLfloat)px, (GLfloat)py, 0);
+    if (sz != IconSizeGS) w3dEngine::Scalef((GLfloat)sz / (GLfloat)IconSizeGS, (GLfloat)sz / (GLfloat)IconSizeGS, 1.0f);
+    W3dDrawStrip4(IconMesh, uv);
+    w3dEngine::PopMatrix();
+}
+// una ESCENA no esta "en uso" ni "huerfana" (se abre, no la usa nadie): sin tilde/cruz ni cuenta de usuarios
+static bool SinEstadoDeUso(const OutFilaRec& f) { return f.carpeta || f.tipo == W3D_VISTA_ESCENAS; }
 // el MARCO de un rectangulo (4 lados de 'g' px)
 static void Marco(int rx, int ry, int rw, int rh, int g) {
     RectLiso(rx, ry, rw, g); RectLiso(rx, ry + rh - g, rw, g);
@@ -1037,12 +1199,62 @@ static std::string Recortar(const std::string& t, int px) {
     return t.substr(0, (size_t)(n - 2)) + "..";
 }
 
+// la carpeta del ESTADO de guardado de un recurso: AZUL = guardado (en el proyecto o en su archivo) pero sin cargar;
+// con FONDO ROJO = todavia no se guardo. Un recurso cargado y guardado no lleva carpeta. false = no lleva
+static bool DibujarCarpetaEstado(const OutFilaRec& f, int px, int py) {
+    if (f.carpeta || f.soloLectura) return false;
+    if (!f.sucio && f.cargado) return false;
+    w3dEngine::PushMatrix();
+    w3dEngine::Translatef((GLfloat)px, (GLfloat)py, 0);
+    if (f.sucio) {
+        w3dEngine::Color4f(0.75f, 0.12f, 0.12f, 1.0f);
+        RectLiso(0, 0, IconSizeGS, IconSizeGS);
+        SetColorID(ColorID::blanco);
+    } else w3dEngine::Color4f(0.35f, 0.62f, 1.0f, 1.0f);
+    W3dDrawStrip4(IconMesh, IconsUV[(size_t)IconType::carpeta]->uvs);
+    w3dEngine::PopMatrix();
+    return true;
+}
+// "12 KB", "3.4 MB" ("" si no se sabe)
+static std::string TamanoTexto(long b) { return b >= 0 ? W3dBytesTexto((double)b) : std::string(); }
+
+// LA MEMORIA del proceso (la fila de abajo de la biblioteca): usada y libre en KB (-1 = la plataforma no lo dice)
+static void MemoriaProcesoKB(long& usadaKB, long& libreKB) {
+    usadaKB = libreKB = -1;
+#if defined(_WIN32) && !defined(W3D_SYMBIAN)
+    PROCESS_MEMORY_COUNTERS_EX pmc; memset(&pmc, 0, sizeof(pmc));
+    if (GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc)))
+        usadaKB = (long)(pmc.PrivateUsage / 1024);
+    MEMORYSTATUSEX ms; ms.dwLength = sizeof(ms);
+    if (GlobalMemoryStatusEx(&ms)) libreKB = (long)(ms.ullAvailPhys / 1024);
+#elif defined(W3D_SYMBIAN)
+    TInt total = 0; User::AllocSize(total); usadaKB = (long)(total / 1024);
+    TInt libre = 0; if (HAL::Get(HALData::EMemoryRAMFree, libre) == KErrNone) libreKB = (long)(libre / 1024);
+#elif defined(__linux__) || defined(__ANDROID__)
+    FILE* f = fopen("/proc/self/statm", "r");
+    if (f) { unsigned long tot = 0, res = 0; if (fscanf(f, "%lu %lu", &tot, &res) == 2) usadaKB = (long)(res * 4u); fclose(f); }
+    f = fopen("/proc/meminfo", "r");
+    if (f) { char l[128]; while (fgets(l, sizeof l, f)) { unsigned long v = 0; if (sscanf(l, "MemAvailable: %lu", &v) == 1) { libreKB = (long)v; break; } } fclose(f); }
+#endif
+}
+static std::string MemoriaTexto() {
+    long usada = 0, libre = 0; MemoriaProcesoKB(usada, libre);
+    const w3dEngine::MemoriaTexturas mt = w3dEngine::TexturasMemoria();
+    std::string s = std::string(T("RAM")) + ": " + (usada >= 0 ? W3dBytesTexto((double)usada * 1024.0) : std::string("?"));
+    if (libre >= 0) s += " (" + W3dBytesTexto((double)libre * 1024.0) + " " + T("free") + ")";
+    s += "   " + std::string(T("Video")) + ": " + W3dBytesTexto((double)mt.bytes);
+    return s;
+}
+int Outliner::AltoFilaMemoria() const {
+    return (EnBiblioteca() && verMemoria) ? (int)RenglonHeightGS + 2 * GlobalScale : 0;
+}
+
 void Outliner::RenderRecursos(int glY, const std::vector<OutFilaRec>& filas) {
     // (el rename que perdio el foco y las filas del cuadro ya los hizo Render)
     SincronizarBarraVista();
     const int reservaBarra = scrollY ? (GlobalScale * 9 + gapGS) : 0;
-    const bool conEstado = !VistaSoloLectura();
-    const int anchoDer = conEstado ? (IconSizeGS + gapGS + 4 * CharacterWidthGS) : 0;   // "999" + el icono de estado
+    const bool conEstado = !VistaSoloLectura() && verUsos;
+    int xTipo, xTam, xEst, xFin; ColumnasLista(xTipo, xTam, xEst, xFin);
     const int alto = (int)RenglonHeightGS;
     const int fc = FilaDelCursor(filas);
 
@@ -1059,14 +1271,18 @@ void Outliner::RenderRecursos(int glY, const std::vector<OutFilaRec>& filas) {
 
     w3dEngine::Enable(w3dEngine::ScissorTest);
     if (!cuadricula) {
-        // ---- LISTA: nombres (recortados antes de la columna de estado) ----
-        if (scrollX) w3dEngine::Scissor(x, glY + marginGS, width - anchoDer - marginGS - borderGS - reservaBarra, height - marginGS);
-        else         w3dEngine::Scissor(x, glY, width - anchoDer - marginGS - borderGS - reservaBarra, height);
-        const int y0 = PosY + borderGS + BarTopOffset();
+        // ---- LISTA: nombres (recortados antes de la columna Tipo), debajo de la fila de los titulos ----
+        const int yCab = borderGS + BarTopOffset();   // la fila de los TITULOS (fija: no scrollea)
+        const int hVis = height - (yCab + alto) - AltoFilaMemoria();   // lo que queda para las filas
+        if (scrollX) w3dEngine::Scissor(x, glY + marginGS + AltoFilaMemoria(), xTipo, hVis - marginGS);
+        else         w3dEngine::Scissor(x, glY + AltoFilaMemoria(), xTipo, hVis);
+        const int y0 = PosY + borderGS + TopContenido();
+        const int hovL = (hoverMx >= 0 && Contains(hoverMx, hoverMy)) ? FilaEnPunto(filas, hoverMx, hoverMy) : -1;
         for (size_t i = 0; i < filas.size(); i++) {
             const int yf = y0 + (int)i * alto;
             if (yf + alto * 2 <= 0 || yf >= height + alto) continue;   // culling (mismo margen que el arbol)
             const OutFilaRec& f = filas[i];
+            if ((int)i == hovL) { SetColorID(ColorID::headerColor, 0.7f); RectLiso(borderGS, yf, width - 2 * borderGS - reservaBarra, alto); }
             const bool arrastrada = recArrastrando && f.clave == recArrastreId && f.carpeta == recArrastreCarpeta;
             // LINEAS GUIA: una linea por cada carpeta de arriba (como el arbol de la escena)
             SetColorID(ColorID::grisUI, 0.55f);
@@ -1087,28 +1303,42 @@ void Outliner::RenderRecursos(int glY, const std::vector<OutFilaRec>& filas) {
             w3dEngine::Translatef((GLfloat)(IconSizeGS + gapGS), 0, 0);
             const bool enRename = renombrando && !renombreObjeto && renombreVista == vista && f.carpeta == renombreCarpeta && f.clave == renombreClave;
             if (enRename) {
-                const bool foco = (g_textFieldActivo == &renombre);
-                if (foco && renombre.selectAll) { SetColorID(ColorID::accent); RenderBitmapText(renombre.text); }
-                else {
-                    SetColorID(ColorID::blanco);
-                    RenderBitmapText(foco ? renombre.text.substr(0, (size_t)renombre.caret) + "|" + renombre.text.substr((size_t)renombre.caret)
-                                          : renombre.text);
-                }
+                SetColorID(ColorID::blanco);
+                RenderTextField(renombre, g_textFieldActivo == &renombre, textAlign::left, 1920);
             } else RenderBitmapText(f.sucio ? f.nombre + "*" : f.nombre);
             w3dEngine::PopMatrix();
             // TACTIL: la fila AGARRADA (pulsacion larga) lleva un marco verde: ya se puede arrastrar
             if (agarreFila == (int)i) { SetColorID(ColorID::accent); Marco(borderGS, yf, width - 2 * borderGS - reservaBarra, alto, GlobalScale); }
         }
-        // ---- la columna de ESTADO: cuantos lo usan + tilde verde (en uso) / cruz roja (huerfano) ----
-        if (conEstado) {
-            if (scrollX) w3dEngine::Scissor(x, glY + marginGS, width - marginGS - borderGS, height - marginGS);
-            else         w3dEngine::Scissor(x, glY, width - marginGS - borderGS, height);
-            const int xIcono = width - IconSizeGS - marginGS - borderGS - reservaBarra;
+        // ---- las otras COLUMNAS: Tipo | Tamanio | Usos ([carpeta de guardado] cuantos lo usan + tilde verde (en uso) /
+        //      cruz roja (huerfano)) ----
+        {
+            w3dEngine::Scissor(x, glY + AltoFilaMemoria(), width - borderGS, hVis);
+            const int xIcono = xFin - IconSizeGS;
             for (size_t i = 0; i < filas.size(); i++) {
                 const OutFilaRec& f = filas[i];
-                if (f.carpeta) continue;
                 const int yf = y0 + (int)i * alto;
                 if (yf + alto * 2 <= 0 || yf >= height + alto) continue;
+                // TIPO: "3D Mesh", "Material"... (una carpeta: "Folder")
+                if (!f.atras && xTipo < xTam) {
+                    SetColorID(ColorID::grisUI, f.soloLectura ? 0.5f : 0.8f);
+                    w3dEngine::PushMatrix();
+                    w3dEngine::Translatef((GLfloat)(xTipo + gapGS), (GLfloat)yf, 0);
+                    RenderBitmapText(f.carpeta ? std::string(T("Folder")) : std::string(T(W3dVistaSingular(f.tipo))), textAlign::left, xTam - xTipo - 2 * gapGS);
+                    w3dEngine::PopMatrix();
+                }
+                if (f.carpeta) continue;
+                if (verTamanos) {
+                    const std::string tt = TamanoTexto(f.bytes);
+                    SetColorID(ColorID::grisUI, f.cargado ? 0.9f : 0.55f);
+                    w3dEngine::PushMatrix();
+                    w3dEngine::Translatef((GLfloat)(xEst - gapGS), (GLfloat)yf, 0);
+                    RenderBitmapText(tt, textAlign::right, xEst - xTam - 2 * gapGS);
+                    w3dEngine::PopMatrix();
+                }
+                if (!conEstado) continue;
+                DibujarCarpetaEstado(f, xEst + gapGS, yf + GlobalScale);
+                if (SinEstadoDeUso(f)) continue;
                 const bool enUso = f.usuarios > 0;
                 w3dEngine::PushMatrix();
                 w3dEngine::Translatef((GLfloat)xIcono, (GLfloat)(yf + GlobalScale), 0);
@@ -1124,12 +1354,60 @@ void Outliner::RenderRecursos(int glY, const std::vector<OutFilaRec>& filas) {
                 w3dEngine::PopMatrix();
             }
         }
+        // ---- el ARRASTRE: el lugar que deja lo que se arrastra queda OSCURO con su borde; la linea verde dice donde
+        //      cae (antes / despues de una fila) ----
+        w3dEngine::Scissor(x, glY + AltoFilaMemoria(), width - borderGS, hVis);
+        for (size_t i = 0; i < filas.size() && recArrastrando; i++) {
+            const OutFilaRec& f = filas[i];
+            if (!(f.clave == recArrastreId && f.carpeta == recArrastreCarpeta) && !(!f.carpeta && FilaEnSeleccion(f) && !recArrastreCarpeta)) continue;
+            const int yf = y0 + (int)i * alto;
+            w3dEngine::Color4f(0.0f, 0.0f, 0.0f, 0.7f);
+            RectLiso(borderGS, yf, xFin - borderGS, alto);
+            SetColorID(ColorID::grisUI, 0.8f);
+            Marco(borderGS, yf, xFin - borderGS, alto, GlobalScale);
+        }
+        if (recArrastrando && recInsFila >= 0 && recInsFila < (int)filas.size()) {
+            const int yl = y0 + recInsFila * alto + (recInsDespues ? alto : 0) - GlobalScale;
+            SetColorID(ColorID::accent);
+            RectLiso(borderGS, yl, xFin - borderGS, 2 * GlobalScale);
+        }
+        // ---- los TITULOS de las columnas (siempre a la vista) ----
+        w3dEngine::Scissor(x, glY, width - borderGS, height - borderGS);
+        SetColorID(ColorID::gris);
+        RectLiso(borderGS, yCab, width - 2 * borderGS, alto);
+        w3dEngine::Color4f(0.0f, 0.0f, 0.0f, 0.75f);
+        RectLiso(borderGS, yCab + alto - GlobalScale, width - 2 * borderGS, GlobalScale);
+        SetColorID(ColorID::grisUI, 0.9f);
+        {
+            struct Titulo { static void En(int px, int py, const char* t, textAlign al, int w) {
+                w3dEngine::PushMatrix(); w3dEngine::Translatef((GLfloat)px, (GLfloat)py, 0); RenderBitmapText(T(t), al, w); w3dEngine::PopMatrix(); } };
+            const int yt = yCab + (alto - LetterHeightGS) / 2;
+            Titulo::En(marginGS + IconSizeGS + gapGS, yt, "Name", textAlign::left, xTipo - marginGS - IconSizeGS - 2 * gapGS);
+            if (xTipo < xTam) Titulo::En(xTipo + gapGS, yt, "Type", textAlign::left, xTam - xTipo - 2 * gapGS);
+            if (verTamanos) Titulo::En(xEst - gapGS, yt, "Size", textAlign::right, xEst - xTam - 2 * gapGS);
+            if (conEstado) Titulo::En(xEst + gapGS, yt, "Users", textAlign::left, xFin - xEst - gapGS);
+        }
+        // ---- los DIVISORES de las columnas: negros; blanco con el mouse encima (se puede arrastrar); verde
+        //      arrastrandolo ----
+        {
+            const int yTop = yCab, hCol = height - yTop - borderGS - AltoFilaMemoria();
+            const int xs[3] = { xTipo, xTam, xEst };
+            const bool hay[3] = { xTipo < xTam, verTamanos, conEstado && xEst < xFin };
+            for (int k = 0; k < 3; k++) {
+                if (!hay[k]) continue;
+                if (colArrastre == k) SetColorID(ColorID::accent);
+                else if (colHover == k) SetColorID(ColorID::blanco);
+                else w3dEngine::Color4f(0.0f, 0.0f, 0.0f, 0.75f);
+                const int grosor = (colArrastre == k || colHover == k) ? 2 * GlobalScale : GlobalScale;
+                RectLiso(xs[k] - grosor / 2, yTop, grosor, hCol);
+            }
+        }
     } else {
-        // ---- CUADRICULA: las carpetas son franjas; los recursos, celdas con su MINIATURA y su nombre ----
+        // ---- CUADRICULA: una carpeta a la vez. Cada celda: el CUADRADO (miniatura, o el icono del tipo / la carpeta
+        //      en grande) y debajo, centrados y afuera del cuadrado, el nombre y el tamanio ----
         w3dEngine::Scissor(x, glY, width - borderGS - reservaBarra, height - borderGS);
-        const int celda = CeldaTam();
-        const int lado = celda - 2 * gapGS - alto;        // la miniatura (arriba del nombre)
         W3dMiniaturasCuadro();   // un cuadro nuevo: las miniaturas que falten se generan de a pocas
+        const int hov = (hoverMx >= 0 && Contains(hoverMx, hoverMy)) ? FilaEnPunto(filas, hoverMx, hoverMy) : -1;
         for (size_t i = 0; i < filas.size(); i++) {
             int rx, ry, rw, rh;
             RectFila(filas, (int)i, rx, ry, rw, rh);
@@ -1137,78 +1415,105 @@ void Outliner::RenderRecursos(int glY, const std::vector<OutFilaRec>& filas) {
             if (ry + rh <= 0 || ry >= height) continue;
             const OutFilaRec& f = filas[i];
             const bool arrastrada = recArrastrando && f.clave == recArrastreId && f.carpeta == recArrastreCarpeta;
-            if (f.carpeta) {
-                // (el fondo de la franja: el destino de un arrastre, o la carpeta elegida)
-                if (recArrastrando && (int)i == recDropFila) { SetColorID(ColorID::accentDark); RectLiso(borderGS, ry, width - 2 * borderGS, rh); }
-                else if (FilaEnSeleccion(f)) { SetColorID(ColorID::headerColor); RectLiso(borderGS, ry, width - 2 * borderGS, rh); }
-                SetColorID(ColorID::grisUI, 0.55f);
-                for (int L = 0; L < f.prof; L++) {
-                    w3dEngine::PushMatrix();
-                    w3dEngine::Translatef((GLfloat)(marginGS + L * (IconSizeGS + gapGS)), (GLfloat)ry, 0);
-                    W3dDrawStrip4(IconLineMesh, IconsUV[(size_t)IconType::line]->uvs);
-                    w3dEngine::PopMatrix();
-                }
-                Colorear::Fila(this, f, (int)i == fc, arrastrada);
-                w3dEngine::PushMatrix();
-                w3dEngine::Translatef((GLfloat)(marginGS + f.prof * (IconSizeGS + gapGS)), (GLfloat)ry, 0);
-                W3dDrawStrip4(IconMesh, IconsUV[(size_t)(f.plegada ? IconType::arrowRight : IconType::arrow)]->uvs);
-                w3dEngine::Translatef((GLfloat)(IconSizeGS + gapGS), 0, 0);
-                W3dDrawStrip4(IconMesh, IconsUV[(size_t)IconType::carpeta]->uvs);
-                w3dEngine::Translatef((GLfloat)(IconSizeGS + gapGS), 0, 0);
-                const bool enRename = renombrando && !renombreObjeto && renombreVista == vista && renombreCarpeta && f.clave == renombreClave;
-                RenderBitmapText(enRename ? renombre.text + (g_textFieldActivo == &renombre ? "|" : "") : f.nombre);
-                w3dEngine::PopMatrix();
-                if (agarreFila == (int)i) { SetColorID(ColorID::accent); Marco(borderGS, ry, width - 2 * borderGS, rh, GlobalScale); }
-                continue;
-            }
-            // el FONDO de la celda: elegida / en la seleccion / normal
-            const bool enSel = FilaEnSeleccion(f);
-            if ((int)i == fc || enSel) SetColorID(enSel ? ColorID::accentDark : ColorID::headerColor);
+            const int lado = rw;   // el cuadrado
+            // el FONDO del cuadrado: elegida / en la seleccion / el destino de un arrastre / bajo el mouse / normal
+            const bool enSel = !f.atras && FilaEnSeleccion(f);
+            if (f.carpeta && recArrastrando && (int)i == recDropFila) SetColorID(ColorID::accentDark);
+            else if (!f.atras && ((int)i == fc || enSel)) SetColorID(enSel ? ColorID::accentDark : ColorID::headerColor);
+            else if ((int)i == hov) SetColorID(ColorID::headerColor);
             else SetColorID(ColorID::gris);
-            RectLiso(rx, ry, rw, rh);
-            // la MINIATURA (perezosa: mientras no esta, el icono del tipo en grande)
-            const int mxp = rx + (rw - lado) / 2, myp = ry + gapGS;
+            RectLiso(rx, ry, lado, lado);
+            if ((int)i == hov) { SetColorID(ColorID::grisUI, 0.9f); Marco(rx, ry, lado, lado, GlobalScale); }   // (bajo el mouse)
+            // lo de ADENTRO: la miniatura, o el icono en grande (la carpeta, "Ir atras", un sonido, un script...)
             int tw = 0, th = 0;
-            const unsigned int tex = MiniaturaDeFila(f, &tw, &th);
-            if (tex) DibujarTextura(tex, mxp, myp, lado);
-            else if (f.icono >= 0 && f.icono < (int)IconsUV.size()) {
-                // el icono del tipo, escalado al lado de la miniatura (sin miniatura todavia, o un sonido/script)
-                SetColorID(ColorID::grisUI, f.soloLectura ? 0.6f : 1.0f);
-                w3dEngine::PushMatrix();
+            const unsigned int tex = f.carpeta ? 0u : MiniaturaDeFila(f, &tw, &th);
+            if (tex) DibujarTextura(tex, rx, ry, lado);
+            else {
+                // "Ir atras" = una FLECHA hacia atras; una carpeta, la carpeta; un recurso sin miniatura, su tipo
+                const int icono = f.atras ? (int)IconType::arrowRight : f.carpeta ? (int)IconType::carpeta : f.icono;
                 const int esc = lado / (IconSizeGS > 0 ? IconSizeGS : 1);
-                const int s = IconSizeGS * (esc > 1 ? esc - 1 : 1);
-                w3dEngine::Translatef((GLfloat)(rx + (rw - s) / 2), (GLfloat)(myp + (lado - s) / 2), 0);
-                w3dEngine::Scalef((GLfloat)s / (GLfloat)IconSizeGS, (GLfloat)s / (GLfloat)IconSizeGS, 1.0f);
-                W3dDrawStrip4(IconMesh, IconsUV[(size_t)f.icono]->uvs);
-                w3dEngine::PopMatrix();
+                const int sz = IconSizeGS * (esc > 1 ? esc - 1 : 1);
+                SetColorID(ColorID::grisUI, f.soloLectura ? 0.6f : 1.0f);
+                IconoEn(icono, rx + (lado - sz) / 2, ry + (lado - sz) / 2, sz, f.atras);
             }
-            // estado (en uso / huerfano) en la esquina
-            if (conEstado) {
+            // guardado (la carpeta azul / roja) arriba a la izquierda; en uso / huerfano arriba a la derecha
+            if (conEstado && !f.carpeta) DibujarCarpetaEstado(f, rx + GlobalScale, ry + GlobalScale);
+            if (conEstado && !SinEstadoDeUso(f)) {
                 w3dEngine::PushMatrix();
-                w3dEngine::Translatef((GLfloat)(rx + rw - IconSizeGS - GlobalScale), (GLfloat)(ry + GlobalScale), 0);
+                w3dEngine::Translatef((GLfloat)(rx + lado - IconSizeGS - GlobalScale), (GLfloat)(ry + GlobalScale), 0);
                 if (f.usuarios > 0) SetColorID(ColorID::accent, 1.0f);
                 else w3dEngine::Color4f(kRojoHuerfano[0], kRojoHuerfano[1], kRojoHuerfano[2], 0.85f);
                 W3dDrawStrip4(IconMesh, IconsUV[(size_t)(f.usuarios > 0 ? IconType::notifOk : IconType::notifError)]->uvs);
                 w3dEngine::PopMatrix();
             }
-            // el nombre, abajo (recortado a la celda)
-            Colorear::Fila(this, f, (int)i == fc, arrastrada);
-            w3dEngine::PushMatrix();
-            w3dEngine::Translatef((GLfloat)(rx + GlobalScale), (GLfloat)(ry + rh - alto), 0);
-            const bool enRename = renombrando && !renombreObjeto && renombreVista == vista && !renombreCarpeta && f.clave == renombreClave;
-            const std::string nom = enRename ? renombre.text + (g_textFieldActivo == &renombre ? "|" : "") : (f.sucio ? f.nombre + "*" : f.nombre);
-            RenderBitmapText(Recortar(nom, rw - 2 * GlobalScale), textAlign::left, rw - 2 * GlobalScale);
-            w3dEngine::PopMatrix();
-            if (agarreFila == (int)i || arrastrada) { SetColorID(ColorID::accent); Marco(rx, ry, rw, rh, GlobalScale); }
+            // el NOMBRE, debajo del cuadrado y centrado
+            if (f.atras) SetColorID(ColorID::grisUI);
+            else Colorear::Fila(this, f, (int)i == fc, arrastrada);
+            const bool enRename = renombrando && !renombreObjeto && renombreVista == vista && renombreCarpeta == f.carpeta && f.clave == renombreClave && !f.atras;
+            {
+                const bool conIcono = !f.carpeta && f.icono >= 0;
+                const int anchoIcono = conIcono ? IconSizeGS + gapGS : 0;
+                const int anchoTexto = rw - anchoIcono;
+                const std::string nom = enRename ? renombre.text : Recortar(f.sucio ? f.nombre + "*" : f.nombre, anchoTexto);
+                int chars = 0;
+                for (size_t k = 0; k < nom.size(); k++) if (((unsigned char)nom[k] & 0xC0) != 0x80) chars++;
+                int wTxt = chars * CharacterWidthGS;
+                if (wTxt > anchoTexto) wTxt = anchoTexto;
+                const int x0 = rx + (rw - anchoIcono - wTxt) / 2;
+                const int yTxt = ry + lado + gapGS / 2;
+                if (conIcono) {
+                    IconoEn(f.icono, x0, yTxt - (IconSizeGS - LetterHeightGS) / 2, IconSizeGS, false);
+                }
+                w3dEngine::PushMatrix();
+                w3dEngine::Translatef((GLfloat)(x0 + anchoIcono), (GLfloat)yTxt, 0);
+                if (enRename) RenderTextField(renombre, g_textFieldActivo == &renombre, textAlign::left, anchoTexto);
+                else RenderBitmapText(nom, textAlign::left, anchoTexto);
+                w3dEngine::PopMatrix();
+            }
+            // el TAMANIO, debajo del nombre
+            if (verTamanos && !f.carpeta && f.bytes >= 0) {
+                const std::string tt = Recortar(TamanoTexto(f.bytes), rw);
+                SetColorID(ColorID::grisUI, f.cargado ? 0.9f : 0.55f);
+                w3dEngine::PushMatrix();
+                w3dEngine::Translatef((GLfloat)(rx + (rw - (int)tt.size() * CharacterWidthGS) / 2), (GLfloat)(ry + lado + gapGS / 2 + alto), 0);
+                RenderBitmapText(tt);
+                w3dEngine::PopMatrix();
+            }
+            if (agarreFila == (int)i) { SetColorID(ColorID::accent); Marco(rx, ry, lado, lado, GlobalScale); }
+            // el ARRASTRE: el lugar que deja queda oscuro con su borde (lo arrastrado va junto al puntero)
+            if (recArrastrando && (arrastrada || (!f.carpeta && !recArrastreCarpeta && FilaEnSeleccion(f)))) {
+                w3dEngine::Color4f(0.0f, 0.0f, 0.0f, 0.7f);
+                RectLiso(rx, ry, rw, rh);
+                SetColorID(ColorID::grisUI, 0.8f);
+                Marco(rx, ry, rw, rh, GlobalScale);
+            }
+            // donde CAE: una linea verde antes / despues de la celda
+            if (recArrastrando && recInsFila == (int)i) {
+                SetColorID(ColorID::accent);
+                RectLiso((recInsDespues ? rx + rw + gapGS / 2 : rx - gapGS / 2) - GlobalScale, ry, 2 * GlobalScale, lado);
+            }
         }
     }
     w3dEngine::Disable(w3dEngine::ScissorTest);
+
+    // ---- la fila de la MEMORIA, abajo de todo (fija: no scrollea) ----
+    if (AltoFilaMemoria() > 0) {
+        const int hf = AltoFilaMemoria();
+        const int yf = height - borderGS - hf;
+        SetColorID(ColorID::headerColor);
+        RectLiso(borderGS, yf, width - 2 * borderGS, hf);
+        SetColorID(ColorID::grisUI);
+        w3dEngine::PushMatrix();
+        w3dEngine::Translatef((GLfloat)(marginGS), (GLfloat)(yf + GlobalScale), 0);
+        RenderBitmapText(Recortar(MemoriaTexto(), width - 2 * marginGS), textAlign::left, width - 2 * marginGS);
+        w3dEngine::PopMatrix();
+    }
 
     // ---- vista vacia: se dice por que ----
     if (filas.empty()) {
         SetColorID(ColorID::grisUI, 0.7f);
         w3dEngine::PushMatrix();
-        w3dEngine::Translatef((GLfloat)(marginGS), (GLfloat)(borderGS + BarTopOffset() + alto / 2), 0);
+        w3dEngine::Translatef((GLfloat)(marginGS), (GLfloat)(borderGS + TopContenido() + alto / 2), 0);
         std::string msg = T("(empty)");
         if (VistaSoloLectura()) {
             std::vector<W3dRecursoItem> its; std::vector<std::string> cs; std::string err;
@@ -1233,7 +1538,7 @@ void Outliner::RenderRecursos(int glY, const std::vector<OutFilaRec>& filas) {
 //  destinos resaltados (verde = se puede soltar ahi; rojo = no)
 // ============================================================================
 void OutlinerArrastreRender(int pantallaW, int pantallaH) {
-    if (!g_outArrastre.activo) return;
+    if (!g_outArrastre.activo && !g_outArrastre.fantasma) return;
     w3dEngine::Viewport(0, 0, pantallaW, pantallaH);
     w3dEngine::MatrixMode(w3dEngine::Projection); w3dEngine::LoadIdentity();
     w3dEngine::Ortho(0, pantallaW, pantallaH, 0, -1, 1);
@@ -1254,7 +1559,7 @@ void OutlinerArrastreRender(int pantallaW, int pantallaH) {
         if (n->ContainerKind() == 1) { Juntar(((ViewportRow*)n)->childA, out); Juntar(((ViewportRow*)n)->childB, out); }
         else { Juntar(((ViewportColumn*)n)->childA, out); Juntar(((ViewportColumn*)n)->childB, out); } } };
     J::Juntar(LayoutRaizCompleta(), hojas);
-    for (size_t h = 0; h < hojas.size(); h++) {
+    for (size_t h = 0; h < hojas.size() && g_outArrastre.activo; h++) {
         if (hojas[h]->ViewportKind() != 3) continue;
         std::vector<int> rects;
         PropsDestinosRecurso((Properties*)hojas[h], g_outArrastre.tipo, rects);
@@ -1268,7 +1573,7 @@ void OutlinerArrastreRender(int pantallaW, int pantallaH) {
     }
     // el viewport 3D bajo el puntero: marco verde (se puede) o rojo (no)
     ViewportBase* bajo = FindViewportUnderMouse(rootViewport, g_outArrastre.x, g_outArrastre.y);
-    if (bajo && bajo->isLeaf() && bajo->ViewportKind() == 1 && g_outArrastre.destino != 0) {
+    if (g_outArrastre.activo && bajo && bajo->isLeaf() && bajo->ViewportKind() == 1 && g_outArrastre.destino != 0) {
         if (g_outArrastre.destino > 0) SetColorID(ColorID::accent);
         else w3dEngine::Color4f(kRojoHuerfano[0], kRojoHuerfano[1], kRojoHuerfano[2], 1.0f);
         Marco(bajo->x, bajo->y, bajo->width, bajo->height, 2 * GlobalScale);
@@ -1311,6 +1616,9 @@ void Outliner::ElegirFila(const OutFilaRec& f, bool abrirProps) {
 
 void Outliner::ClickRecursos(int mx, int my) {
     recArrastre = recArrastrando = recArrastreCarpeta = recSoloAlSoltar = recElegirAlSoltar = false;
+    recInsFila = -1;
+    // el DIVISOR de una columna (la lista): se agarra para cambiar el ancho
+    { const int d = DivisorEnPunto(mx, my); if (d >= 0) { colArrastre = d; colHover = -1; g_redraw = true; return; } }
     if (moviendoRec) { MoverRecConfirmar(); return; }   // (un click confirma el modo mover, como en la escena)
     // un rename en linea abierto: el click AFUERA lo confirma (el down ya desenfoco el campo: controles.cpp)
     if (renombrando) RenombreSincronizar();
@@ -1322,8 +1630,14 @@ void Outliner::ClickRecursos(int mx, int my) {
         if (!LCtrlPressed && !LShiftPressed && SeleccionCantidad() > 1) { selRecursos.clear(); selCarpetas.clear(); selMarcada = false; g_redraw = true; }
         return;
     }
+    if (cuadricula && RecienEntro(this)) return;   // (el 2do click de un doble click: lo de adentro no se toca)
     const OutFilaRec& f = filas[(size_t)fila];
-    if (f.carpeta) {
+    if (f.atras) { EntrarCarpetaGrid(f.clave); return; }   // "Ir atras"
+    // CUADRICULA: una carpeta se ABRE con un click. Con el mouse, al soltar sin arrastrar (arrastrarla la mueve); con el
+    // dedo, al tocarla (con el dedo arrastrar es scroll)
+    { extern bool g_uiTapEnCurso;
+      if (cuadricula && f.carpeta && g_uiTapEnCurso && !LCtrlPressed && !LShiftPressed) { EntrarCarpetaGrid(f.clave); return; } }
+    if (f.carpeta && !cuadricula) {
         // la FLECHITA (o el icono) pliega/despliega sin tocar la seleccion
         const int xFlecha = x + marginGS + (cuadricula ? 0 : PosX) + f.prof * (IconSizeGS + gapGS);
         if (mx >= xFlecha && mx < xFlecha + 2 * IconSizeGS + gapGS && !LCtrlPressed && !LShiftPressed) {
@@ -1384,8 +1698,10 @@ void Outliner::ClickRecursos(int mx, int my) {
 
 // el DESTINO de un arrastre AFUERA del outliner: un viewport 3D o un desplegable de Properties bajo el
 // puntero. soloProbar = solo decir que haria (el resaltado mientras se arrastra).
+extern void W3dSoltarVistaPreviaFin();   // (SoltarRecurso.cpp: la parte con el material / shader de prueba vuelve)
 static bool SoltarAfuera(int mx, int my, int tipo, const std::string& id, bool soloProbar, std::string* que) {
     ViewportBase* bajo = FindViewportUnderMouse(rootViewport, mx, my);
+    if (!bajo || !bajo->isLeaf() || bajo->ViewportKind() != 1) W3dSoltarVistaPreviaFin();   // (fuera del 3D: sin vista previa)
     if (!bajo || !bajo->isLeaf()) return false;
     if (bajo->ViewportKind() == 1) return W3dSoltarRecursoEn3D((Viewport3D*)bajo, mx, my, tipo, id, soloProbar, que);
     if (bajo->ViewportKind() == 3) return PropsSoltarRecurso((Properties*)bajo, mx, my, tipo, id, soloProbar, que);
@@ -1436,10 +1752,31 @@ void Outliner::MotionRecursos(int mx, int my) {
         return;
     }
     g_outArrastre.activo = false;
+    W3dSoltarVistaPreviaFin();   // (de vuelta adentro: la parte del 3D vuelve a lo suyo)
+    recInsFila = -1;
+    // ADENTRO: lo que se lleva sigue al puntero (el fantasma); el lugar que deja queda oscuro (RenderRecursos)
+    {
+        std::vector<OutFilaRec> fs; FilasRecursos(fs);
+        g_outArrastre.fantasma = true;
+        g_outArrastre.x = mx; g_outArrastre.y = my;
+        g_outArrastre.destino = 0; g_outArrastre.destinoTexto.clear();
+        g_outArrastre.nombre = recArrastreId; g_outArrastre.icono = recArrastreCarpeta ? (int)IconType::carpeta : -1;
+        for (size_t i = 0; i < fs.size(); i++)
+            if (fs[i].clave == recArrastreId && fs[i].carpeta == recArrastreCarpeta) { g_outArrastre.nombre = fs[i].nombre; g_outArrastre.icono = fs[i].icono; break; }
+        const int n = SeleccionCantidad();
+        if (n > 1) { char b[24]; sprintf(b, "  (+%d)", n - 1); g_outArrastre.nombre += b; }
+    }
     if (VistaSoloLectura()) return;   // (adentro de una libreria externa no se mueve nada)
     std::vector<OutFilaRec> filas;
     FilasRecursos(filas);
     const int fila = FilaEnPunto(filas, mx, my);
+    // REORDENAR: sobre OTRO recurso, lo arrastrado va antes o despues de el (la mitad de la fila / de la celda)
+    if (fila >= 0 && !recArrastreCarpeta && !filas[(size_t)fila].carpeta && !filas[(size_t)fila].parte &&
+        !(filas[(size_t)fila].clave == recArrastreId)) {
+        int rx, ry, rw, rh; RectFila(filas, fila, rx, ry, rw, rh);
+        recInsFila = fila;
+        recInsDespues = cuadricula ? (mx - x >= rx + rw / 2) : (my - y - PosY >= ry + rh / 2);
+    }
     // el destino es la CARPETA de la fila (el mismo que decide SoltarRecursos): la fila de una carpeta,
     // o la carpeta del recurso que se apunta. Se resalta ESA carpeta, no el recurso; la raiz (un
     // recurso suelto, o el vacio de abajo) no tiene fila y no se resalta nada.
@@ -1503,13 +1840,23 @@ void Outliner::SoltarRecursos(int mx, int my) {
     recElegirAlSoltar = false;
     recArrastre = recArrastrando = recArrastreCarpeta = recSoloAlSoltar = false;
     recDropFila = -1;
+    const int insFila = recInsFila; const bool insDespues = recInsDespues;
+    recInsFila = -1;
     agarreFila = -1; agarreMovido = false;
     const bool afuera = g_outArrastre.activo;
     g_outArrastre.activo = false;
+    W3dSoltarVistaPreviaFin();   // (el arrastre termino: la parte vuelve a lo suyo; si se solto en el 3D, lo pone el soltar)
+    g_outArrastre.fantasma = false;
     g_redraw = true;
     // TACTIL: soltar SIN MOVER lo que se agarro con la pulsacion larga = el menu contextual
     if (agarrada && !movida) { MenuContexto(mx, my); return; }
     if (!estaba) {
+        // CUADRICULA: un click (sin arrastrar, sin Ctrl / Shift) en una carpeta la ABRE
+        if (cuadricula && eraCarpeta && !LCtrlPressed && !LShiftPressed && Contains(mx, my)) {
+            std::vector<OutFilaRec> fs; FilasRecursos(fs);
+            const int fi = FilaEnPunto(fs, mx, my);
+            if (fi >= 0 && fs[(size_t)fi].carpeta && !fs[(size_t)fi].atras && fs[(size_t)fi].clave == clave) { EntrarCarpetaGrid(clave); return; }
+        }
         // un click sin arrastre sobre una fila de la seleccion: queda sola
         if (soloAlSoltar) {
             OutFilaRec f; f.carpeta = eraCarpeta; f.clave = clave;
@@ -1540,8 +1887,39 @@ void Outliner::SoltarRecursos(int mx, int my) {
     const int fila = FilaEnPunto(filas, mx, my);
     std::string destino;   // el vacio de abajo = la raiz
     if (fila >= 0) destino = filas[(size_t)fila].carpeta ? filas[(size_t)fila].clave : filas[(size_t)fila].carpetaDe;
+    // en la CUADRICULA el vacio es la carpeta que se esta viendo
+    if (fila < 0 && cuadricula) destino = carpetaGrid;
+    // REORDENAR: soltado sobre otro recurso, lo arrastrado queda antes / despues de el (y en su carpeta). Todo en
+    // UN paso de undo
+    std::string ancla;
+    if (insFila >= 0 && insFila < (int)filas.size() && insFila == fila) ancla = filas[(size_t)fila].clave;
+    std::vector<std::string> recs, cars;
+    Objetivo(recs, cars, true);
+    W3dVistaRecGrupoIniciar();
     // lo que se arrastra: la SELECCION si la fila apretada es parte de ella (si no, ya quedo sola)
     MoverObjetivo(destino);
+    if (!ancla.empty() && !recs.empty()) {
+        std::set<std::string> mov(recs.begin(), recs.end());
+        if (!mov.count(ancla)) {
+            std::vector<OutFilaRec> fs; FilasRecursos(fs);
+            std::vector<std::string> hermanas;
+            for (size_t i = 0; i < fs.size(); i++) {
+                if (fs[i].carpeta || fs[i].parte || fs[i].carpetaDe != W3dCarpetaNormalizar(destino) || mov.count(fs[i].clave)) continue;
+                hermanas.push_back(fs[i].clave);
+            }
+            std::vector<std::string>::iterator pos = std::find(hermanas.begin(), hermanas.end(), ancla);
+            if (pos != hermanas.end()) {
+                if (insDespues) ++pos;
+                std::vector<std::string> enOrden;   // (los movidos, en el orden en que se ven)
+                for (size_t i = 0; i < fs.size(); i++) if (!fs[i].carpeta && mov.count(fs[i].clave)) enOrden.push_back(fs[i].clave);
+                hermanas.insert(pos, enOrden.begin(), enOrden.end());
+                W3dBibOrdenFijar(hermanas);
+                lastContentRows = -1;
+            }
+        }
+    }
+    W3dVistaRecGrupoFin();
+    g_redraw = true;
 }
 
 // DOBLE CLICK / DOBLE TAP sobre el NOMBRE de una fila: se renombra en linea (en las dos vistas). En el resto de
@@ -1570,11 +1948,14 @@ bool Outliner::DobleClick(int mx, int my) {
     FilasRecursos(filas);
     const int fila = FilaEnPunto(filas, mx, my);
     if (fila < 0) return false;
-    if (!cuadricula || filas[(size_t)fila].carpeta) {
+    if (cuadricula && RecienEntro(this)) { entroMs = 0; return true; }   // (el 1er click ya entro a la carpeta)
+    if (cuadricula && filas[(size_t)fila].carpeta) { EntrarCarpetaGrid(filas[(size_t)fila].clave); return true; }
+    if (!cuadricula) {
         // el NOMBRE: despues de la flechita y el icono, antes de la columna de estado (en uso / huerfano)
         const int x0 = x + marginGS + (cuadricula ? 0 : PosX) + (filas[(size_t)fila].prof + 2) * (IconSizeGS + gapGS);
-        const int anchoDer = (!cuadricula && !VistaSoloLectura()) ? (IconSizeGS + gapGS + 4 * CharacterWidthGS) : 0;
-        const int x1 = x + width - anchoDer - marginGS - borderGS - reservaBarra;
+        int xT, xTm, xE, xF; ColumnasLista(xT, xTm, xE, xF);   // (las mismas columnas que dibuja RenderRecursos)
+        const int x1 = x + xT;
+        (void)reservaBarra;
         if (mx < x0 || mx >= x1) return false;
     }
     recArrastre = recArrastrando = false;
@@ -1626,7 +2007,7 @@ bool Outliner::PulsacionLarga(int mx, int my) {
 // ============================================================================
 void Outliner::AsegurarVisibleFila(int fila) {
     if (fila < 0) return;
-    const int top = BarTopOffset();
+    const int top = TopContenido();
     int yFila, alto;
     if (!cuadricula) { alto = (int)RenglonHeightGS; yFila = borderGS + PosY + top + fila * alto; }
     else {
@@ -2201,7 +2582,7 @@ bool Outliner::AccionDuplicarRecurso() {
 // las hojas OUTLINER del layout entero (con un viewport maximizado, tambien las que no se ven)
 static void JuntarOutliners(ViewportBase* n, std::vector<Outliner*>& out) {
     if (!n) return;
-    if (n->isLeaf()) { if (n->ViewportKind() == 2) out.push_back((Outliner*)n); return; }
+    if (n->isLeaf()) { if (VpEsOutliner(n)) out.push_back((Outliner*)n); return; }
     if (n->ContainerKind() == 1) { JuntarOutliners(((ViewportRow*)n)->childA, out); JuntarOutliners(((ViewportRow*)n)->childB, out); }
     else { JuntarOutliners(((ViewportColumn*)n)->childA, out); JuntarOutliners(((ViewportColumn*)n)->childB, out); }
 }

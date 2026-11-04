@@ -1,0 +1,10 @@
+# ==========================================================================
+#  El gizmo de ROTAR agarrado en el CENTRO = R R (el giro libre / orbital), no un eje
+#  Correr DESDE ESTA CARPETA:
+#    ../../platform/windows/build/Release/whisk3d.exe --script prueba_gizmo_centro.w3s
+# ==========================================================================
+add cube
+selobj Cubo.001
+vistatactil 1
+gizmocentro
+vistatactil 0

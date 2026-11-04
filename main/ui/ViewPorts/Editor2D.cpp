@@ -1093,7 +1093,6 @@ void Editor2DAlimentarOverride(ViewportBase* vp) {
     if (vp && vp->ViewportKind() == 6) ((Editor2D*)vp)->ActualizarOverrideLienzo();
 }
 
-#ifndef W3D_SYMBIAN
 // G = mover, R = rotar; X/Y restringen el eje; ESC cancela, ENTER confirma; flechas = paneo
 void Editor2D::event_key_down(int tecla, bool repeticion) {
     (void)repeticion;
@@ -1154,7 +1153,7 @@ void Editor2D::event_mouse_wheel(float dy, int mx, int my) {
 
 // (el chequeo "hay un transform de teclado activo" es ahora el hook compartido XformEnCurso
 //  de ViewportBase: controles.cpp lo usa para envolver el cursor en el Editor 2D y el UV editor)
-#endif // fin del input SDL de teclado. Lo de abajo (zoom/encuadre/seleccion/borrar/duplicar)
+// (fin del input de teclado. Lo de abajo (zoom/encuadre/seleccion/borrar/duplicar)
        // es logica portable: la usa TAMBIEN el menu tactil (LayoutInput), asi que va sin guardar.
 
 // junta TODOS los elementos 2D de la escena (recursivo, arboles de los UI)
@@ -1268,7 +1267,6 @@ void Editor2DBorrarSeleccion() {
     }
 }
 
-#ifndef W3D_SYMBIAN  // vuelve el input SDL (mouse) del Editor 2D de escritorio
 void Editor2D::mouse_button_up(int boton) {
     (void)boton;
     if (drag) UndoTransformConfirmar();   // Ctrl+Z: cierra el paso (no-op si no se movio)
@@ -1276,4 +1274,3 @@ void Editor2D::mouse_button_up(int boton) {
     ViewPortClickDown = false;
     g_redraw = true;
 }
-#endif

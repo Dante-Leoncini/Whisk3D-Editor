@@ -1,0 +1,536 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="18.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+  </PropertyGroup>
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="MinSizeRel|x64">
+      <Configuration>MinSizeRel</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="RelWithDebInfo|x64">
+      <Configuration>RelWithDebInfo</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{5BAA0DEC-DE8B-3A79-A676-5F15F2424183}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <WindowsTargetPlatformVersion>10.0.26100.0</WindowsTargetPlatformVersion>
+    <Platform>x64</Platform>
+    <ProjectName>SDL2-static</ProjectName>
+    <VCProjectUpgraderObjectName>NoUpgrade</VCProjectUpgraderObjectName>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v145</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v145</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v145</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v145</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <_ProjectFileVersion>10.0.20506.1</_ProjectFileVersion>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\Debug\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">SDL2-static.dir\Debug\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">SDL2-staticd</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">.lib</TargetExt>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\Release\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">SDL2-static.dir\Release\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">SDL2-static</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='Release|x64'">.lib</TargetExt>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\MinSizeRel\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">SDL2-static.dir\MinSizeRel\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">SDL2-static</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">.lib</TargetExt>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\RelWithDebInfo\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">SDL2-static.dir\RelWithDebInfo\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">SDL2-static</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">.lib</TargetExt>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\include;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\include\SDL2;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\include-config-debug\SDL2;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\include-config-debug;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\khronos;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /Gs1048576</AdditionalOptions>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <BufferSecurityCheck>false</BufferSecurityCheck>
+      <CallingConvention></CallingConvention>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <ExceptionHandling>
+      </ExceptionHandling>
+      <FloatingPointModel></FloatingPointModel>
+      <ForceConformanceInForLoopScope></ForceConformanceInForLoopScope>
+      <InlineFunctionExpansion>Disabled</InlineFunctionExpansion>
+      <MinimalRebuild></MinimalRebuild>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <Optimization>Disabled</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RemoveUnreferencedCodeData></RemoveUnreferencedCodeData>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <SupportJustMyCode></SupportJustMyCode>
+      <TreatWChar_tAsBuiltInType></TreatWChar_tAsBuiltInType>
+      <UseFullPaths>false</UseFullPaths>
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;SDL_BUILD_MAJOR_VERSION=2;SDL_BUILD_MINOR_VERSION=33;SDL_BUILD_MICRO_VERSION=0;SDL_STATIC_LIB;W3D_VERSION_GEN;W3D_WEBGL;USING_GENERATED_CONFIG_H;_CRT_SECURE_NO_DEPRECATE;_CRT_NONSTDC_NO_DEPRECATE;_CRT_SECURE_NO_WARNINGS;CMAKE_INTDIR="Debug"</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_DEBUG;_WINDOWS;SDL_BUILD_MAJOR_VERSION=2;SDL_BUILD_MINOR_VERSION=33;SDL_BUILD_MICRO_VERSION=0;SDL_STATIC_LIB;W3D_VERSION_GEN;W3D_WEBGL;USING_GENERATED_CONFIG_H;_CRT_SECURE_NO_DEPRECATE;_CRT_NONSTDC_NO_DEPRECATE;_CRT_SECURE_NO_WARNINGS;CMAKE_INTDIR=\"Debug\"</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\include;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\include\SDL2;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\include-config-debug\SDL2;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\include-config-debug;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\khronos;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\include;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\include\SDL2;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\include-config-debug\SDL2;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\include-config-debug;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\khronos;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <Lib>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\include;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\include\SDL2;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\include-config-release\SDL2;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\include-config-release;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\khronos;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /Gs1048576</AdditionalOptions>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <BufferSecurityCheck>false</BufferSecurityCheck>
+      <CallingConvention></CallingConvention>
+      <ExceptionHandling>
+      </ExceptionHandling>
+      <FloatingPointModel></FloatingPointModel>
+      <ForceConformanceInForLoopScope></ForceConformanceInForLoopScope>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <MinimalRebuild></MinimalRebuild>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <Optimization>MaxSpeed</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RemoveUnreferencedCodeData></RemoveUnreferencedCodeData>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <SupportJustMyCode></SupportJustMyCode>
+      <TreatWChar_tAsBuiltInType></TreatWChar_tAsBuiltInType>
+      <UseFullPaths>false</UseFullPaths>
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;SDL_BUILD_MAJOR_VERSION=2;SDL_BUILD_MINOR_VERSION=33;SDL_BUILD_MICRO_VERSION=0;NDEBUG;SDL_STATIC_LIB;W3D_VERSION_GEN;W3D_WEBGL;USING_GENERATED_CONFIG_H;_CRT_SECURE_NO_DEPRECATE;_CRT_NONSTDC_NO_DEPRECATE;_CRT_SECURE_NO_WARNINGS;CMAKE_INTDIR="Release"</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <DebugInformationFormat>
+      </DebugInformationFormat>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;SDL_BUILD_MAJOR_VERSION=2;SDL_BUILD_MINOR_VERSION=33;SDL_BUILD_MICRO_VERSION=0;NDEBUG;SDL_STATIC_LIB;W3D_VERSION_GEN;W3D_WEBGL;USING_GENERATED_CONFIG_H;_CRT_SECURE_NO_DEPRECATE;_CRT_NONSTDC_NO_DEPRECATE;_CRT_SECURE_NO_WARNINGS;CMAKE_INTDIR=\"Release\"</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\include;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\include\SDL2;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\include-config-release\SDL2;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\include-config-release;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\khronos;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\include;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\include\SDL2;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\include-config-release\SDL2;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\include-config-release;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\khronos;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <Lib>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\include;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\include\SDL2;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\include-config-minsizerel\SDL2;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\include-config-minsizerel;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\khronos;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /Gs1048576</AdditionalOptions>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <BufferSecurityCheck>false</BufferSecurityCheck>
+      <CallingConvention></CallingConvention>
+      <ExceptionHandling>
+      </ExceptionHandling>
+      <FloatingPointModel></FloatingPointModel>
+      <ForceConformanceInForLoopScope></ForceConformanceInForLoopScope>
+      <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
+      <MinimalRebuild></MinimalRebuild>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <Optimization>MinSpace</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RemoveUnreferencedCodeData></RemoveUnreferencedCodeData>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <SupportJustMyCode></SupportJustMyCode>
+      <TreatWChar_tAsBuiltInType></TreatWChar_tAsBuiltInType>
+      <UseFullPaths>false</UseFullPaths>
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;SDL_BUILD_MAJOR_VERSION=2;SDL_BUILD_MINOR_VERSION=33;SDL_BUILD_MICRO_VERSION=0;NDEBUG;SDL_STATIC_LIB;W3D_VERSION_GEN;W3D_WEBGL;USING_GENERATED_CONFIG_H;_CRT_SECURE_NO_DEPRECATE;_CRT_NONSTDC_NO_DEPRECATE;_CRT_SECURE_NO_WARNINGS;CMAKE_INTDIR="MinSizeRel"</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <DebugInformationFormat>
+      </DebugInformationFormat>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;SDL_BUILD_MAJOR_VERSION=2;SDL_BUILD_MINOR_VERSION=33;SDL_BUILD_MICRO_VERSION=0;NDEBUG;SDL_STATIC_LIB;W3D_VERSION_GEN;W3D_WEBGL;USING_GENERATED_CONFIG_H;_CRT_SECURE_NO_DEPRECATE;_CRT_NONSTDC_NO_DEPRECATE;_CRT_SECURE_NO_WARNINGS;CMAKE_INTDIR=\"MinSizeRel\"</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\include;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\include\SDL2;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\include-config-minsizerel\SDL2;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\include-config-minsizerel;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\khronos;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\include;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\include\SDL2;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\include-config-minsizerel\SDL2;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\include-config-minsizerel;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\khronos;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <Lib>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\include;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\include\SDL2;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\include-config-relwithdebinfo\SDL2;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\include-config-relwithdebinfo;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\khronos;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /Gs1048576</AdditionalOptions>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <BufferSecurityCheck>false</BufferSecurityCheck>
+      <CallingConvention></CallingConvention>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <ExceptionHandling>
+      </ExceptionHandling>
+      <FloatingPointModel></FloatingPointModel>
+      <ForceConformanceInForLoopScope></ForceConformanceInForLoopScope>
+      <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
+      <MinimalRebuild></MinimalRebuild>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <Optimization>MaxSpeed</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RemoveUnreferencedCodeData></RemoveUnreferencedCodeData>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <SupportJustMyCode></SupportJustMyCode>
+      <TreatWChar_tAsBuiltInType></TreatWChar_tAsBuiltInType>
+      <UseFullPaths>false</UseFullPaths>
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;SDL_BUILD_MAJOR_VERSION=2;SDL_BUILD_MINOR_VERSION=33;SDL_BUILD_MICRO_VERSION=0;NDEBUG;SDL_STATIC_LIB;W3D_VERSION_GEN;W3D_WEBGL;USING_GENERATED_CONFIG_H;_CRT_SECURE_NO_DEPRECATE;_CRT_NONSTDC_NO_DEPRECATE;_CRT_SECURE_NO_WARNINGS;CMAKE_INTDIR="RelWithDebInfo"</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;SDL_BUILD_MAJOR_VERSION=2;SDL_BUILD_MINOR_VERSION=33;SDL_BUILD_MICRO_VERSION=0;NDEBUG;SDL_STATIC_LIB;W3D_VERSION_GEN;W3D_WEBGL;USING_GENERATED_CONFIG_H;_CRT_SECURE_NO_DEPRECATE;_CRT_NONSTDC_NO_DEPRECATE;_CRT_SECURE_NO_WARNINGS;CMAKE_INTDIR=\"RelWithDebInfo\"</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\include;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\include\SDL2;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\include-config-relwithdebinfo\SDL2;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\include-config-relwithdebinfo;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\khronos;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\include;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\include\SDL2;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\include-config-relwithdebinfo\SDL2;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\include-config-relwithdebinfo;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\khronos;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <Lib>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\CMakeLists.txt">
+      <UseUtf8Encoding>Always</UseUtf8Encoding>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Building Custom Rule C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor -BC:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2 --check-stamp-file C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Program Files\CMake\share\cmake-4.2\Modules\CMakeCheckCompilerFlagCommonPatterns.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CMakeDependentOption.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CMakeParseArguments.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CMakePushCheckState.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CheckCCompilerFlag.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CheckCSourceCompiles.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CheckCSourceRuns.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CheckCXXCompilerFlag.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CheckCXXSourceCompiles.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CheckIncludeFile.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CheckIncludeFiles.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CheckLanguage.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CheckLibraryExists.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CheckSourceCompiles.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CheckStructHasMember.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CheckSymbolExists.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\FindGit.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\FindPackageHandleStandardArgs.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\FindPackageMessage.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\FindPkgConfig.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\GNUInstallDirs.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Internal\CheckCompilerFlag.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Internal\CheckFlagCommonConfig.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Internal\CheckSourceCompiles.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Internal\CheckSourceRuns.cmake;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\SDL_config.h.intermediate;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\SDL2.spec.in;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\cmake\CheckCPUArchitecture.cmake;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\cmake\macros.cmake;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\cmake\sdlchecks.cmake;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\cmake\sdlfind.cmake;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\cmake\sdlplatform.cmake;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\cmake_uninstall.cmake.in;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\include\SDL_config.h.cmake;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\include\SDL_revision.h.cmake;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\sdl2-config.in;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\sdl2.pc.in;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Building Custom Rule C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor -BC:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2 --check-stamp-file C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">C:\Program Files\CMake\share\cmake-4.2\Modules\CMakeCheckCompilerFlagCommonPatterns.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CMakeDependentOption.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CMakeParseArguments.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CMakePushCheckState.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CheckCCompilerFlag.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CheckCSourceCompiles.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CheckCSourceRuns.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CheckCXXCompilerFlag.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CheckCXXSourceCompiles.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CheckIncludeFile.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CheckIncludeFiles.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CheckLanguage.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CheckLibraryExists.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CheckSourceCompiles.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CheckStructHasMember.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CheckSymbolExists.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\FindGit.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\FindPackageHandleStandardArgs.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\FindPackageMessage.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\FindPkgConfig.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\GNUInstallDirs.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Internal\CheckCompilerFlag.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Internal\CheckFlagCommonConfig.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Internal\CheckSourceCompiles.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Internal\CheckSourceRuns.cmake;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\SDL_config.h.intermediate;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\SDL2.spec.in;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\cmake\CheckCPUArchitecture.cmake;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\cmake\macros.cmake;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\cmake\sdlchecks.cmake;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\cmake\sdlfind.cmake;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\cmake\sdlplatform.cmake;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\cmake_uninstall.cmake.in;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\include\SDL_config.h.cmake;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\include\SDL_revision.h.cmake;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\sdl2-config.in;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\sdl2.pc.in;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">Building Custom Rule C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor -BC:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2 --check-stamp-file C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">C:\Program Files\CMake\share\cmake-4.2\Modules\CMakeCheckCompilerFlagCommonPatterns.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CMakeDependentOption.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CMakeParseArguments.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CMakePushCheckState.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CheckCCompilerFlag.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CheckCSourceCompiles.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CheckCSourceRuns.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CheckCXXCompilerFlag.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CheckCXXSourceCompiles.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CheckIncludeFile.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CheckIncludeFiles.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CheckLanguage.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CheckLibraryExists.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CheckSourceCompiles.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CheckStructHasMember.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CheckSymbolExists.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\FindGit.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\FindPackageHandleStandardArgs.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\FindPackageMessage.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\FindPkgConfig.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\GNUInstallDirs.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Internal\CheckCompilerFlag.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Internal\CheckFlagCommonConfig.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Internal\CheckSourceCompiles.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Internal\CheckSourceRuns.cmake;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\SDL_config.h.intermediate;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\SDL2.spec.in;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\cmake\CheckCPUArchitecture.cmake;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\cmake\macros.cmake;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\cmake\sdlchecks.cmake;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\cmake\sdlfind.cmake;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\cmake\sdlplatform.cmake;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\cmake_uninstall.cmake.in;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\include\SDL_config.h.cmake;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\include\SDL_revision.h.cmake;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\sdl2-config.in;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\sdl2.pc.in;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">Building Custom Rule C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/thirdparty/SDL2/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor -BC:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2 --check-stamp-file C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">C:\Program Files\CMake\share\cmake-4.2\Modules\CMakeCheckCompilerFlagCommonPatterns.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CMakeDependentOption.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CMakeParseArguments.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CMakePushCheckState.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CheckCCompilerFlag.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CheckCSourceCompiles.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CheckCSourceRuns.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CheckCXXCompilerFlag.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CheckCXXSourceCompiles.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CheckIncludeFile.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CheckIncludeFiles.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CheckLanguage.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CheckLibraryExists.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CheckSourceCompiles.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CheckStructHasMember.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\CheckSymbolExists.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\FindGit.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\FindPackageHandleStandardArgs.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\FindPackageMessage.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\FindPkgConfig.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\GNUInstallDirs.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Internal\CheckCompilerFlag.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Internal\CheckFlagCommonConfig.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Internal\CheckSourceCompiles.cmake;C:\Program Files\CMake\share\cmake-4.2\Modules\Internal\CheckSourceRuns.cmake;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\SDL_config.h.intermediate;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\SDL2.spec.in;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\cmake\CheckCPUArchitecture.cmake;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\cmake\macros.cmake;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\cmake\sdlchecks.cmake;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\cmake\sdlfind.cmake;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\cmake\sdlplatform.cmake;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\cmake_uninstall.cmake.in;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\include\SDL_config.h.cmake;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\include\SDL_revision.h.cmake;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\sdl2-config.in;C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\sdl2.pc.in;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\SDL.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\SDL_assert.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\SDL_dataqueue.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\SDL_error.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\SDL_guid.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\SDL_hints.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\SDL_list.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\SDL_log.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\SDL_utils.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\atomic\SDL_atomic.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\atomic\SDL_spinlock.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\audio\SDL_audio.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\audio\SDL_audiocvt.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\audio\SDL_audiodev.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\audio\SDL_audiotypecvt.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\audio\SDL_mixer.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\audio\SDL_wave.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\cpuinfo\SDL_cpuinfo.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\dynapi\SDL_dynapi.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\events\SDL_clipboardevents.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\events\SDL_displayevents.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\events\SDL_dropevents.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\events\SDL_events.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\events\SDL_gesture.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\events\SDL_keyboard.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\events\SDL_keysym_to_scancode.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\events\SDL_mouse.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\events\SDL_quit.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\events\SDL_scancode_tables.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\events\SDL_touch.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\events\SDL_windowevents.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\events\imKStoUCS.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\file\SDL_rwops.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\haptic\SDL_haptic.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\hidapi\SDL_hidapi.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\joystick\SDL_gamecontroller.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\joystick\SDL_joystick.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\joystick\SDL_steam_virtual_gamepad.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\joystick\controller_type.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\libm\e_atan2.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\libm\e_exp.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\libm\e_fmod.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\libm\e_log.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\libm\e_log10.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\libm\e_pow.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\libm\e_rem_pio2.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\libm\e_sqrt.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\libm\k_cos.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\libm\k_rem_pio2.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\libm\k_sin.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\libm\k_tan.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\libm\s_atan.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\libm\s_copysign.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\libm\s_cos.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\libm\s_fabs.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\libm\s_floor.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\libm\s_scalbn.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\libm\s_sin.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\libm\s_tan.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\locale\SDL_locale.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\misc\SDL_url.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\power\SDL_power.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\render\SDL_d3dmath.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\render\SDL_render.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\render\SDL_yuv_sw.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\render\direct3d\SDL_render_d3d.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\render\direct3d\SDL_shaders_d3d.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\render\direct3d11\SDL_render_d3d11.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\render\direct3d11\SDL_shaders_d3d11.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\render\direct3d12\SDL_render_d3d12.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\render\direct3d12\SDL_shaders_d3d12.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\render\opengl\SDL_render_gl.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\render\opengl\SDL_shaders_gl.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\render\opengles\SDL_render_gles.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\render\opengles2\SDL_render_gles2.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\render\opengles2\SDL_shaders_gles2.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\render\ps2\SDL_render_ps2.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\render\psp\SDL_render_psp.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\render\software\SDL_blendfillrect.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\render\software\SDL_blendline.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\render\software\SDL_blendpoint.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\render\software\SDL_drawline.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\render\software\SDL_drawpoint.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\render\software\SDL_render_sw.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\render\software\SDL_rotate.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\render\software\SDL_triangle.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\render\vitagxm\SDL_render_vita_gxm.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\render\vitagxm\SDL_render_vita_gxm_memory.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\render\vitagxm\SDL_render_vita_gxm_tools.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\sensor\SDL_sensor.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\stdlib\SDL_crc16.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\stdlib\SDL_crc32.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\stdlib\SDL_getenv.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\stdlib\SDL_iconv.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\stdlib\SDL_malloc.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\stdlib\SDL_mslibc.c">
+      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(AdditionalOptions) /GL-</AdditionalOptions>
+      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(AdditionalOptions) /GL-</AdditionalOptions>
+      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">%(AdditionalOptions) /GL-</AdditionalOptions>
+      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">%(AdditionalOptions) /GL-</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\stdlib\SDL_qsort.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\stdlib\SDL_stdlib.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\stdlib\SDL_string.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\stdlib\SDL_strtokr.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\thread\SDL_thread.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\timer\SDL_timer.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\SDL_RLEaccel.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\SDL_blit.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\SDL_blit_0.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\SDL_blit_1.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\SDL_blit_A.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\SDL_blit_N.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\SDL_blit_auto.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\SDL_blit_copy.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\SDL_blit_slow.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\SDL_bmp.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\SDL_clipboard.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\SDL_egl.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\SDL_fillrect.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\SDL_pixels.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\SDL_rect.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\SDL_shape.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\SDL_stretch.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\SDL_surface.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\SDL_video.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\SDL_vulkan_utils.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\SDL_yuv.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\yuv2rgb\yuv_rgb_lsx.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\yuv2rgb\yuv_rgb_sse.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\yuv2rgb\yuv_rgb_std.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\audio\dummy\SDL_dummyaudio.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\audio\disk\SDL_diskaudio.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\joystick\virtual\SDL_virtualjoystick.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\dummy\SDL_nullevents.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\dummy\SDL_nullframebuffer.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\dummy\SDL_nullvideo.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\offscreen\SDL_offscreenevents.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\offscreen\SDL_offscreenframebuffer.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\offscreen\SDL_offscreenopengles.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\offscreen\SDL_offscreenvideo.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\offscreen\SDL_offscreenwindow.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\core\windows\SDL_hid.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\core\windows\SDL_immdevice.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\core\windows\SDL_windows.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\core\windows\SDL_xinput.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\misc\windows\SDL_sysurl.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\audio\winmm\SDL_winmm.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\audio\directsound\SDL_directsound.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\audio\wasapi\SDL_wasapi.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\audio\wasapi\SDL_wasapi_win32.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\windows\SDL_windowsclipboard.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\windows\SDL_windowsevents.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\windows\SDL_windowsframebuffer.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\windows\SDL_windowskeyboard.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\windows\SDL_windowsmessagebox.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\windows\SDL_windowsmodes.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\windows\SDL_windowsmouse.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\windows\SDL_windowsopengl.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\windows\SDL_windowsopengles.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\windows\SDL_windowsshape.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\windows\SDL_windowsvideo.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\windows\SDL_windowsvulkan.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\video\windows\SDL_windowswindow.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\thread\generic\SDL_syscond.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\thread\windows\SDL_syscond_cv.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\thread\windows\SDL_sysmutex.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\thread\windows\SDL_syssem.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\thread\windows\SDL_systhread.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\thread\windows\SDL_systls.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\sensor\windows\SDL_windowssensor.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\power\windows\SDL_syspower.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\locale\windows\SDL_syslocale.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\filesystem\windows\SDL_sysfilesystem.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\timer\windows\SDL_systimer.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\loadso\windows\SDL_sysloadso.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\joystick\hidapi\SDL_hidapi_8bitdo.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\joystick\hidapi\SDL_hidapi_combined.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\joystick\hidapi\SDL_hidapi_gamecube.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\joystick\hidapi\SDL_hidapi_luna.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\joystick\hidapi\SDL_hidapi_ps3.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\joystick\hidapi\SDL_hidapi_ps4.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\joystick\hidapi\SDL_hidapi_ps5.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\joystick\hidapi\SDL_hidapi_rumble.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\joystick\hidapi\SDL_hidapi_shield.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\joystick\hidapi\SDL_hidapi_stadia.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\joystick\hidapi\SDL_hidapi_steam.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\joystick\hidapi\SDL_hidapi_steamdeck.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\joystick\hidapi\SDL_hidapi_switch.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\joystick\hidapi\SDL_hidapi_wii.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\joystick\hidapi\SDL_hidapi_xbox360.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\joystick\hidapi\SDL_hidapi_xbox360w.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\joystick\hidapi\SDL_hidapi_xboxone.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\joystick\hidapi\SDL_hidapijoystick.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\joystick\windows\SDL_dinputjoystick.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\joystick\windows\SDL_rawinputjoystick.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\joystick\windows\SDL_windows_gaming_input.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\joystick\windows\SDL_windowsjoystick.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\joystick\windows\SDL_xinputjoystick.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\haptic\windows\SDL_dinputhaptic.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\haptic\windows\SDL_windowshaptic.c" />
+    <ClCompile Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\thirdparty\SDL2\src\haptic\windows\SDL_xinputhaptic.c" />
+  </ItemGroup>
+  <ItemGroup />
+  <ItemGroup>
+    <ProjectReference Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\ZERO_CHECK.vcxproj">
+      <Project>{4C5C7496-FA47-367B-AEF8-C01D0F161824}</Project>
+      <Name>ZERO_CHECK</Name>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </ProjectReference>
+    <ProjectReference Include="C:\Symbian\Carbide\workspace\Whisk3Decosystem\Whisk3D-Editor\platform\windows\build_gles2\thirdparty\SDL2\sdl_headers_copy.vcxproj">
+      <Project>{20BB0075-6F34-3E51-820A-6ECA9BDC4E00}</Project>
+      <Name>sdl_headers_copy</Name>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

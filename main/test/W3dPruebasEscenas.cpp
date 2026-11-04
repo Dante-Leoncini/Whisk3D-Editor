@@ -26,13 +26,7 @@
 //                         escena le agrego al activo (en "Juego" ninguno)
 //    raizdope <n>         cuantas filas arma el dope sheet del timeline (0 = sin keyframes)
 //    raizscrub <frame> [cur N]   arrastrar el cabezal del timeline a ese frame (SetFrameFromX): en
-//                         "Juego" recorre los ticks CACHEADOS (acotado) o, sin partida, se queda en el 1
-//    rendercache <carpeta> [rango F0 F1] [n N | sin] [ini N] [fin N]
-//        Render Animation con el timeline en "Juego": renderiza el CACHE de la simulacion. 'rango'
-//        lo fija a mano (se acota al cache); 'n' asserta cuantos frames guardo, 'sin' que no habia
-//        cache (no guardo nada), 'ini'/'fin' el rango que quedo. Render chico (64x48, PNG). Siempre asserta
-//        la tarjeta Render en "Juego" (sin cache: Render Animation GRIS y el aviso; con cache: habilitado y
-//        su rango en la nota) y que cada PNG sea el de su frame (cache_NNNN.png, uno por frame del rango).
+//                         "Juego" sin partida se queda en el 1
 //    raizcontexto [activo X|-] [sel N] [camara X|-] [luces N] [coleccion X|-] [anims N]
 //        el CONTEXTO de la raiz activa (lo que se guarda y vuelve por raiz): objeto activo,
 //        cuantos seleccionados, camara activa, luces registradas (el tope de 8 es por raiz),
@@ -177,15 +171,10 @@
 #include <algorithm>
 
 extern ViewportBase* rootViewport;
-// (Properties.cpp) el selector de animacion y el render del cache de un juego
+// (Properties.cpp) el selector de animacion
 extern void AnimSelPorId(int id);
 extern void AnimSelJuego();
 extern bool AutoKeyOn;
-extern void W3dHarnessRenderAnimation();
-extern bool W3dRenderJuegoCache(int* mn, int* mx);
-extern void W3dRenderJuegoFijar(float ini, float fin);
-extern void W3dRenderJuegoAuto();
-extern float g_renderJuegoIni, g_renderJuegoFin;
 extern void ConstruirMenuAnim(PopupMenu* menu);
 // (Properties.cpp) los desplegables de la tarjeta Animacion por su texto (el mismo camino que el click)
 extern bool PropsJerLibElegir(const std::string& texto);
@@ -427,43 +416,40 @@ static bool CmdRaizMenu(std::istringstream& ss, std::string& err) {
     return true;
 }
 
-// raizboton escena|juego|prefab: el "+" de la barra del outliner es UN boton desplegable (como el Add
-// del 3D): un click real lo abre y se elige "New Scene" / "New Game" / "New Prefab". Comprueba que el
-// menu ofrece los TRES (con el icono de lo que crean) y nada mas.
+// raizboton escena|juego|prefab: el SELECTOR de la escena de la barra del outliner (el outliner ya no tiene "+": la
+// biblioteca es otro viewport) ofrece, debajo de las escenas / juegos / prefabs del proyecto, "New Scene" / "New Game" /
+// "New Prefab" con el icono de lo que crean. Un click real lo abre y se elige uno.
 static bool CmdRaizBoton(std::istringstream& ss, std::string& err) {
     std::string t; ss >> t;
     Outliner* o = (Outliner*)PrimeraHoja(2);
+    if (!o && PrimeraHoja(9)) {   // (la prueba lo habia pasado a la biblioteca: vuelve a ser el outliner, como el usuario)
+        extern void LayoutCambiarTipoViewport(ViewportBase* v, int aId);
+        LayoutCambiarTipoViewport(PrimeraHoja(9), 1);
+        o = (Outliner*)PrimeraHoja(2);
+        if (rootViewport) rootViewport->Render();
+    }
     if (!o) { err = "raizboton: no hay outliner"; return false; }
     if (MenuAbierto) MenuAbierto->Cerrar();
-    if (!ClickBoton(o, o->btnNueva)) { err = "raizboton: el \"+\" no esta visible"; return false; }
-    if (!MenuAbierto || !MenuAbierto->abierto) { err = "raizboton: el click en el \"+\" no abrio su menu"; return false; }
+    if (o->btnNueva && o->btnNueva->visible) { err = "raizboton: el outliner de la escena no lleva \"+\""; return false; }
+    if (!ClickBoton(o, o->btnRaiz)) { err = "raizboton: el selector de la escena no esta visible"; return false; }
+    if (!MenuAbierto || !MenuAbierto->abierto) { err = "raizboton: el click en el selector no abrio su menu"; return false; }
     PopupMenu* m = MenuAbierto;
     static const char* kItems[3] = { "New Scene", "New Game", "New Prefab" };
-    static const int kTipos[3] = { W3D_RAIZ_ESCENA, W3D_RAIZ_JUEGO, W3D_RAIZ_PREFAB };
     std::string hay;
     for (size_t i = 0; i < m->items.size(); i++) {
         char ic[16]; snprintf(ic, sizeof(ic), " %d", m->items[i]->icon);
         hay += " [" + m->items[i]->text + ic + "]";
     }
-    printf("      [raizboton] +:%s\n", hay.c_str());
-    // el "+" de la barra (fase 4b: el UNICO "+" del outliner): primero New Scene / New Game / New Prefab y
-    // despues las altas de la biblioteca (New Folder / New Material). Nada mas.
-    if (m->items.size() != 5 || m->items[3]->text != T("New Folder") || m->items[4]->text != T("New Material")) {
-        m->Cerrar(); err = "raizboton: el \"+\" tiene que ofrecer New Scene / New Game / New Prefab / New Folder / New Material"; return false;
-    }
+    printf("      [raizboton] selector:%s\n", hay.c_str());
     const int quiero = (t == "prefab") ? 2 : (t == "juego") ? 1 : 0;
-    for (int k = 0; k < 3; k++) {
-        MenuItem* it = m->items[(size_t)k];
-        if (it->text != T(kItems[k]) || it->icon != W3dRaizIcono(kTipos[k])) {
-            m->Cerrar(); err = std::string("raizboton: el item ") + (char)('1' + k) + " del \"+\" no es '" + kItems[k] + "' con su icono"; return false;
-        }
-    }
+    int id = -1;
+    for (size_t i = 0; i < m->items.size(); i++) if (m->items[i]->text == T(kItems[quiero])) { id = m->items[i]->id; break; }
+    if (id < 0) { m->Cerrar(); err = std::string("raizboton: el selector no ofrece '") + kItems[quiero] + "'"; return false; }
     const int antes = (int)W3dRaices().size();
-    const int id = m->items[(size_t)quiero]->id;
     m->Cerrar();
     m->Ejecutar(id);
-    if ((int)W3dRaices().size() != antes + 1) { err = "raizboton: elegir en el \"+\" no creo nada"; return false; }
-    printf("      [raizboton] + %s -> '%s'\n", t.c_str(), W3dRaices()[(size_t)W3dRaizActiva()].nombre.c_str());
+    if ((int)W3dRaices().size() != antes + 1) { err = "raizboton: elegir en el selector no creo nada"; return false; }
+    printf("      [raizboton] %s -> '%s'\n", t.c_str(), W3dRaices()[(size_t)W3dRaizActiva()].nombre.c_str());
     if (rootViewport) rootViewport->Render();
     return true;
 }
@@ -816,79 +802,6 @@ static bool CmdRaizScrub(std::istringstream& ss, std::string& err) {
     printf("      [raizscrub] al frame %d -> CurrentFrame=%d (tick %d)\n", f, CurrentFrame, SimFrameActual());
     std::string k; int v = 0;
     if (ss >> k >> v && k == "cur" && CurrentFrame != v) { err = "raizscrub: el cabezal quedo en " + EsEntero(CurrentFrame) + ", se esperaba " + EsEntero(v); return false; }
-    return true;
-}
-
-static int ContarPng(const std::string& dir, const std::string& pref) {
-    std::vector<w3dFileSystem::DirEntry> fs;
-    w3dFileSystem::ListDir(dir, fs);
-    int n = 0;
-    for (size_t i = 0; i < fs.size(); i++) {
-        const std::string& f = fs[i].name;
-        if (!fs[i].isDir && f.compare(0, pref.size(), pref) == 0 && f.size() > 4 && f.compare(f.size() - 4, 4, ".png") == 0) n++;
-    }
-    return n;
-}
-static bool CmdRenderCache(std::istringstream& ss, std::string& err) {
-    std::string dir; ss >> dir;
-    if (dir.empty()) { err = "rendercache: uso: rendercache <carpeta> [rango F0 F1] [n N | sin] [ini N] [fin N]"; return false; }
-    Properties* P = (Properties*)PrimeraHoja(3);
-    if (!P) { err = "rendercache: el layout no tiene panel de propiedades"; return false; }
-    PropsActivo = P;
-    if (rootViewport) rootViewport->Render();   // puebla Viewport3DActive
-    if (!Viewport3DActive) { err = "rendercache: no hay viewport 3D"; return false; }
-    { const std::string c = "mkdir -p \"" + dir + "\""; if (system(c.c_str()) != 0) { err = "rendercache: no pude crear " + dir; return false; } }
-    P->renderW = 64.0f; P->renderH = 48.0f;
-    if (P->propRenderPath) P->propRenderPath->field.text = dir;
-    if (P->propRenderOutput) P->propRenderOutput->field.text = "cache.png";
-    int esperadas = -2, ini = -1, fin = -1;
-    std::string k;
-    while (ss >> k) {
-        if (k == "rango") { float a = 0, b = 0; ss >> a >> b; W3dRenderJuegoFijar(a, b); }
-        else if (k == "auto") W3dRenderJuegoAuto();
-        else if (k == "n") ss >> esperadas;
-        else if (k == "sin") esperadas = -1;
-        else if (k == "ini") ss >> ini;
-        else if (k == "fin") ss >> fin;
-        else { err = "rendercache: no entiendo '" + k + "'"; return false; }
-    }
-    P->RefreshTargetProperties();   // (la tarjeta Render se acomoda al cache: el mismo camino que la UI)
-    int mn = 0, mx = -1;
-    const bool hay = W3dRenderJuegoCache(&mn, &mx);
-    // LA TARJETA lo dice (en "Juego"): sin cache, "Render Animation" en GRIS y el aviso; con cache, habilitado
-    // y el rango cacheado en la nota
-    if (ActiveAnimKind == 2 && AnimEsJuego) {
-        const bool gris = P->propBtnAnimRender && P->propBtnAnimRender->gris;
-        const std::string nota = (P->propRenderNota && !P->propRenderNota->oculto) ? P->propRenderNota->name : std::string();
-        printf("      [rendercache] tarjeta: Render Animation %s; nota '%s'\n", gris ? "GRIS" : "habilitado", nota.c_str());
-        if (!P->propBtnAnimRender || !P->propRenderNota) { err = "rendercache: la tarjeta Render no tiene el boton o la nota"; return false; }
-        if (!hay && !gris) { err = "rendercache: sin cache, Render Animation deberia estar deshabilitado (gris)"; return false; }
-        if (hay && gris) { err = "rendercache: con cache, Render Animation quedo deshabilitado"; return false; }
-        const std::string sinCache = T("No game cache: play the game to record frames. Render Image renders the current frame.");
-        if (!hay && nota != sinCache) { err = "rendercache: sin cache la nota deberia avisarlo, dice '" + nota + "'"; return false; }
-        if (hay && nota.compare(0, strlen(T("Game cache")), T("Game cache")) != 0) {
-            err = "rendercache: con cache la nota deberia mostrar su rango, dice '" + nota + "'"; return false;
-        }
-    }
-    // (los PNG de una corrida anterior se borran: se cuentan los que deja ESTA)
-    { const std::string c = "rm -f \"" + dir + "\"/cache_*.png"; if (system(c.c_str()) != 0) { err = "rendercache: no pude limpiar " + dir; return false; } }
-    const int tick = SimFrameActual();
-    W3dHarnessRenderAnimation();
-    const int hechas = ContarPng(dir, "cache_");
-    printf("      [rendercache] cache %s [%d, %d] rango [%g, %g] -> %d PNG; el cabezal volvio al tick %d (era %d)\n",
-           hay ? "si" : "NO", mn, mx, g_renderJuegoIni, g_renderJuegoFin, hechas, SimFrameActual(), tick);
-    if (SimFrameActual() != tick) { err = "rendercache: el cabezal no volvio al tick en el que estaba"; return false; }
-    if (esperadas == -1 && (hay || hechas != 0)) { err = "rendercache: se esperaba que no hubiera cache"; return false; }
-    if (esperadas >= 0 && hechas != esperadas) { err = "rendercache: guardo " + EsEntero(hechas) + " PNG, se esperaban " + EsEntero(esperadas); return false; }
-    // cada PNG es el de SU tick: el render movio el cabezal a cada frame del rango (SimIrA), y el archivo lleva
-    // el numero de ese frame (cache_0012.png): ni uno repetido ni uno salteado
-    if (hay && hechas > 0)
-        for (int f = (int)g_renderJuegoIni; f <= (int)g_renderJuegoFin; f++) {
-            char nf[64]; snprintf(nf, sizeof(nf), "/cache_%04d.png", f);
-            if (!w3dFileSystem::FileExists(dir + nf)) { err = "rendercache: falta el frame " + EsEntero(f) + " (" + dir + nf + ")"; return false; }
-        }
-    if (ini >= 0 && (int)g_renderJuegoIni != ini) { err = "rendercache: el inicio quedo en " + EsEntero((long)g_renderJuegoIni); return false; }
-    if (fin >= 0 && (int)g_renderJuegoFin != fin) { err = "rendercache: el fin quedo en " + EsEntero((long)g_renderJuegoFin); return false; }
     return true;
 }
 
@@ -1940,7 +1853,6 @@ bool W3dPruebasEscenasCmd(const std::string& cmd, std::istringstream& ss, std::s
     if (cmd == "raizkey")         return CmdRaizKey(ss, err);
     if (cmd == "raizdope")        return CmdRaizDope(ss, err);
     if (cmd == "raizscrub")       return CmdRaizScrub(ss, err);
-    if (cmd == "rendercache")     return CmdRenderCache(ss, err);
     if (cmd == "notif")           return CmdNotif(ss, err);
     if (cmd == "keyrombo")        return CmdKeyRombo(ss, err);
     if (cmd == "menuobjeto")      return CmdMenuObjeto(ss, err);

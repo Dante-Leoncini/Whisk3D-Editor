@@ -54,6 +54,7 @@
 | Material Preview | Varsayılan mod: sahnenin ışıklarına bağlı olmadan, görünümden gelen nötr bir ışık. |
 | Solid Preview / Wireframe Preview / ZBuffer Preview | Düz gri, yalnızca kenarlar ya da derinlik. |
 | Normal View / Alpha Preview | Renkli normaller ya da siyah beyaz saydamlık. |
+| Motion vectors | Her pikselin önceki kareden beri ekranda ne kadar hareket ettiği (kırmızı = X, yeşil = Y; lavanta = sabit, zeytin yeşili = arka plan). Render’ın `_vectores` geçişiyle aynı görüntü. |
 | Wireframe: Only Visible | Tel kafes görünüm yalnızca gerçekten çizilenleri gösterir. |
 
 ### Overlays

@@ -54,6 +54,7 @@ La Vista 3D es donde se ve y se edita la escena. Trabaja en distintos **modos**:
 | Vista Material | La de fábrica: una luz neutra desde la vista, sin depender de las luces de la escena. |
 | Vista Sólido / Alámbrica / ZBuffer | Gris sólido, solo las aristas, o la profundidad. |
 | Vista Normal / Vista Alpha | Las normales en color, o la transparencia en blanco y negro. |
+| Vectores de movimiento | Cuánto se movió cada píxel en la pantalla desde el cuadro anterior (rojo = X, verde = Y; lavanda = quieto, verde oliva = el fondo). La misma imagen que el pase `_vectores` del render. |
 | Alambre: solo lo visible | La vista alámbrica muestra solo lo que se dibuja de verdad. |
 
 ### Superposiciones

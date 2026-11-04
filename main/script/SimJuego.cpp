@@ -58,9 +58,9 @@ struct SimEnt {
     float amb[4], spe[4];  // ...y el ambient/specular (los animan las animaciones de escena y los clips de objeto)
     bool  esPart, partActivo;  // emisor de particulas: setEmitiendo() lo apaga en juego
     bool  esNiebla; float niebla[6];  // setNiebla(): densidad, color, inicio, fin
-    // FISICA: la velocidad tambien es estado del juego. Sin guardarla, el viaje en el tiempo
-    // (SimStep hacia atras / SimIrA) reponia las posiciones pero la pelota seguia con la
-    // velocidad de AHORA. Solo se guarda si el objeto tiene cuerpo (casi ninguno lo tiene).
+    // FISICA: la velocidad tambien es estado del juego. Sin guardarla, restaurar una foto reponia las
+    // posiciones pero la pelota seguia con la velocidad de AHORA. Solo se guarda si el objeto tiene
+    // cuerpo (casi ninguno lo tiene).
     bool  tieneVel;
     float vx, vy, vz;
     // EL RIEL de una Camera: setRiel/setRielNodo lo mueven EN JUEGO (un cambio de sala salta
@@ -99,7 +99,7 @@ struct SimEnt {
 // script (y el siguiente guardado lo escribia en el archivo), y el viaje en el tiempo reponia
 // las posiciones pero no el cabezal con el que se habian posado los huesos.
 // Va APARTE de SimEnt (un vector por snapshot, solo con los armatures): casi ningun objeto es
-// un esqueleto y el cache del rewind guarda un snapshot por tick.
+// un esqueleto.
 struct SimArm {
     Armature* a;
     int   clip;                       // animActiva
@@ -133,7 +133,6 @@ static bool gActiva = false;
 // true mientras SimPlay ARRANCA la partida (los inicio() de ArrancarRaizActual corren antes de gActiva = true): lo
 // que un inicio() crea con instanciar() -un spawner- es de la partida igual (SimObjetoNuevo)
 static bool gArrancando = false;
-static SimSnap gBase;        // frame 0 del juego (post-inicio(): la base del grab/rewind)
 static SimSnap gBaseEditor;  // la escena DEL USUARIO antes de tocar nada (la restaura Stop)
 // ESCENAS 3D (W3dRaices.h): cambiarEscena() a otra escena del proyecto cambia la RAIZ activa sin
 // destruir nada. La del Play (gRaizPlay) vuelve con Stop; cada otra por la que paso la partida
@@ -149,7 +148,6 @@ static std::set<Object*> gRaicesDelUsuario;
 // devuelve al volver) y sus objetos con script (corren mientras dura; los del juego quedan en pausa)
 static SimSnap gCineBase;
 static std::vector<Object*> gCineScripted;
-static std::vector<SimSnap> gGrab;    // un snapshot por frame simulado (editor)
 static int gTick = 0;
 static std::vector<Object*> gScripted;
 // ---- LO QUE UN SCRIPT CREA Y DESTRUYE JUGANDO (instanciar / destruir de lua, io/Prefabs.h) ----
@@ -197,9 +195,6 @@ void SimLuaPerfTop(char* buf, int bufLen, int frames) {
     }
     for (size_t i = 0; i < gLuaMsAcum.size(); i++) gLuaMsAcum[i] = 0.0;
 }
-static int gGrabOffset = 0;   // tick ABSOLUTO del primer snapshot (el cache rueda)
-int gSimCacheMax = 250;       // techo del cache (frames), configurable (tarjeta Juego)
-bool gSimCacheOn = true;      // cache de juego (rewind) ON/OFF (checkbox tarjeta Juego). OFF = sin snapshot -> fluido
 // FLECHAS DEL TECLADO apretadas AHORA [arriba, abajo, izquierda, derecha]. Las
 // mantiene SimTeclaSDL y las mezcla TickReal en el stick izquierdo, igual que el
 // d-pad. Se sueltan al parar la partida (SimStop) para que una flecha que quedo
@@ -210,9 +205,7 @@ bool SimActiva() { return gActiva; }
 // modo juego DE VERDAD (ver SimJuego.h): timeline en "Juego" + partida cargada.
 // Gate compartido de los overlays de edicion / chrome que el juego no muestra.
 bool W3dJuegoCorriendo() { extern bool AnimEsJuego; return AnimEsJuego && gActiva; }
-int  SimFramesGrabados() { return (int)gGrab.size(); }
 int  SimFrameActual() { return gTick; }
-int  SimPrimerFrame() { return gGrabOffset; }
 
 static void Recorrer(Object* o, SimSnap* snap, std::vector<Object*>* scripted) {
     if (!o) return;
@@ -547,10 +540,6 @@ static void SimCambiarRaiz(int idx) {
     ArrancarRaizActual();
     W3dStreamingPartidaInicio();   // (las diferidas cerca de la escena nueva, como al arrancar el Play)
     W3dRaizArrancarCinematica();   // (una ESCENA: su animacion desde el inicio; un juego no hace nada)
-    // el cache del rewind arranca de nuevo (lo grabado era de la otra escena): el snapshot que
-    // TickReal toma al terminar este tick es el primero
-    gGrab.clear();
-    gGrabOffset = gTick + 1;
     w3dLogf("[juego] cambiarEscena: ahora corre '%s' (%d objeto(s) con script)",
             W3dRaizActiva() >= 0 ? W3dRaices()[(size_t)W3dRaizActiva()].nombre.c_str() : "?", (int)gScripted.size());
     g_redraw = true;
@@ -605,10 +594,10 @@ static void SimObjetoNuevo(Object* raiz) {
     g_redraw = true;
 }
 
-// lo que las fotos del Play (el frame 0, el cache del rewind, la base de una cinematica y la de cada escena por
+// lo que las fotos del Play (la escena del usuario, la base de una cinematica y la de cada escena por
 // la que paso la partida) tienen de objetos que se LIBERAN
 // (y lo que las OTRAS entradas nombran de ellos: el RIEL de una camara que setRiel() puso en una curva que se
-// libera. Sin esto, rebobinar -Aplicar- le devolvia a la camara una curva liberada)
+// libera. Sin esto, restaurar la foto -Aplicar- le devolvia a la camara una curva liberada)
 static void PodarSnap(SimSnap& s, const std::set<Object*>& fuera) {
     for (size_t i = s.ents.size(); i-- > 0; ) if (fuera.count(s.ents[i].o)) s.ents.erase(s.ents.begin() + (long)i);
     for (size_t i = 0; i < s.ents.size(); i++) if (s.ents[i].riel && fuera.count((Object*)s.ents[i].riel)) s.ents[i].riel = NULL;
@@ -617,9 +606,7 @@ static void PodarSnap(SimSnap& s, const std::set<Object*>& fuera) {
 }
 // TODAS las fotos de la partida
 static void PodarFotos(const std::set<Object*>& fuera) {
-    PodarSnap(gBase, fuera);
     PodarSnap(gBaseEditor, fuera);
-    for (size_t i = 0; i < gGrab.size(); i++) PodarSnap(gGrab[i], fuera);
     PodarSnap(gCineBase, fuera);
     for (size_t i = 0; i < gBasesRaices.size(); i++) PodarSnap(gBasesRaices[i].snap, fuera);
 }
@@ -806,7 +793,7 @@ void SimGuardadoFin() {
 // ============================================================================
 //  UN OBJETO SE LIBERA CON LA PARTIDA ANDANDO por un camino que no es destruir(): un paso del historial que se
 //  cae con lo que tenia borrado, algo que el editor regenera o descarga... Las listas del Play (los objetos con
-//  script, los nuevos, los de una cinematica) y sus fotos (el frame 0, el cache del rewind, la escena del
+//  script, los nuevos, los de una cinematica) y sus fotos (la escena del
 //  usuario, las bases de cada escena) no pueden quedar apuntandolo: el tick siguiente leia memoria liberada.
 //  Es un piso de memoria (el editor igual bloquea lo que regenera con el Play andando). Lo engancha el
 //  destructor de Object (W3dDesvincularRegistrar, Objects.h); sin partida no hace nada.
@@ -882,13 +869,6 @@ static void SimPlay() {
     // simula los JUEGOS) arranca como en el juego compilado: con su animacion desde el inicio
     W3dRaizArrancarCinematica();
     gArrancando = false;
-    gGrab.clear();
-    gGrabOffset = 0;
-    // frame 0 del cache (post-inicio): SOLO si el cache esta ON y NO es un juego compilado. Con el cache OFF (o
-    // g_modoJuego) gGrab queda VACIO -> juego fluido y SIN rewind. Es CLAVE dejarlo vacio: si gGrab tuviera este
-    // unico frame 0, SimStep back accederia gGrab[gTick] (gTick avanza pero gGrab no crece) fuera de rango = crash.
-    { extern bool g_modoJuego;
-      if (gSimCacheOn && !g_modoJuego) { Snapshot(&gBase); gGrab.push_back(gBase); } }
     gTick = 0;
     gActiva = true;
     CurrentFrame = StartFrame;
@@ -919,9 +899,8 @@ void SimReresolver(Object* o) {
 // la ENTRADA del pad (y las flechas del teclado) hacia los scripts: la leen el tick de la partida y el de
 // una cinematica (un "saltar" con un boton)
 static void EntradaPad() {
-    // el GAMEPAD analogico entra a los scripts (los ejes ya vienen con deadzone).
-    // En Symbian el pad SDL no existe (el input del juego entra por otra via).
-#ifndef W3D_SYMBIAN
+    // el GAMEPAD analogico entra a los scripts (los ejes ya vienen con deadzone). En Symbian los joysticks del driver
+    // Bluetooth (MandosSymbianTick) dejan su estado en los MISMOS arreglos: de aca para abajo es igual.
     float lx = axisState[SDL_CONTROLLER_AXIS_LEFTX], ly = axisState[SDL_CONTROLLER_AXIS_LEFTY];
     // ---- EL D-PAD (LA CRUCETA) ENTRA COMO EL STICK IZQUIERDO --------------------
     // Reporte del dueno, textual: "dejame jugar con las flechas del control y no
@@ -995,11 +974,10 @@ static void EntradaPad() {
         W3dScriptBotonPadDe(m, "l2", ax[SDL_CONTROLLER_AXIS_TRIGGERLEFT] > 0.5f);
         W3dScriptBotonPadDe(m, "r2", ax[SDL_CONTROLLER_AXIS_TRIGGERRIGHT] > 0.5f);
     }
-#endif
 }
 // UN TICK DE CINEMATICA (reproducirEscena): el juego en PAUSA (ni su fisica ni sus scripts ni sus
 // animaciones: su arbol ni esta en el activo) y corre la ESCENA: su animacion, sus esqueletos, sus clips
-// de objeto y sus scripts. No avanza el tick de la partida ni graba en el cache: el rewind es del juego.
+// de objeto y sus scripts. No avanza el tick de la partida.
 static void TickCine(float dt) {
     { extern void W3dCamarasRielTick(); W3dCamarasRielTick(); }
     EntradaPad();
@@ -1111,18 +1089,6 @@ static void TickReal(float dt) {
     // pausa, asi que jugando nunca se avanza dos veces.
     if (!PlayAnimation) UpdateAnimations(dt);
     gTick++;
-    // CACHE DE JUEGO (rewind): un snapshot de TODA la escena por tick. Es lo que DEGRADA el fps (arranca fluido y
-    // cae a ~15 al llenarse el buffer -> clonar la escena + memmove del vector cada frame). Se saltea si el usuario
-    // destildo "Cache de juego" (gSimCacheOn=false) o si corre un JUEGO COMPILADO (g_modoJuego: un juego no rebobina,
-    // nunca debe cachear). Sin cache, SimTickPlay va directo a TickReal (gGrab vacio -> el branch de futuro grabado
-    // de :382 no entra) y SimStep/SimSeek hacen early-return con el buffer vacio.
-    { extern bool g_modoJuego;
-      if (gSimCacheOn && !g_modoJuego) {
-          SimSnap s; Snapshot(&s); gGrab.push_back(s);
-          // el cache RUEDA: al llenarse se descartan los frames mas viejos (limite de memoria)
-          int techo = (gSimCacheMax > 10) ? gSimCacheMax : 10;
-          while ((int)gGrab.size() > techo) { gGrab.erase(gGrab.begin()); gGrabOffset++; }
-      } }
     if (AnimEsJuego || StartFrame + gTick <= EndFrame) CurrentFrame = StartFrame + gTick;
     g_redraw = true;
 }
@@ -1130,18 +1096,6 @@ static void TickReal(float dt) {
 void SimTickPlay(float dt) {
     if (w3dEngine::W3dAudioPaused()) w3dEngine::W3dAudioPause(false);   // Play / reanudar: el mixer sigue donde estaba
     if (!gActiva) { SimPlay(); if (!gActiva) return; }
-    if (gTick + 1 - gGrabOffset < (int)gGrab.size()) {
-        // hay FUTURO grabado. "No reemplazar estados": se REPRODUCE lo grabado
-        // (sin correr los scripts) hasta alcanzar el borde; sin la opcion, el
-        // futuro se descarta y se juega de nuevo desde este momento.
-        if (AnimConservarEstados) {
-            gTick++;
-            Aplicar(gGrab[gTick - gGrabOffset]);
-            if (AnimEsJuego || StartFrame + gTick <= EndFrame) CurrentFrame = StartFrame + gTick;
-            return;
-        }
-        gGrab.resize(gTick + 1 - gGrabOffset);
-    }
     { extern void AlimentarDedosJuego(); AlimentarDedosJuego(); } // multi-touch: dedos -> dedo(n)
     TickReal(dt);
 }
@@ -1225,37 +1179,11 @@ void SimRatonPantalla(ViewportBase* v, int mx, int my, bool dentro) {
     BindsJuegoRaton(cx, cy, dentro);
 }
 
-void SimIrA(int tick) {
-    if (!gActiva || gGrab.empty()) return;
-    W3dCineAbortar();   // (el cache es del JUEGO: viajar en el tiempo deja una cinematica que estuviera sonando)
-    if (tick < gGrabOffset) tick = gGrabOffset;
-    if (tick > gGrabOffset + (int)gGrab.size() - 1) tick = gGrabOffset + (int)gGrab.size() - 1;
-    gTick = tick;
-    Aplicar(gGrab[gTick - gGrabOffset]);
-    W3dHitboxLimpiar();   // el viaje en el tiempo no restaura quien estaba adentro: se recalcula
-    if (AnimEsJuego || StartFrame + gTick <= EndFrame) CurrentFrame = StartFrame + gTick;
-}
-
+// paso a paso con la partida en PAUSA: hacia adelante simula un frame; hacia atras no hay nada (el juego no
+// graba su pasado: no se rebobina)
 bool SimStep(int dir) {
     if (!gActiva) return false;
-    if (gGrab.empty()) return true;   // sin cache (destildado o juego compilado): no hay rewind -> no-op
-                                      // (evita gGrab[gTick] fuera de rango: gTick avanza pero gGrab no crece)
-    if (dir < 0) {
-        if (gTick <= gGrabOffset) return true;   // el cache rodo: mas atras no hay
-        W3dCineAbortar();   // (el rewind es del juego: una cinematica que sonaba se deja)
-        gTick--;
-        Aplicar(gGrab[gTick - gGrabOffset]);     // VIAJE EN EL TIEMPO: re-ver el anterior
-        W3dHitboxLimpiar();                      // (los pares de hitbox se recalculan al seguir)
-        if (AnimEsJuego || StartFrame + gTick <= EndFrame) CurrentFrame = StartFrame + gTick;
-    } else {
-        if (gTick + 1 - gGrabOffset < (int)gGrab.size()) {
-            gTick++;
-            Aplicar(gGrab[gTick - gGrabOffset]);     // re-ver lo ya grabado
-            if (AnimEsJuego || StartFrame + gTick <= EndFrame) CurrentFrame = StartFrame + gTick;
-        } else {
-            TickReal(1.0f / 30.0f);    // borde de lo grabado: simular un frame nuevo
-        }
-    }
+    if (dir > 0) TickReal(1.0f / 30.0f);
     return true;
 }
 
@@ -1303,23 +1231,11 @@ void SimStop() {
     gFlecha[0] = gFlecha[1] = gFlecha[2] = gFlecha[3] = false;  // flechas del teclado
     BindsJuegoResetPunteros();   // soltar el dedo/mouse: que no quede un toque viejo para la proxima partida
     W3dEscenaLimpiar();          // soltar el mapa de escenas / activa (el editor vuelve a elegir UI por ObjActivo)
-    gGrab.clear();
     gScripted.clear();
     gTick = 0;
-    gGrabOffset = 0;
     gActiva = false;
     CurrentFrame = StartFrame;
     g_redraw = true;
-}
-
-// hay frames grabados para rebobinar? (con el cache de juego OFF gGrab queda vacio: no hay rewind)
-bool SimHayCache() { return !gGrab.empty(); }
-
-// corta/reinicia el cache LIMPIO desde el tick actual. Lo llama el checkbox "Cache de juego": al destildarlo a
-// mitad de partida no quedan frames "fantasma" (banda de cache / rewind sobre frames viejos) hasta el proximo Stop.
-void SimCacheReset() {
-    gGrab.clear();
-    gGrabOffset = gTick;
 }
 
 // ---- teclado del juego -----------------------------------------------------

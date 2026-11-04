@@ -1,0 +1,37 @@
+# SHADERS ESCRITOS en un backend SIN shaders (GL fijo, GLES 1.1 del N95, la 3DS): la seccion @vertice la corre la CPU
+# (objects/ShaderCPU.cpp) con el MISMO codigo que en GLES 2.0 corre la GPU; el @fragmento no se usa (el material se
+# dibuja como siempre). En los backends con shaders esta prueba no aplica
+matshader soporte nohay
+ventana 1280 720
+selobj Cubo
+matnew
+matcolor 0.8 0.9 1
+deselectall
+vporbita 0 0 0 9 -60 0
+vpvista material
+# (sin shader, el punto de arriba es fondo, como el de al lado)
+escenapx 0.5 4 0.5 comoen -3 4 0.5 30
+# un shader SIN @vertice: compila (no hay nada que correr) y el material se dibuja como siempre
+selobj Cubo
+matshader shaders/verde.glsl
+matshader compila si
+escenapx 0.5 1 0.5 noes 0 255 0 40
+# @vertice en la CPU: el cubo sube 3 metros (ya no es fondo arriba)
+matshader shaders/sube.glsl
+matshader compila si
+escenapx 0.5 4 0.5 distintode -3 4 0.5 30
+# el interprete: funciones, inout, for, swizzles, ternaria... la cuenta da 3 (como en la GPU, ver prueba_shaders)
+matshader shaders/cpu_completo.glsl
+matshader compila si
+escenapx 0.5 4 0.5 distintode -3 4 0.5 30
+# un error en @vertice: el mensaje dice el renglon del archivo y el cubo se dibuja como siempre (abajo)
+matshader shaders/roto_vertice.glsl
+matshader compila no renglon 5
+escenapx 0.5 4 0.5 comoen -3 4 0.5 30
+# w3d_tiempo es la linea de tiempo: en el cuadro 0 no sube, en el 90 (3 s a 30 FPS) sube 3 m
+matshader shaders/ola_tiempo.glsl
+matshader compila si
+frame 0
+escenapx 0.5 4 0.5 comoen -3 4 0.5 30
+frame 90
+escenapx 0.5 4 0.5 distintode -3 4 0.5 30

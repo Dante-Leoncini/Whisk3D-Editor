@@ -17,6 +17,7 @@ What the editor can do, organized by panel and by mode. Draft for review.
 6. [Timeline](linea-de-tiempo.md)
 7. [Outliner](outliner.md)
 8. [Properties](propiedades.md)
+   - [Hand-written shaders](shaders.md)
 9. [2D Editor](editor-2d.md)
 10. [Script Editor (IDE)](editor-de-scripts.md)
 11. [Console](consola.md)

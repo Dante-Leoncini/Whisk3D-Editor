@@ -1,6 +1,6 @@
 # Script Editor (IDE)
 
-Éditeur de texte pour les scripts Lua, avec numéros de ligne, coloration syntaxique, guides d'indentation et prise en charge de la ñ et des accents. Tant qu'il a le focus, les lettres s'écrivent (elles ne déclenchent pas les raccourcis de l'éditeur). Sur Android, toucher le texte ouvre le clavier. Sur le N95, on écrit avec le T9.
+Éditeur de texte pour les scripts Lua et les [shaders écrits](shaders.md) (`.glsl`), avec numéros de ligne, coloration syntaxique, guides d'indentation et prise en charge de la ñ et des accents. Tant qu'il a le focus, les lettres s'écrivent (elles ne déclenchent pas les raccourcis de l'éditeur). Sur Android, toucher le texte ouvre le clavier. Sur le N95, on écrit avec le T9.
 
 | Fonction | Description | Raccourci |
 |---|---|---|
@@ -10,6 +10,7 @@
 | Save inside the .w3d | Uniquement si le script est externe : le place dans le projet. | File |
 | Save outside the .w3d… | Uniquement si le script est interne : le sort dans un fichier ; les objets utilisent alors ce fichier. | File |
 | Refresh | Recharge le fichier tel qu'il est sur le disque (ce qui a été modifié avec un autre éditeur). S'il y a des modifications non enregistrées dans l'éditeur, il demande avant de les abandonner (et vous pouvez les récupérer avec <kbd>Ctrl+Z</kbd>). Si le jeu tourne, recharge en direct les objets qui utilisent le script. | Bouton |
+| Shaders (.glsl) | S'ouvrent depuis le matériau (le petit bouton de la ligne **Shader**), depuis la Library ou depuis le sélecteur, et sont colorés comme du GLSL. À côté du nom apparaît **Compile** : il compile ce que vous écrivez (si un matériau l'utilise, il l'enregistre et compile ce matériau). Enregistrer un shader le compile dans tous les matériaux qui l'utilisent et indique s'il a compilé, ou l'erreur avec sa ligne. | <kbd>Ctrl+S</kbd> |
 | Protection à l'enregistrement | Si le fichier externe a été modifié à l'extérieur depuis son ouverture, Save demande avant de l'écraser. Save recharge aussi le script en direct si le jeu tourne. | Automatique |
 | Indentation (Tab) | <kbd>Tab</kbd> complète jusqu'au prochain multiple de 4 ; avec plusieurs lignes sélectionnées, il leur ajoute un niveau et <kbd>Shift+Tab</kbd> le retire. Les lignes verticales marquent chaque niveau ; celle du bloc du curseur est plus claire. | <kbd>Tab</kbd> / <kbd>Shift+Tab</kbd> |
 | Menu Edit | Undo, Redo, Cut, Copy, Paste, Find… et Replace… | Bouton Edit |
