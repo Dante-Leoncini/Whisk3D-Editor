@@ -135,6 +135,7 @@
 #include "test/W3dPruebasHitbox.h"      // los comandos del HITBOX (se despachan antes que los de aca, ver abajo)
 #include "test/W3dPruebasIntegracion.h" // la prueba CRUZADA: mallas + animsets + hitbox en la misma escena
 #include "test/W3dPruebasOutliner.h"   // el OUTLINER POR RECURSOS: vistas, carpetas, en uso / huerfano
+#include "test/W3dCapturas.h"          // las CAPTURAS de los tutoriales: mouse, dedo, rueda y teclas reales
 #include "test/W3dPruebasEscenas.h"    // escenas 3D y prefabs (las raices del proyecto)
 #include "test/W3dPruebasPrefabs.h"    // las INSTANCIAS de prefab (generar, scope, overrides, instanciar/destruir)
 #include "test/W3dPruebasLibrerias.h"  // las LIBRERIAS externas y los PROXIES W3D
@@ -2543,6 +2544,8 @@ bool W3dPruebasRecursosCmd(const std::string& cmd, std::istringstream& ss,
     { const bool r = W3dPruebasIntegracionCmd(cmd, ss, err, manejado); if (manejado) return r; }
     // el OUTLINER POR RECURSOS (vistas, carpetas, recurso activo: test/W3dPruebasOutliner.cpp)
     { const bool r = W3dPruebasOutlinerCmd(cmd, ss, err, manejado); if (manejado) return r; }
+    // las CAPTURAS de los tutoriales (test/W3dCapturas.cpp, tools/capturas/)
+    { const bool r = W3dCapturasCmd(cmd, ss, err, manejado); if (manejado) return r; }
     // las ESCENAS 3D y los PREFABS del proyecto (raices: test/W3dPruebasEscenas.cpp)
     { const bool r = W3dPruebasEscenasCmd(cmd, ss, err, manejado); if (manejado) return r; }
     // las INSTANCIAS DE PREFAB (test/W3dPruebasPrefabs.cpp)
