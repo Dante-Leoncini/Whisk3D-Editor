@@ -1,0 +1,89 @@
+# I viewport
+
+La finestra di Whisk3D è divisa in **viewport**: pannelli, ognuno con il suo editor (il 3D Viewport, l'Outliner, Properties...). Puoi dividerli, cambiarne la dimensione e scegliere cosa mostra ognuno. Funziona allo stesso modo con il mouse, con il dito su uno schermo touch e con la tastiera di un Nokia.
+
+## La barra dei menu e il pulsante dell'angolo
+
+Tutti i viewport hanno in alto una **barra dei menu** (in verde nell'immagine) con i menu e i pulsanti di quell'editor. In alto a sinistra c'è sempre il **pulsante dell'angolo** (in arancione): è quello che cambia o modifica il viewport.
+
+![I quattro viewport di Whisk3D, con la barra dei menu di ognuno evidenziata in verde e il pulsante dell'angolo in arancione](img/viewports-barras.webp)
+
+## Cambiare la dimensione
+
+Appoggia il dito (o il mouse) sul pulsante dell'angolo e **trascinalo**. Questo sposta il bordo sinistro e quello superiore di quel viewport, e quelli accanto si adattano. Qui si trascina in cerchio quello in basso a destra e tutti e tre cambiano dimensione:
+
+![Un dito trascina in cerchio il pulsante dell'angolo del viewport in basso a destra, e i tre viewport cambiano dimensione](img/viewports-arrastrar.webp)
+
+> [!TIP]
+> Se tocchi il pulsante e lo lasci senza trascinare, si apre il suo menu. Sul PC puoi anche trascinare il bordo che separa due viewport.
+
+## Il menu dell'angolo
+
+Toccando il pulsante dell'angolo si apre questo menu:
+
+![Il menu del pulsante dell'angolo: i tipi di viewport in alto e, sotto la linea, Expand, Split in Columns, Split in Rows e Maximize](img/viewports-menu.webp)
+
+In alto ci sono i **tipi di viewport**: sceglierne uno trasforma il viewport in quell'editor. Sotto la linea c'è ciò che si può fare con il viewport:
+
+| Opzione | Cosa fa |
+|---|---|
+| Expand | Il viewport prende il posto di quello accanto, che si chiude (se quello accanto è diviso, si chiude tutto quel gruppo). |
+| Split in Columns | Lo divide in due, uno accanto all'altro. |
+| Split in Rows | Lo divide in due, uno sopra l'altro. |
+| Maximize | Lo ingrandisce a tutta la finestra. Mentre è massimizzato, il menu ha solo **Minimize**, che lo riporta al suo posto. |
+
+### Cambiare il tipo
+
+Il 3D Viewport trasformato in UV Editor:
+
+![Si tocca il pulsante dell'angolo del 3D Viewport, si sceglie UV Editor e il viewport diventa un UV Editor](img/viewports-cambiar-tipo.webp)
+
+### Split in Columns e Split in Rows
+
+![Split in Columns: il 3D Viewport resta diviso in due, uno accanto all'altro](img/viewports-dividir-columnas.webp)
+
+![Split in Rows: il 3D Viewport resta diviso in due, uno sopra l'altro](img/viewports-dividir-filas.webp)
+
+### Expand
+
+L'Outliner prende il posto di Properties:
+
+![Si sceglie Expand nell'Outliner e occupa anche il posto di Properties](img/viewports-expandir.webp)
+
+### Maximize e Minimize
+
+![Il 3D Viewport si ingrandisce a tutta la finestra e poi, con Minimize, torna al suo posto](img/viewports-maximizar.webp)
+
+## Quando la barra non ci sta
+
+Se il viewport è stretto, la sua barra non ci sta tutta. Lo stesso succede con la barra inferiore del 3D Viewport. Per vedere il resto:
+
+- **Con il dito:** trascinala di lato.
+- **Con il mouse:** tieni premuto il pulsante del mouse sulla barra e trascina, oppure gira la **rotella** sopra la barra. Nel 3D Viewport la rotella fa lo zoom, quindi la sua barra si trascina.
+- **Con la tastiera:** <kbd>M</kbd> sul PC, o il **tasto di selezione sinistro** sul Nokia, ti porta nella barra del viewport attivo. Con le frecce sinistra e destra la percorri, e ogni menu si apre quando ci arrivi. Con su e giù ti muovi nel menu, e con OK (<kbd>Enter</kbd> sul PC) scegli. La barra scorre da sola per mostrare dove sei.
+
+![Un dito trascina di lato la barra dell'Outliner e compaiono i pulsanti che non ci stavano](img/viewports-barra-dedo.webp)
+
+![Il puntatore del mouse sopra la barra dell'Outliner: con la rotella, la barra scorre](img/viewports-barra-rueda.webp)
+
+Su un Nokia N95: il tasto di selezione sinistro porta nella barra e le frecce la percorrono.
+
+![L'interfaccia del Nokia N95: il tasto di selezione sinistro apre il menu Mode e la freccia destra passa da un menu all'altro della barra, che scorre da sola](img/viewports-barra-nokia.webp)
+
+## I tipi di viewport
+
+| Viewport | A cosa serve |
+|---|---|
+| [3D Viewport](../editor/vista-3d.md) | Dove si vede e si modifica la scena: modellare, spostare oggetti, dipingere, mettere in posa e animare. |
+| [Outliner](../editor/outliner.md) | L'elenco di tutto ciò che c'è nella scena. |
+| [Library](../editor/outliner.md#vista-library) | Le risorse del progetto: mesh, materiali, texture, animazioni, suoni, script e altro. |
+| [Properties](../editor/propiedades.md) | I dati dell'oggetto attivo, in schede. |
+| [UV Editor](../editor/editor-uv.md) | Come la texture si appoggia sulla mesh. |
+| [Timeline](../editor/linea-de-tiempo.md) | L'animazione: i keyframe e le curve. |
+| [2D Editor](../editor/editor-2d.md) | Interfacce di gioco, HUD e giochi 2D. |
+| [Console](../editor/consola.md) | Il registro del motore: errori, avvisi e informazioni. |
+| [IDE](../editor/editor-de-scripts.md) | L'editor di script Lua e di shader. |
+
+Ogni viewport avrà il suo tutorial con più dettagli. Nel frattempo, il [Manuale di Whisk3D](../editor/README.md) li spiega uno per uno.
+
+Whisk3D continua a crescere: col tempo si aggiungeranno nuovi viewport e quelli attuali potranno cambiare. Funzioneranno tutti allo stesso modo, con la barra in alto e il pulsante nell'angolo.
