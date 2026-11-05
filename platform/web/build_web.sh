@@ -52,6 +52,8 @@ SRC="$SRC $CORE/audio/W3dVolumen.cpp $CORE/audio/W3dMusic.cpp"
 SRC="$SRC $CORE/audio/W3dAudio.cpp $CORE/audio/W3dAudioSDL.cpp"
 # portapapeles del sistema (Core): backend SDL (mapea al del navegador en emscripten)
 SRC="$SRC $CORE/base/W3dClipboardSDL.cpp"
+# la vibracion (navigator.vibrate o el "tic" de iOS): controles.cpp la llama al agarrar algo en la biblioteca
+SRC="$SRC $CORE/base/W3dVibrar.cpp"
 LUA_A="$OUT/libw3dlua.a"
 if [[ ! -f "$LUA_A" || thirdparty/lua/src -nt "$LUA_A" ]]; then
     echo "compilando lua (C) -> libw3dlua.a"

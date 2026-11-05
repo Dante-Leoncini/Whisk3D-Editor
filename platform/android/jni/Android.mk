@@ -50,6 +50,7 @@ SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/base/W3dInteractionState.cpp
 # Faltaba en el build del editor -> undefined symbols al linkear.
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/base/W3dConfig.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/base/W3dTactil.cpp      # pantalla tactil sin SDL (el editor engancha su receptor)
+SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/base/W3dVibrar.cpp      # la vibracion (vibrar() de la actividad, por JNI)
 # SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/w3dGraphics.cpp #1.1
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/gles2/w3dGraphicsGLES2.cpp
 SRC_FILES += $(PROJECT_ROOT)/libs/$(CORE)/math/Vector3.cpp

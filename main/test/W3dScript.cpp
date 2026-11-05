@@ -33186,11 +33186,12 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
             if (a == "importar") { size_t p = resto.find_first_not_of(" \t"); ruta = (p == std::string::npos) ? std::string() : resto.substr(p); }
             else ruta += resto;
             {   // (una ruta RELATIVA del disco, desde la carpeta de la prueba: "shaders/x.glsl" sola seria una entrada del proyecto)
-                char abs[1024];
 #ifdef _WIN32
+                char abs[1024];
                 if (_fullpath(abs, ruta.c_str(), sizeof(abs))) ruta = abs;
 #else
-                if (realpath(ruta.c_str(), abs)) ruta = abs;
+                // (NULL: realpath reserva el lugar; con un arreglo propio, el NDK pide que tenga PATH_MAX)
+                if (char* abs = realpath(ruta.c_str(), NULL)) { ruta = abs; free(abs); }
 #endif
             }
             if (a == "importar") ruta = W3dImportarAsset(ruta, "shaders");
