@@ -409,6 +409,8 @@ static void JMat(std::string& s, const Matrix4& m) {
 static void EscribirCurva(std::string& s, const AnimProperty& ap) {
     s += "{ \"p\": "; JInt(s, ap.Property);
     s += ", \"c\": "; JInt(s, ap.component);
+    if (ap.cicloAntes)   { s += ", \"ca\": "; JInt(s, ap.cicloAntes); }     // el modificador Repetir
+    if (ap.cicloDespues) { s += ", \"cd\": "; JInt(s, ap.cicloDespues); }
     s += ", \"k\": [";
     for (size_t i = 0; i < ap.keyframes.size(); i++) {
         const keyFrame k = ap.keyframes.Clave(i);   // (por valor: guardar no expande una curva compacta)

@@ -1,0 +1,15 @@
+# El PORTAPAPELES de keyframes del timeline: Ctrl+C / Ctrl+V (pega desde el frame actual), Ctrl+X, Ctrl+D (duplicar
+# y agarrar) y el click derecho en el strip (menu Cortar / Copiar / Pegar / Duplicar / Borrar). Ademas, los nombres
+# de los ejes de la POSICION son Z-arriba como en Properties: la fila "Z Location" es pos.y (la altura)
+ventana 1280 720
+add cube
+frame 1
+keychan 0 0
+keychan 0 1
+keychan 0 2
+frame 10
+objmove 1 1 1
+keychan 0 0
+keychan 0 1
+keychan 0 2
+tlclip

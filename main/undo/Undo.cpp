@@ -2678,10 +2678,10 @@ struct KFId {
 // (W3dClaves y no std::vector<keyFrame>: capturar, comparar y el swap de Aplicar no expanden las curvas
 //  COMPACTAS del clip -Animation.h-; solo se expande la que la operacion edita: claveseditar en
 //  tools/pruebas/prueba_claves_compactas.w3s)
-struct KFCurva { W3dClaves* c; KFId id; };
+struct KFCurva { W3dClaves* c; KFId id; AnimProperty* ap; };   // (ap: el modificador Repetir de la curva)
 static void KFAgregar(std::vector<KFCurva>& out, std::vector<AnimProperty>& props, Object* obj, int bone){
     for (size_t p = 0; p < props.size(); p++){
-        KFCurva k; k.c = &props[p].keyframes;
+        KFCurva k; k.c = &props[p].keyframes; k.ap = &props[p];
         k.id.obj = obj; k.id.bone = bone; k.id.prop = props[p].Property; k.id.comp = props[p].component;
         out.push_back(k);
     }
@@ -2746,7 +2746,7 @@ static int KFBuscar(const std::vector<KFCurva>& c, const KFId& id){
     return -1;
 }
 class KeyframesUndo : public UndoCmd {
-    struct KFGuardada { KFId id; W3dClaves kf; };   // (una curva compacta se guarda compacta)
+    struct KFGuardada { KFId id; W3dClaves kf; int ca, cd; KFGuardada() : ca(0), cd(0) {} };   // (una curva compacta se guarda compacta; ca/cd = Repetir)
     std::vector<KFGuardada> snap;
     KFLista lid;                 // de QUE lista de curvas salio el snapshot
     // snapshot de los FRAMES de vertices de la anim de objeto activa (kind 3). Se guarda
@@ -2762,11 +2762,15 @@ class KeyframesUndo : public UndoCmd {
         return lid.mesh->animations[lid.idx];
     }
 public:
-    KeyframesUndo(){
+    // arm != NULL: el clip ACTIVO de ese esqueleto aunque el timeline muestre otra cosa (el auto key de pose
+    // escribe ahi siempre)
+    KeyframesUndo(Armature* arm = NULL){
         KFIdentidadActiva(lid);
+        if (arm){ lid = KFLista(); lid.kind = 1; lid.arm = arm; lid.idx = arm->animActiva; }
         std::vector<KFCurva> c; KFResolver(lid, c, false);   // capturar solo lee
         snap.resize(c.size());
-        for (size_t i = 0; i < c.size(); i++){ snap[i].id = c[i].id; snap[i].kf = *c[i].c; }
+        for (size_t i = 0; i < c.size(); i++){ snap[i].id = c[i].id; snap[i].kf = *c[i].c;
+            snap[i].ca = c[i].ap->cicloAntes; snap[i].cd = c[i].ap->cicloDespues; }
         vfHay = false;
         VertexAnimation* van = VfAnim();
         if (van && van->target){ VertexAnimSerializar(*van, vfBlob); vfHay = true; }
@@ -2781,6 +2785,7 @@ public:
             visto[k] = 1;
             const W3dClaves& viva = *c[k].c; const W3dClaves& g = snap[i].kf;
             if (viva.size() != g.size()) return true;
+            if (c[k].ap->cicloAntes != snap[i].ca || c[k].ap->cicloDespues != snap[i].cd) return true;   // Repetir
             for (size_t q = 0; q < g.size(); q++){
                 const keyFrame a = viva.Clave(q); const keyFrame b = g.Clave(q);   // (por valor: no expande)
                 // OJO: tambien la INTERPOLACION y los HANDLES. Curvar un tramo no mueve el keyframe (mismo frame y
@@ -2806,12 +2811,16 @@ public:
             if (k < 0) continue;                      // esa curva ya no existe: la entrada queda guardada
             visto[k] = 1;
             c[k].c->swap(snap[i].kf);                 // swap = sirve de ida (undo) y de vuelta (redo)
+            { int t = c[k].ap->cicloAntes;   c[k].ap->cicloAntes   = snap[i].ca; snap[i].ca = t;
+              t = c[k].ap->cicloDespues;     c[k].ap->cicloDespues = snap[i].cd; snap[i].cd = t; }
         }
         // curvas que NO estaban al capturar (las creo la operacion que se esta deshaciendo): se
         // vacian y su contenido queda en el snapshot, asi el redo las devuelve enteras.
         for (size_t k = 0; k < c.size(); k++){
             if (visto[k] || c[k].c->empty()) continue;
-            KFGuardada g; g.id = c[k].id; c[k].c->swap(g.kf); snap.push_back(g);
+            KFGuardada g; g.id = c[k].id; c[k].c->swap(g.kf);
+            g.ca = c[k].ap->cicloAntes; g.cd = c[k].ap->cicloDespues; c[k].ap->cicloAntes = c[k].ap->cicloDespues = 0;
+            snap.push_back(g);
         }
         // la pose cacheada del rig que TOCAMOS (no la del que este activo) tiene que re-evaluarse
         if (lid.kind == 1 && lid.arm){ lid.arm->lastPoseFrame = -999999; lid.arm->poseDirty = true; lid.arm->poseSerial++;
@@ -2853,9 +2862,12 @@ public:
 };
 static KeyframesUndo* g_pendingKeys = NULL;
 void UndoKeyframesIniciar(){ delete g_pendingKeys; g_pendingKeys = new KeyframesUndo(); }
+void UndoKeyframesIniciarArm(Armature* a){ delete g_pendingKeys; g_pendingKeys = new KeyframesUndo(a); }
 void UndoKeyframesConfirmar(){
     if (!g_pendingKeys) return;
-    if (g_pendingKeys->Vacio() || !g_pendingKeys->Cambio()){ delete g_pendingKeys; g_pendingKeys = NULL; return; }
+    // (sin Vacio(): el PRIMER keyframe de una escena sin curvas arranca con el snapshot vacio y si cambio -las curvas
+    //  nuevas las detecta Cambio-; descartarlo dejaba ese keyframe sin Ctrl+Z)
+    if (!g_pendingKeys->Cambio()){ delete g_pendingKeys; g_pendingKeys = NULL; return; }
     Push(g_pendingKeys); g_pendingKeys = NULL;
 }
 

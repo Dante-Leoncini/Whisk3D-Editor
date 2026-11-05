@@ -4021,7 +4021,8 @@ static std::string W3dTextoTransform(){
 }
 
 // linea PUNTEADA 2D (coords de pantalla del viewport, Y abajo) entre dos puntos.
-static void DibujarLineaPunteada2D(float ax, float ay, float bx, float by){
+// (la usa tambien el timeline: la misma linea pivote -> mouse al rotar / escalar keyframes)
+void DibujarLineaPunteada2D(float ax, float ay, float bx, float by){
     float dx = bx - ax, dy = by - ay;
     float len = sqrtf(dx * dx + dy * dy);
     if (len < 2.0f) return;
@@ -4117,8 +4118,10 @@ void Viewport3D::Aceptar() {
             // AUTO KEY: va ANTES de UndoTransformConfirmar, que es lo que puede limpiar estadoObjetos (el
             // snapshot contra el que se mide QUE canal cambio). Y antes tambien para que los keyframes que
             // guarda entren en el MISMO comando de undo que el transform.
-            AutoKeyObjetos();
+            UndoGrupoIniciar();       // un solo Ctrl+Z: el transform Y los keyframes que dejo el auto key
+            UndoKeyframesIniciar(); AutoKeyObjetos(); UndoKeyframesConfirmar();
             UndoTransformConfirmar(); // Ctrl+Z: el transform se ACEPTO -> pushea el undo pendiente
+            UndoGrupoFin();
             estado = editNavegacion;
         }
     } else if (InteractionMode == EditMode && EditXformActivo()){

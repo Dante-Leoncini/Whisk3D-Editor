@@ -645,6 +645,7 @@ void InputUsuarioSDL3(SDL_Event &e){
                     // (y la seleccion no se puede cambiar). Este era el bug de "pinto y me arma la caja".
                     const bool pintando = (InteractionMode == WeightPaint || InteractionMode == VertexPaint || InteractionMode == TexturePaint);
                     if (e.motion.which != SDL_TOUCH_MOUSEID && !BoxSelectActivo() && !pintando) {
+                        { extern void TimelineCajaOlvidar(); TimelineCajaOlvidar(); }   // (esta es la del 3D)
                         BoxSelectArmar();
                         BoxSelectDown(g_tapStartX, g_tapStartY);
                         BoxSelectMover(mx, my);
@@ -973,6 +974,10 @@ void InputUsuarioSDL3(SDL_Event &e){
             // touch NO genera hover antes del down -> viewPortActive podia quedar stale y el motion/up
             // (slide del campo numerico, mouse_button_up del panel) iban al viewport equivocado.
             if (esTouch && vpDown) viewPortActive = vpDown;
+            // click AFUERA del panel de la ultima operacion (semi-modal): lo confirma y el click es del viewport
+            // que esta abajo del cursor, aunque no haya llegado un motion antes
+            if (vpDown && PopUpActive && PopUpActive->CierraConViewport() &&
+                !PopUpActive->Contains((int)e.button.x, (int)e.button.y)) viewPortActive = vpDown;
             // la 'x' de una notificacion de error la cierra (esta encima de todo)
             if (NotificacionesClick((int)e.button.x, (int)e.button.y)) {
                 // consumido: no propagar el click
@@ -1136,7 +1141,7 @@ void InputUsuarioSDL3(SDL_Event &e){
         }
         else if (e.button.button == SDL_BUTTON_RIGHT) {
             // el derecho CANCELA la caja de seleccion, como cancela cualquier operacion modal
-            if (BoxSelectActivo()) { BoxSelectCancelar(); GuardarMousePos(); return; }
+            if (BoxSelectActivo()) { extern void TimelineCajaOlvidar(); TimelineCajaOlvidar(); BoxSelectCancelar(); GuardarMousePos(); return; }
             // transform de KEYFRAMES (timeline): mismo trato que el del 3D -> derecho CANCELA. No usa 'estado'
             // (ese es el del viewport 3D), asi que necesita su propio chequeo.
             if (DopeXformActivo()){ DopeXformCancelar(); GuardarMousePos(); return; }
@@ -1184,6 +1189,12 @@ void InputUsuarioSDL3(SDL_Event &e){
                     !vpDer->OnToolbar((int)e.button.x, (int)e.button.y) &&
                     !vpDer->OnBrushBar((int)e.button.x, (int)e.button.y)) {
                     LayoutMenuContexto3D((int)e.button.x, (int)e.button.y);
+                    GuardarMousePos(); return;
+                }
+                // TIMELINE: el derecho sobre el strip abre el menu de los keyframes (cortar/copiar/pegar/duplicar)
+                if (vpDer && vpDer->isLeaf() && vpDer->ViewportKind() == 5 &&
+                    !vpDer->OnBar((int)e.button.x, (int)e.button.y) &&
+                    ((Timeline*)vpDer)->MenuContexto((int)e.button.x, (int)e.button.y)) {
                     GuardarMousePos(); return;
                 }
                 // OUTLINER en una vista de RECURSOS: el derecho elige la fila y abre el menu de
@@ -1234,7 +1245,11 @@ void InputUsuarioSDL3(SDL_Event &e){
             // (misma regla que el pick de siempre). Consume el up: no hay pick ni orbita.
             if (BoxSelectArrastrando()) {
                 int bx0, by0, bx1, by1; bool tocar = false;
-                if (BoxSelectSoltar(bx0, by0, bx1, by1, tocar))
+                extern bool TimelineCajaPropia(); extern void TimelineCajaSoltar(bool, int, int, int, int, bool, bool);
+                const bool delTimeline = TimelineCajaPropia();
+                const bool hubo = BoxSelectSoltar(bx0, by0, bx1, by1, tocar);
+                if (delTimeline) TimelineCajaSoltar(hubo, bx0, by0, bx1, by1, tocar, LShiftPressed);   // (la armo el timeline)
+                else if (hubo)
                     BoxSelectAplicar3D(bx0, by0, bx1, by1, tocar, LShiftPressed);
                 ViewPortClickDown = false;
                 GuardarMousePos();

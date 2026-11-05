@@ -88,10 +88,12 @@ class Timeline : public ViewportBase, public WithBorder, public Scrollable {
         Button* btnFps;    // campo FPS (mas comodo aca que en el panel)
         Button* btnAnim;   // dropdown: elegir la animacion del esqueleto (solo si hay armature con clips)
         Button* btnAutoKey;// AUTO KEY (toggle): rojo = graba los canales que toques al transformar
-        Button* btnModo;   // switch Dope Sheet <-> Curves
+        Button* btnModo;   // switch Dope Sheet <-> Curves (ya no va en la barra: es una opcion del menu View)
+        Button* btnTiempo; // el RELOJ: Inicio / Fin / FPS en un desplegable (TiempoPopup)
         Button* btnSelect; // dope sheet: menu Select (All / None / Invert). Al FINAL de la barra; solo con filas
         Button* btnView;   // dope sheet: menu View (Frame Selected)
         Button* btnKey;    // menu Key: Transform (Move/Rotate/Scale) + Duplicate + Delete
+        Button* btnMods;   // menu Modifiers: los modificadores de las CURVAS elegidas (Repetir / con offset)
         Button* btnPivot;  // dope sheet: menu Pivot (Center / Current Frame) = desde donde escala la 's'
 
         int stripY;        // Y (local) del CUERPO (bandas/lineas)
@@ -114,6 +116,11 @@ class Timeline : public ViewportBase, public WithBorder, public Scrollable {
         void event_key_up(int tecla) W3D_OVERRIDE;   // soltar el CERO sin flechas = Frame Selected (Symbian)
         void event_mouse_wheel(float dy, int mx, int my) W3D_OVERRIDE;
         void mouse_button_up(int boton) W3D_OVERRIDE;
+        // TOOLBAR de abajo (la compartida, ToolbarBase.cpp): con keyframes elegidos, un click cambia la
+        // interpolacion | el tipo de handle | el ease del tramo (grupos separados por una linea vertical)
+        bool ToolbarVisible() const W3D_OVERRIDE;
+        void ToolbarSincronizar() W3D_OVERRIDE;
+        void ToolbarAccionRol(int rol) W3D_OVERRIDE;
 
         // click en la BARRA (transporte / campos): lo llama LayoutClickBarraTimeline. Devuelve true si consumio.
         bool ClickBarButton(int mx, int my);
@@ -216,6 +223,20 @@ class Timeline : public ViewportBase, public WithBorder, public Scrollable {
         bool DopeSelNadaNav();                            // lapiz+abajo: ninguno
         void DopeBorrarSeleccion();          // 'x': borra los keyframes seleccionados, o la animacion de las filas seleccionadas
         void DopeDuplicarSeleccion();        // Shift+D: duplica los keyframes seleccionados y los agarra para moverlos
+        bool DopeCopiarSeleccion();          // Ctrl+C: los keyframes elegidos al portapapeles (false = no habia)
+        void DopeCortarSeleccion();          // Ctrl+X: copiar + borrar
+        void DopePegar();                    // Ctrl+V: los del portapapeles desde el frame ACTUAL (quedan elegidos)
+        bool MenuContexto(int mx, int my);   // click derecho en el strip: Cortar / Copiar / Pegar / Duplicar / Borrar
+        bool CabezalEn(int mx, int my) const;  // (pantalla) sobre la LINEA del frame actual (se arrastra)
+        bool CurvaTramoEn(int mx, int my, bool agregar); // click sobre la linea de una curva: elige su tramo A-B
+        void CajaAplicar(int x0, int y0, int x1, int y1, bool tocar, bool agregar); // box select (pantalla)
+        void SetEasingSel(int ease);         // Ctrl+E: el easing (KfEaseAuto/In/Out/InOut) de las curvas de easing elegidas
+        void CambiarModo(bool curvas);       // Dope Sheet <-> Curves (menu View)
+        void AbrirMenuEasing(int mx, int my);
+        void AbrirMenuMods(int mx, int my);  // menu Modifiers (Repeat / Repeat with Offset / Remove Repeat)
+        // el modificador REPETIR de las curvas con algun keyframe elegido: antes del 1ro / despues del ultimo
+        // (KfCicloNo / KfCicloRepite / KfCicloOffset; -1 = ese lado no se toca). Un paso de Ctrl+Z.
+        void SetCicloSel(int antes, int despues);
         // Transform de keyframes. En DOPE SHEET solo existe el eje TIEMPO (rotar no significa nada y no hay ejes
         // que elegir); en CURVAS hay tiempo y VALOR, y ahi si se rota y se puede limitar a un eje.
         enum { DOPE_MOV = 1, DOPE_ESC = 2, DOPE_ROT = 3 };
@@ -317,6 +338,16 @@ class Timeline : public ViewportBase, public WithBorder, public Scrollable {
 // Entrada numerica del transform de keyframes ('g'/'s' del dope sheet). Gemela de NumInputChar: cada plataforma
 // le pasa los caracteres tipeados. true = los consumio (hay un transform de keyframes en curso).
 bool DopeNumInputChar(int c);
+
+// LAS INTERPOLACIONES en un menu: Constant / Linear / Bezier | las de easing por fuerza | las de efecto, separadas
+// con una linea, cada una con su icono. id de cada fila = idBase + KfConstant...KfElastic. Lo comparten el timeline
+// (E / T y el menu Key) y la tarjeta Keyframe de Properties. 'actual' (-1 = ninguna) va en verde.
+class PopupMenu;
+void W3dMenuInterpolaciones(PopupMenu* m, int idBase, int actual);
+// el EASING (Ctrl+E): Automatic / Ease In / Ease Out / Ease In and Out. id = idBase + KfEaseAuto...KfEaseInOut
+void W3dMenuEasings(PopupMenu* m, int idBase, int actual);
+const char* W3dNombreInterpolacion(int interp);   // "Bounce", "Bezier"... (traducido)
+const char* W3dNombreEasing(int ease);
 
 // Invalida la pose + el skin cacheado tras tocar una curva (sin esto la escena sigue mostrando lo viejo).
 void InvalidarAnimYRedraw();

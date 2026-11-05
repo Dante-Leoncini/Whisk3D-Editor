@@ -1,0 +1,6 @@
+# INFLAR / DESINFLAR (Shrink/Fatten, Alt+S) un cubo = escalarlo: cada esquina sale por la normal del VERTICE (el
+# promedio de sus caras, pesado por angulo) y no por la de una cara sola (asi se abrian las esquinas)
+add cube
+shrinkcubo 0.3
+add cube
+shrinkcubo -0.2

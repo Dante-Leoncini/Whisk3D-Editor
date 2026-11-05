@@ -1,0 +1,15 @@
+# El timeline: la TOOLBAR de abajo (estilo Inkscape) con keyframes elegidos: interpolacion | tipo de handle | ease
+# del tramo, cada grupo separado por una linea, cada icono con su cartelito; lo que tienen los keyframes queda en
+# verde y un click lo cambia. Y el reloj trae el frame actual.
+ventana 1280 720
+add cube
+frame 1
+keychan 0 0
+frame 10
+objmove 10 0 0
+keychan 0 0
+frame 20
+objmove -10 0 0
+keychan 0 0
+frame 1
+tltoolbar

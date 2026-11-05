@@ -1,0 +1,15 @@
+# El modificador REPETIR de las curvas (menu Modifiers del timeline y la tarjeta Keyframe de propiedades): antes
+# del primer keyframe y despues del ultimo la curva se repite, igual o CORRIDA (cada vuelta arranca donde termino la
+# anterior). La matematica, el menu, Ctrl+Z, el 3D, el dibujo y que sobreviva a guardar y reabrir.
+ventana 1280 720
+add cube
+frame 1
+keychan 0 0
+frame 11
+objmove 10 0 0
+keychan 0 0
+frame 1
+tlciclos armar
+guardarw3d /tmp/w3d_repetir.w3d
+abrirw3d /tmp/w3d_repetir.w3d
+tlciclos leida

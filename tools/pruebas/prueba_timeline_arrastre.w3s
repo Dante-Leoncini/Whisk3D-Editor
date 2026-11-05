@@ -1,0 +1,14 @@
+# El timeline: agarrar un keyframe y arrastrarlo (click + mover + soltar) anda SIEMPRE, varias veces seguidas, en
+# Curvas y en el Dope Sheet (antes: el primer intento no arrastraba, el segundo si, el tercero no)
+ventana 1280 720
+add cube
+frame 1
+keychan 0 0
+frame 10
+objmove 10 0 0
+keychan 0 0
+frame 20
+objmove -10 0 0
+keychan 0 0
+frame 1
+tlarrastre

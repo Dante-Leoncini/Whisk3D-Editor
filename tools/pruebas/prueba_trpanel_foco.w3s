@@ -1,0 +1,11 @@
+# El panel de la ultima operacion (abajo a la izquierda, tras mover / rotar / escalar) NO traba el viewport activo:
+# el foco sigue al mouse por los otros viewports, y un click en otro viewport confirma el panel y es de ese viewport
+# (antes el 3D quedaba activo y el click le envolvia el cursor: saltaba a la esquina opuesta).
+trpanel on
+add cube
+selobj Cubo.001
+objmove 1 0 0
+trinfo mover
+trfoco
+trinfo cerrado
+objat Cubo.001 1 0 0 0.001

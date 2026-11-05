@@ -11,6 +11,8 @@ bevel 0.2 espera 10 7
 undo
 seledgepos 1 1 1 1 1 -1
 bevel 0.2 segs 3 espera 14 9
+# la tira (suave) se ENGANCHA con las dos caras: sin quiebre de sombreado donde se tocan
+normalesbevel
 undo
 # las tres aristas de una esquina: 13 vertices, 10 caras (la esquina, un triangulo)
 seledgepos 1 1 1 1 1 -1

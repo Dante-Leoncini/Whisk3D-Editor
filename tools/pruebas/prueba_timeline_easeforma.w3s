@@ -1,0 +1,14 @@
+# De una curva de easing (sinusoidal, cuadratica, ..., circular, back) a una BEZIER comun la forma se conserva: los
+# handles del tramo quedan en la bezier que mas se le parece. Bounce y Elastic no entran en una bezier: automaticos.
+ventana 1280 720
+add cube
+frame 1
+keychan 0 0
+frame 10
+objmove 10 0 0
+keychan 0 0
+frame 20
+objmove -10 0 0
+keychan 0 0
+frame 1
+tleaseforma

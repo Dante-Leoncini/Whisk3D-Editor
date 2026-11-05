@@ -823,9 +823,9 @@ static void MainLoopFrame() {
             // NO por puntero: borrar la malla y crear otra recicla la direccion, y el cache daba
             // "no cambio nada" para una malla DISTINTA -> su vertex anim no se evaluaba (la malla
             // nueva se quedaba en la pose del bind hasta mover el playhead).
-            static unsigned int lastSerial = 0; static int lastAnim = -1, lastFrame = -999999;
-            if (ActiveAnimMesh->serial != lastSerial || ai != lastAnim || CurrentFrame != lastFrame) {
-                lastSerial = ActiveAnimMesh->serial; lastAnim = ai; lastFrame = CurrentFrame;
+            static unsigned int lastSerial = 0, lastGen = 0; static int lastAnim = -1, lastFrame = -999999;
+            if (ActiveAnimMesh->serial != lastSerial || ai != lastAnim || CurrentFrame != lastFrame || lastGen != g_animCurvasGen) {
+                lastSerial = ActiveAnimMesh->serial; lastAnim = ai; lastFrame = CurrentFrame; lastGen = g_animCurvasGen;   // (o editaron la curva)
                 VertexAnimation* an = ActiveAnimMesh->animations[ai];
                 an->target = ActiveAnimMesh;
                 // los frames son KEYFRAMES en cuadros arbitrarios: se evalua por
@@ -1340,9 +1340,7 @@ int main(int argc, char* argv[]) {
     // ~300 ms en la GPU
     cfg.enableAntialiasing = false;
 #endif
-    // AUTO KEY: el config MANDA sobre el global de animacion (que arranca apagado). Reporte del
-    // dueno: "no se guarda que en el timeline puse auto key" -> se prendia de nuevo en cada sesion.
-    { extern bool AutoKeyOn; AutoKeyOn = cfg.autoKey; }
+    // AUTO KEY: arranca SIEMPRE apagado (pedido del dueno); el autoKey del config.ini ya no se aplica.
     // LOGS: el nivel del config (Ajustes > Logs)
     g_w3dLogNivel = cfg.logs;
 

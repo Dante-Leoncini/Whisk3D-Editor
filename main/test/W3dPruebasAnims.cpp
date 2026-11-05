@@ -1576,6 +1576,9 @@ float ViejoBezier(const std::vector<keyFrame>& kf, size_t i, float frame) {
     const float x0 = (float)a.frame, x3 = (float)b.frame;
     const float span = x3 - x0;
     if (span <= 0.0f) return b.value;
+    // (2026-11: en las puntas, el valor exacto del keyframe; ver AnimProperty::EvalBezier)
+    if (frame >= x3) return b.value;
+    if (frame <= x0) return a.value;
     float aDF, aDV, bDF, bDV;
     ViejoHandle(kf, i-1, true,  aDF, aDV);
     ViejoHandle(kf, i,   false, bDF, bDV);

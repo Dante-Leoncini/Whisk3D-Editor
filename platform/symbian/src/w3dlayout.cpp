@@ -824,7 +824,8 @@ TBool W3dLayoutTecla(TInt aScan, TInt aMx, TInt aMy) {
     }
     // OK/Enter sobre el viewport con una malla seleccionada = TAB de PC: entra o sale de
     // Edit Mode. LayoutToggleEditMode ya guarda contra transforms en curso y objetos no-malla.
-    if (k == LayoutKey::Enter && LayoutToggleEditMode()) {
+    // SOLO con el 3D activo: en el timeline (u otro viewport) el OK no tiene nada que ver con el modo de la malla
+    if (k == LayoutKey::Enter && viewPortActive && viewPortActive->ViewportKind() == 1 && LayoutToggleEditMode()) {
         return ETrue;
     }
     return EFalse;

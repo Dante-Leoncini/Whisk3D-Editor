@@ -1820,6 +1820,9 @@ static void JsonScripts(JVal* j, Object* o, const std::string& base) {
 static bool CargarCurvaJson(JVal* cj, AnimProperty& ap) {
     if (!cj || cj->tipo != 4) return false;
     ap.Property = JI(cj, "p", 0); ap.component = JI(cj, "c", 0);
+    { const int ca = JI(cj, "ca", 0), cd = JI(cj, "cd", 0);   // el modificador Repetir (ausente = no)
+      ap.cicloAntes   = (ca >= KfCicloNo && ca <= KfCicloOffset) ? ca : KfCicloNo;
+      ap.cicloDespues = (cd >= KfCicloNo && cd <= KfCicloOffset) ? cd : KfCicloNo; }
     JVal* ks = JHijo(cj, "k", 5);
     // COTA: ninguna cantidad del archivo se usa sin acotar. Un millon de keyframes en
     // UNA curva no es un proyecto, es un archivo roto (o hecho a mano): se cargan los

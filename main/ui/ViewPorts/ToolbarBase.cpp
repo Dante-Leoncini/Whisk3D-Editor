@@ -83,6 +83,7 @@ void ViewportBase::ToolbarActualizar(){
         Button* btn = ToolButtons[i];
         if (!btn->visible) continue;
         btn->Resize(width - gapGS * 2); // (btn->cuadrado fuerza ancho = alto, ej: X/Y/Z, Undo/Redo)
+        if (btn->separador) total += gapGS * 2;   // el hueco de la linea que separa los grupos
         total += btn->width + btnGap;
     }
     int maxS = total - width; if (maxS < 0) maxS = 0;
@@ -91,9 +92,10 @@ void ViewportBase::ToolbarActualizar(){
     for (size_t i = 0; i < ToolButtons.size(); i++){
         Button* btn = ToolButtons[i];
         if (!btn->visible){ btn->sx = -10000; btn->sy = -10000; btn->hover = false; continue; }
+        if (btn->separador) bx += gapGS * 2;
         btn->sx = x + bx;
         btn->sy = yBar + (barH - btn->height) / 2;
-        btn->hover = btn->Contains(lastMouseX, lastMouseY);
+        // (el hover NO se calcula aca: lo pone BarHover con el mouse de cada movimiento, como la barra de arriba)
         bx += btn->width + btnGap;
     }
 }
@@ -460,6 +462,23 @@ void ViewportBase::RenderToolbar(){
     gfx::Color4f(gris[0], gris[1], gris[2], barAlpha);
     barCard->Resize(width, barH);
     barCard->RenderObject(false);
+    // las LINEAS que separan los grupos (Button::separador): verticales, en el medio del hueco de antes del boton
+    { bool primero = true;
+      for (size_t i = 0; i < ToolButtons.size(); i++){
+          Button* btn = ToolButtons[i];
+          if (!btn->visible) continue;
+          if (btn->separador && !primero){
+              const int lx = btn->sx - x - gapGS - (gapGS / 2 + 1) / 2;
+              gfx::Disable(gfx::Texture2D); gfx::DisableArray(gfx::TexCoordArray);
+              SetColorID(ColorID::grisUI, 0.6f);
+              const int m = barH / 5;
+              const GLfloat x0 = (GLfloat)lx, x1 = (GLfloat)(lx + GlobalScale), y0 = (GLfloat)m, y1 = (GLfloat)(barH - m);
+              const GLfloat q[12] = { x0,y0, x1,y0, x1,y1,  x0,y0, x1,y1, x0,y1 };
+              gfx::VertexPointer2f(0, q); gfx::DrawTrianglesArray(6);
+              gfx::Enable(gfx::Texture2D); gfx::EnableArray(gfx::TexCoordArray);
+          }
+          primero = false;
+      } }
     // botones en sus sx/sy (ya con scroll). Local = sx-x, sy-y-(height-barH). Mismo patron que RenderBar.
     for (size_t i = 0; i < ToolButtons.size(); i++){
         Button* btn = ToolButtons[i];

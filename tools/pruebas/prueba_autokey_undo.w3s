@@ -1,0 +1,5 @@
+# AUTO KEY + Ctrl+Z: mover un objeto con el auto key prendido deja keyframes; UN Ctrl+Z deshace el movimiento Y
+# esos keyframes (antes quedaban: el undo del transform no los tenia). Ctrl+Y devuelve los dos.
+ventana 1280 720
+add cube
+autokeyundo

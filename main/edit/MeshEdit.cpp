@@ -5967,6 +5967,10 @@ bool Mesh::BevelEdit(const BevelOpciones& o, const std::vector<char>& selRep, co
 
     // ---- la TIRA de cada arista biselada: del arco de una punta al de la otra ----
     std::vector<std::pair<V3, V3> > bordesTira;
+    // la NORMAL que tiene que tener cada vertice de una tira SUAVE: en sus bordes, la de la cara original que toca (asi
+    // la tira se ENGANCHA con ella, sin quiebre de sombreado) y en el medio, girando de una a la otra a lo largo del
+    // perfil (para el perfil circular es justo la normal del arco). Lo aplica el final, despues de GenerarRender
+    std::map<int, V3> nDeseada;
     for (std::set<std::pair<int,int> >::iterator it = bev.begin(); it != bev.end(); ++it) {
         const int a = it->first, b = it->second;
         const std::vector<std::pair<int,int> >& u = usoArista[*it];
@@ -5980,6 +5984,14 @@ bool Mesh::BevelEdit(const BevelOpciones& o, const std::vector<char>& selRep, co
         if (A->second.desde != Fa) std::reverse(pa.begin(), pa.end());
         if (B->second.desde != Fa) std::reverse(pb.begin(), pb.end());
         if (pa.size() != pb.size()) continue;
+        if ((o.endurecer || segs > 1) && pa.size() >= 2) {
+            int Fb = -1; for (size_t q = 0; q < u.size(); q++) if (u[q].first != Fa) Fb = u[q].first;
+            if (Fb >= 0) for (size_t j = 0; j < pa.size(); j++) {
+                const float t = (float)j / (float)(pa.size() - 1);
+                const V3 nn = Unit(nCara[Fa] * (1.0f - t) + nCara[Fb] * t);
+                nDeseada[pa[j]] = nn; nDeseada[pb[j]] = nn;
+            }
+        }
         const int src = base[Fa] + ca;
         const int mat = o.material >= 0 ? o.material : faces3d[Fa].mat;
         for (size_t j = 0; j + 1 < pa.size(); j++) {
@@ -6065,8 +6077,30 @@ bool Mesh::BevelEdit(const BevelOpciones& o, const std::vector<char>& selRep, co
     #undef NUEVO
     #undef IREP
     #undef IPOS
+    const size_t carasViejas = nf3d.size() - caras.size();   // (las nuevas van al final)
     faces3d.swap(nf3d);
     GenerarRender();   // re-merge + render (re-triangula + materialsGroup + CalcularBordes)
+    // las tiras suaves se ENGANCHAN con las caras originales: la normal de cada vertice de la tira es la de nDeseada
+    // (por POSICION: el render ya re-mergeo los indices). Despues se re-arma el render CONSERVANDO esas normales
+    if (!nDeseada.empty() && normals) {
+        std::map<std::string, V3> porPos;
+        for (std::map<int, V3>::iterator it = nDeseada.begin(); it != nDeseada.end(); ++it) {
+            const float pp[3] = { nuevos[it->first].x, nuevos[it->first].y, nuevos[it->first].z };
+            porPos[std::string((const char*)pp, 12)] = it->second;
+        }
+        bool cambio = false;
+        for (size_t f = carasViejas; f < faces3d.size(); f++)
+            for (size_t c = 0; c < faces3d[f].idx.size(); c++) {
+                const int gv = faces3d[f].idx[c]; if (gv < 0 || gv >= vertexSize) continue;
+                std::map<std::string, V3>::iterator q = porPos.find(std::string((const char*)&vertex[gv*3], 12));
+                if (q == porPos.end()) continue;
+                normals[gv*3]   = (GLbyte)(q->second.x * 127.0f);
+                normals[gv*3+1] = (GLbyte)(q->second.y * 127.0f);
+                normals[gv*3+2] = (GLbyte)(q->second.z * 127.0f);
+                cambio = true;
+            }
+        if (cambio) GenerarRender(false);
+    }
     SeleccionarCarasPorCentro(centrosNuevos);
     return true;
 }

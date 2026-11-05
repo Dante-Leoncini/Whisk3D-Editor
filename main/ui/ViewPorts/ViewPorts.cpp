@@ -775,6 +775,12 @@ void ViewportBase::BarHover(int mx, int my){
     for (size_t t = 0; t < BarTabs.size(); t++){
         BarTabs[t]->hover = BarTabs[t]->visible && BarTabs[t]->Contains(mx, my);
     }
+    // la TOOLBAR de abajo: igual que la de arriba (se ilumina y dice que es al pasarle el mouse)
+    const bool tb = !ToolButtons.empty() && ToolbarVisible();
+    for (size_t b = 0; b < ToolButtons.size(); b++){
+        Button* btn = ToolButtons[b];
+        btn->hover = tb && btn->visible && btn->Contains(mx, my);
+    }
 }
 
 bool ViewportBase::BarClick(int mx, int my){

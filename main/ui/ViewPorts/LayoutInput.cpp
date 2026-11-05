@@ -1079,6 +1079,7 @@ static void LayoutAccionSelect(int aId) {
         case 16: LayoutLoopSelectGuiado();     break; // Loop Select en modo VERTICE: guiado (click sobre un borde)
         case 20: w3dVerSeleccion = !w3dVerSeleccion; g_redraw = true; break; // Ver seleccion (contorno + tinte)
         case 30: // Box Select: arma la cruz guia y espera el arrastre (idem tecla B)
+            { extern void TimelineCajaOlvidar(); TimelineCajaOlvidar(); }   // (la del 3D, no la del timeline)
             BoxSelectArmar(); BoxSelectMover(lastMouseX, lastMouseY); break;
     }
 }
@@ -4019,6 +4020,7 @@ static Vector3    gEVtrans;         // translacion de mundo acumulada
 static Quaternion gEVrotTotal(1,0,0,0); // rotacion acumulada
 static float      gEVscaleAmt = 0;  // factor de escala acumulado (f = 1 + amt); en SHRINK = distancia por la normal
 static bool       gEVshrink = false; // SHRINK/FATTEN (Alt+S): reusa EditScale pero cada vert se mueve por SU normal
+static bool       gEVshrinkPedido = false; // (lo prende LayoutShrinkFatten ANTES del snapshot: calcula las normales por vertice)
 bool EditShrinkActivo(){ return gEVshrink; }
 // VERTEX SLIDE (Shift+V, o G-G): el move deja de trasladar y DESLIZA cada vertice por UNA de sus
 // aristas. t=0 lo deja donde estaba, t=1 lo deja encima del vecino. El riel se elige con la direccion
@@ -4181,6 +4183,37 @@ void EditXformIniciar(){
     // grupo de GPU verts por POSICION de cada editable seleccionado (mover uno mueve
     // a todos sus duplicados de UV/normales en el mismo lugar)
     Vector3 nNormAcum(0,0,0); // suma de las normales de los verts seleccionados (orientacion Normal)
+    // NORMAL DE CADA VERTICE EDITABLE para Shrink/Fatten: el promedio de las caras que lo usan, pesado por el ANGULO
+    // que cada cara abre en ese vertice. NO la normal de render: en una malla con bordes duros (un cubo) cada copia del
+    // vertice tiene la de UNA cara, y cada esquina salia para un lado distinto (se abrian las intersecciones). Con el
+    // peso por angulo, inflar un cubo o una esfera da lo mismo que escalarlos, aunque las caras esten trianguladas.
+    std::vector<float> vnEd;
+    if (gEVshrinkPedido) {
+        const size_t nE = e->editVerts.size();
+        vnEd.assign(nE * 3, 0.0f);
+        for (size_t f = 0; f < e->faces.size(); f++) {
+            const std::vector<int>& F = e->faces[f];
+            const size_t n = F.size(); if (n < 3) continue;
+            float nx = 0, ny = 0, nz = 0;   // Newell (sirve para poligonos de n lados)
+            for (size_t j = 0; j < n; j++) {
+                const float* p0 = &e->pos[(size_t)F[j] * 3]; const float* p1 = &e->pos[(size_t)F[(j + 1) % n] * 3];
+                nx += (p0[1] - p1[1]) * (p0[2] + p1[2]); ny += (p0[2] - p1[2]) * (p0[0] + p1[0]); nz += (p0[0] - p1[0]) * (p0[1] + p1[1]);
+            }
+            const float l = sqrtf(nx*nx + ny*ny + nz*nz); if (l < 1e-12f) continue;
+            nx /= l; ny /= l; nz /= l;
+            for (size_t j = 0; j < n; j++) {
+                const int v = F[j]; if (v < 0 || (size_t)v >= nE) continue;
+                const float* pc = &e->pos[(size_t)v * 3];
+                const float* pa = &e->pos[(size_t)F[(j + n - 1) % n] * 3]; const float* pb = &e->pos[(size_t)F[(j + 1) % n] * 3];
+                float ax = pa[0]-pc[0], ay = pa[1]-pc[1], az = pa[2]-pc[2], bx = pb[0]-pc[0], by = pb[1]-pc[1], bz = pb[2]-pc[2];
+                const float la = sqrtf(ax*ax + ay*ay + az*az), lb = sqrtf(bx*bx + by*by + bz*bz);
+                if (la < 1e-12f || lb < 1e-12f) continue;
+                float c = (ax*bx + ay*by + az*bz) / (la * lb); if (c > 1.0f) c = 1.0f; if (c < -1.0f) c = -1.0f;
+                const float ang = acosf(c);
+                vnEd[(size_t)v*3] += nx * ang; vnEd[(size_t)v*3+1] += ny * ang; vnEd[(size_t)v*3+2] += nz * ang;
+            }
+        }
+    }
     for (size_t k=0;k<e->editVerts.size();k++){
         if (!selEdit[k]) continue;
         int rep = e->editVerts[k]; if (rep<0||rep>=nV) continue;
@@ -4190,7 +4223,9 @@ void EditXformIniciar(){
         s.world0 = EVLocalAMundo(l0);
         // normal del vertice en MUNDO (para Shrink/Fatten). rotacion global (la escala no cambia el sentido).
         Vector3 ln = m->normals ? Vector3(m->normals[rep*3]/127.0f, m->normals[rep*3+1]/127.0f, m->normals[rep*3+2]/127.0f) : Vector3(0,1,0);
-        s.worldNormal = (gEVrg * ln).Normalized();
+        Vector3 lnS = ln;   // Shrink/Fatten: la del vertice (todas sus caras), si tiene caras
+        if (!vnEd.empty()) { Vector3 v(vnEd[k*3], vnEd[k*3+1], vnEd[k*3+2]); if (v.x*v.x + v.y*v.y + v.z*v.z > 1e-12f) lnS = v.Normalized(); }
+        s.worldNormal = (gEVrg * lnS).Normalized();
         gEVsnap.push_back(s);
         if (m->normals) nNormAcum = nNormAcum + ln;
     }
@@ -4646,7 +4681,9 @@ void LayoutShrinkFatten() {
     if (EditXformActivo()) EditXformConfirmar(); // encadenar: confirma el transform anterior
     estado = EditScale; axisSelect = XYZ;        // libre (la direccion la da la normal de cada vertice)
     UndoEditMoveIniciar((Mesh*)g_editMesh);      // Ctrl+Z: captura posiciones previas
+    gEVshrinkPedido = true;
     EditXformIniciar();                          // snapshot de la seleccion (calcula las normales por vert)
+    gEVshrinkPedido = false;
     if (!EditXformActivo()){ estado = editNavegacion; return; }
     gEVshrink = true;                            // <- ahora si: mover por la normal
     ToolbarRegistrarAccion(TBScale);             // historial (reusa el de escala)
@@ -4779,6 +4816,11 @@ bool EditSlideTecla(int cual){
 // fija el resultado: recalcula bordes/centro/posRep (sin invalidar el edit) y las
 // NORMALES (salvo Lock Normals). El overlay ya esta sincronizado (SincronizarPos).
 void EditXformConfirmar(){
+    // un solo Ctrl+Z: el move Y el keyframe del auto key de vertices (solo si va a haber keyframe: sin auto key el
+    // Auto Merge sigue siendo su propio paso)
+    extern bool AutoKeyOn;
+    const bool akGrupo = AutoKeyOn && ActiveAnimKind == 3 && gEVmesh && (Mesh*)ActiveAnimMesh == gEVmesh;
+    if (akGrupo) UndoGrupoIniciar();
     UndoEditMoveConfirmar(); // Ctrl+Z: el move PURO se acepto -> pushea el pendiente (NULL si fue extrude)
     if (gEVmesh){
         Mesh* m = gEVmesh;
@@ -4797,6 +4839,7 @@ void EditXformConfirmar(){
     { extern bool AutoKeyOn; extern void VertexAnimInsertarKeyframe();
       if (AutoKeyOn && ActiveAnimKind == 3 && gEVmesh && (Mesh*)ActiveAnimMesh == gEVmesh)
           VertexAnimInsertarKeyframe(); }
+    if (akGrupo) UndoGrupoFin();
     gEVsnap.clear(); gEVprop.clear(); gEVmesh = NULL;
     gEVslide = false; gEVslideCand.clear(); gEVslideDest.clear();
     estado = editNavegacion;
@@ -5084,7 +5127,12 @@ bool LayoutMotionUI(int mx, int my) {
     if (PopUpActive && (!PopUpActive->NoModal() || PopUpActive->Arrastrando())) {
         // popup modal (selector de color): se queda con el mouse (uno NO modal, solo mientras lo arrastran)
         PopUpActive->Motion(mx, my);
-        return true;
+        // el SEMI-MODAL (panel de la ultima operacion, abajo a la izquierda): AFUERA de el el mouse sigue siendo
+        // del layout -> el viewport activo sigue al cursor (si no, quedaba clavado en el 3D y el click en otro
+        // viewport envolvia el cursor del 3D: saltaba a la esquina opuesta). El click afuera lo confirma.
+        if (!(PopUpActive && PopUpActive->CierraConViewport() && !PopUpActive->Arrastrando() &&
+              !PopUpActive->Contains(mx, my)))
+            return true;
     }
     if (gScrollBarDrag) {
         // la barra agarrada sigue al mouse (factor del recorrido real)
@@ -5705,10 +5753,14 @@ bool LayoutClickViewport(int mx, int my){
     if (!vp) return false;
     viewPortActive = vp;
     lastMouseX = mx; lastMouseY = my;   // button_left() los lee: son SU idea de donde ocurrio el click
+    // el boton queda APRETADO hasta el soltar (como el mouse de la PC): sin esto, mantener el OK y mover el cursor no
+    // arrastraba nada (el timeline arranca el arrastre de un keyframe solo con el izquierdo apretado)
+    extern bool leftMouseDown; leftMouseDown = true;
     vp->button_left();
     return true;
 }
 bool LayoutSoltarViewport(int mx, int my){
+    extern bool leftMouseDown; leftMouseDown = false;
     if (!viewPortActive) return false;
     lastMouseX = mx; lastMouseY = my;
     viewPortActive->mouse_button_up(W3dMB_IZQ);
@@ -5967,6 +6019,12 @@ static Button* AyudaBotonBajoMouse(ViewportBase* n) {
             Button* b = n->BarButtons[i];
             if (b && b->visible && b->hover && !b->ayuda.empty()) return b;
         }
+        // (la TOOLBAR de abajo: sus botones de solo icono tambien dicen que son)
+        if (n->ToolbarVisible())
+            for (size_t i = 0; i < n->ToolButtons.size(); i++) {
+                Button* b = n->ToolButtons[i];
+                if (b && b->visible && b->hover && !b->ayuda.empty()) return b;
+            }
         // (Properties: los botones chicos de los mapas del material, adentro de sus filas)
         if (n->ViewportKind() == 3) { extern Button* PropsAyudaEn(Properties* p, int mx, int my); return PropsAyudaEn((Properties*)n, lastMouseX, lastMouseY); }
         return NULL;

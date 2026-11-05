@@ -196,7 +196,7 @@ SOURCE          PropSelectText.cpp PropButton.cpp PropLabel.cpp
 
 // pila de UI de PC (fase outliner real)
 SOURCEPATH      ..\..\..\main\ui\ViewPorts\PopUp
-SOURCE          PopUpBase.cpp ColorPicker.cpp FileBrowser.cpp RedoMeshPanel.cpp ConfirmarPopup.cpp ProgressPopup.cpp GuardarComoPopup.cpp TransformRedoPanel.cpp AtajosPopup.cpp BuscarPopup.cpp ExportarUVPopup.cpp NuevaTexturaPopup.cpp UVMapaPopup.cpp
+SOURCE          PopUpBase.cpp ColorPicker.cpp FileBrowser.cpp RedoMeshPanel.cpp ConfirmarPopup.cpp ProgressPopup.cpp GuardarComoPopup.cpp TransformRedoPanel.cpp AtajosPopup.cpp BuscarPopup.cpp ExportarUVPopup.cpp NuevaTexturaPopup.cpp UVMapaPopup.cpp TiempoPopup.cpp
 SOURCE          FalloffEditor.cpp // popup del editor de curva de falloff del pincel
 SOURCE          CambiosPopup.cpp // el cartel "Se perderan los cambios en:" (al salir / abrir otro proyecto)
 

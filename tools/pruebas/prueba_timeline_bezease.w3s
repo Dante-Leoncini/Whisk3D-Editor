@@ -1,0 +1,15 @@
+# El timeline: las claves que inserta el usuario (la 'i', el auto key) salen BEZIER con handles PLANOS (ease in/out);
+# Ease In / Ease Out / Ease In and Out (Ctrl+E) tambien en una bezier comun, con los handles del tramo; y el 3D se
+# vuelve a aplicar al editar la curva en el MISMO frame (antes solo al mover el cabezal)
+ventana 1280 720
+add cube
+frame 1
+keychan 0 0
+frame 10
+objmove 10 0 0
+keychan 0 0
+frame 20
+objmove -10 0 0
+keychan 0 0
+frame 1
+tleasebez

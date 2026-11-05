@@ -296,6 +296,7 @@ void UndoMaterialModCommit();                   // al soltar el mouse: pushea el
 // activa. Lo usan el editor de curvas y la tarjeta "Keyframe" del panel de propiedades. Si no hubo cambio real,
 // Confirmar descarta el snapshot y no ensucia el stack.
 void UndoKeyframesIniciar();
+void UndoKeyframesIniciarArm(Armature* a);   // las curvas del clip activo de ESE esqueleto (auto key de pose)
 void UndoKeyframesConfirmar();
 // POSE de un esqueleto (mismo criterio: pendiente hasta confirmar)
 class Armature;

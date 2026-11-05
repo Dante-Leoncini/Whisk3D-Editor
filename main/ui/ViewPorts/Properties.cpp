@@ -5761,15 +5761,19 @@ static void VertexAnimInsertarKeyframeCapa(int capa){
     // captura la capa COMO ESTA como KEYFRAME en el cuadro del playhead. VertexAnimSetKey
     // inserta ORDENADO por frame o actualiza si ya hay uno ahi: se puede keyframear en 3,
     // luego 10, luego 5 (queda 3,5,10) sin problemas.
-    int interp = KfLinear; // nuevo keyframe: recta hacia el proximo (como la anim vieja)
+    int interp = KfBezier; // nuevo keyframe: bezier ease in/out (HPlano, ver VertexAnimSetKey)
     // si ya hay un keyframe en ese cuadro, conservar SU interpolacion al reemplazar
+    bool nuevo = true;
     for (size_t k = 0; k < an->frames.size(); ++k)
-        if (an->frames[k]->frame == CurrentFrame) { interp = an->frames[k]->interp; break; }
+        if (an->frames[k]->frame == CurrentFrame) { interp = an->frames[k]->interp; nuevo = false; break; }
     if (capa == 1)      VertexAnimSetKey(*an, CurrentFrame, NULL, NULL, m->uv, interp);
     else if (capa == 2){ if (!m->normals){ Notificar(T("Insert Keyframe: the mesh has no normals"), true); UndoKeyframesConfirmar(); return; }
                         an->UseNormals = true;   // pedirla explicitamente la vuelve a habilitar
                         VertexAnimSetKey(*an, CurrentFrame, NULL, m->normals, NULL, interp); }
     else                VertexAnimSetKey(*an, CurrentFrame, m->vertex, an->UseNormals ? m->normals : NULL, NULL, interp);
+    if (nuevo)   // el keyframe NUEVO del usuario: ease in/out (handles planos, como los de transform)
+        for (size_t k = 0; k < an->frames.size(); ++k)
+            if (an->frames[k]->frame == CurrentFrame) { an->frames[k]->handleType = HPlano; break; }
     // NO pisar el End con el numero de frames: el End es el rango que configuro el usuario.
     // Solo se EXTIENDE si el keyframe cae mas alla del final.
     if (CurrentFrame > EndFrame) { EndFrame = CurrentFrame; an->endFrame = EndFrame; }
@@ -6315,15 +6319,46 @@ static float g_kfFrame = 0.0f, g_kfValor = 0.0f;
 static float g_kfInDF = 0.0f, g_kfInDV = 0.0f, g_kfOutDF = 0.0f, g_kfOutDV = 0.0f;
 static PropFloat *gKfFrame=NULL, *gKfValor=NULL, *gKfInDF=NULL, *gKfInDV=NULL, *gKfOutDF=NULL, *gKfOutDV=NULL;
 static PropButton *gKfInterp=NULL, *gKfHandle=NULL;
+static PropButton *gKfCicloA=NULL, *gKfCicloD=NULL;   // el modificador REPETIR de la curva (antes / despues)
+static PopupMenu* g_menuKfCiclo = NULL; static int g_kfCicloLado = 0;   // 0 = antes, 1 = despues
+static void KfAplicado();   // (abajo)
+static const char* KfNombreCiclo(int m){ return m == KfCicloRepite ? "Repeat" : m == KfCicloOffset ? "Repeat with Offset" : "None"; }
+static void AccionMenuKfCiclo(int id){
+    if (id >= KfCicloNo && id <= KfCicloOffset){
+        extern bool TimelineSetCiclo(int antes, int despues);
+        // con keyframes elegidos en el timeline: todas sus curvas (como el menu Modifiers); si no, la del activo
+        if (!TimelineSetCiclo(g_kfCicloLado == 0 ? id : -1, g_kfCicloLado == 1 ? id : -1)){
+            int i; AnimProperty* ap = DopeKeyframeActivo(&i);
+            if (ap){ UndoKeyframesIniciar();
+                     if (g_kfCicloLado == 0) ap->cicloAntes = id; else ap->cicloDespues = id;
+                     UndoKeyframesConfirmar(); }
+        }
+        KfAplicado();
+    }
+    if (g_menuKfCiclo && MenuAbierto == g_menuKfCiclo) g_menuKfCiclo->Cerrar();
+}
+static void AbrirMenuKfCiclo(int lado){
+    PropButton* pb = lado == 0 ? gKfCicloA : gKfCicloD; if (!pb) return;
+    g_kfCicloLado = lado;
+    if (!g_menuKfCiclo){ g_menuKfCiclo = new PopupMenu(); g_menuKfCiclo->action = AccionMenuKfCiclo; }
+    int i; AnimProperty* ap = DopeKeyframeActivo(&i, false);
+    const int act = ap ? (lado == 0 ? ap->cicloAntes : ap->cicloDespues) : -1;
+    g_menuKfCiclo->Limpiar();
+    g_menuKfCiclo->titulo = T(lado == 0 ? "Repeat Before" : "Repeat After");
+    for (int m = KfCicloNo; m <= KfCicloOffset; m++) g_menuKfCiclo->Agregar(T(KfNombreCiclo(m)), m)->verde = (m == act);
+    if (MenuAbierto && MenuAbierto != g_menuKfCiclo) MenuAbierto->Cerrar();
+    g_menuKfCiclo->Abrir(pb->button->sx, pb->button->sy + pb->button->height, MenuPantallaW, MenuPantallaH);
+    MenuAbierto = g_menuKfCiclo;
+}
+static void AccionKfBtnCicloA(){ AbrirMenuKfCiclo(0); }
+static void AccionKfBtnCicloD(){ AbrirMenuKfCiclo(1); }
 static PopupMenu* g_menuKfInterp = NULL;
 static PopupMenu* g_menuKfHandle = NULL;
 
-static const char* KfNombreInterp(int i){
-    return (i==KfConstant)?"Constant" : (i==KfLinear)?"Linear" : T("Bezier");
-}
+static const char* KfNombreInterp(int i){ return W3dNombreInterpolacion(i); }
 static const char* KfNombreHandle(int h){
     switch (h){ case HFree: return "Free"; case HAligned: return "Aligned"; case HVector: return "Vector";
-                case HAuto: return "Automatic"; default: return "Auto Clamped"; }
+                case HAuto: return "Automatic"; case HPlano: return "Flat"; default: return "Auto Clamped"; }
 }
 static void KfAplicado(){ AplicarAnimacionObjetos(); InvalidarAnimYRedraw(); }
 
@@ -6357,7 +6392,14 @@ static void AccionKfHandles(){
 }
 static void AccionMenuKfInterp(int id){
     if (id >= 0){ int i; AnimProperty* ap = DopeKeyframeActivo(&i);
-        if (ap){ UndoKeyframesIniciar(); ap->keyframes[i].Interpolation = id;
+        if (ap){ UndoKeyframesIniciar();
+                 int& in = ap->keyframes[i].Interpolation;
+                 // 100+ = el EASING (las filas del final); si no, la curva (conserva el easing que tenia)
+                 if (id >= 100) { if (KfEsEasing(in)) in = KfInterpCon(KfInterpBase(in), id - 100);
+                                  else KfEaseBezier(*ap, (size_t)i, id - 100); }   // bezier comun: con los handles
+                 else { const int viejo = in; in = KfInterpCon(id, KfInterpEase(viejo));
+                        // de una curva de easing a bezier: con los handles que conservan su forma (ver Timeline)
+                        if (id == KfBezier) KfBezierDesdeEasing(*ap, (size_t)i, viejo); }
                  if (id == KfBezier && ap->keyframes[i].handleType != HFree && ap->keyframes[i].handleType != HAligned)
                      ap->keyframes[i].handleType = HAuto;
                  UndoKeyframesConfirmar(); KfAplicado(); } }
@@ -6381,10 +6423,16 @@ static void AccionKfBtnInterp(){
     if (!gKfInterp) return;
     if (!g_menuKfInterp){ g_menuKfInterp = new PopupMenu(); g_menuKfInterp->action = AccionMenuKfInterp;
                           g_menuKfInterp->titulo = T("Interpolation"); }
-    g_menuKfInterp->Limpiar();
-    g_menuKfInterp->Agregar(T("Constant"), KfConstant, IconType::interp_constant);
-    g_menuKfInterp->Agregar(T("Linear"), KfLinear, IconType::interp_linear);
-    g_menuKfInterp->Agregar(T("Bezier"), KfBezier, IconType::interp_bezier);
+    { int i; AnimProperty* ap = DopeKeyframeActivo(&i, false);
+      const int act = ap ? ap->keyframes[i].Interpolation : -1;
+      W3dMenuInterpolaciones(g_menuKfInterp, 0, act);
+      // y el EASING de las curvas de easing (ids 100+), separado con una linea
+      if (act >= 0 && (KfEsEasing(act) || act == KfBezier)){   // (la bezier comun lo hace con sus handles)
+          static PopupMenu sEase; W3dMenuEasings(&sEase, 100, KfEsEasing(act) ? KfInterpEase(act) : -1);
+          for (size_t e = 0; e < sEase.items.size(); e++){
+              MenuItem* it = g_menuKfInterp->Agregar(sEase.items[e]->text, 100 + (int)e, sEase.items[e]->icon);
+              it->verde = sEase.items[e]->verde; if (e == 0) it->lineaArriba = true; }
+      } }
     if (MenuAbierto && MenuAbierto != g_menuKfInterp) MenuAbierto->Cerrar();
     g_menuKfInterp->Abrir(gKfInterp->button->sx, gKfInterp->button->sy + gKfInterp->button->height,
                           MenuPantallaW, MenuPantallaH);
@@ -6395,11 +6443,12 @@ static void AccionKfBtnHandle(){
     if (!g_menuKfHandle){ g_menuKfHandle = new PopupMenu(); g_menuKfHandle->action = AccionMenuKfHandle;
                           g_menuKfHandle->titulo = T("Handle Type"); }
     g_menuKfHandle->Limpiar();
-    g_menuKfHandle->Agregar(T("Free"), HFree);
-    g_menuKfHandle->Agregar(T("Aligned"), HAligned);
-    g_menuKfHandle->Agregar(T("Vector"), HVector);
-    g_menuKfHandle->Agregar(T("Automatic"), HAuto);
-    g_menuKfHandle->Agregar(T("Auto Clamped"), HAutoClamped);
+    g_menuKfHandle->Agregar(T("Free"), HFree, IconType::handle_free);
+    g_menuKfHandle->Agregar(T("Aligned"), HAligned, IconType::handle_aligned);
+    g_menuKfHandle->Agregar(T("Vector"), HVector, IconType::handle_vector);
+    g_menuKfHandle->Agregar(T("Automatic"), HAuto, IconType::handle_auto);
+    g_menuKfHandle->Agregar(T("Auto Clamped"), HAutoClamped, IconType::handle_autoclamped);
+    g_menuKfHandle->Agregar(T("Flat"), HPlano, IconType::handle_flat);
     if (MenuAbierto && MenuAbierto != g_menuKfHandle) MenuAbierto->Cerrar();
     g_menuKfHandle->Abrir(gKfHandle->button->sx, gKfHandle->button->sy + gKfHandle->button->height,
                           MenuPantallaW, MenuPantallaH);
@@ -9033,6 +9082,15 @@ void Properties::ConstruirGrupos(){
     gKfHandle->button->desplegable = true; gKfHandle->button->caretMenu = true;
     gKfHandle->action = AccionKfBtnHandle;
     propKeyframe->properties.push_back(gKfHandle);
+    // el modificador REPETIR de la curva: que hace antes del primer keyframe y despues del ultimo
+    gKfCicloA = new PropButton(T("Repeat Before"));
+    gKfCicloA->button->desplegable = true; gKfCicloA->button->caretMenu = true;
+    gKfCicloA->action = AccionKfBtnCicloA;
+    propKeyframe->properties.push_back(gKfCicloA);
+    gKfCicloD = new PropButton(T("Repeat After"));
+    gKfCicloD->button->desplegable = true; gKfCicloD->button->caretMenu = true;
+    gKfCicloD->action = AccionKfBtnCicloD;
+    propKeyframe->properties.push_back(gKfCicloD);
     propKeyframe->properties.push_back(new PropGap(""));
     { PropFloat* p1 = new PropFloat(T("Left Handle X"));
       p1->value = &g_kfInDF; p1->onChange = AccionKfHandles; gKfInDF = p1;
@@ -11871,6 +11929,8 @@ void Properties::ActualizarPestanias(){
             if (g_propFloatEditando != gKfOutDV) g_kfOutDV = k.outDV;
             if (gKfInterp) gKfInterp->button->text = KfNombreInterp(k.Interpolation);
             if (gKfHandle) gKfHandle->button->text = KfNombreHandle(k.handleType);
+            if (gKfCicloA) gKfCicloA->button->text = T(KfNombreCiclo(kap->cicloAntes));
+            if (gKfCicloD) gKfCicloD->button->text = T(KfNombreCiclo(kap->cicloDespues));
             // los handles SOLO existen si el tramo es bezier, y solo se pueden tipear si el TIPO los guarda
             // (con Vector/Automatic/Auto Clamped los calcula la curva sola: mostrarlos editables seria mentir).
             // value = NULL OCULTA la fila: es el idioma del panel (Resize la mide en 0 y el teclado la saltea).
@@ -13728,6 +13788,8 @@ static void PropsOlvidarFila(PropertieBase* p) {
         if ((PropertieBase*)*pfs[i] == p) *pfs[i] = NULL;
     if ((PropertieBase*)gKfInterp == p) gKfInterp = NULL;
     if ((PropertieBase*)gKfHandle == p) gKfHandle = NULL;
+    if ((PropertieBase*)gKfCicloA == p) gKfCicloA = NULL;
+    if ((PropertieBase*)gKfCicloD == p) gKfCicloD = NULL;
     if ((PropertieBase*)gListaScrollLista == p) gListaScrollLista = NULL;
     if ((PropertieBase*)gTouchScrollLista == p) gTouchScrollLista = NULL;
     if ((PropertieBase*)gColorAbierto == p) gColorAbierto = NULL;

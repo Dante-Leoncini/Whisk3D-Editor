@@ -53,6 +53,8 @@ extern int W3dDedosActivos();       // (controles.cpp) dedos apoyados segun el e
 #include "edit/BoxSelect.h"                // test 'boxtest': la caja de seleccion
 #include "edit/PolyMesh.h"                 // test 'booltest': contar los poligonos del stack
 #include "ViewPorts/Timeline.h"
+#include "ViewPorts/PopUp/TiempoPopup.h"
+#include "ViewPorts/TransformUI.h"   // TbVerdeBg (tltoolbar)   // el reloj del timeline (tltoolbar)
 #include "WhiskUI/Propieties/GroupPropertie.h" // icontest: la tarjeta "Keyframe" y su icono
 #include "WhiskUI/Propieties/PropList.h"       // arm2drango: la LISTA de armatures 2D del panel (modo 10)
 #include "ViewPorts/Properties.h"
@@ -2657,7 +2659,10 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         tl->ConstruirDopeRows();
         const float margen = (float)GlobalScale * 12.0f;
         const float izq = (float)tl->panelW, der = (float)tl->width;
-        const float arr = (float)tl->stripY, aba = (float)tl->height;
+        const float arr = (float)tl->stripY; float aba = (float)tl->height;
+        // con keyframes elegidos aparece la barra de herramientas de abajo y TAPA el fondo del strip: el
+        // encuadre tiene que quedar arriba de ella (aba = el borde de abajo VISIBLE)
+        #define CURVFIT_ABA() (aba = (float)(tl->height - ((!tl->ToolButtons.empty() && tl->ToolbarVisible()) ? tl->ToolbarHeight() : 0)))
         bool ok = true;
         float f0,f1,v0,v1;
         // (ii) SIN seleccion: no hay rango de seleccion, pero SI de todo lo visible
@@ -2675,7 +2680,9 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         printf("      [curvfit] curva de VERTEX ANIM seleccionada: f=[%.0f..%.0f] v=[%.3f..%.3f] (esperado 1..20 / 0..2, sin contagio de la de 1000) %s\n",
                f0,f1,v0,v1, rvOk?"OK":"FALLO");
         if (!rvOk){ err="curvfit: la curva de vertex anim no entra en el encuadre"; delete tl; return false; }
-        tl->CurvaFrameSelected();
+        tl->CurvaFrameSelected(); CURVFIT_ABA();
+        printf("      [curvfit] con seleccion la barra de abajo esta (alto %.0f) %s\n", (float)tl->height - aba, (aba < (float)tl->height)?"OK":"FALLO");
+        if (aba >= (float)tl->height){ err="curvfit: con seleccion no aparece la barra de herramientas"; delete tl; return false; }
         { float xa=tl->FrameToX(1.0f), xb=tl->FrameToX(20.0f);
           float ya=tl->ValueToY(2.0f), yb=tl->ValueToY(0.0f);       // el valor MAYOR va ARRIBA
           bool enc = fabsf(xa-(izq+margen))<1.5f && fabsf(xb-(der-margen))<1.5f &&
@@ -2687,7 +2694,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         // curva de OBJETO con valores GRANDES (0..1000): el mismo encuadre, otra escala
         tl->DopeSelectNone(); tl->DopeSelFrame(60,true); tl->DopeSelFrame(80,true);
         bool ro = tl->CurvaRangoVista(true, f0,f1,v0,v1);
-        tl->CurvaFrameSelected();
+        tl->CurvaFrameSelected(); CURVFIT_ABA();
         { float ya=tl->ValueToY(1000.0f), yb=tl->ValueToY(0.0f);
           bool enc = ro && f0==60.0f && f1==80.0f && v0<=0.01f && v1>=999.0f &&
                      fabsf(ya-(arr+margen))<1.5f && fabsf(yb-(aba-margen))<1.5f;
@@ -2698,7 +2705,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         tl->DopeSelectNone(); tl->DopeSelFrame(100,true);
         bool r1 = tl->CurvaRangoVista(true, f0,f1,v0,v1);
         float zoomH0 = tl->pxPerFrame;
-        tl->CurvaFrameSelected();
+        tl->CurvaFrameSelected(); CURVFIT_ABA();
         { float xa = tl->FrameToX(100.0f), medio = (izq+der)*0.5f;
           float ya = tl->ValueToY(500.0f), centroY = (arr+aba)*0.5f;
           float spanV = tl->YToValue(arr) - tl->YToValue(aba);   // cuantas unidades de valor se ven
@@ -2708,6 +2715,7 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
           printf("      [curvfit] un solo key: f=[%.0f..%.0f] v=[%.1f..%.1f] | x=%.1f (medio %.1f) zoomH %s | y=%.1f (centro %.1f) span vertical=%.3f unidades %s\n",
                  f0,f1,v0,v1, xa,medio, (tl->pxPerFrame==zoomH0)?"INTACTO":"CAMBIO", ya,centroY, spanV, enc?"OK":"FALLO");
           if (!enc){ err="curvfit: el encuadre de un solo key esta mal"; delete tl; return false; } }
+        #undef CURVFIT_ABA
         printf("      [curvfit] OK (vertex anim + objeto + sin seleccion + un solo key)\n");
         delete tl; return true;
     }
@@ -11243,6 +11251,437 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
     //      de los ojos, hay barra horizontal, el boton del medio sobre el panel lo scrollea (y NO panea los frames),
     //      el borde se pinta con el hover y se arrastra; Backspace (la C del N95) borra la CURVA elegida y despues
     //      los keyframes elegidos, y el area para agarrar un keyframe es generosa ----
+    // ---- tlclip : cortar / copiar / pegar / duplicar keyframes (Ctrl+X/C/V/D y el click derecho) y los NOMBRES de
+    //      los ejes de la posicion (Z-arriba como Properties: la fila "Z Location" es pos.y) ----
+    // ---- shrinkcubo <d> : INFLAR (Shrink/Fatten, Alt+S) el cubo activo entero 'd' por la normal tiene que dar un cubo
+    //      ESCALADO: cada esquina se aleja del centro sobre su diagonal y las copias de un vertice (una por cara, el cubo
+    //      tiene bordes duros) quedan JUNTAS. Antes cada copia salia por la normal de SU cara y se abrian las esquinas ----
+    if (cmd == "shrinkcubo") {
+        float d = 0.3f; ss >> d;
+        Mesh* m = ScriptActiveMesh(); if (!m || m->vertexSize <= 0){ err = "shrinkcubo: sin malla"; return false; }
+        extern bool LayoutToggleEditMode(); extern void EditXformNumValor(float); extern void EditXformConfirmar();
+        extern void LayoutShrinkFatten();
+        if (InteractionMode != EditMode) LayoutToggleEditMode();
+        m->EnsureEdit(); if (!m->edit){ err = "shrinkcubo: sin edit"; return false; }
+        m->edit->SeleccionarTodo(true);
+        const std::vector<GLfloat> antes = m->edit->pos;
+        LayoutShrinkFatten(); EditXformNumValor(d); EditXformConfirmar();
+        const std::vector<GLfloat>& p = m->edit->pos;
+        float cx = 0, cy = 0, cz = 0; const size_t n = p.size() / 3;
+        for (size_t k = 0; k < n; k++){ cx += p[k*3]; cy += p[k*3+1]; cz += p[k*3+2]; } cx /= n; cy /= n; cz /= n;
+        // escala esperada: la esquina se corre d sobre la diagonal (1,1,1)/sqrt(3) -> cada coordenada d/sqrt(3)
+        float maxErr = 0.0f, a0 = 0.0f;
+        for (size_t k = 0; k < n; k++){ const float h = fabsf(antes[k*3] - cx); if (h > a0) a0 = h; }
+        const float esperado = a0 + d / sqrtf(3.0f);
+        for (size_t k = 0; k < n; k++) for (int c = 0; c < 3; c++){
+            const float cc = (c == 0) ? cx : (c == 1) ? cy : cz;
+            const float e = fabsf(fabsf(p[k*3+c] - cc) - esperado); if (e > maxErr) maxErr = e; }
+        printf("      [shrinkcubo] %d vertices editables | medio lado %.4f -> %.4f (esperado %.4f) | error max %.5f\n",
+               (int)n, a0, a0 + d / sqrtf(3.0f), esperado, maxErr);
+        if (InteractionMode == EditMode) LayoutToggleEditMode();
+        if (maxErr > 1e-3f){ err = "shrinkcubo: inflar el cubo no dio un cubo escalado (se abren las esquinas)"; return false; }
+        return true;
+    }
+    // ---- tlease : las curvas de EASING (E / Ctrl+E y su evaluacion), la CAJA de seleccion (verde / azul), el click en
+    //      el TRAMO de una curva, el frame que solo cambia en la banda de numeros o en la linea, el modo en el menu
+    //      View, el reloj (Inicio / Fin / FPS) y Ctrl arrastrando un handle (sigue la curva que venia).
+    //      Espera la posX del objeto activo con claves en 1 (0), 10 (10) y 20 (0) ----
+    if (cmd == "tlease") {
+        extern bool LCtrlPressed, leftMouseDown; extern int dx, dy; extern PopupMenu* MenuAbierto;
+        extern int TimelineCantSeleccion(); extern void TimelineCajaSoltar(bool, int, int, int, int, bool, bool);
+        bool ok = true;
+        #define TLE_VER(cond, que) do { const bool _c = (cond); printf("      [tlease] %-62s %s\n", que, _c ? "OK" : "MAL"); if (!_c) ok = false; } while (0)
+        // 1) la matematica
+        TLE_VER(fabsf(KfEasing(KfInterpCon(KfQuad, KfEaseIn), 0.5f) - 0.25f) < 1e-4f, "Quadratic Ease In: 0.25 a mitad de tramo");
+        TLE_VER(fabsf(KfEasing(KfInterpCon(KfQuad, KfEaseOut), 0.5f) - 0.75f) < 1e-4f, "Quadratic Ease Out: 0.75");
+        TLE_VER(fabsf(KfEasing(KfInterpCon(KfCubic, KfEaseInOut), 0.5f) - 0.5f) < 1e-4f, "Cubic In-Out: 0.5 en el medio");
+        TLE_VER(KfEasing(KfInterpCon(KfBack, KfEaseIn), 0.2f) < 0.0f, "Back In: se va para atras al arrancar");
+        TLE_VER(fabsf(KfEasing(KfBounce, 0.999f) - 1.0f) < 0.01f && KfEasing(KfBounce, 0.001f) < 0.05f, "Bounce (automatico = out): llega a 1");
+        { bool sobre = false; for (int i = 1; i < 100; i++) if (KfEasing(KfElastic, i / 100.0f) > 1.0f) sobre = true;
+          TLE_VER(sobre, "Elastic (automatico = out): oscila pasandose del final"); }
+        TLE_VER(KfEasing(KfLinear, 0.3f) == 0.3f, "Linear sigue siendo una recta");
+        Timeline* tl = new Timeline(); tl->x = 0; tl->y = 0; tl->Resize(900, 400);
+        tl->Render();   // (las bandas -numeros, cuerpo- se calculan al dibujar)
+        tl->ConstruirDopeRows(); tl->CambiarModo(true); tl->ConstruirDopeRows();
+        int rx = -1; for (size_t i = 0; i < tl->dopeRows.size(); i++) if (tl->dopeRows[i].propId == AnimPosition && tl->dopeRows[i].compId == AnimX) rx = (int)i;
+        if (rx < 0){ delete tl; err = "tlease: sin la curva posX"; return false; }
+        AnimProperty* ap = tl->CurvaDeFila(tl->dopeRows[(size_t)rx]);
+        if (!ap || ap->keyframes.size() != 3){ delete tl; err = "tlease: la curva no tiene 3 claves"; return false; }
+        // 2) E: el menu de interpolaciones, en tres grupos; Ctrl+E: el easing
+        tl->event_key_down(W3dK_E, false);
+        TLE_VER(MenuAbierto && MenuAbierto->items.size() == (size_t)KfInterpN && MenuAbierto->items[KfSine]->lineaArriba
+                && MenuAbierto->items[KfBack]->lineaArriba, "E: Set Keyframe Interpolation (13, en 3 grupos)");
+        if (MenuAbierto){ MenuAbierto->Cerrar(); MenuAbierto = NULL; }
+        LCtrlPressed = true; tl->event_key_down(W3dK_E, false); LCtrlPressed = false;
+        TLE_VER(MenuAbierto && MenuAbierto->items.size() == 4, "Ctrl+E: Set Keyframe Easing Type (4)");
+        if (MenuAbierto){ MenuAbierto->Cerrar(); MenuAbierto = NULL; }
+        // la primera clave: Quadratic, y Ctrl+E Ease In -> a mitad del tramo 1..10 vale 10 * 0.25
+        tl->DopeSelectNone(); tl->CajaAplicar(tl->x + (int)tl->FrameToX(1.0f) - 4, tl->y + (int)tl->ValueToY(0.0f) - 4,
+                                              tl->x + (int)tl->FrameToX(1.0f) + 4, tl->y + (int)tl->ValueToY(0.0f) + 4, false, false);
+        TLE_VER(TimelineCantSeleccion() == 1, "caja VERDE alrededor de una clave: solo esa");
+        tl->SetInterpolacionSel(KfQuad); tl->SetEasingSel(KfEaseIn);
+        TLE_VER(fabsf(ap->EvalF(5.5f, 0.0f) - 2.5f) < 0.01f, "la curva Quadratic Ease In corre (frame 5.5 = 2.5)");
+        tl->SetEasingSel(KfEaseOut);
+        TLE_VER(fabsf(ap->EvalF(5.5f, 0.0f) - 7.5f) < 0.01f, "Ctrl+E Ease Out la da vuelta (7.5)");
+        tl->SetInterpolacionSel(KfCubic);
+        TLE_VER(KfInterpBase(ap->keyframes[0].Interpolation) == KfCubic && KfInterpEase(ap->keyframes[0].Interpolation) == KfEaseOut,
+                "cambiar de curva conserva el easing");
+        tl->SetInterpolacionSel(KfLinear);
+        // 3) la caja AZUL roza el tramo 1..10 (sin claves adentro) -> el tramo entero (2 claves)
+        { const int px = tl->x + (int)tl->FrameToX(5.5f), py = tl->y + (int)tl->ValueToY(ap->EvalF(5.5f, 0.0f));
+          tl->CajaAplicar(px - 3, py - 3, px + 3, py + 3, true, false);
+          TLE_VER(TimelineCantSeleccion() == 2, "caja AZUL que roza la linea: el tramo A-B");
+          tl->CajaAplicar(px - 3, py - 3, px + 3, py + 3, false, false);
+          TLE_VER(TimelineCantSeleccion() == 0, "...la VERDE ahi no elige nada (no hay claves adentro)");
+          // 4) click sobre la linea: el tramo
+          TLE_VER(tl->CurvaTramoEn(px, py + 2, false) && TimelineCantSeleccion() == 2, "click en la linea: el tramo A-B");
+          // 5) un click en el cuerpo NO mueve el frame (arma la caja; soltar sin arrastrar deselecciona)
+          CurrentFrame = 1; tl->lastMx = tl->x + (int)tl->FrameToX(15.0f); tl->lastMy = tl->y + tl->height - 4;
+          tl->button_left(); TimelineCajaSoltar(false, 0, 0, 0, 0, false, false); BoxSelectCancelar();
+          TLE_VER(CurrentFrame == 1, "click en el cuerpo: el frame NO cambia");
+          TLE_VER(TimelineCantSeleccion() == 0, "...y deselecciona");
+          // en la banda de numeros si
+          tl->lastMy = tl->y + tl->numY + 2; tl->button_left(); tl->mouse_button_up(1);
+          TLE_VER(CurrentFrame == 15, "click en los numeros: va a ese frame");
+          TLE_VER(tl->CabezalEn(tl->x + (int)tl->FrameToX(15.0f) + 2, tl->y + tl->stripY + 20), "la linea del frame se agarra");
+          CurrentFrame = 1; }
+        // 6) CTRL arrastrando el handle de SALIDA de la clave 10: sigue la direccion con la que LLEGA la recta 1 -> 10
+        { tl->DopeSelectAll();
+          ap->keyframes[1].Interpolation = KfBezier; ap->keyframes[1].handleType = HAuto;
+          float hx, hy; tl->HandlePos(ap, 1, true, hx, hy);
+          tl->lastMx = tl->x + (int)hx; tl->lastMy = tl->y + (int)hy;
+          tl->button_left();
+          TLE_VER(tl->HandleArrastrando(), "se agarro el handle de salida");
+          LCtrlPressed = true; leftMouseDown = true;
+          dx = 0; dy = 0; tl->event_mouse_motion(tl->lastMx, tl->lastMy);           // (el primero no cuenta)
+          dx = 40; dy = 25; tl->event_mouse_motion(tl->lastMx + 40, tl->lastMy + 25);
+          LCtrlPressed = false; leftMouseDown = false; tl->mouse_button_up(1); dx = dy = 0;
+          const keyFrame& k = ap->keyframes[1];
+          const float pend = k.outDF > 1e-5f ? k.outDV / k.outDF : 0.0f;
+          printf("      [tlease] handle: dF=%.3f dV=%.3f pendiente=%.3f (la recta que llega: %.3f)\n", k.outDF, k.outDV, pend, 10.0f / 9.0f);
+          TLE_VER(fabsf(pend - 10.0f / 9.0f) < 0.02f, "Ctrl: el handle sigue la recta que llegaba"); }
+        // 7) el modo en el menu View; el reloj
+        tl->CambiarModo(false); TLE_VER(tl->modo == Timeline::TL_MODO_DOPE, "menu View: Dope Sheet");
+        #undef TLE_VER
+        delete tl;
+        if (!ok) { err = "tlease: el timeline no se comporta como se pidio"; return false; }
+        return true;
+    }
+    // tleasebez: las claves que inserta el USUARIO salen bezier con handles PLANOS (ease in/out); Ease In / Out /
+    // In and Out tambien en una bezier comun (con los handles del tramo); y el 3D se re-aplica al editar la curva en
+    // el MISMO frame. Escena: posX 0 / 10 / 0 en los frames 1 / 10 / 20 (keychan)
+    if (cmd == "tleasebez") {
+        extern void AplicarAnimacionObjetos();
+        bool ok = true;
+        #define TLB_VER(cond, que) do { const bool _c = (cond); printf("      [tleasebez] %-58s %s\n", que, _c ? "OK" : "MAL"); if (!_c) ok = false; } while (0)
+        Object* o = ObjActivo; if (!o) { err = "tleasebez: sin objeto activo"; return false; }
+        Timeline* tl = new Timeline(); tl->x = 0; tl->y = 0; tl->Resize(900, 400);
+        tl->Render(); tl->CambiarModo(true); tl->ConstruirDopeRows();
+        int rx = -1; for (size_t i = 0; i < tl->dopeRows.size(); i++) if (tl->dopeRows[i].propId == AnimPosition && tl->dopeRows[i].compId == AnimX) rx = (int)i;
+        AnimProperty* ap = rx >= 0 ? tl->CurvaDeFila(tl->dopeRows[(size_t)rx]) : NULL;
+        if (!ap || ap->keyframes.size() != 3){ delete tl; err = "tleasebez: la curva posX no tiene 3 claves"; return false; }
+        float dF, dV;
+        TLB_VER(ap->keyframes[0].Interpolation == KfBezier && ap->keyframes[1].handleType == HPlano, "clave nueva: bezier con handles planos");
+        ap->HandleEfectivo(0, true, dF, dV);
+        TLB_VER(fabsf(dF - 3.0f) < 1e-4f && dV == 0.0f, "handle plano: horizontal, un tercio del tramo");
+        TLB_VER(fabsf(ap->EvalF(5.5f, 0.0f) - 5.0f) < 0.01f, "ease in/out: la mitad en el medio del tramo");
+        TLB_VER(ap->EvalF(2.0f, 0.0f) < 10.0f / 9.0f * 0.5f, "...y arranca despacio (menos que la recta)");
+        // Ease In en la primera: sale plano, llega derecho
+        tl->DopeSelectNone(); tl->CajaAplicar(tl->x + (int)tl->FrameToX(1.0f) - 4, tl->y + (int)tl->ValueToY(0.0f) - 4,
+                                              tl->x + (int)tl->FrameToX(1.0f) + 4, tl->y + (int)tl->ValueToY(0.0f) + 4, false, false);
+        CurrentFrame = 5; AplicarAnimacionObjetos();
+        const float antes = o->pos.x;
+        tl->SetEasingSel(KfEaseIn);
+        const keyFrame& a = ap->keyframes[0]; const keyFrame& b = ap->keyframes[1];
+        TLB_VER(a.outDV == 0.0f && fabsf(b.inDV + 10.0f / 3.0f) < 1e-3f, "Ease In: sale plano y llega apuntando a la anterior");
+        ap->HandleEfectivo(1, true, dF, dV);
+        TLB_VER(fabsf(dF - 10.0f / 3.0f) < 1e-3f && dV == 0.0f, "...el otro lado de la clave 10 no cambio");
+        AplicarAnimacionObjetos();
+        printf("      [tleasebez] frame 5: antes %.4f despues %.4f (curva %.4f)\n", antes, o->pos.x, ap->EvalF(5.0f, 0.0f));
+        TLB_VER(fabsf(o->pos.x - antes) > 0.01f && fabsf(o->pos.x - ap->EvalF(5.0f, 0.0f)) < 1e-3f, "el 3D se actualiza en el MISMO frame");
+        tl->SetEasingSel(KfEaseOut);
+        TLB_VER(fabsf(ap->keyframes[0].outDV - 10.0f / 3.0f) < 1e-3f && ap->keyframes[1].inDV == 0.0f, "Ease Out: sale derecho y llega plano");
+        tl->SetEasingSel(KfEaseInOut);
+        TLB_VER(ap->keyframes[0].outDV == 0.0f && ap->keyframes[1].inDV == 0.0f, "Ease In and Out: los dos planos");
+        CurrentFrame = 1;
+        #undef TLB_VER
+        delete tl;
+        if (!ok) { err = "tleasebez: el ease de las bezier no se comporta como se pidio"; return false; }
+        return true;
+    }
+    // tleaseforma: de una curva de easing (Sine...Circ, Back; In / Out / In and Out) a BEZIER comun la forma se
+    // CONSERVA (los handles quedan en la bezier que mas se le parece); Bounce y Elastic no entran en una bezier y
+    // quedan con handles automaticos. El tramo de al lado no cambia. Escena: la de tleasebez (0 / 10 / 0)
+    if (cmd == "tleaseforma") {
+        bool ok = true;
+        Timeline* tl = new Timeline(); tl->x = 0; tl->y = 0; tl->Resize(900, 400);
+        tl->Render(); tl->CambiarModo(true); tl->ConstruirDopeRows();
+        int rx = -1; for (size_t i = 0; i < tl->dopeRows.size(); i++) if (tl->dopeRows[i].propId == AnimPosition && tl->dopeRows[i].compId == AnimX) rx = (int)i;
+        AnimProperty* ap = rx >= 0 ? tl->CurvaDeFila(tl->dopeRows[(size_t)rx]) : NULL;
+        if (!ap || ap->keyframes.size() != 3){ delete tl; err = "tleaseforma: la curva posX no tiene 3 claves"; return false; }
+        // (antes) ENFOCAR con keyframes elegidos: aparece la barra de herramientas de abajo y la curva tiene que
+        // quedar ARRIBA de ella (el encuadre no la tenia en cuenta: el fondo de la curva quedaba tapado)
+        { tl->DopeSelectAll(); tl->CurvaFrameSelected();
+          const int tbH = (!tl->ToolButtons.empty() && tl->ToolbarVisible()) ? tl->ToolbarHeight() : 0;
+          const float yArr = tl->ValueToY(10.0f), yAba = tl->ValueToY(0.0f), piso = (float)(tl->height - tbH);
+          const float margen = (float)GlobalScale * 12.0f;
+          const bool bien = tbH > 0 && fabsf(yArr - ((float)tl->stripY + margen)) < 1.5f && fabsf(yAba - (piso - margen)) < 1.5f;
+          printf("      [tleaseforma] enfocar con la barra de abajo (alto %d): y(10)=%.1f y(0)=%.1f, visible %d..%.0f %s\n",
+                 tbH, yArr, yAba, tl->stripY, piso, bien ? "OK" : "MAL");
+          if (!bien) ok = false; }
+        tl->DopeSelectNone(); tl->CajaAplicar(tl->x + (int)tl->FrameToX(1.0f) - 4, tl->y + (int)tl->ValueToY(0.0f) - 4,
+                                              tl->x + (int)tl->FrameToX(1.0f) + 4, tl->y + (int)tl->ValueToY(0.0f) + 4, false, false);
+        static const char* nom[] = { "Sine", "Quad", "Cubic", "Quart", "Quint", "Expo", "Circ", "Back", "Bounce", "Elastic" };
+        static const char* nomE[] = { "In", "Out", "In-Out" };
+        // con TODO elegido (lo normal: Ctrl+A y elegir la curva) los DOS tramos de easing conservan su forma; la
+        // ultima clave (sin tramo propio) no pisa la entrada del tramo anterior
+        for (int base = KfSine; base <= KfBack; base++){
+            for (int j = 0; j < 3; j++){ ap->keyframes[j].handleType = HPlano; ap->keyframes[j].Interpolation = KfInterpCon(base, KfEaseAuto); }
+            float orig[77];
+            for (int s = 0; s <= 76; s++) orig[s] = ap->EvalF(1.0f + 0.25f * s, 0.0f);
+            tl->DopeSelectAll(); tl->SetInterpolacionSel(KfBezier);
+            float maxErr = 0.0f;
+            for (int s = 0; s <= 76; s++){ const float d = fabsf(ap->EvalF(1.0f + 0.25f * s, 0.0f) - orig[s]); if (d > maxErr) maxErr = d; }
+            const bool bien = maxErr < 0.25f && KfInterpBase(ap->keyframes[1].Interpolation) == KfBezier;
+            printf("      [tleaseforma] TODO elegido, %-7s -> bezier: error max %.3f en los dos tramos %s\n", nom[base - KfSine], maxErr, bien ? "OK" : "MAL");
+            if (!bien) ok = false;
+        }
+        tl->DopeSelectNone(); tl->CajaAplicar(tl->x + (int)tl->FrameToX(1.0f) - 4, tl->y + (int)tl->ValueToY(0.0f) - 4,
+                                              tl->x + (int)tl->FrameToX(1.0f) + 4, tl->y + (int)tl->ValueToY(0.0f) + 4, false, false);
+        for (int base = KfSine; base < KfInterpN; base++){
+            for (int e = KfEaseIn; e <= KfEaseInOut; e++){
+                for (int j = 0; j < 3; j++){ ap->keyframes[j].handleType = HPlano; ap->keyframes[j].Interpolation = KfBezier; }
+                ap->keyframes[0].Interpolation = KfInterpCon(base, e);
+                float orig[37], vecino[11];
+                for (int s = 0; s <= 36; s++) orig[s] = ap->EvalF(1.0f + 0.25f * s, 0.0f);
+                for (int s = 0; s <= 10; s++) vecino[s] = ap->EvalF(10.0f + s, 0.0f);
+                tl->SetInterpolacionSel(KfBezier);
+                float maxErr = 0.0f, maxVec = 0.0f;
+                for (int s = 0; s <= 36; s++){ const float d = fabsf(ap->EvalF(1.0f + 0.25f * s, 0.0f) - orig[s]); if (d > maxErr) maxErr = d; }
+                for (int s = 0; s <= 10; s++){ const float d = fabsf(ap->EvalF(10.0f + s, 0.0f) - vecino[s]); if (d > maxVec) maxVec = d; }
+                const bool esBez = KfInterpBase(ap->keyframes[0].Interpolation) == KfBezier;
+                bool bien;
+                if (base == KfBounce || base == KfElastic)
+                    bien = esBez && ap->keyframes[0].handleType == HAuto;          // no entran: automaticos
+                else
+                    bien = esBez && ap->keyframes[0].handleType == HFree && maxErr < 0.25f && maxVec < 1e-3f;   // < 2.5% del tramo (10)
+                printf("      [tleaseforma] %-7s %-6s -> bezier: error max %.3f (de 10) | tramo vecino %.4f %s\n",
+                       nom[base - KfSine], nomE[e - 1], maxErr, maxVec, bien ? "OK" : "MAL");
+                if (!bien) ok = false;
+            }
+        }
+        delete tl;
+        if (!ok) { err = "tleaseforma: pasar a bezier no conserva la forma de la curva"; return false; }
+        return true;
+    }
+    // tlarrastre: agarrar un keyframe y arrastrarlo (click + mover + soltar) TRES veces seguidas, en CURVAS y en el
+    // DOPE SHEET: cada vez se tiene que mover (reporte: "el primer click no arrastra, el segundo si, el tercero no").
+    // Escena: posX con claves en los frames 1 / 10 / 20 (keychan)
+    if (cmd == "tlarrastre") {
+        extern bool leftMouseDown; extern int dx, dy;
+        bool ok = true;
+        Timeline* tl = new Timeline(); tl->x = 0; tl->y = 0; tl->Resize(900, 400);
+        tl->Render();
+        for (int curvas = 1; curvas >= 0; curvas--){
+            tl->CambiarModo(curvas != 0); tl->ConstruirDopeRows(); tl->Render(); tl->DopeSelectNone();
+            int rx = -1; for (size_t i = 0; i < tl->dopeRows.size(); i++) if (tl->dopeRows[i].propId == AnimPosition && tl->dopeRows[i].compId == AnimX) rx = (int)i;
+            AnimProperty* ap = rx >= 0 ? tl->CurvaDeFila(tl->dopeRows[(size_t)rx]) : NULL;
+            if (!ap || ap->keyframes.size() != 3){ delete tl; err = "tlarrastre: la curva posX no tiene 3 claves"; return false; }
+            for (int vez = 1; vez <= 3; vez++){
+                tl->ConstruirDopeRows(); tl->Render();
+                const int f0 = ap->keyframes[1].frame;
+                int px = tl->x + (int)tl->FrameToX((float)f0);
+                int py = curvas ? tl->y + (int)tl->ValueToY(ap->keyframes[1].value)
+                                : tl->y + tl->stripY + rx * tl->rowH + tl->PosY + tl->rowH / 2;
+                tl->event_mouse_motion(px, py); tl->lastMx = px; tl->lastMy = py;
+                leftMouseDown = true; tl->button_left();
+                const int paso = (curvas ? 1 : -1) * (int)(tl->pxPerFrame * 3.0f + 0.5f);   // 3 frames: curvas a la derecha, dope a la izquierda
+                for (int k = 1; k <= 4; k++){ dx = paso / 4; dy = 0; tl->event_mouse_motion(px + paso * k / 4, py); }
+                leftMouseDown = false; dx = dy = 0; tl->mouse_button_up(1);
+                if (BoxSelectActivo()){ extern void TimelineCajaSoltar(bool, int, int, int, int, bool, bool); TimelineCajaSoltar(false, 0, 0, 0, 0, false, false); BoxSelectCancelar(); }
+                const int f1 = ap->keyframes[1].frame;
+                const bool movio = f1 == f0 + (curvas ? 3 : -3);   // EXACTO: el keyframe sigue al mouse
+                printf("      [tlarrastre] %s vez %d: frame %d -> %d %s\n", curvas ? "curvas" : "dope  ", vez, f0, f1, movio ? "OK" : "MAL (no arrastro)");
+                if (!movio) ok = false;
+            }
+        }
+        delete tl;
+        if (!ok){ err = "tlarrastre: agarrar y arrastrar un keyframe no anda siempre"; return false; }
+        return true;
+    }
+    // tltoolbar: la TOOLBAR de abajo del timeline (interpolacion | handles | ease, estilo Inkscape) y el reloj con
+    // el frame actual. Escena: posX con claves en 1 / 10 / 20 (keychan: bezier con handles planos)
+    if (cmd == "tltoolbar") {
+        extern PopupMenu* MenuAbierto; extern bool TiempoPopupAbierto();
+        bool ok = true;
+        #define TLT_VER(cond, que) do { const bool _c = (cond); printf("      [tltoolbar] %-58s %s\n", que, _c ? "OK" : "MAL"); if (!_c) ok = false; } while (0)
+        Timeline* tl = new Timeline(); tl->x = 0; tl->y = 0; tl->Resize(2400, 400);   // (ancha: que entren los 23 iconos sin scrollear)
+        tl->CambiarModo(true); tl->ConstruirDopeRows(); tl->Render();
+        int rx = -1; for (size_t i = 0; i < tl->dopeRows.size(); i++) if (tl->dopeRows[i].propId == AnimPosition && tl->dopeRows[i].compId == AnimX) rx = (int)i;
+        AnimProperty* ap = rx >= 0 ? tl->CurvaDeFila(tl->dopeRows[(size_t)rx]) : NULL;
+        if (!ap || ap->keyframes.size() != 3){ delete tl; err = "tltoolbar: la curva posX no tiene 3 claves"; return false; }
+        struct B { static Button* Rol(Timeline* t, int rol){ for (size_t i = 0; i < t->ToolButtons.size(); i++) if (t->ToolButtons[i]->rol == rol) return t->ToolButtons[i]; return NULL; }
+                   static int Visibles(Timeline* t){ int n = 0; for (size_t i = 0; i < t->ToolButtons.size(); i++) if (t->ToolButtons[i]->visible) n++; return n; }
+                   static int Grupos(Timeline* t){ int n = 0; for (size_t i = 0; i < t->ToolButtons.size(); i++) if (t->ToolButtons[i]->visible && t->ToolButtons[i]->separador) n++; return n; } };
+        tl->DopeSelectNone();
+        TLT_VER(!tl->ToolbarVisible(), "sin keyframes elegidos: no hay toolbar");
+        // UNA clave: interpolacion + handles (sin tramo no hay ease)
+        { const int ky = tl->y + (int)tl->ValueToY(ap->EvalF(10.0f, 0.0f));
+          tl->CajaAplicar(tl->x + (int)tl->FrameToX(10.0f) - 4, ky - 4, tl->x + (int)tl->FrameToX(10.0f) + 4, ky + 4, false, false); }
+        tl->ToolbarSincronizar();
+        TLT_VER(tl->ToolbarVisible() && B::Visibles(tl) == 19 && B::Grupos(tl) == 4, "una clave: curvas (3|7|3) | handles (19 iconos, 4 grupos)");
+        TLT_VER(B::Rol(tl, 400 + KfBezier)->tinte && B::Rol(tl, 420 + HPlano)->tinte && !B::Rol(tl, 420 + HAuto)->tinte
+                && !B::Rol(tl, 400 + KfBounce)->tinte,
+                "lo que tiene la clave queda en verde (Bezier, Flat)");
+        bool ayudas = true; for (size_t i = 0; i < tl->ToolButtons.size(); i++) if (tl->ToolButtons[i]->ayuda.empty()) ayudas = false;
+        { tl->ToolbarActualizar(); Button* bh = B::Rol(tl, 420 + HAuto);
+          tl->BarHover(bh->sx + 2, bh->sy + 2); const bool h1 = bh->hover;
+          tl->ToolbarActualizar(); const bool h2 = bh->hover;   // (el layout de la toolbar no se lo borra)
+          tl->BarHover(-500, -500);
+          TLT_VER(h1 && h2 && !bh->hover, "pasar el mouse por un icono lo ilumina (y el cartelito lo ve)"); }
+        TLT_VER(ayudas, "todos los iconos tienen su cartelito");
+        bool iconos = true; for (size_t i = 0; i < tl->ToolButtons.size(); i++){ const int ic = tl->ToolButtons[i]->icon;
+            if (ic < 0 || ic >= (int)IconsUV.size() || !IconsUV[(size_t)ic]) iconos = false; }
+        TLT_VER(iconos, "los iconos (los 6 de handles nuevos) estan en el atlas");
+        // un click en el boton (el camino real: ToolbarClick por su rect)
+        tl->ToolbarActualizar();
+        { Button* bf = B::Rol(tl, 420 + HFree); tl->ToolbarClick(bf->sx + bf->width / 2, bf->sy + bf->height / 2); }
+        TLT_VER(ap->keyframes[1].handleType == HFree, "click en Free: la clave pasa a handles libres");
+        { Button* bl = B::Rol(tl, 400 + KfLinear); tl->ToolbarClick(bl->sx + bl->width / 2, bl->sy + bl->height / 2); }
+        TLT_VER(KfInterpBase(ap->keyframes[1].Interpolation) == KfLinear, "click en Linear: el tramo que sale es recto");
+        { Button* bb = B::Rol(tl, 400 + KfBounce); tl->ToolbarClick(bb->sx + bb->width / 2, bb->sy + bb->height / 2); }
+        TLT_VER(KfInterpBase(ap->keyframes[1].Interpolation) == KfBounce, "click en Bounce: el tramo rebota");
+        tl->ToolbarSincronizar();
+        TLT_VER(B::Rol(tl, 400 + KfBounce)->tinte == TbVerdeBg() && B::Rol(tl, 400 + KfBounce)->colorTexto && !B::Rol(tl, 400 + KfLinear)->tinte,
+                "el activo: fondo verde oscuro + icono verde (como el proportional)");
+        // un TRAMO (sus dos puntas): aparece el grupo del ease
+        tl->SetInterpolacionSel(KfBezier);
+        tl->DopeSelectAll(); tl->ToolbarSincronizar();
+        TLT_VER(B::Visibles(tl) == 23 && B::Grupos(tl) == 5, "un tramo elegido: + ease (23 iconos, 5 grupos)");
+        { tl->ToolbarActualizar(); Button* be = B::Rol(tl, 440 + KfEaseIn); tl->ToolbarClick(be->sx + be->width / 2, be->sy + be->height / 2); }
+        TLT_VER(ap->keyframes[0].outDV == 0.0f && ap->keyframes[1].inDV != 0.0f, "click en Ease In: sale plano del primero");
+        // el RELOJ: el frame actual arriba de todo
+        CurrentFrame = 7; tl->btnTiempo->visible = true; tl->btnTiempo->sx = 5000; tl->btnTiempo->sy = 5000; tl->btnTiempo->width = 20; tl->btnTiempo->height = 20;
+        tl->ClickBarButton(5010, 5010);   // (lejos de los botones que ya ubico el Render)
+        TLT_VER(TiempoPopupAbierto() && PopUpActive && ((TiempoPopup*)PopUpActive)->grupo->properties.size() == 4
+                && *((PropFloat*)((TiempoPopup*)PopUpActive)->grupo->properties[0])->value == 7.0f, "el reloj: Current Frame (7) / Start / End / FPS");
+        if (PopUpActive){ PopUpActive->Cerrar(); PopUpActive = NULL; }
+        CurrentFrame = 1;
+        #undef TLT_VER
+        delete tl;
+        if (!ok){ err = "tltoolbar: la toolbar del timeline no se comporta como se pidio"; return false; }
+        return true;
+    }
+    // tlciclos <fase>: el modificador REPETIR de las curvas (antes del 1er keyframe / despues del ultimo, con o sin
+    // offset). fase "armar": la matematica, el menu Modifiers del timeline, Ctrl+Z / Ctrl+Y, el 3D; deja la curva
+    // posX del objeto activo con Repeat with Offset despues. fase "leida": despues de guardar y reabrir, sigue.
+    if (cmd == "tlciclos") {
+        extern void UndoDeshacer(); extern void UndoRehacer(); extern void AplicarAnimacionObjetos();
+        extern PopupMenu* MenuAbierto;
+        std::string fase; ss >> fase;
+        bool ok = true;
+        #define TLY_VER(cond, que) do { const bool _c = (cond); printf("      [tlciclos] %-60s %s\n", que, _c ? "OK" : "MAL"); if (!_c) ok = false; } while (0)
+        Object* o = ObjActivo;
+        if (fase == "leida" || !o)   // (reabierto: el objeto animado, sea cual sea su nombre en este idioma)
+            for (size_t i = 0; i < AnimationObjects.size(); i++) if (AnimationObjects[i].obj){ o = AnimationObjects[i].obj; break; }
+        if (!o){ err = "tlciclos: sin objeto activo"; return false; }
+        AnimProperty* pa = NULL;
+        for (size_t i = 0; i < AnimationObjects.size(); i++){ if (AnimationObjects[i].obj != o) continue;
+            for (size_t q = 0; q < AnimationObjects[i].Propertys.size(); q++){ AnimProperty& p = AnimationObjects[i].Propertys[q];
+                if (p.Property == AnimPosition && p.component == AnimX) pa = &p; } }
+        if (!pa || pa->keyframes.size() != 2){ err = "tlciclos: la curva posX no tiene 2 claves"; return false; }
+        if (fase == "leida"){
+            TLY_VER(pa->cicloAntes == KfCicloNo && pa->cicloDespues == KfCicloOffset, "guardar y reabrir: sigue Repeat with Offset despues");
+            TLY_VER(fabsf(pa->EvalF(30.0f, 0.0f) - 29.0f) < 1e-3f, "...y la curva sigue avanzando (frame 30 = 29)");
+            if (!ok){ err = "tlciclos: el modificador no sobrevive al guardado"; return false; }
+            return true;
+        }
+        // 1) la MATEMATICA: claves (1, 0) y (11, 10), lineales: una vuelta = 10 frames, avanza 10
+        for (size_t i = 0; i < pa->keyframes.size(); i++) pa->keyframes[i].Interpolation = KfLinear;
+        TLY_VER(fabsf(pa->EvalF(16.0f, 0.0f) - 10.0f) < 1e-4f, "sin modificador: despues del ultimo se queda (10)");
+        pa->cicloDespues = KfCicloRepite;
+        TLY_VER(fabsf(pa->EvalF(16.0f, 0.0f) - 5.0f) < 1e-4f && fabsf(pa->EvalF(36.0f, 0.0f) - 5.0f) < 1e-4f, "Repeat: la vuelta se repite igual (16 y 36 = 5)");
+        pa->cicloDespues = KfCicloOffset;
+        TLY_VER(fabsf(pa->EvalF(16.0f, 0.0f) - 15.0f) < 1e-4f && fabsf(pa->EvalF(36.0f, 0.0f) - 35.0f) < 1e-4f, "Repeat with Offset: cada vuelta sigue donde termino (15, 35)");
+        TLY_VER(fabsf(pa->EvalF(-4.0f, 0.0f) - 0.0f) < 1e-4f, "...antes del primero no se toco: se queda (0)");
+        pa->cicloAntes = KfCicloOffset;
+        TLY_VER(fabsf(pa->EvalF(-4.0f, 0.0f) + 5.0f) < 1e-4f, "Repeat with Offset ANTES: para atras baja (-4 = -5)");
+        pa->cicloAntes = KfCicloRepite;
+        TLY_VER(fabsf(pa->EvalF(-4.0f, 0.0f) - 5.0f) < 1e-4f, "Repeat ANTES (-4 = 5)");
+        TLY_VER(fabsf(pa->EvalF(6.0f, 0.0f) - 5.0f) < 1e-4f, "adentro del rango nada cambia (6 = 5)");
+        pa->cicloAntes = pa->cicloDespues = KfCicloNo;
+        // 2) el MENU Modifiers del timeline, sobre lo elegido; un paso de Ctrl+Z
+        Timeline* tl = new Timeline(); tl->x = 0; tl->y = 0; tl->Resize(900, 400);
+        tl->CambiarModo(true); tl->ConstruirDopeRows(); tl->Render(); tl->DopeSelectAll();
+        tl->AbrirMenuMods(10, 10);
+        TLY_VER(MenuAbierto && MenuAbierto->items.size() == 3, "menu Modifiers: Repeat / Repeat with Offset / Remove Repeat");
+        if (MenuAbierto && MenuAbierto->action){ MenuAbierto->action(KfCicloOffset); }
+        TLY_VER(pa->cicloAntes == KfCicloOffset && pa->cicloDespues == KfCicloOffset, "Repeat with Offset: antes y despues");
+        UndoDeshacer();
+        TLY_VER(pa->cicloAntes == KfCicloNo && pa->cicloDespues == KfCicloNo, "Ctrl+Z lo saca");
+        UndoRehacer();
+        TLY_VER(pa->cicloAntes == KfCicloOffset && pa->cicloDespues == KfCicloOffset, "Ctrl+Y lo devuelve");
+        tl->SetCicloSel(KfCicloNo, -1);   // (el panel de propiedades: un lado solo)
+        TLY_VER(pa->cicloAntes == KfCicloNo && pa->cicloDespues == KfCicloOffset, "un lado solo (Repeat Before = None)");
+        // 3) el 3D: en el frame 36 el objeto esta donde dice la curva repetida
+        CurrentFrame = 36; AplicarAnimacionObjetos();
+        TLY_VER(fabsf(o->pos.x - 35.0f) < 1e-3f, "el objeto sigue la repeticion en el 3D (frame 36: x = 35)");
+        CurrentFrame = 1; AplicarAnimacionObjetos();
+        // 4) el dibujo: la cola de la derecha sigue la curva (no es una linea horizontal)
+        { tl->Render(); const int nv = tl->CurvaTrazo(pa, 1.0f);
+          pa->cicloDespues = KfCicloNo; const int nv0 = tl->CurvaTrazo(pa, 1.0f); pa->cicloDespues = KfCicloOffset;
+          TLY_VER(nv > nv0, "en el timeline la cola dibuja la repeticion"); }
+        delete tl;
+        #undef TLY_VER
+        if (!ok){ err = "tlciclos: el modificador Repetir no se comporta como se pidio"; return false; }
+        return true;
+    }
+    if (cmd == "tlclip") {
+        extern bool LCtrlPressed; extern PopupMenu* MenuAbierto;
+        bool ok = true;
+        #define TLC_VER(cond, que) do { const bool _c = (cond); printf("      [tlclip] %-60s %s\n", que, _c ? "OK" : "MAL"); if (!_c) ok = false; } while (0)
+        Timeline* tl = new Timeline(); tl->x = 0; tl->y = 0; tl->Resize(900, 300);
+        tl->ConstruirDopeRows();
+        struct C { static int Keys(Timeline* t){ t->ConstruirDopeRows(); int n = 0;
+            for (size_t i = 0; i < t->dopeRows.size(); i++) if (t->dopeRows[i].propId >= 0) n += (int)t->dopeRows[i].keys.size(); return n; }
+            static bool KeyEn(Timeline* t, int f){ for (size_t i = 0; i < t->dopeRows.size(); i++){ const Timeline::DopeRow& d = t->dopeRows[i];
+                if (d.propId < 0) continue; for (size_t k = 0; k < d.keys.size(); k++) if (d.keys[k] == f) return true; } return false; } };
+        { bool zEsY = false, yEsZ = false;
+          for (size_t i = 0; i < tl->dopeRows.size(); i++){ const Timeline::DopeRow& d = tl->dopeRows[i];
+            if (d.propId == AnimPosition && d.compId == AnimY && d.nombre == "Z Location") zEsY = true;
+            if (d.propId == AnimPosition && d.compId == AnimZ && d.nombre == "Y Location") yEsZ = true; }
+          TLC_VER(zEsY, "la fila Z Location es pos.y (arriba, como Properties)");
+          TLC_VER(yEsZ, "la fila Y Location es pos.z"); }
+        const int n0 = C::Keys(tl);
+        TLC_VER(n0 > 0, "hay keyframes");
+        tl->DopeSelectAll();
+        LCtrlPressed = true; tl->event_key_down(W3dK_C, false); LCtrlPressed = false;
+        const int frameAntes = CurrentFrame; CurrentFrame = 30;
+        LCtrlPressed = true; tl->event_key_down(W3dK_V, false); LCtrlPressed = false;
+        TLC_VER(C::Keys(tl) == n0 * 2, "Ctrl+C y Ctrl+V en el frame 30: los keyframes se duplican");
+        TLC_VER(C::KeyEn(tl, 30), "...y lo pegado arranca en el frame actual");
+        // pegar deja lo pegado AGARRADO (como el Duplicar): el mouse lo corre; Enter lo suelta ahi
+        { extern bool DopeXformActivo(); TLC_VER(DopeXformActivo(), "Ctrl+V: lo pegado queda agarrado para moverlo");
+          tl->DopeMoveConfirm(); }
+        // Ctrl+X: lo pegado (queda elegido) se va
+        LCtrlPressed = true; tl->event_key_down(W3dK_X, false); LCtrlPressed = false;
+        TLC_VER(C::Keys(tl) == n0 && !C::KeyEn(tl, 30), "Ctrl+X corta lo elegido (lo recien pegado)");
+        // el click derecho en el strip abre el menu; en el panel no
+        TLC_VER(!tl->MenuContexto(tl->x + 2, tl->y + tl->stripY + tl->rowH), "click derecho en el panel: sin menu");
+        TLC_VER(tl->MenuContexto(tl->x + tl->panelW + 40, tl->y + tl->stripY + tl->rowH) && MenuAbierto, "click derecho en el strip: abre el menu");
+        if (MenuAbierto){ MenuAbierto->Cerrar(); MenuAbierto = NULL; }
+        // Ctrl+D: duplica y agarra (Esc lo deshace)
+        tl->DopeSelectAll();
+        LCtrlPressed = true; tl->event_key_down(W3dK_D, false); LCtrlPressed = false;
+        TLC_VER(tl->DopeMoviendo(), "Ctrl+D duplica y agarra las copias");
+        tl->DopeMoveConfirm();
+        TLC_VER(C::Keys(tl) == n0 * 2, "...y quedan las copias");
+        CurrentFrame = frameAntes;
+        #undef TLC_VER
+        delete tl;
+        if (!ok) { err = "tlclip: el portapapeles de keyframes no se comporta como se pidio"; return false; }
+        return true;
+    }
     if (cmd == "tlpanel") {
         extern bool leftMouseDown, middleMouseDown; extern int dx, dy;
         extern bool TimelineHaySeleccion();
@@ -29141,6 +29580,34 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
     // ---- autokeyreal : el AUTO KEY por el camino COMPLETO y REAL, como se usa de verdad: apretar el BOTON del
     //      timeline, mover el cubo con el transform de verdad, y confirmar con Aceptar(). Los tests anteriores
     //      llamaban a AutoKeyObjetos() a mano y se salteaban justo los eslabones que pueden estar rotos. ----
+    // autokeyundo: mover el objeto activo con Auto Key y confirmar (Aceptar real) -> UN Ctrl+Z deshace el
+    // movimiento Y el keyframe que dejo el auto key; Ctrl+Y los devuelve
+    if (cmd == "autokeyundo") {
+        extern void UndoDeshacer(); extern void UndoRehacer();
+        Object* o = ObjActivo; if (!o){ err = "autokeyundo: sin objeto activo"; return false; }
+        InteractionMode = ObjectMode; AutoKeyOn = true; CurrentFrame = 7;
+        struct K { static int Claves(Object* ob){ int n = 0;
+            for (size_t i=0;i<AnimationObjects.size();i++){ if (AnimationObjects[i].obj != ob) continue;
+                for (size_t q=0;q<AnimationObjects[i].Propertys.size();q++) n += (int)AnimationObjects[i].Propertys[q].keyframes.size(); }
+            return n; } };
+        const int k0 = K::Claves(o); const float x0 = o->pos.x;
+        estado = translacion; axisSelect = X; transformOrientation = GlobalOrient;
+        estadoObjetos.clear(); guardarEstadoRec(SceneCollection); UndoTransformIniciar();
+        SetTransformNumerico(5.0f);
+        { Viewport3D* v3 = Viewport3DActive ? NULL : new Viewport3D(); if (v3) v3->Resize(600, 400);
+          (Viewport3DActive ? Viewport3DActive : v3)->Aceptar(); delete v3; }   // el confirm REAL (click / Enter)
+        const int k1 = K::Claves(o); const float x1 = o->pos.x;
+        UndoDeshacer();
+        const int k2 = K::Claves(o); const float x2 = o->pos.x;
+        UndoRehacer();
+        const int k3 = K::Claves(o); const float x3 = o->pos.x;
+        printf("      [autokeyundo] claves %d -> %d (Ctrl+Z %d, Ctrl+Y %d) | x %.2f -> %.2f (Ctrl+Z %.2f, Ctrl+Y %.2f)\n",
+               k0, k1, k2, k3, x0, x1, x2, x3);
+        AutoKeyOn = false; estado = editNavegacion; estadoObjetos.clear();
+        const bool ok = k1 > k0 && k2 == k0 && fabsf(x2 - x0) < 1e-3f && k3 == k1 && fabsf(x3 - x1) < 1e-3f;
+        if (!ok){ err = "autokeyundo: un Ctrl+Z no deshace el movimiento y su keyframe juntos"; return false; }
+        return true;
+    }
     if (cmd == "autokeyreal") {
         Object* o = NULL;
         { std::vector<Object*> st; if(SceneCollection) st.push_back(SceneCollection);
@@ -30647,6 +31114,48 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         if ((esp == "si" && !sel) || (esp == "no" && sel)) { err = "clicobj: la seleccion no es la esperada"; return false; }
         return true;
     }
+    // trfoco: con el panel de la ultima operacion abierto (semi-modal), el viewport ACTIVO sigue al mouse por los
+    // eventos reales (antes quedaba clavado en el 3D) y un click en OTRO viewport confirma el panel y el click es
+    // de ese viewport (antes el 3D seguia activo y le envolvia el cursor: saltaba a la esquina opuesta)
+    if (cmd == "trfoco") {
+        struct VK { static ViewportBase* Buscar(ViewportBase* n, int k) { if (!n) return NULL; if (n->isLeaf()) return n->ViewportKind() == k ? n : NULL;
+                        ViewportBase* a = Buscar(((ViewportColumn*)n)->childA, k); if (a) return a; return Buscar(((ViewportColumn*)n)->childB, k); } };
+        struct Ev {
+            static void Mover(int x, int y) { extern void InputUsuarioSDL3(SDL_Event&);
+                SDL_Event mv; memset(&mv, 0, sizeof(mv)); mv.type = SDL_MOUSEMOTION; mv.motion.x = x; mv.motion.y = y; InputUsuarioSDL3(mv); }
+            static void Boton(Uint32 tipo, int x, int y) { extern void InputUsuarioSDL3(SDL_Event&);
+                SDL_Event ev; memset(&ev, 0, sizeof(ev)); ev.type = tipo; ev.button.button = SDL_BUTTON_LEFT; ev.button.which = 0;
+                ev.button.x = x; ev.button.y = y; ev.button.clicks = 1; ev.button.state = (tipo == SDL_MOUSEBUTTONDOWN) ? SDL_PRESSED : SDL_RELEASED;
+                InputUsuarioSDL3(ev); } };
+        bool ok = true;
+        #define TRF_VER(cond, que) do { const bool _c = (cond); printf("      [trfoco] %-62s %s\n", que, _c ? "OK" : "MAL"); if (!_c) ok = false; } while (0)
+        if (!rootViewport) { err = "trfoco: sin layout"; return false; }
+        rootViewport->Render();
+        ViewportBase* v3 = VK::Buscar(rootViewport, 1);
+        ViewportBase* otro = VK::Buscar(rootViewport, 2);   // el outliner
+        if (!otro) otro = VK::Buscar(rootViewport, 3);
+        if (!v3 || !otro) { err = "trfoco: hace falta un viewport 3D y otro (outliner o propiedades)"; return false; }
+        if (TransformRedoTipo() < 0) { err = "trfoco: el panel de la ultima operacion no esta abierto"; return false; }
+        const int c3x = v3->x + v3->width / 2, c3y = v3->y + v3->height / 3;
+        const int cox = otro->x + otro->width / 2, coy = otro->y + otro->height / 2;
+        Ev::Mover(c3x, c3y);
+        TRF_VER(viewPortActive == v3, "mouse en el 3D: el 3D es el activo");
+        Ev::Mover(cox, coy);
+        TRF_VER(viewPortActive == otro, "mouse en el otro viewport: el activo lo SIGUE (panel abierto)");
+        TRF_VER(TransformRedoTipo() >= 0, "...y el panel sigue abierto (solo pasar no confirma)");
+        Ev::Mover(c3x, c3y);
+        TRF_VER(viewPortActive == v3, "vuelve al 3D");
+        Ev::Mover(cox, coy);
+        Ev::Boton(SDL_MOUSEBUTTONDOWN, cox, coy);
+        TRF_VER(TransformRedoTipo() < 0, "click en el otro viewport: el panel se confirma (se cierra)");
+        TRF_VER(viewPortActive == otro, "...y el click es de ESE viewport (no del 3D)");
+        Ev::Mover(cox + 3, coy + 2);
+        TRF_VER(viewPortActive == otro, "...arrastrando no vuelve al 3D");
+        Ev::Boton(SDL_MOUSEBUTTONUP, cox + 3, coy + 2);
+        #undef TRF_VER
+        if (!ok) { err = "trfoco: el panel de la ultima operacion traba el viewport activo"; return false; }
+        return true;
+    }
     if (cmd == "idetactil") {
         struct VK { static ViewportBase* Buscar(ViewportBase* n, int k) { if (!n) return NULL; if (n->isLeaf()) return n->ViewportKind() == k ? n : NULL;
                         ViewportBase* a = Buscar(((ViewportColumn*)n)->childA, k); if (a) return a; return Buscar(((ViewportColumn*)n)->childB, k); } };
@@ -31419,6 +31928,28 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
     //      seleccion (la op de malla directo). Verifica que la malla quede sana (indices, capas por corner) y, en una malla
     //      convexa, que ninguna cara mire para adentro; con 'espera' ERROR si no quedan V vertices y C caras ----
     //      bevel modal <dx> : el MODAL (Ctrl+B, alejarse 'dx' px del centro, la rueda +1, click) + el panel ----
+    // ---- normalesbevel : la tira de un bevel SUAVE se engancha con las caras originales. En cada lugar donde se
+    //      juntan vertices de render, sus normales son IGUALES o forman un angulo de verdad (las caras planas del cubo:
+    //      90 grados). Un angulo intermedio (entre 1 y 60 grados) es el quiebre de sombreado entre la tira y su cara ----
+    if (cmd == "normalesbevel") {
+        Mesh* m = ScriptActiveMesh();
+        if (!m || !m->normals){ err = "normalesbevel: sin malla / normales"; return false; }
+        std::map<std::string, std::vector<int> > porPos;
+        for (int v = 0; v < m->vertexSize; v++) porPos[std::string((const char*)&m->vertex[v*3], 12)].push_back(v);
+        int malos = 0; float peor = 0.0f;
+        for (std::map<std::string, std::vector<int> >::iterator it = porPos.begin(); it != porPos.end(); ++it)
+            for (size_t i = 0; i < it->second.size(); i++) for (size_t j = i + 1; j < it->second.size(); j++) {
+                const GLbyte* a = &m->normals[it->second[i]*3]; const GLbyte* b = &m->normals[it->second[j]*3];
+                float c = (a[0]*b[0] + a[1]*b[1] + a[2]*b[2]) /
+                          (sqrtf((float)(a[0]*a[0] + a[1]*a[1] + a[2]*a[2])) * sqrtf((float)(b[0]*b[0] + b[1]*b[1] + b[2]*b[2])) + 1e-6f);
+                if (c > 1.0f) c = 1.0f; if (c < -1.0f) c = -1.0f;
+                const float ang = acosf(c) * 57.29578f;
+                if (ang > 1.5f && ang < 60.0f){ malos++; if (ang > peor) peor = ang; }
+            }
+        printf("      [normalesbevel] %d vertices de render | quiebres de sombreado: %d (el peor %.1f grados)\n", m->vertexSize, malos, peor);
+        if (malos){ err = "normalesbevel: la tira no se engancha con las caras (quiebre de sombreado)"; return false; }
+        return true;
+    }
     if (cmd == "bevel") {
         Mesh* m = ScriptActiveMesh();
         if (!m) { err = "no hay malla activa"; return false; }
@@ -39703,6 +40234,10 @@ bool W3dRunScript(const std::string& path) {
     std::ifstream f(path.c_str());
     if (!f) { printf("FALLO: no se pudo abrir el script '%s'\n", path.c_str()); return false; }
     printf("=== W3dScript: %s ===\n", path.c_str()); fflush(stdout);
+    // las PREFERENCIAS del usuario (config.ini) no tienen que cambiar lo que mide una prueba: con el Auto Key prendido
+    // un objmove ya keyeaba y el keychan siguiente BORRABA esa clave (las pruebas de movimiento fallaban en la PC del
+    // que lo tenia prendido). Las que lo necesitan lo prenden ellas
+    { extern bool AutoKeyOn; AutoKeyOn = false; }
     // EL SCRIPT CORRE PARADO EN SU CARPETA: sus entradas (geometria, texturas) viven al lado del .w3s y lo que fabrica
     // con un nombre pelado (los *_v4.w3d / *_rt*.w3d, ver tools/pruebas/.gitignore) queda ahi, ignorado. Corrido
     // desde otro lado (la raiz del repo) no encontraba sus entradas y dejaba las salidas tiradas en la raiz

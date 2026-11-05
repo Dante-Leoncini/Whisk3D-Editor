@@ -1,0 +1,16 @@
+# El timeline: las curvas de EASING (E = Set Keyframe Interpolation en 3 grupos; Ctrl+E = Set Keyframe Easing Type)
+# y como corren; la CAJA de seleccion (verde = solo las claves adentro, azul = rozar la linea elige el tramo A-B); un
+# click en la linea elige su tramo; el frame actual solo cambia en la banda de los numeros o agarrando su linea (un
+# click en el cuerpo no lo mueve); Ctrl arrastrando un handle lo deja en la direccion con la que llega la curva
+ventana 1280 720
+add cube
+frame 1
+keychan 0 0
+frame 10
+objmove 10 0 0
+keychan 0 0
+frame 20
+objmove -10 0 0
+keychan 0 0
+frame 1
+tlease

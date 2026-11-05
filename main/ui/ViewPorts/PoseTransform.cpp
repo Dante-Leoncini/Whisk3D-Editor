@@ -274,11 +274,14 @@ static void PoseAplicarDeltaNodo(Armature* a, const Matrix4& Delta){
 }
 void PoseXformConfirm(){
     if (!g_poseModo) return;
+    bool akGrupo = false;
     // AUTO KEY: va ANTES de limpiar g_poseSnap, que es contra lo que se mide QUE canal cambio. Solo los huesos
     // que se movieron de verdad dejan keyframe, y solo en sus canales.
     if (AutoKeyOn && ActiveAnimKind != 2){   // ("Juego": sin keyframes; los clips se editan eligiendolos)
         Armature* a = PoseArmActiva();
         if (a && AutoKeyEsqueletoPrep(a)){
+            UndoGrupoIniciar(); UndoKeyframesIniciarArm(a);   // (se cierra con el UndoPoseConfirmar: un solo Ctrl+Z)
+            akGrupo = true;
             int n = 0;
             for (size_t k=0;k<g_poseSnap.size();k++){
                 PoseSnap& sn = g_poseSnap[k];
@@ -287,7 +290,9 @@ void PoseXformConfirm(){
             if (n) AutoKeyEsqueletoFin(a);
         }
     }
+    if (akGrupo) UndoKeyframesConfirmar();
     g_poseModo = 0; g_poseSnap.clear(); estado = editNavegacion; NumInputReset(); UndoPoseConfirmar();
+    if (akGrupo) UndoGrupoFin();
 } // deja la pose (Insert Keyframe la guarda a mano; con Auto Key se guarda sola)
 void PoseXformCancel(){
     Armature* a = PoseArmActiva();
@@ -399,10 +404,13 @@ void Pose2DDelta(float du, float dv, float angDeg, float factor){
 }
 void Pose2DConfirm(){
     if (!g_pose2dModo) return;
+    bool akGrupo = false;
     // AUTO KEY: igual que el 3D (ANTES de soltar el snapshot; solo los canales que cambiaron)
     if (AutoKeyOn && ActiveAnimKind != 2){   // ("Juego": sin keyframes; los clips se editan eligiendolos)
         Armature* a = PoseArmActiva();
         if (a && AutoKeyEsqueletoPrep(a)){
+            UndoGrupoIniciar(); UndoKeyframesIniciarArm(a);   // (se cierra con el UndoPoseConfirmar: un solo Ctrl+Z)
+            akGrupo = true;
             int n = 0;
             for (size_t k=0;k<g_poseSnap.size();k++){
                 PoseSnap& sn = g_poseSnap[k];
@@ -411,7 +419,9 @@ void Pose2DConfirm(){
             if (n) AutoKeyEsqueletoFin(a);
         }
     }
+    if (akGrupo) UndoKeyframesConfirmar();
     g_pose2dModo = 0; g_poseSnap.clear(); UndoPoseConfirmar();
+    if (akGrupo) UndoGrupoFin();
 }
 void Pose2DCancel(){
     Armature* a = PoseArmActiva();

@@ -350,7 +350,7 @@ void AnimCanalToggle(Object* o, int prop, int comp, int frame){
 		for (int cc = AnimX; cc <= AnimZ; cc++){
 			AnimProperty& ap = PropertyDeLista(CurvasActivas(o), prop, cc);
 			if (est == 2) BorrarKeyframeManteniendoForma(ap, frame);
-			else          SetKeyCurva(ap, frame, CanalValorActual(o, prop, cc));
+			else          SetKeyCurva(ap, frame, CanalValorActual(o, prop, cc), HPlano);
 		}
 		g_redraw = true;
 		return;
@@ -359,7 +359,7 @@ void AnimCanalToggle(Object* o, int prop, int comp, int frame){
 	AnimProperty& ap = PropertyDeLista(CurvasActivas(o), prop, comp);
 	if (est == 2) BorrarKeyframeManteniendoForma(ap, frame);          // sacar el key de este frame
 	else {
-		SetKeyCurva(ap, frame, CanalValorActual(o, prop, comp));      // poner con el valor actual
+		SetKeyCurva(ap, frame, CanalValorActual(o, prop, comp), HPlano);      // poner con el valor actual
 		// visible/render son TRUE/FALSE -> keyframe CONSTANTE (escalon); los
 		// numericos (pos/rot/escala) quedan en bezier (curvas suaves)
 		if ((prop == AnimVisible || prop == AnimRender || prop == AnimLightMisc ||
@@ -393,7 +393,7 @@ void W3dAnimKeyPaso(Object* o, unsigned id, int frame) {
 		AnimProperty& ap = PropertyDeLista(CurvasActivas(o), AnimPaso, comp);
 		if (todos) BorrarKeyframeManteniendoForma(ap, frame);
 		else {
-			SetKeyCurva(ap, frame, CanalValorActual(o, AnimPaso, comp));
+			SetKeyCurva(ap, frame, CanalValorActual(o, AnimPaso, comp), HPlano);
 			if (campos[i] == AnimPasoOn)   // (prendido / apagado: un escalon)
 				for (size_t k = 0; k < ap.keyframes.size(); k++)
 					if (ap.keyframes[k].frame == frame) ap.keyframes[k].Interpolation = KfConstant;
@@ -423,9 +423,9 @@ void W3dAnimBorrarPaso(Object* o, unsigned id) {
 // (PropertyDeLista las crea/encuentra por (propiedad, componente)); keyar toca las 3 en el mismo frame, pero
 // despues se mueven/borran/curvan por separado desde el dope sheet.
 static void SetKeyObj3(std::vector<AnimProperty>& props, int prop, int frame, float x, float y, float z){
-	SetKeyCurva(PropertyDeLista(props, prop, AnimX), frame, x);
-	SetKeyCurva(PropertyDeLista(props, prop, AnimY), frame, y);
-	SetKeyCurva(PropertyDeLista(props, prop, AnimZ), frame, z);
+	SetKeyCurva(PropertyDeLista(props, prop, AnimX), frame, x, HPlano);
+	SetKeyCurva(PropertyDeLista(props, prop, AnimY), frame, y, HPlano);
+	SetKeyCurva(PropertyDeLista(props, prop, AnimZ), frame, z, HPlano);
 }
 
 // ============================================================================
@@ -446,7 +446,7 @@ static bool AutoKeyCambio(float a, float b){
 // guarda el canal (prop, comp) si cambio. Devuelve true si guardo.
 static bool AutoKeyCanal(std::vector<AnimProperty>& props, int prop, int comp, int frame, float valor, float viejo){
 	if (!AutoKeyCambio(valor, viejo)) return false;
-	SetKeyCurva(PropertyDeLista(props, prop, comp), frame, valor);
+	SetKeyCurva(PropertyDeLista(props, prop, comp), frame, valor, HPlano);
 	return true;
 }
 // Devuelve cuantos canales guardo (0 = no hubo cambios -> no se ensucia la animacion ni el undo).
@@ -677,9 +677,9 @@ void AplicarAnimacionObjetos(){
 	if (ActiveAnimKind == 3){
 		// solo al CAMBIAR de frame: aplicar cada render pisaria las ediciones
 		// manuales (mover/rotar) entre frames
-		static int ultFrame3 = -999999; static Object* ultObj3 = 0;
-		if (CurrentFrame == ultFrame3 && (Object*)ActiveAnimMesh == ultObj3) return;
-		ultFrame3 = CurrentFrame; ultObj3 = (Object*)ActiveAnimMesh;
+		static int ultFrame3 = -999999; static Object* ultObj3 = 0; static unsigned int ultGen3 = 0;
+		if (CurrentFrame == ultFrame3 && (Object*)ActiveAnimMesh == ultObj3 && ultGen3 == g_animCurvasGen) return;
+		ultFrame3 = CurrentFrame; ultObj3 = (Object*)ActiveAnimMesh; ultGen3 = g_animCurvasGen;
 		if (ActiveAnimMesh){
 			VertexAnimation* an = AnimObjetoActiva((Object*)ActiveAnimMesh);   // sus curvas PROPIAS
 			if (an) AplicarCurvasLista((Object*)ActiveAnimMesh, an->curvas);
