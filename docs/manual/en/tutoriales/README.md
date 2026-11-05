@@ -1,7 +1,8 @@
 # Whisk3D tutorials
 
-Step by step, with images and animations of the editor. The screenshots come from the real editor and are regenerated when the interface changes.
+Tutorials on how to use Whisk3D. Tutorials and videos of the program will be added here over time. If you have any questions, ask on Discord or Telegram.
+
+[Whisk3D Discord group and forum](https://discord.gg/2sjpuact8)
+[Telegram group](https://t.me/Whisk3D)
 
 1. [Viewports](viewports.md)
-
-To see everything each part of the editor does, there's the [Whisk3D manual](../editor/README.md). To program games, [Lua in Whisk3D](../lua/README.md).
