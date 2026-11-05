@@ -148,7 +148,13 @@ if(W3D_MULTIBACKEND)
     # VULKAN (vk/w3dVk.h): el backend de ES 2.0 compilado otra vez sobre un ES 2.0 hecho con Vulkan. Nada se enlaza: el
     # cargador lo abre la ventana (SDL) y el compilador de shaders (shaderc_shared, del SDK) va al lado del ejecutable;
     # sin ellos el editor sigue con OpenGL. Los headers de Vulkan vienen en libs/Whisk3DCore/thirdparty/vulkan.
-    option(W3D_VULKAN "Backend Vulkan (opcional al arrancar: sin el driver o sin shaderc queda OpenGL)" ON)
+    # (32 bits -Windows 7 / XP, netbooks-: apagado por defecto; el SDK de Vulkan trae shaderc solo de 64 bits)
+    if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+        set(W3D_VULKAN_DEFAULT ON)
+    else()
+        set(W3D_VULKAN_DEFAULT OFF)
+    endif()
+    option(W3D_VULKAN "Backend Vulkan (opcional al arrancar: sin el driver o sin shaderc queda OpenGL)" ${W3D_VULKAN_DEFAULT})
     if(W3D_VULKAN AND EXISTS ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/thirdparty/vulkan/include/vulkan/vulkan_core.h)
         list(APPEND SRC_FILES
             ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/vk/w3dGraphicsVk.cpp
@@ -198,12 +204,14 @@ w3d_configure_graphics_backend(whisk3d)
 #      OptiX: si estan sus headers (tools/bajar_terceros.ps1 -> libs/Whisk3DCore/thirdparty/optix), sin CUDA Toolkit
 #      (un cuda.h minimo; las funciones las trae el driver). Open Image Denoise: sus DLL al lado del ejecutable.
 set(W3D_TERCEROS ${CMAKE_SOURCE_DIR}/libs/Whisk3DCore/thirdparty)
-if((WIN32 OR (UNIX AND NOT APPLE AND NOT ANDROID)) AND EXISTS ${W3D_TERCEROS}/optix/include/optix.h AND NOT EMSCRIPTEN)
+# (los dos son SOLO de 64 bits: OptiX necesita el CUDA de 64 de NVIDIA y las DLL de OIDN son x64. En 32 bits no van.)
+if((WIN32 OR (UNIX AND NOT APPLE AND NOT ANDROID)) AND EXISTS ${W3D_TERCEROS}/optix/include/optix.h AND NOT EMSCRIPTEN
+   AND CMAKE_SIZEOF_VOID_P EQUAL 8)
     target_include_directories(whisk3d PRIVATE ${W3D_TERCEROS}/optix/include ${CMAKE_SOURCE_DIR}/main/render/cuda_min)
     target_compile_definitions(whisk3d PRIVATE W3D_OPTIX)
     message(STATUS "Whisk3D: denoiser OptiX (opcional, solo con una NVIDIA)")
 endif()
-if(WIN32 AND EXISTS ${W3D_TERCEROS}/oidn/bin/OpenImageDenoise.dll)
+if(WIN32 AND EXISTS ${W3D_TERCEROS}/oidn/bin/OpenImageDenoise.dll AND CMAKE_SIZEOF_VOID_P EQUAL 8)
     # (la CPU y la GPU de NVIDIA; las de AMD / Intel GPU -hip, sycl- no se copian: pesan y casi no se usan)
     foreach(dll OpenImageDenoise.dll OpenImageDenoise_core.dll OpenImageDenoise_device_cpu.dll OpenImageDenoise_device_cuda.dll tbb12.dll)
         add_custom_command(TARGET whisk3d POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different

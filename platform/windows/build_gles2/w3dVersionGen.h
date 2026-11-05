@@ -1,1 +1,0 @@
-#define W3D_VERSION "26.11.01"

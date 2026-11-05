@@ -1,9 +1,0 @@
-{
-	"InstallScripts" : 
-	[
-		"C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/cmake_install.cmake",
-		"C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/cmake_install.cmake",
-		"C:/Symbian/Carbide/workspace/Whisk3Decosystem/Whisk3D-Editor/platform/windows/build_gles2/thirdparty/SDL2/cmake_install.cmake"
-	],
-	"Parallel" : false
-}

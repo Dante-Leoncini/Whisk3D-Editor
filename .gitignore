@@ -57,6 +57,8 @@ whisk3d.log
 # ===============================
 
 platform/windows/build/
+# los otros builds de Windows (build_gles2 = shaders, build_win32 = 32 bits / Windows 7)
+platform/windows/build_*/
 .vs/
 *.sdf
 *.suo
