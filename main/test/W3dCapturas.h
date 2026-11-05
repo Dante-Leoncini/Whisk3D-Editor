@@ -14,6 +14,7 @@
 //    rueda <pasos> <x> <y>                        la rueda del mouse sobre (x, y)
 //    tecla <nombre> [tap|down|up]                 una tecla por nombre de SDL ("m", "Right",
 //                                                 "Return", "Escape"...); tap = apretar y soltar
+//    escala <1..6>                                la escala de la interfaz (1 = como en el N95)
 //    cuadro                                       dibuja un cuadro (cada evento ya dibuja uno despues,
 //                                                 como el loop del editor)
 //    capinfo                                      imprime lineas "@cap ..." con la geometria

@@ -11,7 +11,8 @@
 
 extern ViewportBase* rootViewport;
 extern int MenuPantallaW, MenuPantallaH;
-void LayoutRenderMenu(int w, int h);   // LayoutInput.cpp: los desplegables y popups (van encima de todo)
+void LayoutRenderMenu(int w, int h);
+void SetGlobalScale(int scale);        // ViewPorts.cpp: re-deriva las metricas *GS   // LayoutInput.cpp: los desplegables y popups (van encima de todo)
 
 namespace {
     // la ultima posicion de cada puntero: SDL manda el desplazamiento (xrel/yrel) en cada movimiento, y el
@@ -189,6 +190,15 @@ bool W3dCapturasCmd(const std::string& cmd, std::istringstream& ss, std::string&
         return true;
     }
     if (cmd == "cuadro") { Cuadro(); return true; }
+    // la escala de la interfaz, como la de Ajustes (1 = como se ve en el N95)
+    if (cmd == "escala") {
+        int v = 0; ss >> v;
+        if (v < 1 || v > 6) { err = "escala: uso: escala <1..6>"; return false; }
+        SetGlobalScale(v);
+        if (rootViewport) rootViewport->Resize(MenuPantallaW, MenuPantallaH);
+        Cuadro();
+        return true;
+    }
     if (cmd == "capinfo") {
         if (!rootViewport) { err = "capinfo: no hay layout de viewports"; return false; }
         printf("@cap pantalla w=%d h=%d\n", MenuPantallaW, MenuPantallaH);
