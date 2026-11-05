@@ -62,7 +62,7 @@ The Outliner takes the space of Properties:
 If the viewport is narrow, its bar doesn't fit entirely. The same happens with the toolbar at the bottom of the 3D Viewport. To see the rest:
 
 - **With your finger:** drag it sideways.
-- **With the mouse:** hold down the mouse button on the bar and drag, or turn the **wheel** over it. In the 3D Viewport the wheel zooms, so drag its bar instead.
+- **With the mouse:** hold down the mouse button on the bar and drag, or turn the **wheel** over it.
 - **With the keyboard:** <kbd>M</kbd> on PC, or the **left soft key** on the Nokia, enters the bar of the active viewport. Go through it with the left and right arrows; each menu opens when you reach it. Move through the menu with up and down, and choose with OK (<kbd>Enter</kbd> on PC). The bar scrolls by itself to show where you are.
 
 ![A finger drags the Outliner's bar sideways and the buttons that didn't fit appear](img/viewports-barra-dedo.webp)

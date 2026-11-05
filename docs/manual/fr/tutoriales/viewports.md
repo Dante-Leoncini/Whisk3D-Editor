@@ -62,7 +62,7 @@ L'Outliner prend la place de Properties :
 Si le viewport est étroit, sa barre ne tient pas en entier. C'est pareil pour la barre d'outils en bas du 3D Viewport. Pour voir le reste :
 
 - **Au doigt :** faites-la glisser sur le côté.
-- **À la souris :** maintenez le clic sur la barre et faites glisser, ou tournez la **molette** au-dessus. Dans le 3D Viewport, la molette zoome : faites donc glisser sa barre.
+- **À la souris :** maintenez le clic sur la barre et faites glisser, ou tournez la **molette** au-dessus.
 - **Au clavier :** <kbd>M</kbd> sur PC, ou la **touche de sélection gauche** sur le Nokia, entre dans la barre du viewport actif. Parcourez-la avec les flèches gauche et droite : chaque menu s'ouvre quand vous l'atteignez. Avec haut et bas, vous vous déplacez dans le menu, et avec OK (<kbd>Enter</kbd> sur PC) vous choisissez. La barre défile toute seule pour montrer où vous êtes.
 
 ![Un doigt fait glisser sur le côté la barre de l'Outliner et les boutons qui ne tenaient pas apparaissent](img/viewports-barra-dedo.webp)

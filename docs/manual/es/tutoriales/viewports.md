@@ -62,7 +62,7 @@ El Outliner se queda con el lugar de Propiedades:
 Si el viewport es angosto, su barra no entra entera. Lo mismo pasa con la barra de herramientas de abajo de la Vista 3D. Para ver el resto:
 
 - **Con el dedo:** arrastrala de costado.
-- **Con el mouse:** mantené apretado el click sobre la barra y arrastrá, o girá la **rueda** encima. En la Vista 3D la rueda hace zoom, así que su barra se arrastra.
+- **Con el mouse:** mantené apretado el click sobre la barra y arrastrá, o girá la **rueda** encima.
 - **Con el teclado:** <kbd>M</kbd> en la PC, o la **soft izquierda** en el Nokia, entra a la barra del viewport activo. Con las flechas izquierda y derecha la recorrés, y cada menú se abre al llegar. Con arriba y abajo te movés por el menú, y con OK (<kbd>Enter</kbd> en la PC) elegís. La barra se desplaza sola para mostrar dónde estás.
 
 ![Un dedo arrastra de costado la barra del Outliner y aparecen los botones que no entraban](img/viewports-barra-dedo.webp)

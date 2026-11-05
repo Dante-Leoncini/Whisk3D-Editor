@@ -62,7 +62,7 @@ Outliner, Properties'in yerini alır:
 Viewport darsa çubuğu tamamen sığmaz. Aynı şey 3D Viewport'un alt çubuğunda da olur. Geri kalanını görmek için:
 
 - **Parmakla:** çubuğu yana doğru sürükle.
-- **Fareyle:** fare düğmesini çubuğun üzerinde basılı tutup sürükle ya da çubuğun üzerinde **tekerleği** çevir. 3D Viewport'ta tekerlek yakınlaştırma yapar, bu yüzden onun çubuğu sürüklenir.
+- **Fareyle:** fare düğmesini çubuğun üzerinde basılı tutup sürükle ya da çubuğun üzerinde **tekerleği** çevir.
 - **Klavyeyle:** PC'de <kbd>M</kbd> ya da Nokia'da **sol seçim tuşu**, etkin viewport'un çubuğuna girmeni sağlar. Sol ve sağ ok tuşlarıyla çubukta gezersin; her menü üzerine gelince açılır. Yukarı ve aşağı ile menüde hareket eder, OK ile (PC'de <kbd>Enter</kbd>) seçersin. Çubuk, nerede olduğunu göstermek için kendiliğinden kayar.
 
 ![Bir parmak Outliner'ın çubuğunu yana doğru sürüklüyor ve sığmayan düğmeler beliriyor](img/viewports-barra-dedo.webp)
