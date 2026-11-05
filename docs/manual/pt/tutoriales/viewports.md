@@ -1,10 +1,23 @@
 # As viewports
 
+> [!NOTE]
+> O Nokia N95 suporta mouse e teclado (por Bluetooth). As partes deste tutorial sobre o Nokia explicam como usá-lo sem mouse nem teclado, só com as teclas do telefone.
+
 A janela do Whisk3D se divide em **viewports**: painéis, cada um com o seu editor (a Viewport 3D, o Outliner, Propriedades...). Você pode dividir as viewports, mudar o tamanho delas e escolher o que cada uma mostra. Funciona do mesmo jeito com mouse, com o dedo em uma tela touch e com o teclado de um Nokia.
 
 Isto é o que aparece quando o programa abre pela primeira vez:
 
 ![O Whisk3D recém-aberto: a Viewport 3D com um cubo, uma câmera e uma luz; à direita o Outliner e as Propriedades; embaixo a Linha do Tempo](img/inicio.webp)
+
+## A viewport ativa
+
+A viewport que está embaixo do mouse é a **viewport ativa**, e ela fica marcada com uma borda verde. É ela que recebe os comandos do teclado, os controles e qualquer outro periférico. Ao passar o mouse de uma viewport para outra, a borda verde o acompanha:
+
+![O ponteiro do mouse passa pela Viewport 3D, pelo Outliner, pelas Propriedades e pela Linha do Tempo, e a borda verde marca a cada vez a viewport que está embaixo dele](img/viewports-activo.webp)
+
+**No Nokia N95:** cada toque na **tecla verde** de chamada ![](img/tecla-verde.svg) passa para a viewport seguinte. Na tela do N95 cabem duas: a Viewport 3D à esquerda e as Propriedades à direita.
+
+![Um Nokia N95 com a Viewport 3D à esquerda e as Propriedades à direita: cada vez que se aperta a tecla verde, a borda verde passa para a outra viewport](img/viewports-activo-nokia.webp)
 
 ## A barra de menus e o botão do canto
 
@@ -19,6 +32,8 @@ Todas as viewports têm em cima uma **barra de menus** (em verde na imagem) com 
 ![Um dedo arrasta em círculos o botão do canto da viewport de baixo à direita, e as três viewports mudam de tamanho](img/viewports-arrastrar.webp)
 
 **No Nokia:** mantenha apertada a **tecla verde** de chamada ![](img/tecla-verde.svg) e aperte uma seta: a borda da viewport ativa (a que tem a moldura verde) se move para esse lado, e assim ela aumenta ou diminui. A tecla verde sozinha, sem setas, passa para a viewport seguinte.
+
+![Um Nokia N95 com a tecla verde apertada: com a seta para a direita a Viewport 3D aumenta, com a da esquerda diminui, e depois volta a ficar como estava](img/viewports-tamano-nokia.webp)
 
 ## As opções da viewport
 

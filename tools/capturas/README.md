@@ -54,3 +54,22 @@ Y en el `.md`: `![Texto que la describe](img/viewports-menu.webp)`.
 - Si cambia toda la pantalla en cada cuadro, achicarla: `g.cuadros(ancho=720, calidad=62)`.
 - Las que necesitan un comando nuevo del harness: agregarlo en `main/test/W3dCapturas.cpp`, no en
   `W3dScript.cpp`, que tarda minutos en compilar.
+
+## Demos del Nokia N95
+
+`Guion(idioma, n95=True)` arma la pantalla del teléfono (320x240, escala 1, con 2 viewports: la Vista 3D
+al 55 % y Propiedades al 45 %) y pone cada cuadro adentro de la foto del N95 (`n95.svg`, con `n95.py`):
+
+```python
+g = Guion(idioma, n95=True)
+g.foto(dur=300, teclas=("verde",), tecla="Tecla verde")   # la tecla verde, resaltada en el telefono
+g.verde()                                                 # un toque: pasa al viewport siguiente
+g.verde_flecha(1, 0, 4)                                   # verde mantenida + flecha derecha, 4 cuadros
+g.tecla("m")                                              # la soft izquierda (en la PC es la M)
+```
+
+- Las teclas se nombran con el id de su forma en `n95.svg`: `pantalla`, `verde`, `soft-izq`, `soft-der`,
+  `arriba`, `abajo`, `izquierda`, `derecha`, `ok`, `c`, `lapiz`. Para sumar una, dibujarla en Inkscape
+  (rectángulo, círculo o trazo, sin transformaciones) y ponerle un id.
+- En cada cuadro conviene que cambie la pantalla **o** las teclas, no las dos: primero un cuadro corto con
+  la tecla apretada y la pantalla igual, después la pantalla que reacciona. Pesa mucho menos.

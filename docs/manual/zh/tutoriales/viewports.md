@@ -1,10 +1,23 @@
 # 视口
 
+> [!NOTE]
+> Nokia N95 支持鼠标和键盘（通过蓝牙）。本教程中关于 Nokia 的部分，讲的是不用鼠标和键盘、只用手机按键时怎么操作。
+
 Whisk3D 的窗口被划分为多个**视口**：每个视口是一个面板，里面有自己的编辑器（3D Viewport、Outliner、Properties……）。你可以拆分视口、调整大小，并选择每个视口显示什么。用鼠标、在触屏上用手指，或者用 Nokia 的键盘，操作方式都一样。
 
 这是第一次启动程序时看到的界面：
 
 ![刚打开的 Whisk3D：带有立方体、相机和灯光的 3D Viewport，右侧是 Outliner 和 Properties，底部是 Timeline](img/inicio.webp)
+
+## 活动视口
+
+鼠标下方的视口就是**活动视口**，它会用绿色边框标出。键盘命令、手柄以及其他任何外设的输入，都由它接收。把鼠标从一个视口移到另一个视口时，绿色边框会跟着移动：
+
+![鼠标指针依次经过 3D Viewport、Outliner、Properties 和 Timeline，绿色边框每次都标出指针下方的视口](img/viewports-activo.webp)
+
+**在 Nokia N95 上：**每按一下绿色的**通话键** ![](img/tecla-verde.svg)，就会切换到下一个视口。N95 的屏幕上放得下两个视口：左边是 3D Viewport，右边是 Properties。
+
+![一部 Nokia N95，左边是 3D Viewport，右边是 Properties：每按一次绿色键，绿色边框就移到另一个视口](img/viewports-activo-nokia.webp)
 
 ## 菜单栏和角落按钮
 
@@ -19,6 +32,8 @@ Whisk3D 的窗口被划分为多个**视口**：每个视口是一个面板，�
 ![一根手指绕圈拖动右下角视口的角落按钮，三个视口的大小随之变化](img/viewports-arrastrar.webp)
 
 **在 Nokia 上：**按住绿色的**通话键** ![](img/tecla-verde.svg)，再按方向键：活动视口（带绿色边框的那个）的边框会朝那个方向移动，视口随之变大或变小。只按绿色键、不按方向键，则会切换到下一个视口。
+
+![按住绿色键的 Nokia N95：按右方向键，3D Viewport 变大；按左方向键，它变小，然后恢复原样](img/viewports-tamano-nokia.webp)
 
 ## 视口选项
 

@@ -1,10 +1,23 @@
 # I viewport
 
+> [!NOTE]
+> Il Nokia N95 supporta mouse e tastiera (via Bluetooth). Le parti di questo tutorial dedicate al Nokia spiegano come usarlo senza mouse né tastiera, solo con i tasti del telefono.
+
 La finestra di Whisk3D è divisa in **viewport**: pannelli, ognuno con il suo editor (il 3D Viewport, l'Outliner, Properties...). Puoi dividerli, cambiarne la dimensione e scegliere cosa mostra ognuno. Funziona allo stesso modo con il mouse, con il dito su uno schermo touch e con la tastiera di un Nokia.
 
 Questo è ciò che si vede quando il programma si avvia per la prima volta:
 
 ![Whisk3D appena aperto: il 3D Viewport con un cubo, una telecamera e una luce; a destra l’Outliner e Properties; in basso la Timeline](img/inicio.webp)
+
+## Il viewport attivo
+
+Il viewport che si trova sotto il mouse è il **viewport attivo** ed è segnato da un bordo verde. È quello che riceve i comandi della tastiera, i controller e qualsiasi altra periferica. Quando passi con il mouse da un viewport all'altro, il bordo verde lo segue:
+
+![Il puntatore del mouse passa sul 3D Viewport, sull'Outliner, su Properties e sulla Timeline, e ogni volta il bordo verde segna il viewport che si trova sotto](img/viewports-activo.webp)
+
+**Su un Nokia N95:** ogni pressione del **tasto verde** di chiamata ![](img/tecla-verde.svg) passa al viewport successivo. Sullo schermo del N95 ce ne stanno due: il 3D Viewport a sinistra e Properties a destra.
+
+![Un Nokia N95 con il 3D Viewport a sinistra e Properties a destra: ogni volta che si preme il tasto verde, il bordo verde passa all'altro viewport](img/viewports-activo-nokia.webp)
 
 ## La barra dei menu e il pulsante dell'angolo
 
@@ -19,6 +32,8 @@ Tutti i viewport hanno in alto una **barra dei menu** (in verde nell'immagine) c
 ![Un dito trascina in cerchio il pulsante dell'angolo del viewport in basso a destra, e i tre viewport cambiano dimensione](img/viewports-arrastrar.webp)
 
 **Su un Nokia:** tieni premuto il **tasto verde** di chiamata ![](img/tecla-verde.svg) e premi una freccia: il bordo del viewport attivo (quello con la cornice verde) si sposta da quel lato, e così lo ingrandisci o lo rimpicciolisci. Il tasto verde da solo, senza frecce, passa al viewport successivo.
+
+![Un Nokia N95 con il tasto verde premuto: con la freccia destra il 3D Viewport si ingrandisce, con la sinistra si rimpicciolisce, e poi torna com'era](img/viewports-tamano-nokia.webp)
 
 ## Le opzioni del viewport
 

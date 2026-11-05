@@ -1,10 +1,23 @@
 # Viewport'lar
 
+> [!NOTE]
+> Nokia N95 fare ve klavyeyi (Bluetooth ile) destekler. Bu eğitimin Nokia ile ilgili kısımları, onu fare ve klavye olmadan, yalnızca telefonun tuşlarıyla nasıl kullanacağını anlatır.
+
 Whisk3D penceresi **viewport**'lara bölünür: her birinin kendi editörü olan paneller (3D Viewport, Outliner, Properties...). Onları bölebilir, boyutlarını değiştirebilir ve her birinin ne göstereceğini seçebilirsin. Fareyle, dokunmatik ekranda parmakla ve bir Nokia'nın tuş takımıyla aynı şekilde çalışır.
 
 Program ilk kez açıldığında görünen ekran bu:
 
 ![Yeni açılmış Whisk3D: küp, kamera ve ışıkla 3D Viewport; sağda Outliner ve Properties; altta Timeline](img/inicio.webp)
+
+## Etkin viewport
+
+Farenin altındaki viewport **etkin viewport**'tur ve yeşil bir kenarlıkla işaretlenir. Klavye komutlarını, oyun kumandalarını ve diğer tüm çevre birimlerini o alır. Fareyi bir viewport'tan diğerine götürdükçe yeşil kenarlık onu takip eder:
+
+![Fare imleci 3D Viewport, Outliner, Properties ve Timeline üzerinden geçiyor ve yeşil kenarlık her seferinde altındaki viewport'u işaretliyor](img/viewports-activo.webp)
+
+**Nokia N95'te:** yeşil **arama tuşuna** ![](img/tecla-verde.svg) her basışta bir sonraki viewport'a geçilir. N95'in ekranına iki viewport sığar: solda 3D Viewport, sağda Properties.
+
+![Solda 3D Viewport, sağda Properties olan bir Nokia N95: yeşil tuşa her basıldığında yeşil kenarlık diğer viewport'a geçiyor](img/viewports-activo-nokia.webp)
 
 ## Menü çubuğu ve köşe düğmesi
 
@@ -19,6 +32,8 @@ Boyutu değiştirmek için köşe düğmesini (parmağınla ya da fareyle) **bas
 ![Bir parmak sağ alttaki viewport'un köşe düğmesini daireler çizerek sürüklüyor ve üç viewport da boyut değiştiriyor](img/viewports-arrastrar.webp)
 
 **Nokia'da:** yeşil **arama tuşunu** ![](img/tecla-verde.svg) basılı tut ve bir ok tuşuna bas: etkin viewport'un (yeşil çerçeveli olanın) kenarı o yöne kayar, böylece viewport büyür ya da küçülür. Yeşil tuş tek başına, ok tuşu olmadan, bir sonraki viewport'a geçer.
+
+![Yeşil tuşu basılı tutulan bir Nokia N95: sağ ok tuşuyla 3D Viewport büyüyor, sol ok tuşuyla küçülüyor ve sonra eski haline dönüyor](img/viewports-tamano-nokia.webp)
 
 ## Viewport seçenekleri
 

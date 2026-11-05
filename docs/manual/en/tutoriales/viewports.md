@@ -1,10 +1,23 @@
 # Viewports
 
+> [!NOTE]
+> The Nokia N95 supports a mouse and keyboard (over Bluetooth). The Nokia parts of this tutorial explain how to use it without a mouse or keyboard, with just the phone's keys.
+
 The Whisk3D window is divided into **viewports**: panels, each with its own editor (the 3D Viewport, the Outliner, Properties...). You can split them, resize them and choose what each one shows. It works the same with a mouse, with your finger on a touch screen and with a Nokia's keypad.
 
 This is what you see when the program starts for the first time:
 
 ![Whisk3D just opened: the 3D Viewport with a cube, a camera and a light; the Outliner and Properties on the right; the Timeline at the bottom](img/inicio.webp)
+
+## The active viewport
+
+The viewport under the mouse is the **active viewport**, and it's marked with a green border. It's the one that receives keyboard commands, game controllers and any other peripheral. As you move the mouse from one viewport to another, the green border follows it:
+
+![The mouse pointer goes over the 3D Viewport, the Outliner, Properties and the Timeline, and each time the green border marks the viewport under it](img/viewports-activo.webp)
+
+**On a Nokia N95:** each press of the **green call key** ![](img/tecla-verde.svg) moves to the next viewport. Two fit on the N95's screen: the 3D Viewport on the left and Properties on the right.
+
+![A Nokia N95 with the 3D Viewport on the left and Properties on the right: each time the green key is pressed, the green border moves to the other viewport](img/viewports-activo-nokia.webp)
 
 ## The menu bar and the corner button
 
@@ -19,6 +32,8 @@ Every viewport has a **menu bar** at the top (green in the image) with that edit
 ![A finger drags the corner button of the bottom-right viewport in circles, and the three viewports change size](img/viewports-arrastrar.webp)
 
 **On a Nokia:** hold down the **green call key** ![](img/tecla-verde.svg) and press an arrow: the border of the active viewport (the one with the green frame) moves that way, so it grows or shrinks. The green key on its own, without arrows, moves to the next viewport.
+
+![A Nokia N95 with the green key held down: with the right arrow the 3D Viewport grows, with the left one it shrinks, and then it goes back to how it was](img/viewports-tamano-nokia.webp)
 
 ## The viewport options
 

@@ -7,11 +7,17 @@ abierto), asi la receta sigue andando aunque cambie el tamanio de la interfaz.
 """
 import math
 
-from capturas import (receta, Guion, MENU_TIPO, VISTA_3D, OUTLINER, PROPIEDADES, EDITOR_UV,
+from capturas import (receta, Guion, MENU_TIPO, VISTA_3D, OUTLINER, PROPIEDADES, EDITOR_UV, LINEA_DE_TIEMPO,
                       EXPANDIR, DIVIDIR_COLUMNAS, DIVIDIR_FILAS, MAXIMIZAR)
 
 # lo que se escribe en el cartel de la tecla (el resto son flechas, que no se traducen)
 SOFT_IZQ = {"es": "Soft izquierda", "en": "Left soft key", "pt": "Soft esquerda"}
+TECLA_VERDE = {"es": "Tecla verde", "en": "Green key", "pt": "Tecla verde"}
+
+
+def suave(t):
+    """0..1 -> 0..1, arrancando y frenando despacio (para que el puntero no se mueva a saltos)."""
+    return t * t * (3 - 2 * t)
 
 
 def tres_viewports(g):
@@ -48,6 +54,63 @@ def inicio(idioma):
     g = Guion(idioma)
     g.foto()
     return g.cuadros()
+
+
+@receta("viewports-activo")
+def activo(idioma):
+    """El viewport activo: el puntero pasa por los cuatro viewports y el borde verde lo sigue (el foco es el
+    viewport que esta debajo del mouse). Vuelve al punto de partida: el bucle no salta."""
+    g = Guion(idioma)
+    i = g.info()
+    def punto(kind, fx, fy):
+        v = i.vp(kind)
+        alto = v["h"] - v["barra"]
+        return round(v["x"] + v["w"] * fx), round(v["y"] + v["barra"] + alto * fy)
+    paradas = [punto(VISTA_3D, 0.22, 0.72), punto(OUTLINER, 0.55, 0.62), punto(PROPIEDADES, 0.5, 0.55),
+               punto(LINEA_DE_TIEMPO, 0.62, 0.8)]
+    paradas.append(paradas[0])
+    g.raton_mover(*paradas[0])
+    g.foto(dur=1000)
+    for (xa, ya), (xb, yb) in zip(paradas, paradas[1:]):
+        n = 9
+        for k in range(1, n + 1):
+            t = suave(k / n)
+            g.raton_mover(round(xa + (xb - xa) * t), round(ya + (yb - ya) * t))
+            g.foto(dur=45)
+        g.foto(dur=1000)
+    return g.cuadros()
+
+
+@receta("viewports-activo-nokia")
+def activo_nokia(idioma):
+    """En el N95: cada toque de la tecla verde pasa el foco (el borde verde) al viewport siguiente. El cambio
+    pasa al SOLTAR la tecla, como en el telefono."""
+    g = Guion(idioma, n95=True)
+    for _ in range(2):                          # 3D -> Propiedades -> 3D: termina como empezo
+        g.foto(dur=1100)
+        g.foto(dur=320, teclas=("verde",), tecla=TECLA_VERDE[idioma])
+        g.verde()
+    return g.cuadros()
+
+
+@receta("viewports-tamano-nokia")
+def tamano_nokia(idioma):
+    """En el N95: la tecla verde mantenida + las flechas mueven el borde del viewport activo (la Vista 3D):
+    a la derecha se agranda, a la izquierda se achica, y vuelve al 55 % del principio."""
+    g = Guion(idioma, n95=True)
+    verde = TECLA_VERDE[idioma]
+    g.foto(dur=900)
+    g.foto(dur=300, teclas=("verde",), tecla=verde)
+    for dx, veces in ((1, 5), (-1, 10), (1, 5)):    # 55 % -> 75 % -> 35 % -> 55 %
+        flecha = "derecha" if dx > 0 else "izquierda"
+        cartel = "%s + %s" % (verde, "→" if dx > 0 else "←")
+        g.foto(dur=120, teclas=("verde", flecha), tecla=cartel)   # la flecha apretada, todavia sin moverse
+        for _ in range(veces):
+            g.verde_flecha(dx, 0, 4)            # 4 cuadros del telefono por foto: 0.04 por paso
+            g.foto(dur=110, teclas=("verde", flecha), tecla=cartel)
+        g.foto(dur=350, teclas=("verde",), tecla=verde)
+    # cada cuadro redibuja toda la pantalla: con un poco menos de calidad pesa bastante menos
+    return g.cuadros(calidad=70)
 
 
 @receta("viewports-barras")
@@ -188,18 +251,19 @@ def barra_rueda(idioma):
 @receta("viewports-barra-nokia")
 def barra_nokia(idioma):
     """En el N95: la soft izquierda entra a la barra y las flechas la recorren (la barra se desplaza sola).
-    En la PC es la tecla M. Escala 1, como en el telefono, y ampliada al doble para que se lea."""
-    g = Guion(idioma, w=320, h=240, escala=1, ampliar=2)
-    g.raton_mover(110, 110)                     # (el foco en la Vista 3D; el puntero no se dibuja)
-    g.sin_puntero()
+    En la PC es la tecla M. Adentro del telefono, con la tecla que se aprieta resaltada."""
+    g = Guion(idioma, n95=True)                 # el foco arranca en la Vista 3D
+    # cada tecla: apretada (la pantalla todavia igual) -> la pantalla reacciona -> soltada. Asi en cada cuadro
+    # cambia o la pantalla o las teclas, no las dos: la animacion pesa mucho menos
+    def apretar(tecla, cual, cartel, dur):
+        g.foto(dur=110, teclas=(cual,), tecla=cartel)
+        g.tecla(tecla)
+        g.foto(dur=250, teclas=(cual,), tecla=cartel)
+        g.foto(dur=dur)
     g.foto(dur=900)
-    g.tecla("m")
-    g.foto(dur=1100, tecla=SOFT_IZQ[idioma])
-    for _ in range(7):
-        g.tecla("Right")
-        g.foto(dur=650, tecla="→")
-    for _ in range(3):
-        g.tecla("Left")
-        g.foto(dur=550, tecla="←")
+    apretar("m", "soft-izq", SOFT_IZQ[idioma], 750)
+    for flecha, tecla, simbolo, veces in (("derecha", "Right", "→", 7), ("izquierda", "Left", "←", 3)):
+        for _ in range(veces):
+            apretar(tecla, flecha, simbolo, 330)
     g.tecla("Escape")
-    return g.cuadros()
+    return g.cuadros(calidad=75)

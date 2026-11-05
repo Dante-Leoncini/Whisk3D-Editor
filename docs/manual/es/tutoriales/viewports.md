@@ -1,10 +1,23 @@
 # Los viewports
 
+> [!NOTE]
+> El Nokia N95 soporta mouse y teclado (por Bluetooth). Las partes de este tutorial sobre el Nokia explican cómo se usa sin mouse ni teclado, solo con las teclas del teléfono.
+
 La ventana de Whisk3D se divide en **viewports**: paneles, cada uno con su editor (la Vista 3D, el Outliner, Propiedades...). Los podés dividir, cambiarles el tamaño y elegir qué muestra cada uno. Funciona igual con mouse, con el dedo en una pantalla táctil y con el teclado de un Nokia.
 
 Esto es lo que se ve cuando inicia el programa por primera vez:
 
 ![Whisk3D recién abierto: la Vista 3D con un cubo, una cámara y una luz; a la derecha el Outliner y Propiedades; abajo la Línea de tiempo](img/inicio.webp)
+
+## El viewport activo
+
+El viewport que está debajo del mouse es el **viewport activo**, y se marca con un borde verde. Es el que recibe los comandos del teclado, los controles y cualquier otro periférico. Al pasar el mouse de un viewport a otro, el borde verde lo sigue:
+
+![El puntero del mouse pasa por la Vista 3D, el Outliner, Propiedades y la Línea de tiempo, y el borde verde marca cada vez el viewport que está debajo](img/viewports-activo.webp)
+
+**En el Nokia N95:** cada toque de la **tecla verde** de llamada ![](img/tecla-verde.svg) pasa al viewport siguiente. En la pantalla del N95 entran dos: la Vista 3D a la izquierda y Propiedades a la derecha.
+
+![Un Nokia N95 con la Vista 3D a la izquierda y Propiedades a la derecha: cada vez que se aprieta la tecla verde, el borde verde pasa al otro viewport](img/viewports-activo-nokia.webp)
 
 ## La barra de menús y el botón de la esquina
 
@@ -19,6 +32,8 @@ Todos los viewports tienen arriba una **barra de menús** (en verde en la imagen
 ![Un dedo arrastra en círculos el botón de la esquina del viewport de abajo a la derecha, y los tres viewports cambian de tamaño](img/viewports-arrastrar.webp)
 
 **En el Nokia:** mantené apretada la **tecla verde** de llamada ![](img/tecla-verde.svg) y apretá una flecha: el borde del viewport activo (el que tiene el marco verde) se corre para ese lado, y así lo agrandás o lo achicás. La tecla verde sola, sin flechas, pasa al viewport siguiente.
+
+![Un Nokia N95 con la tecla verde apretada: con la flecha derecha la Vista 3D se agranda, con la izquierda se achica, y vuelve a como estaba](img/viewports-tamano-nokia.webp)
 
 ## Las opciones del viewport
 

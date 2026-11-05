@@ -1,10 +1,23 @@
 # Les viewports
 
+> [!NOTE]
+> Le Nokia N95 prend en charge une souris et un clavier (en Bluetooth). Les parties de ce tutoriel consacrées au Nokia expliquent comment l'utiliser sans souris ni clavier, uniquement avec les touches du téléphone.
+
 La fenêtre de Whisk3D est divisée en **viewports** : des panneaux, chacun avec son éditeur (le 3D Viewport, l'Outliner, Properties...). Vous pouvez les diviser, changer leur taille et choisir ce que chacun affiche. Cela fonctionne de la même façon à la souris, au doigt sur un écran tactile et avec le clavier d'un Nokia.
 
 Voici ce que l’on voit au premier lancement du programme :
 
 ![Whisk3D juste ouvert : le 3D Viewport avec un cube, une caméra et une lumière ; à droite l’Outliner et Properties ; en bas la Timeline](img/inicio.webp)
+
+## Le viewport actif
+
+Le viewport qui se trouve sous la souris est le **viewport actif** : il est marqué d'une bordure verte. C'est lui qui reçoit les commandes du clavier, les manettes et tout autre périphérique. Quand vous passez la souris d'un viewport à l'autre, la bordure verte la suit :
+
+![Le pointeur de la souris passe sur le 3D Viewport, l'Outliner, Properties et la Timeline, et la bordure verte marque chaque fois le viewport qui se trouve dessous](img/viewports-activo.webp)
+
+**Sur un Nokia N95 :** chaque appui sur la **touche verte** d'appel ![](img/tecla-verde.svg) passe au viewport suivant. Sur l'écran du N95, il y en a deux : le 3D Viewport à gauche et Properties à droite.
+
+![Un Nokia N95 avec le 3D Viewport à gauche et Properties à droite : à chaque appui sur la touche verte, la bordure verte passe à l'autre viewport](img/viewports-activo-nokia.webp)
 
 ## La barre de menus et le bouton du coin
 
@@ -19,6 +32,8 @@ Tous les viewports ont en haut une **barre de menus** (en vert sur l'image) avec
 ![Un doigt fait glisser en cercles le bouton du coin du viewport d'en bas à droite, et les trois viewports changent de taille](img/viewports-arrastrar.webp)
 
 **Sur un Nokia :** maintenez enfoncée la **touche verte** d'appel ![](img/tecla-verde.svg) et appuyez sur une flèche : la bordure du viewport actif (celui qui a le cadre vert) se déplace de ce côté, ce qui l'agrandit ou le réduit. La touche verte seule, sans flèche, passe au viewport suivant.
+
+![Un Nokia N95 avec la touche verte maintenue : avec la flèche droite, le 3D Viewport s'agrandit, avec la gauche il rétrécit, puis il revient comme avant](img/viewports-tamano-nokia.webp)
 
 ## Les options du viewport
 

@@ -3,6 +3,7 @@
 #include "app/controles.h"            // SDL_Event + InputUsuarioSDL3: la puerta real de la entrada
 #include "app/variables.h"            // window
 #include "ViewPorts/ViewPorts.h"      // ViewportBase / ViewportColumn (el arbol del layout)
+#include "ViewPorts/ViewPort3D.h"     // Viewport3D (layoutpordefecto)
 #include "WhiskUI/widgets/PopupMenu.h"
 #include "WhiskUI/core/UI.h"          // RenglonHeightGS, gapGS, borderGS (las filas del menu)
 #include "render/OpcionesRender.h"    // g_redraw
@@ -11,6 +12,11 @@
 
 extern ViewportBase* rootViewport;
 extern int MenuPantallaW, MenuPantallaH;
+// la tecla VERDE del N95 (platform/symbian/src/Whisk3DContainer.cpp): las MISMAS funciones que llama el telefono
+void LayoutCiclarViewportActivo(int dir);                              // verde sola (al soltarla)
+void LayoutRedimensionarViewportActivo(int dx, int dy, float paso);    // verde + flecha, una vez por cuadro
+ViewportBase* LayoutPorDefecto(int w, int h, Viewport3D** vp3dOut);    // LayoutInput.cpp: el del arranque
+extern Viewport3D* Viewport3DActive;
 void LayoutRenderMenu(int w, int h);
 void SetGlobalScale(int scale);        // ViewPorts.cpp: re-deriva las metricas *GS   // LayoutInput.cpp: los desplegables y popups (van encima de todo)
 
@@ -105,9 +111,9 @@ namespace {
             Button* b = n->BarButtons[0];
             bx = b->sx; by = b->sy; bw = b->width; bh = b->height;
         }
-        printf("@cap vp kind=%d x=%d y=%d w=%d h=%d esquina=%d,%d,%d,%d barra=%d botones=%d\n",
+        printf("@cap vp kind=%d x=%d y=%d w=%d h=%d esquina=%d,%d,%d,%d barra=%d botones=%d activo=%d\n",
                n->ViewportKind(), n->x, n->y, n->width, n->height, bx, by, bw, bh,
-               n->BarHeight(), (int)n->BarButtons.size());
+               n->BarHeight(), (int)n->BarButtons.size(), n == viewPortActive ? 1 : 0);
         for (size_t i = 0; i < n->BarButtons.size(); i++) {
             Button* b = n->BarButtons[i];
             printf("@cap boton kind=%d i=%d x=%d y=%d w=%d h=%d texto=%s\n",
@@ -197,6 +203,40 @@ bool W3dCapturasCmd(const std::string& cmd, std::istringstream& ss, std::string&
         SetGlobalScale(v);
         if (rootViewport) rootViewport->Resize(MenuPantallaW, MenuPantallaH);
         Cuadro();
+        return true;
+    }
+    // el layout por defecto PARA EL TAMANIO ACTUAL, como si el editor hubiera arrancado asi (el harness abre con
+    // otro tamanio y 'ventana' solo lo redimensiona): en 320x240 son 2 viewports, la Vista 3D y Propiedades, como
+    // en el N95. El arbol viejo no se borra (algun puntero del input podria seguir mirandolo; el harness dura poco).
+    if (cmd == "layoutpordefecto") {
+        Viewport3D* vp3d = NULL;
+        rootViewport = LayoutPorDefecto(MenuPantallaW, MenuPantallaH, &vp3d);
+        viewPortActive = vp3d;
+        Viewport3DActive = vp3d;
+        rootViewport->Resize(MenuPantallaW, MenuPantallaH);
+        g_redraw = true;
+        Cuadro();
+        return true;
+    }
+    // la division de la raiz del layout (0..1, lo que ocupa el de la izquierda / el de arriba). En el N95 las
+    // demos van con 2 viewports: la Vista 3D al 55 % y Propiedades al 45 %.
+    if (cmd == "division") {
+        float f = 0; ss >> f;
+        if (!rootViewport || rootViewport->isLeaf()) { err = "division: la raiz del layout no esta dividida"; return false; }
+        if (f < 0.05f || f > 0.95f) { err = "division: uso: division <0.05..0.95>"; return false; }
+        if (rootViewport->ContainerKind() == 1) ((ViewportRow*)rootViewport)->splitFrac = f;
+        else                                    ((ViewportColumn*)rootViewport)->splitFrac = f;
+        rootViewport->Resize(MenuPantallaW, MenuPantallaH);
+        Cuadro();
+        return true;
+    }
+    // la tecla VERDE del N95: 'verde' = un toque (pasa al viewport siguiente); 'verde <dx> <dy> [cuadros]' = verde
+    // mantenida + una flecha durante esos cuadros (el telefono redimensiona un paso de 0.01 por cuadro)
+    if (cmd == "verde") {
+        int dx = 0, dy = 0, cuadros = 1;
+        if (!(ss >> dx >> dy)) { LayoutCiclarViewportActivo(1); g_redraw = true; Cuadro(); return true; }
+        if (!(ss >> cuadros)) cuadros = 1;
+        for (int i = 0; i < cuadros; i++) { LayoutRedimensionarViewportActivo(dx, dy, 0.01f); g_redraw = true; Cuadro(); }
         return true;
     }
     if (cmd == "capinfo") {

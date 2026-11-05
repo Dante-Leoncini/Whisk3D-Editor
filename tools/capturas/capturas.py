@@ -27,6 +27,8 @@ import math, os, re, shutil, subprocess, sys, tempfile
 
 from PIL import Image, ImageDraw, ImageFont
 
+import n95
+
 AQUI = os.path.dirname(os.path.abspath(__file__))
 RAIZ = os.path.abspath(os.path.join(AQUI, "..", ".."))
 BIN = os.environ.get("W3D_BIN", os.path.join(RAIZ, "platform", "linux", "build", "whisk3d"))
@@ -113,11 +115,16 @@ class Guion:
     w, h     tamanio del layout (la 'ventana' del editor)
     escala   escala de la interfaz (1 = como en el N95)
     ampliar  agrandar cada foto N veces sin suavizar (para la escala 1, que es chica)
+    n95      la demo va adentro de la foto del Nokia N95 (n95.py) y se resaltan las teclas que se aprietan
     """
 
-    def __init__(self, idioma, w=960, h=540, escala=2, ampliar=1):
-        self.idioma, self.w, self.h, self.ampliar = idioma, w, h, ampliar
+    def __init__(self, idioma, w=960, h=540, escala=2, ampliar=1, n95=False):
+        if n95:     # la pantalla del telefono, adentro de la foto del N95 (n95.py): 320x240, escala 1,
+            w, h, escala, ampliar = 320, 240, 1, 1      # la Vista 3D al 55 % y Propiedades al 45 %
+        self.idioma, self.w, self.h, self.ampliar, self.n95 = idioma, w, h, ampliar, n95
         self.lineas = ["ventana %d %d" % (w, h), "escala %d" % escala]
+        if n95:
+            self.lineas += ["layoutpordefecto", "division 0.55"]
         self.fotos = []
         self.puntero = None        # {'tipo': 'dedo'|'raton', 'x', 'y', 'abajo'}
         self.tmp = tempfile.mkdtemp(prefix="w3d_capturas_")
@@ -182,13 +189,22 @@ class Guion:
         self.puntero = None
 
     # ---- fotos ----------------------------------------------------------------
-    def foto(self, dur=100, marcas=(), tecla=None, puntero=True):
+    def verde(self):
+        """N95: un toque de la tecla verde de llamada (pasa al viewport siguiente)."""
+        self.lineas.append("verde")
+
+    def verde_flecha(self, dx, dy, cuadros=1):
+        """N95: la tecla verde mantenida + una flecha durante esos cuadros (cambia el tamanio del viewport activo)."""
+        self.lineas.append("verde %d %d %d" % (dx, dy, cuadros))
+
+    def foto(self, dur=100, marcas=(), tecla=None, puntero=True, teclas=()):
         """Saca una foto de la interfaz. dur = cuanto dura ese cuadro en la animacion (ms).
         marcas: ('rect', x, y, w, h) | ('circulo', cx, cy, r)  resaltados encima.
-        tecla:  texto de la tecla apretada (se dibuja abajo a la derecha)."""
+        tecla:  texto de la tecla apretada (se dibuja abajo a la derecha).
+        teclas: con n95=True, las teclas del telefono que se ven apretadas (ids de n95.svg: 'verde', 'derecha'...)."""
         png = os.path.join(self.tmp, "f%04d.png" % len(self.fotos))
         self.lineas.append("uishot " + png)
-        self.fotos.append({"png": png, "dur": dur, "marcas": list(marcas), "tecla": tecla,
+        self.fotos.append({"png": png, "dur": dur, "marcas": list(marcas), "tecla": tecla, "teclas": tuple(teclas),
                            "puntero": dict(self.puntero) if (puntero and self.puntero) else None})
 
     def cuadros(self, ancho=None, calidad=82):
@@ -202,7 +218,12 @@ class Guion:
             im = Image.open(f["png"]).convert("RGB")
             if self.ampliar > 1:
                 im = im.resize((im.width * self.ampliar, im.height * self.ampliar), Image.NEAREST)
-            im = dibujar(im, f, self.ampliar)
+            if self.n95:
+                # el cartel de la tecla va debajo del telefono, no sobre la pantalla
+                im = n95.componer(dibujar(im, dict(f, tecla=None), 1), f["teclas"])
+                im = con_cartel(im, f["tecla"])
+            else:
+                im = dibujar(im, f, self.ampliar)
             if ancho and im.width > ancho:
                 im = im.resize((ancho, round(im.height * ancho / im.width)), Image.LANCZOS)
             res.append((im, f["dur"]))
@@ -245,15 +266,30 @@ def dibujar(im, f, k):
         d.polygon(pts, fill=(255, 255, 255, 255), outline=(0, 0, 0, 255))
         d.line(pts + [pts[0]], fill=(0, 0, 0, 255), width=2)
     if f["tecla"]:
-        fnt = fuente(22 if k == 1 else 26)
-        caja = d.textbbox((0, 0), f["tecla"], font=fnt)
-        tw, th = caja[2] - caja[0], caja[3] - caja[1]
-        x1, y1 = im.width - 16, im.height - 16
-        x0, y0 = x1 - tw - 28, y1 - th - 22
-        d.rounded_rectangle([x0 + 3, y0 + 4, x1 + 3, y1 + 4], radius=10, fill=(0, 0, 0, 120))
-        d.rounded_rectangle([x0, y0, x1, y1], radius=10, fill=(245, 245, 245, 245), outline=(40, 40, 40, 255), width=2)
-        d.text((x0 + 14 - caja[0], y0 + 11 - caja[1]), f["tecla"], font=fnt, fill=(25, 25, 25, 255))
+        cartel(d, f["tecla"], im.width - 16, im.height - 16, 22 if k == 1 else 26)
     return Image.alpha_composite(im.convert("RGBA"), capa).convert("RGB")
+
+
+def cartel(d, texto, x1, y1, tam=26):
+    """El cartel de una tecla (blanco, con sombra), con la esquina de abajo a la derecha en (x1, y1)."""
+    fnt = fuente(tam)
+    caja = d.textbbox((0, 0), texto, font=fnt)
+    tw, th = caja[2] - caja[0], caja[3] - caja[1]
+    x0, y0 = x1 - tw - 28, y1 - th - 22
+    d.rounded_rectangle([x0 + 3, y0 + 4, x1 + 3, y1 + 4], radius=10, fill=(0, 0, 0, 120))
+    d.rounded_rectangle([x0, y0, x1, y1], radius=10, fill=(245, 245, 245, 245), outline=(40, 40, 40, 255), width=2)
+    d.text((x0 + 14 - caja[0], y0 + 11 - caja[1]), texto, font=fnt, fill=(25, 25, 25, 255))
+
+
+def con_cartel(im, texto, alto=64):
+    """El telefono (RGBA, fondo transparente) con una franja abajo para el cartel de la tecla, que va debajo de
+    las teclas. La franja esta siempre (con o sin cartel) para que todos los cuadros midan lo mismo."""
+    res = Image.new("RGBA", (im.width, im.height + alto), (0, 0, 0, 0))
+    res.paste(im, (0, 0))
+    if texto:
+        d = ImageDraw.Draw(res)
+        cartel(d, texto, im.width - 40, im.height + alto - 10)
+    return res
 
 
 def guardar(cuadros, ruta):
