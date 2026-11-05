@@ -4,6 +4,9 @@ Las imágenes y animaciones de `docs/manual/<idioma>/tutoriales/img/` **no se ha
 `capturas.py` manejando el editor de verdad. Como Whisk3D cambia seguido, cuando se toca la interfaz se
 vuelven a generar y listo, sin rehacer nada a mano.
 
+La única excepción son los íconos de teclas (`img/tecla-*.svg`, por ejemplo la tecla verde de llamada
+del Nokia): son dibujos fijos, hechos a mano, que van dentro del texto.
+
 ```bash
 python3 tools/capturas/capturas.py                  # todas, en es/en/pt (~2 minutos)
 python3 tools/capturas/capturas.py viewports        # solo las que empiezan con "viewports"

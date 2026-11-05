@@ -14,18 +14,17 @@ Todas as viewports têm em cima uma **barra de menus** (em verde na imagem) com 
 
 ## Mudar o tamanho
 
-Apoie o dedo (ou o mouse) no botão do canto e **arraste-o**. Isso move a borda esquerda e a de cima dessa viewport, e as do lado se ajustam. Aqui, a de baixo à direita é arrastada em círculos e as três mudam de tamanho:
+**Mantenha pressionado** o botão do canto (com o dedo ou com o mouse) e arraste-o para mudar o tamanho: isso move a borda esquerda e a de cima dessa viewport, e as do lado se ajustam. Um **toque simples**, sem arrastar, abre o menu suspenso com as opções da viewport. Aqui, a de baixo à direita é arrastada em círculos e as três mudam de tamanho:
 
 ![Um dedo arrasta em círculos o botão do canto da viewport de baixo à direita, e as três viewports mudam de tamanho](img/viewports-arrastrar.webp)
 
-> [!TIP]
-> Se você tocar no botão e soltar sem arrastar, o menu dele se abre. No PC também dá para arrastar a borda que separa duas viewports.
+**No Nokia:** mantenha apertada a **tecla verde** de chamada ![](img/tecla-verde.svg) e aperte uma seta: a borda da viewport ativa (a que tem a moldura verde) se move para esse lado, e assim ela aumenta ou diminui. A tecla verde sozinha, sem setas, passa para a viewport seguinte.
 
-## O menu do canto
+## As opções da viewport
 
-Ao tocar no botão do canto, abre-se este menu:
+Um toque no botão do canto abre este menu:
 
-![O menu do botão do canto: os tipos de viewport em cima e, abaixo da linha, Expandir, Dividir em colunas, Dividir em linhas e Maximizar](img/viewports-menu.webp)
+![Um dedo vai até o botão do canto da Viewport 3D, toca nele e o menu se abre: os tipos de viewport em cima e, abaixo da linha, Expandir, Dividir em colunas, Dividir em linhas e Maximizar](img/viewports-menu.webp)
 
 Em cima estão os **tipos de viewport**: escolher um transforma a viewport nesse editor. Abaixo da linha está o que dá para fazer com ela:
 

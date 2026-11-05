@@ -14,18 +14,17 @@ Tutti i viewport hanno in alto una **barra dei menu** (in verde nell'immagine) c
 
 ## Cambiare la dimensione
 
-Appoggia il dito (o il mouse) sul pulsante dell'angolo e **trascinalo**. Questo sposta il bordo sinistro e quello superiore di quel viewport, e quelli accanto si adattano. Qui si trascina in cerchio quello in basso a destra e tutti e tre cambiano dimensione:
+**Tieni premuto** il pulsante dell'angolo (con il dito o con il mouse) e trascinalo per cambiare la dimensione: questo sposta il bordo sinistro e quello superiore di quel viewport, e quelli accanto si adattano. Un **tocco singolo**, senza trascinare, apre il menu a tendina con le opzioni del viewport. Qui si trascina in cerchio quello in basso a destra e tutti e tre cambiano dimensione:
 
 ![Un dito trascina in cerchio il pulsante dell'angolo del viewport in basso a destra, e i tre viewport cambiano dimensione](img/viewports-arrastrar.webp)
 
-> [!TIP]
-> Se tocchi il pulsante e lo lasci senza trascinare, si apre il suo menu. Sul PC puoi anche trascinare il bordo che separa due viewport.
+**Su un Nokia:** tieni premuto il **tasto verde** di chiamata ![](img/tecla-verde.svg) e premi una freccia: il bordo del viewport attivo (quello con la cornice verde) si sposta da quel lato, e così lo ingrandisci o lo rimpicciolisci. Il tasto verde da solo, senza frecce, passa al viewport successivo.
 
-## Il menu dell'angolo
+## Le opzioni del viewport
 
-Toccando il pulsante dell'angolo si apre questo menu:
+Un tocco sul pulsante dell'angolo apre questo menu:
 
-![Il menu del pulsante dell'angolo: i tipi di viewport in alto e, sotto la linea, Expand, Split in Columns, Split in Rows e Maximize](img/viewports-menu.webp)
+![Un dito va fino al pulsante dell'angolo del 3D Viewport, lo tocca e si apre il menu: i tipi di viewport in alto e, sotto la linea, Expand, Split in Columns, Split in Rows e Maximize](img/viewports-menu.webp)
 
 In alto ci sono i **tipi di viewport**: sceglierne uno trasforma il viewport in quell'editor. Sotto la linea c'è ciò che si può fare con il viewport:
 

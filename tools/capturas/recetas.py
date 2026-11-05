@@ -65,11 +65,26 @@ def barras(idioma):
 
 @receta("viewports-menu")
 def menu(idioma):
-    """El menu del boton de la esquina, abierto."""
+    """Las opciones del viewport: el dedo va hasta el boton de la esquina de la Vista 3D, lo aprieta y se
+    despliega el menu, que queda abierto un rato antes de volver a empezar."""
     g = Guion(idioma)
     i = g.info()
-    g.tocar(*i.esquina(VISTA_3D))
-    g.foto()
+    x, y = i.esquina(VISTA_3D)
+    x0, y0 = x + 230, y + 170                   # arranca sobre la Vista 3D
+    g.dedo_flotando(x0, y0)
+    g.foto(dur=700)
+    n = 10
+    for k in range(1, n + 1):                   # va hasta el boton (frenando al llegar)
+        t = 1 - (1 - k / n) ** 2
+        g.dedo_flotando(round(x0 + (x - x0) * t), round(y0 + (y - y0) * t))
+        g.foto(dur=55)
+    g.foto(dur=350)
+    g.dedo_abajo(x, y)                          # lo aprieta...
+    g.foto(dur=300)
+    g.dedo_arriba()                             # ...y al soltar se despliega el menu
+    g.foto(dur=500)
+    g.sin_puntero()
+    g.foto(dur=3200)                            # abierto un rato; despues el bucle arranca de nuevo
     return g.cuadros()
 
 

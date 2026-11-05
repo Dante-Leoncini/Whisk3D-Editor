@@ -14,18 +14,17 @@ Her viewport'un üstünde, o editörün menülerini ve düğmelerini içeren bir
 
 ## Boyutu değiştirme
 
-Parmağını (ya da fareyi) köşe düğmesine koy ve **sürükle**. Bu, o viewport'un sol ve üst kenarını hareket ettirir; yanındakiler de buna göre ayarlanır. Burada sağ alttaki viewport'un düğmesi daireler çizerek sürükleniyor ve üç viewport da boyut değiştiriyor:
+Boyutu değiştirmek için köşe düğmesini (parmağınla ya da fareyle) **basılı tut** ve sürükle: bu, o viewport'un sol ve üst kenarını hareket ettirir; yanındakiler de buna göre ayarlanır. Sürüklemeden **tek bir dokunuş** ise viewport'un seçeneklerini içeren açılır menüyü açar. Burada sağ alttaki viewport'un düğmesi daireler çizerek sürükleniyor ve üç viewport da boyut değiştiriyor:
 
 ![Bir parmak sağ alttaki viewport'un köşe düğmesini daireler çizerek sürüklüyor ve üç viewport da boyut değiştiriyor](img/viewports-arrastrar.webp)
 
-> [!TIP]
-> Düğmeye dokunup sürüklemeden bırakırsan menüsü açılır. PC'de iki viewport'u ayıran kenarı da sürükleyebilirsin.
+**Nokia'da:** yeşil **arama tuşunu** ![](img/tecla-verde.svg) basılı tut ve bir ok tuşuna bas: etkin viewport'un (yeşil çerçeveli olanın) kenarı o yöne kayar, böylece viewport büyür ya da küçülür. Yeşil tuş tek başına, ok tuşu olmadan, bir sonraki viewport'a geçer.
 
-## Köşe menüsü
+## Viewport seçenekleri
 
-Köşe düğmesine dokununca şu menü açılır:
+Köşe düğmesine bir kez dokununca şu menü açılır:
 
-![Köşe düğmesinin menüsü: üstte viewport türleri, çizginin altında Expand, Split in Columns, Split in Rows ve Maximize](img/viewports-menu.webp)
+![Bir parmak 3D Viewport'un köşe düğmesine gidiyor, ona dokunuyor ve menü açılıyor: üstte viewport türleri, çizginin altında Expand, Split in Columns, Split in Rows ve Maximize](img/viewports-menu.webp)
 
 Üstte **viewport türleri** vardır: birini seçmek viewport'u o editöre dönüştürür. Çizginin altında viewport'la yapılabilecekler bulunur:
 

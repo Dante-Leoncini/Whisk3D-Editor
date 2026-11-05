@@ -14,18 +14,17 @@ Tous les viewports ont en haut une **barre de menus** (en vert sur l'image) avec
 
 ## Redimensionner
 
-Posez le doigt (ou la souris) sur le bouton du coin et **faites-le glisser**. Cela déplace la bordure gauche et la bordure du haut de ce viewport, et ses voisins s'ajustent. Ici, on fait glisser en cercles celui d'en bas à droite, et les trois changent de taille :
+**Maintenez appuyé** le bouton du coin (avec le doigt ou la souris) et faites-le glisser pour redimensionner : cela déplace la bordure gauche et la bordure du haut de ce viewport, et ses voisins s'ajustent. Un **simple toucher**, sans glisser, ouvre le menu déroulant avec les options du viewport. Ici, on fait glisser en cercles celui d'en bas à droite, et les trois changent de taille :
 
 ![Un doigt fait glisser en cercles le bouton du coin du viewport d'en bas à droite, et les trois viewports changent de taille](img/viewports-arrastrar.webp)
 
-> [!TIP]
-> Si vous touchez le bouton et le relâchez sans le faire glisser, son menu s'ouvre. Sur PC, vous pouvez aussi faire glisser la bordure qui sépare deux viewports.
+**Sur un Nokia :** maintenez enfoncée la **touche verte** d'appel ![](img/tecla-verde.svg) et appuyez sur une flèche : la bordure du viewport actif (celui qui a le cadre vert) se déplace de ce côté, ce qui l'agrandit ou le réduit. La touche verte seule, sans flèche, passe au viewport suivant.
 
-## Le menu du coin
+## Les options du viewport
 
-Quand vous touchez le bouton du coin, ce menu s'ouvre :
+Un toucher sur le bouton du coin ouvre ce menu :
 
-![Le menu du bouton du coin : les types de viewport en haut et, sous la ligne, Expand, Split in Columns, Split in Rows et Maximize](img/viewports-menu.webp)
+![Un doigt va jusqu'au bouton du coin du 3D Viewport, le touche et le menu s'ouvre : les types de viewport en haut et, sous la ligne, Expand, Split in Columns, Split in Rows et Maximize](img/viewports-menu.webp)
 
 En haut se trouvent les **types de viewport** : en choisir un transforme le viewport en cet éditeur. Sous la ligne se trouve ce que vous pouvez en faire :
 

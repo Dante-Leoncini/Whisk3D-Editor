@@ -14,18 +14,17 @@ Todos los viewports tienen arriba una **barra de menús** (en verde en la imagen
 
 ## Cambiar el tamaño
 
-Apoyá el dedo (o el mouse) en el botón de la esquina y **arrastralo**. Eso mueve el borde izquierdo y el de arriba de ese viewport, y los de al lado se acomodan. Acá, el de abajo a la derecha se arrastra en círculos y los tres cambian de tamaño:
+**Mantené presionado** el botón de la esquina (con el dedo o con el mouse) y arrastralo para cambiar el tamaño: eso mueve el borde izquierdo y el de arriba de ese viewport, y los de al lado se acomodan. Un **toque simple**, sin arrastrar, abre el menú desplegable con las opciones del viewport. Acá, el de abajo a la derecha se arrastra en círculos y los tres cambian de tamaño:
 
 ![Un dedo arrastra en círculos el botón de la esquina del viewport de abajo a la derecha, y los tres viewports cambian de tamaño](img/viewports-arrastrar.webp)
 
-> [!TIP]
-> Si tocás el botón y lo soltás sin arrastrar, se abre su menú. En la PC también se puede arrastrar el borde que separa dos viewports.
+**En el Nokia:** mantené apretada la **tecla verde** de llamada ![](img/tecla-verde.svg) y apretá una flecha: el borde del viewport activo (el que tiene el marco verde) se corre para ese lado, y así lo agrandás o lo achicás. La tecla verde sola, sin flechas, pasa al viewport siguiente.
 
-## El menú de la esquina
+## Las opciones del viewport
 
-Al tocar el botón de la esquina se abre este menú:
+Un toque en el botón de la esquina despliega este menú:
 
-![El menú del botón de la esquina: los tipos de viewport arriba y, debajo de la línea, Expandir, Dividir en columnas, Dividir en filas y Maximizar](img/viewports-menu.webp)
+![Un dedo va hasta el botón de la esquina de la Vista 3D, lo toca y se despliega el menú: los tipos de viewport arriba y, debajo de la línea, Expandir, Dividir en columnas, Dividir en filas y Maximizar](img/viewports-menu.webp)
 
 Arriba están los **tipos de viewport**: elegir uno convierte el viewport en ese editor. Debajo de la línea está lo que se le puede hacer:
 

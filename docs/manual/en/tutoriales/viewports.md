@@ -14,18 +14,17 @@ Every viewport has a **menu bar** at the top (green in the image) with that edit
 
 ## Resize
 
-Put your finger (or the mouse) on the corner button and **drag it**. That moves the left and top borders of that viewport, and the ones next to it adjust. Here, the bottom-right one is dragged in circles and all three change size:
+**Press and hold** the corner button (with your finger or the mouse) and drag it to resize: that moves the left and top borders of that viewport, and the ones next to it adjust. A **single tap**, without dragging, opens the drop-down menu with the viewport's options. Here, the bottom-right one is dragged in circles and all three change size:
 
 ![A finger drags the corner button of the bottom-right viewport in circles, and the three viewports change size](img/viewports-arrastrar.webp)
 
-> [!TIP]
-> If you tap the button and release it without dragging, its menu opens. On PC you can also drag the border between two viewports.
+**On a Nokia:** hold down the **green call key** ![](img/tecla-verde.svg) and press an arrow: the border of the active viewport (the one with the green frame) moves that way, so it grows or shrinks. The green key on its own, without arrows, moves to the next viewport.
 
-## The corner menu
+## The viewport options
 
-Tapping the corner button opens this menu:
+A tap on the corner button opens this menu:
 
-![The corner button's menu: the viewport types at the top and, below the line, Expand, Split in Columns, Split in Rows and Maximize](img/viewports-menu.webp)
+![A finger goes to the corner button of the 3D Viewport, taps it and the menu opens: the viewport types at the top and, below the line, Expand, Split in Columns, Split in Rows and Maximize](img/viewports-menu.webp)
 
 At the top are the **viewport types**: choosing one turns the viewport into that editor. Below the line is what you can do with it:
 
