@@ -2,6 +2,10 @@
 
 A janela do Whisk3D se divide em **viewports**: painéis, cada um com o seu editor (a Viewport 3D, o Outliner, Propriedades...). Você pode dividir as viewports, mudar o tamanho delas e escolher o que cada uma mostra. Funciona do mesmo jeito com mouse, com o dedo em uma tela touch e com o teclado de um Nokia.
 
+Isto é o que aparece quando o programa abre pela primeira vez:
+
+![O Whisk3D recém-aberto: a Viewport 3D com um cubo, uma câmera e uma luz; à direita o Outliner e as Propriedades; embaixo a Linha do Tempo](img/inicio.webp)
+
 ## A barra de menus e o botão do canto
 
 Todas as viewports têm em cima uma **barra de menus** (em verde na imagem) com os menus e botões desse editor. No canto superior esquerdo fica sempre o **botão do canto** (em laranja): é ele que muda ou modifica a viewport.

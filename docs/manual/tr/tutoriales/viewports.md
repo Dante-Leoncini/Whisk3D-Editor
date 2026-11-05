@@ -2,6 +2,10 @@
 
 Whisk3D penceresi **viewport**'lara bölünür: her birinin kendi editörü olan paneller (3D Viewport, Outliner, Properties...). Onları bölebilir, boyutlarını değiştirebilir ve her birinin ne göstereceğini seçebilirsin. Fareyle, dokunmatik ekranda parmakla ve bir Nokia'nın tuş takımıyla aynı şekilde çalışır.
 
+Program ilk kez açıldığında görünen ekran bu:
+
+![Yeni açılmış Whisk3D: küp, kamera ve ışıkla 3D Viewport; sağda Outliner ve Properties; altta Timeline](img/inicio.webp)
+
 ## Menü çubuğu ve köşe düğmesi
 
 Her viewport'un üstünde, o editörün menülerini ve düğmelerini içeren bir **menü çubuğu** (görselde yeşil) vardır. Sol üstte her zaman **köşe düğmesi** (turuncu) bulunur: viewport'u değiştiren ya da düzenleyen düğme budur.

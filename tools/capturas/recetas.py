@@ -42,6 +42,14 @@ def accion_del_menu(g, kind, opcion, final_ms=1900):
 
 
 # ---- tutorial: los viewports ------------------------------------------------------
+@receta("inicio")
+def inicio(idioma):
+    """Whisk3D recien abierto, sin tocar nada: lo que se ve la primera vez que inicia."""
+    g = Guion(idioma)
+    g.foto()
+    return g.cuadros()
+
+
 @receta("viewports-barras")
 def barras(idioma):
     """Cada viewport con su barra de menus (verde) y el boton de su esquina (naranja)."""
