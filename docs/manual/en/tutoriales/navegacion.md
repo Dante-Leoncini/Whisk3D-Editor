@@ -3,7 +3,11 @@
 > [!NOTE]
 > The Nokia N95 supports a mouse and keyboard (over Bluetooth). The Nokia parts of this tutorial explain how to use it without a mouse or keyboard, with just the phone's keys.
 
-Navigating means moving your point of view: turning around the scene, shifting to one side and moving closer or farther away. The scene doesn't change: the objects stay where they are, and only the view moves. Everything explained here applies to the [active viewport](viewports.md#the-active-viewport), the one with the green border.
+This tutorial explains how to navigate in the 3D Viewport. Navigating means moving your point of view: turning around the scene, shifting to one side and moving closer or farther away.
+
+Knowing how to navigate is important: to make 3D models and animations comfortably and quickly, you need to know how to move around the scene and put yourself in a comfortable position to work.
+
+As explained in the [previous tutorial](viewports.md#the-active-viewport), to use the commands that follow, the 3D Viewport has to be the active viewport, the one with the green border.
 
 The three things you'll use most are **orbiting**, **panning** and **zooming**. You can do each one with the mouse, with your fingers on a touch screen or with the Nokia N95 keypad. In the PC videos, the mouse at the bottom right shows the button being pressed in green.
 

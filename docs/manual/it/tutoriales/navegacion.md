@@ -3,7 +3,11 @@
 > [!NOTE]
 > Il Nokia N95 supporta mouse e tastiera (via Bluetooth). Le parti di questo tutorial dedicate al Nokia spiegano come usarlo senza mouse né tastiera, solo con i tasti del telefono.
 
-Navigare significa spostare il tuo punto di vista: girare intorno alla scena, spostarti di lato e avvicinarti o allontanarti. La scena non cambia: gli oggetti restano dove sono, l'unica cosa che si muove è la vista. Tutto ciò che viene spiegato qui agisce sul [viewport attivo](viewports.md#il-viewport-attivo), quello con il bordo verde.
+Questo tutorial spiega come navigare nel 3D Viewport. Navigare significa spostare il tuo punto di vista: girare intorno alla scena, spostarti di lato e avvicinarti o allontanarti.
+
+Saper navigare è importante: per creare modelli 3D e animazioni in modo comodo e veloce, devi saperti muovere nella scena e metterti in una posizione comoda per lavorare.
+
+Come spiegato nel [tutorial precedente](viewports.md#il-viewport-attivo), per usare i comandi che seguono il 3D Viewport deve essere il viewport attivo, quello con il bordo verde.
 
 Le tre cose che userai di più sono **orbitare**, **spostare la vista** e fare **zoom**. Ognuna si può fare con il mouse, con le dita su uno schermo touch o con la tastiera del Nokia N95. Nei video del PC, il mouse in basso a destra mostra in verde il tasto che si sta premendo.
 

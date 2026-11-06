@@ -3,7 +3,11 @@
 > [!NOTE]
 > Nokia N95 fare ve klavyeyi (Bluetooth ile) destekler. Bu eğitimin Nokia ile ilgili kısımları, onu fare ve klavye olmadan, yalnızca telefonun tuşlarıyla nasıl kullanacağını anlatır.
 
-Gezinmek, bakış açını hareket ettirmektir: sahnenin etrafında dönmek, yana kaymak, yaklaşmak ya da uzaklaşmak. Sahne değişmez: nesneler oldukları yerde kalır, hareket eden tek şey görünümdür. Burada anlatılan her şey [etkin viewport'a](viewports.md#etkin-viewport), yani yeşil kenarlıklı olana uygulanır.
+Bu eğitimde 3D Viewport'ta nasıl gezineceğin anlatılıyor. Gezinmek, bakış açını hareket ettirmektir: sahnenin etrafında dönmek, yana kaymak, yaklaşmak ya da uzaklaşmak.
+
+Gezinmeyi bilmek önemlidir: 3D modelleri ve animasyonları rahat ve hızlı yapmak için sahnede dolaşmayı ve çalışmak için rahat bir konuma geçmeyi bilmen gerekir.
+
+[Önceki eğitimde](viewports.md#etkin-viewport) anlatıldığı gibi, aşağıdaki komutları kullanmak için 3D Viewport'un etkin viewport, yani yeşil kenarlıklı olan olması gerekir.
 
 En çok kullanacağın üç şey **yörüngede döndürme**, **kaydırma** ve **yakınlaştırma**. Her biri fareyle, dokunmatik ekranda parmaklarla ya da Nokia N95'in tuş takımıyla yapılabilir. PC videolarında sağ alttaki fare, o an basılan tuşu yeşille gösterir.
 

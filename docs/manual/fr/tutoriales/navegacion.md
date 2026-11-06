@@ -3,7 +3,11 @@
 > [!NOTE]
 > Le Nokia N95 prend en charge une souris et un clavier (en Bluetooth). Les parties de ce tutoriel consacrées au Nokia expliquent comment l'utiliser sans souris ni clavier, uniquement avec les touches du téléphone.
 
-Naviguer, c'est déplacer votre point de vue : tourner autour de la scène, vous décaler sur le côté, vous rapprocher ou vous éloigner. La scène ne change pas : les objets restent où ils sont, seule la vue bouge. Tout ce qui est expliqué ici s'applique au [viewport actif](viewports.md#le-viewport-actif), celui qui a la bordure verte.
+Ce tutoriel explique comment naviguer dans le 3D Viewport. Naviguer, c'est déplacer votre point de vue : tourner autour de la scène, vous décaler sur le côté, vous rapprocher ou vous éloigner.
+
+Savoir naviguer est important : pour créer des modèles 3D et des animations de façon confortable et rapide, il faut savoir se déplacer dans la scène et se placer dans une position confortable pour travailler.
+
+Comme expliqué dans le [tutoriel précédent](viewports.md#le-viewport-actif), pour utiliser les commandes qui suivent, le 3D Viewport doit être le viewport actif, celui qui a la bordure verte.
 
 Les trois gestes que vous utiliserez le plus sont **orbiter**, **déplacer la vue** et **zoomer**. Chacun se fait à la souris, avec les doigts sur un écran tactile ou avec le clavier du Nokia N95. Dans les vidéos sur PC, la souris en bas à droite montre en vert le bouton enfoncé.
 

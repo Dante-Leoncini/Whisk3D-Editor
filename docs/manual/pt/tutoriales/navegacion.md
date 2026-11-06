@@ -3,7 +3,11 @@
 > [!NOTE]
 > O Nokia N95 suporta mouse e teclado (por Bluetooth). As partes deste tutorial sobre o Nokia explicam como usá-lo sem mouse nem teclado, só com as teclas do telefone.
 
-Navegar é mover o seu ponto de vista: girar ao redor da cena, se deslocar para um lado e se aproximar ou se afastar. A cena não muda: os objetos ficam onde estão, e a única coisa que se move é a vista. Tudo o que é explicado aqui vale para a [viewport ativa](viewports.md#a-viewport-ativa), a da borda verde.
+Este tutorial explica como navegar na Viewport 3D. Navegar é mover o seu ponto de vista: girar ao redor da cena, se deslocar para um lado e se aproximar ou se afastar.
+
+Saber navegar é importante: para fazer modelos 3D e animações de um jeito confortável e rápido, você precisa saber se mover pela cena e se colocar numa posição confortável para trabalhar.
+
+Como foi explicado no [tutorial anterior](viewports.md#a-viewport-ativa), para usar os comandos a seguir, a Viewport 3D precisa ser a viewport ativa, a da borda verde.
 
 As três coisas que você mais vai usar são **orbitar**, **deslocar** e dar **zoom**. Cada uma pode ser feita com o mouse, com os dedos em uma tela touch ou com o teclado do Nokia N95. Nos vídeos do PC, o mouse no canto inferior direito mostra em verde o botão que está sendo apertado.
 
