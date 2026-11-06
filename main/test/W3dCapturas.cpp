@@ -9,6 +9,10 @@
 #include "render/OpcionesRender.h"    // g_redraw
 #include "objects/Objects.h"          // g_editMesh, EditSelectMode (caras)
 #include "objects/Mesh.h"             // Mesh (caras)
+#include "WhiskUI/text/font.h"         // WhiskFont->Soporta (cobertura)
+#include "config/W3dLang.h"           // los idiomas (cobertura)
+#include "w3dFilesystem.h"            // leer res/idiomas (cobertura)
+#include <set>
 #include "objects/EditMesh.h"         // EditMesh (caras)
 #include <stdio.h>
 #include <string.h>
@@ -339,6 +343,32 @@ bool W3dCapturasCmd(const std::string& cmd, std::istringstream& ss, std::string&
         }
         if (!n) { err = "caras: uso: caras <n> <n> ..."; return false; }
         g_redraw = true; Cuadro();
+        return true;
+    }
+    // 'cobertura': que la FUENTE de la interfaz pueda dibujar cada caracter de cada traduccion (res/idiomas/*.txt).
+    // Usa la fuente de verdad (Font::Soporta: font.png + font-ext.png + las compuestas), no una lista aparte.
+    if (cmd == "cobertura") {
+        extern Font* WhiskFont;
+        if (!WhiskFont) { err = "cobertura: no hay fuente"; return false; }
+        int faltan = 0;
+        for (int idi = 1; idi < (int)W3dLangCantidad; idi++) {
+            std::vector<unsigned char> b;
+            const std::string ruta = w3dFileSystem::GetResDir() + "/idiomas/" + W3dIdiomaCodigo((W3dIdioma)idi) + ".txt";
+            if (!w3dFileSystem::ReadFileBytes(ruta, b) || b.empty()) { printf("@cap cobertura %s: sin archivo\n", W3dIdiomaCodigo((W3dIdioma)idi)); continue; }
+            b.push_back(0);
+            std::set<unsigned> malos;
+            size_t i = 0;
+            while (b[i]) {
+                const uint16_t cp = UTF8_Char((const char*)&b[0], i);
+                if (cp == '\n' || cp == '\t' || cp == '\r') continue;
+                if (!WhiskFont->Soporta(cp)) malos.insert(cp);
+            }
+            printf("@cap cobertura %s: %d caracter(es) sin dibujo", W3dIdiomaCodigo((W3dIdioma)idi), (int)malos.size());
+            for (std::set<unsigned>::iterator it = malos.begin(); it != malos.end(); ++it) printf(" U+%04X", *it);
+            printf("\n");
+            faltan += (int)malos.size();
+        }
+        if (faltan) { err = "cobertura: la fuente no tiene todos los caracteres de las traducciones"; return false; }
         return true;
     }
     if (cmd == "capinfo") {

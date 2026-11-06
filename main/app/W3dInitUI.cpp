@@ -26,7 +26,9 @@ void W3dInitUI(const std::string& skinDir) {
     g_skinDir = skinDir;
     // El IDIOMA va primero: la UI que se arma abajo ya pide sus textos con T(), asi que tiene que estar resuelto
     // antes. Aca y no en cada plataforma: este init lo comparten las cinco, y el detector ya sabe preguntarle a
-    // cada SO por su lado.
+    // cada SO por su lado. Las traducciones estan en disco (res/idiomas/): T() carga la del idioma elegido la
+    // primera vez que la necesita, y solo esa.
+    W3dIdiomaCarpeta(skinDir);
     W3dIdiomaDetectar();
     // los menus declarativos se traducen solos: el toolkit llama este hook. Aca es donde el editor se lo presta.
     { extern const char* (*W3dMenuTraducir)(const char*); W3dMenuTraducir = T; }
@@ -92,6 +94,9 @@ void W3dInitUI(const std::string& skinDir) {
 
     WhiskFont = new Font(atlasW, atlasH, Textures[0]->iID);
     WhiskFont->SetScale(GlobalScale);
+    // el atlas EXTENDIDO (acentos que no estan en font.png, ss, l con barra, el cirilico...): se carga recien cuando
+    // un texto lo necesita. En ingles o en espaniol puede no cargarse nunca (ver tools/fuente_ext.py)
+    WhiskFont->SetAtlasExtendido(skinDir + "font-ext.png");
 }
 
 void W3dInitGraphics() {

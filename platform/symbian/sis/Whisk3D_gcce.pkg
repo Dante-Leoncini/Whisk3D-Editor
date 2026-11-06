@@ -27,6 +27,17 @@
 "..\..\..\res\Skins\Whisk3D\cursor3d.png"   -"!:\private\A00D021D\cursor3d.png"
 "..\..\..\res\Skins\Whisk3D\relationshipLine.png"   -"!:\private\A00D021D\relationshipLine.png"
 "..\..\..\res\Skins\Whisk3D\font.png"   -"!:\private\A00D021D\font.png"
+; el atlas EXTENDIDO de la fuente (acentos, ss, cirilico...): se carga recien cuando un texto lo necesita
+"..\..\..\res\Skins\Whisk3D\font-ext.png"   -"!:\private\A00D021D\font-ext.png"
+; las traducciones de la interfaz: el editor carga SOLO la del idioma elegido (ver main/config/W3dLang.h)
+"..\..\..\res\idiomas\es.txt"   -"!:\private\A00D021D\idiomas\es.txt"
+"..\..\..\res\idiomas\pt.txt"   -"!:\private\A00D021D\idiomas\pt.txt"
+"..\..\..\res\idiomas\fr.txt"   -"!:\private\A00D021D\idiomas\fr.txt"
+"..\..\..\res\idiomas\it.txt"   -"!:\private\A00D021D\idiomas\it.txt"
+"..\..\..\res\idiomas\tr.txt"   -"!:\private\A00D021D\idiomas\tr.txt"
+"..\..\..\res\idiomas\de.txt"   -"!:\private\A00D021D\idiomas\de.txt"
+"..\..\..\res\idiomas\pl.txt"   -"!:\private\A00D021D\idiomas\pl.txt"
+"..\..\..\res\idiomas\ru.txt"   -"!:\private\A00D021D\idiomas\ru.txt"
 "..\..\..\res\Skins\Whisk3D\skin.ini"   -"!:\private\A00D021D\skin.ini"
 ; atlas de iconos (arte dinamico, igual que PC): sin esto Symbian usa la tabla legacy de font.png
 ; (disquete de guardar = archivador, keyframe recortado). Ver W3dInitUI/SkinAtlasArmar.

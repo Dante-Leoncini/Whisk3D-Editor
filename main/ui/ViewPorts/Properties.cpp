@@ -1810,9 +1810,8 @@ static void AccionMenuIdioma(){
     if (!MenuIdioma){ MenuIdioma = new PopupMenu(); MenuIdioma->action = AccionIdiomaElegido; }
     MenuIdioma->Limpiar();
     // los idiomas se listan en SU PROPIO nombre y no traducidos: el que abre esto capaz no entiende el idioma actual
-    MenuIdioma->Agregar("English",   (int)W3dLangEN);
-    MenuIdioma->Agregar("Español",   (int)W3dLangES);
-    MenuIdioma->Agregar("Portugues", (int)W3dLangPT);
+    // (las letras que font.png no tiene -la c cedilla, el cirilico- salen del atlas extendido de la fuente)
+    for (int i = 0; i < (int)W3dLangCantidad; i++) MenuIdioma->Agregar(W3dIdiomaNombre((W3dIdioma)i), i);
     AbrirMenuBajoBoton(MenuIdioma, PropsActivo->propAjIdioma->button);
 }
 

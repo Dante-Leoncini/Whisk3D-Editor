@@ -12,7 +12,6 @@
 #include <filesystem>   // W3dDebugFile: los dumps de debug van a la carpeta debug, no a la raiz
 #include "w3dFilesystem.h"   // el test de Ajustes lee el config.ini de vuelta del disco
 #include "W3dLang.h"
-#include "W3dLangTabla.h"
 #include <cmath>               // sqrt (skindump)
 #include "audio/W3dAudio.h"   // audiograbar / audionivel: el mixer sin dispositivo
 #include <ctime>               // nombresperf: clock() para la cota de tiempo
@@ -29970,13 +29969,11 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         printf("      [lang] idioma detectado del SISTEMA: %s\n", W3dIdiomaNombre(g_idioma));
         g_idioma = prevDet;
 
-        // ---- la tabla esta ORDENADA: de eso depende la biseccion de T() ----
-        bool ordenada = true;
-        for (unsigned int i = 1; i < W3D_LANG_ENTRADAS; i++)
-            if (strcmp(W3dLangTabla[i-1].en, W3dLangTabla[i].en) >= 0) ordenada = false;
-        printf("      [lang] tabla: %u entradas | ordenada (la biseccion lo exige): %s\n",
-               W3D_LANG_ENTRADAS, ordenada ? "OK" : "MAL");
-        if (!ordenada) ok = false;
+        // ---- las traducciones de DISCO (res/idiomas/<codigo>.txt): cuantas frases carga cada idioma ----
+        for (int i = 1; i < (int)W3dLangCantidad; i++)
+            printf("      [lang] %s (%s): %u frases\n", W3dIdiomaCodigo((W3dIdioma)i), W3dIdiomaNombre((W3dIdioma)i),
+                   W3dIdiomaFrases((W3dIdioma)i));
+        if (!W3dIdiomaFrases(W3dLangES) || !W3dIdiomaFrases(W3dLangPT)) { printf("      [lang] sin es.txt / pt.txt MAL\n"); ok = false; }
 
         // ---- ingles = la clave, tal cual ----
         W3dIdiomaSet(W3dLangEN);
@@ -30000,17 +29997,35 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
                strcmp(falta, "Esto No Existe En La Tabla")==0 ? "OK (cae al ingles)" : "MAL");
         if (strcmp(falta, "Esto No Existe En La Tabla") != 0) ok = false;
 
-        // ---- la biseccion encuentra TODAS las entradas (no solo la del medio) ----
-        int fallos = 0;
-        W3dIdiomaSet(W3dLangES);
-        for (unsigned int i = 0; i < W3D_LANG_ENTRADAS; i++){
-            const char* r = T(W3dLangTabla[i].en);
-            const char* esperado = (W3dLangTabla[i].es[0]) ? W3dLangTabla[i].es : W3dLangTabla[i].en;
-            if (strcmp(r, esperado) != 0) fallos++;
+        // ---- la busqueda encuentra TODAS las frases de cada archivo (los hashes y la biseccion, de punta a punta):
+        //      se lee cada .txt aca, por separado, y T() tiene que devolver exactamente su traduccion ----
+        for (int idi = 1; idi < (int)W3dLangCantidad; idi++){
+            std::vector<unsigned char> b;
+            const std::string ruta = w3dFileSystem::GetResDir() + "/idiomas/" + W3dIdiomaCodigo((W3dIdioma)idi) + ".txt";
+            if (!w3dFileSystem::ReadFileBytes(ruta, b) || b.empty()) continue;
+            std::string txt((const char*)&b[0], b.size());
+            struct D { static std::string Des(const std::string& x){ std::string o; for (size_t i = 0; i < x.size(); i++){
+                if (x[i] == '\\' && i + 1 < x.size() && (x[i+1] == 'n' || x[i+1] == 't' || x[i+1] == '\\')){
+                    o += (x[i+1] == 'n') ? '\n' : (x[i+1] == 't') ? '\t' : '\\'; i++; } else o += x[i]; } return o; } };
+            W3dIdiomaSet((W3dIdioma)idi);
+            int frases = 0, fallos = 0;
+            size_t pos = 0;
+            while (pos < txt.size()){
+                size_t fin = txt.find('\n', pos); if (fin == std::string::npos) fin = txt.size();
+                const std::string lin = txt.substr(pos, fin - pos);
+                pos = fin + 1;
+                const size_t tab = lin.find('\t');
+                if (tab == std::string::npos || tab + 1 >= lin.size()) continue;
+                const std::string clave = D::Des(lin.substr(0, tab)), tr = D::Des(lin.substr(tab + 1));
+                frases++;
+                if (tr != T(clave.c_str())){ fallos++;
+                    if (fallos <= 3) printf("         %s: T('%.40s') = '%.40s' (esperado '%.40s')\n",
+                                            W3dIdiomaCodigo((W3dIdioma)idi), clave.c_str(), T(clave.c_str()), tr.c_str()); }
+            }
+            printf("      [lang] %s: las %d frases del archivo, %d mal -> %s\n", W3dIdiomaCodigo((W3dIdioma)idi),
+                   frases, fallos, fallos == 0 ? "OK" : "MAL");
+            if (fallos) ok = false;
         }
-        printf("      [lang] biseccion sobre las %u entradas: %d fallos -> %s\n",
-               W3D_LANG_ENTRADAS, fallos, fallos==0 ? "OK" : "MAL");
-        if (fallos) ok = false;
 
         // ---- LA PESTANIA "Constraints" ENTERA, en espaniol y en portugues ----
         // Es lo primero que ve el dueno al abrir la pestania, y una cadena que falta no rompe
@@ -30053,8 +30068,8 @@ bool W3dRunCommand(const std::string& linea, std::string& err) {
         struct C { const char* cod; W3dIdioma esp; };
         const C casos[] = { {"es", W3dLangES}, {"es-AR", W3dLangES}, {"es_MX.UTF-8", W3dLangES},
                             {"ES", W3dLangES}, {"pt", W3dLangPT}, {"pt-BR", W3dLangPT},
-                            {"en", W3dLangEN}, {"en-US", W3dLangEN}, {"de", W3dLangEN},
-                            {"fr_FR", W3dLangEN}, {"e", W3dLangEN}, {"", W3dLangEN} };
+                            {"en", W3dLangEN}, {"en-US", W3dLangEN}, {"de", W3dLangDE},
+                            {"fr_FR", W3dLangFR}, {"e", W3dLangEN}, {"", W3dLangEN} };
         int malos = 0;
         for (int i = 0; i < 12; i++){
             W3dIdioma r = W3dIdiomaDe(casos[i].cod);

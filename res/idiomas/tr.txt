@@ -1,0 +1,1731 @@
+" already exists. Do you want to replace it?	" zaten var. Değiştirilsin mi?
+"%s" is in use by %d user(s). Delete it anyway? Its users will be left without it.	"%s" kullanımda (%d kullanıcı). Yine de silinsin mi? Kullanıcıları onsuz kalacak.
+"%s" is used by %d object(s). Delete it anyway?	"%s", %d nesne tarafından kullanılıyor. Yine de silinsin mi?
+#+Down	#+Aşağı
+#+Left/Right	#+Sol/Sağ
+#+Up	#+Yukarı
+%d animation curve(s) of the selection no longer animate anything (Undo brings them back)	Seçimin %d animasyon eğrisi artık hiçbir şeyi canlandırmıyor (Geri Al geri getirir)
+%d object(s) got their own copy of the mesh	%d nesnenin artık kendi örgü kopyası var
+%d object(s) of the project use 3D meshes of "%s": each one gets its own copy (Ctrl+Z undoes it). Unlink it?	Projedeki %d nesne "%s" içindeki 3D örgüleri kullanıyor: her biri kendi kopyasını alır (Ctrl+Z geri alır). Bağlantı kesilsin mi?
+%d reference(s) of the unpacked objects now find another object with the same name	Paketten çıkarılan nesnelerin %d referansı artık aynı adlı başka bir nesneyi buluyor
+%d resources are in use (%d users). Delete them anyway? Their users will be left without them.	%d kaynak kullanımda (%d kullanıcı). Yine de silinsin mi? Kullanıcıları onlarsız kalacak.
+(Esc to cancel)	(İptal için Esc)
+(choose)	(seç)
+(coming soon)	(yakında)
+(default)	(varsayılan)
+(empty)	(boş)
+(no .lua scripts)	(.lua betiği yok)
+(no properties yet)	(henüz özellik yok)
+(none)	(yok)
+(not shared)	(paylaşılmıyor)
+(nothing to choose)	(seçilecek bir şey yok)
+(root)	(kök)
+(this routine)	(bu rutin)
+16-bit textures	16 bit dokular
+2D Armature Animation	2D İskelet Animasyonu
+2D Cursor	2D İmleç
+2D Editor	2D Düzenleyici
+2D armature animation: the mesh has no 2D armature	2D iskelet animasyonu: örgünün 2D iskeleti yok
+3D Cursor	3D İmleç
+3D Mesh	3D Örgü
+3D Mesh of	3D Örgü:
+3D Meshes	3D Örgüler
+3D Viewport	3D Görünüm
+3D grid	3D ızgara
+: baked	: pişirildi
+A W3D proxy is read-only: it can't be unpacked	W3D proxy salt okunur: paketten çıkarılamaz
+A different file already exists there	Orada farklı bir dosya zaten var
+A flipbook uses it	Bir flipbook kullanıyor
+A game has no animation to render	Oyunun render alınacak animasyonu yok
+A game has no keyframes: choose one of its clips in the timeline to animate	Oyunun anahtar karesi yok: canlandırmak için zaman çizelgesinde kliplerinden birini seçin
+A prefab can't be converted	Prefab dönüştürülemez
+A prefab can't contain itself	Prefab kendini içeremez
+A prefab instance only has what its prefab generates	Prefab örneği yalnızca prefabının ürettiklerini içerir
+A project needs at least one scene	Projenin en az bir sahnesi olmalı
+A scene can't contain itself	Sahne kendini içeremez
+A scene with that name already existed, renamed:	Bu adda bir sahne zaten vardı, yeni adı:
+A texture with that name already exists	Bu adda bir doku zaten var
+Above: once at start. Below: every frame.	Üstte: başta bir kez. Altta: her karede.
+Abrir normal map	Normal haritası aç
+Absolute	Mutlak
+Acceleration	İvme
+Accept	Kabul et
+Actions	Eylemler
+Active	Etkin
+Active Camera	Etkin Kamera
+Active Element	Etkin öğe
+Active camera	Etkin kamera
+Add	Ekle
+Add Circle	Daire Ekle
+Add Color	Renk ekle
+Add Color Layer	Renk Katmanı Ekle
+Add Cone	Koni Ekle
+Add Cube	Küp Ekle
+Add Cylinder	Silindir Ekle
+Add Layer	Katman ekle
+Add Library...	Kütüphane ekle...
+Add Plane	Düzlem Ekle
+Add UV Group	UV Grubu Ekle
+Add UV Map	UV Haritası Ekle
+Add UV Sphere	UV Küre Ekle
+Add Vertex Group	Köşe Grubu Ekle
+Add shortcut	Kısayol ekle
+Added to the library	Kütüphaneye eklendi
+Additive	Toplamsal
+Additive (by alpha)	Toplamsal (alfaya göre)
+Advanced: custom shader	Gelişmiş: özel shader
+Affect	Etkiler
+Affect Move	Taşımayı Etkile
+Affect Rotate	Döndürmeyi Etkile
+Affect Scale	Ölçeklemeyi Etkile
+Affected	Etkilenen
+Align	Hizala
+Align X	X Hizala
+Align Y	Y Hizala
+Aligned	Hizalı
+All	Tümü
+All Transforms	Tüm Dönüşümler
+All parts	Tüm parçalar
+All shortcuts restored	Kısayollar sıfırlandı
+Allow	İzin ver
+Alpha	Alfa
+Alpha (normal)	Alfa (normal)
+Alpha Map	Alfa haritası
+Alpha Preview	Alfa Önizleme
+Alpha Test	Alfa kesme
+Alpha channel	Alfa kanalı
+Alpha kept per second	Saniyede kalan alfa
+Alpha only	Yalnızca alfa
+Alpha order	Alfa sırası
+Alpha reference	Alfa referansı
+Alpha test	Alfa testi
+Alpha test on/off	Alfa testi aç/kapat
+Always	Her zaman
+Ambient	Ortam
+Ambient light	Ortam ışığı
+An animated material uses it	Animasyonlu bir malzeme kullanıyor
+Anamorphic Ratio	Anamorfik oran
+Anchor	Çapa
+Angle	Açı
+Angle random	Rastgele açı (±)
+Animation	Animasyon
+Animation deleted: 	Animasyon silindi: 
+Animation rendered!	Animasyon render alındı!
+Animations	Animasyonlar
+Animations of	Animasyonlar:
+Antialiasing	Kenar yumuşatma
+Any orientation	Tüm yönler
+Anywhere	Her yerde
+Apply	Uygula
+Apply Modifier	Değiştiriciyi Uygula
+Apply Modifiers	Değiştiricileri Uygula
+Apply Transforms	Dönüşümleri Uygula
+Apply: select mesh or armature object(s)	Uygula: örgü veya iskelet nesne(leri) seçin
+Arc	Yay
+Armature	İskelet
+Armature 2D	2D İskelet
+Armature Animation	İskelet Animasyonu
+Array	Dizi
+Array on/off	Diziyi aç/kapat
+Array: a memory @name[i] = count, then first/last triangle pairs (last -1 = max). Empty = the parts.	Dizi: bir bellek @ad[i] = sayı, sonra ilk/son üçgen çiftleri (son -1 = en fazla). Boş = parçalar.
+Array: a memory @name[i] = count, then first/last triangle pairs (last -1 = max). Empty = the whole part.	Dizi: bir bellek @ad[i] = sayı, sonra ilk/son üçgen çiftleri (son -1 = en fazla). Boş = parçanın tamamı.
+Aspect	En-boy
+Assets	Varlıklar
+Assign	Ata
+At Center	Merkezde
+At Cursor	İmleçte
+Atlas	Atlas
+Att Constant	Att Sabit
+Att Linear	Att Doğrusal
+Att Quadratic	Att Karesel
+Audible range	Duyulma menzili
+Auto	Oto
+Auto (active part)	Oto (etkin parça)
+Auto Clamped	Oto Sınırlı
+Auto Fit	Alana sığdır
+Auto Key	Oto Anahtar
+Auto Keyframe	Otomatik anahtar kare
+Auto Keyframe: Off	Otomatik anahtar kare: kapalı
+Auto Keyframe: On	Otomatik anahtar kare: açık
+Auto Merge	Oto Kaynaştır
+Auto frame	Oto çerçeve
+Automatic	Otomatik
+Automatic Easing	Otomatik yumuşatma
+Automatic UVs were generated to paint	Boyama için otomatik UV oluşturuldu
+Axis	Eksen
+Axis Angle	Eksen Açısı
+Axis X	X Ekseni
+Axis Y	Y Ekseni
+Axis Z	Z Ekseni
+BSP (pending)	BSP (beklemede)
+BSP: the .w3dbsp file is missing (Culling.bsp)	BSP: .w3dbsp dosyası eksik (Culling.bsp)
+Back	Arka
+Back (overshoot)	Geri tepme
+Back View	Arka görünüm
+Background	Arka plan
+Base Color	Temel Renk
+Base velocity	Temel hız
+Bevel	Pah
+Bevel Edges	Kenarlara Pah Kır
+Bevel Vertices	Köşelere Pah Kır
+Bevel: enter Edit Mode first	Pah: önce Düzenleme Moduna girin
+Bevel: move away from the center = width, wheel / up-down = segments, V = vertices/edges, click to confirm	Pah: merkezden uzaklaş = genişlik, tekerlek / yukarı-aşağı = bölüm, V = köşe/kenar, onay için tıkla
+Bevel: select edges first	Pah: önce kenarları seçin
+Bevel: select vertices first	Pah: önce köşeleri seçin
+Bezier	Bezier
+Billboard	Billboard
+Bind texture	Dokuyu bağla
+Bits	Bit
+Black Letterbox	Siyah bantlar
+Blank	Düz
+Blend	Karışım
+Blend mode	Karışım modu
+Blending	Karışım
+Blending on/off	Karışım aç/kapat
+Bloom	Bloom
+Blue	Mavi
+Blur	Bulanıklık
+Bone	Kemik
+Bones	Kemikler
+Boolean	Boolean
+Boolean Object	Boolean nesnesi
+Border	Kenarlık
+Border Color	Kenarlık rengi
+Border Scale	Kenarlık ölçeği
+Border X	Kenarlık X
+Border Y	Kenarlık Y
+Borderless	Kenarlıksız
+Bottom	Alt
+Bottom View	Alt görünüm
+Bounce	Sekme
+Boundary	Sınır
+Box (memory)	Kutu (bellek)
+Box Select	Kutu Seçimi
+Box X	Kutu X
+Box Y	Kutu Y
+Box Z	Kutu Z
+Branches	Dallar
+Build game	Oyunu derle
+Build: a build is already running	Derle: zaten bir derleme sürüyor
+Build: a library uses files by absolute path; they do not travel with the game	Derle: bir kütüphane mutlak yollu dosyalar kullanıyor; bunlar oyunla gitmez
+Build: could not generate CMakeLists.txt	Derle: CMakeLists.txt oluşturulamadı
+Build: could not generate main.cpp	Derle: main.cpp oluşturulamadı
+Build: could not generate the Android script	Derle: Android betiği oluşturulamadı
+Build: could not open the library	Derle: kütüphane açılamadı
+Build: could not pack the assets	Derle: varlıklar paketlenemedi
+Build: could not read the icon; continuing without it	Derle: simge okunamadı; simgesiz devam ediliyor
+Build: could not write a scene (.w3dui)	Derle: bir sahne yazılamadı (.w3dui)
+Build: could not write the .w3dui	Derle: .w3dui yazılamadı
+Build: error in a Lua script: 	Derle: Lua betiğinde hata: 
+Build: the Whisk3D repo (runtime sources) was not found. Set the repo folder in Settings (or build from the source tree).	Derle: Whisk3D deposu (runtime kaynakları) bulunamadı. Depo klasörünü Ayarlar'dan belirleyin (veya kaynak ağacından derleyin).
+Build: the project has no scripts (add them to a Script object)	Derle: projede betik yok (bir Betik nesnesine ekleyin)
+Build: there are external references outside the project folder; they do not travel with the game	Derle: proje klasörü dışında harici referanslar var; bunlar oyunla gitmez
+Build: there is no UI in the scene	Derle: sahnede hiç UI yok
+Button	Düğme
+By Distance	Mesafeye göre
+By words	Kelimelere göre
+Bytes	Bayt
+C+Left	C+Sol
+C+Right	C+Sağ
+CPU memory	CPU belleği
+Call Lua	Lua çağır
+Call routine	Rutin çağır
+Camera	Kamera
+Camera View	Kamera görünümü
+Cameras	Kameralar
+Cancel	İptal
+Cancelled	İptal edildi
+Cargar normal map	Normal haritası yükle
+Cargar textura (imagen)	Doku yükle (görüntü)
+Cell size	Hücre boyutu
+Center	Merkez
+Center X	Merkez X
+Center Y	Merkez Y
+Center Z	Merkez Z
+Center of frame	Kare merkezi
+Changes will be lost in:	Değişiklikler kaybolacak:
+Channels	Kanallar
+Child Of	Alt Öğesi
+Children	Alt öğeler
+Choose a shader	Bir shader seçin
+Choose file	Dosya seç
+Choose...	Seç...
+Circle	Daire
+Circular	Dairesel
+Clamp	Sınırla
+Clamp Overlap	Örtüşmeyi sınırla
+Clear	Temizle
+Clear Depth	Derinliği Temizle
+Clear Inverse	Tersi Temizle
+Clear Keyframe	Anahtar Kareleri Temizle
+Clear Location (Pose)	Konumu Temizle (Poz)
+Clear Original File	Orijinal Dosyayı Unut
+Clear Parent	Ebeveyni Kaldır
+Clear Parent Inverse	Ebeveyn Tersini Temizle
+Clear Rotation (Pose)	Dönmeyi Temizle (Poz)
+Clear Screen	Ekranı Temizle
+Clear Seam	Dikişi Temizle
+Clear Sharp	Keskinliği Temizle
+Clear Transform	Dönüşümü Temizle
+Clear UV Group Weights	UV Grubu Ağırlıklarını Temizle
+Clear and Keep Transformation	Temizle ve Dönüşümü Koru
+Clear color	Temizleme rengi
+Clear depth	Derinliği temizle
+Clear screen	Ekranı temizle
+Click the game to capture the mouse (Esc releases it)	Fareyi yakalamak için oyuna tıklayın (Esc bırakır)
+Clip default	Klip varsayılanı
+Clip to rect	Dikdörtgene kırp
+Clipping	Kırpma
+Clips	Klipler
+Clone screen	Ekranı klonla
+Close	Kapat
+Closest	En Yakın
+Collapse	Çökert
+Collection	Koleksiyon
+Color	Renk
+Color Grid	Renk Izgarası
+Color Layers	Renk katmanları
+Color Mode	Renk Modu
+Color at death	Ölürkenki renk
+Color buffer	Renk tamponu
+Color pointer	Renk işaretçisi
+Colored grain	Renkli gren
+Colors	Renkler
+Columns	Sütunlar
+Compile	Derle
+Compiled	Derlendi
+Complete	Tam
+Component	Bileşen
+Cone	Koni
+Confirm	Onayla
+Connect Vertex Path	Köşe Yolunu Bağla
+Connect: no path between the vertices	Bağla: köşeler arasında yol yok
+Connect: select exactly 2 vertices	Bağla: tam olarak 2 köşe seçin
+Connect: the line leaves the surface	Bağla: çizgi yüzeyin dışına çıkıyor
+Connect: the vertices are already connected	Bağla: köşeler zaten bağlı
+Connect: the vertices are not visible	Bağla: köşeler görünmüyor
+Connected	Bağlı
+Connected Only	Yalnızca Bağlı
+Console	Konsol
+Constant	Sabit
+Constant Offset	Sabit ofset
+Constraint	Kısıtlama
+Constraints	Kısıtlamalar
+Constructor	Yapıcı
+Contain	Sığdır
+Container	Kapsayıcı
+Context	Bağlam
+Context menu	Bağlam menüsü
+Continue without saving	Kaydetmeden devam et
+Control	Kontrol
+Convert to Game	Oyuna dönüştür
+Convert to Scene	Sahneye dönüştür
+Convert to editable mesh	Düzenlenebilir örgüye dönüştür
+Copied	Kopyalandı
+Copy	Kopyala
+Copy X	X Kopyala
+Copy Y	Y Kopyala
+Copy Z	Z Kopyala
+Core (advanced)	Çekirdek (gelişmiş)
+Correct UVs	UV'leri Düzelt
+Could not copy the objects	Nesneler kopyalanamadı
+Could not create a viewport on the external display: cloning the screen	Harici ekranda görünüm oluşturulamadı: ekran klonlanıyor
+Could not encode the PNG	PNG kodlanamadı
+Could not import	İçe aktarılamadı
+Could not read the file	Dosya okunamadı
+Could not write config.ini	config.ini yazılamadı
+Could not write the file	Dosya yazılamadı
+Count	Adet
+Cover	Kapla
+Create	Oluştur
+Create Prefab	Prefab oluştur
+Cube	Küp
+Cube Projection	Küp İzdüşümü
+Cubic	Kübik
+Culling	Culling
+Current Frame	Geçerli Kare
+Current node	Geçerli düğüm
+Cursor	İmleç
+Cursor to Active	İmleç Etkine
+Cursor to Center	İmleç Merkeze
+Cursor to Grid	İmleç Izgaraya
+Cursor to Selected	İmleç Seçilene
+Cursor to Selection	İmleç Seçime
+Cursor to World Origin	İmleç Dünya Orijinine
+Curve	Eğri
+Curves	Eğriler
+Custom	Özel
+Custom Normal	Özel Normal
+Custom shader	Özel shader
+Custom: edit the curve	Özel: eğriyi düzenleyin
+Cut	Kes
+Cutoff	Kesim
+Cylinder	Silindir
+Cylinder Projection	Silindir İzdüşümü
+Debug mode	Hata ayıklama modu
+Decal	Çıkartma
+Decimals	Ondalık
+Default Material	Varsayılan Malzeme
+Delete	Sil
+Delete "%s" (%s) with all its objects?	"%s" (%s) tüm nesneleriyle silinsin mi?
+Delete "%s"?	"%s" silinsin mi?
+Delete %d objects?	%d nesne silinsin mi?
+Delete %d scenes, games or prefabs with all their objects?	%d sahne, oyun veya prefab tüm nesneleriyle silinsin mi?
+Delete Edge Loops: select an edge loop first	Kenar Döngülerini Sil: önce bir kenar döngüsü seçin
+Delete Edge Loops: select an edge shared by two faces	Kenar Döngülerini Sil: iki yüzün paylaştığı bir kenar seçin
+Delete Folder	Klasörü sil
+Delete Keyframe	Anahtar Kareyi Sil
+Delete Keyframe: no keyframe at the current frame	Anahtar kareyi sil: geçerli karede anahtar kare yok
+Delete Keyframe: the animation needs at least one keyframe	Anahtar kareyi sil: animasyonun en az bir anahtar karesi olmalı
+Delete Normals Layer	Normal katmanını sil
+Delete Palette	Paleti sil
+Delete editing data	Düzenleme verilerini sil
+Delete normals layer: select an object animation in the timeline	Normal katmanını sil: zaman çizelgesinde bir nesne animasyonu seçin
+Delete selected?	Seçilenler silinsin mi?
+Delete step	Adımı sil
+Delete the orphan resource	Sahipsiz kaynağı sil:
+Delete the orphan resources	Sahipsiz kaynakları sil
+Deleted	Silindi
+Denoiser	Gürültü giderici
+Density	Yoğunluk
+Depth	Derinlik
+Depth & clear	Derinlik ve temizleme
+Depth Bias	Derinlik sapması
+Depth Bias (m)	Derinlik sapması (m)
+Depth Test	Derinlik Testi
+Depth bias	Derinlik sapması
+Depth buffer	Derinlik tamponu
+Depth function	Derinlik fonksiyonu
+Depth of field	Alan derinliği
+Depth range	Derinlik aralığı
+Depth shift (m)	Derinlik kayması (m)
+Depth test	Derinlik testi
+Depth write	Derinlik yazma
+Deselect	Seçimi kaldır
+Deselect All	Tüm seçimi kaldır
+Detect bodies	Cisimleri algıla
+Device	Cihaz
+Device name	Cihaz adı
+Dies below alpha	Şu alfanın altında ölür
+Difference	Fark
+Diffuse	Difüz
+Diffusion	Yayılma
+Directional	Yönlü
+Discard the unsaved changes of	Kaydedilmemiş değişiklikleri at:
+Disconnect	Bağlantıyı kes
+Disconnect Bone	Kemik bağlantısını kes
+Display in Edit Mode	Düzenleme Modunda Göster
+Display in Viewport	Görünümde Göster
+Distance	Mesafe
+Distance X	Mesafe X
+Distances	Mesafeler
+Distribution	Dağılım
+Don't allow	İzin verme
+Done by CPU on this graphics backend (slow)	Bu grafik arka ucunda CPU ile yapılır (yavaş)
+Dope Sheet	Anahtar Tablosu
+Drag (speed kept per second)	Direnç (saniyede kalan hız)
+Drag the points, click to add	Noktaları sürükleyin, eklemek için tıklayın
+Draw	Çiz
+Draw children	Alt öğeleri çiz
+Draw elements	Öğeleri çiz
+Draw in outliner order	Outliner sırasıyla çiz
+Draw mesh	Örgüyü çiz
+Drop a .wav on the library or on the 3D view	Kütüphaneye veya 3D görünüme bir .wav bırakın
+Drop an element of a library	Bir kütüphane öğesi bırakın
+Drop it on a character with an armature	İskeleti olan bir karakterin üzerine bırakın
+Drop it on a compatible selector	Uyumlu bir seçicinin üzerine bırakın
+Drop it on a mesh	Bir örgünün üzerine bırakın
+Drop the library, not a clip	Klibi değil, kütüphaneyi bırakın
+Duplicate	Çoğalt
+Duplicate Linked	Bağlantılı Çoğalt
+Duplicate Objects	Nesneleri Çoğalt
+Duplicate Resource	Kaynağı çoğalt
+Duplicated	Çoğaltıldı
+Duration	Süre
+During a transform	Dönüşüm sırasında
+Dynamic	Dinamik
+Ease In	Girişte
+Ease In and Out	Giriş ve çıkışta
+Ease Out	Çıkışta
+Easing Type	Yumuşatma Türü
+Edge	Kenar
+Edge Center	Kenar Merkezi
+Edge Loops	Kenar Döngüleri
+Edge Rail	Kenar rayı
+Edges	Kenarlar
+Edit	Düzenle
+Edit Bones	Kemikleri Düzenle
+Edit Mode	Düzenleme Modu
+Edit Prefab	Prefabı düzenle
+Edit Scene	Sahneyi düzenle
+Edit in the IDE	IDE'de düzenle
+Editing	Düzenleme
+Editing data deleted (mesh not editable)	Düzenleme verileri silindi (örgü düzenlenemez)
+Effects	Efektler
+Elastic	Elastik
+Elegir archivo	Dosya Seç
+Element	Öğe
+Element of	Öğe:
+Emission	Işıma
+Emission Map	Işıma haritası
+Empty	Boş
+Empty routine	Boş rutin
+Enable	Etkinleştir
+Enabled	Etkin
+End	Son
+End color	Bitiş rengi
+End of frame	Kare sonu
+End:%d	Son:%d
+Entry	Giriş
+Equal	Eşit
+Equirectangular (software)	Eşdikdörtgen (yazılım)
+Error rendering animation	Animasyon render alınırken hata
+Error: could not save the OBJ	Hata: OBJ kaydedilemedi
+Error: could not save the render	Hata: render kaydedilemedi
+Errors only	Yalnızca hatalar
+Esto modificara el vertex group y lo simplificara a 1 hueso por vertice (skinning mas rapido). Puede haber perdida de datos.	Bu, köşe grubunu değiştirip köşe başına 1 kemiğe sadeleştirecek (daha hızlı skinning). Veri kaybı olabilir.
+Exclude X (plane)	X hariç (düzlem)
+Exclude Y (plane)	Y hariç (düzlem)
+Exclude Z (plane)	Z hariç (düzlem)
+Expand	Genişlet
+Exponential	Üstel
+Exponential squared	Üstel kare
+Export	Dışa Aktar
+Export UI	UI Dışa Aktar
+Export UI to...	UI dışa aktar...
+Export UV Layout	UV Düzenini Dışa Aktar
+Export UV Layout...	UV Düzenini Dışa Aktar...
+Export to...	Dışa aktar...
+External	Harici
+External (choose where)...	Harici (yer seç)...
+External display	Harici ekran
+Extract assets	Varlıkları çıkar
+Extract: save the project first (the assets live inside the .w3d)	Çıkar: önce projeyi kaydedin (varlıklar .w3d içinde durur)
+Extrude	Ekstrüde
+Extrude Bone	Kemiği Ekstrüde Et
+Extrude Edges	Kenarları Ekstrüde Et
+Extrude Faces	Yüzleri Ekstrüde Et
+Extrude Vertices	Köşeleri Ekstrüde Et
+F-stop	Diyafram (f)
+FBX export: not available yet	FBX dışa aktarma: henüz yok
+FBX imported successfully!	FBX içe aktarıldı!
+FOV	FOV
+FPS	FPS
+Face	Yüz
+Face Center	Yüz merkezi
+Face Nearest	En yakın yüz
+Face Normal	Yüz Normali
+Face Project	Yüze yansıt
+Face Strength	Yüz gücü
+Face culling	Yüz ayıklama
+Face the camera	Kameraya bak
+Faces	Yüzler
+Faces triangulated	Yüzler üçgenlendi
+Factor	Faktör
+Factor X	Faktör X
+Fade in	Belirme
+Fade out	Solma
+Falloff	Azalma
+Far	Uzak
+Far fade from	Uzak solma başı
+Far fade to	Uzak solma sonu
+Fast Mode	Hızlı mod
+File	Dosya
+File name	Dosya adı
+File size	Dosya boyutu
+Fill	Doldur
+Film grain	Film greni
+Filter	Filtre
+Filtering	Filtreleme
+Find	Bul
+Find and Replace	Bul ve değiştir
+Find...	Bul...
+Finish the current transform first	Önce geçerli dönüşümü bitirin
+First triangle	İlk üçgen
+Fit	Sığdırma
+Flags	Bayraklar
+Flags (memory)	Bayraklar (bellek)
+Flat	Düz
+Flip	Çevir
+Flip Normals	Normalleri Çevir
+Flipbook frames	Flipbook kareleri
+Flipbooks	Flipbook'lar
+Float	Ondalık
+Floor	Zemin
+Focus distance	Odak mesafesi
+Focus object	Odak nesnesi
+Fog	Sis
+Fog color	Sis rengi
+Fog density	Sis yoğunluğu
+Fog end	Sis sonu
+Fog mode	Sis modu
+Fog on/off	Sis aç/kapat
+Fog start	Sis başı
+Folder	Klasör
+Folders	Klasörler
+Follow Active Quads	Etkin Dörtgenleri Takip Et
+Follow Active Quads: no neighbouring quads	Etkin Dörtgenleri Takip Et: komşu dörtgen yok
+Follow Active Quads: select faces first	Etkin Dörtgenleri Takip Et: önce yüzleri seçin
+Follow Active Quads: the active face must be a selected quad	Etkin Dörtgenleri Takip Et: etkin yüz seçili bir dörtgen olmalı
+Font	Yazı tipi
+Fonts	Yazı tipleri
+Format	Biçim
+Fraction	Kesir
+Frame	Kare
+Frame All	Tümünü Çerçevele
+Frame Selected	Seçileni Çerçevele
+Frame X	Kare X
+Frame rate (0 = whole life)	Kare hızı (0 = tüm ömür)
+Frames	Kareler
+Free	Serbest
+Freely	Serbestçe
+Friction	Sürtünme
+Front	Ön
+Front View	Ön görünüm
+Front to back	Önden arkaya
+Frustum (AABB)	Frustum (AABB)
+Full volume radius	Tam ses yarıçapı
+Fullscreen	Tam ekran
+Function	Fonksiyon
+GL Light	GL Işığı
+GPU (A-Trous)	GPU (A-Trous)
+GPU memory	GPU belleği
+GPU-only meshes	Yalnızca GPU'daki örgüler
+Game	Oyun
+Game UID generated (saved with the project)	Oyun UID'si oluşturuldu (projeyle kaydedilir)
+Game View	Oyun görünümü
+Gap	Boşluk
+General	Genel
+Generated by	Üreten:
+Geometry to Origin	Geometriyi Orijine
+Give the project a name to save it	Kaydetmek için projeye bir ad verin
+Gizmo	Gizmo
+Global	Global
+Go back	Geri git
+Go to end	Sona git
+Go to start	Başa git
+Grab step	Adımı tut
+Grain size	Gren boyutu
+Graphics	Grafik
+Gravity	Yerçekimi
+Green	Yeşil
+Green+Left soft	Yeşil+Sol soft
+Grid	Izgara
+Grid (cells)	Izgara (hücreler)
+Grid Cull	Grid Cull
+Grid Fill	Izgara Dolgusu
+Group	Grup
+Growth (size per second)	Büyüme (saniyede boyut)
+Growth kept per second	Saniyede kalan büyüme
+Handle Type	Tutamaç Türü
+Handle type	Tutamaç türü
+Harden Normals	Normalleri Sertleştir
+Height	Yükseklik
+Hide / Show	Gizle / Göster
+Hide/Show	Gizle/Göster
+Hierarchy Clip	Hiyerarşi klibi
+Hierarchy Clips	Hiyerarşi klipleri
+Hitbox	Hitbox
+Hover	Üzerindeyken
+Hue	Ton
+IDE: could not read	IDE: okunamadı:
+IDE: could not save inside the project:	IDE: proje içine kaydedilemedi:
+IDE: could not write	IDE: yazılamadı:
+IDE: saving failed:	IDE: kaydetme başarısız:
+IOR	IOR
+Icon	Simge
+Ignore order	Sırayı yoksay
+Image	Görüntü
+Import FBX	FBX İçe Aktar
+Import GLB	GLB İçe Aktar
+Import OBJ	OBJ İçe Aktar
+Import glTF	glTF İçe Aktar
+Import w3dui	w3dui İçe Aktar
+Imported	İçe aktarıldı
+Imports	İçe aktar
+In the .w3d	.w3d içinde
+In use	Kullanımda
+Include Active	Etkini Dahil Et
+Include Edited	Düzenleneni Dahil Et
+Include Non-Edited	Düzenlenmemişi Dahil Et
+Index	İndeks
+Indices	İndeksler
+Individual	Ayrı
+Individual Elements	Ayrı Öğeler
+Individual Origins	Ayrı Orijinler
+Influence	Etki
+Info	Bilgi
+Insert Keyframe	Anahtar Kare Ekle
+Insert Keyframe (all)	Anahtar kare ekle (tümü)
+Insert Keyframe Layer	Katman Anahtar Karesi Ekle
+Insert Keyframe: select an object animation in the timeline	Anahtar kare ekle: zaman çizelgesinde bir nesne animasyonu seçin
+Insert Keyframe: the mesh has no normals	Anahtar kare ekle: örgünün normalleri yok
+Insert UV keyframe: the mesh has no UV	UV anahtar karesi ekle: örgünün UV'si yok
+Inset Faces	Yüzleri İçe Kaydır
+Inset: enter Edit Mode first	İçe Kaydır: önce Düzenleme Moduna girin
+Inset: move toward the center = thickness, Ctrl = depth, I/B/O = individual/boundary/outset, click to confirm	İçe Kaydır: merkeze yaklaş = kalınlık, Ctrl = derinlik, I/B/O = ayrı/sınır/dışa, onay için tıkla
+Inset: select faces first	İçe Kaydır: önce yüzleri seçin
+Inside	İç
+Inside the .w3d	.w3d'nin içinde
+Intensity	Şiddet
+Interpolate	Enterpole et
+Interpolate (mix)	Enterpole et (karışım)
+Interpolation	Enterpolasyon
+Interpolation Mode	Enterpolasyon Modu
+Intersect	Kesişim
+Intersection Type	Kesişim türü
+Inverse Square	Ters kare
+Invert	Tersine çevir
+Invert Selection	Seçimi tersine çevir
+It already has physics	Zaten fiziği var
+It belongs to a library (read-only): open the library to edit it	Bir kütüphaneye ait (salt okunur): düzenlemek için kütüphaneyi açın
+It belongs to a prefab instance: edit the prefab or unpack the instance	Bir prefab örneğine ait: prefabı düzenleyin veya örneği paketten çıkarın
+It can't be converted	Dönüştürülemez
+It can't be deleted	Silinemez
+It can't be linked	Bağlanamaz
+It can't be opened	Açılamaz
+It could not be loaded	Yüklenemedi
+It couldn't be copied into the .w3d	.w3d içine kopyalanamadı
+It doesn't exist anymore	Artık yok
+It has no proyecto.json	proyecto.json yok
+It is a W3D proxy: choose its library element	Bir W3D proxy: kütüphanedeki öğesini seçin
+It is already linked	Zaten bağlantılı
+It is in use	Kullanımda
+It is open: switch to another scene first	Açık: önce başka bir sahneye geçin
+It is read-only	Salt okunur
+It is the open project	Açık olan proje bu
+It isn't a .w3d project	.w3d projesi değil
+It isn't linked	Bağlantılı değil
+It isn't saved in the project yet	Henüz projeye kaydedilmedi
+Its file couldn't be read	Dosyası okunamadı
+Its geometry couldn't be read	Geometrisi okunamadı
+Its objects couldn't be deleted	Nesneleri silinemedi
+Its objects will be deleted too (Undo brings them back).	Nesneleri de silinecek (Geri Al geri getirir).
+Its own list	Kendi listesi
+Its proyecto.json can't be read	proyecto.json dosyası okunamıyor
+Join	Birleştir
+Join: no active mesh object	Birleştir: etkin örgü nesnesi yok
+Join: select 2+ mesh objects (active is the target)	Birleştir: 2+ örgü nesnesi seçin (hedef etkin olandır)
+Joined into	Birleştirildi:
+Jump to End	Sona Atla
+Jump to Start	Başa Atla
+Keep Offset	Ofseti Koru
+Key	Anahtar
+Keyboard Shortcuts	Klavye Kısayolları
+Keyboard Shortcuts...	Klavye Kısayolları...
+Keyframe	Anahtar kare
+Keyframes	Anahtar kareler
+LOD	LOD
+Landscape only	Yalnızca yatay
+Language	Dil
+Last triangle	Son üçgen
+Layer	Katman
+Layer On	Katman açık
+Layout	Yerleşim
+Left	Sol
+Left Handle X	Sol Tutamaç X
+Left View	Sol görünüm
+Left soft	Sol soft
+Less	Küçük
+Less or equal	Küçük veya eşit
+Levels Viewport	Görünüm Seviyeleri
+Libraries	Kütüphaneler
+Library	Kütüphane
+Library linked	Kütüphane bağlandı
+Library not readable	Kütüphane okunamıyor
+Library unlinked	Kütüphane bağlantısı kesildi
+Lifetime	Ömür
+Light	Işık
+Light color	Işık rengi
+Light on/off	Işık aç/kapat
+Light position	Işık konumu
+Lighting	Aydınlatma
+Lighting on/off	Aydınlatma aç/kapat
+Lightmap Pack	Lightmap Paketle
+Lightmap Pack: select faces first	Lightmap Paketle: önce yüzleri seçin
+Lights	Işıklar
+Line (trail)	Çizgi (kuyruk)
+Line Width	Çizgi Kalınlığı
+Line loop	Çizgi döngüsü
+Line strip	Çizgi şeridi
+Line width	Çizgi kalınlığı
+Linear	Doğrusal
+Lines	Çizgiler
+Link	Bağla
+Link .w3d...	.w3d bağla...
+Linked	Bağlantılı
+List	Liste
+Load (camera x object)	Yükle (kamera x nesne)
+Load .lua...	.lua yükle...
+Load Texture	Doku Yükle
+Load UI	UI Yükle
+Load font	Yazı tipi yükle
+Load from disk...	Diskten yükle...
+Load image	Görüntü yükle
+Load script	Betik yükle
+Load shader	Shader yükle
+Load sound	Ses yükle
+Load sound from the file browser...	Dosya tarayıcısından ses yükle...
+Loaded	Yüklendi
+Loading mode	Yükleme
+Loading...	Yükleniyor...
+Local	Yerel
+Local View	Yerel görünüm
+Location	Konum
+Location Only	Yalnızca Konum
+Location X	Konum X
+Lock Normals	Normalleri Kilitle
+Lock Orbit	Yörüngeyi Kilitle
+Lock the camera to the view	Kamerayı görünüme kilitle
+Longest clip	En uzun klip
+Loop	Döngü
+Loop (smpl)	Döngü (smpl)
+Loop Cut	Döngü Kes
+Loop Cut and Slide	Döngü Kes ve Kaydır
+Loop Cut: enter Edit Mode first	Döngü Kes: önce Düzenleme Moduna girin
+Loop Cut: move = slide, Enter to confirm, Esc = center	Döngü Kes: hareket = kaydır, Enter onaylar, Esc = ortala
+Loop Cut: no active edge (click an edge first)	Döngü Kes: etkin kenar yok (önce bir kenara tıklayın)
+Loop Cut: no active face (click a face first)	Döngü Kes: etkin yüz yok (önce bir yüze tıklayın)
+Loop Cut: scroll = number of cuts, Enter to confirm	Döngü Kes: tekerlek = kesim sayısı, Enter onaylar
+Loop Cut: select an edge (2 verts) or a quad (4 verts)	Döngü Kes: bir kenar (2 köşe) veya dörtgen (4 köşe) seçin
+Loop Cut: select the 4 vertices of one quad	Döngü Kes: bir dörtgenin 4 köşesini seçin
+Loop Cut: tap a yellow dot to pick the cut direction (or arrows + Enter)	Döngü Kes: kesim yönü için sarı bir noktaya dokunun (veya oklar + Enter)
+Loop Cut: the 2 selected vertices are not an edge	Döngü Kes: seçili 2 köşe bir kenar oluşturmuyor
+Loop Cut: the active face has no edges	Döngü Kes: etkin yüzün kenarı yok
+Loop Cut: the active face is not a quad	Döngü Kes: etkin yüz dörtgen değil
+Loop Select	Döngü Seç
+Loop Select (Edge Loop)	Döngü Seç (Kenar Döngüsü)
+Loop Select (Edge Ring)	Döngü Seç (Kenar Halkası)
+Loop Select: arrows = direction, Enter to confirm	Döngü Seç: oklar = yön, onay için Enter
+Loop Select: click an	Döngü Seç: tıklayın:
+Loop Slide	Döngüde Kaydır
+Loop forever	Sürekli tekrarla
+Loose (editable)	Ayrık (düzenlenebilir)
+Make External...	Harici Yap...
+Make Internal	Dahili Yap
+Make Single User	Tek Kullanıcılı Yap
+Manual range	Elle aralık
+Margin	Kenar boşluğu
+Margin bottom	Alt boşluk
+Margin left	Sol boşluk
+Margin right	Sağ boşluk
+Margin top	Üst boşluk
+Mark Seam	Dikiş İşaretle
+Mark Seams	Dikişleri işaretle
+Mark Sharp	Keskin İşaretle
+Mass	Kütle
+Matcap	Matcap
+Matcap (hardware)	Matcap (donanım)
+Match case	Büyük/küçük harf duyarlı
+Match render	Render ile aynı
+Material	Malzeme
+Material Index	Malzeme İndeksi
+Material Preview	Malzeme Önizleme
+Material color	Malzeme rengi
+Material index	Malzeme indeksi
+Material of	Malzeme:
+Materials	Malzemeler
+Max (last triangle of the mesh)	Maks. (örgünün son üçgeni)
+Max (last triangle of the part)	Maks. (parçanın son üçgeni)
+Max distance	Maks. mesafe
+Maximize	Büyüt
+Median	Medyan
+Median Point	Orta Nokta
+Memory	Bellek
+Memory usage	Bellek kullanımı
+Menu bar	Menü çubuğu
+Merge	Kaynaştır
+Merge Distance	Kaynaştırma Mesafesi
+Mesh	Örgü
+Mesh Parts	Örgü Parçaları
+Mesh editable again	Örgü yeniden düzenlenebilir
+Mesh made single user	Örgü artık tek kullanıcılı
+Mesh not editable (Convert to editable mesh, Mesh card)	Örgü düzenlenemez (Düzenlenebilir örgüye dönüştür, 3D Örgü kartı)
+Mesh part	Örgü parçası
+Meshes as text	Metin olarak örgüler
+Metallic	Metalik
+Metallic Map	Metalik haritası
+Meters	Metre
+Method	Yöntem
+Minimize	Küçült
+Minimum	Minimum
+Mipmap	Mipmap
+Mipmaps	Mipmap'ler
+Mirror	Ayna
+Mirror Object	Ayna Nesnesi
+Mirror X	Ayna X
+Mirror Y	Ayna Y
+Mirror Z	Ayna Z
+Miter Inner	İç gönye
+Miter Outer	Dış gönye
+Mix	Karıştır
+Mix end	Karışım sonu
+Mix start	Karışım başı
+Mode	Mod
+Model too big for the N95: more than 65535 vertices (16-bit limit)	N95 için model çok büyük: 65535'ten fazla köşe (16 bit sınırı)
+Modifier	Değiştirici
+Modifier applied	Değiştirici uygulandı
+Modifiers	Değiştiriciler
+Modulate	Modüle et
+Motion Trail	Hareket İzi
+Motion blur	Hareket bulanıklığı
+Motion vectors	Hareket vektörleri
+Move	Taşı
+Move (reorder)	Taşı (yeniden sırala)
+Move Down	Aşağı taşı
+Move Up	Yukarı taşı
+Move to	Hedef klasör
+Move to Folder	Klasöre taşı
+Move: %d frames	Taşı: %d kare
+Move: %d frames, %.3f value%s	Taşı: %d kare, %.3f değer%s
+Multiply	Çarp
+Multiply (lightmap)	Çarp (lightmap)
+Multiply 2x	Çarp 2x
+NRD (real time)	NRD (gerçek zamanlı)
+Name	Ad
+Near	Yakın
+Near fade from	Yakın solma başı
+Near fade to	Yakın solma sonu
+Nearest (pixelated)	En yakın (pikselli)
+Network access	Ağ erişimi
+New	Yeni
+New Animation	Yeni Animasyon
+New Color Layer	Yeni renk katmanı
+New Copy	Yeni kopya
+New Edge/Face from Vertices	Köşelerden Yeni Kenar/Yüz
+New Face from Vertices	Köşelerden yeni yüz
+New Flipbook	Yeni flipbook
+New Folder	Yeni klasör
+New Game	Yeni oyun
+New Library	Yeni kütüphane
+New Material	Yeni Malzeme
+New Mesh Part	Yeni Parça
+New Palette	Yeni palet
+New Prefab	Yeni prefab
+New Scene	Yeni sahne
+New Texture	Yeni Doku
+New Texture...	Yeni Doku...
+New Texture: could not load	Yeni Doku: yüklenemedi
+New Texture: could not save	Yeni Doku: kaydedilemedi
+New Texture: invalid size	Yeni Doku: geçersiz boyut
+New UV Map	Yeni UV haritası
+New W3D proxy of this element	Bu öğenin yeni W3D proxy'si
+New instance of this prefab	Bu prefabın yeni örneği
+New instance of this scene	Bu sahnenin yeni örneği
+New material with this shader	Bu shader ile yeni malzeme
+New material with this texture	Bu doku ile yeni malzeme
+New noise each image	Her görüntüde yeni gürültü
+New object with this 3D mesh	Bu 3D örgü ile yeni nesne
+New paint texture	Yeni boyama dokusu
+New shader	Yeni shader
+New sound object here	Buraya yeni ses nesnesi
+Next	Sonraki
+Next Frame	Sonraki Kare
+Next Keyframe	Sonraki Anahtar
+Next Viewport Shading	Sonraki görünüm gölgelemesi
+Next frame	Sonraki kare
+Next keyframe	Sonraki anahtar kare
+No	Hayır
+No Normal Map	Normal Haritası Yok
+No Properties panel	Özellikler paneli yok
+No Test, Write	Test yok, yazma var
+No Texture	Doku Yok
+No Texture B	İkinci doku yok
+No UV Group for this bone	Bu kemiğin UV Grubu yok
+No UV map with this name in this 3D mesh	Bu 3D örgüde bu adda UV haritası yok
+No UVs to export	Dışa aktarılacak UV yok
+No active 3D viewport	Etkin 3D görünüm yok
+No active object	Etkin nesne yok
+No axes: this constraint does nothing.	Eksen yok: bu kısıtlama hiçbir şey yapmaz.
+No file	Dosya yok
+No library	Kütüphane yok
+No mipmaps (off or NPOT texture)	Mipmap yok (kapalı veya NPOT doku)
+No object of the scene uses it	Sahnedeki hiçbir nesne kullanmıyor
+No original file to forget	Unutulacak orijinal dosya yok
+No other scenes	Başka sahne yok
+No prefabs yet	Henüz prefab yok
+No results	Sonuç yok
+No source: this constraint does nothing.	Kaynak yok: bu kısıtlama hiçbir şey yapmaz.
+None	Hiçbiri
+Normal	Normal
+Normal Map	Normal Haritası
+Normal Map of	Normal Haritası:
+Normal Mapping	Normal Haritalama
+Normal Size	Normal Boyutu
+Normal View	Normal Görünüm
+Normal map	Normal haritası
+Normal map (DOT3)	Normal haritası (DOT3)
+Normal pointer	Normal işaretçisi
+Normals	Normaller
+Normals layer deleted	Normal katmanı silindi
+Not assigned	Atanmadı
+Not deleted	Silinmedi
+Not linked	Bağlanmadı
+Not moved	Taşınmadı
+Not opened	Açılmadı
+Not saved in the project yet	Henüz projeye kaydedilmedi
+Nothing to paste	Yapıştırılacak bir şey yok
+Nothing to save	Kaydedilecek bir şey yok
+Now click the second	Şimdi ikinciye tıklayın:
+Now external	Artık harici
+Now inside the .w3d	Artık .w3d içinde
+Number	Tamsayı
+Number / Texture	Sayı / doku
+Number of Cuts	Kesim Sayısı
+Numbers / memories	Sayılar / bellekler
+OBJ does not store the skeleton or animations: only the mesh will be exported (vertex groups, armature and clips will be lost). It will overwrite the file if it already exists. Continue?	OBJ iskeleti ve animasyonları saklamaz: yalnızca örgü dışa aktarılır (köşe grupları, iskelet ve klipler kaybolur). Dosya varsa üzerine yazılır. Devam edilsin mi?
+OBJ imported successfully!	OBJ içe aktarıldı!
+OBJ saved successfully!	OBJ kaydedildi!
+OK	Tamam
+Object	Nesne
+Object (Keep Transform Without Inverse)	Nesne (Dönüşümü Koru, Terssiz)
+Object (Keep Transform)	Nesne (Dönüşümü Koru)
+Object (Without Inverse)	Nesne (Terssiz)
+Object / Edit Mode	Nesne / Düzenleme Modu
+Object Animation	Nesne Animasyonu
+Object Mode	Nesne Modu
+Object Offset	Ofset Nesnesi
+Object Transforms	Nesne Dönüşümleri
+Object animation: meshes only for now	Nesne animasyonu: şimdilik yalnızca örgüler
+Object index	Nesne indeksi
+Object matrix	Nesne matrisi
+Objects	Nesneler
+Off	Kapalı
+Off (no test, no write)	Kapalı (test yok, yazma yok)
+Offset	Ofset
+Offset Even	Eşit ofset
+Offset Relative	Göreli ofset
+On	Açık
+Only active camera	Yalnızca etkin kamera
+Only external display (faster)	Yalnızca harici ekran (daha hızlı)
+Only in Object Mode	Yalnızca Nesne Modunda
+Only its visibility and script values are saved	Yalnızca görünürlüğü ve betik değerleri kaydedilir
+Only selected vertices	Yalnızca seçili köşeler
+Only the final image	Yalnızca son görüntü
+Opacity	Opaklık
+Opaque (one, zero)	Opak (one, zero)
+Open	Aç
+Open in IDE	IDE'de aç
+Open project	Proje aç
+Open without saving	Kaydetmeden aç
+Operation	İşlem
+Optimize Vertex Groups	Köşe Gruplarını Optimize Et
+Orbit locked	Yörünge kilitlendi
+Orbit unlocked	Yörünge kilidi açıldı
+Orient	Yön
+Orientation	Yönelim
+Origin to 3D Cursor	Orijini 3D İmlece
+Origin to Geometry	Orijini Geometriye
+Original file forgotten	Orijinal dosya unutuldu
+Origins	Orijinler
+Orphan (no users)	Sahipsiz (kullanıcı yok)
+Orphans purged	Sahipsizler temizlendi
+Orthographic	Ortografik
+Outliner	Outliner
+Outset	Dışa
+Overflow X	Taşma X
+Overflow Y	Taşma Y
+Overlays	Bindirmeler
+Overrides	Override'lar
+Own	Kendi
+PVS recalculated	PVS yeniden hesaplandı
+PVS: <model>.pvs.json is missing next to the source .obj	PVS: kaynak .obj'nin yanında <model>.pvs.json eksik
+Packed (protected)	Paketli (korumalı)
+Pad bottom	Dolgu alt
+Pad left	Dolgu sol
+Pad right	Dolgu sağ
+Pad top	Dolgu üst
+Padding	Dolgu
+Paint background	Arka planı boya
+Palette	Palet
+Pan	Pan
+Parent	Ebeveyn
+Part (-1 = all)	Parça (-1 = tümü)
+Particle Color	Renk ve alfa
+Particle Motion	Hareket
+Particle Rotation	Dönme
+Particle Shape	Şekil ve flipbook
+Particle Size	Boyut
+Particles	Parçacıklar
+Parts	Parçalar
+Pass Order	Geçiş sırası
+Passes	Geçişler
+Paste	Yapıştır
+Pasted	Yapıştırıldı
+Patch	Yama
+Path	Yol
+Pencil+Up	Kalem+Yukarı
+Per Pixel Shading	Piksel Başına Gölgeleme
+Per Vertex Shading	Köşe Başına Gölgeleme
+Per pixel	Piksel başına
+Per vertex	Köşe başına
+Per-Corner	Yüz Köşesi Başına
+Per-Vertex	Köşe Başına
+Per-Vertex uses one color per vertex: the colors of the other face corners are lost when painting. Continue?	Köşe Başına, köşe başına tek renk kullanır: diğer yüz köşelerinin renkleri boyarken kaybolur. Devam edilsin mi?
+Percent	Yüzde
+Perspective / Orthographic	Perspektif / Ortografik
+Perspective/Ortho	Perspektif/Orto
+Physics	Fizik
+Pick Shortest Path	En Kısa Yolu Seç
+Pick Shortest Path: click the first	En Kısa Yol: ilkine tıklayın:
+Pitch	Perde
+Pivot	Pivot
+Pixels	Piksel
+Plane	Düzlem
+Platform	Platform
+Play	Çal
+Play / Pause	Oynat / Duraklat
+Play Reverse	Tersten Oynat
+Play once (dies at the end)	Bir kez (sonunda ölür)
+Point	Nokta
+Point size	Nokta boyutu
+Points	Noktalar
+Polygon (simulated)	Çokgen (benzetim)
+Pop matrix	Matrisi çıkar (pop)
+Portrait only	Yalnızca dikey
+Pose	Poz
+Pose Mode	Poz Modu
+Position	Konum
+Positional (3D)	Konumsal (3D)
+Post Processing	Son İşleme
+Prefab	Prefab
+Prefab "%s": %d object(s) are outside its root object and its instances don't show them	Prefab "%s": %d nesne kök nesnesinin dışında kaldı ve örnekleri bunları göstermiyor
+Prefab Instance	Prefab örneği
+Prefab created	Prefab oluşturuldu
+Prefab instances come with the prefabs phase	Prefab örnekleri prefab aşamasıyla gelecek
+Prefab of	Prefab:
+Prefabs	Prefab'lar
+Premultiplied alpha	Önçarpımlı alfa
+Press a key...	Bir tuşa basın...
+Preview	Önizleme
+Preview animation	Animasyonu önizle
+Previous	Önceki
+Previous Frame	Önceki Kare
+Previous Keyframe	Önceki Anahtar
+Previous frame	Önceki kare
+Previous keyframe	Önceki anahtar kare
+Primitive	İlkel
+Profile Shape	Profil şekli
+Profile Type	Profil türü
+Project	Proje
+Project from View	Görünümden Yansıt
+Project from View (Bounds)	Görünümden Yansıt (Sınırlar)
+Project from View: select faces first	Görünümden Yansıt: önce yüzleri seçin
+Project saved: 	Proje kaydedildi: 
+Properties	Özellikler
+Properties viewport	Özellikler görünümü
+Proportional Editing	Orantılı Düzenleme
+Proportional Editing: off	Orantılı Düzenleme: kapalı
+Proportional Editing: on	Orantılı Düzenleme: açık
+Proportional Size	Orantılı Boyut
+Proportional radius +	Orantılı yarıçap +
+Proportional radius -	Orantılı yarıçap -
+Proxy W3D	W3D Proxy
+Purge Orphans	Sahipsizleri Temizle
+Purge orphans	Sahipsizleri temizle
+Push matrix	Matrisi it (push)
+Quad strip (simulated)	Dörtgen şeridi (benzetim)
+Quadratic	Karesel
+Quads (simulated)	Dörtgenler (benzetim)
+Quartic	4. derece
+Quaternion (WXYZ)	Kuaterniyon (WXYZ)
+Quintic	5. derece
+Quit without saving	Kaydetmeden çık
+RAM	RAM
+Radius	Yarıçap
+Radius 1	Yarıçap 1
+Radius 2	Yarıçap 2
+Rail (nodes)	Ray (düğümler)
+Random	Rastgele
+Random angle (0-360)	Rastgele açı (0-360)
+Random spin direction	Rastgele dönüş yönü
+Random velocity	Rastgele hız
+Ranges (memory)	Aralıklar (bellek)
+Rate	Miktar
+Ray Tracing	Işın İzleme
+Ray traced motion blur	Işın izlemeli bulanıklık
+Rays	Işınlar
+Recalculate	Yeniden hesapla
+Recalculate Normals	Normalleri Yeniden Hesapla
+Rectangle	Dikdörtgen
+Red	Kırmızı
+Redo	Yinele
+Reference	Referans
+Reflect children	Alt öğeleri yansıt
+Reflection	Yansıma
+Refresh	Yenile
+Refresh:	Yenile:
+Relationship Lines	İlişki Çizgileri
+Relative Offset	Göreli ofset
+Reload the project to generate mipmaps	Mipmap oluşturmak için projeyi yeniden yükleyin
+Reload the project to upload the textures again	Dokuları tekrar göndermek için projeyi yeniden yükleyin
+Remove	Kaldır
+Remove Repeat	Tekrarı kaldır
+Remove physics	Fiziği kaldır
+Remove script	Betiği kaldır
+Rename	Yeniden adlandır
+Rename 3D Mesh	3D örgüyü yeniden adlandır
+Rename Material	Malzemeyi Yeniden Adlandır
+Render	Render
+Render Animation	Animasyon Render Al
+Render FPS	Render FPS
+Render Image	Görüntü Render Al
+Render Preview	Render Önizleme
+Render end	Render sonu
+Render icons	Render simgeleri
+Render mode	Render modu
+Render saved!	Render kaydedildi!
+Render start	Render başı
+Render to...	Render al...
+Renderable	Render alınabilir
+Rendered	Render
+Rendering animation...	Animasyon render alınıyor...
+Rendering...	Render alınıyor...
+Repeat	Tekrarla
+Repeat After	Sonra tekrarla
+Repeat Before	Önce tekrarla
+Repeat Texture	Dokuyu Tekrarla
+Repeat with Offset	Ofsetle tekrarla
+Replace	Değiştir
+Replace all	Tümünü değiştir
+Replace...	Değiştir...
+Reset	Sıfırla
+Reset Overrides	Override'ları sıfırla
+Reset all	Tümünü sıfırla
+Reset: select faces first	Sıfırla: önce yüzleri seçin
+Resolution	Çözünürlük
+Resource	Kaynak
+Restart Whisk3D for this change to take effect	Bu değişikliğin etkili olması için Whisk3D'yi yeniden başlatın
+Retarget	Retarget
+Reverb	Yankı
+Right	Sağ
+Right Handle X	Sağ Tutamaç X
+Right View	Sağ görünüm
+Rings	Halkalar
+Rip	Yırt
+Rip: mesh separated	Yırt: örgü ayrıldı
+Rip: the selection does not separate the mesh	Yırt: seçim örgüyü ayırmıyor
+Roll Left	Görünümü sola döndür
+Roll Right	Görünümü sağa döndür
+Root	Kök
+Rotate	Döndür
+Rotate handles	Tutamaçları döndür
+Rotate: %.1f deg  (pivot %s)	Döndür: %.1f derece  (pivot %s)
+Rotation	Dönme
+Rotation Only	Yalnızca Dönme
+Rotation W	Dönme W
+Rotation X	Dönme X
+Rotations only	Yalnızca dönmeler
+Roughness	Pürüzlülük
+Roughness Map	Pürüzlülük haritası
+Routine	Rutin
+Routine loop	Rutin döngüsü
+Routines	Rutinler
+Rows	Satırlar
+Same as	Aynısı:
+Same as parent	Ebeveynle aynı
+Same scale as the editor	Düzenleyiciyle aynı ölçek
+Sample rate	Örnekleme hızı
+Samples	Örnek sayısı
+Saturation	Doygunluk
+Save	Kaydet
+Save As	Farklı Kaydet
+Save As...	Farklı Kaydet...
+Save CANCELLED: missing inside the project:	Kaydetme İPTAL: proje içinde eksik:
+Save Changes	Değişiklikleri kaydet
+Save Texture	Dokuyu Kaydet
+Save Texture: could not encode	Dokuyu Kaydet: kodlanamadı
+Save Texture: could not write	Dokuyu Kaydet: yazılamadı
+Save Texture: no texture	Dokuyu Kaydet: doku yok
+Save and continue	Kaydet ve devam et
+Save and open	Kaydet ve aç
+Save and quit	Kaydet ve çık
+Save inside the .w3d	.w3d içine kaydet
+Save outside the .w3d...	.w3d dışına kaydet...
+Save project	Projeyi kaydet
+Save script	Betiği kaydet
+Save the project first	Önce projeyi kaydedin
+Save version: the project has no location (use Save first)	Sürüm kaydet: projenin konumu yok (önce Kaydet'i kullanın)
+Save: could not replace the file (the previous version was kept):	Kaydet: dosya değiştirilemedi (önceki sürüm korundu):
+Save: incomplete write. The file was not touched:	Kaydet: yazma eksik kaldı. Dosyaya dokunulmadı:
+Saved: 	Kaydedildi: 
+Scale	Ölçekle
+Scale Only	Yalnızca Ölçek
+Scale U	Ölçek U
+Scale V	Ölçek V
+Scale X	Ölçek X
+Scale Y	Ölçek Y
+Scale Z	Ölçek Z
+Scale: %.2fx  (pivot %s)%s	Ölçekle: %.2fx  (pivot %s)%s
+Scaled	Ölçeklendi
+Scene	Sahne
+Scene Animation	Sahne Animasyonu
+Scene Instance	Sahne örneği
+Scenes	Sahneler
+Screen	Ekran
+Screen Rect	Ekran Kırpma
+Screw	Vida
+Script	Betik
+Script Editor	Betik Düzenleyici
+Script of	Betik:
+Scripts	Betikler
+Scripts that name the file	Dosyayı anan betikler
+Scripts that name the texture	Dokuyu anan betikler
+Scroll	Kaydırma
+Scroll X	Kaydırma X
+Scroll Y	Kaydırma Y
+Segments	Bölüm
+Select	Seç
+Select All	Tümünü Seç
+Select Folder	Klasör Seç
+Select Instance	Örneği seç
+Select Linked	Bağlantılıyı Seç
+Select Linked: click the	Bağlantılıyı Seç: tıklayın:
+Select Linked: select a UV first (or press L over the island)	Bağlantılıyı Seç: önce bir UV seçin (veya adanın üzerinde L)
+Select Linked: select a bone first	Bağlantılıyı Seç: önce bir kemik seçin
+Select Mode	Seçim Modu
+Select Outer	Dışı Seç
+Select Users	Kullanıcıları seç
+Select a prefab instance	Bir prefab örneği seçin
+Select an object first	Önce bir nesne seçin
+Select faces with more than 3 sides to triangulate	Üçgenlemek için 3'ten fazla kenarı olan yüzleri seçin
+Select objects first	Önce nesneleri seçin
+Select the objects of the prefab	Prefabın nesnelerini seçin
+Selected only	Yalnızca seçililer
+Selection to Active	Seçimi Etkine
+Selection to Cursor	Seçimi İmlece
+Selection to Cursor (Keep Offset)	Seçimi İmlece (Ofseti Koru)
+Selection to Grid	Seçimi Izgaraya
+Separate	Ayır
+Separate: new mesh created	Ayır: yeni örgü oluşturuldu
+Separate: no faces selected	Ayır: seçili yüz yok
+Separate: select only some faces	Ayır: yalnızca bazı yüzleri seçin
+Set Active Camera	Etkin Kamera Yap
+Set Active Camera: the active object is not a camera	Etkin Kamera Yap: etkin nesne kamera değil
+Set Active Object as Camera	Etkin Nesneyi Kamera Yap
+Set Inverse	Tersi Ayarla
+Set Keyframe Easing Type	Yumuşatma türü
+Set Keyframe Handle Type	Tutamaç Türünü Ayarla
+Set Keyframe Interpolation	Enterpolasyon türü
+Set Origin	Orijini Ayarla
+Set Parent	Ebeveyn Ata
+Set Parent To	Ebeveyni Ayarla
+Set as Start Scene	Başlangıç sahnesi yap
+Settings	Ayarlar
+Settings saved	Ayarlar kaydedildi
+Shade Flat	Düz Gölgele
+Shade Smooth	Yumuşak Gölgele
+Shader	Shader
+Shader of	Shader:
+Shaders	Shader'lar
+Shading	Gölgeleme
+Shape	Şekil
+Shape keys	Şekil anahtarları
+Sharp	Keskin
+Sharp range	Keskin aralık
+Sharper	Daha keskin
+Shininess	Parlaklık
+Shortest Path (Fill Region)	En Kısa Yol (Bölgeyi Doldur)
+Shortest path selected	En kısa yol seçildi
+Shortest path: region filled	En kısa yol: bölge dolduruldu
+Show Chrome UV	Krom UV'yi göster
+Show Overlays	Bindirmeleri Göster
+Show Panel	Paneli göster
+Show active	Etkini göster
+Show in Edit Mode	Düzenleme Modunda göster
+Show selection	Seçimi göster
+Shrink/Fatten	Daralt/Şişir
+Shrink/Fatten / Clear Scale	Daralt/Şişir / Ölçeği Temizle
+Shutter	Obtüratör
+Shutter position	Obtüratör konumu
+Simple	Basit
+Simulated: OpenGL ES 1.1 has no quads or polygons. They are converted to triangles (more indices, slower).	Benzetim: OpenGL ES 1.1'de dörtgen ve çokgen yok. Üçgenlere dönüştürülürler (daha çok indeks, daha yavaş).
+Single line	Tek satır
+Sinusoidal	Sinüzoidal
+Size	Boyut
+Size X	Boyut X
+Size Y	Boyut Y
+Size Z	Boyut Z
+Sizes	Boyutlar
+Skin	Tema
+Skinned	Skinning'li
+Skip if hidden	Gizliyse atla
+Skip if no flag	Bayrak yoksa atla
+Skip if zero	Sıfırsa atla
+Slide Vertices	Köşeleri Kaydır
+Smart Euler	Akıllı Euler
+Smart UV Project	Akıllı UV İzdüşümü
+Smart UV Project: select faces first	Akıllı UV İzdüşümü: önce yüzleri seçin
+Smooth	Yumuşak
+Smooth Shading	Yumuşak Gölgeleme
+Smooth shading	Yumuşak gölgeleme
+Smooth texture	Yumuşak doku
+Smoother	Daha yumuşak
+Snap	Mıknatıs
+Snap Base	Mıknatıs Tabanı
+Snap Base:	Mıknatıs Tabanı:
+Snap Target	Mıknatıs Hedefi
+Snap Target for Individual Elements	Ayrı Öğeler için Mıknatıs Hedefi
+Snap Target:	Mıknatıs Hedefi:
+Snap menu	Mıknatıs menüsü (Snap)
+Soft Knee	Yumuşak diz
+Solid	Katı
+Solid Preview	Katı Önizleme
+Sort by camera	Kameraya göre sırala
+Sort once (active camera)	Bir kez sırala (etkin kamera)
+Sound	Ses
+Sounds	Sesler
+Source	Kaynak
+Spawn box	Doğma kutusu
+Specular	Speküler
+Speed	Hız
+Sphere	Küre
+Sphere Map (software)	Küre Haritası (yazılım)
+Sphere Projection	Küre İzdüşümü
+Spin	Dönüş
+Spin Y	Y'de dönüş
+Spin random	Rastgele dönüş (±)
+Split in Columns	Sütunlara böl
+Split in Rows	Satırlara böl
+Spot	Spot
+Spot Cutoff	Spot Açısı
+Spot Exponent	Spot Üssü
+Spread	Yayılım
+Start	Başlangıç
+Start / End / FPS	Başlangıç / Son / FPS
+Start angle	Başlangıç açısı
+Start of frame	Kare başı
+Start time	Başlama zamanı
+Start:%d	Baş:%d
+Starts at frame	Başladığı kare
+State	Durum
+Static	Statik
+Statistics	İstatistikler
+Stencil buffer	Stencil tamponu
+Steps	Adımlar
+Steps Viewport	Görünüm Adımları
+Steps to skip	Atlanacak adım
+Stop	Durdur
+Stop the game before changing the scene	Sahneyi değiştirmeden önce oyunu durdurun
+Stop the game first	Önce oyunu durdurun
+Stored	Saklama
+Streaming preview	Akış önizlemesi
+Stretch	Ger
+Stretch (seconds of velocity)	Germe (hızın saniyesi)
+Stretch U	Germe U
+Stretch V	Germe V
+Stretched	Gerilmiş
+String	Metin
+Subdivision Surface	Alt Bölüm Yüzeyi
+Subtract	Çıkar
+Summary	Özet
+Sun	Güneş
+Superellipse	Süperelips
+Switch to 0-100%	0-100%'e geç
+Switch to 0-255	0-255'e geç
+Symbian .sisx: this target is not wired to this button yet.	Symbian .sisx: bu hedef henüz bu düğmeye bağlı değil.
+Sync Selection	Seçimi Eşitle
+Tag	Etiket
+Target	Hedef
+Test	Test
+Test + Write (opaque)	Test + yazma (opak)
+Test, no Write (decal)	Test, yazma yok (çıkartma)
+Text	Metin
+Text Color	Metin rengi
+Texture	Doku
+Texture %d	Doku %d
+Texture B	İkinci doku
+Texture Layers	Doku katmanları
+Texture Paint	Doku Boyama
+Texture Paint: the active part has no texture	Doku Boyama: etkin parçanın dokusu yok
+Texture filter	Doku filtresi
+Texture layers	Doku katmanları
+Texture mix	İkinci doku oranı
+Texture mode	Doku modu
+Texture of	Doku:
+Texture on/off	Doku aç/kapat
+Texture saved	Doku kaydedildi
+Texture wrap	Doku tekrarı
+Textures	Dokular
+Texturing	Dokulama
+The 3D mesh couldn't be loaded	3D örgü yüklenemedi
+The Object tab shows the BASE transform (the one that gets saved). Constraints modify it when drawing, so the object can appear elsewhere.	Nesne sekmesi TEMEL dönüşümü gösterir (kaydedilen). Kısıtlamalar çizerken onu değiştirir, bu yüzden nesne başka bir yerde görünebilir.
+The armature has its own clips	İskeletin kendi klipleri var
+The cambiarEscena() calls in its .lua still point to the first one: edit them by hand.	.lua dosyasındaki cambiarEscena() çağrıları halen ilkini gösteriyor: elle düzenleyin.
+The clip library could not be read	Klip kütüphanesi okunamadı
+The clipboard has no hex color	Panoda hex renk yok
+The default material can not be edited. Create a new material.	Varsayılan malzeme düzenlenemez. Yeni bir malzeme oluşturun.
+The default material can't be edited	Varsayılan malzeme düzenlenemez
+The editor has unsaved changes. Discard them and reload the file?	Düzenleyicide kaydedilmemiş değişiklikler var. Atılıp dosya yeniden yüklensin mi?
+The external file is missing	Harici dosya eksik
+The file "	Dosya "
+The file already exists. Do you want to replace it?	Dosya zaten var. Değiştirilsin mi?
+The file couldn't be written	Dosya yazılamadı
+The file was changed outside the editor. Overwrite it?	Dosya düzenleyici dışında değiştirildi. Üzerine yazılsın mı?
+The file was not touched:	Dosyaya dokunulmadı:
+The folder isn't empty	Klasör boş değil
+The instance could not be unpacked	Örnek paketten çıkarılamadı
+The instance has nothing to unpack	Örnekte paketten çıkarılacak bir şey yok
+The library file can't be opened	Kütüphane dosyası açılamıyor
+The library has no proyecto.json	Kütüphanede proyecto.json yok
+The library has no such element	Kütüphanede böyle bir öğe yok
+The library is read-only	Kütüphane salt okunur
+The library isn't linked	Kütüphane bağlantılı değil
+The library's proyecto.json can't be read	Kütüphanenin proyecto.json dosyası okunamıyor
+The list of All	Tümü'nün listesi
+The objects of the 3D meshes will be deleted too (Undo brings them back).	3D örgülerin nesneleri de silinecek (Geri Al geri getirir).
+The selected folders are deleted too if they end up empty.	Seçili klasörler boş kalırsa onlar da silinir.
+The shader does not compile	Shader derlenmiyor
+The sound couldn't be decoded	Ses çözülemedi
+The sound couldn't be read	Ses okunamadı
+The texture couldn't be loaded	Doku yüklenemedi
+The undo history still uses it	Geri alma geçmişi halen kullanıyor
+There are no orphans	Sahipsiz yok
+There is no active camera	Etkin kamera yok
+There is no script editor (IDE) in the layout	Yerleşimde betik düzenleyici (IDE) yok
+There is no such prefab	Böyle bir prefab yok
+There is no such scene	Böyle bir sahne yok
+Thickness	Kalınlık
+This animation has no normals layer	Bu animasyonun normal katmanı yok
+This file type can't be added	Bu dosya türü eklenemez
+This graphics backend has no shaders: the @vertice section runs on the CPU and the rest of the material is drawn as usual	Bu grafik arka ucunda shader yok: @vertice bölümü CPU'da çalışır, malzemenin geri kalanı her zamanki gibi çizilir
+This graphics backend has no shaders: the material is drawn as usual (GLES 2.0 and Vulkan have them)	Bu grafik arka ucunda shader yok: malzeme her zamanki gibi çizilir (GLES 2.0 ve Vulkan'da var)
+This hierarchy clip only animates its root and its children	Bu hiyerarşi klibi yalnızca kökünü ve alt öğelerini canlandırır
+This is a scene: convert it to a game to simulate it	Bu bir sahne: simüle etmek için oyuna dönüştürün
+This mesh does not have this array: do not draw with the array on	Bu örgüde bu dizi yok: dizi açıkken çizmeyin
+This phone can only clone the screen on the external display	Bu telefon harici ekranda yalnızca ekranı klonlayabilir
+This project uses the network (LAN, Wi-Fi or the Internet) to play with others. Allow it?	Bu proje başkalarıyla oynamak için ağı (LAN, Wi-Fi veya İnternet) kullanıyor. İzin verilsin mi?
+This resource can't be dropped in the 3D view	Bu kaynak 3D görünüme bırakılamaz
+This resource can't be renamed	Bu kaynak yeniden adlandırılamaz
+This resource type can't be deleted	Bu kaynak türü silinemez
+This resource type can't be duplicated	Bu kaynak türü çoğaltılamaz
+This step has nothing to animate	Bu adımda canlandırılacak bir şey yok
+Threshold	Eşik
+Timeline	Zaman Çizelgesi
+Times	Süreler
+Timing	Zamanlama
+Toggle Snap	Mıknatısı aç/kapat
+Top	Üst
+Top View	Üst görünüm
+Tracks	İzler
+Trail points	Kuyruk noktaları
+Trail step	Kuyruk adımı
+Transform	Dönüştür
+Transform Mesh	Örgüyü dönüştür
+Transform Orientations	Dönüşüm Yönelimleri
+Transform Pivot Point	Pivot Noktası
+Transform UV	UV Dönüştür
+Translate	Ötele
+Translation	Öteleme
+Transmission	Geçirgenlik
+Transparency layers	Saydam katmanlar
+Transparent	Saydam
+Triangle fan	Üçgen yelpazesi
+Triangle strip	Üçgen şeridi
+Triangles	Üçgenler
+Triangles (PVS)	Üçgenler (PVS)
+Triangulate	Üçgenle
+Triangulate Faces	Yüzleri Üçgenle
+Trim end	Sondan kırp
+Trim start	Baştan kırp
+Turbulence	Türbülans
+Type	Tür
+UI	UI
+UV	UV
+UV Editor	UV Düzenleyici
+UV Grid	UV Izgarası
+UV Groups	UV Grupları
+UV Map	UV Haritası
+UV Maps	UV Haritaları
+UV Sphere	UV Küre
+UV layer (0 = active)	UV katmanı (0 = etkin)
+UV layout saved	UV düzeni kaydedildi
+UV menu	UV menüsü
+UV offset	UV ofseti
+UV pointer	UV işaretçisi
+UV: projected from view	UV: görünümden yansıtıldı
+UV: projected from view (bounds)	UV: görünümden yansıtıldı (sınırlar)
+UVSphere	UVKüre
+Undo	Geri Al
+Uniform	Tekdüze
+Union	Birleşim
+Unit	Birim
+Units	Birimler
+Unlink	Bağlantıyı kes
+Unloaded	Yüklü değil
+Unpack	Paketten Çıkar
+Unpack Prefab	Prefabı paketten çıkar
+Unwrap	Açılım
+Unwrap Angle Based	Açılım (Açı Tabanlı)
+Unwrap Conformal	Açılım (Konformal)
+Unwrap Minimum Stretch	Açılım (En Az Germe)
+Unwrap: closed surface, mark seams first	Açılım: kapalı yüzey, önce dikiş işaretleyin
+Unwrap: select faces first	Açılım: önce yüzleri seçin
+Upright (does not tilt)	Dik (eğilmez)
+Upscaler	Büyütücü
+Upscaling	Büyütme
+Use	Kullan
+Use camera focus	Kamera odağını kullan
+Use index	İndeks kullan
+Use new viewport	Yeni görünüm kullan
+Use physics engine	Fizik motorunu kullan
+Use sound	Ses kullan
+Use the material's UV index	Malzemenin UV indeksini kullan
+Use this file	Bu dosyayı kullan
+Use this folder	Bu klasörü kullan
+Users	Kullanıcılar
+Users selected	Seçilen kullanıcılar
+Value	Değer
+Value Y	Değer Y
+Variation	Varyasyon
+Vector	Vektör
+Velocity	Hız
+Vertex	Köşe
+Vertex Animation	Köşe Animasyonu
+Vertex Color	Köşe Rengi
+Vertex Groups	Köşe Grupları
+Vertex Normal	Köşe Normali
+Vertex Paint	Köşe Boyama
+Vertex Slide	Köşe Kaydır
+Vertex color	Köşe rengi
+Vertex groups	Köşe grupları
+Vertex groups optimized (1 bone/vertex)	Köşe grupları optimize edildi (1 kemik/köşe)
+Vertex pointer	Köşe işaretçisi
+Vertices	Köşeler
+Vertices connected	Köşeler bağlandı
+Video	Video
+Videos	Videolar
+View	Görünüm
+View in 3D	3D'de gör
+View options	Görünüm seçenekleri
+Viewpoint	Bakış Açısı
+Visibility icons	Görünürlük simgeleri
+Visibility test	Görünürlük testi
+Visible	Görünür
+Volume	Ses düzeyi
+Volume line	Ses düzeyi çizgisi
+Warning	Uyarı
+Warnings and errors	Uyarılar ve hatalar
+Waveform	Dalga biçimi
+Weight	Ağırlık
+Weight Paint	Ağırlık Boyama
+Whole word	Tam sözcük
+Width	Genişlik
+Width Type	Genişlik türü
+Window	Pencere
+Window mode	Pencere modu
+Windows .exe: not generated from this button yet. The EDITOR is built with platform/windows/build_windows.bat.	Windows .exe: henüz bu düğmeden oluşturulmuyor. DÜZENLEYİCİ platform/windows/build_windows.bat ile derlenir.
+Wireframe	Tel Kafes
+Wireframe Preview	Tel Kafes Önizleme
+Wireframe: Only Visible	Tel Kafes: Yalnızca Görünür
+With influence between 0 and 100 the billboard can flip 180 degrees when it crosses the camera. Use 100% to avoid it.	Etki 0 ile 100 arasındayken billboard kameranın önünden geçerken 180 derece dönebilir. Önlemek için %100 kullanın.
+With its materials	Malzemeleriyle
+Wrap	Tekrar
+Write to	Yazılacak yer
+X Axis	X Ekseni
+X Euler Rotation	X Euler Dönmesi
+X Location	X Konumu
+X Scale	X Ölçeği
+X axis	X ekseni
+X-Ray	X-Işını
+XYZ Euler	XYZ Euler
+Y Axis	Y Ekseni
+Y Euler Rotation	Y Euler Dönmesi
+Y Location	Y Konumu
+Y Scale	Y Ölçeği
+Y axis	Y ekseni
+Yes	Evet
+Z Euler Rotation	Z Euler Dönmesi
+Z Location	Z Konumu
+Z Scale	Z Ölçeği
+Z axis	Z ekseni
+Z-Buffer	Z-Buffer
+ZBuffer Preview	ZBuffer Önizleme
+Zoom 1:1	Zoom 1:1
+Zoom 2:1	Zoom 2:1
+Zoom 3:1	Zoom 3:1
+Zoom 4:1	Zoom 4:1
+[X: time]	[X: zaman]
+[Y: value]	[Y: değer]
+all	tümü
+all opaque	tamamen opak
+along	boyunca
+binary	ikili
+bone	kemik
+bones	kemikler
+center	merkez
+clip	klip
+clips	klip
+color	renk
+compiled	derlendi
+cube	küp
+current frame	geçerli kare
+cylinder	silindir
+deg	derece
+deleted or renamed	silindi veya adı değişti
+depth	derinlik
+done	bitti
+edge	kenar
+edge of a face	bir yüzün kenarı
+face	yüz
+free	boş
+game	oyun
+glTF imported successfully!	glTF içe aktarıldı!
+glTF: could not open the file	glTF: dosya açılamadı
+glTF: could not write the file	glTF: dosya yazılamadı
+glTF: invalid JSON	glTF: geçersiz JSON
+glTF: nothing to export	glTF: dışa aktarılacak bir şey yok
+glTF: nothing to import	glTF: içe aktarılacak bir şey yok
+hierarchy	hiyerarşi
+hierarchy clip	hiyerarşi klibi
+hierarchy clips	hiyerarşi klibi
+islands	ada
+list	liste
+missing	eksik
+mono (1)	mono (1)
+new	yeni
+no new changes in the file	dosyada yeni değişiklik yok
+not loaded	yüklenmedi
+not saved	kaydedilmedi
+not uploaded	gönderilmedi
+nothing	hiçbir şey
+object	nesne
+object(s) reloaded live	nesne canlı olarak yeniden yüklendi
+objects	nesne
+of	/
+off	kapalı
+open	açık
+part	parça
+parts	parça
+prefab	prefab
+preview	önizleme
+projection	izdüşüm
+read-only	salt okunur
+read-only library	salt okunur kütüphane
+reloaded from the file	dosyadan yeniden yüklendi
+removed from	kaldırıldı:
+replacements	değiştirme
+results	sonuç
+root	kök
+running	çalışan
+saved inside the .w3d	.w3d içine kaydedildi
+saved outside the .w3d	.w3d dışına kaydedildi
+scene	sahne
+select a mesh object first	önce bir örgü nesnesi seçin
+soon	yakında
+sphere	küre
+start	başlangıç
+stencil	stencil
+stereo (2)	stereo (2)
+track	iz
+tracks	iz
+triangle	üçgen
+triangles	üçgen
+unsaved	kaydedilmedi
+vertex	köşe
+vertices	köşe
+view	görünüm
+with mipmaps	mipmap ile
+with transparency	saydamlıklı
+without mipmaps	mipmap'siz
+you want to select (Esc to cancel)	seçilecek (İptal için Esc)

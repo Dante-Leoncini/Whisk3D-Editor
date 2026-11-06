@@ -1,0 +1,1731 @@
+" already exists. Do you want to replace it?	" já existe. Deseja substituí-lo?
+"%s" is in use by %d user(s). Delete it anyway? Its users will be left without it.	"%s" está em uso por %d usuário(s). Excluir mesmo assim? Seus usuários ficarão sem ele.
+"%s" is used by %d object(s). Delete it anyway?	"%s" é usado por %d objeto(s). Excluir mesmo assim?
+#+Down	#+Baixo
+#+Left/Right	#+Esq/Dir
+#+Up	#+Cima
+%d animation curve(s) of the selection no longer animate anything (Undo brings them back)	%d curva(s) de animação da seleção não animam mais nada (Desfazer as devolve)
+%d object(s) got their own copy of the mesh	%d objeto(s) passaram a ter sua própria cópia da malha
+%d object(s) of the project use 3D meshes of "%s": each one gets its own copy (Ctrl+Z undoes it). Unlink it?	%d objeto(s) do projeto usam malhas 3D de "%s": cada um passa a ter sua própria cópia (Ctrl+Z desfaz). Desvincular?
+%d reference(s) of the unpacked objects now find another object with the same name	%d referência(s) dos objetos desempacotados agora encontram outro objeto com o mesmo nome
+%d resources are in use (%d users). Delete them anyway? Their users will be left without them.	%d recursos estão em uso (%d usuários). Excluir mesmo assim? Seus usuários ficarão sem eles.
+(Esc to cancel)	(Esc para cancelar)
+(choose)	(escolher)
+(coming soon)	(em breve)
+(default)	(padrão)
+(empty)	(vazio)
+(no .lua scripts)	(não há scripts .lua)
+(no properties yet)	(sem propriedades ainda)
+(none)	(nenhuma)
+(not shared)	(não compartilhada)
+(nothing to choose)	(nada para escolher)
+(root)	(raiz)
+(this routine)	(esta rotina)
+16-bit textures	Texturas de 16 bits
+2D Armature Animation	Animação de Armature 2D
+2D Cursor	Cursor 2D
+2D Editor	Editor 2D
+2D armature animation: the mesh has no 2D armature	Animação de armature 2D: a malha não tem armature 2D
+3D Cursor	Cursor 3D
+3D Mesh	Malha 3D
+3D Mesh of	Malha 3D de
+3D Meshes	Malhas 3D
+3D Viewport	Viewport 3D
+3D grid	Grade 3D
+: baked	: bakeado
+A W3D proxy is read-only: it can't be unpacked	Um proxy W3D é somente leitura: não pode ser desempacotado
+A different file already exists there	Já existe outro arquivo lá
+A flipbook uses it	Um flipbook o usa
+A game has no animation to render	Um jogo não tem animação para renderizar
+A game has no keyframes: choose one of its clips in the timeline to animate	Um jogo não tem keyframes: escolha um de seus clipes na linha do tempo para animar
+A prefab can't be converted	Um prefab não pode ser convertido
+A prefab can't contain itself	Um prefab não pode conter a si mesmo
+A prefab instance only has what its prefab generates	Uma instância de prefab só tem o que seu prefab gera
+A project needs at least one scene	Um projeto precisa de pelo menos uma cena
+A scene can't contain itself	Uma cena não pode conter a si mesma
+A scene with that name already existed, renamed:	Já existia uma cena com esse nome, renomeada:
+A texture with that name already exists	Já existe uma textura com esse nome
+Above: once at start. Below: every frame.	Acima: uma vez ao iniciar. Abaixo: cada quadro.
+Abrir normal map	Abrir Mapa de Normais
+Absolute	Absoluto
+Acceleration	Aceleração
+Accept	Aceitar
+Actions	Ações
+Active	Ativo
+Active Camera	Câmera Ativa
+Active Element	Elemento ativo
+Active camera	Câmera ativa
+Add	Adicionar
+Add Circle	Adicionar Círculo
+Add Color	Adicionar cor
+Add Color Layer	Adicionar Camada de Cor
+Add Cone	Adicionar Cone
+Add Cube	Adicionar Cubo
+Add Cylinder	Adicionar Cilindro
+Add Layer	Adicionar camada
+Add Library...	Adicionar biblioteca...
+Add Plane	Adicionar Plano
+Add UV Group	Adicionar Grupo UV
+Add UV Map	Adicionar Mapa UV
+Add UV Sphere	Adicionar Esfera UV
+Add Vertex Group	Adicionar Grupo de Vértices
+Add shortcut	Adicionar atalho
+Added to the library	Adicionado à biblioteca
+Additive	Aditiva
+Additive (by alpha)	Aditiva (por alfa)
+Advanced: custom shader	Avançado: shader personalizado
+Affect	Afeta
+Affect Move	Afetar Mover
+Affect Rotate	Afetar Rotacionar
+Affect Scale	Afetar Escalar
+Affected	Afetadas
+Align	Alinhar
+Align X	Alinhar X
+Align Y	Alinhar Y
+Aligned	Alinhada
+All	Tudo
+All Transforms	Todas as Transformações
+All parts	Todas as partes
+All shortcuts restored	Atalhos restaurados
+Allow	Permitir
+Alpha	Alfa
+Alpha (normal)	Alfa (normal)
+Alpha Map	Mapa de alfa
+Alpha Preview	Prévia Alpha
+Alpha Test	Recorte alfa
+Alpha channel	Canal alfa
+Alpha kept per second	Alfa mantido por segundo
+Alpha only	Somente alfa
+Alpha order	Ordem por alfa
+Alpha reference	Referência alfa
+Alpha test	Teste alfa
+Alpha test on/off	Teste alfa liga/desliga
+Always	Sempre
+Ambient	Ambiente
+Ambient light	Luz ambiente
+An animated material uses it	Um material animado o usa
+Anamorphic Ratio	Proporção anamórfica
+Anchor	Âncora
+Angle	Ângulo
+Angle random	Ângulo aleatório (±)
+Animation	Animação
+Animation deleted: 	Animação excluída: 
+Animation rendered!	Animação renderizada!
+Animations	Animações
+Animations of	Animações de
+Antialiasing	Antialiasing
+Any orientation	Todas
+Anywhere	Em qualquer lugar
+Apply	Aplicar
+Apply Modifier	Aplicar Modificador
+Apply Modifiers	Aplicar Modificadores
+Apply Transforms	Aplicar Transformações
+Apply: select mesh or armature object(s)	Aplicar: selecione malha(s) ou armação(ões)
+Arc	Arco
+Armature	Armação
+Armature 2D	Armação 2D
+Armature Animation	Animação de Armature
+Array	Array
+Array on/off	Ligar/desligar array
+Array: a memory @name[i] = count, then first/last triangle pairs (last -1 = max). Empty = the parts.	Array: uma memória @nome[i] = quantidade, depois pares primeiro/último triângulo (último -1 = máximo). Vazio = as partes.
+Array: a memory @name[i] = count, then first/last triangle pairs (last -1 = max). Empty = the whole part.	Array: uma memória @nome[i] = quantidade, depois pares primeiro/último triângulo (último -1 = máximo). Vazio = a parte inteira.
+Aspect	Aspecto
+Assets	Assets
+Assign	Atribuir
+At Center	No centro
+At Cursor	No cursor
+Atlas	Atlas
+Att Constant	Att Constante
+Att Linear	Att Linear
+Att Quadratic	Att Quadrática
+Audible range	Alcance audível
+Auto	Auto
+Auto (active part)	Auto (parte ativa)
+Auto Clamped	Auto Limitada
+Auto Fit	Ajustar à área
+Auto Key	Auto Key
+Auto Keyframe	Keyframe automático
+Auto Keyframe: Off	Keyframe automático: desligado
+Auto Keyframe: On	Keyframe automático: ligado
+Auto Merge	Auto Mesclar
+Auto frame	Auto enquadre
+Automatic	Automática
+Automatic Easing	Suavização automática
+Automatic UVs were generated to paint	Foram geradas UV automáticas para pintar
+Axis	Eixo
+Axis Angle	Ângulo de Eixo
+Axis X	Eixo X
+Axis Y	Eixo Y
+Axis Z	Eixo Z
+BSP (pending)	BSP (pendente)
+BSP: the .w3dbsp file is missing (Culling.bsp)	BSP: falta o arquivo .w3dbsp (Culling.bsp)
+Back	Traseira
+Back (overshoot)	Recuo
+Back View	Vista traseira
+Background	Fundo
+Base Color	Cor Base
+Base velocity	Velocidade base
+Bevel	Chanfro
+Bevel Edges	Chanfrar arestas
+Bevel Vertices	Chanfrar vértices
+Bevel: enter Edit Mode first	Chanfro: entre no Modo Edição primeiro
+Bevel: move away from the center = width, wheel / up-down = segments, V = vertices/edges, click to confirm	Chanfro: afastar do centro = largura, roda / cima-baixo = segmentos, V = vértices/arestas, clique para confirmar
+Bevel: select edges first	Chanfro: selecione arestas primeiro
+Bevel: select vertices first	Chanfro: selecione vértices primeiro
+Bezier	Bezier
+Billboard	Billboard
+Bind texture	Vincular textura
+Bits	Bits
+Black Letterbox	Faixas pretas
+Blank	Liso
+Blend	Mistura
+Blend mode	Modo de mistura
+Blending	Mistura
+Blending on/off	Mistura liga/desliga
+Bloom	Bloom
+Blue	Azul
+Blur	Desfoque
+Bone	Osso
+Bones	Ossos
+Boolean	Booleano
+Boolean Object	Objeto do booleano
+Border	Borda
+Border Color	Cor da borda
+Border Scale	Escala da borda
+Border X	Borda X
+Border Y	Borda Y
+Borderless	Sem bordas
+Bottom	Inferior
+Bottom View	Vista inferior
+Bounce	Quique
+Boundary	Borda
+Box (memory)	Caixa (memória)
+Box Select	Seleção por caixa
+Box X	Caixa X
+Box Y	Caixa Y
+Box Z	Caixa Z
+Branches	Ramos
+Build game	Compilar jogo
+Build: a build is already running	Compilar: já há uma compilação em andamento
+Build: a library uses files by absolute path; they do not travel with the game	Compilar: uma biblioteca usa arquivos por caminho absoluto; eles não vão com o jogo
+Build: could not generate CMakeLists.txt	Compilar: não foi possível gerar CMakeLists.txt
+Build: could not generate main.cpp	Compilar: não foi possível gerar main.cpp
+Build: could not generate the Android script	Compilar: não foi possível gerar o script do Android
+Build: could not open the library	Compilar: não foi possível abrir a biblioteca
+Build: could not pack the assets	Compilar: não foi possível empacotar os assets
+Build: could not read the icon; continuing without it	Compilar: não foi possível ler o ícone; seguindo sem ele
+Build: could not write a scene (.w3dui)	Compilar: não foi possível gravar uma cena (.w3dui)
+Build: could not write the .w3dui	Compilar: não foi possível gravar o .w3dui
+Build: error in a Lua script: 	Compilar: erro em um script Lua: 
+Build: the Whisk3D repo (runtime sources) was not found. Set the repo folder in Settings (or build from the source tree).	Compilar: o repositório do Whisk3D (fontes do runtime) não foi encontrado. Defina a pasta do repositório em Ajustes (ou compile a partir do código-fonte).
+Build: the project has no scripts (add them to a Script object)	Compilar: o projeto não tem scripts (adicione-os a um objeto Script)
+Build: there are external references outside the project folder; they do not travel with the game	Compilar: há referências externas fora da pasta do projeto; elas não vão com o jogo
+Build: there is no UI in the scene	Compilar: não há nenhuma UI na cena
+Button	Botão
+By Distance	Por distância
+By words	Por palavras
+Bytes	Bytes
+C+Left	C+Esq
+C+Right	C+Dir
+CPU memory	Memória de CPU
+Call Lua	Chamar Lua
+Call routine	Chamar rotina
+Camera	Câmera
+Camera View	Vista da câmera
+Cameras	Câmeras
+Cancel	Cancelar
+Cancelled	Cancelado
+Cargar normal map	Carregar Mapa de Normais
+Cargar textura (imagen)	Carregar textura (imagem)
+Cell size	Tamanho da célula
+Center	Centro
+Center X	Centro X
+Center Y	Centro Y
+Center Z	Centro Z
+Center of frame	Centro do quadro
+Changes will be lost in:	As alterações serão perdidas em:
+Channels	Canais
+Child Of	Filho De
+Children	Filhos
+Choose a shader	Escolha um shader
+Choose file	Escolher arquivo
+Choose...	Escolher...
+Circle	Círculo
+Circular	Circular
+Clamp	Limitar
+Clamp Overlap	Limitar sobreposição
+Clear	Limpar
+Clear Depth	Limpar Z
+Clear Inverse	Limpar Inversa
+Clear Keyframe	Limpar Keyframes
+Clear Location (Pose)	Limpar posição (Pose)
+Clear Original File	Esquecer Arquivo Original
+Clear Parent	Desparentear
+Clear Parent Inverse	Limpar Inversa do Pai
+Clear Rotation (Pose)	Limpar rotação (Pose)
+Clear Screen	Limpar Tela
+Clear Seam	Limpar Costura
+Clear Sharp	Limpar Aguda
+Clear Transform	Limpar Transformação
+Clear UV Group Weights	Limpar Pesos do Grupo UV
+Clear and Keep Transformation	Limpar e Manter Transformação
+Clear color	Cor de limpeza
+Clear depth	Limpar Z
+Clear screen	Limpar tela
+Click the game to capture the mouse (Esc releases it)	Clique no jogo para capturar o mouse (Esc o solta)
+Clip default	Padrão do clipe
+Clip to rect	Recortar ao retângulo
+Clipping	Recorte
+Clips	Clipes
+Clone screen	Clonar tela
+Close	Fechar
+Closest	Mais Próximo
+Collapse	Colapsar
+Collection	Coleção
+Color	Cor
+Color Grid	Grade de Cores
+Color Layers	Camadas de cor
+Color Mode	Modo de Cor
+Color at death	Cor ao morrer
+Color buffer	Buffer de cor
+Color pointer	Ponteiro de cor
+Colored grain	Grão colorido
+Colors	Cores
+Columns	Colunas
+Compile	Compilar
+Compiled	Compilado
+Complete	Completo
+Component	Componente
+Cone	Cone
+Confirm	Confirmar
+Connect Vertex Path	Conectar caminho de vértices
+Connect: no path between the vertices	Conectar: não há caminho entre os vértices
+Connect: select exactly 2 vertices	Conectar: selecione exatamente 2 vértices
+Connect: the line leaves the surface	Conectar: a linha sai da superfície
+Connect: the vertices are already connected	Conectar: os vértices já estão conectados
+Connect: the vertices are not visible	Conectar: os vértices não estão visíveis
+Connected	Conectado
+Connected Only	Só Conectados
+Console	Console
+Constant	Constante
+Constant Offset	Deslocamento constante
+Constraint	Restrição
+Constraints	Restrições
+Constructor	Construtor
+Contain	Ajustar
+Container	Contêiner
+Context	Contexto
+Context menu	Menu de contexto
+Continue without saving	Continuar sem salvar
+Control	Controle
+Convert to Game	Converter em jogo
+Convert to Scene	Converter em cena
+Convert to editable mesh	Converter em malha editável
+Copied	Copiado
+Copy	Copiar
+Copy X	Copiar X
+Copy Y	Copiar Y
+Copy Z	Copiar Z
+Core (advanced)	Núcleo (avançado)
+Correct UVs	Corrigir UVs
+Could not copy the objects	Não foi possível copiar os objetos
+Could not create a viewport on the external display: cloning the screen	Não foi possível criar um viewport na tela externa: a tela será clonada
+Could not encode the PNG	Não foi possível codificar o PNG
+Could not import	Não foi possível importar
+Could not read the file	Não foi possível ler o arquivo
+Could not write config.ini	Não foi possível gravar config.ini
+Could not write the file	Não foi possível gravar o arquivo
+Count	Cópias
+Cover	Cobrir
+Create	Criar
+Create Prefab	Criar prefab
+Cube	Cubo
+Cube Projection	Projeção de Cubo
+Cubic	Cúbica
+Culling	Culling
+Current Frame	Frame Atual
+Current node	Nó atual
+Cursor	Cursor
+Cursor to Active	Cursor para o ativo
+Cursor to Center	Cursor para Centro
+Cursor to Grid	Cursor para a grade
+Cursor to Selected	Cursor para o selecionado
+Cursor to Selection	Cursor para Seleção
+Cursor to World Origin	Cursor para a origem do mundo
+Curve	Curva
+Curves	Curvas
+Custom	Personalizado
+Custom Normal	Normal Personalizada
+Custom shader	Shader personalizado
+Custom: edit the curve	Personalizado: edite a curva
+Cut	Cortar
+Cutoff	Corte
+Cylinder	Cilindro
+Cylinder Projection	Projeção de Cilindro
+Debug mode	Modo debug
+Decal	Decalque
+Decimals	Decimais
+Default Material	Material Padrão
+Delete	Excluir
+Delete "%s" (%s) with all its objects?	Excluir "%s" (%s) com todos os seus objetos?
+Delete "%s"?	Excluir "%s"?
+Delete %d objects?	Excluir %d objetos?
+Delete %d scenes, games or prefabs with all their objects?	Excluir %d cenas, jogos ou prefabs com todos os seus objetos?
+Delete Edge Loops: select an edge loop first	Excluir Edge Loops: selecione um edge loop primeiro
+Delete Edge Loops: select an edge shared by two faces	Excluir Loops de Arestas: selecione uma aresta compartilhada por duas faces
+Delete Folder	Excluir pasta
+Delete Keyframe	Excluir Keyframe
+Delete Keyframe: no keyframe at the current frame	Apagar keyframe: não há keyframe no quadro atual
+Delete Keyframe: the animation needs at least one keyframe	Apagar keyframe: a animação precisa de pelo menos um keyframe
+Delete Normals Layer	Excluir camada de normais
+Delete Palette	Apagar paleta
+Delete editing data	Apagar dados de edição
+Delete normals layer: select an object animation in the timeline	Apagar camada de normais: escolha uma animação do objeto na timeline
+Delete selected?	Excluir a seleção?
+Delete step	Apagar passo
+Delete the orphan resource	Excluir o recurso órfão
+Delete the orphan resources	Excluir os recursos órfãos
+Deleted	Excluído
+Denoiser	Denoiser
+Density	Densidade
+Depth	Profundidade
+Depth & clear	Profundidade e limpeza
+Depth Bias	Viés de profundidade
+Depth Bias (m)	Viés de profundidade (m)
+Depth Test	Teste de Profundidade
+Depth bias	Viés de profundidade
+Depth buffer	Buffer de profundidade
+Depth function	Função de profundidade
+Depth of field	Profundidade de campo
+Depth range	Faixa de profundidade
+Depth shift (m)	Deslocamento de profundidade (m)
+Depth test	Teste de profundidade
+Depth write	Escrever profundidade
+Deselect	Desselecionar
+Deselect All	Desselecionar tudo
+Detect bodies	Detectar corpos
+Device	Dispositivo
+Device name	Nome do dispositivo
+Dies below alpha	Morre com alfa menor que
+Difference	Diferença
+Diffuse	Difuso
+Diffusion	Difusão
+Directional	Direcional
+Discard the unsaved changes of	Descartar as alterações não salvas de
+Disconnect	Desconectar
+Disconnect Bone	Desconectar osso
+Display in Edit Mode	Mostrar no Modo Edição
+Display in Viewport	Mostrar na Viewport
+Distance	Distância
+Distance X	Distância X
+Distances	Distâncias
+Distribution	Distribuição
+Don't allow	Não permitir
+Done by CPU on this graphics backend (slow)	Com este backend gráfico é feito pela CPU (lento)
+Dope Sheet	Folha de chaves
+Drag (speed kept per second)	Arrasto (velocidade mantida por segundo)
+Drag the points, click to add	Arraste os pontos, clique para adicionar
+Draw	Desenhar
+Draw children	Desenhar filhos
+Draw elements	Desenhar elementos
+Draw in outliner order	Desenhar na ordem do outliner
+Draw mesh	Desenhar malha
+Drop a .wav on the library or on the 3D view	Solte um .wav na biblioteca ou na vista 3D
+Drop an element of a library	Solte um elemento de uma biblioteca
+Drop it on a character with an armature	Solte sobre um personagem com armature
+Drop it on a compatible selector	Solte sobre um seletor compatível
+Drop it on a mesh	Solte sobre uma malha
+Drop the library, not a clip	Solte a biblioteca, não um clipe
+Duplicate	Duplicar
+Duplicate Linked	Duplicar Vinculado
+Duplicate Objects	Duplicar Objetos
+Duplicate Resource	Duplicar recurso
+Duplicated	Duplicado
+Duration	Duração
+During a transform	Durante uma transformação
+Dynamic	Dinâmico
+Ease In	Na entrada
+Ease In and Out	Na entrada e na saída
+Ease Out	Na saída
+Easing Type	Suavização
+Edge	Aresta
+Edge Center	Centro da Aresta
+Edge Loops	Loops de Arestas
+Edge Rail	Trilho de aresta
+Edges	Arestas
+Edit	Editar
+Edit Bones	Editar Ossos
+Edit Mode	Modo Edição
+Edit Prefab	Editar prefab
+Edit Scene	Editar cena
+Edit in the IDE	Editar no IDE
+Editing	Edição
+Editing data deleted (mesh not editable)	Dados de edição apagados (malha não editável)
+Effects	Efeitos
+Elastic	Elástica
+Elegir archivo	Escolher Arquivo
+Element	Elemento
+Element of	Elemento de
+Emission	Emissão
+Emission Map	Mapa de emissão
+Empty	Vazio
+Empty routine	Rotina vazia
+Enable	Ativar
+Enabled	Habilitado
+End	Fim
+End color	Cor final
+End of frame	Fim do quadro
+End:%d	Fim:%d
+Entry	Entrada
+Equal	Igual
+Equirectangular (software)	Equirretangular (software)
+Error rendering animation	Erro ao renderizar a animação
+Error: could not save the OBJ	Erro: não foi possível salvar o OBJ
+Error: could not save the render	Erro: não foi possível salvar o render
+Errors only	Só erros
+Esto modificara el vertex group y lo simplificara a 1 hueso por vertice (skinning mas rapido). Puede haber perdida de datos.	Isto modificará o grupo de vértices e o simplificará para 1 osso por vértice (skinning mais rápido). Pode haver perda de dados.
+Exclude X (plane)	Excluir X (plano)
+Exclude Y (plane)	Excluir Y (plano)
+Exclude Z (plane)	Excluir Z (plano)
+Expand	Expandir
+Exponential	Exponencial
+Exponential squared	Exponencial ao quadrado
+Export	Exportar
+Export UI	Exportar UI
+Export UI to...	Exportar UI para...
+Export UV Layout	Exportar mapa UV
+Export UV Layout...	Exportar mapa UV...
+Export to...	Exportar para...
+External	Externo
+External (choose where)...	Externo (escolher onde)...
+External display	Tela externa
+Extract assets	Extrair assets
+Extract: save the project first (the assets live inside the .w3d)	Extrair: salve o projeto primeiro (os assets ficam dentro do .w3d)
+Extrude	Extrudar
+Extrude Bone	Extrudar osso
+Extrude Edges	Extrudar Arestas
+Extrude Faces	Extrudar Faces
+Extrude Vertices	Extrudar Vértices
+F-stop	Abertura (f)
+FBX export: not available yet	Exportar FBX: ainda não disponível
+FBX imported successfully!	FBX importado!
+FOV	FOV
+FPS	FPS
+Face	Face
+Face Center	Centro da face
+Face Nearest	Face mais próxima
+Face Normal	Normal de Face
+Face Project	Projetar na face
+Face Strength	Força da face
+Face culling	Descarte de faces
+Face the camera	Olhar para a câmera
+Faces	Faces
+Faces triangulated	Faces trianguladas
+Factor	Fator
+Factor X	Fator X
+Fade in	Aparece em
+Fade out	Desvanecer
+Falloff	Queda
+Far	Longe
+Far fade from	Longe: inteira até
+Far fade to	Longe: invisível desde
+Fast Mode	Modo rápido
+File	Arquivo
+File name	Nome do arquivo
+File size	Tamanho do arquivo
+Fill	Fundo
+Film grain	Grão de câmera
+Filter	Filtro
+Filtering	Filtragem
+Find	Localizar
+Find and Replace	Localizar e substituir
+Find...	Localizar...
+Finish the current transform first	Termine primeiro a transformação em andamento
+First triangle	Primeiro triângulo
+Fit	Ajuste
+Flags	Bandeiras
+Flags (memory)	Bandeiras (memória)
+Flat	Plano
+Flip	Virar
+Flip Normals	Inverter Normais
+Flipbook frames	Quadros do flipbook
+Flipbooks	Flipbooks
+Float	Decimal
+Floor	Piso
+Focus distance	Distância de foco
+Focus object	Objeto de foco
+Fog	Névoa
+Fog color	Cor da névoa
+Fog density	Densidade da névoa
+Fog end	Fim da névoa
+Fog mode	Modo da névoa
+Fog on/off	Névoa liga/desliga
+Fog start	Início da névoa
+Folder	Pasta
+Folders	Pastas
+Follow Active Quads	Seguir Quads Ativos
+Follow Active Quads: no neighbouring quads	Seguir Quads Ativos: não há quads vizinhos
+Follow Active Quads: select faces first	Seguir Quads Ativos: selecione faces primeiro
+Follow Active Quads: the active face must be a selected quad	Seguir Quads Ativos: a face ativa precisa ser um quad selecionado
+Font	Fonte
+Fonts	Fontes
+Format	Formato
+Fraction	Fração
+Frame	Quadro
+Frame All	Enquadrar Tudo
+Frame Selected	Enquadrar Seleção
+Frame X	Quadro X
+Frame rate (0 = whole life)	Quadros por segundo (0 = vida toda)
+Frames	Quadros
+Free	Livre
+Freely	Livremente
+Friction	Atrito
+Front	Frontal
+Front View	Vista frontal
+Front to back	Frente para tras
+Frustum (AABB)	Frustum (AABB)
+Full volume radius	Raio de volume pleno
+Fullscreen	Tela cheia
+Function	Função
+GL Light	Luz GL
+GPU (A-Trous)	GPU (A-Trous)
+GPU memory	Memória de GPU
+GPU-only meshes	Malhas só na GPU
+Game	Jogo
+Game UID generated (saved with the project)	UID do jogo gerado (salvo com o projeto)
+Game View	Vista de jogo
+Gap	Gap
+General	Geral
+Generated by	Gerado por
+Geometry to Origin	Geometria para Origem
+Give the project a name to save it	Dê um nome ao projeto para salvar
+Gizmo	Gizmo
+Global	Global
+Go back	Voltar
+Go to end	Ir para o fim
+Go to start	Ir para o início
+Grab step	Pegar passo
+Grain size	Tamanho do grão
+Graphics	Gráficos
+Gravity	Gravidade
+Green	Verde
+Green+Left soft	Verde+Soft esq
+Grid	Grade
+Grid (cells)	Grade (células)
+Grid Cull	Grid Cull
+Grid Fill	Preenchimento de grade
+Group	Grupo
+Growth (size per second)	Crescimento (tamanho por segundo)
+Growth kept per second	Crescimento mantido por segundo
+Handle Type	Tipo de Alça
+Handle type	Tipo de alça
+Harden Normals	Endurecer normais
+Height	Altura
+Hide / Show	Ocultar / Mostrar
+Hide/Show	Ocultar/Mostrar
+Hierarchy Clip	Clipe de hierarquia
+Hierarchy Clips	Clipes de hierarquia
+Hitbox	Hitbox
+Hover	Ao passar
+Hue	Matiz
+IDE: could not read	IDE: não foi possível ler
+IDE: could not save inside the project:	IDE: não foi possível salvar dentro do projeto:
+IDE: could not write	IDE: não foi possível gravar
+IDE: saving failed:	IDE: falha ao salvar:
+IOR	IOR
+Icon	Ícone
+Ignore order	Ignorar ordem
+Image	Imagem
+Import FBX	Importar FBX
+Import GLB	Importar GLB
+Import OBJ	Importar OBJ
+Import glTF	Importar glTF
+Import w3dui	Importar w3dui
+Imported	Importado
+Imports	Importar
+In the .w3d	No .w3d
+In use	Em uso
+Include Active	Incluir Ativo
+Include Edited	Incluir Editado
+Include Non-Edited	Incluir Não Editado
+Index	Índice
+Indices	Índices
+Individual	Individual
+Individual Elements	Elementos individuais
+Individual Origins	Origens individuais
+Influence	Influência
+Info	Info
+Insert Keyframe	Inserir Keyframe
+Insert Keyframe (all)	Inserir keyframe (tudo)
+Insert Keyframe Layer	Inserir Keyframe de Camada
+Insert Keyframe: select an object animation in the timeline	Inserir keyframe: escolha uma animação do objeto na timeline
+Insert Keyframe: the mesh has no normals	Inserir keyframe: a malha não tem normais
+Insert UV keyframe: the mesh has no UV	Inserir keyframe UV: a malha não tem UV
+Inset Faces	Inserir faces
+Inset: enter Edit Mode first	Inset: entre no Modo de Edição primeiro
+Inset: move toward the center = thickness, Ctrl = depth, I/B/O = individual/boundary/outset, click to confirm	Inset: aproximar do centro = espessura, Ctrl = profundidade, I/B/O = individual/borda/para fora, clique confirma
+Inset: select faces first	Inset: selecione faces primeiro
+Inside	Interior
+Inside the .w3d	Dentro do .w3d
+Intensity	Intensidade
+Interpolate	Interpolar
+Interpolate (mix)	Interpolar (mistura)
+Interpolation	Interpolação
+Interpolation Mode	Modo de Interpolação
+Intersect	Interseção
+Intersection Type	Tipo de interseção
+Inverse Square	Quadrado inverso
+Invert	Inverter
+Invert Selection	Inverter seleção
+It already has physics	Já tem física
+It belongs to a library (read-only): open the library to edit it	Pertence a uma biblioteca (somente leitura): abra a biblioteca para editá-lo
+It belongs to a prefab instance: edit the prefab or unpack the instance	Pertence a uma instância de prefab: edite o prefab ou desempacote a instância
+It can't be converted	Não pode ser convertido
+It can't be deleted	Não pode ser excluído
+It can't be linked	Não pode ser vinculado
+It can't be opened	Não pode ser aberto
+It could not be loaded	Não foi possível carregar
+It couldn't be copied into the .w3d	Não foi possível copiá-lo para dentro do .w3d
+It doesn't exist anymore	Não existe mais
+It has no proyecto.json	Não tem proyecto.json
+It is a W3D proxy: choose its library element	É um proxy W3D: escolha o elemento da sua biblioteca
+It is already linked	Já está vinculado
+It is in use	Está em uso
+It is open: switch to another scene first	Está aberta: primeiro troque para outra cena
+It is read-only	É somente leitura
+It is the open project	É o projeto aberto
+It isn't a .w3d project	Não é um projeto .w3d
+It isn't linked	Não está vinculada
+It isn't saved in the project yet	Ainda não está salvo no projeto
+Its file couldn't be read	Não foi possível ler seu arquivo
+Its geometry couldn't be read	Não foi possível ler sua geometria
+Its objects couldn't be deleted	Não foi possível excluir seus objetos
+Its objects will be deleted too (Undo brings them back).	Seus objetos também serão excluídos (Desfazer os traz de volta).
+Its own list	Sua própria lista
+Its proyecto.json can't be read	Seu proyecto.json não pode ser lido
+Join	Juntar
+Join: no active mesh object	Juntar: não há malha ativa
+Join: select 2+ mesh objects (active is the target)	Juntar: selecione 2+ malhas (a ativa é o destino)
+Joined into	Unido em
+Jump to End	Ir ao final
+Jump to Start	Ir ao início
+Keep Offset	Manter Deslocamento
+Key	Key
+Keyboard Shortcuts	Atalhos de teclado
+Keyboard Shortcuts...	Atalhos de teclado...
+Keyframe	Keyframe
+Keyframes	Keyframes
+LOD	LOD
+Landscape only	Só horizontal
+Language	Idioma
+Last triangle	Último triângulo
+Layer	Camada
+Layer On	Camada ativa
+Layout	Layout
+Left	Esquerda
+Left Handle X	Alça Esq. X
+Left View	Vista esquerda
+Left soft	Soft esq
+Less	Menor
+Less or equal	Menor ou igual
+Levels Viewport	Níveis Viewport
+Libraries	Bibliotecas
+Library	Biblioteca
+Library linked	Biblioteca vinculada
+Library not readable	Biblioteca ilegível
+Library unlinked	Biblioteca desvinculada
+Lifetime	Vida
+Light	Luz
+Light color	Cor da luz
+Light on/off	Luz liga/desliga
+Light position	Posição da luz
+Lighting	Iluminação
+Lighting on/off	Iluminação liga/desliga
+Lightmap Pack	Empacotar Lightmap
+Lightmap Pack: select faces first	Empacotar Lightmap: selecione faces primeiro
+Lights	Luzes
+Line (trail)	Linha (rastro)
+Line Width	Espessura da linha
+Line loop	Laço de linhas
+Line strip	Faixa de linhas
+Line width	Espessura da linha
+Linear	Linear
+Lines	Linhas
+Link	Vincular
+Link .w3d...	Vincular .w3d...
+Linked	Vinculado
+List	Lista
+Load (camera x object)	Carregar (câmera x objeto)
+Load .lua...	Carregar .lua...
+Load Texture	Carregar Textura
+Load UI	Carregar UI
+Load font	Carregar fonte
+Load from disk...	Carregar do disco...
+Load image	Carregar imagem
+Load script	Carregar script
+Load shader	Carregar shader
+Load sound	Carregar som
+Load sound from the file browser...	Carregar som do explorador...
+Loaded	Carregada
+Loading mode	Carregamento
+Loading...	Carregando...
+Local	Local
+Local View	Vista local
+Location	Posição
+Location Only	Somente Localização
+Location X	Posição X
+Lock Normals	Travar normais
+Lock Orbit	Travar Órbita
+Lock the camera to the view	Mover a câmera com a vista
+Longest clip	Clipe mais longo
+Loop	Loop
+Loop (smpl)	Loop (smpl)
+Loop Cut	Loop Cut
+Loop Cut and Slide	Loop Cut e Deslizar
+Loop Cut: enter Edit Mode first	Loop Cut: entre no Modo de Edição primeiro
+Loop Cut: move = slide, Enter to confirm, Esc = center	Loop Cut: mover = deslizar, Enter confirma, Esc = centralizar
+Loop Cut: no active edge (click an edge first)	Loop Cut: sem aresta ativa (clique em uma aresta primeiro)
+Loop Cut: no active face (click a face first)	Loop Cut: sem face ativa (clique em uma face primeiro)
+Loop Cut: scroll = number of cuts, Enter to confirm	Loop Cut: roda = número de cortes, Enter confirma
+Loop Cut: select an edge (2 verts) or a quad (4 verts)	Loop Cut: selecione uma aresta (2 vért.) ou um quad (4 vért.)
+Loop Cut: select the 4 vertices of one quad	Loop Cut: selecione os 4 vértices de um quad
+Loop Cut: tap a yellow dot to pick the cut direction (or arrows + Enter)	Loop Cut: toque um ponto amarelo para escolher a direção do corte (ou setas + Enter)
+Loop Cut: the 2 selected vertices are not an edge	Loop Cut: os 2 vértices selecionados não formam uma aresta
+Loop Cut: the active face has no edges	Loop Cut: a face ativa não tem arestas
+Loop Cut: the active face is not a quad	Loop Cut: a face ativa não é um quad
+Loop Select	Selecionar Loop
+Loop Select (Edge Loop)	Selecionar Loop (Edge Loop)
+Loop Select (Edge Ring)	Selecionar Loop (Edge Ring)
+Loop Select: arrows = direction, Enter to confirm	Loop Select: setas = direção, Enter para confirmar
+Loop Select: click an	Loop Select: clique em uma
+Loop Slide	Deslizar pelo loop
+Loop forever	Repetir sempre
+Loose (editable)	Soltos (editáveis)
+Make External...	Tornar Externa...
+Make Internal	Tornar Interna
+Make Single User	Tornar única
+Manual range	Intervalo manual
+Margin	Margem
+Margin bottom	Marg inferior
+Margin left	Marg esq
+Margin right	Marg dir
+Margin top	Marg superior
+Mark Seam	Marcar Costura
+Mark Seams	Marcar costuras
+Mark Sharp	Marcar Aguda
+Mass	Massa
+Matcap	Matcap
+Matcap (hardware)	Matcap (hardware)
+Match case	Diferenciar maiúsculas
+Match render	Igual ao render
+Material	Material
+Material Index	Índice de material
+Material Preview	Prévia Material
+Material color	Cor do material
+Material index	Índice do material
+Material of	Material de
+Materials	Materiais
+Max (last triangle of the mesh)	Máximo (o último triângulo da malha)
+Max (last triangle of the part)	Máximo (o último triângulo da parte)
+Max distance	Distância máxima
+Maximize	Maximizar
+Median	Mediana
+Median Point	Ponto médio
+Memory	Memória
+Memory usage	Uso de memória
+Menu bar	Barra de menu
+Merge	Mesclar
+Merge Distance	Distância de Mesclagem
+Mesh	Malha
+Mesh Parts	Partes de Malha
+Mesh editable again	Malha editável de novo
+Mesh made single user	A malha agora é única
+Mesh not editable (Convert to editable mesh, Mesh card)	Malha não editável (Converter em malha editável, cartão Malha 3D)
+Mesh part	Parte da malha
+Meshes as text	Malhas em texto
+Metallic	Metálico
+Metallic Map	Mapa metálico
+Meters	Metros
+Method	Método
+Minimize	Minimizar
+Minimum	Mínimo
+Mipmap	Mipmap
+Mipmaps	Mipmaps
+Mirror	Espelho
+Mirror Object	Objeto Espelho
+Mirror X	Espelho X
+Mirror Y	Espelho Y
+Mirror Z	Espelho Z
+Miter Inner	Meia-esquadria interna
+Miter Outer	Meia-esquadria externa
+Mix	Mix
+Mix end	Fim do mix
+Mix start	Início do mix
+Mode	Modo
+Model too big for the N95: more than 65535 vertices (16-bit limit)	Modelo grande demais para o N95: mais de 65535 vértices (limite de 16 bits)
+Modifier	Modificador
+Modifier applied	Modificador aplicado
+Modifiers	Modificadores
+Modulate	Modular
+Motion Trail	Rastro de Movimento
+Motion blur	Desfoque de movimento
+Motion vectors	Vetores de movimento
+Move	Mover
+Move (reorder)	Mover (reordenar)
+Move Down	Descer
+Move Up	Subir
+Move to	Mover para
+Move to Folder	Mover para pasta
+Move: %d frames	Mover: %d frames
+Move: %d frames, %.3f value%s	Mover: %d frames, %.3f valor%s
+Multiply	Multiplicar
+Multiply (lightmap)	Multiplicar (lightmap)
+Multiply 2x	Multiplicar 2x
+NRD (real time)	NRD (tempo real)
+Name	Nome
+Near	Perto
+Near fade from	Perto: invisível até
+Near fade to	Perto: inteira desde
+Nearest (pixelated)	Mais próximo (pixelado)
+Network access	Acesso à rede
+New	Novo
+New Animation	Nova Animação
+New Color Layer	Nova camada de cor
+New Copy	Nova cópia
+New Edge/Face from Vertices	Nova Aresta/Face dos Vértices
+New Face from Vertices	Nova face a partir de vértices
+New Flipbook	Novo flipbook
+New Folder	Nova pasta
+New Game	Novo jogo
+New Library	Nova biblioteca
+New Material	Novo Material
+New Mesh Part	Nova Parte
+New Palette	Nova paleta
+New Prefab	Novo prefab
+New Scene	Nova cena
+New Texture	Nova Textura
+New Texture...	Nova Textura...
+New Texture: could not load	Nova Textura: não foi possível carregar
+New Texture: could not save	Nova Textura: não foi possível salvar
+New Texture: invalid size	Nova Textura: tamanho inválido
+New UV Map	Novo mapa UV
+New W3D proxy of this element	Novo proxy W3D deste elemento
+New instance of this prefab	Nova instância deste prefab
+New instance of this scene	Nova instância desta cena
+New material with this shader	Material novo com este shader
+New material with this texture	Material novo com esta textura
+New noise each image	Outro ruído em cada imagem
+New object with this 3D mesh	Novo objeto com esta malha 3D
+New paint texture	Nova textura para pintar
+New shader	Novo shader
+New sound object here	Novo objeto de som aqui
+Next	Próximo
+Next Frame	Próximo frame
+Next Keyframe	Próxima key
+Next Viewport Shading	Próximo modo de visualização
+Next frame	Próximo quadro
+Next keyframe	Próximo keyframe
+No	Não
+No Normal Map	Sem Mapa de Normais
+No Properties panel	Nenhum painel de Propriedades
+No Test, Write	Sem teste, com escrita
+No Texture	Sem Textura
+No Texture B	Sem segunda textura
+No UV Group for this bone	Este osso não tem UV Group
+No UV map with this name in this 3D mesh	Não existe um UV com este nome nesta malha 3D
+No UVs to export	Não há UV para exportar
+No active 3D viewport	Nenhuma viewport 3D ativa
+No active object	Nenhum objeto ativo
+No axes: this constraint does nothing.	Sem eixos: esta restrição não faz nada.
+No file	Sem arquivo
+No library	Sem biblioteca
+No mipmaps (off or NPOT texture)	Sem mipmaps (desligados ou textura NPOT)
+No object of the scene uses it	Nenhum objeto da cena o usa
+No original file to forget	Não há arquivo original a esquecer
+No other scenes	Não há outras cenas
+No prefabs yet	Ainda não há prefabs
+No results	Sem resultados
+No source: this constraint does nothing.	Sem fonte: esta restrição não faz nada.
+None	Nenhum
+Normal	Normal
+Normal Map	Normal map
+Normal Map of	Normal map de
+Normal Mapping	Mapa de Normais
+Normal Size	Tamanho da Normal
+Normal View	Vista Normal
+Normal map	Normal map
+Normal map (DOT3)	Mapa de normais (DOT3)
+Normal pointer	Ponteiro de normais
+Normals	Normais
+Normals layer deleted	Camada de normais excluída
+Not assigned	Não atribuído
+Not deleted	Não excluído
+Not linked	Não vinculado
+Not moved	Não movido
+Not opened	Não aberto
+Not saved in the project yet	Ainda não foi salvo no projeto
+Nothing to paste	Nada para colar
+Nothing to save	Nada para salvar
+Now click the second	Agora, segundo clique em
+Now external	Agora é externo
+Now inside the .w3d	Agora está dentro do .w3d
+Number	Inteiro
+Number / Texture	Número / textura
+Number of Cuts	Número de Cortes
+Numbers / memories	Números / memórias
+OBJ does not store the skeleton or animations: only the mesh will be exported (vertex groups, armature and clips will be lost). It will overwrite the file if it already exists. Continue?	OBJ não armazena o esqueleto nem as animações: apenas a malha será exportada (grupos de vértices, armação e clipes serão perdidos). Vai sobrescrever o arquivo se já existir. Continuar?
+OBJ imported successfully!	OBJ importado!
+OBJ saved successfully!	OBJ salvo com sucesso!
+OK	OK
+Object	Objeto
+Object (Keep Transform Without Inverse)	Objeto (Manter Transform. Sem Inversa)
+Object (Keep Transform)	Objeto (Manter Transform.)
+Object (Without Inverse)	Objeto (Sem Inversa)
+Object / Edit Mode	Modo Objeto / Edição
+Object Animation	Animação do Objeto
+Object Mode	Modo Objeto
+Object Offset	Objeto de deslocamento
+Object Transforms	Transformações do Objeto
+Object animation: meshes only for now	Animação de objeto: por enquanto só malhas
+Object index	Índice do objeto
+Object matrix	Matriz de objeto
+Objects	Objetos
+Off	Desligado
+Off (no test, no write)	Desligado (sem teste nem escrita)
+Offset	Deslocamento
+Offset Even	Deslocamento uniforme
+Offset Relative	Deslocamento relativo
+On	Ativo
+Only active camera	Só câmera ativa
+Only external display (faster)	Só tela externa (mais rápido)
+Only in Object Mode	Só no Object Mode
+Only its visibility and script values are saved	Só são salvos a visibilidade e os valores dos scripts
+Only selected vertices	Só vértices selecionados
+Only the final image	Só a imagem final
+Opacity	Opacidade
+Opaque (one, zero)	Opaco (one, zero)
+Open	Abrir
+Open in IDE	Abrir no IDE
+Open project	Abrir projeto
+Open without saving	Abrir sem salvar
+Operation	Operação
+Optimize Vertex Groups	Otimizar Grupos de Vértices
+Orbit locked	Órbita bloqueada
+Orbit unlocked	Órbita desbloqueada
+Orient	Orient.
+Orientation	Orientação
+Origin to 3D Cursor	Origem para Cursor 3D
+Origin to Geometry	Origem para Geometria
+Original file forgotten	Arquivo original esquecido
+Origins	Origens
+Orphan (no users)	Órfão (sem usuários)
+Orphans purged	Órfãos purgados
+Orthographic	Ortográfica
+Outliner	Outliner
+Outset	Para fora
+Overflow X	Transbordo X
+Overflow Y	Transbordo Y
+Overlays	Sobreposições
+Overrides	Overrides
+Own	Próprio
+PVS recalculated	PVS recalculado
+PVS: <model>.pvs.json is missing next to the source .obj	PVS: falta <modelo>.pvs.json junto ao .obj de origem
+Packed (protected)	Empacotados (protegidos)
+Pad bottom	Pad inferior
+Pad left	Pad esq
+Pad right	Pad dir
+Pad top	Pad superior
+Padding	Padding
+Paint background	Pintar fundo
+Palette	Paleta
+Pan	Pan
+Parent	Pai
+Part (-1 = all)	Parte (-1 = todas)
+Particle Color	Cor e alfa
+Particle Motion	Movimento
+Particle Rotation	Rotação
+Particle Shape	Forma e flipbook
+Particle Size	Tamanho
+Particles	Partículas
+Parts	Partes
+Pass Order	Ordem de passe
+Passes	Passes
+Paste	Colar
+Pasted	Colado
+Patch	Remendo
+Path	Caminho
+Pencil+Up	Lápis+Cima
+Per Pixel Shading	Sombreamento por pixel
+Per Vertex Shading	Sombreamento por vértice
+Per pixel	Por pixel
+Per vertex	Por vértice
+Per-Corner	Por Canto
+Per-Vertex	Por Vértice
+Per-Vertex uses one color per vertex: the colors of the other face corners are lost when painting. Continue?	Per-Vertex usa uma cor por vértice: as cores dos outros face corners se perdem ao pintar. Continuar?
+Percent	Porcentagem
+Perspective / Orthographic	Perspectiva / Ortográfica
+Perspective/Ortho	Perspectiva/Orto
+Physics	Física
+Pick Shortest Path	Caminho Mais Curto
+Pick Shortest Path: click the first	Caminho mais curto: clique inicial em
+Pitch	Tom
+Pivot	Pivô
+Pixels	Pixels
+Plane	Plano
+Platform	Plataforma
+Play	Ouvir
+Play / Pause	Reproduzir / Pausa
+Play Reverse	Reproduzir ao contrário
+Play once (dies at the end)	Uma vez só (morre no fim)
+Point	Pontual
+Point size	Tamanho do ponto
+Points	Pontos
+Polygon (simulated)	Polígono (simulado)
+Pop matrix	Desempilhar matriz
+Portrait only	Só vertical
+Pose	Pose
+Pose Mode	Modo Pose
+Position	Posição
+Positional (3D)	Posicional (3D)
+Post Processing	Pós-processamento
+Prefab	Prefab
+Prefab "%s": %d object(s) are outside its root object and its instances don't show them	Prefab "%s": %d objeto(s) ficaram fora do seu objeto raiz e suas instâncias não os mostram
+Prefab Instance	Instância de prefab
+Prefab created	Prefab criado
+Prefab instances come with the prefabs phase	As instâncias de prefab chegam com a fase de prefabs
+Prefab of	Prefab de
+Prefabs	Prefabs
+Premultiplied alpha	Alfa pré-multiplicado
+Press a key...	Pressione uma tecla...
+Preview	Pré-visualização
+Preview animation	Ver animação
+Previous	Anterior
+Previous Frame	Frame anterior
+Previous Keyframe	Key anterior
+Previous frame	Quadro anterior
+Previous keyframe	Keyframe anterior
+Primitive	Primitiva
+Profile Shape	Forma do perfil
+Profile Type	Tipo de perfil
+Project	Projeto
+Project from View	Projetar da Vista
+Project from View (Bounds)	Projetar da Vista (Limites)
+Project from View: select faces first	Projetar da Vista: selecione faces primeiro
+Project saved: 	Projeto salvo: 
+Properties	Propriedades
+Properties viewport	Viewport de propriedades
+Proportional Editing	Edição Proporcional
+Proportional Editing: off	Edição Proporcional: desligada
+Proportional Editing: on	Edição Proporcional: ligada
+Proportional Size	Tamanho Proporcional
+Proportional radius +	Raio proporcional +
+Proportional radius -	Raio proporcional -
+Proxy W3D	Proxy W3D
+Purge Orphans	Purgar órfãos
+Purge orphans	Purgar os órfãos
+Push matrix	Empilhar matriz
+Quad strip (simulated)	Faixa de quads (simulado)
+Quadratic	Quadrática
+Quads (simulated)	Quads (simulado)
+Quartic	Quártica
+Quaternion (WXYZ)	Quaternion (WXYZ)
+Quintic	Quíntica
+Quit without saving	Sair sem salvar
+RAM	RAM
+Radius	Raio
+Radius 1	Raio 1
+Radius 2	Raio 2
+Rail (nodes)	Trilho (nós)
+Random	Aleatório
+Random angle (0-360)	Ângulo aleatório (0-360)
+Random spin direction	Sentido de giro aleatório
+Random velocity	Velocidade aleatória
+Ranges (memory)	Intervalos (memória)
+Rate	Quantidade
+Ray Tracing	Ray Tracing
+Ray traced motion blur	Desfoque traçado
+Rays	Raios
+Recalculate	Recalcular
+Recalculate Normals	Recalcular Normais
+Rectangle	Retângulo
+Red	Vermelho
+Redo	Refazer
+Reference	Referência
+Reflect children	Refletir filhos
+Reflection	Reflexo
+Refresh	Atualizar
+Refresh:	Atualizar:
+Relationship Lines	Linhas de Relação
+Relative Offset	Deslocamento relativo
+Reload the project to generate mipmaps	Recarregue o projeto para gerar os mipmaps
+Reload the project to upload the textures again	Recarregue o projeto para enviar as texturas de novo
+Remove	Remover
+Remove Repeat	Remover repetição
+Remove physics	Remover física
+Remove script	Remover script
+Rename	Renomear
+Rename 3D Mesh	Renomear malha 3D
+Rename Material	Renomear Material
+Render	Render
+Render Animation	Renderizar Animação
+Render FPS	FPS do render
+Render Image	Renderizar Imagem
+Render Preview	Prévia Render
+Render end	Fim do render
+Render icons	Ícones de render
+Render mode	Modo de render
+Render saved!	Render salvo!
+Render start	Início do render
+Render to...	Renderizar em...
+Renderable	Renderizável
+Rendered	Render
+Rendering animation...	Renderizando animação...
+Rendering...	Renderizando...
+Repeat	Repetir
+Repeat After	Repetir depois
+Repeat Before	Repetir antes
+Repeat Texture	Repetir Textura
+Repeat with Offset	Repetir com deslocamento
+Replace	Substituir
+Replace all	Substituir tudo
+Replace...	Substituir...
+Reset	Redefinir
+Reset Overrides	Remover overrides
+Reset all	Restaurar tudo
+Reset: select faces first	Redefinir: selecione faces primeiro
+Resolution	Resolução
+Resource	Recurso
+Restart Whisk3D for this change to take effect	Reinicie o Whisk3D para que esta alteração tenha efeito
+Retarget	Retarget
+Reverb	Reverb
+Right	Direita
+Right Handle X	Alça Dir. X
+Right View	Vista direita
+Rings	Anéis
+Rip	Rasgar
+Rip: mesh separated	Rip: malha separada
+Rip: the selection does not separate the mesh	Rip: a seleção não separa a malha
+Roll Left	Girar vista à esquerda
+Roll Right	Girar vista à direita
+Root	Raiz
+Rotate	Rotacionar
+Rotate handles	Rotacionar alças
+Rotate: %.1f deg  (pivot %s)	Rotacionar: %.1f graus  (pivô %s)
+Rotation	Rotação
+Rotation Only	Somente Rotação
+Rotation W	Rotação W
+Rotation X	Rotação X
+Rotations only	Só rotações
+Roughness	Rugosidade
+Roughness Map	Mapa de rugosidade
+Routine	Rotina
+Routine loop	Laço de rotina
+Routines	Rotinas
+Rows	Linhas
+Same as	Igual a
+Same as parent	Igual ao pai
+Same scale as the editor	Mesma escala do editor
+Sample rate	Taxa de amostragem
+Samples	Amostras
+Saturation	Saturação
+Save	Salvar
+Save As	Salvar como
+Save As...	Salvar como...
+Save CANCELLED: missing inside the project:	Salvamento CANCELADO: falta dentro do projeto:
+Save Changes	Salvar alterações
+Save Texture	Salvar Textura
+Save Texture: could not encode	Salvar Textura: não foi possível codificar
+Save Texture: could not write	Salvar Textura: não foi possível escrever
+Save Texture: no texture	Salvar Textura: sem textura
+Save and continue	Salvar e continuar
+Save and open	Salvar e abrir
+Save and quit	Salvar e sair
+Save inside the .w3d	Salvar no w3d
+Save outside the .w3d...	Salvar fora do w3d...
+Save project	Salvar projeto
+Save script	Salvar script
+Save the project first	Salve o projeto primeiro
+Save version: the project has no location (use Save first)	Salvar versão: o projeto não tem local (use Salvar primeiro)
+Save: could not replace the file (the previous version was kept):	Salvar: não foi possível substituir o arquivo (a versão anterior foi mantida):
+Save: incomplete write. The file was not touched:	Salvar: gravação incompleta. O arquivo não foi alterado:
+Saved: 	Salvo: 
+Scale	Escalar
+Scale Only	Somente Escala
+Scale U	Escala U
+Scale V	Escala V
+Scale X	Escala X
+Scale Y	Escala Y
+Scale Z	Escala Z
+Scale: %.2fx  (pivot %s)%s	Escalar: %.2fx  (pivô %s)%s
+Scaled	Escalado
+Scene	Cena
+Scene Animation	Animação de Cena
+Scene Instance	Instância de cena
+Scenes	Cenas
+Screen	Tela
+Screen Rect	Recorte
+Screw	Parafuso
+Script	Script
+Script Editor	Editor de scripts
+Script of	Script de
+Scripts	Scripts
+Scripts that name the file	Scripts que citam o arquivo
+Scripts that name the texture	Scripts que nomeiam a textura
+Scroll	Rolagem
+Scroll X	Rolagem X
+Scroll Y	Rolagem Y
+Segments	Segmentos
+Select	Selecionar
+Select All	Selecionar tudo
+Select Folder	Escolher Pasta
+Select Instance	Selecionar a instância
+Select Linked	Selecionar Vinculado
+Select Linked: click the	Selecionar Vinculado: clique sobre
+Select Linked: select a UV first (or press L over the island)	Selecionar Vinculado: selecione um UV primeiro (ou L sobre a ilha)
+Select Linked: select a bone first	Selecionar Vinculado: selecione um osso primeiro
+Select Mode	Modo Seleção
+Select Outer	Selecionar exterior
+Select Users	Selecionar usuários
+Select a prefab instance	Selecione uma instância de prefab
+Select an object first	Primeiro escolha um objeto
+Select faces with more than 3 sides to triangulate	Selecione faces com mais de 3 lados para triangular
+Select objects first	Selecione objetos primeiro
+Select the objects of the prefab	Selecione os objetos do prefab
+Selected only	Apenas selecionados
+Selection to Active	Seleção para o ativo
+Selection to Cursor	Seleção para Cursor
+Selection to Cursor (Keep Offset)	Seleção para o cursor (manter deslocamento)
+Selection to Grid	Seleção para a grade
+Separate	Separar
+Separate: new mesh created	Separar: malha nova criada
+Separate: no faces selected	Separar: nenhuma face selecionada
+Separate: select only some faces	Separar: selecione só algumas faces
+Set Active Camera	Definir câmera ativa
+Set Active Camera: the active object is not a camera	Câmera ativa: o objeto ativo não é uma câmera
+Set Active Object as Camera	Objeto Ativo como Câmera
+Set Inverse	Definir Inversa
+Set Keyframe Easing Type	Tipo de suavização
+Set Keyframe Handle Type	Definir Tipo de Alça
+Set Keyframe Interpolation	Tipo de interpolação
+Set Origin	Definir Origem
+Set Parent	Parentear
+Set Parent To	Parentear Para
+Set as Start Scene	Usar como cena inicial
+Settings	Ajustes
+Settings saved	Ajustes salvos
+Shade Flat	Sombrear Plano
+Shade Smooth	Sombrear Suave
+Shader	Shader
+Shader of	Shader de
+Shaders	Shaders
+Shading	Sombreamento
+Shape	Forma
+Shape keys	Shape keys
+Sharp	Agudo
+Sharp range	Faixa nítida
+Sharper	Mais agudo
+Shininess	Brilho
+Shortest Path (Fill Region)	Caminho Mais Curto (Preencher Região)
+Shortest path selected	Caminho mais curto selecionado
+Shortest path: region filled	Caminho mais curto: região preenchida
+Show Chrome UV	Mostrar Chrome UV
+Show Overlays	Mostrar Sobreposições
+Show Panel	Mostrar painel
+Show active	Mostrar o ativo
+Show in Edit Mode	Ver no modo de edição
+Show selection	Ver seleção
+Shrink/Fatten	Encolher/Engrossar
+Shrink/Fatten / Clear Scale	Engordar / Limpar escala
+Shutter	Obturador
+Shutter position	Posição do obturador
+Simple	Simples
+Simulated: OpenGL ES 1.1 has no quads or polygons. They are converted to triangles (more indices, slower).	Simulado: OpenGL ES 1.1 não tem quads nem polígonos. São convertidos em triângulos (mais índices, mais lento).
+Single line	Uma linha
+Sinusoidal	Senoidal
+Size	Tamanho
+Size X	Tamanho X
+Size Y	Tamanho Y
+Size Z	Tamanho Z
+Sizes	Tamanhos
+Skin	Tema
+Skinned	Com skinning
+Skip if hidden	Pular se estiver oculto
+Skip if no flag	Pular se nenhuma bandeira
+Skip if zero	Pular se for zero
+Slide Vertices	Deslizar vértices
+Smart Euler	Euler Inteligente
+Smart UV Project	Projeção UV Inteligente
+Smart UV Project: select faces first	Projeção UV Inteligente: selecione faces primeiro
+Smooth	Suave
+Smooth Shading	Sombreamento Suave
+Smooth shading	Sombreamento suave
+Smooth texture	Textura suave
+Smoother	Mais suave
+Snap	Ímã
+Snap Base	Base de Snap
+Snap Base:	Base de Snap:
+Snap Target	Destino de Snap
+Snap Target for Individual Elements	Destino de Snap para elementos individuais
+Snap Target:	Destino de Snap:
+Snap menu	Menu de ímã (Snap)
+Soft Knee	Joelho suave
+Solid	Sólido
+Solid Preview	Prévia Sólido
+Sort by camera	Ordenar pela câmera
+Sort once (active camera)	Ordenar uma vez (câmera ativa)
+Sound	Som
+Sounds	Sons
+Source	Fonte
+Spawn box	Caixa de nascimento
+Specular	Especular
+Speed	Velocidade
+Sphere	Esfera
+Sphere Map (software)	Mapa Esférico (software)
+Sphere Projection	Projeção de Esfera
+Spin	Giro
+Spin Y	Giro em Y
+Spin random	Giro aleatório (±)
+Split in Columns	Dividir em colunas
+Split in Rows	Dividir em linhas
+Spot	Foco
+Spot Cutoff	Ângulo Spot
+Spot Exponent	Expoente Spot
+Spread	Dispersão
+Start	Início
+Start / End / FPS	Início / Fim / FPS
+Start angle	Ângulo inicial
+Start of frame	Início do quadro
+Start time	Começa em
+Start:%d	Início:%d
+Starts at frame	Começa no frame
+State	Estado
+Static	Estático
+Statistics	Estatísticas
+Stencil buffer	Buffer de estêncil
+Steps	Passos
+Steps Viewport	Passos Viewport
+Steps to skip	Passos a pular
+Stop	Parar
+Stop the game before changing the scene	Pare o jogo antes de trocar de cena
+Stop the game first	Primeiro pare o jogo
+Stored	Armazenado
+Streaming preview	Pré-visualização do streaming
+Stretch	Esticar
+Stretch (seconds of velocity)	Estiramento (segundos de velocidade)
+Stretch U	Esticar U
+Stretch V	Esticar V
+Stretched	Esticada
+String	Texto
+Subdivision Surface	Superfície de Subdivisão
+Subtract	Subtrair
+Summary	Resumo
+Sun	Sol
+Superellipse	Superelipse
+Switch to 0-100%	Mudar para 0-100%
+Switch to 0-255	Mudar para 0-255
+Symbian .sisx: this target is not wired to this button yet.	Symbian .sisx: este destino ainda não está ligado a este botão.
+Sync Selection	Sincronizar Seleção
+Tag	Etiqueta
+Target	Alvo
+Test	Teste
+Test + Write (opaque)	Teste + escrita (opaco)
+Test, no Write (decal)	Teste, sem escrita (decalque)
+Text	Texto
+Text Color	Cor do texto
+Texture	Textura
+Texture %d	Textura %d
+Texture B	Segunda textura
+Texture Layers	Camadas de textura
+Texture Paint	Pintura de Textura
+Texture Paint: the active part has no texture	Pintura de Textura: a parte ativa não tem textura
+Texture filter	Filtro de textura
+Texture layers	Camadas de textura
+Texture mix	Quanto aparece a segunda textura
+Texture mode	Modo de textura
+Texture of	Textura de
+Texture on/off	Textura liga/desliga
+Texture saved	Textura salva
+Texture wrap	Repetição de textura
+Textures	Texturas
+Texturing	Texturização
+The 3D mesh couldn't be loaded	Não foi possível carregar a malha 3D
+The Object tab shows the BASE transform (the one that gets saved). Constraints modify it when drawing, so the object can appear elsewhere.	A aba Objeto mostra a transformação BASE (a que é salva). As restrições a modificam ao desenhar, então o objeto pode aparecer em outro lugar.
+The armature has its own clips	O armature tem clipes próprios
+The cambiarEscena() calls in its .lua still point to the first one: edit them by hand.	As chamadas cambiarEscena() do seu .lua ainda apontam para a primeira: edite-as à mão.
+The clip library could not be read	Não foi possível ler a biblioteca de clipes
+The clipboard has no hex color	A área de transferência não tem uma cor hex
+The default material can not be edited. Create a new material.	O material padrão não pode ser editado. Crie um novo material.
+The default material can't be edited	O material padrão não pode ser editado
+The editor has unsaved changes. Discard them and reload the file?	Há alterações não salvas no editor. Descartá-las e recarregar o arquivo?
+The external file is missing	O arquivo externo está faltando
+The file "	O arquivo "
+The file already exists. Do you want to replace it?	O arquivo já existe. Deseja substituí-lo?
+The file couldn't be written	Não foi possível gravar o arquivo
+The file was changed outside the editor. Overwrite it?	O arquivo foi alterado fora do editor. Sobrescrevê-lo?
+The file was not touched:	O arquivo não foi alterado:
+The folder isn't empty	A pasta não está vazia
+The instance could not be unpacked	Não foi possível desempacotar a instância
+The instance has nothing to unpack	A instância não tem nada para desempacotar
+The library file can't be opened	Não é possível abrir o arquivo da biblioteca
+The library has no proyecto.json	A biblioteca não tem proyecto.json
+The library has no such element	A biblioteca não tem esse elemento
+The library is read-only	A biblioteca é somente leitura
+The library isn't linked	A biblioteca não está vinculada
+The library's proyecto.json can't be read	Não é possível ler o proyecto.json da biblioteca
+The list of All	A de Tudo
+The objects of the 3D meshes will be deleted too (Undo brings them back).	Os objetos das malhas 3D também serão excluídos (Desfazer os traz de volta).
+The selected folders are deleted too if they end up empty.	As pastas selecionadas também são excluídas se ficarem vazias.
+The shader does not compile	O shader não compila
+The sound couldn't be decoded	Não foi possível decodificar o som
+The sound couldn't be read	Não foi possível ler o som
+The texture couldn't be loaded	Não foi possível carregar a textura
+The undo history still uses it	O histórico de desfazer ainda o usa
+There are no orphans	Não há órfãos
+There is no active camera	Não há câmera ativa
+There is no script editor (IDE) in the layout	Não há um editor de scripts (IDE) no layout
+There is no such prefab	Esse prefab não existe
+There is no such scene	Essa cena não existe
+Thickness	Espessura
+This animation has no normals layer	Esta animação não tem camada de normais
+This file type can't be added	Este tipo de arquivo não pode ser adicionado
+This graphics backend has no shaders: the @vertice section runs on the CPU and the rest of the material is drawn as usual	Este backend gráfico não tem shaders: a seção @vertice roda na CPU e o resto do material é desenhado como sempre
+This graphics backend has no shaders: the material is drawn as usual (GLES 2.0 and Vulkan have them)	Este backend gráfico não tem shaders: o material é desenhado como sempre (GLES 2.0 e Vulkan os têm)
+This hierarchy clip only animates its root and its children	Este clipe de hierarquia só anima sua raiz e seus filhos
+This is a scene: convert it to a game to simulate it	É uma cena: converta-a em jogo para simulá-la
+This mesh does not have this array: do not draw with the array on	Esta malha não tem esse array: não desenhe com o array ligado
+This phone can only clone the screen on the external display	Este telefone só pode clonar a tela na saída externa
+This project uses the network (LAN, Wi-Fi or the Internet) to play with others. Allow it?	Este projeto usa a rede (LAN, Wi-Fi ou a Internet) para jogar com outras pessoas. Permitir?
+This resource can't be dropped in the 3D view	Este recurso não pode ser solto na vista 3D
+This resource can't be renamed	Este recurso não pode ser renomeado
+This resource type can't be deleted	Este tipo de recurso não pode ser excluído
+This resource type can't be duplicated	Este tipo de recurso não pode ser duplicado
+This step has nothing to animate	Este passo não tem nada para animar
+Threshold	Limiar
+Timeline	Linha do Tempo
+Times	Tempos
+Timing	Tempo
+Toggle Snap	Ativar/desativar ímã
+Top	Superior
+Top View	Vista superior
+Tracks	Pistas
+Trail points	Pontos do rastro
+Trail step	Passo do rastro
+Transform	Transformar
+Transform Mesh	Transformar malha
+Transform Orientations	Orientações de Transformação
+Transform Pivot Point	Ponto pivô
+Transform UV	Transformar UV
+Translate	Transladar
+Translation	Translação
+Transmission	Transmissão
+Transparency layers	Camadas transparentes
+Transparent	Transparente
+Triangle fan	Leque de triângulos
+Triangle strip	Faixa de triângulos
+Triangles	Triângulos
+Triangles (PVS)	Triângulos (PVS)
+Triangulate	Triangular
+Triangulate Faces	Triangular Faces
+Trim end	Corte do final
+Trim start	Corte do início
+Turbulence	Turbulência
+Type	Tipo
+UI	UI
+UV	UV
+UV Editor	Editor UV
+UV Grid	Grade UV
+UV Groups	Grupos UV
+UV Map	Mapa UV
+UV Maps	Mapas UV
+UV Sphere	Esfera UV
+UV layer (0 = active)	Camada UV (0 = a ativa)
+UV layout saved	Mapa UV salvo
+UV menu	Menu UV
+UV offset	Deslocamento de UV
+UV pointer	Ponteiro de UV
+UV: projected from view	UV: projetadas da vista
+UV: projected from view (bounds)	UV: projetadas da vista (limites)
+UVSphere	EsferaUV
+Undo	Desfazer
+Uniform	Uniforme
+Union	União
+Unit	Unidade
+Units	Unidades
+Unlink	Desvincular
+Unloaded	Descarregada
+Unpack	Desempacotar
+Unpack Prefab	Desempacotar prefab
+Unwrap	Desdobrar
+Unwrap Angle Based	Desdobrar Baseado em Ângulos
+Unwrap Conformal	Desdobrar Conforme
+Unwrap Minimum Stretch	Desdobrar Mínimo Estiramento
+Unwrap: closed surface, mark seams first	Desdobrar: superfície fechada, marque costuras primeiro
+Unwrap: select faces first	Desdobrar: selecione faces primeiro
+Upright (does not tilt)	Vertical (não se inclina)
+Upscaler	Reescalador
+Upscaling	Reescalonamento
+Use	Usa
+Use camera focus	Usar o foco da câmera
+Use index	Usar índice
+Use new viewport	Usar novo viewport
+Use physics engine	Usar motor de física
+Use sound	Usar som
+Use the material's UV index	Usar o índice UV do material
+Use this file	Usar este ficheiro
+Use this folder	Usar esta pasta
+Users	Usuários
+Users selected	Usuários selecionados
+Value	Valor
+Value Y	Valor Y
+Variation	Variação
+Vector	Vetor
+Velocity	Velocidade
+Vertex	Vértice
+Vertex Animation	Animação de Vértices
+Vertex Color	Cor de Vértice
+Vertex Groups	Grupos de Vértices
+Vertex Normal	Normal de Vértice
+Vertex Paint	Pintura de Vértices
+Vertex Slide	Deslizar vértices
+Vertex color	Cor de vértice
+Vertex groups	Grupos de vértices
+Vertex groups optimized (1 bone/vertex)	Grupos de vértices otimizados (1 osso/vértice)
+Vertex pointer	Ponteiro de vértices
+Vertices	Vértices
+Vertices connected	Vértices conectados
+Video	Vídeo
+Videos	Vídeos
+View	Vista
+View in 3D	Ver em 3D
+View options	Opções de visualização
+Viewpoint	Ponto de Vista
+Visibility icons	Ícones de visibilidade
+Visibility test	Teste de visibilidade
+Visible	Visível
+Volume	Volume
+Volume line	Linha de volume
+Warning	Aviso
+Warnings and errors	Avisos e erros
+Waveform	Forma de onda
+Weight	Peso
+Weight Paint	Pintura de Pesos
+Whole word	Palavra inteira
+Width	Largura
+Width Type	Tipo de largura
+Window	Janela
+Window mode	Modo janela
+Windows .exe: not generated from this button yet. The EDITOR is built with platform/windows/build_windows.bat.	Windows .exe: ainda não é gerado por este botão. O EDITOR é compilado com platform/windows/build_windows.bat.
+Wireframe	Aramado
+Wireframe Preview	Prévia Aramado
+Wireframe: Only Visible	Aramado: Só o Visível
+With influence between 0 and 100 the billboard can flip 180 degrees when it crosses the camera. Use 100% to avoid it.	Com influência entre 0 e 100 o billboard pode girar 180 graus ao cruzar a câmera. Com 100% não acontece.
+With its materials	Com seus materiais
+Wrap	Repetição
+Write to	Escrever em
+X Axis	Eixo X
+X Euler Rotation	X Rotação Euler
+X Location	X Posição
+X Scale	X Escala
+X axis	Eixo X
+X-Ray	Raio-X
+XYZ Euler	Euler XYZ
+Y Axis	Eixo Y
+Y Euler Rotation	Y Rotação Euler
+Y Location	Y Posição
+Y Scale	Y Escala
+Y axis	Eixo Y
+Yes	Sim
+Z Euler Rotation	Z Rotação Euler
+Z Location	Z Posição
+Z Scale	Z Escala
+Z axis	Eixo Z
+Z-Buffer	Z-Buffer
+ZBuffer Preview	Prévia ZBuffer
+Zoom 1:1	Zoom 1:1
+Zoom 2:1	Zoom 2:1
+Zoom 3:1	Zoom 3:1
+Zoom 4:1	Zoom 4:1
+[X: time]	[X: tempo]
+[Y: value]	[Y: valor]
+all	todas
+all opaque	todo opaco
+along	em
+binary	binário
+bone	osso
+bones	ossos
+center	centro
+clip	clipe
+clips	clipes
+color	cor
+compiled	compilado
+cube	cubo
+current frame	frame atual
+cylinder	cilindro
+deg	graus
+deleted or renamed	excluído ou renomeado
+depth	profundidade
+done	pronto
+edge	aresta
+edge of a face	aresta de uma face
+face	face
+free	livre
+game	jogo
+glTF imported successfully!	glTF importado!
+glTF: could not open the file	glTF: não foi possível abrir o arquivo
+glTF: could not write the file	glTF: não foi possível gravar o arquivo
+glTF: invalid JSON	glTF: JSON inválido
+glTF: nothing to export	glTF: nada para exportar
+glTF: nothing to import	glTF: nada para importar
+hierarchy	hierarquia
+hierarchy clip	clipe de hierarquia
+hierarchy clips	clipes de hierarquia
+islands	ilhas
+list	lista
+missing	faltando
+mono (1)	mono (1)
+new	novo
+no new changes in the file	o arquivo não tem alterações novas
+not loaded	não carregado
+not saved	não salvo
+not uploaded	não enviado
+nothing	nada
+object	objeto
+object(s) reloaded live	objeto(s) recarregados ao vivo
+objects	objetos
+of	de
+off	desligado
+open	aberta
+part	parte
+parts	partes
+prefab	prefab
+preview	prévia
+projection	projeção
+read-only	somente leitura
+read-only library	biblioteca somente leitura
+reloaded from the file	recarregado do arquivo
+removed from	removido de
+replacements	substituições
+results	resultados
+root	raiz
+running	rodando
+saved inside the .w3d	salvo no .w3d
+saved outside the .w3d	salvo fora do .w3d
+scene	cena
+select a mesh object first	escolha primeiro um objeto malha
+soon	em breve
+sphere	esfera
+start	inicial
+stencil	estêncil
+stereo (2)	estéreo (2)
+track	trilha
+tracks	trilhas
+triangle	triângulo
+triangles	triângulos
+unsaved	não salvo
+vertex	vértice
+vertices	vértices
+view	vista
+with mipmaps	com mipmaps
+with transparency	com transparência
+without mipmaps	sem mipmaps
+you want to select (Esc to cancel)	a selecionar (Esc para cancelar)
