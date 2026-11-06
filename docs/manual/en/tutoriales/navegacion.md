@@ -103,7 +103,7 @@ To look at the scene straight on from one side, without lining up the orbit by h
 | Right / Left | <kbd>Num 3</kbd> / <kbd>Ctrl</kbd> + <kbd>Num 3</kbd> | View → Viewpoint → Right / Left |
 | Top / Bottom | <kbd>Num 7</kbd> / <kbd>Ctrl</kbd> + <kbd>Num 7</kbd> | View → Viewpoint → Top / Bottom |
 
-With <kbd>Ctrl</kbd>, each key gives the opposite view.
+![PC](img/icono-pc.svg) With <kbd>Ctrl</kbd>, each key gives the opposite view.
 
 ![The crowded scene from the front, right and top views and, with Ctrl, from their opposites](img/navegacion-vistas.webp)
 
@@ -115,8 +115,8 @@ With <kbd>Ctrl</kbd>, each key gives the opposite view.
 
 The 3D Viewport has two ways of showing the scene:
 
-- **Perspective:** the way the eye or a camera sees it. Things far away look smaller, and parallel lines (the edges of a street, the rows of boxes in the video) converge toward the horizon. This is how things really look, with depth.
-- **Orthographic:** no perspective. Everything keeps its size, near or far, and parallel lines stay parallel. It's like an architectural plan or a technical drawing.
+- **Perspective:** the way the eye or a camera sees it. Things far away look smaller, and parallel lines (the edges of a street, the rows of boxes in the video) meet at a point on the horizon: the **vanishing point**. This is how things really look, with depth.
+- **Orthographic:** no perspective. Everything keeps its size, near or far, and parallel lines never meet. It's like an architectural plan or a technical drawing.
 
 Orthographic is useful for modeling precisely: aligning things, comparing sizes and measuring without distance fooling you. Combined with the front, side and top views, it's like working on a blueprint. Perspective is useful for seeing how the result will look.
 
@@ -157,9 +157,9 @@ To make another camera the active one: select it and press <kbd>Ctrl</kbd> + <kb
 
 ## More view options
 
-| Option | What it does | ![PC](img/icono-pc.svg) PC | ![Nokia](img/icono-nokia.svg) Nokia N95 |
-|---|---|---|---|
-| Roll the view | Rotates it 15° around its own axis, like tilting your head. | <kbd>Num 4</kbd> / <kbd>Num 6</kbd> | — |
-| Lock Orbit | The view stops turning: what used to orbit now pans, as on a 2D board. | View → Lock Orbit | <kbd>9</kbd> |
+| Option | What it does | ![PC](img/icono-pc.svg) PC | ![Nokia](img/icono-nokia.svg) Nokia N95 | Menu |
+|---|---|---|---|---|
+| Roll the view | Rotates it 15° around its own axis, like tilting your head. | <kbd>Num 4</kbd> / <kbd>Num 6</kbd> | — | — |
+| Lock Orbit | The view stops turning: what used to orbit now pans, as on a 2D board. | — | <kbd>9</kbd> | View → Lock Orbit |
 
 All the editor's shortcuts are in [Keyboard Shortcuts](../editor/atajos.md), and the manual's [Navigation](../editor/navegacion.md) page sums them up in tables.

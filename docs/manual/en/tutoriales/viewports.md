@@ -27,7 +27,7 @@ Every viewport has a **menu bar** at the top (green in the image) with that edit
 
 ## Resize
 
-**Press and hold** the corner button (with your finger or the mouse) and drag it to resize: that moves the left and top borders of that viewport, and the ones next to it adjust. A **single tap**, without dragging, opens the drop-down menu with the viewport's options. Here, the bottom-right one is dragged in circles and all three change size:
+![PC](img/icono-pc.svg) ![Android](img/icono-android.svg) **Press and hold** the corner button (with your finger or the mouse) and drag it to resize: that moves the left and top borders of that viewport, and the ones next to it adjust. A **single tap**, without dragging, opens the drop-down menu with the viewport's options. Here, the bottom-right one is dragged in circles and all three change size:
 
 ![A finger drags the corner button of the bottom-right viewport in circles, and the three viewports change size](img/viewports-arrastrar.webp)
 

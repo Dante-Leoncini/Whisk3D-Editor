@@ -103,7 +103,7 @@ Para olhar a cena diretamente de um dos lados, sem ajustar a órbita à mão:
 | Direita / Esquerda | <kbd>Num 3</kbd> / <kbd>Ctrl</kbd> + <kbd>Num 3</kbd> | Vista → Ponto de Vista → Direita / Esquerda |
 | Superior / Inferior | <kbd>Num 7</kbd> / <kbd>Ctrl</kbd> + <kbd>Num 7</kbd> | Vista → Ponto de Vista → Superior / Inferior |
 
-Com <kbd>Ctrl</kbd>, cada tecla dá a vista oposta.
+![PC](img/icono-pc.svg) Com <kbd>Ctrl</kbd>, cada tecla dá a vista oposta.
 
 ![A cena cheia na vista frontal, na direita, na superior e, com Ctrl, nas opostas](img/navegacion-vistas.webp)
 
@@ -115,8 +115,8 @@ Com <kbd>Ctrl</kbd>, cada tecla dá a vista oposta.
 
 A Viewport 3D tem duas maneiras de mostrar a cena:
 
-- **Perspectiva:** como o olho ou uma câmera a vê. O que está longe parece menor, e as linhas paralelas (as bordas de uma rua, as fileiras de caixas do vídeo) se juntam em direção ao horizonte. É assim que as coisas são vistas de verdade, com profundidade.
-- **Ortográfica:** sem perspectiva. Tudo mantém o seu tamanho, esteja perto ou longe, e as linhas paralelas continuam paralelas. É como uma planta de arquitetura ou um desenho técnico.
+- **Perspectiva:** como o olho ou uma câmera a vê. O que está longe parece menor, e as linhas paralelas (as bordas de uma rua, as fileiras de caixas do vídeo) se juntam em um ponto do horizonte: o **ponto de fuga**. É assim que as coisas são vistas de verdade, com profundidade.
+- **Ortográfica:** sem perspectiva. Tudo mantém o seu tamanho, esteja perto ou longe, e as linhas paralelas nunca se tocam. É como uma planta de arquitetura ou um desenho técnico.
 
 A ortográfica serve para modelar com precisão: alinhar coisas, comparar tamanhos e medir sem que a distância engane. Combinada com as vistas de frente, de lado e de cima, é como trabalhar sobre uma planta. A perspectiva serve para ver como vai ficar.
 
@@ -157,9 +157,9 @@ Para que outra câmera passe a ser a ativa: selecione-a e aperte <kbd>Ctrl</kbd>
 
 ## Mais opções da vista
 
-| Opção | O que faz | ![PC](img/icono-pc.svg) PC | ![Nokia](img/icono-nokia.svg) Nokia N95 |
-|---|---|---|---|
-| Girar a vista | Gira a vista 15° sobre o seu próprio eixo, como quando se inclina a cabeça. | <kbd>Num 4</kbd> / <kbd>Num 6</kbd> | — |
-| Travar Órbita | A vista para de girar: o que orbitava passa a deslocar, como em um tabuleiro 2D. | Vista → Travar Órbita | <kbd>9</kbd> |
+| Opção | O que faz | ![PC](img/icono-pc.svg) PC | ![Nokia](img/icono-nokia.svg) Nokia N95 | Menu |
+|---|---|---|---|---|
+| Girar a vista | Gira a vista 15° sobre o seu próprio eixo, como quando se inclina a cabeça. | <kbd>Num 4</kbd> / <kbd>Num 6</kbd> | — | — |
+| Travar Órbita | A vista para de girar: o que orbitava passa a deslocar, como em um tabuleiro 2D. | — | <kbd>9</kbd> | Vista → Travar Órbita |
 
 Todos os atalhos do editor estão em [Atalhos de teclado](../editor/atajos.md), e a página [Navegação](../editor/navegacion.md) do manual os resume em tabelas.

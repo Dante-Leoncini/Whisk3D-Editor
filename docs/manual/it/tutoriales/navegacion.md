@@ -103,7 +103,7 @@ Per guardare la scena esattamente da un lato, senza sistemare l'orbita a mano:
 | Destra / Sinistra | <kbd>Num 3</kbd> / <kbd>Ctrl</kbd> + <kbd>Num 3</kbd> | View → Viewpoint → Right / Left |
 | Dall'alto / Dal basso | <kbd>Num 7</kbd> / <kbd>Ctrl</kbd> + <kbd>Num 7</kbd> | View → Viewpoint → Top / Bottom |
 
-Con <kbd>Ctrl</kbd>, ogni tasto dà la vista opposta.
+![PC](img/icono-pc.svg) Con <kbd>Ctrl</kbd>, ogni tasto dà la vista opposta.
 
 ![La scena piena vista di fronte, da destra, dall'alto e, con Ctrl, dai lati opposti](img/navegacion-vistas.webp)
 
@@ -115,8 +115,8 @@ Con <kbd>Ctrl</kbd>, ogni tasto dà la vista opposta.
 
 Il 3D Viewport ha due modi di mostrare la scena:
 
-- **Prospettiva:** come la vede l'occhio o una camera. Ciò che è lontano appare più piccolo, e le linee parallele (i bordi di una strada, le file di scatole del video) convergono verso l'orizzonte. È così che si vede davvero, con profondità.
-- **Ortografica:** senza prospettiva. Tutto mantiene la sua dimensione, vicino o lontano che sia, e le linee parallele restano parallele. È come una pianta architettonica o un disegno tecnico.
+- **Prospettiva:** come la vede l'occhio o una camera. Ciò che è lontano appare più piccolo, e le linee parallele (i bordi di una strada, le file di scatole del video) si incontrano in un punto dell'orizzonte: il **punto di fuga**. È così che si vede davvero, con profondità.
+- **Ortografica:** senza prospettiva. Tutto mantiene la sua dimensione, vicino o lontano che sia, e le linee parallele non si toccano mai. È come una pianta architettonica o un disegno tecnico.
 
 L'ortografica serve per modellare con precisione: allineare le cose, confrontare le dimensioni e misurare senza che la distanza inganni. Insieme alle viste di fronte, di lato e dall'alto, è come lavorare su una pianta. La prospettiva serve per vedere come verrà il risultato.
 
@@ -157,9 +157,9 @@ Perché un'altra camera diventi quella attiva: selezionala e premi <kbd>Ctrl</kb
 
 ## Altre opzioni della vista
 
-| Opzione | Cosa fa | ![PC](img/icono-pc.svg) PC | ![Nokia](img/icono-nokia.svg) Nokia N95 |
-|---|---|---|---|
-| Ruotare la vista | La ruota di 15° sul proprio asse, come quando inclini la testa. | <kbd>Num 4</kbd> / <kbd>Num 6</kbd> | — |
-| Lock Orbit | La vista smette di ruotare: ciò che la faceva orbitare ora la sposta, come su una tavola 2D. | View → Lock Orbit | <kbd>9</kbd> |
+| Opzione | Cosa fa | ![PC](img/icono-pc.svg) PC | ![Nokia](img/icono-nokia.svg) Nokia N95 | Menu |
+|---|---|---|---|---|
+| Ruotare la vista | La ruota di 15° sul proprio asse, come quando inclini la testa. | <kbd>Num 4</kbd> / <kbd>Num 6</kbd> | — | — |
+| Lock Orbit | La vista smette di ruotare: ciò che la faceva orbitare ora la sposta, come su una tavola 2D. | — | <kbd>9</kbd> | View → Lock Orbit |
 
 Tutte le scorciatoie dell'editor sono in [Scorciatoie da tastiera](../editor/atajos.md), e la pagina [Navigazione](../editor/navegacion.md) del manuale le riassume in tabelle.

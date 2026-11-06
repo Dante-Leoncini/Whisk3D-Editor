@@ -103,7 +103,7 @@ Sahneye bir yönden dümdüz bakmak için, yörüngeyi elle ayarlamadan:
 | Sağ / Sol | <kbd>Num 3</kbd> / <kbd>Ctrl</kbd> + <kbd>Num 3</kbd> | View → Viewpoint → Right / Left |
 | Üst / Alt | <kbd>Num 7</kbd> / <kbd>Ctrl</kbd> + <kbd>Num 7</kbd> | View → Viewpoint → Top / Bottom |
 
-<kbd>Ctrl</kbd> ile her tuş karşıt görünümü verir.
+![PC](img/icono-pc.svg) <kbd>Ctrl</kbd> ile her tuş karşıt görünümü verir.
 
 ![Dolu sahne önden, sağdan, üstten ve Ctrl ile bunların karşıtlarından görülüyor](img/navegacion-vistas.webp)
 
@@ -115,8 +115,8 @@ Sahneye bir yönden dümdüz bakmak için, yörüngeyi elle ayarlamadan:
 
 3D Viewport'un sahneyi göstermenin iki yolu vardır:
 
-- **Perspektif:** gözün ya da bir kameranın gördüğü gibi. Uzaktaki şeyler daha küçük görünür, paralel çizgiler (bir yolun kenarları, videodaki kutu sıraları) ufka doğru birleşir. Gerçekte de böyle görünür, derinlikle.
-- **Ortografik:** perspektifsiz. Yakında da olsa uzakta da olsa her şey boyutunu korur, paralel çizgiler paralel kalır. Bir mimari plan ya da teknik çizim gibidir.
+- **Perspektif:** gözün ya da bir kameranın gördüğü gibi. Uzaktaki şeyler daha küçük görünür, paralel çizgiler (bir yolun kenarları, videodaki kutu sıraları) ufukta tek bir noktada birleşir: **kaçış noktası**. Gerçekte de böyle görünür, derinlikle.
+- **Ortografik:** perspektifsiz. Yakında da olsa uzakta da olsa her şey boyutunu korur, paralel çizgiler asla birleşmez. Bir mimari plan ya da teknik çizim gibidir.
 
 Ortografik görünüm hassas modelleme için işe yarar: nesneleri hizalamak, boyutları karşılaştırmak ve mesafeye aldanmadan ölçmek için. Önden, yandan ve üstten görünümlerle birlikte kullanınca bir plan üzerinde çalışmak gibidir. Perspektif ise sonucun nasıl görüneceğini görmeye yarar.
 
@@ -157,9 +157,9 @@ Başka bir kamerayı etkin yapmak için onu seç ve <kbd>Ctrl</kbd> + <kbd>Num 0
 
 ## Diğer görünüm seçenekleri
 
-| Seçenek | Ne yapar | ![PC](img/icono-pc.svg) PC | ![Nokia](img/icono-nokia.svg) Nokia N95 |
-|---|---|---|---|
-| Görünümü döndürme | Görünümü kendi ekseni etrafında 15° döndürür; başını yana eğmek gibi. | <kbd>Num 4</kbd> / <kbd>Num 6</kbd> | — |
-| Lock Orbit | Görünüm dönmeyi bırakır: yörüngede döndürme yerine kaydırma yapılır, 2D bir tahtadaki gibi. | View → Lock Orbit | <kbd>9</kbd> |
+| Seçenek | Ne yapar | ![PC](img/icono-pc.svg) PC | ![Nokia](img/icono-nokia.svg) Nokia N95 | Menü |
+|---|---|---|---|---|
+| Görünümü döndürme | Görünümü kendi ekseni etrafında 15° döndürür; başını yana eğmek gibi. | <kbd>Num 4</kbd> / <kbd>Num 6</kbd> | — | — |
+| Lock Orbit | Görünüm dönmeyi bırakır: yörüngede döndürme yerine kaydırma yapılır, 2D bir tahtadaki gibi. | — | <kbd>9</kbd> | View → Lock Orbit |
 
 Editörün tüm kısayolları [Klavye kısayolları](../editor/atajos.md) sayfasında; kılavuzun [Gezinme](../editor/navegacion.md) sayfası da bunları tablolar hâlinde özetler.

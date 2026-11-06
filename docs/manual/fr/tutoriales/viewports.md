@@ -27,7 +27,7 @@ Tous les viewports ont en haut une **barre de menus** (en vert sur l'image) avec
 
 ## Redimensionner
 
-**Maintenez appuyé** le bouton du coin (avec le doigt ou la souris) et faites-le glisser pour redimensionner : cela déplace la bordure gauche et la bordure du haut de ce viewport, et ses voisins s'ajustent. Un **simple toucher**, sans glisser, ouvre le menu déroulant avec les options du viewport. Ici, on fait glisser en cercles celui d'en bas à droite, et les trois changent de taille :
+![PC](img/icono-pc.svg) ![Android](img/icono-android.svg) **Maintenez appuyé** le bouton du coin (avec le doigt ou la souris) et faites-le glisser pour redimensionner : cela déplace la bordure gauche et la bordure du haut de ce viewport, et ses voisins s'ajustent. Un **simple toucher**, sans glisser, ouvre le menu déroulant avec les options du viewport. Ici, on fait glisser en cercles celui d'en bas à droite, et les trois changent de taille :
 
 ![Un doigt fait glisser en cercles le bouton du coin du viewport d'en bas à droite, et les trois viewports changent de taille](img/viewports-arrastrar.webp)
 

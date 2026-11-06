@@ -27,7 +27,7 @@ Todos los viewports tienen arriba una **barra de menús** (en verde en la imagen
 
 ## Cambiar el tamaño
 
-**Mantené presionado** el botón de la esquina (con el dedo o con el mouse) y arrastralo para cambiar el tamaño: eso mueve el borde izquierdo y el de arriba de ese viewport, y los de al lado se acomodan. Un **toque simple**, sin arrastrar, abre el menú desplegable con las opciones del viewport. Acá, el de abajo a la derecha se arrastra en círculos y los tres cambian de tamaño:
+![PC](img/icono-pc.svg) ![Android](img/icono-android.svg) **Mantené presionado** el botón de la esquina (con el dedo o con el mouse) y arrastralo para cambiar el tamaño: eso mueve el borde izquierdo y el de arriba de ese viewport, y los de al lado se acomodan. Un **toque simple**, sin arrastrar, abre el menú desplegable con las opciones del viewport. Acá, el de abajo a la derecha se arrastra en círculos y los tres cambian de tamaño:
 
 ![Un dedo arrastra en círculos el botón de la esquina del viewport de abajo a la derecha, y los tres viewports cambian de tamaño](img/viewports-arrastrar.webp)
 

@@ -103,7 +103,7 @@ Pour regarder la scène bien en face depuis l'un de ses côtés, sans régler l'
 | Droite / Gauche | <kbd>Num 3</kbd> / <kbd>Ctrl</kbd> + <kbd>Num 3</kbd> | View → Viewpoint → Right / Left |
 | Dessus / Dessous | <kbd>Num 7</kbd> / <kbd>Ctrl</kbd> + <kbd>Num 7</kbd> | View → Viewpoint → Top / Bottom |
 
-Avec <kbd>Ctrl</kbd>, chaque touche donne la vue opposée.
+![PC](img/icono-pc.svg) Avec <kbd>Ctrl</kbd>, chaque touche donne la vue opposée.
 
 ![La scène remplie vue de face, de droite, de dessus et, avec Ctrl, depuis les vues opposées](img/navegacion-vistas.webp)
 
@@ -115,8 +115,8 @@ Avec <kbd>Ctrl</kbd>, chaque touche donne la vue opposée.
 
 Le 3D Viewport a deux façons d'afficher la scène :
 
-- **Perspective :** comme la voit l'œil ou une caméra. Ce qui est loin paraît plus petit, et les lignes parallèles (les bords d'une rue, les rangées de boîtes de la vidéo) se rejoignent vers l'horizon. C'est ainsi que l'on voit vraiment, avec de la profondeur.
-- **Orthographique :** sans perspective. Tout garde sa taille, que ce soit près ou loin, et les lignes parallèles restent parallèles. C'est comme un plan d'architecte ou un dessin technique.
+- **Perspective :** comme la voit l'œil ou une caméra. Ce qui est loin paraît plus petit, et les lignes parallèles (les bords d'une rue, les rangées de boîtes de la vidéo) se rejoignent en un point de l'horizon : le **point de fuite**. C'est ainsi que l'on voit vraiment, avec de la profondeur.
+- **Orthographique :** sans perspective. Tout garde sa taille, que ce soit près ou loin, et les lignes parallèles ne se touchent jamais. C'est comme un plan d'architecte ou un dessin technique.
 
 La vue orthographique sert à modéliser avec précision : aligner des éléments, comparer des tailles et mesurer sans que la distance ne trompe. Combinée aux vues de face, de côté et de dessus, c'est comme travailler sur un plan. La perspective sert à voir à quoi ressemblera le résultat.
 
@@ -157,9 +157,9 @@ Pour qu'une autre caméra devienne la caméra active : sélectionnez-la et appuy
 
 ## Autres options de la vue
 
-| Option | Ce qu'elle fait | ![PC](img/icono-pc.svg) PC | ![Nokia](img/icono-nokia.svg) Nokia N95 |
-|---|---|---|---|
-| Faire pivoter la vue | La fait tourner de 15° autour de son propre axe, comme quand on penche la tête. | <kbd>Num 4</kbd> / <kbd>Num 6</kbd> | — |
-| Lock Orbit | La vue ne tourne plus : ce qui la faisait orbiter la déplace désormais, comme sur un plateau 2D. | View → Lock Orbit | <kbd>9</kbd> |
+| Option | Ce qu'elle fait | ![PC](img/icono-pc.svg) PC | ![Nokia](img/icono-nokia.svg) Nokia N95 | Menu |
+|---|---|---|---|---|
+| Faire pivoter la vue | La fait tourner de 15° autour de son propre axe, comme quand on penche la tête. | <kbd>Num 4</kbd> / <kbd>Num 6</kbd> | — | — |
+| Lock Orbit | La vue ne tourne plus : ce qui la faisait orbiter la déplace désormais, comme sur un plateau 2D. | — | <kbd>9</kbd> | View → Lock Orbit |
 
 Tous les raccourcis de l'éditeur se trouvent dans [Raccourcis clavier](../editor/atajos.md), et la page [Navigation](../editor/navegacion.md) du manuel les résume dans des tableaux.
